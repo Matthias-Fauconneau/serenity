@@ -42,7 +42,7 @@ generic struct array : buffer<T> {
     /// Moves elements from a reference
     explicit array(const mref<T> ref) : buffer<T>(ref.size) { mref<T>::move(ref); }
     /// Copies elements from a reference
-    explicit array(const ref<T> ref) : buffer<T>(ref.size) { mref<T>::copy(ref); }
+    //explicit array(const ref<T> ref) : buffer<T>(ref.size) { mref<T>::copy(ref); }
 
     /// If the array owns the reference, destroys all initialized elements
     ~array() { if(capacity) { for(size_t i: range(size)) at(i).~T(); } }
@@ -51,9 +51,11 @@ generic struct array : buffer<T> {
     using buffer<T>::at;
     using buffer<T>::last;
     using buffer<T>::slice;
+    using buffer<T>::set;
 
     /// Allocates enough memory for \a capacity elements
-    void reserve(size_t nextCapacity) {
+    // virtual for String::reserve override (alternative: reimplement methods using reserve in String to avoid 8B vtable)
+    virtual void reserve(size_t nextCapacity) {
         if(nextCapacity>capacity) {
             assert(nextCapacity>=size);
             if(capacity) {
@@ -108,7 +110,7 @@ generic struct array : buffer<T> {
         assert(index>=0);
         reserve(++size);
         for(int i=size-2;i>=index;i--) raw(at(i+1)).copy(raw(at(i)));
-        new (&at(index)) T(move(e));
+        set(index, move(e));
         return at(index);
     }
     /// Inserts immediately before the first element greater than the argument
@@ -165,78 +167,6 @@ generic inline buffer<T> operator+(buffer<T>&& a, const ref<T> b) {
 generic inline buffer<T> operator+(buffer<T>&& a, const array<T>& b) {
     array<T> target(move(a)); target.append(b); return move(target);
 }
-
-//template<class A, class B> struct cat;
-
-/// Concatenates another \a cat and a value
-template<class A, class T> struct cat/*<A, T>*/ {
-    const A a; const T b;
-    cat(const A a, const T b) : a(a), b(b) {}
-    int size() const { return a.size() + 1; };
-    void copy(mref<T> target) const { a.copy(target.slice(0, a.size())); target.set(a.size(), b); }
-    operator buffer<T>() const { buffer<T> target (size()); copy(target); return move(target); }
-    operator array<T>() const { return operator buffer<T>(); }
-};
-template<class T, class A, class B> cat<cat<A, B>, T> operator +(cat<A, B> a, T b) { return {a,b}; }
-
-/// Concatenates another \a cat and a ref
-template<class A, class T> struct cat<A, ref<T>> {
-    const A a; const ref<T> b;
-    cat(A a, ref<T> b) : a(a), b(b) {}
-    int size() const { return a.size() + b.size; };
-    void copy(mref<T> target) const { a.copy(target.slice(0, a.size())); target.slice(a.size()).copy(b); }
-    operator buffer<T>() const { buffer<T> target (size()); copy(target); return move(target); }
-    operator array<T>() const { return operator buffer<T>(); }
-};
-template<class T, class A, class B> cat<cat<A, B>, ref<T>> operator +(cat<A, B> a, ref<T> b) { return {a,b}; }
-// Required for implicit string literal conversion
-template<class T, class A, class B, size_t N> cat<cat<A, B>, ref<T>> operator +(cat<A, B> a, const T(&b)[N]) { return {a,b}; }
-//template<class A, class B> cat<cat<A, B>, ref<char>> operator +(const cat<A, B>& a, const ref<char>& b) { return {a,b}; }
-// Prevents wrong match with operator +(const cat<A, B>& a, const T& b)
-template<class T, class A, class B> cat<cat<A, B>, ref<T>> operator +(cat<A, B> a, const buffer<T>& b) { return {a,b}; }
-template<class T, class A, class B> cat<cat<A, B>, ref<T>> operator +(cat<A, B> a, const array<T>& b) { return {a,b}; }
-
-/// Specialization to concatenate a value with a ref
-generic struct cat<T, ref<T>> {
-    T a; ref<T> b;
-    cat(T a, ref<T> b) : a(a), b(b) {}
-    int size() const { return 1 + b.size; };
-    void copy(mref<T> target) const { target.set(0, a); target.slice(1).copy(b); }
-    operator buffer<T>() const { buffer<T> target (size()); copy(target); return move(target); }
-    operator array<T>() const { return operator buffer<T>(); }
-};
-generic cat<T, ref<T>> operator +(T a, ref<T> b) { return {a,b}; }
-// Required for implicit string literal conversion
-//cat<char, ref<char>> operator +(const char& a, const ref<char>& b) { return {a,b}; }
-
-/// Specialization to concatenate a ref with a value
-template<class T> struct cat<ref<T>, T> {
-    ref<T> a; T b;
-    cat(ref<T> a, T b) : a(a), b(b) {}
-    int size() const { return a.size + 1; };
-    void copy(mref<T> target) const { target.slice(0, a.size).copy(a); target.set(a.size, b); }
-    operator buffer<T>() const { buffer<T> target (size()); copy(target); return move(target); }
-    operator array<T>() const { return operator buffer<T>(); }
-};
-generic cat<ref<T>, T> operator +(ref<T> a, T b) { return {a,b}; }
-// Required for implicit string literal conversion
-//cat<ref<char>, char> operator +(const ref<char>& a, const char& b) { return {a,b}; }
-
-/// Specialization to concatenate a ref with a ref
-generic struct cat<ref<T>, ref<T>> {
-    ref<T> a; ref<T> b;
-    cat(ref<T> a, ref<T> b) : a(a), b(b) {}
-    int size() const { return a.size + b.size; };
-    void copy(mref<T> target) const { target.slice(0, a.size).copy(a); target.slice(a.size).copy(b); }
-    //operator buffer<T>() const { buffer<T> target (size()); copy(target); return move(target); }
-    //operator array<T>() const { return operator buffer<T>(); }
-    operator array<T>() const { buffer<T> target (size()); copy(target); return move(target); }
-};
-generic cat<ref<T>,ref<T>> operator +(ref<T> a, ref<T> b) { return {a,b}; }
-generic cat<ref<T>,ref<T>> operator +(ref<T> a, const array<T>& b) { return {a,b}; }
-// Required for implicit string literal conversion
-inline cat<ref<char>,ref<char>> operator +(ref<char> a, ref<char> b) { return {a,b}; }
-//cat<ref<char>,ref<char>> operator +(const ref<char>& a, const array<char>& b) { return {a,b}; }
 
 // -- Sort --
 

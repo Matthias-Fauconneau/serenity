@@ -101,7 +101,7 @@ struct Build {
         assert_(!files.contains(object), name);
         int64 lastFileEdit = File(file, subfolder).modifiedTime();
         if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
-            array<string> args (ref<string>{"-r", "-b", "binary", "-o", object, file});
+            array<string> args ({"-r", "-b", "binary", "-o", object, file});
             if(execute(LD, args, true, subfolder)) error("Failed to embed");
             needLink = true;
         }
@@ -149,7 +149,7 @@ struct Build {
             Folder(tmp+"/"+join(flags,"-")+"/"+section(target,'/',0,-2), root(), true);
             log(target);
             pids.append( execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1y", "-Wall", "-Wextra", "-Wno-overloaded-virtual",
-                                                  "-march=native", "-o" , object, fileName, "-I/usr/include/freetype2"}+toRefs(args), false) );
+                                                  "-march=native", "-o" , object, fileName, "-I/usr/include/freetype2"} + toRefs(args), false) );
             needLink = true;
         }
         files.append( tmp+"/"+join(flags,"-")+"/"+target+".o" );

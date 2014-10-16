@@ -9,33 +9,34 @@
 /// Interface to read structured data. \sa BinaryData TextData
 /// \note \a available can be overridden to feed \a buffer as needed. \sa DataStream
 struct Data {
-    ::buffer<byte> buffer;
+    ref<byte> data;
     uint index=0;
+    ::buffer<byte> buffer;
 
     Data(){}
     /// Creates a Data interface to a \a buffer
-    Data(::buffer<byte>&& data) : buffer(move(data)) {}
+    Data(::buffer<byte>&& buffer) : data(buffer), buffer(move(buffer)) {}
     /// Creates a Data interface to a \a ref
-    explicit Data(const ref<byte> data) : buffer(unsafeReference(data)) {}
+    explicit Data(ref<byte> data) : data(data) {}
     /// Slices a reference to the buffer from \a index to \a index + \a size
-    ref<byte> slice(uint pos, uint size) const { return buffer.slice(pos,size); }
-    /// Slices a reference to the buffer from \a index to the end of the buffer
-    ref<byte> slice(uint pos) const { return buffer.slice(pos); }
+    ref<byte> slice(uint pos, uint size) const { return data.slice(pos,size); }
+    /// Slices a reference to the buffer from \a index to the end of the data
+    ref<byte> slice(uint pos) const { return data.slice(pos); }
 
     /// Buffers \a need bytes (if overridden) and returns number of bytes available
-    virtual uint available(uint /*need*/) { return buffer.size-index; }
+    virtual uint available(uint /*need*/) { return data.size-index; }
     /// Returns true if there is data to read
     explicit operator bool() { return available(1); }
 
     /// Returns next byte without advancing
-    byte peek() const { assert(index<buffer.size, index, buffer.size); return buffer[index];}
-    /// Peeks at buffer without advancing
-    byte operator[](int i) const { assert(index+i<buffer.size); return buffer[index+i]; }
+    byte peek() const { assert(index<data.size, index, data.size); return data[index];}
+    /// Peeks at data without advancing
+    byte operator[](int i) const { assert(index+i<data.size); return data[index+i]; }
     /// Returns a reference to the next \a size bytes
     ref<byte> peek(uint size) const { return slice(index,size); }
 
     /// Advances \a count bytes
-    virtual void advance(uint step) {assert(index+step<=buffer.size,index,step,buffer.size); index+=step; }
+    virtual void advance(uint step) {assert(index+step<=data.size,index,step,data.size); index+=step; }
     /// Returns next byte and advance one byte
     byte next() { byte b=peek(); advance(1); return b; }
     /// Returns a reference to the next \a size bytes and advances \a size bytes
@@ -81,18 +82,11 @@ struct BinaryData : Data {
     BinaryData(){}
     /// Creates a BinaryData interface to an \a array
     BinaryData(::buffer<byte>&& buffer, bool isBigEndian=false) : Data(move(buffer)), isBigEndian(isBigEndian) {}
-    /// Creates a BinaryData interface to a \a reference
-    explicit BinaryData(const ref<byte> reference, bool isBigEndian=false):Data(reference),isBigEndian(isBigEndian){}
-
-    /*/// Slices a reference to the buffer from \a index to \a index + \a size
-    BinaryData slice(uint pos, uint size) { return BinaryData(Data::slice(pos,size),isBigEndian); }
-    /// Slices a reference to the buffer from \a index to \a index + \a size
-    BinaryData slice(uint pos) { return BinaryData(Data::slice(pos),isBigEndian); }*/
+    /// Creates a BinaryData interface to \a data
+    explicit BinaryData(ref<byte> data, bool isBigEndian=false) : Data(data), isBigEndian(isBigEndian) {}
 
     /// Seeks to /a index
-    void seek(uint index) { assert(index<buffer.size); this->index=index; }
-    /// Seeks to next aligned position
-    //void align(uint width) { index=::align(width,index); }
+    void seek(uint index) { assert(index<data.size); this->index=index; }
 
     /// Reads one raw \a T element
     generic const T& read() { return *(T*)Data::read(sizeof(T)).data; }
@@ -124,7 +118,7 @@ struct BinaryData : Data {
     /// Provides return type overloading for reading arrays (swap as needed)
     struct ArrayReadOperator {
        BinaryData* s; uint size;
-       generic operator ::buffer<T>() { ::buffer<T> buffer(size); for(uint i: range(size)) new (&buffer.at(i)) T(s->read()); return buffer; }
+       generic operator ::buffer<T>() { ::buffer<T> buffer(size); for(uint i: range(size)) buffer.set(i, s->read()); return buffer; }
    };
    ArrayReadOperator read(uint size) { return {this,size}; }
 

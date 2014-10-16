@@ -138,21 +138,6 @@ generic struct ref {
     ref<T> slice(size_t pos, size_t size) const;
     /// Slices a reference to elements from \a pos to the end of the reference
     ref<T> slice(size_t pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
-    /// Slices a reference to elements from \a start to \a stop
-    //ref<T> operator()(size_t start, size_t stop) const { return slice(start, stop-start); }
-
-    /*struct reverse_ref {
-        const T* start; const T* stop;
-        struct iterator {
-            const T* pointer;
-            const T& operator*() { return *pointer; }
-            iterator& operator++() { pointer--; return *this; }
-            bool operator !=(const iterator& o) const { return intptr_t(pointer)>=intptr_t(o.pointer); }
-        };
-        iterator begin() const { return {start}; }
-        iterator end() const { return {stop}; }
-    };
-    reverse_ref reverse() { return {end()-1, begin()}; }*/
 
     /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
     size_t indexOf(const T& key) const { for(size_t i: range(size)) { if(data[i]==key) return i; } return -1; }
@@ -187,6 +172,7 @@ template<> struct ref<char> {
     const char& at(size_t i) const;
     const char& operator [](size_t i) const { return at(i); }
     ref<char> slice(size_t pos, size_t size) const;
+    ref<char> slice(size_t pos) const;
 
     /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
     size_t indexOf(const char& key) const { for(size_t i: range(size)) { if(data[i]==key) return i; } return -1; }
@@ -255,6 +241,7 @@ generic ref<T> ref<T>::slice(size_t pos, size_t size) const { assert(pos+size<=t
 
 inline const char& ref<char>::at(size_t i) const { assert(i<size, i, size); return data[i]; }
 inline ref<char> ref<char>::slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<char>(data+pos, size); }
+inline ref<char> ref<char>::slice(size_t pos) const { assert(pos<=size); return ref<char>(data+pos,size-pos); }
 
 // -- FILE
 
@@ -302,16 +289,16 @@ generic struct mref : ref<T> {
     //mref<T> operator()(size_t start, size_t stop) const { return slice(start, stop-start); }
 
     /// Initializes the element at index
-    template<Type... Args> void set(size_t index, Args... args) const { new (&at(index)) T(args...); }
+    template<Type... Args> void set(size_t index, Args&&... args) const { new (&at(index)) T(forward<Args>(args)...); }
     /// Initializes reference using the same constructor for all elements
     template<Type... Args> void clear(Args... args) const { for(T& e: *this) new (&e) T(args...); }
     /// Initializes reference from \a source using move constructor
-    void move(const mref<T>& source) { assert(size==source.size); for(size_t i: range(size)) new(&at(i)) T(::move(source[i])); }
+    void move(const mref<T>& source) { assert(size==source.size); for(size_t index: range(size)) set(index, ::move(source[index])); }
     /// Initializes reference from \a source using copy constructor
-    void copy(const ref<T> source) const { assert(size==source.size); for(size_t i: range(size)) new(&at(i)) T(::copy(source[i])); }
+    void copy(const ref<T> source) const { assert(size==source.size); for(size_t index: range(size)) set(index, ::copy(source[index])); }
 
     /// Stores the application of a function to every index up to a size in a mref
-    template<Type Function> void apply(Function function) const { for(size_t index: range(size)) new (&at(index)) T(function(index)); }
+    template<Type Function> void apply(Function function) const { for(size_t index: range(size)) set(index, function(index)); }
     /// Stores the application of a function to every elements of a ref in a mref
     template<Type Function, Type... S> void apply(Function function, ref<S>... sources) const {
         for(size_t index: range(size)) new (&at(index)) T(function(sources[index]...));

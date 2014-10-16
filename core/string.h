@@ -9,8 +9,6 @@ generic string str(const T&) { static_assert(0&&sizeof(T),"No overload for str(c
 
 /// Forwards string
 inline string str(string s) { return s; }
-/// Forwards String
-//inline string str(const String& s) { return s; }
 /// Forwards char[]
 template<size_t N> string str(const char (&source)[N]) { return string(source); }
 
@@ -48,20 +46,32 @@ double fromDecimal(const string str);
 
 // -- String
 
-typedef array<char> String;
+/// array<char> holding a UTF8 text string with a stack-allocated buffer for small strings
+struct String : array<char> {
+    char buffer[32];
+    String() : array<char>(::buffer<char>(mref<char>(buffer))) {}
+    /// Allocates an empty array with storage space for \a capacity elements, on stack if possible
+    String(size_t capacity) { reserve(capacity); }
+    /// Copies a string reference
+    String(const string s) : String(s.size) { append(s); }
+
+    void reserve(size_t nextCapacity) override {
+        if(data!=buffer) array<char>::reserve(nextCapacity);
+        else if(nextCapacity > sizeof(buffer)) { data=0, capacity=0; array<char>::reserve(nextCapacity); copy(ref<char>(buffer, size)); }
+    }
+};
+static_assert(sizeof(String)==64,"");
+
+/// Forwards String
+inline string str(const String& s) { return s; }
 
 /// Converts Strings to strings
 inline buffer<string> toRefs(const ref<String>& source) { return apply(source, [](const String& e) -> string { return  e; }); }
 
-/// Copies the reference, appends a null byte and allows implicit conversion to const char*
+/// Null-terminated \a String with implicit conversion to const char*
 struct strz : String {
-    char buffer[20];
-    strz(const string s) : String(s.size<20?::buffer<char>(buffer,sizeof(buffer)):s+'\0') {
-        if(s.size<20) {
-            slice(0, s.size).copy(s);
-            set(s.size, 0);
-        }
-    }
+    /// Copies a string reference, appends a null byte and allows implicit conversion to const char*
+    strz(const string s) : String(s.size+1) { append(s); append('\0'); }
     operator const char*() { return data; }
 };
 
@@ -79,9 +89,6 @@ String left(const string s, size_t size, const char pad=' ');
 /// Pads a string to the right
 String right(const string s, size_t size, const char pad=' ');
 
-/// Flatten cats
-template<class A, class B> String str(const cat<A, B>& a) { return a; }
-
 // -- string[]
 
 /// Joins \a list into a single String with each element separated by \a separator
@@ -89,6 +96,78 @@ String join(const ref<string> list, const string separator="");
 
 /// Returns an array of references splitting \a str wherever \a separator occurs
 array<string> split(const string str, string separator=", ");
+
+// -- cat
+
+/// Concatenates another \a cat and a value
+template<class A, class T> struct cat {
+    const A a; const T b;
+    cat(const A a, const T b) : a(a), b(b) {}
+    int size() const { return a.size() + 1; };
+    void copy(mref<char> target) const { a.copy(target.slice(0, a.size())); target.set(a.size(), b); }
+    //operator buffer<char>() const { buffer<char> target (size()); copy(target); return move(target); }
+    //operator array<char>() const { return operator buffer<char>(); }
+    operator String() const { String target (size()); copy(target); return move(target); }
+};
+template<class A, class B> cat<cat<A,B>, char> operator +(cat<A,B> a, char b) { return {a,b}; }
+
+/// Concatenates another \a cat and a ref
+template<class A> struct cat<A, ref<char>> {
+    const A a; const ref<char> b;
+    cat(A a, ref<char> b) : a(a), b(b) {}
+    int size() const { return a.size() + b.size; };
+    void copy(mref<char> target) const { a.copy(target.slice(0, a.size())); target.slice(a.size()).copy(b); }
+    //operator buffer<char>() const { buffer<char> target (size()); copy(target); return move(target); }
+    //operator array<char>() const { return operator buffer<char>(); }
+    operator String() const { String target (size()); copy(target); return move(target); }
+};
+template<class A, class B> cat<cat<A, B>, ref<char>> operator +(cat<A, B> a, ref<char> b) { return {a,b}; }
+// Required for implicit string literal conversion
+//template<class char, class A, class B, size_t N> cat<cat<A, B>, ref<char>> operator +(cat<A, B> a, const char(&b)[N]) { return {a,b}; }
+// Prevents wrong match with operator +(const cat<A, B>& a, const char& b)
+//template<class char, class A, class B> cat<cat<A, B>, ref<char>> operator +(cat<A, B> a, const buffer<char>& b) { return {a,b}; }
+//template<class char, class A, class B> cat<cat<A, B>, ref<char>> operator +(cat<A, B> a, const array<char>& b) { return {a,b}; }
+
+/// Specialization to concatenate a value with a ref
+template<> struct cat<char, ref<char>> {
+    char a; ref<char> b;
+    cat(char a, ref<char> b) : a(a), b(b) {}
+    int size() const { return 1 + b.size; };
+    void copy(mref<char> target) const { target.set(0, a); target.slice(1).copy(b); }
+    //operator buffer<char>() const { buffer<char> target (size()); copy(target); return move(target); }
+    //operator array<char>() const { return operator buffer<char>(); }
+    operator String() const { String target (size()); copy(target); return move(target); }
+};
+cat<char, ref<char>> operator +(char a, ref<char> b) { return {a,b}; }
+
+/// Specialization to concatenate a ref with a value
+template<> struct cat<ref<char>, char> {
+    ref<char> a; char b;
+    cat(ref<char> a, char b) : a(a), b(b) {}
+    int size() const { return a.size + 1; };
+    void copy(mref<char> target) const { target.slice(0, a.size).copy(a); target.set(a.size, b); }
+    //operator buffer<char>() const { buffer<char> target (size()); copy(target); return move(target); }
+    //operator array<char>() const { return operator buffer<char>(); }
+    operator String() const { String target (size()); copy(target); return move(target); }
+};
+cat<ref<char>, char> operator +(ref<char> a, char b) { return {a,b}; }
+
+/// Specialization to concatenate a ref with a ref
+template<> struct cat<ref<char>, ref<char>> {
+    ref<char> a; ref<char> b;
+    cat(ref<char> a, ref<char> b) : a(a), b(b) {}
+    int size() const { return a.size + b.size; };
+    void copy(mref<char> target) const { target.slice(0, a.size).copy(a); target.slice(a.size).copy(b); }
+    //operator array<char>() const { buffer<char> target (size()); copy(target); return move(target); }
+    operator String() const { String target (size()); copy(target); return move(target); }
+};
+//generic cat<ref<char>,ref<char>> operator +(ref<char> a, ref<char> b) { return {a,b}; }
+//generic cat<ref<char>,ref<char>> operator +(ref<char> a, const array<char>& b) { return {a,b}; }
+// Required for implicit string literal conversion
+inline cat<ref<char>,ref<char>> operator +(ref<char> a, ref<char> b) { return {a,b}; }
+
+/// Flatten cats
+template<class A, class B> String str(const cat<A, B>& a) { return a; }
 
 // -- Number conversions
 
