@@ -52,10 +52,13 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
 
         float DC = parallel::mean(target);
 
-        // Merges unobscuring correction near spot (i.e saturates any enlightenment to flattening)
-        ::apply(target, [=](float source, float corrected_low_spot, float high) {
-            return max(source, DC + min(0.f, corrected_low_spot-DC) + high);
-        }, crop, target, high);
+		// Merges unobscuring correction near spot (i.e saturates any enlightenment to flattening)
+		vec2 center = vec2(target.size)/2.f;
+		::applyXY(target, [=](float x, float y, float source, float corrected_low_spot, float high) {
+			float r2 = sq(vec2(x,y)-center);
+			float w = min(1.f, r2/sq(center.x));
+			return max(source, w * source + (1-w) * (DC + min(0.f, corrected_low_spot-DC) + high));
+		}, crop, target, high);
 
         // Inserts cropped correction
         return insert(source, target, origin);

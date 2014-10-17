@@ -117,10 +117,10 @@ inline ImageF min(const ImageF& a, const ImageF& b) { return min({a.size,"min"},
 inline ImageF operator-(const ImageF& a, const ImageF& b) { return apply(a, b, [](float a, float b){ return a - b;}); }
 inline ImageF operator/(const ImageF& a, const ImageF& b) { return apply(a, b, [](float a, float b){ return a / b;}); }
 
-template<Type F, Type... S> void applyXY(const ImageF& target, F function, const S&... source) {
+template<Type F, Type... S> void applyXY(const ImageF& target, F function, const S&... sources) {
     parallel_chunk(target.size.y, [&](uint, uint64 start, uint64 chunkSize) {
         for(size_t y: range(start, start+chunkSize)) for(size_t x: range(target.size.x)) {
-            target[y*target.stride + x] = function(x, y, source[y*source.stride + x]...);
+			target[y*target.stride + x] = function(x, y, sources[y*sources.stride + x]...);
         }
     });
 }
