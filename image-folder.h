@@ -76,7 +76,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
         assert_(index  < count());
         File sourceFile (properties(index).at("Path"_), folder);
 		if(!size || size>=this->size(index)) return image(index, noCacheWrite);
-		assert_(!noCacheWrite);
+		if(noCacheWrite) return resize(size, image(index));
         return cache<Image>(folder, "Resize", name(index), size, sourceFile.modifiedTime(), [&](const Image& target){
             SourceImageRGB source = image(index);
             assert_(target.size <= source.size, target.size, source.size);

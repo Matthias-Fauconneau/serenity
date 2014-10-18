@@ -24,9 +24,9 @@ struct DustRemoval {
 
 	PersistentValue<map<String, String>> imagesAttributes {folder,"attributes"};
 
-	ImageFolder source { folder, /*[this](string name, const map<String, String>& properties){
-			//return imagesAttributes.contains(name); //fromDecimal(properties.at("Aperture"_)) <= 5;
-		}*/ };
+	ImageFolder source { folder, [this](string name, const map<String, String>& unused properties) {
+			return imagesAttributes.value(name) != "best"; //fromDecimal(properties.at("Aperture"_)) <= 5;
+		} };
     ProcessedSource corrected {source, correction};
 };
 
@@ -54,6 +54,7 @@ struct DustRemovalPreview : DustRemoval, Application {
 		window.actions[Key('3')] = [this]{ setCurrentImageAttributes("same"); }; // No correction needed
 		window.actions[Key('4')] = [this]{ setCurrentImageAttributes("better"); }; // Slightly better than original
 		window.actions[Key('5')] = [this]{ setCurrentImageAttributes("good"); }; // Good correction
+		window.actions[Key('6')] = [this]{ setCurrentImageAttributes("best"); }; // Best corrections
 	}
 
 	void setCurrentImageAttributes(string currentImageAttributes) { imagesAttributes[corrected.name(index)] = String(currentImageAttributes); }
@@ -62,26 +63,32 @@ registerApplication(DustRemovalPreview);
 
 struct DustRemovalExport : DustRemoval, Application {
     DustRemovalExport() {
-        Folder output ("Output", folder, true);
-        uint64 total = sum(apply(corrected.count(), [this](size_t index) { return product(corrected.size(index)); }));
-        log(binaryPrefix(total,"pixels","Pixels"));
-        uint64 exported = 0; uint64 compressed = 0;
+		Folder output ("Best", folder, true);
         for(size_t index: range(corrected.count())) {
-            uint size = product(corrected.size(index));
             String name = corrected.name(index);
 			Time correctionTime;
-			SourceImageRGB image = corrected.image(index, 0, true);
+			SourceImageRGB image = corrected.image(index, int2(2048,1536), true);
 			correctionTime.stop();
 			Time compressionTime;
-			compressed += writeFile(name, encodeJPEG(image), Folder(imagesAttributes[corrected.name(index)], output, true), true);
+			//writeFile(name, encodeJPEG(image), Folder(imagesAttributes[corrected.name(index)], output, true), true);
+			writeFile(name, encodeJPEG(image), output, true);
 			compressionTime.stop();
-            exported += size;
-			log(str(100*(index+1)/corrected.count())+'%',
-				'\t',index+1,'/',corrected.count(),
-				'\t',exported/1024/1024,'/',total/1024/1024,"MP",
-				'\t',corrected.name(index),str(size/1024/1024, 2),"MP", strx(corrected.size(index)),
+			log(str(100*(index+1)/corrected.count())+'%', '\t',index+1,'/',corrected.count(),
+				'\t',imagesAttributes[corrected.name(index)],
+				'\t',corrected.name(index), strx(corrected.size(index)),
 				'\t',correctionTime, compressionTime);
         }
     }
 };
 registerApplication(DustRemovalExport, export);
+
+struct DustRemovalSource : DustRemoval, Application {
+	DustRemovalSource() {
+		Folder output ("Best", folder, true);
+		for(size_t index: range(corrected.count())) {
+			if(imagesAttributes[source.name(index)]=="best")
+				copy(folder, source.properties(index).at("Path"_), output, source.name(index)+"-source");
+		}
+	}
+};
+registerApplication(DustRemovalSource, source);
