@@ -2,5 +2,5 @@
 /// \file jpeg.h JPEG decoder
 #include "image.h"
 
-/// Encodes image using the Portable Network Graphics standard
+/// Decodes image from the Joint Photographic Experts Group standard
 Image decodeJPEG(const ref<byte> file);

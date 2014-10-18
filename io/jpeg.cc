@@ -1,5 +1,5 @@
 // Public domain, Rich Geldreich <richgel99@gmail.com>
-#include "image.h"
+#include "jpeg.h"
 
 #include <stdlib.h>
 #include <stdio.h>

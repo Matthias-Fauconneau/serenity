@@ -41,6 +41,8 @@ io/pdf.h
 io/pdf.cc
 io/jpeg.cc
 io/jpeg.h
+io/jpeg-encoder.cc
+io/jpeg-encoder.h
 
 ui/graphics.h
 ui/interface.h
@@ -94,3 +96,5 @@ processed-source.h
 image-source-view.h
 cache.h
 core/cat.h
+serialization.h
+io/jpeg-encoder.h

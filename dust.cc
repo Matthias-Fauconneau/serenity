@@ -1,8 +1,9 @@
 /// \file dust.cc Automatic dust removal
+#include "serialization.h"
 #include "processed-source.h"
 #include "inverse-attenuation.h"
 #include "image-source-view.h"
-#include "png.h"
+#include "jpeg-encoder.h"
 
 struct CalibrationView : Application {
     ImageFolder folder1 {Folder("Pictures", home())};
@@ -20,8 +21,12 @@ struct DustRemoval {
     Folder folder {"Pictures", home()};
     ImageFolder calibration {Folder("Paper", folder)};
     InverseAttenuation correction { calibration };
-    ImageFolder source { folder,
-                [](const String&, const map<String, String>& properties){ return fromDecimal(properties.at("Aperture"_)) <= 5; } };
+
+	PersistentValue<map<String, String>> imagesAttributes {folder,"attributes"};
+
+	ImageFolder source { folder, /*[this](string name, const map<String, String>& properties){
+			//return imagesAttributes.contains(name); //fromDecimal(properties.at("Aperture"_)) <= 5;
+		}*/ };
     ProcessedSource corrected {source, correction};
 };
 
@@ -30,39 +35,7 @@ struct DustRemovalTest : DustRemoval, Application {
 };
 registerApplication(DustRemovalTest, test);
 
-generic T parse(string source);
-template<> String parse<String>(string source) { return String(source); }
-template<> map<String, String> parse<map<String, String>>(string source) {
-	TextData s(source);
-	map<String, String> target;
-	s.match('{');
-	if(s && !s.match('}')) for(;;) {
-		s.whileAny(" \t");
-		string key = s.identifier();
-		s.match(':'); s.whileAny(" \t");
-		string value = s.whileNo("},\t\n");
-		target.insert(key, trim(value));
-		if(!s || s.match('}')) break;
-		if(!s.match(',')) s.skip('\n');
-	}
-	assert_(!s);
-	return target;
-}
-
-generic struct PersistentValue : T {
-	File file;
-	function<T()> evaluate;
-
-	PersistentValue(File&& file, function<T()> evaluate={}) : T(parse<T>(string(file.read(file.size())))), file(move(file)), evaluate(evaluate) {}
-	PersistentValue(const Folder& folder, string name, function<T()> evaluate={})
-		: PersistentValue(File(name, folder, Flags(ReadWrite|Create)), evaluate) {}
-	~PersistentValue() { file.seek(0); file.resize(file.write(evaluate ? str(evaluate()) : str((const T&)*this))); }
-};
-generic String str(const PersistentValue<T>& o) { return str((const T&)o); }
-
 struct DustRemovalPreview : DustRemoval, Application {
-	PersistentValue<map<String, String>> imagesAttributes {folder,"attributes"};
-
 	PersistentValue<String> lastName {folder, ".last", [this]{ return source.name(index); }};
 	const size_t lastIndex = source.keys.indexOf(lastName);
 	size_t index = lastIndex != invalid ? lastIndex : 0;
@@ -76,11 +49,11 @@ struct DustRemovalPreview : DustRemoval, Application {
 		for(string attribute: imagesAttributes.values) counts[attribute]++;
 		log(counts);
 
-		window.actions[Key('1')] = [this]{ setCurrentImageAttributes("bad"); };
-		window.actions[Key('2')] = [this]{ setCurrentImageAttributes("worse"); };
-		window.actions[Key('3')] = [this]{ setCurrentImageAttributes("same"); };
-		window.actions[Key('4')] = [this]{ setCurrentImageAttributes("better"); };
-		window.actions[Key('5')] = [this]{ setCurrentImageAttributes("good"); };
+		window.actions[Key('1')] = [this]{ setCurrentImageAttributes("bad"); }; // Bad correction
+		window.actions[Key('2')] = [this]{ setCurrentImageAttributes("worse"); }; // Slightly worse than original
+		window.actions[Key('3')] = [this]{ setCurrentImageAttributes("same"); }; // No correction needed
+		window.actions[Key('4')] = [this]{ setCurrentImageAttributes("better"); }; // Slightly better than original
+		window.actions[Key('5')] = [this]{ setCurrentImageAttributes("good"); }; // Good correction
 	}
 
 	void setCurrentImageAttributes(string currentImageAttributes) { imagesAttributes[corrected.name(index)] = String(currentImageAttributes); }
@@ -100,7 +73,7 @@ struct DustRemovalExport : DustRemoval, Application {
 			SourceImageRGB image = corrected.image(index, 0, true);
 			correctionTime.stop();
 			Time compressionTime;
-			compressed += writeFile(name, encodePNG(image), output, true);
+			compressed += writeFile(name, encodeJPEG(image), Folder(imagesAttributes[corrected.name(index)], output, true), true);
 			compressionTime.stop();
             exported += size;
 			log(str(100*(index+1)/corrected.count())+'%',
