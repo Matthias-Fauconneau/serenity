@@ -30,16 +30,60 @@ struct DustRemovalTest : DustRemoval, Application {
 };
 registerApplication(DustRemovalTest, test);
 
+generic T parse(string source);
+template<> String parse<String>(string source) { return String(source); }
+template<> map<String, String> parse<map<String, String>>(string source) {
+	TextData s(source);
+	map<String, String> target;
+	s.match('{');
+	if(s && !s.match('}')) for(;;) {
+		s.whileAny(" \t");
+		string key = s.identifier();
+		s.match(':'); s.whileAny(" \t");
+		string value = s.whileNo("},\t\n");
+		target.insert(key, trim(value));
+		if(!s || s.match('}')) break;
+		if(!s.match(',')) s.skip('\n');
+	}
+	assert_(!s);
+	return target;
+}
+
+generic struct PersistentValue : T {
+	File file;
+	function<T()> evaluate;
+
+	PersistentValue(File&& file, function<T()> evaluate={}) : T(parse<T>(string(file.read(file.size())))), file(move(file)), evaluate(evaluate) {}
+	PersistentValue(const Folder& folder, string name, function<T()> evaluate={})
+		: PersistentValue(File(name, folder, Flags(ReadWrite|Create)), evaluate) {}
+	~PersistentValue() { file.seek(0); file.resize(file.write(evaluate ? str(evaluate()) : str((const T&)*this))); }
+};
+generic String str(const PersistentValue<T>& o) { return str((const T&)o); }
+
 struct DustRemovalPreview : DustRemoval, Application {
-    File last {".last", folder, Flags(ReadWrite|Create)};
-    const size_t lastIndex = source.keys.indexOf(string(last.read(last.size())));
-    size_t index = lastIndex != invalid ? lastIndex : 0;
-    ~DustRemovalPreview() { last.seek(0); last.resize(last.write(str(source.name(index)))); }
+	PersistentValue<map<String, String>> imagesAttributes {folder,"attributes"};
+
+	PersistentValue<String> lastName {folder, ".last", [this]{ return source.name(index); }};
+	const size_t lastIndex = source.keys.indexOf(lastName);
+	size_t index = lastIndex != invalid ? lastIndex : 0;
 
     ImageSourceView sourceView {source, &index, window};
     ImageSourceView correctedView {corrected, &index, window};
     WidgetToggle toggleView {&sourceView, &correctedView};
-    Window window {&toggleView};
+	Window window {&toggleView, -1, [this]{ return toggleView.title()+" "+imagesAttributes.value(corrected.name(index)); } };
+	DustRemovalPreview() {
+		map<string, int> counts;
+		for(string attribute: imagesAttributes.values) counts[attribute]++;
+		log(counts);
+
+		window.actions[Key('1')] = [this]{ setCurrentImageAttributes("bad"); };
+		window.actions[Key('2')] = [this]{ setCurrentImageAttributes("worse"); };
+		window.actions[Key('3')] = [this]{ setCurrentImageAttributes("same"); };
+		window.actions[Key('4')] = [this]{ setCurrentImageAttributes("better"); };
+		window.actions[Key('5')] = [this]{ setCurrentImageAttributes("good"); };
+	}
+
+	void setCurrentImageAttributes(string currentImageAttributes) { imagesAttributes[corrected.name(index)] = String(currentImageAttributes); }
 };
 registerApplication(DustRemovalPreview);
 
@@ -52,17 +96,18 @@ struct DustRemovalExport : DustRemoval, Application {
         for(size_t index: range(corrected.count())) {
             uint size = product(corrected.size(index));
             String name = corrected.name(index);
-			//if(existsFile(name, output)) continue; //TODO: invalidate
-			/*uint fileIndex = 0;
-            if(existsFile(name, output)) fileIndex = 1;
-			while(existsFile(name+'.'+str(fileIndex), output)) fileIndex++;*/
-			compressed += writeFile(name/*+(fileIndex?'.'+str(fileIndex):String())*/, encodePNG(corrected.image(index, 0, true)), output, true);
+			Time correctionTime;
+			SourceImageRGB image = corrected.image(index, 0, true);
+			correctionTime.stop();
+			Time compressionTime;
+			compressed += writeFile(name, encodePNG(image), output, true);
+			compressionTime.stop();
             exported += size;
 			log(str(100*(index+1)/corrected.count())+'%',
 				'\t',index+1,'/',corrected.count(),
 				'\t',exported/1024/1024,'/',total/1024/1024,"MP",
-				'\t',corrected.name(index),size/1024/1024,"MP", corrected.size(index));
-            //break;
+				'\t',corrected.name(index),str(size/1024/1024, 2),"MP", strx(corrected.size(index)),
+				'\t',correctionTime, compressionTime);
         }
     }
 };

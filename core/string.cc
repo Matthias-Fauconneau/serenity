@@ -47,6 +47,13 @@ string section(const string s, byte separator, int begin, int end) {
     return string(s.data+b,e-b);
 }
 
+string trim(const string s) {
+	int begin=0,end=s.size;
+	for(;begin<end;begin++) { byte c=s[(uint)begin]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim heading
+	for(;end>begin;end--) { uint c=s[(uint)end-1]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } //trim trailing
+	return s.slice(begin, end-begin);
+}
+
 bool isInteger(const string s) { if(!s) return false; for(char c: s) if(c<'0'||c>'9') return false; return true; }
 int64 fromInteger(const string number, int base) { return TextData(number).integer(true, base); }
 double fromDecimal(const string number) { return TextData(number).decimal(); }

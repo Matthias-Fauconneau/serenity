@@ -38,18 +38,24 @@ bool Data::match(const string key) {
     else return false;
 }
 
+String escape(char c) {
+	size_t index = "\n"_.indexOf(c);
+	return index != invalid ? "\\"_+"n"_[index] : ""_+c;
+}
+String escape(string s) { String target; for(char c: s) target.append(escape(c)); return target; }
+
 void Data::skip(const uint8 key) {
     if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(peek())+'\'');
 }
 void Data::skip(const char key) {
-    if(!match(key)) error("Expected '"_+key+"', got '"+peek()+'\'');
+	if(!match(key)) error("Expected '"_+escape(key)+"', got '"+peek()+'\'', data.slice(index));
 }
 
 void Data::skip(const ref<uint8> key) {
     if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(peek(key.size))+'\'');
 }
 void Data::skip(const string key) {
-    if(!match(key)) error("Expected '"+key+"', got '"+(string)peek(key.size)+'\'');
+	if(!match(key)) error("Expected '"+escape(key)+"', got '"+(string)peek(key.size)+'\'', data.slice(index));
 }
 
 ref<uint8> BinaryData::whileNot(uint8 key) {
@@ -142,11 +148,11 @@ string TextData::until(const string key) {
 
 string TextData::untilAny(const string any) {
     uint start=index, end;
-    for(;;advance(1)) {
-        if(!available(1)) { end=index; break; }
-        if(matchAny(any)) { end=index-1; break; }
-    }
-    return slice(start,end-start);
+	for(;;advance(1)) {
+		if(!available(1)) { end=index; break; }
+		if(matchAny(any)) { end=index-1; break; }
+	}
+	return slice(start,end-start);
 }
 
 string TextData::line() { return until('\n'); }

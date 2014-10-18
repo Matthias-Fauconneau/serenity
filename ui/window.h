@@ -17,6 +17,7 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     };
     /// Window title
     String title;
+	function<String()> getTitle;
 
     /// Associated window resource (relative to \a id)
     enum Resource { XWindow, GraphicContext, Colormap, Segment, Pixmap, PresentEvent };
@@ -51,7 +52,7 @@ struct Window : Display /*should reference but inherits for convenience*/ {
 // Methods
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
-    Window(Widget* widget, int2 size=int2(-1,-1), const string name="", const Image& icon=Image());
+	Window(Widget* widget, int2 size=int2(-1,-1), function<String()> title={}, const Image& icon=Image());
     /// Frees the graphics context and destroys the window
     virtual ~Window();
 

@@ -5,7 +5,7 @@
 #include "time.h"
 #include <sys/shm.h>
 
-Window::Window(Widget* widget, int2 sizeHint, const string title, const Image& icon) : widget(widget), size(sizeHint), title(title) {
+Window::Window(Widget* widget, int2 sizeHint, function<String()> title, const Image& icon) : widget(widget), size(sizeHint), getTitle(title) {
     Display::onEvent.connect(this, &Window::onEvent);
     send(CreateColormap{ .colormap=id+Colormap, .window=root, .visual=visual});
 
@@ -22,7 +22,6 @@ Window::Window(Widget* widget, int2 sizeHint, const string title, const Image& i
                         .format=32, .length=1, .size=6+1}, raw(Atom("WM_DELETE_WINDOW")));
     send(ChangeProperty{.window=id+XWindow, .property=Atom("_KDE_OXYGEN_BACKGROUND_GRADIENT"), .type=Atom("CARDINAL"),
                         .format=32, .length=1, .size=6+1}, raw(1));
-    setTitle(title);
     setIcon(icon);
     send(CreateGC{.context=id+GraphicContext, .window=id+XWindow});
     send(Present::SelectInput{.window=id+XWindow, .eid=id+PresentEvent});
@@ -113,11 +112,10 @@ void Window::show() { send(MapWindow{.id=id}); send(RaiseWindow{.id=id}); }
 void Window::hide() { send(UnmapWindow{.id=id}); }
 
 void Window::setTitle(const string title) {
-    if(title != this->title) {
-        this->title = String(title);
-        send(ChangeProperty{.window=id+XWindow, .property=Atom("_NET_WM_NAME"), .type=Atom("UTF8_STRING"), .format=8,
-                            .length=uint(title.size), .size=uint16(6+align(4, title.size)/4)}, title);
-    }
+	if(!title || title == this->title) return;
+	this->title = String(title);
+	send(ChangeProperty{.window=id+XWindow, .property=Atom("_NET_WM_NAME"), .type=Atom("UTF8_STRING"), .format=8,
+						.length=uint(title.size), .size=uint16(6+align(4, title.size)/4)}, title);
 }
 void Window::setIcon(const Image& icon) {
     send(ChangeProperty{.window=id+XWindow, .property=Atom("_NET_WM_ICON"), .type=Atom("CARDINAL"), .format=32,
@@ -135,7 +133,7 @@ void Window::render() { assert_(size); updates.clear(); render({},int2(0),size);
 void Window::event() {
     Display::event();
     if(heldEvent) { processEvent(heldEvent); heldEvent = nullptr; }
-    if(title!=widget->title()) setTitle(widget->title());
+	setTitle(getTitle ? getTitle() : widget->title());
     if(updates && state==Idle) {
         assert_(size);
         if(target.size != size) {

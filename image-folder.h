@@ -52,7 +52,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
        if(predicate) filter(predicate);
     }
 
-    String name() const override { return String(section(folder.name(),'/',-2,-1)); }
+	String name() const override { return String(section(folder.name(),'/',-2,-1)); }
     size_t count() const override { return map::size(); }
     int2 maximumSize() const override { return maximumImageSize; }
     String name(size_t index) const override { assert_(index<count()); return copy(keys[index]); }

@@ -42,6 +42,9 @@ bool find(const string str, const string substring);
 /// \note You can use a negative \a begin or \a end to count from the right (-1=last)
 string section(const string str, byte separator, int begin=0, int end=1);
 
+/// Returns a reference with heading and trailing whitespace removed
+string trim(const string s);
+
 /// Returns true if s contains only [0-9]
 bool isInteger(const string s);
 /// Parses an integer value
@@ -98,13 +101,13 @@ template<class A, class B, class T> String str(const cat<A, B, T>& a) { return a
 /// Converts an unsigned integer
 String str(uint64 number, int pad=0, uint base=10, char padChar='0');
 /// Converts an unsigned integer (implicit conversion)
-inline String str(uint8 number) { return str(uint64(number)); }
+inline String str(uint8 number, int pad=0) { return str(uint64(number), pad); }
 /// Converts an unsigned integer (implicit conversion)
-inline String str(uint16 number) { return str(uint64(number)); }
+inline String str(uint16 number, int pad=0) { return str(uint64(number), pad); }
 /// Converts an unsigned integer (implicit conversion)
-inline String str(uint32 number) { return str(uint64(number)); }
+inline String str(uint32 number, int pad=0) { return str(uint64(number), pad); }
 /// Converts an unsigned integer (implicit conversion)
-inline String str(size_t number) { return str(uint64(number)); }
+inline String str(size_t number, int pad=0) { return str(uint64(number), pad); }
 /// Converts an unsigned integer in hexadecimal base
 inline String hex(uint64 n, int pad=0) { return str(n, pad, 16); }
 /// Converts a memory address in hexadecimal base

@@ -40,8 +40,9 @@ struct ImageSourceView : ImageView, Poll {
     // Content
 
     String title() override {
+		if(!source.count()) return String();
         index = clip(0ul, (size_t)index, source.count()-1);
-        return str(source.name(), source.count() ? str(index+1,'/',source.count(), source.name(index), source.properties(index)) : String());
+		return str(/*source.name(), str(index+1,'/',source.count(),*/ source.name(index), source.properties(index));
     }
 
     int2 sizeHint(int2 size) override {
