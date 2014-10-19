@@ -41,7 +41,7 @@ struct ImageSourceView : ImageView, Poll {
 
     String title() override {
 		if(!source.count()) return String();
-		return str(/*source.name(), str(index+1,'/',source.count(),*/ source.elementName(index), source.properties(index));
+		return str(index+1,'/',source.count(), source.elementName(index));
     }
 
     int2 sizeHint(int2 size) override {
@@ -66,9 +66,8 @@ struct ImageSourceView : ImageView, Poll {
 
     // Control
 
-    bool setIndex(int value) {
-		if(!source.count(value)) return {};
-        if(index != this->index) { this->index = index; if(index != imageIndex) queue(); return true; }
+	bool setIndex(size_t value) {
+		if(value != this->index) { this->index = value; if(value != imageIndex) queue(); return true; }
         return false;
     }
 
@@ -81,8 +80,8 @@ struct ImageSourceView : ImageView, Poll {
     bool keyPress(Key key, Modifiers) override {
 		if(source.count() && key==Home) return setIndex(0);
 		if(int(index)>0 && ref<Key>{Backspace,LeftArrow}.contains(key)) return setIndex(index-1);
-		if(index+1<source.count(index+1) && ref<Key>{Return,RightArrow}.contains(key)) return setIndex(index+1);
-		if(index+1<source.count(index+1) && key==End) return setIndex(source.count(index+1)-1);
+		if(index+1<source.count(index+2) && ref<Key>{Return,RightArrow}.contains(key)) return setIndex(index+1);
+		if(index+1<source.count(index+2) && key==End) return setIndex(source.count(index+2)-1);
         return false;
     }
 };

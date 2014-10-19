@@ -13,6 +13,5 @@ void Normalize::apply(const ImageF& Y, const ImageF& X0, const ImageF& X1, const
 
 	float energy = parallel::energy(Y);
 	float deviation = sqrt(energy / Y.ref::size);
-	assert_(deviation, energy, Y);
 	parallel::apply(Y, [deviation](const float value) { return (1+(value)/deviation /*-1,1*/)/2 /*0,1*/; }, Y);
 }

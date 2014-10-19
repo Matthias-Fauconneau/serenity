@@ -23,7 +23,7 @@ struct ConsecutivePairs : GroupSource {
 
 /// Splits sequence in groups separated when difference between consecutive images is greater than a threshold
 struct DifferenceSplit : ImageGroupSource {
-	static constexpr float threshold = 0.41;
+	static constexpr float threshold = 0.18;
 	ConsecutivePairs pairs {source};
 	Subtract subtract;
 	ProcessedGroupImageSource difference{source, pairs, subtract};
@@ -38,11 +38,13 @@ struct DifferenceSplit : ImageGroupSource {
 		for(; endIndex < difference.count(); endIndex++) {
 			SourceImage image = difference.image(endIndex, 0, int2(1024,768));
 			float meanEnergy = parallel::energy(image)/image.ref::size;
+			log(endIndex, difference.elementName(endIndex), meanEnergy);
 			if(meanEnergy > threshold) break;
 		}
 		assert_(endIndex < source.count(), endIndex, source.count());
 		array<size_t> group;
 		for(size_t index: range(startIndex, endIndex+1/*included*/)) group.append( index );
+		log(group);
 		groups.append(move(group));
 		return true;
 	}
@@ -51,7 +53,7 @@ struct DifferenceSplit : ImageGroupSource {
 
 	/// Returns image indices for group index
 	array<size_t> operator()(size_t groupIndex) override {
-		assert_(groupIndex < count(groupIndex), groupIndex, groups.size);
+		assert_(groupIndex < count(groupIndex+1), groupIndex, groups.size);
 		return copy(groups[groupIndex]);
 	}
 };
@@ -81,7 +83,7 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 
 	ImageSourceView sourceView {source, &index, window};
 	ImageSourceView processedView {processed, &index, window};
-	WidgetToggle toggleView {&sourceView, &processedView, 1};
+	WidgetToggle toggleView {&sourceView, &processedView, 0};
 	Window window {&toggleView, -1, [this]{ return toggleView.title()+" "+imagesAttributes.value(source.elementName(index)); }};
 
 	ExposureBlendPreview() {
@@ -92,3 +94,12 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	}
 };
 registerApplication(ExposureBlendPreview);
+
+struct ExposureBlendTest : ExposureBlend, Application {
+	ExposureBlendTest() {
+		for(size_t groupIndex=0; split.nextGroup(); groupIndex++) {
+			log(apply(split(groupIndex), [this](const size_t index) { return copy(imagesAttributes.at(source.elementName(index))); }));
+		}
+	}
+};
+registerApplication(ExposureBlendTest, test);
