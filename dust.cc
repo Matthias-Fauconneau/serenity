@@ -70,8 +70,7 @@ struct DustRemovalExport : DustRemoval, Application {
 			SourceImageRGB image = corrected.image(index, int2(2048,1536), true);
 			correctionTime.stop();
 			Time compressionTime;
-			//writeFile(name, encodeJPEG(image), Folder(imagesAttributes[corrected.name(index)], output, true), true);
-			writeFile(name, encodeJPEG(image), output, true);
+			writeFile(name, encodeJPEG(image, 50), output, true);
 			compressionTime.stop();
 			log(str(100*(index+1)/corrected.count())+'%', '\t',index+1,'/',corrected.count(),
 				'\t',imagesAttributes[corrected.name(index)],
@@ -86,8 +85,12 @@ struct DustRemovalSource : DustRemoval, Application {
 	DustRemovalSource() {
 		Folder output ("Best", folder, true);
 		for(size_t index: range(corrected.count())) {
-			if(imagesAttributes[source.name(index)]=="best")
-				copy(folder, source.properties(index).at("Path"_), output, source.name(index)+"-source");
+			String name = source.name(index);
+			SourceImageRGB image = source.image(index, int2(2048,1536), true);
+			writeFile(name+".source", encodeJPEG(image, 50), output, true);
+			log(str(100*(index+1)/corrected.count())+'%', '\t',index+1,'/',corrected.count(),
+				'\t',imagesAttributes[corrected.name(index)],
+				'\t',corrected.name(index), strx(corrected.size(index)));
 		}
 	}
 };

@@ -3,4 +3,4 @@
 #include "image.h"
 
 /// Encodes image in the Joint Photographic Experts Group standard
-buffer<byte> encodeJPEG(const Image& image);
+buffer<byte> encodeJPEG(const Image& image, int quality = 100 /*50-95*/);

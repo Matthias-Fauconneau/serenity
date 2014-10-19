@@ -15,9 +15,8 @@ typedef unsigned int   uint;
 enum subsampling_t { Y_ONLY = 0, H1V1 = 1, H2V1 = 2, H2V2 = 3 };
 
 // JPEG compression parameters structure.
-struct params
-{
-	inline params() : m_quality(100), m_subsampling(H1V1), m_no_chroma_discrim_flag(false), m_two_pass_flag(false) { }
+struct params {
+	inline params(int quality=100) : m_quality(quality) { }
 
 	inline bool check() const
 	{
@@ -34,23 +33,14 @@ struct params
 	// 1 = YCbCr, no subsampling (H1V1, YCbCr 1x1x1, 3 blocks per MCU)
 	// 2 = YCbCr, H2V1 subsampling (YCbCr 2x1x1, 4 blocks per MCU)
 	// 3 = YCbCr, H2V2 subsampling (YCbCr 4x1x1, 6 blocks per MCU-- very common)
-	subsampling_t m_subsampling;
+	subsampling_t m_subsampling = H2V2;
 
 	// Disables CbCr discrimination - only intended for testing.
 	// If true, the Y quantization table is also used for the CbCr channels.
-	bool m_no_chroma_discrim_flag;
+	bool m_no_chroma_discrim_flag = false;
 
-	bool m_two_pass_flag;
+	bool m_two_pass_flag = true;
 };
-
-// Writes JPEG image to a file.
-// num_channels must be 1 (Y) or 3 (RGB), image pitch must be width*num_channels.
-bool compress_image_to_jpeg_file(const char *pFilename, int width, int height, int num_channels, const uint8 *pImage_data, const params &comp_params = params());
-
-// Writes JPEG image to memory buffer.
-// On entry, buf_size is the size of the output buffer pointed at by pBuf, which should be at least ~1024 bytes.
-// If return value is true, buf_size will be set to the size of the compressed data.
-bool compress_image_to_jpeg_file_in_memory(void *pBuf, int &buf_size, int width, int height, int num_channels, const uint8 *pImage_data, const params &comp_params = params());
 
 // Output stream abstract class - used by the jpeg_encoder class to write to the output stream.
 // put_buf() is generally called with len==JPGE_OUT_BUF_SIZE bytes, but for headers it'll be called with smaller amounts.
@@ -75,7 +65,7 @@ public:
 	// width, height  - Image dimensions.
 	// channels - May be 1, or 3. 1 indicates grayscale, 3 indicates RGB source data.
 	// Returns false on out of memory or if a stream write fails.
-	bool init(output_stream *pStream, int width, int height, int src_channels, const params &comp_params = params());
+	bool init(output_stream *pStream, int width, int height, int src_channels, const params &comp_params);
 
 	const params &get_params() const { return m_params; }
 
@@ -1026,8 +1016,7 @@ public:
 };
 
 bool compress_image_to_jpeg_file_in_memory(void *pDstBuf, int &buf_size, int width, int height, int num_channels, const uint8 *pImage_data,
-										   const params &comp_params)
-{
+										   int quality) {
    if ((!pDstBuf) || (!buf_size))
       return false;
 
@@ -1036,7 +1025,7 @@ bool compress_image_to_jpeg_file_in_memory(void *pDstBuf, int &buf_size, int wid
    buf_size = 0;
 
    jpeg_encoder dst_image;
-   if (!dst_image.init(&dst_stream, width, height, num_channels, comp_params))
+   if (!dst_image.init(&dst_stream, width, height, num_channels, quality))
       return false;
 
    for (uint pass_index = 0; pass_index < dst_image.get_total_passes(); pass_index++)
@@ -1057,10 +1046,11 @@ bool compress_image_to_jpeg_file_in_memory(void *pDstBuf, int &buf_size, int wid
    return true;
 }
 
-buffer<byte> encodeJPEG(const Image& image) {
+buffer<byte> encodeJPEG(const Image& image, int quality) {
 	buffer<byte> buffer(image.height*image.width*2, "JPEG");
 	int size = buffer.size;
-	if(!compress_image_to_jpeg_file_in_memory((void*)buffer.data, size, image.width, image.height, 4, (const uint8*)image.data)) error("JPEG");
+	if(!compress_image_to_jpeg_file_in_memory((void*)buffer.data, size, image.width, image.height, 4, (const uint8*)image.data, quality))
+		error("JPEG");
 	buffer.size = size;
 	return buffer;
 }
