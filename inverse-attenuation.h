@@ -1,6 +1,5 @@
 #pragma once
 #include "image-operation.h"
-#include "image-folder.h"
 #include "calibration.h"
 
 /// Inverts attenuation bias

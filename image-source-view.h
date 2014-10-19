@@ -74,9 +74,9 @@ struct ImageSourceView : ImageView, Poll {
         return false;
     }
 
-    /// Browses source by moving mouse horizontally over image view (like an hidden slider)
-    bool mouseEvent(int2 cursor, int2 size, Event, Button button, Widget*&) override {
-        return button ? setIndex(source.count()*min(size.x-1,cursor.x)/size.x) : false;
+	/// Browses source by dragging mouse horizontally over image view (like an hidden slider)
+	bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*&) override {
+		return (event==Motion && button) ? setIndex(source.count()*min(size.x-1,cursor.x)/size.x) : false;
     }
 
     /// Browses source with keys
