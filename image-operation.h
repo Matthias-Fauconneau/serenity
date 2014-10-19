@@ -7,7 +7,9 @@
 struct ImageOperation {
     virtual string name() const abstract;
     virtual int64 time() const abstract;
-    virtual buffer<ImageF> apply(const ImageF& red, const ImageF& green, const ImageF& blue) const abstract;
+	virtual int type() const { return 3; }
+	virtual buffer<ImageF> apply3(const ImageF& /*red*/, const ImageF& /*green*/, const ImageF& /*blue*/) const { error(type()); }
+	virtual ImageF apply1(const ImageF& /*red*/, const ImageF& /*green*/, const ImageF& /*blue*/) const { error(type()); }
 };
 
 generic struct ImageOperationT : ImageOperation {

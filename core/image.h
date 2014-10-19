@@ -70,7 +70,7 @@ struct ImageF : buffer<float> {
     ImageF(int width, int height, string name) : buffer(height*width, name), width(width), height(height), stride(width) {
         assert_(size>int2(0), size, width, height);
     }
-    ImageF(int2 size, string name/*="ImageF"*/) : ImageF(size.x, size.y, name) {}
+	ImageF(int2 size, string name="ImageF") : ImageF(size.x, size.y, name) {}
 
     explicit operator bool() const { return data && width && height; }
     inline float& operator()(size_t x, size_t y) const {assert(x<width && y<height, x, y); return at(y*stride+x); }

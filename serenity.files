@@ -99,3 +99,4 @@ core/cat.h
 serialization.h
 io/jpeg-encoder.h
 crop.cc
+blend.cc
