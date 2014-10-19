@@ -1,7 +1,6 @@
-#include "image-operation.h"
+#include "operation.h"
 
 /// Normalizes mean and deviation
-struct Normalize : ImageOperationT<Normalize> {
-	int outputs() const override { return 1; }
-	void apply1(const ImageF& Y, const ImageF& red, const ImageF& green, const ImageF& blue) const override;
+struct Normalize : ImageOperation31, OperationT<Normalize> {
+	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1, const ImageF& X2) const override;
 };

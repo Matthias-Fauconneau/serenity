@@ -4,6 +4,7 @@
 /// Calibrates attenuation bias image by summing images of a white subject
 struct Calibration {
     const ImageSource& source;
+	const Folder folder {"Calibration", source.folder()};
 
     /// Calibrates attenuation bias image by summing images of a white subject
     Calibration(const ImageSource& source) : source(source) {}

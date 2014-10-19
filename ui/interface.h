@@ -108,9 +108,9 @@ struct ToggleButton : ImageView {
 /// Two widgets in one spot, toggled by user
 struct WidgetToggle : Widget {
     Widget* widgets[2];
-    size_t index = 0;
+	size_t index;
 
-    WidgetToggle(Widget* first, Widget* second) : widgets{first, second} {}
+	WidgetToggle(Widget* first, Widget* second, size_t index = 0) : widgets{first, second}, index(index) {}
 
     // Forwards content
     String title() override { return widgets[index]->title(); }
@@ -125,9 +125,9 @@ struct WidgetToggle : Widget {
 };
 
 struct Index {
-    size_t* pointer;
-    Index(size_t* pointer) : pointer(pointer) {}
-    void operator=(size_t value) { *pointer = value; }
-    operator size_t() const { return *pointer; }
-    operator size_t&() { return *pointer; }
+	size_t* pointer;
+	Index(size_t* pointer) : pointer(pointer) {}
+	void operator=(size_t value) { *pointer = value; }
+	operator size_t() const { return *pointer; }
+	operator size_t&() { return *pointer; }
 };

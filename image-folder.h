@@ -1,18 +1,19 @@
 #pragma once
-#include "image-source.h"
+#include "source.h"
 #include "variant.h"
 #include "exif.h"
 #include "jpeg.h"
 
 /// Cached collection of images backed by a source folder
 struct ImageFolder : ImageSource, map<String, map<String, String>> {
+	Folder source;
     int2 maximumImageSize = 0;
 
     ImageFolder(const Folder& source, function<bool(const String& name, const map<String, String>& properties)> predicate={})
-        : ImageSource(Folder(".",source)) {
+		: source(Folder(".",source)) {
         {// Lists images and their properties
-            for(String& fileName: folder.list(Files|Sorted)) {
-                Map file = Map(fileName, folder);
+			for(String& fileName: source.list(Files|Sorted)) {
+				Map file = Map(fileName, source);
                 if(imageFileFormat(file)!="JPEG") continue; // Only JPEG images
                 int2 imageSize = ::imageSize(file);
 
@@ -52,44 +53,24 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
        if(predicate) filter(predicate);
     }
 
-	String name() const override { return String(section(folder.name(),'/',-2,-1)); }
-    size_t count() const override { return map::size(); }
+	const Folder& folder() const override { return source; }
+	String name() const override { return String(section(source.name(),'/',-2,-1)); }
+	size_t count(size_t) override { return map::size(); }
+	size_t count() const { return map::size(); }
+	int outputs() const override { return 3; }
     int2 maximumSize() const override { return maximumImageSize; }
-    String name(size_t index) const override { assert_(index<count()); return copy(keys[index]); }
-    int64 time(size_t index) const override { return File(properties(index).at("Path"_), folder).modifiedTime(); }
-    const map<String, String>& properties(size_t index) const override { return values[index]; }
+	String elementName(size_t index) const override { assert_(index<count()); return copy(keys[index]); }
+	int64 time(size_t index) override { return File(properties(index).at("Path"_), source).modifiedTime(); }
+	const map<String, String>& properties(size_t index) const override { return values[index]; }
     int2 size(size_t index) const override { return fromInt2(properties(index).at("Size"_)); }
 
     /// Converts encoded sRGB images to raw (mmap'able) sRGB images
-	SourceImageRGB image(size_t index, bool noCacheWrite = false) const {
-        assert_(index  < count());
-        File sourceFile (properties(index).at("Path"_), folder);
-		if(noCacheWrite) return decodeImage(Map(sourceFile));
-        return cache<Image>(folder, "Source", name(index), size(index), sourceFile.modifiedTime(), [&](const Image& target){
-            target.copy(decodeImage(Map(sourceFile)));
-        }, "" /*Disable version invalidation to avoid redecoding on header changes*/);
-    }
+	SourceImageRGB image(size_t index, bool noCacheWrite = false);
 
     /// Resizes sRGB images
     /// \note Resizing after linear float conversion would be more accurate but less efficient
-	SourceImageRGB image(size_t index, int2 size, bool noCacheWrite = false) const override {
-        assert_(index  < count());
-        File sourceFile (properties(index).at("Path"_), folder);
-		if(!size || size>=this->size(index)) return image(index, noCacheWrite);
-		if(noCacheWrite) return resize(size, image(index));
-        return cache<Image>(folder, "Resize", name(index), size, sourceFile.modifiedTime(), [&](const Image& target){
-            SourceImageRGB source = image(index);
-            assert_(target.size <= source.size, target.size, source.size);
-            resize(target, source);
-        });
-    }
+	SourceImageRGB image(size_t index, int2 size, bool noCacheWrite = false) override;
 
     /// Converts sRGB images to linear float images
-	SourceImage image(size_t index, int component, int2 size, bool noCacheWrite) const override {
-        assert_(index  < count());
-		if(noCacheWrite) return linear(image(index, size, noCacheWrite), component);
-        return cache<ImageF>(folder, "Linear["+str(component)+']', name(index), size?:this->size(index), time(index), [&](const ImageF& target) {
-			linear(target, image(index, size), component);
-        });
-    }
+	SourceImage image(size_t index, int outputIndex, int2 size, bool noCacheWrite) override;
 };

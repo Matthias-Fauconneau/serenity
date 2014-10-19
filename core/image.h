@@ -82,8 +82,8 @@ struct ImageF : buffer<float> {
     };
     size_t stride = 0;
 };
-
 inline ImageF copy(const ImageF& o) { return ImageF(copy((const buffer<float>&)o), o.size, o.stride); }
+inline String str(const ImageF& o) { return str(strx(o.size), o.ref::size); }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 inline ImageF share(const ImageF& o) { return ImageF(unsafeReference(o), o.size, o.stride); }

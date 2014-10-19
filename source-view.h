@@ -1,5 +1,5 @@
 #pragma once
-#include "image-source.h"
+#include "source.h"
 #include "interface.h"
 #include "window.h"
 
@@ -7,14 +7,14 @@
 struct ImageSourceView : ImageView, Poll {
     ImageSource& source;
     Index index;
-    size_t imageIndex = -1;
+	size_t imageIndex = -1;
     SourceImageRGB image; // Holds memory map reference
     int2 size = 0;
     function<void()> contentChanged;
 
-    ImageSourceView(ImageSource& source, size_t* index, function<void()> contentChanged)
-        : source(source), index(index), contentChanged(contentChanged) {}
-    ImageSourceView(ImageSource& source, size_t* index, Window& window)
+	ImageSourceView(ImageSource& source, size_t* index, function<void()> contentChanged)
+		: source(source), index(index), contentChanged(contentChanged) {}
+	ImageSourceView(ImageSource& source, size_t* index, Window& window)
         : ImageSourceView(source, index, {&window, &Window::render}) {}
 
     // Progressive evaluation
@@ -32,7 +32,7 @@ struct ImageSourceView : ImageView, Poll {
         assert_(source.maximumSize().x/hint.x <= 16);
 #endif
         imageIndex = index;
-        image = source.image(index, hint);
+		image = source.image(min<size_t>(index, source.count(index+1)-1), hint);
         ImageView::image = share(image);
         contentChanged();
     }
@@ -41,8 +41,7 @@ struct ImageSourceView : ImageView, Poll {
 
     String title() override {
 		if(!source.count()) return String();
-        index = clip(0ul, (size_t)index, source.count()-1);
-		return str(/*source.name(), str(index+1,'/',source.count(),*/ source.name(index), source.properties(index));
+		return str(/*source.name(), str(index+1,'/',source.count(),*/ source.elementName(index), source.properties(index));
     }
 
     int2 sizeHint(int2 size) override {
@@ -55,8 +54,7 @@ struct ImageSourceView : ImageView, Poll {
     }
 
     Graphics graphics(int2 size) override {
-        if(!source.count()) return {};
-        index = clip(0ul, (size_t)index, source.count()-1);
+		if(!source.count(1)) return {};
         this->size=size;
         if(imageIndex != index) event(); // Evaluates requested image immediately
 #if PROGRESSIVE
@@ -69,7 +67,7 @@ struct ImageSourceView : ImageView, Poll {
     // Control
 
     bool setIndex(int value) {
-        size_t index = clip(0, value, (int)source.count()-1);
+		if(!source.count(value)) return {};
         if(index != this->index) { this->index = index; if(index != imageIndex) queue(); return true; }
         return false;
     }
@@ -81,10 +79,10 @@ struct ImageSourceView : ImageView, Poll {
 
     /// Browses source with keys
     bool keyPress(Key key, Modifiers) override {
-        if(key==Home) return setIndex(0);
-        if(ref<Key>{Backspace,LeftArrow}.contains(key)) return setIndex(index-1);
-        if(ref<Key>{Return,RightArrow}.contains(key)) return setIndex(index+1);
-        if(key==End) return setIndex(source.count()-1);
+		if(source.count() && key==Home) return setIndex(0);
+		if(int(index)>0 && ref<Key>{Backspace,LeftArrow}.contains(key)) return setIndex(index-1);
+		if(index+1<source.count(index+1) && ref<Key>{Return,RightArrow}.contains(key)) return setIndex(index+1);
+		if(index+1<source.count(index+1) && key==End) return setIndex(source.count(index+1)-1);
         return false;
     }
 };

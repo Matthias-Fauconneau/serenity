@@ -82,18 +82,18 @@ player.cc
 
 exif.cc
 exif.h
-image-operation.h
+operation.h
 dust.cc
 core/parallel.h
-inverse-attenuation.h
-image-source.h
+inverse-diffusion.h
+source.h
 image-folder.h
 calibration.cc
 calibration.h
-inverse-attenuation.cc
-processed-source.cc
-processed-source.h
-image-source-view.h
+inverse-diffusion.cc
+process.cc
+process.h
+source-view.h
 cache.h
 core/cat.h
 serialization.h
@@ -104,3 +104,4 @@ normalize.cc
 normalize.h
 difference.h
 difference.cc
+image-folder.cc

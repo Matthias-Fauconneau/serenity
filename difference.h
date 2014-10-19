@@ -1,8 +1,13 @@
 #pragma once
-#include "image-operation.h"
+#include "operation.h"
 
-struct Difference : ImageOperationT<Difference> {
+/*struct Substract : ImageOperation, OperationT<Substract> {
 	int inputs() const override { return 2; }
 	int outputs() const override { return 1; }
-	void apply1(const ImageF& Y, const ImageF& A, const ImageF& B) const override;
+	void apply(ref<ImageF> Y, ref<ImageF> X) const override;
+};*/
+
+struct Subtract : ImageGroupOperation, OperationT<Subtract> {
+	int outputs() const override { return 1; }
+	void apply(ref<ImageF> Y, ref<ImageF> X) const override;
 };
