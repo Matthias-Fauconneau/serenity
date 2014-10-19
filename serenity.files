@@ -100,3 +100,7 @@ serialization.h
 io/jpeg-encoder.h
 crop.cc
 blend.cc
+normalize.cc
+normalize.h
+difference.h
+difference.cc
