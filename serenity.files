@@ -105,3 +105,5 @@ normalize.h
 difference.h
 difference.cc
 image-folder.cc
+transform.h
+align.h

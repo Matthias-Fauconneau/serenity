@@ -36,12 +36,13 @@ size_t ProcessedGroupImageSource::count(size_t need) { return source.count(need)
 int2 ProcessedGroupImageSource::maximumSize() const { return source.maximumSize(); }
 String ProcessedGroupImageSource::elementName(size_t groupIndex) const { return source.elementName(groupIndex); }
 int64 ProcessedGroupImageSource::time(size_t groupIndex) { return max(operation.time(), source.time(groupIndex)); }
-const map<String, String>& ProcessedGroupImageSource::properties(size_t unused groupIndex) const { error("Unimplemented"); }
+//const map<String, String>& ProcessedGroupImageSource::properties(size_t unused groupIndex) const { error("Unimplemented"); }
 int2 ProcessedGroupImageSource::size(size_t groupIndex) const { return source.size(groupIndex); }
 
 SourceImage ProcessedGroupImageSource::image(size_t groupIndex, int outputIndex, int2 size, bool noCacheWrite) {
 	return  ::cache<ImageF>(folder(), elementName(groupIndex), size?:this->size(groupIndex), time(groupIndex),
 						   [&](const ImageF& target) {
+		assert_(operation.inputs() == 1);
 		assert_(operation.outputs() == 1);
 		operation.apply({share(target)}, share(source.images(groupIndex, outputIndex, size, noCacheWrite)));
 	}, noCacheWrite);
@@ -50,14 +51,22 @@ SourceImage ProcessedGroupImageSource::image(size_t groupIndex, int outputIndex,
 SourceImageRGB ProcessedGroupImageSource::image(size_t groupIndex, int2 size, bool noCacheWrite) {
 	return  ::cache<Image>(folder(), elementName(groupIndex), size?:this->size(groupIndex), time(groupIndex),
 						   [&](const Image& target) {
-		assert_(operation.outputs() == 1);
 		array<ImageF> outputs;
-		for(size_t inputIndex: range(source.outputs())) {
-			outputs.append(ImageF( size?:this->size(groupIndex )));
-			operation.apply({share(outputs.last())}, share(source.images(groupIndex, inputIndex, size, noCacheWrite)));
-		}
+		if(operation.inputs()==1) {
+			assert_(operation.outputs() == 1);
+			for(size_t inputIndex: range(source.outputs())) {
+				outputs.append(ImageF( size ? : this->size(groupIndex) ));
+				operation.apply({share(outputs.last())}, share(source.images(groupIndex, inputIndex, size, noCacheWrite)));
+			}
+		} else if(operation.inputs()==source.outputs()) {
+			assert_(operation.outputs() == 3);
+			array<SourceImage> inputs;
+			for(size_t inputIndex: range(source.outputs())) inputs.append( source.images(groupIndex, inputIndex, size, noCacheWrite) );
+			for(size_t unused outputIndex: range(operation.outputs())) outputs.append( ImageF( size ? : this->size(groupIndex) ) );
+			operation.apply(outputs, share(inputs));
+		} else error(operation.inputs(), source.outputs());
 		/**/  if(source.outputs() == 1) sRGB(target, outputs[0]);
-		else if(source.outputs() == 3) sRGB(target, outputs[0], outputs[1], outputs[2]);
+		else if(source.outputs() >= 3) sRGB(target, outputs[0], outputs[1], outputs[2]);
 		else error(source.outputs());
 	}, noCacheWrite);
 }

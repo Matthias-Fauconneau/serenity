@@ -60,9 +60,9 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
 	int outputs() const override { return 3; }
     int2 maximumSize() const override { return maximumImageSize; }
 	String elementName(size_t index) const override { assert_(index<count()); return copy(keys[index]); }
-	int64 time(size_t index) override { return File(properties(index).at("Path"_), source).modifiedTime(); }
-	const map<String, String>& properties(size_t index) const override { return values[index]; }
-	int2 size(size_t index) const override { return parse<int2>(properties(index).at("Size"_)); }
+	int64 time(size_t index) override { return File(values[index].at("Path"_), source).modifiedTime(); }
+	//const map<String, String>& properties(size_t index) const override { return values[index]; }
+	int2 size(size_t index) const override { return parse<int2>(values[index].at("Size"_)); }
 
     /// Converts encoded sRGB images to raw (mmap'able) sRGB images
 	SourceImageRGB image(size_t index, bool noCacheWrite = false);

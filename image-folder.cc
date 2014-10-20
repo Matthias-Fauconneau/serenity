@@ -3,7 +3,7 @@
 /// Converts encoded sRGB images to raw (mmap'able) sRGB images
 SourceImageRGB ImageFolder::image(size_t index, bool noCacheWrite) {
 	assert_(index  < count());
-	File sourceFile (properties(index).at("Path"_), source);
+	File sourceFile (values[index].at("Path"_), source);
 	return cache<Image>({"Source", source, true}, elementName(index), size(index), sourceFile.modifiedTime(), [&](const Image& target) {
 		target.copy(decodeImage(Map(sourceFile)));
 	}, noCacheWrite, "" /*Disable version invalidation to avoid redecoding on header changes*/);
@@ -13,7 +13,7 @@ SourceImageRGB ImageFolder::image(size_t index, bool noCacheWrite) {
 /// \note Resizing after linear float conversion would be more accurate but less efficient
 SourceImageRGB ImageFolder::image(size_t index, int2 size, bool noCacheWrite) {
 	assert_(index  < count());
-	File sourceFile (properties(index).at("Path"_), source);
+	File sourceFile (values[index].at("Path"_), source);
 	if(!size || size>=this->size(index)) return image(index, noCacheWrite);
 	return cache<Image>({"Resize", source, true}, elementName(index), size, sourceFile.modifiedTime(), [&](const Image& target){
 		SourceImageRGB source = image(index);

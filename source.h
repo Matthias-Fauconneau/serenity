@@ -14,14 +14,6 @@ struct Source {
 	virtual int64 time(size_t index) abstract;
 };
 
-/*/// Implements I::name for T
-template<class I, class T> struct Name : virtual I {
-	String name() const override {
-		static String name = String(({ TextData s (str(typeid(T).name())); s.whileInteger(); s.identifier(); }));
-		return copy(name);
-	}
-};*/
-
 /// Splits a collection in groups
 struct GroupSource : Source {
 	virtual array<size_t> operator()(size_t groupIndex) = 0;
@@ -41,7 +33,7 @@ struct ImageSource : Source {
     virtual int2 maximumSize() const abstract;
 	virtual String elementName(size_t index) const abstract;
     virtual int2 size(size_t index) const abstract;
-	virtual const map<String, String>& properties(size_t index) const abstract;
+	//virtual const map<String, String>& properties(size_t index) const abstract;
 	virtual SourceImage image(size_t /*index*/, int outputIndex, int2 unused size=0, bool unused noCacheWrite = false) {
 		error(name(), "does not implement 32bit linear image["+str(outputIndex)+']');
 	}

@@ -19,7 +19,7 @@ struct ImageOperation : virtual Operation {
 	virtual void apply(ref<ImageF> Y, ref<ImageF> X) const abstract;
 };
 
-struct ImageOperation1 : ImageOperation{
+struct ImageOperation1 : ImageOperation {
 	int inputs() const override { return 1; }
 	int outputs() const override { return 1; }
 	virtual void apply(const ImageF& Y, const ImageF& X) const abstract;
@@ -30,7 +30,7 @@ struct ImageOperation1 : ImageOperation{
 	}
 };
 
-struct ImageOperation31 : ImageOperation{
+struct ImageOperation31 : ImageOperation {
 	int inputs() const override { return 3; }
 	int outputs() const override { return 1; }
 	virtual void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1, const ImageF& X2) const abstract;
@@ -44,6 +44,7 @@ struct ImageOperation31 : ImageOperation{
 
 /// Operates on a varying number of images to provide a given number of outputs
 struct ImageGroupOperation : virtual Operation {
+	virtual int inputs() const { return 1; }
 	virtual int outputs() const abstract;
 	virtual void apply(ref<ImageF>, ref<ImageF>) const = 0;
 };
