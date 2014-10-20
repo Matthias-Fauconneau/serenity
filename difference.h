@@ -8,6 +8,7 @@
 };*/
 
 struct Subtract : ImageGroupOperation, OperationT<Subtract> {
+	string name() const override { return "[subtract]"; }
 	int outputs() const override { return 1; }
 	void apply(ref<ImageF> Y, ref<ImageF> X) const override;
 };

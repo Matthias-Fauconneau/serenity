@@ -55,8 +55,8 @@ string trim(const string s) {
 }
 
 bool isInteger(const string s) { if(!s) return false; for(char c: s) if(c<'0'||c>'9') return false; return true; }
-int64 fromInteger(const string number, int base) { return TextData(number).integer(true, base); }
-double fromDecimal(const string number) { return TextData(number).decimal(); }
+int64 parseInteger(const string number, int base) { return TextData(number).integer(true, base); }
+double parseDecimal(const string number) { return TextData(number).decimal(); }
 
 // -- String
 

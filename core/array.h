@@ -171,7 +171,7 @@ template<Type T, size_t N=128> struct Array : array<T> {
     /// Default constructs an empty array
     Array() : array<T>(buffer<T>((T*)inlineBuffer, 0, inlineBufferCapacity)) {}
     /// Converts a buffer to an array
-    Array(buffer<T>&& o) : array<T>(move(o)) { assert_(capacity > inlineBufferCapacity, capacity); }
+	Array(buffer<T>&& o) : array<T>(move(o)) { assert(capacity > inlineBufferCapacity, capacity); }
     /// Allocates an empty array with storage space for \a capacity elements
     explicit Array(size_t nextCapacity) : Array() { reserve(nextCapacity); }
     /// Copies elements from a reference

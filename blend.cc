@@ -46,11 +46,6 @@ struct ProcessedImageGroupSource : ImageGroupSource {
 	}
 };
 
-/*generic struct ImageGroupSourceT : T, ImageGroupSource {
-	ImageGroupSourceT(ImageSource& source) : T(source), ImageGroupSource(source) {}
-	virtual int64 time(size_t groupIndex) override { return max(T::time(groupIndex), ImageGroupSource::time(groupIndex)); }
-};*/
-
 /// Splits sequence in groups separated when difference between consecutive images is greater than a threshold
 struct DifferenceSplit : GroupSource {
 	static constexpr float threshold = 0.18;
@@ -93,6 +88,7 @@ struct DifferenceSplit : GroupSource {
 };
 
 struct Mean : ImageGroupOperation1, OperationT<Mean> {
+	string name() const override { return "[mean]"; }
 	virtual int outputs() const { return 1; }
 	virtual void apply(const ImageF& Y, ref<ImageF> X) const {
 		parallel::apply(Y, [&](size_t index) { return sum(::apply(X, [index](const ImageF& x) { return x[index]; }))/X.size; });
@@ -100,15 +96,21 @@ struct Mean : ImageGroupOperation1, OperationT<Mean> {
 };
 
 struct Transform {
-	vec2 operator()(vec2);
+	vec2 offset = 0;
+	/// Returns normalized source coordinates for the given normalized target coordinates
+	vec2 operator()(vec2 target) const { return target + offset; }
+	/// Returns scaled source coordinates for the given scaled target coordinates
+	vec2 operator()(int2 target, int2 size) const { return operator()(vec2(target)/vec2(size))*vec2(size); }
 };
+String str(const Transform& o) { return str(o.offset); }
+template<> Transform parse<Transform>(TextData& s) { return {parse<vec2>(s)}; }
 
 struct TransformGroupSource {
 	virtual array<Transform> operator()(size_t groupIndex);
 };
 
 /// Evaluates transforms for a group of images
-struct ImageTransformGroupOperation : Operation {
+struct ImageTransformGroupOperation : virtual Operation {
 	virtual array<Transform> operator()(ref<ImageF>) const = 0;
 };
 
@@ -120,43 +122,84 @@ struct ProcessedImageTransformGroupSource : TransformGroupSource {
 		source(source), operation(operation) {}
 
 	array<Transform> operator()(size_t groupIndex) override {
-		array<SourceImage> images = source.images(groupIndex, 0);
-		return operation(apply(images, [](const SourceImage& x){ return share(x); }));
+		assert_(source.outputs()==1);
+		int2 size = source.size(groupIndex)/16;
+		array<SourceImage> images = source.images(groupIndex, 0, size);
+		return parseArray<Transform>(cache(cacheFolder, source.elementName(groupIndex), strx(size), source.time(groupIndex), [&]() {
+			return str(operation(apply(images, [](const SourceImage& x){ return share(x); })));
+		}, false));
 	}
 };
 
-#if 0
-// ProcessedGroupImageGroupSource
+/// Aligns images
+struct Align : ImageTransformGroupOperation, OperationT<Align> {
+	string name() const override { return "[align]"; }
 
-/// Processes every image in a group individually
-struct ProcessedGroupImageGroupSource : ImageGroupSource {
+	// Evaluates residual energy at integer offsets
+	virtual array<Transform> operator()(ref<ImageF> images) const override {
+		int2 size = images[0].size;
+		for(auto& image: images) assert_(image.size == size);
+		const ImageF& A = images[0];
+		array<Transform> transforms;
+		transforms.append();
+		for(const ImageF& B : images.slice(1)) { // Compares each image with first one (TODO: full regression)
+			Transform bestTransform; float bestResidualEnergy = inf;
+			for(int2 offset: {int2(-1,0), int2(1,0),  int2(0,-1),int2(0,1)}) { // Diamond search step along both translation axis
+				Transform transform {vec2(offset)/vec2(size)};
+				// Evaluates residual energy
+				float energy = sumXY(size-int2(2), [&A, &B, transform](int x, int y) {
+					int2 a = int2(1)+int2(x,y);
+					assert_(a >= int2(0) && a < A.size);
+					int2 b = int2(round(transform(a, A.size)));
+					assert_(b >= int2(0) && b < A.size);
+					return sq(A(a) - B(b));
+				}, 0.f);
+				log(offset, energy);
+				if(energy < bestResidualEnergy) {
+					bestResidualEnergy = energy;
+					bestTransform = transform;
+				}
+			}
+			transforms.append(bestTransform);
+		}
+		return transforms;
+	}
+};
+
+/// Samples \a transform of \a source using nearest neighbour
+void sample(const ImageF& target, const ImageF& source, Transform transform) {
+	applyXY(target, [&](int x, int y) {
+		int2 s = int2(round(transform(int2(x,y), source.size)));
+		if(!(s >= int2(0) && s < source.size)) return 0.f;
+		assert_(s >= int2(0) && s < source.size, s, source.size);
+		return source(s);
+	});
+}
+ImageF sample(ImageF&& target, const ImageF& source, Transform transform) { sample(target, source, transform); return move(target); }
+ImageF sample(const ImageF& source, Transform transform) { return sample(source.size, source, transform); }
+
+struct TransformSampleImageGroupSource : ImageGroupSource {
 	ImageGroupSource& source;
-	ImageOperation& operation;
-	Folder cacheFolder {operation.name(), source.folder(), true};
-	ProcessedGroupImageGroupSource(ImageGroupSource& source, ImageOperation& operation) : source(source), operation(operation) {}
+	TransformGroupSource& transform;
+	Folder cacheFolder {"[sample]", source.folder(), true};
+	TransformSampleImageGroupSource(ImageGroupSource& source, TransformGroupSource& transform)
+		: source(source), transform(transform) {}
 
-#if 0
-	int outputs() const /*override*/ { return operation.outputs(); }
-	const Folder& folder() const /*override*/ { return cacheFolder; }
-	String name() const /*override*/ { return str(operation.name(), source.name()); }
-	size_t count(size_t need=0) /*override*/ { return groups.count(need); }
-	int2 maximumSize() const /*override*/ { return source.maximumSize(); }
-	String elementName(size_t groupIndex) const /*override*/ {
-		return str(apply(groups(groupIndex), [this](const size_t index) { return source.elementName(index); }));
-	}
-	int64 time(size_t groupIndex) override {
-		return max(operation.time(), max(apply(groups(groupIndex), [this](size_t index) { return source.time(index); })));
-	}
-	int2 size(size_t groupIndex) const /*override*/ {
-		auto sizes = apply(groups(groupIndex), [this](size_t index) { return source.size(index); });
-		for(auto size: sizes) assert_(size == sizes[0]);
-		return sizes[0];
-	}
-#endif
+	size_t count(size_t need=0) override { return source.count(need); }
+	int64 time(size_t groupIndex) override { return source.time(groupIndex); }
+	String name() const override { return str("[sample]", source.name()); }
+	int outputs() const override { return source.outputs(); }
+	const Folder& folder() const override { return cacheFolder; }
+	int2 maximumSize() const override { return source.maximumSize(); }
+	String elementName(size_t groupIndex) const override { return source.elementName(groupIndex); }
+	int2 size(size_t groupIndex) const override { return source.size(groupIndex); }
 
-	array<SourceImage> images(size_t groupIndex, int outputIndex, int2 size=0, bool noCacheWrite = false) override;
+	array<SourceImage> images(size_t groupIndex, int outputIndex, int2 size=0, bool noCacheWrite = false) override {
+		auto images = source.images(groupIndex, outputIndex, size, noCacheWrite);
+		auto transforms = transform(groupIndex);
+		return apply(images.size, [&](size_t index) -> SourceImage { return sample(images[index], transforms[index]); });
+	}
 };
-#endif
 
 /// Evaluates transforms to align groups of images
 
@@ -166,15 +209,17 @@ struct ExposureBlend {
 	ImageFolder source { folder };
 	ProcessedSourceT<Normalize> normalize {source};
 	DifferenceSplit split {normalize};
-	ProcessedImageGroupSource groups {source, split};
+	ProcessedImageGroupSource sourceSplit {source, split};
+	ProcessedImageGroupSource normalizeSplit {normalize, split};
 
-	/*Align align; : ImageTransformGroupOperation
-	ProcessedImageTransformGroupSource transforms {groups, align};*/
+	Align align;
+	ProcessedImageTransformGroupSource transforms {normalizeSplit, align};
 
-	//Transform transform {groups, transforms} : ImageGroupSource
+	TransformSampleImageGroupSource transformed {sourceSplit, transforms};
 
 	Mean mean;
-	ProcessedGroupImageSource processed {groups/*transformed*/, mean};
+	ProcessedGroupImageSource unaligned {sourceSplit, mean};
+	ProcessedGroupImageSource aligned {transformed, mean};
 };
 
 struct ExposureBlendPreview : ExposureBlend, Application {
@@ -183,9 +228,8 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	size_t index = lastIndex != invalid ? lastIndex : 0;*/
 	size_t index = 0;
 
-	ImageSourceView sourceView {source, &index, window};
-	ImageSourceView processedView {processed, &index, window, source.maximumSize()/16};
-	WidgetToggle toggleView {&sourceView, &processedView, 1};
+	ImageSourceView views [2] {{unaligned, &index, window}, {aligned, &index, window}};
+	WidgetToggle toggleView {&views[0], &views[1], 0};
 	Window window {&toggleView, -1, [this]{ return toggleView.title()+" "+imagesAttributes.value(source.elementName(index)); }};
 
 	ExposureBlendPreview() {

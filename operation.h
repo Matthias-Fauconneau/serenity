@@ -1,5 +1,4 @@
 #pragma once
-#include <typeinfo>
 #include "time.h"
 #include "image.h"
 
@@ -9,7 +8,7 @@ struct Operation {
 };
 
 generic struct OperationT : virtual Operation {
-	string name() const override { static string name = ({ TextData s (str(typeid(T).name())); s.whileInteger(); s.identifier(); }); return name; }
+	//string name() const override { static string name = ({ TextData s (str(typeid(T).name())); s.whileInteger(); s.identifier(); }); return name; }
 	int64 time() const override { return parseDate(__DATE__ " " __TIME__)*1000000000l; }
 };
 

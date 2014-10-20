@@ -125,6 +125,18 @@ template<Type F, Type... S> void applyXY(const ImageF& target, F function, const
     });
 }
 
+template<Type A, Type F, Type... Ss> A sumXY(int2 size, F apply, A initial_value) {
+	assert_(size);
+	A accumulators[threadCount];
+	mref<A>(accumulators).clear(initial_value); // Some threads may not iterate
+	parallel_chunk(size.y, [&](uint id, uint64 start, uint64 chunkSize) {
+		A accumulator = initial_value;
+		for(size_t y: range(start, start+chunkSize)) for(size_t x: range(size.x)) accumulator += apply(x, y);
+		accumulators[id] = accumulator;
+	});
+	return ::sum(accumulators);
+}
+
 // -- sRGB --
 
 extern uint8 sRGB_forward[0x1000];

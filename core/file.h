@@ -53,7 +53,7 @@ struct Folder : Handle {
 bool existsFolder(const string folder, const Folder& at=currentWorkingDirectory());
 
 /// Handle to an Unix I/O stream
-struct Stream : Handle {
+struct Stream : Handle { //FIXME: overlaps with Data/BinaryData
     Stream(){}
     Stream(int fd):Handle(fd){}
     /// Reads exactly \a size bytes into \a buffer
@@ -83,8 +83,6 @@ struct Stream : Handle {
     size_t write(const byte* data, size_t size);
     /// Writes \a buffer
     size_t write(const ref<byte> buffer);
-    /// Writes \a buffer (helps implicit conversion from cat)
-    //size_t write(const array<char>& buffer) { return write((ref<byte>)buffer); }
     /// Writes a raw value
     generic size_t writeRaw(T t) { return write((byte*)&t,sizeof(T)); }
 };
@@ -103,7 +101,7 @@ struct File : Stream {
     File(){}
     File(int fd):Stream(fd){}
     /// Opens \a path
-    File(const string path, const Folder& at=currentWorkingDirectory(), Flags flags=ReadOnly);
+	explicit File(string path, const Folder& at=currentWorkingDirectory(), Flags flags=ReadOnly);
     /// Returns file properties
     struct stat stat() const;
     /// Returns file type

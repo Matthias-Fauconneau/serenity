@@ -6,7 +6,7 @@
 
 /// Caches results of \a generate on file system as folder/name.key
 /// \note All results of a given \name and any \a key older than \a sourceTime or \a version are removed
-inline File cache(const Folder& folder, string name, string key, int64 sourceTime,
+inline File cacheFile(const Folder& folder, string name, string key, int64 sourceTime,
            function<void(File&)> write, string version = __DATE__ " " __TIME__) {
 	auto files = filter(folder.list(Files), [&](string fileName){ return section(fileName,'.',0,-2) != name; });
     for(string fileName: files) {
@@ -33,12 +33,34 @@ inline File cache(const Folder& folder, string name, string key, int64 sourceTim
     return file;
 }
 
-// Read/Write value cache
+// Read/Write string cache
+inline String cache(const Folder& folder, string name, string key, int64 sourceTime,
+						 function<String()> evaluate, bool noCacheWrite = false, string version = __DATE__ " " __TIME__) {
+	if(noCacheWrite) return evaluate();
+	File file = cacheFile(folder, name, key, sourceTime, [&evaluate](File& target) {
+		target.write(evaluate()); target.seek(0);
+	}, version);
+	return file.read(file.size());
+}
+
+// Read/Write raw value cache
 template<Type T> T cache(const Folder& folder, string name, string key, int64 sourceTime,
-                         function<T()> evaluate, string version = __DATE__ " " __TIME__) {
-	return cache(folder, name, key, sourceTime, [&evaluate](File& target) {
+						 function<T()> evaluate, bool noCacheWrite = false, string version = __DATE__ " " __TIME__) {
+	if(noCacheWrite) return evaluate();
+	return cacheFile(folder, name, key, sourceTime, [&evaluate](File& target) {
         target.writeRaw<T>(evaluate()); target.seek(0);
     }, version).template read<T>();
+}
+
+// Read/Write array value cache (FIXME: buffer)
+template<Type T> array<T> cache(const Folder& folder, string name, string key, int64 sourceTime,
+						 function<array<T>()> evaluate, bool noCacheWrite = false, string version = __DATE__ " " __TIME__) {
+	if(noCacheWrite) return evaluate();
+	File file = cacheFile(folder, name, key, sourceTime, [&evaluate](File& target) {
+		target.write(cast<byte>(evaluate())); target.seek(0);
+	}, version);
+	assert_( file.size()%sizeof(T) == 0 );
+	file.template read<T>(file.size()/sizeof(T));
 }
 
 // Mapped image cache
@@ -56,7 +78,7 @@ generic auto share(ref<ImageMapSource<T>> ref) -> buffer<decltype(share(ref[0]))
 template<Type T> ImageMapSource<T> cache(const Folder& folder, string name, int2 size, int64 sourceTime,
 										 function<void(const T&)> evaluate, bool noCacheWrite = false, string version = __DATE__ " " __TIME__) {
 	if(noCacheWrite) { T target(size); evaluate(target); return move(target); }
-	return {cache(folder, name, strx(size), sourceTime, [size,&evaluate](File& file) {
+	return {cacheFile(folder, name, strx(size), sourceTime, [size,&evaluate](File& file) {
         file.resize(size.y*size.x*sizeof(typename T::type));
         Map map(file, Map::Write);
         evaluate(T(unsafeReference(cast<typename T::type>(map)), size, size.x));

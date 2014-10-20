@@ -89,6 +89,7 @@ struct range {
     iterator begin() const { return {start}; }
     iterator end() const { return {stop}; }
     explicit operator bool() const { return start < stop; }
+	int size() { return stop-start; }
     int start, stop;
 };
 
@@ -138,7 +139,7 @@ generic struct ref {
     /// Slices a reference to elements from \a pos to \a pos + \a size
     ref<T> slice(size_t pos, size_t size) const;
     /// Slices a reference to elements from \a pos to the end of the reference
-    ref<T> slice(size_t pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
+	ref<T> slice(size_t pos) const;
 
     /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
     size_t indexOf(const T& key) const { for(size_t i: range(size)) { if(data[i]==key) return i; } return -1; }
@@ -240,6 +241,7 @@ template<> void error(const string& message) __attribute((noreturn));
 // -- ref
 generic const T& ref<T>::at(size_t i) const { assert(i<size, i, size); return data[i]; }
 generic ref<T> ref<T>::slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos, size); }
+generic ref<T> ref<T>::slice(size_t pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
 
 inline const char& ref<char>::at(size_t i) const { assert(i<size, i, size); return data[i]; }
 inline ref<char> ref<char>::slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<char>(data+pos, size); }

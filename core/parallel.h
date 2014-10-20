@@ -9,10 +9,10 @@ inline void operator*=(mref<float> values, float factor) { values.apply([&](floa
 
 // -> \file algorithm.h
 
-/*template<Type A, Type F> A reduce(range range, F fold, A accumulator) {
+template<Type A, Type F> A reduce(range range, F fold, A accumulator) {
     for(size_t index: range) accumulator = fold(accumulator, index);
     return accumulator;
-}*/
+}
 
 template<Type A, Type T, Type F, Type... Ss> T reduce(ref<T> values, F fold, A accumulator, ref<Ss>... sources) {
     for(size_t index: range(values.size)) accumulator = fold(accumulator, values[index], sources[index]...);
@@ -95,7 +95,17 @@ void apply(mref<T> target, Function function, ref<S>... sources) {
     for(auto size: {sources.size...}) assert_(target.size == size, target.size, sources.size...);
     if(target.size < minimumSize) return target.apply(function, sources...);
     else chunk_parallel(target.size, [&](uint, size_t index) { new (&target[index]) T(function(sources[index]...)); });
-    //else parallel_chunk(target.size, [&](uint, size_t start, size_t size) { target.slice(start,size).apply(function(sources.slice(start,size)...)); });
+}
+
+template<Type A, Type T, Type F, Type... Ss> T parallel_reduce(size_t size, F fold, A initial_value) {
+	assert_(size);
+	if(size< minimumSize) return ::reduce(size, fold, initial_value);
+	else {
+		A accumulators[threadCount];
+		mref<A>(accumulators).clear(initial_value); // Some threads may not iterate
+		parallel_chunk(size, [&](uint id, size_t start, size_t size) { accumulators[id] = ::reduce(range(start, size), fold, initial_value); });
+		return reduce(accumulators, fold, initial_value);
+	}
 }
 
 template<Type A, Type T, Type F, Type... Ss> T parallel_reduce(ref<T> values, F fold, A initial_value) {

@@ -2,7 +2,7 @@
 #include "string.h"
 #include "map.h"
 #include "data.h"
-#include "vector.h"
+//#include "vector.h"
 
 struct Variant {
     enum { Empty, Boolean, Integer, Real, Data, List, Dict, Rational } type = Empty;
@@ -47,13 +47,3 @@ inline String str(const Variant& o) {
     if(o.type==Variant::Dict) return str(o.dict);
     error("Invalid Variant",int(o.type));
 }
-
-/// Parses 2 integers separated by 'x', ' ', or ',' to an \a int2
-inline int2 fromInt2(TextData& s) {
-    int x = s.integer(); // Assigns a single value to all components
-    if(!s) return int2(x);
-    s.whileAny("x, "); int y=s.integer();
-    assert_(!s, s); return int2(x,y);
-}
-/// Parses 2 integers separated by 'x', ' ', or ',' to an \a int2
-inline int2 fromInt2(string str) { TextData s(str); return fromInt2(s); }

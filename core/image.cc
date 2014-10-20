@@ -201,6 +201,7 @@ ImageF resize(ImageF&& target, ImageF&& source) {
 /// Convolves and transposes (with repeat border conditions)
 static void convolve(float* target, const float* source, const float* kernel, int radius, int width, int height, uint sourceStride, uint targetStride) {
     int N = radius+1+radius;
+	assert_(N < 1024, N);
     chunk_parallel(height, [=](uint, size_t y) {
         const float* line = source + y * sourceStride;
         float* targetColumn = target + y;

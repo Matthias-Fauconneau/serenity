@@ -2,7 +2,6 @@
 /// \file process.h \link Thread threads\endlink, \link Lock synchronization\endlink, process environment and arguments
 #include "map.h"
 #include "data.h"
-#include <typeinfo>
 #include "file.h"
 #include <poll.h>
 #include <pthread.h> //pthread
@@ -19,7 +18,7 @@ template<class I> struct Interface {
         string version() override { return __DATE__ " " __TIME__ ""_; }
         unique<I> constructNewInstance() override { return unique<C>(); }
         Factory(string name) { factories().insert(name, this); }
-        Factory() : Factory(({ TextData s (str(typeid(C).name())); s.integer(); s.identifier(); })) {}
+		//Factory() : Factory(({ TextData s (str(typeid(C).name())); s.integer(); s.identifier(); })) {}
         static Factory registerFactory;
     };
     static string version(const string& name) { return factories().at(name)->version(); }

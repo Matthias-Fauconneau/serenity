@@ -1,6 +1,5 @@
 #pragma once
 #include "file.h"
-#include "variant.h" // fromInt2
 #include "image.h"
 #include "function.h"
 #include "time.h"
@@ -16,13 +15,13 @@ struct Source {
 	virtual ~Source() {}
 };
 
-/// Implements I::name for T
+/*/// Implements I::name for T
 template<class I, class T> struct Name : virtual I {
 	String name() const override {
 		static String name = String(({ TextData s (str(typeid(T).name())); s.whileInteger(); s.identifier(); }));
 		return copy(name);
 	}
-};
+};*/
 
 /// Splits a collection in groups
 struct GroupSource : Source {
@@ -60,5 +59,5 @@ struct ImageGroupSource : Source {
 	virtual String elementName(size_t groupIndex) const abstract;
 	virtual int64 time(size_t groupIndex)  abstract;
 	virtual int2 size(size_t groupIndex) const abstract;
-	virtual array<SourceImage> images(size_t groupIndex, int outputIndex, int2 size=0, bool noCacheWrite = false)  abstract;
+	virtual array<SourceImage> images(size_t groupIndex, int outputIndex, int2 size, bool noCacheWrite = false)  abstract;
 };
