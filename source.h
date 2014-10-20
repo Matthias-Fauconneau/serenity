@@ -12,7 +12,6 @@ struct Source {
 	virtual size_t count(size_t need=0) abstract;
 	/// Last modified time of element
 	virtual int64 time(size_t index) abstract;
-	virtual ~Source() {}
 };
 
 /*/// Implements I::name for T

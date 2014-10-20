@@ -31,7 +31,7 @@ ProcessedGroupImageSource::ProcessedGroupImageSource(ImageGroupSource& source, I
 
 int ProcessedGroupImageSource::outputs() const { return operation.outputs(); }
 const Folder& ProcessedGroupImageSource::folder() const { return cacheFolder; }
-String ProcessedGroupImageSource::name() const { return str(operation.name(), source.name()); }
+String ProcessedGroupImageSource::name() const { return str(source.name(), operation.name()); }
 size_t ProcessedGroupImageSource::count(size_t need) { return source.count(need); }
 int2 ProcessedGroupImageSource::maximumSize() const { return source.maximumSize(); }
 String ProcessedGroupImageSource::elementName(size_t groupIndex) const { return source.elementName(groupIndex); }

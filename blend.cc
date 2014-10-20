@@ -63,7 +63,7 @@ struct DifferenceSplit : GroupSource {
 		if(startIndex == source.count()) return false;
 		size_t endIndex = startIndex+1; // Included
 		for(; endIndex < difference.count(); endIndex++) {
-			SourceImage image = difference.image(endIndex, 0, difference.maximumSize()/16);
+			SourceImage image = difference.image(endIndex, 0, difference.maximumSize()/32);
 			float meanEnergy = parallel::energy(image)/image.ref::size;
 			log(endIndex, difference.elementName(endIndex), meanEnergy);
 			if(meanEnergy > threshold) break;
@@ -96,16 +96,23 @@ struct Mean : ImageGroupOperation1, OperationT<Mean> {
 };
 
 struct Transform {
-	vec2 offset = 0;
+	vec2 offset;
 	/// Returns normalized source coordinates for the given normalized target coordinates
 	vec2 operator()(vec2 target) const { return target + offset; }
 	/// Returns scaled source coordinates for the given scaled target coordinates
 	vec2 operator()(int2 target, int2 size) const { return operator()(vec2(target)/vec2(size))*vec2(size); }
 };
-String str(const Transform& o) { return str(o.offset); }
-template<> Transform parse<Transform>(TextData& s) { return {parse<vec2>(s)}; }
+// FIXME
+static constexpr vec2 maximumImageSize = vec2(4000,3000);
+String str(const Transform& o) { return str(o.offset*maximumImageSize); }
+template<> Transform parse<Transform>(TextData& s) { return {parse<vec2>(s)/maximumImageSize}; }
 
-struct TransformGroupSource {
+/// Composes transforms
+Transform operator *(const Transform& a, const Transform& b) {
+	return {a.offset+b.offset};
+}
+
+struct TransformGroupSource : Source {
 	virtual array<Transform> operator()(size_t groupIndex);
 };
 
@@ -121,9 +128,12 @@ struct ProcessedImageTransformGroupSource : TransformGroupSource {
 	ProcessedImageTransformGroupSource(ImageGroupSource& source, ImageTransformGroupOperation& operation) :
 		source(source), operation(operation) {}
 
+	virtual size_t count(size_t need=0) { return source.count(need); }
+	virtual int64 time(size_t index) { return max(operation.time(), source.time(index)); }
+
 	array<Transform> operator()(size_t groupIndex) override {
 		assert_(source.outputs()==1);
-		int2 size = source.size(groupIndex)/16;
+		int2 size = source.size(groupIndex)/32;
 		array<SourceImage> images = source.images(groupIndex, 0, size);
 		return parseArray<Transform>(cache(cacheFolder, source.elementName(groupIndex), strx(size), source.time(groupIndex), [&]() {
 			return str(operation(apply(images, [](const SourceImage& x){ return share(x); })));
@@ -131,37 +141,60 @@ struct ProcessedImageTransformGroupSource : TransformGroupSource {
 	}
 };
 
+/// Evaluates residual energy between A and transform B
+float residualEnergy(const ImageF& A, const ImageF& B, Transform transform) {
+	assert_(A.size == B.size);
+	float energy = sumXY(A.size-int2(4), [&A, &B, transform](int x, int y) {
+		int2 a = int2(2)+int2(x,y);
+		assert_(a >= int2(0) && a < A.size);
+		int2 b = int2(round(transform(a, B.size)));
+		assert_(b >= int2(0) && b < B.size);
+		return sq(A(a) - B(b));
+	}, 0.f);
+	log(transform.offset, energy);
+	return energy;
+}
+
+/// Evaluates first \a levelCount mipmap levels (shares source as first element)
+array<ImageF> mipmap(const ImageF& source, int levelCount) {
+	array<ImageF> mipmap; mipmap.append( share(source) );
+	for(int unused level: range(levelCount)) mipmap.append(downsample(mipmap.last()));
+	return mipmap;
+}
+
 /// Aligns images
 struct Align : ImageTransformGroupOperation, OperationT<Align> {
 	string name() const override { return "[align]"; }
 
 	// Evaluates residual energy at integer offsets
 	virtual array<Transform> operator()(ref<ImageF> images) const override {
-		int2 size = images[0].size;
-		for(auto& image: images) assert_(image.size == size);
-		const ImageF& A = images[0];
+		for(auto& image: images) assert_(image.size == images[0].size);
+		constexpr int levelCount = 2;
+		array<ImageF> A = mipmap(images[0], levelCount);
 		array<Transform> transforms;
 		transforms.append();
-		for(const ImageF& B : images.slice(1)) { // Compares each image with first one (TODO: full regression)
-			Transform bestTransform; float bestResidualEnergy = inf;
-			for(int2 offset: {int2(-1,0), int2(1,0),  int2(0,-1),int2(0,1)}) { // Diamond search step along both translation axis
-				Transform transform {vec2(offset)/vec2(size)};
-				// Evaluates residual energy
-				float energy = sumXY(size-int2(2), [&A, &B, transform](int x, int y) {
-					int2 a = int2(1)+int2(x,y);
-					assert_(a >= int2(0) && a < A.size);
-					int2 b = int2(round(transform(a, A.size)));
-					assert_(b >= int2(0) && b < A.size);
-					return sq(A(a) - B(b));
-				}, 0.f);
-				log(offset, energy);
-				if(energy < bestResidualEnergy) {
-					bestResidualEnergy = energy;
-					bestTransform = transform;
+		for(const ImageF& image : images.slice(1)) { // Compares each image with first one (TODO: full regression)
+			array<ImageF> B = mipmap(image, levelCount);
+			Transform bestTransform {vec2(0,0)};
+			for(int level: range(levelCount)) {
+				const ImageF& a = A[level];
+				const ImageF& b = B[level];
+				// FIXME: Compare image subsets
+				Transform levelBestTransform = bestTransform * Transform{vec2(0,0)};
+				float bestResidualEnergy = residualEnergy(a, b, levelBestTransform);
+				for(int2 offset: {int2(-1,0), int2(1,0),  int2(0,-1),int2(0,1)}) { // Diamond search step along both translation axis
+					Transform transform = bestTransform * Transform{vec2(offset)/vec2(b.size)};
+					float energy = residualEnergy(a, b, transform);
+					if(energy < bestResidualEnergy) {
+						bestResidualEnergy = energy;
+						levelBestTransform = transform;
+					}
 				}
+				bestTransform = levelBestTransform;
 			}
 			transforms.append(bestTransform);
 		}
+		log(transforms);
 		return transforms;
 	}
 };
@@ -186,7 +219,7 @@ struct TransformSampleImageGroupSource : ImageGroupSource {
 		: source(source), transform(transform) {}
 
 	size_t count(size_t need=0) override { return source.count(need); }
-	int64 time(size_t groupIndex) override { return source.time(groupIndex); }
+	int64 time(size_t groupIndex) override { return max(source.time(groupIndex), transform.time(groupIndex)); }
 	String name() const override { return str("[sample]", source.name()); }
 	int outputs() const override { return source.outputs(); }
 	const Folder& folder() const override { return cacheFolder; }
@@ -207,13 +240,15 @@ struct ExposureBlend {
 	Folder folder {"Pictures/ExposureBlend", home()};
 	PersistentValue<map<String, String>> imagesAttributes {folder,"attributes"};
 	ImageFolder source { folder };
-	ProcessedSourceT<Normalize> normalize {source};
+	ProcessedSourceT<Intensity> intensity {source};
+	ProcessedSourceT<BandPass> bandpass {intensity};
+	ProcessedSourceT<Normalize> normalize {bandpass};
 	DifferenceSplit split {normalize};
 	ProcessedImageGroupSource sourceSplit {source, split};
-	ProcessedImageGroupSource normalizeSplit {normalize, split};
+	ProcessedImageGroupSource intensitySplit {normalize, split};
 
 	Align align;
-	ProcessedImageTransformGroupSource transforms {normalizeSplit, align};
+	ProcessedImageTransformGroupSource transforms {intensitySplit, align};
 
 	TransformSampleImageGroupSource transformed {sourceSplit, transforms};
 
@@ -228,7 +263,11 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	size_t index = lastIndex != invalid ? lastIndex : 0;*/
 	size_t index = 0;
 
+#if 0
+	ImageSourceView views [2] {{unaligned, &index, window, source.maximumSize()/32}, {aligned, &index, window, source.maximumSize()/32}};
+#else
 	ImageSourceView views [2] {{unaligned, &index, window}, {aligned, &index, window}};
+#endif
 	WidgetToggle toggleView {&views[0], &views[1], 0};
 	Window window {&toggleView, -1, [this]{ return toggleView.title()+" "+imagesAttributes.value(source.elementName(index)); }};
 

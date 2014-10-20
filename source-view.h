@@ -30,7 +30,7 @@ struct ImageSourceView : ImageView, Poll {
         int2 hint = (source.size(index)+int2(downscaleFactor-1))/downscaleFactor;
 #else
         int2 hint = size;
-        assert_(source.maximumSize().x/hint.x <= 16);
+		assert_(source.maximumSize().x/hint.x <= 256);
 #endif
         imageIndex = index;
 		image = source.image(min<size_t>(index, source.count(index+1)-1), hint);

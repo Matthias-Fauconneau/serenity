@@ -73,15 +73,15 @@ Image decodeImage(const ref<byte> file) {
 // -- Resampling (3x8bit) --
 
 static void box(const Image& target, const Image& source) {
-    assert_(source.width/target.width==source.height/target.height, source.size, target.size);
     assert_(!source.alpha); //FIXME: not alpha correct
-    uint scale = source.width/target.width;
-    assert_(scale <= 16, target.size, source.size);
+	int scale = source.width/target.width;
+	assert_(scale <= 256, target.size, source.size);
+	assert_((target.size-int2(1))*scale+int2(scale-1) < source.size);
     chunk_parallel(target.height, [&](uint, size_t y) {
         const byte4* sourceLine = source.data + y * scale * source.stride;
         byte4* targetLine = target.begin() + y * target.stride;
         for(uint unused x: range(target.width)) {
-            const byte4* sourceSpanOrigin = sourceLine + x* scale;
+			const byte4* sourceSpanOrigin = sourceLine + x * scale;
             uint4 s = 0;
             for(uint i: range(scale)) {
                 const byte4* sourceSpan = sourceSpanOrigin + i * source.stride;
@@ -103,7 +103,7 @@ static void bilinear(const Image& target, const Image& source) {
             uint ix = fx/256, iy = fy/256;
             uint u = fx%256, v = fy%256;
             const ref<byte4> span = source.slice(iy*stride+ix);
-            byte4 d /*=Void()*/;
+			byte4 d;
             for(int i=0; i<3; i++) { // Interpolates values as if in linear space (not sRGB)
                 d[i] = ((uint(span[      0][i]) * (256-u) + uint(span[           1][i]) * u) * (256-v)
                        + (uint(span[stride][i]) * (256-u) + uint(span[stride+1][i]) * u) * (       v) ) / (256*256);
@@ -120,7 +120,7 @@ void resize(const Image& target, const Image& source) {
     else if(target.size > source.size/2) bilinear(target, source); // Bilinear resample
     else { // Integer box downsample + Bilinear resample
         int downsampleFactor = min(source.size.x/target.size.x, source.size.y/target.size.y);
-        bilinear(target, box(source.size/downsampleFactor, source));
+		bilinear(target, box((source.size/*+int2((downsampleFactor-1)/2)*/)/downsampleFactor, source));
     }
 }
 
@@ -172,7 +172,7 @@ void sRGB(mref<byte4> target, ref<float> blue, ref<float> green, ref<float> red)
 
 // -- Resampling (float) --
 
-static ImageF downsample(ImageF&& target, const ImageF& source) {
+ImageF downsample(ImageF&& target, const ImageF& source) {
     assert_(target.size == source.size/2, target.size, source.size);
     for(uint y: range(target.height)) for(uint x: range(target.width))
         target(x,y) = (source(x*2+0,y*2+0) + source(x*2+1,y*2+0) + source(x*2+0,y*2+1) + source(x*2+1,y*2+1)) / 4;

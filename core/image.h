@@ -160,6 +160,10 @@ inline Image sRGB(const ImageF& blue, const ImageF& green, const ImageF& red) {
 
 // -- Resampling (float) --
 
+/// Downsamples linear float image by a factor 2
+ImageF downsample(ImageF&& target, const ImageF& source);
+inline ImageF downsample(const ImageF& source) { return downsample(source.size/2, source); }
+
 ImageF resize(ImageF&& target, ImageF&& source);
 
 // -- Convolution --

@@ -69,7 +69,7 @@ struct Stream : Handle { //FIXME: overlaps with Data/BinaryData
     /// Reads up to \a size bytes in an inline Array if possible
     template<size_t N> Array<byte, N> readUpTo(size_t size) { Array<byte, N> target; readUpTo(target, size); return target; }
     /// Reads a raw value
-    generic T read() { T t/*=Void()*/; read(mref<byte>((byte*)&t,sizeof(T))); return t; }
+	generic T read() { T t; read(mref<byte>((byte*)&t,sizeof(T))); return t; }
     /// Reads \a size raw values
     generic buffer<T> read(size_t size) {
 		::buffer<byte> buffer(size*sizeof(T), "read");

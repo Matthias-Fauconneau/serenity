@@ -13,11 +13,11 @@ struct ProcessedSource : ImageSource {
 
 	int outputs() const override { return operation.outputs(); }
 	const Folder& folder() const override { return cacheFolder; }
-	String name() const override { return str(operation.name(), source.name()); }
+	String name() const override { return str(source.name(), operation.name()); }
 	size_t count(size_t) override { return source.count(); }
     int2 maximumSize() const override { return source.maximumSize(); }
 	String elementName(size_t index) const override { return source.elementName(index); }
-	int64 time(size_t index) override { return max(operation.time(), source.time(index)); }
+	int64 time(size_t index) override { return max(source.time(index), operation.time()); }
     const map<String, String>& properties(size_t index) const override { return source.properties(index); }
     int2 size(size_t index) const override { return source.size(index); }
 

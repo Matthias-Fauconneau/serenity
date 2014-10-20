@@ -19,6 +19,17 @@ struct ImageOperation : virtual Operation {
 	virtual void apply(ref<ImageF> Y, ref<ImageF> X) const abstract;
 };
 
+struct ImageOperation1 : ImageOperation{
+	int inputs() const override { return 1; }
+	int outputs() const override { return 1; }
+	virtual void apply(const ImageF& Y, const ImageF& X) const abstract;
+	virtual void apply(ref<ImageF> Y, ref<ImageF> X) const override {
+		assert_(Y.size == 1);
+		assert_(X.size == 1);
+		apply(Y[0], X[0]);
+	}
+};
+
 struct ImageOperation31 : ImageOperation{
 	int inputs() const override { return 3; }
 	int outputs() const override { return 1; }
