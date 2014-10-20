@@ -4,6 +4,9 @@
 #include "data.h"
 #include "parallel.h"
 
+inline bool isPowerOfTwo(uint v) { return !(v & (v - 1)); }
+inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
+
 /// 2D array of BGRA 8-bit unsigned integer pixels
 struct Image : buffer<byte4> {
     union {

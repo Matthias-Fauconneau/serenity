@@ -179,8 +179,6 @@ ImageF downsample(ImageF&& target, const ImageF& source) {
     return move(target);
 }
 
-static bool isPowerOfTwo(uint v) { return !(v & (v - 1)); }
-static uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
 ImageF resize(ImageF&& target, ImageF&& source) {
     assert_(source.width*target.height==source.height*target.width); // Uniform scale
     assert_(source.size > target.size, target.size, source.size); // Downsample
