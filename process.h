@@ -33,35 +33,22 @@ generic struct ProcessedSourceT : T, ProcessedSource {
 
 // ProcessedGroupImageSource
 
+/// Evaluates an image for each group
 struct ProcessedGroupImageSource : ImageSource {
-	ImageSource& source;
-	GroupSource& groups;
+	ImageGroupSource& source;
 	ImageGroupOperation& operation;
-	Folder cacheFolder {operation.name(), source.folder(), true};
-	ProcessedGroupImageSource(ImageSource& source, GroupSource& groups, ImageGroupOperation& operation) :
-		source(source), groups(groups), operation(operation) {}
+	Folder cacheFolder;
+	ProcessedGroupImageSource(ImageGroupSource& source, ImageGroupOperation& operation);
 
-	int outputs() const override { return operation.outputs(); }
-	const Folder& folder() const override { return cacheFolder; }
-	String name() const override { return str(operation.name(), source.name()); }
-	size_t count(size_t need=0) override { return groups.count(need); }
-	int2 maximumSize() const override { return source.maximumSize(); }
-	String elementName(size_t groupIndex) const override {
-		return str(apply(groups(groupIndex), [this](const size_t index) { return source.elementName(index); }));
-	}
-	int64 time(size_t groupIndex) override {
-		return max(operation.time(), max(apply(groups(groupIndex), [this](size_t index) { return source.time(index); })));
-	}
-	const map<String, String>& properties(size_t unused groupIndex) const override {
-		static map<String, String> empty;
-		return empty; // Unimplemented
-		//return str(apply(groups(groupIndex), [this](const size_t index) { return source.properties(index); }));
-	}
-	int2 size(size_t groupIndex) const override {
-		auto sizes = apply(groups(groupIndex), [this](size_t index) { return source.size(index); });
-		for(auto size: sizes) assert_(size == sizes[0]);
-		return sizes[0];
-	}
+	int outputs() const override;
+	const Folder& folder() const override;
+	String name() const override;
+	size_t count(size_t need=0) override;
+	int2 maximumSize() const override;
+	String elementName(size_t groupIndex) const override;
+	int64 time(size_t groupIndex) override;
+	const map<String, String>& properties(size_t unused groupIndex) const override;
+	int2 size(size_t groupIndex) const override;
 
 	SourceImage image(size_t groupIndex, int outputIndex, int2 unused size=0, bool unused noCacheWrite = false) override;
 	SourceImageRGB image(size_t groupIndex, int2 size, bool noCacheWrite) override;

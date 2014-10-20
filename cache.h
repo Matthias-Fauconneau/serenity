@@ -48,6 +48,9 @@ generic struct ImageMapSource : T {
     ImageMapSource(T&& image) : T(move(image)) { assert_(T::capacity); /*Heap allocated image*/ }
     ImageMapSource(const File& file, int2 size) : map(file) { (T&)*this = T(unsafeReference(cast<typename T::type>(map)), size, size.x); }
 };
+generic auto share(ref<ImageMapSource<T>> ref) -> buffer<decltype(share(ref[0]))> {
+	return apply(ref,  [](const ImageMapSource<T>& x){ return share(x); });
+}
 
 /// Maps results to be generated or read from cache
 template<Type T> ImageMapSource<T> cache(const Folder& folder, string name, int2 size, int64 sourceTime,

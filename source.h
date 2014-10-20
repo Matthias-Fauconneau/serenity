@@ -13,6 +13,7 @@ struct Source {
 	virtual size_t count(size_t need=0) abstract;
 	/// Last modified time of element
 	virtual int64 time(size_t index) abstract;
+	virtual ~Source() {}
 };
 
 /// Implements I::name for T
@@ -24,7 +25,7 @@ template<class I, class T> struct Name : virtual I {
 };
 
 /// Splits a collection in groups
-struct GroupSource : virtual Source {
+struct GroupSource : Source {
 	virtual array<size_t> operator()(size_t groupIndex) = 0;
 };
 
@@ -32,7 +33,7 @@ typedef ImageMapSource<ImageF> SourceImage;
 typedef ImageMapSource<Image> SourceImageRGB;
 
 /// Implicit collection of images
-struct ImageSource : virtual Source {
+struct ImageSource : Source {
 	/// Name
 	virtual String name() const abstract;
 	/// Number of outputs per image index (aka channels, components)
@@ -51,8 +52,13 @@ struct ImageSource : virtual Source {
 	}
 };
 
-struct ImageGroupSource : GroupSource {
-	ImageSource& source;
-	ImageGroupSource(ImageSource& source) : source(source) {}
-	int64 time(size_t index) override { return max(apply(operator()(index), [this](size_t index) { return source.time(index); })); }
+struct ImageGroupSource : Source {
+	virtual String name() const abstract;
+	virtual int outputs() const  abstract;
+	virtual const Folder& folder() const  abstract;
+	virtual int2 maximumSize() const  abstract;
+	virtual String elementName(size_t groupIndex) const abstract;
+	virtual int64 time(size_t groupIndex)  abstract;
+	virtual int2 size(size_t groupIndex) const abstract;
+	virtual array<SourceImage> images(size_t groupIndex, int outputIndex, int2 size=0, bool noCacheWrite = false)  abstract;
 };

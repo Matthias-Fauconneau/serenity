@@ -11,11 +11,12 @@ struct ImageSourceView : ImageView, Poll {
     SourceImageRGB image; // Holds memory map reference
     int2 size = 0;
     function<void()> contentChanged;
+	int2 hint = 0;
 
-	ImageSourceView(ImageSource& source, size_t* index, function<void()> contentChanged)
-		: source(source), index(index), contentChanged(contentChanged) {}
-	ImageSourceView(ImageSource& source, size_t* index, Window& window)
-        : ImageSourceView(source, index, {&window, &Window::render}) {}
+	ImageSourceView(ImageSource& source, size_t* index, function<void()> contentChanged, int2 hint=0)
+		: source(source), index(index), contentChanged(contentChanged), hint(hint) {}
+	ImageSourceView(ImageSource& source, size_t* index, Window& window, int2 hint=0)
+		: ImageSourceView(source, index, {&window, &Window::render}, hint) {}
 
     // Progressive evaluation
     void event() override {
@@ -50,7 +51,7 @@ struct ImageSourceView : ImageView, Poll {
         int downscaleFactor = min(max((maximum.x+size.x-1)/size.x, (maximum.y+size.y-1)/size.y), 16);
         int2 hint = maximum/downscaleFactor;
         assert_(hint<=size, maximum, size, downscaleFactor, maximum/downscaleFactor);
-        return hint;
+		return this->hint ? this->hint : hint;
     }
 
     Graphics graphics(int2 size) override {
@@ -78,10 +79,10 @@ struct ImageSourceView : ImageView, Poll {
 
     /// Browses source with keys
     bool keyPress(Key key, Modifiers) override {
-		if(source.count() && key==Home) return setIndex(0);
-		if(int(index)>0 && ref<Key>{Backspace,LeftArrow}.contains(key)) return setIndex(index-1);
-		if(index+1<source.count(index+2) && ref<Key>{Return,RightArrow}.contains(key)) return setIndex(index+1);
-		if(index+1<source.count(index+2) && key==End) return setIndex(source.count(index+2)-1);
+		if(key==Home && source.count()) return setIndex(0);
+		if(ref<Key>{Backspace,LeftArrow}.contains(key) && int(index)>0) return setIndex(index-1);
+		if(ref<Key>{Return,RightArrow}.contains(key) && index+1<source.count(index+2)) return setIndex(index+1);
+		if(key==End && index+1<source.count(index+2)) return setIndex(source.count(index+2)-1);
         return false;
     }
 };
