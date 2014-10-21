@@ -18,7 +18,7 @@ void Handle::close() { if(fd>0) ::close(fd); fd=0; }
 String Handle::name() const {
     if(fd==AT_FDCWD) return String(".");
     static Folder procSelfFD("/proc/self/fd/");
-    String s; s.size=check(readlinkat(procSelfFD.fd, strz(str((int)fd)), s.begin(), s.capacity), (int)fd);
+	String s (256); s.size=check(readlinkat(procSelfFD.fd, strz(str((int)fd)), s.begin(), s.capacity), (int)fd);
     return s;
 }
 

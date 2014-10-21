@@ -63,25 +63,64 @@ array<SourceImage> ProcessedImageGroupSource::images(size_t groupIndex, size_t o
 array<SourceImage> ProcessedGroupImageGroupSource::images(size_t groupIndex, size_t outputIndex, int2 size, bool noCacheWrite) {
 	assert_(outputIndex == 0, outputIndex, operation.name(), operation.inputs(), operation.outputs());
 	if(!size) size=this->size(groupIndex);
-	if(operation.outputs() == 1) {
-		array<array<SourceImage>> groupInputs;
-		for(size_t inputIndex: range(operation.inputs())) groupInputs.append( source.images(groupIndex, inputIndex, size, noCacheWrite) );
-		return apply(groupInputs[0].size, [&](size_t index) -> SourceImage {
-			array<ImageF> inputs;
-			for(size_t inputIndex: range(operation.inputs())) inputs.append( share(groupInputs[inputIndex][index]) );
-			array<ImageF> outputs;
-			for(size_t unused index: range(operation.outputs())) outputs.append( size );
-			operation.apply(outputs, inputs);
-			return move(outputs[0]);
-		});
-	}
-	if(operation.outputs() == 0) {
+	if(operation.outputs() == 0) { // Process all images at once
 		assert_(operation.inputs()==0);
 		auto inputs = source.images(groupIndex, outputIndex, size, noCacheWrite);
 		array<SourceImage> outputs;
 		for(size_t unused index: range(inputs.size)) outputs.append( size );
 		operation.apply(share(outputs), share(inputs));
 		return outputs;
+	} else { // Process every image separately
+		assert_(operation.inputs() >= 1, operation.name());
+		array<array<SourceImage>> groupInputs;
+		for(size_t inputIndex: range(operation.inputs())) groupInputs.append( source.images(groupIndex, inputIndex, size, noCacheWrite) );
+		array<SourceImage> allOutputs;
+		for(size_t imageIndex: range(groupInputs[0].size)) {
+			array<ImageF> inputs;
+			for(size_t inputIndex: range(groupInputs.size)) inputs.append( share(groupInputs[inputIndex][imageIndex]) );
+			array<SourceImage> outputs;
+			for(size_t unused index: range(operation.outputs())) outputs.append( size );
+			operation.apply(share(outputs), inputs);
+			allOutputs.append(outputs);
+		}
+		return allOutputs;
 	}
 	error(operation.outputs());
+}
+
+// BinaryGroupImageGroupSource
+
+array<SourceImage> BinaryGroupImageGroupSource::images(size_t groupIndex, size_t outputIndex, int2 size, bool noCacheWrite) {
+	/*if(A.outputs()+B.outputs() == operation.inputs()) { // Process all images at once
+		auto a = A.images(groupIndex, outputIndex, size, noCacheWrite);
+		auto b = B.images(groupIndex, outputIndex, size, noCacheWrite);
+		array<SourceImage> outputs;
+		for(size_t unused index: range(operation.outputs())) outputs.append( size );
+		operation.apply(share(outputs), share(a)+share(b));
+		return outputs;
+	} else */ { // Distributes binary operator on every output of B
+		assert_(operation.inputs() >= 2, operation.name());
+		array<array<SourceImage>> groupInputs;
+		for(size_t inputIndex: range(operation.inputs()-1)) groupInputs.append( A.images(groupIndex, inputIndex, size, noCacheWrite) );
+		auto b = B.images(groupIndex, outputIndex, size, noCacheWrite);
+		/*if(operation.outputs() == 0) { // Process all images at once
+			assert_(operation.inputs()==0);
+			array<SourceImage> outputs;
+			for(size_t unused index: range(operation.outputs())) outputs.append( size );
+			operation.apply(share(outputs), share(a)+share(b));
+			return outputs;
+		} else*/ {
+			array<SourceImage> allOutputs;
+			for(size_t imageIndex: range(groupInputs[0].size)) {
+				array<ImageF> inputs;
+				for(size_t inputIndex: range(groupInputs.size)) inputs.append(share(groupInputs[inputIndex][imageIndex]));
+				inputs.append( share(b[imageIndex]) );
+				array<SourceImage> outputs;
+				for(size_t unused index: range(operation.outputs())) outputs.append( size );
+				operation.apply(share(outputs), inputs);
+				allOutputs.append(outputs);
+			}
+			return allOutputs;
+		}
+	}
 }

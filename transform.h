@@ -75,7 +75,7 @@ struct TransformSampleImageGroupSource : ImageGroupSource {
 
 	size_t count(size_t need=0) override { return source.count(need); }
 	int64 time(size_t groupIndex) override { return max(source.time(groupIndex), transform.time(groupIndex)); }
-	String name() const override { return str("[sample]", source.name()); }
+	String name() const override { return str(source.name(), "[sample]"); }
 	const Folder& folder() const override { return cacheFolder; }
 	int2 maximumSize() const override { return source.maximumSize(); }
 	String elementName(size_t groupIndex) const override { return source.elementName(groupIndex); }

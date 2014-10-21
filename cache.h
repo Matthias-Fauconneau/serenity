@@ -77,7 +77,7 @@ generic auto share(ref<ImageMapSource<T>> ref) -> buffer<decltype(share(ref[0]))
 /// Maps results to be generated or read from cache
 template<Type T> ImageMapSource<T> cache(const Folder& folder, string name, int2 size, int64 sourceTime,
 										 function<void(const T&)> evaluate, bool noCacheWrite = false, string version = __DATE__ " " __TIME__) {
-	if(noCacheWrite) { T target(size); evaluate(target); return move(target); }
+	if(noCacheWrite) { log(name); T target(size); evaluate(target); return move(target); }
 	return {cacheFile(folder, name, strx(size), sourceTime, [size,&evaluate](File& file) {
         file.resize(size.y*size.x*sizeof(typename T::type));
         Map map(file, Map::Write);

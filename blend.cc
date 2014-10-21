@@ -21,6 +21,7 @@ struct Contrast : ImageOperation1, OperationT<Contrast> {
 	}
 };
 
+#if 0
 struct MergeGenericImageSource : virtual GenericImageSource {
 	GenericImageSource& A;
 	GenericImageSource& B;
@@ -52,13 +53,13 @@ struct MergeImageGroupSource : MergeGenericImageSource, ImageGroupSource {
 		return B.images(groupIndex, subOutputIndex, size, noCacheWrite);
 	}
 };
+#endif
 
 /// Normalizes weights
 /// \note if all weights are zero, weights are all set to 1/groupSize.
 struct NormalizeWeights : ImageGroupOperation, OperationT<NormalizeWeights> {
 	string name() const override { return "[normalize-weights]"; }
 	virtual void apply(ref<ImageF> Y, ref<ImageF> X) const override {
-		log("NormalizeWeights");
 		assert_(Y.size == X.size);
 		forXY(Y[0].size, [&](uint x, uint y) {
 			float sum = 0;
@@ -69,11 +70,26 @@ struct NormalizeWeights : ImageGroupOperation, OperationT<NormalizeWeights> {
 	}
 };
 
+struct First : ImageGroupOperation1, OperationT<First> {
+	string name() const override { return "[first]"; }
+	virtual void apply(const ImageF& Y, ref<ImageF> X) const {
+		Y.copy(X[0]);
+	}
+};
+
 /// Sums together all images in an image group
 struct Sum : ImageGroupOperation1, OperationT<Sum> {
 	string name() const override { return "[sum]"; }
 	virtual void apply(const ImageF& Y, ref<ImageF> X) const {
 		parallel::apply(Y, [&](size_t index) { return sum(::apply(X, [index](const ImageF& x) { return x[index]; })); });
+	}
+};
+
+/// Averages together all images in an image group
+struct Mean : ImageGroupOperation1, OperationT<Mean> {
+	string name() const override { return "[mean]"; }
+	virtual void apply(const ImageF& Y, ref<ImageF> X) const {
+		parallel::apply(Y, [&](size_t index) { return sum(::apply(X, [index](const ImageF& x) { return x[index]; }))/X.size; });
 	}
 };
 
@@ -97,22 +113,20 @@ struct ExposureBlend {
 	ProcessedGroupImageGroupSourceT<LowPass> lowWeights {weights}; // Filters high frequency noise in contrast estimation
 	ProcessedGroupImageGroupSourceT<NormalizeWeights> normalizedWeights {lowWeights};
 
-	MergeImageGroupSource weights_source {normalizedWeights, alignedIntensity /*alignedSource*/};
-	ProcessedGroupImageGroupSourceT<Multiply> weighted {weights_source};
+	BinaryGroupImageGroupSourceT<Multiply> weighted {normalizedWeights, alignedSource};
 
-	ProcessedGroupImageSourceT<Sum> aligned {weighted};
-
-	sRGBSource sRGB_intensity {intensity};
-	sRGBSource sRGB_aligned {aligned};
+	ProcessedGroupImageSourceT<First> first {alignedSource};
+	ProcessedGroupImageSourceT<Mean> mean {alignedSource};
+	ProcessedGroupImageSourceT<Sum> blend {weighted};
 };
 
 struct ExposureBlendPreview : ExposureBlend, Application {
-	/*PersistentValue<String> lastName {folder, ".last", [this]{ return source.elementName(index); }};
+	PersistentValue<String> lastName {folder, ".last", [this]{ return source.elementName(index); }};
 	const size_t lastIndex = source.keys.indexOf(lastName);
-	size_t index = lastIndex != invalid ? lastIndex : 0;*/
-	size_t index = 0;
+	size_t index = lastIndex != invalid ? lastIndex : 0;
 
-	ImageSourceView views [2] {{sRGB_intensity, &index, window}, {sRGB_aligned, &index, window}};
+	sRGBSource sRGB [2] {{first}, {blend}};
+	ImageSourceView views [2] {{sRGB[0], &index, window}, {sRGB[1], &index, window}};
 	WidgetToggle toggleView {&views[0], &views[1], 0};
 	Window window {&toggleView, -1, [this]{ return toggleView.title()+" "+imagesAttributes.value(source.elementName(index)); }};
 
@@ -133,3 +147,8 @@ struct ExposureBlendTest : ExposureBlend, Application {
 	}
 };
 registerApplication(ExposureBlendTest, test);
+
+struct ExposureBlendGraph : ExposureBlend, Application {
+	ExposureBlendGraph() { log(first.toString()); }
+};
+registerApplication(ExposureBlendGraph, graph);

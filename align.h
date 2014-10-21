@@ -5,7 +5,7 @@ float residualEnergy(const ImageF& A, const ImageF& B, Transform transform) {
 	assert_(A.size == B.size);
 	int2 margin = int2(round(abs(transform.offset)*vec2(B.size)));
 	int2 size = A.size - 2*margin;
-	assert_(size > int2(16), transform, margin, A.size);
+	assert_(size > int2(16), transform, margin, A.size, size);
 	float energy = sumXY(size, [&A, &B, transform](int x, int y) {
 		int2 a = int2(round(abs(transform.offset)*vec2(B.size)))+int2(x,y);
 		int2 b = int2(round(transform(a, B.size)));
@@ -33,7 +33,7 @@ struct Align : ImageTransformGroupOperation, OperationT<Align> {
 	// Evaluates residual energy at integer offsets
 	virtual array<Transform> operator()(ref<ImageF> images) const override {
 		for(auto& image: images) assert_(image.size == images[0].size);
-		const int levelCount = log2(uint(images[0].size.x/16)); // / (16, 12)
+		const int levelCount = log2(uint(images[0].size.x/32)); // / (32, 24)
 		array<ImageF> A = mipmap(images[0], levelCount);
 		array<Transform> transforms;
 		transforms.append();

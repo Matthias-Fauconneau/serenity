@@ -12,6 +12,7 @@ struct ImageSourceView : ImageView, Poll {
     int2 size = 0;
     function<void()> contentChanged;
 	int2 hint = 0;
+	bool noCacheWrite = true;
 
 	ImageSourceView(ImageRGBSource& source, size_t* index, function<void()> contentChanged, int2 hint=0)
 		: source(source), index(index), contentChanged(contentChanged), hint(hint) {}
@@ -33,7 +34,7 @@ struct ImageSourceView : ImageView, Poll {
 		assert_(source.maximumSize().x/hint.x <= 256);
 #endif
         imageIndex = index;
-		image = source.image(min<size_t>(index, source.count(index+1)-1), hint);
+		image = source.image(min<size_t>(index, source.count(index+1)-1), hint, noCacheWrite);
         ImageView::image = share(image);
         contentChanged();
     }
@@ -42,7 +43,7 @@ struct ImageSourceView : ImageView, Poll {
 
     String title() override {
 		if(!source.count()) return String();
-		return str(index+1,'/',source.count(), source.elementName(index));
+		return str(index+1,'/',source.count(), source.elementName(min<size_t>(index, source.count(1)-1)));
     }
 
     int2 sizeHint(int2 size) override {
