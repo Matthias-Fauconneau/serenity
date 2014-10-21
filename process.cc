@@ -31,7 +31,7 @@ SourceImageRGB sRGBSource::image(size_t imageIndex, int2 size, bool noCacheWrite
 // ProcessedGroupImageSource
 
 SourceImage ProcessedGroupImageSource::image(size_t groupIndex, size_t outputIndex, int2 size, bool noCacheWrite) {
-	return  ::cache<ImageF>(folder(), elementName(groupIndex), size?:this->size(groupIndex), time(groupIndex),
+	return  ::cache<ImageF>(folder(), elementName(groupIndex)+'['+str(outputIndex)+']', size?:this->size(groupIndex), time(groupIndex),
 						   [&](const ImageF& target) {
 		if(!size) size=this->size(groupIndex);
 		auto inputs = source.images(groupIndex, outputIndex, size, noCacheWrite);
@@ -99,6 +99,7 @@ array<SourceImage> BinaryGroupImageGroupSource::images(size_t groupIndex, size_t
 		operation.apply(share(outputs), share(a)+share(b));
 		return outputs;
 	} else */ { // Distributes binary operator on every output of B
+		assert_(A.outputs() == 1, operation.name());
 		assert_(operation.inputs() >= 2, operation.name());
 		array<array<SourceImage>> groupInputs;
 		for(size_t inputIndex: range(operation.inputs()-1)) groupInputs.append( A.images(groupIndex, inputIndex, size, noCacheWrite) );

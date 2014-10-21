@@ -12,7 +12,7 @@ struct ImageSourceView : ImageView, Poll {
     int2 size = 0;
     function<void()> contentChanged;
 	int2 hint = 0;
-	bool noCacheWrite = true;
+	bool noCacheWrite = false;
 
 	ImageSourceView(ImageRGBSource& source, size_t* index, function<void()> contentChanged, int2 hint=0)
 		: source(source), index(index), contentChanged(contentChanged), hint(hint) {}
