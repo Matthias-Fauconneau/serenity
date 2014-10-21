@@ -205,7 +205,7 @@ static void convolve(float* target, const float* source, const float* kernel, in
         float* targetColumn = target + y;
         for(int x: range(-radius,0)) {
             float sum = 0;
-            for(int dx: range(N)) sum += kernel[dx] * line[max(0, x+dx)];
+			for(int dx: range(N)) sum += kernel[dx] * line[abs(x+dx)];
             targetColumn[(x+radius)*targetStride] = sum;
         }
         for(int x: range(0,width-2*radius)) {
@@ -216,7 +216,7 @@ static void convolve(float* target, const float* source, const float* kernel, in
         }
         for(int x: range(width-2*radius,width-radius)){
             float sum = 0;
-            for(int dx: range(N)) sum += kernel[dx] * line[min(width-1, x+dx)];
+			for(int dx: range(N)) sum += kernel[dx] * line[width-1-abs(x+dx-(width-1))];
             targetColumn[(x+radius)*targetStride] = sum;
         }
     });

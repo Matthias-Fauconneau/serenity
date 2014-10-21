@@ -13,7 +13,7 @@ void Intensity::apply(const ImageF& Y, const ImageF& X0, const ImageF& X1, const
 
 void LowPass::apply(const ImageF& Y, const ImageF& X) const {
 	const float largeScale = (X.size.y-1)/6;
-	gaussianBlur(Y, X, largeScale/16); // Low pass
+	gaussianBlur(Y, X, largeScale/4); // Low pass
 }
 
 void BandPass::apply(const ImageF& Y, const ImageF& X) const {

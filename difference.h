@@ -35,7 +35,7 @@ struct ConsecutivePairs : virtual GroupSource {
 
 /// Splits sequence in groups separated when difference between consecutive images is greater than a threshold
 struct DifferenceSplit : GroupSource {
-	static constexpr float threshold = 0.1; // 0.18 with bandpass
+	static constexpr float threshold = 0.04; // 0.18 with bandpass
 	ImageSource& source;
 	ConsecutivePairs pairs {source};
 	ProcessedImageGroupSource sourcePairs {source, pairs};

@@ -7,36 +7,24 @@
 #include "transform.h"
 #include "align.h"
 #include "source-view.h"
+#include "jpeg-encoder.h"
 
 /// Estimates contrast at every pixel
 struct Contrast : ImageOperation1, OperationT<Contrast> {
 	string name() const override { return "contrast"; }
 	virtual void apply(const ImageF& Y, const ImageF& X) const {
-		forXY(Y.size-int2(2), [&](uint x, uint y) {
-			int2 p = int2(1) + int2(x,y);
+		forXY(Y.size, [&](uint x, uint y) {
+			int2 A = int2(x,y);
 			float sum = 0, SAD = 0;
-			float a = X(p);
+			float a = X(A);
 			for(int dy: range(3)) for(int dx: range(3)) {
-				float b = X(p+int2(dx-1, dy-1));
+				int2 B = A+int2(dx-1, dy-1);
+				if(!(B >= int2(0) && B < X.size)) continue;
+				float b = X(B);
 				sum += b;
 				SAD += abs(a - b);
 			}
-			Y(p) = sum ? SAD / sum : 0;
-		});
-	}
-};
-
-/// Normalizes weights
-/// \note if all weights are zero, weights are all set to 1/groupSize.
-struct NormalizeWeights : ImageGroupOperation, OperationT<NormalizeWeights> {
-	string name() const override { return "[normalize-weights]"; }
-	virtual void apply(ref<ImageF> Y, ref<ImageF> X) const override {
-		assert_(Y.size == X.size);
-		forXY(Y[0].size, [&](uint x, uint y) {
-			float sum = 0;
-			for(size_t index: range(X.size)) sum += X[index](x, y);
-			if(sum) for(size_t index: range(Y.size)) Y[index](x, y) = X[index](x, y)/sum;
-			else for(size_t index: range(Y.size)) Y[index](x, y) = 1./X.size;
+			Y(A) = sum ? SAD / sum : 0;
 		});
 	}
 };
@@ -54,11 +42,26 @@ struct MaximumWeight : ImageGroupOperation, OperationT<MaximumWeight> {
 	}
 };
 
+struct Mask : ImageOperation21, OperationT<Mask> {
+	string name() const override { return "[mask]"; }
+	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const override;
+};
+inline void Mask::apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const {
+	::apply(Y, [&](float a, float b) { return a ? b : 0; }, X0, X1);
+}
 
-struct First : ImageGroupOperation1, OperationT<First> {
-	string name() const override { return "[first]"; }
-	virtual void apply(const ImageF& Y, ref<ImageF> X) const {
-		Y.copy(X[0]);
+/// Normalizes weights
+/// \note if all weights are zero, weights are all set to 1/groupSize.
+struct NormalizeWeights : ImageGroupOperation, OperationT<NormalizeWeights> {
+	string name() const override { return "[normalize-weights]"; }
+	virtual void apply(ref<ImageF> Y, ref<ImageF> X) const override {
+		assert_(Y.size == X.size);
+		forXY(Y[0].size, [&](uint x, uint y) {
+			float sum = 0;
+			for(size_t index: range(X.size)) sum += X[index](x, y);
+			if(sum) for(size_t index: range(Y.size)) Y[index](x, y) = X[index](x, y)/sum;
+			else for(size_t index: range(Y.size)) Y[index](x, y) = 1./X.size;
+		});
 	}
 };
 
@@ -83,27 +86,21 @@ struct ExposureBlend {
 	PersistentValue<map<String, String>> imagesAttributes {folder,"attributes"};
 	ImageFolder source { folder };
 	ProcessedSourceT<Intensity> intensity {source};
-	//ProcessedSourceT<BandPass> bandpass {intensity};
 	ProcessedSourceT<Normalize> normalize {intensity};
 	DifferenceSplit split {normalize};
 	ProcessedImageGroupSource sourceSplit {source, split};
 	ProcessedImageGroupSource intensitySplit {normalize, split};
-
 	ProcessedImageTransformGroupSourceT<Align> transforms {intensitySplit};
-
 	TransformSampleImageGroupSource alignedSource {sourceSplit, transforms};
+	ProcessedGroupImageSourceT<Mean> mean {alignedSource};
 	ProcessedGroupImageGroupSourceT<Intensity> alignedIntensity {alignedSource};
-
 	ProcessedGroupImageGroupSourceT<Contrast> contrast {alignedIntensity};
-	ProcessedGroupImageGroupSourceT<LowPass> lowWeights {contrast}; // Filters high frequency noise in contrast estimation
-	ProcessedGroupImageGroupSourceT<MaximumWeight> maximumWeights {lowWeights}; // Prevents ghosting from misalignment
-	ProcessedGroupImageGroupSourceT<NormalizeWeights> normalizeWeights {lowWeights};
-
-	BinaryGroupImageGroupSourceT<Multiply> maximumWeighted {maximumWeights, alignedSource};
+	ProcessedGroupImageGroupSourceT<LowPass> lowContrast {contrast};
+	ProcessedGroupImageGroupSourceT<MaximumWeight> maximumWeights {lowContrast}; // Prevents misalignment blur
+	ProcessedGroupImageGroupSourceT<LowPass> lowWeights {maximumWeights}; // Diffuses weight selection
+	BinaryGroupImageGroupSourceT<Mask> maskLowWeights {alignedIntensity, lowWeights}; // Clears weight where no data is available
+	ProcessedGroupImageGroupSourceT<NormalizeWeights> normalizeWeights {maskLowWeights};
 	BinaryGroupImageGroupSourceT<Multiply> normalizeWeighted {normalizeWeights, alignedSource};
-
-	ProcessedGroupImageSourceT<First> first {alignedSource};
-	ProcessedGroupImageSourceT<Sum> mask {maximumWeighted};
 	ProcessedGroupImageSourceT<Sum> blend {normalizeWeighted};
 };
 
@@ -112,7 +109,7 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	const size_t lastIndex = source.keys.indexOf(lastName);
 	size_t index = lastIndex != invalid ? lastIndex : 0;
 
-	sRGBSource sRGB [2] {{mask}, {blend}};
+	sRGBSource sRGB [2] {{mean}, {blend}};
 	ImageSourceView views [2] {{sRGB[0], &index, window}, {sRGB[1], &index, window}};
 	WidgetToggle toggleView {&views[0], &views[1], 0};
 	Window window {&toggleView, -1, [this]{ return toggleView.title()+" "+imagesAttributes.value(source.elementName(index)); }};
@@ -135,7 +132,24 @@ struct ExposureBlendTest : ExposureBlend, Application {
 };
 registerApplication(ExposureBlendTest, test);
 
-struct ExposureBlendGraph : ExposureBlend, Application {
-	ExposureBlendGraph() { log(mask.toString()); }
+struct ExposureBlendExport : ExposureBlend, Application {
+	sRGBSource sRGB {blend};
+	ExposureBlendExport() {
+		Folder output ("Export", folder, true);
+		for(size_t index: range(sRGB.count(-1))) {
+			String name = sRGB.elementName(index);
+			Time correctionTime;
+			SourceImageRGB image = sRGB.image(index, int2(2048,1536), true);
+			correctionTime.stop();
+			Time compressionTime;
+			writeFile(name, encodeJPEG(image, 50), output, true);
+			compressionTime.stop();
+			log(str(100*(index+1)/sRGB.count(-1))+'%', '\t',index+1,'/',sRGB.count(-1),
+				'\t',imagesAttributes[sRGB.elementName(index)],
+				'\t',sRGB.elementName(index), strx(sRGB.size(index)),
+				'\t',correctionTime, compressionTime);
+		}
+	}
 };
-registerApplication(ExposureBlendGraph, graph);
+registerApplication(ExposureBlendExport, export);
+
