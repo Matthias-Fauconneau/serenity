@@ -6,10 +6,7 @@
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
 template<template<typename> class V, Type T, uint N> struct vec : V<T> {
-	template<Type _T> using _V = V<_T>;
-	typedef T _T;
-	static constexpr uint _N = N;
-    static_assert(sizeof(V<T>)==N*sizeof(T),"");
+	static_assert(sizeof(V<T>)==N*sizeof(T),"");
 
     /// Defaults initializes to zero
     vec() : vec(0) {}

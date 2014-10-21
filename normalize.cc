@@ -6,6 +6,7 @@ static void sum(mref<float> Y, ref<float> R, ref<float> G, ref<float> B) { apply
 
 void Intensity::apply(const ImageF& Y, const ImageF& X0, const ImageF& X1, const ImageF& X2) const {
 	::sum(Y, X0, X1, X2);
+	assert_(isNumber(Y[0]));
 }
 
 void BandPass::apply(const ImageF& Y, const ImageF& X) const {

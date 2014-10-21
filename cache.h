@@ -43,7 +43,7 @@ inline String cache(const Folder& folder, string name, string key, int64 sourceT
 	return file.read(file.size());
 }
 
-// Read/Write raw value cache
+/*// Read/Write raw value cache
 template<Type T> T cache(const Folder& folder, string name, string key, int64 sourceTime,
 						 function<T()> evaluate, bool noCacheWrite = false, string version = __DATE__ " " __TIME__) {
 	if(noCacheWrite) return evaluate();
@@ -61,7 +61,7 @@ template<Type T> array<T> cache(const Folder& folder, string name, string key, i
 	}, version);
 	assert_( file.size()%sizeof(T) == 0 );
 	file.template read<T>(file.size()/sizeof(T));
-}
+}*/
 
 // Mapped image cache
 generic struct ImageMapSource : T {

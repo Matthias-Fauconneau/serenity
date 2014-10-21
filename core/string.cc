@@ -67,14 +67,16 @@ char upperCase(char c) { return c>='a'&&c<='z'?'A'+c-'a':c; }
 String toUpper(const string source) { return apply(source, upperCase); }
 
 String left(const string source, size_t size, const char pad) {
-    String target(max(size, source.size));
+	if(source.size >= size) return String(source);
+	String target(size);
     target.append(source);
     while(target.size < size) target.append(pad);
     return target;
 }
 String right(const string source, size_t size, const char pad) {
-    String target(max(size, source.size));
-    while(target.size < size-source.size) target.append(pad);
+	if(source.size >= size) return String(source);
+	String target(size);
+	while(target.size < size-source.size) target.append(pad);
     target.append(source);
     return target;
 }

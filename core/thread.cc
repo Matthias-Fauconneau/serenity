@@ -120,13 +120,14 @@ void setExceptions(uint except) {
     asm volatile("ldmxcsr %0" : : "m" (*&r));
 }
 
-#include <sys/resource.h>
 void __attribute((constructor(102))) setup_signals() {
+#if 0
     /// Limits process ressources to avoid hanging the system when debugging
     { rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<21;/*2M*/ setrlimit(RLIMIT_STACK,&limit); }
     { rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<29;/*512M*/ setrlimit(RLIMIT_DATA,&limit); }
     { rlimit limit; getrlimit(RLIMIT_AS,&limit); limit.rlim_cur=1<<30;/*1GB*/ setrlimit(RLIMIT_AS,&limit); }
     setpriority(PRIO_PROCESS,0,19);
+#endif
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
     struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={{}};
     check_(sigaction(SIGABRT, &sa, 0));

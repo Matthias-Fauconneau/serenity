@@ -21,12 +21,12 @@ Transform operator *(const Transform& a, const Transform& b) {
 }
 
 struct TransformGroupSource : Source {
-	virtual array<Transform> operator()(size_t groupIndex);
+	virtual array<Transform> operator()(size_t groupIndex) abstract;
 };
 
 /// Evaluates transforms for a group of images
 struct ImageTransformGroupOperation : virtual Operation {
-	virtual array<Transform> operator()(ref<ImageF>) const = 0;
+	virtual array<Transform> operator()(ref<ImageF>) const abstract;
 };
 
 struct ProcessedImageTransformGroupSource : TransformGroupSource {
@@ -41,7 +41,7 @@ struct ProcessedImageTransformGroupSource : TransformGroupSource {
 
 	array<Transform> operator()(size_t groupIndex) override {
 		assert_(source.outputs()==1);
-		int2 size = source.size(groupIndex)/32;
+		int2 size = source.size(groupIndex);
 		array<SourceImage> images = source.images(groupIndex, 0, size);
 		return parseArray<Transform>(cache(cacheFolder, source.elementName(groupIndex), strx(size), source.time(groupIndex), [&]() {
 			return str(operation(apply(images, [](const SourceImage& x){ return share(x); })));

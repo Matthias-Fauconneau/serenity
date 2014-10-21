@@ -47,7 +47,7 @@ struct DifferenceSplit : GroupSource {
 		if(startIndex == source.count()) return false;
 		size_t endIndex = startIndex+1; // Included
 		for(; endIndex < difference.count(); endIndex++) {
-			SourceImage image = difference.image(endIndex, 0, difference.maximumSize()/32);
+			SourceImage image = difference.image(endIndex, 0, difference.maximumSize()/4);
 			float meanEnergy = parallel::energy(image)/image.ref::size;
 			log(endIndex, difference.elementName(endIndex), meanEnergy);
 			if(meanEnergy > threshold) break;
