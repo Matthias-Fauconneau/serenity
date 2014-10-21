@@ -24,7 +24,7 @@ struct AudioFile {
     default_move(AudioFile);
     ~AudioFile() { close(); }
 
-    operator bool() { return file; }
+	explict operator bool() { return file; }
     bool open(const string path);
     bool open();
     void close();

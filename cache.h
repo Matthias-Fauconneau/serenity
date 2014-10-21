@@ -67,7 +67,7 @@ template<Type T> array<T> cache(const Folder& folder, string name, string key, i
 generic struct ImageMapSource : T {
     Map map;
     ImageMapSource() {}
-    ImageMapSource(T&& image) : T(move(image)) { assert_(T::capacity); /*Heap allocated image*/ }
+	ImageMapSource(T&& image) : T(move(image)) {}
     ImageMapSource(const File& file, int2 size) : map(file) { (T&)*this = T(unsafeReference(cast<typename T::type>(map)), size, size.x); }
 };
 generic auto share(ref<ImageMapSource<T>> ref) -> buffer<decltype(share(ref[0]))> {

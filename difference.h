@@ -8,6 +8,16 @@ struct Subtract : ImageOperation21, OperationT<Subtract> {
 	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const override;
 };
 
+struct Multiply : ImageOperation21, OperationT<Multiply> {
+	string name() const override { return "[multiply]"; }
+	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const override;
+};
+
+struct Divide : ImageOperation21, OperationT<Divide> {
+	string name() const override { return "[divide]"; }
+	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const override;
+};
+
 /// Returns groups of consecutive pairs
 struct ConsecutivePairs : virtual GroupSource {
 	Source& source;

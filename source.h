@@ -36,7 +36,7 @@ struct GenericImageSource : Source {
 struct ImageSource : virtual GenericImageSource {
 	/// Number of outputs per image index (aka channels, components)
 	virtual size_t outputs() const abstract;
-	virtual SourceImage image(size_t index, int outputIndex, int2 size = 0, bool noCacheWrite = false) abstract;
+	virtual SourceImage image(size_t index, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) abstract;
 };
 
 struct ImageRGBSource : virtual GenericImageSource {
@@ -46,5 +46,6 @@ struct ImageRGBSource : virtual GenericImageSource {
 struct ImageGroupSource : virtual GenericImageSource {
 	/// Number of outputs per image index (aka channels, components)
 	virtual size_t outputs() const abstract;
-	virtual array<SourceImage> images(size_t groupIndex, int outputIndex, int2 size, bool noCacheWrite = false)  abstract;
+	virtual size_t groupSize(size_t groupIndex) const abstract;
+	virtual array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size, bool noCacheWrite = false)  abstract;
 };

@@ -21,6 +21,66 @@ struct Contrast : ImageOperation1, OperationT<Contrast> {
 	}
 };
 
+struct MergeGenericImageSource : virtual GenericImageSource {
+	GenericImageSource& A;
+	GenericImageSource& B;
+	Folder cacheFolder {A.name()+B.name(), A.folder()/*FIXME: MRCA of A and B*/, true};
+	MergeGenericImageSource(GenericImageSource& A, GenericImageSource& B) : A(A), B(B) {}
+	size_t count(size_t need=0) override { assert_(A.count(need) == B.count(need)); return A.count(need); }
+	String name() const override { return A.name()+B.name(); }
+	const Folder& folder() const override { return cacheFolder; }
+	int2 maximumSize() const override { assert_(A.maximumSize() == B.maximumSize()); return A.maximumSize(); }
+	int64 time(size_t index) override { return max(A.time(index), B.time(index)); }
+	virtual String elementName(size_t index) const override {
+		assert_(A.elementName(index) == B.elementName(index)); return A.elementName(index);
+	}
+	int2 size(size_t index) const override { assert_(A.size(index) == B.size(index)); return A.size(index); }
+};
+
+/*struct MergeImageSource : MergeGenericImageSource, ImageSource {
+	size_t outputs() const override { return A.outputs()+B.outputs(); }
+	SourceImage image(size_t index, size_t outputIndex, int2 unused size=0, bool unused noCacheWrite = false) override {
+		if(outputIndex < A.outputs()) return A.image(index, outputIndex, size, noCacheWrite);
+		else return B.image(index, outputIndex - A.outputs(), size, noCacheWrite);
+	}
+};*/
+
+struct MergeImageGroupSource : MergeGenericImageSource, ImageGroupSource {
+	ImageGroupSource& A;
+	ImageGroupSource& B;
+	MergeImageGroupSource(ImageGroupSource& A, ImageGroupSource& B) : MergeGenericImageSource(A, B), A(A), B(B) {}
+
+	size_t outputs() const override { return A.outputs()+B.outputs(); }
+	size_t groupSize(size_t groupIndex) const { assert_(A.groupSize(groupIndex) == B.groupSize(groupIndex)); return A.groupSize(groupIndex); }
+	array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override {
+		size_t subOutputIndex = outputIndex;
+		if(subOutputIndex < A.outputs()) return A.images(groupIndex, subOutputIndex, size, noCacheWrite);
+		subOutputIndex -= A.outputs();
+		assert_(subOutputIndex < B.outputs(), outputIndex, A.outputs(), B.outputs());
+		return B.images(groupIndex, subOutputIndex, size, noCacheWrite);
+	}
+};
+
+struct RepeatMergeImageGroupSource : MergeGenericImageSource, ImageGroupSource {
+	ImageGroupSource& A;
+	ImageSource& B;
+	RepeatMergeImageGroupSource(ImageGroupSource& A, ImageSource& B) : MergeGenericImageSource(A, B), A(A), B(B) {}
+
+	size_t outputs() const override { return A.outputs()+B.outputs(); }
+	size_t groupSize(size_t groupIndex) const { return A.groupSize(groupIndex); }
+	array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override {
+		size_t subOutputIndex = outputIndex;
+		if(subOutputIndex < A.outputs()) return A.images(groupIndex, subOutputIndex, size, noCacheWrite);
+		subOutputIndex -= A.outputs();
+		assert_(subOutputIndex < B.outputs(), outputIndex, A.outputs(), B.outputs());
+		size_t groupSize = this->groupSize(groupIndex);
+		array<SourceImage> b (groupSize);
+		b.append( B.image(groupIndex, subOutputIndex, size, noCacheWrite) );
+		while(b.size < groupSize) b.append(share(b.first()));
+		return b;
+	}
+};
+
 /// Sums together all images in an image group
 struct Sum : ImageGroupOperation, OperationT<Sum> {
 	string name() const override { return "[sum]"; }
@@ -40,17 +100,23 @@ struct ExposureBlend {
 	ProcessedImageGroupSource sourceSplit {source, split};
 	ProcessedImageGroupSource intensitySplit {normalize, split};
 
-	Align align;
-	ProcessedImageTransformGroupSource transforms {intensitySplit, align};
+	ProcessedImageTransformGroupSourceT<Align> transforms {intensitySplit};
 
-	TransformSampleImageGroupSource transformedSource {sourceSplit, transforms};
-	TransformSampleImageGroupSource transformedIntensity {intensitySplit, transforms};
+	TransformSampleImageGroupSource alignedSource {sourceSplit, transforms};
+	ProcessedGroupImageGroupSourceT<Intensity> alignedIntensity {alignedSource};
 
-	Contrast contrast;
-	ProcessedGroupImageGroupSource weights {transformedIntensity, contrast};
+	ProcessedGroupImageGroupSourceT<Contrast> weights {alignedIntensity};
 
-	Sum sum;
-	ProcessedGroupImageSource aligned {weights, sum};
+	ProcessedGroupImageSourceT<Sum> weightSum {weights};
+
+	RepeatMergeImageGroupSource weights_weightSum{weights, weightSum};
+
+	ProcessedGroupImageGroupSourceT<Divide> normalizedWeights {weights_weightSum};
+
+	MergeImageGroupSource weights_source {normalizedWeights, alignedIntensity /*alignedSource*/};
+	ProcessedGroupImageGroupSourceT<Multiply> weighted {weights_source};
+
+	ProcessedGroupImageSourceT<Sum> aligned {weighted};
 
 	sRGBSource sRGB_intensity {intensity};
 	sRGBSource sRGB_aligned {aligned};

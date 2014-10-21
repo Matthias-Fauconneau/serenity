@@ -49,6 +49,10 @@ struct ProcessedImageTransformGroupSource : TransformGroupSource {
 	}
 };
 
+generic struct ProcessedImageTransformGroupSourceT : T, ProcessedImageTransformGroupSource {
+	ProcessedImageTransformGroupSourceT(ImageGroupSource& source) : ProcessedImageTransformGroupSource(source, *this) {}
+};
+
 /// Samples \a transform of \a source using nearest neighbour
 void sample(const ImageF& target, const ImageF& source, Transform transform) {
 	applyXY(target, [&](int x, int y) {
@@ -61,6 +65,7 @@ void sample(const ImageF& target, const ImageF& source, Transform transform) {
 ImageF sample(ImageF&& target, const ImageF& source, Transform transform) { sample(target, source, transform); return move(target); }
 ImageF sample(const ImageF& source, Transform transform) { return sample(source.size, source, transform); }
 
+//FIXME: reuse ProcessedImageGroupSource
 struct TransformSampleImageGroupSource : ImageGroupSource {
 	ImageGroupSource& source;
 	TransformGroupSource& transform;
@@ -71,13 +76,15 @@ struct TransformSampleImageGroupSource : ImageGroupSource {
 	size_t count(size_t need=0) override { return source.count(need); }
 	int64 time(size_t groupIndex) override { return max(source.time(groupIndex), transform.time(groupIndex)); }
 	String name() const override { return str("[sample]", source.name()); }
-	size_t outputs() const override { return source.outputs(); }
 	const Folder& folder() const override { return cacheFolder; }
 	int2 maximumSize() const override { return source.maximumSize(); }
 	String elementName(size_t groupIndex) const override { return source.elementName(groupIndex); }
 	int2 size(size_t groupIndex) const override { return source.size(groupIndex); }
 
-	array<SourceImage> images(size_t groupIndex, int outputIndex, int2 size=0, bool noCacheWrite = false) override {
+	size_t outputs() const override { return source.outputs(); }
+	size_t groupSize(size_t groupIndex) const { return source.groupSize(groupIndex); }
+
+	array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size=0, bool noCacheWrite = false) override {
 		auto images = source.images(groupIndex, outputIndex, size, noCacheWrite);
 		auto transforms = transform(groupIndex, size);
 		return apply(images.size, [&](size_t index) -> SourceImage { return sample(images[index], transforms[index]); });

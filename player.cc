@@ -246,6 +246,6 @@ struct Player : Poll {
     }
     void event() override {
         if(audio) audio.stop();
-        audio.start(file->rate, periodSize);
+		if(file) audio.start(file->rate, periodSize);
     }
 } application;

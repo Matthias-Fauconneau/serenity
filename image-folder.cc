@@ -23,7 +23,7 @@ SourceImageRGB ImageFolder::image(size_t index, int2 size, bool noCacheWrite) {
 }
 
 /// Converts sRGB images to linear float images
-SourceImage ImageFolder::image(size_t index, int outputIndex, int2 size, bool noCacheWrite) {
+SourceImage ImageFolder::image(size_t index, size_t outputIndex, int2 size, bool noCacheWrite) {
 	assert_(index  < count());
 	return cache<ImageF>({"Linear["+str(outputIndex)+']', source, true}, elementName(index), size?:this->size(index), time(index),
 						 [&](const ImageF& target) { linear(target, image(index, size), outputIndex); }, noCacheWrite );

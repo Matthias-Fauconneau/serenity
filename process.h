@@ -26,9 +26,8 @@ struct ProcessedSource : ProcessedGenericSource, ImageSource {
 		: ProcessedGenericSource(source, operation), source(source) {}
 
 	size_t outputs() const override { return operation.outputs(); }
-
 	/// Returns processed linear image
-	SourceImage image(size_t imageIndex, int outputIndex, int2 size = 0, bool noCacheWrite = false) override;
+	SourceImage image(size_t imageIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override;
 };
 
 struct sRGBSource : ImageRGBSource {
@@ -60,8 +59,12 @@ struct ProcessedGroupImageSource : ProcessedGenericSource, ImageSource {
 	ProcessedGroupImageSource(ImageGroupSource& source, ImageOperation& operation)
 		: ProcessedGenericSource(source, operation), source(source), operation(operation), cacheFolder(operation.name(), source.folder(), true) {}
 
-	size_t outputs() const override { return source.outputs(); }
-	SourceImage image(size_t groupIndex, int outputIndex, int2 size = 0, bool noCacheWrite = false) override;
+	size_t outputs() const override { return operation.outputs(); }
+	SourceImage image(size_t groupIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override;
+};
+
+generic struct ProcessedGroupImageSourceT : T, ProcessedGroupImageSource {
+	ProcessedGroupImageSourceT(ImageGroupSource& source) : ProcessedGroupImageSource(source, *this) {}
 };
 
 // ProcessedImageGroupSource
@@ -73,14 +76,15 @@ struct ProcessedImageGroupSource : ImageGroupSource {
 	ProcessedImageGroupSource(ImageSource& source, GroupSource& groups) : source(source), groups(groups) {}
 	size_t count(size_t need=0) override { return groups.count(need); }
 	String name() const override { return source.name(); }
-	size_t outputs() const override { return source.outputs(); }
 	const Folder& folder() const override { return source.folder(); }
 	int2 maximumSize() const override { return source.maximumSize(); }
 	int64 time(size_t groupIndex) override { return max(apply(groups(groupIndex), [this](size_t index) { return source.time(index); })); }
 	String elementName(size_t groupIndex) const override;
 	int2 size(size_t groupIndex) const override;
 
-	array<SourceImage> images(size_t groupIndex, int outputIndex, int2 size = 0, bool noCacheWrite = false) override;
+	size_t outputs() const override { return source.outputs(); }
+	size_t groupSize(size_t groupIndex) const { return groups(groupIndex).size; }
+	array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override;
 };
 
 // ProcessedGroupImageGroupSource
@@ -94,12 +98,17 @@ struct ProcessedGroupImageGroupSource : ImageGroupSource {
 
 	size_t count(size_t need=0) override { return source.count(need); }
 	String name() const override { return source.name(); }
-	size_t outputs() const override { return source.outputs(); }
 	const Folder& folder() const override { return source.folder(); }
 	int2 maximumSize() const override { return source.maximumSize(); }
 	int64 time(size_t index) override { return source.time(index); }
 	String elementName(size_t index) const override { return source.elementName(index); }
 	int2 size(size_t index) const override { return source.size(index); }
 
-	array<SourceImage> images(size_t groupIndex, int outputIndex, int2 size = 0, bool noCacheWrite = false) override;
+	size_t outputs() const override { return operation.outputs(); }
+	size_t groupSize(size_t groupIndex) const { return source.groupSize(groupIndex); }
+	array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override;
+};
+
+generic struct ProcessedGroupImageGroupSourceT : T, ProcessedGroupImageGroupSource {
+	ProcessedGroupImageGroupSourceT(ImageGroupSource& source) : ProcessedGroupImageGroupSource(source, *this) {}
 };
