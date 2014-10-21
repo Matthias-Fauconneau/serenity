@@ -1,6 +1,3 @@
 #include "difference.h"
 
-void Subtract::apply(ref<ImageF> Y, ref<ImageF> X) const {
-	assert_(X.size == 2);
-	parallel::sub(Y[0], X[0], X[1]);
-}
+void Subtract::apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const { parallel::sub(Y, X0, X1); }

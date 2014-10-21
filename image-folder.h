@@ -5,7 +5,7 @@
 #include "jpeg.h"
 
 /// Cached collection of images backed by a source folder
-struct ImageFolder : ImageSource, map<String, map<String, String>> {
+struct ImageFolder : ImageSource, ImageRGBSource, map<String, map<String, String>> {
 	Folder source;
     int2 maximumImageSize = 0;
 
@@ -57,7 +57,7 @@ struct ImageFolder : ImageSource, map<String, map<String, String>> {
 	String name() const override { return String(section(source.name(),'/',-2,-1)); }
 	size_t count(size_t) override { return map::size(); }
 	size_t count() const { return map::size(); }
-	int outputs() const override { return 3; }
+	size_t outputs() const override { return 3; }
     int2 maximumSize() const override { return maximumImageSize; }
 	String elementName(size_t index) const override { assert_(index<count()); return copy(keys[index]); }
 	int64 time(size_t index) override { return File(values[index].at("Path"_), source).modifiedTime(); }

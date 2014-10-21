@@ -23,32 +23,28 @@ typedef ImageMapSource<ImageF> SourceImage;
 typedef ImageMapSource<Image> SourceImageRGB;
 
 /// Implicit collection of images
-struct ImageSource : Source {
+struct GenericImageSource : Source {
 	/// Name
 	virtual String name() const abstract;
-	/// Number of outputs per image index (aka channels, components)
-	virtual int outputs() const abstract;
 	/// Folder to be used for persistent data (cache, parameters)
 	virtual const Folder& folder() const abstract;
     virtual int2 maximumSize() const abstract;
 	virtual String elementName(size_t index) const abstract;
     virtual int2 size(size_t index) const abstract;
-	//virtual const map<String, String>& properties(size_t index) const abstract;
-	virtual SourceImage image(size_t /*index*/, int outputIndex, int2 unused size=0, bool unused noCacheWrite = false) {
-		error(name(), "does not implement 32bit linear image["+str(outputIndex)+']');
-	}
-	virtual SourceImageRGB image(size_t /*index*/, int2 unused size = 0, bool unused noCacheWrite = false) {
-		error(name(), "does not implement 8bit sRGB image");
-	}
 };
 
-struct ImageGroupSource : Source {
-	virtual String name() const abstract;
-	virtual int outputs() const  abstract;
-	virtual const Folder& folder() const  abstract;
-	virtual int2 maximumSize() const  abstract;
-	virtual String elementName(size_t groupIndex) const abstract;
-	virtual int64 time(size_t groupIndex)  abstract;
-	virtual int2 size(size_t groupIndex) const abstract;
+struct ImageSource : virtual GenericImageSource {
+	/// Number of outputs per image index (aka channels, components)
+	virtual size_t outputs() const abstract;
+	virtual SourceImage image(size_t index, int outputIndex, int2 size = 0, bool noCacheWrite = false) abstract;
+};
+
+struct ImageRGBSource : virtual GenericImageSource {
+	virtual SourceImageRGB image(size_t index, int2 size = 0, bool noCacheWrite = false) abstract;
+};
+
+struct ImageGroupSource : virtual GenericImageSource {
+	/// Number of outputs per image index (aka channels, components)
+	virtual size_t outputs() const abstract;
 	virtual array<SourceImage> images(size_t groupIndex, int outputIndex, int2 size, bool noCacheWrite = false)  abstract;
 };

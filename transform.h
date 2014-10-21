@@ -21,7 +21,7 @@ Transform operator *(const Transform& a, const Transform& b) {
 }
 
 struct TransformGroupSource : Source {
-	virtual array<Transform> operator()(size_t groupIndex) abstract;
+	virtual array<Transform> operator()(size_t groupIndex, int2 size=0) abstract;
 };
 
 /// Evaluates transforms for a group of images
@@ -39,9 +39,9 @@ struct ProcessedImageTransformGroupSource : TransformGroupSource {
 	virtual size_t count(size_t need=0) { return source.count(need); }
 	virtual int64 time(size_t index) { return max(operation.time(), source.time(index)); }
 
-	array<Transform> operator()(size_t groupIndex) override {
+	array<Transform> operator()(size_t groupIndex, int2 size) override {
 		assert_(source.outputs()==1);
-		int2 size = source.size(groupIndex);
+		if(!size) size = source.size(groupIndex)/4;
 		array<SourceImage> images = source.images(groupIndex, 0, size);
 		return parseArray<Transform>(cache(cacheFolder, source.elementName(groupIndex), strx(size), source.time(groupIndex), [&]() {
 			return str(operation(apply(images, [](const SourceImage& x){ return share(x); })));
@@ -71,7 +71,7 @@ struct TransformSampleImageGroupSource : ImageGroupSource {
 	size_t count(size_t need=0) override { return source.count(need); }
 	int64 time(size_t groupIndex) override { return max(source.time(groupIndex), transform.time(groupIndex)); }
 	String name() const override { return str("[sample]", source.name()); }
-	int outputs() const override { return source.outputs(); }
+	size_t outputs() const override { return source.outputs(); }
 	const Folder& folder() const override { return cacheFolder; }
 	int2 maximumSize() const override { return source.maximumSize(); }
 	String elementName(size_t groupIndex) const override { return source.elementName(groupIndex); }
@@ -79,7 +79,7 @@ struct TransformSampleImageGroupSource : ImageGroupSource {
 
 	array<SourceImage> images(size_t groupIndex, int outputIndex, int2 size=0, bool noCacheWrite = false) override {
 		auto images = source.images(groupIndex, outputIndex, size, noCacheWrite);
-		auto transforms = transform(groupIndex);
+		auto transforms = transform(groupIndex, size);
 		return apply(images.size, [&](size_t index) -> SourceImage { return sample(images[index], transforms[index]); });
 	}
 };

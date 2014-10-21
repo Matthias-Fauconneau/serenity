@@ -5,7 +5,7 @@
 
 /// Displays an image collection
 struct ImageSourceView : ImageView, Poll {
-    ImageSource& source;
+	ImageRGBSource& source;
     Index index;
 	size_t imageIndex = -1;
     SourceImageRGB image; // Holds memory map reference
@@ -13,9 +13,9 @@ struct ImageSourceView : ImageView, Poll {
     function<void()> contentChanged;
 	int2 hint = 0;
 
-	ImageSourceView(ImageSource& source, size_t* index, function<void()> contentChanged, int2 hint=0)
+	ImageSourceView(ImageRGBSource& source, size_t* index, function<void()> contentChanged, int2 hint=0)
 		: source(source), index(index), contentChanged(contentChanged), hint(hint) {}
-	ImageSourceView(ImageSource& source, size_t* index, Window& window, int2 hint=0)
+	ImageSourceView(ImageRGBSource& source, size_t* index, Window& window, int2 hint=0)
 		: ImageSourceView(source, index, {&window, &Window::render}, hint) {}
 
     // Progressive evaluation

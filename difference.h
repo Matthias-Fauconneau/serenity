@@ -3,16 +3,9 @@
 #include "source.h"
 #include "process.h"
 
-/*struct Substract : ImageOperation, OperationT<Substract> {
-	int inputs() const override { return 2; }
-	int outputs() const override { return 1; }
-	void apply(ref<ImageF> Y, ref<ImageF> X) const override;
-};*/
-
-struct Subtract : ImageGroupOperation, OperationT<Subtract> {
+struct Subtract : ImageOperation21, OperationT<Subtract> {
 	string name() const override { return "[subtract]"; }
-	int outputs() const override { return 1; }
-	void apply(ref<ImageF> Y, ref<ImageF> X) const override;
+	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const override;
 };
 
 /// Returns groups of consecutive pairs
@@ -32,7 +25,7 @@ struct ConsecutivePairs : virtual GroupSource {
 
 /// Splits sequence in groups separated when difference between consecutive images is greater than a threshold
 struct DifferenceSplit : GroupSource {
-	static constexpr float threshold = 0.18;
+	static constexpr float threshold = 0.1; // 0.18 with bandpass
 	ImageSource& source;
 	ConsecutivePairs pairs {source};
 	ProcessedImageGroupSource sourcePairs {source, pairs};

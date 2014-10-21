@@ -22,9 +22,8 @@ struct Contrast : ImageOperation1, OperationT<Contrast> {
 };
 
 /// Sums together all images in an image group
-struct Sum : ImageGroupOperation1, OperationT<Sum> {
+struct Sum : ImageGroupOperation, OperationT<Sum> {
 	string name() const override { return "[sum]"; }
-	virtual int outputs() const { return 1; }
 	virtual void apply(const ImageF& Y, ref<ImageF> X) const {
 		parallel::apply(Y, [&](size_t index) { return sum(::apply(X, [index](const ImageF& x) { return x[index]; })); });
 	}
@@ -52,6 +51,9 @@ struct ExposureBlend {
 
 	Sum sum;
 	ProcessedGroupImageSource aligned {weights, sum};
+
+	sRGBSource sRGB_intensity {intensity};
+	sRGBSource sRGB_aligned {aligned};
 };
 
 struct ExposureBlendPreview : ExposureBlend, Application {
@@ -60,7 +62,7 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	size_t index = lastIndex != invalid ? lastIndex : 0;*/
 	size_t index = 0;
 
-	ImageSourceView views [2] {{intensity, &index, window}, {aligned, &index, window}};
+	ImageSourceView views [2] {{sRGB_intensity, &index, window}, {sRGB_aligned, &index, window}};
 	WidgetToggle toggleView {&views[0], &views[1], 0};
 	Window window {&toggleView, -1, [this]{ return toggleView.title()+" "+imagesAttributes.value(source.elementName(index)); }};
 
