@@ -37,7 +37,7 @@ struct ImageOperation21 : ImageOperation {
 	void apply(ref<ImageF> Y, ref<ImageF> X) const override {
 		assert_(Y.size == 1);
 		assert_(X.size == 2);
-		for(auto& x: X) assert_(x.size == Y[0].size);
+		for(auto& x: X) assert_(x.size == Y[0].size, Y, X, name());
 		apply(Y[0], X[0], X[1]);
 	}
 };
@@ -49,7 +49,7 @@ struct ImageOperation31 : ImageOperation {
 	void apply(ref<ImageF> Y, ref<ImageF> X) const override {
 		assert_(Y.size == 1);
 		assert_(X.size == 3);
-		for(auto& x: X) assert_(x.size == Y[0].size);
+		for(auto& x: X) assert_(x.size == Y[0].size, Y, X, name());
 		apply(Y[0], X[0], X[1], X[2]);
 	}
 };
@@ -65,7 +65,7 @@ struct ImageGroupOperation1 : ImageGroupOperation {
 	virtual void apply(const ImageF& Y, ref<ImageF> X) const abstract;
 	void apply(ref<ImageF> Y, ref<ImageF> X) const override {
 		assert_(Y.size == 1);
-		for(auto& x: X) assert_(x.size == Y[0].size);
+		for(auto& x: X) assert_(x.size == Y[0].size, Y, X, name());
 		apply(Y[0], X);
 	}
 };

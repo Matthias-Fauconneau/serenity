@@ -18,10 +18,16 @@ SourceImage ProcessedSource::image(size_t imageIndex, size_t outputIndex, int2 s
 // ProcessedRGBSource
 
 SourceImageRGB sRGBSource::image(size_t imageIndex, int2 size, bool noCacheWrite) {
-	return ::cache<Image>(folder(), elementName(imageIndex), size?:this->size(imageIndex), time(imageIndex),
-				 [&](const Image& target) {
-		array<SourceImage> inputs;
-		for(size_t inputIndex: range(source.outputs())) inputs.append(source.image(imageIndex, inputIndex, target.size, noCacheWrite));
+	array<SourceImage> inputs;
+	for(size_t inputIndex: range(source.outputs())) inputs.append(source.image(imageIndex, inputIndex, size, noCacheWrite));
+	return ::cache<Image>(folder(), elementName(imageIndex), inputs[0].size /*size?:this->size(imageIndex)*/, time(imageIndex),
+				 [&](Image& target) {
+		if(target.size != inputs[0].size) {
+			assert_(target.size > inputs[0].size);
+			target.Image::size = inputs[0].ImageF::size;
+		}
+		/*array<SourceImage> inputs;
+		for(size_t inputIndex: range(source.outputs())) inputs.append(source.image(imageIndex, inputIndex, target.size, noCacheWrite));*/
 		if(inputs.size==1) sRGB(target, inputs[0]);
 		else if(inputs.size==3) sRGB(target, inputs[0], inputs[1], inputs[2]);
 		else error(inputs.size);
@@ -31,13 +37,18 @@ SourceImageRGB sRGBSource::image(size_t imageIndex, int2 size, bool noCacheWrite
 // ProcessedGroupImageSource
 
 SourceImage ProcessedGroupImageSource::image(size_t groupIndex, size_t outputIndex, int2 size, bool noCacheWrite) {
-	return  ::cache<ImageF>(folder(), elementName(groupIndex)+'['+str(outputIndex)+']', size?:this->size(groupIndex), time(groupIndex),
-						   [&](const ImageF& target) {
-		if(!size) size=this->size(groupIndex);
-		auto inputs = source.images(groupIndex, outputIndex, size, noCacheWrite);
+	auto inputs = source.images(groupIndex, outputIndex, size, noCacheWrite); // FIXME
+	return  ::cache<ImageF>(folder(), elementName(groupIndex)+'['+str(outputIndex)+']', inputs[0].size /*size?:this->size(groupIndex)*/,
+			time(groupIndex), [&](ImageF& target) {
+		if(target.size != inputs[0].size) {
+			assert_(target.size > inputs[0].size);
+			target.size = inputs[0].size;
+		}
 		assert_(operation.inputs() == 0 || operation.inputs() == inputs.size);
 		assert_(operation.outputs() == 1);
+		assert_(inputs[0].size == target.size);
 		operation.apply({share(target)}, share(inputs));
+
 	}, noCacheWrite);
 }
 
@@ -67,7 +78,7 @@ array<SourceImage> ProcessedGroupImageGroupSource::images(size_t groupIndex, siz
 		assert_(operation.inputs()==0);
 		auto inputs = source.images(groupIndex, outputIndex, size, noCacheWrite);
 		array<SourceImage> outputs;
-		for(size_t unused index: range(inputs.size)) outputs.append( size );
+		for(size_t unused index: range(inputs.size)) outputs.append( inputs[0].size );
 		operation.apply(share(outputs), share(inputs));
 		return outputs;
 	} else { // Process every image separately
@@ -79,7 +90,7 @@ array<SourceImage> ProcessedGroupImageGroupSource::images(size_t groupIndex, siz
 			array<ImageF> inputs;
 			for(size_t inputIndex: range(groupInputs.size)) inputs.append( share(groupInputs[inputIndex][imageIndex]) );
 			array<SourceImage> outputs;
-			for(size_t unused index: range(operation.outputs())) outputs.append( size );
+			for(size_t unused index: range(operation.outputs())) outputs.append( inputs[0].size );
 			operation.apply(share(outputs), inputs);
 			allOutputs.append(outputs);
 		}
@@ -116,8 +127,9 @@ array<SourceImage> BinaryGroupImageGroupSource::images(size_t groupIndex, size_t
 				array<ImageF> inputs;
 				for(size_t inputIndex: range(groupInputs.size)) inputs.append(share(groupInputs[inputIndex][imageIndex]));
 				inputs.append( share(b[imageIndex]) );
+				for(auto& x: inputs) assert_(x.size == inputs[0].size, inputs, name());
 				array<SourceImage> outputs;
-				for(size_t unused index: range(operation.outputs())) outputs.append( size );
+				for(size_t unused index: range(operation.outputs())) outputs.append( inputs[0].size );
 				operation.apply(share(outputs), inputs);
 				allOutputs.append(outputs);
 			}

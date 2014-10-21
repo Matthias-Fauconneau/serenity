@@ -86,7 +86,7 @@ struct ImageF : buffer<float> {
     size_t stride = 0;
 };
 inline ImageF copy(const ImageF& o) { return ImageF(copy((const buffer<float>&)o), o.size, o.stride); }
-inline String str(const ImageF& o) { return str(strx(o.size), o.ref::size); }
+inline String str(const ImageF& o) { return strx(o.size); }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 inline ImageF share(const ImageF& o) { return ImageF(unsafeReference(o), o.size, o.stride); }
@@ -97,8 +97,6 @@ inline ImageF crop(const ImageF& source, int2 origin, int2 size) {
     size = min(size, source.size-origin);
     return ImageF(buffer<float>(source.begin()+origin.y*source.stride+origin.x, size.y*source.stride, 0), size, source.stride);
 }
-
-//inline ImageF operator/(ImageF&& a, const ImageF& b) { assert_(a.stride==b.stride); parallel::div(a, a, b); return move(a); }
 
 template<Type F, Type... S> void apply(const ImageF& target, F function, const S&... sources) {
     for(int2 size: ref<int2>{sources.size...}) assert_(target.size == size, target.size, sources.size...);
@@ -127,7 +125,16 @@ template<Type F, Type... S> void forXY(int2 size, F function, const S&... source
 		}
 	});
 }
-
+#if 0
+template<Type F, Type... S> void forXY(int2 min, int2 max, F function, const S&... sources) {
+	parallel_chunk(max.y-min.y, [&](uint, uint64 start, uint64 chunkSize) {
+		for(size_t y: range(min.y+start, min.y+start+chunkSize)) for(size_t x: range(min.x, max.x)) {
+			function(x, y, sources[y*sources.stride + x]...);
+		}
+	});
+}
+template<Type F, Type... S> void forXY(int2 size, F function, const S&... sources) { forXY(0, size, function, sources...); }
+#endif
 template<Type F, Type... S> void applyXY(const ImageF& target, F function, const S&... sources) {
     parallel_chunk(target.size.y, [&](uint, uint64 start, uint64 chunkSize) {
         for(size_t y: range(start, start+chunkSize)) for(size_t x: range(target.size.x)) {

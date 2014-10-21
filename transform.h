@@ -7,6 +7,10 @@ struct Transform {
 	vec2 operator()(vec2 target) const { return target + offset; }
 	/// Returns scaled source coordinates for the given scaled target coordinates
 	vec2 operator()(int2 target, int2 size) const { return operator()(vec2(target)/vec2(size))*vec2(size); }
+	/// Returns top left corner of inscribed rectangle
+	int2 min(int2 size) const { return int2(ceil(-offset*vec2(size))); }
+	/// Returns bottom right corner of inscribed rectangle
+	int2 max(int2 size) const { return int2(floor(vec2(size)-offset*vec2(size))); }
 };
 // FIXME
 static constexpr vec2 maximumImageSize = vec2(4000,3000);
@@ -54,16 +58,17 @@ generic struct ProcessedImageTransformGroupSourceT : T, ProcessedImageTransformG
 };
 
 /// Samples \a transform of \a source using nearest neighbour
-void sample(const ImageF& target, const ImageF& source, Transform transform) {
+void sample(const ImageF& target, const ImageF& source, Transform transform, int2 min, int2 max) {
+	assert_(target.size == max-min);
 	applyXY(target, [&](int x, int y) {
-		int2 s = int2(round(transform(int2(x,y), source.size)));
+		int2 s = int2(round(transform(min+int2(x,y), source.size)));
 		if(!(s >= int2(0) && s < source.size)) return 0.f;
 		assert_(s >= int2(0) && s < source.size, s, source.size);
 		return source(s);
 	});
 }
-ImageF sample(ImageF&& target, const ImageF& source, Transform transform) { sample(target, source, transform); return move(target); }
-ImageF sample(const ImageF& source, Transform transform) { return sample(source.size, source, transform); }
+ImageF sample(ImageF&& target, const ImageF& source, Transform transform, int2 min, int2 max) { sample(target, source, transform, min, max); return move(target); }
+ImageF sample(const ImageF& source, Transform transform, int2 min, int2 max) { return sample(max-min, source, transform, min, max); }
 
 //FIXME: reuse ProcessedImageGroupSource
 struct TransformSampleImageGroupSource : ImageGroupSource {
@@ -87,6 +92,8 @@ struct TransformSampleImageGroupSource : ImageGroupSource {
 	array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size=0, bool noCacheWrite = false) override {
 		auto images = source.images(groupIndex, outputIndex, size, noCacheWrite);
 		auto transforms = transform(groupIndex, size);
-		return apply(images.size, [&](size_t index) -> SourceImage { return sample(images[index], transforms[index]); });
+		int2 min = ::max(apply(transforms,[&](const Transform& t){ return t.min(images[0].size); }));
+		int2 max = ::min(apply(transforms,[&](const Transform& t){ return t.max(images[0].size); }));
+		return apply(images.size, [&](size_t index) -> SourceImage { return sample(images[index], transforms[index], min, max); });
 	}
 };
