@@ -37,52 +37,40 @@ struct MergeGenericImageSource : virtual GenericImageSource {
 	int2 size(size_t index) const override { assert_(A.size(index) == B.size(index)); return A.size(index); }
 };
 
-/*struct MergeImageSource : MergeGenericImageSource, ImageSource {
-	size_t outputs() const override { return A.outputs()+B.outputs(); }
-	SourceImage image(size_t index, size_t outputIndex, int2 unused size=0, bool unused noCacheWrite = false) override {
-		if(outputIndex < A.outputs()) return A.image(index, outputIndex, size, noCacheWrite);
-		else return B.image(index, outputIndex - A.outputs(), size, noCacheWrite);
-	}
-};*/
-
 struct MergeImageGroupSource : MergeGenericImageSource, ImageGroupSource {
 	ImageGroupSource& A;
 	ImageGroupSource& B;
 	MergeImageGroupSource(ImageGroupSource& A, ImageGroupSource& B) : MergeGenericImageSource(A, B), A(A), B(B) {}
 
-	size_t outputs() const override { return A.outputs()+B.outputs(); }
+	size_t outputs() const override { return (A.outputs()?:1)+(B.outputs()?:1); }
 	size_t groupSize(size_t groupIndex) const { assert_(A.groupSize(groupIndex) == B.groupSize(groupIndex)); return A.groupSize(groupIndex); }
 	array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override {
 		size_t subOutputIndex = outputIndex;
-		if(subOutputIndex < A.outputs()) return A.images(groupIndex, subOutputIndex, size, noCacheWrite);
-		subOutputIndex -= A.outputs();
-		assert_(subOutputIndex < B.outputs(), outputIndex, A.outputs(), B.outputs());
+		if(subOutputIndex < (A.outputs()?:1)) return A.images(groupIndex, subOutputIndex, size, noCacheWrite);
+		subOutputIndex -= (A.outputs()?:1);
+		assert_(subOutputIndex < (B.outputs()?:1), outputIndex, A.outputs(), B.outputs());
 		return B.images(groupIndex, subOutputIndex, size, noCacheWrite);
 	}
 };
 
-struct RepeatMergeImageGroupSource : MergeGenericImageSource, ImageGroupSource {
-	ImageGroupSource& A;
-	ImageSource& B;
-	RepeatMergeImageGroupSource(ImageGroupSource& A, ImageSource& B) : MergeGenericImageSource(A, B), A(A), B(B) {}
-
-	size_t outputs() const override { return A.outputs()+B.outputs(); }
-	size_t groupSize(size_t groupIndex) const { return A.groupSize(groupIndex); }
-	array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override {
-		size_t subOutputIndex = outputIndex;
-		if(subOutputIndex < A.outputs()) return A.images(groupIndex, subOutputIndex, size, noCacheWrite);
-		subOutputIndex -= A.outputs();
-		assert_(subOutputIndex < B.outputs(), outputIndex, A.outputs(), B.outputs());
-		size_t groupSize = this->groupSize(groupIndex);
-		array<SourceImage> b (groupSize);
-		b.append( B.image(groupIndex, subOutputIndex, size, noCacheWrite) );
-		while(b.size < groupSize) b.append(share(b.first()));
-		return b;
+/// Normalizes weights
+/// \note if all weights are zero, weights are all set to 1/groupSize.
+struct NormalizeWeights : ImageGroupOperation, OperationT<NormalizeWeights> {
+	string name() const override { return "[normalize-weights]"; }
+	virtual void apply(ref<ImageF> Y, ref<ImageF> X) const override {
+		log("NormalizeWeights");
+		assert_(Y.size == X.size);
+		forXY(Y[0].size, [&](uint x, uint y) {
+			float sum = 0;
+			for(size_t index: range(X.size)) sum += X[index](x, y);
+			if(sum) for(size_t index: range(Y.size)) Y[index](x, y) = X[index](x, y)/sum;
+			else for(size_t index: range(Y.size)) Y[index](x, y) = 1./X.size;
+		});
 	}
 };
 
 /// Sums together all images in an image group
-struct Sum : ImageGroupOperation, OperationT<Sum> {
+struct Sum : ImageGroupOperation1, OperationT<Sum> {
 	string name() const override { return "[sum]"; }
 	virtual void apply(const ImageF& Y, ref<ImageF> X) const {
 		parallel::apply(Y, [&](size_t index) { return sum(::apply(X, [index](const ImageF& x) { return x[index]; })); });
@@ -106,12 +94,8 @@ struct ExposureBlend {
 	ProcessedGroupImageGroupSourceT<Intensity> alignedIntensity {alignedSource};
 
 	ProcessedGroupImageGroupSourceT<Contrast> weights {alignedIntensity};
-
-	ProcessedGroupImageSourceT<Sum> weightSum {weights};
-
-	RepeatMergeImageGroupSource weights_weightSum{weights, weightSum};
-
-	ProcessedGroupImageGroupSourceT<Divide> normalizedWeights {weights_weightSum};
+	ProcessedGroupImageGroupSourceT<LowPass> lowWeights {weights}; // Filters high frequency noise in contrast estimation
+	ProcessedGroupImageGroupSourceT<NormalizeWeights> normalizedWeights {lowWeights};
 
 	MergeImageGroupSource weights_source {normalizedWeights, alignedIntensity /*alignedSource*/};
 	ProcessedGroupImageGroupSourceT<Multiply> weighted {weights_source};

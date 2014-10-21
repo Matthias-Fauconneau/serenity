@@ -23,7 +23,7 @@ struct ImageOperation1 : ImageOperation {
 	size_t inputs() const override { return 1; }
 	size_t outputs() const override { return 1; }
 	virtual void apply(const ImageF& Y, const ImageF& X) const abstract;
-	virtual void apply(ref<ImageF> Y, ref<ImageF> X) const override {
+	void apply(ref<ImageF> Y, ref<ImageF> X) const override {
 		assert_(Y.size == 1);
 		assert_(X.size == 1);
 		apply(Y[0], X[0]);
@@ -34,7 +34,7 @@ struct ImageOperation21 : ImageOperation {
 	size_t inputs() const override { return 2; }
 	size_t outputs() const override { return 1; }
 	virtual void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const abstract;
-	virtual void apply(ref<ImageF> Y, ref<ImageF> X) const override {
+	void apply(ref<ImageF> Y, ref<ImageF> X) const override {
 		assert_(Y.size == 1);
 		assert_(X.size == 2);
 		for(auto& x: X) assert_(x.size == Y[0].size);
@@ -46,7 +46,7 @@ struct ImageOperation31 : ImageOperation {
 	size_t inputs() const override { return 3; }
 	size_t outputs() const override { return 1; }
 	virtual void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1, const ImageF& X2) const abstract;
-	virtual void apply(ref<ImageF> Y, ref<ImageF> X) const override {
+	void apply(ref<ImageF> Y, ref<ImageF> X) const override {
 		assert_(Y.size == 1);
 		assert_(X.size == 3);
 		for(auto& x: X) assert_(x.size == Y[0].size);
@@ -56,9 +56,14 @@ struct ImageOperation31 : ImageOperation {
 
 struct ImageGroupOperation : ImageOperation {
 	size_t inputs() const override { return 0; } // Varying
-	size_t outputs() const override { return 1; }
+	size_t outputs() const override { return 0; } // Varying (default)
+};
+
+struct ImageGroupOperation1 : ImageGroupOperation {
+	size_t inputs() const override { return 0; } // Varying
+	size_t outputs() const override { return 1; } // Fixed
 	virtual void apply(const ImageF& Y, ref<ImageF> X) const abstract;
-	virtual void apply(ref<ImageF> Y, ref<ImageF> X) const override {
+	void apply(ref<ImageF> Y, ref<ImageF> X) const override {
 		assert_(Y.size == 1);
 		for(auto& x: X) assert_(x.size == Y[0].size);
 		apply(Y[0], X);

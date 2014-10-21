@@ -1,9 +1,15 @@
 #include "operation.h"
 
-/// Sums 3 components
+/// Averages 3 components
 struct Intensity : ImageOperation31, OperationT<Intensity> {
 	string name() const override { return "[intensity]"; }
 	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1, const ImageF& X2) const override;
+};
+
+/// Selects scales over (size.y-1)/12
+struct LowPass : ImageOperation1, OperationT<LowPass> {
+	string name() const override { return "[lowpass]"; }
+	void apply(const ImageF& Y, const ImageF& X) const override;
 };
 
 /// Selects scales between [(size.y-1)/6 .. (size.y-1)/12]

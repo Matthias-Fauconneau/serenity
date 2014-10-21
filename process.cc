@@ -61,17 +61,27 @@ array<SourceImage> ProcessedImageGroupSource::images(size_t groupIndex, size_t o
 // ProcessedGroupImageGroupSource
 
 array<SourceImage> ProcessedGroupImageGroupSource::images(size_t groupIndex, size_t outputIndex, int2 size, bool noCacheWrite) {
-	assert_(operation.outputs() == 1);
 	assert_(outputIndex == 0, outputIndex, operation.name(), operation.inputs(), operation.outputs());
 	if(!size) size=this->size(groupIndex);
-	array<array<SourceImage>> groupInputs;
-	for(size_t inputIndex: range(operation.inputs())) groupInputs.append( source.images(groupIndex, inputIndex, size, noCacheWrite) );
-	return apply(groupInputs[0].size, [&](size_t index) -> SourceImage {
-		array<ImageF> inputs;
-		for(size_t inputIndex: range(operation.inputs())) inputs.append( share(groupInputs[inputIndex][index]) );
-		array<ImageF> outputs;
-		for(size_t unused index: range(operation.outputs())) outputs.append( size );
-		operation.apply(outputs, inputs);
-		return move(outputs[0]);
-	});
+	if(operation.outputs() == 1) {
+		array<array<SourceImage>> groupInputs;
+		for(size_t inputIndex: range(operation.inputs())) groupInputs.append( source.images(groupIndex, inputIndex, size, noCacheWrite) );
+		return apply(groupInputs[0].size, [&](size_t index) -> SourceImage {
+			array<ImageF> inputs;
+			for(size_t inputIndex: range(operation.inputs())) inputs.append( share(groupInputs[inputIndex][index]) );
+			array<ImageF> outputs;
+			for(size_t unused index: range(operation.outputs())) outputs.append( size );
+			operation.apply(outputs, inputs);
+			return move(outputs[0]);
+		});
+	}
+	if(operation.outputs() == 0) {
+		assert_(operation.inputs()==0);
+		auto inputs = source.images(groupIndex, outputIndex, size, noCacheWrite);
+		array<SourceImage> outputs;
+		for(size_t unused index: range(inputs.size)) outputs.append( size );
+		operation.apply(share(outputs), share(inputs));
+		return outputs;
+	}
+	error(operation.outputs());
 }
