@@ -85,7 +85,6 @@ array<SourceImage> ProcessedGroupImageGroupSource::images(size_t groupIndex, siz
 		auto inputs = source.images(groupIndex, outputIndex, size, noCacheWrite);
 		array<SourceImage> outputs;
 		for(size_t unused index: range(inputs.size)) outputs.append( inputs[0].size );
-		log(operation.name());
 		operation.apply(share(outputs), share(inputs));
 		return outputs;
 	} else { // Process every image separately
@@ -98,7 +97,6 @@ array<SourceImage> ProcessedGroupImageGroupSource::images(size_t groupIndex, siz
 			for(size_t inputIndex: range(groupInputs.size)) inputs.append( share(groupInputs[inputIndex][imageIndex]) );
 			array<SourceImage> outputs;
 			for(size_t unused index: range(operation.outputs())) outputs.append( inputs[0].size );
-			log(operation.name());
 			operation.apply(share(outputs), inputs);
 			allOutputs.append(outputs);
 		}
@@ -124,7 +122,6 @@ array<SourceImage> BinaryGroupImageGroupSource::images(size_t groupIndex, size_t
 		for(auto& x: inputs) assert_(x.size == inputs[0].size, inputs, name());
 		array<SourceImage> outputs;
 		for(size_t unused index: range(operation.outputs())) outputs.append( inputs[0].size );
-		log(operation.name());
 		operation.apply(share(outputs), inputs);
 		allOutputs.append(outputs);
 	}

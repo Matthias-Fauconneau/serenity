@@ -12,13 +12,9 @@ static double residualEnergy(const ImageF& A, const ImageF& B, Transform transfo
 		int2 b = int2(round(transform(a, B.size)));
 		assert_(a >= int2(0) && a < A.size);
 		assert_(b >= int2(0) && b < B.size);
-		//return -A(a)*B(b); // -NCC
-		/*if(b >= int2(0) && b < B.size)*/ return sq(A(a) - B(b)); //SSE
-		//else return sq(A(a)); // Penalizes large offsets
+		return sq(A(a) - B(b)); //SSE
 	}, 0.0);
 	energy /= size.x*size.y;
-	//energy -= size.x*size.y; // Advantages more overlap
-	log(A.size, int2(round(transform.offset*vec2(B.size))), energy);
 	return energy;
 }
 
@@ -36,7 +32,7 @@ struct Align : ImageTransformGroupOperation, OperationT<Align> {
 	// Evaluates residual energy at integer offsets
 	virtual array<Transform> operator()(ref<ImageF> images) const override {
 		for(auto& image: images) assert_(image.size == images[0].size);
-		const int levelCount = log2(uint(images[0].size.x/32)); // / (32, 24)
+		const int levelCount = log2(uint(images[0].size.x/128)); // / (32, 24)
 		array<ImageF> A = mipmap(images[0], levelCount);
 		array<Transform> transforms;
 		transforms.append();
@@ -48,20 +44,9 @@ struct Align : ImageTransformGroupOperation, OperationT<Align> {
 				const ImageF& b = B[levelCount-1-level];
 				Transform levelBestTransform = bestTransform;
 				double bestResidualEnergy = residualEnergy(a, b, levelBestTransform);
-				for(;;) { // Integer walk toward minimum at this scale
-					// FIXME: Compare image subsets
+				for(;;) { // Integer walk toward minimum at this scale (TODO: better multiscale to avoid long walks)
 					Transform stepBestTransform = levelBestTransform;
-					//for(int2 offset: {int2(-1,0), int2(1,0),int2(0,-1),int2(0,1)}) { // Evaluate single steps along each translation axis
-					/*for(int2 offset: {
-						int2(-1, -1), int2( 0, -1), int2(1, -1),
-						int2(-1,  0),                    int2(1,  0),
-						int2(-1,  1), int2( 0,  1), int2(1,  1), }) {*/
-						for(int2 offset: {
-																  int2( 0, -2),
-											  int2(-1, -1), int2( 0, -1), int2(1, -1),
-							int2(-2, 0), int2(-1,  0),                     int2(1,  0), int2(2, 0),
-											  int2(-1,  1), int2( 0,  1), int2(1,  1),
-																  int2(0, 2) }) {
+					for(int2 offset: {int2(-1,0), int2(1,0),int2(0,-1),int2(0,1)}) { // Evaluate single steps along each translation axis
 						Transform transform = levelBestTransform * Transform{vec2(offset)/vec2(b.size)};
 						double energy = residualEnergy(a, b, transform);
 						if(energy < bestResidualEnergy) {
@@ -70,7 +55,8 @@ struct Align : ImageTransformGroupOperation, OperationT<Align> {
 						}
 					}
 					if(stepBestTransform==levelBestTransform) break;
-					else levelBestTransform = stepBestTransform;
+					levelBestTransform = stepBestTransform;
+					//break;
 				}
 				if(levelBestTransform != Transform{vec2(0,0)}) {
 					// Asserts higher level walk was not as large as too miss a better shorter alignment at lower levels
@@ -81,7 +67,6 @@ struct Align : ImageTransformGroupOperation, OperationT<Align> {
 			}
 			transforms.append(bestTransform);
 		}
-		log(transforms);
 		return transforms;
 	}
 };

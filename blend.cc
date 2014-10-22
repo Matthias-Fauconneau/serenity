@@ -10,7 +10,7 @@
 
 /// Estimates contrast at every pixel
 struct Contrast : ImageOperation1, OperationT<Contrast> {
-	string name() const override { return "contrast"; }
+	string name() const override { return "[contrast]"; }
 	virtual void apply(const ImageF& Y, const ImageF& X) const {
 		forXY(Y.size, [&](uint x, uint y) {
 			int2 A = int2(x,y);
@@ -82,9 +82,12 @@ struct ExposureBlend {
 	ProcessedGroupImageGroupSourceT<Contrast> contrast {alignIntensity};
 	ProcessedGroupImageGroupSourceT<LowPass> lowContrast {contrast};
 	ProcessedGroupImageGroupSourceT<MaximumWeight> maximumWeights {lowContrast}; // Prevents misalignment blur
+
+	BinaryGroupImageGroupSourceT<Multiply> maximumWeighted {maximumWeights, alignSource};
+	ProcessedGroupImageSourceT<Sum> select {maximumWeighted};
+
 	ProcessedGroupImageGroupSourceT<LowPass> lowWeights {maximumWeights}; // Diffuses weight selection
 	ProcessedGroupImageGroupSourceT<NormalizeWeights> normalizeWeights {lowWeights};
-	ProcessedGroupImageSourceT<Prism> normalizeWeightsPrism {normalizeWeights};
 	BinaryGroupImageGroupSourceT<Multiply> normalizeWeighted {normalizeWeights, alignSource};
 	ProcessedGroupImageSourceT<Sum> blend {normalizeWeighted};
 };
@@ -94,13 +97,7 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	const size_t lastIndex = source.keys.indexOf(lastName);
 	size_t index = lastIndex != invalid ? lastIndex : 0;
 
-	//ProcessedGroupImageSourceT<Mean> meanSource {splitSource};
-	//ProcessedGroupImageSourceT<Mean> meanNormalize {splitNormalize};
-	//ProcessedGroupImageSourceT<Mean> meanAlignNormalize {alignNormalize};
-	ProcessedGroupImageSourceT<Mean> meanAlignSource {alignSource};
-	//ProcessedGroupImageSourceT<Prism> alignedIntensityPrism {alignedIntensity};
-	//ProcessedGroupImageSourceT<Prism> contrastPrism {contrast};
-	sRGBSource sRGB [2] {{meanAlignSource}, {blend}};
+	sRGBSource sRGB [2] {{select}, {blend}};
 	ImageSourceView views [2] {{sRGB[0], &index, window}, {sRGB[1], &index, window}};
 	WidgetToggle toggleView {&views[0], &views[1], 0};
 	Window window {&toggleView, -1, [this]{ return toggleView.title()+" "+imagesAttributes.value(source.elementName(index)); }};
@@ -147,3 +144,30 @@ struct ExposureBlendExport : ExposureBlend, Application {
 };
 registerApplication(ExposureBlendExport, export);
 
+struct First : ImageGroupOperation1, OperationT<First> {
+	string name() const override { return "[first]"; }
+	virtual void apply(const ImageF& Y, ref<ImageF> X) const {
+		Y.copy(X[0]);
+	}
+};
+
+struct ExposureBlendCopy : ExposureBlend, Application {
+	ProcessedGroupImageSourceT<First> first {alignSource};
+	sRGBSource sRGB {first};
+	ExposureBlendCopy() {
+		Folder output ("Export", folder, true);
+		for(size_t index: range(sRGB.count(-1))) {
+			String name = sRGB.elementName(index);
+			Time correctionTime;
+			SourceImageRGB image = sRGB.image(index, int2(2048,1536), true);
+			correctionTime.stop();
+			Time compressionTime;
+			writeFile(name+".first", encodeJPEG(image, 50), output, true);
+			compressionTime.stop();
+			log(str(100*(index+1)/sRGB.count(-1))+'%', '\t',index+1,'/',sRGB.count(-1),
+				'\t',sRGB.elementName(index), strx(sRGB.size(index)),
+				'\t',correctionTime, compressionTime);
+		}
+	}
+};
+registerApplication(ExposureBlendCopy, copy);

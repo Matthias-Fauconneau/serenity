@@ -3,7 +3,6 @@
 #include "source.h"
 #include "process.h"
 
-
 /// Splits sequence in groups separated when difference between consecutive images is greater than a threshold
 struct DifferenceSplit : GroupSource {
 	ImageSource& source;
@@ -31,7 +30,6 @@ struct DifferenceSplit : GroupSource {
 			float previous = endIndex > 0 ? SSE(endIndex-1, endIndex) : inf;
 			float current = SSE(endIndex, endIndex+1);
 			float next = endIndex+2 < source.count() ? SSE(endIndex+1, endIndex+2) : inf;
-			log(str(previous,3), source.elementName(endIndex), str(current,3), source.elementName(endIndex+1), str(next,3));
 			if(endIndex == startIndex && startIndex>0) {
 				if(previous/current < current/next) startIndex++; // Skips single unmatched image
 			}
