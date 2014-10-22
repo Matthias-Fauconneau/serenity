@@ -19,7 +19,7 @@ struct DifferenceSplit : GroupSource {
 		int2 size = source.maximumSize()/8;
 		SourceImage A = source.image(indexA, 0, size);
 		SourceImage B = source.image(indexB, 0, size);
-		return SSE = parallel::SSE(A, B);
+		return SSE = parallel::SSE(A, B) / (size.x*size.y);
 	}
 
 	bool nextGroup() {
@@ -32,7 +32,10 @@ struct DifferenceSplit : GroupSource {
 			float next = endIndex+2 < source.count() ? SSE(endIndex+1, endIndex+2) : inf;
 			log(previous, source.elementName(endIndex), current, source.elementName(endIndex+1), next);
 			if(endIndex == startIndex && startIndex>0) {
-				//if(previous/current < current/next) startIndex++; // Skips single unmatched image
+				if(current > 2./3) {
+					log("SKIP",  source.elementName(endIndex));
+					startIndex++; // Skips single unmatched image
+				}
 			}
 			else if((previous+next)/2 < current) break;
 		}
@@ -49,6 +52,7 @@ struct DifferenceSplit : GroupSource {
 	/// Returns image indices for group index
 	array<size_t> operator()(size_t groupIndex) override {
 		assert_(groupIndex < count(groupIndex+1), groupIndex, groups.size);
+		return array<size_t>(groups[groupIndex].slice(0, 2)); // Assumes first two images are the best brackets
 		return copy(groups[groupIndex]);
 	}
 
