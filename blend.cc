@@ -1,10 +1,9 @@
 /// \file blend.cc Automatic exposure blending
 #include "serialization.h"
 #include "image-folder.h"
+#include "split.h"
+#include "image-group-operation.h"
 #include "process.h"
-#include "normalize.h"
-#include "difference.h"
-#include "transform.h"
 #include "align.h"
 #include "source-view.h"
 #include "jpeg-encoder.h"
@@ -24,7 +23,7 @@ struct Contrast : ImageOperation1, OperationT<Contrast> {
 				sum += b;
 				SAD += abs(a - b);
 			}
-			Y(A) = sum ? SAD / sum : 0;
+			Y(A) = sum ? SAD /*/ sum*/ : 0;
 		});
 	}
 };
@@ -42,13 +41,13 @@ struct MaximumWeight : ImageGroupOperation, OperationT<MaximumWeight> {
 	}
 };
 
-struct Mask : ImageOperation21, OperationT<Mask> {
+/*struct Mask : ImageOperation21, OperationT<Mask> {
 	string name() const override { return "[mask]"; }
 	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const override;
 };
 inline void Mask::apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const {
 	::apply(Y, [&](float a, float b) { return a ? b : 0; }, X0, X1);
-}
+}*/
 
 /// Normalizes weights
 /// \note if all weights are zero, weights are all set to 1/groupSize.
@@ -65,19 +64,13 @@ struct NormalizeWeights : ImageGroupOperation, OperationT<NormalizeWeights> {
 	}
 };
 
-/// Averages together all images in an image group
-struct Mean : ImageGroupOperation1, OperationT<Mean> {
-	string name() const override { return "[mean]"; }
-	virtual void apply(const ImageF& Y, ref<ImageF> X) const {
-		parallel::apply(Y, [&](size_t index) { return sum(::apply(X, [index](const ImageF& x) { return x[index]; }))/X.size; });
-	}
-};
-
-/// Sums together all images in an image group
-struct Sum : ImageGroupOperation1, OperationT<Sum> {
-	string name() const override { return "[sum]"; }
-	virtual void apply(const ImageF& Y, ref<ImageF> X) const {
-		parallel::apply(Y, [&](size_t index) { return sum(::apply(X, [index](const ImageF& x) { return x[index]; })); });
+/// Converts single component image group to a multiple component image
+struct Prism : ImageGroupOperation, OperationT<Prism> {
+	string name() const override { return "[prism]"; }
+	size_t outputs() const override { return 3; }
+	virtual void apply(ref<ImageF> Y, ref<ImageF> X) const {
+		assert_(X.size == 3);
+		for(size_t index: range(X.size)) Y[index].copy(X[index]);
 	}
 };
 
@@ -90,16 +83,24 @@ struct ExposureBlend {
 	DifferenceSplit split {normalize};
 	ProcessedImageGroupSource sourceSplit {source, split};
 	ProcessedImageGroupSource intensitySplit {normalize, split};
-	ProcessedImageTransformGroupSourceT<Align> transforms {intensitySplit};
+	ProcessedSourceT<BandPass> bandpass {intensity};
+	ProcessedImageGroupSource bandpassSplit {bandpass, split};
+	ProcessedGroupImageSourceT<Mean> unaligned {bandpassSplit};
+	ProcessedImageTransformGroupSourceT<Align> transforms {bandpassSplit};
+	TransformSampleImageGroupSource alignedNormalized {bandpassSplit, transforms};
+	ProcessedGroupImageSourceT<Mean> aligned {alignedNormalized};
 	TransformSampleImageGroupSource alignedSource {sourceSplit, transforms};
-	ProcessedGroupImageSourceT<Mean> mean {alignedSource};
+	ProcessedGroupImageSourceT<Mean> alignedSourceMean {alignedSource};
 	ProcessedGroupImageGroupSourceT<Intensity> alignedIntensity {alignedSource};
+	ProcessedGroupImageSourceT<Prism> alignedIntensityPrism {alignedIntensity};
 	ProcessedGroupImageGroupSourceT<Contrast> contrast {alignedIntensity};
+	ProcessedGroupImageSourceT<Prism> contrastPrism {contrast};
 	ProcessedGroupImageGroupSourceT<LowPass> lowContrast {contrast};
 	ProcessedGroupImageGroupSourceT<MaximumWeight> maximumWeights {lowContrast}; // Prevents misalignment blur
 	ProcessedGroupImageGroupSourceT<LowPass> lowWeights {maximumWeights}; // Diffuses weight selection
-	BinaryGroupImageGroupSourceT<Mask> maskLowWeights {alignedIntensity, lowWeights}; // Clears weight where no data is available
-	ProcessedGroupImageGroupSourceT<NormalizeWeights> normalizeWeights {maskLowWeights};
+	//BinaryGroupImageGroupSourceT<Mask> maskLowWeights {alignedIntensity, lowWeights}; // Clears weight where no data is available
+	ProcessedGroupImageGroupSourceT<NormalizeWeights> normalizeWeights {lowWeights};
+	ProcessedGroupImageSourceT<Prism> normalizeWeightsPrism {normalizeWeights};
 	BinaryGroupImageGroupSourceT<Multiply> normalizeWeighted {normalizeWeights, alignedSource};
 	ProcessedGroupImageSourceT<Sum> blend {normalizeWeighted};
 };
@@ -109,7 +110,7 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	const size_t lastIndex = source.keys.indexOf(lastName);
 	size_t index = lastIndex != invalid ? lastIndex : 0;
 
-	sRGBSource sRGB [2] {{mean}, {blend}};
+	sRGBSource sRGB [2] {{alignedSourceMean}, {blend}};
 	ImageSourceView views [2] {{sRGB[0], &index, window}, {sRGB[1], &index, window}};
 	WidgetToggle toggleView {&views[0], &views[1], 0};
 	Window window {&toggleView, -1, [this]{ return toggleView.title()+" "+imagesAttributes.value(source.elementName(index)); }};

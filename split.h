@@ -3,21 +3,6 @@
 #include "source.h"
 #include "process.h"
 
-struct Subtract : ImageOperation21, OperationT<Subtract> {
-	string name() const override { return "[subtract]"; }
-	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const override;
-};
-
-struct Multiply : ImageOperation21, OperationT<Multiply> {
-	string name() const override { return "[multiply]"; }
-	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const override;
-};
-
-struct Divide : ImageOperation21, OperationT<Divide> {
-	string name() const override { return "[divide]"; }
-	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const override;
-};
-
 /// Returns groups of consecutive pairs
 struct ConsecutivePairs : virtual GroupSource {
 	Source& source;
@@ -35,7 +20,7 @@ struct ConsecutivePairs : virtual GroupSource {
 
 /// Splits sequence in groups separated when difference between consecutive images is greater than a threshold
 struct DifferenceSplit : GroupSource {
-	static constexpr float threshold = 0.04; // 0.18 with bandpass
+	static constexpr float threshold = 0.04; // 0.18 with normalized bandpass
 	ImageSource& source;
 	ConsecutivePairs pairs {source};
 	ProcessedImageGroupSource sourcePairs {source, pairs};
@@ -68,6 +53,7 @@ struct DifferenceSplit : GroupSource {
 	/// Returns image indices for group index
 	array<size_t> operator()(size_t groupIndex) override {
 		assert_(groupIndex < count(groupIndex+1), groupIndex, groups.size);
+		//return array<size_t>(groups[groupIndex].slice(0, 2)); // DEBUG: Align debug
 		return copy(groups[groupIndex]);
 	}
 

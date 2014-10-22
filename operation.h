@@ -54,18 +54,43 @@ struct ImageOperation31 : ImageOperation {
 	}
 };
 
-struct ImageGroupOperation : ImageOperation {
-	size_t inputs() const override { return 0; } // Varying
-	size_t outputs() const override { return 0; } // Varying (default)
+// Basic ImageOperation implementations
+
+struct Subtract : ImageOperation21, OperationT<Subtract> {
+	string name() const override { return "[subtract]"; }
+	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const override;
 };
 
-struct ImageGroupOperation1 : ImageGroupOperation {
-	size_t inputs() const override { return 0; } // Varying
-	size_t outputs() const override { return 1; } // Fixed
-	virtual void apply(const ImageF& Y, ref<ImageF> X) const abstract;
-	void apply(ref<ImageF> Y, ref<ImageF> X) const override {
-		assert_(Y.size == 1);
-		for(auto& x: X) assert_(x.size == Y[0].size, Y, X, name());
-		apply(Y[0], X);
-	}
+struct Multiply : ImageOperation21, OperationT<Multiply> {
+	string name() const override { return "[multiply]"; }
+	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const override;
+};
+
+struct Divide : ImageOperation21, OperationT<Divide> {
+	string name() const override { return "[divide]"; }
+	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const override;
+};
+
+/// Averages 3 components
+struct Intensity : ImageOperation31, OperationT<Intensity> {
+	string name() const override { return "[intensity]"; }
+	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1, const ImageF& X2) const override;
+};
+
+/// Selects scales over (size.y-1)/12
+struct LowPass : ImageOperation1, OperationT<LowPass> {
+	string name() const override { return "[lowpass]"; }
+	void apply(const ImageF& Y, const ImageF& X) const override;
+};
+
+/// Selects scales between [(size.y-1)/6 .. (size.y-1)/12] using a difference of gaussian
+struct BandPass : ImageOperation1, OperationT<BandPass> {
+	string name() const override { return "[bandpass]"; }
+	void apply(const ImageF& Y, const ImageF& X) const override;
+};
+
+/// Normalizes mean and deviation
+struct Normalize : ImageOperation1, OperationT<Normalize> {
+	string name() const override { return "[normalize]"; }
+	void apply(const ImageF& Y, const ImageF& X) const override;
 };

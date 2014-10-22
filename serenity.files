@@ -100,10 +100,10 @@ serialization.h
 io/jpeg-encoder.h
 crop.cc
 blend.cc
-normalize.cc
-normalize.h
-difference.h
-difference.cc
+split.h
+split.cc
 image-folder.cc
 transform.h
 align.h
+operation.cc
+image-group-operation.h

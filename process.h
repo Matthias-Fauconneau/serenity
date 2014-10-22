@@ -65,7 +65,7 @@ struct ProcessedGroupImageSource : ProcessedGenericSource, ImageSource {
 		: ProcessedGenericSource(source, operation), source(source) {}
 
 	size_t outputs() const override {
-		if(source.outputs() == operation.inputs()) return operation.outputs();
+		if((operation.inputs() == 0 && operation.outputs()>1) || source.outputs() == operation.inputs()) return operation.outputs();
 		assert_(operation.inputs() == 0 && operation.outputs() == 1,
 				operation.name(), operation.inputs(), operation.outputs(), source.name(), "ProcessedGroupImageSource");
 		return source.outputs();

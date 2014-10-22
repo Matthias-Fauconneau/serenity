@@ -1,21 +1,24 @@
 #pragma once
+#include "transform.h"
 
 /// Evaluates residual energy between A and transform B
-float residualEnergy(const ImageF& A, const ImageF& B, Transform transform) {
+double residualEnergy(const ImageF& A, const ImageF& B, Transform transform) {
 	assert_(A.size == B.size);
 	int2 margin = int2(round(abs(transform.offset)*vec2(B.size)));
 	int2 size = A.size - 2*margin;
-	assert_(size > int2(16), transform, margin, A.size, size);
-	float energy = sumXY(size, [&A, &B, transform](int x, int y) {
-		int2 a = int2(round(abs(transform.offset)*vec2(B.size)))+int2(x,y);
+	assert_(size > int2(16), transform, A.size, margin, size);
+	double energy = sumXY(size, [&A, &B, transform, margin](int x, int y) {
+		int2 a = margin+int2(x,y);
 		int2 b = int2(round(transform(a, B.size)));
-		assert_(a >= int2(0) && a < A.size, a, A.size, b, B.size, transform.offset, int2(round(transform.offset*vec2(B.size))));
+		assert_(a >= int2(0) && a < A.size);
 		assert_(b >= int2(0) && b < B.size);
-		return sq(A(a) - B(b));
-	}, 0.f);
+		//return -A(a)*B(b); // -NCC
+		/*if(b >= int2(0) && b < B.size)*/ return sq(A(a) - B(b)); //SSE
+		//else return sq(A(a)); // Penalizes large offsets
+	}, 0.0);
 	energy /= size.x*size.y;
 	//energy -= size.x*size.y; // Advantages more overlap
-	log(transform.offset, energy);
+	log(A.size, int2(round(transform.offset*vec2(B.size))), energy);
 	return energy;
 }
 
@@ -44,13 +47,13 @@ struct Align : ImageTransformGroupOperation, OperationT<Align> {
 				const ImageF& a = A[levelCount-1-level];
 				const ImageF& b = B[levelCount-1-level];
 				Transform levelBestTransform = bestTransform;
-				float bestResidualEnergy = residualEnergy(a, b, levelBestTransform);
+				double bestResidualEnergy = residualEnergy(a, b, levelBestTransform);
 				for(;;) { // Integer walk toward minimum at this scale
 					// FIXME: Compare image subsets
 					Transform stepBestTransform = levelBestTransform;
-					for(int2 offset: {int2(-1,0), int2(1,0),  int2(0,-1),int2(0,1)}) { // Evaluate single steps along each translation axis
+					for(int2 offset: {int2(-1,0), int2(1,0),int2(0,-1),int2(0,1)}) { // Evaluate single steps along each translation axis
 						Transform transform = levelBestTransform * Transform{vec2(offset)/vec2(b.size)};
-						float energy = residualEnergy(a, b, transform);
+						double energy = residualEnergy(a, b, transform);
 						if(energy < bestResidualEnergy) {
 							bestResidualEnergy = energy;
 							stepBestTransform = transform;
@@ -58,6 +61,11 @@ struct Align : ImageTransformGroupOperation, OperationT<Align> {
 					}
 					if(stepBestTransform==levelBestTransform) break;
 					else levelBestTransform = stepBestTransform;
+				}
+				if(levelBestTransform != Transform{vec2(0,0)}) {
+					// Asserts higher level walk was not as large as too miss a better shorter alignment at lower levels
+					double originalResidualEnergy = residualEnergy(a, b, Transform{vec2(0,0)});
+					assert_(bestResidualEnergy <= originalResidualEnergy, bestResidualEnergy, originalResidualEnergy, bestTransform);
 				}
 				bestTransform = levelBestTransform;
 			}

@@ -9,8 +9,9 @@ SourceImage ProcessedSource::image(size_t imageIndex, size_t outputIndex, int2 s
 		assert_(outputIndex == 0);
 		auto inputs = apply(operation.inputs(), [&](size_t inputIndex) { return source.image(imageIndex, inputIndex, target.size, noCacheWrite); });
 		for(auto& input: inputs) assert_(isNumber(input[0]));
+		log(operation.name(), operation.time(), time(imageIndex), target.size);
 		operation.apply({share(target)}, share(inputs));
-	}, noCacheWrite||true);
+	}, noCacheWrite);
 	assert_(isNumber(target[0]), target[0], target.size, name());
 	return target;
 }
@@ -37,7 +38,7 @@ SourceImageRGB sRGBSource::image(size_t imageIndex, int2 size, bool noCacheWrite
 // ProcessedGroupImageSource
 
 SourceImage ProcessedGroupImageSource::image(size_t groupIndex, size_t outputIndex, int2 size, bool noCacheWrite) {
-	auto inputs = source.images(groupIndex, outputIndex, size, noCacheWrite); // FIXME
+	auto inputs = source.images(groupIndex, operation.outputs()==1?outputIndex:0, size, noCacheWrite); // FIXME
 	return  ::cache<ImageF>(folder(), elementName(groupIndex)+'['+str(outputIndex)+']', inputs[0].size /*size?:this->size(groupIndex)*/,
 			time(groupIndex), [&](ImageF& target) {
 		if(target.size != inputs[0].size) {
@@ -45,10 +46,17 @@ SourceImage ProcessedGroupImageSource::image(size_t groupIndex, size_t outputInd
 			target.size = inputs[0].size;
 		}
 		assert_(operation.inputs() == 0 || operation.inputs() == inputs.size);
-		assert_(operation.outputs() == 1);
 		assert_(inputs[0].size == target.size);
-		operation.apply({share(target)}, share(inputs));
-
+		if(operation.outputs()==1) { // outputIndex selects source output index
+			operation.apply({share(target)}, share(inputs));
+		} else {
+			array<SourceImage> outputs;
+			for(size_t unused index: range(operation.outputs())) outputs.append( inputs[0].size );
+			log(operation.name(), operation.time(), time(groupIndex), inputs[0].size);
+			operation.apply(share(outputs), share(inputs));
+			assert_(outputIndex < outputs.size, outputIndex, this->outputs(), operation.outputs());
+			target.copy(outputs[outputIndex]);
+		}
 	}, noCacheWrite);
 }
 
@@ -79,6 +87,7 @@ array<SourceImage> ProcessedGroupImageGroupSource::images(size_t groupIndex, siz
 		auto inputs = source.images(groupIndex, outputIndex, size, noCacheWrite);
 		array<SourceImage> outputs;
 		for(size_t unused index: range(inputs.size)) outputs.append( inputs[0].size );
+		log(operation.name());
 		operation.apply(share(outputs), share(inputs));
 		return outputs;
 	} else { // Process every image separately
@@ -91,6 +100,7 @@ array<SourceImage> ProcessedGroupImageGroupSource::images(size_t groupIndex, siz
 			for(size_t inputIndex: range(groupInputs.size)) inputs.append( share(groupInputs[inputIndex][imageIndex]) );
 			array<SourceImage> outputs;
 			for(size_t unused index: range(operation.outputs())) outputs.append( inputs[0].size );
+			log(operation.name());
 			operation.apply(share(outputs), inputs);
 			allOutputs.append(outputs);
 		}
@@ -130,6 +140,7 @@ array<SourceImage> BinaryGroupImageGroupSource::images(size_t groupIndex, size_t
 				for(auto& x: inputs) assert_(x.size == inputs[0].size, inputs, name());
 				array<SourceImage> outputs;
 				for(size_t unused index: range(operation.outputs())) outputs.append( inputs[0].size );
+				log(operation.name());
 				operation.apply(share(outputs), inputs);
 				allOutputs.append(outputs);
 			}
