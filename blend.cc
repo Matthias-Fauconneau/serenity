@@ -71,30 +71,18 @@ struct ExposureBlend {
 	PersistentValue<map<String, String>> imagesAttributes {folder,"attributes"};
 	ImageFolder source { folder };
 	ProcessedSourceT<Intensity> intensity {source};
-	ProcessedSourceT<Normalize> normalizeI {intensity};
-	//ProcessedSourceT<LowPass> low {intensity};
-	//ProcessedSourceT<HighPass> high {low};
-	ProcessedSourceT<BandPass> band {intensity};
-	ProcessedSourceT<Normalize> normalize {band};
+	ProcessedSourceT<Normalize> normalize {intensity};
 	DifferenceSplit split {normalize};
 	ProcessedImageGroupSource splitSource {source, split};
 	ProcessedImageGroupSource splitNormalize {normalize, split};
-	//ProcessedImageGroupSource bandpassSplit {bandpass, split};
-	ProcessedGroupImageSourceT<Mean> meanSource {splitSource};
-	ProcessedGroupImageSourceT<Mean> meanNormalize {splitNormalize};
 	ProcessedImageTransformGroupSourceT<Align> transforms {splitNormalize};
 	TransformSampleImageGroupSource alignNormalize {splitNormalize, transforms};
-	ProcessedGroupImageSourceT<Mean> meanAlignNormalize {alignNormalize};
 	TransformSampleImageGroupSource alignSource {splitSource, transforms};
-	ProcessedGroupImageSourceT<Mean> meanAlignSource {alignSource};
 	ProcessedGroupImageGroupSourceT<Intensity> alignIntensity {alignSource};
-	//ProcessedGroupImageSourceT<Prism> alignedIntensityPrism {alignedIntensity};
 	ProcessedGroupImageGroupSourceT<Contrast> contrast {alignIntensity};
-	//ProcessedGroupImageSourceT<Prism> contrastPrism {contrast};
 	ProcessedGroupImageGroupSourceT<LowPass> lowContrast {contrast};
 	ProcessedGroupImageGroupSourceT<MaximumWeight> maximumWeights {lowContrast}; // Prevents misalignment blur
 	ProcessedGroupImageGroupSourceT<LowPass> lowWeights {maximumWeights}; // Diffuses weight selection
-	//BinaryGroupImageGroupSourceT<Mask> maskLowWeights {alignIntensity, lowWeights}; // Clears weight where no data is available
 	ProcessedGroupImageGroupSourceT<NormalizeWeights> normalizeWeights {lowWeights};
 	ProcessedGroupImageSourceT<Prism> normalizeWeightsPrism {normalizeWeights};
 	BinaryGroupImageGroupSourceT<Multiply> normalizeWeighted {normalizeWeights, alignSource};
@@ -106,7 +94,13 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	const size_t lastIndex = source.keys.indexOf(lastName);
 	size_t index = lastIndex != invalid ? lastIndex : 0;
 
-	sRGBSource sRGB [2] {{intensity}, {band}};
+	//ProcessedGroupImageSourceT<Mean> meanSource {splitSource};
+	//ProcessedGroupImageSourceT<Mean> meanNormalize {splitNormalize};
+	//ProcessedGroupImageSourceT<Mean> meanAlignNormalize {alignNormalize};
+	ProcessedGroupImageSourceT<Mean> meanAlignSource {alignSource};
+	//ProcessedGroupImageSourceT<Prism> alignedIntensityPrism {alignedIntensity};
+	//ProcessedGroupImageSourceT<Prism> contrastPrism {contrast};
+	sRGBSource sRGB [2] {{meanAlignSource}, {blend}};
 	ImageSourceView views [2] {{sRGB[0], &index, window}, {sRGB[1], &index, window}};
 	WidgetToggle toggleView {&views[0], &views[1], 0};
 	Window window {&toggleView, -1, [this]{ return toggleView.title()+" "+imagesAttributes.value(source.elementName(index)); }};

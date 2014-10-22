@@ -82,7 +82,7 @@ struct LowPass : ImageOperation1, OperationT<LowPass> {
 	void apply(const ImageF& Y, const ImageF& X) const override;
 };
 
-struct HighPass : ImageOperation1, OperationT<HighPass> {
+/*struct HighPass : ImageOperation1, OperationT<HighPass> {
 	string name() const override { return "[high]"; }
 	void apply(const ImageF& Y, const ImageF& X) const override;
 };
@@ -90,7 +90,7 @@ struct HighPass : ImageOperation1, OperationT<HighPass> {
 struct BandPass : ImageOperation1, OperationT<BandPass> {
 	string name() const override { return "[band]"; }
 	void apply(const ImageF& Y, const ImageF& X) const override;
-};
+};*/
 
 /// Normalizes mean and deviation
 struct Normalize : ImageOperation1, OperationT<Normalize> {

@@ -18,7 +18,7 @@ void LowPass::apply(const ImageF& Y, const ImageF& X) const {
 	gaussianBlur(Y, X, largeScale/4); // Low pass
 }
 
-void HighPass::apply(const ImageF& Y, const ImageF& X) const {
+/*void HighPass::apply(const ImageF& Y, const ImageF& X) const {
 	const float largeScale = (X.size.y-1)/6;
 	parallel::sub(Y, X, gaussianBlur(X, largeScale/4)); // High pass [ .. largeScale/4]
 }
@@ -27,7 +27,7 @@ void BandPass::apply(const ImageF& Y, const ImageF& X) const {
 	const float largeScale = (X.size.y-1)/6;
 	gaussianBlur(Y, X, largeScale/8); // Low pass [largeScale/2 .. ]
 	parallel::sub(Y, Y, gaussianBlur(Y, largeScale/2)); // High pass [ .. largeScale]
-}
+}*/
 
 void Normalize::apply(const ImageF& Y, const ImageF& X) const {
 	float energy = parallel::energy(X);

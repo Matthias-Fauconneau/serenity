@@ -44,7 +44,7 @@ struct DifferenceSplit : GroupSource {
 		bestResidual = inf; int2 bestOffset=0;
 		//for(;;) {
 			int2 stepOffset = bestOffset;
-			const int delta = size.y/2;
+			const int delta = 0;
 			for(int y: range(-delta, delta +1)) {
 				int2 offset = int2(0, y);
 				double residual = residualEnergy(A, B, offset/**size/16*/);
@@ -69,10 +69,9 @@ struct DifferenceSplit : GroupSource {
 			float previous = endIndex > 0 ? residual(endIndex-1, endIndex) : inf;
 			float current = residual(endIndex, endIndex+1);
 			float next = endIndex+2 < source.count() ? residual(endIndex+1, endIndex+2) : inf;
-			log(str(previous,3), source.elementName(endIndex), str(current,3), source.elementName(endIndex+1), str(next,3),
-				previous/**(1+1./128)*/ < current/*, current > next*(1+1./128)*/, 1/(previous/current-1));
-			if(endIndex == startIndex) {
-				if(previous*(1-1./128) < current) {
+			log(str(previous,3), source.elementName(endIndex), str(current,3), source.elementName(endIndex+1), str(next,3));
+			if(endIndex == startIndex && startIndex>0) {
+				if(previous/current < current/next) {
 					log("SKIP", source.elementName(endIndex), previous, current);
 					startIndex++; // Single
 				}
