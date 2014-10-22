@@ -137,7 +137,7 @@ inline real sum(ref<float> values) { return reduce(values, [](real accumulator, 
 
 inline real mean(ref<float> values) { return sum(values)/values.size; }
 
-inline float energy(ref<float> values) { return reduce(values, [](float accumulator, float value) { return accumulator + value*value; }, 0.f); }
+inline real energy(ref<float> values) { return reduce(values, [](real accumulator, float value) { return accumulator + value*value; }, 0.); }
 
 // apply reduce
 

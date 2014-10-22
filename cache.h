@@ -24,7 +24,7 @@ inline File cacheFile(const Folder& folder, string name, string key, int64 sourc
 	File file(name, folder, ::Flags(ReadWrite|Create|Truncate));
     Time time;
     static String prefix;
-	log(prefix+folder.name(), name, key);
+	//log(prefix+folder.name(), name, key);
     prefix.append(' ');
 	String newKey = write(file);
 	if(newKey != key) {
@@ -32,7 +32,7 @@ inline File cacheFile(const Folder& folder, string name, string key, int64 sourc
 		key = move(newKey);
 	}
     prefix.pop();
-    if(time>0.1) log(prefix+str(time));
+	//if(time>0.1) log(prefix+str(time));
 	rename(name, name+'.'+key, folder);
     return file;
 }

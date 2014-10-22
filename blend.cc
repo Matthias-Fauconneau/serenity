@@ -41,14 +41,6 @@ struct MaximumWeight : ImageGroupOperation, OperationT<MaximumWeight> {
 	}
 };
 
-/*struct Mask : ImageOperation21, OperationT<Mask> {
-	string name() const override { return "[mask]"; }
-	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const override;
-};
-inline void Mask::apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const {
-	::apply(Y, [&](float a, float b) { return a ? b : 0; }, X0, X1);
-}*/
-
 /// Normalizes weights
 /// \note if all weights are zero, weights are all set to 1/groupSize.
 struct NormalizeWeights : ImageGroupOperation, OperationT<NormalizeWeights> {
@@ -79,29 +71,33 @@ struct ExposureBlend {
 	PersistentValue<map<String, String>> imagesAttributes {folder,"attributes"};
 	ImageFolder source { folder };
 	ProcessedSourceT<Intensity> intensity {source};
-	ProcessedSourceT<Normalize> normalize {intensity};
+	ProcessedSourceT<Normalize> normalizeI {intensity};
+	//ProcessedSourceT<LowPass> low {intensity};
+	//ProcessedSourceT<HighPass> high {low};
+	ProcessedSourceT<BandPass> band {intensity};
+	ProcessedSourceT<Normalize> normalize {band};
 	DifferenceSplit split {normalize};
-	ProcessedImageGroupSource sourceSplit {source, split};
-	ProcessedImageGroupSource intensitySplit {normalize, split};
-	ProcessedSourceT<BandPass> bandpass {intensity};
-	ProcessedImageGroupSource bandpassSplit {bandpass, split};
-	ProcessedGroupImageSourceT<Mean> unaligned {bandpassSplit};
-	ProcessedImageTransformGroupSourceT<Align> transforms {bandpassSplit};
-	TransformSampleImageGroupSource alignedNormalized {bandpassSplit, transforms};
-	ProcessedGroupImageSourceT<Mean> aligned {alignedNormalized};
-	TransformSampleImageGroupSource alignedSource {sourceSplit, transforms};
-	ProcessedGroupImageSourceT<Mean> alignedSourceMean {alignedSource};
-	ProcessedGroupImageGroupSourceT<Intensity> alignedIntensity {alignedSource};
-	ProcessedGroupImageSourceT<Prism> alignedIntensityPrism {alignedIntensity};
-	ProcessedGroupImageGroupSourceT<Contrast> contrast {alignedIntensity};
-	ProcessedGroupImageSourceT<Prism> contrastPrism {contrast};
+	ProcessedImageGroupSource splitSource {source, split};
+	ProcessedImageGroupSource splitNormalize {normalize, split};
+	//ProcessedImageGroupSource bandpassSplit {bandpass, split};
+	ProcessedGroupImageSourceT<Mean> meanSource {splitSource};
+	ProcessedGroupImageSourceT<Mean> meanNormalize {splitNormalize};
+	ProcessedImageTransformGroupSourceT<Align> transforms {splitNormalize};
+	TransformSampleImageGroupSource alignNormalize {splitNormalize, transforms};
+	ProcessedGroupImageSourceT<Mean> meanAlignNormalize {alignNormalize};
+	TransformSampleImageGroupSource alignSource {splitSource, transforms};
+	ProcessedGroupImageSourceT<Mean> meanAlignSource {alignSource};
+	ProcessedGroupImageGroupSourceT<Intensity> alignIntensity {alignSource};
+	//ProcessedGroupImageSourceT<Prism> alignedIntensityPrism {alignedIntensity};
+	ProcessedGroupImageGroupSourceT<Contrast> contrast {alignIntensity};
+	//ProcessedGroupImageSourceT<Prism> contrastPrism {contrast};
 	ProcessedGroupImageGroupSourceT<LowPass> lowContrast {contrast};
 	ProcessedGroupImageGroupSourceT<MaximumWeight> maximumWeights {lowContrast}; // Prevents misalignment blur
 	ProcessedGroupImageGroupSourceT<LowPass> lowWeights {maximumWeights}; // Diffuses weight selection
-	//BinaryGroupImageGroupSourceT<Mask> maskLowWeights {alignedIntensity, lowWeights}; // Clears weight where no data is available
+	//BinaryGroupImageGroupSourceT<Mask> maskLowWeights {alignIntensity, lowWeights}; // Clears weight where no data is available
 	ProcessedGroupImageGroupSourceT<NormalizeWeights> normalizeWeights {lowWeights};
 	ProcessedGroupImageSourceT<Prism> normalizeWeightsPrism {normalizeWeights};
-	BinaryGroupImageGroupSourceT<Multiply> normalizeWeighted {normalizeWeights, alignedSource};
+	BinaryGroupImageGroupSourceT<Multiply> normalizeWeighted {normalizeWeights, alignSource};
 	ProcessedGroupImageSourceT<Sum> blend {normalizeWeighted};
 };
 
@@ -110,13 +106,14 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	const size_t lastIndex = source.keys.indexOf(lastName);
 	size_t index = lastIndex != invalid ? lastIndex : 0;
 
-	sRGBSource sRGB [2] {{alignedSourceMean}, {blend}};
+	sRGBSource sRGB [2] {{intensity}, {band}};
 	ImageSourceView views [2] {{sRGB[0], &index, window}, {sRGB[1], &index, window}};
 	WidgetToggle toggleView {&views[0], &views[1], 0};
 	Window window {&toggleView, -1, [this]{ return toggleView.title()+" "+imagesAttributes.value(source.elementName(index)); }};
 
 	ExposureBlendPreview() {
 		for(char c: range('0','9'+1)) window.actions[Key(c)] = [this, c]{ setCurrentImageAttributes("#"_+c); };
+		window.actions[Key('-')] = [this]{ setCurrentImageAttributes("#10"_); };
 	}
 	void setCurrentImageAttributes(string currentImageAttributes) {
 		imagesAttributes[source.elementName(index)] = String(currentImageAttributes);
@@ -127,7 +124,9 @@ registerApplication(ExposureBlendPreview);
 struct ExposureBlendTest : ExposureBlend, Application {
 	ExposureBlendTest() {
 		for(size_t groupIndex=0; split.nextGroup(); groupIndex++) {
-			log(apply(split(groupIndex), [this](const size_t index) { return copy(imagesAttributes.at(source.elementName(index))); }));
+			auto set = apply(split(groupIndex), [this](const size_t index) { return copy(imagesAttributes.at(source.elementName(index))); });
+			log(set);
+			for(const auto& e: set) assert_(e == set[0]);
 		}
 	}
 };

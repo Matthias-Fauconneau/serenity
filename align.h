@@ -2,7 +2,7 @@
 #include "transform.h"
 
 /// Evaluates residual energy between A and transform B
-double residualEnergy(const ImageF& A, const ImageF& B, Transform transform) {
+static double residualEnergy(const ImageF& A, const ImageF& B, Transform transform) {
 	assert_(A.size == B.size);
 	int2 margin = int2(round(abs(transform.offset)*vec2(B.size)));
 	int2 size = A.size - 2*margin;
@@ -23,7 +23,7 @@ double residualEnergy(const ImageF& A, const ImageF& B, Transform transform) {
 }
 
 /// Evaluates first \a levelCount mipmap levels (shares source as first element)
-array<ImageF> mipmap(const ImageF& source, int levelCount) {
+static array<ImageF> mipmap(const ImageF& source, int levelCount) {
 	array<ImageF> mipmap; mipmap.append( share(source) );
 	for(int unused level: range(levelCount)) mipmap.append(downsample(mipmap.last()));
 	return mipmap;
@@ -51,7 +51,17 @@ struct Align : ImageTransformGroupOperation, OperationT<Align> {
 				for(;;) { // Integer walk toward minimum at this scale
 					// FIXME: Compare image subsets
 					Transform stepBestTransform = levelBestTransform;
-					for(int2 offset: {int2(-1,0), int2(1,0),int2(0,-1),int2(0,1)}) { // Evaluate single steps along each translation axis
+					//for(int2 offset: {int2(-1,0), int2(1,0),int2(0,-1),int2(0,1)}) { // Evaluate single steps along each translation axis
+					/*for(int2 offset: {
+						int2(-1, -1), int2( 0, -1), int2(1, -1),
+						int2(-1,  0),                    int2(1,  0),
+						int2(-1,  1), int2( 0,  1), int2(1,  1), }) {*/
+						for(int2 offset: {
+																  int2( 0, -2),
+											  int2(-1, -1), int2( 0, -1), int2(1, -1),
+							int2(-2, 0), int2(-1,  0),                     int2(1,  0), int2(2, 0),
+											  int2(-1,  1), int2( 0,  1), int2(1,  1),
+																  int2(0, 2) }) {
 						Transform transform = levelBestTransform * Transform{vec2(offset)/vec2(b.size)};
 						double energy = residualEnergy(a, b, transform);
 						if(energy < bestResidualEnergy) {

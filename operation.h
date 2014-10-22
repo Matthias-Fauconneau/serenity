@@ -77,15 +77,18 @@ struct Intensity : ImageOperation31, OperationT<Intensity> {
 	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1, const ImageF& X2) const override;
 };
 
-/// Selects scales over (size.y-1)/12
 struct LowPass : ImageOperation1, OperationT<LowPass> {
-	string name() const override { return "[lowpass]"; }
+	string name() const override { return "[low]"; }
 	void apply(const ImageF& Y, const ImageF& X) const override;
 };
 
-/// Selects scales between [(size.y-1)/6 .. (size.y-1)/12] using a difference of gaussian
+struct HighPass : ImageOperation1, OperationT<HighPass> {
+	string name() const override { return "[high]"; }
+	void apply(const ImageF& Y, const ImageF& X) const override;
+};
+
 struct BandPass : ImageOperation1, OperationT<BandPass> {
-	string name() const override { return "[bandpass]"; }
+	string name() const override { return "[band]"; }
 	void apply(const ImageF& Y, const ImageF& X) const override;
 };
 
