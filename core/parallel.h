@@ -18,7 +18,7 @@ template<Type A, Type T, Type F, Type... Ss> T reduce(ref<T> values, F fold, A a
     for(size_t index: range(values.size)) accumulator = fold(accumulator, values[index], sources[index]...);
     return accumulator;
 }
-template<Type T, Type F, size_t N> T reduce(const T (&values)[N], F fold, T initialValue) {
+template<Type T, Type A, Type F, size_t N> T reduce(const T (&values)[N], F fold, A initialValue) {
     return reduce(ref<T>(values), fold, initialValue);
 }
 
@@ -97,25 +97,25 @@ void apply(mref<T> target, Function function, ref<S>... sources) {
     else chunk_parallel(target.size, [&](uint, size_t index) { new (&target[index]) T(function(sources[index]...)); });
 }
 
-template<Type A, Type T, Type F, Type... Ss> T parallel_reduce(size_t size, F fold, A initial_value) {
+template<Type A, Type T, Type F, Type... Ss> T reduce(size_t size, F fold, A initial_value) {
 	assert_(size);
 	if(size< minimumSize) return ::reduce(size, fold, initial_value);
 	else {
 		A accumulators[threadCount];
 		mref<A>(accumulators).clear(initial_value); // Some threads may not iterate
 		parallel_chunk(size, [&](uint id, size_t start, size_t size) { accumulators[id] = ::reduce(range(start, size), fold, initial_value); });
-		return reduce(accumulators, fold, initial_value);
+		return ::reduce(accumulators, fold, initial_value);
 	}
 }
 
-template<Type A, Type T, Type F, Type... Ss> T parallel_reduce(ref<T> values, F fold, A initial_value) {
+template<Type A, Type T, Type F, Type... Ss> T reduce(ref<T> values, F fold, A initial_value) {
     assert_(values);
     if(values.size < minimumSize) return ::reduce(values, fold, initial_value);
     else {
         A accumulators[threadCount];
         mref<A>(accumulators).clear(initial_value); // Some threads may not iterate
         parallel_chunk(values.size, [&](uint id, size_t start, size_t size) { accumulators[id] = ::reduce(values.slice(start, size), fold, initial_value); });
-        return reduce(accumulators, fold, initial_value);
+		return ::reduce(accumulators, fold, initial_value);
     }
 }
 template<Type T, Type F> T reduce(ref<T> values, F fold) { return reduce(values, fold, values[0]); }
@@ -142,17 +142,22 @@ inline real energy(ref<float> values) { return reduce(values, [](real accumulato
 // apply reduce
 
 // \note Cannot be a generic reduction as the final fold is single source
-template<Type T, Type F, Type... Ss> T sum(ref<T> values, F apply, T initial_value, ref<Ss>... sources) {
+template<Type T, Type F, Type A, Type... Ss> T sum(ref<T> values, F apply, A initial_value, ref<Ss>... sources) {
     assert_(values);
     if(values.size < minimumSize) return ::reduce(values, [&](T a, T v, Ss... s) { return a+apply(v, s...); }, initial_value, sources...);
     else {
-        T accumulators[threadCount];
-        mref<T>(accumulators).clear(initial_value); // Some threads may not iterate
+		A accumulators[threadCount];
+		mref<A>(accumulators).clear(initial_value); // Some threads may not iterate
         parallel_chunk(values.size, [&](uint id, size_t start, size_t size) {
             accumulators[id] = ::reduce(values.slice(start, size),
-                                        [&](T a, T v, Ss... s) { return a+apply(v, s...); }, initial_value, sources.slice(start, size)...); });
+										[&](A a, T v, Ss... s) { return a+apply(v, s...); }, initial_value, sources.slice(start, size)...); });
         return ::sum(accumulators);
     }
+}
+
+inline double SSE(ref<float> A, ref<float> B) {
+	assert_(A.size == B.size);
+	return sum(A, [](float a, float b) { return sq(a-b); }, 0., B);
 }
 
 // multiple accumulator reduce
