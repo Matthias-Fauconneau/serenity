@@ -92,6 +92,26 @@ struct ExposureBlend {
 	ProcessedGroupImageSourceT<Sum> blend {normalizeWeighted};
 };
 
+struct ExposureBlendAnnotate : ExposureBlend, Application {
+	PersistentValue<String> lastName {folder, ".last", [this]{ return source.elementName(index); }};
+	const size_t lastIndex = source.keys.indexOf(lastName);
+	size_t index = lastIndex != invalid ? lastIndex : 0;
+
+	sRGBSource sRGB [2] {{source}, {normalize}};
+	ImageSourceView views [2] {{sRGB[0], &index, window}, {sRGB[1], &index, window}};
+	WidgetToggle toggleView {&views[0], &views[1], 0};
+	Window window {&toggleView, -1, [this]{ return toggleView.title()+" "+imagesAttributes.value(source.elementName(index)); }};
+
+	ExposureBlendAnnotate() {
+		for(char c: range('0','9'+1)) window.actions[Key(c)] = [this, c]{ setCurrentImageAttributes("#"_+c); };
+		for(char c: range('a','z'+1)) window.actions[Key(c)] = [this, c]{ setCurrentImageAttributes("#"_+c); };
+	}
+	void setCurrentImageAttributes(string currentImageAttributes) {
+		imagesAttributes[source.elementName(index)] = String(currentImageAttributes);
+	}
+};
+registerApplication(ExposureBlendAnnotate, annotate);
+
 struct ExposureBlendPreview : ExposureBlend, Application {
 	PersistentValue<String> lastName {folder, ".last", [this]{ return source.elementName(index); }};
 	const size_t lastIndex = source.keys.indexOf(lastName);
@@ -101,14 +121,6 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	ImageSourceView views [2] {{sRGB[0], &index, window}, {sRGB[1], &index, window}};
 	WidgetToggle toggleView {&views[0], &views[1], 0};
 	Window window {&toggleView, -1, [this]{ return toggleView.title()+" "+imagesAttributes.value(source.elementName(index)); }};
-
-	ExposureBlendPreview() {
-		for(char c: range('0','9'+1)) window.actions[Key(c)] = [this, c]{ setCurrentImageAttributes("#"_+c); };
-		window.actions[Key('-')] = [this]{ setCurrentImageAttributes("#10"_); };
-	}
-	void setCurrentImageAttributes(string currentImageAttributes) {
-		imagesAttributes[source.elementName(index)] = String(currentImageAttributes);
-	}
 };
 registerApplication(ExposureBlendPreview);
 
@@ -136,25 +148,16 @@ struct ExposureBlendExport : ExposureBlend, Application {
 			writeFile(name, encodeJPEG(image, 50), output, true);
 			compressionTime.stop();
 			log(str(100*(index+1)/sRGB.count(-1))+'%', '\t',index+1,'/',sRGB.count(-1),
-				//'\t',imagesAttributes.at(sRGB.elementName(index)),
-				'\t',sRGB.elementName(index), strx(sRGB.size(index)),
+				'\t',sRGB.elementName(index),
 				'\t',correctionTime, compressionTime);
 		}
 	}
 };
 registerApplication(ExposureBlendExport, export);
 
-struct First : ImageGroupOperation1, OperationT<First> {
-	string name() const override { return "[first]"; }
-	virtual void apply(const ImageF& Y, ref<ImageF> X) const {
-		Y.copy(X[0]);
-	}
-};
-
-struct ExposureBlendCopy : ExposureBlend, Application {
-	ProcessedGroupImageSourceT<First> first {alignSource};
-	sRGBSource sRGB {first};
-	ExposureBlendCopy() {
+struct ExposureBlendSelect : ExposureBlend, Application {
+	sRGBSource sRGB {select};
+	ExposureBlendSelect() {
 		Folder output ("Export", folder, true);
 		for(size_t index: range(sRGB.count(-1))) {
 			String name = sRGB.elementName(index);
@@ -162,12 +165,12 @@ struct ExposureBlendCopy : ExposureBlend, Application {
 			SourceImageRGB image = sRGB.image(index, int2(2048,1536), true);
 			correctionTime.stop();
 			Time compressionTime;
-			writeFile(name+".first", encodeJPEG(image, 50), output, true);
+			writeFile(name+".select", encodeJPEG(image, 50), output, true);
 			compressionTime.stop();
 			log(str(100*(index+1)/sRGB.count(-1))+'%', '\t',index+1,'/',sRGB.count(-1),
-				'\t',sRGB.elementName(index), strx(sRGB.size(index)),
+				'\t',sRGB.elementName(index),
 				'\t',correctionTime, compressionTime);
 		}
 	}
 };
-registerApplication(ExposureBlendCopy, copy);
+registerApplication(ExposureBlendSelect, select);

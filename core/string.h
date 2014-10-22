@@ -120,7 +120,7 @@ inline String str(int32 n, int pad=0) { return str(int64(n), pad); }
 
 /// Converts a floating-point number
 String str(double number, int precision=2, uint pad=0, int exponent=0);
-inline String str(float n) { return str(double(n)); }
+inline String str(float n, int precision=2) { return str(double(n), precision); }
 
 /// Formats value using best binary prefix
 String binaryPrefix(uint64 value, string unit="B", string unitSuffix="");

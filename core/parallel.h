@@ -137,8 +137,6 @@ inline real sum(ref<float> values) { return reduce(values, [](real accumulator, 
 
 inline real mean(ref<float> values) { return sum(values)/values.size; }
 
-inline real energy(ref<float> values) { return reduce(values, [](real accumulator, float value) { return accumulator + value*value; }, 0.); }
-
 // apply reduce
 
 // \note Cannot be a generic reduction as the final fold is single source
@@ -154,6 +152,8 @@ template<Type T, Type F, Type A, Type... Ss> T sum(ref<T> values, F apply, A ini
         return ::sum(accumulators);
     }
 }
+
+inline real energy(ref<float> values, float offset=0) { return sum(values, [offset](float value) { return sq(value-offset); }, 0.); }
 
 inline double SSE(ref<float> A, ref<float> B) {
 	assert_(A.size == B.size);

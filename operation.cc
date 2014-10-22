@@ -30,7 +30,8 @@ void BandPass::apply(const ImageF& Y, const ImageF& X) const {
 }*/
 
 void Normalize::apply(const ImageF& Y, const ImageF& X) const {
-	float energy = parallel::energy(X);
-	float deviation = sqrt(energy / X.ref::size);
-	parallel::apply(Y, [deviation](const float value) { return (1+(value)/deviation /*-1,1*/)/2 /*0,1*/; }, X);
+	real mean = parallel::mean(X);
+	real energy = parallel::energy(X, mean);
+	real deviation = sqrt(energy / X.ref::size);
+	parallel::apply(Y, [deviation, mean](const float value) { return (value-mean)/deviation; }, X);
 }

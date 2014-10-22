@@ -30,15 +30,15 @@ struct DifferenceSplit : GroupSource {
 			float previous = endIndex > 0 ? SSE(endIndex-1, endIndex) : inf;
 			float current = SSE(endIndex, endIndex+1);
 			float next = endIndex+2 < source.count() ? SSE(endIndex+1, endIndex+2) : inf;
+			log(previous, source.elementName(endIndex), current, source.elementName(endIndex+1), next);
 			if(endIndex == startIndex && startIndex>0) {
-				if(previous/current < current/next) startIndex++; // Skips single unmatched image
+				//if(previous/current < current/next) startIndex++; // Skips single unmatched image
 			}
 			else if((previous+next)/2 < current) break;
 		}
 		assert_(endIndex < source.count());
 		array<size_t> group;
 		for(size_t index: range(startIndex, endIndex+1/*included*/)) group.append(index);
-		log(group, apply(group, [&](const size_t index){ return source.elementName(index); }));
 		assert_(group.size > 1);
 		groups.append(move(group));
 		return true;
