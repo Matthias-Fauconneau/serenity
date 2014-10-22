@@ -124,7 +124,7 @@ generic struct bgr {
 /// Integer b,g,r vector (8bit)
 typedef vec<bgr,uint8,3> byte3;
 /// Integer b,g,r vector (32bit)
-typedef vec<bgr,uint8,3> bgr3i;
+typedef vec<bgr,int,3> bgr3i;
 /// Floating-point b,g,r vector
 typedef vec<bgr,float,3> bgr3f;
 

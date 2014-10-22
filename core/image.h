@@ -125,16 +125,7 @@ template<Type F, Type... S> void forXY(int2 size, F function, const S&... source
 		}
 	});
 }
-#if 0
-template<Type F, Type... S> void forXY(int2 min, int2 max, F function, const S&... sources) {
-	parallel_chunk(max.y-min.y, [&](uint, uint64 start, uint64 chunkSize) {
-		for(size_t y: range(min.y+start, min.y+start+chunkSize)) for(size_t x: range(min.x, max.x)) {
-			function(x, y, sources[y*sources.stride + x]...);
-		}
-	});
-}
-template<Type F, Type... S> void forXY(int2 size, F function, const S&... sources) { forXY(0, size, function, sources...); }
-#endif
+
 template<Type F, Type... S> void applyXY(const ImageF& target, F function, const S&... sources) {
     parallel_chunk(target.size.y, [&](uint, uint64 start, uint64 chunkSize) {
         for(size_t y: range(start, start+chunkSize)) for(size_t x: range(target.size.x)) {

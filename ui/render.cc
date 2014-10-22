@@ -107,7 +107,7 @@ void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity) {
 
 void oxygen(const Image& target, int2 min, int2 max) {
     const int y0 = -32-8, splitY = ::min(300, 3*target.size.y/4);
-    const bgr3f radial = bgr3f(246./255); // linear
+	const bgr3f radial = bgr3f(246./0xFF); // linear
     const bgr3f top = bgr3f(221, 223, 225); // sRGB
     const bgr3f bottom = bgr3f(184, 187, 194); // sRGB
     const bgr3f middle = (bottom+top)/2.f; //FIXME
@@ -129,8 +129,8 @@ void oxygen(const Image& target, int2 min, int2 max) {
     const float sx = 2.f/w, sy = 2.f/h;
     for(int y: range(0, ::min(max.y, y0+h))) for(int x: range(::max(min.x,(target.size.x-w)/2), ::min(max.x,(target.size.x+w)/2))) {
         float r = sqrt( sq( sx * (x - cx) ) + sq( sy * (y - cy) ) );
-        const float r0 = 0./4, r1 = 2./4, r2 = 3./4, r3 = 4./4;
-        const float a0 = 255./255, a1 = 101./255, a2 = 37./255, a3 = 0./255;
+		const float r0 = 0, r1 = 1./2, r2 = 3./4, r3 = 1;
+		const float a0 = 1, a1 = 101./0xFF, a2 = 37./0xFF, a3 = 0;
         /***/ if(r < r1) { float t = (r-r0) / (r1-r0); blend(target, x, y, radial, (1-t)*a0 + t*a1); }
         else if(r < r2) { float t = (r-r1) / (r2-r1); blend(target, x, y, radial, (1-t)*a1 + t*a2); }
         else if(r < r3) { float t = (r-r2) / (r3-r2); blend(target, x, y, radial, (1-t)*a2 + t*a3); }

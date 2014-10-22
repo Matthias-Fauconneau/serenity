@@ -145,7 +145,7 @@ struct ExposureBlendExport : ExposureBlend, Application {
 			writeFile(name, encodeJPEG(image, 50), output, true);
 			compressionTime.stop();
 			log(str(100*(index+1)/sRGB.count(-1))+'%', '\t',index+1,'/',sRGB.count(-1),
-				'\t',imagesAttributes[sRGB.elementName(index)],
+				//'\t',imagesAttributes.at(sRGB.elementName(index)),
 				'\t',sRGB.elementName(index), strx(sRGB.size(index)),
 				'\t',correctionTime, compressionTime);
 		}
