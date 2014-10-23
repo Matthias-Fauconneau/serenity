@@ -107,3 +107,4 @@ transform.h
 align.h
 operation.cc
 image-group-operation.h
+ui/color.h

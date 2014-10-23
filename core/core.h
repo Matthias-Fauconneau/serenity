@@ -307,6 +307,10 @@ generic struct mref : ref<T> {
     template<Type Function, Type... S> void apply(Function function, ref<S>... sources) const {
         for(size_t index: range(size)) new (&at(index)) T(function(sources[index]...));
     }
+	/// Stores the application of a function to every elements of a ref in a mref
+	template<Type Function, Type... S> void apply(Function function, mref<S>... sources) const {
+		for(size_t index: range(size)) new (&at(index)) T(function(sources[index]...));
+	}
 
     /// Replaces in \a array every occurence of \a before with \a after
     template<Type B, Type A> mref& replace(const B& before, const A& after) { for(T& e : *this) if(e==before) e=T(after); return *this; }

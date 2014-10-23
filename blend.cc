@@ -56,12 +56,28 @@ struct NormalizeWeights : ImageGroupOperation, OperationT<NormalizeWeights> {
 	}
 };
 
+#include "color.h"
 /// Converts single component image group to a multiple component image
 struct Prism : ImageGroupOperation, OperationT<Prism> {
 	string name() const override { return "[prism]"; }
 	size_t outputs() const override { return 3; }
-	virtual void apply(ref<ImageF> Y, ref<ImageF> X) const {
-		for(size_t index: range(min(Y.size, X.size))) Y[index].copy(X[index]);
+	void apply(ref<ImageF> Y, ref<ImageF> X) const override {
+		if(X.size <= 3) {
+			for(size_t index: range(X.size)) Y[index].copy(X[index]);
+			for(size_t index: range(X.size, Y.size)) Y[index].clear();
+		} else {
+			assert_(Y.size == 3);
+			for(size_t index: range(X.size)) {
+				vec3 color = LChuvtoBGR(53, 179, 2*PI*index/X.size);
+				assert_(isNumber(color));
+				for(size_t component: range(3)) {
+					assert_(X[index].size == Y[component].size);
+					if(index == 0) parallel::apply(Y[component], [=](float x) { return x * color[component]; }, X[index]);
+					else parallel::apply(Y[component], [=](float y, float x) { return y + x * color[component]; }, Y[component], X[index]);
+				}
+			}
+			for(size_t component: range(3)) for(auto v: Y[component]) assert_(isNumber(v));
+		}
 	}
 };
 
@@ -106,8 +122,8 @@ struct ExposureBlendAnnotate : ExposureBlend, Application {
 
 	sRGBSource sRGB [2] {{source}, {normalize}};
 	ImageSourceView views [2] {{sRGB[0], &index}, {sRGB[1], &index}};
-	WidgetToggle toggleView {&views[0], &views[1], 0};
-	Window window {&toggleView, -1, [this]{ return toggleView.title()+" "+imagesAttributes.value(source.elementName(index)); }};
+	WidgetCycle view {views};
+	Window window {&view, -1, [this]{ return view.title()+" "+imagesAttributes.value(source.elementName(index)); }};
 
 	ExposureBlendAnnotate() {
 		for(char c: range('0','9'+1)) window.actions[Key(c)] = [this, c]{ setCurrentImageAttributes("#"_+c); };
@@ -124,21 +140,18 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	const size_t lastIndex = source.keys.indexOf(lastName);
 	size_t index = lastIndex != invalid ? lastIndex : 0;
 
-	/*ProcessedGroupImageSourceT<Mean> unaligned {splitSource};
-	ProcessedGroupImageSourceT<Mean> aligned {alignSource};*/
 	ProcessedGroupImageSourceT<Prism> prism {transforms.source};
 	TransformSampleImageGroupSource align {transforms.source, transforms};
 	ProcessedGroupImageSourceT<Prism> prismAlign {align};
 
-	sRGBSource sRGB [2] {{prism}, {prismAlign}};
-	////sRGBSource sRGB [2] {{select}, {blend}};
-	ImageSourceView views [2] {{sRGB[0], &index}, {sRGB[1], &index}};
+	sRGBSource sRGB [4] {{prism}, {prismAlign},{select}, {blend}};
+	ImageSourceView views [4] {{sRGB[0], &index}, {sRGB[1], &index}, {sRGB[2], &index}, {sRGB[3], &index}};
 
 	//sRGBGroupSource sRGB [2] {{splitLow}, {align}};
 	//ImageGroupSourceView views [2] {{sRGB[0], &index}, {sRGB[1], &index}};
 
-	WidgetToggle toggleView {&views[0], &views[1], 0};
-	Window window {&toggleView, -1, [this]{ return toggleView.title()+" "+imagesAttributes.value(source.elementName(index)); }};
+	WidgetCycle view {views};
+	Window window {&view, -1, [this]{ return view.title()+" "+imagesAttributes.value(source.elementName(index)); }};
 };
 registerApplication(ExposureBlendPreview);
 

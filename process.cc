@@ -23,11 +23,11 @@ SourceImageRGB sRGBSource::image(size_t imageIndex, int2 size, bool noCacheWrite
 	return ::cache<Image>(folder(), elementName(imageIndex), inputs[0].size, ProcessedGenericSource::time(imageIndex),
 				 [&](Image& target) {
 		if(target.size != inputs[0].size) {
+			error("Resize");
 			assert_(target.size > inputs[0].size);
 			target.Image::size = inputs[0].ImageF::size;
 		}
-		/*array<SourceImage> inputs;
-		for(size_t inputIndex: range(source.outputs())) inputs.append(source.image(imageIndex, inputIndex, target.size, noCacheWrite));*/
+		log(toString());
 		if(inputs.size==1) ::sRGB(target, inputs[0]);
 		else if(inputs.size==3) ::sRGB(target, inputs[0], inputs[1], inputs[2]);
 		else error(inputs.size);
@@ -37,10 +37,11 @@ SourceImageRGB sRGBSource::image(size_t imageIndex, int2 size, bool noCacheWrite
 // ProcessedGroupImageSource
 
 SourceImage ProcessedGroupImageSource::image(size_t groupIndex, size_t outputIndex, int2 size, bool noCacheWrite) {
-	auto inputs = source.images(groupIndex, operation.outputs()==1?outputIndex:0, size, noCacheWrite); // FIXME
-	return  ::cache<ImageF>(folder(), elementName(groupIndex)+'['+str(outputIndex)+']', inputs[0].size /*size?:this->size(groupIndex)*/,
-			time(groupIndex), [&](ImageF& target) {
+	assert_(operation.outputs()==1 || source.outputs()==1);
+	array<SourceImage> inputs = source.images(groupIndex, operation.outputs()==1?outputIndex:0, size, noCacheWrite); // FIXME
+	return ::cache<ImageF>(folder(), elementName(groupIndex)+'['+str(outputIndex)+']', inputs[0].size, time(groupIndex), [&](ImageF& target) {
 		if(target.size != inputs[0].size) {
+			error("Resize");
 			assert_(target.size > inputs[0].size);
 			target.size = inputs[0].size;
 		}
@@ -52,7 +53,8 @@ SourceImage ProcessedGroupImageSource::image(size_t groupIndex, size_t outputInd
 			array<SourceImage> outputs;
 			for(size_t unused index: range(operation.outputs())) outputs.append( inputs[0].size );
 			operation.apply(share(outputs), share(inputs));
-			assert_(outputIndex < outputs.size, outputIndex, this->outputs(), operation.outputs());
+			assert_(outputIndex < outputs.size);
+			assert_(target.size == outputs[outputIndex].size && target.stride == outputs[outputIndex].stride);
 			target.copy(outputs[outputIndex]);
 		}
 	}, noCacheWrite);

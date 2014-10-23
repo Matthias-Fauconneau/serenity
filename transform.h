@@ -2,26 +2,30 @@
 #include "source.h"
 
 struct Transform {
-	vec2 offset;
-	/// Returns normalized source coordinates for the given normalized target coordinates
-	vec2 operator()(vec2 target) const { return target + offset; }
+	int2 size, offset;
+	Transform(int2 size, int2 offset=0) : size(size), offset(offset) { assert_(size); }
 	/// Returns scaled source coordinates for the given scaled target coordinates
-	vec2 operator()(int2 target, int2 size) const { return operator()(vec2(target)/vec2(size))*vec2(size); }
+	int2 nearest(int2 target, int2 size) const {
+		assert_(size == this->size, size, this->size);
+		return target + offset;
+	}
+	/// Returns scaled source coordinates for the given scaled target coordinates
+	vec2 operator()(int2 target, int2 size) const { return vec2(nearest(target, size)); }
 	/// Returns top left corner of inscribed rectangle
-	int2 min(int2 size) const { return int2(ceil(-offset*vec2(size))); }
+	int2 min(int2 size) const { assert_(size == this->size, size, this->size); return -offset; }
 	/// Returns bottom right corner of inscribed rectangle
-	int2 max(int2 size) const { return int2(floor(vec2(size)-offset*vec2(size))); }
+	int2 max(int2 size) const { assert_(size == this->size, size, this->size); return size-offset; }
 };
-// FIXME
-static constexpr vec2 maximumImageSize = vec2(4000,3000);
-String str(const Transform& o) { return str(o.offset*maximumImageSize); }
-template<> Transform parse<Transform>(TextData& s) { return {parse<vec2>(s)/maximumImageSize}; }
-
-bool operator ==(const Transform& a, const Transform& b) { return a.offset == b.offset; }
+String str(const Transform& o) { return str(o.size, o.offset); }
+template<> Transform parse<Transform>(TextData& s) {
+	int2 size = parse<int2>(s); s.whileAny(' '); int2 offset = parse<int2>(s); return {size, offset};
+}
+bool operator ==(const Transform& a, const Transform& b) { return a.offset*b.size == b.offset*a.size; }
 
 /// Composes transforms
 Transform operator *(const Transform& a, const Transform& b) {
-	return {a.offset+b.offset};
+	assert_(a.size == b.size);
+	return {a.size, a.offset+b.offset};
 }
 
 struct TransformGroupSource : Source {

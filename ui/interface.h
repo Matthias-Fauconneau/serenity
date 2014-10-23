@@ -105,12 +105,14 @@ struct ToggleButton : ImageView {
     Image disableIcon;
 };
 
-/// Two widgets in one spot, toggled by user
-struct WidgetToggle : Widget {
-    Widget* widgets[2];
-	size_t index;
+/// Several widgets in one spot, cycled by user
+struct WidgetCycle : Widget {
+	buffer<Widget*> widgets;
+	size_t index = 0;
 
-	WidgetToggle(Widget* first, Widget* second, size_t index = 0) : widgets{first, second}, index(index) {}
+	WidgetCycle(ref<Widget*> widgets) : widgets(widgets) {}
+	generic WidgetCycle(mref<T> widgets) : widgets(apply(widgets, [](T& widget) -> Widget* { return &widget; })) {}
+	template<Type T, size_t N> WidgetCycle(T (&a)[N]) : WidgetCycle(mref<T>(a,N)) {}
 
     // Forwards content
     String title() override { return widgets[index]->title(); }
@@ -119,9 +121,9 @@ struct WidgetToggle : Widget {
 
 	// Forwards events
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;
-    // Forwards events and enables filter while a key is pressed
+	// Forwards events and cycle widgets
     bool keyPress(Key key, Modifiers modifiers) override;
-    bool keyRelease(Key key, Modifiers modifiers) override;
+	bool keyRelease(Key key, Modifiers modifiers) override { return widgets[index]->keyRelease(key, modifiers); }
 };
 
 struct Index {

@@ -85,14 +85,15 @@ bool ToggleButton::mouseEvent(int2, int2, Event event, Button button, Widget*&) 
     return false;
 }
 
-// WidgetToggle
-bool WidgetToggle::mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
+// WidgetCycle
+bool WidgetCycle::mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
 	focus = this;
 	return widgets[index]->mouseEvent(cursor, size, event, button, focus);
 }
-bool WidgetToggle::keyPress(Key key, Modifiers modifiers) {
+bool WidgetCycle::keyPress(Key key, Modifiers modifiers) {
     size_t previousIndex = index;
-	if(key == Space) index = !index;
+	if(key == Return || key == Space || key == PageUp) index = (index+1)%widgets.size;
+	if(key == Backspace || key == PageDown) index = (index+widgets.size-1)%widgets.size;
     return widgets[index]->keyPress(key, modifiers) || previousIndex != index;
 }
-bool WidgetToggle::keyRelease(Key key, Modifiers modifiers) { return widgets[index]->keyRelease(key, modifiers); }
+

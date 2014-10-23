@@ -47,8 +47,8 @@ struct GenericImageSourceView : ImageView {
     /// Browses source with keys
     bool keyPress(Key key, Modifiers) override {
 		if(key==Home && source.count()) return setIndex(0);
-		if(ref<Key>{Backspace,LeftArrow}.contains(key) && int(index)>0) return setIndex(index-1);
-		if(ref<Key>{Return,RightArrow}.contains(key) && index+1<source.count(index+2)) return setIndex(index+1);
+		if(key==LeftArrow && int(index)>0) return setIndex(index-1);
+		if(key==RightArrow && index+1<source.count(index+2)) return setIndex(index+1);
 		if(key==End && index+1<source.count(index+2)) return setIndex(source.count(index+2)-1);
         return false;
     }

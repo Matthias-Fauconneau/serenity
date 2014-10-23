@@ -5,7 +5,7 @@
 #include "map.h"
 
 // -> \file math.h
-inline void operator*=(mref<float> values, float factor) { values.apply([&](float v) { return factor*v; }, values); }
+inline void operator*=(mref<float> values, float factor) { values.apply([factor](float v) { return factor*v; }, values); }
 
 // -> \file algorithm.h
 
@@ -71,13 +71,13 @@ template<Type F> void parallel_chunk(uint64 totalSize, F f) {
     constexpr uint64 chunkCount = threadCount;
     assert(totalSize%chunkCount<chunkCount); //Last chunk might be up to chunkCount smaller
     const uint64 chunkSize = (totalSize+chunkCount-1)/chunkCount;
-    assert_(totalSize-(chunkCount-1)*chunkSize > 0);
-    parallel_for(chunkCount, [&](uint id, uint64 chunkIndex) { f(id, chunkIndex*chunkSize, min(chunkSize, totalSize-chunkIndex*chunkSize)); });
+	assert_(totalSize > (chunkCount-1)*chunkSize);
+	parallel_for(chunkCount, [&](uint id, uint64 chunkIndex) { f(id, chunkIndex*chunkSize, min(chunkSize, totalSize-chunkIndex*chunkSize)); });
 }
 
 /// Runs a loop in parallel chunks with element-wise functor
 template<Type F> void chunk_parallel(uint64 totalSize, F f) {
-    parallel_chunk(totalSize, [&](uint id, uint64 start, uint64 size) { for(uint64 index: range(start, start+size)) f(id, index); });
+	parallel_chunk(totalSize, [&](uint id, uint64 start, uint64 size) { for(uint64 index: range(start, start+size)) f(id, index); });
 }
 
 namespace parallel {
@@ -128,9 +128,9 @@ template<Type T, Type F> T reduce(ref<T> values, F fold) { return reduce(values,
 
 // apply
 
-inline void sub(mref<float> Y, ref<float> A, ref<float> B) { apply(Y, [&](float a, float b) {  return a-b; }, A, B); }
-inline void mul(mref<float> Y, ref<float> A, ref<float> B) { apply(Y, [&](float a, float b) {  return a*b; }, A, B); }
-inline void div(mref<float> Y, ref<float> A, ref<float> B) { apply(Y, [&](float a, float b) {  return a/b; }, A, B); }
+inline void sub(mref<float> Y, ref<float> A, ref<float> B) { apply(Y, [](float a, float b) {  return a-b; }, A, B); }
+inline void mul(mref<float> Y, ref<float> A, ref<float> B) { apply(Y, [](float a, float b) {  return a*b; }, A, B); }
+inline void div(mref<float> Y, ref<float> A, ref<float> B) { apply(Y, [](float a, float b) {  return a/b; }, A, B); }
 
 // reduce
 

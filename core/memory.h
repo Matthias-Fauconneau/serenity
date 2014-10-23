@@ -64,6 +64,11 @@ template<Type Function, Type T> auto apply(ref<T> source, Function function) -> 
     buffer<decltype(function(source[0]))> target(source.size, "apply"); target.apply(function, source); return target;
 }
 
+/// Returns an array of the application of a function to every elements of a reference
+template<Type Function, Type T> auto apply(mref<T> source, Function function) -> buffer<decltype(function(source[0]))> {
+	buffer<decltype(function(source[0]))> target(source.size, "apply"); target.apply(function, source); return target;
+}
+
 // -- Index operations: floor / align
 
 /// Aligns \a offset down to previous \a width wide step (only for power of two \a width)

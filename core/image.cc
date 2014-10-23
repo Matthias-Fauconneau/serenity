@@ -166,8 +166,7 @@ void sRGB(mref<byte4> target, ref<float> source) {
     parallel::apply(target, [](float value) { uint8 v=sRGB(value); return byte4(v,v,v, 0xFF); }, source);
 }
 void sRGB(mref<byte4> target, ref<float> blue, ref<float> green, ref<float> red) {
-    assert_(target.size == blue.size && target.size == green.size && target.size == red.size, target.size, blue.size, green.size, red.size);
-    parallel::apply(target, [=](size_t index) { return byte4(sRGB(blue[index]), sRGB(green[index]), sRGB(red[index]), 0xFF); });
+	parallel::apply(target, [=](float b, float g, float r) { return byte4(sRGB(b), sRGB(g), sRGB(r), 0xFF); }, blue, green, red);
 }
 
 // -- Resampling (float) --
