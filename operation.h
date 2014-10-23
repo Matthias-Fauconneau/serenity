@@ -25,9 +25,8 @@ struct ImageOperation : GenericImageOperation, ImageSource {
 		: GenericImageOperation(source, operation), source(source), operation(operation) {}
 
 	size_t outputs() const override {
-		if(source.outputs() == operation.inputs() || operation.inputs()==0) return operation.outputs();
-		assert_(operation.inputs() == 0 && operation.outputs() == 1,
-				operation.name(), operation.inputs(), operation.outputs(), source.name(), "GenericImageOperation");
+		if(source.outputs() == operation.inputs() || (operation.inputs()==0 && operation.outputs()!=0)) return operation.outputs();
+		assert_(operation.inputs() == 0 && (operation.outputs() == 0 || operation.outputs() == 1));
 		return source.outputs();
 	}
 	/// Returns processed linear image

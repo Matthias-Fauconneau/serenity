@@ -10,16 +10,6 @@
 #include "source-view.h"
 #include "jpeg-encoder.h"
 
-/*/// Multiplies 2 components together
-struct MultiplyAdd : ImageOperator, OperatorT<Multiply> {
-	string name() const override { return "[multiply]"; }
-	size_t inputs() const override { return 2; }
-	size_t outputs() const override { return 1; }
-	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const;
-	void apply(ref<ImageF> Y, ref<ImageF> X) const override { apply(Y[0], X[0], X[1]); }
-};
-void Multiply::apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const { parallel::mul(Y, X0, X1); }*/
-
 struct Join : OperatorT<Join> {
 	string name() const override { return  "[join]"; }
 };
@@ -31,6 +21,17 @@ struct JoinOperation : GenericImageOperation, ImageSource, Join {
 	SourceImage image(size_t index, size_t componentIndex, int2 size = 0, bool noCacheWrite = false) override {
 		assert_(sources[componentIndex]->outputs()==1);
 		return sources[componentIndex]->image(index, 0, size, noCacheWrite);
+	}
+};
+
+struct NormalizeMinMax : ImageGroupOperator, OperatorT<NormalizeMinMax> {
+	string name() const override { return "[normalizeminmax]"; }
+	void apply(ref<ImageF> Y, ref<ImageF> X) const override {
+		assert_(X.size == Y.size);
+		float min=inf, max=-inf;
+		for(const ImageF& x: X) parallel::minmax(x, min, max);
+		assert_(max > min);
+		for(size_t index: range(X.size)) parallel::apply(Y[index], [min, max](float x) { return (x-min)/(max-min); }, X[index]);
 	}
 };
 
@@ -50,21 +51,15 @@ struct ExposureBlend {
 	SampleImageGroupOperation alignSource {splitSource, transforms};
 	ImageGroupOperationT<Intensity> alignIntensity {alignSource};
 	ImageGroupOperationT<Contrast> contrast {alignIntensity};
-	ImageGroupOperationT<MaximumWeight> maximumWeights {contrast}; // Selects maximum weights
+	ImageGroupOperationT<LowPass> low {contrast};
 
+	ImageGroupOperationT<MaximumWeight> maximumWeights {low}; // Selects maximum weights
 	BinaryImageGroupOperationT<Multiply> maximumWeighted {maximumWeights, alignSource};
 	ImageGroupFoldT<Sum> select {maximumWeighted};
 
 	ImageGroupOperationT<WeightFilterBank> weightBands {maximumWeights}; // Splits each weight selection in bands
 	ImageGroupOperationT<NormalizeWeights> normalizeWeightBands {weightBands}; // Normalizes weight selection for each band
-	//BinaryImageGroupOperationT<MultiBandWeight> multiBandWeightedIntensity {normalizeWeightBands, alignIntensity}; // DEBUG
-	//BinaryImageGroupOperationT<MultiBandWeight> multiBandWeighted {normalizeWeightBands, alignSource};
-	//ImageGroupOperationT<FilterBank> intensityBands {alignIntensity}; // DEBUG
 
-	//BinaryImageGroupOperationT<Multiply> multiBandWeightedIntensity {normalizeWeightBands, intensityBands}; // Applies
-	//ImageGroupFoldT<Sum> blend {multiBandWeightedIntensity}; // Blends images
-
-	// FIXME: need nested image groups
 	ImageGroupOperationT<Index0> alignB {alignSource};
 	ImageGroupOperationT<FilterBank> bBands {alignB};
 	BinaryImageGroupOperationT<Multiply> multiBandWeightedB {normalizeWeightBands, bBands}; // Applies
@@ -83,7 +78,8 @@ struct ExposureBlend {
 	ImageGroupOperationT<Sum> joinR {multiBandWeightedR}; // Joins bands again
 	ImageGroupFoldT<Sum> blendR {joinR}; // Blends images
 
-	JoinOperation blend {{&blendB, &blendG, &blendR}};
+	JoinOperation output {{&blendB, &blendG, &blendR}};
+	//ImageOperationT<NormalizeMinMax> output {blend};
 };
 
 struct ExposureBlendAnnotate : ExposureBlend, Application {
@@ -91,9 +87,8 @@ struct ExposureBlendAnnotate : ExposureBlend, Application {
 	const size_t lastIndex = source.keys.indexOf(lastName);
 	size_t index = lastIndex != invalid ? lastIndex : 0;
 
-	sRGBOperation sRGB [2] {{source}, {normalize}};
-	ImageSourceView views [2] {{sRGB[0], &index}, {sRGB[1], &index}};
-	WidgetCycle view {views};
+	sRGBOperation sRGB {source};
+	ImageSourceView view {sRGB, &index};
 	Window window {&view, -1, [this]{ return view.title()+" "+imagesAttributes.value(source.elementName(index)); }};
 
 	ExposureBlendAnnotate() {
@@ -133,18 +128,16 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	const size_t lastIndex = source.keys.indexOf(lastName);
 	size_t index = lastIndex != invalid ? lastIndex : 0;
 
-	//ImageGroupFoldT<Prism> prismMaximumWeights {maximumWeights};
-	sRGBOperation sRGBs [1] {/*{prismMaximumWeights},*/{blend}};
-
-	/*TransposeOperation transpose[3] {normalizeWeightBands, intensityBands, multiBandWeightedIntensity};
-	ImageGroupOperationT<Prism> prism[3] {{transpose[0]}, {transpose[1]}, {transpose[2]}};
-	sRGBGroupOperation sRGBGroups [3] {{prism[0]}, {prism[1]}, {prism[2]}};*/
-
-	ImageSourceView sRGBViews [1] {{sRGBs[0], &index}/*,{sRGBs[1], &index}*/};
-	//ImageGroupSourceView sRGBGroupViews [3] {{sRGBGroups[0], &index}, {sRGBGroups[1], &index}, {sRGBGroups[2], &index}};
-
-	//WidgetCycle view {{&sRGBViews[0], &sRGBGroupViews[0], &sRGBGroupViews[1], &sRGBGroupViews[2], &sRGBViews[1]}};*/
-	WidgetCycle view {{&sRGBViews[0]}};
+	ImageGroupFoldT<Prism> prismMaximumWeights {maximumWeights};
+	sRGBOperation sRGB [3] {output, select, prismMaximumWeights};
+	array<ImageSourceView> sRGBView = apply(mref<sRGBOperation>(sRGB),
+											[&](ImageRGBSource& source) -> ImageSourceView { return {source, &index}; });
+	TransposeOperation transposeWeightBands {normalizeWeightBands};
+	ImageGroupOperationT<Prism> prism {transposeWeightBands};
+	sRGBGroupOperation sRGBGroups [1] {{prism}};
+	array<ImageGroupSourceView> sRGBGroupView = apply(mref<sRGBGroupOperation>(sRGBGroups),
+											[&](sRGBGroupOperation& source) -> ImageGroupSourceView { return {source, &index}; });
+	WidgetCycle view {toWidgets(sRGBView)+toWidgets(sRGBGroupView)};
 	Window window {&view, -1, [this]{ return view.title()+" "+imagesAttributes.value(source.elementName(index)); }};
 };
 registerApplication(ExposureBlendPreview);
@@ -163,7 +156,7 @@ struct ExposureBlendTest : ExposureBlend, Application {
 registerApplication(ExposureBlendTest, test);
 
 struct ExposureBlendExport : ExposureBlend, Application {
-	sRGBOperation sRGB {blend};
+	sRGBOperation sRGB {output};
 	ExposureBlendExport() {
 		Folder output ("Export", folder, true);
 		for(size_t index: range(sRGB.count(-1))) {

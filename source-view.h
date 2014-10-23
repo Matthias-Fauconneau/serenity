@@ -20,7 +20,7 @@ struct GenericImageSourceView : ImageView {
 
     int2 sizeHint(int2 size) override {
         assert_(size);
-        int2 maximum = source.maximumSize();
+		int2 maximum = source.maximumSize();
         int downscaleFactor = min(max((maximum.x+size.x-1)/size.x, (maximum.y+size.y-1)/size.y), 16);
         int2 hint = maximum/downscaleFactor;
         assert_(hint<=size, maximum, size, downscaleFactor, maximum/downscaleFactor);
@@ -31,7 +31,7 @@ struct GenericImageSourceView : ImageView {
 
     Graphics graphics(int2 size) override {
 		if(!source.count(1)) return {};
-		update(index, size);
+		update(index, size/2); // DEBUG
 		ImageView::image = share(image);
 		assert_(image.size <= size);
         return ImageView::graphics(size);

@@ -59,8 +59,8 @@ bool Window::processEvent(const XEvent& e) {
     uint8 type = e.type&0b01111111; //msb set if sent by SendEvent
     /**/ if(type==ButtonPress) {
         Widget* focus=this->focus; this->focus=0;
-        if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key, focus) || this->focus!=focus) render();
-        drag = focus;
+		if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key, this->focus) || this->focus!=focus) render();
+		drag = this->focus;
     }
     else if(type==ButtonRelease) {
         drag=0;

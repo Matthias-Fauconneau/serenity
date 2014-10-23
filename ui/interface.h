@@ -105,14 +105,16 @@ struct ToggleButton : ImageView {
     Image disableIcon;
 };
 
+generic buffer<Widget*> toWidgets(mref<T> widgets) { return apply(widgets, [](T& widget) -> Widget* { return &widget; }); }
+
 /// Several widgets in one spot, cycled by user
 struct WidgetCycle : Widget {
 	buffer<Widget*> widgets;
 	size_t index = 0;
 
 	WidgetCycle(ref<Widget*> widgets) : widgets(widgets) {}
-	generic WidgetCycle(mref<T> widgets) : widgets(apply(widgets, [](T& widget) -> Widget* { return &widget; })) {}
-	template<Type T, size_t N> WidgetCycle(T (&a)[N]) : WidgetCycle(mref<T>(a,N)) {}
+	//generic WidgetCycle(mref<T> widgets) : widgets(apply(widgets, [](T& widget) -> Widget* { return &widget; })) {}
+	//template<Type T, size_t N> WidgetCycle(T (&a)[N]) : WidgetCycle(mref<T>(a,N)) {}
 
     // Forwards content
     String title() override { return widgets[index]->title(); }

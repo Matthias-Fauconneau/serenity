@@ -3,6 +3,13 @@
 // ImageOperation
 
 SourceImage ImageOperation::image(size_t imageIndex, size_t componentIndex, int2 size, bool noCacheWrite) {
+	if(operation.inputs()==0 && operation.outputs()==0) {
+		auto inputs = apply(source.outputs(), [&](size_t inputIndex) { return source.image(imageIndex, inputIndex, size, noCacheWrite); });
+		array<SourceImage> outputs;
+		for(size_t unused index: range(operation.outputs()?:inputs.size)) outputs.append( inputs[0].size );
+		operation.apply({share(outputs)}, share(inputs));
+		return move( outputs[componentIndex] );
+	}
 	assert_(operation.outputs() == 1);
 	assert_(componentIndex == 0);
 	auto inputs = apply(operation.inputs()?:source.outputs(),
@@ -35,7 +42,6 @@ SourceImageRGB sRGBOperation::image(size_t imageIndex, int2 size, bool noCacheWr
 // ImageGroupFold
 
 SourceImage ImageGroupFold::image(size_t groupIndex, size_t componentIndex, int2 size, bool noCacheWrite) {
-	assert_(operation.outputs()==1 || source.outputs()==1);
 	array<SourceImage> inputs = source.images(groupIndex, operation.outputs()==1?componentIndex:0, size, noCacheWrite); // FIXME
 	return ::cache<ImageF>(folder(), elementName(groupIndex)+'['+str(componentIndex)+']', inputs[0].size, time(groupIndex),
 			[&](ImageF& target) {
@@ -81,17 +87,33 @@ array<SourceImage> GroupImageOperation::images(size_t groupIndex, size_t compone
 array<SourceImage> ImageGroupOperation::images(size_t groupIndex, size_t componentIndex, int2 size, bool noCacheWrite) {
 	//assert_(componentIndex == 0, componentIndex, operation.name(), operation.inputs(), operation.outputs(), outputs());
 	if(!size) size=this->size(groupIndex);
-	if(operation.inputs() == 0 && operation.outputs()==0) { // Process all images at once (Forwards componentIndex)
+	array<SourceImage> allOutputs;
+	if(operation.inputs() == 0 && operation.outputs()==0) { // Process all images at once (forwards componentIndex)
 		auto inputs = source.images(groupIndex, componentIndex, size, noCacheWrite);
-		array<SourceImage> outputs;
-		for(size_t unused index: range(inputs.size)) outputs.append( inputs[0].size );
-		operation.apply(share(outputs), share(inputs));
-		return outputs;
+		for(size_t imageIndex: range(inputs.size)) {
+			allOutputs.append( ::cache<ImageF>(folder(), elementName(groupIndex)+'{'+str(imageIndex)+'}'+'['+str(componentIndex)+']', inputs[0].size, time(groupIndex),
+							   [&](ImageF& target) {
+				array<SourceImage> outputs;
+				for(size_t unused index: range(inputs.size)) outputs.append( inputs[0].size );
+				operation.apply(share(outputs), share(inputs));
+				assert_(imageIndex < outputs.size);
+				assert_(target.size == outputs[imageIndex].size);
+				target.copy(outputs[imageIndex]);
+				for(size_t otherImageIndex: range(outputs.size)) { // Writes all outputs
+					if(otherImageIndex != imageIndex)
+					::cache<ImageF>(folder(), elementName(groupIndex)+'{'+str(otherImageIndex)+'}'+'['+str(componentIndex)+']',
+									inputs[0].size, time(groupIndex), [&](ImageF& target) {
+						assert_(otherImageIndex < outputs.size);
+						assert_(target.size == outputs[otherImageIndex].size);
+						target.copy(outputs[otherImageIndex]);
+					});
+				}
+			}));
+		}
 	} else { // Process every image separately
 		array<array<SourceImage>> groupInputs;
 		for(size_t inputIndex: range(operation.inputs()?:source.outputs()))
 			groupInputs.append( source.images(groupIndex, inputIndex, size, noCacheWrite) );
-		array<SourceImage> allOutputs;
 		for(size_t imageIndex: range(groupInputs[0].size)) {
 			array<ImageF> inputs;
 			for(size_t inputIndex: range(groupInputs.size)) inputs.append( share(groupInputs[inputIndex][imageIndex]) );
@@ -99,25 +121,25 @@ array<SourceImage> ImageGroupOperation::images(size_t groupIndex, size_t compone
 					[&](ImageF& target) {
 				array<SourceImage> outputs;
 				for(size_t unused index: range(operation.outputs())) outputs.append( inputs[0].size );
-				log(operation.name(), elementName(groupIndex)+'{'+str(imageIndex)+'}');
+				log(operation.name(), elementName(groupIndex)+'{'+str(imageIndex)+'}'+'['+str(componentIndex)+']');
 				operation.apply(share(outputs), inputs);
 				assert_(componentIndex < outputs.size);
 				assert_(target.size == outputs[componentIndex].size);
 				target.copy(outputs[componentIndex]);
 				for(size_t otherComponentIndex: range(outputs.size)) { // Writes all outputs
-					if(otherComponentIndex != componentIndex)
-					::cache<ImageF>(folder(), elementName(groupIndex)+'{'+str(imageIndex)+'}'+'['+str(otherComponentIndex)+']',
-									inputs[0].size, time(groupIndex), [&](ImageF& target) {
-						assert_(otherComponentIndex < outputs.size);
-						assert_(target.size == outputs[otherComponentIndex].size);
-						target.copy(outputs[otherComponentIndex]);
-					});
+					if(otherComponentIndex != componentIndex) {
+						::cache<ImageF>(folder(), elementName(groupIndex)+'{'+str(imageIndex)+'}'+'['+str(otherComponentIndex)+']',
+										inputs[0].size, time(groupIndex), [&](ImageF& target) {
+							assert_(otherComponentIndex < outputs.size);
+							assert_(target.size == outputs[otherComponentIndex].size);
+							target.copy(outputs[otherComponentIndex]);
+						});
+					}
 				}
 			}) );
 		}
-		return allOutputs;
 	}
-	error(operation.outputs(), "ImageGroupOperation");
+	return allOutputs;
 }
 
 // sRGBGroupOperation
