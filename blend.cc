@@ -170,6 +170,28 @@ struct ExposureBlendAnnotate : ExposureBlend, Application {
 };
 registerApplication(ExposureBlendAnnotate, annotate);
 
+struct Transpose : OperatorT<Transpose> {
+	string name() const override { return  "[transpose]"; }
+};
+/// Swaps component and group indices
+struct TransposeOperation : GenericImageOperation, ImageGroupSource, Transpose {
+	ImageGroupSource& source;
+	TransposeOperation(ImageGroupSource& source) : GenericImageOperation(source, *this), source(source) {}
+
+	size_t outputs() const override { return source.groupSize(0); /*Assumes all groups have same size*/ }
+	size_t groupSize(size_t) const { return source.outputs(); }
+	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size, bool noCacheWrite = false) {
+		array<SourceImage> outputs;
+		assert_(source.outputs(), source.toString());
+		for(size_t outputIndex: range(source.outputs())) {
+			auto inputs = source.images(groupIndex, outputIndex, size, noCacheWrite);
+			assert_(componentIndex < inputs.size);
+			outputs.append( move(inputs[componentIndex]) );
+		}
+		return outputs;
+	}
+};
+
 struct ExposureBlendPreview : ExposureBlend, Application {
 	PersistentValue<String> lastName {folder, ".last", [this]{ return source.elementName(index); }};
 	const size_t lastIndex = source.keys.indexOf(lastName);
@@ -178,7 +200,8 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	ImageGroupFoldT<Prism> prismMaximumWeights {maximumWeights};
 	sRGBOperation sRGBs [1] {{prismMaximumWeights}};
 
-	ImageGroupOperationT<Prism> prismWeightBands {weightBands};
+	TransposeOperation transposeWeightBands {weightBands};
+	ImageGroupOperationT<Prism> prismWeightBands {transposeWeightBands};
 	sRGBGroupOperation sRGBGroups [1] {{prismWeightBands}};
 
 	ImageSourceView sRGBViews [1] {{sRGBs[0], &index}};

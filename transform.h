@@ -93,8 +93,8 @@ struct SampleImageGroupOperation : ImageGroupSource {
 	size_t outputs() const override { return source.outputs(); }
 	size_t groupSize(size_t groupIndex) const { return source.groupSize(groupIndex); }
 
-	array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size=0, bool noCacheWrite = false) override {
-		auto images = source.images(groupIndex, outputIndex, size, noCacheWrite);
+	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size=0, bool noCacheWrite = false) override {
+		auto images = source.images(groupIndex, componentIndex, size, noCacheWrite);
 		auto transforms = transform(groupIndex, size);
 		int2 min = ::max(apply(transforms,[&](const Transform& t){ return t.min(images[0].size); }));
 		int2 max = ::min(apply(transforms,[&](const Transform& t){ return t.max(images[0].size); }));

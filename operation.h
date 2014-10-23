@@ -5,9 +5,9 @@
 /// Provides outputs of an \a operation on a \a source
 struct GenericImageOperation : virtual GenericImageSource {
 	GenericImageSource& source;
-	GenericImageOperator& operation;
+	Operator& operation;
 	Folder cacheFolder {operation.name(), source.folder(), true};
-	GenericImageOperation(GenericImageSource& source, GenericImageOperator& operation) : source(source), operation(operation) {}
+	GenericImageOperation(GenericImageSource& source, Operator& operation) : source(source), operation(operation) {}
 
 	const Folder& folder() const override { return cacheFolder; }
 	String name() const override { return str(source.name(), operation.name()); }
@@ -31,7 +31,7 @@ struct ImageOperation : GenericImageOperation, ImageSource {
 		return source.outputs();
 	}
 	/// Returns processed linear image
-	SourceImage image(size_t imageIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override;
+	SourceImage image(size_t imageIndex, size_t componentIndex, int2 size = 0, bool noCacheWrite = false) override;
 
 	String toString() const override { return GenericImageSource::toString()+'['+str(outputs())+']'; }
 };
@@ -66,7 +66,7 @@ struct ImageGroupFold : GenericImageOperation, ImageSource {
 				operation.name(), operation.inputs(), operation.outputs(), source.name(), "ImageGroupFold");
 		return source.outputs();
 	}
-	SourceImage image(size_t groupIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override;
+	SourceImage image(size_t groupIndex, size_t componentIndex, int2 size = 0, bool noCacheWrite = false) override;
 
 	String toString() const override { return str(source.toString(), operation.name())+'['+str(outputs())+']'; }
 };
@@ -90,13 +90,14 @@ struct GroupImageOperation : ImageGroupSource {
 
 	size_t outputs() const override { return source.outputs(); }
 	size_t groupSize(size_t groupIndex) const { return groups(groupIndex).size; }
-	array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override;
+	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size = 0, bool noCacheWrite = false) override;
 };
 
 struct GenericImageGroupOperation : GenericImageOperation, virtual GenericImageGroupSource {
 	ImageGroupSource& source;
+	GenericImageOperator& operation;
 	GenericImageGroupOperation(ImageGroupSource& source, GenericImageOperator& operation)
-		: GenericImageOperation(source, operation), source(source) {}
+		: GenericImageOperation(source, operation), source(source), operation(operation) {}
 
 	size_t outputs() const override {
 		if(source.outputs() == operation.inputs()) return operation.outputs();
@@ -112,7 +113,7 @@ struct ImageGroupOperation : GenericImageGroupOperation, ImageGroupSource {
 	ImageGroupOperation(ImageGroupSource& source, ImageOperator& operation)
 		: GenericImageGroupOperation(source, operation), operation(operation) {}
 
-	array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override;
+	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size = 0, bool noCacheWrite = false) override;
 };
 
 generic struct ImageGroupOperationT : T, ImageGroupOperation {
@@ -158,7 +159,7 @@ struct BinaryImageGroupOperation : BinaryGenericImageOperation, ImageGroupSource
 	}
 	size_t groupSize(size_t groupIndex) const { assert_(A.groupSize(groupIndex) == B.groupSize(groupIndex)); return A.groupSize(groupIndex); }
 
-	array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override;
+	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size = 0, bool noCacheWrite = false) override;
 
 	String toString() const override { return BinaryGenericImageOperation::toString()+'['+str(outputs())+']'; }
 };

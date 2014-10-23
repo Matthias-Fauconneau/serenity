@@ -72,5 +72,5 @@ struct ImageFolder : ImageSource, ImageRGBSource, map<String, map<String, String
 	SourceImageRGB image(size_t index, int2 size, bool noCacheWrite = false) override;
 
     /// Converts sRGB images to linear float images
-	SourceImage image(size_t index, size_t outputIndex, int2 size, bool noCacheWrite) override;
+	SourceImage image(size_t index, size_t componentIndex, int2 size, bool noCacheWrite) override;
 };
