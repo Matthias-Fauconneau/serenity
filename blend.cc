@@ -128,7 +128,9 @@ registerApplication(ExposureBlendPreview);
 struct ExposureBlendTest : ExposureBlend, Application {
 	ExposureBlendTest() {
 		for(size_t groupIndex=0; split.nextGroup(); groupIndex++) {
-			auto set = apply(split(groupIndex), [this](const size_t index) { return copy(imagesAttributes.at(source.elementName(index))); });
+			auto names = apply(split(groupIndex), [this](const size_t index) { return copy(source.elementName(index)); });
+			auto set = apply(names, [this](string name) { return copy(imagesAttributes.at(name)); });
+			log(names);
 			log(set);
 			for(const auto& e: set) assert_(e == set[0]);
 		}
