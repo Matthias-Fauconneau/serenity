@@ -25,7 +25,7 @@ struct ImageOperation : GenericImageOperation, ImageSource {
 		: GenericImageOperation(source, operation), source(source), operation(operation) {}
 
 	size_t outputs() const override {
-		if(source.outputs() == operation.inputs()) return operation.outputs();
+		if(source.outputs() == operation.inputs() || operation.inputs()==0) return operation.outputs();
 		assert_(operation.inputs() == 0 && operation.outputs() == 1,
 				operation.name(), operation.inputs(), operation.outputs(), source.name(), "GenericImageOperation");
 		return source.outputs();
@@ -155,7 +155,8 @@ struct BinaryImageGroupOperation : BinaryGenericImageOperation, ImageGroupSource
 
 	size_t outputs() const override {
 		//if(A.outputs()+B.outputs() == operation.inputs()) return operation.outputs();
-		return B.outputs() * operation.outputs(); // Distributes binary operator on every output of B
+		if(A.outputs() == B.outputs()) return A.outputs();
+		else return B.outputs() * operation.outputs(); // Distributes binary operator on every output of B
 	}
 	size_t groupSize(size_t groupIndex) const { assert_(A.groupSize(groupIndex) == B.groupSize(groupIndex)); return A.groupSize(groupIndex); }
 

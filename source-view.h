@@ -76,6 +76,10 @@ struct ImageGroupSourceView  : GenericImageSourceView {
 
 	ImageGroupSourceView(ImageRGBGroupSource& source, size_t* index) : GenericImageSourceView(source, index), source(source) {}
 
+	String title() override {
+		return str(GenericImageSourceView::title(), imageIndex);
+	}
+
 	void update(size_t index, int2 size) override {
 		if(groupIndex != index) {
 			groupIndex = index;

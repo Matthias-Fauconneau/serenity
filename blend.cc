@@ -4,122 +4,33 @@
 #include "split.h"
 #include "operation.h"
 #include "align.h"
+#include "weight.h"
+#include "multiscale.h"
+#include "prism.h"
 #include "source-view.h"
 #include "jpeg-encoder.h"
 
-/// Estimates contrast at every pixel
-struct Contrast : ImageOperator1, OperatorT<Contrast> {
-	string name() const override { return "[contrast]"; }
-	virtual void apply(const ImageF& Y, const ImageF& X) const {
-		forXY(Y.size, [&](uint x, uint y) {
-			int2 A = int2(x,y);
-			float sum = 0, SAD = 0;
-			float a = X(A);
-			for(int dy: range(3)) for(int dx: range(3)) {
-				int2 B = A+int2(dx-1, dy-1);
-				if(!(B >= int2(0) && B < X.size)) continue;
-				float b = X(B);
-				sum += b;
-				SAD += abs(a - b);
-			}
-			Y(A) = sum ? SAD : 0;
-		});
-	}
-};
-
-struct MaximumWeight : ImageGroupOperator, OperatorT<MaximumWeight> {
-	string name() const override { return "[maximum-weight]"; }
-	virtual void apply(ref<ImageF> Y, ref<ImageF> X) const override {
-		assert_(Y.size == X.size);
-		forXY(Y[0].size, [&](uint x, uint y) {
-			int best = -1; float max = 0;
-			for(size_t index: range(X.size)) { float v = X[index](x, y); if(v > max) { max = v, best = index; } }
-			for(size_t index: range(Y.size)) Y[index](x, y) = 0;
-			if(best>=0) Y[best](x, y) = 1;
-		});
-	}
-};
-
-/// Normalizes weights
-/// \note if all weights are zero, weights are all set to 1/groupSize.
-struct NormalizeWeights : ImageGroupOperator, OperatorT<NormalizeWeights> {
-	string name() const override { return "[normalize-weights]"; }
-	virtual void apply(ref<ImageF> Y, ref<ImageF> X) const override {
-		assert_(Y.size == X.size);
-		forXY(Y[0].size, [&](uint x, uint y) {
-			float sum = 0;
-			for(size_t index: range(X.size)) sum += X[index](x, y);
-			if(sum) for(size_t index: range(Y.size)) Y[index](x, y) = X[index](x, y)/sum;
-			else for(size_t index: range(Y.size)) Y[index](x, y) = 1./X.size;
-		});
-	}
-};
-
-#include "color.h"
-/// Converts single component image group to a multiple component image
-struct Prism : ImageGroupOperator, OperatorT<Prism> {
-	string name() const override { return "[prism]"; }
-	size_t outputs() const override { return 3; }
-	void apply(ref<ImageF> Y, ref<ImageF> X) const override {
-		if(X.size <= 3) {
-			for(size_t index: range(X.size)) Y[index].copy(X[index]);
-			for(size_t index: range(X.size, Y.size)) Y[index].clear();
-		} else {
-			assert_(Y.size == 3);
-			for(size_t index: range(X.size)) {
-				vec3 color = LChuvtoBGR(53, 179, 2*PI*index/X.size);
-				assert_(isNumber(color));
-				for(size_t component: range(3)) {
-					assert_(X[index].size == Y[component].size);
-					if(index == 0) parallel::apply(Y[component], [=](float x) { return x * color[component]; }, X[index]);
-					else parallel::apply(Y[component], [=](float y, float x) { return y + x * color[component]; }, Y[component], X[index]);
-				}
-			}
-			for(size_t component: range(3)) for(auto v: Y[component]) assert_(isNumber(v));
-		}
-	}
-};
-
-/// Splits in bands
-struct FilterBank : ImageOperator, OperatorT<FilterBank> {
-	size_t inputs() const override { return 1; }
-	size_t outputs() const override { return 2; }
-	string name() const override { return "[filterbank]"; }
-	void apply(ref<ImageF> Y, ref<ImageF> X) const override {
-		assert_(X.size == 1);
-		const int bandCount = Y.size;
-		const ImageF& r = Y[bandCount-1];
-		r.copy(X[0]); // Remaining octaves
-		const float largeScale = (min(r.size.x,r.size.y)-1)/6;
-		float octaveScale = largeScale / exp2(bandCount-1);
-		for(size_t index: range(bandCount-1)) {
-			gaussianBlur(Y[index], r, octaveScale); // Splits lowest octave
-			parallel::sub(r, r, Y[index]); // Removes from remainder
-			octaveScale *= 2; // Next octave
-		}
-		// Y[bandCount-1] holds remaining high octaves
-	}
-};
-
-/// Applies weights bands to source bands
-struct MultiBandWeight : ImageOperator, OperatorT<MultiBandWeight> {
-	size_t inputs() const override { return 0; }
+/*/// Multiplies 2 components together
+struct MultiplyAdd : ImageOperator, OperatorT<Multiply> {
+	string name() const override { return "[multiply]"; }
+	size_t inputs() const override { return 2; }
 	size_t outputs() const override { return 1; }
-	string name() const override { return "[multibandweight]"; }
-	void apply(ref<ImageF> Y, ref<ImageF> X /*weight bands, source*/) const override {
-		const int bandCount = X.size-1;
-		assert_(X.size > 2 && Y.size == 1, X.size, Y.size);
-		ImageF r = copy(X.last()); // Remaining source octaves
-		const float largeScale = (min(r.size.x,r.size.y)-1)/6;
-		float octaveScale = largeScale / exp2(bandCount-1);
-		for(size_t index: range(bandCount-1)) {
-			ImageF octave = gaussianBlur(r, octaveScale); // Splits lowest source octave
-			if(index==0) parallel::mul(Y[0], X[index], octave); // Adds octave contribution
-			else parallel::fmadd(Y[0], X[index], octave); // Adds octave contribution
-			parallel::sub(r, r, Y[index]); // Removes from remainder
-			octaveScale *= 2; // Next octave
-		}
-		parallel::fmadd(Y[0], X[bandCount-1], r); // Applies band weights remainder to source remainder
+	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const;
+	void apply(ref<ImageF> Y, ref<ImageF> X) const override { apply(Y[0], X[0], X[1]); }
+};
+void Multiply::apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const { parallel::mul(Y, X0, X1); }*/
+
+struct Join : OperatorT<Join> {
+	string name() const override { return  "[join]"; }
+};
+struct JoinOperation : GenericImageOperation, ImageSource, Join {
+	array<ImageSource*> sources;
+	JoinOperation(ref<ImageSource*> sources) : GenericImageOperation(*sources[0], *this), sources(sources) {}
+
+	size_t outputs() const override { return sources.size; }
+	SourceImage image(size_t index, size_t componentIndex, int2 size = 0, bool noCacheWrite = false) override {
+		assert_(sources[componentIndex]->outputs()==1);
+		return sources[componentIndex]->image(index, 0, size, noCacheWrite);
 	}
 };
 
@@ -144,10 +55,35 @@ struct ExposureBlend {
 	BinaryImageGroupOperationT<Multiply> maximumWeighted {maximumWeights, alignSource};
 	ImageGroupFoldT<Sum> select {maximumWeighted};
 
-	ImageGroupOperationT<FilterBank> weightBands {maximumWeights}; // Splits each weight selection in bands
+	ImageGroupOperationT<WeightFilterBank> weightBands {maximumWeights}; // Splits each weight selection in bands
 	ImageGroupOperationT<NormalizeWeights> normalizeWeightBands {weightBands}; // Normalizes weight selection for each band
-	BinaryImageGroupOperationT<MultiBandWeight> multiBandWeighted {normalizeWeightBands, alignSource};
-	ImageGroupFoldT<Sum> blend {multiBandWeighted};
+	//BinaryImageGroupOperationT<MultiBandWeight> multiBandWeightedIntensity {normalizeWeightBands, alignIntensity}; // DEBUG
+	//BinaryImageGroupOperationT<MultiBandWeight> multiBandWeighted {normalizeWeightBands, alignSource};
+	//ImageGroupOperationT<FilterBank> intensityBands {alignIntensity}; // DEBUG
+
+	//BinaryImageGroupOperationT<Multiply> multiBandWeightedIntensity {normalizeWeightBands, intensityBands}; // Applies
+	//ImageGroupFoldT<Sum> blend {multiBandWeightedIntensity}; // Blends images
+
+	// FIXME: need nested image groups
+	ImageGroupOperationT<Index0> alignB {alignSource};
+	ImageGroupOperationT<FilterBank> bBands {alignB};
+	BinaryImageGroupOperationT<Multiply> multiBandWeightedB {normalizeWeightBands, bBands}; // Applies
+	ImageGroupOperationT<Sum> joinB {multiBandWeightedB}; // Joins bands again
+	ImageGroupFoldT<Sum> blendB {joinB}; // Blends images
+
+	ImageGroupOperationT<Index1> alignG {alignSource};
+	ImageGroupOperationT<FilterBank> gBands {alignG};
+	BinaryImageGroupOperationT<Multiply> multiBandWeightedG {normalizeWeightBands, gBands}; // Applies
+	ImageGroupOperationT<Sum> joinG {multiBandWeightedG}; // Joins bands again
+	ImageGroupFoldT<Sum> blendG {joinG}; // Blends images
+
+	ImageGroupOperationT<Index2> alignR {alignSource};
+	ImageGroupOperationT<FilterBank> rBands {alignR};
+	BinaryImageGroupOperationT<Multiply> multiBandWeightedR {normalizeWeightBands, rBands}; // Applies
+	ImageGroupOperationT<Sum> joinR {multiBandWeightedR}; // Joins bands again
+	ImageGroupFoldT<Sum> blendR {joinR}; // Blends images
+
+	JoinOperation blend {{&blendB, &blendG, &blendR}};
 };
 
 struct ExposureBlendAnnotate : ExposureBlend, Application {
@@ -197,17 +133,18 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	const size_t lastIndex = source.keys.indexOf(lastName);
 	size_t index = lastIndex != invalid ? lastIndex : 0;
 
-	ImageGroupFoldT<Prism> prismMaximumWeights {maximumWeights};
-	sRGBOperation sRGBs [1] {{prismMaximumWeights}};
+	//ImageGroupFoldT<Prism> prismMaximumWeights {maximumWeights};
+	sRGBOperation sRGBs [1] {/*{prismMaximumWeights},*/{blend}};
 
-	TransposeOperation transposeWeightBands {weightBands};
-	ImageGroupOperationT<Prism> prismWeightBands {transposeWeightBands};
-	sRGBGroupOperation sRGBGroups [1] {{prismWeightBands}};
+	/*TransposeOperation transpose[3] {normalizeWeightBands, intensityBands, multiBandWeightedIntensity};
+	ImageGroupOperationT<Prism> prism[3] {{transpose[0]}, {transpose[1]}, {transpose[2]}};
+	sRGBGroupOperation sRGBGroups [3] {{prism[0]}, {prism[1]}, {prism[2]}};*/
 
-	ImageSourceView sRGBViews [1] {{sRGBs[0], &index}};
-	ImageGroupSourceView sRGBGroupViews [1] {{sRGBGroups[0], &index}};
+	ImageSourceView sRGBViews [1] {{sRGBs[0], &index}/*,{sRGBs[1], &index}*/};
+	//ImageGroupSourceView sRGBGroupViews [3] {{sRGBGroups[0], &index}, {sRGBGroups[1], &index}, {sRGBGroups[2], &index}};
 
-	WidgetCycle view {{&sRGBViews[0], &sRGBGroupViews[0]}};
+	//WidgetCycle view {{&sRGBViews[0], &sRGBGroupViews[0], &sRGBGroupViews[1], &sRGBGroupViews[2], &sRGBViews[1]}};*/
+	WidgetCycle view {{&sRGBViews[0]}};
 	Window window {&view, -1, [this]{ return view.title()+" "+imagesAttributes.value(source.elementName(index)); }};
 };
 registerApplication(ExposureBlendPreview);

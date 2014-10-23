@@ -107,3 +107,9 @@ transform.h
 align.h
 operator.cc
 ui/color.h
+multiscale.h
+multiscale.cc
+prism.h
+prism.cc
+weight.h
+weight.cc

@@ -3,15 +3,14 @@
 // ImageOperation
 
 SourceImage ImageOperation::image(size_t imageIndex, size_t componentIndex, int2 size, bool noCacheWrite) {
-	SourceImage target = ::cache<ImageF>(folder(), elementName(imageIndex), size?:this->size(imageIndex), time(imageIndex),
+	assert_(operation.outputs() == 1);
+	assert_(componentIndex == 0);
+	auto inputs = apply(operation.inputs()?:source.outputs(),
+						[&](size_t inputIndex) { return source.image(imageIndex, inputIndex, size, noCacheWrite); });
+	SourceImage target = ::cache<ImageF>(folder(), elementName(imageIndex), inputs[0].size, time(imageIndex),
 				 [&](const ImageF& target) {
-		assert_(operation.outputs() == 1);
-		assert_(componentIndex == 0);
-		auto inputs = apply(operation.inputs(), [&](size_t inputIndex) { return source.image(imageIndex, inputIndex, target.size, noCacheWrite); });
-		for(auto& input: inputs) assert_(isNumber(input[0]));
 		operation.apply({share(target)}, share(inputs));
 	}, noCacheWrite);
-	assert_(isNumber(target[0]), target[0], target.size, name());
 	return target;
 }
 
@@ -29,7 +28,7 @@ SourceImageRGB sRGBOperation::image(size_t imageIndex, int2 size, bool noCacheWr
 		}
 		if(inputs.size==1) ::sRGB(target, inputs[0]);
 		else if(inputs.size==3) ::sRGB(target, inputs[0], inputs[1], inputs[2]);
-		else error(inputs.size);
+		else error(inputs.size, "SourceImageRGB");
 	}, noCacheWrite);
 }
 
@@ -38,7 +37,8 @@ SourceImageRGB sRGBOperation::image(size_t imageIndex, int2 size, bool noCacheWr
 SourceImage ImageGroupFold::image(size_t groupIndex, size_t componentIndex, int2 size, bool noCacheWrite) {
 	assert_(operation.outputs()==1 || source.outputs()==1);
 	array<SourceImage> inputs = source.images(groupIndex, operation.outputs()==1?componentIndex:0, size, noCacheWrite); // FIXME
-	return ::cache<ImageF>(folder(), elementName(groupIndex)+'['+str(componentIndex)+']', inputs[0].size, time(groupIndex), [&](ImageF& target) {
+	return ::cache<ImageF>(folder(), elementName(groupIndex)+'['+str(componentIndex)+']', inputs[0].size, time(groupIndex),
+			[&](ImageF& target) {
 		if(target.size != inputs[0].size) {
 			error("Resize");
 			assert_(target.size > inputs[0].size);
@@ -95,16 +95,29 @@ array<SourceImage> ImageGroupOperation::images(size_t groupIndex, size_t compone
 		for(size_t imageIndex: range(groupInputs[0].size)) {
 			array<ImageF> inputs;
 			for(size_t inputIndex: range(groupInputs.size)) inputs.append( share(groupInputs[inputIndex][imageIndex]) );
-			array<SourceImage> outputs;
-			for(size_t unused index: range(operation.outputs())) outputs.append( inputs[0].size );
-			operation.apply(share(outputs), inputs);
-			assert_(componentIndex < outputs.size, componentIndex, outputs.size, operation.name());
-			allOutputs.append( move( outputs[componentIndex] ) );
-			// FIXME: cache before discarding
+			allOutputs.append( ::cache<ImageF>(folder(), elementName(groupIndex)+'{'+str(imageIndex)+'}'+'['+str(componentIndex)+']', inputs[0].size, time(groupIndex),
+					[&](ImageF& target) {
+				array<SourceImage> outputs;
+				for(size_t unused index: range(operation.outputs())) outputs.append( inputs[0].size );
+				log(operation.name(), elementName(groupIndex)+'{'+str(imageIndex)+'}');
+				operation.apply(share(outputs), inputs);
+				assert_(componentIndex < outputs.size);
+				assert_(target.size == outputs[componentIndex].size);
+				target.copy(outputs[componentIndex]);
+				for(size_t otherComponentIndex: range(outputs.size)) { // Writes all outputs
+					if(otherComponentIndex != componentIndex)
+					::cache<ImageF>(folder(), elementName(groupIndex)+'{'+str(imageIndex)+'}'+'['+str(otherComponentIndex)+']',
+									inputs[0].size, time(groupIndex), [&](ImageF& target) {
+						assert_(otherComponentIndex < outputs.size);
+						assert_(target.size == outputs[otherComponentIndex].size);
+						target.copy(outputs[otherComponentIndex]);
+					});
+				}
+			}) );
 		}
 		return allOutputs;
 	}
-	error(operation.outputs());
+	error(operation.outputs(), "ImageGroupOperation");
 }
 
 // sRGBGroupOperation
@@ -122,7 +135,7 @@ array<SourceImageRGB> sRGBGroupOperation::images(size_t groupIndex, int2 size, b
 		SourceImageRGB target( inputs[0].size );
 		/**/  if(inputs.size==1) ::sRGB(target, inputs[0]);
 		else if(inputs.size==3) ::sRGB(target, inputs[0], inputs[1], inputs[2]);
-		else error(inputs.size);
+		else error(inputs.size, "sRGBGroupOperation");
 		allOutputs.append(move(target));
 	}
 	return allOutputs;
@@ -132,16 +145,28 @@ array<SourceImageRGB> sRGBGroupOperation::images(size_t groupIndex, int2 size, b
 
 array<SourceImage> BinaryImageGroupOperation::images(size_t groupIndex, size_t componentIndex, int2 size, bool noCacheWrite) {
 	// Distributes binary operator on every output of B
-	assert_(A.outputs() == 1 || operation.inputs()==0, operation.name());
+	assert_(A.outputs() == 1 || operation.inputs()==0 || A.outputs() == B.outputs(), operation.name(), A.outputs(), B.outputs());
 	assert_(operation.inputs() >= 2 || operation.inputs()==0, operation.name());
-	array<array<SourceImage>> groupInputs;
-	if(operation.inputs()) assert_(operation.inputs()-1 <= A.outputs(), operation.inputs(), A.outputs());
-	for(size_t inputIndex: range(operation.inputs() ? operation.inputs()-1 : A.outputs()))
-		groupInputs.append( A.images(groupIndex, inputIndex, size, noCacheWrite) );
-	auto b = B.images(groupIndex, componentIndex, size, noCacheWrite);
 	array<SourceImage> allOutputs;
-	/*if(operation.inputs() == 0) { // For each image of the group, operates on A[*], B[componentIndex]
-	} else*/ { // For each image of the group, operates on A[*], B[componentIndex]
+	if(A.outputs() == B.outputs()) {
+		assert_(A.groupSize(groupIndex) == B.groupSize(groupIndex));
+		array<SourceImage> a = A.images(groupIndex, componentIndex, size, noCacheWrite);
+		array<SourceImage> b = B.images(groupIndex, componentIndex, size, noCacheWrite);
+		for(size_t imageIndex: range(a.size)) {
+			array<ImageF> inputs;
+			inputs.append( share( a[imageIndex] ) );
+			inputs.append( share( b[imageIndex] ) );
+			array<SourceImage> outputs;
+			for(size_t unused index: range(operation.outputs())) outputs.append( inputs[0].size );
+			operation.apply(share(outputs), inputs);
+			allOutputs.append(outputs);
+		}
+	} else { // For each image of the group, operates on A[*], B[componentIndex]
+		array<array<SourceImage>> groupInputs;
+		if(operation.inputs()) assert_(operation.inputs()-1 <= A.outputs(), operation.inputs(), A.outputs());
+		for(size_t inputIndex: range(operation.inputs() ? operation.inputs()-1 : A.outputs()))
+			groupInputs.append( A.images(groupIndex, inputIndex, size, noCacheWrite) );
+		auto b = B.images(groupIndex, componentIndex, size, noCacheWrite);
 		assert_(A.groupSize(groupIndex) == B.groupSize(groupIndex));
 		assert_(groupInputs.size);
 		for(size_t imageIndex: range(groupInputs[0].size)) {

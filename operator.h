@@ -77,7 +77,20 @@ struct Multiply : ImageOperator, OperatorT<Multiply> {
 /// Sums together all images in an image group
 struct Sum : ImageGroupOperator1, OperatorT<Sum> {
 	string name() const override { return "[sum]"; }
-	virtual void apply(const ImageF& Y, ref<ImageF> X) const {
+	void apply(const ImageF& Y, ref<ImageF> X) const override {
 		parallel::apply(Y, [&](size_t index) { return sum<float>(::apply(X, [index](const ImageF& x) { return x[index]; })); });
 	}
+};
+
+struct Index0 : ImageGroupOperator1, OperatorT<Index0> {
+	string name() const override { return "[0]"; }
+	void apply(const ImageF& Y, ref<ImageF> X) const override {	Y.copy(X[0]); }
+};
+struct Index1 : ImageGroupOperator1, OperatorT<Index0> {
+	string name() const override { return "[1]"; }
+	void apply(const ImageF& Y, ref<ImageF> X) const override {	Y.copy(X[1]); }
+};
+struct Index2 : ImageGroupOperator1, OperatorT<Index0> {
+	string name() const override { return "[2]"; }
+	void apply(const ImageF& Y, ref<ImageF> X) const override {	Y.copy(X[2]); }
 };
