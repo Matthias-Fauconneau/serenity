@@ -1,79 +1,178 @@
 #pragma once
-#include "time.h"
-#include "image.h"
+#include "source.h"
+#include "operator.h"
 
-struct Operation {
-	virtual string name() const abstract;
-	virtual int64 time() const abstract;
+// GenericImageOperation
+
+/// Provides outputs of an \a operation on a \a source
+struct GenericImageOperation : virtual GenericImageSource {
+	GenericImageSource& source;
+	GenericImageOperator& operation;
+	Folder cacheFolder {operation.name(), source.folder(), true};
+	GenericImageOperation(GenericImageSource& source, GenericImageOperator& operation) : source(source), operation(operation) {}
+
+	const Folder& folder() const override { return cacheFolder; }
+	String name() const override { return str(source.name(), operation.name()); }
+	size_t count(size_t need = 0) override { return source.count(need); }
+    int2 maximumSize() const override { return source.maximumSize(); }
+	String elementName(size_t index) const override { return source.elementName(index); }
+	int64 time(size_t index) override { return max(source.time(index), operation.time()); }
+	int2 size(size_t index) const override { return source.size(index); }
 };
 
-generic struct OperationT : virtual Operation {
-	//string name() const override { static string name = ({ TextData s (str(typeid(T).name())); s.whileInteger(); s.identifier(); }); return name; }
-	int64 time() const override { return parseDate(__DATE__ " " __TIME__)*1000000000l; }
+struct ImageOperation : GenericImageOperation, ImageSource {
+	ImageSource& source;
+	ImageOperator& operation;
+	ImageOperation(ImageSource& source, ImageOperator& operation)
+		: GenericImageOperation(source, operation), source(source), operation(operation) {}
+
+	size_t outputs() const override {
+		if(source.outputs() == operation.inputs()) return operation.outputs();
+		assert_(operation.inputs() == 0 && operation.outputs() == 1,
+				operation.name(), operation.inputs(), operation.outputs(), source.name(), "GenericImageOperation");
+		return source.outputs();
+	}
+	/// Returns processed linear image
+	SourceImage image(size_t imageIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override;
+
+	String toString() const override { return GenericImageSource::toString()+'['+str(outputs())+']'; }
 };
 
-/// Operates on a predetermined number of images to provide a given number of outputs
-struct GenericImageOperation : virtual Operation {
-	virtual size_t inputs() const abstract;
-	virtual size_t outputs() const abstract;
+generic struct ImageOperationT : T, ImageOperation {
+	ImageOperationT(ImageSource& source) : ImageOperation(source, *this) {}
 };
 
-/// Operates on a predetermined number of images to provide a given number of outputs
-struct ImageOperation : virtual GenericImageOperation {
-	virtual void apply(ref<ImageF> Y, ref<ImageF> X) const abstract;
-};
-
-struct ImageOperation1 : ImageOperation {
+struct SRGB : GenericImageOperator, OperatorT<SRGB> {
 	size_t inputs() const override { return 1; }
 	size_t outputs() const override { return 1; }
-	virtual void apply(const ImageF& Y, const ImageF& X) const abstract;
-	void apply(ref<ImageF> Y, ref<ImageF> X) const override {
-		assert_(Y.size == 1);
-		assert_(X.size == 1);
-		apply(Y[0], X[0]);
+	string name() const override { return  "[sRGB]"; }
+};
+struct sRGBOperation : GenericImageOperation, ImageRGBSource, SRGB {
+	ImageSource& source;
+	sRGBOperation(ImageSource& source) : GenericImageOperation(source, *this), source(source) {}
+
+	/// Returns processed sRGB image
+	virtual SourceImageRGB image(size_t index, int2 size, bool noCacheWrite) override;
+};
+
+/// Evaluates an image for each group
+struct ImageGroupFold : GenericImageOperation, ImageSource {
+	ImageGroupSource& source;
+	ImageOperator& operation;
+	ImageGroupFold(ImageGroupSource& source, ImageOperator& operation)
+		: GenericImageOperation(source, operation), source(source), operation(operation) {}
+
+	size_t outputs() const override {
+		if((operation.inputs() == 0 && operation.outputs()>1) || source.outputs() == operation.inputs()) return operation.outputs();
+		assert_(operation.inputs() == 0 && operation.outputs() == 1,
+				operation.name(), operation.inputs(), operation.outputs(), source.name(), "ImageGroupFold");
+		return source.outputs();
 	}
+	SourceImage image(size_t groupIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override;
+
+	String toString() const override { return str(source.toString(), operation.name())+'['+str(outputs())+']'; }
 };
 
-struct ImageOperation21 : ImageOperation {
-	size_t inputs() const override { return 2; }
-	size_t outputs() const override { return 1; }
-	virtual void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const abstract;
-	void apply(ref<ImageF> Y, ref<ImageF> X) const override {
-		assert_(Y.size == 1);
-		assert_(X.size == 2);
-		for(auto& x: X) assert_(x.size == Y[0].size, Y, X, name());
-		apply(Y[0], X[0], X[1]);
+generic struct ImageGroupFoldT : T, ImageGroupFold {
+	ImageGroupFoldT(ImageGroupSource& source) : ImageGroupFold(source, *this) {}
+};
+
+// ImageGroupOperation
+
+/// Returns image groups from an image source grouped by a group source
+struct GroupImageOperation : ImageGroupSource {
+	ImageSource& source;
+	GroupSource& groups;
+	GroupImageOperation(ImageSource& source, GroupSource& groups) : source(source), groups(groups) {}
+	size_t count(size_t need=0) override { return groups.count(need); }
+	String name() const override { return source.name(); }
+	const Folder& folder() const override { return source.folder(); }
+	int2 maximumSize() const override { return source.maximumSize(); }
+	int64 time(size_t groupIndex) override { return max(apply(groups(groupIndex), [this](size_t index) { return source.time(index); })); }
+	String elementName(size_t groupIndex) const override;
+	int2 size(size_t groupIndex) const override;
+
+	size_t outputs() const override { return source.outputs(); }
+	size_t groupSize(size_t groupIndex) const { return groups(groupIndex).size; }
+	array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override;
+};
+
+// ImageGroupOperation
+
+struct GenericImageGroupOperation : GenericImageOperation, virtual GenericImageGroupSource {
+	ImageGroupSource& source;
+	GenericImageGroupOperation(ImageGroupSource& source, GenericImageOperator& operation)
+		: GenericImageOperation(source, operation), source(source) {}
+
+	size_t outputs() const override {
+		if(source.outputs() == operation.inputs()) return operation.outputs();
+		return (operation.inputs() == 0 && operation.outputs() == 0) ? source.outputs() : operation.outputs();
 	}
+	size_t groupSize(size_t groupIndex) const { return source.groupSize(groupIndex); }
 };
 
-struct ImageOperation31 : ImageOperation {
-	size_t inputs() const override { return 3; }
-	size_t outputs() const override { return 1; }
-	virtual void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1, const ImageF& X2) const abstract;
-	void apply(ref<ImageF> Y, ref<ImageF> X) const override {
-		assert_(Y.size == 1);
-		assert_(X.size == 3);
-		for(auto& x: X) assert_(x.size == Y[0].size, Y, X, name());
-		apply(Y[0], X[0], X[1], X[2]);
+/// Evaluates an operation on every image of an image group
+struct ImageGroupOperation : GenericImageGroupOperation, ImageGroupSource {
+	ImageOperator& operation;
+	ImageGroupOperation(ImageGroupSource& source, ImageOperator& operation)
+		: GenericImageGroupOperation(source, operation), operation(operation) {}
+
+	array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override;
+};
+
+generic struct ImageGroupOperationT : T, ImageGroupOperation {
+	ImageGroupOperationT(ImageGroupSource& source) : ImageGroupOperation(source, *this) {}
+};
+
+struct sRGBImageGroupSource : GenericImageGroupOperation, ImageRGBGroupSource, SRGB {
+	sRGBImageGroupSource(ImageGroupSource& source) : GenericImageGroupOperation(source, *this) {}
+	array<SourceImageRGB> images(size_t groupIndex, int2 size = 0, bool noCacheWrite = false) override;
+};
+
+
+// BinaryImageSource
+
+/// Operates on two image sources
+struct BinaryGenericImageOperation : virtual GenericImageSource {
+	GenericImageSource& A;
+	GenericImageSource& B;
+	ImageOperator& operation;
+	Folder cacheFolder {A.name()+B.name(), A.folder()/*FIXME: MRCA of A and B*/, true};
+	BinaryGenericImageOperation(GenericImageSource& A, GenericImageSource& B, ImageOperator& operation)
+		: A(A), B(B), operation(operation) {}
+	size_t count(size_t need=0) override { assert_(A.count(need) == B.count(need)); return A.count(need); }
+	String name() const override { return "("+A.name()+" | "+B.name()+")"; }
+	const Folder& folder() const override { return cacheFolder; }
+	int2 maximumSize() const override { assert_(A.maximumSize() == B.maximumSize()); return A.maximumSize(); }
+	int64 time(size_t index) override { return max(max(A.time(index), B.time(index)), operation.time()); }
+	virtual String elementName(size_t index) const override {
+		assert_(A.elementName(index) == B.elementName(index)); return A.elementName(index);
 	}
+	int2 size(size_t index) const override { assert_(A.size(index) == B.size(index)); return A.size(index); }
+
+	String toString() const override { return "("+A.toString()+" | "+B.toString()+")"; }
 };
 
-// Basic ImageOperation implementations
+// BinaryImageGroupOperation
 
-/// Averages 3 components
-struct Intensity : ImageOperation31, OperationT<Intensity> {
-	string name() const override { return "[intensity]"; }
-	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1, const ImageF& X2) const override;
+/// Operates on two image group sources
+struct BinaryImageGroupOperation : BinaryGenericImageOperation, ImageGroupSource {
+	ImageGroupSource& A;
+	ImageGroupSource& B;
+	BinaryImageGroupOperation(ImageGroupSource& A, ImageGroupSource& B, ImageOperator& operation)
+		: BinaryGenericImageOperation(A, B, operation), A(A), B(B) {}
+
+	size_t outputs() const override {
+		//if(A.outputs()+B.outputs() == operation.inputs()) return operation.outputs();
+		return B.outputs() * operation.outputs(); // Distributes binary operator on every output of B
+	}
+	size_t groupSize(size_t groupIndex) const { assert_(A.groupSize(groupIndex) == B.groupSize(groupIndex)); return A.groupSize(groupIndex); }
+
+	array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override;
+
+	String toString() const override { return BinaryGenericImageOperation::toString()+'['+str(outputs())+']'; }
 };
 
-/// Normalizes mean and deviation
-struct Normalize : ImageOperation1, OperationT<Normalize> {
-	string name() const override { return "[normalize]"; }
-	void apply(const ImageF& Y, const ImageF& X) const override;
-};
-
-/// Multiplies 2 components together
-struct Multiply : ImageOperation21, OperationT<Multiply> {
-	string name() const override { return "[multiply]"; }
-	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const override;
+generic struct BinaryImageGroupOperationT : T, BinaryImageGroupOperation {
+	BinaryImageGroupOperationT(ImageGroupSource& A, ImageGroupSource& B) : BinaryImageGroupOperation(A, B, *this) {}
 };

@@ -33,15 +33,15 @@ struct TransformGroupSource : Source {
 };
 
 /// Evaluates transforms for a group of images
-struct ImageTransformGroupOperation : virtual Operation {
+struct ImageTransformGroupOperator : virtual Operator {
 	virtual array<Transform> operator()(ref<ImageF>) const abstract;
 };
 
-struct ProcessedImageTransformGroupSource : TransformGroupSource {
+struct ImageGroupTransformOperation : TransformGroupSource {
 	ImageGroupSource& source;
-	ImageTransformGroupOperation& operation;
+	ImageTransformGroupOperator& operation;
 	Folder cacheFolder {operation.name(), source.folder(), true};
-	ProcessedImageTransformGroupSource(ImageGroupSource& source, ImageTransformGroupOperation& operation) :
+	ImageGroupTransformOperation(ImageGroupSource& source, ImageTransformGroupOperator& operation) :
 		source(source), operation(operation) {}
 
 	virtual size_t count(size_t need=0) { return source.count(need); }
@@ -57,8 +57,8 @@ struct ProcessedImageTransformGroupSource : TransformGroupSource {
 	}
 };
 
-generic struct ProcessedImageTransformGroupSourceT : T, ProcessedImageTransformGroupSource {
-	ProcessedImageTransformGroupSourceT(ImageGroupSource& source) : ProcessedImageTransformGroupSource(source, *this) {}
+generic struct ImageGroupTransformOperationT : T, ImageGroupTransformOperation {
+	ImageGroupTransformOperationT(ImageGroupSource& source) : ImageGroupTransformOperation(source, *this) {}
 };
 
 /// Samples \a transform of \a source using nearest neighbour
@@ -74,12 +74,12 @@ void sample(const ImageF& target, const ImageF& source, Transform transform, int
 ImageF sample(ImageF&& target, const ImageF& source, Transform transform, int2 min, int2 max) { sample(target, source, transform, min, max); return move(target); }
 ImageF sample(const ImageF& source, Transform transform, int2 min, int2 max) { return sample(max-min, source, transform, min, max); }
 
-//FIXME: reuse ProcessedImageGroupSource
-struct TransformSampleImageGroupSource : ImageGroupSource {
+//FIXME: reuse UnaryImageGroupSource
+struct SampleImageGroupOperation : ImageGroupSource {
 	ImageGroupSource& source;
 	TransformGroupSource& transform;
 	Folder cacheFolder {"[sample]", source.folder(), true};
-	TransformSampleImageGroupSource(ImageGroupSource& source, TransformGroupSource& transform)
+	SampleImageGroupOperation(ImageGroupSource& source, TransformGroupSource& transform)
 		: source(source), transform(transform) {}
 
 	size_t count(size_t need=0) override { return source.count(need); }

@@ -82,7 +82,7 @@ player.cc
 
 exif.cc
 exif.h
-operation.h
+operator.h
 dust.cc
 core/parallel.h
 inverse-diffusion.h
@@ -91,8 +91,8 @@ image-folder.h
 calibration.cc
 calibration.h
 inverse-diffusion.cc
-process.cc
-process.h
+operation.cc
+operation.h
 source-view.h
 cache.h
 core/cat.h
@@ -105,6 +105,5 @@ split.cc
 image-folder.cc
 transform.h
 align.h
-operation.cc
-image-group-operation.h
+operator.cc
 ui/color.h

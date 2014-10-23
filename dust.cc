@@ -27,7 +27,7 @@ struct DustRemoval {
 	ImageFolder source { folder, [this](string name, const map<String, String>& unused properties) {
 			return imagesAttributes.value(name) != "best"; //fromDecimal(properties.at("Aperture"_)) <= 5;
 		} };
-    ProcessedSource corrected {source, correction};
+	UnarySource corrected {source, correction};
 };
 
 struct DustRemovalTest : DustRemoval, Application {

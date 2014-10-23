@@ -16,7 +16,7 @@ static array<ImageF> mipmap(const ImageF& source, int levelCount) {
 }
 
 /// Aligns images
-struct Align : ImageTransformGroupOperation, OperationT<Align> {
+struct Align : ImageTransformGroupOperator, OperatorT<Align> {
 	string name() const override { return "[align]"; }
 
 	// Evaluates residual energy at integer offsets
