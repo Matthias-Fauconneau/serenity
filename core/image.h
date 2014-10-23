@@ -141,7 +141,7 @@ template<Type A, Type F, Type... Ss> A sumXY(int2 size, F apply, A initialValue)
 	parallel_chunk(size.y, [&](uint id, uint64 start, uint64 chunkSize) {
 		A accumulator = initialValue;
 		for(size_t y: range(start, start+chunkSize)) for(size_t x: range(size.x)) accumulator += apply(x, y);
-		accumulators[id] = accumulator;
+		accumulators[id] += accumulator;
 	});
 	return ::sum<A>(accumulators);
 }
