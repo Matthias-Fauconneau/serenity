@@ -47,11 +47,18 @@ struct ImageRGBSource : virtual GenericImageSource {
 	virtual SourceImageRGB image(size_t index, int2 size = 0, bool noCacheWrite = false) abstract;
 };
 
-struct ImageGroupSource : virtual GenericImageSource {
+struct GenericImageGroupSource : virtual GenericImageSource {
 	/// Number of outputs per image index (aka channels, components)
 	virtual size_t outputs() const abstract;
 	virtual size_t groupSize(size_t groupIndex) const abstract;
-	virtual array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size, bool noCacheWrite = false)  abstract;
 
 	String toString() const override { return GenericImageSource::toString()+'['+str(outputs())+']'; }
+};
+
+struct ImageGroupSource : virtual GenericImageGroupSource {
+	virtual array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size, bool noCacheWrite = false)  abstract;
+};
+
+struct ImageRGBGroupSource : virtual GenericImageGroupSource {
+	virtual array<SourceImageRGB> images(size_t groupIndex, int2 size, bool noCacheWrite = false)  abstract;
 };

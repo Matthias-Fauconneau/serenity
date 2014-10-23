@@ -20,7 +20,7 @@ SourceImage ProcessedSource::image(size_t imageIndex, size_t outputIndex, int2 s
 SourceImageRGB sRGBSource::image(size_t imageIndex, int2 size, bool noCacheWrite) {
 	array<SourceImage> inputs;
 	for(size_t inputIndex: range(source.outputs())) inputs.append(source.image(imageIndex, inputIndex, size, noCacheWrite));
-	return ::cache<Image>(folder(), elementName(imageIndex), inputs[0].size /*size?:this->size(imageIndex)*/, time(imageIndex),
+	return ::cache<Image>(folder(), elementName(imageIndex), inputs[0].size, ProcessedGenericSource::time(imageIndex),
 				 [&](Image& target) {
 		if(target.size != inputs[0].size) {
 			assert_(target.size > inputs[0].size);
@@ -28,8 +28,8 @@ SourceImageRGB sRGBSource::image(size_t imageIndex, int2 size, bool noCacheWrite
 		}
 		/*array<SourceImage> inputs;
 		for(size_t inputIndex: range(source.outputs())) inputs.append(source.image(imageIndex, inputIndex, target.size, noCacheWrite));*/
-		if(inputs.size==1) sRGB(target, inputs[0]);
-		else if(inputs.size==3) sRGB(target, inputs[0], inputs[1], inputs[2]);
+		if(inputs.size==1) ::sRGB(target, inputs[0]);
+		else if(inputs.size==3) ::sRGB(target, inputs[0], inputs[1], inputs[2]);
 		else error(inputs.size);
 	}, noCacheWrite);
 }
@@ -103,6 +103,27 @@ array<SourceImage> ProcessedGroupImageGroupSource::images(size_t groupIndex, siz
 		return allOutputs;
 	}
 	error(operation.outputs());
+}
+
+// sRGBGroupSource
+
+array<SourceImageRGB> sRGBGroupSource::images(size_t groupIndex, int2 size, bool noCacheWrite) {
+	if(!size) size=this->size(groupIndex);
+	assert_(source.outputs() == 1); // Process every image separately
+	assert_(operation.outputs() == 1);
+	assert_(operation.inputs() == 1);
+	array<array<SourceImage>> groupInputs;
+	for(size_t inputIndex: range(operation.inputs())) groupInputs.append( source.images(groupIndex, inputIndex, size, noCacheWrite) );
+	array<SourceImageRGB> allOutputs;
+	for(size_t imageIndex: range(groupInputs[0].size)) {
+		array<ImageF> inputs;
+		for(size_t inputIndex: range(groupInputs.size)) inputs.append( share(groupInputs[inputIndex][imageIndex]) );
+		assert_(groupInputs.size == 1, groupInputs.size);
+		SourceImageRGB target( inputs[0].size );
+		::sRGB(target, inputs[0]);
+		allOutputs.append(move(target));
+	}
+	return allOutputs;
 }
 
 // BinaryGroupImageGroupSource

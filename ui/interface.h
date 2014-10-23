@@ -117,7 +117,7 @@ struct WidgetToggle : Widget {
     int2 sizeHint(int2 size) override { return widgets[index]->sizeHint(size); }
     Graphics graphics(int2 size) override { return widgets[index]->graphics(size); }
 
-    // Forwards events and enables filter while a mouse button is pressed
+	// Forwards events
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;
     // Forwards events and enables filter while a key is pressed
     bool keyPress(Key key, Modifiers modifiers) override;

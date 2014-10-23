@@ -13,9 +13,13 @@ generic struct OperationT : virtual Operation {
 };
 
 /// Operates on a predetermined number of images to provide a given number of outputs
-struct ImageOperation : virtual Operation {
+struct GenericImageOperation : virtual Operation {
 	virtual size_t inputs() const abstract;
 	virtual size_t outputs() const abstract;
+};
+
+/// Operates on a predetermined number of images to provide a given number of outputs
+struct ImageOperation : virtual GenericImageOperation {
 	virtual void apply(ref<ImageF> Y, ref<ImageF> X) const abstract;
 };
 

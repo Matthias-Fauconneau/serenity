@@ -61,8 +61,7 @@ struct Prism : ImageGroupOperation, OperationT<Prism> {
 	string name() const override { return "[prism]"; }
 	size_t outputs() const override { return 3; }
 	virtual void apply(ref<ImageF> Y, ref<ImageF> X) const {
-		assert_(X.size >= 3);
-		for(size_t index: range(3)) Y[index].copy(X[index]);
+		for(size_t index: range(min(Y.size, X.size))) Y[index].copy(X[index]);
 	}
 };
 
@@ -106,7 +105,7 @@ struct ExposureBlendAnnotate : ExposureBlend, Application {
 	size_t index = lastIndex != invalid ? lastIndex : 0;
 
 	sRGBSource sRGB [2] {{source}, {normalize}};
-	ImageSourceView views [2] {{sRGB[0], &index, window}, {sRGB[1], &index, window}};
+	ImageSourceView views [2] {{sRGB[0], &index}, {sRGB[1], &index}};
 	WidgetToggle toggleView {&views[0], &views[1], 0};
 	Window window {&toggleView, -1, [this]{ return toggleView.title()+" "+imagesAttributes.value(source.elementName(index)); }};
 
@@ -127,12 +126,17 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 
 	/*ProcessedGroupImageSourceT<Mean> unaligned {splitSource};
 	ProcessedGroupImageSourceT<Mean> aligned {alignSource};*/
-	ProcessedGroupImageSourceT<Prism> unaligned {splitNormalize};
-	TransformSampleImageGroupSource alignNormalize {splitNormalize, transforms};
-	ProcessedGroupImageSourceT<Prism> aligned {alignNormalize};
-	sRGBSource sRGB [2] {{unaligned}, {aligned}};
-	//sRGBSource sRGB [2] {{select}, {blend}};
-	ImageSourceView views [2] {{sRGB[0], &index, window}, {sRGB[1], &index, window}};
+	ProcessedGroupImageSourceT<Prism> prism {transforms.source};
+	TransformSampleImageGroupSource align {transforms.source, transforms};
+	ProcessedGroupImageSourceT<Prism> prismAlign {align};
+
+	sRGBSource sRGB [2] {{prism}, {prismAlign}};
+	////sRGBSource sRGB [2] {{select}, {blend}};
+	ImageSourceView views [2] {{sRGB[0], &index}, {sRGB[1], &index}};
+
+	//sRGBGroupSource sRGB [2] {{splitLow}, {align}};
+	//ImageGroupSourceView views [2] {{sRGB[0], &index}, {sRGB[1], &index}};
+
 	WidgetToggle toggleView {&views[0], &views[1], 0};
 	Window window {&toggleView, -1, [this]{ return toggleView.title()+" "+imagesAttributes.value(source.elementName(index)); }};
 };

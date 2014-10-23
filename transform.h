@@ -45,7 +45,7 @@ struct ProcessedImageTransformGroupSource : TransformGroupSource {
 
 	array<Transform> operator()(size_t groupIndex, int2 size) override {
 		assert_(source.outputs()==1);
-		if(!size) size = source.size(groupIndex)/4;
+		if(!size) size = source.maximumSize()/16;
 		array<SourceImage> images = source.images(groupIndex, 0, size);
 		return parseArray<Transform>(cache(cacheFolder, source.elementName(groupIndex), strx(size), time(groupIndex), [&]() {
 			return str(operation(apply(images, [](const SourceImage& x){ return share(x); })));
@@ -62,7 +62,7 @@ void sample(const ImageF& target, const ImageF& source, Transform transform, int
 	assert_(target.size == max-min);
 	applyXY(target, [&](int x, int y) {
 		int2 s = int2(round(transform(min+int2(x,y), source.size)));
-		if(!(s >= int2(0) && s < source.size)) return 0.f;
+		//if(!(s >= int2(0) && s < source.size)) return 0.f;
 		assert_(s >= int2(0) && s < source.size, s, source.size);
 		return source(s);
 	});
