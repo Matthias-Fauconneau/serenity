@@ -146,6 +146,22 @@ template<Type A, Type F, Type... Ss> A sumXY(int2 size, F apply, A initialValue)
 	return ::sum<A>(accumulators);
 }
 
+inline double SSE(const ImageF& A, const ImageF& B, int2 offset) {
+	assert_(A.size == B.size);
+	int2 size = A.size - abs(offset);
+	double energy = sumXY(size, [&A, &B, offset](int x, int y) {
+		int2 p = int2(x,y);
+		int2 a = p + max(int2(0), -offset);
+		int2 b = p + max(int2(0),  offset);
+		assert_(b-a==offset, offset, a, b);
+		assert_(a >= int2(0) && a < A.size);
+		assert_(b >= int2(0) && b < B.size);
+		return sq(A(a) - B(b)); // SSE
+	}, 0.0);
+	energy /= size.x*size.y;
+	return energy;
+}
+
 // -- sRGB --
 
 extern uint8 sRGB_forward[0x1000];

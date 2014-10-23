@@ -61,23 +61,30 @@ struct Prism : ImageGroupOperation, OperationT<Prism> {
 	string name() const override { return "[prism]"; }
 	size_t outputs() const override { return 3; }
 	virtual void apply(ref<ImageF> Y, ref<ImageF> X) const {
-		assert_(X.size == 3);
-		for(size_t index: range(X.size)) Y[index].copy(X[index]);
+		assert_(X.size >= 3);
+		for(size_t index: range(3)) Y[index].copy(X[index]);
 	}
 };
 
 struct ExposureBlend {
 	Folder folder {"Pictures/ExposureBlend", home()};
 	PersistentValue<map<String, String>> imagesAttributes {folder,"attributes"};
+
 	ImageFolder source { folder };
 	ProcessedSourceT<Intensity> intensity {source};
-	ProcessedSourceT<LowPass> low {intensity};
-	ProcessedSourceT<Normalize> normalize {low};
+	ProcessedSourceT<Normalize> normalize {intensity};
 	DifferenceSplit split {normalize};
-	ProcessedImageGroupSource splitSource {source, split};
+
+#if 0
+	ProcessedSourceT<LowPass> low {normalize};
+	ProcessedImageGroupSource splitLow {low, split};
+	ProcessedImageTransformGroupSourceT<Align> transforms {splitLow};
+#else
 	ProcessedImageGroupSource splitNormalize {normalize, split};
 	ProcessedImageTransformGroupSourceT<Align> transforms {splitNormalize};
-	TransformSampleImageGroupSource alignNormalize {splitNormalize, transforms};
+#endif
+
+	ProcessedImageGroupSource splitSource {source, split};
 	TransformSampleImageGroupSource alignSource {splitSource, transforms};
 	ProcessedGroupImageGroupSourceT<Intensity> alignIntensity {alignSource};
 	ProcessedGroupImageGroupSourceT<Contrast> contrast {alignIntensity};
@@ -118,7 +125,13 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	const size_t lastIndex = source.keys.indexOf(lastName);
 	size_t index = lastIndex != invalid ? lastIndex : 0;
 
-	sRGBSource sRGB [2] {{select}, {blend}};
+	/*ProcessedGroupImageSourceT<Mean> unaligned {splitSource};
+	ProcessedGroupImageSourceT<Mean> aligned {alignSource};*/
+	ProcessedGroupImageSourceT<Prism> unaligned {splitNormalize};
+	TransformSampleImageGroupSource alignNormalize {splitNormalize, transforms};
+	ProcessedGroupImageSourceT<Prism> aligned {alignNormalize};
+	sRGBSource sRGB [2] {{unaligned}, {aligned}};
+	//sRGBSource sRGB [2] {{select}, {blend}};
 	ImageSourceView views [2] {{sRGB[0], &index, window}, {sRGB[1], &index, window}};
 	WidgetToggle toggleView {&views[0], &views[1], 0};
 	Window window {&toggleView, -1, [this]{ return toggleView.title()+" "+imagesAttributes.value(source.elementName(index)); }};

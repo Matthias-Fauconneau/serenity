@@ -47,7 +47,7 @@ struct ProcessedImageTransformGroupSource : TransformGroupSource {
 		assert_(source.outputs()==1);
 		if(!size) size = source.size(groupIndex)/4;
 		array<SourceImage> images = source.images(groupIndex, 0, size);
-		return parseArray<Transform>(cache(cacheFolder, source.elementName(groupIndex), strx(size), source.time(groupIndex), [&]() {
+		return parseArray<Transform>(cache(cacheFolder, source.elementName(groupIndex), strx(size), time(groupIndex), [&]() {
 			return str(operation(apply(images, [](const SourceImage& x){ return share(x); })));
 		}, false));
 	}
