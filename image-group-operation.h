@@ -23,7 +23,7 @@ struct ImageGroupOperation1 : ImageGroupOperation {
 struct Mean : ImageGroupOperation1, OperationT<Mean> {
 	string name() const override { return "[mean]"; }
 	virtual void apply(const ImageF& Y, ref<ImageF> X) const {
-		parallel::apply(Y, [&](size_t index) { return sum(::apply(X, [index](const ImageF& x) { return x[index]; }))/X.size; });
+		parallel::apply(Y, [&](size_t index) { return sum<float>(::apply(X, [index](const ImageF& x) { return x[index]; }))/X.size; });
 	}
 };
 
@@ -31,6 +31,6 @@ struct Mean : ImageGroupOperation1, OperationT<Mean> {
 struct Sum : ImageGroupOperation1, OperationT<Sum> {
 	string name() const override { return "[sum]"; }
 	virtual void apply(const ImageF& Y, ref<ImageF> X) const {
-		parallel::apply(Y, [&](size_t index) { return sum(::apply(X, [index](const ImageF& x) { return x[index]; })); });
+		parallel::apply(Y, [&](size_t index) { return sum<float>(::apply(X, [index](const ImageF& x) { return x[index]; })); });
 	}
 };

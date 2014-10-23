@@ -71,7 +71,8 @@ struct ExposureBlend {
 	PersistentValue<map<String, String>> imagesAttributes {folder,"attributes"};
 	ImageFolder source { folder };
 	ProcessedSourceT<Intensity> intensity {source};
-	ProcessedSourceT<Normalize> normalize {intensity};
+	ProcessedSourceT<LowPass> low {intensity};
+	ProcessedSourceT<Normalize> normalize {low};
 	DifferenceSplit split {normalize};
 	ProcessedImageGroupSource splitSource {source, split};
 	ProcessedImageGroupSource splitNormalize {normalize, split};
