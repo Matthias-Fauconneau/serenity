@@ -60,44 +60,20 @@ struct ImageOperation31 : ImageOperation {
 
 // Basic ImageOperation implementations
 
-struct Subtract : ImageOperation21, OperationT<Subtract> {
-	string name() const override { return "[subtract]"; }
-	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const override;
-};
-
-struct Multiply : ImageOperation21, OperationT<Multiply> {
-	string name() const override { return "[multiply]"; }
-	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const override;
-};
-
-struct Divide : ImageOperation21, OperationT<Divide> {
-	string name() const override { return "[divide]"; }
-	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const override;
-};
-
 /// Averages 3 components
 struct Intensity : ImageOperation31, OperationT<Intensity> {
 	string name() const override { return "[intensity]"; }
 	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1, const ImageF& X2) const override;
 };
 
-struct LowPass : ImageOperation1, OperationT<LowPass> {
-	string name() const override { return "[low]"; }
-	void apply(const ImageF& Y, const ImageF& X) const override;
-};
-
-/*struct HighPass : ImageOperation1, OperationT<HighPass> {
-	string name() const override { return "[high]"; }
-	void apply(const ImageF& Y, const ImageF& X) const override;
-};
-
-struct BandPass : ImageOperation1, OperationT<BandPass> {
-	string name() const override { return "[band]"; }
-	void apply(const ImageF& Y, const ImageF& X) const override;
-};*/
-
 /// Normalizes mean and deviation
 struct Normalize : ImageOperation1, OperationT<Normalize> {
 	string name() const override { return "[normalize]"; }
 	void apply(const ImageF& Y, const ImageF& X) const override;
+};
+
+/// Multiplies 2 components together
+struct Multiply : ImageOperation21, OperationT<Multiply> {
+	string name() const override { return "[multiply]"; }
+	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const override;
 };

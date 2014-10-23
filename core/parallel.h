@@ -130,6 +130,7 @@ template<Type T, Type F> T reduce(ref<T> values, F fold) { return reduce(values,
 
 inline void sub(mref<float> Y, ref<float> A, ref<float> B) { apply(Y, [](float a, float b) {  return a-b; }, A, B); }
 inline void mul(mref<float> Y, ref<float> A, ref<float> B) { apply(Y, [](float a, float b) {  return a*b; }, A, B); }
+inline void fmadd(mref<float> Y, ref<float> A, ref<float> B) { apply(Y, [](float y, float a, float b) {  return y + a*b; }, Y, A, B); }
 inline void div(mref<float> Y, ref<float> A, ref<float> B) { apply(Y, [](float a, float b) {  return a/b; }, A, B); }
 
 // reduce

@@ -81,38 +81,74 @@ struct Prism : ImageGroupOperation, OperationT<Prism> {
 	}
 };
 
+/// Splits in bands
+struct FilterBank : ImageOperation, OperationT<FilterBank> {
+	size_t inputs() const override { return 1; }
+	size_t outputs() const override { return 2; }
+	string name() const override { return "[filterbank]"; }
+	void apply(ref<ImageF> Y, ref<ImageF> X) const override {
+		assert_(X.size == 1);
+		const int bandCount = Y.size;
+		const ImageF& r = Y[bandCount-1];
+		r.copy(X[0]); // Remaining octaves
+		const float largeScale = (min(r.size.x,r.size.y)-1)/6;
+		float octaveScale = largeScale / exp2(bandCount-1);
+		for(size_t index: range(bandCount-1)) {
+			gaussianBlur(Y[index], r, octaveScale); // Splits lowest octave
+			parallel::sub(r, r, Y[index]); // Removes from remainder
+			octaveScale *= 2; // Next octave
+		}
+		// Y[bandCount-1] holds remaining high octaves
+	}
+};
+
+/// Applies weights bands to source bands
+struct MultiBandWeight : ImageOperation, OperationT<MultiBandWeight> {
+	size_t inputs() const override { return 0; }
+	size_t outputs() const override { return 1; }
+	string name() const override { return "[multibandweight]"; }
+	void apply(ref<ImageF> Y, ref<ImageF> X /*weight bands, source*/) const override {
+		const int bandCount = X.size-1;
+		assert_(X.size > 2 && Y.size == 1);
+		ImageF r = copy(X.last()); // Remaining source octaves
+		const float largeScale = (min(r.size.x,r.size.y)-1)/6;
+		float octaveScale = largeScale / exp2(bandCount-1);
+		for(size_t index: range(bandCount-1)) {
+			ImageF octave = gaussianBlur(r, octaveScale); // Splits lowest source octave
+			if(index==0) parallel::mul(Y[0], X[index], octave); // Adds octave contribution
+			else parallel::fmadd(Y[0], X[index], octave); // Adds octave contribution
+			parallel::sub(r, r, Y[index]); // Removes from remainder
+			octaveScale *= 2; // Next octave
+		}
+		parallel::fmadd(Y[0], X[bandCount-1], r); // Applies band weights remainder to source remainder
+	}
+};
+
 struct ExposureBlend {
 	Folder folder {"Pictures/ExposureBlend", home()};
 	PersistentValue<map<String, String>> imagesAttributes {folder,"attributes"};
 
 	ImageFolder source { folder };
-	ProcessedSourceT<Intensity> intensity {source};
-	ProcessedSourceT<Normalize> normalize {intensity};
+	UnaryImageSourceT<Intensity> intensity {source};
+	UnaryImageSourceT<Normalize> normalize {intensity};
 	DifferenceSplit split {normalize};
 
-#if 0
-	ProcessedSourceT<LowPass> low {normalize};
-	ProcessedImageGroupSource splitLow {low, split};
-	ProcessedImageTransformGroupSourceT<Align> transforms {splitLow};
-#else
-	ProcessedImageGroupSource splitNormalize {normalize, split};
+	GroupImageGroupSource splitNormalize {normalize, split};
 	ProcessedImageTransformGroupSourceT<Align> transforms {splitNormalize};
-#endif
 
-	ProcessedImageGroupSource splitSource {source, split};
+	GroupImageGroupSource splitSource {source, split};
 	TransformSampleImageGroupSource alignSource {splitSource, transforms};
-	ProcessedGroupImageGroupSourceT<Intensity> alignIntensity {alignSource};
-	ProcessedGroupImageGroupSourceT<Contrast> contrast {alignIntensity};
-	ProcessedGroupImageGroupSourceT<LowPass> lowContrast {contrast};
-	ProcessedGroupImageGroupSourceT<MaximumWeight> maximumWeights {lowContrast}; // Prevents misalignment blur
+	UnaryImageGroupSourceT<Intensity> alignIntensity {alignSource};
+	UnaryImageGroupSourceT<Contrast> contrast {alignIntensity};
+	UnaryImageGroupSourceT<MaximumWeight> maximumWeights {contrast}; // Selects maximum weights
 
-	BinaryGroupImageGroupSourceT<Multiply> maximumWeighted {maximumWeights, alignSource};
-	ProcessedGroupImageSourceT<Sum> select {maximumWeighted};
+	BinaryImageGroupSourceT<Multiply> maximumWeighted {maximumWeights, alignSource};
+	UnaryGroupImageSourceT<Sum> select {maximumWeighted};
 
-	ProcessedGroupImageGroupSourceT<LowPass> lowWeights {maximumWeights}; // Diffuses weight selection
-	ProcessedGroupImageGroupSourceT<NormalizeWeights> normalizeWeights {lowWeights};
-	BinaryGroupImageGroupSourceT<Multiply> normalizeWeighted {normalizeWeights, alignSource};
-	ProcessedGroupImageSourceT<Sum> blend {normalizeWeighted};
+	UnaryImageGroupSourceT<FilterBank> weightBands {maximumWeights}; // Splits each weight selection in bands
+	UnaryImageGroupSourceT<NormalizeWeights> normalizeWeightBands {weightBands}; // Normalizes weight selection for each band
+	BinaryImageGroupSourceT<MultiBandWeight> multiBandWeighted {normalizeWeightBands, alignSource};
+	UnaryGroupImageSourceT<Sum> blend {multiBandWeighted};
 };
 
 struct ExposureBlendAnnotate : ExposureBlend, Application {
@@ -120,7 +156,7 @@ struct ExposureBlendAnnotate : ExposureBlend, Application {
 	const size_t lastIndex = source.keys.indexOf(lastName);
 	size_t index = lastIndex != invalid ? lastIndex : 0;
 
-	sRGBSource sRGB [2] {{source}, {normalize}};
+	sRGBImageSource sRGB [2] {{source}, {normalize}};
 	ImageSourceView views [2] {{sRGB[0], &index}, {sRGB[1], &index}};
 	WidgetCycle view {views};
 	Window window {&view, -1, [this]{ return view.title()+" "+imagesAttributes.value(source.elementName(index)); }};
@@ -140,11 +176,11 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	const size_t lastIndex = source.keys.indexOf(lastName);
 	size_t index = lastIndex != invalid ? lastIndex : 0;
 
-	ProcessedGroupImageSourceT<Prism> prism {transforms.source};
+	UnaryGroupImageSourceT<Prism> prism {transforms.source};
 	TransformSampleImageGroupSource align {transforms.source, transforms};
-	ProcessedGroupImageSourceT<Prism> prismAlign {align};
+	UnaryGroupImageSourceT<Prism> prismAlign {align};
 
-	sRGBSource sRGB [4] {{prism}, {prismAlign},{select}, {blend}};
+	sRGBImageSource sRGB [4] {{prism}, {prismAlign},{select}, {blend}};
 	ImageSourceView views [4] {{sRGB[0], &index}, {sRGB[1], &index}, {sRGB[2], &index}, {sRGB[3], &index}};
 
 	//sRGBGroupSource sRGB [2] {{splitLow}, {align}};
@@ -169,7 +205,7 @@ struct ExposureBlendTest : ExposureBlend, Application {
 registerApplication(ExposureBlendTest, test);
 
 struct ExposureBlendExport : ExposureBlend, Application {
-	sRGBSource sRGB {blend};
+	sRGBImageSource sRGB {blend};
 	ExposureBlendExport() {
 		Folder output ("Export", folder, true);
 		for(size_t index: range(sRGB.count(-1))) {
@@ -189,7 +225,7 @@ struct ExposureBlendExport : ExposureBlend, Application {
 registerApplication(ExposureBlendExport, export);
 
 struct ExposureBlendSelect : ExposureBlend, Application {
-	sRGBSource sRGB {select};
+	sRGBImageSource sRGB {select};
 	ExposureBlendSelect() {
 		Folder output ("Export", folder, true);
 		for(size_t index: range(sRGB.count(-1))) {

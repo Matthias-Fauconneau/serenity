@@ -2,14 +2,14 @@
 #include "source.h"
 #include "operation.h"
 
-// ProcessedSource
+// UnaryGenericImageSource
 
 /// Provides outputs of an \a operation on a \a source
-struct ProcessedGenericSource : virtual GenericImageSource {
+struct UnaryGenericImageSource : virtual GenericImageSource {
 	GenericImageSource& source;
 	GenericImageOperation& operation;
 	Folder cacheFolder {operation.name(), source.folder(), true};
-	ProcessedGenericSource(GenericImageSource& source, GenericImageOperation& operation) : source(source), operation(operation) {}
+	UnaryGenericImageSource(GenericImageSource& source, GenericImageOperation& operation) : source(source), operation(operation) {}
 
 	const Folder& folder() const override { return cacheFolder; }
 	String name() const override { return str(source.name(), operation.name()); }
@@ -20,16 +20,16 @@ struct ProcessedGenericSource : virtual GenericImageSource {
 	int2 size(size_t index) const override { return source.size(index); }
 };
 
-struct ProcessedSource : ProcessedGenericSource, ImageSource {
+struct UnaryImageSource : UnaryGenericImageSource, ImageSource {
 	ImageSource& source;
 	ImageOperation& operation;
-	ProcessedSource(ImageSource& source, ImageOperation& operation)
-		: ProcessedGenericSource(source, operation), source(source), operation(operation) {}
+	UnaryImageSource(ImageSource& source, ImageOperation& operation)
+		: UnaryGenericImageSource(source, operation), source(source), operation(operation) {}
 
 	size_t outputs() const override {
 		if(source.outputs() == operation.inputs()) return operation.outputs();
 		assert_(operation.inputs() == 0 && operation.outputs() == 1,
-				operation.name(), operation.inputs(), operation.outputs(), source.name(), "ProcessedGenericSource");
+				operation.name(), operation.inputs(), operation.outputs(), source.name(), "UnaryGenericImageSource");
 		return source.outputs();
 	}
 	/// Returns processed linear image
@@ -38,8 +38,8 @@ struct ProcessedSource : ProcessedGenericSource, ImageSource {
 	String toString() const override { return GenericImageSource::toString()+'['+str(outputs())+']'; }
 };
 
-generic struct ProcessedSourceT : T, ProcessedSource {
-	ProcessedSourceT(ImageSource& source) : ProcessedSource(source, *this) {}
+generic struct UnaryImageSourceT : T, UnaryImageSource {
+	UnaryImageSourceT(ImageSource& source) : UnaryImageSource(source, *this) {}
 };
 
 struct SRGB : GenericImageOperation, OperationT<SRGB> {
@@ -47,25 +47,25 @@ struct SRGB : GenericImageOperation, OperationT<SRGB> {
 	size_t outputs() const override { return 1; }
 	string name() const override { return  "[sRGB]"; }
 };
-struct sRGBSource : ProcessedGenericSource, ImageRGBSource, SRGB {
+struct sRGBImageSource : UnaryGenericImageSource, ImageRGBSource, SRGB {
 	ImageSource& source;
-	sRGBSource(ImageSource& source) : ProcessedGenericSource(source, *this), source(source) {}
+	sRGBImageSource(ImageSource& source) : UnaryGenericImageSource(source, *this), source(source) {}
 
 	/// Returns processed sRGB image
 	virtual SourceImageRGB image(size_t index, int2 size, bool noCacheWrite) override;
 };
 
 /// Evaluates an image for each group
-struct ProcessedGroupImageSource : ProcessedGenericSource, ImageSource {
+struct UnaryGroupImageSource : UnaryGenericImageSource, ImageSource {
 	ImageGroupSource& source;
 	ImageOperation& operation;
-	ProcessedGroupImageSource(ImageGroupSource& source, ImageOperation& operation)
-		: ProcessedGenericSource(source, operation), source(source), operation(operation) {}
+	UnaryGroupImageSource(ImageGroupSource& source, ImageOperation& operation)
+		: UnaryGenericImageSource(source, operation), source(source), operation(operation) {}
 
 	size_t outputs() const override {
 		if((operation.inputs() == 0 && operation.outputs()>1) || source.outputs() == operation.inputs()) return operation.outputs();
 		assert_(operation.inputs() == 0 && operation.outputs() == 1,
-				operation.name(), operation.inputs(), operation.outputs(), source.name(), "ProcessedGroupImageSource");
+				operation.name(), operation.inputs(), operation.outputs(), source.name(), "UnaryGroupImageSource");
 		return source.outputs();
 	}
 	SourceImage image(size_t groupIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override;
@@ -73,17 +73,17 @@ struct ProcessedGroupImageSource : ProcessedGenericSource, ImageSource {
 	String toString() const override { return str(source.toString(), operation.name())+'['+str(outputs())+']'; }
 };
 
-generic struct ProcessedGroupImageSourceT : T, ProcessedGroupImageSource {
-	ProcessedGroupImageSourceT(ImageGroupSource& source) : ProcessedGroupImageSource(source, *this) {}
+generic struct UnaryGroupImageSourceT : T, UnaryGroupImageSource {
+	UnaryGroupImageSourceT(ImageGroupSource& source) : UnaryGroupImageSource(source, *this) {}
 };
 
 // ProcessedImageGroupSource
 
 /// Returns image groups from an image source grouped by a group source
-struct ProcessedImageGroupSource : ImageGroupSource {
+struct GroupImageGroupSource : ImageGroupSource {
 	ImageSource& source;
 	GroupSource& groups;
-	ProcessedImageGroupSource(ImageSource& source, GroupSource& groups) : source(source), groups(groups) {}
+	GroupImageGroupSource(ImageSource& source, GroupSource& groups) : source(source), groups(groups) {}
 	size_t count(size_t need=0) override { return groups.count(need); }
 	String name() const override { return source.name(); }
 	const Folder& folder() const override { return source.folder(); }
@@ -97,43 +97,42 @@ struct ProcessedImageGroupSource : ImageGroupSource {
 	array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override;
 };
 
-// ProcessedGroupImageGroupSource (Unary)
+// UnaryImageGroupSource
 
-/// Evaluates an operation on every image of an image group
-struct GenericProcessedGroupImageGroupSource : ProcessedGenericSource, virtual GenericImageGroupSource {
+struct GenericProcessedImageGroupSource : UnaryGenericImageSource, virtual GenericImageGroupSource {
 	ImageGroupSource& source;
-	GenericProcessedGroupImageGroupSource(ImageGroupSource& source, GenericImageOperation& operation)
-		: ProcessedGenericSource(source, operation), source(source) {}
+	GenericProcessedImageGroupSource(ImageGroupSource& source, GenericImageOperation& operation)
+		: UnaryGenericImageSource(source, operation), source(source) {}
 
 	size_t outputs() const override {
 		if(source.outputs() == operation.inputs()) return operation.outputs();
 		assert_(operation.inputs() == 0 && operation.outputs() == 0,
-				operation.name(), operation.inputs(), operation.outputs(), source.name(), "ProcessedGroupImageGroupSource");
+				operation.name(), operation.inputs(), operation.outputs(), source.name(), "UnaryImageGroupSource");
 		return source.outputs();
 	}
 	size_t groupSize(size_t groupIndex) const { return source.groupSize(groupIndex); }
 };
 
 /// Evaluates an operation on every image of an image group
-struct ProcessedGroupImageGroupSource : GenericProcessedGroupImageGroupSource, ImageGroupSource {
+struct UnaryImageGroupSource : GenericProcessedImageGroupSource, ImageGroupSource {
 	ImageOperation& operation;
-	ProcessedGroupImageGroupSource(ImageGroupSource& source, ImageOperation& operation)
-		: GenericProcessedGroupImageGroupSource(source, operation), operation(operation) {}
+	UnaryImageGroupSource(ImageGroupSource& source, ImageOperation& operation)
+		: GenericProcessedImageGroupSource(source, operation), operation(operation) {}
 
 	array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override;
 };
 
-generic struct ProcessedGroupImageGroupSourceT : T, ProcessedGroupImageGroupSource {
-	ProcessedGroupImageGroupSourceT(ImageGroupSource& source) : ProcessedGroupImageGroupSource(source, *this) {}
+generic struct UnaryImageGroupSourceT : T, UnaryImageGroupSource {
+	UnaryImageGroupSourceT(ImageGroupSource& source) : UnaryImageGroupSource(source, *this) {}
 };
 
-struct sRGBGroupSource : GenericProcessedGroupImageGroupSource, ImageRGBGroupSource, SRGB {
-	sRGBGroupSource(ImageGroupSource& source) : GenericProcessedGroupImageGroupSource(source, *this) {}
+struct sRGBImageGroupSource : GenericProcessedImageGroupSource, ImageRGBGroupSource, SRGB {
+	sRGBImageGroupSource(ImageGroupSource& source) : GenericProcessedImageGroupSource(source, *this) {}
 	array<SourceImageRGB> images(size_t groupIndex, int2 size = 0, bool noCacheWrite = false) override;
 };
 
 
-// BinaryGroupImageGroupSource
+// BinaryImageSource
 
 struct BinaryGenericImageSource : virtual GenericImageSource {
 	GenericImageSource& A;
@@ -155,11 +154,13 @@ struct BinaryGenericImageSource : virtual GenericImageSource {
 	String toString() const override { return "("+A.toString()+" | "+B.toString()+")"; }
 };
 
+// BinaryImageGroupSource
+
 /// Evaluates an operation on every image of an image group
-struct BinaryGroupImageGroupSource : BinaryGenericImageSource, ImageGroupSource {
+struct BinaryImageGroupSource : BinaryGenericImageSource, ImageGroupSource {
 	ImageGroupSource& A;
 	ImageGroupSource& B;
-	BinaryGroupImageGroupSource(ImageGroupSource& A, ImageGroupSource& B, ImageOperation& operation)
+	BinaryImageGroupSource(ImageGroupSource& A, ImageGroupSource& B, ImageOperation& operation)
 		: BinaryGenericImageSource(A, B, operation), A(A), B(B) {}
 
 	size_t outputs() const override {
@@ -173,6 +174,6 @@ struct BinaryGroupImageGroupSource : BinaryGenericImageSource, ImageGroupSource 
 	String toString() const override { return BinaryGenericImageSource::toString()+'['+str(outputs())+']'; }
 };
 
-generic struct BinaryGroupImageGroupSourceT : T, BinaryGroupImageGroupSource {
-	BinaryGroupImageGroupSourceT(ImageGroupSource& A, ImageGroupSource& B) : BinaryGroupImageGroupSource(A, B, *this) {}
+generic struct BinaryImageGroupSourceT : T, BinaryImageGroupSource {
+	BinaryImageGroupSourceT(ImageGroupSource& A, ImageGroupSource& B) : BinaryImageGroupSource(A, B, *this) {}
 };

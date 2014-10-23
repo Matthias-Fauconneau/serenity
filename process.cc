@@ -1,8 +1,8 @@
 #include "process.h"
 
-// ProcessedSource
+// UnaryImageSource
 
-SourceImage ProcessedSource::image(size_t imageIndex, size_t outputIndex, int2 size, bool noCacheWrite) {
+SourceImage UnaryImageSource::image(size_t imageIndex, size_t outputIndex, int2 size, bool noCacheWrite) {
 	SourceImage target = ::cache<ImageF>(folder(), elementName(imageIndex), size?:this->size(imageIndex), time(imageIndex),
 				 [&](const ImageF& target) {
 		assert_(operation.outputs() == 1);
@@ -17,10 +17,10 @@ SourceImage ProcessedSource::image(size_t imageIndex, size_t outputIndex, int2 s
 
 // ProcessedRGBSource
 
-SourceImageRGB sRGBSource::image(size_t imageIndex, int2 size, bool noCacheWrite) {
+SourceImageRGB sRGBImageSource::image(size_t imageIndex, int2 size, bool noCacheWrite) {
 	array<SourceImage> inputs;
 	for(size_t inputIndex: range(source.outputs())) inputs.append(source.image(imageIndex, inputIndex, size, noCacheWrite));
-	return ::cache<Image>(folder(), elementName(imageIndex), inputs[0].size, ProcessedGenericSource::time(imageIndex),
+	return ::cache<Image>(folder(), elementName(imageIndex), inputs[0].size, UnaryGenericImageSource::time(imageIndex),
 				 [&](Image& target) {
 		if(target.size != inputs[0].size) {
 			error("Resize");
@@ -34,9 +34,9 @@ SourceImageRGB sRGBSource::image(size_t imageIndex, int2 size, bool noCacheWrite
 	}, noCacheWrite);
 }
 
-// ProcessedGroupImageSource
+// UnaryGroupImageSource
 
-SourceImage ProcessedGroupImageSource::image(size_t groupIndex, size_t outputIndex, int2 size, bool noCacheWrite) {
+SourceImage UnaryGroupImageSource::image(size_t groupIndex, size_t outputIndex, int2 size, bool noCacheWrite) {
 	assert_(operation.outputs()==1 || source.outputs()==1);
 	array<SourceImage> inputs = source.images(groupIndex, operation.outputs()==1?outputIndex:0, size, noCacheWrite); // FIXME
 	return ::cache<ImageF>(folder(), elementName(groupIndex)+'['+str(outputIndex)+']', inputs[0].size, time(groupIndex), [&](ImageF& target) {
@@ -62,24 +62,24 @@ SourceImage ProcessedGroupImageSource::image(size_t groupIndex, size_t outputInd
 
 // ProcessedImageGroupSource
 
-String ProcessedImageGroupSource::elementName(size_t groupIndex) const {
+String GroupImageGroupSource::elementName(size_t groupIndex) const {
 	return str(apply(groups(groupIndex), [this](const size_t imageIndex) { return source.elementName(imageIndex); }));
 }
 
-int2 ProcessedImageGroupSource::size(size_t groupIndex) const {
+int2 GroupImageGroupSource::size(size_t groupIndex) const {
 	auto sizes = apply(groups(groupIndex), [this](size_t imageIndex) { return source.size(imageIndex); });
 	for(auto size: sizes) assert_(size == sizes[0], sizes);
 	return sizes[0];
 }
 
-array<SourceImage> ProcessedImageGroupSource::images(size_t groupIndex, size_t outputIndex, int2 size, bool noCacheWrite) {
+array<SourceImage> GroupImageGroupSource::images(size_t groupIndex, size_t outputIndex, int2 size, bool noCacheWrite) {
 	if(!size) size=this->size(groupIndex);
 	return apply(groups(groupIndex), [&](const size_t imageIndex) { return source.image(imageIndex, outputIndex, size, noCacheWrite); });
 }
 
-// ProcessedGroupImageGroupSource
+// UnaryImageGroupSource
 
-array<SourceImage> ProcessedGroupImageGroupSource::images(size_t groupIndex, size_t outputIndex, int2 size, bool noCacheWrite) {
+array<SourceImage> UnaryImageGroupSource::images(size_t groupIndex, size_t outputIndex, int2 size, bool noCacheWrite) {
 	assert_(outputIndex == 0, outputIndex, operation.name(), operation.inputs(), operation.outputs());
 	if(!size) size=this->size(groupIndex);
 	if(operation.outputs() == 0) { // Process all images at once
@@ -109,7 +109,7 @@ array<SourceImage> ProcessedGroupImageGroupSource::images(size_t groupIndex, siz
 
 // sRGBGroupSource
 
-array<SourceImageRGB> sRGBGroupSource::images(size_t groupIndex, int2 size, bool noCacheWrite) {
+array<SourceImageRGB> sRGBImageGroupSource::images(size_t groupIndex, int2 size, bool noCacheWrite) {
 	if(!size) size=this->size(groupIndex);
 	assert_(source.outputs() == 1); // Process every image separately
 	assert_(operation.outputs() == 1);
@@ -128,9 +128,9 @@ array<SourceImageRGB> sRGBGroupSource::images(size_t groupIndex, int2 size, bool
 	return allOutputs;
 }
 
-// BinaryGroupImageGroupSource
+// BinaryImageGroupSource
 
-array<SourceImage> BinaryGroupImageGroupSource::images(size_t groupIndex, size_t outputIndex, int2 size, bool noCacheWrite) {
+array<SourceImage> BinaryImageGroupSource::images(size_t groupIndex, size_t outputIndex, int2 size, bool noCacheWrite) {
 	// Distributes binary operator on every output of B
 	assert_(A.outputs() == 1, operation.name());
 	assert_(operation.inputs() >= 2, operation.name());
