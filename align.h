@@ -3,9 +3,7 @@
 
 static double similarity(const ImageF& A, const ImageF& B, Transform transform) {
 	assert_(transform.size == A.size && transform.size == B.size);
-	log(transform);
 	return -SSE(A, B, transform.offset);
-	//return correlation(A, B, transform.offset);
 }
 
 /// Evaluates first \a levelCount mipmap levels (shares source as first element)
@@ -22,7 +20,7 @@ struct Align : ImageTransformGroupOperator, OperatorT<Align> {
 	// Evaluates residual energy at integer offsets
 	virtual array<Transform> operator()(ref<ImageF> images) const override {
 		for(auto& image: images) assert_(image.size == images[0].size);
-		const int levelCount = log2(uint(images[0].size.x/8)); // / (32, 24)
+		const int levelCount = log2(uint(images[0].size.x/8));
 		array<ImageF> A = mipmap(images[0], levelCount);
 		array<Transform> transforms;
 		transforms.append(A[0].size, 0);

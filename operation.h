@@ -2,8 +2,6 @@
 #include "source.h"
 #include "operator.h"
 
-// GenericImageOperation
-
 /// Provides outputs of an \a operation on a \a source
 struct GenericImageOperation : virtual GenericImageSource {
 	GenericImageSource& source;
@@ -77,8 +75,6 @@ generic struct ImageGroupFoldT : T, ImageGroupFold {
 	ImageGroupFoldT(ImageGroupSource& source) : ImageGroupFold(source, *this) {}
 };
 
-// ImageGroupOperation
-
 /// Returns image groups from an image source grouped by a group source
 struct GroupImageOperation : ImageGroupSource {
 	ImageSource& source;
@@ -97,8 +93,6 @@ struct GroupImageOperation : ImageGroupSource {
 	array<SourceImage> images(size_t groupIndex, size_t outputIndex, int2 size = 0, bool noCacheWrite = false) override;
 };
 
-// ImageGroupOperation
-
 struct GenericImageGroupOperation : GenericImageOperation, virtual GenericImageGroupSource {
 	ImageGroupSource& source;
 	GenericImageGroupOperation(ImageGroupSource& source, GenericImageOperator& operation)
@@ -109,6 +103,7 @@ struct GenericImageGroupOperation : GenericImageOperation, virtual GenericImageG
 		return (operation.inputs() == 0 && operation.outputs() == 0) ? source.outputs() : operation.outputs();
 	}
 	size_t groupSize(size_t groupIndex) const { return source.groupSize(groupIndex); }
+	String toString() const override { return str(source.toString(), operation.name())+'['+str(outputs())+']'; }
 };
 
 /// Evaluates an operation on every image of an image group
@@ -124,13 +119,10 @@ generic struct ImageGroupOperationT : T, ImageGroupOperation {
 	ImageGroupOperationT(ImageGroupSource& source) : ImageGroupOperation(source, *this) {}
 };
 
-struct sRGBImageGroupSource : GenericImageGroupOperation, ImageRGBGroupSource, SRGB {
-	sRGBImageGroupSource(ImageGroupSource& source) : GenericImageGroupOperation(source, *this) {}
+struct sRGBGroupOperation : GenericImageGroupOperation, ImageRGBGroupSource, SRGB {
+	sRGBGroupOperation(ImageGroupSource& source) : GenericImageGroupOperation(source, *this) {}
 	array<SourceImageRGB> images(size_t groupIndex, int2 size = 0, bool noCacheWrite = false) override;
 };
-
-
-// BinaryImageSource
 
 /// Operates on two image sources
 struct BinaryGenericImageOperation : virtual GenericImageSource {
@@ -152,8 +144,6 @@ struct BinaryGenericImageOperation : virtual GenericImageSource {
 
 	String toString() const override { return "("+A.toString()+" | "+B.toString()+")"; }
 };
-
-// BinaryImageGroupOperation
 
 /// Operates on two image group sources
 struct BinaryImageGroupOperation : BinaryGenericImageOperation, ImageGroupSource {

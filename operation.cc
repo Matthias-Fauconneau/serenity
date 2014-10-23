@@ -15,7 +15,7 @@ SourceImage ImageOperation::image(size_t imageIndex, size_t outputIndex, int2 si
 	return target;
 }
 
-// UnaryRGBSource
+// sRGBOperation
 
 SourceImageRGB sRGBOperation::image(size_t imageIndex, int2 size, bool noCacheWrite) {
 	array<SourceImage> inputs;
@@ -52,14 +52,14 @@ SourceImage ImageGroupFold::image(size_t groupIndex, size_t outputIndex, int2 si
 			array<SourceImage> outputs;
 			for(size_t unused index: range(operation.outputs())) outputs.append( inputs[0].size );
 			operation.apply(share(outputs), share(inputs));
-			assert_(outputIndex < outputs.size);
+			assert_(outputIndex < outputs.size, outputIndex, outputs.size, operation.name());
 			assert_(target.size == outputs[outputIndex].size && target.stride == outputs[outputIndex].stride);
 			target.copy(outputs[outputIndex]);
 		}
 	}, noCacheWrite);
 }
 
-// ImageGroupOperation
+// GroupImageOperation
 
 String GroupImageOperation::elementName(size_t groupIndex) const {
 	return str(apply(groups(groupIndex), [this](const size_t imageIndex) { return source.elementName(imageIndex); }));
@@ -81,17 +81,16 @@ array<SourceImage> GroupImageOperation::images(size_t groupIndex, size_t outputI
 array<SourceImage> ImageGroupOperation::images(size_t groupIndex, size_t outputIndex, int2 size, bool noCacheWrite) {
 	//assert_(outputIndex == 0, outputIndex, operation.name(), operation.inputs(), operation.outputs(), outputs());
 	if(!size) size=this->size(groupIndex);
-	if(operation.inputs() == 0) { // Process all images at once
-		assert_(operation.inputs()==0);
+	if(operation.inputs() == 0 && operation.outputs()==0) { // Process all images at once (Forwards outputIndex)
 		auto inputs = source.images(groupIndex, outputIndex, size, noCacheWrite);
 		array<SourceImage> outputs;
 		for(size_t unused index: range(inputs.size)) outputs.append( inputs[0].size );
 		operation.apply(share(outputs), share(inputs));
 		return outputs;
 	} else { // Process every image separately
-		assert_(operation.inputs() >= 1, operation.name());
 		array<array<SourceImage>> groupInputs;
-		for(size_t inputIndex: range(operation.inputs())) groupInputs.append( source.images(groupIndex, inputIndex, size, noCacheWrite) );
+		for(size_t inputIndex: range(operation.inputs()?:source.outputs()))
+			groupInputs.append( source.images(groupIndex, inputIndex, size, noCacheWrite) );
 		array<SourceImage> allOutputs;
 		for(size_t imageIndex: range(groupInputs[0].size)) {
 			array<ImageF> inputs;
@@ -99,7 +98,7 @@ array<SourceImage> ImageGroupOperation::images(size_t groupIndex, size_t outputI
 			array<SourceImage> outputs;
 			for(size_t unused index: range(operation.outputs())) outputs.append( inputs[0].size );
 			operation.apply(share(outputs), inputs);
-			assert_(outputIndex < outputs.size);
+			assert_(outputIndex < outputs.size, outputIndex, outputs.size, operation.name());
 			allOutputs.append( move( outputs[outputIndex] ) );
 			// FIXME: cache before discarding
 		}
@@ -108,19 +107,18 @@ array<SourceImage> ImageGroupOperation::images(size_t groupIndex, size_t outputI
 	error(operation.outputs());
 }
 
-// sRGBGroupSource
+// sRGBGroupOperation
 
-array<SourceImageRGB> sRGBImageGroupSource::images(size_t groupIndex, int2 size, bool noCacheWrite) {
+array<SourceImageRGB> sRGBGroupOperation::images(size_t groupIndex, int2 size, bool noCacheWrite) {
 	if(!size) size=this->size(groupIndex);
 	assert_(source.outputs() == 1 || source.outputs() == 3, source.outputs()); // Process every image separately
 	assert_(operation.inputs() == 1 && operation.outputs() == 1);
 	array<array<SourceImage>> groupInputs;
-	for(size_t inputIndex: range(operation.inputs())) groupInputs.append( source.images(groupIndex, inputIndex, size, noCacheWrite) );
+	for(size_t inputIndex: range(source.outputs())) groupInputs.append( source.images(groupIndex, inputIndex, size, noCacheWrite) );
 	array<SourceImageRGB> allOutputs;
 	for(size_t imageIndex: range(groupInputs[0].size)) {
 		array<ImageF> inputs;
 		for(size_t inputIndex: range(groupInputs.size)) inputs.append( share(groupInputs[inputIndex][imageIndex]) );
-		assert_(groupInputs.size == 1, groupInputs.size);
 		SourceImageRGB target( inputs[0].size );
 		/**/  if(inputs.size==1) ::sRGB(target, inputs[0]);
 		else if(inputs.size==3) ::sRGB(target, inputs[0], inputs[1], inputs[2]);

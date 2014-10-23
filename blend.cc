@@ -22,7 +22,7 @@ struct Contrast : ImageOperator1, OperatorT<Contrast> {
 				sum += b;
 				SAD += abs(a - b);
 			}
-			Y(A) = sum ? SAD /*/ sum*/ : 0;
+			Y(A) = sum ? SAD : 0;
 		});
 	}
 };
@@ -175,29 +175,17 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	const size_t lastIndex = source.keys.indexOf(lastName);
 	size_t index = lastIndex != invalid ? lastIndex : 0;
 
-	/*ImageGroupFoldT<Prism> prism {transforms.source};
-	SampleImageGroupOperation align {transforms.source, transforms};
-	ImageGroupFoldT<Prism> prismAlign {align};
-	sRGBOperation sRGB [4] {{prism}, {prismAlign},{select}, {blend}};
-	ImageSourceView views [4] {{sRGB[0], &index}, {sRGB[1], &index}, {sRGB[2], &index}, {sRGB[3], &index}};*/
-
 	ImageGroupFoldT<Prism> prismMaximumWeights {maximumWeights};
 	sRGBOperation sRGBs [1] {{prismMaximumWeights}};
 
 	ImageGroupOperationT<Prism> prismWeightBands {weightBands};
-	sRGBImageGroupSource sRGBGroups [1] {{prismWeightBands}};
-
-	//sRGBGroupImageSource sRGB [2] {{splitLow}, {align}};
-	//ImageGroupSourceView views [2] {{sRGB[0], &index}, {sRGB[1], &index}};
+	sRGBGroupOperation sRGBGroups [1] {{prismWeightBands}};
 
 	ImageSourceView sRGBViews [1] {{sRGBs[0], &index}};
 	ImageGroupSourceView sRGBGroupViews [1] {{sRGBGroups[0], &index}};
 
-	//WidgetCycle view {{&views[3]}};
 	WidgetCycle view {{&sRGBViews[0], &sRGBGroupViews[0]}};
 	Window window {&view, -1, [this]{ return view.title()+" "+imagesAttributes.value(source.elementName(index)); }};
-
-	ExposureBlendPreview() { log(sRGBGroups[0].toString()); }
 };
 registerApplication(ExposureBlendPreview);
 
