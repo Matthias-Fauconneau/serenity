@@ -31,7 +31,7 @@ struct GenericImageSourceView : ImageView {
 
     Graphics graphics(int2 size) override {
 		if(!source.count(1)) return {};
-		update(index, size/2); // DEBUG
+		update(index, size);
 		ImageView::image = share(image);
 		assert_(image.size <= size);
         return ImageView::graphics(size);

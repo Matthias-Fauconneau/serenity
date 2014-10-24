@@ -195,7 +195,7 @@ ImageF resize(ImageF&& target, ImageF&& source) {
 
 // -- Convolution --
 
-/// Convolves and transposes (with repeat border conditions)
+/// Convolves and transposes (with zero border conditions)
 static void convolve(float* target, const float* source, const float* kernel, int radius, int width, int height, uint sourceStride, uint targetStride) {
     int N = radius+1+radius;
 	assert_(N < 1024, N);
@@ -204,8 +204,10 @@ static void convolve(float* target, const float* source, const float* kernel, in
         float* targetColumn = target + y;
         for(int x: range(-radius,0)) {
             float sum = 0;
-			for(int dx: range(N)) sum += kernel[dx] * line[abs(x+dx)];
-            targetColumn[(x+radius)*targetStride] = sum;
+			int dxMin = -x;
+			for(int dx: range(dxMin, N)) sum += kernel[dx] * line[x+dx];
+			//sum = sum * N / (N-dxMin);
+			targetColumn[(x+radius)*targetStride] = sum;
         }
         for(int x: range(0,width-2*radius)) {
             float sum = 0;
@@ -215,16 +217,17 @@ static void convolve(float* target, const float* source, const float* kernel, in
         }
         for(int x: range(width-2*radius,width-radius)){
             float sum = 0;
-			for(int dx: range(N)) sum += kernel[dx] * line[width-1-abs(x+dx-(width-1))];
-            targetColumn[(x+radius)*targetStride] = sum;
+			int dxMax = width-x;
+			for(int dx: range(dxMax)) sum += kernel[dx] * line[x+dx];
+			//sum = sum * N / dxMax;
+			targetColumn[(x+radius)*targetStride] = sum;
         }
     });
 }
 
-static float gaussian(float sigma, float x) { return exp(-sq(x)/(2*sq(sigma))); }
-void gaussianBlur(const ImageF& target, const ImageF& source, float sigma) {
+void gaussianBlur(const ImageF& target, const ImageF& source, float sigma, int radius) {
     assert_(sigma > 0);
-    int radius = ceil(3*sigma);
+	if(!radius) radius = ceil(3*sigma);
     size_t N = radius+1+radius;
     assert_(int2(N) <= source.size, withName(sigma, radius, N, source.size));
     float kernel[N];
