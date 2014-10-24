@@ -7,7 +7,6 @@
 #include "align.h"
 #include "weight.h"
 #include "multiscale.h"
-#include "prism.h"
 #include "jpeg-encoder.h"
 
 struct ExposureBlendAnnotate : Application {
@@ -69,48 +68,19 @@ struct ExposureBlend {
 	GroupImageOperation splitSource {source, split};
 	SampleImageGroupOperation alignSource {splitSource, transforms};
 
-	/*ImageGroupOperationT<Exposure> exposure {alignSource};
-	ImageGroupOperationT<LowPass> lowExposure {exposure};
-	ImageGroupOperationT<SelectMaximum> selectExposure {lowExposure};
-	ImageGroupOperationT<NormalizeSum> normalizeExposure {exposure};
-	ImageGroupOperationT<SmoothStep> exposureStep {normalizeExposure};
-	ImageGroupOperationT<NormalizeSum> normalizeStepExposure {exposureStep};
+	ImageGroupOperationT<Exposure> exposure {alignSource};
 
-	ImageGroupOperationT<Contrast> contrast {alignSource};
-	ImageGroupOperationT<LowPass> lowContrast {contrast};
-	ImageGroupOperationT<SelectMaximum> selectContrast {lowContrast};
-	ImageGroupOperationT<NormalizeSum> normalizeContrast {contrast};
-	ImageGroupOperationT<SmoothStep> contrastStep {normalizeContrast};
-	ImageGroupOperationT<NormalizeSum> normalizeStepContrast {contrastStep};
+	ImageGroupOperationT<SelectMaximum> selectionWeights {exposure};
+	BinaryImageGroupOperationT<Multiply> applySelectionWeights {selectionWeights, alignSource};
+	ImageGroupFoldT<Sum> select {applySelectionWeights};
 
-	ImageGroupOperationT<Saturation> saturation {alignSource};
-	ImageGroupOperationT<LowPass> lowSaturation {saturation};
-	ImageGroupOperationT<SelectMaximum> selectSaturation {lowSaturation};
-	ImageGroupOperationT<NormalizeSum> normalizeSaturation {saturation};
-	ImageGroupOperationT<SmoothStep> saturationStep {normalizeSaturation};
-	ImageGroupOperationT<NormalizeSum> normalizeStepSaturation {saturationStep};
+	ImageGroupOperationT<SmoothStep> stepExposure {exposure};
+	ImageGroupOperationT<NormalizeSum> weights {stepExposure};
 
-	ImageGroupOperationT<Weight> sum {alignSource};
-	ImageGroupOperationT<LowPass> lowSum {sum};
-	ImageGroupOperationT<SelectMaximum> selectSum {lowSum};*/
+	BinaryImageGroupOperationT<Multiply> applyWeights {weights, alignSource};
+	ImageGroupFoldT<Sum> direct {applyWeights};
 
-	ImageGroupOperationT<Exposure> weights {alignSource};
-	ImageGroupOperationT<LowPass> lowWeights {weights};
-	//ImageGroupOperationT<SelectMaximum> selectWeights {weights};
-	ImageGroupOperationT<SmoothStep> step {weights};
-	ImageGroupOperationT<NormalizeSum> selectWeights {step};
-
-	BinaryImageGroupOperationT<Multiply> selected {selectWeights, alignSource};
-	ImageGroupFoldT<Sum> select {selected};
-
-	/*ImageGroupOperationT<NormalizeSum> normalizeSum {weights};
-	ImageGroupOperationT<SmoothStep> step {normalizeSum};
-	ImageGroupOperationT<NormalizeSum> normalizeStep {step};
-
-	BinaryImageGroupOperationT<Multiply> weighted {normalizeStep, alignSource};
-	ImageGroupFoldT<Sum> direct {weighted};*/
-
-	ImageGroupOperationT<WeightFilterBank> weightBands {selectWeights}; // Splits each weight selection in bands
+	ImageGroupOperationT<WeightFilterBank> weightBands {weights}; // Splits each weight selection in bands
 	ImageGroupOperationT<NormalizeSum> normalizeWeightBands {weightBands}; // Normalizes weight selection for each band
 
 	ImageGroupOperationT<Index0> alignB {alignSource};
@@ -159,28 +129,10 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	const size_t lastIndex = source.keys.indexOf(lastName);
 	size_t index = lastIndex != invalid ? lastIndex : 0;
 
-#if 0
-	ImageGroupFoldT<Prism> prism [3] {
-		//exposure, contrast, saturation, sum
-		//lowExposure, lowContrast, lowSaturation, lowSum
-		//normalizeExposure, normalizeContrast, normalizeSaturation, normalizeSum
-		//selectExposure, selectSaturation, selectContrast, selectSum
-		//normalizeStepExposure, normalizeStepContrast, normalizeStepSaturation,
-		weights, lowWeights, selectWeights //normalizeSum, normalizeStep
-	};
-	array<sRGBOperation> sRGB = apply(mref<ImageGroupFoldT<Prism>>(prism), [&](ImageSource& source) -> sRGBOperation { return source; });
-#else
-	sRGBOperation sRGB [2] {select, blend};
-#endif
+	sRGBOperation sRGB [3] {blend, direct, select};
 	array<ImageSourceView> sRGBView = apply(mref<sRGBOperation>(sRGB),
 											[&](ImageRGBSource& source) -> ImageSourceView { return {source, &index}; });
-	/*TransposeOperation transposeWeightBands [1] {weightBands};
-	ImageGroupOperationT<Prism> prism [1] {transposeWeightBands[0]};
-	sRGBGroupOperation sRGBGroups [1] {prism[0]};
-	array<ImageGroupSourceView> sRGBGroupView = apply(mref<sRGBGroupOperation>(sRGBGroups),
-											[&](sRGBGroupOperation& source) -> ImageGroupSourceView { return {source, &index}; });*/
-	array<ImageGroupSourceView> sRGBGroupView;
-	WidgetCycle view {toWidgets(sRGBView)+toWidgets(sRGBGroupView)};
+	WidgetCycle view {toWidgets(sRGBView)};
 	Window window {&view, -1, [this]{ return view.title()+" "+imagesAttributes.value(source.elementName(index)); }};
 };
 registerApplication(ExposureBlendPreview);
@@ -198,8 +150,8 @@ struct ExposureBlendTest : ExposureBlend, Application {
 };
 registerApplication(ExposureBlendTest, test);
 
-/*struct ExposureBlendExport : ExposureBlend, Application {
-	sRGBOperation sRGB {output};
+struct ExposureBlendExport : ExposureBlend, Application {
+	sRGBOperation sRGB {blend};
 	ExposureBlendExport() {
 		Folder output ("Export", folder, true);
 		for(size_t index: range(sRGB.count(-1))) {
@@ -236,4 +188,4 @@ struct ExposureBlendSelect : ExposureBlend, Application {
 		}
 	}
 };
-registerApplication(ExposureBlendSelect, select);*/
+registerApplication(ExposureBlendSelect, select);

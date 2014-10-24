@@ -129,7 +129,7 @@ struct BinaryGenericImageOperation : virtual GenericImageSource {
 	GenericImageSource& A;
 	GenericImageSource& B;
 	ImageOperator& operation;
-	Folder cacheFolder {operation.name(), B.folder()/*FIXME: MRCA of A and B + diff name*/, true};
+	Folder cacheFolder {section(A.folder().name(),'/',-2,-1)+operation.name(), B.folder()/*FIXME: MRCA of A and B + diff name*/, true};
 	BinaryGenericImageOperation(GenericImageSource& A, GenericImageSource& B, ImageOperator& operation)
 		: A(A), B(B), operation(operation) {}
 	size_t count(size_t need=0) override { assert_(A.count(need) == B.count(need)); return A.count(need); }
@@ -171,7 +171,6 @@ struct BinaryImageGroupOperation : BinaryGenericImageOperation, ImageGroupSource
 		: BinaryGenericImageOperation(A, B, operation), A(A), B(B) {}
 
 	size_t outputs() const override {
-		//if(A.outputs()+B.outputs() == operation.inputs()) return operation.outputs();
 		if(A.outputs() == B.outputs()) return A.outputs();
 		else return B.outputs() * operation.outputs(); // Distributes binary operator on every output of B
 	}
