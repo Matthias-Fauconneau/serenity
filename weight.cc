@@ -14,6 +14,7 @@ void Exposure::apply(ref<ImageF> Y, ref<ImageF> X) const {
 				sum += b;
 				N += 1;
 			}
+			assert_(N);
 			float mean = sum / N;
 			delta[index] = 1-gaussian(mean-1./2, 1./3);
 		}

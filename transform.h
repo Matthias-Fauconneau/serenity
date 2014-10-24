@@ -66,8 +66,8 @@ void sample(const ImageF& target, const ImageF& source, Transform transform, int
 	assert_(target.size == max-min);
 	applyXY(target, [&](int x, int y) {
 		int2 s = int2(round(transform(min+int2(x,y), source.size)));
-		//if(!(s >= int2(0) && s < source.size)) return 0.f;
-		assert_(s >= int2(0) && s < source.size, s, source.size);
+		if(!(s >= int2(0) && s < source.size)) return 0.f;
+		//assert_(s >= int2(0) && s < source.size, s, source.size);
 		return source(s);
 	});
 }
@@ -96,8 +96,23 @@ struct SampleImageGroupOperation : ImageGroupSource {
 	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size=0, bool noCacheWrite = false) override {
 		auto images = source.images(groupIndex, componentIndex, size, noCacheWrite);
 		auto transforms = transform(groupIndex, size);
+#if CROP // CROP
 		int2 min = ::max(apply(transforms,[&](const Transform& t){ return t.min(images[0].size); }));
-		int2 max = ::min(apply(transforms,[&](const Transform& t){ return t.max(images[0].size); }));
+		int2 max =::min(apply(transforms,[&](const Transform& t){ return t.max(images[0].size); }));
+#elif 1 // EXTEND X CROP Y
+		int2 minmin = ::min(apply(transforms,[&](const Transform& t){ return t.min(images[0].size); }));
+		int2 maxmin = ::max(apply(transforms,[&](const Transform& t){ return t.min(images[0].size); }));
+		int2 minmax =::min(apply(transforms,[&](const Transform& t){ return t.max(images[0].size); }));
+		int2 maxmax =::max(apply(transforms,[&](const Transform& t){ return t.max(images[0].size); }));
+		int2 min (minmin.x, maxmin.y);
+		int2 max (maxmax.x, minmax.y);
+#elif KEEP // KEEP
+		int2 min = 0; //::max(apply(transforms,[&](const Transform& t){ return t.min(images[0].size); }));
+		int2 max = images[0].size; //::min(apply(transforms,[&](const Transform& t){ return t.max(images[0].size); }));
+#else //EXTEND (FIXME: need to allocate larger image when cached
+		int2 min = ::min(apply(transforms,[&](const Transform& t){ return t.min(images[0].size); }));
+		int2 max =::max(apply(transforms,[&](const Transform& t){ return t.max(images[0].size); }));
+#endif
 		return apply(images.size, [&](size_t index) -> SourceImage { return sample(images[index], transforms[index], min, max); });
 	}
 };

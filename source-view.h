@@ -6,10 +6,11 @@
 /// Displays an image collection
 struct GenericImageSourceView : ImageView {
 	GenericImageSource& source;
+	size_t ownIndex;
 	Index index;
 	SourceImageRGB image; // Holds memory map reference
 
-	GenericImageSourceView(GenericImageSource& source, size_t* index) : source(source), index(index) {}
+	GenericImageSourceView(GenericImageSource& source, size_t* index=0) : source(source), index(index?:&ownIndex) {}
 
     // Content
 
@@ -33,7 +34,7 @@ struct GenericImageSourceView : ImageView {
 		if(!source.count(1)) return {};
 		update(index, size);
 		ImageView::image = share(image);
-		assert_(image.size <= size);
+		assert_(image.size <= size*4);
         return ImageView::graphics(size);
     }
 
@@ -58,7 +59,7 @@ struct ImageSourceView  : GenericImageSourceView {
 	ImageRGBSource& source;
 	size_t imageIndex = -1;
 
-	ImageSourceView(ImageRGBSource& source, size_t* index) : GenericImageSourceView(source, index), source(source) {}
+	ImageSourceView(ImageRGBSource& source, size_t* index=0) : GenericImageSourceView(source, index), source(source) {}
 
 	void update(size_t index, int2 size) override {
 		if(imageIndex != index) {
@@ -74,7 +75,7 @@ struct ImageGroupSourceView  : GenericImageSourceView {
 	size_t imageIndex = 0;
 	array<SourceImageRGB> images;
 
-	ImageGroupSourceView(ImageRGBGroupSource& source, size_t* index) : GenericImageSourceView(source, index), source(source) {}
+	ImageGroupSourceView(ImageRGBGroupSource& source, size_t* index=0) : GenericImageSourceView(source, index), source(source) {}
 
 	String title() override {
 		return str(GenericImageSourceView::title(), imageIndex);

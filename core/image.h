@@ -136,6 +136,11 @@ template<Type F, Type... S> void applyXY(const ImageF& target, F function, const
 
 template<Type A, Type F, Type... Ss> A sumXY(int2 size, F apply, A initialValue) {
 	assert_(size);
+	if(size.y <= 16) {
+		A accumulator = initialValue;
+		for(size_t y: range(size.y)) for(size_t x: range(size.x)) accumulator += apply(x, y);
+		return accumulator;
+	}
 	A accumulators[threadCount];
 	mref<A>(accumulators).clear(initialValue); // Some threads may not iterate
 	parallel_chunk(size.y, [&](uint id, uint64 start, uint64 chunkSize) {

@@ -113,3 +113,4 @@ prism.h
 prism.cc
 weight.h
 weight.cc
+stitch.cc

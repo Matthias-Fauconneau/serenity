@@ -71,7 +71,7 @@ template<Type F> void parallel_chunk(uint64 totalSize, F f) {
     constexpr uint64 chunkCount = threadCount;
     assert(totalSize%chunkCount<chunkCount); //Last chunk might be up to chunkCount smaller
     const uint64 chunkSize = (totalSize+chunkCount-1)/chunkCount;
-	assert_(totalSize > (chunkCount-1)*chunkSize);
+	assert_(totalSize > (chunkCount-1)*chunkSize, totalSize);
 	parallel_for(chunkCount, [&](uint id, uint64 chunkIndex) { f(id, chunkIndex*chunkSize, min(chunkSize, totalSize-chunkIndex*chunkSize)); });
 }
 
