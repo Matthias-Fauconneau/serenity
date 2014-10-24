@@ -2,6 +2,8 @@
 #include "x.h"
 #include <sys/socket.h>
 #include "data.h"
+//FIXME: undefined reference
+#include <typeinfo>
 
 String str(XEvent::Error e) {
     uint8 code = e.code;

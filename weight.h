@@ -1,20 +1,21 @@
 #pragma once
 #include "operator.h"
 
-/// Estimates contrast at every pixel
-struct Contrast : ImageOperator1, OperatorT<Contrast> {
-	string name() const override { return "[contrast]"; }
-	void apply(const ImageF& Y, const ImageF& X) const;
+/// Estimates exposure, saturation (TODO) and contrast at every pixel
+struct Weight : ImageOperator, OperatorT<Weight> {
+	size_t inputs() const override { return 3; }
+	size_t outputs() const override { return 1; }
+	void apply(ref<ImageF> Y, ref<ImageF> X) const override;
 };
 
-struct MaximumWeight : ImageGroupOperator, OperatorT<MaximumWeight> {
-	string name() const override { return "[maximum-weight]"; }
+struct SelectMaximum : ImageGroupOperator, OperatorT<SelectMaximum> {
+	//string name() const override { return "SelectMax"; }
 	void apply(ref<ImageF> Y, ref<ImageF> X) const override;
 };
 
 /// Normalizes weights
 /// \note if all weights are zero, weights are all set to 1/groupSize.
-struct NormalizeWeights : ImageGroupOperator, OperatorT<NormalizeWeights> {
-	string name() const override { return "[normalize-weights]"; }
+struct NormalizeSum : ImageGroupOperator, OperatorT<NormalizeSum> {
+	//string name() const override { return "NormalizeSum"; }
 	void apply(ref<ImageF> Y, ref<ImageF> X) const override;
 };

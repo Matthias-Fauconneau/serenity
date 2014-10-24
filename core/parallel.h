@@ -105,7 +105,9 @@ template<Type A, Type T, Type F, Type... Ss> T reduce(size_t size, F fold, A ini
 	else {
 		A accumulators[threadCount];
 		mref<A>(accumulators).clear(initialValue); // Some threads may not iterate
-		parallel_chunk(size, [&](uint id, size_t start, size_t size) { fold(accumulators[id], ::reduce(range(start, size), fold, initialValue)); });
+		parallel_chunk(size, [&](uint id, size_t start, size_t size) {
+			accumulators[id] = fold(accumulators[id], ::reduce(range(start, size), fold, initialValue));
+		});
 		return ::reduce(accumulators, fold, initialValue);
 	}
 }
@@ -117,7 +119,7 @@ template<Type A, Type T, Type F, Type... Ss> T reduce(ref<T> values, F fold, A i
         A accumulators[threadCount];
 		mref<A>(accumulators).clear(initialValue); // Some threads may not iterate
 		parallel_chunk(values.size, [&](uint id, size_t start, size_t size) {
-			fold(accumulators[id], ::reduce(values.slice(start, size), fold, initialValue));
+			accumulators[id] = fold(accumulators[id], ::reduce(values.slice(start, size), fold, initialValue));
 		});
 		return ::reduce(accumulators, fold, initialValue);
     }
@@ -175,8 +177,8 @@ template<Type A, Type T, Type F0, Type F1> void reduce(ref<T> values, F0 fold0, 
     parallel_chunk(values.size, [&](uint id, size_t start, size_t size) {
         A a0 = accumulator0, a1 = accumulator1;
         for(T v: values.slice(start, size)) a0=fold0(a0, v), a1=fold1(a1, v);
-        accumulators[0][id] = a0;
-        accumulators[1][id] = a1;
+		accumulators[0][id] = fold0(accumulators[0][id], a0);
+		accumulators[1][id] = fold1(accumulators[1][id], a1);
     });
     accumulator0 = ::reduce(accumulators[0], fold0, accumulator0), accumulator1 = ::reduce(accumulators[1], fold1, accumulator1);
 }

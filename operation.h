@@ -26,7 +26,7 @@ struct ImageOperation : GenericImageOperation, ImageSource {
 
 	size_t outputs() const override {
 		if(source.outputs() == operation.inputs() || (operation.inputs()==0 && operation.outputs()!=0)) return operation.outputs();
-		assert_(operation.inputs() == 0 && (operation.outputs() == 0 || operation.outputs() == 1));
+		assert_((operation.inputs() == 0 || operation.inputs() == 1) && (operation.outputs() == 0 || operation.outputs() == 1));
 		return source.outputs();
 	}
 	/// Returns processed linear image
@@ -40,9 +40,9 @@ generic struct ImageOperationT : T, ImageOperation {
 };
 
 struct SRGB : GenericImageOperator, OperatorT<SRGB> {
+	//string name() const override { return  "sRGB"; }
 	size_t inputs() const override { return 1; }
 	size_t outputs() const override { return 1; }
-	string name() const override { return  "[sRGB]"; }
 };
 struct sRGBOperation : GenericImageOperation, ImageRGBSource, SRGB {
 	ImageSource& source;
@@ -129,7 +129,7 @@ struct BinaryGenericImageOperation : virtual GenericImageSource {
 	GenericImageSource& A;
 	GenericImageSource& B;
 	ImageOperator& operation;
-	Folder cacheFolder {A.name()+B.name(), A.folder()/*FIXME: MRCA of A and B*/, true};
+	Folder cacheFolder {operation.name(), B.folder()/*FIXME: MRCA of A and B + diff name*/, true};
 	BinaryGenericImageOperation(GenericImageSource& A, GenericImageSource& B, ImageOperator& operation)
 		: A(A), B(B), operation(operation) {}
 	size_t count(size_t need=0) override { assert_(A.count(need) == B.count(need)); return A.count(need); }
@@ -143,6 +143,24 @@ struct BinaryGenericImageOperation : virtual GenericImageSource {
 	int2 size(size_t index) const override { assert_(A.size(index) == B.size(index)); return A.size(index); }
 
 	String toString() const override { return "("+A.toString()+" | "+B.toString()+")"; }
+};
+
+/// Operates on two image sources
+struct BinaryImageOperation : BinaryGenericImageOperation, ImageSource {
+	ImageSource& A;
+	ImageSource& B;
+	BinaryImageOperation(ImageSource& A, ImageSource& B, ImageOperator& operation)
+		: BinaryGenericImageOperation(A, B, operation), A(A), B(B) {}
+
+	size_t outputs() const override { return B.outputs(); }
+
+	SourceImage image(size_t imageIndex, size_t componentIndex, int2 size = 0, bool noCacheWrite = false) override;
+
+	String toString() const override { return BinaryGenericImageOperation::toString()+'['+str(outputs())+']'; }
+};
+
+generic struct BinaryImageOperationT : T, BinaryImageOperation {
+	BinaryImageOperationT(ImageSource& A, ImageSource& B) : BinaryImageOperation(A, B, *this) {}
 };
 
 /// Operates on two image group sources

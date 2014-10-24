@@ -52,7 +52,7 @@ struct Progress : Widget {
 };
 
 /// Displays an image
-struct ImageView : virtual Widget {
+struct ImageView : Widget {
     /// Displayed image
     Image image;
 

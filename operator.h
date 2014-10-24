@@ -7,8 +7,9 @@ struct Operator {
 	virtual int64 time() const abstract;
 };
 
+#include <typeinfo>
 generic struct OperatorT : virtual Operator {
-	//string name() const override { static string name = ({ TextData s (str(typeid(T).name())); s.whileInteger(); s.identifier(); }); return name; }
+	string name() const override { static string name = ({ TextData s (str(typeid(T).name())); s.whileInteger(); s.identifier(); }); return name; }
 	int64 time() const override { return parseDate(__DATE__ " " __TIME__)*1000000000l; }
 };
 
@@ -52,7 +53,7 @@ struct ImageGroupOperator1 : ImageGroupOperator {
 
 /// Averages 3 components
 struct Intensity : ImageOperator, OperatorT<Intensity> {
-	string name() const override { return "[intensity]"; }
+	//string name() const override { return "Intensity"; }
 	size_t inputs() const override { return 3; }
 	size_t outputs() const override { return 1; }
 	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1, const ImageF& X2) const;
@@ -61,13 +62,13 @@ struct Intensity : ImageOperator, OperatorT<Intensity> {
 
 /// Normalizes mean and deviation
 struct Normalize : ImageOperator1, OperatorT<Normalize> {
-	string name() const override { return "[normalize]"; }
+	//string name() const override { return "Normalize"; }
 	void apply(const ImageF& Y, const ImageF& X) const override;
 };
 
 /// Multiplies 2 components together
 struct Multiply : ImageOperator, OperatorT<Multiply> {
-	string name() const override { return "[multiply]"; }
+	//string name() const override { return "Multiply"; }
 	size_t inputs() const override { return 2; }
 	size_t outputs() const override { return 1; }
 	void apply(const ImageF& Y, const ImageF& X0, const ImageF& X1) const;
@@ -76,21 +77,21 @@ struct Multiply : ImageOperator, OperatorT<Multiply> {
 
 /// Sums together all images in an image group
 struct Sum : ImageGroupOperator1, OperatorT<Sum> {
-	string name() const override { return "[sum]"; }
+	//string name() const override { return "Sum"; }
 	void apply(const ImageF& Y, ref<ImageF> X) const override {
 		parallel::apply(Y, [&](size_t index) { return sum<float>(::apply(X, [index](const ImageF& x) { return x[index]; })); });
 	}
 };
 
 struct Index0 : ImageGroupOperator1, OperatorT<Index0> {
-	string name() const override { return "[0]"; }
+	//string name() const override { return "[0]"; }
 	void apply(const ImageF& Y, ref<ImageF> X) const override {	Y.copy(X[0]); }
 };
-struct Index1 : ImageGroupOperator1, OperatorT<Index0> {
-	string name() const override { return "[1]"; }
+struct Index1 : ImageGroupOperator1, OperatorT<Index1> {
+	//string name() const override { return "[1]"; }
 	void apply(const ImageF& Y, ref<ImageF> X) const override {	Y.copy(X[1]); }
 };
-struct Index2 : ImageGroupOperator1, OperatorT<Index0> {
-	string name() const override { return "[2]"; }
+struct Index2 : ImageGroupOperator1, OperatorT<Index2> {
+	//string name() const override { return "[2]"; }
 	void apply(const ImageF& Y, ref<ImageF> X) const override {	Y.copy(X[2]); }
 };

@@ -15,7 +15,7 @@ struct GenericImageSourceView : ImageView {
 
     String title() override {
 		if(!source.count()) return String();
-		return str(index+1,'/',source.count(), source.elementName(min<size_t>(index, source.count(1)-1)));
+		return str(index+1,'/',source.count(), source.elementName(min<size_t>(index, source.count(1)-1)), source.name());
     }
 
     int2 sizeHint(int2 size) override {

@@ -11,10 +11,15 @@ SourceImage ImageOperation::image(size_t imageIndex, size_t componentIndex, int2
 		return move( outputs[componentIndex] );
 	}
 	assert_(operation.outputs() == 1);
-	assert_(componentIndex == 0);
-	auto inputs = apply(operation.inputs()?:source.outputs(),
-						[&](size_t inputIndex) { return source.image(imageIndex, inputIndex, size, noCacheWrite); });
-	SourceImage target = ::cache<ImageF>(folder(), elementName(imageIndex), inputs[0].size, time(imageIndex),
+	array<SourceImage> inputs;
+	if(operation.inputs()==1 && source.outputs()!=1) { // Component wise
+		inputs.append( source.image(imageIndex, componentIndex, size, noCacheWrite) );
+	} else {
+		assert_(componentIndex == 0);
+		inputs = apply(operation.inputs()?:source.outputs(),
+					   [&](size_t inputIndex) { return source.image(imageIndex, inputIndex, size, noCacheWrite); });
+	}
+	SourceImage target = ::cache<ImageF>(folder(), elementName(imageIndex)+'['+str(componentIndex)+']', inputs[0].size, time(imageIndex),
 				 [&](const ImageF& target) {
 		operation.apply({share(target)}, share(inputs));
 	}, noCacheWrite);
@@ -163,14 +168,34 @@ array<SourceImageRGB> sRGBGroupOperation::images(size_t groupIndex, int2 size, b
 	return allOutputs;
 }
 
+// BinaryImageOperation
+
+SourceImage BinaryImageOperation::image(size_t imageIndex, size_t componentIndex, int2 size, bool noCacheWrite) {
+	if(A.outputs() == B.outputs()) {
+		assert_(operation.inputs() == 2, A.outputs(), B.outputs(), operation.inputs(), operation.name());
+		array<SourceImage> inputs;
+		inputs.append( A.image(imageIndex, componentIndex, size, noCacheWrite) );
+		inputs.append( B.image(imageIndex, componentIndex, size, noCacheWrite) );
+		SourceImage output ( inputs[0].size );
+		operation.apply({share(output)}, share(inputs));
+		return output;
+	}
+	assert_(A.outputs() == 1 && operation.inputs() == 2, A.outputs(), B.outputs(), operation.inputs(), operation.name());
+	array<SourceImage> inputs;
+	inputs.append( A.image(imageIndex, 0, size, noCacheWrite) );
+	inputs.append( B.image(imageIndex, componentIndex, size, noCacheWrite) );
+	SourceImage output ( inputs[0].size );
+	operation.apply({share(output)}, share(inputs));
+	return output;
+}
+
 // BinaryImageGroupOperation
 
 array<SourceImage> BinaryImageGroupOperation::images(size_t groupIndex, size_t componentIndex, int2 size, bool noCacheWrite) {
-	// Distributes binary operator on every output of B
 	assert_(A.outputs() == 1 || operation.inputs()==0 || A.outputs() == B.outputs(), operation.name(), A.outputs(), B.outputs());
 	assert_(operation.inputs() >= 2 || operation.inputs()==0, operation.name());
 	array<SourceImage> allOutputs;
-	if(A.outputs() == B.outputs()) {
+	if(A.outputs() == B.outputs()) {  // For each image of the group, operates on A[componentIndex], B[componentIndex]
 		assert_(A.groupSize(groupIndex) == B.groupSize(groupIndex));
 		array<SourceImage> a = A.images(groupIndex, componentIndex, size, noCacheWrite);
 		array<SourceImage> b = B.images(groupIndex, componentIndex, size, noCacheWrite);
@@ -183,7 +208,16 @@ array<SourceImage> BinaryImageGroupOperation::images(size_t groupIndex, size_t c
 			operation.apply(share(outputs), inputs);
 			allOutputs.append(outputs);
 		}
-	} else { // For each image of the group, operates on A[*], B[componentIndex]
+	} /*else if(operation.inputs()==0 && A.outputs()==1) { // Operates on A{*}, B[componentIndex]
+		assert_(operation.outputs()==1);
+		array<SourceImage> inputs;
+		inputs.append( A.images(groupIndex, 0, size, noCacheWrite) );
+		inputs.append( B.images(groupIndex, componentIndex, size, noCacheWrite) );
+		array<SourceImage> outputs;
+		for(size_t unused index: range(operation.outputs())) outputs.append( inputs[0].size );
+		operation.apply(share(outputs), share(inputs));
+		allOutputs.append(outputs);
+	}*/ else { // For each image of the group, operates on A[*], B[componentIndex]
 		array<array<SourceImage>> groupInputs;
 		if(operation.inputs()) assert_(operation.inputs()-1 <= A.outputs(), operation.inputs(), A.outputs());
 		for(size_t inputIndex: range(operation.inputs() ? operation.inputs()-1 : A.outputs()))

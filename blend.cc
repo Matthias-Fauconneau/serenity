@@ -1,4 +1,5 @@
 /// \file blend.cc Automatic exposure blending
+#include "source-view.h"
 #include "serialization.h"
 #include "image-folder.h"
 #include "split.h"
@@ -7,31 +8,100 @@
 #include "weight.h"
 #include "multiscale.h"
 #include "prism.h"
-#include "source-view.h"
 #include "jpeg-encoder.h"
 
-struct Join : OperatorT<Join> {
-	string name() const override { return  "[join]"; }
+struct ExposureBlendAnnotate : Application {
+	Folder folder {"Pictures/ExposureBlend", home()};
+	PersistentValue<map<String, String>> imagesAttributes {folder,"attributes"};
+	ImageFolder source { folder };
+
+	PersistentValue<String> lastName {folder, ".last", [this]{ return source.elementName(index); }};
+	const size_t lastIndex = source.keys.indexOf(lastName);
+	size_t index = lastIndex != invalid ? lastIndex : 0;
+
+	sRGBOperation sRGB {source};
+	ImageSourceView view {sRGB, &index};
+	Window window {&view, -1, [this]{ return view.title()+" "+imagesAttributes.value(source.elementName(index)); }};
+
+	ExposureBlendAnnotate() {
+		for(char c: range('0','9'+1)) window.actions[Key(c)] = [this, c]{ setCurrentImageAttributes("#"_+c); };
+		for(char c: range('a','z'+1)) window.actions[Key(c)] = [this, c]{ setCurrentImageAttributes("#"_+c); };
+	}
+	void setCurrentImageAttributes(string currentImageAttributes) {
+		imagesAttributes[source.elementName(index)] = String(currentImageAttributes);
+	}
 };
-struct JoinOperation : GenericImageOperation, ImageSource, Join {
+registerApplication(ExposureBlendAnnotate, annotate);
+
+struct JoinOperation : ImageSource {
 	array<ImageSource*> sources;
-	JoinOperation(ref<ImageSource*> sources) : GenericImageOperation(*sources[0], *this), sources(sources) {}
+	Folder cacheFolder {"Join", sources[0]->folder() /*FIXME: MRCA*/, true};
+	JoinOperation(ref<ImageSource*> sources) : sources(sources) {}
+
+	const Folder& folder() const override { return cacheFolder; }
+	String name() const override { return str(apply(sources,[](const ImageSource* source){ return source->name(); })); };
+	size_t count(size_t need = 0) override { return sources[0]->count(need); }
+	int2 maximumSize() const override { return sources[0]->maximumSize(); }
+	String elementName(size_t index) const override { return sources[0]->elementName(index); }
+	int64 time(size_t index) override { return max(apply(sources,[=](ImageSource* source){ return source->time(index); })); }
+	int2 size(size_t index) const override { return sources[0]->size(index); }
 
 	size_t outputs() const override { return sources.size; }
 	SourceImage image(size_t index, size_t componentIndex, int2 size = 0, bool noCacheWrite = false) override {
 		assert_(sources[componentIndex]->outputs()==1);
+		log(sources[componentIndex]->folder().name());
 		return sources[componentIndex]->image(index, 0, size, noCacheWrite);
 	}
 };
 
-struct NormalizeMinMax : ImageGroupOperator, OperatorT<NormalizeMinMax> {
-	string name() const override { return "[normalizeminmax]"; }
-	void apply(ref<ImageF> Y, ref<ImageF> X) const override {
-		assert_(X.size == Y.size);
+struct NormalizeMinMax : ImageOperator, OperatorT<NormalizeMinMax> {
+	//string name() const override { return "NormalizeMinMax"; }
+	size_t inputs() const override { return 2; }
+	size_t outputs() const override { return 1; }
+	void apply(ref<ImageF> Y, ref<ImageF> Xx /*minmax, source*/) const override {
+		assert_(Xx.size==2 && Y.size==1);
+		ref<ImageF> X = Xx.slice(0, Xx.size-1);
+		const ImageF& x = Xx.last();
 		float min=inf, max=-inf;
 		for(const ImageF& x: X) parallel::minmax(x, min, max);
 		assert_(max > min);
-		for(size_t index: range(X.size)) parallel::apply(Y[index], [min, max](float x) { return (x-min)/(max-min); }, X[index]);
+		//for(size_t index: range(Y.size)) parallel::apply(Y[index], [min, max](float x) { return (x-min)/(max-min); }, X[index]);
+		parallel::apply(Y[0], [min, max](float x) { return (x-min)/(max-min); }, x);
+	}
+};
+
+/*// Brightens low octaves so higher octaves are not clipped below zero
+struct LowPlus : ImageOperator1, OperatorT<LowPlus> {
+	size_t inputs() const override { return 1; }
+	size_t outputs() const override { return 1; }
+	void apply(const ImageF& Y, const ImageF& X) const override {
+		const float largeScale = (X.size.y-1)/6;
+		Y.copy(X);
+		for(float octave=largeScale; octave>=largeScale/128; octave/=2) {
+			auto low = gaussianBlur(Y, octave);
+			auto lowmid = gaussianBlur(Y, octave/2);
+			auto band = lowmid - low;
+			float min = parallel::min(band);
+			assert_(min < 0);
+			parallel::apply(Y, [min](float x, float low) {
+				float high = x-low;
+				return max(-min, low)+high;
+			}, Y, low);
+		}
+	}
+};*/
+
+struct DCHigh : ImageOperator1, OperatorT<DCHigh> {
+	size_t inputs() const override { return 1; }
+	size_t outputs() const override { return 1; }
+	void apply(const ImageF& Y, const ImageF& X) const override {
+		const float largeScale = (X.size.y-1)/6;
+		auto low = gaussianBlur(X, largeScale/4);
+		float DC = parallel::mean(X);
+		parallel::apply(Y, [DC](float x, float low) {
+			float high = x - low;
+			return DC + high;
+		}, X, low);
 	}
 };
 
@@ -49,16 +119,18 @@ struct ExposureBlend {
 
 	GroupImageOperation splitSource {source, split};
 	SampleImageGroupOperation alignSource {splitSource, transforms};
-	ImageGroupOperationT<Intensity> alignIntensity {alignSource};
-	ImageGroupOperationT<Contrast> contrast {alignIntensity};
-	ImageGroupOperationT<LowPass> low {contrast};
+	//ImageGroupOperationT<Intensity> alignIntensity {alignSource};
+	ImageGroupOperationT<Weight> weights {alignSource};
+	ImageGroupOperationT<LowPass> lowWeights {weights};
 
-	ImageGroupOperationT<MaximumWeight> maximumWeights {low}; // Selects maximum weights
-	BinaryImageGroupOperationT<Multiply> maximumWeighted {maximumWeights, alignSource};
-	ImageGroupFoldT<Sum> select {maximumWeighted};
+	ImageGroupOperationT<SelectMaximum> maximumWeights {lowWeights};
+	BinaryImageGroupOperationT<Multiply> weighted {maximumWeights, alignSource};
+	ImageGroupFoldT<Sum> select {weighted};
 
-	ImageGroupOperationT<WeightFilterBank> weightBands {maximumWeights}; // Splits each weight selection in bands
-	ImageGroupOperationT<NormalizeWeights> normalizeWeightBands {weightBands}; // Normalizes weight selection for each band
+	ImageGroupOperationT<WeightFilterBank> weightBands {weights/*maximumWeights*/}; // Splits each weight selection in bands
+	ImageGroupOperationT<SelectMaximum> maximumWeightBands {weightBands};
+	ImageGroupOperationT<WeightFilterBank2> weightBands2 {maximumWeightBands}; // Lowpass each weight selection in bands
+	ImageGroupOperationT<NormalizeSum> normalizeWeightBands {weightBands2}; // Normalizes weight selection for each band
 
 	ImageGroupOperationT<Index0> alignB {alignSource};
 	ImageGroupOperationT<FilterBank> bBands {alignB};
@@ -78,34 +150,38 @@ struct ExposureBlend {
 	ImageGroupOperationT<Sum> joinR {multiBandWeightedR}; // Joins bands again
 	ImageGroupFoldT<Sum> blendR {joinR}; // Blends images
 
-	JoinOperation output {{&blendB, &blendG, &blendR}};
-	//ImageOperationT<NormalizeMinMax> output {blend};
+	JoinOperation blend {{&blendB, &blendG, &blendR}};
+
+	//ImageOperationT<DCHigh> output {blend};
+
+	/*ImageOperationT<DCHigh> high {blend};
+	ImageOperationT<Intensity> highY {high};
+	ImageOperationT<LowPass> lowY {highY};
+	BinaryImageOperationT<NormalizeMinMax> normalizeMinMax {lowY, high};
+	ImageSource& output = normalizeMinMax;*/
+
+	/*ImageOperationT<LowPlus> lowPlus {blend};
+	ImageSource& output = lowPlus;*/
+
+	/*ImageOperationT<HighPass> high {blend};
+	ImageOperationT<Intensity> highY {high};
+	ImageOperationT<LowPass> lowHighY {highY};
+	BinaryImageOperationT<NormalizeMinMax> output {lowHighY, high};*/
+
+	/*ImageOperationT<Intensity> blendY {blend};
+	ImageOperationT<LowPass> lowBlendY {blendY};
+	BinaryImageOperationT<NormalizeMinMax> normalizeMinMax {lowBlendY, blend};
+	ImageSource& output = normalizeMinMax;*/
+
+	ImageOperationT<Intensity> blendY {blend};
+	ImageOperationT<LowPass> lowBlendY {blendY};
+	BinaryImageOperationT<NormalizeMinMax> normalizeMinMax {lowBlendY, blend};
+	ImageSource& output = normalizeMinMax;
 };
 
-struct ExposureBlendAnnotate : ExposureBlend, Application {
-	PersistentValue<String> lastName {folder, ".last", [this]{ return source.elementName(index); }};
-	const size_t lastIndex = source.keys.indexOf(lastName);
-	size_t index = lastIndex != invalid ? lastIndex : 0;
-
-	sRGBOperation sRGB {source};
-	ImageSourceView view {sRGB, &index};
-	Window window {&view, -1, [this]{ return view.title()+" "+imagesAttributes.value(source.elementName(index)); }};
-
-	ExposureBlendAnnotate() {
-		for(char c: range('0','9'+1)) window.actions[Key(c)] = [this, c]{ setCurrentImageAttributes("#"_+c); };
-		for(char c: range('a','z'+1)) window.actions[Key(c)] = [this, c]{ setCurrentImageAttributes("#"_+c); };
-	}
-	void setCurrentImageAttributes(string currentImageAttributes) {
-		imagesAttributes[source.elementName(index)] = String(currentImageAttributes);
-	}
-};
-registerApplication(ExposureBlendAnnotate, annotate);
-
-struct Transpose : OperatorT<Transpose> {
-	string name() const override { return  "[transpose]"; }
-};
+struct Transpose : OperatorT<Transpose> { /*string name() const override { return  "Transpose"; }*/ };
 /// Swaps component and group indices
-struct TransposeOperation : GenericImageOperation, ImageGroupSource, Transpose {
+struct TransposeOperation : GenericImageOperation, ImageGroupSource, OperatorT<Transpose> {
 	ImageGroupSource& source;
 	TransposeOperation(ImageGroupSource& source) : GenericImageOperation(source, *this), source(source) {}
 
@@ -128,13 +204,18 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	const size_t lastIndex = source.keys.indexOf(lastName);
 	size_t index = lastIndex != invalid ? lastIndex : 0;
 
-	ImageGroupFoldT<Prism> prismMaximumWeights {maximumWeights};
-	sRGBOperation sRGB [3] {output, select, prismMaximumWeights};
+	ImageGroupFoldT<Prism> prismWeights0 {weights};
+	ImageGroupFoldT<Prism> prismWeights1 {lowWeights};
+	ImageGroupFoldT<Prism> prismWeights2 {maximumWeights};
+	//sRGBOperation sRGB [3] {blend, output, select/*, prismWeights1, prismWeights0*/};
+	sRGBOperation sRGB [3] {prismWeights0, prismWeights1, prismWeights2};
+	//sRGBOperation sRGB [1] {prismWeights0};
 	array<ImageSourceView> sRGBView = apply(mref<sRGBOperation>(sRGB),
 											[&](ImageRGBSource& source) -> ImageSourceView { return {source, &index}; });
-	TransposeOperation transposeWeightBands {normalizeWeightBands};
-	ImageGroupOperationT<Prism> prism {transposeWeightBands};
-	sRGBGroupOperation sRGBGroups [1] {{prism}};
+	TransposeOperation transposeWeightBands0 {weightBands};
+	TransposeOperation transposeWeightBands1 {normalizeWeightBands};
+	ImageGroupOperationT<Prism> prism [2] {transposeWeightBands0, transposeWeightBands1};
+	sRGBGroupOperation sRGBGroups [2] {{prism[0]}, prism[1]};
 	array<ImageGroupSourceView> sRGBGroupView = apply(mref<sRGBGroupOperation>(sRGBGroups),
 											[&](sRGBGroupOperation& source) -> ImageGroupSourceView { return {source, &index}; });
 	WidgetCycle view {toWidgets(sRGBView)+toWidgets(sRGBGroupView)};
@@ -155,7 +236,7 @@ struct ExposureBlendTest : ExposureBlend, Application {
 };
 registerApplication(ExposureBlendTest, test);
 
-struct ExposureBlendExport : ExposureBlend, Application {
+/*struct ExposureBlendExport : ExposureBlend, Application {
 	sRGBOperation sRGB {output};
 	ExposureBlendExport() {
 		Folder output ("Export", folder, true);
@@ -193,4 +274,4 @@ struct ExposureBlendSelect : ExposureBlend, Application {
 		}
 	}
 };
-registerApplication(ExposureBlendSelect, select);
+registerApplication(ExposureBlendSelect, select);*/
