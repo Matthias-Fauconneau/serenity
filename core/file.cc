@@ -191,7 +191,7 @@ void rename(const string oldName,const string newName, const Folder& at) {
 
 void remove(const string name, const Folder& at) { check_( unlinkat(at.fd, strz(name), 0), name); }
 
-void removeIfExisting(const string name, const Folder& at) { if(existsFile(name, at)) remove(name, at); }
+void removeFolder(const string& name, const Folder& at) { check_( unlinkat(at.fd, strz(name), AT_REMOVEDIR), name); }
 
 void symlink(const string from,const string to, const Folder& at) {
     assert(from!=to);

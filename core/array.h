@@ -203,7 +203,7 @@ generic uint partition(const mref<T>& at, size_t left, size_t right, size_t pivo
     const T& pivot = at[right];
     uint storeIndex = left;
     for(uint i: range(left,right)) {
-        if(at[i] < pivot) {
+		if(at[i] > pivot) {
             swap(at[i], at[storeIndex]);
             storeIndex++;
         }

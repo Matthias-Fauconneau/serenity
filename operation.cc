@@ -42,23 +42,20 @@ SourceImageRGB sRGBOperation::image(size_t imageIndex, int2 hint, bool noCacheWr
 // ImageGroupFold
 
 SourceImage ImageGroupFold::image(size_t groupIndex, size_t componentIndex, int2 hint, bool noCacheWrite) {
-	int2 size = this->size(groupIndex, hint);
-	return ::cache<ImageF>(folder(), elementName(groupIndex)+'['+str(componentIndex)+']', size, time(groupIndex),
-			[&](const ImageF& target) {
-		array<SourceImage> inputs = source.images(groupIndex, operation.outputs()==1?componentIndex:0, hint, noCacheWrite);
-		assert_(operation.inputs() == 0 || operation.inputs() == inputs.size);
-		assert_(inputs[0].size == target.size, inputs[0].size, target.size, source.name());
-		if(operation.outputs()==1) { // componentIndex selects source output index
-			operation.apply({share(target)}, share(inputs));
+	return move(::cacheGroup<ImageF>(folder(), elementName(groupIndex), size(groupIndex, hint), outputs(), time(groupIndex),
+								[&](ref<ImageF> targets) {
+		if(operation.outputs()==1) { // Forwards componentIndex
+			for(size_t componentIndex: range(outputs())) {
+				array<SourceImage> inputs = source.images(groupIndex, componentIndex, hint, noCacheWrite);
+				assert_(operation.inputs() == 0 || operation.inputs() == inputs.size);
+				operation.apply(targets.slice(componentIndex, 1), share(inputs));
+			}
 		} else {
-			array<SourceImage> outputs;
-			for(size_t unused index: range(operation.outputs())) outputs.append( inputs[0].size );
-			operation.apply(share(outputs), share(inputs));
-			assert_(componentIndex < outputs.size, componentIndex, outputs.size, operation.name());
-			assert_(target.size == outputs[componentIndex].size && target.stride == outputs[componentIndex].stride);
-			target.copy(outputs[componentIndex]);
+			assert_(source.outputs() == 1);
+			array<SourceImage> inputs = source.images(groupIndex, 0, hint, noCacheWrite);
+			operation.apply(targets, share(inputs));
 		}
-	}, noCacheWrite);
+	}, noCacheWrite)[componentIndex]);
 }
 
 // GroupImageOperation

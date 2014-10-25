@@ -36,7 +36,6 @@ struct Mask : ImageOperator, OperatorT<Mask> {
 	}
 };
 
-//FIXME: reuse UnaryImageGroupSource
 struct PanoramaWeights : ImageGroupSource {
 	ImageGroupSource& source;
 	TransformGroupSource& transform;
@@ -98,7 +97,6 @@ struct PanoramaWeights : ImageGroupSource {
 				assert_(midX > 0 && midX < size.x, midX);
 				end = midX;
 			}
-			log(index, current.min(sourceSize).x, index>0?transforms[index-1].max(sourceSize).x:0, start, end,  index<transforms.size-1?transforms[index+1].min(sourceSize).x:image.size.x, current.max(sourceSize).x);
 			for(size_t y : range(image.size.y)) { //FIXME: parallel + SIMD
 				for(size_t x : range(start)) image(x,y) = 0;
 				for(size_t x : range(start, end)) image(x,y) = 1;
@@ -178,7 +176,6 @@ struct PanoramaStitch {
 	BinaryImageGroupOperationT<Multiply> weightedBands {normalizeWeightBands, splitBands}; // Applies weights to each band
 	ImageGroupOperationT<Sum> sumBands {weightedBands}; // Sums bands
 	ImageGroupOperationT<Sum> sumImages {multiscale}; // Sums images
-
 };
 
 struct PanoramaStitchPreview : PanoramaStitch, Application {

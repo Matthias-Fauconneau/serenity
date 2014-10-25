@@ -73,7 +73,8 @@ inline Folder cacheFolder(const Folder& parent, string name, string key, int64 s
 		} else { // Removes any invalidated folders (of any key)
 			assert_(find(parent.name(),"/Pictures/"_) && !folderName.contains('/')); // Safeguards
 			//log('-', folderName/*, Date(cacheTime), Date(sourceTime), Date(parseDate(version)*1000000000l)*/);
-			remove(folderName, parent); //FIXME: recursively
+			for(string file: folder.list(Files)) remove(file, folder);
+			removeFolder(folderName, parent);
 		}
 	}
 	Folder folder(name, parent, true);

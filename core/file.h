@@ -11,8 +11,6 @@ extern "C" int* __errno_location() noexcept __attribute((const));
 #define check(expr, message...) ({ auto e = expr; if(long(e)<0 && size_t(-long(e)) < ref<string>(linuxErrors).size) error(#expr, linuxErrors[*__errno_location()], ##message); e; })
 /// Aborts if \a expr is negative and logs corresponding error code (unused result)
 #define check_(expr, message...) ({ auto e=expr; if(long(e)<0 && size_t(-long(e)) < ref<string>(linuxErrors).size) error(#expr, linuxErrors[*__errno_location()], ##message); })
-/// Does not abort if \a expr is negative and logs corresponding error code (unused result)
-#define check__(expr, message...) ({ auto e=expr; if(long(e)<0 && size_t(-long(e)) < ref<string>(linuxErrors).size) log(#expr, linuxErrors[*__errno_location()], ##message); })
 
 /// Unix file descriptor
 struct Handle {
@@ -173,10 +171,10 @@ struct Map : mref<byte> {
 void rename(const Folder& oldAt, const string oldName, const Folder& newAt, const string newName);
 /// Renames a file
 void rename(const string oldName, const string newName, const Folder& at=currentWorkingDirectory());
-/// Removes file
+/// Removes a file
 void remove(const string name, const Folder& at=currentWorkingDirectory());
-/// Removes file if it exists
-void removeIfExisting(const string name, const Folder& at=currentWorkingDirectory());
+/// Removes a folder
+void removeFolder(const string& name, const Folder& at);
 
 /// Creates a symbolic link to \a target at \a name, replacing any existing files or links
 void symlink(const string target,const string name, const Folder& at=currentWorkingDirectory());
