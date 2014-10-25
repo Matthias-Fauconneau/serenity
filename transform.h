@@ -28,6 +28,27 @@ Transform operator *(const Transform& a, const Transform& b) {
 	return {a.size, a.offset+b.offset};
 }
 
+void minmax(ref<Transform> transforms, int2 size, int2& min, int2& max) {
+#if CROP // CROP
+	min = ::max(apply(transforms,[&](const Transform& t){ return t.min(size); }));
+	max =::min(apply(transforms,[&](const Transform& t){ return t.max(size); }));
+#elif 1 // EXTEND X CROP Y
+	int2 minmin = ::min(apply(transforms,[&](const Transform& t){ return t.min(size); }));
+	int2 maxmin = ::max(apply(transforms,[&](const Transform& t){ return t.min(size); }));
+	int2 minmax =::min(apply(transforms,[&](const Transform& t){ return t.max(size); }));
+	int2 maxmax =::max(apply(transforms,[&](const Transform& t){ return t.max(size); }));
+	min = int2(minmin.x, maxmin.y);
+	max = int2(maxmax.x, minmax.y);
+#elif KEEP // KEEP
+	min = 0; //::max(apply(transforms,[&](const Transform& t){ return t.min(size); }));
+	max = size; //::min(apply(transforms,[&](const Transform& t){ return t.max(size); }));
+#else //EXTEND (FIXME: need to allocate larger image when cached
+	min = ::min(apply(transforms,[&](const Transform& t){ return t.min(size); }));
+	max =::max(apply(transforms,[&](const Transform& t){ return t.max(size); }));
+#endif
+}
+
+
 struct TransformGroupSource : Source {
 	virtual array<Transform> operator()(size_t groupIndex, int2 size=0) abstract;
 };
@@ -74,6 +95,7 @@ void sample(const ImageF& target, const ImageF& source, Transform transform, int
 ImageF sample(ImageF&& target, const ImageF& source, Transform transform, int2 min, int2 max) { sample(target, source, transform, min, max); return move(target); }
 ImageF sample(const ImageF& source, Transform transform, int2 min, int2 max) { return sample(max-min, source, transform, min, max); }
 
+
 //FIXME: reuse UnaryImageGroupSource
 struct SampleImageGroupOperation : ImageGroupSource {
 	ImageGroupSource& source;
@@ -88,31 +110,23 @@ struct SampleImageGroupOperation : ImageGroupSource {
 	const Folder& folder() const override { return cacheFolder; }
 	int2 maximumSize() const override { return source.maximumSize(); }
 	String elementName(size_t groupIndex) const override { return source.elementName(groupIndex); }
-	int2 size(size_t groupIndex) const override { return source.size(groupIndex); }
+
+	int2 size(size_t groupIndex) const override {
+		int2 min,max; minmax(transform(groupIndex, source.size(groupIndex)), source.size(groupIndex), min, max); return max-min;
+	}
 
 	size_t outputs() const override { return source.outputs(); }
 	size_t groupSize(size_t groupIndex) const { return source.groupSize(groupIndex); }
 
-	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size=0, bool noCacheWrite = false) override {
-		auto images = source.images(groupIndex, componentIndex, size, noCacheWrite);
-		auto transforms = transform(groupIndex, size);
-#if CROP // CROP
-		int2 min = ::max(apply(transforms,[&](const Transform& t){ return t.min(images[0].size); }));
-		int2 max =::min(apply(transforms,[&](const Transform& t){ return t.max(images[0].size); }));
-#elif 1 // EXTEND X CROP Y
-		int2 minmin = ::min(apply(transforms,[&](const Transform& t){ return t.min(images[0].size); }));
-		int2 maxmin = ::max(apply(transforms,[&](const Transform& t){ return t.min(images[0].size); }));
-		int2 minmax =::min(apply(transforms,[&](const Transform& t){ return t.max(images[0].size); }));
-		int2 maxmax =::max(apply(transforms,[&](const Transform& t){ return t.max(images[0].size); }));
-		int2 min (minmin.x, maxmin.y);
-		int2 max (maxmax.x, minmax.y);
-#elif KEEP // KEEP
-		int2 min = 0; //::max(apply(transforms,[&](const Transform& t){ return t.min(images[0].size); }));
-		int2 max = images[0].size; //::min(apply(transforms,[&](const Transform& t){ return t.max(images[0].size); }));
-#else //EXTEND (FIXME: need to allocate larger image when cached
-		int2 min = ::min(apply(transforms,[&](const Transform& t){ return t.min(images[0].size); }));
-		int2 max =::max(apply(transforms,[&](const Transform& t){ return t.max(images[0].size); }));
-#endif
+	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 targetSize=0, bool noCacheWrite = false) override {
+		int2 fullTargetSize = size(groupIndex);
+		int2 fullSourceSize = source.size(groupIndex);
+		int2 sourceSize = targetSize*fullSourceSize/fullTargetSize;
+		assert_(fullSourceSize.x/sourceSize.x == fullSourceSize.y/sourceSize.y, targetSize, fullTargetSize, fullSourceSize, sourceSize);
+		auto images = source.images(groupIndex, componentIndex, sourceSize, noCacheWrite);
+		assert_(images[0].size == sourceSize, images[0].size, sourceSize);
+		auto transforms = transform(groupIndex, images[0].size);
+		int2 min,max; minmax(transforms, images[0].size, min, max);
 		return apply(images.size, [&](size_t index) -> SourceImage { return sample(images[index], transforms[index], min, max); });
 	}
 };

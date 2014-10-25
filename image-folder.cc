@@ -14,10 +14,13 @@ SourceImageRGB ImageFolder::image(size_t index, bool noCacheWrite) {
 SourceImageRGB ImageFolder::image(size_t index, int2 size, bool noCacheWrite) {
 	assert_(index  < count());
 	File sourceFile (values[index].at("Path"_), source);
-	if(!size || size>=this->size(index)) return image(index, noCacheWrite);
-	return cache<Image>({"Resize", source, true}, elementName(index), size, sourceFile.modifiedTime(), [&](const Image& target){
+	int2 sourceSize = this->size(index);
+	//size = min(sourceSize*size.x/sourceSize.x, sourceSize*size.y/sourceSize.y); // Fits aspect ratio
+	if(!size || size>=sourceSize) return image(index, noCacheWrite);
+	return cache<Image>({"Resize", source, true}, elementName(index), size, sourceFile.modifiedTime(), [&](const Image& target) {
 		SourceImageRGB source = image(index);
-		assert_(target.size <= source.size, target.size, source.size);
+		assert_(target.size <= source.size);
+		//assert_(target.size.x*source.size.y == source.size.x*target.size.y, source.size, target.size);
 		resize(target, source);
 	}, noCacheWrite);
 }

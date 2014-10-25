@@ -1,6 +1,6 @@
 #pragma once
 /// \file utf8.h UTF-8 iterator and encoder
-#include "array.h"
+#include "string.h"
 
 /// Iterates UTF-8 encoded strings
 struct utf8_iterator {

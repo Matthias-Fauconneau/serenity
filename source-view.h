@@ -22,10 +22,10 @@ struct GenericImageSourceView : ImageView {
     int2 sizeHint(int2 size) override {
         assert_(size);
 		int2 maximum = source.maximumSize();
-        int downscaleFactor = min(max((maximum.x+size.x-1)/size.x, (maximum.y+size.y-1)/size.y), 16);
+		/*int downscaleFactor = min(max((maximum.x+size.x-1)/size.x, (maximum.y+size.y-1)/size.y), 16);
         int2 hint = maximum/downscaleFactor;
-        assert_(hint<=size, maximum, size, downscaleFactor, maximum/downscaleFactor);
-		return hint;
+		assert_(hint<=size, maximum, size, downscaleFactor, maximum/downscaleFactor);*/
+		return int2(-maximum.x, -size.y); //hint;
     }
 
 	virtual void update(size_t index, int2 size) abstract;
@@ -34,7 +34,7 @@ struct GenericImageSourceView : ImageView {
 		if(!source.count(1)) return {};
 		update(index, size);
 		ImageView::image = share(image);
-		assert_(image.size <= size*4);
+		assert_(image.size.x <= size.x || image.size.y <= size.y, image.size, size);
         return ImageView::graphics(size);
     }
 
@@ -64,7 +64,10 @@ struct ImageSourceView  : GenericImageSourceView {
 	void update(size_t index, int2 size) override {
 		if(imageIndex != index) {
 			imageIndex = index;
-			image = source.image(min<size_t>(index, source.count(index+1)-1), size);
+			int2 sourceSize = source.size(index);
+			int2 targetSize = max(sourceSize*size.x/sourceSize.x, sourceSize*size.y/sourceSize.y); // Fits aspect ratio
+			log(size, sourceSize, targetSize);
+			image = source.image(min<size_t>(index, source.count(index+1)-1), targetSize);
 		}
 	}
 };
@@ -84,6 +87,8 @@ struct ImageGroupSourceView  : GenericImageSourceView {
 	void update(size_t index, int2 size) override {
 		if(groupIndex != index) {
 			groupIndex = index;
+			int2 sourceSize = source.size(index);
+			size = max(sourceSize*size.x/sourceSize.x, sourceSize*size.y/sourceSize.y); // Fits aspect ratio
 			images = source.images(min<size_t>(groupIndex, source.count(index+1)-1), size);
 		}
 		assert_(images.size);

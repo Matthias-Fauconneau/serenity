@@ -1,5 +1,10 @@
 #include "multiscale.h"
 
+void LowPass::apply(const ImageF& Y, const ImageF& X) const {
+	const float largeScale = (X.size.y-1)/6;
+	gaussianBlur(Y, X, largeScale);
+}
+
 void WeightFilterBank::apply(ref<ImageF> Y, ref<ImageF> X) const {
 	assert_(X.size == 1);
 	const ImageF& x = X[0];

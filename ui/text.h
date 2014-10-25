@@ -7,21 +7,21 @@
 
 /// Rich text format control code encoded in 00-1F range
 // \note first word (until ' ') after a Link tag is not displayed but used as \a linkActivated identifier.
-enum TextFormat : char { Regular, Bold, Italic, Superscript, Subscript, Stack, Fraction, End };
-static_assert(End < '\t', "");
+enum class TextFormat : char { Regular, Bold, Italic, Superscript, Subscript, Stack, Fraction, End };
+static_assert(TextFormat::End < (TextFormat)'\t', "");
 
-inline String regular(const string s) { return string{TextFormat::Regular} + s + string{TextFormat::End}; }
-inline String bold(const string s) { return string{TextFormat::Bold} + s + string{TextFormat::End}; }
-inline String italic(const string s) { return string{TextFormat::Italic} + s + string{TextFormat::End}; }
-inline String superscript(const string s) { return string{TextFormat::Superscript} + s + string{TextFormat::End}; }
-inline String subscript(const string s) { return string{TextFormat::Subscript} + s + string{TextFormat::End}; }
-inline String stack(const string s) { return string{TextFormat::Stack} + s + string{TextFormat::End}; }
-inline String fraction(const string s) { return string{TextFormat::Fraction} + s + string{TextFormat::End}; }
+inline String regular(const string s) { return char(TextFormat::Regular) + s + char(TextFormat::End); }
+inline String bold(const string s) { return char(TextFormat::Bold) + s + char(TextFormat::End); }
+inline String italic(const string s) { return char(TextFormat::Italic) + s + char(TextFormat::End); }
+inline String superscript(const string s) { return char(TextFormat::Superscript) + s + char(TextFormat::End); }
+inline String subscript(const string s) { return char(TextFormat::Subscript) + s + char(TextFormat::End); }
+inline String stack(const string s) { return char(TextFormat::Stack) + s + char(TextFormat::End); }
+inline String fraction(const string s) { return char(TextFormat::Fraction) + s + char(TextFormat::End); }
 
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : virtual Widget {
     /// Create a caption that display \a text using a \a size pt (points) font
-    Text(const string text="", float size=16, vec3 color=0, float opacity=1, float wrap=0, string font="DejaVuSans", bool hint=true, float interline=1, bool center=true, int2 minimalSizeHint=0);
+	Text(const string text="", float size=16, bgr3f color=0, float opacity=1, float wrap=0, string font="DejaVuSans", bool hint=true, float interline=1, bool center=true, int2 minimalSizeHint=0);
 
     // Parameters
     /// Displayed text in UTF32
@@ -29,7 +29,7 @@ struct Text : virtual Widget {
     /// Font size
     int size;
     /// Text color
-    vec3 color;
+	bgr3f color;
     /// Text opacity
     float opacity;
     /// Line wrap limit in pixels (0: no wrap)
@@ -47,6 +47,6 @@ struct Text : virtual Widget {
 
     struct TextLayout layout(float wrap) const;
 
-    int2 sizeHint(int2 size) const override;
-    Graphics graphics(int2 size) const override;
+	int2 sizeHint(int2 size) override;
+	Graphics graphics(int2 size) override;
 };

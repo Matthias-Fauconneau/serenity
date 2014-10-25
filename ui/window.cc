@@ -13,8 +13,8 @@ Window::Window(Widget* widget, int2 sizeHint, function<String()> title, const Im
     if(sizeHint.y<=0) size.y=Display::size.y;
     if((sizeHint.x<0||sizeHint.y<0) && widget) {
         int2 hint = widget->sizeHint(size);
-        if(sizeHint.x<0) size.x=max(abs(hint.x),-sizeHint.x);
-        if(sizeHint.y<0) size.y=max(abs(hint.y),-sizeHint.y);
+		if(sizeHint.x<0) size.x=min(max(abs(hint.x),-sizeHint.x), Display::size.x);
+		if(sizeHint.y<0) size.y=min(max(abs(hint.y),-sizeHint.y), Display::size.y-46);
     }
     assert_(size);
     send(CreateWindow{.id=id+XWindow, .parent=root, .width=uint16(size.x), .height=uint16(size.y), .visual=visual, .colormap=id+Colormap});

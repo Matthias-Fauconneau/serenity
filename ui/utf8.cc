@@ -21,16 +21,23 @@ const utf8_iterator& utf8_iterator::operator++() {
 
 String utf8(uint c) {
     String utf8;
-    /**/  if(c<(1<<7)) utf8 << c;
-    else if(c<(1<<(7+6))) utf8 << (0b11000000|(c>>6)) << (0b10000000|(c&0b111111));
-    else if(c<(1<<(7+6+6))) utf8 << (0b11100000|(c>>12)) << (0b10000000|((c>>6)&0b111111)) << (0b10000000|(c&0b111111));
+	/**/  if(c<(1<<7)) utf8.append(c);
+	else if(c<(1<<(7+6))) {
+		utf8.append(0b11000000|(c>>6));
+		utf8.append(0b10000000|(c&0b111111));
+	}
+	else if(c<(1<<(7+6+6))) {
+		utf8.append(0b11100000|(c>>12));
+		utf8.append(0b10000000|((c>>6)&0b111111));
+		utf8.append(0b10000000|(c&0b111111));
+	}
     else assert(0);
     return utf8;
 }
 
 generic array<T> toUCS(string utf8) {
     array<T> ucs(utf8.size);
-    for(utf8_iterator it=utf8.begin(); it!=utf8_iterator(utf8.end());++it) ucs << *it;
+	for(utf8_iterator it=utf8.begin(); it!=utf8_iterator(utf8.end());++it) ucs.append( *it );
     return ucs;
 }
 array<uint16> toUCS2(string utf8) { return toUCS<uint16>(utf8); }
@@ -38,7 +45,7 @@ array<uint32> toUCS4(string utf8) { return toUCS<uint32>(utf8); }
 
 generic String toUTF8(ref<T> ucs) {
     String utf8(ucs.size);
-    for(uint c: ucs) utf8 << ::utf8(c);
+	for(uint c: ucs) utf8.append( ::utf8(c) );
     return utf8;
 }
 String toUTF8(ref<uint16> ucs) { return toUTF8<uint16>(ucs); }

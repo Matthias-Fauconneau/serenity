@@ -95,7 +95,6 @@ template<class B, class T> struct cat<ref<T>, B, T> {
     int size() const { return a.size + b.size(); };
     void copy(Array<T>& target) const { target.append(a); b.copy(target); }
     operator Array<T>() const { Array<T> target (size()); copy(target); return move(target); }
-    //operator ref<T>() const { return Array<T>(); }
 };
 template<class T, class A, class B> cat<ref<T>, cat<A, B, T>, T> operator+(ref<T> a, cat<A, B, T>&& b) { return {a,move(b)}; }
 

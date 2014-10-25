@@ -2,7 +2,7 @@
 #include "text.h"
 
 // Layout
-Graphics Layout::graphics(int2 size) const {
+Graphics Layout::graphics(int2 size) {
     array<Rect> widgets = layout(size);
     Graphics graphics;
     for(uint i: range(count())) {
@@ -23,7 +23,7 @@ bool Layout::mouseEvent(int2 cursor, int2 size, Event event, Button button, Widg
 }
 
 // Linear
-int2 Linear::sizeHint(int2 size) const {
+int2 Linear::sizeHint(int2 size) {
     int width=0, expandingWidth=0;
     int height=0, expandingHeight=0;
     for(uint i: range(count())) { Widget& child=at(i); assert(*(void**)&child);
@@ -96,7 +96,7 @@ array<Rect> Linear::layout(const int2 originalSize) const {
         else if(side==Left) y=0;
         else if(side==Center) y=(height-heights[i])/2;
         else if(side==Right) y=height-heights[i];
-        widgets << Rect{xy(pen+int2(0,y)), xy(int2(widths[i],heights[i]))};
+		widgets.append( Rect{xy(pen+int2(0,y)), xy(int2(widths[i],heights[i]))} );
         pen.x += widths[i]+margin;
     }
     return widgets;
@@ -126,7 +126,7 @@ array<Rect> GridLayout::layout(int2 size) const {
         extraWidth = availableWidth - w*fixedWidth;
     }
     else if(size.x) {
-        const int requiredWidth = sum(ref<int>(widths,w));
+		const int requiredWidth = sum<int>(ref<int>(widths,w));
         extraWidth = size.x ? size.x-requiredWidth: 0;
         const int extra = extraWidth / w; // Extra space per column (may be negative for missing space)
         for(int& v: widths) { v += extra; extraWidth -= extra; } // Distributes extra/missing space
@@ -149,7 +149,7 @@ array<Rect> GridLayout::layout(int2 size) const {
             }
             heights[y] = maxY;
         }
-        const int requiredHeight = sum(ref<int>(heights,h)); // Remaining space after fixed allocation
+		const int requiredHeight = sum<int>(ref<int>(heights,h)); // Remaining space after fixed allocation
         extraHeight = size.y ? size.y-requiredHeight: 0;
         const int extra = extraHeight / h; // Extra space per cell
         if(extra > 0) {
@@ -163,7 +163,7 @@ array<Rect> GridLayout::layout(int2 size) const {
                 for(int& size: heights) if(size == first) { size -= offset, extraHeight += offset; }
             }
         }
-        assert_(extraHeight > -h, extraHeight, size, "(", ref<int>(widths,w), ")", "(", ref<int>(heights,h),")", sum(ref<int>(heights,h)));
+		assert_(extraHeight > -h, extraHeight, size, "(", ref<int>(widths,w), ")", "(", ref<int>(heights,h),")", sum<int>(ref<int>(heights,h)));
     }
 
     int Y = extraHeight/2;
@@ -172,7 +172,7 @@ array<Rect> GridLayout::layout(int2 size) const {
         for(uint x: range(w)) {
             uint i = y*w+x;
             if(i<count()) {
-                widgets << Rect{int2(X,Y), int2(widths[x], heights[y])};
+				widgets.append( Rect{int2(X,Y), int2(widths[x], heights[y])} );
                 X += widths[x];
             }
         }
@@ -182,7 +182,7 @@ array<Rect> GridLayout::layout(int2 size) const {
     return widgets;
 }
 
-int2 GridLayout::sizeHint(int2 size) const {
+int2 GridLayout::sizeHint(int2 size) {
     int2 requiredSize=0;
     for(Rect r: layout(int2(size.x,0))) requiredSize=max(requiredSize, r.origin+r.size);
     return requiredSize;

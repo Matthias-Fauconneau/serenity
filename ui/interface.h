@@ -61,7 +61,7 @@ struct ImageView : Widget {
     ImageView(Image&& image) : image(move(image)) {}
 
     int2 sizeHint(int2) override;
-    Graphics graphics(int2 size) override;
+	Graphics graphics(int2 size) override;
 };
 
 // Control

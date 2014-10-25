@@ -68,6 +68,7 @@ template<Type T> ImageMapSource<T> cache(const Folder& folder, string name, int2
 		T image(unsafeReference(cast<typename T::type>(map)), size, size.x);
 		evaluate(image);
 		if(image.size != size) {
+			error(image.size);
 			assert_(image.size < size);
 			file.resize(image.size.y*image.size.x*sizeof(typename T::type));
 		}

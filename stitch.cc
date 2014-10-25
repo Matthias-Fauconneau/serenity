@@ -6,10 +6,11 @@
 #include "operation.h"
 #include "align.h"
 #include "weight.h"
+#include "prism.h"
 #include "multiscale.h"
+#include "layout.h"
 #include "jpeg-encoder.h"
 
-#if 1
 struct AllImages : GroupSource {
 	ImageSource& source;
 	AllImages(ImageSource& source) : source(source) {}
@@ -21,26 +22,13 @@ struct AllImages : GroupSource {
 	}
 	int64 time(size_t groupIndex) override { return max(apply(operator()(groupIndex), [this](size_t index) { return source.time(index); })); }
 };
-#else
-/// Returns consecutive pairs
-struct ConsecutivePairs : virtual GroupSource {
-	Source& source;
-	ConsecutivePairs(Source& source) : source(source) {}
-	size_t count(size_t unused need=0) override { return source.count()-1; }
-	int64 time(size_t index) override { return max(apply(operator()(index), [this](size_t index) { return source.time(index); })); }
-	array<size_t> operator()(size_t groupIndex) override {
-		assert_(groupIndex < count());
-		array<size_t> pair;
-		pair.append(groupIndex);
-		pair.append(groupIndex+1);
-		return pair;
-	}
-};
-#endif
 
-struct Mean : ImageGroupOperator1, OperatorT<Mean> {
-	void apply(const ImageF& Y, ref<ImageF> X) const override {
-		parallel::apply(Y, [&](size_t index) { return sum<float>(::apply(X, [index](const ImageF& x) { return x[index]; })) / X.size; });
+struct Mask : ImageOperator, OperatorT<Mask> {
+	size_t inputs() const override { return 2; }
+	size_t outputs() const override { return 1; }
+	void apply(ref<ImageF> Y, ref<ImageF> X) const override {
+		assert_(X.size==2 && Y.size==1);
+		::apply(Y[0], [&](float x0, float x1) { return x0 ? x1 : 0; }, X[0], X[1]);
 	}
 };
 
@@ -51,14 +39,49 @@ struct PanoramaStitch {
 	ImageOperationT<Intensity> intensity {source};
 	ImageOperationT<Normalize> normalize {intensity};
 	AllImages groups {source};
-	//ConsecutivePairs groups {source};
 
 	GroupImageOperation groupNormalize {normalize, groups};
 	ImageGroupTransformOperationT<Align> transforms {groupNormalize};
 
 	GroupImageOperation groupSource {source, groups};
 	SampleImageGroupOperation alignSource {groupSource, transforms};
-	ImageGroupFoldT<Sum> align {alignSource};
+	ImageGroupOperationT<Intensity> alignIntensity {alignSource};
+
+	ImageGroupFoldT<Sum> sum {alignSource};
+
+	ImageGroupOperationT<Exposure> exposure {alignSource};
+	ImageGroupOperationT<LowPass> lowExposure {exposure};
+	ImageGroupOperationT<NormalizeSum> normalizeExposure {lowExposure};
+	ImageGroupOperationT<LowPass> lowNormalizeExposure {normalizeExposure};
+	BinaryImageGroupOperationT<Mask> maskLowExposure {alignIntensity, lowNormalizeExposure};
+	ImageGroupOperationT<NormalizeSum> weights {maskLowExposure};
+	BinaryImageGroupOperationT<Multiply> applySelectionWeights {weights, alignSource};
+	ImageGroupFoldT<Sum> select {applySelectionWeights};
+
+
+	ImageGroupOperationT<WeightFilterBank> weightBands {weights}; // Splits each weight selection in bands
+	BinaryImageGroupOperationT<Mask> maskWeightBands {alignIntensity, weightBands};
+	ImageGroupOperationT<NormalizeSum> normalizeWeightBands {maskWeightBands}; // Normalizes weight selection for each band
+
+	ImageGroupOperationT<Index0> alignB {alignSource};
+	ImageGroupOperationT<FilterBank> bBands {alignB};
+	BinaryImageGroupOperationT<Multiply> multiBandWeightedB {normalizeWeightBands, bBands}; // Applies
+	ImageGroupOperationT<Sum> joinB {multiBandWeightedB}; // Joins bands again
+	ImageGroupFoldT<Sum> blendB {joinB}; // Blends images
+
+	ImageGroupOperationT<Index1> alignG {alignSource};
+	ImageGroupOperationT<FilterBank> gBands {alignG};
+	BinaryImageGroupOperationT<Multiply> multiBandWeightedG {normalizeWeightBands, gBands}; // Applies
+	ImageGroupOperationT<Sum> joinG {multiBandWeightedG}; // Joins bands again
+	ImageGroupFoldT<Sum> blendG {joinG}; // Blends images
+
+	ImageGroupOperationT<Index2> alignR {alignSource};
+	ImageGroupOperationT<FilterBank> rBands {alignR};
+	BinaryImageGroupOperationT<Multiply> multiBandWeightedR {normalizeWeightBands, rBands}; // Applies
+	ImageGroupOperationT<Sum> joinR {multiBandWeightedR}; // Joins bands again
+	ImageGroupFoldT<Sum> blendR {joinR}; // Blends images
+
+	JoinOperation blend {{&blendB, &blendG, &blendR}};
 };
 
 struct PanoramaStitchPreview : PanoramaStitch, Application {
@@ -66,8 +89,16 @@ struct PanoramaStitchPreview : PanoramaStitch, Application {
 	const size_t lastIndex = source.keys.indexOf(lastName);
 	size_t index = lastIndex != invalid ? lastIndex : 0;
 
-	sRGBOperation sRGB = align;
-	ImageSourceView view = {sRGB, &index};
-	Window window {&view, -1, [this]{ return view.title(); }};
+	/*ImageGroupFoldT<Prism> prism [6] {exposure, lowExposure, normalizeExposure, lowNormalizeExposure, maskLowExposure, weights};
+	array<sRGBOperation> sRGB = apply(mref<ImageGroupFoldT<Prism>>(prism),
+									  [&](ImageSource& source) -> sRGBOperation { return source; });
+	array<Scroll<ImageSourceView>> sRGBView =
+			apply(mref<sRGBOperation>(sRGB), [&](ImageRGBSource& source) -> Scroll<ImageSourceView> { return {source, &index}; });*/
+
+	sRGBOperation sRGB2 [2] = {select, blend};
+	array<Scroll<ImageSourceView>> sRGBView2 =
+			apply(mref<sRGBOperation>(sRGB2), [&](ImageRGBSource& source) -> Scroll<ImageSourceView> { return {source, &index}; });
+	VBox views {/*toWidgets(sRGBView)+*/toWidgets(sRGBView2), VBox::Share, VBox::Expand};
+	Window window {&views, int2(0,-1), [this]{ return views.title(); }};
 };
 registerApplication(PanoramaStitchPreview);

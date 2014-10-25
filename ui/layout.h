@@ -19,7 +19,7 @@ struct Layout : Widget {
     virtual array<Rect> layout(int2 size) const abstract;
 
     /// Renders all visible child widgets
-    Graphics graphics(int2 size) const override;
+	Graphics graphics(int2 size) override;
     /// Forwards event to intersecting child widgets until accepted
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;
 };
@@ -29,17 +29,17 @@ struct Layout : Widget {
 struct Widgets : virtual Layout, array<Widget*> {
     default_move(Widgets);
     Widgets(){}
-    Widgets(array<Widget*>&& widgets):array(move(widgets)){}
+	Widgets(array<Widget*>&& widgets) : array(::move(widgets)){}
     uint count() const { return array::size; }
     Widget& at(int i)  const { return *array::at(i); }
 };
 
 /// Implements Layout storage using array<T> (i.e by value)
 /// \note It allows a layout to directly contain homogenous items without managing pointers.
-generic struct Array : virtual Layout, array<T> {
-    Array(){}
-    Array(const mref<T>& items) : array<T>(items){}
-    Array(array<T>&& items) : array<T>(move(items)){}
+generic struct WidgetArray : virtual Layout, array<T> {
+	WidgetArray(){}
+	WidgetArray(const mref<T>& items) : array<T>(items){}
+	WidgetArray(array<T>&& items) : array<T>(move(items)){}
     uint count() const { return array<T>::size; }
     Widget& at(int i) const { return array<T>::at(i); }
 };
@@ -69,7 +69,7 @@ struct Linear : virtual Layout {
     /// \note This constructor should be used in most derived class (any initialization in derived classes are ignored)
     Linear(Extra main=Share, Extra side=AlignCenter, bool expanding=false) : main(main), side(side), expanding(expanding) {}
 
-    int2 sizeHint(int2) const override;
+	int2 sizeHint(int2) override;
     array<Rect> layout(int2 size) const override;
     /// Transforms coordinates so that x/y always means main/side (i.e along/across) axis to reuse same code in Vertical/Horizontal
     virtual int2 xy(int2 xy) const abstract;
@@ -90,7 +90,7 @@ struct HBox : Horizontal, Widgets {
     HBox(Extra main=Share, Extra side=AlignCenter, bool expanding=false) : Linear(main, side, expanding){}
     /// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if HBox is not most derived
     HBox(array<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter, bool expanding=false)
-        : Linear(main, side, expanding), Widgets(move(widgets)){}
+		: Linear(main, side, expanding), Widgets(::move(widgets)){}
     /// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if HBox is not most derived
     HBox(ref<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter, bool expanding=false)
         : Linear(main, side, expanding), Widgets(array<Widget*>(widgets)){}
@@ -103,7 +103,7 @@ struct VBox : Vertical, Widgets {
     VBox(Extra main=Share, Extra side=AlignCenter, bool expanding=false) : Linear(main, side, expanding) {}
     /// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if VBox is not most derived
     VBox(array<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter, bool expanding=false)
-        : Linear(main, side, expanding), Widgets(move(widgets)) {}
+		: Linear(main, side, expanding), Widgets(::move(widgets)) {}
     /// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if VBox is not most derived
     VBox(ref<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter, bool expanding=false)
         : Linear(main, side, expanding), Widgets(array<Widget*>(widgets)) {}
@@ -130,7 +130,7 @@ struct GridLayout : virtual Layout {
 
     GridLayout(bool uniformX=false, bool uniformY=false, int width=0)
         : uniformX(uniformX), uniformY(uniformY), width(width) {}
-    int2 sizeHint(int2) const override;
+	int2 sizeHint(int2) override;
     array<Rect> layout(int2 size) const override;
 };
 
@@ -139,7 +139,7 @@ struct WidgetGrid : GridLayout, Widgets {
     WidgetGrid(bool uniformX=false, bool uniformY=false, int width=0)
         : GridLayout(uniformX, uniformY, width) {}
     WidgetGrid(array<Widget*>&& widgets, bool uniformX=false, bool uniformY=false, int width=0)
-        : GridLayout(uniformX, uniformY, width), Widgets(move(widgets)) {}
+		: GridLayout(uniformX, uniformY, width), Widgets(::move(widgets)) {}
 };
 
 generic struct UniformGrid : GridLayout,  Array<T> {

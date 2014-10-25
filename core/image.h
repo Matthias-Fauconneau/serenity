@@ -154,6 +154,7 @@ template<Type A, Type F, Type... Ss> A sumXY(int2 size, F apply, A initialValue)
 inline double SSE(const ImageF& A, const ImageF& B, int2 offset) {
 	assert_(A.size == B.size);
 	int2 size = A.size - abs(offset);
+	assert_(size.x && size.y, size);
 	double energy = sumXY(size, [&A, &B, offset](int x, int y) {
 		int2 p = int2(x,y);
 		int2 a = p + max(int2(0), -offset);
