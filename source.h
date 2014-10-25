@@ -56,9 +56,9 @@ struct GenericImageGroupSource : virtual GenericImageSource {
 };
 
 struct ImageGroupSource : virtual GenericImageGroupSource {
-	virtual array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size, bool noCacheWrite = false)  abstract;
+	virtual array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size, bool noCacheWrite = false) abstract;
 };
 
 struct ImageRGBGroupSource : virtual GenericImageGroupSource {
-	virtual array<SourceImageRGB> images(size_t groupIndex, int2 size, bool noCacheWrite = false)  abstract;
+	virtual array<SourceImageRGB> images(size_t groupIndex, int2 size, bool noCacheWrite = false) abstract;
 };

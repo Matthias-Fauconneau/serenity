@@ -231,7 +231,7 @@ template<> void error(const string& message) __attribute((noreturn));
 #define debug(statements...)
 #endif
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message (even in release)
-#define assert_(expr, message...) ({ if(!(expr)) error(#expr ## _ , ##message); })
+#define assert_(expr, message...) ({ if(!(expr)) error(#expr ""_ , ##message); })
 
 // -- ref
 generic const T& ref<T>::at(size_t i) const { assert(i<size, i, size); return data[i]; }

@@ -109,6 +109,46 @@ struct PanoramaWeights : ImageGroupSource {
 	}
 };
 
+/// Forwards a component transparently across a single component group operation
+struct ImageGroupForwardComponent : ImageGroupSource {
+	ImageGroupSource& input;
+	ImageGroupSource& target;
+	struct ImageGroupForwardComponentSource : ImageGroupSource {
+		ImageGroupForwardComponent& forward;
+		ImageGroupForwardComponentSource(ImageGroupForwardComponent& forward) : forward(forward) {}
+		size_t count(size_t need=0) { return forward.input.count(need); }
+		int64 time(size_t index) { return forward.input.time(index); }
+		String name() const { return forward.input.name(); }
+		const Folder& folder() const { return forward.input.folder(); }
+		int2 maximumSize() const { return forward.input.maximumSize(); }
+		String elementName(size_t index) const { return forward.input.elementName(index); }
+		int2 size(size_t index, int2 size=0) const { return forward.input.size(index, size); }
+		size_t groupSize(size_t groupIndex) const { return forward.input.groupSize(groupIndex); }
+		size_t outputs() const { return 1; }
+		array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size, bool noCacheWrite = false) {
+			assert_(componentIndex == 0);
+			return forward.input.images(groupIndex, forward.componentIndex, size, noCacheWrite);
+		}
+	} source {*this};
+	int componentIndex = -1; // FIXME: upgrade ImageSource interface to pass private parameters
+	ImageGroupForwardComponent(ImageGroupSource& input, ImageGroupSource& target) : input(input), target(target) {}
+
+	size_t count(size_t need=0) { return target.count(need); }
+	int64 time(size_t index) { return target.time(index); }
+	String name() const { return target.name(); }
+	const Folder& folder() const { return target.folder(); }
+	int2 maximumSize() const { return target.maximumSize(); }
+	String elementName(size_t index) const { return target.elementName(index); }
+	int2 size(size_t index, int2 size=0) const { return target.size(index, size); }
+	size_t groupSize(size_t groupIndex) const { return target.groupSize(groupIndex); }
+	size_t outputs() const { return input.outputs(); }
+	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size, bool noCacheWrite = false) override {
+		this->componentIndex = componentIndex; // Forwards componentIndex through a private field
+		assert_(target.outputs()==1);
+		return target.images(groupIndex, 0, size, noCacheWrite);
+	}
+};
+
 struct PanoramaStitch {
 	Folder folder {"Pictures/Panorama", home()};
 
@@ -124,44 +164,21 @@ struct PanoramaStitch {
 	SampleImageGroupOperation alignSource {groupSource, transforms};
 	ImageGroupOperationT<Intensity> alignIntensity {alignSource};
 
-	ImageGroupFoldT<Sum> sum {alignSource};
-
-	/*ImageGroupOperationT<Exposure> exposure {alignSource};
-	ImageGroupOperationT<LowPass> lowExposure {exposure};
-	BinaryImageGroupOperationT<Mask> maskLowExposure {alignIntensity, lowExposure};*/
-	/*ImageGroupOperationT<Binary> overlap {alignIntensity};
-	ImageGroupOperationT<LowPass> low {overlap};
-	BinaryImageGroupOperationT<Mask> mask {overlap, low};
-	ImageGroupOperationT<NormalizeSum> weights {mask};*/
 	GroupImageOperation groupIntensity {intensity, groups};
 	PanoramaWeights weights {groupIntensity, transforms};
 	BinaryImageGroupOperationT<Multiply> applySelectionWeights {weights, alignSource};
 	ImageGroupFoldT<Sum> select {applySelectionWeights};
 
-
 	ImageGroupOperationT<WeightFilterBank> weightBands {weights}; // Splits each weight selection in bands
 	BinaryImageGroupOperationT<Mask> maskWeightBands {alignIntensity, weightBands};
 	ImageGroupOperationT<NormalizeSum> normalizeWeightBands {maskWeightBands}; // Normalizes weight selection for each band
 
-	ImageGroupOperationT<Index0> alignB {alignSource};
-	ImageGroupOperationT<FilterBank> bBands {alignB};
-	BinaryImageGroupOperationT<Multiply> multiBandWeightedB {normalizeWeightBands, bBands}; // Applies
-	ImageGroupOperationT<Sum> joinB {multiBandWeightedB}; // Joins bands again
-	ImageGroupFoldT<Sum> blendB {joinB}; // Blends images
+	ImageGroupForwardComponent multiscale {alignSource, sumBands};
+	ImageGroupOperationT<FilterBank> splitBands {multiscale.source};
+	BinaryImageGroupOperationT<Multiply> weightedBands {normalizeWeightBands, splitBands}; // Applies weights to each band
+	ImageGroupOperationT<Sum> sumBands {weightedBands}; // Sums bands
+	ImageGroupOperationT<Sum> sumImages {multiscale}; // Sums images
 
-	ImageGroupOperationT<Index1> alignG {alignSource};
-	ImageGroupOperationT<FilterBank> gBands {alignG};
-	BinaryImageGroupOperationT<Multiply> multiBandWeightedG {normalizeWeightBands, gBands}; // Applies
-	ImageGroupOperationT<Sum> joinG {multiBandWeightedG}; // Joins bands again
-	ImageGroupFoldT<Sum> blendG {joinG}; // Blends images
-
-	ImageGroupOperationT<Index2> alignR {alignSource};
-	ImageGroupOperationT<FilterBank> rBands {alignR};
-	BinaryImageGroupOperationT<Multiply> multiBandWeightedR {normalizeWeightBands, rBands}; // Applies
-	ImageGroupOperationT<Sum> joinR {multiBandWeightedR}; // Joins bands again
-	ImageGroupFoldT<Sum> blendR {joinR}; // Blends images
-
-	JoinOperation blend {{&blendB, &blendG, &blendR}};
 };
 
 struct PanoramaStitchPreview : PanoramaStitch, Application {
