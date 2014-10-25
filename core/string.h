@@ -88,7 +88,7 @@ String right(const string s, size_t size, const char pad=' ');
 // -- string[]
 
 /// Joins \a list into a single String with each element separated by \a separator
-String join(const ref<string> list, const string separator="");
+String join(ref<string> list, const string separator="");
 
 /// Returns an array of references splitting \a str wherever \a separator occurs
 Array<string> split(const string str, string separator=", ");
@@ -157,4 +157,5 @@ template<Type... Args> void log(const Args&... args) { log((string)str(args...))
 template<Type... Args> void __attribute((noreturn)) error(const Args&... args) { error<string>(str(args...)); }
 
 /// Converts Strings to strings
-inline buffer<string> toRefs(const ref<String>& source) { return apply(source, [](const String& e) -> string { return e; }); }
+inline buffer<string> toRefs(ref<String> source) { return apply(source, [](const String& e) -> string { return e; }); }
+inline String join(const ref<String> list, string separator="") { return join(toRefs(list), separator); }

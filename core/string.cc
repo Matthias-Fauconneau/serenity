@@ -83,14 +83,13 @@ String right(const string source, size_t size, const char pad) {
 
 // -- string[]
 
-String join(const ref<string> list, const string separator) {
+String join(ref<string> list, const string separator) {
     if(!list) return {};
     size_t size = 0; for(auto e: list) size += e.size;
     String target ( size + (list.size-1)*separator.size );
     for(size_t i: range(list.size)) { target.append( list[i] ); if(i<list.size-1) target.append( separator ); }
     return target;
 }
-String join(const ref<String> list, const string separator) { return join(toRefs(list), separator); }
 
 Array<string> split(const string source, string separator) {
     Array<string> list;

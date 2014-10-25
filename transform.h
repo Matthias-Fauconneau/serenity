@@ -21,6 +21,7 @@ template<> Transform parse<Transform>(TextData& s) {
 	int2 size = parse<int2>(s); s.whileAny(' '); int2 offset = parse<int2>(s); return {size, offset};
 }
 bool operator ==(const Transform& a, const Transform& b) { return a.offset*b.size == b.offset*a.size; }
+bool operator <(const Transform& a, const Transform& b) { return a.offset.x < b.offset.x; }
 
 /// Composes transforms
 Transform operator *(const Transform& a, const Transform& b) {
