@@ -112,20 +112,16 @@ struct SampleImageGroupOperation : ImageGroupSource {
 	int2 maximumSize() const override { return source.maximumSize(); }
 	String elementName(size_t groupIndex) const override { return source.elementName(groupIndex); }
 
-	int2 size(size_t groupIndex) const override {
-		int2 min,max; minmax(transform(groupIndex, source.size(groupIndex)), source.size(groupIndex), min, max); return max-min;
+	int2 size(size_t groupIndex, int2 size) const override {
+		int2 min,max; minmax(transform(groupIndex, source.size(groupIndex, size)), source.size(groupIndex, size), min, max); return max-min;
 	}
 
 	size_t outputs() const override { return source.outputs(); }
 	size_t groupSize(size_t groupIndex) const { return source.groupSize(groupIndex); }
 
-	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 targetSize=0, bool noCacheWrite = false) override {
-		int2 fullTargetSize = size(groupIndex);
-		int2 fullSourceSize = source.size(groupIndex);
-		int2 sourceSize = targetSize*fullSourceSize/fullTargetSize;
-		assert_(fullSourceSize.x/sourceSize.x == fullSourceSize.y/sourceSize.y, targetSize, fullTargetSize, fullSourceSize, sourceSize);
-		auto images = source.images(groupIndex, componentIndex, sourceSize, noCacheWrite);
-		assert_(images[0].size == sourceSize, images[0].size, sourceSize);
+	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size=0, bool noCacheWrite = false) override {
+		auto images = source.images(groupIndex, componentIndex, size, noCacheWrite);
+		//FIXME: assert same images[].size
 		auto transforms = transform(groupIndex, images[0].size);
 		int2 min,max; minmax(transforms, images[0].size, min, max);
 		return apply(images.size, [&](size_t index) -> SourceImage { return sample(images[index], transforms[index], min, max); });

@@ -15,7 +15,7 @@ struct GenericImageOperation : virtual GenericImageSource {
     int2 maximumSize() const override { return source.maximumSize(); }
 	String elementName(size_t index) const override { return source.elementName(index); }
 	int64 time(size_t index) override { return max(source.time(index), operation.time()); }
-	int2 size(size_t index) const override { return source.size(index); }
+	int2 size(size_t index, int2 size) const override { return source.size(index, size); }
 };
 
 struct ImageOperation : GenericImageOperation, ImageSource {
@@ -85,7 +85,7 @@ struct GroupImageOperation : ImageGroupSource {
 	int2 maximumSize() const override { return source.maximumSize(); }
 	int64 time(size_t groupIndex) override { return max(apply(groups(groupIndex), [this](size_t index) { return source.time(index); })); }
 	String elementName(size_t groupIndex) const override;
-	int2 size(size_t groupIndex) const override;
+	int2 size(size_t groupIndex, int2 size) const override;
 
 	size_t outputs() const override { return source.outputs(); }
 	size_t groupSize(size_t groupIndex) const { return groups(groupIndex).size; }
@@ -140,7 +140,7 @@ struct BinaryGenericImageOperation : virtual GenericImageSource {
 	virtual String elementName(size_t index) const override {
 		assert_(A.elementName(index) == B.elementName(index)); return A.elementName(index);
 	}
-	int2 size(size_t index) const override { assert_(A.size(index) == B.size(index)); return A.size(index); }
+	int2 size(size_t index, int2 size) const override { assert_(A.size(index, size) == B.size(index, size)); return A.size(index, size); }
 
 	String toString() const override { return "("+A.toString()+" | "+B.toString()+")"; }
 };

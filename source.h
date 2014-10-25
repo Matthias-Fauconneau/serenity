@@ -30,7 +30,7 @@ struct GenericImageSource : Source {
 	virtual const Folder& folder() const abstract;
     virtual int2 maximumSize() const abstract;
 	virtual String elementName(size_t index) const abstract;
-    virtual int2 size(size_t index) const abstract;
+	virtual int2 size(size_t index, int2 size=0) const abstract;
 
 	virtual String toString() const { return name(); }
 };

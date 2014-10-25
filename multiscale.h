@@ -18,6 +18,7 @@ struct FilterBank : ImageOperator, OperatorT<FilterBank> {
 };
 
 #include "source.h"
+/// Joins multiple single component sources as a single multiple component source
 struct JoinOperation : ImageSource {
 	array<ImageSource*> sources;
 	Folder cacheFolder {"Join", sources[0]->folder() /*FIXME: MRCA*/, true};
@@ -29,7 +30,7 @@ struct JoinOperation : ImageSource {
 	int2 maximumSize() const override { return sources[0]->maximumSize(); }
 	String elementName(size_t index) const override { return sources[0]->elementName(index); }
 	int64 time(size_t index) override { return max(apply(sources,[=](ImageSource* source){ return source->time(index); })); }
-	int2 size(size_t index) const override { return sources[0]->size(index); }
+	int2 size(size_t index, int2 size) const override { /*FIXME: assert same sizes*/ return sources[0]->size(index, size); }
 
 	size_t outputs() const override { return sources.size; }
 	SourceImage image(size_t index, size_t componentIndex, int2 size = 0, bool noCacheWrite = false) override {
