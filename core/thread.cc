@@ -123,9 +123,9 @@ void setExceptions(uint except) {
 void __attribute((constructor(102))) setup_signals() {
 #if 1
     /// Limits process ressources to avoid hanging the system when debugging
-    { rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<21;/*2M*/ setrlimit(RLIMIT_STACK,&limit); }
-    { rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<29;/*512M*/ setrlimit(RLIMIT_DATA,&limit); }
-    { rlimit limit; getrlimit(RLIMIT_AS,&limit); limit.rlim_cur=1<<30;/*1GB*/ setrlimit(RLIMIT_AS,&limit); }
+	{ rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<24;/*16M*/ setrlimit(RLIMIT_STACK,&limit); }
+	{ rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<31;/*2GB*/ setrlimit(RLIMIT_DATA,&limit); }
+	{ rlimit limit; getrlimit(RLIMIT_AS,&limit); limit.rlim_cur=1ul<<32;/*4GB*/ setrlimit(RLIMIT_AS,&limit); }
     setpriority(PRIO_PROCESS,0,19);
 #endif
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}

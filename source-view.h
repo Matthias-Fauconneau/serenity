@@ -34,7 +34,7 @@ struct GenericImageSourceView : ImageView {
 		if(!source.count(1)) return {};
 		update(index, size);
 		ImageView::image = share(image);
-		assert_(image.size.x <= size.x || image.size.y <= size.y, image.size, size);
+		//assert_(image.size.x <= size.x || image.size.y <= size.y, image.size, size);
         return ImageView::graphics(size);
     }
 

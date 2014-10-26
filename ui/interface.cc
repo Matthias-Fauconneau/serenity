@@ -55,7 +55,7 @@ int2 ImageView::sizeHint(int2 size) { return min(image.size, size.x && image.siz
 Graphics ImageView::graphics(int2 size) {
     Graphics graphics;
     if(image) {
-		int2 target = max(image.size*size.x/image.size.x, image.size*size.y/image.size.y);
+		int2 target = min(image.size*size.x/image.size.x, image.size*size.y/image.size.y);
         graphics.blits.append(vec2(max(vec2(0),vec2((size-target)/2))), vec2(target), share(image));
     }
     return graphics;

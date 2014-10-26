@@ -31,7 +31,7 @@ const Folder& root() { static const Folder root("/",currentWorkingDirectory()); 
 Folder::Folder(const string folder, const Folder& at, bool create):Handle(0){
     if(create && !existsFolder(folder,at)) check_(mkdirat(at.fd, strz(folder), 0777), at.name(), folder);
     assert_(folder);
-    fd = check( openat(at.fd, strz(folder?:"."), O_RDONLY|O_DIRECTORY, 0), '\''+folder+'\'');
+	fd = check( openat(at.fd, strz(folder?:"."), O_RDONLY|O_DIRECTORY, 0), '\''+folder+'\'', at.name());
 }
 
 struct stat Folder::stat() const { struct stat stat; check_( fstat(fd, &stat) ); return stat; }

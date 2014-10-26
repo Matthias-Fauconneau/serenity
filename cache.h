@@ -59,6 +59,15 @@ template<Type T> ImageMapSource<T> cache(const Folder& folder, string name, int2
 	return ImageMapSource<T>(move(t), move(map));
 }
 
+// -> file
+inline void emptyRecursively(const Folder& folder) {
+	for(string subfolder: folder.list(Folders)) {
+		emptyRecursively(Folder(subfolder, folder));
+		removeFolder(subfolder, folder);
+	}
+	for(string file: folder.list(Files)) remove(file, folder);
+}
+
 /// Caches results of \a write on file system as folder/name.key/
 /// \note All results of a given \name and any \a key older than \a sourceTime or \a version are removed
 inline Folder cacheFolder(const Folder& parent, string name, string key, int64 sourceTime,
@@ -66,14 +75,15 @@ inline Folder cacheFolder(const Folder& parent, string name, string key, int64 s
 	auto folders = filter(parent.list(Folders), [&](string folderName){ return section(folderName,'.',0,-2) != name; });
 	for(string folderName: folders) {
 		Folder folder (folderName, parent);
-		int64 cacheTime = File(folder.list(Files)[0], folder).modifiedTime();
+		auto files = folder.list(Files|Recursive);
+		int64 cacheTime = files ? File(files[0], folder).modifiedTime() : 0;
 		string folderKey = section(folderName,'.',-2,-1);
 		if(folderKey && cacheTime > sourceTime && (version ? cacheTime > parseDate(version)*1000000000l : true)) {
 			if(folderKey==key) return folder;
 		} else { // Removes any invalidated folders (of any key)
 			assert_(find(parent.name(),"/Pictures/"_) && !folderName.contains('/')); // Safeguards
 			//log('-', folderName/*, Date(cacheTime), Date(sourceTime), Date(parseDate(version)*1000000000l)*/);
-			for(string file: folder.list(Files)) remove(file, folder);
+			emptyRecursively(folder);
 			removeFolder(folderName, parent);
 		}
 	}

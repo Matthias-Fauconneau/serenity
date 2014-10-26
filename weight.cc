@@ -40,9 +40,8 @@ void NormalizeSum::apply(ref<ImageF> Y, ref<ImageF> X) const {
 	forXY(Y[0].size, [&](uint x, uint y) {
 		float sum = 0;
 		for(size_t index: range(X.size)) sum += X[index](x, y);
-		//assert_(sum);
 		if(sum) for(size_t index: range(Y.size)) Y[index](x, y) = X[index](x, y)/sum;
-		else for(size_t index: range(Y.size)) Y[index](x, y) = 1./X.size;
+		else for(size_t index: range(Y.size)) Y[index](x, y) = 0;
 	});
 }
 

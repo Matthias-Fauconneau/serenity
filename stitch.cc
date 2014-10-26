@@ -68,7 +68,6 @@ struct PanoramaWeights : ImageGroupSource {
 		int2 size = max-min;
 		auto indices = sortIndices(transforms); // by X offset
 		buffer<size_t> reverse (indices.size); for(size_t index: range(indices.size)) reverse[indices[index]] = index;
-		log(indices, reverse);
 		array<SourceImage> sorted = apply(transforms.size, [&](size_t index) -> SourceImage {
 			SourceImage image (size);
 			auto current = transforms[index];
@@ -82,11 +81,9 @@ struct PanoramaWeights : ImageGroupSource {
 			for(size_t y : range(image.size.y)) {
 				for(size_t x : range(currentMin)) image(x,y) = 0;
 				for(size_t x : range(currentMin, (currentMin+previousMax)/2)) image(x,y) = 0;
-				//for(size_t x : range(currentMin, previousMax)) image(x,y) = (float)(x-currentMin)/(previousMax-currentMin);
 				for(size_t x : range((currentMin+previousMax)/2, previousMax)) image(x,y) = 1;
 				for(size_t x : range(previousMax, nextMin)) image(x,y) = 1;
 				for(size_t x : range(nextMin, (nextMin+currentMax)/2)) image(x,y) = 1;
-				//for(size_t x : range(nextMin, currentMax)) image(x,y) = (float)(currentMax-x)/(currentMax-nextMin);
 				for(size_t x : range((nextMin+currentMax)/2, currentMax)) image(x,y) = 0;
 				for(size_t x : range(currentMax, image.size.x)) image(x,y) = 0;
 			}
@@ -114,8 +111,7 @@ struct ImageGroupForwardComponent : ImageGroupSource {
 		size_t outputs() const { return 1; }
 		array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size, string parameters = "") {
 			assert_(componentIndex == 0);
-			assert_(isInteger(parameters));
-			log("get", parseInteger(parameters), forward.input.outputs());
+			assert_(isInteger(parameters), parameters);
 			return forward.input.images(groupIndex, parseInteger(parameters), size, parameters);
 		}
 	} source {*this};
@@ -132,7 +128,6 @@ struct ImageGroupForwardComponent : ImageGroupSource {
 	size_t outputs() const { return input.outputs(); }
 	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size, string parameters = "") override {
 		assert_(!parameters);
-		log("set", componentIndex, input.outputs());
 		assert_(target.outputs()==1);
 		return target.images(groupIndex, 0, size, str(componentIndex));
 	}
@@ -152,7 +147,7 @@ struct PanoramaStitch {
 
 	GroupImageOperation groupSource {source, groups};
 	SampleImageGroupOperation alignSource {groupSource, transforms};
-	ImageGroupOperationT<Intensity> alignIntensity {alignSource};
+	//ImageGroupOperationT<Intensity> alignIntensity {alignSource}; //FIXME
 
 	PanoramaWeights weights {groupSource, transforms};
 	ImageGroupOperationT<NormalizeSum> normalizeWeights {weights};
@@ -160,8 +155,8 @@ struct PanoramaStitch {
 	ImageGroupFoldT<Sum> select {applySelectionWeights};
 
 	ImageGroupOperationT<WeightFilterBank> weightBands {weights}; // Splits each weight selection in bands
-	BinaryImageGroupOperationT<Mask> maskWeightBands {alignIntensity, weightBands};
-	ImageGroupOperationT<NormalizeSum> normalizeWeightBands {maskWeightBands}; // Normalizes weight selection for each band
+	//BinaryImageGroupOperationT<Mask> maskWeightBands {alignIntensity, weightBands};
+	ImageGroupOperationT<NormalizeSum> normalizeWeightBands {weightBands}; // Normalizes weight selection over images for each band
 
 	ImageGroupForwardComponent multiscale {alignSource, sumBands};
 	ImageGroupOperationT<FilterBank> splitBands {multiscale.source};
@@ -177,7 +172,7 @@ struct PanoramaStitchPreview : PanoramaStitch, Application {
 	size_t imageIndex = 0;
 
 #if 1
-	sRGBGroupOperation sRGB [2] = {normalizeWeightBands, multiscale};
+	sRGBGroupOperation sRGB [2] = {alignSource, multiscale};
 	array<Scroll<ImageGroupSourceView>> sRGBView = apply(mref<sRGBGroupOperation>(sRGB), [&](ImageRGBGroupSource& source) {
 			return Scroll<ImageGroupSourceView>(source, &index, &imageIndex); });
 #else
@@ -186,7 +181,7 @@ struct PanoramaStitchPreview : PanoramaStitch, Application {
 													[&](ImageRGBSource& source) -> Scroll<ImageSourceView> { return {source, &index}; });
 #endif
 	VBox views {toWidgets(sRGBView), VBox::Share, VBox::Expand};
-	Window window {&views, int2(0, views.size*256), [this]{ return views.title(); }};
+	Window window {&views, -1, [this]{ return views.title(); }};
 };
 registerApplication(PanoramaStitchPreview);
 
@@ -197,7 +192,7 @@ struct PanoramaStitchExport : PanoramaStitch, Application {
 		for(size_t index: range(sRGB.count(-1))) {
 			String name = sRGB.elementName(index);
 			Time time;
-			SourceImageRGB image = sRGB.image(index, int2(0,1024));
+			SourceImageRGB image = sRGB.image(index, int2(0,1680));
 			time.stop();
 			Time compressionTime;
 			writeFile(name, encodeJPEG(image, 75), output, true);

@@ -77,33 +77,45 @@ array<SourceImage> GroupImageOperation::images(size_t groupIndex, size_t compone
 
 // ImageGroupOperation
 array<SourceImage> ImageGroupOperation::images(size_t groupIndex, size_t componentIndex, int2 hint, string parameters) {
-	return ::cacheGroup<ImageF>(folder(), elementName(groupIndex)+parameters+'['+str(componentIndex)+']', size(groupIndex, hint),
-								groupSize(groupIndex), time(groupIndex), [&](ref<ImageF> targets) {
-		if(operation.inputs() == 0 && operation.outputs()==0) { // Operates on all images at once (forwards componentIndex)
-			array<SourceImage> inputs = source.images(groupIndex, componentIndex, hint, parameters);
-			operation.apply(targets, share(inputs));
-		}
-		else if(outputs()==0 && (operation.inputs()==source.outputs() || operation.inputs()==0)) {
-			assert_(componentIndex == 0, name());
+	if(outputs() > 1 && source.outputs() == operation.inputs() && operation.outputs() == outputs()) {
+		Folder folder = ::cacheFolder(this->folder(), elementName(groupIndex)+parameters, strx(size(groupIndex, hint)), time(groupIndex),
+										 [&](const Folder& folder) {
 			array<array<SourceImage>> images;
 			for(size_t inputIndex: range(source.outputs())) images.append( source.images(groupIndex, inputIndex, hint, parameters) );
 			for(size_t imageIndex: range(groupSize(groupIndex))) { // Operates on each image separately
+				::cacheGroup<ImageF>(folder, str(imageIndex), size(groupIndex, hint), outputs(), time(groupIndex),
+									 [&](ref<ImageF> targets) {
+					array<ImageF> inputs;
+					// Transposes images/components
+					for(size_t inputIndex: range(source.outputs())) inputs.append( share(images[inputIndex][imageIndex]) );
+					log(operation.name(), groupIndex, imageIndex);
+					operation.apply(targets, inputs);
+				});
+			}
+		});
+		return ::apply(groupSize(groupIndex), [&folder, size=this->size(groupIndex, hint), componentIndex](size_t imageIndex) {
+			Map map(str(componentIndex), Folder(str(imageIndex)+'.'+strx(size), folder));
+			ImageF image (unsafeReference(cast<typename ImageF::type>(map)), size, size.x);
+			return ImageMapSource<ImageF>(move(image), move(map));
+		});
+	}
+	return ::cacheGroup<ImageF>(folder(), elementName(groupIndex)+parameters+'['+str(componentIndex)+']', size(groupIndex, hint),
+								groupSize(groupIndex), time(groupIndex), [&](ref<ImageF> targets) {
+		// Operates on all images at once (forwards componentIndex)
+		if(operation.inputs() == 0 && operation.outputs() == 0 && source.outputs() == outputs()) {
+			array<SourceImage> inputs = source.images(groupIndex, componentIndex, hint, parameters);
+			operation.apply(targets, share(inputs));
+		}
+		else { // Operates on each image separately (only single component supported)
+			assert_((source.outputs() == operation.inputs() || operation.inputs()==0) && outputs()==1 && componentIndex == 0,
+					source.outputs(), operation.inputs(), operation.outputs(), outputs());
+			array<array<SourceImage>> images;
+			for(size_t inputIndex: range(source.outputs())) images.append( source.images(groupIndex, inputIndex, hint, parameters) );
+			for(size_t imageIndex: range(groupSize(groupIndex))) {
 				array<ImageF> components;
 				// Transposes images/components
 				for(size_t inputIndex: range(source.outputs())) components.append( share(images[inputIndex][imageIndex]) );
 				operation.apply(targets.slice(imageIndex, 1), components);
-			}
-		} else { // FIXME: recomputed for each component (need cacheGroupGroup)
-			array<array<SourceImage>> images;
-			for(size_t inputIndex: range(source.outputs())) images.append( source.images(groupIndex, inputIndex, hint, parameters) );
-			for(size_t imageIndex: range(groupSize(groupIndex))) { // Operates on each image separately
-				array<ImageF> components;
-				// Transposes images/components
-				for(size_t inputIndex: range(source.outputs())) components.append( share(images[inputIndex][imageIndex]) );
-				array<ImageF> outputs;
-				for(size_t unused index: range(operation.outputs())) outputs.append( this->size(groupIndex, hint) );
-				operation.apply(outputs, components);
-				targets[imageIndex].copy(outputs[componentIndex]);
 			}
 		}
 	});
