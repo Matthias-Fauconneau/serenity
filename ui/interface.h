@@ -135,3 +135,4 @@ struct Index {
 	operator size_t() const { return *pointer; }
 	operator size_t&() { return *pointer; }
 };
+inline String str(Index o) { return str(*o.pointer); }

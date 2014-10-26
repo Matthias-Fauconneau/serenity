@@ -57,13 +57,13 @@ struct GenericImageSourceView : ImageView {
 
 struct ImageSourceView  : GenericImageSourceView {
 	ImageRGBSource& source;
-	size_t imageIndex = -1;
+	size_t lastImageIndex = -1;
 
 	ImageSourceView(ImageRGBSource& source, size_t* index=0) : GenericImageSourceView(source, index), source(source) {}
 
 	void update(size_t index, int2 size) override {
-		if(imageIndex != index) {
-			imageIndex = index;
+		if(lastImageIndex != index) {
+			lastImageIndex = index;
 			int2 sourceSize = source.size(index);
 			int2 targetSize = max(sourceSize*size.x/sourceSize.x, sourceSize*size.y/sourceSize.y); // Fits aspect ratio
 			log(size, sourceSize, targetSize);
@@ -74,25 +74,27 @@ struct ImageSourceView  : GenericImageSourceView {
 
 struct ImageGroupSourceView  : GenericImageSourceView {
 	ImageRGBGroupSource& source;
-	size_t groupIndex = -1;
-	size_t imageIndex = 0;
+	size_t lastGroupIndex = -1;
+	size_t ownImageIndex = 0;
+	Index imageIndex;
 	array<SourceImageRGB> images;
 
-	ImageGroupSourceView(ImageRGBGroupSource& source, size_t* index=0) : GenericImageSourceView(source, index), source(source) {}
+	ImageGroupSourceView(ImageRGBGroupSource& source, size_t* index=0, size_t* imageIndex=0)
+		: GenericImageSourceView(source, index), source(source), imageIndex(imageIndex?:&ownImageIndex) {}
 
 	String title() override {
 		return str(GenericImageSourceView::title(), imageIndex);
 	}
 
 	void update(size_t index, int2 size) override {
-		if(groupIndex != index) {
-			groupIndex = index;
+		if(lastGroupIndex != index) {
+			lastGroupIndex = index;
 			int2 sourceSize = source.size(index);
 			size = max(sourceSize*size.x/sourceSize.x, sourceSize*size.y/sourceSize.y); // Fits aspect ratio
-			images = source.images(min<size_t>(groupIndex, source.count(index+1)-1), size);
+			images = source.images(min<size_t>(index, source.count(index+1)-1), size);
 		}
 		assert_(images.size);
-		image = share(images[min(images.size-1, imageIndex)]);
+		image = share(images[min<size_t>(images.size-1, imageIndex)]);
 	}
 
 	/// Cycles between images of a group with the mouse wheel

@@ -87,9 +87,7 @@ inline Folder cacheFolder(const Folder& parent, string name, string key, int64 s
 /// Maps results to be generated or read from cache
 // TODO: recursion
 template<Type T> array<ImageMapSource<T>> cacheGroup(const Folder& parent, string name, int2 size, size_t groupSize, int64 sourceTime,
-										 function<void(ref<T>)> evaluate, bool noCacheWrite = false, string version = __DATE__ " " __TIME__) {
-	//if(noCacheWrite) { array<ImageMapSource<T>> target(size); evaluate(target); return move(target); }
-	assert_(!noCacheWrite);
+										 function<void(ref<T>)> evaluate, string version = __DATE__ " " __TIME__) {
 	Folder folder = cacheFolder(parent, name, strx(size), sourceTime, [groupSize, size, &evaluate](const Folder& folder) {
 		array<Map> maps = apply(groupSize, [&folder, size](size_t index) {
 				File file(str(index), folder, Flags(ReadWrite|Create|Truncate));

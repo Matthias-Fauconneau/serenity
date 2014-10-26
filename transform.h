@@ -128,11 +128,11 @@ struct SampleImageGroupOperation : ImageGroupSource {
 	}
 	int2 sourceSize(size_t groupIndex, int2 hint) const { return source.size(groupIndex, sourceHint(groupIndex, hint)); }
 
-	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 hint=0, bool noCacheWrite = false) override {
+	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 hint=0, string parameters = "") override {
 		int2 sourceSize = this->sourceSize(groupIndex, hint);
 		auto transforms = transform(groupIndex, sourceSize);
 		int2 min,max; minmax(transforms, sourceSize, min, max);
-		auto images = source.images(groupIndex, componentIndex, sourceHint(groupIndex, hint), noCacheWrite);
+		auto images = source.images(groupIndex, componentIndex, sourceHint(groupIndex, hint), parameters);
 		assert_(images[0].size == sourceSize, images[0].size, sourceSize);
 		return apply(images.size, [&](size_t index) -> SourceImage { return sample(images[index], transforms[index], min, max); });
 	}

@@ -60,7 +60,7 @@ struct PanoramaWeights : ImageGroupSource {
 	}
 	int2 sourceSize(size_t groupIndex, int2 hint) const { return source.size(groupIndex, sourceHint(groupIndex, hint)); }
 
-	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 hint=0, bool unused noCacheWrite = false) override {
+	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 hint, string) override {
 		assert_(componentIndex == 0);
 		int2 sourceSize = this->sourceSize(groupIndex, hint);
 		auto transforms = transform(groupIndex, sourceSize);
@@ -81,9 +81,13 @@ struct PanoramaWeights : ImageGroupSource {
 					currentMin, previousMax, nextMin, currentMax);
 			for(size_t y : range(image.size.y)) {
 				for(size_t x : range(currentMin)) image(x,y) = 0;
-				for(size_t x : range(currentMin, previousMax)) image(x,y) = (float)(x-currentMin)/(previousMax-currentMin);
+				for(size_t x : range(currentMin, (currentMin+previousMax)/2)) image(x,y) = 0;
+				//for(size_t x : range(currentMin, previousMax)) image(x,y) = (float)(x-currentMin)/(previousMax-currentMin);
+				for(size_t x : range((currentMin+previousMax)/2, previousMax)) image(x,y) = 1;
 				for(size_t x : range(previousMax, nextMin)) image(x,y) = 1;
-				for(size_t x : range(nextMin, currentMax)) image(x,y) = (float)(currentMax-x)/(currentMax-nextMin);
+				for(size_t x : range(nextMin, (nextMin+currentMax)/2)) image(x,y) = 1;
+				//for(size_t x : range(nextMin, currentMax)) image(x,y) = (float)(currentMax-x)/(currentMax-nextMin);
+				for(size_t x : range((nextMin+currentMax)/2, currentMax)) image(x,y) = 0;
 				for(size_t x : range(currentMax, image.size.x)) image(x,y) = 0;
 			}
 			return image;
@@ -108,12 +112,13 @@ struct ImageGroupForwardComponent : ImageGroupSource {
 		int2 size(size_t index, int2 size=0) const { return forward.input.size(index, size); }
 		size_t groupSize(size_t groupIndex) const { return forward.input.groupSize(groupIndex); }
 		size_t outputs() const { return 1; }
-		array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size, bool noCacheWrite = false) {
+		array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size, string parameters = "") {
 			assert_(componentIndex == 0);
-			return forward.input.images(groupIndex, forward.componentIndex, size, noCacheWrite);
+			assert_(isInteger(parameters));
+			log("get", parseInteger(parameters), forward.input.outputs());
+			return forward.input.images(groupIndex, parseInteger(parameters), size, parameters);
 		}
 	} source {*this};
-	int componentIndex = -1; // FIXME: upgrade ImageSource interface to pass private parameters
 	ImageGroupForwardComponent(ImageGroupSource& input, ImageGroupSource& target) : input(input), target(target) {}
 
 	size_t count(size_t need=0) { return target.count(need); }
@@ -125,10 +130,11 @@ struct ImageGroupForwardComponent : ImageGroupSource {
 	int2 size(size_t index, int2 size=0) const { return target.size(index, size); }
 	size_t groupSize(size_t groupIndex) const { return target.groupSize(groupIndex); }
 	size_t outputs() const { return input.outputs(); }
-	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size, bool noCacheWrite = false) override {
-		this->componentIndex = componentIndex; // Forwards componentIndex through a private field
+	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size, string parameters = "") override {
+		assert_(!parameters);
+		log("set", componentIndex, input.outputs());
 		assert_(target.outputs()==1);
-		return target.images(groupIndex, 0, size, noCacheWrite);
+		return target.images(groupIndex, 0, size, str(componentIndex));
 	}
 };
 
@@ -168,11 +174,12 @@ struct PanoramaStitchPreview : PanoramaStitch, Application {
 	PersistentValue<String> lastName {folder, ".last", [this]{ return source.elementName(index); }};
 	const size_t lastIndex = source.keys.indexOf(lastName);
 	size_t index = lastIndex != invalid ? lastIndex : 0;
+	size_t imageIndex = 0;
 
 #if 1
-	sRGBGroupOperation sRGB [1] = {alignAlignSource};
-	array<Scroll<ImageGroupSourceView>> sRGBView = apply(mref<sRGBGroupOperation>(sRGB),
-														 [&](ImageRGBGroupSource& source) -> Scroll<ImageGroupSourceView> { return {source, &index}; });
+	sRGBGroupOperation sRGB [2] = {normalizeWeightBands, multiscale};
+	array<Scroll<ImageGroupSourceView>> sRGBView = apply(mref<sRGBGroupOperation>(sRGB), [&](ImageRGBGroupSource& source) {
+			return Scroll<ImageGroupSourceView>(source, &index, &imageIndex); });
 #else
 	sRGBOperation sRGB [1] = {blend};
 	array<Scroll<ImageSourceView>> sRGBView = apply(mref<sRGBOperation>(sRGB),
@@ -184,7 +191,7 @@ struct PanoramaStitchPreview : PanoramaStitch, Application {
 registerApplication(PanoramaStitchPreview);
 
 struct PanoramaStitchExport : PanoramaStitch, Application {
-	sRGBOperation sRGB {select};
+	sRGBOperation sRGB {blend};
 	PanoramaStitchExport() {
 		Folder output ("Export", folder, true);
 		for(size_t index: range(sRGB.count(-1))) {

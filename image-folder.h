@@ -65,12 +65,12 @@ struct ImageFolder : ImageSource, ImageRGBSource, map<String, map<String, String
 	int2 size(size_t index, int2 size=0) const override { return size ?: parse<int2>(values[index].at("Size"_)); }
 
     /// Converts encoded sRGB images to raw (mmap'able) sRGB images
-	SourceImageRGB image(size_t index, bool noCacheWrite = false);
+	SourceImageRGB image(size_t index, string parameters = "");
 
     /// Resizes sRGB images
     /// \note Resizing after linear float conversion would be more accurate but less efficient
-	SourceImageRGB image(size_t index, int2 size, bool noCacheWrite = false) override;
+	SourceImageRGB image(size_t index, int2 size, string parameters = "") override;
 
     /// Converts sRGB images to linear float images
-	SourceImage image(size_t index, size_t componentIndex, int2 size, bool noCacheWrite) override;
+	SourceImage image(size_t index, size_t componentIndex, int2 size, string parameters = "") override;
 };

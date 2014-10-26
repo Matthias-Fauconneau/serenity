@@ -78,13 +78,3 @@ struct Sum : ImageGroupOperator1, OperatorT<Sum> {
 		parallel::apply(Y, [&](size_t index) { return sum<float>(::apply(X, [index](const ImageF& x) { return x[index]; })); });
 	}
 };
-
-struct Index0 : ImageGroupOperator1, OperatorT<Index0> {
-	void apply(const ImageF& Y, ref<ImageF> X) const override {	Y.copy(X[0]); }
-};
-struct Index1 : ImageGroupOperator1, OperatorT<Index1> {
-	void apply(const ImageF& Y, ref<ImageF> X) const override {	Y.copy(X[1]); }
-};
-struct Index2 : ImageGroupOperator1, OperatorT<Index2> {
-	void apply(const ImageF& Y, ref<ImageF> X) const override {	Y.copy(X[2]); }
-};

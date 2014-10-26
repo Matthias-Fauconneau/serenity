@@ -91,11 +91,11 @@ struct TransposeOperation : GenericImageOperation, ImageGroupSource, OperatorT<T
 
 	size_t outputs() const override { return source.groupSize(0); /*Assumes all groups have same size*/ }
 	size_t groupSize(size_t) const { return source.outputs(); }
-	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size, bool noCacheWrite = false) {
+	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size, string parameters = "") {
 		array<SourceImage> outputs;
 		assert_(source.outputs(), source.toString());
 		for(size_t outputIndex: range(source.outputs())) {
-			auto inputs = source.images(groupIndex, outputIndex, size, noCacheWrite);
+			auto inputs = source.images(groupIndex, outputIndex, size, parameters);
 			assert_(componentIndex < inputs.size);
 			outputs.append( move(inputs[componentIndex]) );
 		}

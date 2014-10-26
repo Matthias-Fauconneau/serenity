@@ -30,7 +30,7 @@ struct ImageOperation : GenericImageOperation, ImageSource {
 		return source.outputs();
 	}
 	/// Returns processed linear image
-	SourceImage image(size_t imageIndex, size_t componentIndex, int2 size = 0, bool noCacheWrite = false) override;
+	SourceImage image(size_t imageIndex, size_t componentIndex, int2 size = 0, string parameters = "") override;
 
 	String toString() const override { return GenericImageSource::toString()+'['+str(outputs())+']'; }
 };
@@ -49,7 +49,7 @@ struct sRGBOperation : GenericImageOperation, ImageRGBSource, SRGB {
 	sRGBOperation(ImageSource& source) : GenericImageOperation(source, *this), source(source) {}
 
 	/// Returns processed sRGB image
-	virtual SourceImageRGB image(size_t index, int2 size = 0, bool noCacheWrite = false) override;
+	virtual SourceImageRGB image(size_t index, int2 size = 0, string parameters = "") override;
 };
 
 /// Evaluates an image for each group
@@ -65,7 +65,7 @@ struct ImageGroupFold : GenericImageOperation, ImageSource {
 				operation.name(), operation.inputs(), operation.outputs(), source.name(), "ImageGroupFold");
 		return source.outputs();
 	}
-	SourceImage image(size_t groupIndex, size_t componentIndex, int2 size = 0, bool noCacheWrite = false) override;
+	SourceImage image(size_t groupIndex, size_t componentIndex, int2 size = 0, string parameters = "") override;
 
 	String toString() const override { return str(source.toString(), operation.name())+'['+str(outputs())+']'; }
 };
@@ -89,7 +89,7 @@ struct GroupImageOperation : ImageGroupSource {
 
 	size_t outputs() const override { return source.outputs(); }
 	size_t groupSize(size_t groupIndex) const { return groups(groupIndex).size; }
-	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size = 0, bool noCacheWrite = false) override;
+	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size = 0, string parameters = "") override;
 };
 
 struct GenericImageGroupOperation : GenericImageOperation, virtual GenericImageGroupSource {
@@ -112,7 +112,7 @@ struct ImageGroupOperation : GenericImageGroupOperation, ImageGroupSource {
 	ImageGroupOperation(ImageGroupSource& source, ImageOperator& operation)
 		: GenericImageGroupOperation(source, operation), operation(operation) {}
 
-	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size = 0, bool noCacheWrite = false) override;
+	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size = 0, string parameters = "") override;
 };
 
 generic struct ImageGroupOperationT : T, ImageGroupOperation {
@@ -121,7 +121,7 @@ generic struct ImageGroupOperationT : T, ImageGroupOperation {
 
 struct sRGBGroupOperation : GenericImageGroupOperation, ImageRGBGroupSource, SRGB {
 	sRGBGroupOperation(ImageGroupSource& source) : GenericImageGroupOperation(source, *this) {}
-	array<SourceImageRGB> images(size_t groupIndex, int2 size = 0, bool noCacheWrite = false) override;
+	array<SourceImageRGB> images(size_t groupIndex, int2 size = 0, string parameters = "") override;
 };
 
 /// Operates on two image sources
@@ -157,7 +157,7 @@ struct BinaryImageOperation : BinaryGenericImageOperation, ImageSource {
 
 	size_t outputs() const override { return B.outputs(); }
 
-	SourceImage image(size_t imageIndex, size_t componentIndex, int2 size = 0, bool noCacheWrite = false) override;
+	SourceImage image(size_t imageIndex, size_t componentIndex, int2 size = 0, string parameters = "") override;
 
 	String toString() const override { return BinaryGenericImageOperation::toString()+'['+str(outputs())+']'; }
 };
@@ -179,7 +179,7 @@ struct BinaryImageGroupOperation : BinaryGenericImageOperation, ImageGroupSource
 	}
 	size_t groupSize(size_t groupIndex) const { assert_(A.groupSize(groupIndex) == B.groupSize(groupIndex)); return A.groupSize(groupIndex); }
 
-	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size = 0, bool noCacheWrite = false) override;
+	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size = 0, string parameters = "") override;
 
 	String toString() const override { return BinaryGenericImageOperation::toString()+'['+str(outputs())+']'; }
 };
