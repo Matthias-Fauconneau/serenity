@@ -23,10 +23,6 @@ struct AllImages : GroupSource {
 	int64 time(size_t groupIndex) override { return max(apply(operator()(groupIndex), [this](size_t index) { return source.time(index); })); }
 };
 
-struct Binary : ImageOperator1, OperatorT<Binary> {
-	void apply(const ImageF& Y, const ImageF& X) const override { ::apply(Y, [&](float x) { return x ? 1 : 0; }, X); }
-};
-
 struct Mask : ImageOperator, OperatorT<Mask> {
 	size_t inputs() const override { return 2; }
 	size_t outputs() const override { return 1; }
@@ -39,12 +35,12 @@ struct Mask : ImageOperator, OperatorT<Mask> {
 struct PanoramaWeights : ImageGroupSource {
 	ImageGroupSource& source;
 	TransformGroupSource& transform;
-	Folder cacheFolder {"[sample]", source.folder(), true};
+	Folder cacheFolder {"[panoramaweights]", source.folder(), true};
 	PanoramaWeights(ImageGroupSource& source, TransformGroupSource& transform) : source(source), transform(transform) {}
 
 	size_t count(size_t need=0) override { return source.count(need); }
 	int64 time(size_t groupIndex) override { return max(source.time(groupIndex), transform.time(groupIndex)); }
-	String name() const override { return str(source.name(), "[sample]"); }
+	String name() const override { return str(source.name(), "[panoramaweights]"); }
 	const Folder& folder() const override { return cacheFolder; }
 	int2 maximumSize() const override { return source.maximumSize(); }
 	String elementName(size_t groupIndex) const override { return source.elementName(groupIndex); }
@@ -58,7 +54,6 @@ struct PanoramaWeights : ImageGroupSource {
 
 	int2 sourceHint(size_t groupIndex, int2 hint) const {
 		if(!hint) return source.size(groupIndex, 0);
-		// Scales source size
 		int2 fullTargetSize = this->size(groupIndex, 0);
 		int2 fullSourceSize = source.size(groupIndex, 0);
 		return hint*fullSourceSize/fullTargetSize;
@@ -71,39 +66,29 @@ struct PanoramaWeights : ImageGroupSource {
 		auto transforms = transform(groupIndex, sourceSize);
 		int2 min,max; minmax(transforms, sourceSize, min, max);
 		int2 size = max-min;
-
-		sort(transforms); // by X offset
-		return apply(transforms.size, [&](size_t index) -> SourceImage {
+		auto indices = sortIndices(transforms); // by X offset
+		buffer<size_t> reverse (indices.size); for(size_t index: range(indices.size)) reverse[indices[index]] = index;
+		log(indices, reverse);
+		array<SourceImage> sorted = apply(transforms.size, [&](size_t index) -> SourceImage {
 			SourceImage image (size);
 			auto current = transforms[index];
-			int start, end;
-			if(index == 0) start =0;
-			else {
-				auto previous = transforms[index-1];
-				int currentMin = current.min(sourceSize).x;
-				int previousMax = previous.max(sourceSize).x;
-				assert_(currentMin < previousMax);
-				int midX = (currentMin + previousMax)/2 - min.x;
-				assert_(midX > 0 && midX < size.x, midX);
-				start = midX;
-			}
-			if(index==transforms.size-1) end = image.size.x;
-			else {
-				auto next = transforms[index+1];
-				int nextMin = next.min(sourceSize).x;
-				int currentMax = current.max(sourceSize).x;
-				assert_(nextMin < currentMax);
-				int midX = (nextMin + currentMax)/2 - min.x;
-				assert_(midX > 0 && midX < size.x, midX);
-				end = midX;
-			}
-			for(size_t y : range(image.size.y)) { //FIXME: parallel + SIMD
-				for(size_t x : range(start)) image(x,y) = 0;
-				for(size_t x : range(start, end)) image(x,y) = 1;
-				for(size_t x : range(end, image.size.x)) image(x,y) = 0;
+			int currentMin = current.min(sourceSize).x  - min.x;
+			int previousMax = (index == 0) ? currentMin : (transforms[index-1].max(sourceSize).x - min.x);
+			int currentMax = current.max(sourceSize).x - min.x;
+			int nextMin = (index == transforms.size-1) ? currentMax : (transforms[index+1].min(sourceSize).x - min.x);
+			if(previousMax > nextMin) previousMax=nextMin= (previousMax+nextMin)/2;
+			assert_(currentMin <= previousMax && previousMax <= nextMin && nextMin <= currentMax,
+					currentMin, previousMax, nextMin, currentMax);
+			for(size_t y : range(image.size.y)) {
+				for(size_t x : range(currentMin)) image(x,y) = 0;
+				for(size_t x : range(currentMin, previousMax)) image(x,y) = (float)(x-currentMin)/(previousMax-currentMin);
+				for(size_t x : range(previousMax, nextMin)) image(x,y) = 1;
+				for(size_t x : range(nextMin, currentMax)) image(x,y) = (float)(currentMax-x)/(currentMax-nextMin);
+				for(size_t x : range(currentMax, image.size.x)) image(x,y) = 0;
 			}
 			return image;
 		} );
+		return apply(reverse, [&](size_t index) { return move(sorted[index]); });
 	}
 };
 
@@ -160,11 +145,13 @@ struct PanoramaStitch {
 
 	GroupImageOperation groupSource {source, groups};
 	SampleImageGroupOperation alignSource {groupSource, transforms};
-	ImageGroupOperationT<Intensity> alignIntensity {alignSource};
-
+	//ImageGroupOperationT<Intensity> alignIntensity {alignSource};
 	GroupImageOperation groupIntensity {intensity, groups};
+	SampleImageGroupOperation alignIntensity {groupIntensity, transforms};
+
 	PanoramaWeights weights {groupIntensity, transforms};
-	BinaryImageGroupOperationT<Multiply> applySelectionWeights {weights, alignSource};
+	ImageGroupOperationT<NormalizeSum> normalizeWeights {weights};
+	BinaryImageGroupOperationT<Multiply> applySelectionWeights {normalizeWeights, alignSource};
 	ImageGroupFoldT<Sum> select {applySelectionWeights};
 
 	ImageGroupOperationT<WeightFilterBank> weightBands {weights}; // Splits each weight selection in bands
@@ -175,7 +162,7 @@ struct PanoramaStitch {
 	ImageGroupOperationT<FilterBank> splitBands {multiscale.source};
 	BinaryImageGroupOperationT<Multiply> weightedBands {normalizeWeightBands, splitBands}; // Applies weights to each band
 	ImageGroupOperationT<Sum> sumBands {weightedBands}; // Sums bands
-	ImageGroupOperationT<Sum> sumImages {multiscale}; // Sums images
+	ImageGroupFoldT<Sum> blend {multiscale}; // Sums images
 };
 
 struct PanoramaStitchPreview : PanoramaStitch, Application {
@@ -183,18 +170,25 @@ struct PanoramaStitchPreview : PanoramaStitch, Application {
 	const size_t lastIndex = source.keys.indexOf(lastName);
 	size_t index = lastIndex != invalid ? lastIndex : 0;
 
-	ImageGroupFoldT<Prism> prism [1] {/*overlap, low, mask,*/ weights};
-	//ImageGroupFoldT<Prism> prism [4] {exposure, lowExposure, maskLowExposure, weights};
+	ImageGroupFoldT<Prism> prism [1] {weights};
 	array<sRGBOperation> sRGB = apply(mref<ImageGroupFoldT<Prism>>(prism),
 									  [&](ImageSource& source) -> sRGBOperation { return source; });
 	array<Scroll<ImageSourceView>> sRGBView =
 			apply(mref<sRGBOperation>(sRGB), [&](ImageRGBSource& source) -> Scroll<ImageSourceView> { return {source, &index}; });
-
-	/*sRGBOperation sRGB2 [1] = {select};
+#if 0
+	sRGBGroupOperation sRGB2 [2] = {weights, alignIntensity};
+	array<Scroll<ImageGroupSourceView>> sRGBView3 =
+			apply(mref<sRGBGroupOperation>(sRGB2),
+				  [&](ImageRGBGroupSource& source) -> Scroll<ImageGroupSourceView> { return {source, &index}; });
+	VBox views {toWidgets(sRGBView3), VBox::Share, VBox::Expand};
+#elif 1
+	sRGBOperation sRGB2 [2] = {blend, select};
 	array<Scroll<ImageSourceView>> sRGBView2 =
-			apply(mref<sRGBOperation>(sRGB2), [&](ImageRGBSource& source) -> Scroll<ImageSourceView> { return {source, &index}; });*/
-	//VBox views {toWidgets(sRGBView)+toWidgets(sRGBView2), VBox::Share, VBox::Expand};
+			apply(mref<sRGBOperation>(sRGB2), [&](ImageRGBSource& source) -> Scroll<ImageSourceView> { return {source, &index}; });
+	VBox views {/*toWidgets(sRGBView)+*/toWidgets(sRGBView2), VBox::Share, VBox::Expand};
+#else
 	VBox views {toWidgets(sRGBView), VBox::Share, VBox::Expand};
-	Window window {&views, int2(0, 256), [this]{ return views.title(); }};
+#endif
+	Window window {&views, int2(0, views.size*256), [this]{ return views.title(); }};
 };
 registerApplication(PanoramaStitchPreview);

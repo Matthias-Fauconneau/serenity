@@ -234,6 +234,39 @@ generic void quicksort(const mref<T>& at, int left, int right) {
 /// Quicksorts the array in-place
 generic const mref<T>& sort(const mref<T>& at) { if(at.size) quicksort(at, 0, at.size-1); return at; }
 
+generic size_t partition(mref<T> at, size_t left, size_t right, size_t pivotIndex, mref<size_t> indices) {
+	swap(at[pivotIndex], at[right]); swap(indices[pivotIndex], indices[right]);
+	const T& pivot = at[right];
+	size_t storeIndex = left;
+	for(size_t i: range(left,right)) {
+		if(at[i] > pivot) {
+			swap(at[i], at[storeIndex]); swap(indices[i], indices[storeIndex]);
+			storeIndex++;
+		}
+	}
+	swap(at[storeIndex], at[right]); swap(indices[storeIndex], indices[right]);
+	return storeIndex;
+}
+generic void quicksort(mref<T> at, int left, int right, mref<size_t> indices) {
+	if(left < right) { // If the list has 2 or more items
+		int pivotIndex = partition(at, left, right, (left + right)/2, indices);
+		if(pivotIndex) quicksort(at, left, pivotIndex-1, indices);
+		quicksort(at, pivotIndex+1, right, indices);
+	}
+}
+/*generic buffer<size_t> sortIndices(ref<T> at) {
+	buffer<size_t> indices (at.size);
+	for(size_t index: range(indices.size)) indices[index]=index;
+	quicksort(buffer<T>(at), 0, at.size-1, indices);
+	return indices;
+}*/
+generic buffer<size_t> sortIndices(mref<T> at) {
+	buffer<size_t> indices (at.size);
+	for(size_t index: range(indices.size)) indices[index]=index;
+	quicksort(at, 0, at.size-1, indices);
+	return indices;
+}
+
 // -- Functional  --
 
 /// Creates a new array containing only elements where filter \a predicate does not match

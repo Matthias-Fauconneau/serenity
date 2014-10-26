@@ -96,7 +96,6 @@ void sample(const ImageF& target, const ImageF& source, Transform transform, int
 ImageF sample(ImageF&& target, const ImageF& source, Transform transform, int2 min, int2 max) { sample(target, source, transform, min, max); return move(target); }
 ImageF sample(const ImageF& source, Transform transform, int2 min, int2 max) { return sample(max-min, source, transform, min, max); }
 
-
 //FIXME: reuse UnaryImageGroupSource
 struct SampleImageGroupOperation : ImageGroupSource {
 	ImageGroupSource& source;
@@ -112,18 +111,29 @@ struct SampleImageGroupOperation : ImageGroupSource {
 	int2 maximumSize() const override { return source.maximumSize(); }
 	String elementName(size_t groupIndex) const override { return source.elementName(groupIndex); }
 
-	int2 size(size_t groupIndex, int2 size) const override {
-		int2 min,max; minmax(transform(groupIndex, source.size(groupIndex, size)), source.size(groupIndex, size), min, max); return max-min;
+	int2 size(size_t groupIndex, int2 hint) const override {
+		int2 sourceSize = this->sourceSize(groupIndex, hint);
+		int2 min,max; minmax(transform(groupIndex, sourceSize), source.size(groupIndex, sourceSize), min, max);
+		return max-min;
 	}
 
 	size_t outputs() const override { return source.outputs(); }
 	size_t groupSize(size_t groupIndex) const { return source.groupSize(groupIndex); }
 
-	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size=0, bool noCacheWrite = false) override {
-		auto images = source.images(groupIndex, componentIndex, size, noCacheWrite);
-		//FIXME: assert same images[].size
-		auto transforms = transform(groupIndex, images[0].size);
-		int2 min,max; minmax(transforms, images[0].size, min, max);
+	int2 sourceHint(size_t groupIndex, int2 hint) const {
+		if(!hint) return source.size(groupIndex, 0);
+		int2 fullTargetSize = this->size(groupIndex, 0);
+		int2 fullSourceSize = source.size(groupIndex, 0);
+		return hint*fullSourceSize/fullTargetSize;
+	}
+	int2 sourceSize(size_t groupIndex, int2 hint) const { return source.size(groupIndex, sourceHint(groupIndex, hint)); }
+
+	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 hint=0, bool noCacheWrite = false) override {
+		int2 sourceSize = this->sourceSize(groupIndex, hint);
+		auto transforms = transform(groupIndex, sourceSize);
+		int2 min,max; minmax(transforms, sourceSize, min, max);
+		auto images = source.images(groupIndex, componentIndex, sourceHint(groupIndex, hint), noCacheWrite);
+		assert_(images[0].size == sourceSize, images[0].size, sourceSize);
 		return apply(images.size, [&](size_t index) -> SourceImage { return sample(images[index], transforms[index], min, max); });
 	}
 };

@@ -66,7 +66,7 @@ inline Folder cacheFolder(const Folder& parent, string name, string key, int64 s
 	auto folders = filter(parent.list(Folders), [&](string folderName){ return section(folderName,'.',0,-2) != name; });
 	for(string folderName: folders) {
 		Folder folder (folderName, parent);
-		int64 cacheTime = folder.modifiedTime();
+		int64 cacheTime = File(folder.list(Files)[0], folder).modifiedTime();
 		string folderKey = section(folderName,'.',-2,-1);
 		if(folderKey && cacheTime > sourceTime && (version ? cacheTime > parseDate(version)*1000000000l : true)) {
 			if(folderKey==key) return folder;

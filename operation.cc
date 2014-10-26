@@ -44,15 +44,16 @@ SourceImageRGB sRGBOperation::image(size_t imageIndex, int2 hint, bool noCacheWr
 SourceImage ImageGroupFold::image(size_t groupIndex, size_t componentIndex, int2 hint, bool noCacheWrite) {
 	return move(::cacheGroup<ImageF>(folder(), elementName(groupIndex), size(groupIndex, hint), outputs(), time(groupIndex),
 								[&](ref<ImageF> targets) {
-		if(operation.outputs()==1) { // Forwards componentIndex
+		if(operation.inputs()==1 || operation.inputs()==0) { // Forwards componentIndex
 			for(size_t componentIndex: range(outputs())) {
 				array<SourceImage> inputs = source.images(groupIndex, componentIndex, hint, noCacheWrite);
 				assert_(operation.inputs() == 0 || operation.inputs() == inputs.size);
 				operation.apply(targets.slice(componentIndex, 1), share(inputs));
 			}
 		} else {
-			assert_(source.outputs() == 1);
+			assert_(source.outputs() == 1, "ImageGroupFold", source.outputs(), name());
 			array<SourceImage> inputs = source.images(groupIndex, 0, hint, noCacheWrite);
+			log("fold", name(), operation.inputs(), inputs.size);
 			operation.apply(targets, share(inputs));
 		}
 	}, noCacheWrite)[componentIndex]);
@@ -78,13 +79,18 @@ array<SourceImage> GroupImageOperation::images(size_t groupIndex, size_t compone
 array<SourceImage> ImageGroupOperation::images(size_t groupIndex, size_t componentIndex, int2 hint, bool noCacheWrite) {
 	return ::cacheGroup<ImageF>(folder(), elementName(groupIndex)+'['+str(componentIndex)+']', size(groupIndex, hint),
 								groupSize(groupIndex), time(groupIndex), [&](ref<ImageF> targets) {
-		array<SourceImage> inputs =  source.images(groupIndex, componentIndex, hint, noCacheWrite);
 		if(operation.inputs() == 0 && operation.outputs()==0) { // Operates on all images at once (forwards componentIndex)
+			array<SourceImage> inputs = source.images(groupIndex, componentIndex, hint, noCacheWrite);
 			operation.apply(targets, share(inputs));
 		} else {
-			assert_(operation.inputs()==1 && source.outputs()== 1);
-			for(size_t imageIndex: range(inputs.size)) { // Operates on each image separately (single component supported)
-				operation.apply(targets.slice(imageIndex, 1), {share(inputs[imageIndex])});
+			assert_(operation.inputs()==0 || operation.inputs()==source.outputs());
+			array<array<SourceImage>> images;
+			for(size_t inputIndex: range(source.outputs())) images.append( source.images(groupIndex, inputIndex, hint, noCacheWrite) );
+			for(size_t imageIndex: range(groupSize(groupIndex))) { // Operates on each image separately
+				array<ImageF> components;
+				// Transposes images/components
+				for(size_t inputIndex: range(source.outputs())) components.append( share(images[inputIndex][imageIndex]) );
+				operation.apply(targets.slice(imageIndex, 1), components);
 			}
 		}
 	});

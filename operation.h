@@ -140,7 +140,10 @@ struct BinaryGenericImageOperation : virtual GenericImageSource {
 	virtual String elementName(size_t index) const override {
 		assert_(A.elementName(index) == B.elementName(index)); return A.elementName(index);
 	}
-	int2 size(size_t index, int2 size) const override { assert_(A.size(index, size) == B.size(index, size)); return A.size(index, size); }
+	int2 size(size_t index, int2 size) const override {
+		assert_(A.size(index, size) == B.size(index, size), A.size(index, size), B.size(index, size));
+		return A.size(index, size);
+	}
 
 	String toString() const override { return "("+A.toString()+" | "+B.toString()+")"; }
 };

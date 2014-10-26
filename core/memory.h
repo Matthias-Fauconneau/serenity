@@ -23,12 +23,12 @@ generic struct buffer : mref<T> {
     /// Move constructor
     buffer(buffer&& o) : mref<T>(o), capacity(o.capacity) { o.data=0, o.size=0, o.capacity=0; }
     /// Allocates an uninitialized buffer for \a capacity elements
-    buffer(size_t capacity, size_t size, string name) : mref<T>((T*)0,size), capacity(capacity), name(name) {
+	buffer(size_t capacity, size_t size, string name="") : mref<T>((T*)0,size), capacity(capacity), name(name) {
 		if(capacity > 36003000) { /*logTrace();*/ log("+", name, capacity); }
         assert(capacity>=size && size>=0); if(!capacity) return;
         if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error("Out of memory", name, size, capacity, sizeof(T));
     }
-    explicit buffer(size_t size, string name) : buffer(size, size, name) {}
+	explicit buffer(size_t size, string name="") : buffer(size, size, name) {}
     /// Initializes a new buffer with the content of \a o
     explicit buffer(const ref<T> o) : buffer(o.size, "copy") { mref<T>::copy(o); }
     /// References \a size elements from const \a data pointer

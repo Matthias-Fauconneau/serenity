@@ -33,16 +33,6 @@ struct Align : ImageTransformGroupOperator, OperatorT<Align> {
 				map<Transform, real> similarities;
 				for(;;) { // Integer walk toward minimum at this scale (TODO: better multiscale to avoid long walks)
 					Transform stepBestTransform = levelBestTransform;
-										/*for(int2 offset: {
-											int2(-1, -1), int2( 0, -1), int2(1, -1),
-											int2(-1,  0),                    int2(1,  0),
-											int2(-1,  1), int2( 0,  1), int2(1,  1), }) {*/
-										/*for(int2 offset: {
-																					  int2( 0, -2),
-																  int2(-1, -1), int2( 0, -1), int2(1, -1),
-												int2(-2, 0), int2(-1,  0),                     int2(1,  0), int2(2, 0),
-																  int2(-1,  1), int2( 0,  1), int2(1,  1),
-																					  int2(0, 2) }) {*/
 					for(int2 offset: {int2(0,-1), int2(-2, 0), int2(-1,0), int2(1,0), int2(2, 0), int2(0,1)}) { // Evaluate single steps along each translation axis
 						Transform transform = levelBestTransform * Transform(b.size, offset); real& similarity = similarities[transform];
 						if(!similarity) similarity = ::similarity(a, b, transform);

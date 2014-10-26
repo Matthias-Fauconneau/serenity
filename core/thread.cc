@@ -121,7 +121,7 @@ void setExceptions(uint except) {
 }
 
 void __attribute((constructor(102))) setup_signals() {
-#if 0
+#if 1
     /// Limits process ressources to avoid hanging the system when debugging
     { rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<21;/*2M*/ setrlimit(RLIMIT_STACK,&limit); }
     { rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<29;/*512M*/ setrlimit(RLIMIT_DATA,&limit); }
