@@ -56,7 +56,7 @@ struct PanoramaWeights : ImageGroupSource {
 		if(!hint) return source.size(groupIndex, 0);
 		int2 fullTargetSize = this->size(groupIndex, 0);
 		int2 fullSourceSize = source.size(groupIndex, 0);
-		return hint*fullSourceSize/fullTargetSize;
+		return hint.y*fullSourceSize.y/fullTargetSize.y;
 	}
 	int2 sourceSize(size_t groupIndex, int2 hint) const { return source.size(groupIndex, sourceHint(groupIndex, hint)); }
 
@@ -134,22 +134,21 @@ struct ImageGroupForwardComponent : ImageGroupSource {
 
 struct PanoramaStitch {
 	Folder folder {"Pictures/Panorama", home()};
-
 	ImageFolder source { folder };
-	ImageOperationT<Intensity> intensity {source};
-	ImageOperationT<Normalize> normalize {intensity};
 	AllImages groups {source};
 
+	ImageOperationT<Intensity> intensity {source};
+	GroupImageOperation groupIntensity {intensity, groups};
+	ImageOperationT<Normalize> normalize {intensity};
 	GroupImageOperation groupNormalize {normalize, groups};
-	ImageGroupTransformOperationT<Align> transforms {groupNormalize};
+	ImageGroupTransformOperationT<Align> transforms {groupIntensity};
+	SampleImageGroupOperation alignAlignSource {transforms.source, transforms};
 
 	GroupImageOperation groupSource {source, groups};
 	SampleImageGroupOperation alignSource {groupSource, transforms};
-	//ImageGroupOperationT<Intensity> alignIntensity {alignSource};
-	GroupImageOperation groupIntensity {intensity, groups};
-	SampleImageGroupOperation alignIntensity {groupIntensity, transforms};
+	ImageGroupOperationT<Intensity> alignIntensity {alignSource};
 
-	PanoramaWeights weights {groupIntensity, transforms};
+	PanoramaWeights weights {groupSource, transforms};
 	ImageGroupOperationT<NormalizeSum> normalizeWeights {weights};
 	BinaryImageGroupOperationT<Multiply> applySelectionWeights {normalizeWeights, alignSource};
 	ImageGroupFoldT<Sum> select {applySelectionWeights};
@@ -170,25 +169,34 @@ struct PanoramaStitchPreview : PanoramaStitch, Application {
 	const size_t lastIndex = source.keys.indexOf(lastName);
 	size_t index = lastIndex != invalid ? lastIndex : 0;
 
-	ImageGroupFoldT<Prism> prism [1] {weights};
-	array<sRGBOperation> sRGB = apply(mref<ImageGroupFoldT<Prism>>(prism),
-									  [&](ImageSource& source) -> sRGBOperation { return source; });
-	array<Scroll<ImageSourceView>> sRGBView =
-			apply(mref<sRGBOperation>(sRGB), [&](ImageRGBSource& source) -> Scroll<ImageSourceView> { return {source, &index}; });
-#if 0
-	sRGBGroupOperation sRGB2 [2] = {weights, alignIntensity};
-	array<Scroll<ImageGroupSourceView>> sRGBView3 =
-			apply(mref<sRGBGroupOperation>(sRGB2),
-				  [&](ImageRGBGroupSource& source) -> Scroll<ImageGroupSourceView> { return {source, &index}; });
-	VBox views {toWidgets(sRGBView3), VBox::Share, VBox::Expand};
-#elif 1
-	sRGBOperation sRGB2 [2] = {blend, select};
-	array<Scroll<ImageSourceView>> sRGBView2 =
-			apply(mref<sRGBOperation>(sRGB2), [&](ImageRGBSource& source) -> Scroll<ImageSourceView> { return {source, &index}; });
-	VBox views {/*toWidgets(sRGBView)+*/toWidgets(sRGBView2), VBox::Share, VBox::Expand};
+#if 1
+	sRGBGroupOperation sRGB [1] = {alignAlignSource};
+	array<Scroll<ImageGroupSourceView>> sRGBView = apply(mref<sRGBGroupOperation>(sRGB),
+														 [&](ImageRGBGroupSource& source) -> Scroll<ImageGroupSourceView> { return {source, &index}; });
 #else
-	VBox views {toWidgets(sRGBView), VBox::Share, VBox::Expand};
+	sRGBOperation sRGB [1] = {blend};
+	array<Scroll<ImageSourceView>> sRGBView = apply(mref<sRGBOperation>(sRGB),
+													[&](ImageRGBSource& source) -> Scroll<ImageSourceView> { return {source, &index}; });
 #endif
+	VBox views {toWidgets(sRGBView), VBox::Share, VBox::Expand};
 	Window window {&views, int2(0, views.size*256), [this]{ return views.title(); }};
 };
 registerApplication(PanoramaStitchPreview);
+
+struct PanoramaStitchExport : PanoramaStitch, Application {
+	sRGBOperation sRGB {select};
+	PanoramaStitchExport() {
+		Folder output ("Export", folder, true);
+		for(size_t index: range(sRGB.count(-1))) {
+			String name = sRGB.elementName(index);
+			Time time;
+			SourceImageRGB image = sRGB.image(index, int2(0,1024));
+			time.stop();
+			Time compressionTime;
+			writeFile(name, encodeJPEG(image, 75), output, true);
+			compressionTime.stop();
+			log(str(100*(index+1)/sRGB.count(-1))+'%', '\t',index+1,'/',sRGB.count(-1),'\t',sRGB.elementName(index), strx(image.size),'\t',time);
+		}
+	}
+};
+registerApplication(PanoramaStitchExport, export);

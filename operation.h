@@ -49,7 +49,7 @@ struct sRGBOperation : GenericImageOperation, ImageRGBSource, SRGB {
 	sRGBOperation(ImageSource& source) : GenericImageOperation(source, *this), source(source) {}
 
 	/// Returns processed sRGB image
-	virtual SourceImageRGB image(size_t index, int2 size, bool noCacheWrite) override;
+	virtual SourceImageRGB image(size_t index, int2 size = 0, bool noCacheWrite = false) override;
 };
 
 /// Evaluates an image for each group

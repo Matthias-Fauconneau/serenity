@@ -124,7 +124,7 @@ struct SampleImageGroupOperation : ImageGroupSource {
 		if(!hint) return source.size(groupIndex, 0);
 		int2 fullTargetSize = this->size(groupIndex, 0);
 		int2 fullSourceSize = source.size(groupIndex, 0);
-		return hint*fullSourceSize/fullTargetSize;
+		return hint.y*fullSourceSize.y/fullTargetSize.y;
 	}
 	int2 sourceSize(size_t groupIndex, int2 hint) const { return source.size(groupIndex, sourceHint(groupIndex, hint)); }
 

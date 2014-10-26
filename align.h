@@ -18,7 +18,7 @@ struct Align : ImageTransformGroupOperator, OperatorT<Align> {
 	// Evaluates residual energy at integer offsets
 	virtual array<Transform> operator()(ref<ImageF> images) const override {
 		for(auto& image: images) assert_(image.size == images[0].size);
-		const int levelCount = log2(uint(min(images[0].size.x, images[0].size.y)/4));
+		const int levelCount = log2(uint(min(images[0].size.x, images[0].size.y)/8));
 		array<ImageF> A = mipmap(images[0], levelCount);
 		array<Transform> transforms;
 		transforms.append(A[0].size, 0);
@@ -33,7 +33,13 @@ struct Align : ImageTransformGroupOperator, OperatorT<Align> {
 				map<Transform, real> similarities;
 				for(;;) { // Integer walk toward minimum at this scale (TODO: better multiscale to avoid long walks)
 					Transform stepBestTransform = levelBestTransform;
-					for(int2 offset: {int2(0,-1), int2(-2, 0), int2(-1,0), int2(1,0), int2(2, 0), int2(0,1)}) { // Evaluate single steps along each translation axis
+					//for(int2 offset: {int2(0,-1), int2(-2, 0), int2(-1,0), int2(1,0), int2(2, 0), int2(0,1)}) { // Evaluate single steps along each translation axis
+					for(int2 offset: {
+																										  int2( 0, -2),
+																					  int2(-1, -1), int2( 0, -1), int2(1, -1),
+																	int2(-2, 0), int2(-1,  0),                     int2(1,  0), int2(2, 0),
+																					  int2(-1,  1), int2( 0,  1), int2(1,  1),
+																										  int2(0, 2) }) {
 						Transform transform = levelBestTransform * Transform(b.size, offset); real& similarity = similarities[transform];
 						if(!similarity) similarity = ::similarity(a, b, transform);
 						if(similarity > bestSimilarity) {

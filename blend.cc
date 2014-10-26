@@ -139,7 +139,7 @@ struct ExposureBlendExport : ExposureBlend, Application {
 			SourceImageRGB image = sRGB.image(index, int2(2048,1536), true);
 			correctionTime.stop();
 			Time compressionTime;
-			writeFile(name, encodeJPEG(image, 50), output, true);
+			writeFile(name, encodeJPEG(image, 75), output, true);
 			compressionTime.stop();
 			log(str(100*(index+1)/sRGB.count(-1))+'%', '\t',index+1,'/',sRGB.count(-1),
 				'\t',sRGB.elementName(index),
@@ -159,7 +159,7 @@ struct ExposureBlendSelect : ExposureBlend, Application {
 			SourceImageRGB image = sRGB.image(index, int2(2048,1536), true);
 			correctionTime.stop();
 			Time compressionTime;
-			writeFile(name+".select", encodeJPEG(image, 50), output, true);
+			writeFile(name+".select", encodeJPEG(image, 75), output, true);
 			compressionTime.stop();
 			log(str(100*(index+1)/sRGB.count(-1))+'%', '\t',index+1,'/',sRGB.count(-1),
 				'\t',sRGB.elementName(index),
