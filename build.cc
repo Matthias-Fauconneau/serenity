@@ -115,7 +115,7 @@ struct Build {
                     if(header) lastEdit = max(lastEdit, parse(header+".h", parent));
                     String module = find(name+".cc");
                     if(!module || parent == module) continue;
-                    if(!modules.contains(module)) compileModule(module);
+					if(!modules.contains(module)) { if(!compileModule(module)) return 0; }
                     parent.children.append( modules[modules.indexOf(module)].pointer );
                 }
             }
@@ -128,17 +128,18 @@ struct Build {
 
     /// Compiles a module and its dependencies as needed
     /// \return Timestamp of the last modified module implementation (deep)
-    void compileModule(const string target) {
+	bool compileModule(const string target) {
         assert_(target);
         modules.append( unique<Node>(target) );
         Node& module = modules.last();
         String fileName = target+".cc";
         int64 lastEdit = parse(fileName, module);
+		if(!lastEdit) return false;
         String object = tmp+"/"+join(flags,"-")+"/"+target+".o";
         if(!existsFile(object, folder) || lastEdit >= File(object).modifiedTime()) {
             while(pids.size>=4) { // Waits for a job to finish before launching a new unit
                 int pid = wait(); // Waits for any child to terminate
-                if(wait(pid))  error("Failed to compile");
+				if(wait(pid)) { log("Failed to compile"); return false; }
                 pids.remove(pid);
             }
             Folder(tmp+"/"+join(flags,"-")+"/"+section(target,'/',0,-2), root(), true);
@@ -148,6 +149,7 @@ struct Build {
             needLink = true;
         }
         files.append( tmp+"/"+join(flags,"-")+"/"+target+".o" );
+		return true;
     }
 
     Build() {
@@ -181,8 +183,8 @@ struct Build {
         Folder(tmp+"/"+join(flags,"-"), root(), true);
 
         // Compiles
-        if(flags.contains("profile")) compileModule(find("profile.cc"));
-        compileModule( find(target+".cc") );
+		if(flags.contains("profile")) if(!compileModule(find("profile.cc"))) { log("Failed to compile"); requestTermination(-1); return; }
+		if(!compileModule( find(target+".cc") )) { log("Failed to compile"); requestTermination(-1); return; }
 
         // Links
         String binary = tmp+"/"+join(flags,"-")+"/"+target;
@@ -192,8 +194,9 @@ struct Build {
             args.append(String("-o"));
             args.append(copy(binary));
             args.append(apply(libraries, [this](const String& library){ return String("-l"+library); }));
-            for(int pid: pids) if(wait(pid)) error("Failed to compile"); // Waits for each translation unit to finish compiling before final linking
-            if(execute(CXX, toRefs(args))) error("Failed to link");
+			// Waits for all translation units to finish compilation before final link
+			for(int pid: pids) if(wait(pid)) { log("Failed to compile"); requestTermination(-1); return; }
+			if(execute(CXX, toRefs(args))) { log("Failed to link"); requestTermination(-1); return; }
         }
 
         // Installs

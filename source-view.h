@@ -66,7 +66,6 @@ struct ImageSourceView  : GenericImageSourceView {
 			lastImageIndex = index;
 			int2 sourceSize = source.size(index);
 			int2 targetSize = max(sourceSize*size.x/sourceSize.x, sourceSize*size.y/sourceSize.y); // Fits aspect ratio
-			log(size, sourceSize, targetSize);
 			image = source.image(min<size_t>(index, source.count(index+1)-1), targetSize);
 		}
 	}

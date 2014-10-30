@@ -5,7 +5,7 @@
 #include "math.h"
 #include "map.h"
 
-// -- Decoding --
+// -- Decode --
 
 string imageFileFormat(const ref<byte> file) {
     if(startsWith(file,"\xFF\xD8")) return "JPEG";
@@ -70,7 +70,13 @@ Image decodeImage(const ref<byte> file) {
     else { if(file.size) error("Unknown image format", hex(file.slice(0,min<int>(file.size,4)))); return Image(); }
 }
 
-// -- Resampling (3x8bit) --
+// -- Rotate --
+
+void rotate(const Image& target, const Image& source) {
+	for(int y: range(source.height)) for(int x: range(source.width)) target(source.height-1-y, x) = source(x,y);
+}
+
+// -- Resample (3x8bit) --
 
 static void box(const Image& target, const Image& source) {
     assert_(!source.alpha); //FIXME: not alpha correct

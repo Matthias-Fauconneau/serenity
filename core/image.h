@@ -37,7 +37,7 @@ inline Image copy(const Image& o) { return Image(copy((const buffer<byte4>&)o),o
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 inline Image share(const Image& o) { return Image(unsafeReference(o),o.size,o.stride,o.alpha,o.sRGB); }
 
-// -- Decoding --
+// -- Decode --
 
 /// Returns the image file format if valid
 string imageFileFormat(const ref<byte> file);
@@ -56,7 +56,12 @@ static Image name ## Icon() { \
     return share(icon); \
 }
 
-// -- Resampling (3x8bit) --
+// -- Rotate --
+
+/// Rotates an image
+void rotate(const Image& target, const Image& source);
+
+// -- Resample (3x8bit) --
 
 /// Resizes \a source into \a target
 void resize(const Image& target, const Image& source);
