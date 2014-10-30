@@ -109,7 +109,7 @@ struct Tuner : Poll {
             writeCount.acquire(input.size); // Will overflow if processing thread doesn't follow
         }
         assert(writeIndex+input.size<=signal.size);
-        for(uint i: range(input.size)) signal[writeIndex+i] = (input[i][0] +  input[i][1]) * 0x1p-25; // Mix both channels (assumes no overflow)
+        for(uint i: range(input.size)) signal[writeIndex+i] = input[i][0] * 0x1p-24; // Use left channel only //Mix both channels (assumes no overflow)
         writeIndex = (writeIndex+input.size)%signal.size; // Updates ring buffer pointer
         readCount.release(input.size); // Releases new samples
         queue(); // Queues processing thread
@@ -164,10 +164,10 @@ struct Tuner : Poll {
             }
             if(key!=lastKey) keyOffset = offset; // Resets on key change
             keyOffset = (keyOffset+offset)/2; // Running average
-            int keyOffsetCents = round(100*keyOffset);
+            int keyOffsetCents = round(100*(keyOffset - stretch(key-21)*12));
             if(this->keyOffsetCents != keyOffsetCents) {
                 this->keyOffsetCents = keyOffsetCents;
-                keyOffsetText = Text(dec(keyOffsetCents), 64, white);
+                keyOffsetText = Text(dec(keyOffsetCents), 32, white);
                 needUpdate = true;
             }
 
@@ -183,7 +183,7 @@ struct Tuner : Poll {
                     this->worstKey = worstKey;
                     worstKeyText = Text(strKey(worstKey), 64, white);
                 }
-                int keyOffsetCents = round(100*keyOffset);
+                int keyOffsetCents = round(100*(keyOffset- stretch(key-21)*12));
                 if(this->keyOffsetCents != keyOffsetCents) {
                     this->keyOffsetCents = keyOffsetCents;
                     keyOffsetText = Text(dec(keyOffsetCents), 64, white);
