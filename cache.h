@@ -38,6 +38,7 @@ inline String cache(const Folder& folder, string name, string key, int64 sourceT
 // Mapped image cache
 generic struct ImageMapSource : T {
     Map map;
+	default_move(ImageMapSource);
 	ImageMapSource(T&& image=T(), Map&& map=Map()) : T(move(image)), map(move(map)) {}
 };
 generic auto share(ref<ImageMapSource<T>> ref) -> buffer<decltype(share(ref[0]))> {

@@ -18,11 +18,12 @@ void log_(string buffer) { check_(write(2, buffer.data, buffer.size)); }
 void log(string buffer) { log_(buffer+'\n'); }
 
 // Poll
+Poll::Poll(Poll&& o) : pollfd(o), thread(o.thread) { assert_(!o.thread.contains(&o)); }
 void Poll::registerPoll() {
     Locker lock(thread.lock);
-    if(thread.contains(this)) { thread.unregistered.remove(this); return; }
+	if(thread.contains(this)) { thread.unregistered.tryRemove(this); return; }
     assert_(!thread.unregistered.contains(this));
-    thread.append( this );
+	thread.append(this);
     if(thread.tid) thread.post(); // Resets poll to include this new descriptor (FIXME: only if not current)
 }
 void Poll::unregisterPoll() {

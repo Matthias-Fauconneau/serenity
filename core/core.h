@@ -192,18 +192,6 @@ typedef ref<char> string;
 /// Returns const reference to a static string literal
 inline constexpr string operator "" _(const char* data, size_t size) { return string(data,size); }
 
-#if 0
-/// ref<char> holding a UTF8 text string literal
-struct StringLiteral : string {
-    //using ref::ref;
-    //StringLiteral() {}
-    //StringLiteral(ref<char> o) : ref<char>(o) {}
-    /// Implicitly references a string literal
-    template<size_t N> constexpr StringLiteral(const char (&a)[N]) : ref(a, N-1 /*Does not include trailling zero byte*/) {}
-    //bool operator ==(const StringLiteral o) const { return ref<char>::operator==(o); }
-};
-#endif
-
 // -- Log
 
 /// Logs a message to standard output without newline
@@ -287,8 +275,12 @@ generic struct mref : ref<T> {
     /// Slices a reference to elements from \a start to \a stop
 	mref<T> sliceRange(size_t start, size_t stop) const { return slice(start, stop-start); }
 
-    /// Initializes the element at index
-    template<Type... Args> T& set(size_t index, Args&&... args) const { return *(new (&at(index)) T(forward<Args>(args)...)); }
+	/// Initializes the element at index
+	T& set(size_t index, const T& value) const { return *(new (&at(index)) T(value)); }
+	/// Initializes the element at index
+	T& set(size_t index, T&& value) const { return *(new (&at(index)) T(::move(value))); }
+	/// Initializes the element at index
+	template<Type... Args> T& set(size_t index, Args&&... args) const { return *(new (&at(index)) T{forward<Args>(args)...}); }
     /// Initializes reference using the same constructor for all elements
     template<Type... Args> void clear(Args... args) const { for(T& e: *this) new (&e) T(args...); }
     /// Initializes reference from \a source using move constructor

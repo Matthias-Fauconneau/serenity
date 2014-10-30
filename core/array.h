@@ -93,19 +93,19 @@ generic struct array : buffer<T> {
     /// Appends a default element
     T& append() { size=reserve(size+1); return set(size-1, T()); }
     /// Appends an implicitly copiable value
-    T& append(const T& e) { size=reserve(size+1); return set(size-1, T(e)); }
+	T& append(const T& e) { size=reserve(size+1); return set(size-1, e); }
     /// Appends a movable value
-    T& append(T&& e) { size=reserve(size+1); return set(size-1, T(::move(e))); }
+	T& append(T&& e) { size=reserve(size+1); return set(size-1, ::move(e)); }
     /// Appends another list of elements to this array by moving
     void append(const mref<T> source) { size=reserve(size+source.size); slice(size-source.size).move(source); }
     /// Appends another list of elements to this array by copying
     void append(const ref<T> source) { size=reserve(size+source.size); slice(size-source.size).copy(source); }
     /// Appends a new element
     template<Type Arg, typename enable_if<!is_convertible<Arg, T>::value && !is_convertible<Arg, ref<T>>::value>::type* = nullptr>
-    T& append(Arg&& arg) { size=reserve(size+1); return set(size-1, T{forward<Arg>(arg)}); }
+	T& append(Arg&& arg) { size=reserve(size+1); return set(size-1, forward<Arg>(arg)); }
     /// Appends a new element
     template<Type Arg0, Type Arg1, Type... Args> T& append(Arg0&& arg0, Arg1&& arg1, Args&&... args) {
-        size=reserve(size+1); return set(size-1, T{forward<Arg0>(arg0), forward<Arg1>(arg1), forward<Args>(args)...});
+		size=reserve(size+1); return set(size-1, forward<Arg0>(arg0), forward<Arg1>(arg1), forward<Args>(args)...);
     }
 
     /// Appends the element, if it is not present already

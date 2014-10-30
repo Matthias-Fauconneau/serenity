@@ -55,11 +55,13 @@ extern struct Thread mainThread;
 /// Poll is a convenient interface to participate in the event loop
 struct Poll : pollfd {
     enum { IDLE=64 };
-    Poll(const Poll&)=delete; Poll& operator=(const Poll&)=delete;
     Thread& thread; /// Thread monitoring this pollfd
+
     /// Creates an handle to participate in an event loop, use \a registerPoll when ready
     /// \note May be used without a file descriptor to queue jobs using \a wait, \a event will be called after all system events have been handled
     Poll(int fd=0, int events=POLLIN, Thread& thread=mainThread) : pollfd{fd,(short)events,0}, thread(thread) { if(fd) registerPoll(); }
+	Poll(const Poll&)=delete; Poll& operator=(const Poll&)=delete;
+	Poll(Poll&& o);
     ~Poll(){ if(fd) unregisterPoll(); }
     /// Registers \a fd to the event loop
     void registerPoll();

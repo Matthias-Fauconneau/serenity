@@ -3,23 +3,19 @@
 #include "widget.h"
 #include "function.h"
 
-/// Axis-aligned rectangle with 2D integer coordinates
-struct Rect {
-    int2 origin, size;
-    bool contains(int2 p) const { return p>=origin && p<origin+size; }
-};
-
 /// Proxy Widget containing multiple widgets.
 struct Layout : Widget {
     /// Derived classes should override \a count and \a at to implement widgets storage. \sa Widgets Array Tuple
-    virtual uint count() const abstract;
-    virtual Widget& at(int) const abstract;
+	virtual size_t count() const abstract;
+	virtual Widget& at(size_t) abstract;
+	// Allows derived to override sizeHint queries to avoid explicit widget instantiation
+	int2 sizeHintAt(size_t index, int2 size) { return at(index).sizeHint(size); }
 
     /// Computes widgets layout
-    virtual array<Rect> layout(int2 size) const abstract;
+	virtual array<Rect> layout(int2 size) abstract;
 
     /// Renders all visible child widgets
-	Graphics graphics(int2 size) override;
+	Graphics graphics(int2 size, Rect clip) override;
     /// Forwards event to intersecting child widgets until accepted
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;
 };
@@ -30,7 +26,7 @@ struct Widgets : virtual Layout, array<Widget*> {
     default_move(Widgets);
     Widgets(){}
 	Widgets(array<Widget*>&& widgets) : array(::move(widgets)){}
-    uint count() const { return array::size; }
+	size_t count() const { return array::size; }
     Widget& at(int i)  const { return *array::at(i); }
 };
 
@@ -40,7 +36,7 @@ generic struct WidgetArray : virtual Layout, array<T> {
 	WidgetArray(){}
 	WidgetArray(const mref<T>& items) : array<T>(items){}
 	WidgetArray(array<T>&& items) : array<T>(move(items)){}
-    uint count() const { return array<T>::size; }
+	size_t count() const { return array<T>::size; }
     Widget& at(int i) const { return array<T>::at(i); }
 };
 
@@ -70,7 +66,7 @@ struct Linear : virtual Layout {
     Linear(Extra main=Share, Extra side=AlignCenter, bool expanding=false) : main(main), side(side), expanding(expanding) {}
 
 	int2 sizeHint(int2) override;
-    array<Rect> layout(int2 size) const override;
+	array<Rect> layout(int2 size) override;
     /// Transforms coordinates so that x/y always means main/side (i.e along/across) axis to reuse same code in Vertical/Horizontal
     virtual int2 xy(int2 xy) const abstract;
 };
@@ -131,7 +127,7 @@ struct GridLayout : virtual Layout {
     GridLayout(bool uniformX=false, bool uniformY=false, int width=0)
         : uniformX(uniformX), uniformY(uniformY), width(width) {}
 	int2 sizeHint(int2) override;
-    array<Rect> layout(int2 size) const override;
+	array<Rect> layout(int2 size) override;
 };
 
 /// Grid of heterogenous widgets. \sa Widgets

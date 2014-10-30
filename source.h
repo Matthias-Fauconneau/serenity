@@ -44,7 +44,7 @@ struct ImageSource : virtual GenericImageSource {
 };
 
 struct ImageRGBSource : virtual GenericImageSource {
-	virtual SourceImageRGB image(size_t index, int2 size, string parameters = "") abstract;
+	virtual SourceImageRGB image(size_t index, int2 size = 0, string parameters = "") abstract;
 };
 
 struct GenericImageGroupSource : virtual GenericImageSource {

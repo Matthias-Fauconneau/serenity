@@ -2,6 +2,18 @@
 /// \file widget.h Widget interface to compose user interfaces
 #include "graphics.h"
 
+/// Axis-aligned rectangle with 2D integer coordinates
+struct Rect {
+	int2 min, max;
+	static Rect fromOriginAndSize(int2 origin, int2 size) { return {origin, origin+size}; }
+	int2 origin() const { return min; }
+	int2 size() const { return max-min; }
+	explicit operator bool() { return min<max; }
+	bool contains(int2 p) const { return p>=min && p<max; }
+};
+inline Rect operator &(Rect a, Rect b) { return {max(a.min,b.min),min(a.max,b.max)}; }
+inline String str(const Rect& r) { return "["_+str(r.min)+" - "_+str(r.max)+"]"_; }
+
 /// User interface colors
 static constexpr bgr3f lightBlue (7./8, 3./4, 1./2);
 static constexpr bgr3f gray (3./4, 3./4, 3./4);
@@ -23,8 +35,6 @@ enum Modifiers { NoModifiers=0, Shift=1<<0, Control=1<<2, Alt=1<<3, NumLock=1<<4
 
 /// Abstract component to compose user interfaces
 struct Widget {
-    Widget(){}
-    default_move(Widget);
     virtual ~Widget() {}
 // Contents
     virtual String title() { return {}; }
@@ -32,7 +42,8 @@ struct Widget {
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
     virtual int2 sizeHint(int2) = 0;
     /// Returns graphic elements representing this widget at the given \a size.
-    virtual Graphics graphics(int2 size) = 0;
+	virtual Graphics graphics(int2 unused size) { assert_("Unimplemented, use graphics(int2 size, Rect clip"); return {}; }
+	virtual Graphics graphics(int2 size, Rect unused clip) { return graphics(size); }
 
 // Events
     /// Mouse event type

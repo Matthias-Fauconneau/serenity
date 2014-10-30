@@ -61,16 +61,17 @@ SourceImageRGB ImageFolder::image(size_t index, string) {
 
 /// Resizes sRGB images
 /// \note Resizing after linear float conversion would be more accurate but less efficient
-SourceImageRGB ImageFolder::image(size_t index, int2 size, string parameters) {
+SourceImageRGB ImageFolder::image(size_t index, int2 hint, string parameters) {
 	assert_(index  < count());
 	File sourceFile (values[index].at("Path"_), source);
-	int2 sourceSize = this->size(index);
-	//size = min(sourceSize*size.x/sourceSize.x, sourceSize*size.y/sourceSize.y); // Fits aspect ratio
-	if(!size || size>=sourceSize) return image(index, parameters);
+	int2 sourceSize = parse<int2>(values[index].at("Size"_));
+	int2 size = this->size(index, hint);
+	if(size==sourceSize) return image(index, parameters);
 	return cache<Image>({"Resize", source, true}, elementName(index), size, sourceFile.modifiedTime(), [&](const Image& target) {
 		SourceImageRGB source = image(index);
 		assert_(target.size <= source.size, target.size, source.size);
-		//assert_(target.size.x*source.size.y == source.size.x*target.size.y, source.size, target.size);
+		assert_(target.size.x/source.size.x == target.size.y/source.size.y, target.size, source.size);
+		assert_(source.size.x/target.size.x == source.size.y/target.size.y, target.size, source.size);
 		resize(target, source);
 	});
 }

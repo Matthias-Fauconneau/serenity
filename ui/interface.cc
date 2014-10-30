@@ -7,7 +7,10 @@ Graphics ScrollArea::graphics(int2 size) {
     int2 view (horizontal?max(hint.x,size.x):size.x,vertical?max(hint.y,size.y):size.y);
     Graphics graphics;
     if(view <= size) return widget().graphics(size);
-    else graphics.append(widget().graphics(view), vec2(offset));
+	else {
+		assert_(offset <= int2(0));
+		graphics.append(widget().graphics(view, Rect::fromOriginAndSize(-offset, size)), vec2(offset));
+	}
     if(scrollbar && size.y<view.y)
         graphics.fills.append( vec2(size.x-scrollBarWidth, -offset.y*size.y/view.y), vec2(size.x,(-offset.y+size.y)*size.y/view.y), 1./2, 1.f/2 );
     return graphics;
