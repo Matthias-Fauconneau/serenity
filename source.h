@@ -9,7 +9,7 @@
 struct Source {
 	/// Returns number of elements
 	/// \a need is the minimum number to count for lazy evaluation
-	virtual size_t count(size_t need=0) abstract;
+	virtual size_t count(size_t need=-1) abstract;
 	/// Last modified time of element
 	virtual int64 time(size_t index) abstract;
 };
@@ -61,4 +61,8 @@ struct ImageGroupSource : virtual GenericImageGroupSource {
 
 struct ImageRGBGroupSource : virtual GenericImageGroupSource {
 	virtual array<SourceImageRGB> images(size_t groupIndex, int2 size, string parameters = "") abstract;
+};
+
+struct PropertySource : virtual Source {
+	virtual string at(size_t index) const abstract;
 };

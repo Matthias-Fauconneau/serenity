@@ -54,18 +54,18 @@ bool existsFolder(const string folder, const Folder& at=currentWorkingDirectory(
 struct Stream : Handle { //FIXME: overlaps with Data/BinaryData
     Stream(){}
     Stream(int fd):Handle(fd){}
-    /// Reads exactly \a size bytes into \a buffer
+	/// Reads up to \a size bytes into \a buffer
+	int64 readUpTo(mref<byte> target);
+	/// Reads exactly \a size bytes into \a buffer
     void read(mref<byte> target);
-    /// Reads up to \a size bytes into \a buffer
-    int64 readUpTo(mref<byte> target);
-    /// Reads exactly \a size bytes
+	/// Reads up to \a size bytes
+	buffer<byte> readUpTo(size_t size);
+	/// Reads exactly \a size bytes
     buffer<byte> read(size_t size);
-    /// Reads up to \a size bytes
-    buffer<byte> readUpTo(size_t size);
-    /// Reads up to \a size bytes into \a target
-    void readUpTo(array<byte>& target, size_t size);
+	/// Reads up to \a size bytes into \a target
+	//void readUpTo(array<byte>& target, size_t size);
     /// Reads up to \a size bytes in an inline Array if possible
-    template<size_t N> Array<byte, N> readUpTo(size_t size) { Array<byte, N> target; readUpTo(target, size); return target; }
+	//template<size_t N> Array<byte, N> readUpTo(size_t size) { Array<byte, N> target; readUpTo(target, size); return target; }
     /// Reads a raw value
 	generic T read() { T t; read(mref<byte>((byte*)&t,sizeof(T))); return t; }
     /// Reads \a size raw values

@@ -5,9 +5,9 @@
 
 /// Proxy Widget containing multiple widgets.
 struct Layout : Widget {
-    /// Derived classes should override \a count and \a at to implement widgets storage. \sa Widgets Array Tuple
+	/// Derived classes should override \a count and \a at to implement widgets storage. \sa Widgets WidgetArray Tuple
 	virtual size_t count() const abstract;
-	virtual Widget& at(size_t) abstract;
+	virtual Widget& at(size_t) const abstract;
 	// Allows derived to override sizeHint queries to avoid explicit widget instantiation
 	int2 sizeHintAt(size_t index, int2 size) { return at(index).sizeHint(size); }
 
@@ -23,21 +23,18 @@ struct Layout : Widget {
 /// Implements Layout storage using array<Widget*> (i.e by reference)
 /// \note It allows a layout to contain heterogenous Widget objects.
 struct Widgets : virtual Layout, array<Widget*> {
-    default_move(Widgets);
-    Widgets(){}
-	Widgets(array<Widget*>&& widgets) : array(::move(widgets)){}
-	size_t count() const { return array::size; }
-    Widget& at(int i)  const { return *array::at(i); }
+	using array::array;
+	size_t count() const override { return array::size; }
+	Widget& at(size_t i) const override { return *array::at(i); }
 };
 
-/// Implements Layout storage using array<T> (i.e by value)
+/// Implements Layout storage using buffer<T> (i.e by value)
 /// \note It allows a layout to directly contain homogenous items without managing pointers.
-generic struct WidgetArray : virtual Layout, array<T> {
-	WidgetArray(){}
-	WidgetArray(const mref<T>& items) : array<T>(items){}
-	WidgetArray(array<T>&& items) : array<T>(move(items)){}
-	size_t count() const { return array<T>::size; }
-    Widget& at(int i) const { return array<T>::at(i); }
+generic struct WidgetArray : virtual Layout, buffer<T> {
+	using buffer<T>::buffer;
+	WidgetArray(buffer<T>&& items) : buffer<T>(move(items)){}
+	size_t count() const override { return buffer<T>::size; }
+	Widget& at(size_t i) const override { return buffer<T>::at(i); }
 };
 
 /// Layouts widgets on an axis
@@ -105,15 +102,15 @@ struct VBox : Vertical, Widgets {
         : Linear(main, side, expanding), Widgets(array<Widget*>(widgets)) {}
 };
 
-/// Horizontal layout of homogenous items. \sa Array
-generic struct HList : Horizontal, Array<T> {
-    HList(array<T>&& widgets):Array<T>(move(widgets)){}
+/// Horizontal layout of homogenous items. \sa WidgetArray
+generic struct HList : Horizontal, WidgetArray<T> {
+	HList(buffer<T>&& widgets) : WidgetArray<T>(move(widgets)){}
     HList(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
 
-/// Vertical layout of homogenous items. \sa Array
-generic struct VList : Vertical, Array<T> {
-    VList(array<T>&& widgets):Array<T>(move(widgets)){}
+/// Vertical layout of homogenous items. \sa WidgetArray
+generic struct VList : Vertical, WidgetArray<T> {
+	VList(buffer<T>&& widgets) : WidgetArray<T>(move(widgets)){}
     VList(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
 };
 
@@ -138,6 +135,6 @@ struct WidgetGrid : GridLayout, Widgets {
 		: GridLayout(uniformX, uniformY, width), Widgets(::move(widgets)) {}
 };
 
-generic struct UniformGrid : GridLayout,  Array<T> {
-    UniformGrid(const mref<T>& items={}) : Array<T>(items) {}
+generic struct UniformGrid : GridLayout,  WidgetArray<T> {
+	UniformGrid(const mref<T>& items={}) : WidgetArray<T>(items) {}
 };

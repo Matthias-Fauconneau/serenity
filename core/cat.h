@@ -1,6 +1,9 @@
 #pragma once
 #include "array.h"
 
+// FIXME: -> buffer
+#define Array array
+
 /// Concatenates a \a cat with a cat
 template<class A, class B, class T> struct cat {
     A a; B b;
@@ -129,3 +132,5 @@ generic struct cat<Array<T>, Array<T>, T> {
     operator Array<T>() const { Array<T> target (size()); copy(target); return move(target); }
 };
 generic cat<Array<T>,Array<T>, T> operator+(Array<T>&& a, Array<T>&& b) { return {move(a),move(b)}; }
+
+#undef Array

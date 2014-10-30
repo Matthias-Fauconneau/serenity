@@ -16,23 +16,22 @@ generic struct buffer : mref<T> {
     using mref<T>::data;
     using mref<T>::size;
     size_t capacity = 0; /// 0: reference, >0: size of the owned heap allocation
-    string name;
 
     /// Default constructs an empty buffer
     buffer(){}
     /// Move constructor
     buffer(buffer&& o) : mref<T>(o), capacity(o.capacity) { o.data=0, o.size=0, o.capacity=0; }
     /// Allocates an uninitialized buffer for \a capacity elements
-	buffer(size_t capacity, size_t size, string name="") : mref<T>((T*)0,size), capacity(capacity), name(name) {
-		if(capacity > 36003000) { /*logTrace();*/ log("+", name, capacity); }
+	buffer(size_t capacity, size_t size, string unused name="") : mref<T>((T*)0,size), capacity(capacity) {
         assert(capacity>=size && size>=0); if(!capacity) return;
-        if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error("Out of memory", name, size, capacity, sizeof(T));
+		if(posix_memalign((void**)&data,64,capacity*sizeof(T))) error("Out of memory", size, capacity, sizeof(T));
     }
-	explicit buffer(size_t size, string name="") : buffer(size, size, name) {}
-    /// Initializes a new buffer with the content of \a o
-    explicit buffer(const ref<T> o) : buffer(o.size, "copy") { mref<T>::copy(o); }
+	explicit buffer(size_t size, string unused name="") : buffer(size, size) {}
     /// References \a size elements from const \a data pointer
-    buffer(T* data, size_t size, size_t capacity) : mref<T>(data, size), capacity(capacity) {}
+	buffer(T* data, size_t size, size_t capacity) : mref<T>(data, size), capacity(capacity) {}
+	/// Initializes a new buffer with the content of \a o
+	//explicit buffer(const ref<T> o) : buffer(o.size, "copy") { mref<T>::copy(o); }
+	static buffer copy(const ref<T> o) { buffer copy(o.size, "copy"); copy.mref<T>::copy(o); return copy; }
 
     buffer& operator=(buffer&& o) { this->~buffer(); new (this) buffer(::move(o)); return *this; }
 
@@ -43,7 +42,6 @@ generic struct buffer : mref<T> {
         if(capacity) {
 			for(size_t i: range(size)) at(i).~T();
 			free((void*)data);
-			if(capacity > 36003000) { /*logTrace();*/ log("~", name, capacity); }
         }
         data=0; capacity=0; size=0;
     }
@@ -52,7 +50,7 @@ generic struct buffer : mref<T> {
 generic buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity?:o.size, o.size, "copy"); t.copy(o); return t; }
 
 /// Converts a reference to a buffer (unsafe as no reference counting will keep the original buffer from being freed)
-generic buffer<T> unsafeReference(const /*m*/ref<T> o) { return buffer<T>((T*)o.data, o.size, 0); }
+generic buffer<T> unsafeReference(const ref<T> o) { return buffer<T>((T*)o.data, o.size, 0); }
 
 /// Returns an array of the application of a function to every index up to a size
 template<Type Function> auto apply(size_t size, Function function) -> buffer<decltype(function(0))> {

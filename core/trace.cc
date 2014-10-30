@@ -129,12 +129,11 @@ Symbol findSymbol(void* find) {
         const CU& cu = s.read<CU>();
         s.advance(cu.opcode_base-1);
         while(s.next()) { s.whileNot(0); s.skip('\0'); }
-		Array<string, 1024> files;
+		/*Array*/array<string/*, 1024*/> files;
         while(s.peek()) {
             files.append( cast<char>(s.whileNot(0)) ); s.skip('\0');
             int unused index = readLEV(s), unused time = readLEV(s), unused file_length=readLEV(s);
         }
-        assert_(files.isInline(), files.size, files.capacity, sizeof(files.inlineBuffer)/sizeof(string), sizeof(files.inlineBuffer), sizeof(string));
         s.advance(1);
         byte* address = 0; uint file_index = 1, line = 1, is_stmt = cu.stmt;
 

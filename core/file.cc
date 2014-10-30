@@ -72,26 +72,10 @@ bool existsFolder(const string folder, const Folder& at) { return Handle( openat
 
 // -- Stream
 
-void Stream::read(mref<byte> target) {
-    int unused read=check( ::read(fd, target.begin(), target.size) ); assert(read==(int)target.size,"Expected", target.size, "got", read);
-}
-
 int64 Stream::readUpTo(mref<byte> target) { return check( ::read(fd, target.begin(), target.size), (int)fd); }
 
-void Stream::readUpTo(array<byte>& target, size_t size) {
-    target.size = target.capacity;
-    target.size = readUpTo(target);
-    if(target.size == target.capacity) {
-        target.reserve(size);
-        target.size += readUpTo(target.slice(target.size,target.capacity-target.size));
-    }
-}
-
-buffer<byte> Stream::read(size_t size) {
-    buffer<byte> buffer(size, "read");
-    size_t offset=0; while(offset<size) offset+=check(::read(fd, buffer.begin()+offset, size-offset));
-    assert(offset==size);
-    return buffer;
+void Stream::read(mref<byte> target) {
+    int unused read=check( ::read(fd, target.begin(), target.size) ); assert(read==(int)target.size,"Expected", target.size, "got", read);
 }
 
 buffer<byte> Stream::readUpTo(size_t capacity) {
@@ -99,6 +83,22 @@ buffer<byte> Stream::readUpTo(size_t capacity) {
     buffer.size = check( ::read(fd, (void*)buffer.data, capacity) );
     return buffer;
 }
+
+buffer<byte> Stream::read(size_t size) {
+	buffer<byte> buffer(size, "read");
+	size_t offset=0; while(offset<size) offset+=check(::read(fd, buffer.begin()+offset, size-offset));
+	assert(offset==size);
+	return buffer;
+}
+
+/*void Stream::readUpTo(array<byte>& target, size_t size) {
+	target.size = target.capacity;
+	target.size = readUpTo(target);
+	if(target.size == target.capacity && size > target.capacity) {
+		target.reserve(size);
+		target.size += readUpTo(target.slice(target.size,target.capacity-target.size));
+	}
+}*/
 
 bool Stream::poll(int timeout) { assert(fd); pollfd pollfd{fd,POLLIN,0}; return ::poll(&pollfd,1,timeout)==1 && (pollfd.revents&POLLIN); }
 

@@ -91,8 +91,8 @@ String join(ref<string> list, const string separator) {
     return target;
 }
 
-Array<string> split(const string source, string separator) {
-    Array<string> list;
+/*Array*/array<string> split(const string source, string separator) {
+	/*Array*/array<string> list;
     TextData s (source);
     while(s) list.append( s.until(separator) );
     return list;

@@ -60,7 +60,7 @@ struct Display : Socket, Poll {
          array<byte> replyData = readReply(sequence, sizeof(T));
          typename Request::Reply reply = *(typename Request::Reply*)replyData.data;
          assert_(replyData.size == sizeof(typename Request::Reply)+reply.size*sizeof(T));
-         output = buffer<T>(cast<T>(replyData.slice(sizeof(reply), reply.size*sizeof(T))));
+		 output = buffer<T>::copy(cast<T>(replyData.slice(sizeof(reply), reply.size*sizeof(T))));
          return reply;
      }
 

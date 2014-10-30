@@ -105,16 +105,24 @@ struct ToggleButton : ImageView {
     Image disableIcon;
 };
 
+struct Index {
+	size_t* pointer;
+	Index(size_t* pointer) : pointer(pointer) {}
+	void operator=(size_t value) { *pointer = value; }
+	operator size_t() const { return *pointer; }
+	operator size_t&() { return *pointer; }
+};
+inline String str(Index o) { return str(*o.pointer); }
+
 generic buffer<Widget*> toWidgets(mref<T> widgets) { return apply(widgets, [](T& widget) -> Widget* { return &widget; }); }
 
+#if 0
 /// Several widgets in one spot, cycled by user
 struct WidgetCycle : Widget {
 	buffer<Widget*> widgets;
 	size_t index = 0;
 
 	WidgetCycle(ref<Widget*> widgets) : widgets(widgets) {}
-	//generic WidgetCycle(mref<T> widgets) : widgets(apply(widgets, [](T& widget) -> Widget* { return &widget; })) {}
-	//template<Type T, size_t N> WidgetCycle(T (&a)[N]) : WidgetCycle(mref<T>(a,N)) {}
 
     // Forwards content
     String title() override { return widgets[index]->title(); }
@@ -127,12 +135,4 @@ struct WidgetCycle : Widget {
     bool keyPress(Key key, Modifiers modifiers) override;
 	bool keyRelease(Key key, Modifiers modifiers) override { return widgets[index]->keyRelease(key, modifiers); }
 };
-
-struct Index {
-	size_t* pointer;
-	Index(size_t* pointer) : pointer(pointer) {}
-	void operator=(size_t value) { *pointer = value; }
-	operator size_t() const { return *pointer; }
-	operator size_t&() { return *pointer; }
-};
-inline String str(Index o) { return str(*o.pointer); }
+#endif

@@ -88,6 +88,7 @@ bool ToggleButton::mouseEvent(int2, int2, Event event, Button button, Widget*&) 
     return false;
 }
 
+#if CYCLE
 // WidgetCycle
 bool WidgetCycle::mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
 	focus = this;
@@ -99,4 +100,4 @@ bool WidgetCycle::keyPress(Key key, Modifiers modifiers) {
 	if(key == Backspace || key == PageDown) index = (index+widgets.size-1)%widgets.size;
     return widgets[index]->keyPress(key, modifiers) || previousIndex != index;
 }
-
+#endif

@@ -32,10 +32,12 @@ generic struct array : buffer<T> {
     using buffer<T>::data;
     using buffer<T>::size;
     using buffer<T>::capacity;
+#if ARRAY
     byte inlineBuffer[0]; // Address of any inline buffer
     bool isInline() const { return data==(T*)inlineBuffer; }
+#endif
 
-    /// Default constructs an empty array
+	/// Default constructs an empty array
     array() {}
     /// Converts a buffer to an array
     array(buffer<T>&& o) : buffer<T>(move(o)) {}
@@ -46,12 +48,14 @@ generic struct array : buffer<T> {
     /// Moves elements from a reference
     explicit array(const mref<T> source) : array() { append(source); } //FIXME: only enables for non implicitly copiable types
 
-    array(array&& o) : buffer<T>((T*)o.data, o.size, o.capacity) {
+	array(array&& o) : buffer<T>((T*)o.data, o.size, o.capacity) {
+#if ARRAY
         if(o.isInline()) {
             capacity = 0;
             reserve(o.size);
             mref<T>::move(o);
         }
+#endif
         o.data=0, o.size=0, o.capacity=0;
     }
     array& operator=(array&& o) { this->~array(); new (this) array(::move(o)); return *this; }
@@ -60,7 +64,9 @@ generic struct array : buffer<T> {
     ~array() {
         if(capacity) {
             for(size_t i: range(size)) at(i).~T();
+#if ARRAY
             if(isInline()) capacity=0; /*Prevents buffer from free'ing*/
+#endif
         }
     }
 
@@ -74,7 +80,12 @@ generic struct array : buffer<T> {
     size_t reserve(size_t nextCapacity) {
         assert(nextCapacity>=size);
         if(nextCapacity>capacity) {
-			bool wasHeap = !isInline() && capacity;
+			bool wasHeap =
+#if ARRAY
+					!isInline() && capacity;
+#else
+					true;
+#endif
             const T* data = 0;
             // TODO: move compatible realloc
             if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error("Out of memory", size, capacity, nextCapacity, sizeof(T));
@@ -160,76 +171,47 @@ generic struct array : buffer<T> {
 /// Copies all elements in a new array
 generic array<T> copy(const array<T>& o) { return array<T>((const ref<T>)o); }
 
-/// Allocates an inline buffer on stack to store small arrays without an heap allocation
-template<Type T, size_t N=128> struct Array : array<T> {
-    using array<T>::data;
-    using array<T>::size;
-    using array<T>::capacity;
-    byte inlineBuffer[N-sizeof(array<T>)]; // Pads array<T> reference to cache line size to hold small arrays without managing an heap allocation
-    static constexpr size_t inlineBufferCapacity = sizeof(inlineBuffer)/sizeof(T);
+// -- Functional  --
 
-    /// Default constructs an empty array
-    Array() : array<T>(buffer<T>((T*)inlineBuffer, 0, inlineBufferCapacity)) {}
-    /// Converts a buffer to an array
-	Array(buffer<T>&& o) : array<T>(move(o)) { assert(capacity > inlineBufferCapacity, capacity); }
-    /// Allocates an empty array with storage space for \a capacity elements
-    explicit Array(size_t nextCapacity) : Array() { reserve(nextCapacity); }
-    /// Copies elements from a reference
-    explicit Array(const ref<T> source) : Array() { append(source); }
-    /// Moves elements from a reference
-    explicit Array(const mref<T> source) : Array() { append(source); } //FIXME: only enables for non implicitly copiable types
-
-    Array(Array&& o) : array<T>(buffer<T>((T*)o.data, o.size, o.capacity)) {
-        if(o.isInline()) {
-            data = (T*)inlineBuffer;
-            capacity = inlineBufferCapacity;
-            reserve(o.size);
-            mref<T>::move(o);
-        }
-        o.data=0, o.size=0, o.capacity=0;
-    }
-    Array& operator=(Array&& o) { this->~Array(); new (this) Array(::move(o)); return *this; }
-
-    using array<T>::reserve;
-    using array<T>::append;
-};
-/// Copies all elements in a new array
-generic Array<T> copy(const Array<T>& o) { return Array<T>((const ref<T>)o); }
+/// Creates a new array containing only elements where filter \a predicate does not match
+template<Type T, Type Function> array<T> filter(const ref<T> source, Function predicate) {
+    array<T> target(source.size); for(const T& e: source) if(!predicate(e)) target.append(copy(e)); return target;
+}
 
 // -- Sort --
 
 generic uint partition(const mref<T>& at, size_t left, size_t right, size_t pivotIndex) {
-    swap(at[pivotIndex], at[right]);
-    const T& pivot = at[right];
-    uint storeIndex = left;
-    for(uint i: range(left,right)) {
+	swap(at[pivotIndex], at[right]);
+	const T& pivot = at[right];
+	uint storeIndex = left;
+	for(uint i: range(left,right)) {
 		if(at[i] > pivot) {
-            swap(at[i], at[storeIndex]);
-            storeIndex++;
-        }
-    }
-    swap(at[storeIndex], at[right]);
-    return storeIndex;
+			swap(at[i], at[storeIndex]);
+			storeIndex++;
+		}
+	}
+	swap(at[storeIndex], at[right]);
+	return storeIndex;
 }
 
 generic T quickselect(const mref<T>& at, size_t left, size_t right, size_t k) {
-    for(;;) {
-        size_t pivotIndex = partition(at, left, right, (left + right)/2);
-        size_t pivotDist = pivotIndex - left + 1;
-        if(pivotDist == k) return at[pivotIndex];
-        else if(k < pivotDist) right = pivotIndex - 1;
-        else { k -= pivotDist; left = pivotIndex + 1; }
-    }
+	for(;;) {
+		size_t pivotIndex = partition(at, left, right, (left + right)/2);
+		size_t pivotDist = pivotIndex - left + 1;
+		if(pivotDist == k) return at[pivotIndex];
+		else if(k < pivotDist) right = pivotIndex - 1;
+		else { k -= pivotDist; left = pivotIndex + 1; }
+	}
 }
 /// Quickselects the median in-place
 generic T median(const mref<T>& at) { if(at.size==1) return at[0]; return quickselect(at, 0, at.size-1, at.size/2); }
 
 generic void quicksort(const mref<T>& at, int left, int right) {
-    if(left < right) { // If the list has 2 or more items
-        int pivotIndex = partition(at, left, right, (left + right)/2);
-        if(pivotIndex) quicksort(at, left, pivotIndex-1);
-        quicksort(at, pivotIndex+1, right);
-    }
+	if(left < right) { // If the list has 2 or more items
+		int pivotIndex = partition(at, left, right, (left + right)/2);
+		if(pivotIndex) quicksort(at, left, pivotIndex-1);
+		quicksort(at, pivotIndex+1, right);
+	}
 }
 /// Quicksorts the array in-place
 generic const mref<T>& sort(const mref<T>& at) { if(at.size) quicksort(at, 0, at.size-1); return at; }
@@ -254,12 +236,6 @@ generic void quicksort(mref<T> at, int left, int right, mref<size_t> indices) {
 		quicksort(at, pivotIndex+1, right, indices);
 	}
 }
-/*generic buffer<size_t> sortIndices(ref<T> at) {
-	buffer<size_t> indices (at.size);
-	for(size_t index: range(indices.size)) indices[index]=index;
-	quicksort(buffer<T>(at), 0, at.size-1, indices);
-	return indices;
-}*/
 generic buffer<size_t> sortIndices(mref<T> at) {
 	buffer<size_t> indices (at.size);
 	for(size_t index: range(indices.size)) indices[index]=index;
@@ -267,9 +243,41 @@ generic buffer<size_t> sortIndices(mref<T> at) {
 	return indices;
 }
 
-// -- Functional  --
+// -- Array --
+#if ARRAY
+/// Allocates an inline buffer on stack to store small arrays without an heap allocation
+template<Type T, size_t N=128> struct Array : array<T> {
+	using array<T>::data;
+	using array<T>::size;
+	using array<T>::capacity;
+	byte inlineBuffer[N-sizeof(array<T>)]; // Pads array<T> reference to cache line size to hold small arrays without managing an heap allocation
+	static constexpr size_t inlineBufferCapacity = sizeof(inlineBuffer)/sizeof(T);
 
-/// Creates a new array containing only elements where filter \a predicate does not match
-template<Type T, Type Function> array<T> filter(const ref<T> source, Function predicate) {
-    array<T> target(source.size); for(const T& e: source) if(!predicate(e)) target.append(copy(e)); return target;
-}
+	/// Default constructs an empty array
+	Array() : array<T>(buffer<T>((T*)inlineBuffer, 0, inlineBufferCapacity)) {}
+	/// Converts a buffer to an array
+	Array(buffer<T>&& o) : array<T>(move(o)) { assert(capacity > inlineBufferCapacity, capacity); }
+	/// Allocates an empty array with storage space for \a capacity elements
+	explicit Array(size_t nextCapacity) : Array() { reserve(nextCapacity); }
+	/// Copies elements from a reference
+	explicit Array(const ref<T> source) : Array() { append(source); }
+	/// Moves elements from a reference
+	explicit Array(const mref<T> source) : Array() { append(source); } //FIXME: only enables for non implicitly copiable types
+
+	Array(Array&& o) : array<T>(buffer<T>((T*)o.data, o.size, o.capacity)) {
+		if(o.isInline()) {
+			data = (T*)inlineBuffer;
+			capacity = inlineBufferCapacity;
+			reserve(o.size);
+			mref<T>::move(o);
+		}
+		o.data=0, o.size=0, o.capacity=0;
+	}
+	Array& operator=(Array&& o) { this->~Array(); new (this) Array(::move(o)); return *this; }
+
+	using array<T>::reserve;
+	using array<T>::append;
+};
+/// Copies all elements in a new array
+generic Array<T> copy(const Array<T>& o) { return Array<T>((const ref<T>)o); }
+#endif

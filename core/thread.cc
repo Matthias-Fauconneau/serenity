@@ -220,7 +220,7 @@ int wait() { return wait4(-1,0,0,0); }
 int64 wait(int pid) { void* status=0; wait4(pid,&status,0,0); return (int64)status; }
 
 string getenv(const string name, string value) {
-    static auto environ = File("/proc/self/environ").readUpTo<4096>(8192);
+	static auto environ = File("/proc/self/environ").readUpTo/*<4096>*/(8192);
     for(TextData s(environ);s;) {
         string key=s.until('='); string value=s.until('\0');
         if(key==name) return value;
@@ -229,7 +229,7 @@ string getenv(const string name, string value) {
 }
 
 ref<string> arguments() {
-    static auto cmdline = File("/proc/self/cmdline").readUpTo<256>(512);
+	static auto cmdline = File("/proc/self/cmdline").readUpTo/*<256>*/(512);
     assert(cmdline.size<4096);
     static array<string> arguments = split(section(cmdline,0,1,-1),"\0");
     return arguments;
