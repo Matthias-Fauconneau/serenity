@@ -3037,5 +3037,6 @@ Image decodeJPEG(const ref<byte> file) {
 	jpeg_decoder_mem_stream mem_stream((uint8*)file.data, file.size);
 	int width=0, height=0, depth;
 	byte4* data = (byte4*)decompress_jpeg_image_from_stream(&mem_stream, &width, &height, &depth, 4); // mallocated
+	assert_(width && height);
 	return Image(buffer<byte4>(data, width*height, width*height), int2(width,height), width);
 }

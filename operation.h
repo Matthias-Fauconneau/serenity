@@ -6,10 +6,9 @@
 struct GenericImageOperation : virtual GenericImageSource {
 	GenericImageSource& source;
 	Operator& operation;
-	Folder cacheFolder {operation.name(), source.folder(), true};
 	GenericImageOperation(GenericImageSource& source, Operator& operation) : source(source), operation(operation) {}
 
-	const Folder& folder() const override { return cacheFolder; }
+	String path() const override { return source.path()+'/'+operation.name(); }
 	String name() const override { return str(source.name(), operation.name()); }
 	size_t count(size_t need = 0) override { return source.count(need); }
     int2 maximumSize() const override { return source.maximumSize(); }
@@ -81,7 +80,7 @@ struct GroupImageOperation : ImageGroupSource {
 	GroupImageOperation(ImageSource& source, GroupSource& groups) : source(source), groups(groups) {}
 	size_t count(size_t need=0) override { return groups.count(need); }
 	String name() const override { return source.name(); }
-	const Folder& folder() const override { return source.folder(); }
+	String path() const override { return source.path(); }
 	int2 maximumSize() const override { return source.maximumSize(); }
 	int64 time(size_t groupIndex) override { return max(apply(groups(groupIndex), [this](size_t index) { return source.time(index); })); }
 	String elementName(size_t groupIndex) const override;
@@ -129,12 +128,11 @@ struct BinaryGenericImageOperation : virtual GenericImageSource {
 	GenericImageSource& A;
 	GenericImageSource& B;
 	ImageOperator& operation;
-	Folder cacheFolder {section(A.folder().name(),'/',-2,-1)+operation.name(), B.folder()/*FIXME: MRCA of A and B + diff name*/, true};
 	BinaryGenericImageOperation(GenericImageSource& A, GenericImageSource& B, ImageOperator& operation)
 		: A(A), B(B), operation(operation) {}
 	size_t count(size_t need=0) override { assert_(A.count(need) == B.count(need)); return A.count(need); }
 	String name() const override { return "("+A.name()+" | "+B.name()+")"; }
-	const Folder& folder() const override { return cacheFolder; }
+	String path() const override { return B.path()+'/'+section(A.path(),'/',-2,-1)+'/'+operation.name(); }
 	int2 maximumSize() const override { assert_(A.maximumSize() == B.maximumSize()); return A.maximumSize(); }
 	int64 time(size_t index) override { return max(max(A.time(index), B.time(index)), operation.time()); }
 	virtual String elementName(size_t index) const override {

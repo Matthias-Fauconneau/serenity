@@ -13,6 +13,8 @@ ImageFolder::ImageFolder(const Folder& source, function<bool(const String& name,
 			if((string)properties.at("Exif.Image.Orientation"_) == "6") imageSize = int2(imageSize.y, imageSize.x);
 			properties.insert("Size"_, strx(imageSize));
 			properties.insert("Path"_, copy(fileName));
+			auto& date = properties.at("Exif.Image.DateTime");
+			date = section((string)date, ' '); // Discards time to group by date using PropertyGroup
 			properties.at("Exif.Photo.ExposureTime"_).number *= 1000; // Scales seconds to milliseconds
 			insert(String(section(fileName,'.')), {move(properties.keys), apply(properties.values, [](const Variant& o){return str(o);})});
 
@@ -26,12 +28,14 @@ ImageFolder::ImageFolder(const Folder& source, function<bool(const String& name,
 			properties.filter([this](const string key, const string) { return !ref<string>{
 					"Size", "Path",
 					"Exif.Image.Orientation",
+					"Exif.Image.DateTime",
 					"Exif.Photo.FocalLength",
 					"Exif.Photo.FNumber",
 					"Exif.Photo.ExposureBiasValue",
 					"Exif.Photo.ISOSpeedRatings",
 					"Exif.Photo.ExposureTime" }.contains(key);
 			});
+			properties.keys.replace("Exif.Image.DateTime"_, "Date"_);
 			properties.keys.replace("Exif.Image.Orientation"_, "Orientation"_);
 			properties.keys.replace("Exif.Photo.FocalLength"_, "Focal"_);
 			properties.keys.replace("Exif.Photo.FNumber"_, "Aperture"_);
@@ -52,11 +56,12 @@ ImageFolder::ImageFolder(const Folder& source, function<bool(const String& name,
 SourceImageRGB ImageFolder::image(size_t index, string) {
 	assert_(index  < count());
 	File sourceFile (values[index].at("Path"_), source);
-	return cache<Image>({"Source", source, true}, elementName(index), size(index), sourceFile.modifiedTime(), [&](const Image& target) {
-		auto source = decodeImage(Map(sourceFile));
+	return cache<Image>(path()+"/Source", elementName(index), size(index), sourceFile.modifiedTime(), [&](const Image& target) {
+		Image source = decodeImage(Map(sourceFile));
+		assert_(source.size);
 		if(values[index].at("Orientation") == "6") rotate(target, source);
 		else target.copy(source);
-	}, "" /*Disable version invalidation to avoid redecoding on header changes*/);
+	}, true /*Disables full size source cache*/, "" /*Disables version invalidation to avoid redecoding on header changes*/);
 }
 
 /// Resizes sRGB images
@@ -67,11 +72,9 @@ SourceImageRGB ImageFolder::image(size_t index, int2 hint, string parameters) {
 	int2 sourceSize = parse<int2>(values[index].at("Size"_));
 	int2 size = this->size(index, hint);
 	if(size==sourceSize) return image(index, parameters);
-	return cache<Image>({"Resize", source, true}, elementName(index), size, sourceFile.modifiedTime(), [&](const Image& target) {
+	return cache<Image>(path()+"/Resize", elementName(index), size, sourceFile.modifiedTime(), [&](const Image& target) {
 		SourceImageRGB source = image(index);
-		assert_(target.size <= source.size, target.size, source.size);
-		assert_(target.size.x/source.size.x == target.size.y/source.size.y, target.size, source.size);
-		assert_(source.size.x/target.size.x == source.size.y/target.size.y, target.size, source.size);
+		assert_(target.size <= source.size);
 		resize(target, source);
 	});
 }
@@ -79,6 +82,6 @@ SourceImageRGB ImageFolder::image(size_t index, int2 hint, string parameters) {
 /// Converts sRGB images to linear float images
 SourceImage ImageFolder::image(size_t index, size_t componentIndex, int2 size, string parameters) {
 	assert_(index  < count());
-	return cache<ImageF>({"Linear["+str(componentIndex)+']', source, true}, elementName(index), size?:this->size(index), time(index),
+	return cache<ImageF>(path()+"Linear["+str(componentIndex)+']', elementName(index), size?:this->size(index), time(index),
 						 [&](const ImageF& target) { linear(target, image(index, size, parameters), componentIndex); } );
 }

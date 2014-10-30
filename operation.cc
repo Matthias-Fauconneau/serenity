@@ -11,7 +11,7 @@ SourceImage ImageOperation::image(size_t imageIndex, size_t componentIndex, int2
 		return move( outputs[componentIndex] );
 	}
 	assert_(operation.outputs() == 1);
-	SourceImage target = ::cache<ImageF>(folder(), elementName(imageIndex)+'['+str(componentIndex)+']', this->size(imageIndex, hint),
+	SourceImage target = ::cache<ImageF>(path(), elementName(imageIndex)+'['+str(componentIndex)+']', this->size(imageIndex, hint),
 										 time(imageIndex), [&](const ImageF& target) {
 		array<SourceImage> inputs;
 		if(operation.inputs()==1 && source.outputs()!=1) { // Component wise
@@ -29,7 +29,7 @@ SourceImage ImageOperation::image(size_t imageIndex, size_t componentIndex, int2
 // sRGBOperation
 
 SourceImageRGB sRGBOperation::image(size_t imageIndex, int2 hint, string parameters) {
-	return ::cache<Image>(folder(), elementName(imageIndex), this->size(imageIndex, hint), GenericImageOperation::time(imageIndex),
+	return ::cache<Image>(path(), elementName(imageIndex), this->size(imageIndex, hint), GenericImageOperation::time(imageIndex),
 						  [&](const Image& target) {
 		array<SourceImage> inputs;
 		for(size_t inputIndex: range(source.outputs())) inputs.append(source.image(imageIndex, inputIndex, hint, parameters));
@@ -42,7 +42,7 @@ SourceImageRGB sRGBOperation::image(size_t imageIndex, int2 hint, string paramet
 // ImageGroupFold
 
 SourceImage ImageGroupFold::image(size_t groupIndex, size_t componentIndex, int2 hint, string parameters) {
-	return move(::cacheGroup<ImageF>(folder(), elementName(groupIndex), size(groupIndex, hint), outputs(), time(groupIndex),
+	return move(::cacheGroup<ImageF>(path(), elementName(groupIndex), size(groupIndex, hint), outputs(), time(groupIndex),
 								[&](ref<ImageF> targets) {
 		if(operation.inputs()==1 || operation.inputs()==0) { // Forwards componentIndex
 			for(size_t componentIndex: range(outputs())) {
@@ -78,7 +78,7 @@ array<SourceImage> GroupImageOperation::images(size_t groupIndex, size_t compone
 // ImageGroupOperation
 array<SourceImage> ImageGroupOperation::images(size_t groupIndex, size_t componentIndex, int2 hint, string parameters) {
 	if(outputs() > 1 && source.outputs() == operation.inputs() && operation.outputs() == outputs()) {
-		Folder folder = ::cacheFolder(this->folder(), elementName(groupIndex)+parameters, strx(size(groupIndex, hint)), time(groupIndex),
+		Folder folder = ::cacheFolder(path(), elementName(groupIndex)+parameters, strx(size(groupIndex, hint)), time(groupIndex),
 										 [&](const Folder& folder) {
 			array<array<SourceImage>> images;
 			for(size_t inputIndex: range(source.outputs())) images.append( source.images(groupIndex, inputIndex, hint, parameters) );
@@ -99,7 +99,7 @@ array<SourceImage> ImageGroupOperation::images(size_t groupIndex, size_t compone
 			return ImageMapSource<ImageF>(move(image), move(map));
 		});
 	}
-	return ::cacheGroup<ImageF>(folder(), elementName(groupIndex)+parameters+'['+str(componentIndex)+']', size(groupIndex, hint),
+	return ::cacheGroup<ImageF>(path(), elementName(groupIndex)+parameters+'['+str(componentIndex)+']', size(groupIndex, hint),
 								groupSize(groupIndex), time(groupIndex), [&](ref<ImageF> targets) {
 		// Operates on all images at once (forwards componentIndex)
 		if(operation.inputs() == 0 && operation.outputs() == 0 && source.outputs() == outputs()) {
@@ -126,7 +126,7 @@ array<SourceImage> ImageGroupOperation::images(size_t groupIndex, size_t compone
 array<SourceImageRGB> sRGBGroupOperation::images(size_t groupIndex, int2 hint, string parameters) {
 	assert_(source.outputs() == 1 || source.outputs() == 3, source.outputs()); // Process every image separately
 	assert_(operation.inputs() == 1 && operation.outputs() == 1);
-	return ::cacheGroup<Image>(folder(), elementName(groupIndex), size(groupIndex, hint),
+	return ::cacheGroup<Image>(path(), elementName(groupIndex), size(groupIndex, hint),
 								groupSize(groupIndex), GenericImageGroupOperation::time(groupIndex), [&](ref<Image> targets) {
 		array<array<SourceImage>> images;
 		for(size_t inputIndex: range(source.outputs())) images.append( source.images(groupIndex, inputIndex, hint, parameters) );

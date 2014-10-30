@@ -26,8 +26,8 @@ typedef ImageMapSource<Image> SourceImageRGB;
 struct GenericImageSource : Source {
 	/// Name
 	virtual String name() const abstract;
-	/// Folder to be used for persistent data (cache, parameters)
-	virtual const Folder& folder() const abstract;
+	/// Path to be used for persistent data (cache, parameters))
+	virtual String path() const abstract;
     virtual int2 maximumSize() const abstract;
 	virtual String elementName(size_t index) const abstract;
 	virtual int2 size(size_t index, int2 size=0) const abstract;

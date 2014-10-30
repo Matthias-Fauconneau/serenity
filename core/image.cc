@@ -73,6 +73,7 @@ Image decodeImage(const ref<byte> file) {
 // -- Rotate --
 
 void rotate(const Image& target, const Image& source) {
+	assert_(target.size.x == source.size.y && target.size.y == source.size.x, source.size, target.size);
 	for(int y: range(source.height)) for(int x: range(source.width)) target(source.height-1-y, x) = source(x,y);
 }
 
@@ -80,9 +81,10 @@ void rotate(const Image& target, const Image& source) {
 
 static void box(const Image& target, const Image& source) {
     assert_(!source.alpha); //FIXME: not alpha correct
-	int scale = source.width/target.width;
-	assert_(scale <= 256, target.size, source.size);
-	assert_((target.size-int2(1))*scale+int2(scale-1) < source.size);
+	//assert_(source.size.x/target.size.x == source.size.y/target.size.y, target, source, source.size.x/target.size.x, source.size.y/target.size.y);
+	int scale = min(source.size.x/target.size.x, source.size.y/target.size.y);
+	assert_(scale < 256, target.size, source.size);
+	assert_((target.size-int2(1))*scale+int2(scale-1) < source.size, target, source);
     chunk_parallel(target.height, [&](uint, size_t y) {
         const byte4* sourceLine = source.data + y * scale * source.stride;
         byte4* targetLine = target.begin() + y * target.stride;
@@ -121,7 +123,7 @@ static void bilinear(const Image& target, const Image& source) {
 }
 
 void resize(const Image& target, const Image& source) {
-    assert_(source && target && target.size != source.size, source.size, target.size);
+	assert_(source && target && target.size != source.size);
     if(source.width%target.width==0 && source.height%target.height==0) box(target, source); // Integer box downsample
     else if(target.size > source.size/2) bilinear(target, source); // Bilinear resample
     else { // Integer box downsample + Bilinear resample

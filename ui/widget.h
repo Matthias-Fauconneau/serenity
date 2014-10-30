@@ -5,13 +5,15 @@
 /// Axis-aligned rectangle with 2D integer coordinates
 struct Rect {
 	int2 min, max;
-	static Rect fromOriginAndSize(int2 origin, int2 size) { return {origin, origin+size}; }
+	explicit Rect(int2 size) : min(0), max(size) {}
+	explicit Rect(int2 min, int2 max) : min(min), max(max) {}
+	static Rect fromOriginAndSize(int2 origin, int2 size) { return Rect(origin, origin+size); }
 	int2 origin() const { return min; }
 	int2 size() const { return max-min; }
 	explicit operator bool() { return min<max; }
 	bool contains(int2 p) const { return p>=min && p<max; }
 };
-inline Rect operator &(Rect a, Rect b) { return {max(a.min,b.min),min(a.max,b.max)}; }
+inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min),min(a.max,b.max)); }
 inline String str(const Rect& r) { return "["_+str(r.min)+" - "_+str(r.max)+"]"_; }
 
 /// User interface colors
@@ -43,7 +45,7 @@ struct Widget {
     virtual int2 sizeHint(int2) = 0;
     /// Returns graphic elements representing this widget at the given \a size.
 	virtual Graphics graphics(int2 unused size) { assert_("Unimplemented, use graphics(int2 size, Rect clip"); return {}; }
-	virtual Graphics graphics(int2 size, Rect unused clip) { return graphics(size); }
+	virtual Graphics graphics(int2 size, Rect unused clip) { return this->graphics(size); }
 
 // Events
     /// Mouse event type

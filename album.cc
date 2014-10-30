@@ -4,9 +4,9 @@
 #include "source-view.h"
 #include "layout.h"
 
-struct PropertySplit : GroupSource {
+struct PropertyGroup : GroupSource {
 	PropertySource& source;
-	PropertySplit(PropertySource& source) : source(source) {}
+	PropertyGroup(PropertySource& source) : source(source) {}
 
 	array<array<size_t>> groups;
 
@@ -33,8 +33,8 @@ struct PropertySplit : GroupSource {
 
 struct Album {
 	Folder folder {"Pictures", home()};
-	ImageFolder source { folder };
-	PropertySplit groups { source };
+	ImageFolder source {folder};
+	PropertyGroup groups {source};
 };
 
 struct SourceImageView : Widget, Poll {
@@ -67,6 +67,6 @@ struct AlbumPreview : Album, Application {
 				return SourceImageView(source, imageIndex, window);
 			}));
 		});
-	Window window {&view, 1050};
+	Window window {&view, 1050, []{return String("Album");}};
 };
 registerApplication(AlbumPreview);

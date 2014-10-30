@@ -31,7 +31,7 @@ generic struct buffer : mref<T> {
 	buffer(T* data, size_t size, size_t capacity) : mref<T>(data, size), capacity(capacity) {}
 	/// Initializes a new buffer with the content of \a o
 	//explicit buffer(const ref<T> o) : buffer(o.size, "copy") { mref<T>::copy(o); }
-	static buffer copy(const ref<T> o) { buffer copy(o.size, "copy"); copy.mref<T>::copy(o); return copy; }
+	//static buffer copy(const ref<T> o) { buffer copy(o.size, "copy"); copy.mref<T>::copy(o); return copy; }
 
     buffer& operator=(buffer&& o) { this->~buffer(); new (this) buffer(::move(o)); return *this; }
 
@@ -48,6 +48,8 @@ generic struct buffer : mref<T> {
 };
 /// Initializes a new buffer with the content of \a o
 generic buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity?:o.size, o.size, "copy"); t.copy(o); return t; }
+/// Initializes a new buffer with the content of \a o
+generic buffer<T> bufferCopyFromRef(ref<T> o) { buffer<T> copy(o.size, "copy"); copy.mref<T>::copy(o); return copy; }
 
 /// Converts a reference to a buffer (unsafe as no reference counting will keep the original buffer from being freed)
 generic buffer<T> unsafeReference(const ref<T> o) { return buffer<T>((T*)o.data, o.size, 0); }

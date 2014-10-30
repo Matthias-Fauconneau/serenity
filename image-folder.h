@@ -11,7 +11,7 @@ struct ImageFolder : ImageSource, ImageRGBSource, PropertySource, map<String, ma
 
 	ImageFolder(const Folder& source, function<bool(const String& name, const map<String, String>& properties)> predicate={});
 
-	const Folder& folder() const override { return source; }
+	String path() const override { return source.name(); }
 	String name() const override { return String(section(source.name(),'/',-2,-1)); }
 	size_t count(size_t) override { return map::size(); }
 	size_t count() const { return map::size(); }
@@ -23,8 +23,9 @@ struct ImageFolder : ImageSource, ImageRGBSource, PropertySource, map<String, ma
 	int2 size(size_t index, int2 hint = 0) const override {
 		int2 size = parse<int2>(values[index].at("Size"_));
 		int2 resize = size; // Defaults to original size
-		if(hint.x) resize = min(resize, size*hint.x/size.x); // Fits width
-		if(hint.y) resize = min(resize, size*hint.y/size.y); // Fits height
+		if(hint.x && hint.x < size.x) { assert_(size.x/hint.x, size, hint); resize = min(resize, size/(size.x/hint.x)); } // Fits width (Integer box resample)
+		if(hint.y && hint.y < size.y) { assert_(size.y/hint.y); resize = min(resize, size/(size.y/hint.y)); } // Fits height (Integer box resample)
+		assert_(size && resize.x/size.x == resize.y/size.y /*&& size.x/resize.x == size.y/resize.y, resize, size, vec2(size)/vec2(resize)*/);
 		return resize;
 	}
 
