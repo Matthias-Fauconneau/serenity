@@ -42,16 +42,17 @@ template<Type F> void parallel_for(uint stop, F f) { parallel_for(0,stop,f); }
 
 /// Runs a loop in parallel chunks with chunk-wise functor
 template<Type F> void parallel_chunk(uint64 totalSize, F f) {
-    constexpr uint64 chunkCount = threadCount;
-    assert(totalSize%chunkCount<chunkCount); //Last chunk might be up to chunkCount smaller
-    const uint64 chunkSize = (totalSize+chunkCount-1)/chunkCount;
-	assert_(totalSize > (chunkCount-1)*chunkSize, totalSize, (chunkCount-1)*chunkSize);
+	constexpr uint64 chunkCount = threadCount;
+	assert_(totalSize > (chunkCount-1)*chunkCount, totalSize, (chunkCount-1)*chunkCount); // totalSize > (chunkCount-1)*chunkSize
+	const uint64 chunkSize = (totalSize+chunkCount-1)/chunkCount;
+	assert_(totalSize > (chunkCount-1)*chunkSize); // Enough elements for non-empty last chunk
 	parallel_for(chunkCount, [&](uint id, uint64 chunkIndex) { f(id, chunkIndex*chunkSize, min(chunkSize, totalSize-chunkIndex*chunkSize)); });
 }
 
 /// Runs a loop in parallel chunks with element-wise functor
 template<Type F> void chunk_parallel(uint64 totalSize, F f) {
-	parallel_chunk(totalSize, [&](uint id, uint64 start, uint64 size) { for(uint64 index: range(start, start+size)) f(id, index); });
+	if(totalSize <= (threadCount-1)*threadCount) for(uint64 index: range(totalSize)) f(0, index);
+	else parallel_chunk(totalSize, [&](uint id, uint64 start, uint64 size) { for(uint64 index: range(start, start+size)) f(id, index); });
 }
 
 namespace parallel {

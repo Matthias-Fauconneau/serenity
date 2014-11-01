@@ -4,10 +4,11 @@
 #include "font.h"
 
 /// Primary colors
-static constexpr vec3 red (0, 0, 1);
-static constexpr vec3 green (0, 1, 0);
-static constexpr vec3 blue (1, 0, 0);
-static constexpr vec3 white (1, 1, 1);
+static constexpr bgr3f black (0, 0, 0);
+static constexpr bgr3f red (0, 0, 1);
+static constexpr bgr3f green (0, 1, 0);
+static constexpr bgr3f blue (1, 0, 0);
+static constexpr bgr3f white (1, 1, 1);
 
 /// Fill graphic element
 struct Fill {
@@ -32,6 +33,7 @@ struct Glyph {
 /// Line graphic element
 struct Line {
     vec2 a, b;
+	bgr3f color;
 };
 
 /// Set of graphic elements

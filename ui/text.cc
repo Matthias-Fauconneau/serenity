@@ -250,7 +250,7 @@ struct TextLayout {
             float midY = (numMaxY+denMinY) / 2;
             float minX  = ::min(apply(fract, [](const Glyph& g) { return g.origin.x - g.bearing.x; }));
             float maxX  = ::max(apply(fract, [](const Glyph& g) { return g.origin.x - g.bearing.x + g.width; }));
-			this->lines.append( ::Line{vec2(minX, midY), vec2(maxX, midY)} );
+			this->lines.append( ::Line{vec2(minX, midY), vec2(maxX, midY), black} );
         }
     }
 };

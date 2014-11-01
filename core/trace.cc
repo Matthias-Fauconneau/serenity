@@ -46,6 +46,7 @@ String demangle(TextData& s, bool function=true) {
     else if(s.match('a')) r.append("byte");
     else if(s.match('b')) r.append("bool");
     else if(s.match('c')) r.append("char");
+	else if(s.match('d')) r.append("double");
     else if(s.match('f')) r.append("float");
     else if(s.match('h')) r.append("byte");
     else if(s.match('i')) r.append("int");

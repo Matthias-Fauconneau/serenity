@@ -76,7 +76,7 @@ SourceImageRGB ImageFolder::image(size_t index, int2 hint, string parameters) {
 		SourceImageRGB source = image(index);
 		assert_(target.size >= int2(12) && target.size <= source.size, target.size, hint);
 		resize(target, source);
-	});
+	}, false, "" /*Disables version invalidation to avoid redecoding and resizing on header changes*/);
 }
 
 /// Converts sRGB images to linear float images

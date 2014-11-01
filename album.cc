@@ -52,20 +52,38 @@ struct SourceImageView : Widget, Poll {
 		Graphics graphics;
 		if(image) {
 			assert_(size, image.size);
-			int2 target = min(image.size*size.x/image.size.x, image.size*size.y/image.size.y);
-			//assert_(target <= size, target, size);
-			if(target > int2(9)) {
-				assert_(target > int2(9), target, size);
-				graphics.blits.append(vec2((size-target)/2), vec2(target), share(image));
-			}
+			vec2 target = vec2(image.size)*min(float(size.x)/float(image.size.x), float(size.y)/float(image.size.y));
+			if(target > vec2(0)) graphics.blits.append((vec2(size)-target)/2.f, target, share(image));
 		} else { this->size=size; queue(); } // Progressive load
 		return graphics;
 	}
 	void event() {
-		image = source.image(index, max(size, int2(64)));
+		image = source.image(index, max(size, int2(256)));
 		onLoad();
 	}
 };
+
+static vec2 bezier(vec2 p0, vec2 p1, vec2 p2, vec2 p3, float t) { return cb(1-t)*p0 + 3*sq(1-t)*t*p1+ 3*(1-t)*sq(t)*p2 + cb(t)*p3; }
+float bezierY(vec2 P0, vec2 P1, vec2 P2, vec2 P3, float x) {
+	const int precision = 2;
+	for(float i: range(precision)) { //FIXME: binary search
+		vec2 p0 = bezier(P0, P1, P2, P3, i/precision);
+		vec2 p1 = bezier(P0, P1, P2, P3, (i+1)/precision);
+		if(p0.x <= x && x <= p1.x) {
+			if(p0.x == p1.x) { assert_(p0.y == p1.y); return p0.y; }
+			return p0.y + (p1.y-p0.y)*(x-p0.x)/(p1.x-p0.x);
+		}
+	}
+	return nan;
+}
+float step(float x, float min, float mid, float max) {
+	mid = clip(min, mid, max);
+	{float y = bezierY(vec2(min), vec2(mid,min), vec2(mid,min), vec2(mid), x);
+		if(!isNaN(y)) return y;}
+	{float y = bezierY(vec2(mid), vec2(mid,max), vec2(mid,max), vec2(max), x);
+		if(!isNaN(y)) return y;}
+	error(x, min, mid, max);
+}
 
 /// Allocates more space to widgets near the cursor
 generic struct Magnify : T, virtual Layout {
@@ -80,22 +98,13 @@ generic struct Magnify : T, virtual Layout {
 	}
 	array<Rect> layout(int2 size) override {
 		auto layout = T::layout(size);
-		if(size>int2(1)) for(int axis: range(2)) {
-			real x0 = (real)clip(1, cursor[axis], size[axis]-1)/size[axis];
-			real a = -1/(2*x0*x0);
-			real b = 3/(2*x0);
-			real D = 2*sq(x0-1);
-			real c = -1/D;
-			real d = 3*x0/D;
-			real e = (3-6*x0)/D;
-			real f = x0*(2*x0-1)/D;
-
-			auto F = [=](real x) { // Smooth step with maximum slope under cursor
-				x /= size[axis];
-				real y = x < x0 ? a*x*x*x + b*x*x : c*x*x*x + d*x*x + e*x + f;
-				return y * size[axis];
-			};
-			for(Rect& r: layout) { r.min[axis] = F(r.min[axis]), r.max[axis] = F(r.max[axis]); }
+		for(int axis: range(2)) if(size[axis] > 1) {
+			int min=0, max=size[axis]-1;
+			for(Rect r: layout) { min=::min(min, r.min[axis]), max=::max(max, r.max[axis]-1); }
+			for(Rect& r: layout) {
+				r.min[axis] = step(r.min[axis], min, cursor[axis], max);
+				r.max[axis] = step(r.max[axis]-1, min, cursor[axis], max)+1;
+			}
 		}
 		return layout;
 	}

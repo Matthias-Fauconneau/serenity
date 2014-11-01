@@ -83,9 +83,8 @@ static void box(const Image& target, const Image& source) {
     assert_(!source.alpha); //FIXME: not alpha correct
 	//assert_(source.size.x/target.size.x == source.size.y/target.size.y, target, source, source.size.x/target.size.x, source.size.y/target.size.y);
 	int scale = min(source.size.x/target.size.x, source.size.y/target.size.y);
-	assert_(scale <= 256, target.size, source.size);
+	assert_(scale <= 512, target.size, source.size);
 	assert_((target.size-int2(1))*scale+int2(scale-1) < source.size, target, source);
-	assert_(target.height > 9);
     chunk_parallel(target.height, [&](uint, size_t y) {
         const byte4* sourceLine = source.data + y * scale * source.stride;
         byte4* targetLine = target.begin() + y * target.stride;
@@ -106,7 +105,6 @@ static Image box(Image&& target, const Image& source) { box(target, source); ret
 static void bilinear(const Image& target, const Image& source) {
     assert_(!source.alpha);
     const uint stride = source.stride;
-	assert_(target.height > 9);
     chunk_parallel(target.height, [&](uint, size_t y) {
         for(uint x: range(target.width)) {
             const uint fx = x*256*(source.width-1)/target.width, fy = y*256*(source.height-1)/target.height; //TODO: incremental
