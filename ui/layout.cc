@@ -177,7 +177,7 @@ array<Rect> GridLayout::layout(int2 size) {
         const int availableHeight = size.y ?: requiredHeight;
         const int fixedHeight = availableHeight / h;
         for(int& v: heights) v = fixedHeight;
-        extraHeight = availableHeight - w*fixedHeight;
+		extraHeight = availableHeight - h*fixedHeight;
     } else {
 		for(size_t y : range(h)) {
             int maxY = 0;

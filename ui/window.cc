@@ -79,9 +79,6 @@ bool Window::processEvent(const XEvent& e) {
         if(focus && focus->keyRelease(key, modifiers)) render();
     }
     else if(type==MotionNotify) {
-		for(Widget* w: onMotion)
-			if(w->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?Widget::LeftButton:Widget::NoButton, focus))
-				render();
         if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, Widget::LeftButton, focus))
             render();
         else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?Widget::LeftButton:Widget::NoButton, focus))

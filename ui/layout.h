@@ -82,11 +82,11 @@ struct HBox : Horizontal, Widgets {
     /// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if HBox is not most derived
     HBox(Extra main=Share, Extra side=AlignCenter, bool expanding=false) : Linear(main, side, expanding){}
     /// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if HBox is not most derived
-    HBox(array<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter, bool expanding=false)
+	HBox(array<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter, bool expanding=false)
 		: Linear(main, side, expanding), Widgets(::move(widgets)){}
     /// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if HBox is not most derived
     HBox(ref<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter, bool expanding=false)
-        : Linear(main, side, expanding), Widgets(array<Widget*>(widgets)){}
+		: Linear(main, side, expanding), Widgets(array<Widget*>(widgets)){}
 };
 
 /// Vertical layout of heterogenous widgets. \sa Widgets
@@ -95,11 +95,11 @@ struct VBox : Vertical, Widgets {
     /// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if VBox is not most derived
     VBox(Extra main=Share, Extra side=AlignCenter, bool expanding=false) : Linear(main, side, expanding) {}
     /// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if VBox is not most derived
-    VBox(array<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter, bool expanding=false)
+	VBox(array<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter, bool expanding=false)
 		: Linear(main, side, expanding), Widgets(::move(widgets)) {}
     /// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if VBox is not most derived
     VBox(ref<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter, bool expanding=false)
-        : Linear(main, side, expanding), Widgets(array<Widget*>(widgets)) {}
+		: Linear(main, side, expanding), Widgets(array<Widget*>(widgets)) {}
 };
 
 /// Horizontal layout of homogenous items. \sa WidgetArray
@@ -131,10 +131,11 @@ struct GridLayout : virtual Layout {
 struct WidgetGrid : GridLayout, Widgets {
     WidgetGrid(bool uniformX=false, bool uniformY=false, int width=0)
         : GridLayout(uniformX, uniformY, width) {}
-    WidgetGrid(array<Widget*>&& widgets, bool uniformX=false, bool uniformY=false, int width=0)
+	WidgetGrid(array<Widget*>&& widgets, bool uniformX=false, bool uniformY=false, int width=0)
 		: GridLayout(uniformX, uniformY, width), Widgets(::move(widgets)) {}
 };
 
 generic struct UniformGrid : GridLayout,  WidgetArray<T> {
-	UniformGrid(const mref<T>& items={}) : WidgetArray<T>(items) {}
+	UniformGrid(buffer<T>&& widgets, bool uniformX=false, bool uniformY=false)
+		: GridLayout(uniformX, uniformY), WidgetArray<T>(move(widgets)){}
 };

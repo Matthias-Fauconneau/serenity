@@ -48,8 +48,6 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     Widget* focus = widget;
     /// Current widget that has the drag focus
     Widget* drag = 0;
-	/// Widgets which registered for any mouse motion events
-	array<Widget*> onMotion;
 
 // Methods
     /// Creates an initially hidden window for \a widget, use \a show to display

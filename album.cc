@@ -51,71 +51,47 @@ struct SourceImageView : Widget, Poll {
 	Graphics graphics(int2 size) override {
 		Graphics graphics;
 		if(image) {
-			assert_(size, image.size);
 			vec2 target = vec2(image.size)*min(float(size.x)/float(image.size.x), float(size.y)/float(image.size.y));
-			if(target > vec2(0)) graphics.blits.append((vec2(size)-target)/2.f, target, share(image));
+			graphics.blits.append((vec2(size)-target)/2.f, target, share(image));
 		} else { this->size=size; queue(); } // Progressive load
 		return graphics;
 	}
 	void event() {
-		image = source.image(index, max(size, int2(256)));
+		image = source.image(index, size);
 		onLoad();
 	}
 };
 
-static vec2 bezier(vec2 p0, vec2 p1, vec2 p2, vec2 p3, float t) { return cb(1-t)*p0 + 3*sq(1-t)*t*p1+ 3*(1-t)*sq(t)*p2 + cb(t)*p3; }
-float bezierY(vec2 P0, vec2 P1, vec2 P2, vec2 P3, float x) {
-	const int precision = 2;
-	for(float i: range(precision)) { //FIXME: binary search
-		vec2 p0 = bezier(P0, P1, P2, P3, i/precision);
-		vec2 p1 = bezier(P0, P1, P2, P3, (i+1)/precision);
-		if(p0.x <= x && x <= p1.x) {
-			if(p0.x == p1.x) { assert_(p0.y == p1.y); return p0.y; }
-			return p0.y + (p1.y-p0.y)*(x-p0.x)/(p1.x-p0.x);
-		}
-	}
-	return nan;
-}
-float step(float x, float min, float mid, float max) {
-	mid = clip(min, mid, max);
-	{float y = bezierY(vec2(min), vec2(mid,min), vec2(mid,min), vec2(mid), x);
-		if(!isNaN(y)) return y;}
-	{float y = bezierY(vec2(mid), vec2(mid,max), vec2(mid,max), vec2(max), x);
-		if(!isNaN(y)) return y;}
-	error(x, min, mid, max);
-}
+/// Browses a collection displaying a single element
+generic struct Book : array<T>, Widget {
+	using array<T>::array;
+	int index = 0;
+	Widget& active() { return array<T>::at(index); }
 
-/// Allocates more space to widgets near the cursor
-generic struct Magnify : T, virtual Layout {
-	int2 cursor;
-
-	using T::T;
-
-	bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override {
-		int2 previousCursor = this->cursor;
-		this->cursor = cursor;
-		return T::mouseEvent(cursor, size, event, button, focus) || cursor != previousCursor;
+	int2 sizeHint(int2 size) { return active().sizeHint(size); }
+	Graphics graphics(int2 size) { return active().graphics(size); }
+	Graphics graphics(int2 size, Rect clip) { return active().graphics(size, clip); }
+	bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
+		focus = this;
+		return active().mouseEvent(cursor, size, event, button, focus);
 	}
-	array<Rect> layout(int2 size) override {
-		auto layout = T::layout(size);
-		for(int axis: range(2)) if(size[axis] > 1) {
-			int min=0, max=size[axis]-1;
-			for(Rect r: layout) { min=::min(min, r.min[axis]), max=::max(max, r.max[axis]-1); }
-			for(Rect& r: layout) {
-				r.min[axis] = step(r.min[axis], min, cursor[axis], max);
-				r.max[axis] = step(r.max[axis]-1, min, cursor[axis], max)+1;
-			}
-		}
-		return layout;
+	bool keyPress(Key key, Modifiers modifiers) {
+		int previousIndex = index;
+		if(key==LeftArrow) index=max(0, index-1);
+		if(key==RightArrow) index=min<int>(array<T>::size-1, index+1);
+		return active().keyPress(key, modifiers) || previousIndex != index;
 	}
+	bool keyRelease(Key key, Modifiers modifiers) { return active().keyRelease(key, modifiers); }
 };
 
+typedef UniformGrid<SourceImageView> Page;
+
 struct AlbumPreview : Album, Application {
-	Magnify<VList<Magnify<HList<SourceImageView>>>> lines = apply(groups.count(), [&](size_t groupIndex) {
-			return Magnify<HList<SourceImageView>>(apply(groups(groupIndex),[&](size_t imageIndex) {
+	Book<Page> book = apply(groups.count(), [&](size_t groupIndex) {
+			return Page(apply(groups(groupIndex),[&](size_t imageIndex) {
 				return SourceImageView(source, imageIndex, window);
-			})); });
-	Window window {&lines, int2(-1), []{return String("Album");}};
-	AlbumPreview() { for(auto& line: lines) window.onMotion.append(&line); }
+			}), true, true); });
+	Window window {&book, int2(1050), []{return String("Album");}};
+	AlbumPreview() { window.background = Window::White; }
 };
 registerApplication(AlbumPreview);
