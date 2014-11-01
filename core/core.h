@@ -9,6 +9,7 @@
 #define generic template<Type T>
 #define abstract =0
 #define default_move(T) T(T&&)=default; T& operator=(T&&)=default
+#define immobile(T) T(T&&)=delete; T& operator=(T&&)=delete
 
 // Move semantics
 generic struct remove_reference { typedef T type; };

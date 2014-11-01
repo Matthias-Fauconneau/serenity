@@ -74,7 +74,7 @@ SourceImageRGB ImageFolder::image(size_t index, int2 hint, string parameters) {
 	if(size==sourceSize) return image(index, parameters);
 	return cache<Image>(path()+"/Resize", elementName(index), size, sourceFile.modifiedTime(), [&](const Image& target) {
 		SourceImageRGB source = image(index);
-		assert_(target.size <= source.size);
+		assert_(target.size >= int2(12) && target.size <= source.size, target.size, hint);
 		resize(target, source);
 	});
 }

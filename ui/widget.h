@@ -44,7 +44,7 @@ struct Widget {
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
     virtual int2 sizeHint(int2) = 0;
     /// Returns graphic elements representing this widget at the given \a size.
-	virtual Graphics graphics(int2 unused size) { assert_("Unimplemented, use graphics(int2 size, Rect clip"); return {}; }
+	virtual Graphics graphics(int2 unused size) { error("Unimplemented, use graphics(int2 size, Rect clip)"); }
 	virtual Graphics graphics(int2 size, Rect unused clip) { return this->graphics(size); }
 
 // Events

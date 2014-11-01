@@ -6,7 +6,7 @@ Graphics ScrollArea::graphics(int2 size) {
     int2 hint = abs(widget().sizeHint(size));
     int2 view (horizontal?max(hint.x,size.x):size.x,vertical?max(hint.y,size.y):size.y);
     Graphics graphics;
-    if(view <= size) return widget().graphics(size);
+	if(view <= size) return widget().graphics(size, Rect(size));
 	else {
 		assert_(offset <= int2(0));
 		graphics.append(widget().graphics(view, Rect::fromOriginAndSize(-offset, size)), vec2(offset));
