@@ -24,26 +24,26 @@ MusicXML::MusicXML(string document) {
                     duration = (uint[]){16,8,4,2,1}[uint(type)]*divisions/16;
                 } else {
                     uint acciaccaturaTime = 0;
-                    for(Sign grace: acciaccaturas.reverse()) { // Inserts any pending Acciaccatura graces before principal
+					for(Sign grace: acciaccaturas.reverse()) { // Inserts any pending acciaccatura graces before principal
                         acciaccaturaTime += grace.duration;
                         grace.time = time-acciaccaturaTime;
                         signs.insertSorted(grace);
                     }
-                    duration = fromInteger(e("duration"_).text()) - appoggiaturaTime;
+					duration = parseInteger(e("duration"_).text()) - appoggiaturaTime;
                     assert_(acciaccaturaTime <= duration, acciaccaturaTime, duration, appoggiaturaTime);
                     acciaccaturas.clear();
                     appoggiaturaTime = 0;
                 }
                 if(!e("chord"_) && !e("grace"_)) nextTime = time+duration;
                 if(e["print-object"_]=="no"_) continue;
-                uint staff = fromInteger(e("staff"_).text())-1;
+				uint staff = parseInteger(e("staff"_).text())-1;
                 assert_(int(type)>=0, e);
                 if(e("rest"_)) {
                     {Sign sign{time, duration, staff, Sign::Rest, {}}; sign.rest={type}; signs.insertSorted(sign);}
                 } else {
                     assert_(e("pitch"_)("step"_).text(), e);
                     uint octaveStep = "CDEFGAB"_.indexOf(e("pitch"_)("step"_).text()[0]);
-                    int noteOctave = fromInteger(e("pitch"_)("octave"_).text());
+					int noteOctave = parseInteger(e("pitch"_)("octave"_).text());
                     int noteStep = (noteOctave-4) * 7 + octaveStep;
                     Accidental noteAccidental = Accidental(ref<string>({""_,"flat"_,"sharp"_,"natural"_}).indexOf(e("accidental"_).text()));
                     if(e("notations"_)("slur"_)) {
@@ -90,20 +90,20 @@ MusicXML::MusicXML(string document) {
                                    key, 0
                                   };
                         // Acciaccatura are played before principal beat (Records graces to shift in on parsing principal)
-                        if(e("grace"_) && e("grace"_)["slash"_]=="yes"_) acciaccaturas << sign;
+						if(e("grace"_) && e("grace"_)["slash"_]=="yes"_) acciaccaturas.append( sign );
                         else signs.insertSorted(sign);
                     }
                 }
                 if(e("grace"_) && e("grace"_)["slash"_]!="yes"_) appoggiaturaTime += duration; // Takes time away from principal (appoggiatura)
             }
             else if(e.name=="backup"_) {
-                int dt = fromInteger(e("duration"_).text());
+				int dt = parseInteger(e("duration"_).text());
                 time -= dt;
                 //log("<<", dt);
                 nextTime = time;
             }
             else if(e.name=="forward"_) {
-                int dt =  fromInteger(e("duration"_).text());
+				int dt =  parseInteger(e("duration"_).text());
                 time += dt;
                 //log(">>", dt);
                 maxTime = max(maxTime, time);
@@ -113,42 +113,42 @@ MusicXML::MusicXML(string document) {
                 const Element& d = e("direction-type"_);
                 if(d("dynamics"_)) {
                     Loudness loudness = Loudness(ref<string>({"ppp"_,"pp"_,"p"_,"mp"_,"mf"_,"f"_,"ff"_,"fff"_}).indexOf(d("dynamics"_).children.first()->name));
-                    {Sign sign{time, 0, 0, Sign::Dynamic, {}}; sign.dynamic={loudness}; signs << sign;}
+					{Sign sign{time, 0, 0, Sign::Dynamic, {}}; sign.dynamic={loudness}; signs.append( sign );}
                 }
                 else if(d("metronome"_)) {
                     Duration beatUnit = Duration(ref<string>({"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_}).indexOf(d("metronome"_)("beat-unit"_).text()));
-                    uint perMinute = fromInteger(d("metronome"_)("per-minute"_).text());
-                    {Sign sign{time, 0, 0, Sign::Metronome, {}}; sign.metronome={beatUnit, perMinute}; signs << sign;}
+					uint perMinute = parseInteger(d("metronome"_)("per-minute"_).text());
+					{Sign sign{time, 0, 0, Sign::Metronome, {}}; sign.metronome={beatUnit, perMinute}; signs.append( sign );}
                 }
                 else if(d("pedal"_)) {
                     PedalAction action = PedalAction(ref<string>({"start"_,"change"_,"stop"_}).indexOf(d("pedal"_)["type"_]));
                     if(action==Start && d("pedal"_)["line"_]!="yes"_) action=Ped;
-                    int offset = e("offset"_) ? fromInteger(e("offset"_).text()) : 0;
+					int offset = e("offset"_) ? parseInteger(e("offset"_).text()) : 0;
                     {Sign sign{time + offset, 0, 0, Sign::Pedal, {}}; sign.pedal={action}; signs.insertSorted(sign);}
                 }
                 else if(d("wedge"_)) {
                     WedgeAction action = WedgeAction(ref<string>({"crescendo"_,"diminuendo"_,"stop"_}).indexOf(d("wedge"_)["type"_]));
-                    {Sign sign{time, 0, 0, Sign::Wedge, {}}; sign.wedge={action}; signs << sign;}
+					{Sign sign{time, 0, 0, Sign::Wedge, {}}; sign.wedge={action}; signs.append( sign );}
                 }
                 else if(d("octave-shift"_)) {}
                 else if(d("other-direction"_)) {}
                 else error(e);
             }
             else if(e.name=="attributes"_) {
-                if(e("divisions"_)) divisions = fromInteger(e("divisions"_).text());
+				if(e("divisions"_)) divisions = parseInteger(e("divisions"_).text());
                 e.xpath("clef"_, [&](const Element& clef) {
-                    uint staff = fromInteger(clef["number"_])-1;
+					uint staff = parseInteger(clef["number"_])-1;
                     ClefSign clefSign = ClefSign("FG"_.indexOf(clef("sign"_).text()[0]));
-                    {Sign sign{time, 0, staff, Sign::Clef, {}}; sign.clef={clefSign, 0}; signs << sign;};
+					{Sign sign{time, 0, staff, Sign::Clef, {}}; sign.clef={clefSign, 0}; signs.append( sign );};
                     clefs[staff] = {clefSign, 0};
                 });
                 if(e("key"_)) {
-                    keySignature.fifths = fromInteger(e("key"_)("fifths"_).text());
+					keySignature.fifths = parseInteger(e("key"_)("fifths"_).text());
                     {Sign sign{time, 0, 0, Sign::KeySignature, {}}; sign.keySignature=keySignature; signs.insertSorted(sign); }
                 }
                 if(e("time"_)) {
-                    timeSignature = {uint(fromInteger(e("time"_)("beats"_).text())), uint(fromInteger(e("time"_)("beat-type"_).text()))};
-                    {Sign sign{time, 0, 0, Sign::TimeSignature, {}}; sign.timeSignature=timeSignature; signs << sign;}
+					timeSignature = {uint(parseInteger(e("time"_)("beats"_).text())), uint(parseInteger(e("time"_)("beat-type"_).text()))};
+					{Sign sign{time, 0, 0, Sign::TimeSignature, {}}; sign.timeSignature=timeSignature; signs.append( sign );}
                 }
             }
             else if(e.name=="barline"_) {}

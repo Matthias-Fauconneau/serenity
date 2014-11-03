@@ -155,7 +155,7 @@ struct Build {
             map<size_t, string> files;
 			for(string path: filter(sources, [](string name) { return !(endsWith(name, ".cc")||endsWith(name,".h")); }))
 				files.insertSortedMulti(File(path).size(), path);
-            log(str(files,"\n"_));
+			//log(str(files,"\n"_));
             return;
         }
 

@@ -28,6 +28,10 @@ core/trace.h
 core/profile.h
 core/profile.cc
 core/vector.h
+core/parallel.h
+core/cache.h
+core/cat.h
+core/serialization.h
 
 io/rle.h
 io/variant.h
@@ -43,6 +47,10 @@ io/jpeg.cc
 io/jpeg.h
 io/jpeg-encoder.cc
 io/jpeg-encoder.h
+io/xml.h
+io/xml.cc
+io/exif.cc
+io/exif.h
 
 ui/graphics.h
 ui/interface.h
@@ -63,6 +71,7 @@ ui/selection.h
 ui/selection.cc
 ui/display.cc
 ui/x.h
+ui/color.h
 
 audio/audio.h
 audio/audio.cc
@@ -78,13 +87,7 @@ tuner/profile.h
 tuner/analysis.cc
 tuner/tuner.cc
 
-player.cc
-
-io/exif.cc
-io/exif.h
 image/operator.h
-dust.cc
-core/parallel.h
 image/inverse-diffusion.h
 image/source.h
 image/image-folder.h
@@ -94,27 +97,29 @@ image/inverse-diffusion.cc
 image/operation.cc
 image/operation.h
 image/source-view.h
-core/cache.h
-core/cat.h
-core/serialization.h
-io/jpeg-encoder.h
 image/crop.cc
-image/blend.cc
 image/split.h
 image/split.cc
 image/image-folder.cc
 image/transform.h
 image/align.h
 image/operator.cc
-ui/color.h
 image/multiscale.h
 image/multiscale.cc
 image/prism.h
 image/prism.cc
 image/weight.h
 image/weight.cc
-stitch.cc
-web.cc
-book.cc
 image/image.h
 image/image.cc
+
+music/MusicXML.cc
+music/midi.cc
+music/sheet.h
+
+player.cc
+dust.cc
+blend.cc
+stitch.cc
+book.cc
+web.cc

@@ -79,6 +79,7 @@ generic struct array : buffer<T> {
     }
     /// Inserts immediately before the first element greater than the argument
 	int insertSorted(T&& e) { size_t i=0; while(i<size && at(i) <= e) i++; insertAt(i, ::move(e)); return i; }
+	int insertSorted(const T& e) { size_t i=0; while(i<size && at(i) <= e) i++; insertAt(i, ::copy(e)); return i; }
 
     /// Removes one element at \a index
     void removeAt(size_t index) { at(index).~T(); for(size_t i: range(index, size-1)) at(i)=move(at(i+1)); size--; }

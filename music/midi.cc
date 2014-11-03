@@ -2,18 +2,18 @@
 #include "file.h"
 #include "math.h"
 
-MidiFile::MidiFile(const ref<byte>& data) { /// parse MIDI header
-    BinaryData s(data,true);
+MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
+	BinaryData s(file, true);
     s.advance(10);
     uint16 nofChunks = s.read(); ticksPerSeconds = 2*(uint16)s.read(); // Ticks per second (*2 as actually defined for MIDI as ticks per beat at 120bpm)
     for(int i=0; s && i<nofChunks;i++) {
         ref<byte> tag = s.read<byte>(4); uint32 length = s.read();
         if(tag == "MTrk"_) {
-            BinaryData track = array<byte>(s.peek(length));
+			BinaryData track = copyRef(s.peek(length));
             // Reads first time (next event time will always be kept to read events in time)
             uint8 c=track.read(); uint t=c&0x7f;
             if(c&0x80){c=track.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=track.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=track.read();t=(t<<7)|c;}}}
-            tracks<< Track(t,move(track));
+			tracks.append( Track(t,move(track)) );
         }
         s.advance(length);
     }

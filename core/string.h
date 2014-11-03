@@ -79,9 +79,16 @@ String toLower(const string s);
 String toUpper(const string s);
 
 /// Pads a string to the left
-String left(const string s, size_t size, const char pad=' ');
+String left(string s, size_t size, const char pad=' ');
 /// Pads a string to the right
-String right(const string s, size_t size, const char pad=' ');
+String right(string s, size_t size, const char pad=' ');
+
+/// Replaces every occurrence of \a before with \a after
+String replace(string s, const string& before, const string& after);
+
+/// Removes duplicate whitespace
+String simplify(String&& s);
+inline String simplify(string s) { return simplify(copyRef(s)); }
 
 // -- string[]
 

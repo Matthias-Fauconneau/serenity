@@ -155,6 +155,19 @@ generic struct Ref {
     /// Slices a reference to elements from \a pos to the end of the reference
 	ref<T> slice(size_t pos) const;
 
+	struct reverse_ref {
+		const T* start; const T* stop;
+		struct iterator {
+			const T* pointer;
+			const T& operator*() { return *pointer; }
+			iterator& operator++() { pointer--; return *this; }
+			bool operator !=(const iterator& o) const { return intptr_t(pointer)>=intptr_t(o.pointer); }
+		};
+		iterator begin() const { return {start}; }
+		iterator end() const { return {stop}; }
+	};
+	reverse_ref reverse() { return {end()-1, begin()}; }
+
     /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
     size_t indexOf(const T& key) const { for(size_t i: range(size)) { if(data[i]==key) return i; } return -1; }
     /// Returns true if the array contains an occurrence of \a value

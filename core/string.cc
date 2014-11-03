@@ -61,10 +61,10 @@ double parseDecimal(const string number) { return TextData(number).decimal(); }
 // -- String
 
 char lowerCase(char c) { return c>='A'&&c<='Z'?'a'+c-'A':c; }
-String toLower(const string source) { return apply(source, lowerCase); }
+String toLower(string source) { return apply(source, lowerCase); }
 
 char upperCase(char c) { return c>='a'&&c<='z'?'A'+c-'a':c; }
-String toUpper(const string source) { return apply(source, upperCase); }
+String toUpper(string source) { return apply(source, upperCase); }
 
 String left(const string source, size_t size, const char pad) {
 	if(source.size >= size) return copyRef(source);
@@ -79,6 +79,27 @@ String right(const string source, size_t size, const char pad) {
 	while(target.size < size-source.size) target.append(pad);
     target.append(source);
     return target;
+}
+
+String replace(const string& s, const string& before, const string& after) {
+	array<char> r(s.size, 0);
+	for(size_t i=0; i<s.size;) {
+		if(i<=s.size-before.size && string(s.data+i, before.size)==before) { r.append(after); i+=before.size; }
+		else { r.append( s[i] ); i++; }
+	}
+	return move(r);
+}
+
+String simplify(array<char>&& s) {
+	for(size_t i=0; i<s.size;) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //trim heading
+	for(size_t i=0; i<s.size;) {
+		byte c=s[i];
+		if(c=='\r') { s.removeAt(i); continue; } //Removes any \r
+		i++;
+	   if(c==' '||c=='\t'||c=='\n') while(i<s.size) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //Simplify whitespace
+	}
+	if(s.size) for(size_t i=s.size-1;i>0;i--) { byte c=s[i]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; s.removeAt(i); } //trim trailing
+	return move(s);
 }
 
 // -- string[]

@@ -25,6 +25,6 @@ struct MidiFile {
     uint timeSignature[2] = {4,4}, tempo=60000/120; int key=0; enum {Major,Minor} scale=Major;
     array<MidiNote> notes;
     uint duration=0; // Duration in ticks
-    MidiFile(const ref<byte>& data);
+	MidiFile(ref<byte> file);
     void read(Track& track);
 };

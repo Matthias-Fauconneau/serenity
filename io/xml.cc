@@ -2,17 +2,16 @@
 #include "string.h"
 #include "utf8.h"
 
-static Element parse(const string& document, bool html) {
-    assert(document);
+static Element parse(string document, bool html) {
     TextData s(document);
     s.match("\xEF\xBB\xBF"_); //spurious BOM
     Element root;
     while(s) {
-        s.skip();
+		//s.skip();
         if(s.match("</"_)) log("Unexpected","</"_+s.until('>')+">"_);
-        else if(s.match('<')) root.children << unique<Element>(s,html);
+		else if(s.match('<')) root.children.append( unique<Element>(s,html) );
         else log("Unexpected '",s.line(),"'");
-        s.skip();
+		//s.skip();
     }
     return root;
 }
@@ -22,33 +21,33 @@ Element parseHTML(const string& document) { return parse(document,true); }
 
 Element::Element(TextData& s, bool html) {
     //uint begin = s.index;
-    if(s.match("!DOCTYPE"_)||s.match("!doctype"_)) { s.until('>'); return; }
-    else if(s.match("?xml"_)) { s.until("?>"_); return; }
-    else if(s.match("!--"_)) { s.until("-->"_); return; }
-    else if(s.match('?')){ log("Unexpected <?",s.until("?>"_),"?>"); return; }
-    else name = String(s.identifier("_-:"_));
+	if(s.match("!DOCTYPE")||s.match("!doctype")) { s.until('>'); return; }
+	else if(s.match("?xml")) { s.until("?>"); return; }
+	else if(s.match("!--")) { s.until("-->"); return; }
+	else if(s.match('?')){ log("Unexpected <?",s.until("?>"),"?>"); return; }
+	else name = copyRef(s.identifier("_-:"));
     if(!name) { log(s.slice(0,s.index)); log("expected tag name got",s.line()); }
     if(html) name=toLower(name);
-    s.skip();
+	//s.skip();
     while(!s.match('>')) {
-        if(s.match("/>"_)) { s.skip(); return; }
-        else if(s.match('/')) s.skip(); //spurious /
+		if(s.match("/>")) { /*s.skip();*/ return; }
+		else if(s.match('/')) {} //s.skip(); //spurious /
         else if(s.match('<')) break; //forgotten >
-        String key = String(s.identifier("_-:"_));/*TODO:reference*/ s.skip();
+		String key = copyRef(s.identifier("_-:"));/*TODO:reference*/ //s.skip();
         if(!key) { /*log("Attribute syntax error"_,s.slice(begin,s.index-begin),"|"_,s.until('>'));*/ s.until('>'); break; }
         if(html) key=toLower(key);
         String value;
         if(s.match('=')) {
-            s.skip();
+			//s.skip();
             if(s.match('"')) value=unescape(s.until('"'));
             else if(s.match('\'')) value=unescape(s.until('\''));
-            else { value=String(s.untilAny(" \t\n>"_)); if(s.slice(s.index-1,1)==">"_) s.index--; }
-            s.match("\""_); //duplicate "
+			else { value=copyRef(s.untilAny(" \t\n>")); if(s.slice(s.index-1,1)==">") s.index--; }
+			s.match("\""); //duplicate "
         }
         attributes.insertMulti(move(key), move(value));
-        s.skip();
+		//s.skip();
     }
-    if(html) {
+	/*if(html) {
         static array<string> voidElements = split("area base br col command embed hr img input keygen link meta param source track wbr"_,' ');
         if(voidElements.contains(name)) return; //HTML tags which are implicity void (i.e not explicitly closed)
         if(name=="style"_||name=="script"_) { //Raw text elements can contain <>
@@ -57,20 +56,20 @@ Element::Element(TextData& s, bool html) {
             s.skip();
             return;
         }
-    }
+	}*/
     for(;;) {
         if(s.available(4)<4) return; //ignore unclosed tag
         if(s.match("<![CDATA["_)) {
-            String content (s.until("]]>"_));
-            if(content) children << unique<Element>(move(content));
+			string content = s.until("]]>");
+			if(content) children.append( unique<Element>(copyRef(content)) );
         }
         else if(s.match("<!--"_)) { s.until("-->"_); }
         else if(s.match("</"_)) { if(name==s.until(">"_)) break; } //ignore
         //else if(s.match(String("<?"_+name+">"_))) { log("Invalid tag","<?"_+name+">"_); return; }
-        else if(s.match('<')) children << unique<Element>(s,html);
+		else if(s.match('<')) children.append( unique<Element>(s,html) );
         else {
             String content = unescape(s.whileNot('<'));
-            if(trim(content)) children << unique<Element>(move(content));
+			if(trim(content)) children.append( unique<Element>(move(content)) );
         }
     }
 }
@@ -118,56 +117,60 @@ void Element::xpath(const string& path, const function<void(const Element &)>& v
     else { for(const Element& e: children) if(e.name==first) visitor(e); }
 }
 
-String Element::text() const { String text; visit([&text](const Element& e){ text<<unescape(e.content); }); return text; }
+String Element::text() const { String text; visit([&text](const Element& e){ text.append( unescape(e.content) ); }); return text; }
 
 String Element::text(const string& path) const {
 	array<char> text;
-    xpath(path,[&text](const Element& e){ text<<e.text(); });
-    return text;
+	xpath(path, [&text](const Element& e) { text.append( e.text() ); });
+	return move(text);
 }
+
+static String repeat(const string& s, uint times) { array<char> r (times*s.size, 0); for(uint unused i: range(times)) r.append(s); return move(r); }
 
 String Element::str(uint depth) const {
     //assert(name||content, attributes, children);
 	array<char> line;
-    String indent = repeat(" "_,depth);
-    if(name) line << indent<<"<"_+name;
-    for(auto attr: attributes) line << " "_+attr.key+"=\""_+attr.value+"\""_;
+	String indent = repeat(" "_, depth);
+	if(name) line.append(indent+'<'+name);
+	for(auto attr: attributes) line.append(' '+attr.key+"=\""+attr.value+'"');
     if(trim(content)||children) {
-        if(name) line << ">\n"_;
-        if(trim(content)) line<<indent<<replace(simplify(String(trim(content))),"\n"_,String("\n"_+indent))<<"\n"_;
-        if(children) for(const Element& e: children) line << e.str(depth+1);
-        if(name) line << indent+"</"_+name+">\n"_;
-    } else if(name) line << " />\n"_;
-    return line;
+		if(name) line.append(">\n");
+		if(trim(content)) line.append(indent+replace(simplify(trim(content)),"\n",'\n'+indent)+'\n');
+		if(children) for(const Element& e: children) line.append( e.str(depth+1) );
+		if(name) line.append(indent+"</"_+name+">\n");
+	} else if(name) line.append(" />\n");
+	return move(line);
 }
 String str(const Element& e) { return e.str(); }
 
 String unescape(const string& xml) {
     static map<string, string> entities;
     if(!entities) {
-        array<string> kv = split(
-"quot \" acute ´ amp & apos ' lt < gt > nbsp \xA0 copy © euro € reg ® trade ™ lsaquo ‹ rsaquo › ldquo “ rdquo ” laquo « raquo » rsquo ’ hellip … ndash – not ¬ mdash — "
-"larr ← uarr ↑ rarr → darr ↓ infin ∞ deg ° middot · bull • "
-"aacute á Aacute Á agrave à Agrave À acirc â ccedil ç Ccedil Ç eacute é Eacute É egrave è Egrave È ecirc ê euml ë ocirc ô ouml ö oslash ø oelig œ iacute í icirc î Icirc Î iuml ï ugrave ù ucirc û szlig ß yen ¥"_,' ');
+		array<string> kv = split(
+					"quot \" acute ´ amp & apos ' lt < gt > nbsp \xA0 copy © euro € reg ® trade ™ "
+					"lsaquo ‹ rsaquo › ldquo “ rdquo ” laquo « raquo » rsquo ’ hellip … ndash – not ¬ mdash — "
+					"larr ← uarr ↑ rarr → darr ↓ infin ∞ deg ° middot · bull • "
+					"aacute á Aacute Á agrave à Agrave À acirc â ccedil ç Ccedil Ç eacute é Eacute É egrave è Egrave È ecirc ê euml ë "
+					"ocirc ô ouml ö oslash ø oelig œ iacute í icirc î Icirc Î iuml ï ugrave ù ucirc û szlig ß yen ¥"_," ");
         assert(kv.size%2==0,kv.size);
         entities.reserve(kv.size/2);
         for(uint i=0;i<kv.size;i+=2) entities.insert(move(kv[i]), move(kv[i+1]));
     }
 	array<char> out;
     for(TextData s(xml);s;) {
-        out << s.until('&');
+		out.append( s.until('&') );
         if(!s) break;
 
-        if(s.match("#x"_)) out << utf8(fromInteger(toLower(s.until(";"_)),16));
-        else if(s.match('#')) out << utf8(fromInteger(s.until(";"_)));
+		if(s.match("#x"_)) out.append( utf8(parseInteger(toLower(s.until(";"_)),16)) );
+		else if(s.match('#')) out.append( utf8(parseInteger(s.until(";"_))) );
         else {
             string key = s.word();
             if(s.match(';')) {
                 string* c = entities.find(key);
-                if(c) out<<*c; else { log("Unknown entity",key); out<<key; }
+				if(c) out.append( *c ); else { log("Unknown entity",key); out.append( key ); }
             }
-            else out<<"&"_; //unescaped &
+			else out.append( "&"_ ); //unescaped &
         }
     }
-    return out;
+	return move(out);
 }
