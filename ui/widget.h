@@ -15,6 +15,7 @@ struct Rect {
 };
 inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min),min(a.max,b.max)); }
 inline String str(const Rect& r) { return "["_+str(r.min)+" - "_+str(r.max)+"]"_; }
+inline Rect operator +(int2 offset, Rect rect) { return Rect(offset+rect.min,offset+rect.max); }
 
 /// User interface colors
 static constexpr bgr3f lightBlue (7./8, 3./4, 1./2);

@@ -20,7 +20,9 @@ struct AudioOutput : Device, Poll {
     uint rate = 0;
     uint periodSize = 0, bufferSize = 0;
 
-    AudioOutput(decltype(read16) read, Thread& thread=mainThread);
+	function<uint(const mref<short2>&)> read16 = [](const mref<short2>&){return 0;};
+
+	AudioOutput(decltype(read16) read, Thread& thread=mainThread);
     virtual ~AudioOutput() { if(status) stop(); }
     explicit operator bool() const { return status; }
 
@@ -33,8 +35,6 @@ struct AudioOutput : Device, Poll {
 
     /// Callback for poll events
     void event() override;
-
-    function<uint(const mref<short2>&)> read16 = [](const mref<short2>&){return 0;};
 };
 
 /// Audio input using ALSA PCM interface

@@ -116,6 +116,9 @@ image/image.cc
 music/MusicXML.cc
 music/midi.cc
 music/sheet.h
+music/sheet.cc
+music/encoder.cc
+music/music.cc
 
 player.cc
 dust.cc

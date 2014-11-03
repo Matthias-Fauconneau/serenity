@@ -24,7 +24,7 @@ struct AudioFile {
     default_move(AudioFile);
     ~AudioFile() { close(); }
 
-	explict operator bool() { return file; }
+	explicit operator bool() { return file; }
     bool open(const string path);
     bool open();
     void close();
@@ -36,8 +36,8 @@ struct AudioFile {
     void seek(uint position);
 };
 
-struct Audio : buffer<int2> {
+/*struct Audio : buffer<int2> {
     Audio(buffer&& data, uint rate):buffer(move(data)),rate(rate){}
     uint rate;
 };
-Audio decodeAudio(const string path, uint duration=-1);
+Audio decodeAudio(const string path, uint duration=-1);*/

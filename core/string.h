@@ -84,10 +84,10 @@ String left(string s, size_t size, const char pad=' ');
 String right(string s, size_t size, const char pad=' ');
 
 /// Replaces every occurrence of \a before with \a after
-String replace(string s, const string& before, const string& after);
+String replace(string s, string before, string after);
 
 /// Removes duplicate whitespace
-String simplify(String&& s);
+String simplify(array<char>&& s);
 inline String simplify(string s) { return simplify(copyRef(s)); }
 
 // -- string[]

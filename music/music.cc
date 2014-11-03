@@ -2,9 +2,9 @@
 #include "midi.h"
 #include "sheet.h"
 #include "ffmpeg.h"
-#include "encoder.h"
 #include "window.h"
 #include "audio.h"
+#include "encoder.h"
 
 // -> ffmpeg.h/cc
 extern "C" {
@@ -48,7 +48,7 @@ struct Music
     // Preview
 #if PREVIEW
     bool preview = PREVIEW;
-    Window window {this, int2(1280,720), "MusicXML"_};
+	Window window {this, int2(1280,720), [](){return "MusicXML"__;}};
     const uint fps = 60;
     uint64 videoTime = 0;
 #if AUDIO
@@ -66,7 +66,7 @@ struct Music
 
     Music() {
 #if PREVIEW
-        window.background = White;
+		window.background = Window::White;
         seek( midi.notes[noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[122]])].time );
         if(preview) {
             window.show();
@@ -155,14 +155,14 @@ struct Music
         position = targetPosition;
     }
 
-    // Render loop
-    void render(const Image& target) override {
+	int2 sizeHint(int2 size) { return sheet.sizeHint(size); }
+	Graphics graphics(int2 size) override {
         follow(videoTime, fps);
         step(1./fps);
         videoTime++;
-        position = min(float(sheet.measures.last()-target.size().x), position);
-        sheet.render(target, int2(floor(-position), 0), target.size());
+		position = min(float(sheet.measures.last()-size.x), position);
         if(running) window.render();
+		return sheet.graphics(size); //int2(floor(-position), 0)
     }
 #endif
 } app;

@@ -19,12 +19,12 @@ struct Sheet : Widget {
     int Y(const map<uint, Clef>& clefs, uint staff, int step) { return staffY(staff, clefStep(clefs.at(staff).clefSign, step)); } // Clef dependent
 
     // Fonts
-    Font graceFont {File("emmentaler-26.otf"_), 4*halfLineInterval};
-    Font font {File("emmentaler-26.otf"_), 9*halfLineInterval};
-    Font textFont{File("FreeSerifBold.ttf"_), 6*halfLineInterval};
-    Font smallFont{File("FreeSerifBold.ttf"_), 14};
+	Font graceFont {Map("emmentaler-26.otf"_), 4.f*halfLineInterval};
+	Font font {Map("emmentaler-26.otf"_), 9.f*halfLineInterval};
+	Font textFont{Map("FreeSerifBold.ttf"_), 6.f*halfLineInterval};
+	Font smallFont{Map("FreeSerifBold.ttf"_), 14.f};
     // Font helpers
-    vec2 glyphSize(const string name) { return font.size(font.index(name)); }
+	vec2 glyphSize(string name) { return font.metrics(font.index(name)).size; }
     int2 noteSize = int2(round(glyphSize("noteheads.s2"_)));
     float glyph(int2 position, const string name, Font& font);
     float glyph(int2 position, const string name) { return glyph(position, name, font); }
@@ -33,8 +33,8 @@ struct Sheet : Widget {
     array<Rect> fills;
     struct Parallelogram { int2 min,max; int dy; }; array<Parallelogram> parallelograms;
     struct Blit { int2 position; Image image; }; array<Blit> blits;
-    typedef array<vec2> Cubic; array<Cubic> cubics;
-    map<uint, vec3> colors; // Overrides color for Blit index
+	typedef buffer<vec2> Cubic; array<Cubic> cubics;
+	map<uint, bgr3f> colors; // Overrides color for Blit index
 
     uint text(int2 position, const string& text, Font& font, array<Blit>& blits);
     uint text(int2 position, const string& text, Font& font) { return this->text(position, text, font, blits); }
@@ -58,8 +58,7 @@ struct Sheet : Widget {
     array<int> chordToNote; // first note index of chord
     //int position = 0;
 
-    int2 sizeHint() { return int2(-1, staffY(1,-16)); }
-    void render(const Image& target, int2 offset, int2 size) override;
-    void render(const Image& target) override { render(target, 0, target.size()); }
+	int2 sizeHint(int2) override { return int2(-1, staffY(1,-16)); }
+	Graphics graphics(int2 size) override;
     //bool mouseEvent(int2, int2, Event, Button button);
 };

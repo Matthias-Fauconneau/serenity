@@ -21,10 +21,10 @@ Encoder::Encoder(const string& name, int width, int height, int fps, const Audio
     : width(width), height(height), fps(fps), rate(audio.rate) {
     av_register_all();
 
-    String path = homePath()+"/"_+name+".mp4"_;
+	String path = home().name()+"/"_+name+".mp4"_;
     if(existsFile(path)) remove(strz(path));
     context = avformat_alloc_context();
-    copy(mref<char>(context->filename), left(path, sizeof(context->filename), "\0"_));
+	mref<char>(context->filename).copy(left(path, sizeof(context->filename), '\0'));
     context->oformat =  av_guess_format(0, context->filename, 0);
     assert_(context->oformat);
     if(context->oformat->priv_data_size > 0) {
@@ -67,8 +67,8 @@ Encoder::Encoder(const string& name, int width, int height, int fps, const Audio
 }
 
 void Encoder::writeVideoFrame(const Image& image) {
-    assert_(videoStream && image.size()==int2(width,height), image.size());
-    AVFrame* framePtr = avcodec_alloc_frame(); AVFrame& frame = *framePtr;
+	assert_(videoStream && image.size==int2(width,height), image.size);
+	AVFrame* framePtr = av_frame_alloc(); AVFrame& frame = *framePtr;
     //AVFrame frame; avcodec_get_frame_defaults(&frame);
     avpicture_alloc((AVPicture*)&frame, AV_PIX_FMT_YUV420P, width, height);
     int stride = image.stride*4; sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, height, frame.data, frame.linesize);
@@ -85,7 +85,7 @@ void Encoder::writeVideoFrame(const Image& image) {
     setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow);
 #endif
     avpicture_free((AVPicture*)&frame);
-    avcodec_free_frame(&framePtr); //
+	av_frame_free(&framePtr);
     if(gotVideoPacket) {
         pkt.stream_index = videoStream->index;
         av_interleaved_write_frame(context, &pkt);
@@ -97,7 +97,7 @@ void Encoder::writeVideoFrame(const Image& image) {
 
 void Encoder::writeAudioFrame(const ref<float2>& audio) {
     assert(audioStream && audio.size==audioSize);
-    AVFrame frame; avcodec_get_frame_defaults(&frame);
+	AVFrame frame; av_frame_unref(&frame);
     frame.nb_samples = audio.size;
     avcodec_fill_audio_frame(&frame, 2, AV_SAMPLE_FMT_FLT, (uint8*)audio.data, audio.size * 2 * sizeof(float), 1);
     frame.pts = audioTime;

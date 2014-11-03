@@ -55,7 +55,7 @@ uint AudioFile::read(const mref<short2>& output) {
                 if(used < 0 || !gotFrame) continue;
                 bufferIndex=0, bufferSize = frame->nb_samples;
                 if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
-                    shortBuffer = unsafeReference(ref<short2>((short2*)frame->data[0], bufferSize)); // Valid until next frame
+					shortBuffer = unsafeRef(ref<short2>((short2*)frame->data[0], bufferSize)); // Valid until next frame
                 }
                 else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
                     shortBuffer = buffer<short2>(bufferSize);
@@ -71,7 +71,7 @@ uint AudioFile::read(const mref<short2>& output) {
             av_free_packet(&packet);
         }
         uint size = min(bufferSize, output.size-readSize);
-        copy(output.slice(readSize, size), shortBuffer.slice(bufferIndex, size));
+		output.slice(readSize, size).copy(shortBuffer.slice(bufferIndex, size));
         bufferSize -= size; bufferIndex += size; readSize += size;
     }
     assert(readSize == output.size);
@@ -91,7 +91,7 @@ uint AudioFile::read(const mref<int2>& output) {
                 if(used < 0 || !gotFrame) continue;
                 bufferIndex=0, bufferSize = frame->nb_samples;
                 if(audio->sample_fmt == AV_SAMPLE_FMT_S32) {
-                    intBuffer = unsafeReference(ref<int2>((int2*)frame->data[0], bufferSize)); // Valid until next frame
+					intBuffer = unsafeRef(ref<int2>((int2*)frame->data[0], bufferSize)); // Valid until next frame
                 }
                 else if(audio->sample_fmt == AV_SAMPLE_FMT_S16P) {
                     intBuffer = buffer<int2>(bufferSize);
@@ -113,7 +113,7 @@ uint AudioFile::read(const mref<int2>& output) {
             av_free_packet(&packet);
         }
         uint size = min(bufferSize, output.size-readSize);
-        copy(output.slice(readSize, size), intBuffer.slice(bufferIndex, size));
+		output.slice(readSize, size).copy(intBuffer.slice(bufferIndex, size));
         bufferSize -= size; bufferIndex += size; readSize += size;
     }
     assert(readSize == output.size);
@@ -164,7 +164,7 @@ uint AudioFile::read(const mref<float2>& output) {
             av_free_packet(&packet);
         }
         uint size = min(bufferSize, output.size-readSize);
-        copy(output.slice(readSize, size), floatBuffer.slice(bufferIndex, size));
+		output.slice(readSize, size).copy(floatBuffer.slice(bufferIndex, size));
         bufferSize -= size; bufferIndex += size; readSize += size;
     }
     assert(readSize == output.size);
@@ -180,10 +180,10 @@ void AudioFile::close() {
     if(file) avformat_close_input(&file);
 }
 
-Audio decodeAudio(const string path, uint duration) {
+/*Audio decodeAudio(const string path, uint duration) {
     AudioFile file(path);
     duration = min(duration, file.duration);
     Audio audio {buffer<int2>(duration), file.rate};
     audio.size = file.read(audio);
     return audio;
-}
+}*/

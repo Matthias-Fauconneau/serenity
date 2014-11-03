@@ -51,6 +51,12 @@ uint Font::index(uint code) const {
     return code;
 }
 
+uint Font::index(string name) const {
+	uint index = FT_Get_Name_Index(face, (char*)(const char*)strz(name));
+	if(!index) for(int i=0;i<face->num_glyphs;i++) { char buffer[256]; FT_Get_Glyph_Name(face,i,buffer,sizeof(buffer)); log(buffer); }
+	assert(index,name); return index;
+}
+
 float Font::kerning(uint leftIndex, uint rightIndex) {
     FT_Vector kerning; FT_Get_Kerning(face, leftIndex, rightIndex, FT_KERNING_DEFAULT, &kerning); return kerning.x*0x1p-6;
 }

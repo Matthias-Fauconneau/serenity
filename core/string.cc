@@ -81,7 +81,7 @@ String right(const string source, size_t size, const char pad) {
     return target;
 }
 
-String replace(const string& s, const string& before, const string& after) {
+String replace(string s, string before, string after) {
 	array<char> r(s.size, 0);
 	for(size_t i=0; i<s.size;) {
 		if(i<=s.size-before.size && string(s.data+i, before.size)==before) { r.append(after); i+=before.size; }

@@ -11,14 +11,16 @@ String findFont(string fontName, ref<string> fontTypes={""});
 /// Freetype wrapper
 struct Font {
     /// Loads font at /a data to /a size pixels high
-    Font(Map&& data, float size, string name, bool hint=false);
+	Font(Map&& data, float size, string name="", bool hint=false);
     /// Loads font /a data scaled to /a size pixels high
-    Font(buffer<byte>&& data, float size, string name, bool hint=false);
+	Font(buffer<byte>&& data, float size, string name="", bool hint=false);
     default_move(Font);
     ~Font();
 
     /// Returns font glyph index for Unicode codepoint \a code
     uint index(uint code) const;
+	/// Returns font glyph index for glyph \a name
+	uint index(string name) const;
 
     /// Returns scaled kerning adjustment between \a leftIndex and \a rightIndex
     float kerning(uint leftIndex, uint rightIndex);

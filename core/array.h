@@ -101,7 +101,7 @@ generic struct array : buffer<T> {
     template<Type K> bool contains(const K& key) const { return indexOf(key)>=0; }
 };
 /// Copies all elements in a new array
-generic array<T> copy(const array<T>& o) { array<T> copy(o.size); copy.append(o); return copy; }
+generic array<T> copy(const array<T>& o) { array<T> copy(o.size, 0); copy.append(o); return copy; }
 
 // -- Sort --
 
