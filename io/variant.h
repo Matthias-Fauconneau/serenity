@@ -12,7 +12,7 @@ struct Variant {
     map<String,Variant> dict;
     double denominator=1;
 
-    Variant(bool boolean) : type(Boolean), number(boolean) {}
+	//Variant(bool boolean) : type(Boolean), number(boolean) {}
     Variant(int number) : type(Integer), number(number) {}
     Variant(int64 number) : type(Integer), number(number) {}
     Variant(uint number) : type(Integer), number(number) {}
@@ -34,6 +34,12 @@ struct Variant {
     explicit operator string() const { assert(type==Data); return data; }
     int64 numerator() {  assert(type==Rational, *this); return number; }
 };
+
+generic String str(const map<T,Variant>& dict) {
+	array<char> s;
+	s.append("<<"); for(auto entry: dict) s.append( '/'+entry.key+' '+str(entry.value)+' ' ); s.append(">>");
+	return move(s);
+}
 
 inline String str(const Variant& o) {
 	if(o.type==Variant::Boolean) return unsafeRef(str(bool(o.number)));

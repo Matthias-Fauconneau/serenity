@@ -5,12 +5,6 @@
 #include "deflate.h"
 #include "time.h"
 
-generic String str(const map<T,Variant>& dict) {
-	array<char> s;
-    s.append("<<"); for(auto entry: dict) s.append( '/'+entry.key+' '+str(entry.value)+' ' ); s.append(">>");
-	return move(s);
-}
-
 typedef map<String,Variant> Dict;
 
 struct Object : Dict {
@@ -26,7 +20,8 @@ inline String str(const Object& o) {
 	array<char> s = str((const Dict&)o);
     if(o.data) {
         assert_(o.at("Length").integer() == int(o.data.size), (const Dict&)o);
-		//assert_(o.data.size <= 30 || o.value("Filter","")=="/FlateDecode", o.data.size, deflate(o.data).size, o.value("Filter",""));
+		//assert_(o.data.size <= 30 || o.value("Filter","")=="/FlateDecode", o.data.size, deflate(o.data).size, o.value("Filter",""_));
+		assert_(!o.contains("Filter") || (string)o.at("Filter")=="/FlateDecode"_, o.at("Filter"));
 		s.append("\nstream\n"+o.data+"\nendstream");
     }
 	return move(s);
@@ -34,7 +29,7 @@ inline String str(const Object& o) {
 
 buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
     array<unique<Object>> objects;
-	auto ref = [&](const Object& object) { return str(objects.indexOf(&object))+" 0 R"; };
+	auto ref = [&](const Object& object) -> String { return str(objects.indexOf(&object))+" 0 R"; };
 
     objects.append(); // Null object
 
@@ -49,7 +44,6 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
     map<String, String> fonts; // font ID to font ref
 
     for(const Graphics& graphics: pages) {
-		log(pdfPages.at("Count"));
         Object& page = objects.append();
 		page.insert("Parent"__, ref(pdfPages));
 		page.insert("Type"__, "/Page");
@@ -165,21 +159,19 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
 	size_t fileByteIndex = header.size;
 	buffer<buffer<byte>> pdfObjects =
 			apply(objects.size-1, [&](size_t index) -> buffer<byte> { return str(1+index)+" 0 obj\n"+str(objects[1+index])+"\nendobj\n"; });
-	String xrefHeader = "xref\n0 "+str(1+objects.size)+"\n0000000000 65535 f\r\n";
+	String xrefHeader = "xref\n0 "+str(objects.size)+"\n0000000000 65535 f\r\n";
 	String xrefTable ((objects.size-1)*20, 0);
-	for(size_t index: range(objects.size-1)) {
-		xrefTable.append(str(fileByteIndex, 10)+" 00000 n\r\n");
-		fileByteIndex += pdfObjects[index].size;
-    }
+	for(::ref<byte> o: pdfObjects) { xrefTable.append(str(fileByteIndex, 10)+" 00000 n\r\n"); fileByteIndex += o.size; }
 	size_t contentSize = fileByteIndex;
 	size_t xrefTableStart = fileByteIndex;
-	Dict trailerDict; trailerDict.insert("Size"__, 1+objects.size); trailerDict.insert("Root"__, ref(root));
+	Dict trailerDict; trailerDict.insert("Size"__, objects.size); trailerDict.insert("Root"__, ref(root));
 	String trailer = ("trailer "+str(trailerDict)+"\n")+("startxref\n"+str(xrefTableStart)+"\r\n%%EOF");
-	buffer<byte> file(header.size+contentSize+xrefHeader.size+xrefTable.size+trailer.size, 0);
+	buffer<byte> file(contentSize+xrefHeader.size+xrefTable.size+trailer.size, 0);
 	file.append(header);
-	for(size_t index: range(objects.size-1)) file.append(pdfObjects[index]);
+	for(::ref<byte> o: pdfObjects) file.append(o);
 	file.append(xrefHeader);
 	file.append(xrefTable);
 	file.append(trailer);
+	assert_(file.size == file.capacity);
 	return file;
 }

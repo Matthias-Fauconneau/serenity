@@ -125,7 +125,6 @@ String str(int64 number, int pad, uint base, char padChar) {
 }
 
 String str(double n, int precision, uint pad, int exponent) {
-    //(isNumber(n) && n==round(n)) ? dec(int(n))
     bool sign = n<0; n=abs(n);
     if(__builtin_isnan(n)) return ::right("NaN", pad);
     if(n==::inf) return ::right("∞", pad+2);

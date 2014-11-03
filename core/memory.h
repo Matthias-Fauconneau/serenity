@@ -119,13 +119,13 @@ generic struct buffer : mref<T> {
 	void append(const mref<T> source) { setSize(size+source.size); slice(size-source.size).move(source); }
 	/// Appends another list of elements to this array by copying
 	void append(const ref<T> source) { setSize(size+source.size); slice(size-source.size).copy(source); }
-	/// Appends a new element
+	/*/// Appends a new element
 	template<Type Arg, typename enable_if<!is_convertible<Arg, T>::value && !is_convertible<Arg, ref<T>>::value>::type* = nullptr>
 	T& append(Arg&& arg) { setSize(size+1); return set(size-1, forward<Arg>(arg)); }
 	/// Appends a new element
 	template<Type Arg0, Type Arg1, Type... Args> T& append(Arg0&& arg0, Arg1&& arg1, Args&&... args) {
 		setSize(size+1); return set(size-1, forward<Arg0>(arg0), forward<Arg1>(arg1), forward<Args>(args)...);
-	}
+	}*/
 };
 /// Initializes a new buffer with the content of \a o
 //generic buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity?:o.size, o.size); t.copy(o); return t; }

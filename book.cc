@@ -116,7 +116,7 @@ struct PhotoBookExport : PhotoBook, Application {
 
 	PhotoBookExport() {
 		int2 size = 1050;
-		buffer<Graphics> pages = apply(book.slice(0,1), [=](Widget& page) { return page.graphics(size, Rect(size)); });
+		buffer<Graphics> pages = apply(book, [=](Widget& page) { return page.graphics(size, Rect(size)); });
 		writeFile("book.pdf", toPDF(size, pages), home(), true);
 	}
 };
