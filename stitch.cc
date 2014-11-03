@@ -11,6 +11,35 @@
 #include "layout.h"
 #include "jpeg-encoder.h"
 
+generic size_t reversiblePartition(mref<T> at, size_t left, size_t right, size_t pivotIndex, mref<size_t> indices) {
+	swap(at[pivotIndex], at[right]); swap(indices[pivotIndex], indices[right]);
+	const T& pivot = at[right];
+	size_t storeIndex = left;
+	for(size_t i: range(left,right)) {
+		if(at[i] > pivot) {
+			swap(at[i], at[storeIndex]); swap(indices[i], indices[storeIndex]);
+			storeIndex++;
+		}
+	}
+	swap(at[storeIndex], at[right]); swap(indices[storeIndex], indices[right]);
+	return storeIndex;
+}
+generic void reversibleQuickSort(mref<T> at, int left, int right, mref<size_t> indices) {
+	if(left < right) { // If the list has 2 or more items
+		int pivotIndex = reversiblePartition(at, left, right, (left + right)/2, indices);
+		if(pivotIndex) reversibleQuickSort(at, left, pivotIndex-1, indices);
+		reversibleQuickSort(at, pivotIndex+1, right, indices);
+	}
+}
+generic buffer<size_t> reversibleSort(mref<T> at) {
+	buffer<size_t> indices (at.size);
+	for(size_t index: range(indices.size)) indices[index]=index;
+	reversibleQuickSort(at, 0, at.size-1, indices);
+	buffer<size_t> reverse (indices.size);
+	for(size_t index: range(indices.size)) reverse[indices[index]] = index;
+	return reverse;
+}
+
 struct AllImages : GroupSource {
 	ImageSource& source;
 	AllImages(ImageSource& source) : source(source) {}
@@ -66,9 +95,8 @@ struct PanoramaWeights : ImageGroupSource {
 		auto transforms = transform(groupIndex, sourceSize);
 		int2 min,max; minmax(transforms, sourceSize, min, max);
 		int2 size = max-min;
-		auto indices = sortIndices(transforms); // by X offset
-		buffer<size_t> reverse (indices.size); for(size_t index: range(indices.size)) reverse[indices[index]] = index;
-		array<SourceImage> sorted = apply(transforms.size, [&](size_t index) -> SourceImage {
+		auto reverse = reversibleSort(transforms); // by X offset
+		array<SourceImage> images = apply(transforms.size, [&](size_t index) -> SourceImage {
 			SourceImage image (size);
 			auto current = transforms[index];
 			int currentMin = current.min(sourceSize).x  - min.x;
@@ -89,7 +117,7 @@ struct PanoramaWeights : ImageGroupSource {
 			}
 			return image;
 		} );
-		return apply(reverse, [&](size_t index) { return move(sorted[index]); });
+		return apply(reverse, [&](size_t index) { return move(images[index]); });
 	}
 };
 

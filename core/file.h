@@ -4,13 +4,25 @@
 
 /// Linux error code names
 enum class LinuxError { Interrupted=4 };
-constexpr string linuxErrors[] = {"OK", "PERM", "NOENT", "SRCH", "INTR", "IO", "NXIO", "TOOBIG", "NOEXEC", "BADF", "CHILD", "AGAIN", "NOMEM", "ACCES", "FAULT", "NOTBLK", "BUSY", "EXIST", "XDEV", "NODEV", "NOTDIR", "ISDIR", "INVAL", "NFILE", "MFILE", "NOTTY", "TXTBSY", "FBIG", "NOSPC", "SPIPE", "ROFS", "MLINK", "PIPE", "DOM", "RANGE", "DEADLK", "NAMETOOLONG", "NOLCK", "NOSYS", "NOTEMPTY", "LOOP", "WOULDBLOCK", "NOMSG", "IDRM", "CHRNG", "L2NSYNC", "L3HLT", "L3RST", "LNRNG", "UNATCH", "NOCSI", "L2HLT", "BADE", "BADR", "XFULL", "NOANO", "BADRQC", "BADSLT", "DEADLOCK", "EBFONT", "NOSTR", "NODATA", "TIME", "NOSR", "NONET", "NOPKG", "REMOTE", "NOLINK", "ADV", "SRMNT", "COMM", "PROTO", "MULTIHO", "DOTDOT", "BADMSG", "OVERFLOW", "NOTUNIQ", "BADFD", "REMCHG", "LIBACC", "LIBBAD", "LIBSCN", "LIBMAX", "LIBEXEC", "ILSEQ", "RESTART", "STRPIPE", "USERS", "NOTSOCK", "DESTADDRREQ", "MSGSIZE", "PROTOTYPE", "NOPROTOOPT", "PROTONOSUPPORT", "SOCKTNOSUPPORT", "OPNOTSUPP", "PFNOSUPPORT", "AFNOSUPPORT", "ADDRINUSE", "ADDRNOTAVAIL", "NETDOWN", "NETUNREACH", "NETRESET", "CONNABORTED", "CONNRESET", "NOBUFS", "ISCONN", "NOTCONN", "SHUTDOWN", "TOOMANYREFS", "TIMEDOUT", "CONNREFUSED", "HOSTDOWN", "HOSTUNREACH", "ALREADY", "INPROGRESS", "STALE", "UCLEAN", "NOTNAM", "NAVAIL", "ISNAM", "REMOTEIO", "DQUOT", "NOMEDIUM", "MEDIUMTYPE", "CANCELED", "NOKEY", "KEYEXPIRED", "KEYREVOKED", "KEYREJECTED", "OWNERDEAD", "NOTRECOVERABLE", "RFKILL", "HWPOISON"};
+constexpr string linuxErrors[] = {
+	"OK", "PERM", "NOENT", "SRCH", "INTR", "IO", "NXIO", "TOOBIG", "NOEXEC", "BADF", "CHILD", "AGAIN", "NOMEM", "ACCES", "FAULT", "NOTBLK",
+	"BUSY", "EXIST", "XDEV", "NODEV", "NOTDIR", "ISDIR", "INVAL", "NFILE", "MFILE", "NOTTY", "TXTBSY", "FBIG", "NOSPC", "SPIPE", "ROFS", "MLINK",
+	"PIPE", "DOM", "RANGE", "DEADLK", "NAMETOOLONG", "NOLCK", "NOSYS", "NOTEMPTY", "LOOP", "WOULDBLOCK", "NOMSG", "IDRM", "CHRNG",
+	"L2NSYNC", "L3HLT", "L3RST", "LNRNG", "UNATCH", "NOCSI", "L2HLT", "BADE", "BADR", "XFULL", "NOANO", "BADRQC", "BADSLT", "DEADLOCK",
+	"EBFONT", "NOSTR", "NODATA", "TIME", "NOSR", "NONET", "NOPKG", "REMOTE", "NOLINK", "ADV", "SRMNT", "COMM", "PROTO", "MULTIHO",
+	"DOTDOT", "BADMSG", "OVERFLOW", "NOTUNIQ", "BADFD", "REMCHG", "LIBACC", "LIBBAD", "LIBSCN", "LIBMAX", "LIBEXEC", "ILSEQ", "RESTART",
+	"STRPIPE", "USERS", "NOTSOCK", "DESTADDRREQ", "MSGSIZE", "PROTOTYPE", "NOPROTOOPT", "PROTONOSUPPORT", "SOCKTNOSUPPORT",
+	"OPNOTSUPP", "PFNOSUPPORT", "AFNOSUPPORT", "ADDRINUSE", "ADDRNOTAVAIL", "NETDOWN", "NETUNREACH", "NETRESET",
+	"CONNABORTED","CONNRESET", "NOBUFS", "ISCONN", "NOTCONN", "SHUTDOWN", "TOOMANYREFS", "TIMEDOUT", "CONNREFUSED",
+	"HOSTDOWN","HOSTUNREACH","ALREADY", "INPROGRESS", "STALE", "UCLEAN", "NOTNAM", "NAVAIL", "ISNAM", "REMOTEIO", "DQUOT",
+	"NOMEDIUM","MEDIUMTYPE", "CANCELED", "NOKEY", "KEYEXPIRED", "KEYREVOKED", "KEYREJECTED", "OWNERDEAD", "NOTRECOVERABLE"};
 extern "C" int* __errno_location() noexcept __attribute((const));
 
 /// Aborts if \a expr is negative and logs corresponding error code
-#define check(expr, message...) ({ auto e = expr; if(long(e)<0 && size_t(-long(e)) < ref<string>(linuxErrors).size) error(#expr, linuxErrors[*__errno_location()], ##message); e; })
-/// Aborts if \a expr is negative and logs corresponding error code (unused result)
-#define check_(expr, message...) ({ auto e=expr; if(long(e)<0 && size_t(-long(e)) < ref<string>(linuxErrors).size) error(#expr, linuxErrors[*__errno_location()], ##message); })
+#define check(expr, args...) ({ \
+	auto e = expr; \
+	if(long(e)<0 && size_t(-long(e)) < ref<string>(linuxErrors).size) error(#expr ""_, linuxErrors[*__errno_location()], ##args); \
+	e; })
 
 /// Unix file descriptor
 struct Handle {
@@ -18,7 +30,7 @@ struct Handle {
 
     Handle():fd(0){}
     Handle(int fd):fd(fd){}
-    default_move(Handle);
+	default_move(Handle);
     ~Handle() { close(); }
     explicit operator bool() const { return fd; }
     /// Closes file descriptor
@@ -70,7 +82,7 @@ struct Stream : Handle { //FIXME: overlaps with Data/BinaryData
 	generic T read() { T t; read(mref<byte>((byte*)&t,sizeof(T))); return t; }
     /// Reads \a size raw values
     generic buffer<T> read(size_t size) {
-		::buffer<byte> buffer(size*sizeof(T), "read");
+		::buffer<byte> buffer(size*sizeof(T));
 		size_t offset=0; while(offset<buffer.size) offset+=readUpTo(buffer.slice(offset));
 		assert(offset==buffer.size);
 		return cast<T>(move(buffer));
@@ -128,7 +140,7 @@ int64 writeFile(const string path, const ref<byte> content, const Folder& at=cur
 template<uint major, uint minor> struct IO { static constexpr uint io = major<<8 | minor; };
 template<uint major, uint minor, Type T> struct IOW { typedef T Args; static constexpr uint iow = 1<<30 | sizeof(T)<<16 | major<<8 | minor; };
 template<uint major, uint minor, Type T> struct IOR { typedef T Args; static constexpr uint ior = 2<<30 | sizeof(T)<<16 | major<<8 | minor; };
-template<uint major, uint minor, Type T> struct IOWR { typedef T Args; static constexpr uint iowr = 3u<<30 | sizeof(T)<<16 | major<<8 | minor; };
+template<uint major, uint minor, Type T> struct IOWR { typedef T Args; static constexpr uint iowr = 3u<<30|sizeof(T)<<16|major<<8|minor; };
 /// Handle to a device
 struct Device : File {
     Device(){}

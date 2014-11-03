@@ -21,7 +21,7 @@ template<template<typename> class T, int N>
 void unpredict(byte4* target, const byte* source, size_t width, size_t height, size_t xStride, size_t yStride) {
     typedef vec<T, uint8, N> U;
     typedef vec<T, int, N> V;
-    buffer<U> prior(width, "PNG"); prior.clear(0);
+	buffer<U> prior(width); prior.clear(0);
     for(size_t unused y: range(height)) {
         Predictor predictor = Predictor(*source++);
         U* src = (U*)source;
@@ -90,7 +90,7 @@ Image decodePNG(const ref<byte> file) {
         assert(width%(8/bitDepth)==0);
         assert(predicted.size == height*(1+width*depth*bitDepth/8));
         const byte* source = predicted.data;
-        ::buffer<byte> unpackedBytes(height*(1+width*depth), "PNG");
+		::buffer<byte> unpackedBytes(height*(1+width*depth));
         byte* target = unpackedBytes.begin();
         for(size_t unused y: range(height)) {
             target[0] = source[0]; source++; target++;
@@ -155,8 +155,8 @@ template<template<typename> class T, int N> buffer<byte> predict(const byte4* so
     typedef vec<T,uint8,N> U;
     typedef vec<T, int8, N> S;
     typedef vec<T,int,N> V;
-    buffer<U> prior(width, "PNG"); prior.clear(0);
-    buffer<byte> data ( height * ( 1 + width*sizeof(U) ), "PNG");
+	buffer<U> prior(width); prior.clear(0);
+	buffer<byte> data ( height * ( 1 + width*sizeof(U) ));
     byte* target = data.begin();
     for(size_t unused y: range(height)) {
         *target++ = byte(Predictor::Paeth);
@@ -178,7 +178,7 @@ template<template<typename> class T, int N> buffer<byte> predict(const byte4* so
 buffer<byte> encodePNG(const Image& image) {
     struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } packed ihdr
      { big32(image.width), big32(image.height), 8, uint8(image.alpha?6:2), 0, 0, 0 };
-    array<byte> IHDR = ref<byte>("IHDR"_)+raw(ihdr);
+	buffer<byte> IHDR = "IHDR"_+raw(ihdr);
 
     buffer<byte> predicted;
     if(!image.alpha) predicted = predict<rgb,3>(image.data, image.width, image.height);

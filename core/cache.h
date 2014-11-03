@@ -52,11 +52,11 @@ template<Type T> ImageMapSource<T> cache(String path, string name, int2 size, in
 	File file = cacheFile({path, currentWorkingDirectory(), true}, name, strx(size), sourceTime, [size,&evaluate](File& file) {
         file.resize(size.y*size.x*sizeof(typename T::type));
         Map map(file, Map::Write);
-		T image(unsafeReference(cast<typename T::type>(map)), size, size.x);
+		T image(unsafeRef(cast<typename T::type>(map)), size, size.x);
 		evaluate(image);
 	}, version);
 	Map map (file);
-	T t (unsafeReference(cast<typename T::type>(map)), size, size.x);
+	T t (unsafeRef(cast<typename T::type>(map)), size, size.x);
 	return ImageMapSource<T>(move(t), move(map));
 }
 
@@ -105,12 +105,12 @@ template<Type T> array<ImageMapSource<T>> cacheGroup(const Folder& parent, strin
 				file.resize(size.y*size.x*sizeof(typename T::type));
 				return Map(file, Map::Write);
 			});
-		array<T> images = apply(maps, [size](const Map& map) { return T(unsafeReference(cast<typename T::type>(map)), size, size.x); });
+		array<T> images = apply(maps, [size](const Map& map) { return T(unsafeRef(cast<typename T::type>(map)), size, size.x); });
 		evaluate(images);
 	}, version);
 	return apply(groupSize, [&folder, size](size_t index) {
 		Map map(str(index), folder);
-		T t (unsafeReference(cast<typename T::type>(map)), size, size.x);
+		T t (unsafeRef(cast<typename T::type>(map)), size, size.x);
 		return ImageMapSource<T>(move(t), move(map));
 	});
 }

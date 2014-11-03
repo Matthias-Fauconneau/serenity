@@ -1,15 +1,37 @@
 #pragma once
-/// \file core.h keywords, basic types, debugging, ranges, ref
+/// \file core.h Keywords, traits, move semantics, range, ref, debug
 
 // Keywords
 #define unused __attribute((unused))
 #define packed __attribute((packed))
-#define notrace __attribute((no_instrument_function))
 #define Type typename
 #define generic template<Type T>
 #define abstract =0
 #define default_move(T) T(T&&)=default; T& operator=(T&&)=default
-#define immobile(T) T(T&&)=delete; T& operator=(T&&)=delete
+
+// Traits
+struct true_type { static constexpr bool value = true; };
+struct false_type{ static constexpr bool value = false; };
+template<Type> struct is_lvalue_reference : false_type {};
+generic struct is_lvalue_reference<T&> : true_type {};
+template<Type A, Type B> struct is_same : false_type {};
+generic struct is_same<T, T> : true_type {};
+template<bool B, Type T = void> struct enable_if {};
+generic struct enable_if<true, T> { typedef T type; };
+generic struct declval_protector {
+	static const bool stop = false;
+	static T&& delegate();
+};
+generic inline T&& declval() noexcept {
+	static_assert(declval_protector<T>::__stop, "declval() must not be used!");
+	return declval_protector<T>::__delegate();
+}
+template<Type From, Type To> struct is_convertible {
+	template<Type T> static void test(T);
+	template<Type F, Type T, Type = decltype(test<T>(declval<F>()))> static true_type test(int);
+	template<Type, Type> static false_type test(...);
+	static constexpr bool value = decltype(test<From, To>(0))::value;
+};
 
 // Move semantics
 generic struct remove_reference { typedef T type; };
@@ -20,31 +42,27 @@ generic inline constexpr Type remove_reference<T>::type&& __attribute__((warn_un
 { return (Type remove_reference<T>::type&&)(t); }
 /// Swap values (using move semantics as necessary)
 generic void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
+/// Forwards references and copyable values
+generic constexpr T&& forward(Type remove_reference<T>::type& t) { return (T&&)t; }
+/// Forwards moveable values
+generic constexpr T&& forward(Type remove_reference<T>::type&& t){static_assert(!is_lvalue_reference<T>::value,""); return (T&&)t; }
 /// Base template for explicit copy (overriden by explicitly copyable types)
 generic T __attribute__((warn_unused_result))  copy(const T& o) { return o; }
 
 /// Reference type with move semantics
 generic struct handle {
-    T pointer;
+	T pointer;
 
-    handle(T pointer=T()):pointer(pointer){}
-    handle& operator=(handle&& o){ pointer=o.pointer; o.pointer=0; return *this; }
-    handle(handle&& o):pointer(o.pointer){o.pointer=T();}
+	handle(T pointer=T()):pointer(pointer){}
+	handle& operator=(handle&& o){ pointer=o.pointer; o.pointer=0; return *this; }
+	handle(handle&& o):pointer(o.pointer){o.pointer=T();}
 
-    operator T() const { return pointer; }
-    operator T&() { return pointer; }
-    T* operator &() { return &pointer; }
-    T operator ->() { return pointer; }
-    const T operator ->() const { return pointer; }
+	operator T() const { return pointer; }
+	operator T&() { return pointer; }
+	T* operator &() { return &pointer; }
+	T operator ->() { return pointer; }
+	const T operator ->() const { return pointer; }
 };
-
-// Forward
-template<Type> struct is_lvalue_reference { static constexpr bool value = false; };
-generic struct is_lvalue_reference<T&> { static constexpr bool value = true; };
-/// Forwards references and copyable values
-generic constexpr T&& forward(Type remove_reference<T>::type& t) { return (T&&)t; }
-/// Forwards moveable values
-generic constexpr T&& forward(Type remove_reference<T>::type&& t){static_assert(!is_lvalue_reference<T>::value,""); return (T&&)t; }
 
 template<Type A, Type B> constexpr bool operator !=(const A& a, const B& b) { return !(a==b); }
 
@@ -100,27 +118,28 @@ namespace std { generic struct initializer_list {
     constexpr const T* begin() const noexcept { return data; }
     constexpr const T* end() const { return (T*)data+length; }
 }; }
-generic struct ref;
 #endif
 
 // -- ref
 
+generic struct Ref;
+// Allows ref<char> template specialization to be implemented by Ref
+generic struct ref : Ref<T> { using Ref<T>::Ref; };
+
 /// Unmanaged fixed-size const reference to an array of elements
-generic struct ref {
+generic struct Ref {
     typedef T type;
     const T* data = 0;
     size_t size = 0;
 
     /// Default constructs an empty reference
-    constexpr ref() {}
+	constexpr Ref() {}
     /// References \a size elements from const \a data pointer
-    constexpr ref(const T* data, size_t size) : data(data), size(size) {}
-    /// References \a size elements from const \a data pointer
-    //constexpr ref(const T* begin, const T* end) : data(begin), size(end-begin) {}
+	constexpr Ref(const T* data, size_t size) : data(data), size(size) {}
     /// Converts a real std::initializer_list to ref
-    constexpr ref(const std::initializer_list<T>& list) : data(list.begin()), size(list.size()) {}
+	constexpr Ref(const std::initializer_list<T>& list) : data(list.begin()), size(list.size()) {}
     /// Explicitly references a static array
-    template<size_t N> explicit constexpr ref(const T (&a)[N]) : ref(a,N) {}
+	template<size_t N> explicit constexpr Ref(const T (&a)[N]) : Ref(a,N) {}
 
     explicit operator bool() const { return size; }
     explicit operator const T*() const { return data; }
@@ -128,7 +147,6 @@ generic struct ref {
     const T* begin() const { return data; }
     const T* end() const { return data+size; }
     const T& at(size_t i) const;
-    //T value(size_t i, T defaultValue) const { return i<size ? data[i] : defaultValue; }
     const T& operator [](size_t i) const { return at(i); }
     const T& last() const { return at(size-1); }
 
@@ -151,38 +169,13 @@ generic struct ref {
 
 // -- string
 
-template<> struct ref<char> {
-    typedef char type;
-    const char* data = 0;
-    size_t size = 0;
-
-    /// Default constructs an empty reference
-    constexpr ref() {}
-    /// References \a size elements from const \a data pointer
-    constexpr ref(const char* data, size_t size) : data(data), size(size) {}
-    /// Implicitly references a string literal
-    template<size_t N> constexpr ref(char const(&a)[N]) : ref(a, N-1 /*Does not include trailling zero byte*/) {}
-
-    explicit operator bool() const { return size; }
-
-    const char* begin() const { return data; }
-    const char* end() const { return data+size; }
-    const char& at(size_t i) const;
-    const char& operator [](size_t i) const { return at(i); }
-    const char& last() const { return at(size-1); }
-    ref<char> slice(size_t pos, size_t size) const;
-    ref<char> slice(size_t pos) const;
-
-    /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
-    size_t indexOf(const char& key) const { for(size_t i: range(size)) { if(data[i]==key) return i; } return -1; }
-    /// Returns true if the array contains an occurrence of \a value
-    bool contains(const char& key) const { return indexOf(key)!=invalid; }
-
-    bool operator ==(const ref<char> o) const {
-        if(size != o.size) return false;
-        for(size_t i: range(size)) if(data[i]!=o.data[i]) return false;
-        return true;
-    }
+/// ref discarding trailing zero byte in ref(char[N])
+// Needs to be a template specialization as a direct derived class specialization prevents implicit use of ref(char[N]) to bind ref<char>
+template<> struct ref<char> : Ref<char> {
+	using Ref::Ref;
+	constexpr ref() {}
+	/// Implicitly references a string literal
+	template<size_t N> constexpr ref(char const(&a)[N]) : ref(a, N-1 /*Does not include trailling zero byte*/) {}
 };
 
 /// Returns const reference to memory used by \a t
@@ -190,13 +183,12 @@ generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 
 /// ref<char> holding a UTF8 text string
 typedef ref<char> string;
+
 /// Returns const reference to a static string literal
 inline constexpr string operator "" _(const char* data, size_t size) { return string(data,size); }
 
 // -- Log
 
-/// Logs a message to standard output without newline
-void log_(string message);
 /// Logs a message to standard output
 template<Type... Args> void log(const Args&... args);
 void log(string message);
@@ -207,29 +199,19 @@ void log(string message);
 template<Type... Args> void error(const Args&... args)  __attribute((noreturn));
 template<> void error(const string& message) __attribute((noreturn));
 
+/// Aborts if \a expr evaluates to false and logs \a expr and \a message (even in release)
+#define assert_(expr, message...) ({ if(!(expr)) error(#expr ""_, ## message); })
 #if DEBUG
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message
-#define assert(expr, message...) ({ if(!(expr)) error(#expr, ##message); })
-/// Aborts if \a expr evaluates to false and logs \a expr and \a message
-#define warn(expr, message...) ({ if(!(expr)) error(#expr, ##message); })
-#define debug(statements...) statements
+#define assert(expr, message...) assert_(expr, ## message)
 #else
 #define assert(expr, message...) ({})
-/// Warns if \a expr evaluates to false and logs \a expr and \a message
-#define warn(expr, message...) ({ if(!(expr)) log(#expr, ##message); })
-#define debug(statements...)
 #endif
-/// Aborts if \a expr evaluates to false and logs \a expr and \a message (even in release)
-#define assert_(expr, message...) ({ if(!(expr)) error(#expr ""_ , ##message); })
 
 // -- ref
-generic const T& ref<T>::at(size_t i) const { assert(i<size, i, size); return data[i]; }
-generic ref<T> ref<T>::slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos, size); }
-generic ref<T> ref<T>::slice(size_t pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
-
-inline const char& ref<char>::at(size_t i) const { assert(i<size, i, size); return data[i]; }
-inline ref<char> ref<char>::slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<char>(data+pos, size); }
-inline ref<char> ref<char>::slice(size_t pos) const { assert(pos<=size); return ref<char>(data+pos,size-pos); }
+generic const T& Ref<T>::at(size_t i) const { assert(i<size, i, size); return data[i]; }
+generic ref<T> Ref<T>::slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos, size); }
+generic ref<T> Ref<T>::slice(size_t pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
 
 // -- FILE
 
@@ -238,70 +220,3 @@ inline ref<char> ref<char>::slice(size_t pos) const { assert(pos<=size); return 
     extern char _binary_ ## name ##_start[], _binary_ ## name ##_end[]; \
     return ref<byte>(_binary_ ## name ##_start,_binary_ ## name ##_end); \
 }
-
-// -- mref
-
-#ifndef _NEW
-/// Initializes memory using a constructor (placement new)
-inline void* operator new(size_t, void* p) noexcept { return p; }
-#endif
-
-/// Unmanaged fixed-size mutable reference to an array of elements
-generic struct mref : ref<T> {
-    using ref<T>::data;
-    using ref<T>::size;
-
-    /// Default constructs an empty reference
-    mref(){}
-    /// References \a size elements from \a data pointer
-    mref(T* data, size_t size) : ref<T>(data,size) {}
-    /// Converts an std::initializer_list to mref
-    constexpr mref(std::initializer_list<T>&& list) : ref<T>(list.begin(), list.size()) {}
-    /// Converts a static array to ref
-    template<size_t N> mref(T (&a)[N]): mref(a,N) {}
-
-    explicit operator bool() const { assert(!size || data, size); return size; }
-    explicit operator T*() const { return (T*)data; }
-    T* begin() const { return (T*)data; }
-    T* end() const { return (T*)data+size; }
-    T& at(size_t i) const { return (T&)ref<T>::at(i); }
-    T& operator [](size_t i) const { return at(i); }
-    T& first() const { return at(0); }
-    T& last() const { return at(size-1); }
-
-    /// Slices a reference to elements from \a pos to \a pos + \a size
-    mref<T> slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return mref<T>((T*)data+pos, size); }
-    /// Slices a reference to elements from to the end of the reference
-    mref<T> slice(size_t pos) const { assert(pos<=size); return mref<T>((T*)data+pos,size-pos); }
-    /// Slices a reference to elements from \a start to \a stop
-	mref<T> sliceRange(size_t start, size_t stop) const { return slice(start, stop-start); }
-
-	/// Initializes the element at index
-	T& set(size_t index, const T& value) const { return *(new (&at(index)) T(value)); }
-	/// Initializes the element at index
-	T& set(size_t index, T&& value) const { return *(new (&at(index)) T(::move(value))); }
-	/// Initializes the element at index
-	template<Type... Args> T& set(size_t index, Args&&... args) const { return *(new (&at(index)) T{forward<Args>(args)...}); }
-    /// Initializes reference using the same constructor for all elements
-    template<Type... Args> void clear(Args... args) const { for(T& e: *this) new (&e) T(args...); }
-    /// Initializes reference from \a source using move constructor
-    void move(const mref<T>& source) { assert(size==source.size); for(size_t index: range(size)) set(index, ::move(source[index])); }
-    /// Initializes reference from \a source using copy constructor
-    void copy(const ref<T> source) const { assert(size==source.size); for(size_t index: range(size)) set(index, ::copy(source[index])); }
-
-    /// Stores the application of a function to every index up to a size in a mref
-    template<Type Function> void apply(Function function) const { for(size_t index: range(size)) set(index, function(index)); }
-    /// Stores the application of a function to every elements of a ref in a mref
-    template<Type Function, Type... S> void apply(Function function, ref<S>... sources) const {
-        for(size_t index: range(size)) new (&at(index)) T(function(sources[index]...));
-    }
-	/// Stores the application of a function to every elements of a ref in a mref
-	template<Type Function, Type... S> void apply(Function function, mref<S>... sources) const {
-		for(size_t index: range(size)) new (&at(index)) T(function(sources[index]...));
-	}
-
-    /// Replaces in \a array every occurence of \a before with \a after
-    template<Type B, Type A> mref& replace(const B& before, const A& after) { for(T& e : *this) if(e==before) e=T(after); return *this; }
-};
-/// Returns mutable reference to memory used by \a t
-generic mref<byte> raw(T& t) { return mref<byte>((byte*)&t,sizeof(T)); }

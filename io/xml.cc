@@ -121,14 +121,14 @@ void Element::xpath(const string& path, const function<void(const Element &)>& v
 String Element::text() const { String text; visit([&text](const Element& e){ text<<unescape(e.content); }); return text; }
 
 String Element::text(const string& path) const {
-    String text;
+	array<char> text;
     xpath(path,[&text](const Element& e){ text<<e.text(); });
     return text;
 }
 
 String Element::str(uint depth) const {
     //assert(name||content, attributes, children);
-    String line;
+	array<char> line;
     String indent = repeat(" "_,depth);
     if(name) line << indent<<"<"_+name;
     for(auto attr: attributes) line << " "_+attr.key+"=\""_+attr.value+"\""_;
@@ -153,7 +153,7 @@ String unescape(const string& xml) {
         entities.reserve(kv.size/2);
         for(uint i=0;i<kv.size;i+=2) entities.insert(move(kv[i]), move(kv[i+1]));
     }
-    String out;
+	array<char> out;
     for(TextData s(xml);s;) {
         out << s.until('&');
         if(!s) break;

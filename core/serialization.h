@@ -9,7 +9,7 @@
 generic T parse(TextData&) { static_assert(0&&sizeof(T), "No overload for parse<T>(TextData&)"); }
 
 generic T parse(string str) { TextData s(str); T t = parse<T>(s); assert_(!s, s); return t; }
-template<> inline String parse<String>(string source) { return String(source); }
+template<> inline String parse<String>(string source) { return copyRef(source); }
 
 template<> inline int parse<int>(TextData& s) { return s.integer(); }
 template<> inline float parse<float>(TextData& s) { return s.decimal(); }
@@ -35,8 +35,8 @@ template<> inline map<String, String> parse<map<String, String>>(TextData& s) {
 		s.whileAny(" \t");
 		string key = s.identifier();
 		s.match(':'); s.whileAny(" \t");
-		string value = s.whileNo("},\t\n");
-		target.insert(key, trim(value));
+		string value = trim(s.whileNo("},\t\n"));
+		target.insert(copyRef(key), copyRef(value));
 		if(!s || s.match('}')) break;
 		if(!s.match(',')) s.skip('\n');
 	}

@@ -19,8 +19,8 @@ String findFont(string fontName, ref<string> fontTypes) {
 }
 
 static FT_Library ft; static int fontCount=0;
-Font::Font(Map&& map, float size, string name, bool hint) : Font(unsafeReference<byte>(map), size, name, hint) { keep=move(map); }
-Font::Font(buffer<byte>&& data_, float size, string name, bool hint) : data(move(data_)), size(size), name(name), hint(hint) {
+Font::Font(Map&& map, float size, string name, bool hint) : Font(unsafeRef<byte>(map), size, name, hint) { keep=move(map); }
+Font::Font(buffer<byte>&& data_, float size, string name, bool hint) : data(move(data_)), size(size), name(copyRef(name)), hint(hint) {
     if(!ft) FT_Init_FreeType(&ft);
     int e; if((e=FT_New_Memory_Face(ft,(const FT_Byte*)data.data,data.size,0,&face)) || !face) { error("Invalid font", data.data, data.size); return; }
     fontCount++;

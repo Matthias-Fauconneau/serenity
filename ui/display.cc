@@ -90,12 +90,12 @@ void Display::event() {
             }
             event(e);
         }
-        array<byte> o;
+		array<byte> o;
         if(!poll()) break;
         {Locker lock(this->lock);
             XEvent e = read<XEvent>();
             if(e.type==Error) { log(e); continue; }
-            o = array<byte>(raw(e));
+			o.append(raw(e));
             if(e.type==GenericEvent) o.append( read(e.genericEvent.size*4) );
         }
         event(o);
@@ -117,12 +117,14 @@ array<byte> Display::readReply(uint16 sequence, uint elementSize) {
         XEvent e = read<XEvent>();
         if(e.type==Reply) {
             assert_(e.seq==sequence);
-            array<byte> reply (raw(e.reply));
+			array<byte> reply;
+			reply.append(raw(e.reply));
             if(e.reply.size) { assert_(elementSize); reply.append(read(e.reply.size*elementSize)); }
             return reply;
         }
         if(e.type==Error) { log(e); assert_(e.seq!=sequence, e.seq, sequence); continue; }
-        array<byte> o (raw(e));
+		array<byte> o;
+		o.append(raw(e));
         if(e.type==GenericEvent) o.append(read(e.genericEvent.size*4));
         events.append(move(o));
         queue(); // Queue event to process after unwinding back to event loop

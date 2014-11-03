@@ -1,7 +1,7 @@
 #include <exiv2/exiv2.hpp> //exiv2
 #include "exif.h"
 #include "string.h"
-String str(const std::string s) { return String(string(s.data(), s.size())); }
+String str(const std::string s) { return copyRef(string(s.data(), s.size())); }
 
 map<String, Variant> parseExifTags(ref<byte> data) {
     using namespace Exiv2;

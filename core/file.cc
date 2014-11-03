@@ -16,7 +16,7 @@
 void Handle::close() { if(fd>0) ::close(fd); fd=0; }
 
 String Handle::name() const {
-    if(fd==AT_FDCWD) return String(".");
+	if(fd==AT_FDCWD) return "."__;
     static Folder procSelfFD("/proc/self/fd/");
 	String s (256); s.size=check(readlinkat(procSelfFD.fd, strz(str((int)fd)), s.begin(), s.capacity), (int)fd);
     return s;
@@ -29,12 +29,12 @@ const Folder& currentWorkingDirectory() { static const int cwd = AT_FDCWD; retur
 const Folder& root() { static const Folder root("/",currentWorkingDirectory()); return root; }
 
 Folder::Folder(const string folder, const Folder& at, bool create):Handle(0){
-    if(create && !existsFolder(folder,at)) check_(mkdirat(at.fd, strz(folder), 0777), at.name(), folder);
+	if(create && !existsFolder(folder,at)) check(mkdirat(at.fd, strz(folder), 0777), at.name(), folder);
     assert_(folder);
 	fd = check( openat(at.fd, strz(folder?:"."), O_RDONLY|O_DIRECTORY, 0), '\''+folder+'\'', at.name());
 }
 
-struct stat Folder::stat() const { struct stat stat; check_( fstat(fd, &stat) ); return stat; }
+struct stat Folder::stat() const { struct stat stat; check( fstat(fd, &stat) ); return stat; }
 
 int64 Folder::accessTime() const { struct stat stat = Folder::stat(); return stat.st_atim.tv_sec*1000000000ull + stat.st_atim.tv_nsec; }
 
@@ -56,7 +56,7 @@ array<String> Folder::list(uint flags) const {
                     || (flags&Folders && type==DT_DIR)
                     || (flags&Devices && type==DT_CHR)
                     || (flags&Drives && type==DT_BLK) ) {
-                if(flags&Sorted) list.insertSorted( String(name) ); else list.append( String(name) );
+				if(flags&Sorted) list.insertSorted( copyRef(name) ); else list.append( copyRef(name) );
             }
             if(flags&Recursive && type==DT_DIR) {
                 for(const String& file: Folder(name,*this).list(flags)) {
@@ -79,13 +79,13 @@ void Stream::read(mref<byte> target) {
 }
 
 buffer<byte> Stream::readUpTo(size_t capacity) {
-    buffer<byte> buffer(capacity, "read");
+	buffer<byte> buffer(capacity);
     buffer.size = check( ::read(fd, (void*)buffer.data, capacity) );
     return buffer;
 }
 
 buffer<byte> Stream::read(size_t size) {
-	buffer<byte> buffer(size, "read");
+	buffer<byte> buffer(size);
 	size_t offset=0; while(offset<size) offset+=check(::read(fd, buffer.begin()+offset, size-offset));
 	assert(offset==size);
 	return buffer;
@@ -114,7 +114,7 @@ Socket::Socket(int domain, int type):Stream(check(socket(domain,type|SOCK_CLOEXE
 
 File::File(const string path, const Folder& at, Flags flags) : Stream(check(openat(at.fd, strz(path), flags, 0666), at.name(), path, int(flags))) {}
 
-struct stat File::stat() const { struct stat stat; check_( fstat(fd, &stat) ); return stat; }
+struct stat File::stat() const { struct stat stat; check( fstat(fd, &stat) ); return stat; }
 
 FileType File::type() const { return FileType(stat().st_mode&__S_IFMT); }
 
@@ -124,9 +124,9 @@ int64 File::accessTime() const { struct stat stat = File::stat(); return stat.st
 
 int64 File::modifiedTime() const { struct stat stat = File::stat(); return stat.st_mtim.tv_sec*1000000000ull + stat.st_mtim.tv_nsec;  }
 
-const File& File::resize(int64 size) { check_(ftruncate(fd, size), fd.pointer, size); return *this; }
+const File& File::resize(int64 size) { check(ftruncate(fd, size), fd.pointer, size); return *this; }
 
-void File::seek(int index) { check_(::lseek(fd,index,0)); }
+void File::seek(int index) { check(::lseek(fd,index,0)); }
 
 
 bool existsFile(const string path, const Folder& at) { int fd = openat(at.fd, strz(path), O_PATH, 0); if(fd>0) close(fd); return fd>0; }
@@ -180,7 +180,7 @@ void rename(const Folder& oldFolder, const string oldName, const Folder& newFold
     assert_(existsFile(oldName,oldFolder), oldFolder.name(), oldName, newName);
     assert_(!existsFile(newName,newFolder), oldName, newFolder.name(), newName);
     assert_(newName.size<0x100);
-    check_(renameat(oldFolder.fd, strz(oldName), newFolder.fd, strz(newName)));
+	check(renameat(oldFolder.fd, strz(oldName), newFolder.fd, strz(newName)));
 }
 
 void rename(const string oldName,const string newName, const Folder& at) {
@@ -189,19 +189,19 @@ void rename(const string oldName,const string newName, const Folder& at) {
 }
 
 
-void remove(const string name, const Folder& at) { check_( unlinkat(at.fd, strz(name), 0), name); }
+void remove(const string name, const Folder& at) { check( unlinkat(at.fd, strz(name), 0), name); }
 
-void removeFolder(const string& name, const Folder& at) { check_( unlinkat(at.fd, strz(name), AT_REMOVEDIR), name); }
+void removeFolder(const string& name, const Folder& at) { check( unlinkat(at.fd, strz(name), AT_REMOVEDIR), name); }
 
 void symlink(const string from,const string to, const Folder& at) {
     assert(from!=to);
     remove(from, at);
-    check_(symlinkat(strz(from), at.fd, strz(to)), from,"->",to);
+	check(symlinkat(strz(from), at.fd, strz(to)), from,"->",to);
 }
 
 void touchFile(const string path, const Folder& at, bool setModified) {
     timespec times[]={{0,0}, {0,setModified?UTIME_NOW:UTIME_OMIT}};
-    check_(utimensat(at.fd, strz(path), times, 0), path);
+	check(utimensat(at.fd, strz(path), times, 0), path);
 }
 
 void copy(const Folder& oldAt, const string oldName, const Folder& newAt, const string newName) {
@@ -212,11 +212,11 @@ void copy(const Folder& oldAt, const string oldName, const Folder& newAt, const 
 }
 
 
-int64 available(const Handle& file) { struct statvfs statvfs; check_( fstatvfs(file.fd, &statvfs) ); return statvfs.f_bavail*statvfs.f_frsize; }
+int64 available(const Handle& file) { struct statvfs statvfs; check( fstatvfs(file.fd, &statvfs) ); return statvfs.f_bavail*statvfs.f_frsize; }
 
 int64 available(const string path, const Folder& at) { return available(File(path,at)); }
 
 
-int64 capacity(const Handle& file) { struct statvfs statvfs; check_( fstatvfs(file.fd, &statvfs) ); return statvfs.f_blocks*statvfs.f_frsize; }
+int64 capacity(const Handle& file) { struct statvfs statvfs; check( fstatvfs(file.fd, &statvfs) ); return statvfs.f_blocks*statvfs.f_frsize; }
 
 int64 capacity(const string path, const Folder& at) { return capacity(File(path,at)); }

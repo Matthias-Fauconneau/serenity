@@ -65,7 +65,7 @@ template<Type K, Type V> struct map {
         assertNo(key);
         return values.insertAt(keys.insertSorted(key),move(value));
     }
-    template<Type KK> V& insertSortedMulti(const KK& key, const V& value) { return values.insertAt(keys.insertSorted(key),value); }
+	V& insertSortedMulti(K&& key, const V& value) { return values.insertAt(keys.insertSorted(::move(key)),value); }
 
     template<Type KK> V& operator [](KK&& key) { size_t i = keys.indexOf(key); return i!=invalid ? values[i] : insert(key); }
     /// Returns value for \a key, inserts a new sorted key with a default value if not existing
@@ -105,13 +105,13 @@ template<Type K, Type V> map<K,V> copy(const map<K,V>& o) {
 }
 
 template<Type K, Type V> String str(const map<K,V>& m, string separator=", ") {
-    String s; s.append('{'); s.append(separator.last());
+	array<char> s; s.append('{'); s.append(separator.last());
     for(uint i: range(m.size())) {
         s.append(str(m.keys[i])+": "+str(m.values[i]));
         if(i<m.size()-1) s.append(separator);
     }
     s.append(separator.last());
-    s.append('}'); return s;
+	s.append('}'); return move(s);
 }
 
 /// Associates each argument's name with its string conversion

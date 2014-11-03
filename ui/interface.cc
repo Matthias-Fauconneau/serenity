@@ -44,7 +44,7 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button, 
 int2 Progress::sizeHint(int2) { return int2(-height,height); }
 Graphics Progress::graphics(int2 size) {
     Graphics graphics;
-    warn(minimum <= value && value <= maximum, minimum, value, maximum);
+	assert(minimum <= value && value <= maximum, minimum, value, maximum);
     int x = size.x*uint(value-minimum)/uint(maximum-minimum);
     graphics.fills.append(vec2(0,1), vec2(x,size.y-1-1), lightBlue, 1.f);
     graphics.fills.append(vec2(x,1), vec2(size.x-x,size.y-1-1), gray, 1.f);

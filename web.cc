@@ -3,7 +3,7 @@
 
 struct Web : Application {
 	String parseLine(const Folder& folder, string line, const map<string,string>& arguments={}) {
-		String out;
+		array<char> out;
 		TextData s (line);
 		while(s) {
 			out.append( s.whileNot('$') );
@@ -33,7 +33,7 @@ struct Web : Application {
 	}
 
 	String parseFile(const Folder& folder, string file) {
-		String out;
+		array<char> out;
 		for(TextData s(file); s;) out.append( parseLine(folder, s.line())+"\n" );
 		return out;
 	}

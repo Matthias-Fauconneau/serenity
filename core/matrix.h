@@ -135,18 +135,18 @@ struct mat4 {
 inline mat4 operator*(float s, mat4 M) {mat4 r; for(int j=0;j<4;j++) for(int i=0;i<4;i++) r.M(i,j)=s*M(i,j); return r; }
 
 template<int N, int M, Type T> inline String str(const T a[M*N]) {
-    String s; s<<"\n[";
+	array<char> s; s.append("\n[");
     for(int i=0;i<M;i++) {
-        if(N==1) s = s+"\t"+ftoa(a[i],4);
+		if(N==1) s.append("\t"+str(a[i],4));
         else {
             for(int j=0;j<N;j++) {
-                s = s+"\t"+ftoa(a[j*M+i],4);
+				s.append("\t"+str(a[j*M+i],4));
             }
-            if(i<M-1) s=s+"\n";
+			if(i<M-1) s.append('\n');
         }
     }
-    s<<" ]";
-    return s;
+	s.append(" ]");
+	return move(s);
 }
 inline String str(const mat3x2& M) { return str<3,2>(M.data); }
 inline String str(const mat3& M) { return str<3,3>(M.data); }

@@ -19,7 +19,7 @@ struct OffsetPlot : Widget {
       for(uint i: range(keyCount)) { offsets[i] = clip(-1./2, s.decimal()/100, 1./2); s.skip(' '); variances[i] = sq(s.decimal()/100); s.skip('\n'); }
     }
     ~OffsetPlot() {
-        String s;
+		array<char> s;
         for(uint i: range(keyCount)) s << str(offsets[i]*100) << ' ' << str(sqrt(variances[i])*100) << '\n';
         writeFile("offsets.profile", s, config, true);
     }

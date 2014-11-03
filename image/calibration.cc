@@ -17,7 +17,6 @@ SourceImage Calibration::sum(int2 size) const {
                 parallel::apply(target, [scale](float sum, byte4 source) {
                     return sum + scale*(sRGB_reverse[source.b]+sRGB_reverse[source.g]+sRGB_reverse[source.r]);
                 }, target, source);
-                debug(break;)
             }
     });
 }

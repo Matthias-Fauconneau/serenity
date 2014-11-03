@@ -42,7 +42,7 @@ String escape(char c) {
 	size_t index = "\n"_.indexOf(c);
 	return index != invalid ? "\\"_+"n"_[index] : ""_+c;
 }
-String escape(string s) { String target; for(char c: s) target.append(escape(c)); return target; }
+String escape(string s) { array<char> target (s.size, 0); for(char c: s) target.append(escape(c)); return move(target); }
 
 void Data::skip(const uint8 key) {
     if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(peek())+'\'');

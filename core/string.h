@@ -54,25 +54,23 @@ double parseDecimal(const string str);
 
 // -- String
 
-typedef /*Array*/array<char> String;
+typedef buffer<char> String;
+
+/// Converts a static reference to a buffer
+//template<size_t N> buffer<char> staticRef(char const(&a)[N]) { return buffer<char>((char*)a, N-1 /*Discards trailing zero byte*/, 0); }
+/// Returns const reference to a static string literal
+inline String operator "" __(const char* data, size_t size) { return String((char*)data, size, 0); }
 
 /// Forwards string
 inline string str(const String& s) { return s; }
 
 /// Null-terminated \a String with implicit conversion to const char*
-struct strz : /*String*/buffer<char> {
+struct strz : buffer<char> {
     /// Copies a string reference, appends a null byte and allows implicit conversion to const char*
 	strz(const string s) : buffer(s.size+1) { slice(0, s.size).copy(s); last()='\0'; }
     operator const char*() { return data; }
 };
 
-/// Returns an array of the application of a function to every elements of a reference
-template<Type Function> String apply(string source, Function function) {
-    String target(source.size); target.size=source.size; target.apply(function, source); return target;
-}
-
-/// Replaces every occurrence of the String \a before with the String \a after
-String replace(const string s, const string before, const string after);
 /// Lowers case
 char toLower(char c);
 /// Lowers case
@@ -91,7 +89,7 @@ String right(const string s, size_t size, const char pad=' ');
 String join(ref<string> list, const string separator="");
 
 /// Returns an array of references splitting \a str wherever \a separator occurs
-/*Array*/array<string> split(const string str, string separator=", ");
+array<string> split(const string str, string separator=", ");
 
 /// Flatten cats
 template<class A, class B, class T> String str(const cat<A, B, T>& a) { return a; }
@@ -101,13 +99,13 @@ template<class A, class B, class T> String str(const cat<A, B, T>& a) { return a
 /// Converts an unsigned integer
 String str(uint64 number, int pad=0, uint base=10, char padChar='0');
 /// Converts an unsigned integer (implicit conversion)
-inline String str(uint8 number, int pad=0) { return str(uint64(number), pad); }
+inline String str(uint8 number, int pad=0, uint base=10, char padChar='0') { return str(uint64(number), pad, base, padChar); }
 /// Converts an unsigned integer (implicit conversion)
-inline String str(uint16 number, int pad=0) { return str(uint64(number), pad); }
+inline String str(uint16 number, int pad=0, uint base=10, char padChar='0') { return str(uint64(number), pad, base, padChar); }
 /// Converts an unsigned integer (implicit conversion)
-inline String str(uint32 number, int pad=0) { return str(uint64(number), pad); }
+inline String str(uint32 number, int pad=0, uint base=10, char padChar='0') { return str(uint64(number), pad, base, padChar); }
 /// Converts an unsigned integer (implicit conversion)
-inline String str(size_t number, int pad=0) { return str(uint64(number), pad); }
+inline String str(size_t number, int pad=0, uint base=10, char padChar='0') { return str(uint64(number), pad, base, padChar); }
 /// Converts an unsigned integer in hexadecimal base
 inline String hex(uint64 n, int pad=0) { return str(n, pad, 16); }
 /// Converts a memory address in hexadecimal base
@@ -116,7 +114,7 @@ generic inline String str(T* const& p) { return "0x"+hex(ptr(p)); }
 /// Converts a signed integer
 String str(int64 number, int pad=0, uint base=10, char padChar=' ');
 /// Converts a signed integer (implicit conversion)
-inline String str(int32 n, int pad=0) { return str(int64(n), pad); }
+inline String str(int32 n, int pad=0, uint base=10, char padChar=' ') { return str(int64(n), pad, base, padChar); }
 
 /// Converts a floating-point number
 String str(double number, int precision=2, uint pad=0, int exponent=0);
@@ -128,14 +126,14 @@ String binaryPrefix(uint64 value, string unit="B", string unitSuffix="");
 /// Converts arrays
 template<Type T, typename enable_if<!is_same<char, T>::value>::type* = nullptr>
 String str(const ref<T> source, string separator=" ") {
-    String target;
+	array<char> target;
     target.append('[');
     for(uint i: range(source.size)) {
         target.append( str(source[i]) );
         if(i<source.size-1) target.append(separator);
     }
     target.append(']');
-    return target;
+	return move(target);
 }
 generic String str(const mref<T>& source, string separator=" ") { return str((const ref<T>)source, separator); }
 generic String str(const buffer<T>& source, string separator=" ") { return str((const ref<T>)source, separator); }

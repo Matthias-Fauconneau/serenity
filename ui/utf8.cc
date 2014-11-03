@@ -20,7 +20,7 @@ const utf8_iterator& utf8_iterator::operator++() {
 }
 
 String utf8(uint c) {
-    String utf8;
+	array<char> utf8;
 	/**/  if(c<(1<<7)) utf8.append(c);
 	else if(c<(1<<(7+6))) {
 		utf8.append(0b11000000|(c>>6));
@@ -32,11 +32,11 @@ String utf8(uint c) {
 		utf8.append(0b10000000|(c&0b111111));
 	}
     else assert(0);
-    return utf8;
+	return move(utf8);
 }
 
 generic array<T> toUCS(string utf8) {
-    array<T> ucs(utf8.size);
+	array<T> ucs(utf8.size, 0);
 	for(utf8_iterator it=utf8.begin(); it!=utf8_iterator(utf8.end());++it) ucs.append( *it );
     return ucs;
 }

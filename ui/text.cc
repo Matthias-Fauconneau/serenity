@@ -15,7 +15,7 @@ Font* getFont(string fontName, float size, ref<string> fontTypes, bool hint) {
     unique<Font>* font = fonts.find(NameSize{copy(key), size});
     if(font) return font->pointer;
     String path = findFont(fontName, fontTypes);
-    String name = String(section(section(path, '/', -2, -1),'.'));
+	String name = copyRef(section(section(path, '/', -2, -1),'.'));
     return fonts.insert(NameSize{copy(key),size}, unique<Font>(Map(path), size, name, hint)).pointer;
 }
 

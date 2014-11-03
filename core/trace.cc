@@ -16,7 +16,7 @@ static int readLEV(BinaryData& s, bool sign=false) {
 }
 
 String demangle(TextData& s, bool function=true) {
-    String r;
+	array<char> r;
     bool rvalue=false,ref=false; int pointer=0;
     for(;;) {
         /**/  if(s.match('O')) rvalue=true;
@@ -104,7 +104,7 @@ String demangle(TextData& s, bool function=true) {
     for(int i=0;i<pointer;i++) r.append('*');
     if(rvalue) r.append("&&");
     if(ref) r.append('&');
-    return r;
+	return move(r);
 }
 String demangle(const string symbol) { TextData s(symbol); s.match('_'); return demangle(s); }
 
@@ -195,7 +195,7 @@ void* return_address(void* fp) { return *((void**)fp+1); }
 #include <execinfo.h>
 
 String trace(int skip, void* ip) {
-    String log;
+	array<char> log;
     void* stack[32];
 #if 1
     int i = backtrace(stack, 32);
@@ -219,7 +219,8 @@ String trace(int skip, void* ip) {
         if(s.function||s.file||s.line) log.append(left(s.file+':'+str(s.line),16)+'\t'+s.function+'\n');
         else log.append("0x"+hex(ptr(ip))+'\n');
     }
-    return log;
+	log.pop(); // Pops last \n
+	return move(log);
 }
 
 void logTrace() { log(trace()); }

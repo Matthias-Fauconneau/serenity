@@ -67,15 +67,15 @@ char upperCase(char c) { return c>='a'&&c<='z'?'A'+c-'a':c; }
 String toUpper(const string source) { return apply(source, upperCase); }
 
 String left(const string source, size_t size, const char pad) {
-	if(source.size >= size) return String(source);
-	String target(size);
+	if(source.size >= size) return copyRef(source);
+	String target(size, 0);
     target.append(source);
     while(target.size < size) target.append(pad);
     return target;
 }
 String right(const string source, size_t size, const char pad) {
-	if(source.size >= size) return String(source);
-	String target(size);
+	if(source.size >= size) return copyRef(source);
+	String target(size, 0);
 	while(target.size < size-source.size) target.append(pad);
     target.append(source);
     return target;
@@ -86,7 +86,7 @@ String right(const string source, size_t size, const char pad) {
 String join(ref<string> list, const string separator) {
     if(!list) return {};
     size_t size = 0; for(auto e: list) size += e.size;
-    String target ( size + (list.size-1)*separator.size );
+	String target ( size + (list.size-1)*separator.size, 0);
     for(size_t i: range(list.size)) { target.append( list[i] ); if(i<list.size-1) target.append( separator ); }
     return target;
 }
@@ -108,7 +108,7 @@ String str(uint64 n, int pad, uint base, char padChar) {
         n /= base;
     } while( n!=0 );
     while(64-i<pad) buf[--i] = padChar;
-    return String(string(buf+i,64-i));
+	return copyRef(string(buf+i,64-i));
 }
 
 String str(int64 number, int pad, uint base, char padChar) {
@@ -121,7 +121,7 @@ String str(int64 number, int pad, uint base, char padChar) {
     } while( n!=0 );
     if(number<0) buf[--i]='-';
     while(64-i<pad) buf[--i] = padChar;
-    return String(string(buf+i,64-i));
+	return copyRef(string(buf+i,64-i));
 }
 
 String str(double n, int precision, uint pad, int exponent) {
@@ -131,7 +131,7 @@ String str(double n, int precision, uint pad, int exponent) {
     if(n==::inf) return ::right("∞", pad+2);
     if(n==-::inf) return ::right("-∞", pad+2);
     int e=0; if(n && exponent && (n<1 || log10(n)>=precision+4)) e=floor(log10(n) / exponent) * exponent, n /= exp10(e);
-    String s;
+	array<char> s;
     if(sign) s.append('-');
     if(precision /*&& n!=round(n)*/) {
         double integer=1, fract=__builtin_modf(n, &integer);

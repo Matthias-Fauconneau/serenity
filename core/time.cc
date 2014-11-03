@@ -102,7 +102,7 @@ bool operator ==(const Date& a, const Date& b) { return a.seconds==b.seconds && 
             && a.day==b.day && a.month==b.month && a.year==b.year ; }
 
 String str(Date date, const string format) {
-    String r;
+	array<char> r;
     for(TextData s(format);s;) {
         /**/ if(s.match("ss")){ if(date.seconds>=0) r.append( str(date.seconds,2) ); else s.until(' '); }
         else if(s.match("mm")){ if(date.minutes>=0) r.append( str(date.minutes,2) ); else s.until(' '); }
@@ -118,7 +118,7 @@ String str(Date date, const string format) {
         else r.append( s.next() );
     }
     if(endsWith(r,",") || endsWith(r,":")) r.pop(); //prevent dangling separator when last valid part is week day or seconds
-    return r;
+	return move(r);
 }
 
 Date parseDate(TextData& s) {

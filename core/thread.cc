@@ -14,8 +14,10 @@
 #include <sys/syscall.h>
 
 // Log
-void log_(string buffer) { check_(write(2, buffer.data, buffer.size)); }
-void log(string buffer) { log_(buffer+'\n'); }
+void log(string message) {
+	String buffer = message+'\n';
+	check(write(2, buffer.data, buffer.size));
+}
 
 // Poll
 Poll::Poll(Poll&& o) : pollfd(o), thread(o.thread) { assert_(!o.thread.contains(&o)); }
@@ -103,7 +105,7 @@ static void traceAllThreads() {
 static void handler(int sig, siginfo_t* info, void* ctx) {
     if(sig==SIGSEGV) log("Segmentation fault");
     if(threads.size>1) log("Thread #"+str(gettid())+':');
-    log_(trace(1, (void*) ((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP]));
+	log(trace(1, (void*) ((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP]));
     if(sig!=SIGTRAP) traceAllThreads();
     if(sig==SIGABRT) log("Aborted");
     static constexpr string fpErrors[] = {"", "Integer division", "Integer overflow", "Division by zero", "Overflow",
@@ -131,24 +133,23 @@ void __attribute((constructor(102))) setup_signals() {
 #endif
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
     struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={{}};
-    check_(sigaction(SIGABRT, &sa, 0));
-    check_(sigaction(SIGSEGV, &sa, 0));
-    check_(sigaction(SIGTERM, &sa, 0));
-    check_(sigaction(SIGTRAP, &sa, 0));
-    check_(sigaction(SIGFPE, &sa, 0));
+	check(sigaction(SIGABRT, &sa, 0));
+	check(sigaction(SIGSEGV, &sa, 0));
+	check(sigaction(SIGTERM, &sa, 0));
+	check(sigaction(SIGTRAP, &sa, 0));
+	check(sigaction(SIGFPE, &sa, 0));
     setExceptions(Invalid /*| Denormal*/ | DivisionByZero | Overflow /*| Underflow *//*| Precision*/);
 }
 
 static void __attribute((noreturn)) exit_thread(int status) { syscall(SYS_exit, status); __builtin_unreachable(); }
 
 template<> void __attribute((noreturn)) error(const string& message) {
-    //log(message); // In case, tracing crashes
     static bool reentrant = false;
     if(!reentrant) { // Avoid hangs if tracing errors
         reentrant = true;
         traceAllThreads();
         if(threads.size>1) log("Thread #"+str(gettid())+':');
-        log_(trace(1,0));
+		log(trace(1,0));
         reentrant = false;
     }
     log(message);
@@ -183,7 +184,7 @@ void requestTermination(int status) {
 // Locates an executable
 String which(string name) {
     if(!name) return {};
-    if(existsFile(name)) return String(name);
+	if(existsFile(name)) return copyRef(name);
     for(string folder: split(getenv("PATH","/usr/bin"),":")) if(existsFolder(folder) && existsFile(name, folder)) return folder+'/'+name;
     return {};
 }
@@ -191,14 +192,14 @@ String which(string name) {
 int execute(const string path, const ref<string> args, bool wait, const Folder& workingDirectory) {
     if(!existsFile(path)) { error("Executable not found",path); return -1; }
 
-    array<String> args0(1+args.size);
+	buffer<String> args0(1+args.size, 0);
     args0.append( path+'\0' );
     for(const auto& arg: args) args0.append( arg+'\0' );
     const char* argv[args0.size+1];
     for(uint i: range(args0.size)) argv[i] = args0[i].data;
     argv[args0.size]=0;
 
-    array<string> env0;
+	array<string> env0;
     static String environ = File("/proc/self/environ").readUpTo(4096);
     for(TextData s(environ);s;) env0.append( s.until('\0') );
 
@@ -209,7 +210,7 @@ int execute(const string path, const ref<string> args, bool wait, const Folder& 
     int cwd = workingDirectory.fd;
     int pid = fork();
     if(pid==0) {
-        if(cwd!=AT_FDCWD) check_(fchdir(cwd));
+		if(cwd!=AT_FDCWD) check(fchdir(cwd));
         if(!execve(strz(path), (char*const*)argv, (char*const*)envp)) exit_group(-1);
         __builtin_unreachable();
     }

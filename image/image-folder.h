@@ -5,14 +5,14 @@
 #include "jpeg.h"
 
 /// Cached collection of images backed by a source folder
-struct ImageFolder : ImageSource, ImageRGBSource, PropertySource, map<String, map<String, String>> {
+struct ImageFolder : ImageSource, ImageRGBSource, PropertySource, map<String, map<string, String>> {
 	Folder source;
     int2 maximumImageSize = 0;
 
-	ImageFolder(const Folder& source, function<bool(const String& name, const map<String, String>& properties)> predicate={});
+	ImageFolder(const Folder& source, function<bool(string name, const map<string, String>& properties)> predicate={});
 
 	String path() const override { return source.name(); }
-	String name() const override { return String(section(source.name(),'/',-2,-1)); }
+	String name() const override { return copyRef(section(source.name(),'/',-2,-1)); }
 	size_t count(size_t) override { return map::size(); }
 	size_t count() const { return map::size(); }
 	size_t outputs() const override { return 3; }
@@ -21,6 +21,7 @@ struct ImageFolder : ImageSource, ImageRGBSource, PropertySource, map<String, ma
 	int64 time(size_t index) override { return File(values[index].at("Path"_), source).modifiedTime(); }
 	string at(size_t index) const override { return values[index].at("Date"); }
 	int2 size(size_t index, int2 hint = 0) const override {
+		assert_(index < values.size, index, values.size, count());
 		int2 size = parse<int2>(values[index].at("Size"_));
 		int2 resize = size; // Defaults to original size
 		if(hint.x && hint.x < size.x) { assert_(size.x/hint.x, size, hint); resize = min(resize, size/(size.x/hint.x)); } // Fits width (Integer box resample)

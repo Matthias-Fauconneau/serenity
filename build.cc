@@ -5,9 +5,9 @@
 #include "time.h" //DEBUG
 
 struct Node {
-    String name;
+	string name;
     array<Node*> children;
-    explicit Node(const string name):name(copy(name)){}
+	explicit Node(string name):name(name){}
 };
 //bool operator ==(const Node& a, const Node& b) { return a.name==b.name; }
 bool operator ==(const Node& a, const string b) { return a.name==b; }
@@ -17,13 +17,13 @@ struct Build {
     String CXX = which(getenv("CC")) ?: which("clang++") ?: which("g++");
     String LD = which("ld");
 
-    const Folder folder {"."};
-    const String base {section(folder.name(),'/',-2,-1)};
+	const Folder folder {"."};
+	const String base = copyRef(section(folder.name(),'/',-2,-1));
     const String tmp = "/var/tmp/"+base+"."+section(CXX,'/',-2,-1);
 
-    String target;
+	string target;
     array<string> flags;
-    array<String> args = apply(folder.list(Folders), [this](const string subfolder){ return String("-iquote"+subfolder); });
+	array<String> args = apply(folder.list(Folders), [this](string subfolder)->String{ return "-iquote"+subfolder; });
 
     // Variables
     array<String> defines;
@@ -33,12 +33,11 @@ struct Build {
     array<int> pids;
     bool needLink = false;
 
-	array<String> sources = folder.list(Files|Recursive);
+	const array<String> sources = folder.list(Files|Recursive);
     /// Returns the first path matching file
-    String find(const string file) {
-        for(string path: sources) {
-            if(section(path,'/',-2,-1) == file) return String( path.contains('.') ? section(path,'.',0,-2) : path );
-        }
+	string find(string file) {
+		for(string path: sources) if(path == file) return path.contains('.') ? section(path,'.',0,-2) : path; // Exact match
+		for(string path: sources) if(section(path,'/',-2,-1) == file) return path.contains('.') ? section(path,'.',0,-2) : path; // Sub match
         return {};
     }
 
@@ -57,7 +56,7 @@ struct Build {
                     s.whileAny(' ');
                     string library=s.identifier("_");
                     if(!library) break;
-                    if(!libraries.contains(library)) libraries.append(String(library));
+					if(!libraries.contains(library)) libraries.append(copyRef(library));
                 }
                 assert_(s.wouldMatch('\n'));
             }
@@ -87,7 +86,7 @@ struct Build {
 
         String filesPath = tmp+"/files";
         Folder(filesPath, root(), true);
-        String path = find(String(name).replace('_','/'));
+		string path = find(replace(name, '_', '/'));
         assert(path, "No such file to embed", name);
         Folder subfolder = Folder(section(path,'/',0,-2), folder);
         string file = section(path,'/',-2,-1);
@@ -95,8 +94,7 @@ struct Build {
         assert_(!files.contains(object), name);
         int64 lastFileEdit = File(file, subfolder).modifiedTime();
         if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
-            array<string> args (ref<string>{"-r", "-b", "binary", "-o", object, file});
-            if(execute(LD, args, true, subfolder)) error("Failed to embed");
+			if(execute(LD, {"-r", "-b", "binary", "-o", object, file}, true, subfolder)) error("Failed to embed");
             needLink = true;
         }
         files.append( move(object) );
@@ -104,16 +102,16 @@ struct Build {
     }
 
     /// Returns timestamp of the last modified interface header recursively parsing includes
-    int64 parse(const string fileName, Node& parent) {
+	int64 parse(string fileName, Node& parent) {
         File file(fileName, folder);
         int64 lastEdit = file.modifiedTime();
 		if(file.size() > 32768) return lastEdit; // Skips large files (jpeg, deflate)
 		for(TextData s = file.read(file.size()); s; s.line()) {
             {string name = tryParseIncludes(s, fileName);
                 if(name) {
-                    String header = find(name+".h");
+					string header = find(name+".h");
                     if(header) lastEdit = max(lastEdit, parse(header+".h", parent));
-                    String module = find(name+".cc");
+					string module = find(name+".cc");
                     if(!module || parent == module) continue;
 					if(!modules.contains(module)) { if(!compileModule(module)) return 0; }
                     parent.children.append( modules[modules.indexOf(module)].pointer );
@@ -128,7 +126,7 @@ struct Build {
 
     /// Compiles a module and its dependencies as needed
     /// \return Timestamp of the last modified module implementation (deep)
-	bool compileModule(const string target) {
+	bool compileModule(string target) {
         assert_(target);
         modules.append( unique<Node>(target) );
         Node& module = modules.last();
@@ -154,9 +152,9 @@ struct Build {
 
     Build() {
         if(arguments()==ref<string>{"statistics"}) {
-			sources.filter( [](string name) { return !(endsWith(name, ".cc")||endsWith(name,".h")); });
             map<size_t, string> files;
-            for(string path: sources) files.insertSortedMulti(File(path).size(), path);
+			for(string path: filter(sources, [](string name) { return !(endsWith(name, ".cc")||endsWith(name,".h")); }))
+				files.insertSortedMulti(File(path).size(), path);
             log(str(files,"\n"_));
             return;
         }
@@ -167,17 +165,18 @@ struct Build {
             if(startsWith(arg,"/")) install=arg;
             else if(find(arg+".cc")) {
                 if(target) log("Multiple targets unsupported, building last target:",arg);
-                target = String(arg);
+				target = arg;
             } else flags.append( split(arg,"-") );
         }
 
-        if(!target) target = copy(base);
+		if(!target) target = base;
 
+		args.append("-iquote."__);
         for(string flag: flags) args.append( "-D"+toUpper(flag)+"=1" );
-        if(!flags.contains("release")) args.append( String("-g") );
-        if(!flags.contains("debug")) args.append( String("-O3") );
-        else if(flags.contains("fast")) args.append( String("-O1") ); // fast-debug
-        if(flags.contains("profile")) args.append( String("-finstrument-functions") );
+		if(!flags.contains("release")) args.append("-g"__);
+		if(!flags.contains("debug")) args.append("-O3"__);
+		else if(flags.contains("fast")) args.append("-O1"__); // fast-debug
+		if(flags.contains("profile")) args.append("-finstrument-functions"__);
 
         Folder(tmp, root(), true);
         Folder(tmp+"/"+join(flags,"-"), root(), true);
@@ -191,9 +190,9 @@ struct Build {
         if(existsFolder(binary)) binary.append(".elf");
         if(!existsFile(binary) || needLink) {
             array<String> args = move(files);
-            args.append(String("-o"));
+			args.append("-o"__);
             args.append(copy(binary));
-            args.append(apply(libraries, [this](const String& library){ return String("-l"+library); }));
+			args.append(apply(libraries, [this](const String& library)->String{ return "-l"+library; }));
 			// Waits for all translation units to finish compilation before final link
 			for(int pid: pids) if(wait(pid)) { log("Failed to compile"); requestTermination(-1); return; }
 			if(execute(CXX, toRefs(args))) { log("Failed to link"); requestTermination(-1); return; }

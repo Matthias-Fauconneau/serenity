@@ -111,9 +111,9 @@ bool Window::processEvent(const XEvent& e) {
 void Window::show() { send(MapWindow{.id=id}); send(RaiseWindow{.id=id}); }
 void Window::hide() { send(UnmapWindow{.id=id}); }
 
-void Window::setTitle(const string title) {
+void Window::setTitle(string title) {
 	if(!title || title == this->title) return;
-	this->title = String(title);
+	this->title = copyRef(title);
 	send(ChangeProperty{.window=id+XWindow, .property=Atom("_NET_WM_NAME"), .type=Atom("UTF8_STRING"), .format=8,
 						.length=uint(title.size), .size=uint16(6+align(4, title.size)/4)}, title);
 }

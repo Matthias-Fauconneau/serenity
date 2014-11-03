@@ -95,7 +95,7 @@ array<SourceImage> ImageGroupOperation::images(size_t groupIndex, size_t compone
 		});
 		return ::apply(groupSize(groupIndex), [&folder, size=this->size(groupIndex, hint), componentIndex](size_t imageIndex) {
 			Map map(str(componentIndex), Folder(str(imageIndex)+'.'+strx(size), folder));
-			ImageF image (unsafeReference(cast<typename ImageF::type>(map)), size, size.x);
+			ImageF image (unsafeRef(cast<typename ImageF::type>(map)), size, size.x);
 			return ImageMapSource<ImageF>(move(image), move(map));
 		});
 	}

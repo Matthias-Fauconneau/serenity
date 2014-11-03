@@ -4,6 +4,9 @@
 #include "function.h" // onEvent
 #include "map.h" // actions
 #include "vector.h" // int2
+
+/// Aligns \a offset to \a width (only for power of two \a width)
+inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
 inline string padding(size_t size, uint width=4){ return "\0\0\0\0"_.slice(0, align(width, size)-size); }
 generic auto pad(T&& t, uint width=4) -> decltype(t+padding(t.size, width)) { return move(t)+padding(t.size, width); }
 
@@ -60,7 +63,7 @@ struct Display : Socket, Poll {
          array<byte> replyData = readReply(sequence, sizeof(T));
          typename Request::Reply reply = *(typename Request::Reply*)replyData.data;
          assert_(replyData.size == sizeof(typename Request::Reply)+reply.size*sizeof(T));
-		 output = bufferCopyFromRef<T>(cast<T>(replyData.slice(sizeof(reply), reply.size*sizeof(T))));
+		 output = copyRef(cast<T>(replyData.slice(sizeof(reply), reply.size*sizeof(T))));
          return reply;
      }
 

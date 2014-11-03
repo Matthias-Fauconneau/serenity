@@ -1,6 +1,6 @@
 #include "image-folder.h"
 
-ImageFolder::ImageFolder(const Folder& source, function<bool(const String& name, const map<String, String>& properties)> predicate)
+ImageFolder::ImageFolder(const Folder& source, function<bool(string name, const map<string, String>& properties)> predicate)
 	: source(Folder(".",source)) {
 	{// Lists images and their properties
 		for(String& fileName: source.list(Files|Sorted)) {
@@ -8,46 +8,32 @@ ImageFolder::ImageFolder(const Folder& source, function<bool(const String& name,
 			if(imageFileFormat(file)!="JPEG") continue; // Only JPEG images
 			int2 imageSize = ::imageSize(file);
 
-			map<String, Variant> properties = parseExifTags(file);
+			map<String, Variant> exif = parseExifTags(file);
 
-			if((string)properties.at("Exif.Image.Orientation"_) == "6") imageSize = int2(imageSize.y, imageSize.x);
-			properties.insert("Size"_, strx(imageSize));
-			properties.insert("Path"_, copy(fileName));
-			auto& date = properties.at("Exif.Image.DateTime");
+			if((string)exif.at("Exif.Image.Orientation"_) == "6") imageSize = int2(imageSize.y, imageSize.x);
+			Variant& date = exif.at("Exif.Image.DateTime");
 			date = section((string)date, ' '); // Discards time to group by date using PropertyGroup
-			properties.at("Exif.Photo.ExposureTime"_).number *= 1000; // Scales seconds to milliseconds
-			insert(String(section(fileName,'.')), {move(properties.keys), apply(properties.values, [](const Variant& o){return str(o);})});
+			exif.at("Exif.Photo.ExposureTime"_).number *= 1000; // Scales seconds to milliseconds
+
+			map<string, String> properties;
+			properties.insert("Size", strx(imageSize));
+			properties.insert("Path", copy(fileName));
+			properties.insert("Date", str(exif.at("Exif.Image.DateTime"_)));
+			properties.insert("Orientation", str(exif.at("Exif.Image.Orientation"_)));
+			properties.insert("Focal", str(exif.at("Exif.Photo.FocalLength"_)));
+			properties.insert("Aperture", str(exif.at("Exif.Photo.FNumber"_)));
+			properties.insert("Bias", str(exif.at("Exif.Photo.ExposureBiasValue"_)));
+			properties.insert("Gain", str(exif.at("Exif.Photo.ISOSpeedRatings"_)));
+			properties.insert("Time", str(exif.at("Exif.Photo.ExposureTime"_)));
+
+			string name = section(fileName,'.');
+			if(predicate && predicate(name, properties)) continue;
+
+			insert(copyRef(name), move(properties));
 
 			maximumImageSize = max(maximumImageSize, imageSize);
 		}
 	}
-
-	{// Filters useless tags and renames to short names
-		map<string, array<string>> occurences;
-		for(auto& properties: values) {
-			properties.filter([this](const string key, const string) { return !ref<string>{
-					"Size", "Path",
-					"Exif.Image.Orientation",
-					"Exif.Image.DateTime",
-					"Exif.Photo.FocalLength",
-					"Exif.Photo.FNumber",
-					"Exif.Photo.ExposureBiasValue",
-					"Exif.Photo.ISOSpeedRatings",
-					"Exif.Photo.ExposureTime" }.contains(key);
-			});
-			properties.keys.replace("Exif.Image.DateTime"_, "Date"_);
-			properties.keys.replace("Exif.Image.Orientation"_, "Orientation"_);
-			properties.keys.replace("Exif.Photo.FocalLength"_, "Focal"_);
-			properties.keys.replace("Exif.Photo.FNumber"_, "Aperture"_);
-			properties.keys.replace("Exif.Photo.ExposureBiasValue"_, "Bias"_);
-			properties.keys.replace("Exif.Photo.ISOSpeedRatings"_, "Gain"_);
-			properties.keys.replace("Exif.Photo.ExposureTime"_, "Time (ms)"_);
-
-			for(auto property: properties) occurences[property.key].add( property.value ); // Aggregates occuring values for each property
-		}
-		//for(auto property: occurences) if(property.value.size!=count()) log(property.key,':', sort(property.value));
-	}
-
 	// Applies application specific filter
    if(predicate) filter(predicate);
 }

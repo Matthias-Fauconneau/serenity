@@ -81,7 +81,7 @@ generic bool isNaN(const vec& v){ for(uint i: range(N)) if(isNaN(v[i])) return t
 generic bool isNumber(const vec& v){ for(uint i: range(N)) if(!isNumber(v[i])) return false; return true; }
 
 generic String str(const vec& v) {
-    String s(6*N); s.append('('); for(uint i: range(N)) { s.append(str(v[i])); if(i<N-1) s.append(", "); } s.append(')'); return s;
+	array<char> s(6*N, 0); s.append('('); for(uint i: range(N)) { s.append(str(v[i])); if(i<N-1) s.append(", "); } s.append(')'); return move(s);
 }
 
 #undef vec
