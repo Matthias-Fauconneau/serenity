@@ -129,11 +129,9 @@ struct Build {
 	int64 parse(string fileName, Node& parent) {
         File file(fileName, folder);
 		int64 lastEdit = file.modifiedTime();
-		log(parent.name, fileName);
 		for(TextData s = file.read(file.size()); s; s.line()) {
 			{String name = tryParseIncludes(s, fileName);
 				if(name) {
-					log("include", name);
 					String module = find(name+".cc");
 					if(!parent.edges.contains(module)) {
 						String header = find(name+".h");
@@ -215,7 +213,7 @@ struct Build {
 		if(flags.contains("profile")) if(!compileModule(find("profile.cc"))) { log("Failed to compile"); requestTermination(-1); return; }
 		if(!compileModule( find(target+".cc") )) { log("Failed to compile"); requestTermination(-1); return; }
 
-		if(arguments().contains("-tree")) log(collect(modules.first(), 1)); return;
+		if(arguments().contains("-tree")) { log(collect(modules.first(), 1)); return; }
 
         // Links
 		String binary = tmp+"/"+join(flags,"-")+"/"+target;

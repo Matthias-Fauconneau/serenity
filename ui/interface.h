@@ -10,7 +10,7 @@ struct ScrollArea : Widget {
     /// Directions (false: expand, true: scroll)
     bool horizontal=false, vertical=true;
     bool scrollbar = false;
-    const int scrollBarWidth = 16;
+	const int scrollBarWidth = 8;
     int2 offset=0;
     int2 dragStartCursor, dragStartDelta;
     //int2 size;

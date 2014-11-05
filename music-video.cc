@@ -27,7 +27,7 @@ struct Music
         : Widget
 #endif
 {
-    string name = arguments()[0];
+	string name = arguments() ? arguments()[0] : (error("Expected name"), string());
     MusicXML xml = readFile(name+".xml"_);
 	Scroll<Sheet> sheet {xml.signs, xml.divisions};
 #if AUDIO || ENCODE
@@ -72,7 +72,7 @@ struct Music
     Music() {
 #if PREVIEW
 		window.background = Window::White;
-		sheet.scrollbar = true;
+		sheet.horizontal=true, sheet.vertical=false, sheet.scrollbar = true;
 #if MIDI
         seek( midi.notes[noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[122]])].time );
 #endif
@@ -165,7 +165,7 @@ struct Music
         position = targetPosition;
     }
 
-	int2 sizeHint(int2 size) { return sheet.ScrollArea::sizeHint(size); }
+	int2 sizeHint(int2 size) override { return sheet.ScrollArea::sizeHint(size); }
 	Graphics graphics(int2 size) override {
 #if VIDEO
         follow(videoTime, fps);
@@ -177,4 +177,7 @@ struct Music
 		return sheet.ScrollArea::graphics(size); //int2(floor(-position), 0)
     }
 #endif
+	bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
+		return sheet.ScrollArea::mouseEvent(cursor, size, event, button, focus);
+	}
 } app;

@@ -110,7 +110,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
                 Sign sign[2] = { stemUp?beam.first().last():beam.first().first(), stemUp?beam.last().last():beam.last().first()};
 				vec2 p0 (X(sign[0])+dx, farTip+delta[0]-beamWidth/2);
 				vec2 p1 (X(sign[1])+dx+stemWidth, farTip+delta[1]-beamWidth/2);
-				parallelograms.append(p0, p1, beamWidth);
+				notation.parallelograms.append(p0, p1, beamWidth);
             } else { // Draws horizontal beam
 				float stemY = stemUp ? -inf : inf;
                 if(stemUp) {
@@ -182,7 +182,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
             int step = clefStep(note.clef.clefSign, note.step);
 			for(int s=2; s<=step; s+=2) { int y=staffY(staff, s); notation.fills.append(vec2(x-dx/3,y),vec2(dx*5/3,1)); }
 			for(int s=-10; s>=step; s-=2) { int y=staffY(staff, s); notation.fills.append(vec2(x-dx/3,y),vec2(dx*5/3,1)); }
-			if(note.slash) parallelograms.append( Parallelogram{p+vec2(-dx+dx/2,dx), p+vec2(dx+dx/2,-dx), 1} );
+			if(note.slash) notation.parallelograms.append( Parallelogram{p+vec2(-dx+dx/2,dx), p+vec2(dx+dx/2,-dx), 1} );
 			if(note.dot) glyph(p+vec2(dx*4/3,0),"dots.dot"_);
             x += 2*dx;
 
@@ -245,8 +245,8 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 					notation.fills.append(min, max-min);}
 				if(sign.pedal.action == PedalStop) notation.fills.append(vec2(x-1, y-lineInterval), vec2(1, lineInterval));
                 else {
-					parallelograms.append(vec2(x, y-1), vec2(x+noteSize.x/2, y-noteSize.x), 2.f);
-					parallelograms.append(vec2(x+noteSize.x/2, y-noteSize.x), vec2(x+noteSize.x, y), 2.f);
+					notation.parallelograms.append(vec2(x, y-1), vec2(x+noteSize.x/2, y-noteSize.x), 2.f);
+					notation.parallelograms.append(vec2(x+noteSize.x/2, y-noteSize.x), vec2(x+noteSize.x, y), 2.f);
                     pedalStart = x + noteSize.x;
                 }
             }
@@ -256,8 +256,8 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
             int y = (staffY(0, -8)+staffY(1, 0))/2;
             if(sign.wedge.action == WedgeStop) {
                 bool crescendo = wedgeStart.wedge.action == Crescendo;
-				parallelograms.append( vec2(timeTrack.at(wedgeStart.time).direction, y+(-!crescendo-1)*3), vec2(x, y+(-crescendo-1)*3), 1.f);
-				parallelograms.append( vec2(timeTrack.at(wedgeStart.time).direction, y+(!crescendo-1)*3), vec2(x, y+(crescendo-1)*3), 1.f);
+				notation.parallelograms.append( vec2(timeTrack.at(wedgeStart.time).direction, y+(-!crescendo-1)*3), vec2(x, y+(-crescendo-1)*3), 1.f);
+				notation.parallelograms.append( vec2(timeTrack.at(wedgeStart.time).direction, y+(!crescendo-1)*3), vec2(x, y+(crescendo-1)*3), 1.f);
             } else wedgeStart = sign;
         }
         else if(sign.type == Sign::Dynamic) {
@@ -315,7 +315,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 	vec2 offset = vec2(0/*-position*/, /*(height - sizeHint(0).y)/2 +*/ /*4*lineInterval*/ -staffY(0,16)+textFont.size);
 	for(auto& o: notation.fills) o.origin += offset;
 	for(auto& o: notation.glyphs) o.origin += offset;
-    for(Parallelogram& p: parallelograms) p.min+=offset, p.max+=offset;
+	for(Parallelogram& p: notation.parallelograms) p.min+=offset, p.max+=offset;
 	for(auto& o: notation.blits) o.origin += offset;
     for(Cubic& c: cubics) for(vec2& p: c) p+=vec2(offset);
 }
@@ -431,9 +431,6 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
 
 Graphics Sheet::graphics(int2 unused size) {
 	//Graphics graphics;
-	//for(Rect r: notation.fills) fill(target, offset+r);
-	//for(Parallelogram p: parallelograms) parallelogram(target, offset+p.min, offset+p.max, p.dy);
-	//for(uint i: range(blits.size)) { const Blit& b=blits[i]; blit(target, offset+b.position, b.image, colors.value(i, black)); }
 	//for(const Cubic& c: cubics) { buffer<vec2> points(c.size); for(uint i: range(c.size)) points[i]=vec2(offset)+c[i]; cubic(target, points); }*/
 	return copy(notation); //FIXME: shared
 }

@@ -139,8 +139,7 @@ struct TextData : Data {
 	/// Creates a TextData interface to a \a ref
 	/// \note Matches any heading Unicode BOM
 	explicit TextData(ref<byte> data) : Data(data) {
-		assert_(data);
-		if(uint8(data[0]) >= 0x80 && !match("\xEF\xBB\xBF")) error("Expected Unicode BOM");
+		if(data && uint8(data[0]) >= 0x80 && !match("\xEF\xBB\xBF")) error("Expected Unicode BOM");
 	}
 	/// Creates a Data interface to a \a buffer
 	/// \note Matches any heading Unicode BOM

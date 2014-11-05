@@ -13,9 +13,9 @@ Graphics ScrollArea::graphics(int2 size) {
 	}
 	if(scrollbar) {
 		if(size.y<view.y)
-			graphics.fills.append( vec2(size.x-scrollBarWidth, -offset.y*size.y/view.y), vec2(size.x,(-offset.y+size.y)*size.y/view.y), 1./2, 1.f/2);
+			graphics.fills.append( vec2(size.x-scrollBarWidth, -offset.y*size.y/view.y), vec2(scrollBarWidth, size.y*size.y/view.y), 1./2, 1.f/2);
 		if(size.x<view.x)
-			graphics.fills.append( vec2(-offset.x*size.x/view.x, size.y-scrollBarWidth), vec2((-offset.x+size.x)*size.x/view.x, size.y), 1./2, 1.f/2);
+			graphics.fills.append( vec2(-offset.x*size.x/view.x, size.y-scrollBarWidth), vec2(size.x*size.x/view.x, scrollBarWidth), 1./2, 1.f/2);
 	}
     return graphics;
 }
@@ -24,19 +24,23 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button, 
     int2 hint = abs(widget().sizeHint(size));
     if(event==Press) {
         focus = this;
-        if((button==WheelDown || button==WheelUp) && size.y<hint.y) {
-            offset.y += (button==WheelUp?1:-1) * 64;
-            offset = min(int2(0,0), max(size-hint, offset));
-            return true;
-        }
+		if((button==WheelDown || button==WheelUp)) for(int axis: range(2)) {
+			if(size[axis]<hint[axis]) {
+				offset[axis] += (button==WheelUp?1:-1) * 64;
+				offset = min(int2(0,0), max(size-hint, offset));
+				return true;
+			}
+		}
         if(button==LeftButton) { dragStartCursor=cursor, dragStartDelta=offset; }
     }
-    if(event==Motion && button==LeftButton && size.y<hint.y && scrollbar && dragStartCursor.x>size.x-scrollBarWidth) {
-        offset.y = min(0, max(size.y-hint.y, dragStartDelta.y-(cursor.y-dragStartCursor.y)*hint.y/size.y));
-        return true;
-    }
+	if(event==Motion && button==LeftButton) for(int axis: range(2)) {
+		if(size[axis]<hint[axis] && scrollbar && dragStartCursor[!axis]>size[!axis]-scrollBarWidth) {
+			offset[axis] = min(0, max(size[axis]-hint[axis], dragStartDelta[axis]-(cursor[axis]-dragStartCursor[axis])*hint[axis]/size[axis]));
+			return true;
+		}
+	}
     if(widget().mouseEvent(cursor-offset,max(hint,size),event,button,focus)) return true;
-    if(event==Motion && button==LeftButton && size.y<hint.y) {
+	if(event==Motion && button==LeftButton && !(hint<=size)) {
         offset = min(int2(0,0), max(size-hint, dragStartDelta+cursor-dragStartCursor));
         return true;
     }

@@ -137,6 +137,21 @@ void oxygen(const Image& target, int2 min, int2 max) {
     }
 }
 
+void parallelogram(const Image& target, int2 p0, int2 p1, int dy, bgr3f color, float alpha) {
+	if(p0.x > p1.x) swap(p0.x, p1.x);
+	for(uint x: range(max(0,p0.x), min(int(target.width),p1.x))) {
+		float y0 = float(p0.y) + float((p1.y - p0.y) * int(x - p0.x)) / float(p1.x - p0.x); // FIXME: step
+		float f0 = floor(y0);
+		float coverage = (y0-f0);
+		int i0 = int(f0);
+		if(uint(i0)<target.height) blend(target, x, i0, color, alpha*(1-coverage));
+		for(uint y: range(max(0,i0+1), min(int(target.height),i0+1+dy-1))) { // FIXME: clip once
+			blend(target, x,y, color, alpha); // FIXME: antialias
+		}
+		if(uint(i0)<target.height) blend(target, x, i0+dy, color, alpha*coverage);
+	}
+}
+
 void render(const Image& target, const Graphics& graphics) {
     for(const auto& e: graphics.fills) fill(target, int2(round(e.origin)), int2(e.size), e.color, e.opacity);
     for(const auto& e: graphics.blits) {
@@ -148,4 +163,5 @@ void render(const Image& target, const Graphics& graphics) {
         blit(target, int2(round(e.origin))+glyph.offset, glyph.image, e.color, 1);
     }
 	for(const auto& e: graphics.lines) line(target, e.a, e.b, e.color, 1);
+	for(const auto& e: graphics.parallelograms) parallelogram(target, int2(round(e.min)), int2(round(e.max)), e.dy, black, 1);
 }

@@ -36,20 +36,28 @@ struct Line {
 	bgr3f color;
 };
 
+/// Parallelogram graphic element
+struct Parallelogram {
+	vec2 min,max;
+	float dy;
+};
+
 /// Set of graphic elements
 struct Graphics {
     array<Fill> fills;
     array<Blit> blits;
     array<Glyph> glyphs;
     array<Line> lines;
-    explicit operator bool() const { return fills || blits || glyphs || lines; }
+	array<Parallelogram> parallelograms;
+	explicit operator bool() const { return fills || blits || glyphs || lines || parallelograms; }
     void append(const Graphics& o, vec2 offset) {
         for(auto e: o.fills) { e.origin += offset; fills.append(e); }
         for(const auto& e: o.blits) blits.append(e.origin+offset, e.size, share(e.image));
         for(auto e: o.glyphs) { e.origin += offset; glyphs.append(e); }
         for(auto e: o.lines) { e.a += offset; e.b += offset; lines.append(e); }
+		for(auto e: o.parallelograms) { e.min += offset; e.max += offset; parallelograms.append(e); }
     }
 };
-inline Graphics copy(const Graphics& o) { return {copy(o.fills), copy(o.blits), copy(o.glyphs), copy(o.lines)}; }
+inline Graphics copy(const Graphics& o) { return {copy(o.fills), copy(o.blits), copy(o.glyphs), copy(o.lines), copy(o.parallelograms)}; }
 
 inline String str(const Graphics& o) { return str(o.fills.size, o.blits.size, o.glyphs.size, o.lines.size); }

@@ -30,7 +30,6 @@ struct Sheet : Widget {
 	float glyph(vec2 position, const string name) { return glyph(position, name, font); }
 
     // Graphic primitives
-	struct Parallelogram { vec2 min,max; float dy; }; array<Parallelogram> parallelograms;
 	typedef buffer<vec2> Cubic; array<Cubic> cubics;
 	Graphics notation;
 	map<uint, bgr3f> colors; // Overrides color for Blit index
