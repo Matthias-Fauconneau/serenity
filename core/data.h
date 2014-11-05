@@ -129,6 +129,8 @@ struct BinaryData : Data {
    ref<uint8> whileNot(uint8 key);
 };
 
+String escape(string s);
+
 /// Provides a convenient interface to parse text streams
 struct TextData : Data {
     /// 1-based line index

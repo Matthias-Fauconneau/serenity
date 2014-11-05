@@ -3,15 +3,14 @@
 #include "utf8.h"
 
 static Element parse(string document, bool html) {
-    TextData s(document);
+	TextData s (document);
     s.match("\xEF\xBB\xBF"_); //spurious BOM
     Element root;
     while(s) {
-		//s.skip();
         if(s.match("</"_)) log("Unexpected","</"_+s.until('>')+">"_);
 		else if(s.match('<')) root.children.append( unique<Element>(s, html) );
-        else log("Unexpected '",s.line(),"'");
-		//s.skip();
+		else error(str(s.lineIndex)+": Expected end of file, got", escape(s.line()));
+		s.whileAny(" \r\t\n");
     }
     return root;
 }

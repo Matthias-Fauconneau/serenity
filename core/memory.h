@@ -167,7 +167,6 @@ template<Type T, Type Function> buffer<T> filter(const ref<T> source, Function p
 	buffer<T> target(source.size, 0); for(const T& e: source) if(!predicate(e)) target.append(copy(e)); return target;
 }
 
-
 // -- Reinterpret casts
 
 /// Reinterpret casts a const reference to another type
@@ -193,6 +192,10 @@ template<Type T, Type O> buffer<T> cast(buffer<O>&& o) {
     o.data=0, o.size=0, o.capacity = 0;
     return buffer;
 }
+
+// -- String
+
+typedef buffer<char> String;
 
 // -- unique
 

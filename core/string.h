@@ -50,8 +50,6 @@ double parseDecimal(const string str);
 
 // -- String
 
-typedef buffer<char> String;
-
 /// Converts a static reference to a buffer
 //template<size_t N> buffer<char> staticRef(char const(&a)[N]) { return buffer<char>((char*)a, N-1 /*Discards trailing zero byte*/, 0); }
 /// Returns const reference to a static string literal

@@ -32,8 +32,10 @@ struct Music
 #if AUDIO || ENCODE
     AudioFile mp3 = name+".mp3"_; // 48KHz AAC would be better
 #endif
+#if MIDI
     MidiFile midi = readFile(name+".mid"_);
     buffer<uint> noteToBlit = sheet.synchronize(apply(filter(midi.notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;}));
+#endif
 
     // Highlighting
     map<uint,uint> active; // Maps active keys to notes (indices)
@@ -58,16 +60,20 @@ struct Music
 #endif
     bool running = false;
 #endif
+#if MIDI
     uint noteIndexToMidiIndex(uint seekNoteIndex) {
         uint midiIndex=0;
         for(uint noteIndex=0; noteIndex<seekNoteIndex; midiIndex++) if(midi.notes[midiIndex].velocity) noteIndex++;
         return midiIndex;
     }
+#endif
 
     Music() {
 #if PREVIEW
 		window.background = Window::White;
+#if MIDI
         seek( midi.notes[noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[122]])].time );
+#endif
         if(preview) {
             window.show();
 #if AUDIO
@@ -108,8 +114,9 @@ struct Music
 #endif
     }
 
-    void follow(uint timeNum, uint timeDen) {
+	void follow(uint unused timeNum, uint unused timeDen) {
         bool contentChanged = false;
+#if MIDI
         for(;midiIndex < midi.notes.size && midi.notes[midiIndex].time*timeDen <= timeNum*midi.ticksPerSeconds; midiIndex++) {
             MidiNote note = midi.notes[midiIndex];
             if(note.velocity) {
@@ -121,6 +128,7 @@ struct Music
                 while(active.contains(note.key)) { active.remove(note.key); contentChanged = true; }
             }
         }
+#endif
         if(!contentChanged) return;
 
         sheet.colors.clear();
@@ -143,12 +151,12 @@ struct Music
     }
 #endif
 
-    void seek(uint64 midiTime) {
+	void seek(uint64 unused midiTime) {
 #if AUDIO
         audioTime = midiTime * mp3.rate / midi.ticksPerSeconds;
         mp3.seek(audioTime); //FIXME: return actual frame time
         videoTime = audioTime*fps/mp3.rate; // FIXME: remainder
-#else
+#elif MIDI
         videoTime = midiTime * fps / midi.ticksPerSeconds;
 #endif
         follow(videoTime, fps);

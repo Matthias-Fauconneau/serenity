@@ -418,7 +418,7 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
 			chordExtra.append( midiIndex );
         }
     }
-    assert_(chordToNote.size == this->notes.size());
+	assert_(chordToNote.size == this->notes.size(), chordToNote.size, this->notes.size());
     log(extraErrors, wrongErrors, missingErrors, orderErrors);
     return move(midiToBlit);
 }

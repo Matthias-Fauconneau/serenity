@@ -39,8 +39,8 @@ bool Data::match(const string key) {
 }
 
 String escape(char c) {
-	size_t index = "\n"_.indexOf(c);
-	return index != invalid ? "\\"_+"n"_[index] : ""_+c;
+	size_t index = "\r\n"_.indexOf(c);
+	return index != invalid ? "\\"_+"rn"_[index] : ""_+c;
 }
 String escape(string s) { array<char> target (s.size, 0); for(char c: s) target.append(escape(c)); return move(target); }
 
