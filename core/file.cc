@@ -28,10 +28,10 @@ const Folder& currentWorkingDirectory() { static const int cwd = AT_FDCWD; retur
 
 const Folder& root() { static const Folder root("/",currentWorkingDirectory()); return root; }
 
-Folder::Folder(const string folder, const Folder& at, bool create):Handle(0){
+Folder::Folder(string folder, const Folder& at, bool create) {
 	if(create && !existsFolder(folder,at)) check(mkdirat(at.fd, strz(folder), 0777), at.name(), folder);
     assert_(folder);
-	fd = check( openat(at.fd, strz(folder?:"."), O_RDONLY|O_DIRECTORY, 0), '\''+folder+'\'', at.name());
+	fd = check( openat(at.fd, strz(folder?:"."), O_RDONLY|O_DIRECTORY, 0), '\''+folder+'\'', at.name() );
 }
 
 struct stat Folder::stat() const { struct stat stat; check( fstat(fd, &stat) ); return stat; }
@@ -91,15 +91,6 @@ buffer<byte> Stream::read(size_t size) {
 	return buffer;
 }
 
-/*void Stream::readUpTo(array<byte>& target, size_t size) {
-	target.size = target.capacity;
-	target.size = readUpTo(target);
-	if(target.size == target.capacity && size > target.capacity) {
-		target.reserve(size);
-		target.size += readUpTo(target.slice(target.size,target.capacity-target.size));
-	}
-}*/
-
 bool Stream::poll(int timeout) { assert(fd); pollfd pollfd{fd,POLLIN,0}; return ::poll(&pollfd,1,timeout)==1 && (pollfd.revents&POLLIN); }
 
 size_t Stream::write(const byte* data, size_t size) {
@@ -112,7 +103,7 @@ Socket::Socket(int domain, int type):Stream(check(socket(domain,type|SOCK_CLOEXE
 
 // -- File
 
-File::File(const string path, const Folder& at, Flags flags) : Stream(check(openat(at.fd, strz(path), flags, 0666), at.name(), path, int(flags))) {}
+File::File(const string path, const Folder& at, Flags flags) : Stream(check(openat(at.fd, strz(path), flags, 0666), at.name(), path, at.list(Files))) {}
 
 struct stat File::stat() const { struct stat stat; check( fstat(fd, &stat) ); return stat; }
 

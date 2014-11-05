@@ -118,7 +118,7 @@ music/midi.cc
 music/sheet.h
 music/sheet.cc
 music/encoder.cc
-music/music.cc
+music-video.cc
 
 player.cc
 dust.cc

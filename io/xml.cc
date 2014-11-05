@@ -9,7 +9,7 @@ static Element parse(string document, bool html) {
     while(s) {
 		//s.skip();
         if(s.match("</"_)) log("Unexpected","</"_+s.until('>')+">"_);
-		else if(s.match('<')) root.children.append( unique<Element>(s,html) );
+		else if(s.match('<')) root.children.append( unique<Element>(s, html) );
         else log("Unexpected '",s.line(),"'");
 		//s.skip();
     }
@@ -20,21 +20,22 @@ Element parseXML(const string& document) { return parse(document,false); }
 Element parseHTML(const string& document) { return parse(document,true); }
 
 Element::Element(TextData& s, bool html) {
-    //uint begin = s.index;
+	uint begin = s.index;
 	if(s.match("!DOCTYPE")||s.match("!doctype")) { s.until('>'); return; }
 	else if(s.match("?xml")) { s.until("?>"); return; }
 	else if(s.match("!--")) { s.until("-->"); return; }
 	else if(s.match('?')){ log("Unexpected <?",s.until("?>"),"?>"); return; }
 	else name = copyRef(s.identifier("_-:"));
-    if(!name) { log(s.slice(0,s.index)); log("expected tag name got",s.line()); }
+	if(!name) { log(s.slice(0,s.index)); log("Expected tag name got",s.line()); }
     if(html) name=toLower(name);
-	//s.skip();
+	s.whileAny(" \t\n");
     while(!s.match('>')) {
 		if(s.match("/>")) { /*s.skip();*/ return; }
 		else if(s.match('/')) {} //s.skip(); //spurious /
         else if(s.match('<')) break; //forgotten >
+		s.whileAny(" \t\n");
 		String key = copyRef(s.identifier("_-:"));/*TODO:reference*/ //s.skip();
-        if(!key) { /*log("Attribute syntax error"_,s.slice(begin,s.index-begin),"|"_,s.until('>'));*/ s.until('>'); break; }
+		if(!key) { log("Attribute syntax error"_,s.slice(begin,s.index-begin),"|"_,s.until('>')); s.until('>'); break; }
         if(html) key=toLower(key);
         String value;
         if(s.match('=')) {
@@ -45,7 +46,7 @@ Element::Element(TextData& s, bool html) {
 			s.match("\""); //duplicate "
         }
         attributes.insertMulti(move(key), move(value));
-		//s.skip();
+		s.whileAny(" \t\n");
     }
 	/*if(html) {
         static array<string> voidElements = split("area base br col command embed hr img input keygen link meta param source track wbr"_,' ');
@@ -117,7 +118,7 @@ void Element::xpath(const string& path, const function<void(const Element &)>& v
     else { for(const Element& e: children) if(e.name==first) visitor(e); }
 }
 
-String Element::text() const { String text; visit([&text](const Element& e){ text.append( unescape(e.content) ); }); return text; }
+String Element::text() const { array<char> text; visit([&text](const Element& e){ text.append( unescape(e.content) ); }); return move(text); }
 
 String Element::text(const string& path) const {
 	array<char> text;

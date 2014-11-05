@@ -186,8 +186,8 @@ struct Build {
 		if(!compileModule( find(target+".cc") )) { log("Failed to compile"); requestTermination(-1); return; }
 
         // Links
-		array<char> binary = String(tmp+"/"+join(flags,"-")+"/"+target);
-        if(existsFolder(binary)) binary.append(".elf");
+		String binary = tmp+"/"+join(flags,"-")+"/"+target;
+		assert_(!existsFolder(binary));
         if(!existsFile(binary) || needLink) {
             array<String> args = move(files);
 			args.append("-o"__);

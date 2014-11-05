@@ -19,9 +19,9 @@ String findFont(string fontName, ref<string> fontTypes) {
 }
 
 static FT_Library ft; static int fontCount=0;
-Font::Font(Map&& map, float size, string name, bool hint) : Font(unsafeRef<byte>(map), size, name, hint) { keep=move(map); }
 Font::Font(buffer<byte>&& data_, float size, string name, bool hint) : data(move(data_)), size(size), name(copyRef(name)), hint(hint) {
-    if(!ft) FT_Init_FreeType(&ft);
+	assert_(this->name);
+	if(!ft) FT_Init_FreeType(&ft);
     int e; if((e=FT_New_Memory_Face(ft,(const FT_Byte*)data.data,data.size,0,&face)) || !face) { error("Invalid font", data.data, data.size); return; }
     fontCount++;
     assert_(size);
@@ -33,6 +33,8 @@ Font::Font(buffer<byte>&& data_, float size, string name, bool hint) : data(move
     bboxMin = scale*vec2(face->bbox.xMin, face->bbox.yMin);
     bboxMax = scale*vec2(face->bbox.xMax, face->bbox.yMax);
 }
+Font::Font(Map&& map, float size, string name, bool hint) : Font(unsafeRef<byte>(map), size, name, hint) { keep=move(map); }
+Font::Font(const File& file, float size, string name, bool hint) : Font(Map(file), size, name?:file.name(), hint) {}
 
 Font::~Font(){
     if(face) {
@@ -47,14 +49,14 @@ uint Font::index(uint code) const {
         uint index = FT_Get_Char_Index(face, code);
         if(index) return index;
     }
-    error("Missing code", code);
+	error("Missing code", code, "in", name);
     return code;
 }
 
 uint Font::index(string name) const {
 	uint index = FT_Get_Name_Index(face, (char*)(const char*)strz(name));
 	if(!index) for(int i=0;i<face->num_glyphs;i++) { char buffer[256]; FT_Get_Glyph_Name(face,i,buffer,sizeof(buffer)); log(buffer); }
-	assert(index,name); return index;
+	assert_(index, name); return index;
 }
 
 float Font::kerning(uint leftIndex, uint rightIndex) {

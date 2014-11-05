@@ -53,9 +53,9 @@ generic T __attribute__((warn_unused_result))  copy(const T& o) { return o; }
 generic struct handle {
 	T pointer;
 
-	handle(T pointer=T()):pointer(pointer){}
-	handle& operator=(handle&& o){ pointer=o.pointer; o.pointer=0; return *this; }
-	handle(handle&& o):pointer(o.pointer){o.pointer=T();}
+	handle(T pointer=T()) : pointer(pointer){}
+	handle& operator=(handle&& o) { pointer=o.pointer; o.pointer=0; return *this; }
+	handle(handle&& o) : pointer(o.pointer){ o.pointer=T(); }
 
 	operator T() const { return pointer; }
 	operator T&() { return pointer; }

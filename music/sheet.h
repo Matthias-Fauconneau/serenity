@@ -19,10 +19,10 @@ struct Sheet : Widget {
     int Y(const map<uint, Clef>& clefs, uint staff, int step) { return staffY(staff, clefStep(clefs.at(staff).clefSign, step)); } // Clef dependent
 
     // Fonts
-	Font graceFont {Map("emmentaler-26.otf"_), 4.f*halfLineInterval};
-	Font font {Map("emmentaler-26.otf"_), 9.f*halfLineInterval};
-	Font textFont{Map("FreeSerifBold.ttf"_), 6.f*halfLineInterval};
-	Font smallFont{Map("FreeSerifBold.ttf"_), 14.f};
+	Font graceFont {File("emmentaler-26.otf", Folder("/usr/local/share/fonts"_)), 4.f*halfLineInterval, "Emmentaler"};
+	Font font {File("emmentaler-26.otf", "/usr/local/share/fonts"_), 9.f*halfLineInterval, "Emmentaler"};
+	Font textFont{File("LinLibertine_R.ttf", "/usr/share/fonts/libertine-ttf"_), 6.f*halfLineInterval, "LinLibertine_R"};
+	Font smallFont{File("LinLibertine_R.ttf", "/usr/share/fonts/libertine-ttf"_), 14.f, "LinLibertine_R"};
     // Font helpers
 	vec2 glyphSize(string name) { return font.metrics(font.index(name)).size; }
     int2 noteSize = int2(round(glyphSize("noteheads.s2"_)));

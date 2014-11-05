@@ -49,7 +49,7 @@ enum { Drives=1<<0, Devices=1<<1, Folders=1<<2, Files=1<<3, Recursive=1<<4, Sort
 struct Folder : Handle {
     Folder() : Handle(0) {}
     /// Opens \a folderPath
-    Folder(const string folderPath, const Folder& at=currentWorkingDirectory(), bool create=false);
+	Folder(string folderPath, const Folder& at=currentWorkingDirectory(), bool create=false);
     /// Returns folder properties
     struct stat stat() const;
     /// Returns the last access Unix timestamp (in nanoseconds)
@@ -74,10 +74,6 @@ struct Stream : Handle { //FIXME: overlaps with Data/BinaryData
 	buffer<byte> readUpTo(size_t size);
 	/// Reads exactly \a size bytes
     buffer<byte> read(size_t size);
-	/// Reads up to \a size bytes into \a target
-	//void readUpTo(array<byte>& target, size_t size);
-    /// Reads up to \a size bytes in an inline Array if possible
-	//template<size_t N> Array<byte, N> readUpTo(size_t size) { Array<byte, N> target; readUpTo(target, size); return target; }
     /// Reads a raw value
 	generic T read() { T t; read(mref<byte>((byte*)&t,sizeof(T))); return t; }
     /// Reads \a size raw values
@@ -171,7 +167,7 @@ struct Map : mref<byte> {
     Map& operator=(Map&& o) { this->~Map(); new (this) Map(::move(o)); return *this; }
 
     explicit Map(const File& file, Prot prot=Read, Flags flags=Shared);
-    explicit Map(const string path, const Folder& at=root(), Prot prot=Read) : Map(File(path,at), prot) {}
+	explicit Map(const string path, const Folder& at=currentWorkingDirectory(), Prot prot=Read) : Map(File(path,at), prot) {}
     Map(uint fd, uint offset, uint size, Prot prot, Flags flags=Shared);
     ~Map();
 

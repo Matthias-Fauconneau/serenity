@@ -12,10 +12,6 @@ generic string str(const T&) { static_assert(0&&sizeof(T),"No overload for str(c
 inline string str(string s) { return s; }
 /// Forwards char[]
 template<size_t N> string str(const char (&source)[N]) { return string(source); }
-/// Forwards unique
-generic auto str(const unique<T>& t) -> decltype(str(*t.pointer)) { return str(*t.pointer); }
-/// Forwards shared
-generic auto str(const shared<T>& t) -> decltype(str(*t.pointer)) { return str(*t.pointer); }
 
 /// Returns boolean as "true"/"false"
 inline string str(bool value) { return value ? "true"_ : "false"_; }
@@ -164,3 +160,10 @@ template<Type... Args> void __attribute((noreturn)) error(const Args&... args) {
 /// Converts Strings to strings
 inline buffer<string> toRefs(ref<String> source) { return apply(source, [](const String& e) -> string { return e; }); }
 inline String join(const ref<String> list, string separator="") { return join(toRefs(list), separator); }
+
+/// Forwards handle
+generic auto str(const handle<T>& t) -> decltype(str(t.pointer)) { return str(t.pointer); }
+/// Forwards unique
+generic auto str(const unique<T>& t) -> decltype(str(*t.pointer)) { return str(*t.pointer); }
+/// Forwards shared
+generic auto str(const shared<T>& t) -> decltype(str(*t.pointer)) { return str(*t.pointer); }
