@@ -133,7 +133,7 @@ struct Music
 
         sheet.colors.clear();
         for(uint index: active.values) sheet.colors.insert(index, red);
-        if(active) targetPosition = min(apply(active.values,[this](uint index){return sheet.blits[index].position.x;}));
+		if(active) targetPosition = min(apply(active.values,[this](uint index){return sheet.notation.blits[index].origin.x;}));
     }
 
     void step(const float dt) {

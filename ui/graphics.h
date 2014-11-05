@@ -13,7 +13,7 @@ static constexpr bgr3f white (1, 1, 1);
 /// Fill graphic element
 struct Fill {
     vec2 origin, size;
-    bgr3f color; float opacity;
+	bgr3f color = black; float opacity = 1;
 };
 
 /// Image graphic element
@@ -50,4 +50,6 @@ struct Graphics {
         for(auto e: o.lines) { e.a += offset; e.b += offset; lines.append(e); }
     }
 };
+inline Graphics copy(const Graphics& o) { return {copy(o.fills), copy(o.blits), copy(o.glyphs), copy(o.lines)}; }
+
 inline String str(const Graphics& o) { return str(o.fills.size, o.blits.size, o.glyphs.size, o.lines.size); }

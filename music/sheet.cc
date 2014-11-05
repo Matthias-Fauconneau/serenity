@@ -2,19 +2,19 @@
 #include "notation.h"
 #include "utf8.h"
 
-float Sheet::glyph(int2 position, const string name, Font& font) {
+float Sheet::glyph(vec2 position, const string name, Font& font) {
 	uint index = font.index(name);
 	const Font::Glyph& glyph = font.render(index);
-	blits.append( Blit{position+glyph.offset, share(glyph.image)} );
+	notation.blits.append(position+vec2(glyph.offset), vec2(glyph.image.size), share(glyph.image));
 	return font.metrics(index).advance;
 }
 
-uint Sheet::text(int2 position, const string& text, Font& font, array<Blit>& blits) {
+uint Sheet::text(vec2 position, const string& text, Font& font, array<Blit>& blits) {
     uint x = position.x;
     for(uint code: toUCS4(text)) {
 		uint index = font.index(code);
 		const Font::Glyph& glyph = font.render(index);
-		blits.append( Blit{int2(x, position.y)+glyph.offset, share(glyph.image)} );
+		blits.append( Blit{vec2(int2(x, position.y)+glyph.offset), vec2(glyph.image.size), share(glyph.image)} );
 		x += font.metrics(index).advance;
     }
     return x;
@@ -50,7 +50,8 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
     vec2 c1[2] = {vec2(pM.x, p1.y), vec2((pM+p1).x/2, p1.y)};
 	cubics.append( copyRef(ref<vec2>({p0,c0[0],c0M[0],pM,c1M[0],c1[0],p1,c1[1],c1M[1],pM,c0M[1],c0[1]})) );
     x += noteSize.x;
-	fills.append( Rect(int2(x-1, staffY(0, 0)), int2(x+1, staffY(1, -8))) );
+	{vec2 min(x-1, staffY(0, 0)), max(1, staffY(1, -8));
+	notation.fills.append(min, max-min);}
 	measures.append( x );
 	measureToChord.append( 0 );
     for(Sign sign: signs) {
@@ -64,7 +65,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
                 if(abs(y-lastY)<=lineInterval) dx -= noteSize.x/2;
                 else dx = 0;
                 String name = "accidentals."_+ref<string>({"flat"_,"sharp"_,"natural"_})[sign.note.accidental-1];
-                glyph(int2(X(sign)-glyphSize(name).x+dx, y), name);
+				glyph(vec2(X(sign)-glyphSize(name).x+dx, y), name);
                 lastY = y;
             }
             chord.clear();
@@ -88,12 +89,13 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
                 int yMin = Y(sign.note.clef, sign.staff, beam[0].first().note.step);
                 int yMax = Y(sign.note.clef, sign.staff, beam[0].last().note.step);
                 int yBase = stemUp ? yMin : yMax + dy;
-                int yStem = stemUp ? min(yMax-stemLength, staffY(sign.staff, -4)) : max(yMin+stemLength, staffY(sign.staff, -4));
-				fills.append( Rect(int2(x, min(yBase, yStem)), int2(x+stemWidth, max(yBase, yStem))) );
-                /**/ if(sign.note.duration==Eighth) glyph(int2(x+stemWidth, yStem), stemUp?"flags.u3"_:"flags.d3"_);
-                else if(sign.note.duration==Sixteenth) glyph(int2(x+stemWidth, yStem), stemUp?"flags.u4"_:"flags.d4"_);
+				int yStem = stemUp ? min(yMax-stemLength, staffY(sign.staff, -4)) : max(yMin+stemLength, staffY(sign.staff, -4));
+				{vec2 min (x, ::min(yBase, yStem)), max(x+stemWidth, ::max(yBase, yStem));
+					notation.fills.append(min, max-min); }
+				/**/ if(sign.note.duration==Eighth) glyph(vec2(x+stemWidth, yStem), stemUp?"flags.u3"_:"flags.d3"_);
+				else if(sign.note.duration==Sixteenth) glyph(vec2(x+stemWidth, yStem), stemUp?"flags.u4"_:"flags.d4"_);
             } else if(beam.size==2) { // Draws slanted beam
-                int x[2], base[2], tip[2];
+				float x[2], base[2], tip[2];
                 for(uint i: range(2)) {
                     const Chord& chord = beam[i];
                     Sign sign = chord.first();
@@ -101,16 +103,19 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
                     base[i] = Y(sign.note.clef, sign.staff, (stemUp?chord.first():chord.last()).note.step) + dy;
                     tip[i] = Y(sign.note.clef, sign.staff, (stemUp?chord.last():chord.first()).note.step)+(stemUp?-1:1)*(stemLength-noteSize.y/2);
                 }
-                int farTip = stemUp ? min(tip[0],tip[1]) : max(tip[0],tip[1]);
-                int delta[2] = {clip(-lineInterval, tip[0]-farTip, lineInterval), clip(-lineInterval, tip[1]-farTip, lineInterval)};
+				float farTip = stemUp ? min(tip[0],tip[1]) : max(tip[0],tip[1]);
+				float delta[2] = {clip(-lineInterval, tip[0]-farTip, lineInterval), clip(-lineInterval, tip[1]-farTip, lineInterval)};
                 farTip = stemUp ? min(farTip, staffY(sign.staff, -4)) : max(farTip, staffY(sign.staff, -4));
-				for(uint i: range(2)) fills.append( Rect(int2(x[i], min(base[i],farTip+delta[i])),int2(x[i]+stemWidth, max(base[i],farTip+delta[i]))) );
+				for(uint i: range(2)) {
+					vec2 min(x[i], ::min(base[i],farTip+delta[i])), max(x[i]+stemWidth, ::max(base[i],farTip+delta[i]));
+					notation.fills.append(min, max-min);
+				}
                 Sign sign[2] = { stemUp?beam.first().last():beam.first().first(), stemUp?beam.last().last():beam.last().first()};
-                int2 p0 (X(sign[0])+dx, farTip+delta[0]-beamWidth/2);
-                int2 p1 (X(sign[1])+dx+stemWidth, farTip+delta[1]-beamWidth/2);
-				parallelograms.append( Parallelogram{p0, p1, beamWidth} );
+				vec2 p0 (X(sign[0])+dx, farTip+delta[0]-beamWidth/2);
+				vec2 p1 (X(sign[1])+dx+stemWidth, farTip+delta[1]-beamWidth/2);
+				parallelograms.append(p0, p1, beamWidth);
             } else { // Draws horizontal beam
-                int stemY = stemUp ? -1000 : 1000; //FIXME
+				float stemY = stemUp ? -inf : inf;
                 if(stemUp) {
                     for(const Chord& chord: beam) for(Sign sign: chord) stemY = max(stemY, Y(sign)-stemLength);
                     for(const Chord& chord: beam) for(Sign sign: chord) stemY = min(stemY, Y(sign)-shortStemLength);
@@ -121,11 +126,12 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
                 stemY = stemUp ? min(stemY, staffY(sign.staff, -4)) : max(stemY, staffY(sign.staff, -4));
                 for(const Chord& chord: beam) for(Sign sign: chord) {
                     int x = X(sign) + dx;
-                    int y = Y(sign) + dy;
-					fills.append( Rect(int2(x,min(y, stemY)),int2(x+stemWidth, max(stemY, y))) );
+					float y = Y(sign) + dy;
+					{vec2 min(x, ::min(y, stemY)), max(x+stemWidth, ::max(stemY, y));
+						notation.fills.append(min, max-min); }
                 }
-				fills.append( Rect(int2(X(beam.first()[0]) + dx,             stemY-beamWidth/2+1),
-						int2(X(beam.last ()[0]) + dx + stemWidth, stemY+beamWidth/2)) );
+				{vec2 min (X(beam.first()[0]) + dx, stemY-beamWidth/2+1), max(X(beam.last ()[0]) + dx + stemWidth, stemY+beamWidth/2);
+					notation.fills.append(min, max-min);}
             }
 
             for(const Chord& chord: beam) {
@@ -133,12 +139,12 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
                 int x = X(sign) + noteSize.x/2;
                 int step = clefStep(sign.note.clef.clefSign, sign.note.step);
                 int y = Y(sign) + (stemUp?1:-1) * (lineInterval+(step%2?0:halfLineInterval));
-                if(chord.first().note.staccato) { glyph(int2(x,y),"scripts.staccato"_); y+=lineInterval; }
-                if(chord.first().note.tenuto) { glyph(int2(x,y),"scripts.tenuto"_); y+=lineInterval; }
+				if(chord.first().note.staccato) { glyph(vec2(x,y),"scripts.staccato"_); y+=lineInterval; }
+				if(chord.first().note.tenuto) { glyph(vec2(x,y),"scripts.tenuto"_); y+=lineInterval; }
                 int y2 = staffY(sign.staff, stemUp ? -10 : 2);
                 y = stemUp ? max(y,y2) : min(y,y2);
                 y -= (stemUp?0:glyphSize("scripts.sforzato"_).y/2);
-                if(chord.first().note.accent) { glyph(int2(x,y),"scripts.sforzato"_); y+=lineInterval; }
+				if(chord.first().note.accent) { glyph(vec2(x,y),"scripts.sforzato"_); y+=lineInterval; }
             }
             beam.clear();
 
@@ -172,15 +178,15 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
             Note& note = sign.note;
             assert_(note.clef.octave == clefs.at(sign.staff).octave); // FIXME: key relies on correct octave`
             note.clef = clefs.at(sign.staff);
-            int2 p = int2(x, Y(sign));
+			vec2 p = vec2(x, Y(sign));
             Duration duration = note.duration;
-            note.blitIndex = blits.size;
+			note.blitIndex = notation.blits.size;
 			int dx = glyph(p, "noteheads.s"_+str(min(2,int(duration))), note.grace?graceFont:font);
             int step = clefStep(note.clef.clefSign, note.step);
-			for(int s=2; s<=step; s+=2) { int y=staffY(staff, s); fills.append( Rect(int2(x-dx/3,y),int2(x+dx*4/3,y+1)) ); }
-			for(int s=-10; s>=step; s-=2) { int y=staffY(staff, s); fills.append( Rect(int2(x-dx/3,y),int2(x+dx*4/3,y+1)) ); }
-			if(note.slash) parallelograms.append( Parallelogram{p+int2(-dx+dx/2,dx), p+int2(dx+dx/2,-dx), 1} );
-            if(note.dot) glyph(p+int2(dx*4/3,0),"dots.dot"_);
+			for(int s=2; s<=step; s+=2) { int y=staffY(staff, s); notation.fills.append(vec2(x-dx/3,y),vec2(dx*5/3,1)); }
+			for(int s=-10; s>=step; s-=2) { int y=staffY(staff, s); notation.fills.append(vec2(x-dx/3,y),vec2(dx*5/3,1)); }
+			if(note.slash) parallelograms.append( Parallelogram{p+vec2(-dx+dx/2,dx), p+vec2(dx+dx/2,-dx), 1} );
+			if(note.dot) glyph(p+vec2(dx*4/3,0),"dots.dot"_);
             x += 2*dx;
 
             chord.insertSorted(sign);
@@ -200,7 +206,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
 			if(note.tie == Note::NoTie || note.tie == Note::TieStart) notes.sorted(sign.time).append( note );
         }
         else if(sign.type == Sign::Rest) {
-            int2 p = int2(x, staffY(staff, -4));
+			vec2 p = vec2(x, staffY(staff, -4));
             if(sign.rest.duration == Whole) x+= 3*glyph(p, "rests.0"_);
             else if(sign.rest.duration == Half) x+= 3*glyph(p, "rests.1"_);
             else if(sign.rest.duration == Quarter) x+= 3*glyph(p, "rests.2"_);
@@ -211,12 +217,14 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
         else if(sign.type == Sign::Measure) {
             //if(sign.staff==1 && x > int(target.width) && !slurs[0] && !slurs[1]) break;
             if(sign.staff==0) {
-				fills.append( Rect(int2(x-barWidth+barWidth/2, staffY(0,0)),int2(x+barWidth/2, staffY(1,-8))) ); // Bar
+				{vec2 min(x-barWidth+barWidth/2, staffY(0,0)), max(x+barWidth/2, staffY(1,-8));
+					notation.fills.append(min, max-min); } // Bar
                 // Raster
                 for(int staff: range(staffCount)) {
                     for(int line: range(5)) {
                         int y = staffY(staff, -line*2);
-						fills.append( Rect(int2(measures.last(), y), int2(x, y+lineWidth)) );
+						{vec2 min(measures.last(), y), max(x, y+lineWidth);
+							notation.fills.append(min, max-min);}
                     }
                 }
 				measures.append( x );
@@ -227,21 +235,22 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
 				for(uint8 code: str(sign.measure.index)) {
                     uint16 index = textFont.index(code);
 					const Font::Glyph& glyph = textFont.render(index);
-					blits.append( Blit{int2(sx, staffY(0, 16))+glyph.offset, share(glyph.image)} );
+					notation.blits.append(vec2(int2(sx, staffY(0, 16))+glyph.offset), vec2(glyph.image.size), share(glyph.image));
 					sx += textFont.metrics(index).advance;
                 }
             }
         }
         else if(sign.type == Sign::Pedal) {
             int y = staffY(1, -24);
-            if(sign.pedal.action == Ped) glyph(int2(x, y), "pedal.Ped"_);
+			if(sign.pedal.action == Ped) glyph(vec2(x, y), "pedal.Ped"_);
             if(sign.pedal.action == Start) pedalStart = x + glyphSize("pedal.Ped"_).x;
             if(sign.pedal.action == Change || sign.pedal.action == PedalStop) {
-				fills.append( Rect(int2(pedalStart, y), int2(x, y+1)) );
-				if(sign.pedal.action == PedalStop) fills.append( Rect(int2(x-1, y-lineInterval), int2(x, y)) );
+				{vec2 min(pedalStart, y), max(x, y+1);
+					notation.fills.append(min, max-min);}
+				if(sign.pedal.action == PedalStop) notation.fills.append(vec2(x-1, y-lineInterval), vec2(1, lineInterval));
                 else {
-					parallelograms.append( Parallelogram{int2(x, y-1), int2(x+noteSize.x/2, y-noteSize.x), 2} );
-					parallelograms.append( Parallelogram{int2(x+noteSize.x/2, y-noteSize.x), int2(x+noteSize.x, y), 2} );
+					parallelograms.append(vec2(x, y-1), vec2(x+noteSize.x/2, y-noteSize.x), 2.f);
+					parallelograms.append(vec2(x+noteSize.x/2, y-noteSize.x), vec2(x+noteSize.x, y), 2.f);
                     pedalStart = x + noteSize.x;
                 }
             }
@@ -251,8 +260,8 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
             int y = (staffY(0, -8)+staffY(1, 0))/2;
             if(sign.wedge.action == WedgeStop) {
                 bool crescendo = wedgeStart.wedge.action == Crescendo;
-				parallelograms.append( int2(timeTrack.at(wedgeStart.time).direction, y+(-!crescendo-1)*3), int2(x, y+(-crescendo-1)*3), 1 );
-				parallelograms.append( int2(timeTrack.at(wedgeStart.time).direction, y+(!crescendo-1)*3), int2(x, y+(crescendo-1)*3), 1 );
+				parallelograms.append( vec2(timeTrack.at(wedgeStart.time).direction, y+(-!crescendo-1)*3), vec2(x, y+(-crescendo-1)*3), 1.f);
+				parallelograms.append( vec2(timeTrack.at(wedgeStart.time).direction, y+(!crescendo-1)*3), vec2(x, y+(crescendo-1)*3), 1.f);
             } else wedgeStart = sign;
         }
         else if(sign.type == Sign::Dynamic) {
@@ -263,7 +272,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
             int& x = timeTrack.at(sign.time).direction;
 			x -= w/2; x += glyphSize({word[0]}).x/2;
             for(char character: word) {
-                x += glyph(int2(x, (staffY(0, -8)+staffY(1, 0))/2), {character});
+				x += glyph(vec2(x, (staffY(0, -8)+staffY(1, 0))/2), {character});
             }
         } else if(sign.type == Sign::Clef) {
             string change = clefs.contains(sign.staff)?"_change"_:""_;
@@ -272,8 +281,8 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
             if(!clefs.contains(sign.staff) || clefs.at(sign.staff).clefSign != sign.clef.clefSign) {
                 clefs[sign.staff] = sign.clef;
                 x += noteSize.x;
-                if(clef.clefSign==Treble) x += glyph(int2(x, Y(clefs,staff,4)), "clefs.G"_+change);
-                if(clef.clefSign==Bass) x += glyph(int2(x, Y(clefs,staff,-4)),"clefs.F"_+change);
+				if(clef.clefSign==Treble) x += glyph(vec2(x, Y(clefs,staff,4)), "clefs.G"_+change);
+				if(clef.clefSign==Bass) x += glyph(vec2(x, Y(clefs,staff,-4)),"clefs.F"_+change);
                 x += noteSize.x;
                 if(staff==0) x=X(sign);
                 timeTrack.at(sign.time).direction = x;
@@ -284,8 +293,8 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
             int fifths = keySignature.fifths;
             for(int i: range(abs(fifths))) {
                 int step = (fifths>0?2:4) + ((fifths>0 ? 4 : 3) * i +2)%7;
-                glyph(int2(x, Y(clefs,0,step)), fifths<0?"accidentals.flat"_:"accidentals.sharp"_);
-                x += glyph(int2(x, Y(clefs,1,step - (clefs[1u].clefSign==Bass ? 14 : 0))), fifths<0?"accidentals.flat"_:"accidentals.sharp"_);
+				glyph(vec2(x, Y(clefs,0,step)), fifths<0?"accidentals.flat"_:"accidentals.sharp"_);
+				x += glyph(vec2(x, Y(clefs,1,step - (clefs[1u].clefSign==Bass ? 14 : 0))), fifths<0?"accidentals.flat"_:"accidentals.sharp"_);
             }
             x += noteSize.x;
             timeTrack.at(sign.time).direction = x;
@@ -293,13 +302,13 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
         else if(sign.type==Sign::TimeSignature) {
             timeSignature = sign.timeSignature;
             static constexpr string numbers[10] = {"zero"_,"one"_,"two"_,"three"_,"four"_,"five"_,"six"_,"seven"_,"eight"_,"nine"_};
-            glyph(int2(x, staffY(0, -4)),numbers[timeSignature.beats]);
-            glyph(int2(x, staffY(1, -4)),numbers[timeSignature.beats]);
-            glyph(int2(x, staffY(0, -8)),numbers[timeSignature.beatUnit]);
-            x += 2*glyph(int2(x, staffY(1, -8)),numbers[timeSignature.beatUnit]);
+			glyph(vec2(x, staffY(0, -4)),numbers[timeSignature.beats]);
+			glyph(vec2(x, staffY(1, -4)),numbers[timeSignature.beats]);
+			glyph(vec2(x, staffY(0, -8)),numbers[timeSignature.beatUnit]);
+			x += 2*glyph(vec2(x, staffY(1, -8)),numbers[timeSignature.beatUnit]);
         }
         else if(sign.type == Sign::Metronome) {
-			text(int2(x, staffY(0, 16)), "♩="_+str(sign.metronome.perMinute), textFont);
+			text(vec2(x, staffY(0, 16)), "♩="_+str(sign.metronome.perMinute), textFont);
         }
 
         if(timeTrack.contains(sign.time+sign.duration)) timeTrack.at(sign.time+sign.duration) = x; // Updates end position for future signs
@@ -307,10 +316,10 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
     }
 
     // Vertical center align
-	int2 offset = int2(0/*-position*/, (height - sizeHint(0).y)/2 + 4*lineInterval);
-    for(Rect& r: fills) r = offset+r;
+	vec2 offset = vec2(0/*-position*/, (height - sizeHint(0).y)/2 + 4*lineInterval);
+	for(auto& o: notation.fills) o.origin += offset;
     for(Parallelogram& p: parallelograms) p.min+=offset, p.max+=offset;
-    for(Blit& b: blits) b.position+=offset;
+	for(auto& o: notation.blits) o.origin += offset;
     for(Cubic& c: cubics) for(vec2& p: c) p+=vec2(offset);
 }
 
@@ -333,8 +342,8 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
                 assert_(note.key == midiKey);
                 midiToBlit[midiIndex] = note.blitIndex;
                 //log_("O"_+str(note.key));
-                int2 p = blits[note.blitIndex].position;
-                text(p+int2(noteSize.x, 2), "O"_+str(note.key), smallFont, debug);
+				vec2 p = notation.blits[note.blitIndex].origin;
+				text(p+vec2(noteSize.x, 2), "O"_+str(note.key), smallFont, debug);
                 orderErrors++;
                 return true; // Discards
             });
@@ -360,7 +369,7 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
             log("MID", midiNotes.slice(midiIndex,7));
             log("XML", chord);
             synchronizationFailed = true;
-			blits.append( move(debug) );
+			notation.blits.append( move(debug) );
             break;
         }
 
@@ -369,8 +378,8 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
             Note note = chord.take(match);
             assert_(note.key == midiKey);
 			midiToBlit.append( note.blitIndex );
-            int2 p = blits[note.blitIndex].position;
-            text(p+int2(noteSize.x, 2), str(note.key), smallFont, debug);
+			vec2 p = notation.blits[note.blitIndex].origin;
+			text(p+vec2(noteSize.x, 2), str(note.key), smallFont, debug);
         } else if(chordExtra && chord.size == chordExtra.size) {
             int match = notes.values[chordIndex+1].indexOf(midiNotes[chordExtra[0]]);
             if(match >= 0) {
@@ -388,8 +397,8 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
                     Note note = chord.take(match);
                     assert_(midiKey == note.key);
                     midiToBlit[index] = note.blitIndex;
-                    int2 p = blits[note.blitIndex].position;
-                    text(p+int2(noteSize.x, 2), str(note.key), smallFont, debug);
+					vec2 p = notation.blits[note.blitIndex].origin;
+					text(p+vec2(noteSize.x, 2), str(note.key), smallFont, debug);
                     return true; // Discards extra as matched to next chord
                 });
             } else {
@@ -401,8 +410,8 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
                     uint midiKey = midiNotes[midiIndex];
                     assert_(note.key != midiKey);
                     //log_("!"_+str(note.key, midiKey));
-                    int2 p = blits[note.blitIndex].position;
-                    text(p+int2(noteSize.x, 2), str(note.key)+"?"_+str(midiKey)+"!"_, smallFont, debug);
+					vec2 p = notation.blits[note.blitIndex].origin;
+					text(p+vec2(noteSize.x, 2), str(note.key)+"?"_+str(midiKey)+"!"_, smallFont, debug);
                     wrongErrors++;
                     return true; // Discards as wrong
                 });
@@ -424,13 +433,12 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
 }
 
 Graphics Sheet::graphics(int2 unused size) {
-	Graphics graphics;
-	/*// TODO: cull
-	for(Rect r: fills) fill(target, offset+r);
-	for(Parallelogram p: parallelograms) parallelogram(target, offset+p.min, offset+p.max, p.dy);
-	for(uint i: range(blits.size)) { const Blit& b=blits[i]; blit(target, offset+b.position, b.image, colors.value(i, black)); }
-	for(const Cubic& c: cubics) { buffer<vec2> points(c.size); for(uint i: range(c.size)) points[i]=vec2(offset)+c[i]; cubic(target, points); }*/
-	return graphics;
+	//Graphics graphics;
+	//for(Rect r: notation.fills) fill(target, offset+r);
+	//for(Parallelogram p: parallelograms) parallelogram(target, offset+p.min, offset+p.max, p.dy);
+	//for(uint i: range(blits.size)) { const Blit& b=blits[i]; blit(target, offset+b.position, b.image, colors.value(i, black)); }
+	//for(const Cubic& c: cubics) { buffer<vec2> points(c.size); for(uint i: range(c.size)) points[i]=vec2(offset)+c[i]; cubic(target, points); }*/
+	return copy(notation); //FIXME: shared
 }
 
 int Sheet::measureIndex(int x0) {
