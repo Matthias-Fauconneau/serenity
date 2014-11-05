@@ -67,7 +67,7 @@ Image decodeImage(const ref<byte> file) {
     else if(startsWith(file,"\x00\x00\x02\x00")||startsWith(file,"\x00\x00\x0A\x00")) return decodeTGA(file);
     else if(startsWith(file,"\x49\x49\x2A\x00") || startsWith(file,"\x4D\x4D\x00\x2A")) return decodeTIFF(file);
     else if(startsWith(file,"BM")) return decodeBMP(file);
-    else { if(file.size) error("Unknown image format", hex(file.slice(0,min<int>(file.size,4)))); return Image(); }
+	else error("Unknown image format", hex(file.slice(0,min<int>(file.size,4))));
 }
 
 // -- Rotate --

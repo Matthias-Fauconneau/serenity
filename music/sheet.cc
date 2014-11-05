@@ -2,22 +2,25 @@
 #include "notation.h"
 #include "utf8.h"
 
-float Sheet::glyph(vec2 position, const string name, Font& font) {
+float Sheet::glyph(vec2 origin, const string name, Font& font) {
 	uint index = font.index(name);
-	const Font::Glyph& glyph = font.render(index);
-	notation.blits.append(position+vec2(glyph.offset), vec2(glyph.image.size), share(glyph.image));
+	//const Font::Glyph& glyph = font.render(index);
+	//assert_(glyph.image);
+	//notation.blits.append(position+vec2(glyph.offset), vec2(glyph.image.size), share(glyph.image));
+	notation.glyphs.append(origin, font, index);
 	return font.metrics(index).advance;
 }
 
-uint Sheet::text(vec2 position, const string& text, Font& font, array<Blit>& blits) {
-    uint x = position.x;
+uint Sheet::text(vec2 origin, const string& text, Font& font, array<Glyph>& glyphs) {
     for(uint code: toUCS4(text)) {
+		//const Font::Glyph& glyph = font.render(index);
+		//assert_(glyph.image);
+		//blits.append( Blit{vec2(int2(x, position.y)+glyph.offset), vec2(glyph.image.size), share(glyph.image)} );
 		uint index = font.index(code);
-		const Font::Glyph& glyph = font.render(index);
-		blits.append( Blit{vec2(int2(x, position.y)+glyph.offset), vec2(glyph.image.size), share(glyph.image)} );
-		x += font.metrics(index).advance;
+		glyphs.append(origin, font, index);
+		origin.x += font.metrics(index).advance;
     }
-    return x;
+	return origin.x;
 }
 
 // Layouts notations to graphic primitives (and parses notes to MIDI keys)
@@ -235,6 +238,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
 				for(uint8 code: str(sign.measure.index)) {
                     uint16 index = textFont.index(code);
 					const Font::Glyph& glyph = textFont.render(index);
+					assert_(glyph.image);
 					notation.blits.append(vec2(int2(sx, staffY(0, 16))+glyph.offset), vec2(glyph.image.size), share(glyph.image));
 					sx += textFont.metrics(index).advance;
                 }
@@ -327,7 +331,7 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
 	array<uint> midiToBlit (midiNotes.size, 0);
     map<uint, array<Note>> notes = copy(this->notes);
     array<uint> chordExtra;
-    array<Blit> debug;
+	array<Glyph> debug;
     uint chordIndex = 0;
     while(chordIndex<notes.size()) {
         if(!notes.values[chordIndex]) {
@@ -369,7 +373,7 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
             log("MID", midiNotes.slice(midiIndex,7));
             log("XML", chord);
             synchronizationFailed = true;
-			notation.blits.append( move(debug) );
+			notation.glyphs.append( move(debug) );
             break;
         }
 

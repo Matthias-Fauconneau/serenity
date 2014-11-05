@@ -35,8 +35,8 @@ struct Sheet : Widget {
 	Graphics notation;
 	map<uint, bgr3f> colors; // Overrides color for Blit index
 
-	uint text(vec2 position, const string& text, Font& font, array<Blit>& blits);
-	uint text(vec2 position, const string& text, Font& font) { return this->text(position, text, font, notation.blits); }
+	uint text(vec2 position, const string& text, Font& font, array<Glyph>& glyphs);
+	uint text(vec2 position, const string& text, Font& font) { return this->text(position, text, font, notation.glyphs); }
 
     // Layouts notations to graphic primitives
     Sheet(const ref<Sign>& signs, uint divisions, uint height);

@@ -37,7 +37,7 @@ void fill(const Image& target, int2 origin, int2 size, bgr3f color, float alpha)
 
 static void blit(const Image& target, int2 origin, const Image& source, bgr3f color, float opacity) {
     assert_(bgr3f(0) <= color && color <= bgr3f(1));
-    assert_(source);
+	assert_(source, source.size, source.data);
 
     int2 min = ::max(int2(0), origin);
     int2 max = ::min(target.size, origin+source.size);
@@ -144,7 +144,7 @@ void render(const Image& target, const Graphics& graphics) {
 		else blit(target, int2(round(e.origin)), resize(int2(round(e.size)), e.image), 1, 1); // FIXME: subpixel blit
     }
     for(const auto& e: graphics.glyphs) {
-        Font::Glyph glyph = e.font.render(e.font.index(e.code));
+		Font::Glyph glyph = e.font.render(e.index);
         blit(target, int2(round(e.origin))+glyph.offset, glyph.image, e.color, 1);
     }
 	for(const auto& e: graphics.lines) line(target, e.a, e.b, e.color, 1);

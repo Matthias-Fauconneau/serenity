@@ -26,8 +26,8 @@ struct Blit {
 struct Glyph {
     vec2 origin;
     Font& font;
-    uint code;
-    bgr3f color;
+	uint index;
+	bgr3f color = black;
 };
 
 /// Line graphic element
