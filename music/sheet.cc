@@ -4,18 +4,12 @@
 
 float Sheet::glyph(vec2 origin, const string name, Font& font) {
 	uint index = font.index(name);
-	//const Font::Glyph& glyph = font.render(index);
-	//assert_(glyph.image);
-	//notation.blits.append(position+vec2(glyph.offset), vec2(glyph.image.size), share(glyph.image));
 	notation.glyphs.append(origin, font, index);
 	return font.metrics(index).advance;
 }
 
 uint Sheet::text(vec2 origin, const string& text, Font& font, array<Glyph>& glyphs) {
     for(uint code: toUCS4(text)) {
-		//const Font::Glyph& glyph = font.render(index);
-		//assert_(glyph.image);
-		//blits.append( Blit{vec2(int2(x, position.y)+glyph.offset), vec2(glyph.image.size), share(glyph.image)} );
 		uint index = font.index(code);
 		glyphs.append(origin, font, index);
 		origin.x += font.metrics(index).advance;
@@ -237,9 +231,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
                 uint sx = x;
 				for(uint8 code: str(sign.measure.index)) {
                     uint16 index = textFont.index(code);
-					const Font::Glyph& glyph = textFont.render(index);
-					assert_(glyph.image);
-					notation.blits.append(vec2(int2(sx, staffY(0, 16))+glyph.offset), vec2(glyph.image.size), share(glyph.image));
+					notation.glyphs.append(vec2(sx, staffY(0, 16)), textFont, index);
 					sx += textFont.metrics(index).advance;
                 }
             }
@@ -322,6 +314,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
     // Vertical center align
 	vec2 offset = vec2(0/*-position*/, (height - sizeHint(0).y)/2 + 4*lineInterval);
 	for(auto& o: notation.fills) o.origin += offset;
+	for(auto& o: notation.glyphs) o.origin += offset;
     for(Parallelogram& p: parallelograms) p.min+=offset, p.max+=offset;
 	for(auto& o: notation.blits) o.origin += offset;
     for(Cubic& c: cubics) for(vec2& p: c) p+=vec2(offset);
