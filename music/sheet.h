@@ -39,7 +39,7 @@ struct Sheet : Widget {
 	uint text(vec2 position, const string& text, Font& font) { return this->text(position, text, font, notation.glyphs); }
 
     // Layouts notations to graphic primitives
-    Sheet(const ref<Sign>& signs, uint divisions, uint height);
+	Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/);
 
     // MIDI Synchronization
     map<uint,array<Note>> notes; // Signs for notes (time, key, blitIndex)
@@ -55,9 +55,7 @@ struct Sheet : Widget {
     array<int> measures; // X position of measure starts
     array<int> measureToChord; // first chord index of measure
     array<int> chordToNote; // first note index of chord
-    //int position = 0;
 
-	int2 sizeHint(int2) override { return int2(-1, staffY(1,-16)); }
+	int2 sizeHint(int2) override { return int2(measures.last(), staffY(1, -32)-staffY(0, 16)); }
 	Graphics graphics(int2 size) override;
-    //bool mouseEvent(int2, int2, Event, Button button);
 };

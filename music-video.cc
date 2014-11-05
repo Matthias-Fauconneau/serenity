@@ -3,6 +3,7 @@
 #include "sheet.h"
 #include "ffmpeg.h"
 #include "window.h"
+#include "interface.h"
 #include "audio.h"
 #include "encoder.h"
 
@@ -28,7 +29,7 @@ struct Music
 {
     string name = arguments()[0];
     MusicXML xml = readFile(name+".xml"_);
-    Sheet sheet {xml.signs, xml.divisions, 720};
+	Scroll<Sheet> sheet {xml.signs, xml.divisions, 360};
 #if AUDIO || ENCODE
     AudioFile mp3 = name+".mp3"_; // 48KHz AAC would be better
 #endif
@@ -50,7 +51,7 @@ struct Music
     // Preview
 #if PREVIEW
     bool preview = PREVIEW;
-	Window window {this, int2(1280,720), [](){return "MusicXML"__;}};
+	Window window {this, int2(-1), [](){return "MusicXML"__;}};
     const uint fps = 60;
     uint64 videoTime = 0;
 #if AUDIO
@@ -71,6 +72,7 @@ struct Music
     Music() {
 #if PREVIEW
 		window.background = Window::White;
+		sheet.scrollbar = true;
 #if MIDI
         seek( midi.notes[noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[122]])].time );
 #endif
@@ -163,14 +165,16 @@ struct Music
         position = targetPosition;
     }
 
-	int2 sizeHint(int2 size) { return sheet.sizeHint(size); }
+	int2 sizeHint(int2 size) { return sheet.ScrollArea::sizeHint(size); }
 	Graphics graphics(int2 size) override {
+#if VIDEO
         follow(videoTime, fps);
         step(1./fps);
         videoTime++;
 		position = min(float(sheet.measures.last()-size.x), position);
         if(running) window.render();
-		return sheet.graphics(size); //int2(floor(-position), 0)
+#endif
+		return sheet.ScrollArea::graphics(size); //int2(floor(-position), 0)
     }
 #endif
 } app;

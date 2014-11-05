@@ -18,7 +18,7 @@ uint Sheet::text(vec2 origin, const string& text, Font& font, array<Glyph>& glyp
 }
 
 // Layouts notations to graphic primitives (and parses notes to MIDI keys)
-Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time steps per measure
+Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time steps per measure
     int x = 0;
     map<uint, Clef> clefs; KeySignature keySignature={0}; TimeSignature timeSignature={0,0};
     typedef array<Sign> Chord; // Signs belonging to a same chord (same time)
@@ -37,7 +37,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
     map<uint, Position> timeTrack; // Maps times to positions
     auto X = [&](const Sign& sign) { return timeTrack.at(sign.time); };
     auto P = [&](const Sign& sign) { return int2(X(sign),Y(sign)); };
-    // System
+	/*// System
     vec2 p0 = vec2(x+noteSize.x, staffY(0, 0));
     vec2 p1 = vec2(x+noteSize.x, staffY(1, -8));
     vec2 pM = vec2(x, (p0+p1).y/2);
@@ -46,7 +46,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
     vec2 c1M[2] = {vec2((pM+p1).x/2, pM.y), vec2(p1.x, pM.y)};
     vec2 c1[2] = {vec2(pM.x, p1.y), vec2((pM+p1).x/2, p1.y)};
 	cubics.append( copyRef(ref<vec2>({p0,c0[0],c0M[0],pM,c1M[0],c1[0],p1,c1[1],c1M[1],pM,c0M[1],c0[1]})) );
-    x += noteSize.x;
+	x += noteSize.x;*/
 	{vec2 min(x-1, staffY(0, 0)), max(1, staffY(1, -8));
 	notation.fills.append(min, max-min);}
 	measures.append( x );
@@ -312,7 +312,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, uint height) { // Time step
     }
 
     // Vertical center align
-	vec2 offset = vec2(0/*-position*/, (height - sizeHint(0).y)/2 + 4*lineInterval);
+	vec2 offset = vec2(0/*-position*/, /*(height - sizeHint(0).y)/2 +*/ /*4*lineInterval*/ -staffY(0,16)+textFont.size);
 	for(auto& o: notation.fills) o.origin += offset;
 	for(auto& o: notation.glyphs) o.origin += offset;
     for(Parallelogram& p: parallelograms) p.min+=offset, p.max+=offset;

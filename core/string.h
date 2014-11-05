@@ -72,6 +72,8 @@ String toLower(const string s);
 /// Uppers case
 String toUpper(const string s);
 
+String repeat(const string& s, uint times);
+
 /// Pads a string to the left
 String left(string s, size_t size, const char pad=' ');
 /// Pads a string to the right

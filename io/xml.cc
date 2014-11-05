@@ -125,8 +125,6 @@ String Element::text(const string& path) const {
 	return move(text);
 }
 
-static String repeat(const string& s, uint times) { array<char> r (times*s.size, 0); for(uint unused i: range(times)) r.append(s); return move(r); }
-
 String Element::str(uint depth) const {
     //assert(name||content, attributes, children);
 	array<char> line;

@@ -11,8 +11,12 @@ Graphics ScrollArea::graphics(int2 size) {
 		assert_(offset <= int2(0));
 		graphics.append(widget().graphics(view, Rect::fromOriginAndSize(-offset, size)), vec2(offset));
 	}
-    if(scrollbar && size.y<view.y)
-        graphics.fills.append( vec2(size.x-scrollBarWidth, -offset.y*size.y/view.y), vec2(size.x,(-offset.y+size.y)*size.y/view.y), 1./2, 1.f/2 );
+	if(scrollbar) {
+		if(size.y<view.y)
+			graphics.fills.append( vec2(size.x-scrollBarWidth, -offset.y*size.y/view.y), vec2(size.x,(-offset.y+size.y)*size.y/view.y), 1./2, 1.f/2);
+		if(size.x<view.x)
+			graphics.fills.append( vec2(-offset.x*size.x/view.x, size.y-scrollBarWidth), vec2((-offset.x+size.x)*size.x/view.x, size.y), 1./2, 1.f/2);
+	}
     return graphics;
 }
 

@@ -5,12 +5,36 @@
 #include "time.h" //DEBUG
 
 struct Node {
-	string name;
-    array<Node*> children;
-	explicit Node(string name):name(name){}
+	String name;
+	array<Node*> edges;
+	explicit Node(String&& name):name(move(name)){}
 };
-//bool operator ==(const Node& a, const Node& b) { return a.name==b.name; }
+bool operator ==(const Node* a, const string b) { return a->name==b; }
 bool operator ==(const Node& a, const string b) { return a.name==b; }
+
+struct Branch {
+	String name;
+	array<Branch> children;
+	explicit Branch(String&& name) : name(move(name)) {}
+};
+String str(const Branch& o, int depth=0) {
+	return repeat(" ", depth)+o.name+"\n"+join(apply(o.children, [=](const Branch& child){ return str(child, depth+1); }));
+};
+
+/// Breaks cycles (converts a directed graph to a directed acyclic graph (DAG))
+Branch collect(const Node* source, array<const Node*>& stack, int maxDepth) {
+	stack.append(source);
+	Branch branch (copy(source->name));
+	if(stack.size <= maxDepth) {
+		for(const Node* child: source->edges) {
+			if(!stack.contains(child))
+				branch.children.append( collect(child, stack, maxDepth) );
+		}
+	}
+	stack.pop();
+	return branch;
+}
+Branch collect(const Node& source, int maxDepth) { array<const Node*> stack; return collect(&source, stack, maxDepth); }
 
 struct Build {
     // Parameters
@@ -35,9 +59,9 @@ struct Build {
 
 	const array<String> sources = folder.list(Files|Recursive);
     /// Returns the first path matching file
-	string find(string file) {
-		for(string path: sources) if(path == file) return path.contains('.') ? section(path,'.',0,-2) : path; // Exact match
-		for(string path: sources) if(section(path,'/',-2,-1) == file) return path.contains('.') ? section(path,'.',0,-2) : path; // Sub match
+	String find(string file) {
+		for(string path: sources) if(path == file) return copyRef(path.contains('.') ? section(path,'.',0,-2) : path); // Exact match
+		for(string path: sources) if(section(path,'/',-2,-1) == file) return copyRef(path.contains('.') ? section(path,'.',0,-2) : path); // Sub match
         return {};
     }
 
@@ -86,7 +110,7 @@ struct Build {
 
         String filesPath = tmp+"/files";
         Folder(filesPath, root(), true);
-		string path = find(replace(name, '_', '/'));
+		String path = find(replace(name, '_', '/'));
         assert(path, "No such file to embed", name);
         Folder subfolder = Folder(section(path,'/',0,-2), folder);
         string file = section(path,'/',-2,-1);
@@ -108,13 +132,15 @@ struct Build {
 		if(file.size() > 32768) return lastEdit; // Skips large files (jpeg, deflate)
 		for(TextData s = file.read(file.size()); s; s.line()) {
             {string name = tryParseIncludes(s, fileName);
-                if(name) {
-					string header = find(name+".h");
-                    if(header) lastEdit = max(lastEdit, parse(header+".h", parent));
-					string module = find(name+".cc");
-                    if(!module || parent == module) continue;
-					if(!modules.contains(module)) { if(!compileModule(module)) return 0; }
-                    parent.children.append( modules[modules.indexOf(module)].pointer );
+				if(name) {
+					String module = find(name+".cc");
+					if(!parent.edges.contains(module)) {
+						String header = find(name+".h");
+						if(header) lastEdit = max(lastEdit, parse(header+".h", parent));
+						if(!module || parent == module) continue;
+						if(!modules.contains(module)) { if(!compileModule(module)) return 0; }
+						parent.edges.append( modules[modules.indexOf(module)].pointer );
+					}
                 }
             }
             //tryParseDefines(s);
@@ -128,7 +154,7 @@ struct Build {
     /// \return Timestamp of the last modified module implementation (deep)
 	bool compileModule(string target) {
         assert_(target);
-        modules.append( unique<Node>(target) );
+		modules.append( unique<Node>(copyRef(target)) );
         Node& module = modules.last();
         String fileName = target+".cc";
         int64 lastEdit = parse(fileName, module);
@@ -151,25 +177,28 @@ struct Build {
     }
 
     Build() {
-        if(arguments()==ref<string>{"statistics"}) {
+		/*if(arguments()==ref<string>{"statistics"}) {
             map<size_t, string> files;
 			for(string path: filter(sources, [](string name) { return !(endsWith(name, ".cc")||endsWith(name,".h")); }))
 				files.insertSortedMulti(File(path).size(), path);
 			//log(str(files,"\n"_));
             return;
-        }
+		}*/
 
         // Configures
         string install;
         for(string arg: arguments()) {
-            if(startsWith(arg,"/")) install=arg;
+			if(startsWith(arg,"-")) {} // Build command flag
+			else if(startsWith(arg,"/")) install=arg;
             else if(find(arg+".cc")) {
                 if(target) log("Multiple targets unsupported, building last target:",arg);
 				target = arg;
-            } else flags.append( split(arg,"-") );
+			}
+			else flags.append( split(arg,"-") );
         }
 
 		if(!target) target = base;
+		assert_(find(target+".cc"), "Invalid target"_, target);
 
 		args.append("-iquote."__);
         for(string flag: flags) args.append( "-D"+toUpper(flag)+"=1" );
@@ -184,6 +213,8 @@ struct Build {
         // Compiles
 		if(flags.contains("profile")) if(!compileModule(find("profile.cc"))) { log("Failed to compile"); requestTermination(-1); return; }
 		if(!compileModule( find(target+".cc") )) { log("Failed to compile"); requestTermination(-1); return; }
+
+		if(arguments().contains("-tree")) log(collect(modules.first(), 1)); return;
 
         // Links
 		String binary = tmp+"/"+join(flags,"-")+"/"+target;
