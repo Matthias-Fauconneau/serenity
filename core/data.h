@@ -14,10 +14,10 @@ struct Data {
     ::buffer<byte> buffer;
 
     Data(){}
-    /// Creates a Data interface to a \a buffer
-    Data(::buffer<byte>&& buffer) : data(buffer), buffer(move(buffer)) {}
     /// Creates a Data interface to a \a ref
     explicit Data(ref<byte> data) : data(data) {}
+	/// Creates a Data interface to a \a buffer
+	Data(::buffer<byte>&& buffer) : Data(buffer) { this->buffer=move(buffer); }
     /// Slices a reference to the buffer from \a index to \a index + \a size
     ref<byte> slice(uint pos, uint size) const { return data.slice(pos,size); }
     /// Slices a reference to the buffer from \a index to the end of the data
@@ -136,7 +136,16 @@ struct TextData : Data {
     /// 1-based line index
     int lineIndex = 1;
 
-    using Data::Data;
+	/// Creates a TextData interface to a \a ref
+	/// \note Matches any heading Unicode BOM
+	explicit TextData(ref<byte> data) : Data(data) {
+		assert_(data);
+		if(uint8(data[0]) >= 0x80 && !match("\xEF\xBB\xBF")) error("Expected Unicode BOM");
+	}
+	/// Creates a Data interface to a \a buffer
+	/// \note Matches any heading Unicode BOM
+	TextData(::buffer<byte>&& buffer) : TextData(buffer) { this->buffer=move(buffer); }
+
     void advance(size_t step) override;
 
     /// Returns whether input match any of \a keys

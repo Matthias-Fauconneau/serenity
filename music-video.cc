@@ -29,7 +29,7 @@ struct Music
 {
     string name = arguments()[0];
     MusicXML xml = readFile(name+".xml"_);
-	Scroll<Sheet> sheet {xml.signs, xml.divisions, 360};
+	Scroll<Sheet> sheet {xml.signs, xml.divisions};
 #if AUDIO || ENCODE
     AudioFile mp3 = name+".mp3"_; // 48KHz AAC would be better
 #endif

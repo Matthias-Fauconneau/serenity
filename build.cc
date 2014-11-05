@@ -65,11 +65,11 @@ struct Build {
         return {};
     }
 
-    string tryParseIncludes(TextData& s, string fileName) {
-        if(!s.match("#include ") && !s.match("//#include ")) return "";
+	String tryParseIncludes(TextData& s, string fileName) {
+		if(!s.match("#include ") && !s.match("//#include ")) return {};
         if(s.match('"')) { // module header
             string name = s.until('.');
-            return name;
+			return copyRef(name);
         } else { // library header
             s.skip('<');
             s.whileNo(">\n");
@@ -85,7 +85,7 @@ struct Build {
                 assert_(s.wouldMatch('\n'));
             }
         }
-        return "";
+		return {};
     }
     bool tryParseConditions(TextData& s, string fileName) {
         if(!s.match("#if ")) return false;
@@ -128,11 +128,12 @@ struct Build {
     /// Returns timestamp of the last modified interface header recursively parsing includes
 	int64 parse(string fileName, Node& parent) {
         File file(fileName, folder);
-        int64 lastEdit = file.modifiedTime();
-		if(file.size() > 32768) return lastEdit; // Skips large files (jpeg, deflate)
+		int64 lastEdit = file.modifiedTime();
+		log(parent.name, fileName);
 		for(TextData s = file.read(file.size()); s; s.line()) {
-            {string name = tryParseIncludes(s, fileName);
+			{String name = tryParseIncludes(s, fileName);
 				if(name) {
+					log("include", name);
 					String module = find(name+".cc");
 					if(!parent.edges.contains(module)) {
 						String header = find(name+".h");
