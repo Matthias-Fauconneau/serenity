@@ -68,8 +68,9 @@ Element::Element(TextData& s, bool html) {
         //else if(s.match(String("<?"_+name+">"_))) { log("Invalid tag","<?"_+name+">"_); return; }
 		else if(s.match('<')) children.append( unique<Element>(s,html) );
         else {
-            String content = unescape(s.whileNot('<'));
-			if(trim(content)) children.append( unique<Element>(move(content)) );
+			assert_(!content);
+			content = copyRef(trim(unescape(s.whileNot('<'))));
+			//if(trim(content)) children.append( unique<Element>(move(content)) );
         }
     }
 }
@@ -132,10 +133,14 @@ String Element::str(uint depth) const {
 	if(name) line.append(indent+'<'+name);
 	for(auto attr: attributes) line.append(' '+attr.key+"=\""+attr.value+'"');
     if(trim(content)||children) {
-		if(name) line.append(">\n");
-		if(trim(content)) line.append(indent+replace(simplify(trim(content)),"\n",'\n'+indent)+'\n');
-		if(children) for(const Element& e: children) line.append( e.str(depth+1) );
-		if(name) line.append(indent+"</"_+name+">\n");
+		if(name) line.append(">");
+		if(trim(content)) line.append(replace(simplify(trim(content)),"\n",'\n'+indent));
+		if(children) {
+			line.append('\n');
+			for(const Element& e: children) line.append( e.str(depth+1) );
+			line.append(indent);
+		}
+		if(name) line.append("</"_+name+">\n");
 	} else if(name) line.append(" />\n");
 	return move(line);
 }

@@ -1,3 +1,4 @@
+/// \file sheet.h
 #pragma once
 #include "notation.h"
 #include "widget.h"
@@ -5,6 +6,7 @@
 
 inline String str(const Note& a) { return str(a.key); }
 
+/// Layouts musical notations to graphic primitives
 struct Sheet : Widget {
     // Layout parameters
 	static constexpr int staffCount = 2;
@@ -26,36 +28,38 @@ struct Sheet : Widget {
 	Font smallFont{File("LinLibertine_R.ttf", "/usr/share/fonts/libertine-ttf"_), 14.f, "LinLibertine_R"};
     // Font helpers
 	vec2 glyphSize(string name) { return font.metrics(font.index(name)).size; }
-    int2 noteSize = int2(round(glyphSize("noteheads.s2"_)));
+	vec2 noteSize = glyphSize("noteheads.s2"_);
+
+	// Graphics
+	array<int> measures; // X position of measure starts
+	Graphics notation;
+	map<uint, bgr3f> colors; // Overrides color for glyph index
+	// Graphic helpers
 	float glyph(vec2 position, const string name, Font& font);
 	float glyph(vec2 position, const string name) { return glyph(position, name, font); }
-
-    // Graphic primitives
-	typedef buffer<vec2> Cubic; array<Cubic> cubics;
-	Graphics notation;
-	map<uint, bgr3f> colors; // Overrides color for Blit index
-
 	uint text(vec2 position, const string& text, Font& font, array<Glyph>& glyphs);
 	uint text(vec2 position, const string& text, Font& font) { return this->text(position, text, font, notation.glyphs); }
 
-    // Layouts notations to graphic primitives
-	Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/);
+	int2 sizeHint(int2) override { return int2(measures.last(), staffY(1, -32)-staffY(0, 16)); }
+	Graphics graphics(int2 size) override;
 
-    // MIDI Synchronization
-    map<uint,array<Note>> notes; // Signs for notes (time, key, blitIndex)
+	// -- Control
+	array<int> measureToChord; // First chord index of measure
+	array<int> chordToNote; // First note index of chord
+
+	/// Returns measure index containing position \a x
+	int measureIndex(int x);
+	int stop(int unused axis, int currentPosition, int direction) override;
+
+	// -- MIDI Synchronization
+	map<uint, array<Note>> notes; // Signs for notes (time, key, blitIndex)
     uint extraErrors = 0, missingErrors = 0, wrongErrors = 0, orderErrors = 0;
     bool synchronizationFailed = false;
 
     /// Synchronizes with MIDI notes and layouts additional debug output if necessary
     /// \return Returns blit index of corresponding note for each MIDI note
     buffer<uint> synchronize(const ref<uint>& midiMotes);
-    int measureIndex(int x0);
 
-    // Control
-    array<int> measures; // X position of measure starts
-    array<int> measureToChord; // first chord index of measure
-    array<int> chordToNote; // first note index of chord
-
-	int2 sizeHint(int2) override { return int2(measures.last(), staffY(1, -32)-staffY(0, 16)); }
-	Graphics graphics(int2 size) override;
+	/// Layouts musical notations to graphic primitives
+	Sheet(const ref<Sign>& signs, uint divisions);
 };

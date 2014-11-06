@@ -13,15 +13,15 @@ struct ScrollArea : Widget {
 	const int scrollBarWidth = 8;
     int2 offset=0;
     int2 dragStartCursor, dragStartDelta;
-    //int2 size;
+	int2 size;
 
     /// Overrides \a widget to return the proxied widget
     virtual Widget& widget() const abstract;
 
     int2 sizeHint(int2 size) override { return widget().sizeHint(size); }
+	Graphics graphics(int2 size) override;
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;
-    //bool keyPress(Key key, Modifiers modifiers) override;
-    Graphics graphics(int2 size) override;
+	bool keyPress(Key key, Modifiers modifiers) override;
 };
 
 /// Makes a widget scrollable by proxying it through \a ScrollArea
@@ -115,24 +115,3 @@ struct Index {
 inline String str(Index o) { return str(*o.pointer); }
 
 generic buffer<Widget*> toWidgets(mref<T> widgets) { return apply(widgets, [](T& widget) -> Widget* { return &widget; }); }
-
-#if 0
-/// Several widgets in one spot, cycled by user
-struct WidgetCycle : Widget {
-	buffer<Widget*> widgets;
-	size_t index = 0;
-
-	WidgetCycle(ref<Widget*> widgets) : widgets(widgets) {}
-
-    // Forwards content
-    String title() override { return widgets[index]->title(); }
-    int2 sizeHint(int2 size) override { return widgets[index]->sizeHint(size); }
-    Graphics graphics(int2 size) override { return widgets[index]->graphics(size); }
-
-	// Forwards events
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;
-	// Forwards events and cycle widgets
-    bool keyPress(Key key, Modifiers modifiers) override;
-	bool keyRelease(Key key, Modifiers modifiers) override { return widgets[index]->keyRelease(key, modifiers); }
-};
-#endif

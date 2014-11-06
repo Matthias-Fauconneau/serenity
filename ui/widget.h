@@ -47,6 +47,10 @@ struct Widget {
     /// Returns graphic elements representing this widget at the given \a size.
 	virtual Graphics graphics(int2 unused size) { error("Unimplemented, use graphics(int2 size, Rect clip)"); }
 	virtual Graphics graphics(int2 size, Rect unused clip) { return this->graphics(size); }
+	/// Returns stop position for scrolling
+	/// \arg direction Direction of requested stop (-1: previous, 0: nearest, 1: next)
+	/// \note Defaults to discrete uniform coarse stops
+	virtual int stop(int unused axis, int currentPosition, int direction=0) { return currentPosition + direction * 64; }
 
 // Events
     /// Mouse event type
@@ -62,6 +66,5 @@ struct Widget {
     /// Override \a keyPress to handle or forward user input
     /// \note \a keyPress is directly called on the current focus
     /// \return Whether the key press was accepted
-    virtual bool keyPress(Key key, Modifiers modifiers) { (void)key, (void) modifiers; return false; }
-    virtual bool keyRelease(Key key, Modifiers modifiers) { (void)key, (void) modifiers; return false; }
+	virtual bool keyPress(Key key, Modifiers modifiers) { (void)key, (void) modifiers; return false; }
 };

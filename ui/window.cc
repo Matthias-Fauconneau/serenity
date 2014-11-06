@@ -43,24 +43,24 @@ void Window::onEvent(const ref<byte> ge) {
     if(type==MotionNotify) { heldEvent = unique<XEvent>(event); queue(); }
     else {
         // Ignores autorepeat
-        if(heldEvent && heldEvent->type==KeyRelease && heldEvent->time==event.time && type==KeyPress) heldEvent=nullptr;
+		//if(heldEvent && heldEvent->type==KeyRelease && heldEvent->time==event.time && type==KeyPress) heldEvent=nullptr;
         if(heldEvent) { processEvent(heldEvent); heldEvent=nullptr; }
-        if(type==KeyRelease) { heldEvent = unique<XEvent>(event); queue(); } // Hold release to detect any repeat
-        else if(processEvent(event)) {}
+		/*if(type==KeyRelease) { heldEvent = unique<XEvent>(event); queue(); } // Hold release to detect any repeat
+		else*/ if(processEvent(event)) {}
         else if(type==GenericEvent && event.genericEvent.ext == Present::EXT && event.genericEvent.type==Present::CompleteNotify) {
             assert_(state == Present);
             state = Idle;
         }
-        else log("Unhandled event", ref<string>(X11::events)[type]);
+		else error("Unhandled event", ref<string>(X11::events)[type]);
     }
 }
 
 bool Window::processEvent(const XEvent& e) {
     uint8 type = e.type&0b01111111; //msb set if sent by SendEvent
     /**/ if(type==ButtonPress) {
-        Widget* focus=this->focus; this->focus=0;
-		if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key, this->focus) || this->focus!=focus) render();
-		drag = this->focus;
+		Widget* previousFocus = focus;
+		if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key, focus) || focus!=previousFocus) render();
+		drag = focus;
     }
     else if(type==ButtonRelease) {
         drag=0;
@@ -73,11 +73,8 @@ bool Window::processEvent(const XEvent& e) {
             function<void()>* action = actions.find(key);
             if(action) (*action)(); // Local window action
         }
-    }
-    else if(type==KeyRelease) {
-        Key key = (Key)keySym(e.key, e.state); Modifiers modifiers = (Modifiers)e.state;
-        if(focus && focus->keyRelease(key, modifiers)) render();
-    }
+	}
+	else if(type==KeyRelease) {}
     else if(type==MotionNotify) {
         if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, Widget::LeftButton, focus))
             render();

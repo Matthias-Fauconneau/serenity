@@ -86,7 +86,6 @@ generic struct Book : array<T>, Widget {
 		if(key==RightArrow) index=min<int>(array<T>::size-1, index+1);
 		return active().keyPress(key, modifiers) || previousIndex != index;
 	}
-	bool keyRelease(Key key, Modifiers modifiers) { return active().keyRelease(key, modifiers); }
 };
 
 typedef UniformGrid<SourceImageView> Page;

@@ -3,6 +3,7 @@
 // ScrollArea
 
 Graphics ScrollArea::graphics(int2 size) {
+	this->size = size;
     int2 hint = abs(widget().sizeHint(size));
     int2 view (horizontal?max(hint.x,size.x):size.x,vertical?max(hint.y,size.y):size.y);
     Graphics graphics;
@@ -26,8 +27,8 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button, 
         focus = this;
 		if((button==WheelDown || button==WheelUp)) for(int axis: range(2)) {
 			if(size[axis]<hint[axis]) {
-				offset[axis] += (button==WheelUp?1:-1) * 64;
-				offset = min(int2(0,0), max(size-hint, offset));
+				offset[axis] = -stop(axis, -offset[axis], button==WheelDown?1:-1);
+				offset = min(int2(0,0), max(-(hint-size), offset));
 				return true;
 			}
 		}
@@ -36,7 +37,6 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button, 
 				if(size[axis]<hint[axis]) {
 					if(cursor[!axis]>size[!axis]-scrollBarWidth) {
 						offset[axis] = min(0, max(size[axis]-hint[axis], -cursor[axis]*(hint[axis]-size[axis]/2)/size[axis]));
-						log(cursor[axis], hint[axis], size[axis] , cursor[axis]*hint[axis]/size[axis], offset[axis]);
 						dragStartCursor=cursor, dragStartDelta=offset;
 						return true;
 					}
@@ -51,12 +51,19 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button, 
 			return true;
 		}
 	}
-    if(widget().mouseEvent(cursor-offset,max(hint,size),event,button,focus)) return true;
+	if(widget().mouseEvent(cursor-offset, max(hint,size), event, button, focus)) return true;
 	if(event==Motion && button==LeftButton && !(hint<=size)) {
-        offset = min(int2(0,0), max(size-hint, dragStartDelta+cursor-dragStartCursor));
+		offset = min(int2(0,0), max(-(hint-size), dragStartDelta+cursor-dragStartCursor));
         return true;
     }
     return false;
+}
+
+bool ScrollArea::keyPress(Key key, Modifiers) {
+	int2 hint = abs(widget().sizeHint(size));
+	if(key==Home) { offset = 0; return true; }
+	if(key==End) { offset = -(hint-size); return true; }
+	return false;
 }
 
 // Progress

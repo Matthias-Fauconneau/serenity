@@ -25,7 +25,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
     array<Chord> beams[2]; // Chords belonging to current beam (per staff) (also for correct single chord layout)
     array<array<Sign>> pendingSlurs[2];
     array<Sign> slurs[2]; // Signs belonging to current slur (pending slurs per staff)
-    uint pedalStart = 0; // Last pedal start/change position
+	float pedalStart = 0; // Last pedal start/change position
     Sign wedgeStart; // Current wedge
 	struct Position { // Holds current pen position for each line
 		float staffs[2];
@@ -39,7 +39,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 		/// Synchronizes all positions to \a x
 		void setAll(float x) { setStaves(x); middle = x; top = x; bottom = x; }
     };
-	map<uint, Position> timeTrack; // Maps times to positions
+	map<uint64, Position> timeTrack; // Maps times to positions
 	auto X = [&](const Sign& sign) -> float& {
 		assert_(timeTrack.contains(sign.time), int(sign.type), sign.time, sign.duration);
 		if(sign.type == Sign::Metronome) return timeTrack.at(sign.time).top;
@@ -66,7 +66,8 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 		measureToChord.append( 0 );
 		timeTrack.insert(0u, {{0,0},0,0,0/*{x,x},x*/});
 	}
-	for(Sign sign: signs) {
+	for(size_t signIndex: range(signs.size)) {
+		Sign sign = signs[signIndex];
 		for(uint staff: range(staffCount)) {
 			// Layout tails and beams
 			array<Chord>& beam = beams[staff];
@@ -165,7 +166,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 					vec2 k0p = k0 + vec2(0, slurDown*noteSize.y/2);
 					vec2 k1 = vec2(p1.x, y) + vec2(0, slurDown*2*noteSize.y);
 					vec2 k1p = k1 + vec2(0, slurDown*noteSize.y/2);
-					cubics.append( copyRef(ref<vec2>({p0,k0,k1,p1,k1p,k0p})) );
+					notation.cubics.append( copyRef(ref<vec2>({p0,k0,k1,p1,k1p,k0p})) );
 				}
 				pendingSlurs[staff].clear();
 			}
@@ -239,7 +240,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 				string change = clefs.contains(staff)?"_change"_:""_;
 				Clef clef = sign.clef;
 				assert_(!clef.octave);
-				if(!clefs.contains(staff) || clefs.at(staff).clefSign != sign.clef.clefSign) {
+				if((!clefs.contains(staff) || clefs.at(staff).clefSign != sign.clef.clefSign) && !(signIndex>=signs.size-2)) {
 					clefs[staff] = sign.clef;
 					x += noteSize.x;
 					if(clef.clefSign==Treble) x += glyph(vec2(x, Y(sign, 4)), "clefs.G"_+change);
@@ -253,7 +254,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 			else error(int(sign.type));
 
 			// Updates end position for future signs
-			if(timeTrack.contains(sign.time+sign.duration)) timeTrack.at(sign.time+sign.duration).staffs[sign.staff] = x;
+			if(timeTrack.contains(sign.time+sign.duration)) timeTrack.at(sign.time+sign.duration).setStaves(x);
 			else timeTrack.insert(sign.time+sign.duration, {{x,x},x,x,x});
 		} else {
 			assert_(staff == uint(-1));
@@ -268,7 +269,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 					glyph(vec2(x, staffY(0, -8)),numbers[timeSignature.beatUnit]);
 					x += 2*glyph(vec2(x, staffY(1, -8)),numbers[timeSignature.beatUnit]);
 					timeTrack.at(sign.time).setStaves(x); // Does not clear directions lines
-				} else {
+				} else { // Clears all lines (including direction lines)
 					if(sign.type == Sign::Measure) {
 						{vec2 min(x-barWidth+barWidth/2, staffY(0,0)), max(x+barWidth/2, staffY(1,-8));
 							notation.fills.append(min, max-min); } // Bar
@@ -283,7 +284,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 						measures.append( x );
 						measureToChord.append( notes.size() );
 						x += noteSize.x;
-						uint sx = x;
+						float sx = x;
 						for(uint8 code: str(sign.measure.index)) {
 							uint16 index = textFont.index(code);
 							notation.glyphs.append(vec2(sx, staffY(0, 16)), textFont, index);
@@ -300,7 +301,6 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 							x += glyph(vec2(x, Y(1, {clefs[1u].clefSign, 0}, step - (clefs[1u].clefSign==Bass ? 14 : 0))), symbol);
 						}
 						x += noteSize.x;
-						//timeTrack.at(sign.time).direction = x;
 					}
 					else error(int(sign.type));
 					timeTrack.at(sign.time).setAll(x);
@@ -351,7 +351,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 	for(auto& o: notation.glyphs) o.origin += offset;
 	for(Parallelogram& p: notation.parallelograms) p.min+=offset, p.max+=offset;
 	for(auto& o: notation.blits) o.origin += offset;
-    for(Cubic& c: cubics) for(vec2& p: c) p+=vec2(offset);
+	for(Cubic& c: notation.cubics) for(vec2& p: c) p+=vec2(offset);
 }
 
 buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
@@ -469,15 +469,13 @@ Graphics Sheet::graphics(int2 unused size) {
 	return copy(notation); //FIXME: shared
 }
 
-int Sheet::measureIndex(int x0) {
-    if(x0<measures[0]) return -1;
-    for(uint i: range(measures.size-1)) if(measures[i]<=x0 && x0<measures[i+1]) return i;
-    assert_(x0 >= measures.last()); return measures.size;
+int Sheet::measureIndex(int x) {
+	if(x<measures[0]) return -1;
+	for(uint i: range(measures.size-1)) if(measures[i]<=x && x<measures[i+1]) return i;
+	assert_(x >= measures.last()); return measures.size;
 }
 
-/*bool Sheet::mouseEvent(int2, int2, Event, Button button) {
-    int index = measureIndex(position);
-    if(button==WheelUp && index>0) { position=measures[index-1]; return true; } //TODO: previous measure
-    if(button==WheelDown && index<int(measures.size-1)) { position=measures[index+1]; return true; } //TODO: next measure
-    return false;
-}*/
+int Sheet::stop(int unused axis, int currentPosition, int direction=0) {
+	int currentIndex = measureIndex(currentPosition);
+	return measures[clip(0, currentIndex+direction, int(measures.size-1))];
+}

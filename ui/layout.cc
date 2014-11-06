@@ -20,23 +20,6 @@ bool Layout::mouseEvent(int2 cursor, int2 size, Event event, Button button, Widg
 
 // Linear
 int2 Linear::sizeHint(const int2 xySize) {
-#if 0
-	int width=0, expandingWidth=0;
-    int height=0, expandingHeight=0;
-	for(size_t index: range(count())) {
-		int2 hint = xy(at(index).sizeHint(size));
-		if(hint .y<0) expandingHeight=true;
-		height = max(height,abs(hint .y));
-		if(hint .x<0) expandingWidth=true;
-		width += abs(hint .x);
-    }
-	return xy(int2((this->expanding||expandingWidth)?-max(1,width):width,expandingHeight?-height:height));
-#elif 0
-	int2 requiredSize=0;
-	for(Rect r: layout(int2(size.x,0))) requiredSize=max(requiredSize, r.max);
-	log(requiredSize);
-	return requiredSize;
-#else
 	size_t count = this->count();
 	if(!count) return {};
 	const int2 size = xy(xySize);
@@ -61,9 +44,7 @@ int2 Linear::sizeHint(const int2 xySize) {
 		int offset = max(1, min(-width, first-second) / firstCount); // Distributes reduction to all largest widgets (max(1,...) to account for flooring)
 		for(int& size: widths) if(size == first) { size -= offset, width += offset; }
 	}
-	//int requiredWidth = sum(ref<int>(widths,count));
 	// Evaluates new required height with fitted widgets
-	//int requiredHeight = max(apply(count, [&](size_t index){ return abs(xy(at(index).sizeHint(xy(int2(widths[index], heights[index]))))); }));
 	int requiredWidth = 0, requiredHeight = 0;
 	for(size_t index: range(count)) {
 		int2 hint = abs(xy(at(index).sizeHint(xy(int2(widths[index], heights[index])))));
@@ -71,7 +52,6 @@ int2 Linear::sizeHint(const int2 xySize) {
 		requiredHeight = max(requiredHeight, hint.y);
 	}
 	return int2(requiredWidth, requiredHeight);
-#endif
 }
 
 buffer<Rect> Linear::layout(const int2 xySize) {
@@ -216,8 +196,7 @@ buffer<Rect> GridLayout::layout(int2 size) {
         }
         Y += heights[y];
         assert_(size.y ==0 || (int2(0) < int2(X,Y) && int2(X,Y) < size+int2(w,h)), X, Y, size, ref<int>(widths,w), ref<int>(heights,h));
-    }
-	//log("GridLayout::layout", strx(size), "->", strx(int2(w,h)), ":"); log(str(widgets));
+	}
     return widgets;
 }
 

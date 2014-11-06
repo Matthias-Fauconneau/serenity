@@ -73,7 +73,7 @@ struct Music
 #if PREVIEW
 		window.background = Window::White;
 		sheet.horizontal=true, sheet.vertical=false, sheet.scrollbar = true;
-		sheet.offset.x = -sheet.measures[126 -1];
+		//sheet.offset.x = -sheet.measures[126 -1];
 #if MIDI
         seek( midi.notes[noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[122]])].time );
 #endif
@@ -181,4 +181,5 @@ struct Music
 	bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
 		return sheet.ScrollArea::mouseEvent(cursor, size, event, button, focus);
 	}
+	bool keyPress(Key key, Modifiers modifiers) override { return sheet.ScrollArea::keyPress(key, modifiers); }
 } app;

@@ -5,21 +5,15 @@ MusicXML::MusicXML(string document) {
     Element root = parseXML(document);
 	map<uint, Clef> clefs; map<uint, bool> slurs; KeySignature keySignature={0}; TimeSignature timeSignature={4,4};
 	uint64 time = 0, nextTime = 0, maxTime = 0;
-    uint measureIndex=1;
-    for(const Element& m: root("score-partwise"_)("part"_).children) {
+	uint measureIndex=1;
+	for(const Element& m: root("score-partwise"_)("part"_).children) {
         assert_(m.name=="measure"_, m);
-        //log("Measure:", measureIndex);
-		if(measureIndex == 127) {
-			log(m);
-			error("Measure 127");
-		}
 		map<int, Accidental> measureAccidentals; // Currently accidented steps (for implicit accidentals)
         array<Sign> acciaccaturas; // Acciaccatura graces for pending principal
         uint appoggiaturaTime = 0; // Appoggiatura time to remove from pending principal
         for(const Element& e: m.children) {
             if(!(e.name=="note"_ && e("chord"_))) time = nextTime; // Advances time (except chords)
-            //log("time", time%(timeSignature.beats*divisions));
-            maxTime = max(maxTime, time);
+			maxTime = max(maxTime, time);
 
             if(e.name=="note"_) {
                 Duration type = Duration(ref<string>({"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_}).indexOf(e("type"_).text()));
@@ -104,13 +98,11 @@ MusicXML::MusicXML(string document) {
             else if(e.name=="backup"_) {
 				int dt = parseInteger(e("duration"_).text());
 				time -= dt;
-                //log("<<", dt);
                 nextTime = time;
             }
             else if(e.name=="forward"_) {
 				int dt =  parseInteger(e("duration"_).text());
 				time += dt;
-                //log(">>", dt);
                 maxTime = max(maxTime, time);
                 nextTime = time;
             }
@@ -163,13 +155,8 @@ MusicXML::MusicXML(string document) {
             else if(e.name=="print"_) {}
             else error(e);
         }
-        time=nextTime;
-        maxTime = max(maxTime, time);
-        time=maxTime;
+		maxTime=time=nextTime= max(maxTime, max(time, nextTime));
         measureIndex++;
 		{Sign sign{time, 0, uint(-1), Sign::Measure, {}}; sign.measure.index=measureIndex; signs.insertSorted(sign);}
-		//{Sign sign{time, 0, 1, Sign::Measure, {}}; sign.measure.index=measureIndex; signs.insertSorted(sign);}
-        //if(time%(timeSignature.beats*divisions)!=0) break;
-        //assert_(time%(timeSignature.beats*divisions)==0, measureIndex, time, timeSignature.beats, divisions);
-    }
+	}
 }

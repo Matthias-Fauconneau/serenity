@@ -42,6 +42,8 @@ struct Parallelogram {
 	float dy;
 };
 
+typedef buffer<vec2> Cubic;
+
 /// Set of graphic elements
 struct Graphics {
     array<Fill> fills;
@@ -49,6 +51,7 @@ struct Graphics {
     array<Glyph> glyphs;
     array<Line> lines;
 	array<Parallelogram> parallelograms;
+	array<Cubic> cubics;
 	explicit operator bool() const { return fills || blits || glyphs || lines || parallelograms; }
     void append(const Graphics& o, vec2 offset) {
         for(auto e: o.fills) { e.origin += offset; fills.append(e); }
@@ -58,6 +61,8 @@ struct Graphics {
 		for(auto e: o.parallelograms) { e.min += offset; e.max += offset; parallelograms.append(e); }
     }
 };
-inline Graphics copy(const Graphics& o) { return {copy(o.fills), copy(o.blits), copy(o.glyphs), copy(o.lines), copy(o.parallelograms)}; }
+inline Graphics copy(const Graphics& o) {
+	return {copy(o.fills), copy(o.blits), copy(o.glyphs), copy(o.lines), copy(o.parallelograms), copy(o.cubics)};
+}
 
 inline String str(const Graphics& o) { return str(o.fills.size, o.blits.size, o.glyphs.size, o.lines.size); }

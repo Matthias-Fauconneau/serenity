@@ -94,7 +94,7 @@ void Display::event() {
         if(!poll()) break;
         {Locker lock(this->lock);
             XEvent e = read<XEvent>();
-            if(e.type==Error) { log(e); continue; }
+			if(e.type==Error) { error(e); continue; }
 			o.append(raw(e));
             if(e.type==GenericEvent) o.append( read(e.genericEvent.size*4) );
         }
@@ -122,7 +122,7 @@ array<byte> Display::readReply(uint16 sequence, uint elementSize) {
             if(e.reply.size) { assert_(elementSize); reply.append(read(e.reply.size*elementSize)); }
             return reply;
         }
-        if(e.type==Error) { log(e); assert_(e.seq!=sequence, e.seq, sequence); continue; }
+		if(e.type==Error) { error(e); assert_(e.seq!=sequence, e.seq, sequence); continue; }
 		array<byte> o;
 		o.append(raw(e));
         if(e.type==GenericEvent) o.append(read(e.genericEvent.size*4));
@@ -147,7 +147,7 @@ uint8 Display::keyCode(uint sym) {
     if(!keycode) {
         if(sym==0x1008ff14/*Play*/) return 172; //FIXME
         if(sym==0x1008ff32/*Media*/) return 234; //FIXME
-        log("Unknown KeySym",int(sym)); return sym; }
+		error("Unknown KeySym",int(sym)); return sym; }
     return keycode;
 }
 
