@@ -44,8 +44,8 @@ struct Sheet : Widget {
 	Graphics graphics(int2 size) override;
 
 	// -- Control
-	array<int> measureToChord; // First chord index of measure
-	array<int> chordToNote; // First note index of chord
+	array<size_t> measureToChord; // First chord index of measure
+	array<size_t> chordToNote; // First note index of chord
 
 	/// Returns measure index containing position \a x
 	int measureIndex(int x);
@@ -54,11 +54,11 @@ struct Sheet : Widget {
 	// -- MIDI Synchronization
 	map<uint, array<Note>> notes; // Signs for notes (time, key, blitIndex)
     uint extraErrors = 0, missingErrors = 0, wrongErrors = 0, orderErrors = 0;
-    bool synchronizationFailed = false;
+	size_t firstSynchronizationFailureChordIndex = -1;
 
     /// Synchronizes with MIDI notes and layouts additional debug output if necessary
     /// \return Returns blit index of corresponding note for each MIDI note
-    buffer<uint> synchronize(const ref<uint>& midiMotes);
+	buffer<size_t> synchronize(const ref<uint>& midiMotes);
 
 	/// Layouts musical notations to graphic primitives
 	Sheet(const ref<Sign>& signs, uint divisions);

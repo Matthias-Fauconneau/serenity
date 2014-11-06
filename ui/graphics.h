@@ -20,6 +20,7 @@ struct Fill {
 struct Blit {
     vec2 origin, size;
     Image image;
+	bgr3f color = black; float opacity = 1;
 };
 
 /// Text graphic element
@@ -27,22 +28,26 @@ struct Glyph {
     vec2 origin;
     Font& font;
 	uint index;
-	bgr3f color = black;
+	bgr3f color = black; float opacity = 1;
 };
 
 /// Line graphic element
 struct Line {
     vec2 a, b;
-	bgr3f color;
+	bgr3f color = black; float opacity = 1;
 };
 
 /// Parallelogram graphic element
 struct Parallelogram {
 	vec2 min,max;
 	float dy;
+	bgr3f color = black; float opacity = 1;
 };
 
-typedef buffer<vec2> Cubic;
+struct Cubic {
+	buffer<vec2> points;
+	bgr3f color = black; float opacity = 1;
+};
 
 /// Set of graphic elements
 struct Graphics {

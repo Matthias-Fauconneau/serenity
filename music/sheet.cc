@@ -200,7 +200,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 				note.clef = clefs.at(staff);
 				vec2 p = P(sign);
 				Duration duration = note.duration;
-				note.blitIndex = notation.blits.size;
+				note.glyphIndex = notation.glyphs.size;
 				int dx = glyph(p, "noteheads.s"_+str(min(2,int(duration))), note.grace?graceFont:font);
 				int step = clefStep(note.clef.clefSign, note.step);
 				for(int s=2; s<=step; s+=2) { int y=staffY(staff, s); notation.fills.append(vec2(x-dx/3,y),vec2(dx*5/3,1)); }
@@ -348,59 +348,61 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
     // Vertical center align
 	vec2 offset = vec2(0/*-position*/, /*(height - sizeHint(0).y)/2 +*/ /*4*lineInterval*/ -staffY(0,16)+textFont.size);
 	for(auto& o: notation.fills) o.origin += offset;
+	assert_(!notation.blits);
 	for(auto& o: notation.glyphs) o.origin += offset;
-	for(Parallelogram& p: notation.parallelograms) p.min+=offset, p.max+=offset;
-	for(auto& o: notation.blits) o.origin += offset;
-	for(Cubic& c: notation.cubics) for(vec2& p: c) p+=vec2(offset);
+	for(auto& o: notation.parallelograms) o.min+=offset, o.max+=offset;
+	assert_(!notation.lines);
+	for(auto& o: notation.cubics) for(vec2& p: o.points) p+=vec2(offset);
 }
 
-buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
-	array<uint> midiToBlit (midiNotes.size, 0);
+buffer<size_t> Sheet::synchronize(const ref<uint>& midiNotes) {
+	chordToNote.clear();
+	array<size_t> midiToGlyphIndex (midiNotes.size, 0);
     map<uint, array<Note>> notes = copy(this->notes);
     array<uint> chordExtra;
 	array<Glyph> debug;
-    uint chordIndex = 0;
-    while(chordIndex<notes.size()) {
-        if(!notes.values[chordIndex]) {
-			chordIndex++; chordToNote.append( midiToBlit.size );
-            if(chordIndex==notes.size()) break;
-            array<Note>& chord = notes.values[chordIndex];
+	constexpr bool logErrors = false;
+	while(chordToNote.size<notes.size()) {
+		if(!notes.values[chordToNote.size]) {
+			chordToNote.append( midiToGlyphIndex.size );
+			if(chordToNote.size==notes.size()) break;
+			array<Note>& chord = notes.values[chordToNote.size];
             chordExtra.filter([&](uint midiIndex){ // Tries to match any previous extra to next notes
                 uint midiKey = midiNotes[midiIndex];
                 int match = chord.indexOf(midiKey);
                 if(match < 0) return false; // Keeps
                 Note note = chord.take(match);
                 assert_(note.key == midiKey);
-                midiToBlit[midiIndex] = note.blitIndex;
-                //log_("O"_+str(note.key));
-				vec2 p = notation.blits[note.blitIndex].origin;
+				midiToGlyphIndex[midiIndex] = note.glyphIndex;
+				if(logErrors) log("O",str(note.key));
+				vec2 p = notation.glyphs[note.glyphIndex].origin;
 				text(p+vec2(noteSize.x, 2), "O"_+str(note.key), smallFont, debug);
                 orderErrors++;
                 return true; // Discards
             });
             if(chordExtra) {
-                //log_("+"_+str(apply(chordExtra, [&](const uint index){return midiNotes[index];})));
+				if(logErrors) log("+"_+str(apply(chordExtra, [&](const uint index){return midiNotes[index];})));
                 assert_(chordExtra.size<=2, chordExtra.size);
                 extraErrors+=chordExtra.size;
                 chordExtra.clear();
             }
-			if(!notes.values[chordIndex]) { chordIndex++; chordToNote.append( midiToBlit.size ); }
-            assert_(chordIndex<notes.size());
-            if(chordIndex==notes.size()) break;
+			if(!notes.values[chordToNote.size]) chordToNote.append( midiToGlyphIndex.size );
+			assert_(chordToNote.size<notes.size());
+			if(chordToNote.size==notes.size()) break;
         }
-        assert_(chordIndex<notes.size());
-        array<Note>& chord = notes.values[chordIndex];
+		assert_(chordToNote.size<notes.size());
+		array<Note>& chord = notes.values[chordToNote.size];
         assert_(chord);
 
-        uint midiIndex = midiToBlit.size;
+		uint midiIndex = midiToGlyphIndex.size;
         assert_(midiIndex < midiNotes.size);
         uint midiKey = midiNotes[midiIndex];
 
-        if(extraErrors > 9 || wrongErrors > 6 || missingErrors > 9 || orderErrors > 7) {
-            log("MID", midiNotes.slice(midiIndex,7));
-            log("XML", chord);
-            synchronizationFailed = true;
+		if(extraErrors > 18 /*FIXME: tremolo*/ || wrongErrors > 6 || missingErrors > 8 || orderErrors > 7) {
+			firstSynchronizationFailureChordIndex = chordToNote.size;
 			notation.glyphs.append( move(debug) );
+			log("MID", midiNotes.slice(midiIndex,7));
+			log("XML", chord);
             break;
         }
 
@@ -408,27 +410,27 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
         if(match >= 0) {
             Note note = chord.take(match);
             assert_(note.key == midiKey);
-			midiToBlit.append( note.blitIndex );
-			vec2 p = notation.blits[note.blitIndex].origin;
+			midiToGlyphIndex.append( note.glyphIndex );
+			vec2 p = notation.glyphs[note.glyphIndex].origin;
 			text(p+vec2(noteSize.x, 2), str(note.key), smallFont, debug);
         } else if(chordExtra && chord.size == chordExtra.size) {
-            int match = notes.values[chordIndex+1].indexOf(midiNotes[chordExtra[0]]);
+			int match = notes.values[chordToNote.size+1].indexOf(midiNotes[chordExtra[0]]);
             if(match >= 0) {
                 assert_(chord.size<=3, chord);
-                //log_("-"_+str(chord));
+				if(logErrors) log("-"_+str(chord));
                 missingErrors += chord.size;
                 chord.clear();
                 chordExtra.filter([&](uint index){
-					if(!notes.values[chordIndex]) { chordIndex++; chordToNote.append( midiToBlit.size ); }
-                    array<Note>& chord = notes.values[chordIndex];
-                    assert_(chord, chordIndex, notes.size());
+					if(!notes.values[chordToNote.size]) chordToNote.append( midiToGlyphIndex.size );
+					array<Note>& chord = notes.values[chordToNote.size];
+					assert_(chord, chordToNote.size, notes.size());
                     int match = chord.indexOf(midiNotes[index]);
                     if(match<0) return false; // Keeps as extra
                     midiKey = midiNotes[index];
                     Note note = chord.take(match);
                     assert_(midiKey == note.key);
-                    midiToBlit[index] = note.blitIndex;
-					vec2 p = notation.blits[note.blitIndex].origin;
+					midiToGlyphIndex[index] = note.glyphIndex;
+					vec2 p = notation.glyphs[note.glyphIndex].origin;
 					text(p+vec2(noteSize.x, 2), str(note.key), smallFont, debug);
                     return true; // Discards extra as matched to next chord
                 });
@@ -440,33 +442,32 @@ buffer<uint> Sheet::synchronize(const ref<uint>& midiNotes) {
                     uint midiIndex = chordExtra.take(0);
                     uint midiKey = midiNotes[midiIndex];
                     assert_(note.key != midiKey);
-                    //log_("!"_+str(note.key, midiKey));
-					vec2 p = notation.blits[note.blitIndex].origin;
+					if(logErrors) log("!"_+str(note.key, midiKey));
+					vec2 p = notation.glyphs[note.glyphIndex].origin;
 					text(p+vec2(noteSize.x, 2), str(note.key)+"?"_+str(midiKey)+"!"_, smallFont, debug);
                     wrongErrors++;
                     return true; // Discards as wrong
                 });
                 if(previousSize == chord.size) { // No notes have been filtered out as wrong, remaining are extras
                     assert_(chordExtra && chordExtra.size<=3, chordExtra.size);
-                    //log_("+"_+str(apply(chordExtra, [&](const uint index){return midiNotes[index];})));
+					if(logErrors) log("+"_+str(apply(chordExtra, [&](const uint index){return midiNotes[index];})));
                     extraErrors += chordExtra.size;
                     chordExtra.clear();
                 }
             }
         } else {
-			midiToBlit.append( -1 );
+			midiToGlyphIndex.append( -1 );
 			chordExtra.append( midiIndex );
         }
-    }
-	assert_(chordToNote.size == this->notes.size(), chordToNote.size, this->notes.size());
-    log(extraErrors, wrongErrors, missingErrors, orderErrors);
-    return move(midiToBlit);
+	}
+	if(logErrors) log(extraErrors, wrongErrors, missingErrors, orderErrors);
+	return move(midiToGlyphIndex);
 }
 
-Graphics Sheet::graphics(int2 unused size) {
-	//Graphics graphics;
-	//for(const Cubic& c: cubics) { buffer<vec2> points(c.size); for(uint i: range(c.size)) points[i]=vec2(offset)+c[i]; cubic(target, points); }*/
-	return copy(notation); //FIXME: shared
+Graphics Sheet::graphics(int2) {
+	Graphics graphics = copy(notation);
+	for(auto color: colors) graphics.glyphs[color.key].color = color.value;
+	return graphics;
 }
 
 int Sheet::measureIndex(int x) {

@@ -28,6 +28,9 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     Image target;
     /// Shared window buffer state
     enum State { Idle, Copy, Present } state = Idle;
+	uint64 firstFrameCounterValue = 0;
+	uint64 currentFrameCounterValue = 0;
+	static constexpr uint framesPerSecond = 60; // FIXME: get from Window
 
     /// Updates to be rendered
     struct Update { Graphics graphics; int2 origin, size; };

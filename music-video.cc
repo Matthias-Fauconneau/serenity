@@ -21,6 +21,7 @@ extern "C" {
 #define ENCODE 0
 #define PREVIEW !ENCODE
 #define AUDIO 0
+#define MIDI 1
 
 struct Music
 #if PREVIEW
@@ -35,7 +36,8 @@ struct Music
 #endif
 #if MIDI
     MidiFile midi = readFile(name+".mid"_);
-    buffer<uint> noteToBlit = sheet.synchronize(apply(filter(midi.notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;}));
+	buffer<size_t> noteToGlyph =
+			sheet.synchronize(apply(filter(midi.notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;}));
 #endif
 
     // Highlighting
@@ -52,14 +54,14 @@ struct Music
 #if PREVIEW
     bool preview = PREVIEW;
 	Window window {this, int2(-1), [](){return "MusicXML"__;}};
-    const uint fps = 60;
-    uint64 videoTime = 0;
+	uint64 videoTime = 0;
+	uint64 previousFrameCounterValue = 0;
 #if AUDIO
     Thread audioThread;
     AudioOutput audio {{this,&Music::read}, audioThread};
     uint64 audioTime = 0;
 #endif
-    bool running = false;
+	bool running = true;
 #endif
 #if MIDI
     uint noteIndexToMidiIndex(uint seekNoteIndex) {
@@ -73,9 +75,16 @@ struct Music
 #if PREVIEW
 		window.background = Window::White;
 		sheet.horizontal=true, sheet.vertical=false, sheet.scrollbar = true;
-		//sheet.offset.x = -sheet.measures[126 -1];
+		if(sheet.firstSynchronizationFailureChordIndex != invalid) {
+			size_t measureIndex = 0;
+			for(;measureIndex < sheet.measureToChord.size; measureIndex++)
+				if(sheet.measureToChord[measureIndex]>=sheet.firstSynchronizationFailureChordIndex) break;
+			sheet.offset.x = -sheet.measures[max<int>(0, measureIndex-3)];
+		}
 #if MIDI
-        seek( midi.notes[noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[122]])].time );
+		if(sheet.firstSynchronizationFailureChordIndex == invalid) {
+			seek( midi.notes[noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[0/*122*/]])].time );
+		}
 #endif
         if(preview) {
             window.show();
@@ -92,12 +101,12 @@ struct Music
                     if(av_read_frame(mp3.file, &packet) < 0) { done=1; break; }
                     assert_(mp3.file->streams[packet.stream_index]==mp3.audioStream);
                     assert_(mp3.audioStream->time_base.num==1);
-                    assert_(packet.pts*encoder.audioStream->time_base.den%mp3.audioStream->time_base.den==0, packet.pts, packet.pts/float(mp3.audioStream->time_base.den));
+					assert_(packet.pts*encoder.audioStream->time_base.den%mp3.audioStream->time_base.den==0);
                     encoder.audioTime = packet.pts*encoder.audioStream->time_base.den/mp3.audioStream->time_base.den;
                     assert_(encoder.audioStream->time_base.num==1 && uint(encoder.audioStream->time_base.den)==encoder.rate);
                     assert_(packet.dts == packet.pts, packet.dts, packet.pts);
                     packet.pts = packet.dts = encoder.audioTime;
-                    assert_((int64)packet.duration*encoder.audioStream->time_base.den%mp3.audioStream->time_base.den==0, packet.duration, packet.duration/float(mp3.audioStream->time_base.den));
+					assert_((int64)packet.duration*encoder.audioStream->time_base.den%mp3.audioStream->time_base.den==0);
                     packet.duration = (int64)packet.duration*encoder.audioStream->time_base.den/mp3.audioStream->time_base.den;
                     packet.stream_index = encoder.audioStream->index;
                     av_interleaved_write_frame(encoder.context, &packet);
@@ -117,34 +126,34 @@ struct Music
 #endif
     }
 
-	void follow(uint unused timeNum, uint unused timeDen) {
-        bool contentChanged = false;
 #if MIDI
-        for(;midiIndex < midi.notes.size && midi.notes[midiIndex].time*timeDen <= timeNum*midi.ticksPerSeconds; midiIndex++) {
+	void follow(uint timeNum, uint timeDen) {
+        bool contentChanged = false;
+		for(;midiIndex < midi.notes.size && midi.notes[midiIndex].time*timeDen <= timeNum*midi.ticksPerSeconds; midiIndex++) {
             MidiNote note = midi.notes[midiIndex];
-            if(note.velocity) {
-                uint blitIndex = noteToBlit[noteIndex];
-                if(blitIndex!=uint(-1)) { active.insertMulti(note.key, blitIndex); contentChanged = true; }
+			if(note.velocity) {
+				size_t glyphIndex = noteToGlyph[noteIndex];
+				if(glyphIndex!=invalid) { active.insertMulti(note.key, glyphIndex); contentChanged = true; }
                 noteIndex++;
             }
             else if(!note.velocity && active.contains(note.key)) {
                 while(active.contains(note.key)) { active.remove(note.key); contentChanged = true; }
             }
         }
-#endif
         if(!contentChanged) return;
 
         sheet.colors.clear();
         for(uint index: active.values) sheet.colors.insert(index, red);
-		if(active) targetPosition = min(apply(active.values,[this](uint index){return sheet.notation.blits[index].origin.x;}));
+		if(active) targetPosition = min(apply(active.values,[this](uint index){return sheet.notation.glyphs[index].origin.x;}));
     }
 
     void step(const float dt) {
         const float b=-1, k=1; // damping [1] and stiffness [1/T2] constants
         speed += dt * (b*speed + k*(targetPosition-position)); // Euler integration of speed (px/s) from acceleration by spring equation (px/s2)
         position += dt * speed; // Euler integration of position (in pixels) from speed (in pixels/s)
+		position = targetPosition - window.size.x/2;
     }
-
+#endif
 #if PREVIEW
 #if AUDIO
     uint read(const mref<short2>& output) {
@@ -158,21 +167,24 @@ struct Music
 #if AUDIO
         audioTime = midiTime * mp3.rate / midi.ticksPerSeconds;
         mp3.seek(audioTime); //FIXME: return actual frame time
-        videoTime = audioTime*fps/mp3.rate; // FIXME: remainder
+		videoTime = audioTime * window.framesPerSecond / mp3.rate; // FIXME: remainder
 #elif MIDI
-        videoTime = midiTime * fps / midi.ticksPerSeconds;
+		videoTime = midiTime * window.framesPerSecond / midi.ticksPerSeconds;
+		previousFrameCounterValue=window.currentFrameCounterValue;
+		follow(videoTime, window.framesPerSecond);
+		position = targetPosition; //DEBUG
 #endif
-        follow(videoTime, fps);
-        position = targetPosition;
     }
 
 	int2 sizeHint(int2 size) override { return sheet.ScrollArea::sizeHint(size); }
 	Graphics graphics(int2 size) override {
-#if VIDEO
-        follow(videoTime, fps);
-        step(1./fps);
-        videoTime++;
-		position = min(float(sheet.measures.last()-size.x), position);
+		if(!previousFrameCounterValue) previousFrameCounterValue=window.currentFrameCounterValue;
+		videoTime += int64(window.currentFrameCounterValue) - int64(previousFrameCounterValue);
+#if MIDI
+		follow(videoTime, window.framesPerSecond);
+		step(1./window.framesPerSecond);
+		previousFrameCounterValue = window.currentFrameCounterValue;
+		sheet.offset.x = -max(0.f, position);
         if(running) window.render();
 #endif
 		return sheet.ScrollArea::graphics(size); //int2(floor(-position), 0)

@@ -30,7 +30,7 @@ struct Note {
     bool accent:1;
     bool stem:1; // 0: down, 1: up
     uint key;
-	size_t blitIndex;
+	size_t glyphIndex;
 };
 inline bool operator ==(const Note& note, const uint& key) { return note.key == key; }
 struct Rest {

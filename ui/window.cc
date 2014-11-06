@@ -48,8 +48,13 @@ void Window::onEvent(const ref<byte> ge) {
 		/*if(type==KeyRelease) { heldEvent = unique<XEvent>(event); queue(); } // Hold release to detect any repeat
 		else*/ if(processEvent(event)) {}
         else if(type==GenericEvent && event.genericEvent.ext == Present::EXT && event.genericEvent.type==Present::CompleteNotify) {
+			const auto& completeNotify = *(struct Present::CompleteNotify*)&event;
+			assert_(sizeof(XEvent)+event.genericEvent.size*4 == sizeof(completeNotify),
+					sizeof(XEvent)+event.genericEvent.size*4, sizeof(completeNotify));
             assert_(state == Present);
             state = Idle;
+			currentFrameCounterValue = completeNotify.msc;
+			if(!firstFrameCounterValue) firstFrameCounterValue = currentFrameCounterValue;
         }
 		else error("Unhandled event", ref<string>(X11::events)[type]);
     }
