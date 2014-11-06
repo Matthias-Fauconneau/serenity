@@ -6,12 +6,12 @@
 
 /// XML element providing DOM-like access
 struct Element {
-    String name, content;
-    map<String, String> attributes;
+	string name, content;
+	map<string, string> attributes;
     array<unique<Element>> children;
     Element(){}
     /// Creates a content element from \a content
-    Element(String&& content):content(move(content)){}
+	Element(string content) : content(content){}
     /// Parses XML data to construct a DOM tree of \a Elements
     /// \note As all name, content and attribute Strings are referenced, the input document should live as long as the parsed elements.
     Element(TextData& data, bool html=false);

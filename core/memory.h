@@ -74,7 +74,7 @@ extern "C" void* malloc(size_t size) noexcept;
 extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size) noexcept;
 extern "C" void* realloc(void* buffer, size_t size) noexcept;
 extern "C" void free(void* buffer) noexcept;
-
+#include <type_traits>
 /// Managed fixed capacity mutable reference to an array of elements
 /// \note Data is either an heap allocation managed by this object or a reference to memory managed by another object.
 generic struct buffer : mref<T> {
@@ -102,7 +102,7 @@ generic struct buffer : mref<T> {
     /// If the buffer owns the reference, returns the memory to the allocator
     ~buffer() {
         if(capacity) {
-			for(size_t i: range(size)) at(i).~T();
+			if(!__has_trivial_destructor(T)) for(size_t i: range(size)) at(i).~T();
 			free((void*)data);
         }
         data=0; capacity=0; size=0;

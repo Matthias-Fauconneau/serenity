@@ -189,8 +189,8 @@ struct Build {
         for(string arg: arguments()) {
 			if(startsWith(arg,"-")) {} // Build command flag
 			else if(startsWith(arg,"/")) install=arg;
-            else if(find(arg+".cc")) {
-                if(target) log("Multiple targets unsupported, building last target:",arg);
+			else if(find(arg+".cc") && arg!="profile") {
+				if(target) log("Multiple targets unsupported, building last target:", arg, ". Parsing arguments:", arguments());
 				target = arg;
 			}
 			else flags.append( split(arg,"-") );
@@ -210,7 +210,7 @@ struct Build {
         Folder(tmp+"/"+join(flags,"-"), root(), true);
 
         // Compiles
-		if(flags.contains("profile")) if(!compileModule(find("profile.cc"))) { log("Failed to compile"); requestTermination(-1); return; }
+		if(flags.contains("profile")) if(!compileModule(find("core/profile.cc"))) { log("Failed to compile"); requestTermination(-1); return; }
 		if(!compileModule( find(target+".cc") )) { log("Failed to compile"); requestTermination(-1); return; }
 
 		if(arguments().contains("-tree")) { log(collect(modules.first(), 1)); return; }

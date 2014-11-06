@@ -31,6 +31,7 @@ generic struct array : buffer<T> {
 	void reserve(size_t nextCapacity) {
         assert(nextCapacity>=size);
         if(nextCapacity>capacity) {
+			nextCapacity = max(nextCapacity, capacity*2); // Amortizes reallocation
             const T* data = 0;
 			if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error("Out of memory"); // TODO: move compatible realloc
             swap(data, this->data);

@@ -16,7 +16,7 @@ static Element parse(string document, bool html) {
 }
 
 Element parseXML(const string& document) { return parse(document,false); }
-Element parseHTML(const string& document) { return parse(document,true); }
+//Element parseHTML(const string& document) { return parse(document,true); }
 
 Element::Element(TextData& s, bool html) {
 	size_t begin = s.index;
@@ -24,27 +24,28 @@ Element::Element(TextData& s, bool html) {
 	else if(s.match("?xml")) { s.until("?>"); return; }
 	else if(s.match("!--")) { s.until("-->"); return; }
 	else if(s.match('?')){ log("Unexpected <?",s.until("?>"),"?>"); return; }
-	else name = copyRef(s.identifier("_-:"));
+	else name = s.identifier("_-:");
 	if(!name) { log(s.slice(0,s.index)); log("Expected tag name got",s.line()); }
-    if(html) name=toLower(name);
+	//if(html) name=toLower(name);
 	s.whileAny(" \t\n");
     while(!s.match('>')) {
 		if(s.match("/>")) { /*s.skip();*/ return; }
 		else if(s.match('/')) {} //s.skip(); //spurious /
         else if(s.match('<')) break; //forgotten >
 		s.whileAny(" \t\n");
-		String key = copyRef(s.identifier("_-:"));/*TODO:reference*/ //s.skip();
+		string key = s.identifier("_-:");/*TODO:reference*/ //s.skip();
 		if(!key) { log("Attribute syntax error"_,s.slice(begin,s.index-begin),"|"_,s.until('>')); s.until('>'); break; }
-        if(html) key=toLower(key);
-        String value;
+		//if(html) key = toLower(key);
+		string value;
         if(s.match('=')) {
 			//s.skip();
-            if(s.match('"')) value=unescape(s.until('"'));
-            else if(s.match('\'')) value=unescape(s.until('\''));
-			else { value=copyRef(s.untilAny(" \t\n>")); if(s.slice(s.index-1,1)==">") s.index--; }
-			s.match("\""); //duplicate "
+			if(s.match('"')) value=s.until('"');
+			else if(s.match('\'')) value=s.until('\'');
+			else { value=s.untilAny(" \t\n>"); if(s.slice(s.index-1,1)==">") s.index--; }
+			//if(html) value=unescape(value);
+			//s.match("\""); //duplicate "
         }
-        attributes.insertMulti(move(key), move(value));
+		attributes.insertMulti(key, value);
 		s.whileAny(" \t\n");
     }
 	/*if(html) {
@@ -61,7 +62,7 @@ Element::Element(TextData& s, bool html) {
         if(s.available(4)<4) return; //ignore unclosed tag
         if(s.match("<![CDATA["_)) {
 			string content = s.until("]]>");
-			if(content) children.append( unique<Element>(copyRef(content)) );
+			if(content) children.append( unique<Element>(content) );
         }
         else if(s.match("<!--"_)) { s.until("-->"_); }
         else if(s.match("</"_)) { if(name==s.until(">"_)) break; } //ignore
@@ -69,7 +70,8 @@ Element::Element(TextData& s, bool html) {
 		else if(s.match('<')) children.append( unique<Element>(s,html) );
         else {
 			assert_(!content);
-			content = copyRef(trim(unescape(s.whileNot('<'))));
+			content = trim(s.whileNot('<'));
+			//if(html) content = unescape(content);
 			//if(trim(content)) children.append( unique<Element>(move(content)) );
         }
     }

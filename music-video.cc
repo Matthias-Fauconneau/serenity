@@ -151,7 +151,6 @@ struct Music
         const float b=-1, k=1; // damping [1] and stiffness [1/T2] constants
         speed += dt * (b*speed + k*(targetPosition-position)); // Euler integration of speed (px/s) from acceleration by spring equation (px/s2)
         position += dt * speed; // Euler integration of position (in pixels) from speed (in pixels/s)
-		position = targetPosition - window.size.x/2;
     }
 #endif
 #if PREVIEW
@@ -179,19 +178,25 @@ struct Music
 	int2 sizeHint(int2 size) override { return sheet.ScrollArea::sizeHint(size); }
 	Graphics graphics(int2 size) override {
 		if(!previousFrameCounterValue) previousFrameCounterValue=window.currentFrameCounterValue;
-		videoTime += int64(window.currentFrameCounterValue) - int64(previousFrameCounterValue);
+		int64 elapsedFrameCount = int64(window.currentFrameCounterValue) - int64(previousFrameCounterValue);
+		if(elapsedFrameCount>1) log(elapsedFrameCount); // PROFILE
+#if AUDIO
+		videoTime = audioTime * window.framesPerSecond / mp3.rate + elapsedFrameCount /*Compensates renderer latency*/;
+#else
+		videoTime += elapsedFrameCount;
+#endif
 #if MIDI
 		follow(videoTime, window.framesPerSecond);
-		step(1./window.framesPerSecond);
+		step(float(elapsedFrameCount)/float(window.framesPerSecond));
 		previousFrameCounterValue = window.currentFrameCounterValue;
 		sheet.offset.x = -max(0.f, position);
         if(running) window.render();
 #endif
 		return sheet.ScrollArea::graphics(size); //int2(floor(-position), 0)
     }
-#endif
 	bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
 		return sheet.ScrollArea::mouseEvent(cursor, size, event, button, focus);
 	}
 	bool keyPress(Key key, Modifiers modifiers) override { return sheet.ScrollArea::keyPress(key, modifiers); }
+#endif
 } app;
