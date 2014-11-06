@@ -3,12 +3,17 @@
 
 MusicXML::MusicXML(string document) {
     Element root = parseXML(document);
-    map<uint, Clef> clefs; map<uint, bool> slurs; KeySignature keySignature={0}; TimeSignature timeSignature={4,4}; uint time = 0, nextTime = 0, maxTime = 0;
+	map<uint, Clef> clefs; map<uint, bool> slurs; KeySignature keySignature={0}; TimeSignature timeSignature={4,4};
+	uint64 time = 0, nextTime = 0, maxTime = 0;
     uint measureIndex=1;
     for(const Element& m: root("score-partwise"_)("part"_).children) {
         assert_(m.name=="measure"_, m);
         //log("Measure:", measureIndex);
-        map<int,Accidental> measureAccidentals; // Currently accidented steps (for implicit accidentals)
+		if(measureIndex == 127) {
+			log(m);
+			error("Measure 127");
+		}
+		map<int, Accidental> measureAccidentals; // Currently accidented steps (for implicit accidentals)
         array<Sign> acciaccaturas; // Acciaccatura graces for pending principal
         uint appoggiaturaTime = 0; // Appoggiatura time to remove from pending principal
         for(const Element& e: m.children) {
@@ -18,7 +23,7 @@ MusicXML::MusicXML(string document) {
 
             if(e.name=="note"_) {
                 Duration type = Duration(ref<string>({"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_}).indexOf(e("type"_).text()));
-                uint duration;
+				uint duration;
                 if(e("grace"_)) {
                     assert_(uint(type)<Sixteenth && divisions%16 == 0);
                     duration = (uint[]){16,8,4,2,1}[uint(type)]*divisions/16;
@@ -34,12 +39,12 @@ MusicXML::MusicXML(string document) {
                     acciaccaturas.clear();
                     appoggiaturaTime = 0;
                 }
-                if(!e("chord"_) && !e("grace"_)) nextTime = time+duration;
+				if(!e("chord"_) && !e("grace"_)) nextTime = time+duration;
                 if(e["print-object"_]=="no"_) continue;
 				uint staff = parseInteger(e("staff"_).text())-1;
                 assert_(int(type)>=0, e);
                 if(e("rest"_)) {
-                    {Sign sign{time, duration, staff, Sign::Rest, {}}; sign.rest={type}; signs.insertSorted(sign);}
+					{Sign sign{time, duration, staff, Sign::Rest, {}}; sign.rest={type}; signs.insertSorted(sign);}
                 } else {
                     assert_(e("pitch"_)("step"_).text(), e);
                     uint octaveStep = "CDEFGAB"_.indexOf(e("pitch"_)("step"_).text()[0]);
@@ -90,21 +95,21 @@ MusicXML::MusicXML(string document) {
                                    key, 0
                                   };
                         // Acciaccatura are played before principal beat (Records graces to shift in on parsing principal)
-						/*if(e("grace"_) && e("grace"_)["slash"_]=="yes"_) acciaccaturas.append( sign ); // FIXME: display after measure bar
-						else*/ signs.insertSorted(sign);
+						if(e("grace"_) && e("grace"_)["slash"_]=="yes"_) acciaccaturas.append( sign ); // FIXME: display after measure bar
+						else signs.insertSorted(sign);
                     }
                 }
                 if(e("grace"_) && e("grace"_)["slash"_]!="yes"_) appoggiaturaTime += duration; // Takes time away from principal (appoggiatura)
             }
             else if(e.name=="backup"_) {
 				int dt = parseInteger(e("duration"_).text());
-                time -= dt;
+				time -= dt;
                 //log("<<", dt);
                 nextTime = time;
             }
             else if(e.name=="forward"_) {
 				int dt =  parseInteger(e("duration"_).text());
-                time += dt;
+				time += dt;
                 //log(">>", dt);
                 maxTime = max(maxTime, time);
                 nextTime = time;

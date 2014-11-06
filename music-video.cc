@@ -73,6 +73,7 @@ struct Music
 #if PREVIEW
 		window.background = Window::White;
 		sheet.horizontal=true, sheet.vertical=false, sheet.scrollbar = true;
+		sheet.offset.x = -sheet.measures[126 -1];
 #if MIDI
         seek( midi.notes[noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[122]])].time );
 #endif

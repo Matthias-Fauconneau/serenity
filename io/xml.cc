@@ -19,7 +19,7 @@ Element parseXML(const string& document) { return parse(document,false); }
 Element parseHTML(const string& document) { return parse(document,true); }
 
 Element::Element(TextData& s, bool html) {
-	uint begin = s.index;
+	size_t begin = s.index;
 	if(s.match("!DOCTYPE")||s.match("!doctype")) { s.until('>'); return; }
 	else if(s.match("?xml")) { s.until("?>"); return; }
 	else if(s.match("!--")) { s.until("-->"); return; }

@@ -84,7 +84,7 @@ String replace(string s, string before, string after);
 
 /// Removes duplicate whitespace
 String simplify(array<char>&& s);
-inline String simplify(string s) { return simplify(copyRef(s)); }
+inline String simplify(string s) { return simplify((array<char>)copyRef(s)); }
 
 // -- string[]
 

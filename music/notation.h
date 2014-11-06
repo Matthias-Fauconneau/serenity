@@ -1,6 +1,8 @@
 #pragma once
 /// notation.h Music notation definitions
 typedef unsigned int uint;
+typedef unsigned long long uint64;
+typedef __SIZE_TYPE__ 	size_t;
 
 enum ClefSign { Bass, Treble };
 enum Accidental { None, Flat /*♭*/, Sharp /*♯*/, Natural /*♮*/ };
@@ -28,7 +30,7 @@ struct Note {
     bool accent:1;
     bool stem:1; // 0: down, 1: up
     uint key;
-    uint blitIndex;
+	size_t blitIndex;
 };
 inline bool operator ==(const Note& note, const uint& key) { return note.key == key; }
 struct Rest {
@@ -58,10 +60,16 @@ struct Metronome {
 };
 
 struct Sign {
-    uint time; // Absolute time offset
+	uint64 time; // Absolute time offset
     uint duration;
 	uint staff; // Staff index
-    enum { Note, Rest, Measure, Dynamic, Clef, KeySignature, TimeSignature, Metronome, Pedal, Wedge } type;
+	enum {
+		Note, Rest, Clef, // Staff
+		Metronome, // Top
+		Dynamic, Wedge, // Middle
+		Pedal, // Bottom
+		Measure, KeySignature, TimeSignature // Across
+	} type;
     union {
         struct Note note;
         struct Rest rest;

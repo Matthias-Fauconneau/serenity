@@ -7,16 +7,17 @@ inline String str(const Note& a) { return str(a.key); }
 
 struct Sheet : Widget {
     // Layout parameters
-    const int staffCount = 2;
+	static constexpr int staffCount = 2;
 	const float halfLineInterval = 5, lineInterval = 2*halfLineInterval;
 	const float lineWidth = 1, barWidth=1, stemWidth = 1, stemLength = 4*lineInterval, beamWidth = 6;
 	const float shortStemLength = 5*halfLineInterval;
     // Layout helpers
     int clefStep(ClefSign clefSign, int step) { return step - (clefSign==Treble ? 10 : -2); } // Translates C4 step to top line step using clef
 	float staffY(uint staff, int clefStep) { return staff*10*lineInterval - clefStep * halfLineInterval; } // Clef independent
-    int Y(Clef clef, uint staff, int step) { return staffY(staff, clefStep(clef.clefSign, step)); } // Clef dependent
-    int Y(Sign sign) { assert_(sign.type==Sign::Note); return Y(sign.note.clef, sign.staff, sign.note.step); } // Clef dependent
-    int Y(const map<uint, Clef>& clefs, uint staff, int step) { return staffY(staff, clefStep(clefs.at(staff).clefSign, step)); } // Clef dependent
+	int Y(uint staff, Clef clef, int step) { return staffY(staff, clefStep(clef.clefSign, step)); } // Clef dependent
+	int Y(Sign sign, int step) { assert_(sign.type==Sign::Note||sign.type==Sign::Clef); return Y(sign.staff, sign.note.clef, step); } // Clef dependent
+	int Y(Sign sign) { assert_(sign.type==Sign::Note); return Y(sign, sign.note.step); } // Clef dependent
+	//int Y(const map<uint, Clef>& clefs, uint staff, int step) { return staffY(staff, clefStep(clefs.at(staff).clefSign, step)); } // Clef dependent
 
     // Fonts
 	Font graceFont {File("emmentaler-26.otf", Folder("/usr/local/share/fonts"_)), 4.f*halfLineInterval, "Emmentaler"};
