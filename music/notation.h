@@ -60,7 +60,7 @@ struct Metronome {
 struct Sign {
     uint time; // Absolute time offset
     uint duration;
-    uint staff; // Staff index
+	uint staff; // Staff index
     enum { Note, Rest, Measure, Dynamic, Clef, KeySignature, TimeSignature, Metronome, Pedal, Wedge } type;
     union {
         struct Note note;

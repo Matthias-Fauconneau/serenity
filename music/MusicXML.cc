@@ -26,7 +26,7 @@ MusicXML::MusicXML(string document) {
                     uint acciaccaturaTime = 0;
 					for(Sign grace: acciaccaturas.reverse()) { // Inserts any pending acciaccatura graces before principal
                         acciaccaturaTime += grace.duration;
-                        grace.time = time-acciaccaturaTime;
+						grace.time = time; //FIXME: -acciaccaturaTime;
                         signs.insertSorted(grace);
                     }
 					duration = parseInteger(e("duration"_).text()) - appoggiaturaTime;
@@ -51,7 +51,7 @@ MusicXML::MusicXML(string document) {
                         else assert_(e("notations"_)("slur"_).attribute("type"_)=="start"_, e("notations"_)("slur"_).attribute("type"_), e);
                         slurs[staff] = !slurs[staff];
                     }
-                    Note::Tie tie = Note::NoTie;
+					Note::Tie tie = Note::NoTie;
                     if(e("notations"_)("tied"_)) {
                         /**/ if(e("notations"_)("tied"_)["type"_] == "start"_) tie = Note::TieStart;
                         else if(e("notations"_)("tied"_)["type"_] == "stop"_) tie = Note::TieStop;
@@ -90,8 +90,8 @@ MusicXML::MusicXML(string document) {
                                    key, 0
                                   };
                         // Acciaccatura are played before principal beat (Records graces to shift in on parsing principal)
-						if(e("grace"_) && e("grace"_)["slash"_]=="yes"_) acciaccaturas.append( sign );
-                        else signs.insertSorted(sign);
+						/*if(e("grace"_) && e("grace"_)["slash"_]=="yes"_) acciaccaturas.append( sign ); // FIXME: display after measure bar
+						else*/ signs.insertSorted(sign);
                     }
                 }
                 if(e("grace"_) && e("grace"_)["slash"_]!="yes"_) appoggiaturaTime += duration; // Takes time away from principal (appoggiatura)
@@ -113,22 +113,25 @@ MusicXML::MusicXML(string document) {
                 const Element& d = e("direction-type"_);
                 if(d("dynamics"_)) {
                     Loudness loudness = Loudness(ref<string>({"ppp"_,"pp"_,"p"_,"mp"_,"mf"_,"f"_,"ff"_,"fff"_}).indexOf(d("dynamics"_).children.first()->name));
-					{Sign sign{time, 0, 0, Sign::Dynamic, {}}; sign.dynamic={loudness}; signs.append( sign );}
+					{Sign sign{time, 0, uint(-1), Sign::Dynamic, {}}; sign.dynamic={loudness}; signs.append( sign );}
                 }
                 else if(d("metronome"_)) {
                     Duration beatUnit = Duration(ref<string>({"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_}).indexOf(d("metronome"_)("beat-unit"_).text()));
 					uint perMinute = parseInteger(d("metronome"_)("per-minute"_).text());
-					{Sign sign{time, 0, 0, Sign::Metronome, {}}; sign.metronome={beatUnit, perMinute}; signs.append( sign );}
+					{Sign sign{time, 0, uint(-1), Sign::Metronome, {}}; sign.metronome={beatUnit, perMinute}; signs.append( sign );}
                 }
                 else if(d("pedal"_)) {
                     PedalAction action = PedalAction(ref<string>({"start"_,"change"_,"stop"_}).indexOf(d("pedal"_)["type"_]));
                     if(action==Start && d("pedal"_)["line"_]!="yes"_) action=Ped;
 					int offset = e("offset"_) ? parseInteger(e("offset"_).text()) : 0;
-                    {Sign sign{time + offset, 0, 0, Sign::Pedal, {}}; sign.pedal={action}; signs.insertSorted(sign);}
+					if(offset == -1) offset=0; // FIXME
+					if(offset == 127) offset=128; //FIXME
+					if(offset == 255) offset=256; //FIXME
+					{Sign sign{time + offset, 0, uint(-1), Sign::Pedal, {}}; sign.pedal={action}; signs.insertSorted(sign);}
                 }
                 else if(d("wedge"_)) {
                     WedgeAction action = WedgeAction(ref<string>({"crescendo"_,"diminuendo"_,"stop"_}).indexOf(d("wedge"_)["type"_]));
-					{Sign sign{time, 0, 0, Sign::Wedge, {}}; sign.wedge={action}; signs.append( sign );}
+					{Sign sign{time, 0, uint(-1), Sign::Wedge, {}}; sign.wedge={action}; signs.append( sign );}
                 }
                 else if(d("octave-shift"_)) {}
                 else if(d("other-direction"_)) {}
@@ -144,11 +147,11 @@ MusicXML::MusicXML(string document) {
                 });
                 if(e("key"_)) {
 					keySignature.fifths = parseInteger(e("key"_)("fifths"_).text());
-                    {Sign sign{time, 0, 0, Sign::KeySignature, {}}; sign.keySignature=keySignature; signs.insertSorted(sign); }
+					{Sign sign{time, 0, uint(-1), Sign::KeySignature, {}}; sign.keySignature=keySignature; signs.insertSorted(sign); }
                 }
                 if(e("time"_)) {
 					timeSignature = {uint(parseInteger(e("time"_)("beats"_).text())), uint(parseInteger(e("time"_)("beat-type"_).text()))};
-					{Sign sign{time, 0, 0, Sign::TimeSignature, {}}; sign.timeSignature=timeSignature; signs.append( sign );}
+					{Sign sign{time, 0, uint(-1), Sign::TimeSignature, {}}; sign.timeSignature=timeSignature; signs.append( sign );}
                 }
             }
             else if(e.name=="barline"_) {}
@@ -159,8 +162,8 @@ MusicXML::MusicXML(string document) {
         maxTime = max(maxTime, time);
         time=maxTime;
         measureIndex++;
-        {Sign sign{time, 0, 0, Sign::Measure, {}}; sign.measure.index=measureIndex; signs.insertSorted(sign);}
-        {Sign sign{time, 0, 1, Sign::Measure, {}}; sign.measure.index=measureIndex; signs.insertSorted(sign);}
+		{Sign sign{time, 0, uint(-1), Sign::Measure, {}}; sign.measure.index=measureIndex; signs.insertSorted(sign);}
+		//{Sign sign{time, 0, 1, Sign::Measure, {}}; sign.measure.index=measureIndex; signs.insertSorted(sign);}
         //if(time%(timeSignature.beats*divisions)!=0) break;
         //assert_(time%(timeSignature.beats*divisions)==0, measureIndex, time, timeSignature.beats, divisions);
     }

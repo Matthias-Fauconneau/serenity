@@ -31,10 +31,22 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button, 
 				return true;
 			}
 		}
-        if(button==LeftButton) { dragStartCursor=cursor, dragStartDelta=offset; }
-    }
-	if(event==Motion && button==LeftButton) for(int axis: range(2)) {
-		if(size[axis]<hint[axis] && scrollbar && dragStartCursor[!axis]>size[!axis]-scrollBarWidth) {
+		if(button==LeftButton) {
+			if(scrollbar && button==LeftButton) for(int axis: range(2)) {
+				if(size[axis]<hint[axis]) {
+					if(cursor[!axis]>size[!axis]-scrollBarWidth) {
+						offset[axis] = min(0, max(size[axis]-hint[axis], -cursor[axis]*(hint[axis]-size[axis]/2)/size[axis]));
+						log(cursor[axis], hint[axis], size[axis] , cursor[axis]*hint[axis]/size[axis], offset[axis]);
+						dragStartCursor=cursor, dragStartDelta=offset;
+						return true;
+					}
+				}
+			}
+			dragStartCursor=cursor, dragStartDelta=offset;
+		}
+	}
+	if(scrollbar && button==LeftButton && event==Motion) for(int axis: range(2)) {
+		if(size[axis]<hint[axis] && dragStartCursor[!axis]>size[!axis]-scrollBarWidth) {
 			offset[axis] = min(0, max(size[axis]-hint[axis], dragStartDelta[axis]-(cursor[axis]-dragStartCursor[axis])*hint[axis]/size[axis]));
 			return true;
 		}
