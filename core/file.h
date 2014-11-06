@@ -157,13 +157,12 @@ struct Device : File {
 struct Map : mref<byte> {
 	using mref::data;
 	using mref::size;
-	String name;
 
     enum Prot {Read=1, Write=2};
     enum Flags {Shared=1, Private=2, Anonymous=0x20, Populate=0x8000};
 
     Map(){}
-	Map(Map&& o) : mref(o), name(::move(o.name)) { o.data=0, o.size=0; }
+	Map(Map&& o) : mref(o) { o.data=0, o.size=0; }
     Map& operator=(Map&& o) { this->~Map(); new (this) Map(::move(o)); return *this; }
 
     explicit Map(const File& file, Prot prot=Read, Flags flags=Shared);

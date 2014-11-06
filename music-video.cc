@@ -20,7 +20,7 @@ extern "C" {
 
 #define ENCODE 0
 #define PREVIEW !ENCODE
-#define AUDIO 0
+#define AUDIO 1
 #define MIDI 1
 
 struct Music
@@ -32,7 +32,7 @@ struct Music
     MusicXML xml = readFile(name+".xml"_);
 	Scroll<Sheet> sheet {xml.signs, xml.divisions};
 #if AUDIO || ENCODE
-    AudioFile mp3 = name+".mp3"_; // 48KHz AAC would be better
+	AudioFile mp3 {name+".mp3"_}; // 48KHz AAC would be better
 #endif
 #if MIDI
     MidiFile midi = readFile(name+".mid"_);
