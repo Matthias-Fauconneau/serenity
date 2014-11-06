@@ -4,7 +4,7 @@
 
 float Sheet::glyph(vec2 origin, const string name, Font& font) {
 	uint index = font.index(name);
-	notation.glyphs.append(origin, font, index);
+	notation->glyphs.append(origin, font, index);
 	return font.metrics(index).advance;
 }
 
@@ -61,7 +61,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 	cubics.append( copyRef(ref<vec2>({p0,c0[0],c0M[0],pM,c1M[0],c1[0],p1,c1[1],c1M[1],pM,c0M[1],c0[1]})) );
 	x += noteSize.x;*/
 		{vec2 min(/*x*/-1, staffY(0, 0)), max(1, staffY(1, -8));
-			notation.fills.append(min, max-min);}
+			notation->fills.append(min, max-min);}
 		measures.append( /*x*/0 );
 		measureToChord.append( 0 );
 		timeTrack.insert(0u, {{0,0},0,0,0/*{x,x},x*/});
@@ -92,7 +92,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 					int yBase = stemUp ? yMin : yMax + dy;
 					int yStem = stemUp ? min(yMax-stemLength, staffY(staff, -4)) : max(yMin+stemLength, staffY(staff, -4));
 					{vec2 min (x, ::min(yBase, yStem)), max(x+stemWidth, ::max(yBase, yStem));
-						notation.fills.append(min, max-min); }
+						notation->fills.append(min, max-min); }
 					/**/ if(sign.note.duration==Eighth) glyph(vec2(x+stemWidth, yStem), stemUp?"flags.u3"_:"flags.d3"_);
 					else if(sign.note.duration==Sixteenth) glyph(vec2(x+stemWidth, yStem), stemUp?"flags.u4"_:"flags.d4"_);
 				} else if(beam.size==2) { // Draws slanted beam
@@ -109,12 +109,12 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 					farTip = stemUp ? min(farTip, staffY(staff, -4)) : max(farTip, staffY(staff, -4));
 					for(uint i: range(2)) {
 						vec2 min(x[i], ::min(base[i],farTip+delta[i])), max(x[i]+stemWidth, ::max(base[i],farTip+delta[i]));
-						notation.fills.append(min, max-min);
+						notation->fills.append(min, max-min);
 					}
 					Sign sign[2] = { stemUp?beam.first().last():beam.first().first(), stemUp?beam.last().last():beam.last().first()};
 					vec2 p0 (X(sign[0])+dx, farTip+delta[0]-beamWidth/2);
 					vec2 p1 (X(sign[1])+dx+stemWidth, farTip+delta[1]-beamWidth/2);
-					notation.parallelograms.append(p0, p1, beamWidth);
+					notation->parallelograms.append(p0, p1, beamWidth);
 				} else { // Draws horizontal beam
 					float stemY = stemUp ? -inf : inf;
 					if(stemUp) {
@@ -129,10 +129,10 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 						int x = X(sign) + dx;
 						float y = Y(sign) + dy;
 						{vec2 min(x, ::min(y, stemY)), max(x+stemWidth, ::max(stemY, y));
-							notation.fills.append(min, max-min); }
+							notation->fills.append(min, max-min); }
 					}
 					{vec2 min (X(beam.first()[0]) + dx, stemY-beamWidth/2+1), max(X(beam.last ()[0]) + dx + stemWidth, stemY+beamWidth/2);
-						notation.fills.append(min, max-min);}
+						notation->fills.append(min, max-min);}
 				}
 
 				for(const Chord& chord: beam) {
@@ -166,7 +166,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 					vec2 k0p = k0 + vec2(0, slurDown*noteSize.y/2);
 					vec2 k1 = vec2(p1.x, y) + vec2(0, slurDown*2*noteSize.y);
 					vec2 k1p = k1 + vec2(0, slurDown*noteSize.y/2);
-					notation.cubics.append( copyRef(ref<vec2>({p0,k0,k1,p1,k1p,k0p})) );
+					notation->cubics.append( copyRef(ref<vec2>({p0,k0,k1,p1,k1p,k0p})) );
 				}
 				pendingSlurs[staff].clear();
 			}
@@ -200,12 +200,12 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 				note.clef = clefs.at(staff);
 				vec2 p = P(sign);
 				Duration duration = note.duration;
-				note.glyphIndex = notation.glyphs.size;
+				note.glyphIndex = notation->glyphs.size;
 				int dx = glyph(p, "noteheads.s"_+str(min(2,int(duration))), note.grace?graceFont:font);
 				int step = clefStep(note.clef.clefSign, note.step);
-				for(int s=2; s<=step; s+=2) { int y=staffY(staff, s); notation.fills.append(vec2(x-dx/3,y),vec2(dx*5/3,1)); }
-				for(int s=-10; s>=step; s-=2) { int y=staffY(staff, s); notation.fills.append(vec2(x-dx/3,y),vec2(dx*5/3,1)); }
-				if(note.slash) notation.parallelograms.append( Parallelogram{p+vec2(-dx+dx/2,dx), p+vec2(dx+dx/2,-dx), 1} );
+				for(int s=2; s<=step; s+=2) { int y=staffY(staff, s); notation->fills.append(vec2(x-dx/3,y),vec2(dx*5/3,1)); }
+				for(int s=-10; s>=step; s-=2) { int y=staffY(staff, s); notation->fills.append(vec2(x-dx/3,y),vec2(dx*5/3,1)); }
+				if(note.slash) notation->parallelograms.append( Parallelogram{p+vec2(-dx+dx/2,dx), p+vec2(dx+dx/2,-dx), 1} );
 				if(note.dot) glyph(p+vec2(dx*4/3,0),"dots.dot"_);
 				x += 2*dx;
 
@@ -272,13 +272,13 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 				} else { // Clears all lines (including direction lines)
 					if(sign.type == Sign::Measure) {
 						{vec2 min(x-barWidth+barWidth/2, staffY(0,0)), max(x+barWidth/2, staffY(1,-8));
-							notation.fills.append(min, max-min); } // Bar
+							notation->fills.append(min, max-min); } // Bar
 						// Raster
 						for(int staff: range(staffCount)) {
 							for(int line: range(5)) {
 								int y = staffY(staff, -line*2);
 								{vec2 min(measures.last(), y), max(x, y+lineWidth);
-									notation.fills.append(min, max-min);}
+									notation->fills.append(min, max-min);}
 							}
 						}
 						measures.append( x );
@@ -287,7 +287,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 						float sx = x;
 						for(uint8 code: str(sign.measure.index)) {
 							uint16 index = textFont.index(code);
-							notation.glyphs.append(vec2(sx, staffY(0, 16)), textFont, index);
+							notation->glyphs.append(vec2(sx, staffY(0, 16)), textFont, index);
 							sx += textFont.metrics(index).advance;
 						}
 					}
@@ -323,8 +323,8 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 					int y = (staffY(0, -8)+staffY(1, 0))/2;
 					if(sign.wedge.action == WedgeStop) {
 						bool crescendo = wedgeStart.wedge.action == Crescendo;
-						notation.parallelograms.append( vec2(X(wedgeStart), y+(-!crescendo-1)*3), vec2(x, y+(-crescendo-1)*3), 1.f);
-						notation.parallelograms.append( vec2(X(wedgeStart), y+(!crescendo-1)*3), vec2(x, y+(crescendo-1)*3), 1.f);
+						notation->parallelograms.append( vec2(X(wedgeStart), y+(-!crescendo-1)*3), vec2(x, y+(-crescendo-1)*3), 1.f);
+						notation->parallelograms.append( vec2(X(wedgeStart), y+(!crescendo-1)*3), vec2(x, y+(crescendo-1)*3), 1.f);
 					} else wedgeStart = sign;
 				} else if(sign.type == Sign::Pedal) {
 					int y = staffY(1, -24);
@@ -332,11 +332,11 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 					if(sign.pedal.action == Start) pedalStart = x + glyphSize("pedal.Ped"_).x;
 					if(sign.pedal.action == Change || sign.pedal.action == PedalStop) {
 						{vec2 min(pedalStart, y), max(x, y+1);
-							notation.fills.append(min, max-min);}
-						if(sign.pedal.action == PedalStop) notation.fills.append(vec2(x-1, y-lineInterval), vec2(1, lineInterval));
+							notation->fills.append(min, max-min);}
+						if(sign.pedal.action == PedalStop) notation->fills.append(vec2(x-1, y-lineInterval), vec2(1, lineInterval));
 						else {
-							notation.parallelograms.append(vec2(x, y-1), vec2(x+noteSize.x/2, y-noteSize.x), 2.f);
-							notation.parallelograms.append(vec2(x+noteSize.x/2, y-noteSize.x), vec2(x+noteSize.x, y), 2.f);
+							notation->parallelograms.append(vec2(x, y-1), vec2(x+noteSize.x/2, y-noteSize.x), 2.f);
+							notation->parallelograms.append(vec2(x+noteSize.x/2, y-noteSize.x), vec2(x+noteSize.x, y), 2.f);
 							pedalStart = x + noteSize.x;
 						}
 					}
@@ -347,12 +347,12 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 
     // Vertical center align
 	vec2 offset = vec2(0/*-position*/, /*(height - sizeHint(0).y)/2 +*/ /*4*lineInterval*/ -staffY(0,16)+textFont.size);
-	for(auto& o: notation.fills) o.origin += offset;
-	assert_(!notation.blits);
-	for(auto& o: notation.glyphs) o.origin += offset;
-	for(auto& o: notation.parallelograms) o.min+=offset, o.max+=offset;
-	assert_(!notation.lines);
-	for(auto& o: notation.cubics) for(vec2& p: o.points) p+=vec2(offset);
+	for(auto& o: notation->fills) o.origin += offset;
+	assert_(!notation->blits);
+	for(auto& o: notation->glyphs) o.origin += offset;
+	for(auto& o: notation->parallelograms) o.min+=offset, o.max+=offset;
+	assert_(!notation->lines);
+	for(auto& o: notation->cubics) for(vec2& p: o.points) p+=vec2(offset);
 }
 
 buffer<size_t> Sheet::synchronize(const ref<uint>& midiNotes) {
@@ -375,7 +375,7 @@ buffer<size_t> Sheet::synchronize(const ref<uint>& midiNotes) {
                 assert_(note.key == midiKey);
 				midiToGlyphIndex[midiIndex] = note.glyphIndex;
 				if(logErrors) log("O",str(note.key));
-				vec2 p = notation.glyphs[note.glyphIndex].origin;
+				vec2 p = notation->glyphs[note.glyphIndex].origin;
 				text(p+vec2(noteSize.x, 2), "O"_+str(note.key), smallFont, debug);
                 orderErrors++;
                 return true; // Discards
@@ -400,7 +400,7 @@ buffer<size_t> Sheet::synchronize(const ref<uint>& midiNotes) {
 
 		if(extraErrors > 18 /*FIXME: tremolo*/ || wrongErrors > 6 || missingErrors > 8 || orderErrors > 7) {
 			firstSynchronizationFailureChordIndex = chordToNote.size;
-			notation.glyphs.append( move(debug) );
+			notation->glyphs.append( move(debug) );
 			log("MID", midiNotes.slice(midiIndex,7));
 			log("XML", chord);
             break;
@@ -411,7 +411,7 @@ buffer<size_t> Sheet::synchronize(const ref<uint>& midiNotes) {
             Note note = chord.take(match);
             assert_(note.key == midiKey);
 			midiToGlyphIndex.append( note.glyphIndex );
-			vec2 p = notation.glyphs[note.glyphIndex].origin;
+			vec2 p = notation->glyphs[note.glyphIndex].origin;
 			text(p+vec2(noteSize.x, 2), str(note.key), smallFont, debug);
         } else if(chordExtra && chord.size == chordExtra.size) {
 			int match = notes.values[chordToNote.size+1].indexOf(midiNotes[chordExtra[0]]);
@@ -430,7 +430,7 @@ buffer<size_t> Sheet::synchronize(const ref<uint>& midiNotes) {
                     Note note = chord.take(match);
                     assert_(midiKey == note.key);
 					midiToGlyphIndex[index] = note.glyphIndex;
-					vec2 p = notation.glyphs[note.glyphIndex].origin;
+					vec2 p = notation->glyphs[note.glyphIndex].origin;
 					text(p+vec2(noteSize.x, 2), str(note.key), smallFont, debug);
                     return true; // Discards extra as matched to next chord
                 });
@@ -443,7 +443,7 @@ buffer<size_t> Sheet::synchronize(const ref<uint>& midiNotes) {
                     uint midiKey = midiNotes[midiIndex];
                     assert_(note.key != midiKey);
 					if(logErrors) log("!"_+str(note.key, midiKey));
-					vec2 p = notation.glyphs[note.glyphIndex].origin;
+					vec2 p = notation->glyphs[note.glyphIndex].origin;
 					text(p+vec2(noteSize.x, 2), str(note.key)+"?"_+str(midiKey)+"!"_, smallFont, debug);
                     wrongErrors++;
                     return true; // Discards as wrong
@@ -464,10 +464,9 @@ buffer<size_t> Sheet::synchronize(const ref<uint>& midiNotes) {
 	return move(midiToGlyphIndex);
 }
 
-Graphics Sheet::graphics(int2) {
-	Graphics graphics = copy(notation);
-	for(auto color: colors) graphics.glyphs[color.key].color = color.value;
-	return graphics;
+shared<Graphics> Sheet::graphics(int2 size) {
+	notation->offset.y = (size.y - sizeHint(size).y)/2;
+	return share(notation);
 }
 
 int Sheet::measureIndex(int x) {

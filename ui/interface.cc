@@ -2,21 +2,18 @@
 
 // ScrollArea
 
-Graphics ScrollArea::graphics(int2 size) {
+shared<Graphics> ScrollArea::graphics(int2 size) {
 	this->size = size;
     int2 hint = abs(widget().sizeHint(size));
     int2 view (horizontal?max(hint.x,size.x):size.x,vertical?max(hint.y,size.y):size.y);
-    Graphics graphics;
-	if(view <= size) return widget().graphics(size, Rect(size));
-	else {
-		assert_(offset <= int2(0));
-		graphics.append(widget().graphics(view, Rect::fromOriginAndSize(-offset, size)), vec2(offset));
-	}
+	assert_(offset <= vec2(0) && (!(size < view) || offset==vec2(0)), offset, view, size);
+	shared<Graphics> graphics;
+	graphics->graphics.insert(offset, widget().graphics(size, Rect::fromOriginAndSize(int2(-offset), size)));
 	if(scrollbar) {
 		if(size.y<view.y)
-			graphics.fills.append( vec2(size.x-scrollBarWidth, -offset.y*size.y/view.y), vec2(scrollBarWidth, size.y*size.y/view.y), 1./2, 1.f/2);
+			graphics->fills.append( vec2(size.x-scrollBarWidth, -offset.y*size.y/view.y), vec2(scrollBarWidth, size.y*size.y/view.y), 1./2, 1.f/2);
 		if(size.x<view.x)
-			graphics.fills.append( vec2(-offset.x*size.x/view.x, size.y-scrollBarWidth), vec2(size.x*size.x/view.x, scrollBarWidth), 1./2, 1.f/2);
+			graphics->fills.append( vec2(-offset.x*size.x/view.x, size.y-scrollBarWidth), vec2(size.x*size.x/view.x, scrollBarWidth), 1./2, 1.f/2);
 	}
     return graphics;
 }
@@ -28,7 +25,7 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button, 
 		if((button==WheelDown || button==WheelUp)) for(int axis: range(2)) {
 			if(size[axis]<hint[axis]) {
 				offset[axis] = -stop(axis, -offset[axis], button==WheelDown?1:-1);
-				offset = min(int2(0,0), max(-(hint-size), offset));
+				offset = min(vec2(0), max(-vec2(hint-size), offset));
 				return true;
 			}
 		}
@@ -37,23 +34,23 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button, 
 				if(size[axis]<hint[axis]) {
 					if(cursor[!axis]>size[!axis]-scrollBarWidth) {
 						offset[axis] = min(0, max(size[axis]-hint[axis], -cursor[axis]*(hint[axis]-size[axis]/2)/size[axis]));
-						dragStartCursor=cursor, dragStartDelta=offset;
+						dragStartCursor=cursor, dragStartOffset=offset;
 						return true;
 					}
 				}
 			}
-			dragStartCursor=cursor, dragStartDelta=offset;
+			dragStartCursor=cursor, dragStartOffset=offset;
 		}
 	}
 	if(scrollbar && button==LeftButton && event==Motion) for(int axis: range(2)) {
 		if(size[axis]<hint[axis] && dragStartCursor[!axis]>size[!axis]-scrollBarWidth) {
-			offset[axis] = min(0, max(size[axis]-hint[axis], dragStartDelta[axis]-(cursor[axis]-dragStartCursor[axis])*hint[axis]/size[axis]));
+			offset[axis] = min(0.f, max<float>(-(hint[axis]-size[axis]), dragStartOffset[axis]-(cursor[axis]-dragStartCursor[axis])*hint[axis]/size[axis]));
 			return true;
 		}
 	}
-	if(widget().mouseEvent(cursor-offset, max(hint,size), event, button, focus)) return true;
+	if(widget().mouseEvent(cursor-int2(offset), max(hint,size), event, button, focus)) return true;
 	if(event==Motion && button==LeftButton && !(hint<=size)) {
-		offset = min(int2(0,0), max(-(hint-size), dragStartDelta+cursor-dragStartCursor));
+		offset = min(vec2(0), max(-vec2(hint-size), dragStartOffset+vec2(cursor-dragStartCursor)));
         return true;
     }
     return false;
@@ -62,19 +59,19 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button, 
 bool ScrollArea::keyPress(Key key, Modifiers) {
 	int2 hint = abs(widget().sizeHint(size));
 	if(key==Home) { offset = 0; return true; }
-	if(key==End) { offset = -(hint-size); return true; }
+	if(key==End) { offset = -vec2(hint-size); return true; }
 	return false;
 }
 
 // Progress
 
 int2 Progress::sizeHint(int2) { return int2(-height,height); }
-Graphics Progress::graphics(int2 size) {
-    Graphics graphics;
+shared<Graphics> Progress::graphics(int2 size) {
+	shared<Graphics> graphics;
 	assert(minimum <= value && value <= maximum, minimum, value, maximum);
     int x = size.x*uint(value-minimum)/uint(maximum-minimum);
-    graphics.fills.append(vec2(0,1), vec2(x,size.y-1-1), lightBlue, 1.f);
-    graphics.fills.append(vec2(x,1), vec2(size.x-x,size.y-1-1), gray, 1.f);
+	graphics->fills.append(vec2(0,1), vec2(x,size.y-1-1), lightBlue, 1.f);
+	graphics->fills.append(vec2(x,1), vec2(size.x-x,size.y-1-1), gray, 1.f);
     return graphics;
 }
 
@@ -82,11 +79,11 @@ Graphics Progress::graphics(int2 size) {
 
 int2 ImageView::sizeHint(int2 size) { return min(image.size, size.x && image.size.x ? image.size*size.x/image.size.x : image.size); }
 
-Graphics ImageView::graphics(int2 size) {
-    Graphics graphics;
+shared<Graphics> ImageView::graphics(int2 size) {
+	shared<Graphics> graphics;
     if(image) {
 		int2 target = min(image.size*size.x/image.size.x, image.size*size.y/image.size.y);
-        graphics.blits.append(vec2(max(vec2(0),vec2((size-target)/2))), vec2(target), share(image));
+		graphics->blits.append(vec2(max(vec2(0),vec2((size-target)/2))), vec2(target), share(image));
     }
     return graphics;
 }

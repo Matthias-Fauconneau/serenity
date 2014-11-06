@@ -126,11 +126,11 @@ void Window::setIcon(const Image& icon) {
 }
 
 // Render
-void Window::render(Graphics&& graphics, int2 origin, int2 size) {
+void Window::render(shared<Graphics>&& graphics, int2 origin, int2 size) {
     updates.append( Update{move(graphics),origin,size} );
     if(updates && mapped && state == Idle) queue();
 }
-void Window::render() { assert_(size); updates.clear(); render({},int2(0),size); }
+void Window::render() { assert_(size); updates.clear(); render(nullptr, int2(0), size); }
 
 void Window::event() {
     Display::event();

@@ -45,8 +45,8 @@ struct Widget {
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
     virtual int2 sizeHint(int2) = 0;
     /// Returns graphic elements representing this widget at the given \a size.
-	virtual Graphics graphics(int2 unused size) { error("Unimplemented, use graphics(int2 size, Rect clip)"); }
-	virtual Graphics graphics(int2 size, Rect unused clip) { return this->graphics(size); }
+	virtual shared<Graphics> graphics(int2 unused size) { error("Unimplemented, use graphics(int2 size, Rect clip)"); }
+	virtual shared<Graphics> graphics(int2 size, Rect unused clip) { return this->graphics(size); }
 	/// Returns stop position for scrolling
 	/// \arg direction Direction of requested stop (-1: previous, 0: nearest, 1: next)
 	/// \note Defaults to discrete uniform coarse stops

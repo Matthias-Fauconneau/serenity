@@ -60,7 +60,8 @@ static void blit(const Image& target, int2 origin, const Image& source, bgr3f co
     else {
         for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
             byte4 BGRA = source(x-origin.x,y-origin.y);
-            bgr3f linear = source.sRGB ? bgr3f(sRGB_reverse[BGRA[0]], sRGB_reverse[BGRA[1]], sRGB_reverse[BGRA[2]]) : bgr3f(BGRA.bgr())/float(0xFF);
+			bgr3f linear = source.sRGB ? bgr3f(sRGB_reverse[BGRA[0]], sRGB_reverse[BGRA[1]], sRGB_reverse[BGRA[2]])
+														 : bgr3f(BGRA.bgr())/float(0xFF);
             blend(target, x, y, color*linear, opacity*BGRA.a/0xFF);
         }
     }
@@ -194,7 +195,9 @@ static void cubic(Image8& raster, vec2 A, vec2 B, vec2 C, vec2 D) {
 }
 
 // Renders cubic spline (two control points between each end point)
-void cubic(const Image& target, const ref<vec2>& points, bgr3f color, float alpha, const uint oversample=1) {
+void cubic(const Image& target, ref<vec2> sourcePoints, bgr3f color, float alpha, vec2 offset, const uint oversample=2) {
+	byte points_[sourcePoints.size*sizeof(vec2)]; mref<vec2> points ((vec2*)points_, sourcePoints.size); //FIXME: stack<T> points(sourceSize.size)
+	for(size_t index: range(sourcePoints.size)) points[index] = offset+sourcePoints[index];
 	vec2 pMin = vec2(target.size), pMax = 0;
 	for(vec2 p: points) pMin = ::min(pMin, p), pMax = ::max(pMax, p);
 	pMin = floor(pMin), pMax = ceil(pMax);
@@ -205,12 +208,13 @@ void cubic(const Image& target, const ref<vec2>& points, bgr3f color, float alph
 	Image8 raster(oversample*size.x+1,oversample*size.y+1);
 	lastStepY = 0;
 	for(uint i=0;i<points.size; i+=3) {
-		cubic(raster, float(oversample)*(points[i]-pMin), float(oversample)*(points[(i+1)%points.size]-pMin), float(oversample)*(points[(i+2)%points.size]-pMin),
-				float(oversample)*(points[(i+3)%points.size]-pMin));
+		cubic(raster, float(oversample)*(points[i]-pMin), float(oversample)*(points[(i+1)%points.size]-pMin),
+							 float(oversample)*(points[(i+2)%points.size]-pMin), float(oversample)*(points[(i+3)%points.size]-pMin) );
 	}
 	for(uint y: range(cMin.y, cMax.y)) {
 		int acc[oversample]; mref<int>(acc,oversample).clear(0);
-		for(uint x: range(iMin.x, cMin.x)) for(uint j: range(oversample)) for(uint i: range(oversample)) acc[j] += raster((x-iMin.x)*oversample+i, (y-iMin.y)*oversample+j);
+		for(uint x: range(iMin.x, cMin.x)) for(uint j: range(oversample)) for(uint i: range(oversample))
+			acc[j] += raster((x-iMin.x)*oversample+i, (y-iMin.y)*oversample+j);
 		for(uint x: range(cMin.x, cMax.x)) { //Supersampled rasterization
 			int coverage = 0;
 			for(uint j: range(oversample)) for(uint i: range(oversample)) {
@@ -222,17 +226,19 @@ void cubic(const Image& target, const ref<vec2>& points, bgr3f color, float alph
 	}
 }
 
-void render(const Image& target, const Graphics& graphics) {
-    for(const auto& e: graphics.fills) fill(target, int2(round(e.origin)), int2(e.size), e.color, e.opacity);
+void render(const Image& target, const Graphics& graphics, vec2 offset) {
+	offset += graphics.offset;
+	for(const auto& e: graphics.graphics) render(target, e.value, offset+e.key);
+	for(const auto& e: graphics.fills) fill(target, int2(round(offset+e.origin)), int2(e.size), e.color, e.opacity);
     for(const auto& e: graphics.blits) {
-		if(int2(e.size) == e.image.size) blit(target, int2(round(e.origin)), e.image, e.color, e.opacity);
+		if(int2(e.size) == e.image.size) blit(target, int2(round(offset+e.origin)), e.image, e.color, e.opacity);
 		else blit(target, int2(round(e.origin)), resize(int2(round(e.size)), e.image), e.color, e.opacity); // FIXME: subpixel blit
     }
     for(const auto& e: graphics.glyphs) {
 		Font::Glyph glyph = e.font.render(e.index);
-		blit(target, int2(round(e.origin))+glyph.offset, glyph.image, e.color, e.opacity);
+		blit(target, int2(round(offset+e.origin))+glyph.offset, glyph.image, e.color, e.opacity);
     }
-	for(const auto& e: graphics.lines) line(target, e.a, e.b, e.color, e.opacity);
-	for(const auto& e: graphics.parallelograms) parallelogram(target, int2(round(e.min)), int2(round(e.max)), e.dy, e.color, e.opacity);
-	for(const auto& e: graphics.cubics) cubic(target, e.points, e.color, e.opacity);
+	for(const auto& e: graphics.lines) line(target, offset+e.a, offset+e.b, e.color, e.opacity);
+	for(const auto& e: graphics.parallelograms) parallelogram(target, int2(round(offset+e.min)), int2(round(offset+e.max)), e.dy, e.color, e.opacity);
+	for(const auto& e: graphics.cubics) cubic(target, e.points, e.color, e.opacity, offset);
 }

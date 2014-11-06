@@ -32,16 +32,15 @@ struct Sheet : Widget {
 
 	// Graphics
 	array<int> measures; // X position of measure starts
-	Graphics notation;
-	map<uint, bgr3f> colors; // Overrides color for glyph index
+	shared<Graphics> notation;
 	// Graphic helpers
 	float glyph(vec2 position, const string name, Font& font);
 	float glyph(vec2 position, const string name) { return glyph(position, name, font); }
 	uint text(vec2 position, const string& text, Font& font, array<Glyph>& glyphs);
-	uint text(vec2 position, const string& text, Font& font) { return this->text(position, text, font, notation.glyphs); }
+	uint text(vec2 position, const string& text, Font& font) { return this->text(position, text, font, notation->glyphs); }
 
 	int2 sizeHint(int2) override { return int2(measures.last(), staffY(1, -32)-staffY(0, 16)); }
-	Graphics graphics(int2 size) override;
+	shared<Graphics> graphics(int2 size) override;
 
 	// -- Control
 	array<size_t> measureToChord; // First chord index of measure

@@ -100,24 +100,24 @@ template<class A, class B, class T> String str(const cat<A, B, T>& a) { return a
 // -- Number conversions
 
 /// Converts an unsigned integer
-String str(uint64 number, int pad=0, uint base=10, char padChar='0');
+String str(uint64 number, int pad=0, char padChar='0', uint base=10);
 /// Converts an unsigned integer (implicit conversion)
-inline String str(uint8 number, int pad=0, uint base=10, char padChar='0') { return str(uint64(number), pad, base, padChar); }
+inline String str(uint8 number, int pad=0, char padChar='0', uint base=10) { return str(uint64(number), pad, padChar, base); }
 /// Converts an unsigned integer (implicit conversion)
-inline String str(uint16 number, int pad=0, uint base=10, char padChar='0') { return str(uint64(number), pad, base, padChar); }
+inline String str(uint16 number, int pad=0, char padChar='0', uint base=10) { return str(uint64(number), pad, padChar, base); }
 /// Converts an unsigned integer (implicit conversion)
-inline String str(uint32 number, int pad=0, uint base=10, char padChar='0') { return str(uint64(number), pad, base, padChar); }
+inline String str(uint32 number, int pad=0, char padChar='0', uint base=10) { return str(uint64(number), pad, padChar, base); }
 /// Converts an unsigned integer (implicit conversion)
-inline String str(size_t number, int pad=0, uint base=10, char padChar='0') { return str(uint64(number), pad, base, padChar); }
+inline String str(size_t number, int pad=0, char padChar='0', uint base=10) { return str(uint64(number), pad, padChar, base); }
 /// Converts an unsigned integer in hexadecimal base
-inline String hex(uint64 n, int pad=0) { return str(n, pad, 16); }
+inline String hex(uint64 n, int pad=0) { return str(n, pad, '0', 16); }
 /// Converts a memory address in hexadecimal base
 generic inline String str(T* const& p) { return "0x"+hex(ptr(p)); }
 
 /// Converts a signed integer
-String str(int64 number, int pad=0, uint base=10, char padChar=' ');
+String str(int64 number, int pad=0, char padChar=' ', uint base=10);
 /// Converts a signed integer (implicit conversion)
-inline String str(int32 n, int pad=0, uint base=10, char padChar=' ') { return str(int64(n), pad, base, padChar); }
+inline String str(int32 n, int pad=0, char padChar=' ', uint base=10) { return str(int64(n), pad, padChar, base); }
 
 /// Converts a floating-point number
 String str(double number, int precision=2, uint pad=0, int exponent=0);
@@ -141,7 +141,7 @@ String str(const ref<T> source, string separator=" ") {
 generic String str(const mref<T>& source, string separator=" ") { return str((const ref<T>)source, separator); }
 generic String str(const buffer<T>& source, string separator=" ") { return str((const ref<T>)source, separator); }
 generic String str(const array<T>& source, string separator=" ") { return str((const ref<T>)source, separator); }
-inline String hex(const ref<uint8> source, string separator=" ") { return str(apply(source, [](const uint8& c) { return hex(c,2); }), separator); }
+inline String hex(const ref<uint8> source, string separator=" ") { return str(apply(source, [](const uint8& c) { return hex(c, 2); }), separator); }
 inline String hex(const ref<byte> source, string separator=" ") { return hex(cast<uint8>(source), separator); }
 
 /// Converts static arrays

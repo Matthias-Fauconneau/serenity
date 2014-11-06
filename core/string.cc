@@ -123,7 +123,7 @@ String join(ref<string> list, const string separator) {
 
 // -- Number conversions
 
-String str(uint64 n, int pad, uint base, char padChar) {
+String str(uint64 n, int pad, char padChar, uint base) {
     assert(base>=2 && base<=16);
     byte buf[64]; int i=64;
     do {
@@ -134,7 +134,7 @@ String str(uint64 n, int pad, uint base, char padChar) {
 	return copyRef(string(buf+i,64-i));
 }
 
-String str(int64 number, int pad, uint base, char padChar) {
+String str(int64 number, int pad, char padChar, uint base) {
     assert(base>=2 && base<=16);
     byte buf[64]; int i=64;
     uint64 n=abs(number);
@@ -162,7 +162,7 @@ String str(double n, int precision, uint pad, int exponent) {
         if(decimal==exp10) integer++, decimal=0; // Rounds to ceiling integer
         s.append( str(uint64(integer)) );
         s.append('.');
-		s.append( str(decimal, precision, 10u, '0') );
+		s.append( str(decimal, precision) );
     } else s.append( str(uint64(round(n))) );
     if(exponent==3 && e==3) s.append('K');
     else if(exponent==3 && e==6) s.append('M');

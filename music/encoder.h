@@ -10,14 +10,17 @@ struct Encoder {
     /// Flushes all encoders and close the file
     ~Encoder();
     operator bool() { return context; }
-    int2 size() { return int2(width, height); }
 
     /// Writes a video frame
     void writeVideoFrame(const Image& image);
     /// Writes an audio frame
     void writeAudioFrame(const ref<float2>& audio);
 
-    const uint width, height, fps, rate, audioSize = 1024;
+	union {
+		const int2 size = 0;
+		struct { const uint width, height; };
+	};
+	const uint fps, rate, audioSize = 1024;
     struct AVFormatContext* context=0;
     struct SwsContext* swsContext=0;
     struct AVStream* videoStream=0; struct AVCodecContext* videoCodec=0;

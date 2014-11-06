@@ -33,7 +33,7 @@ struct Window : Display /*should reference but inherits for convenience*/ {
 	static constexpr uint framesPerSecond = 60; // FIXME: get from Window
 
     /// Updates to be rendered
-    struct Update { Graphics graphics; int2 origin, size; };
+	struct Update { shared<Graphics> graphics; int2 origin, size; };
     array<Update> updates;
 
     /// Whether this window is currently mapped. This doesn't imply the window is visible (can be covered)
@@ -78,7 +78,7 @@ struct Window : Display /*should reference but inherits for convenience*/ {
 
 // Display
     /// Schedules partial rendering after all events have been processed (\sa Poll::queue)
-    void render(Graphics&& graphics, int2 origin, int2 size);
+	void render(shared<Graphics>&& graphics, int2 origin, int2 size);
     /// Schedules window rendering after all events have been processed (\sa Poll::queue)
     void render();
     /// Event handler

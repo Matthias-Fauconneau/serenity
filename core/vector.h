@@ -9,7 +9,8 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
 	static_assert(sizeof(V<T>)==N*sizeof(T),"");
 
     /// Defaults initializes to zero
-    vec() : vec(0) {}
+	vec() {}
+	//vec() : vec(0) {}
     /// Initializes all components to the same value \a v
     vec(T v){ for(uint i: range(N)) at(i)=v; }
     /// Initializes components separately
@@ -148,7 +149,7 @@ generic struct rgba {
 /// Integer b,g,r,a vector (8bit)
 struct byte4 : vec<bgra,uint8,4> {
     using vec::vec;
-    byte4() : vec() {} // Defaults initalizes to zero
+	byte4() : vec(0) {} // Defaults initalizes to zero
     byte4(vec<rgba,uint8,4> rgba) : vec(rgba.b, rgba.g, rgba.r, rgba.a) {}
     byte4(vec<rgb,uint8,3> rgb) : vec(rgb.b, rgb.g, rgb.r, 0xFF) {}
     byte4(byte3 bgr) : vec(bgr.b, bgr.g, bgr.r, 0xFF) {}

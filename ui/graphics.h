@@ -50,24 +50,27 @@ struct Cubic {
 };
 
 /// Set of graphic elements
-struct Graphics {
+struct Graphics : shareable {
+	vec2 offset;
     array<Fill> fills;
     array<Blit> blits;
     array<Glyph> glyphs;
     array<Line> lines;
 	array<Parallelogram> parallelograms;
 	array<Cubic> cubics;
-	explicit operator bool() const { return fills || blits || glyphs || lines || parallelograms; }
-    void append(const Graphics& o, vec2 offset) {
+	map<vec2, shared<Graphics>> graphics;
+	//explicit operator bool() const { return fills || blits || glyphs || lines || parallelograms || cubics || graphics; }
+	/*void append(const Graphics& o, vec2 offset) {
         for(auto e: o.fills) { e.origin += offset; fills.append(e); }
         for(const auto& e: o.blits) blits.append(e.origin+offset, e.size, share(e.image));
         for(auto e: o.glyphs) { e.origin += offset; glyphs.append(e); }
         for(auto e: o.lines) { e.a += offset; e.b += offset; lines.append(e); }
 		for(auto e: o.parallelograms) { e.min += offset; e.max += offset; parallelograms.append(e); }
-    }
+	}*/
 };
-inline Graphics copy(const Graphics& o) {
-	return {copy(o.fills), copy(o.blits), copy(o.glyphs), copy(o.lines), copy(o.parallelograms), copy(o.cubics)};
-}
-
-inline String str(const Graphics& o) { return str(o.fills.size, o.blits.size, o.glyphs.size, o.lines.size); }
+/*inline Graphics copy(const Graphics& o) {
+	return {copy(o.fills), copy(o.blits), copy(o.glyphs), copy(o.lines), copy(o.parallelograms), copy(o.cubics), copy(o.graphics)};
+}*/
+/*inline String str(const Graphics& o) {
+	return str(o.fills.size, o.blits.size, o.glyphs.size, o.lines.size, o.parallelograms.size, o.cubics.size, o.graphics.size);
+}*/

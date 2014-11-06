@@ -20,18 +20,19 @@ struct tsc { uint64 total=0, tsc=0; void reset(){total=0;tsc=0;} void start(){if
 
 /// Logs the time spent executing a scope
 struct Time {
-    uint64 startTime=realTime(), stopTime=0;
+	uint64 startTime=realTime(), stopTime=startTime;
     void start() { if(stopTime) startTime=realTime()-(stopTime-startTime); stopTime=0; }
     void stop() { if(!stopTime) stopTime=realTime(); }
     String reset() { stop(); String s=str((stopTime-startTime)/1000000000.,1)+'s'; startTime=stopTime; stopTime=0; return s; }
     operator uint64() const { return ((stopTime?:realTime()) - startTime)/1000000; }
-    double toReal() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
+	double toReal() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
     operator float() const { return toReal(); }
     operator double() const { return toReal(); }
 };
 inline String str(const Time& t) { return str(t.toReal())+'s'; }
 inline bool operator<(float a, const Time& b) { return a < b.toReal(); }
 inline bool operator<(double a, const Time& b) { return a < b.toReal(); }
+inline String str(const Time& num, const Time& div) { return str(100*num.toReal()/div.toReal())+'%'; }
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;

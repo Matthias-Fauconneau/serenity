@@ -5,7 +5,9 @@
 #include "window.h"
 #include "interface.h"
 #include "audio.h"
+#include "render.h"
 #include "encoder.h"
+#include "time.h"
 
 // -> ffmpeg.h/cc
 extern "C" {
@@ -18,9 +20,9 @@ extern "C" {
 #include <libavutil/avutil.h> //avutil
 }
 
-#define ENCODE 0
+#define ENCODE 1
 #define PREVIEW !ENCODE
-#define AUDIO 1
+#define AUDIO 0
 #define MIDI 1
 
 struct Music
@@ -47,13 +49,14 @@ struct Music
 
     // Encode
 #if ENCODE
-    bool encode = ENCODE
     Encoder encoder {name, 1280, 720, 60, mp3};
+	int2 size = encoder.size;
 #endif
     // Preview
 #if PREVIEW
     bool preview = PREVIEW;
-	Window window {this, int2(-1), [](){return "MusicXML"__;}};
+	Window window {this, int2(1280, 720), [](){return "MusicXML"__;}};
+	int2 size = window.size;
 	uint64 videoTime = 0;
 	uint64 previousFrameCounterValue = 0;
 #if AUDIO
@@ -94,7 +97,9 @@ struct Music
         }
 #else
         /*else*/ {
-            Image target(encoder.size());
+			Image target(encoder.size);
+			Time renderTime, encodeTime, totalTime;
+			totalTime.start();
             for(int lastReport=0, done=0;!done;) {
                 while(encoder.audioTime*encoder.fps <= encoder.videoTime*encoder.rate) {
                     AVPacket packet;
@@ -104,7 +109,7 @@ struct Music
 					assert_(packet.pts*encoder.audioStream->time_base.den%mp3.audioStream->time_base.den==0);
                     encoder.audioTime = packet.pts*encoder.audioStream->time_base.den/mp3.audioStream->time_base.den;
                     assert_(encoder.audioStream->time_base.num==1 && uint(encoder.audioStream->time_base.den)==encoder.rate);
-                    assert_(packet.dts == packet.pts, packet.dts, packet.pts);
+					assert_(packet.dts == packet.pts);
                     packet.pts = packet.dts = encoder.audioTime;
 					assert_((int64)packet.duration*encoder.audioStream->time_base.den%mp3.audioStream->time_base.den==0);
                     packet.duration = (int64)packet.duration*encoder.audioStream->time_base.den/mp3.audioStream->time_base.den;
@@ -114,13 +119,17 @@ struct Music
                 while(encoder.audioTime*encoder.fps > encoder.videoTime*encoder.rate) {
                     follow(encoder.videoTime, encoder.fps);
                     step(1./encoder.fps);
-                    renderBackground(target, White);
-                    position = min(float(sheet.measures.last()-target.size().x), position);
-                    sheet.render(target, int2(floor(-position), 0), target.size());
+					renderTime.start();
+					fill(target, 0, target.size, 1, 1);
+					::render(target, sheet.ScrollArea::graphics(target.size));
+					renderTime.stop();
+					encodeTime.start();
                     encoder.writeVideoFrame(target);
+					encodeTime.stop();
                 }
                 int percent = round(100.*encoder.audioTime/mp3.duration);
-                if(percent!=lastReport) { log(percent); lastReport=percent; }
+				if(percent!=lastReport) { log(str(percent,2)+"%", str(renderTime, totalTime), str(encodeTime, totalTime)); lastReport=percent; }
+				if(percent==25) break; // DEBUG
             }
         }
 #endif
@@ -133,24 +142,28 @@ struct Music
             MidiNote note = midi.notes[midiIndex];
 			if(note.velocity) {
 				size_t glyphIndex = noteToGlyph[noteIndex];
-				if(glyphIndex!=invalid) { active.insertMulti(note.key, glyphIndex); contentChanged = true; }
+				if(glyphIndex!=invalid) {
+					sheet.notation->glyphs[active.insertMulti(note.key, glyphIndex)].color = red;
+					contentChanged = true;
+				}
                 noteIndex++;
             }
             else if(!note.velocity && active.contains(note.key)) {
-                while(active.contains(note.key)) { active.remove(note.key); contentChanged = true; }
+				while(active.contains(note.key)) {
+					sheet.notation->glyphs[active.take(note.key)].color = black;
+					contentChanged = true;
+				}
             }
         }
         if(!contentChanged) return;
-
-        sheet.colors.clear();
-        for(uint index: active.values) sheet.colors.insert(index, red);
-		if(active) targetPosition = min(apply(active.values,[this](uint index){return sheet.notation.glyphs[index].origin.x;}));
+		if(active) targetPosition = min(apply(active.values,[this](uint index){return sheet.notation->glyphs[index].origin.x;}));
     }
 
     void step(const float dt) {
         const float b=-1, k=1; // damping [1] and stiffness [1/T2] constants
         speed += dt * (b*speed + k*(targetPosition-position)); // Euler integration of speed (px/s) from acceleration by spring equation (px/s2)
         position += dt * speed; // Euler integration of position (in pixels) from speed (in pixels/s)
+		sheet.offset.x = -clip(0, int(round(position)), sheet.widget().sizeHint(size).x-size.x);
     }
 #endif
 #if PREVIEW
@@ -171,15 +184,14 @@ struct Music
 		videoTime = midiTime * window.framesPerSecond / midi.ticksPerSeconds;
 		previousFrameCounterValue=window.currentFrameCounterValue;
 		follow(videoTime, window.framesPerSecond);
-		position = targetPosition; //DEBUG
 #endif
     }
 
 	int2 sizeHint(int2 size) override { return sheet.ScrollArea::sizeHint(size); }
-	Graphics graphics(int2 size) override {
+	shared<Graphics> graphics(int2 size) override {
 		if(!previousFrameCounterValue) previousFrameCounterValue=window.currentFrameCounterValue;
 		int64 elapsedFrameCount = int64(window.currentFrameCounterValue) - int64(previousFrameCounterValue);
-		if(elapsedFrameCount>1) log(elapsedFrameCount); // PROFILE
+		if(elapsedFrameCount>1) log("Skipped", elapsedFrameCount, "frames"); // PROFILE
 #if AUDIO
 		videoTime = audioTime * window.framesPerSecond / mp3.rate + elapsedFrameCount /*Compensates renderer latency*/;
 #else
@@ -189,10 +201,9 @@ struct Music
 		follow(videoTime, window.framesPerSecond);
 		step(float(elapsedFrameCount)/float(window.framesPerSecond));
 		previousFrameCounterValue = window.currentFrameCounterValue;
-		sheet.offset.x = -max(0.f, position);
         if(running) window.render();
 #endif
-		return sheet.ScrollArea::graphics(size); //int2(floor(-position), 0)
+		return sheet.ScrollArea::graphics(size);
     }
 	bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
 		return sheet.ScrollArea::mouseEvent(cursor, size, event, button, focus);
