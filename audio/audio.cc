@@ -143,9 +143,9 @@ void AudioOutput::event() {
 Device getCaptureDevice() {
     Folder snd("/dev/snd");
     for(const String& device: snd.list(Devices))
-        if(startsWith(device, "pcm") && endsWith(device,"D0c")) return Device(device, snd, ReadWrite);
+		if(startsWith(device, "pcm") && endsWith(device,"D0c")) return Device(device, snd, ReadWrite);
     for(const String& device: snd.list(Devices))
-        if(startsWith(device, "pcm") && endsWith(device,"c")) return Device(device, snd, ReadWrite);
+		if(startsWith(device, "pcm") && endsWith(device,"c")) return Device(device, snd, ReadWrite);
     error("No PCM playback device found"); //FIXME: Block and watch folder until connected
 }
 

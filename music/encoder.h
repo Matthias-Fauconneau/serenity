@@ -6,7 +6,7 @@
 /// Generic video/audio encoder (using ffmpeg/x264)
 struct Encoder {
     /// Starts a new file recording video and audio
-    Encoder(const string& name, int width, int height, int fps, const AudioFile& audio);
+	Encoder(const string& name, int2 size, int fps, const AudioFile& audio);
     /// Flushes all encoders and close the file
     ~Encoder();
     operator bool() { return context; }

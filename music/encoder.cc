@@ -17,8 +17,7 @@ extern "C" {
 #include <libavutil/mathematics.h>
 }
 
-Encoder::Encoder(const string& name, int width, int height, int fps, const AudioFile& audio)
-    : width(width), height(height), fps(fps), rate(audio.rate) {
+Encoder::Encoder(const string& name, int2 size, int fps, const AudioFile& audio) : size(size), fps(fps), rate(audio.rate) {
     av_register_all();
 
 	String path = home().name()+"/"_+name+".mp4"_;
