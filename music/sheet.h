@@ -39,7 +39,7 @@ struct Sheet : Widget {
 	uint text(vec2 position, const string& text, Font& font, array<Glyph>& glyphs);
 	uint text(vec2 position, const string& text, Font& font) { return this->text(position, text, font, notation->glyphs); }
 
-	int2 sizeHint(int2) override { return int2(measures.last(), staffY(1, -32)-staffY(0, 16)); }
+	int2 sizeHint(int2) override { return int2(measures.last(), -(staffY(1, -32)-staffY(0, 16))); }
 	shared<Graphics> graphics(int2 size) override;
 
 	// -- Control
@@ -51,13 +51,13 @@ struct Sheet : Widget {
 	int stop(int unused axis, int currentPosition, int direction) override;
 
 	// -- MIDI Synchronization
-	map<uint, array<Note>> notes; // Signs for notes (time, key, blitIndex)
+	map<uint, array<Sign>> notes; // Signs for notes (time, key, blitIndex)
     uint extraErrors = 0, missingErrors = 0, wrongErrors = 0, orderErrors = 0;
 	size_t firstSynchronizationFailureChordIndex = -1;
 
     /// Synchronizes with MIDI notes and layouts additional debug output if necessary
-    /// \return Returns blit index of corresponding note for each MIDI note
-	buffer<size_t> synchronize(const ref<uint>& midiMotes);
+	/// \return Returns Sign of corresponding note for each MIDI note
+	buffer<Sign> synchronize(const ref<uint>& midiMotes);
 
 	/// Layouts musical notations to graphic primitives
 	Sheet(const ref<Sign>& signs, uint divisions);

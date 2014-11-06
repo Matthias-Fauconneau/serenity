@@ -225,7 +225,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 						else { pendingSlurs[staff].append( move(slur) ); } // Stops
 					}
 				}
-				if(note.tie == Note::NoTie || note.tie == Note::TieStart) notes.sorted(sign.time).append( note );
+				if(note.tie == Note::NoTie || note.tie == Note::TieStart) notes.sorted(sign.time).append( sign );
 			}
 			else if(sign.type == Sign::Rest) {
 				vec2 p = vec2(x, staffY(staff, -4));
@@ -355,94 +355,99 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 	for(auto& o: notation->cubics) for(vec2& p: o.points) p+=vec2(offset);
 }
 
-buffer<size_t> Sheet::synchronize(const ref<uint>& midiNotes) {
+inline bool operator ==(const Sign& sign, const uint& key) {
+	assert_(sign.type == Sign::Note);
+	return sign.note.key == key;
+}
+
+buffer<Sign> Sheet::synchronize(const ref<uint>& midiNotes) {
 	chordToNote.clear();
-	array<size_t> midiToGlyphIndex (midiNotes.size, 0);
-    map<uint, array<Note>> notes = copy(this->notes);
+	buffer<Sign> midiToSign (midiNotes.size, 0);
+	map<uint, array<Sign>> notes = copy(this->notes);
     array<uint> chordExtra;
 	array<Glyph> debug;
 	constexpr bool logErrors = false;
 	while(chordToNote.size<notes.size()) {
 		if(!notes.values[chordToNote.size]) {
-			chordToNote.append( midiToGlyphIndex.size );
+			chordToNote.append( midiToSign.size );
 			if(chordToNote.size==notes.size()) break;
-			array<Note>& chord = notes.values[chordToNote.size];
+			array<Sign>& chord = notes.values[chordToNote.size];
             chordExtra.filter([&](uint midiIndex){ // Tries to match any previous extra to next notes
                 uint midiKey = midiNotes[midiIndex];
                 int match = chord.indexOf(midiKey);
                 if(match < 0) return false; // Keeps
-                Note note = chord.take(match);
+				Sign sign = chord.take(match); Note note = sign.note;
                 assert_(note.key == midiKey);
-				midiToGlyphIndex[midiIndex] = note.glyphIndex;
-				if(logErrors) log("O",str(note.key));
+				midiToSign[midiIndex] = sign;
+				//if(logErrors) log("O",str(note.key));
 				vec2 p = notation->glyphs[note.glyphIndex].origin;
 				text(p+vec2(noteSize.x, 2), "O"_+str(note.key), smallFont, debug);
                 orderErrors++;
                 return true; // Discards
             });
             if(chordExtra) {
-				if(logErrors) log("+"_+str(apply(chordExtra, [&](const uint index){return midiNotes[index];})));
+				//if(logErrors) log("+"_+str(apply(chordExtra, [&](const uint index){return midiNotes[index];})));
                 assert_(chordExtra.size<=2, chordExtra.size);
                 extraErrors+=chordExtra.size;
                 chordExtra.clear();
             }
-			if(!notes.values[chordToNote.size]) chordToNote.append( midiToGlyphIndex.size );
+			if(!notes.values[chordToNote.size]) chordToNote.append( midiToSign.size );
 			assert_(chordToNote.size<notes.size());
 			if(chordToNote.size==notes.size()) break;
         }
 		assert_(chordToNote.size<notes.size());
-		array<Note>& chord = notes.values[chordToNote.size];
+		array<Sign>& chord = notes.values[chordToNote.size];
         assert_(chord);
 
-		uint midiIndex = midiToGlyphIndex.size;
+		uint midiIndex = midiToSign.size;
         assert_(midiIndex < midiNotes.size);
         uint midiKey = midiNotes[midiIndex];
 
 		if(extraErrors > 18 /*FIXME: tremolo*/ || wrongErrors > 6 || missingErrors > 8 || orderErrors > 7) {
 			firstSynchronizationFailureChordIndex = chordToNote.size;
 			notation->glyphs.append( move(debug) );
-			log("MID", midiNotes.slice(midiIndex,7));
-			log("XML", chord);
+			//log("MID", midiNotes.slice(midiIndex,7));
+			//log("XML", chord);
             break;
         }
 
         int match = chord.indexOf(midiKey);
         if(match >= 0) {
-            Note note = chord.take(match);
+			Sign sign = chord.take(match); Note note = sign.note;
             assert_(note.key == midiKey);
-			midiToGlyphIndex.append( note.glyphIndex );
+			midiToSign.append( sign );
 			vec2 p = notation->glyphs[note.glyphIndex].origin;
 			text(p+vec2(noteSize.x, 2), str(note.key), smallFont, debug);
         } else if(chordExtra && chord.size == chordExtra.size) {
 			int match = notes.values[chordToNote.size+1].indexOf(midiNotes[chordExtra[0]]);
             if(match >= 0) {
-                assert_(chord.size<=3, chord);
-				if(logErrors) log("-"_+str(chord));
+				assert_(chord.size<=3/*, chord*/);
+				//if(logErrors) log("-"_+str(chord));
                 missingErrors += chord.size;
                 chord.clear();
                 chordExtra.filter([&](uint index){
-					if(!notes.values[chordToNote.size]) chordToNote.append( midiToGlyphIndex.size );
-					array<Note>& chord = notes.values[chordToNote.size];
+					if(!notes.values[chordToNote.size]) chordToNote.append( midiToSign.size );
+					array<Sign>& chord = notes.values[chordToNote.size];
 					assert_(chord, chordToNote.size, notes.size());
                     int match = chord.indexOf(midiNotes[index]);
                     if(match<0) return false; // Keeps as extra
                     midiKey = midiNotes[index];
-                    Note note = chord.take(match);
+					Sign sign = chord.take(match); Note note = sign.note;
                     assert_(midiKey == note.key);
-					midiToGlyphIndex[index] = note.glyphIndex;
+					midiToSign[index] = sign;
 					vec2 p = notation->glyphs[note.glyphIndex].origin;
 					text(p+vec2(noteSize.x, 2), str(note.key), smallFont, debug);
                     return true; // Discards extra as matched to next chord
                 });
             } else {
-                assert_(midiKey != chord[0].key);
+				assert_(midiKey != chord[0].note.key);
                 uint previousSize = chord.size;
-                chord.filter([&](const Note& note) {
+				chord.filter([&](const Sign& sign) { Note note = sign.note;
                     if(midiNotes.slice(midiIndex,5).contains(note.key)) return false; // Keeps as extra
                     uint midiIndex = chordExtra.take(0);
                     uint midiKey = midiNotes[midiIndex];
                     assert_(note.key != midiKey);
-					if(logErrors) log("!"_+str(note.key, midiKey));
+					//if(logErrors) log("!"_+str(note.key, midiKey));
 					vec2 p = notation->glyphs[note.glyphIndex].origin;
 					text(p+vec2(noteSize.x, 2), str(note.key)+"?"_+str(midiKey)+"!"_, smallFont, debug);
                     wrongErrors++;
@@ -450,22 +455,22 @@ buffer<size_t> Sheet::synchronize(const ref<uint>& midiNotes) {
                 });
                 if(previousSize == chord.size) { // No notes have been filtered out as wrong, remaining are extras
                     assert_(chordExtra && chordExtra.size<=3, chordExtra.size);
-					if(logErrors) log("+"_+str(apply(chordExtra, [&](const uint index){return midiNotes[index];})));
+					//if(logErrors) log("+"_+str(apply(chordExtra, [&](const uint index){return midiNotes[index];})));
                     extraErrors += chordExtra.size;
                     chordExtra.clear();
                 }
             }
         } else {
-			midiToGlyphIndex.append( -1 );
+			midiToSign.append();
 			chordExtra.append( midiIndex );
         }
 	}
 	if(logErrors) log(extraErrors, wrongErrors, missingErrors, orderErrors);
-	return move(midiToGlyphIndex);
+	return midiToSign;
 }
 
 shared<Graphics> Sheet::graphics(int2 size) {
-	notation->offset.y = (size.y - sizeHint(size).y)/2;
+	notation->offset.y = (size.y - abs(sizeHint(size).y))/2;
 	return share(notation);
 }
 

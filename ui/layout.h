@@ -13,7 +13,7 @@ struct Layout : Widget {
 	virtual buffer<Rect> layout(int2 size) abstract;
 
     /// Renders all visible child widgets
-	Graphics graphics(int2 size, Rect clip) override;
+	shared<Graphics> graphics(int2 size, Rect clip) override;
     /// Forwards event to intersecting child widgets until accepted
     bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;
 };
@@ -95,9 +95,9 @@ struct VBox : Vertical, Widgets {
     /// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if VBox is not most derived
 	VBox(array<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter, bool expanding=false)
 		: Linear(main, side, expanding), Widgets(::move(widgets)) {}
-	/*/// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if VBox is not most derived
+	/// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if VBox is not most derived
     VBox(ref<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter, bool expanding=false)
-		: Linear(main, side, expanding), Widgets(array<Widget*>(widgets)) {}*/
+		: Linear(main, side, expanding), Widgets(copyRef(widgets)) {}
 };
 
 /// Horizontal layout of homogenous items. \sa WidgetArray

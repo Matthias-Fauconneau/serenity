@@ -1,12 +1,11 @@
 #include "layout.h"
-#include "text.h"
 
 // Layout
-Graphics Layout::graphics(int2 size, Rect clip) {
+shared<Graphics> Layout::graphics(int2 size, Rect clip) {
     array<Rect> widgets = layout(size);
-    Graphics graphics;
+	shared<Graphics> graphics;
 	for(size_t i: range(count())) if(widgets[i] & clip) {
-		graphics.append(at(i).graphics(widgets[i].size(), Rect(widgets[i].size()) /*& (clip-origin)*/), vec2(widgets[i].origin()));
+		graphics->graphics.insert(vec2(widgets[i].origin()), at(i).graphics(widgets[i].size(), Rect(widgets[i].size()) /*& (clip-origin)*/));
 	}
     return graphics;
 }

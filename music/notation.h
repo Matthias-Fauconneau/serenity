@@ -32,7 +32,6 @@ struct Note {
     uint key;
 	size_t glyphIndex;
 };
-inline bool operator ==(const Note& note, const uint& key) { return note.key == key; }
 struct Rest {
     Duration duration;
 };
@@ -64,6 +63,7 @@ struct Sign {
     uint duration;
 	uint staff; // Staff index
 	enum {
+		Invalid,
 		Note, Rest, Clef, // Staff
 		Metronome, // Top
 		Dynamic, Wedge, // Middle

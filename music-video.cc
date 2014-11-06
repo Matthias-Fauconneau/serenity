@@ -4,6 +4,8 @@
 #include "ffmpeg.h"
 #include "window.h"
 #include "interface.h"
+#include "layout.h"
+#include "keyboard.h"
 #include "audio.h"
 #include "render.h"
 #include "encoder.h"
@@ -38,14 +40,18 @@ struct Music
 #endif
 #if MIDI
     MidiFile midi = readFile(name+".mid"_);
-	buffer<size_t> noteToGlyph =
+	buffer<Sign> midiToSign =
 			sheet.synchronize(apply(filter(midi.notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;}));
 #endif
 
     // Highlighting
-    map<uint,uint> active; // Maps active keys to notes (indices)
+	map<uint, Sign> active; // Maps active keys to notes (indices)
     uint midiIndex = 0, noteIndex = 0;
     float targetPosition=0, speed=0, position=0; // X target/speed/position of sheet view
+
+	// View
+	Keyboard keyboard;
+	VBox widget {{&sheet, &keyboard}};
 
     // Encode
 #if ENCODE
@@ -141,29 +147,32 @@ struct Music
 		for(;midiIndex < midi.notes.size && midi.notes[midiIndex].time*timeDen <= timeNum*midi.ticksPerSeconds; midiIndex++) {
             MidiNote note = midi.notes[midiIndex];
 			if(note.velocity) {
-				size_t glyphIndex = noteToGlyph[noteIndex];
-				if(glyphIndex!=invalid) {
-					sheet.notation->glyphs[active.insertMulti(note.key, glyphIndex)].color = red;
+				Sign sign = midiToSign[noteIndex];
+				if(sign.type == Sign::Note) {
+					(sign.staff?keyboard.left:keyboard.right).append( sign.note.key );
+					sheet.notation->glyphs[active.insertMulti(note.key, sign).note.glyphIndex].color = (sign.staff?red:green);
 					contentChanged = true;
 				}
                 noteIndex++;
             }
             else if(!note.velocity && active.contains(note.key)) {
 				while(active.contains(note.key)) {
-					sheet.notation->glyphs[active.take(note.key)].color = black;
+					Sign sign = active.take(note.key);
+					(sign.staff?keyboard.left:keyboard.right).remove(sign.note.key);
+					sheet.notation->glyphs[sign.note.glyphIndex].color = black;
 					contentChanged = true;
 				}
             }
         }
         if(!contentChanged) return;
-		if(active) targetPosition = min(apply(active.values,[this](uint index){return sheet.notation->glyphs[index].origin.x;}));
+		if(active) targetPosition = min(apply(active.values, [this](Sign sign){return sheet.notation->glyphs[sign.note.glyphIndex].origin.x;}));
     }
 
     void step(const float dt) {
         const float b=-1, k=1; // damping [1] and stiffness [1/T2] constants
         speed += dt * (b*speed + k*(targetPosition-position)); // Euler integration of speed (px/s) from acceleration by spring equation (px/s2)
         position += dt * speed; // Euler integration of position (in pixels) from speed (in pixels/s)
-		sheet.offset.x = -clip(0, int(round(position)), sheet.widget().sizeHint(size).x-size.x);
+		sheet.offset.x = -clip(0, int(round(position)), abs(sheet.widget().sizeHint(size).x)-size.x);
     }
 #endif
 #if PREVIEW
@@ -187,7 +196,7 @@ struct Music
 #endif
     }
 
-	int2 sizeHint(int2 size) override { return sheet.ScrollArea::sizeHint(size); }
+	int2 sizeHint(int2 size) override { return widget.sizeHint(size); }
 	shared<Graphics> graphics(int2 size) override {
 		if(!previousFrameCounterValue) previousFrameCounterValue=window.currentFrameCounterValue;
 		int64 elapsedFrameCount = int64(window.currentFrameCounterValue) - int64(previousFrameCounterValue);
@@ -203,11 +212,11 @@ struct Music
 		previousFrameCounterValue = window.currentFrameCounterValue;
         if(running) window.render();
 #endif
-		return sheet.ScrollArea::graphics(size);
+		return widget.graphics(size, Rect(size));
     }
 	bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
-		return sheet.ScrollArea::mouseEvent(cursor, size, event, button, focus);
+		return widget.mouseEvent(cursor, size, event, button, focus);
 	}
-	bool keyPress(Key key, Modifiers modifiers) override { return sheet.ScrollArea::keyPress(key, modifiers); }
+	bool keyPress(Key key, Modifiers modifiers) override { return widget.keyPress(key, modifiers); }
 #endif
 } app;
