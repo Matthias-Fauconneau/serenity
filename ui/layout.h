@@ -28,11 +28,12 @@ struct Widgets : virtual Layout, array<Widget*> {
 
 /// Implements Layout storage using buffer<T> (i.e by value)
 /// \note It allows a layout to directly contain homogenous items without managing pointers.
-generic struct WidgetArray : virtual Layout, buffer<T> {
-	using buffer<T>::buffer;
-	WidgetArray(buffer<T>&& items) : buffer<T>(move(items)){}
-	size_t count() const override { return buffer<T>::size; }
-	Widget& at(size_t i) const override { return buffer<T>::at(i); }
+generic struct WidgetArray : virtual Layout, array<T> {
+	using array<T>::array;
+	WidgetArray() {}
+	WidgetArray(array<T>&& items) : array<T>(move(items)){}
+	size_t count() const override { return array<T>::size; }
+	Widget& at(size_t i) const override { return array<T>::at(i); }
 };
 
 /// Layouts widgets on an axis
@@ -82,9 +83,9 @@ struct HBox : Horizontal, Widgets {
     /// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if HBox is not most derived
 	HBox(array<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter, bool expanding=false)
 		: Linear(main, side, expanding), Widgets(::move(widgets)){}
-	/*/// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if HBox is not most derived
+	/// Warning: As virtual Linear will be constructed by the most derived class, the layout parameter here will be ignored if HBox is not most derived
     HBox(ref<Widget*>&& widgets, Extra main=Share, Extra side=AlignCenter, bool expanding=false)
-		: Linear(main, side, expanding), Widgets(array<Widget*>(widgets)){}*/
+		: Linear(main, side, expanding), Widgets(copyRef(widgets)){}
 };
 
 /// Vertical layout of heterogenous widgets. \sa Widgets

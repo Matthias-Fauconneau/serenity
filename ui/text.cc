@@ -229,7 +229,7 @@ struct TextLayout {
                         vec2 offset = 0;
                         if(c==toUCS4("⌊")[0] || c==toUCS4("⌋")[0]) offset.y += font->size/3; // Fixes too high floor signs from FreeSerif
                         assert_(metrics.size, hex(c));
-						word.append( Glyph(metrics,::Glyph{position+offset, *font, font.index(c), color}) );
+						word.append( Glyph(metrics,::Glyph{position+offset, *font, c, font->index(c), color}) );
                     }
                     position.x += metrics.advance;
                 }
@@ -274,14 +274,15 @@ int2 Text::sizeHint(int2 size) {
     return max(minimalSizeHint, int2(textSize));
 }
 
-Graphics Text::graphics(int2 size) {
+shared<Graphics> Text::graphics(int2 size) {
     TextLayout layout = this->layout(min<float>(wrap, size.x));
     vec2 textSize = ceil(layout.bbMax - min(vec2(0),layout.bbMin));
 
-    Graphics graphics;
+	shared<Graphics> graphics;
     //assert_(abs(size.y - textSize.y)<=1, size, textSize);
     vec2 offset = max(vec2(0), vec2(center ? (size.x-textSize.x)/2.f : 0, (size.y-textSize.y)/2.f));
-	for(const auto& line: layout.glyphs) for(const auto& word: line) for(Glyph e: word) { e.origin += offset; graphics.glyphs.append( e ); }
-	for(auto e: layout.lines) { e.a += offset; e.b +=offset; graphics.lines.append( e ); }
+	//FIXME: use Graphic::offset
+	for(const auto& line: layout.glyphs) for(const auto& word: line) for(Glyph e: word) { e.origin += offset; graphics->glyphs.append( e ); }
+	for(auto e: layout.lines) { e.a += offset; e.b +=offset; graphics->lines.append( e ); }
     return graphics;
 }

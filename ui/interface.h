@@ -14,7 +14,7 @@ struct ScrollArea : Widget {
 	vec2 offset=0;
 	int2 dragStartCursor;
 	vec2 dragStartOffset;
-	int2 size;
+	int2 viewSize;
 
     /// Overrides \a widget to return the proxied widget
     virtual Widget& widget() const abstract;

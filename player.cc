@@ -61,12 +61,12 @@ struct Player : Poll {
     Slider slider;
     Text remaining {"00:00"};
     HBox status {{&elapsed, &slider, &remaining}};
-    HBox toolbar {{&randomButton, &playButton, &nextButton, &status}};
+	HBox toolbar {{&randomButton, &playButton, &nextButton, &status}};
     Scroll<List<Text>> albums;
     Scroll<List<Text>> titles;
     HBox main {{ &albums, &titles }};
-    VBox layout {{ &toolbar, &main },VBox::Spread};
-    Window window {&layout, -int2(1680,1050)/2, "Player", pauseIcon()};
+	VBox layout {{ &toolbar, &main }};
+	Window window {&layout, -int2(1680,1050)/2, []{ return"Player"__; }, pauseIcon()};
 
 // Content
     String device; // Device underlying folder
@@ -100,7 +100,7 @@ struct Player : Poll {
     void recordPosition() {
         assert_(titles.index<files.size && file);
         if(/*writableFile(".last", folder) &&*/ titles.index<files.size && file)
-            writeFile(".last",files[titles.index]+'\0'+dec(file->position/file->rate)+(randomSequence?"\0random":""), folder, true);
+			writeFile(".last",str(files[titles.index]+'\0'+str(file->position/file->rate)+(randomSequence?"\0random"_:""_)), folder, true);
     }
     void setFolder(string path) {
         assert(folder.name() != path);
@@ -126,7 +126,7 @@ struct Player : Poll {
                     for(;i<files.size;i++) queueFile(album, files[i], false);
                     if(this->files) playTitle(0);
                 }
-                seek(fromInteger(section(mark,'\0',1,2)));
+				seek(parseInteger(section(mark,'\0',1,2)));
             }
             return;
         }
@@ -135,14 +135,14 @@ struct Player : Poll {
         if(files) playTitle(0);
     }
     void insertFile(int index, const string folder, const string file, bool withAlbumName) {
-        String title = String(section(section(file,'/',-2,-1),'.',0,-2));
+		String title = copyRef(section(section(file,'/',-2,-1),'.',0,-2));
         uint i=title.indexOf('-'); i++; //skip album name
         while(i<title.size && title[i]>='0'&&title[i]<='9') i++; //skip track number
         while(i<title.size && (title[i]==' '||title[i]=='.'||title[i]=='-'||title[i]=='_')) i++; //skip whitespace
         title = replace(title.slice(i),"_"," ");
         if(withAlbumName) title = folder + " - " + title;
         titles.insertAt(index, Text(title, 16));
-        files.insertAt(index, folder+'/'+file );
+		files.insertAt(index, str(folder+'/'+file));
     }
     void queueFile(const string folder, const string file, bool withAlbumName) { insertFile(titles.size, folder, file, withAlbumName); }
     void playAlbum(const string album) {
@@ -172,16 +172,15 @@ struct Player : Poll {
         updatePlaylist();
     }
     void setRandom(bool random) {
-        main.clear();
         randomSequence.clear();
         randomButton.enabled = random;
         if(random) {
-            main << &titles; // Hide albums
+			main = ref<Widget*>{&titles}; // Hide albums
             // Explicits random sequence to: resume the sequence from the last played file, ensure files are played once in the sequence.
             randomSequence = shuffle(folder.list(Recursive|Files|Sorted));
             titles.shrink(titles.index+1); this->files.shrink(titles.index+1); // Replaces all queued titles with the next tracks drawn from the random sequence
             updatePlaylist();
-        } else main<<&albums<<&titles; // Show albums
+		} else main = ref<Widget*>{&albums,&titles}; // Show albums
     }
     void updatePlaylist() {
         if(!randomSequence) return;
@@ -234,14 +233,14 @@ struct Player : Poll {
     void update(uint position, uint duration) {
         if(slider.value == (int)position || position>duration) return;
         slider.value = position; slider.maximum=duration;
-        elapsed    = Text(String(dec(                position/60,2,'0')+':'+dec(                 position%60,2,'0')),
+		elapsed    = Text(String(str(                position/60,2,'0')+':'+str(                 position%60,2,'0')),
                           16, 0, 1, 0, "DejaVuSans", true, 1, true, int2(64,32));
-        remaining = Text(String(dec((duration-position)/60,2,'0')+':'+dec((duration-position)%60,2,'0')),
+		remaining = Text(String(str((duration-position)/60,2,'0')+':'+str((duration-position)%60,2,'0')),
                           16, 0, 1, 0, "DejaVuSans", true, 1, true, int2(64,32));
         {Rect toolbarRect = layout.layout(window.size)[0];
-            Graphics update;
-            update.append(toolbar.graphics(toolbarRect.size), vec2(toolbarRect.origin));
-            window.render(move(update), toolbarRect.origin, toolbarRect.size);
+			shared<Graphics> update;
+			update->graphics.insert(vec2(toolbarRect.origin()), toolbar.graphics(toolbarRect.size(), toolbarRect));
+			window.render(move(update), toolbarRect.origin(), toolbarRect.size());
         }
     }
     void event() override {

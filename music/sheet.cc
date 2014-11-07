@@ -293,7 +293,7 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 						measures.append( x );
 						measureToChord.append( notes.size() );
 						x += noteSize.x;
-						text(vec2(x, staffY(0, 16)), str(pageIndex)+','+str(pageLineIndex)+','+str(lineMeasureIndex)+' '+str(measureIndex), textFont);
+						text(vec2(x, staffY(0, 16)), str(pageIndex)+','+str(pageLineIndex)+','+str(lineMeasureIndex)+' '+str(measureIndex), textFont, debug);
 					}
 					else if(sign.type==Sign::KeySignature) {
 						keySignature = sign.keySignature;

@@ -3,7 +3,7 @@
 // ScrollArea
 
 shared<Graphics> ScrollArea::graphics(int2 size) {
-	this->size = size;
+	this->viewSize = size;
     int2 hint = abs(widget().sizeHint(size));
     int2 view (horizontal?max(hint.x,size.x):size.x,vertical?max(hint.y,size.y):size.y);
 	assert_(offset <= vec2(0) && (!(size < view) || offset==vec2(0)), offset, view, size);
@@ -57,9 +57,9 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button, 
 }
 
 bool ScrollArea::keyPress(Key key, Modifiers) {
-	int2 hint = abs(widget().sizeHint(size));
+	int2 hint = abs(widget().sizeHint(viewSize));
 	if(key==Home) { offset = 0; return true; }
-	if(key==End) { offset = -vec2(hint-size); return true; }
+	if(key==End) { offset = -vec2(hint-viewSize); return true; }
 	return false;
 }
 

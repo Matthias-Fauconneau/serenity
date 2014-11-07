@@ -48,5 +48,5 @@ struct Text : virtual Widget {
     struct TextLayout layout(float wrap) const;
 
 	int2 sizeHint(int2 size) override;
-	Graphics graphics(int2 size) override;
+	shared<Graphics> graphics(int2 size) override;
 };

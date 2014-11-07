@@ -228,7 +228,6 @@ void cubic(const Image& target, ref<vec2> sourcePoints, bgr3f color, float alpha
 
 void render(const Image& target, const Graphics& graphics, vec2 offset) {
 	offset += graphics.offset;
-	for(const auto& e: graphics.graphics) render(target, e.value, offset+e.key);
 	for(const auto& e: graphics.fills) fill(target, int2(round(offset+e.origin)), int2(e.size), e.color, e.opacity);
     for(const auto& e: graphics.blits) {
 		if(int2(e.size) == e.image.size) blit(target, int2(round(offset+e.origin)), e.image, e.color, e.opacity);
@@ -241,4 +240,5 @@ void render(const Image& target, const Graphics& graphics, vec2 offset) {
 	for(const auto& e: graphics.lines) line(target, offset+e.a, offset+e.b, e.color, e.opacity);
 	for(const auto& e: graphics.parallelograms) parallelogram(target, int2(round(offset+e.min)), int2(round(offset+e.max)), e.dy, e.color, e.opacity);
 	for(const auto& e: graphics.cubics) cubic(target, e.points, e.color, e.opacity, offset);
+	for(const auto& e: graphics.graphics) render(target, e.value, offset+e.key);
 }

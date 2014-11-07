@@ -22,35 +22,38 @@ int2 Linear::sizeHint(const int2 xySize) {
 	size_t count = this->count();
 	if(!count) return {};
 	const int2 size = xy(xySize);
-	int width = size.x /*remaining space*/; int expanding=0, height=0;
-	int widths[count], heights[count];
+	int widths[count];
+	int remainingWidth = size.x;
+	int expandingWidth = 0;
+	int height = 0;
+	bool expandingHeight=false;
 
 	for(size_t index: range(count)) {
 		int2 hint = xy(at(index).sizeHint(xySize));
-		widths[index] = hint.x;
-		if(size.x!=0) width -= abs(widths[index]); // Commits minimum width for all widgets (unless evaluating required size for sizeHint)
-		if(hint.x<0) expanding++; // Counts expanding widgets
-		height = max(height, heights[index] = size.y ? (hint.y < 0 ? size.y : min(size.y, hint.y)) : hint.y); // Required height
+		if(hint.x<0) expandingWidth++; // Counts expanding widgets
+		widths[index] = abs(hint.x);
+		if(size.x!=0) remainingWidth -= abs(hint.x); // Commits minimum width for all widgets (unless evaluating required size for sizeHint)
+		if(hint.y<0) expandingHeight=true;
+		height = max(height, size.y ? (hint.y < 0 ? size.y : min(size.y, hint.y)) : abs(hint.y));
 	}
 
 	// Reduces widgets to fit allocated width
-	for(size_t i: range(count)) widths[i]=abs(widths[i]); // Converts all expanding widgets to fixed
-	while(width <= -int(count)) { // While layout is overcommited
+	while(remainingWidth <= -int(count)) { // While layout is overcommited
 		int first = max(ref<int>(widths,count)); // First largest size
 		int firstCount=0; for(int size: widths) if(size == first) firstCount++; // Counts how many widgets already have the largest size
 		assert_(firstCount);
 		int second=0; for(int size: widths) if(second<size && size<first) second=size; // Second largest size
-		int offset = max(1, min(-width, first-second) / firstCount); // Distributes reduction to all largest widgets (max(1,...) to account for flooring)
-		for(int& size: widths) if(size == first) { size -= offset, width += offset; }
+		int offset = max(1, min(-remainingWidth, first-second) / firstCount); // Distributes reduction to all largest widgets (max(1,...) to account for flooring)
+		for(int& size: widths) if(size == first) { size -= offset, remainingWidth += offset; }
 	}
-	// Evaluates new required height with fitted widgets
+	// Evaluates new required size with fitted widgets
 	int requiredWidth = 0, requiredHeight = 0;
 	for(size_t index: range(count)) {
-		int2 hint = abs(xy(at(index).sizeHint(xy(int2(widths[index], heights[index])))));
-		requiredWidth += hint.x;
-		requiredHeight = max(requiredHeight, hint.y);
+		int2 hint = xy(at(index).sizeHint(xy(int2(widths[index], height))));
+		requiredWidth += abs(hint.x);
+		requiredHeight = max(requiredHeight, abs(hint.y));
 	}
-	return int2(requiredWidth, requiredHeight);
+	return xy(int2((expandingWidth||expanding?-1:1)*requiredWidth, (expandingHeight?-1:1)*requiredHeight));
 }
 
 buffer<Rect> Linear::layout(const int2 xySize) {

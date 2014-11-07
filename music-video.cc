@@ -153,6 +153,7 @@ struct Music : Widget {
 				if(percent!=lastReport) { log(str(percent,2)+"%", str(renderTime, totalTime), str(encodeTime, totalTime)); lastReport=percent; }
 				//if(percent==5) break; // DEBUG
             }
+			requestTermination(0); // window prevents automatic termination
 		} else { // Preview
 			window.show();
 			if(playbackDeviceAvailable()) audio.start(audioFile.rate, 1024); audioThread.spawn();

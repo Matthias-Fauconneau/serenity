@@ -44,9 +44,9 @@ array<uint16> toUCS2(string utf8) { return toUCS<uint16>(utf8); }
 array<uint32> toUCS4(string utf8) { return toUCS<uint32>(utf8); }
 
 generic String toUTF8(ref<T> ucs) {
-    String utf8(ucs.size);
+	array<char> utf8(ucs.size, 0);
 	for(uint c: ucs) utf8.append( ::utf8(c) );
-    return utf8;
+	return move(utf8);
 }
 String toUTF8(ref<uint16> ucs) { return toUTF8<uint16>(ucs); }
 String toUTF8(ref<uint32> ucs) { return toUTF8<uint32>(ucs); }

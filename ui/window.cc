@@ -25,10 +25,8 @@ Window::Window(Widget* widget, int2 sizeHint, function<String()> title, const Im
     setIcon(icon);
     send(CreateGC{.context=id+GraphicContext, .window=id+XWindow});
     send(Present::SelectInput{.window=id+XWindow, .eid=id+PresentEvent});
-    show();
     actions[Escape] = []{requestTermination();};
     actions[PrintScreen] = [this]{writeFile(str(Date(currentTime())), encodePNG(target), home());};
-    render();
 }
 
 Window::~Window() {

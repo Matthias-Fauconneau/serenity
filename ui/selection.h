@@ -16,21 +16,21 @@ struct Selection : virtual Layout {
 
 /// Displays a selection using a blue highlight
 struct HighlightSelection : virtual Selection {
-    Graphics graphics(int2 size) const override;
+	shared<Graphics> graphics(int2 size, Rect clip) override;
 };
 
 /// Array with Selection
-generic struct ArraySelection : Array<T>, virtual Selection {
-    ArraySelection(){}
-    ArraySelection(array<T>&& items) : Array<T>(move(items)){}
+generic struct ArraySelection : WidgetArray<T>, virtual Selection {
+	ArraySelection(){}
+	ArraySelection(buffer<T>&& items) : WidgetArray<T>(move(items)){}
     /// Return active item (last selection)
     T& active() { return array<T>::at(this->index); }
     /// Clears array and resets index
-    void clear() { Array<T>::clear(); index=-1; }
+	void clear() { WidgetArray<T>::clear(); index=-1; }
 };
 
 /// Vertical layout of selectable items. \sa ArraySelection
 generic struct List : Vertical, ArraySelection<T>, HighlightSelection {
-    List(){}
+	List(){}
     List(array<T>&& items) : ArraySelection<T>(move(items)){}
 };

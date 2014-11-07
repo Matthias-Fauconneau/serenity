@@ -6,7 +6,7 @@ bool Selection::mouseEvent(int2 cursor, int2 size, Event event, Button button, W
     if(event==Press) focus=this;
     for(uint i: range(widgets.size)) {
         if(widgets[i].contains(cursor)) {
-            if(at(i).mouseEvent(cursor-widgets[i].origin,widgets[i].size,event,button,focus)) return true;
+			if(at(i).mouseEvent(cursor - widgets[i].origin(), widgets[i].size(), event, button, focus)) return true;
             if(event==Press && button == LeftButton) { setActive(i); return true; }
         }
     }
@@ -26,11 +26,12 @@ void Selection::setActive(uint i) {
 }
 
 // HighlightSelection
-Graphics HighlightSelection::graphics(int2 size) const {
-    Graphics graphics = Selection::graphics(size);
+shared<Graphics> HighlightSelection::graphics(int2 size, Rect clip) {
+	shared<Graphics> graphics;
+	graphics->graphics.insert(vec2(0), Selection::graphics(size, clip));
     if(index != invalid) {
         array<Rect> widgets = layout(size);
-        graphics.fills << Fill{vec2(widgets[index].origin), vec2(widgets[index].size), lightBlue, 1./2};
+		graphics->fills.append(vec2(widgets[index].origin()), vec2(widgets[index].size()), lightBlue, 1.f/2);
     }
     return graphics;
 }

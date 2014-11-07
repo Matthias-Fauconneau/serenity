@@ -20,13 +20,14 @@ struct Fill {
 struct Blit {
     vec2 origin, size;
     Image image;
-	bgr3f color = black; float opacity = 1;
+	bgr3f color = white; float opacity = 1;
 };
 
 /// Text graphic element
 struct Glyph {
     vec2 origin;
     Font& font;
+	uint code;
 	uint index;
 	bgr3f color = black; float opacity = 1;
 };
