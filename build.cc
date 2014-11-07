@@ -221,7 +221,7 @@ struct Build {
         if(!existsFile(binary) || needLink) {
 			// Waits for all translation units to finish compilation before final link
 			for(int pid: pids) if(wait(pid)) { log("Failed to compile"); requestTermination(-1); return; }
-			auto args =
+			buffer<String> args =
 					move(files) +
 					mref<String>{"-o"__, unsafeRef(binary)} +
 					apply(libraries, [this](const String& library)->String{ return "-l"+library; });
