@@ -34,7 +34,7 @@ template<class T, class A, class B> cat<cat<A, B, T>, ref<T>, T> operator+(cat<A
 // Required for implicit string literal conversion
 template<class T, class A, class B, size_t N> cat<cat<A, B, T>, ref<T>, T> operator+(cat<A, B, T>&& a, const T(&b)[N]) { return {move(a),b}; }
 
-/// Concatenates a \a cat with an buffer
+/// Concatenates a \a cat with a buffer
 template<class A, class T> struct cat<A, buffer<T>, T> {
 	A a; buffer<T> b;
 	cat(A&& a, buffer<T>&& b) : a(move(a)), b(move(b)) {}
@@ -77,7 +77,7 @@ generic cat<ref<T>,ref<T>, T> operator+(ref<T> a, ref<T> b) { return {a,b}; }
 template<class T, size_t N> cat<ref<T>,ref<T>, T> operator+(const T(&a)[N], ref<T> b) { return {a,b}; }
 template<class T, size_t N> cat<ref<T>,ref<T>, T> operator+(ref<T> a, const T(&b)[N]) { return {a,b}; }
 
-/// Concatenates a ref with an buffer
+/// Concatenates a ref with a buffer
 generic struct cat<ref<T>, buffer<T>, T> {
 	ref<T> a; buffer<T> b;
 	cat(ref<T> a, buffer<T>&& b) : a(a), b(move(b)) {}
@@ -98,7 +98,7 @@ template<class B, class T> struct cat<ref<T>, B, T> {
 };
 template<class T, class A, class B> cat<ref<T>, cat<A, B, T>, T> operator+(ref<T> a, cat<A, B, T>&& b) { return {a,move(b)}; }
 
-/// Concatenates an buffer with a value
+/// Concatenates a buffer with a value
 generic struct cat<buffer<T>, T, T> {
 	buffer<T> a; T b;
 	cat(buffer<T>&& a, T b) : a(move(a)), b(b) {}
@@ -108,7 +108,7 @@ generic struct cat<buffer<T>, T, T> {
 };
 generic cat<buffer<T>, T, T> operator+(buffer<T>&& a, T b) { return {move(a),b}; }
 
-/// Concatenates an buffer with a ref
+/// Concatenates a buffer with a ref
 generic struct cat<buffer<T>, ref<T>, T> {
 	buffer<T> a; ref<T> b;
 	cat(buffer<T>&& a, ref<T> b) : a(move(a)), b(b) {}
@@ -118,7 +118,17 @@ generic struct cat<buffer<T>, ref<T>, T> {
 };
 generic cat<buffer<T>,ref<T>, T> operator+(buffer<T>&& a, ref<T> b) { return {move(a),b}; }
 
-/// Concatenates an buffer with an buffer
+/// Concatenates a buffer with an mref
+generic struct cat<buffer<T>, mref<T>, T> {
+	buffer<T> a; mref<T> b;
+	cat(buffer<T>&& a, mref<T> b) : a(move(a)), b(b) {}
+	int size() const { return a.size + b.size; };
+	void copy(buffer<T>& target) const { target.append(a); target.append(b); }
+	operator buffer<T>() const { buffer<T> target (size(), 0); copy(target); return move(target); }
+};
+generic cat<buffer<T>, mref<T>, T> operator+(buffer<T>&& a, mref<T> b) { return {move(a),b}; }
+
+/// Concatenates a buffer with a buffer
 generic struct cat<buffer<T>, buffer<T>, T> {
 	buffer<T> a; buffer<T> b;
 	cat(buffer<T>&& a, buffer<T>&& b) : a(move(a)), b(move(b)) {}

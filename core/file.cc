@@ -122,7 +122,9 @@ void File::seek(int index) { check(::lseek(fd,index,0)); }
 
 bool existsFile(const string path, const Folder& at) { int fd = openat(at.fd, strz(path), O_PATH, 0); if(fd>0) close(fd); return fd>0; }
 
-bool writableFile(const string path, const Folder& at) { int fd = openat(at.fd, strz(path), O_WRONLY, 0); if(fd>0) close(fd); return fd>0; }
+bool writableFile(const string path, const Folder& at) {
+	int fd = openat(at.fd, strz(path), O_WRONLY|O_NONBLOCK, 0); if(fd>0) close(fd); return fd>0;
+}
 
 buffer<byte> readFile(const string path, const Folder& at) { File file(path,at); return file.read( file.size() ); }
 

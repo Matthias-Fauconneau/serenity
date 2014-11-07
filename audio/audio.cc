@@ -52,6 +52,15 @@ typedef IO<'A', 0x44> DRAIN;
 
 /// Playback
 
+bool playbackDeviceAvailable() {
+	Folder snd("/dev/snd");
+	for(const String& device: snd.list(Devices))
+		if(startsWith(device, "pcm") && endsWith(device,"D0p")) return writableFile(device, snd);
+	for(const String& device: snd.list(Devices))
+		if(startsWith(device, "pcm") && endsWith(device,"p")) return writableFile(device, snd);
+	error("No PCM playback device found"); //FIXME: Block and watch folder until connected
+}
+
 Device getPlaybackDevice() {
     Folder snd("/dev/snd");
     for(const String& device: snd.list(Devices))

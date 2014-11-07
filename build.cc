@@ -219,12 +219,12 @@ struct Build {
 		String binary = tmp+"/"+join(flags,"-")+"/"+target;
 		assert_(!existsFolder(binary));
         if(!existsFile(binary) || needLink) {
-            array<String> args = move(files);
-			args.append("-o"__);
-            args.append(copy(binary));
-			args.append(apply(libraries, [this](const String& library)->String{ return "-l"+library; }));
 			// Waits for all translation units to finish compilation before final link
 			for(int pid: pids) if(wait(pid)) { log("Failed to compile"); requestTermination(-1); return; }
+			auto args =
+					move(files) +
+					mref<String>{"-o"__, unsafeRef(binary)} +
+					apply(libraries, [this](const String& library)->String{ return "-l"+library; });
 			if(execute(CXX, toRefs(args))) { log("Failed to link"); requestTermination(-1); return; }
         }
 

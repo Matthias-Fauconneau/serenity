@@ -55,7 +55,7 @@ generic struct array : buffer<T> {
     /// Appends a movable value
 	T& append(T&& e) { grow(size+1); return set(size-1, ::move(e)); }
     /// Appends another list of elements to this array by moving
-	void append(const mref<T> source) { grow(size+source.size); slice(size-source.size).move(source); }
+	//void append(const mref<T> source) { grow(size+source.size); slice(size-source.size).move(source); }
     /// Appends another list of elements to this array by copying
 	void append(const ref<T> source) { grow(size+source.size); slice(size-source.size).copy(source); }
     /// Appends a new element

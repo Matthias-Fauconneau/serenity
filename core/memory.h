@@ -135,7 +135,10 @@ generic buffer<T> copy(const buffer<T>& o){ assert_(o.capacity); return copyRef(
 /// Converts a reference to a buffer (unsafe as no automatic memory management method keeps the original reference from being released)
 generic buffer<T> unsafeRef(const ref<T> o) { return buffer<T>((T*)o.data, o.size, 0); }
 
-/// Initializes a new buffer with the content of \a o
+/// Initializes a new buffer moving the content of \a o
+generic buffer<T> moveRef(mref<T> o) { buffer<T> copy(o.size); copy.mref<T>::move(o); return copy; }
+
+/// Initializes a new buffer copying the content of \a o
 generic buffer<T> copyRef(ref<T> o) { buffer<T> copy(o.size); copy.mref<T>::copy(o); return copy; }
 
 // -- Apply --

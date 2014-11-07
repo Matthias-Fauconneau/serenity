@@ -7,6 +7,7 @@ typedef __SIZE_TYPE__ 	size_t;
 enum ClefSign { Bass, Treble };
 enum Accidental { None, Flat /*♭*/, Sharp /*♯*/, Natural /*♮*/ };
 enum Duration { Whole, Half, Quarter, Eighth, Sixteenth };
+//enum RestDuration { Semibreve, Minim, Crotchet, Quaver, Semiquaver };
 enum class Loudness { PPP, PP, P, MP, MF, F, FF, FFF };
 enum PedalAction { Ped=-1, Start, Change, PedalStop };
 enum WedgeAction { Crescendo, Diminuendo, WedgeStop };
@@ -29,15 +30,13 @@ struct Note {
     bool tenuto:1;
     bool accent:1;
     bool stem:1; // 0: down, 1: up
-    uint key;
+	uint key; // MIDI key
 	size_t glyphIndex;
 };
 struct Rest {
     Duration duration;
 };
-struct Measure {
-    uint index;
-};
+struct Measure { uint measure, page, pageLine, lineMeasure; };
 struct Pedal {
     PedalAction action;
 };

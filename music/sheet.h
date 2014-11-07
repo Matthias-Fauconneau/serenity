@@ -51,14 +51,10 @@ struct Sheet : Widget {
 	int stop(int unused axis, int currentPosition, int direction) override;
 
 	// -- MIDI Synchronization
-	map<uint, array<Sign>> notes; // Signs for notes (time, key, blitIndex)
-    uint extraErrors = 0, missingErrors = 0, wrongErrors = 0, orderErrors = 0;
+	buffer<Sign> midiToSign; /// Sign of corresponding note for each MIDI note
+	uint extraErrors = 0, missingErrors = 0, wrongErrors = 0, orderErrors = 0;
 	size_t firstSynchronizationFailureChordIndex = -1;
 
-    /// Synchronizes with MIDI notes and layouts additional debug output if necessary
-	/// \return Returns Sign of corresponding note for each MIDI note
-	buffer<Sign> synchronize(const ref<uint>& midiMotes);
-
 	/// Layouts musical notations to graphic primitives
-	Sheet(const ref<Sign>& signs, uint divisions);
+	Sheet(const ref<Sign>& signs, uint divisions, ref<uint> midiNotes={});
 };

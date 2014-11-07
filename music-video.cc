@@ -24,33 +24,40 @@ extern "C" {
 
 struct Music : Widget {
 	string name = arguments() ? arguments()[0] : (error("Expected name"), string());
+
+	// MusicXML file
     MusicXML xml = readFile(name+".xml"_);
-	Scroll<Sheet> sheet {xml.signs, xml.divisions};
-	AudioFile mp3 {name+".mp3"_}; // 48KHz AAC would be better
+	// MIDI file
     MidiFile midi = readFile(name+".mid"_);
-	buffer<Sign> midiToSign =
-			sheet.synchronize(apply(filter(midi.notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;}));
+	// Audio file
+	AudioFile audioFile {filter(Folder(".").list(Files),
+								[this](string path) { return !startsWith(path, name) || (!endsWith(path, ".mp3") && !endsWith(path, ".m4a")); })[0]};
 
-    // Highlighting
-	map<uint, Sign> active; // Maps active keys to notes (indices)
-    uint midiIndex = 0, noteIndex = 0;
-    float targetPosition=0, speed=0, position=0; // X target/speed/position of sheet view
-
-	// View
+	// Rendering
+	Scroll<Sheet> sheet {xml.signs, xml.divisions, apply(filter(midi.notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
+	bool failed = sheet.firstSynchronizationFailureChordIndex != invalid;
 	Keyboard keyboard;
 	VBox widget {{&sheet, &keyboard}};
 
-	int2 size {1280,720};
-    // Encode
-	Encoder encoder {name, size, 60, mp3};
-    // Preview
-	Window window {this, size, [](){return "MusicXML"__;}};
-	uint64 videoTime = 0;
-	uint64 previousFrameCounterValue = 0;
+	// Highlighting
+	map<uint, Sign> active; // Maps active keys to notes (indices)
+	uint midiIndex = 0, noteIndex = 0;
+	float targetPosition=0, speed=0, position=0; // X target/speed/position of sheet view
 
+	// Preview --
+	Window window {this, int2(-1), [](){return "MusicXML"__;}};
+	uint64 previousFrameCounterValue = 0;
+	uint64 videoTime = 0;
+	// Audio output
     Thread audioThread;
     AudioOutput audio {{this,&Music::read}, audioThread};
     uint64 audioTime = 0;
+
+	uint read(const mref<short2>& output) {
+		size_t readSize = audioFile.read(output);
+		audioTime += readSize;
+		return readSize;
+	}
 
     uint noteIndexToMidiIndex(uint seekNoteIndex) {
         uint midiIndex=0;
@@ -58,45 +65,87 @@ struct Music : Widget {
         return midiIndex;
     }
 
+	void follow(uint timeNum, uint timeDen) {
+		bool contentChanged = false;
+		for(;midiIndex < midi.notes.size && midi.notes[midiIndex].time*timeDen <= timeNum*midi.ticksPerSeconds; midiIndex++) {
+			MidiNote note = midi.notes[midiIndex];
+			if(note.velocity) {
+				Sign sign = sheet.midiToSign[noteIndex];
+				if(sign.type == Sign::Note) {
+					(sign.staff?keyboard.left:keyboard.right).append( sign.note.key );
+					sheet.notation->glyphs[active.insertMulti(note.key, sign).note.glyphIndex].color = (sign.staff?red:green);
+					contentChanged = true;
+				}
+				noteIndex++;
+			}
+			else if(!note.velocity && active.contains(note.key)) {
+				while(active.contains(note.key)) {
+					Sign sign = active.take(note.key);
+					(sign.staff?keyboard.left:keyboard.right).remove(sign.note.key);
+					sheet.notation->glyphs[sign.note.glyphIndex].color = black;
+					contentChanged = true;
+				}
+			}
+		}
+		if(!contentChanged) return;
+		if(active) targetPosition = min(apply(active.values, [this](Sign sign){return sheet.notation->glyphs[sign.note.glyphIndex].origin.x;}));
+	}
+
+	void seek(uint64 unused midiTime) {
+		if(audio) {
+			audioTime = midiTime * audioFile.rate / midi.ticksPerSeconds;
+			audioFile.seek(audioTime); //FIXME: return actual frame time
+			videoTime = audioTime * window.framesPerSecond / audioFile.rate; // FIXME: remainder
+		} else {
+			videoTime = midiTime * window.framesPerSecond / midi.ticksPerSeconds;
+			previousFrameCounterValue=window.currentFrameCounterValue;
+			follow(videoTime, window.framesPerSecond);
+		}
+	}
+
+	// Double Euler integration of position from spring equation: dtt x = -k δx
+	void step(const float dt, int2 size) {
+		const float b = -1, k = 1./4; // damping [1/T] and stiffness [1/TT] constants
+		speed += dt * (b*speed - k*(position-targetPosition)); // Euler time integration of acceleration [px/s²] from spring equation to speed [px/s]
+		position += dt * speed; // Euler time integration of speed [px/s] to position [px]
+		sheet.offset.x = -clip(0.f, position, float(abs(sheet.widget().sizeHint(size).x)-size.x));
+	}
+
     Music() {
 		window.background = Window::White;
 		sheet.horizontal=true, sheet.vertical=false, sheet.scrollbar = true;
-		if(sheet.firstSynchronizationFailureChordIndex != invalid) {
+		if(failed) { // Seeks to first synchronization failure
 			size_t measureIndex = 0;
 			for(;measureIndex < sheet.measureToChord.size; measureIndex++)
 				if(sheet.measureToChord[measureIndex]>=sheet.firstSynchronizationFailureChordIndex) break;
 			sheet.offset.x = -sheet.measures[max<int>(0, measureIndex-3)];
+		} else { // Seeks to first note
+			seek( midi.notes[noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[0]])].time );
 		}
-		if(sheet.firstSynchronizationFailureChordIndex == invalid) {
-			seek( midi.notes[noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[0/*122*/]])].time );
-		}
-		if(!arguments().contains("encode")) {
-            window.show();
-            audio.start(mp3.rate, 1024); audioThread.spawn();
-        }
-		else {
+		if(arguments().contains("encode")) { // Encode
+			Encoder encoder {name, int2(1280,720), 60, audioFile};
 			Image target(encoder.size);
 			Time renderTime, encodeTime, totalTime;
 			totalTime.start();
             for(int lastReport=0, done=0;!done;) {
                 while(encoder.audioTime*encoder.fps <= encoder.videoTime*encoder.rate) {
                     AVPacket packet;
-                    if(av_read_frame(mp3.file, &packet) < 0) { done=1; break; }
-                    assert_(mp3.file->streams[packet.stream_index]==mp3.audioStream);
-                    assert_(mp3.audioStream->time_base.num==1);
-					assert_(packet.pts*encoder.audioStream->time_base.den%mp3.audioStream->time_base.den==0);
-                    encoder.audioTime = packet.pts*encoder.audioStream->time_base.den/mp3.audioStream->time_base.den;
+					if(av_read_frame(audioFile.file, &packet) < 0) { done=1; break; }
+					assert_(audioFile.file->streams[packet.stream_index]==audioFile.audioStream);
+					assert_(audioFile.audioStream->time_base.num==1);
+					assert_(packet.pts*encoder.audioStream->time_base.den%audioFile.audioStream->time_base.den==0);
+					encoder.audioTime = packet.pts*encoder.audioStream->time_base.den/audioFile.audioStream->time_base.den;
                     assert_(encoder.audioStream->time_base.num==1 && uint(encoder.audioStream->time_base.den)==encoder.rate);
 					assert_(packet.dts == packet.pts);
                     packet.pts = packet.dts = encoder.audioTime;
-					assert_((int64)packet.duration*encoder.audioStream->time_base.den%mp3.audioStream->time_base.den==0);
-                    packet.duration = (int64)packet.duration*encoder.audioStream->time_base.den/mp3.audioStream->time_base.den;
+					assert_((int64)packet.duration*encoder.audioStream->time_base.den%audioFile.audioStream->time_base.den==0);
+					packet.duration = (int64)packet.duration*encoder.audioStream->time_base.den/audioFile.audioStream->time_base.den;
                     packet.stream_index = encoder.audioStream->index;
                     av_interleaved_write_frame(encoder.context, &packet);
                 }
                 while(encoder.audioTime*encoder.fps > encoder.videoTime*encoder.rate) {
-                    follow(encoder.videoTime, encoder.fps);
-                    step(1./encoder.fps);
+					follow(encoder.videoTime, encoder.fps);
+					step(1./encoder.fps, target.size);
 					renderTime.start();
 					fill(target, 0, target.size, 1, 1);
 					::render(target, widget.graphics(target.size, Rect(target.size)));
@@ -105,76 +154,29 @@ struct Music : Widget {
                     encoder.writeVideoFrame(target);
 					encodeTime.stop();
                 }
-                int percent = round(100.*encoder.audioTime/mp3.duration);
+				int percent = round(100.*encoder.audioTime/audioFile.duration);
 				if(percent!=lastReport) { log(str(percent,2)+"%", str(renderTime, totalTime), str(encodeTime, totalTime)); lastReport=percent; }
 				//if(percent==5) break; // DEBUG
             }
-        }
-    }
-
-	void follow(uint timeNum, uint timeDen) {
-        bool contentChanged = false;
-		for(;midiIndex < midi.notes.size && midi.notes[midiIndex].time*timeDen <= timeNum*midi.ticksPerSeconds; midiIndex++) {
-            MidiNote note = midi.notes[midiIndex];
-			if(note.velocity) {
-				Sign sign = midiToSign[noteIndex];
-				if(sign.type == Sign::Note) {
-					(sign.staff?keyboard.left:keyboard.right).append( sign.note.key );
-					sheet.notation->glyphs[active.insertMulti(note.key, sign).note.glyphIndex].color = (sign.staff?red:green);
-					contentChanged = true;
-				}
-                noteIndex++;
-            }
-            else if(!note.velocity && active.contains(note.key)) {
-				while(active.contains(note.key)) {
-					Sign sign = active.take(note.key);
-					(sign.staff?keyboard.left:keyboard.right).remove(sign.note.key);
-					sheet.notation->glyphs[sign.note.glyphIndex].color = black;
-					contentChanged = true;
-				}
-            }
-        }
-        if(!contentChanged) return;
-		if(active) targetPosition = min(apply(active.values, [this](Sign sign){return sheet.notation->glyphs[sign.note.glyphIndex].origin.x;}));
-    }
-
-	void step(const float dt) { // dtt x = -k δx
-		const float b=-1, k=1./2; // damping [1] and stiffness [1/TT] constants
-		speed += dt * (b*speed - k*(position-targetPosition)); // Euler integration of speed (px/s) from acceleration by spring equation (px/s2)
-        position += dt * speed; // Euler integration of position (in pixels) from speed (in pixels/s)
-		sheet.offset.x = -clip(0.f, position, float(abs(sheet.widget().sizeHint(size).x)-size.x));
-    }
-
-    uint read(const mref<short2>& output) {
-        size_t readSize = mp3.read(output);
-        audioTime += readSize;
-        return readSize;
-    }
-
-	void seek(uint64 unused midiTime) {
-		if(audio) {
-			audioTime = midiTime * mp3.rate / midi.ticksPerSeconds;
-			mp3.seek(audioTime); //FIXME: return actual frame time
-			videoTime = audioTime * window.framesPerSecond / mp3.rate; // FIXME: remainder
-		} else {
-			videoTime = midiTime * window.framesPerSecond / midi.ticksPerSeconds;
-			previousFrameCounterValue=window.currentFrameCounterValue;
-			follow(videoTime, window.framesPerSecond);
+		} else { // Preview
+			window.show();
+			if(playbackDeviceAvailable()) audio.start(audioFile.rate, 1024); audioThread.spawn();
 		}
     }
 
-	int2 sizeHint(int2 size) override { return widget.sizeHint(size); }
+	int2 sizeHint(int2 size) override { return sheet.ScrollArea::sizeHint(size); }
 	shared<Graphics> graphics(int2 size) override {
+		if(failed) return sheet.ScrollArea::graphics(size);
 		if(!previousFrameCounterValue) previousFrameCounterValue=window.currentFrameCounterValue;
 		int64 elapsedFrameCount = int64(window.currentFrameCounterValue) - int64(previousFrameCounterValue);
 		if(elapsedFrameCount>1) log("Skipped", elapsedFrameCount, "frames"); // PROFILE
 		if(audio) {
-			videoTime = audioTime * window.framesPerSecond / mp3.rate + elapsedFrameCount /*Compensates renderer latency*/;
+			videoTime = audioTime * window.framesPerSecond / audioFile.rate + elapsedFrameCount /*Compensates renderer latency*/;
 		} else {
 			videoTime += elapsedFrameCount;
 		}
 		follow(videoTime, window.framesPerSecond);
-		step(float(elapsedFrameCount)/float(window.framesPerSecond));
+		step(float(elapsedFrameCount)/float(window.framesPerSecond), size);
 		previousFrameCounterValue = window.currentFrameCounterValue;
 		window.render();
 		return widget.graphics(size, Rect(size));

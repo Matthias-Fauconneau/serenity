@@ -5,8 +5,9 @@ MusicXML::MusicXML(string document) {
     Element root = parseXML(document);
 	map<uint, Clef> clefs; map<uint, bool> slurs; KeySignature keySignature={0}; TimeSignature timeSignature={4,4};
 	uint64 time = 0, nextTime = 0, maxTime = 0;
-	uint measureIndex=1;
+	uint measureIndex=0, pageIndex=0, pageLineIndex=0, lineMeasureIndex=0; // starts with 1
 	for(const Element& m: root("score-partwise"_)("part"_).children) {
+		measureIndex++; lineMeasureIndex++;
         assert_(m.name=="measure"_, m);
 		map<int, Accidental> measureAccidentals; // Currently accidented steps (for implicit accidentals)
         array<Sign> acciaccaturas; // Acciaccatura graces for pending principal
@@ -20,7 +21,7 @@ MusicXML::MusicXML(string document) {
 				uint duration;
                 if(e("grace"_)) {
                     assert_(uint(type)<Sixteenth && divisions%16 == 0);
-                    duration = (uint[]){16,8,4,2,1}[uint(type)]*divisions/16;
+					duration = (uint[]){16,8,4,2,1}[uint(type)]*divisions/4;
                 } else {
                     uint acciaccaturaTime = 0;
 					for(Sign grace: acciaccaturas.reverse()) { // Inserts any pending acciaccatura graces before principal
@@ -28,7 +29,17 @@ MusicXML::MusicXML(string document) {
 						grace.time = time; //FIXME: -acciaccaturaTime;
                         signs.insertSorted(grace);
                     }
-					duration = parseInteger(e("duration"_).text()) - appoggiaturaTime;
+					duration = parseInteger(e("duration"_).text());
+					uint notationDuration = (uint[]){16,8,4,2,1}[uint(type)]*divisions/4;
+					if(e("rest"_) && type==Whole) notationDuration = timeSignature.beats*divisions;
+					if(e("dot"_)) notationDuration = notationDuration * 3 / 2;
+					if(e("time-modification"_)) {
+						notationDuration = notationDuration * parseInteger(e("time-modification"_)("normal-notes").text())
+								/ parseInteger(e("time-modification"_)("actual-notes").text());
+					}
+					else if(!e("chord")) assert_(duration == notationDuration, e,
+												 withName(duration, notationDuration,  divisions, measureIndex, pageIndex, pageLineIndex, lineMeasureIndex));
+					duration -= appoggiaturaTime;
                     assert_(acciaccaturaTime <= duration, acciaccaturaTime, duration, appoggiaturaTime);
                     acciaccaturas.clear();
                     appoggiaturaTime = 0;
@@ -37,9 +48,8 @@ MusicXML::MusicXML(string document) {
                 if(e["print-object"_]=="no"_) continue;
 				uint staff = parseInteger(e("staff"_).text())-1;
                 assert_(int(type)>=0, e);
-                if(e("rest"_)) {
-					{Sign sign{time, duration, staff, Sign::Rest, {}}; sign.rest={type}; signs.insertSorted(sign);}
-                } else {
+				if(e("rest"_)) signs.insertSorted({time, duration, staff, Sign::Rest, .rest={type}});
+				else {
                     assert_(e("pitch"_)("step"_).text(), e);
                     uint octaveStep = "CDEFGAB"_.indexOf(e("pitch"_)("step"_).text()[0]);
 					int noteOctave = parseInteger(e("pitch"_)("octave"_).text());
@@ -121,9 +131,7 @@ MusicXML::MusicXML(string document) {
                     PedalAction action = PedalAction(ref<string>({"start"_,"change"_,"stop"_}).indexOf(d("pedal"_)["type"_]));
                     if(action==Start && d("pedal"_)["line"_]!="yes"_) action=Ped;
 					int offset = e("offset"_) ? parseInteger(e("offset"_).text()) : 0;
-					if(offset == -1) offset=0; // FIXME
-					if(offset == 127) offset=128; //FIXME
-					if(offset == 255) offset=256; //FIXME
+					if((offset+1)%divisions == 0) offset++; // FIXME
 					{Sign sign{time + offset, 0, uint(-1), Sign::Pedal, {}}; sign.pedal={action}; signs.insertSorted(sign);}
                 }
                 else if(d("wedge"_)) {
@@ -152,11 +160,13 @@ MusicXML::MusicXML(string document) {
                 }
             }
             else if(e.name=="barline"_) {}
-            else if(e.name=="print"_) {}
+			else if(e.name=="print"_) {
+				if(e["new-system"]=="yes") { pageLineIndex++, lineMeasureIndex=1; }
+				if(e["new-page"]=="yes") { pageIndex++, pageLineIndex=1; }
+			}
             else error(e);
         }
 		maxTime=time=nextTime= max(maxTime, max(time, nextTime));
-        measureIndex++;
-		{Sign sign{time, 0, uint(-1), Sign::Measure, {}}; sign.measure.index=measureIndex; signs.insertSorted(sign);}
+		{Sign sign{time, 0, uint(-1), Sign::Measure, .measure={measureIndex, pageIndex, pageLineIndex, lineMeasureIndex}}; signs.insertSorted(sign);}
 	}
 }

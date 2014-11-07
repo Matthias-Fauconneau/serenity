@@ -11,14 +11,15 @@ float Sheet::glyph(vec2 origin, const string name, Font& font) {
 uint Sheet::text(vec2 origin, const string& text, Font& font, array<Glyph>& glyphs) {
     for(uint code: toUCS4(text)) {
 		uint index = font.index(code);
-		glyphs.append(origin, font, index);
+		if(code!=' ') glyphs.append(origin, font, index);
 		origin.x += font.metrics(index).advance;
     }
 	return origin.x;
 }
 
 // Layouts notations to graphic primitives (and parses notes to MIDI keys)
-Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time steps per measure
+Sheet::Sheet(const ref<Sign>& signs, uint divisions, ref<uint> midiNotes) { // Time steps per measure
+	uint measureIndex=1, pageIndex=1, pageLineIndex=1, lineMeasureIndex=1;
     map<uint, Clef> clefs; KeySignature keySignature={0}; TimeSignature timeSignature={0,0};
     typedef array<Sign> Chord; // Signs belonging to a same chord (same time)
     Chord chords[2]; // Current chord (per staff)
@@ -40,15 +41,8 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 		void setAll(float x) { setStaves(x); middle = x; top = x; bottom = x; }
     };
 	map<uint64, Position> timeTrack; // Maps times to positions
-	auto X = [&](const Sign& sign) -> float& {
-		assert_(timeTrack.contains(sign.time), int(sign.type), sign.time, sign.duration);
-		if(sign.type == Sign::Metronome) return timeTrack.at(sign.time).top;
-		if(sign.type==Sign::Dynamic || sign.type==Sign::Wedge) return timeTrack.at(sign.time).middle;
-		if(sign.type == Sign::Pedal) return timeTrack.at(sign.time).bottom;
-		assert_(sign.staff < 2, int(sign.type));
-		return timeTrack.at(sign.time).staffs[sign.staff];
-	};
-	auto P = [&](const Sign& sign) { return vec2(X(sign),Y(sign)); };
+	map<uint, array<Sign>> notes; // Signs for notes (time, key, blitIndex)
+	array<Glyph> debug;
 	{//int x = 0;
 		/*// System
 	vec2 p0 = vec2(x+noteSize.x, staffY(0, 0));
@@ -68,6 +62,17 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 	}
 	for(size_t signIndex: range(signs.size)) {
 		Sign sign = signs[signIndex];
+		auto X = [&](const Sign& sign) -> float& {
+			assert_(timeTrack.contains(sign.time), withName(int(sign.type), sign.note.step, sign.time, sign.duration,
+					measureIndex, pageIndex, pageLineIndex, lineMeasureIndex, signIndex));
+			if(sign.type == Sign::Metronome) return timeTrack.at(sign.time).top;
+			if(sign.type==Sign::Dynamic || sign.type==Sign::Wedge) return timeTrack.at(sign.time).middle;
+			if(sign.type == Sign::Pedal) return timeTrack.at(sign.time).bottom;
+			assert_(sign.staff < 2, int(sign.type));
+			return timeTrack.at(sign.time).staffs[sign.staff];
+		};
+		auto P = [&](const Sign& sign) { return vec2(X(sign),Y(sign)); };
+
 		for(uint staff: range(staffCount)) {
 			// Layout tails and beams
 			array<Chord>& beam = beams[staff];
@@ -271,6 +276,10 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 					timeTrack.at(sign.time).setStaves(x); // Does not clear directions lines
 				} else { // Clears all lines (including direction lines)
 					if(sign.type == Sign::Measure) {
+						measureIndex = sign.measure.measure;
+						pageIndex = sign.measure.page;
+						pageLineIndex = sign.measure.pageLine;
+						lineMeasureIndex = sign.measure.lineMeasure;
 						{vec2 min(x-barWidth+barWidth/2, staffY(0,0)), max(x+barWidth/2, staffY(1,-8));
 							notation->fills.append(min, max-min); } // Bar
 						// Raster
@@ -284,12 +293,8 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 						measures.append( x );
 						measureToChord.append( notes.size() );
 						x += noteSize.x;
-						float sx = x;
-						for(uint8 code: str(sign.measure.index)) {
-							uint16 index = textFont.index(code);
-							notation->glyphs.append(vec2(sx, staffY(0, 16)), textFont, index);
-							sx += textFont.metrics(index).advance;
-						}
+						text(vec2(x, staffY(0, 16)), str(pageIndex)+','+str(pageLineIndex)+','+str(lineMeasureIndex)+' '+str(measureIndex),
+							 textFont, debug);
 					}
 					else if(sign.type==Sign::KeySignature) {
 						keySignature = sign.keySignature;
@@ -345,6 +350,114 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 		}
 	}
 
+	midiToSign = buffer<Sign>(midiNotes.size, 0);
+	array<uint> chordExtra;
+
+	constexpr bool logErrors = true;
+	while(chordToNote.size<notes.size()) {
+		if(!notes.values[chordToNote.size]) {
+			chordToNote.append( midiToSign.size );
+			if(chordToNote.size==notes.size()) break;
+			array<Sign>& chord = notes.values[chordToNote.size];
+			chordExtra.filter([&](uint midiIndex){ // Tries to match any previous extra to next notes
+				uint midiKey = midiNotes[midiIndex];
+				int match = chord.indexOf(midiKey);
+				if(match < 0) return false; // Keeps
+				Sign sign = chord.take(match); Note note = sign.note;
+				assert_(note.key == midiKey);
+				midiToSign[midiIndex] = sign;
+				//if(logErrors) log("O",str(note.key));
+				vec2 p = notation->glyphs[note.glyphIndex].origin;
+				text(p+vec2(noteSize.x, 2), "O"_+str(note.key), smallFont, debug);
+				orderErrors++;
+				return true; // Discards
+			});
+			if(chordExtra) {
+				if(logErrors) log("+"_+str(apply(chordExtra, [&](const uint index){return midiNotes[index];})));
+				if(!(chordExtra.size<=2)) { log("chordExtra.size<=2"); break; }
+				assert_(chordExtra.size<=2, chordExtra.size);
+				extraErrors+=chordExtra.size;
+				chordExtra.clear();
+			}
+			if(!notes.values[chordToNote.size]) chordToNote.append( midiToSign.size );
+			assert_(chordToNote.size<notes.size());
+			if(chordToNote.size==notes.size()) break;
+		}
+		assert_(chordToNote.size<notes.size());
+		array<Sign>& chord = notes.values[chordToNote.size];
+		assert_(chord);
+
+		uint midiIndex = midiToSign.size;
+		assert_(midiIndex < midiNotes.size);
+		uint midiKey = midiNotes[midiIndex];
+
+		if(extraErrors > 18 /*FIXME: tremolo*/ || wrongErrors > 6 || missingErrors > 8 || orderErrors > 7) {
+			//log("MID", midiNotes.slice(midiIndex,7));
+			//log("XML", chord);
+			break;
+		}
+
+		int match = chord.indexOf(midiKey);
+		if(match >= 0) {
+			Sign sign = chord.take(match); Note note = sign.note;
+			assert_(note.key == midiKey);
+			midiToSign.append( sign );
+			vec2 p = notation->glyphs[note.glyphIndex].origin;
+			text(p+vec2(noteSize.x, 2), str(note.key), smallFont, debug);
+		} else if(chordExtra && chord.size == chordExtra.size) {
+			int match = notes.values[chordToNote.size+1].indexOf(midiNotes[chordExtra[0]]);
+			if(match >= 0) {
+				assert_(chord.size<=3/*, chord*/);
+				//if(logErrors) log("-"_+str(chord));
+				missingErrors += chord.size;
+				chord.clear();
+				chordExtra.filter([&](uint index){
+					if(!notes.values[chordToNote.size]) chordToNote.append( midiToSign.size );
+					array<Sign>& chord = notes.values[chordToNote.size];
+					assert_(chord, chordToNote.size, notes.size());
+					int match = chord.indexOf(midiNotes[index]);
+					if(match<0) return false; // Keeps as extra
+					midiKey = midiNotes[index];
+					Sign sign = chord.take(match); Note note = sign.note;
+					assert_(midiKey == note.key);
+					midiToSign[index] = sign;
+					vec2 p = notation->glyphs[note.glyphIndex].origin;
+					text(p+vec2(noteSize.x, 2), str(note.key), smallFont, debug);
+					return true; // Discards extra as matched to next chord
+				});
+			} else {
+				assert_(midiKey != chord[0].note.key);
+				uint previousSize = chord.size;
+				chord.filter([&](const Sign& sign) { Note note = sign.note;
+					if(midiNotes.slice(midiIndex,5).contains(note.key)) return false; // Keeps as extra
+					uint midiIndex = chordExtra.take(0);
+					uint midiKey = midiNotes[midiIndex];
+					assert_(note.key != midiKey);
+					//if(logErrors) log("!"_+str(note.key, midiKey));
+					vec2 p = notation->glyphs[note.glyphIndex].origin;
+					text(p+vec2(noteSize.x, 2), str(note.key)+"?"_+str(midiKey)+"!"_, smallFont, debug);
+					wrongErrors++;
+					return true; // Discards as wrong
+				});
+				if(previousSize == chord.size) { // No notes have been filtered out as wrong, remaining are extras
+					assert_(chordExtra && chordExtra.size<=3, chordExtra.size);
+					//if(logErrors) log("+"_+str(apply(chordExtra, [&](const uint index){return midiNotes[index];})));
+					extraErrors += chordExtra.size;
+					chordExtra.clear();
+				}
+			}
+		} else {
+			midiToSign.append();
+			chordExtra.append( midiIndex );
+		}
+	}
+	if(chordToNote.size == notes.size()) assert_(midiToSign.size == midiNotes.size);
+	else {
+		firstSynchronizationFailureChordIndex = chordToNote.size;
+		notation->glyphs.append( move(debug) );
+	}
+	if(logErrors) log(extraErrors, wrongErrors, missingErrors, orderErrors);
+
     // Vertical center align
 	vec2 offset = vec2(0/*-position*/, /*(height - sizeHint(0).y)/2 +*/ /*4*lineInterval*/ -staffY(0,16)+textFont.size);
 	for(auto& o: notation->fills) o.origin += offset;
@@ -358,115 +471,6 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions/*, uint height*/) { // Time 
 inline bool operator ==(const Sign& sign, const uint& key) {
 	assert_(sign.type == Sign::Note);
 	return sign.note.key == key;
-}
-
-buffer<Sign> Sheet::synchronize(const ref<uint>& midiNotes) {
-	chordToNote.clear();
-	buffer<Sign> midiToSign (midiNotes.size, 0);
-	map<uint, array<Sign>> notes = copy(this->notes);
-    array<uint> chordExtra;
-	array<Glyph> debug;
-	constexpr bool logErrors = false;
-	while(chordToNote.size<notes.size()) {
-		if(!notes.values[chordToNote.size]) {
-			chordToNote.append( midiToSign.size );
-			if(chordToNote.size==notes.size()) break;
-			array<Sign>& chord = notes.values[chordToNote.size];
-            chordExtra.filter([&](uint midiIndex){ // Tries to match any previous extra to next notes
-                uint midiKey = midiNotes[midiIndex];
-                int match = chord.indexOf(midiKey);
-                if(match < 0) return false; // Keeps
-				Sign sign = chord.take(match); Note note = sign.note;
-                assert_(note.key == midiKey);
-				midiToSign[midiIndex] = sign;
-				//if(logErrors) log("O",str(note.key));
-				vec2 p = notation->glyphs[note.glyphIndex].origin;
-				text(p+vec2(noteSize.x, 2), "O"_+str(note.key), smallFont, debug);
-                orderErrors++;
-                return true; // Discards
-            });
-            if(chordExtra) {
-				//if(logErrors) log("+"_+str(apply(chordExtra, [&](const uint index){return midiNotes[index];})));
-                assert_(chordExtra.size<=2, chordExtra.size);
-                extraErrors+=chordExtra.size;
-                chordExtra.clear();
-            }
-			if(!notes.values[chordToNote.size]) chordToNote.append( midiToSign.size );
-			assert_(chordToNote.size<notes.size());
-			if(chordToNote.size==notes.size()) break;
-        }
-		assert_(chordToNote.size<notes.size());
-		array<Sign>& chord = notes.values[chordToNote.size];
-        assert_(chord);
-
-		uint midiIndex = midiToSign.size;
-        assert_(midiIndex < midiNotes.size);
-        uint midiKey = midiNotes[midiIndex];
-
-		if(extraErrors > 18 /*FIXME: tremolo*/ || wrongErrors > 6 || missingErrors > 8 || orderErrors > 7) {
-			firstSynchronizationFailureChordIndex = chordToNote.size;
-			notation->glyphs.append( move(debug) );
-			//log("MID", midiNotes.slice(midiIndex,7));
-			//log("XML", chord);
-            break;
-        }
-
-        int match = chord.indexOf(midiKey);
-        if(match >= 0) {
-			Sign sign = chord.take(match); Note note = sign.note;
-            assert_(note.key == midiKey);
-			midiToSign.append( sign );
-			vec2 p = notation->glyphs[note.glyphIndex].origin;
-			text(p+vec2(noteSize.x, 2), str(note.key), smallFont, debug);
-        } else if(chordExtra && chord.size == chordExtra.size) {
-			int match = notes.values[chordToNote.size+1].indexOf(midiNotes[chordExtra[0]]);
-            if(match >= 0) {
-				assert_(chord.size<=3/*, chord*/);
-				//if(logErrors) log("-"_+str(chord));
-                missingErrors += chord.size;
-                chord.clear();
-                chordExtra.filter([&](uint index){
-					if(!notes.values[chordToNote.size]) chordToNote.append( midiToSign.size );
-					array<Sign>& chord = notes.values[chordToNote.size];
-					assert_(chord, chordToNote.size, notes.size());
-                    int match = chord.indexOf(midiNotes[index]);
-                    if(match<0) return false; // Keeps as extra
-                    midiKey = midiNotes[index];
-					Sign sign = chord.take(match); Note note = sign.note;
-                    assert_(midiKey == note.key);
-					midiToSign[index] = sign;
-					vec2 p = notation->glyphs[note.glyphIndex].origin;
-					text(p+vec2(noteSize.x, 2), str(note.key), smallFont, debug);
-                    return true; // Discards extra as matched to next chord
-                });
-            } else {
-				assert_(midiKey != chord[0].note.key);
-                uint previousSize = chord.size;
-				chord.filter([&](const Sign& sign) { Note note = sign.note;
-                    if(midiNotes.slice(midiIndex,5).contains(note.key)) return false; // Keeps as extra
-                    uint midiIndex = chordExtra.take(0);
-                    uint midiKey = midiNotes[midiIndex];
-                    assert_(note.key != midiKey);
-					//if(logErrors) log("!"_+str(note.key, midiKey));
-					vec2 p = notation->glyphs[note.glyphIndex].origin;
-					text(p+vec2(noteSize.x, 2), str(note.key)+"?"_+str(midiKey)+"!"_, smallFont, debug);
-                    wrongErrors++;
-                    return true; // Discards as wrong
-                });
-                if(previousSize == chord.size) { // No notes have been filtered out as wrong, remaining are extras
-                    assert_(chordExtra && chordExtra.size<=3, chordExtra.size);
-					//if(logErrors) log("+"_+str(apply(chordExtra, [&](const uint index){return midiNotes[index];})));
-                    extraErrors += chordExtra.size;
-                    chordExtra.clear();
-                }
-            }
-        } else {
-			midiToSign.append();
-			chordExtra.append( midiIndex );
-        }
-	}
-	if(logErrors) log(extraErrors, wrongErrors, missingErrors, orderErrors);
-	return midiToSign;
 }
 
 shared<Graphics> Sheet::graphics(int2 size) {
