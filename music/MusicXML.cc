@@ -4,9 +4,10 @@
 MusicXML::MusicXML(string document) {
     Element root = parseXML(document);
 	map<uint, Clef> clefs; map<uint, bool> slurs; KeySignature keySignature={0}; TimeSignature timeSignature={4,4};
-	uint64 time = 0, nextTime = 0, maxTime = 0;
+	uint64 measureTime = 0, time = 0, nextTime = 0, maxTime = 0;
 	uint measureIndex=0, pageIndex=0, pageLineIndex=0, lineMeasureIndex=0; // starts with 1
 	for(const Element& m: root("score-partwise"_)("part"_).children) {
+		measureTime = time;
 		measureIndex++; lineMeasureIndex++;
         assert_(m.name=="measure"_, m);
 		map<int, Accidental> measureAccidentals; // Currently accidented steps (for implicit accidentals)
@@ -44,7 +45,7 @@ MusicXML::MusicXML(string document) {
                     acciaccaturas.clear();
                     appoggiaturaTime = 0;
                 }
-				if(!e("chord"_) && !e("grace"_)) nextTime = time+duration;
+				if(!e("chord"_) && (!e("grace"_) || e("grace"_)["slash"_]!="yes"_)) nextTime = time+duration;
                 if(e["print-object"_]=="no"_) continue;
 				uint staff = parseInteger(e("staff"_).text())-1;
                 assert_(int(type)>=0, e);
@@ -165,6 +166,8 @@ MusicXML::MusicXML(string document) {
 				if(e["new-page"]=="yes") { pageIndex++, pageLineIndex=1; }
 			}
             else error(e);
+
+			assert_(time >= measureTime, int(time-measureTime), int(nextTime-measureTime), int(maxTime-measureTime), measureIndex, e);
         }
 		maxTime=time=nextTime= max(maxTime, max(time, nextTime));
 		{Sign sign{time, 0, uint(-1), Sign::Measure, .measure={measureIndex, pageIndex, pageLineIndex, lineMeasureIndex}}; signs.insertSorted(sign);}

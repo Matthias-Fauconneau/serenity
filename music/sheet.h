@@ -34,10 +34,10 @@ struct Sheet : Widget {
 	array<int> measures; // X position of measure starts
 	shared<Graphics> notation;
 	// Graphic helpers
-	float glyph(vec2 position, const string name, Font& font);
-	float glyph(vec2 position, const string name) { return glyph(position, name, font); }
-	uint text(vec2 position, const string& text, Font& font, array<Glyph>& glyphs);
-	uint text(vec2 position, const string& text, Font& font) { return this->text(position, text, font, notation->glyphs); }
+	float glyph(vec2 position, string name, Font& font);
+	float glyph(vec2 position, string name) { return glyph(position, name, font); }
+	uint text(vec2 position, string text, Font& font, array<Glyph>& glyphs);
+	uint text(vec2 position, string text, Font& font) { return this->text(position, text, font, notation->glyphs); }
 
 	int2 sizeHint(int2) override { return int2(measures.last(), -(staffY(1, -32)-staffY(0, 16))); }
 	shared<Graphics> graphics(int2 size) override;
@@ -56,5 +56,5 @@ struct Sheet : Widget {
 	size_t firstSynchronizationFailureChordIndex = -1;
 
 	/// Layouts musical notations to graphic primitives
-	Sheet(const ref<Sign>& signs, uint divisions, ref<uint> midiNotes={});
+	Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes={});
 };

@@ -182,7 +182,7 @@ struct Music : Widget {
 		return widget.graphics(size, Rect(size));
     }
 	bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
-		return widget.mouseEvent(cursor, size, event, button, focus);
+		return sheet.ScrollArea::mouseEvent(cursor, size, event, button, focus);
 	}
-	bool keyPress(Key key, Modifiers modifiers) override { return widget.keyPress(key, modifiers); }
+	bool keyPress(Key key, Modifiers modifiers) override { return sheet.ScrollArea::keyPress(key, modifiers); }
 } app;

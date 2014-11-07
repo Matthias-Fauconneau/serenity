@@ -2,13 +2,13 @@
 #include "notation.h"
 #include "utf8.h"
 
-float Sheet::glyph(vec2 origin, const string name, Font& font) {
+float Sheet::glyph(vec2 origin, string name, Font& font) {
 	uint index = font.index(name);
 	notation->glyphs.append(origin, font, index);
 	return font.metrics(index).advance;
 }
 
-uint Sheet::text(vec2 origin, const string& text, Font& font, array<Glyph>& glyphs) {
+uint Sheet::text(vec2 origin, string text, Font& font, array<Glyph>& glyphs) {
     for(uint code: toUCS4(text)) {
 		uint index = font.index(code);
 		if(code!=' ') glyphs.append(origin, font, index);
@@ -18,7 +18,7 @@ uint Sheet::text(vec2 origin, const string& text, Font& font, array<Glyph>& glyp
 }
 
 // Layouts notations to graphic primitives (and parses notes to MIDI keys)
-Sheet::Sheet(const ref<Sign>& signs, uint divisions, ref<uint> midiNotes) { // Time steps per measure
+Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time steps per measure
 	uint measureIndex=1, pageIndex=1, pageLineIndex=1, lineMeasureIndex=1;
     map<uint, Clef> clefs; KeySignature keySignature={0}; TimeSignature timeSignature={0,0};
     typedef array<Sign> Chord; // Signs belonging to a same chord (same time)
@@ -293,8 +293,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, ref<uint> midiNotes) { // T
 						measures.append( x );
 						measureToChord.append( notes.size() );
 						x += noteSize.x;
-						text(vec2(x, staffY(0, 16)), str(pageIndex)+','+str(pageLineIndex)+','+str(lineMeasureIndex)+' '+str(measureIndex),
-							 textFont, debug);
+						text(vec2(x, staffY(0, 16)), str(pageIndex)+','+str(pageLineIndex)+','+str(lineMeasureIndex)+' '+str(measureIndex), textFont);
 					}
 					else if(sign.type==Sign::KeySignature) {
 						keySignature = sign.keySignature;
@@ -345,7 +344,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, ref<uint> midiNotes) { // T
 							pedalStart = x + noteSize.x;
 						}
 					}
-				}
+				} else error(int(sign.type));
 			}
 		}
 	}
@@ -459,7 +458,7 @@ Sheet::Sheet(const ref<Sign>& signs, uint divisions, ref<uint> midiNotes) { // T
 	if(logErrors) log(extraErrors, wrongErrors, missingErrors, orderErrors);
 
     // Vertical center align
-	vec2 offset = vec2(0/*-position*/, /*(height - sizeHint(0).y)/2 +*/ /*4*lineInterval*/ -staffY(0,16)+textFont.size);
+	vec2 offset = vec2(0, -staffY(0,16)+textFont.size);
 	for(auto& o: notation->fills) o.origin += offset;
 	assert_(!notation->blits);
 	for(auto& o: notation->glyphs) o.origin += offset;
