@@ -124,7 +124,7 @@ void setExceptions(uint except) {
 }
 
 void __attribute((constructor(102))) setup_signals() {
-#if 1
+#if 0
     /// Limits process ressources to avoid hanging the system when debugging
 	{ rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<24;/*16M*/ setrlimit(RLIMIT_STACK,&limit); }
 	{ rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<31;/*2GB*/ setrlimit(RLIMIT_DATA,&limit); }
@@ -137,7 +137,7 @@ void __attribute((constructor(102))) setup_signals() {
 	check(sigaction(SIGSEGV, &sa, 0));
 	check(sigaction(SIGTERM, &sa, 0));
 	check(sigaction(SIGTRAP, &sa, 0));
-	check(sigaction(SIGFPE, &sa, 0));
+	//check(sigaction(SIGFPE, &sa, 0));
     setExceptions(Invalid /*| Denormal*/ | DivisionByZero | Overflow /*| Underflow *//*| Precision*/);
 }
 

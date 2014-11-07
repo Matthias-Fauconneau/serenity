@@ -118,6 +118,8 @@ generic inline String str(T* const& p) { return "0x"+hex(ptr(p)); }
 String str(int64 number, int pad=0, char padChar=' ', uint base=10);
 /// Converts a signed integer (implicit conversion)
 inline String str(int32 n, int pad=0, char padChar=' ', uint base=10) { return str(int64(n), pad, padChar, base); }
+/// Converts a signed integer (implicit conversion)
+inline String str(long n, int pad=0, char padChar=' ', uint base=10) { return str(int64(n), pad, padChar, base); }
 
 /// Converts a floating-point number
 String str(double number, int precision=2, uint pad=0, int exponent=0);

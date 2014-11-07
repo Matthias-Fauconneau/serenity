@@ -45,7 +45,7 @@ struct Music : Widget {
 	float targetPosition=0, speed=0, position=0; // X target/speed/position of sheet view
 
 	// Preview --
-	Window window {this, int2(-1), [](){return "MusicXML"__;}};
+	Window window {this, int2(1280,720), [](){return "MusicXML"__;}};
 	uint64 previousFrameCounterValue = 0;
 	uint64 videoTime = 0;
 	// Audio output
@@ -128,24 +128,19 @@ struct Music : Widget {
 			Time renderTime, encodeTime, totalTime;
 			totalTime.start();
             for(int lastReport=0, done=0;!done;) {
-                while(encoder.audioTime*encoder.fps <= encoder.videoTime*encoder.rate) {
-                    AVPacket packet;
+				assert_(encoder.audioStream->time_base.num == 1);
+				while(encoder.audioTime*encoder.videoFrameRate <= encoder.videoTime*encoder.audioStream->time_base.den) {
+					AVPacket packet;
 					if(av_read_frame(audioFile.file, &packet) < 0) { done=1; break; }
-					assert_(audioFile.file->streams[packet.stream_index]==audioFile.audioStream);
-					assert_(audioFile.audioStream->time_base.num==1);
-					assert_(packet.pts*encoder.audioStream->time_base.den%audioFile.audioStream->time_base.den==0);
-					encoder.audioTime = packet.pts*encoder.audioStream->time_base.den/audioFile.audioStream->time_base.den;
-                    assert_(encoder.audioStream->time_base.num==1 && uint(encoder.audioStream->time_base.den)==encoder.rate);
-					assert_(packet.dts == packet.pts);
-                    packet.pts = packet.dts = encoder.audioTime;
-					assert_((int64)packet.duration*encoder.audioStream->time_base.den%audioFile.audioStream->time_base.den==0);
-					packet.duration = (int64)packet.duration*encoder.audioStream->time_base.den/audioFile.audioStream->time_base.den;
-                    packet.stream_index = encoder.audioStream->index;
-                    av_interleaved_write_frame(encoder.context, &packet);
+					packet.pts=packet.dts=encoder.audioTime=
+							int64(packet.pts)*encoder.audioStream->codec->time_base.den/audioFile.audioStream->codec->time_base.den;
+					packet.duration = int64(packet.duration)*encoder.audioStream->time_base.den/audioFile.audioStream->time_base.den;
+					packet.stream_index = encoder.audioStream->index;
+					av_interleaved_write_frame(encoder.context, &packet);
                 }
-                while(encoder.audioTime*encoder.fps > encoder.videoTime*encoder.rate) {
-					follow(encoder.videoTime, encoder.fps);
-					step(1./encoder.fps, target.size);
+				while(encoder.audioTime*encoder.videoFrameRate > encoder.videoTime*encoder.audioStream->time_base.den) {
+					follow(encoder.videoTime, encoder.videoFrameRate);
+					step(1./encoder.videoFrameRate, target.size);
 					renderTime.start();
 					fill(target, 0, target.size, 1, 1);
 					::render(target, widget.graphics(target.size, Rect(target.size)));
@@ -164,7 +159,7 @@ struct Music : Widget {
 		}
     }
 
-	int2 sizeHint(int2 size) override { return sheet.ScrollArea::sizeHint(size); }
+	int2 sizeHint(int2 size) override { return failed ? sheet.ScrollArea::sizeHint(size) : widget.sizeHint(size); }
 	shared<Graphics> graphics(int2 size) override {
 		if(failed) return sheet.ScrollArea::graphics(size);
 		if(!previousFrameCounterValue) previousFrameCounterValue=window.currentFrameCounterValue;

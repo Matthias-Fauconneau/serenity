@@ -17,22 +17,13 @@ extern "C" {
 #include <libavutil/mathematics.h>
 }
 
-Encoder::Encoder(const string& name, int2 size, int fps, const AudioFile& audio) : size(size), fps(fps), rate(audio.rate) {
+Encoder::Encoder(const string& name, int2 size, uint videoFrameRate, const AudioFile& audio)
+	: size(size), videoFrameRate(videoFrameRate) {
     av_register_all();
 
 	String path = home().name()+"/"_+name+".mp4"_;
     if(existsFile(path)) remove(strz(path));
-    context = avformat_alloc_context();
-	mref<char>(context->filename).copy(left(path, sizeof(context->filename), '\0'));
-    context->oformat =  av_guess_format(0, context->filename, 0);
-    assert_(context->oformat);
-    if(context->oformat->priv_data_size > 0) {
-        context->priv_data = av_mallocz(context->oformat->priv_data_size);
-        if(context->oformat->priv_class) {
-            *(const AVClass**)context->priv_data= context->oformat->priv_class;
-            av_opt_set_defaults(context->priv_data);
-        }
-    } else context->priv_data = 0;
+	avformat_alloc_output_context2(&context, NULL, NULL, strz(path));
 
     {// Video
         swsContext = sws_getContext(width, height, AV_PIX_FMT_BGRA, width, height, AV_PIX_FMT_YUV420P, SWS_FAST_BILINEAR, 0, 0, 0);
@@ -46,7 +37,7 @@ Encoder::Encoder(const string& name, int2 size, int fps, const AudioFile& audio)
         videoCodec->width = width;
         videoCodec->height = height;
         videoStream->time_base.num = videoCodec->time_base.num = 1;
-        videoStream->time_base.den = videoCodec->time_base.den = fps;
+		videoStream->time_base.den = videoCodec->time_base.den = videoFrameRate;
         videoCodec->pix_fmt = AV_PIX_FMT_YUV420P;
         if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
         AVDictionary* options=0;
@@ -59,10 +50,12 @@ Encoder::Encoder(const string& name, int2 size, int fps, const AudioFile& audio)
         audioStream = avformat_new_stream(context, codec);
         audioCodec = audioStream->codec;
         avcodec_copy_context(audioCodec, audio.audio);
+		audioCodec->codec_tag = 0;
+		audioStream->pts.den = 1;
     }
 
     avio_open(&context->pb, strz(path), AVIO_FLAG_WRITE);
-    avformat_write_header(context, 0);
+	{int ret = avformat_write_header(context, 0); assert_(ret>=0, (const char*)av_err2str(ret));}
 }
 
 void Encoder::writeVideoFrame(const Image& image) {
@@ -72,7 +65,7 @@ void Encoder::writeVideoFrame(const Image& image) {
     avpicture_alloc((AVPicture*)&frame, AV_PIX_FMT_YUV420P, width, height);
     int stride = image.stride*4; sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, height, frame.data, frame.linesize);
 
-    frame.pts = videoTime*videoStream->time_base.den/(fps*videoStream->time_base.num);
+	frame.pts = videoTime*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
 
     AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
     int gotVideoPacket;
@@ -94,12 +87,12 @@ void Encoder::writeVideoFrame(const Image& image) {
     videoTime++;
 }
 
-void Encoder::writeAudioFrame(const ref<float2>& audio) {
+/*void Encoder::writeAudioFrame(const ref<float2>& audio) {
     assert(audioStream && audio.size==audioSize);
 	AVFrame frame; av_frame_unref(&frame);
     frame.nb_samples = audio.size;
     avcodec_fill_audio_frame(&frame, 2, AV_SAMPLE_FMT_FLT, (uint8*)audio.data, audio.size * 2 * sizeof(float), 1);
-    frame.pts = audioTime;
+	frame.pts = audioTime*audioStream->time_base.den/(audioFrameRate*audioStream->time_base.num);
 
     AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
     int gotAudioPacket;
@@ -111,11 +104,11 @@ void Encoder::writeAudioFrame(const ref<float2>& audio) {
     }
 
     audioTime += audio.size;
-}
+}*/
 
 Encoder::~Encoder() {
     assert_(context && videoStream);
-    for(;;) {
+	for(;;) { // FIXME: flush audio
         AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
         int gotVideoPacket = 0;
         avcodec_encode_video2(videoCodec, &pkt, 0, &gotVideoPacket);

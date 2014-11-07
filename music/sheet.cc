@@ -365,7 +365,7 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 				Sign sign = chord.take(match); Note note = sign.note;
 				assert_(note.key == midiKey);
 				midiToSign[midiIndex] = sign;
-				//if(logErrors) log("O",str(note.key));
+				if(logErrors) log("O",str(note.key));
 				vec2 p = notation->glyphs[note.glyphIndex].origin;
 				text(p+vec2(noteSize.x, 2), "O"_+str(note.key), smallFont, debug);
 				orderErrors++;
@@ -390,7 +390,7 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 		assert_(midiIndex < midiNotes.size);
 		uint midiKey = midiNotes[midiIndex];
 
-		if(extraErrors > 18 /*FIXME: tremolo*/ || wrongErrors > 6 || missingErrors > 8 || orderErrors > 7) {
+		if(extraErrors > 18 /*FIXME: tremolo*/ || wrongErrors > 6 || missingErrors > 8 || orderErrors > 8) {
 			//log("MID", midiNotes.slice(midiIndex,7));
 			//log("XML", chord);
 			break;
@@ -407,7 +407,7 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 			int match = notes.values[chordToNote.size+1].indexOf(midiNotes[chordExtra[0]]);
 			if(match >= 0) {
 				assert_(chord.size<=3/*, chord*/);
-				//if(logErrors) log("-"_+str(chord));
+				if(logErrors) log("-"_+str(apply(chord,[](const Sign& sign){return sign.note.key;})));
 				missingErrors += chord.size;
 				chord.clear();
 				chordExtra.filter([&](uint index){
@@ -432,7 +432,7 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 					uint midiIndex = chordExtra.take(0);
 					uint midiKey = midiNotes[midiIndex];
 					assert_(note.key != midiKey);
-					//if(logErrors) log("!"_+str(note.key, midiKey));
+					if(logErrors) log("!"_+str(note.key, midiKey));
 					vec2 p = notation->glyphs[note.glyphIndex].origin;
 					text(p+vec2(noteSize.x, 2), str(note.key)+"?"_+str(midiKey)+"!"_, smallFont, debug);
 					wrongErrors++;
@@ -440,7 +440,7 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 				});
 				if(previousSize == chord.size) { // No notes have been filtered out as wrong, remaining are extras
 					assert_(chordExtra && chordExtra.size<=3, chordExtra.size);
-					//if(logErrors) log("+"_+str(apply(chordExtra, [&](const uint index){return midiNotes[index];})));
+					if(logErrors) log("+"_+str(apply(chordExtra, [&](const uint index){return midiNotes[index];})));
 					extraErrors += chordExtra.size;
 					chordExtra.clear();
 				}
