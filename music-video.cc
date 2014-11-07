@@ -30,8 +30,9 @@ struct Music : Widget {
 	// MIDI file
     MidiFile midi = readFile(name+".mid"_);
 	// Audio file
-	AudioFile audioFile {filter(Folder(".").list(Files),
-								[this](string path) { return !startsWith(path, name) || (!endsWith(path, ".mp3") && !endsWith(path, ".m4a")); })[0]};
+	buffer<String> audioFiles = filter(Folder(".").list(Files),
+							   [this](string path) { return !startsWith(path, name) || (!endsWith(path, ".mp3") && !endsWith(path, ".m4a")); });
+	AudioFile audioFile = audioFiles ? AudioFile(audioFiles[0]) : AudioFile();
 
 	// Rendering
 	Scroll<Sheet> sheet {xml.signs, xml.divisions, apply(filter(midi.notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};

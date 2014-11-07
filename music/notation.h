@@ -5,7 +5,7 @@ typedef unsigned long long uint64;
 typedef __SIZE_TYPE__ 	size_t;
 
 enum ClefSign { Bass, Treble };
-enum Accidental { None, Flat /*♭*/, Sharp /*♯*/, Natural /*♮*/ };
+enum Accidental { None, DoubleFlat /*♭♭*/, Flat /*♭*/, Natural /*♮*/, Sharp /*♯*/, DoubleSharp /*♯♯*/ };
 enum Duration { Whole, Half, Quarter, Eighth, Sixteenth };
 //enum RestDuration { Semibreve, Minim, Crotchet, Quaver, Semiquaver };
 enum class Loudness { PPP, PP, P, MP, MF, F, FF, FFF };

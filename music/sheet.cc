@@ -4,14 +4,14 @@
 
 float Sheet::glyph(vec2 origin, string name, Font& font) {
 	uint index = font.index(name);
-	notation->glyphs.append(origin, font, index);
+	notation->glyphs.append(origin, font, index, index);
 	return font.metrics(index).advance;
 }
 
 uint Sheet::text(vec2 origin, string text, Font& font, array<Glyph>& glyphs) {
     for(uint code: toUCS4(text)) {
 		uint index = font.index(code);
-		if(code!=' ') glyphs.append(origin, font, index);
+		if(code!=' ') glyphs.append(origin, font, index, index);
 		origin.x += font.metrics(index).advance;
     }
 	return origin.x;
@@ -24,8 +24,8 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
     typedef array<Sign> Chord; // Signs belonging to a same chord (same time)
     Chord chords[2]; // Current chord (per staff)
     array<Chord> beams[2]; // Chords belonging to current beam (per staff) (also for correct single chord layout)
-    array<array<Sign>> pendingSlurs[2];
-    array<Sign> slurs[2]; // Signs belonging to current slur (pending slurs per staff)
+	array<array<Sign>> pendingSlurs[3];
+	array<Sign> slurs[3]; // Signs belonging to current slur (pending slurs per staff + across staff)
 	float pedalStart = 0; // Last pedal start/change position
     Sign wedgeStart; // Current wedge
 	struct Position { // Holds current pen position for each line
@@ -185,7 +185,8 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 					int y = Y(sign);
 					if(abs(y-lastY)<=lineInterval) dx -= noteSize.x/2;
 					else dx = 0;
-					String name = "accidentals."_+ref<string>({"flat"_,"sharp"_,"natural"_})[sign.note.accidental-1];
+					assert_(size_t(sign.note.accidental-1) < 5, int(sign.note.accidental));
+					String name = "accidentals."_+ref<string>({"flatflat"_,"flat"_,"natural"_,"sharp"_,"doublesharp"})[sign.note.accidental-1];
 					glyph(vec2(X(sign)-glyphSize(name).x+dx, y), name);
 					lastY = y;
 				}

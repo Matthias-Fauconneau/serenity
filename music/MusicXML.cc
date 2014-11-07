@@ -3,7 +3,7 @@
 
 MusicXML::MusicXML(string document) {
     Element root = parseXML(document);
-	map<uint, Clef> clefs; map<uint, bool> slurs; KeySignature keySignature={0}; TimeSignature timeSignature={4,4};
+	map<uint, Clef> clefs; map<uint, uint> slurs; KeySignature keySignature={0}; TimeSignature timeSignature={4,4};
 	uint64 measureTime = 0, time = 0, nextTime = 0, maxTime = 0;
 	uint measureIndex=0, pageIndex=0, pageLineIndex=0, lineMeasureIndex=0; // starts with 1
 	for(const Element& m: root("score-partwise"_)("part"_).children) {
@@ -55,11 +55,20 @@ MusicXML::MusicXML(string document) {
                     uint octaveStep = "CDEFGAB"_.indexOf(e("pitch"_)("step"_).text()[0]);
 					int noteOctave = parseInteger(e("pitch"_)("octave"_).text());
                     int noteStep = (noteOctave-4) * 7 + octaveStep;
-                    Accidental noteAccidental = Accidental(ref<string>({""_,"flat"_,"sharp"_,"natural"_}).indexOf(e("accidental"_).text()));
+					Accidental noteAccidental =
+							Accidental(ref<string>({""_,"double-flat"_,"flat"_,"natural"_,"sharp"_,"double-sharp"_}).indexOf(e("accidental"_).text()));
+					assert_(noteAccidental != -1, e("accidental"_));
                     if(e("notations"_)("slur"_)) {
-                        if(slurs[staff]) assert_(e("notations"_)("slur"_).attribute("type"_)=="stop"_);
-                        else assert_(e("notations"_)("slur"_).attribute("type"_)=="start"_, e("notations"_)("slur"_).attribute("type"_), e);
-                        slurs[staff] = !slurs[staff];
+						uint index = parseInteger(e("notations"_)("slur"_).attribute("number"));
+						if(slurs.contains(index)) {
+							assert_(e("notations"_)("slur"_).attribute("type"_)=="stop"_);
+							slurs.remove(index);
+						}
+						else {
+							assert_(e("notations"_)("slur"_).attribute("type"_)=="start"_, e("notations"_)("slur"_).attribute("type"_), e,
+									 measureIndex, pageIndex, pageLineIndex, lineMeasureIndex);
+							slurs[index] = staff; // FIXME: slurs across staff
+						}
                     }
 					Note::Tie tie = Note::NoTie;
                     if(e("notations"_)("tied"_)) {
@@ -90,7 +99,7 @@ MusicXML::MusicXML(string document) {
                     {Sign sign{time, duration, staff, Sign::Note, {}};
                         sign.note={clefs.at(staff), noteStep, noteAccidental, type, tie,
                                    e("dot"_) ? true : false,
-                                   e("notations"_)("slur"_)?true:false,
+								   slurs.values.contains(staff)?true:false,
                                    e("grace"_)?true:false,
                                    e("grace"_)["slash"_]=="yes"_?true:false,
                                    e("notations"_)("articulations"_)("staccato"_)?true:false,
@@ -141,6 +150,7 @@ MusicXML::MusicXML(string document) {
                 }
                 else if(d("octave-shift"_)) {}
                 else if(d("other-direction"_)) {}
+				else if(d("words"_)) {}
                 else error(e);
             }
             else if(e.name=="attributes"_) {
@@ -160,11 +170,11 @@ MusicXML::MusicXML(string document) {
 					{Sign sign{time, 0, uint(-1), Sign::TimeSignature, {}}; sign.timeSignature=timeSignature; signs.append( sign );}
                 }
             }
-            else if(e.name=="barline"_) {}
 			else if(e.name=="print"_) {
 				if(e["new-system"]=="yes") { pageLineIndex++, lineMeasureIndex=1; }
 				if(e["new-page"]=="yes") { pageIndex++, pageLineIndex=1; }
 			}
+			else if(e.name=="barline"_) {}
             else error(e);
 
 			assert_(time >= measureTime, int(time-measureTime), int(nextTime-measureTime), int(maxTime-measureTime), measureIndex, e);
