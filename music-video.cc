@@ -22,12 +22,6 @@ extern "C" {
 #include <libavutil/avutil.h> //avutil
 }
 
-static String str(const Sign& o) {
-	String s;// = str(o.time, o.duration, o.staff, int(o.type));
-	if(o.type==Sign::Metronome) s=s+str(o.metronome.perMinute);
-	return s;
-}
-
 /// Converts signs to notes
 MidiNotes notes(ref<Sign> signs, uint divisions) {
 	MidiNotes notes;
@@ -35,14 +29,13 @@ MidiNotes notes(ref<Sign> signs, uint divisions) {
 		if(sign.type==Sign::Metronome) {
 			assert_(!notes.ticksPerSeconds);
 			notes.ticksPerSeconds = sign.metronome.perMinute*divisions;
-			assert_(notes.ticksPerSeconds);
 		}
 		else if(sign.type == Sign::Note) {
 			notes.insertSorted({uint(sign.time*60), sign.note.key, 128/*FIXME: use dynamics*/});
 			notes.insertSorted({uint((sign.time+sign.duration)*60), sign.note.key, 0});
 		}
 	}
-	assert_(notes.ticksPerSeconds, signs);
+	assert_(notes.ticksPerSeconds);
 	return notes;
 }
 
