@@ -10,6 +10,7 @@
 #include "render.h"
 #include "encoder.h"
 #include "time.h"
+#include "sampler.h"
 
 // -> ffmpeg.h/cc
 extern "C" {
@@ -70,11 +71,31 @@ struct Music : Widget {
 	uint64 videoTime = 0;
 	// Audio output
     Thread audioThread;
-    AudioOutput audio {{this,&Music::read}, audioThread};
+	AudioOutput audio16 = {{this,&Music::read16}, audioThread};
+	AudioOutput audio32 = {{this,&Music::read32}, audioThread};
+	AudioOutput& audio = audioFile ? audio16 : audio32; // FIXME
+	Sampler sampler {48000, "/Samples/Salamander.sfz"_, {this, &Music::timeChanged}};
     uint64 audioTime = 0;
 
-	uint read(const mref<short2>& output) {
+	/// Adds new notes to be played (called in main thread before decoding)
+	uint64 decodeTime = 0;
+	uint samplerMidiIndex = 0;
+	void timeChanged(uint delta) {
+		decodeTime += delta;
+		while(samplerMidiIndex < notes.size && notes[samplerMidiIndex].time*sampler.rate <= decodeTime*notes.ticksPerSeconds) {
+			sampler.noteEvent(notes[samplerMidiIndex].key, notes[samplerMidiIndex].velocity);
+			samplerMidiIndex++;
+		}
+	}
+
+	uint read16(const mref<short2>& output) {
 		size_t readSize = audioFile.read(output);
+		audioTime += readSize;
+		return readSize;
+	}
+
+	uint read32(const mref<int2>& output) {
+		size_t readSize = sampler.read(output);
 		audioTime += readSize;
 		return readSize;
 	}
@@ -183,7 +204,11 @@ struct Music : Widget {
 			requestTermination(0); // window prevents automatic termination
 		} else { // Preview
 			window.show();
-			if(audioFile /*FIXME: restore sampler*/ && playbackDeviceAvailable()) audio.start(audioFile.rate, 1024); audioThread.spawn();
+			if(playbackDeviceAvailable()) {
+				audio.start(audioFile.rate, 1024, audioFile ? 16 : 32);
+				assert_(audio.rate == audioFile.rate ?: sampler.rate);
+				audioThread.spawn();
+			}
 		}
     }
 
@@ -194,7 +219,7 @@ struct Music : Widget {
 		int64 elapsedFrameCount = int64(window.currentFrameCounterValue) - int64(previousFrameCounterValue);
 		if(elapsedFrameCount>1) log("Skipped", elapsedFrameCount, "frames"); // PROFILE
 		if(audio.status && audio.status->state==Running) {
-			videoTime = audioTime * window.framesPerSecond / audioFile.rate + elapsedFrameCount /*Compensates renderer latency*/;
+			videoTime = audioTime * window.framesPerSecond / audio.rate + elapsedFrameCount /*Compensates renderer latency*/;
 		} else {
 			videoTime += elapsedFrameCount;
 		}

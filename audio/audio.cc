@@ -71,6 +71,7 @@ Device getPlaybackDevice() {
 }
 
 AudioOutput::AudioOutput(decltype(read16) read, Thread& thread) : Poll(0, POLLOUT, thread), read16(read) {}
+AudioOutput::AudioOutput(decltype(read32) read, Thread& thread) : Poll(0, POLLOUT, thread), read32(read) {}
 
 void AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
     if(!Device::fd) { Device::fd = move(getPlaybackDevice().fd); Poll::fd = Device::fd; }
@@ -102,7 +103,7 @@ void AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
             }
             hparams.interval(Rate) = hparams.interval(Rate).max; // Selects maximum rate
             hparams.interval(PeriodSize) = hparams.interval(PeriodSize).max; // Selects maximum latency
-			log(hparams.interval(PeriodSize).max);
+			log((uint)hparams.interval(SampleBits), (uint)hparams.interval(Rate), (uint)hparams.interval(PeriodSize));
         }
         if(status && status->state > Prepared) io<DRAIN>();
         maps[0].unmap(); maps[1].unmap(); maps[2].unmap(); // Releases any memory mappings
@@ -140,7 +141,8 @@ void AudioOutput::event() {
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
         uint readSize;
-        if(sampleBits==16) readSize=read16(mref<short2>(((short2*)buffer)+control->swPointer%bufferSize, periodSize));
+		/**/  if(sampleBits==16) readSize=read16(mref<short2>(((short2*)buffer)+control->swPointer%bufferSize, periodSize));
+		else if(sampleBits==32) readSize=read32(mref<int2>(((int2*)buffer)+control->swPointer%bufferSize, periodSize));
         else error("Unsupported sample size", sampleBits);
         assert(readSize<=periodSize);
         control->swPointer += readSize;

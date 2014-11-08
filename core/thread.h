@@ -1,7 +1,6 @@
 #pragma once
 /// \file process.h \link Thread threads\endlink, \link Lock synchronization\endlink, process environment and arguments
 #include "map.h"
-#include "data.h"
 #include "file.h"
 #include <poll.h>
 #include <pthread.h> //pthread
@@ -17,8 +16,7 @@ template<class I> struct Interface {
     template<class C> struct Factory : AbstractFactory {
         string version() override { return __DATE__ " " __TIME__ ""_; }
         unique<I> constructNewInstance() override { return unique<C>(); }
-        Factory(string name) { factories().insert(name, this); }
-		//Factory() : Factory(({ TextData s (str(typeid(C).name())); s.integer(); s.identifier(); })) {}
+		Factory(string name) { factories().insert(name, this); }
         static Factory registerFactory;
     };
     static string version(const string& name) { return factories().at(name)->version(); }
@@ -32,6 +30,7 @@ struct Application { virtual ~Application() {} };
 
 /// Lock is an initially released binary semaphore which can only be released by the acquiring thread
 struct Lock : handle<pthread_mutex_t> {
+	default_move(Lock);
     Lock() { pthread_mutex_init(&pointer,0); }
     ~Lock() { pthread_mutex_destroy(&pointer); }
     /// Locks the mutex.
@@ -49,6 +48,46 @@ struct Locker {
     ~Locker(){lock.unlock();}
 };
 
+struct Condition : handle<pthread_cond_t> {
+	default_move(Condition);
+	Condition() { pthread_cond_init(&pointer,0); }
+	~Condition(){ pthread_cond_destroy(&pointer); }
+};
+
+/// A semaphore implemented using POSIX mutex, POSIX condition variable, and a counter
+struct Semaphore {
+	default_move(Semaphore);
+	Lock mutex;
+	Condition condition;
+	int64 counter;
+	/// Creates a semaphore with \a count initial ressources
+	explicit Semaphore(int64 count=0) : counter(count) {}
+	/// Acquires \a count ressources
+	void acquire(int64 count) {
+		mutex.lock();
+		while(counter<count) pthread_cond_wait(&condition,&mutex);
+		__sync_sub_and_fetch(&counter,count); assert(counter>=0);
+		mutex.unlock();
+	}
+	/// Atomically tries to acquires \a count ressources only if available
+	bool tryAcquire(int64 count) {
+		mutex.lock();
+		if(counter<count) { mutex.unlock(); return false; }
+		assert(count>0);
+		__sync_sub_and_fetch(&counter,count);
+		mutex.unlock();
+		return true;
+	}
+	/// Releases \a count ressources
+	void release(int64 count) {
+		__sync_add_and_fetch(&counter,count);
+		pthread_cond_signal(&condition);
+	}
+	/// Returns available ressources \a count
+	operator int() const { return counter; }
+};
+inline String str(const Semaphore& o) { return str(o.counter); }
+
 /// Original thread spawned when this process was forked, terminating this thread leader terminates the whole thread group
 extern struct Thread mainThread;
 
@@ -61,7 +100,7 @@ struct Poll : pollfd {
     /// \note May be used without a file descriptor to queue jobs using \a wait, \a event will be called after all system events have been handled
     Poll(int fd=0, int events=POLLIN, Thread& thread=mainThread) : pollfd{fd,(short)events,0}, thread(thread) { if(fd) registerPoll(); }
 	Poll(const Poll&)=delete; Poll& operator=(const Poll&)=delete;
-	Poll(Poll&& o);
+	//Poll(Poll&& o);
     ~Poll(){ if(fd) unregisterPoll(); }
     /// Registers \a fd to the event loop
     void registerPoll();

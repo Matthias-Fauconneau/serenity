@@ -20,7 +20,7 @@ void log(string message) {
 }
 
 // Poll
-Poll::Poll(Poll&& o) : pollfd(o), thread(o.thread) { assert_(!o.thread.contains(&o)); }
+//Poll::Poll(Poll&& o) : pollfd(o), thread(o.thread) { assert_(!o.thread.contains(&o)); }
 void Poll::registerPoll() {
     Locker lock(thread.lock);
 	if(thread.contains(this)) { thread.unregistered.tryRemove(this); return; }

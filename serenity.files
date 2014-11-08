@@ -78,6 +78,8 @@ audio/audio.h
 audio/audio.cc
 audio/ffmpeg.h
 audio/ffmpeg.cc
+audio/resample.h
+audio/resample.cc
 
 tuner/fft.h
 tuner/fft.cc
@@ -121,6 +123,10 @@ music/sheet.h
 music/sheet.cc
 music/encoder.cc
 music/keyboard.cc
+music/sampler.h
+music/sampler.cc
+music/flac.h
+music/flac.cc
 music-video.cc
 
 player.cc

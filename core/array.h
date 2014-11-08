@@ -32,11 +32,15 @@ generic struct array : buffer<T> {
         assert(nextCapacity>=size);
         if(nextCapacity>capacity) {
 			nextCapacity = max(nextCapacity, capacity*2); // Amortizes reallocation
-            const T* data = 0;
-			if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error("Out of memory"); // TODO: move compatible realloc
-            swap(data, this->data);
-			mref<T>::move(mref<T>((T*)data, size));
-			if(capacity) free((void*)data);
+			if(capacity) {
+				data = (T*)realloc((T*)data, nextCapacity*sizeof(T)); // Reallocates heap buffer (copy is done by allocator if necessary)
+			} else {
+				const T* data = 0;
+				if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error("Out of memory"); // TODO: move compatible realloc
+				swap(data, this->data);
+				assert_(!size); //mref<T>::move(mref<T>((T*)data, size));
+				if(capacity) free((void*)data);
+			}
 			capacity = nextCapacity;
         }
     }
@@ -58,9 +62,9 @@ generic struct array : buffer<T> {
 	//void append(const mref<T> source) { grow(size+source.size); slice(size-source.size).move(source); }
     /// Appends another list of elements to this array by copying
 	void append(const ref<T> source) { grow(size+source.size); slice(size-source.size).copy(source); }
-    /// Appends a new element
+	/*/// Appends a new element
     template<Type Arg, typename enable_if<!is_convertible<Arg, T>::value && !is_convertible<Arg, ref<T>>::value>::type* = nullptr>
-	T& append(Arg&& arg) { grow(size+1); return set(size-1, forward<Arg>(arg)); }
+	T& append(Arg&& arg) { grow(size+1); return set(size-1, forward<Arg>(arg)); }*/
     /// Appends a new element
     template<Type Arg0, Type Arg1, Type... Args> T& append(Arg0&& arg0, Arg1&& arg1, Args&&... args) {
 		grow(size+1); return set(size-1, forward<Arg0>(arg0), forward<Arg1>(arg1), forward<Args>(args)...);
@@ -83,7 +87,8 @@ generic struct array : buffer<T> {
 	int insertSorted(const T& e) { size_t i=0; while(i<size && at(i) <= e) i++; insertAt(i, ::copy(e)); return i; }
 
     /// Removes one element at \a index
-    void removeAt(size_t index) { at(index).~T(); for(size_t i: range(index, size-1)) at(i)=move(at(i+1)); size--; }
+	void removeAt(size_t index) { at(index).~T(); for(size_t i: range(index, size-1)) raw(at(i)).copy(raw(at(i+1))); size--; }
+	//void removeAt(size_t index) { at(index).~T(); for(size_t i: range(index, size-1)) at(i)=move(at(i+1)); size--; }
     /// Removes one element at \a index and returns its value
     T take(int index) { T value = move(at(index)); removeAt(index); return value; }
     /// Removes the last element and returns its value

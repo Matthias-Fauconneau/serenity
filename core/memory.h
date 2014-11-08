@@ -2,6 +2,9 @@
 /// \file memory.h Memory operations and management (mref, buffer, unique, shared)
 #include "core.h"
 
+/// Aligns \a offset to \a width (only for power of two \a width)
+inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
+
 // -- mref
 
 #ifndef _NEW

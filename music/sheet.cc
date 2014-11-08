@@ -2,11 +2,6 @@
 #include "notation.h"
 #include "utf8.h"
 
-static String str(const Sign& o) {
-	String s = str(int(o.type), o.staff);
-	return s;
-}
-
 float Sheet::glyph(vec2 origin, string name, Font& font) {
 	uint index = font.index(name);
 	notation->glyphs.append(origin, font, index, index);
@@ -24,7 +19,6 @@ uint Sheet::text(vec2 origin, string text, Font& font, array<Glyph>& glyphs) {
 
 // Layouts notations to graphic primitives (and parses notes to MIDI keys)
 Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time steps per measure
-	log(str(signs,"\n"_));
 	uint measureIndex=1, pageIndex=1, pageLineIndex=1, lineMeasureIndex=1;
     map<uint, Clef> clefs; KeySignature keySignature={0}; TimeSignature timeSignature={0,0};
     typedef array<Sign> Chord; // Signs belonging to a same chord (same time)
@@ -189,7 +183,7 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 					vec2 k0p = k0 + vec2(0, slurDown*noteSize.y/2);
 					vec2 k1 = vec2(p1.x, y) + vec2(0, slurDown*2*noteSize.y);
 					vec2 k1p = k1 + vec2(0, slurDown*noteSize.y/2);
-					notation->cubics.append( copyRef(ref<vec2>({p0,k0,k1,p1,k1p,k0p})) );
+					notation->cubics.append({copyRef(ref<vec2>({p0,k0,k1,p1,k1p,k0p}))});
 				}
 				pendingSlurs.clear();
 			}
