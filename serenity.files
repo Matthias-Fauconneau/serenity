@@ -115,6 +115,7 @@ image/image.h
 image/image.cc
 
 music/MusicXML.cc
+music/midi.h
 music/midi.cc
 music/sheet.h
 music/sheet.cc

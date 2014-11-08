@@ -11,6 +11,7 @@ enum Duration { Whole, Half, Quarter, Eighth, Sixteenth };
 enum class Loudness { PPP, PP, P, MP, MF, F, FF, FFF };
 enum PedalAction { Ped=-1, Start, Change, PedalStop };
 enum WedgeAction { Crescendo, Diminuendo, WedgeStop };
+enum SlurType { SlurStart, SlurStop };
 
 struct Clef {
     ClefSign clefSign;
@@ -23,15 +24,14 @@ struct Note {
     Duration duration;
     enum Tie { NoTie, TieStart, TieContinue, TieStop } tie;
     bool dot:1;
-    bool slur:1; // toggle
     bool grace:1;
     bool slash:1;
     bool staccato:1;
     bool tenuto:1;
     bool accent:1;
     bool stem:1; // 0: down, 1: up
-	uint key; // MIDI key
-	size_t glyphIndex;
+    uint key; // MIDI key
+    size_t glyphIndex;
 };
 struct Rest {
     Duration duration;
@@ -56,18 +56,25 @@ struct Metronome {
     Duration beatUnit;
     uint perMinute;
 };
+struct Slur {
+	size_t documentIndex;
+	int index;
+	SlurType type;
+	bool matched;
+};
 
 struct Sign {
 	uint64 time; // Absolute time offset
     uint duration;
-	uint staff; // Staff index
+	uint staff; // Staff index (-1: all)
 	enum {
 		Invalid,
 		Note, Rest, Clef, // Staff
 		Metronome, // Top
 		Dynamic, Wedge, // Middle
 		Pedal, // Bottom
-		Measure, KeySignature, TimeSignature // Across
+		Measure, KeySignature, TimeSignature, // Across
+		Slur // Toggle (Staff/Across)
 	} type;
     union {
         struct Note note;
@@ -80,6 +87,7 @@ struct Sign {
         struct Dynamic dynamic;
         struct Pedal pedal;
         struct Wedge wedge;
+		struct Slur slur;
     };
 };
 inline bool operator <=(const Sign& a, const Sign& b) {

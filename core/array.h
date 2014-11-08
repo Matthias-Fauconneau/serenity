@@ -35,7 +35,7 @@ generic struct array : buffer<T> {
             const T* data = 0;
 			if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error("Out of memory"); // TODO: move compatible realloc
             swap(data, this->data);
-            mref<T>::move(mref<T>((T*)data, size));
+			mref<T>::move(mref<T>((T*)data, size));
 			if(capacity) free((void*)data);
 			capacity = nextCapacity;
         }

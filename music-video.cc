@@ -22,21 +22,47 @@ extern "C" {
 #include <libavutil/avutil.h> //avutil
 }
 
+static String str(const Sign& o) {
+	String s;// = str(o.time, o.duration, o.staff, int(o.type));
+	if(o.type==Sign::Metronome) s=s+str(o.metronome.perMinute);
+	return s;
+}
+
+/// Converts signs to notes
+MidiNotes notes(ref<Sign> signs, uint divisions) {
+	MidiNotes notes;
+	for(Sign sign: signs) {
+		if(sign.type==Sign::Metronome) {
+			assert_(!notes.ticksPerSeconds);
+			notes.ticksPerSeconds = sign.metronome.perMinute*divisions;
+			assert_(notes.ticksPerSeconds);
+		}
+		else if(sign.type == Sign::Note) {
+			notes.insertSorted({uint(sign.time*60), sign.note.key, 128/*FIXME: use dynamics*/});
+			notes.insertSorted({uint((sign.time+sign.duration)*60), sign.note.key, 0});
+		}
+	}
+	assert_(notes.ticksPerSeconds, signs);
+	return notes;
+}
+
 struct Music : Widget {
 	string name = arguments() ? arguments()[0] : (error("Expected name"), string());
 
 	// MusicXML file
     MusicXML xml = readFile(name+".xml"_);
 	// MIDI file
-    MidiFile midi = readFile(name+".mid"_);
+	MidiNotes notes = existsFile(name+".mid"_) ? MidiFile(readFile(name+".mid"_)) : ::notes(xml.signs, xml.divisions);
+
 	// Audio file
 	buffer<String> audioFiles = filter(Folder(".").list(Files),
 							   [this](string path) { return !startsWith(path, name) || (!endsWith(path, ".mp3") && !endsWith(path, ".m4a")); });
 	AudioFile audioFile = audioFiles ? AudioFile(audioFiles[0]) : AudioFile();
 
 	// Rendering
-	Scroll<Sheet> sheet {xml.signs, xml.divisions, apply(filter(midi.notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
+	Scroll<Sheet> sheet {xml.signs, xml.divisions, apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
 	bool failed = sheet.firstSynchronizationFailureChordIndex != invalid;
+	bool running = !failed;
 	Keyboard keyboard;
 	VBox widget {{&sheet, &keyboard}};
 
@@ -62,14 +88,17 @@ struct Music : Widget {
 
     uint noteIndexToMidiIndex(uint seekNoteIndex) {
         uint midiIndex=0;
-        for(uint noteIndex=0; noteIndex<seekNoteIndex; midiIndex++) if(midi.notes[midiIndex].velocity) noteIndex++;
+		for(uint noteIndex=0; noteIndex<seekNoteIndex; midiIndex++) {
+			assert_(midiIndex < notes.size);
+			if(notes[midiIndex].velocity) noteIndex++;
+		}
         return midiIndex;
     }
 
 	void follow(uint timeNum, uint timeDen) {
 		bool contentChanged = false;
-		for(;midiIndex < midi.notes.size && midi.notes[midiIndex].time*timeDen <= timeNum*midi.ticksPerSeconds; midiIndex++) {
-			MidiNote note = midi.notes[midiIndex];
+		for(;midiIndex < notes.size && notes[midiIndex].time*timeDen <= timeNum*notes.ticksPerSeconds; midiIndex++) {
+			MidiNote note = notes[midiIndex];
 			if(note.velocity) {
 				Sign sign = sheet.midiToSign[noteIndex];
 				if(sign.type == Sign::Note) {
@@ -89,16 +118,17 @@ struct Music : Widget {
 			}
 		}
 		if(!contentChanged) return;
-		if(active) targetPosition = min(apply(active.values, [this](Sign sign){return sheet.notation->glyphs[sign.note.glyphIndex].origin.x;}));
+		if(active) targetPosition = min(apply(active.values, [this](Sign sign){return sheet.notation->glyphs[sign.note.glyphIndex].origin.x;}))-1;
 	}
 
-	void seek(uint64 unused midiTime) {
+	void seek(uint64 midiTime) {
 		if(audio) {
-			audioTime = midiTime * audioFile.rate / midi.ticksPerSeconds;
+			audioTime = midiTime * audioFile.rate / notes.ticksPerSeconds;
 			audioFile.seek(audioTime); //FIXME: return actual frame time
 			videoTime = audioTime * window.framesPerSecond / audioFile.rate; // FIXME: remainder
 		} else {
-			videoTime = midiTime * window.framesPerSecond / midi.ticksPerSeconds;
+			assert_(notes.ticksPerSeconds);
+			videoTime = midiTime * window.framesPerSecond / notes.ticksPerSeconds;
 			previousFrameCounterValue=window.currentFrameCounterValue;
 			follow(videoTime, window.framesPerSecond);
 		}
@@ -109,7 +139,7 @@ struct Music : Widget {
 		const float b = -1, k = 1./4; // damping [1/T] and stiffness [1/TT] constants
 		speed += dt * (b*speed - k*(position-targetPosition)); // Euler time integration of acceleration [px/s²] from spring equation to speed [px/s]
 		position += dt * speed; // Euler time integration of speed [px/s] to position [px]
-		sheet.offset.x = -clip(0.f, position, float(abs(sheet.widget().sizeHint(size).x)-size.x));
+		sheet.offset.x = -clip(0.f, position-size.x/2, float(abs(sheet.widget().sizeHint(size).x)-size.x));
 	}
 
     Music() {
@@ -120,8 +150,11 @@ struct Music : Widget {
 			for(;measureIndex < sheet.measureToChord.size; measureIndex++)
 				if(sheet.measureToChord[measureIndex]>=sheet.firstSynchronizationFailureChordIndex) break;
 			sheet.offset.x = -sheet.measures[max<int>(0, measureIndex-3)];
-		} else { // Seeks to first note
-			seek( midi.notes[noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[0]])].time );
+		} else if(running) { // Seeks to first note
+			assert_(0 < sheet.measureToChord.size);
+			assert_(sheet.measureToChord[0] < sheet.chordToNote.size);
+			assert_(noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[0]])<notes.size);
+			seek( notes[noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[0]])].time );
 		}
 		if(arguments().contains("encode")) { // Encode
 			Encoder encoder {name, int2(1280,720), 60, audioFile};
@@ -157,17 +190,17 @@ struct Music : Widget {
 			requestTermination(0); // window prevents automatic termination
 		} else { // Preview
 			window.show();
-			if(playbackDeviceAvailable()) audio.start(audioFile.rate, 1024); audioThread.spawn();
+			if(audioFile /*FIXME: restore sampler*/ && playbackDeviceAvailable()) audio.start(audioFile.rate, 1024); audioThread.spawn();
 		}
     }
 
 	int2 sizeHint(int2 size) override { return failed ? sheet.ScrollArea::sizeHint(size) : widget.sizeHint(size); }
 	shared<Graphics> graphics(int2 size) override {
-		if(failed) return sheet.ScrollArea::graphics(size);
+		if(!running) return sheet.ScrollArea::graphics(size);
 		if(!previousFrameCounterValue) previousFrameCounterValue=window.currentFrameCounterValue;
 		int64 elapsedFrameCount = int64(window.currentFrameCounterValue) - int64(previousFrameCounterValue);
 		if(elapsedFrameCount>1) log("Skipped", elapsedFrameCount, "frames"); // PROFILE
-		if(audio) {
+		if(audio.status && audio.status->state==Running) {
 			videoTime = audioTime * window.framesPerSecond / audioFile.rate + elapsedFrameCount /*Compensates renderer latency*/;
 		} else {
 			videoTime += elapsedFrameCount;

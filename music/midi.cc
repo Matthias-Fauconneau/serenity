@@ -13,7 +13,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
             // Reads first time (next event time will always be kept to read events in time)
             uint8 c=track.read(); uint t=c&0x7f;
             if(c&0x80){c=track.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=track.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=track.read();t=(t<<7)|c;}}}
-			tracks.append( Track(t,move(track)) );
+			tracks.append(Track(t, ::move(track)));
         }
         s.advance(length);
     }
@@ -49,7 +49,7 @@ void MidiFile::read(Track& track) {
         }
 
         if(type==NoteOff) type=NoteOn, vel=0;
-        if(type==NoteOn) notes.insertSorted(MidiNote{track.time, key, vel});
+		if(type==NoteOn) insertSorted(MidiNote{track.time, key, vel});
 
         if(!s) return;
         uint8 c=s.read(); uint t=c&0x7f;

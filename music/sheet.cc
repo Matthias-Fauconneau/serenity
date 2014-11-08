@@ -24,8 +24,8 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
     typedef array<Sign> Chord; // Signs belonging to a same chord (same time)
     Chord chords[2]; // Current chord (per staff)
     array<Chord> beams[2]; // Chords belonging to current beam (per staff) (also for correct single chord layout)
-	array<array<Sign>> pendingSlurs[3];
-	array<Sign> slurs[3]; // Signs belonging to current slur (pending slurs per staff + across staff)
+	array<array<Sign>> pendingSlurs; // Slurs pending rendering (waiting for beams)
+	map<int, array<Sign>> slurs; // Signs belonging to current slur
 	float pedalStart = 0; // Last pedal start/change position
     Sign wedgeStart; // Current wedge
 	struct Position { // Holds current pen position for each line
@@ -41,7 +41,6 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 		void setAll(float x) { setStaves(x); middle = x; top = x; bottom = x; }
     };
 	map<uint64, Position> timeTrack; // Maps times to positions
-	map<uint, array<Sign>> notes; // Signs for notes (time, key, blitIndex)
 	array<Glyph> debug;
 	{//int x = 0;
 		/*// System
@@ -62,6 +61,19 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 	}
 	for(size_t signIndex: range(signs.size)) {
 		Sign sign = signs[signIndex];
+
+		// Meta sign
+		if(sign.type == Sign::Slur) {
+			/*if(sign.slur.type==SlurStart) {
+				assert_(!slurs.contains(int(sign.staff)), int(sign.staff), slurs.keys, measureIndex, sign.slur.index);
+				slurs.insert(int(sign.staff)); // Starts new slur
+			}
+			else {
+				pendingSlurs.append(slurs.take(int(sign.staff))); // Stops current slur
+			} FIXME*/
+			continue;
+		}
+
 		auto X = [&](const Sign& sign) -> float& {
 			assert_(timeTrack.contains(sign.time), withName(int(sign.type), sign.note.step, sign.time, sign.duration,
 					measureIndex, pageIndex, pageLineIndex, lineMeasureIndex, signIndex));
@@ -154,11 +166,11 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 				}
 				beam.clear();
 
-				for(const array<Sign>& slur: pendingSlurs[staff]) {
+				for(const array<Sign>& slur: pendingSlurs) {
 					int sum = 0; for(Sign sign: slur) sum += clefStep(sign.note.clef.clefSign, sign.note.step);
 					int slurDown = (int(slur.size) > count ? sum < (int(slur.size) * -4) : stemUp) ? 1 : -1;
 
-					int y = slurDown>0 ? -1000 : 1000;
+					float y = slurDown>0 ? -inf : inf;
 					for(Sign sign: slur) {
 						y = slurDown>0 ? max(y, Y(sign)) : min(y, Y(sign));
 					}
@@ -173,13 +185,13 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 					vec2 k1p = k1 + vec2(0, slurDown*noteSize.y/2);
 					notation->cubics.append( copyRef(ref<vec2>({p0,k0,k1,p1,k1p,k0p})) );
 				}
-				pendingSlurs[staff].clear();
+				pendingSlurs.clear();
 			}
 
 			// Layout accidentals
 			Chord& chord = chords[staff];
 			if(chord && sign.time != chord.last().time) {
-				int lastY = -1000, dx = 0;
+				float lastY = -inf, dx = 0;
 				for(Sign sign: chord.reverse()) {
 					if(!sign.note.accidental) continue;
 					int y = Y(sign);
@@ -224,12 +236,8 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 						else beam.append( copyRef(ref<Sign>({sign})) );
 					}
 
-					array<Sign>& slur = slurs[staff];
-					if(slur) slur.append( sign );
-					if(note.slur) {
-						if(!slur) slur.append( sign ); // Starts new slur (only if visible)
-						else { pendingSlurs[staff].append( move(slur) ); } // Stops
-					}
+					if(slurs.contains(int(staff))) slurs.at(int(staff)).append( sign );
+					if(slurs.contains(-1)) slurs.at(-1).append( sign );
 				}
 				if(note.tie == Note::NoTie || note.tie == Note::TieStart) notes.sorted(sign.time).append( sign );
 			}
@@ -300,7 +308,7 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 						keySignature = sign.keySignature;
 						int fifths = keySignature.fifths;
 						for(int i: range(abs(fifths))) {
-							int step = (fifths>0?2:4) + ((fifths>0 ? 4 : 3) * i +2)%7;
+							int step = fifths<0 ? 4+(3*i+2)%7 : 6+(4*i+4)%7;
 							string symbol = fifths<0?"accidentals.flat"_:"accidentals.sharp"_;
 									 glyph(vec2(x, Y(0, {clefs[0u].clefSign, 0}, step - (clefs[0u].clefSign==Bass ? 14 : 0))), symbol);
 							x += glyph(vec2(x, Y(1, {clefs[1u].clefSign, 0}, step - (clefs[1u].clefSign==Bass ? 14 : 0))), symbol);
@@ -349,6 +357,16 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 			}
 		}
 	}
+
+	/*// Generates MIDI notes from XML
+	array<uint> xmlNotes;
+	if(!midiNotes) {
+		for(ref<Sign> chord: notes.values) for(Sign note: chord) {
+			assert_(note.type == Sign::Note);
+			xmlNotes.append(note.note.key);
+		}
+		midiNotes = xmlNotes;
+	}*/
 
 	midiToSign = buffer<Sign>(midiNotes.size, 0);
 	array<uint> chordExtra;

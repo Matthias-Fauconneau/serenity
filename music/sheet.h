@@ -16,9 +16,9 @@ struct Sheet : Widget {
     // Layout helpers
     int clefStep(ClefSign clefSign, int step) { return step - (clefSign==Treble ? 10 : -2); } // Translates C4 step to top line step using clef
 	float staffY(uint staff, int clefStep) { return staff*10*lineInterval - clefStep * halfLineInterval; } // Clef independent
-	int Y(uint staff, Clef clef, int step) { return staffY(staff, clefStep(clef.clefSign, step)); } // Clef dependent
-	int Y(Sign sign, int step) { assert_(sign.type==Sign::Note||sign.type==Sign::Clef); return Y(sign.staff, sign.note.clef, step); } // Clef dependent
-	int Y(Sign sign) { assert_(sign.type==Sign::Note); return Y(sign, sign.note.step); } // Clef dependent
+	float Y(uint staff, Clef clef, int step) { return staffY(staff, clefStep(clef.clefSign, step)); } // Clef dependent
+	float Y(Sign sign, int step) { assert_(sign.type==Sign::Note||sign.type==Sign::Clef); return Y(sign.staff, sign.note.clef, step); } // Clef dependent
+	float Y(Sign sign) { assert_(sign.type==Sign::Note); return Y(sign, sign.note.step); } // Clef dependent
 	//int Y(const map<uint, Clef>& clefs, uint staff, int step) { return staffY(staff, clefStep(clefs.at(staff).clefSign, step)); } // Clef dependent
 
     // Fonts
@@ -51,6 +51,7 @@ struct Sheet : Widget {
 	int stop(int unused axis, int currentPosition, int direction) override;
 
 	// -- MIDI Synchronization
+	map<uint, array<Sign>> notes; // Signs for notes (time, key, blitIndex)
 	buffer<Sign> midiToSign; /// Sign of corresponding note for each MIDI note
 	uint extraErrors = 0, missingErrors = 0, wrongErrors = 0, orderErrors = 0;
 	size_t firstSynchronizationFailureChordIndex = -1;

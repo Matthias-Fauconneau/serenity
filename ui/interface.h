@@ -12,9 +12,9 @@ struct ScrollArea : Widget {
     bool scrollbar = false;
 	const int scrollBarWidth = 8;
 	vec2 offset=0;
-	int2 dragStartCursor;
-	vec2 dragStartOffset;
-	int2 viewSize;
+	int2 dragStartCursor = 0;
+	vec2 dragStartOffset = 0;
+	int2 viewSize = 0;
 
     /// Overrides \a widget to return the proxied widget
     virtual Widget& widget() const abstract;

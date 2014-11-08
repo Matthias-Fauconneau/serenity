@@ -5,9 +5,11 @@
 #include "map.h"
 
 struct MidiNote { uint time, key, velocity; };
-//inline bool operator ==(const MidiNote& a, uint key) { return a.key == key; }
 inline bool operator <=(const MidiNote& a, const MidiNote& b) { return a.time < b.time || (a.time == b.time && a.key <= b.key); }
-//inline String str(const MidiNote& a) { return str(a.key); }
+
+struct MidiNotes : array<MidiNote> {
+	uint ticksPerSeconds=0;
+};
 
 enum { NoteOff=8, NoteOn, Aftertouch, Controller, ProgramChange, ChannelAftertouch, PitchBend, Meta };
 struct Track {
@@ -18,13 +20,11 @@ struct Track {
 };
 
 /// Standard MIDI file player
-struct MidiFile {
+struct MidiFile : MidiNotes {
     array<Track> tracks;
     int trackCount=0;
-    uint ticksPerSeconds=0;
     uint timeSignature[2] = {4,4}, tempo=60000/120; int key=0; enum {Major,Minor} scale=Major;
-    array<MidiNote> notes;
-    uint duration=0; // Duration in ticks
+	uint duration=0; // Duration in ticks
 	MidiFile(ref<byte> file);
     void read(Track& track);
 };

@@ -26,8 +26,8 @@ generic buffer<T> shuffle(buffer<T>&& a) {
 struct Player : Poll {
 // Playback
     AudioControl volume;
-    static constexpr uint channels = 2;
-    static constexpr uint periodSize = 8192;
+	static constexpr uint channels = 2;
+	static constexpr uint periodSize = 32768;
     unique<AudioFile> file = 0;
     AudioOutput audio {{this,&Player::read}};
     mref<short2> lastPeriod;
@@ -66,7 +66,7 @@ struct Player : Poll {
     Scroll<List<Text>> titles;
     HBox main {{ &albums, &titles }};
 	VBox layout {{ &toolbar, &main }};
-	Window window {&layout, -int2(1680,1050)/2, []{ return"Player"__; }, pauseIcon()};
+	Window window {&layout, -int2(1050, 1680)/2, {}, pauseIcon()};
 
 // Content
     String device; // Device underlying folder
@@ -209,7 +209,7 @@ struct Player : Poll {
         if(play) {
             assert_(file);
             if(!playButton.enabled) {
-                audio.start(file->rate, periodSize);
+				audio.start(file->rate, periodSize);
                 window.setIcon(playIcon());
             }
         } else {

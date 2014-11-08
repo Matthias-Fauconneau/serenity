@@ -9,8 +9,7 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
 	static_assert(sizeof(V<T>)==N*sizeof(T),"");
 
     /// Defaults initializes to zero
-	vec() {}
-	//vec() : vec(0) {}
+	vec() : vec(0) {}
     /// Initializes all components to the same value \a v
     vec(T v){ for(uint i: range(N)) at(i)=v; }
     /// Initializes components separately
