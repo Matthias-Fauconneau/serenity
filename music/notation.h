@@ -57,42 +57,42 @@ struct Metronome {
     uint perMinute;
 };
 struct Slur {
-	size_t documentIndex;
-	int index;
-	SlurType type;
-	bool matched;
+    size_t documentIndex;
+    int index;
+    SlurType type;
+    bool matched;
 };
 
 struct Sign {
-	uint64 time; // Absolute time offset
+    uint64 time; // Absolute time offset
     uint duration;
-	uint staff; // Staff index (-1: all)
-	enum {
-		Invalid,
-		Note, Rest, Clef, // Staff
-		Metronome, // Top
-		Dynamic, Wedge, // Middle
-		Pedal, // Bottom
-		Measure, KeySignature, TimeSignature, // Across
-		Slur // Toggle (Staff/Across)
-	} type;
+    uint staff; // Staff index (-1: all)
+    enum {
+	Invalid,
+	Note, Rest, Clef, // Staff
+	Metronome, // Top
+	Dynamic, Wedge, // Middle
+	Pedal, // Bottom
+	Measure, KeySignature, TimeSignature, // Across
+	Slur // Toggle (Staff/Across)
+    } type;
     union {
-        struct Note note;
-        struct Rest rest;
-        struct Measure measure;
-        struct Clef clef;
-        struct KeySignature keySignature;
-        struct TimeSignature timeSignature;
-        struct Metronome metronome;
-        struct Dynamic dynamic;
-        struct Pedal pedal;
-        struct Wedge wedge;
-		struct Slur slur;
+	struct Note note;
+	struct Rest rest;
+	struct Measure measure;
+	struct Clef clef;
+	struct KeySignature keySignature;
+	struct TimeSignature timeSignature;
+	struct Metronome metronome;
+	struct Dynamic dynamic;
+	struct Pedal pedal;
+	struct Wedge wedge;
+	struct Slur slur;
     };
 };
 inline bool operator <=(const Sign& a, const Sign& b) {
     if(a.time==b.time) {
-        if(a.type==Sign::Note && b.type==Sign::Note) return a.note.step <= b.note.step;
+	if(a.type==Sign::Note && b.type==Sign::Note) return a.note.step <= b.note.step;
     }
     return a.time <= b.time;
 }

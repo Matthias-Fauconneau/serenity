@@ -2,7 +2,7 @@
 #include "thread.h" // setExceptions
 #include "data.h"
 
-void BitReader::setData(const ref<byte>& buffer) { data=buffer.data; bsize=8*buffer.size; index=0; }
+BitReader::BitReader(ref<uint8> data) : ref<uint8>(data) { bitSize=8*data.size; index=0; }
 
 void BitReader::skip(int count) { index+=count; }
 
@@ -10,7 +10,7 @@ uint BitReader::bit() { uint8 bit = uint8(data[index/8]<<(index&7))>>7; index++;
 
 uint BitReader::binary(int size) {
     assert(size<=32);//48
-    assert(index<bsize);
+	assert(index<bitSize);
     uint value = (big64(*(uint64*)(data+index/8)) << (index&7)) >> int8(64-size);
     index += size;
     return value;
@@ -18,7 +18,7 @@ uint BitReader::binary(int size) {
 
 int BitReader::sbinary(int size) {
     assert(size<=32);//48
-    assert(index<bsize);
+	assert(index<bitSize);
     int64 word = big64(*(uint64*)(data+index/8)) << (index&7);
     index += size;
     return word>>int8(64-size);
@@ -26,16 +26,16 @@ int BitReader::sbinary(int size) {
 
 static uint8 log2i[256];
 uint BitReader::unary() {
-    assert(index<bsize);
+	assert(index<bitSize);
     // 64bit word optimization of "uint size=0; while(!bit()) size++; assert(size<(64-8)+64);"
     uint64 w = big64(*(uint64*)(data+index/8)) << (index&7);
-    uint size=0;
+	uint size = 0;
     if(!w) {
-        size+=64-(index&7);
-        w = big64(*(uint64*)(data+index/8+8));
+		size += 64 - (index&7);
+		w = big64(*(uint64*)(data+index/8+8));
     }
-    assert(w);
-    uint8 b=w>>(64-8);
+	assert(w, size, bin(slice(index/8)), index, bitSize);
+	uint8 b = w >> (64-8);
     while(!b) size+=8, w<<=8, b=w>>(64-8);
     size += log2i[b];
     index += size+1;
@@ -44,7 +44,7 @@ uint BitReader::unary() {
 
 uint BitReader::utf8() {
     assert(index%8==0);
-    const byte* pointer = &data[index/8];
+	const uint8* pointer = &data[index/8];
     byte code = pointer[0];
     /**/  if((code&0b10000000)==0b00000000) { index+=8; return code; }
     else if((code&0b11100000)==0b11000000) { index+=16; return(code&0b11111)<<6  |(pointer[1]&0b111111); }
@@ -60,9 +60,8 @@ void setRoundMode(Round round) {
     int r; asm volatile("stmxcsr %0":"=m"(*&r)); r &= ~(0b11<<13); r |= (round&0b11) << 13; asm volatile("ldmxcsr %0" : : "m" (*&r));
 }
 
-FLAC::FLAC(const ref<byte>& data) {
-    static bool unused once = ({ int i=1; for(int l=0;l<=7;l++) for(int r=0;r<1<<l;r++) log2i[i++]=7-l; assert(i==256); true;});
-    BitReader::setData(data);
+FLAC::FLAC(ref<byte> data) : BitReader(cast<uint8>(data)) {
+	static bool unused once = ({ int i=1; for(int l=0;l<=7;l++) for(int r=0;r<1<<l;r++) log2i[i++] = 7-l; assert(i==256); true;});
     assert(startsWith(data,"fLaC"_)); skip(32);
     for(;;) { //METADATA_BLOCK*
         bool last=bit();
@@ -87,7 +86,7 @@ FLAC::FLAC(const ref<byte>& data) {
 
 enum { Independent=1, LeftSide=8, RightSide=9, MidSide=10 };
 void FLAC::parseFrame() {
-    int unused sync = binary(15); assert(sync==0b111111111111100, sync, index, bsize);
+	int unused sync = binary(15); assert(sync==0b111111111111100, sync, index, bitSize);
     bool unused variable = bit();
     int blockSize_[16] = {0, 192, 576,1152,2304,4608, -8,-16, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768};
     int blockSize = blockSize_[binary(4)];
@@ -157,7 +156,7 @@ void FLAC::decodeFrame() {
         if(channel == 1) { if(channelMode==LeftSide || channelMode == MidSide) rawSampleSize++; }
 
         //Subframe
-        int unused zero = bit(); assert(zero==0,channel,blockSize,index,bsize);
+		int unused zero = bit(); assert(zero==0,channel,blockSize,index,bitSize);
         uint type = binary(6);
         int unused wasted = bit(); assert(wasted==0,type);
         if (type == 0) { //constant
@@ -189,7 +188,7 @@ void FLAC::decodeFrame() {
             else if(order==2) predictor[0]=-1, predictor[1]=2;
             else if(order==3) predictor[0]=0, predictor[1]=1, predictor[2]=-3, predictor[3]=3;
             else if(order==4) predictor[0]=-1, predictor[1]=4, predictor[2]=-6, predictor[3]=4;
-        } else { error("Unknown type",type,channel,blockSize,index,bsize); return; }
+		} else { error("Unknown type",type,channel,blockSize,index,bitSize); return; }
         float* end=signal; signal += order;
 
         //Residual
@@ -249,9 +248,9 @@ void FLAC::decodeFrame() {
     index=align(8,index);
     skip(16);
     assert(align(4,blockSize)<=readIndex+audio.capacity-writeIndex,blockSize,align(4,blockSize),align(4,blockSize)+writeIndex,audio.capacity);
-    audio.size+=blockSize;
-    uint beforeWrap=audio.capacity-writeIndex;
-    if(blockSize>beforeWrap) {
+	__sync_add_and_fetch(&audioAvailable, blockSize);
+	uint beforeWrap = audio.capacity-writeIndex;
+	if(blockSize > beforeWrap) {
         interleave<4>(channelMode,block[0],block[1],audio.begin()+writeIndex,audio.begin()+audio.capacity);
         interleave<4>(channelMode,block[0]+beforeWrap,block[1]+beforeWrap,audio.begin(),audio.begin()+blockSize-beforeWrap);
         writeIndex = blockSize-beforeWrap;
@@ -259,13 +258,13 @@ void FLAC::decodeFrame() {
         interleave<4>(channelMode,block[0],block[1],audio.begin()+writeIndex,audio.begin()+writeIndex+blockSize);
         writeIndex += blockSize;
     }
-    if(index<bsize) parseFrame(); else blockSize=0;
+	if(index<bitSize) parseFrame(); else blockSize=0;
     //log(::predict/::order); // GCC~4 / Clang~8 [in cycles/(sample*order) on Athlon64 3200]
 }
 
-uint FLAC::read(mref<float2> out) {
-    while(audio.size<out.size){ if(blockSize==0) { out.size=audio.size; break; } decodeFrame(); }
-    uint beforeWrap = audio.capacity-readIndex;
+size_t FLAC::read(mref<float2> out) {
+	while(audioAvailable<out.size){ if(blockSize==0) { out.size=audioAvailable; break; } decodeFrame(); }
+	size_t beforeWrap = audio.capacity-readIndex;
     if(out.size>beforeWrap) {
 		out.slice(0, beforeWrap).copy(audio.slice(readIndex, beforeWrap));
 		out.slice(beforeWrap).copy(audio.slice(0, out.size-beforeWrap));
@@ -274,7 +273,7 @@ uint FLAC::read(mref<float2> out) {
 		out.copy(audio.slice(readIndex, out.size));
         readIndex+=out.size;
     }
-    audio.size -= out.size; position += out.size;
+	audioAvailable -= out.size; position += out.size;
     return out.size;
 }
 
@@ -282,6 +281,6 @@ Audio decodeAudio(const ref<byte>& data, uint duration) {
     FLAC flac(data);
     duration = ::min(duration, flac.duration);
     flac.audio = buffer<float2>(max(32768u,duration+8192),0);
-    while(flac.audio.size<duration) flac.decodeFrame();
+	while(flac.audioAvailable<duration) flac.decodeFrame();
     return {move(flac.audio), flac.rate};
 }

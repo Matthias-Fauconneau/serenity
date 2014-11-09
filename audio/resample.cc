@@ -90,8 +90,8 @@ Resampler::Resampler(uint channels, uint sourceRate, uint targetRate, uint buffe
     }
 
     // Allocates and clears aligned planar signal buffers
-    this->bufferSize = bufferSize = max(bufferSize,sourceRate)+N-1;
-	for(uint i: range(channels)) { signal[i] = buffer<float>(bufferSize,bufferSize); signal[i].clear(0); }
+	this->bufferSize = bufferSize = max(bufferSize, sourceRate)+N+1/*Fractionnal*/;
+	for(uint i: range(channels)) { signal[i] = buffer<float>(bufferSize, bufferSize); signal[i].clear(0); }
 
     // Generates an N tap filter for each fractionnal position
     kernel = buffer<float>(targetRate*N);
@@ -103,25 +103,27 @@ Resampler::Resampler(uint channels, uint sourceRate, uint targetRate, uint buffe
 }
 
 template<bool mix> void Resampler::filter(const ref<float2> &source, const mref<float2> &target) {
-    assert(int(source.size)>=need(target.size));
+	assert(int(source.size)>=need(target.size));
     write(source); read<mix>(target);
 }
 template void Resampler::filter<false>(const ref<float2> &source, const mref<float2> &target);
 template void Resampler::filter<true>(const ref<float2> &source, const mref<float2> &target);
 
 int Resampler::need(uint targetSize) {
-    return (integerIndex+targetSize*integerAdvance+int(fractionalIndex+targetSize*fractionalAdvance+targetRate-1)/targetRate)-writeIndex;
+	size_t need = integerIndex+targetSize*integerAdvance+int(fractionalIndex+targetSize*fractionalAdvance+targetRate-1)/targetRate;
+	return need-writeIndex;
 }
 
 void Resampler::write(const ref<float2>& source) {
     if(N-1+writeIndex+source.size>bufferSize) { // Wraps buffer (FIXME: map ring buffer)
+		assert_(N-1+writeIndex+source.size-integerIndex<=bufferSize, integerIndex, writeIndex, source.size, bufferSize);
         writeIndex -= integerIndex;
         for(uint channel=0;channel<channels;channel++) {
             for(uint i: range(N-1+writeIndex)) signal[channel][i] = signal[channel][integerIndex+i];
         }
         integerIndex = 0;
     }
-    assert(N-1+writeIndex+source.size<=bufferSize);
+	assert_(N-1+writeIndex+source.size<=bufferSize, N-1+writeIndex+source.size, bufferSize);
     for(uint i: range(source.size)) { // Deinterleaves source to buffers
         signal[0][N-1+writeIndex+i]=source[i][0];
         signal[1][N-1+writeIndex+i]=source[i][1];
@@ -131,8 +133,8 @@ void Resampler::write(const ref<float2>& source) {
 }
 
 size_t Resampler::available() {
+	assert_(writeIndex >= integerIndex);
     size_t available = ((writeIndex-integerIndex)*targetRate-fractionalIndex)/sourceRate;
-    assert(int(available)>=0 && (need(available)==0 || (sourceRate>targetRate && need(available)==-1)));
     return available;
 }
 

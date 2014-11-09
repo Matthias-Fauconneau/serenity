@@ -131,9 +131,9 @@ generic struct buffer : mref<T> {
 	}*/
 };
 /// Initializes a new buffer with the content of \a o
-//generic buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity?:o.size, o.size); t.copy(o); return t; }
+generic buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity?:o.size, o.size); t.copy(o); return t; }
 //generic buffer<T> copy(const buffer<T>& o){ return o.capacity ? copyRef(o) : unsafeRef(o); }
-generic buffer<T> copy(const buffer<T>& o){ assert_(o.capacity); return copyRef(o); }
+//generic buffer<T> copy(const buffer<T>& o){ assert_(o.capacity); return copyRef(o); }
 
 /// Converts a reference to a buffer (unsafe as no automatic memory management method keeps the original reference from being released)
 generic buffer<T> unsafeRef(const ref<T> o) { return buffer<T>((T*)o.data, o.size, 0); }

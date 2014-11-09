@@ -143,6 +143,9 @@ String str(const ref<T> source, string separator=" ") {
 generic String str(const mref<T>& source, string separator=" ") { return str((const ref<T>)source, separator); }
 generic String str(const buffer<T>& source, string separator=" ") { return str((const ref<T>)source, separator); }
 generic String str(const array<T>& source, string separator=" ") { return str((const ref<T>)source, separator); }
+inline String bin(const ref<uint8> source, string separator=" ") {
+	return str(apply(source, [](uint64 c) { return str(c, 8, '0', 2u); }), separator);
+}
 inline String hex(const ref<uint8> source, string separator=" ") { return str(apply(source, [](const uint8& c) { return hex(c, 2); }), separator); }
 inline String hex(const ref<byte> source, string separator=" ") { return hex(cast<uint8>(source), separator); }
 

@@ -31,7 +31,7 @@ struct Sheet : Widget {
 	vec2 noteSize = glyphSize("noteheads.s2"_);
 
 	// Graphics
-	array<int> measures; // X position of measure starts
+	map<uint64, float> measures; // X position of measure starts
 	shared<Graphics> notation;
 	// Graphic helpers
 	float glyph(vec2 position, string name, Font& font);
@@ -39,7 +39,7 @@ struct Sheet : Widget {
 	uint text(vec2 position, string text, Font& font, array<Glyph>& glyphs);
 	uint text(vec2 position, string text, Font& font) { return this->text(position, text, font, notation->glyphs); }
 
-	int2 sizeHint(int2) override { return int2(measures.last(), -(staffY(1, -32)-staffY(0, 16))); }
+	int2 sizeHint(int2) override { return int2(measures.values.last(), -(staffY(1, -32)-staffY(0, 16))); }
 	shared<Graphics> graphics(int2 size) override;
 
 	// -- Control
@@ -47,7 +47,7 @@ struct Sheet : Widget {
 	array<size_t> chordToNote; // First note index of chord
 
 	/// Returns measure index containing position \a x
-	int measureIndex(int x);
+	size_t measureIndex(float x);
 	int stop(int unused axis, int currentPosition, int direction) override;
 
 	// -- MIDI Synchronization

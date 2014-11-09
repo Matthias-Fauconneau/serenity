@@ -19,10 +19,10 @@ struct Sampler : Poll {
 	/// Samples composing the current instrument
 	array<Sample> samples;
 
-    Lock lock; // Prevents decoder from removing notes being mixed
+	Semaphore lock {2}; // Decoder (producer) and mixer (consumer) may use \a layers concurrently, a mutator needs to lock/acquire both
     array<Layer> layers;
 
-    uint rate = 0;
+	uint64 rate = 0;
     //static constexpr uint periodSize = 64; // [1ms] Prevents samples to synchronize with shifted copies from same chord
     //static constexpr uint periodSize = 128; // [3ms] Same as resampler latency and 1m sound propagation time
     //static constexpr uint periodSize = 256; // [5ms] Latency/convolution tradeoff (FIXME: ring buffer)
@@ -46,17 +46,17 @@ struct Sampler : Poll {
 #endif
 
     /// Emits period time to trigger MIDI file input and update the interface
-	function<void(uint)> timeChanged;
+	function<void(uint64)> timeChanged;
     uint64 time=0, stopTime=0;
 
 	/// Whether decoding is run in advance in main thread.
 	/// \note Prevents underruns when latency is much lower than FLAC frame sizes.
 	///          FLAC frames need to be fully decoded in order to get both channels.
-	bool backgroundDecoder = false;
+	bool backgroundDecoder = true;
 
 	explicit operator bool() const { return samples.size; }
 
-	Sampler(uint outputRate, string path, function<void(uint)> timeChanged);
+	Sampler(uint outputRate, string path, function<void(uint64)> timeChanged, Thread& thread);
 	~Sampler();
 
 	void noteEvent(uint key, uint velocity);
@@ -65,8 +65,8 @@ struct Sampler : Poll {
     void event() override;
 
     /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer
-    uint read(const mref<int2>& output);
-    uint read(const mref<float2>& output);
+	size_t read(mref<int2> output);
+	size_t read(mref<float2> output);
 
     /// Signals when all samples are done playing
     signal<> silence;

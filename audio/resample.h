@@ -6,13 +6,13 @@ struct Resampler {
     Resampler(){}
     /// Allocates buffers and generates filter to resample from \a sourceRate to \a targetRate
     /// \note bufferSize will be the maximum size which can be given at once to filter
-    Resampler(uint channels, uint sourceRate, uint targetRate, uint bufferSize=1024);
+	Resampler(uint channels, uint sourceRate, uint targetRate, uint bufferSize);
     /// Returns needed input size to produce a given target size
-    int need(uint targetSize);
+	int need(uint targetSize);
     /// Stores \a sourceSize samples to the resampling buffer
     void write(const ref<float2>& source);
     /// Returns available output size
-    size_t available();
+	size_t available();
     /// Convolves buffered samples with the resampling kernel to produce \a targetSize samples
     /// \note If mix is true, samples are mixed with \a target (instead of overwriting the \a target buffer).
     template<bool mix=false> void read(const mref<float2>& target);
@@ -30,7 +30,7 @@ struct Resampler {
     buffer<float> kernel; uint N=0;
     buffer<float> signal[channels]; uint bufferSize=0;
 
-    uint writeIndex=0;
-    uint integerAdvance=0, fractionalAdvance=0;
-    uint integerIndex=0, fractionalIndex=0;
+	size_t writeIndex=0;
+	size_t integerAdvance=0, fractionalAdvance=0;
+	size_t integerIndex=0, fractionalIndex=0;
 };

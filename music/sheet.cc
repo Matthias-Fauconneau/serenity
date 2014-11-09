@@ -55,7 +55,7 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 	x += noteSize.x;*/
 		{vec2 min(/*x*/-1, staffY(0, 0)), max(1, staffY(1, -8));
 			notation->fills.append(min, max-min);}
-		measures.append( /*x*/0 );
+		measures.insert(/*t*/0u, /*x*/0.f);
 		measureToChord.append( 0 );
 		timeTrack.insert(0u, {{0,0},0,0,0/*{x,x},x*/});
 	}
@@ -293,11 +293,11 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 						for(int staff: range(staffCount)) {
 							for(int line: range(5)) {
 								int y = staffY(staff, -line*2);
-								{vec2 min(measures.last(), y), max(x, y+lineWidth);
+								{vec2 min(measures.values.last(), y), max(x, y+lineWidth);
 									notation->fills.append(min, max-min);}
 							}
 						}
-						measures.append( x );
+						measures.insert(sign.time, x);
 						measureToChord.append( notes.size() );
 						x += noteSize.x;
 						text(vec2(x, staffY(0, 16)), str(pageIndex)+','+str(pageLineIndex)+','+str(lineMeasureIndex)+' '+str(measureIndex), textFont, debug);
@@ -359,7 +359,7 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 	midiToSign = buffer<Sign>(midiNotes.size, 0);
 	array<uint> chordExtra;
 
-	constexpr bool logErrors = true;
+	constexpr bool logErrors = false;
 	while(chordToNote.size<notes.size()) {
 		if(!notes.values[chordToNote.size]) {
 			chordToNote.append( midiToSign.size );
@@ -484,13 +484,13 @@ shared<Graphics> Sheet::graphics(int2 size) {
 	return share(notation);
 }
 
-int Sheet::measureIndex(int x) {
-	if(x<measures[0]) return -1;
-	for(uint i: range(measures.size-1)) if(measures[i]<=x && x<measures[i+1]) return i;
-	assert_(x >= measures.last()); return measures.size;
+size_t Sheet::measureIndex(float x) {
+	if(x < measures.values[0]) return invalid;
+	for(size_t i: range(measures.size()-1)) if(measures.values[i]<=x && x<measures.values[i+1]) return i;
+	assert_(x >= measures.values.last()); return measures.size();
 }
 
 int Sheet::stop(int unused axis, int currentPosition, int direction=0) {
 	int currentIndex = measureIndex(currentPosition);
-	return measures[clip(0, currentIndex+direction, int(measures.size-1))];
+	return measures.values[clip(0, currentIndex+direction, int(measures.size()-1))];
 }

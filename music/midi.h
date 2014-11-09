@@ -8,7 +8,7 @@ struct MidiNote { uint time, key, velocity; };
 inline bool operator <=(const MidiNote& a, const MidiNote& b) { return a.time < b.time || (a.time == b.time && a.key <= b.key); }
 
 struct MidiNotes : array<MidiNote> {
-	uint ticksPerSeconds=0;
+	uint64 ticksPerSeconds=0;
 };
 
 enum { NoteOff=8, NoteOn, Aftertouch, Controller, ProgramChange, ChannelAftertouch, PitchBend, Meta };

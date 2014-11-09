@@ -22,8 +22,8 @@ struct AudioOutput : Device, Poll {
     uint rate = 0;
     uint periodSize = 0, bufferSize = 0;
 
-	function<uint(const mref<short2>&)> read16 = [](const mref<short2>&){return 0;};
-	function<uint(const mref<int2>&)> read32 = [](const mref<int2>&){return 0;};
+	function<size_t(mref<short2>)> read16 = [](mref<short2>){return 0;};
+	function<size_t(mref<int2>)> read32 = [](mref<int2>){return 0;};
 
 	AudioOutput(decltype(read16) read, Thread& thread=mainThread);
 	AudioOutput(decltype(read32) read, Thread& thread=mainThread);
