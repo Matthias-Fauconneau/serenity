@@ -42,7 +42,7 @@ bool AudioFile::open() {
     return true;
 }
 
-uint AudioFile::read(const mref<short2>& output) {
+size_t AudioFile::read16(mref<short2> output) {
     uint readSize = 0;
     while(readSize<output.size) {
         if(!bufferSize) {
@@ -78,7 +78,7 @@ uint AudioFile::read(const mref<short2>& output) {
     return readSize;
 }
 
-uint AudioFile::read(const mref<int2>& output) {
+size_t AudioFile::read32(mref<int2> output) {
     uint readSize = 0;
     while(readSize<output.size) {
         if(!bufferSize) {
@@ -120,6 +120,7 @@ uint AudioFile::read(const mref<int2>& output) {
     return readSize;
 }
 
+#if 0
 uint AudioFile::read(const mref<float2>& output) {
     uint readSize = 0;
     while(readSize<output.size) {
@@ -170,6 +171,7 @@ uint AudioFile::read(const mref<float2>& output) {
     assert(readSize == output.size);
     return readSize;
 }
+#endif
 
 void AudioFile::seek(uint position) { av_seek_frame(file, audioStream->index, (uint64)position*audioStream->time_base.den/(rate*audioStream->time_base.num), 0); }
 

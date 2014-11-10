@@ -17,44 +17,61 @@ extern "C" {
 #include <libavutil/mathematics.h>
 }
 
-Encoder::Encoder(const string& name, int2 size, uint videoFrameRate, const AudioFile& audio)
-	: size(size), videoFrameRate(videoFrameRate) {
-    av_register_all();
+Encoder::Encoder(const string& name, int2 size, uint videoFrameRate)
+	: path(home().name()+"/"_+name+".mp4"_), size(size), videoFrameRate(videoFrameRate) {
+	av_register_all();
 
-	String path = home().name()+"/"_+name+".mp4"_;
-    if(existsFile(path)) remove(strz(path));
+	if(existsFile(path)) remove(strz(path));
 	avformat_alloc_output_context2(&context, NULL, NULL, strz(path));
 
-    {// Video
-        swsContext = sws_getContext(width, height, AV_PIX_FMT_BGRA, width, height, AV_PIX_FMT_YUV420P, SWS_FAST_BILINEAR, 0, 0, 0);
-        assert(swsContext);
+	{// Video
+		swsContext = sws_getContext(width, height, AV_PIX_FMT_BGRA, width, height, AV_PIX_FMT_YUV420P, SWS_FAST_BILINEAR, 0, 0, 0);
+		assert(swsContext);
 
-        AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_H264);
-        videoStream = avformat_new_stream(context, codec);
-        videoCodec = videoStream->codec;
-        avcodec_get_context_defaults3(videoCodec, codec);
-        videoCodec->codec_id = AV_CODEC_ID_H264;
-        videoCodec->width = width;
-        videoCodec->height = height;
-        videoStream->time_base.num = videoCodec->time_base.num = 1;
+		AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_H264);
+		videoStream = avformat_new_stream(context, codec);
+		videoCodec = videoStream->codec;
+		avcodec_get_context_defaults3(videoCodec, codec);
+		videoCodec->codec_id = AV_CODEC_ID_H264;
+		videoCodec->width = width;
+		videoCodec->height = height;
+		videoStream->time_base.num = videoCodec->time_base.num = 1;
 		videoStream->time_base.den = videoCodec->time_base.den = videoFrameRate;
-        videoCodec->pix_fmt = AV_PIX_FMT_YUV420P;
-        if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
-        AVDictionary* options=0;
-        avcodec_open2(videoCodec, codec, &options);
-        assert_(!av_dict_count(options));
-    }
+		videoCodec->pix_fmt = AV_PIX_FMT_YUV420P;
+		if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
+		AVDictionary* options=0;
+		avcodec_open2(videoCodec, codec, &options);
+		assert_(!av_dict_count(options));
+	}
+}
 
-    {// Audio
-        AVCodec* codec = avcodec_find_encoder(audio.audio->codec_id);
-        audioStream = avformat_new_stream(context, codec);
-        audioCodec = audioStream->codec;
-        avcodec_copy_context(audioCodec, audio.audio);
-		audioCodec->codec_tag = 0;
-		audioStream->pts.den = 1;
-    }
+void Encoder::setAudio(const AudioFile& audio) {
+	AVCodec* codec = avcodec_find_encoder(audio.audio->codec_id);
+	audioStream = avformat_new_stream(context, codec);
+	audioCodec = audioStream->codec;
+	avcodec_copy_context(audioCodec, audio.audio);
+	audioCodec->codec_tag = 0;
+	audioStream->pts.den = 1;
+}
 
-    avio_open(&context->pb, strz(path), AVIO_FLAG_WRITE);
+void Encoder::setAudio(uint rate) {
+	audioFrameRate = rate;
+	AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_AAC);
+	audioStream = avformat_new_stream(context, codec);
+	audioStream->id = 1;
+	audioCodec = audioStream->codec;
+	audioCodec->codec_id = AV_CODEC_ID_AAC;
+	audioCodec->sample_fmt  = AV_SAMPLE_FMT_S16;
+	audioCodec->bit_rate = 192000;
+	audioCodec->sample_rate = rate;
+	audioCodec->channels = 2;
+	audioCodec->channel_layout = AV_CH_LAYOUT_STEREO;
+	if(context->oformat->flags & AVFMT_GLOBALHEADER) audioCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
+	avcodec_open2(audioCodec, codec, 0);
+}
+
+void Encoder::open() {
+	avio_open(&context->pb, strz(path), AVIO_FLAG_WRITE);
 	{int ret = avformat_write_header(context, 0); assert_(ret>=0, (const char*)av_err2str(ret));}
 }
 
@@ -87,9 +104,9 @@ void Encoder::writeVideoFrame(const Image& image) {
     videoTime++;
 }
 
-/*void Encoder::writeAudioFrame(const ref<float2>& audio) {
+void Encoder::writeAudioFrame(const ref<float2>& audio) {
     assert(audioStream && audio.size==audioSize);
-	AVFrame frame; av_frame_unref(&frame);
+	AVFrame frame;
     frame.nb_samples = audio.size;
     avcodec_fill_audio_frame(&frame, 2, AV_SAMPLE_FMT_FLT, (uint8*)audio.data, audio.size * 2 * sizeof(float), 1);
 	frame.pts = audioTime*audioStream->time_base.den/(audioFrameRate*audioStream->time_base.num);
@@ -104,7 +121,7 @@ void Encoder::writeVideoFrame(const Image& image) {
     }
 
     audioTime += audio.size;
-}*/
+}
 
 Encoder::~Encoder() {
     assert_(context && videoStream);

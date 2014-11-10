@@ -29,9 +29,9 @@ struct AudioFile {
     bool open();
     void close();
 
-    uint read(const mref<short2>& output);
-    uint read(const mref<int2>& output);
-    uint read(const mref<float2>& output);
+	size_t read16(mref<short2> output);
+	size_t read32(mref<int2> output);
+	//uint read(const mref<float2>& output);
 
     void seek(uint position);
 };

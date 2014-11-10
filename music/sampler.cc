@@ -368,9 +368,7 @@ size_t Sampler::read(mref<int2> output) { // Audio thread
 }
 
 size_t Sampler::read(mref<float2> output) {
-	timeChanged(time); // Updates active notes
-	if(backgroundDecoder) queue(); else event(); // Decodes before mixing
-    output.clear(0);
+	output.clear(0);
     int noteCount = 0;
 	{
 		lock.acquire(1);
@@ -396,10 +394,10 @@ size_t Sampler::read(mref<float2> output) {
             if(!stopTime) stopTime=time; // First waits for reverb
             else if(time>stopTime+N) {
                 stopTime=0;
-                silence();
+				silence = true; //silence();
                 //return 0; // Stops audio output (will be restarted on noteEvent (cf music.cc)) (FIXME: disable on video record)
             }
-      } else stopTime=0;
+	  } else { stopTime=0; silence = false; }
 
 #if REVERB
     if(enableReverb) { // Convolution reverb
@@ -438,6 +436,8 @@ size_t Sampler::read(mref<float2> output) {
 #endif
 
 	time += output.size;
+	timeChanged(time); // Updates active notes
+	if(backgroundDecoder) queue(); else event(); // Decodes before mixing
     return output.size;
 }
 

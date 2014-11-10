@@ -70,12 +70,10 @@ struct Music : Widget {
 	uint64 videoTime = 0;
 	// Audio output
     Thread audioThread;
-	AudioOutput audio16 = {{this,&Music::read16}, audioThread};
-	AudioOutput audio32 = {{this,&Music::read32}, audioThread};
-	AudioOutput& audio = audioFile ? audio16 : audio32; // FIXME
+	AudioOutput audio = {audioFile ? decltype(AudioOutput::read32)(&audioFile,&AudioFile::read32)
+														: decltype(AudioOutput::read32)(&sampler,&Sampler::read), audioThread};
 	Thread decodeThread;
 	Sampler sampler {48000, "/Samples/Salamander.sfz"_, {this, &Music::timeChanged}, decodeThread};
-    uint64 audioTime = 0;
 
 	/// Adds new notes to be played (called in audio thread by sampler)
 	uint samplerMidiIndex = 0;
@@ -85,18 +83,6 @@ struct Music : Widget {
 			sampler.noteEvent(note.key, note.velocity);
 			samplerMidiIndex++;
 		}
-	}
-
-	size_t read16(mref<short2> output) {
-		size_t readSize = audioFile.read(output);
-		audioTime += readSize;
-		return readSize;
-	}
-
-	size_t read32(mref<int2> output) {
-		size_t readSize = sampler.read(output);
-		audioTime += readSize;
-		return readSize;
 	}
 
     uint noteIndexToMidiIndex(uint seekNoteIndex) {
@@ -130,13 +116,12 @@ struct Music : Widget {
 				}
 			}
 		}
+		uint64 t = timeNum*notes.ticksPerSeconds;
 		for(size_t index: range(sheet.measures.size()-1)) {
-			uint64 t0 = sheet.measures.keys[index], t1 = sheet.measures.keys[index+1];
-			assert_(t0<t1);
-			if(t0*timeDen <= timeNum*xml.divisions && timeNum*xml.divisions <= t1*timeDen) {
+			uint64 t0 = sheet.measures.keys[index]*60*timeDen, t1 = sheet.measures.keys[index+1]*60*timeDen;
+			if(t0 <= t && t <= t1) {
 				float x0 = sheet.measures.values[index], x1 = sheet.measures.values[index+1];
-				assert_(x0<x1);
-				float x = x0+(x1-x0)*(timeNum*xml.divisions-t0*timeDen)/((t1-t0)*timeDen);
+				float x = x0+(x1-x0)*float(t-t0)/float(t1-t0);
 				sheet.offset.x = -clip(0.f, x-size.x/2, float(abs(sheet.widget().sizeHint(size).x)-size.x));
 				break;
 			}
@@ -165,27 +150,33 @@ struct Music : Widget {
 			for(;measureIndex < sheet.measureToChord.size; measureIndex++)
 				if(sheet.measureToChord[measureIndex]>=sheet.firstSynchronizationFailureChordIndex) break;
 			sheet.offset.x = -sheet.measures.values[max<int>(0, measureIndex-3)];
-		} /*else if(running) { // Seeks to first note
-			assert_(0 < sheet.measureToChord.size);
-			assert_(sheet.measureToChord[0] < sheet.chordToNote.size);
-			assert_(noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[0]])<notes.size);
-			seek( notes[noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[0]])].time );
-		}*/
+		}
+		if(!audioFile) decodeThread.spawn(); // For sampler
 		if(arguments().contains("encode")) { // Encode
-			Encoder encoder {name, int2(1280,720), 60, audioFile};
+			Encoder encoder {name, int2(1280,720), 60};
+			if(audioFile) encoder.setAudio(audioFile);
+			else encoder.setAudio(sampler.rate);
+			encoder.open();
 			Image target(encoder.size);
 			Time renderTime, encodeTime, totalTime;
 			totalTime.start();
-            for(int lastReport=0, done=0;!done;) {
+			for(int lastReport=0, done=0; !done;) {
 				assert_(encoder.audioStream->time_base.num == 1);
 				while(encoder.audioTime*encoder.videoFrameRate <= encoder.videoTime*encoder.audioStream->time_base.den) {
-					AVPacket packet;
-					if(av_read_frame(audioFile.file, &packet) < 0) { done=1; break; }
-					packet.pts=packet.dts=encoder.audioTime=
-							int64(packet.pts)*encoder.audioStream->codec->time_base.den/audioFile.audioStream->codec->time_base.den;
-					packet.duration = int64(packet.duration)*encoder.audioStream->time_base.den/audioFile.audioStream->time_base.den;
-					packet.stream_index = encoder.audioStream->index;
-					av_interleaved_write_frame(encoder.context, &packet);
+					if(audioFile) {
+						AVPacket packet;
+						if(av_read_frame(audioFile.file, &packet) < 0) { done=true; break; }
+						packet.pts=packet.dts=encoder.audioTime=
+								int64(packet.pts)*encoder.audioStream->codec->time_base.den/audioFile.audioStream->codec->time_base.den;
+						packet.duration = int64(packet.duration)*encoder.audioStream->time_base.den/audioFile.audioStream->time_base.den;
+						packet.stream_index = encoder.audioStream->index;
+						av_interleaved_write_frame(encoder.context, &packet);
+					} else {
+						float buffer_[2*sampler.periodSize]; mref<float2> buffer((float2*)buffer_, sampler.periodSize);
+						sampler.read(buffer);
+						encoder.writeAudioFrame(buffer);
+						done = sampler.silence || encoder.audioTime*notes.ticksPerSeconds >= notes.last().time*encoder.audioFrameRate;
+					}
                 }
 				while(encoder.audioTime*encoder.videoFrameRate > encoder.videoTime*encoder.audioStream->time_base.den) {
 					follow(encoder.videoTime, encoder.videoFrameRate, target.size);
@@ -196,14 +187,13 @@ struct Music : Widget {
 					encodeTime.start();
                     encoder.writeVideoFrame(target);
 					encodeTime.stop();
-                }
-				int percent = round(100.*encoder.audioTime/audioFile.duration);
+				}
+				int percent = round(100.*encoder.audioTime/encoder.audioFrameRate/((float)notes.last().time/notes.ticksPerSeconds));
 				if(percent!=lastReport) { log(str(percent,2)+"%", str(renderTime, totalTime), str(encodeTime, totalTime)); lastReport=percent; }
 				//if(percent==5) break; // DEBUG
-            }
+			}
 			requestTermination(0); // window prevents automatic termination
 		} else { // Preview
-			if(!audioFile) decodeThread.spawn(); // for sampler
 			window.show();
 			if(playbackDeviceAvailable()) {
 				audio.start(audioFile.rate ?: sampler.rate, sampler.periodSize, audioFile ? 16 : 32);
@@ -216,23 +206,7 @@ struct Music : Widget {
 	int2 sizeHint(int2 size) override { return failed ? sheet.ScrollArea::sizeHint(size) : widget.sizeHint(size); }
 	shared<Graphics> graphics(int2 size) override {
 		if(!running) return sheet.ScrollArea::graphics(size);
-		if(!previousFrameCounterValue) previousFrameCounterValue=window.currentFrameCounterValue;
-		//int64 elapsedFrameCount = int64(window.currentFrameCounterValue) - int64(previousFrameCounterValue);
-		//if(elapsedFrameCount>1) log("Skipped", elapsedFrameCount, "frames"); // PROFILE
-#if 0
-		if(audio) {
-			videoTime = (audioTime - audio.periodSize/*latency*/) * window.framesPerSecond / audio.rate;
-		}/*else {
-			videoTime += elapsedFrameCount;
-			if(!audio && !audioFile) while(audioTime * window.framesPerSecond < videoTime * sampler.rate) {
-				log("Simulation");
-				int buffer[2*sampler.periodSize]; read32(mref<int2>((int2*)buffer, sampler.periodSize));
-			}
-		}*/
-		follow(videoTime, window.framesPerSecond, size);
-#endif
 		follow(sampler.time, sampler.rate, size);
-		previousFrameCounterValue = window.currentFrameCounterValue;
 		window.render();
 		return widget.graphics(size, Rect(size));
     }

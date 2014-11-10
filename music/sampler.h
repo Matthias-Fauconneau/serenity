@@ -69,5 +69,6 @@ struct Sampler : Poll {
 	size_t read(mref<float2> output);
 
     /// Signals when all samples are done playing
-    signal<> silence;
+	//signal<> silence;
+	bool silence = false;
 };
