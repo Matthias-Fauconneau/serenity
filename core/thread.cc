@@ -137,8 +137,8 @@ void __attribute((constructor(102))) setup_signals() {
 	check(sigaction(SIGSEGV, &sa, 0));
 	check(sigaction(SIGTERM, &sa, 0));
 	check(sigaction(SIGTRAP, &sa, 0));
-	//check(sigaction(SIGFPE, &sa, 0));
-    setExceptions(Invalid /*| Denormal*/ | DivisionByZero | Overflow /*| Underflow *//*| Precision*/);
+	check(sigaction(SIGFPE, &sa, 0));
+	setExceptions(Invalid /*| Denormal*/ | DivisionByZero /*| Overflow *//*| Underflow *//*| Precision*/);
 }
 
 static void __attribute((noreturn)) exit_thread(int status) { syscall(SYS_exit, status); __builtin_unreachable(); }

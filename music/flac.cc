@@ -1,5 +1,4 @@
 #include "flac.h"
-#include "thread.h" // setExceptions
 #include "data.h"
 
 BitReader::BitReader(ref<uint8> data) : ref<uint8>(data) { bitSize=8*data.size; index=0; }
@@ -149,8 +148,7 @@ void FLAC::decodeFrame() {
     int allocSize = align(4096,blockSize);
     float block[2][allocSize];
     setRoundMode(Down);
-    setExceptions(Invalid | DivisionByZero | Overflow); // Allows denormal and underflow in roundDown
-    for(int channel=0;channel<2;channel++) {
+	for(int channel=0;channel<2;channel++) {
         int rawSampleSize = sampleSize; //one bit more to be able to substract full range from other channel (1 sign bit + bits per sample)
         if(channel == 0) { if(channelMode==RightSide) rawSampleSize++; }
         if(channel == 1) { if(channelMode==LeftSide || channelMode == MidSide) rawSampleSize++; }
@@ -244,8 +242,7 @@ void FLAC::decodeFrame() {
         int t=rice*rate/2000000000; if(t>16) log("predict",t); //::predict += predict, ::order += order*blockSize;
     }
     setRoundMode(Even);
-    setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow); // Restores denormal and underflow
-    index=align(8,index);
+	index=align(8,index);
     skip(16);
     assert(align(4,blockSize)<=readIndex+audio.capacity-writeIndex,blockSize,align(4,blockSize),align(4,blockSize)+writeIndex,audio.capacity);
 	__sync_add_and_fetch(&audioAvailable, blockSize);

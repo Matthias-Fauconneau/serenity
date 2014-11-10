@@ -22,7 +22,7 @@ struct Resampler {
     /// Clears input (buffer pointers)
     void clear();
 
-    explicit operator bool() const { return (bool)kernel; }
+	explicit operator bool() const { return (bool)kernel; }
 
     static constexpr uint channels=2;
     uint sourceRate=1,targetRate=1;

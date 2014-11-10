@@ -1,8 +1,6 @@
 #pragma once
 #include "transform.h"
 
-inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
-
 static double similarity(const ImageF& A, const ImageF& B, Transform transform) {
 	assert_(transform.size == A.size && transform.size == B.size);
 	return -SSE(A, B, transform.offset);

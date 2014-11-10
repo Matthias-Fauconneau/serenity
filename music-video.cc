@@ -28,7 +28,8 @@ MidiNotes notes(ref<Sign> signs, uint divisions) {
 	MidiNotes notes;
 	for(Sign sign: signs) {
 		if(sign.type==Sign::Metronome) {
-			assert_(!notes.ticksPerSeconds);
+			assert_(!notes.ticksPerSeconds || notes.ticksPerSeconds == sign.metronome.perMinute*divisions,
+					notes.ticksPerSeconds, sign.metronome.perMinute*divisions);
 			notes.ticksPerSeconds = sign.metronome.perMinute*divisions;
 		}
 		else if(sign.type == Sign::Note) {
@@ -153,46 +154,57 @@ struct Music : Widget {
 		}
 		if(!audioFile) decodeThread.spawn(); // For sampler
 		if(arguments().contains("encode")) { // Encode
-			Encoder encoder {name, int2(1280,720), 60};
+			Encoder encoder {name};
+			encoder.setVideo(int2(1280,720), 60);
 			if(audioFile) encoder.setAudio(audioFile);
 			else encoder.setAudio(sampler.rate);
 			encoder.open();
-			Image target(encoder.size);
 			Time renderTime, encodeTime, totalTime;
 			totalTime.start();
 			for(int lastReport=0, done=0; !done;) {
 				assert_(encoder.audioStream->time_base.num == 1);
-				while(encoder.audioTime*encoder.videoFrameRate <= encoder.videoTime*encoder.audioStream->time_base.den) {
+				auto writeAudio = [&]{
 					if(audioFile) {
 						AVPacket packet;
-						if(av_read_frame(audioFile.file, &packet) < 0) { done=true; break; }
+						if(av_read_frame(audioFile.file, &packet) < 0) { done=true; return false; }
 						packet.pts=packet.dts=encoder.audioTime=
 								int64(packet.pts)*encoder.audioStream->codec->time_base.den/audioFile.audioStream->codec->time_base.den;
 						packet.duration = int64(packet.duration)*encoder.audioStream->time_base.den/audioFile.audioStream->time_base.den;
 						packet.stream_index = encoder.audioStream->index;
 						av_interleaved_write_frame(encoder.context, &packet);
 					} else {
-						float buffer_[2*sampler.periodSize]; mref<float2> buffer((float2*)buffer_, sampler.periodSize);
+						float buffer_[2*sampler.periodSize];
+						mref<float2> buffer((float2*)buffer_, sampler.periodSize);
 						sampler.read(buffer);
 						encoder.writeAudioFrame(buffer);
 						done = sampler.silence || encoder.audioTime*notes.ticksPerSeconds >= notes.last().time*encoder.audioFrameRate;
 					}
-                }
-				while(encoder.audioTime*encoder.videoFrameRate > encoder.videoTime*encoder.audioStream->time_base.den) {
-					follow(encoder.videoTime, encoder.videoFrameRate, target.size);
-					renderTime.start();
-					fill(target, 0, target.size, 1, 1);
-					::render(target, widget.graphics(target.size, Rect(target.size)));
-					renderTime.stop();
-					encodeTime.start();
-                    encoder.writeVideoFrame(target);
-					encodeTime.stop();
+					return true;
+				};
+				if(encoder.videoFrameRate) { // Interleaved AV
+					while(encoder.audioTime*encoder.videoFrameRate <= encoder.videoTime*encoder.audioStream->time_base.den) {
+						if(!writeAudio()) break;
+					}
+					while(encoder.audioTime*encoder.videoFrameRate > encoder.videoTime*encoder.audioStream->time_base.den) {
+						follow(encoder.videoTime, encoder.videoFrameRate, encoder.size);
+						renderTime.start();
+						Image target (encoder.size);
+						fill(target, 0, target.size, 1, 1);
+						::render(target, widget.graphics(target.size, Rect(target.size)));
+						renderTime.stop();
+						encodeTime.start();
+						encoder.writeVideoFrame(target);
+						encodeTime.stop();
+					}
+				} else { // Audio only
+					if(!writeAudio()) break;
 				}
 				int percent = round(100.*encoder.audioTime/encoder.audioFrameRate/((float)notes.last().time/notes.ticksPerSeconds));
 				if(percent!=lastReport) { log(str(percent,2)+"%", str(renderTime, totalTime), str(encodeTime, totalTime)); lastReport=percent; }
 				//if(percent==5) break; // DEBUG
 			}
-			requestTermination(0); // window prevents automatic termination
+			log("DONE");
+			requestTermination(0); // Window prevents automatic termination
 		} else { // Preview
 			window.show();
 			if(playbackDeviceAvailable()) {

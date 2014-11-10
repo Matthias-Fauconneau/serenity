@@ -180,7 +180,7 @@ Sampler::Sampler(uint outputRate, string path, function<void(uint64)> timeChange
             if(layer == 0) { // Generates pitch shifting (resampling) filter banks
 				Layer layer;
 				layer.shift = shift;
-				layer.notes.reserve(32);
+				layer.notes.reserve(64);
                 if(shift || rate!=outputRate) {
                     const uint size = 2048; // Accurate frequency resolution while keeping reasonnable filter bank size
 					layer.resampler = Resampler(2, size, round(size*exp2((-shift)/12.0)*outputRate/rate), size);
@@ -305,7 +305,7 @@ void Sampler::event() { // Decode thread event posted every period from Sampler:
         for(Layer& layer: layers) for(Note& n: layer.notes) { // Finds least buffered note
 			if(n.flac.blockSize /*!EOF*/ && n.writeCount >= n.flac.blockSize && n.flac.audioAvailable < minBufferSize) {
 				note = &n;
-				minBufferSize = max<int>(layer.resampler.need(periodSize), n.flac.audioAvailable);
+				minBufferSize = max<int>(layer.resampler?layer.resampler.need(periodSize):periodSize, n.flac.audioAvailable);
             }
 		}
         if(!note) { // All notes are already fully buffered
@@ -325,16 +325,14 @@ void Sampler::event() { // Decode thread event posted every period from Sampler:
 
 /// Audio mixer (realtime thread)
 inline void mix(v4sf& level, v4sf step, mref<float2> output, ref<float2> input) {
-    assert(output.size == input.size);
-    uint size = output.size;
 #if SIMD
+	size_t size = output.size;
     v4sf* out = (v4sf*)output.data;
     v4sf* in = (v4sf*)input.data;
     for(uint i: range(size/2)) { out[i] += level * in[i]; level *= step; }
 #else
-	float2* out = output.begin();
-	const float2* in = input.data;
-	for(size_t i: range(size)) { out[i] += level[0] * in[i]; level *= step; }
+	if(step[0] == 1) for(size_t i: range(output.size)) output[i] += level[0] * input[i];
+	else for(size_t i: range(output.size)) { output[i] += level[0] * input[i]; level *= step; }
 #endif
 }
 void Note::read(mref<float2> output) {
@@ -376,8 +374,9 @@ size_t Sampler::read(mref<float2> output) {
             if(layer.resampler) {
 				int need = layer.resampler.need(output.size);
                 if(need >= 0 ) {
-					size_t inSize = need; //align(2, need);
+					size_t inSize = need;
                     if(layer.audio.capacity<inSize) layer.audio = buffer<float2>(inSize);
+					layer.audio.size = inSize;
                     layer.audio.clear(0);
                     for(Note& note: layer.notes) note.read(layer.audio);
                     layer.resampler.write(layer.audio);

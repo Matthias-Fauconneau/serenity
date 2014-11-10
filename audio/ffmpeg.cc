@@ -129,10 +129,8 @@ uint AudioFile::read(const mref<float2>& output) {
             if(av_read_frame(file, &packet) < 0) return readSize;
             if(file->streams[packet.stream_index]==audioStream) {
                 if(!frame) frame = av_frame_alloc(); int gotFrame=0;
-                setExceptions(Invalid | DivisionByZero | Overflow); // Allows denormals and underflows in FFmpeg AAC decoder
-                int used = avcodec_decode_audio4(audio, frame, &gotFrame, &packet);
-                setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow); // Restores previous flags
-                if(used < 0 || !gotFrame) continue;
+				int used = avcodec_decode_audio4(audio, frame, &gotFrame, &packet);
+				if(used < 0 || !gotFrame) continue;
                 bufferIndex=0, bufferSize = frame->nb_samples;
                 floatBuffer = buffer<float2>(bufferSize);
                 if(audio->sample_fmt == AV_SAMPLE_FMT_S32) {

@@ -7,11 +7,10 @@
 struct Encoder {
     String path;
     union {
-	const int2 size = 0;
-	struct { const uint width, height; };
+	int2 size = 0;
+	struct { uint width, height; };
     };
-    const uint videoFrameRate;
-    uint64 audioFrameRate=0;
+    uint64 videoFrameRate=0, audioFrameRate=0;
     struct AVFormatContext* context=0;
     struct SwsContext* swsContext=0;
     struct AVStream* videoStream=0; struct AVCodecContext* videoCodec=0;
@@ -19,8 +18,9 @@ struct Encoder {
     uint64 videoTime = 0, videoEncodedTime = 0, audioTime = 0, audioEncodedTime = 0;
 
     /// Starts a new file recording video
-    Encoder(const string& name, int2 size, uint videoFrameRate);
-    void setAudio( const AudioFile& audio);
+    Encoder(string name);
+    void setVideo(int2 size, uint videoFrameRate);
+    void setAudio(const AudioFile& audio);
     void setAudio(uint rate);
     void open();
     /// Flushes all encoders and close the file
@@ -30,5 +30,5 @@ struct Encoder {
     /// Writes a video frame
     void writeVideoFrame(const Image& image);
     /// Writes an audio frame
-    void writeAudioFrame(const ref<float2>& audio);
+    void writeAudioFrame(ref<float2> audio);
 };

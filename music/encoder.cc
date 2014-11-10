@@ -17,35 +17,38 @@ extern "C" {
 #include <libavutil/mathematics.h>
 }
 
-Encoder::Encoder(const string& name, int2 size, uint videoFrameRate)
-	: path(home().name()+"/"_+name+".mp4"_), size(size), videoFrameRate(videoFrameRate) {
+Encoder::Encoder(string name) : path(home().name()+"/"_+name+".mp4"_) {
 	av_register_all();
 
 	if(existsFile(path)) remove(strz(path));
 	avformat_alloc_output_context2(&context, NULL, NULL, strz(path));
+}
 
-	{// Video
-		swsContext = sws_getContext(width, height, AV_PIX_FMT_BGRA, width, height, AV_PIX_FMT_YUV420P, SWS_FAST_BILINEAR, 0, 0, 0);
-		assert(swsContext);
+void Encoder::setVideo(int2 size, uint videoFrameRate) {
+	this->size=size;
+	this->videoFrameRate=videoFrameRate;
+	assert_(!videoStream);
+	swsContext = sws_getContext(width, height, AV_PIX_FMT_BGRA, width, height, AV_PIX_FMT_YUV420P, SWS_FAST_BILINEAR, 0, 0, 0);
+	assert(swsContext);
 
-		AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_H264);
-		videoStream = avformat_new_stream(context, codec);
-		videoCodec = videoStream->codec;
-		avcodec_get_context_defaults3(videoCodec, codec);
-		videoCodec->codec_id = AV_CODEC_ID_H264;
-		videoCodec->width = width;
-		videoCodec->height = height;
-		videoStream->time_base.num = videoCodec->time_base.num = 1;
-		videoStream->time_base.den = videoCodec->time_base.den = videoFrameRate;
-		videoCodec->pix_fmt = AV_PIX_FMT_YUV420P;
-		if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
-		AVDictionary* options=0;
-		avcodec_open2(videoCodec, codec, &options);
-		assert_(!av_dict_count(options));
-	}
+	AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_H264);
+	videoStream = avformat_new_stream(context, codec);
+	videoCodec = videoStream->codec;
+	avcodec_get_context_defaults3(videoCodec, codec);
+	videoCodec->codec_id = AV_CODEC_ID_H264;
+	videoCodec->width = width;
+	videoCodec->height = height;
+	videoStream->time_base.num = videoCodec->time_base.num = 1;
+	videoStream->time_base.den = videoCodec->time_base.den = videoFrameRate;
+	videoCodec->pix_fmt = AV_PIX_FMT_YUV420P;
+	if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
+	AVDictionary* options=0;
+	avcodec_open2(videoCodec, codec, &options);
+	assert_(!av_dict_count(options));
 }
 
 void Encoder::setAudio(const AudioFile& audio) {
+	assert_(!audioStream);
 	AVCodec* codec = avcodec_find_encoder(audio.audio->codec_id);
 	audioStream = avformat_new_stream(context, codec);
 	audioCodec = audioStream->codec;
@@ -55,6 +58,7 @@ void Encoder::setAudio(const AudioFile& audio) {
 }
 
 void Encoder::setAudio(uint rate) {
+	assert_(!audioStream);
 	audioFrameRate = rate;
 	AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_AAC);
 	audioStream = avformat_new_stream(context, codec);
@@ -71,6 +75,7 @@ void Encoder::setAudio(uint rate) {
 }
 
 void Encoder::open() {
+	assert_(videoStream || audioStream);
 	avio_open(&context->pb, strz(path), AVIO_FLAG_WRITE);
 	{int ret = avformat_write_header(context, 0); assert_(ret>=0, (const char*)av_err2str(ret));}
 }
@@ -86,13 +91,7 @@ void Encoder::writeVideoFrame(const Image& image) {
 
     AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
     int gotVideoPacket;
-#if __x86_64
-    setExceptions(Invalid | DivisionByZero | Overflow); // Allows denormal and underflow in x264
-#endif
     avcodec_encode_video2(videoCodec, &pkt, &frame, &gotVideoPacket);
-#if __x86_64
-    setExceptions(Invalid | Denormal | DivisionByZero | Overflow | Underflow);
-#endif
     avpicture_free((AVPicture*)&frame);
 	av_frame_free(&framePtr);
     if(gotVideoPacket) {
@@ -104,8 +103,8 @@ void Encoder::writeVideoFrame(const Image& image) {
     videoTime++;
 }
 
-void Encoder::writeAudioFrame(const ref<float2>& audio) {
-    assert(audioStream && audio.size==audioSize);
+void Encoder::writeAudioFrame(ref<float2> audio) {
+	assert(audioStream);
 	AVFrame frame;
     frame.nb_samples = audio.size;
     avcodec_fill_audio_frame(&frame, 2, AV_SAMPLE_FMT_FLT, (uint8*)audio.data, audio.size * 2 * sizeof(float), 1);
@@ -124,8 +123,8 @@ void Encoder::writeAudioFrame(const ref<float2>& audio) {
 }
 
 Encoder::~Encoder() {
-    assert_(context && videoStream);
-	for(;;) { // FIXME: flush audio
+	assert_(context);
+	if(videoStream) for(;;) { // FIXME: flush audio
         AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
         int gotVideoPacket = 0;
         avcodec_encode_video2(videoCodec, &pkt, 0, &gotVideoPacket);
