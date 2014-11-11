@@ -37,7 +37,7 @@ bool find(const string s, const string a) {
 }
 
 string section(const string s, byte separator, int begin, int end) {
-    if(!s) return "";
+	if(!s) return ""_;
     uint b,e;
     if(begin>=0) { b=0; for(uint i=0;i<(uint)begin && b<s.size;b++) if(s[b]==separator) i++; }
     else { b=s.size; if(begin!=-1) { b--; for(uint i=0;b>0;b--) if(s[b]==separator) { i++; if(i>=uint(-begin-1)) { b++; break; } } } }
@@ -168,7 +168,8 @@ String str(double n, int precision, uint pad, int exponent) {
     else if(exponent==3 && e==6) s.append('M');
     else if(exponent==3 && e==9) s.append('G');
     else if(e) { s.append('e'); s.append(str(e)); }
-    return pad > s.size ? right(s, pad) : move(s);
+	if(pad > s.size) return right(s, pad);
+	return move(s);
 }
 
 String binaryPrefix(uint64 value, string unit, string unitSuffix) {

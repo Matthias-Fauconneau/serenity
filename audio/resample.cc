@@ -30,20 +30,13 @@
 #include "resample.h"
 #include "string.h"
 
-#if SIMD
 #include "simd.h"
 static float product(ref<float> kernel, ref<float> signal) {
-    assert(kernel.size==signal.size);
+	assert(kernel.size==signal.size && kernel.size%4==0);
     v4sf sum = {0,0,0,0};
-    for(size_t i=0;i<kernel.size;i+=4) sum += loada(kernel+i) * loadu(signal+i);
+	for(size_t i=0;i<kernel.size;i+=4) sum += loada(kernel.data+i) * loadu(signal.data+i);
     return sum[0]+sum[1]+sum[2]+sum[3];
 }
-#else
-static float product(ref<float> kernel, ref<float> signal) {
-    assert(kernel.size==signal.size);
-    float sum=0; for(size_t i: range(kernel.size)) sum += kernel[i] * signal[i]; return sum;
-}
-#endif
 
 static double window(float x) {
     const int windowOversample = 32;
@@ -76,12 +69,15 @@ static double sinc(double cutoff, double x, int N) {
 /// Returns the largest positive integer that divides the numbers without a remainder
 int gcd(int a, int b) { while(b != 0) { int t = b; b = a % b; a = t; } return a; }
 
-Resampler::Resampler(uint channels, uint sourceRate, uint targetRate, uint bufferSize) {
+Resampler::Resampler(uint channels, uint sourceRate, uint targetRate, uint readSize) {
 	assert_(channels==this->channels);
     // Factorize rates if possible to reduce filter bank size
     int factor = gcd(sourceRate,targetRate);
     sourceRate /= factor; targetRate /= factor;
 	assert_(sourceRate); assert_(targetRate); assert_(targetRate!=sourceRate);
+	this->sourceRate = sourceRate, this->targetRate= targetRate;
+	integerAdvance = sourceRate/targetRate;
+	fractionalAdvance = sourceRate%targetRate;
 
     // Computes filter size and cutoff
     const int filterSize = 256;
@@ -95,18 +91,14 @@ Resampler::Resampler(uint channels, uint sourceRate, uint targetRate, uint buffe
         cutoff = bandwidth;
         N = filterSize;
     }
-
-    // Allocates and clears aligned planar signal buffers
-	this->bufferSize = bufferSize = align(32, max(bufferSize, sourceRate)+N+4/*Fractionnal margin*/);
-	for(uint i: range(channels)) { signal[i] = buffer<float>(bufferSize, bufferSize); signal[i].clear(0); }
-
     // Generates an N tap filter for each fractionnal position
     kernel = buffer<float>(targetRate*N);
     for(uint i: range(targetRate)) for(uint j: range(N)) kernel[i*N+j] = sinc(cutoff, -float(i)/targetRate+j-N/2-1, N);
 
-    integerAdvance = sourceRate/targetRate;
-    fractionalAdvance = sourceRate%targetRate;
-    this->sourceRate = sourceRate, this->targetRate= targetRate;
+	// Allocates and clears aligned planar signal buffers
+	size_t writeSize = readSize*integerAdvance+int(readSize*fractionalAdvance+targetRate-1)/targetRate;
+	bufferSize = align(16, N+writeSize);
+	for(size_t index: range(channels)) { signal[index] = buffer<float>(bufferSize, bufferSize); signal[index].clear(0); }
 }
 
 template<bool mix> void Resampler::filter(const ref<float2> &source, const mref<float2> &target) {

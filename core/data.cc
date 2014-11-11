@@ -48,11 +48,11 @@ void Data::skip(const uint8 key) {
     if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(peek())+'\'');
 }
 void Data::skip(const char key) {
-	if(!match(key)) error("Expected '"_+escape(key)+"', got '"+peek()+'\'', data.slice(index));
+	if(!match(key)) error("Expected '"+escape(key)+"', got '"+peek()+'\'', data.slice(index));
 }
 
 void Data::skip(const ref<uint8> key) {
-    if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(peek(key.size))+'\'');
+	if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(peek(key.size))+'\'');
 }
 void Data::skip(const string key) {
 	if(!match(key)) error("Expected '"+escape(key)+"', got '"+(string)peek(key.size)+'\'', data.slice(index));
@@ -79,7 +79,7 @@ char TextData::wouldMatchAny(const string any) {
 
 string TextData::wouldMatchAny(const ref<string> keys) {
     for(string key: keys) if(wouldMatch(key)) return key;
-    return "";
+	return ""_;
 }
 
 
@@ -91,7 +91,7 @@ char TextData::matchAny(const string any) {
 
 string TextData::matchAny(const ref<string> keys) {
     for(string key: keys) if(match(key)) return key;
-    return "";
+	return ""_;
 }
 
 bool TextData::matchNo(const string any) {

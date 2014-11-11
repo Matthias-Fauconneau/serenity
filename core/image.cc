@@ -1,19 +1,42 @@
-#include "image.h"
+#include "core/image.h"
 #include "data.h"
 #include "vector.h"
 #include "parallel.h"
 #include "math.h"
 #include "map.h"
 
+// -- sRGB --
+
+uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)
+void __attribute((constructor(1001))) generate_sRGB_forward() {
+	for(uint index: range(sizeof(sRGB_forward))) {
+		real linear = (real) index / (sizeof(sRGB_forward)-1);
+		real sRGB = linear > 0.0031308 ? 1.055*pow(linear,1/2.4)-0.055 : 12.92*linear;
+		assert(abs(linear-(sRGB > 0.04045 ? pow((sRGB+0.055)/1.055, 2.4) : sRGB / 12.92))<exp2(-50));
+		sRGB_forward[index] = round(0xFF*sRGB);
+	}
+}
+
+float sRGB_reverse[0x100];
+void __attribute((constructor(1001))) generate_sRGB_reverse() {
+	for(uint index: range(0x100)) {
+		real sRGB = (real) index / 0xFF;
+		real linear = sRGB > 0.04045 ? pow((sRGB+0.055)/1.055, 2.4) : sRGB / 12.92;
+		assert(abs(sRGB-(linear > 0.0031308 ? 1.055*pow(linear,1/2.4)-0.055 : 12.92*linear))<exp2(-50));
+		sRGB_reverse[index] = linear;
+		assert(sRGB_forward[int(round(0xFFF*sRGB_reverse[index]))]==index);
+	}
+}
+
 // -- Decode --
 
 string imageFileFormat(const ref<byte> file) {
-    if(startsWith(file,"\xFF\xD8")) return "JPEG";
-    else if(startsWith(file,"\x89PNG\r\n\x1A\n")) return "PNG";
-    else if(startsWith(file,"\x00\x00\x01\x00")) return "ICO";
-    else if(startsWith(file,"\x49\x49\x2A\x00") || startsWith(file,"\x4D\x4D\x00\x2A")) return "TIFF";
-    else if(startsWith(file,"BM")) return "BMP";
-    else return "";
+	if(startsWith(file,"\xFF\xD8")) return "JPEG"_;
+	else if(startsWith(file,"\x89PNG\r\n\x1A\n")) return "PNG"_;
+	else if(startsWith(file,"\x00\x00\x01\x00")) return "ICO"_;
+	else if(startsWith(file,"\x49\x49\x2A\x00") || startsWith(file,"\x4D\x4D\x00\x2A")) return "TIFF"_;
+	else if(startsWith(file,"BM")) return "BMP"_;
+	else return ""_;
 }
 
 int2 imageSize(const ref<byte> file) {

@@ -149,7 +149,7 @@ void Window::event() {
             uint stride = align(16, width);
             shm = check( shmget(0, height*stride*sizeof(byte4) , IPC_CREAT | 0777) );
             target = Image(buffer<byte4>((byte4*)check(shmat(shm, 0, 0)), height*stride, 0), size, stride);
-            target.clear(0xFF);
+			target.clear(byte4(0xFF));
             send(Shm::Attach{.seg=id+Segment, .shm=shm});
             send(CreatePixmap{.pixmap=id+Pixmap, .window=id+XWindow, .w=uint16(width), .h=uint16(size.y)});
         }

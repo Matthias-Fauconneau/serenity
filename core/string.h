@@ -6,7 +6,7 @@
 // -- str()
 
 // Enforces exact match for overload resolution
-generic string str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); }
+generic string str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); error(); }
 
 /// Forwards string
 inline string str(string s) { return s; }
@@ -89,10 +89,10 @@ inline String simplify(string s) { return simplify((array<char>)copyRef(s)); }
 // -- string[]
 
 /// Joins \a list into a single String with each element separated by \a separator
-String join(ref<string> list, const string separator="");
+String join(ref<string> list, const string separator=""_);
 
 /// Returns an array of references splitting \a str wherever \a separator occurs
-array<string> split(const string str, string separator=", ");
+array<string> split(const string str, string separator=", "_);
 
 /// Flatten cats
 template<class A, class B, class T> String str(const cat<A, B, T>& a) { return a; }
@@ -126,11 +126,11 @@ String str(double number, int precision=2, uint pad=0, int exponent=0);
 inline String str(float n, int precision=2) { return str(double(n), precision); }
 
 /// Formats value using best binary prefix
-String binaryPrefix(uint64 value, string unit="B", string unitSuffix="");
+String binaryPrefix(uint64 value, string unit="B"_, string unitSuffix=""_);
 
 /// Converts arrays
 template<Type T, typename enable_if<!is_same<char, T>::value>::type* = nullptr>
-String str(const ref<T> source, string separator=" ") {
+String str(const ref<T> source, string separator=" "_) {
 	array<char> target;
     target.append('[');
     for(uint i: range(source.size)) {
@@ -140,14 +140,14 @@ String str(const ref<T> source, string separator=" ") {
     target.append(']');
 	return move(target);
 }
-generic String str(const mref<T>& source, string separator=" ") { return str((const ref<T>)source, separator); }
-generic String str(const buffer<T>& source, string separator=" ") { return str((const ref<T>)source, separator); }
-generic String str(const array<T>& source, string separator=" ") { return str((const ref<T>)source, separator); }
-inline String bin(const ref<uint8> source, string separator=" ") {
+generic String str(const mref<T>& source, string separator=" "_) { return str((const ref<T>)source, separator); }
+generic String str(const buffer<T>& source, string separator=" "_) { return str((const ref<T>)source, separator); }
+generic String str(const array<T>& source, string separator=" "_) { return str((const ref<T>)source, separator); }
+inline String bin(const ref<uint8> source, string separator=" "_) {
 	return str(apply(source, [](uint64 c) { return str(c, 8, '0', 2u); }), separator);
 }
-inline String hex(const ref<uint8> source, string separator=" ") { return str(apply(source, [](const uint8& c) { return hex(c, 2); }), separator); }
-inline String hex(const ref<byte> source, string separator=" ") { return hex(cast<uint8>(source), separator); }
+inline String hex(const ref<uint8> source, string separator=" "_) { return str(apply(source, [](const uint8& c) { return hex(c, 2); }), separator); }
+inline String hex(const ref<byte> source, string separator=" "_) { return hex(cast<uint8>(source), separator); }
 
 /// Converts static arrays
 template<Type T, size_t N> String str(const T (&source)[N], string separator=" ") { return str(ref<T>(source, N), separator); }
@@ -155,7 +155,7 @@ template<Type T, size_t N> String str(const T (&source)[N], string separator=" "
 /// Converts and concatenates all arguments separating with spaces
 /// \note Use join({str(args)...}) to convert and concatenate without spaces
 template<Type Arg0, Type Arg1, Type... Args>
-String str(const Arg0& arg0, const Arg1& arg1, const Args&... args) { return join({str(arg0), str(arg1), str(args)...}," "); }
+String str(const Arg0& arg0, const Arg1& arg1, const Args&... args) { return join(ref<string>{str(arg0), str(arg1), str(args)...}, " "_); }
 
 /// Logs to standard output using str(...) serialization
 template<Type... Args> void log(const Args&... args) { log((string)str(args...)); }
@@ -164,7 +164,7 @@ template<Type... Args> void __attribute((noreturn)) error(const Args&... args) {
 
 /// Converts Strings to strings
 inline buffer<string> toRefs(ref<String> source) { return apply(source, [](const String& e) -> string { return e; }); }
-inline String join(const ref<String> list, string separator="") { return join(toRefs(list), separator); }
+inline String join(const ref<String> list, string separator=""_) { return join(toRefs(list), separator); }
 
 /// Forwards handle
 generic auto str(const handle<T>& t) -> decltype(str(t.pointer)) { return str(t.pointer); }

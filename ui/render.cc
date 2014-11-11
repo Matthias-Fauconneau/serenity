@@ -1,6 +1,9 @@
 #include "math.h"
 #include "graphics.h"
 
+extern uint8 sRGB_forward[0x1000];
+extern float sRGB_reverse[0x100];
+
 static void blend(const Image& target, uint x, uint y, bgr3f source_linear, float opacity) {
     byte4& target_sRGB = target(x,y);
     bgr3f target_linear(sRGB_reverse[target_sRGB[0]], sRGB_reverse[target_sRGB[1]], sRGB_reverse[target_sRGB[2]]);

@@ -1,6 +1,6 @@
 #pragma once
 /// \file graphics.h 2D graphics primitives (fill, blit, line)
-#include "image.h"
+#include "core/image.h"
 #include "font.h"
 
 /// Primary colors
@@ -30,6 +30,8 @@ struct Glyph {
 	uint code;
 	uint index;
 	bgr3f color = black; float opacity = 1;
+	Glyph(vec2 origin, Font& font, uint code, uint index, bgr3f color = black, float opacity=1)
+		: origin(origin), font(font), code(code), index(index), color(color), opacity(opacity) {}
 };
 
 /// Line graphic element
@@ -43,11 +45,13 @@ struct Parallelogram {
 	vec2 min,max;
 	float dy;
 	bgr3f color = black; float opacity = 1;
+	Parallelogram(vec2 min, vec2 max, float dy, bgr3f color=black, float opacity=1) : min(min), max(max), dy(dy), color(color), opacity(opacity) {}
 };
 
 struct Cubic {
 	buffer<vec2> points;
 	bgr3f color = black; float opacity = 1;
+	Cubic(buffer<vec2>&& points, bgr3f color=black, float opacity=1) : points(move(points)), color(color), opacity(opacity) {}
 };
 
 /// Set of graphic elements
@@ -60,18 +64,4 @@ struct Graphics : shareable {
 	array<Parallelogram> parallelograms;
 	array<Cubic> cubics;
 	map<vec2, shared<Graphics>> graphics;
-	//explicit operator bool() const { return fills || blits || glyphs || lines || parallelograms || cubics || graphics; }
-	/*void append(const Graphics& o, vec2 offset) {
-        for(auto e: o.fills) { e.origin += offset; fills.append(e); }
-        for(const auto& e: o.blits) blits.append(e.origin+offset, e.size, share(e.image));
-        for(auto e: o.glyphs) { e.origin += offset; glyphs.append(e); }
-        for(auto e: o.lines) { e.a += offset; e.b += offset; lines.append(e); }
-		for(auto e: o.parallelograms) { e.min += offset; e.max += offset; parallelograms.append(e); }
-	}*/
 };
-/*inline Graphics copy(const Graphics& o) {
-	return {copy(o.fills), copy(o.blits), copy(o.glyphs), copy(o.lines), copy(o.parallelograms), copy(o.cubics), copy(o.graphics)};
-}*/
-/*inline String str(const Graphics& o) {
-	return str(o.fills.size, o.blits.size, o.glyphs.size, o.lines.size, o.parallelograms.size, o.cubics.size, o.graphics.size);
-}*/

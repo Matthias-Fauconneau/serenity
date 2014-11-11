@@ -6,32 +6,32 @@
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
 template<template<typename> class V, Type T, uint N> struct vec : V<T> {
-	static_assert(sizeof(V<T>)==N*sizeof(T),"");
+    static_assert(sizeof(V<T>)==N*sizeof(T),"");
 
     /// Defaults initializes to zero
-	notrace vec() : vec(0) {}
+    notrace vec() : vec(0) {}
     /// Initializes all components to the same value \a v
-	notrace vec(T v){ for(uint i: range(N)) at(i)=v; }
+    notrace vec(T v){ for(uint i: range(N)) at(i)=v; }
     /// Initializes components separately
-	template<Type... Args> notrace explicit constexpr vec(T a, T b, Args... args) : V<T>{a,b,T(args)...}{
-        static_assert(sizeof...(args) == N-2, "Invalid number of arguments");
+	template<Type... Args> notrace explicit constexpr vec(T a, T b, Args... args) : V<T>{a,b,T(args)...} {
+		static_assert(sizeof...(args) == N-2, "Invalid number of arguments");
     }
     /// Initializes components from a fixed size array
-    template<Type... Args> explicit vec(const T o[N]){ for(uint i: range(N)) at(i)=(T)o[i]; }
+    template<Type... Args> notrace explicit vec(const T o[N]){ for(uint i: range(N)) at(i)=(T)o[i]; }
 
     /// Initializes components from another vec \a o casting from \a S to \a T
-    template<Type S> explicit vec(const vec<V,S,N>& o) { for(uint i: range(N)) at(i)=(T)o[i]; }
+    template<Type S> notrace explicit vec(const vec<V,S,N>& o) { for(uint i: range(N)) at(i)=(T)o[i]; }
     /// Unchecked accessor (const)
-    const T& at(uint i) const { return ((T*)this)[i]; }
+    notrace const T& at(uint i) const { return ((T*)this)[i]; }
     /// Unchecked accessor
-    T& at(uint i) { return ((T*)this)[i]; }
+    notrace T& at(uint i) { return ((T*)this)[i]; }
     /// Accessor (checked in debug build, const)
-    const T& operator[](uint i) const { assert(i<N); return at(i); }
+    notrace const T& operator[](uint i) const { assert(i<N); return at(i); }
     /// Accessor (checked in debug build)
-    T& operator[](uint i) { assert(i<N); return at(i); }
+    notrace T& operator[](uint i) { assert(i<N); return at(i); }
     /// \name Operators
     explicit operator bool() const { for(uint i: range(N)) if(at(i)!=0) return true; return false; }
-    vec& operator +=(const vec& v) { for(uint i: range(N)) at(i)+=v[i]; return *this; }
+	notrace vec& operator +=(const vec& v) { for(uint i: range(N)) at(i)+=v[i]; return *this; }
     vec& operator -=(const vec& v) { for(uint i: range(N)) at(i)-=v[i]; return *this; }
     vec& operator *=(const vec& v) { for(uint i: range(N)) at(i)*=v[i]; return *this; }
     vec& operator *=(const T& s) { for(uint i: range(N)) at(i)*=s; return *this; }
@@ -40,7 +40,7 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
 };
 
 #undef generic
-#define generic template<template<typename> class V, Type T, uint N> inline
+#define generic template<template<typename> class V, Type T, uint N> inline notrace
 #define vec vec<V,T,N>
 
 generic vec rotate(const vec& u) { vec r=u; for(uint i=0;i<N-1;i++) swap(r[i],r[i+1]); return r; }
@@ -147,8 +147,10 @@ generic struct rgba {
 
 /// Integer b,g,r,a vector (8bit)
 struct byte4 : vec<bgra,uint8,4> {
-    using vec::vec;
-	byte4() : vec(0) {} // Defaults initalizes to zero
+	//using vec::vec;
+    byte4() : vec(0) {} // Defaults initalizes to zero
+    notrace byte4(byte v) : vec(v) {}
+	notrace byte4(byte b, byte g, byte r, byte a) : vec(b,g,r,a) {}
     byte4(vec<rgba,uint8,4> rgba) : vec(rgba.b, rgba.g, rgba.r, rgba.a) {}
     byte4(vec<rgb,uint8,3> rgb) : vec(rgb.b, rgb.g, rgb.r, 0xFF) {}
     byte4(byte3 bgr) : vec(bgr.b, bgr.g, bgr.r, 0xFF) {}

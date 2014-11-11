@@ -170,6 +170,9 @@ struct Map : mref<byte> {
     Map(uint fd, uint offset, uint size, Prot prot, Flags flags=Shared);
     ~Map();
 
+	/// Locks memory map in RAM
+	void lock(size_t size=-1) const;
+
     /// Unmaps memory map
     void unmap();
 };

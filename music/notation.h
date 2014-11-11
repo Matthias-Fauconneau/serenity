@@ -31,7 +31,7 @@ struct Note {
     bool accent:1;
     bool stem:1; // 0: down, 1: up
     uint key; // MIDI key
-    size_t glyphIndex;
+	size_t measureIndex, glyphIndex;
 };
 struct Rest {
     Duration duration;

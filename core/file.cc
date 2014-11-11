@@ -151,6 +151,8 @@ Map::Map(uint fd, uint offset, uint size, Prot prot, Flags flags){
 
 Map::~Map() { unmap(); }
 
+void Map::lock(size_t size) const { /*check*/(mlock(data, min<size_t>(this->size,size))); }
+
 void Map::unmap() {
 	if(data) munmap((void*)data, size);
 	data=0, size=0;

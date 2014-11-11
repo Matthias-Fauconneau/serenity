@@ -39,10 +39,10 @@ generic struct remove_reference { typedef T type; };
 generic struct remove_reference<T&> { typedef T type; };
 generic struct remove_reference<T&&> { typedef T type; };
 /// Allows move assignment
-generic inline constexpr Type remove_reference<T>::type&& __attribute__((warn_unused_result)) move(T&& t)
+generic inline notrace constexpr Type remove_reference<T>::type&& __attribute__((warn_unused_result)) move(T&& t)
 { return (Type remove_reference<T>::type&&)(t); }
 /// Swap values (using move semantics as necessary)
-generic void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
+generic inline notrace void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 /// Forwards references and copyable values
 generic constexpr T&& forward(Type remove_reference<T>::type& t) { return (T&&)t; }
 /// Forwards moveable values
@@ -87,8 +87,8 @@ constexpr size_t invalid = -1; // Invalid index
 // -- Number arithmetic
 template<Type A, Type B> bool operator >(const A& a, const B& b) { return b<a; }
 template<Type A, Type B> bool operator >=(const A& a, const B& b) { return b<=a; }
-generic T min(T a, T b) { return a<b ? a : b; }
-generic T max(T a, T b) { return a<b ? b : a; }
+generic notrace T min(T a, T b) { return a<b ? a : b; }
+generic notrace T max(T a, T b) { return a<b ? b : a; }
 generic T clip(T min, T x, T max) { return x < min ? min : max < x ? max : x; }
 generic T abs(T x) { return x>=0 ? x : -x; }
 inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
@@ -202,7 +202,7 @@ generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 typedef ref<char> string;
 
 /// Returns const reference to a static string literal
-inline constexpr string operator "" _(const char* data, size_t size) { return string(data,size); }
+inline notrace constexpr string operator "" _(const char* data, size_t size) { return string(data,size); }
 
 // -- Log
 

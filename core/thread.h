@@ -149,7 +149,7 @@ enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflo
 ref<string> arguments();
 
 /// Returns value for environment variable \a name
-string getenv(const string name, string value="");
+string getenv(const string name, string value=""_);
 
 /// Returns standard folders
 const Folder& home(); //$HOME ?: pwuid->pw_dir

@@ -45,8 +45,6 @@ struct FLAC : BitReader {
 	size_t read(mref<float2> out);
 };
 inline FLAC copy(const FLAC& o) {
-	//return {o.data, o.bitSize, o.index, copy(o.audio),
-	//            o.writeIndex, o.readIndex, o.blockSize, o.rate, o.channelMode, o.sampleSize, o.position, o.duration};
 	FLAC t ;
 	t.data=o.data, t.bitSize=o.bitSize, t.index=o.index; t.audio=copy(o.audio);
 	t.writeIndex=o.writeIndex, t.readIndex=o.readIndex; t.audioAvailable = o.audioAvailable;

@@ -33,8 +33,8 @@ MidiNotes notes(ref<Sign> signs, uint divisions) {
 			notes.ticksPerSeconds = sign.metronome.perMinute*divisions;
 		}
 		else if(sign.type == Sign::Note) {
-			notes.insertSorted({uint(sign.time*60), sign.note.key, 64/*FIXME: use dynamics*/});
-			notes.insertSorted({uint((sign.time+sign.duration)*60), sign.note.key, 0});
+			notes.insertSorted({sign.time*60, sign.note.key, 64/*FIXME: use dynamics*/});
+			notes.insertSorted({(sign.time+sign.duration)*60, sign.note.key, 0});
 		}
 	}
 	assert_(notes.ticksPerSeconds);
@@ -72,9 +72,9 @@ struct Music : Widget {
 	// Audio output
     Thread audioThread;
 	AudioOutput audio = {audioFile ? decltype(AudioOutput::read32)(&audioFile,&AudioFile::read32)
-														: decltype(AudioOutput::read32)(&sampler,&Sampler::read)/*, audioThread*/};
+														: decltype(AudioOutput::read32)(&sampler,&Sampler::read), audioThread};
 	Thread decodeThread;
-	Sampler sampler {48000, "/Samples/Salamander.sfz"_, {this, &Music::timeChanged}/*, decodeThread*/};
+	Sampler sampler {48000, "/Samples/Salamander.sfz"_, {this, &Music::timeChanged}, decodeThread};
 
 	/// Adds new notes to be played (called in audio thread by sampler)
 	uint samplerMidiIndex = 0;
@@ -84,7 +84,7 @@ struct Music : Widget {
 			sampler.noteEvent(note.key, note.velocity);
 			samplerMidiIndex++;
 		}
-		if(samplerMidiIndex >= notes.size/16) requestTermination(0); // PROFILE
+		//if(samplerMidiIndex >= notes.size/32) requestTermination(0); // PROFILE
 	}
 
     uint noteIndexToMidiIndex(uint seekNoteIndex) {
@@ -104,7 +104,8 @@ struct Music : Widget {
 				Sign sign = sheet.midiToSign[noteIndex];
 				if(sign.type == Sign::Note) {
 					(sign.staff?keyboard.left:keyboard.right).append( sign.note.key );
-					sheet.notation->glyphs[active.insertMulti(note.key, sign).note.glyphIndex].color = (sign.staff?red:green);
+					active.insertMulti(note.key, sign);
+					sheet.measures.values[sign.note.measureIndex]->glyphs[sign.note.glyphIndex].color = (sign.staff?red:green);
 					contentChanged = true;
 				}
 				noteIndex++;
@@ -113,16 +114,16 @@ struct Music : Widget {
 				while(active.contains(note.key)) {
 					Sign sign = active.take(note.key);
 					(sign.staff?keyboard.left:keyboard.right).remove(sign.note.key);
-					sheet.notation->glyphs[sign.note.glyphIndex].color = black;
+					sheet.measures.values[sign.note.measureIndex]->glyphs[sign.note.glyphIndex].color = black;
 					contentChanged = true;
 				}
 			}
 		}
 		uint64 t = timeNum*notes.ticksPerSeconds;
 		for(size_t index: range(sheet.measures.size()-1)) {
-			uint64 t0 = sheet.measures.keys[index]*60*timeDen, t1 = sheet.measures.keys[index+1]*60*timeDen;
+			uint64 t0 = sheet.measureBars.keys[index]*60*timeDen, t1 = sheet.measureBars.keys[index+1]*60*timeDen;
 			if(t0 <= t && t <= t1) {
-				float x0 = sheet.measures.values[index], x1 = sheet.measures.values[index+1];
+				float x0 = sheet.measureBars.values[index], x1 = sheet.measureBars.values[index+1];
 				float x = x0+(x1-x0)*float(t-t0)/float(t1-t0);
 				sheet.offset.x = -clip(0.f, x-size.x/2, float(abs(sheet.widget().sizeHint(size).x)-size.x));
 				break;
@@ -151,7 +152,7 @@ struct Music : Widget {
 			size_t measureIndex = 0;
 			for(;measureIndex < sheet.measureToChord.size; measureIndex++)
 				if(sheet.measureToChord[measureIndex]>=sheet.firstSynchronizationFailureChordIndex) break;
-			sheet.offset.x = -sheet.measures.values[max<int>(0, measureIndex-3)];
+			sheet.offset.x = -sheet.measureBars.values[max<int>(0, measureIndex-3)];
 		}
 		if(!audioFile) decodeThread.spawn(); // For sampler
 		if(arguments().contains("encode")) { // Encode

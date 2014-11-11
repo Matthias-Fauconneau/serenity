@@ -100,22 +100,22 @@ void FLAC::parseFrame() {
     this->blockSize = blockSize;
 }
 
-notrace inline double roundDown(double x) { //depends on setRoundMode(Down) to round towards negative infinity
-    const double lead = 0x1p52+0x1p51; //add leading bit to force rounding (+1p51 to also force negative numbers)
+notrace inline double roundDown(double x) { // Depends on setRoundMode(Down) to round towards negative infinity
+	const double lead = 0x1p52+0x1p51; // Adds leading bit to force rounding (+1p51 to also force negative numbers)
     return x+lead-lead; // WARNING: miscompiles with -Ofast !
 }
 
 template<int unroll> inline void filter(double2 kernel[unroll], double*& aligned, double*& misaligned, float*& signal) {
     double2 sum = {0,0};
-    for(uint i: range(unroll)) sum += kernel[i] * *(double2*)(aligned+2*i); //unrolled loop in registers
-    double sample = roundDown(sum[0]+sum[1])+double(*signal); //add residue to prediction [SS2SD=2]
-    aligned[2*unroll]= misaligned[2*unroll]= sample; aligned++; misaligned++; //write out contexts, misalign align, align misalign
-    *signal = sample; signal++; //write out decoded sample [SD2SS=8]
+	for(uint i: range(unroll)) sum += kernel[i] * *(double2*)(aligned+2*i); // Unrolled loop in registers
+	double sample = roundDown(sum[0]+sum[1])+double(*signal); // Adds residue to prediction [SS2SD=2]
+	aligned[2*unroll]= misaligned[2*unroll]= sample; aligned++; misaligned++; // Writes out contexts, misalign align, align misalign
+	*signal = sample; signal++; // Writes out decoded sample [SD2SS=8]
 }
 
 template<int unroll> inline void convolve(double* predictor, double* even, double* odd, float* signal, float* end) {
     double2 kernel[unroll];
-    for(uint i: range(unroll)) kernel[i] = *(double2*)&predictor[2*i]; //load predictor in registers
+	for(uint i: range(unroll)) kernel[i] = *(double2*)&predictor[2*i]; // Loads predictor in registers
     for(;signal<end;) {
         filter<unroll>(kernel, even, odd, signal);
         filter<unroll>(kernel, odd, even, signal);
@@ -147,19 +147,19 @@ void FLAC::decodeFrame() {
     float block[2][allocSize];
     setRoundMode(Down);
 	for(int channel=0;channel<2;channel++) {
-        int rawSampleSize = sampleSize; //one bit more to be able to substract full range from other channel (1 sign bit + bits per sample)
+		int rawSampleSize = sampleSize; // One bit more to be able to substract full range from other channel (1 sign bit + bits per sample)
         if(channel == 0) { if(channelMode==RightSide) rawSampleSize++; }
         if(channel == 1) { if(channelMode==LeftSide || channelMode == MidSide) rawSampleSize++; }
 
-        //Subframe
+		// Subframe
 		int unused zero = bit(); assert(zero==0,channel,blockSize,index,bitSize);
         uint type = binary(6);
         int unused wasted = bit(); assert(wasted==0,type);
-        if (type == 0) { //constant
-            int constant = sbinary(rawSampleSize); //sbinary?
+		if (type == 0) { // Constant
+			int constant = sbinary(rawSampleSize); // sbinary?
             for(uint i : range(blockSize)) block[channel][i] = constant;
             continue;
-        } else if (type == 1) { //verbatim
+		} else if (type == 1) { // Verbatim
             error("TODO");
             continue;
         }
@@ -175,7 +175,7 @@ void FLAC::decodeFrame() {
             for(uint i: range(order)) even[i]=odd[i]=signal[i]= sbinary(rawSampleSize);
             int precision = binary(4)+1; assert(precision<=15,precision);
             int shift = sbinary(5); assert(shift>=0);
-            if(order%2) { predictor[0]=0; for(uint i: range(order)) predictor[order-i]= double(sbinary(precision))/(1<<shift); } //right align odd order
+			if(order%2) { predictor[0]=0; for(uint i: range(order)) predictor[order-i]= double(sbinary(precision))/(1<<shift); } // Right align odd order
             else { for(uint i: range(order)) predictor[order-1-i]= double(sbinary(precision))/(1<<shift); }
         } else if(type>=8 && type <=12) { //Fixed
             order = type & ~0x8; assert(order<=4,order);

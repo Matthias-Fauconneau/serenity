@@ -9,7 +9,7 @@
 #include "window.h"
 #include "text.h"
 #include "time.h"
-#include "image.h"
+#include "core/image.h"
 #include "png.h"
 
 /// Shuffles an array of elements

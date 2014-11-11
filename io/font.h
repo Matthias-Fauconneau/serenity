@@ -1,7 +1,7 @@
 #pragma once
 /// \file font.h Freetype font renderer wrapper (Font)
 #include "file.h"
-#include "image.h"
+#include "core/image.h"
 #include "map.h"
 struct  FT_FaceRec_;
 
@@ -41,8 +41,10 @@ struct Font {
     Metrics metrics(uint index) const;
 
     struct Glyph {
-        int2 offset = 0; // (left bearing, min.y-baseline) //FIXME: -> Image
+		int2 offset; // (left bearing, min.y-baseline) //FIXME: -> Image
         Image image;
+		Glyph() : offset(0) {}
+		Glyph(int2 offset, Image&& image) : offset(offset), image(move(image)) {}
     };
 
     /// Caches and renders glyph for \a index

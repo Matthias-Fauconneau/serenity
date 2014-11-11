@@ -108,7 +108,7 @@ MusicXML::MusicXML(string document) {
 																		 e("notations"_)("articulations"_)("tenuto"_)?true:false,
 																		 e("notations"_)("articulations"_)("accent"_)?true:false,
 																		 e("stem").text() == "up"_,
-																		 key, 0 }};
+																		 key, invalid, invalid }};
                         // Acciaccatura are played before principal beat (Records graces to shift in on parsing principal)
 						if(e("grace"_) && e("grace"_)["slash"_]=="yes"_) {
 							if(e("notations"_)("slur"_)) {

@@ -74,7 +74,7 @@ Font::Metrics Font::metrics(uint index) const {
 
 Font::Glyph Font::render(uint index) {
     {const Glyph* glyph = cache.find(index);
-        if(glyph) return {glyph->offset, share(glyph->image)};}
+		if(glyph) return Font::Glyph(glyph->offset, share(glyph->image));}
     Glyph& glyph = cache.insert(index);
     FT_Load_Glyph(face, index, hint?FT_LOAD_TARGET_NORMAL:FT_LOAD_TARGET_LIGHT);
     FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL);

@@ -27,7 +27,8 @@ struct Sampler : Poll {
     //static constexpr uint periodSize = 128; // [3ms] Same as resampler latency and 1m sound propagation time
     //static constexpr uint periodSize = 256; // [5ms] Latency/convolution tradeoff (FIXME: ring buffer)
     //static constexpr uint periodSize = 512; // [11ms] Required for efficient FFT convolution (reverb) (FIXME: ring buffer)
-    static constexpr uint periodSize = 1024; // [21ms] Maximum compatibility (when latency is not critical) (FIXME: skip start for accurate timing))
+	//static constexpr uint periodSize = 1024; // [21ms] Maximum compatibility (when latency is not critical) (FIXME: skip start for accurate timing))
+	static constexpr uint periodSize = 1024; // [42ms] FIXME
 
     /// Convolution reverb
 	bool enableReverb=false; // Disables reverb by default as it prevents lowest latency (FFT convolution gets too expensive).

@@ -12,7 +12,7 @@ struct Node {
 bool operator ==(const Node* a, const string b) { return a->name==b; }
 bool operator ==(const Node& a, const string b) { return a.name==b; }
 String str(const Node& o) {
-	return o.name+"\n"+join(apply(o.edges, [=](const Node* child){ return str(child); }));
+	return o.name+'\n'+join(apply(o.edges, [=](const Node* child){ return str(child); }));
 };
 
 struct Branch {
@@ -21,7 +21,7 @@ struct Branch {
 	explicit Branch(String&& name) : name(move(name)) {}
 };
 String str(const Branch& o, int depth=0) {
-	return repeat(" ", depth)+o.name+"\n"+join(apply(o.children, [=](const Branch& child){ return str(child, depth+1); }));
+	return repeat(" ", depth)+o.name+'\n'+join(apply(o.children, [=](const Branch& child){ return str(child, depth+1); }));
 };
 
 /// Breaks cycles (converts a directed graph to a directed acyclic graph (DAG))
@@ -41,7 +41,7 @@ Branch collect(const Node& source, int maxDepth) { array<const Node*> stack; ret
 
 struct Build {
     // Parameters
-    String CXX = which(getenv("CC")) ?: which("clang++") ?: which("g++");
+	String CXX = which(getenv("CC")) ? which(getenv("CC")) : which("clang++") ? which("clang++") : which("g++");
     String LD = which("ld");
 
 	const Folder folder {"."};

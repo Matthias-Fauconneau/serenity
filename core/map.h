@@ -42,7 +42,7 @@ template<Type K, Type V> struct map {
         size_t i = keys.indexOf(key);
         return i!=invalid ? VV(values[i]) : forward<VV>(value);
     }
-    template<Type KK> const V& value(const KK& key, const V& value=V()) const {
+	template<Type KK> const V value(const KK& key, const V& value=V()) const {
         size_t i = keys.indexOf(key);
         return i!=invalid ? values[i] : value;
     }

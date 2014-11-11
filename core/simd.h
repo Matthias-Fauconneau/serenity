@@ -1,6 +1,7 @@
 #pragma once
 /// \file simd.h SIMD intrinsics (SSE, AVX, ...)
 #include "core.h"
+#define inline inline notrace
 
 // v4si
 typedef int v4si __attribute((__vector_size__ (16)));
@@ -32,3 +33,5 @@ inline int mask(v4sf a) { return __builtin_ia32_movmskps(a); }
 
 inline v4si cvtps2dq(v4sf a) { return __builtin_ia32_cvtps2dq(a); }
 inline v4sf cvtdq2ps(v4si a) { return __builtin_ia32_cvtdq2ps(a); }
+
+#undef inline

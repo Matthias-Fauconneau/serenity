@@ -11,15 +11,15 @@ Symbol findSymbol(void* find);
 
 /// Traces functions to time their execution times and displays statistics on exit
 struct Frame { uint64 tsc=0; void* function=0; uint64 time=0; };
-static Frame stack[32] = {Frame{readCycleCounter(), 0, 0}};
+static Frame stack[64] = {Frame{readCycleCounter(), 0, 0}};
 static Frame* top = stack;
 static constexpr size_t capacity = 0x2000;
 struct Entry { void* function=0; uint64 time=0; uint64 count=0; };
 static Entry entries[capacity];
 static size_t size = 0;
 static bool tracePaused = false;
-//bool operator <(const Entry& a, const Entry& b) { return a.time < b.time; }
-bool operator <(const Entry& a, const Entry& b) { return a.count < b.count; }
+bool operator <(const Entry& a, const Entry& b) { return a.time < b.time; }
+//bool operator <(const Entry& a, const Entry& b) { return a.count < b.count; }
 
 __attribute((destructor(101))) notrace void logProfile() {
 	uint64 total = readCycleCounter() - stack[0].tsc;

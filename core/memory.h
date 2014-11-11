@@ -20,7 +20,7 @@ generic struct mref : ref<T> {
 	/// Default constructs an empty reference
 	mref(){}
 	/// References \a size elements from \a data pointer
-	mref(T* data, size_t size) : ref<T>(data,size) {}
+	notrace mref(T* data, size_t size) : ref<T>(data,size) {}
 	/// Converts an std::initializer_list to mref
 	constexpr mref(std::initializer_list<T>&& list) : ref<T>(list.begin(), list.size()) {}
 	/// Converts a static array to ref
@@ -36,7 +36,7 @@ generic struct mref : ref<T> {
 	T& last() const { return at(size-1); }
 
 	/// Slices a reference to elements from \a pos to \a pos + \a size
-	mref<T> slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return mref<T>((T*)data+pos, size); }
+	notrace mref<T> slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return mref<T>((T*)data+pos, size); }
 	/// Slices a reference to elements from to the end of the reference
 	mref<T> slice(size_t pos) const { assert(pos<=size); return mref<T>((T*)data+pos,size-pos); }
 	/// Slices a reference to elements from \a start to \a stop
@@ -122,18 +122,9 @@ generic struct buffer : mref<T> {
 	void append(const mref<T> source) { setSize(size+source.size); slice(size-source.size).move(source); }
 	/// Appends another list of elements to this array by copying
 	void append(const ref<T> source) { setSize(size+source.size); slice(size-source.size).copy(source); }
-	/*/// Appends a new element
-	template<Type Arg, typename enable_if<!is_convertible<Arg, T>::value && !is_convertible<Arg, ref<T>>::value>::type* = nullptr>
-	T& append(Arg&& arg) { setSize(size+1); return set(size-1, forward<Arg>(arg)); }
-	/// Appends a new element
-	template<Type Arg0, Type Arg1, Type... Args> T& append(Arg0&& arg0, Arg1&& arg1, Args&&... args) {
-		setSize(size+1); return set(size-1, forward<Arg0>(arg0), forward<Arg1>(arg1), forward<Args>(args)...);
-	}*/
 };
 /// Initializes a new buffer with the content of \a o
 generic buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity?:o.size, o.size); t.copy(o); return t; }
-//generic buffer<T> copy(const buffer<T>& o){ return o.capacity ? copyRef(o) : unsafeRef(o); }
-//generic buffer<T> copy(const buffer<T>& o){ assert_(o.capacity); return copyRef(o); }
 
 /// Converts a reference to a buffer (unsafe as no automatic memory management method keeps the original reference from being released)
 generic buffer<T> unsafeRef(const ref<T> o) { return buffer<T>((T*)o.data, o.size, 0); }

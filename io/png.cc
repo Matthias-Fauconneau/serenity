@@ -2,8 +2,8 @@
 #include "data.h"
 #include "deflate.h"
 
-generic struct ia { T i,a; operator byte4() const {return byte4 {i,i,i,a}; } };
-generic struct luma { T i; operator byte4() const {return byte4 {i,i,i,255}; } };
+generic struct ia { T i,a; operator byte4() const {return byte4(i,i,i,a); } };
+generic struct luma { T i; operator byte4() const {return byte4(i,i,i,0xFF); } };
 
 typedef vec<rgb,uint8,3> rgb3;
 

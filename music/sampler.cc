@@ -171,7 +171,7 @@ Sampler::Sampler(uint outputRate, string path, function<void(uint64)> timeChange
         }
 
         s.flac.decodeFrame(); // Decodes first frame of all samples to start mixing without latency
-		//s.data.lock(); // Locks compressed samples in memory
+		s.data.lock(); // Locks compressed samples in memory
 
         for(int key: range(s.lokey,s.hikey+1)) { // Instantiates all pitch shifts on startup
             float shift = key-s.pitch_keycenter; //TODO: tune
@@ -183,7 +183,7 @@ Sampler::Sampler(uint outputRate, string path, function<void(uint64)> timeChange
 				layer.notes.reserve(64);
                 if(shift || rate!=outputRate) {
                     const uint size = 2048; // Accurate frequency resolution while keeping reasonnable filter bank size
-					layer.resampler = Resampler(2, size, round(size*exp2((-shift)/12.0)*outputRate/rate), size);
+					layer.resampler = Resampler(2, size, round(size*exp2((-shift)/12.0)*outputRate/rate), periodSize);
                 }
 				layers.append(move(layer));
             }
