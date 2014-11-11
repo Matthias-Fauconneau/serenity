@@ -9,6 +9,9 @@ generic inline constexpr T cb(const T& x) { return x*x*x; }
 /// Declares real as a double-precision floating point number
 typedef double real;
 
+notrace inline float abs(float x) { return __builtin_fabsf(x); }
+notrace inline real abs(real x) { return __builtin_fabs(x); }
+
 constexpr real nan = __builtin_nan("");
 inline bool isNaN(float x) { return x!=x; }
 inline bool isNaN(real x) { return x!=x; }
@@ -34,7 +37,7 @@ inline real ln(real x) { return __builtin_log(x); }
 
 inline real cos(real t) { return __builtin_cos(t); }
 inline real acos(real t) { return __builtin_acos(t); }
-inline real sin(real t) { return __builtin_sin(t); }
+notrace inline real sin(real t) { return __builtin_sin(t); }
 inline real asin(real t) { return __builtin_asin(t); }
 inline real tan(real t) { return __builtin_tan(t); }
 inline real atan(real y, real x) { return __builtin_atan2(y, x); }

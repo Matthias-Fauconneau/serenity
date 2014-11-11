@@ -22,7 +22,7 @@ struct Sampler::Sample {
 	int pitch_keycenter=60; float releaseTime=/*0*/1; float amp_veltrack=1; float volume=1; //Performance parameters
 };
 inline String str(const  Sampler::Sample& s) { return str(s.lokey)+"-"_+str(s.pitch_keycenter)+"-"_+str(s.hikey); }
-inline bool operator <=(const  Sampler::Sample& a, const Sampler::Sample& b) { return a.pitch_keycenter<=b.pitch_keycenter; }
+inline bool operator <(const  Sampler::Sample& a, const Sampler::Sample& b) { return a.pitch_keycenter<b.pitch_keycenter; }
 
 struct Note {
 	default_move(Note);
@@ -90,7 +90,7 @@ float sumOfSquares(const FLAC& flac, uint size) {
 }
 
 Sampler::Sampler(uint outputRate, string path, function<void(uint64)> timeChanged, Thread& thread)
-	: Poll(0, POLLIN, thread), timeChanged(timeChanged) {
+	: Poll(0, POLLIN, thread), timeChanged(timeChanged), backgroundDecoder(thread!=mainThread) {
 	registerPoll();
     layers.clear();
     samples.clear();

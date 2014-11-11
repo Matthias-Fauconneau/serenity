@@ -16,7 +16,6 @@ static Element parse(string document, bool html) {
 }
 
 Element parseXML(const string& document) { return parse(document,false); }
-//Element parseHTML(const string& document) { return parse(document,true); }
 
 Element::Element(TextData& s, bool html) {
 	size_t begin = s.index;
@@ -26,53 +25,36 @@ Element::Element(TextData& s, bool html) {
 	else if(s.match('?')){ log("Unexpected <?",s.until("?>"),"?>"); return; }
 	else name = s.identifier("_-:");
 	if(!name) { log(s.slice(0,s.index)); log("Expected tag name got",s.line()); }
-	//if(html) name=toLower(name);
 	s.whileAny(" \t\n");
     while(!s.match('>')) {
-		if(s.match("/>")) { /*s.skip();*/ return; }
-		else if(s.match('/')) {} //s.skip(); //spurious /
-        else if(s.match('<')) break; //forgotten >
+		if(s.match("/>")) return;
+		else if(s.match('/')) {} //spurious /
+		else if(s.match('<')) break; // forgotten >
 		s.whileAny(" \t\n");
-		string key = s.identifier("_-:");/*TODO:reference*/ //s.skip();
+		string key = s.identifier("_-:"); /*TODO:reference*/
 		if(!key) { log("Attribute syntax error"_,s.slice(begin,s.index-begin),"|"_,s.until('>')); s.until('>'); break; }
-		//if(html) key = toLower(key);
 		string value;
         if(s.match('=')) {
-			//s.skip();
 			if(s.match('"')) value=s.until('"');
 			else if(s.match('\'')) value=s.until('\'');
 			else { value=s.untilAny(" \t\n>"); if(s.slice(s.index-1,1)==">") s.index--; }
-			//if(html) value=unescape(value);
-			//s.match("\""); //duplicate "
         }
 		attributes.insertMulti(key, value);
 		s.whileAny(" \t\n");
     }
-	/*if(html) {
-        static array<string> voidElements = split("area base br col command embed hr img input keygen link meta param source track wbr"_,' ');
-        if(voidElements.contains(name)) return; //HTML tags which are implicity void (i.e not explicitly closed)
-        if(name=="style"_||name=="script"_) { //Raw text elements can contain <>
-            s.skip();
-            content = String(s.until(String("</"_+name+">"_)));
-            s.skip();
-            return;
-        }
-	}*/
     for(;;) {
-        if(s.available(4)<4) return; //ignore unclosed tag
-        if(s.match("<![CDATA["_)) {
+		//if(s.available(4)<4) return; // Ignores unclosed tag
+		if(s.match("<![CDATA["_)) {
 			string content = s.until("]]>");
 			if(content) children.append( unique<Element>(content) );
-        }
-        else if(s.match("<!--"_)) { s.until("-->"_); }
-        else if(s.match("</"_)) { if(name==s.until(">"_)) break; } //ignore
+		}
+		else if(s.match("<!--"_)) s.until("-->"_);
+		else if(s.match("</"_)) { if(name==s.until(">"_)) break; } // FIXME: check correct closing tag
         //else if(s.match(String("<?"_+name+">"_))) { log("Invalid tag","<?"_+name+">"_); return; }
 		else if(s.match('<')) children.append( unique<Element>(s,html) );
         else {
 			assert_(!content);
 			content = trim(s.whileNot('<'));
-			//if(html) content = unescape(content);
-			//if(trim(content)) children.append( unique<Element>(move(content)) );
         }
     }
 }

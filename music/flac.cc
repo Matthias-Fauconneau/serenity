@@ -7,25 +7,23 @@ void BitReader::skip(int count) { index+=count; }
 
 uint BitReader::bit() { uint8 bit = uint8(data[index/8]<<(index&7))>>7; index++; return bit; }
 
-uint BitReader::binary(int size) {
-    assert(size<=32);//48
-	assert(index<bitSize);
+notrace uint BitReader::binary(int size) {
+	assert(size <= 32 && index < bitSize);
     uint value = (big64(*(uint64*)(data+index/8)) << (index&7)) >> int8(64-size);
     index += size;
     return value;
 }
 
 int BitReader::sbinary(int size) {
-    assert(size<=32);//48
-	assert(index<bitSize);
+	assert(size <= 32 && index < bitSize);
     int64 word = big64(*(uint64*)(data+index/8)) << (index&7);
     index += size;
     return word>>int8(64-size);
 }
 
 static uint8 log2i[256];
-uint BitReader::unary() {
-	assert(index<bitSize);
+__attribute__ ((hot)) uint BitReader::unary() {
+	assert(index < bitSize);
     // 64bit word optimization of "uint size=0; while(!bit()) size++; assert(size<(64-8)+64);"
     uint64 w = big64(*(uint64*)(data+index/8)) << (index&7);
 	uint size = 0;
@@ -33,7 +31,7 @@ uint BitReader::unary() {
 		size += 64 - (index&7);
 		w = big64(*(uint64*)(data+index/8+8));
     }
-	assert(w, size, bin(slice(index/8)), index, bitSize);
+	assert(w);
 	uint8 b = w >> (64-8);
     while(!b) size+=8, w<<=8, b=w>>(64-8);
     size += log2i[b];
@@ -102,7 +100,7 @@ void FLAC::parseFrame() {
     this->blockSize = blockSize;
 }
 
-inline double roundDown(double x) { //depends on setRoundMode(Down) to round towards negative infinity
+notrace inline double roundDown(double x) { //depends on setRoundMode(Down) to round towards negative infinity
     const double lead = 0x1p52+0x1p51; //add leading bit to force rounding (+1p51 to also force negative numbers)
     return x+lead-lead; // WARNING: miscompiles with -Ofast !
 }

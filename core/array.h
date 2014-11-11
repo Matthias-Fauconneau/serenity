@@ -73,38 +73,54 @@ generic struct array : buffer<T> {
     template<Type F> T& add(F&& e) { size_t i = indexOf(e); if(i!=invalid) return at(i); else return append(forward<F>(e)); }
 
     /// Inserts an element at \a index
-    template<Type V> T& insertAt(int index, V&& e) {
-        assert(index>=0);
+	template<Type V> T& insertAt(size_t index, V&& e) {
+		assert(int(index)>=0);
 		grow(size+1);
-        if(int(size)-2>=index) {
+		if(int(size)-2>=int(index)) {
 			set(size-1, ::move(at(size-2))); // Initializes last slot
-			for(int i=size-3;i>=index;i--) at(i+1)= ::move(at(i)); // Shifts elements
+			for(int i=size-3;i>=int(index);i--) at(i+1)= ::move(at(i)); // Shifts elements
 			return at(index) = ::move(e);
 		} else return set(index, ::move(e)); // index==size-1
     }
     /// Inserts immediately before the first element greater than the argument
-	int insertSorted(T&& e) { size_t i=0; while(i<size && at(i) <= e) i++; insertAt(i, ::move(e)); return i; }
-	int insertSorted(const T& e) { size_t i=0; while(i<size && at(i) <= e) i++; insertAt(i, ::copy(e)); return i; }
+	//size_t insertSorted(T&& e) { size_t index=linearSearch(e); insertAt(index, ::move(e)); return index; }
+	//size_t insertSorted(const T& e) { size_t index=linearSearch(e); insertAt(index, ::copy(e)); return index; }
+	size_t insertSorted(T&& e) { size_t index=reverseLinearSearch(e); insertAt(index, ::move(e)); return index; }
+	size_t insertSorted(const T& e) { size_t index=reverseLinearSearch(e); insertAt(index, ::copy(e)); return index; }
+	//size_t insertSorted(T&& e) { size_t index = binarySearch(e); insertAt(index, ::move(e)); return index; }
+	//size_t insertSorted(const T& e) { size_t index = binarySearch(e); insertAt(index, ::copy(e)); return index; }
 
     /// Removes one element at \a index
 	void removeAt(size_t index) { at(index).~T(); for(size_t i: range(index, size-1)) raw(at(i)).copy(raw(at(i+1))); size--; }
 	//void removeAt(size_t index) { at(index).~T(); for(size_t i: range(index, size-1)) at(i)=move(at(i+1)); size--; }
     /// Removes one element at \a index and returns its value
-    T take(int index) { T value = move(at(index)); removeAt(index); return value; }
+	T take(size_t index) { T value = move(at(index)); removeAt(index); return value; }
     /// Removes the last element and returns its value
     T pop() { return take(size-1); }
 
 	/// Removes one matching element and returns an index to its successor, or invalid if none match
-	template<Type K> int tryRemove(const K& key) { size_t i=indexOf(key); if(i!=invalid) removeAt(i); return i; }
+	template<Type K> size_t tryRemove(const K& key) { size_t i=ref<T>::indexOf(key); if(i!=invalid) removeAt(i); return i; }
 	/// Removes one matching element and returns an index to its successor, aborts if none match
-    template<Type K> int remove(const K& key) { int i=indexOf(key); assert(i>=0); removeAt(i); return i; }
+	template<Type K> size_t remove(const K& key) { size_t i=ref<T>::indexOf(key); assert(i>=0); removeAt(i); return i; }
     /// Filters elements matching predicate
     template<Type F> array& filter(F f) { for(size_t i=0; i<size;) if(f(at(i))) removeAt(i); else i++; return *this; }
 
-    /// Returns the index of the first occurence of \a key. Returns -1 if \a key could not be found.
-    template<Type K> int indexOf(const K& key) const { for(size_t i: range(size)) { if(data[i]==key) return i; } return -1; }
-    /// Returns true if the array contains an occurrence of \a value
-    template<Type K> bool contains(const K& key) const { return indexOf(key)>=0; }
+	/// Returns index to the first element greater than to \a value using linear search (assuming a sorted array)
+	template<Type K> size_t linearSearch(const K& key) const { size_t i=0; while(i<size && at(i) <= key) i++; return i; }
+	/// Returns index after the last element lesser than \a value using linear search (assuming a sorted array)
+	template<Type K> size_t reverseLinearSearch(const K& key) const { size_t i=size; while(i>0 && at(i-1) > key) i--; return i; }
+	/// Returns index to the first element greater than or equal to \a value using binary search (assuming a sorted array)
+	template<Type K> size_t binarySearch(const K& key) const {
+		size_t min=0, max=size;
+		while(min<max) {
+			size_t mid = (min+max)/2;
+			assert(mid<max);
+			if(at(mid) < key) min = mid+1;
+			else max = mid;
+		}
+		assert(min == max);
+		return min;
+	}
 };
 /// Copies all elements in a new array
 generic array<T> copy(const array<T>& o) { array<T> copy(o.size, 0); copy.append(o); return copy; }

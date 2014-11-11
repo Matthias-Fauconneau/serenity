@@ -127,6 +127,7 @@ music/sampler.h
 music/sampler.cc
 music/flac.h
 music/flac.cc
+music/notation.h
 music-video.cc
 
 player.cc

@@ -90,9 +90,9 @@ struct Sign {
 	struct Slur slur;
     };
 };
-inline bool operator <=(const Sign& a, const Sign& b) {
+inline bool operator <(const Sign& a, const Sign& b) {
     if(a.time==b.time) {
-	if(a.type==Sign::Note && b.type==Sign::Note) return a.note.step <= b.note.step;
+		if(a.type==Sign::Note && b.type==Sign::Note) return a.note.step < b.note.step;
     }
-    return a.time <= b.time;
+	return a.time < b.time;
 }

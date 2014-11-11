@@ -2,6 +2,7 @@
 /// \file core.h Keywords, traits, move semantics, range, ref, debug
 
 // Keywords
+#define notrace __attribute((no_instrument_function))
 #define unused __attribute((unused))
 #define packed __attribute((packed))
 #define Type typename
@@ -85,6 +86,7 @@ constexpr size_t invalid = -1; // Invalid index
 
 // -- Number arithmetic
 template<Type A, Type B> bool operator >(const A& a, const B& b) { return b<a; }
+template<Type A, Type B> bool operator >=(const A& a, const B& b) { return b<=a; }
 generic T min(T a, T b) { return a<b ? a : b; }
 generic T max(T a, T b) { return a<b ? b : a; }
 generic T clip(T min, T x, T max) { return x < min ? min : max < x ? max : x; }
@@ -93,16 +95,16 @@ inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
 
 /// Numeric range
 struct range {
-    range(int start, int stop) : start(start), stop(stop){}
-    range(uint size) : range(0, size){}
+	notrace range(int start, int stop) : start(start), stop(stop){}
+	notrace range(uint size) : range(0, size){}
     struct iterator {
         int i;
-        int operator*() { return i; }
-        iterator& operator++() { i++; return *this; }
-        bool operator !=(const iterator& o) const{ return i<o.i; }
+		notrace int operator*() { return i; }
+		notrace iterator& operator++() { i++; return *this; }
+		notrace bool operator !=(const iterator& o) const { return i<o.i; }
     };
-    iterator begin() const { return {start}; }
-    iterator end() const { return {stop}; }
+	notrace iterator begin() const { return {start}; }
+	notrace iterator end() const { return {stop}; }
     explicit operator bool() const { return start < stop; }
 	int size() { return stop-start; }
     int start, stop;
@@ -134,9 +136,9 @@ generic struct Ref {
     size_t size = 0;
 
     /// Default constructs an empty reference
-	constexpr Ref() {}
+	notrace constexpr Ref() {}
     /// References \a size elements from const \a data pointer
-	constexpr Ref(const T* data, size_t size) : data(data), size(size) {}
+	notrace constexpr Ref(const T* data, size_t size) : data(data), size(size) {}
     /// Converts a real std::initializer_list to ref
 	constexpr Ref(const std::initializer_list<T>& list) : data(list.begin()), size(list.size()) {}
     /// Explicitly references a static array
@@ -147,14 +149,14 @@ generic struct Ref {
 
     const T* begin() const { return data; }
     const T* end() const { return data+size; }
-    const T& at(size_t i) const;
-    const T& operator [](size_t i) const { return at(i); }
+	notrace const T& at(size_t i) const;
+	notrace const T& operator [](size_t i) const { return at(i); }
     const T& last() const { return at(size-1); }
 
     /// Slices a reference to elements from \a pos to \a pos + \a size
-    ref<T> slice(size_t pos, size_t size) const;
+	notrace ref<T> slice(size_t pos, size_t size) const;
     /// Slices a reference to elements from \a pos to the end of the reference
-	ref<T> slice(size_t pos) const;
+	notrace ref<T> slice(size_t pos) const;
 
 	struct reverse_ref {
 		const T* start; const T* stop;
@@ -169,10 +171,10 @@ generic struct Ref {
 	};
 	reverse_ref reverse() { return {end()-1, begin()}; }
 
-    /// Returns the index of the first occurence of \a value. Returns -1 if \a value could not be found.
-    size_t indexOf(const T& key) const { for(size_t i: range(size)) { if(data[i]==key) return i; } return -1; }
+	/// Returns the index of the first occurence of \a value. Returns invalid if \a value could not be found.
+	template<Type K> size_t indexOf(const K& key) const { for(size_t index: range(size)) { if(data[index]==key) return index; } return invalid; }
     /// Returns true if the array contains an occurrence of \a value
-    bool contains(const T& key) const { return indexOf(key)!=invalid; }
+	template<Type K> bool contains(const K& key) const { return indexOf(key) != invalid; }
     /// Compares all elements
     bool operator ==(const ref<T> o) const {
         if(size != o.size) return false;
@@ -188,6 +190,7 @@ generic struct Ref {
 template<> struct ref<char> : Ref<char> {
 	using Ref::Ref;
 	constexpr ref() {}
+	notrace constexpr ref(const char* data, size_t size) : Ref<char>(data, size) {}
 	/// Implicitly references a string literal
 	template<size_t N> constexpr ref(char const(&a)[N]) : ref(a, N-1 /*Does not include trailling zero byte*/) {}
 };
@@ -223,9 +226,9 @@ template<> void error(const string& message) __attribute((noreturn));
 #endif
 
 // -- ref
-generic const T& Ref<T>::at(size_t i) const { assert(i<size, i, size); return data[i]; }
-generic ref<T> Ref<T>::slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos, size); }
-generic ref<T> Ref<T>::slice(size_t pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
+generic notrace const T& Ref<T>::at(size_t i) const { assert(i<size, i, size); return data[i]; }
+generic notrace ref<T> Ref<T>::slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos, size); }
+generic notrace ref<T> Ref<T>::slice(size_t pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
 
 // -- FILE
 

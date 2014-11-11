@@ -1,5 +1,7 @@
 /// \file profile.cc Profiles executable when linked (need all sources to be compiled with -finstrument-functions)
-#include "trace.h"
+#include "string.h"
+struct Symbol { String function; string file; int line=0; };
+Symbol findSymbol(void* find);
 
 #if __clang__
 #define readCycleCounter  __builtin_readcyclecounter
@@ -8,44 +10,52 @@
 #endif
 
 /// Traces functions to time their execution times and displays statistics on exit
-//static uint64 tsc = readCycleCounter();
-struct Frame { uint64 tsc; void* function; uint64 time; };
-static Frame stack[32] = {Frame{readCycleCounter(),0,0}};
+struct Frame { uint64 tsc=0; void* function=0; uint64 time=0; };
+static Frame stack[32] = {Frame{readCycleCounter(), 0, 0}};
 static Frame* top = stack;
-static constexpr size_t capacity = 0x1000;
-struct Entry { void* function; uint64 time; uint count; };
+static constexpr size_t capacity = 0x2000;
+struct Entry { void* function=0; uint64 time=0; uint64 count=0; };
 static Entry entries[capacity];
 static size_t size = 0;
+static bool tracePaused = false;
+//bool operator <(const Entry& a, const Entry& b) { return a.time < b.time; }
+bool operator <(const Entry& a, const Entry& b) { return a.count < b.count; }
 
-bool operator <(const Entry& a, const Entry& b) { return a.time < b.time; }
-
-#define notrace __attribute((no_instrument_function))
-void __attribute((destructor(101))) logProfile() notrace;
-void __attribute((destructor(101))) logProfile() {
-    uint64 total = readCycleCounter() - stack[0].tsc; //readCycleCounter()-tsc;
-    sort(mref<Entry>(entries, size));
-    for(uint i=0; i<size; i++) {
-        if(100*entries[i].time/total==0) continue;
-        Symbol s = findSymbol(entries[i].function);
-		//log(str(100*entries[i].time/total)+"%\t"+str(entries[i].count)+'\t'+s.file+':'+str(s.line)+"     \t"+s.function);
+__attribute((destructor(101))) notrace void logProfile() {
+	uint64 total = readCycleCounter() - stack[0].tsc;
+	tracePaused = true;
+	mref<Entry> entries(::entries, ::size);
+	sort(entries);
+	for(Entry e : entries) {
+		if(100*e.time/total==0) continue;
+		Symbol s = findSymbol(e.function);
+		log(str(100*e.time/total)+"%\t"+str(e.count)+'\t'+s.file+':'+str(s.line)+"     \t"+s.function);
     }
+	tracePaused = false;
 }
 
 // May not call any non-inline functions to avoid recursions
-extern "C" void __cyg_profile_func_enter(void* function, void*) notrace;
-extern "C" void __cyg_profile_func_enter(void* function, void*) {
+extern "C" notrace void __cyg_profile_func_enter(void* function, void*) {
+	if(tracePaused) return;
     uint64 tsc = readCycleCounter();
-    //top->time += tsc - top->tsc;
     top++;
-    *top = {tsc,function,0};
+	assert_(top-stack < 32);
+	*top = {tsc, function, 0};
 }
 
-extern "C" void __cyg_profile_func_exit(void*, void*) notrace;
-extern "C" void __cyg_profile_func_exit(void*, void*) {
+extern "C" notrace void __cyg_profile_func_exit(void*, void*) {
+	if(tracePaused) return;
     uint64 tsc = readCycleCounter();
     top->time += tsc - top->tsc;
-    uint count = 1;
-    for(uint index = 0;;index++) { // Lookup entry and swap to front
+	size_t count = 1;
+	for(size_t index = 0;;index++) { // Lookup entry and swap to front
+		if(index==size) { // Creates new entry
+			size++;
+			if(size >= capacity) __builtin_trap();
+			// Shift all previous entries to free first slot (erases current entry)
+			for(;index > 0;index--) entries[index] = entries[index-1]; // 128bit moves
+			break;
+		}
         if(entries[index].function == top->function) {
             // Accumulates current entry (64bit add)
             top->time += entries[index].time;
@@ -54,16 +64,8 @@ extern "C" void __cyg_profile_func_exit(void*, void*) {
             for(;index > 0;index--) entries[index] = entries[index-1]; // 128bit moves
             break;
         }
-        if(index==size) { // Creates new entry
-            size++;
-            assert(size < capacity);
-            // Shift all previous entries to free first slot (erases current entry)
-            for(;index > 0;index--) entries[index] = entries[index-1]; // 128bit moves
-            break;
-        }
     }
     // Records current entry on first slot
     entries[0] = {top->function, top->time, count};
     top--;
-    //top->tsc = tsc;
 }

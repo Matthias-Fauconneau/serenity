@@ -72,9 +72,9 @@ struct Music : Widget {
 	// Audio output
     Thread audioThread;
 	AudioOutput audio = {audioFile ? decltype(AudioOutput::read32)(&audioFile,&AudioFile::read32)
-														: decltype(AudioOutput::read32)(&sampler,&Sampler::read), audioThread};
+														: decltype(AudioOutput::read32)(&sampler,&Sampler::read)/*, audioThread*/};
 	Thread decodeThread;
-	Sampler sampler {48000, "/Samples/Salamander.sfz"_, {this, &Music::timeChanged}, decodeThread};
+	Sampler sampler {48000, "/Samples/Salamander.sfz"_, {this, &Music::timeChanged}/*, decodeThread*/};
 
 	/// Adds new notes to be played (called in audio thread by sampler)
 	uint samplerMidiIndex = 0;
@@ -84,6 +84,7 @@ struct Music : Widget {
 			sampler.noteEvent(note.key, note.velocity);
 			samplerMidiIndex++;
 		}
+		if(samplerMidiIndex >= notes.size/16) requestTermination(0); // PROFILE
 	}
 
     uint noteIndexToMidiIndex(uint seekNoteIndex) {

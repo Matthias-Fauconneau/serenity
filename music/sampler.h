@@ -52,11 +52,11 @@ struct Sampler : Poll {
 	/// Whether decoding is run in advance in main thread.
 	/// \note Prevents underruns when latency is much lower than FLAC frame sizes.
 	///          FLAC frames need to be fully decoded in order to get both channels.
-	bool backgroundDecoder = true;
+	bool backgroundDecoder;
 
 	explicit operator bool() const { return samples.size; }
 
-	Sampler(uint outputRate, string path, function<void(uint64)> timeChanged, Thread& thread);
+	Sampler(uint outputRate, string path, function<void(uint64)> timeChanged, Thread& thread=mainThread);
 	~Sampler();
 
 	void noteEvent(uint key, uint velocity);

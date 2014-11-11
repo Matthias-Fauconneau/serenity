@@ -1,12 +1,6 @@
 #include "MusicXML.h"
 #include "xml.h"
 
-/*static String str(const Sign& o) {
-	String s = str(o.time, o.duration, o.staff, int(o.type));
-	if(o.type==Sign::Slur) s=s+str(o.slur.documentIndex, o.slur.index, o.slur.matched, int(o.slur.type));
-	return s;
-}*/
-
 MusicXML::MusicXML(string document) {
     Element root = parseXML(document);
 	map<uint, Clef> clefs;

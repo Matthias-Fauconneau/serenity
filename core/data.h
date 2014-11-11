@@ -19,31 +19,31 @@ struct Data {
 	/// Creates a Data interface to a \a buffer
 	Data(::buffer<byte>&& buffer) : Data(buffer) { this->buffer=move(buffer); }
     /// Slices a reference to the buffer from \a index to \a index + \a size
-    ref<byte> slice(uint pos, uint size) const { return data.slice(pos,size); }
+	notrace ref<byte> slice(size_t pos, size_t size) const { return data.slice(pos,size); }
     /// Slices a reference to the buffer from \a index to the end of the data
-    ref<byte> slice(uint pos) const { return data.slice(pos); }
+	notrace ref<byte> slice(size_t pos) const { return data.slice(pos); }
 
     /// Buffers \a need bytes (if overridden) and returns number of bytes available
-    virtual uint available(uint /*need*/) { return data.size-index; }
+	/*virtual*/ notrace size_t available(size_t /*need*/) { return data.size-index; }
     /// Returns true if there is data to read
     explicit operator bool() { return available(1); }
 
     /// Returns next byte without advancing
-    byte peek() const { assert(index<data.size, index, data.size); return data[index];}
+	notrace byte peek() const { assert(index<data.size, index, data.size); return data[index];}
     /// Peeks at data without advancing
     byte operator[](int i) const { assert(index+i<data.size); return data[index+i]; }
     /// Returns a reference to the next \a size bytes
-    ref<byte> peek(uint size) const { return slice(index,size); }
+	notrace ref<byte> peek(size_t size) const { return slice(index,size); }
 
     /// Advances \a count bytes
     virtual void advance(size_t step) {assert(index+step<=data.size,index,step,data.size); index+=step; }
     /// Returns next byte and advance one byte
     byte next() { byte b=peek(); advance(1); return b; }
     /// Returns a reference to the next \a size bytes and advances \a size bytes
-    ref<byte> read(uint size) { ref<byte> t = peek(size); advance(size); return t; }
+	ref<byte> read(size_t size) { ref<byte> t = peek(size); advance(size); return t; }
 
     /// Reads until the end of input
-    ref<byte> untilEnd() { uint size=available(-1); return read(size); }
+	ref<byte> untilEnd() { size_t size=available(-1); return read(size); }
 
     /// Returns whether input match \a key
     bool wouldMatch(uint8 key);
@@ -86,7 +86,7 @@ struct BinaryData : Data {
     explicit BinaryData(ref<byte> data, bool isBigEndian=false) : Data(data), isBigEndian(isBigEndian) {}
 
     /// Seeks to /a index
-    void seek(uint index) { assert(index<data.size); this->index=index; }
+	void seek(size_t index) { assert(index<data.size); this->index=index; }
 
     /// Reads one raw \a T element
     generic const T& read() { return *(T*)Data::read(sizeof(T)).data; }
@@ -113,17 +113,17 @@ struct BinaryData : Data {
     ReadOperator read() { return {this}; }
 
     /// Reads \a size raw \a T elements
-    generic ref<T> read(uint size) { return cast<T>(Data::read(size*sizeof(T))); }
+	generic ref<T> read(size_t size) { return cast<T>(Data::read(size*sizeof(T))); }
 
     /// Provides return type overloading for reading arrays (swap as needed)
     struct ArrayReadOperator {
-       BinaryData* s; uint size;
-       generic operator ::buffer<T>() { ::buffer<T> buffer(size); for(uint i: range(size)) buffer.set(i, s->read()); return buffer; }
+	   BinaryData* s; size_t size;
+	   generic operator ::buffer<T>() { ::buffer<T> buffer(size); for(size_t i: range(size)) buffer.set(i, s->read()); return buffer; }
    };
-   ArrayReadOperator read(uint size) { return {this,size}; }
+   ArrayReadOperator read(size_t size) { return {this,size}; }
 
    /// Reads \a size \a T elements (swap as needed)
-   generic  void read(T buffer[], uint size) { for(uint i: range(size)) buffer[i]=(T)read(); }
+   generic  void read(T buffer[], size_t size) { for(size_t i: range(size)) buffer[i]=(T)read(); }
 
    /// Advances while input doesn't match \a key.
    ref<uint8> whileNot(uint8 key);
@@ -145,7 +145,7 @@ struct TextData : Data {
 	/// \note Matches any heading Unicode BOM
 	TextData(::buffer<byte>&& buffer) : TextData(buffer) { this->buffer=move(buffer); }
 
-    void advance(size_t step) override;
+	notrace void advance(size_t step) override;
 
     /// Returns whether input match any of \a keys
     char wouldMatchAny(const string any);

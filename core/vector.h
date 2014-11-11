@@ -9,11 +9,11 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
 	static_assert(sizeof(V<T>)==N*sizeof(T),"");
 
     /// Defaults initializes to zero
-	vec() : vec(0) {}
+	notrace vec() : vec(0) {}
     /// Initializes all components to the same value \a v
-    vec(T v){ for(uint i: range(N)) at(i)=v; }
+	notrace vec(T v){ for(uint i: range(N)) at(i)=v; }
     /// Initializes components separately
-	template<Type... Args> explicit constexpr vec(T a, T b, Args... args) : V<T>{a,b,T(args)...}{
+	template<Type... Args> notrace explicit constexpr vec(T a, T b, Args... args) : V<T>{a,b,T(args)...}{
         static_assert(sizeof...(args) == N-2, "Invalid number of arguments");
     }
     /// Initializes components from a fixed size array
@@ -40,7 +40,7 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
 };
 
 #undef generic
-#define generic template<template<typename> class V, Type T, uint N>
+#define generic template<template<typename> class V, Type T, uint N> inline
 #define vec vec<V,T,N>
 
 generic vec rotate(const vec& u) { vec r=u; for(uint i=0;i<N-1;i++) swap(r[i],r[i+1]); return r; }

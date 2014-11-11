@@ -30,8 +30,8 @@ generic struct mref : ref<T> {
 	explicit operator T*() const { return (T*)data; }
 	T* begin() const { return (T*)data; }
 	T* end() const { return (T*)data+size; }
-	T& at(size_t i) const { return (T&)ref<T>::at(i); }
-	T& operator [](size_t i) const { return at(i); }
+	notrace T& at(size_t i) const { return (T&)ref<T>::at(i); }
+	notrace T& operator [](size_t i) const { return at(i); }
 	T& first() const { return at(0); }
 	T& last() const { return at(size-1); }
 

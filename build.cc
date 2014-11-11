@@ -11,6 +11,9 @@ struct Node {
 };
 bool operator ==(const Node* a, const string b) { return a->name==b; }
 bool operator ==(const Node& a, const string b) { return a.name==b; }
+String str(const Node& o) {
+	return o.name+"\n"+join(apply(o.edges, [=](const Node* child){ return str(child); }));
+};
 
 struct Branch {
 	String name;
@@ -140,14 +143,14 @@ struct Build {
 						if(!modules.contains(module)) { if(!compileModule(module)) return 0; }
 						parent.edges.append( modules[modules.indexOf(module)].pointer );
 					}
-                }
-            }
-            //tryParseDefines(s);
-            tryParseConditions(s, fileName);
-            do { s.whileAny(" "); } while(tryParseFiles(s));
-        }
-        return lastEdit;
-    }
+				}
+			}
+			//tryParseDefines(s);
+			tryParseConditions(s, fileName);
+			do { s.whileAny(" "); } while(tryParseFiles(s));
+		}
+		return lastEdit;
+	}
 
     /// Compiles a module and its dependencies as needed
     /// \return Timestamp of the last modified module implementation (deep)
@@ -197,7 +200,7 @@ struct Build {
         }
 
 		if(!target) target = base;
-		assert_(find(target+".cc"), "Invalid target"_, target);
+		assert_(find(target+".cc"), "Invalid target"_, target, sources);
 
 		args.append("-iquote."__);
         for(string flag: flags) args.append( "-D"+toUpper(flag)+"=1" );

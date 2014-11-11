@@ -5,7 +5,7 @@
 #include "map.h"
 
 struct MidiNote { uint64 time; uint key, velocity; };
-inline bool operator <=(const MidiNote& a, const MidiNote& b) { return a.time < b.time || (a.time == b.time && a.key <= b.key); }
+notrace inline bool operator <(const MidiNote& a, const MidiNote& b) { return a.time < b.time || (a.time == b.time && a.key < b.key); }
 
 struct MidiNotes : array<MidiNote> {
 	uint64 ticksPerSeconds=0;
