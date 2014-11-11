@@ -28,13 +28,16 @@ MidiNotes notes(ref<Sign> signs, uint divisions) {
 	MidiNotes notes;
 	for(Sign sign: signs) {
 		if(sign.type==Sign::Metronome) {
-			assert_(!notes.ticksPerSeconds || notes.ticksPerSeconds == sign.metronome.perMinute*divisions,
+			/*assert_(!notes.ticksPerSeconds || notes.ticksPerSeconds == sign.metronome.perMinute*divisions,
 					notes.ticksPerSeconds, sign.metronome.perMinute*divisions);
-			notes.ticksPerSeconds = sign.metronome.perMinute*divisions;
+			notes.ticksPerSeconds = sign.metronome.perMinute*divisions;*/
+			notes.ticksPerSeconds = max(notes.ticksPerSeconds, int64(sign.metronome.perMinute*divisions));
 		}
 		else if(sign.type == Sign::Note) {
-			notes.insertSorted({sign.time*60, sign.note.key, 64/*FIXME: use dynamics*/});
-			notes.insertSorted({(sign.time+sign.duration)*60, sign.note.key, 0});
+			if(sign.note.tie == Note::NoTie || sign.note.tie == Note::TieStart)
+					notes.insertSorted({sign.time*60, sign.note.key, 64/*FIXME: use dynamics*/});
+			if(sign.note.tie == Note::NoTie || sign.note.tie == Note::TieStop)
+				notes.insertSorted({(sign.time+sign.duration)*60, sign.note.key, 0});
 		}
 	}
 	if(!notes.ticksPerSeconds) notes.ticksPerSeconds = 120*divisions;
@@ -133,8 +136,8 @@ struct Music : Widget {
 		return contentChanged;
 	}
 
-	/*void seek(uint64 midiTime) {
-		if(audio) {
+	void seek(uint64 time) {
+		/*if(audio) {
 			audioTime = midiTime * audioFile.rate / notes.ticksPerSeconds;
 			audioFile.seek(audioTime); //FIXME: return actual frame time
 			videoTime = audioTime * window.framesPerSecond / audioFile.rate; // FIXME: remainder
@@ -143,8 +146,10 @@ struct Music : Widget {
 			videoTime = midiTime * window.framesPerSecond / notes.ticksPerSeconds;
 			previousFrameCounterValue=window.currentFrameCounterValue;
 			follow(videoTime, window.framesPerSecond);
-		}
-	}*/
+		}*/
+		sampler.time = time*sampler.rate/notes.ticksPerSeconds;
+		while(samplerMidiIndex < notes.size && notes[samplerMidiIndex].time*sampler.rate <= time*notes.ticksPerSeconds) samplerMidiIndex++;
+	}
 
     Music() {
 		window.background = Window::White;
@@ -154,6 +159,11 @@ struct Music : Widget {
 			for(;measureIndex < sheet.measureToChord.size; measureIndex++)
 				if(sheet.measureToChord[measureIndex]>=sheet.firstSynchronizationFailureChordIndex) break;
 			sheet.offset.x = -sheet.measureBars.values[max<int>(0, measureIndex-3)];
+		} else if(running) { // Seeks to first note
+			assert_(0 < sheet.measureToChord.size);
+			assert_(sheet.measureToChord[0] < sheet.chordToNote.size);
+			assert_(noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[0]])<notes.size);
+			seek( notes[noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[0]])].time );
 		}
 		if(!audioFile) decodeThread.spawn(); // For sampler
 		if(arguments().contains("encode")) { // Encode

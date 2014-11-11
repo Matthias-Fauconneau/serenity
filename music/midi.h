@@ -4,11 +4,11 @@
 #include "data.h"
 #include "map.h"
 
-struct MidiNote { uint64 time; uint key, velocity; };
+struct MidiNote { int64 time; uint key, velocity; };
 notrace inline bool operator <(const MidiNote& a, const MidiNote& b) { return a.time < b.time || (a.time == b.time && a.key < b.key); }
 
 struct MidiNotes : array<MidiNote> {
-	uint64 ticksPerSeconds=0;
+	int64 ticksPerSeconds=0;
 };
 
 enum { NoteOff=8, NoteOn, Aftertouch, Controller, ProgramChange, ChannelAftertouch, PitchBend, Meta };

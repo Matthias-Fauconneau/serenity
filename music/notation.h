@@ -1,16 +1,14 @@
 #pragma once
 /// notation.h Music notation definitions
-typedef unsigned int uint;
-typedef unsigned long long uint64;
-typedef __SIZE_TYPE__ 	size_t;
+#include "core.h"
 
 enum ClefSign { Bass, Treble };
 enum Accidental { None, DoubleFlat /*♭♭*/, Flat /*♭*/, Natural /*♮*/, Sharp /*♯*/, DoubleSharp /*♯♯*/ };
 enum Duration { Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
 //enum RestDuration { Semibreve, Minim, Crotchet, Quaver, Semiquaver };
-enum class Loudness { PPP, PP, P, MP, MF, F, FF, FFF };
-enum PedalAction { Ped=-1, Start, Change, PedalStop };
-enum WedgeAction { Crescendo, Diminuendo, WedgeStop };
+//enum class Loudness { PPP, PP, P, MP, MF, F, FF, FFF };
+enum Pedal/*Action*/ { Ped=-1, Start, Change, PedalStop };
+enum Wedge/*Action*/ { Crescendo, Diminuendo, WedgeStop };
 enum SlurType { SlurStart, SlurStop };
 
 struct Clef {
@@ -37,15 +35,15 @@ struct Rest {
     Duration duration;
 };
 struct Measure { uint measure, page, pageLine, lineMeasure; };
-struct Pedal {
+/*struct Pedal {
     PedalAction action;
-};
-struct Wedge {
+};*/
+/*struct Wedge {
     WedgeAction action;
-};
-struct Dynamic {
-    Loudness loudness;
-};
+};*/
+/*struct Dynamic {
+	//Loudness loudness;
+};*/
 struct KeySignature {
     int fifths; // Index on the fifths circle
 };
@@ -64,31 +62,32 @@ struct Slur {
 };
 
 struct Sign {
-    uint64 time; // Absolute time offset
-    uint duration;
-    uint staff; // Staff index (-1: all)
-    enum {
-	Invalid,
-	Note, Rest, Clef, // Staff
-	Metronome, // Top
-	Dynamic, Wedge, // Middle
-	Pedal, // Bottom
-	Measure, KeySignature, TimeSignature, // Across
-	Slur // Toggle (Staff/Across)
-    } type;
-    union {
-	struct Note note;
-	struct Rest rest;
-	struct Measure measure;
-	struct Clef clef;
-	struct KeySignature keySignature;
-	struct TimeSignature timeSignature;
-	struct Metronome metronome;
-	struct Dynamic dynamic;
-	struct Pedal pedal;
-	struct Wedge wedge;
-	struct Slur slur;
-    };
+	int64 time; // Absolute time offset
+	int duration;
+	uint staff; // Staff index (-1: all)
+	enum {
+		Invalid,
+		Note, Rest, Clef, // Staff
+		Metronome, // Top
+		Dynamic, Wedge, // Middle
+		Pedal, // Bottom
+		Measure, KeySignature, TimeSignature, // Across
+		Slur // Toggle (Staff/Across)
+	} type;
+	union {
+		struct Note note;
+		struct Rest rest;
+		struct Measure measure;
+		struct Clef clef;
+		struct KeySignature keySignature;
+		struct TimeSignature timeSignature;
+		struct Metronome metronome;
+		//struct Dynamic dynamic;
+		string dynamic;
+		enum Pedal pedal;
+		enum Wedge wedge;
+		struct Slur slur;
+	};
 };
 inline bool operator <(const Sign& a, const Sign& b) {
     if(a.time==b.time) {

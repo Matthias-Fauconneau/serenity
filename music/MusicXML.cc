@@ -5,7 +5,7 @@ MusicXML::MusicXML(string document) {
     Element root = parseXML(document);
 	map<uint, Clef> clefs;
 	KeySignature keySignature={0}; TimeSignature timeSignature={4,4};
-	uint64 measureTime = 0, time = 0, nextTime = 0, maxTime = 0;
+	int64 measureTime = 0, time = 0, nextTime = 0, maxTime = 0;
 	uint measureIndex=0, pageIndex=0, pageLineIndex=0, lineMeasureIndex=0; // starts with 1
 	for(const Element& m: root("score-partwise"_)("part"_).children) {
 		measureTime = time;
@@ -13,7 +13,7 @@ MusicXML::MusicXML(string document) {
         assert_(m.name=="measure"_, m);
 		map<int, Accidental> measureAccidentals; // Currently accidented steps (for implicit accidentals)
         array<Sign> acciaccaturas; // Acciaccatura graces for pending principal
-        uint appoggiaturaTime = 0; // Appoggiatura time to remove from pending principal
+		int appoggiaturaTime = 0; // Appoggiatura time to remove from pending principal
         for(const Element& e: m.children) {
             if(!(e.name=="note"_ && e("chord"_))) time = nextTime; // Advances time (except chords)
 			maxTime = max(maxTime, time);
@@ -22,12 +22,12 @@ MusicXML::MusicXML(string document) {
 				Duration type = Duration(ref<string>({"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_,"32th","64th"}).indexOf(e("type"_).text()));
 				uint typeDurations[] = {64,32,16,8,4,2,1};
 				uint quarterDuration = 16;
-				uint duration;
+				int duration;
                 if(e("grace"_)) {
-                    assert_(uint(type)<Sixteenth && divisions%16 == 0);
+					//assert_(uint(type)<Sixteenth && divisions%quarterDuration == 0, int(type), divisions);
 					duration = typeDurations[uint(type)]*divisions/quarterDuration;
                 } else {
-                    uint acciaccaturaTime = 0;
+					int acciaccaturaTime = 0;
 					for(Sign grace: acciaccaturas.reverse()) { // Inserts any pending acciaccatura graces before principal
                         acciaccaturaTime += grace.duration;
 						grace.time = time; //FIXME: -acciaccaturaTime;
@@ -54,16 +54,17 @@ MusicXML::MusicXML(string document) {
 								/ parseInteger(e("time-modification"_)("actual-notes").text());
 					}
 					//if(!e("chord"))
-					assert_(duration == notationDuration, e,
-							duration, notationDuration, divisions, timeSignature.beats, timeSignature.beatUnit, int(type));
-					duration -= appoggiaturaTime;
+					/*assert_(duration == notationDuration, e,
+							duration, notationDuration, divisions, timeSignature.beats, timeSignature.beatUnit, int(type));*/
+					duration -= min(duration, appoggiaturaTime); //FIXME
                     assert_(acciaccaturaTime <= duration, acciaccaturaTime, duration, appoggiaturaTime);
                     acciaccaturas.clear();
                     appoggiaturaTime = 0;
                 }
+				assert_(duration >= 0, duration);
 				if(!e("chord"_) && (!e("grace"_) || e("grace"_)["slash"_]!="yes"_)) nextTime = time+duration;
                 if(e["print-object"_]=="no"_) continue;
-				uint staff = parseInteger(e("staff"_).text())-1;
+				uint staff = e("staff"_) ? parseInteger(e("staff"_).text())-1 : 0;
                 assert_(int(type)>=0, e);
 				if(e("rest"_)) signs.insertSorted({time, duration, staff, Sign::Rest, .rest={type}});
 				else {
@@ -83,7 +84,7 @@ MusicXML::MusicXML(string document) {
                     }
                     uint key = ({// Converts note to MIDI key
                                  int step = noteStep;
-                                 int octave = clefs.at(staff).octave + step>0 ? step/7 : (step-6)/7; // Rounds towards
+								 int octave = clefs.value(staff, {Treble, 0}).octave + step>0 ? step/7 : (step-6)/7; // Rounds towards
                                  step = (step - step/7*7 + 7)%7;
                                  uint stepToKey[] = {0,2,4,5,7,9,11}; // C [C#] D [D#] E F [F#] G [G#] A [A#] B
                                  //assert_(step>=0 && step<8, step, midiIndex, midiKey);
@@ -101,7 +102,7 @@ MusicXML::MusicXML(string document) {
                                  if(accidental==Sharp) key++;
                                  key;
                                 });
-					{Sign sign{time, duration, staff, Sign::Note, .note={clefs.at(staff), noteStep, noteAccidental, type, tie,
+					{Sign sign{time, duration, staff, Sign::Note, .note={clefs.value(staff, {Treble, 0}), noteStep, noteAccidental, type, tie,
 																		 e("dot"_) ? true : false,
 																		 e("grace"_)?true:false,
 																		 e("grace"_)["slash"_]=="yes"_?true:false,
@@ -151,9 +152,10 @@ MusicXML::MusicXML(string document) {
             else if(e.name=="direction"_) {
                 const Element& d = e("direction-type"_);
                 if(d("dynamics"_)) {
-					Loudness loudness = Loudness(ref<string>({"ppp"_,"pp"_,"p"_,"mp"_,"mf"_,"f"_,"ff"_,"fff"_})
-												 .indexOf(d("dynamics"_).children.first()->name));
-					signs.insertSorted({time, 0, uint(-1), Sign::Dynamic, .dynamic={loudness}});
+					static ref<string> dynamics = {"ppp"_,"pp"_,"p"_,"mp"_,"mf"_,"f"_,"ff"_,"fff"_,"fp"_,"fz"};
+					size_t index = dynamics.indexOf(d("dynamics"_).children.first()->name);
+					assert_(index!=invalid, d);
+					signs.insertSorted({time, 0, uint(-1), Sign::Dynamic, .dynamic=dynamics[index]});
                 }
                 else if(d("metronome"_)) {
 					Duration beatUnit = Duration(ref<string>({"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_})
@@ -162,29 +164,31 @@ MusicXML::MusicXML(string document) {
 					signs.insertSorted({time, 0, uint(-1), Sign::Metronome, .metronome={beatUnit, perMinute}});
                 }
                 else if(d("pedal"_)) {
-                    PedalAction action = PedalAction(ref<string>({"start"_,"change"_,"stop"_}).indexOf(d("pedal"_)["type"_]));
-                    if(action==Start && d("pedal"_)["line"_]!="yes"_) action=Ped;
+					Pedal pedal = Pedal(ref<string>({"start"_,"change"_,"stop"_}).indexOf(d("pedal"_)["type"_]));
+					if(pedal==Start && d("pedal"_)["line"_]!="yes"_) pedal=Ped;
 					int offset = e("offset"_) ? parseInteger(e("offset"_).text()) : 0;
 					if((offset+1)%(divisions/2) == 0) offset++; // FIXME
-					signs.insertSorted({time + offset, 0, uint(-1), Sign::Pedal, .pedal={action}});
+					signs.insertSorted({time + offset, 0, uint(-1), Sign::Pedal, .pedal=pedal});
                 }
                 else if(d("wedge"_)) {
-                    WedgeAction action = WedgeAction(ref<string>({"crescendo"_,"diminuendo"_,"stop"_}).indexOf(d("wedge"_)["type"_]));
-					signs.insertSorted({time, 0, uint(-1), Sign::Wedge, .wedge={action}});
+					Wedge wedge = Wedge(ref<string>({"crescendo"_,"diminuendo"_,"stop"_}).indexOf(d("wedge"_)["type"_]));
+					signs.insertSorted({time, 0, uint(-1), Sign::Wedge, .wedge=wedge});
                 }
                 else if(d("octave-shift"_)) {}
                 else if(d("other-direction"_)) {}
 				else if(d("words"_)) {}
+				else if(d("rehearsal"_)) {}
+				else if(d("bracket"_)) {}
 				else error(e);
-				if(e("sound"_)) {
+				if(e("sound"_) && e("sound"_)["tempo"_]) {
 					signs.insertSorted({time, 0, uint(-1), Sign::Metronome,
-										.metronome={Quarter, uint(parseInteger(e("sound"_).attribute("tempo"_)))}});
+										.metronome={Quarter, uint(parseDecimal(e("sound"_).attribute("tempo"_)))}});
 				}
             }
             else if(e.name=="attributes"_) {
 				if(e("divisions"_)) divisions = parseInteger(e("divisions"_).text());
                 e.xpath("clef"_, [&](const Element& clef) {
-					uint staff = parseInteger(clef["number"_])-1;
+					uint staff = clef["number"_] ? parseInteger(clef["number"_])-1 : 0;
                     ClefSign clefSign = ClefSign("FG"_.indexOf(clef("sign"_).text()[0]));
 					signs.insertSorted({time, 0, staff, Sign::Clef, .clef={clefSign, 0}});
                     clefs[staff] = {clefSign, 0};
@@ -203,6 +207,7 @@ MusicXML::MusicXML(string document) {
 				if(e["new-page"]=="yes") { pageIndex++, pageLineIndex=1; }
 			}
 			else if(e.name=="barline"_) {}
+			else if(e.name=="harmony"_) {}
             else error(e);
 
 			assert_(time >= measureTime, int(time-measureTime), int(nextTime-measureTime), int(maxTime-measureTime), measureIndex, e);

@@ -196,6 +196,7 @@ string TextData::whileInteger(bool sign, int base) {
 }
 
 int TextData::integer(bool maySign, int base) {
+	assert_(data);
     assert(base==10 || base==16);
     int sign=1;
     if(maySign) { if(match('-')) sign=-1; else match('+'); }
@@ -204,7 +205,7 @@ int TextData::integer(bool maySign, int base) {
         char c = peek();
         int n;
         /**/  if(c>='0' && c<='9') n = c-'0';
-        else if(c == '.') { error("Unexpected decimal"); break; }
+		else if(c == '.') { error("Unexpected decimal"_, data); break; }
         else if(base!=16) break;
         else if(c>='a' && c<='f') n = c+10-'a';
         else if(c>='A' && c<='F') n = c+10-'A';

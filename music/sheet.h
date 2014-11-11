@@ -31,14 +31,9 @@ struct Sheet : Widget {
 	vec2 noteSize = glyphSize("noteheads.s2"_);
 
 	// Graphics
-	map<uint64, float> measureBars; // Maps sheet time to position of measure starts
+	map<int64, float> measureBars; // Maps sheet time to position of measure starts
 	map<Rect, shared<Graphics>> measures;
 	shared<Graphics> debug;
-	// Graphic helpers
-	//float glyph(vec2 position, string name, Font& font);
-	//float glyph(vec2 position, string name) { return glyph(position, name, font); }
-	//uint text(vec2 position, string text, Font& font, array<Glyph>& glyphs);
-	//uint text(vec2 position, string text, Font& font) { return this->text(position, text, font, notation->glyphs); }
 
 	int2 sizeHint(int2) override { return int2(measureBars.values.last(), -(staffY(1, -32)-staffY(0, 16))); }
 	shared<Graphics> graphics(int2 size, Rect clip) override;
