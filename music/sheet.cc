@@ -2,6 +2,11 @@
 #include "notation.h"
 #include "utf8.h"
 
+static String str(const Sign& o) {
+	if(o.type==Sign::Note) return str(o.note.key);
+	error(int(o.type));
+}
+
 float glyph(vec2 origin, string name, Font& font, array<Glyph>& glyphs) {
 	uint index = font.index(name);
 	glyphs.append(origin, font, index, index);
@@ -41,7 +46,7 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 		void setAll(float x) { setStaves(x); middle = x; top = x; bottom = x; }
     };
 	map<uint64, Position> timeTrack; // Maps times to positions
-	array<Glyph> debug;
+
 	{//int x = 0;
 		/*// System
 	vec2 p0 = vec2(x+noteSize.x, staffY(0, 0));
@@ -113,6 +118,8 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 						measure.fills.append(min, max-min); }
 					/**/ if(sign.note.duration==Eighth) glyph(vec2(x+stemWidth, yStem), stemUp?"flags.u3"_:"flags.d3"_, font, measure.glyphs);
 					else if(sign.note.duration==Sixteenth) glyph(vec2(x+stemWidth, yStem), stemUp?"flags.u4"_:"flags.d4"_, font, measure.glyphs);
+					else if(sign.note.duration==Thirtysecond) glyph(vec2(x+stemWidth, yStem), stemUp?"flags.u5"_:"flags.d5"_, font, measure.glyphs);
+					else if(sign.note.duration==Sixtyfourth) glyph(vec2(x+stemWidth, yStem), stemUp?"flags.u6"_:"flags.d6"_, font, measure.glyphs);
 				} else if(beam.size==2) { // Draws slanted beam
 					float x[2], base[2], tip[2];
 					for(uint i: range(2)) {
@@ -143,14 +150,25 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 						for(const Chord& chord: beam) for(Sign sign: chord) stemY = max(stemY, Y(sign)+shortStemLength);
 					}
 					stemY = stemUp ? min(stemY, staffY(staff, -4)) : max(stemY, staffY(staff, -4));
-					for(const Chord& chord: beam) for(Sign sign: chord) {
+					for(const Chord& chord: beam) for(Sign sign: chord) { // Stems
 						int x = X(sign) + dx;
 						float y = Y(sign) + dy;
 						{vec2 min(x, ::min(y, stemY)), max(x+stemWidth, ::max(stemY, y));
 							measure.fills.append(min, max-min); }
 					}
-					{vec2 min (X(beam.first()[0]) + dx, stemY-beamWidth/2+1), max(X(beam.last ()[0]) + dx + stemWidth, stemY+beamWidth/2);
-						measure.fills.append(min, max-min);}
+					// Beam
+					/*{vec2 min (X(beam.first()[0]) + dx, stemY-beamWidth/2+1), max(X(beam.last ()[0]) + dx + stemWidth, stemY+beamWidth/2);
+						measure.fills.append(min, max-min);}*/
+					for(size_t chordIndex: range(beam.size-1)) {
+						const Chord& chord = beam[chordIndex];
+						Duration duration = chord[0].note.duration;
+						for(Sign sign: chord) assert_(sign.note.duration == duration, int(sign.note.duration), int(duration));
+						for(size_t index: range(duration-Quarter)) {
+							float Y = stemY + (stemUp ? 1 : -1) * float(index) * beamWidth;
+							vec2 min (X(chord[0]) + dx, Y-beamWidth/2+1), max(X(beam[chordIndex+1][0]) + dx + stemWidth, Y+beamWidth/2);
+							measure.fills.append(min, max-min);
+						}
+					}
 				}
 
 				for(const Chord& chord: beam) {
@@ -250,6 +268,8 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 				else if(sign.rest.duration == Quarter) x+= 3*glyph(p, "rests.2"_, font, measure.glyphs);
 				else if(sign.rest.duration == Eighth) x+= 3*glyph(p, "rests.3"_, font, measure.glyphs);
 				else if(sign.rest.duration == Sixteenth) x+= 3*glyph(p, "rests.4"_, font, measure.glyphs);
+				else if(sign.rest.duration == Thirtysecond) x+= 3*glyph(p, "rests.5"_, font, measure.glyphs);
+				else if(sign.rest.duration == Sixtyfourth) x+= 3*glyph(p, "rests.6"_, font, measure.glyphs);
 				else error(int(sign.rest.duration));
 			}
 			else if(sign.type == Sign::Clef) {
@@ -304,7 +324,7 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 						measureBars.insert(sign.time, x);
 						measureToChord.append( notes.size() );
 						x += noteSize.x;
-						text(vec2(x, staffY(0, 16)), str(pageIndex)+','+str(pageLineIndex)+','+str(lineMeasureIndex)+' '+str(measureIndex), textFont, debug);
+						text(vec2(x, staffY(0, 16)), str(pageIndex)+','+str(pageLineIndex)+','+str(lineMeasureIndex)+' '+str(measureIndex), textFont, debug->glyphs);
 					}
 					else if(sign.type==Sign::KeySignature) {
 						keySignature = sign.keySignature;
@@ -363,7 +383,7 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 	midiToSign = buffer<Sign>(midiNotes.size, 0);
 	array<uint> chordExtra;
 
-	constexpr bool logErrors = false;
+	constexpr bool logErrors = true;
 	while(chordToNote.size<notes.size()) {
 		if(!notes.values[chordToNote.size]) {
 			chordToNote.append( midiToSign.size );
@@ -378,7 +398,7 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 				midiToSign[midiIndex] = sign;
 				if(logErrors) log("O",str(note.key));
 				vec2 p = measures.values[note.measureIndex]->glyphs[note.glyphIndex].origin;
-				text(p+vec2(noteSize.x, 2), "O"_+str(note.key), smallFont, debug);
+				text(p+vec2(noteSize.x, 2), "O"_+str(note.key), smallFont, debug->glyphs);
 				orderErrors++;
 				return true; // Discards
 			});
@@ -401,9 +421,10 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 		assert_(midiIndex < midiNotes.size);
 		uint midiKey = midiNotes[midiIndex];
 
-		if(extraErrors > 18 /*FIXME: tremolo*/ || wrongErrors > 6 || missingErrors > 8 || orderErrors > 8) {
-			//log("MID", midiNotes.slice(midiIndex,7));
-			//log("XML", chord);
+		//if(extraErrors > 18 /*FIXME: tremolo*/ || wrongErrors > 6 || missingErrors > 8 || orderErrors > 8) {
+		if(extraErrors || wrongErrors || missingErrors || orderErrors) {
+			log("MID", midiNotes.slice(midiIndex,7));
+			log("XML", chord);
 			break;
 		}
 
@@ -413,12 +434,12 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 			assert_(note.key == midiKey);
 			midiToSign.append( sign );
 			vec2 p = measures.values[note.measureIndex]->glyphs[note.glyphIndex].origin;
-			text(p+vec2(noteSize.x, 2), str(note.key), smallFont, debug);
+			text(p+vec2(noteSize.x, 2), str(note.key), smallFont, debug->glyphs);
 		} else if(chordExtra && chord.size == chordExtra.size) {
 			int match = notes.values[chordToNote.size+1].indexOf(midiNotes[chordExtra[0]]);
 			if(match >= 0) {
 				assert_(chord.size<=3/*, chord*/);
-				if(logErrors) log("-"_+str(apply(chord,[](const Sign& sign){return sign.note.key;})));
+				if(logErrors) log("-"_+str(chord));
 				missingErrors += chord.size;
 				chord.clear();
 				chordExtra.filter([&](uint index){
@@ -432,7 +453,7 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 					assert_(midiKey == note.key);
 					midiToSign[index] = sign;
 					vec2 p = measures.values[note.measureIndex]->glyphs[note.glyphIndex].origin;
-					text(p+vec2(noteSize.x, 2), str(note.key), smallFont, debug);
+					text(p+vec2(noteSize.x, 2), str(note.key), smallFont, debug->glyphs);
 					return true; // Discards extra as matched to next chord
 				});
 			} else {
@@ -445,7 +466,7 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 					assert_(note.key != midiKey);
 					if(logErrors) log("!"_+str(note.key, midiKey));
 					vec2 p = measures.values[note.measureIndex]->glyphs[note.glyphIndex].origin;
-					text(p+vec2(noteSize.x, 2), str(note.key)+"?"_+str(midiKey)+"!"_, smallFont, debug);
+					text(p+vec2(noteSize.x, 2), str(note.key)+"?"_+str(midiKey)+"!"_, smallFont, debug->glyphs);
 					wrongErrors++;
 					return true; // Discards as wrong
 				});
@@ -464,11 +485,10 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 	if(chordToNote.size == notes.size()) assert_(midiToSign.size == midiNotes.size);
 	else {
 		firstSynchronizationFailureChordIndex = chordToNote.size;
-		measures.values[0]->glyphs.append( move(debug) );
 	}
 	if(logErrors) log(extraErrors, wrongErrors, missingErrors, orderErrors);
 
-	for(Graphics& measure: measures.values) {// Vertical center align
+	auto verticalAlign = [&](Graphics& measure) {
 		vec2 offset = vec2(0, -staffY(0,16)+textFont.size);
 		for(auto& o: measure.fills) o.origin += offset;
 		assert_(!measure.blits);
@@ -476,7 +496,9 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 		for(auto& o: measure.parallelograms) o.min+=offset, o.max+=offset;
 		assert_(!measure.lines);
 		for(auto& o: measure.cubics) for(vec2& p: o.points) p+=vec2(offset);
-	}
+	};
+	for(Graphics& measure: measures.values) verticalAlign(measure);
+	verticalAlign(debug);
 }
 
 inline bool operator ==(const Sign& sign, const uint& key) {
@@ -493,6 +515,7 @@ shared<Graphics> Sheet::graphics(int2 size, Rect clip) {
 	assert_(last > first);
 	for(const auto& measure: measures.values.slice(first, last-first)) graphics->graphics.insertMulti(vec2(0), share(measure));
 	graphics->offset.y = (size.y - abs(sizeHint(size).y))/2;
+	if(firstSynchronizationFailureChordIndex) graphics->graphics.insertMulti(vec2(0), share(debug));
 	return graphics;
 }
 

@@ -66,7 +66,8 @@ struct Sampler : Poll {
     void event() override;
 
     /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer
-	size_t read(mref<int2> output);
+	size_t read32(mref<int2> output);
+	size_t read16(mref<short2> output);
 	size_t read(mref<float2> output);
 
     /// Signals when all samples are done playing

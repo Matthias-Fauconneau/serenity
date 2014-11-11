@@ -6,7 +6,7 @@ typedef __SIZE_TYPE__ 	size_t;
 
 enum ClefSign { Bass, Treble };
 enum Accidental { None, DoubleFlat /*♭♭*/, Flat /*♭*/, Natural /*♮*/, Sharp /*♯*/, DoubleSharp /*♯♯*/ };
-enum Duration { Whole, Half, Quarter, Eighth, Sixteenth };
+enum Duration { Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
 //enum RestDuration { Semibreve, Minim, Crotchet, Quaver, Semiquaver };
 enum class Loudness { PPP, PP, P, MP, MF, F, FF, FFF };
 enum PedalAction { Ped=-1, Start, Change, PedalStop };

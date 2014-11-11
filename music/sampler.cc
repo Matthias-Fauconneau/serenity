@@ -358,7 +358,14 @@ void Note::read(mref<float2> output) {
 	flac.position += output.size; // Keeps track of position for release sample level matching
 }
 
-size_t Sampler::read(mref<int2> output) { // Audio thread
+size_t Sampler::read16(mref<short2> output) {
+	byte buffer_[output.size*sizeof(float2)]; mref<float2> buffer((float2*)buffer_, output.size);
+	size_t size = read(buffer);
+	for(size_t i: range(size)) for(size_t c: range(2)) output[i][c] = round(buffer[i][c]*0x1p-11f); // 24bit -> 16bit with 3bit headroom for multiple notes
+	return size;
+}
+
+size_t Sampler::read32(mref<int2> output) { // Audio thread
     v4sf buffer[output.size*2/4];
     uint size = read(mref<float2>((float2*)buffer, output.size));
     for(uint i: range(size*2/4)) ((v4si*)output.data)[i] = cvtps2dq(buffer[i]*float4(0x1p5f)); // 24bit -> 32bit with 3bit headroom for multiple notes

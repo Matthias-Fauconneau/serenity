@@ -103,7 +103,7 @@ void Encoder::writeVideoFrame(const Image& image) {
     videoTime++;
 }
 
-void Encoder::writeAudioFrame(ref<float2> audio) {
+/*void Encoder::writeAudioFrame(ref<float2> audio) {
 	assert(audioStream);
 	AVFrame frame;
     frame.nb_samples = audio.size;
@@ -113,13 +113,32 @@ void Encoder::writeAudioFrame(ref<float2> audio) {
     AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
     int gotAudioPacket;
     avcodec_encode_audio2(audioCodec, &pkt, &frame, &gotAudioPacket);
-    if (gotAudioPacket) {
+	if(gotAudioPacket) {
         pkt.stream_index = audioStream->index;
         av_interleaved_write_frame(context, &pkt);
         audioEncodedTime += audio.size;
     }
 
     audioTime += audio.size;
+}*/
+
+void Encoder::writeAudioFrame(ref<short2> audio) {
+	assert(audioStream);
+	AVFrame frame;
+	frame.nb_samples = audio.size;
+	avcodec_fill_audio_frame(&frame, 2, AV_SAMPLE_FMT_S16, (uint8*)audio.data, audio.size * sizeof(short2), 1);
+	frame.pts = audioTime*audioStream->time_base.den/(audioFrameRate*audioStream->time_base.num);
+
+	AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
+	int gotAudioPacket;
+	avcodec_encode_audio2(audioCodec, &pkt, &frame, &gotAudioPacket);
+	if(gotAudioPacket) {
+		pkt.stream_index = audioStream->index;
+		av_interleaved_write_frame(context, &pkt);
+		audioEncodedTime += audio.size;
+	}
+
+	audioTime += audio.size;
 }
 
 Encoder::~Encoder() {

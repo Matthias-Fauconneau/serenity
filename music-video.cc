@@ -37,6 +37,7 @@ MidiNotes notes(ref<Sign> signs, uint divisions) {
 			notes.insertSorted({(sign.time+sign.duration)*60, sign.note.key, 0});
 		}
 	}
+	if(!notes.ticksPerSeconds) notes.ticksPerSeconds = 120*divisions;
 	assert_(notes.ticksPerSeconds);
 	return notes;
 }
@@ -72,7 +73,7 @@ struct Music : Widget {
 	// Audio output
     Thread audioThread;
 	AudioOutput audio = {audioFile ? decltype(AudioOutput::read32)(&audioFile,&AudioFile::read32)
-														: decltype(AudioOutput::read32)(&sampler,&Sampler::read), audioThread};
+														: decltype(AudioOutput::read32)(&sampler,&Sampler::read32), audioThread};
 	Thread decodeThread;
 	Sampler sampler {48000, "/Samples/Salamander.sfz"_, {this, &Music::timeChanged}, decodeThread};
 
@@ -175,9 +176,11 @@ struct Music : Widget {
 						packet.stream_index = encoder.audioStream->index;
 						av_interleaved_write_frame(encoder.context, &packet);
 					} else {
-						float buffer_[2*sampler.periodSize];
-						mref<float2> buffer((float2*)buffer_, sampler.periodSize);
-						sampler.read(buffer);
+						/*float buffer_[2*sampler.periodSize];
+						mref<float2> buffer((float2*)buffer_, sampler.periodSize);*/
+						byte buffer_[sampler.periodSize*sizeof(short2)];
+						mref<short2> buffer((short2*)buffer_, sampler.periodSize);
+						sampler.read16(buffer);
 						encoder.writeAudioFrame(buffer);
 						done = sampler.silence || encoder.audioTime*notes.ticksPerSeconds >= notes.last().time*encoder.audioFrameRate;
 					}
@@ -205,7 +208,6 @@ struct Music : Widget {
 				if(percent!=lastReport) { log(str(percent,2)+"%", str(renderTime, totalTime), str(encodeTime, totalTime)); lastReport=percent; }
 				//if(percent==5) break; // DEBUG
 			}
-			log("DONE");
 			requestTermination(0); // Window prevents automatic termination
 		} else { // Preview
 			window.show();

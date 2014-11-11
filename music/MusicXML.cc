@@ -19,12 +19,13 @@ MusicXML::MusicXML(string document) {
 			maxTime = max(maxTime, time);
 
             if(e.name=="note"_) {
-				Duration type = Duration(ref<string>({"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_}).indexOf(e("type"_).text()));
-				uint typeDurations[] = {16,8,4,2,1};
+				Duration type = Duration(ref<string>({"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_,"32th","64th"}).indexOf(e("type"_).text()));
+				uint typeDurations[] = {64,32,16,8,4,2,1};
+				uint quarterDuration = 16;
 				uint duration;
                 if(e("grace"_)) {
                     assert_(uint(type)<Sixteenth && divisions%16 == 0);
-					duration = typeDurations[uint(type)]*divisions/4;
+					duration = typeDurations[uint(type)]*divisions/quarterDuration;
                 } else {
                     uint acciaccaturaTime = 0;
 					for(Sign grace: acciaccaturas.reverse()) { // Inserts any pending acciaccatura graces before principal
@@ -35,17 +36,17 @@ MusicXML::MusicXML(string document) {
 					duration = parseInteger(e("duration"_).text());
 					bool dot = e("dot"_) ? true : false;
 					if(int(type)==-1) {
-						uint typeDuration = duration*4/divisions;
+						uint typeDuration = duration*quarterDuration/divisions;
 						if(typeDuration%3 == 0) {
 							dot = true;
 							typeDuration = typeDuration * 2 / 3;
 						}
-						type = Duration(4-log2(typeDuration));
+						type = Duration(ref<uint>(typeDurations).size-1-log2(typeDuration));
 						assert_(int(type)>=0, duration, divisions, timeSignature.beats, timeSignature.beatUnit,e);
 					}
 					//log(timeSignature.beats, divisions, notationDuration, e);
-					assert_(uint(type) < 5, int(type), e);
-					uint notationDuration = typeDurations[uint(type)]*divisions/4;
+					assert_(uint(type) < ref<uint>(typeDurations).size, int(type), e);
+					uint notationDuration = typeDurations[uint(type)]*divisions/quarterDuration;
 					if(e("rest"_) && type==Whole) notationDuration = timeSignature.beats*divisions;
 					if(dot) notationDuration = notationDuration * 3 / 2;
 					if(e("time-modification"_)) {

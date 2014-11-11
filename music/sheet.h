@@ -33,6 +33,7 @@ struct Sheet : Widget {
 	// Graphics
 	map<uint64, float> measureBars; // Maps sheet time to position of measure starts
 	map<Rect, shared<Graphics>> measures;
+	shared<Graphics> debug;
 	// Graphic helpers
 	//float glyph(vec2 position, string name, Font& font);
 	//float glyph(vec2 position, string name) { return glyph(position, name, font); }
