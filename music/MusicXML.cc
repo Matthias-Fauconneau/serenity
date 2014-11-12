@@ -152,7 +152,7 @@ MusicXML::MusicXML(string document) {
             else if(e.name=="direction"_) {
                 const Element& d = e("direction-type"_);
                 if(d("dynamics"_)) {
-					static ref<string> dynamics = {"ppp"_,"pp"_,"p"_,"mp"_,"mf"_,"f"_,"ff"_,"fff"_,"fp"_,"fz"};
+					static ref<string> dynamics = {"ppp"_,"pp"_,"p"_,"mp"_,"mf"_,"f"_,"ff"_,"fff"_,"fp"_,"fz"_,"sf"_};
 					size_t index = dynamics.indexOf(d("dynamics"_).children.first()->name);
 					assert_(index!=invalid, d);
 					signs.insertSorted({time, 0, uint(-1), Sign::Dynamic, .dynamic=dynamics[index]});

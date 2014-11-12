@@ -30,7 +30,5 @@ struct Encoder {
     /// Writes a video frame
     void writeVideoFrame(const Image& image);
     /// Writes an audio frame
-    //void writeAudioFrame(ref<float2> audio);
-    /// Writes an audio frame
     void writeAudioFrame(ref<short2> audio);
 };

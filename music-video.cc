@@ -124,12 +124,18 @@ struct Music : Widget {
 			}
 		}
 		uint64 t = timeNum*notes.ticksPerSeconds;
-		for(size_t index: range(sheet.measures.size()-1)) {
-			uint64 t0 = sheet.measureBars.keys[index]*60*timeDen, t1 = sheet.measureBars.keys[index+1]*60*timeDen;
-			if(t0 <= t && t <= t1) {
-				float x0 = sheet.measureBars.values[index], x1 = sheet.measureBars.values[index+1];
-				float x = x0+(x1-x0)*float(t-t0)/float(t1-t0);
-				sheet.offset.x = -clip(0.f, x-size.x/2, float(abs(sheet.widget().sizeHint(size).x)-size.x));
+		// Cardinal cubic B-Spline
+		for(int index: range(sheet.measureBars.size()-1)) {
+			//uint64 t0 = sheet.measureBars.keys[index-1]*60*timeDen;
+			uint64 t1 = sheet.measureBars.keys[index]*60*timeDen;
+			uint64 t2 = sheet.measureBars.keys[index+1]*60*timeDen;
+			//uint64 t3 = sheet.measureBars.keys[index+2]*60*timeDen;
+			if(t1 <= t && t <= t2) {
+				float f = float(t-t1)/float(t2-t1);
+				float w[4] = { 1.f/6 * cb(1-f), 2.f/3 - 1.f/2 * sq(f)*(2-f), 2.f/3 - 1.f/2 * sq(1-f)*(2-(1-f)), 1.f/6 * cb(f) };
+				auto X = [&](int index) { return clip(0.f, sheet.measureBars.values[clip<int>(0, index, sheet.measureBars.values.size)] - float(size.x/2),
+																	   float(abs(sheet.widget().sizeHint(size).x)-size.x)); };
+				sheet.offset.x = -( w[0]*X(index-1) + w[1]*X(index) + w[2]*X(index+1) + w[3]*X(index+2) );
 				break;
 			}
 		}
@@ -148,7 +154,7 @@ struct Music : Widget {
 			follow(videoTime, window.framesPerSecond);
 		}*/
 		sampler.time = time*sampler.rate/notes.ticksPerSeconds;
-		while(samplerMidiIndex < notes.size && notes[samplerMidiIndex].time*sampler.rate <= time*notes.ticksPerSeconds) samplerMidiIndex++;
+		while(samplerMidiIndex < notes.size && notes[samplerMidiIndex].time*sampler.rate < time*notes.ticksPerSeconds) samplerMidiIndex++;
 	}
 
     Music() {
@@ -186,8 +192,6 @@ struct Music : Widget {
 						packet.stream_index = encoder.audioStream->index;
 						av_interleaved_write_frame(encoder.context, &packet);
 					} else {
-						/*float buffer_[2*sampler.periodSize];
-						mref<float2> buffer((float2*)buffer_, sampler.periodSize);*/
 						byte buffer_[sampler.periodSize*sizeof(short2)];
 						mref<short2> buffer((short2*)buffer_, sampler.periodSize);
 						sampler.read16(buffer);

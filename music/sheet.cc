@@ -504,7 +504,7 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 	else {
 		firstSynchronizationFailureChordIndex = chordToNote.size;
 	}
-	if(logErrors) log(extraErrors, wrongErrors, missingErrors, orderErrors);
+	if(logErrors && (extraErrors||wrongErrors||missingErrors||orderErrors)) log(extraErrors, wrongErrors, missingErrors, orderErrors);
 
 	auto verticalAlign = [&](Graphics& measure) {
 		vec2 offset = vec2(0, -staffY(0,16)+textFont.size);
