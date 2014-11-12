@@ -63,7 +63,8 @@ void Decoder::read(const Image& image) {
 		if(file->streams[packet.stream_index]==videoStream) {
 			if(!frame) frame = av_frame_alloc(); int gotFrame=0;
 			int used = avcodec_decode_video2(video, frame, &gotFrame, &packet);
-			if(used < 0 || !gotFrame) continue;
+			assert_(used >= 0, used);
+			if(!gotFrame) continue;
 
 			/*AVFrame* targetFrame = av_frame_alloc();
 			avpicture_alloc((AVPicture*)targetFrame, AV_PIX_FMT_BGRA, width, height);*/
@@ -75,6 +76,7 @@ void Decoder::read(const Image& image) {
 			sws_scale(swsContext, frame->data, frame->linesize, 0, height, targetFrame.data, targetFrame.linesize);
 
 			videoTime = packet.dts*audioStream->time_base.num*rate/audioStream->time_base.den;
+			return;
 		}
 		av_free_packet(&packet);
 	}

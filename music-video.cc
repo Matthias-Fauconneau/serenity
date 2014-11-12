@@ -59,12 +59,16 @@ struct Music : Widget {
 			return !startsWith(path, name) || (!endsWith(path, ".mp3") && !endsWith(path, ".m4a") && !endsWith(path, "performance.mp4")); });
 	AudioFile audioFile = audioFiles ? AudioFile(audioFiles[0]) : AudioFile();
 
+	// Video input
+	Decoder video {name+".performance.mp4"_};
+	ImageView videoView {video.size};
+
 	// Rendering
 	Scroll<Sheet> sheet {xml.signs, xml.divisions, apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
 	bool failed = sheet.firstSynchronizationFailureChordIndex != invalid;
-	bool running = !failed;
+	bool running = true; //!failed;
 	Keyboard keyboard;
-	VBox widget {{&sheet, &keyboard}};
+	VBox widget {{&sheet, &videoView, &keyboard}};
 
 	// Highlighting
 	map<uint, Sign> active; // Maps active keys to notes (indices)
@@ -77,14 +81,21 @@ struct Music : Widget {
 
 	// Audio output
     Thread audioThread;
-	AudioOutput audio = {audioFile ? decltype(AudioOutput::read32)(&audioFile,&AudioFile::read32)
-														: decltype(AudioOutput::read32)(&sampler,&Sampler::read32), audioThread};
+	AudioOutput audio = {{this, &Music::read32}, audioThread};
 	Thread decodeThread;
 	Sampler sampler {48000, "/Samples/Salamander.sfz"_, {this, &Music::timeChanged}, decodeThread};
 
-	// Video input
-	Decoder video {name+".performance.mp4"_};
-	ImageView videoView;
+	size_t read32(mref<int2> output) {
+		assert_(audioFile);
+		bool contentChanged = false;
+		if(follow(audioFile.position, audioFile.rate, window.size)) contentChanged = true;
+		if(audioFile.position*video.videoFrameRate > video.videoTime*audioFile.rate) {
+			video.read(videoView.image);
+			contentChanged = true;
+		}
+		if(contentChanged) window.render();
+		return audioFile.read32(output);
+	}
 
 	/// Adds new notes to be played (called in audio thread by sampler)
 	uint samplerMidiIndex = 0;
@@ -129,13 +140,11 @@ struct Music : Widget {
 				}
 			}
 		}
-		uint64 t = timeNum*notes.ticksPerSeconds;
+		uint64 t = timeNum*sheet.ticksPerMinutes;
 		// Cardinal cubic B-Spline
 		for(int index: range(sheet.measureBars.size()-1)) {
-			//uint64 t0 = sheet.measureBars.keys[index-1]*60*timeDen;
 			uint64 t1 = sheet.measureBars.keys[index]*60*timeDen;
 			uint64 t2 = sheet.measureBars.keys[index+1]*60*timeDen;
-			//uint64 t3 = sheet.measureBars.keys[index+2]*60*timeDen;
 			if(t1 <= t && t <= t2) {
 				float f = float(t-t1)/float(t2-t1);
 				float w[4] = { 1.f/6 * cb(1-f), 2.f/3 - 1.f/2 * sq(f)*(2-f), 2.f/3 - 1.f/2 * sq(1-f)*(2-(1-f)), 1.f/6 * cb(f) };
@@ -163,7 +172,8 @@ struct Music : Widget {
 		while(samplerMidiIndex < notes.size && notes[samplerMidiIndex].time*sampler.rate < time*notes.ticksPerSeconds) samplerMidiIndex++;
 	}
 
-    Music() {
+	Music() {
+		//TODO: measureBars.t *= 60 when using MusicXML (no MIDI)
 		window.background = Window::White;
 		sheet.horizontal=true, sheet.vertical=false, sheet.scrollbar = true;
 		if(failed && !video) { // Seeks to first synchronization failure
@@ -239,17 +249,14 @@ struct Music : Widget {
 		}
     }
 
-	int2 sizeHint(int2 size) override { return failed ? sheet.ScrollArea::sizeHint(size) : widget.sizeHint(size); }
+	int2 sizeHint(int2 size) override { return running ? widget.sizeHint(size) : sheet.ScrollArea::sizeHint(size); }
 	shared<Graphics> graphics(int2 size) override {
-		if(video) {
-			if(!videoView.image) videoView.image = Image(video.size);
-			video.read(videoView.image);
-			return videoView.graphics(size);
-		}
-		if(!running) return sheet.ScrollArea::graphics(size);
-		follow(sampler.time, sampler.rate, size);
-		window.render();
-		return widget.graphics(size, Rect(size));
+		/*if(video) {
+			if(audioFile.position*video.videoFrameRate > video.videoTime*audioFile.rate) video.read(videoView.image);
+			if(audioFile.position*video.videoFrameRate > video.videoTime*audioFile.rate) window.render();
+			//return videoView.graphics(size);
+		}*/
+		return running ? widget.graphics(size, Rect(size)) : sheet.ScrollArea::graphics(size);
     }
 	bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
 		return sheet.ScrollArea::mouseEvent(cursor, size, event, button, focus);

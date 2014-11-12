@@ -234,8 +234,8 @@ void render(const Image& target, const Graphics& graphics, vec2 offset) {
 	for(const auto& e: graphics.fills) fill(target, int2(round(offset+e.origin)), int2(e.size), e.color, e.opacity);
     for(const auto& e: graphics.blits) {
 		if(int2(e.size) == e.image.size) blit(target, int2(round(offset+e.origin)), e.image, e.color, e.opacity);
-		else blit(target, int2(round(e.origin)), resize(int2(round(e.size)), e.image), e.color, e.opacity); // FIXME: subpixel blit
-    }
+		else blit(target, int2(round(offset+e.origin)), resize(int2(round(e.size)), e.image), e.color, e.opacity); // FIXME: subpixel blit
+	}
     for(const auto& e: graphics.glyphs) {
 		Font::Glyph glyph = e.font.render(e.index);
 		blit(target, int2(round(offset+e.origin))+glyph.offset, glyph.image, e.color, e.opacity);

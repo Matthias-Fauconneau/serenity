@@ -343,7 +343,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) { // Ti
 						measureBars.insert(sign.time, x);
 						measureToChord.append( notes.size() );
 						x += noteSize.x;
-						text(vec2(x, staffY(0, 16)), str(pageIndex)+','+str(pageLineIndex)+','+str(lineMeasureIndex)+' '+str(measureIndex), textFont, debug->glyphs);
+						text(vec2(x, staffY(0, 12)), str(pageIndex)+','+str(pageLineIndex)+','+str(lineMeasureIndex)+' '+str(measureIndex), textFont, debug->glyphs);
 					}
 					else if(sign.type==Sign::KeySignature) {
 						keySignature = sign.keySignature;
@@ -362,7 +362,10 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) { // Ti
 			} else { // Directions signs
 				float& x = X(sign);
 				if(sign.type == Sign::Metronome) {
-					text(vec2(x, staffY(0, 16)), "♩="_+str(sign.metronome.perMinute), textFont, measure.glyphs);
+					text(vec2(x, staffY(0, 12)), "♩="_+str(sign.metronome.perMinute), textFont, measure.glyphs);
+					if(sign.type==Sign::Metronome) { // FIXME: variable tempo
+						ticksPerMinutes = max(ticksPerMinutes, int64(sign.metronome.perMinute*ticksPerQuarter));
+					}
 				}
 				else if(sign.type == Sign::Dynamic) {
 					string word = sign.dynamic;
@@ -381,7 +384,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) { // Ti
 						measure.parallelograms.append( vec2(X(wedgeStart), y+(!crescendo-1)*3), vec2(x, y+(crescendo-1)*3), 1.f);
 					} else wedgeStart = sign;
 				} else if(sign.type == Sign::Pedal) {
-					int y = staffY(1, -24);
+					int y = staffY(1, -20);
 					if(sign.pedal == Ped) glyph(vec2(x, y), "pedal.Ped"_, font, measure.glyphs);
 					if(sign.pedal == Start) pedalStart = x + glyphSize("pedal.Ped"_).x;
 					if(sign.pedal == Change || sign.pedal == PedalStop) {
@@ -440,8 +443,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) { // Ti
 		assert_(midiIndex < midiNotes.size);
 		uint midiKey = midiNotes[midiIndex];
 
-		//if(extraErrors > 18 /*FIXME: tremolo*/ || wrongErrors > 6 || missingErrors > 8 || orderErrors > 8) {
-		if(extraErrors || wrongErrors || missingErrors || orderErrors) {
+		if(extraErrors > 18 /*FIXME: tremolo*/ || wrongErrors > 6 || missingErrors > 8 || orderErrors > 8) {
+		//if(extraErrors || wrongErrors || missingErrors || orderErrors) {
 			log("MID", midiNotes.slice(midiIndex,7));
 			log("XML", chord);
 			break;
@@ -508,7 +511,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) { // Ti
 	if(logErrors && (extraErrors||wrongErrors||missingErrors||orderErrors)) log(extraErrors, wrongErrors, missingErrors, orderErrors);
 
 	auto verticalAlign = [&](Graphics& measure) {
-		vec2 offset = vec2(0, -staffY(0,16)+textFont.size);
+		vec2 offset = vec2(0, -staffY(0,14)+textFont.size);
 		for(auto& o: measure.fills) o.origin += offset;
 		assert_(!measure.blits);
 		for(auto& o: measure.glyphs) o.origin += offset;
