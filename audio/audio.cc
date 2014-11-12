@@ -138,9 +138,9 @@ void AudioOutput::stop() {
 
 void AudioOutput::event() {
     if(status->state == XRun) { io<PREPARE>(); log("Overrun"); }
-    int available = status->hwPointer + bufferSize - control->swPointer;
+	int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
-        uint readSize;
+		uint readSize;
 		/**/  if(sampleBits==16) readSize=read16(mref<short2>(((short2*)buffer)+control->swPointer%bufferSize, periodSize));
 		else if(sampleBits==32) readSize=read32(mref<int2>(((int2*)buffer)+control->swPointer%bufferSize, periodSize));
         else error("Unsupported sample size", sampleBits);

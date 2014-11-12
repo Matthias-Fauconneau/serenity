@@ -8,9 +8,10 @@
 #include "keyboard.h"
 #include "audio.h"
 #include "render.h"
-#include "encoder.h"
+#include "decoder.h"
 #include "time.h"
 #include "sampler.h"
+#include "encoder.h"
 
 // -> ffmpeg.h/cc
 extern "C" {
@@ -54,8 +55,8 @@ struct Music : Widget {
 	MidiNotes notes = existsFile(name+".mid"_) ? MidiFile(readFile(name+".mid"_)) : ::notes(xml.signs, xml.divisions);
 
 	// Audio file
-	buffer<String> audioFiles = filter(Folder(".").list(Files),
-							   [this](string path) { return !startsWith(path, name) || (!endsWith(path, ".mp3") && !endsWith(path, ".m4a")); });
+	buffer<String> audioFiles = filter(Folder(".").list(Files), [this](string path) {
+			return !startsWith(path, name) || (!endsWith(path, ".mp3") && !endsWith(path, ".m4a") && !endsWith(path, "performance.mp4")); });
 	AudioFile audioFile = audioFiles ? AudioFile(audioFiles[0]) : AudioFile();
 
 	// Rendering
@@ -73,12 +74,17 @@ struct Music : Widget {
 	Window window {this, int2(1280,720), [](){return "MusicXML"__;}};
 	uint64 previousFrameCounterValue = 0;
 	uint64 videoTime = 0;
+
 	// Audio output
     Thread audioThread;
 	AudioOutput audio = {audioFile ? decltype(AudioOutput::read32)(&audioFile,&AudioFile::read32)
 														: decltype(AudioOutput::read32)(&sampler,&Sampler::read32), audioThread};
 	Thread decodeThread;
 	Sampler sampler {48000, "/Samples/Salamander.sfz"_, {this, &Music::timeChanged}, decodeThread};
+
+	// Video input
+	Decoder video {name+".performance.mp4"_};
+	ImageView videoView;
 
 	/// Adds new notes to be played (called in audio thread by sampler)
 	uint samplerMidiIndex = 0;
@@ -160,7 +166,7 @@ struct Music : Widget {
     Music() {
 		window.background = Window::White;
 		sheet.horizontal=true, sheet.vertical=false, sheet.scrollbar = true;
-		if(failed) { // Seeks to first synchronization failure
+		if(failed && !video) { // Seeks to first synchronization failure
 			size_t measureIndex = 0;
 			for(;measureIndex < sheet.measureToChord.size; measureIndex++)
 				if(sheet.measureToChord[measureIndex]>=sheet.firstSynchronizationFailureChordIndex) break;
@@ -226,7 +232,7 @@ struct Music : Widget {
 		} else { // Preview
 			window.show();
 			if(playbackDeviceAvailable()) {
-				audio.start(audioFile.rate ?: sampler.rate, sampler.periodSize, audioFile ? 16 : 32);
+				audio.start(audioFile.rate ?: sampler.rate, sampler.periodSize, /*audioFile ? 16 :*/ 32);
 				assert_(audio.rate == audioFile.rate ?: sampler.rate);
 				audioThread.spawn();
 			} else running = false;
@@ -235,6 +241,11 @@ struct Music : Widget {
 
 	int2 sizeHint(int2 size) override { return failed ? sheet.ScrollArea::sizeHint(size) : widget.sizeHint(size); }
 	shared<Graphics> graphics(int2 size) override {
+		if(video) {
+			if(!videoView.image) videoView.image = Image(video.size);
+			video.read(videoView.image);
+			return videoView.graphics(size);
+		}
 		if(!running) return sheet.ScrollArea::graphics(size);
 		follow(sampler.time, sampler.rate, size);
 		window.render();
