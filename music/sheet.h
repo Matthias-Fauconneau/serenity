@@ -53,5 +53,5 @@ struct Sheet : Widget {
 	size_t firstSynchronizationFailureChordIndex = -1;
 
 	/// Layouts musical notations to graphic primitives
-	Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes={});
+	Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes={});
 };

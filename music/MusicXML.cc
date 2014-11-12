@@ -21,7 +21,7 @@ MusicXML::MusicXML(string document) {
             if(e.name=="note"_) {
 				Duration type = Duration(ref<string>({"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_,"32th","64th"}).indexOf(e("type"_).text()));
 				uint typeDurations[] = {64,32,16,8,4,2,1};
-				uint quarterDuration = 16;
+				constexpr uint quarterDuration = 16;
 				int duration;
                 if(e("grace"_)) {
 					//assert_(uint(type)<Sixteenth && divisions%quarterDuration == 0, int(type), divisions);

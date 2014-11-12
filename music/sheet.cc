@@ -23,7 +23,7 @@ uint text(vec2 origin, string text, Font& font, array<Glyph>& glyphs) {
 }
 
 // Layouts notations to graphic primitives (and parses notes to MIDI keys)
-Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time steps per measure
+Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) { // Time steps per measure
 	uint measureIndex=1, pageIndex=1, pageLineIndex=1, lineMeasureIndex=1;
     map<uint, Clef> clefs; KeySignature keySignature={0}; TimeSignature timeSignature={0,0};
     typedef array<Sign> Chord; // Signs belonging to a same chord (same time)
@@ -102,10 +102,11 @@ Sheet::Sheet(ref<Sign> signs, uint divisions, ref<uint> midiNotes) { // Time ste
 		for(uint staff: range(staffCount)) {
 			// Layout tails and beams
 			array<Chord>& beam = beams[staff];
+			//log(sign.time, ticksPerQuarter, timeSignature.beats*timeSignature.beatUnit)
 			if(beam &&
 					((sign.type == Sign::Measure) || // Full beat
-					 (sign.time%(timeSignature.beats*divisions) == (timeSignature.beats*divisions)/2 && sign.time>beam[0][0].time) || // Half beat
-					 (beam[0][0].time%divisions && sign.time>beam[0][0].time) || // Off beat (stem after complete chord)
+					 (sign.time%(ticksPerQuarter*timeSignature.beatUnit/4) == 0 && sign.time>beam[0][0].time) || // Half beat
+					 (beam[0][0].time%ticksPerQuarter && sign.time>beam[0][0].time) || // Off beat (stem after complete chord)
 					 (sign.staff == staff && sign.type == Sign::Rest) || // Rest
 					 (sign.staff == staff && sign.type == Sign::Note
 					  && (beam.last().last().note.duration < Eighth || sign.note.duration < Eighth) && sign.time > beam[0][0].time) // Increasing time

@@ -169,7 +169,7 @@ struct Music : Widget {
 			assert_(0 < sheet.measureToChord.size);
 			assert_(sheet.measureToChord[0] < sheet.chordToNote.size);
 			assert_(noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[0]])<notes.size);
-			seek( notes[noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[0]])].time );
+			//seek( notes[noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[0]])].time );
 		}
 		if(!audioFile) decodeThread.spawn(); // For sampler
 		if(arguments().contains("encode")) { // Encode
@@ -229,7 +229,7 @@ struct Music : Widget {
 				audio.start(audioFile.rate ?: sampler.rate, sampler.periodSize, audioFile ? 16 : 32);
 				assert_(audio.rate == audioFile.rate ?: sampler.rate);
 				audioThread.spawn();
-			}
+			} else running = false;
 		}
     }
 
