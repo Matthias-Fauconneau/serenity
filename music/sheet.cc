@@ -390,7 +390,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 				float& x = X(sign);
 				if(sign.type == Sign::Metronome) {
 					x += text(vec2(x, staffY(0, 12)), "♩="_+str(sign.metronome.perMinute)+" "_, textFont, measure.glyphs);
-					// FIXME: variable tempo
+					if(ticksPerMinutes) log(ticksPerMinutes, "->", int64(sign.metronome.perMinute*ticksPerQuarter)); // FIXME: variable tempo
 					ticksPerMinutes = max(ticksPerMinutes, int64(sign.metronome.perMinute*ticksPerQuarter));
 				}
 				else if(sign.type == Sign::Dynamic) {
@@ -427,6 +427,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 			}
 		}
 	}
+	if(!ticksPerMinutes) ticksPerMinutes = 120*ticksPerQuarter; // TODO: default tempo from audio
 
 	midiToSign = buffer<Sign>(midiNotes.size, 0);
 	array<uint> chordExtra;

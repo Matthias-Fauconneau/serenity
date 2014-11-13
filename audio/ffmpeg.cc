@@ -31,8 +31,10 @@ bool AudioFile::open() {
             AVCodec* codec = avcodec_find_decoder(audio->codec_id);
             if(codec && avcodec_open2(audio, codec, 0) >= 0) {
 				audioFrameRate = audio->sample_rate;
-				assert_(audioStream->time_base.num == 1 && (uint)audioStream->time_base.den == audioFrameRate);
-				duration = audioStream->duration; //*audioFrameRate*audioStream->time_base.num/audioStream->time_base.den;
+				assert_(audioStream->time_base.num == 1 /*&& (uint)audioStream->time_base.den == audioFrameRate*/, audioStream->time_base.den, audioFrameRate);
+				assert_(audioStream->duration != AV_NOPTS_VALUE);
+				duration = audioStream->duration*int64(audioFrameRate)*int64(audioStream->time_base.num)/int64(audioStream->time_base.den);
+				assert_(duration, hex(audioStream->duration), audioStream->time_base.num, audioStream->time_base.den, audioFrameRate);
                 break;
             }
         }
@@ -85,7 +87,7 @@ size_t AudioFile::read32(mref<int2> output) {
         if(!bufferSize) {
             AVPacket packet;
             if(av_read_frame(file, &packet) < 0) return readSize;
-            if(file->streams[packet.stream_index]==audioStream) {
+			if(file->streams[packet.stream_index]==audioStream && packet.pts >= 0 /*FIXME*/) {
                 intBuffer = buffer<int2>();
                 if(!frame) frame = av_frame_alloc(); int gotFrame=0;
                 int used = avcodec_decode_audio4(audio, frame, &gotFrame, &packet);
@@ -118,7 +120,6 @@ size_t AudioFile::read32(mref<int2> output) {
 				}
                 else error("Unimplemented conversion to int32 from", (int)audio->sample_fmt);
 				assert_(audioStream->time_base.num == 1 && (uint)audioStream->time_base.den == audioFrameRate);
-				//log("A", packet.pts, packet.dts, audioFrameRate);
 				audioTime = packet.pts; //*audioStream->time_base.num*rate/audioStream->time_base.den;
             }
             av_free_packet(&packet);
@@ -137,7 +138,7 @@ size_t AudioFile::read(mref<float2> output) {
 		if(!bufferSize) {
 			AVPacket packet;
 			if(av_read_frame(file, &packet) < 0) return readSize;
-			if(file->streams[packet.stream_index]==audioStream) {
+			if(file->streams[packet.stream_index]==audioStream && packet.pts >= 0 /*FIXME*/) {
 				if(!frame) frame = av_frame_alloc(); int gotFrame=0;
 				int used = avcodec_decode_audio4(audio, frame, &gotFrame, &packet);
 				if(used < 0 || !gotFrame) continue;
@@ -160,15 +161,16 @@ size_t AudioFile::read(mref<float2> output) {
 						floatBuffer[i][0] = ((int16*)frame->data[0])[i]*0x1.0p-15;
 						floatBuffer[i][1] = ((int16*)frame->data[1])[i]*0x1.0p-15;
 					}
-				}
+				}*/
 				else if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
 					for(uint i : range(bufferSize)) {
 						floatBuffer[i][0] = ((int16*)frame->data[0])[i*2+0]*0x1.0p-15;
 						floatBuffer[i][1] = ((int16*)frame->data[0])[i*2+1]*0x1.0p-15;
 					}
-				}*/
+				}
 				else error("Unimplemented conversion to float32 from", (int)audio->sample_fmt);
 				assert_(audioStream->time_base.num == 1 && (uint)audioStream->time_base.den == audioFrameRate);
+				assert_(packet.pts >= 0);
 				audioTime = packet.pts; //*audioStream->time_base.num*rate/audioStream->time_base.den;
 			}
 			av_free_packet(&packet);

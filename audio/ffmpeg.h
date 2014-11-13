@@ -6,7 +6,7 @@
 struct AudioFile {
     static constexpr uint channels = 2;
 	uint audioFrameRate = 0;
-	uint audioTime = 0;
+	int64 audioTime = 0;
     uint duration = 0;
 
     struct AVFormatContext* file=0;

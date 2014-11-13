@@ -19,7 +19,7 @@ struct Decoder {
 	struct SwsContext* swsContext=0;
 	struct AVStream* videoStream=0; struct AVCodecContext* video=0;
 	struct AVStream* audioStream=0; struct AVCodecContext* audio=0;
-	uint64 videoTime = 0, audioTime = 0;
+	int64 videoTime = 0, audioTime = 0;
 	struct AVFrame* frame=0;
 
 	buffer<short2> shortBuffer;

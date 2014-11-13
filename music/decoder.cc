@@ -21,6 +21,7 @@ extern "C" {
 
 Decoder::Decoder(string path) {
 	if(avformat_open_input(&file, strz(path), 0, 0)) { log("No such file", path); return; }
+	//file->flags |= /*AVFMT_FLAG_IGNDTS|*/AVFMT_FLAG_SORT_DTS;
 	avformat_find_stream_info(file, 0);
 	if(file->duration <= 0) { file=0; log("Invalid file"); return; }
 	for(uint i=0; i<file->nb_streams; i++) {
@@ -30,8 +31,8 @@ Decoder::Decoder(string path) {
 			AVCodec* codec = avcodec_find_decoder(video->codec_id);
 			if(codec && avcodec_open2(video, codec, 0) >= 0) {
 				width = video->width; height=video->height;
-				assert_(video->time_base.num);
-				videoFrameRate = video->time_base.den;
+				assert_(videoStream->time_base.den%videoStream->time_base.num == 0);
+				videoFrameRate = video->time_base.den/videoStream->time_base.num;
 			}
 		}
 		if(file->streams[i]->codec->codec_type==AVMEDIA_TYPE_AUDIO) {
@@ -73,11 +74,9 @@ void Decoder::read(const Image& image) {
 			targetFrame.linesize[0] = targetFrame.linesize[1] = targetFrame.linesize[2] = image.stride*4;
 			sws_scale(swsContext, frame->data, frame->linesize, 0, height, targetFrame.data, targetFrame.linesize);
 
-			assert_(videoStream->time_base.num == 1 && videoStream->time_base.den == videoFrameRate);
-			assert_(packet.dts == packet.pts);
-			if(!firstPTS) firstPTS=packet.pts; // Ignores any embedded sync
-			videoTime = packet.pts-firstPTS;
-			//assert_(videoTime == packet.dts, videoTime, frame->pts==AV_NOPTS_VALUE, packet.dts, packet.pts, videoFrameRate);
+			//if(!firstPTS) firstPTS=frame->pkt_pts; // Ignores any embedded sync
+			assert_(frame->pkt_pts >= firstPTS, firstPTS, packet.pts, packet.dts);
+			videoTime = (frame->pkt_pts-firstPTS) * videoFrameRate * videoStream->time_base.num / videoStream->time_base.den;
 			return;
 		}
 		av_free_packet(&packet);
