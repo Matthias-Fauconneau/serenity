@@ -324,7 +324,11 @@ struct Music : Widget {
 			}
 		}
 		beatSynchronizer.time = timeNum*beatSynchronizer.rate/timeDen;
-		if(video.videoTime*timeDen < timeNum*video.videoFrameRate) { video.read(videoView.image); contentChanged=true; }
+		if(video.videoTime*timeDen < timeNum*video.videoFrameRate) {
+			video.read(videoView.image);
+			rotate(videoView.image);
+			contentChanged=true;
+		}
 		return contentChanged;
 	}
 

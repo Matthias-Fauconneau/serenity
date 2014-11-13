@@ -100,6 +100,11 @@ void rotate(const Image& target, const Image& source) {
 	for(int y: range(source.height)) for(int x: range(source.width)) target(source.height-1-y, x) = source(x,y);
 }
 
+void rotate(const Image& target) {
+	for(int y: range(target.height)) for(int x: range(target.width/2)) swap(target(x,y), target(target.width-1-x, y)); // Reverse rows
+	for(int y: range(target.height/2)) for(int x: range(target.width)) swap(target(x,y), target(x, target.height-1-y)); // Reverse columns
+}
+
 // -- Resample (3x8bit) --
 
 static void box(const Image& target, const Image& source) {

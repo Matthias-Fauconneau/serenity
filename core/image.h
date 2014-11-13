@@ -58,6 +58,8 @@ static Image name ## Icon() { \
 
 /// Rotates an image
 void rotate(const Image& target, const Image& source);
+/// Rotates an image around
+void rotate(const Image& target);
 
 // -- Resample (3x8bit) --
 

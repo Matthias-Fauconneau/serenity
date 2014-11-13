@@ -217,14 +217,13 @@ MusicXML::MusicXML(string document) {
 						repeatIndex=signs.size;
 					}
 					else if(e("repeat")["direction"]=="backward") {
-						signs.insertSorted({time, 0, uint(-1), Sign::Measure, .measure={measureIndex, pageIndex, pageLineIndex, lineMeasureIndex}});
+						//signs.insertSorted({time, 0, uint(-1), Sign::Measure, .measure={measureIndex, pageIndex, pageLineIndex, lineMeasureIndex}});
 						assert_(repeatIndex!=invalid);
 						buffer<Sign> copy = copyRef(signs.slice(repeatIndex));
 						assert_(time==nextTime && time==maxTime);
 						int64 repeatLength = time - signs[repeatIndex].time; // FIXME: Assumes document order matches time order
 						for(Sign& sign: copy) sign.time += repeatLength;
 						signs.append( move(copy) );
-						log(apply(signs,[](Sign sign){return sign.time;}));
 						log(repeatIndex, signs[repeatIndex].time, time, repeatLength);
 						nextTime = time + repeatLength;
 						repeatIndex=invalid;
