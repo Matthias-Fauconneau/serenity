@@ -31,6 +31,13 @@ struct AudioFile {
 
 	size_t read16(mref<short2> output);
 	size_t read32(mref<int2> output);
+	size_t read(mref<float2> output);
 
     void seek(uint position);
 };
+
+struct Audio : buffer<float2> {
+	Audio(buffer<float2>&& data, uint rate) : buffer<float2>(::move(data)), rate(rate) {}
+	uint rate;
+};
+Audio decodeAudio(string path);

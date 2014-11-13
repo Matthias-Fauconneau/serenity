@@ -5,10 +5,9 @@
 enum ClefSign { Bass, Treble };
 enum Accidental { None, DoubleFlat /*♭♭*/, Flat /*♭*/, Natural /*♮*/, Sharp /*♯*/, DoubleSharp /*♯♯*/ };
 enum Duration { Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
-//enum RestDuration { Semibreve, Minim, Crotchet, Quaver, Semiquaver };
-//enum class Loudness { PPP, PP, P, MP, MF, F, FF, FFF };
-enum Pedal/*Action*/ { Ped=-1, Start, Change, PedalStop };
-enum Wedge/*Action*/ { Crescendo, Diminuendo, WedgeStop };
+enum Pedal { Ped=-1, Start, Change, PedalStop };
+enum Wedge{ Crescendo, Diminuendo, WedgeStop };
+enum OctaveShift { Down, Up, OctaveStop };
 enum SlurType { SlurStart, SlurStop };
 
 struct Clef {
@@ -68,7 +67,7 @@ struct Sign {
 	enum {
 		Invalid,
 		Note, Rest, Clef, // Staff
-		Metronome, // Top
+		Metronome, OctaveShift, // Top
 		Dynamic, Wedge, // Middle
 		Pedal, // Bottom
 		Measure, KeySignature, TimeSignature, // Across
@@ -86,6 +85,7 @@ struct Sign {
 		string dynamic;
 		enum Pedal pedal;
 		enum Wedge wedge;
+		enum OctaveShift octave;
 		struct Slur slur;
 	};
 };

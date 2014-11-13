@@ -8,7 +8,7 @@ shared<Graphics> ScrollArea::graphics(int2 size) {
     int2 view (horizontal?max(hint.x,size.x):size.x,vertical?max(hint.y,size.y):size.y);
 	assert_(offset <= vec2(0) && (!(size < view) || offset==vec2(0)), offset, view, size);
 	shared<Graphics> graphics;
-	graphics->graphics.insert(offset, widget().graphics(size, Rect::fromOriginAndSize(int2(-offset), size)));
+	graphics->graphics.insert(offset, widget().graphics(view, Rect::fromOriginAndSize(int2(-offset), size)));
 	if(scrollbar) {
 		if(size.y<view.y)
 			graphics->fills.append( vec2(size.x-scrollBarWidth, -offset.y*size.y/view.y), vec2(scrollBarWidth, size.y*size.y/view.y), 1./2, 1.f/2);

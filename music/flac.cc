@@ -271,11 +271,3 @@ size_t FLAC::read(mref<float2> out) {
 	audioAvailable -= out.size; position += out.size;
     return out.size;
 }
-
-Audio decodeAudio(const ref<byte>& data, uint duration) {
-    FLAC flac(data);
-    duration = ::min(duration, flac.duration);
-    flac.audio = buffer<float2>(max(32768u,duration+8192),0);
-	while(flac.audioAvailable<duration) flac.decodeFrame();
-    return {move(flac.audio), flac.rate};
-}

@@ -12,6 +12,7 @@
 #include "time.h"
 #include "sampler.h"
 #include "encoder.h"
+#include "parallel.h"
 
 // -> ffmpeg.h/cc
 extern "C" {
@@ -46,6 +47,63 @@ MidiNotes notes(ref<Sign> signs, uint divisions) {
 	return notes;
 }
 
+struct BeatView : Widget {
+	buffer<float> audio;
+	int rate;
+	Sheet& sheet;
+	buffer<Sign> signs = filter(sheet.midiToSign,[](Sign sign){return sign.type!=Sign::Note;});
+	Image image;
+	BeatView(ref<float2> stereo, uint rate, Sheet& sheet) : audio(stereo.size), rate(rate), sheet(sheet) {
+		for(size_t index: range(audio.size)) audio[index] = stereo[index][0]+stereo[index][1];
+	}
+	int2 sizeHint(int2 size) override { return int2(sheet.sizeHint(size).x, 32); }
+	shared<Graphics> graphics(int2 size) override {
+		assert_(size.x > 1050, size, sizeHint(size));
+		shared<Graphics> graphics;
+		if(image.size.x != size.x) { // FIXME: progressive
+			image = Image(size.x, size.y); image.clear(0xFF);
+			float beatProbabilities [size.x];
+			{int t0 = 0, x0 = 0;
+				for(Sign sign: signs) {
+					int t1 = (int64)rate*sign.time*60/sheet.ticksPerMinutes;
+					int x1 = sheet.measures.values[sign.note.measureIndex]->glyphs[sign.note.glyphIndex].origin.x;
+					assert_(x1 <= size.x);
+					for(int x: range(x0, x1)) {
+						int t = t0+(t1-t0)*(x-x0)/(x1-x0);
+						ref<float> instant = audio.slice(max(0, t-512), 1024);
+						ref<float> context = audio.slice(max(0, t-rate/2), rate);
+						double instantEnergy = parallel::energy(instant) / instant.size;
+						double contextEnergy = parallel::energy(context) / context.size;
+						double beatProbability = instantEnergy / contextEnergy;
+						beatProbabilities[x] = beatProbability;
+					}
+					t0 = t1;
+					x0 = x1;
+				}
+			}
+			{int t0 = 0, x0 = 0;
+				for(Sign sign: signs) {
+					int t1 = (int64)rate*sign.time*60/sheet.ticksPerMinutes;
+					int x1 = sheet.measures.values[sign.note.measureIndex]->glyphs[sign.note.glyphIndex].origin.x;
+					assert_(x1 <= size.x);
+					for(int x: range(x0, x1)) {
+						// Local maximum over 1
+						if(beatProbabilities[x] > 1 &&
+								beatProbabilities[max(0,x-1)] < beatProbabilities[x] && beatProbabilities[x] > beatProbabilities[min(size.x-1, x+1)])
+							image(x, 0).g = image(x, 0).r = 0;
+					}
+					image(x0, 0).b = 0; image(x0, 0).g = 0xFF;  image(x0, 0).r = 0;
+					t0 = t1;
+					x0 = x1;
+				}
+			}
+			for(int y: range(size.y)) for(int x: range(size.x)) image(x, y) = image(x, 0); // Duplicate lines
+		}
+		graphics->blits.append(vec2(0), vec2(size), share(image));
+		return graphics;
+	}
+};
+
 struct Music : Widget {
 	string name = arguments() ? arguments()[0] : (error("Expected name"), string());
 
@@ -59,16 +117,21 @@ struct Music : Widget {
 			return !startsWith(path, name) || (!endsWith(path, ".mp3") && !endsWith(path, ".m4a") && !endsWith(path, "performance.mp4")); });
 	AudioFile audioFile = audioFiles ? AudioFile(audioFiles[0]) : AudioFile();
 
+	// Audio data
+	Audio audioData = decodeAudio(audioFiles[0]); // Decodes full file for analysis (beat detection and synchronization)
+
 	// Video input
 	Decoder video {name+".performance.mp4"_};
 	ImageView videoView {video.size};
 
 	// Rendering
-	Scroll<Sheet> sheet {xml.signs, xml.divisions, apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
+	Sheet sheet {xml.signs, xml.divisions, apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
+	BeatView beatView {audioData, audioData.rate, sheet};
+	Scroll<VBox> scroll {{&sheet, &beatView}};
 	bool failed = sheet.firstSynchronizationFailureChordIndex != invalid;
 	bool running = true; //!failed;
 	Keyboard keyboard;
-	VBox widget {{&sheet, &videoView, &keyboard}};
+	VBox widget {{&scroll, &videoView, &keyboard}};
 
 	// Highlighting
 	map<uint, Sign> active; // Maps active keys to notes (indices)
@@ -108,15 +171,6 @@ struct Music : Widget {
 		//if(samplerMidiIndex >= notes.size/32) requestTermination(0); // PROFILE
 	}
 
-    uint noteIndexToMidiIndex(uint seekNoteIndex) {
-        uint midiIndex=0;
-		for(uint noteIndex=0; noteIndex<seekNoteIndex; midiIndex++) {
-			assert_(midiIndex < notes.size);
-			if(notes[midiIndex].velocity) noteIndex++;
-		}
-        return midiIndex;
-    }
-
 	bool follow(uint64 timeNum, uint64 timeDen, int2 size) {
 		bool contentChanged = false;
 		for(;midiIndex < notes.size && notes[midiIndex].time*timeDen <= timeNum*notes.ticksPerSeconds; midiIndex++) {
@@ -149,8 +203,8 @@ struct Music : Widget {
 				float f = float(t-t1)/float(t2-t1);
 				float w[4] = { 1.f/6 * cb(1-f), 2.f/3 - 1.f/2 * sq(f)*(2-f), 2.f/3 - 1.f/2 * sq(1-f)*(2-(1-f)), 1.f/6 * cb(f) };
 				auto X = [&](int index) { return clip(0.f, sheet.measureBars.values[clip<int>(0, index, sheet.measureBars.values.size)] - float(size.x/2),
-																	   float(abs(sheet.widget().sizeHint(size).x)-size.x)); };
-				sheet.offset.x = -( w[0]*X(index-1) + w[1]*X(index) + w[2]*X(index+1) + w[3]*X(index+2) );
+																	   float(abs(sheet.sizeHint(size).x)-size.x)); };
+				scroll.offset.x = -( w[0]*X(index-1) + w[1]*X(index) + w[2]*X(index+1) + w[3]*X(index+2) );
 				break;
 			}
 		}
@@ -175,17 +229,14 @@ struct Music : Widget {
 	Music() {
 		//TODO: measureBars.t *= 60 when using MusicXML (no MIDI)
 		window.background = Window::White;
-		sheet.horizontal=true, sheet.vertical=false, sheet.scrollbar = true;
+		scroll.horizontal=true, scroll.vertical=false, scroll.scrollbar = true;
 		if(failed && !video) { // Seeks to first synchronization failure
 			size_t measureIndex = 0;
 			for(;measureIndex < sheet.measureToChord.size; measureIndex++)
 				if(sheet.measureToChord[measureIndex]>=sheet.firstSynchronizationFailureChordIndex) break;
-			sheet.offset.x = -sheet.measureBars.values[max<int>(0, measureIndex-3)];
+			scroll.offset.x = -sheet.measureBars.values[max<int>(0, measureIndex-3)];
 		} else if(running) { // Seeks to first note
-			assert_(0 < sheet.measureToChord.size);
-			assert_(sheet.measureToChord[0] < sheet.chordToNote.size);
-			assert_(noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[0]])<notes.size);
-			//seek( notes[noteIndexToMidiIndex(sheet.chordToNote[sheet.measureToChord[0]])].time );
+			seek( sheet.midiToSign[0].time );
 		}
 		if(!audioFile) decodeThread.spawn(); // For sampler
 		if(arguments().contains("encode")) { // Encode
@@ -249,17 +300,17 @@ struct Music : Widget {
 		}
     }
 
-	int2 sizeHint(int2 size) override { return running ? widget.sizeHint(size) : sheet.ScrollArea::sizeHint(size); }
+	int2 sizeHint(int2 size) override { return running ? widget.sizeHint(size) : scroll.ScrollArea::sizeHint(size); }
 	shared<Graphics> graphics(int2 size) override {
 		/*if(video) {
 			if(audioFile.position*video.videoFrameRate > video.videoTime*audioFile.rate) video.read(videoView.image);
 			if(audioFile.position*video.videoFrameRate > video.videoTime*audioFile.rate) window.render();
 			//return videoView.graphics(size);
 		}*/
-		return running ? widget.graphics(size, Rect(size)) : sheet.ScrollArea::graphics(size);
+		return running ? widget.graphics(size, Rect(size)) : scroll.ScrollArea::graphics(size);
     }
 	bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
-		return sheet.ScrollArea::mouseEvent(cursor, size, event, button, focus);
+		return scroll.ScrollArea::mouseEvent(cursor, size, event, button, focus);
 	}
-	bool keyPress(Key key, Modifiers modifiers) override { return sheet.ScrollArea::keyPress(key, modifiers); }
+	bool keyPress(Key key, Modifiers modifiers) override { return scroll.ScrollArea::keyPress(key, modifiers); }
 } app;

@@ -174,7 +174,10 @@ MusicXML::MusicXML(string document) {
 					Wedge wedge = Wedge(ref<string>({"crescendo"_,"diminuendo"_,"stop"_}).indexOf(d("wedge"_)["type"_]));
 					signs.insertSorted({time, 0, uint(-1), Sign::Wedge, .wedge=wedge});
                 }
-                else if(d("octave-shift"_)) {}
+				else if(d("octave-shift"_)) {
+					OctaveShift octave = OctaveShift(ref<string>({"down"_,"up"_,"stop"_}).indexOf(d("octave-shift"_)["type"_]));
+					signs.insertSorted({time, 0, 0/*FIXME*//*uint(-1)*/, Sign::OctaveShift, .octave=octave});
+				}
                 else if(d("other-direction"_)) {}
 				else if(d("words"_)) {}
 				else if(d("rehearsal"_)) {}

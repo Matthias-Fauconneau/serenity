@@ -39,7 +39,11 @@ Font::Font(const File& file, float size, string name, bool hint) : Font(Map(file
 Font::~Font(){
     if(face) {
         FT_Done_Face(face); face=0; fontCount--;
-        assert(fontCount>=0); if(fontCount == 0) { assert(ft); FT_Done_FreeType(ft), ft=0; }
+		assert_(fontCount >= 0);
+		if(fontCount == 0) {
+			assert_(ft);
+			//FT_Done_FreeType(ft), ft=0;
+		}
     }
 }
 

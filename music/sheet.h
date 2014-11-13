@@ -48,7 +48,6 @@ struct Sheet : Widget {
 
 	// -- MIDI Synchronization
 	int64 ticksPerMinutes = 0;
-	map<uint, array<Sign>> notes; // Signs for notes (time, key, blitIndex)
 	buffer<Sign> midiToSign; /// Sign of corresponding note for each MIDI note
 	uint extraErrors = 0, missingErrors = 0, wrongErrors = 0, orderErrors = 0;
 	size_t firstSynchronizationFailureChordIndex = -1;

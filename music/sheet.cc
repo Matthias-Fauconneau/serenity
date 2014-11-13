@@ -23,7 +23,8 @@ uint text(vec2 origin, string text, Font& font, array<Glyph>& glyphs) {
 }
 
 // Layouts notations to graphic primitives (and parses notes to MIDI keys)
-Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) { // Time steps per measure
+Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
+	map<uint, array<Sign>> notes; // Signs for notes (time, key, blitIndex)
 	uint measureIndex=1, pageIndex=1, pageLineIndex=1, lineMeasureIndex=1;
     map<uint, Clef> clefs; KeySignature keySignature={0}; TimeSignature timeSignature={0,0};
     typedef array<Sign> Chord; // Signs belonging to a same chord (same time)
@@ -33,6 +34,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) { // Ti
 	map<int, array<Sign>> slurs; // Signs belonging to current slur
 	float pedalStart = 0; // Last pedal start/change position
 	Sign wedgeStart {.wedge={}}; // Current wedge
+	Sign octaveStart[2] {{.octave=OctaveStop}, {.octave=OctaveStop}}; // Current octave shift (for each staff)
 	struct Position { // Holds current pen position for each line
 		float staffs[2];
 		float middle; // Dynamic, Wedge
@@ -61,7 +63,6 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) { // Ti
 		/*{vec2 min(x-1, staffY(0, 0)), max(1, staffY(1, -8));
 			notation->fills.append(min, max-min);}*/
 		measureBars.insert(/*t*/0u, /*x*/0.f);
-		measureToChord.append( 0 );
 		timeTrack.insert(0u, {{0,0},0,0,0/*{x,x},x*/});
 	}
 	Graphics measure;
@@ -91,13 +92,13 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) { // Ti
 			}
 			assert_(timeTrack.contains(sign.time), withName(int(sign.type), sign.note.step, sign.time, sign.duration,
 					measureIndex, pageIndex, pageLineIndex, lineMeasureIndex, signIndex));
-			if(sign.type == Sign::Metronome) return timeTrack.at(sign.time).top;
+			if(sign.type == Sign::Metronome || sign.type == Sign::OctaveShift) return timeTrack.at(sign.time).top;
 			if(sign.type==Sign::Dynamic || sign.type==Sign::Wedge) return timeTrack.at(sign.time).middle;
 			if(sign.type == Sign::Pedal) return timeTrack.at(sign.time).bottom;
 			assert_(sign.staff < 2, int(sign.type));
 			return timeTrack.at(sign.time).staffs[sign.staff];
 		};
-		auto P = [&](const Sign& sign) { return vec2(X(sign),Y(sign)); };
+		auto P = [&](const Sign& sign) { return vec2(X(sign), Y(sign)); };
 
 		for(uint staff: range(staffCount)) {
 			// Layout tails and beams
@@ -239,7 +240,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) { // Ti
 
 			/**/ if(sign.type == Sign::Note) {
 				Note& note = sign.note;
-				assert_(note.clef.octave == clefs.at(staff).octave); // FIXME: key relies on correct octave`
+				//assert_(note.clef.octave == clefs.at(staff).octave); // FIXME: key relies on correct octave
 				note.clef = clefs.at(staff);
 				vec2 p = P(sign);
 				Duration duration = note.duration;
@@ -289,6 +290,23 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) { // Ti
 					if(clef.clefSign==Bass) x += glyph(vec2(x, Y(sign, -4)),"clefs.F"_+change, font, measure.glyphs);
 					x += noteSize.x;
 				}
+			}
+			else if(sign.type == Sign::OctaveShift) {
+				/**/  if(sign.octave == Down) {
+					text(vec2(x, staffY(0, 12)), "8va", textFont, measure.glyphs);
+					clefs[staff].octave++;
+				}
+				else if(sign.octave == OctaveStop) {
+					assert_(octaveStart[staff].octave==Down, int(octaveStart[staff].octave));
+					clefs[staff].octave--;
+					float start = X(octaveStart[staff]);
+					float end = x;
+					// FIXME: breaks at each measure
+					measure.fills.append(vec2(start,staffY(0, 12)),vec2(end-start,1));
+					// TODO: dash
+				}
+				else error(int(sign.octave));
+				octaveStart[staff] = sign;
 			}
 			else error(int(sign.type));
 
@@ -341,7 +359,6 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) { // Ti
 						measures.insertMulti(Rect(int2(measureBars.values.last()-barWidth+barWidth/2, 0), int2(x+barWidth/2, 0)),
 											 shared<Graphics>(move(measure)) );
 						measureBars.insert(sign.time, x);
-						measureToChord.append( notes.size() );
 						x += noteSize.x;
 						text(vec2(x, staffY(0, 12)), str(pageIndex)+','+str(pageLineIndex)+','+str(lineMeasureIndex)+' '+str(measureIndex), textFont, debug->glyphs);
 					}
@@ -363,9 +380,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) { // Ti
 				float& x = X(sign);
 				if(sign.type == Sign::Metronome) {
 					text(vec2(x, staffY(0, 12)), "♩="_+str(sign.metronome.perMinute), textFont, measure.glyphs);
-					if(sign.type==Sign::Metronome) { // FIXME: variable tempo
-						ticksPerMinutes = max(ticksPerMinutes, int64(sign.metronome.perMinute*ticksPerQuarter));
-					}
+					// FIXME: variable tempo
+					ticksPerMinutes = max(ticksPerMinutes, int64(sign.metronome.perMinute*ticksPerQuarter));
 				}
 				else if(sign.type == Sign::Dynamic) {
 					string word = sign.dynamic;
@@ -406,7 +422,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) { // Ti
 	array<uint> chordExtra;
 
 	constexpr bool logErrors = true;
-	while(chordToNote.size<notes.size()) {
+	while(chordToNote.size < notes.size()) {
 		if(!notes.values[chordToNote.size]) {
 			chordToNote.append( midiToSign.size );
 			if(chordToNote.size==notes.size()) break;
@@ -504,7 +520,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) { // Ti
 			chordExtra.append( midiIndex );
 		}
 	}
-	if(chordToNote.size == notes.size()) assert_(midiToSign.size == midiNotes.size);
+	if(chordToNote.size == notes.size()) assert_(midiToSign.size == midiNotes.size, midiToSign.size, midiNotes.size);
 	else {
 		firstSynchronizationFailureChordIndex = chordToNote.size;
 	}
