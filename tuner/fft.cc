@@ -20,7 +20,6 @@ mref<float> FFT::transform() {
     float energy=0;
     for(uint i: range(N/2)) {
         spectrum[i] = (sq(halfcomplex[i]) + sq(halfcomplex[N-1-i])) / N; // Converts amplitude to power spectrum density
-		//assert_(isNumber(spectrum[i]), i, str(halfcomplex[i], 2, 1), str(halfcomplex[N-1-i], 2, 1));
         energy += spectrum[i];
     }
     periodEnergy = energy;

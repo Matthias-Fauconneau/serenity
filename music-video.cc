@@ -78,14 +78,12 @@ struct BeatView : Widget {
 				size_t t0 = frameIndex * h;
 				for(size_t i: range(N)) {
 					fft.windowed[i] = fft.window[i] * signal[t0+i];
-					//assert_(fft.windowed[i]>=-1 && fft.windowed[i]<=1, fft.windowed[i], signal[t0+i]);
 				}
 				fft.spectrum = buffer<float>(N/2);
 				fft.transform();
 				buffer<float> current = move(fft.spectrum);
 				double spectralFlux = 0;
 				for(size_t k: range(N/2)) {
-					//assert_(isNumber(current[k]) && isNumber(previous[k]), k, previous[k], current[k]);
 					float x = current[k] - previous[k]; // or L1: sqrt(current[k]) - sqrt(previous[k])
 					if(x<0) x=0; // "Half-wave rectifier"
 					spectralFlux += x;
@@ -117,11 +115,13 @@ struct BeatView : Widget {
 				}
 			}
 			image = Image(size.x, size.y); image.clear(0xFF);
-			{int t0 = 0; int x0 = 0;
-				size_t beatIndex = 0; int t = beatIndex<beats.size ? beats[beatIndex] : 0;
-				for(Sign sign: signs) {
-					int t1 = (int64)rate*sign.time*60/sheet.ticksPerMinutes;
-					int x1 = sheet.measures.values[sign.note.measureIndex]->glyphs[sign.note.glyphIndex].origin.x;
+			{
+				size_t beatIndex = 0; int64 t = beatIndex<beats.size ? beats[beatIndex] : 0;
+				for(int index: range(sheet.measureBars.size()-1)) {
+					int64 t0 = (int64)rate*sheet.measureBars.keys[index]*60/sheet.ticksPerMinutes;
+					float x0 = sheet.measureBars.values[index];
+					int64 t1 = (int64)rate*sheet.measureBars.keys[index+1]*60/sheet.ticksPerMinutes;
+					float x1 = sheet.measureBars.values[index+1];
 					image(x0, 0).b = 0; image(x0, 0).g = 0xFF;  image(x0, 0).r = 0;
 					while(beatIndex<beats.size && t0 <= t && t < t1) {
 						assert_(t1>t0);
@@ -130,24 +130,21 @@ struct BeatView : Widget {
 						beatIndex++;
 						if(beatIndex<beats.size) t = beats[beatIndex];
 					}
-					t0 = t1;
-					x0 = x1;
 				}
 			}
 			for(int y: range(size.y)) for(int x: range(size.x)) image(x, y) = image(x, 0); // Duplicate lines
 		}
 		graphics->blits.append(vec2(0), vec2(size), share(image));
-		{size_t t0 = 0; float x0 = 0;
-			for(Sign sign: signs) {
-				size_t t1 = (int64)rate*sign.time*60/sheet.ticksPerMinutes;
-				float x1 = sheet.measures.values[sign.note.measureIndex]->glyphs[sign.note.glyphIndex].origin.x;
-				if(t0 <= time && time < t1) {
-					assert_(t1>t0);
-					float x = x0+(x1-x0)*(time-t0)/(t1-t0);
-					graphics->fills.append(vec2(x, 0), vec2(1, size.y));
-				}
-				t0 = t1;
-				x0 = x1;
+		for(int index: range(sheet.measureBars.size()-1)) {
+			uint64 t0 = (int64)rate*sheet.measureBars.keys[index]*60/sheet.ticksPerMinutes;
+			float x0 = sheet.measureBars.values[index];
+			uint64 t1 = (int64)rate*sheet.measureBars.keys[index+1]*60/sheet.ticksPerMinutes;
+			float x1 = sheet.measureBars.values[index+1];
+			if(t0 <= time && time < t1) {
+				assert_(t1>t0);
+				float x = x0+(x1-x0)*(time-t0)/(t1-t0);
+				log(x);
+				graphics->fills.append(vec2(x, 0), vec2(2, size.y));
 			}
 		}
 		return graphics;
