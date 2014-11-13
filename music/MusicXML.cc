@@ -7,6 +7,7 @@ MusicXML::MusicXML(string document) {
 	KeySignature keySignature={0}; TimeSignature timeSignature={4,4};
 	int64 measureTime = 0, time = 0, nextTime = 0, maxTime = 0;
 	uint measureIndex=0, pageIndex=0, pageLineIndex=0, lineMeasureIndex=0; // starts with 1
+	size_t repeatIndex = invalid;
 	for(const Element& m: root("score-partwise"_)("part"_).children) {
 		measureTime = time;
 		measureIndex++; lineMeasureIndex++;
@@ -209,7 +210,28 @@ MusicXML::MusicXML(string document) {
 				if(e["new-system"]=="yes") { pageLineIndex++, lineMeasureIndex=1; }
 				if(e["new-page"]=="yes") { pageIndex++, pageLineIndex=1; }
 			}
-			else if(e.name=="barline"_) {}
+			else if(e.name=="barline"_) {
+				if(e("repeat")) {
+					if(e("repeat")["direction"]=="forward") {
+						assert_(repeatIndex==invalid);
+						repeatIndex=signs.size;
+					}
+					else if(e("repeat")["direction"]=="backward") {
+						signs.insertSorted({time, 0, uint(-1), Sign::Measure, .measure={measureIndex, pageIndex, pageLineIndex, lineMeasureIndex}});
+						assert_(repeatIndex!=invalid);
+						buffer<Sign> copy = copyRef(signs.slice(repeatIndex));
+						assert_(time==nextTime && time==maxTime);
+						int64 repeatLength = time - signs[repeatIndex].time; // FIXME: Assumes document order matches time order
+						for(Sign& sign: copy) sign.time += repeatLength;
+						signs.append( move(copy) );
+						log(apply(signs,[](Sign sign){return sign.time;}));
+						log(repeatIndex, signs[repeatIndex].time, time, repeatLength);
+						nextTime = time + repeatLength;
+						repeatIndex=invalid;
+					}
+					else error(e);
+				}
+			}
 			else if(e.name=="harmony"_) {}
             else error(e);
 
