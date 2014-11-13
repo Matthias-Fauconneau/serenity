@@ -35,6 +35,9 @@ inline Image copy(const Image& o) { return Image(copy((const buffer<byte4>&)o),o
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 inline notrace Image share(const Image& o) { return Image(unsafeRef(o),o.size,o.stride,o.alpha,o.sRGB); }
 
+/// Returns a weak reference to \a image (unsafe if referenced image is freed)
+inline notrace Image cropShare(const Image& o, int2 offset, int2 size) { return Image(unsafeRef(o.slice(offset.y*o.stride+offset.x, size.y*o.stride)),size,o.stride,o.alpha,o.sRGB); }
+
 // -- Decode --
 
 /// Returns the image file format if valid

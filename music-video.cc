@@ -50,14 +50,14 @@ MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter) {
 
 struct BeatSynchronizer : Widget {
 	buffer<float> signal;
-	size_t rate;
+	int64 rate;
 	Sheet& sheet;
 	MidiNotes& notes;
 	buffer<Sign> signs = filter(sheet.midiToSign,[](Sign sign){return sign.type!=Sign::Note;});
 	struct Bar { float x; bgr3f color; };
 	array<Bar> bars;
 	size_t time = 0;
-	BeatSynchronizer(ref<float2> stereo, uint rate, Sheet& sheet, MidiNotes& notes) : signal(stereo.size), rate(rate), sheet(sheet), notes(notes) {
+	BeatSynchronizer(ref<float2> stereo, int64 rate, Sheet& sheet, MidiNotes& notes) : signal(stereo.size), rate(rate), sheet(sheet), notes(notes) {
 		assert_(stereo);
 		for(size_t index: range(signal.size)) {
 			signal[index] = (stereo[index][0]+stereo[index][1])/2;
@@ -99,9 +99,8 @@ struct BeatSynchronizer : Widget {
 		for(double& v: f) v /= deviation;
 
 		// For visualization only
-		array<int> beats;
+		array<int64> beats;
 		const int w = 3, m = 3;
-		const double threshold = 1./2048; //1./1024;
 		for(size_t n: range(m*w, frameCount-w)) {
 			bool localMaximum = true;
 			for(size_t k: range(n-w, n+w+1)) {
@@ -112,37 +111,35 @@ struct BeatSynchronizer : Widget {
 				double sum = 0;
 				for(size_t k: range(n-m*w, n+w+1)) sum += f[k];
 				double mean = sum / (m*w+w+1);
+				const double threshold = beats ? 1./1024 : 1./2048;
 				if(f[n] > mean + threshold) beats.append( n * h );
 			}
 		}
 
 		// Synchronizes MIDI with audio by moving each onset to nearest onset
 		{
+			// Converts MIDI time base to audio sample rate
+			for(MidiNote& note: notes) note.time = note.time*rate/notes.ticksPerSeconds;
+			notes.ticksPerSeconds = rate;
 			{// Inconditionnaly sync first note with first beat
 				MidiNote note = notes[0];
-				int64 current = (int64)rate*note.time/notes.ticksPerSeconds;
-				int offset = beats[0] - current;
-				int64 midiOffset = (int64)offset*notes.ticksPerSeconds/int64(rate);
-				for(MidiNote& note: notes) note.time += midiOffset;
+				int64 current = note.time;
+				int64 offset = beats[0] - current;
+				for(MidiNote& note: notes) note.time += offset;
 			}
 			for(size_t midiIndex: range(notes.size)) {
 				MidiNote note = notes[midiIndex];
 				if(!note.velocity) continue;
-				int64 current = (int64)rate*note.time/notes.ticksPerSeconds;
+				int64 current = note.time;
 				size_t beatIndex = beats.linearSearch(current);
 				int64 previous = beats[max(0,int(beatIndex)-1)];
-				while(beatIndex<beats.size && beats[beatIndex] < current) beatIndex++;
+				while(beatIndex < beats.size && beats[beatIndex] < current) beatIndex++;
 				int64 next = beats[beatIndex];
 				assert_((previous <= current && current <= next) || (beatIndex==0), previous, current, next, current, beatIndex);
-				int nearest = abs(next-current) < abs(previous-current) ? next : previous;
-				int offset = nearest - current;
-				if(offset /*&& abs(offset) < int(rate)/2*/) { ///8) {
-					int64 midiOffset = (int64)offset*notes.ticksPerSeconds/int64(rate);
-					//log(offset/float(rate), midiOffset/float(notes.ticksPerSeconds));
-					for(MidiNote& note: notes.slice(midiIndex, notes.size-midiIndex)) {
-						assert_(note.time+midiOffset >= 0, midiIndex, note.time, midiOffset, note.time+midiOffset, offset, previous, current, next);
-						note.time += midiOffset;
-					}
+				int64 nearest = abs(next-current) < abs(previous-current) ? next : previous;
+				int64 offset = nearest - current;
+				if(offset && abs(offset) < rate) {
+					for(MidiNote& note: notes.slice(midiIndex, notes.size-midiIndex)) note.time += offset;
 				}
 			}
 		}

@@ -82,8 +82,12 @@ int2 ImageView::sizeHint(int2 size) { return min(image.size, size.x && image.siz
 shared<Graphics> ImageView::graphics(int2 size) {
 	shared<Graphics> graphics;
     if(image) {
-		int2 target = min(image.size*size.x/image.size.x, image.size*size.y/image.size.y);
-		graphics->blits.append(vec2(max(vec2(0),vec2((size-target)/2))), vec2(target), share(image));
+		// Fit
+		/*int2 target = min(image.size*size.x/image.size.x, image.size*size.y/image.size.y);
+		graphics->blits.append(max(vec2(0),vec2((size-target)/2)), vec2(target), share(image));*/
+		// Crop
+		//int2 offset = size-image.size;
+		graphics->blits.append(max(vec2(0),vec2((size-image.size)/2)), vec2(min(size, image.size)), cropShare(image, max(int2(0),int2((image.size-size)/2)), min(size, image.size)));
     }
     return graphics;
 }
