@@ -54,6 +54,7 @@ struct BeatView : Widget {
 	Sheet& sheet;
 	buffer<Sign> signs = filter(sheet.midiToSign,[](Sign sign){return sign.type!=Sign::Note;});
 	Image image;
+	size_t time = 0;
 	BeatView(ref<float2> stereo, uint rate, Sheet& sheet) : signal(stereo.size), rate(rate), sheet(sheet) {
 		for(size_t index: range(signal.size)) {
 			signal[index] = (stereo[index][0]+stereo[index][1])/2;
@@ -70,7 +71,7 @@ struct BeatView : Widget {
 			size_t h = N/4; // Hop size (11ms @48KHz (75% overlap))
 			FFT fft(N);
 			size_t frameCount = (T-N)/h;
-			buffer<float> f(frameCount); // Spectral flux onset function
+			buffer<double> f(frameCount); // Spectral flux onset function
 			buffer<float> previous = buffer<float>(N/2); previous.clear(0);
 			double sum = 0;
 			for(size_t frameIndex: range(frameCount)) {
@@ -96,15 +97,12 @@ struct BeatView : Widget {
 			/// Normalizes onset function
 			double mean = sum/frameCount;
 			double SSQ = 0;
-			for(float& v: f) { v -= mean; SSQ += sq(v); }
+			for(double& v: f) { v -= mean; SSQ += sq(v); }
 			double deviation = sqrt(SSQ);
-			for(float& v: f) v /= deviation;
-			//assert_(::sum(f,0.)==0 && parallel::energy(f)==1, ::sum(f,0.), parallel::energy(f));
+			for(double& v: f) v /= deviation;
 			array<int> beats;
 			const int w = 3, m = 3;
-			//float g = f[0];
 			const double threshold = 1./1024;
-			//const float a = 1;
 			for(size_t n: range(m*w, frameCount-w)) {
 				bool localMaximum = true;
 				for(size_t k: range(n-w, n+w+1)) {
@@ -117,21 +115,21 @@ struct BeatView : Widget {
 					double mean = sum / (m*w+w+1);
 					if(f[n] > mean + threshold) beats.append( n * h );
 				}
-				//g = max(f[n], a*g+(1-a)*f[n]);
 			}
 			image = Image(size.x, size.y); image.clear(0xFF);
-			{int t0 = 0, x0 = 0;
+			{int t0 = 0; int x0 = 0;
 				size_t beatIndex = 0; int t = beatIndex<beats.size ? beats[beatIndex] : 0;
 				for(Sign sign: signs) {
 					int t1 = (int64)rate*sign.time*60/sheet.ticksPerMinutes;
 					int x1 = sheet.measures.values[sign.note.measureIndex]->glyphs[sign.note.glyphIndex].origin.x;
-					while(beatIndex<beats.size && t0 <= t && t <= t1) {
+					image(x0, 0).b = 0; image(x0, 0).g = 0xFF;  image(x0, 0).r = 0;
+					while(beatIndex<beats.size && t0 <= t && t < t1) {
+						assert_(t1>t0);
 						int x = x0+(x1-x0)*(t-t0)/(t1-t0);
-						image(x, 0).g = image(x, 0).r = 0;
+						image(x, 0).b = 0xFF; image(x, 0).g = image(x, 0).r = 0;
 						beatIndex++;
 						if(beatIndex<beats.size) t = beats[beatIndex];
 					}
-					image(x0, 0).b = 0; image(x0, 0).g = 0xFF;  image(x0, 0).r = 0;
 					t0 = t1;
 					x0 = x1;
 				}
@@ -139,6 +137,19 @@ struct BeatView : Widget {
 			for(int y: range(size.y)) for(int x: range(size.x)) image(x, y) = image(x, 0); // Duplicate lines
 		}
 		graphics->blits.append(vec2(0), vec2(size), share(image));
+		{size_t t0 = 0; float x0 = 0;
+			for(Sign sign: signs) {
+				size_t t1 = (int64)rate*sign.time*60/sheet.ticksPerMinutes;
+				float x1 = sheet.measures.values[sign.note.measureIndex]->glyphs[sign.note.glyphIndex].origin.x;
+				if(t0 <= time && time < t1) {
+					assert_(t1>t0);
+					float x = x0+(x1-x0)*(time-t0)/(t1-t0);
+					graphics->fills.append(vec2(x, 0), vec2(1, size.y));
+				}
+				t0 = t1;
+				x0 = x1;
+			}
+		}
 		return graphics;
 	}
 };
@@ -190,6 +201,7 @@ struct Music : Widget {
 	size_t read32(mref<int2> output) {
 		assert_(audioFile);
 		bool contentChanged = false;
+		beatView.time = audioFile.position;
 		if(follow(audioFile.position, audioFile.rate, window.size)) contentChanged = true;
 		if(audioFile.position*video.videoFrameRate > video.videoTime*audioFile.rate) {
 			video.read(videoView.image);

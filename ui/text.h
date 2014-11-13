@@ -10,13 +10,13 @@
 enum class TextFormat : char { Regular, Bold, Italic, Superscript, Subscript, Stack, Fraction, End };
 static_assert(TextFormat::End < (TextFormat)'\t', "");
 
-inline String regular(const string s) { return char(TextFormat::Regular) + s + char(TextFormat::End); }
-inline String bold(const string s) { return char(TextFormat::Bold) + s + char(TextFormat::End); }
-inline String italic(const string s) { return char(TextFormat::Italic) + s + char(TextFormat::End); }
-inline String superscript(const string s) { return char(TextFormat::Superscript) + s + char(TextFormat::End); }
-inline String subscript(const string s) { return char(TextFormat::Subscript) + s + char(TextFormat::End); }
-inline String stack(const string s) { return char(TextFormat::Stack) + s + char(TextFormat::End); }
-inline String fraction(const string s) { return char(TextFormat::Fraction) + s + char(TextFormat::End); }
+inline String regular(string s) { return char(TextFormat::Regular) + s + char(TextFormat::End); }
+inline String bold(string s) { return char(TextFormat::Bold) + s + char(TextFormat::End); }
+inline String italic(string s) { return char(TextFormat::Italic) + s + char(TextFormat::End); }
+inline String superscript(string s) { return char(TextFormat::Superscript) + s + char(TextFormat::End); }
+inline String subscript(string s) { return char(TextFormat::Subscript) + s + char(TextFormat::End); }
+inline String stack(string s) { return char(TextFormat::Stack) + s + char(TextFormat::End); }
+inline String fraction(string s) { return char(TextFormat::Fraction) + s + char(TextFormat::End); }
 
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : virtual Widget {

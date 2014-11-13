@@ -162,7 +162,7 @@ struct TextLayout {
 					if(format==TextFormat::Bold) { assert_(!find(fontName,"Bold"), toUTF8(text)); font = getFont(fontName, fontSize, {"Bold","RB"}, hint); }
 					if(format==TextFormat::Italic) { assert_(!find(fontName,"Italic")); font = getFont(fontName, fontSize, {"Italic","I","Oblique"}, hint); }
 					if(format==TextFormat::Subscript || format==TextFormat::Superscript) fontSize *= 2./3;
-					if(format==TextFormat::Superscript) position.y -= fontSize/2;
+					if(format==TextFormat::Superscript) position.y -= fontSize/4;
 					if(format==TextFormat::Subscript) position.y += font->ascender/2;
                 }
                 // Pop format context

@@ -10,15 +10,23 @@ inline String str(const Note& a) { return str(a.key); }
 struct Sheet : Widget {
     // Layout parameters
 	static constexpr int staffCount = 2;
-	const float halfLineInterval = 5, lineInterval = 2*halfLineInterval;
+	static constexpr float halfLineInterval = 5, lineInterval = 2*halfLineInterval;
 	const float lineWidth = 1, barWidth=1, stemWidth = 1, stemLength = 4*lineInterval, beamWidth = 6;
 	const float shortStemLength = 5*halfLineInterval;
     // Layout helpers
-    int clefStep(ClefSign clefSign, int step) { return step - (clefSign==Treble ? 10 : -2); } // Translates C4 step to top line step using clef
 	float staffY(uint staff, int clefStep) { return staff*10*lineInterval - clefStep * halfLineInterval; } // Clef independent
-	float Y(uint staff, Clef clef, int step) { return staffY(staff, clefStep(clef.clefSign, step)); } // Clef dependent
-	float Y(Sign sign, int step) { assert_(sign.type==Sign::Note||sign.type==Sign::Clef); return Y(sign.staff, sign.note.clef, step); } // Clef dependent
-	float Y(Sign sign) { assert_(sign.type==Sign::Note); return Y(sign, sign.note.step); } // Clef dependent
+	float Y(uint staff, ClefSign clefSign, int step) { return staffY(staff, step-(clefSign==Treble ? 10 : -2)); } // Clef dependent
+	/*int clefStep(Sign sign) {
+		assert_(sign.type==Sign::Note);
+		return sign.note.step - (sign.note.clef.clefSign==Treble ? 10 : -2) - sign.note.clef.octave*7;
+	}*/
+	//float Y(Sign sign, int step) { assert_(sign.type==Sign::Note||sign.type==Sign::Clef); return Y(sign.staff, clefStep(sign); } // Clef dependent
+	// Translates C4 step to top line step using clef
+	int clefStep(Sign sign) {
+		assert_(sign.type==Sign::Note);
+		return sign.note.step - (sign.note.clef.clefSign==Treble ? 10 : -2) - sign.note.clef.octave*7;
+	}
+	float Y(Sign sign) { assert_(sign.type==Sign::Note); return staffY(sign.staff, clefStep(sign)); } // Clef dependent
 	//int Y(const map<uint, Clef>& clefs, uint staff, int step) { return staffY(staff, clefStep(clefs.at(staff).clefSign, step)); } // Clef dependent
 
     // Fonts
