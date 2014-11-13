@@ -147,7 +147,7 @@ String str(int64 number, int pad, char padChar, uint base) {
 	return copyRef(string(buf+i,64-i));
 }
 
-String str(double n, int precision, uint pad, int exponent) {
+String str(double n, int precision, int exponent, uint pad) {
     bool sign = n<0; n=abs(n);
     if(__builtin_isnan(n)) return ::right("NaN", pad);
     if(n==::inf) return ::right("∞", pad+2);
@@ -160,6 +160,7 @@ String str(double n, int precision, uint pad, int exponent) {
         uint64 decimal = round(fract*exp10(precision));
         uint exp10=1; for(uint i unused: range(precision)) exp10*=10; // Integer exp10(precision)
         if(decimal==exp10) integer++, decimal=0; // Rounds to ceiling integer
+		assert_(isNumber(integer), integer, n);
         s.append( str(uint64(integer)) );
         s.append('.');
 		s.append( str(decimal, precision) );

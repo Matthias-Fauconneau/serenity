@@ -13,6 +13,7 @@
 #include "sampler.h"
 #include "encoder.h"
 #include "parallel.h"
+#include "fft.h"
 
 // -> ffmpeg.h/cc
 extern "C" {
@@ -48,51 +49,87 @@ MidiNotes notes(ref<Sign> signs, uint divisions) {
 }
 
 struct BeatView : Widget {
-	buffer<float> audio;
+	buffer<float> signal;
 	size_t rate;
 	Sheet& sheet;
 	buffer<Sign> signs = filter(sheet.midiToSign,[](Sign sign){return sign.type!=Sign::Note;});
 	Image image;
-	BeatView(ref<float2> stereo, uint rate, Sheet& sheet) : audio(stereo.size), rate(rate), sheet(sheet) {
-		for(size_t index: range(audio.size)) audio[index] = stereo[index][0]+stereo[index][1];
+	BeatView(ref<float2> stereo, uint rate, Sheet& sheet) : signal(stereo.size), rate(rate), sheet(sheet) {
+		for(size_t index: range(signal.size)) {
+			signal[index] = (stereo[index][0]+stereo[index][1])/2;
+			assert_(signal[index]>=-1 && signal[index]<=1, signal[index]);
+		}
 	}
 	int2 sizeHint(int2 size) override { return int2(sheet.sizeHint(size).x, 32); }
 	shared<Graphics> graphics(int2 size) override {
 		assert_(size.x > 1050, size, sizeHint(size));
 		shared<Graphics> graphics;
 		if(image.size.x != size.x) { // FIXME: progressive
-			size_t frameStart = rate/2;
-			size_t frameSize = 1024;
-			size_t frameCount = (audio.size-rate)/frameSize;
-			float beatProbabilities [frameCount];
+			size_t T = signal.size; // Total sample count
+			size_t N = 2048; // Frame size (43ms @48KHz)
+			size_t h = N/4; // Hop size (11ms @48KHz (75% overlap))
+			FFT fft(N);
+			size_t frameCount = (T-N)/h;
+			buffer<float> f(frameCount); // Spectral flux onset function
+			buffer<float> previous = buffer<float>(N/2); previous.clear(0);
+			double sum = 0;
 			for(size_t frameIndex: range(frameCount)) {
-				size_t t = frameStart + frameIndex * frameSize;
-				assert_(t >= rate/2 && t <= audio.size-rate/2, t);
-				ref<float> instant = audio.slice(t-frameSize/2, frameSize);
-				ref<float> context = audio.slice(t-rate/2, rate);
-				double instantEnergy = parallel::energy(instant) / instant.size;
-				double contextEnergy = parallel::energy(context) / context.size; //FIXME: reuse instant frame energy evaluation
-				double beatProbability = instantEnergy / contextEnergy;
-				beatProbabilities[frameIndex] = beatProbability;
-			}
-			array<int> beats;
-			for(size_t i: range(1, audio.size/frameSize-1)) {
-				// Local maximum over 1
-				if(beatProbabilities[i] > 1 && beatProbabilities[i-1] < beatProbabilities[i] && beatProbabilities[i] > beatProbabilities[i+1]) {
-					log(i, beatProbabilities[i-1], beatProbabilities[i], beatProbabilities[i+1]);
-					beats.append( frameStart + i * frameSize );
+				size_t t0 = frameIndex * h;
+				for(size_t i: range(N)) {
+					fft.windowed[i] = fft.window[i] * signal[t0+i];
+					//assert_(fft.windowed[i]>=-1 && fft.windowed[i]<=1, fft.windowed[i], signal[t0+i]);
 				}
+				fft.spectrum = buffer<float>(N/2);
+				fft.transform();
+				buffer<float> current = move(fft.spectrum);
+				double spectralFlux = 0;
+				for(size_t k: range(N/2)) {
+					//assert_(isNumber(current[k]) && isNumber(previous[k]), k, previous[k], current[k]);
+					float x = current[k] - previous[k]; // or L1: sqrt(current[k]) - sqrt(previous[k])
+					if(x<0) x=0; // "Half-wave rectifier"
+					spectralFlux += x;
+				}
+				f[frameIndex] = spectralFlux;
+				sum += spectralFlux;
+				previous = move(current);
+			}
+			/// Normalizes onset function
+			double mean = sum/frameCount;
+			double SSQ = 0;
+			for(float& v: f) { v -= mean; SSQ += sq(v); }
+			double deviation = sqrt(SSQ);
+			for(float& v: f) v /= deviation;
+			//assert_(::sum(f,0.)==0 && parallel::energy(f)==1, ::sum(f,0.), parallel::energy(f));
+			array<int> beats;
+			const int w = 3, m = 3;
+			//float g = f[0];
+			const double threshold = 1./1024;
+			//const float a = 1;
+			for(size_t n: range(m*w, frameCount-w)) {
+				bool localMaximum = true;
+				for(size_t k: range(n-w, n+w+1)) {
+					if(k==n) continue;
+					if(!(f[n] > f[k])) localMaximum=false;
+				}
+				if(localMaximum) {
+					double sum = 0;
+					for(size_t k: range(n-m*w, n+w+1)) sum += f[k];
+					double mean = sum / (m*w+w+1);
+					if(f[n] > mean + threshold) beats.append( n * h );
+				}
+				//g = max(f[n], a*g+(1-a)*f[n]);
 			}
 			image = Image(size.x, size.y); image.clear(0xFF);
 			{int t0 = 0, x0 = 0;
-				size_t beatIndex = 0; int t = beats[beatIndex];
+				size_t beatIndex = 0; int t = beatIndex<beats.size ? beats[beatIndex] : 0;
 				for(Sign sign: signs) {
 					int t1 = (int64)rate*sign.time*60/sheet.ticksPerMinutes;
 					int x1 = sheet.measures.values[sign.note.measureIndex]->glyphs[sign.note.glyphIndex].origin.x;
-					while(t0 <= t && t <= t1) {
+					while(beatIndex<beats.size && t0 <= t && t <= t1) {
 						int x = x0+(x1-x0)*(t-t0)/(t1-t0);
 						image(x, 0).g = image(x, 0).r = 0;
-						t = beats[++beatIndex];
+						beatIndex++;
+						if(beatIndex<beats.size) t = beats[beatIndex];
 					}
 					image(x0, 0).b = 0; image(x0, 0).g = 0xFF;  image(x0, 0).r = 0;
 					t0 = t1;

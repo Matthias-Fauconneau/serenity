@@ -146,6 +146,7 @@ void AudioOutput::event() {
         else error("Unsupported sample size", sampleBits);
         assert(readSize<=periodSize);
         control->swPointer += readSize;
+		if(readSize < periodSize) return;
     }
     if(status->state < Running) io<START>();
 }

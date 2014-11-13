@@ -11,7 +11,8 @@ void __attribute((constructor(1001))) initialize_FFTW() {
 FFTW::~FFTW() { if(pointer) fftwf_destroy_plan(pointer); }
 
 FFT::FFT(uint N) : N(N), fftw(fftwf_plan_r2r_1d(N, windowed.begin(), halfcomplex.begin(), FFTW_R2HC, FFTW_ESTIMATE)) {
-    for(uint i: range(N)) { const real z = 2*PI*i/N; window[i] = 1 - 1.90796*cos(z) + 1.07349*cos(2*z) - 0.18199*cos(3*z); }
+	//for(uint i: range(N)) { const real z = 2*PI*i/N; window[i] = 1 - 1.90796*cos(z) + 1.07349*cos(2*z) - 0.18199*cos(3*z); }
+	for(uint i: range(N)) { const real z = 2*PI*i/(N-1); const real a=0.53836; window[i] = a  - (1-a)*cos(z); }
 }
 
 mref<float> FFT::transform() {
@@ -19,6 +20,7 @@ mref<float> FFT::transform() {
     float energy=0;
     for(uint i: range(N/2)) {
         spectrum[i] = (sq(halfcomplex[i]) + sq(halfcomplex[N-1-i])) / N; // Converts amplitude to power spectrum density
+		//assert_(isNumber(spectrum[i]), i, str(halfcomplex[i], 2, 1), str(halfcomplex[N-1-i], 2, 1));
         energy += spectrum[i];
     }
     periodEnergy = energy;
