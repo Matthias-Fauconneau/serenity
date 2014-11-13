@@ -49,7 +49,7 @@ MidiNotes notes(ref<Sign> signs, uint divisions) {
 
 struct BeatView : Widget {
 	buffer<float> audio;
-	int rate;
+	size_t rate;
 	Sheet& sheet;
 	buffer<Sign> signs = filter(sheet.midiToSign,[](Sign sign){return sign.type!=Sign::Note;});
 	Image image;
@@ -61,36 +61,38 @@ struct BeatView : Widget {
 		assert_(size.x > 1050, size, sizeHint(size));
 		shared<Graphics> graphics;
 		if(image.size.x != size.x) { // FIXME: progressive
-			image = Image(size.x, size.y); image.clear(0xFF);
-			float beatProbabilities [size.x];
-			{int t0 = 0, x0 = 0;
-				for(Sign sign: signs) {
-					int t1 = (int64)rate*sign.time*60/sheet.ticksPerMinutes;
-					int x1 = sheet.measures.values[sign.note.measureIndex]->glyphs[sign.note.glyphIndex].origin.x;
-					assert_(x1 <= size.x);
-					for(int x: range(x0, x1)) {
-						int t = t0+(t1-t0)*(x-x0)/(x1-x0);
-						ref<float> instant = audio.slice(max(0, t-512), 1024);
-						ref<float> context = audio.slice(max(0, t-rate/2), rate);
-						double instantEnergy = parallel::energy(instant) / instant.size;
-						double contextEnergy = parallel::energy(context) / context.size;
-						double beatProbability = instantEnergy / contextEnergy;
-						beatProbabilities[x] = beatProbability;
-					}
-					t0 = t1;
-					x0 = x1;
+			size_t frameStart = rate/2;
+			size_t frameSize = 1024;
+			size_t frameCount = (audio.size-rate)/frameSize;
+			float beatProbabilities [frameCount];
+			for(size_t frameIndex: range(frameCount)) {
+				size_t t = frameStart + frameIndex * frameSize;
+				assert_(t >= rate/2 && t <= audio.size-rate/2, t);
+				ref<float> instant = audio.slice(t-frameSize/2, frameSize);
+				ref<float> context = audio.slice(t-rate/2, rate);
+				double instantEnergy = parallel::energy(instant) / instant.size;
+				double contextEnergy = parallel::energy(context) / context.size; //FIXME: reuse instant frame energy evaluation
+				double beatProbability = instantEnergy / contextEnergy;
+				beatProbabilities[frameIndex] = beatProbability;
+			}
+			array<int> beats;
+			for(size_t i: range(1, audio.size/frameSize-1)) {
+				// Local maximum over 1
+				if(beatProbabilities[i] > 1 && beatProbabilities[i-1] < beatProbabilities[i] && beatProbabilities[i] > beatProbabilities[i+1]) {
+					log(i, beatProbabilities[i-1], beatProbabilities[i], beatProbabilities[i+1]);
+					beats.append( frameStart + i * frameSize );
 				}
 			}
+			image = Image(size.x, size.y); image.clear(0xFF);
 			{int t0 = 0, x0 = 0;
+				size_t beatIndex = 0; int t = beats[beatIndex];
 				for(Sign sign: signs) {
 					int t1 = (int64)rate*sign.time*60/sheet.ticksPerMinutes;
 					int x1 = sheet.measures.values[sign.note.measureIndex]->glyphs[sign.note.glyphIndex].origin.x;
-					assert_(x1 <= size.x);
-					for(int x: range(x0, x1)) {
-						// Local maximum over 1
-						if(beatProbabilities[x] > 1 &&
-								beatProbabilities[max(0,x-1)] < beatProbabilities[x] && beatProbabilities[x] > beatProbabilities[min(size.x-1, x+1)])
-							image(x, 0).g = image(x, 0).r = 0;
+					while(t0 <= t && t <= t1) {
+						int x = x0+(x1-x0)*(t-t0)/(t1-t0);
+						image(x, 0).g = image(x, 0).r = 0;
+						t = beats[++beatIndex];
 					}
 					image(x0, 0).b = 0; image(x0, 0).g = 0xFF;  image(x0, 0).r = 0;
 					t0 = t1;
