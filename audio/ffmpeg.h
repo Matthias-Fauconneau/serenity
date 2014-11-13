@@ -5,8 +5,8 @@
 /// Generic audio decoder (using ffmpeg)
 struct AudioFile {
     static constexpr uint channels = 2;
-    uint rate=0;
-    uint position = 0;
+	uint audioFrameRate = 0;
+	uint audioTime = 0;
     uint duration = 0;
 
     struct AVFormatContext* file=0;
@@ -33,7 +33,7 @@ struct AudioFile {
 	size_t read32(mref<int2> output);
 	size_t read(mref<float2> output);
 
-    void seek(uint position);
+	void seek(uint audioTime);
 };
 
 struct Audio : buffer<float2> {

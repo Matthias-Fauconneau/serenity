@@ -10,7 +10,8 @@ struct Decoder {
 		int2 size = 0;
 		struct { uint width, height; };
 	};
-	uint64 videoFrameRate=0;
+	int videoFrameRate=0;
+	int64 firstPTS = 0;
 
 	uint duration = 0;
 

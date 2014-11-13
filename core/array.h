@@ -105,7 +105,7 @@ generic struct array : buffer<T> {
     /// Filters elements matching predicate
     template<Type F> array& filter(F f) { for(size_t i=0; i<size;) if(f(at(i))) removeAt(i); else i++; return *this; }
 
-	/// Returns index to the first element greater than to \a value using linear search (assuming a sorted array)
+	/// Returns index to the first element greater than \a value using linear search (assuming a sorted array)
 	template<Type K> size_t linearSearch(const K& key) const { size_t i=0; while(i<size && at(i) <= key) i++; return i; }
 	/// Returns index after the last element lesser than \a value using linear search (assuming a sorted array)
 	template<Type K> size_t reverseLinearSearch(const K& key) const { size_t i=size; while(i>0 && at(i-1) > key) i--; return i; }

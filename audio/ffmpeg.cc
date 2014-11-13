@@ -30,8 +30,9 @@ bool AudioFile::open() {
             audio->request_sample_fmt = AV_SAMPLE_FMT_S16;
             AVCodec* codec = avcodec_find_decoder(audio->codec_id);
             if(codec && avcodec_open2(audio, codec, 0) >= 0) {
-                rate = audio->sample_rate;
-                duration = audioStream->duration*rate*audioStream->time_base.num/audioStream->time_base.den;
+				audioFrameRate = audio->sample_rate;
+				assert_(audioStream->time_base.num == 1 && (uint)audioStream->time_base.den == audioFrameRate);
+				duration = audioStream->duration; //*audioFrameRate*audioStream->time_base.num/audioStream->time_base.den;
                 break;
             }
         }
@@ -42,7 +43,7 @@ bool AudioFile::open() {
     return true;
 }
 
-size_t AudioFile::read16(mref<short2> output) {
+/*size_t AudioFile::read16(mref<short2> output) {
     uint readSize = 0;
     while(readSize<output.size) {
         if(!bufferSize) {
@@ -66,7 +67,7 @@ size_t AudioFile::read16(mref<short2> output) {
                     }
                 }
                 else error("Unimplemented conversion to int16 from", (int)audio->sample_fmt);
-                position = packet.dts*audioStream->time_base.num*rate/audioStream->time_base.den;
+				position = packet.pts*audioStream->time_base.num*rate/audioStream->time_base.den;
             }
             av_free_packet(&packet);
         }
@@ -76,7 +77,7 @@ size_t AudioFile::read16(mref<short2> output) {
     }
     assert(readSize == output.size);
     return readSize;
-}
+}*/
 
 size_t AudioFile::read32(mref<int2> output) {
     uint readSize = 0;
@@ -116,7 +117,9 @@ size_t AudioFile::read32(mref<int2> output) {
 					}
 				}
                 else error("Unimplemented conversion to int32 from", (int)audio->sample_fmt);
-                position = packet.dts*audioStream->time_base.num*rate/audioStream->time_base.den;
+				assert_(audioStream->time_base.num == 1 && (uint)audioStream->time_base.den == audioFrameRate);
+				//log("A", packet.pts, packet.dts, audioFrameRate);
+				audioTime = packet.pts; //*audioStream->time_base.num*rate/audioStream->time_base.den;
             }
             av_free_packet(&packet);
         }
@@ -165,7 +168,8 @@ size_t AudioFile::read(mref<float2> output) {
 					}
 				}*/
 				else error("Unimplemented conversion to float32 from", (int)audio->sample_fmt);
-				position = packet.dts*audioStream->time_base.num*rate/audioStream->time_base.den;
+				assert_(audioStream->time_base.num == 1 && (uint)audioStream->time_base.den == audioFrameRate);
+				audioTime = packet.pts; //*audioStream->time_base.num*rate/audioStream->time_base.den;
 			}
 			av_free_packet(&packet);
 		}
@@ -177,19 +181,18 @@ size_t AudioFile::read(mref<float2> output) {
 	return readSize;
 }
 
-
-void AudioFile::seek(uint position) { av_seek_frame(file, audioStream->index, (uint64)position*audioStream->time_base.den/(rate*audioStream->time_base.num), 0); }
+//void AudioFile::seek(uint position) { av_seek_frame(file, audioStream->index, (uint64)position*audioStream->time_base.den/(rate*audioStream->time_base.num), 0); }
 
 void AudioFile::close() {
     if(frame) av_frame_free(&frame);
-    rate=0, position=0, duration=0; audioStream = 0; audio=0;
+	duration=0; audioStream = 0; audio=0;
     intBuffer=buffer<int2>(); floatBuffer=buffer<float2>(); bufferIndex=0, bufferSize=0;
     if(file) avformat_close_input(&file);
 }
 
 Audio decodeAudio(string path) {
 	AudioFile file(path);
-	Audio audio (buffer<float2>(file.duration), file.rate);
+	Audio audio (buffer<float2>(file.duration), file.audioFrameRate);
 	audio.size = file.read(audio);
 	return audio;
 }

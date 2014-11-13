@@ -66,8 +66,6 @@ void Decoder::read(const Image& image) {
 			assert_(used >= 0, used);
 			if(!gotFrame) continue;
 
-			/*AVFrame* targetFrame = av_frame_alloc();
-			avpicture_alloc((AVPicture*)targetFrame, AV_PIX_FMT_BGRA, width, height);*/
 			AVPicture targetFrame;
 			targetFrame.data[0] = ((uint8*)image.data);
 			targetFrame.data[1] = ((uint8*)image.data)+1;
@@ -75,7 +73,11 @@ void Decoder::read(const Image& image) {
 			targetFrame.linesize[0] = targetFrame.linesize[1] = targetFrame.linesize[2] = image.stride*4;
 			sws_scale(swsContext, frame->data, frame->linesize, 0, height, targetFrame.data, targetFrame.linesize);
 
-			videoTime = packet.dts*audioStream->time_base.num*rate/audioStream->time_base.den;
+			assert_(videoStream->time_base.num == 1 && videoStream->time_base.den == videoFrameRate);
+			assert_(packet.dts == packet.pts);
+			if(!firstPTS) firstPTS=packet.pts; // Ignores any embedded sync
+			videoTime = packet.pts-firstPTS;
+			//assert_(videoTime == packet.dts, videoTime, frame->pts==AV_NOPTS_VALUE, packet.dts, packet.pts, videoFrameRate);
 			return;
 		}
 		av_free_packet(&packet);
@@ -106,7 +108,7 @@ void Decoder::read(const Image& image) {
 					}
 				}
 				else error("Unimplemented conversion to int16 from", (int)audio->sample_fmt);
-				audioTime = packet.dts*audioStream->time_base.num*rate/audioStream->time_base.den;
+				audioTime = packet.pts*audioStream->time_base.num*rate/audioStream->time_base.den;
 			}
 			av_free_packet(&packet);
 		}

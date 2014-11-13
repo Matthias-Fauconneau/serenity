@@ -158,7 +158,7 @@ template<Type Arg0, Type Arg1, Type... Args>
 String str(const Arg0& arg0, const Arg1& arg1, const Args&... args) { return join(ref<string>{str(arg0), str(arg1), str(args)...}, " "_); }
 
 /// Logs to standard output using str(...) serialization
-template<Type... Args> void log(const Args&... args) { log((string)str(args...)); }
+template<Type... Args> void log(const Args&... args) { log((string)join(ref<string>{str(args)...}, " "_)); }
 /// Logs to standard output using str(...) serialization and terminate all threads
 template<Type... Args> void __attribute((noreturn)) error(const Args&... args) { error<string>(str(args...)); }
 

@@ -49,6 +49,7 @@ void Encoder::setVideo(int2 size, uint videoFrameRate) {
 
 void Encoder::setAudio(const AudioFile& audio) {
 	assert_(!audioStream);
+	audioFrameRate = audio.audioFrameRate;
 	AVCodec* codec = avcodec_find_encoder(audio.audio->codec_id);
 	audioStream = avformat_new_stream(context, codec);
 	audioCodec = audioStream->codec;

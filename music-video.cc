@@ -48,93 +48,150 @@ MidiNotes notes(ref<Sign> signs, uint divisions) {
 	return notes;
 }
 
-struct BeatView : Widget {
+struct BeatSynchronizer : Widget {
 	buffer<float> signal;
 	size_t rate;
 	Sheet& sheet;
+	MidiNotes& notes;
 	buffer<Sign> signs = filter(sheet.midiToSign,[](Sign sign){return sign.type!=Sign::Note;});
-	Image image;
+	struct Bar { float x; bgr3f color; };
+	array<Bar> bars;
 	size_t time = 0;
-	BeatView(ref<float2> stereo, uint rate, Sheet& sheet) : signal(stereo.size), rate(rate), sheet(sheet) {
+	BeatSynchronizer(ref<float2> stereo, uint rate, Sheet& sheet, MidiNotes& notes) : signal(stereo.size), rate(rate), sheet(sheet), notes(notes) {
 		for(size_t index: range(signal.size)) {
 			signal[index] = (stereo[index][0]+stereo[index][1])/2;
 			assert_(signal[index]>=-1 && signal[index]<=1, signal[index]);
 		}
+		size_t T = signal.size; // Total sample count
+		size_t N = 2048; // Frame size (43ms @48KHz)
+		size_t h = N/4; // Hop size (11ms @48KHz (75% overlap))
+		FFT fft(N);
+		size_t frameCount = (T-N)/h;
+		buffer<double> f(frameCount); // Spectral flux onset function
+		buffer<float> previous = buffer<float>(N/2); previous.clear(0);
+		double sum = 0;
+		for(size_t frameIndex: range(frameCount)) {
+			size_t t0 = frameIndex * h;
+			for(size_t i: range(N)) {
+				fft.windowed[i] = fft.window[i] * signal[t0+i];
+			}
+			fft.spectrum = buffer<float>(N/2);
+			fft.transform();
+			buffer<float> current = move(fft.spectrum);
+			double spectralFlux = 0;
+			for(size_t k: range(N/2)) {
+				float x = current[k] - previous[k]; // or L1: sqrt(current[k]) - sqrt(previous[k])
+				if(x<0) x=0; // "Half-wave rectifier"
+				spectralFlux += x;
+			}
+			f[frameIndex] = spectralFlux;
+			sum += spectralFlux;
+			previous = move(current);
+		}
+
+		/// Normalizes onset function
+		double mean = sum/frameCount;
+		double SSQ = 0;
+		for(double& v: f) { v -= mean; SSQ += sq(v); }
+		double deviation = sqrt(SSQ);
+		for(double& v: f) v /= deviation;
+
+		// For visualization only
+		array<int> beats;
+		const int w = 3, m = 3;
+		const double threshold = 1./1024;
+		for(size_t n: range(m*w, frameCount-w)) {
+			bool localMaximum = true;
+			for(size_t k: range(n-w, n+w+1)) {
+				if(k==n) continue;
+				if(!(f[n] > f[k])) localMaximum=false;
+			}
+			if(localMaximum) {
+				double sum = 0;
+				for(size_t k: range(n-m*w, n+w+1)) sum += f[k];
+				double mean = sum / (m*w+w+1);
+				if(f[n] > mean + threshold) beats.append( n * h );
+			}
+		}
+
+		// Synchronizes MIDI with audio by moving each onset to nearest onset
+		{
+			for(size_t midiIndex: range(notes.size)) {
+				MidiNote note = notes[midiIndex];
+				if(!note.velocity) continue;
+				int64 current = (int64)rate*note.time/notes.ticksPerSeconds;
+				size_t beatIndex = beats.linearSearch(current);
+				assert_(int(beatIndex)>0);
+				int64 previous = beats[beatIndex-1];
+				while(beatIndex<beats.size && beats[beatIndex] < current) beatIndex++;
+				int64 next = beats[beatIndex];
+				/*int previous = current;
+				while(previous > 0) {
+					if(f[previous-1] >= f[previous]) previous--;
+					else break;
+				}
+				int next = current;
+				while(next < int(frameCount-1)) {
+					if(f[next+1] >= f[next]) next++;
+					else break;
+				}*/
+				assert_(previous <= current && current <= next, previous, current, next);
+				int nearest = abs(next-current) < abs(previous-current) ? next : previous;
+				int offset = nearest - current;
+				if(offset && abs(offset) < int(rate)/8) {
+					int64 midiOffset = (int64)offset*notes.ticksPerSeconds/int64(rate);
+					//log(offset/float(rate), midiOffset/float(notes.ticksPerSeconds));
+					for(MidiNote& note: notes.slice(midiIndex, notes.size-midiIndex)) {
+						assert_(note.time+midiOffset >= 0, midiIndex, note.time, midiOffset, note.time+midiOffset, offset, previous, current, next);
+						note.time += midiOffset;
+					}
+				}
+			}
+		}
+
+		// MIDI visualization (synchronized to sheet time)
+		{
+			size_t midiIndex = 0;
+			auto onsets = apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.time;});
+			for(int index: range(sheet.measureBars.size()-1)) {
+				int64 t0 = (int64)notes.ticksPerSeconds*sheet.measureBars.keys[index]*60/sheet.ticksPerMinutes;
+				float x0 = sheet.measureBars.values[index];
+				int64 t1 = (int64)notes.ticksPerSeconds*sheet.measureBars.keys[index+1]*60/sheet.ticksPerMinutes;
+				float x1 = sheet.measureBars.values[index+1];
+
+				while(midiIndex<onsets.size && t0 <= onsets[midiIndex] && onsets[midiIndex] < t1) {
+					assert_(t1>t0);
+					float x = x0+(x1-x0)*(onsets[midiIndex]-t0)/(t1-t0);
+					bars.append(Bar{x, blue});
+					midiIndex++;
+				}
+			}
+		}
+
+		// Beat visualization (synchronized to sheet time)
+		{
+			size_t beatIndex = 0;
+			for(int index: range(sheet.measureBars.size()-1)) {
+				int64 t0 = (int64)rate*sheet.measureBars.keys[index]*60/sheet.ticksPerMinutes;
+				float x0 = sheet.measureBars.values[index];
+				int64 t1 = (int64)rate*sheet.measureBars.keys[index+1]*60/sheet.ticksPerMinutes;
+				float x1 = sheet.measureBars.values[index+1];
+				while(beatIndex<beats.size && t0 <= beats[beatIndex] && beats[beatIndex] < t1) {
+					assert_(t1>t0);
+					float x = x0+(x1-x0)*(beats[beatIndex]-t0)/(t1-t0);
+					bars.append(Bar{x, red});
+					beatIndex++;
+				}
+			}
+		}
+
+		//for(float x: sheet.measureBars.values) bars.append(Bar{x, green});
 	}
 	int2 sizeHint(int2 size) override { return int2(sheet.sizeHint(size).x, 32); }
 	shared<Graphics> graphics(int2 size) override {
 		assert_(size.x > 1050, size, sizeHint(size));
 		shared<Graphics> graphics;
-		if(image.size.x != size.x) { // FIXME: progressive
-			size_t T = signal.size; // Total sample count
-			size_t N = 2048; // Frame size (43ms @48KHz)
-			size_t h = N/4; // Hop size (11ms @48KHz (75% overlap))
-			FFT fft(N);
-			size_t frameCount = (T-N)/h;
-			buffer<double> f(frameCount); // Spectral flux onset function
-			buffer<float> previous = buffer<float>(N/2); previous.clear(0);
-			double sum = 0;
-			for(size_t frameIndex: range(frameCount)) {
-				size_t t0 = frameIndex * h;
-				for(size_t i: range(N)) {
-					fft.windowed[i] = fft.window[i] * signal[t0+i];
-				}
-				fft.spectrum = buffer<float>(N/2);
-				fft.transform();
-				buffer<float> current = move(fft.spectrum);
-				double spectralFlux = 0;
-				for(size_t k: range(N/2)) {
-					float x = current[k] - previous[k]; // or L1: sqrt(current[k]) - sqrt(previous[k])
-					if(x<0) x=0; // "Half-wave rectifier"
-					spectralFlux += x;
-				}
-				f[frameIndex] = spectralFlux;
-				sum += spectralFlux;
-				previous = move(current);
-			}
-			/// Normalizes onset function
-			double mean = sum/frameCount;
-			double SSQ = 0;
-			for(double& v: f) { v -= mean; SSQ += sq(v); }
-			double deviation = sqrt(SSQ);
-			for(double& v: f) v /= deviation;
-			array<int> beats;
-			const int w = 3, m = 3;
-			const double threshold = 1./1024;
-			for(size_t n: range(m*w, frameCount-w)) {
-				bool localMaximum = true;
-				for(size_t k: range(n-w, n+w+1)) {
-					if(k==n) continue;
-					if(!(f[n] > f[k])) localMaximum=false;
-				}
-				if(localMaximum) {
-					double sum = 0;
-					for(size_t k: range(n-m*w, n+w+1)) sum += f[k];
-					double mean = sum / (m*w+w+1);
-					if(f[n] > mean + threshold) beats.append( n * h );
-				}
-			}
-			image = Image(size.x, size.y); image.clear(0xFF);
-			{
-				size_t beatIndex = 0; int64 t = beatIndex<beats.size ? beats[beatIndex] : 0;
-				for(int index: range(sheet.measureBars.size()-1)) {
-					int64 t0 = (int64)rate*sheet.measureBars.keys[index]*60/sheet.ticksPerMinutes;
-					float x0 = sheet.measureBars.values[index];
-					int64 t1 = (int64)rate*sheet.measureBars.keys[index+1]*60/sheet.ticksPerMinutes;
-					float x1 = sheet.measureBars.values[index+1];
-					image(x0, 0).b = 0; image(x0, 0).g = 0xFF;  image(x0, 0).r = 0;
-					while(beatIndex<beats.size && t0 <= t && t < t1) {
-						assert_(t1>t0);
-						int x = x0+(x1-x0)*(t-t0)/(t1-t0);
-						image(x, 0).b = 0xFF; image(x, 0).g = image(x, 0).r = 0;
-						beatIndex++;
-						if(beatIndex<beats.size) t = beats[beatIndex];
-					}
-				}
-			}
-			for(int y: range(size.y)) for(int x: range(size.x)) image(x, y) = image(x, 0); // Duplicate lines
-		}
-		graphics->blits.append(vec2(0), vec2(size), share(image));
+		for(Bar bar: bars) graphics->fills.append(vec2(bar.x, 0), vec2(2, size.y), bar.color, 1.f/2);
 		for(int index: range(sheet.measureBars.size()-1)) {
 			uint64 t0 = (int64)rate*sheet.measureBars.keys[index]*60/sheet.ticksPerMinutes;
 			float x0 = sheet.measureBars.values[index];
@@ -143,7 +200,6 @@ struct BeatView : Widget {
 			if(t0 <= time && time < t1) {
 				assert_(t1>t0);
 				float x = x0+(x1-x0)*(time-t0)/(t1-t0);
-				log(x);
 				graphics->fills.append(vec2(x, 0), vec2(2, size.y));
 			}
 		}
@@ -173,8 +229,8 @@ struct Music : Widget {
 
 	// Rendering
 	Sheet sheet {xml.signs, xml.divisions, apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
-	BeatView beatView {audioData, audioData.rate, sheet};
-	Scroll<VBox> scroll {{&sheet, &beatView}};
+	BeatSynchronizer beatSynchronizer {audioData, audioData.rate, sheet, notes};
+	Scroll<VBox> scroll {{&sheet/*, &beatSynchronizer*/}};
 	bool failed = sheet.firstSynchronizationFailureChordIndex != invalid;
 	bool running = true; //!failed;
 	Keyboard keyboard;
@@ -197,14 +253,7 @@ struct Music : Widget {
 
 	size_t read32(mref<int2> output) {
 		assert_(audioFile);
-		bool contentChanged = false;
-		beatView.time = audioFile.position;
-		if(follow(audioFile.position, audioFile.rate, window.size)) contentChanged = true;
-		if(audioFile.position*video.videoFrameRate > video.videoTime*audioFile.rate) {
-			video.read(videoView.image);
-			contentChanged = true;
-		}
-		if(contentChanged) window.render();
+		if(follow(audioFile.audioTime, audioFile.audioFrameRate, window.size)) window.render();
 		return audioFile.read32(output);
 	}
 
@@ -250,12 +299,14 @@ struct Music : Widget {
 			if(t1 <= t && t <= t2) {
 				float f = float(t-t1)/float(t2-t1);
 				float w[4] = { 1.f/6 * cb(1-f), 2.f/3 - 1.f/2 * sq(f)*(2-f), 2.f/3 - 1.f/2 * sq(1-f)*(2-(1-f)), 1.f/6 * cb(f) };
-				auto X = [&](int index) { return clip(0.f, sheet.measureBars.values[clip<int>(0, index, sheet.measureBars.values.size)] - float(size.x/2),
+				auto X = [&](int index) { return clip(0.f, sheet.measureBars.values[clip<int>(0, index, sheet.measureBars.values.size)] - float(size.x/3),
 																	   float(abs(sheet.sizeHint(size).x)-size.x)); };
 				scroll.offset.x = -( w[0]*X(index-1) + w[1]*X(index) + w[2]*X(index+1) + w[3]*X(index+2) );
 				break;
 			}
 		}
+		beatSynchronizer.time = timeNum*beatSynchronizer.rate/timeDen;
+		if(video.videoTime*timeDen < timeNum*video.videoFrameRate) { video.read(videoView.image); contentChanged=true; }
 		return contentChanged;
 	}
 
@@ -301,11 +352,13 @@ struct Music : Widget {
 					if(audioFile) {
 						AVPacket packet;
 						if(av_read_frame(audioFile.file, &packet) < 0) { done=true; return false; }
-						packet.pts=packet.dts=encoder.audioTime=
-								int64(packet.pts)*encoder.audioStream->codec->time_base.den/audioFile.audioStream->codec->time_base.den;
-						packet.duration = int64(packet.duration)*encoder.audioStream->time_base.den/audioFile.audioStream->time_base.den;
-						packet.stream_index = encoder.audioStream->index;
-						av_interleaved_write_frame(encoder.context, &packet);
+						if(audioFile.file->streams[packet.stream_index]==audioFile.audioStream) {
+							assert_(encoder.audioStream->codec->time_base.den == audioFile.audioStream->codec->time_base.den);
+							packet.pts=packet.dts=encoder.audioTime= int64(packet.pts); //*encoder.audioStream->codec->time_base.den/audioFile.audioStream->codec->time_base.den;
+							packet.duration = int64(packet.duration)*encoder.audioStream->time_base.den/audioFile.audioStream->time_base.den;
+							packet.stream_index = encoder.audioStream->index;
+							av_interleaved_write_frame(encoder.context, &packet);
+						}
 					} else {
 						byte buffer_[sampler.periodSize*sizeof(short2)];
 						mref<short2> buffer((short2*)buffer_, sampler.periodSize);
@@ -316,10 +369,11 @@ struct Music : Widget {
 					return true;
 				};
 				if(encoder.videoFrameRate) { // Interleaved AV
-					while(encoder.audioTime*encoder.videoFrameRate <= encoder.videoTime*encoder.audioStream->time_base.den) {
+					assert_(encoder.audioStream->time_base.den == (int)encoder.audioFrameRate);
+					while(encoder.audioTime*encoder.videoFrameRate <= encoder.videoTime*encoder.audioFrameRate) { // If both streams are at same PTS, starts with audio
 						if(!writeAudio()) break;
 					}
-					while(encoder.audioTime*encoder.videoFrameRate > encoder.videoTime*encoder.audioStream->time_base.den) {
+					while(encoder.videoTime*encoder.audioFrameRate < encoder.audioTime*encoder.videoFrameRate) {
 						follow(encoder.videoTime, encoder.videoFrameRate, encoder.size);
 						renderTime.start();
 						Image target (encoder.size);
@@ -341,22 +395,15 @@ struct Music : Widget {
 		} else { // Preview
 			window.show();
 			if(playbackDeviceAvailable()) {
-				audio.start(audioFile.rate ?: sampler.rate, sampler.periodSize, /*audioFile ? 16 :*/ 32);
-				assert_(audio.rate == audioFile.rate ?: sampler.rate);
+				audio.start(audioFile.audioFrameRate ?: sampler.rate, sampler.periodSize, /*audioFile ? 16 :*/ 32);
+				assert_(audio.rate == audioFile.audioFrameRate ?: sampler.rate);
 				audioThread.spawn();
 			} else running = false;
 		}
     }
 
 	int2 sizeHint(int2 size) override { return running ? widget.sizeHint(size) : scroll.ScrollArea::sizeHint(size); }
-	shared<Graphics> graphics(int2 size) override {
-		/*if(video) {
-			if(audioFile.position*video.videoFrameRate > video.videoTime*audioFile.rate) video.read(videoView.image);
-			if(audioFile.position*video.videoFrameRate > video.videoTime*audioFile.rate) window.render();
-			//return videoView.graphics(size);
-		}*/
-		return running ? widget.graphics(size, Rect(size)) : scroll.ScrollArea::graphics(size);
-    }
+	shared<Graphics> graphics(int2 size) override { return running ? widget.graphics(size, Rect(size)) : scroll.ScrollArea::graphics(size); }
 	bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
 		return scroll.ScrollArea::mouseEvent(cursor, size, event, button, focus);
 	}

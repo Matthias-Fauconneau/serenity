@@ -19,7 +19,7 @@ struct AudioOutput : Device, Poll {
 
     static constexpr uint channels = 2;
     uint sampleBits = 0;
-    uint rate = 0;
+	uint rate = 0;
     uint periodSize = 0, bufferSize = 0;
 
 	function<size_t(mref<short2>)> read16 = [](mref<short2>){ error("read16"); return 0;};
