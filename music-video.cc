@@ -48,6 +48,7 @@ MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter) {
 	return notes;
 }
 
+inline float keyToPitch(float key) { return 440*exp2((key-69)/12); }
 struct BeatSynchronizer : Widget {
 	buffer<float> signal;
 	int64 rate;
@@ -58,6 +59,11 @@ struct BeatSynchronizer : Widget {
 	array<Bar> bars;
 	size_t time = 0;
 	BeatSynchronizer(ref<float2> stereo, int64 rate, Sheet& sheet, MidiNotes& notes) : signal(stereo.size), rate(rate), sheet(sheet), notes(notes) {
+		// Converts MIDI time base to audio sample rate
+		for(MidiNote& note: notes) note.time = note.time*rate/notes.ticksPerSeconds;
+		notes.ticksPerSeconds = rate;
+
+		// Setups signal spectral processing
 		assert_(stereo);
 		for(size_t index: range(signal.size)) {
 			signal[index] = (stereo[index][0]+stereo[index][1])/2;
@@ -69,6 +75,52 @@ struct BeatSynchronizer : Widget {
 		FFT fft(N);
 		assert_(T>N, T);
 		size_t frameCount = (T-N)/h;
+#if 0
+		buffer<float> previous;
+		// Synchronizes MIDI with audio by matching expected fundamentals onsets (TODO: use pitch estimator candidates, offsets)
+		map<uint, size_t> expected;
+		size_t firstMidiIndex = 0, nextMidiIndex = 0;
+		int64 midiTime = 0; uint64 firstMatchAudioTimeShift = 0;
+		for(size_t frameIndex: range(frameCount)) {
+			while(nextMidiIndex < notes.size && !expected) {
+				// Shifts next notes using last match
+				if(firstMatchAudioTimeShift) {
+					for(MidiNote& note: notes.slice(firstMidiIndex)) note.time += firstMatchAudioTimeShift;
+					firstMatchAudioTimeShift = 0;
+				}
+				// Prepares next expectation
+				firstMidiIndex = nextMidiIndex;
+				midiTime = notes[nextMidiIndex].time;
+				while(nextMidiIndex < notes.size && notes[nextMidiIndex].time == midiTime) {
+					if(notes[nextMidiIndex].velocity) expected.insert(notes[nextMidiIndex].key, nextMidiIndex);
+					nextMidiIndex++;
+				}
+			}
+
+			size_t audioTime = frameIndex * h;
+			for(size_t i: range(N)) {
+				fft.windowed[i] = fft.window[i] * signal[audioTime+i];
+			}
+			fft.spectrum = buffer<float>(N/2);
+			fft.transform();
+			buffer<float> current = move(fft.spectrum);
+			if(previous) {
+				expected.filter([&](uint key, size_t index) {
+					uint f0 = round(keyToPitch(key)*N/rate);
+					assert_(f0 < N/2);
+					int64 expectedTime = notes[index].time;
+					float distance = (expectedTime-int64(audioTime))/float(rate);
+					if(current[f0] > previous[f0]/max(1.f,abs(distance)) && current[f0] > fft.periodEnergy/(10*max(1.f,abs(distance)))) {
+						log(expectedTime/float(rate), audioTime/float(rate), distance, "got", key, current[f0]/previous[f0], current[f0]/fft.periodEnergy);
+						if(!firstMatchAudioTimeShift) firstMatchAudioTimeShift = audioTime - notes[index].time;
+						return true;
+					}
+					return false;
+				});
+			}
+			previous = move(current);
+		}
+#else
 		buffer<double> f(frameCount); // Spectral flux onset function
 		buffer<float> previous = buffer<float>(N/2); previous.clear(0);
 		double sum = 0;
@@ -98,7 +150,7 @@ struct BeatSynchronizer : Widget {
 		double deviation = sqrt(SSQ);
 		for(double& v: f) v /= deviation;
 
-		// For visualization only
+		/// Selects onset peaks (beats)
 		array<int64> beats;
 		const int w = 3, m = 3;
 		for(size_t n: range(m*w, frameCount-w)) {
@@ -117,32 +169,13 @@ struct BeatSynchronizer : Widget {
 		}
 
 		// Synchronizes MIDI with audio by moving each onset to nearest onset
-		{
-			// Converts MIDI time base to audio sample rate
-			for(MidiNote& note: notes) note.time = note.time*rate/notes.ticksPerSeconds;
-			notes.ticksPerSeconds = rate;
-			{// Inconditionnaly sync first note with first beat
-				MidiNote note = notes[0];
-				int64 current = note.time;
-				int64 offset = beats[0] - current;
-				for(MidiNote& note: notes) note.time += offset;
-			}
-			for(size_t midiIndex: range(notes.size)) {
-				MidiNote note = notes[midiIndex];
-				if(!note.velocity) continue;
-				int64 current = note.time;
-				size_t beatIndex = beats.linearSearch(current);
-				int64 previous = beats[max(0,int(beatIndex)-1)];
-				while(beatIndex < beats.size && beats[beatIndex] < current) beatIndex++;
-				int64 next = beats[beatIndex];
-				assert_((previous <= current && current <= next) || (beatIndex==0), previous, current, next, current, beatIndex);
-				int64 nearest = abs(next-current) < abs(previous-current) ? next : previous;
-				int64 offset = nearest - current;
-				if(offset && abs(offset) < rate) {
-					for(MidiNote& note: notes.slice(midiIndex, notes.size-midiIndex)) note.time += offset;
-				}
-			}
+		{// Inconditionnaly sync first note with first beat
+			MidiNote note = notes[0];
+			int64 current = note.time;
+			int64 offset = beats[0] - current;
+			for(MidiNote& note: notes) note.time += offset;
 		}
+#endif
 
 		assert_(sheet.ticksPerMinutes);
 		{ // Synchronizes measure times with MIDI
@@ -180,7 +213,7 @@ struct BeatSynchronizer : Widget {
 			}
 		}
 
-		// Beat visualization (synchronized to sheet time)
+		/*// Beat visualization (synchronized to sheet time)
 		{
 			size_t beatIndex = 0;
 			for(int index: range(sheet.measureBars.size()-1)) {
@@ -195,7 +228,7 @@ struct BeatSynchronizer : Widget {
 					beatIndex++;
 				}
 			}
-		}
+		}*/
 
 		for(float x: sheet.measureBars.values) bars.append(Bar{x, green});
 	}
@@ -238,13 +271,13 @@ struct Music : Widget {
 	// Video input
 	buffer<String> videoFiles = filter(Folder(".").list(Files), [this](string path) {
 			return !startsWith(path, name) ||  (!endsWith(path, "performance.mp4") && !endsWith(path, ".cut.mp4")); });
-	Decoder video {videoFiles[0]};
-	ImageView videoView {video.size};
+	Decoder video = videoFiles ? Decoder(videoFiles[0]) : Decoder();
+	ImageView videoView = video ? video.size : Image();
 
 	// Rendering
 	Sheet sheet {xml.signs, xml.divisions, apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
 	BeatSynchronizer beatSynchronizer {audioData, audioData.rate, sheet, notes};
-	Scroll<VBox> scroll {{&sheet, &beatSynchronizer}};
+	Scroll<VBox> scroll {{&sheet/*, &beatSynchronizer*/}};
 	bool failed = sheet.firstSynchronizationFailureChordIndex != invalid;
 	bool running = true; //!failed;
 	Keyboard keyboard;
@@ -306,11 +339,12 @@ struct Music : Widget {
 			}
 		}
 		uint64 t = timeNum*sheet.ticksPerMinutes;
+		int previousOffset = scroll.offset.x;
 		// Cardinal cubic B-Spline
 		for(int index: range(sheet.measureBars.size()-1)) {
 			uint64 t1 = sheet.measureBars.keys[index]*60*timeDen;
 			uint64 t2 = sheet.measureBars.keys[index+1]*60*timeDen;
-			if(t1 <= t && t <= t2) {
+			if(t1 <= t && t < t2) {
 				//log(index, t1/float(sheet.ticksPerMinutes*timeDen), t/float(sheet.ticksPerMinutes*timeDen), t2/float(sheet.ticksPerMinutes*timeDen));
 				real f = real(t-t1)/real(t2-t1);
 				real w[4] = { 1./6 * cb(1-f), 2./3 - 1./2 * sq(f)*(2-f), 2./3 - 1./2 * sq(1-f)*(2-(1-f)), 1./6 * cb(f) };
@@ -320,8 +354,9 @@ struct Music : Widget {
 				break;
 			}
 		}
+		if(previousOffset != scroll.offset.x) contentChanged = true;
 		beatSynchronizer.time = timeNum*beatSynchronizer.rate/timeDen;
-		if(video.videoTime*timeDen < timeNum*video.videoFrameRate) {
+		if(video && video.videoTime*timeDen < timeNum*video.videoFrameRate) {
 			video.read(videoView.image);
 			rotate(videoView.image);
 			contentChanged=true;

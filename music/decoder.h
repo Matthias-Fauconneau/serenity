@@ -25,9 +25,11 @@ struct Decoder {
 	buffer<short2> shortBuffer;
 	size_t bufferIndex=0, bufferSize=0;
 
+	Decoder() {}
 	Decoder(string name);
+	default_move(Decoder);
 	~Decoder();
-	operator bool() { return file; }
+	explicit operator bool() { return file; }
 
 	/// Reads a video frame
 	void read(const Image& video);

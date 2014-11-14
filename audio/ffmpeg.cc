@@ -31,9 +31,10 @@ bool AudioFile::open() {
             AVCodec* codec = avcodec_find_decoder(audio->codec_id);
             if(codec && avcodec_open2(audio, codec, 0) >= 0) {
 				audioFrameRate = audio->sample_rate;
-				assert_(audioStream->time_base.num == 1 /*&& (uint)audioStream->time_base.den == audioFrameRate*/, audioStream->time_base.den, audioFrameRate);
+				assert_(audioStream->time_base.num == 1, audioStream->time_base.den, audioFrameRate);
+				assert_(audioStream->time_base.den%audioFrameRate == 0);
 				assert_(audioStream->duration != AV_NOPTS_VALUE);
-				duration = audioStream->duration*int64(audioFrameRate)*int64(audioStream->time_base.num)/int64(audioStream->time_base.den);
+				duration = audioStream->duration*audioFrameRate*audioStream->time_base.num/audioStream->time_base.den;
 				assert_(duration, hex(audioStream->duration), audioStream->time_base.num, audioStream->time_base.den, audioFrameRate);
                 break;
             }
@@ -119,8 +120,7 @@ size_t AudioFile::read32(mref<int2> output) {
 					}
 				}
                 else error("Unimplemented conversion to int32 from", (int)audio->sample_fmt);
-				assert_(audioStream->time_base.num == 1 && (uint)audioStream->time_base.den == audioFrameRate);
-				audioTime = packet.pts; //*audioStream->time_base.num*rate/audioStream->time_base.den;
+				audioTime = packet.pts*audioFrameRate*audioStream->time_base.num/audioStream->time_base.den;
             }
             av_free_packet(&packet);
         }
@@ -169,9 +169,7 @@ size_t AudioFile::read(mref<float2> output) {
 					}
 				}
 				else error("Unimplemented conversion to float32 from", (int)audio->sample_fmt);
-				assert_(audioStream->time_base.num == 1 && (uint)audioStream->time_base.den == audioFrameRate);
-				assert_(packet.pts >= 0);
-				audioTime = packet.pts; //*audioStream->time_base.num*rate/audioStream->time_base.den;
+				audioTime = packet.pts*audioFrameRate*audioStream->time_base.num/audioStream->time_base.den;
 			}
 			av_free_packet(&packet);
 		}
