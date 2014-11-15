@@ -3,8 +3,8 @@
 
 /// Generic video/audio decoder (using ffmpeg)
 struct Decoder {
-	static constexpr uint channels = 2;
-	uint rate=0;
+	//static constexpr uint channels = 2;
+	//uint rate=0;
 
 	union {
 		int2 size = 0;

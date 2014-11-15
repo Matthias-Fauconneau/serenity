@@ -43,7 +43,8 @@ MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter) {
 				notes.insertSorted({(sign.time+sign.duration)*60, sign.note.key, 0});
 		}
 	}
-	if(!notes.ticksPerSeconds) notes.ticksPerSeconds = 120*ticksPerQuarter;
+	assert(notes.last().time >= 0);
+	if(!notes.ticksPerSeconds) notes.ticksPerSeconds = 120*ticksPerQuarter; //TODO: default tempo from audio
 	assert_(notes.ticksPerSeconds);
 	return notes;
 }
@@ -55,19 +56,21 @@ struct BeatSynchronizer : Widget {
 	buffer<Sign> signs = filter(sheet.midiToSign,[](Sign sign){return sign.type!=Sign::Note;});
 	struct Bar { float x; bgr3f color; };
 	array<Bar> bars;
-	size_t time = 0;
-	BeatSynchronizer(ref<float> signal, int64 rate, Sheet& sheet, MidiNotes& notes) : rate(rate), sheet(sheet), notes(notes) {
+	//size_t time = 0;
+	BeatSynchronizer(ref<float> signal, uint rate, Sheet& sheet, MidiNotes& notes) : rate(rate), sheet(sheet), notes(notes) {
 		// Converts MIDI time base to audio sample rate
-		for(MidiNote& note: notes) note.time = note.time*rate/notes.ticksPerSeconds;
+		for(MidiNote& note: notes) {
+			note.time = note.time*int64(rate)/notes.ticksPerSeconds;
+			assert(note.time >= 0);
+		}
 		notes.ticksPerSeconds = rate;
 
 		// Setups signal spectral processing
-		size_t T = signal.size; // Total sample count
-		size_t N = 16384;
-		size_t h = 2048;
-		assert_(T>N, T);
-		size_t frameCount = (T-N)/h;
-#if 1
+		size_t N = 2048; // Frame size (43ms @48KHz)
+		assert_(signal.size>N);
+		int h = N/4; // Hop size (11ms @48KHz (75% overlap))
+		int frameCount = (signal.size-N)/h;
+#if 0
 		array<size_t> beats;
 		{
 			FFT fft(N);
@@ -128,59 +131,84 @@ struct BeatSynchronizer : Widget {
 		}
 #endif
 #if 1
-		PitchEstimator estimator (N);
-		// Synchronizes MIDI with audio estimating notes pitch
-		map<uint, size_t> expected;
-		size_t firstMidiIndex = 0, nextMidiIndex = 0;
-		int64 midiTime = 0; uint64 firstMatchAudioTimeShift = 0;
+		array<buffer<float>> spectra (frameCount);
+		FFT fft(N);
 		for(size_t frameIndex: range(frameCount)) {
-			while(nextMidiIndex < notes.size && !expected) {
-				// Shifts next notes using last match
-				if(firstMatchAudioTimeShift) {
-					for(MidiNote& note: notes.slice(firstMidiIndex)) note.time += firstMatchAudioTimeShift;
-					firstMatchAudioTimeShift = 0;
-				}
-				// Prepares next expectation
-				firstMidiIndex = nextMidiIndex;
-				midiTime = notes[nextMidiIndex].time;
-				while(nextMidiIndex < notes.size && notes[nextMidiIndex].time == midiTime) {
-					if(notes[nextMidiIndex].velocity) expected.insert(notes[nextMidiIndex].key, nextMidiIndex);
-					nextMidiIndex++;
-				}
-			}
-
 			size_t audioTime = frameIndex * h;
 			for(size_t i: range(N)) {
-				estimator.windowed[i] = estimator.window[i] * signal[audioTime+i];
+				fft.windowed[i] = fft.window[i] * signal[audioTime+i];
 			}
-			estimator.estimate();
-			//log(expected, apply(estimator.candidates.slice(0),[&](const list<PitchEstimator::Candidate, 2>::element& c){ return (int)round(pitchToKey( ((c.f0*(1+c.B))*rate/N)?: 1 )); }));
-			//for(const PitchEstimator::Candidate& c: estimator.candidates) {
-			array<uint> keys; array<float> confidences;
-			for(int index=estimator.candidates.size-1; index >=0; index--) {
-				const PitchEstimator::Candidate& c = estimator.candidates[index];
-				float confidence = estimator.periodEnergy ? c.energy  / estimator.periodEnergy : 0;
-				//if(confidence<1./4) break;
-				float f = c.f0*(1+c.B); // First partial
-				uint key = f > 0 ? round(pitchToKey(f*rate/N)) : 0;
-				if(expected.contains(key)) keys.append(0);
-				keys.append(key);
-				confidences.append(confidence);
+			fft.spectrum = buffer<float>(N/2);
+			fft.transform();
+			spectra.append( move(fft.spectrum) );
+		}
+		// Synchronizes MIDI with audio estimating notes pitch
+		size_t index = 0; int64 previousTime = 0;
+		struct Chord { array<uint> chord; float bestMatchEnergy=0; int64 expectedTime=0; float beforeSigma=0, afterSigma=0; int64 maxTime=0; }
+					 previous;
+		while(index < notes.size) {
+			// Collects current chord
+			size_t first = index;
+			assert_(index < notes.size);
+			int64 expectedTime = notes[index].time;
+			array<uint> chord;
+			while(index < notes.size && notes[index].time == expectedTime) {
+				if(notes[index].velocity) chord.append(notes[index].key);
+				index++;
 			}
-			auto times = apply(expected.values,[&](size_t i){ return (float)notes[i].time/notes.ticksPerSeconds; });
-			log(beats.contains(audioTime), (float)audioTime/rate, times, expected, keys, confidences);
-			for(int index=estimator.candidates.size-1; index >=0; index--) {
-				const PitchEstimator::Candidate& c = estimator.candidates[index];
-				float confidence = estimator.periodEnergy ? c.energy  / estimator.periodEnergy : 0;
-				if(confidence<1./4) break;
-				float f = c.f0*(1+c.B); // First partial
-				uint key = f > 0 ? round(pitchToKey(f*rate/N)) : 0;
-				if(expected.contains(key)) {
-					size_t index = expected.take(key);
-					if(!firstMatchAudioTimeShift) firstMatchAudioTimeShift = audioTime - notes[index].time;
-				}
+			while(index < notes.size && !notes[index].velocity) index++;
+
+			//int64 minTime = previousTime;
+			int64 minTime = min(previousTime+int(rate)/8, expectedTime); //4/8@120
+			/*float noteLength = float(expectedTime-previousTime)/rate;
+			float a = clip(1.f/2, 4-noteLength*4, 1.f/2); // Allows for shortening of long notes (while preventing false short match on already short notes)
+			float beforeSigma = ((1-a) * previousTime + a*expectedTime) - expectedTime;
+			assert_(beforeSigma || minTime==expectedTime, a, noteLength, previousTime, expectedTime);*/
+			//int64 minTime = previousTime;
+			float beforeSigma = (3*previousTime + expectedTime)/4 - expectedTime;
+
+			int64 nextTime = notes[min(notes.size-1,index)].time;
+			int64 maxTime = max(nextTime, expectedTime + 3*rate);  // Allows for long unmarked rests
+			maxTime = min(maxTime, int64(frameCount*h));
+			float afterSigma = (expectedTime+nextTime)/2 - expectedTime;
+
+			assert_(previousTime <= expectedTime && expectedTime < nextTime, previousTime, expectedTime, nextTime, index, notes.size);
+			//log((float)previousTime/rate, (float)expectedTime/rate, (float)nextTime/rate);
+
+			// Selects best overall match from last time to next time (assumes simultaneous onsets)
+			int64 bestMatchTime = 0; float bestMatchEnergy = 0;
+			for(size_t frameIndex: range(minTime/h+1, maxTime/h)) {
+				float time = frameIndex * h;
+				auto eval = [&](ref<uint> chord, float expectedTime, float beforeSigma, float afterSigma) -> float {
+					float energy = 0;
+					for(uint key: chord) {
+						float f0m = keyToPitch(key-1./2)*N/rate;
+						float f0p = keyToPitch(key+1./2)*N/rate;
+						for(float n=1; n<=3; n++) { // First two partials
+							{float f = n*f0m; int i = f; energy += (ceil(f) - f) * max(0.f, spectra[frameIndex][i]-spectra[frameIndex-1][i]); }
+							for(uint f=n*f0m+1; f < uint(n*f0p); f++) energy += max(0.f, spectra[frameIndex][f]-spectra[frameIndex-1][f]);
+							{float f = n*f0m; int i = f; energy += (f - floor(f)) * max(0.f, spectra[frameIndex][i]-spectra[frameIndex-1][i]); }
+						}
+					}
+					if(time < expectedTime) energy *= exp(-sq((expectedTime-time)/beforeSigma)/2);
+					if(time > expectedTime) energy *= exp(-sq((time-expectedTime)/afterSigma)/2);
+					return energy;
+				};
+				float energy = eval(chord, expectedTime, beforeSigma, afterSigma);
+				/*if(time < min(expectedTime, previous.expectedTime)) energy /= 2;
+				else if(time < expectedTime && previous.bestMatchEnergy) {
+					float previousEnergy = eval(previous.chord, previous.expectedTime, previous.beforeSigma, previous.afterSigma);
+					assert_(previousEnergy <= previous.bestMatchEnergy);
+					energy *= 1-(previousEnergy/previous.bestMatchEnergy)/2; // Prevents matching same onset twice
+				}*/
+				if(energy > bestMatchEnergy) { bestMatchEnergy = energy; bestMatchTime = time; }
 			}
-			if(firstMatchAudioTimeShift) expected.clear();
+			int64 offset = bestMatchTime - expectedTime;
+			//log(chord, float(previousTime) / rate, float(expectedTime) / rate, float(bestMatchTime) / rate, float(nextTime) / rate);
+			//log(chord, (float)offset/rate);
+			for(MidiNote& note: notes.slice(first)) note.time += offset; // Shifts notes to best match
+			previousTime = bestMatchTime;
+			previous = {move(chord), bestMatchEnergy, expectedTime, beforeSigma, afterSigma, maxTime};
 		}
 #endif
 
@@ -244,7 +272,7 @@ struct BeatSynchronizer : Widget {
 		assert_(size.x > 1050, size, sizeHint(size));
 		shared<Graphics> graphics;
 		for(Bar bar: bars) graphics->fills.append(vec2(bar.x, 0), vec2(2, size.y), bar.color, 1.f/2);
-		for(int index: range(sheet.measureBars.size()-1)) {
+		/*for(int index: range(sheet.measureBars.size()-1)) {
 			uint64 t0 = (int64)rate*sheet.measureBars.keys[index]*60/sheet.ticksPerMinutes;
 			float x0 = sheet.measureBars.values[index];
 			uint64 t1 = (int64)rate*sheet.measureBars.keys[index+1]*60/sheet.ticksPerMinutes;
@@ -254,7 +282,7 @@ struct BeatSynchronizer : Widget {
 				float x = x0+(x1-x0)*(time-t0)/(t1-t0);
 				graphics->fills.append(vec2(x, 0), vec2(2, size.y));
 			}
-		}
+		}*/
 		return graphics;
 	}
 };
@@ -307,7 +335,10 @@ struct Music : Widget {
 
 	size_t read32(mref<int2> output) {
 		assert_(audioFile && audioFile.audioTime>=0);
-		return audioFile.read32(mcast<int>(output));
+		int mono[output.size];
+		size_t readSize = audioFile.read32(mref<int>(mono, output.size));
+		for(size_t i: range(readSize)) output[i] = mono[i];
+		return readSize;
 	}
 
 	/// Adds new notes to be played (called in audio thread by sampler)
@@ -361,7 +392,7 @@ struct Music : Widget {
 			}
 		}
 		if(previousOffset != scroll.offset.x) contentChanged = true;
-		beatSynchronizer.time = timeNum*beatSynchronizer.rate/timeDen;
+		//beatSynchronizer.time = timeNum*beatSynchronizer.rate/timeDen;
 		if(video && video.videoTime*timeDen < timeNum*video.videoFrameRate) {
 			video.read(videoView.image);
 			rotate(videoView.image);
@@ -456,7 +487,7 @@ struct Music : Widget {
 		} else { // Preview
 			window.show();
 			if(playbackDeviceAvailable()) {
-				audio.start(audioFile.audioFrameRate ?: sampler.rate, sampler.periodSize, /*audioFile ? 16 :*/ 32);
+				audio.start(audioFile.audioFrameRate ?: sampler.rate, sampler.periodSize, 32, 2);
 				assert_(audio.rate == audioFile.audioFrameRate ?: sampler.rate);
 				audioThread.spawn();
 			} else running = false;

@@ -35,7 +35,7 @@ Decoder::Decoder(string path) {
 				videoFrameRate = video->time_base.den/videoStream->time_base.num;
 			}
 		}
-		if(file->streams[i]->codec->codec_type==AVMEDIA_TYPE_AUDIO) {
+		/*if(file->streams[i]->codec->codec_type==AVMEDIA_TYPE_AUDIO) {
 			audioStream = file->streams[i];
 			audio = audioStream->codec;
 			audio->request_sample_fmt = AV_SAMPLE_FMT_S16;
@@ -44,10 +44,10 @@ Decoder::Decoder(string path) {
 				rate = audio->sample_rate;
 				duration = audioStream->duration*rate*audioStream->time_base.num/audioStream->time_base.den;
 			}
-		}
+		}*/
 	}
-	assert(audio && audio->sample_rate && (uint)audio->channels == channels
-		   && audio->sample_fmt == AV_SAMPLE_FMT_S16);
+	/*assert_(audio && audio->sample_rate && (uint)audio->channels == channels
+		   && audio->sample_fmt == AV_SAMPLE_FMT_S16);*/
 	swsContext = sws_getContext (width, height, video->pix_fmt, width, height,  AV_PIX_FMT_BGRA, SWS_FAST_BILINEAR, 0, 0, 0);
 	assert_(swsContext);
 }

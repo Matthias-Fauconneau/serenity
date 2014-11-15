@@ -72,8 +72,9 @@ Device getPlaybackDevice() {
 
 AudioOutput::AudioOutput(decltype(read16) read, Thread& thread) : Poll(0, POLLOUT, thread), read16(read) {}
 AudioOutput::AudioOutput(decltype(read32) read, Thread& thread) : Poll(0, POLLOUT, thread), read32(read) {}
+AudioOutput::AudioOutput(decltype(read32m) read, Thread& thread) : Poll(0, POLLOUT, thread), read32m(read) {}
 
-void AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
+void AudioOutput::start(uint rate, uint periodSize, uint sampleBits, uint channels) {
     if(!Device::fd) { Device::fd = move(getPlaybackDevice().fd); Poll::fd = Device::fd; }
     if(!status || status->state < Setup || this->rate!=rate || this->periodSize!=periodSize || this->sampleBits!=sampleBits) {
         HWParams hparams;
@@ -109,6 +110,7 @@ void AudioOutput::start(uint rate, uint periodSize, uint sampleBits) {
         maps[0].unmap(); maps[1].unmap(); maps[2].unmap(); // Releases any memory mappings
         iowr<HW_PARAMS>(hparams);
         this->sampleBits = hparams.interval(SampleBits);
+		this->channels = hparams.interval(Channels);
         this->rate = hparams.interval(Rate);
         this->periodSize = hparams.interval(PeriodSize);
         bufferSize = hparams.interval(Periods) * this->periodSize;
@@ -142,8 +144,11 @@ void AudioOutput::event() {
     if(available>=(int)periodSize) {
 		uint readSize;
 		/**/  if(sampleBits==16) readSize=read16(mref<short2>(((short2*)buffer)+control->swPointer%bufferSize, periodSize));
-		else if(sampleBits==32) readSize=read32(mref<int2>(((int2*)buffer)+control->swPointer%bufferSize, periodSize));
-        else error("Unsupported sample size", sampleBits);
+		else if(sampleBits==32) {
+			/**/   if(channels==1) readSize=read32m(mref<int>(((int*)buffer)+control->swPointer%bufferSize, periodSize));
+			else if(channels==2) readSize=read32(mref<int2>(((int2*)buffer)+control->swPointer%bufferSize, periodSize));
+			else error(channels);
+		} else error("Unsupported sample size", sampleBits);
         assert(readSize<=periodSize);
         control->swPointer += readSize;
 		if(readSize < periodSize) return;

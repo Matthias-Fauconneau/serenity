@@ -30,6 +30,8 @@ bool AudioFile::open() {
             audio->request_sample_fmt = AV_SAMPLE_FMT_S16;
             AVCodec* codec = avcodec_find_decoder(audio->codec_id);
             if(codec && avcodec_open2(audio, codec, 0) >= 0) {
+				channels = audio->channels;
+				assert_(channels == 1 || channels == 2);
 				audioFrameRate = audio->sample_rate;
 				assert_(audioStream->time_base.num == 1, audioStream->time_base.den, audioFrameRate);
 				assert_(audioFrameRate%audioStream->time_base.den == 0, audioStream->time_base.den, audioFrameRate);
@@ -40,7 +42,7 @@ bool AudioFile::open() {
             }
         }
     }
-    assert(audio && audio->sample_rate && (uint)audio->channels == channels &&
+	assert_(audio && audio->sample_rate && (uint)audio->channels == channels &&
             (audio->sample_fmt == AV_SAMPLE_FMT_S16 || audio->sample_fmt == AV_SAMPLE_FMT_S16P ||
              audio->sample_fmt == AV_SAMPLE_FMT_FLTP || audio->sample_fmt == AV_SAMPLE_FMT_S32));
     return true;
@@ -67,15 +69,12 @@ size_t AudioFile::read32(mref<int> output) {
                         intBuffer[i][0] = ((int16*)frame->data[0])[i]<<16;
                         intBuffer[i][1] = ((int16*)frame->data[1])[i]<<16;
                     }
-                }
+				}*/
                 else if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
-                    intBuffer = buffer<int2>(bufferSize);
-                    for(uint i : range(bufferSize)) {
-                        intBuffer[i][0] = ((int16*)frame->data[0])[i*2+0]<<16;
-                        intBuffer[i][1] = ((int16*)frame->data[0])[i*2+1]<<16;
-                    }
+					intBuffer = buffer<int>(bufferSize*channels);
+					for(uint i : range(bufferSize*channels)) intBuffer[i] = ((int16*)frame->data[0])[i] << 16;
                 }
-				else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
+				/*else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
 					intBuffer = buffer<int2>(bufferSize);
 					for(uint i : range(bufferSize)) for(uint j : range(2)) {
 						int32 s = ((float*)frame->data[j])[i]*(1<<30); //TODO: ReplayGain
@@ -97,6 +96,7 @@ size_t AudioFile::read32(mref<int> output) {
 }
 
 size_t AudioFile::read(mref<float> output) {
+	assert_(channels);
 	uint readSize = 0;
 	while(readSize<output.size) {
 		if(!bufferSize) {
@@ -126,7 +126,7 @@ size_t AudioFile::read(mref<float> output) {
 		output.slice(readSize*channels, size*channels).copy(floatBuffer.slice(bufferIndex*channels, size*channels));
 		bufferSize -= size; bufferIndex += size; readSize += size;
 	}
-	assert(readSize == output.size);
+	assert_(readSize == output.size);
 	return readSize;
 }
 
