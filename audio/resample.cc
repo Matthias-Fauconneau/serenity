@@ -69,8 +69,7 @@ static double sinc(double cutoff, double x, int N) {
 /// Returns the largest positive integer that divides the numbers without a remainder
 int gcd(int a, int b) { while(b != 0) { int t = b; b = a % b; a = t; } return a; }
 
-Resampler::Resampler(uint channels, uint sourceRate, uint targetRate, uint readSize) {
-	assert_(channels==this->channels);
+Resampler::Resampler(uint channels, uint sourceRate, uint targetRate, size_t readSize, size_t writeSize) : channels(channels) {
     // Factorize rates if possible to reduce filter bank size
     int factor = gcd(sourceRate,targetRate);
     sourceRate /= factor; targetRate /= factor;
@@ -96,17 +95,19 @@ Resampler::Resampler(uint channels, uint sourceRate, uint targetRate, uint readS
     for(uint i: range(targetRate)) for(uint j: range(N)) kernel[i*N+j] = sinc(cutoff, -float(i)/targetRate+j-N/2-1, N);
 
 	// Allocates and clears aligned planar signal buffers
-	size_t writeSize = readSize*integerAdvance+int(readSize*fractionalAdvance+targetRate-1)/targetRate;
+	size_t writeForReadSize = readSize*integerAdvance+int(readSize*fractionalAdvance+targetRate-1)/targetRate;
+	if(writeSize) assert_(readSize == 0 || writeSize == writeForReadSize);
+	writeSize = writeForReadSize;
 	bufferSize = align(16, N+writeSize);
-	for(size_t index: range(channels)) { signal[index] = buffer<float>(bufferSize, bufferSize); signal[index].clear(0); }
+	for(size_t channel: range(channels)) { signal[channel] = buffer<float>(bufferSize, bufferSize); signal[channel].clear(0); }
 }
 
-template<bool mix> void Resampler::filter(const ref<float2> &source, const mref<float2> &target) {
-	assert(int(source.size)>=need(target.size));
+template<bool mix> void Resampler::filter(ref<float> source, mref<float> target) {
+	assert(int(source.size/channels)>=need(target.size/channels));
     write(source); read<mix>(target);
 }
-template void Resampler::filter<false>(const ref<float2> &source, const mref<float2> &target);
-template void Resampler::filter<true>(const ref<float2> &source, const mref<float2> &target);
+template void Resampler::filter<false>(ref<float> source, mref<float> target);
+template void Resampler::filter<true>(ref<float> source, mref<float> target);
 
 int Resampler::need(uint targetSize) {
 	assert_(targetRate!=sourceRate);
@@ -122,19 +123,16 @@ int Resampler::need(uint targetSize) {
 	return need;
 }
 
-void Resampler::write(const ref<float2>& source) {
-    if(N-1+writeIndex+source.size>bufferSize) { // Wraps buffer (FIXME: map ring buffer)
-		assert_(N-1+writeIndex+source.size-integerIndex<=bufferSize, N, writeIndex, source.size, integerIndex, bufferSize);
+void Resampler::write(ref<float> source) {
+	if(N-1+writeIndex+source.size/channels>bufferSize) { // Wraps buffer (FIXME: map ring buffer)
+		assert_(N-1+writeIndex+source.size/channels-integerIndex<=bufferSize);
         writeIndex -= integerIndex;
-        for(uint channel=0;channel<channels;channel++) {
-            for(uint i: range(N-1+writeIndex)) signal[channel][i] = signal[channel][integerIndex+i];
-        }
+		for(uint channel: range(channels)) for(uint i: range(N-1+writeIndex)) signal[channel][i] = signal[channel][integerIndex+i];
         integerIndex = 0;
     }
-	assert_(N-1+writeIndex+source.size<=bufferSize, N-1+writeIndex+source.size, bufferSize);
-    for(uint i: range(source.size)) { // Deinterleaves source to buffers
-        signal[0][N-1+writeIndex+i]=source[i][0];
-        signal[1][N-1+writeIndex+i]=source[i][1];
+	assert_(N-1+writeIndex+source.size/channels<=bufferSize);
+	for(uint i: range(source.size/channels)) { // Deinterleaves source to buffers
+		for(uint channel: range(channels)) signal[channel][N-1+writeIndex+i]=source[i*channels+channel];
     }
 	writeIndex += source.size;
 	assert_(writeIndex<bufferSize);
@@ -146,12 +144,12 @@ size_t Resampler::available() {
     return available;
 }
 
-template<bool mix> void Resampler::read(const mref<float2>& target) {
-    assert(target.size<=available());
-    for(uint i: range(target.size)) {
-        for(uint channel=0;channel<channels;channel++) {
-            if(mix) target[i][channel] += product(kernel.slice(fractionalIndex*N, N), signal[channel].slice(integerIndex, N));
-            else    target[i][channel]    = product(kernel.slice(fractionalIndex*N, N), signal[channel].slice(integerIndex, N));
+template<bool mix> void Resampler::read(mref<float> target) {
+	assert(target.size/channels<=available());
+	for(size_t i: range(target.size/channels)) {
+		for(uint channel: range(channels)) {
+			if(mix) target[i*channels+channel] += product(kernel.slice(fractionalIndex*N, N), signal[channel].slice(integerIndex, N));
+			else    target[i*channels+channel]    = product(kernel.slice(fractionalIndex*N, N), signal[channel].slice(integerIndex, N));
         }
         integerIndex += integerAdvance;
         fractionalIndex += fractionalAdvance;
@@ -164,7 +162,7 @@ template<bool mix> void Resampler::read(const mref<float2>& target) {
     }
     //assert(integerIndex>=writeIndex-2);
 }
-template void Resampler::read<false>(const mref<float2>& target);
-template void Resampler::read<true>(const mref<float2>& target);
+template void Resampler::read<false>(mref<float> target);
+template void Resampler::read<true>(mref<float> target);
 
 void Resampler::clear() { writeIndex=0, integerIndex=0, fractionalIndex=0; }

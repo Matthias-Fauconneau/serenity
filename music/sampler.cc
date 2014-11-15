@@ -386,9 +386,9 @@ size_t Sampler::read(mref<float2> output) {
 					layer.audio.size = inSize;
                     layer.audio.clear(0);
                     for(Note& note: layer.notes) note.read(layer.audio);
-                    layer.resampler.write(layer.audio);
+					layer.resampler.write(cast<float>(layer.audio));
                 }
-                layer.resampler.read<true>(output);
+				layer.resampler.read<true>(mcast<float>(output));
             } else {
                 for(Note& note: layer.notes) note.read(output);
             }

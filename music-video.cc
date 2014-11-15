@@ -13,7 +13,7 @@
 #include "sampler.h"
 #include "encoder.h"
 #include "parallel.h"
-#include "pitch.h"
+#include "biquad.h"
 
 // -> ffmpeg.h/cc
 extern "C" {
@@ -49,6 +49,7 @@ MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter) {
 	return notes;
 }
 
+inline float keyToPitch(float key) { return 440*exp2((key-69)/12); }
 struct BeatSynchronizer : Widget {
 	int64 rate;
 	Sheet& sheet;
@@ -57,7 +58,7 @@ struct BeatSynchronizer : Widget {
 	struct Bar { float x; bgr3f color; };
 	array<Bar> bars;
 	//size_t time = 0;
-	BeatSynchronizer(ref<float> signal, uint rate, Sheet& sheet, MidiNotes& notes) : rate(rate), sheet(sheet), notes(notes) {
+	BeatSynchronizer(ref<float> X, uint rate, Sheet& sheet, MidiNotes& notes) : rate(rate), sheet(sheet), notes(notes) {
 		// Converts MIDI time base to audio sample rate
 		for(MidiNote& note: notes) {
 			note.time = note.time*int64(rate)/notes.ticksPerSeconds;
@@ -65,152 +66,99 @@ struct BeatSynchronizer : Widget {
 		}
 		notes.ticksPerSeconds = rate;
 
-		// Setups signal spectral processing
-		size_t N = 2048; // Frame size (43ms @48KHz)
-		assert_(signal.size>N);
-		int h = N/4; // Hop size (11ms @48KHz (75% overlap))
-		int frameCount = (signal.size-N)/h;
-#if 0
-		array<size_t> beats;
-		{
-			FFT fft(N);
-			buffer<double> f(frameCount); // Spectral flux onset function
-			buffer<float> previous = buffer<float>(N/2); previous.clear(0);
-			double sum = 0;
-			for(size_t frameIndex: range(frameCount)) {
-				size_t t0 = frameIndex * h;
-				for(size_t i: range(N)) {
-					fft.windowed[i] = fft.window[i] * signal[t0+i];
-				}
-				fft.spectrum = buffer<float>(N/2);
-				fft.transform();
-				buffer<float> current = move(fft.spectrum);
-				double spectralFlux = 0;
-				for(size_t k: range(N/2)) {
-					float x = current[k] - previous[k]; // or L1: sqrt(current[k]) - sqrt(previous[k])
-					if(x<0) x=0; // "Half-wave rectifier"
-					spectralFlux += x;
-				}
-				f[frameIndex] = spectralFlux;
-				sum += spectralFlux;
-				previous = move(current);
-			}
-
+		// Evaluates onset functions
+		static constexpr int firstKey = 21, keyCount = 85;
+		buffer<float> OF[keyCount] = {}; // onset functions for each key
+		const int ratio = 2400; // 48000/2400 = 20Hz (50ms)
+		assert_(rate%ratio);
+		const int ofRate = rate/ratio; //30
+		for(size_t key: range(keyCount)) {
+			BandPass filter(keyToPitch(firstKey+key)/rate, /*Q=*/25);
+			const size_t T = X.size;
+			float Y[T];
+			for(size_t t: range(T)) Y[t] = filter(X[t]);
+			// || convolve hann 220 Hz, low pass, downsample 440 Hz
+			Resampler resampler(1, rate, ofRate, 0, T); // 1600:1
+			resampler.write(ref<float>(Y, T));
+			assert_(resampler.available() == T/ratio);
+			buffer<float> F(resampler.available());
+			resampler.read(F);
+			float sum=0;
+			float p=0; for(float& v: F) { float np=v; v=max(0.f, v-p); p=np; sum += v; }
 			/// Normalizes onset function
-			double mean = sum/frameCount;
+			double mean = sum / F.size;
 			double SSQ = 0;
-			for(double& v: f) { v -= mean; SSQ += sq(v); }
+			for(float& v: F) { v -= mean; SSQ += sq(v); }
 			double deviation = sqrt(SSQ);
 			assert_(deviation);
-			for(double& v: f) v /= deviation;
+			for(float& v: F) v /= deviation;
+			OF[key] = move(F);
+		}
 
-			/// Selects onset peaks (beats)
-			const int w = 3, m = 3;
-			for(size_t n: range(m*w, frameCount-w)) {
+		/// Selects onset peaks
+		struct Peak { size_t time; uint key; float value; };
+		array<Peak> peaks;
+		const int w = 3, m = 3;
+		for(size_t n: range(m*w, OF[0].size-w)) {
+			for(uint key: range(keyCount)) {
+				ref<float> f = OF[key];
 				bool localMaximum = true;
 				for(size_t k: range(n-w, n+w+1)) {
 					if(k==n) continue;
 					if(!(f[n] > f[k])) localMaximum=false;
 				}
-				if(localMaximum) {
-					double sum = 0;
-					for(size_t k: range(n-m*w, n+w+1)) sum += f[k];
-					double mean = sum / (m*w+w+1);
-					const double threshold = beats ? 1./1024 : 1./2048;
-					if(f[n] > mean + threshold) beats.append( n * h );
-				}
+				if(!localMaximum) continue;
+				double sum = 0;
+				for(size_t k: range(n-m*w, n+w+1)) sum += f[k];
+				double mean = sum / (m*w+w+1);
+				const double threshold = 1./2048;
+				if(f[n] > mean + threshold) peaks.append({n, key, f[n]});
 			}
+		}
 
-			// Synchronizes MIDI with audio by moving each onset to nearest onset
-			{// Inconditionnaly sync first note with first beat
-				MidiNote note = notes[0];
-				int64 current = note.time;
-				int64 offset = beats[0] - current;
-				for(MidiNote& note: notes) note.time += offset;
-			}
-		}
-#endif
-#if 1
-		array<buffer<float>> spectra (frameCount);
-		FFT fft(N);
-		for(size_t frameIndex: range(frameCount)) {
-			size_t audioTime = frameIndex * h;
-			for(size_t i: range(N)) {
-				fft.windowed[i] = fft.window[i] * signal[audioTime+i];
-			}
-			fft.spectrum = buffer<float>(N/2);
-			fft.transform();
-			spectra.append( move(fft.spectrum) );
-		}
-		// Synchronizes MIDI with audio estimating notes pitch
-		size_t index = 0; int64 previousTime = 0;
-		struct Chord { array<uint> chord; float bestMatchEnergy=0; int64 expectedTime=0; float beforeSigma=0, afterSigma=0; int64 maxTime=0; }
-					 previous;
-		while(index < notes.size) {
+		// Follows MIDI using onset functions (TODO: synchronize)
+		size_t midiIndex = 0; int64 previousTime = 0; size_t peakIndex = 0;
+		while(midiIndex < notes.size) {
 			// Collects current chord
-			size_t first = index;
-			assert_(index < notes.size);
-			int64 expectedTime = notes[index].time;
+			size_t first = midiIndex;
+			assert_(midiIndex < notes.size);
+			int64 expectedTime = notes[midiIndex].time;
 			array<uint> chord;
-			while(index < notes.size && notes[index].time == expectedTime) {
-				if(notes[index].velocity) chord.append(notes[index].key);
-				index++;
+			while(midiIndex < notes.size && notes[midiIndex].time == expectedTime) {
+				if(notes[midiIndex].velocity) chord.append(notes[midiIndex].key);
+				midiIndex++;
 			}
-			while(index < notes.size && !notes[index].velocity) index++;
+			while(midiIndex < notes.size && !notes[midiIndex].velocity) midiIndex++;
 
-			//int64 minTime = previousTime;
-			int64 minTime = min(previousTime+int(rate)/8, expectedTime); //4/8@120
-			/*float noteLength = float(expectedTime-previousTime)/rate;
-			float a = clip(1.f/2, 4-noteLength*4, 1.f/2); // Allows for shortening of long notes (while preventing false short match on already short notes)
-			float beforeSigma = ((1-a) * previousTime + a*expectedTime) - expectedTime;
-			assert_(beforeSigma || minTime==expectedTime, a, noteLength, previousTime, expectedTime);*/
-			//int64 minTime = previousTime;
-			float beforeSigma = (3*previousTime + expectedTime)/4 - expectedTime;
+			if(peakIndex >= peaks.size) break;
+			int64 bestMatchTime = peaks[peakIndex].time * ratio;
+			peakIndex += chord.size; // FIXME: Assumes identity map
 
-			int64 nextTime = notes[min(notes.size-1,index)].time;
-			int64 maxTime = max(nextTime, expectedTime + 3*rate);  // Allows for long unmarked rests
-			maxTime = min(maxTime, int64(frameCount*h));
+			/*int64 minTime = previousTime;
+			float beforeSigma = (previousTime + expectedTime)/2 - expectedTime;
+			int64 nextTime = notes[min(notes.size-1,midiIndex)].time;
+			int64 maxTime = min(max(nextTime, expectedTime + 3*rate), int64(frameCount*h));  // Allows for long unmarked rests
 			float afterSigma = (expectedTime+nextTime)/2 - expectedTime;
-
-			assert_(previousTime <= expectedTime && expectedTime < nextTime, previousTime, expectedTime, nextTime, index, notes.size);
-			//log((float)previousTime/rate, (float)expectedTime/rate, (float)nextTime/rate);
 
 			// Selects best overall match from last time to next time (assumes simultaneous onsets)
 			int64 bestMatchTime = 0; float bestMatchEnergy = 0;
-			for(size_t frameIndex: range(minTime/h+1, maxTime/h)) {
-				float time = frameIndex * h;
-				auto eval = [&](ref<uint> chord, float expectedTime, float beforeSigma, float afterSigma) -> float {
-					float energy = 0;
-					for(uint key: chord) {
-						float f0m = keyToPitch(key-1./2)*N/rate;
-						float f0p = keyToPitch(key+1./2)*N/rate;
-						for(float n=1; n<=3; n++) { // First two partials
-							{float f = n*f0m; int i = f; energy += (ceil(f) - f) * max(0.f, spectra[frameIndex][i]-spectra[frameIndex-1][i]); }
-							for(uint f=n*f0m+1; f < uint(n*f0p); f++) energy += max(0.f, spectra[frameIndex][f]-spectra[frameIndex-1][f]);
-							{float f = n*f0m; int i = f; energy += (f - floor(f)) * max(0.f, spectra[frameIndex][i]-spectra[frameIndex-1][i]); }
-						}
-					}
-					if(time < expectedTime) energy *= exp(-sq((expectedTime-time)/beforeSigma)/2);
-					if(time > expectedTime) energy *= exp(-sq((time-expectedTime)/afterSigma)/2);
-					return energy;
-				};
+			for(size_t index: range(peakIndex, peaks.size)) {
+				int64 time = peaks[index] * ratio;
+				float energy = 0;
+				for(uint key: chord) {
+					energy += OF[key-firstKey];
+				}
+				if(time < expectedTime) energy *= exp(-sq((expectedTime-time)/beforeSigma)/2);
+				if(time > expectedTime) energy *= exp(-sq((time-expectedTime)/afterSigma)/2);
+				return energy;
+			};
 				float energy = eval(chord, expectedTime, beforeSigma, afterSigma);
-				/*if(time < min(expectedTime, previous.expectedTime)) energy /= 2;
-				else if(time < expectedTime && previous.bestMatchEnergy) {
-					float previousEnergy = eval(previous.chord, previous.expectedTime, previous.beforeSigma, previous.afterSigma);
-					assert_(previousEnergy <= previous.bestMatchEnergy);
-					energy *= 1-(previousEnergy/previous.bestMatchEnergy)/2; // Prevents matching same onset twice
-				}*/
 				if(energy > bestMatchEnergy) { bestMatchEnergy = energy; bestMatchTime = time; }
-			}
+			}*/
 			int64 offset = bestMatchTime - expectedTime;
-			//log(chord, float(previousTime) / rate, float(expectedTime) / rate, float(bestMatchTime) / rate, float(nextTime) / rate);
-			//log(chord, (float)offset/rate);
 			for(MidiNote& note: notes.slice(first)) note.time += offset; // Shifts notes to best match
 			previousTime = bestMatchTime;
-			previous = {move(chord), bestMatchEnergy, expectedTime, beforeSigma, afterSigma, maxTime};
 		}
-#endif
 
 		assert_(sheet.ticksPerMinutes);
 		{ // Synchronizes measure times with MIDI
