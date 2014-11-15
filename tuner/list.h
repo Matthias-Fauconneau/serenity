@@ -8,7 +8,7 @@ template<Type V, uint N> struct list { // Small sorted list
     void clear() { for(size_t i: range(size)) elements[i]=element(); size=0; }
     void insert(float key, V&& value) {
         uint i=0;
-        while(i<size && elements[i].key<=key) i++;
+		while(i<size && elements[i].key<=key) i++;
         if(size<capacity) {
             for(int j=size-1; j>=(int)i; j--) elements[j+1]=move(elements[j]); // Shifts right
             size++;

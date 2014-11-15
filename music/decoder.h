@@ -32,7 +32,7 @@ struct Decoder {
 	explicit operator bool() { return file; }
 
 	/// Reads a video frame
-	void read(const Image& video);
+	bool read(const Image& image);
 	/// Reads an audio frame
 	//size_t read(mref<short2> audio);
 };

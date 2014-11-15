@@ -20,7 +20,7 @@ generic struct array : buffer<T> {
 	/// Converts a buffer to an array
 	array(buffer<T>&& o) : buffer<T>(move(o)) {}
 	/// Allocates an empty array with storage space for \a capacity elements
-	explicit array(size_t capacity) = delete; // { reserve(capacity); }
+	explicit array(size_t capacity) { reserve(capacity); }
 	/*/// Copies elements from a reference
     explicit array(const ref<T> source) : array() { append(source); }
     /// Moves elements from a reference

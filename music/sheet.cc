@@ -470,8 +470,9 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 		assert_(midiIndex < midiNotes.size);
 		uint midiKey = midiNotes[midiIndex];
 
-		if(extraErrors > 18 /*FIXME: tremolo*/ || wrongErrors > 6 || missingErrors > 8 || orderErrors > 8) {
+		if(extraErrors > 40 /*FIXME: tremolo*/ || wrongErrors > 9 || missingErrors > 13 || orderErrors > 8) {
 		//if(extraErrors || wrongErrors || missingErrors || orderErrors) {
+			log(midiIndex, midiNotes.size);
 			log("MID", midiNotes.slice(midiIndex,7));
 			log("XML", chord);
 			break;

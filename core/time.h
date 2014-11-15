@@ -4,6 +4,7 @@
 #include "thread.h"
 #include "function.h"
 #include "string.h"
+#include "math.h"
 
 /// A second in nanoseconds
 const int64 second = 1000000000ull;
@@ -32,7 +33,7 @@ struct Time {
 inline String str(const Time& t) { return str(t.toReal())+'s'; }
 inline bool operator<(float a, const Time& b) { return a < b.toReal(); }
 inline bool operator<(double a, const Time& b) { return a < b.toReal(); }
-inline String str(const Time& num, const Time& div) { return str(100*num.toReal()/div.toReal())+'%'; }
+inline String str(const Time& num, const Time& div) { return str(int(round(100*num.toReal()/div.toReal())))+'%'; }
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;

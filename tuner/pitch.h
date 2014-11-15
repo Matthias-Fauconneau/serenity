@@ -8,8 +8,7 @@
 
 struct PitchEstimator : FFT {
     using FFT::FFT;
-    // Parameters
-    const uint rate = 96000; // Discards 50Hz harmonics for absolute harmonic energy evaluation
+	// Parameters
     const uint fMin = 8, fMax = N/16; // 15 ~ 6000 Hz
     const uint iterationCount = 4; // Number of least square iterations
     const float initialInharmonicity = 0; //1./cb(24); // Initial inharmonicity
@@ -47,7 +46,7 @@ struct PitchEstimator : FFT {
         Candidate(float f0=0, float B=0, float energy=0, array<uint>&& peaks={}):
             f0(f0),B(B),energy(energy),peaks(move(peaks)){}
     };
-    list<Candidate, 2> candidates;
+	list<Candidate, 10> candidates;
 
     /// Returns first partial (f1=f0*sqrt(1+B)~f0*(1+B))
     /// \a fMin Minimum fundamental frequency for harmonic evaluation
@@ -59,8 +58,8 @@ inline float pitchToKey(float pitch) { return 69+log2(pitch/440)*12; }
 inline String strKey(int key) { return (string[]){"A","A#","B","C","C#","D","D#","E","F","F#","G","G#"}[(key+2*12+3)%12]+str(key/12-2); }
 inline int parseKey(TextData& s) {
     int key=24;
-    if(!"cdefgabCDEFGAB".contains(s.peek())) return -1;
-    key += "c#d#ef#g#a#b".indexOf(toLower(s.next()));
+	if(!"cdefgabCDEFGAB"_.contains(s.peek())) return -1;
+	key += "c#d#ef#g#a#b"_.indexOf(toLower(s.next()));
     if(s.match('#')) key++;
     key += 12*s.mayInteger(4);
     return key;

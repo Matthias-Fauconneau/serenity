@@ -37,7 +37,7 @@ float PitchEstimator::estimate() {
     array<uint> byFrequency(peaks.size);
     for(Peak peak: peaks) byFrequency.insertSorted(peak.f); // Insertion sorts by frequency
     array<uint> distance (peaks.size);
-    {uint last=0; for(uint f: byFrequency) { distance << f-last; last=f; }} // Compute distances
+	{uint last=0; for(uint f: byFrequency) { distance.append(f-last); last=f; }} // Compute distances
     uint medianF0 = ::median(distance);
     // Corrects outlying fundamental estimate from median
     if(highPeak && highPeak/medianF0>=minHighPeakRank) {
@@ -79,7 +79,7 @@ float PitchEstimator::estimate() {
                     if(spectrum[fn+df] > peakEnergy) peakEnergy=spectrum[fn+df], f=fn+df;
                     if(spectrum[fn-df] > peakEnergy) peakEnergy=spectrum[fn-df], f=fn-df;
                 }
-                peaks << f;
+				peaks.append(f);
                 energy += peakEnergy;
                 for(; df<=fMin/2; df++) { // Fit nearest peak (FIXME: proportionnal to frequency)
                     if(spectrum[fn+df] > peakEnergy) peakEnergy=spectrum[fn+df], f=fn+df;

@@ -101,8 +101,8 @@ void rotate(const Image& target, const Image& source) {
 }
 
 void rotate(const Image& target) {
-	for(int y: range(target.height)) for(int x: range(target.width/2)) swap(target(x,y), target(target.width-1-x, y)); // Reverse rows
-	for(int y: range(target.height/2)) for(int x: range(target.width)) swap(target(x,y), target(x, target.height-1-y)); // Reverse columns
+	for(size_t y: range(target.height)) for(size_t x: range(target.width/2)) swap(target(x,y), target(target.width-1-x, y)); // Reverse rows
+	for(size_t y: range(target.height/2)) for(size_t x: range(target.width)) swap(target(x,y), target(x, target.height-1-y)); // Reverse columns
 }
 
 // -- Resample (3x8bit) --

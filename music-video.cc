@@ -13,7 +13,7 @@
 #include "sampler.h"
 #include "encoder.h"
 #include "parallel.h"
-#include "fft.h"
+#include "pitch.h"
 
 // -> ffmpeg.h/cc
 extern "C" {
@@ -48,9 +48,7 @@ MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter) {
 	return notes;
 }
 
-inline float keyToPitch(float key) { return 440*exp2((key-69)/12); }
 struct BeatSynchronizer : Widget {
-	buffer<float> signal;
 	int64 rate;
 	Sheet& sheet;
 	MidiNotes& notes;
@@ -58,26 +56,80 @@ struct BeatSynchronizer : Widget {
 	struct Bar { float x; bgr3f color; };
 	array<Bar> bars;
 	size_t time = 0;
-	BeatSynchronizer(ref<float2> stereo, int64 rate, Sheet& sheet, MidiNotes& notes) : signal(stereo.size), rate(rate), sheet(sheet), notes(notes) {
+	BeatSynchronizer(ref<float> signal, int64 rate, Sheet& sheet, MidiNotes& notes) : rate(rate), sheet(sheet), notes(notes) {
 		// Converts MIDI time base to audio sample rate
 		for(MidiNote& note: notes) note.time = note.time*rate/notes.ticksPerSeconds;
 		notes.ticksPerSeconds = rate;
 
 		// Setups signal spectral processing
-		assert_(stereo);
-		for(size_t index: range(signal.size)) {
-			signal[index] = (stereo[index][0]+stereo[index][1])/2;
-			assert_(signal[index]>=-1 && signal[index]<=1, signal[index]);
-		}
 		size_t T = signal.size; // Total sample count
-		size_t N = 2048; // Frame size (43ms @48KHz)
-		size_t h = N/4; // Hop size (11ms @48KHz (75% overlap))
-		FFT fft(N);
+		size_t N = 16384;
+		size_t h = 2048;
 		assert_(T>N, T);
 		size_t frameCount = (T-N)/h;
-#if 0
-		buffer<float> previous;
-		// Synchronizes MIDI with audio by matching expected fundamentals onsets (TODO: use pitch estimator candidates, offsets)
+#if 1
+		array<size_t> beats;
+		{
+			FFT fft(N);
+			buffer<double> f(frameCount); // Spectral flux onset function
+			buffer<float> previous = buffer<float>(N/2); previous.clear(0);
+			double sum = 0;
+			for(size_t frameIndex: range(frameCount)) {
+				size_t t0 = frameIndex * h;
+				for(size_t i: range(N)) {
+					fft.windowed[i] = fft.window[i] * signal[t0+i];
+				}
+				fft.spectrum = buffer<float>(N/2);
+				fft.transform();
+				buffer<float> current = move(fft.spectrum);
+				double spectralFlux = 0;
+				for(size_t k: range(N/2)) {
+					float x = current[k] - previous[k]; // or L1: sqrt(current[k]) - sqrt(previous[k])
+					if(x<0) x=0; // "Half-wave rectifier"
+					spectralFlux += x;
+				}
+				f[frameIndex] = spectralFlux;
+				sum += spectralFlux;
+				previous = move(current);
+			}
+
+			/// Normalizes onset function
+			double mean = sum/frameCount;
+			double SSQ = 0;
+			for(double& v: f) { v -= mean; SSQ += sq(v); }
+			double deviation = sqrt(SSQ);
+			assert_(deviation);
+			for(double& v: f) v /= deviation;
+
+			/// Selects onset peaks (beats)
+			const int w = 3, m = 3;
+			for(size_t n: range(m*w, frameCount-w)) {
+				bool localMaximum = true;
+				for(size_t k: range(n-w, n+w+1)) {
+					if(k==n) continue;
+					if(!(f[n] > f[k])) localMaximum=false;
+				}
+				if(localMaximum) {
+					double sum = 0;
+					for(size_t k: range(n-m*w, n+w+1)) sum += f[k];
+					double mean = sum / (m*w+w+1);
+					const double threshold = beats ? 1./1024 : 1./2048;
+					if(f[n] > mean + threshold) beats.append( n * h );
+				}
+			}
+
+			// Synchronizes MIDI with audio by moving each onset to nearest onset
+			{// Inconditionnaly sync first note with first beat
+				MidiNote note = notes[0];
+				int64 current = note.time;
+				int64 offset = beats[0] - current;
+				for(MidiNote& note: notes) note.time += offset;
+			}
+		}
+#endif
+#if 1
+		PitchEstimator estimator (N);
+		// Synchronizes MIDI with audio estimating notes pitch
 		map<uint, size_t> expected;
 		size_t firstMidiIndex = 0, nextMidiIndex = 0;
 		int64 midiTime = 0; uint64 firstMatchAudioTimeShift = 0;
@@ -99,81 +151,36 @@ struct BeatSynchronizer : Widget {
 
 			size_t audioTime = frameIndex * h;
 			for(size_t i: range(N)) {
-				fft.windowed[i] = fft.window[i] * signal[audioTime+i];
+				estimator.windowed[i] = estimator.window[i] * signal[audioTime+i];
 			}
-			fft.spectrum = buffer<float>(N/2);
-			fft.transform();
-			buffer<float> current = move(fft.spectrum);
-			if(previous) {
-				expected.filter([&](uint key, size_t index) {
-					uint f0 = round(keyToPitch(key)*N/rate);
-					assert_(f0 < N/2);
-					int64 expectedTime = notes[index].time;
-					float distance = (expectedTime-int64(audioTime))/float(rate);
-					if(current[f0] > previous[f0]/max(1.f,abs(distance)) && current[f0] > fft.periodEnergy/(10*max(1.f,abs(distance)))) {
-						log(expectedTime/float(rate), audioTime/float(rate), distance, "got", key, current[f0]/previous[f0], current[f0]/fft.periodEnergy);
-						if(!firstMatchAudioTimeShift) firstMatchAudioTimeShift = audioTime - notes[index].time;
-						return true;
-					}
-					return false;
-				});
+			estimator.estimate();
+			//log(expected, apply(estimator.candidates.slice(0),[&](const list<PitchEstimator::Candidate, 2>::element& c){ return (int)round(pitchToKey( ((c.f0*(1+c.B))*rate/N)?: 1 )); }));
+			//for(const PitchEstimator::Candidate& c: estimator.candidates) {
+			array<uint> keys; array<float> confidences;
+			for(int index=estimator.candidates.size-1; index >=0; index--) {
+				const PitchEstimator::Candidate& c = estimator.candidates[index];
+				float confidence = estimator.periodEnergy ? c.energy  / estimator.periodEnergy : 0;
+				//if(confidence<1./4) break;
+				float f = c.f0*(1+c.B); // First partial
+				uint key = f > 0 ? round(pitchToKey(f*rate/N)) : 0;
+				if(expected.contains(key)) keys.append(0);
+				keys.append(key);
+				confidences.append(confidence);
 			}
-			previous = move(current);
-		}
-#else
-		buffer<double> f(frameCount); // Spectral flux onset function
-		buffer<float> previous = buffer<float>(N/2); previous.clear(0);
-		double sum = 0;
-		for(size_t frameIndex: range(frameCount)) {
-			size_t t0 = frameIndex * h;
-			for(size_t i: range(N)) {
-				fft.windowed[i] = fft.window[i] * signal[t0+i];
+			auto times = apply(expected.values,[&](size_t i){ return (float)notes[i].time/notes.ticksPerSeconds; });
+			log(beats.contains(audioTime), (float)audioTime/rate, times, expected, keys, confidences);
+			for(int index=estimator.candidates.size-1; index >=0; index--) {
+				const PitchEstimator::Candidate& c = estimator.candidates[index];
+				float confidence = estimator.periodEnergy ? c.energy  / estimator.periodEnergy : 0;
+				if(confidence<1./4) break;
+				float f = c.f0*(1+c.B); // First partial
+				uint key = f > 0 ? round(pitchToKey(f*rate/N)) : 0;
+				if(expected.contains(key)) {
+					size_t index = expected.take(key);
+					if(!firstMatchAudioTimeShift) firstMatchAudioTimeShift = audioTime - notes[index].time;
+				}
 			}
-			fft.spectrum = buffer<float>(N/2);
-			fft.transform();
-			buffer<float> current = move(fft.spectrum);
-			double spectralFlux = 0;
-			for(size_t k: range(N/2)) {
-				float x = current[k] - previous[k]; // or L1: sqrt(current[k]) - sqrt(previous[k])
-				if(x<0) x=0; // "Half-wave rectifier"
-				spectralFlux += x;
-			}
-			f[frameIndex] = spectralFlux;
-			sum += spectralFlux;
-			previous = move(current);
-		}
-
-		/// Normalizes onset function
-		double mean = sum/frameCount;
-		double SSQ = 0;
-		for(double& v: f) { v -= mean; SSQ += sq(v); }
-		double deviation = sqrt(SSQ);
-		for(double& v: f) v /= deviation;
-
-		/// Selects onset peaks (beats)
-		array<int64> beats;
-		const int w = 3, m = 3;
-		for(size_t n: range(m*w, frameCount-w)) {
-			bool localMaximum = true;
-			for(size_t k: range(n-w, n+w+1)) {
-				if(k==n) continue;
-				if(!(f[n] > f[k])) localMaximum=false;
-			}
-			if(localMaximum) {
-				double sum = 0;
-				for(size_t k: range(n-m*w, n+w+1)) sum += f[k];
-				double mean = sum / (m*w+w+1);
-				const double threshold = beats ? 1./1024 : 1./2048;
-				if(f[n] > mean + threshold) beats.append( n * h );
-			}
-		}
-
-		// Synchronizes MIDI with audio by moving each onset to nearest onset
-		{// Inconditionnaly sync first note with first beat
-			MidiNote note = notes[0];
-			int64 current = note.time;
-			int64 offset = beats[0] - current;
-			for(MidiNote& note: notes) note.time += offset;
+			if(firstMatchAudioTimeShift) expected.clear();
 		}
 #endif
 
@@ -261,8 +268,8 @@ struct Music : Widget {
 	MidiNotes notes = existsFile(name+".mid"_) ? MidiFile(readFile(name+".mid"_)) : ::notes(xml.signs, xml.divisions);
 
 	// Audio file
-	buffer<String> audioFiles = filter(Folder(".").list(Files), [this](string path) {
-			return !startsWith(path, name) || (!endsWith(path, ".mp3") && !endsWith(path, ".m4a") && !endsWith(path, "performance.mp4") && !endsWith(path, ".cut.mp4")); });
+	buffer<String> audioFiles = filter(Folder(".").list(Files), [this](string path) { return !startsWith(path, name)
+			|| (!endsWith(path, ".mp3") && !endsWith(path, ".m4a") && !endsWith(path, "performance.mp4") && !find(path, ".cut.")); });
 	AudioFile audioFile = audioFiles ? AudioFile(audioFiles[0]) : AudioFile();
 
 	// Audio data
@@ -270,7 +277,7 @@ struct Music : Widget {
 
 	// Video input
 	buffer<String> videoFiles = filter(Folder(".").list(Files), [this](string path) {
-			return !startsWith(path, name) ||  (!endsWith(path, "performance.mp4") && !endsWith(path, ".cut.mp4")); });
+			return !startsWith(path, name) ||  (!endsWith(path, "performance.mp4") && !find(path, ".cut.")); });
 	Decoder video = videoFiles ? Decoder(videoFiles[0]) : Decoder();
 	ImageView videoView = video ? video.size : Image();
 
@@ -300,8 +307,7 @@ struct Music : Widget {
 
 	size_t read32(mref<int2> output) {
 		assert_(audioFile && audioFile.audioTime>=0);
-		if(follow(audioFile.audioTime, audioFile.audioFrameRate, window.size)) window.render();
-		return audioFile.read32(output);
+		return audioFile.read32(mcast<int>(output));
 	}
 
 	/// Adds new notes to be played (called in audio thread by sampler)
@@ -407,8 +413,8 @@ struct Music : Widget {
 						AVPacket packet;
 						if(av_read_frame(audioFile.file, &packet) < 0) { done=true; return false; }
 						if(audioFile.file->streams[packet.stream_index]==audioFile.audioStream) {
-							assert_(encoder.audioStream->codec->time_base.den == audioFile.audioStream->codec->time_base.den);
-							packet.pts=packet.dts=encoder.audioTime= int64(packet.pts); //*encoder.audioStream->codec->time_base.den/audioFile.audioStream->codec->time_base.den;
+							assert_(encoder.audioStream->time_base.num == audioFile.audioStream->time_base.num);
+							packet.pts=packet.dts=encoder.audioTime=int64(packet.pts)*encoder.audioStream->time_base.den/audioFile.audioStream->time_base.den;
 							packet.duration = int64(packet.duration)*encoder.audioStream->time_base.den/audioFile.audioStream->time_base.den;
 							packet.stream_index = encoder.audioStream->index;
 							av_interleaved_write_frame(encoder.context, &packet);
@@ -423,7 +429,7 @@ struct Music : Widget {
 					return true;
 				};
 				if(encoder.videoFrameRate) { // Interleaved AV
-					assert_(encoder.audioStream->time_base.den == (int)encoder.audioFrameRate);
+					assert_(encoder.audioStream->time_base.num == 1 && encoder.audioStream->time_base.den == (int)encoder.audioFrameRate);
 					while(encoder.audioTime*encoder.videoFrameRate <= encoder.videoTime*encoder.audioFrameRate) { // If both streams are at same PTS, starts with audio
 						if(!writeAudio()) break;
 					}
@@ -442,8 +448,9 @@ struct Music : Widget {
 					if(!writeAudio()) break;
 				}
 				int percent = round(100.*encoder.audioTime/encoder.audioFrameRate/((float)notes.last().time/notes.ticksPerSeconds));
-				if(percent!=lastReport) { log(str(percent,2)+"%", str(renderTime, totalTime), str(encodeTime, totalTime)); lastReport=percent; }
+				if(percent!=lastReport) { log(str(percent,2)+"%", str(renderTime, totalTime), str(encodeTime, totalTime), (float)encoder.audioTime/encoder.audioFrameRate, (float)notes.last().time/notes.ticksPerSeconds); lastReport=percent; }
 				//if(percent==5) break; // DEBUG
+				//if(percent>=100) break; // FIXME
 			}
 			requestTermination(0); // Window prevents automatic termination
 		} else { // Preview
@@ -457,7 +464,11 @@ struct Music : Widget {
     }
 
 	int2 sizeHint(int2 size) override { return running ? widget.sizeHint(size) : scroll.ScrollArea::sizeHint(size); }
-	shared<Graphics> graphics(int2 size) override { return running ? widget.graphics(size, Rect(size)) : scroll.ScrollArea::graphics(size); }
+	shared<Graphics> graphics(int2 size) override {
+		follow(audioFile.audioTime, audioFile.audioFrameRate, window.size);
+		window.render();
+		return running ? widget.graphics(size, Rect(size)) : scroll.ScrollArea::graphics(size);
+	}
 	bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
 		return scroll.ScrollArea::mouseEvent(cursor, size, event, button, focus);
 	}

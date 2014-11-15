@@ -57,10 +57,10 @@ Decoder::~Decoder() {
 	if(file) avformat_close_input(&file);
 }
 
-void Decoder::read(const Image& image) {
+bool Decoder::read(const Image& image) {
 	for(;;) {
 		AVPacket packet;
-		if(av_read_frame(file, &packet) < 0) return;
+		if(av_read_frame(file, &packet) < 0) return false;
 		if(file->streams[packet.stream_index]==videoStream) {
 			if(!frame) frame = av_frame_alloc(); int gotFrame=0;
 			int used = avcodec_decode_video2(video, frame, &gotFrame, &packet);
@@ -77,7 +77,7 @@ void Decoder::read(const Image& image) {
 			//if(!firstPTS) firstPTS=frame->pkt_pts; // Ignores any embedded sync
 			assert_(frame->pkt_pts >= firstPTS, firstPTS, packet.pts, packet.dts);
 			videoTime = (frame->pkt_pts-firstPTS) * videoFrameRate * videoStream->time_base.num / videoStream->time_base.den;
-			return;
+			return true;
 		}
 		av_free_packet(&packet);
 	}
