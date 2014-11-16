@@ -96,9 +96,9 @@ inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
 /// Numeric range
 struct range {
 	notrace range(int start, int stop) : start(start), stop(stop){}
-	notrace range(uint size) : range(0, size){}
+	notrace range(int size) : range(0, size){}
     struct iterator {
-        int i;
+		int i;
 		notrace int operator*() { return i; }
 		notrace iterator& operator++() { i++; return *this; }
 		notrace bool operator !=(const iterator& o) const { return i<o.i; }
@@ -107,7 +107,7 @@ struct range {
 	notrace iterator end() const { return {stop}; }
     explicit operator bool() const { return start < stop; }
 	int size() { return stop-start; }
-    int start, stop;
+	int start, stop;
 };
 
 // -- initializer_list

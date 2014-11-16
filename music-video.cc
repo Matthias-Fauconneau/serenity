@@ -110,70 +110,94 @@ struct BeatSynchronizer : Widget {
 
 		/// Selects onset peaks
 		struct Peak { int64 time; uint key; float value; };
-		array<Peak> peaks;
-		const int w = 3, m = 3;
-		for(size_t n: range(m*w, T/ratio-w)) {
-			for(uint key: range(keyCount)) {
-				ref<float> f = OF[key];
-				bool localMaximum = true;
-				for(size_t k: range(n-w, n+w+1)) {
-					if(k==n) continue;
-					if(!(f[n] > f[k])) localMaximum=false;
+		array<array<Peak>> P; // peaks
+		{const int w = 3, m = 3;
+			for(size_t n: range(m*w, T/ratio-w)) {
+				array<Peak> bin;
+				for(uint key: range(keyCount)) {
+					ref<float> f = OF[key];
+					bool localMaximum = true;
+					for(size_t k: range(n-w, n+w+1)) {
+						if(k==n) continue;
+						if(!(f[n] > f[k])) localMaximum=false;
+					}
+					if(!localMaximum) continue;
+					double sum = 0;
+					for(size_t k: range(n-m*w, n+w+1)) sum += f[k];
+					double mean = sum / (m*w+w+1);
+					const double threshold = 0;//1./32;
+					if(f[n] > mean + threshold) {
+						//log(int64(n * ratio), firstKey+key, f[n], mean);
+						bin.append({int64(n * ratio), firstKey+key, f[n]});
+					}
 				}
-				if(!localMaximum) continue;
-				double sum = 0;
-				for(size_t k: range(n-m*w, n+w+1)) sum += f[k];
-				double mean = sum / (m*w+w+1);
-				const double threshold = 0;//1./32;
-				if(f[n] > mean + threshold) {
-					//log(int64(n * ratio), firstKey+key, f[n], mean);
-					peaks.append({int64(n * ratio), firstKey+key, f[n]});
-				}
+				if(bin) P.append(move(bin));
 			}
 		}
 
-		// Follows MIDI using onset functions (TODO: synchronize)
-		size_t midiIndex = 0; int64 previousTime = 0; size_t peakIndex = 0;
-		array<Peak> candidates;
-		while(midiIndex < notes.size) {
-			// Collects current chord
+		/// Collects MIDI chords
+		array<array<Peak>> S; // score
+		array<range> indices;
+		for(size_t midiIndex = 0; midiIndex < notes.size;) {
 			size_t first = midiIndex;
-			assert_(midiIndex < notes.size);
-			int64 expectedTime = notes[midiIndex].time;
-			array<uint> chord;
-			while(midiIndex < notes.size && notes[midiIndex].time == expectedTime) {
-				if(notes[midiIndex].velocity) chord.add(notes[midiIndex].key);
+			while(midiIndex < notes.size && !notes[midiIndex].velocity) midiIndex++;
+			if(midiIndex >= notes.size) break;
+			int64 time = notes[midiIndex].time;
+			array<Peak> chord;
+			while(midiIndex < notes.size && notes[midiIndex].time == time) {
+				if(notes[midiIndex].velocity) chord.append({time, notes[midiIndex].key, (float)notes[midiIndex].velocity});
 				midiIndex++;
 			}
-			while(midiIndex < notes.size && !notes[midiIndex].velocity) midiIndex++;
-
-			if(peakIndex >= peaks.size) break;
-			Peak best[chord.size];
-			for(Peak& p: mref<Peak>(best, chord.size)) p = {0,0,0};
-			while(peakIndex < peaks.size) {
-				float sum = 0; size_t matchCount = 0;
-				for(Peak p: ref<Peak>(best, chord.size)) { sum += p.value; matchCount += p.value ? 1 : 0; }
-				if(/*sum*4/3 >= chord.size &&*/ matchCount*4 >= chord.size*3) { log(chord.size, matchCount, sum); break; }
-				Peak peak = peaks[peakIndex];
-				uint key = peak.key;
-				if(chord.contains(key)) {
-					candidates.append( peak );
-					size_t i = chord.indexOf(key);
-					if(peak.value > best[i].value) best[i] = peak;
-				}
-				peakIndex++;
-			}
-			/*int64 sum = 0;
-			for(Peak p: ref<Peak>(best, chord.size)) sum += p.time;
-			int64 matchTime = sum / chord.size;*/
-			int64 min = best[0].time;
-			for(Peak p: ref<Peak>(best, chord.size)) min = ::min(min, p.time);
-			int64 matchTime = min;
-
-			int64 offset = matchTime - expectedTime;
-			for(MidiNote& note: notes.slice(first)) note.time += offset; // Shifts notes to best match
-			previousTime = matchTime;
+			S.append(move(chord));
+			indices.append(range(first, midiIndex));
+			if(midiIndex < notes.size) assert_(notes[midiIndex].time > time+rate/20, time, notes[midiIndex].time, midiIndex);
 		}
+		indices.last().stop = notes.size;
+
+		/// Synchronizes audio and score
+		size_t m = S.size, n = P.size;
+
+		// Global score matrix D //FIXME: implicit ?
+		//buffer<float> D (m*n); D.clear(0);
+		struct Matrix {
+			size_t m,n;
+			buffer<float> elements;
+			Matrix(size_t m, size_t n) : m(m), n(n), elements(m*n) { elements.clear(0); }
+			float& operator()(size_t i, size_t j) { return elements[i*n+j]; }
+		} D(m,n);
+
+		for(size_t i: range(m)) for(size_t j: range(n)) {
+			float d = 0;
+			for(Peak s: S[i]) for(Peak p: P[j]) d += (s.key==p.key || s.key+12==p.key || s.key+12+7==p.key) * p.value;
+			D(i,j) = max(max(j==0?0:D(i,j-1), i==0?0:D(i-1, j)), ((i==0||j==0)?0:D(i-1,j-1)) + d);
+		};
+
+		/// Best monotonous map
+		buffer<int> map (m);
+		map.clear(invalid);
+		int i = m-1, j = n-1;
+		while(i>=0 && j>=0) { //FIXME: reverse ?
+			if(D(i,j) == (j==0?0:D(i,j-1))) j--; // Missing from peaks
+			else if(D(i,j) == (i==0?0:D(i-1,j))) i--; // Missing from score
+			else { map[i] = j; i--; j--; } // Match
+		}
+		//log(map);
+
+		assert_(indices.first().start == 0);
+		int64 offset = 0;
+		for(size_t i: range(m)) {
+			Peak s = S[i][0];
+			if(map[i] != -1) {
+				assert_(size_t(map[i]) < P.size);
+				Peak p = P[map[i]][0];
+				offset = p.time - s.time;
+			}
+			//log(i,n, indices[i].start, indices[i].stop, notes.size, offset/float(rate));
+			assert_(size_t(indices[i].start) < notes.size && size_t(indices[i].stop) <= notes.size);
+			if(i>0) assert_(indices[i-1].stop == indices[i].start);
+			for(size_t midiIndex: indices[i]) notes[midiIndex].time += offset;
+		}
+		assert_(size_t(indices.last().stop) == notes.size);
 
 		assert_(sheet.ticksPerMinutes);
 		{ // Synchronizes measure times with MIDI
@@ -192,7 +216,7 @@ struct BeatSynchronizer : Widget {
 			}
 		}
 
-		// MIDI visualization (synchronized to sheet time)
+		/*// MIDI visualization (synchronized to sheet time)
 		{
 			size_t midiIndex = 0;
 			auto onsets = apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.time;});
@@ -209,9 +233,9 @@ struct BeatSynchronizer : Widget {
 					midiIndex++;
 				}
 			}
-		}
+		}*/
 
-		// Beat visualization (synchronized to sheet time)
+		/*// Beat visualization (synchronized to sheet time)
 		{ref<Peak> peaks = candidates;
 			size_t peakIndex = 0;
 			for(int index: range(sheet.measureBars.size()-1)) {
@@ -226,7 +250,7 @@ struct BeatSynchronizer : Widget {
 					peakIndex++;
 				}
 			}
-		}
+		}*/
 
 		for(float x: sheet.measureBars.values) bars.append(Bar{x, green});
 	}
