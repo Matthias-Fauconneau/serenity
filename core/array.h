@@ -70,7 +70,7 @@ generic struct array : buffer<T> {
 		grow(size+1); return set(size-1, forward<Arg0>(arg0), forward<Arg1>(arg1), forward<Args>(args)...);
     }
     /// Appends the element, if it is not present already
-    template<Type F> T& add(F&& e) { size_t i = indexOf(e); if(i!=invalid) return at(i); else return append(forward<F>(e)); }
+	template<Type F> T& add(F&& e) { size_t i = ref<T>::indexOf(e); if(i!=invalid) return at(i); else return append(forward<F>(e)); }
 
     /// Inserts an element at \a index
 	template<Type V> T& insertAt(size_t index, V&& e) {

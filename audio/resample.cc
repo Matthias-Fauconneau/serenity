@@ -97,9 +97,9 @@ Resampler::Resampler(uint channels, uint sourceRate, uint targetRate, size_t rea
 	// Allocates and clears aligned planar signal buffers
 	size_t writeForReadSize = readSize*integerAdvance+int(readSize*fractionalAdvance+targetRate-1)/targetRate;
 	if(writeSize) assert_(readSize == 0 || writeSize == writeForReadSize);
-	writeSize = writeForReadSize;
+	else writeSize = writeForReadSize;
 	bufferSize = align(16, N+writeSize);
-	for(size_t channel: range(channels)) { signal[channel] = buffer<float>(bufferSize, bufferSize); signal[channel].clear(0); }
+	for(size_t channel: range(channels)) { signal[channel] = buffer<float>(bufferSize); signal[channel].clear(0); }
 }
 
 template<bool mix> void Resampler::filter(ref<float> source, mref<float> target) {
@@ -125,7 +125,7 @@ int Resampler::need(uint targetSize) {
 
 void Resampler::write(ref<float> source) {
 	if(N-1+writeIndex+source.size/channels>bufferSize) { // Wraps buffer (FIXME: map ring buffer)
-		assert_(N-1+writeIndex+source.size/channels-integerIndex<=bufferSize);
+		assert_(N-1+writeIndex+source.size/channels-integerIndex<=bufferSize, N-1+writeIndex+source.size/channels-integerIndex, source.size/channels, bufferSize);
         writeIndex -= integerIndex;
 		for(uint channel: range(channels)) for(uint i: range(N-1+writeIndex)) signal[channel][i] = signal[channel][integerIndex+i];
         integerIndex = 0;
