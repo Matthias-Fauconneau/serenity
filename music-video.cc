@@ -13,7 +13,7 @@
 #include "sampler.h"
 #include "encoder.h"
 #include "parallel.h"
-#include "biquad.h"
+#include "fft.h"
 
 // -> ffmpeg.h/cc
 extern "C" {
@@ -50,6 +50,7 @@ MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter) {
 }
 
 inline float keyToPitch(float key) { return 440*exp2((key-69)/12); }
+inline float pitchToKey(float pitch) { return 69+log2(pitch/440)*12; }
 struct BeatSynchronizer : Widget {
 	int64 rate;
 	Sheet& sheet;
@@ -67,72 +68,55 @@ struct BeatSynchronizer : Widget {
 			lastKey = max(lastKey, note.key);
 			assert(note.time >= 0);
 		}
+		uint keyCount = lastKey+1-firstKey;
 		notes.ticksPerSeconds = rate;
 
-		// Evaluates onset functions (FIXME: persistent | optimize)
-		//static constexpr int firstKey = 21, keyCount = 85;
-		uint keyCount = lastKey+1-firstKey;
-		array<buffer<float>> OF (keyCount); // onset functions for each key
-		const int ratio = 2400; // 48000/2400 = 20Hz (50ms)
-		assert_(rate%ratio==0, rate, ratio);
-		//const int ofRate = rate/ratio; //30
-		const size_t T = X.size;
-		//Resampler resampler(1, rate, ofRate, 0, T); // 1600:1
-		for(size_t key: range(keyCount)) {
-			BandPass filter(keyToPitch(firstKey+key)/rate, /*Q=*/25);
-			buffer<float> F(T/ratio);
-#if 0
-			buffer<float> Y (T);
-			for(size_t t: range(T)) Y[t] = filter(X[t]);
-			resampler.clear();
-			resampler.write(Y);
-			assert_(resampler.available() == F.size);
-			resampler.read(F);
-#else
-			for(size_t i: range(F.size)) {
-				float sum = 0;
-				for(float x: X.slice(i*ratio, ratio)) sum += filter(x);
-				F[i] = sum / ratio;
+		size_t T = X.size; // Total sample count
+		size_t N = 2048; // Frame size (43ms @48KHz)
+		size_t h = N; // Hop size (11ms @48KHz (75% overlap))
+		FFT fft(N);
+		size_t frameCount = (T-N)/h;
+		buffer<float> keyOnsetFunctions(keyCount*frameCount); keyOnsetFunctions.clear(0);
+		buffer<float> previous = buffer<float>(N/2); previous.clear(0);
+		int firstK = floor(keyToPitch(firstKey)*N/rate);
+		int lastK = ceil(keyToPitch(lastKey)*N/rate);
+		for(size_t frameIndex: range(frameCount)) {
+			for(size_t i: range(N)) fft.windowed[i] = fft.window[i] * X[frameIndex*h+i];
+			fft.spectrum = buffer<float>(N/2);
+			fft.transform();
+			buffer<float> current = move(fft.spectrum);
+			for(size_t k: range(firstK, lastK+1)) {
+				float y = max(0.f, current[k] - previous[k]);
+				for(uint key: range(max(firstKey, uint(round(pitchToKey(k*rate/N)))), round(pitchToKey((k+1)*rate/N))))
+					keyOnsetFunctions[(key-firstKey)*frameCount+frameIndex] += y;
 			}
-//#else || convolve hann 220 Hz, low pass, downsample 440 Hz
-#endif
-			float sum=0;
-			float p=0; for(float& v: F) { float np=v; v=max(0.f, v-p); p=np; sum += v; }
-			/// Normalizes onset function
-			double mean = sum / F.size;
-			double SSQ = 0;
-			for(float& v: F) { v -= mean; SSQ += sq(v); }
-			double deviation = sqrt(SSQ / F.size);
-			assert_(deviation);
-			for(float& v: F) v /= deviation;
-			OF.append(move(F));
+			previous = move(current);
+		}
+
+		/// Normalizes onset function
+		for(size_t key: range(keyCount)) {
+			mref<float> f = keyOnsetFunctions.slice(key*frameCount, frameCount);
+			float sum = 0;
+			for(float v: f) sum += v;
+			float mean = sum / frameCount;
+			float SSQ = 0;
+			for(float& v: f) { v -= mean; SSQ += sq(v); }
+			float deviation = sqrt(SSQ / frameCount);
+			for(float& v: f) v /= deviation;
 		}
 
 		/// Selects onset peaks
 		struct Peak { int64 time; uint key; float value; };
 		array<array<Peak>> P; // peaks
-		{const int w = 3, m = 3;
-			for(size_t n: range(m*w, T/ratio-w)) {
-				array<Peak> bin;
-				for(uint key: range(keyCount)) {
-					ref<float> f = OF[key];
-					bool localMaximum = true;
-					for(size_t k: range(n-w, n+w+1)) {
-						if(k==n) continue;
-						if(!(f[n] > f[k])) localMaximum=false;
-					}
-					if(!localMaximum) continue;
-					double sum = 0;
-					for(size_t k: range(n-m*w, n+w+1)) sum += f[k];
-					double mean = sum / (m*w+w+1);
-					const double threshold = 0;//1./32;
-					if(f[n] > mean + threshold) {
-						//log(int64(n * ratio), firstKey+key, f[n], mean);
-						bin.append({int64(n * ratio), firstKey+key, f[n]});
-					}
+		for(size_t i: range(1, frameCount-1)) {
+			array<Peak> chord;
+			for(uint key: range(keyCount)) {
+				ref<float> f = keyOnsetFunctions.slice(key*frameCount, frameCount);
+				if(f[i-1] < f[i] && f[i] > f[i+1]) {
+					chord.append({int64(i*h), firstKey+key, f[i]});
 				}
-				if(bin) P.append(move(bin));
 			}
+			if(chord) P.append(move(chord));
 		}
 
 		/// Collects MIDI chords
@@ -156,9 +140,9 @@ struct BeatSynchronizer : Widget {
 
 		/// Synchronizes audio and score
 		size_t m = S.size, n = P.size;
+		log(m, n);
 
-		// Global score matrix D //FIXME: implicit ?
-		//buffer<float> D (m*n); D.clear(0);
+		// Global score matrix D
 		struct Matrix {
 			size_t m,n;
 			buffer<float> elements;
@@ -181,23 +165,12 @@ struct BeatSynchronizer : Widget {
 			else if(D(i,j) == (i==0?0:D(i-1,j))) i--; // Missing from score
 			else { map[i] = j; i--; j--; } // Match
 		}
-		//log(map);
 
-		assert_(indices.first().start == 0);
 		int64 offset = 0;
 		for(size_t i: range(m)) {
-			Peak s = S[i][0];
-			if(map[i] != -1) {
-				assert_(size_t(map[i]) < P.size);
-				Peak p = P[map[i]][0];
-				offset = p.time - s.time;
-			}
-			//log(i,n, indices[i].start, indices[i].stop, notes.size, offset/float(rate));
-			assert_(size_t(indices[i].start) < notes.size && size_t(indices[i].stop) <= notes.size);
-			if(i>0) assert_(indices[i-1].stop == indices[i].start);
+			if(map[i] != -1) offset = P[map[i]][0].time - S[i][0].time;
 			for(size_t midiIndex: indices[i]) notes[midiIndex].time += offset;
 		}
-		assert_(size_t(indices.last().stop) == notes.size);
 
 		assert_(sheet.ticksPerMinutes);
 		{ // Synchronizes measure times with MIDI
@@ -216,9 +189,8 @@ struct BeatSynchronizer : Widget {
 			}
 		}
 
-		/*// MIDI visualization (synchronized to sheet time)
-		{
-			size_t midiIndex = 0;
+		// MIDI visualization (synchronized to sheet time)
+		{size_t midiIndex = 0;
 			auto onsets = apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.time;});
 			for(int index: range(sheet.measureBars.size()-1)) {
 				int64 t0 = (int64)notes.ticksPerSeconds*sheet.measureBars.keys[index]*60/sheet.ticksPerMinutes;
@@ -233,24 +205,23 @@ struct BeatSynchronizer : Widget {
 					midiIndex++;
 				}
 			}
-		}*/
+		}
 
-		/*// Beat visualization (synchronized to sheet time)
-		{ref<Peak> peaks = candidates;
-			size_t peakIndex = 0;
+		// Beat visualization (synchronized to sheet time)
+		{size_t peakIndex = 0;
 			for(int index: range(sheet.measureBars.size()-1)) {
 				int64 t0 = (int64)rate*sheet.measureBars.keys[index]*60/sheet.ticksPerMinutes;
 				float x0 = sheet.measureBars.values[index];
 				int64 t1 = (int64)rate*sheet.measureBars.keys[index+1]*60/sheet.ticksPerMinutes;
 				float x1 = sheet.measureBars.values[index+1];
-				while(peakIndex<peaks.size && t0 <= peaks[peakIndex].time && peaks[peakIndex].time < t1) {
+				while(peakIndex<P.size && t0 <= P[peakIndex][0].time && P[peakIndex][0].time < t1) {
 					assert_(t1>t0);
-					float x = x0+(x1-x0)*(peaks[peakIndex].time-t0)/(t1-t0);
+					float x = x0+(x1-x0)*(P[peakIndex][0].time-t0)/(t1-t0);
 					bars.append(Bar{x, red});
 					peakIndex++;
 				}
 			}
-		}*/
+		}
 
 		for(float x: sheet.measureBars.values) bars.append(Bar{x, green});
 	}
@@ -381,9 +352,10 @@ struct Music : Widget {
 		if(previousOffset != scroll.offset.x) contentChanged = true;
 		beatSynchronizer.currentTime = timeNum*beatSynchronizer.rate/timeDen;
 		if(video && video.videoTime*timeDen < timeNum*video.videoFrameRate) {
-			video.read(videoView.image);
-			rotate(videoView.image);
-			contentChanged=true;
+			if(video.read(videoView.image)) {
+				rotate(videoView.image);
+				contentChanged=true;
+			}
 		}
 		return contentChanged;
 	}
@@ -468,7 +440,6 @@ struct Music : Widget {
 				int percent = round(100.*encoder.audioTime/encoder.audioFrameRate/((float)notes.last().time/notes.ticksPerSeconds));
 				if(percent!=lastReport) { log(str(percent,2)+"%", str(renderTime, totalTime), str(encodeTime, totalTime), (float)encoder.audioTime/encoder.audioFrameRate, (float)notes.last().time/notes.ticksPerSeconds); lastReport=percent; }
 				//if(percent==5) break; // DEBUG
-				//if(percent>=100) break; // FIXME
 			}
 			requestTermination(0); // Window prevents automatic termination
 		} else { // Preview
