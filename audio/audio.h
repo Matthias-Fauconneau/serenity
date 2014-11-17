@@ -12,9 +12,11 @@ struct AudioFile {
     struct AVFormatContext* file=0;
     struct AVStream* audioStream=0;
     struct AVCodecContext* audio=0;
+	enum Codec { Invalid=-1, AAC, FLAC } codec;
     struct AVFrame* frame=0;
 
-	buffer<int> intBuffer;
+	buffer<int16> int16Buffer;
+	buffer<int32> int32Buffer;
 	buffer<float> floatBuffer;
     size_t bufferIndex=0, bufferSize=0;
 
@@ -24,7 +26,8 @@ struct AudioFile {
 	~AudioFile();
 	explicit operator bool() { return file; }
 
-	size_t read32(mref<int> output);
+	size_t read16(mref<int16> output);
+	size_t read32(mref<int32> output);
 	size_t read(mref<float> output);
 
 	void seek(uint audioTime);

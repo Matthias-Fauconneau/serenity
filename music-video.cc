@@ -192,7 +192,7 @@ struct BeatSynchronizer : Widget {
 
 		// MIDI visualization (synchronized to sheet time)
 		{size_t midiIndex = 0;
-			lo){return o.velocity==0;}), [](MidiNote o){return o.time;});
+			auto onsets = apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.time;});
 			for(int index: range(sheet.measureBars.size()-1)) {
 				int64 t0 = (int64)notes.ticksPerSeconds*sheet.measureBars.keys[index]*60/sheet.ticksPerMinutes;
 				float x0 = sheet.measureBars.values[index];
@@ -256,12 +256,12 @@ struct Music : Widget {
 
 	// Audio file
 	buffer<String> audioFiles = filter(Folder(".").list(Files), [this](string path) { return !startsWith(path, name)
-			|| (!endsWith(path, ".mp3") && !endsWith(path, ".m4a") && !endsWith(path, "performance.mp4") && !find(path, ".cut.")); });
+			|| (!endsWith(path, ".mp3") && !endsWith(path, ".m4a") && !endsWith(path, "performance.mp4") && !find(path, ".mkv")); });
 	AudioFile audioFile = audioFiles ? AudioFile(audioFiles[0]) : AudioFile();
 
 	// Video input
 	buffer<String> videoFiles = filter(Folder(".").list(Files), [this](string path) {
-			return !startsWith(path, name) ||  (!endsWith(path, "performance.mp4") && !find(path, ".cut.")); });
+			return !startsWith(path, name) ||  (!endsWith(path, "performance.mp4") && !find(path, ".mkv")); });
 	Decoder video = videoFiles ? Decoder(videoFiles[0]) : Decoder();
 	ImageView videoView = video ? video.size : Image();
 
@@ -286,9 +286,10 @@ struct Music : Widget {
 	// Audio output
     Thread audioThread;
 	AudioOutput audio = {{this, &Music::read32}, audioThread};
+#if SAMPLER
 	Thread decodeThread;
 	Sampler sampler {48000, "/Samples/Salamander.sfz"_, {this, &Music::timeChanged}, decodeThread};
-
+#endif
 	size_t read32(mref<int2> output) {
 		assert_(audioFile && audioFile.audioTime>=0);
 		/**/  if(audioFile.channels == audio.channels) return audioFile.read32(mcast<int>(output));
@@ -301,6 +302,7 @@ struct Music : Widget {
 		else error(audioFile.channels);
 	}
 
+#if SAMPLER
 	/// Adds new notes to be played (called in audio thread by sampler)
 	uint samplerMidiIndex = 0;
 	void timeChanged(uint64 time) {
@@ -310,6 +312,7 @@ struct Music : Widget {
 			samplerMidiIndex++;
 		}
 	}
+#endif
 
 	bool follow(int64 timeNum, int64 timeDen, int2 size) {
 		if(timeNum < 0) return false; // FIXME
@@ -369,8 +372,10 @@ struct Music : Widget {
 		if(video) {
 			video.seek(time * video.videoFrameRate / notes.ticksPerSeconds);
 		}
+#if SAMPLER
 		sampler.time = time*sampler.rate/notes.ticksPerSeconds;
 		while(samplerMidiIndex < notes.size && notes[samplerMidiIndex].time*sampler.rate < time*notes.ticksPerSeconds) samplerMidiIndex++;
+#endif
 	}
 
 	Music() {
@@ -385,19 +390,26 @@ struct Music : Widget {
 		} else if(running) { // Starts one second before first onset
 			if(notes[0].time > notes.ticksPerSeconds) seek(notes[0].time-notes.ticksPerSeconds);
 		}
-		if(!audioFile) decodeThread.spawn(); // For sampler
+#if SAMPLER
+		if(sampler) decodeThread.spawn(); // For sampler
+#endif
 		if(arguments().contains("encode")) { // Encode
 			Encoder encoder {name};
 			encoder.setVideo(int2(1280,720), 60);
-			if(audioFile) encoder.setAudio(audioFile);
+			if(audioFile && audioFile.codec==AudioFile::AAC) encoder.setAudio(audioFile);
+			else if(audioFile) encoder.setAudio(audioFile.channels, audioFile.audioFrameRate);
+#if SAMPLER
 			else encoder.setAudio(sampler.rate);
+#else
+			else error("audio");
+#endif
 			encoder.open();
 			Time renderTime, encodeTime, totalTime;
 			totalTime.start();
 			for(int lastReport=0, done=0; !done;) {
 				assert_(encoder.audioStream->time_base.num == 1);
 				auto writeAudio = [&]{
-					if(audioFile) {
+					if(audioFile && audioFile.codec==AudioFile::AAC) {
 						AVPacket packet;
 						if(av_read_frame(audioFile.file, &packet) < 0) { done=true; return false; }
 						if(audioFile.file->streams[packet.stream_index]==audioFile.audioStream) {
@@ -408,13 +420,22 @@ struct Music : Widget {
 							packet.stream_index = encoder.audioStream->index;
 							av_interleaved_write_frame(encoder.context, &packet);
 						}
-					} else {
-						byte buffer_[sampler.periodSize*sizeof(short2)];
-						mref<short2> buffer((short2*)buffer_, sampler.periodSize);
+					} else if(audioFile) {
+						buffer<int16> buffer(1024*audioFile.channels);
+						buffer.size = audioFile.read16(buffer) * audioFile.channels;
+						encoder.writeAudioFrame(buffer);
+						done = buffer.size < buffer.capacity;
+					}
+#if SAMPLER
+					else {
+						buffer<int16> buffer(1024*sampler.channels);
 						sampler.read16(buffer);
 						encoder.writeAudioFrame(buffer);
 						done = sampler.silence || encoder.audioTime*notes.ticksPerSeconds >= notes.last().time*encoder.audioFrameRate;
 					}
+#else
+					else error("audio");
+#endif
 					return true;
 				};
 				if(encoder.videoFrameRate) { // Interleaved AV
@@ -440,15 +461,24 @@ struct Music : Widget {
 				int percent = round(100.*encoder.audioTime/encoder.audioFrameRate/((float)notes.last().time/notes.ticksPerSeconds));
 				if(percent!=lastReport) { log(str(percent,2)+"%", str(renderTime, totalTime), str(encodeTime, totalTime)); lastReport=percent; }
 				{assert_(encoder.audioFrameRate == uint64(notes.ticksPerSeconds));
-					if(encoder.audioTime > uint64(notes.last().time + notes.ticksPerSeconds)) break; // Cuts 1 second after last offset
+					auto onsets = apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.time;});
+					if(encoder.audioTime > uint64(onsets.last() + notes.ticksPerSeconds)) {
+						log("1s after last onset");
+						break; // Cuts 1 second after last onset
+					}
 				}
 			}
 			requestTermination(0); // Window prevents automatic termination
 		} else { // Preview
 			window.show();
 			if(playbackDeviceAvailable()) {
+#if SAMPLER
 				audio.start(audioFile.audioFrameRate ?: sampler.rate, sampler.periodSize, 32, 2);
 				assert_(audio.rate == audioFile.audioFrameRate ?: sampler.rate);
+#else
+				assert_(audioFile);
+				audio.start(audioFile.audioFrameRate, 1024, 32, 2);
+#endif
 				audioThread.spawn();
 			} else running = false;
 		}
