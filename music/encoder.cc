@@ -108,7 +108,7 @@ void Encoder::writeAudioFrame(ref<int16> audio) {
 	assert(audioStream);
 	AVFrame frame;
 	frame.nb_samples = audio.size/channels;
-	avcodec_fill_audio_frame(&frame, channels, AV_SAMPLE_FMT_S16, (uint8*)audio.data, audio.size * sizeof(int16), 1);
+	avcodec_fill_audio_frame(&frame, channels, AV_SAMPLE_FMT_S16, (uint8*)audio.data, audio.size * channels * sizeof(int16), 1);
 	frame.pts = audioTime*audioStream->time_base.den/(audioFrameRate*audioStream->time_base.num);
 
 	AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
@@ -117,10 +117,10 @@ void Encoder::writeAudioFrame(ref<int16> audio) {
 	if(gotAudioPacket) {
 		pkt.stream_index = audioStream->index;
 		av_interleaved_write_frame(context, &pkt);
-		audioEncodedTime += audio.size;
+		audioEncodedTime += audio.size/channels;
 	}
 
-	audioTime += audio.size;
+	audioTime += audio.size/channels;
 }
 
 Encoder::~Encoder() {
