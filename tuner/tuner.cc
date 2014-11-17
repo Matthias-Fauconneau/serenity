@@ -2,7 +2,7 @@
 #include "math.h"
 #include "time.h"
 #include "pitch.h"
-#include "audio.h"
+#include "asound.h"
 #include "graphics.h"
 #include "text.h"
 #include "layout.h"

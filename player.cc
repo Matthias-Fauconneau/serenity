@@ -1,8 +1,8 @@
 /// \file player.cc Music player
 #include "thread.h"
 #include "file.h"
-#include "ffmpeg.h"
 #include "audio.h"
+#include "asound.h"
 #include "interface.h"
 #include "selection.h"
 #include "layout.h"

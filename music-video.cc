@@ -1,14 +1,14 @@
 #include "MusicXML.h"
 #include "midi.h"
 #include "sheet.h"
-#include "ffmpeg.h"
+#include "audio.h"
 #include "window.h"
 #include "interface.h"
 #include "layout.h"
 #include "keyboard.h"
-#include "audio.h"
+#include "asound.h"
 #include "render.h"
-#include "decoder.h"
+#include "video.h"
 #include "time.h"
 #include "sampler.h"
 #include "encoder.h"
@@ -59,7 +59,7 @@ struct BeatSynchronizer : Widget {
 	struct Bar { float x; bgr3f color; };
 	array<Bar> bars;
 	int64 currentTime = 0;
-	BeatSynchronizer(ref<float> X, uint rate, Sheet& sheet, MidiNotes& notes) : rate(rate), sheet(sheet), notes(notes) {
+	BeatSynchronizer(Audio audio, Sheet& sheet, MidiNotes& notes) : rate(audio.rate), sheet(sheet), notes(notes) {
 		// Converts MIDI time base to audio sample rate
 		uint firstKey = 21+85, lastKey = 0;
 		for(MidiNote& note: notes) {
@@ -71,7 +71,7 @@ struct BeatSynchronizer : Widget {
 		uint keyCount = lastKey+1-firstKey;
 		notes.ticksPerSeconds = rate;
 
-		size_t T = X.size; // Total sample count
+		size_t T = audio.size/audio.channels; // Total sample count
 		size_t N = 2048; // Frame size (43ms @48KHz)
 		size_t h = N; // Hop size (11ms @48KHz (75% overlap))
 		FFT fft(N);
@@ -81,7 +81,10 @@ struct BeatSynchronizer : Widget {
 		int firstK = floor(keyToPitch(firstKey)*N/rate);
 		int lastK = ceil(keyToPitch(lastKey)*N/rate);
 		for(size_t frameIndex: range(frameCount)) {
-			for(size_t i: range(N)) fft.windowed[i] = fft.window[i] * X[frameIndex*h+i];
+			ref<float> X = audio.slice(frameIndex*h*audio.channels, N*audio.channels);
+			//if(audio.channels==1) for(size_t i: range(N)) fft.windowed[i] = fft.window[i] * X[frameIndex*h+i];
+			if(audio.channels==2) for(size_t i: range(N)) fft.windowed[i] = fft.window[i] * (X[i*2+0]+X[i*2+1])/2;
+			else error(audio.channels);
 			fft.spectrum = buffer<float>(N/2);
 			fft.transform();
 			buffer<float> current = move(fft.spectrum);
@@ -113,7 +116,7 @@ struct BeatSynchronizer : Widget {
 			for(uint key: range(keyCount)) {
 				ref<float> f = keyOnsetFunctions.slice(key*frameCount, frameCount);
 				if(f[i-1] < f[i] && f[i] > f[i+1]) {
-					chord.append({int64(i*h), firstKey+key, f[i]});
+					chord.append(Peak{int64(i*h), firstKey+key, f[i]});
 				}
 			}
 			if(chord) P.append(move(chord));
@@ -129,18 +132,16 @@ struct BeatSynchronizer : Widget {
 			int64 time = notes[midiIndex].time;
 			array<Peak> chord;
 			while(midiIndex < notes.size && notes[midiIndex].time == time) {
-				if(notes[midiIndex].velocity) chord.append({time, notes[midiIndex].key, (float)notes[midiIndex].velocity});
+				if(notes[midiIndex].velocity) chord.append(Peak{time, notes[midiIndex].key, (float)notes[midiIndex].velocity});
 				midiIndex++;
 			}
 			S.append(move(chord));
 			indices.append(range(first, midiIndex));
-			if(midiIndex < notes.size) assert_(notes[midiIndex].time > time+rate/20, time, notes[midiIndex].time, midiIndex);
 		}
 		indices.last().stop = notes.size;
 
 		/// Synchronizes audio and score
 		size_t m = S.size, n = P.size;
-		log(m, n);
 
 		// Global score matrix D
 		struct Matrix {
@@ -191,7 +192,7 @@ struct BeatSynchronizer : Widget {
 
 		// MIDI visualization (synchronized to sheet time)
 		{size_t midiIndex = 0;
-			auto onsets = apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.time;});
+			lo){return o.velocity==0;}), [](MidiNote o){return o.time;});
 			for(int index: range(sheet.measureBars.size()-1)) {
 				int64 t0 = (int64)notes.ticksPerSeconds*sheet.measureBars.keys[index]*60/sheet.ticksPerMinutes;
 				float x0 = sheet.measureBars.values[index];
@@ -258,9 +259,6 @@ struct Music : Widget {
 			|| (!endsWith(path, ".mp3") && !endsWith(path, ".m4a") && !endsWith(path, "performance.mp4") && !find(path, ".cut.")); });
 	AudioFile audioFile = audioFiles ? AudioFile(audioFiles[0]) : AudioFile();
 
-	// Audio data
-	Audio audioData = decodeAudio(audioFiles[0]); // Decodes full file for analysis (beat detection and synchronization)
-
 	// Video input
 	buffer<String> videoFiles = filter(Folder(".").list(Files), [this](string path) {
 			return !startsWith(path, name) ||  (!endsWith(path, "performance.mp4") && !find(path, ".cut.")); });
@@ -269,8 +267,8 @@ struct Music : Widget {
 
 	// Rendering
 	Sheet sheet {xml.signs, xml.divisions, apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
-	BeatSynchronizer beatSynchronizer {audioData, audioData.rate, sheet, notes};
-	Scroll<VBox> scroll {{&sheet, &beatSynchronizer}};
+	BeatSynchronizer beatSynchronizer {decodeAudio(audioFiles[0]), sheet, notes};
+	Scroll<VBox> scroll {{&sheet/*, &beatSynchronizer*/}};
 	bool failed = sheet.firstSynchronizationFailureChordIndex != invalid;
 	bool running = true; //!failed;
 	Keyboard keyboard;
@@ -293,10 +291,14 @@ struct Music : Widget {
 
 	size_t read32(mref<int2> output) {
 		assert_(audioFile && audioFile.audioTime>=0);
-		int mono[output.size];
-		size_t readSize = audioFile.read32(mref<int>(mono, output.size));
-		for(size_t i: range(readSize)) output[i] = mono[i];
-		return readSize;
+		/**/  if(audioFile.channels == audio.channels) return audioFile.read32(mcast<int>(output));
+		/*else if(audioFile.channels == 1) {
+			int mono[output.size];
+			size_t readSize = audioFile.read32(mref<int>(mono, output.size));
+			for(size_t i: range(readSize)) output[i] = mono[i];
+			return readSize;
+		}*/
+		else error(audioFile.channels);
 	}
 
 	/// Adds new notes to be played (called in audio thread by sampler)
@@ -340,11 +342,10 @@ struct Music : Widget {
 			uint64 t1 = sheet.measureBars.keys[index]*60*timeDen;
 			uint64 t2 = sheet.measureBars.keys[index+1]*60*timeDen;
 			if(t1 <= t && t < t2) {
-				//log(index, t1/float(sheet.ticksPerMinutes*timeDen), t/float(sheet.ticksPerMinutes*timeDen), t2/float(sheet.ticksPerMinutes*timeDen));
 				real f = real(t-t1)/real(t2-t1);
 				real w[4] = { 1./6 * cb(1-f), 2./3 - 1./2 * sq(f)*(2-f), 2./3 - 1./2 * sq(1-f)*(2-(1-f)), 1./6 * cb(f) };
-				auto X = [&](int index) { return clip(0.f, sheet.measureBars.values[clip<int>(0, index, sheet.measureBars.values.size)] - size.x/2, (float)abs(sheet.sizeHint(size).x)-size.x); };
-				//log(X(index), w[0]*X(index-1) + w[1]*X(index) + w[2]*X(index+1) + w[3]*X(index+2), X(index+1));
+				auto X = [&](int index) { return clip(0.f, sheet.measureBars.values[clip<int>(0, index, sheet.measureBars.values.size)] - size.x/2,
+							(float)abs(sheet.sizeHint(size).x)-size.x); };
 				scroll.offset.x = -round( w[0]*X(index-1) + w[1]*X(index) + w[2]*X(index+1) + w[3]*X(index+2) );
 				break;
 			}
@@ -361,16 +362,13 @@ struct Music : Widget {
 	}
 
 	void seek(uint64 time) {
-		/*if(audio) {
-			audioTime = midiTime * audioFile.rate / notes.ticksPerSeconds;
-			audioFile.seek(audioTime); //FIXME: return actual frame time
-			videoTime = audioTime * window.framesPerSecond / audioFile.rate; // FIXME: remainder
-		} else {
-			assert_(notes.ticksPerSeconds);
-			videoTime = midiTime * window.framesPerSecond / notes.ticksPerSeconds;
-			previousFrameCounterValue=window.currentFrameCounterValue;
-			follow(videoTime, window.framesPerSecond);
-		}*/
+		if(audioFile) {
+			assert_(notes.ticksPerSeconds == audioFile.audioFrameRate);
+			audioFile.seek(time); //FIXME: return actual frame time
+		}
+		if(video) {
+			video.seek(time * video.videoFrameRate / notes.ticksPerSeconds);
+		}
 		sampler.time = time*sampler.rate/notes.ticksPerSeconds;
 		while(samplerMidiIndex < notes.size && notes[samplerMidiIndex].time*sampler.rate < time*notes.ticksPerSeconds) samplerMidiIndex++;
 	}
@@ -384,8 +382,8 @@ struct Music : Widget {
 			for(;measureIndex < sheet.measureToChord.size; measureIndex++)
 				if(sheet.measureToChord[measureIndex]>=sheet.firstSynchronizationFailureChordIndex) break;
 			scroll.offset.x = -sheet.measureBars.values[max<int>(0, measureIndex-3)];
-		} else if(running) { // Seeks to first note
-			seek( sheet.midiToSign[0].time );
+		} else if(running) { // Starts one second before first onset
+			if(notes[0].time > notes.ticksPerSeconds) seek(notes[0].time-notes.ticksPerSeconds);
 		}
 		if(!audioFile) decodeThread.spawn(); // For sampler
 		if(arguments().contains("encode")) { // Encode
@@ -404,7 +402,8 @@ struct Music : Widget {
 						if(av_read_frame(audioFile.file, &packet) < 0) { done=true; return false; }
 						if(audioFile.file->streams[packet.stream_index]==audioFile.audioStream) {
 							assert_(encoder.audioStream->time_base.num == audioFile.audioStream->time_base.num);
-							packet.pts=packet.dts=encoder.audioTime=int64(packet.pts)*encoder.audioStream->time_base.den/audioFile.audioStream->time_base.den;
+							packet.pts=packet.dts=encoder.audioTime=
+									int64(packet.pts)*encoder.audioStream->time_base.den/audioFile.audioStream->time_base.den;
 							packet.duration = int64(packet.duration)*encoder.audioStream->time_base.den/audioFile.audioStream->time_base.den;
 							packet.stream_index = encoder.audioStream->index;
 							av_interleaved_write_frame(encoder.context, &packet);
@@ -420,7 +419,8 @@ struct Music : Widget {
 				};
 				if(encoder.videoFrameRate) { // Interleaved AV
 					assert_(encoder.audioStream->time_base.num == 1 && encoder.audioStream->time_base.den == (int)encoder.audioFrameRate);
-					while(encoder.audioTime*encoder.videoFrameRate <= encoder.videoTime*encoder.audioFrameRate) { // If both streams are at same PTS, starts with audio
+					// If both streams are at same PTS, starts with audio
+					while(encoder.audioTime*encoder.videoFrameRate <= encoder.videoTime*encoder.audioFrameRate) {
 						if(!writeAudio()) break;
 					}
 					while(encoder.videoTime*encoder.audioFrameRate < encoder.audioTime*encoder.videoFrameRate) {
@@ -438,8 +438,10 @@ struct Music : Widget {
 					if(!writeAudio()) break;
 				}
 				int percent = round(100.*encoder.audioTime/encoder.audioFrameRate/((float)notes.last().time/notes.ticksPerSeconds));
-				if(percent!=lastReport) { log(str(percent,2)+"%", str(renderTime, totalTime), str(encodeTime, totalTime), (float)encoder.audioTime/encoder.audioFrameRate, (float)notes.last().time/notes.ticksPerSeconds); lastReport=percent; }
-				//if(percent==5) break; // DEBUG
+				if(percent!=lastReport) { log(str(percent,2)+"%", str(renderTime, totalTime), str(encodeTime, totalTime)); lastReport=percent; }
+				{assert_(encoder.audioFrameRate == uint64(notes.ticksPerSeconds));
+					if(encoder.audioTime > uint64(notes.last().time + notes.ticksPerSeconds)) break; // Cuts 1 second after last offset
+				}
 			}
 			requestTermination(0); // Window prevents automatic termination
 		} else { // Preview

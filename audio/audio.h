@@ -1,82 +1,37 @@
 #pragma once
-/// \file audio.h PCM audio output interface
 #include "thread.h"
 #include "vector.h"
-#include "function.h"
 
-bool playbackDeviceAvailable();
+/// Generic audio decoder (using ffmpeg)
+struct AudioFile {
+	size_t channels = 0;
+	uint audioFrameRate = 0;
+	int64 audioTime = 0;
+    uint duration = 0;
 
-enum State { Open, Setup, Prepared, Running, XRun, Draining, Paused, Suspended };
-struct Status { int state, pad; ptr hwPointer; long sec,nsec; int suspended_state; };
-struct Control { ptr swPointer; long availableMinimum; };
+    struct AVFormatContext* file=0;
+    struct AVStream* audioStream=0;
+    struct AVCodecContext* audio=0;
+    struct AVFrame* frame=0;
 
-/// Audio output using ALSA PCM interface
-struct AudioOutput : Device, Poll {
-    Map maps[3];
-    void* buffer = 0;
-    const struct Status* status = 0;
-    struct Control* control = 0;
+	buffer<int> intBuffer;
+	buffer<float> floatBuffer;
+    size_t bufferIndex=0, bufferSize=0;
 
-	uint channels = 0;
-    uint sampleBits = 0;
-	uint rate = 0;
-    uint periodSize = 0, bufferSize = 0;
+	AudioFile(){}
+	AudioFile(string path);
+	default_move(AudioFile);
+	~AudioFile();
+	explicit operator bool() { return file; }
 
-	function<size_t(mref<short2>)> read16 = [](mref<short2>){ error("read16"); return 0;};
-	function<size_t(mref<int2>)> read32 = [](mref<int2>){ error("read32"); return 0;};
-	function<size_t(mref<int>)> read32m = [](mref<int>){ error("read32 mono"); return 0;};
+	size_t read32(mref<int> output);
+	size_t read(mref<float> output);
 
-	AudioOutput(decltype(read16) read, Thread& thread=mainThread);
-	AudioOutput(decltype(read32) read, Thread& thread=mainThread);
-	AudioOutput(decltype(read32m) read, Thread& thread=mainThread);
-    virtual ~AudioOutput() { if(status) stop(); }
-    explicit operator bool() const { return status; }
-
-    /// Configures PCM for 16bit output
-    /// \note \a read will be called back periodically to request an \a output frame of \a size samples
-	void start(uint rate, uint periodSize, uint sampleBits, uint channels);
-
-    /// Drains audio output and stops requiring data from \a read callback
-    void stop();
-
-    /// Callback for poll events
-    void event() override;
+	void seek(uint audioTime);
 };
 
-/// Audio input using ALSA PCM interface
-struct AudioInput : Device, Poll {
-    uint sampleBits = 0;
-    uint channels = 2, rate = 0;
-    uint periodSize = 0, bufferSize = 0;
-    uint periods =0, overruns = 0;
-
-    /// Configures PCM input
-    AudioInput(uint sampleBits, uint rate, uint periodSize, Thread& thread);
-    /// Configures PCM for 32bit input
-    /// \note read will be called back periodically to provide an \a input frame of \a size samples
-    /// \note 0 means maximum
-    AudioInput(function<uint(const ref<int2> output)> write, uint rate=0, uint periodSize=0, Thread& thread=mainThread):
-    AudioInput(32,rate,periodSize,thread) { write32=write; }
-    /// Drains audio input and stops providing data to \a write callback
-    virtual ~AudioInput();
-
-    /// Callback for poll events
-    void event();
-
-private:
-    function<uint(const ref<int2> output)> write32 = [](const ref<int2>){return 0;};
-
-    Map maps[3];
-    void* buffer = 0;
-    const struct Status* status = 0;
-    struct Control* control = 0;
+struct Audio : buffer<float> {
+	Audio(buffer<float>&& data, uint channels, uint rate) : buffer<float>(::move(data)), channels(channels), rate(rate) {}
+	uint channels, rate;
 };
-
-/// Audio control using ALSA Control interface
-struct AudioControl : Device {
-    uint id = 0;
-    long min, max;
-    AudioControl();
-    operator long();
-    void operator =(long value);
-};
+Audio decodeAudio(string path);

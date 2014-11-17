@@ -18,12 +18,8 @@ struct Decoder {
 	struct AVFormatContext* file=0;
 	struct SwsContext* swsContext=0;
 	struct AVStream* videoStream=0; struct AVCodecContext* video=0;
-	struct AVStream* audioStream=0; struct AVCodecContext* audio=0;
-	int64 videoTime = 0, audioTime = 0;
+	int64 videoTime = 0;
 	struct AVFrame* frame=0;
-
-	buffer<short2> shortBuffer;
-	size_t bufferIndex=0, bufferSize=0;
 
 	Decoder() {}
 	Decoder(string name);
@@ -33,6 +29,6 @@ struct Decoder {
 
 	/// Reads a video frame
 	bool read(const Image& image);
-	/// Reads an audio frame
-	//size_t read(mref<short2> audio);
+
+	void seek(uint videoTime);
 };
