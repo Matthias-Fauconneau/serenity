@@ -99,7 +99,14 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 				index = min(index, timeTrack.keys.size-1);
 				//assert_(index < timeTrack.keys.size, index, timeTrack.keys.size, sign.time, timeTrack.keys);
 				assert_(index < timeTrack.keys.size);
-				float x = timeTrack.values[index].staffs[sign.staff];
+				float x;
+				//if(sign.type == Sign::Pedal) x = timeTrack.values[index].bottom;
+				//if(sign.type == Sign::Measure) x = timeTrack.values[index].maximum(); // FIXME
+				if(sign.type == Sign::Wedge) x = timeTrack.values[index].middle;
+				else {
+					assert_(sign.staff < 2, int(sign.type));
+					x = timeTrack.values[index].staffs[sign.staff];
+				}
 				assert_(x - measureBars.values.last() < 1024, sign, sign.staff, sign.time, x - measureBars.values.last(),
 						measureBars.values.last());
 				timeTrack.insert(sign.time, {{x,x},x,x,x,x});

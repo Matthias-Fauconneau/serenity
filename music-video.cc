@@ -243,7 +243,7 @@ struct BeatSynchronizer : Widget {
 			for(int i: range(frameCount)) {
 				array<Peak> chord;
 				for(uint key: range(keyCount)) {
-					if( firstKey+key <= 32) continue; // Inaccurate keys
+					//if( firstKey+key <= 32) continue; // Inaccurate keys
 					ref<float> f = keyOnsetFunctions.slice(key*frameCount, frameCount);
 					bool localMaximum = true;
 					for(int k: range(max(0, i-w), min(int(f.size)-1, i+w+1))) {
@@ -320,9 +320,9 @@ struct BeatSynchronizer : Widget {
 			for(Peak s: S[i]) for(Peak p: P[j])
 #if 1
 				d += (
-						s.key==p.key-1 || s.key==p.key /*|| s.key==p.key+1*/ ||
-						/*s.key==p.key-12-1 ||*/ s.key==p.key-12 || s.key==p.key-12+1 ||
-						s.key==p.key-12-6 || s.key==p.key-12-7) * p.value;
+						/*s.key==p.key-1 ||*/ s.key==p.key /*|| s.key==p.key+1*/ ||
+						/*s.key==p.key-12-1 ||*/ s.key==p.key-12 /*|| s.key==p.key-12+1*/ ||
+						/*s.key==p.key-12-6 ||*/ s.key==p.key-12-7) * p.value;
 #else
 				d += p.value; // Beat match only
 #endif
@@ -341,7 +341,9 @@ struct BeatSynchronizer : Widget {
 		size_t i = 0, j = 0; // Starts from anchor alignment (0, 0)
 		size_t midiIndex = 0;
 		while(i<m && j<n) {
-			if(i+1<m && D(i,j) == D(i+1,j) /*&& instantanousOffset < -offsetConstraint*/) { //(Skip chords when we are early). Step to (i+1, j)
+			int localOffset = (P[j][0].time - notes[midiIndex].time) - globalOffset; // >0: late, <0: early
+#if 0
+			if(i+1<m && D(i,j) == D(i+1,j)) {
 				if(i+1<m && j+1<n) assert_(D(i+1, j) >= D(i, j+1) && D(i+1, j) >= D(i+1, j+1)); // Globally best step is to ignore chord i
 				size_t firstMidiIndex = midiIndex;
 				for(size_t unused count: range(S[i].size)) {
@@ -355,10 +357,11 @@ struct BeatSynchronizer : Widget {
 				}
 				assert_(midiIndex > firstMidiIndex);
 				i++; // Ignores chord i
-			} else // There are enough peaks to match instead (but need to be able to skip tremolos
-			 //(Prevents skip when we are already late)
-			/*else*/
-			if(j+1<n && D(i,j) == D(i,j+1)) {
+			}
+			else // There are enough peaks to match instead
+#endif
+			if(j+1<n && ((D(i,j) == D(i,j+1) && localOffset < notes.ticksPerSeconds/8) //&& globalOffset < 10*notes.ticksPerSeconds
+						 || (i && localOffset < -notes.ticksPerSeconds/4))) { // Limits advance to quaver at 2 qps
 				j++; // Ignores peak j
 			} else { // Match
 				globalOffset = P[j][0].time - notes[midiIndex].time;
@@ -693,7 +696,9 @@ struct Music : Widget {
 				}
 				int percent = round(100.*encoder.audioTime/encoder.audioFrameRate/((float)notes.last().time/notes.ticksPerSeconds));
 				if(percent!=lastReport) { log(str(percent,2)+"%", str(renderTime, totalTime), str(encodeTime, totalTime)); lastReport=percent; }
-				if(startTime+encoder.audioTime >= uint64(onsets.last() + notes.ticksPerSeconds)) break; // Cuts 1 second after last onset
+				if(startTime+encoder.audioTime >= uint64(onsets.last() + 2*notes.ticksPerSeconds) &&
+						startTime+encoder.videoTime*encoder.audioFrameRate/encoder.videoFrameRate
+						>= uint64(onsets.last() + 2*notes.ticksPerSeconds)) break; // Cuts 2 second after last onset
 			}
 			requestTermination(0); // Window prevents automatic termination
 		} else { // Preview
