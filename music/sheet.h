@@ -32,8 +32,9 @@ struct Sheet : Widget {
     // Fonts
 	Font graceFont {File("emmentaler-26.otf", Folder("/usr/local/share/fonts"_)), 4.f*halfLineInterval, "Emmentaler"};
 	Font font {File("emmentaler-26.otf", "/usr/local/share/fonts"_), 9.f*halfLineInterval, "Emmentaler"};
-	Font textFont{File("LinLibertine_R.ttf", "/usr/share/fonts/libertine-ttf"_), 6.f*halfLineInterval, "LinLibertine_R"};
-	Font smallFont{File("LinLibertine_R.ttf", "/usr/share/fonts/libertine-ttf"_), 14.f, "LinLibertine_R"};
+	//Font textFont{File("LinLibertine_R.ttf", "/usr/share/fonts/libertine-ttf"_), 6.f*halfLineInterval, "LinLibertine_R"};
+	//Font smallFont{File("LinLibertine_R.ttf", "/usr/share/fonts/libertine-ttf"_), 14.f, "LinLibertine_R"};
+	float textSize = 6*halfLineInterval;
     // Font helpers
 	vec2 glyphSize(string name) { return font.metrics(font.index(name)).size; }
 	vec2 noteSize = glyphSize("noteheads.s2"_);
@@ -43,7 +44,8 @@ struct Sheet : Widget {
 	map<Rect, shared<Graphics>> measures;
 	shared<Graphics> debug;
 
-	int2 sizeHint(int2) override { return int2(measureBars.values.last(), -(staffY(1, -32)-staffY(0, 16))); }
+	int highestStep = 0;
+	int2 sizeHint(int2) override { return int2(measureBars.values.last(), -(staffY(1, -32)-staffY(0, highestStep))); }
 	shared<Graphics> graphics(int2 size, Rect clip) override;
 
 	// -- Control
