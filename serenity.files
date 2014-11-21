@@ -140,3 +140,5 @@ web.cc
 music/video.h
 music/video.cc
 tuner/biquad.h
+record.cc
+statistics.cc

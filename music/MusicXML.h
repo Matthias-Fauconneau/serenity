@@ -5,5 +5,5 @@
 struct MusicXML {
     array<Sign> signs;
     uint divisions = 0; // Time unit per quarter note
-    MusicXML(string document);
+    MusicXML(string document, string name="");
 };

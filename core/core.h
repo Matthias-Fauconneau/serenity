@@ -110,6 +110,23 @@ struct range {
 	int start, stop;
 };
 
+/// Numeric range
+struct reverse_range {
+	notrace reverse_range(int start, int stop) : start(start), stop(stop){}
+	notrace reverse_range(int size) : reverse_range(size-1, -1){}
+	struct iterator {
+		int i;
+		notrace int operator*() { return i; }
+		notrace iterator& operator++() { i--; return *this; }
+		notrace bool operator !=(const iterator& o) const { return i>o.i; }
+	};
+	notrace iterator begin() const { return {start}; }
+	notrace iterator end() const { return {stop}; }
+	explicit operator bool() const { return start > stop; }
+	int size() { return start-stop; }
+	int start, stop;
+};
+
 // -- initializer_list
 
 #ifndef _INITIALIZER_LIST

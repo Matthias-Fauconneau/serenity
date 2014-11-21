@@ -1,7 +1,7 @@
 #include "MusicXML.h"
 #include "xml.h"
 
-MusicXML::MusicXML(string document) {
+MusicXML::MusicXML(string document, string) {
     Element root = parseXML(document);
 	map<uint, Clef> clefs;
 	KeySignature keySignature={0}; TimeSignature timeSignature={4,4};
@@ -217,6 +217,7 @@ MusicXML::MusicXML(string document) {
 						repeatIndex=signs.size;
 					}
 					else if(e("repeat")["direction"]=="backward") {
+						if(repeatIndex==invalid) { signs.clear(); return; } // FIXME
 						assert_(repeatIndex!=invalid);
 						buffer<Sign> copy = copyRef(signs.slice(repeatIndex));
 						assert_(time==nextTime && time==maxTime && time > signs[repeatIndex].time);

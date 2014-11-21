@@ -57,7 +57,7 @@ void Encoder::setAudio(const AudioFile& audio) {
 	audioStream->pts.den = 1;
 }
 
-void Encoder::setAudio(uint channels, uint rate) {
+void Encoder::setAAC(uint channels, uint rate) {
 	assert_(!audioStream);
 	this->channels = channels;
 	audioFrameRate = rate;
@@ -71,7 +71,22 @@ void Encoder::setAudio(uint channels, uint rate) {
 	audioCodec->sample_rate = rate;
 	audioCodec->channels = channels;
 	audioCodec->channel_layout = ref<int>{0,AV_CH_LAYOUT_MONO,AV_CH_LAYOUT_STEREO}[channels];
-	if(context->oformat->flags & AVFMT_GLOBALHEADER) audioCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
+	avcodec_open2(audioCodec, codec, 0);
+}
+
+void Encoder::setFLAC(uint channels, uint rate) {
+	assert_(!audioStream);
+	this->channels = channels;
+	audioFrameRate = rate;
+	AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_FLAC);
+	audioStream = avformat_new_stream(context, codec);
+	audioStream->id = 1;
+	audioCodec = audioStream->codec;
+	audioCodec->codec_id = AV_CODEC_ID_FLAC;
+	audioCodec->sample_fmt  = AV_SAMPLE_FMT_S32;
+	audioCodec->sample_rate = rate;
+	audioCodec->channels = channels;
+	audioCodec->channel_layout = ref<int>{0,AV_CH_LAYOUT_MONO,AV_CH_LAYOUT_STEREO}[channels];
 	avcodec_open2(audioCodec, codec, 0);
 }
 
@@ -109,6 +124,24 @@ void Encoder::writeAudioFrame(ref<int16> audio) {
 	AVFrame frame;
 	frame.nb_samples = audio.size/channels;
 	avcodec_fill_audio_frame(&frame, channels, AV_SAMPLE_FMT_S16, (uint8*)audio.data, audio.size * channels * sizeof(int16), 1);
+	frame.pts = audioTime*audioStream->time_base.den/(audioFrameRate*audioStream->time_base.num);
+
+	AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
+	int gotAudioPacket;
+	avcodec_encode_audio2(audioCodec, &pkt, &frame, &gotAudioPacket);
+	if(gotAudioPacket) {
+		pkt.stream_index = audioStream->index;
+		av_interleaved_write_frame(context, &pkt);
+		audioEncodedTime += audio.size/channels;
+	}
+
+	audioTime += audio.size/channels;
+}
+void Encoder::writeAudioFrame(ref<int32> audio) {
+	assert(audioStream);
+	AVFrame frame;
+	frame.nb_samples = audio.size/channels;
+	avcodec_fill_audio_frame(&frame, channels, AV_SAMPLE_FMT_S32, (uint8*)audio.data, audio.size * channels * sizeof(int32), 1);
 	frame.pts = audioTime*audioStream->time_base.den/(audioFrameRate*audioStream->time_base.num);
 
 	AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;

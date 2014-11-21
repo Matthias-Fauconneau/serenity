@@ -31,7 +31,7 @@ AudioFile::AudioFile(string path) {
 				assert_(channels == 1 || channels == 2);
 				audioFrameRate = audio->sample_rate;
 				assert_(audioStream->time_base.num == 1, audioStream->time_base.den, audioFrameRate);
-				assert_(audioFrameRate%audioStream->time_base.den == 0, audioStream->time_base.den, audioFrameRate);
+				//assert_(audioFrameRate%audioStream->time_base.den == 0, audioStream->time_base.den, audioFrameRate);
 				if(audioStream->duration != AV_NOPTS_VALUE) {
 					assert_(audioStream->duration != AV_NOPTS_VALUE);
 					duration = (int64)audioStream->duration*audioFrameRate*audioStream->time_base.num/audioStream->time_base.den;
@@ -106,11 +106,19 @@ size_t AudioFile::read32(mref<int32> output) {
                 if(audio->sample_fmt == AV_SAMPLE_FMT_S32) {
 					int32Buffer = unsafeRef(ref<int32>((int32*)frame->data[0], bufferSize)); // Valid until next frame
                 }
-                else if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
+				else {
 					int32Buffer = buffer<int32>(bufferSize*channels);
-					for(size_t i : range(bufferSize*channels)) int32Buffer[i] = ((int16*)frame->data[0])[i] << 16;
-                }
-                else error("Unimplemented conversion to int32 from", (int)audio->sample_fmt);
+					if(audio->sample_fmt == AV_SAMPLE_FMT_S16)
+						for(size_t i : range(bufferSize*channels)) int32Buffer[i] = ((int16*)frame->data[0])[i] << 16;
+					else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
+						for(size_t i : range(bufferSize)) for(size_t j : range(channels)) {
+							int32 s = ((float*)frame->data[j])[i]*(1<<30); //TODO: ReplayGain
+							if(s<-(1<<31) || s >= int(uint(1<<31)-1)) error("Clip", -(1<<31), s, 1<<31, ((float*)frame->data[j])[i]);
+							int32Buffer[i*channels+j] = s;
+						}
+					}
+					else error("Unimplemented conversion to int32 from", (int)audio->sample_fmt);
+				}
 				audioTime = packet.pts*audioFrameRate*audioStream->time_base.num/audioStream->time_base.den;
             }
             av_free_packet(&packet);

@@ -19,7 +19,8 @@ struct Encoder {
     Encoder(string name);
     void setVideo(int2 size, uint videoFrameRate);
     void setAudio(const AudioFile& audio);
-	void setAudio(uint channels, uint rate);
+	void setAAC(uint channels, uint rate);
+	void setFLAC(uint channels, uint rate);
     void open();
     /// Flushes all encoders and close the file
     ~Encoder();
@@ -29,4 +30,6 @@ struct Encoder {
     void writeVideoFrame(const Image& image);
     /// Writes an audio frame
 	void writeAudioFrame(ref<int16> audio);
+	/// Writes an audio frame
+	void writeAudioFrame(ref<int32> audio);
 };

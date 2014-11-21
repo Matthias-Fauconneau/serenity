@@ -62,7 +62,6 @@ generic bool operator >=(const vec& u, const vec& v) { for(uint i: range(N)) if(
 generic bool operator >(const vec& u, const vec& v) { for(uint i: range(N)) if(u[i]<=v[i]) return false; return true; }
 
 generic vec abs(const vec& v){ vec r; for(uint i: range(N)) r[i]=abs(v[i]); return r;  }
-generic vec sign(const vec& v){ vec r; for(uint i: range(N)) r[i]=ceil(v[i]); return r;  }
 generic vec floor(const vec& v){ vec r; for(uint i: range(N)) r[i]=floor(v[i]); return r;  }
 generic vec fract(const vec& v){ vec r; for(uint i: range(N)) r[i]=mod(v[i],1); return r;  }
 generic vec round(const vec& v){ vec r; for(uint i: range(N)) r[i]=round(v[i]); return r;  }
