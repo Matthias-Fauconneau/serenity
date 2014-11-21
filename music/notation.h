@@ -26,6 +26,7 @@ struct Note {
     bool staccato:1;
     bool tenuto:1;
     bool accent:1;
+	bool trill:1;
     bool stem:1; // 0: down, 1: up
     uint key; // MIDI key
 	size_t measureIndex = invalid, glyphIndex = invalid;

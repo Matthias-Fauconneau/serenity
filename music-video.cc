@@ -52,7 +52,7 @@ MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter) {
 
 struct Peak { int time; uint key; float value; };
 bool operator <(const Peak& a, const Peak& b) { return a.value > b.value; } // Decreasing order
-String str(const Peak& o) { return str(o.key)/*+":"+str(int(round(o.value)))*/; }
+String str(const Peak& o) { return strKey(o.key)/*+":"+str(int(round(o.value)))*/; }
 
 typedef array<Peak> Bin;
 String str(const Bin& o) { return /*str(o[0].time*8/48000)+*/str(o.slice(0, min(5ul, o.size))); }
@@ -65,7 +65,8 @@ struct BeatSynchronizer : Widget {
 	struct Bar { float x; bgr3f color; };
 	array<Bar> bars;
 	int currentTime = 0;
-	BeatSynchronizer(Audio audio, MidiNotes& notes, ref<Sign> signs, map<int, float>& measureBars) : measureBars(measureBars) {
+	BeatSynchronizer(Audio audio, MidiNotes& notes, ref<Sign> signs, map<int, float>& measureBars, int64 /*ticksPerMinutes*/)
+		: measureBars(measureBars) {
 		// Converts MIDI time base to audio sample rate
 		uint firstKey = 21+85, lastKey = 0;
 		for(MidiNote& note: notes) {
@@ -77,7 +78,7 @@ struct BeatSynchronizer : Widget {
 		notes.ticksPerSeconds = audio.rate;
 
 		size_t T = audio.size/audio.channels; // Total sample count
-#if 1 // Simple beat score follower
+#if 0 // Simple beat score follower
 		size_t N = 2048; // Frame size (43ms @48KHz)
 		size_t h = N/4; // Hop size (11ms @48KHz (75% overlap))
 		FFT fft(N);
@@ -160,7 +161,7 @@ struct BeatSynchronizer : Widget {
 #else
 		uint keyCount = lastKey+1-firstKey;
 
-#if 0
+#if 0 // FFT
 		size_t N = 8192;  // Frame size: 48KHz * 2 (Nyquist) * 2 (window) / frameSize ~ 24Hz~A0
 		size_t h = 2048; // Hop size: 48KHz * 60 s/min / 4 b/q / hopSize / 2 (Nyquist) ~ 175 bpm
 		FFT fft(N);
@@ -179,12 +180,12 @@ struct BeatSynchronizer : Widget {
 				for(size_t key: range(max(firstKey, uint(round(pitchToKey(k*audio.rate/N)))), round(pitchToKey((k+1)*audio.rate/N))))
 					keyOnsetFunctions[(key-firstKey)*frameCount+frameIndex] += fft.spectrum[k];
 			}
-			if(frameIndex>0) for(size_t key: range(keyCount)) { // Differentiates
+			if(frameIndex>0) for(size_t key: range(keyCount)) { // Differentiates (key granularity should be more robust against frequency oscillations)
 				keyOnsetFunctions[key*frameCount+frameIndex] =
 						max(0.f, keyOnsetFunctions[key*frameCount+frameIndex] - keyOnsetFunctions[key*frameCount+frameIndex-1]);
 			}
 		}
-#else
+#else // Filter bank
 		const size_t h = 2400; // 48000/2400 = 20Hz (50ms)
 		size_t frameCount = T/h;
 		buffer<float> keyOnsetFunctions(keyCount*frameCount);
@@ -210,17 +211,18 @@ struct BeatSynchronizer : Widget {
 		}
 #endif
 #endif
-		/*/// Normalizes onset function
+		/// Normalizes onset function
 		for(size_t key: range(keyCount)) {
 			mref<float> f = keyOnsetFunctions.slice(key*frameCount, frameCount);
 			float SSQ = 0;
 			for(float& v: f) SSQ += sq(v);
 			float deviation = sqrt(SSQ / frameCount);
 			if(deviation) for(float& v: f) v /= deviation;
-		}*/
+		}
 
 		/// Selects onset peaks
 		array<Bin> P; // peaks
+#if 0
 		//int peakTimeOrigin = -1;
 		const int framesPerBin = 2; // 50ms
 		for(size_t binIndex: range(1, frameCount/framesPerBin-1)) {
@@ -237,31 +239,76 @@ struct BeatSynchronizer : Widget {
 			}
 			if(chord) P.append(move(chord));
 		}
-		log(P.slice(0,32));
+#else
+		{const int w = 2, W=3, m = 3;
+			for(int i: range(frameCount)) {
+				array<Peak> chord;
+				for(uint key: range(keyCount)) {
+					if( firstKey+key <= 32) continue; // Inaccurate keys
+					ref<float> f = keyOnsetFunctions.slice(key*frameCount, frameCount);
+					bool localMaximum = true;
+					for(int k: range(max(0, i-w), min(int(f.size)-1, i+w+1))) {
+						if(k==i) continue;
+						if(!(f[i] > f[k])) localMaximum=false;
+					}
+					if(localMaximum) {
+						double sum = 0;
+						for(size_t k: range(max(0, i-m*W), min(int(f.size)-1, i+W+1))) sum += f[k];
+						double mean = sum / (min(int(f.size)*1, i+W+1) - max(0, i-m*W));
+						const double threshold = 1./4; // FFT
+						//const double threshold = 1; // Filter
+						if(f[i] > mean + threshold)
+							chord.insertSorted(Peak{int(i*h)/*-peakTimeOrigin*/, firstKey+key, f[i]/**127*/});
+					}
+				}
+				if(chord) P.append(move(chord));
+			}
+		}
+#endif
+		//log(P.slice(0,32));
 
 		/// Collects MIDI chords following MusicXML at the same time to cluster (assumes performance is correctly ordered)
 		array<Bin> S; // MIDI
-		int scoreTimeOrigin = -1;
+		//int scoreTimeOrigin = -1;
 		buffer<MidiNote> onsets = filter(notes, [](MidiNote o){return o.velocity==0;});
+#if 0 // without MIDI
 		assert_(signs.size == onsets.size);
 		for(size_t index = 0; index < signs.size;) {
 			array<Peak> chord;
 			while(index < signs.size && signs[index].type == Sign::Invalid) index++;
 			assert_(signs[index].type == Sign::Note, index, signs.size, (int)signs[index].type);
-			int64 time = signs[index].time;
-			while(index < signs.size && signs[index].time == time) {
-				if(scoreTimeOrigin == -1) scoreTimeOrigin = onsets[index].time;
-				if(chord) assert_(onsets[index].time-scoreTimeOrigin-chord[0].time < 24000, onsets[index].time-chord[0].time);
-				chord.append(Peak{int(onsets[index].time)-scoreTimeOrigin, onsets[index].key, (float)onsets[index].velocity});
+			int64 time = signs[index].time*60*audio.rate/ticksPerMinutes;
+			while(index < signs.size && signs[index].time*60*audio.rate/ticksPerMinutes < time+int(h)) {
+				//if(scoreTimeOrigin == -1) scoreTimeOrigin = onsets[index].time;
+				//if(chord) assert_(onsets[index].time/*-scoreTimeOrigin*/-chord[0].time < 24000, onsets[index].time, chord[0].time);
+				if(chord) assert_(int(time*audio.rate*60/ticksPerMinutes)/*-scoreTimeOrigin*/-chord[0].time < 24000, onsets[index].time, chord[0].time);
+				chord.append(Peak{int(time*audio.rate*60/ticksPerMinutes)/*int(onsets[index].time)*//*-scoreTimeOrigin*/, onsets[index].key, (float)onsets[index].velocity});
 				index++;
 				while(index < signs.size && signs[index].type == Sign::Invalid) index++;
 			}
+			log(chord);
 			S.append(move(chord));
 		}
-		log(S.slice(0,32));
+#else
+		for(size_t index = 0; index < onsets.size;) {
+			array<Peak> chord;
+			int64 time = onsets[index].time;
+			while(index < onsets.size && onsets[index].time < time+int(h)) {
+				//if(scoreTimeOrigin == -1) scoreTimeOrigin = onsets[index].time;
+				//if(chord) assert_(onsets[index].time/*-scoreTimeOrigin*/-chord[0].time < 24000, onsets[index].time, chord[0].time);
+				if(chord) assert_(int(time)/*-scoreTimeOrigin*/-chord[0].time < 24000, onsets[index].time, chord[0].time);
+				chord.append(Peak{int(onsets[index].time)/*-scoreTimeOrigin*/, onsets[index].key, (float)onsets[index].velocity});
+				index++;
+			}
+			log(chord);
+			S.append(move(chord));
+		}
+#endif
+		//log(S.slice(0,32));
 
 		/// Synchronizes audio and score using dynamic time warping
 		size_t m = S.size, n = P.size;
+		log(m, n);
 		assert_(m < n, m, n);
 
 		// Evaluates cumulative score matrix at each alignment point (i, j)
@@ -276,10 +323,15 @@ struct BeatSynchronizer : Widget {
 			// Evaluates match (i,j)
 			float d = 0;
 			//TODO: evaluate peak harmonic energy
-			for(Peak s: S[i]) for(Peak p: P[j]) d += (
-						/*s.key==p.key-1 ||*/ s.key==p.key /*|| s.key==p.key+1*/ ||
-						/*s.key==p.key-12-1 ||*/ s.key==p.key-12 || /*s.key==p.key-12+1 ||*/
-						s.key==p.key-12-7) * p.value;
+			for(Peak s: S[i]) for(Peak p: P[j])
+#if 1
+				d += (
+						s.key==p.key-1 || s.key==p.key /*|| s.key==p.key+1*/ ||
+						/*s.key==p.key-12-1 ||*/ s.key==p.key-12 || s.key==p.key-12+1 ||
+						s.key==p.key-12-6 || s.key==p.key-12-7) * p.value;
+#else
+				d += p.value; // Beat match only
+#endif
 			// Evaluates best cumulative score to an alignment point (i,j)
 			D(i,j) = max((float[]){
 							 j+1==n?0:D(i,j+1), // Ignores peak j
@@ -293,39 +345,105 @@ struct BeatSynchronizer : Widget {
 		int globalOffset = 0;
 		// Forward scan (chronologic for clearer midi time correlation logic)
 		size_t i = 0, j = 0; // Starts from anchor alignment (0, 0)
-		size_t midiIndex = 0;
+		size_t midiIndex = 0;//, signIndex = 0;
+		int remainingLines = 32;
 		while(i<m && j<n) {
 			//log(cumulativeOffset - (P[0][0].time - S[0][0].time));
 			//float globalOffsetConstraint =  (P[0][0].time - S[0][0].time) + notes.ticksPerSeconds; // Allows up to 1 second global offset
-			//int localOffset = (P[j][0].time - S[i][0].time) - globalOffset; // >0: late, <0: early
+			int localOffset = (P[j][0].time - notes[midiIndex].time) - globalOffset; // >0: late, <0: early
 			//log(globalOffset/float(notes.ticksPerSeconds), localOffset/float(notes.ticksPerSeconds));
 			//float instantanousOffsetConstraint = 0; // Constrains instantanous offset to obtain a reasonnable alignment even when peaks match badly
 			if(i+1<m && D(i,j) == D(i+1,j) /*&& instantanousOffset < -offsetConstraint*/) { //(Skip chords when we are early). Step to (i+1, j)
 				if(i+1<m && j+1<n) assert_(D(i+1, j) >= D(i, j+1) && D(i+1, j) >= D(i+1, j+1)); // Globally best step is to ignore chord i
-				i++; // Ignores chord i
-				int onsetChordTime = notes[midiIndex].time;
-				for(;midiIndex < notes.size && (notes[midiIndex].velocity==0 || notes[midiIndex].time == onsetChordTime); midiIndex++)
+				if(remainingLines) { log("S", S[i]); remainingLines--; }
+				size_t firstMidiIndex = midiIndex;
+#if 0
+				int64 time = signs[signIndex].time;
+				for(;signIndex < signs.size && signs[signIndex].time == time; signIndex++) {
+					assert_(notes[midiIndex].velocity);
 					notes[midiIndex].time += /*uniformOffset +*/ globalOffset; // Shifts all events until next chord, by the offset of last match
+					midiIndex++;
+					while(midiIndex < notes.size && !notes[midiIndex].velocity) {
+						notes[midiIndex].time += /*uniformOffset +*/ globalOffset;
+						midiIndex++;
+					}
+				}
+#else
+				for(size_t unused count: range(S[i].size)) {
+					assert_(notes[midiIndex].velocity);
+					notes[midiIndex].time += /*uniformOffset +*/ globalOffset; // Shifts all events until next chord, by the offset of last match
+					midiIndex++;
+					while(midiIndex < notes.size && !notes[midiIndex].velocity) {
+						notes[midiIndex].time += /*uniformOffset +*/ globalOffset;
+						midiIndex++;
+					}
+				}
+#endif
+				assert_(midiIndex > firstMidiIndex);
+				i++; // Ignores chord i
 			} else // There are enough peaks to match instead (but need to be able to skip tremolos
 			 //(Prevents skip when we are already late)
 			/*else*/
 			if(j+1<n &&
-					((D(i,j) == D(i,j+1) /*&& globalOffset < 8*notes.ticksPerSeconds && localOffset < notes.ticksPerSeconds/2*/)
-					/*|| globalOffset < -notes.ticksPerSeconds*/ /*|| localOffset < -notes.ticksPerSeconds/4*/)
-					) {
+					((D(i,j) == D(i,j+1) /*&& globalOffset < 10*notes.ticksPerSeconds*/ // Limits global delay to 4-10 sec //FIXME
+					  /*&& localOffset < notes.ticksPerSeconds/8*/ /*Limits local delay to semiquaver at 2 qps*/)
+					//|| localOffset < -notes.ticksPerSeconds/8 // Limit match to quaver at 2 qps
+					)) {
 				//if(i+1<m && j+1<n) assert_(D(i, j+1) >= D(i+1,j) && D(i+1,j) >= D(i+1,j+1)); // Globally best step is to ignore peak j
+				if(remainingLines) { log("P", P[j]); remainingLines--; }
 				j++; // Ignores peak j
 			} else { // Match (step to (i+1, j+1))
-				globalOffset = P[j][0].time - S[i][0].time;
-				int onsetChordTime = notes[midiIndex].time;
-				for(;midiIndex < notes.size && (notes[midiIndex].velocity==0 || notes[midiIndex].time == onsetChordTime); midiIndex++)
-					notes[midiIndex].time += /*uniformOffset +*/ globalOffset; // Shifts all events until next chord
+				//log(localOffset, notes.ticksPerSeconds);
+				assert_(midiIndex < notes.size, i, m, j, n);
+				globalOffset = P[j][0].time - notes[midiIndex].time;
+				if(midiIndex == 0) log(globalOffset, notes.last().time, P.last().last().time); // first
+				//for(size_t k: range(S[i].size)) assert_(S[i][k].time == S[i][0].time);
+				for(size_t k: range(P[j].size)) assert_(P[j][k].time == P[j][0].time);
+				size_t firstMidiIndex = midiIndex;
+#if 0
+				int64 time = signs[signIndex].time;
+				size_t k = 0;
+				for(;signIndex < signs.size && signs[signIndex].time == time; signIndex++) {
+					if(signs[signIndex].type == Sign::Note) {
+						assert_(signs[signIndex].type == Sign::Note, (int)signs[signIndex].type);
+						assert_(notes[midiIndex].key == signs[signIndex].note.key, midiIndex, notes.size, signIndex, signs.size, notes[midiIndex].key, signs[signIndex].note.key, S[i]);
+						//assert_(notes[midiIndex].key == S[i][k].key, notes[midiIndex].key, S[i][k].key, S[i]);
+					}
+					assert_(notes[midiIndex].velocity);
+					k++;
+					notes[midiIndex].time += /*uniformOffset +*/ globalOffset; // Shifts all events until next chord, by the offset of last match
+					midiIndex++;
+					while(midiIndex < notes.size && !notes[midiIndex].velocity) {
+						notes[midiIndex].time += /*uniformOffset +*/ globalOffset;
+						midiIndex++;
+					}
+				}
+#else
+				for(size_t unused count: range(S[i].size)) {
+					assert_(notes[midiIndex].velocity);
+					notes[midiIndex].time += /*uniformOffset +*/ globalOffset; // Shifts all events until next chord, by the offset of last match
+					midiIndex++;
+					while(midiIndex < notes.size && !notes[midiIndex].velocity) {
+						notes[midiIndex].time += /*uniformOffset +*/ globalOffset;
+						midiIndex++;
+					}
+				}
+#endif
+				assert_(midiIndex > firstMidiIndex);
 				// Strict map (no multiple match)
+				if(remainingLines) {
+					array<char> debug  = str(P[j][0].time, "X", S[i], P[j]); remainingLines--;
+					for(Peak s: S[i]) for(Peak p: P[j]) {
+						if(s.key==p.key-1 || s.key==p.key || s.key==p.key-12 || s.key==p.key-12+1 || s.key==p.key-12-6 || s.key==p.key-12-7)
+							 debug.append(" "_+str(p.key-s.key, strKey(s.key), strKey(p.key), p.value));
+					}
+					log(debug);
+					log(notes.slice(firstMidiIndex, midiIndex-firstMidiIndex));
+				}
 				i++; j++;
 			}
 		}
 		//assert_(i==m && j==n, i,j, m,n); // Ends with anchor aligment (m, n)
-		log(m, n);
 #endif
 
 		{ // Set measure times to MIDI times
@@ -349,7 +467,6 @@ struct BeatSynchronizer : Widget {
 				float x0 = measureBars.values[index];
 				int t1 = measureBars.keys[index+1];
 				float x1 = measureBars.values[index+1];
-
 				while(midiIndex<onsets.size && t0 <= onsets[midiIndex] && onsets[midiIndex] < t1) {
 					assert_(t1>t0);
 					float x = x0+(x1-x0)*(onsets[midiIndex]-t0)/(t1-t0);
@@ -359,9 +476,22 @@ struct BeatSynchronizer : Widget {
 			}
 		}
 
-#if 0
+#if 1
 		// Beat visualization (synchronized to sheet time)
 		{size_t peakIndex = 0;
+			{// Before first measure
+				int t0 = 0;
+				assert_(P[peakIndex][0].time >= 0);
+				float x0 = 0;
+				int t1 = measureBars.keys[0];
+				float x1 = measureBars.values[1];
+				while(peakIndex<P.size && t0 <= /*peakTimeOrigin+*/P[peakIndex][0].time && /*peakTimeOrigin+*/P[peakIndex][0].time < t1) {
+					assert_(t1>t0);
+					float x = x0+(x1-x0)*(/*peakTimeOrigin+*/P[peakIndex][0].time-t0)/(t1-t0);
+					bars.append(Bar{x, red});
+					peakIndex++;
+				}
+			}
 			for(int index: range(measureBars.size()-1)) {
 				int t0 = measureBars.keys[index];
 				float x0 = measureBars.values[index];
@@ -404,7 +534,7 @@ struct Music : Widget {
 	string name = arguments() ? arguments()[0] : (error("Expected name"), string());
 	// Files
 	buffer<String> audioFiles = filter(Folder(".").list(Files), [this](string path) { return !startsWith(path, name)
-			|| (!endsWith(path, ".mp3") && !endsWith(path, ".m4a") && !endsWith(path, "performance.mp4") && !find(path, ".mkv")); });
+			|| (/*!endsWith(path, ".mp3") && !endsWith(path, ".m4a") &&*/ !endsWith(path, "performance.mp4") && !find(path, ".mkv")); });
 	buffer<String> videoFiles = filter(Folder(".").list(Files), [this](string path) {
 			return !startsWith(path, name) ||  (!endsWith(path, "performance.mp4") && !find(path, ".mkv")); });
 
@@ -416,7 +546,7 @@ struct Music : Widget {
 	AudioFile audioFile = audioFiles ? AudioFile(audioFiles[0]) : AudioFile();
 	// Sheet
 	Sheet sheet {xml.signs, xml.divisions, apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
-	BeatSynchronizer beatSynchronizer {decodeAudio(audioFiles[0]), notes, sheet.midiToSign, sheet.measureBars};
+	BeatSynchronizer beatSynchronizer {decodeAudio(audioFiles[0]), notes, sheet.midiToSign, sheet.measureBars, sheet.ticksPerMinutes};
 	// Video
 	Decoder video = videoFiles ? Decoder(videoFiles[0]) : Decoder();
 
@@ -635,9 +765,9 @@ struct Music : Widget {
 			}
 			requestTermination(0); // Window prevents automatic termination
 		} else { // Preview
-			if(running) { // Starts one second before first onset
+			/*if(running) { // Starts one second before first onset
 				if(notes[0].time > notes.ticksPerSeconds) seek(notes[0].time-notes.ticksPerSeconds);
-			}
+			}*/
 			window.show();
 			if(playbackDeviceAvailable()) {
 #if SAMPLER
