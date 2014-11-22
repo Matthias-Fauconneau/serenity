@@ -26,11 +26,11 @@ Encoder::Encoder(String&& name) : path(move(name)) {
 	avformat_alloc_output_context2(&context, NULL, NULL, strz(path));
 }
 
-void Encoder::setVideo(int2 size, uint videoFrameRate) {
+void Encoder::setVideo(Format format, int2 size, uint videoFrameRate) {
 	assert_(!videoStream);
 	this->size=size;
 	this->videoFrameRate=videoFrameRate;
-	swsContext = sws_getContext(width, height, AV_PIX_FMT_BGRA, width, height, AV_PIX_FMT_YUV420P, SWS_FAST_BILINEAR, 0, 0, 0);
+	if(format==sRGB) swsContext = sws_getContext(width, height, AV_PIX_FMT_BGRA, width, height, AV_PIX_FMT_YUV420P, SWS_FAST_BILINEAR, 0, 0, 0);
 
 	AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_H264);
 	videoStream = avformat_new_stream(context, codec);
@@ -41,7 +41,7 @@ void Encoder::setVideo(int2 size, uint videoFrameRate) {
 	videoCodec->height = height;
 	videoStream->time_base.num = videoCodec->time_base.num = 1;
 	videoStream->time_base.den = videoCodec->time_base.den = videoFrameRate;
-	videoCodec->pix_fmt = AV_PIX_FMT_YUV420P;
+	videoCodec->pix_fmt = format==sRGB ? AV_PIX_FMT_YUV420P : AV_PIX_FMT_YUYV422;
 	if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
 	avcodec_open2(videoCodec, codec, 0);
 }
@@ -75,7 +75,7 @@ void Encoder::setAAC(uint channels, uint rate) {
 	audioFrameSize = audioCodec->frame_size;
 }
 
-void Encoder::setFLAC(uint channels, uint rate) {
+void Encoder::setFLAC(uint sampleBits, uint channels, uint rate) {
 	assert_(!audioStream);
 	this->channels = channels;
 	audioFrameRate = rate;
@@ -84,7 +84,8 @@ void Encoder::setFLAC(uint channels, uint rate) {
 	audioStream->id = 1;
 	audioCodec = audioStream->codec;
 	audioCodec->codec_id = AV_CODEC_ID_FLAC;
-	audioCodec->sample_fmt  = AV_SAMPLE_FMT_S32;
+	assert_(sampleBits==16 || sampleBits==32);
+	audioCodec->sample_fmt  = sampleBits==16 ? AV_SAMPLE_FMT_S16 : AV_SAMPLE_FMT_S32;
 	audioCodec->sample_rate = rate;
 	audioCodec->channels = channels;
 	audioCodec->channel_layout = ref<int>{0,AV_CH_LAYOUT_MONO,AV_CH_LAYOUT_STEREO}[channels];
@@ -96,6 +97,30 @@ void Encoder::open() {
 	assert_(context && (videoStream || audioStream));
 	avio_open(&context->pb, strz(path), AVIO_FLAG_WRITE);
 	check( avformat_write_header(context, 0) );
+}
+
+void Encoder::writeVideoFrame(YUYVImage image) {
+	assert_(videoStream && image.size==int2(width,height), image.size);
+	AVFrame* framePtr = av_frame_alloc(); AVFrame& frame = *framePtr;
+	frame.format = AV_PIX_FMT_YUYV422;
+	frame.width = image.width;
+	frame.height = image.height;
+	frame.data[0] = (uint8*)image.data.data;
+	frame.linesize[0] = image.bytesPerLine;
+	frame.pts = videoTime*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
+
+	AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
+	int gotVideoPacket;
+	avcodec_encode_video2(videoCodec, &pkt, &frame, &gotVideoPacket);
+	avpicture_free((AVPicture*)&frame);
+	av_frame_free(&framePtr);
+	if(gotVideoPacket) {
+		pkt.stream_index = videoStream->index;
+		av_interleaved_write_frame(context, &pkt);
+		videoEncodedTime++;
+	}
+
+	videoTime++;
 }
 
 void Encoder::writeVideoFrame(const Image& image) {
@@ -122,7 +147,7 @@ void Encoder::writeVideoFrame(const Image& image) {
 }
 
 void Encoder::writeAudioFrame(ref<int16> audio) {
-	assert(audioStream);
+	assert_(audioStream && audioCodec->sample_fmt==AV_SAMPLE_FMT_S16);
 	AVFrame frame;
 	frame.nb_samples = audio.size/channels;
 	avcodec_fill_audio_frame(&frame, channels, AV_SAMPLE_FMT_S16, (uint8*)audio.data, audio.size * channels * sizeof(int16), 1);
@@ -139,8 +164,9 @@ void Encoder::writeAudioFrame(ref<int16> audio) {
 
 	audioTime += audio.size/channels;
 }
+
 void Encoder::writeAudioFrame(ref<int32> audio) {
-	assert(audioStream);
+	assert_(audioStream && audioCodec->sample_fmt==AV_SAMPLE_FMT_S32);
 	AVFrame frame;
 	frame.nb_samples = audio.size/channels;
 	assert_(frame.nb_samples < audioCodec->frame_size);

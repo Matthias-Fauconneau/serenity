@@ -6,10 +6,7 @@
 
 /// 2D array of BGRA 8-bit unsigned integer pixels
 struct Image : buffer<byte4> {
-    union {
-        int2 size = 0;
-        struct { uint width, height; };
-    };
+	union { int2 size = 0; struct { uint width, height; }; };
     uint stride = 0;
     bool alpha = false, sRGB = true;
 

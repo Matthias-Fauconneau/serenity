@@ -171,17 +171,18 @@ AudioInput::AudioInput(uint sampleBits, uint channels, uint rate, uint periodSiz
 	: Device(getCaptureDevice()), Poll(Device::fd,POLLIN,thread) {
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
-    if(sampleBits) hparams.mask(Format).set(sampleBits==16?S16_LE:S32_LE);
-    else hparams.mask(Format).set(S16_LE).set(S32_LE);
+	if(sampleBits) hparams.mask(Format).set(sampleBits==16?S16_LE:S32_LE);
+	else hparams.mask(Format).set(S16_LE).set(S32_LE);
+	hparams.interval(SampleBits) = sampleBits;
+	hparams.interval(FrameBits) = sampleBits*channels;
     hparams.mask(SubFormat).set(Standard);
-    hparams.interval(SampleBits) = sampleBits;
-    hparams.interval(FrameBits) = sampleBits*channels;
-    hparams.interval(Channels) = channels;
-    hparams.interval(Rate) = rate; assert(rate);
+	hparams.interval(Channels).max = channels;
+	hparams.interval(Rate).max = rate; assert(rate);
     hparams.interval(Periods) = 2;
-    hparams.interval(PeriodSize).max = periodSize?:-1;
+	hparams.interval(PeriodSize) = periodSize?:-1;
     iowr<HW_REFINE>(hparams);
     if(!sampleBits) {
+		channels = hparams.interval(Channels);
         if(hparams.mask(Format).get(S32_LE)) {
             hparams.mask(Format).clear(S16_LE);
             hparams.interval(SampleBits) = 32;
@@ -201,7 +202,6 @@ AudioInput::AudioInput(uint sampleBits, uint channels, uint rate, uint periodSiz
 	this->channels= hparams.interval(Channels);
     this->rate = hparams.interval(Rate);
     this->periodSize = hparams.interval(PeriodSize);
-    assert(hparams.interval(Channels)==2);
     bufferSize = hparams.interval(Periods) * this->periodSize;
     buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Read)).data);
     status = (Status*)(maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data;
@@ -225,7 +225,8 @@ void AudioInput::event() {
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
         uint readSize;
-		if(sampleBits==32) readSize=write32(ref<int>(((int*)buffer)+channels*(control->swPointer%bufferSize), periodSize));
+		if(sampleBits==16) readSize=write16(ref<int16>(((int16*)buffer)+channels*(control->swPointer%bufferSize), periodSize));
+		else if(sampleBits==32) readSize=write32(ref<int>(((int*)buffer)+channels*(control->swPointer%bufferSize), periodSize));
         else error(sampleBits);
         assert_(readSize==periodSize);
         control->swPointer += readSize;
