@@ -177,7 +177,7 @@ AudioInput::AudioInput(uint sampleBits, uint channels, uint rate, uint periodSiz
 	hparams.interval(FrameBits) = sampleBits*channels;
     hparams.mask(SubFormat).set(Standard);
 	hparams.interval(Channels).max = channels;
-	hparams.interval(Rate).max = rate; assert(rate);
+    hparams.interval(Rate) = rate; assert(rate);
     hparams.interval(Periods) = 2;
 	hparams.interval(PeriodSize) = periodSize?:-1;
     iowr<HW_REFINE>(hparams);

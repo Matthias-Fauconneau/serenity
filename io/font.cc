@@ -1,6 +1,6 @@
 #include <ft2build.h>
 #include <freetype2/freetype.h> //freetype
-#include <freetype2/ftlcdfil.h>
+#include <freetype2/ftlcdfil.h> //z
 
 #include "font.h"
 #include "file.h"

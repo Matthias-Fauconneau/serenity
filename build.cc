@@ -81,7 +81,7 @@ struct Build {
             if(s.match("//")) {
                 for(;;) {
                     s.whileAny(' ');
-                    string library=s.identifier("_");
+                    string library=s.identifier("_-");
                     if(!library) break;
 					if(!libraries.contains(library)) libraries.append(copyRef(library));
                 }
@@ -226,7 +226,7 @@ struct Build {
 			for(int pid: pids) if(wait(pid)) { log("Failed to compile"); requestTermination(-1); return; }
 			buffer<String> args =
 					move(files) +
-					mref<String>{"-o"__, unsafeRef(binary)} +
+                    mref<String>{"-o"__, unsafeRef(binary), "-L/usr/local/lib"__} +
 					apply(libraries, [this](const String& library)->String{ return "-l"+library; });
 			if(execute(CXX, toRefs(args))) { log("Failed to link"); requestTermination(-1); return; }
         }

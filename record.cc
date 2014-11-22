@@ -12,48 +12,49 @@ typedef IOWR<'V', 15, v4l2_buffer> QueueBuffer;
 typedef IOWR<'V', 17, v4l2_buffer> DequeueBuffer;
 typedef IOW<'V', 18, int> StartStream;
 
-
 struct VideoInput : Device, Poll {
 	array<Map> buffers;
 	int2 size;
 	size_t videoTime = 0;
 	function<void(YUYVImage)> write;
 	VideoInput(function<void(YUYVImage)> write) : Device("/dev/video0"), Poll(Device::fd,POLLIN), write(write) {
-		v4l2_format fmt = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE}; iowr<GetFormat>(fmt);
+        v4l2_format fmt = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE}; iowr<GetFormat>(fmt);
 		size = int2(fmt.fmt.pix.width, fmt.fmt.pix.height);
 		assert_(fmt.fmt.pix.bytesperline==uint(2*size.x));
-		v4l2_requestbuffers req = {.count = 4, .type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP};
+        const int bufferSize = 4;
+        v4l2_requestbuffers req = {.count = bufferSize, .type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP};
 		iowr<RequestBuffers>(req);
-		for(uint bufferIndex: range(req.count)) {
+        assert_(req.count == bufferSize);
+        for(uint bufferIndex: range(req.count)) {
 			v4l2_buffer buf = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP, .index = bufferIndex};
-			iowr<QueryBuffer>(buf);
-			assert_(buf.length >= fmt.fmt.pix.height*fmt.fmt.pix.bytesperline);
-			buffers.append(Map(Device::fd, buf.m.offset, buf.length, Map::Prot(Map::Read|Map::Write)));
-			iowr<QueueBuffer>(buf);
-			iow<StartStream>(V4L2_BUF_TYPE_VIDEO_CAPTURE);
-		}
-	}
+            iowr<QueryBuffer>(buf);
+            assert_(buf.length == fmt.fmt.pix.height*fmt.fmt.pix.bytesperline);
+            buffers.append(Map(Device::fd, buf.m.offset, buf.length, Map::Prot(Map::Read|Map::Write)));
+            iowr<QueueBuffer>(buf);
+        }
+        iow<StartStream>(V4L2_BUF_TYPE_VIDEO_CAPTURE);
+    }
 	void event() {
-		v4l2_buffer buf = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP};
+        v4l2_buffer buf = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP};
 		iowr<DequeueBuffer>(buf);
 		assert_(buf.sequence == videoTime, videoTime, buf.sequence);
 		assert_(buf.bytesused == uint(size.y*size.x*2));
 		write(YUYVImage(cast<byte2>(buffers[buf.index]), size));
 		videoTime++;
 		iowr<QueueBuffer>(buf);
-	}
+    }
 };
 
 struct Record : ImageView {
 	Encoder encoder {arguments()[0]+".mkv"_};
-	AudioInput audio {{this, &Record::write16}, {this, &Record::write32}, 2, 96000, 576};
-	VideoInput video {{this, &Record::write}}; //{&encoder, &Encoder::writeVideoFrame}
-	Window window {this, video.size, [](){return "Record"__;}};
+    AudioInput audio {{this, &Record::write16}, {this, &Record::write32}, 2, 96000, 8192};
+    VideoInput video {{this, &Record::write}};
+    Window window {this, video.size, [](){return "Record"__;}};
 	Record() { // -> Encoder
 		encoder.setVideo(Encoder::YUYV, video.size, 30/*FIXME*/);
 		encoder.setFLAC(audio.sampleBits, 1, audio.rate);
 		encoder.open();
-		assert_(audio.periodSize <= encoder.audioFrameSize, audio.periodSize, encoder.audioFrameSize, encoder.channels, encoder.audioFrameRate);
+        assert_(audio.periodSize == encoder.audioFrameSize, audio.periodSize, encoder.audioFrameSize, encoder.channels, encoder.audioFrameRate);
 		if(audio.sampleBits==16) log("16bit audio capture");
 		image = Image(video.size);
 		window.show();

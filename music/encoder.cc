@@ -7,14 +7,15 @@ extern "C" {
 #define _MATH_H // Prevent system <math.h> inclusion which conflicts with local "math.h"
 #define _STDLIB_H // Prevent system <stdlib.h> inclusion which conflicts with local "thread.h"
 #define __STDC_CONSTANT_MACROS
-#include <stdint.h>
+#include <stdint.h> //lzma
 #include <libavformat/avformat.h> //avformat
 #include <libswscale/swscale.h> //swscale
 #include <libavcodec/avcodec.h> //avcodec
+#include <libavcodec/avcodec.h> //va
 #include <libavutil/avutil.h> //avutil
-#include <libavutil/opt.h>
-#include <libavutil/channel_layout.h>
-#include <libavutil/mathematics.h>
+#include <libavutil/opt.h> //fdk-aac
+#include <libavutil/channel_layout.h> //x264
+#include <libavutil/mathematics.h> //swresample
 }
 
 #undef check
@@ -40,8 +41,8 @@ void Encoder::setVideo(Format format, int2 size, uint videoFrameRate) {
 	videoCodec->codec_id = AV_CODEC_ID_H264;
 	videoCodec->width = width;
 	videoCodec->height = height;
-	videoStream->time_base.num = videoCodec->time_base.num = 1;
-	videoStream->time_base.den = videoCodec->time_base.den = videoFrameRate;
+    videoStream->time_base.num = 1;
+    videoStream->time_base.den = videoFrameRate;
 	videoCodec->pix_fmt = format==sRGB ? AV_PIX_FMT_YUV420P : AV_PIX_FMT_YUV422P;
 	if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
 	check( avcodec_open2(videoCodec, codec, 0) );
@@ -55,9 +56,9 @@ void Encoder::setAudio(const AudioFile& audio) {
 	AVCodec* codec = avcodec_find_encoder(audio.audio->codec_id);
 	audioStream = avformat_new_stream(context, codec);
 	audioCodec = audioStream->codec;
-	check( avcodec_copy_context(audioCodec, audio.audio) );
+    if(context->oformat->flags & AVFMT_GLOBALHEADER) audioCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
+    check( avcodec_copy_context(audioCodec, audio.audio) );
 	audioCodec->codec_tag = 0;
-	audioStream->pts.den = 1;
 }
 
 void Encoder::setAAC(uint channels, uint rate) {
@@ -74,7 +75,8 @@ void Encoder::setAAC(uint channels, uint rate) {
 	audioCodec->sample_rate = rate;
 	audioCodec->channels = channels;
 	audioCodec->channel_layout = ref<int>{0,AV_CH_LAYOUT_MONO,AV_CH_LAYOUT_STEREO}[channels];
-	avcodec_open2(audioCodec, codec, 0);
+    if(context->oformat->flags & AVFMT_GLOBALHEADER) audioCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
+    avcodec_open2(audioCodec, codec, 0);
 	audioFrameSize = audioCodec->frame_size;
 }
 
@@ -92,6 +94,7 @@ void Encoder::setFLAC(uint sampleBits, uint channels, uint rate) {
 	audioCodec->sample_rate = rate;
 	audioCodec->channels = channels;
 	audioCodec->channel_layout = ref<int>{0,AV_CH_LAYOUT_MONO,AV_CH_LAYOUT_STEREO}[channels];
+    if(context->oformat->flags & AVFMT_GLOBALHEADER) audioCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
 	avcodec_open2(audioCodec, codec, 0);
 	audioFrameSize = audioCodec->frame_size;
 }
