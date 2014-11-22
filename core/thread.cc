@@ -95,6 +95,11 @@ void Thread::event() {
     }
 }
 
+void Thread::wait() {
+    if(!thread) return;
+    void* status; pthread_join(thread,&status);
+}
+
 // Debugger
 
 static int tgkill(int tgid, int tid, int sig) { return syscall(SYS_tgkill,tgid,tid,sig); }
@@ -170,7 +175,7 @@ int main() {
 	if(arguments()) factory = Interface<Application>::factories().value(arguments()[0]);
 	if(factory) application = factory->constructNewInstance();
     if(mainThread.size>1 || mainThread.queue || threads.size>1) mainThread.run();
-    for(Thread* thread: threads) if(thread->thread) { void* status; pthread_join(thread->thread,&status); } // Waits for all threads to terminate
+    for(Thread* thread: threads) thread->wait(); // Waits for all threads to terminate
     return groupExitStatus; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
 }
 

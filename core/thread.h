@@ -137,6 +137,8 @@ struct Thread : array<Poll*>, EventFD, Poll {
     void run();
     /// Processes one queued task
     void event();
+    /// Waits on this thread
+    void wait();
 };
 
 /// Flags all threads to terminate as soon as they return to event loop, destroys all global objects and exits process.

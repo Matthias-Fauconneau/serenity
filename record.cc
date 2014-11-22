@@ -69,6 +69,10 @@ struct Record : ImageView, Poll {
     Thread audioThread;// {-20};
     AudioInput audio {{this, &Record::bufferAudio}, 2, 48000/*96000/192000*/, 4096 /*ChromeOS kernel restricts maximum buffer size*/, audioThread};
     array<buffer<int32>> audioFrames;
+    int32 maximumAmplitude = 0;
+    int32 reportedMaximumAmplitude = 0;
+    int32 clipped = 0, total = 0;
+    int32 reportedClipped = 0;
 
     Thread videoThread;// {-19};
     VideoInput video {{this, &Record::bufferVideo}, videoThread};
@@ -90,17 +94,27 @@ struct Record : ImageView, Poll {
         audio.start();
         video.start();
     }
+    ~Record() {
+        audioThread.wait();
+        videoThread.wait();
+    }
 
     uint bufferAudio(ref<int32> input) {
         // Downmix
         assert_(audio.channels==2 && encoder.channels==1);
         buffer<int32> mono (input.size/audio.channels);
-        for(size_t i: range(mono.size)) mono[i] = (input[i*2+0] + input[i*2+1]) / 2; // Assumes 1bit headroom
+        for(size_t i: range(mono.size)) {
+            assert(abs(input[i*2+0])<1<<31 && abs(input[i*2+1])<1<<31);
+            int s = (input[i*2+0] + input[i*2+1]) / 2; // Assumes 1bit headroom
+            if(abs(s) > maximumAmplitude) maximumAmplitude = abs(s);
+            mono[i] = s;
+        }
+        total += mono.size;
         assert_(mono.size <= encoder.audioFrameSize);
         Locker locker(lock);
         audioFrames.append(move(mono));
         queue();
-        return input.size;
+        return input.size/audio.channels;
     }
 
     void bufferVideo(YUYVImage&& image) {
@@ -135,6 +149,14 @@ struct Record : ImageView, Poll {
             break;
         }
         if(contentChanged) window.render(); // only when otherwise idle
+        if(maximumAmplitude > reportedMaximumAmplitude) {
+            log("Max", maximumAmplitude, log2(real(maximumAmplitude)));
+            reportedMaximumAmplitude = maximumAmplitude;
+        }
+        if(clipped > reportedClipped) {
+            log(clipped, total, 100.*clipped/total);
+            reportedClipped = clipped;
+        }
     }
 
     shared<Graphics> graphics(int2 size) override {

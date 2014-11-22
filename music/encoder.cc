@@ -121,13 +121,12 @@ void Encoder::writeVideoFrame(const YUYVImage& image) {
 	AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
 	int gotVideoPacket;
 	avcodec_encode_video2(videoCodec, &pkt, frame, &gotVideoPacket);
-    log(videoTime, frame->pts, pkt.pts, videoStream->time_base.num, videoFrameRate, videoStream->time_base.den);
+    //log(videoTime, frame->pts, pkt.pts, videoStream->time_base.num, videoFrameRate, videoStream->time_base.den);
 
 	if(gotVideoPacket) {
 		pkt.stream_index = videoStream->index;
         Locker locker(lock);
         av_interleaved_write_frame(context, &pkt);
-		videoEncodedTime++;
 	}
 	videoTime++;
 }
@@ -145,7 +144,6 @@ void Encoder::writeVideoFrame(const Image& image) {
         pkt.stream_index = videoStream->index;
         Locker locker(lock);
         av_interleaved_write_frame(context, &pkt);
-        videoEncodedTime++;
     }
     videoTime++;
 }
@@ -164,8 +162,7 @@ void Encoder::writeAudioFrame(ref<int16> audio) {
 		pkt.stream_index = audioStream->index;
         Locker locker(lock);
 		av_interleaved_write_frame(context, &pkt);
-		audioEncodedTime += audio.size/channels;
-	}
+    }
 
 	audioTime += audio.size/channels;
 }
@@ -185,8 +182,7 @@ void Encoder::writeAudioFrame(ref<int32> audio) {
 		pkt.stream_index = audioStream->index;
         Locker locker(lock);
 		av_interleaved_write_frame(context, &pkt);
-		audioEncodedTime += audio.size/channels;
-	}
+    }
 
 	audioTime += audio.size/channels;
 }
@@ -194,17 +190,25 @@ void Encoder::writeAudioFrame(ref<int32> audio) {
 Encoder::~Encoder() {
     lock.lock();
 	assert_(context);
-	if(videoStream) for(;;) { // FIXME: flush audio
+    for(;;) {
+        if(!videoStream && !audioStream) break;
         AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
-        int gotVideoPacket = 0;
-        avcodec_encode_video2(videoCodec, &pkt, 0, &gotVideoPacket);
-        if(!gotVideoPacket) break;
-        if (videoCodec->coded_frame->key_frame) pkt.flags |= AV_PKT_FLAG_KEY;
-        pkt.stream_index = videoStream->index;
+        int gotPacket = 0;
+        if(videoStream) {
+            avcodec_encode_video2(videoCodec, &pkt, 0, &gotPacket);
+            if(!gotPacket) { videoStream=0; continue; }
+            if(videoCodec->coded_frame->key_frame) pkt.flags |= AV_PKT_FLAG_KEY;
+            pkt.stream_index = videoStream->index;
+        }
+        if(audioStream) {
+            avcodec_encode_audio2(audioCodec, &pkt, 0, &gotPacket);
+            if(!gotPacket) { audioStream=0; continue; }
+            pkt.stream_index = audioStream->index;
+        }
         av_interleaved_write_frame(context, &pkt);
-        videoEncodedTime++;
-	}
+    }
     av_interleaved_write_frame(context, 0);
     av_write_trailer(context);
-    avformat_free_context(context); context=0;
+    avformat_free_context(context);
+    context=0;
 }
