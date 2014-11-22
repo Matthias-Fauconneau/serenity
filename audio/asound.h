@@ -55,7 +55,9 @@ struct AudioInput : Device, Poll {
     /// Configures PCM for 32bit input
     /// \note read will be called back periodically to provide an \a input frame of \a size samples
     /// \note 0 means maximum
-	AudioInput(function<uint(const ref<int16> output)> write16, function<uint(const ref<int32> output)> write32, uint channels, uint rate=0, uint periodSize=0, Thread& thread=mainThread)
+    AudioInput(function<uint(const ref<int32> output)> write32, uint channels, uint rate=0, uint periodSize=0, Thread& thread=mainThread)
+        : AudioInput(32, channels, rate, periodSize, thread) { this->write32=write32; }
+    AudioInput(function<uint(const ref<int16> output)> write16, function<uint(const ref<int32> output)> write32, uint channels, uint rate=0, uint periodSize=0, Thread& thread=mainThread)
 		: AudioInput(0, channels, rate, periodSize, thread) { this->write16=write16; this->write32=write32; }
     /// Drains audio input and stops providing data to \a write callback
     virtual ~AudioInput();

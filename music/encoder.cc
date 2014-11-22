@@ -22,6 +22,7 @@ extern "C" {
 #define check(expr, args...) ({ auto e = expr; if(int(e)<0) error(#expr ""_, (const char*)av_err2str(int(e)), ##args); e; })
 
 Encoder::Encoder(String&& name) : path(move(name)) {
+    lock.lock();
 	av_register_all();
 	if(existsFile(path)) remove(strz(path));
 	avformat_alloc_output_context2(&context, NULL, NULL, strz(path));
@@ -103,31 +104,8 @@ void Encoder::open() {
 	assert_(context && (videoStream || audioStream));
 	avio_open(&context->pb, strz(path), AVIO_FLAG_WRITE);
 	check( avformat_write_header(context, 0) );
+    lock.unlock();
 }
-
-/*void Encoder::writeVideoFrame(YUYVImage image) {
-	assert_(videoStream && image.size==int2(width,height), image.size);
-	AVFrame* framePtr = av_frame_alloc(); AVFrame& frame = *framePtr;
-	frame.format = AV_PIX_FMT_YUYV422;
-	frame.width = image.width;
-	frame.height = image.height;
-	frame.data[0] = (uint8*)image.data;
-	frame.linesize[0] = image.width*2;
-	frame.pts = videoTime*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
-
-	AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
-	int gotVideoPacket;
-	avcodec_encode_video2(videoCodec, &pkt, &frame, &gotVideoPacket);
-	avpicture_free((AVPicture*)&frame);
-	av_frame_free(&framePtr);
-	if(gotVideoPacket) {
-		pkt.stream_index = videoStream->index;
-		av_interleaved_write_frame(context, &pkt);
-		videoEncodedTime++;
-	}
-
-	videoTime++;
-}*/
 
 void Encoder::writeVideoFrame(YUYVImage image) {
 	assert_(videoStream && image.size==int2(width,height), image.size);
@@ -141,7 +119,8 @@ void Encoder::writeVideoFrame(YUYVImage image) {
 
 	if(gotVideoPacket) {
 		pkt.stream_index = videoStream->index;
-		av_interleaved_write_frame(context, &pkt);
+        Locker locker(lock);
+        av_interleaved_write_frame(context, &pkt);
 		videoEncodedTime++;
 	}
 	videoTime++;
@@ -158,6 +137,7 @@ void Encoder::writeVideoFrame(const Image& image) {
 	avcodec_encode_video2(videoCodec, &pkt, frame, &gotVideoPacket);
     if(gotVideoPacket) {
         pkt.stream_index = videoStream->index;
+        Locker locker(lock);
         av_interleaved_write_frame(context, &pkt);
         videoEncodedTime++;
     }
@@ -176,6 +156,7 @@ void Encoder::writeAudioFrame(ref<int16> audio) {
 	avcodec_encode_audio2(audioCodec, &pkt, &frame, &gotAudioPacket);
 	if(gotAudioPacket) {
 		pkt.stream_index = audioStream->index;
+        Locker locker(lock);
 		av_interleaved_write_frame(context, &pkt);
 		audioEncodedTime += audio.size/channels;
 	}
@@ -196,6 +177,7 @@ void Encoder::writeAudioFrame(ref<int32> audio) {
 	avcodec_encode_audio2(audioCodec, &pkt, &frame, &gotAudioPacket);
 	if(gotAudioPacket) {
 		pkt.stream_index = audioStream->index;
+        Locker locker(lock);
 		av_interleaved_write_frame(context, &pkt);
 		audioEncodedTime += audio.size/channels;
 	}
@@ -204,6 +186,7 @@ void Encoder::writeAudioFrame(ref<int32> audio) {
 }
 
 Encoder::~Encoder() {
+    lock.lock();
 	assert_(context);
 	if(videoStream) for(;;) { // FIXME: flush audio
         AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;

@@ -5,11 +5,12 @@
 
 struct YUYVImage : ref<byte2> {
 	union { int2 size = 0; struct { uint width, height; }; };
-	YUYVImage(ref<byte2> data, int2 size) : ref<byte2>(data), size(size) {}
+    YUYVImage(ref<byte2> data, int2 size) : ref<byte2>(data), size(size) {}
 };
 
 /// Generic video/audio encoder (using ffmpeg/x264)
 struct Encoder {
+    Lock lock;
     String path;
 
 	union { int2 size = 0; struct { uint width, height; }; };
