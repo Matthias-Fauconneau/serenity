@@ -38,7 +38,6 @@ struct VideoInput : Device, Poll {
 		iowr<DequeueBuffer>(buf);
 		assert_(buf.sequence == videoTime, videoTime, buf.sequence);
 		assert_(buf.bytesused == uint(size.y*size.x*2));
-		log("V", size, buf.index, hex(uint64(buffers[buf.index].data)), buffers[buf.index].size);
 		write(YUYVImage(cast<byte2>(buffers[buf.index]), size));
 		videoTime++;
 		iowr<QueueBuffer>(buf);
@@ -60,27 +59,25 @@ struct Record : ImageView {
 		window.show();
 	}
 	void write(YUYVImage image) {
+		encoder.writeVideoFrame(image);
 		for(size_t i: range(image.ref<byte2>::size/2)) {
-			int u = image[2*i+0][1];
-			int v = image[2*i+1][1];
-			int a1 = 1634 * (v - 128);
-			int a2 = 832 * (v - 128);
-			int a3 = 400 * (u - 128);
-			int a4 = 2066 * (u - 128);
-			for(size_t j: range(2)) {
-				int y = image[2*i+j][0];
-				int a0 = 1192 * (y - 16);
-				int r = (a0 + a1) >> 10;
-				int g = (a0 - a2 - a3) >> 10;
-				int b = (a0 + a4) >> 10;
-				this->image[2*i+j] = byte4(b,g,r,0xFF);
+			int U = int(image[2*i+0][1])-128;
+			int V = int(image[2*i+1][1])-128;
+			int b = (int(2.018*(1<<16)) * U) >> 16;
+			int g = - ((int(0.391*(1<<16)) * U) >> 16) - ((int(0.813*(1<<16)) * V) >> 16);
+			int r = (int(1.596*(1<<16)) * V) >> 16;
+			for(size_t j: range(2)) { //TODO: fixed point
+				int Y = image[2*i+j][0];
+				int y = (int(1.164*(1<<16)) * (Y-16)) >> 16;
+				int B = y + b;
+				int G = y + g;
+				int R = y + r;
+				this->image[2*i+j] = byte4(clip(0, B, 0xFF), clip(0, G, 0xFF), clip(0, R, 0xFF),0xFF);
 			}
 		}
-		encoder.writeVideoFrame(image);
 		window.render();
 	}
 	uint write16(ref<int16> input) { // -> Encoder
-		log("A");
 		if(audio.channels == encoder.channels) encoder.writeAudioFrame(input);
 		else {
 			assert_(audio.channels==2 && encoder.channels==1);

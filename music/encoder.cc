@@ -46,7 +46,7 @@ void Encoder::setVideo(Format format, int2 size, uint videoFrameRate) {
 	if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
 	check( avcodec_open2(videoCodec, codec, 0) );
 	frame = av_frame_alloc();
-	avpicture_alloc((AVPicture*)frame, sRGB ? AV_PIX_FMT_YUV420P : AV_PIX_FMT_YUV422P, width, height);
+	avpicture_alloc((AVPicture*)frame, format==sRGB ? AV_PIX_FMT_YUV420P : AV_PIX_FMT_YUV422P, width, height);
 }
 
 void Encoder::setAudio(const AudioFile& audio) {
