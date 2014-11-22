@@ -71,8 +71,8 @@ struct Record : ImageView, Poll {
     array<buffer<int32>> audioFrames;
     int32 maximumAmplitude = 0;
     int32 reportedMaximumAmplitude = 0;
-    int32 clipped = 0, total = 0;
-    int32 reportedClipped = 0;
+    float smoothedMean = 0;
+    int audioFrameCount = 0;
 
     Thread videoThread;// {-19};
     VideoInput video {{this, &Record::bufferVideo}, videoThread};
@@ -100,16 +100,21 @@ struct Record : ImageView, Poll {
     }
 
     uint bufferAudio(ref<int32> input) {
-        // Downmix
+        audioFrameCount++;
+        //if(audioFrameCount<=audio.rate/input.size) { return input.size/audio.channels; } // first frames are garbage
         assert_(audio.channels==2 && encoder.channels==1);
         buffer<int32> mono (input.size/audio.channels);
+        int64 sum = 0;
         for(size_t i: range(mono.size)) {
             assert(abs(input[i*2+0])<1<<31 && abs(input[i*2+1])<1<<31);
             int s = (input[i*2+0] + input[i*2+1]) / 2; // Assumes 1bit headroom
             if(abs(s) > maximumAmplitude) maximumAmplitude = abs(s);
+            sum += abs(s);
             mono[i] = s;
         }
-        total += mono.size;
+        int mean = sum / mono.size;
+        const float a = float(mono.size) / float(audio.rate);
+        smoothedMean = a * mean + (1-a) * smoothedMean;
         assert_(mono.size <= encoder.audioFrameSize);
         Locker locker(lock);
         audioFrames.append(move(mono));
@@ -153,10 +158,6 @@ struct Record : ImageView, Poll {
             log("Max", maximumAmplitude, log2(real(maximumAmplitude)));
             reportedMaximumAmplitude = maximumAmplitude;
         }
-        if(clipped > reportedClipped) {
-            log(clipped, total, 100.*clipped/total);
-            reportedClipped = clipped;
-        }
     }
 
     shared<Graphics> graphics(int2 size) override {
@@ -178,8 +179,12 @@ struct Record : ImageView, Poll {
                     int B = y + b;
                     int G = y + g;
                     int R = y + r;
-                    this->image[2*i+j] = byte4(clip(0, B, 0xFF), clip(0, G, 0xFF), clip(0, R, 0xFF),0xFF);
+                    image[2*i+j] = byte4(clip(0, B, 0xFF), clip(0, G, 0xFF), clip(0, R, 0xFF),0xFF);
                 }
+            }
+            {// VU meter
+                int w = image.size.x * smoothedMean / (1<<28);
+                for(size_t x: range(clip(0, w, image.size.x))) for(size_t y: range(image.size.y/8)) image(x, y) = byte4(0xFF, 0,0, 0xFF);
             }
             contentChanged = false;
         }
