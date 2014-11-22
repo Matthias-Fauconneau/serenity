@@ -34,7 +34,8 @@ struct AudioFile {
 };
 
 struct Audio : buffer<float> {
+	Audio() {}
 	Audio(buffer<float>&& data, uint channels, uint rate) : buffer<float>(::move(data)), channels(channels), rate(rate) {}
-	uint channels, rate;
+	uint channels=0, rate=0;
 };
 Audio decodeAudio(string path);

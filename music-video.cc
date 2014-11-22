@@ -73,7 +73,6 @@ void MidiSheet::read(Track& track) {
 	}
 }
 
-
 /// Converts signs to notes
 MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter) {
 	MidiNotes notes;
@@ -97,6 +96,18 @@ MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter) {
 	return notes;
 }
 
+/// Converts MIDI time base to audio sample rate
+MidiNotes scale(MidiNotes&& notes, int64 targetTicksPerSeconds) {
+	assert_(targetTicksPerSeconds > notes.ticksPerSeconds);
+	for(MidiNote& note: notes) {
+		note.time = int64(note.time)*targetTicksPerSeconds/notes.ticksPerSeconds;
+		assert(note.time >= 0);
+	}
+	notes.ticksPerSeconds = targetTicksPerSeconds;
+	return move(notes);
+}
+
+
 struct Peak { int time; uint key; float value; };
 bool operator <(const Peak& a, const Peak& b) { return a.value > b.value; } // Decreasing order
 String str(const Peak& o) { return strKey(o.key)/*+":"+str(int(round(o.value)))*/; }
@@ -112,320 +123,157 @@ struct BeatSynchronizer : Widget {
 	struct Bar { float x; bgr3f color; };
 	array<Bar> bars;
 	int currentTime = 0;
-	BeatSynchronizer(map<int, float>& measureBars) : measureBars(measureBars) {}
+	//BeatSynchronizer(map<int, float>& measureBars) : measureBars(measureBars) {}
 	BeatSynchronizer(Audio audio, MidiNotes& notes, ref<Sign> signs, map<int, float>& measureBars) : measureBars(measureBars) {
-		// Converts MIDI time base to audio sample rate
-		uint firstKey = 21+85, lastKey = 0;
-		for(MidiNote& note: notes) {
-			note.time = int64(note.time)*int64(audio.rate)/int64(notes.ticksPerSeconds);
-			firstKey = min(firstKey, note.key);
-			lastKey = max(lastKey, note.key);
-			assert(note.time >= 0);
-		}
-		notes.ticksPerSeconds = audio.rate;
-
-		size_t T = audio.size/audio.channels; // Total sample count
-#if 0 // Simple beat score follower
-		size_t N = 2048; // Frame size (43ms @48KHz)
-		size_t h = N/4; // Hop size (11ms @48KHz (75% overlap))
-		FFT fft(N);
-		assert_(T>N);
-		size_t frameCount = (T-N)/h;
-		buffer<double> f(frameCount); // Spectral flux onset function
-		buffer<float> previous = buffer<float>(N/2); previous.clear(0);
-		double sum = 0;
-		for(size_t frameIndex: range(frameCount)) {
-			ref<float> X = audio.slice(frameIndex*h*audio.channels, N*audio.channels);
-			for(size_t i: range(N)) fft.windowed[i] = fft.window[i] * (X[i*2+0]+X[i*2+1])/2;
-			fft.spectrum = buffer<float>(N/2);
-			fft.transform();
-			buffer<float> current = move(fft.spectrum);
-			double spectralFlux = 0;
-			for(size_t k: range(N/2)) {
-				float x = current[k] - previous[k]; // or L1: sqrt(current[k]) - sqrt(previous[k])
-				if(x<0) x=0; // "Half-wave rectifier"
-				spectralFlux += x;
-			}
-			f[frameIndex] = spectralFlux;
-			sum += spectralFlux;
-			previous = move(current);
-		}
-
-		// Normalizes integral onset function
-		double mean = sum / frameCount;
-		double SSQ = 0;
-		for(double& v: f) { v -= mean; SSQ += sq(v); }
-		double deviation = sqrt(SSQ);
-		for(double& v: f) v /= deviation;
-
-		/// Selects onset peaks (beats)
-		array<int64> beats;
-		const int w = 3, m = 3;
-		for(size_t n: range(m*w, frameCount-w)) {
-			bool localMaximum = true;
-			for(size_t k: range(n-w, n+w+1)) {
-				if(k==n) continue;
-				if(!(f[n] > f[k])) localMaximum=false;
-			}
-			if(localMaximum) {
-				double sum = 0;
-				for(size_t k: range(n-m*w, n+w+1)) sum += f[k];
-				double mean = sum / (m*w+w+1);
-				const double threshold = beats ? 1./1024 : 1./2048;
-				if(f[n] > mean + threshold) beats.append(n * h);
-			}
-		}
-
-		// Synchronizes MIDI with audio by moving each onset to nearest onset
-		{// Inconditionnaly sync first note with first beat
-			MidiNote note = notes[0];
-			int64 current = note.time;
-			int64 offset = beats[0] - current;
-			for(MidiNote& note: notes) {
-				note.time += offset;
-				assert_(note.time >= 0);
-			}
-		}
-		for(size_t midiIndex: range(notes.size)) {
-			MidiNote note = notes[midiIndex];
-			if(!note.velocity) continue;
-			int64 current = note.time;
-			size_t beatIndex = beats.linearSearch(current);
-			int64 previous = beats[max(0,int(beatIndex)-1)];
-			while(beatIndex < beats.size && beats[beatIndex] < current) beatIndex++;
-			int64 next = beats[beatIndex];
-			assert_((previous <= current && current <= next) || (beatIndex==0), previous, current, next, current, beatIndex);
-			int64 nearest = abs(next-current) < abs(previous-current) ? next : previous;
-			int64 offset = nearest - current;
-			if(offset && abs(offset) < audio.rate/4) {
-				for(MidiNote& note: notes.slice(midiIndex, notes.size-midiIndex)) {
-					note.time += offset;
-					assert_(note.time >= 0);
-				}
-			}
-		}
-#else
-		uint keyCount = lastKey+1-firstKey;
-
-#if 0 // FFT
-		size_t N = 8192;  // Frame size: 48KHz * 2 (Nyquist) * 2 (window) / frameSize ~ 24Hz~A0
-		size_t h = 2048; // Hop size: 48KHz * 60 s/min / 4 b/q / hopSize / 2 (Nyquist) ~ 175 bpm
-		FFT fft(N);
-		size_t frameCount = (T-N)/h;
-		buffer<float> keyOnsetFunctions(keyCount*frameCount); keyOnsetFunctions.clear(0);
-		int firstK = floor(keyToPitch(firstKey)*N/audio.rate);
-		int lastK = ceil(keyToPitch(lastKey)*N/audio.rate);
-		for(size_t frameIndex: range(frameCount)) {
-			ref<float> X = audio.slice(frameIndex*h*audio.channels, N*audio.channels);
-			//if(audio.channels==1) for(size_t i: range(N)) fft.windowed[i] = fft.window[i] * X[frameIndex*h+i];
-			if(audio.channels==2) for(size_t i: range(N)) fft.windowed[i] = fft.window[i] * (X[i*2+0]+X[i*2+1])/2;
-			else error(audio.channels);
-			fft.transform();
-			for(size_t k: range(firstK, lastK+1)) { // For each bin
-				// For each intersected key
-				for(size_t key: range(max(firstKey, uint(round(pitchToKey(k*audio.rate/N)))), round(pitchToKey((k+1)*audio.rate/N))))
-					keyOnsetFunctions[(key-firstKey)*frameCount+frameIndex] += fft.spectrum[k];
-			}
-			if(frameIndex>0) for(size_t key: range(keyCount)) { // Differentiates (key granularity should be more robust against frequency oscillations)
-				keyOnsetFunctions[key*frameCount+frameIndex] =
-						max(0.f, keyOnsetFunctions[key*frameCount+frameIndex] - keyOnsetFunctions[key*frameCount+frameIndex-1]);
-			}
-		}
-#else // Filter bank
-		const size_t h = 2400; // 48000/2400 = 20Hz (50ms)
-		size_t frameCount = T/h;
-		buffer<float> keyOnsetFunctions(keyCount*frameCount);
-		for(size_t key: range(keyCount)) {
-			BandPass filter(keyToPitch(firstKey+key)/audio.rate, /*Q=*/25);
-#if 0
-			buffer<float> Y (T);
-			for(size_t t: range(T)) Y[t] = filter(X[t]);
-			resampler.clear();
-			resampler.write(Y);
-			assert_(resampler.available() == F.size);
-			resampler.read(F);
-#else
-			mref<float> F = keyOnsetFunctions.slice(key*frameCount, frameCount);
-			for(size_t frameIndex: range(frameCount)) {
-				double sum = 0;
-				ref<float> X = audio.slice(frameIndex*h*audio.channels, h*audio.channels);
-				if(audio.channels==2) for(size_t i: range(h)) sum += filter((X[i*2+0]+X[i*2+1])/2);
-				else error(audio.channels);
-				F[frameIndex] = max(0.f, float(sum / h) - (frameIndex>0 ? F[frameIndex-1] : 0));
-			}
-			//#else || convolve hann 220 Hz, low pass, downsample 440 Hz
-		}
-#endif
-#endif
-		/// Normalizes onset function
-		for(size_t key: range(keyCount)) {
-			mref<float> f = keyOnsetFunctions.slice(key*frameCount, frameCount);
-			float SSQ = 0;
-			for(float& v: f) SSQ += sq(v);
-			float deviation = sqrt(SSQ / frameCount);
-			if(deviation) for(float& v: f) v /= deviation;
-		}
-
-		/// Selects onset peaks
 		array<Bin> P; // peaks
-#if 0
-		//int peakTimeOrigin = -1;
-		const int framesPerBin = 2; // 50ms
-		for(size_t binIndex: range(1, frameCount/framesPerBin-1)) {
-			array<Peak> chord;
-			for(size_t subIndex: range(framesPerBin)) {
-				size_t i = binIndex * framesPerBin + subIndex;
-				for(uint key: range(keyCount)) {
-					ref<float> f = keyOnsetFunctions.slice(key*frameCount, frameCount);
-					if(/*f[i] > 50./127 &&*//*over global threshold*/ f[i-1] < f[i] && f[i] > f[i+1] /*Local maximum*/) {
-						//if(peakTimeOrigin == -1) peakTimeOrigin = i*h;
-						chord.insertSorted(Peak{int(i*h)/*-peakTimeOrigin*/, firstKey+key, f[i]/**127*/});
-					}
+		if(audio) {
+			assert_(notes.ticksPerSeconds = audio.rate);
+
+			uint firstKey = 21+85, lastKey = 0;
+			for(MidiNote& note: notes) {
+				firstKey = min(firstKey, note.key);
+				lastKey = max(lastKey, note.key);
+			}
+			uint keyCount = lastKey+1-firstKey;
+
+			size_t T = audio.size/audio.channels; // Total sample count
+#if 1 // FFT
+			size_t N = 8192;  // Frame size: 48KHz * 2 (Nyquist) * 2 (window) / frameSize ~ 24Hz~A0
+			size_t h = 2048; // Hop size: 48KHz * 60 s/min / 4 b/q / hopSize / 2 (Nyquist) ~ 175 bpm
+			FFT fft(N);
+			size_t frameCount = (T-N)/h;
+			buffer<float> keyOnsetFunctions(keyCount*frameCount); keyOnsetFunctions.clear(0);
+			int firstK = floor(keyToPitch(firstKey)*N/audio.rate);
+			int lastK = ceil(keyToPitch(lastKey)*N/audio.rate);
+			for(size_t frameIndex: range(frameCount)) {
+				ref<float> X = audio.slice(frameIndex*h*audio.channels, N*audio.channels);
+				//if(audio.channels==1) for(size_t i: range(N)) fft.windowed[i] = fft.window[i] * X[frameIndex*h+i];
+				if(audio.channels==2) for(size_t i: range(N)) fft.windowed[i] = fft.window[i] * (X[i*2+0]+X[i*2+1])/2;
+				else error(audio.channels);
+				fft.transform();
+				for(size_t k: range(firstK, lastK+1)) { // For each bin
+					// For each intersected key
+					for(size_t key: range(max(firstKey, uint(round(pitchToKey(k*audio.rate/N)))), round(pitchToKey((k+1)*audio.rate/N))))
+						keyOnsetFunctions[(key-firstKey)*frameCount+frameIndex] += fft.spectrum[k];
+				}
+				if(frameIndex>0) for(size_t key: range(keyCount)) { // Differentiates (key granularity should be more robust against frequency oscillations)
+					keyOnsetFunctions[key*frameCount+frameIndex] =
+							max(0.f, keyOnsetFunctions[key*frameCount+frameIndex] - keyOnsetFunctions[key*frameCount+frameIndex-1]);
 				}
 			}
-			if(chord) P.append(move(chord));
-		}
-#else
-		{const int w = 2, W=3, m = 3;
-			for(int i: range(frameCount)) {
+#else // Filter bank
+			const size_t h = 2400; // 48000/2400 = 20Hz (50ms)
+			size_t frameCount = T/h;
+			buffer<float> keyOnsetFunctions(keyCount*frameCount);
+			for(size_t key: range(keyCount)) {
+				BandPass filter(keyToPitch(firstKey+key)/audio.rate, /*Q=*/25);
+				mref<float> F = keyOnsetFunctions.slice(key*frameCount, frameCount);
+				for(size_t frameIndex: range(frameCount)) {
+					double sum = 0;
+					ref<float> X = audio.slice(frameIndex*h*audio.channels, h*audio.channels);
+					if(audio.channels==2) for(size_t i: range(h)) sum += filter((X[i*2+0]+X[i*2+1])/2);
+					else error(audio.channels);
+					F[frameIndex] = max(0.f, float(sum / h) - (frameIndex>0 ? F[frameIndex-1] : 0));
+				}
+			}
+#endif
+			/// Normalizes onset function
+			for(size_t key: range(keyCount)) {
+				mref<float> f = keyOnsetFunctions.slice(key*frameCount, frameCount);
+				float SSQ = 0;
+				for(float& v: f) SSQ += sq(v);
+				float deviation = sqrt(SSQ / frameCount);
+				if(deviation) for(float& v: f) v /= deviation;
+			}
+
+			/// Selects onset peaks
+			{const int w = 2, W=3, m = 3;
+				for(int i: range(frameCount)) {
+					array<Peak> chord;
+					for(uint key: range(keyCount)) {
+						ref<float> f = keyOnsetFunctions.slice(key*frameCount, frameCount);
+						bool localMaximum = true;
+						for(int k: range(max(0, i-w), min(int(f.size)-1, i+w+1))) {
+							if(k==i) continue;
+							if(!(f[i] > f[k])) localMaximum=false;
+						}
+						if(localMaximum) {
+							double sum = 0;
+							for(size_t k: range(max(0, i-m*W), min(int(f.size)-1, i+W+1))) sum += f[k];
+							double mean = sum / (min(int(f.size)*1, i+W+1) - max(0, i-m*W));
+							const double threshold = 1./4; // FFT
+							//const double threshold = 1; // Filter
+							if(f[i] > mean + threshold)
+								chord.insertSorted(Peak{int(i*h)/*-peakTimeOrigin*/, firstKey+key, f[i]/**127*/});
+						}
+					}
+					if(chord) P.append(move(chord));
+				}
+			}
+
+			/// Collects MIDI chords following MusicXML at the same time to cluster (assumes performance is correctly ordered)
+			array<Bin> S; // MIDI
+			buffer<MidiNote> onsets = filter(notes, [](MidiNote o){return o.velocity==0;});
+			for(size_t index = 0; index < onsets.size;) {
 				array<Peak> chord;
-				for(uint key: range(keyCount)) {
-					//if( firstKey+key <= 32) continue; // Inaccurate keys
-					ref<float> f = keyOnsetFunctions.slice(key*frameCount, frameCount);
-					bool localMaximum = true;
-					for(int k: range(max(0, i-w), min(int(f.size)-1, i+w+1))) {
-						if(k==i) continue;
-						if(!(f[i] > f[k])) localMaximum=false;
-					}
-					if(localMaximum) {
-						double sum = 0;
-						for(size_t k: range(max(0, i-m*W), min(int(f.size)-1, i+W+1))) sum += f[k];
-						double mean = sum / (min(int(f.size)*1, i+W+1) - max(0, i-m*W));
-						const double threshold = 1./4; // FFT
-						//const double threshold = 1; // Filter
-						if(f[i] > mean + threshold)
-							chord.insertSorted(Peak{int(i*h)/*-peakTimeOrigin*/, firstKey+key, f[i]/**127*/});
-					}
+				int64 time = onsets[index].time;
+				while(index < onsets.size && onsets[index].time < time+int(h)) {
+					//if(scoreTimeOrigin == -1) scoreTimeOrigin = onsets[index].time;
+					//if(chord) assert_(onsets[index].time/*-scoreTimeOrigin*/-chord[0].time < 24000, onsets[index].time, chord[0].time);
+					if(chord) assert_(int(time)/*-scoreTimeOrigin*/-chord[0].time < 24000, onsets[index].time, chord[0].time);
+					chord.append(Peak{int(onsets[index].time)/*-scoreTimeOrigin*/, onsets[index].key, (float)onsets[index].velocity});
+					index++;
 				}
-				if(chord) P.append(move(chord));
+				S.append(move(chord));
 			}
-		}
-#endif
 
-		/// Collects MIDI chords following MusicXML at the same time to cluster (assumes performance is correctly ordered)
-		array<Bin> S; // MIDI
-		//int scoreTimeOrigin = -1;
-		buffer<MidiNote> onsets = filter(notes, [](MidiNote o){return o.velocity==0;});
-#if 0 // without MIDI
-		assert_(signs.size == onsets.size);
-		for(size_t index = 0; index < signs.size;) {
-			array<Peak> chord;
-			while(index < signs.size && signs[index].type == Sign::Invalid) index++;
-			assert_(signs[index].type == Sign::Note, index, signs.size, (int)signs[index].type);
-			int64 time = signs[index].time*60*audio.rate/ticksPerMinutes;
-			while(index < signs.size && signs[index].time*60*audio.rate/ticksPerMinutes < time+int(h)) {
-				//if(scoreTimeOrigin == -1) scoreTimeOrigin = onsets[index].time;
-				//if(chord) assert_(onsets[index].time/*-scoreTimeOrigin*/-chord[0].time < 24000, onsets[index].time, chord[0].time);
-				if(chord) assert_(int(time*audio.rate*60/ticksPerMinutes)/*-scoreTimeOrigin*/-chord[0].time < 24000, onsets[index].time, chord[0].time);
-				chord.append(Peak{int(time*audio.rate*60/ticksPerMinutes)/*int(onsets[index].time)*//*-scoreTimeOrigin*/, onsets[index].key, (float)onsets[index].velocity});
-				index++;
-				while(index < signs.size && signs[index].type == Sign::Invalid) index++;
-			}
-			S.append(move(chord));
-		}
-#else
-		for(size_t index = 0; index < onsets.size;) {
-			array<Peak> chord;
-			int64 time = onsets[index].time;
-			while(index < onsets.size && onsets[index].time < time+int(h)) {
-				//if(scoreTimeOrigin == -1) scoreTimeOrigin = onsets[index].time;
-				//if(chord) assert_(onsets[index].time/*-scoreTimeOrigin*/-chord[0].time < 24000, onsets[index].time, chord[0].time);
-				if(chord) assert_(int(time)/*-scoreTimeOrigin*/-chord[0].time < 24000, onsets[index].time, chord[0].time);
-				chord.append(Peak{int(onsets[index].time)/*-scoreTimeOrigin*/, onsets[index].key, (float)onsets[index].velocity});
-				index++;
-			}
-			S.append(move(chord));
-		}
-#endif
+			/// Synchronizes audio and score using dynamic time warping
+			size_t m = S.size, n = P.size;
+			assert_(m < n, m, n);
 
-		/// Synchronizes audio and score using dynamic time warping
-		size_t m = S.size, n = P.size;
-		assert_(m < n, m, n);
+			// Evaluates cumulative score matrix at each alignment point (i, j)
+			struct Matrix {
+				size_t m, n;
+				buffer<float> elements;
+				Matrix(size_t m, size_t n) : m(m), n(n), elements(m*n) { elements.clear(0); }
+				float& operator()(size_t i, size_t j) { return elements[i*n+j]; }
+			} D(m,n);
+			// Reversed scan here to have the forward scan when walking back the best path
+			for(size_t i: reverse_range(m)) for(size_t j: reverse_range(n)) { // Evaluates match (i,j)
+				float d = 0;
+				for(Peak s: S[i]) for(Peak p: P[j]) d += (s.key==p.key || s.key==p.key-12 || s.key==p.key-12-7) * p.value;
+				// Evaluates best cumulative score to an alignment point (i,j)
+				D(i,j) = max((float[]){
+								 j+1==n?0:D(i,j+1), // Ignores peak j
+								 i+1==m?0:D(i+1, j), // Ignores chord i
+								 ((i+1==m||j+1==n)?0:D(i+1,j+1)) + d // Matches chord i with peak j
+							 });
+			};
 
-		// Evaluates cumulative score matrix at each alignment point (i, j)
-		struct Matrix {
-			size_t m, n;
-			buffer<float> elements;
-			Matrix(size_t m, size_t n) : m(m), n(n), elements(m*n) { elements.clear(0); }
-			float& operator()(size_t i, size_t j) { return elements[i*n+j]; }
-		} D(m,n);
-		// Reversed scan here to have the forward scan when walking back the best path
-		for(size_t i: reverse_range(m)) for(size_t j: reverse_range(n)) {
-			// Evaluates match (i,j)
-			float d = 0;
-			//TODO: evaluate peak harmonic energy
-			for(Peak s: S[i]) for(Peak p: P[j])
-#if 1
-				d += (
-						/*s.key==p.key-1 ||*/ s.key==p.key /*|| s.key==p.key+1*/ ||
-						/*s.key==p.key-12-1 ||*/ s.key==p.key-12 /*|| s.key==p.key-12+1*/ ||
-						/*s.key==p.key-12-6 ||*/ s.key==p.key-12-7) * p.value;
-#else
-				d += p.value; // Beat match only
-#endif
-			// Evaluates best cumulative score to an alignment point (i,j)
-			D(i,j) = max((float[]){
-							 j+1==n?0:D(i,j+1), // Ignores peak j
-							 i+1==m?0:D(i+1, j), // Ignores chord i
-							 ((i+1==m||j+1==n)?0:D(i+1,j+1)) + d // Matches chord i with peak j
-						 });
-		};
-
-		// Evaluates _strictly_ monotonous map by walking back the best path on the cumulative score matrix
-		//int uniformOffset = peakTimeOrigin - scoreTimeOrigin;
-		int globalOffset = 0;
-		// Forward scan (chronologic for clearer midi time correlation logic)
-		size_t i = 0, j = 0; // Starts from anchor alignment (0, 0)
-		size_t midiIndex = 0;
-		while(i<m && j<n) {
-			int localOffset = (P[j][0].time - notes[midiIndex].time) - globalOffset; // >0: late, <0: early
-#if 0
-			if(i+1<m && D(i,j) == D(i+1,j)) {
-				if(i+1<m && j+1<n) assert_(D(i+1, j) >= D(i, j+1) && D(i+1, j) >= D(i+1, j+1)); // Globally best step is to ignore chord i
-				size_t firstMidiIndex = midiIndex;
-				for(size_t unused count: range(S[i].size)) {
-					assert_(notes[midiIndex].velocity);
-					notes[midiIndex].time += /*uniformOffset +*/ globalOffset; // Shifts all events until next chord, by the offset of last match
-					midiIndex++;
-					while(midiIndex < notes.size && !notes[midiIndex].velocity) {
-						notes[midiIndex].time += /*uniformOffset +*/ globalOffset;
+			// Evaluates _strictly_ monotonous map by walking back the best path on the cumulative score matrix
+			int globalOffset = 0;
+			// Forward scan (chronologic for clearer midi time correlation logic)
+			size_t i = 0, j = 0;
+			size_t midiIndex = 0;
+			while(i<m && j<n) {
+				int localOffset = (P[j][0].time - notes[midiIndex].time) - globalOffset; // >0: late, <0: early
+				if(j+1<n && ((D(i,j) == D(i,j+1) && localOffset < notes.ticksPerSeconds/8) || (i && localOffset < -notes.ticksPerSeconds/4))) {
+					j++;
+				} else {
+					globalOffset = P[j][0].time - notes[midiIndex].time;
+					for(size_t unused count: range(S[i].size)) {
+						assert_(notes[midiIndex].velocity);
+						notes[midiIndex].time += globalOffset; // Shifts all events until next chord, by the offset of last match
 						midiIndex++;
+						while(midiIndex < notes.size && !notes[midiIndex].velocity) {
+							notes[midiIndex].time += globalOffset;
+							midiIndex++;
+						}
 					}
+					i++; j++;
 				}
-				assert_(midiIndex > firstMidiIndex);
-				i++; // Ignores chord i
-			}
-			else // There are enough peaks to match instead
-#endif
-			if(j+1<n && ((D(i,j) == D(i,j+1) && localOffset < notes.ticksPerSeconds/8) //&& globalOffset < 10*notes.ticksPerSeconds
-						 || (i && localOffset < -notes.ticksPerSeconds/4))) { // Limits advance to quaver at 2 qps
-				j++; // Ignores peak j
-			} else { // Match
-				globalOffset = P[j][0].time - notes[midiIndex].time;
-				for(size_t unused count: range(S[i].size)) {
-					assert_(notes[midiIndex].velocity);
-					notes[midiIndex].time += /*uniformOffset +*/ globalOffset; // Shifts all events until next chord, by the offset of last match
-					midiIndex++;
-					while(midiIndex < notes.size && !notes[midiIndex].velocity) {
-						notes[midiIndex].time += /*uniformOffset +*/ globalOffset;
-						midiIndex++;
-					}
-				}
-				// Strict map (no multiple match)
-				i++; j++;
 			}
 		}
-#endif
 
 		{ // Set measure times to MIDI times
 			buffer<MidiNote> onsets = filter(notes, [](MidiNote o){return o.velocity==0;});
@@ -458,9 +306,9 @@ struct BeatSynchronizer : Widget {
 			}
 		}
 
-#if 1
 		// Beat visualization (synchronized to sheet time)
-		{size_t peakIndex = 0;
+		if(P) {
+			size_t peakIndex = 0;
 			{// Before first measure
 				int t0 = 0;
 				assert_(P[peakIndex][0].time >= 0);
@@ -487,7 +335,6 @@ struct BeatSynchronizer : Widget {
 				}
 			}
 		}
-#endif
 
 		for(float x: measureBars.values) bars.append(Bar{x, green});
 	}
@@ -520,18 +367,24 @@ struct Music : Widget {
 	buffer<String> videoFiles = filter(Folder(".").list(Files), [this](string path) {
 			return !startsWith(path, name) ||  (!endsWith(path, "performance.mp4") && !find(path, ".mkv")); });
 
+	// Audio
+	AudioFile audioFile = audioFiles ? AudioFile(audioFiles[0]) : AudioFile();
+	// Sampler
+	Thread decodeThread;
+	Sampler sampler {48000, "/Samples/Salamander.sfz"_, {this, &Music::timeChanged}, decodeThread};
+
+
 	// MusicXML
 	MusicXML xml = existsFile(name+".xml"_) ? readFile(name+".xml"_) : MusicXML();
 	// MIDI
-	MidiNotes notes = existsFile(name+".mid"_) ? MidiFile(readFile(name+".mid"_)) : ::notes(xml.signs, xml.divisions);
+	MidiNotes notes = scale( existsFile(name+".mid"_) ? MidiFile(readFile(name+".mid"_)) : ::notes(xml.signs, xml.divisions),
+							 audioFile.audioFrameRate?: sampler.rate);
 	MidiSheet midiSheet = existsFile(name+".mid"_) ? MidiSheet(readFile(name+".mid"_)) : MidiSheet();
-	// Audio
-	AudioFile audioFile = audioFiles ? AudioFile(audioFiles[0]) : AudioFile();
 	// Sheet
 	Sheet sheet {xml ? xml.signs : midiSheet.signs, xml ? xml.divisions : midiSheet.divisions,
 				apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
-	BeatSynchronizer beatSynchronizer = audioFiles ?
-				BeatSynchronizer(decodeAudio(audioFiles[0]), notes, sheet.midiToSign, sheet.measureBars) : BeatSynchronizer(sheet.measureBars);
+	BeatSynchronizer beatSynchronizer {audioFiles?decodeAudio(audioFiles[0]):Audio(), notes, sheet.midiToSign, sheet.measureBars};
+
 	// Video
 	Decoder video = videoFiles ? Decoder(videoFiles[0]) : Decoder();
 
@@ -557,12 +410,6 @@ struct Music : Widget {
     Thread audioThread;
 	AudioOutput audio = {{this, &Music::read32}, audioThread};
 
-	// Sampler
-#define SAMPLER 1
-#if SAMPLER
-	Thread decodeThread;
-	Sampler sampler {48000, "/Samples/Salamander.sfz"_, {this, &Music::timeChanged}, decodeThread};
-#endif
 
 	// End
 	buffer<int64> onsets = apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.time;});
@@ -584,7 +431,6 @@ struct Music : Widget {
 		}
 	}
 
-#if SAMPLER
 	/// Adds new notes to be played (called in audio thread by sampler)
 	uint samplerMidiIndex = 0;
 	void timeChanged(uint64 time) {
@@ -594,10 +440,9 @@ struct Music : Widget {
 			samplerMidiIndex++;
 		}
 	}
-#endif
 
 	bool follow(int64 timeNum, int64 timeDen, int2 size) {
-		assert_(timeDen);
+		assert_(timeDen && notes.ticksPerSeconds == timeDen);
 		if(timeNum < 0) return false; // FIXME
 		bool contentChanged = false;
 		for(;midiIndex < notes.size && notes[midiIndex].time*timeDen <= timeNum*notes.ticksPerSeconds; midiIndex++) {
@@ -625,6 +470,7 @@ struct Music : Widget {
 				}
 			}
 		}
+
 		uint64 t = timeNum*notes.ticksPerSeconds;
 		int previousOffset = scroll.offset.x;
 		// Cardinal cubic B-Spline
@@ -660,10 +506,8 @@ struct Music : Widget {
 		if(video) {
 			video.seek(time * video.videoFrameRate / notes.ticksPerSeconds);
 		}
-#if SAMPLER
 		sampler.audioTime = time*sampler.rate/notes.ticksPerSeconds;
 		while(samplerMidiIndex < notes.size && notes[samplerMidiIndex].time*sampler.rate < time*notes.ticksPerSeconds) samplerMidiIndex++;
-#endif
 	}
 
 	Music() {
@@ -676,19 +520,13 @@ struct Music : Widget {
 				if(sheet.measureToChord[measureIndex]>=sheet.firstSynchronizationFailureChordIndex) break;
 			scroll.offset.x = -sheet.measureBars.values[max<int>(0, measureIndex-3)];
 		}
-#if SAMPLER
 		if(sampler) decodeThread.spawn(); // For sampler
-#endif
 		if(arguments().contains("encode")) { // Encode
 			Encoder encoder {name};
 			encoder.setVideo(int2(1280,720), 60);
 			if(audioFile && audioFile.codec==AudioFile::AAC) encoder.setAudio(audioFile);
 			else if(audioFile) encoder.setAAC(audioFile.channels, audioFile.audioFrameRate);
-#if SAMPLER
 			else encoder.setFLAC(2, sampler.rate);
-#else
-			else error("audio");
-#endif
 			encoder.open();
 			Time renderTime, encodeTime, totalTime;
 			totalTime.start();
@@ -719,16 +557,12 @@ struct Music : Widget {
 						if(buffer.size) encoder.writeAudioFrame(buffer);
 						done = buffer.size < buffer.capacity;
 					}
-#if SAMPLER
 					else {
 						buffer<int16> buffer(1024*sampler.channels);
 						sampler.read16(buffer);
 						encoder.writeAudioFrame(buffer);
 						done = sampler.silence || int64(encoder.audioTime*notes.ticksPerSeconds) >= notes.last().time*encoder.audioFrameRate;
 					}
-#else
-					else error("audio");
-#endif
 					return !done;
 				};
 				if(encoder.videoFrameRate) { // Interleaved AV

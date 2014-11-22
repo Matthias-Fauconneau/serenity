@@ -238,6 +238,7 @@ float Note::actualLevel(uint size) const {
 }
 
 void Sampler::noteEvent(uint key, uint velocity) {
+	//TODO: Pedal events
     Note* released=0;
     if(velocity==0) {
         for(Layer& layer: layers) for(Note& note: layer.notes) if(note.key==key) {
@@ -271,7 +272,7 @@ void Sampler::noteEvent(uint key, uint velocity) {
 					float sustainLevel = note.actualLevel(1<<11);
 					float releaseLevel = released->actualLevel(1<<14);
 					float currentAttenuation = released->level[0];
-					note.level = float4(min<float>(8.f, currentAttenuation * sustainLevel / releaseLevel)); // 341ms/21ms
+					note.level = float4(min<float>(4.f, currentAttenuation * sustainLevel / releaseLevel)); // 341ms/21ms
                 }
                 if(note.level[0]<0x1p-15) { layer->notes.removeAt(layer->notes.size-1); return; }
                 note.step=(v4sf){1,1,1,1};

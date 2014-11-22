@@ -272,13 +272,15 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 					assert_(note.measureIndex == measures.size());
 					const float x = X(sign);
 					vec2 p = P(sign);
+					String noteGlyphName = "noteheads.s"_+str(min(2,int(note.duration)));
+					vec2 noteSize = glyphSize(noteGlyphName);
 
 					// Ledger lines
 					int step = clefStep(sign);
 					//if(step > 6) { step -= 7; sign.clef.octave++; p = P(sign);
-					if(sign.note.octava) {
+					/*if(sign.note.octava) {
 						centeredText(p+vec2(noteSize.x/2, -3*lineInterval), "8"+superscript("va"), 2*lineInterval, measure.glyphs);
-					}
+					}*/
 					for(int s=2; s<=step; s+=2) { int y=staffY(staff, s); measure.fills.append(vec2(x-noteSize.x/3,y),vec2(noteSize.x*5/3,1)); }
 					for(int s=-10; s>=step; s-=2) { int y=staffY(staff, s); measure.fills.append(vec2(x-noteSize.x/3,y),vec2(noteSize.x*5/3,1)); }
 					// Body
@@ -286,7 +288,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 					if(abs(p.y-bodyAboveY)<=halfLineInterval || abs(p.y-belowY)<=halfLineInterval) bodyOffset = bodyOffset ? 0 : noteSize.x; // Alternate
 					else bodyOffset = 0;
 					note.glyphIndex = measure.glyphs.size;
-					glyph(p+vec2(bodyOffset, 0), "noteheads.s"_+str(min(2,int(note.duration))), note.grace?graceFont:font, measure.glyphs);
+					glyph(p+vec2(bodyOffset, 0), noteGlyphName, note.grace?graceFont:font, measure.glyphs);
 					bodyAboveY = p.y;
 					// Dot
 					if(note.dot) glyph(p+vec2(bodyOffset, 0)+vec2(noteSize.x*4/3,0),"dots.dot"_, font, measure.glyphs);
@@ -456,10 +458,11 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 			} else { // Directions signs
 				float& x = X(sign);
 				if(sign.type == Sign::Metronome) {
-					x += text(vec2(x, staffY(0, 12)), "♩="_+str(sign.metronome.perMinute)+" "_, textSize, measure.glyphs);
-					if(ticksPerMinutes && ticksPerMinutes!=int64(sign.metronome.perMinute*ticksPerQuarter))
-						log(ticksPerMinutes, "->", int64(sign.metronome.perMinute*ticksPerQuarter)); // FIXME: variable tempo
-					ticksPerMinutes = max(ticksPerMinutes, int64(sign.metronome.perMinute*ticksPerQuarter));
+					if(ticksPerMinutes!=int64(sign.metronome.perMinute*ticksPerQuarter)) {
+						x += text(vec2(x, staffY(0, 12)), "♩="_+str(sign.metronome.perMinute)+" "_, textSize, measure.glyphs);
+						if(ticksPerMinutes) log(ticksPerMinutes, "->", int64(sign.metronome.perMinute*ticksPerQuarter)); // FIXME: variable tempo
+						ticksPerMinutes = max(ticksPerMinutes, int64(sign.metronome.perMinute*ticksPerQuarter));
+					}
 				}
 				else if(sign.type == Sign::Dynamic) {
 					string word = sign.dynamic;

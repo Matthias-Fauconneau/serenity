@@ -12,6 +12,7 @@ inline String str(const MidiNote& o) { return str(o.time, strKey(o.key)); }
 struct MidiNotes : array<MidiNote> {
 	int64 ticksPerSeconds=0;
 };
+inline String str(const MidiNotes& o) { return str(o.ticksPerSeconds, str(ref<MidiNote>(o))); }
 
 enum { NoteOff=8, NoteOn, Aftertouch, Controller, ProgramChange, ChannelAftertouch, PitchBend, Meta };
 struct Track {
