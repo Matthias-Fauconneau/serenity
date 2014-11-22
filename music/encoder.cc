@@ -20,7 +20,7 @@ extern "C" {
 #undef check
 #define check(expr, args...) ({ auto e = expr; if(int(e)<0) error(#expr ""_, (const char*)av_err2str(int(e)), ##args); e; })
 
-Encoder::Encoder(string name) : path(name+".mp4"_) {
+Encoder::Encoder(String&& name) : path(move(name)) {
 	av_register_all();
 	if(existsFile(path)) remove(strz(path));
 	avformat_alloc_output_context2(&context, NULL, NULL, strz(path));
@@ -72,6 +72,7 @@ void Encoder::setAAC(uint channels, uint rate) {
 	audioCodec->channels = channels;
 	audioCodec->channel_layout = ref<int>{0,AV_CH_LAYOUT_MONO,AV_CH_LAYOUT_STEREO}[channels];
 	avcodec_open2(audioCodec, codec, 0);
+	audioFrameSize = audioCodec->frame_size;
 }
 
 void Encoder::setFLAC(uint channels, uint rate) {
@@ -88,6 +89,7 @@ void Encoder::setFLAC(uint channels, uint rate) {
 	audioCodec->channels = channels;
 	audioCodec->channel_layout = ref<int>{0,AV_CH_LAYOUT_MONO,AV_CH_LAYOUT_STEREO}[channels];
 	avcodec_open2(audioCodec, codec, 0);
+	audioFrameSize = audioCodec->frame_size;
 }
 
 void Encoder::open() {
@@ -141,6 +143,7 @@ void Encoder::writeAudioFrame(ref<int32> audio) {
 	assert(audioStream);
 	AVFrame frame;
 	frame.nb_samples = audio.size/channels;
+	assert_(frame.nb_samples < audioCodec->frame_size);
 	avcodec_fill_audio_frame(&frame, channels, AV_SAMPLE_FMT_S32, (uint8*)audio.data, audio.size * channels * sizeof(int32), 1);
 	frame.pts = audioTime*audioStream->time_base.den/(audioFrameRate*audioStream->time_base.num);
 

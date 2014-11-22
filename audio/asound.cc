@@ -167,7 +167,8 @@ Device getCaptureDevice() {
     error("No PCM playback device found"); //FIXME: Block and watch folder until connected
 }
 
-AudioInput::AudioInput(uint sampleBits, uint rate, uint periodSize, Thread& thread) : Device(getCaptureDevice()), Poll(Device::fd,POLLIN,thread) {
+AudioInput::AudioInput(uint sampleBits, uint channels, uint rate, uint periodSize, Thread& thread)
+	: Device(getCaptureDevice()), Poll(Device::fd,POLLIN,thread) {
     HWParams hparams;
     hparams.mask(Access).set(MMapInterleaved);
     if(sampleBits) hparams.mask(Format).set(sampleBits==16?S16_LE:S32_LE);
@@ -197,6 +198,7 @@ AudioInput::AudioInput(uint sampleBits, uint rate, uint periodSize, Thread& thre
     iowr<HW_PARAMS>(hparams);
     assert_(hparams.flags == NoResample);
     this->sampleBits = hparams.interval(SampleBits);
+	this->channels= hparams.interval(Channels);
     this->rate = hparams.interval(Rate);
     this->periodSize = hparams.interval(PeriodSize);
     assert(hparams.interval(Channels)==2);
@@ -223,7 +225,7 @@ void AudioInput::event() {
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
         uint readSize;
-        if(sampleBits==32) readSize=write32(ref<int2>(((int2*)buffer)+(control->swPointer%bufferSize), periodSize));
+		if(sampleBits==32) readSize=write32(ref<int>(((int*)buffer)+channels*(control->swPointer%bufferSize), periodSize));
         else error(sampleBits);
         assert_(readSize==periodSize);
         control->swPointer += readSize;

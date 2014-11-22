@@ -46,17 +46,17 @@ struct AudioOutput : Device, Poll {
 /// Audio input using ALSA PCM interface
 struct AudioInput : Device, Poll {
     uint sampleBits = 0;
-    uint channels = 2, rate = 0;
+	uint channels = 0, rate = 0;
     uint periodSize = 0, bufferSize = 0;
     uint periods =0, overruns = 0;
 
     /// Configures PCM input
-    AudioInput(uint sampleBits, uint rate, uint periodSize, Thread& thread);
+	AudioInput(uint sampleBits, uint channels, uint rate, uint periodSize, Thread& thread);
     /// Configures PCM for 32bit input
     /// \note read will be called back periodically to provide an \a input frame of \a size samples
     /// \note 0 means maximum
-    AudioInput(function<uint(const ref<int2> output)> write, uint rate=0, uint periodSize=0, Thread& thread=mainThread):
-    AudioInput(32,rate,periodSize,thread) { write32=write; }
+	AudioInput(function<uint(const ref<int32> output)> write, uint channels, uint rate=0, uint periodSize=0, Thread& thread=mainThread)
+		: AudioInput(32, channels, rate, periodSize, thread) { write32=write; }
     /// Drains audio input and stops providing data to \a write callback
     virtual ~AudioInput();
 
@@ -64,7 +64,7 @@ struct AudioInput : Device, Poll {
     void event();
 
 private:
-    function<uint(const ref<int2> output)> write32 = [](const ref<int2>){return 0;};
+	function<uint(const ref<int32> output)> write32;
 
     Map maps[3];
     void* buffer = 0;

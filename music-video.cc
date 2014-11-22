@@ -522,7 +522,7 @@ struct Music : Widget {
 		}
 		if(sampler) decodeThread.spawn(); // For sampler
 		if(arguments().contains("encode")) { // Encode
-			Encoder encoder {name};
+			Encoder encoder {name+".mp4"_};
 			encoder.setVideo(int2(1280,720), 60);
 			if(audioFile && audioFile.codec==AudioFile::AAC) encoder.setAudio(audioFile);
 			else if(audioFile) encoder.setAAC(audioFile.channels, audioFile.audioFrameRate);
