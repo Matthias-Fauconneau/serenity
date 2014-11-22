@@ -30,7 +30,8 @@ void Encoder::setVideo(Format format, int2 size, uint videoFrameRate) {
 	assert_(!videoStream);
 	this->size=size;
 	this->videoFrameRate=videoFrameRate;
-	if(format==sRGB) swsContext = sws_getContext(width, height, AV_PIX_FMT_BGRA, width, height, AV_PIX_FMT_YUV420P, SWS_FAST_BILINEAR, 0, 0, 0);
+	swsContext = sws_getContext(width, height, format==sRGB ? AV_PIX_FMT_BGRA : AV_PIX_FMT_YUYV422, width, height,
+								format==sRGB ? AV_PIX_FMT_YUV420P : AV_PIX_FMT_YUV422P, SWS_FAST_BILINEAR, 0, 0, 0);
 
 	AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_H264);
 	videoStream = avformat_new_stream(context, codec);
@@ -41,9 +42,11 @@ void Encoder::setVideo(Format format, int2 size, uint videoFrameRate) {
 	videoCodec->height = height;
 	videoStream->time_base.num = videoCodec->time_base.num = 1;
 	videoStream->time_base.den = videoCodec->time_base.den = videoFrameRate;
-	videoCodec->pix_fmt = format==sRGB ? AV_PIX_FMT_YUV420P : AV_PIX_FMT_YUYV422;
+	videoCodec->pix_fmt = format==sRGB ? AV_PIX_FMT_YUV420P : AV_PIX_FMT_YUV422P;
 	if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
-	avcodec_open2(videoCodec, codec, 0);
+	check( avcodec_open2(videoCodec, codec, 0) );
+	frame = av_frame_alloc();
+	avpicture_alloc((AVPicture*)frame, sRGB ? AV_PIX_FMT_YUV420P : AV_PIX_FMT_YUV422P, width, height);
 }
 
 void Encoder::setAudio(const AudioFile& audio) {
@@ -99,14 +102,14 @@ void Encoder::open() {
 	check( avformat_write_header(context, 0) );
 }
 
-void Encoder::writeVideoFrame(YUYVImage image) {
+/*void Encoder::writeVideoFrame(YUYVImage image) {
 	assert_(videoStream && image.size==int2(width,height), image.size);
 	AVFrame* framePtr = av_frame_alloc(); AVFrame& frame = *framePtr;
 	frame.format = AV_PIX_FMT_YUYV422;
 	frame.width = image.width;
 	frame.height = image.height;
-	frame.data[0] = (uint8*)image.data.data;
-	frame.linesize[0] = image.bytesPerLine;
+	frame.data[0] = (uint8*)image.data;
+	frame.linesize[0] = image.width*2;
 	frame.pts = videoTime*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
 
 	AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
@@ -121,28 +124,40 @@ void Encoder::writeVideoFrame(YUYVImage image) {
 	}
 
 	videoTime++;
+}*/
+
+void Encoder::writeVideoFrame(YUYVImage image) {
+	assert_(videoStream && image.size==int2(width,height), image.size);
+	int stride = image.width * 2;
+	sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, height, frame->data, frame->linesize);
+	frame->pts = videoTime*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
+
+	AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
+	int gotVideoPacket;
+	avcodec_encode_video2(videoCodec, &pkt, frame, &gotVideoPacket);
+
+	if(gotVideoPacket) {
+		pkt.stream_index = videoStream->index;
+		av_interleaved_write_frame(context, &pkt);
+		videoEncodedTime++;
+	}
+	videoTime++;
 }
 
 void Encoder::writeVideoFrame(const Image& image) {
 	assert_(videoStream && image.size==int2(width,height), image.size);
-	AVFrame* framePtr = av_frame_alloc(); AVFrame& frame = *framePtr;
-    //AVFrame frame; avcodec_get_frame_defaults(&frame);
-    avpicture_alloc((AVPicture*)&frame, AV_PIX_FMT_YUV420P, width, height);
-    int stride = image.stride*4; sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, height, frame.data, frame.linesize);
-
-	frame.pts = videoTime*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
+	int stride = image.stride*4;
+	sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, height, frame->data, frame->linesize);
+	frame->pts = videoTime*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
 
     AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
     int gotVideoPacket;
-    avcodec_encode_video2(videoCodec, &pkt, &frame, &gotVideoPacket);
-    avpicture_free((AVPicture*)&frame);
-	av_frame_free(&framePtr);
+	avcodec_encode_video2(videoCodec, &pkt, frame, &gotVideoPacket);
     if(gotVideoPacket) {
         pkt.stream_index = videoStream->index;
         av_interleaved_write_frame(context, &pkt);
         videoEncodedTime++;
     }
-
     videoTime++;
 }
 
@@ -197,7 +212,7 @@ Encoder::~Encoder() {
         pkt.stream_index = videoStream->index;
         av_interleaved_write_frame(context, &pkt);
         videoEncodedTime++;
-    }
+	}
     av_interleaved_write_frame(context, 0);
     av_write_trailer(context);
     avformat_free_context(context); context=0;

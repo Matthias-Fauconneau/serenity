@@ -88,6 +88,8 @@ generic String str(const vec& v) {
 #define generic template<Type T>
 
 generic struct xy { T x,y; };
+/// Integer x,y vector (8bit)
+typedef vec<xy,uint8,2> byte2;
 /// Integer x,y vector (16bit)
 typedef vec<xy,int16,2> short2;
 /// Integer x,y vector (32bit)

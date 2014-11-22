@@ -146,7 +146,7 @@ struct Device : File {
     /// Sends ioctl request with neither input/outputs arguments
     template<Type IO> int io() { return ioctl(IO::io, 0); }
     /// Sends ioctl request with \a input arguments
-	template<Type IOW> int iow(const typename IOW::Args& input) { return ioctl(IOW::iow, &input); }
+	template<Type IOW> int iow(const typename IOW::Args& input) { return ioctl(IOW::iow, (void*)&input); }
     /// Sends ioctl request with output arguments
     template<Type IOR> typename IOR::Args ior() { typename IOR::Args output; ioctl(IOR::ior, &output); return output; }
     /// Sends ioctl request with \a reference argument
