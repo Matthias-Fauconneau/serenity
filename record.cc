@@ -11,20 +11,29 @@ typedef IOWR<'V', 9, v4l2_buffer> QueryBuffer;
 typedef IOWR<'V', 15, v4l2_buffer> QueueBuffer;
 typedef IOWR<'V', 17, v4l2_buffer> DequeueBuffer;
 typedef IOW<'V', 18, int> StartStream;
+typedef IOWR<'V', 75, v4l2_frmivalenum> EnumerateFrameIntervals;
 
 struct VideoInput : Device, Poll {
 	array<Map> buffers;
 	int2 size;
+    uint frameRate = 0;
 	size_t videoTime = 0;
-	function<void(YUYVImage)> write;
-    VideoInput(function<void(YUYVImage)> write, Thread& thread=mainThread) : Device("/dev/video0"), Poll(Device::fd,POLLIN,thread), write(write) {
+    uint64 firstTimeStamp = 0;
+    uint64 timeStampDen = 1000000;
+    function<void(YUYVImage&&)> write;
+    VideoInput(function<void(YUYVImage&&)> write, Thread& thread=mainThread) : Device("/dev/video0"), Poll(Device::fd,POLLIN,thread), write(write) {
         v4l2_format fmt = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE}; iowr<GetFormat>(fmt);
 		size = int2(fmt.fmt.pix.width, fmt.fmt.pix.height);
 		assert_(fmt.fmt.pix.bytesperline==uint(2*size.x));
-        const int bufferSize = 4;
-        v4l2_requestbuffers req = {.count = bufferSize, .type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP};
+        v4l2_frmivalenum frmi = {.pixel_format=V4L2_PIX_FMT_YUYV, .width=uint(size.x), .height=uint(size.y)};
+        iowr<EnumerateFrameIntervals>(frmi);
+        assert_(frmi.type==V4L2_FRMIVAL_TYPE_DISCRETE && frmi.discrete.numerator == 1);
+        frameRate = frmi.discrete.denominator;
+        assert_(frameRate == 30);
+        const int bufferedFrameCount = 1;
+        v4l2_requestbuffers req = {.count = bufferedFrameCount, .type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP};
 		iowr<RequestBuffers>(req);
-        assert_(req.count == bufferSize);
+        assert_(req.count == bufferedFrameCount);
         for(uint bufferIndex: range(req.count)) {
 			v4l2_buffer buf = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP, .index = bufferIndex};
             iowr<QueryBuffer>(buf);
@@ -32,14 +41,22 @@ struct VideoInput : Device, Poll {
             buffers.append(Map(Device::fd, buf.m.offset, buf.length, Map::Prot(Map::Read|Map::Write)));
             iowr<QueueBuffer>(buf);
         }
+    }
+    void start() {
         iow<StartStream>(V4L2_BUF_TYPE_VIDEO_CAPTURE);
     }
 	void event() {
         v4l2_buffer buf = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP};
 		iowr<DequeueBuffer>(buf);
-		assert_(buf.sequence == videoTime, videoTime, buf.sequence);
-		assert_(buf.bytesused == uint(size.y*size.x*2));
-		write(YUYVImage(cast<byte2>(buffers[buf.index]), size));
+        //assert_(buf.sequence == videoTime, videoTime, buf.sequence);
+        if(buf.sequence != videoTime) {
+            log(videoTime, buf.sequence);
+            videoTime = buf.sequence;
+        }
+        assert_(buf.bytesused == uint(size.y*size.x*2));
+        uint64 timeStamp = buf.timestamp.tv_sec*1000000+buf.timestamp.tv_usec;
+        if(!firstTimeStamp) firstTimeStamp = timeStamp;
+        write(YUYVImage(unsafeRef(cast<byte2>(buffers[buf.index])), size, timeStamp-firstTimeStamp));
 		videoTime++;
 		iowr<QueueBuffer>(buf);
     }
@@ -50,25 +67,29 @@ struct Record : ImageView, Poll {
     Encoder encoder {arguments()[0]+".mkv"_};
 
     Thread audioThread;// {-20};
-    AudioInput audio {{this, &Record::bufferAudio}, 1, 96000, 8192, audioThread};
+    AudioInput audio {{this, &Record::bufferAudio}, 2, 48000/*96000/192000*/, 4096 /*ChromeOS kernel restricts maximum buffer size*/, audioThread};
     array<buffer<int32>> audioFrames;
 
     Thread videoThread;// {-19};
     VideoInput video {{this, &Record::bufferVideo}, videoThread};
     Window window {this, video.size, [](){return "Record"__;}};
-    array<buffer<byte2>> videoFrames;
-    buffer<byte2> lastFrame;
+    array<YUYVImage> videoFrames;
+    YUYVImage lastImage;
     bool contentChanged = false;
 
     Record() {
-		encoder.setVideo(Encoder::YUYV, video.size, 30/*FIXME*/);
+        encoder.setVideo(Encoder::YUYV, video.size, video.frameRate);
 		encoder.setFLAC(audio.sampleBits, 1, audio.rate);
 		encoder.open();
-        assert_(audio.periodSize == encoder.audioFrameSize, audio.periodSize, encoder.audioFrameSize, encoder.channels, encoder.audioFrameRate);
-		if(audio.sampleBits==16) log("16bit audio capture");
+        assert_(audio.periodSize <= encoder.audioFrameSize, audio.periodSize, encoder.audioFrameSize, encoder.channels, encoder.audioFrameRate);
+        assert_(audio.sampleBits==32);
 		image = Image(video.size);
 		window.show();
-	}
+        audioThread.spawn();
+        videoThread.spawn();
+        audio.start();
+        video.start();
+    }
 
     uint bufferAudio(ref<int32> input) {
         // Downmix
@@ -82,9 +103,9 @@ struct Record : ImageView, Poll {
         return input.size;
     }
 
-    void bufferVideo(YUYVImage image) {
+    void bufferVideo(YUYVImage&& image) {
         Locker locker(lock);
-        videoFrames.append(copyRef(image)); //FIXME: merge with deinterleaving to avoid a copy
+        videoFrames.append(YUYVImage(copyRef(image), image.size, image.time)); //FIXME: merge with deinterleaving to avoid a copy
         queue();
     }
 
@@ -93,12 +114,11 @@ struct Record : ImageView, Poll {
         for(;;) {
             lock.lock();
             if(videoFrames) { // 18MB/s
-                buffer<byte2> frame = videoFrames.take(0);
+                YUYVImage image = videoFrames.take(0);
                 lock.unlock();
 
-                YUYVImage image(frame, video.size);
                 encoder.writeVideoFrame(image);
-                lastFrame = move(frame);
+                lastImage = move(image);
                 contentChanged = true;
 
                 continue;
@@ -124,14 +144,14 @@ struct Record : ImageView, Poll {
             const int gV = 0.813*(1<<16);
             const int rV = 1.596*(1<<16);
             const int yY = 1.164*(1<<16);
-            for(size_t i: range(lastFrame.size/2)) {
-                int U = int(lastFrame[2*i+0][1])-128;
-                int V = int(lastFrame[2*i+1][1])-128;
+            for(size_t i: range(lastImage.ref<byte2>::size/2)) {
+                int U = int(lastImage[2*i+0][1])-128;
+                int V = int(lastImage[2*i+1][1])-128;
                 int b = (bU * U) >> 16;
                 int g = - ((gU * U + gV * V) >> 16);
                 int r = (rV * V) >> 16;
                 for(size_t j: range(2)) { //TODO: fixed point
-                    int Y = lastFrame[2*i+j][0];
+                    int Y = lastImage[2*i+j][0];
                     int y = (yY * (Y-16)) >> 16;
                     int B = y + b;
                     int G = y + g;

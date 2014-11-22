@@ -208,8 +208,9 @@ AudioInput::AudioInput(uint sampleBits, uint channels, uint rate, uint periodSiz
     control = (Control*)(maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data;
     control->availableMinimum = periodSize; // Minimum available space to trigger POLLIN
     io<PREPARE>();
+}
+void AudioInput::start() {
     io<START>();
-
 }
 AudioInput::~AudioInput(){
      io<DRAIN>();

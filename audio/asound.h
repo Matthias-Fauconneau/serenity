@@ -62,6 +62,8 @@ struct AudioInput : Device, Poll {
     /// Drains audio input and stops providing data to \a write callback
     virtual ~AudioInput();
 
+    void start();
+
     /// Callback for poll events
     void event();
 

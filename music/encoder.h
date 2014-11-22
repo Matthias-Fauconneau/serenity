@@ -3,9 +3,12 @@
 #include "core/image.h"
 #include "audio.h" // AudioFile
 
-struct YUYVImage : ref<byte2> {
+struct YUYVImage : buffer<byte2> {
 	union { int2 size = 0; struct { uint width, height; }; };
-    YUYVImage(ref<byte2> data, int2 size) : ref<byte2>(data), size(size) {}
+    uint64 time;
+    YUYVImage() {}
+    YUYVImage(buffer<byte2>&& data, int2 size, uint64 time) : buffer<byte2>(::move(data)), size(size), time(time) {}
+    default_move(YUYVImage);
 };
 
 /// Generic video/audio encoder (using ffmpeg/x264)
@@ -36,7 +39,7 @@ struct Encoder {
     operator bool() { return context; }
 
 	/// Writes a video frame
-	void writeVideoFrame(YUYVImage image);
+    void writeVideoFrame(const YUYVImage& image);
     /// Writes a video frame
     void writeVideoFrame(const Image& image);
     /// Writes an audio frame

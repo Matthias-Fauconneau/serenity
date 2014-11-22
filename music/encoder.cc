@@ -42,10 +42,14 @@ void Encoder::setVideo(Format format, int2 size, uint videoFrameRate) {
 	videoCodec->codec_id = AV_CODEC_ID_H264;
 	videoCodec->width = width;
 	videoCodec->height = height;
-    videoStream->time_base.num = 1;
-    videoStream->time_base.den = videoFrameRate;
+    videoStream->time_base.num = videoCodec->time_base.num = 1;
+    videoStream->time_base.den = videoCodec->time_base.den = videoFrameRate;
 	videoCodec->pix_fmt = format==sRGB ? AV_PIX_FMT_YUV420P : AV_PIX_FMT_YUV422P;
 	if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
+    AVDictionary* options = 0;
+    //av_dict_set(&options, "qp","0",0); // Lossless
+    av_dict_set(&options, "preset", "ultrafast", 0);
+    avcodec_open2(videoCodec, codec, &options);
 	check( avcodec_open2(videoCodec, codec, 0) );
 	frame = av_frame_alloc();
 	avpicture_alloc((AVPicture*)frame, format==sRGB ? AV_PIX_FMT_YUV420P : AV_PIX_FMT_YUV422P, width, height);
@@ -107,15 +111,17 @@ void Encoder::open() {
     lock.unlock();
 }
 
-void Encoder::writeVideoFrame(YUYVImage image) {
+void Encoder::writeVideoFrame(const YUYVImage& image) {
 	assert_(videoStream && image.size==int2(width,height), image.size);
 	int stride = image.width * 2;
 	sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, height, frame->data, frame->linesize);
-	frame->pts = videoTime*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
+    frame->pts = image.time*videoStream->time_base.den/(1000000*videoStream->time_base.num);
+    //videoTime*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
 
 	AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
 	int gotVideoPacket;
 	avcodec_encode_video2(videoCodec, &pkt, frame, &gotVideoPacket);
+    log(videoTime, frame->pts, pkt.pts, videoStream->time_base.num, videoFrameRate, videoStream->time_base.den);
 
 	if(gotVideoPacket) {
 		pkt.stream_index = videoStream->index;
@@ -193,7 +199,6 @@ Encoder::~Encoder() {
         int gotVideoPacket = 0;
         avcodec_encode_video2(videoCodec, &pkt, 0, &gotVideoPacket);
         if(!gotVideoPacket) break;
-        pkt.pts = av_rescale_q(videoEncodedTime, videoCodec->time_base, videoStream->time_base);
         if (videoCodec->coded_frame->key_frame) pkt.flags |= AV_PKT_FLAG_KEY;
         pkt.stream_index = videoStream->index;
         av_interleaved_write_frame(context, &pkt);
