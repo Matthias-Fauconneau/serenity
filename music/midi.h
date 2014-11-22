@@ -27,6 +27,7 @@ struct MidiFile : MidiNotes {
     int trackCount=0;
     uint timeSignature[2] = {4,4}, tempo=60000/120; int key=0; enum {Major,Minor} scale=Major;
 	uint duration=0; // Duration in ticks
+	MidiFile() {}
 	MidiFile(ref<byte> file);
-    void read(Track& track);
+	virtual void read(Track& track); // FIXME: merge MidiSheet::read
 };

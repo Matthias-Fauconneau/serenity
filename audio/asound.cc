@@ -145,8 +145,8 @@ void AudioOutput::event() {
 		uint readSize;
 		/**/  if(sampleBits==16) readSize=read16(mref<short2>(((short2*)buffer)+control->swPointer%bufferSize, periodSize));
 		else if(sampleBits==32) {
-			/**/   if(channels==1) readSize=read32m(mref<int>(((int*)buffer)+control->swPointer%bufferSize, periodSize));
-			else if(channels==2) readSize=read32(mref<int2>(((int2*)buffer)+control->swPointer%bufferSize, periodSize));
+			/**/   /*if(channels==1) readSize=read32m(mref<int>(((int*)buffer)+control->swPointer%bufferSize, periodSize));
+			else*/ if(channels==2) readSize=read32(mref<int2>(((int2*)buffer)+control->swPointer%bufferSize, periodSize));
 			else error(channels);
 		} else error("Unsupported sample size", sampleBits);
         assert(readSize<=periodSize);

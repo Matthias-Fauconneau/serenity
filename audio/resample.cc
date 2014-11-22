@@ -96,8 +96,8 @@ Resampler::Resampler(uint channels, uint sourceRate, uint targetRate, size_t rea
 
 	// Allocates and clears aligned planar signal buffers
 	size_t writeForReadSize = readSize*integerAdvance+int(readSize*fractionalAdvance+targetRate-1)/targetRate;
-	if(writeSize) assert_(readSize == 0 || writeSize == writeForReadSize);
-	else writeSize = writeForReadSize;
+	log(writeSize, writeForReadSize);
+	writeSize = max(writeSize, writeForReadSize);
 	bufferSize = align(16, N+writeSize);
 	for(size_t channel: range(channels)) { signal[channel] = buffer<float>(bufferSize); signal[channel].clear(0); }
 }
@@ -134,8 +134,8 @@ void Resampler::write(ref<float> source) {
 	for(uint i: range(source.size/channels)) { // Deinterleaves source to buffers
 		for(uint channel: range(channels)) signal[channel][N-1+writeIndex+i]=source[i*channels+channel];
     }
-	writeIndex += source.size;
-	assert_(writeIndex<bufferSize);
+	writeIndex += source.size/channels;
+	assert_(writeIndex<bufferSize, writeIndex, bufferSize);
 }
 
 size_t Resampler::available() {

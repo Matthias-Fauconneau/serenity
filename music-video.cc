@@ -27,6 +27,53 @@ extern "C" {
 #include <libavutil/avutil.h> //avutil
 }
 
+/// Converts notes to signs
+struct MidiSheet : MidiFile {
+	array<Sign> signs;
+	uint divisions = 0; // Time unit per quarter note
+	MidiSheet() {}
+	MidiSheet(ref<byte> file) : MidiFile(file) {}
+	void read(Track& track) override;
+};
+
+void MidiSheet::read(Track& track) {
+	BinaryData& s = track.data;
+	assert_(s);
+	for(;;) {
+		uint8 key=s.read();
+		if(key & 0x80) { track.type_channel=key; key=s.read(); }
+		uint8 type=track.type_channel>>4;
+		uint8 vel=0;
+		if(type == NoteOn) vel=s.read();
+		else if(type == NoteOff) { vel=s.read(); assert_(vel==0) ; }
+		//else if(type == Aftertouch || type == Controller || type == PitchBend ) s.advance(1);
+		//else if(type == ProgramChange || type == ChannelAftertouch ) {}
+		else if(type == Meta) {
+			uint8 c=s.read(); uint len=c&0x7f; if(c&0x80){ c=s.read(); len=(len<<7)|(c&0x7f); }
+			enum { SequenceNumber, Text, Copyright, TrackName, InstrumentName, Lyrics, Marker, Cue, ChannelPrefix=0x20,
+				   EndOfTrack=0x2F, Tempo=0x51, Offset=0x54, TimeSignature=0x58, KeySignature, SequencerSpecific=0x7F };
+			ref<byte> data = s.read<byte>(len);
+			if(key==TimeSignature) {
+				timeSignature[0]=data[0], timeSignature[1]=1<<data[1];
+				//signs.append(Sign{}); TODO
+			}
+			else if(key==Tempo) tempo=((data[0]<<16)|(data[1]<<8)|data[2])/1000;
+			else if(key==KeySignature) this->key=(int8)data[0], scale=data[1]?Minor:Major;
+			else error(key);
+		}
+		else error(type);
+
+		if(type==NoteOff) type=NoteOn, vel=0;
+		if(type==NoteOn) insertSorted(MidiNote{track.time, key, vel});
+
+		if(!s) return;
+		uint8 c=s.read(); uint t=c&0x7f;
+		if(c&0x80){c=s.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=s.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=s.read();t=(t<<7)|c;}}}
+		track.time += t;
+	}
+}
+
+
 /// Converts signs to notes
 MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter) {
 	MidiNotes notes;
@@ -65,8 +112,8 @@ struct BeatSynchronizer : Widget {
 	struct Bar { float x; bgr3f color; };
 	array<Bar> bars;
 	int currentTime = 0;
-	BeatSynchronizer(Audio audio, MidiNotes& notes, ref<Sign> signs, map<int, float>& measureBars, int64 /*ticksPerMinutes*/)
-		: measureBars(measureBars) {
+	BeatSynchronizer(map<int, float>& measureBars) : measureBars(measureBars) {}
+	BeatSynchronizer(Audio audio, MidiNotes& notes, ref<Sign> signs, map<int, float>& measureBars) : measureBars(measureBars) {
 		// Converts MIDI time base to audio sample rate
 		uint firstKey = 21+85, lastKey = 0;
 		for(MidiNote& note: notes) {
@@ -474,14 +521,17 @@ struct Music : Widget {
 			return !startsWith(path, name) ||  (!endsWith(path, "performance.mp4") && !find(path, ".mkv")); });
 
 	// MusicXML
-    MusicXML xml = readFile(name+".xml"_);
+	MusicXML xml = existsFile(name+".xml"_) ? readFile(name+".xml"_) : MusicXML();
 	// MIDI
 	MidiNotes notes = existsFile(name+".mid"_) ? MidiFile(readFile(name+".mid"_)) : ::notes(xml.signs, xml.divisions);
+	MidiSheet midiSheet = existsFile(name+".mid"_) ? MidiSheet(readFile(name+".mid"_)) : MidiSheet();
 	// Audio
 	AudioFile audioFile = audioFiles ? AudioFile(audioFiles[0]) : AudioFile();
 	// Sheet
-	Sheet sheet {xml.signs, xml.divisions, apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
-	BeatSynchronizer beatSynchronizer {decodeAudio(audioFiles[0]), notes, sheet.midiToSign, sheet.measureBars, sheet.ticksPerMinutes};
+	Sheet sheet {xml ? xml.signs : midiSheet.signs, xml ? xml.divisions : midiSheet.divisions,
+				apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
+	BeatSynchronizer beatSynchronizer = audioFiles ?
+				BeatSynchronizer(decodeAudio(audioFiles[0]), notes, sheet.midiToSign, sheet.measureBars) : BeatSynchronizer(sheet.measureBars);
 	// Video
 	Decoder video = videoFiles ? Decoder(videoFiles[0]) : Decoder();
 
@@ -508,6 +558,7 @@ struct Music : Widget {
 	AudioOutput audio = {{this, &Music::read32}, audioThread};
 
 	// Sampler
+#define SAMPLER 1
 #if SAMPLER
 	Thread decodeThread;
 	Sampler sampler {48000, "/Samples/Salamander.sfz"_, {this, &Music::timeChanged}, decodeThread};
@@ -517,15 +568,20 @@ struct Music : Widget {
 	buffer<int64> onsets = apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.time;});
 
 	size_t read32(mref<int2> output) {
-		assert_(audioFile && audioFile.audioTime>=0);
-		/**/  if(audioFile.channels == audio.channels) return audioFile.read32(mcast<int>(output));
-		/*else if(audioFile.channels == 1) {
+		if(audioFile) {
+			/**/  if(audioFile.channels == audio.channels) return audioFile.read32(mcast<int>(output));
+			/*else if(audioFile.channels == 1) {
 			int mono[output.size];
 			size_t readSize = audioFile.read32(mref<int>(mono, output.size));
 			for(size_t i: range(readSize)) output[i] = mono[i];
 			return readSize;
 		}*/
-		else error(audioFile.channels);
+			else error(audioFile.channels);
+		} else {
+			assert_(sampler.channels == audio.channels);
+			assert_(sampler.rate == audio.rate);
+			return sampler.read32(output);
+		}
 	}
 
 #if SAMPLER
@@ -541,6 +597,7 @@ struct Music : Widget {
 #endif
 
 	bool follow(int64 timeNum, int64 timeDen, int2 size) {
+		assert_(timeDen);
 		if(timeNum < 0) return false; // FIXME
 		bool contentChanged = false;
 		for(;midiIndex < notes.size && notes[midiIndex].time*timeDen <= timeNum*notes.ticksPerSeconds; midiIndex++) {
@@ -604,7 +661,7 @@ struct Music : Widget {
 			video.seek(time * video.videoFrameRate / notes.ticksPerSeconds);
 		}
 #if SAMPLER
-		sampler.time = time*sampler.rate/notes.ticksPerSeconds;
+		sampler.audioTime = time*sampler.rate/notes.ticksPerSeconds;
 		while(samplerMidiIndex < notes.size && notes[samplerMidiIndex].time*sampler.rate < time*notes.ticksPerSeconds) samplerMidiIndex++;
 #endif
 	}
@@ -628,7 +685,7 @@ struct Music : Widget {
 			if(audioFile && audioFile.codec==AudioFile::AAC) encoder.setAudio(audioFile);
 			else if(audioFile) encoder.setAAC(audioFile.channels, audioFile.audioFrameRate);
 #if SAMPLER
-			else encoder.setAudio(sampler.rate);
+			else encoder.setFLAC(2, sampler.rate);
 #else
 			else error("audio");
 #endif
@@ -667,7 +724,7 @@ struct Music : Widget {
 						buffer<int16> buffer(1024*sampler.channels);
 						sampler.read16(buffer);
 						encoder.writeAudioFrame(buffer);
-						done = sampler.silence || encoder.audioTime*notes.ticksPerSeconds >= notes.last().time*encoder.audioFrameRate;
+						done = sampler.silence || int64(encoder.audioTime*notes.ticksPerSeconds) >= notes.last().time*encoder.audioFrameRate;
 					}
 #else
 					else error("audio");
@@ -707,13 +764,8 @@ struct Music : Widget {
 			}*/
 			window.show();
 			if(playbackDeviceAvailable()) {
-#if SAMPLER
-				audio.start(audioFile.audioFrameRate ?: sampler.rate, sampler.periodSize, 32, 2);
+				audio.start(audioFile.audioFrameRate ? : sampler.rate, audioFile ? 1024 : sampler.periodSize, 32, 2);
 				assert_(audio.rate == audioFile.audioFrameRate ?: sampler.rate);
-#else
-				assert_(audioFile);
-				audio.start(audioFile.audioFrameRate, 1024, 32, 2);
-#endif
 				audioThread.spawn();
 			} else running = false;
 		}
@@ -721,7 +773,8 @@ struct Music : Widget {
 
 	int2 sizeHint(int2 size) override { return running ? widget.sizeHint(size) : scroll.ScrollArea::sizeHint(size); }
 	shared<Graphics> graphics(int2 size) override {
-		follow(audioFile.audioTime, audioFile.audioFrameRate, window.size);
+		if(audioFile) follow(audioFile.audioTime, audioFile.audioFrameRate, window.size);
+		else follow(sampler.audioTime, sampler.rate, window.size);
 		window.render();
 		return running ? widget.graphics(size, Rect(size)) : scroll.ScrollArea::graphics(size);
 	}

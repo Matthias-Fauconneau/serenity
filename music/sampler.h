@@ -22,6 +22,7 @@ struct Sampler : Poll {
 	Semaphore lock {2}; // Decoder (producer) and mixer (consumer) may use \a layers concurrently, a mutator needs to lock/acquire both
     array<Layer> layers;
 
+	static constexpr uint channels = 2;
 	uint64 rate = 0;
     //static constexpr uint periodSize = 64; // [1ms] Prevents samples to synchronize with shifted copies from same chord
     //static constexpr uint periodSize = 128; // [3ms] Same as resampler latency and 1m sound propagation time
@@ -48,7 +49,7 @@ struct Sampler : Poll {
 
     /// Emits period time to trigger MIDI file input and update the interface
 	function<void(uint64)> timeChanged;
-    uint64 time=0, stopTime=0;
+	uint64 audioTime=0, stopTime=0;
 
 	/// Whether decoding is run in advance in main thread.
 	/// \note Prevents underruns when latency is much lower than FLAC frame sizes.
@@ -67,7 +68,7 @@ struct Sampler : Poll {
 
     /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer
 	size_t read32(mref<int2> output);
-	size_t read16(mref<short2> output);
+	size_t read16(mref<int16> output);
 	size_t read(mref<float2> output);
 
     /// Signals when all samples are done playing

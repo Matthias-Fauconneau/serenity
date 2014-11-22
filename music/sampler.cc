@@ -183,7 +183,8 @@ Sampler::Sampler(uint outputRate, string path, function<void(uint64)> timeChange
 				layer.notes.reserve(64);
                 if(shift || rate!=outputRate) {
                     const uint size = 2048; // Accurate frequency resolution while keeping reasonnable filter bank size
-					layer.resampler = Resampler(2, size, round(size*exp2((-shift)/12.0)*outputRate/rate), periodSize);
+					layer.resampler = Resampler(2, size, round(size*exp2((-shift)/12.0)*outputRate/rate),
+												/*readSize:*/ periodSize, /*writeSize:*/ 0/*FLAC::maxBlockSize*/ /*TODO: no copy*/);
                 }
 				layers.append(move(layer));
             }
@@ -358,10 +359,11 @@ void Note::read(mref<float2> output) {
 	flac.position += output.size; // Keeps track of position for release sample level matching
 }
 
-size_t Sampler::read16(mref<short2> output) {
-	byte buffer_[output.size*sizeof(float2)]; mref<float2> buffer((float2*)buffer_, output.size);
-	size_t size = read(buffer);
-	for(size_t i: range(size)) for(size_t c: range(2)) output[i][c] = round(buffer[i][c]*0x1p-11f); // 24bit -> 16bit with 3bit headroom for multiple notes
+size_t Sampler::read16(mref<int16> output) {
+	error("");
+	buffer<float> buffer (output.size);
+	size_t size = read(mcast<float2>(buffer));
+	for(size_t i: range(size*channels)) output[i] = round(buffer[i]*0x1p-11f); // 24bit -> 16bit with 3bit headroom for multiple notes
 	return size;
 }
 
@@ -397,8 +399,8 @@ size_t Sampler::read(mref<float2> output) {
 		lock.release(1);
     }
     if(noteCount==0 /*&& !record*/) { // Stops audio output when all notes are released
-            if(!stopTime) stopTime=time; // First waits for reverb
-            else if(time>stopTime+N) {
+			if(!stopTime) stopTime=audioTime; // First waits for reverb
+			else if(audioTime>stopTime+N) {
                 stopTime=0;
 				silence = true; //silence();
                 //return 0; // Stops audio output (will be restarted on noteEvent (cf music.cc)) (FIXME: disable on video record)
@@ -441,8 +443,8 @@ size_t Sampler::read(mref<float2> output) {
     }
 #endif
 
-	time += output.size;
-	timeChanged(time); // Updates active notes
+	audioTime += output.size;
+	timeChanged(audioTime); // Updates active notes
 	if(backgroundDecoder) queue(); else event(); // Decodes before mixing
     return output.size;
 }

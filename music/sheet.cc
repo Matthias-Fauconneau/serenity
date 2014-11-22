@@ -457,7 +457,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 				float& x = X(sign);
 				if(sign.type == Sign::Metronome) {
 					x += text(vec2(x, staffY(0, 12)), "♩="_+str(sign.metronome.perMinute)+" "_, textSize, measure.glyphs);
-					if(ticksPerMinutes) log(ticksPerMinutes, "->", int64(sign.metronome.perMinute*ticksPerQuarter)); // FIXME: variable tempo
+					if(ticksPerMinutes && ticksPerMinutes!=int64(sign.metronome.perMinute*ticksPerQuarter))
+						log(ticksPerMinutes, "->", int64(sign.metronome.perMinute*ticksPerQuarter)); // FIXME: variable tempo
 					ticksPerMinutes = max(ticksPerMinutes, int64(sign.metronome.perMinute*ticksPerQuarter));
 				}
 				else if(sign.type == Sign::Dynamic) {
