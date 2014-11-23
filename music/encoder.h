@@ -5,7 +5,7 @@
 
 struct YUYVImage : buffer<byte2> {
 	union { int2 size = 0; struct { uint width, height; }; };
-    uint64 time;
+    uint64 time = 0;
     YUYVImage() {}
     YUYVImage(buffer<byte2>&& data, int2 size, uint64 time) : buffer<byte2>(::move(data)), size(size), time(time) {}
     default_move(YUYVImage);

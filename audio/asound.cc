@@ -211,9 +211,10 @@ AudioInput::AudioInput(uint sampleBits, uint channels, uint rate, uint periodSiz
 }
 void AudioInput::start() {
     io<START>();
+    time = 0;
 }
 AudioInput::~AudioInput(){
-     io<DRAIN>();
+    io<DRAIN>();
 }
 
 void AudioInput::event() {
@@ -231,7 +232,8 @@ void AudioInput::event() {
         else error(sampleBits);
         assert_(readSize==periodSize, readSize, periodSize);
         control->swPointer += readSize;
-        periods++;
+        time += readSize;
+        periods += 1;
     }
 }
 

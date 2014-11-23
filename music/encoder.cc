@@ -189,12 +189,14 @@ void Encoder::writeAudioFrame(ref<int32> audio) {
 
 void Encoder::abort() {
     lock.lock();
+    if(frame) av_frame_free(&frame);
     videoStream=0; audioStream=0;
     avformat_free_context(context); // Releases encoder without flushing
     context=0;
 }
 
 Encoder::~Encoder() {
+    if(!context) { assert(!frame && !videoStream && !audioStream && !context); return; } // Aborted
     lock.lock();
     if(frame) av_frame_free(&frame);
     for(;;) {

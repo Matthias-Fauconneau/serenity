@@ -18,7 +18,7 @@ struct VideoInput : Device, Poll {
 	array<Map> buffers;
 	int2 size;
     uint frameRate = 0;
-	size_t videoTime = 0;
+    size_t time = 0;
     function<void(YUYVImage&&)> write;
     VideoInput(function<void(YUYVImage&&)> write, Thread& thread=mainThread) : Device("/dev/video0"), Poll(Device::fd,POLLIN,thread), write(write) {
         v4l2_format fmt = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE}; iowr<GetFormat>(fmt);
@@ -47,15 +47,15 @@ struct VideoInput : Device, Poll {
 	void event() {
         v4l2_buffer buf = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP};
 		iowr<DequeueBuffer>(buf);
-        //assert_(buf.sequence == videoTime, videoTime, buf.sequence);
-        if(buf.sequence != videoTime) {
-            log("Dropped", buf.sequence-videoTime, "frame"+((buf.sequence-videoTime)>1?"s"_:""_));
-            videoTime = buf.sequence;
+        //assert_(buf.sequence == time, time, buf.sequence);
+        if(buf.sequence != time) {
+            log("Dropped", buf.sequence-time, "frame"+((buf.sequence-time)>1?"s"_:""_));
+            time = buf.sequence;
         }
         assert_(buf.bytesused == uint(size.y*size.x*2));
         uint64 timeStamp = buf.timestamp.tv_sec*1000000+buf.timestamp.tv_usec;
         write(YUYVImage(unsafeRef(cast<byte2>(buffers[buf.index])), size, timeStamp));
-		videoTime++;
+        time++;
 		iowr<QueueBuffer>(buf);
     }
 };
@@ -78,6 +78,7 @@ struct Record : ImageView, Poll {
 
     const int margin = 16;
     Window window {this, video.size+int2(2*margin,margin), [](){return "Record"__;}};
+    Lock viewLock;
     YUYVImage lastImage;
     Text sizeText, availableText;
     bool contentChanged = false;
@@ -116,36 +117,41 @@ struct Record : ImageView, Poll {
         Locker locker(lock);
         audioFrames.clear();
         videoFrames.clear();
-        encoder->abort();
+        if(encoder) encoder->abort();
     }
 
     /// Stops capture, flushes buffers and writes up file
     void stop() {
         Locker locker(lock); // Stops capture while encoding buffer
-        while(encode()) {}
+        while(encode(false)) {}
         assert_(!audioFrames && !videoFrames);
         encoder = nullptr;
     }
 
     uint bufferAudio(ref<int32> input) {
-        if(encoder) {
+        if(!encoder) evaluateSoundLevel(input);
+        else {
             {Locker locker(lock);
                 audioFrames.append(copyRef(input));}
-            queue();
         }
+        queue();
         return input.size/audio.channels;
     }
 
     void bufferVideo(YUYVImage&& image) {
-        if(!encoder) return;
-        {Locker locker(lock);
+        if(!encoder) {
+            Locker locker(viewLock);
+            lastImage = YUYVImage(copyRef(image), image.size, image.time); // FIXME: merge with conversion to avoid a copy
+            contentChanged = true;
+        } else {
+            {Locker locker(lock);
             videoFrames.append(YUYVImage(copyRef(image), image.size, image.time));} //FIXME: merge with deinterleaving to avoid a copy
+        }
         queue();
     }
 
     // Encoder thread (TODO: multithread ?)
     void event() {
-        if(!encoder) return;
         while(encode()) {}
         if(contentChanged) window.render(); // only when otherwise idle
         if(maximumAmplitude > reportedMaximumAmplitude) {
@@ -165,6 +171,7 @@ struct Record : ImageView, Poll {
             if(!firstTimeStamp) firstTimeStamp = image.time;
             image.time -= firstTimeStamp;
             encoder->writeVideoFrame(image);
+            Locker locker(viewLock);
             lastImage = move(image);
             contentChanged = true;
 
@@ -175,26 +182,30 @@ struct Record : ImageView, Poll {
             if(lock) this->lock.unlock();
 
             encoder->writeAudioFrame(frame);
-            { // Evaluates mean sound levels
-                assert_(encoder->channels == 2);
-                const float a = float(frame.size) / float(audio.rate);
-                maximumAmplitude = (1-a) * maximumAmplitude; // Smoothly recoil maximum back
-                long2 sum;
-                for(int2 s: cast<int2>(frame)) {
-                    sum += abs(long2(s));
-                    if(encoder->audioTime > encoder->audioFrameRate) { // Amplitude is still setting in first frames
-                        if(abs(s[0]) > maximumAmplitude) maximumAmplitude = abs(s[0]);
-                        if(abs(s[1]) > maximumAmplitude) maximumAmplitude = abs(s[1]);
-                    }
-                }
-                float2 mean = float2(sum / long2(frame.size));
-                smoothedMean = a * mean + (1-a) * smoothedMean;
-            }
+            evaluateSoundLevel(frame);
 
             return true;
         }
         if(lock) this->lock.unlock();
         return false;
+    }
+
+    /// Evaluates mean sound levels
+    void evaluateSoundLevel(ref<int32> frame) {
+        assert_(audio.channels == 2);
+        const float a = float(frame.size) / float(audio.rate);
+        maximumAmplitude = (1-a) * maximumAmplitude; // Smoothly recoil maximum back
+        long2 sum;
+        for(int2 s: cast<int2>(frame)) {
+            sum += abs(long2(s));
+            if(audio.time > audio.rate) { // Amplitude is still setting in first frames
+                if(abs(s[0]) > maximumAmplitude) maximumAmplitude = abs(s[0]);
+                if(abs(s[1]) > maximumAmplitude) maximumAmplitude = abs(s[1]);
+            }
+        }
+        float2 mean = float2(sum / long2(frame.size));
+        smoothedMean = a * mean + (1-a) * smoothedMean;
+        contentChanged = true;
     }
 
     shared<Graphics> graphics(int2 size) override {
@@ -204,6 +215,7 @@ struct Record : ImageView, Poll {
             const int gV = 0.813*(1<<16);
             const int rV = 1.596*(1<<16);
             const int yY = 1.164*(1<<16);
+            Locker locker(viewLock);
             for(size_t i: range(lastImage.ref<byte2>::size/2)) {
                 int U = int(lastImage[2*i+0][1])-128;
                 int V = int(lastImage[2*i+1][1])-128;

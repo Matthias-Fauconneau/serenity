@@ -48,7 +48,8 @@ struct AudioInput : Device, Poll {
     uint sampleBits = 0;
 	uint channels = 0, rate = 0;
     uint periodSize = 0, bufferSize = 0;
-    uint periods =0, overruns = 0;
+    uint periods = 0, overruns = 0;
+    uint time = 0;
 
     /// Configures PCM input
 	AudioInput(uint sampleBits, uint channels, uint rate, uint periodSize, Thread& thread);

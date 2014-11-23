@@ -206,8 +206,8 @@ generic struct unique {
 
     operator T&() { return *pointer; }
     operator const T&() const { return *pointer; }
-    T* operator ->() { return pointer; }
-    const T* operator ->() const { return pointer; }
+    T* operator ->() { assert_(pointer); return pointer; }
+    const T* operator ->() const { assert_(pointer); return pointer; }
     explicit operator bool() const { return pointer; }
     bool operator !() const { return !pointer; }
     bool operator ==(const unique<T>& o) const { return pointer==o.pointer; }
