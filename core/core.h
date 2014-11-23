@@ -55,7 +55,7 @@ generic struct handle {
 	T pointer;
 
 	handle(T pointer=T()) : pointer(pointer){}
-	handle& operator=(handle&& o) { pointer=o.pointer; o.pointer=0; return *this; }
+    handle& operator=(handle&& o) { pointer=o.pointer; o.pointer={}; return *this; }
 	handle(handle&& o) : pointer(o.pointer){ o.pointer=T(); }
 
 	operator T() const { return pointer; }

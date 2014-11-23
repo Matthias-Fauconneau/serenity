@@ -19,7 +19,6 @@ struct VideoInput : Device, Poll {
 	int2 size;
     uint frameRate = 0;
 	size_t videoTime = 0;
-    uint64 firstTimeStamp = 0;
     function<void(YUYVImage&&)> write;
     VideoInput(function<void(YUYVImage&&)> write, Thread& thread=mainThread) : Device("/dev/video0"), Poll(Device::fd,POLLIN,thread), write(write) {
         v4l2_format fmt = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE}; iowr<GetFormat>(fmt);
@@ -55,8 +54,7 @@ struct VideoInput : Device, Poll {
         }
         assert_(buf.bytesused == uint(size.y*size.x*2));
         uint64 timeStamp = buf.timestamp.tv_sec*1000000+buf.timestamp.tv_usec;
-        if(!firstTimeStamp) firstTimeStamp = timeStamp;
-        write(YUYVImage(unsafeRef(cast<byte2>(buffers[buf.index])), size, timeStamp-firstTimeStamp));
+        write(YUYVImage(unsafeRef(cast<byte2>(buffers[buf.index])), size, timeStamp));
 		videoTime++;
 		iowr<QueueBuffer>(buf);
     }
@@ -75,22 +73,28 @@ struct Record : ImageView, Poll {
 
     Thread videoThread {-19};
     VideoInput video {{this, &Record::bufferVideo}, videoThread};
+    array<YUYVImage> videoFrames;
+    uint64 firstTimeStamp = 0;
+
     const int margin = 16;
     Window window {this, video.size+int2(2*margin,margin), [](){return "Record"__;}};
-    array<YUYVImage> videoFrames;
     YUYVImage lastImage;
     Text sizeText, availableText;
     bool contentChanged = false;
 
     Record() {
-        encoder.setVideo(Encoder::YUYV, video.size, video.frameRate);
-        encoder.setFLAC(audio.sampleBits, audio.channels, audio.rate);
-		encoder.open();
-        assert_(audio.periodSize <= encoder.audioFrameSize, audio.periodSize, encoder.audioFrameSize, encoder.channels, encoder.audioFrameRate);
         assert_(audio.sampleBits==32);
+
 		image = Image(video.size);
         window.background = Window::NoBackground;
+        window.actions[F3] = {this, &Record::restart};
         window.show();
+
+        encoder.setVideo(Encoder::YUYV, video.size, video.frameRate);
+        encoder.setFLAC(audio.sampleBits, audio.channels, audio.rate);
+        encoder.open();
+        assert_(audio.periodSize <= encoder.audioFrameSize);
+
         audioThread.spawn();
         videoThread.spawn();
         audio.start();
@@ -101,19 +105,22 @@ struct Record : ImageView, Poll {
         videoThread.wait();
     }
 
+    void restart() {
+        Locker locker(lock);
+        audioFrames.clear();
+        videoFrames.clear();
+        firstTimeStamp = 0;
+        encoder.~Encoder();
+        new(&encoder) Encoder(arguments()[0]+".mkv"_);
+        encoder.setVideo(Encoder::YUYV, video.size, video.frameRate);
+        encoder.setFLAC(audio.sampleBits, audio.channels, audio.rate);
+        encoder.open();
+        assert_(audio.periodSize <= encoder.audioFrameSize);
+    }
+
     uint bufferAudio(ref<int32> input) {
-        buffer<int32> frame;
-        if(encoder.channels == audio.channels) frame = copyRef(input); //FIXME: | direct encode ?
-        else {
-            assert_(audio.channels==2 && encoder.channels==1);
-            frame = buffer<int32>(input.size/audio.channels);
-            for(size_t i: range(frame.size)) {
-                int s = input[i*2+0]/2 + input[i*2+1]/2; // Assumes 1bit footroom
-                frame[i] = s;
-            }
-        }
         {Locker locker(lock);
-            audioFrames.append(move(frame));}
+            audioFrames.append(copyRef(input));}
         queue();
         return input.size/audio.channels;
     }
@@ -132,6 +139,8 @@ struct Record : ImageView, Poll {
                 YUYVImage image = videoFrames.take(0);
                 lock.unlock();
 
+                if(!firstTimeStamp) firstTimeStamp = image.time;
+                image.time -= firstTimeStamp;
                 encoder.writeVideoFrame(image);
                 lastImage = move(image);
                 contentChanged = true;

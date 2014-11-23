@@ -190,6 +190,7 @@ void Encoder::writeAudioFrame(ref<int32> audio) {
 Encoder::~Encoder() {
     lock.lock();
 	assert_(context);
+    av_frame_free(&frame);
     for(;;) {
         if(!videoStream && !audioStream) break;
         AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;

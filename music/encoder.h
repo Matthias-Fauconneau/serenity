@@ -24,11 +24,12 @@ struct Encoder {
     struct AVStream* videoStream=0; struct AVCodecContext* videoCodec=0;
     struct AVStream* audioStream=0; struct AVCodecContext* audioCodec=0;
     uint64 videoTime = 0, audioTime = 0;
-	AVFrame* frame;
+    AVFrame* frame = 0;
 
     /// Starts a new file recording video
 	Encoder(String&& name);
-	enum Format { YUYV, sRGB };
+
+    enum Format { YUYV, sRGB };
 	void setVideo(Format format, int2 size, uint videoFrameRate);
     void setAudio(const AudioFile& audio);
 	void setAAC(uint channels, uint rate);
