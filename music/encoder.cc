@@ -190,6 +190,8 @@ void Encoder::writeAudioFrame(ref<int32> audio) {
 void Encoder::abort() {
     lock.lock();
     if(frame) av_frame_free(&frame);
+    avcodec_close(videoCodec); videoCodec=0;
+    avcodec_close(audioCodec); audioCodec=0;
     videoStream=0; audioStream=0;
     avformat_free_context(context); // Releases encoder without flushing
     context=0;
@@ -219,7 +221,8 @@ Encoder::~Encoder() {
     if(context) {
         av_interleaved_write_frame(context, 0);
         av_write_trailer(context);
-        avformat_free_context(context);
-        context=0;
+        avformat_close_input(&context);
+        avcodec_close(videoCodec); videoCodec=0;
+        avcodec_close(audioCodec); audioCodec=0;
     }
 }
