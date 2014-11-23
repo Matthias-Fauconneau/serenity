@@ -23,7 +23,7 @@ struct Sampler : Poll {
     array<Layer> layers;
 
 	static constexpr uint channels = 2;
-	uint64 rate = 0;
+	uint rate = 0;
     //static constexpr uint periodSize = 64; // [1ms] Prevents samples to synchronize with shifted copies from same chord
     //static constexpr uint periodSize = 128; // [3ms] Same as resampler latency and 1m sound propagation time
     //static constexpr uint periodSize = 256; // [5ms] Latency/convolution tradeoff (FIXME: ring buffer)
@@ -48,7 +48,7 @@ struct Sampler : Poll {
 #endif
 
     /// Emits period time to trigger MIDI file input and update the interface
-	function<void(uint64)> timeChanged;
+	function<void(int64)> timeChanged;
 	uint64 audioTime=0, stopTime=0;
 
 	/// Whether decoding is run in advance in main thread.
@@ -58,7 +58,7 @@ struct Sampler : Poll {
 
 	explicit operator bool() const { return samples.size; }
 
-	Sampler(uint outputRate, string path, function<void(uint64)> timeChanged, Thread& thread=mainThread);
+	Sampler(uint outputRate, string path, function<void(int64)> timeChanged, Thread& thread=mainThread);
 	~Sampler();
 
 	void noteEvent(uint key, uint velocity);

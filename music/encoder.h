@@ -30,7 +30,7 @@ struct Encoder {
 	Encoder(String&& name);
 
     enum Format { YUYV, sRGB };
-	void setVideo(Format format, int2 size, uint videoFrameRate);
+	void setVideo(Format format, int2 size, uint videoFrameRate, bool ultrafast=false);
     void setAudio(const AudioFile& audio);
 	void setAAC(uint channels, uint rate);
 	void setFLAC(uint sampleBits, uint channels, uint rate);

@@ -89,7 +89,7 @@ float sumOfSquares(const FLAC& flac, uint size) {
     return (sum[0]+sum[1]+sum[2]+sum[3])/(1<<24)/(1<<24);
 }
 
-Sampler::Sampler(uint outputRate, string path, function<void(uint64)> timeChanged, Thread& thread)
+Sampler::Sampler(uint outputRate, string path, function<void(int64)> timeChanged, Thread& thread)
 	: Poll(0, POLLIN, thread), timeChanged(timeChanged), backgroundDecoder(thread!=mainThread) {
 	registerPoll();
     layers.clear();

@@ -10,7 +10,7 @@ inline String strKey(int key) { return (string[]){"A","A#","B","C","C#","D","D#"
 inline String str(const MidiNote& o) { return str(o.time, strKey(o.key)); }
 
 struct MidiNotes : array<MidiNote> {
-	int64 ticksPerSeconds=0;
+	uint ticksPerSeconds=0;
 };
 inline String str(const MidiNotes& o) { return str(o.ticksPerSeconds, str(ref<MidiNote>(o))); }
 

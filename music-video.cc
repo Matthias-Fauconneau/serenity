@@ -81,7 +81,7 @@ MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter) {
 			/*assert_(!notes.ticksPerSeconds || notes.ticksPerSeconds == sign.metronome.perMinute*ticksPerQuarter,
 					notes.ticksPerSeconds, sign.metronome.perMinute*ticksPerQuarter);
 			notes.ticksPerSeconds = sign.metronome.perMinute*ticksPerQuarter;*/
-			notes.ticksPerSeconds = max(notes.ticksPerSeconds, int64(sign.metronome.perMinute*ticksPerQuarter));
+			notes.ticksPerSeconds = max(notes.ticksPerSeconds, sign.metronome.perMinute*ticksPerQuarter);
 		}
 		else if(sign.type == Sign::Note) {
 			if(sign.note.tie == Note::NoTie || sign.note.tie == Note::TieStart)
@@ -257,7 +257,9 @@ struct BeatSynchronizer : Widget {
 			size_t midiIndex = 0;
 			while(i<m && j<n) {
 				int localOffset = (P[j][0].time - notes[midiIndex].time) - globalOffset; // >0: late, <0: early
-				if(j+1<n && ((D(i,j) == D(i,j+1) && localOffset < notes.ticksPerSeconds/8) || (i && localOffset < -notes.ticksPerSeconds/4))) {
+				static constexpr bool limitDelay=false, limitAdvance=true;
+				if(j+1<n && ((D(i,j) == D(i,j+1) && (!limitDelay || localOffset < notes.ticksPerSeconds/8))
+							 || (limitAdvance && i && localOffset < -int(notes.ticksPerSeconds)/4))) {
 					j++;
 				} else {
 					globalOffset = P[j][0].time - notes[midiIndex].time;
@@ -433,7 +435,7 @@ struct Music : Widget {
 
 	/// Adds new notes to be played (called in audio thread by sampler)
 	uint samplerMidiIndex = 0;
-	void timeChanged(uint64 time) {
+	void timeChanged(int64 time) {
 		while(samplerMidiIndex < notes.size && notes[samplerMidiIndex].time*sampler.rate <= time*notes.ticksPerSeconds) {
 			auto note = notes[samplerMidiIndex];
 			sampler.noteEvent(note.key, note.velocity);
@@ -489,7 +491,7 @@ struct Music : Widget {
 		if(previousOffset != scroll.offset.x) contentChanged = true;
 		beatSynchronizer.currentTime = timeNum*notes.ticksPerSeconds/timeDen;
 		if(video && (!videoView.image || (video.videoTime*timeDen <= timeNum*video.videoFrameRate
-				&& video.videoTime*notes.ticksPerSeconds < (onsets.last() + notes.ticksPerSeconds)*video.videoFrameRate))) {
+				/*&& video.videoTime*notes.ticksPerSeconds < (onsets.last() + notes.ticksPerSeconds)*video.videoFrameRate*/))) {
 			if(video.read(videoView.image)) {
 				if(rotate) ::rotate(videoView.image);
 				contentChanged=true;
@@ -498,13 +500,17 @@ struct Music : Widget {
 		return contentChanged;
 	}
 
-	void seek(uint64 time) {
+	void seek(int64 time) {
 		if(audioFile) {
 			assert_(notes.ticksPerSeconds == audioFile.audioFrameRate);
 			audioFile.seek(time); //FIXME: return actual frame time
 		}
 		if(video) {
-			video.seek(time * video.videoFrameRate / notes.ticksPerSeconds);
+			//video.seek(time * video.videoFrameRate / notes.ticksPerSeconds); //FIXME
+			while(video.videoTime*notes.ticksPerSeconds <= time*video.videoFrameRate) {
+				video.read(videoView.image);
+				if(rotate) ::rotate(videoView.image);
+			}
 		}
 		sampler.audioTime = time*sampler.rate/notes.ticksPerSeconds;
 		while(samplerMidiIndex < notes.size && notes[samplerMidiIndex].time*sampler.rate < time*notes.ticksPerSeconds) samplerMidiIndex++;
@@ -514,24 +520,25 @@ struct Music : Widget {
 		//TODO: measureBars.t *= 60 when using MusicXML (no MIDI)
 		window.background = Window::White;
 		scroll.horizontal=true, scroll.vertical=false, scroll.scrollbar = true;
+		int64 startTime = max(0ll, notes[0].time - notes.ticksPerSeconds);
 		if(failed && !video) { // Seeks to first synchronization failure
 			size_t measureIndex = 0;
 			for(;measureIndex < sheet.measureToChord.size; measureIndex++)
 				if(sheet.measureToChord[measureIndex]>=sheet.firstSynchronizationFailureChordIndex) break;
 			scroll.offset.x = -sheet.measureBars.values[max<int>(0, measureIndex-3)];
+		} else {
+			if(startTime > 0) seek(startTime);
 		}
 		if(sampler) decodeThread.spawn(); // For sampler
 		if(arguments().contains("encode")) { // Encode
 			Encoder encoder {name+".mp4"_};
-			encoder.setVideo(int2(1280,720), 60);
+			encoder.setVideo(Encoder::sRGB, int2(1280,720), 60);
 			if(audioFile && audioFile.codec==AudioFile::AAC) encoder.setAudio(audioFile);
 			else if(audioFile) encoder.setAAC(audioFile.channels, audioFile.audioFrameRate);
-			else encoder.setFLAC(2, sampler.rate);
+			else encoder.setFLAC(32, 2, sampler.rate);
 			encoder.open();
 			Time renderTime, encodeTime, totalTime;
 			totalTime.start();
-			int64 startTime = max(0ll, notes[0].time - notes.ticksPerSeconds);
-			if(startTime > 0) seek(startTime);
 			bool done = 0;
 			for(int lastReport=0; !done;) {
 				assert_(encoder.audioStream->time_base.num == 1);

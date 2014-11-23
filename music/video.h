@@ -30,5 +30,5 @@ struct Decoder {
 	/// Reads a video frame
 	bool read(const Image& image);
 
-	void seek(uint videoTime);
+	void seek(uint64 videoTime);
 };

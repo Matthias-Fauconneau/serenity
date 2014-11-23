@@ -28,7 +28,7 @@ Encoder::Encoder(String&& name) : path(move(name)) {
 	avformat_alloc_output_context2(&context, NULL, NULL, strz(path));
 }
 
-void Encoder::setVideo(Format format, int2 size, uint videoFrameRate) {
+void Encoder::setVideo(Format format, int2 size, uint videoFrameRate, bool ultrafast) {
 	assert_(!videoStream);
 	this->size=size;
 	this->videoFrameRate=videoFrameRate;
@@ -48,7 +48,7 @@ void Encoder::setVideo(Format format, int2 size, uint videoFrameRate) {
 	if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
     AVDictionary* options = 0;
     //av_dict_set(&options, "qp","0",0); // Lossless
-    av_dict_set(&options, "preset", "ultrafast", 0);
+	if(ultrafast) av_dict_set(&options, "preset", "ultrafast", 0);
     avcodec_open2(videoCodec, codec, &options);
 	check( avcodec_open2(videoCodec, codec, 0) );
 	frame = av_frame_alloc();

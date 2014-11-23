@@ -105,7 +105,7 @@ struct Record : ImageView, Poll {
     void start() {
         abort();
         encoder = unique<Encoder>(arguments()[0]+".mkv"_);
-        encoder->setVideo(Encoder::YUYV, video.size, video.frameRate);
+		encoder->setVideo(Encoder::YUYV, video.size, video.frameRate, true);
         encoder->setFLAC(audio.sampleBits, audio.channels, audio.rate);
         encoder->open();
         assert_(audio.periodSize <= encoder->audioFrameSize);

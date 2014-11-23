@@ -76,7 +76,7 @@ bool Decoder::read(const Image& image) {
 	}
 }
 
-void Decoder::seek(uint videoTime) {
+void Decoder::seek(uint64 videoTime) {
 	assert_(videoStream->time_base.num == 1);
 	av_seek_frame(file, videoStream->index, videoTime*videoStream->time_base.den/videoFrameRate, 0);
 	this->videoTime = videoTime; // FIXME: actual
