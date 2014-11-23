@@ -187,10 +187,16 @@ void Encoder::writeAudioFrame(ref<int32> audio) {
 	audioTime += audio.size/channels;
 }
 
+void Encoder::abort() {
+    lock.lock();
+    videoStream=0; audioStream=0;
+    avformat_free_context(context); // Releases encoder without flushing
+    context=0;
+}
+
 Encoder::~Encoder() {
     lock.lock();
-	assert_(context);
-    av_frame_free(&frame);
+    if(frame) av_frame_free(&frame);
     for(;;) {
         if(!videoStream && !audioStream) break;
         AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
@@ -208,8 +214,10 @@ Encoder::~Encoder() {
         }
         av_interleaved_write_frame(context, &pkt);
     }
-    av_interleaved_write_frame(context, 0);
-    av_write_trailer(context);
-    avformat_free_context(context);
-    context=0;
+    if(context) {
+        av_interleaved_write_frame(context, 0);
+        av_write_trailer(context);
+        avformat_free_context(context);
+        context=0;
+    }
 }

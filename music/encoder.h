@@ -35,6 +35,7 @@ struct Encoder {
 	void setAAC(uint channels, uint rate);
 	void setFLAC(uint sampleBits, uint channels, uint rate);
     void open();
+    void abort();
     /// Flushes all encoders and close the file
     ~Encoder();
     operator bool() { return context; }

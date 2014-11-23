@@ -102,19 +102,28 @@ struct Record : ImageView, Poll {
     }
 
     void start() {
-        stop();
+        abort();
         encoder = unique<Encoder>(arguments()[0]+".mkv"_);
         encoder->setVideo(Encoder::YUYV, video.size, video.frameRate);
         encoder->setFLAC(audio.sampleBits, audio.channels, audio.rate);
         encoder->open();
         assert_(audio.periodSize <= encoder->audioFrameSize);
+        firstTimeStamp = 0;
     }
 
-    void stop() {
+    /// Stops capture and aborts encoding
+    void abort() {
         Locker locker(lock);
         audioFrames.clear();
         videoFrames.clear();
-        firstTimeStamp = 0;
+        encoder->abort();
+    }
+
+    /// Stops capture, flushes buffers and writes up file
+    void stop() {
+        Locker locker(lock); // Stops capture while encoding buffer
+        while(encode()) {}
+        assert_(!audioFrames && !videoFrames);
         encoder = nullptr;
     }
 
@@ -137,52 +146,55 @@ struct Record : ImageView, Poll {
     // Encoder thread (TODO: multithread ?)
     void event() {
         if(!encoder) return;
-        for(;;) {
-            lock.lock();
-            if(videoFrames) { // 18MB/s
-                YUYVImage image = videoFrames.take(0);
-                lock.unlock();
-
-                if(!firstTimeStamp) firstTimeStamp = image.time;
-                image.time -= firstTimeStamp;
-                encoder->writeVideoFrame(image);
-                lastImage = move(image);
-                contentChanged = true;
-
-                continue;
-            }
-            if(audioFrames) { // 1MB/s
-                buffer<int32> frame = audioFrames.take(0);
-                lock.unlock();
-
-                encoder->writeAudioFrame(frame);
-                { // Evaluates mean sound levels
-                    assert_(encoder->channels == 2);
-                    const float a = float(frame.size) / float(audio.rate);
-                    maximumAmplitude = (1-a) * maximumAmplitude; // Smoothly recoil maximum back
-                    long2 sum;
-                    for(int2 s: cast<int2>(frame)) {
-                        sum += abs(long2(s));
-                        if(encoder->audioTime > encoder->audioFrameRate) { // Amplitude is still setting in first frames
-                            if(abs(s[0]) > maximumAmplitude) maximumAmplitude = abs(s[0]);
-                            if(abs(s[1]) > maximumAmplitude) maximumAmplitude = abs(s[1]);
-                        }
-                    }
-                    float2 mean = float2(sum / long2(frame.size));
-                    smoothedMean = a * mean + (1-a) * smoothedMean;
-                }
-
-                continue;
-            }
-            lock.unlock();
-            break;
-        }
+        while(encode()) {}
         if(contentChanged) window.render(); // only when otherwise idle
         if(maximumAmplitude > reportedMaximumAmplitude) {
             float bit = log2(real(maximumAmplitude));
             log("Warning: Measured maximum amplitude at",bit,"bit, leaving only ",31-bit, "headroom");
             reportedMaximumAmplitude = maximumAmplitude;
         }
+    }
+
+    bool encode(bool lock=true) {
+        if(!encoder) return false;
+        if(lock) this->lock.lock();
+        if(videoFrames /*&& encoder->videoTime*encoder->audioFrameRate <= (encoder->audioTime+encoder->audioFrameSize)*encoder->videoFrameRate*/) { // 18MB/s
+            YUYVImage image = videoFrames.take(0);
+            if(lock) this->lock.unlock();
+
+            if(!firstTimeStamp) firstTimeStamp = image.time;
+            image.time -= firstTimeStamp;
+            encoder->writeVideoFrame(image);
+            lastImage = move(image);
+            contentChanged = true;
+
+            return true;
+        }
+        if(audioFrames /*&& encoder->audioTime*encoder->videoFrameRate <= (encoder->videoTime+1)*encoder->audioFrameRate*/) { // 1MB/s
+            buffer<int32> frame = audioFrames.take(0);
+            if(lock) this->lock.unlock();
+
+            encoder->writeAudioFrame(frame);
+            { // Evaluates mean sound levels
+                assert_(encoder->channels == 2);
+                const float a = float(frame.size) / float(audio.rate);
+                maximumAmplitude = (1-a) * maximumAmplitude; // Smoothly recoil maximum back
+                long2 sum;
+                for(int2 s: cast<int2>(frame)) {
+                    sum += abs(long2(s));
+                    if(encoder->audioTime > encoder->audioFrameRate) { // Amplitude is still setting in first frames
+                        if(abs(s[0]) > maximumAmplitude) maximumAmplitude = abs(s[0]);
+                        if(abs(s[1]) > maximumAmplitude) maximumAmplitude = abs(s[1]);
+                    }
+                }
+                float2 mean = float2(sum / long2(frame.size));
+                smoothedMean = a * mean + (1-a) * smoothedMean;
+            }
+
+            return true;
+        }
+        if(lock) this->lock.unlock();
+        return false;
     }
 
     shared<Graphics> graphics(int2 size) override {
