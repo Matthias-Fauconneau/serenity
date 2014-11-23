@@ -104,7 +104,6 @@ void AudioOutput::start(uint rate, uint periodSize, uint sampleBits, uint channe
             }
             hparams.interval(Rate) = hparams.interval(Rate).max; // Selects maximum rate
             hparams.interval(PeriodSize) = hparams.interval(PeriodSize).max; // Selects maximum latency
-			log((uint)hparams.interval(SampleBits), (uint)hparams.interval(Rate), (uint)hparams.interval(PeriodSize));
         }
         if(status && status->state > Prepared) io<DRAIN>();
         maps[0].unmap(); maps[1].unmap(); maps[2].unmap(); // Releases any memory mappings

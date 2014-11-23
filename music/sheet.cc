@@ -130,7 +130,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 		//const int singleNoteOctavaThreshold = 5;
 		for(uint staff: range(staffCount)) { // Layout notes, stems, beams and slurs
 			array<Chord>& beam = beams[staff];
-			//log(sign.time, ticksPerQuarter, timeSignature.beats*timeSignature.beatUnit)
+
 			if(beam &&
 					((sign.type == Sign::Measure) || // Full beat
 					 (sign.time%(ticksPerQuarter*timeSignature.beatUnit/4) == 0 && sign.time>beam[0][0].time) || // Half beat
@@ -262,7 +262,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 			// Notes
 			Chord& chord = chords[staff];
 			if(chord && sign.time != chord.last().time) {
-				float bodyAboveY = -inf, bodyOffset = 0;
+				float bodyAboveY = -inf, bodyOffset = 0, maxOffset=0;
 				float accidentalAboveY = -inf, accidentalOffset = 0;
 				for(size_t index: reverse_range(chord.size)) { // Top to bottom (notes are sorted bass to treble)
 					Sign sign = chord[index];
@@ -287,11 +287,11 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 					float belowY = index ? Y(chord[index-1]) : inf;
 					if(abs(p.y-bodyAboveY)<=halfLineInterval || abs(p.y-belowY)<=halfLineInterval) bodyOffset = bodyOffset ? 0 : noteSize.x; // Alternate
 					else bodyOffset = 0;
+					maxOffset = max(maxOffset, bodyOffset);
 					note.glyphIndex = measure.glyphs.size;
 					glyph(p+vec2(bodyOffset, 0), noteGlyphName, note.grace?graceFont:font, measure.glyphs);
 					bodyAboveY = p.y;
 					// Dot
-					if(note.dot) glyph(p+vec2(bodyOffset, 0)+vec2(noteSize.x*4/3,0),"dots.dot"_, font, measure.glyphs);
 					if(note.accidental) { // Accidental
 						if(abs(p.y-accidentalAboveY)<=3*halfLineInterval) accidentalOffset -= noteSize.x/2;
 						else accidentalOffset = 0;
@@ -301,6 +301,10 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 						accidentalAboveY = p.y;
 					}
 					if(note.tie == Note::NoTie || note.tie == Note::TieStart) notes.sorted(sign.time).append( sign );
+				}
+				for(Sign sign: chord) {
+					sign.note.step = sign.note.step/2*2 +1; // Aligns dots between lines
+					if(sign.note.dot) glyph(P(sign)+vec2(maxOffset+noteSize.x*4/3,0),"dots.dot"_, font, measure.glyphs);
 				}
 				chord.clear();
 			}
@@ -394,7 +398,16 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 			assert_(staff == uint(-1));
 			assert_(sign.duration == 0);
 			if(sign.type == Sign::Measure || sign.type==Sign::KeySignature || sign.type==Sign::TimeSignature) { // Clearing signs (across staves)
+				if(!timeTrack.contains(sign.time)) { // FIXME: -> X
+					log("!timeTrack.contains(sign.time)", sign.time);
+					size_t index = timeTrack.keys.linearSearch(sign.time);
+					index = min(index, timeTrack.keys.size-1);
+					assert_(index < timeTrack.keys.size);
+					float x = timeTrack.values[index].maximum();
+					timeTrack.insert(sign.time, {{x,x},x,x,x,x});
+				}
 				float x = timeTrack.at(sign.time).maximum();
+				//float x = X(sign); X(sign) -> float& but maximum() -> float
 				if(sign.type==Sign::TimeSignature) {
 					timeSignature = sign.timeSignature;
 					String beats = str(timeSignature.beats);
@@ -436,6 +449,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 						measures.insertMulti(Rect(int2(measureBars.values.last()-barWidth+barWidth/2, 0), int2(x+barWidth/2, 0)),
 											 shared<Graphics>(move(measure)) );
 						assert_(x - measureBars.values.last() < 1024, measureIndex, x - measureBars.values.last());
+						assert_(sign.time - measureBars.keys.last() <= timeSignature.beats*ticksPerQuarter, sign.time - measureBars.keys.last(), ticksPerQuarter, timeSignature.beats);
 						measureBars.insert(sign.time, x);
 						x += noteSize.x;
 						text(vec2(x, staffY(0, 12)), str(pageIndex)+','+str(pageLineIndex)+','+str(lineMeasureIndex)+' '+str(measureIndex), textSize, debug->glyphs);

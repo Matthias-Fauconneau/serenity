@@ -40,7 +40,7 @@ struct Sheet : Widget {
 	vec2 noteSize = glyphSize("noteheads.s2"_);
 
 	// Graphics
-	map<int, float> measureBars; // Maps sheet time to position of measure starts
+	map<int64, float> measureBars; // Maps sheet time to position of measure starts
 	map<Rect, shared<Graphics>> measures;
 	shared<Graphics> debug;
 

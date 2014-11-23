@@ -119,12 +119,12 @@ inline float keyToPitch(float key) { return 440*exp2((key-69)/12); }
 inline float pitchToKey(float pitch) { return 69+log2(pitch/440)*12; }
 
 struct BeatSynchronizer : Widget {
-	map<int, float>& measureBars;
+	map<int64, float>& measureBars;
 	struct Bar { float x; bgr3f color; };
 	array<Bar> bars;
 	int currentTime = 0;
 	//BeatSynchronizer(map<int, float>& measureBars) : measureBars(measureBars) {}
-	BeatSynchronizer(Audio audio, MidiNotes& notes, ref<Sign> signs, map<int, float>& measureBars) : measureBars(measureBars) {
+	BeatSynchronizer(Audio audio, MidiNotes& notes, ref<Sign> signs, map<int64, float>& measureBars) : measureBars(measureBars) {
 		array<Bin> P; // peaks
 		if(audio) {
 			assert_(notes.ticksPerSeconds = audio.rate);
@@ -218,8 +218,6 @@ struct BeatSynchronizer : Widget {
 				array<Peak> chord;
 				int64 time = onsets[index].time;
 				while(index < onsets.size && onsets[index].time < time+int(h)) {
-					//if(scoreTimeOrigin == -1) scoreTimeOrigin = onsets[index].time;
-					//if(chord) assert_(onsets[index].time/*-scoreTimeOrigin*/-chord[0].time < 24000, onsets[index].time, chord[0].time);
 					if(chord) assert_(int(time)/*-scoreTimeOrigin*/-chord[0].time < 24000, onsets[index].time, chord[0].time);
 					chord.append(Peak{int(onsets[index].time)/*-scoreTimeOrigin*/, onsets[index].key, (float)onsets[index].velocity});
 					index++;
@@ -283,11 +281,16 @@ struct BeatSynchronizer : Widget {
 			size_t index = 0;
 			for(size_t measureIndex: range(measureBars.size())) {
 				while(index < signs.size) {
-					if(signs[index].note.measureIndex==measureIndex) break;
+					if(signs[index].note.measureIndex>=measureIndex) break;
 					index++;
 				}
-				//assert_(index < onsets.size);
-				measureBars.keys[measureIndex] = index < onsets.size ? onsets[index].time : onsets.last().time;
+				if(index == onsets.size) measureBars.keys[measureIndex] =  onsets.last().time; // Last measure (FIXME: last release time)
+				else {
+					if(signs[index].note.measureIndex!=measureIndex) { // Empty measure
+						assert_(index>0);
+						measureBars.keys[measureIndex] = onsets[index-1].time; // FIXME: should be onsets[index].time - measureTime[index]
+					} else measureBars.keys[measureIndex] = onsets[index].time;
+				}
 			}
 		}
 
@@ -418,13 +421,7 @@ struct Music : Widget {
 
 	size_t read32(mref<int2> output) {
 		if(audioFile) {
-			/**/  if(audioFile.channels == audio.channels) return audioFile.read32(mcast<int>(output));
-			/*else if(audioFile.channels == 1) {
-			int mono[output.size];
-			size_t readSize = audioFile.read32(mref<int>(mono, output.size));
-			for(size_t i: range(readSize)) output[i] = mono[i];
-			return readSize;
-		}*/
+			if(audioFile.channels == audio.channels) return audioFile.read32(mcast<int>(output));
 			else error(audioFile.channels);
 		} else {
 			assert_(sampler.channels == audio.channels);
@@ -473,12 +470,12 @@ struct Music : Widget {
 			}
 		}
 
-		uint64 t = timeNum*notes.ticksPerSeconds;
+		int64 t = timeNum*notes.ticksPerSeconds;
 		int previousOffset = scroll.offset.x;
 		// Cardinal cubic B-Spline
 		for(int index: range(sheet.measureBars.size()-1)) {
-			uint64 t1 = sheet.measureBars.keys[index]*timeDen;
-			uint64 t2 = sheet.measureBars.keys[index+1]*timeDen;
+			int64 t1 = int64(sheet.measureBars.keys[index])*timeDen;
+			int64 t2 = int64(sheet.measureBars.keys[index+1])*timeDen;
 			if(t1 <= t && t < t2) {
 				real f = real(t-t1)/real(t2-t1);
 				real w[4] = { 1./6 * cb(1-f), 2./3 - 1./2 * sq(f)*(2-f), 2./3 - 1./2 * sq(1-f)*(2-(1-f)), 1./6 * cb(f) };
@@ -600,9 +597,6 @@ struct Music : Widget {
 			}
 			requestTermination(0); // Window prevents automatic termination
 		} else { // Preview
-			/*if(running) { // Starts one second before first onset
-				if(notes[0].time > notes.ticksPerSeconds) seek(notes[0].time-notes.ticksPerSeconds);
-			}*/
 			window.show();
 			if(playbackDeviceAvailable()) {
 				audio.start(audioFile.audioFrameRate ? : sampler.rate, audioFile ? 1024 : sampler.periodSize, 32, 2);

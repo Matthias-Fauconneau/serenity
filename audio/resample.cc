@@ -96,7 +96,6 @@ Resampler::Resampler(uint channels, uint sourceRate, uint targetRate, size_t rea
 
 	// Allocates and clears aligned planar signal buffers
 	size_t writeForReadSize = readSize*integerAdvance+int(readSize*fractionalAdvance+targetRate-1)/targetRate;
-	log(writeSize, writeForReadSize);
 	writeSize = max(writeSize, writeForReadSize);
 	bufferSize = align(16, N+writeSize);
 	for(size_t channel: range(channels)) { signal[channel] = buffer<float>(bufferSize); signal[channel].clear(0); }
