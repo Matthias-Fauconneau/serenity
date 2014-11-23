@@ -160,3 +160,6 @@ struct byte4 : vec<bgra,uint8,4> {
 typedef vec<bgra,int,4> int4;
 /// Unsigned integer b,g,r,a vector (32bit)
 typedef vec<bgra,uint,4> uint4;
+
+/// Integer x,y vector (64bit)
+typedef vec<xy,int64,2> long2;

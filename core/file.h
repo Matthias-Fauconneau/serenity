@@ -196,9 +196,9 @@ void copy(const Folder& oldAt, const string oldName, const Folder& newAt, const 
 /// Returns available free space in bytes for the file system containing \a file
 int64 available(const Handle& file);
 /// Returns available free space in bytes for the file system containing \a path
-int64 available(const string path, const Folder& at=root());
+int64 available(const string path, const Folder& at=currentWorkingDirectory());
 
 /// Returns capacity in bytes for the file system containing \a file
 int64 capacity(const Handle& file);
 /// Returns capacity in bytes for the file system containing \a path
-int64 capacity(const string path, const Folder& at=root());
+int64 capacity(const string path, const Folder& at=currentWorkingDirectory());

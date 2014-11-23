@@ -3,6 +3,7 @@
 #include "window.h"
 #include "encoder.h"
 #include "interface.h"
+#include "text.h"
 
 typedef IOR<'V', 0, v4l2_capability> QueryCapabilities;
 typedef IOWR<'V', 4, v4l2_format> GetFormat;
@@ -19,7 +20,6 @@ struct VideoInput : Device, Poll {
     uint frameRate = 0;
 	size_t videoTime = 0;
     uint64 firstTimeStamp = 0;
-    uint64 timeStampDen = 1000000;
     function<void(YUYVImage&&)> write;
     VideoInput(function<void(YUYVImage&&)> write, Thread& thread=mainThread) : Device("/dev/video0"), Poll(Device::fd,POLLIN,thread), write(write) {
         v4l2_format fmt = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE}; iowr<GetFormat>(fmt);
@@ -30,7 +30,7 @@ struct VideoInput : Device, Poll {
         assert_(frmi.type==V4L2_FRMIVAL_TYPE_DISCRETE && frmi.discrete.numerator == 1);
         frameRate = frmi.discrete.denominator;
         assert_(frameRate == 30);
-        const int bufferedFrameCount = 1;
+        const int bufferedFrameCount = 4;
         v4l2_requestbuffers req = {.count = bufferedFrameCount, .type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP};
 		iowr<RequestBuffers>(req);
         assert_(req.count == bufferedFrameCount);
@@ -50,7 +50,7 @@ struct VideoInput : Device, Poll {
 		iowr<DequeueBuffer>(buf);
         //assert_(buf.sequence == videoTime, videoTime, buf.sequence);
         if(buf.sequence != videoTime) {
-            log(videoTime, buf.sequence);
+            log("Dropped", buf.sequence-videoTime, "frame"+((buf.sequence-videoTime)>1?"s"_:""_));
             videoTime = buf.sequence;
         }
         assert_(buf.bytesused == uint(size.y*size.x*2));
@@ -66,29 +66,31 @@ struct Record : ImageView, Poll {
     Lock lock;
     Encoder encoder {arguments()[0]+".mkv"_};
 
-    Thread audioThread;// {-20};
-    AudioInput audio {{this, &Record::bufferAudio}, 2, 48000/*96000/192000*/, 4096 /*ChromeOS kernel restricts maximum buffer size*/, audioThread};
+    Thread audioThread {-20};
+    AudioInput audio {{this, &Record::bufferAudio}, 2, 48000, 4096 /*ChromeOS kernel restricts maximum buffer size*/, audioThread};
     array<buffer<int32>> audioFrames;
     int32 maximumAmplitude = 0;
-    int32 reportedMaximumAmplitude = 0;
-    float smoothedMean = 0;
-    int audioFrameCount = 0;
+    int32 reportedMaximumAmplitude = 1<<30;
+    float2 smoothedMean = 0;
 
-    Thread videoThread;// {-19};
+    Thread videoThread {-19};
     VideoInput video {{this, &Record::bufferVideo}, videoThread};
-    Window window {this, video.size, [](){return "Record"__;}};
+    const int margin = 16;
+    Window window {this, video.size+int2(2*margin,margin), [](){return "Record"__;}};
     array<YUYVImage> videoFrames;
     YUYVImage lastImage;
+    Text sizeText, availableText;
     bool contentChanged = false;
 
     Record() {
         encoder.setVideo(Encoder::YUYV, video.size, video.frameRate);
-		encoder.setFLAC(audio.sampleBits, 1, audio.rate);
+        encoder.setFLAC(audio.sampleBits, audio.channels, audio.rate);
 		encoder.open();
         assert_(audio.periodSize <= encoder.audioFrameSize, audio.periodSize, encoder.audioFrameSize, encoder.channels, encoder.audioFrameRate);
         assert_(audio.sampleBits==32);
 		image = Image(video.size);
-		window.show();
+        window.background = Window::NoBackground;
+        window.show();
         audioThread.spawn();
         videoThread.spawn();
         audio.start();
@@ -100,31 +102,25 @@ struct Record : ImageView, Poll {
     }
 
     uint bufferAudio(ref<int32> input) {
-        audioFrameCount++;
-        //if(audioFrameCount<=audio.rate/input.size) { return input.size/audio.channels; } // first frames are garbage
-        assert_(audio.channels==2 && encoder.channels==1);
-        buffer<int32> mono (input.size/audio.channels);
-        int64 sum = 0;
-        for(size_t i: range(mono.size)) {
-            assert(abs(input[i*2+0])<1<<31 && abs(input[i*2+1])<1<<31);
-            int s = (input[i*2+0] + input[i*2+1]) / 2; // Assumes 1bit headroom
-            if(abs(s) > maximumAmplitude) maximumAmplitude = abs(s);
-            sum += abs(s);
-            mono[i] = s;
+        buffer<int32> frame;
+        if(encoder.channels == audio.channels) frame = copyRef(input); //FIXME: | direct encode ?
+        else {
+            assert_(audio.channels==2 && encoder.channels==1);
+            frame = buffer<int32>(input.size/audio.channels);
+            for(size_t i: range(frame.size)) {
+                int s = input[i*2+0]/2 + input[i*2+1]/2; // Assumes 1bit footroom
+                frame[i] = s;
+            }
         }
-        int mean = sum / mono.size;
-        const float a = float(mono.size) / float(audio.rate);
-        smoothedMean = a * mean + (1-a) * smoothedMean;
-        assert_(mono.size <= encoder.audioFrameSize);
-        Locker locker(lock);
-        audioFrames.append(move(mono));
+        {Locker locker(lock);
+            audioFrames.append(move(frame));}
         queue();
         return input.size/audio.channels;
     }
 
     void bufferVideo(YUYVImage&& image) {
-        Locker locker(lock);
-        videoFrames.append(YUYVImage(copyRef(image), image.size, image.time)); //FIXME: merge with deinterleaving to avoid a copy
+        {Locker locker(lock);
+            videoFrames.append(YUYVImage(copyRef(image), image.size, image.time));} //FIXME: merge with deinterleaving to avoid a copy
         queue();
     }
 
@@ -147,6 +143,19 @@ struct Record : ImageView, Poll {
                 lock.unlock();
 
                 encoder.writeAudioFrame(frame);
+                { // Evaluates mean sound levels
+                    assert_(encoder.channels == 2);
+                    const float a = float(frame.size) / float(audio.rate);
+                    maximumAmplitude = (1-a) * maximumAmplitude; // Smoothly recoil maximum back
+                    long2 sum;
+                    for(int2 s: cast<int2>(frame)) {
+                        sum += abs(long2(s));
+                        if(abs(s[0]) > maximumAmplitude) maximumAmplitude = abs(s[0]);
+                        if(abs(s[1]) > maximumAmplitude) maximumAmplitude = abs(s[1]);
+                    }
+                    float2 mean = float2(sum / long2(frame.size));
+                    smoothedMean = a * mean + (1-a) * smoothedMean;
+                }
 
                 continue;
             }
@@ -155,7 +164,8 @@ struct Record : ImageView, Poll {
         }
         if(contentChanged) window.render(); // only when otherwise idle
         if(maximumAmplitude > reportedMaximumAmplitude) {
-            log("Max", maximumAmplitude, log2(real(maximumAmplitude)));
+            float bit = log2(real(maximumAmplitude));
+            log("Warning: Measured maximum amplitude at",bit,"bit, leaving only ",32-bit, "headroom");
             reportedMaximumAmplitude = maximumAmplitude;
         }
     }
@@ -182,12 +192,31 @@ struct Record : ImageView, Poll {
                     image[2*i+j] = byte4(clip(0, B, 0xFF), clip(0, G, 0xFF), clip(0, R, 0xFF),0xFF);
                 }
             }
-            {// VU meter
-                int w = image.size.x * smoothedMean / (1<<28);
-                for(size_t x: range(clip(0, w, image.size.x))) for(size_t y: range(image.size.y/8)) image(x, y) = byte4(0xFF, 0,0, 0xFF);
-            }
             contentChanged = false;
         }
-        return ImageView::graphics(size);
+        shared<Graphics> graphics;
+        int2 offset = int2((size.x-image.size.x)/2, size.y-image.size.y);
+        { // Capacity meter
+            int64 fileSize = File(encoder.path, currentWorkingDirectory()).size();
+            int64 available = ::available(encoder.path, currentWorkingDirectory());
+            float x = int64(size.x-2*offset.x) * fileSize / (fileSize+available);
+            graphics->fills.append(vec2(offset.x, 0), vec2(offset.x + x, offset.y), green);
+            graphics->fills.append(vec2(offset.x + x, 0), vec2(size.x-offset.x - (offset.x + x), offset.y), black);
+            int fileLengthSeconds = (encoder.videoTime+encoder.videoFrameRate-1)/encoder.videoFrameRate;
+            int64 fileSizeMB = (fileSize+1023) / 1024 / 1024;
+            sizeText = Text(str(fileLengthSeconds)+"s "+str(fileSizeMB)+"MB", offset.y, white); // FIXME: skip if no change
+            graphics->graphics.insertMulti(vec2(offset.x, 0), sizeText.graphics(int2(x, offset.y)));
+            int availableLengthMinutes = int64(fileLengthS) * available / fileSize;
+            int64 availableMB = available / 1024 / 1024;
+            availableText = Text(str(availableLengthMinutes)+"min "+str(availableMB)+"MB", offset.y, white); // FIXME: skip if no change
+            graphics->graphics.insertMulti(vec2(offset.x + x, 0), availableText.graphics(int2(size.x-offset.x-(offset.x+x), offset.y)));
+        }
+        for(int channel : range(audio.channels)) {// VU meters
+            float y = size.y * (1 - smoothedMean[channel] / 0x1p28f); //clip(1.f, float(maximumAmplitude), 0x1p28f));
+            graphics->fills.append(vec2(channel?offset.x+image.size.x:0, 0), vec2(offset.x, y), black);
+            graphics->fills.append(vec2(channel?offset.x+image.size.x:0, y), vec2(offset.x, size.y-y), maximumAmplitude < ((1<<31)-1) ? green : red);
+        }
+        graphics->graphics.insert(vec2(offset), ImageView::graphics(image.size));
+        return graphics;
     }
 } app;
