@@ -150,8 +150,10 @@ struct Record : ImageView, Poll {
                     long2 sum;
                     for(int2 s: cast<int2>(frame)) {
                         sum += abs(long2(s));
-                        if(abs(s[0]) > maximumAmplitude) maximumAmplitude = abs(s[0]);
-                        if(abs(s[1]) > maximumAmplitude) maximumAmplitude = abs(s[1]);
+                        if(encoder.audioTime > encoder.audioFrameRate) { // Amplitude is still setting in first frames
+                            if(abs(s[0]) > maximumAmplitude) maximumAmplitude = abs(s[0]);
+                            if(abs(s[1]) > maximumAmplitude) maximumAmplitude = abs(s[1]);
+                        }
                     }
                     float2 mean = float2(sum / long2(frame.size));
                     smoothedMean = a * mean + (1-a) * smoothedMean;
@@ -165,7 +167,7 @@ struct Record : ImageView, Poll {
         if(contentChanged) window.render(); // only when otherwise idle
         if(maximumAmplitude > reportedMaximumAmplitude) {
             float bit = log2(real(maximumAmplitude));
-            log("Warning: Measured maximum amplitude at",bit,"bit, leaving only ",32-bit, "headroom");
+            log("Warning: Measured maximum amplitude at",bit,"bit, leaving only ",31-bit, "headroom");
             reportedMaximumAmplitude = maximumAmplitude;
         }
     }
@@ -206,7 +208,7 @@ struct Record : ImageView, Poll {
             int64 fileSizeMB = (fileSize+1023) / 1024 / 1024;
             sizeText = Text(str(fileLengthSeconds)+"s "+str(fileSizeMB)+"MB", offset.y, white); // FIXME: skip if no change
             graphics->graphics.insertMulti(vec2(offset.x, 0), sizeText.graphics(int2(x, offset.y)));
-            int availableLengthMinutes = int64(fileLengthS) * available / fileSize;
+            int availableLengthMinutes = int64(fileLengthSeconds) * available / fileSize / 60;
             int64 availableMB = available / 1024 / 1024;
             availableText = Text(str(availableLengthMinutes)+"min "+str(availableMB)+"MB", offset.y, white); // FIXME: skip if no change
             graphics->graphics.insertMulti(vec2(offset.x + x, 0), availableText.graphics(int2(size.x-offset.x-(offset.x+x), offset.y)));
