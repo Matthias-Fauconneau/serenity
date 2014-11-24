@@ -28,7 +28,6 @@ struct Note {
     bool accent:1;
 	bool trill:1;
     bool stem:1; // 0: down, 1: up
-	bool octava:1;
     uint key; // MIDI key
 	size_t measureIndex = invalid, glyphIndex = invalid;
 };

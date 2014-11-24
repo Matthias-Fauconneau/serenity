@@ -27,52 +27,6 @@ extern "C" {
 #include <libavutil/avutil.h> //avutil
 }
 
-/// Converts notes to signs
-struct MidiSheet : MidiFile {
-	array<Sign> signs;
-	uint divisions = 0; // Time unit per quarter note
-	MidiSheet() {}
-	MidiSheet(ref<byte> file) : MidiFile(file) {}
-	void read(Track& track) override;
-};
-
-void MidiSheet::read(Track& track) {
-	BinaryData& s = track.data;
-	assert_(s);
-	for(;;) {
-		uint8 key=s.read();
-		if(key & 0x80) { track.type_channel=key; key=s.read(); }
-		uint8 type=track.type_channel>>4;
-		uint8 vel=0;
-		if(type == NoteOn) vel=s.read();
-		else if(type == NoteOff) { vel=s.read(); assert_(vel==0) ; }
-		//else if(type == Aftertouch || type == Controller || type == PitchBend ) s.advance(1);
-		//else if(type == ProgramChange || type == ChannelAftertouch ) {}
-		else if(type == Meta) {
-			uint8 c=s.read(); uint len=c&0x7f; if(c&0x80){ c=s.read(); len=(len<<7)|(c&0x7f); }
-			enum { SequenceNumber, Text, Copyright, TrackName, InstrumentName, Lyrics, Marker, Cue, ChannelPrefix=0x20,
-				   EndOfTrack=0x2F, Tempo=0x51, Offset=0x54, TimeSignature=0x58, KeySignature, SequencerSpecific=0x7F };
-			ref<byte> data = s.read<byte>(len);
-			if(key==TimeSignature) {
-				timeSignature[0]=data[0], timeSignature[1]=1<<data[1];
-				//signs.append(Sign{}); TODO
-			}
-			else if(key==Tempo) tempo=((data[0]<<16)|(data[1]<<8)|data[2])/1000;
-			else if(key==KeySignature) this->key=(int8)data[0], scale=data[1]?Minor:Major;
-			else error(key);
-		}
-		else error(type);
-
-		if(type==NoteOff) type=NoteOn, vel=0;
-		if(type==NoteOn) insertSorted(MidiNote{track.time, key, vel});
-
-		if(!s) return;
-		uint8 c=s.read(); uint t=c&0x7f;
-		if(c&0x80){c=s.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=s.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=s.read();t=(t<<7)|c;}}}
-		track.time += t;
-	}
-}
-
 /// Converts signs to notes
 MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter) {
 	MidiNotes notes;
@@ -277,14 +231,15 @@ struct BeatSynchronizer : Widget {
 
 		{ // Set measure times to MIDI times
 			buffer<MidiNote> onsets = filter(notes, [](MidiNote o){return o.velocity==0;});
-			assert_(onsets.size == signs.size);
+			//assert_(onsets.size == signs.size || !signs.size, onsets.size, signs.size); FIXME
+			assert_(onsets.size >= signs.size, onsets.size, signs.size);
 			size_t index = 0;
 			for(size_t measureIndex: range(measureBars.size())) {
 				while(index < signs.size) {
 					if(signs[index].note.measureIndex>=measureIndex) break;
 					index++;
 				}
-				if(index == onsets.size) measureBars.keys[measureIndex] =  onsets.last().time; // Last measure (FIXME: last release time)
+				if(index == signs.size) measureBars.keys[measureIndex] =  onsets.last().time; // Last measure (FIXME: last release time)
 				else {
 					if(signs[index].note.measureIndex!=measureIndex) { // Empty measure
 						assert_(index>0);
@@ -382,11 +337,10 @@ struct Music : Widget {
 	// MusicXML
 	MusicXML xml = existsFile(name+".xml"_) ? readFile(name+".xml"_) : MusicXML();
 	// MIDI
-	MidiNotes notes = scale( existsFile(name+".mid"_) ? MidiFile(readFile(name+".mid"_)) : ::notes(xml.signs, xml.divisions),
-							 audioFile.audioFrameRate?: sampler.rate);
-	MidiSheet midiSheet = existsFile(name+".mid"_) ? MidiSheet(readFile(name+".mid"_)) : MidiSheet();
+	MidiFile midi =  existsFile(name+".mid"_) ? MidiFile(readFile(name+".mid"_)) : MidiFile(); // if used: midi.signs are scaled in BeatSynchronizer
+	MidiNotes notes = scale(midi ? copy(midi.notes) : ::notes(xml.signs, xml.divisions), audioFile.audioFrameRate?: sampler.rate);
 	// Sheet
-	Sheet sheet {xml ? xml.signs : midiSheet.signs, xml ? xml.divisions : midiSheet.divisions,
+	Sheet sheet {xml ? xml.signs : midi.signs, xml ? xml.divisions : midi.divisions,
 				apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
 	BeatSynchronizer beatSynchronizer {audioFiles?decodeAudio(audioFiles[0]):Audio(), notes, sheet.midiToSign, sheet.measureBars};
 

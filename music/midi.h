@@ -3,6 +3,7 @@
 #include "function.h"
 #include "data.h"
 #include "map.h"
+#include "notation.h"
 
 struct MidiNote { int64 time; uint key, velocity; };
 notrace inline bool operator <(const MidiNote& a, const MidiNote& b) { return a.time < b.time || (a.time == b.time && a.key < b.key); }
@@ -10,8 +11,11 @@ inline String strKey(int key) { return (string[]){"A","A#","B","C","C#","D","D#"
 inline String str(const MidiNote& o) { return str(o.time, strKey(o.key)); }
 
 struct MidiNotes : array<MidiNote> {
+	MidiNotes() {}
+	MidiNotes(array<MidiNote>&& notes, uint ticksPerSeconds) : array<MidiNote>(::move(notes)), ticksPerSeconds(ticksPerSeconds) {}
 	uint ticksPerSeconds=0;
 };
+inline MidiNotes copy(const MidiNotes& o) { return {copy((array<MidiNote>&)o), o.ticksPerSeconds}; }
 inline String str(const MidiNotes& o) { return str(o.ticksPerSeconds, str(ref<MidiNote>(o))); }
 
 enum { NoteOff=8, NoteOn, Aftertouch, Controller, ProgramChange, ChannelAftertouch, PitchBend, Meta };
@@ -23,12 +27,17 @@ struct Track {
 };
 
 /// Standard MIDI file player
-struct MidiFile : MidiNotes {
+struct MidiFile {
+	MidiNotes notes;
     array<Track> tracks;
-    int trackCount=0;
-    uint timeSignature[2] = {4,4}, tempo=60000/120; int key=0; enum {Major,Minor} scale=Major;
-	uint duration=0; // Duration in ticks
+	uint duration = 0; // Duration in ticks
+
+	//uint timeSignature[2] = {4,4}, tempo=60000/120; int key=0; enum {Major,Minor} scale=Major;
+	array<Sign> signs;
+	uint divisions = 0; // Time unit (ticks) per beat (quarter note)
+
 	MidiFile() {}
 	MidiFile(ref<byte> file);
-	virtual void read(Track& track); // FIXME: merge MidiSheet::read
+	virtual void read(Track& track, uint index);
+	explicit operator bool() const {  return tracks.size; }
 };
