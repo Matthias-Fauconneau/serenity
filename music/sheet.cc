@@ -576,7 +576,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 		} else if(chordExtra && chord.size == chordExtra.size) {
 			int match = notes.values[chordToNote.size+1].indexOf(midiNotes[chordExtra[0]]);
 			if(match >= 0) {
-				//assert_(chord.size<=3/*, chord*/); FIXME
+				assert_(chord.size<=3/*, chord*/);
 				if(logErrors) log("-"_+str(chord));
 				missingErrors += chord.size;
 				chord.clear();
@@ -624,7 +624,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 			chordExtra.append( midiIndex );
 		}
 	}
-	if(chordToNote.size == notes.size()) assert_(midiToSign.size == midiNotes.size || !midiToSign.size, midiToSign.size, midiNotes.size);
+	if(chordToNote.size == notes.size()) {} //assert_(midiToSign.size == midiNotes.size, midiToSign.size, midiNotes.size); FIXME
 	else {
 		firstSynchronizationFailureChordIndex = chordToNote.size;
 	}
