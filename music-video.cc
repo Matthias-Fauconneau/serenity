@@ -552,7 +552,7 @@ struct Music : Widget {
 			requestTermination(0); // Window prevents automatic termination
 		} else { // Preview
 			window.show();
-			if(playbackDeviceAvailable()) {
+			if(playbackDeviceAvailable() && false) {
 				audio.start(audioFile.audioFrameRate ? : sampler.rate, audioFile ? 1024 : sampler.periodSize, 32, 2);
 				assert_(audio.rate == audioFile.audioFrameRate ?: sampler.rate);
 				audioThread.spawn();
@@ -562,9 +562,11 @@ struct Music : Widget {
 
 	int2 sizeHint(int2 size) override { return running ? widget.sizeHint(size) : scroll.ScrollArea::sizeHint(size); }
 	shared<Graphics> graphics(int2 size) override {
-		if(audioFile) follow(audioFile.audioTime, audioFile.audioFrameRate, window.size);
-		else follow(sampler.audioTime, sampler.rate, window.size);
-		window.render();
+		if(running) {
+			if(audioFile) follow(audioFile.audioTime, audioFile.audioFrameRate, window.size);
+			else follow(sampler.audioTime, sampler.rate, window.size);
+			window.render();
+		}
 		return running ? widget.graphics(size, Rect(size)) : scroll.ScrollArea::graphics(size);
 	}
 	bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {

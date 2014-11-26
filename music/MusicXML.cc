@@ -1,6 +1,8 @@
 #include "MusicXML.h"
 #include "xml.h"
 
+inline bool isPowerOfTwo(uint v) { return !(v & (v - 1)); }
+
 MusicXML::MusicXML(string document, string) {
     Element root = parseXML(document);
 	map<uint, Clef> clefs;
@@ -8,6 +10,7 @@ MusicXML::MusicXML(string document, string) {
 	int64 measureTime = 0, time = 0, nextTime = 0, maxTime = 0;
 	uint measureIndex=0, pageIndex=0, pageLineIndex=0, lineMeasureIndex=0; // starts with 1
 	size_t repeatIndex = invalid;
+	array<size_t> activeTies;
 	for(const Element& m: root("score-partwise"_)("part"_).children) {
 		measureTime = time;
 		measureIndex++; lineMeasureIndex++;
@@ -20,11 +23,11 @@ MusicXML::MusicXML(string document, string) {
 			maxTime = max(maxTime, time);
 
             if(e.name=="note"_) {
-				Duration type = Duration(ref<string>({"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_,"32th","64th"}).indexOf(e("type"_).text()));
+				Value type = Value(ref<string>({"double","whole"_,"half"_,"quarter"_,"eighth"_,"16th"_,"32th","64th"}).indexOf(e("type"_).text()));
 				int duration;
                 if(e("grace"_)) {
 					//assert_(uint(type)<Sixteenth && divisions%quarterDuration == 0, int(type), divisions);
-					duration = typeDurations[uint(type)]*divisions/quarterDuration;
+					duration = valueDurations[uint(type)]*divisions/quarterDuration;
                 } else {
 					int acciaccaturaTime = 0;
 					for(Sign grace: acciaccaturas.reverse()) { // Inserts any pending acciaccatura graces before principal
@@ -40,12 +43,12 @@ MusicXML::MusicXML(string document, string) {
 							dot = true;
 							typeDuration = typeDuration * 2 / 3;
 						}
-						type = Duration(ref<uint>(typeDurations).size-1-log2(typeDuration));
+						type = Value(ref<uint>(valueDurations).size-1-log2(typeDuration));
 						assert_(int(type)>=0, duration, divisions, timeSignature.beats, timeSignature.beatUnit,e);
 					}
 					//log(timeSignature.beats, divisions, notationDuration, e);
-					assert_(uint(type) < ref<uint>(typeDurations).size, int(type), e);
-					uint notationDuration = typeDurations[uint(type)]*divisions/quarterDuration;
+					assert_(uint(type) < ref<uint>(valueDurations).size, int(type), e);
+					uint notationDuration = valueDurations[uint(type)]*divisions/quarterDuration;
 					if(e("rest"_) && type==Whole) notationDuration = timeSignature.beats*divisions;
 					if(dot) notationDuration = notationDuration * 3 / 2;
 					if(e("time-modification"_)) {
@@ -77,7 +80,7 @@ MusicXML::MusicXML(string document, string) {
 
 					Note::Tie tie = Note::NoTie;
                     if(e("notations"_)("tied"_)) {
-                        /**/ if(e("notations"_)("tied"_)["type"_] == "start"_) tie = Note::TieStart;
+						/**/ if(e("notations"_)("tied"_)["type"_] == "start"_) tie = Note::TieStart;
                         else if(e("notations"_)("tied"_)["type"_] == "stop"_) tie = Note::TieStop;
                         else error("");
                     }
@@ -158,7 +161,7 @@ MusicXML::MusicXML(string document, string) {
 					signs.insertSorted({time, 0, uint(-1), Sign::Dynamic, .dynamic=dynamics[index]});
                 }
                 else if(d("metronome"_)) {
-					Duration beatUnit = Duration(ref<string>({"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_})
+					Value beatUnit = Value(ref<string>({"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_})
 												 .indexOf(d("metronome"_)("beat-unit"_).text()));
 					uint perMinute = parseInteger(d("metronome"_)("per-minute"_).text());
 					signs.insertSorted({time, 0, uint(-1), Sign::Metronome, .metronome={beatUnit, perMinute}});
@@ -252,6 +255,32 @@ MusicXML::MusicXML(string document, string) {
 					start.slur.matched = true; stop.slur.matched=true;
 					break;
 				}
+			}
+		}
+	}
+
+	{/// Converts ties to longer notes (spanning beats and measures)
+		array<size_t> active;
+		for(size_t signIndex: range(signs.size)) {
+			Sign sign = signs[signIndex];
+			if(sign.type == Sign::Note && (sign.note.tie == Note::TieStart)) active.append(signIndex);
+			if(sign.type == Sign::Note && (sign.note.tie == Note::TieContinue || sign.note.tie == Note::TieStop)) {
+				size_t tieStart = invalid;
+				for(size_t index: range(active.size)) if(signs[active[index]].note.key == sign.note.key) { assert_(tieStart==invalid); tieStart = index; }
+				if(tieStart == invalid) continue; //FIXME
+				assert_(tieStart != invalid, sign.note.key, active);
+				Sign& first = signs[active[tieStart]];
+				first.duration = sign.time+sign.duration-first.time;
+				int duration = first.note.duration() + sign.note.duration();
+				if(duration%3 == 0) {
+					//assert_(!first.note.dot, first.note.duration(), sign.note.duration(), duration);
+					first.note.dot = true;
+					duration = duration * 2 / 3;
+				}
+				//assert_(isPowerOfTwo(duration), duration); FIXME
+				first.note.value = Value(ref<uint>(valueDurations).size-1-log2(duration));
+				assert_(int(first.note.value)>=0);
+				if(sign.note.tie == Note::TieStop) active.removeAt(tieStart);
 			}
 		}
 	}

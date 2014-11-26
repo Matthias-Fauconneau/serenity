@@ -4,9 +4,9 @@
 
 enum ClefSign { Bass, Treble };
 enum Accidental { None, Flat /*♭*/, Natural /*♮*/, Sharp /*♯*/, DoubleFlat /*♭♭*/, DoubleSharp /*♯♯*/ };
-enum Duration { Double, Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
+enum Value { Double, Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
 static constexpr uint quarterDuration = 16;
-static constexpr uint typeDurations[] = {128,64,32,16,8,4,2,1};
+static constexpr uint valueDurations[] = {128,64,32,16,8,4,2,1};
 enum Pedal { Ped=-1, Start, Change, PedalStop };
 enum Wedge{ Crescendo, Diminuendo, WedgeStop };
 enum OctaveShift { Down, Up, OctaveStop };
@@ -20,7 +20,7 @@ struct Note {
     Clef clef;
     int step; // 0 = C4
     Accidental accidental;
-    Duration duration;
+	Value value;
     enum Tie { NoTie, TieStart, TieContinue, TieStop } tie;
     bool dot:1;
     bool grace:1;
@@ -32,9 +32,15 @@ struct Note {
     bool stem:1; // 0: down, 1: up
     uint key; // MIDI key
 	size_t measureIndex = invalid, glyphIndex = invalid;
+	uint duration() const {
+		uint duration = valueDurations[value];
+		if(dot) duration = duration * 3 / 2;
+		//TODO: tuplet
+		return duration;
+	};
 };
 struct Rest {
-    Duration duration;
+	Value value;
 };
 struct Measure { uint measure, page, pageLine, lineMeasure; };
 /*struct Pedal {
@@ -53,7 +59,7 @@ struct TimeSignature {
 	uint beats, beatUnit;
 };
 struct Metronome {
-    Duration beatUnit;
+	Value beatUnit;
     uint perMinute;
 };
 struct Slur {

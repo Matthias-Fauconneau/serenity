@@ -158,21 +158,21 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 				assert_(!clef.octave);
 				int noteStep = h - (clef.clefSign==Treble ? 47 : 35);
 
-				// Duration
+				// Value
 				int duration = track.time-active[key];
 				const uint quarterDuration = 16*metronome.perMinute/60;
-				uint typeDuration = duration*quarterDuration/divisions;
-				assert_(typeDuration);
+				uint valueDuration = duration*quarterDuration/divisions;
+				assert_(valueDuration);
 				bool dot=false;
-				if(typeDuration%3 == 0) {
+				if(valueDuration%3 == 0) {
 					dot = true;
-					typeDuration = typeDuration * 2 / 3;
+					valueDuration = valueDuration * 2 / 3;
 				}
-				Duration type = Duration(ref<uint>(typeDurations).size-1-log2(typeDuration));
-				assert_(int(type) >= 0, duration, typeDuration);
+				Value value = Value(ref<uint>(valueDurations).size-1-log2(valueDuration));
+				assert_(int(value) >= 0, duration, valueDuration);
 
 				signs.insertSorted(Sign{active[key], duration, staff, Sign::Note, .note={
-											clef, noteStep, Accidental(".bN#"_.indexOf(pitchClass.accidentals[key%12/*0-11*/])), type, Note::NoTie,
+											clef, noteStep, Accidental(".bN#"_.indexOf(pitchClass.accidentals[key%12/*0-11*/])), value, Note::NoTie,
 											dot, /*grace*/ false, /*slash*/ false, /*staccato*/ false, /*tenuto*/ false, /*accent*/ false, /*trill*/ false, /*up*/false,
 											key, invalid, invalid}});
 				active.remove(key);

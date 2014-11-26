@@ -11,7 +11,7 @@ struct Sheet : Widget {
     // Layout parameters
 	static constexpr int staffCount = 2;
 	static constexpr float halfLineInterval = 5, lineInterval = 2*halfLineInterval;
-	const float lineWidth = 1, barWidth=1, stemWidth = 1, stemLength = 4*lineInterval, beamWidth = 6;
+	const float lineWidth = 1, barWidth=1, stemWidth = 1, stemLength = 7*halfLineInterval, beamWidth = 6;
 	const float shortStemLength = 5*halfLineInterval;
     // Layout helpers
 	float staffY(uint staff, int clefStep) { return staff*10*lineInterval - clefStep * halfLineInterval; } // Clef independent
