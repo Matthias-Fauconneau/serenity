@@ -3,8 +3,10 @@
 #include "core.h"
 
 enum ClefSign { Bass, Treble };
-enum Accidental { None, DoubleFlat /*♭♭*/, Flat /*♭*/, Natural /*♮*/, Sharp /*♯*/, DoubleSharp /*♯♯*/ };
-enum Duration { Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
+enum Accidental { None, Flat /*♭*/, Natural /*♮*/, Sharp /*♯*/, DoubleFlat /*♭♭*/, DoubleSharp /*♯♯*/ };
+enum Duration { Double, Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
+static constexpr uint quarterDuration = 16;
+static constexpr uint typeDurations[] = {128,64,32,16,8,4,2,1};
 enum Pedal { Ped=-1, Start, Change, PedalStop };
 enum Wedge{ Crescendo, Diminuendo, WedgeStop };
 enum OctaveShift { Down, Up, OctaveStop };
@@ -48,7 +50,7 @@ struct KeySignature {
     int fifths; // Index on the fifths circle
 };
 struct TimeSignature {
-    uint beats, beatUnit;
+	uint beats, beatUnit;
 };
 struct Metronome {
     Duration beatUnit;

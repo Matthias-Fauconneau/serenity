@@ -21,8 +21,6 @@ MusicXML::MusicXML(string document, string) {
 
             if(e.name=="note"_) {
 				Duration type = Duration(ref<string>({"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_,"32th","64th"}).indexOf(e("type"_).text()));
-				uint typeDurations[] = {64,32,16,8,4,2,1};
-				constexpr uint quarterDuration = 16;
 				int duration;
                 if(e("grace"_)) {
 					//assert_(uint(type)<Sixteenth && divisions%quarterDuration == 0, int(type), divisions);
@@ -74,7 +72,7 @@ MusicXML::MusicXML(string document, string) {
 					int noteOctave = parseInteger(e("pitch"_)("octave"_).text());
                     int noteStep = (noteOctave-4) * 7 + octaveStep;
 					Accidental noteAccidental =
-							Accidental(ref<string>({""_,"double-flat"_,"flat"_,"natural"_,"sharp"_,"double-sharp"_}).indexOf(e("accidental"_).text()));
+							Accidental(ref<string>({""_,"flat"_,"natural"_,"sharp"_,"double-flat"_,"double-sharp"_}).indexOf(e("accidental"_).text()));
 					assert_(noteAccidental != -1, e("accidental"_));
 
 					Note::Tie tie = Note::NoTie;

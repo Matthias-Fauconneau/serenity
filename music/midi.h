@@ -32,12 +32,10 @@ struct MidiFile {
     array<Track> tracks;
 	uint duration = 0; // Duration in ticks
 
-	//uint timeSignature[2] = {4,4}, tempo=60000/120; int key=0; enum {Major,Minor} scale=Major;
 	array<Sign> signs;
 	uint divisions = 0; // Time unit (ticks) per beat (quarter note)
 
 	MidiFile() {}
 	MidiFile(ref<byte> file);
-	virtual void read(Track& track, uint index);
 	explicit operator bool() const {  return tracks.size; }
 };

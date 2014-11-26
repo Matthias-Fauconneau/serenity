@@ -8,6 +8,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 	uint16 nofChunks = s.read();
 	notes.ticksPerSeconds = 2*(uint16)s.read(); // Ticks per second (*2 as actually defined for MIDI as ticks per beat at 120bpm)
 	divisions = notes.ticksPerSeconds; // Defaults to 60 qpm (FIXME: max 64/metronome.perMinute)
+
     for(int i=0; s && i<nofChunks;i++) {
         ref<byte> tag = s.read<byte>(4); uint32 length = s.read();
         if(tag == "MTrk"_) {
@@ -19,25 +20,34 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
         }
         s.advance(length);
     }
-    uint minTime=-1; for(Track& track: tracks) minTime=min(minTime,track.time);
-	for(size_t index: range(tracks.size)) {
-		Track& track = tracks[index];
-        track.startTime = track.time-minTime; // Time of the first event
-        track.startIndex = track.data.index; // Index of the first event
-		this->read(track, index);
-        duration = max(duration, track.time);
-        track.reset();
-    }
-}
 
-void MidiFile::read(Track& track, uint trackIndex) {
-	BinaryData& s = track.data;
+	{
+		uint minTime=-1;
+		for(Track& track: tracks) minTime=min(minTime,track.time);
+		for(Track& track: tracks) {
+			track.startTime = track.time-minTime; // Time of the first event
+			track.startIndex = track.data.index; // Index of the first event
+			duration = max(duration, track.time);
+			track.reset();
+		}
+	}
+
 	map<uint, Clef> clefs;
 	KeySignature keySignature={0}; TimeSignature timeSignature={4,4}; Metronome metronome={Quarter, 120};
 	uint measureIndex = 0;
 	int64 lastMeasureStart = 0;
 	map<uint, int64> active;
-	while(s) {
+	for(int64 lastTime = 0;;) {
+		size_t trackIndex = invalid;
+		for(size_t index: range(tracks.size))
+			if(tracks[index].data && (trackIndex==invalid || tracks[index].time <= tracks[trackIndex].time))
+					trackIndex = index;
+		if(trackIndex == invalid) break;
+		Track& track = tracks[trackIndex];
+		assert_(track.time >= lastTime);
+		lastTime = track.time;
+
+		BinaryData& s = tracks[trackIndex].data;
 		uint8 key=s.read();
 		if(key & 0x80) { track.type_channel=key; key=s.read(); }
 		uint8 type=track.type_channel>>4;
@@ -49,7 +59,7 @@ void MidiFile::read(Track& track, uint trackIndex) {
 		else if(type == Meta) {
 			uint8 c=s.read(); uint len=c&0x7f; if(c&0x80){ c=s.read(); len=(len<<7)|(c&0x7f); }
 			enum class MIDI { SequenceNumber, Text, Copyright, TrackName, InstrumentName, Lyrics, Marker, Cue, ChannelPrefix=0x20,
-				   EndOfTrack=0x2F, Tempo=0x51, Offset=0x54, TimeSignature=0x58, KeySignature, SequencerSpecific=0x7F };
+							  EndOfTrack=0x2F, Tempo=0x51, Offset=0x54, TimeSignature=0x58, KeySignature, SequencerSpecific=0x7F };
 			ref<byte> data = s.read<byte>(len);
 			if(MIDI(key)==MIDI::TimeSignature) {
 				uint beats = data[0];
@@ -67,7 +77,7 @@ void MidiFile::read(Track& track, uint trackIndex) {
 				//scale=data[1]?Minor:Major;
 				signs.insertSorted(Sign{track.time, 0, uint(-1), Sign::KeySignature, .keySignature=keySignature});
 			}
-			else if(MIDI(key)==MIDI::TrackName || MIDI(key)==MIDI::Text || MIDI(key)==MIDI::Copyright) log(data);
+			else if(MIDI(key)==MIDI::TrackName || MIDI(key)==MIDI::Text || MIDI(key)==MIDI::Copyright) {}
 			else if(MIDI(key)==MIDI::EndOfTrack) {}
 			else error(hex(key));
 		}
@@ -77,23 +87,8 @@ void MidiFile::read(Track& track, uint trackIndex) {
 		if(type==NoteOn) {
 			notes.insertSorted(MidiNote{track.time, key, vel});
 			if(active.contains(key)) {
-				//assert(key==-1 || key==0 || key==2, key);
-				assert_(keySignature.fifths == 0);
-				int keys[4][11] = {
-					{1,0,1,0,1,1,0,1,0,1,0}, // F minor (♭)
-					{0,1,0,1,1,0,1,0,1,0,1},  // C major (♮) (should be same for all majors)
-					{0,1,0,1,1,0,1,0,1,0,1},  // G major (♯) TESTME
-					{0,1,0,1,1,0,1,0,1,0,1}  // D major (♯♯) TESTME
-				};
-				int accidentals[4][12] = { // 0=nothing, 1=♭, 2=♮, 3=♯ (TODO)
-										   {0,1,0,1,0,0,1,0,1,0,0,2}, // F minor (♭)
-										   {0,3,0,3,0,0,3,0,3,0,3,0},  // C major (♮)
-										   {0,3,0,3,0,2,0,0,3,0,3,0},  // G major (♯) TODO
-										   {2,0,0,3,0,2,0,0,3,0,3,0}  // D major (♯♯) TODO
-										 };
-				int h=key/12*7; for(int i=0;i<key%12;i++) h+=keys[keySignature.fifths+1][i];
-				const int trebleOffset = 6*7+3; // C0 position in intervals from top line
-				const int bassOffset = 4*7+5; // C0 position in intervals from top line
+
+				// Staff
 				uint staff = key < 60; // C4
 #if 0 //TODO: Balances load on both hand
 				array<MidiNote> currents[2]; // new notes to be pressed
@@ -136,16 +131,35 @@ void MidiFile::read(Track& track, uint trackIndex) {
 					}
 				}
 #endif
-				Clef clef = clefs.value(staff, {Treble, 0});
+				// Step
+				assert_(keySignature.fifths >= -6 && keySignature.fifths <= 6, keySignature.fifths);
+				struct PitchClass {
+					char keyIntervals[11 +1];
+					char accidentals[12 +1]; // 0=none, 1=♭, 2=♮, 3=♯
+				};
+				PitchClass pitchClasses[12] = { //*7%12 //FIXME: generate
+					//C # D # E F #G # A # B C#D#EF#G#A#B
+					{"10101101010", "N.N.N..N.N.N"}, // ♭♭♭♭♭♭ G♭/F# e♭/d#
+					{"10101101010", "..N.N..N.N.N"}, // ♭♭♭♭♭/♯♯♯♯♯♯♯ D♭ b♭
+					{"10101101010", "..N.N.b..N.N"}, // ♭♭♭♭ A♭ f
+					{"10101101010", ".b..N.b..N.N"}, // ♭♭♭ E♭ c
+					{"10101101010", ".b..N.b.b..N"}, // ♭♭ B♭ g
+					{"10101101010", ".b.b..b.b..N"}, // ♭ F d
+					{"01011010101", ".#.#..#.#.#."},  // ♮ C a '.b.b..b.b.b.'
+					{"01011010101", ".#.#.N..#.#."},  // ♯ G e
+					{"01011010101",  "N..#.N..#.#."},  // ♯♯ D b
+					{"01011010101", "N..#.N.N..#."},  // ♯♯♯ A f♯
+					{"01011010101", "N.N..N.N..#."},  // ♯♯♯♯ E c♯
+					{"01011010101", "N.N..N.N.N.."}  // ♯♯♯♯♯/♭♭♭♭♭♭♭ B g♯
+				};
+				PitchClass pitchClass = pitchClasses[keySignature.fifths+6];
+				int h=key/12*7; for(int i: range(key%12)/*0-10*/) h+=pitchClass.keyIntervals[i]-'0';
+				Clef clef = clefs.value(staff, {staff?Bass:Treble, 0});
 				assert_(!clef.octave);
-				int clefOffset = clef.clefSign==Treble ? trebleOffset : clef.clefSign==Bass ? bassOffset : 0;
-				int noteStep = clefOffset-h;
-				int accidentalShortCode = accidentals[keySignature.fifths+1][key%12]; // FIXME: single code
-				Accidental noteAccidental = Accidental(accidentalShortCode ? Flat-1+accidentalShortCode : None);
-				log(track.time, strKey(key), staff);
+				int noteStep = h - (clef.clefSign==Treble ? 47 : 35);
+
+				// Duration
 				int duration = track.time-active[key];
-				log(duration, duration*metronome.perMinute/60./divisions, duration*metronome.perMinute/60/divisions);
-				uint typeDurations[] = {64,32,16,8,4,2,1};
 				const uint quarterDuration = 16*metronome.perMinute/60;
 				uint typeDuration = duration*quarterDuration/divisions;
 				assert_(typeDuration);
@@ -156,8 +170,9 @@ void MidiFile::read(Track& track, uint trackIndex) {
 				}
 				Duration type = Duration(ref<uint>(typeDurations).size-1-log2(typeDuration));
 				assert_(int(type) >= 0, duration, typeDuration);
+
 				signs.insertSorted(Sign{active[key], duration, staff, Sign::Note, .note={
-											clef, noteStep, noteAccidental, type, Note::NoTie,
+											clef, noteStep, Accidental(".bN#"_.indexOf(pitchClass.accidentals[key%12/*0-11*/])), type, Note::NoTie,
 											dot, /*grace*/ false, /*slash*/ false, /*staccato*/ false, /*tenuto*/ false, /*accent*/ false, /*trill*/ false, /*up*/false,
 											key, invalid, invalid}});
 				active.remove(key);
@@ -171,16 +186,19 @@ void MidiFile::read(Track& track, uint trackIndex) {
 			track.time += t;
 		}
 
-		if(trackIndex /*First track is metadata*/) {
-			int64 measureLength = timeSignature.beats*60*divisions/metronome.perMinute;
-			assert_(measureLength);
-			int64 nextMeasureStart = lastMeasureStart+measureLength;
-			if(track.time >= nextMeasureStart) {
-				lastMeasureStart = nextMeasureStart;
-				signs.insertSorted({nextMeasureStart, 0, uint(-1), Sign::Measure, .measure={measureIndex, 1, 1, measureIndex}});
-				measureIndex++;
-			}
+		int64 measureLength = timeSignature.beats*60*divisions/metronome.perMinute;
+		assert_(measureLength);
+		int64 nextMeasureStart = lastMeasureStart+measureLength;
+		if(track.time >= nextMeasureStart) {
+			lastMeasureStart = nextMeasureStart;
+			signs.insertSorted({nextMeasureStart, 0, uint(-1), Sign::Measure, .measure={measureIndex, 1, 1, measureIndex}});
+			measureIndex++;
 		}
 	}
-	assert_(!active);
+	assert_(!active, active);
+	// Measures are signaled on end
+	int64 measureLength = timeSignature.beats*60*divisions/metronome.perMinute;
+	assert_(measureLength);
+	int64 nextMeasureStart = lastMeasureStart+measureLength;
+	signs.insertSorted({nextMeasureStart, 0, uint(-1), Sign::Measure, .measure={measureIndex, 1, 1, measureIndex}}); // Last measure bar
 }
