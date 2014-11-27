@@ -49,7 +49,7 @@ struct VideoInput : Device, Poll {
 		iowr<DequeueBuffer>(buf);
         //assert_(buf.sequence == time, time, buf.sequence);
         if(buf.sequence != time) {
-            log("Dropped", buf.sequence-time, "frame"+((buf.sequence-time)>1?"s"_:""_));
+            log("Dropped", buf.sequence-time, "video frame"+((buf.sequence-time)>1?"s"_:""_));
             time = buf.sequence;
         }
         assert_(buf.bytesused == uint(size.y*size.x*2));
@@ -83,6 +83,9 @@ struct Record : ImageView, Poll {
     Text sizeText, availableText;
     bool contentChanged = false;
 
+    const bool encodeAudio = !arguments().contains("noaudio");
+    const bool encodeVideo = !arguments().contains("novideo");
+
     Record() {
         assert_(audio.sampleBits==32);
 
@@ -105,8 +108,8 @@ struct Record : ImageView, Poll {
     void start() {
         abort();
         encoder = unique<Encoder>(arguments()[0]+".mkv"_);
-		encoder->setVideo(Encoder::YUYV, video.size, video.frameRate, true);
-        encoder->setFLAC(audio.sampleBits, audio.channels, audio.rate);
+        if(encodeVideo) encoder->setVideo(Encoder::YUYV, video.size, video.frameRate, true);
+        if(encodeAudio) encoder->setFLAC(audio.sampleBits, audio.channels, audio.rate);
         encoder->open();
         assert_(audio.periodSize <= encoder->audioFrameSize);
         firstTimeStamp = 0;
@@ -129,7 +132,7 @@ struct Record : ImageView, Poll {
     }
 
     uint bufferAudio(ref<int32> input) {
-        if(!encoder) evaluateSoundLevel(input);
+        if(!encoder || !encodeAudio) evaluateSoundLevel(input);
         else {
             {Locker locker(lock);
                 audioFrames.append(copyRef(input));}
@@ -139,7 +142,7 @@ struct Record : ImageView, Poll {
     }
 
     void bufferVideo(YUYVImage&& image) {
-        if(!encoder) {
+        if(!encoder || !encodeVideo) {
             Locker locker(viewLock);
             lastImage = YUYVImage(copyRef(image), image.size, image.time); // FIXME: merge with conversion to avoid a copy
             contentChanged = true;
@@ -164,7 +167,7 @@ struct Record : ImageView, Poll {
     bool encode(bool lock=true) {
         if(!encoder) return false;
         if(lock) this->lock.lock();
-        if(videoFrames /*&& encoder->videoTime*encoder->audioFrameRate <= (encoder->audioTime+encoder->audioFrameSize)*encoder->videoFrameRate*/) { // 18MB/s
+        if(videoFrames /*&& encoder->videoTime*encoder->audioFrameRate <= (encoder->audioTime+encoder->audioFrameSize)*encoder->videoFrameRate*/) {
             YUYVImage image = videoFrames.take(0);
             if(lock) this->lock.unlock();
 
@@ -177,7 +180,7 @@ struct Record : ImageView, Poll {
 
             return true;
         }
-        if(audioFrames /*&& encoder->audioTime*encoder->videoFrameRate <= (encoder->videoTime+1)*encoder->audioFrameRate*/) { // 1MB/s
+        if(audioFrames /*&& encoder->audioTime*encoder->videoFrameRate <= (encoder->videoTime+1)*encoder->audioFrameRate*/) {
             buffer<int32> frame = audioFrames.take(0);
             if(lock) this->lock.unlock();
 
@@ -241,7 +244,8 @@ struct Record : ImageView, Poll {
             float x = int64(size.x-2*offset.x) * fileSize / (fileSize+available);
             graphics->fills.append(vec2(offset.x, 0), vec2(offset.x + x, offset.y), green);
             graphics->fills.append(vec2(offset.x + x, 0), vec2(size.x-offset.x - (offset.x + x), offset.y), black);
-            int fileLengthSeconds = (encoder->videoTime+encoder->videoFrameRate-1)/encoder->videoFrameRate;
+            int fileLengthSeconds = encodeVideo ? (encoder->videoTime+encoder->videoFrameRate-1)/encoder->videoFrameRate
+                                                : (encoder->audioTime+encoder->audioFrameRate-1)/encoder->audioFrameRate;
             int64 fileSizeMB = (fileSize+1023) / 1024 / 1024;
             sizeText = Text(str(fileLengthSeconds)+"s "+str(fileSizeMB)+"MB", offset.y, white); // FIXME: skip if no change
             graphics->graphics.insertMulti(vec2(offset.x, 0), sizeText.graphics(int2(x, offset.y)));
