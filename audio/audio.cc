@@ -93,7 +93,7 @@ size_t AudioFile::read16(mref<int16> output) {
 
 size_t AudioFile::read32(mref<int32> output) {
 	size_t readSize = 0;
-	while(readSize*channels<output.size) {
+	while(readSize*channels < output.size) {
         if(!bufferSize) {
             AVPacket packet;
             if(av_read_frame(file, &packet) < 0) return readSize;
@@ -134,7 +134,7 @@ size_t AudioFile::read32(mref<int32> output) {
 size_t AudioFile::read(mref<float> output) {
 	assert_(channels);
 	size_t readSize = 0;
-	while(readSize < output.size*channels) {
+	while(readSize*channels < output.size) {
 		if(!bufferSize) {
 			AVPacket packet;
 			if(av_read_frame(file, &packet) < 0) return readSize;
@@ -158,7 +158,8 @@ size_t AudioFile::read(mref<float> output) {
 			}
 			av_free_packet(&packet);
 		}
-		size_t size = min(bufferSize, output.size/channels-readSize);
+		assert_(bufferSize && readSize*channels < output.size);
+		size_t size = min(bufferSize, output.size-readSize*channels);
 		output.slice(readSize*channels, size*channels).copy(floatBuffer.slice(bufferIndex*channels, size*channels));
 		bufferSize -= size; bufferIndex += size; readSize += size;
 	}

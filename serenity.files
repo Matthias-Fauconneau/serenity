@@ -142,3 +142,4 @@ music/video.cc
 tuner/biquad.h
 record.cc
 statistics.cc
+tuner/estimate.cc
