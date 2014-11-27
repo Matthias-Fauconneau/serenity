@@ -66,13 +66,13 @@ struct strz : buffer<char> {
 };
 
 /// Lowers case
-char toLower(char c);
+char lowerCase(char c);
 /// Lowers case
-String toLower(const string s);
+String toLower(string s);
 /// Uppers case
-String toUpper(const string s);
+String toUpper(string s);
 
-String repeat(const string& s, uint times);
+String repeat(string s, uint times);
 
 /// Pads a string to the left
 String left(string s, size_t size, const char pad=' ');
