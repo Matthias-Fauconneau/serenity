@@ -4,9 +4,12 @@
 
 enum ClefSign { Bass, Treble };
 enum Accidental { None, Flat /*♭*/, Natural /*♮*/, Sharp /*♯*/, DoubleFlat /*♭♭*/, DoubleSharp /*♯♯*/ };
-enum Value { Double, Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
+static constexpr string accidentalNames[] = {""_,"flat"_,"natural"_,"sharp"_,"double-flat"_,"double-sharp"_};
+static constexpr string accidentalNamesLy[] = {""_,"flat"_,"natural"_,"sharp"_,"flatflat"_,"doublesharp"};
+enum Value { InvalidValue=-1,                  Double, Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
+static constexpr string valueNames[] = {"double"_,"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_,"32nd"_,"64th"_};
+static constexpr uint valueDurations[] = {128,       64,         32,       16,           8,             4,         2,         1};
 static constexpr uint quarterDuration = 16;
-static constexpr uint valueDurations[] = {128,64,32,16,8,4,2,1};
 enum Pedal { Ped=-1, Start, Change, PedalStop };
 enum Wedge{ Crescendo, Diminuendo, WedgeStop };
 enum OctaveShift { Down, Up, OctaveStop };
@@ -21,7 +24,7 @@ struct Note {
     int step; // 0 = C4
     Accidental accidental;
 	Value value;
-    enum Tie { NoTie, TieStart, TieContinue, TieStop } tie;
+	enum Tie { NoTie, TieStart, TieContinue, TieStop, Merged } tie;
     bool dot:1;
     bool grace:1;
     bool slash:1;
@@ -41,6 +44,7 @@ struct Note {
 };
 struct Rest {
 	Value value;
+	uint duration() const { return valueDurations[value]; };
 };
 struct Measure { uint measure, page, pageLine, lineMeasure; };
 struct KeySignature {

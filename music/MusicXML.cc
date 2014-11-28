@@ -23,12 +23,12 @@ MusicXML::MusicXML(string document, string) {
 			maxTime = max(maxTime, time);
 
             if(e.name=="note"_) {
-				Value type = e.contains("type"_) ?
-							Value(ref<string>({"double","whole"_,"half"_,"quarter"_,"eighth"_,"16th"_,"32th","64th"}).indexOf(e("type"_).text())) : Whole;
+				Value value = e.contains("type"_) ? Value(ref<string>(valueNames).indexOf(e("type"_).text())) : Whole;
+				assert_(int(value)!=-1);
 				int duration;
 				if(e.contains("grace"_)) {
-					//assert_(uint(type)<Sixteenth && divisions%quarterDuration == 0, int(type), divisions);
-					duration = valueDurations[uint(type)]*divisions/quarterDuration;
+					//assert_(uint(value)<Sixteenth && divisions%quarterDuration == 0, int(value), divisions);
+					duration = valueDurations[uint(value)]*divisions/quarterDuration;
                 } else {
 					int acciaccaturaTime = 0;
 					for(Sign grace: acciaccaturas.reverse()) { // Inserts any pending acciaccatura graces before principal
@@ -38,27 +38,24 @@ MusicXML::MusicXML(string document, string) {
                     }
 					duration = parseInteger(e("duration"_).text());
 					bool dot = e.contains("dot"_) ? true : false;
-					if(int(type)==-1) {
-						uint typeDuration = duration*quarterDuration/divisions;
-						if(typeDuration%3 == 0) {
+					/*if(int(value)==-1) {
+						uint valueDuration = duration*quarterDuration/divisions;
+						if(valueDuration%3 == 0) {
 							dot = true;
-							typeDuration = typeDuration * 2 / 3;
+							valueDuration = valueDuration * 2 / 3;
 						}
-						type = Value(ref<uint>(valueDurations).size-1-log2(typeDuration));
-						assert_(int(type)>=0, duration, divisions, timeSignature.beats, timeSignature.beatUnit,e);
-					}
-					//log(timeSignature.beats, divisions, notationDuration, e);
-					assert_(uint(type) < ref<uint>(valueDurations).size, int(type), e);
-					uint notationDuration = valueDurations[uint(type)]*divisions/quarterDuration;
-					if(e.contains("rest"_) && type==Whole) notationDuration = timeSignature.beats*divisions;
+						value = Value(ref<uint>(valueDurations).size-1-log2(valueDuration));
+						assert_(int(value)>=0, duration, divisions, timeSignature.beats, timeSignature.beatUnit,e);
+					}*/
+					assert_(int(value)!=-1);
+					assert_(uint(value) < ref<uint>(valueDurations).size, int(value), e);
+					uint notationDuration = valueDurations[uint(value)]*divisions/quarterDuration;
+					if(e.contains("rest"_) && value==Whole) notationDuration = timeSignature.beats*divisions;
 					if(dot) notationDuration = notationDuration * 3 / 2;
 					if(e.contains("time-modification"_)) {
 						notationDuration = notationDuration * parseInteger(e("time-modification"_)("normal-notes").text())
 								/ parseInteger(e("time-modification"_)("actual-notes").text());
 					}
-					//if(!e("chord"))
-					/*assert_(duration == notationDuration, e,
-							duration, notationDuration, divisions, timeSignature.beats, timeSignature.beatUnit, int(type));*/
 					duration -= min(duration, appoggiaturaTime); //FIXME
                     assert_(acciaccaturaTime <= duration, acciaccaturaTime, duration, appoggiaturaTime);
                     acciaccaturas.clear();
@@ -68,15 +65,15 @@ MusicXML::MusicXML(string document, string) {
 				if(!e.contains("chord"_) && (!e.contains("grace"_) || e("grace"_)["slash"_]!="yes"_)) nextTime = time+duration;
                 if(e["print-object"_]=="no"_) continue;
 				uint staff = e("staff"_) ? parseInteger(e("staff"_).text())-1 : 0;
-                assert_(int(type)>=0, e);
-				if(e.contains("rest"_)) signs.insertSorted({time, duration, staff, Sign::Rest, .rest={type}});
+				assert_(int(value)>=0, e);
+				if(e.contains("rest"_)) signs.insertSorted({time, duration, staff, Sign::Rest, .rest={value}});
 				else {
                     assert_(e("pitch"_)("step"_).text(), e);
                     uint octaveStep = "CDEFGAB"_.indexOf(e("pitch"_)("step"_).text()[0]);
 					int noteOctave = parseInteger(e("pitch"_)("octave"_).text());
                     int noteStep = (noteOctave-4) * 7 + octaveStep;
 					Accidental noteAccidental = e.contains("accidental"_) ?
-							Accidental(ref<string>({""_,"flat"_,"natural"_,"sharp"_,"double-flat"_,"double-sharp"_}).indexOf(e("accidental"_).text())) : None;
+							Accidental(ref<string>(accidentalNames).indexOf(e("accidental"_).text())) : None;
 					assert_(noteAccidental != -1, e("accidental"_));
 
 					Note::Tie tie = Note::NoTie;
@@ -110,7 +107,7 @@ MusicXML::MusicXML(string document, string) {
                                  key;
                                 });
 					bool articulations = e.contains("notations"_) && e("notations"_).contains("articulations"_);
-					{Sign sign{time, duration, staff, Sign::Note, .note={clefs.value(staff, {Treble, 0}), noteStep, noteAccidental, type, tie,
+					{Sign sign{time, duration, staff, Sign::Note, .note={clefs.value(staff, {Treble, 0}), noteStep, noteAccidental, value, tie,
 																		 e.contains("dot"_) ? true : false,
 																		 e.contains("grace"_)?true:false,
 																		 e.contains("grace"_) && e("grace"_)["slash"_]=="yes"_?true:false,
@@ -265,31 +262,35 @@ MusicXML::MusicXML(string document, string) {
 		}
 	}
 
-	{/// Converts ties to longer notes (spanning beats and measures)
+	/*{/// Converts ties to longer notes (spanning beats and measures) (FIXME: new note within merged time)
 		array<size_t> active;
 		uint page=0, line=0, measure=0;
 		for(size_t signIndex: range(signs.size)) {
-			Sign sign = signs[signIndex];
+			Sign& sign = signs[signIndex];
 			if(sign.type == Sign::Measure) { page=sign.measure.page, line=sign.measure.pageLine, measure=sign.measure.lineMeasure; }
 			if(sign.type == Sign::Note && (sign.note.tie == Note::TieStart)) active.append(signIndex);
 			if(sign.type == Sign::Note && (sign.note.tie == Note::TieContinue || sign.note.tie == Note::TieStop)) {
 				size_t tieStart = invalid;
 				for(size_t index: range(active.size)) if(signs[active[index]].note.key == sign.note.key) { assert_(tieStart==invalid); tieStart = index; }
-				//if(tieStart == invalid) continue; //FIXME
-				assert_(tieStart != invalid, (int)sign.note.tie, sign.note.key, signs[active[0]], page, line, measure);
+				assert_(tieStart != invalid);
 				Sign& first = signs[active[tieStart]];
+				if(sign.note.tie == Note::TieStop) active.removeAt(tieStart);
 				first.duration = sign.time+sign.duration-first.time;
 				int duration = first.note.duration() + sign.note.duration();
+				bool dot = false;
 				if(duration%3 == 0) {
-					//assert_(!first.note.dot, first.note.duration(), sign.note.duration(), duration);
-					first.note.dot = true;
+					dot = true;
 					duration = duration * 2 / 3;
 				}
-				//assert_(isPowerOfTwo(duration), duration); FIXME
-				first.note.value = Value(ref<uint>(valueDurations).size-1-log2(duration));
-				assert_(int(first.note.value)>=0);
-				if(sign.note.tie == Note::TieStop) active.removeAt(tieStart);
+				if(isPowerOfTwo(duration)) {
+					assert_(isPowerOfTwo(duration), first.note.duration(), sign.note.duration(), duration);
+					first.note.value = Value(ref<uint>(valueDurations).size-1-log2(duration));
+					first.note.dot = dot;
+					assert_(int(first.note.value)>=0);
+					first.note.tie = Note::NoTie;
+					sign.note.tie = Note::Merged;
+				}
 			}
 		}
-	}
+	}*/
 }
