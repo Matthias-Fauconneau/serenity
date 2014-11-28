@@ -66,8 +66,9 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 			assert_(index < timeTrack.keys.size);
 			float x;
 			if(sign.type == Sign::Wedge) x = timeTrack.values[index].middle;
+			else if(sign.type == Sign::Metronome) x = timeTrack.values[index].metronome;
 			else {
-				assert_(sign.staff < 2, int(sign.type));
+				assert_(sign.staff < 2, sign.staff, int(sign.type));
 				x = timeTrack.values[index].staffs[sign.staff];
 			}
 			timeTrack.insert(sign.time, {{x,x},x,x,x,x});
@@ -95,7 +96,6 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 			count += chord.size;
 		}
 		bool stemUp = sum < -4*count; // sum/count<-4 (Average note height below mid staff)
-		int dy = (stemUp ? 0 : 0);
 
 		auto isDichord = [](const Chord& chord){
 			for(const Sign& a: chord) for(const Sign& b: chord) if(a.note.key!=b.note.key && abs(a.note.step-b.note.step)<=1) return true;
@@ -116,7 +116,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 			float yMin = Y(beam[0].first());
 			float yMax = Y(beam[0].last());
 			for(Sign sign: beam[0]) { yMin = max(yMin, Y(sign)); yMax = min(yMax, Y(sign)); } // inverted Y
-			float yBase = stemUp ? yMin : yMax + dy;
+			float yBase = stemUp ? yMin : yMax;
 			float yStem = stemUp ? yMax-stemLength : yMin+stemLength;
 			float opacity = isTied(beam[0]) ? 1./2 : 1;
 			{vec2 min (x, ::min(yBase, yStem)), max(x+stemWidth, ::max(yBase, yStem));
@@ -138,12 +138,12 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 				vec2 noteSize = glyphSize(noteGlyphName).x;
 				float dx = (stemUp ? noteSize.x - 2 : (isDichord(beam[i])?noteSize.x:0));
 				x[i] = X(sign) + dx;
-				base[i] = Y(stemUp?chord.first():chord.last()) + dy;
-				tip[i] = Y(stemUp?chord.last():chord.first())+(stemUp?-1:1)*(stemLength-noteSize.y/2);
+				base[i] = Y(stemUp?chord.first():chord.last());
+				tip[i] = Y(stemUp?chord.last():chord.first())+(stemUp?-1:1)*stemLength;
 			}
 			float farTip = stemUp ? min(tip[0],tip[1]) : max(tip[0],tip[1]);
 			float delta[2] = {clip(-lineInterval, tip[0]-farTip, lineInterval), clip(-lineInterval, tip[1]-farTip, lineInterval)};
-			farTip = stemUp ? min(farTip, staffY(staff, -4)) : max(farTip, staffY(staff, -4));
+			//farTip = stemUp ? min(farTip, staffY(staff, -4)) : max(farTip, staffY(staff, -4));
 			float dx[2];
 			Sign sign[2] = { stemUp?beam[0].last():beam[0].first(), stemUp?beam[1].last():beam[1].first()};
 			for(uint i: range(2)) {
@@ -155,18 +155,26 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 				dx[i] = (stemUp ? noteSize.x - 2 : (isDichord(beam[i])?noteSize.x:0));
 			}
 			float opacity = isTied(beam[0]) && isTied(beam[1]) ? 1./2 : 1;
-			Value value = beam[0][0].note.value;
-			for(size_t index: range(value-Quarter)) {
+			Value first = max(apply(beam[0], [](Sign sign){return sign.note.value;}));
+			Value second = max(apply(beam[1], [](Sign sign){return sign.note.value;}));
+			for(size_t index: range(min(first,second)-Quarter)) {
 				float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1);
 				vec2 p0 (X(sign[0])+dx[0], farTip+delta[0]-beamWidth/2 + Y);
 				vec2 p1 (X(sign[1])+dx[1]+stemWidth, farTip+delta[1]-beamWidth/2 + Y);
 				measure.parallelograms.append(p0, p1, beamWidth, black, opacity);
 			}
-			Value second = beam[1][0].note.value;
-			for(size_t index: range(value-Quarter, second-Quarter)) {
+			for(size_t index: range(min(first,second)-Quarter, first-Quarter)) {
 				float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1);
-				vec2 p0 (((X(sign[0])+dx[0])+(X(sign[1])+dx[1]))/2, farTip+delta[0]-beamWidth/2 + Y);
+				vec2 p0 (X(sign[0])+dx[0], farTip+delta[0]-beamWidth/2 + Y);
+				vec2 p1 (X(sign[1])+dx[1]+stemWidth, farTip+delta[1]/2-beamWidth/2 + Y);
+				p1 = (p0+p1)/2.f;
+				measure.parallelograms.append(p0, p1, beamWidth, black, opacity);
+			}
+			for(size_t index: range(int(min(first,second)-Quarter), int(second-Quarter))) {
+				float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1);
+				vec2 p0 (X(sign[0])+dx[0], farTip+delta[0]-beamWidth/2 + Y);
 				vec2 p1 (X(sign[1])+dx[1]+stemWidth, farTip+delta[1]-beamWidth/2 + Y);
+				p0 = (p0+p1)/2.f;
 				measure.parallelograms.append(p0, p1, beamWidth, black, opacity);
 			}
 		} else { // Draws horizontal beam
@@ -184,7 +192,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 				vec2 noteSize = glyphSize(noteGlyphName).x;
 				float dx = (stemUp ? noteSize.x - 2 : (isDichord(chord)?noteSize.x:0));
 				float x = X(sign) + dx;
-				float y = Y(sign) + dy;
+				float y = Y(sign);
 				{vec2 min(x, ::min(y, stemY)), max(x+stemWidth, ::max(stemY, y));
 					float opacity = isTied(chord) ? 1./2 : 1;
 					measure.fills.append(min, max-min, black, opacity); } // FIXME
@@ -307,8 +315,10 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 						}
 					}
 					else if(sign.type == Sign::Rest) {
+						doBeam(staff);
 						vec2 p = vec2(x, staffY(staff, -4));
-						if(sign.rest.value == Whole) x+= 3*glyph(p, "rests.0"_, font, measure.glyphs);
+						if(sign.rest.value == Double) x+= 3*glyph(p, "rests.M2"_, font, measure.glyphs);
+						else if(sign.rest.value == Whole) x+= 3*glyph(p, "rests.0"_, font, measure.glyphs);
 						else if(sign.rest.value == Half) x+= 3*glyph(p, "rests.1"_, font, measure.glyphs);
 						else if(sign.rest.value == Quarter) x+= 3*glyph(p, "rests.2"_, font, measure.glyphs);
 						else if(sign.rest.value == Eighth) x+= 3*glyph(p, "rests.3"_, font, measure.glyphs);
@@ -360,9 +370,9 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 
 					if(sign.type==Sign::TimeSignature) {
 						for(size_t staff: range(staffCount)) {
-							assert_(beatTime[staff] % (timeSignature.beats*quarterDuration) == 0,
+							/*assert_(beatTime[staff] % (timeSignature.beats*quarterDuration) == 0,
 									withName(beatTime[staff], beatTime[staff] % (timeSignature.beats*quarterDuration),
-											 timeSignature.beats, quarterDuration, page, lineIndex, lineMeasureIndex, staff));
+											 timeSignature.beats, quarterDuration, page, lineIndex, lineMeasureIndex, staff));*/
 							beatTime[staff] = 0;
 						}
 
@@ -497,7 +507,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 				}
 				beamDuration += duration;
 
-				uint beatDuration = timeSignature.beatUnit*quarterDuration/4;
+				uint beatDuration = quarterDuration; //*4/timeSignature.beatUnit;
 				//uint beamFirstBeat = beamStart[staff] / beatDuration;
 				//uint beamLastBeat = (beamStart[staff]+beamDuration) / beatDuration;
 
@@ -521,7 +531,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 					for(size_t index: range(chord.size-1)) { // Alternate
 						if(shift[index] == shift[index+1] && abs(chord[index].note.step-chord[index+1].note.step)>2) shift[index] = !shift[index];
 					}
-					if(chord.size>1 && abs(chord.last().note.step-chord[chord.size-2].note.step)>2) shift.last() = true; // Shifts single top
+					if(chord.size>1 && abs(chord.last().note.step-chord[chord.size-2].note.step)>=2) shift.last() = true; // Shifts single top
 				}
 				float maxOffset=0;
 				float accidentalAboveY = -inf, accidentalOffset = 0;
@@ -604,7 +614,9 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 				}
 				if(value >= Half /*also quarter and halfs for stems*/) {
 					if(!beam) beamStart[staff] = beatTime[staff];
+					if(value <= Quarter) doBeam(staff); // Flushes any pending beams
 					beam.append(move(chord));
+					if(value <= Quarter) doBeam(staff); // Only stems for quarter and halfs (actually no beams :/)
 				}
 				chord.clear();
 				beatTime[staff] += duration;

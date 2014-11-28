@@ -107,14 +107,15 @@ MusicXML::MusicXML(string document, string) {
                                  key;
                                 });
 					bool articulations = e.contains("notations"_) && e("notations"_).contains("articulations"_);
+					bool ornaments = e.contains("notations"_) && e("notations"_).contains("ornaments"_);
 					{Sign sign{time, duration, staff, Sign::Note, .note={clefs.value(staff, {Treble, 0}), noteStep, noteAccidental, value, tie,
 																		 e.contains("dot"_) ? true : false,
 																		 e.contains("grace"_)?true:false,
 																		 e.contains("grace"_) && e("grace"_)["slash"_]=="yes"_?true:false,
-																		 articulations && e("notations"_)("articulations"_)("staccato"_)?true:false,
-																		 articulations && e("notations"_)("articulations"_)("tenuto"_)?true:false,
-																		 articulations && e("notations"_)("articulations"_)("accent"_)?true:false,
-																		 articulations && e("notations"_)("ornaments"_)("trill-mark"_)?true:false,
+																		 articulations && e("notations"_)("articulations"_).contains("staccato"_)?true:false,
+																		 articulations && e("notations"_)("articulations"_).contains("tenuto"_)?true:false,
+																		 articulations && e("notations"_)("articulations"_).contains("accent"_)?true:false,
+																		 ornaments && e("notations"_)("ornaments"_).contains("trill-mark"_)?true:false,
 																		 e.contains("stem"_) && e("stem").text() == "up"_,
 																		 key, invalid, invalid }};
                         // Acciaccatura are played before principal beat (Records graces to shift in on parsing principal)
@@ -216,7 +217,7 @@ MusicXML::MusicXML(string document, string) {
 				if(e["new-page"]=="yes") { pageIndex++, pageLineIndex=1; }
 			}
 			else if(e.name=="barline"_) {
-				if(e("repeat")) {
+				if(e.contains("repeat")) {
 					if(e("repeat")["direction"]=="forward") {
 						assert_(repeatIndex==invalid);
 						repeatIndex=signs.size;

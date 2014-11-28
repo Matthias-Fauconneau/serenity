@@ -37,6 +37,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 	uint measureIndex = 0;
 	int64 lastMeasureStart = 0;
 	map<uint, int64> active;
+	int64 lastOff[2] = {0,0};
 	for(int64 lastTime = 0;;) {
 		size_t trackIndex = invalid;
 		for(size_t index: range(tracks.size))
@@ -46,6 +47,16 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 		Track& track = tracks[trackIndex];
 		assert_(track.time >= lastTime);
 		lastTime = track.time;
+
+		// When latest track is ready to switch measure
+		int64 measureLength = timeSignature.beats*60*divisions/metronome.perMinute;
+		assert_(measureLength);
+		int64 nextMeasureStart = lastMeasureStart+measureLength;
+		if(track.time >= nextMeasureStart) {
+			lastMeasureStart = nextMeasureStart;
+			signs.insertSorted({nextMeasureStart, 0, uint(-1), Sign::Measure, .measure={measureIndex, 1, 1, measureIndex}});
+			measureIndex++;
+		}
 
 		BinaryData& s = tracks[trackIndex].data;
 		uint8 key=s.read();
@@ -160,21 +171,42 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 
 				// Value
 				int duration = track.time-active[key];
-				const uint quarterDuration = 16*metronome.perMinute/60;
-				uint valueDuration = duration*quarterDuration/divisions;
-				assert_(valueDuration);
-				bool dot=false;
-				if(valueDuration%3 == 0) {
-					dot = true;
-					valueDuration = valueDuration * 2 / 3;
-				}
-				Value value = Value(ref<uint>(valueDurations).size-1-log2(valueDuration));
-				assert_(int(value) >= 0, duration, valueDuration);
+				if(duration) {
+					const uint quarterDuration = 16*metronome.perMinute/60;
+					uint valueDuration = duration*quarterDuration/divisions;
+					if(!valueDuration) valueDuration = quarterDuration/2; //FIXME
+					assert_(valueDuration, duration, quarterDuration, divisions);
+					bool dot=false;
+					if(valueDuration%3 == 0) {
+						dot = true;
+						valueDuration = valueDuration * 2 / 3;
+					}
+					Value value = Value(ref<uint>(valueDurations).size-1-log2(valueDuration));
+					assert_(int(value) >= 0, duration, valueDuration);
 
-				signs.insertSorted(Sign{active[key], duration, staff, Sign::Note, .note={
-											clef, noteStep, Accidental(".bN#"_.indexOf(pitchClass.accidentals[key%12/*0-11*/])), value, Note::NoTie,
-											dot, /*grace*/ false, /*slash*/ false, /*staccato*/ false, /*tenuto*/ false, /*accent*/ false, /*trill*/ false, /*up*/false,
-											key, invalid, invalid}});
+					if(active[key] > lastOff[staff]) {
+						int duration = active[key] - lastOff[staff];
+						assert_(duration);
+						const uint quarterDuration = 16*metronome.perMinute/60;
+						uint valueDuration = duration*quarterDuration/divisions;
+						if(!valueDuration) valueDuration = quarterDuration/2; //FIXME
+						assert_(valueDuration, duration, quarterDuration, divisions);
+						bool dot=false;
+						if(valueDuration%3 == 0) {
+							dot = true;
+							valueDuration = valueDuration * 2 / 3;
+						}
+						Value value = Value(ref<uint>(valueDurations).size-1-log2(valueDuration));
+						assert_(int(value) >= 0, duration, valueDuration);
+						signs.insertSorted(Sign{lastOff[staff], duration, staff, Sign::Rest, .rest={value}});
+					}
+
+					signs.insertSorted(Sign{active[key], duration, staff, Sign::Note, .note={
+												clef, noteStep, Accidental(".bN#"_.indexOf(pitchClass.accidentals[key%12/*0-11*/])), value, Note::NoTie,
+												dot, /*grace*/ false, /*slash*/ false, /*staccato*/ false, /*tenuto*/ false, /*accent*/ false, /*trill*/ false, /*up*/false,
+												key, invalid, invalid}});
+					lastOff[staff] = active[key]+duration;
+				} //else FIXME
 				active.remove(key);
 			}
 			if(vel) active[key] = track.time;
@@ -184,15 +216,6 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 			uint8 c=s.read(); uint t=c&0x7f;
 			if(c&0x80){c=s.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=s.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=s.read();t=(t<<7)|c;}}}
 			track.time += t;
-		}
-
-		int64 measureLength = timeSignature.beats*60*divisions/metronome.perMinute;
-		assert_(measureLength);
-		int64 nextMeasureStart = lastMeasureStart+measureLength;
-		if(track.time >= nextMeasureStart) {
-			lastMeasureStart = nextMeasureStart;
-			signs.insertSorted({nextMeasureStart, 0, uint(-1), Sign::Measure, .measure={measureIndex, 1, 1, measureIndex}});
-			measureIndex++;
 		}
 	}
 	assert_(!active, active);
