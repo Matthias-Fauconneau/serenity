@@ -1,6 +1,6 @@
 #pragma once
 /// notation.h Music notation definitions
-#include "core.h"
+#include "string.h"
 
 enum ClefSign { Bass, Treble };
 enum Accidental { None, Flat /*♭*/, Natural /*♮*/, Sharp /*♯*/, DoubleFlat /*♭♭*/, DoubleSharp /*♯♯*/ };
@@ -43,15 +43,6 @@ struct Rest {
 	Value value;
 };
 struct Measure { uint measure, page, pageLine, lineMeasure; };
-/*struct Pedal {
-    PedalAction action;
-};*/
-/*struct Wedge {
-    WedgeAction action;
-};*/
-/*struct Dynamic {
-	//Loudness loudness;
-};*/
 struct KeySignature {
     int fifths; // Index on the fifths circle
 };
@@ -103,4 +94,9 @@ inline bool operator <(const Sign& a, const Sign& b) {
 		if(a.type==Sign::Note && b.type==Sign::Note) return a.note.step < b.note.step;
     }
 	return a.time < b.time;
+}
+inline String strKey(int key) { return (string[]){"A","A#","B","C","C#","D","D#","E","F","F#","G","G#"}[(key+2*12+3)%12]+str(key/12-2); }
+inline String str(const Sign& o) {
+	if(o.type==Sign::Note) return strKey(o.note.key);
+	error(int(o.type));
 }

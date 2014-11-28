@@ -16,24 +16,16 @@ struct Sheet : Widget {
     // Layout helpers
 	float staffY(uint staff, int clefStep) { return staff*10*lineInterval - clefStep * halfLineInterval; } // Clef independent
 	float Y(uint staff, ClefSign clefSign, int step) { return staffY(staff, step-(clefSign==Treble ? 10 : -2)); } // Clef dependent
-	/*int clefStep(Sign sign) {
-		assert_(sign.type==Sign::Note);
-		return sign.note.step - (sign.note.clef.clefSign==Treble ? 10 : -2) - sign.note.clef.octave*7;
-	}*/
-	//float Y(Sign sign, int step) { assert_(sign.type==Sign::Note||sign.type==Sign::Clef); return Y(sign.staff, clefStep(sign); } // Clef dependent
 	// Translates C4 step to top line step using clef
 	int clefStep(Sign sign) {
 		assert_(sign.type==Sign::Note);
 		return sign.note.step - (sign.note.clef.clefSign==Treble ? 10 : -2) - sign.note.clef.octave*7;
 	}
 	float Y(Sign sign) { assert_(sign.type==Sign::Note); return staffY(sign.staff, clefStep(sign)); } // Clef dependent
-	//int Y(const map<uint, Clef>& clefs, uint staff, int step) { return staffY(staff, clefStep(clefs.at(staff).clefSign, step)); } // Clef dependent
 
     // Fonts
 	Font graceFont {File("emmentaler-26.otf", Folder("/usr/local/share/fonts"_)), 4.f*halfLineInterval, "Emmentaler"};
 	Font font {File("emmentaler-26.otf", "/usr/local/share/fonts"_), 9.f*halfLineInterval, "Emmentaler"};
-	//Font textFont{File("LinLibertine_R.ttf", "/usr/share/fonts/libertine-ttf"_), 6.f*halfLineInterval, "LinLibertine_R"};
-	//Font smallFont{File("LinLibertine_R.ttf", "/usr/share/fonts/libertine-ttf"_), 14.f, "LinLibertine_R"};
 	float textSize = 6*halfLineInterval;
     // Font helpers
 	vec2 glyphSize(string name) { return font.metrics(font.index(name)).size; }

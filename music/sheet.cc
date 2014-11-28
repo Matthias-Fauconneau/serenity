@@ -1,13 +1,6 @@
 ﻿#include "sheet.h"
 #include "notation.h"
-//#include "utf8.h"
 #include "text.h"
-
-inline String strKey(int key) { return (string[]){"A","A#","B","C","C#","D","D#","E","F","F#","G","G#"}[(key+2*12+3)%12]+str(key/12-2); }
-static String str(const Sign& o) {
-	if(o.type==Sign::Note) return strKey(o.note.key);
-	error(int(o.type));
-}
 
 float glyph(vec2 origin, string name, Font& font, array<Glyph>& glyphs) {
 	uint index = font.index(name);
