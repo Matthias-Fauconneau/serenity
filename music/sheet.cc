@@ -2,20 +2,20 @@
 #include "notation.h"
 #include "text.h"
 
-float glyph(vec2 origin, string name, Font& font, array<Glyph>& glyphs, float opacity=1) {
+static float glyph(vec2 origin, string name, Font& font, array<Glyph>& glyphs, float opacity=1) {
 	uint index = font.index(name);
 	glyphs.append(origin, font, index, index, black, opacity);
 	return font.metrics(index).advance;
 }
 
-uint centeredText(vec2 origin, string message, float size, array<Glyph>& glyphs) {
+static uint centeredText(vec2 origin, string message, float size, array<Glyph>& glyphs) {
 	Text text(message, size, 0, 1, 0, "LinLibertine");
 	auto textGlyphs = move(text.graphics(0)->glyphs);
-	for(auto& glyph: textGlyphs) { glyph.origin += origin - vec2(text.sizeHint(0).x/2.f, 0); glyphs.append(glyph); }
+	for(auto& glyph: textGlyphs) { glyph.origin += origin - vec2(text.sizeHint(0))/2.f; glyphs.append(glyph); }
 	return text.sizeHint(0).x;
 }
 
-uint text(vec2 origin, string message, float size, array<Glyph>& glyphs) {
+static uint text(vec2 origin, string message, float size, array<Glyph>& glyphs) {
 	Text text(message, size, 0, 1, 0, "LinLibertine");
 	auto textGlyphs = move(text.graphics(0)->glyphs);
 	for(auto& glyph: textGlyphs) { glyph.origin+=origin; glyphs.append(glyph); }
@@ -89,6 +89,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 
 	auto doBeam = [&](uint staff){
 		auto& beam = beams[staff];
+		if(!beam) return;
 		// Stems
 		int sum = 0, count=0;
 		for(Chord& chord: beam) {
@@ -209,6 +210,15 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 					vec2 min (X(chord[0]) + dx, Y-beamWidth/2+1), max(X(beam[chordIndex+1][0]) + dx + stemWidth, Y+beamWidth/2);
 					measure.fills.append(min, max-min);
 				}
+			}
+			// Tuplet
+			uint tuplet = beam[0][0].note.tuplet;
+			for(const Chord& chord: beam) for(Sign sign: chord) assert_(sign.note.tuplet == tuplet, sign.note.tuplet, tuplet);
+			if(tuplet) {
+				float dx = (stemUp ? noteSize.x - 2 : 0);
+				float x = (X(beam.first()[0])+X(beam.last()[0]))/2 + dx;
+				float y = stemY + (stemUp ? -1 : 1) * 2 * beamWidth;
+				centeredText(vec2(x,y), str(tuplet), 3*halfLineInterval, measure.glyphs);
 			}
 		}
 
@@ -517,6 +527,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 						  /*|| beamFirstBeat!=beamLastBeat*/ /*Beam before spanning*/
 						  || beatTime[staff]%beatDuration==0 /*"Beam" before spanning (single chord)*/
 						  /*|| beam.last().last().note.duration() < duration*/ /*Increasing time (FIXME: revert last if different*/
+						  || beam[0][0].note.tuplet != chord[0].note.tuplet
 						  )) doBeam(staff);
 
 				buffer<bool> shift (chord.size); shift.clear();

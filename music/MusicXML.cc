@@ -117,6 +117,7 @@ MusicXML::MusicXML(string document, string) {
 																		 articulations && e("notations"_)("articulations"_).contains("accent"_)?true:false,
 																		 ornaments && e("notations"_)("ornaments"_).contains("trill-mark"_)?true:false,
 																		 e.contains("stem"_) && e("stem").text() == "up"_,
+																		 e.contains("time-modification"_) ? (uint)parseInteger(e("time-modification"_)("actual-notes").text()) : 0,
 																		 key, invalid, invalid }};
                         // Acciaccatura are played before principal beat (Records graces to shift in on parsing principal)
 						if(e.contains("grace"_) && e("grace"_)["slash"_]=="yes"_) {

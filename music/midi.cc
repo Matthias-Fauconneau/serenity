@@ -203,7 +203,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 
 					signs.insertSorted(Sign{active[key], duration, staff, Sign::Note, .note={
 												clef, noteStep, Accidental(".bN#"_.indexOf(pitchClass.accidentals[key%12/*0-11*/])), value, Note::NoTie,
-												dot, /*grace*/ false, /*slash*/ false, /*staccato*/ false, /*tenuto*/ false, /*accent*/ false, /*trill*/ false, /*up*/false,
+												dot, /*grace*/ false, /*slash*/ false, /*staccato*/ false, /*tenuto*/ false, /*accent*/ false, /*trill*/ false, /*up*/false, 0,
 												key, invalid, invalid}});
 					lastOff[staff] = active[key]+duration;
 				} //else FIXME
