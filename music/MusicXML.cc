@@ -1,8 +1,6 @@
 #include "MusicXML.h"
 #include "xml.h"
 
-inline bool isPowerOfTwo(uint v) { return !(v & (v - 1)); }
-
 MusicXML::MusicXML(string document, string) {
     Element root = parseXML(document);
 	map<uint, Clef> clefs;

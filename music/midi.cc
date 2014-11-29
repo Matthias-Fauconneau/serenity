@@ -172,21 +172,30 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 				// Value
 				int duration = track.time-active[key];
 				if(duration) {
-					const uint quarterDuration = 16*metronome.perMinute/60;
+					const int quarterDuration = 16*metronome.perMinute/60;
 					uint valueDuration = duration*quarterDuration/divisions;
 					if(!valueDuration) valueDuration = quarterDuration/2; //FIXME
 					assert_(valueDuration, duration, quarterDuration, divisions);
 					bool dot=false;
-					if(valueDuration%3 == 0) {
+					uint tuplet = 0;
+					if(valueDuration == 5 || valueDuration == 6) { // Triplet of quavers
+						tuplet = 3;
+						valueDuration = 8;
+					}
+					else if(valueDuration == 44) { // Dotted white
+						dot = true;
+						valueDuration = 32;
+					} else if(valueDuration%3 == 0) { // Dot
 						dot = true;
 						valueDuration = valueDuration * 2 / 3;
 					}
+					//assert_(isPowerOfTwo(valueDuration), duration, quarterDuration, divisions, valueDuration, strKey(key));
 					Value value = Value(ref<uint>(valueDurations).size-1-log2(valueDuration));
 					assert_(int(value) >= 0, duration, valueDuration);
 
-					if(active[key] > lastOff[staff]) {
+					if(active[key] > lastOff[staff]+quarterDuration/8) {
 						int duration = active[key] - lastOff[staff];
-						assert_(duration);
+						assert_(duration > quarterDuration/4);
 						const uint quarterDuration = 16*metronome.perMinute/60;
 						uint valueDuration = duration*quarterDuration/divisions;
 						if(!valueDuration) valueDuration = quarterDuration/2; //FIXME
@@ -196,14 +205,18 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 							dot = true;
 							valueDuration = valueDuration * 2 / 3;
 						}
-						Value value = Value(ref<uint>(valueDurations).size-1-log2(valueDuration));
-						assert_(int(value) >= 0, duration, valueDuration);
-						signs.insertSorted(Sign{lastOff[staff], duration, staff, Sign::Rest, .rest={value}});
+						//assert_(isPowerOfTwo(valueDuration), duration, quarterDuration, divisions, valueDuration, strKey(key), "rest");
+						if(valueDuration>=valueDurations[Eighth]) {
+							assert_(valueDuration>=valueDurations[Eighth], duration, quarterDuration, divisions, valueDuration, strKey(key), "rest");
+							Value value = Value(ref<uint>(valueDurations).size-1-log2(valueDuration));
+							assert_(int(value) >= 0, duration, valueDuration);
+							signs.insertSorted(Sign{lastOff[staff], duration, staff, Sign::Rest, .rest={value}});
+						}
 					}
 
 					signs.insertSorted(Sign{active[key], duration, staff, Sign::Note, .note={
 												clef, noteStep, Accidental(".bN#"_.indexOf(pitchClass.accidentals[key%12/*0-11*/])), value, Note::NoTie,
-												dot, /*grace*/ false, /*slash*/ false, /*staccato*/ false, /*tenuto*/ false, /*accent*/ false, /*trill*/ false, /*up*/false, 0,
+												dot, /*grace*/ false, /*slash*/ false, /*staccato*/ false, /*tenuto*/ false, /*accent*/ false, /*trill*/ false, /*up*/false, tuplet,
 												key, invalid, invalid}});
 					lastOff[staff] = active[key]+duration;
 				} //else FIXME

@@ -2,6 +2,8 @@
 /// notation.h Music notation definitions
 #include "string.h"
 
+inline bool isPowerOfTwo(uint v) { return !(v & (v - 1)); }
+
 enum ClefSign { Bass, Treble };
 enum Accidental { None, Flat /*♭*/, Natural /*♮*/, Sharp /*♯*/, DoubleFlat /*♭♭*/, DoubleSharp /*♯♯*/ };
 static constexpr string accidentalNames[] = {""_,"flat"_,"natural"_,"sharp"_,"double-flat"_,"double-sharp"_};
@@ -39,7 +41,7 @@ struct Note {
 	uint duration() const {
 		uint duration = valueDurations[value];
 		if(dot) duration = duration * 3 / 2;
-		//TODO: tuplet
+		if(tuplet) duration = duration * (tuplet-1) / tuplet;
 		return duration;
 	};
 };

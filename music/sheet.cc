@@ -90,6 +90,11 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 	auto doBeam = [&](uint staff){
 		auto& beam = beams[staff];
 		if(!beam) return;
+
+		uint tuplet = beam[0][0].note.tuplet;
+		for(const Chord& chord: beam) for(Sign sign: chord) assert_(sign.note.tuplet == tuplet, sign.note.tuplet, tuplet, beam,
+																	page, lineIndex, lineMeasureIndex);
+
 		// Stems
 		int sum = 0, count=0;
 		for(Chord& chord: beam) {
@@ -212,8 +217,6 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 				}
 			}
 			// Tuplet
-			uint tuplet = beam[0][0].note.tuplet;
-			for(const Chord& chord: beam) for(Sign sign: chord) assert_(sign.note.tuplet == tuplet, sign.note.tuplet, tuplet);
 			if(tuplet) {
 				float dx = (stemUp ? noteSize.x - 2 : 0);
 				float x = (X(beam.first()[0])+X(beam.last()[0]))/2 + dx;
@@ -318,6 +321,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 							String noteGlyphName = "noteheads.s"_+str(clip(0,int(note.value-1),2)); // FIXME: factor
 							x += 2*glyphSize(noteGlyphName).x;
 							for(Sign sign: chords[staff]) if(abs(sign.note.step-note.step) <=1) { x += glyphSize(noteGlyphName).x; break; }// Dichord
+							if(chords[staff]) sign.note.tuplet = chords[staff][0].note.tuplet; // Does not affect rendering but mismatch triggers asserts
 							chords[staff].insertSorted(sign);
 						} else {
 							//if(note.slash) measure.parallelograms.append( Parallelogram(p+vec2(-dx+dx/2,dx), p+vec2(dx+dx/2,-dx), 1) );
@@ -520,7 +524,6 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 				uint beatDuration = quarterDuration; //*4/timeSignature.beatUnit;
 				//uint beamFirstBeat = beamStart[staff] / beatDuration;
 				//uint beamLastBeat = (beamStart[staff]+beamDuration) / beatDuration;
-
 
 				if(beam &&
 						( beamDuration > beatDuration /*Beam before too long*/
