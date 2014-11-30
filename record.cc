@@ -86,13 +86,23 @@ struct Record : ImageView, Poll {
     const bool encodeAudio = !arguments().contains("noaudio");
     const bool encodeVideo = !arguments().contains("novideo");
 
+    // Beeps on overrun
+    AudioOutput audioOutput = {{this, &Record::read32}};
+    int remainingBeepTime = 0; // in samples (/channels)
+    size_t read32(mref<int2> output) {
+        for(size_t i: range(output.size)) output[i] = (1<<30)*sin(2*PI*i*440/48000);
+        remainingBeepTime -= output.size;
+        if(remainingBeepTime <= 0) audioOutput.stop();
+        return output.size;
+    }
+
     Record() {
         assert_(audio.sampleBits==32);
 
 		image = Image(video.size);
         window.background = Window::NoBackground;
-        window.actions[F3] = {this, &Record::start};
-        window.actions[F8] = {this, &Record::stop};
+        window.actions[F3] = window.actions[RightArrow] = {this, &Record::start};
+        window.actions[F8] = window.actions[DownArrow] = {this, &Record::stop};
         window.actions[Space] = {this, &Record::toggle};
         window.show();
 
@@ -128,8 +138,9 @@ struct Record : ImageView, Poll {
     /// Stops capture, flushes buffers and writes up file
     void stop() {
         Locker locker(lock); // Stops capture while encoding buffer
+        assert_(encoder);
         while(encode(false)) {}
-        assert_(!audioFrames && !videoFrames);
+        assert_(!audioFrames && !videoFrames, audioFrames.size, videoFrames.size);
         encoder = nullptr;
     }
 
@@ -162,6 +173,13 @@ struct Record : ImageView, Poll {
 
     // Encoder thread (TODO: multithread ?)
     void event() {
+        if(audio.overruns && encoder) {
+            remainingBeepTime = 48000;
+            audioOutput.start(48000, 4096, 32, 2);
+            stop();
+            audio.overruns = 0;
+            return;
+        }
         while(encode()) {}
         if(contentChanged) window.render(); // only when otherwise idle
         if(maximumAmplitude > reportedMaximumAmplitude) {
