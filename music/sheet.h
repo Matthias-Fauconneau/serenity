@@ -14,7 +14,7 @@ struct Sheet : Widget {
 	const float lineWidth = 1, barWidth=1, stemWidth = 1, stemLength = 7*halfLineInterval, beamWidth = 6;
 	const float shortStemLength = 7*halfLineInterval;
     // Layout helpers
-	float staffY(uint staff, int clefStep) { return staff*10*lineInterval - clefStep * halfLineInterval; } // Clef independent
+	float staffY(uint staff, int clefStep) { return (!staff)*10*lineInterval - clefStep * halfLineInterval; } // Clef independent
 	float Y(uint staff, ClefSign clefSign, int step) { return staffY(staff, step-(clefSign==Treble ? 10 : -2)); } // Clef dependent
 	// Translates C4 step to top line step using clef
 	int clefStep(Sign sign) {
@@ -37,7 +37,7 @@ struct Sheet : Widget {
 	shared<Graphics> debug;
 
 	int highestStep = 0;
-	int2 sizeHint(int2) override { return int2(measureBars.values.last(), -(staffY(1, -32)-staffY(0, highestStep))); }
+	int2 sizeHint(int2) override { return int2(measureBars.values.last(), -(staffY(0, -32)-staffY(1, highestStep))); }
 	shared<Graphics> graphics(int2 size, Rect clip) override;
 
 	// -- Control

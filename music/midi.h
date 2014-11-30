@@ -6,6 +6,7 @@
 #include "notation.h"
 
 struct MidiNote { int64 time; uint key, velocity; };
+notrace inline bool operator ==(const MidiNote& a, const MidiNote& b) { return a.time == b.time && a.key == b.key && a.velocity == b.velocity; }
 notrace inline bool operator <(const MidiNote& a, const MidiNote& b) { return a.time < b.time || (a.time == b.time && a.key < b.key); }
 inline String str(const MidiNote& o) { return str(o.time, strKey(o.key)); }
 

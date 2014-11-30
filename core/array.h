@@ -18,7 +18,7 @@ generic struct array : buffer<T> {
 	using buffer<T>::buffer;
 	array() {}
 	/// Converts a buffer to an array
-	array(buffer<T>&& o) : buffer<T>(move(o)) {}
+	array(buffer<T>&& o) : buffer<T>(::move(o)) {}
 	/// Allocates an empty array with storage space for \a capacity elements
 	explicit array(size_t capacity) { reserve(capacity); }
 
@@ -56,6 +56,8 @@ generic struct array : buffer<T> {
 	T& append(T&& e) { grow(size+1); return set(size-1, ::move(e)); }
 	/// Appends another list of elements to this array by copying
 	void append(const ref<T> source) { grow(size+source.size); slice(size-source.size).copy(source); }
+	/// Appends another list of elements to this array by moving
+	void append(const mref<T> source) { grow(size+source.size); slice(size-source.size).move(source); }
     /// Appends a new element
     template<Type Arg0, Type Arg1, Type... Args> T& append(Arg0&& arg0, Arg1&& arg1, Args&&... args) {
 		grow(size+1); return set(size-1, forward<Arg0>(arg0), forward<Arg1>(arg1), forward<Args>(args)...);
