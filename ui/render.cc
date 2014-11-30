@@ -198,7 +198,7 @@ static void cubic(Image8& raster, vec2 A, vec2 B, vec2 C, vec2 D) {
 }
 
 // Renders cubic spline (two control points between each end point)
-void cubic(const Image& target, ref<vec2> sourcePoints, bgr3f color, float alpha, vec2 offset, const uint oversample=2) {
+void cubic(const Image& target, ref<vec2> sourcePoints, bgr3f color, float alpha, vec2 offset, const uint oversample=4) {
 	byte points_[sourcePoints.size*sizeof(vec2)]; mref<vec2> points ((vec2*)points_, sourcePoints.size); //FIXME: stack<T> points(sourceSize.size)
 	for(size_t index: range(sourcePoints.size)) points[index] = offset+sourcePoints[index];
 	vec2 pMin = vec2(target.size), pMax = 0;

@@ -2,6 +2,16 @@
 #include "file.h"
 #include "math.h"
 
+inline uint parseKey(TextData& s) {
+	int key=24;
+	if(!"cdefgabCDEFGAB"_.contains(s.peek())) return -1;
+	key += "c#d#ef#g#a#b"_.indexOf(lowerCase(s.next()));
+	if(s.match('#')) key++;
+	key += 12*s.mayInteger(4);
+	return key;
+}
+inline uint parseKey(const string name) { TextData s(name); return parseKey(s); }
+
 MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 	BinaryData s(file, true);
     s.advance(10);
@@ -32,11 +42,16 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 		}
 	}
 
-	map<uint, Clef> clefs;
 	KeySignature keySignature={0}; TimeSignature timeSignature={4,4}; Metronome metronome={Quarter, 120};
 	uint measureIndex = 0;
 	int64 lastMeasureStart = 0;
-	map<uint, int64> active;
+	// For each staff (0: Bass, 1: Treble)
+	Clef clefs[2] = {{Bass,0}, {Treble,0}};
+	for(uint staff: range(2)) signs.insertSorted(Sign{0, 0, staff, Sign::Clef, .clef=clefs[staff]});
+	array<MidiNote> currents[2]; // New notes to be pressed
+	array<MidiNote> actives[2]; // Notes currently pressed
+	array<MidiNote> commited[2]; // Commited/assigned notes to be written once duration is known (on note off)
+	int64 lastOff[2] = {0,0}; // For rests
 	for(int64 lastTime = 0;;) {
 		size_t trackIndex = invalid;
 		for(size_t index: range(tracks.size))
@@ -45,7 +60,66 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 		if(trackIndex == invalid) break;
 		Track& track = tracks[trackIndex];
 		assert_(track.time >= lastTime);
+
+		if(track.time != lastTime) { // Commits last chord
+			uint sustain[2] = { (uint)actives[0].size, (uint)actives[1].size }; // Remaining notes kept sustained
+			// Balances load on both hand
+			for(size_t staff: range(2)) {
+				array<MidiNote>& active = actives[staff];
+				array<MidiNote>& otherActive = actives[!staff];
+				array<MidiNote>& current = currents[staff];
+				array<MidiNote>& other = currents[!staff];
+				while(
+					  current && // Any notes to move from staff to !staff ?
+					  ((staff==0 && current.last().key>parseKey("F2")) || (staff==1 && current.first().key<68)) && // Prevents stealing from far notes (TODO: relative to last active)
+					  current.size>=other.size && // keep new notes balanced
+					  active.size>=otherActive.size && // keep active (sustain+new) notes balanced
+					  (!other ||
+					   (staff==1 && abs(int(other.first().key-current.first().key))<=12) || // Keeps short span on new notes (left)
+					   (staff==0 && abs(int(other.last().key-current.last().key))<=12) ) && // Keeps short span on new notes (right)
+					  (!sustain[!staff] ||
+					   (staff==1 && abs(int(otherActive[0].key-current.first().key))<=18) || // Keeps short span with active notes (left)
+					   (staff==0 && abs(int(otherActive[sustain[!staff]-1].key-current.last().key))<=18) ) && // Keeps short span with active notes (right)
+					  (
+						  active.size>otherActive.size+1 || // Balances active notes
+						  current.size>other.size+1 || // Balances load
+						  // Both new notes and active notes load are balanced
+						  (currents[0] && currents[1] && staff == 0 && abs(int(currents[1].first().key-currents[1].last().key))<abs(int(currents[0].first().key-currents[0].last().key))) || // Minimizes left span
+						  (currents[0] && currents[1] && staff == 1 && abs(int(currents[0].first().key-currents[0].last().key))<abs(int(currents[1].first().key-currents[1].last().key))) || // Minimizes right span
+						  (sustain[staff] && sustain[!staff] && active.last()/*[sustain[staff]-1]?*/.time>otherActive.last()/*[sustain[!staff]-1]?*/.time) // Loads least recently used hand
+						  )) {
+					// Notes are sorted bass to treble (bottom to top)
+					if(!staff) { // Top bass to bottom treble
+						other.insertAt(0, current.pop());
+						otherActive.insertAt(0, active.pop());
+						assert_(other[0]==otherActive[0]);
+					} else { // Bottom treble to top bass
+						other.append( current.take(0) );
+						otherActive.append( active.take(0/*sustain[staff]?*/) );
+						assert_(other.last()==otherActive.last());
+					}
+				}
+			}
+			for(size_t staff: range(2)) commited[staff].append(::move(currents[staff]));  // Defers until duration is known (on note off)
+			for(size_t staff: range(2)) currents[staff].clear(); // FIXME: ^ move should already clear currents[staff]
+			for(size_t staff: range(2)) assert_(!currents[staff], currents, commited);
+			if(measureIndex > 35) {
+				signs.insertSorted({track.time, 0, uint(-1), Sign::Measure, .measure={measureIndex, 1, 1, measureIndex}});
+				break; // HACK: Stops 'Brave Adventurers' before repeat
+			}
+		}
+
 		lastTime = track.time;
+
+		// When latest track is ready to switch measure
+		int64 measureLength = timeSignature.beats*60*divisions/metronome.perMinute;
+		assert_(measureLength);
+		int64 nextMeasureStart = lastMeasureStart+measureLength;
+		if(track.time >= nextMeasureStart) {
+			lastMeasureStart = nextMeasureStart;
+			signs.insertSorted({nextMeasureStart, 0, uint(-1), Sign::Measure, .measure={measureIndex, 1, 1, measureIndex}});
+			measureIndex++;
+		}
 
 		BinaryData& s = tracks[trackIndex].data;
 		uint8 key=s.read();
@@ -68,14 +142,20 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 				signs.insertSorted(Sign{track.time, 0, uint(-1), Sign::TimeSignature, .timeSignature=timeSignature});
 			}
 			else if(MIDI(key)==MIDI::Tempo) {
-				uint tempo=((data[0]<<16)|(data[1]<<8)|data[2]); // Microseconds per beat (quarter)
+				/*uint tempo=((data[0]<<16)|(data[1]<<8)|data[2]); // Microseconds per beat (quarter)
 				uint perMinute = 60000000 / tempo; // Beats per minute
-				signs.insertSorted({track.time, 0, uint(-1), Sign::Metronome, .metronome={Quarter, perMinute}});
+				if(perMinute) signs.insertSorted({track.time, 0, uint(-1), Sign::Metronome, .metronome={Quarter, perMinute}}); FIXME*/
 			}
 			else if(MIDI(key)==MIDI::KeySignature) {
-				keySignature.fifths=(int8)data[0];
+				int fifths = (int8)data[0];
 				//scale=data[1]?Minor:Major;
-				signs.insertSorted(Sign{track.time, 0, uint(-1), Sign::KeySignature, .keySignature=keySignature});
+				if(keySignature.fifths!=fifths) {
+					keySignature.fifths=fifths;
+					if(signs.last().type == Sign::TimeSignature)
+						signs.insertAt(signs.size-1, Sign{track.time, 0, uint(-1), Sign::KeySignature, .keySignature=keySignature});
+					else
+						signs.insertSorted(Sign{track.time, 0, uint(-1), Sign::KeySignature, .keySignature=keySignature});
+				}
 			}
 			else if(MIDI(key)==MIDI::TrackName || MIDI(key)==MIDI::Text || MIDI(key)==MIDI::Copyright) {}
 			else if(MIDI(key)==MIDI::EndOfTrack) {}
@@ -85,99 +165,105 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 
 		if(type==NoteOff) type=NoteOn, vel=0;
 		if(type==NoteOn) {
-			notes.insertSorted(MidiNote{track.time, key, vel});
-			if(active.contains(key)) {
+			MidiNote note{track.time, key, vel};
+			notes.insertSorted( note );
+			for(uint staff: range(2)) actives[staff].filter([key](MidiNote o){return o.key == key;}); // Releases active note
+			// Commits before any repeated note on (auto release on note on without matching note off)
+			for(uint staff: range(2)) { // Inserts chord now that durations are known
+				for(size_t index: range(commited[staff].size)) {
+					if(commited[staff][index].key !=  note.key) continue;
+					MidiNote noteOn = commited[staff].take(index);
+					// Step
+					assert_(keySignature.fifths >= -6 && keySignature.fifths <= 6, keySignature.fifths);
+					struct PitchClass {
+						char keyIntervals[11 +1];
+						char accidentals[12 +1]; // 0=none, 1=♭, 2=♮, 3=♯
+					};
+					PitchClass pitchClasses[12] = { //*7%12 //FIXME: generate
+													//C # D # E F #G # A # B C#D#EF#G#A#B
+													{"10101101010", "N.N.N..N.N.N"}, // ♭♭♭♭♭♭ G♭/F# e♭/d#
+													{"10101101010", "..N.N..N.N.N"}, // ♭♭♭♭♭/♯♯♯♯♯♯♯ D♭ b♭
+													{"10101101010", "..N.N.b..N.N"}, // ♭♭♭♭ A♭ f
+													{"10101101010", ".b..N.b..N.N"}, // ♭♭♭ E♭ c
+													{"10101101010", ".b..N.b.b..N"}, // ♭♭ B♭ g
+													{"10101101010", ".b.b..b.b..N"}, // ♭ F d
+													{"01011010101", ".#.#..#.#.#."},  // ♮ C a '.b.b..b.b.b.'
+													{"01011010101", ".#.#.N..#.#."},  // ♯ G e
+													{"01011010101",  "N..#.N..#.#."},  // ♯♯ D b
+													{"01011010101", "N..#.N.N..#."},  // ♯♯♯ A f♯
+													{"01011010101", "N.N..N.N..#."},  // ♯♯♯♯ E c♯
+													{"01011010101", "N.N..N.N.N.."}  // ♯♯♯♯♯/♭♭♭♭♭♭♭ B g♯
+												  };
+					PitchClass pitchClass = pitchClasses[keySignature.fifths+6];
+					int h=key/12*7; for(int i: range(key%12)/*0-10*/) h+=pitchClass.keyIntervals[i]-'0';
+					Clef clef = clefs[staff];
+					assert_(!clef.octave);
+					int noteStep = h - 35; //;(clef.clefSign==Treble ? 47 : 35);
 
-				// Staff
-				uint staff = key < 60; // C4
-#if 0 //TODO: Balances load on both hand
-				array<MidiNote> currents[2]; // new notes to be pressed
-				for(MidiNote note: notes.values[i]) { //first rough split based on pitch
-					int s = note.; //middle C
-					currents[s] << note;
-					actives[s] << note;
-				}
-				for(uint s: range(2)) { // then balances load on both hand
-					array<MidiNote>& active = actives[s];
-					array<MidiNote>& otherActive = actives[!s];
-					array<MidiNote>& current = currents[s];
-					array<MidiNote>& other = currents[!s];
-					while(
-						  current && // any notes to move ?
-						  ((s==0 && current.last().key>=52) || (s==1 && current.first().key<68)) && // prevent stealing from far notes (TODO: relative to last active)
-						  current.size>=other.size && // keep new notes balanced
-						  active.size>=otherActive.size && // keep active (sustain+new) notes balanced
-						  (!other ||
-						   (s==1 && abs(int(other.first().key-current.first().key))<=12) || // keep short span on new notes (left)
-						   (s==0 && abs(int(other.last().key-current.last().key))<=12) ) && // keep short span on new notes (right)
-						  (!sustain[!s] ||
-						   (s==1 && abs(int(otherActive[0].key-current.first().key))<=18) || // keep short span with active notes (left)
-						   (s==0 && abs(int(otherActive[sustain[!s]-1].key-current.last().key))<=18) ) && // keep short span with active notes (right)
-						  (
-							  active.size>otherActive.size+1 || // balance active notes
-							  current.size>other.size+1 || // balance load
-							  // both new notes and active notes load are balanced
-							  (currents[0] && currents[1] && s == 0 && abs(int(currents[1].first().key-currents[1].last().key))<abs(int(currents[0].first().key-currents[0].last().key))) || // minimize left span
-							  (currents[0] && currents[1] && s == 1 && abs(int(currents[0].first().key-currents[0].last().key))<abs(int(currents[1].first().key-currents[1].last().key))) || // minimize right span
-							  (sustain[s] && sustain[!s] && active[sustain[s]-1].start>otherActive[sustain[!s]-1].start) // load least recently used hand
-							  )) {
-						if(!s) {
-							other.insertAt(0, current.pop());
-							actives[!s].insertAt(0, active.pop());
-						} else {
-							other << current.take(0);
-							actives[!s] << active.take(sustain[s]);
+					// Value
+					int duration = note.time - noteOn.time;
+					if(duration) {
+						const int quarterDuration = 16*metronome.perMinute/60;
+						uint valueDuration = duration*quarterDuration/divisions;
+						if(!valueDuration) valueDuration = quarterDuration/2; //FIXME
+						assert_(valueDuration, duration, quarterDuration, divisions);
+						bool dot=false;
+						uint tuplet = 0;
+						if(valueDuration == 5 || valueDuration == 6) { // Triplet of quavers
+							tuplet = 3;
+							valueDuration = 8;
 						}
+						else if(valueDuration == 44) { // Dotted white
+							dot = true;
+							valueDuration = 32;
+						} 	else if(valueDuration == 60) { // Whole
+							valueDuration = 64;
+						} else if(valueDuration%3 == 0) { // Dot
+							dot = true;
+							valueDuration = valueDuration * 2 / 3;
+						}
+						assert_(isPowerOfTwo(valueDuration), duration, quarterDuration, divisions, duration*quarterDuration/divisions, valueDuration, strKey(key));
+						Value value = Value(ref<uint>(valueDurations).size-1-log2(valueDuration));
+						assert_(int(value) >= 0, duration, valueDuration);
+
+						if(noteOn.time > lastOff[staff]+quarterDuration/8) { // Rest
+							int duration = noteOn.time - lastOff[staff];
+							assert_(duration > quarterDuration/4);
+							const uint quarterDuration = 16*metronome.perMinute/60;
+							uint valueDuration = duration*quarterDuration/divisions;
+							if(!valueDuration) valueDuration = quarterDuration/2; //FIXME
+							assert_(valueDuration, duration, quarterDuration, divisions);
+							bool dot=false;
+							if(valueDuration%3 == 0) {
+								dot = true;
+								valueDuration = valueDuration * 2 / 3;
+							}
+							//assert_(isPowerOfTwo(valueDuration), duration, quarterDuration, divisions, valueDuration, strKey(key), "rest");
+							if(valueDuration>=valueDurations[Eighth]) {
+								assert_(valueDuration>=valueDurations[Eighth], duration, quarterDuration, divisions, valueDuration, strKey(key), "rest");
+								Value value = Value(ref<uint>(valueDurations).size-1-log2(valueDuration));
+								assert_(int(value) >= 0, duration, valueDuration);
+								signs.insertSorted(Sign{lastOff[staff], duration, staff, Sign::Rest, .rest={value}});
+							}
+						}
+
+						signs.insertSorted(Sign{noteOn.time, duration, staff, Sign::Note, .note={
+													clef, noteStep, Accidental(".bN#"_.indexOf(pitchClass.accidentals[key%12/*0-11*/])), value, Note::NoTie,
+													dot, /*grace*/ false, /*slash*/ false, /*staccato*/ false, /*tenuto*/ false, /*accent*/ false, /*trill*/ false, /*up*/false,
+													tuplet, key, invalid, invalid}});
+						lastOff[staff] = note.time;
 					}
+					break; // Assumes single match (FIXME: assert)
 				}
-#endif
-				// Step
-				assert_(keySignature.fifths >= -6 && keySignature.fifths <= 6, keySignature.fifths);
-				struct PitchClass {
-					char keyIntervals[11 +1];
-					char accidentals[12 +1]; // 0=none, 1=♭, 2=♮, 3=♯
-				};
-				PitchClass pitchClasses[12] = { //*7%12 //FIXME: generate
-					//C # D # E F #G # A # B C#D#EF#G#A#B
-					{"10101101010", "N.N.N..N.N.N"}, // ♭♭♭♭♭♭ G♭/F# e♭/d#
-					{"10101101010", "..N.N..N.N.N"}, // ♭♭♭♭♭/♯♯♯♯♯♯♯ D♭ b♭
-					{"10101101010", "..N.N.b..N.N"}, // ♭♭♭♭ A♭ f
-					{"10101101010", ".b..N.b..N.N"}, // ♭♭♭ E♭ c
-					{"10101101010", ".b..N.b.b..N"}, // ♭♭ B♭ g
-					{"10101101010", ".b.b..b.b..N"}, // ♭ F d
-					{"01011010101", ".#.#..#.#.#."},  // ♮ C a '.b.b..b.b.b.'
-					{"01011010101", ".#.#.N..#.#."},  // ♯ G e
-					{"01011010101",  "N..#.N..#.#."},  // ♯♯ D b
-					{"01011010101", "N..#.N.N..#."},  // ♯♯♯ A f♯
-					{"01011010101", "N.N..N.N..#."},  // ♯♯♯♯ E c♯
-					{"01011010101", "N.N..N.N.N.."}  // ♯♯♯♯♯/♭♭♭♭♭♭♭ B g♯
-				};
-				PitchClass pitchClass = pitchClasses[keySignature.fifths+6];
-				int h=key/12*7; for(int i: range(key%12)/*0-10*/) h+=pitchClass.keyIntervals[i]-'0';
-				Clef clef = clefs.value(staff, {staff?Bass:Treble, 0});
-				assert_(!clef.octave);
-				int noteStep = h - (clef.clefSign==Treble ? 47 : 35);
-
-				// Value
-				int duration = track.time-active[key];
-				const uint quarterDuration = 16*metronome.perMinute/60;
-				uint valueDuration = duration*quarterDuration/divisions;
-				assert_(valueDuration);
-				bool dot=false;
-				if(valueDuration%3 == 0) {
-					dot = true;
-					valueDuration = valueDuration * 2 / 3;
-				}
-				Value value = Value(ref<uint>(valueDurations).size-1-log2(valueDuration));
-				assert_(int(value) >= 0, duration, valueDuration);
-
-				signs.insertSorted(Sign{active[key], duration, staff, Sign::Note, .note={
-											clef, noteStep, Accidental(".bN#"_.indexOf(pitchClass.accidentals[key%12/*0-11*/])), value, Note::NoTie,
-											dot, /*grace*/ false, /*slash*/ false, /*staccato*/ false, /*tenuto*/ false, /*accent*/ false, /*trill*/ false, /*up*/false,
-											key, invalid, invalid}});
-				active.remove(key);
 			}
-			if(vel) active[key] = track.time;
+			if(vel) { // First rough split based on pitch (final load balanced staff assignment deferred until whole chord is seen)
+				uint staff = key >= 60; // C4
+				for(MidiNote o: currents[staff]) assert_(o.time == note.time, o.time, note.time, "current", currents[staff]);
+				//for(MidiNote o: actives[staff]) assert_(o.time == note.time, o.time, note.time, "active", actives[staff]);
+				// Sorts by key (bass to treble)
+				currents[staff].insertSorted( note );
+				actives[staff].insertSorted( note );
+			}
 		}
 
 		if(s) {
@@ -185,17 +271,12 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 			if(c&0x80){c=s.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=s.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=s.read();t=(t<<7)|c;}}}
 			track.time += t;
 		}
-
-		int64 measureLength = timeSignature.beats*60*divisions/metronome.perMinute;
-		assert_(measureLength);
-		int64 nextMeasureStart = lastMeasureStart+measureLength;
-		if(track.time >= nextMeasureStart) {
-			lastMeasureStart = nextMeasureStart;
-			signs.insertSorted({nextMeasureStart, 0, uint(-1), Sign::Measure, .measure={measureIndex, 1, 1, measureIndex}});
-			measureIndex++;
-		}
 	}
-	assert_(!active, active);
+	for(uint staff: range(2)) {
+		assert_(!currents[staff], currents[staff]);
+		//assert_(!actives[staff], actives[staff]);
+		//assert_(!commited[staff], commited[staff]);
+	}
 	// Measures are signaled on end
 	int64 measureLength = timeSignature.beats*60*divisions/metronome.perMinute;
 	assert_(measureLength);

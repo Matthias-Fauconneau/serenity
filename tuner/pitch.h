@@ -59,7 +59,7 @@ inline String strKey(int key) { return (string[]){"A","A#","B","C","C#","D","D#"
 inline int parseKey(TextData& s) {
     int key=24;
 	if(!"cdefgabCDEFGAB"_.contains(s.peek())) return -1;
-	key += "c#d#ef#g#a#b"_.indexOf(toLower(s.next()));
+	key += "c#d#ef#g#a#b"_.indexOf(lowerCase(s.next()));
     if(s.match('#')) key++;
     key += 12*s.mayInteger(4);
     return key;

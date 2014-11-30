@@ -18,13 +18,9 @@ generic struct array : buffer<T> {
 	using buffer<T>::buffer;
 	array() {}
 	/// Converts a buffer to an array
-	array(buffer<T>&& o) : buffer<T>(move(o)) {}
+	array(buffer<T>&& o) : buffer<T>(::move(o)) {}
 	/// Allocates an empty array with storage space for \a capacity elements
 	explicit array(size_t capacity) { reserve(capacity); }
-	/*/// Copies elements from a reference
-    explicit array(const ref<T> source) : array() { append(source); }
-    /// Moves elements from a reference
-	explicit array(const mref<T> source) : array() { append(source); } //FIXME: only enables for non implicitly copiable types*/
 
 	// -- Variable capacity
     /// Allocates enough memory for \a capacity elements
@@ -58,13 +54,10 @@ generic struct array : buffer<T> {
 	T& append(const T& e) { grow(size+1); return set(size-1, e); }
     /// Appends a movable value
 	T& append(T&& e) { grow(size+1); return set(size-1, ::move(e)); }
-    /// Appends another list of elements to this array by moving
-	//void append(const mref<T> source) { grow(size+source.size); slice(size-source.size).move(source); }
-    /// Appends another list of elements to this array by copying
+	/// Appends another list of elements to this array by copying
 	void append(const ref<T> source) { grow(size+source.size); slice(size-source.size).copy(source); }
-	/*/// Appends a new element
-    template<Type Arg, typename enable_if<!is_convertible<Arg, T>::value && !is_convertible<Arg, ref<T>>::value>::type* = nullptr>
-	T& append(Arg&& arg) { grow(size+1); return set(size-1, forward<Arg>(arg)); }*/
+	/// Appends another list of elements to this array by moving
+	void append(const mref<T> source) { grow(size+source.size); slice(size-source.size).move(source); }
     /// Appends a new element
     template<Type Arg0, Type Arg1, Type... Args> T& append(Arg0&& arg0, Arg1&& arg1, Args&&... args) {
 		grow(size+1); return set(size-1, forward<Arg0>(arg0), forward<Arg1>(arg1), forward<Args>(args)...);
@@ -83,17 +76,12 @@ generic struct array : buffer<T> {
 		} else return set(index, ::move(e)); // index==size-1
     }
     /// Inserts immediately before the first element greater than the argument
-	//size_t insertSorted(T&& e) { size_t index=linearSearch(e); insertAt(index, ::move(e)); return index; }
-	//size_t insertSorted(const T& e) { size_t index=linearSearch(e); insertAt(index, ::copy(e)); return index; }
 	size_t insertSorted(T&& e) { size_t index=reverseLinearSearch(e); insertAt(index, ::move(e)); return index; }
 	size_t insertSorted(const T& e) { size_t index=reverseLinearSearch(e); insertAt(index, ::copy(e)); return index; }
-	//size_t insertSorted(T&& e) { size_t index = binarySearch(e); insertAt(index, ::move(e)); return index; }
-	//size_t insertSorted(const T& e) { size_t index = binarySearch(e); insertAt(index, ::copy(e)); return index; }
 
     /// Removes one element at \a index
 	void removeAt(size_t index) { at(index).~T(); for(size_t i: range(index, size-1)) raw(at(i)).copy(raw(at(i+1))); size--; }
-	//void removeAt(size_t index) { at(index).~T(); for(size_t i: range(index, size-1)) at(i)=move(at(i+1)); size--; }
-    /// Removes one element at \a index and returns its value
+	/// Removes one element at \a index and returns its value
 	T take(size_t index) { T value = move(at(index)); removeAt(index); return value; }
     /// Removes the last element and returns its value
     T pop() { return take(size-1); }

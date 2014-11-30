@@ -15,7 +15,7 @@ static Element parse(string document, bool html) {
     return root;
 }
 
-Element parseXML(const string& document) { return parse(document,false); }
+Element parseXML(string document) { return parse(document,false); }
 
 Element::Element(TextData& s, bool html) {
 	size_t begin = s.index;
@@ -59,25 +59,27 @@ Element::Element(TextData& s, bool html) {
     }
 }
 
-string Element::attribute(const string& attribute) const {
+string Element::attribute(string attribute) const {
     assert_(attributes.contains(attribute),"attribute", attribute,"not found in",*this);
     return attributes.at(attribute);
 }
 
-string Element::operator[](const string& attribute) const {
+string Element::operator[](string attribute) const {
     if(!attributes.contains(attribute)) return ""_;
     return attributes.at(attribute);
 }
 
-const Element& Element::child(const string& name) const {
-    for(const Element& e: children) if(e.name==name) return e;
-    error("children"_, name, "not found in"_, *this);
+bool Element::contains(string name) const {
+	for(const Element& e: children) if(e.name==name) return true;
+	return false;
 }
 
-const Element& Element::operator()(const string& name) const {
-    for(const Element& e: children) if(e.name==name) return e;
-    static Element empty;
-    return empty;
+const Element& Element::operator()(string name) const {
+	const Element* element = 0;
+	for(const Element& e: children) if(e.name==name) { assert_(!element, "Multiple match for", name); element=&e; }
+	assert_(element, "No such element", name);
+	static Element empty;
+	return element ? *element : empty;
 }
 
 void Element::visit(const function<void(const Element&)>& visitor) const {
@@ -89,7 +91,7 @@ void Element::mayVisit(const function<bool(const Element&)>& visitor) const {
     if(visitor(*this)) for(const Element& e: children) e.mayVisit(visitor);
 }
 
-void Element::xpath(const string& path, const function<void(const Element &)>& visitor) const {
+void Element::xpath(string path, const function<void(const Element &)>& visitor) const {
     assert(path);
     if(startsWith(path,"//"_)) {
         string next = path.slice(2);
@@ -97,14 +99,13 @@ void Element::xpath(const string& path, const function<void(const Element &)>& v
     }
     string first = section(path,'/');
     string next = section(path,'/',1,-1);
-    array<Element> collect;
     if(next) { for(const Element& e: children) if(e.name==first) e.xpath(next,visitor); }
     else { for(const Element& e: children) if(e.name==first) visitor(e); }
 }
 
 String Element::text() const { array<char> text; visit([&text](const Element& e){ text.append( unescape(e.content) ); }); return move(text); }
 
-String Element::text(const string& path) const {
+String Element::text(string path) const {
 	array<char> text;
 	xpath(path, [&text](const Element& e) { text.append( e.text() ); });
 	return move(text);
@@ -130,7 +131,7 @@ String Element::str(uint depth) const {
 }
 String str(const Element& e) { return e.str(); }
 
-String unescape(const string& xml) {
+String unescape(string xml) {
     static map<string, string> entities;
     if(!entities) {
 		array<string> kv = split(

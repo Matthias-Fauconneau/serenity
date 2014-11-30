@@ -66,7 +66,7 @@ String toLower(string source) { return apply(source, lowerCase); }
 char upperCase(char c) { return c>='a'&&c<='z'?'A'+c-'a':c; }
 String toUpper(string source) { return apply(source, upperCase); }
 
-String repeat(const string& s, uint times) { array<char> r (times*s.size, 0); for(uint unused i: range(times)) r.append(s); return move(r); }
+String repeat(string s, uint times) { array<char> r (times*s.size, 0); for(uint unused i: range(times)) r.append(s); return move(r); }
 
 String left(const string source, size_t size, const char pad) {
 	if(source.size >= size) return copyRef(source);

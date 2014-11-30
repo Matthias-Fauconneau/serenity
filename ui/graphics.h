@@ -9,6 +9,9 @@ static constexpr bgr3f red (0, 0, 1);
 static constexpr bgr3f green (0, 1, 0);
 static constexpr bgr3f blue (1, 0, 0);
 static constexpr bgr3f white (1, 1, 1);
+static constexpr bgr3f cyan (1, 1, 0);
+static constexpr bgr3f magenta (1, 0, 1);
+static constexpr bgr3f yellow (0, 1, 1);
 
 /// Fill graphic element
 struct Fill {
