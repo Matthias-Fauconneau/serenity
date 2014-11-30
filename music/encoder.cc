@@ -222,7 +222,11 @@ Encoder::~Encoder() {
         av_interleaved_write_frame(context, 0);
         av_write_trailer(context);
         avformat_close_input(&context);
-        avcodec_close(videoCodec); videoCodec=0;
-        avcodec_close(audioCodec); audioCodec=0;
+        assert_(videoCodec);
+        avcodec_close(videoCodec); // Destroyed by avformat ?
+        videoCodec=0;
+        assert_(audioCodec);
+        avcodec_close(audioCodec); // Destroyed by avformat ?
+        audioCodec=0;
     }
 }

@@ -93,6 +93,7 @@ struct Record : ImageView, Poll {
         window.background = Window::NoBackground;
         window.actions[F3] = {this, &Record::start};
         window.actions[F8] = {this, &Record::stop};
+        window.actions[Space] = {this, &Record::toggle};
         window.show();
 
         audioThread.spawn();
@@ -107,6 +108,7 @@ struct Record : ImageView, Poll {
 
     void start() {
         abort();
+        Locker locker(lock);
         encoder = unique<Encoder>(arguments()[0]+".mkv"_);
         if(encodeVideo) encoder->setVideo(Encoder::YUYV, video.size, video.frameRate, true);
         if(encodeAudio) encoder->setFLAC(audio.sampleBits, audio.channels, audio.rate);
@@ -129,6 +131,11 @@ struct Record : ImageView, Poll {
         while(encode(false)) {}
         assert_(!audioFrames && !videoFrames);
         encoder = nullptr;
+    }
+
+    void toggle() {
+        if(!encoder) start();
+        else stop();
     }
 
     uint bufferAudio(ref<int32> input) {
