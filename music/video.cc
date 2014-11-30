@@ -50,27 +50,28 @@ Decoder::~Decoder() {
 	if(file) avformat_close_input(&file);
 }
 
-bool Decoder::read(const Image& image) {
+Image Decoder::read() {
 	for(;;) {
 		AVPacket packet;
-		if(av_read_frame(file, &packet) < 0) return false;
+		if(av_read_frame(file, &packet) < 0) return {};
 		if(file->streams[packet.stream_index]==videoStream) {
 			int gotFrame=0;
 			int used = avcodec_decode_video2(video, frame, &gotFrame, &packet);
 			assert_(used >= 0, used);
-			if(!gotFrame) continue;
+			if(gotFrame) {
+				AVPicture targetFrame;
+				Image image (size);
+				targetFrame.data[0] = ((uint8*)image.data);
+				targetFrame.data[1] = ((uint8*)image.data)+1;
+				targetFrame.data[2] = ((uint8*)image.data)+2;
+				targetFrame.linesize[0] = targetFrame.linesize[1] = targetFrame.linesize[2] = image.stride*4;
+				sws_scale(swsContext, frame->data, frame->linesize, 0, height, targetFrame.data, targetFrame.linesize);
 
-			AVPicture targetFrame;
-			targetFrame.data[0] = ((uint8*)image.data);
-			targetFrame.data[1] = ((uint8*)image.data)+1;
-			targetFrame.data[2] = ((uint8*)image.data)+2;
-			targetFrame.linesize[0] = targetFrame.linesize[1] = targetFrame.linesize[2] = image.stride*4;
-			sws_scale(swsContext, frame->data, frame->linesize, 0, height, targetFrame.data, targetFrame.linesize);
-
-			//if(!firstPTS) firstPTS=frame->pkt_pts; // Ignores any embedded sync
-			assert_(frame->pkt_pts >= firstPTS, firstPTS, packet.pts, packet.dts);
-			videoTime = (frame->pkt_pts-firstPTS) * videoFrameRate * videoStream->time_base.num / videoStream->time_base.den;
-			return true;
+				//if(!firstPTS) firstPTS=frame->pkt_pts; // Ignores any embedded sync
+				assert_(frame->pkt_pts >= firstPTS, firstPTS, packet.pts, packet.dts);
+				videoTime = (frame->pkt_pts-firstPTS) * videoFrameRate * videoStream->time_base.num / videoStream->time_base.den;
+				return image;
+			}
 		}
 		av_free_packet(&packet);
 	}

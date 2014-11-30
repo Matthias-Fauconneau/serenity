@@ -72,7 +72,7 @@ size_t AudioFile::read16(mref<int16> output) {
 				if(used < 0 || !gotFrame) continue;
 				bufferIndex=0, bufferSize = frame->nb_samples;
 				if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
-					int16Buffer = unsafeRef(ref<int16>((int16*)frame->data[0], bufferSize)); // Valid until next frame
+					int16Buffer = unsafeRef(ref<int16>((int16*)frame->data[0], bufferSize*channels)); // Valid until next frame
 				}
 				else if(audio->sample_fmt == AV_SAMPLE_FMT_S32) {
 					int16Buffer = buffer<int16>(bufferSize*channels);
@@ -94,18 +94,19 @@ size_t AudioFile::read16(mref<int16> output) {
 size_t AudioFile::read32(mref<int32> output) {
 	size_t readSize = 0;
 	while(readSize*channels < output.size) {
-        if(!bufferSize) {
-            AVPacket packet;
-            if(av_read_frame(file, &packet) < 0) return readSize;
+		while(!bufferSize) {
+			AVPacket packet;
+			if(av_read_frame(file, &packet) < 0) return readSize;
 			if(file->streams[packet.stream_index]==audioStream && packet.pts >= 0 /*FIXME*/) {
 				int32Buffer = buffer<int32>();
 				int gotFrame=0;
-                int used = avcodec_decode_audio4(audio, frame, &gotFrame, &packet);
-                if(used < 0 || !gotFrame) continue;
-                bufferIndex=0, bufferSize = frame->nb_samples;
-                if(audio->sample_fmt == AV_SAMPLE_FMT_S32) {
-					int32Buffer = unsafeRef(ref<int32>((int32*)frame->data[0], bufferSize)); // Valid until next frame
-                }
+				int used = avcodec_decode_audio4(audio, frame, &gotFrame, &packet);
+				if(used < 0 || !gotFrame) continue;
+				bufferIndex=0, bufferSize = frame->nb_samples;
+				assert_(bufferSize);
+				if(audio->sample_fmt == AV_SAMPLE_FMT_S32) {
+					int32Buffer = unsafeRef(ref<int32>((int32*)frame->data[0], bufferSize*channels)); // Valid until next frame
+				}
 				else {
 					int32Buffer = buffer<int32>(bufferSize*channels);
 					if(audio->sample_fmt == AV_SAMPLE_FMT_S16)
@@ -120,9 +121,10 @@ size_t AudioFile::read32(mref<int32> output) {
 					else error("Unimplemented conversion to int32 from", (int)audio->sample_fmt);
 				}
 				audioTime = packet.pts*audioFrameRate*audioStream->time_base.num/audioStream->time_base.den;
-            }
-            av_free_packet(&packet);
-        }
+			}
+			av_free_packet(&packet);
+		}
+		assert_(bufferSize && readSize*channels < output.size, bufferSize, readSize*channels, output.size);
 		size_t size = min(bufferSize, output.size/channels-readSize);
 		output.slice(readSize*channels, size*channels).copy(int32Buffer.slice(bufferIndex*channels, size*channels));
         bufferSize -= size; bufferIndex += size; readSize += size;
@@ -135,7 +137,7 @@ size_t AudioFile::read(mref<float> output) {
 	assert_(channels);
 	size_t readSize = 0;
 	while(readSize*channels < output.size) {
-		if(!bufferSize) {
+		while(!bufferSize) {
 			AVPacket packet;
 			if(av_read_frame(file, &packet) < 0) return readSize;
 			if(file->streams[packet.stream_index]==audioStream && packet.pts >= 0 /*FIXME*/) {
@@ -158,7 +160,7 @@ size_t AudioFile::read(mref<float> output) {
 			}
 			av_free_packet(&packet);
 		}
-		assert_(bufferSize && readSize*channels < output.size);
+		assert_(bufferSize && readSize*channels < output.size, bufferSize, readSize*channels, output.size);
 		size_t size = min(bufferSize, output.size-readSize*channels);
 		output.slice(readSize*channels, size*channels).copy(floatBuffer.slice(bufferIndex*channels, size*channels));
 		bufferSize -= size; bufferIndex += size; readSize += size;

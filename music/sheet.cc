@@ -309,7 +309,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 						Note& note = sign.note;
 						note.clef = clefs.at(staff);
 						note.measureIndex = measures.size();
-						highestStep = max(highestStep, note.step);
+						if(staff==0) lowestStep = min(lowestStep, clefStep(sign));
+						if(staff==1) highestStep = max(highestStep, clefStep(sign));
 
 						if(!note.grace && note.tie != Note::Merged) { //FIXME: render ties
 
@@ -762,7 +763,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 	if(logErrors && (extraErrors||wrongErrors||missingErrors||orderErrors)) log(extraErrors, wrongErrors, missingErrors, orderErrors);
 
 	auto verticalAlign = [&](Graphics& measure) {
-		vec2 offset = vec2(0, -staffY(0,highestStep)+textSize);
+		vec2 offset = vec2(0, -staffY(1,highestStep)+textSize);
 		for(auto& o: measure.fills) o.origin += offset;
 		assert_(!measure.blits);
 		for(auto& o: measure.glyphs) o.origin += offset;
