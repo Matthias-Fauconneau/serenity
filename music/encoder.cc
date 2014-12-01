@@ -42,7 +42,7 @@ void Encoder::setMJPEG(int2 size, uint videoFrameRate) {
     videoCodec->height = height;
     videoStream->time_base.num = videoCodec->time_base.num = 1;
     videoStream->time_base.den = videoCodec->time_base.den = videoFrameRate;
-    videoCodec->pix_fmt = PIX_FMT_YUV440P;
+    videoCodec->pix_fmt = AV_PIX_FMT_YUVJ444P;
     if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
     check( avcodec_open2(videoCodec, codec, 0) );
     frame = av_frame_alloc();

@@ -15,7 +15,7 @@ struct Record : Poll, Widget {
     array<buffer<int32>> audioFrames;
     int32 maximumAmplitude = 0;
     int32 reportedMaximumAmplitude = 1<<30;
-    float2 smoothedMean = 0;
+    float smoothedMean = 0;
 
     Thread videoThread {-20};
     VideoInput video {{this, &Record::bufferVideo}, videoThread};
@@ -73,7 +73,7 @@ struct Record : Poll, Widget {
         if(encodeVideo) encoder->setMJPEG(int2(video.width, video.height), video.frameRate);
         if(encodeAudio) encoder->setFLAC(audio.sampleBits, 1, 48000);
         encoder->open();
-        audio.start(encoder->channels, encoder->audioFrameRate, 4096 /*ChromeOS kernel restricts maximum buffer size*/);
+        audio.start(2, encoder->audioFrameRate, 4096 /*ChromeOS kernel restricts maximum buffer size*/);
         assert_(audio.periodSize <= encoder->audioFrameSize);
         audioThread.wait(); // Terminated once no poll left after unregisterPoll in audio.stop
         assert_(!audioThread);
@@ -106,10 +106,14 @@ struct Record : Poll, Widget {
     }
 
     uint bufferAudio(ref<int32> input) {
-        if(!encoder || !encodeAudio) evaluateSoundLevel(input);
+        buffer<int32> mono (input.size/audio.channels);
+        for(size_t i: range(input.size/audio.channels)) mono[i] = input[i*2+0]/2 + input[i*2+1]/2; // Assumes 1bit footroom
+
+        if(!encoder || !encodeAudio) evaluateSoundLevel(mono);
         else {
-            {Locker locker(lock);
-                audioFrames.append(copyRef(input));}
+            Locker locker(lock);
+            assert_(encoder->channels==1);
+            audioFrames.append(move(mono));
         }
         queue();
         return input.size/audio.channels;
@@ -175,18 +179,15 @@ struct Record : Poll, Widget {
 
     /// Evaluates mean sound levels
     void evaluateSoundLevel(ref<int32> frame) {
-        assert_(audio.channels == 2);
         const float a = float(frame.size) / float(audio.rate);
         maximumAmplitude = (1-a) * maximumAmplitude; // Smoothly recoil maximum back
-        long2 sum;
-        for(int2 s: cast<int2>(frame)) {
-            sum += abs(long2(s));
-            if(audio.time > audio.rate) { // Amplitude is still setting in first frames
-                if(abs(s[0]) > maximumAmplitude) maximumAmplitude = abs(s[0]);
-                if(abs(s[1]) > maximumAmplitude) maximumAmplitude = abs(s[1]);
-            }
+        int64 sum = 0;
+        for(int32 s: frame) {
+            sum += abs(int64(s));
+            if(audio.time > audio.rate) // Amplitude is still setting in first frames
+                maximumAmplitude = max(maximumAmplitude, s);
         }
-        float2 mean = float2(sum / long2(frame.size));
+        int32 mean = sum / frame.size;
         smoothedMean = a * mean + (1-a) * smoothedMean;
         contentChanged = true;
     }
@@ -216,8 +217,8 @@ struct Record : Poll, Widget {
             availableText = Text(str(availableLengthMinutes)+"min "+str(availableMB)+"MB", offset.y, white); // FIXME: skip if no change
             graphics->graphics.insertMulti(vec2(offset.x + x, 0), availableText.graphics(int2(size.x-offset.x-(offset.x+x), offset.y)));
         }
-        for(int channel : range(audio.channels)) {// VU meters
-            float y = size.y * (1 - smoothedMean[channel] / 0x1p28f); //clip(1.f, float(maximumAmplitude), 0x1p28f));
+        for(int channel : range(audio.channels)) { // VU meters (actually mono)
+            float y = size.y * (1 - smoothedMean / 0x1p28f); //clip(1.f, float(maximumAmplitude), 0x1p28f));
             graphics->fills.append(vec2(channel?offset.x+image.size.x:0, 0), vec2(offset.x, y), black);
             graphics->fills.append(vec2(channel?offset.x+image.size.x:0, y), vec2(offset.x, size.y-y), maximumAmplitude < ((1<<31)-1) ? green : red);
         }
