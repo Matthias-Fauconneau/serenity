@@ -596,21 +596,23 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 								tieStart = index;
 							}
 						}
-						assert_(tieStart != invalid, note.key, apply(activeTies[staff],[](TieStart o){return  o.key;}), signIndex);
-						TieStart tie = activeTies[staff].take(tieStart);
+						if(tieStart != invalid) {
+							assert_(tieStart != invalid, note.key, apply(activeTies[staff],[](TieStart o){return  o.key;}), signIndex);
+							TieStart tie = activeTies[staff].take(tieStart);
 
-						assert_(tie.position.y == P(sign).y);
-						float y = P(sign).y;
-						int slurDown = (chord.size>1 && index==chord.size-1) ? -1 :(y > staffY(staff, -4) ? 1 : -1);
-						vec2 p0 = vec2(tie.position.x + noteSize.x + (note.dot?noteSize.x/2:0), y + slurDown*halfLineInterval);
-						float bodyOffset = shift[index] ? noteSize.x : 0; // Shift body for dichords
-						vec2 p1 = vec2(P(sign).x + bodyOffset, y + slurDown*halfLineInterval);
-						const float offset = min(halfLineInterval, (P(sign).x-tie.position.x)/4), width = halfLineInterval/2;
-						vec2 k0 (p0.x, p0.y + slurDown*offset);
-						vec2 k0p (k0.x, k0.y + slurDown*width);
-						vec2 k1 (p1.x, p1.y + slurDown*offset);
-						vec2 k1p (k1.x, k1.y + slurDown*width);
-						measure.cubics.append(Cubic(copyRef(ref<vec2>({p0,k0,k1,p1,k1p,k0p}))));
+							assert_(tie.position.y == P(sign).y);
+							float y = P(sign).y;
+							int slurDown = (chord.size>1 && index==chord.size-1) ? -1 :(y > staffY(staff, -4) ? 1 : -1);
+							vec2 p0 = vec2(tie.position.x + noteSize.x + (note.dot?noteSize.x/2:0), y + slurDown*halfLineInterval);
+							float bodyOffset = shift[index] ? noteSize.x : 0; // Shift body for dichords
+							vec2 p1 = vec2(P(sign).x + bodyOffset, y + slurDown*halfLineInterval);
+							const float offset = min(halfLineInterval, (P(sign).x-tie.position.x)/4), width = halfLineInterval/2;
+							vec2 k0 (p0.x, p0.y + slurDown*offset);
+							vec2 k0p (k0.x, k0.y + slurDown*width);
+							vec2 k1 (p1.x, p1.y + slurDown*offset);
+							vec2 k1p (k1.x, k1.y + slurDown*width);
+							measure.cubics.append(Cubic(copyRef(ref<vec2>({p0,k0,k1,p1,k1p,k0p}))));
+						} else sign.note.tie = Note::NoTie;
 					}
 					if(sign.note.tie == Note::TieStart || sign.note.tie == Note::TieContinue) {
 						float bodyOffset = shift[index] ? noteSize.x : 0; // Shift body for dichords
@@ -648,7 +650,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 	midiToSign = buffer<Sign>(midiNotes.size, 0);
 	array<uint> chordExtra;
 
-	while(chordToNote.size < notes.size()) {
+	if(midiNotes) while(chordToNote.size < notes.size()) {
 		if(!notes.values[chordToNote.size]) {
 			chordToNote.append( midiToSign.size );
 			if(chordToNote.size==notes.size()) break;
@@ -756,10 +758,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 			chordExtra.append( midiIndex );
 		}
 	}
-	if(chordToNote.size == notes.size()) {} //assert_(midiToSign.size == midiNotes.size, midiToSign.size, midiNotes.size); FIXME
-	else {
-		firstSynchronizationFailureChordIndex = chordToNote.size;
-	}
+	if(chordToNote.size == notes.size() || !midiNotes) {} //assert_(midiToSign.size == midiNotes.size, midiToSign.size, midiNotes.size); FIXME
+	else { firstSynchronizationFailureChordIndex = chordToNote.size; }
 	if(logErrors && (extraErrors||wrongErrors||missingErrors||orderErrors)) log(extraErrors, wrongErrors, missingErrors, orderErrors);
 
 	auto verticalAlign = [&](Graphics& measure) {

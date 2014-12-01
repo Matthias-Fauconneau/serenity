@@ -62,7 +62,8 @@ MusicXML::MusicXML(string document, string) {
 				assert_(duration >= 0, duration);
 				if(!e.contains("chord"_) && (!e.contains("grace"_) || e("grace"_)["slash"_]!="yes"_)) nextTime = time+duration;
                 if(e["print-object"_]=="no"_) continue;
-				uint staff = e("staff"_) ? parseInteger(e("staff"_).text())-1 : 0;
+				uint xmlStaffIndex = e("staff"_) ? parseInteger(e("staff"_).text())-1 : 0;
+				uint staff = 1-xmlStaffIndex; // Inverts staff order convention (treble, bass -> bass, treble)
 				assert_(int(value)>=0, e);
 				if(e.contains("rest"_)) signs.insertSorted({time, duration, staff, Sign::Rest, .rest={value}});
 				else {
@@ -197,7 +198,8 @@ MusicXML::MusicXML(string document, string) {
             else if(e.name=="attributes"_) {
 				if(e.contains("divisions"_)) divisions = parseInteger(e("divisions"_).text());
                 e.xpath("clef"_, [&](const Element& clef) {
-					uint staff = clef["number"_] ? parseInteger(clef["number"_])-1 : 0;
+					uint xmlStaffIndex = clef["number"_] ? parseInteger(clef["number"_])-1 : 0;
+					uint staff = 1-xmlStaffIndex; // Inverts staff order convention (treble, bass -> bass, treble)
                     ClefSign clefSign = ClefSign("FG"_.indexOf(clef("sign"_).text()[0]));
 					signs.insertSorted({time, 0, staff, Sign::Clef, .clef={clefSign, 0}});
                     clefs[staff] = {clefSign, 0};
