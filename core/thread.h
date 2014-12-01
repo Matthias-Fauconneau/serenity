@@ -124,12 +124,14 @@ struct Thread : array<Poll*>, EventFD, Poll {
     array<Poll*> queue; // Poll objects queued on this thread
     array<Poll*> unregistered; // Poll objects removed while in event loop
     int priority=0; // Thread system priority
-    int tid=0; // Thread system identifier
     pthread_t thread;
+    int tid=0; // Thread system identifier
     Lock lock;
 
     Thread(int priority=0);
-    ~Thread(){Poll::fd=0;/*Avoid Thread::unregistered reference in ~Poll*/}
+    ~Thread(){ Poll::fd=0;/*Avoid Thread::unregistered reference in ~Poll*/ }
+    explicit operator bool() const { return thread; }
+
     void setPriority(int priority);
     /// Spawns a thread running an event loop with the given \a priority
     void spawn();

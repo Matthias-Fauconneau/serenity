@@ -49,18 +49,17 @@ static bool terminationRequested = false;
 // Exit status to return for process (group)
 static int groupExitStatus = 0;
 
-Thread::Thread(int priority) : Poll(EventFD::fd,POLLIN,*this), priority(priority) {
-    Locker lock(threadsLock); threads.append(this); // Adds this thread to global thread list
-}
+Thread::Thread(int priority) : Poll(EventFD::fd,POLLIN,*this), priority(priority) {}
 void Thread::setPriority(int priority) { setpriority(0,0,priority); }
 static void* run(void* thread) { ((Thread*)thread)->run(); return 0; }
-void Thread::spawn() { assert(!thread); pthread_create(&thread,0,&::run,this); }
+void Thread::spawn() { assert_(!thread); pthread_create(&thread,0,&::run,this); }
 
 static int32 gettid() { return syscall(SYS_gettid); }
 
 void Thread::run() {
     tid=gettid();
     if(priority) setpriority(0,0,priority);
+    {Locker lock(threadsLock); threads.append(this); } // Adds this thread to global running thread list
     while(!terminationRequested) {
         if(size==1 && !queue && !(this==&mainThread && threads.size>1)) break; // Terminates when no Poll objects are registered (except main)
 
@@ -78,8 +77,8 @@ void Thread::run() {
         }
         while(unregistered){Locker locker(lock); Poll* poll=unregistered.pop(); remove(poll); queue.tryRemove(poll);}
     }
-    Locker lock(threadsLock); threads.remove(this);
-    thread = 0;
+    {Locker lock(threadsLock); threads.remove(this); } // Removes this thread from global running thread list
+    tid = 0; thread = 0;
 }
 
 void Thread::event() {

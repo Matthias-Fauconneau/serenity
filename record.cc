@@ -18,6 +18,7 @@ struct VideoInput : Device, Poll {
 	array<Map> buffers;
 	int2 size;
     uint frameRate = 0;
+    uint64 lastTimeStamp = 0;
     size_t time = 0;
     function<void(YUYVImage&&)> write;
     VideoInput(function<void(YUYVImage&&)> write, Thread& thread=mainThread) : Device("/dev/video0"), Poll(Device::fd,POLLIN,thread), write(write) {
@@ -29,7 +30,7 @@ struct VideoInput : Device, Poll {
         assert_(frmi.type==V4L2_FRMIVAL_TYPE_DISCRETE && frmi.discrete.numerator == 1);
         frameRate = frmi.discrete.denominator;
         assert_(frameRate == 30);
-        const int bufferedFrameCount = 4;
+        const int bufferedFrameCount = 8;
         v4l2_requestbuffers req = {.count = bufferedFrameCount, .type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP};
 		iowr<RequestBuffers>(req);
         assert_(req.count == bufferedFrameCount);
@@ -47,13 +48,14 @@ struct VideoInput : Device, Poll {
 	void event() {
         v4l2_buffer buf = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP};
 		iowr<DequeueBuffer>(buf);
-        //assert_(buf.sequence == time, time, buf.sequence);
         if(buf.sequence != time) {
             log("Dropped", buf.sequence-time, "video frame"+((buf.sequence-time)>1?"s"_:""_));
             time = buf.sequence;
         }
         assert_(buf.bytesused == uint(size.y*size.x*2));
         uint64 timeStamp = buf.timestamp.tv_sec*1000000+buf.timestamp.tv_usec;
+        if(lastTimeStamp) assert_(timeStamp-lastTimeStamp <= 33500/*1000000/frameRate*/, timeStamp-lastTimeStamp, 1000000/frameRate);
+        lastTimeStamp = timeStamp;
         write(YUYVImage(unsafeRef(cast<byte2>(buffers[buf.index])), size, timeStamp));
         time++;
 		iowr<QueueBuffer>(buf);
@@ -65,7 +67,7 @@ struct Record : ImageView, Poll {
     unique<Encoder> encoder = nullptr;
 
     Thread audioThread {-20};
-    AudioInput audio {{this, &Record::bufferAudio}, 2, 48000, 4096 /*ChromeOS kernel restricts maximum buffer size*/, audioThread};
+    AudioInput audio {{this, &Record::bufferAudio}, audioThread};
     array<buffer<int32>> audioFrames;
     int32 maximumAmplitude = 0;
     int32 reportedMaximumAmplitude = 1<<30;
@@ -99,16 +101,17 @@ struct Record : ImageView, Poll {
     Record() {
         assert_(audio.sampleBits==32);
 
-		image = Image(video.size);
+        image = Image(video.size);
         window.background = Window::NoBackground;
-        window.actions[F3] = window.actions[RightArrow] = {this, &Record::start};
+        window.actions[F1] = window.actions[LeftArrow] = {this, &Record::abort};
         window.actions[F8] = window.actions[DownArrow] = {this, &Record::stop};
+        window.actions[F3] = window.actions[RightArrow] = {this, &Record::start};
         window.actions[Space] = {this, &Record::toggle};
         window.show();
 
-        audioThread.spawn();
+        audio.start(2, 48000, 4096 /*ChromeOS kernel restricts maximum buffer size*/);
+        audioThread.spawn(); // after registerPoll in audio.start
         videoThread.spawn();
-        audio.start();
         video.start();
     }
     ~Record() {
@@ -117,14 +120,19 @@ struct Record : ImageView, Poll {
     }
 
     void start() {
+        if(audio) audio.stop();
         abort();
         Locker locker(lock);
+        firstTimeStamp = 0;
         encoder = unique<Encoder>(arguments()[0]+".mkv"_);
         if(encodeVideo) encoder->setVideo(Encoder::YUYV, video.size, video.frameRate, true);
-        if(encodeAudio) encoder->setFLAC(audio.sampleBits, audio.channels, audio.rate);
+        if(encodeAudio) encoder->setFLAC(audio.sampleBits, 2, 48000);
         encoder->open();
+        audio.start(encoder->channels, encoder->audioFrameRate, 4096 /*ChromeOS kernel restricts maximum buffer size*/);
         assert_(audio.periodSize <= encoder->audioFrameSize);
-        firstTimeStamp = 0;
+        audioThread.wait(); // Terminated once no poll left after unregisterPoll in audio.stop
+        assert_(!audioThread);
+        audioThread.spawn();
     }
 
     /// Stops capture and aborts encoding
@@ -132,7 +140,10 @@ struct Record : ImageView, Poll {
         Locker locker(lock);
         audioFrames.clear();
         videoFrames.clear();
-        if(encoder) encoder->abort();
+        if(encoder) {
+            encoder->abort();
+            encoder = nullptr;
+        }
     }
 
     /// Stops capture, flushes buffers and writes up file

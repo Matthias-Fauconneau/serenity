@@ -192,13 +192,14 @@ void Encoder::abort() {
     if(frame) av_frame_free(&frame);
     if(videoCodec) { avcodec_close(videoCodec); videoCodec=0; videoStream=0; }
     if(audioCodec) { avcodec_close(audioCodec); audioCodec=0; audioStream=0; }
-    assert_(context); avformat_close_input(&context); // Releases encoder without flushing
-    assert_(!context);
+    avio_close(context->pb);
+    avformat_free_context(context);
+    context = 0;
 }
 
 Encoder::~Encoder() {
-    lock.lock();
     if(!context) { assert(!frame && !videoStream && !audioStream && !context); return; } // Aborted
+    lock.lock();
     if(frame) av_frame_free(&frame);
     for(;;) {
         if(!videoStream && !audioStream) break;
@@ -207,23 +208,23 @@ Encoder::~Encoder() {
         if(videoStream) {
             assert_(videoCodec);
             avcodec_encode_video2(videoCodec, &pkt, 0, &gotPacket);
-            if(!gotPacket) { videoStream=0;/*Released by avformat_close_input*/ continue; }
+            if(!gotPacket) { videoStream=0;/*Released by avformat_free_context*/ continue; }
             if(videoCodec->coded_frame->key_frame) pkt.flags |= AV_PKT_FLAG_KEY;
             pkt.stream_index = videoStream->index;
         }
         if(audioStream) {
             avcodec_encode_audio2(audioCodec, &pkt, 0, &gotPacket);
-            if(!gotPacket) { audioStream=0;/*Released by avformat_close_input*/ continue; }
+            if(!gotPacket) { audioStream=0;/*Released by avformat_free_context*/ continue; }
             pkt.stream_index = audioStream->index;
         }
         av_interleaved_write_frame(context, &pkt);
-        if(!pkt.buf) av_free_packet(&pkt); // else av_packet_unref(&pkt) ?
+        if(!pkt.buf) av_free_packet(&pkt);
     }
-    assert_(context);
     av_interleaved_write_frame(context, 0);
     av_write_trailer(context);
     if(videoCodec) { avcodec_close(videoCodec); videoCodec=0; }
     if(audioCodec) { avcodec_close(audioCodec); audioCodec=0; }
-    avformat_close_input(&context);
-    assert_(!context);
+    avio_close(context->pb);
+    avformat_free_context(context);
+    context = 0;
 }

@@ -131,7 +131,7 @@ void AudioOutput::stop() {
     unregisterPoll();
     {int state = status->state;
         buffer=0, maps[0].unmap(); status=0, maps[1].unmap(); control=0, maps[2].unmap(); // Release maps
-        if(state < Running) io<HW_FREE>(); // Releases hardware
+        if(state < Running || state==XRun) io<HW_FREE>(); // Releases hardware
         else log("Could not free", state);}
     sampleBits=0, rate=0, periodSize=0, bufferSize=0;
     close(); Poll::fd=0; // Closes file descriptor
@@ -167,57 +167,76 @@ Device getCaptureDevice() {
     error("No PCM playback device found"); //FIXME: Block and watch folder until connected
 }
 
-AudioInput::AudioInput(uint sampleBits, uint channels, uint rate, uint periodSize, Thread& thread)
-	: Device(getCaptureDevice()), Poll(Device::fd,POLLIN,thread) {
-    HWParams hparams;
-    hparams.mask(Access).set(MMapInterleaved);
-	if(sampleBits) hparams.mask(Format).set(sampleBits==16?S16_LE:S32_LE);
-	else hparams.mask(Format).set(S16_LE).set(S32_LE);
-	hparams.interval(SampleBits) = sampleBits;
-	hparams.interval(FrameBits) = sampleBits*channels;
-    hparams.mask(SubFormat).set(Standard);
-	hparams.interval(Channels).max = channels;
-    hparams.interval(Rate) = rate; assert(rate);
-    hparams.interval(Periods) = 2;
-	hparams.interval(PeriodSize) = periodSize?:-1;
-    iowr<HW_REFINE>(hparams);
-    if(!sampleBits) {
-		channels = hparams.interval(Channels);
-        if(hparams.mask(Format).get(S32_LE)) {
-            hparams.mask(Format).clear(S16_LE);
-            hparams.interval(SampleBits) = 32;
-            hparams.interval(FrameBits) = 32*channels;
-        } else {
-            hparams.interval(SampleBits) = 16;
-            hparams.interval(FrameBits) = 16*channels;
-        }
-        hparams.rmask=~0;
+AudioInput::AudioInput(Thread& thread) : Poll(Device::fd,POLLIN,thread) {}
+void AudioInput::start(uint channels, uint rate, uint periodSize) {
+    if(!Device::fd) { Device::fd = move(getCaptureDevice().fd); Poll::fd = Device::fd; }
+    if(!status || status->state < Setup || this->rate!=rate || this->periodSize!=periodSize || this->sampleBits!=sampleBits) {
+        HWParams hparams;
+        hparams.mask(Access).set(MMapInterleaved);
+        if(sampleBits) hparams.mask(Format).set(sampleBits==16?S16_LE:S32_LE);
+        else hparams.mask(Format).set(S16_LE).set(S32_LE);
+        hparams.interval(SampleBits) = sampleBits;
+        hparams.interval(FrameBits) = sampleBits*channels;
+        hparams.mask(SubFormat).set(Standard);
+        hparams.interval(Channels).max = channels;
+        hparams.interval(Rate) = rate; assert(rate);
+        hparams.interval(Periods) = 2;
+        hparams.interval(PeriodSize) = periodSize?:-1;
         iowr<HW_REFINE>(hparams);
+        if(!sampleBits) {
+            channels = hparams.interval(Channels);
+            if(hparams.mask(Format).get(S32_LE)) {
+                hparams.mask(Format).clear(S16_LE);
+                hparams.interval(SampleBits) = 32;
+                hparams.interval(FrameBits) = 32*channels;
+            } else {
+                hparams.interval(SampleBits) = 16;
+                hparams.interval(FrameBits) = 16*channels;
+            }
+            hparams.rmask=~0;
+            iowr<HW_REFINE>(hparams);
+        }
+        if(!rate) hparams.interval(Rate) = hparams.interval(Rate).max; // Selects maximum rate
+        hparams.interval(PeriodSize) = hparams.interval(PeriodSize).max; // Selects maximum latency
+        iowr<HW_PARAMS>(hparams);
+        assert_(hparams.flags == NoResample);
+        assert_(this->sampleBits == hparams.interval(SampleBits));
+        this->channels= hparams.interval(Channels);
+        assert_(this->channels == channels);
+        this->rate = hparams.interval(Rate);
+        assert_(this->rate == rate);
+        this->periodSize = hparams.interval(PeriodSize);
+        assert_(this->periodSize == periodSize);
+        bufferSize = hparams.interval(Periods) * this->periodSize;
+        buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Read)).data);
+        status = (Status*)(maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data;
+        control = (Control*)(maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data;
+        control->availableMinimum = periodSize; // Minimum available space to trigger POLLIN
     }
-    if(!rate) hparams.interval(Rate) = hparams.interval(Rate).max; // Selects maximum rate
-    hparams.interval(PeriodSize) = hparams.interval(PeriodSize).max; // Selects maximum latency
-    iowr<HW_PARAMS>(hparams);
-    assert_(hparams.flags == NoResample);
-    this->sampleBits = hparams.interval(SampleBits);
-	this->channels= hparams.interval(Channels);
-    this->rate = hparams.interval(Rate);
-    this->periodSize = hparams.interval(PeriodSize);
-    bufferSize = hparams.interval(Periods) * this->periodSize;
-    buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Read)).data);
-    status = (Status*)(maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data;
-    control = (Control*)(maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data;
-    control->availableMinimum = periodSize; // Minimum available space to trigger POLLIN
-    io<PREPARE>();
-}
-void AudioInput::start() {
-    io<START>();
+    registerPoll();
+    if(status->state < Prepared) io<PREPARE>();
     time = 0;
+    io<START>();
 }
-AudioInput::~AudioInput(){
-    io<DRAIN>();
+void AudioInput::stop() {
+    Locker locker(lock);
+    assert_(status);
+    if(status->state == XRun) io<PREPARE>(); // FIXME: Necessary to prevent BADFD error on HW_FREE
+    io<DROP>();
+    unregisterPoll();
+    {int state = status->state;
+        buffer=0, maps[0].unmap(); status=0, maps[1].unmap(); control=0, maps[2].unmap(); // Release maps
+        if(state < Running) io<HW_FREE>(); // Releases hardware
+        else log("HW_FREE", state);
+    }
+    rate=0, periodSize=0, bufferSize=0;
+    close(); Poll::fd=0; // Closes file descriptor
+    time = 0;
 }
 
 void AudioInput::event() {
+    Locker locker(lock);
+    if(!status) return; // Closed by a concurrent thread
     if(status->state == XRun) {
         overruns++;
         //log("Overrun",overruns,"/",periods,"~ 1/",(float)periods/overruns);
@@ -227,8 +246,7 @@ void AudioInput::event() {
     int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
         uint readSize;
-        if(sampleBits==16) readSize=write16(ref<int16>(((int16*)buffer)+channels*(control->swPointer%bufferSize), periodSize*channels));
-        else if(sampleBits==32) readSize=write32(ref<int32>(((int*)buffer)+channels*(control->swPointer%bufferSize), periodSize*channels));
+        if(sampleBits==32) readSize=write32(ref<int32>(((int*)buffer)+channels*(control->swPointer%bufferSize), periodSize*channels));
         else error(sampleBits);
         assert_(readSize==periodSize, readSize, periodSize);
         control->swPointer += readSize;
