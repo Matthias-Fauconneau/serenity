@@ -190,39 +190,40 @@ void Encoder::writeAudioFrame(ref<int32> audio) {
 void Encoder::abort() {
     lock.lock();
     if(frame) av_frame_free(&frame);
-    avcodec_close(videoCodec); videoCodec=0;
-    avcodec_close(audioCodec); audioCodec=0;
-    videoStream=0; audioStream=0;
-    avformat_free_context(context); // Releases encoder without flushing
-    context=0;
+    if(videoCodec) { avcodec_close(videoCodec); videoCodec=0; videoStream=0; }
+    if(audioCodec) { avcodec_close(audioCodec); audioCodec=0; audioStream=0; }
+    assert_(context); avformat_close_input(&context); // Releases encoder without flushing
+    assert_(!context);
 }
 
 Encoder::~Encoder() {
-    if(!context) { assert(!frame && !videoStream && !audioStream && !context); return; } // Aborted
     lock.lock();
+    if(!context) { assert(!frame && !videoStream && !audioStream && !context); return; } // Aborted
     if(frame) av_frame_free(&frame);
     for(;;) {
         if(!videoStream && !audioStream) break;
         AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
         int gotPacket = 0;
         if(videoStream) {
+            assert_(videoCodec);
             avcodec_encode_video2(videoCodec, &pkt, 0, &gotPacket);
-            if(!gotPacket) { videoStream=0; continue; }
+            if(!gotPacket) { videoStream=0;/*Released by avformat_close_input*/ continue; }
             if(videoCodec->coded_frame->key_frame) pkt.flags |= AV_PKT_FLAG_KEY;
             pkt.stream_index = videoStream->index;
         }
         if(audioStream) {
             avcodec_encode_audio2(audioCodec, &pkt, 0, &gotPacket);
-            if(!gotPacket) { audioStream=0; continue; }
+            if(!gotPacket) { audioStream=0;/*Released by avformat_close_input*/ continue; }
             pkt.stream_index = audioStream->index;
         }
         av_interleaved_write_frame(context, &pkt);
+        if(!pkt.buf) av_free_packet(&pkt); // else av_packet_unref(&pkt) ?
     }
-    if(context) {
-        av_interleaved_write_frame(context, 0);
-        av_write_trailer(context);
-        avformat_close_input(&context);
-        avcodec_close(videoCodec); videoCodec=0;
-        avcodec_close(audioCodec); audioCodec=0;
-    }
+    assert_(context);
+    av_interleaved_write_frame(context, 0);
+    av_write_trailer(context);
+    if(videoCodec) { avcodec_close(videoCodec); videoCodec=0; }
+    if(audioCodec) { avcodec_close(audioCodec); audioCodec=0; }
+    avformat_close_input(&context);
+    assert_(!context);
 }

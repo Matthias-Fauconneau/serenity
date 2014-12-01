@@ -149,6 +149,7 @@ void AudioOutput::event() {
 			else error(channels);
 		} else error("Unsupported sample size", sampleBits);
         assert(readSize<=periodSize);
+        if(!control) return; // Was closed from read callback
         control->swPointer += readSize;
 		if(readSize < periodSize) return;
     }
@@ -219,7 +220,7 @@ AudioInput::~AudioInput(){
 void AudioInput::event() {
     if(status->state == XRun) {
         overruns++;
-        log("Overrun",overruns,"/",periods,"~ 1/",(float)periods/overruns);
+        //log("Overrun",overruns,"/",periods,"~ 1/",(float)periods/overruns);
         io<PREPARE>();
         io<START>();
     }
