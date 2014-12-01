@@ -12,7 +12,9 @@ typedef IOWR<'V', 9, v4l2_buffer> QueryBuffer;
 typedef IOWR<'V', 15, v4l2_buffer> QueueBuffer;
 typedef IOWR<'V', 17, v4l2_buffer> DequeueBuffer;
 typedef IOW<'V', 18, int> StartStream;
-typedef IOWR<'V', 75, v4l2_frmivalenum> EnumerateFrameIntervals;
+typedef IOWR<'V', 21, v4l2_streamparm> GetParameters;
+typedef IOWR<'V', 22, v4l2_streamparm> SetParameters;
+typedef IOW<'V', 68, uint32> SetPriority;
 
 struct VideoInput : Device, Poll {
 	array<Map> buffers;
@@ -25,12 +27,13 @@ struct VideoInput : Device, Poll {
         v4l2_format fmt = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE}; iowr<GetFormat>(fmt);
 		size = int2(fmt.fmt.pix.width, fmt.fmt.pix.height);
 		assert_(fmt.fmt.pix.bytesperline==uint(2*size.x));
-        v4l2_frmivalenum frmi = {.pixel_format=V4L2_PIX_FMT_YUYV, .width=uint(size.x), .height=uint(size.y)};
-        iowr<EnumerateFrameIntervals>(frmi);
-        assert_(frmi.type==V4L2_FRMIVAL_TYPE_DISCRETE && frmi.discrete.numerator == 1);
-        frameRate = frmi.discrete.denominator;
+        v4l2_streamparm parm {.type=V4L2_BUF_TYPE_VIDEO_CAPTURE};
+        iowr<GetParameters>(parm);
+        assert_(parm.parm.capture.timeperframe.numerator == 1);
+        frameRate = parm.parm.capture.timeperframe.denominator;
         assert_(frameRate == 30);
-        const int bufferedFrameCount = 8;
+        iow<SetPriority>(V4L2_PRIORITY_RECORD);
+        const int bufferedFrameCount = 4;
         v4l2_requestbuffers req = {.count = bufferedFrameCount, .type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP};
 		iowr<RequestBuffers>(req);
         assert_(req.count == bufferedFrameCount);
@@ -54,7 +57,9 @@ struct VideoInput : Device, Poll {
         }
         assert_(buf.bytesused == uint(size.y*size.x*2));
         uint64 timeStamp = buf.timestamp.tv_sec*1000000+buf.timestamp.tv_usec;
-        if(lastTimeStamp) assert_(timeStamp-lastTimeStamp <= 33500/*1000000/frameRate*/, timeStamp-lastTimeStamp, 1000000/frameRate);
+        if(lastTimeStamp) {
+            if(timeStamp-lastTimeStamp > 33600/*1000000/frameRate*/) log("Late frame", timeStamp-lastTimeStamp, 1000000/frameRate);
+        }
         lastTimeStamp = timeStamp;
         write(YUYVImage(unsafeRef(cast<byte2>(buffers[buf.index])), size, timeStamp));
         time++;
@@ -73,7 +78,7 @@ struct Record : ImageView, Poll {
     int32 reportedMaximumAmplitude = 1<<30;
     float2 smoothedMean = 0;
 
-    Thread videoThread {-19};
+    Thread videoThread {-20};
     VideoInput video {{this, &Record::bufferVideo}, videoThread};
     array<YUYVImage> videoFrames;
     uint64 firstTimeStamp = 0;
