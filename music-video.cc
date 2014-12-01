@@ -323,9 +323,9 @@ struct Music : Widget {
 	string name = arguments() ? arguments()[0] : (error("Expected name"), string());
 	// Files
 	buffer<String> audioFiles = filter(Folder(".").list(Files), [this](string path) { return !startsWith(path, name)
-			|| (/*!endsWith(path, ".mp3") && !endsWith(path, ".m4a") &&*/ !endsWith(path, "performance.mp4") && !find(path, ".mkv")); });
+			|| (/*!endsWith(path, ".mp3") && !endsWith(path, ".m4a") &&*/ !endsWith(path, "performance.mp4") && !endsWith(path, ".mkv")); });
 	buffer<String> videoFiles = filter(Folder(".").list(Files), [this](string path) {
-			return !startsWith(path, name) ||  (!endsWith(path, "performance.mp4") && !find(path, ".mkv")); });
+			return !startsWith(path, name) ||  (!endsWith(path, "performance.mp4") && !endsWith(path, ".mkv")); });
 
 	// Audio
 	AudioFile audioFile = audioFiles ? AudioFile(audioFiles[0]) : AudioFile();
@@ -368,7 +368,6 @@ struct Music : Widget {
 	// Audio preview
     Thread audioThread;
 	AudioOutput audio = {{this, &Music::read32}, audioThread};
-
 
 	// End
 	buffer<int64> onsets = apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.time;});
@@ -441,10 +440,12 @@ struct Music : Widget {
 		}
 		if(previousOffset != scroll.offset.x) contentChanged = true;
 		beatSynchronizer.currentTime = timeNum*notes.ticksPerSeconds/timeDen;
-		if(video && (!videoView.image || (video.videoTime*timeDen <= timeNum*video.videoFrameRate
-				/*&& video.videoTime*notes.ticksPerSeconds < (onsets.last() + notes.ticksPerSeconds)*video.videoFrameRate*/))) {
-			if(video.read(videoView.image)) {
-				if(rotate) ::rotate(videoView.image);
+		if(video && (!videoView.image || video.videoTime*timeDen <= timeNum*video.videoFrameRate)) {
+			Image image = video.read();
+			if(image) {
+				if(rotate) ::rotate(image);
+				image = copy(cropShare(image, int2(0, image.height/5), int2(image.width, image.height/3)));
+				videoView.image = move(image);
 				contentChanged=true;
 			}
 		}
@@ -458,10 +459,7 @@ struct Music : Widget {
 		}
 		if(video) {
 			//video.seek(time * video.videoFrameRate / notes.ticksPerSeconds); //FIXME
-			while(video.videoTime*notes.ticksPerSeconds <= time*video.videoFrameRate) {
-				video.read(videoView.image);
-				if(rotate) ::rotate(videoView.image);
-			}
+			while(video.videoTime*notes.ticksPerSeconds <= time*video.videoFrameRate) video.read();
 		}
 		sampler.audioTime = time*sampler.rate/notes.ticksPerSeconds;
 		while(samplerMidiIndex < notes.size && notes[samplerMidiIndex].time*sampler.rate < time*notes.ticksPerSeconds) samplerMidiIndex++;
@@ -547,12 +545,12 @@ struct Music : Widget {
 				if(percent!=lastReport) { log(str(percent,2)+"%", str(renderTime, totalTime), str(encodeTime, totalTime)); lastReport=percent; }
 				if(startTime+encoder.audioTime >= uint64(onsets.last() + 2*notes.ticksPerSeconds) &&
 						startTime+encoder.videoTime*encoder.audioFrameRate/encoder.videoFrameRate
-						>= uint64(onsets.last() + 2*notes.ticksPerSeconds)) break; // Cuts 2 second after last onset
+						>= uint64(onsets.last() + 4*notes.ticksPerSeconds)) break; // Cuts 2 second after last onset
 			}
 			requestTermination(0); // Window prevents automatic termination
 		} else { // Preview
 			window.show();
-			if(playbackDeviceAvailable() && false) {
+			if(playbackDeviceAvailable()) {
 				audio.start(audioFile.audioFrameRate ? : sampler.rate, audioFile ? 1024 : sampler.periodSize, 32, 2);
 				assert_(audio.rate == audioFile.audioFrameRate ?: sampler.rate);
 				audioThread.spawn();
@@ -567,6 +565,7 @@ struct Music : Widget {
 			else follow(sampler.audioTime, sampler.rate, window.size);
 			window.render();
 		}
+		assert_(videoView.image || !video);
 		return running ? widget.graphics(size, Rect(size)) : scroll.ScrollArea::graphics(size);
 	}
 	bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {

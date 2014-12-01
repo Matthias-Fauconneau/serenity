@@ -27,7 +27,7 @@ struct Image : buffer<byte4> {
 };
 inline String str(const Image& o) { return strx(o.size); }
 
-inline Image copy(const Image& o) { return Image(copy((const buffer<byte4>&)o),o.size,o.stride,o.alpha,o.sRGB); }
+inline Image copy(const Image& o) { return Image(copyRef(o), o.size, o.stride, o.alpha, o.sRGB); }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 inline notrace Image share(const Image& o) { return Image(unsafeRef(o),o.size,o.stride,o.alpha,o.sRGB); }

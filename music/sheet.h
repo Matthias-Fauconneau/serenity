@@ -36,8 +36,8 @@ struct Sheet : Widget {
 	map<Rect, shared<Graphics>> measures;
 	shared<Graphics> debug;
 
-	int highestStep = 0;
-	int2 sizeHint(int2) override { return int2(measureBars.values.last(), -(staffY(0, -32)-staffY(1, highestStep))); }
+	int lowestStep = 0, highestStep = 0;
+	int2 sizeHint(int2) override { return int2(measureBars.values.last(), -(staffY(0, lowestStep)-staffY(1, highestStep))); }
 	shared<Graphics> graphics(int2 size, Rect clip) override;
 
 	// -- Control
