@@ -63,7 +63,9 @@ struct AudioInput : Device, Poll {
     virtual ~AudioInput() { if(status) stop(); }
     explicit operator bool() const { return status; }
 
-    void start(uint channels, uint rate, uint periodSize);
+    void setup(uint channels, uint rate, uint periodSize);
+    void start();
+    void start(uint channels, uint rate, uint periodSize) { setup(channels, rate, periodSize); start(); }
     void stop();
 
     /// Callback for poll events

@@ -135,8 +135,11 @@ int64 writeFile(const string path, const ref<byte> content, const Folder& at, bo
 
 // -- Device
 
-int Device::ioctl(uint request, void* arguments) { return check(::ioctl(fd, request, arguments),
-																request>>30, (request>>16)&((1<<14)-1), (request>>8)&((1<<8)-1), request&((1<<8)-1)); }
+int Device::ioctl(uint request, void* arguments, int pass) {
+    int status = ::ioctl(fd, request, arguments);
+    if(status==pass) return status;
+    return check(status, request>>30, (request>>16)&((1<<14)-1), (request>>8)&((1<<8)-1), request&((1<<8)-1));
+}
 
 // -- Map
 

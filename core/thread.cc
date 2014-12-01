@@ -20,7 +20,6 @@ void log(string message) {
 }
 
 // Poll
-//Poll::Poll(Poll&& o) : pollfd(o), thread(o.thread) { assert_(!o.thread.contains(&o)); }
 void Poll::registerPoll() {
     Locker lock(thread.lock);
 	if(thread.contains(this)) { thread.unregistered.tryRemove(this); return; }
@@ -43,7 +42,7 @@ static Lock threadsLock __attribute((init_priority(102)));
 // Process-wide thread list to trace all threads when one fails and cleanly terminates all threads before exiting
 static array<Thread*> threads __attribute((init_priority(102)));
 // Handle for the main thread (group leader)
-Thread mainThread __attribute((init_priority(102))) (20);
+Thread mainThread __attribute((init_priority(102))) (0);
 // Flag to cleanly terminate all threads
 static bool terminationRequested = false;
 // Exit status to return for process (group)
@@ -59,9 +58,10 @@ static int32 gettid() { return syscall(SYS_gettid); }
 void Thread::run() {
     tid=gettid();
     if(priority) setpriority(0,0,priority);
-    {Locker lock(threadsLock); threads.append(this); } // Adds this thread to global running thread list
+    {Locker lock(threadsLock); threads.append(this);} // Adds this thread to global running thread list
     while(!terminationRequested) {
-        if(size==1 && !queue && !(this==&mainThread && threads.size>1)) break; // Terminates when no Poll objects are registered (except main)
+        assert_(size>=1);
+        if(size==1 && !queue) break; // Terminates if no Poll objects (except thread queue EventFD) are registered and no job is queued)
 
         pollfd pollfds[size];
         for(uint i: range(size)) pollfds[i]=*at(i); //Copy pollfds as objects might unregister while processing in the loop
@@ -77,7 +77,7 @@ void Thread::run() {
         }
         while(unregistered){Locker locker(lock); Poll* poll=unregistered.pop(); remove(poll); queue.tryRemove(poll);}
     }
-    {Locker lock(threadsLock); threads.remove(this); } // Removes this thread from global running thread list
+    {Locker lock(threadsLock); threads.remove(this);} // Removes this thread from global running thread list
     tid = 0; thread = 0;
 }
 
@@ -146,7 +146,8 @@ void __attribute((constructor(102))) setup_signals() {
 	setExceptions(Invalid /*| Denormal*/ | DivisionByZero /*| Overflow *//*| Underflow *//*| Precision*/);
 }
 
-static void __attribute((noreturn)) exit_thread(int status) { syscall(SYS_exit, status); __builtin_unreachable(); }
+//static void __attribute((noreturn)) exit_thread(int status) { syscall(SYS_exit, status); __builtin_unreachable(); }
+static int __attribute((noreturn)) exit_group(int status) { syscall(SYS_exit_group, status); __builtin_unreachable(); }
 
 template<> void __attribute((noreturn)) error(const string& message) {
     static bool reentrant = false;
@@ -158,14 +159,13 @@ template<> void __attribute((noreturn)) error(const string& message) {
         reentrant = false;
     }
     log(message);
-    requestTermination(-1); // Sets terminationRequested flag and signals (EventFD::post) all threads to terminate
-    {Locker lock(threadsLock);
-        for(Thread* thread: threads) if(thread->tid==gettid()) { threads.remove(thread); break; } } // Removes this thread from the running threads
+    //requestTermination(-1); //FIXME // Sets terminationRequested flag and signals (EventFD::post) all threads to terminate
+    /*{Locker lock(threadsLock); // FIXME
+        for(Thread* thread: threads) if(thread->tid==gettid()) { threads.remove(thread); break; } } // Removes this thread from the running threads*/
     __builtin_trap(); //TODO: detect if running under debugger
-    exit_thread(-1); // Exits this thread
+    //exit_thread(-1); // Exits this thread
+    exit_group(-1); // Exits this group (process) FIXME
 }
-
-static int __attribute((noreturn)) exit_group(int status) { syscall(SYS_exit_group, status); __builtin_unreachable(); }
 
 // Entry point
 int main() {
@@ -173,8 +173,8 @@ int main() {
 	Interface<Application>::AbstractFactory* factory = Interface<Application>::factories().value("");
 	if(arguments()) factory = Interface<Application>::factories().value(arguments()[0]);
 	if(factory) application = factory->constructNewInstance();
-    if(mainThread.size>1 || mainThread.queue || threads.size>1) mainThread.run();
-    for(Thread* thread: threads) thread->wait(); // Waits for all threads to terminate
+    mainThread.run(); // Reuses main thread as default event loop runner when not overriden in Poll constructor
+    //for(Thread* thread: threads) thread->wait(); // Waits for all threads to terminate
     return groupExitStatus; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
 }
 

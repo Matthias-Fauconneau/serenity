@@ -168,7 +168,8 @@ Device getCaptureDevice() {
 }
 
 AudioInput::AudioInput(Thread& thread) : Poll(Device::fd,POLLIN,thread) {}
-void AudioInput::start(uint channels, uint rate, uint periodSize) {
+void AudioInput::setup(uint channels, uint rate, uint periodSize) {
+    Locker locker(lock);
     if(!Device::fd) { Device::fd = move(getCaptureDevice().fd); Poll::fd = Device::fd; }
     if(!status || status->state < Setup || this->rate!=rate || this->periodSize!=periodSize || this->sampleBits!=sampleBits) {
         HWParams hparams;
@@ -216,6 +217,10 @@ void AudioInput::start(uint channels, uint rate, uint periodSize) {
     registerPoll();
     if(status->state < Prepared) io<PREPARE>();
     time = 0;
+}
+void AudioInput::start() {
+    Locker locker(lock);
+    assert_(status);
     io<START>();
 }
 void AudioInput::stop() {

@@ -3,14 +3,6 @@
 #include "core/image.h"
 #include "audio.h" // AudioFile
 
-struct YUYVImage : buffer<byte2> {
-	union { int2 size = 0; struct { uint width, height; }; };
-    uint64 time = 0;
-    YUYVImage() {}
-    YUYVImage(buffer<byte2>&& data, int2 size, uint64 time) : buffer<byte2>(::move(data)), size(size), time(time) {}
-    default_move(YUYVImage);
-};
-
 /// Generic video/audio encoder (using ffmpeg/x264)
 struct Encoder {
     Lock lock;
@@ -29,8 +21,8 @@ struct Encoder {
     /// Starts a new file recording video
 	Encoder(String&& name);
 
-    enum Format { YUYV, sRGB };
-	void setVideo(Format format, int2 size, uint videoFrameRate, bool ultrafast=false);
+    void setH264(int2 size, uint videoFrameRate);
+    void setMJPEG(int2 size, uint videoFrameRate);
     void setAudio(const AudioFile& audio);
 	void setAAC(uint channels, uint rate);
 	void setFLAC(uint sampleBits, uint channels, uint rate);
@@ -41,7 +33,7 @@ struct Encoder {
     operator bool() { return context; }
 
 	/// Writes a video frame
-    void writeVideoFrame(const YUYVImage& image);
+    void writeMJPEGPacket(ref<byte> data, uint64 pts);
     /// Writes a video frame
     void writeVideoFrame(const Image& image);
     /// Writes an audio frame
