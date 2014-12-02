@@ -3,22 +3,13 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <setjmp.h>
 #include <string.h>
-//#include <assert.h>
 
-typedef unsigned char  uint8;
+typedef unsigned char uint8;
 typedef signed short int16;
 typedef unsigned short uint16;
-typedef unsigned int   uint;
-typedef signed int   int32;
-
-// Loads a JPEG image from a memory buffer or a file.
-// req_comps can be 1 (grayscale), 3 (RGB), or 4 (RGBA).
-// On return, width/height will be set to the image's dimensions, and actual_comps will be set to the either 1 (grayscale) or 3 (RGB).
-// Notes: For more control over where and how the source data is read, see the decompress_jpeg_image_from_stream() function below, or call the jpeg_decoder class directly.
-// Requesting a 8 or 32bpp image is currently a little faster than 24bpp because the jpeg_decoder class itself currently always unpacks to either 8 or 32bpp.
-uint8 *decompress_jpeg_image_from_memory(const uint8 *pSrc_data, int src_data_size, int *width, int *height, int *actual_comps, int req_comps);
+typedef unsigned int uint;
+typedef signed int int32;
 
 // Success/failure error codes.
 enum jpgd_status {
@@ -54,20 +45,10 @@ public:
 };
 
 // Memory stream class.
-class jpeg_decoder_mem_stream : public jpeg_decoder_stream {
-	const uint8 *m_pSrc_data;
-	uint m_ofs, m_size;
-
-public:
-	jpeg_decoder_mem_stream() : m_pSrc_data(NULL), m_ofs(0), m_size(0) { }
-	jpeg_decoder_mem_stream(const uint8 *pSrc_data, uint size) : m_pSrc_data(pSrc_data), m_ofs(0), m_size(size) { }
-
-	virtual ~jpeg_decoder_mem_stream() { }
-
-	bool open(const uint8 *pSrc_data, uint size);
-	void close() { m_pSrc_data = NULL; m_ofs = 0; m_size = 0; }
-
-	virtual int read(uint8 *pBuf, int max_bytes_to_read, bool *pEOF_flag);
+struct jpeg_decoder_mem_stream : ref<byte> {
+    size_t index = 0;
+    jpeg_decoder_mem_stream(ref<byte> data) : ref(data) { }
+    int read(uint8 *pBuf, int max_bytes_to_read, bool *pEOF_flag);
 };
 
 enum {
@@ -82,7 +63,7 @@ class jpeg_decoder {
 public:
 	// Call get_error_code() after constructing to determine if the stream is valid or not. You may call the get_width(), get_height(), etc.
 	// methods after the constructor is called. You may then either destruct the object, or begin decoding the image by calling begin_decoding(), then decode() on each scanline.
-	jpeg_decoder(jpeg_decoder_stream *pStream);
+    jpeg_decoder(ref<byte> file);
 
 	~jpeg_decoder();
 
@@ -111,7 +92,6 @@ public:
 	// Returns the total number of bytes actually consumed by the decoder (which should equal the actual size of the JPEG file).
 	inline int get_total_bytes_read() const { return m_total_bytes_read; }
 
-private:
 	jpeg_decoder(const jpeg_decoder &);
 	jpeg_decoder &operator =(const jpeg_decoder &);
 
@@ -139,11 +119,10 @@ private:
 		char m_data[1];
 	};
 
-	jmp_buf m_jmp_state;
 	mem_block *m_pMem_blocks;
 	int m_image_x_size;
 	int m_image_y_size;
-	jpeg_decoder_stream *m_pStream;
+    jpeg_decoder_mem_stream m_pStream;
 	int m_progressive_flag;
 	uint8 m_huff_ac[JPGD_MAX_HUFF_TABLES];
 	uint8* m_huff_num[JPGD_MAX_HUFF_TABLES];      // pointer to number of Huffman codes per bit size
@@ -1005,8 +984,7 @@ struct R_S {
 
 // Unconditionally frees all allocated m_blocks.
 void jpeg_decoder::free_all_blocks() {
-	m_pStream = NULL;
-	for (mem_block *b = m_pMem_blocks; b; ) {
+    for (mem_block *b = m_pMem_blocks; b; ) {
 		mem_block *n = b->m_pNext;
 		free(b);
 		b = n;
@@ -1019,7 +997,7 @@ void jpeg_decoder::free_all_blocks() {
 __attribute__ ((noreturn)) void jpeg_decoder::stop_decoding(jpgd_status status) {
 	m_error_code = status;
 	free_all_blocks();
-	longjmp(m_jmp_state, status);
+    error(int(status));
 }
 
 void *jpeg_decoder::alloc(size_t nSize, bool zero) {
@@ -1035,8 +1013,8 @@ void *jpeg_decoder::alloc(size_t nSize, bool zero) {
 	if (!rv) {
 		int capacity = max(32768ul - 256, (nSize + 2047) & ~2047);
 		mem_block *b = (mem_block*)malloc(sizeof(mem_block) + capacity);
-		if (!b) { stop_decoding(JPGD_NOTENOUGHMEM); }
-		b->m_pNext = m_pMem_blocks; m_pMem_blocks = b;
+        assert_(b);
+        b->m_pNext = m_pMem_blocks; m_pMem_blocks = b;
 		b->m_used_count = nSize;
 		b->m_size = capacity;
 		rv = b->m_data;
@@ -1065,9 +1043,8 @@ void jpeg_decoder::prep_in_buffer() {
 		return;
 
 	do {
-		int bytes_read = m_pStream->read(m_in_buf + m_in_buf_left, JPGD_IN_BUF_SIZE - m_in_buf_left, &m_eof_flag);
-		if (bytes_read == -1)
-			stop_decoding(JPGD_STREAM_READ);
+        int bytes_read = m_pStream.read(m_in_buf + m_in_buf_left, JPGD_IN_BUF_SIZE - m_in_buf_left, &m_eof_flag);
+        assert_(bytes_read != -1, m_pStream.size);
 
 		m_in_buf_left += bytes_read;
 	} while ((m_in_buf_left < JPGD_IN_BUF_SIZE) && (!m_eof_flag));
@@ -1466,108 +1443,6 @@ int jpeg_decoder::locate_sos_marker() {
 	read_sos_marker();
 
 	return true;
-}
-
-// Reset everything to default/uninitialized state.
-void jpeg_decoder::init(jpeg_decoder_stream *pStream) {
-	m_pMem_blocks = NULL;
-	m_error_code = JPGD_SUCCESS;
-	m_ready_flag = false;
-	m_image_x_size = m_image_y_size = 0;
-	m_pStream = pStream;
-	m_progressive_flag = false;
-
-	memset(m_huff_ac, 0, sizeof(m_huff_ac));
-	memset(m_huff_num, 0, sizeof(m_huff_num));
-	memset(m_huff_val, 0, sizeof(m_huff_val));
-	memset(m_quant, 0, sizeof(m_quant));
-
-	m_scan_type = 0;
-	m_comps_in_frame = 0;
-
-	memset(m_comp_h_samp, 0, sizeof(m_comp_h_samp));
-	memset(m_comp_v_samp, 0, sizeof(m_comp_v_samp));
-	memset(m_comp_quant, 0, sizeof(m_comp_quant));
-	memset(m_comp_ident, 0, sizeof(m_comp_ident));
-	memset(m_comp_h_blocks, 0, sizeof(m_comp_h_blocks));
-	memset(m_comp_v_blocks, 0, sizeof(m_comp_v_blocks));
-
-	m_comps_in_scan = 0;
-	memset(m_comp_list, 0, sizeof(m_comp_list));
-	memset(m_comp_dc_tab, 0, sizeof(m_comp_dc_tab));
-	memset(m_comp_ac_tab, 0, sizeof(m_comp_ac_tab));
-
-	m_spectral_start = 0;
-	m_spectral_end = 0;
-	m_successive_low = 0;
-	m_successive_high = 0;
-	m_max_mcu_x_size = 0;
-	m_max_mcu_y_size = 0;
-	m_blocks_per_mcu = 0;
-	m_max_blocks_per_row = 0;
-	m_mcus_per_row = 0;
-	m_mcus_per_col = 0;
-	m_expanded_blocks_per_component = 0;
-	m_expanded_blocks_per_mcu = 0;
-	m_expanded_blocks_per_row = 0;
-	m_freq_domain_chroma_upsample = false;
-
-	memset(m_mcu_org, 0, sizeof(m_mcu_org));
-
-	m_total_lines_left = 0;
-	m_mcu_lines_left = 0;
-	m_real_dest_bytes_per_scan_line = 0;
-	m_dest_bytes_per_scan_line = 0;
-	m_dest_bytes_per_pixel = 0;
-
-	memset(m_pHuff_tabs, 0, sizeof(m_pHuff_tabs));
-
-	memset(m_dc_coeffs, 0, sizeof(m_dc_coeffs));
-	memset(m_ac_coeffs, 0, sizeof(m_ac_coeffs));
-	memset(m_block_y_mcu, 0, sizeof(m_block_y_mcu));
-
-	m_eob_run = 0;
-
-	memset(m_block_y_mcu, 0, sizeof(m_block_y_mcu));
-
-	m_pIn_buf_ofs = m_in_buf;
-	m_in_buf_left = 0;
-	m_eof_flag = false;
-	m_tem_flag = 0;
-
-	memset(m_in_buf_pad_start, 0, sizeof(m_in_buf_pad_start));
-	memset(m_in_buf, 0, sizeof(m_in_buf));
-	memset(m_in_buf_pad_end, 0, sizeof(m_in_buf_pad_end));
-
-	m_restart_interval = 0;
-	m_restarts_left    = 0;
-	m_next_restart_num = 0;
-
-	m_max_mcus_per_row = 0;
-	m_max_blocks_per_mcu = 0;
-	m_max_mcus_per_col = 0;
-
-	memset(m_last_dc_val, 0, sizeof(m_last_dc_val));
-	m_pMCU_coefficients = NULL;
-	m_pSample_buf = NULL;
-
-	m_total_bytes_read = 0;
-
-	m_pScan_line_0 = NULL;
-	m_pScan_line_1 = NULL;
-
-	// Ready the input buffer.
-	prep_in_buffer();
-
-	// Prime the bit buffer.
-	m_bits_left = 16;
-	m_bit_buf = 0;
-
-	get_bits(16);
-	get_bits(16);
-
-	for (int i = 0; i < JPGD_MAX_BLOCKS_PER_MCU; i++)
-		m_mcu_block_max_zag[i] = 64;
 }
 
 #define SCALEBITS 16
@@ -2185,17 +2060,11 @@ void jpeg_decoder::find_eoi() {
 }
 
 int jpeg_decoder::decode(const void** pScan_line, uint* pScan_line_len) {
-	if ((m_error_code) || (!m_ready_flag))
-		return JPGD_FAILED;
-
-	if (m_total_lines_left == 0)
-		return JPGD_DONE;
+    assert_(!m_error_code && m_ready_flag);
+    if (m_total_lines_left == 0) return JPGD_DONE;
 
 	if (m_mcu_lines_left == 0) {
-		if (setjmp(m_jmp_state))
-			return JPGD_FAILED;
-
-		if (m_progressive_flag)
+        if (m_progressive_flag)
 			load_next_row();
 		else
 			decode_next_row();
@@ -2889,26 +2758,111 @@ void jpeg_decoder::decode_start() {
 		init_sequential();
 }
 
-void jpeg_decoder::decode_init(jpeg_decoder_stream *pStream) {
-	init(pStream);
-	locate_sof_marker();
-}
+jpeg_decoder::jpeg_decoder(ref<byte> file) : m_pStream(file) {
+    m_pMem_blocks = NULL;
+    m_error_code = JPGD_SUCCESS;
+    m_ready_flag = false;
+    m_image_x_size = m_image_y_size = 0;
+    m_progressive_flag = false;
 
-jpeg_decoder::jpeg_decoder(jpeg_decoder_stream *pStream) {
-	if (setjmp(m_jmp_state))
-		return;
-	decode_init(pStream);
+    memset(m_huff_ac, 0, sizeof(m_huff_ac));
+    memset(m_huff_num, 0, sizeof(m_huff_num));
+    memset(m_huff_val, 0, sizeof(m_huff_val));
+    memset(m_quant, 0, sizeof(m_quant));
+
+    m_scan_type = 0;
+    m_comps_in_frame = 0;
+
+    memset(m_comp_h_samp, 0, sizeof(m_comp_h_samp));
+    memset(m_comp_v_samp, 0, sizeof(m_comp_v_samp));
+    memset(m_comp_quant, 0, sizeof(m_comp_quant));
+    memset(m_comp_ident, 0, sizeof(m_comp_ident));
+    memset(m_comp_h_blocks, 0, sizeof(m_comp_h_blocks));
+    memset(m_comp_v_blocks, 0, sizeof(m_comp_v_blocks));
+
+    m_comps_in_scan = 0;
+    memset(m_comp_list, 0, sizeof(m_comp_list));
+    memset(m_comp_dc_tab, 0, sizeof(m_comp_dc_tab));
+    memset(m_comp_ac_tab, 0, sizeof(m_comp_ac_tab));
+
+    m_spectral_start = 0;
+    m_spectral_end = 0;
+    m_successive_low = 0;
+    m_successive_high = 0;
+    m_max_mcu_x_size = 0;
+    m_max_mcu_y_size = 0;
+    m_blocks_per_mcu = 0;
+    m_max_blocks_per_row = 0;
+    m_mcus_per_row = 0;
+    m_mcus_per_col = 0;
+    m_expanded_blocks_per_component = 0;
+    m_expanded_blocks_per_mcu = 0;
+    m_expanded_blocks_per_row = 0;
+    m_freq_domain_chroma_upsample = false;
+
+    memset(m_mcu_org, 0, sizeof(m_mcu_org));
+
+    m_total_lines_left = 0;
+    m_mcu_lines_left = 0;
+    m_real_dest_bytes_per_scan_line = 0;
+    m_dest_bytes_per_scan_line = 0;
+    m_dest_bytes_per_pixel = 0;
+
+    memset(m_pHuff_tabs, 0, sizeof(m_pHuff_tabs));
+
+    memset(m_dc_coeffs, 0, sizeof(m_dc_coeffs));
+    memset(m_ac_coeffs, 0, sizeof(m_ac_coeffs));
+    memset(m_block_y_mcu, 0, sizeof(m_block_y_mcu));
+
+    m_eob_run = 0;
+
+    memset(m_block_y_mcu, 0, sizeof(m_block_y_mcu));
+
+    m_pIn_buf_ofs = m_in_buf;
+    m_in_buf_left = 0;
+    m_eof_flag = false;
+    m_tem_flag = 0;
+
+    memset(m_in_buf_pad_start, 0, sizeof(m_in_buf_pad_start));
+    memset(m_in_buf, 0, sizeof(m_in_buf));
+    memset(m_in_buf_pad_end, 0, sizeof(m_in_buf_pad_end));
+
+    m_restart_interval = 0;
+    m_restarts_left    = 0;
+    m_next_restart_num = 0;
+
+    m_max_mcus_per_row = 0;
+    m_max_blocks_per_mcu = 0;
+    m_max_mcus_per_col = 0;
+
+    memset(m_last_dc_val, 0, sizeof(m_last_dc_val));
+    m_pMCU_coefficients = NULL;
+    m_pSample_buf = NULL;
+
+    m_total_bytes_read = 0;
+
+    m_pScan_line_0 = NULL;
+    m_pScan_line_1 = NULL;
+
+    // Ready the input buffer.
+    prep_in_buffer();
+
+    // Prime the bit buffer.
+    m_bits_left = 16;
+    m_bit_buf = 0;
+
+    get_bits(16);
+    get_bits(16);
+
+    for (int i = 0; i < JPGD_MAX_BLOCKS_PER_MCU; i++)
+        m_mcu_block_max_zag[i] = 64;
+
+    locate_sof_marker();
 }
 
 int jpeg_decoder::begin_decoding() {
-	if (m_ready_flag)
-		return JPGD_SUCCESS;
-
-	if (m_error_code)
-		return JPGD_FAILED;
-
-	if (setjmp(m_jmp_state))
-		return JPGD_FAILED;
+    if(m_ready_flag) return JPGD_SUCCESS;
+    assert_(!m_error_code);
 
 	decode_start();
 
@@ -2921,122 +2875,35 @@ jpeg_decoder::~jpeg_decoder() {
 	free_all_blocks();
 }
 
-bool jpeg_decoder_mem_stream::open(const uint8 *pSrc_data, uint size) {
-	close();
-	m_pSrc_data = pSrc_data;
-	m_ofs = 0;
-	m_size = size;
-	return true;
-}
-
 int jpeg_decoder_mem_stream::read(uint8 *pBuf, int max_bytes_to_read, bool *pEOF_flag) {
 	*pEOF_flag = false;
+    assert_(data);
 
-	if (!m_pSrc_data)
-		return -1;
-
-	uint bytes_remaining = m_size - m_ofs;
+    uint bytes_remaining = size - index;
 	if ((uint)max_bytes_to_read > bytes_remaining) {
 		max_bytes_to_read = bytes_remaining;
 		*pEOF_flag = true;
 	}
 
-	memcpy(pBuf, m_pSrc_data + m_ofs, max_bytes_to_read);
-	m_ofs += max_bytes_to_read;
+    memcpy(pBuf, data + index, max_bytes_to_read);
+    index += max_bytes_to_read;
 
 	return max_bytes_to_read;
 }
 
-uint8 *decompress_jpeg_image_from_stream(jpeg_decoder_stream *pStream, int *width, int *height, int *actual_comps, int req_comps) {
-	if (!actual_comps)
-		return NULL;
-	*actual_comps = 0;
+Image decodeJPEG(ref<byte> file) {
+    jpeg_decoder decoder(file);
+    assert_(decoder.get_error_code() == JPGD_SUCCESS);
+    assert_(decoder.begin_decoding() == JPGD_SUCCESS);
 
-	if ((!pStream) || (!width) || (!height) || (!req_comps))
-		return NULL;
-
-	if ((req_comps != 1) && (req_comps != 3) && (req_comps != 4))
-		return NULL;
-
-	jpeg_decoder decoder(pStream);
-	if (decoder.get_error_code() != JPGD_SUCCESS)
-		return NULL;
-
-	const int image_width = decoder.get_width(), image_height = decoder.get_height();
-	*width = image_width;
-	*height = image_height;
-	*actual_comps = decoder.get_num_components();
-
-	if (decoder.begin_decoding() != JPGD_SUCCESS)
-		return NULL;
-
-	const int dst_bpl = image_width * req_comps;
-
-	uint8 *pImage_data = (uint8*)malloc(dst_bpl * image_height);
-	if (!pImage_data)
-		return NULL;
-
-	for (int y = 0; y < image_height; y++) {
-		const uint8* pScan_line;
-		uint scan_line_len;
-		if (decoder.decode((const void**)&pScan_line, &scan_line_len) != JPGD_SUCCESS) {
-			free(pImage_data);
-			return NULL;
-		}
-
-		uint8 *pDst = pImage_data + y * dst_bpl;
-
-		if (((req_comps == 1) && (decoder.get_num_components() == 1)) || ((req_comps == 4) && (decoder.get_num_components() == 3)))
-			memcpy(pDst, pScan_line, dst_bpl);
-		else if (decoder.get_num_components() == 1) {
-			if (req_comps == 3) {
-				for (int x = 0; x < image_width; x++) {
-					uint8 luma = pScan_line[x];
-					pDst[0] = luma;
-					pDst[1] = luma;
-					pDst[2] = luma;
-					pDst += 3;
-				}
-			}
-			else {
-				for (int x = 0; x < image_width; x++) {
-					uint8 luma = pScan_line[x];
-					pDst[0] = luma;
-					pDst[1] = luma;
-					pDst[2] = luma;
-					pDst[3] = 0xFF;
-					pDst += 4;
-				}
-			}
-		}
-		else if (decoder.get_num_components() == 3) {
-			if (req_comps == 1) {
-				const int YR = 19595, YG = 38470, YB = 7471;
-				for (int x = 0; x < image_width; x++) {
-					int r = pScan_line[x*4+0];
-					int g = pScan_line[x*4+1];
-					int b = pScan_line[x*4+2];
-					*pDst++ = static_cast<uint8>((r * YR + g * YG + b * YB + 32768) >> 16);
-				}
-			}
-			else {
-				for (int x = 0; x < image_width; x++) {
-					pDst[2] = pScan_line[x*4+0];
-					pDst[1] = pScan_line[x*4+1];
-					pDst[0] = pScan_line[x*4+2];
-					pDst += 3;
-				}
-			}
-		}
-	}
-
-	return pImage_data;
-}
-
-Image decodeJPEG(const ref<byte> file) {
-	jpeg_decoder_mem_stream mem_stream((uint8*)file.data, file.size);
-	int width=0, height=0, depth;
-	byte4* data = (byte4*)decompress_jpeg_image_from_stream(&mem_stream, &width, &height, &depth, 4); // mallocated
-	assert_(width && height);
-	return Image(buffer<byte4>(data, width*height, width*height), int2(width,height), width);
+    Image image(decoder.get_width(), decoder.get_height());
+    for(int y: range(image.height)) {
+        const byte4* pScan_line;
+        uint scan_line_len;
+        assert_(decoder.decode((const void**)&pScan_line, &scan_line_len) == JPGD_SUCCESS);
+        assert_(scan_line_len == image.width*4);
+        assert_(decoder.get_num_components() == 3);
+        image.slice(y*image.width, image.width).copy(ref<byte4>(pScan_line, image.width));
+    }
+    return image;
 }

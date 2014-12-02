@@ -213,8 +213,8 @@ struct Build {
         Folder(tmp+"/"+join(flags,"-"), root(), true);
 
         // Compiles
-		if(flags.contains("profile")) if(!compileModule(find("core/profile.cc"))) { log("Failed to compile"); requestTermination(-1); return; }
-		if(!compileModule( find(target+".cc") )) { log("Failed to compile"); requestTermination(-1); return; }
+        if(flags.contains("profile")) if(!compileModule(find("core/profile.cc"))) { log("Failed to compile"); return; }
+        if(!compileModule( find(target+".cc") )) { log("Failed to compile"); return; }
 
 		if(arguments().contains("-tree")) { log(collect(modules.first(), 1)); return; }
 
@@ -223,12 +223,12 @@ struct Build {
 		assert_(!existsFolder(binary));
         if(!existsFile(binary) || needLink) {
 			// Waits for all translation units to finish compilation before final link
-			for(int pid: pids) if(wait(pid)) { log("Failed to compile"); requestTermination(-1); return; }
+            for(int pid: pids) if(wait(pid)) { log("Failed to compile"); return; }
 			buffer<String> args =
 					move(files) +
                     mref<String>{"-o"__, unsafeRef(binary), "-L/usr/local/lib"__} +
 					apply(libraries, [this](const String& library)->String{ return "-l"+library; });
-			if(execute(CXX, toRefs(args))) { log("Failed to link"); requestTermination(-1); return; }
+            if(execute(CXX, toRefs(args))) { log("Failed to link"); return; }
         }
 
         // Installs

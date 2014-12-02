@@ -28,12 +28,31 @@ Encoder::Encoder(String&& name) : path(move(name)) {
 	avformat_alloc_output_context2(&context, NULL, NULL, strz(path));
 }
 
-void Encoder::setVideo(Format format, int2 size, uint videoFrameRate, bool ultrafast) {
+void Encoder::setMJPEG(int2 size, uint videoFrameRate) {
+    assert_(!videoStream);
+    this->size=size;
+    this->videoFrameRate=videoFrameRate;
+
+    AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_MJPEG);
+    videoStream = avformat_new_stream(context, codec);
+    videoCodec = videoStream->codec;
+    avcodec_get_context_defaults3(videoCodec, codec);
+    videoCodec->codec_id = AV_CODEC_ID_MJPEG;
+    videoCodec->width = width;
+    videoCodec->height = height;
+    videoStream->time_base.num = videoCodec->time_base.num = 1;
+    videoStream->time_base.den = videoCodec->time_base.den = videoFrameRate;
+    videoCodec->pix_fmt = AV_PIX_FMT_YUVJ444P;
+    if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
+    check( avcodec_open2(videoCodec, codec, 0) );
+    frame = av_frame_alloc();
+}
+
+void Encoder::setH264(int2 size, uint videoFrameRate) {
 	assert_(!videoStream);
 	this->size=size;
 	this->videoFrameRate=videoFrameRate;
-	swsContext = sws_getContext(width, height, format==sRGB ? AV_PIX_FMT_BGRA : AV_PIX_FMT_YUYV422, width, height,
-								format==sRGB ? AV_PIX_FMT_YUV420P : AV_PIX_FMT_YUV422P, SWS_FAST_BILINEAR, 0, 0, 0);
+    swsContext = sws_getContext(width, height, AV_PIX_FMT_BGRA, width, height, AV_PIX_FMT_YUV420P, SWS_FAST_BILINEAR, 0, 0, 0);
 
 	AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_H264);
 	videoStream = avformat_new_stream(context, codec);
@@ -44,15 +63,11 @@ void Encoder::setVideo(Format format, int2 size, uint videoFrameRate, bool ultra
 	videoCodec->height = height;
     videoStream->time_base.num = videoCodec->time_base.num = 1;
     videoStream->time_base.den = videoCodec->time_base.den = videoFrameRate;
-	videoCodec->pix_fmt = format==sRGB ? AV_PIX_FMT_YUV420P : AV_PIX_FMT_YUV422P;
+    videoCodec->pix_fmt = AV_PIX_FMT_YUV420P;
 	if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
-    AVDictionary* options = 0;
-    //av_dict_set(&options, "qp","0",0); // Lossless
-	if(ultrafast) av_dict_set(&options, "preset", "ultrafast", 0);
-    avcodec_open2(videoCodec, codec, &options);
-	check( avcodec_open2(videoCodec, codec, 0) );
+    check( avcodec_open2(videoCodec, codec, 0) );
 	frame = av_frame_alloc();
-	avpicture_alloc((AVPicture*)frame, format==sRGB ? AV_PIX_FMT_YUV420P : AV_PIX_FMT_YUV422P, width, height);
+    avpicture_alloc((AVPicture*)frame, AV_PIX_FMT_YUV420P, width, height);
 }
 
 void Encoder::setAudio(const AudioFile& audio) {
@@ -111,23 +126,17 @@ void Encoder::open() {
     lock.unlock();
 }
 
-void Encoder::writeVideoFrame(const YUYVImage& image) {
-	assert_(videoStream && image.size==int2(width,height), image.size);
-	int stride = image.width * 2;
-	sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, height, frame->data, frame->linesize);
-    frame->pts = image.time*videoStream->time_base.den/(1000000*videoStream->time_base.num);
-    //videoTime*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
+void Encoder::writeMJPEGPacket(ref<byte> data, uint64 pts) {
+    assert_(videoStream);
+    frame->pts = pts*videoStream->time_base.den/(1000000*videoStream->time_base.num);
 
-	AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
-	int gotVideoPacket;
-	avcodec_encode_video2(videoCodec, &pkt, frame, &gotVideoPacket);
-    //log(videoTime, frame->pts, pkt.pts, videoStream->time_base.num, videoFrameRate, videoStream->time_base.den);
-
-	if(gotVideoPacket) {
-		pkt.stream_index = videoStream->index;
-        Locker locker(lock);
-        av_interleaved_write_frame(context, &pkt);
-	}
+    AVPacket pkt;
+    av_init_packet(&pkt);
+    pkt.data = (uint8*)data.data;
+    pkt.size = data.size;
+    pkt.stream_index = videoStream->index;
+    Locker locker(lock);
+    av_interleaved_write_frame(context, &pkt);
 	videoTime++;
 }
 
@@ -192,13 +201,14 @@ void Encoder::abort() {
     if(frame) av_frame_free(&frame);
     if(videoCodec) { avcodec_close(videoCodec); videoCodec=0; videoStream=0; }
     if(audioCodec) { avcodec_close(audioCodec); audioCodec=0; audioStream=0; }
-    assert_(context); avformat_close_input(&context); // Releases encoder without flushing
-    assert_(!context);
+    avio_close(context->pb);
+    avformat_free_context(context);
+    context = 0;
 }
 
 Encoder::~Encoder() {
-    lock.lock();
     if(!context) { assert(!frame && !videoStream && !audioStream && !context); return; } // Aborted
+    lock.lock();
     if(frame) av_frame_free(&frame);
     for(;;) {
         if(!videoStream && !audioStream) break;
@@ -207,23 +217,23 @@ Encoder::~Encoder() {
         if(videoStream) {
             assert_(videoCodec);
             avcodec_encode_video2(videoCodec, &pkt, 0, &gotPacket);
-            if(!gotPacket) { videoStream=0;/*Released by avformat_close_input*/ continue; }
+            if(!gotPacket) { videoStream=0;/*Released by avformat_free_context*/ continue; }
             if(videoCodec->coded_frame->key_frame) pkt.flags |= AV_PKT_FLAG_KEY;
             pkt.stream_index = videoStream->index;
         }
         if(audioStream) {
             avcodec_encode_audio2(audioCodec, &pkt, 0, &gotPacket);
-            if(!gotPacket) { audioStream=0;/*Released by avformat_close_input*/ continue; }
+            if(!gotPacket) { audioStream=0;/*Released by avformat_free_context*/ continue; }
             pkt.stream_index = audioStream->index;
         }
         av_interleaved_write_frame(context, &pkt);
-        if(!pkt.buf) av_free_packet(&pkt); // else av_packet_unref(&pkt) ?
+        if(!pkt.buf) av_free_packet(&pkt);
     }
-    assert_(context);
     av_interleaved_write_frame(context, 0);
     av_write_trailer(context);
     if(videoCodec) { avcodec_close(videoCodec); videoCodec=0; }
     if(audioCodec) { avcodec_close(audioCodec); audioCodec=0; }
-    avformat_close_input(&context);
-    assert_(!context);
+    avio_close(context->pb);
+    avformat_free_context(context);
+    context = 0;
 }
