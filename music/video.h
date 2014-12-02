@@ -8,14 +8,14 @@ struct Decoder {
 		struct { uint width, height; };
 	};
 	int videoFrameRate=0;
-	int64 firstPTS = 0;
+	int firstPTS = 0;
 
 	uint duration = 0;
 
 	struct AVFormatContext* file=0;
 	struct SwsContext* swsContext=0;
-	struct AVStream* videoStream=0; struct AVCodecContext* video=0;
-	int64 videoTime = 0;
+	struct AVStream* videoStream=0; struct AVCodecContext* videoCodec=0;
+	int videoTime = -1;
 	struct AVFrame* frame=0;
 
 	Decoder() {}

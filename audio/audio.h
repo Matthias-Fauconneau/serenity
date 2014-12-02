@@ -4,7 +4,7 @@
 
 /// Generic audio decoder (using ffmpeg)
 struct AudioFile {
-	size_t channels = 0;
+	uint channels = 0;
 	uint audioFrameRate = 0;
 	int64 audioTime = 0;
     uint duration = 0;

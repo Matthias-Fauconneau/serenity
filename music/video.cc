@@ -29,19 +29,19 @@ Decoder::Decoder(string path) {
 	for(uint i=0; i<file->nb_streams; i++) {
 		if(file->streams[i]->codec->codec_type==AVMEDIA_TYPE_VIDEO) {
 			videoStream = file->streams[i];
-			video = videoStream->codec;
-			AVCodec* codec = avcodec_find_decoder(video->codec_id);
-			if(codec && avcodec_open2(video, codec, 0) >= 0) {
-				width = video->width; height=video->height;
-				assert_(videoStream->time_base.den%videoStream->time_base.num == 0);
-				videoFrameRate = video->time_base.den/videoStream->time_base.num;
+			videoCodec = videoStream->codec;
+			AVCodec* codec = avcodec_find_decoder(videoCodec->codec_id);
+			if(codec && avcodec_open2(videoCodec, codec, 0) >= 0) {
+				width = videoCodec->width; height=videoCodec->height;
+				assert_(videoCodec->time_base.num == 1);
+				videoFrameRate = 30; //FIXME: videoCodec->time_base.den;
 			}
 		}
 	}
-	//if(video->pix_fmt==-1) video->pix_fmt=AV_PIX_FMT_YUV422P;
-	assert_(video->pix_fmt!=-1);
-	assert_(video->pix_fmt == AV_PIX_FMT_YUVJ422P);
-	swsContext = sws_getContext (width, height, video->pix_fmt, width, height,  AV_PIX_FMT_BGRA, SWS_FAST_BILINEAR, 0, 0, 0);
+	//if(videoCodec->pix_fmt==-1) videoCodec->pix_fmt=AV_PIX_FMT_YUV422P;
+	assert_(videoCodec->pix_fmt!=-1);
+	assert_(videoCodec->pix_fmt == AV_PIX_FMT_YUVJ422P);
+	swsContext = sws_getContext (width, height, videoCodec->pix_fmt, width, height,  AV_PIX_FMT_BGRA, SWS_FAST_BILINEAR, 0, 0, 0);
 	assert_(swsContext);
 	frame = av_frame_alloc();
 }
@@ -57,7 +57,7 @@ Image Decoder::read() {
 		if(av_read_frame(file, &packet) < 0) return {};
 		if(file->streams[packet.stream_index]==videoStream) {
 			int gotFrame=0;
-			int used = avcodec_decode_video2(video, frame, &gotFrame, &packet);
+			int used = avcodec_decode_video2(videoCodec, frame, &gotFrame, &packet);
 			assert_(used >= 0, used);
 			if(gotFrame) {
 				AVPicture targetFrame;
@@ -70,7 +70,9 @@ Image Decoder::read() {
 
 				//if(!firstPTS) firstPTS=frame->pkt_pts; // Ignores any embedded sync
 				assert_(frame->pkt_pts >= firstPTS, firstPTS, packet.pts, packet.dts);
-				videoTime = (frame->pkt_pts-firstPTS) * videoFrameRate * videoStream->time_base.num / videoStream->time_base.den;
+				int nextTime = ((frame->pkt_pts-firstPTS) * videoFrameRate * videoStream->time_base.num + 10) / videoStream->time_base.den;
+				assert_(nextTime == videoTime+1, videoTime, nextTime, videoFrameRate, frame->pkt_pts);
+				videoTime = nextTime;
 				return image;
 			}
 		}

@@ -87,7 +87,11 @@ shared<Graphics> ImageView::graphics(int2 size) {
 		graphics->blits.append(max(vec2(0),vec2((size-target)/2)), vec2(target), share(image));*/
 		// Crop
 		//int2 offset = size-image.size;
-		graphics->blits.append(max(vec2(0),vec2((size-image.size)/2)), vec2(min(size, image.size)), cropShare(image, max(int2(0),int2((image.size-size)/2)), min(size, image.size)));
+		graphics->blits.append(
+					max(vec2(0),vec2((size-image.size)/2)), // Centers
+					vec2(min(size, image.size)), // or fits
+					cropShare(image, max(int2(0),int2((image.size-size)/2)), min(size, image.size)) // by cropping center
+					);
     }
     return graphics;
 }
