@@ -49,7 +49,7 @@ struct Rest {
 	Value value;
 	uint duration() const { return valueDurations[value]; };
 };
-struct Measure { uint measure, page, pageLine, lineMeasure; };
+struct Measure { bool lineBreak; uint measure, page, pageLine, lineMeasure; };
 struct KeySignature {
     int fifths; // Index on the fifths circle
 };

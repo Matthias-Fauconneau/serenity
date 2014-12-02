@@ -54,6 +54,9 @@ struct Sheet : Widget {
 	uint extraErrors = 0, missingErrors = 0, wrongErrors = 0, orderErrors = 0;
 	size_t firstSynchronizationFailureChordIndex = -1;
 
+	// -- Page layout
+	int2 pageSize = 0;
+
 	/// Layouts musical notations to graphic primitives
-	Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes={});
+	Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes={}, int2 pageSize=0);
 };

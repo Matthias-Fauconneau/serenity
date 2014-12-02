@@ -23,7 +23,7 @@ static uint text(vec2 origin, string message, float size, array<Glyph>& glyphs) 
 }
 
 // Layouts notations to graphic primitives (and parses notes to MIDI keys)
-Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
+Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pageSize) : pageSize(pageSize) {
 	constexpr bool logErrors = false;
 	map<uint, array<Sign>> notes; // Signs for notes (time, key, blitIndex)
 	uint measureIndex=1, page=1, lineIndex=1, lineMeasureIndex=1;
@@ -319,7 +319,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 
 							String noteGlyphName = "noteheads.s"_+str(clip(0,int(note.value-1),2)); // FIXME: factor
 							x += 2*glyphSize(noteGlyphName).x;
-							for(Sign sign: chords[staff]) if(abs(sign.note.step-note.step) <=1) { x += glyphSize(noteGlyphName).x; break; }// Dichord
+							for(Sign sign: chords[staff]) if(abs(sign.note.step-note.step) <= 1) { x += glyphSize(noteGlyphName).x; break; }// Dichord
+							for(Sign sign: chords[staff]) if(sign.note.dot) x += glyphSize(noteGlyphName).x; // Dot
 							if(chords[staff]) sign.note.tuplet = chords[staff][0].note.tuplet; // Does not affect rendering but mismatch triggers asserts
 							chords[staff].insertSorted(sign);
 						} else {
@@ -343,15 +344,14 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 						beatTime[staff] += sign.rest.value == Whole ? measureLength /*FIXME: only if single*/ : sign.rest.duration();
 					}
 					else if(sign.type == Sign::Clef) {
-						string change = clefs.contains(staff)?"_change"_:""_;
 						Clef clef = sign.clef;
 						assert_(!clef.octave);
 						if((!clefs.contains(staff) || clefs.at(staff).clefSign != sign.clef.clefSign) && !(signIndex>=signs.size-2)) {
+							String glyphName = (clef.clefSign==Treble ? "clefs.G" : "clefs.F")+(clefs.contains(staff)?"_change"_:""_);
+							x += clefs.contains(staff) ? -glyphSize(glyphName).x : noteSize.x;
+							x += glyph(vec2(x, staffY(staff, clef.clefSign==Treble ? -6 : -2)), glyphName, font, measure.glyphs);
+							x += clefs.contains(staff) ? noteSize.x/2 : noteSize.x;
 							clefs[staff] = sign.clef;
-							if(!change) x += noteSize.x; else x -= glyphSize(clef.clefSign==Treble ? "clefs.G_change"_ : "clefs.F_change"_).x;
-							if(clef.clefSign==Treble) x += glyph(vec2(x, staffY(staff, -6)), "clefs.G"_+change, font, measure.glyphs);
-							if(clef.clefSign==Bass) x += glyph(vec2(x, staffY(staff, -2)),"clefs.F"_+change, font, measure.glyphs);
-							if(!change) x += noteSize.x; else x += noteSize.x/2;
 						}
 					}
 					else error(int(sign.type));
@@ -546,15 +546,13 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 					}
 					if(chord.size>1 && abs(chord.last().note.step-chord[chord.size-2].note.step)>=2) shift.last() = true; // Shifts single top
 				}
-				float maxOffset=0;
 				float accidentalAboveY = -inf, accidentalOffset = 0;
 				for(size_t index: reverse_range(chord.size)) { // Top to bottom (notes are sorted bass to treble)
 					Sign sign = chord[index];
 					assert_(sign.type==Sign::Note);
 					Note& note = sign.note;
 					//assert_(note.measureIndex == measures.size());
-					const float x = X(sign);
-					vec2 p = P(sign);
+					const float x = X(sign) + (shift[index] ? noteSize.x : 0), y = Y(sign);
 					String noteGlyphName = "noteheads.s"_+str(clip(0,int(note.value-1),2)); // FIXME: factor
 					vec2 noteSize = glyphSize(noteGlyphName);
 					float opacity = (note.tie == Note::NoTie || note.tie == Note::TieStart) ? 1 : 1./2;
@@ -568,18 +566,16 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 						int y=staffY(staff, s); measure.fills.append(vec2(x-noteSize.x/3,y),vec2(noteSize.x*5/3,1), black, opacity);
 					}
 					// Body
-					float bodyOffset = shift[index] ? noteSize.x : 0; // Shift body for dichords
-					maxOffset = max(maxOffset, bodyOffset);
 					note.glyphIndex = measure.glyphs.size;
-					glyph(p+vec2(bodyOffset, 0), noteGlyphName, note.grace?graceFont:font, measure.glyphs, opacity);
-					// Dot
-					if(note.accidental) { // Accidental
-						if(abs(p.y-accidentalAboveY)<=3*halfLineInterval) accidentalOffset -= noteSize.x/2;
+					glyph(vec2(x, y), noteGlyphName, note.grace?graceFont:font, measure.glyphs, opacity);
+					// Accidental
+					if(note.accidental) {
+						if(abs(y-accidentalAboveY)<=3*halfLineInterval) accidentalOffset -= noteSize.x/2;
 						else accidentalOffset = 0;
 						assert_(size_t(note.accidental-1) < 5, int(note.accidental));
 						String name = "accidentals."_+accidentalNamesLy[note.accidental];
-						glyph(vec2(x-glyphSize(name).x+accidentalOffset, p.y), name, font, measure.glyphs); //TODO: highlight as well
-						accidentalAboveY = p.y;
+						glyph(vec2(x-glyphSize(name).x+accidentalOffset, y), name, font, measure.glyphs); //TODO: highlight as well
+						accidentalAboveY = y;
 					}
 					if(note.tie == Note::NoTie || note.tie == Note::TieStart) notes.sorted(sign.time).append( sign );
 				}
@@ -624,7 +620,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 					vec2 noteSize = glyphSize(noteGlyphName);
 					if(note.dot) {
 						 float opacity = (note.tie == Note::NoTie || note.tie == Note::TieStart) ? 1 : 1./2;
-						glyph(P(sign)+vec2(maxOffset+noteSize.x*4/3,0),"dots.dot"_, font, measure.glyphs, opacity);
+						glyph(P(sign)+vec2((shift.contains(true) ? noteSize.x : 0)+noteSize.x*4/3,0),"dots.dot"_, font, measure.glyphs, opacity);
 					}
 				}
 				if(value >= Half /*also quarter and halfs for stems*/) {
@@ -762,17 +758,21 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes) {
 	else { firstSynchronizationFailureChordIndex = chordToNote.size; }
 	if(logErrors && (extraErrors||wrongErrors||missingErrors||orderErrors)) log(extraErrors, wrongErrors, missingErrors, orderErrors);
 
-	auto verticalAlign = [&](Graphics& measure) {
-		vec2 offset = vec2(0, -staffY(1,highestStep)+textSize);
-		for(auto& o: measure.fills) o.origin += offset;
-		assert_(!measure.blits);
-		for(auto& o: measure.glyphs) o.origin += offset;
-		for(auto& o: measure.parallelograms) o.min+=offset, o.max+=offset;
-		assert_(!measure.lines);
-		for(auto& o: measure.cubics) for(vec2& p: o.points) p+=vec2(offset);
-	};
-	for(Graphics& measure: measures.values) verticalAlign(measure);
-	verticalAlign(debug);
+	if(pageSize) {
+		//TODO: h justify, v distribute
+	} else {
+		auto verticalAlign = [&](Graphics& measure) {
+			vec2 offset = vec2(0, -staffY(1,highestStep)+textSize);
+			for(auto& o: measure.fills) o.origin += offset;
+			assert_(!measure.blits);
+			for(auto& o: measure.glyphs) o.origin += offset;
+			for(auto& o: measure.parallelograms) o.min+=offset, o.max+=offset;
+			assert_(!measure.lines);
+			for(auto& o: measure.cubics) for(vec2& p: o.points) p+=vec2(offset);
+		};
+		for(Graphics& measure: measures.values) verticalAlign(measure);
+		verticalAlign(debug);
+	}
 }
 
 inline bool operator ==(const Sign& sign, const uint& key) {

@@ -38,8 +38,9 @@ Decoder::Decoder(string path) {
 			}
 		}
 	}
-	if(video->pix_fmt==-1) video->pix_fmt=AV_PIX_FMT_YUV422P;
+	//if(video->pix_fmt==-1) video->pix_fmt=AV_PIX_FMT_YUV422P;
 	assert_(video->pix_fmt!=-1);
+	assert_(video->pix_fmt == AV_PIX_FMT_YUVJ422P);
 	swsContext = sws_getContext (width, height, video->pix_fmt, width, height,  AV_PIX_FMT_BGRA, SWS_FAST_BILINEAR, 0, 0, 0);
 	assert_(swsContext);
 	frame = av_frame_alloc();

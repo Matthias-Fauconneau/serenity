@@ -3,7 +3,8 @@
 
 MusicXML::MusicXML(string document, string) {
     Element root = parseXML(document);
-	map<uint, Clef> clefs;
+	Clef clefs[2] = {{Treble,0}, {Treble,0}};
+	for(uint staff: range(2)) signs.insertSorted(Sign{0, 0, staff, Sign::Clef, .clef=clefs[staff]}); // Defaults
 	KeySignature keySignature={0}; TimeSignature timeSignature={4,4};
 	int64 measureTime = 0, time = 0, nextTime = 0, maxTime = 0;
 	uint measureIndex=0, pageIndex=0, pageLineIndex=0, lineMeasureIndex=0; // starts with 1
@@ -87,7 +88,7 @@ MusicXML::MusicXML(string document, string) {
 					e.xpath("notations/tied"_, tieLambda);
                     uint key = ({// Converts note to MIDI key
                                  int step = noteStep;
-								 int octave = clefs.value(staff, {Treble, 0}).octave + step>0 ? step/7 : (step-6)/7; // Rounds towards
+								 int octave = clefs[staff].octave + step>0 ? step/7 : (step-6)/7; // Rounds towards
                                  step = (step - step/7*7 + 7)%7;
                                  uint stepToKey[] = {0,2,4,5,7,9,11}; // C [C#] D [D#] E F [F#] G [G#] A [A#] B
                                  //assert_(step>=0 && step<8, step, midiIndex, midiKey);
@@ -107,7 +108,7 @@ MusicXML::MusicXML(string document, string) {
                                 });
 					bool articulations = e.contains("notations"_) && e("notations"_).contains("articulations"_);
 					bool ornaments = e.contains("notations"_) && e("notations"_).contains("ornaments"_);
-					{Sign sign{time, duration, staff, Sign::Note, .note={clefs.value(staff, {Treble, 0}), noteStep, noteAccidental, value, tie,
+					{Sign sign{time, duration, staff, Sign::Note, .note={clefs[staff], noteStep, noteAccidental, value, tie,
 																		 e.contains("dot"_) ? true : false,
 																		 e.contains("grace"_)?true:false,
 																		 e.contains("grace"_) && e("grace"_)["slash"_]=="yes"_?true:false,
@@ -200,6 +201,7 @@ MusicXML::MusicXML(string document, string) {
                 e.xpath("clef"_, [&](const Element& clef) {
 					uint xmlStaffIndex = clef["number"_] ? parseInteger(clef["number"_])-1 : 0;
 					uint staff = 1-xmlStaffIndex; // Inverts staff order convention (treble, bass -> bass, treble)
+					assert_(staff >= 0 && staff <= 1);
                     ClefSign clefSign = ClefSign("FG"_.indexOf(clef("sign"_).text()[0]));
 					signs.insertSorted({time, 0, staff, Sign::Clef, .clef={clefSign, 0}});
                     clefs[staff] = {clefSign, 0};
@@ -230,7 +232,7 @@ MusicXML::MusicXML(string document, string) {
 						assert_(time==nextTime && time==maxTime && time > signs[repeatIndex].time);
 						int64 repeatLength = time - signs[repeatIndex].time; // FIXME: Assumes document order matches time order
 						for(Sign& sign: copy) sign.time += repeatLength;
-						signs.insertSorted({time, 0, uint(-1), Sign::Measure, .measure={measureIndex, pageIndex, pageLineIndex, lineMeasureIndex}});
+						signs.insertSorted({time, 0, uint(-1), Sign::Measure, .measure={false, measureIndex, pageIndex, pageLineIndex, lineMeasureIndex}});
 						signs.append( move(copy) );
 						nextTime = time + repeatLength;
 						repeatIndex=invalid;
@@ -244,7 +246,8 @@ MusicXML::MusicXML(string document, string) {
 			assert_(time >= measureTime, int(time-measureTime), int(nextTime-measureTime), int(maxTime-measureTime), measureIndex, e);
         }
 		maxTime=time=nextTime= max(maxTime, max(time, nextTime));
-		signs.insertSorted({time, 0, uint(-1), Sign::Measure, .measure={measureIndex, pageIndex, pageLineIndex, lineMeasureIndex}});
+		bool lineBreak = m.contains("print") ? m("print")["new-system"]=="yes" : false;
+		signs.insertSorted({time, 0, uint(-1), Sign::Measure, .measure={lineBreak, measureIndex, pageIndex, pageLineIndex, lineMeasureIndex}});
 	}
 
 	// Matches start-end-stop signs together

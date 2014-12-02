@@ -101,8 +101,8 @@ struct BeatSynchronizer : Widget {
 			int lastK = ceil(keyToPitch(lastKey)*N/audio.rate);
 			for(size_t frameIndex: range(frameCount)) {
 				ref<float> X = audio.slice(frameIndex*h*audio.channels, N*audio.channels);
-				//if(audio.channels==1) for(size_t i: range(N)) fft.windowed[i] = fft.window[i] * X[frameIndex*h+i];
-				if(audio.channels==2) for(size_t i: range(N)) fft.windowed[i] = fft.window[i] * (X[i*2+0]+X[i*2+1])/2;
+				if(audio.channels==1) for(size_t i: range(N)) fft.windowed[i] = fft.window[i] * X[i];
+				//else if(audio.channels==2) for(size_t i: range(N)) fft.windowed[i] = fft.window[i] * (X[i*2+0]+X[i*2+1])/2;
 				else error(audio.channels);
 				fft.transform();
 				for(size_t k: range(firstK, lastK+1)) { // For each bin
@@ -209,9 +209,8 @@ struct BeatSynchronizer : Widget {
 			size_t midiIndex = 0;
 			while(i<m && j<n) {
 				int localOffset = (P[j][0].time - notes[midiIndex].time) - globalOffset; // >0: late, <0: early
-				static constexpr bool limitDelay=false, limitAdvance=true;
-				if(j+1<n && ((D(i,j) == D(i,j+1) && (!limitDelay || localOffset < notes.ticksPerSeconds/8))
-							 || (limitAdvance && i && localOffset < -int(notes.ticksPerSeconds)/4))) {
+				const int limitDelay = notes.ticksPerSeconds/2, limitAdvance = notes.ticksPerSeconds; //int(notes.ticksPerSeconds)/4;
+				if(j+1<n && ((D(i,j) == D(i,j+1) && (i==0 || localOffset < limitDelay)) || (i && localOffset < -limitAdvance))) {
 					j++;
 				} else {
 					globalOffset = P[j][0].time - notes[midiIndex].time;
@@ -318,6 +317,16 @@ struct BeatSynchronizer : Widget {
 	}
 };
 
+// Scales intensity to set mean to FF
+void normalize(const Image& image) {
+	uint d = 1;
+	//for(byte4 p: image) d=max(d,max(max(p.b,p.g),p.r));
+	for(byte4 p: image) d += p.b + p.g + p.r;
+	d /= image.ref::size;
+	assert_(d < 0xFF);
+	for(byte4& p: image) p = byte4(min(0xFFu, uint(p.b)*0xFF/d), min(0xFFu, uint(p.g)*0xFF/d), min(0xFFu, uint(p.r)*0xFF/d), 0xFF);
+}
+
 struct Music : Widget {
 	// Name
 	string name = arguments() ? arguments()[0] : (error("Expected name"), string());
@@ -375,7 +384,12 @@ struct Music : Widget {
 	size_t read32(mref<int2> output) {
 		if(audioFile) {
 			if(audioFile.channels == audio.channels) return audioFile.read32(mcast<int>(output));
-			else error(audioFile.channels);
+			else if(audioFile.channels == 1 && audio.channels==2) {
+				int buffer[output.size];
+				audioFile.read32(mref<int>(buffer, output.size));
+				for(size_t i: range(output.size)) output[i] = buffer[i];
+				return output.size;
+			} else error(audioFile.channels);
 		} else {
 			assert_(sampler.channels == audio.channels);
 			assert_(sampler.rate == audio.rate);
@@ -393,7 +407,7 @@ struct Music : Widget {
 		}
 	}
 
-	bool follow(int64 timeNum, int64 timeDen, int2 size) {
+	bool follow(int64 timeNum, int64 timeDen, int2 size, bool preview=true) {
 		assert_(timeDen && notes.ticksPerSeconds == timeDen);
 		if(timeNum < 0) return false; // FIXME
 		bool contentChanged = false;
@@ -440,14 +454,16 @@ struct Music : Widget {
 		}
 		if(previousOffset != scroll.offset.x) contentChanged = true;
 		beatSynchronizer.currentTime = timeNum*notes.ticksPerSeconds/timeDen;
-		if(video && (!videoView.image || video.videoTime*timeDen <= timeNum*video.videoFrameRate)) {
+		if(video) while(!videoView.image || video.videoTime*timeDen <= timeNum*video.videoFrameRate) {
 			Image image = video.read();
 			if(image) {
 				if(rotate) ::rotate(image);
-				image = copy(cropShare(image, int2(0, image.height/5), int2(image.width, image.height/3)));
+				image = copy(cropShare(image, int2(0, image.height/5), int2(image.width, image.height/2)));
+				normalize(image);
 				videoView.image = move(image);
 				contentChanged=true;
 			}
+			if(!preview) break; // Only preview may have lower framerate than video
 		}
 		return contentChanged;
 	}
@@ -528,7 +544,7 @@ struct Music : Widget {
 						if(!writeAudio()) break;
 					}
 					while(encoder.videoTime*encoder.audioFrameRate < encoder.audioTime*encoder.videoFrameRate) {
-						follow(startTime+encoder.videoTime*notes.ticksPerSeconds/encoder.videoFrameRate, notes.ticksPerSeconds, encoder.size);
+						follow(startTime+encoder.videoTime*notes.ticksPerSeconds/encoder.videoFrameRate, notes.ticksPerSeconds, encoder.size, false);
 						renderTime.start();
 						Image target (encoder.size);
 						fill(target, 0, target.size, 1, 1);
