@@ -15,7 +15,7 @@ struct Encoder {
     struct SwsContext* swsContext=0;
     struct AVStream* videoStream=0; struct AVCodecContext* videoCodec=0;
     struct AVStream* audioStream=0; struct AVCodecContext* audioCodec=0;
-    uint64 videoTime = 0, audioTime = 0;
+	uint64 videoTime = 0, audioTime = 0, videoEncodeTime = 0, audioEncodeTime = 0;
     AVFrame* frame = 0;
 
     /// Starts a new file recording video

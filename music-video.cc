@@ -318,7 +318,6 @@ struct BeatSynchronizer : Widget {
 	}
 };
 
-// Scales intensity to set mean to FF
 void scale(const Image& target, const Image& source, int num, int den) {
 	if(den==1)
 		for(size_t i: range(target.ref::size)) {
@@ -331,15 +330,11 @@ void scale(const Image& target, const Image& source, int num, int den) {
 }
 Image scale(const Image& source, int num, int den) { Image target(source.size); scale(target, source, num, den); return target; }
 
-// Scales intensity to set mean to FF
-/*void normalize(const Image& image) {
-	uint d = 1;
-	//for(byte4 p: image) d=max(d,max(max(p.b,p.g),p.r));
-	for(byte4 p: image) d += p.b + p.g + p.r;
-	d /= image.ref::size;
-	assert_(d < 0xFF);
-	scale(image, image, 0xFF, d);
-}*/
+uint mean(const Image& image) {
+	uint sum = 0;
+	for(byte4 p: image) sum += p.b + p.g + p.r;
+	return sum / image.ref::size;
+}
 
 struct Music : Widget {
 	// Name
@@ -474,8 +469,9 @@ struct Music : Widget {
 				Image image = video.read();
 				assert_(image);
 				if(rotate) ::rotate(image);
-				videoView.image = scale(cropShare(image, int2(0, image.height/5), int2(image.width, image.height/2)), 2, 1); // FIXME: copying
-				videoView.image = resize(videoView.image.size*3/4, videoView.image);
+				Image crop = cropShare(image, int2(0, image.height/16), int2(image.width, image.height/3));
+				assert_(mean(crop) >= 0x80, mean(crop));
+				videoView.image = resize(crop.size*4/5, scale(crop, 2, 1));
 				contentChanged=true;
 				if(!preview) assert_(video.videoTime*timeDen >= timeNum*video.videoFrameRate); // Only preview may have lower framerate than video
 			}
@@ -526,13 +522,13 @@ struct Music : Widget {
 
 			Time followTime, renderTime, encodeTime, totalTime;
 			totalTime.start();
-			bool done = 0;
-			for(int lastReport=0; !done;) {
+			for(int lastReport=0;;) {
 				assert_(encoder.audioStream->time_base.num == 1);
 				auto writeAudio = [&]{
 					if(audioFile && audioFile.codec==AudioFile::AAC) {
 						AVPacket packet;
-						if(av_read_frame(audioFile.file, &packet) < 0) { done=true; return false; }
+						int status = av_read_frame(audioFile.file, &packet);
+						assert_(status == 0);
 						if(audioFile.file->streams[packet.stream_index]==audioFile.audioStream) {
 							assert_(encoder.audioStream->time_base.num == audioFile.audioStream->time_base.num);
 							packet.pts=packet.dts=encoder.audioTime=
@@ -542,32 +538,27 @@ struct Music : Widget {
 							av_interleaved_write_frame(encoder.context, &packet);
 						}
 					} else if(audioFile) {
-						const size_t periodSize = 1024;
-						buffer<int16> source(periodSize*audioFile.channels);
+						assert_(encoder.audioFrameSize==1024);
+						buffer<int16> source(encoder.audioFrameSize*audioFile.channels);
 						const size_t readSize = audioFile.read16(source);
-						assert_(readSize <= periodSize);
+						assert_(readSize == encoder.audioFrameSize);
 						buffer<int16> target(readSize*encoder.channels);
 						if(audioFile.channels == 1 && encoder.channels == 2) {
 							for(size_t i: range(readSize)) target[i*2+0] = target[i*2+1] = source[i];
 						} else assert_(audioFile.channels == encoder.channels);
 						if(target.size) encoder.writeAudioFrame(target);
-						done = target.size < target.capacity;
 					}
 					else {
 						buffer<int16> buffer(1024*sampler.channels);
 						sampler.read16(buffer);
 						encoder.writeAudioFrame(buffer);
-						done = sampler.silence || int64(encoder.audioTime*notes.ticksPerSeconds) >= notes.last().time*encoder.audioFrameRate;
 					}
-					return !done;
 				};
 				if(encoder.videoFrameRate) { // Interleaved AV
 					assert_(encoder.audioStream->time_base.num == 1 && encoder.audioStream->time_base.den == (int)encoder.audioFrameRate);
 					// If both streams are at same PTS, starts with audio
-					while(encoder.audioTime*encoder.videoFrameRate <= encoder.videoTime*encoder.audioFrameRate) {
-						if(!writeAudio()) break;
-					}
-					while(encoder.videoTime*encoder.audioFrameRate < encoder.audioTime*encoder.videoFrameRate) {
+					while(encoder.audioTime*encoder.videoFrameRate <= encoder.videoTime*encoder.audioFrameRate) writeAudio();
+					while(encoder.videoTime*encoder.audioFrameRate <= encoder.audioTime*encoder.videoFrameRate) {
 						followTime.start();
 						follow(time, encoder.videoFrameRate, encoder.size, false);
 						followTime.stop();
@@ -582,7 +573,7 @@ struct Music : Widget {
 						time++;
 					}
 				} else { // Audio only
-					if(!writeAudio()) break;
+					writeAudio();
 				}
 				int percent = round(100.*encoder.audioTime/encoder.audioFrameRate/((float)notes.last().time/notes.ticksPerSeconds));
 				if(percent!=lastReport) {

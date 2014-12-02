@@ -40,8 +40,9 @@ Decoder::Decoder(string path) {
 	}
 	//if(videoCodec->pix_fmt==-1) videoCodec->pix_fmt=AV_PIX_FMT_YUV422P;
 	assert_(videoCodec->pix_fmt!=-1);
-	assert_(videoCodec->pix_fmt == AV_PIX_FMT_YUVJ422P);
-	swsContext = sws_getContext (width, height, videoCodec->pix_fmt, width, height,  AV_PIX_FMT_BGRA, SWS_FAST_BILINEAR, 0, 0, 0);
+
+	swsContext = sws_getContext(width, height, videoCodec->pix_fmt == AV_PIX_FMT_YUVJ422P ? PIX_FMT_YUV422P : videoCodec->pix_fmt,
+								 width, height,  AV_PIX_FMT_BGRA, SWS_FAST_BILINEAR, 0, 0, 0);
 	assert_(swsContext);
 	frame = av_frame_alloc();
 }
@@ -58,7 +59,8 @@ Image Decoder::read() {
 		if(file->streams[packet.stream_index]==videoStream) {
 			int gotFrame=0;
 			int used = avcodec_decode_video2(videoCodec, frame, &gotFrame, &packet);
-			assert_(used >= 0, used);
+			assert_(used >= 0);
+			assert_(av_frame_get_color_range(frame) == AVCOL_RANGE_JPEG);
 			if(gotFrame) {
 				AVPicture targetFrame;
 				Image image (size);
