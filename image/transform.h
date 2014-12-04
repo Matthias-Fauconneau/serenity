@@ -1,6 +1,18 @@
 #pragma once
 #include "source.h"
 
+struct AllImages : GroupSource {
+	ImageSource& source;
+	AllImages(ImageSource& source) : source(source) {}
+	size_t count(size_t) override { return 1; }
+	buffer<size_t> operator()(size_t) override {
+		buffer<size_t> indices (source.count());
+		for(size_t index: range(source.count())) indices[index] = index;
+		return indices;
+	}
+	int64 time(size_t groupIndex) override { return max(apply(operator()(groupIndex), [this](size_t index) { return source.time(index); })); }
+};
+
 struct Transform {
 	int2 size, offset;
 	Transform(int2 size, int2 offset=0) : size(size), offset(offset) { assert_(size); }
@@ -29,15 +41,15 @@ Transform operator *(const Transform& a, const Transform& b) {
 	return {a.size, a.offset+b.offset};
 }
 
-void minmax(ref<Transform> transforms, int2 size, int2& min, int2& max) {
+void minmax(ref<Transform> transforms, int2& min, int2& max) {
 #if CROP // CROP
 	min = ::max(apply(transforms,[&](const Transform& t){ return t.min(size); }));
 	max =::min(apply(transforms,[&](const Transform& t){ return t.max(size); }));
 #elif 1 // EXTEND X CROP Y
-	int2 minmin = ::min(apply(transforms,[&](const Transform& t){ return t.min(size); }));
-	int2 maxmin = ::max(apply(transforms,[&](const Transform& t){ return t.min(size); }));
-	int2 minmax =::min(apply(transforms,[&](const Transform& t){ return t.max(size); }));
-	int2 maxmax =::max(apply(transforms,[&](const Transform& t){ return t.max(size); }));
+	int2 minmin = ::min(apply(transforms,[&](const Transform& t){ return t.min(t.size); }));
+	int2 maxmin = ::max(apply(transforms,[&](const Transform& t){ return t.min(t.size); }));
+	int2 minmax =::min(apply(transforms,[&](const Transform& t){ return t.max(t.size); }));
+	int2 maxmax =::max(apply(transforms,[&](const Transform& t){ return t.max(t.size); }));
 	min = int2(minmin.x, maxmin.y);
 	max = int2(maxmax.x, minmax.y);
 #elif KEEP // KEEP
@@ -62,7 +74,6 @@ struct ImageTransformGroupOperator : virtual Operator {
 struct ImageGroupTransformOperation : TransformGroupSource {
 	ImageGroupSource& source;
 	ImageTransformGroupOperator& operation;
-	Folder cacheFolder {operation.name(), source.folder(), true};
 	ImageGroupTransformOperation(ImageGroupSource& source, ImageTransformGroupOperator& operation) :
 		source(source), operation(operation) {}
 
@@ -70,10 +81,10 @@ struct ImageGroupTransformOperation : TransformGroupSource {
 	virtual int64 time(size_t index) { return max(operation.time(), source.time(index)); }
 
 	array<Transform> operator()(size_t groupIndex, int2 size) override {
-		assert_(source.outputs()==1);
-		if(!size) size = source.maximumSize()/16;
+		//assert_(source.outputs()==1);
+		//if(!size) size = source.maximumSize()/16; FIXME
 		array<SourceImage> images = source.images(groupIndex, 0, size);
-		return parseArray<Transform>(cache(cacheFolder, source.elementName(groupIndex), strx(size), time(groupIndex), [&]() {
+		return parseArray<Transform>(cache(Folder(operation.name(), source.path(), true), source.elementName(groupIndex), strx(size), time(groupIndex), [&]() {
 			return str(operation(apply(images, [](const SourceImage& x){ return share(x); })));
 		}, false));
 	}
@@ -100,20 +111,20 @@ ImageF sample(const ImageF& source, Transform transform, int2 min, int2 max) { r
 struct SampleImageGroupOperation : ImageGroupSource {
 	ImageGroupSource& source;
 	TransformGroupSource& transform;
-	Folder cacheFolder {"[sample]", source.folder(), true};
 	SampleImageGroupOperation(ImageGroupSource& source, TransformGroupSource& transform)
 		: source(source), transform(transform) {}
 
 	size_t count(size_t need=0) override { return source.count(need); }
 	int64 time(size_t groupIndex) override { return max(source.time(groupIndex), transform.time(groupIndex)); }
-	String name() const override { return str(source.name(), "[sample]"); }
-	const Folder& folder() const override { return cacheFolder; }
+	String name() const override { return str(source.name(), "Sample"); }
+	String path() const override { return source.path()+"/Sample"; }
 	int2 maximumSize() const override { return source.maximumSize(); }
 	String elementName(size_t groupIndex) const override { return source.elementName(groupIndex); }
 
 	int2 size(size_t groupIndex, int2 hint) const override {
-		int2 sourceSize = this->sourceSize(groupIndex, hint);
-		int2 min,max; minmax(transform(groupIndex, sourceSize), source.size(groupIndex, sourceSize), min, max);
+		hint = 0; // FIXME: Evaluate required source image size from transforms
+		int2 sourceSize = 0; //this->sourceSize(groupIndex, hint); FIXME: Evaluate required source image size from transforms
+		int2 min,max; minmax(transform(groupIndex, sourceSize), min, max);
 		return max-min;
 	}
 
@@ -121,7 +132,7 @@ struct SampleImageGroupOperation : ImageGroupSource {
 	size_t groupSize(size_t groupIndex) const { return source.groupSize(groupIndex); }
 
 	int2 sourceHint(size_t groupIndex, int2 hint) const {
-		if(!hint) return source.size(groupIndex, 0);
+		if(!hint) return 0; //source.size(groupIndex, 0); FIXME: Evaluate required source image size from transforms
 		int2 fullTargetSize = this->size(groupIndex, 0);
 		int2 fullSourceSize = source.size(groupIndex, 0);
 		return hint.y*fullSourceSize.y/fullTargetSize.y;
@@ -129,11 +140,15 @@ struct SampleImageGroupOperation : ImageGroupSource {
 	int2 sourceSize(size_t groupIndex, int2 hint) const { return source.size(groupIndex, sourceHint(groupIndex, hint)); }
 
 	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 hint=0, string parameters = "") override {
-		int2 sourceSize = this->sourceSize(groupIndex, hint);
+		hint = 0; // FIXME: Evaluate required source image size from transforms
+		int2 sourceSize = 0; //this->sourceSize(groupIndex, hint); FIXME: Evaluate required source image size from transforms
 		auto transforms = transform(groupIndex, sourceSize);
-		int2 min,max; minmax(transforms, sourceSize, min, max);
+		int2 min,max; minmax(transforms, min, max);
 		auto images = source.images(groupIndex, componentIndex, sourceHint(groupIndex, hint), parameters);
-		assert_(images[0].size == sourceSize, images[0].size, sourceSize);
-		return apply(images.size, [&](size_t index) -> SourceImage { return sample(images[index], transforms[index], min, max); });
+		//assert_(images[0].size == sourceSize, images[0].size, sourceSize);
+		return apply(images.size, [&](size_t index) -> SourceImage {
+			//log(groupIndex, componentIndex, "Sample", index);
+			return sample(images[index], transforms[index], min, max);
+		});
 	}
 };

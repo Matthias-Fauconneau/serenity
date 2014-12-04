@@ -39,7 +39,6 @@ generic struct ImageOperationT : T, ImageOperation {
 };
 
 struct SRGB : GenericImageOperator, OperatorT<SRGB> {
-	//string name() const override { return  "sRGB"; }
 	size_t inputs() const override { return 1; }
 	size_t outputs() const override { return 1; }
 };

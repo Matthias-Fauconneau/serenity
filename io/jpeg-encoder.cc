@@ -1047,7 +1047,7 @@ bool compress_image_to_jpeg_file_in_memory(void *pDstBuf, int &buf_size, int wid
 }
 
 buffer<byte> encodeJPEG(const Image& image, int quality) {
-	buffer<byte> buffer(image.height*image.width*2, "JPEG");
+	buffer<byte> buffer(image.height*image.width*2);
 	int size = buffer.size;
 	if(!compress_image_to_jpeg_file_in_memory((void*)buffer.data, size, image.width, image.height, 4, (const uint8*)image.data, quality))
 		error("JPEG");

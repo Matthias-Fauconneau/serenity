@@ -6,7 +6,7 @@ SourceImage ImageOperation::image(size_t imageIndex, size_t componentIndex, int2
 	if(operation.inputs()==0 && operation.outputs()==0) {
 		auto inputs = apply(source.outputs(), [&](size_t inputIndex) { return source.image(imageIndex, inputIndex, hint, parameters); });
 		array<SourceImage> outputs;
-		for(size_t unused index: range(operation.outputs()?:inputs.size)) outputs.append( inputs[0].size );
+		for(size_t unused index: range(operation.outputs()?:inputs.size)) outputs.append( SourceImage(inputs[0].size) );
 		operation.apply({share(outputs)}, share(inputs));
 		return move( outputs[componentIndex] );
 	}
@@ -180,7 +180,7 @@ array<SourceImage> BinaryImageGroupOperation::images(size_t groupIndex, size_t c
 			inputs.append( share( a[imageIndex] ) );
 			inputs.append( share( b[imageIndex] ) );
 			array<SourceImage> outputs;
-			for(size_t unused index: range(operation.outputs())) outputs.append( this->size(groupIndex, hint) );
+			for(size_t unused index: range(operation.outputs())) outputs.append( SourceImage(this->size(groupIndex, hint)) );
 			operation.apply(share(outputs), inputs);
 			allOutputs.append(outputs);
 		}
@@ -200,7 +200,7 @@ array<SourceImage> BinaryImageGroupOperation::images(size_t groupIndex, size_t c
 			inputs.append( share(b[imageIndex]) );
 			for(auto& x: inputs) assert_(x.size == this->size(groupIndex, hint), inputs, name());
 			array<SourceImage> outputs;
-			for(size_t unused index: range(operation.outputs())) outputs.append( this->size(groupIndex, hint) );
+			for(size_t unused index: range(operation.outputs())) outputs.append( SourceImage(this->size(groupIndex, hint)) );
 			operation.apply(share(outputs), inputs);
 			allOutputs.append(outputs);
 		}

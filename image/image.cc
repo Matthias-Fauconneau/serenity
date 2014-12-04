@@ -1,4 +1,5 @@
 #include "image.h"
+inline float gaussian(float sigma, float x) { return exp(-sq(x/sigma)/2); }
 
 // -- sRGB --
 

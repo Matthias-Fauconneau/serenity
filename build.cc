@@ -135,11 +135,10 @@ struct Build {
 		for(TextData s = file.read(file.size()); s; s.line()) {
 			{String name = tryParseIncludes(s, fileName);
 				if(name) {
-					String module = find(name+".cc");
-					if(!parent.edges.contains(module)) {
-						String header = find(name+".h");
-						if(header) lastEdit = max(lastEdit, parse(header+".h", parent));
-						if(!module || parent == module) continue;
+					String module = find(name+".h"); // .h to find module corresponding to header
+					assert_(module);
+					lastEdit = max(lastEdit, parse(module+".h", parent));
+					if(!parent.edges.contains(module) && existsFile(module+".cc", folder) && module != parent.name) {
 						if(!modules.contains(module)) { if(!compileModule(module)) return 0; }
 						parent.edges.append( modules[modules.indexOf(module)].pointer );
 					}

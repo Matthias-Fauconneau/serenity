@@ -40,18 +40,6 @@ generic buffer<size_t> reversibleSort(mref<T> at) {
 	return reverse;
 }
 
-struct AllImages : GroupSource {
-	ImageSource& source;
-	AllImages(ImageSource& source) : source(source) {}
-	size_t count(size_t) override { return 1; }
-	array<size_t> operator()(size_t) override {
-		array<size_t> indices;
-		for(size_t index: range(source.count())) indices.append( index );
-		return indices;
-	}
-	int64 time(size_t groupIndex) override { return max(apply(operator()(groupIndex), [this](size_t index) { return source.time(index); })); }
-};
-
 struct Mask : ImageOperator, OperatorT<Mask> {
 	size_t inputs() const override { return 2; }
 	size_t outputs() const override { return 1; }
@@ -64,13 +52,11 @@ struct Mask : ImageOperator, OperatorT<Mask> {
 struct PanoramaWeights : ImageGroupSource {
 	ImageGroupSource& source;
 	TransformGroupSource& transform;
-	Folder cacheFolder {"[panoramaweights]", source.folder(), true};
 	PanoramaWeights(ImageGroupSource& source, TransformGroupSource& transform) : source(source), transform(transform) {}
 
 	size_t count(size_t need=0) override { return source.count(need); }
 	int64 time(size_t groupIndex) override { return max(source.time(groupIndex), transform.time(groupIndex)); }
 	String name() const override { return str(source.name(), "[panoramaweights]"); }
-	const Folder& folder() const override { return cacheFolder; }
 	int2 maximumSize() const override { return source.maximumSize(); }
 	String elementName(size_t groupIndex) const override { return source.elementName(groupIndex); }
 	int2 size(size_t groupIndex, int2 hint) const override {
@@ -168,10 +154,10 @@ struct PanoramaStitch {
 
 	ImageOperationT<Intensity> intensity {source};
 	GroupImageOperation groupIntensity {intensity, groups};
-	ImageOperationT<Normalize> normalize {intensity};
-	GroupImageOperation groupNormalize {normalize, groups};
+	//ImageOperationT<Normalize> normalize {intensity};
+	//GroupImageOperation groupNormalize {normalize, groups};
 	ImageGroupTransformOperationT<Align> transforms {groupIntensity};
-	SampleImageGroupOperation alignAlignSource {transforms.source, transforms};
+	//SampleImageGroupOperation alignAlignSource {transforms.source, transforms};
 
 	GroupImageOperation groupSource {source, groups};
 	SampleImageGroupOperation alignSource {groupSource, transforms};

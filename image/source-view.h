@@ -30,8 +30,8 @@ struct GenericImageSourceView : ImageView {
 
 	virtual void update(size_t index, int2 size) abstract;
 
-    Graphics graphics(int2 size) override {
-		if(!source.count(1)) return {};
+	shared<Graphics> graphics(int2 size) override {
+		if(!source.count(1)) return shared<Graphics>();
 		update(index, size);
 		ImageView::image = share(image);
 		//assert_(image.size.x <= size.x || image.size.y <= size.y, image.size, size);

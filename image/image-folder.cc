@@ -60,7 +60,7 @@ SourceImageRGB ImageFolder::image(size_t index, int2 hint, string parameters) {
 	if(size==sourceSize) return image(index, parameters);
 	return cache<Image>(path()+"/Resize", elementName(index), size, sourceFile.modifiedTime(), [&](const Image& target) {
 		SourceImageRGB source = image(index);
-		assert_(target.size >= int2(12) && target.size <= source.size, target.size, hint);
+		assert_(size==target.size && size >= int2(12) && size <= source.size, size, hint);
 		resize(target, source);
 	}, false, "" /*Disables version invalidation to avoid redecoding and resizing on header changes*/);
 }
@@ -68,6 +68,10 @@ SourceImageRGB ImageFolder::image(size_t index, int2 hint, string parameters) {
 /// Converts sRGB images to linear float images
 SourceImage ImageFolder::image(size_t index, size_t componentIndex, int2 size, string parameters) {
 	assert_(index  < count());
-	return cache<ImageF>(path()+"Linear["+str(componentIndex)+']', elementName(index), size?:this->size(index), time(index),
-						 [&](const ImageF& target) { linear(target, image(index, size, parameters), componentIndex); } );
+	int2 targetSize = size?:this->size(index);
+	return cache<ImageF>(path()+"Linear["+str(componentIndex)+']', elementName(index), targetSize, time(index),
+						 [&](const ImageF& target) {
+		SourceImageRGB source = image(index, targetSize, parameters);
+		assert_(source.size == target.size);
+		linear(target, source, componentIndex); } );
 }

@@ -16,7 +16,7 @@ struct Source {
 
 /// Splits a collection in groups
 struct GroupSource : Source {
-	virtual ref<size_t> operator()(size_t groupIndex) = 0;
+	virtual buffer<size_t> operator()(size_t groupIndex) = 0;
 };
 
 typedef ImageMapSource<ImageF> SourceImage;

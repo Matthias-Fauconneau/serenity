@@ -147,3 +147,4 @@ tuner/stretch.cc
 video-input.h
 video-input.cc
 music-pdf.cc
+layout.cc

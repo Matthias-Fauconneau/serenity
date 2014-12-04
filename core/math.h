@@ -51,8 +51,6 @@ inline real log2(real x) { return __builtin_log2(x); }
 inline real exp10(real x) { return __builtin_exp2(__builtin_log2(10)*x); }
 inline real log10(real x) { return __builtin_log10(x); }
 
-//inline float gaussian(float sigma, float x) { return exp(-sq(x/sigma)/2); }
-
 // -> \file algorithm.h
 
 template<Type A, Type F> A reduce(range range, F fold, A accumulator) {

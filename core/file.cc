@@ -29,7 +29,11 @@ const Folder& currentWorkingDirectory() { static const int cwd = AT_FDCWD; retur
 const Folder& root() { static const Folder root("/",currentWorkingDirectory()); return root; }
 
 Folder::Folder(string folder, const Folder& at, bool create) {
-	if(create && !existsFolder(folder,at)) check(mkdirat(at.fd, strz(folder), 0777), at.name(), folder);
+	if(create && !existsFolder(folder,at)) {
+		if(folder != "/"_ && folder.contains('/') && !existsFolder(section(folder,'/',0,-2), at))
+			Folder(section(folder,'/',0,-2), at, true); // Recursively creates parents
+		check(mkdirat(at.fd, strz(folder), 0777), at.name(), folder);
+	}
     assert_(folder);
 	fd = check( openat(at.fd, strz(folder?:"."), O_RDONLY|O_DIRECTORY, 0), '\''+folder+'\'', at.name() );
 }

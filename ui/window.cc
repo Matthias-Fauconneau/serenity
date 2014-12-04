@@ -27,6 +27,7 @@ Window::Window(Widget* widget, int2 sizeHint, function<String()> title, const Im
     send(Present::SelectInput{.window=id+XWindow, .eid=id+PresentEvent});
     actions[Escape] = []{requestTermination();};
     actions[PrintScreen] = [this]{writeFile(str(Date(currentTime())), encodePNG(target), home());};
+	show();
 }
 
 Window::~Window() {
