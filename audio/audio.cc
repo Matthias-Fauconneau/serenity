@@ -31,24 +31,12 @@ AudioFile::AudioFile(string path) {
 				assert_(channels == 1 || channels == 2);
 				audioFrameRate = audio->sample_rate;
 				assert_(audioStream->time_base.num == 1, audioStream->time_base.den, audioFrameRate);
-				//assert_(audioFrameRate%audioStream->time_base.den == 0, audioStream->time_base.den, audioFrameRate);
 				if(audioStream->duration != AV_NOPTS_VALUE) {
 					assert_(audioStream->duration != AV_NOPTS_VALUE);
 					duration = (int64)audioStream->duration*audioFrameRate*audioStream->time_base.num/audioStream->time_base.den;
 				} else {
 					duration = (int64)file->duration*audioFrameRate/AV_TIME_BASE;
-
-				} /*else { // Explicitly evaluate duration by decoding whole file (FIXME)
-					duration = 0;
-					for(;;) {
-						AVPacket packet;
-						if(av_read_frame(file, &packet) < 0) break;
-						if(file->streams[packet.stream_index]==audioStream) {
-							avcodec_decode_audio4(audio, frame, &gotFrame, &packet);
-							duration += frame->nb_samples;
-						}
-					}
-				}*/
+				}
 				assert_(duration);
                 break;
             }

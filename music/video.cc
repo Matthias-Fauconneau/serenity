@@ -23,7 +23,6 @@ Decoder::Decoder(string path) {
 	file = avformat_alloc_context();
 	file->probesize = File(path).size();
 	if(avformat_open_input(&file, strz(path), 0, 0)) { log("No such file", path); return; }
-	file->max_analyze_duration = 	AV_TIME_BASE; // 1 sec
 	avformat_find_stream_info(file, 0);
 	if(file->duration <= 0) { file=0; log("Invalid file"); return; }
 	for(uint i=0; i<file->nb_streams; i++) {
@@ -35,6 +34,10 @@ Decoder::Decoder(string path) {
 				width = videoCodec->width; height=videoCodec->height;
 				assert_(videoCodec->time_base.num == 1);
 				videoFrameRate = 30; //FIXME: videoCodec->time_base.den;
+				//assert_(videoCodec->time_base.den == videoFrameRate, videoCodec->time_base.den);
+				//assert_(videoStream->duration != AV_NOPTS_VALUE);
+				//duration = videoStream->duration*videoFrameRate*videoStream->time_base.num/videoStream->time_base.den;
+				duration = file->duration*videoFrameRate/AV_TIME_BASE;
 			}
 		}
 	}

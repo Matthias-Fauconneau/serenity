@@ -469,8 +469,7 @@ struct Music : Widget {
 				Image image = video.read();
 				assert_(image);
 				if(rotate) ::rotate(image);
-				Image crop = cropShare(image, int2(0, image.height/16), int2(image.width, image.height/3));
-				assert_(mean(crop) >= 0x80, mean(crop));
+				Image crop = cropShare(image, int2(0, image.height*10/24), int2(image.width, image.height/2));
 				videoView.image = resize(crop.size*4/5, scale(crop, 2, 1));
 				contentChanged=true;
 				if(!preview) assert_(video.videoTime*timeDen >= timeNum*video.videoFrameRate); // Only preview may have lower framerate than video
@@ -597,7 +596,7 @@ struct Music : Widget {
 
 	int2 sizeHint(int2 size) override { return running ? widget.sizeHint(size) : scroll.ScrollArea::sizeHint(size); }
 	shared<Graphics> graphics(int2 size) override {
-		if(running) {
+		if(running && video.videoTime < video.duration) {
 			if(audioFile) follow(audioFile.audioTime, audioFile.audioFrameRate, window.size);
 			else follow(sampler.audioTime, sampler.rate, window.size);
 			window.render();

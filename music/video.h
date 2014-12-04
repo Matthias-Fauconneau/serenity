@@ -10,7 +10,7 @@ struct Decoder {
 	int videoFrameRate=0;
 	int firstPTS = 0;
 
-	uint duration = 0;
+	int duration = 0;
 
 	struct AVFormatContext* file=0;
 	struct SwsContext* swsContext=0;
