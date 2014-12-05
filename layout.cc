@@ -11,10 +11,11 @@
 /// Layouts images
 struct ImageLayout : ImageTransformGroupOperator, OperatorT<ImageLayout> {
 	virtual array<Transform> operator()(ref<ImageF> images) const override {
+		assert_(images.size==3); // FIXME
 		array<Transform> transforms;
-		for(const ImageF& image : images) { // Stacks all images without any transform (FIXME)
-			transforms.append(image.size, 0);
-		}
+		transforms.append(images[0].size, -0); // TODO: resize
+		transforms.append(images[1].size, -int2(images[0].size.x,0));
+		transforms.append(images[2].size, -int2(0,images[0].size.y));
 		return transforms;
 	}
 };

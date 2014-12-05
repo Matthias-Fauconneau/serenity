@@ -69,7 +69,7 @@ SourceImageRGB ImageFolder::image(size_t index, int2 hint, string parameters) {
 SourceImage ImageFolder::image(size_t index, size_t componentIndex, int2 size, string parameters) {
 	assert_(index  < count());
 	int2 targetSize = size?:this->size(index);
-	return cache<ImageF>(path()+"Linear["+str(componentIndex)+']', elementName(index), targetSize, time(index),
+	return cache<ImageF>(path()+"/Linear["+str(componentIndex)+']', elementName(index), targetSize, time(index),
 						 [&](const ImageF& target) {
 		SourceImageRGB source = image(index, targetSize, parameters);
 		assert_(source.size == target.size);
