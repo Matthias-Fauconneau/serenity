@@ -138,7 +138,7 @@ struct BinaryGenericImageOperation : virtual GenericImageSource {
 		assert_(A.elementName(index) == B.elementName(index)); return A.elementName(index);
 	}
 	int2 size(size_t index, int2 size) const override {
-		assert_(A.size(index, size) == B.size(index, size), A.size(index, size), B.size(index, size));
+		assert_(A.size(index, size) == B.size(index, size), A.size(index, size), B.size(index, size), size);
 		return A.size(index, size);
 	}
 

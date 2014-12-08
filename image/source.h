@@ -66,3 +66,43 @@ struct ImageRGBGroupSource : virtual GenericImageGroupSource {
 struct PropertySource : virtual Source {
 	virtual string at(size_t index) const abstract;
 };
+
+/// Forwards a component transparently across a single component group operation
+struct ImageGroupForwardComponent : ImageGroupSource {
+	ImageGroupSource& input;
+	ImageGroupSource& target;
+	struct ImageGroupForwardComponentSource : ImageGroupSource {
+		ImageGroupForwardComponent& forward;
+		ImageGroupForwardComponentSource(ImageGroupForwardComponent& forward) : forward(forward) {}
+		size_t count(size_t need=0) { return forward.input.count(need); }
+		int64 time(size_t index) { return forward.input.time(index); }
+		String name() const { return forward.input.name(); }
+		String path() const { return forward.input.path(); }
+		int2 maximumSize() const { return forward.input.maximumSize(); }
+		String elementName(size_t index) const { return forward.input.elementName(index); }
+		int2 size(size_t index, int2 size=0) const { return forward.input.size(index, size); }
+		size_t groupSize(size_t groupIndex) const { return forward.input.groupSize(groupIndex); }
+		size_t outputs() const { return 1; }
+		array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size, string parameters = "") {
+			assert_(componentIndex == 0);
+			assert_(isInteger(parameters), parameters);
+			return forward.input.images(groupIndex, parseInteger(parameters), size, parameters);
+		}
+	} source {*this};
+	ImageGroupForwardComponent(ImageGroupSource& input, ImageGroupSource& target) : input(input), target(target) {}
+
+	size_t count(size_t need=0) { return target.count(need); }
+	int64 time(size_t index) { return target.time(index); }
+	String name() const { return target.name(); }
+	String path() const { return target.path(); }
+	int2 maximumSize() const { return target.maximumSize(); }
+	String elementName(size_t index) const { return target.elementName(index); }
+	int2 size(size_t index, int2 size=0) const { return target.size(index, size); }
+	size_t groupSize(size_t groupIndex) const { return target.groupSize(groupIndex); }
+	size_t outputs() const { return input.outputs(); }
+	array<SourceImage> images(size_t groupIndex, size_t componentIndex, int2 size, string parameters = "") override {
+		assert_(!parameters);
+		assert_(target.outputs()==1);
+		return target.images(groupIndex, 0, size, str(componentIndex));
+	}
+};

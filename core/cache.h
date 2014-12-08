@@ -46,7 +46,7 @@ generic auto share(ref<ImageMapSource<T>> ref) -> buffer<decltype(share(ref[0]))
 }
 
 /// Maps results to be generated or read from cache
-template<Type T> ImageMapSource<T> cache(String path, string name, int2 size, int64 sourceTime,
+template<Type T> ImageMapSource<T> cache(string path, string name, int2 size, int64 sourceTime,
 										 function<void(const T&)> evaluate, bool noCacheWrite = false, string version = __DATE__ " " __TIME__) {
 	if(noCacheWrite) { T target(size); evaluate(target); return move(target); }
 	File file = cacheFile({path, currentWorkingDirectory(), true}, name, strx(size), sourceTime, [size,&evaluate,&path/*DEBUG*/](File& file) {
@@ -94,6 +94,10 @@ inline Folder cacheFolder(const Folder& parent, string name, string key, int64 s
 	rename(name, name+'.'+key, parent);
 	return folder;
 }
+inline Folder cacheFolder(string path, string name, string key, int64 sourceTime,
+function<void(const Folder&)> write, string version = __DATE__ " " __TIME__) {
+	return cacheFolder({path, currentWorkingDirectory(), true}, name, key, sourceTime, write, version);
+}
 
 /// Maps results to be generated or read from cache
 // TODO: recursion
@@ -113,4 +117,8 @@ template<Type T> array<ImageMapSource<T>> cacheGroup(const Folder& parent, strin
 		T t (unsafeRef(cast<typename T::type>(map)), size, size.x);
 		return ImageMapSource<T>(move(t), move(map));
 	});
+}
+template<Type T> inline array<ImageMapSource<T>> cacheGroup(string path, string name, int2 size, size_t groupSize, int64 sourceTime,
+						 function<void(ref<T>)> evaluate, string version = __DATE__ " " __TIME__) {
+	return cacheGroup(Folder(path, currentWorkingDirectory(), true), name, size, groupSize, sourceTime, evaluate, version);
 }

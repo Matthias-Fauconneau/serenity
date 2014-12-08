@@ -8,7 +8,9 @@
 #include "weight.h"
 #include "multiscale.h"
 #include "jpeg-encoder.h"
+#include "layout.h"
 
+#if 0
 struct ExposureBlendAnnotate : Application {
 	Folder folder {"Pictures/ExposureBlend", home()};
 	PersistentValue<map<String, String>> imagesAttributes {folder,"attributes"};
@@ -27,19 +29,21 @@ struct ExposureBlendAnnotate : Application {
 		for(char c: range('a','z'+1)) window.actions[Key(c)] = [this, c]{ setCurrentImageAttributes("#"_+c); };
 	}
 	void setCurrentImageAttributes(string currentImageAttributes) {
-		imagesAttributes[source.elementName(index)] = String(currentImageAttributes);
+		imagesAttributes[source.elementName(index)] = copyRef(currentImageAttributes);
 	}
 };
 registerApplication(ExposureBlendAnnotate, annotate);
+#endif
 
 struct ExposureBlend {
-	Folder folder {"Pictures/ExposureBlend", home()};
+	Folder folder {"Documents/Pictures/ExposureBlend", home()};
 	PersistentValue<map<String, String>> imagesAttributes {folder,"attributes"};
 
 	ImageFolder source { folder };
 	ImageOperationT<Intensity> intensity {source};
 	ImageOperationT<Normalize> normalize {intensity};
-	DifferenceSplit split {normalize};
+	//DifferenceSplit split {normalize};
+	AllImages split {source};
 
 	GroupImageOperation splitNormalize {normalize, split};
 	ImageGroupTransformOperationT<Align> transforms {splitNormalize};
@@ -62,25 +66,11 @@ struct ExposureBlend {
 	ImageGroupOperationT<WeightFilterBank> weightBands {weights}; // Splits each weight selection in bands
 	ImageGroupOperationT<NormalizeSum> normalizeWeightBands {weightBands}; // Normalizes weight selection for each band
 
-	ImageGroupOperationT<Index0> alignB {alignSource};
-	ImageGroupOperationT<FilterBank> bBands {alignB};
-	BinaryImageGroupOperationT<Multiply> multiBandWeightedB {normalizeWeightBands, bBands}; // Applies
-	ImageGroupOperationT<Sum> joinB {multiBandWeightedB}; // Joins bands again
-	ImageGroupFoldT<Sum> blendB {joinB}; // Blends images
-
-	ImageGroupOperationT<Index1> alignG {alignSource};
-	ImageGroupOperationT<FilterBank> gBands {alignG};
-	BinaryImageGroupOperationT<Multiply> multiBandWeightedG {normalizeWeightBands, gBands}; // Applies
-	ImageGroupOperationT<Sum> joinG {multiBandWeightedG}; // Joins bands again
-	ImageGroupFoldT<Sum> blendG {joinG}; // Blends images
-
-	ImageGroupOperationT<Index2> alignR {alignSource};
-	ImageGroupOperationT<FilterBank> rBands {alignR};
-	BinaryImageGroupOperationT<Multiply> multiBandWeightedR {normalizeWeightBands, rBands}; // Applies
-	ImageGroupOperationT<Sum> joinR {multiBandWeightedR}; // Joins bands again
-	ImageGroupFoldT<Sum> blendR {joinR}; // Blends images
-
-	JoinOperation blend {{&blendB, &blendG, &blendR}};
+	ImageGroupForwardComponent multiscale {alignSource, sumBands};
+	ImageGroupOperationT<FilterBank> splitBands {multiscale.source};
+	BinaryImageGroupOperationT<Multiply> weightedBands {normalizeWeightBands, splitBands}; // Applies weights to each band
+	ImageGroupOperationT<Sum> sumBands {weightedBands}; // Sums bands
+	ImageGroupFoldT<Sum> blend {multiscale}; // Sums images
 };
 
 struct Transpose : OperatorT<Transpose> { /*string name() const override { return  "Transpose"; }*/ };
@@ -111,11 +101,12 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	sRGBOperation sRGB [3] {blend, direct, select};
 	array<ImageSourceView> sRGBView = apply(mref<sRGBOperation>(sRGB),
 											[&](ImageRGBSource& source) -> ImageSourceView { return {source, &index}; });
-	WidgetCycle view {toWidgets(sRGBView)};
-	Window window {&view, -1, [this]{ return view.title()+" "+imagesAttributes.value(source.elementName(index)); }};
+	VBox views {toWidgets(sRGBView), VBox::Share, VBox::Expand};
+	Window window {&views, -1, [this]{ return views.title(); }};
 };
 registerApplication(ExposureBlendPreview);
 
+#if 0
 struct ExposureBlendTest : ExposureBlend, Application {
 	ExposureBlendTest() {
 		for(size_t groupIndex=0; split.nextGroup(); groupIndex++) {
@@ -128,6 +119,7 @@ struct ExposureBlendTest : ExposureBlend, Application {
 	}
 };
 registerApplication(ExposureBlendTest, test);
+#endif
 
 struct ExposureBlendExport : ExposureBlend, Application {
 	sRGBOperation sRGB {blend};
@@ -136,7 +128,7 @@ struct ExposureBlendExport : ExposureBlend, Application {
 		for(size_t index: range(sRGB.count(-1))) {
 			String name = sRGB.elementName(index);
 			Time correctionTime;
-			SourceImageRGB image = sRGB.image(index, int2(2048,1536), true);
+			SourceImageRGB image = sRGB.image(index/*, int2(2048,1536)*/);
 			correctionTime.stop();
 			Time compressionTime;
 			writeFile(name, encodeJPEG(image, 75), output, true);
@@ -149,6 +141,7 @@ struct ExposureBlendExport : ExposureBlend, Application {
 };
 registerApplication(ExposureBlendExport, export);
 
+#if 0
 struct ExposureBlendSelect : ExposureBlend, Application {
 	sRGBOperation sRGB {select};
 	ExposureBlendSelect() {
@@ -156,7 +149,7 @@ struct ExposureBlendSelect : ExposureBlend, Application {
 		for(size_t index: range(sRGB.count(-1))) {
 			String name = sRGB.elementName(index);
 			Time correctionTime;
-			SourceImageRGB image = sRGB.image(index, int2(2048,1536), true);
+			SourceImageRGB image = sRGB.image(index/*, int2(2048,1536), true*/);
 			correctionTime.stop();
 			Time compressionTime;
 			writeFile(name+".select", encodeJPEG(image, 75), output, true);
@@ -168,3 +161,4 @@ struct ExposureBlendSelect : ExposureBlend, Application {
 	}
 };
 registerApplication(ExposureBlendSelect, select);
+#endif

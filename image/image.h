@@ -1,6 +1,8 @@
 #pragma once
 #include "core/image.h"
 
+inline float gaussian(float sigma, float x) { return exp(-sq(x/sigma)/2); }
+
 template<Type F, Type... S> void forXY(int2 size, F function, const S&... sources) {
 	parallel_chunk(size.y, [&](uint, uint64 start, uint64 chunkSize) {
 		for(size_t y: range(start, start+chunkSize)) for(size_t x: range(size.x)) {
