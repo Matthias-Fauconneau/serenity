@@ -3,15 +3,16 @@
 // ImageOperation
 
 SourceImage ImageOperation::image(size_t imageIndex, size_t componentIndex, int2 hint, string parameters) {
-	if(operation.inputs()==0 && operation.outputs()==0) {
-		auto inputs = apply(source.outputs(), [&](size_t inputIndex) { return source.image(imageIndex, inputIndex, hint, parameters); });
-		array<SourceImage> outputs;
-		for(size_t unused index: range(operation.outputs()?:inputs.size)) outputs.append( SourceImage(inputs[0].size) );
-		operation.apply({share(outputs)}, share(inputs));
-		return move( outputs[componentIndex] );
+	hint = 0; //FIXME
+	if(source.outputs() == operation.inputs() || (operation.inputs()==0 && operation.outputs()==0)) {
+		return move(::cacheGroup<ImageF>(path(), elementName(imageIndex)+parameters, this->size(imageIndex, hint), outputs(), time(imageIndex),
+									[&](ref<ImageF> outputs) {
+			auto inputs = apply(source.outputs(), [&](size_t inputIndex) { return source.image(imageIndex, inputIndex, hint, parameters); });
+			operation.apply(outputs, share(inputs));
+		})[componentIndex]);
 	}
 	assert_(operation.outputs() == 1);
-	SourceImage target = ::cache<ImageF>(path(), elementName(imageIndex)+'['+str(componentIndex)+']', this->size(imageIndex, hint),
+	return ::cache<ImageF>(path(), elementName(imageIndex)+'['+str(componentIndex)+']', this->size(imageIndex, hint),
 										 time(imageIndex), [&](const ImageF& target) {
 		array<SourceImage> inputs;
 		if(operation.inputs()==1 && source.outputs()!=1) { // Component wise
@@ -23,7 +24,6 @@ SourceImage ImageOperation::image(size_t imageIndex, size_t componentIndex, int2
 		}
 		operation.apply({share(target)}, share(inputs));
 	});
-	return target;
 }
 
 // ImageRGBOperation

@@ -25,7 +25,7 @@ struct GenericImageSourceView : ImageView {
 		/*int downscaleFactor = min(max((maximum.x+size.x-1)/size.x, (maximum.y+size.y-1)/size.y), 16);
         int2 hint = maximum/downscaleFactor;
 		assert_(hint<=size, maximum, size, downscaleFactor, maximum/downscaleFactor);*/
-		return int2(-maximum.x, -size.y); //hint;
+		return -maximum; //int2(-maximum.x, /*-size.y); //hint;
     }
 
 	virtual void update(size_t index, int2 size) abstract;
