@@ -55,9 +55,13 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
     };
 	map<int64, Position> timeTrack; // Maps times to positions
 
+	pageBreaks.append(0);
 	measureBars.insert(/*t*/0, /*x*/0.f);
 	timeTrack.insert(/*t*/0u, /*x*/{{0,0},0,0,0,0});
 	Graphics measure;
+	vec2 offset = 0;
+	int currentLineLowestStep = 0, currentLineHighestStep = 0;
+	int previousLineLowestStep = 0;
 
 	auto X = [&](const Sign& sign) -> float& {
 		if(!timeTrack.contains(sign.time)) {
@@ -263,8 +267,6 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 	};
 
 	for(size_t signIndex: range(signs.size)) {
-
-
 		{
 			Sign sign = signs[signIndex];
 
@@ -309,8 +311,14 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 						Note& note = sign.note;
 						note.clef = clefs.at(staff);
 						note.measureIndex = measures.size();
-						if(staff==0) lowestStep = min(lowestStep, clefStep(sign));
-						if(staff==1) highestStep = max(highestStep, clefStep(sign));
+						if(staff==0) {
+							currentLineLowestStep = min(currentLineLowestStep, clefStep(sign));
+							lowestStep = min(lowestStep, clefStep(sign));
+						}
+						if(staff==1) {
+							currentLineHighestStep = max(currentLineHighestStep, clefStep(sign));
+							highestStep = max(highestStep, clefStep(sign));
+						}
 
 						if(!note.grace && note.tie != Note::Merged) { //FIXME: render ties
 
@@ -426,7 +434,19 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 								}
 							}
 							for(uint staff: range(staffCount)) doBeam(staff); // Before measure is moved
-							measures.insertMulti(Rect(int2(measureBars.values.last()-barWidth+barWidth/2, 0), int2(x+barWidth/2, 0)),
+							// FIXME: layout with measure relative coordinates instead of translating back
+							if(offset.x+x > pageSize.x) {
+								offset.x = -measureBars.values.last();
+								offset.y += staffY(0, previousLineLowestStep-7) - staffY(1, currentLineHighestStep+7);
+								previousLineLowestStep = currentLineLowestStep;
+								currentLineLowestStep = 0, currentLineHighestStep = 0;
+								if(offset.y + staffY(0, previousLineLowestStep-7) > pageSize.y) {
+									offset.y = 0;
+									pageBreaks.append(measures.size());
+								}
+							}
+							measure.translate(offset);
+							measures.insertMulti(Rect(int2(offset)+int2(measureBars.values.last()-barWidth+barWidth/2, 0), int2(offset)+int2(x+barWidth/2, 0)),
 												 shared<Graphics>(move(measure)) );
 							assert_(sign.time - measureBars.keys.last() <= timeSignature.beats*ticksPerQuarter);
 							measureBars.insert(sign.time, x);
@@ -641,6 +661,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 			}
 		}
 	}
+	pageBreaks.append(measures.size());
 	if(!ticksPerMinutes) ticksPerMinutes = 120*ticksPerQuarter; // TODO: default tempo from audio
 
 	midiToSign = buffer<Sign>(midiNotes.size, 0);
@@ -763,12 +784,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 	} else {
 		auto verticalAlign = [&](Graphics& measure) {
 			vec2 offset = vec2(0, -staffY(1,highestStep)+textSize);
-			for(auto& o: measure.fills) o.origin += offset;
-			assert_(!measure.blits);
-			for(auto& o: measure.glyphs) o.origin += offset;
-			for(auto& o: measure.parallelograms) o.min+=offset, o.max+=offset;
-			assert_(!measure.lines);
-			for(auto& o: measure.cubics) for(vec2& p: o.points) p+=vec2(offset);
+			measure.translate(offset);
 		};
 		for(Graphics& measure: measures.values) verticalAlign(measure);
 		verticalAlign(debug);
@@ -782,12 +798,19 @@ inline bool operator ==(const Sign& sign, const uint& key) {
 
 shared<Graphics> Sheet::graphics(int2 size, Rect clip) {
 	shared<Graphics> graphics;
-	size_t first = 0;
-	for(; first < measures.size(); first++) if(measures.keys[first].max.x > clip.min.x) break;
-	size_t last = first;
-	for(; last < measures.size(); last++) if(measures.keys[last].min.x > clip.max.x) break;
+	size_t first = 0, last;
+	if(pageSize) {
+		first = pageBreaks[pageIndex];
+		last = pageBreaks[pageIndex+1];
+	}
+	else {
+		for(; first < measures.size(); first++) if(measures.keys[first].max.x > clip.min.x) break;
+		last = first;
+		for(; last < measures.size(); last++) if(measures.keys[last].min.x > clip.max.x) break;
+	}
 	for(const auto& measure: measures.values.slice(first, last-first)) graphics->graphics.insertMulti(vec2(0), share(measure));
-	graphics->offset.y = (size.y - abs(sizeHint(size).y))/2;
+	if(!pageSize) graphics->offset.y = (size.y - abs(sizeHint(size).y))/2;
+	else graphics->offset.y = -staffY(1, highestStep+8);
 	if(firstSynchronizationFailureChordIndex != invalid) graphics->graphics.insertMulti(vec2(0), share(debug));
 	return graphics;
 }
@@ -801,4 +824,10 @@ size_t Sheet::measureIndex(float x) {
 int Sheet::stop(int unused axis, int currentPosition, int direction=0) {
 	int currentIndex = measureIndex(currentPosition);
 	return measureBars.values[clip(0, currentIndex+direction, int(measureBars.size()-1))];
+}
+
+bool Sheet::keyPress(Key key, Modifiers) {
+	if(key==LeftArrow) { pageIndex = max(0, int(pageIndex)-1); return true; }
+	if(key==RightArrow) { pageIndex = min(pageIndex+1, pageBreaks.size-2); return true; }
+	return false;
 }

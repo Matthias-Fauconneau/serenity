@@ -228,6 +228,7 @@ MusicXML::MusicXML(string document, string) {
 					if(e["new-page"]=="yes") { pageIndex++, pageLineIndex=1; }
 				}
 				else if(e.name=="barline"_) {
+#if 0 // TODO: display
 					if(e.contains("repeat")) {
 						if(e("repeat")["direction"]=="forward") {
 							assert_(repeatIndex==invalid);
@@ -235,20 +236,23 @@ MusicXML::MusicXML(string document, string) {
 						}
 						else if(e("repeat")["direction"]=="backward") {
 							assert_(partIndex == 0);
-							if(repeatIndex==invalid) { signs.clear(); return; } // FIXME
-							assert_(repeatIndex!=invalid);
-							buffer<Sign> copy = copyRef(signs.slice(repeatIndex));
-							assert_(time==nextTime && time==maxTime && time > signs[repeatIndex].time);
-							int64 repeatLength = time - signs[repeatIndex].time; // FIXME: Assumes document order matches time order
-							for(Sign& sign: copy) sign.time += repeatLength;
-							signs.insertSorted({time, 0, uint(-1), Sign::Measure,
-												.measure={false, measureIndex, pageIndex, pageLineIndex, lineMeasureIndex}});
-							signs.append( move(copy) );
-							nextTime = time + repeatLength;
+							if(repeatIndex==invalid) { /*signs.clear();*/ log("Unmatched repeat"); } // FIXME
+							else {
+								assert_(repeatIndex!=invalid);
+								buffer<Sign> copy = copyRef(signs.slice(repeatIndex));
+								assert_(time==nextTime && time==maxTime && time > signs[repeatIndex].time);
+								int64 repeatLength = time - signs[repeatIndex].time; // FIXME: Assumes document order matches time order
+								for(Sign& sign: copy) sign.time += repeatLength;
+								signs.insertSorted({time, 0, uint(-1), Sign::Measure,
+													.measure={false, measureIndex, pageIndex, pageLineIndex, lineMeasureIndex}});
+								signs.append( move(copy) );
+								nextTime = time + repeatLength;
+							}
 							repeatIndex=invalid;
 						}
 						else error(e);
 					}
+#endif
 				}
 				else if(e.name=="harmony"_) {}
 				else error(e);
@@ -261,55 +265,69 @@ MusicXML::MusicXML(string document, string) {
 			if(partIndex == 0)
 				signs.insertSorted({time, 0, uint(-1), Sign::Measure, .measure={lineBreak, measureIndex, pageIndex, pageLineIndex, lineMeasureIndex}});
 		}
+		partIndex++;
+	}
 
-		/*// Matches start-end-stop signs together
-		for(size_t startIndex: range(signs.size)) {
-			Sign& start = signs[startIndex];
-			if(start.type == Sign::Slur && start.slur.type == SlurStart) {
-				assert_(!start.slur.matched);
-				for(size_t stopIndex: range(startIndex+1, signs.size)) {
-					Sign& stop = signs[stopIndex];
-					if(stop.type == Sign::Slur && stop.slur.type == SlurStop && !stop.slur.matched && start.slur.index==stop.slur.index
-							&& (start.slur.index!=-1 || start.staff == stop.staff)) {
-						start.staff=stop.staff= (start.staff==stop.staff ? start.staff : -1);
-						start.slur.matched = true; stop.slur.matched=true;
-						break;
-					}
-				}
-			}
-		}*/
-
-		/*{/// Converts ties to longer notes (spanning beats and measures) (FIXME: new note within merged time)
-		array<size_t> active;
-		uint page=0, line=0, measure=0;
-		for(size_t signIndex: range(signs.size)) {
-			Sign& sign = signs[signIndex];
-			if(sign.type == Sign::Measure) { page=sign.measure.page, line=sign.measure.pageLine, measure=sign.measure.lineMeasure; }
-			if(sign.type == Sign::Note && (sign.note.tie == Note::TieStart)) active.append(signIndex);
-			if(sign.type == Sign::Note && (sign.note.tie == Note::TieContinue || sign.note.tie == Note::TieStop)) {
-				size_t tieStart = invalid;
-				for(size_t index: range(active.size)) if(signs[active[index]].note.key == sign.note.key) { assert_(tieStart==invalid); tieStart = index; }
-				assert_(tieStart != invalid);
-				Sign& first = signs[active[tieStart]];
-				if(sign.note.tie == Note::TieStop) active.removeAt(tieStart);
-				first.duration = sign.time+sign.duration-first.time;
-				int duration = first.note.duration() + sign.note.duration();
-				bool dot = false;
-				if(duration%3 == 0) {
-					dot = true;
-					duration = duration * 2 / 3;
-				}
-				if(isPowerOfTwo(duration)) {
-					assert_(isPowerOfTwo(duration), first.note.duration(), sign.note.duration(), duration);
-					first.note.value = Value(ref<uint>(valueDurations).size-1-log2(duration));
-					first.note.dot = dot;
-					assert_(int(first.note.value)>=0);
-					first.note.tie = Note::NoTie;
-					sign.note.tie = Note::Merged;
+	/*// Matches start-end-stop signs together
+	for(size_t startIndex: range(signs.size)) {
+		Sign& start = signs[startIndex];
+		if(start.type == Sign::Slur && start.slur.type == SlurStart) {
+			assert_(!start.slur.matched);
+			for(size_t stopIndex: range(startIndex+1, signs.size)) {
+				Sign& stop = signs[stopIndex];
+				if(stop.type == Sign::Slur && stop.slur.type == SlurStop && !stop.slur.matched && start.slur.index==stop.slur.index
+						&& (start.slur.index!=-1 || start.staff == stop.staff)) {
+					start.staff=stop.staff= (start.staff==stop.staff ? start.staff : -1);
+					start.slur.matched = true; stop.slur.matched=true;
+					break;
 				}
 			}
 		}
 	}*/
-		partIndex++;
+
+	/*{/// Converts ties to longer notes (spanning beats and measures) (FIXME: new note within merged time)
+	array<size_t> active;
+	uint page=0, line=0, measure=0;
+	for(size_t signIndex: range(signs.size)) {
+		Sign& sign = signs[signIndex];
+		if(sign.type == Sign::Measure) { page=sign.measure.page, line=sign.measure.pageLine, measure=sign.measure.lineMeasure; }
+		if(sign.type == Sign::Note && (sign.note.tie == Note::TieStart)) active.append(signIndex);
+		if(sign.type == Sign::Note && (sign.note.tie == Note::TieContinue || sign.note.tie == Note::TieStop)) {
+			size_t tieStart = invalid;
+			for(size_t index: range(active.size)) if(signs[active[index]].note.key == sign.note.key) { assert_(tieStart==invalid); tieStart = index; }
+			assert_(tieStart != invalid);
+			Sign& first = signs[active[tieStart]];
+			if(sign.note.tie == Note::TieStop) active.removeAt(tieStart);
+			first.duration = sign.time+sign.duration-first.time;
+			int duration = first.note.duration() + sign.note.duration();
+			bool dot = false;
+			if(duration%3 == 0) {
+				dot = true;
+				duration = duration * 2 / 3;
+			}
+			if(isPowerOfTwo(duration)) {
+				assert_(isPowerOfTwo(duration), first.note.duration(), sign.note.duration(), duration);
+				first.note.value = Value(ref<uint>(valueDurations).size-1-log2(duration));
+				first.note.dot = dot;
+				assert_(int(first.note.value)>=0);
+				first.note.tie = Note::NoTie;
+				sign.note.tie = Note::Merged;
+			}
+		}
+	}*/
+
+	// Removes unused signs
+	for(size_t signIndex=0; signIndex <signs.size;) {
+		Sign& sign = signs[signIndex];
+		if(sign.type==Sign::Clef) {
+			for(size_t nextIndex: range(signIndex+1, signs.size)) {
+				Sign& next = signs[nextIndex];
+				if(next.type==Sign::Note) { signIndex++; break; }
+				if(next.type==Sign::Clef && next.staff == sign.staff) { signs.removeAt(signIndex); break; }
+			}
+		}
+		else signIndex++;
 	}
+
+	assert_(signs);
 }

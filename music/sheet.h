@@ -10,8 +10,8 @@ inline String str(const Note& a) { return str(a.key); }
 struct Sheet : Widget {
     // Layout parameters
 	static constexpr int staffCount = 2;
-	static constexpr float halfLineInterval = 5, lineInterval = 2*halfLineInterval;
-	const float lineWidth = 1, barWidth=1, stemWidth = 1, stemLength = 7*halfLineInterval, beamWidth = 6;
+	static constexpr float halfLineInterval = 3, lineInterval = 2*halfLineInterval;
+	const float lineWidth = 1, barWidth=1, stemWidth = 1, stemLength = 7*halfLineInterval, beamWidth = halfLineInterval;
 	const float shortStemLength = 7*halfLineInterval;
     // Layout helpers
 	float staffY(uint staff, int clefStep) { return (!staff)*10*lineInterval - clefStep * halfLineInterval; } // Clef independent
@@ -56,7 +56,12 @@ struct Sheet : Widget {
 
 	// -- Page layout
 	int2 pageSize = 0;
+	array<int> pageBreaks;
+	size_t pageIndex = 0;
 
 	/// Layouts musical notations to graphic primitives
 	Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes={}, int2 pageSize=0);
+
+	/// Turn pages
+	bool keyPress(Key key, Modifiers modifiers) override;
 };

@@ -67,4 +67,17 @@ struct Graphics : shareable {
 	array<Parallelogram> parallelograms;
 	array<Cubic> cubics;
 	map<vec2, shared<Graphics>> graphics;
+
+	void translate(vec2 offset) {
+		for(auto& o: fills) o.origin += offset;
+		assert_(!blits);
+		for(auto& o: glyphs) o.origin += offset;
+		for(auto& o: parallelograms) o.min+=offset, o.max+=offset;
+		assert_(!lines);
+		for(auto& o: cubics) for(vec2& p: o.points) p+=vec2(offset);
+	}
 };
+
+inline String str(const Graphics& o) {
+	return str(o.fills.size, o.blits.size, o.glyphs.size, o.lines.size, o.parallelograms.size, o.cubics.size, o.graphics.size());
+}

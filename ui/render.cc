@@ -152,7 +152,7 @@ void parallelogram(const Image& target, int2 p0, int2 p1, int dy, bgr3f color, f
 		for(uint y: range(max(0,i0+1), min(int(target.height),i0+1+dy-1))) { // FIXME: clip once
 			blend(target, x,y, color, alpha); // FIXME: antialias
 		}
-		if(uint(i0)<target.height) blend(target, x, i0+dy, color, alpha*coverage);
+		if(uint(i0+dy)<target.height) blend(target, x, i0+dy, color, alpha*coverage);
 	}
 }
 
