@@ -24,6 +24,13 @@ struct ImageOperator : virtual GenericImageOperator {
 	virtual void apply(ref<ImageF> Y, ref<ImageF> X) const abstract;
 };
 
+/// Operates on a predetermined number of images to provide a given number of outputs
+struct ImageRGBOperator : virtual GenericImageOperator {
+	size_t inputs() const override { return 1; }
+	size_t outputs() const override { return 1; }
+	virtual void apply(const Image& Y, const Image& X) const abstract;
+};
+
 struct ImageGroupOperator : ImageOperator {
 	size_t inputs() const override { return 0; } // Varying
 	size_t outputs() const override { return 0; } // Varying (default)

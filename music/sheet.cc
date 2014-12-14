@@ -786,7 +786,6 @@ shared<Graphics> Sheet::graphics(int2 size, Rect clip) {
 	for(; first < measures.size(); first++) if(measures.keys[first].max.x > clip.min.x) break;
 	size_t last = first;
 	for(; last < measures.size(); last++) if(measures.keys[last].min.x > clip.max.x) break;
-	assert_(last > first);
 	for(const auto& measure: measures.values.slice(first, last-first)) graphics->graphics.insertMulti(vec2(0), share(measure));
 	graphics->offset.y = (size.y - abs(sizeHint(size).y))/2;
 	if(firstSynchronizationFailureChordIndex != invalid) graphics->graphics.insertMulti(vec2(0), share(debug));

@@ -136,7 +136,7 @@ struct Build {
 			{String name = tryParseIncludes(s, fileName);
 				if(name) {
 					String module = find(name+".h"); // .h to find module corresponding to header
-					assert_(module);
+					assert_(module, "No such module", name);
 					lastEdit = max(lastEdit, parse(module+".h", parent));
 					if(!parent.edges.contains(module) && existsFile(module+".cc", folder) && module != parent.name) {
 						if(!modules.contains(module)) { if(!compileModule(module)) return 0; }

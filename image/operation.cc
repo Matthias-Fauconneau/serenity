@@ -26,6 +26,15 @@ SourceImage ImageOperation::image(size_t imageIndex, size_t componentIndex, int2
 	return target;
 }
 
+// ImageRGBOperation
+
+SourceImageRGB ImageRGBOperation::image(size_t imageIndex, int2 hint, string parameters) {
+	auto input = source.image(imageIndex, hint, parameters);
+	SourceImageRGB output ( input.size );
+	operation.apply(output, input);
+	return output;
+}
+
 // sRGBOperation
 
 SourceImageRGB sRGBOperation::image(size_t imageIndex, int2 hint, string parameters) {

@@ -116,3 +116,21 @@ struct Index {
 inline String str(Index o) { return str(*o.pointer); }
 
 generic buffer<Widget*> toWidgets(mref<T> widgets) { return apply(widgets, [](T& widget) -> Widget* { return &widget; }); }
+
+/// Several widgets in one spot, cycled by user
+struct WidgetCycle : Widget {
+	buffer<Widget*> widgets;
+	size_t index = 0;
+
+	WidgetCycle(ref<Widget*> widgets) : widgets(copyRef(widgets)) {}
+
+	// Forwards content
+	String title() override { return widgets[index]->title(); }
+	int2 sizeHint(int2 size) override { return widgets[index]->sizeHint(size); }
+	shared<Graphics> graphics(int2 size) override { return widgets[index]->graphics(size); }
+
+	// Forwards events
+	bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;
+	// Forwards events and cycle widgets
+	bool keyPress(Key key, Modifiers modifiers) override;
+};

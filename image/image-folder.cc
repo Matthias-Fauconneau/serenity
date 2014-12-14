@@ -10,21 +10,22 @@ ImageFolder::ImageFolder(const Folder& source, function<bool(string name, const 
 
 			map<String, Variant> exif = parseExifTags(file);
 
-			if((string)exif.at("Exif.Image.Orientation"_) == "6") imageSize = int2(imageSize.y, imageSize.x);
-			Variant& date = exif.at("Exif.Image.DateTime");
+			if(exif.contains("Exif.Image.Orientation"_) && (string)exif.at("Exif.Image.Orientation"_) == "6") imageSize = int2(imageSize.y, imageSize.x);
+			Variant date = ""_;
+			if(exif.contains("Exif.Image.DateTime"_)) date = move(exif.at("Exif.Image.DateTime"));
 			date = section((string)date, ' '); // Discards time to group by date using PropertyGroup
-			exif.at("Exif.Photo.ExposureTime"_).number *= 1000; // Scales seconds to milliseconds
+			if(exif.contains("Exif.Photo.ExposureTime"_)) exif.at("Exif.Photo.ExposureTime"_).number *= 1000; // Scales seconds to milliseconds
 
 			map<string, String> properties;
 			properties.insert("Size", strx(imageSize));
 			properties.insert("Path", copy(fileName));
-			properties.insert("Date", str(exif.at("Exif.Image.DateTime"_)));
-			properties.insert("Orientation", str(exif.at("Exif.Image.Orientation"_)));
-			properties.insert("Focal", str(exif.at("Exif.Photo.FocalLength"_)));
-			properties.insert("Aperture", str(exif.at("Exif.Photo.FNumber"_)));
-			properties.insert("Bias", str(exif.at("Exif.Photo.ExposureBiasValue"_)));
-			properties.insert("Gain", str(exif.at("Exif.Photo.ISOSpeedRatings"_)));
-			properties.insert("Time", str(exif.at("Exif.Photo.ExposureTime"_)));
+			if(exif.contains("Exif.Image.DateTime"_)) properties.insert("Date", str(date));
+			if(exif.contains("Exif.Image.Orientation"_)) properties.insert("Orientation", str(exif.at("Exif.Image.Orientation"_)));
+			if(exif.contains("Exif.Photo.FocalLength"_)) properties.insert("Focal", str(exif.at("Exif.Photo.FocalLength"_)));
+			if(exif.contains("Exif.Photo.FNumber"_)) properties.insert("Aperture", str(exif.at("Exif.Photo.FNumber"_)));
+			if(exif.contains("Exif.Photo.ExposureBiasValue"_)) properties.insert("Bias", str(exif.at("Exif.Photo.ExposureBiasValue"_)));
+			if(exif.contains("Exif.Photo.ISOSpeedRatings"_)) properties.insert("Gain", str(exif.at("Exif.Photo.ISOSpeedRatings"_)));
+			if(exif.contains("Exif.Photo.ExposureTime"_)) properties.insert("Time", str(exif.at("Exif.Photo.ExposureTime"_)));
 
 			string name = section(fileName,'.');
 			if(predicate && predicate(name, properties)) continue;
@@ -45,7 +46,7 @@ SourceImageRGB ImageFolder::image(size_t index, string) {
 	return cache<Image>(path()+"/Source", elementName(index), size(index), sourceFile.modifiedTime(), [&](const Image& target) {
 		Image source = decodeImage(Map(sourceFile));
 		assert_(source.size);
-		if(values[index].at("Orientation") == "6") rotate(target, source);
+		if(values[index].contains("Orientation") && values[index].at("Orientation") == "6") rotate(target, source);
 		else target.copy(source);
 	}, true /*Disables full size source cache*/, "" /*Disables version invalidation to avoid redecoding on header changes*/);
 }

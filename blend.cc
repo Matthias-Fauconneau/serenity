@@ -128,10 +128,10 @@ struct ExposureBlendExport : ExposureBlend, Application {
 		for(size_t index: range(sRGB.count(-1))) {
 			String name = sRGB.elementName(index);
 			Time correctionTime;
-			SourceImageRGB image = sRGB.image(index/*, int2(2048,1536)*/);
+			SourceImageRGB image = sRGB.image(index);
 			correctionTime.stop();
 			Time compressionTime;
-			writeFile(name, encodeJPEG(image, 75), output, true);
+			writeFile(name, encodeJPEG(image), output, true);
 			compressionTime.stop();
 			log(str(100*(index+1)/sRGB.count(-1))+'%', '\t',index+1,'/',sRGB.count(-1),
 				'\t',sRGB.elementName(index),

@@ -38,6 +38,20 @@ generic struct ImageOperationT : T, ImageOperation {
 	ImageOperationT(ImageSource& source) : ImageOperation(source, *this) {}
 };
 
+struct ImageRGBOperation : GenericImageOperation, ImageRGBSource {
+	ImageRGBSource& source;
+	ImageRGBOperator& operation;
+	ImageRGBOperation(ImageRGBSource& source, ImageRGBOperator& operation)
+		: GenericImageOperation(source, operation), source(source), operation(operation) {}
+
+	/// Returns RGB image
+	virtual SourceImageRGB image(size_t index, int2 size = 0, string parameters = "") override;
+};
+
+generic struct ImageRGBOperationT : T, ImageRGBOperation {
+	ImageRGBOperationT(ImageRGBSource& source) : ImageRGBOperation(source, *this) {}
+};
+
 struct SRGB : GenericImageOperator, OperatorT<SRGB> {
 	size_t inputs() const override { return 1; }
 	size_t outputs() const override { return 1; }

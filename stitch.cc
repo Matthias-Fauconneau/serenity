@@ -170,7 +170,7 @@ struct PanoramaStitchExport : PanoramaStitch, Application {
 			SourceImageRGB image = sRGB.image(index, int2(0,0));
 			time.stop();
 			Time compressionTime;
-			writeFile(name, encodeJPEG(image, 75), output, true);
+			writeFile(name, encodeJPEG(image), output, true);
 			compressionTime.stop();
 			log(str(100*(index+1)/sRGB.count(-1))+'%', '\t',index+1,'/',sRGB.count(-1),'\t',sRGB.elementName(index), strx(image.size),'\t',time);
 		}

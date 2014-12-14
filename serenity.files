@@ -148,3 +148,4 @@ video-input.h
 video-input.cc
 music-pdf.cc
 layout.cc
+denoise.cc
