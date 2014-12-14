@@ -55,13 +55,13 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
     };
 	map<int64, Position> timeTrack; // Maps times to positions
 
-	pageBreaks.append(0);
 	measureBars.insert(/*t*/0, /*x*/0.f);
 	timeTrack.insert(/*t*/0u, /*x*/{{0,0},0,0,0,0});
 	Graphics measure;
 	vec2 offset = 0;
 	int currentLineLowestStep = 0, currentLineHighestStep = 0;
 	int previousLineLowestStep = 0;
+	int lastLineBreak = 0;
 
 	auto X = [&](const Sign& sign) -> float& {
 		if(!timeTrack.contains(sign.time)) {
@@ -436,16 +436,21 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 							for(uint staff: range(staffCount)) doBeam(staff); // Before measure is moved
 							// FIXME: layout with measure relative coordinates instead of translating back
 							if(offset.x+x > pageSize.x) {
-								offset.x = -measureBars.values.last();
+								// Layouts previous line vertically (FIXME: distribute)
 								offset.y += staffY(0, previousLineLowestStep-7) - staffY(1, currentLineHighestStep+7);
+								if(offset.y + staffY(0, currentLineLowestStep-7) > pageSize.y) {
+									offset.y = -staffY(1, currentLineHighestStep+7);
+									pageBreaks.append(lastLineBreak);
+								}
+								if(lastLineBreak == 0) offset.y = -staffY(1, currentLineHighestStep+7);
+								for(shared<Graphics>& measure: measures.values.slice(lastLineBreak)) measure->translate(vec2(0, offset.y));
+								lastLineBreak = measures.size();
+
+								offset.x = -measureBars.values.last();
 								previousLineLowestStep = currentLineLowestStep;
 								currentLineLowestStep = 0, currentLineHighestStep = 0;
-								if(offset.y + staffY(0, previousLineLowestStep-7) > pageSize.y) {
-									offset.y = 0;
-									pageBreaks.append(measures.size());
-								}
 							}
-							measure.translate(offset);
+							measure.translate(vec2(offset.x, 0));
 							measures.insertMulti(Rect(int2(offset)+int2(measureBars.values.last()-barWidth+barWidth/2, 0), int2(offset)+int2(x+barWidth/2, 0)),
 												 shared<Graphics>(move(measure)) );
 							assert_(sign.time - measureBars.keys.last() <= timeSignature.beats*ticksPerQuarter);
@@ -661,6 +666,16 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 			}
 		}
 	}
+	{// Layouts last line vertically (FIXME: distribute)
+		offset.y += staffY(0, previousLineLowestStep-7) - staffY(1, currentLineHighestStep+7);
+		if(offset.y + staffY(0, currentLineLowestStep-7) > pageSize.y) {
+			offset.y = -staffY(1, currentLineHighestStep+7);
+			pageBreaks.append(lastLineBreak);
+		}
+		if(lastLineBreak == 0) offset.y = -staffY(1, currentLineHighestStep+7);
+		for(shared<Graphics>& measure: measures.values.slice(lastLineBreak)) measure->translate(vec2(0, offset.y));
+	}
+	lastLineBreak = measures.size();
 	pageBreaks.append(measures.size());
 	if(!ticksPerMinutes) ticksPerMinutes = 120*ticksPerQuarter; // TODO: default tempo from audio
 
@@ -810,7 +825,6 @@ shared<Graphics> Sheet::graphics(int2 size, Rect clip) {
 	}
 	for(const auto& measure: measures.values.slice(first, last-first)) graphics->graphics.insertMulti(vec2(0), share(measure));
 	if(!pageSize) graphics->offset.y = (size.y - abs(sizeHint(size).y))/2;
-	else graphics->offset.y = -staffY(1, highestStep+8);
 	if(firstSynchronizationFailureChordIndex != invalid) graphics->graphics.insertMulti(vec2(0), share(debug));
 	return graphics;
 }
