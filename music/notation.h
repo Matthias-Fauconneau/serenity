@@ -4,7 +4,7 @@
 
 inline bool isPowerOfTwo(uint v) { return !(v & (v - 1)); }
 
-enum ClefSign { Bass, Treble };
+enum ClefSign { Bass, Treble, NoClef };
 enum Accidental { None, Flat /*♭*/, Natural /*♮*/, Sharp /*♯*/, DoubleFlat /*♭♭*/, DoubleSharp /*♯♯*/ };
 static constexpr string accidentalNames[] = {""_,"flat"_,"natural"_,"sharp"_,"double-flat"_,"double-sharp"_};
 static constexpr string accidentalNamesLy[] = {""_,"flat"_,"natural"_,"sharp"_,"flatflat"_,"doublesharp"};
