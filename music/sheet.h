@@ -29,7 +29,8 @@ struct Sheet : Widget {
 	float textSize = 6*halfLineInterval;
     // Font helpers
 	vec2 glyphSize(string name) { return font.metrics(font.index(name)).size; }
-	vec2 noteSize = glyphSize("noteheads.s2"_);
+	float glyphAdvance(string name) { return font.metrics(font.index(name)).advance; }
+	float space = lineInterval;
 
 	// Graphics
 	map<int64, float> measureBars; // Maps sheet time to position of measure starts

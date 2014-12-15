@@ -285,10 +285,11 @@ MusicXML::MusicXML(string document, string) {
 		}
 	}*/
 
-	/*{/// Converts ties to longer notes (spanning beats and measures) (FIXME: new note within merged time)
+#if 0
+	{/// Converts ties to longer notes (spanning beats and measures) (FIXME: new note within merged time)
 	array<size_t> active;
 	uint page=0, line=0, measure=0;
-	for(size_t signIndex: range(signs.size)) {
+	for(size_t signIndex=0; signIndex < signs.size;) {
 		Sign& sign = signs[signIndex];
 		if(sign.type == Sign::Measure) { page=sign.measure.page, line=sign.measure.pageLine, measure=sign.measure.lineMeasure; }
 		if(sign.type == Sign::Note && (sign.note.tie == Note::TieStart)) active.append(signIndex);
@@ -311,12 +312,18 @@ MusicXML::MusicXML(string document, string) {
 				first.note.dot = dot;
 				assert_(int(first.note.value)>=0);
 				first.note.tie = Note::NoTie;
-				sign.note.tie = Note::Merged;
+				//sign.note.tie = Note::Merged;
+				signs.removeAt(signIndex);
+				continue;
 			}
 		}
-	}*/
+		signIndex++;
+	}
+	}
+#endif
 
-	// Removes unused signs
+#if 1
+	// Removes unused clef change
 	for(size_t signIndex=0; signIndex <signs.size;) {
 		Sign& sign = signs[signIndex];
 		if(sign.type==Sign::Clef) {
@@ -328,6 +335,7 @@ MusicXML::MusicXML(string document, string) {
 		}
 		else signIndex++;
 	}
+#endif
 
 	assert_(signs);
 }
