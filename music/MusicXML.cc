@@ -12,7 +12,7 @@ MusicXML::MusicXML(string document, string) {
 		KeySignature keySignature={0}; TimeSignature timeSignature={4,4};
 		int64 measureTime = 0, time = 0, nextTime = 0, maxTime = 0;
 		uint measureIndex=0, pageIndex=0, pageLineIndex=0, lineMeasureIndex=0; // starts with 1
-		size_t repeatIndex = invalid;
+		//size_t repeatIndex = invalid;
 		array<size_t> activeTies;
 		for(const Element& m: p.children) {
 			measureTime = time;

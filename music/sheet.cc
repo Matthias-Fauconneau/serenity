@@ -33,8 +33,6 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
     array<Chord> beams[2]; // Chords belonging to current beam (per staff) (also for correct single chord layout)
 	uint beamStart[2] = {0,0};
 	uint beatTime[2] = {0,0};
-	//array<array<Sign>> pendingSlurs; // Slurs pending rendering (waiting for beams)
-	//map<int, array<Sign>> slurs; // Signs belonging to current slur
 	float pedalStart = 0; // Last pedal start/change position
 	Sign wedgeStart {.wedge={}}; // Current wedge
 	Sign octaveStart[2] {{.octave=OctaveStop}, {.octave=OctaveStop}}; // Current octave shift (for each staff)
@@ -242,45 +240,11 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 			if(chord.first().note.accent) { glyph(vec2(x,y),"scripts.sforzato"_, font, measure.glyphs); y+=lineInterval; }
 		}
 		beam.clear();
-
-		/*// Slurs
-		for(const array<Sign>& slur: pendingSlurs) {
-			int sum = 0; for(Sign sign: slur) sum += clefStep(sign);
-			int slurDown = (int(slur.size) > count ? sum < (int(slur.size) * -4) : stemUp) ? 1 : -1;
-
-			float y = slurDown>0 ? -inf : inf;
-			for(Sign sign: slur) {
-				y = slurDown>0 ? max(y, Y(sign)) : min(y, Y(sign));
-			}
-			Sign first = slur.first(); if(slurDown<0) for(Sign sign: slur) if(sign.time==first.time) first=sign; // Top note of chord
-			Sign last = slur.last(); if(slurDown>0) for(int i=slur.size-1; i>=0; i--) if(slur[i].time==last.time) last=slur[i]; // Bottom note of chord
-
-			vec2 p0 = vec2(P(first)) + vec2(noteSize.x/2, slurDown*1*noteSize.y);
-			vec2 p1 = vec2(P(last)) + vec2(noteSize.x/2, slurDown*2*noteSize.y);
-			vec2 k0 = vec2(p0.x, y) + vec2(0, slurDown*2*noteSize.y);
-			vec2 k0p = k0 + vec2(0, slurDown*noteSize.y/2);
-			vec2 k1 = vec2(p1.x, y) + vec2(0, slurDown*2*noteSize.y);
-			vec2 k1p = k1 + vec2(0, slurDown*noteSize.y/2);
-			measure.cubics.append(Cubic(copyRef(ref<vec2>({p0,k0,k1,p1,k1p,k0p}))));
-		}
-		pendingSlurs.clear();*/
 	};
 
 	for(size_t signIndex: range(signs.size)) {
 		{
 			Sign sign = signs[signIndex];
-
-			// Meta sign
-			if(sign.type == Sign::Slur) {
-				/*if(sign.slur.type==SlurStart) {
-				assert_(!slurs.contains(int(sign.staff)), int(sign.staff), slurs.keys, measureIndex, sign.slur.index);
-				slurs.insert(int(sign.staff)); // Starts new slur
-			}
-			else {
-				pendingSlurs.append(slurs.take(int(sign.staff))); // Stops current slur
-			} FIXME*/
-				continue;
-			}
 
 			uint staff = sign.staff;
 			if(staff < 2) { // Staff signs
@@ -320,11 +284,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 							highestStep = max(highestStep, clefStep(sign));
 						}
 
-						if(!note.grace && note.tie != Note::Merged) { //FIXME: render ties
-
-							//if(slurs.contains(int(staff))) slurs.at(int(staff)).append( sign );
-							//if(slurs.contains(-1)) slurs.at(-1).append( sign );
-
+						if(!note.grace && note.tie != Note::Merged) {
 							String noteGlyphName = "noteheads.s"_+str(clip(0,int(note.value-1),2)); // FIXME: factor
 							x += 2*glyphSize(noteGlyphName).x;
 							for(Sign sign: chords[staff]) if(abs(sign.note.step-note.step) <= 1) { x += glyphSize(noteGlyphName).x; break; }// Dichord
@@ -390,12 +350,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 					float x = timeTrack.at(sign.time).maximum();
 
 					if(sign.type==Sign::TimeSignature) {
-						for(size_t staff: range(staffCount)) {
-							/*assert_(beatTime[staff] % (timeSignature.beats*quarterDuration) == 0,
-									withName(beatTime[staff], beatTime[staff] % (timeSignature.beats*quarterDuration),
-											 timeSignature.beats, quarterDuration, page, lineIndex, lineMeasureIndex, staff));*/
-							beatTime[staff] = 0;
-						}
+						for(size_t staff: range(staffCount)) beatTime[staff] = 0;
 
 						timeSignature = sign.timeSignature;
 						String beats = str(timeSignature.beats);
@@ -443,7 +398,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 									pageBreaks.append(lastLineBreak);
 								}
 								if(lastLineBreak == 0) offset.y = -staffY(1, currentLineHighestStep+7);
-								for(shared<Graphics>& measure: measures.values.slice(lastLineBreak)) measure->translate(vec2(0, offset.y));
+								for(Graphics& measure: measures.values.slice(lastLineBreak)) measure.translate(vec2(0, offset.y));
 								lastLineBreak = measures.size();
 
 								offset.x = -measureBars.values.last();
@@ -546,14 +501,10 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 				beamDuration += duration;
 
 				uint beatDuration = quarterDuration; //*4/timeSignature.beatUnit;
-				//uint beamFirstBeat = beamStart[staff] / beatDuration;
-				//uint beamLastBeat = (beamStart[staff]+beamDuration) / beatDuration;
 
 				if(beam &&
 						( beamDuration > beatDuration /*Beam before too long*/
-						  /*|| beamFirstBeat!=beamLastBeat*/ /*Beam before spanning*/
 						  || beatTime[staff]%beatDuration==0 /*"Beam" before spanning (single chord)*/
-						  /*|| beam.last().last().note.duration() < duration*/ /*Increasing time (FIXME: revert last if different*/
 						  || beam[0][0].note.tuplet != chord[0].note.tuplet
 						  )) doBeam(staff);
 
@@ -576,7 +527,6 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 					Sign sign = chord[index];
 					assert_(sign.type==Sign::Note);
 					Note& note = sign.note;
-					//assert_(note.measureIndex == measures.size());
 					const float x = X(sign) + (shift[index] ? noteSize.x : 0), y = Y(sign);
 					String noteGlyphName = "noteheads.s"_+str(clip(0,int(note.value-1),2)); // FIXME: factor
 					vec2 noteSize = glyphSize(noteGlyphName);
@@ -656,13 +606,6 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 				}
 				chord.clear();
 				beatTime[staff] += duration;
-				/*if(sign.type == Sign::Measure) {
-					uint measureLength = timeSignature.beats*quarterDuration;
-					assert_(beatTime[staff]%measureLength==0
-							|| duration > measureLength
-							|| ((beatTime[staff]-duration)/measureLength != beatTime[staff]/measureLength),
-							withName(beatTime[staff], beatTime[staff]%measureLength, measureLength, page, lineIndex, lineMeasureIndex, staff, duration));
-				}*/
 			}
 		}
 	}
@@ -794,15 +737,9 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 	else { firstSynchronizationFailureChordIndex = chordToNote.size; }
 	if(logErrors && (extraErrors||wrongErrors||missingErrors||orderErrors)) log(extraErrors, wrongErrors, missingErrors, orderErrors);
 
-	if(pageSize) {
-		//TODO: h justify, v distribute
-	} else {
-		auto verticalAlign = [&](Graphics& measure) {
-			vec2 offset = vec2(0, -staffY(1,highestStep)+textSize);
-			measure.translate(offset);
-		};
-		for(Graphics& measure: measures.values) verticalAlign(measure);
-		verticalAlign(debug);
+	if(!pageSize) {
+		for(Graphics& measure: measures.values) measure.translate(vec2(0, -staffY(1,highestStep)+textSize));
+		debug->translate(vec2(0, -staffY(1,highestStep)+textSize));
 	}
 }
 
