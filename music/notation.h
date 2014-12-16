@@ -15,7 +15,7 @@ static constexpr uint quarterDuration = 16;
 enum Pedal { Ped=-1, Start, Change, PedalStop };
 enum Wedge{ Crescendo, Diminuendo, WedgeStop };
 enum OctaveShift { Down, Up, OctaveStop };
-enum SlurType { SlurStart, SlurStop };
+enum class Repeat { Begin=-1, End=0 };
 
 struct Clef {
     ClefSign clefSign;
@@ -60,12 +60,6 @@ struct Metronome {
 	Value beatUnit;
     uint perMinute;
 };
-struct Slur {
-    size_t documentIndex;
-    int index;
-    SlurType type;
-    bool matched;
-};
 
 struct Sign {
 	int64 time; // Absolute time offset
@@ -77,8 +71,7 @@ struct Sign {
 		Metronome, OctaveShift, // Top
 		Dynamic, Wedge, // Middle
 		Pedal, // Bottom
-		Measure, KeySignature, TimeSignature, // Across
-		Slur // Toggle (Staff/Across)
+		Measure, KeySignature, TimeSignature, Repeat // Across
 	} type;
 	union {
 		struct Note note;
@@ -88,12 +81,11 @@ struct Sign {
 		struct KeySignature keySignature;
 		struct TimeSignature timeSignature;
 		struct Metronome metronome;
-		//struct Dynamic dynamic;
 		string dynamic;
 		enum Pedal pedal;
 		enum Wedge wedge;
 		enum OctaveShift octave;
-		struct Slur slur;
+		enum Repeat repeat;
 	};
 };
 inline bool operator <(const Sign& a, const Sign& b) {

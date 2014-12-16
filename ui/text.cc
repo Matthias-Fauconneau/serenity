@@ -156,7 +156,7 @@ struct TextLayout {
 					stack.append( Context{format, font, origin, start, move(children), position, word.size} );
                     start = word.size;
                     origin = position;
-                    String fontName = copy(font->name);
+					//String fontName = copy(font->name);
                     float fontSize = font->size;
                     format = TextFormat(c);
 					if(format==TextFormat::Bold) { assert_(!find(fontName,"Bold"), toUTF8(text)); font = getFont(fontName, fontSize, {"Bold","RB"}, hint); }

@@ -252,6 +252,19 @@ MusicXML::MusicXML(string document, string) {
 						}
 						else error(e);
 					}
+#else
+					if(e.contains("repeat")) {
+						if(e("repeat")["direction"]=="forward") {
+							if(partIndex==0) signs.insertSorted({time, 0, uint(-1), Sign::Repeat, .repeat=Repeat::Begin});
+						}
+						else if(e("repeat")["direction"]=="backward") {
+							if(partIndex==0) signs.insertSorted({time, 0, uint(-1), Sign::Repeat, .repeat=Repeat::End});
+						}
+						else error(e);
+					}
+					if(e.contains("ending") && e("ending")["type"]=="start") {
+						if(partIndex==0) signs.insertSorted({time, 0, uint(-1), Sign::Repeat, .repeat=Repeat(parseInteger(e("ending")["number"]))});
+					}
 #endif
 				}
 				else if(e.name=="harmony"_) {}

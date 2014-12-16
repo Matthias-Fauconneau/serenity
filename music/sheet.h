@@ -14,7 +14,7 @@ struct Sheet : Widget {
 	const float lineWidth = 1, barWidth=1, stemWidth = 1, stemLength = 7*halfLineInterval, beamWidth = halfLineInterval;
 	const float shortStemLength = 7*halfLineInterval;
     // Layout helpers
-	float staffY(uint staff, int clefStep) { return (!staff)*10*lineInterval - clefStep * halfLineInterval; } // Clef independent
+	float staffY(uint staff, int clefStep) { return (!staff)*(10*lineInterval+halfLineInterval) - clefStep * halfLineInterval; } // Clef independent
 	float Y(uint staff, ClefSign clefSign, int step) { return staffY(staff, step-(clefSign==Treble ? 10 : -2)); } // Clef dependent
 	// Translates C4 step to top line step using clef
 	int clefStep(Sign sign) {
@@ -30,11 +30,12 @@ struct Sheet : Widget {
     // Font helpers
 	vec2 glyphSize(string name) { return font.metrics(font.index(name)).size; }
 	float glyphAdvance(string name) { return font.metrics(font.index(name)).advance; }
-	float space = lineInterval;
+	float space = 1; //glyphSize("flags.u3"_).x;
 
 	// Graphics
 	map<int64, float> measureBars; // Maps sheet time to position of measure starts
 	map<Rect, shared<Graphics>> measures;
+	array<shared<Graphics>> pages; // FIXME: Page[]:Line[]:Measures[]
 	shared<Graphics> debug;
 
 	int lowestStep = 0, highestStep = 0;
@@ -61,7 +62,7 @@ struct Sheet : Widget {
 	size_t pageIndex = 0;
 
 	/// Layouts musical notations to graphic primitives
-	Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes={}, int2 pageSize=0);
+	Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes={}, int2 pageSize=0, string title="");
 
 	/// Turn pages
 	bool keyPress(Key key, Modifiers modifiers) override;
