@@ -12,7 +12,7 @@ struct Sheet : Widget {
 	static constexpr int staffCount = 2;
 	static constexpr float halfLineInterval = 3, lineInterval = 2*halfLineInterval;
 	const float stemLength = 7*halfLineInterval, beamWidth = halfLineInterval;
-	const float shortStemLength = 7*halfLineInterval;
+	const float shortStemLength = 5*halfLineInterval;
     // Layout helpers
 	float staffY(uint staff, int clefStep) { return (!staff)*(10*lineInterval+halfLineInterval) - clefStep * halfLineInterval; } // Clef independent
 	float Y(uint staff, ClefSign clefSign, int step) { return staffY(staff, step-(clefSign==Treble ? 10 : -2)); } // Clef dependent
@@ -24,13 +24,13 @@ struct Sheet : Widget {
 	float Y(Sign sign) { assert_(sign.type==Sign::Note); return staffY(sign.staff, clefStep(sign)); } // Clef dependent
 
     // Fonts
-	Font graceFont {File("emmentaler-26.otf", Folder("/usr/local/share/fonts"_)), 4.f*halfLineInterval, "Emmentaler"};
-	Font font {File("emmentaler-26.otf", "/usr/local/share/fonts"_), 9.f*halfLineInterval, "Emmentaler"};
+	Font smallFont {File("emmentaler-26.otf", Folder("/usr/local/share/fonts"_)), 6.f*halfLineInterval, "Emmentaler"};
+	Font font {File("emmentaler-26.otf", "/usr/local/share/fonts"_), 8.f*halfLineInterval, "Emmentaler"};
 	float textSize = 6*halfLineInterval;
     // Font helpers
 	vec2 glyphSize(string name) { return font.metrics(font.index(name)).size; }
-	float glyphAdvance(string name) { return font.metrics(font.index(name)).advance; }
-	float space = 1;
+	float glyphAdvance(string name, Font* font_=0/*font*/) { Font& font=font_?*font_:this->font; return font.metrics(font.index(name)).advance; }
+	float space = max(1.f, glyphSize("noteheads.s2"_).x/4);
 	float margin = glyphSize("flags.u3"_).x;
 
 	// Graphics

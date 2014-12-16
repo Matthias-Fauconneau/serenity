@@ -31,6 +31,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 	Sign octaveStart[2] {{.octave=OctaveStop}, {.octave=OctaveStop}}; // Current octave shift (for each staff)
 	struct TieStart { uint key; vec2 position; };
 	array<TieStart> activeTies[2];
+	array<Chord> tuplets[2];
 
 	map<uint, array<Sign>> notes; // Signs for notes (time, key, blitIndex)
 
@@ -54,8 +55,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 		//pageBreaks.append(measures.size);
 		pages.append();
 		if(pages.size==1) {
-			int2 size = Text(bold(title),textSize*2,0,1,0,"LinLibertine").sizeHint(0);
-			text(vec2(pageSize.x/2-size.x/2,0), bold(title), textSize*2, pages.last().glyphs);
+			int2 size = Text(bold(title),textSize,0,1,0,"LinLibertine").sizeHint(0);
+			text(vec2(pageSize.x/2-size.x/2,0), bold(title), textSize, pages.last().glyphs);
 		}
 		{// Page index at each corner
 			int2 size = Text(str(pages.size),textSize,0,1,0,"LinLibertine").sizeHint(0);
@@ -137,7 +138,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 					x += space;
 				}
 				else if(sign.type == Sign::Rest) {
-					x += glyphAdvance("rests."+(sign.rest.value==Double?"M2"_:str(int(sign.rest.value-1))));
+					x += glyphAdvance("rests."+(sign.rest.value==Double?"M2"_:str(int(sign.rest.value-1))), &smallFont);
 					x += space;
 				}
 				else if(sign.type == Sign::Clef) {
@@ -170,12 +171,12 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 						if(x > pageSize.x) break;
 						if(breakIndex>startIndex  && sign.measure.lineBreak) break;
 						breakIndex = signIndex+1; // Includes measure break
+						x += space;
 						allocatedLineWidth = x;
 						spaceCount = timeTrack.size() + measureCount;
 						//uint manualBreak[] = {6,6,8,8,8,8, 8,8,8,8,8,8, 8,8,8,8,8,8}; //TODO: align 2,4 <-> 3,6
 						measureCount++;
 						//if(lineCount < ref<uint>(manualBreak).size && measureCount>=manualBreak[lineCount]) break;
-						x += space;
 					}
 					else if(sign.type==Sign::KeySignature) {
 						x += abs(sign.keySignature.fifths)*glyphAdvance(sign.keySignature.fifths<0?"accidentals.flat"_:"accidentals.sharp"_);
@@ -224,14 +225,15 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 		}
 		offsetY += -staffY(1, max(highMargin/*lineHasTopText?4:0*/,currentLineHighestStep)+7);
 
+		auto isDichord = [](const Chord& chord){
+			for(const Sign& a: chord) for(const Sign& b: chord) if(a.note.key!=b.note.key && abs(a.note.step-b.note.step)<=1) return true;
+			return false;
+		};
+
 		Graphics system;
 		auto doBeam = [&](uint staff) {
 			auto& beam = beams[staff];
 			if(!beam) return;
-
-			uint tuplet = beam[0][0].note.tuplet;
-			for(const Chord& chord: beam) for(Sign sign: chord) assert_(sign.note.tuplet == tuplet, sign.note.tuplet, tuplet, beam,
-																		page, lineIndex, lineMeasureIndex);
 
 			// Stems
 			int sum = 0, count=0;
@@ -241,10 +243,6 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 			}
 			bool stemUp = sum < -4*count; // sum/count<-4 (Average note height below mid staff)
 
-			auto isDichord = [](const Chord& chord){
-				for(const Sign& a: chord) for(const Sign& b: chord) if(a.note.key!=b.note.key && abs(a.note.step-b.note.step)<=1) return true;
-				return false;
-			};
 			auto isTied = [](const Chord& chord){
 				for(const Sign& a: chord) if(a.note.tie == Note::NoTie || a.note.tie == Note::TieStart) return false;
 				return true;
@@ -255,92 +253,95 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 				Sign sign = stemUp ? beam[0].last() : beam[0].first();
 				String noteGlyphName = "noteheads.s"_+str(clip(0,int(sign.note.value-1),2)); // FIXME: factor, FIXME: assumes same width
 				vec2 noteSize = glyphSize(noteGlyphName).x;
-				float upOffset = noteSize.x*11/12, downOffset = noteSize.x*1/12;
+				float upOffset = noteSize.x-1./2, downOffset = 1./2;
 				float dx = stemUp ? upOffset : (isDichord(beam[0])?noteSize.x:0)+downOffset;
 				float x = X(sign) + dx;
 				float yBottom = -inf, yTop = inf;
 				for(Sign sign: beam[0]) if(sign.note.value >= Half) { yBottom = max(yBottom, Y(sign)); yTop = min(yTop, Y(sign)); } // inverted Y
-				float yBase = stemUp ? yBottom : yTop;
+				float yBase = stemUp ? yBottom-1./2 : yTop+1./2;
 				float yStem = stemUp ? yTop-stemLength : yBottom+stemLength;
 				float opacity = isTied(beam[0]) ? 1./2 : 1;
 				//system.fills.append(vec2(x, ::min(yBase, yStem)), vec2(stemWidth, abs(yBase-yStem)), black, opacity);
 				system.lines.append(vec2(x, ::min(yBase, yStem)), vec2(x, max(yBase, yStem)), black, opacity);
 				/**/ if(sign.note.value==Eighth)
-					glyph(vec2(x, yStem), stemUp?"flags.u3"_:"flags.d3"_, font, system.glyphs, opacity);
+					glyph(vec2(x, yStem), stemUp?"flags.u3"_:"flags.d3"_, smallFont, system.glyphs, opacity);
 				else if(sign.note.value==Sixteenth)
-					glyph(vec2(x, yStem), stemUp?"flags.u4"_:"flags.d4"_, font, system.glyphs, opacity);
+					glyph(vec2(x, yStem), stemUp?"flags.u4"_:"flags.d4"_, smallFont, system.glyphs, opacity);
 				else if(sign.note.value==Thirtysecond)
-					glyph(vec2(x, yStem), stemUp?"flags.u5"_:"flags.d5"_, font, system.glyphs, opacity);
+					glyph(vec2(x, yStem), stemUp?"flags.u5"_:"flags.d5"_, smallFont, system.glyphs, opacity);
 				else if(sign.note.value==Sixtyfourth)
-					glyph(vec2(x, yStem), stemUp?"flags.u6"_:"flags.d6"_, font, system.glyphs, opacity);
-			} else if(beam.size==2) { // Draws slanted beam
+					glyph(vec2(x, yStem), stemUp?"flags.u6"_:"flags.d6"_, smallFont, system.glyphs, opacity);
+			} else if(beam.size==2) { // Draws pairing beam
 				float x[2], base[2], tip[2];
 				for(uint i: range(2)) {
 					const Chord& chord = beam[i];
 					Sign sign = chord.first();
 					String noteGlyphName = "noteheads.s"_+str(clip(0,int(sign.note.value-1),2)); // FIXME: factor, FIXME: assumes same width
 					vec2 noteSize = glyphSize(noteGlyphName).x;
-					float upOffset = noteSize.x*11/12, downOffset = noteSize.x*1/12;
+					float upOffset = noteSize.x-1./2, downOffset = 1./2;
 					float dx = stemUp ? upOffset : (isDichord(beam[0])?noteSize.x:0)+downOffset;
 					x[i] = X(sign) + dx;
-					base[i] = Y(stemUp?chord.first():chord.last());
+					base[i] = Y(stemUp?chord.first():chord.last()) + (stemUp ? -1./2 : +1./2);
 					tip[i] = Y(stemUp?chord.last():chord.first())+(stemUp?-1:1)*stemLength;
 				}
-				float farTip = stemUp ? min(tip[0],tip[1]) : max(tip[0],tip[1]);
-				float delta[2] = {clip(-lineInterval, tip[0]-farTip, lineInterval), clip(-lineInterval, tip[1]-farTip, lineInterval)};
+				float midTip = (tip[0]+tip[1])/2; //farTip = stemUp ? min(tip[0],tip[1]) : max(tip[0],tip[1]);
+				float delta[2] = {clip(-lineInterval, tip[0]-midTip, lineInterval), clip(-lineInterval, tip[1]-midTip, lineInterval)};
 				float dx[2];
 				Sign sign[2] = { stemUp?beam[0].last():beam[0].first(), stemUp?beam[1].last():beam[1].first()};
 				for(uint i: range(2)) {
 					float opacity = isTied(beam[i]) ? 1./2 : 1;
-					//system.fills.append(vec2(x[i], ::min(base[i],farTip+delta[i])), vec2(stemWidth, abs(base[i]-(farTip+delta[i]))), black, opacity);
-					system.lines.append(vec2(x[i], ::min(base[i],farTip+delta[i])), vec2(x[i], ::max(base[i],farTip+delta[i])), black, opacity);
+					tip[i] = midTip+delta[i];
+					system.lines.append(vec2(x[i], ::min(base[i],tip[i])), vec2(x[i], ::max(base[i],tip[i])), black, opacity);
 					String noteGlyphName = "noteheads.s"_+str(clip(0,int(sign[i].note.value-1),2)); // FIXME: factor, FIXME: assumes same width
 					vec2 noteSize = glyphSize(noteGlyphName).x;
-					float upOffset = noteSize.x*11/12, downOffset = noteSize.x*1/12;
+					float upOffset = noteSize.x-1./2, downOffset = 1./2;
 					dx[i] = stemUp ? upOffset : (isDichord(beam[i])?noteSize.x:0)+downOffset;
 				}
 				float opacity = isTied(beam[0]) && isTied(beam[1]) ? 1./2 : 1;
 				Value first = max(apply(beam[0], [](Sign sign){return sign.note.value;}));
 				Value second = max(apply(beam[1], [](Sign sign){return sign.note.value;}));
+				// Beams
 				for(size_t index: range(min(first,second)-Quarter)) {
 					float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1);
-					vec2 p0 (X(sign[0])+dx[0], farTip+delta[0]-beamWidth/2 + Y);
-					vec2 p1 (X(sign[1])+dx[1], farTip+delta[1]-beamWidth/2 + Y);
+					vec2 p0 (X(sign[0])+dx[0]-1./2, tip[0]-beamWidth/2 + Y);
+					vec2 p1 (X(sign[1])+dx[1]+1./2, tip[1]-beamWidth/2 + Y);
 					system.parallelograms.append(p0, p1, beamWidth, black, opacity);
 				}
 				for(size_t index: range(min(first,second)-Quarter, first-Quarter)) {
 					float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1);
-					vec2 p0 (X(sign[0])+dx[0], farTip+delta[0]-beamWidth/2 + Y);
-					vec2 p1 (X(sign[1])+dx[1], farTip+delta[1]/2-beamWidth/2 + Y);
+					vec2 p0 (X(sign[0])+dx[0]-1./2, tip[0]-beamWidth/2 + Y);
+					vec2 p1 (X(sign[1])+dx[1]+1./2, (tip[0]+tip[1])/2-beamWidth/2 + Y);
 					p1 = (p0+p1)/2.f;
 					system.parallelograms.append(p0, p1, beamWidth, black, opacity);
 				}
 				for(size_t index: range(int(min(first,second)-Quarter), int(second-Quarter))) {
 					float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1);
-					vec2 p0 (X(sign[0])+dx[0], farTip+delta[0]-beamWidth/2 + Y);
-					vec2 p1 (X(sign[1])+dx[1], farTip+delta[1]-beamWidth/2 + Y);
+					vec2 p0 (X(sign[0])+dx[0]-1./2, tip[0]-beamWidth/2 + Y);
+					vec2 p1 (X(sign[1])+dx[1]+1./2, tip[1]-beamWidth/2 + Y);
 					p0 = (p0+p1)/2.f;
 					system.parallelograms.append(p0, p1, beamWidth, black, opacity);
 				}
-			} else { // Draws horizontal beam
-				float stemY = stemUp ? -inf : inf;
-				if(stemUp) {
-					for(const Chord& chord: beam) for(Sign sign: chord) stemY = max(stemY, Y(sign)-stemLength);
-					for(const Chord& chord: beam) for(Sign sign: chord) stemY = min(stemY, Y(sign)-shortStemLength);
-				} else {
-					for(const Chord& chord: beam) for(Sign sign: chord) stemY = min(stemY, Y(sign)+stemLength);
-					for(const Chord& chord: beam) for(Sign sign: chord) stemY = max(stemY, Y(sign)+shortStemLength);
-				}
-				stemY = stemUp ? min(stemY, staffY(staff, -4)) : max(stemY, staffY(staff, -4));
-				for(const Chord& chord: beam) for(Sign sign: chord) { // Stems
-					String noteGlyphName = "noteheads.s"_+str(clip(0,int(sign.note.value-1),2)); // FIXME: factor, FIXME: assumes same width
+			} else { // Draws grouping beam
+				float firstStemY = Y(stemUp?beam.first().last():beam.first().first())+(stemUp?-1:1)*stemLength;
+				float lastStemY = Y(stemUp?beam.last().last():beam.last().first())+(stemUp?-1:1)*stemLength;
+				array<float> stemX;
+				for(const Chord& chord: beam) { // Stems X
+					String noteGlyphName = "noteheads.s"_+str(clip(0,int(chord[0].note.value-1),2)); // FIXME: factor, FIXME: assumes same width
 					vec2 noteSize = glyphSize(noteGlyphName).x;
-					float upOffset = noteSize.x*11/12, downOffset = noteSize.x*1/12;
+					float upOffset = noteSize.x-1./2, downOffset = 1./2;
 					float dx = stemUp ? upOffset : (isDichord(chord)?noteSize.x:0)+downOffset;
-					float x = X(sign) + dx;
-					float y = Y(sign);
+					float x = X(chord[0]) + dx;
+					stemX.append(x);
+				}
+				array<float> stemsY;
+				for(size_t index: range(beam.size)) { // Stems
+					const Chord& chord = beam[index];
+					float x = stemX[index];
+					Sign sign = stemUp ? chord.first() : chord.last();
+					float y = Y(sign) + (stemUp ? -1./2 : +1./2);
 					float opacity = isTied(chord) ? 1./2 : 1;
-					//{vec2 min(x, ::min(y, stemY)), max(x+stemWidth, ::max(stemY, y)); system.fills.append(min, max-min, black, opacity);}
+					float stemY = firstStemY + (lastStemY-firstStemY)*(x-stemX.first()) / (stemX.last()-stemX.first());
+					stemsY.append(stemY);
 					system.lines.append(vec2(x, ::min(y, stemY)), vec2(x, ::max(stemY, y)), black, opacity);
 				}
 				// Beam
@@ -348,21 +349,11 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 					const Chord& chord = beam[chordIndex];
 					Value value = chord[0].note.value;
 					for(size_t index: range(value-Quarter)) {
-						float Y = stemY + (stemUp ? 1 : -1) * float(index) * (beamWidth+1);
-						String noteGlyphName = "noteheads.s"_+str(clip(0,int(chord[0].note.value-1),2)); // FIXME: factor, FIXME: assumes same width
-						vec2 noteSize = glyphSize(noteGlyphName).x;
-						float upOffset = noteSize.x*11/12, downOffset = noteSize.x*1/12;
-						float dx = stemUp ? upOffset : downOffset;
-						vec2 min (X(chord[0]) + dx, Y-beamWidth/2), max(X(beam[chordIndex+1][0])+dx, Y-beamWidth/2);
-						system.parallelograms.append(min, max, beamWidth-1);
+						float dy = (stemUp ? 1 : -1) * float(index) * (beamWidth+1) - beamWidth/2;
+						system.parallelograms.append(
+									vec2(stemX[chordIndex]-(chordIndex==0?1./2:0), stemsY[chordIndex]+dy),
+									vec2(stemX[chordIndex+1]+(chordIndex==beam.size-1?1./2:0), stemsY[chordIndex+1]+dy), beamWidth-1);
 					}
-				}
-				// Tuplet
-				if(tuplet) {
-					float dx = (stemUp ? space - 2 : 0);
-					float x = (X(beam.first()[0])+X(beam.last()[0]))/2 + dx;
-					float y = stemY + (stemUp ? -1 : 1) * 2 * beamWidth;
-					text(vec2(x,y) - vec2(Text(str(tuplet),textSize/2,0,1,0,"LinLibertine").sizeHint(0))/2.f, str(tuplet), textSize/2, system.glyphs);
 				}
 			}
 
@@ -442,7 +433,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 							x += spaceWidth;
 							for(Sign sign: chords[staff]) if(abs(sign.note.step-note.step) <= 1) { x += glyphAdvance(noteGlyphName); break; }// Dichord
 							//for(Sign sign: chords[staff]) if(sign.note.dot) x += glyphAdvance(noteGlyphName); // Dot
-							if(chords[staff]) sign.note.tuplet = chords[staff][0].note.tuplet; // Does not affect rendering but mismatch triggers asserts
+							//if(chords[staff]) sign.note.tuplet = chords[staff][0].note.tuplet; // Does not affect rendering but mismatch triggers asserts
 							chords[staff].insertSorted(sign);
 						} else {
 							//if(note.slash) system.parallelograms.append( Parallelogram(p+vec2(-dx+dx/2,dx), p+vec2(dx+dx/2,-dx), 1) );
@@ -452,7 +443,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 					else if(sign.type == Sign::Rest) {
 						doBeam(staff);
 						vec2 p = vec2(x, staffY(staff, -4));
-						x += glyph(p, "rests."+(sign.rest.value==Double?"M2"_:str(int(sign.rest.value-1))), font, system.glyphs);
+						x += glyph(p, "rests."+(sign.rest.value==Double?"M2"_:str(int(sign.rest.value-1))), smallFont, system.glyphs, 1./2);
 						x += spaceWidth;
 						uint measureLength = timeSignature.beats*quarterDuration;
 						beatTime[staff] += sign.rest.value == Whole ? measureLength /*FIXME: only if single*/ : sign.rest.duration();
@@ -521,10 +512,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 						if(sign.type == Sign::Measure) {
 							for(uint staff: range(staffCount)) doBeam(staff);
 
-							{vec2 min(x, staffY(1,0)), max(x, staffY(0,-8));
-								//system.fills.append(min, max-min);
-								system.lines.append(min, max);
-							} // Bar line
+							system.lines.append(vec2(x, staffY(1,0)), vec2(x, staffY(0,-8)));
 
 							measureIndex = sign.measure.measure;
 							page = sign.measure.page;
@@ -686,7 +674,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 						}
 						// Body
 						note.glyphIndex = system.glyphs.size;
-						glyph(vec2(x, y), noteGlyphName, note.grace?graceFont:font, system.glyphs, opacity);
+						glyph(vec2(x, y), noteGlyphName, note.grace?smallFont:font, system.glyphs, opacity);
 						// Accidental
 						if(note.accidental) {
 							if(abs(y-accidentalAboveY)<=3*halfLineInterval) accidentalOffset -= space/2;
@@ -729,7 +717,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 									vec2 k0p (k0.x, k0.y + slurDown*width);
 									vec2 k1 (p1.x, p1.y + slurDown*offset);
 									vec2 k1p (k1.x, k1.y + slurDown*width);
-									system.cubics.append(Cubic(copyRef(ref<vec2>({p0,k0,k1,p1,k1p,k0p}))));
+									system.cubics.append(copyRef(ref<vec2>({p0,k0,k1,p1,k1p,k0p})), black, 1.f/2);
 								} else { // Wrapped tie
 									// TODO: Tie start
 									// Tie end
@@ -739,7 +727,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 									vec2 k0p (k0.x, k0.y + slurDown*width);
 									vec2 k1 (p1.x, p1.y + slurDown*offset);
 									vec2 k1p (k1.x, k1.y + slurDown*width);
-									system.cubics.append(Cubic(copyRef(ref<vec2>({p0,k0,k1,p1,k1p,k0p}))));
+									system.cubics.append(copyRef(ref<vec2>({p0,k0,k1,p1,k1p,k0p})), black, 1.f/2);
 								}
 							} else sign.note.tie = Note::NoTie;
 						}
@@ -757,9 +745,50 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 					if(value >= Half /*also quarter and halfs for stems*/) {
 						if(!beam) beamStart[staff] = beatTime[staff];
 						if(value <= Quarter) doBeam(staff); // Flushes any pending beams
-						beam.append(move(chord));
+						beam.append(copy(chord));
 						if(value <= Quarter) doBeam(staff); // Only stems for quarter and halfs (actually no beams :/)
 					}
+					uint tupletSize = chord[0].note.tuplet;
+					auto& tuplet = tuplets[staff];
+					if(tupletSize) {	// Tuplet
+						tuplet.append(copy(chord));
+						for(const auto& chord: tuplet) for(Sign sign: chord) assert_(sign.note.tuplet == tupletSize, sign.note.tuplet, tupletSize);
+						if(tuplet.size == tupletSize) {
+							// Stems
+							int sum = 0, count=0;
+							for(Chord& chord: tuplet) {
+								for(Sign& sign: chord) sum += clefStep(sign);
+								count += chord.size;
+							}
+							bool stemUp = sum < -4*count; // sum/count<-4 (Average note height below mid staff)
+
+							array<float> stemX;
+							for(const Chord& chord: tuplet) { // Stems X
+								String noteGlyphName = "noteheads.s"_+str(clip(0,int(chord[0].note.value-1),2)); // FIXME: factor, FIXME: assumes same width
+								vec2 noteSize = glyphSize(noteGlyphName).x;
+								float upOffset = noteSize.x*11/12, downOffset = noteSize.x*1/12;
+								float dx = stemUp ? upOffset : (isDichord(chord)?noteSize.x:0)+downOffset;
+								float x = X(chord[0]) + dx;
+								stemX.append(x);
+							}
+							float x = (stemX.first() + stemX.last()) / 2;
+
+							float firstStemY = Y(stemUp?tuplet.first().last():tuplet.first().first())+(stemUp?-1:1)*stemLength;
+							float lastStemY = Y(stemUp?tuplet.last().last():tuplet.last().first())+(stemUp?-1:1)*stemLength;
+							float stemY = (firstStemY + lastStemY) / 2;
+							float dy = (stemUp ? -1 : 1) * 2 * beamWidth;
+							float y = stemY+dy;
+							vec2 size(Text(str(tupletSize),textSize/2,0,1,0,"LinLibertine").sizeHint(0));
+							text(vec2(x,y) - size/2.f, str(tupletSize), textSize/2, system.glyphs);
+							system.lines.append(
+										vec2(stemX.first(),firstStemY+dy),
+										vec2(x-size.x, firstStemY+((x-size.x)-stemX.first())/(stemX.last()-stemX.first())*(lastStemY-firstStemY)+dy), black);
+							system.lines.append(
+										vec2(x+size.x,firstStemY+((x+size.x)-stemX.first())/(stemX.last()-stemX.first())*(lastStemY-firstStemY)+dy),
+										vec2(stemX.last(),lastStemY+dy), black);
+							tuplet.clear();
+						}
+					} else assert_(!tuplet);
 					chord.clear();
 					beatTime[staff] += duration;
 				}
