@@ -44,6 +44,7 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
     map<String, String> fonts; // font ID to font ref
 
     for(const Graphics& graphics: pages) {
+		if(graphics.fills) log("WARNING: unsupported fills, skipping", graphics.fills.size, "elements, use parallelograms");
         Object& page = objects.append();
 		page.insert("Parent"__, ref(pdfPages));
 		page.insert("Type"__, "/Page"_);
@@ -104,12 +105,12 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
                     }
 					content.append('/'+font.name+' '+str(int(glyph.font.size*px))+" Tf\n"); // Font size in pixels
                 }
-                uint index = font.index(glyph.code);
+				uint index = glyph.index; //font.index(glyph.code);
                 assert_(index < 1<<15);
                 vec2 origin = vec2(glyph.origin.x, pageSize.y-glyph.origin.y)*px;
                 vec2 relative = origin - last; // Position update of glyph origin in pixels
                 last = origin;
-				content.append(str<int>(relative.x,relative.y)+" Td <"+hex(index,4)+"> Tj\n");
+				content.append(str(relative.x,relative.y)+" Td <"+hex(index,4)+"> Tj\n");
             }
 			content.append("ET\n");
 
@@ -143,8 +144,12 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
 				page.insert("Resources"__, move(resources));
             }
 
+			auto P = [&](vec2 p) { return str(p.x*px, (pageSize.y-p.y)*px); };
 			for(auto& line: graphics.lines)
-				content.append(str(line.a.x*px, (pageSize.y-line.a.y)*px)+" m "+str(line.b.x*px, (pageSize.y-line.b.y)*px)+" l S\n");
+				content.append(P(line.a)+" m "+P(line.b)+" l S\n");
+
+			for(auto& p: graphics.parallelograms)
+				content.append(P(p.min)+" m "+P(p.min+vec2(0,p.dy))+" l "+P(p.max+vec2(0,p.dy))+" l "+P(p.max)+" l f\n");
 
 			contents.insert("Filter"__, "/FlateDecode"_);
             contents = deflate(content);

@@ -16,6 +16,7 @@ enum Pedal { Ped=-1, Start, Change, PedalStop };
 enum Wedge{ Crescendo, Diminuendo, WedgeStop };
 enum OctaveShift { Down, Up, OctaveStop };
 enum class Repeat { Begin=-2, End=-1, None=0 };
+enum Break { NoBreak, LineBreak, PageBreak };
 
 struct Clef {
     ClefSign clefSign;
@@ -50,7 +51,7 @@ struct Rest {
 	uint duration() const { return valueDurations[value]; };
 };
 struct Measure {
-	bool lineBreak;
+	Break lineBreak;
 	uint measure, page, pageLine, lineMeasure;
 	//enum Repeat repeat;
 };

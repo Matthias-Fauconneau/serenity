@@ -58,11 +58,11 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 			text(vec2(pageSize.x/2-size.x/2,0), bold(title), textSize*2, pages.last().glyphs);
 		}
 		{// Page index at each corner
-			int2 size= Text(str(pages.size),textSize,0,1,0,"LinLibertine").sizeHint(0);
+			int2 size = Text(str(pages.size),textSize,0,1,0,"LinLibertine").sizeHint(0);
 			text(vec2(0,0), str(pages.size), textSize, pages.last().glyphs);
-			text(vec2(pageSize.x-size.x,0), str(pages.size), textSize, pages.last().glyphs);
+			text(vec2(pageSize.x-size.x*2,0), str(pages.size), textSize, pages.last().glyphs);
 			text(vec2(0,pageSize.y-size.y), str(pages.size), textSize, pages.last().glyphs);
-			text(vec2(pageSize.x-size.x,pageSize.y-size.y), str(pages.size), textSize, pages.last().glyphs);
+			text(vec2(pageSize.x-size.x*2,pageSize.y-size.y), str(pages.size), textSize, pages.last().glyphs);
 		}
 		for(const Graphics& system: systems) pages.last().append(system);
 		systems.clear();
@@ -84,7 +84,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 			void setAll(float x) { setStaves(x); middle = x; metronome = x; octave = x; bottom = x; }
 		};
 		map<int64, Position> timeTrack; // Maps times to positions
-		{float x = /*2**/space; timeTrack.insert(signs[startIndex].time, {{x,x},x,x,x,x});}
+		{float x = /*2**/0; timeTrack.insert(signs[startIndex].time, {{x,x},x,x,x,x});}
 
 		auto X = [&](const Sign& sign) -> float& {
 			/*if(!timeTrack.contains(sign.time)) {
@@ -168,12 +168,13 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 				} else if(sign.type == Sign::Measure || sign.type==Sign::KeySignature) { // Clears all lines (including direction lines)
 					if(sign.type == Sign::Measure) {
 						if(x > pageSize.x) break;
+						if(breakIndex>startIndex  && sign.measure.lineBreak) break;
 						breakIndex = signIndex+1; // Includes measure break
 						allocatedLineWidth = x;
 						spaceCount = timeTrack.size() + measureCount;
-						uint manualBreak[] = {6,6,8,8,8,8, 8,8,8,8,8,8, 8,8,8,8,8,8}; //TODO: align 2,4 <-> 3,6
+						//uint manualBreak[] = {6,6,8,8,8,8, 8,8,8,8,8,8, 8,8,8,8,8,8}; //TODO: align 2,4 <-> 3,6
 						measureCount++;
-						if(lineCount < ref<uint>(manualBreak).size && measureCount>=manualBreak[lineCount]) break;
+						//if(lineCount < ref<uint>(manualBreak).size && measureCount>=manualBreak[lineCount]) break;
 						x += space;
 					}
 					else if(sign.type==Sign::KeySignature) {
@@ -212,9 +213,10 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 
 		// Evaluates vertical offset
 		int highMargin = 3, lowMargin = -8-4;
-		uint manualBreak[] = {5,6,7};
+		//uint manualBreak[] = {5,6,7};
 		if(offsetY + staffY(0, currentLineLowestStep-7)-staffY(1, max(highMargin/*lineHasTopText?4:0*/,currentLineHighestStep)+7) > pageSize.y ||
-			(pages.size < ref<uint>(manualBreak).size && systems.size>=manualBreak[pages.size])) {
+			/*(pages.size < ref<uint>(manualBreak).size && systems.size>=manualBreak[pages.size])*/
+				signs[breakIndex-1].measure.lineBreak == PageBreak) {
 			doPage();
 
 			offsetY = 0;
@@ -253,23 +255,24 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 				Sign sign = stemUp ? beam[0].last() : beam[0].first();
 				String noteGlyphName = "noteheads.s"_+str(clip(0,int(sign.note.value-1),2)); // FIXME: factor, FIXME: assumes same width
 				vec2 noteSize = glyphSize(noteGlyphName).x;
-				float upOffset = noteSize.x*5/6;
-				float dx = (stemUp ? upOffset : (isDichord(beam[0])?noteSize.x:0));
+				float upOffset = noteSize.x*11/12, downOffset = noteSize.x*1/12;
+				float dx = stemUp ? upOffset : (isDichord(beam[0])?noteSize.x:0)+downOffset;
 				float x = X(sign) + dx;
 				float yBottom = -inf, yTop = inf;
 				for(Sign sign: beam[0]) if(sign.note.value >= Half) { yBottom = max(yBottom, Y(sign)); yTop = min(yTop, Y(sign)); } // inverted Y
 				float yBase = stemUp ? yBottom : yTop;
 				float yStem = stemUp ? yTop-stemLength : yBottom+stemLength;
 				float opacity = isTied(beam[0]) ? 1./2 : 1;
-				system.fills.append(vec2(x, ::min(yBase, yStem)), vec2(stemWidth, abs(yBase-yStem)), black, opacity);
+				//system.fills.append(vec2(x, ::min(yBase, yStem)), vec2(stemWidth, abs(yBase-yStem)), black, opacity);
+				system.lines.append(vec2(x, ::min(yBase, yStem)), vec2(x, max(yBase, yStem)), black, opacity);
 				/**/ if(sign.note.value==Eighth)
-					glyph(vec2(x+stemWidth, yStem), stemUp?"flags.u3"_:"flags.d3"_, font, system.glyphs, opacity);
+					glyph(vec2(x, yStem), stemUp?"flags.u3"_:"flags.d3"_, font, system.glyphs, opacity);
 				else if(sign.note.value==Sixteenth)
-					glyph(vec2(x+stemWidth, yStem), stemUp?"flags.u4"_:"flags.d4"_, font, system.glyphs, opacity);
+					glyph(vec2(x, yStem), stemUp?"flags.u4"_:"flags.d4"_, font, system.glyphs, opacity);
 				else if(sign.note.value==Thirtysecond)
-					glyph(vec2(x+stemWidth, yStem), stemUp?"flags.u5"_:"flags.d5"_, font, system.glyphs, opacity);
+					glyph(vec2(x, yStem), stemUp?"flags.u5"_:"flags.d5"_, font, system.glyphs, opacity);
 				else if(sign.note.value==Sixtyfourth)
-					glyph(vec2(x+stemWidth, yStem), stemUp?"flags.u6"_:"flags.d6"_, font, system.glyphs, opacity);
+					glyph(vec2(x, yStem), stemUp?"flags.u6"_:"flags.d6"_, font, system.glyphs, opacity);
 			} else if(beam.size==2) { // Draws slanted beam
 				float x[2], base[2], tip[2];
 				for(uint i: range(2)) {
@@ -277,8 +280,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 					Sign sign = chord.first();
 					String noteGlyphName = "noteheads.s"_+str(clip(0,int(sign.note.value-1),2)); // FIXME: factor, FIXME: assumes same width
 					vec2 noteSize = glyphSize(noteGlyphName).x;
-					float upOffset = noteSize.x*5/6;
-					float dx = (stemUp ? upOffset : (isDichord(beam[i])?noteSize.x:0));
+					float upOffset = noteSize.x*11/12, downOffset = noteSize.x*1/12;
+					float dx = stemUp ? upOffset : (isDichord(beam[0])?noteSize.x:0)+downOffset;
 					x[i] = X(sign) + dx;
 					base[i] = Y(stemUp?chord.first():chord.last());
 					tip[i] = Y(stemUp?chord.last():chord.first())+(stemUp?-1:1)*stemLength;
@@ -289,11 +292,12 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 				Sign sign[2] = { stemUp?beam[0].last():beam[0].first(), stemUp?beam[1].last():beam[1].first()};
 				for(uint i: range(2)) {
 					float opacity = isTied(beam[i]) ? 1./2 : 1;
-					system.fills.append(vec2(x[i], ::min(base[i],farTip+delta[i])), vec2(stemWidth, abs(base[i]-(farTip+delta[i]))), black, opacity);
+					//system.fills.append(vec2(x[i], ::min(base[i],farTip+delta[i])), vec2(stemWidth, abs(base[i]-(farTip+delta[i]))), black, opacity);
+					system.lines.append(vec2(x[i], ::min(base[i],farTip+delta[i])), vec2(x[i], ::max(base[i],farTip+delta[i])), black, opacity);
 					String noteGlyphName = "noteheads.s"_+str(clip(0,int(sign[i].note.value-1),2)); // FIXME: factor, FIXME: assumes same width
 					vec2 noteSize = glyphSize(noteGlyphName).x;
-					float upOffset = noteSize.x*5/6;
-					dx[i] = (stemUp ? upOffset : (isDichord(beam[i])?noteSize.x:0));
+					float upOffset = noteSize.x*11/12, downOffset = noteSize.x*1/12;
+					dx[i] = stemUp ? upOffset : (isDichord(beam[i])?noteSize.x:0)+downOffset;
 				}
 				float opacity = isTied(beam[0]) && isTied(beam[1]) ? 1./2 : 1;
 				Value first = max(apply(beam[0], [](Sign sign){return sign.note.value;}));
@@ -301,20 +305,20 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 				for(size_t index: range(min(first,second)-Quarter)) {
 					float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1);
 					vec2 p0 (X(sign[0])+dx[0], farTip+delta[0]-beamWidth/2 + Y);
-					vec2 p1 (X(sign[1])+dx[1]+stemWidth, farTip+delta[1]-beamWidth/2 + Y);
+					vec2 p1 (X(sign[1])+dx[1], farTip+delta[1]-beamWidth/2 + Y);
 					system.parallelograms.append(p0, p1, beamWidth, black, opacity);
 				}
 				for(size_t index: range(min(first,second)-Quarter, first-Quarter)) {
 					float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1);
 					vec2 p0 (X(sign[0])+dx[0], farTip+delta[0]-beamWidth/2 + Y);
-					vec2 p1 (X(sign[1])+dx[1]+stemWidth, farTip+delta[1]/2-beamWidth/2 + Y);
+					vec2 p1 (X(sign[1])+dx[1], farTip+delta[1]/2-beamWidth/2 + Y);
 					p1 = (p0+p1)/2.f;
 					system.parallelograms.append(p0, p1, beamWidth, black, opacity);
 				}
 				for(size_t index: range(int(min(first,second)-Quarter), int(second-Quarter))) {
 					float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1);
 					vec2 p0 (X(sign[0])+dx[0], farTip+delta[0]-beamWidth/2 + Y);
-					vec2 p1 (X(sign[1])+dx[1]+stemWidth, farTip+delta[1]-beamWidth/2 + Y);
+					vec2 p1 (X(sign[1])+dx[1], farTip+delta[1]-beamWidth/2 + Y);
 					p0 = (p0+p1)/2.f;
 					system.parallelograms.append(p0, p1, beamWidth, black, opacity);
 				}
@@ -331,13 +335,13 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 				for(const Chord& chord: beam) for(Sign sign: chord) { // Stems
 					String noteGlyphName = "noteheads.s"_+str(clip(0,int(sign.note.value-1),2)); // FIXME: factor, FIXME: assumes same width
 					vec2 noteSize = glyphSize(noteGlyphName).x;
-					float upOffset = noteSize.x*5/6;
-					float dx = (stemUp ? upOffset : (isDichord(chord)?noteSize.x:0));
+					float upOffset = noteSize.x*11/12, downOffset = noteSize.x*1/12;
+					float dx = stemUp ? upOffset : (isDichord(chord)?noteSize.x:0)+downOffset;
 					float x = X(sign) + dx;
 					float y = Y(sign);
-					{vec2 min(x, ::min(y, stemY)), max(x+stemWidth, ::max(stemY, y));
-						float opacity = isTied(chord) ? 1./2 : 1;
-						system.fills.append(min, max-min, black, opacity); } // FIXME
+					float opacity = isTied(chord) ? 1./2 : 1;
+					//{vec2 min(x, ::min(y, stemY)), max(x+stemWidth, ::max(stemY, y)); system.fills.append(min, max-min, black, opacity);}
+					system.lines.append(vec2(x, ::min(y, stemY)), vec2(x, ::max(stemY, y)), black, opacity);
 				}
 				// Beam
 				for(size_t chordIndex: range(beam.size-1)) {
@@ -347,10 +351,10 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 						float Y = stemY + (stemUp ? 1 : -1) * float(index) * (beamWidth+1);
 						String noteGlyphName = "noteheads.s"_+str(clip(0,int(chord[0].note.value-1),2)); // FIXME: factor, FIXME: assumes same width
 						vec2 noteSize = glyphSize(noteGlyphName).x;
-						float upOffset = noteSize.x*5/6;
-						float dx = (stemUp ? upOffset : 0);
-						vec2 min (X(chord[0]) + dx, Y-beamWidth/2+1), max(X(beam[chordIndex+1][0]) + dx + stemWidth, Y+beamWidth/2);
-						system.fills.append(min, max-min);
+						float upOffset = noteSize.x*11/12, downOffset = noteSize.x*1/12;
+						float dx = stemUp ? upOffset : downOffset;
+						vec2 min (X(chord[0]) + dx, Y-beamWidth/2), max(X(beam[chordIndex+1][0])+dx, Y-beamWidth/2);
+						system.parallelograms.append(min, max, beamWidth-1);
 					}
 				}
 				// Tuplet
@@ -380,25 +384,27 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 		};
 
 		// Layouts justified line
-		float spaceWidth = space + float(pageSize.x-2*space - allocatedLineWidth)/float(spaceCount);
+		float spaceWidth = space + float(pageSize.x-2*margin - allocatedLineWidth)/float(spaceCount);
 
 		// Raster
 		for(int staff: range(staffCount)) {
 			for(int line: range(5)) {
 				int y = staffY(staff, -line*2);
-				system.fills.append(vec2(space, y), vec2(pageSize.x-2*space, lineWidth));
+				//system.fills.append(vec2(space, y), vec2(pageSize.x-2*space, lineWidth));
+				system.lines.append(vec2(margin, y), vec2(pageSize.x-margin, y));
 			}
 		}
 
 		// System first measure bar line
-		{float x = space;
-			vec2 min(x-barWidth+barWidth/2, staffY(1,0)), max(x+barWidth/2, staffY(0,-8));
-			system.fills.append(min, max-min);
+		{float x = margin;
+			vec2 min(x, staffY(1,0)), max(x, staffY(0,-8));
+			//system.fills.append(min, max-min);
+			system.lines.append(min, max);
 			measureBars[signs[startIndex].time] = x;
 		}
 
 		timeTrack.clear();
-		{float x = space + spaceWidth; timeTrack.insert(signs[startIndex].time, {{x,x},x,x,x,x});}
+		{float x = margin + spaceWidth; timeTrack.insert(signs[startIndex].time, {{x,x},x,x,x,x});}
 
 		for(size_t signIndex: range(startIndex, breakIndex)) {
 			Sign sign = signs[signIndex];
@@ -418,7 +424,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 						float start = X(octaveStart[staff]) + space;
 						float end = x;
 						for(float x=start; x<end-space; x+=space*2) {
-							system.fills.append(vec2(x,staffY(1, 12)),vec2(space,1));
+							//system.fills.append(vec2(x,staffY(1, 12)),vec2(space,1));
+							system.lines.append(vec2(x,staffY(1, 12)),vec2(x+space,staffY(1, 12)+1));
 						}
 					}
 					else error(int(sign.octave));
@@ -514,8 +521,10 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 						if(sign.type == Sign::Measure) {
 							for(uint staff: range(staffCount)) doBeam(staff);
 
-							{vec2 min(x-barWidth+barWidth/2, staffY(1,0)), max(x+barWidth/2, staffY(0,-8));
-								system.fills.append(min, max-min); } // Bar line
+							{vec2 min(x, staffY(1,0)), max(x, staffY(0,-8));
+								//system.fills.append(min, max-min);
+								system.lines.append(min, max);
+							} // Bar line
 
 							measureIndex = sign.measure.measure;
 							page = sign.measure.page;
@@ -587,9 +596,13 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 						if(sign.pedal == Start) pedalStart = x + glyphAdvance("pedal.Ped"_);
 						if(sign.pedal == Change || sign.pedal == PedalStop) {
 							{vec2 min(pedalStart, y), max(x, y+1);
-								system.fills.append(min, max-min);}
-							if(sign.pedal == PedalStop) system.fills.append(vec2(x-1, y-lineInterval), vec2(1, lineInterval));
-							else {
+								//system.fills.append(min, max-min);
+								system.lines.append(min, max);
+							}
+							if(sign.pedal == PedalStop) {
+								//system.fills.append(vec2(x-1, y-lineInterval), vec2(1, lineInterval));
+								system.lines.append(vec2(x-1, y-lineInterval), vec2(x, y));
+							} else {
 								system.parallelograms.append(vec2(x, y-1), vec2(x+space/2, y-space), 2.f);
 								system.parallelograms.append(vec2(x+space/2, y-space), vec2(x+space, y), 2.f);
 								pedalStart = x + space;
@@ -662,10 +675,14 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 						// Ledger lines
 						int step = clefStep(sign);
 						for(int s=2; s<=step; s+=2) {
-							int y=staffY(staff, s); system.fills.append(vec2(x-space/3,y),vec2(space/3+noteSize.x+space/3,1), black, opacity);
+							int y=staffY(staff, s);
+							//system.fills.append(vec2(x-space/3,y),vec2(space/3+noteSize.x+space/3,1), black, opacity);
+							system.lines.append(vec2(x-spaceWidth/2,y),vec2(x+noteSize.x+spaceWidth/3,y), black, opacity);
 						}
 						for(int s=-10; s>=step; s-=2) {
-							int y=staffY(staff, s); system.fills.append(vec2(x-space/3,y),vec2(space/3+noteSize.x+space/3,1), black, opacity);
+							int y=staffY(staff, s);
+							//system.fills.append(vec2(x-space/3,y),vec2(space/3+noteSize.x+space/3,1), black, opacity);
+							system.lines.append(vec2(x-spaceWidth/2,y),vec2(x+noteSize.x+spaceWidth/3,y), black, opacity);
 						}
 						// Body
 						note.glyphIndex = system.glyphs.size;

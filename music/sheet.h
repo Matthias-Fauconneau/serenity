@@ -11,7 +11,7 @@ struct Sheet : Widget {
     // Layout parameters
 	static constexpr int staffCount = 2;
 	static constexpr float halfLineInterval = 3, lineInterval = 2*halfLineInterval;
-	const float lineWidth = 1, barWidth=1, stemWidth = 1, stemLength = 7*halfLineInterval, beamWidth = halfLineInterval;
+	const float stemLength = 7*halfLineInterval, beamWidth = halfLineInterval;
 	const float shortStemLength = 7*halfLineInterval;
     // Layout helpers
 	float staffY(uint staff, int clefStep) { return (!staff)*(10*lineInterval+halfLineInterval) - clefStep * halfLineInterval; } // Clef independent
@@ -30,7 +30,8 @@ struct Sheet : Widget {
     // Font helpers
 	vec2 glyphSize(string name) { return font.metrics(font.index(name)).size; }
 	float glyphAdvance(string name) { return font.metrics(font.index(name)).advance; }
-	float space = 1; //glyphSize("flags.u3"_).x;
+	float space = 1;
+	float margin = glyphSize("flags.u3"_).x;
 
 	// Graphics
 	map<int64, float> measureBars; // Maps sheet time to position of measure starts

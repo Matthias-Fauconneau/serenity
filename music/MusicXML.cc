@@ -273,10 +273,15 @@ MusicXML::MusicXML(string document, string) {
 				assert_(time >= measureTime, int(time-measureTime), int(nextTime-measureTime), int(maxTime-measureTime), measureIndex, e);
 			}
 			maxTime=time=nextTime= max(maxTime, max(time, nextTime));
-			bool lineBreak = m.contains("print") ? m("print")["new-system"]=="yes" : false;
+			Break measureBreak = NoBreak;
+			if(m.contains("print")) {
+				if(m("print")["new-page"]=="yes") measureBreak=PageBreak;
+				else if(m("print")["new-system"]=="yes") measureBreak = LineBreak;
+			}
 			assert_(time > measureTime);
 			if(partIndex == 0)
-				signs.insertSorted({time, 0, uint(-1), Sign::Measure, .measure={lineBreak, measureIndex, pageIndex, pageLineIndex, lineMeasureIndex}});
+				signs.insertSorted({time, 0, uint(-1), Sign::Measure,
+									.measure={measureBreak, measureIndex, pageIndex, pageLineIndex, lineMeasureIndex}});
 		}
 		partIndex++;
 	}

@@ -14,6 +14,7 @@ static constexpr bgr3f magenta (1, 0, 1);
 static constexpr bgr3f yellow (0, 1, 1);
 
 /// Fill graphic element
+// FIXME: Implements as parallelogram
 struct Fill {
     vec2 origin, size;
 	bgr3f color = black; float opacity = 1;
@@ -73,7 +74,7 @@ struct Graphics : shareable {
 		assert_(!blits);
 		for(auto& o: glyphs) o.origin += offset;
 		for(auto& o: parallelograms) o.min+=offset, o.max+=offset;
-		assert_(!lines);
+		for(auto& o: lines) o.a+=offset, o.b+=offset;
 		for(auto& o: cubics) for(vec2& p: o.points) p+=vec2(offset);
 	}
 	void append(const Graphics& o) {
@@ -81,7 +82,7 @@ struct Graphics : shareable {
 		assert_(!o.blits);
 		glyphs.append(o.glyphs);
 		parallelograms.append(o.parallelograms);
-		assert_(!lines);
+		lines.append(o.lines);
 		cubics.append(o.cubics);
 	}
 };
