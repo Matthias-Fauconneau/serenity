@@ -34,10 +34,10 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
     objects.append(); // Null object
 
     Object& root = objects.append();
-	root.insert("Type"__, "/Catalog");
+	root.insert("Type"__, "/Catalog"_);
 
     Object& pdfPages = objects.append();
-	pdfPages.insert("Type"__, "/Pages");
+	pdfPages.insert("Type"__, "/Pages"_);
 	pdfPages.insert("Kids"__, Variant(array<Variant>()));
 	pdfPages.insert("Count"__, 0);
 
@@ -46,7 +46,7 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
     for(const Graphics& graphics: pages) {
         Object& page = objects.append();
 		page.insert("Parent"__, ref(pdfPages));
-		page.insert("Type"__, "/Page");
+		page.insert("Type"__, "/Page"_);
         {array<Variant> mediaBox;
 			mediaBox.append( 0 ); mediaBox.append( 0 ); mediaBox.append(pageSize.x*px); mediaBox.append(pageSize.y*px);
 			page.insert("MediaBox"__, Variant(move(mediaBox)));}
@@ -63,23 +63,23 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
                     if(!xFonts.contains(font.name)) {
                         if(!fonts.contains(font.name)) {
                             Object& xFont = objects.append();
-							xFont.insert("Type"__, "/Font");
-							xFont.insert("Subtype"__, "/Type0");
-							xFont.insert("BaseFont"__, "/Font");
-							xFont.insert("Encoding"__, "/Identity-H");
+							xFont.insert("Type"__, "/Font"_);
+							xFont.insert("Subtype"__, "/Type0"_);
+							xFont.insert("BaseFont"__, "/Font"_);
+							xFont.insert("Encoding"__, "/Identity-H"_);
                             {array<Variant> descendantFonts;
                                 {Dict cidFont;
-									cidFont.insert("Type"__, "/Font");
-									cidFont.insert("Subtype"__, "/CIDFontType2");
-									cidFont.insert("BaseFont"__, "/Font");
+									cidFont.insert("Type"__, "/Font"_);
+									cidFont.insert("Subtype"__, "/CIDFontType2"_);
+									cidFont.insert("BaseFont"__, "/Font"_);
                                     {Dict cidSystemInfo;
-										cidSystemInfo.insert("Registry"__, "(Adobe)");
-										cidSystemInfo.insert("Ordering"__, "(Identity)");
+										cidSystemInfo.insert("Registry"__, "(Adobe)"_);
+										cidSystemInfo.insert("Ordering"__, "(Identity)"_);
 										cidSystemInfo.insert("Supplement"__, 0);
 										cidFont.insert("CIDSystemInfo"__, Variant(move(cidSystemInfo)));}
                                     {Object& fontDescriptor = objects.append();
-										fontDescriptor.insert("Type"__, "/FontDescriptor");
-										fontDescriptor.insert("FontName"__, "/Font");
+										fontDescriptor.insert("Type"__, "/FontDescriptor"_);
+										fontDescriptor.insert("FontName"__, "/Font"_);
 										fontDescriptor.insert("Flags"__, 1<<3 /*Symbolic*/);
                                         {array<Variant> fontBBox;
 											fontBBox.append(str(int(font.bboxMin .x))); fontBBox.append(str(int(font.bboxMin .y)));
@@ -90,11 +90,11 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
 										fontDescriptor.insert("Descent"__, int(font.descender));
 										fontDescriptor.insert("StemV"__, 1);
                                         {Object& fontFile = objects.append();
-											fontFile.insert("Filter"__, "/FlateDecode");
+											fontFile.insert("Filter"__, "/FlateDecode"_);
                                             fontFile = deflate(font.data);
 											fontDescriptor.insert("FontFile2"__, ref(fontFile));}
 										cidFont.insert("FontDescriptor"__, ref(fontDescriptor));}
-									cidFont.insert("CIDToGIDMap"__, "/Identity");
+									cidFont.insert("CIDToGIDMap"__, "/Identity"_);
 									descendantFonts.append(move(cidFont));}
 								xFont.insert("DescendantFonts"__, Variant(move(descendantFonts)));}
                             //TODO: ToUnicode
@@ -121,15 +121,15 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
 						const Image& image = blit.image;
                         String id = "Image"+str(pdfPages.at("Count").number)+str(index);
                         {Object& xImage = objects.append();
-							xImage.insert("Subtype"__, "/Image");
+							xImage.insert("Subtype"__, "/Image"_);
 							xImage.insert("Width"__, image.width);
 							xImage.insert("Height"__, image.height);
-							xImage.insert("ColorSpace"__, "/DeviceRGB");
+							xImage.insert("ColorSpace"__, "/DeviceRGB"_);
 							xImage.insert("BitsPerComponent"__, 8);
 							typedef vec<rgb,uint8,3> rgb3;
 							buffer<rgb3> rgb (image.height * image.width);
 							for(uint y: range(image.height)) for(uint x: range(image.width)) rgb[y*image.width+x] = image[y*image.stride+x];
-							xImage.insert("Filter"__, "/FlateDecode");
+							xImage.insert("Filter"__, "/FlateDecode"_);
 							xImage = deflate(cast<byte>(rgb));
                             xObjects.insert(copy(id), ref(xImage));
                         }
@@ -146,7 +146,7 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
 			for(auto& line: graphics.lines)
 				content.append(str(line.a.x*px, (pageSize.y-line.a.y)*px)+" m "+str(line.b.x*px, (pageSize.y-line.b.y)*px)+" l S\n");
 
-			contents.insert("Filter"__, "/FlateDecode");
+			contents.insert("Filter"__, "/FlateDecode"_);
             contents = deflate(content);
 			page.insert("Contents"__, ref(contents));
         }

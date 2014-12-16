@@ -2,6 +2,7 @@
 #include "sheet.h"
 #include "window.h"
 #include "interface.h"
+#include "pdf.h"
 
 struct MusicPDF {
 	// Name
@@ -13,7 +14,16 @@ struct MusicPDF {
 	const int2 pageSize = int2(210/*mm*/ * (inchPx/inchMM), 297/*mm*/ * (inchPx/inchMM));
 	// Sheet
 	Sheet sheet {xml.signs, xml.divisions, {}, pageSize, name};
-	// Preview
-	Window window {&sheet, pageSize, [](){return "MusicPDF"__;}};
-	MusicPDF() { window.background = Window::White; window.show(); }
-} app;
+};
+
+struct MusicPDFPreview : MusicPDF, Application {
+	Window window {&sheet, pageSize, [this](){return unsafeRef(name);}};
+};
+registerApplication(MusicPDFPreview);
+
+struct MusicPDFExport : MusicPDF, Application {
+	MusicPDFExport() {
+		toPDF(sheet.pageSize, sheet.pages, inchPx/72/*PostScript point per inch*/);
+	}
+};
+registerApplication(MusicPDFExport, export);

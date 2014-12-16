@@ -76,6 +76,14 @@ struct Graphics : shareable {
 		assert_(!lines);
 		for(auto& o: cubics) for(vec2& p: o.points) p+=vec2(offset);
 	}
+	void append(const Graphics& o) {
+		fills.append(o.fills);
+		assert_(!o.blits);
+		glyphs.append(o.glyphs);
+		parallelograms.append(o.parallelograms);
+		assert_(!lines);
+		cubics.append(o.cubics);
+	}
 };
 
 inline String str(const Graphics& o) {

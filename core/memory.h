@@ -227,7 +227,8 @@ generic struct shared {
     template<Type D> shared(shared<D>&& o):pointer(dynamic_cast<T*>(o.pointer)){o.pointer=0;}
     template<Type... Args> explicit shared(Args&&... args):pointer(new (malloc(sizeof(T))) T(forward<Args>(args)...)){}
     shared& operator=(shared&& o){ this->~shared(); new (this) shared(move(o)); return *this; }
-    explicit shared(const shared<T>& o):pointer(o.pointer){ pointer->addUser(); }
+	explicit shared(const shared<T>& o) : pointer(o.pointer) { pointer->addUser(); }
+	explicit shared(T* o) : pointer(o) { pointer->addUser();/*Unsafe as original owner might free*/ pointer->addUser(); }
     ~shared() { if(!pointer) return; assert(pointer->userCount); if(pointer->removeUser()==0) { pointer->~T(); free(pointer); } pointer=0; }
 
     operator T&() { return *pointer; }

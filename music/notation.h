@@ -15,7 +15,7 @@ static constexpr uint quarterDuration = 16;
 enum Pedal { Ped=-1, Start, Change, PedalStop };
 enum Wedge{ Crescendo, Diminuendo, WedgeStop };
 enum OctaveShift { Down, Up, OctaveStop };
-enum class Repeat { Begin=-1, End=0 };
+enum class Repeat { Begin=-2, End=-1, None=0 };
 
 struct Clef {
     ClefSign clefSign;
@@ -49,7 +49,11 @@ struct Rest {
 	Value value;
 	uint duration() const { return valueDurations[value]; };
 };
-struct Measure { bool lineBreak; uint measure, page, pageLine, lineMeasure; };
+struct Measure {
+	bool lineBreak;
+	uint measure, page, pageLine, lineMeasure;
+	//enum Repeat repeat;
+};
 struct KeySignature {
     int fifths; // Index on the fifths circle
 };

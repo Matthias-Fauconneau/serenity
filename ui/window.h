@@ -40,7 +40,7 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     bool mapped = false;
 
     /// Background style
-    enum Background { NoBackground, Black, White, Oxygen } background = Oxygen;
+	enum Background { NoBackground, Black, White, Oxygen } background = White;
 
 // Control
     /// An event held to implement motion compression and ignore autorepeats

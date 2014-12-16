@@ -34,8 +34,8 @@ struct Sheet : Widget {
 
 	// Graphics
 	map<int64, float> measureBars; // Maps sheet time to position of measure starts
-	map<Rect, shared<Graphics>> measures;
-	array<shared<Graphics>> pages; // FIXME: Page[]:Line[]:Measures[]
+	//map<Rect, shared<Graphics>> measures;
+	array<Graphics> pages; // FIXME: Page[]:Line[]:Measures[]
 	shared<Graphics> debug;
 
 	int lowestStep = 0, highestStep = 0;
@@ -58,7 +58,7 @@ struct Sheet : Widget {
 
 	// -- Page layout
 	int2 pageSize = 0;
-	array<int> pageBreaks;
+	//array<int> pageBreaks;
 	size_t pageIndex = 0;
 
 	/// Layouts musical notations to graphic primitives

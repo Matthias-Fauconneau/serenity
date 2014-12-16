@@ -171,7 +171,7 @@ template<> void __attribute((noreturn)) error(const string& message) {
 int main() {
     unique<Application> application;
 	Interface<Application>::AbstractFactory* factory = Interface<Application>::factories().value("");
-	if(arguments()) factory = Interface<Application>::factories().value(arguments()[0]);
+	if(arguments()) factory = Interface<Application>::factories().value(arguments()[0]) ?: factory;
 	if(factory) application = factory->constructNewInstance();
     mainThread.run(); // Reuses main thread as default event loop runner when not overriden in Poll constructor
     //for(Thread* thread: threads) thread->wait(); // Waits for all threads to terminate
