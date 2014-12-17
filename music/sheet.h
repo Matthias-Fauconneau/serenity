@@ -28,10 +28,10 @@ struct Sheet : Widget {
 	Font font {File("emmentaler-26.otf", "/usr/local/share/fonts"_), 8.f*halfLineInterval, "Emmentaler"};
 	float textSize = 6*halfLineInterval;
     // Font helpers
-	vec2 glyphSize(string name) { return font.metrics(font.index(name)).size; }
+	vec2 glyphSize(string name, Font* font_=0/*font*/) { Font& font=font_?*font_:this->font; return font.metrics(font.index(name)).size; }
 	float glyphAdvance(string name, Font* font_=0/*font*/) { Font& font=font_?*font_:this->font; return font.metrics(font.index(name)).advance; }
 	float space = max(1.f, glyphSize("noteheads.s2"_).x/4);
-	float margin = glyphSize("flags.u3"_).x;
+	float margin = glyphSize("flags.u3"_, &smallFont).x;
 
 	// Graphics
 	map<int64, float> measureBars; // Maps sheet time to position of measure starts

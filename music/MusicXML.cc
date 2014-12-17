@@ -211,7 +211,9 @@ MusicXML::MusicXML(string document, string) {
 						uint staff = 1-xmlStaffIndex; // Inverts staff order convention (treble, bass -> bass, treble)
 						assert_(staff >= 0 && staff <= 1);
 						ClefSign clefSign = ClefSign("FG"_.indexOf(clef("sign"_).text()[0]));
-						signs.insertSorted({time, 0, staff, Sign::Clef, .clef={clefSign, 0}});
+						int octave = 0;
+						if(clef.contains("clef-octave-change")) octave = parseInteger(clef("clef-octave-change").text());
+						signs.insertSorted({time, 0, staff, Sign::Clef, .clef={clefSign, octave}});
 						clefs[staff] = {clefSign, 0};
 					});
 					if(e.contains("key"_)) {

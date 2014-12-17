@@ -23,7 +23,7 @@ registerApplication(MusicPDFPreview);
 
 struct MusicPDFExport : MusicPDF, Application {
 	MusicPDFExport() {
-		writeFile(name+".pdf"_, toPDF(sheet.pageSize, sheet.pages, inchPx/72/*PostScript point per inch*/), home(), true);
+		writeFile(name+".pdf"_, toPDF(sheet.pageSize, sheet.pages, 72/*PostScript point per inch*/ / inchPx /*px/inch*/), home(), true);
 	}
 };
 registerApplication(MusicPDFExport, export);
