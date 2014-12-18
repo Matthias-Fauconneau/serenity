@@ -13,7 +13,7 @@ struct MusicPDF {
 	static constexpr float inchMM = 25.4, inchPx = 90;
 	const int2 pageSize = int2(210/*mm*/ * (inchPx/inchMM), 297/*mm*/ * (inchPx/inchMM));
 	// Sheet
-	Sheet sheet {xml.signs, xml.divisions, {}, pageSize, name};
+	Sheet sheet {xml.signs, xml.divisions, {}, 7/*mm*/*(inchPx/inchMM) / 8/*half intervals / staff height*/, pageSize, name};
 };
 
 struct MusicPDFPreview : MusicPDF, Application {

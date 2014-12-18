@@ -104,7 +104,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 			for(size_t staff: range(2)) currents[staff].clear(); // FIXME: ^ move should already clear currents[staff]
 			for(size_t staff: range(2)) assert_(!currents[staff], currents, commited);
 			if(measureIndex > 35) {
-				signs.insertSorted({track.time, 0, uint(-1), Sign::Measure, .measure={false, measureIndex, 1, 1, measureIndex}});
+				signs.insertSorted({track.time, 0, uint(-1), Sign::Measure, .measure={NoBreak, measureIndex, 1, 1, measureIndex}});
 				break; // HACK: Stops 'Brave Adventurers' before repeat
 			}
 		}
@@ -117,7 +117,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 		int64 nextMeasureStart = lastMeasureStart+measureLength;
 		if(track.time >= nextMeasureStart) {
 			lastMeasureStart = nextMeasureStart;
-			signs.insertSorted({nextMeasureStart, 0, uint(-1), Sign::Measure, .measure={false, measureIndex, 1, 1, measureIndex}});
+			signs.insertSorted({nextMeasureStart, 0, uint(-1), Sign::Measure, .measure={NoBreak, measureIndex, 1, 1, measureIndex}});
 			measureIndex++;
 		}
 
@@ -250,7 +250,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 						signs.insertSorted(Sign{noteOn.time, duration, staff, Sign::Note, .note={
 													clef, noteStep, Accidental(".bN#"_.indexOf(pitchClass.accidentals[key%12/*0-11*/])), value, Note::NoTie,
 													dot, /*grace*/ false, /*slash*/ false, /*staccato*/ false, /*tenuto*/ false, /*accent*/ false, /*trill*/ false, /*up*/false,
-													tuplet, key, invalid, invalid}});
+													tuplet, key, invalid, invalid, invalid}});
 						lastOff[staff] = note.time;
 					}
 					break; // Assumes single match (FIXME: assert)
@@ -281,5 +281,5 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 	int64 measureLength = timeSignature.beats*60*divisions/metronome.perMinute;
 	assert_(measureLength);
 	int64 nextMeasureStart = lastMeasureStart+measureLength;
-	signs.insertSorted({nextMeasureStart, 0, uint(-1), Sign::Measure, .measure={false, measureIndex, 1, 1, measureIndex}}); // Last measure bar
+	signs.insertSorted({nextMeasureStart, 0, uint(-1), Sign::Measure, .measure={NoBreak, measureIndex, 1, 1, measureIndex}}); // Last measure bar
 }

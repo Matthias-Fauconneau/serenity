@@ -228,7 +228,7 @@ struct TextLayout {
                     if(c != 0xA0) {
                         vec2 offset = 0;
                         if(c==toUCS4("⌊")[0] || c==toUCS4("⌋")[0]) offset.y += font->size/3; // Fixes too high floor signs from FreeSerif
-                        assert_(metrics.size, hex(c));
+						//assert_(metrics.size, hex(c));
 						word.append( Glyph(metrics,::Glyph{position+offset, *font, c, font->index(c), color}) );
                     }
                     position.x += metrics.advance;

@@ -3,7 +3,7 @@
 
 MusicXML::MusicXML(string document, string) {
     Element root = parseXML(document);
-	Clef clefs[2] = {{Treble,0}, {Treble,0}};
+	Clef clefs[2] = {{FClef,0}, {GClef,0}};
 	for(uint staff: range(2)) signs.insertSorted(Sign{0, 0, staff, Sign::Clef, .clef=clefs[staff]}); // Defaults
 	uint partIndex = 0;
 	for(const Element& p: root("score-partwise"_).children) {
@@ -78,7 +78,7 @@ MusicXML::MusicXML(string document, string) {
 						int noteOctave = parseInteger(e("pitch"_)("octave"_).text());
 						int noteStep = (noteOctave-4) * 7 + octaveStep;
 						Accidental noteAccidental = e.contains("accidental"_) ?
-									Accidental(ref<string>(accidentalNames).indexOf(e("accidental"_).text())) : None;
+									Accidental(SMuFL::AccidentalBase + ref<string>(SMuFL::accidental).indexOf(e("accidental"_).text())) : Accidental::None;
 						assert_(noteAccidental != -1, e("accidental"_));
 
 						Note::Tie tie = Note::NoTie;
@@ -99,16 +99,17 @@ MusicXML::MusicXML(string document, string) {
 									 //assert_(step>=0 && step<8, step, midiIndex, midiKey);
 									 uint key = 60 + octave*12 + stepToKey[step];
 
-									 Accidental accidental = None;
+									 Accidental accidental = Accidental::None;
 									 int fifths = keySignature.fifths;
 									 for(int i: range(abs(fifths))) {
 										 int fifthStep = fifths<0 ? 4+(3*i+2)%7 : 6+(4*i+4)%7;
-										 if(step == fifthStep%7) accidental = fifths>0?Sharp:Flat;
+										 if(step == fifthStep%7) accidental = fifths>0 ? Accidental::Sharp : Accidental::Flat;
 									 }
-									 if(noteAccidental!=None) measureAccidentals[noteStep] = noteAccidental;
+									 if(noteAccidental == accidental) noteAccidental = Accidental::None; // Redundant accidental
+									 if(noteAccidental != Accidental::None) measureAccidentals[noteStep] = noteAccidental;
 									 accidental = measureAccidentals.value(noteStep, accidental); // Any accidental overrides key signature
-									 if(accidental==Flat) key--;
-									 if(accidental==Sharp) key++;
+									 if(accidental==Accidental::Flat) key--;
+									 if(accidental==Accidental::Sharp) key++;
 									 key;
 									});
 						bool articulations = e.contains("notations"_) && e("notations"_).contains("articulations"_);
@@ -117,13 +118,13 @@ MusicXML::MusicXML(string document, string) {
 																			 e.contains("dot"_) ? true : false,
 																			 e.contains("grace"_)?true:false,
 																			 e.contains("grace"_) && e("grace"_)["slash"_]=="yes"_?true:false,
-																			 articulations && e("notations"_)("articulations"_).contains("staccato"_)?true:false,
-																			 articulations && e("notations"_)("articulations"_).contains("tenuto"_)?true:false,
-																			 articulations && e("notations"_)("articulations"_).contains("accent"_)?true:false,
+																			 .accent= articulations && e("notations"_)("articulations"_).contains("accent"_)?true:false,
+																			 .staccato= articulations && e("notations"_)("articulations"_).contains("staccato"_)?true:false,
+																			 .tenuto= articulations && e("notations"_)("articulations"_).contains("tenuto"_)?true:false,
 																			 ornaments && e("notations"_)("ornaments"_).contains("trill-mark"_)?true:false,
 																			 e.contains("stem"_) && e("stem").text() == "up"_,
 																			 e.contains("time-modification"_) ? (uint)parseInteger(e("time-modification"_)("actual-notes").text()) : 0,
-																			 key, invalid, invalid }};
+																			 key, invalid, invalid, invalid}};
 							// Acciaccatura are played before principal beat (Records graces to shift in on parsing principal)
 							if(e.contains("grace"_) && e("grace"_)["slash"_]=="yes"_) {
 								/*if(e.contains("notations"_) && e("notations"_).contains("slur"_)) {
@@ -167,10 +168,9 @@ MusicXML::MusicXML(string document, string) {
 					for(const Element& d : e.children) {
 						if(d.name !="direction-type"_) continue;
 						if(d.contains("dynamics"_)) {
-							static ref<string> dynamics = {"ppp"_,"pp"_,"p"_,"mp"_,"mf"_,"f"_,"ff"_,"fff"_,"fp"_,"fz"_,"sf"_};
-							size_t index = dynamics.indexOf(d("dynamics"_).children.first()->name);
-							assert_(index!=invalid, d);
-							signs.insertSorted({time, 0, uint(-1), Sign::Dynamic, .dynamic=dynamics[index]});
+							Dynamic dynamic = Dynamic(SMuFL::DynamicBase + ref<string>(SMuFL::dynamic).indexOf(d("dynamics"_).children.first()->name));
+							assert_(dynamic!=-1, d);
+							signs.insertSorted({time, 0, uint(-1), Sign::Dynamic, .dynamic=dynamic});
 						}
 						else if(d.contains("metronome"_)) {
 							Value beatUnit = Value(ref<string>({"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_})
@@ -210,7 +210,7 @@ MusicXML::MusicXML(string document, string) {
 						uint xmlStaffIndex = clef["number"_] ? parseInteger(clef["number"_])-1 : partIndex;
 						uint staff = 1-xmlStaffIndex; // Inverts staff order convention (treble, bass -> bass, treble)
 						assert_(staff >= 0 && staff <= 1);
-						ClefSign clefSign = ClefSign("FG"_.indexOf(clef("sign"_).text()[0]));
+						ClefSign clefSign = ref<ClefSign>{FClef,GClef}["FG"_.indexOf(clef("sign"_).text()[0])];
 						int octave = 0;
 						if(clef.contains("clef-octave-change")) octave = parseInteger(clef("clef-octave-change").text());
 						signs.insertSorted({time, 0, staff, Sign::Clef, .clef={clefSign, octave}});

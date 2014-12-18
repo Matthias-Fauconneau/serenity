@@ -10,27 +10,28 @@ inline String str(const Note& a) { return str(a.key); }
 struct Sheet : Widget {
     // Layout parameters
 	static constexpr int staffCount = 2;
-	static constexpr float halfLineInterval = 3, lineInterval = 2*halfLineInterval; // 4 sp * 6 px/sp / 90 px/in * 25.4 mm/in ~ 7mm
-	const float stemLength = 7*halfLineInterval, beamWidth = halfLineInterval;
+	const float halfLineInterval, lineInterval = 2*halfLineInterval;
+	const float stemWidth = 0, stemLength = 7*halfLineInterval, beamWidth = halfLineInterval;
 	const float shortStemLength = 5*halfLineInterval;
     // Layout helpers
 	float staffY(uint staff, int clefStep) { return (!staff)*(10*lineInterval+halfLineInterval) - clefStep * halfLineInterval; } // Clef independent
-	float Y(uint staff, ClefSign clefSign, int step) { return staffY(staff, step-(clefSign==Treble ? 10 : -2)); } // Clef dependent
+	float Y(uint staff, ClefSign clefSign, int step) { return staffY(staff, step-(clefSign==GClef ? 10 : -2)); } // Clef dependent
 	// Translates C4 step to top line step using clef
 	int clefStep(Sign sign) {
 		assert_(sign.type==Sign::Note);
-		return sign.note.step - (sign.note.clef.clefSign==Treble ? 10 : -2) - sign.note.clef.octave*7;
+		return sign.note.step - (sign.note.clef.clefSign==GClef ? 10 : -2) - sign.note.clef.octave*7;
 	}
 	float Y(Sign sign) { assert_(sign.type==Sign::Note); return staffY(sign.staff, clefStep(sign)); } // Clef dependent
 
     // Fonts
-	Font smallFont {File("emmentaler-26.otf", Folder("/usr/local/share/fonts"_)), 6.f*halfLineInterval, "Emmentaler"};
-	Font font {File("emmentaler-26.otf", "/usr/local/share/fonts"_), 8.f*halfLineInterval, "Emmentaler"};
+	Font smallFont {File("Bravura.otf", Folder("/usr/local/share/fonts"_)), 6.f*halfLineInterval, "Bravura"};
+	Font font {File("Bravura.otf", "/usr/local/share/fonts"_), 8.f*halfLineInterval, "Bravura"};
+	string textFont = "LinLibertine";
 	float textSize = 6*halfLineInterval;
     // Font helpers
-	vec2 glyphSize(string name, Font* font_=0/*font*/) { Font& font=font_?*font_:this->font; return font.metrics(font.index(name)).size; }
-	float glyphAdvance(string name, Font* font_=0/*font*/) { Font& font=font_?*font_:this->font; return font.metrics(font.index(name)).advance; }
-	float space = 1;
+	vec2 glyphSize(uint code, Font* font_=0/*font*/) { Font& font=font_?*font_:this->font; return font.metrics(font.index(code)).size; }
+	float glyphAdvance(uint code, Font* font_=0/*font*/) { Font& font=font_?*font_:this->font; return font.metrics(font.index(code)).advance; }
+	float space = glyphAdvance(SMuFL::NoteHead::Black);
 	float margin = 1;
 
 	// Graphics
@@ -58,12 +59,11 @@ struct Sheet : Widget {
 	size_t firstSynchronizationFailureChordIndex = -1;
 
 	// -- Page layout
-	int2 pageSize = 0;
-	//array<int> pageBreaks;
+	int2 pageSize;
 	size_t pageIndex = 0;
 
 	/// Layouts musical notations to graphic primitives
-	Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes={}, int2 pageSize=0, string title="");
+	Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes={}, float halfLineInterval = 4, int2 pageSize=0, string title="");
 
 	/// Turn pages
 	bool keyPress(Key key, Modifiers modifiers) override;

@@ -126,7 +126,7 @@ struct BeatSynchronizer : Widget {
 					double sum = 0;
 					ref<float> X = audio.slice(frameIndex*h*audio.channels, h*audio.channels);
 					if(audio.channels==1) for(size_t i: range(h)) sum += filter(X[i]);
-					//if(audio.channels==2) for(size_t i: range(h)) sum += filter((X[i*2+0]+X[i*2+1])/2);
+					else if(audio.channels==2) for(size_t i: range(h)) sum += filter((X[i*2+0]+X[i*2+1])/2);
 					else error(audio.channels);
 					F[frameIndex] = max(0.f, float(sum / h) - (frameIndex>0 ? F[frameIndex-1] : 0));
 				}
@@ -242,7 +242,7 @@ struct BeatSynchronizer : Widget {
 				if(index == signs.size) measureBars.keys[measureIndex] =  onsets.last().time; // Last measure (FIXME: last release time)
 				else {
 					if(signs[index].note.measureIndex!=measureIndex) { // Empty measure
-						assert_(index>0);
+						//assert_(index>0, index, measureIndex, signs[index].note.measureIndex);
 						measureBars.keys[measureIndex] = onsets[index-1].time; // FIXME: should be onsets[index].time - measureTime[index]
 					} else measureBars.keys[measureIndex] = onsets[index].time;
 				}
@@ -368,7 +368,10 @@ struct Music : Widget {
 	// State
 	bool failed = sheet.firstSynchronizationFailureChordIndex != invalid;
 	bool running = true; //!failed;
-	bool rotate = videoFiles ? endsWith(videoFiles[0], ".mkv") : false;
+	bool keyboardView = videoFiles ? endsWith(videoFiles[0], ".mkv") : false;
+	bool rotate = keyboardView;
+	bool crop = keyboardView;
+	bool resize = keyboardView;
 
 	// View
 	Scroll<VBox> scroll {{&sheet/*, &beatSynchronizer*/}};
@@ -416,10 +419,9 @@ struct Music : Widget {
 		}
 	}
 
-	bool follow(int64 timeNum, int64 timeDen, int2 size, bool preview=true) {
-		assert_(timeDen /*&& notes.ticksPerSeconds == timeDen*/);
+	bool follow(int64 timeNum, uint timeDen, int2 size, bool preview=true) {
+		assert_(timeDen);
 		assert_(timeNum >= 0, timeNum);
-		//if(timeNum < 0) return false; // FIXME
 		bool contentChanged = false;
 		for(;midiIndex < notes.size && notes[midiIndex].time*timeDen <= timeNum*notes.ticksPerSeconds; midiIndex++) {
 			MidiNote note = notes[midiIndex];
@@ -428,8 +430,8 @@ struct Music : Widget {
 				if(sign.type == Sign::Note) {
 					(sign.staff?keyboard.left:keyboard.right).append( sign.note.key );
 					active.insertMulti(note.key, sign);
-					if(sign.note.measureIndex != invalid && sign.note.glyphIndex != invalid) {
-						sheet.measures.values[sign.note.measureIndex]->glyphs[sign.note.glyphIndex].color = (sign.staff?red:green);
+					if(sign.note.pageIndex != invalid && sign.note.glyphIndex != invalid) {
+						sheet.pages[sign.note.pageIndex].glyphs[sign.note.glyphIndex].color = (sign.staff?red:green);
 						contentChanged = true;
 					}
 				}
@@ -439,8 +441,8 @@ struct Music : Widget {
 				while(active.contains(note.key)) {
 					Sign sign = active.take(note.key);
 					(sign.staff?keyboard.left:keyboard.right).remove(sign.note.key);
-					if(sign.note.measureIndex != invalid && sign.note.glyphIndex != invalid) {
-						sheet.measures.values[sign.note.measureIndex]->glyphs[sign.note.glyphIndex].color = black;
+					if(sign.note.pageIndex != invalid && sign.note.glyphIndex != invalid) {
+						sheet.pages[sign.note.pageIndex].glyphs[sign.note.glyphIndex].color = black;
 					}
 					contentChanged = true;
 				}
@@ -465,14 +467,15 @@ struct Music : Widget {
 		if(previousOffset != scroll.offset.x) contentChanged = true;
 		beatSynchronizer.currentTime = timeNum*notes.ticksPerSeconds/timeDen;
 		if(video) {
-			while(video.videoTime*timeDen < timeNum*video.videoFrameRate) {
+			while(video.videoTime*int64(timeDen) < timeNum*int64(video.timeDen)) {
 				Image image = video.read();
+				if(!image) { assert_(preview); break; }
 				assert_(image);
 				if(rotate) ::rotate(image);
-				Image crop = cropShare(image, int2(0, image.height*10/24), int2(image.width, image.height/2));
-				videoView.image = resize(crop.size*4/5, scale(crop, 2, 1));
+				Image crop = this->crop ? cropShare(image, int2(0, image.height*10/24), int2(image.width, image.height/2)) : share(image);
+				videoView.image = resize ? ::resize(crop.size*4/5, scale(crop, 2, 1)) : copy(crop);
 				contentChanged=true;
-				if(!preview) assert_(video.videoTime*timeDen >= timeNum*video.videoFrameRate); // Only preview may have lower framerate than video
+				if(!preview) assert_(video.videoTime*timeDen >= timeNum*video.timeDen); // Only preview may have lower framerate than video
 			}
 		}
 		return contentChanged;
@@ -488,7 +491,8 @@ struct Music : Widget {
 		}
 		if(video) {
 			//video.seek(time * video.videoFrameRate / notes.ticksPerSeconds); //FIXME
-			while((video.videoTime+1)*notes.ticksPerSeconds <= time*video.videoFrameRate) video.read();
+			assert_(notes.ticksPerSeconds == audioFile.audioFrameRate);
+			while((video.videoTime+video.timeNum)*notes.ticksPerSeconds <= time*video.timeDen) video.read();
 			return video.videoTime;
 		}
 		return 0;
@@ -516,8 +520,8 @@ struct Music : Widget {
 			encoder.open();
 
 			int time = seek(max(0ll, notes[0].time - notes.ticksPerSeconds));
-			assert_((time*encoder.videoFrameRate)%video.videoFrameRate == 0, time, encoder.videoFrameRate, video.videoFrameRate);
-			time = time * encoder.videoFrameRate / video.videoFrameRate; // Scales from source (30fps) to target (60fps) video timebase
+			//assert_((time*encoder.videoFrameRate)%video.videoFrameRate == 0, time, encoder.videoFrameRate, video.videoFrameRate);
+			time = time * encoder.videoFrameRate * video.timeNum / video.timeDen; // Scales from source (30fps) to target (60fps) video timebase
 
 			Time followTime, renderTime, encodeTime, totalTime;
 			totalTime.start();
@@ -584,7 +588,7 @@ struct Music : Widget {
 			}
 			requestTermination(0); // Window prevents automatic termination
 		} else { // Preview
-			if(!failed) seek(max(0ll, notes[0].time - notes.ticksPerSeconds));
+			//if(!failed) seek(max(0ll, notes[0].time - notes.ticksPerSeconds));
 			window.show();
 			if(playbackDeviceAvailable()) {
 				audio.start(audioFile.audioFrameRate ? : sampler.rate, audioFile ? 1024 : sampler.periodSize, 32, 2);

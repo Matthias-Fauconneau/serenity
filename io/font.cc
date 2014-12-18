@@ -8,7 +8,7 @@
 
 String findFont(string fontName, ref<string> fontTypes) {
 	for(string path: Folder("/usr/share/fonts").list(Files|Recursive)) {
-        if(endsWith(path,".ttf")) for(string fontType: fontTypes) {
+		if(endsWith(path,".ttf") || endsWith(path,".otf")) for(string fontType: fontTypes) {
             if( find(path, fontName+     fontType+'.') ||
                 find(path, fontName+'-'+fontType+'.') ||
                 find(path, fontName+'_'+fontType+'.') ||

@@ -4,13 +4,30 @@
 
 inline bool isPowerOfTwo(uint v) { return !(v & (v - 1)); }
 
-enum ClefSign { Bass, Treble, NoClef };
-enum Accidental { None, Flat /*♭*/, Natural /*♮*/, Sharp /*♯*/, DoubleFlat /*♭♭*/, DoubleSharp /*♯♯*/ };
-static constexpr string accidentalNames[] = {""_,"flat"_,"natural"_,"sharp"_,"double-flat"_,"double-sharp"_};
-static constexpr string accidentalNamesLy[] = {""_,"flat"_,"natural"_,"sharp"_,"flatflat"_,"doublesharp"};
-enum Value { InvalidValue=-1,                  Double, Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
-static constexpr string valueNames[] = {"double"_,"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_,"32nd"_,"64th"_};
-static constexpr uint valueDurations[] = {128,       64,         32,       16,           8,             4,         2,         1};
+namespace SMuFL { //Standard Music Font Layout
+	namespace NoteHead { enum { Double=0xE0A0, Square, Whole, Half, Black }; }
+	namespace Rest { enum { Maxima = 0xE4E0, Longa, Double, Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth }; }
+	namespace Clef {  enum { G=0xE050, F=0xE062 }; enum { _15mb=1, _8vb, _8va, _15ma }; }
+	namespace TimeSignature {  enum { _0=0xE080 }; }
+	enum { Dot=0xE1E7 };
+	namespace Flag { enum { Above=0xE240, Below }; }
+	enum Accidental { None=0, AccidentalBase=0xE260, Flat=AccidentalBase, Natural, Sharp, DoubleSharp, DoubleFlat };
+	static constexpr string accidental[] = {"flat"_,"natural"_,"sharp"_,"double-sharp"_,"double-flat"_};
+	namespace Articulation { enum { Base=0xE4A0, Accent=0, Staccato, Tenuto }; }
+	enum Dynamic { DynamicBase=0xE520/*Piano=DynamicBase, Mezzo, Forte, Rinforzando, Sforzando, z, n, pppppp, ppppp, pppp, ppp, pp, mp, mf, pf, ff, fff, ffff, fffff, ffffff,
+				   fp, fz, sf, sfp, sfpp, sfz, sfzp, sffz, rf, rfz*/ };
+	static constexpr string dynamic[] = {
+		"p", "m", "f", "r", "s", "z", "n", "pppppp", "ppppp", "pppp", "ppp", "pp", "mp", "mf", "pf", "ff", "fff", "ffff", "fffff", "ffffff",
+		"fp", "fz", "sf", "sfp", "sfpp", "sfz", "sfzp", "sffz", "rf", "rfz"};
+	namespace Pedal { enum { Mark = 0xE650 }; }
+}
+
+enum ClefSign { NoClef=0, FClef=SMuFL::Clef::F, GClef=SMuFL::Clef::G };
+using Dynamic = SMuFL::Dynamic;
+using Accidental = SMuFL::Accidental;
+enum Value { InvalidValue=-1,                  /*Maxima, Longa, Double,*/ Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
+static constexpr string valueNames[] = {/*"maxima","longa","double"_,*/"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_,"32nd"_,"64th"_};
+static constexpr uint valueDurations[] = {/*512, 256, 128,       64,*/         32,       16,           8,             4,         2,         1};
 static constexpr uint quarterDuration = 16;
 enum Pedal { Ped=-1, Start, Change, PedalStop };
 enum Wedge{ Crescendo, Diminuendo, WedgeStop };
@@ -30,15 +47,15 @@ struct Note {
 	enum Tie { NoTie, TieStart, TieContinue, TieStop, Merged } tie;
     bool dot:1;
     bool grace:1;
-    bool slash:1;
-    bool staccato:1;
-    bool tenuto:1;
-    bool accent:1;
+	bool slash:1;
+	bool accent:1;
+	bool staccato:1;
+	bool tenuto:1;
 	bool trill:1;
     bool stem:1; // 0: down, 1: up
 	uint tuplet;
     uint key; // MIDI key
-	size_t measureIndex = invalid, glyphIndex = invalid;
+	size_t pageIndex = invalid, measureIndex = invalid, glyphIndex = invalid;
 	uint duration() const {
 		uint duration = valueDurations[value];
 		if(dot) duration = duration * 3 / 2;
@@ -53,7 +70,6 @@ struct Rest {
 struct Measure {
 	Break lineBreak;
 	uint measure, page, pageLine, lineMeasure;
-	//enum Repeat repeat;
 };
 struct KeySignature {
     int fifths; // Index on the fifths circle
@@ -79,18 +95,18 @@ struct Sign {
 		Measure, KeySignature, TimeSignature, Repeat // Across
 	} type;
 	union {
-		struct Note note;
-		struct Rest rest;
-		struct Measure measure;
-		struct Clef clef;
-		struct KeySignature keySignature;
-		struct TimeSignature timeSignature;
-		struct Metronome metronome;
-		string dynamic;
-		enum Pedal pedal;
-		enum Wedge wedge;
-		enum OctaveShift octave;
-		enum Repeat repeat;
+		::Note note;
+		::Rest rest;
+		::Measure measure;
+		::Clef clef;
+		::KeySignature keySignature;
+		::TimeSignature timeSignature;
+		::Metronome metronome;
+		::Dynamic dynamic;
+		::Pedal pedal;
+		::Wedge wedge;
+		::OctaveShift octave;
+		::Repeat repeat;
 	};
 };
 inline bool operator <(const Sign& a, const Sign& b) {
