@@ -42,6 +42,7 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
 	pdfPages.insert("Count"__, 0);
 
     map<String, String> fonts; // font ID to font ref
+	map<String, String> graphicStates; // graphic state ID to graphic state ref
 
     for(const Graphics& graphics: pages) {
 		if(graphics.fills) log("WARNING: unsupported fills, skipping", graphics.fills.size, "elements, use parallelograms");
@@ -54,14 +55,34 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
         //page.insert("UserUnit", userUnit); log(userUnit); // Minimum user unit is 1
         {Object& contents = objects.append();
 			array<char> content;
+
+			Dict pageGraphicStateReferences;
+			float currentOpacity=1;
+			auto setOpacity = [&](float opacity) {
+				if(opacity != currentOpacity) {
+					if(!pageGraphicStateReferences.contains(str(opacity))) {
+						if(!graphicStates.contains(str(opacity))) {
+							Object& graphicState = objects.append();
+							graphicState.insert("Type"__, "/ExtGState"_);
+							graphicState.insert("CA"__, opacity);
+							graphicState.insert("ca"__, opacity);
+							graphicStates.insert(str(opacity), ref(graphicState));
+						}
+						pageGraphicStateReferences.insert(str(opacity), copy(graphicStates.at(str(opacity))));
+					}
+					content.append("/"_+str(opacity)+" gs\n");
+					currentOpacity = opacity;
+				}
+			};
+
 			content.append("BT\n");
-            Dict xFonts;
-            String fontID; float fontSize=0;
+			Dict pageFontReferences;
+			String fontID; float fontSize=0;
             vec2 last = 0;
-            for(const Glyph& glyph: graphics.glyphs) { // FIXME: Optimize redundant state changes
+			for(const Glyph& glyph: graphics.glyphs) {
                 const Font& font = glyph.font;
                 if(font.name != fontID || font.size != fontSize) {
-                    if(!xFonts.contains(font.name)) {
+					if(!pageFontReferences.contains(font.name)) {
                         if(!fonts.contains(font.name)) {
                             Object& xFont = objects.append();
 							xFont.insert("Type"__, "/Font"_);
@@ -101,15 +122,17 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
                             //TODO: ToUnicode
                             fonts.insert(copy(font.name), ref(xFont));
                         }
-						xFonts.insert(copy(font.name), copy(fonts.at(font.name)));
+						pageFontReferences.insert(copy(font.name), copy(fonts.at(font.name)));
                     }
 					content.append('/'+font.name+' '+str(int(glyph.font.size*px))+" Tf\n"); // Font size in pixels
                 }
+
 				uint index = glyph.index; //font.index(glyph.code);
                 assert_(index < 1<<15);
                 vec2 origin = vec2(glyph.origin.x, pageSize.y-glyph.origin.y)*px;
                 vec2 relative = origin - last; // Position update of glyph origin in pixels
                 last = origin;
+				setOpacity(glyph.opacity);
 				content.append(str(relative.x,relative.y)+" Td <"+hex(index,4)+"> Tj\n");
             }
 			content.append("ET\n");
@@ -135,21 +158,36 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
                             xObjects.insert(copy(id), ref(xImage));
                         }
                         assert_(image.width && image.height, image.size);
+						setOpacity(blit.opacity);
 						content.append("q "+str(blit.size.x*px,0,0,blit.size.y*px, blit.origin.x*px, (pageSize.y-blit.origin.y-blit.size.y)*px)+
 									   " cm /"+id+" Do Q\n");
                     }
 					resources.insert("XObject"__, move(xObjects));
                 }
-				resources.insert("Font"__, move(xFonts));
+				resources.insert("Font"__, move(pageFontReferences));
+				resources.insert("ExtGState"__, move(pageGraphicStateReferences));
 				page.insert("Resources"__, move(resources));
             }
 
 			auto P = [&](vec2 p) { return str(p.x*px, (pageSize.y-p.y)*px); };
-			for(auto& line: graphics.lines)
+			for(auto& line: graphics.lines) {
+				setOpacity(line.opacity);
 				content.append(P(line.a)+" m "+P(line.b)+" l S\n");
+			}
 
-			for(auto& p: graphics.parallelograms)
+			for(auto& p: graphics.parallelograms) {
+				setOpacity(p.opacity);
 				content.append(P(p.min)+" m "+P(p.min+vec2(0,p.dy))+" l "+P(p.max+vec2(0,p.dy))+" l "+P(p.max)+" l f\n");
+			}
+
+			for(auto& c: graphics.cubics) {
+				setOpacity(c.opacity);
+				content.append(P(c.points[0])+" m ");
+				assert_(c.points.size%3==0);
+				for(size_t index=1; index<c.points.size; index+=3)
+					content.append(P(c.points[index])+" "+P(c.points[index+1])+" "+P(c.points[(index+2)%c.points.size])+" c ");
+				content.append("f\n");
+			}
 
 			contents.insert("Filter"__, "/FlateDecode"_);
             contents = deflate(content);

@@ -181,7 +181,7 @@ MusicXML::MusicXML(string document, string) {
 						else if(d.contains("pedal"_)) {
 							Pedal pedal = Pedal(ref<string>({"start"_,"change"_,"stop"_}).indexOf(d("pedal"_)["type"_]));
 							if(pedal==Start && d("pedal"_)["line"_]!="yes"_) pedal=Ped;
-							int offset = e("offset"_) ? parseInteger(e("offset"_).text()) : 0;
+							int offset = e.contains("offset"_) ? parseInteger(e("offset"_).text()) : 0;
 							if((offset+1)%(divisions/2) == 0) offset++; // FIXME
 							signs.insertSorted({time + offset, 0, uint(-1), Sign::Pedal, .pedal=pedal});
 						}

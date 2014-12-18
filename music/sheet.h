@@ -10,7 +10,7 @@ inline String str(const Note& a) { return str(a.key); }
 struct Sheet : Widget {
     // Layout parameters
 	static constexpr int staffCount = 2;
-	static constexpr float halfLineInterval = 3, lineInterval = 2*halfLineInterval;
+	static constexpr float halfLineInterval = 3, lineInterval = 2*halfLineInterval; // 4 sp * 6 px/sp / 90 px/in * 25.4 mm/in ~ 7mm
 	const float stemLength = 7*halfLineInterval, beamWidth = halfLineInterval;
 	const float shortStemLength = 5*halfLineInterval;
     // Layout helpers
@@ -30,8 +30,8 @@ struct Sheet : Widget {
     // Font helpers
 	vec2 glyphSize(string name, Font* font_=0/*font*/) { Font& font=font_?*font_:this->font; return font.metrics(font.index(name)).size; }
 	float glyphAdvance(string name, Font* font_=0/*font*/) { Font& font=font_?*font_:this->font; return font.metrics(font.index(name)).advance; }
-	float space = max(1.f, glyphSize("noteheads.s2"_).x/4);
-	float margin = glyphSize("flags.u3"_, &smallFont).x;
+	float space = 1;
+	float margin = 1;
 
 	// Graphics
 	map<int64, float> measureBars; // Maps sheet time to position of measure starts

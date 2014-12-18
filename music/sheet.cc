@@ -95,20 +95,21 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 		map<int64, Position> timeTrack; // Maps times to positions
 		{float x = /*2**/0; timeTrack.insert(signs[startIndex].time, {{x,x},x,x,x,x});}
 
-		auto X = [&](const Sign& sign) -> float& {
-			/*if(!timeTrack.contains(sign.time)) {
+		auto X = [&timeTrack](const Sign& sign) -> float& {
+			if(!timeTrack.contains(sign.time)) {
 				size_t index = timeTrack.keys.linearSearch(sign.time);
 				index = min(index, timeTrack.keys.size-1);
 				assert_(index < timeTrack.keys.size);
 				float x;
 				if(sign.type == Sign::Wedge) x = timeTrack.values[index].middle;
 				else if(sign.type == Sign::Metronome) x = timeTrack.values[index].metronome;
+				else if(sign.type == Sign::Pedal) x = timeTrack.values[index].bottom;
 				else {
-					assert_(sign.staff < 2, sign.staff, int(sign.type));
+					assert_(sign.staff < 2, sign.staff==uint(-1), int(sign.type));
 					x = timeTrack.values[index].staffs[sign.staff];
 				}
 				timeTrack.insert(sign.time, {{x,x},x,x,x,x});
-			}*/
+			}
 			assert_(timeTrack.contains(sign.time), sign.time, timeTrack.keys);
 			float* x = 0;
 			if(sign.type == Sign::Metronome) x = &timeTrack.at(sign.time).metronome;
@@ -128,6 +129,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 		float allocatedLineWidth = 0;
 		uint spaceCount = 0;
 		uint measureCount = 0;
+		uint additionnalSpaceCount = 0;
 		bool pageBreak = false;
 		for(size_t signIndex: range(startIndex, signs.size)) {
 			Sign sign = signs[signIndex];
@@ -171,6 +173,15 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 				} else timeTrack.at(sign.time).staffs[staff] = x;
 			} else {
 				assert_(staff == uint(-1)  && sign.duration == 0);
+				//float x = X(sign); X(sign) -> float& but maximum() -> float
+				if(!timeTrack.contains(sign.time)) { // FIXME: -> X
+					log("!timeTrack.contains(sign.time)", sign.time);
+					size_t index = timeTrack.keys.linearSearch(sign.time);
+					index = min(index, timeTrack.keys.size-1);
+					assert_(index < timeTrack.keys.size);
+					float x = timeTrack.values[index].maximum();
+					timeTrack.insert(sign.time, {{x,x},x,x,x,x});
+				}
 				assert_(timeTrack.contains(sign.time), sign.time);
 				float x = timeTrack.at(sign.time).maximum();
 
@@ -185,7 +196,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 						breakIndex = signIndex+1; // Includes measure break
 						x += space;
 						allocatedLineWidth = x;
-						spaceCount = timeTrack.size() + measureCount;
+						spaceCount = timeTrack.size() + measureCount + additionnalSpaceCount;
 						//uint manualBreak[] = {6,6,8,8,8,8, 8,8,8,8,8,8, 8,8,8,8,8,8}; //TODO: align 2,4 <-> 3,6
 						measureCount++;
 						//if(lineCount < ref<uint>(manualBreak).size && measureCount>=manualBreak[lineCount]) break;
@@ -193,6 +204,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 					else if(sign.type==Sign::KeySignature) {
 						x += abs(sign.keySignature.fifths)*glyphAdvance(sign.keySignature.fifths<0?"accidentals.flat"_:"accidentals.sharp"_);
 						x += space;
+						additionnalSpaceCount++;
 					}
 					else error(int(sign.type));
 					timeTrack.at(sign.time).setAll(x);
@@ -229,7 +241,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 		//uint manualBreak[] = {5,6,7};
 		if(/*offsetY + staffY(0, currentLineLowestStep-7)-staffY(1, max(highMargin,currentLineHighestStep)+7) > pageSize.y ||*/
 			/*(pages.size < ref<uint>(manualBreak).size && systems.size>=manualBreak[pages.size])*/
-				pageBreak) {
+				pageBreak && systems) {
 			doPage();
 
 			offsetY = 0;
@@ -376,7 +388,9 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 			// Beams
 			for(const Chord& chord: beam) {
 				Sign sign = stemUp ? chord.first() : chord.last();
-				float x = X(sign) + space/2;
+				String noteGlyphName = "noteheads.s"_+str(clip(0,int(sign.note.value-1),2)); // FIXME: factor, FIXME: assumes same width
+				vec2 noteSize = glyphSize(noteGlyphName).x;
+				float x = X(sign) + noteSize.x/2;
 				int step = clefStep(sign);
 				int y = Y(sign) + (stemUp?1:-1) * (lineInterval+(step%2?0:halfLineInterval));
 				if(chord.first().note.staccato) { glyph(vec2(x,y),"scripts.staccato"_, font, system.glyphs); y+=lineInterval; }
@@ -416,6 +430,25 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 		for(size_t signIndex: range(startIndex, breakIndex)) {
 			Sign sign = signs[signIndex];
 			uint staff = sign.staff;
+
+			auto doLedger = [this,&X, spaceWidth,&system](Sign sign) {// Ledger lines
+				uint staff = sign.staff;
+				Note& note = sign.note;
+				String noteGlyphName = "noteheads.s"_+str(clip(0,int(note.value-1),2)); // FIXME: factor
+				float noteSize = glyphAdvance(noteGlyphName);
+				const float x = X(sign);
+				float ledgerLength = noteSize+min(noteSize, spaceWidth/2);
+				int step = clefStep(sign);
+				for(int s=2; s<=step; s+=2) {
+					int y=staffY(staff, s);
+					system.lines.append(vec2(x+noteSize/2-ledgerLength/2,y),vec2(x+noteSize/2+ledgerLength/2,y));
+				}
+				for(int s=-10; s>=step; s-=2) {
+					int y=staffY(staff, s);
+					system.lines.append(vec2(x+noteSize/2-ledgerLength/2,y),vec2(x+noteSize/2+ledgerLength/2,y));
+				}
+			};
+
 			if(staff < 2) { // Staff signs
 				float x = X(sign);
 
@@ -424,9 +457,13 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 						x += text(vec2(x, staffY(1, max(0,currentLineHighestStep+7))), "8"+superscript("va"), textSize, system.glyphs);
 						clefs[staff].octave++;
 						timeTrack.at(sign.time).octave = x;
+					} else if(sign.octave == Up) {
+						x += text(vec2(x, staffY(1, max(0,currentLineHighestStep+7))), "8"+superscript("vb"), textSize, system.glyphs);
+						clefs[staff].octave--;
+						timeTrack.at(sign.time).octave = x;
 					}
 					else if(sign.octave == OctaveStop) {
-						assert_(octaveStart[staff].octave==Down, int(octaveStart[staff].octave));
+						assert_(octaveStart[staff].octave==Down || octaveStart[staff].octave==Up, int(octaveStart[staff].octave));
 						clefs[staff].octave--;
 						float start = X(octaveStart[staff]) + space;
 						float end = x;
@@ -457,16 +494,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 							vec2 noteSize = glyphSize(noteGlyphName, &smallFont);
 							const float x = X(sign) - noteSize.x - glyphSize("flags.u3"_, &smallFont).x, y = Y(sign);
 
-							// Ledger lines
-							int step = clefStep(sign);
-							for(int s=2; s<=step; s+=2) {
-								int y=staffY(staff, s);
-								system.lines.append(vec2(x-spaceWidth/3,y),vec2(x+noteSize.x+spaceWidth/4,y));
-							}
-							for(int s=-10; s>=step; s-=2) {
-								int y=staffY(staff, s);
-								system.lines.append(vec2(x-spaceWidth/3,y),vec2(x+noteSize.x+spaceWidth/4,y));
-							}
+							doLedger(sign);
 							// Body
 							note.glyphIndex = system.glyphs.size;
 							glyph(vec2(x, y), noteGlyphName, note.grace?smallFont:font, system.glyphs);
@@ -493,15 +521,17 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 					}
 					else if(sign.type == Sign::Clef) {
 						Clef clef = sign.clef;
-						assert_(clefs[staff].clefSign != sign.clef.clefSign || clefs[staff].octave != sign.clef.octave);
-						float y = staffY(staff, clef.clefSign==Treble ? -6 : -2);
-						if(clef.octave==1) {
-							vec2 clefSize = glyphSize(clef.clefSign==Treble?"clefs.G":"clefs.F");
-							vec2 _8Size = vec2(Text("8"_, textSize/2, 0, 1, 0, "LinLibertine").sizeHint(0));
-							text(vec2(x + clefSize.x/2 - _8Size.x/2, y - clefSize.y + _8Size.y/2), "8", textSize/2, system.glyphs);
-						} else assert_(clef.octave==0);
-						x += glyph(vec2(x, y), clef.clefSign==Treble?"clefs.G":"clefs.F", font, system.glyphs);
-						x += space;
+						if(clefs[staff].clefSign != sign.clef.clefSign || clefs[staff].octave != sign.clef.octave) {
+							assert_(clefs[staff].clefSign != sign.clef.clefSign || clefs[staff].octave != sign.clef.octave);
+							float y = staffY(staff, clef.clefSign==Treble ? -6 : -2);
+							if(clef.octave==1) {
+								vec2 clefSize = glyphSize(clef.clefSign==Treble?"clefs.G":"clefs.F");
+								vec2 _8Size = vec2(Text("8"_, textSize/2, 0, 1, 0, "LinLibertine").sizeHint(0));
+								text(vec2(x + clefSize.x/2 - _8Size.x/2, y - clefSize.y + _8Size.y/2), "8", textSize/2, system.glyphs);
+							} else assert_(clef.octave==0);
+							x += glyph(vec2(x, y), clef.clefSign==Treble?"clefs.G":"clefs.F", font, system.glyphs);
+							x += space;
+						}
 						clefs[staff] = sign.clef;
 					}
 					else error(int(sign.type));
@@ -521,15 +551,6 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 				assert_(sign.duration == 0);
 				// Clearing signs (across staves)
 				if(sign.type == Sign::Measure || sign.type==Sign::KeySignature || sign.type==Sign::TimeSignature || sign.type==Sign::Repeat) {
-					//float x = X(sign); X(sign) -> float& but maximum() -> float
-					/*if(!timeTrack.contains(sign.time)) { // FIXME: -> X
-						log("!timeTrack.contains(sign.time)", sign.time);
-						size_t index = timeTrack.keys.linearSearch(sign.time);
-						index = min(index, timeTrack.keys.size-1);
-						assert_(index < timeTrack.keys.size);
-						float x = timeTrack.values[index].maximum();
-						timeTrack.insert(sign.time, {{x,x},x,x,x,x});
-					}*/
 					assert_(timeTrack.contains(sign.time));
 					float x = timeTrack.at(sign.time).maximum();
 
@@ -581,7 +602,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 								glyph(vec2(x, Y(0, clefs[0].clefSign, step - (clefs[0].clefSign==Bass ? 14 : 0))), symbol, font, system.glyphs);
 								x += glyph(vec2(x, Y(1, clefs[1].clefSign, step - (clefs[1].clefSign==Bass ? 14 : 0))), symbol, font, system.glyphs);
 							}
-							x += space;
+							x += spaceWidth;
 						}
 						else if(sign.type==Sign::Repeat) {
 							if(int(sign.repeat)>0) { // Ending
@@ -708,18 +729,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 						const float x = X(sign) + (shift[index] ? noteSize.x : 0), y = Y(sign);
 						float opacity = (note.tie == Note::NoTie || note.tie == Note::TieStart) ? 1 : 1./2;
 
-						// Ledger lines
-						int step = clefStep(sign);
-						for(int s=2; s<=step; s+=2) {
-							int y=staffY(staff, s);
-							//system.fills.append(vec2(x-space/3,y),vec2(space/3+noteSize.x+space/3,1), black, opacity);
-							system.lines.append(vec2(x-spaceWidth/3,y),vec2(x+noteSize.x+spaceWidth/4,y), black, opacity);
-						}
-						for(int s=-10; s>=step; s-=2) {
-							int y=staffY(staff, s);
-							//system.fills.append(vec2(x-space/3,y),vec2(space/3+noteSize.x+space/3,1), black, opacity);
-							system.lines.append(vec2(x-spaceWidth/3,y),vec2(x+noteSize.x+spaceWidth/4,y), black, opacity);
-						}
+						doLedger(sign);
 						// Body
 						note.glyphIndex = system.glyphs.size;
 						glyph(vec2(x, y), noteGlyphName, note.grace?smallFont:font, system.glyphs, opacity);
@@ -745,7 +755,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 							size_t tieStart = invalid;
 							for(size_t index: range(activeTies[staff].size)) {
 								if(activeTies[staff][index].key == note.key) {
-									assert_(tieStart==invalid, note.key, apply(activeTies[staff],[](TieStart o){return o.key;}));
+									//assert_(tieStart==invalid, note.key, apply(activeTies[staff],[](TieStart o){return o.key;}));
 									tieStart = index;
 								}
 							}
@@ -801,9 +811,18 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 					auto& tuplet = tuplets[staff];
 					if(tupletSize) {	// Tuplet
 						tuplet.append(copy(chord));
-						for(const auto& chord: tuplet) for(Sign sign: chord) assert_(sign.note.tuplet == tupletSize, sign.note.tuplet, tupletSize);
+
+						uint totalDuration = 0;
+						for(const auto& chord: tuplet) {
+							assert_(chord);
+							uint duration = chord[0].note.duration();
+							for(Sign sign: chord) {
+								assert_(sign.note.tuplet == tupletSize);
+								duration = min(duration, sign.note.duration());
+							}
+							totalDuration += duration;
+						}
 						if(tuplet.size == tupletSize) {
-							// Stems
 							int sum = 0, count=0;
 							for(Chord& chord: tuplet) {
 								for(Sign& sign: chord) sum += clefStep(sign);
@@ -829,15 +848,20 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, int2 pa
 							float y = stemY+dy;
 							vec2 size(Text(str(tupletSize),textSize/2,0,1,0,"LinLibertine").sizeHint(0));
 							text(vec2(x,y) - size/2.f, str(tupletSize), textSize/2, system.glyphs);
-							system.lines.append(
-										vec2(stemX.first(),firstStemY+dy),
-										vec2(x-size.x, firstStemY+((x-size.x)-stemX.first())/(stemX.last()-stemX.first())*(lastStemY-firstStemY)+dy), black);
-							system.lines.append(
-										vec2(x+size.x,firstStemY+((x+size.x)-stemX.first())/(stemX.last()-stemX.first())*(lastStemY-firstStemY)+dy),
-										vec2(stemX.last(),lastStemY+dy), black);
+							if(totalDuration > quarterDuration) { // No beam ? draw lines
+								system.lines.append(
+											vec2(stemX.first(),firstStemY+dy),
+											vec2(x-size.x, firstStemY+((x-size.x)-stemX.first())/(stemX.last()-stemX.first())*(lastStemY-firstStemY)+dy), black);
+								system.lines.append(
+											vec2(x+size.x,firstStemY+((x+size.x)-stemX.first())/(stemX.last()-stemX.first())*(lastStemY-firstStemY)+dy),
+											vec2(stemX.last(),lastStemY+dy), black);
+							}
 							tuplet.clear();
 						}
-					} else assert_(!tuplet);
+					} else {
+						tuplet.clear(); // FIXME
+						assert_(!tuplet, tuplet);
+					}
 					chord.clear();
 					beatTime[staff] += duration;
 				}
