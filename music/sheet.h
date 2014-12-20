@@ -12,14 +12,11 @@ struct Sheet : Widget {
 	const float stemWidth = 0, stemLength = 7*halfLineInterval, beamWidth = halfLineInterval;
 	const float shortStemLength = 5*halfLineInterval;
     // Layout helpers
-	float staffY(uint staff, int clefStep) { return (!staff)*(10*lineInterval+halfLineInterval) - clefStep * halfLineInterval; } // Clef independent
-	float Y(uint staff, ClefSign clefSign, int step) { return staffY(staff, step-(clefSign==GClef ? 10 : -2)); } // Clef dependent
-	// Translates C4 step to top line step using clef
-	int clefStep(Sign sign) {
-		assert_(sign.type==Sign::Note);
-		return sign.note.step - (sign.note.clef.clefSign==GClef ? 10 : -2) - sign.note.clef.octave*7;
-	}
-	float Y(Sign sign) { assert_(sign.type==Sign::Note); return staffY(sign.staff, clefStep(sign)); } // Clef dependent
+	float staffY(uint staff, int clefStep) { return (!staff)*(10*lineInterval+halfLineInterval) - clefStep * halfLineInterval; }
+	int clefStep(Clef clef, int step) { return step - (clef.clefSign==GClef ? 10 : -2) - clef.octave*7; } // Translates C4 step to top line step using clef
+	int clefStep(Sign sign) { assert_(sign.type==Sign::Note); return clefStep(sign.note.clef, sign.note.step); }
+	float Y(uint staff, Clef clef, int step) { return staffY(staff, clefStep(clef, step)); }
+	float Y(Sign sign) { assert_(sign.type==Sign::Note); return staffY(sign.staff, clefStep(sign)); }
 
     // Fonts
 	Font smallFont {File("Bravura.otf", Folder("/usr/local/share/fonts"_)), 6.f*halfLineInterval, "Bravura"};

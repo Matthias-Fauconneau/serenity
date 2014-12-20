@@ -222,9 +222,9 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 
 						signs.insertSorted(Sign{noteOn.time, duration, staff, Sign::Note, .note={
 													.clef=clefs[staff],
-													.step=keyStep(key, keySignature),
-													.accidental=keyAccidental(key, keySignature),
-													.explicitAccidental=keyAccidental(key, keySignature), // FIXME
+													.step=keyStep(keySignature, key),
+													.alteration=keyAlteration(keySignature, key),
+													.accidental=alterationAccidental(alteration), // FIXME
 													.key = key
 													.value = value,
 													.tie = Note::NoTie,
