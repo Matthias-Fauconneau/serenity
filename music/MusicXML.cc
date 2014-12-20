@@ -41,6 +41,7 @@ MusicXML::MusicXML(string document, string) {
 
 	const size_t staffCount = 2;
 	Clef clefs[staffCount] = {{FClef,0}, {GClef,0}};
+	Sign octaveStart[staffCount] {{.octave=OctaveStop}, {.octave=OctaveStop}}; // Current octave shift (for each staff)
 	for(uint staff: range(staffCount)) signs.insertSorted({Sign::Clef, 0, {{staff, {.clef=clefs[staff]}}}}); // Defaults
 	size_t partIndex = 0;
 	for(const Element& p: root("score-partwise"_).children) {
@@ -66,7 +67,7 @@ MusicXML::MusicXML(string document, string) {
 			map<int, int> measureAlterations; // Currently altered steps (for implicit alterations)
 			array<Sign> acciaccaturas; // Acciaccatura graces for pending principal
 			int appoggiaturaTime = 0; // Appoggiatura time to remove from pending principal
-			int64 lastChordTime=0; Step minStep, maxStep;
+			int lastChordTime=0; Step minStep, maxStep;
 			Tuplet tuplet {0,{},{},{},{}};
 			for(const Element& e: m.children) {
 				if(!(e.name=="note"_ && e.contains("chord"_))) time = nextTime; // Advances time (except chords)
@@ -76,6 +77,7 @@ MusicXML::MusicXML(string document, string) {
 					Value value = e.contains("type"_) ? Value(ref<string>(valueNames).indexOf(e("type"_).text())) : Whole;
 					assert_(int(value)!=-1);
 					int duration;
+					uint durationCoefficientNum=1, durationCoefficientDen=1;
 					if(e.contains("grace"_)) {
 						//assert_(uint(value)<Sixteenth && divisions%quarterDuration == 0, int(value), divisions);
 						duration = valueDurations[uint(value)]*divisions/quarterDuration;
@@ -103,8 +105,10 @@ MusicXML::MusicXML(string document, string) {
 						if(e.contains("rest"_) && value==Whole) notationDuration = timeSignature.beats*divisions;
 						if(dot) notationDuration = notationDuration * 3 / 2;
 						if(e.contains("time-modification"_)) {
-							notationDuration = notationDuration * parseInteger(e("time-modification"_)("normal-notes").text())
-									/ parseInteger(e("time-modification"_)("actual-notes").text());
+							durationCoefficientNum = parseInteger(e("time-modification"_)("normal-notes").text());
+							durationCoefficientDen = parseInteger(e("time-modification"_)("actual-notes").text());
+							notationDuration = notationDuration * durationCoefficientNum / durationCoefficientDen;
+							assert_(e("time-modification"_)("normal-type"_).text() == e("type"_).text());
 						}
 						duration -= min(duration, appoggiaturaTime); //FIXME
 						assert_(acciaccaturaTime <= duration, acciaccaturaTime, duration, appoggiaturaTime);
@@ -226,7 +230,6 @@ MusicXML::MusicXML(string document, string) {
 						// Records alteration used for the measure
 						if(accidental) measureAlterations[step] = alteration;
 
-						bool timeModification = e.contains("time-modification"_);
 						bool articulations = e.contains("notations"_) && e("notations"_).contains("articulations"_);
 						bool ornaments = e.contains("notations"_) && e("notations"_).contains("ornaments"_);
 						{
@@ -237,8 +240,8 @@ MusicXML::MusicXML(string document, string) {
 													.alteration=alteration,
 													.accidental=accidental,
 													.tie=tie,
-													.durationCoefficientNum = timeModification ? (uint)parseInteger(e("time-modification"_)("normal-notes").text()) : 1,
-													.durationCoefficientDen = timeModification ? (uint)parseInteger(e("time-modification"_)("actual-notes").text()) : 1,
+													.durationCoefficientNum = (uint)durationCoefficientNum,
+													.durationCoefficientDen = (uint)durationCoefficientDen,
 													.dot = e.contains("dot"_) ? true : false,
 													.grace = e.contains("grace"_)?true:false,
 													.acciaccatura = e.contains("grace"_) && e("grace"_)["slash"_]=="yes"_?true:false,
@@ -301,7 +304,14 @@ MusicXML::MusicXML(string document, string) {
 							uint xmlStaffIndex = e.contains("staff") ? parseInteger(e("staff"_).text())-1 : partIndex;
 							uint staff = 1-xmlStaffIndex; // Inverts staff order convention: (top/treble, bottom/bass) -> (bottom/bass, top/treble)
 							assert_(staff < staffCount, staff);
-							insertSign({Sign::OctaveShift, time, {{xmlStaffIndex, {.octave=octave}}}});
+							if(octave == Down) clefs[staff].octave++;
+							if(octave == Up) clefs[staff].octave--;
+							if(octave == OctaveStop) {
+								assert_(octaveStart[staff].octave==Down || octaveStart[staff].octave==Up);
+								if(octaveStart[staff].octave == Down) clefs[staff].octave--;
+								if(octaveStart[staff].octave == Up) clefs[staff].octave++;
+							}
+							octaveStart[staff] = signs[insertSign({Sign::OctaveShift, time, {{xmlStaffIndex, {.octave=octave}}}})];
 						}
 						else if(d.contains("other-direction"_)) {}
 						else if(d.contains("words"_)) {
@@ -326,7 +336,7 @@ MusicXML::MusicXML(string document, string) {
 						int octave = 0;
 						if(clef.contains("clef-octave-change")) octave = parseInteger(clef("clef-octave-change").text());
 						insertSign({Sign::Clef, time, {{staff,  .clef={clefSign, octave}}}});
-						clefs[staff] = {clefSign, 0};
+						clefs[staff] = {clefSign, octave};
 					});
 					if(e.contains("key"_)) {
 						keySignature = parseInteger(e("key"_)("fifths"_).text());
@@ -355,7 +365,7 @@ MusicXML::MusicXML(string document, string) {
 								assert_(repeatIndex!=invalid);
 								buffer<Sign> copy = copyRef(signs.slice(repeatIndex));
 								assert_(time==nextTime && time==maxTime && time > signs[repeatIndex].time);
-								int64 repeatLength = time - signs[repeatIndex].time; // FIXME: Assumes document order matches time order
+								int repeatLength = time - signs[repeatIndex].time; // FIXME: Assumes document order matches time order
 								for(Sign& sign: copy) sign.time += repeatLength;
 								signs.insertSorted({time, 0, uint(-1), Sign::Measure,
 													.measure={false, globalMeasureIndex, pageIndex, lineIndex, measureIndex}});
@@ -419,11 +429,11 @@ MusicXML::MusicXML(string document, string) {
 		for(size_t signIndex : range(signs.size)) {
 			Sign sign = signs[signIndex];
 			if(sign.type==Sign::Clef && signIndex > staffIndex[sign.staff]+1) {
-				log(staffIndex[sign.staff], signIndex);
-				log(signs.slice(staffIndex[sign.staff]-1, (signIndex+1)-(staffIndex[sign.staff]-1)));
+				//log(staffIndex[sign.staff], signIndex);
+				//log(signs.slice(staffIndex[sign.staff]-1, (signIndex+1)-(staffIndex[sign.staff]-1)));
 				for(size_t index: reverse_range(signIndex, staffIndex[sign.staff]+1)) signs[index] = signs[index-1];
 				signs[staffIndex[sign.staff]+1] = sign;
-				log(signs.slice(staffIndex[sign.staff]-1, signIndex+1-(staffIndex[sign.staff]-1)));
+				//log(signs.slice(staffIndex[sign.staff]-1, signIndex+1-(staffIndex[sign.staff]-1)));
 			}
 			if(sign.type == Sign::Clef || sign.type == Sign::OctaveShift || sign.type==Sign::Note || sign.type==Sign::OctaveShift) {
 				staffIndex[sign.staff] = signIndex;

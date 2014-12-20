@@ -14,23 +14,23 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 	constexpr bool logErrors = false;
 
 	//uint measureIndex=1, page=1, lineIndex=1, lineMeasureIndex=1;
-	Clef clefs[2] = {{NoClef,0}, {NoClef,0}}; KeySignature keySignature = 0; TimeSignature timeSignature = {4,4};
+	Clef clefs[staffCount] = {{NoClef,0}, {NoClef,0}}; KeySignature keySignature = 0; TimeSignature timeSignature = {4,4};
     typedef array<Sign> Chord; // Signs belonging to a same chord (same time)
-    Chord chords[2]; // Current chord (per staff)
-    array<Chord> beams[2]; // Chords belonging to current beam (per staff) (also for correct single chord layout)
-	uint beamStart[2] = {0,0};
-	uint beatTime[2] = {0,0}; // Time after last commited chord in .16 quarters since last time signature change
-	uint staffTime[2] = {0,0}; // Time after last commited chord in ticks
+	Chord chords[staffCount]; // Current chord (per staff)
+	array<Chord> beams[staffCount]; // Chords belonging to current beam (per staff) (also for correct single chord layout)
+	uint beamStart[staffCount] = {0,0};
+	uint beatTime[staffCount] = {0,0}; // Time after last commited chord in .16 quarters since last time signature change
+	uint staffTime[staffCount] = {0,0}; // Time after last commited chord in ticks
 	vec2 pedalStart = 0; // Last pedal start/change position
 	Sign wedgeStart {.wedge={}}; // Current wedge
-	Sign octaveStart[2] {{.octave=OctaveStop}, {.octave=OctaveStop}}; // Current octave shift (for each staff)
+	Sign octaveStart[staffCount] {{.octave=OctaveStop}, {.octave=OctaveStop}}; // Current octave shift (for each staff)
 	struct TieStart { int step; vec2 position; };
-	array<TieStart> activeTies[2];
-	array<Chord> tuplets[2];
+	array<TieStart> activeTies[staffCount];
+	array<Chord> tuplets[staffCount];
 
 	map<uint, array<Sign>> notes; // Signs for notes (time, key, blitIndex)
 
-	measureBars.insert(/*t*/0, /*x*/0.f);
+	measureBars.insert(/*t*/0u, /*x*/0.f);
 	array<Graphics> systems;
 
 	auto text = [this](vec2 origin, string message, float fontSize, array<Glyph>& glyphs, vec2 align=0 /*0:left|top,1/2,center,1:right|bottom*/) {
@@ -61,7 +61,11 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 			}
 		}
 		pages.append();
-		for(const Graphics& system: systems) pages.last().append(system); // Appends systems first to preserve references to glyph indices
+		for(Graphics& system: systems) {
+			system.translate(system.offset); // FIXME: -> append
+			if(!pageSize) assert_(!pages.last().glyphs);
+			pages.last().append(system); // Appends systems first to preserve references to glyph indices
+		}
 		if(pages.size==1) text(vec2(pageSize.x/2,0), bold(title), textSize, pages.last().glyphs, vec2(1./2, 0));
 		{// Page index at each corner
 			text(vec2(margin,margin), str(pages.size), textSize, pages.last().glyphs, vec2(0, 0));
@@ -75,7 +79,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 	size_t lineCount = 0;//, pageLineCount = 0;
 	for(size_t startIndex = 0; startIndex < signs.size;) { // Lines
 		struct Position { // Holds current pen position for each line
-			float staffs[2];
+			float staffs[staffCount];
 			float middle; // Dynamic, Wedge
 			float metronome; // Metronome
 			float octave; // OctaveShift
@@ -87,12 +91,12 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 			/// Synchronizes all positions to \a x
 			void setAll(float x) { setStaves(x); middle = x; metronome = x; octave = x; bottom = x; }
 		};
-		map<int64, Position> timeTrack; // Maps times to positions
+		map<uint, Position> timeTrack; // Maps times to positions
 		{float x = /*2**/0; timeTrack.insert(signs[startIndex].time, {{x,x},x,x,x,x});}
 
-		auto staffX = [&timeTrack](int64 time, int type, uint staff) -> float& {
+		auto staffX = [&timeTrack](uint time, int type, uint staff) -> float& {
 			if(!timeTrack.contains(time)) {
-				log("!timeTrack.contains(time)", time, int(type));
+				//log("!timeTrack.contains(time)", time, int(type));
 				assert_(type==Sign::Clef || type==Sign::Wedge || type==Sign::Pedal);
 				size_t index = timeTrack.keys.linearSearch(time);
 				index = min(index, timeTrack.keys.size-1);
@@ -215,19 +219,34 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 		assert_(startIndex < breakIndex && spaceCount, startIndex, breakIndex, spaceCount, signs);
 
 		// Evaluates vertical bounds
-		int currentLineLowestStep = 7, currentLineHighestStep = -7; bool lineHasTopText = false;
-		for(size_t signIndex: range(startIndex, breakIndex)) {
-			Sign sign = signs[signIndex];
-			uint staff = sign.staff;
-			if(sign.type==Sign::Repeat) lineHasTopText=true;
-			if(sign.type == Sign::Note) {
-				if(staff==0) {
-					currentLineLowestStep = min(currentLineLowestStep, clefStep(sign));
-					lowestStep = min(lowestStep, clefStep(sign));
+		int currentLineLowestStep = 7, currentLineHighestStep = -7; //bool lineHasTopText = false;
+		{Clef lineClefs[staffCount] = {clefs[0], clefs[1]}; Sign lineOctaveStart[staffCount] {octaveStart[0], octaveStart[1]};
+			for(size_t signIndex: range(startIndex, breakIndex)) {
+				Sign sign = signs[signIndex];
+				uint staff = sign.staff;
+				//if(sign.type==Sign::Repeat) lineHasTopText=true;
+				if(sign.type == Sign::Clef) lineClefs[staff] = sign.clef;
+				else if(sign.type == Sign::OctaveShift) {
+					if(sign.octave == Down) lineClefs[staff].octave++;
+					else if(sign.octave == Up) lineClefs[staff].octave--;
+					else if(sign.octave == OctaveStop) {
+						assert_(lineOctaveStart[staff].octave==Down || lineOctaveStart[staff].octave==Up, int(lineOctaveStart[staff].octave));
+						if(lineOctaveStart[staff].octave == Down) lineClefs[staff].octave--;
+						if(lineOctaveStart[staff].octave == Up) lineClefs[staff].octave++;
+					}
+					else error(int(sign.octave));
+					lineOctaveStart[staff] = sign;
 				}
-				if(staff==1) {
-					currentLineHighestStep = max(currentLineHighestStep, clefStep(sign));
-					highestStep = max(highestStep, clefStep(sign));
+				if(sign.type == Sign::Note) {
+					sign.note.clef = lineClefs[staff]; // FIXME: postprocess MusicXML instead
+					if(staff==0) {
+						currentLineLowestStep = min(currentLineLowestStep, clefStep(sign));
+						lowestStep = min(lowestStep, clefStep(sign));
+					}
+					if(staff==1) {
+						currentLineHighestStep = max(currentLineHighestStep, clefStep(sign));
+						highestStep = max(highestStep, clefStep(sign));
+					}
 				}
 			}
 		}
@@ -430,7 +449,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 					// Ledger
 					doLedger(sign);
 					// Body
-					glyph(vec2(x, y), noteCode(sign), note.grace?smallFont:font, system.glyphs, opacity);
+					{note.glyphIndex = system.glyphs.size; // Records glyph index of body, i.e next glyph to be appended to system.glyphs :
+						glyph(vec2(x, y), noteCode(sign), note.grace?smallFont:font, system.glyphs, opacity); }
 					// Dot
 					if(note.dot) {
 						float dotOffset = glyphSize(SMuFL::NoteHead::Black).x*7/6;
@@ -506,7 +526,6 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 					// Highlight
 					note.pageIndex = pages.size;
 					note.measureIndex = measureBars.size();
-					note.glyphIndex = system.glyphs.size;
 					if(note.tie == Note::NoTie || note.tie == Note::TieStart) notes.sorted(sign.time).append( sign );
 				}
 
@@ -565,11 +584,11 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 				if(sign.time > staffTime[staff]) {
 					uint unmarkedRestTickDuration = time - staffTime[staff];
 					uint unmarkedRestDuration = unmarkedRestTickDuration * quarterDuration / ticksPerQuarter;
-					log("Unmarked rest", staff, beatTime[staff], unmarkedRestDuration, staffTime[staff], time, unmarkedRestTickDuration);
+					//log("Unmarked rest", staff, beatTime[staff], unmarkedRestDuration, staffTime[staff], time, unmarkedRestTickDuration);
 					staffTime[staff] += unmarkedRestTickDuration;
 					beatTime[staff] += unmarkedRestDuration;
 					// TODO: update time track
-					doBeam(staff);
+					//doBeam(staff);
 				}
 			};
 
@@ -594,7 +613,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 						 clefs[staff] = sign.clef;
 						 if(signs[signIndex+1].type != Sign::Clef) timeTrack.at(sign.time).setStaves(x); // Clears other staff to keep aligned notes
 					 } else if(sign.type == Sign::OctaveShift) {
-						 log(staff, clefs[staff].octave);
+						 //log(staff, clefs[staff].octave);
 						 /****/  if(sign.octave == Down) {
 							 x += text(vec2(x, staffY(1, max(0,currentLineHighestStep+7))), "8"+superscript("va"), textSize, system.glyphs).x;
 							 clefs[staff].octave++;
@@ -623,6 +642,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 				} else {
 					if(sign.type == Sign::Note) {
 						Note& note = sign.note;
+						/*assert_(note.clef.octave == clefs[staff].octave && note.clef.clefSign == clefs[staff].clefSign,
+								note.clef, clefs[staff], pages.size, systems.size, measureBars.size(), sign);*/ // FIXME
 						note.clef = clefs[staff];
 
 						assert_(note.tie != Note::Merged);
@@ -789,17 +810,17 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 				bool stemUp = staff == -1 ?: aboveDistance == belowDistance ? !staff  : aboveDistance < belowDistance;
 				bool above = stemUp;
 
-				float x0 = staffX(tuplet.first.time, Sign::Note, tuplet.first.min.staff);
-				float x1 = staffX(tuplet.last.time, Sign::Note, tuplet.last.max.staff);
+				float x0 = staffX(tuplet.first.time, Sign::Note, above ? tuplet.max.staff : tuplet.min.staff);
+				float x1 = staffX(tuplet.last.time, Sign::Note, above ? tuplet.max.staff : tuplet.min.staff);
 				float x = (x0+x1)/2;
 
-				auto staffY = [&](Step step) { return Y(step.staff, clefs[step.staff], step.step); };
+				auto staffY = [&](Step step) { return Y(above ? tuplet.max.staff : tuplet.min.staff, clefs[step.staff], step.step); };
 				float y0 = staffY( above ? tuplet.first.max : tuplet.first.min ) + (stemUp?-1:1)*stemLength;
 				float y1 =staffY( above ? tuplet.last.max : tuplet.last.min ) + (stemUp?-1:1)*stemLength;
 				float stemY = (y0 + y1) / 2;
 				float dy = (above ? -1 : 1) * 2 * beamWidth;
 				float y = stemY+dy;
-				vec2 size = text(vec2(x,y), str(tuplet.size), textSize/2, system.glyphs, vec2(1./2, 0));
+				vec2 size = text(vec2(x,y), str(tuplet.size), textSize/2, system.glyphs, 1./2);
 				if(uint(tuplet.last.time - tuplet.first.time) > ticksPerQuarter) { // No beam ? draw lines
 					system.lines.append(vec2(x0, y0+dy), vec2(x-size.x, y0+((x-size.x)-x0)/(x1-x0)*(y1-y0)+dy), black);
 					system.lines.append(vec2(x+size.x, y0+((x+size.x)-x0)/(x1-x0)*(y1-y0)+dy), vec2(x1, y1+dy), black);
@@ -808,10 +829,10 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 			else { // Directions signs
 				float& x = X(sign);
 				if(sign.type == Sign::Metronome) {
-					if(ticksPerMinutes!=int64(sign.metronome.perMinute*ticksPerQuarter)) {
+					if(ticksPerMinutes!=sign.metronome.perMinute*ticksPerQuarter) {
 						x += text(vec2(x, staffY(1, 12)), "♩="_+str(sign.metronome.perMinute)+" "_, textSize, system.glyphs).x;
-						if(ticksPerMinutes) log(ticksPerMinutes, "->", int64(sign.metronome.perMinute*ticksPerQuarter)); // FIXME: variable tempo
-						ticksPerMinutes = max(ticksPerMinutes, int64(sign.metronome.perMinute*ticksPerQuarter));
+						if(ticksPerMinutes) log(ticksPerMinutes, "->", sign.metronome.perMinute*ticksPerQuarter); // FIXME: variable tempo
+						ticksPerMinutes = max(ticksPerMinutes, sign.metronome.perMinute*ticksPerQuarter);
 					}
 				}
 				else if(sign.type == Sign::Dynamic) {
@@ -887,13 +908,16 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 								//|| (beatTime[staff]+chordDuration)%(2*beatDuration)==0 /*Beam before spanning*/
 								|| beam[0][0].note.durationCoefficientDen != chord[0].note.durationCoefficientDen // Do not mix tuplet beams
 								//|| chord[0].time > beam[0][0].time + beamDuration*ticksPerQuarter/quarterDuration // Unmarked rest (completed by another staff)
-								) doBeam(staff);
+								) {
+							doBeam(staff);
+						}
 					}
 
 					// Beam (higher values are single chord "beams")
 					if(!beam) beamStart[staff] = beatTime[staff];
 					if(value <= Quarter) doBeam(staff); // Flushes any pending beams
-					if(beam) assert_(beam[0][0].note.durationCoefficientDen == chord[0].note.durationCoefficientDen);
+					if(beam) assert_(beam[0][0].note.durationCoefficientDen == chord[0].note.durationCoefficientDen,
+							beam[0][0].note.durationCoefficientDen, chord[0].note.durationCoefficientDen);
 					beam.append(copy(chord));
 					if(value <= Quarter) doBeam(staff); // Only stems for quarter and halfs (actually no beams :/)
 
@@ -903,7 +927,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 						assert_(sign.time == staffTime[staff], sign.time, staffTime[staff]);
 						staffTime[staff] += chordDuration * ticksPerQuarter / quarterDuration;
 						beatTime[staff] += chordDuration;
-					} else log("Interleaved note", chordDuration); // else note completing another staff within time frame of a rest in this staff
+					} //else log("Interleaved note", chordDuration); // else note completing another staff within time frame of a rest in this staff
 					//log("chord", staff, beatTime[staff], staffTime[staff]);
 				}
 			}
@@ -911,6 +935,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 		lineCount++;
 		float top = -staffY(1, max(highMargin,currentLineHighestStep)+7);
 		float bottom = staffY(0, min(lowMargin, currentLineLowestStep)-7);
+		system.offset = vec2(0, top);
 		system.size = vec2(pageSize.x, bottom - top);
 		systems.append(move(system));
 		startIndex = breakIndex;

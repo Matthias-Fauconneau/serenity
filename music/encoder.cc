@@ -132,7 +132,7 @@ void Encoder::open() {
     lock.unlock();
 }
 
-void Encoder::writeMJPEGPacket(ref<byte> data, uint64 pts) {
+void Encoder::writeMJPEGPacket(ref<byte> data, int pts) {
     assert_(videoStream);
     frame->pts = pts*videoStream->time_base.den/(1000000*videoStream->time_base.num);
 

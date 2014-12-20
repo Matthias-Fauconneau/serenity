@@ -47,8 +47,8 @@ struct Sampler : Poll {
 #endif
 
     /// Emits period time to trigger MIDI file input and update the interface
-	function<void(int64)> timeChanged;
-	uint64 audioTime=0, stopTime=0;
+	function<void(uint)> timeChanged;
+	uint audioTime=0, stopTime=0;
 
 	/// Whether decoding is run in advance in main thread.
 	/// \note Prevents underruns when latency is much lower than FLAC frame sizes.
@@ -57,7 +57,7 @@ struct Sampler : Poll {
 
 	explicit operator bool() const { return samples.size; }
 
-	Sampler(uint outputRate, string path, function<void(int64)> timeChanged, Thread& thread=mainThread);
+	Sampler(uint outputRate, string path, function<void(uint)> timeChanged, Thread& thread=mainThread);
 	~Sampler();
 
 	void noteEvent(uint key, uint velocity);

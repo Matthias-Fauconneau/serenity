@@ -5,6 +5,6 @@
 struct Keyboard : Widget {
     array<uint> left, right;
     void midiNoteEvent(uint key, uint vel);
-    int2 sizeHint(int2) override { return int2(1280, 128); }
+    int2 sizeHint(int2) override { return int2(1280, 120); }
     shared<Graphics> graphics(int2 size) override;
 };

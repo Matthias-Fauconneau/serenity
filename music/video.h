@@ -16,7 +16,7 @@ struct Decoder {
 	struct AVFormatContext* file=0;
 	struct SwsContext* swsContext=0;
 	struct AVStream* videoStream=0; struct AVCodecContext* videoCodec=0;
-	int64 videoTime = -1; // in stream time base
+	int videoTime = -1; // in stream time base
 	struct AVFrame* frame=0;
 
 	Decoder() {}

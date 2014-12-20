@@ -44,14 +44,14 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 
 	KeySignature keySignature = 0; TimeSignature timeSignature = {4,4}; Metronome metronome = {Quarter, 120};
 	uint measureIndex = 0;
-	int64 lastMeasureStart = 0;
+	int lastMeasureStart = 0;
 	Clef clefs[2] = {{FClef,0}, {GClef,0}};
-	for(uint staff: range(2)) signs.insertSorted(Sign{0, 0, staff, Sign::Clef, .clef=clefs[staff]});
+	for(uint staff: range(2)) signs.insertSorted({Sign::Clef, 0, {{staff, {.clef=clefs[staff]}}}});
 	array<MidiNote> currents[2]; // New notes to be pressed
 	array<MidiNote> actives[2]; // Notes currently pressed
 	array<MidiNote> commited[2]; // Commited/assigned notes to be written once duration is known (on note off)
-	int64 lastOff[2] = {0,0}; // For rests
-	for(int64 lastTime = 0;;) {
+	uint lastOff[2] = {0,0}; // For rests
+	for(int lastTime = 0;;) {
 		size_t trackIndex = invalid;
 		for(size_t index: range(tracks.size))
 			if(tracks[index].data && (trackIndex==invalid || tracks[index].time <= tracks[trackIndex].time))
@@ -103,7 +103,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 			for(size_t staff: range(2)) currents[staff].clear(); // FIXME: ^ move should already clear currents[staff]
 			for(size_t staff: range(2)) assert_(!currents[staff], currents, commited);
 			if(measureIndex > 35) {
-				signs.insertSorted({track.time, 0, uint(-1), Sign::Measure, .measure={NoBreak, measureIndex, 1, 1, measureIndex}});
+				signs.insertSorted({Sign::Measure, track.time, .measure={Measure::NoBreak, measureIndex, 1, 1, measureIndex}});
 				break; // HACK: Stops 'Brave Adventurers' before repeat
 			}
 		}
@@ -111,12 +111,12 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 		lastTime = track.time;
 
 		// When latest track is ready to switch measure
-		int64 measureLength = timeSignature.beats*60*divisions/metronome.perMinute;
+		int measureLength = timeSignature.beats*60*divisions/metronome.perMinute;
 		assert_(measureLength);
-		int64 nextMeasureStart = lastMeasureStart+measureLength;
+		uint nextMeasureStart = lastMeasureStart+measureLength;
 		if(track.time >= nextMeasureStart) {
 			lastMeasureStart = nextMeasureStart;
-			signs.insertSorted({nextMeasureStart, 0, uint(-1), Sign::Measure, .measure={NoBreak, measureIndex, 1, 1, measureIndex}});
+			signs.insertSorted({Sign::Measure, nextMeasureStart, .measure={Measure::NoBreak, measureIndex, 1, 1, measureIndex}});
 			measureIndex++;
 		}
 
@@ -138,7 +138,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 				uint beats = data[0];
 				uint beatUnit = 1<<data[1];
 				timeSignature = TimeSignature{beats, beatUnit};
-				signs.insertSorted(Sign{track.time, 0, uint(-1), Sign::TimeSignature, .timeSignature=timeSignature});
+				signs.insertSorted({Sign::TimeSignature, track.time, .timeSignature=timeSignature});
 			}
 			else if(MIDI(key)==MIDI::Tempo) {
 				/*uint tempo=((data[0]<<16)|(data[1]<<8)|data[2]); // Microseconds per beat (quarter)
@@ -150,10 +150,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 				//scale=data[1]?Minor:Major;
 				if(keySignature != newKeySignature) {
 					keySignature = newKeySignature;
-					if(signs.last().type == Sign::TimeSignature)
-						signs.insertAt(signs.size-1, Sign{track.time, 0, uint(-1), Sign::KeySignature, .keySignature=keySignature});
-					else
-						signs.insertSorted(Sign{track.time, 0, uint(-1), Sign::KeySignature, .keySignature=keySignature});
+					signs.insertSorted({Sign::KeySignature, track.time, .keySignature=keySignature});
 				}
 			}
 			else if(MIDI(key)==MIDI::TrackName || MIDI(key)==MIDI::Text || MIDI(key)==MIDI::Copyright) {}
@@ -181,7 +178,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 						if(!valueDuration) valueDuration = quarterDuration/2; //FIXME
 						assert_(valueDuration, duration, quarterDuration, divisions);
 						bool dot=false;
-						uint tuplet = 0;
+						uint tuplet = 1;
 						if(valueDuration == 5 || valueDuration == 6) { // Triplet of quavers
 							tuplet = 3;
 							valueDuration = 8;
@@ -216,21 +213,21 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 								assert_(valueDuration>=valueDurations[Eighth], duration, quarterDuration, divisions, valueDuration, strKey(key), "rest");
 								Value value = Value(ref<uint>(valueDurations).size-1-log2(valueDuration));
 								assert_(int(value) >= 0, duration, valueDuration);
-								signs.insertSorted(Sign{lastOff[staff], duration, staff, Sign::Rest, .rest={value}});
+								signs.insertSorted({Sign::Rest, lastOff[staff], {{staff, {{duration, .rest={value}}}}}});
 							}
 						}
 
-						signs.insertSorted(Sign{noteOn.time, duration, staff, Sign::Note, .note={
-													.clef=clefs[staff],
-													.step=keyStep(keySignature, key),
-													.alteration=keyAlteration(keySignature, key),
-													.accidental=alterationAccidental(alteration), // FIXME
-													.key = key
-													.value = value,
-													.tie = Note::NoTie,
-													.tuplet = tuplet,
-													.dot=dot,
-												}});
+						signs.insertSorted(Sign{Sign::Note, noteOn.time, {{staff, {{duration, .note={
+																					.value = value,
+																					.clef = clefs[staff],
+																					.step = keyStep(keySignature, key),
+																					.alteration = keyAlteration(keySignature, key),
+																					.accidental = alterationAccidental(keyAlteration(keySignature, key)), // FIXME
+																					.tie = Note::NoTie,
+																					.durationCoefficientNum = tuplet!=1 ? tuplet-1 : 1,
+																					.durationCoefficientDen = tuplet,
+																					.dot=dot,
+																				}}}}}});
 						lastOff[staff] = note.time;
 					}
 					break; // Assumes single match (FIXME: assert)
@@ -258,8 +255,8 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 		//assert_(!commited[staff], commited[staff]);
 	}
 	// Measures are signaled on end
-	int64 measureLength = timeSignature.beats*60*divisions/metronome.perMinute;
+	int measureLength = timeSignature.beats*60*divisions/metronome.perMinute;
 	assert_(measureLength);
-	int64 nextMeasureStart = lastMeasureStart+measureLength;
-	signs.insertSorted({nextMeasureStart, 0, uint(-1), Sign::Measure, .measure={NoBreak, measureIndex, 1, 1, measureIndex}}); // Last measure bar
+	uint nextMeasureStart = lastMeasureStart+measureLength;
+	signs.insertSorted({Sign::Measure, nextMeasureStart, .measure={Measure::NoBreak, measureIndex, 1, 1, measureIndex}}); // Last measure bar
 }

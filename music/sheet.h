@@ -30,13 +30,13 @@ struct Sheet : Widget {
 	float margin = 1;
 
 	// Graphics
-	map<int64, float> measureBars; // Maps sheet time to position of measure starts
+	map<uint, float> measureBars; // Maps sheet time to position of measure starts
 	//map<Rect, shared<Graphics>> measures;
 	array<Graphics> pages; // FIXME: Page[]:Line[]:Measures[]
 	shared<Graphics> debug;
 
 	int lowestStep = 0, highestStep = 0;
-	int2 sizeHint(int2) override { return int2(measureBars.values.last(), -(staffY(0, lowestStep)-staffY(1, highestStep))); }
+	int2 sizeHint(int2) override { return int2(measureBars.values.last(), -((staffY(0, lowestStep)+2*lineInterval)-staffY(1, highestStep))); }
 	shared<Graphics> graphics(int2 size, Rect clip) override;
 
 	// -- Control
@@ -48,7 +48,7 @@ struct Sheet : Widget {
 	int stop(int unused axis, int currentPosition, int direction) override;
 
 	// -- MIDI Synchronization
-	int64 ticksPerMinutes = 0;
+	uint ticksPerMinutes = 0;
 	buffer<Sign> midiToSign; /// Sign of corresponding note for each MIDI note
 	uint extraErrors = 0, missingErrors = 0, wrongErrors = 0, orderErrors = 0;
 	size_t firstSynchronizationFailureChordIndex = -1;

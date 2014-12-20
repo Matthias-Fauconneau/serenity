@@ -5,7 +5,8 @@
 #include "time.h"
 #include <sys/shm.h>
 
-Window::Window(Widget* widget, int2 sizeHint, function<String()> title, const Image& icon) : widget(widget), size(sizeHint), getTitle(title) {
+Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool show, const Image& icon)
+	: widget(widget), size(sizeHint), getTitle(title) {
     Display::onEvent.connect(this, &Window::onEvent);
     send(CreateColormap{ .colormap=id+Colormap, .window=root, .visual=visual});
 
@@ -27,7 +28,7 @@ Window::Window(Widget* widget, int2 sizeHint, function<String()> title, const Im
     send(Present::SelectInput{.window=id+XWindow, .eid=id+PresentEvent});
     actions[Escape] = []{requestTermination();};
     actions[PrintScreen] = [this]{writeFile(str(Date(currentTime())), encodePNG(target), home());};
-	show();
+	if(show) this->show();
 }
 
 Window::~Window() {

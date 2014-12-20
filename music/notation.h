@@ -65,7 +65,6 @@ using Accidental = SMuFL::Accidental;
 inline int keyAlteration(int fifths, int key) {
 	assert_(fifths >= -6 && fifths < 6 && key>0, fifths, key);
 	char c = pitchClasses[fifths+6].accidentals[key%12/*0-11*/];
-	log(fifths, key, key%12, c);
 	if(c== 'b' || c=='-') return -1;
 	if(c=='N' || c=='.') return 0;
 	if(c=='#' || c=='+') return 1;
@@ -100,7 +99,7 @@ struct Note {
 	int alteration;
 	Accidental accidental;
 	enum Tie { NoTie, TieStart, TieContinue, TieStop, Merged } tie;
-	uint durationCoefficientNum /* Tuplet duration */, durationCoefficientDen /* Note count */;
+	uint durationCoefficientNum /* Tuplet duration */, durationCoefficientDen /* Tuplet note count */;
 	bool dot = false;
 	bool grace = false;
 	bool acciaccatura = false; // Before principal beat (slashed)
@@ -199,14 +198,15 @@ inline String strNote(int octave, int step, Accidental accidental) {
 	return "CDEFGAB"_[octaveStep]+(accidental?ref<string>{"♭"_,"♮","♯"_}[accidental-Accidental::AccidentalBase]:""_)+superDigit(octave);
 }
 inline String str(const Note& o) { return strNote(o.clef.octave, o.step, o.accidental); }
-
+inline String str(const Clef& o) {
+	if(o.clefSign==ClefSign::GClef) return "G:"__;
+	if(o.clefSign==ClefSign::FClef) return "F:"__;
+	error("");
+}
 inline String str(const Sign& o) {
 	if(o.type==Sign::Clef || o.type==Sign::OctaveShift || o.type==Sign::Note || o.type==Sign::Rest) {
 		String s;
-		if(o.type==Sign::Clef) {
-			if(o.clef.clefSign==ClefSign::GClef) s="G:"__;
-			if(o.clef.clefSign==ClefSign::FClef) s="F:"__;
-		}
+		if(o.type==Sign::Clef) s = str(o.clef);
 		else if(o.type==Sign::OctaveShift) s = copyRef(ref<string>{"8va"_,"8vb"_,"⸥"_}[int(o.octave)]);
 		else if(o.type==Sign::Note) s = str(o.note);
 		else if(o.type==Sign::Rest) s = copyRef(str("-;,"_[clip(0, int(o.rest.value)-Value::Whole, 1)]));
