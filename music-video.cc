@@ -72,13 +72,12 @@ String str(const Bin& o) { return /*str(o[0].time*8/48000)+*/str(o.slice(0, min(
 inline float keyToPitch(float key) { return 440*exp2((key-69)/12); }
 inline float pitchToKey(float pitch) { return 69+log2(pitch/440)*12; }
 
-struct BeatSynchronizer : Widget {
+struct Synchronizer : Widget {
 	map<int64, float>& measureBars;
 	struct Bar { float x; bgr3f color; };
 	array<Bar> bars;
 	int currentTime = 0;
-	//BeatSynchronizer(map<int, float>& measureBars) : measureBars(measureBars) {}
-	BeatSynchronizer(Audio audio, MidiNotes& notes, ref<Sign> signs, map<int64, float>& measureBars) : measureBars(measureBars) {
+	Synchronizer(Audio audio, MidiNotes& notes, ref<Sign> signs, map<int64, float>& measureBars) : measureBars(measureBars) {
 		array<Bin> P; // peaks
 		if(audio) {
 			assert_(notes.ticksPerSeconds = audio.rate);
@@ -210,7 +209,7 @@ struct BeatSynchronizer : Widget {
 			size_t midiIndex = 0;
 			while(i<m && j<n) {
 				int localOffset = (P[j][0].time - notes[midiIndex].time) - globalOffset; // >0: late, <0: early
-				const int limitDelay = 2*notes.ticksPerSeconds, limitAdvance = notes.ticksPerSeconds; //int(notes.ticksPerSeconds)/4;
+				const int limitDelay = notes.ticksPerSeconds/4, limitAdvance = notes.ticksPerSeconds/4;
 				if(j+1<n && ((D(i,j) == D(i,j+1) && (i==0 || localOffset < limitDelay)) || (i && localOffset < -limitAdvance))) {
 					j++;
 				} else {
@@ -355,12 +354,12 @@ struct Music : Widget {
 	// MusicXML
 	MusicXML xml = existsFile(name+".xml"_) ? readFile(name+".xml"_) : MusicXML();
 	// MIDI
-	MidiFile midi =  existsFile(name+".mid"_) ? MidiFile(readFile(name+".mid"_)) : MidiFile(); // if used: midi.signs are scaled in BeatSynchronizer
+	MidiFile midi =  existsFile(name+".mid"_) ? MidiFile(readFile(name+".mid"_)) : MidiFile(); // if used: midi.signs are scaled in synchronizer
 	MidiNotes notes = scale(midi ? copy(midi.notes) : ::notes(xml.signs, xml.divisions), audioFile.audioFrameRate?: sampler.rate);
 	// Sheet
 	Sheet sheet {xml ? xml.signs : midi.signs, xml ? xml.divisions : midi.divisions,
 				apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
-	BeatSynchronizer beatSynchronizer {audioFiles?decodeAudio(audioFiles[0]):Audio(), notes, sheet.midiToSign, sheet.measureBars};
+	Synchronizer synchronizer {audioFiles?decodeAudio(audioFiles[0]):Audio(), notes, sheet.midiToSign, sheet.measureBars};
 
 	// Video
 	Decoder video = videoFiles ? Decoder(videoFiles[0]) : Decoder();
@@ -374,7 +373,7 @@ struct Music : Widget {
 	bool resize = keyboardView;
 
 	// View
-	Scroll<VBox> scroll {{&sheet/*, &beatSynchronizer*/}};
+	Scroll<VBox> scroll {{&sheet/*, &synchronizer*/}};
 	ImageView videoView;
 	Keyboard keyboard;
 	VBox widget {{&scroll, &videoView, &keyboard}};
@@ -465,7 +464,7 @@ struct Music : Widget {
 			}
 		}
 		if(previousOffset != scroll.offset.x) contentChanged = true;
-		beatSynchronizer.currentTime = timeNum*notes.ticksPerSeconds/timeDen;
+		synchronizer.currentTime = timeNum*notes.ticksPerSeconds/timeDen;
 		if(video) {
 			while(video.videoTime*int64(timeDen) < timeNum*int64(video.timeDen)) {
 				Image image = video.read();

@@ -42,11 +42,10 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 		}
 	}
 
-	KeySignature keySignature={0}; TimeSignature timeSignature={4,4}; Metronome metronome={Quarter, 120};
+	KeySignature keySignature = 0; TimeSignature timeSignature = {4,4}; Metronome metronome = {Quarter, 120};
 	uint measureIndex = 0;
 	int64 lastMeasureStart = 0;
-	// For each staff (0: Bass, 1: Treble)
-	Clef clefs[2] = {{Bass,0}, {Treble,0}};
+	Clef clefs[2] = {{FClef,0}, {GClef,0}};
 	for(uint staff: range(2)) signs.insertSorted(Sign{0, 0, staff, Sign::Clef, .clef=clefs[staff]});
 	array<MidiNote> currents[2]; // New notes to be pressed
 	array<MidiNote> actives[2]; // Notes currently pressed
@@ -147,10 +146,10 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 				if(perMinute) signs.insertSorted({track.time, 0, uint(-1), Sign::Metronome, .metronome={Quarter, perMinute}}); FIXME*/
 			}
 			else if(MIDI(key)==MIDI::KeySignature) {
-				int fifths = (int8)data[0];
+				int newKeySignature = (int8)data[0];
 				//scale=data[1]?Minor:Major;
-				if(keySignature.fifths!=fifths) {
-					keySignature.fifths=fifths;
+				if(keySignature != newKeySignature) {
+					keySignature = newKeySignature;
 					if(signs.last().type == Sign::TimeSignature)
 						signs.insertAt(signs.size-1, Sign{track.time, 0, uint(-1), Sign::KeySignature, .keySignature=keySignature});
 					else
@@ -173,32 +172,6 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 				for(size_t index: range(commited[staff].size)) {
 					if(commited[staff][index].key !=  note.key) continue;
 					MidiNote noteOn = commited[staff].take(index);
-					// Step
-					assert_(keySignature.fifths >= -6 && keySignature.fifths <= 6, keySignature.fifths);
-					struct PitchClass {
-						char keyIntervals[11 +1];
-						char accidentals[12 +1]; // 0=none, 1=♭, 2=♮, 3=♯
-					};
-					PitchClass pitchClasses[12] = { //*7%12 //FIXME: generate
-													//C # D # E F #G # A # B C#D#EF#G#A#B
-													{"10101101010", "N.N.N..N.N.N"}, // ♭♭♭♭♭♭ G♭/F# e♭/d#
-													{"10101101010", "..N.N..N.N.N"}, // ♭♭♭♭♭/♯♯♯♯♯♯♯ D♭ b♭
-													{"10101101010", "..N.N.b..N.N"}, // ♭♭♭♭ A♭ f
-													{"10101101010", ".b..N.b..N.N"}, // ♭♭♭ E♭ c
-													{"10101101010", ".b..N.b.b..N"}, // ♭♭ B♭ g
-													{"10101101010", ".b.b..b.b..N"}, // ♭ F d
-													{"01011010101", ".#.#..#.#.#."},  // ♮ C a '.b.b..b.b.b.'
-													{"01011010101", ".#.#.N..#.#."},  // ♯ G e
-													{"01011010101",  "N..#.N..#.#."},  // ♯♯ D b
-													{"01011010101", "N..#.N.N..#."},  // ♯♯♯ A f♯
-													{"01011010101", "N.N..N.N..#."},  // ♯♯♯♯ E c♯
-													{"01011010101", "N.N..N.N.N.."}  // ♯♯♯♯♯/♭♭♭♭♭♭♭ B g♯
-												  };
-					PitchClass pitchClass = pitchClasses[keySignature.fifths+6];
-					int h=key/12*7; for(int i: range(key%12)/*0-10*/) h+=pitchClass.keyIntervals[i]-'0';
-					Clef clef = clefs[staff];
-					assert_(!clef.octave);
-					int noteStep = h - 35; //;(clef.clefSign==Treble ? 47 : 35);
 
 					// Value
 					int duration = note.time - noteOn.time;
@@ -248,9 +221,16 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 						}
 
 						signs.insertSorted(Sign{noteOn.time, duration, staff, Sign::Note, .note={
-													clef, noteStep, Accidental(".bN#"_.indexOf(pitchClass.accidentals[key%12/*0-11*/])), value, Note::NoTie,
-													dot, /*grace*/ false, /*slash*/ false, /*staccato*/ false, /*tenuto*/ false, /*accent*/ false, /*trill*/ false, /*up*/false,
-													tuplet, key, invalid, invalid, invalid}});
+													.clef=clefs[staff],
+													.step=keyStep(key, keySignature),
+													.accidental=keyAccidental(key, keySignature),
+													.explicitAccidental=keyAccidental(key, keySignature), // FIXME
+													.key = key
+													.value = value,
+													.tie = Note::NoTie,
+													.tuplet = tuplet,
+													.dot=dot,
+												}});
 						lastOff[staff] = note.time;
 					}
 					break; // Assumes single match (FIXME: assert)

@@ -5,6 +5,8 @@
 #include "core/image.h"
 #include "utf8.h"
 
+Font* getFont(string fontName, float size, ref<string> fontTypes={"","R","Regular"}, bool hint=false);
+
 /// Rich text format control code encoded in 00-1F range
 // \note first word (until ' ') after a Link tag is not displayed but used as \a linkActivated identifier.
 enum class TextFormat : char { Regular, Bold, Italic, Superscript, Subscript, Stack, Fraction, End };
@@ -45,7 +47,8 @@ struct Text : virtual Widget {
     /// Minimal size hint
     int2 minimalSizeHint;
 
-    struct TextLayout layout(float wrap) const;
+	struct TextLayout layout(float wrap=0) const;
+	vec2 textSize(int2 size=0) const;
 
 	int2 sizeHint(int2 size) override;
 	shared<Graphics> graphics(int2 size) override;

@@ -60,7 +60,7 @@ struct Cubic {
 
 /// Set of graphic elements
 struct Graphics : shareable {
-	vec2 offset;
+	vec2 offset, size;
     array<Fill> fills;
     array<Blit> blits;
     array<Glyph> glyphs;

@@ -4,8 +4,6 @@
 #include "widget.h"
 #include "font.h"
 
-inline String str(const Note& a) { return str(a.key); }
-
 /// Layouts musical notations to graphic primitives
 struct Sheet : Widget {
     // Layout parameters

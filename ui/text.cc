@@ -77,7 +77,7 @@ struct TextLayout {
                 for(Glyph glyph: word) {
                     glyph.origin += vec2(x, lineOriginY);
                     bbMin = ::min(bbMin, glyph.origin-glyph.bearing);
-                    bbMax = ::max(bbMax, glyph.origin-glyph.bearing+glyph.size);
+					bbMax = ::max(bbMax, glyph.origin-glyph.bearing+glyph.size);
                     wordOut.append( glyph );
                 }
                 x += advance(word);
@@ -268,11 +268,12 @@ TextLayout Text::layout(float wrap) const {
     return TextLayout(text, size, wrap, font, hint, interline, true, true, true, color);
 }
 
-int2 Text::sizeHint(int2 size) {
-    TextLayout layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
-    vec2 textSize = ceil(layout.bbMax - min(vec2(0),layout.bbMin));
-    return max(minimalSizeHint, int2(textSize));
+vec2 Text::textSize(int2 size) const {
+	TextLayout layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
+	return ceil(layout.bbMax - min(vec2(0),layout.bbMin));
 }
+
+int2 Text::sizeHint(int2 size) { return max(minimalSizeHint, int2(textSize(size))); }
 
 shared<Graphics> Text::graphics(int2 size) {
     TextLayout layout = this->layout(min<float>(wrap, size.x));

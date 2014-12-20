@@ -66,10 +66,11 @@ template<Type A, Type T, Type F, size_t N> T reduce(const T (&values)[N], F fold
 	return reduce(ref<T>(values), fold, initialValue);
 }
 
-template<Type A, Type T> T sum(ref<T> values, A initialValue=0) {
+template<Type A, Type T> T sum(ref<T> values, A initialValue) {
 	return reduce(values, [](A accumulator, T value) { return accumulator + value; }, initialValue);
 }
-template<Type A, Type T, size_t N> T sum(const T (&values)[N]) { return sum<A>(ref<T>(values)); }
+template<Type T> T sum(ref<T> values) { return sum(values, T()); }
+template<Type T, size_t N> T sum(const T (&values)[N]) { return sum(ref<T>(values)); }
 
 template<Type T> T min(ref<T> values) { return reduce(values, [](T accumulator, T value) { return min(accumulator, value); }, values[0]); }
 template<Type T, size_t N> T min(const T (&a)[N]) { return min(ref<T>(a)); }
