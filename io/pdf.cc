@@ -5,8 +5,6 @@
 #include "deflate.h"
 #include "time.h"
 
-typedef map<String,Variant> Dict;
-
 struct Object : Dict {
     buffer<byte> data;
 

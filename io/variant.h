@@ -50,3 +50,5 @@ inline String str(const Variant& o) {
     if(o.type==Variant::Dict) return str(o.dict);
     error("Invalid Variant",int(o.type));
 }
+
+typedef map<String,Variant> Dict;

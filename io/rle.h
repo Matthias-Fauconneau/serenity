@@ -7,12 +7,12 @@ static buffer<byte> decodeRunLength(const ref<byte> source) {
     for(;;) {
         assert_(s);
         uint8 code = s.next();
-        if(code < 128) buffer << s.read(code+1);
+        if(code < 128) buffer.append( s.read(code+1) );
         else if(code != 128) {
             byte value = s.next();
             uint size = 257-code;
             buffer.reserve(buffer.size+size);
-            for(uint unused i: range(size)) buffer << value;
+            for(uint unused i: range(size)) buffer.append( value );
         }
         else break;
     }

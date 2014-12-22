@@ -84,7 +84,7 @@ private:
 struct AudioControl : Device {
     uint id = 0;
     long min, max;
-    AudioControl();
+    AudioControl(string name = "Master Playback Volume");
     operator long();
     void operator =(long value);
 };

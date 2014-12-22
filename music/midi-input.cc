@@ -37,7 +37,7 @@ void MidiInput::event() {
             sustained.tryRemove(key);
             assert_(!pressed.contains(key));
             pressed.append(key);
-            noteEvent(key, min(127,(int)value*4/3)); //x4/3 to reach maximum velocity without destroying the keyboard
+            noteEvent(key, min(127,(int)value*4/3)); // Keyboard saturates at 96
             /*if(record) {
                 int tick = realTime()/1000000;
                 events.append( Event((int16)(tick-lastTick), (uint8)key, (uint8)value) );

@@ -73,6 +73,8 @@ ui/selection.cc
 ui/display.cc
 ui/x.h
 ui/color.h
+ui/pdf-renderer.h
+ui/pdf-renderer.cc
 
 audio/asound.h
 audio/asound.cc

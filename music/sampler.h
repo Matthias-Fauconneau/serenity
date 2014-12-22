@@ -7,9 +7,7 @@
 #include "thread.h"
 #include "map.h"
 #include "simd.h"
-#if REVERB
 typedef struct fftwf_plan_s* fftwf_plan;
-#endif
 
 /// High performance, low latency SFZ sound font sampler
 struct Sampler : Poll {
@@ -26,14 +24,12 @@ struct Sampler : Poll {
 	uint rate = 0;
     //static constexpr uint periodSize = 64; // [1ms] Prevents samples to synchronize with shifted copies from same chord
     //static constexpr uint periodSize = 128; // [3ms] Same as resampler latency and 1m sound propagation time
-    //static constexpr uint periodSize = 256; // [5ms] Latency/convolution tradeoff (FIXME: ring buffer)
+    static constexpr uint periodSize = 256; // [5ms] Latency/convolution tradeoff (FIXME: ring buffer)
     //static constexpr uint periodSize = 512; // [11ms] Required for efficient FFT convolution (reverb) (FIXME: ring buffer)
-	static constexpr uint periodSize = 1024; // [21ms] Maximum compatibility (when latency is not critical) (FIXME: skip start for accurate timing))
+    //static constexpr uint periodSize = 1024; // [21ms] Maximum compatibility (when latency is not critical) (FIXME: skip start for accurate timing))
 
     /// Convolution reverb
-	bool enableReverb=false; // Disables reverb by default as it prevents lowest latency (FFT convolution gets too expensive).
     uint N=0; // reverbSize+periodSize
-#if REVERB
     buffer<float> reverbFilter[2]; // Convolution reverb filter in frequency-domain
     buffer<float> reverbBuffer[2]; // Mixer output in time-domain
 
@@ -44,7 +40,6 @@ struct Sampler : Poll {
     struct FFTW : handle<fftwf_plan> { using handle<fftwf_plan>::handle; default_move(FFTW); FFTW(){} ~FFTW(); };
     FFTW forward[2]; // FFTW plan to forward transform reverb buffer
     FFTW backward; // FFTW plan to backward transform product*/
-#endif
 
     /// Emits period time to trigger MIDI file input and update the interface
 	function<void(uint)> timeChanged;

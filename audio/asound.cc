@@ -276,7 +276,7 @@ typedef IOWR<'U', 0x11, Info> ELEM_INFO;
 typedef IOWR<'U', 0x12, Value> ELEM_READ;
 typedef IOWR<'U', 0x13, Value> ELEM_WRITE;
 
-AudioControl::AudioControl() : Device("/dev/snd/controlC1") {
+AudioControl::AudioControl(string name) : Device("/dev/snd/controlC1") {
     List list = {};
     iowr<ELEM_LIST>(list);
     ID ids[list.count];
@@ -287,7 +287,8 @@ AudioControl::AudioControl() : Device("/dev/snd/controlC1") {
         Info info;
         info.id.numid = ids[i].numid;
         iowr<ELEM_INFO>(info);
-        if(startsWith(string(info.id.name),"Master Playback Volume")) { id=info.id.numid; min=info.min, max=info.max; break; }
+        log(info.id.name);
+        if(startsWith(string(info.id.name),name)) { id=info.id.numid; min=info.min, max=info.max; /*break;*/ }
     }
 }
 
