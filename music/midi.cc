@@ -51,7 +51,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 	array<MidiNote> actives[2]; // Notes currently pressed
 	array<MidiNote> commited[2]; // Commited/assigned notes to be written once duration is known (on note off)
 	uint lastOff[2] = {0,0}; // For rests
-	for(int lastTime = 0;;) {
+    for(uint lastTime = 0;;) {
 		size_t trackIndex = invalid;
 		for(size_t index: range(tracks.size))
 			if(tracks[index].data && (trackIndex==invalid || tracks[index].time <= tracks[trackIndex].time))

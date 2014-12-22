@@ -89,8 +89,7 @@ float sumOfSquares(const FLAC& flac, uint size) {
     return (sum[0]+sum[1]+sum[2]+sum[3])/(1<<24)/(1<<24);
 }
 
-Sampler::Sampler(uint outputRate, string path, function<void(uint)> timeChanged, Thread& thread)
-	: Poll(0, POLLIN, thread), timeChanged(timeChanged), backgroundDecoder(thread!=mainThread) {
+Sampler::Sampler(uint outputRate, string path, function<void(uint)> timeChanged, Thread& thread) : Poll(0, POLLIN, thread), timeChanged(timeChanged) {
 	registerPoll();
     layers.clear();
     samples.clear();
@@ -289,7 +288,7 @@ void Sampler::noteEvent(uint key, uint velocity) {
 				layer->notes.append(move(note)); // Copies predecoded buffer and corresponding FLAC decoder state
 				lock.release(2);
             }
-            if(backgroundDecoder) queue(); //queue background decoder in main thread
+            queue(); //queue background decoder in main thread
             return;
         }
     }
@@ -446,7 +445,7 @@ size_t Sampler::read(mref<float2> output) {
 
 	audioTime += output.size;
 	timeChanged(audioTime); // Updates active notes
-	if(backgroundDecoder) queue(); else event(); // Decodes before mixing
+    queue(); // Decodes before mixing
     return output.size;
 }
 

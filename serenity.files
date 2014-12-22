@@ -129,23 +129,8 @@ music/sampler.cc
 music/flac.h
 music/flac.cc
 music/notation.h
-music-video.cc
+music/midi-input.h
+music/midi-input.cc
 
-player.cc
-dust.cc
-blend.cc
-stitch.cc
-book.cc
-web.cc
-music/video.h
-music/video.cc
-tuner/biquad.h
-record.cc
-statistics.cc
-tuner/estimate.cc
-tuner/stretch.cc
-video-input.h
-video-input.cc
-music-pdf.cc
-layout.cc
-denoise.cc
+music-video.cc
+music-practice.cc
