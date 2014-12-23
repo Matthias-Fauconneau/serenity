@@ -44,8 +44,9 @@ generic struct array : buffer<T> {
     void shrink(size_t nextSize) { assert(capacity && nextSize<=size); for(size_t i: range(nextSize,size)) data[i].~T(); size=nextSize; }
     /// Removes all elements
     void clear() { if(size) shrink(0); }
-	/// Grows the array to \a size without initializing new elements
-	void grow(size_t size) { reserve(size); this->size=size; }
+    /// Grows the array to \a size without initializing new elements
+    /// \return Previous size
+    size_t grow(size_t size) { reserve(size); swap(this->size, size); return size; }
 
 	// - Append
     /// Appends a default element

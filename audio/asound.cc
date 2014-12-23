@@ -287,7 +287,6 @@ AudioControl::AudioControl(string name) : Device("/dev/snd/controlC1") {
         Info info;
         info.id.numid = ids[i].numid;
         iowr<ELEM_INFO>(info);
-        log(info.id.name);
         if(startsWith(string(info.id.name),name)) { id=info.id.numid; min=info.min, max=info.max; /*break;*/ }
     }
 }

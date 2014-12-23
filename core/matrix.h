@@ -8,7 +8,7 @@ struct mat3x2 {
 
     mat3x2(float d=1) : data{d,0, 0,d, 0,0} {}
     mat3x2(float dx, float dy) : data{1,0, 0,1, dx,dy} {}
-    mat3x2(float m00, float m01, float m10, float m11, float dx, float dy):data{m00,m10,m01,m11, dx,dy}{assert(m01==0 && m10==0);}
+    mat3x2(float m00, float m01, float m10, float m11, float dx, float dy):data{m00,m10,m01,m11, dx,dy}{ /*assert(m01==0 && m10==0, m01, m10);*/ }
 
     float M(int i, int j) const {assert(i<2 && j<3); return data[j*2+i]; }
     float& M(int i, int j) {assert(i<2 && j<3); return data[j*2+i]; }

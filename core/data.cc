@@ -55,7 +55,7 @@ void Data::skip(const ref<uint8> key) {
 	if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(peek(key.size))+'\'');
 }
 void Data::skip(const string key) {
-	if(!match(key)) error("Expected '"+escape(key)+"', got '"+(string)peek(key.size)+'\'', data.slice(index));
+    if(!match(key)) error("Expected '"+escape(key)+"', got '"+(string)peek(key.size)+'\'', index, data.slice(index, 128));
 }
 
 ref<uint8> BinaryData::whileNot(uint8 key) {

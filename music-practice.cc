@@ -25,6 +25,6 @@ struct Music {
         //audio.start(sampler.rate, Sampler::periodSize, 32, 2);
         audioThread.spawn();
         AudioControl("Master Playback Switch") = 1;
-        AudioControl("Headphone Jack") = 1;
+        //AudioControl("Headphone Jack") = 1;
     }
 } app;

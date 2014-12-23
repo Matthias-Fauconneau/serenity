@@ -60,7 +60,9 @@ struct Cubic {
 
 /// Set of graphic elements
 struct Graphics : shareable {
-	vec2 offset, size;
+    vec2 size = 0;
+    vec2 offset = 0;
+    //vec2 scale = 1; TODO
     array<Fill> fills;
     array<Blit> blits;
     array<Glyph> glyphs;

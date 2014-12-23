@@ -16,7 +16,7 @@ static Variant parseVariant(TextData& s) {
     }
     if(s.match('/')) return copyRef(s.identifier("-+."_));
     if(s.match('(')) {
-        String data;
+        array<char> data;
         while(!s.match(')')) data.append( s.character() );
         return move(data);
     }
@@ -82,37 +82,36 @@ static Variant parseVariant(TextData& s) {
         return move(v);
     }
     if(s.match('<')) {
-        String data;
+        array<char> data;
         while(!s.match('>')) data.append( parseInteger(s.read(2),16) );
         return move(data);
     }
     if(s.match("true"_)) return true;
     if(s.match("false"_)) return false;
-    error("Unknown type"_,s.slice(s.index-32,32),"|"_,s.slice(s.index,32),s.buffer.size-s.index);
+    error("Unknown type"_,s.slice(s.index-32,32),"|"_,s.slice(s.index,32),s.data.size-s.index);
     //return Variant();
 }
 static Variant parseVariant(const string& buffer) { TextData s(buffer); return parseVariant(s); }
 static Dict toDict(const array<String>& xref, Variant&& object) { return object.dict ? move(object.dict) : parseVariant(xref[object.integer()]).dict; }
 
-PDF::PDF(const string& data) {
+PDF::PDF(string data) {
     array<String> xref; Dict catalog;
     {
         TextData s (data);
-        for(s.index=s.buffer.size-sizeof("\r\n%%EOF");!( (s[-2]=='\r' && s[-1]=='\n') || s[-1]=='\n' || (s[-2]==' ' && s[-1]=='\r') );s.index--){}
-        int index=s.integer(); assert(index!=-1,s.untilEnd()); s.index=index;
-        int root=0;
+        for(s.index=s.data.size-sizeof("\r\n%%EOF");!( (s[-2]=='\r' && s[-1]=='\n') || s[-1]=='\n' || (s[-2]==' ' && s[-1]=='\r') );s.index--){}
+        int index = s.integer(); assert(index>0, s.untilEnd()); s.index = index;
+        int root = 0;
         struct CompressedXRef { uint object, index; }; array<CompressedXRef> compressedXRefs;
         for(;;) { /// Parse XRefs
             if(s.match("xref"_)) { // Direct cross reference
                 s.whileAny(" \t\r\n");
                 uint i=s.integer(); s.whileAny(" \t\r\n");
                 uint n=s.integer(); s.whileAny(" \t\r\n");
-                if(xref.size<i+n) xref.grow(i+n);
+                if(xref.size<i+n) xref.slice(xref.grow(i+n)).clear();
                 for(;n>0;n--,i++) {
                     int offset=s.integer(); s.whileAny(" \t\r\n"); s.integer(); s.whileAny(" \t\r\n");
-                    if(s.match('n')) {
-                        xref[i] = unsafeRef(s.slice(offset+(i<10?1:(i<100?2:i<1000?3:4))+6));
-                    } else if(s.match('f')) {}
+                    if(s.match('n')) xref[i] = unsafeRef(s.slice(offset+(i<10?1:(i<100?2:i<1000?3:4))+6));
+                    else if(s.match('f')) {}
                     else error(s.untilEnd());
                     s.whileAny(" \t\r\n");
                 }
@@ -121,7 +120,7 @@ PDF::PDF(const string& data) {
             } else { // Cross reference dictionnary
                 uint i=s.integer(); s.whileAny(" \t\r\n");
                 uint unused n=s.integer(); s.whileAny(" \t\r\n");
-                if(!s.match("obj"_)) error("");
+                s.skip("obj"_);
                 if(xref.size<=i) xref.grow(i+1);
                 xref[i] = unsafeRef(s.until("endobj"_));
             }
@@ -161,9 +160,10 @@ PDF::PDF(const string& data) {
                     }
                 }
             }
-            if(!root && dict.contains("Root"_)) { assert_(dict.at("Root"_).type==Variant::Integer, dict); root=dict.at("Root"_).integer(); }
+            if(!root && dict.contains("Root"_)) { assert_(dict.at("Root"_).type==Variant::Integer, dict); root = dict.at("Root"_).integer(); }
             if(!dict.contains("Prev"_)) break;
-            s.index=dict.at("Prev"_).integer();
+            s.index = dict.at("Prev"_).integer();
+            assert_(int(s.index) > 0);
         }
         catalog = parseVariant(xref[root]).dict;
         for(CompressedXRef ref: compressedXRefs) {
@@ -179,35 +179,40 @@ PDF::PDF(const string& data) {
     }
     Variant kids = move(parseVariant(xref[catalog.at("Pages"_).integer()]).dict.at("Kids"_));
     array<Variant> pages = kids.list ? move(kids.list) : parseVariant(xref[kids.integer()]).list;
-    vec2 documentMin = vec2(+inf), documentMax = vec2(-inf);
+    //vec2 documentMin = vec2(+inf), documentMax = vec2(-inf);
+    //struct Break { size_t blits, lines, characters, polygons; };
+    //array<Break> breaks;
     for(uint i=0; i<pages.size; i++) {
         const Variant& page = pages[i];
         auto dict = parseVariant(xref[page.integer()]).dict;
+        assert_(!dict.contains("UserUnit"_), dict);
         if(dict.contains("Resources"_)) {
-            auto resources = toDict(xref,move(dict.at("Resources"_)));
+            auto resources = toDict(xref, move(dict.at("Resources"_)));
             // Parses font definitions
-            if(resources.contains("Font"_)) for(auto e : toDict(xref,move(resources.at("Font"_)))) {
-                if(fonts.contains(e.key)) continue;
-                Dict fontDict = parseVariant(xref[e.value.integer()]).dict;
-                Variant* descendant = fontDict.find("DescendantFonts"_);
-                if(descendant) {
-                    if(descendant->type==Variant::Integer)
-                        fontDict = parseVariant(xref[descendant->integer()]).dict;
-                    else if(descendant->type==Variant::List && descendant->list[0].type==Variant::Integer)
-                        fontDict = parseVariant(xref[descendant->list[0].integer()]).dict;
-                    else if(descendant->type==Variant::List && descendant->list[0].type==Variant::Dict)
-                        fontDict = move(descendant->list[0].dict);
+            if(resources.contains("Font"_)) {
+                for(auto e : toDict(xref, move(resources.at("Font"_)))) {
+                    if(fonts.contains(e.key)) continue;
+                    Dict fontDict = parseVariant(xref[e.value.integer()]).dict;
+                    Variant* descendant = fontDict.find("DescendantFonts"_);
+                    if(descendant) {
+                        if(descendant->type==Variant::Integer)
+                            fontDict = parseVariant(xref[descendant->integer()]).dict;
+                        else if(descendant->type==Variant::List && descendant->list[0].type==Variant::Integer)
+                            fontDict = parseVariant(xref[descendant->list[0].integer()]).dict;
+                        else if(descendant->type==Variant::List && descendant->list[0].type==Variant::Dict)
+                            fontDict = move(descendant->list[0].dict);
+                    }
+                    if(!fontDict.contains("FontDescriptor"_)) continue;
+                    String name = move(fontDict.at("BaseFont"_).data);
+                    auto descriptor = parseVariant(xref[fontDict.at("FontDescriptor"_).integer()]).dict;
+                    Variant* fontFile = descriptor.find("FontFile"_)?:descriptor.find("FontFile2"_)?:descriptor.find("FontFile3"_);
+                    if(!fontFile) continue;
+                    Fonts& font = fonts.insert(copyRef(e.key), Fonts{move(name), parseVariant(xref[fontFile->integer()]).data, {}, {}});
+                    Variant* firstChar = fontDict.find("FirstChar"_);
+                    if(firstChar) font.widths.grow(firstChar->integer());
+                    Variant* widths = fontDict.find("Widths"_);
+                    if(widths) for(const Variant& width : widths->list) font.widths.append( width.real() );
                 }
-                if(!fontDict.contains("FontDescriptor"_)) continue;
-                String name = move(fontDict.at("BaseFont"_).data);
-                auto descriptor = parseVariant(xref[fontDict.at("FontDescriptor"_).integer()]).dict;
-                Variant* fontFile = descriptor.find("FontFile"_)?:descriptor.find("FontFile2"_)?:descriptor.find("FontFile3"_);
-                if(!fontFile) continue;
-                Fonts& font = fonts.insert(e.key, Fonts{move(name), parseVariant(xref[fontFile->integer()]).data, {}, {}});
-                Variant* firstChar = fontDict.find("FirstChar"_);
-                if(firstChar) font.widths.grow(firstChar->integer());
-                Variant* widths = fontDict.find("Widths"_);
-                if(widths) for(const Variant& width : widths->list) font.widths.append( width.real() );
             }
             // Parses image definitions
             if(resources.contains("XObject"_)) {
@@ -262,7 +267,8 @@ PDF::PDF(const string& data) {
         Variant* contents = dict.find("Contents"_);
         if(contents) {
             // Keeps current page first geometry indices to translate the page primitives after full parse
-            uint firstBlit = blits.size, firstLine = lines.size, firstCharacter = characters.size, firstPolygon=polygons.size;
+            //breaks.append({blits.size, lines.size, characters.size, polygons.size});
+            //uint firstBlit = blits.size, firstLine = lines.size, firstCharacter = characters.size, firstPolygon=polygons.size;
             // Parses page bounds
             const array<Variant>& box = // Lower-left, upper-right
                     (dict.find("ArtBox"_)?:dict.find("TrimBox"_)?:dict.find("BleedBox"_)?:dict.find("CropBox"_)?:&dict.at("MediaBox"_))->list;
@@ -286,7 +292,7 @@ PDF::PDF(const string& data) {
             for(TextData s = move(data); s.whileAny(" \t\r\n"), s;) {
                 string id = s.word("'*"_);
                 if(!id || id=="true"_ || id=="false"_) {
-                    assert(!((s[0]>='a' && s[0]<='z')||(s[0]>='A' && s[0]<='Z')||s[0]=='\''||s[0]=='"'),s.peek(min(16ul,s.buffer.size-s.index)));
+                    assert(!((s[0]>='a' && s[0]<='z')||(s[0]>='A' && s[0]<='Z')||s[0]=='\''||s[0]=='"'),s.peek(min(16ul,s.data.size-s.index)));
                     args.append( parseVariant(s) );
                     continue;
                 }
@@ -298,18 +304,18 @@ PDF::PDF(const string& data) {
 #define OP3(c1,c2,c3) break;case c1|c2<<8|c3<<16:
 #define f(i) args[i].real()
 #define p(x,y) (Cm*vec2(f(x),f(y)))
-                    OP('b') drawPath(path,Close|Stroke|Fill|Winding|Trace);
-                    OP2('b','*') drawPath(path,Close|Stroke|Fill|OddEven|Trace);
+                    OP('b') drawPath(path,Close|Stroke|Fill|Winding|Trace); path.clear();
+                    OP2('b','*') drawPath(path,Close|Stroke|Fill|OddEven|Trace); path.clear();
                     OP('B') drawPath(path,Stroke|Fill|Winding|Trace);
                     OP2('B','I') ;
                     OP2('I','D') while(!s.match("EI"_)) s.advance(1);
-                    OP2('B','*') drawPath(path,Stroke|Fill|OddEven|Trace);
+                    OP2('B','*') drawPath(path,Stroke|Fill|OddEven|Trace); path.clear();
                     OP3('B','D','C') ;
                     OP3('E','M','C') ;
                     OP('c') path.last().append(ref<vec2>{p(0,1), p(2,3), p(4,5)});
                     OP('d') ; // setDashOffset();
-                    OP('f') drawPath(path,Fill|Winding|Trace);
-                    OP2('f','*') drawPath(path,Fill|OddEven|Trace);
+                    OP('f') drawPath(path,Fill|Winding|Trace); path.clear();
+                    OP2('f','*') drawPath(path,Fill|OddEven|Trace); path.clear();
                     OP('g') ; //brushColor = f(0);
                     OP('h') ; //closePath
                     OP2('r','g') ; // brushColor = vec3(f(0),f(1),f(2));
@@ -323,8 +329,8 @@ PDF::PDF(const string& data) {
                     OP('n') path.clear();
                     OP('q') stack.append( Cm );
                     OP('Q') Cm = stack.pop();
-                    OP('s') drawPath(path,Close|Stroke|OddEven);
-                    OP('S') drawPath(path,Stroke|OddEven|Trace);
+                    OP('s') drawPath(path,Close|Stroke|OddEven); path.clear();
+                    OP('S') drawPath(path,Stroke|OddEven|Trace); path.clear();
                     OP('v') ; // curveTo (replicate first)
                     OP('w') ; // setWidth(Cm.m11()*f(0));
                     OP('W') path.clear(); //intersect winding clip
@@ -363,53 +369,59 @@ PDF::PDF(const string& data) {
                         else if(e.type==Variant::Data) drawText(*font,fontSize,spacing,wordSpacing,e.data);
                         else error("Unexpected type",(int)e.type);
                     }
-                    OP2('T','f') font = fonts.find(args[0].data); fontSize=f(1);
+                    OP2('T','f') font = &fonts.at(args[0].data); fontSize=f(1);
                     OP2('T','m') Tm=Tlm=mat3x2(f(0),f(1),f(2),f(3),f(4),f(5));
                     OP2('T','w') wordSpacing=f(0);
                     OP2('W','*') path.clear(); // intersect odd even clip
                 }
                 args.clear();
             }
-            pageMin.x=min(pageMin.x, boxMin.x); pageMax.x = max(pageMax.x, boxMax.x); // Keep full horizontal margins
-            pageMin.y=(pageMin.y+min(pageMin.y, boxMin.y))/2; pageMax.y = (pageMax.y+max(pageMax.y, boxMax.y))/2; // Keep half vertical margins
-            mat3x2 m (1,0, 0,-1, 0, pageMax.y + (documentMax.y==-inf?0:documentMax.y));
-            { vec2 a = m*pageMin, b = m*pageMax; pageMin = min(a, b); pageMax = max(a, b); }
-            // Transforms from page to document
-            for(Blit& b: blits.slice(firstBlit)) b.position = m*b.position ;
-            for(Line& l: lines.slice(firstLine)) { l.a=m*l.a; l.b=m*l.b; }
-            for(Character& c: characters.slice(firstCharacter)) c.position=m*c.position;
-            for(Polygon& polygon: polygons.slice(firstPolygon)) {
-                { vec2 a=m*polygon.min, b=m*polygon.max; polygon.min = min(a, b); polygon.max = max(a, b); }
-                for(Line& l: polygon.edges) { l.a=m*l.a; l.b=m*l.b; }
+            //pageMin.x=min(pageMin.x, boxMin.x); pageMax.x = max(pageMax.x, boxMax.x); // Keep full horizontal margins
+            //pageMin.y=(pageMin.y+min(pageMin.y, boxMin.y))/2; pageMax.y = (pageMax.y+max(pageMax.y, boxMax.y))/2; // Keep half vertical margins
+            {mat3x2 m (1,0, 0, -1, 0, pageMax.y);
+                { vec2 a = m*pageMin, b = m*pageMax; pageMin = min(a, b); pageMax = max(a, b); }
+                // Transforms from bottom-left to top left
+                for(Blit& b: blits) b.position = m*b.position ;
+                for(Line& l: lines) { l.a=m*l.a; l.b=m*l.b; }
+                for(Character& c: characters) c.position=m*c.position;
+                for(Polygon& polygon: polygons) {
+                    { vec2 a=m*polygon.min, b=m*polygon.max; polygon.min = min(a, b); polygon.max = max(a, b); }
+                    for(Line& l: polygon.edges) { l.a=m*l.a; l.b=m*l.b; }
+                }
             }
-            // Updates document bounds
-            documentMin = min(documentMin, pageMin);
-            documentMax = max(documentMax, pageMax);
+
+            {// Normalizes coordinates (Aligns top-left to 0, scales to DPI)
+                float scale = 96. /*ppi*/ / 72/*PostScript point per inch*/; // px/pt
+                mat3x2 m (scale, 0,0, scale, -pageMin.x*scale, -pageMin.y*scale);
+                { vec2 a = m*pageMin, b = m*pageMax; pageMin = min(a, b); pageMax = max(a, b); }
+                for(Blit& b: blits) b.position = m*b.position, b.size *= scale;
+                for(Line& l: lines) { l.a=m*l.a; l.b=m*l.b; }
+                for(Character& c: characters) c.position=m*c.position, c.size *= scale;
+                for(Polygon& polygon: polygons) {
+                    { vec2 a=m*polygon.min, b=m*polygon.max; polygon.min = min(a, b); polygon.max = max(a, b); }
+                    for(Line& l: polygon.edges) { l.a=m*l.a; l.b=m*l.b; }
+                }
+            }
+
+            // Converts to Graphics page
+            Graphics page;
+            for(Line& l: lines) page.lines.append(l.a, l.b);
+            lines.clear();
+            blits.clear();
+            characters.clear();
+            polygons.clear();
+            page.size = pageMax-pageMin;
+            this->pages.append(move(page));
         }
         // add any children
         if(dict.contains("Kids"_)) pages.append( move(dict.at("Kids"_).list) );
     }
-
-    // Normalizes coordinates (aligns top-left to 0, fit width to 1)
-    float width = documentMax.x-documentMin.x;
-    mat3x2 m (1/width, 0,0, 1/width, -documentMin.x/width, -documentMin.y/width);
-    for(Blit& b: blits) b.position = m*b.position, b.size /= width;
-    for(Line& l: lines) { l.a=m*l.a; l.b=m*l.b; }
-    for(Character& c: characters) c.position=m*c.position, c.size /= width;
-    for(Polygon& polygon: polygons) {
-        { vec2 a=m*polygon.min, b=m*polygon.max; polygon.min = min(a, b); polygon.max = max(a, b); }
-        for(Line& l: polygon.edges) { l.a=m*l.a; l.b=m*l.b; }
-    }
-    height = (documentMax.y-documentMin.y)/width;
-
-    // Sorts primitives for culling
-    sort(blits), sort(lines), sort(characters);
 }
 
 vec2 cubic(vec2 A,vec2 B,vec2 C,vec2 D,float t) { return ((1-t)*(1-t)*(1-t))*A + (3*(1-t)*(1-t)*t)*B + (3*(1-t)*t*t)*C + (t*t*t)*D; }
 //inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
-void PDF::drawPath(array<array<vec2>>& paths, int flags) {
-    for(array<vec2>& path : paths) {
+void PDF::drawPath(const ref<array<vec2>> paths, int flags) {
+    for(ref<vec2> path : paths) {
         //if(path.size > 5) continue; //FIXME: triangulate concave polygons
         for(vec2 p : path) if(p > boxMin && p < boxMax) extend(p); // FIXME: clip
         array<vec2> polyline;
@@ -433,12 +445,12 @@ void PDF::drawPath(array<array<vec2>>& paths, int flags) {
         if(flags&Fill) {
             Polygon polygon;
             // Software rendering (FIXME: precompute line equations)
-            polygon.min=path.first(), polygon.max=path.first();
+            polygon.min=path[0], polygon.max=path[0];
             for(vec2 p : path) {
                 polygon.min=min(polygon.min,p);
                 polygon.max=max(polygon.max,p);
             }
-            assert(polygon.min < polygon.max);
+            assert(polygon.min <= polygon.max);
             polygon.edges = move(lines);
             /*float area=0;
             for(uint i: range(polyline.size)) {
@@ -475,68 +487,13 @@ void PDF::drawText(Fonts& fonts, int size, float spacing, float wordSpacing, con
     }
 }
 
-int2 PDF::sizeHint(int2 size) { return int2(size.y/height, size.y); }
-shared<Graphics> PDF::graphics(int2 unused size) {
-#if 0
-    lastSize = size.x;
-    const float scale = size.x; // Fit width
+int2 PDF::sizeHint(int2 unused size) { return int2(pages[pageIndex].size); }
+shared<Graphics> PDF::graphics(int2 unused size /*TODO: center*/) {
+    return shared<Graphics>(&pages[pageIndex]);
+}
 
-    for(Blit& blit: blits) {
-        if(scale*(blit.position.y+blit.size.y) < 0) continue;
-        if(scale*blit.position.y > size.y) break;
-        if(!blit.resized) {
-            int2 target = int2(round(scale*blit.size));
-            assert_(target <= int2(4096));
-            blit.resized = size != blit.image.size ? resize(target, blit.image) : share(blit.image);
-        }
-        ::blit(target, int2(scale*blit.position),blit.resized);
-    }
-
-    for(const Line& l: lines.slice(lines.binarySearch(Line{vec2(-offset-int2(0,200))/scale,vec2(-offset-int2(0,200))/scale}))) {
-        vec2 a = scale*l.a, b = scale*l.b;
-        a+=vec2(offset), b+=vec2(offset);
-        if(a.y < 0 && b.y < 0) continue;
-        if(a.y > size.y+200 && b.y > size.y+200) break;
-        if(a.x==b.x) a.x=b.x=round(a.x); if(a.y==b.y) a.y=b.y=round(a.y);
-        line(target, a,b);
-    }
-
-    for(const Polygon& polygon: polygons) {
-        int2 min=offset+int2(floor(scale*polygon.min-vec2(1./2))), max=offset+int2(ceil(scale*polygon.max+vec2(1./2)));
-        Rect rect = Rect(min,max) & Rect(size);
-        for(int y=rect.min.y; y < ::min<int>(size.y,rect.max.y); y++) {
-            for(int x=rect.min.x; x < ::min<int>(size.x,rect.max.x); x++) {
-                vec2 p = vec2(x,y)+vec2(1./2); float coverage=1;
-                for(const Line& e: polygon.edges) {
-                    vec2 a = vec2(offset)+scale*e.a, b=vec2(offset)+scale*e.b;
-                    float d = cross(p-a,normalize(b-a));
-                    if(d>1./2) goto outside;
-                    if(d>-1./2) coverage *= 1./2-d;
-                } /*else*/ {
-                    blend(target, x,y, 0, coverage?coverage:1);
-                }
-outside:;
-            }
-        }
-    }
-
-    int i = characters.binarySearch(Character{0,0,0,vec2(-offset-int2(0,100))/scale,0});
-    for(const Character& c: characters.slice(i)) {
-        int2 pos = offset+int2(round(scale*c.position));
-        if(pos.y<=-100) { i++; continue; }
-        if(pos.y>=size.y+100) break;
-        ::Font& font = getFont(*c.fonts, scale*c.size);
-        const Glyph& glyph = font.glyph(c.index);
-        if(glyph.image) blit(target, pos+glyph.offset,glyph.image,colors.value(i,black));
-        i++;
-    }
-
-    for(const_pair<vec2,String> text: (const map<vec2, String>&)annotations) {
-        int2 pos = offset+int2(round(scale*text.key));
-        if(pos.y<=0) continue;
-        if(pos.y>=size.y) continue; //break;
-        Text(text.value,14,red).render(target, pos);
-    }
-#endif
-    return share(pages[pageIndex]);
+bool PDF::keyPress(Key key, Modifiers) {
+    if(key==LeftArrow) { pageIndex = max(0, int(pageIndex)-1); return true; }
+    if(key==RightArrow) { pageIndex = min(pageIndex+1, pages.size-1); return true; }
+    return false;
 }

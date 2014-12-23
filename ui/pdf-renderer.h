@@ -7,9 +7,10 @@
 
 /// Portable Document Format renderer
 struct PDF : Widget {
-    PDF(const ref<byte>& data);
+    PDF(string data);
     int2 sizeHint(int2) override;
     shared<Graphics> graphics(int2) override;
+    bool keyPress(Key key, Modifiers) override;
 
     // Current page rendering context
     mat3x2 Tm,Cm;
@@ -18,10 +19,10 @@ struct PDF : Widget {
     void extend(vec2 p) { pageMin=min(pageMin, p), pageMax=max(pageMax, p); }
 
     // Rendering primitives
-    struct Line { vec2 a,b; bool operator <(const Line& o) const{return a.y<o.a.y || b.y<o.b.y;}};
+    struct Line { vec2 a, b; bool operator <(const Line& o) const{return a.y<o.a.y || b.y<o.b.y;}};
     array<Line> lines;
     enum Flags { Close=1,Stroke=2,Fill=4,OddEven=8,Winding=16,Trace=32 };
-    void drawPath(array<array<vec2>>& paths, int flags);
+    void drawPath(ref<array<vec2>> paths, int flags);
 
     struct Fonts {
         String name;
@@ -29,7 +30,7 @@ struct PDF : Widget {
         map<float, Font> fonts;
         array<float> widths;
     };
-    map<string, Fonts> fonts;
+    map<String, Fonts> fonts;
     Font& getFont(Fonts& fonts, float size);
 
     struct Character {
@@ -51,9 +52,6 @@ struct PDF : Widget {
     };
     array<Polygon> polygons;
 
-    array<shared<Graphics>> pages;
+    array<Graphics> pages;
     size_t pageIndex = 0;
-
-    // Document height (normalized by width=1]
-    float height;
 };

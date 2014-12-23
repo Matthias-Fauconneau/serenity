@@ -50,7 +50,6 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
         {array<Variant> mediaBox;
 			mediaBox.append( 0 ); mediaBox.append( 0 ); mediaBox.append(pageSize.x*px); mediaBox.append(pageSize.y*px);
 			page.insert("MediaBox"__, Variant(move(mediaBox)));}
-        //page.insert("UserUnit", userUnit); log(userUnit); // Minimum user unit is 1
         {Object& contents = objects.append();
 			array<char> content;
 
