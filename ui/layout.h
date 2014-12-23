@@ -11,6 +11,7 @@ struct Layout : Widget {
 
     /// Computes widgets layout
 	virtual buffer<Rect> layout(int2 size) abstract;
+    virtual int stop(int2 size, int unused axis, int currentPosition, int direction=0) override;
 
     /// Renders all visible child widgets
 	shared<Graphics> graphics(int2 size, Rect clip) override;

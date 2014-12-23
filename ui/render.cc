@@ -239,7 +239,7 @@ void render(const Image& target, const Graphics& graphics, vec2 offset) {
 	for(const auto& e: graphics.lines) line(target, offset+e.a, offset+e.b, e.color, e.opacity);
     for(const auto& e: graphics.glyphs) {
 		Font::Glyph glyph = e.font.render(e.index);
-		blit(target, int2(round(offset+e.origin))+glyph.offset, glyph.image, e.color, e.opacity);
+        if(glyph.image) blit(target, int2(round(offset+e.origin))+glyph.offset, glyph.image, e.color, e.opacity);
     }
 	for(const auto& e: graphics.parallelograms) parallelogram(target, int2(round(offset+e.min)), int2(round(offset+e.max)), e.dy, e.color, e.opacity);
 	for(const auto& e: graphics.cubics) cubic(target, e.points, e.color, e.opacity, offset);

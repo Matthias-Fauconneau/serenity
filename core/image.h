@@ -14,11 +14,11 @@ struct Image : buffer<byte4> {
 	default_move(Image);
     Image(buffer<byte4>&& pixels, int2 size, uint stride=0, bool alpha=false, bool sRGB=true)
         : buffer<byte4>(::move(pixels)), size(size), stride(stride?:size.x), alpha(alpha), sRGB(sRGB) {
-		assert_(buffer::data && buffer::size == height*this->stride);
+        //assert_(buffer::data && buffer::size == height*this->stride);
     }
     Image(uint width, uint height, bool alpha=false, bool sRGB=true)
 		: buffer(height*width), width(width), height(height), stride(width), alpha(alpha), sRGB(sRGB) {
-		assert_(width && height && buffer::data);
+        //assert_(width && height && buffer::data);
     }
     Image(int2 size, bool alpha=false, bool sRGB=true) : Image(size.x, size.y, alpha, sRGB) {}
 

@@ -6,6 +6,8 @@
 #include "graphics.h"
 #include "text.h"
 #include "rle.h"
+#include "matrix.h"
+#include "function.h"
 
 static Variant parseVariant(TextData& s) {
     s.whileAny(" \t\r\n");
@@ -93,6 +95,54 @@ static Variant parseVariant(TextData& s) {
 }
 static Variant parseVariant(const string& buffer) { TextData s(buffer); return parseVariant(s); }
 static Dict toDict(const array<String>& xref, Variant&& object) { return object.dict ? move(object.dict) : parseVariant(xref[object.integer()]).dict; }
+
+
+/// Portable Document Format rendering context
+struct PDF {
+    PDF(string data);
+
+    // Current page rendering context
+    mat3x2 Tm,Cm;
+    vec2 boxMin, boxMax;
+    vec2 pageMin, pageMax;
+    void extend(vec2 p) { pageMin=min(pageMin, p), pageMax=max(pageMax, p); }
+
+    // Rendering primitives
+    struct Line { vec2 a, b; bool operator <(const Line& o) const{return a.y<o.a.y || b.y<o.b.y;}};
+    array<Line> lines;
+    enum Flags { Close=1,Stroke=2,Fill=4,OddEven=8,Winding=16,Trace=32 };
+    void drawPath(ref<array<vec2>> paths, int flags);
+
+    struct Fonts {
+        String name;
+        buffer<byte> data;
+        map<float, unique<Font>> fonts;
+        array<float> widths;
+    };
+    map<String, Fonts> fonts;
+    Font& getFont(Fonts& fonts, float size);
+
+    struct Character {
+        Fonts* fonts; float size; uint16 index; vec2 position; uint16 code;
+        bool operator <(const Character& o) const{return position.y<o.position.y;}
+    };
+    array<Character> characters;
+    void drawText(Fonts& fonts, int fontSize, float spacing, float wordSpacing, const string& data);
+
+    map<String, Image> images;
+    struct Blit {
+        vec2 position, size; Image image; Image resized;
+        bool operator <(const Blit& o) const{return position.y<o.position.y;}
+    };
+    array<Blit> blits;
+
+    struct Polygon {
+        vec2 min,max; array<Line> edges;
+    };
+    array<Polygon> polygons;
+
+    array<Graphics> pages;
+};
 
 PDF::PDF(string data) {
     array<String> xref; Dict catalog;
@@ -391,9 +441,11 @@ PDF::PDF(string data) {
             }
 
             {// Normalizes coordinates (Aligns top-left to 0, scales to DPI)
-                float scale = 96. /*ppi*/ / 72/*PostScript point per inch*/; // px/pt
+                //float scale = 96. /*ppi*/ / 72/*PostScript point per inch*/; // px/pt
+                float scale = 768 / (pageMax.y-pageMin.y); // Fit height
                 mat3x2 m (scale, 0,0, scale, -pageMin.x*scale, -pageMin.y*scale);
                 { vec2 a = m*pageMin, b = m*pageMax; pageMin = min(a, b); pageMax = max(a, b); }
+                assert_(int2(pageMin) == int2(0), pageMin);
                 for(Blit& b: blits) b.position = m*b.position, b.size *= scale;
                 for(Line& l: lines) { l.a=m*l.a; l.b=m*l.b; }
                 for(Character& c: characters) c.position=m*c.position, c.size *= scale;
@@ -405,7 +457,12 @@ PDF::PDF(string data) {
 
             // Converts to Graphics page
             Graphics page;
-            for(Line& l: lines) page.lines.append(l.a, l.b);
+            for(Line l: lines) page.lines.append(l.a, l.b);
+            for(Character o: characters) {
+                Font& font = getFont(*o.fonts, o.size);
+                assert_(font.index(o.code) == o.index);
+                if(font.metrics(o.index).size) page.glyphs.append(o.position, font, o.code, o.index);
+            }
             lines.clear();
             blits.clear();
             characters.clear();
@@ -463,37 +520,34 @@ void PDF::drawPath(const ref<array<vec2>> paths, int flags) {
 }
 
 Font& PDF::getFont(Fonts& fonts, float size) {
-     return *(fonts.fonts.find(size) ?: &fonts.fonts.insert(size, ::Font(unsafeRef(fonts.data), size, fonts.name)));
+     return *(fonts.fonts.find(size) ?: &fonts.fonts.insert(size, ::unique<Font>(unsafeRef(fonts.data), size, fonts.name)));
 }
 
 void PDF::drawText(Fonts& fonts, int size, float spacing, float wordSpacing, const string& data) {
     assert_(&fonts);
     //if(!fonts) return;
     assert_(fonts.data);
-    Font& font = getFont(fonts, size);
+    Font& font = getFont(fonts, (Tm*Cm)(0,0)*size);
     for(uint8 code : data) {
         if(code==0) continue;
         mat3x2 Trm = Tm*Cm;
         uint16 index = font.index(code);
         vec2 position = vec2(Trm(0,2),Trm(1,2));
-        if(position > boxMin && position < boxMax) {
-            pageMin.y=min(pageMin.y, position.y), pageMax.y=max(pageMax.y, position.y+Trm(0,0)*size);
+        auto metrics = font.metrics(index);
+        if(position > boxMin && position < boxMax && metrics.size) {
+            if(find(font.name, "HelsinkiStd"_)) // HACK: to trim text
+                pageMin.y=min(pageMin.y, position.y-metrics.bearing.y), pageMax.y=max(pageMax.y, position.y-metrics.bearing.y+metrics.height);
             characters.append( Character{&fonts, Trm(0,0)*size, index, position, code} );
         }
         float advance = spacing+(code==' '?wordSpacing:0);
         if(code < fonts.widths.size) advance += size*fonts.widths[code]/1000;
-        else advance += font.metrics(index).advance;
+        else advance += metrics.advance;
         Tm = mat3x2(advance, 0) * Tm;
     }
 }
 
-int2 PDF::sizeHint(int2 unused size) { return int2(pages[pageIndex].size); }
-shared<Graphics> PDF::graphics(int2 unused size /*TODO: center*/) {
-    return shared<Graphics>(&pages[pageIndex]);
-}
-
-bool PDF::keyPress(Key key, Modifiers) {
-    if(key==LeftArrow) { pageIndex = max(0, int(pageIndex)-1); return true; }
-    if(key==RightArrow) { pageIndex = min(pageIndex+1, pages.size-1); return true; }
-    return false;
+buffer<Graphics> decodePDF(ref<byte> file, array<unique<Font>>& fonts) {
+    PDF pdf(file);
+    for(PDF::Fonts& pdfFonts: pdf.fonts.values) fonts.append(move(pdfFonts.fonts.values));
+    return move(pdf.pages);
 }

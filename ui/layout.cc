@@ -10,9 +10,19 @@ shared<Graphics> Layout::graphics(int2 size, Rect clip) {
     return graphics;
 }
 
+int Layout::stop(int2 size, int axis, int currentPosition, int direction) {
+    array<Rect> widgets = layout(size);
+    for(int i: range(widgets.size)) {
+        if(widgets[i].min[axis] <= currentPosition && currentPosition < widgets[i].max[axis]) {
+            return widgets[clip(0, i+direction, int(widgets.size-1))].min[axis];
+        }
+    }
+    error(currentPosition);
+}
+
 bool Layout::mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
     array<Rect> widgets = layout(size);
-	for(size_t i: range(count()))
+    for(size_t i: range(widgets.size))
 		if(widgets[i].contains(cursor) && at(i).mouseEvent(cursor-widgets[i].origin(), widgets[i].size(), event, button, focus)) return true;
     return false;
 }
@@ -23,7 +33,7 @@ int2 Linear::sizeHint(const int2 xySize) {
 	if(!count) return {};
 	const int2 size = xy(xySize);
 	int widths[count];
-	int remainingWidth = size.x;
+    int remainingWidth = abs(size.x);
 	int expandingWidth = 0;
 	int height = 0;
 	bool expandingHeight=false;
@@ -32,13 +42,13 @@ int2 Linear::sizeHint(const int2 xySize) {
 		int2 hint = xy(at(index).sizeHint(xySize));
 		if(hint.x<0) expandingWidth++; // Counts expanding widgets
 		widths[index] = abs(hint.x);
-		if(size.x!=0) remainingWidth -= abs(hint.x); // Commits minimum width for all widgets (unless evaluating required size for sizeHint)
+        remainingWidth -= abs(hint.x); // Commits minimum width for all widgets (unless evaluating required size for sizeHint)
 		if(hint.y<0) expandingHeight=true;
-		height = max(height, size.y ? (hint.y < 0 ? size.y : min(size.y, hint.y)) : abs(hint.y));
+        height = max(height, size.y>0 ? (hint.y < 0 ? size.y : min(size.y, hint.y)) : abs(hint.y));
 	}
 
 	// Reduces widgets to fit allocated width
-	while(remainingWidth <= -int(count)) { // While layout is overcommited
+    if(size.x > 0) while(remainingWidth <= -int(count)) { // While layout is overcommited
 		int first = max(ref<int>(widths,count)); // First largest size
 		int firstCount=0; for(int size: widths) if(size == first) firstCount++; // Counts how many widgets already have the largest size
 		assert_(firstCount);
@@ -50,23 +60,23 @@ int2 Linear::sizeHint(const int2 xySize) {
 	int requiredWidth = 0, requiredHeight = 0;
 	for(size_t index: range(count)) {
 		int2 hint = xy(at(index).sizeHint(xy(int2(widths[index], height))));
-		requiredWidth += abs(hint.x);
+        requiredWidth += abs(hint.x);
 		requiredHeight = max(requiredHeight, abs(hint.y));
-	}
-	return xy(int2((expandingWidth||expanding?-1:1)*requiredWidth, (expandingHeight?-1:1)*requiredHeight));
+    }
+    return xy(int2((expandingWidth||expanding?-1:1)*requiredWidth, (expandingHeight?-1:1)*requiredHeight));
 }
 
 buffer<Rect> Linear::layout(const int2 xySize) {
 	size_t count = this->count();
     if(!count) return {};
 	const int2 size = xy(xySize);
-    int width = size.x /*remaining space*/; int expanding=0, height=0;
+    int width = abs(size.x) /*remaining space*/; int expanding=0, height=0;
     int widths[count], heights[count];
 
 	for(size_t index: range(count)) {
 		int2 hint = xy(at(index).sizeHint(xySize));
 		widths[index] = hint.x;
-		if(size.x!=0) width -= abs(widths[index]); // Commits minimum width for all widgets (unless evaluating required size for sizeHint)
+        width -= abs(widths[index]); // Commits minimum width for all widgets (unless evaluating required size for sizeHint)
 		if(hint.x<0) expanding++; // Counts expanding widgets
 		height = max(height, heights[index] = size.y ? (hint.y < 0 ? size.y : min(size.y, hint.y)) : hint.y); // Required height
     }
@@ -80,7 +90,7 @@ buffer<Rect> Linear::layout(const int2 xySize) {
             }
         }
         //width%sharing space remains as extra is rounded down
-	} else { // Reduces widgets to fit allocated space
+    } else if(size.x>0) { // Reduces widgets to fit allocated space
 		for(size_t i: range(count)) widths[i]=abs(widths[i]); // Converts all expanding widgets to fixed
 		while(width<=-int(count)) { // While layout is overcommited
             int first = max(ref<int>(widths,count)); // First largest size

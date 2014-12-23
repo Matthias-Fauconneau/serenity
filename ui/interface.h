@@ -8,7 +8,7 @@
 /// Implements a scrollable area for \a widget
 struct ScrollArea : Widget {
     /// Directions (false: expand, true: scroll)
-    bool horizontal=false, vertical=true;
+    bool horizontal = true, vertical = false;
     bool scrollbar = false;
 	const int scrollBarWidth = 8;
 	vec2 offset=0;
