@@ -160,7 +160,7 @@ void FLAC::decodeFrame() {
             for(uint i : range(blockSize)) block[channel][i] = constant;
             continue;
 		} else if (type == 1) { // Verbatim
-            error("TODO");
+            for(uint i: range(blockSize)) block[channel][i] = sbinary(rawSampleSize);
             continue;
         }
 

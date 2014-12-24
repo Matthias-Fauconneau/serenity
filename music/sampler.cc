@@ -10,6 +10,35 @@
 #include <fftw3.h> //fftw3f
 #include <fftw3.h> //fftw3f_threads
 
+#if 0
+#include <freeverb/revmodel.hpp>
+class FreeVerb : public LinuxSampler::Effect, private fv3::revmodel_f {
+public:
+    FreeVerb();
+    LinuxSampler::EffectInfo* GetEffectInfo();
+    void RenderAudio(uint Samples);
+    void InitEffect(LinuxSampler::AudioOutputDevice* pDevice) throw (LinuxSampler::Exception);
+};
+FreeVerb::FreeVerb() { setdry(0.4); setwet(0.3); setdamp(0.2);  setroomsize(0.7); setwidth(0.5); setInitialDelay(480); }
+LinuxSampler::EffectInfo* FreeVerb::GetEffectInfo() { return &info; }
+void FreeVerb::InitEffect(LinuxSampler::AudioOutputDevice* pDevice) throw (LinuxSampler::Exception) {
+  vInputChannels.push_back(pDevice->Channel(0));
+  vInputChannels.push_back(pDevice->Channel(1));
+  vOutputChannels.push_back(pDevice->Channel(0));
+  vOutputChannels.push_back(pDevice->Channel(1));
+}
+void FreeVerb::RenderAudio(uint Samples) {
+  processreplace(vInputChannels[0]->Buffer(), vInputChannels[1]->Buffer(),
+                 vOutputChannels[0]->Buffer(), vOutputChannels[1]->Buffer(), Samples );
+  static int muteDelay=0;
+  if(muteDelay<48000) {
+    memset(vOutputChannels[0]->Buffer(),0,sizeof(float)*Samples);
+    memset(vOutputChannels[1]->Buffer(),0,sizeof(float)*Samples);
+    muteDelay+=Samples;
+  }
+}
+#endif
+
 struct Audio : buffer<float2> { uint rate; Audio(buffer&& data, uint rate) : buffer(::move(data)), rate(rate){} };
 /// Decodes a full audio file
 Audio decodeAudio(const ref<byte>& data, uint duration=-1);
@@ -19,15 +48,17 @@ Audio decodeAudio(const ref<byte>& data, uint duration) {
     duration = ::min(duration, flac.duration);
     flac.audio = buffer<float2>(max(32768u,duration+8192));
     while(flac.audioAvailable<duration) flac.decodeFrame();
-    return {move(flac.audio), flac.rate};
+    return {copyRef(flac.audio.slice(0, duration)), flac.rate};
 }
 
 struct Sampler::Sample {
 	String name;
 	Map data; FLAC flac; array<float> envelope; //Sample data
 	int trigger=0; uint lovel=0; uint hivel=127; uint lokey=0; uint hikey=127; //Input controls
-    int pitch_keycenter=60; float releaseTime=0; float amp_veltrack=1; float volume=1; //Performance parameters
+    int pitch_keycenter=60; float releaseTime=1; float amp_veltrack=1; float volume=1; //Performance parameters
     int rt_decay=0;
+    float startLevel; // Sound level of first 2K samples
+    uint decayTime; // Time (in samples) where level decays below
 };
 inline String str(const  Sampler::Sample& s) { return str(s.lokey)+"-"_+str(s.pitch_keycenter)+"-"_+str(s.hikey); }
 inline bool operator <(const  Sampler::Sample& a, const Sampler::Sample& b) { return a.pitch_keycenter<b.pitch_keycenter; }
@@ -38,13 +69,14 @@ struct Note {
 	explicit Note(FLAC&& flac) : flac(move(flac)), readCount(this->flac.audioAvailable), writeCount(this->flac.audio.capacity-this->flac.audioAvailable) {}
 	FLAC flac;
 	v4sf level; //current note attenuation
-	v4sf step; //coefficient for release fade out = (2 ** -24)**(1/releaseTime)
+    v4sf step; //coefficient for release fade out = (2 ** -16)**(1/releaseTime)
 	Semaphore readCount; //decoder thread releases decoded samples, audio thread acquires
 	Semaphore writeCount; //audio thread release free samples, decoder thread acquires
     uint releaseTime; //to compute step
 	uint key=0, velocity=0; //to match release sample
 	ref<float> envelope; //to level release sample
-	/// Decodes frames until \a available samples is over \a need
+    uint decayTime = 0;
+    /// Decodes frames until \a available samples is over \a need
 	void decode(uint need);
 	/// Reads samples to be mixed into \a output
 	void read(mref<float2> output);
@@ -78,23 +110,32 @@ int noteToMIDI(const string& value) {
 
 template<int unroll> inline void accumulate(v4sf accumulators[unroll], const v4sf* ptr, const v4sf* end) {
     for(;ptr<end;ptr+=unroll) {
-        for(uint i: range(unroll)) accumulators[i]+=ptr[i]*ptr[i];
+        for(uint i: range(unroll)) accumulators[i] += ptr[i]*ptr[i];
     }
 }
-float sumOfSquares(const FLAC& flac, uint size) {
+double sumOfSquares(const FLAC& flac, uint size) {
 	size =size/2; uint index = flac.readIndex/2, capacity = flac.audio.capacity/2; // floor to v4sf
     uint beforeWrap = capacity-index;
     const v4sf* buffer = (v4sf*)flac.audio.data;
-    constexpr uint unroll=4; //4*4*4~64bytes: 1 prefetch/line
-    v4sf accumulators[unroll]={}; //breaks dependency chain to pipeline the unrolled loops
-    if(size>beforeWrap) { //wrap
+    constexpr uint unroll = 4; // 4*4*4~64bytes: 1 prefetch/line
+    v4sf accumulators[unroll]={}; // Breaks dependency chain to pipeline the unrolled loops (FIXME: double precision accumulation)
+    if(size>beforeWrap) { // Wraps
         accumulate<unroll>(accumulators, buffer+index,buffer+capacity); //accumulate until end of buffer
         accumulate<unroll>(accumulators, buffer,buffer+(size-beforeWrap)); //accumulate remaining wrapped part
     } else {
         accumulate<unroll>(accumulators, buffer+index,buffer+(index+size));
     }
     v4sf sum={}; for(uint i: range(unroll)) sum+=accumulators[i];
-    return (sum[0]+sum[1]+sum[2]+sum[3])/(1<<24)/(1<<24);
+    return double(sum[0]+sum[1]+sum[2]+sum[3]) / 4 / (1<<16) / (1<<16);
+}
+
+// Evaluates level from precomputed average of squares (sqrt( sum_N sq u ) / N = sqrt( sum_n ( sum_n' sq u ) / sq n' ) ) / n)
+static constexpr int factor = 256; // Downsample factor of precomputed average of squares
+static double level(ref<float> envelope, size_t start, size_t duration) {
+    start /= factor, duration /= factor;
+    double sum = 0;
+    if(start < envelope.size) for(float U: envelope.slice(start, min(envelope.size-start, duration))) sum += U;
+    return sqrt(sum) / duration;
 }
 
 Sampler::Sampler(uint outputRate, string path, function<void(uint)> timeChanged, Thread& thread) : Poll(0, POLLIN, thread), timeChanged(timeChanged) {
@@ -105,7 +146,7 @@ Sampler::Sampler(uint outputRate, string path, function<void(uint)> timeChanged,
 	TextData s = readFile(path);
 	Folder folder = section(path,'.',0,1); // Samples must be in a subfolder with the same name as the .sfz file
     Sample group, region; Sample* sample=&group;
-    bool release=false;
+    //bool release=false;
     for(;;) {
         s.whileAny(" \n\r"_);
         if(!s) break;
@@ -130,19 +171,19 @@ Sampler::Sampler(uint outputRate, string path, function<void(uint)> timeChanged,
             if(key=="sample"_) {
                 String path = replace(replace(value,"\\"_,"/"_),".wav"_,".flac"_);
                 sample->name = copy(path);
-                sample->data = Map(path,folder);
+                sample->data = Map(path, folder, Map::Read, Map::Flags(Map::Shared|Map::Populate));
                 sample->flac = FLAC(sample->data);
                 if(!rate) rate=sample->flac.rate;
 				else if(rate!=sample->flac.rate) error("Sample rate mismatch", rate,sample->flac.rate);
             }
-            else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1, release=true; else error("unknown trigger",value); }
+            else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1/*, release=true*/; else error("unknown trigger",value); }
 			else if(key=="lovel"_) sample->lovel=parseInteger(value);
 			else if(key=="hivel"_) sample->hivel=parseInteger(value);
 			else if(key=="lokey"_) sample->lokey=isInteger(value)?parseInteger(value):noteToMIDI(value);
 			else if(key=="hikey"_) sample->hikey=isInteger(value)?parseInteger(value):noteToMIDI(value);
 			else if(key=="pitch_keycenter"_) sample->pitch_keycenter=isInteger(value)?parseInteger(value):noteToMIDI(value);
 			else if(key=="key"_) sample->lokey=sample->hikey=sample->pitch_keycenter=isInteger(value)?parseInteger(value):noteToMIDI(value);
-            else if(key=="ampeg_release"_) {} /*sample->releaseTime=fromDecimal(value);*/
+            else if(key=="ampeg_release"_) sample->releaseTime = parseDecimal(value);
             else if(key=="amp_veltrack"_) {} /*sample->amp_veltrack=fromDecimal(value)/100;*/
             else if(key=="rt_decay"_) sample->rt_decay = parseInteger(value);
             else if(key=="volume"_) sample->volume = exp10(parseDecimal(value)/20.0); // dB (energy) to amplitude
@@ -156,38 +197,39 @@ Sampler::Sampler(uint outputRate, string path, function<void(uint)> timeChanged,
     }
     if(sample==&region) samples.insertSorted(move(region)); // Do not forget to record last region
 
-    if(release) Folder("Envelope"_, folder, true);
+    Folder("Envelope"_, folder, true);
     for(Sample& s: samples) {
-        if(release) {
-            if(!existsFile(String("Envelope/"_+s.name+".env"_),folder)) {
-                FLAC flac(s.data);
-                array<float> envelope; uint size=0;
-                while(flac.blockSize!=0) {
-                    const uint period=1<<8;
-                    while(flac.blockSize!=0 && size<period) { size+=flac.blockSize; flac.decodeFrame(); }
-                    if(size>=period) {
-						envelope.append( sumOfSquares(flac, period) );
-                        flac.readIndex=(flac.readIndex+period)%flac.audio.capacity;
-                        size-=period;
-                    }
+        if(!existsFile(String("Envelope/"_+s.name+".env"_),folder)) {
+            FLAC flac(s.data);
+            array<float> envelope; uint size=0;
+            while(flac.blockSize!=0) {
+                while(flac.blockSize!=0 && size<factor) { size+=flac.blockSize; flac.decodeFrame(); }
+                if(size>=factor) {
+                    envelope.append( sumOfSquares(flac, factor) / sq(factor) );
+                    flac.readIndex=(flac.readIndex+factor)%flac.audio.capacity;
+                    size-=factor;
                 }
-                log(s.name, envelope.size);
-                writeFile("Envelope/"_+s.name+".env"_,cast<byte>(envelope),folder);
             }
-            s.envelope = cast<float>(readFile(String("Envelope/"_+s.name+".env"_),folder));
+            log(s.name, envelope.size);
+            writeFile("Envelope/"_+s.name+".env"_,cast<byte>(envelope), folder, true);
         }
+        s.envelope = cast<float>(readFile(String("Envelope/"_+s.name+".env"_),folder));
+        s.startLevel = ::level(s.envelope, 0, 2048);
+        for(size_t t: reverse_range(s.envelope.size)) if(sqrt(s.envelope[t])>0x1p-16) { s.decayTime = t * factor; break; }
+        //log(s.decayTime, s.flac.duration);
 
         s.flac.decodeFrame(); // Decodes first frame of all samples to start mixing without latency
-		s.data.lock(); // Locks compressed samples in memory
+        s.data.lock(); // Locks compressed samples in memory
 
         for(int key: range(s.lokey,s.hikey+1)) { // Instantiates all pitch shifts on startup
             float shift = key-s.pitch_keycenter; //TODO: tune
+            assert_(shift == -1 || shift== 0 || shift == 1, s.lokey, s.hikey, s.pitch_keycenter);
             Layer* layer=0;
             for(Layer& l : layers) if(l.shift==shift) layer=&l;
             if(layer == 0) { // Generates pitch shifting (resampling) filter banks
 				Layer layer;
 				layer.shift = shift;
-				layer.notes.reserve(64);
+                layer.notes.reserve(32);
                 if(shift || rate!=outputRate) {
                     const uint size = 2048; // Accurate frequency resolution while keeping reasonnable filter bank size
 					layer.resampler = Resampler(2, size, round(size*exp2((-shift)/12.0)*outputRate/rate),
@@ -198,10 +240,11 @@ Sampler::Sampler(uint outputRate, string path, function<void(uint)> timeChanged,
         }
     }
 
-    Audio reverb = decodeAudio(readFile("../reverb.flac"_,folder));
-    assert(reverb.rate == rate);
+    Audio reverb = decodeAudio(readFile("../reverb.flac"_,folder), 8192);
+    assert_(reverb.rate == rate);
     //reverbSize = reverb.size;
-    N = reverb.size+periodSize;
+    N = reverb.size;
+    assert_(N<=32768);
 
     // Computes normalization
     float sum=0; for(uint i: range(reverb.size)) sum += reverb[i][0]*reverb[i][0] + reverb[i][1]*reverb[i][1];
@@ -234,112 +277,105 @@ Sampler::Sampler(uint outputRate, string path, function<void(uint)> timeChanged,
 
 /// Input events (realtime thread)
 
-float Note::actualLevel(uint size) const {
-    const int count = size>>8;
-	if((flac.position>>8)+count>envelope.size) return 0; // Fully decayed
-	float sum=0; for(int i=0;i<count;i++) sum+=envelope[(flac.position>>8)+count]; // Precomputed sum
-    return sqrt(sum)/size;
-}
+
+float Note::actualLevel(uint duration) const { return ::level(envelope, flac.position, duration); }
 
 void Sampler::noteEvent(uint key, uint velocity) {
 	//TODO: Pedal events
     Note* released=0;
-    if(velocity==0) {
+    //if(velocity==0) { // Also releases repetitions
         for(Layer& layer: layers) for(Note& note: layer.notes) if(note.key==key) {
-            released=&note; // Records released note to match release sample level
+            if(velocity==0) released=&note; // Triggers release sample (only release, not on repetitions)
             if(note.releaseTime) { // Releases fades out current note
-                float step = pow(0x2p-24, 2./*2 frames/step*//(rate*note.releaseTime)); // Fades out to 2^-24 in releaseTime
+                float step = pow(0x1p-16, 2./*2 frames/step*//(rate*note.releaseTime)); // Fades out to 2^-16 in releaseTime
                 note.step=(v4sf){step,step,step,step};
                 note.level[2]=note.level[3]=note.level[0]*step/2; // Steps level of second frame
             }
         }
-        if(!released) return; // Already fully decayed
-        velocity=released->velocity;
-    }
+        if(velocity==0) {
+            if(!released) return; // Already fully decayed
+            velocity=released->velocity;
+        }
+    //}
     for(const Sample& s : samples) {
         if(s.trigger == (released?1:0) && s.lokey <= key && key <= s.hikey && s.lovel <= velocity && velocity <= s.hivel) {
-			{
-                float shift = int(key)-s.pitch_keycenter; //TODO: tune
-                Layer* layer=0;
-                for(Layer& l : layers) if(l.shift==shift) layer=&l;
-                assert(layer);
-
-				Note note (::copy(s.flac));
-                note.envelope = s.envelope;
-                if(!released) { // Press
-                    note.key=key, note.velocity=velocity;
-                    note.level = float4(s.volume * float(velocity) / 127.f); // E ~ A^2 ~ v^2 => A ~ v
-                } else { // Release (rt_decay is unreliable, matching levels works better), FIXME: window length for energy evaluation is arbitrary
-                    float sustainLevel = note.actualLevel(2048); // 42ms
-                    float releaseLevel = released->actualLevel(2048);
-					float currentAttenuation = released->level[0];
-                    float estimatedLevel = min<float>(1.f, currentAttenuation * sustainLevel / releaseLevel); // 341ms/21ms
-                    float modeledLevel = exp10((s.volume - s.rt_decay*(note.flac.position/48000.0))/20.0);
-                    note.level = float4(min(estimatedLevel, modeledLevel));
-                }
-                if(note.level[0]<0x1p-8) return;
-                note.step=(v4sf){1,1,1,1};
-                note.releaseTime=s.releaseTime;
-                note.envelope=s.envelope;
-                if(note.flac.sampleSize==16) note.level *= float4(0x1p8f);
-
-				if(layer->notes.size>=layer->notes.capacity) log(layer->notes.size);
-                // WARNING: decoder should run in separate thread or deadlock will occur
-                lock.acquire(2); // Lock both decoder and mixer before reallocating (FIXME: append is atomic when not reallocating)
-				// Cleanups silent notes
-				for(Layer& layer: layers) layer.notes.filter([](const Note& note){
-					return (note.flac.blockSize==0 && note.readCount<int(2*periodSize)) || note.level[0]<0x1p-15;
-				});
-				layer->notes.append(move(note)); // Copies predecoded buffer and corresponding FLAC decoder state
-				lock.release(2);
+            float level = 1;
+            if(released) { // Release (rt_decay is unreliable, matching levels works better), FIXME: window length for energy evaluation is arbitrary
+                float releaseLevel = s.startLevel; // 42ms
+                float releasedLevel = released->actualLevel(2048);
+                float currentAttenuation = released->level[0];
+                float estimatedLevel = min<float>(1.f, currentAttenuation * releasedLevel / releaseLevel); // 341ms/21ms
+                level = estimatedLevel; //min(estimatedLevel, modeledLevel);
             }
+            if(level < 0x1p-7) return;
+
+            float shift = int(key)-s.pitch_keycenter; //TODO: tune
+            Layer* layer=0;
+            for(Layer& l : layers) if(l.shift==shift) layer=&l;
+            assert(layer);
+
+            Note note (::copy(s.flac));
+            note.envelope = s.envelope;
+            note.decayTime = s.decayTime;
+            if(!released) { // Press
+                note.key = key, note.velocity = velocity;
+                note.level = float4(1); // Velocity layers already select correct level //s.volume * float(velocity) / 127.f); // E ~ A^2 ~ v^2 => A ~ v
+            } else {
+                note.level = float4(level);
+            }
+            note.step=(v4sf){1,1,1,1};
+            note.releaseTime=s.releaseTime;
+            note.envelope=s.envelope;
+            //if(note.flac.sampleSize==16) note.level *= float4(0x1p8f);
+
+            if(layer->notes.size>=layer->notes.capacity) log(layer->notes.size);
+            // WARNING: decoder should run in separate thread or deadlock will occur
+            lock.acquire(2); // Lock both decoder and mixer before reallocating (FIXME: append is atomic when not reallocating)
+            // Cleanups silent notes
+            for(Layer& layer: layers) layer.notes.filter([](const Note& note) {
+                return (note.flac.blockSize==0 && note.readCount<int(2*periodSize)) || note.level[0]<0x1p-7 || note.flac.position > note.decayTime;
+            });
+            layer->notes.append(move(note)); // Copies predecoded buffer and corresponding FLAC decoder state
+            lock.release(2);
             queue(); //queue background decoder in main thread
             return;
         }
     }
     if(released) return; // Release samples are not mandatory
-    if(key<=30 || key>=90) return; // Some instruments have a narrower range
+    if(key<=30 || key>=90) return; // Some instruments have a narrow range
 	log("Missing sample"_, key, velocity);
 }
 
 /// Background decoder (background thread)
 
 void Sampler::event() { // Decode thread event posted every period from Sampler::read by audio thread
-	lock.acquire(1);
     for(;;) {
-		Note* note=0; size_t minBufferSize=-1;
+        lock.acquire(1);
+        Note* note=0; size_t minBufferSize=-1;
         for(Layer& layer: layers) for(Note& n: layer.notes) { // Finds least buffered note
 			if(n.flac.blockSize /*!EOF*/ && n.writeCount >= n.flac.blockSize && n.flac.audioAvailable < minBufferSize) {
 				note = &n;
 				minBufferSize = max<int>(layer.resampler?layer.resampler.need(periodSize):periodSize, n.flac.audioAvailable);
             }
 		}
-        if(!note) { // All notes are already fully buffered
-            break;
-        }
-		//assert_(note->readCount + note->writeCount == note->flac.audio.capacity);
-		size_t size = note->flac.blockSize;
+        if(!note) { lock.release(1); break; } // All notes are already fully buffered
+        size_t size = note->flac.blockSize;
 		note->writeCount.acquire(size);
 		note->flac.decodeFrame();
+        lock.release(1);
 		note->readCount.release(size);
-		//assert_(note->readCount + note->writeCount == note->flac.audio.capacity);
     }
-	/*for(Layer& layer: layers) for(Note& note: layer.notes)
-		assert_(note.readCount + note.writeCount == note.flac.audio.capacity, note.readCount, note.writeCount, note.flac.audio.capacity);*/
-	lock.release(1);
 }
 
 /// Audio mixer (realtime thread)
 inline void mix(v4sf& level, v4sf step, mref<float2> output, ref<float2> input) {
-#if SIMD
 	size_t size = output.size;
     v4sf* out = (v4sf*)output.data;
-    v4sf* in = (v4sf*)input.data;
-    for(uint i: range(size/2)) { out[i] += level * in[i]; level *= step; }
-#else
-	if(step[0] == 1) for(size_t i: range(output.size)) output[i] += level[0] * input[i];
-	else for(size_t i: range(output.size)) { output[i] += level[0] * input[i]; level *= step; }
-#endif
+    assert_(ptr(out)%sizeof(v4sf)==0);
+    const v4sf* in = (const v4sf*)input.data;
+    assert_(ptr(in)%sizeof(v4sf)==0, in);
+    if(step[0] == 1) for(size_t i: range(size/2)) out[i] += level * in[i];
+    else for(size_t i: range(size/2)) { out[i] += level * in[i]; level *= step; }
 }
 void Note::read(mref<float2> output) {
 	if(flac.blockSize==0 && readCount<output.size) { readCount.counter=0; return; } // End of stream
@@ -350,8 +386,9 @@ void Note::read(mref<float2> output) {
     }
 	uint beforeWrap = flac.audio.capacity - flac.readIndex;
 	assert_(output.size <= flac.audioAvailable, output.size, flac.audioAvailable, readCount);
-	if(output.size > beforeWrap) {
-		mix(level, step, output.slice(0, beforeWrap), flac.audio.slice(flac.readIndex,beforeWrap));
+    assert_(output.size%2 == 0, output.size);
+    if(output.size > beforeWrap) {
+        mix(level, step, output.slice(0, beforeWrap), flac.audio.slice(flac.readIndex, beforeWrap));
 		mix(level, step, output.slice(beforeWrap), flac.audio.slice(0,output.size-beforeWrap));
         flac.readIndex = output.size-beforeWrap;
     } else {
@@ -368,14 +405,14 @@ size_t Sampler::read16(mref<int16> output) {
 	error("");
 	buffer<float> buffer (output.size);
 	size_t size = read(mcast<float2>(buffer));
-	for(size_t i: range(size*channels)) output[i] = round(buffer[i]*0x1p-11f); // 24bit -> 16bit with 3bit headroom for multiple notes
+    for(size_t i: range(size*channels)) output[i] = round(buffer[i]*0x1p-3f); // 16bit -> 16bit with 3bit headroom for multiple notes
 	return size;
 }
 
 size_t Sampler::read32(mref<int2> output) { // Audio thread
     v4sf buffer[output.size*2/4];
     uint size = read(mref<float2>((float2*)buffer, output.size));
-    for(uint i: range(size*2/4)) ((v4si*)output.data)[i] = cvtps2dq(buffer[i]*float4(0x1p7f)); // 24bit -> 32bit with 1bit headroom for multiple notes
+    for(uint i: range(size*2/4)) ((v4si*)output.data)[i] = cvtps2dq(buffer[i]*float4(0x1p15f)); // 16bit -> 32bit with 1bit headroom for multiple notes
     return size;
 }
 
@@ -387,8 +424,8 @@ size_t Sampler::read(mref<float2> output) {
         for(Layer& layer: layers) { // Mixes all notes of all layers
             if(layer.resampler) {
 				int need = layer.resampler.need(output.size);
-                if(need >= 0 ) {
-					size_t inSize = need;
+                if(need >= 0) {
+                    size_t inSize = align(2, need);
                     if(layer.audio.capacity<inSize) layer.audio = buffer<float2>(inSize);
 					layer.audio.size = inSize;
                     layer.audio.clear(0);

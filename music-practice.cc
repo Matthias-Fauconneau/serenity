@@ -20,24 +20,45 @@ shared<Graphics> GraphicsWidget::graphics(int2 unused size /*TODO: center*/) { r
 /// SFZ sampler and PDF renderer
 struct Music {
     Folder folder {"Scores"_, home()};
-    const uint rate = 48000;
+    String title;
+
+    const uint rate = 44100;
     Thread decodeThread;
-    Sampler sampler {rate, "/Samples/Blanchet.sfz"_, [](uint){}, decodeThread}; // Audio mixing (consumer thread) preempts decoder running in advance (in producer thread (main thread))
+    Sampler sampler {rate, "/Samples/Maestro.sfz"_, [](uint){}, decodeThread}; // Audio mixing (consumer thread) preempts decoder running in advance (in producer thread (main thread))
     Thread audioThread;
     AudioOutput audio {{&sampler, &Sampler::read32}, audioThread};
-    //MidiInput input;
+    MidiInput input;
 
     array<unique<Font>> fonts;
-    Scroll<HList<GraphicsWidget>> pages = apply(decodePDF(readFile(arguments()[0], folder), fonts), [](Graphics& o) { return GraphicsWidget(move(o)); });
-    Window window {&pages, int2(0, 768)};
+    unique<Scroll<HList<GraphicsWidget>>> pages;
+    Window window {&pages->area(), int2(0, 768)};
 
     Music() {
-        pages.horizontal = true;
-        //input.noteEvent.connect(&sampler,&Sampler::noteEvent);
+        setTitle(arguments()[0]);
+        window.actions[DownArrow] = {this, &Music::nextTitle};
+        window.actions[Return] = {this, &Music::nextTitle};
+        input.noteEvent.connect(&sampler,&Sampler::noteEvent);
         decodeThread.spawn();
-        //audio.start(sampler.rate, Sampler::periodSize, 32, 2);
-        audioThread.spawn();
         AudioControl("Master Playback Switch") = 1;
-        //AudioControl("Headphone Jack") = 1;
+        AudioControl("Headphone Playback Switch") = 1;
+        audio.start(sampler.rate, Sampler::periodSize, 32, 2);
+        audioThread.spawn();
+     }
+    ~Music() {
+        decodeThread.wait(); // ~Thread
+        audioThread.wait(); // ~Thread
     }
+
+     void setTitle(string title) {
+         this->title = copyRef(title);
+         pages = unique<Scroll<HList<GraphicsWidget>>>( apply(decodePDF(readFile(title+".pdf"_, folder), fonts), [](Graphics& o) { return GraphicsWidget(move(o)); }) );
+         pages->horizontal = true;
+         window.widget = window.focus = &pages->area();
+         window.render();
+         window.setTitle(title);
+     }
+     void nextTitle() {
+         array<String> files = folder.list(Files|Sorted);
+         for(size_t index: range(files.size-1)) if(startsWith(files[index], title) && !startsWith(files[index+1], title)) { setTitle(section(files[index+1],'.')); break; }
+     }
 } app;

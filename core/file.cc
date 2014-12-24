@@ -107,7 +107,12 @@ Socket::Socket(int domain, int type):Stream(check(socket(domain,type|SOCK_CLOEXE
 
 // -- File
 
-File::File(const string path, const Folder& at, Flags flags) : Stream(check(openat(at.fd, strz(path), flags, 0666), at.name(), path, at.list(Files))) {}
+int open(const string path, const Folder& at, Flags flags) {
+    int fd = openat(at.fd, strz(path), flags, 0666);
+    if(flags&NonBlocking && -*__errno_location()==int(LinuxError::Busy)) return 0;
+    return check(fd, at.name(), path, at.list(Files));
+}
+File::File(const string path, const Folder& at, Flags flags) : Stream(open(path, at, flags)) {}
 
 struct stat File::stat() const { struct stat stat; check( fstat(fd, &stat) ); return stat; }
 
@@ -159,7 +164,7 @@ Map::Map(uint fd, uint offset, uint size, Prot prot, Flags flags){
 
 Map::~Map() { unmap(); }
 
-void Map::lock(size_t size) const { /*check*/(mlock(data, min<size_t>(this->size,size))); }
+int Map::lock(size_t size) const { return mlock(data, min<size_t>(this->size,size)); }
 
 void Map::unmap() {
 	if(data) munmap((void*)data, size);

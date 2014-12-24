@@ -6,4 +6,5 @@ music
 tuner
 image
 /usr/include/freetype2
+/usr/local/include/libfreeverb3-3
 .

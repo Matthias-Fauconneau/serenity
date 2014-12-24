@@ -64,9 +64,9 @@ bool playbackDeviceAvailable() {
 Device getPlaybackDevice() {
     Folder snd("/dev/snd");
     for(const String& device: snd.list(Devices))
-        if(startsWith(device, "pcm") && endsWith(device,"D0p")) return Device(device, snd, ReadWrite);
+        if(startsWith(device, "pcm") && endsWith(device,"D0p")) return Device(device, snd, Flags(ReadWrite|NonBlocking));
     for(const String& device: snd.list(Devices))
-        if(startsWith(device, "pcm") && endsWith(device,"p")) return Device(device, snd, ReadWrite);
+        if(startsWith(device, "pcm") && endsWith(device,"p")) return Device(device, snd, Flags(ReadWrite|NonBlocking));
     error("No PCM playback device found"); //FIXME: Block and watch folder until connected
 }
 
@@ -74,8 +74,9 @@ AudioOutput::AudioOutput(decltype(read16) read, Thread& thread) : Poll(0, POLLOU
 AudioOutput::AudioOutput(decltype(read32) read, Thread& thread) : Poll(0, POLLOUT, thread), read32(read) {}
 AudioOutput::AudioOutput(decltype(read32m) read, Thread& thread) : Poll(0, POLLOUT, thread), read32m(read) {}
 
-void AudioOutput::start(uint rate, uint periodSize, uint sampleBits, uint channels) {
+bool AudioOutput::start(uint rate, uint periodSize, uint sampleBits, uint channels) {
     if(!Device::fd) { Device::fd = move(getPlaybackDevice().fd); Poll::fd = Device::fd; }
+    if(!Device::fd) return false;
     if(!status || status->state < Setup || this->rate!=rate || this->periodSize!=periodSize || this->sampleBits!=sampleBits) {
         HWParams hparams;
         hparams.mask(Access).set(MMapInterleaved);
@@ -121,6 +122,7 @@ void AudioOutput::start(uint rate, uint periodSize, uint sampleBits, uint channe
     registerPoll();
     if(status->state < Prepared) io<PREPARE>();
     event();
+    return true;
 }
 
 void AudioOutput::stop() {
@@ -138,7 +140,7 @@ void AudioOutput::stop() {
 }
 
 void AudioOutput::event() {
-    if(status->state == XRun) { io<PREPARE>(); log("Overrun"); }
+    if(status->state == XRun) { io<PREPARE>(); }
 	int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
 		uint readSize;
@@ -265,7 +267,6 @@ void AudioInput::event() {
 #include "thread.h"
 #include "file.h"
 #include "string.h"
-
 struct ID { uint numid, iface, device, subdevice; char name[44]; uint index; };
 struct List { uint offset, capacity, used, count; ID* pids; byte reserved[50]; };
 struct Info { ID id; uint type, access, count, owner; long min, max, step; byte reserved[128-sizeof(long[3])+64]; };
@@ -287,8 +288,9 @@ AudioControl::AudioControl(string name) : Device("/dev/snd/controlC1") {
         Info info;
         info.id.numid = ids[i].numid;
         iowr<ELEM_INFO>(info);
-        if(startsWith(string(info.id.name),name)) { id=info.id.numid; min=info.min, max=info.max; /*break;*/ }
+        if(startsWith(string(info.id.name),name)) { id=info.id.numid; min=info.min, max=info.max; return; }
     }
+    error("No such control", name);
 }
 
 AudioControl::operator long() {
@@ -296,9 +298,4 @@ AudioControl::operator long() {
     iowr<ELEM_READ>(value);
     return value.values[0];
 }
-
-void AudioControl::operator =(long v) {
-    Value value; value.id.numid = id;
-    value.values[0] = clip(min, v, max);
-    iowr<ELEM_WRITE>(value);
-}
+void AudioControl::operator =(long v) { Value value{.id={.numid = id}, .values = {clip(min, v, max) /*L*/, clip(min, v, max)/*R*/}}; iowr<ELEM_WRITE>(value); }

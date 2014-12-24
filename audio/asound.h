@@ -34,7 +34,7 @@ struct AudioOutput : Device, Poll {
 
     /// Configures PCM for 16bit output
     /// \note \a read will be called back periodically to request an \a output frame of \a size samples
-	void start(uint rate, uint periodSize, uint sampleBits, uint channels);
+    bool start(uint rate, uint periodSize, uint sampleBits, uint channels);
 
     /// Drains audio output and stops requiring data from \a read callback
     void stop();

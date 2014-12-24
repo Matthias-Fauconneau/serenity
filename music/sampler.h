@@ -26,8 +26,8 @@ struct Sampler : Poll {
     //static constexpr uint periodSize = 128; // [3ms] Same as resampler latency and 1m sound propagation time
     static constexpr uint periodSize = 256; // [5ms] Latency/convolution tradeoff (FIXME: ring buffer)
     //static constexpr uint periodSize = 512; // [11ms] Required for efficient FFT convolution (reverb) (FIXME: ring buffer)
-    //static constexpr uint periodSize = 1024; // [21ms] Maximum compatibility (when latency is not critical) (FIXME: skip start for accurate timing))
 
+#if 1
     /// Convolution reverb
     uint N=0; // reverbSize+periodSize
     buffer<float> reverbFilter[2]; // Convolution reverb filter in frequency-domain
@@ -40,6 +40,8 @@ struct Sampler : Poll {
     struct FFTW : handle<fftwf_plan> { using handle<fftwf_plan>::handle; default_move(FFTW); FFTW(){} ~FFTW(); };
     FFTW forward[2]; // FFTW plan to forward transform reverb buffer
     FFTW backward; // FFTW plan to backward transform product*/
+#else
+#endif
 
     /// Emits period time to trigger MIDI file input and update the interface
 	function<void(uint)> timeChanged;

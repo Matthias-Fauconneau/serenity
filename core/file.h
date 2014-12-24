@@ -3,7 +3,7 @@
 #include "string.h"
 
 /// Linux error code names
-enum class LinuxError : int { OK, Interrupted=-4, Invalid=-22 };
+enum class LinuxError : int { OK, Interrupted=-4, Busy=-16, Invalid=-22 };
 constexpr string linuxErrors[] = {
 	"OK", "PERM", "NOENT", "SRCH", "INTR", "IO", "NXIO", "TOOBIG", "NOEXEC", "BADF", "CHILD", "AGAIN", "NOMEM", "ACCES", "FAULT", "NOTBLK",
 	"BUSY", "EXIST", "XDEV", "NODEV", "NOTDIR", "ISDIR", "INVAL", "NFILE", "MFILE", "NOTTY", "TXTBSY", "FBIG", "NOSPC", "SPIPE", "ROFS", "MLINK",
@@ -140,7 +140,7 @@ template<uint major, uint minor, Type T> struct IOWR { typedef T Args; static co
 /// Handle to a device
 struct Device : File {
     Device(){}
-    Device(const string path, const Folder& at=root(), Flags flags=ReadWrite):File(path, at, flags){}
+    Device(const string path, const Folder& at=root(), Flags flags=ReadWrite) : File(path, at, flags){}
     /// Sends ioctl \a request with untyped \a arguments
     int ioctl(uint request, void* arguments, int pass=0);
     /// Sends ioctl request with neither input/outputs arguments
@@ -166,12 +166,12 @@ struct Map : mref<byte> {
     Map& operator=(Map&& o) { this->~Map(); new (this) Map(::move(o)); return *this; }
 
     explicit Map(const File& file, Prot prot=Read, Flags flags=Shared);
-	explicit Map(const string path, const Folder& at=currentWorkingDirectory(), Prot prot=Read) : Map(File(path,at), prot) {}
+    explicit Map(const string path, const Folder& at=currentWorkingDirectory(), Prot prot=Read, Flags flags=Shared) : Map(File(path,at), prot, flags) {}
     Map(uint fd, uint offset, uint size, Prot prot, Flags flags=Shared);
     ~Map();
 
 	/// Locks memory map in RAM
-	void lock(size_t size=-1) const;
+    int lock(size_t size=-1) const;
 
     /// Unmaps memory map
     void unmap();

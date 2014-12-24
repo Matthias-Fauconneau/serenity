@@ -136,10 +136,11 @@ struct PDF {
     };
     array<Blit> blits;
 
-    struct Polygon {
+    /*struct Polygon {
         vec2 min,max; array<Line> edges;
     };
-    array<Polygon> polygons;
+    array<Polygon> polygons;*/
+    array<Cubic> cubics;
 
     array<Graphics> pages;
 };
@@ -392,7 +393,7 @@ PDF::PDF(string data) {
                     OP2('D','o') if(images.contains(args[0].data)) {
                         extend(Cm*vec2(0,0)); extend(Cm*vec2(1,1));
                         blits.append( Blit{Cm*vec2(0,1),Cm*vec2(1,1)-Cm*vec2(0,0),share(images.at(args[0].data)),{}} );
-                    } else error("No such image", args[0].data);
+                    } //else error("No such image", args[0].data);
                     OP2('E','T') ;
                     OP2('g','s') ;
                     OP2('r','e') {
@@ -434,13 +435,14 @@ PDF::PDF(string data) {
                 for(Blit& b: blits) b.position = m*b.position ;
                 for(Line& l: lines) { l.a=m*l.a; l.b=m*l.b; }
                 for(Character& c: characters) c.position=m*c.position;
-                for(Polygon& polygon: polygons) {
+                /*for(Polygon& polygon: polygons) {
                     { vec2 a=m*polygon.min, b=m*polygon.max; polygon.min = min(a, b); polygon.max = max(a, b); }
                     for(Line& l: polygon.edges) { l.a=m*l.a; l.b=m*l.b; }
-                }
+                }*/
+                for(Cubic& o: cubics) for(vec2& p: o.points) p = m*p;
             }
 
-            {// Normalizes coordinates (Aligns top-left to 0, scales to DPI)
+            { // Normalizes coordinates (Aligns top-left to 0, scales to DPI)
                 //float scale = 96. /*ppi*/ / 72/*PostScript point per inch*/; // px/pt
                 float scale = 768 / (pageMax.y-pageMin.y); // Fit height
                 mat3x2 m (scale, 0,0, scale, -pageMin.x*scale, -pageMin.y*scale);
@@ -449,10 +451,11 @@ PDF::PDF(string data) {
                 for(Blit& b: blits) b.position = m*b.position, b.size *= scale;
                 for(Line& l: lines) { l.a=m*l.a; l.b=m*l.b; }
                 for(Character& c: characters) c.position=m*c.position, c.size *= scale;
-                for(Polygon& polygon: polygons) {
-                    { vec2 a=m*polygon.min, b=m*polygon.max; polygon.min = min(a, b); polygon.max = max(a, b); }
-                    for(Line& l: polygon.edges) { l.a=m*l.a; l.b=m*l.b; }
-                }
+                for(Cubic& o: cubics) for(vec2& p: o.points) p = m*p;
+            }
+
+            { // Hints lnes
+               // for(Line& l: lines) { l.a=round(l.a); l.b=round(l.b); }
             }
 
             // Converts to Graphics page
@@ -461,12 +464,17 @@ PDF::PDF(string data) {
             for(Character o: characters) {
                 Font& font = getFont(*o.fonts, o.size);
                 assert_(font.index(o.code) == o.index);
-                if(font.metrics(o.index).size) page.glyphs.append(o.position, font, o.code, o.index);
+                if(font.metrics(o.index).size) {
+                    page.glyphs.append(o.position, font, o.code, o.index);
+                    assert_(font.render(o.index).image);
+                }
             }
+            for(Cubic& o: cubics) page.cubics.append(move(o));
             lines.clear();
             blits.clear();
             characters.clear();
-            polygons.clear();
+            //polygons.clear();
+            cubics.clear();
             page.size = pageMax-pageMin;
             this->pages.append(move(page));
         }
@@ -480,7 +488,7 @@ vec2 cubic(vec2 A,vec2 B,vec2 C,vec2 D,float t) { return ((1-t)*(1-t)*(1-t))*A +
 void PDF::drawPath(const ref<array<vec2>> paths, int flags) {
     for(ref<vec2> path : paths) {
         //if(path.size > 5) continue; //FIXME: triangulate concave polygons
-        for(vec2 p : path) if(p > boxMin && p < boxMax) extend(p); // FIXME: clip
+        for(vec2 p : path) if(p >= boxMin && p <= boxMax) extend(p); // FIXME: clip
         array<vec2> polyline;
         if(path.size>=4) for(uint i=0; i<path.size-3; i+=3) {
             if( path[i+1] == path[i+2] && path[i+2] == path[i+3] ) {
@@ -498,8 +506,8 @@ void PDF::drawPath(const ref<array<vec2>> paths, int flags) {
             }
             if(flags&Close) lines.append( Line{polyline.last(), polyline.first()} );
         }
-        if(flags&Stroke) this->lines.append( lines );
         if(flags&Fill) {
+#if 0
             Polygon polygon;
             // Software rendering (FIXME: precompute line equations)
             polygon.min=path[0], polygon.max=path[0];
@@ -515,7 +523,15 @@ void PDF::drawPath(const ref<array<vec2>> paths, int flags) {
             }
             if(area>0) for(Line& e: polygon.edges) swap(e.a,e.b); // Converts to CCW winding in top-left coordinate system*/
             polygons.append( move(polygon) );
+#else
+            if(!(flags&Close)) {
+                //assert_(path[0]==path.last(), path);
+                path = path.slice(0, path.size-1);
+            }
+            cubics.append( copyRef(path) );
+#endif
         }
+        else if(flags&Stroke) this->lines.append( lines );
     }
 }
 
@@ -535,8 +551,10 @@ void PDF::drawText(Fonts& fonts, int size, float spacing, float wordSpacing, con
         vec2 position = vec2(Trm(0,2),Trm(1,2));
         auto metrics = font.metrics(index);
         if(position > boxMin && position < boxMax && metrics.size) {
-            if(find(font.name, "HelsinkiStd"_)) // HACK: to trim text
+            if(find(font.name, "HelsinkiStd"_)) { // HACK: to trim text
+                pageMin.x=min(pageMin.x, position.x+metrics.bearing.x), pageMax.x=max(pageMax.x, position.y+metrics.bearing.x+metrics.width);
                 pageMin.y=min(pageMin.y, position.y-metrics.bearing.y), pageMax.y=max(pageMax.y, position.y-metrics.bearing.y+metrics.height);
+            }
             characters.append( Character{&fonts, Trm(0,0)*size, index, position, code} );
         }
         float advance = spacing+(code==' '?wordSpacing:0);

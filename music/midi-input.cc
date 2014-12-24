@@ -8,53 +8,42 @@
 Device getMIDIDevice() {
     Folder snd("/dev/snd");
     for(const String& device: snd.list(Devices)) if(startsWith(device, "midi"_)) return Device(device, snd, ReadOnly);
-    error("No MIDI device found"); //FIXME: Block and watch folder until connected
+    log("No MIDI device found"); //FIXME: Block and watch folder until connected
+    return Device();
 }
 
 MidiInput::MidiInput(Thread& thread) : Device(getMIDIDevice()), Poll(Device::fd,POLLIN,thread) {}
 
 void MidiInput::event() {
-    if(!(revents&POLLIN)) return;
-    uint8 key=read<uint8>();
-    if(key & 0x80) { type=key>>4; key=read<uint8>(); }
-    uint8 value=0;
-    if(type == NoteOn || type == NoteOff || type == Aftertouch || type == Controller || type == PitchBend) value=read<uint8>();
-    else log("Unhandled MIDI event"_,type);
-    if(type == NoteOn) {
-        if(value == 0 ) {
-            if(!pressed.contains(key)) return; //pressed even before the device was opened
-            pressed.remove(key);
-            if(sustain) sustained.add( key );
-            else {
-                noteEvent(key,0);
-                /*if(record) {
-                    int tick = realTime()/1000000;
-                    events.append( Event((int16)(tick-lastTick), (uint8)key, (uint8)0) );
-                    lastTick = tick;
-                }*/
+    while(poll()) {
+        uint8 key=read<uint8>();
+        if(key & 0x80) { type=key>>4; key=read<uint8>(); }
+        uint8 value=0;
+        if(type == NoteOn || type == NoteOff || type == Aftertouch || type == Controller || type == PitchBend) value = read<uint8>();
+        else log("Unhandled MIDI event"_, type);
+        if(type == NoteOn) {
+            if(value == 0 ) {
+                if(!pressed.contains(key)) return; // Pressed before the device was opened
+                pressed.remove(key);
+                if(sustain) sustained.add( key );
+                else noteEvent(key,0);
+            } else {
+                sustained.tryRemove(key);
+                assert_(!pressed.contains(key));
+                pressed.append(key);
+                noteEvent(key, min(127,(int)value*4/3)); // Keyboard saturates at 96
             }
-        } else {
-            sustained.tryRemove(key);
-            assert_(!pressed.contains(key));
-            pressed.append(key);
-            noteEvent(key, min(127,(int)value*4/3)); // Keyboard saturates at 96
-            /*if(record) {
-                int tick = realTime()/1000000;
-                events.append( Event((int16)(tick-lastTick), (uint8)key, (uint8)value) );
-                lastTick = tick;
-            }*/
-        }
-    } else if(type == Controller) {
-        if(key==64) {
-            sustain = (value != 0);
-            if(!sustain) {
-                for(int key : sustained) { noteEvent(key,0); assert(!pressed.contains(key)); }
-                sustained.clear();
+        } else if(type == Controller) {
+            if(key==64) {
+                sustain = (value != 0);
+                if(!sustain) {
+                    for(int key : sustained) { noteEvent(key,0); assert(!pressed.contains(key)); }
+                    sustained.clear();
+                }
             }
         }
     }
 }
-
 /*void MidiInput::recordMID(const string& path) {
     if(existsFile(path,home())) { log(path,"already exists"); return; }
     record=File(path,home(),Flags(WriteOnly|Create|Truncate));

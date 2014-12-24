@@ -14,7 +14,7 @@ static constexpr bgr3f magenta (1, 0, 1);
 static constexpr bgr3f yellow (0, 1, 1);
 
 /// Fill graphic element
-// FIXME: Implements as parallelogram
+// FIXME: Implement as polygon
 struct Fill {
     vec2 origin, size;
 	bgr3f color = black; float opacity = 1;
@@ -45,12 +45,19 @@ struct Line {
 };
 
 /// Parallelogram graphic element
+// FIXME: Implement as polygon
 struct Parallelogram {
 	vec2 min,max;
 	float dy;
 	bgr3f color = black; float opacity = 1;
 	Parallelogram(vec2 min, vec2 max, float dy, bgr3f color=black, float opacity=1) : min(min), max(max), dy(dy), color(color), opacity(opacity) {}
 };
+
+/*/// Polygon graphic element
+// FIXME: Implements as cubic path
+struct Polygon {
+    vec2 min,max; array<Line> edges;
+};*/
 
 struct Cubic {
 	buffer<vec2> points;
@@ -68,8 +75,10 @@ struct Graphics : shareable {
     array<Glyph> glyphs;
     array<Line> lines;
 	array<Parallelogram> parallelograms;
-	array<Cubic> cubics;
-	map<vec2, shared<Graphics>> graphics;
+    //array<Polygon> polygons;
+    array<Cubic> cubics;
+
+    map<vec2, shared<Graphics>> graphics;
 
 	void translate(vec2 offset) {
 		for(auto& o: fills) o.origin += offset;
