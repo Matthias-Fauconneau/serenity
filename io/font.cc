@@ -80,12 +80,12 @@ Font::Glyph Font::render(uint index) {
     {const Glyph* glyph = cache.find(index);
 		if(glyph) return Font::Glyph(glyph->offset, share(glyph->image));}
     Glyph& glyph = cache.insert(index);
-    FT_Load_Glyph(face, index, hint?FT_LOAD_TARGET_NORMAL:FT_LOAD_TARGET_LIGHT);
-    FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL);
+    check( FT_Load_Glyph(face, index, hint?FT_LOAD_TARGET_NORMAL:FT_LOAD_TARGET_LIGHT) );
+    check( FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL) );
     glyph.offset = int2(face->glyph->bitmap_left, -face->glyph->bitmap_top);
     FT_Bitmap bitmap=face->glyph->bitmap;
     //assert_(bitmap.buffer, metrics(index).size, metrics(index).size?true:false, size);
-    if(!bitmap.buffer) { log(size, index, metrics(index).size); return {glyph.offset, share(glyph.image)}; }
+    if(!bitmap.buffer) { log("Empty glyph", size, index, metrics(index).size); return {glyph.offset, share(glyph.image)}; }
     int width = bitmap.width, height = bitmap.rows;
     Image image(width, height, true, false);
     for(int y=0;y<height;y++) for(int x=0;x<width;x++) image(x,y) = byte4(0xFF,0xFF,0xFF,bitmap.buffer[y*bitmap.pitch+x]);

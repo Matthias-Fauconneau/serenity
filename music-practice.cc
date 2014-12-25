@@ -20,6 +20,7 @@ shared<Graphics> GraphicsWidget::graphics(int2 unused size /*TODO: center*/) { r
 /// SFZ sampler and PDF renderer
 struct Music {
     Folder folder {"Scores"_, home()};
+    array<String> files = folder.list(Files|Sorted);
     String title;
 
     const uint rate = 44100;
@@ -34,7 +35,7 @@ struct Music {
     Window window {&pages->area(), int2(0, 768)};
 
     Music() {
-        setTitle(arguments()[0]);
+        setTitle(arguments() ? arguments()[0] : files[0]);
         window.actions[DownArrow] = {this, &Music::nextTitle};
         window.actions[Return] = {this, &Music::nextTitle};
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);
@@ -50,6 +51,7 @@ struct Music {
     }
 
      void setTitle(string title) {
+         if(endsWith(title,".pdf"_)) title=title.slice(0,title.size-4);
          this->title = copyRef(title);
          pages = unique<Scroll<HList<GraphicsWidget>>>( apply(decodePDF(readFile(title+".pdf"_, folder), fonts), [](Graphics& o) { return GraphicsWidget(move(o)); }) );
          pages->horizontal = true;
@@ -58,7 +60,6 @@ struct Music {
          window.setTitle(title);
      }
      void nextTitle() {
-         array<String> files = folder.list(Files|Sorted);
-         for(size_t index: range(files.size-1)) if(startsWith(files[index], title) && !startsWith(files[index+1], title)) { setTitle(section(files[index+1],'.')); break; }
+         for(size_t index: range(files.size-1)) if(startsWith(files[index], title) && !startsWith(files[index+1], title)) { setTitle(section(files[index+1],'.', 0, -2)); break; }
      }
 } app;

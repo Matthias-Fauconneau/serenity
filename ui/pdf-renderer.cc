@@ -43,7 +43,7 @@ static Variant parseVariant(TextData& s) {
                 string filter = v.dict.at("Filter"_).list?v.dict.at("Filter"_).list[0].data:v.dict.at("Filter"_).data;
                 if(filter=="FlateDecode"_) stream = inflate(stream, true);
                 else if(filter=="RunLengthDecode"_) stream = decodeRunLength(stream);
-                else { error("Unsupported filter",v.dict); /*return Variant();*/ }
+                else { log("Unsupported filter",v.dict); return ""_; }
             }
             if(v.dict.contains("DecodeParms"_)) {
                 assert(v.dict.at("DecodeParms"_).dict.size() == 2);
@@ -93,7 +93,7 @@ static Variant parseVariant(TextData& s) {
     error("Unknown type"_,s.slice(s.index-32,32),"|"_,s.slice(s.index,32),s.data.size-s.index);
     //return Variant();
 }
-static Variant parseVariant(const string& buffer) { TextData s(buffer); return parseVariant(s); }
+static Variant parseVariant(string buffer) { TextData s(buffer); return parseVariant(s); }
 static Dict toDict(const array<String>& xref, Variant&& object) { return object.dict ? move(object.dict) : parseVariant(xref[object.integer()]).dict; }
 
 
@@ -123,11 +123,11 @@ struct PDF {
     Font& getFont(Fonts& fonts, float size);
 
     struct Character {
-        Fonts* fonts; float size; uint16 index; vec2 position; uint16 code;
+        Fonts* fonts; float size; uint index; vec2 position; uint code;
         bool operator <(const Character& o) const{return position.y<o.position.y;}
     };
     array<Character> characters;
-    void drawText(Fonts& fonts, int fontSize, float spacing, float wordSpacing, const string& data);
+    void drawText(Fonts& fonts, float fontSize, float spacing, float wordSpacing, string data);
 
     map<String, Image> images;
     struct Blit {
@@ -253,11 +253,11 @@ PDF::PDF(string data) {
                         else if(descendant->type==Variant::List && descendant->list[0].type==Variant::Dict)
                             fontDict = move(descendant->list[0].dict);
                     }
-                    if(!fontDict.contains("FontDescriptor"_)) continue;
-                    String name = move(fontDict.at("BaseFont"_).data);
+                    if(!fontDict.contains("FontDescriptor"_)) { log("Missing FontDescriptor", fontDict); continue; }
                     auto descriptor = parseVariant(xref[fontDict.at("FontDescriptor"_).integer()]).dict;
                     Variant* fontFile = descriptor.find("FontFile"_)?:descriptor.find("FontFile2"_)?:descriptor.find("FontFile3"_);
-                    if(!fontFile) continue;
+                    if(!fontFile) { log("Missing FontFile", fontDict); continue; }
+                    String name = move(fontDict.at("BaseFont"_).data);
                     Fonts& font = fonts.insert(copyRef(e.key), Fonts{move(name), parseVariant(xref[fontFile->integer()]).data, {}, {}});
                     Variant* firstChar = fontDict.find("FirstChar"_);
                     if(firstChar) font.widths.grow(firstChar->integer());
@@ -272,7 +272,7 @@ PDF::PDF(string data) {
                 for(auto e: dict) {
                     if( images.contains(unsafeRef(e.key)) ) continue;
                     Variant object = parseVariant(xref[e.value.integer()]);
-                    if(!object.dict.contains("Width"_) || !object.dict.contains("Height"_)) continue;
+                    if(!object.dict.contains("Width"_) || !object.dict.contains("Height"_)) { log("Missing Width|Height", object.dict); continue; }
                     Image image(object.dict.at("Width"_).integer(), object.dict.at("Height"_).integer());
                     int depth=object.dict.at("BitsPerComponent"_).integer();
                     assert(depth, object.dict.at("BitsPerComponent"_).integer());
@@ -311,7 +311,7 @@ PDF::PDF(string data) {
                         image.alpha=true;
                     }
                     else error("Unsupported depth",depth);
-                    images.insert(unsafeRef(e.key), move(image));
+                    images.insert(copyRef(e.key), move(image));
                 }
             }
         }
@@ -389,16 +389,17 @@ PDF::PDF(string data) {
                     OP2('B','T') Tm=Tlm=mat3x2();
                     OP2('c','s') ; // setFillColorspace
                     OP2('C','S') ; // setStrokeColorspace
-                    OP2('c','m') Cm=mat3x2(f(0),f(1),f(2),f(3),f(4),f(5))*Cm;
+                    OP2('c','m') Cm = Cm*mat3x2(f(0),f(1),f(2),f(3),f(4),f(5));
                     OP2('D','o') if(images.contains(args[0].data)) {
                         extend(Cm*vec2(0,0)); extend(Cm*vec2(1,1));
                         blits.append( Blit{Cm*vec2(0,1),Cm*vec2(1,1)-Cm*vec2(0,0),share(images.at(args[0].data)),{}} );
-                    } //else error("No such image", args[0].data);
+                    } else log("No such image", args[0].data, images.keys);
                     OP2('E','T') ;
                     OP2('g','s') ;
                     OP2('r','e') {
-                        vec2 p1 = p(0,1), p2 = p1 + vec2(f(2)*Cm(0,0),f(3)*Cm(1,1));
-                        path.append(copyRef(ref<vec2>{p1, vec2(p1.x,p2.y), vec2(p1.x,p2.y), vec2(p1.x,p2.y),
+                        vec2 p1 = p(0,1), p2 = p1 + vec2(Cm(0,0)*f(2),Cm(1,1)*f(3));
+                        path.append(copyRef(ref<vec2>{p1,
+                                                      vec2(p1.x,p2.y), vec2(p1.x,p2.y), vec2(p1.x,p2.y),
                                                       p2, p2, p2,
                                                       vec2(p2.x,p1.y), vec2(p2.x,p1.y), vec2(p2.x,p1.y)}));
                     }
@@ -406,21 +407,21 @@ PDF::PDF(string data) {
                     OP2('s','c') ;
                     OP3('S','C','N') ;
                     OP3('s','c','n') ;
-                    OP2('T','*') Tm=Tlm=mat3x2(0,-leading)*Tlm;
+                    OP2('T','*') Tm=Tlm=Tlm*mat3x2(0,-leading);
                     OP2('T','c') spacing=f(0);
-                    OP2('T','d') Tm=Tlm=mat3x2(f(0),f(1))*Tlm;
-                    OP2('T','D') Tm=Tlm=mat3x2(f(0),f(1))*Tlm; leading=-f(1);
+                    OP2('T','d') Tm=Tlm=Tlm*mat3x2(f(0),f(1));
+                    OP2('T','D') Tm=Tlm=Tlm*mat3x2(f(0),f(1)); leading=-f(1);
                     OP2('T','L') leading=f(0);
                     OP2('T','r') ; // setRenderMode
                     OP2('T','z') ; // setHorizontalScaling
-                    OP('\'') { Tm=Tlm=mat3x2(0,-leading)*Tlm; drawText(*font,fontSize,spacing,wordSpacing,args[0].data); }
-                    OP2('T','j') drawText(*font,fontSize,spacing,wordSpacing,args[0].data);
+                    OP('\'') { Tm=Tlm=Tlm*mat3x2(0,-leading); drawText(*font,fontSize,spacing,wordSpacing,args[0].data); }
+                    OP2('T','j') drawText(*font, fontSize, spacing, wordSpacing, args[0].data);
                     OP2('T','J') for(const auto& e : args[0].list) {
-                        if(e.type==Variant::Integer||e.type==Variant::Real) Tm=mat3x2(-e.real()*fontSize/1000,0)*Tm;
+                        if(e.type==Variant::Integer||e.type==Variant::Real) Tm=Tm*mat3x2(-e.real()*fontSize/1000,0);
                         else if(e.type==Variant::Data) drawText(*font,fontSize,spacing,wordSpacing,e.data);
                         else error("Unexpected type",(int)e.type);
                     }
-                    OP2('T','f') font = &fonts.at(args[0].data); fontSize=f(1);
+                    OP2('T','f') font = fonts.find(args[0].data); if(!font) log("No such font", args[0].data, fonts.keys); fontSize=f(1);
                     OP2('T','m') Tm=Tlm=mat3x2(f(0),f(1),f(2),f(3),f(4),f(5));
                     OP2('T','w') wordSpacing=f(0);
                     OP2('W','*') path.clear(); // intersect odd even clip
@@ -444,7 +445,7 @@ PDF::PDF(string data) {
 
             { // Normalizes coordinates (Aligns top-left to 0, scales to DPI)
                 //float scale = 96. /*ppi*/ / 72/*PostScript point per inch*/; // px/pt
-                float scale = 768 / (pageMax.y-pageMin.y); // Fit height
+                float scale = min(96.f/72, min(1366 / (pageMax.x-pageMin.x), 768 / (pageMax.y-pageMin.y))); // Fit page
                 mat3x2 m (scale, 0,0, scale, -pageMin.x*scale, -pageMin.y*scale);
                 { vec2 a = m*pageMin, b = m*pageMax; pageMin = min(a, b); pageMax = max(a, b); }
                 assert_(int2(pageMin) == int2(0), pageMin);
@@ -465,9 +466,10 @@ PDF::PDF(string data) {
                 Font& font = getFont(*o.fonts, o.size);
                 assert_(font.index(o.code) == o.index);
                 if(font.metrics(o.index).size) {
+                    //log(o.position);
                     page.glyphs.append(o.position, font, o.code, o.index);
-                    assert_(font.render(o.index).image);
-                }
+                    //assert_(font.render(o.index).image);
+                } //else log(font.name, o.code, o.index, font.metrics(o.index).size);
             }
             for(Cubic& o: cubics) page.cubics.append(move(o));
             lines.clear();
@@ -488,7 +490,13 @@ vec2 cubic(vec2 A,vec2 B,vec2 C,vec2 D,float t) { return ((1-t)*(1-t)*(1-t))*A +
 void PDF::drawPath(const ref<array<vec2>> paths, int flags) {
     for(ref<vec2> path : paths) {
         //if(path.size > 5) continue; //FIXME: triangulate concave polygons
-        for(vec2 p : path) if(p >= boxMin && p <= boxMax) extend(p); // FIXME: clip
+        vec2 min=path[0], max=path[0];
+        for(vec2 p : path) if(p >= boxMin && p <= boxMax) {
+            min=::min(min, p);
+            max=::max(max, p);
+            extend(p); // FIXME: clip
+        }
+        if(!(max > boxMin && min < boxMax)) return; // clip
         array<vec2> polyline;
         if(path.size>=4) for(uint i=0; i<path.size-3; i+=3) {
             if( path[i+1] == path[i+2] && path[i+2] == path[i+3] ) {
@@ -536,18 +544,20 @@ void PDF::drawPath(const ref<array<vec2>> paths, int flags) {
 }
 
 Font& PDF::getFont(Fonts& fonts, float size) {
-     return *(fonts.fonts.find(size) ?: &fonts.fonts.insert(size, ::unique<Font>(unsafeRef(fonts.data), size, fonts.name)));
+     return *(fonts.fonts.find(size) ?: &fonts.fonts.insert(size, ::unique<Font>(copyRef(fonts.data), size, fonts.name)));
 }
 
-void PDF::drawText(Fonts& fonts, int size, float spacing, float wordSpacing, const string& data) {
+void PDF::drawText(Fonts& fonts, float size, float spacing, float wordSpacing, string data) {
+    if(!&fonts) { log("Missing font"); return; } // FIXME
     assert_(&fonts);
     //if(!fonts) return;
     assert_(fonts.data);
-    Font& font = getFont(fonts, (Tm*Cm)(0,0)*size);
+    if(!(Cm*Tm)(0,0)) { log("Rotated glyph"); return; } // FIXME: rotated glyphs
+    Font& font = getFont(fonts, (Cm*Tm)(0,0)*size);
     for(uint8 code : data) {
-        if(code==0) continue;
-        mat3x2 Trm = Tm*Cm;
-        uint16 index = font.index(code);
+        if(code==0 && data.size>1) { assert_(data.size==2 && data[1]!=0, data);/*Misparsed 16bit ccode*/ continue; }
+        mat3x2 Trm = Cm*Tm;
+        uint index = font.index(code);
         vec2 position = vec2(Trm(0,2),Trm(1,2));
         auto metrics = font.metrics(index);
         if(position > boxMin && position < boxMax && metrics.size) {
