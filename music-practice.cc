@@ -26,9 +26,9 @@ struct Music {
     const uint rate = 44100;
     Thread decodeThread;
     Sampler sampler {rate, "/Samples/Maestro.sfz"_, [](uint){}, decodeThread}; // Audio mixing (consumer thread) preempts decoder running in advance (in producer thread (main thread))
-    Thread audioThread;
+    Thread audioThread{-20};
     AudioOutput audio {{&sampler, &Sampler::read32}, audioThread};
-    MidiInput input;
+    MidiInput input {audioThread};
 
     array<unique<Font>> fonts;
     unique<Scroll<HList<GraphicsWidget>>> pages;
@@ -38,6 +38,7 @@ struct Music {
         setTitle(arguments() ? arguments()[0] : files[0]);
         window.actions[DownArrow] = {this, &Music::nextTitle};
         window.actions[Return] = {this, &Music::nextTitle};
+        sampler.pollEvents = {&input, &MidiInput::event}; // Ensures all events are received right before mixing
         input.noteEvent.connect(&sampler,&Sampler::noteEvent);
         decodeThread.spawn();
         AudioControl("Master Playback Switch") = 1;

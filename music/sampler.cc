@@ -230,7 +230,7 @@ Sampler::Sampler(uint outputRate, string path, function<void(uint)> timeChanged,
             if(layer == 0) { // Generates pitch shifting (resampling) filter banks
 				Layer layer;
 				layer.shift = shift;
-                layer.notes.reserve(128);
+                layer.notes.reserve(512);
                 if(shift || rate!=outputRate) {
                     const uint size = 2048; // Accurate frequency resolution while keeping reasonnable filter bank size
 					layer.resampler = Resampler(2, size, round(size*exp2((-shift)/12.0)*outputRate/rate),
@@ -323,6 +323,7 @@ void Sampler::noteEvent(uint key, uint velocity) {
                 note.key = key, note.velocity = velocity;
                 //note.level = float4(1); // Velocity layers already select correct level
                 note.level = float4(s.volume * float(velocity) / s.hivel); // E ~ A^2 ~ v^2 => A ~ v (TODO: normalize levels)
+                note.level = float4(s.volume * float(velocity) / 127/*s.hivel*/); // FIXME: this is not right
                 //log(velocity, s.lovel, s.hivel, note.level[0]);
             } else {
                 note.level = float4(level);
@@ -332,15 +333,10 @@ void Sampler::noteEvent(uint key, uint velocity) {
             note.envelope=s.envelope;
             //if(note.flac.sampleSize==16) note.level *= float4(0x1p8f);
 
-            if(layer->notes.size>=layer->notes.capacity) log(layer->notes.size);
-            // WARNING: decoder should run in separate thread or deadlock will occur
-            lock.acquire(2); // Lock both decoder and mixer before reallocating (FIXME: append is atomic when not reallocating)
-            // Cleanups silent notes
-            for(Layer& layer: layers) layer.notes.filter([](const Note& note) {
-                return (note.flac.blockSize==0 && note.readCount<int(2*periodSize)); // || note.level[0]<0x1p-7 || note.flac.position > note.decayTime;
-            });
-            layer->notes.append(move(note)); // Copies predecoded buffer and corresponding FLAC decoder state
-            lock.release(2);
+            assert_(layer->notes.size<layer->notes.capacity);
+            {Locker lock(this->lock);
+                layer->notes.append(move(note)); // Copies predecoded buffer and corresponding FLAC decoder state
+            }
             queue(); //queue background decoder in main thread
             return;
         }
@@ -354,7 +350,7 @@ void Sampler::noteEvent(uint key, uint velocity) {
 
 void Sampler::event() { // Decode thread event posted every period from Sampler::read by audio thread
     for(;;) {
-        lock.acquire(1);
+        //lock.acquire(1);
         Note* note=0; size_t minBufferSize=-1;
         for(Layer& layer: layers) for(Note& n: layer.notes) { // Finds least buffered note
 			if(n.flac.blockSize /*!EOF*/ && n.writeCount >= n.flac.blockSize && n.flac.audioAvailable < minBufferSize) {
@@ -362,13 +358,20 @@ void Sampler::event() { // Decode thread event posted every period from Sampler:
 				minBufferSize = max<int>(layer.resampler?layer.resampler.need(periodSize):periodSize, n.flac.audioAvailable);
             }
 		}
-        if(!note) { lock.release(1); break; } // All notes are already fully buffered
+        if(!note) { /*lock.release(1);*/ break; } // All notes are already fully buffered
         size_t size = note->flac.blockSize;
 		note->writeCount.acquire(size);
 		note->flac.decodeFrame();
-        lock.release(1);
+        //lock.release(1);
 		note->readCount.release(size);
     }
+    //lock.acquire(2);
+    Locker lock(this->lock);
+    // Cleanups silent notes
+    for(Layer& layer: layers) layer.notes.filter([](const Note& note) {
+        return (note.flac.blockSize==0 && note.readCount<int(2*periodSize)); // || note.level[0]<0x1p-7 || note.flac.position > note.decayTime;
+    });
+    //lock.release(2);
 }
 
 /// Audio mixer (realtime thread)
@@ -419,7 +422,7 @@ size_t Sampler::read16(mref<int16> output) {
 size_t Sampler::read32(mref<int2> output) { // Audio thread
     v4sf buffer[output.size*2/4];
     uint size = read(mref<float2>((float2*)buffer, output.size));
-    for(uint i: range(size*2/4)) ((v4si*)output.data)[i] = cvtps2dq(buffer[i]*float4(0x1p15f)); // 16bit -> 32bit with 1bit headroom for multiple notes
+    for(uint i: range(size*2/4)) ((v4si*)output.data)[i] = cvtps2dq(buffer[i]*float4(0x1p13f)); // 16bit -> 32bit with 3bit headroom for multiple notes
     return size;
 }
 
@@ -427,7 +430,9 @@ size_t Sampler::read(mref<float2> output) {
 	output.clear(0);
     int noteCount = 0;
 	{
-		lock.acquire(1);
+        //lock.acquire(1);
+        pollEvents();
+        Locker lock(this->lock);
         for(Layer& layer: layers) { // Mixes all notes of all layers
             if(layer.resampler) {
 				int need = layer.resampler.need(output.size);
@@ -445,7 +450,7 @@ size_t Sampler::read(mref<float2> output) {
             }
             noteCount += layer.notes.size;
         }
-		lock.release(1);
+        //lock.release(1);
     }
     if(noteCount==0 /*&& !record*/) { // Stops audio output when all notes are released
 			if(!stopTime) stopTime=audioTime; // First waits for reverb

@@ -38,7 +38,7 @@ static Variant parseVariant(TextData& s) {
         dictionaryEnd: s.whileAny(" \t\r\n");
         Variant v = move(dict);
         if(s.match("stream"_)) { s.whileAny(" \t\r\n");
-            array<byte> stream = unsafeRef( s.until("endstream"_) );
+            array<byte> stream = copyRef( s.until("endstream"_) );
             if(v.dict.contains("Filter"_)) {
                 string filter = v.dict.at("Filter"_).list?v.dict.at("Filter"_).list[0].data:v.dict.at("Filter"_).data;
                 if(filter=="FlateDecode"_) stream = inflate(stream, true);
@@ -90,7 +90,7 @@ static Variant parseVariant(TextData& s) {
     }
     if(s.match("true"_)) return true;
     if(s.match("false"_)) return false;
-    error("Unknown type"_,s.slice(s.index-32,32),"|"_,s.slice(s.index,32),s.data.size-s.index);
+    error("Unknown type"_,s.slice(s.index-32,32),"|"_,s.slice(s.index,min(s.data.size-s.index, 32ul)),s.data.size-s.index);
     //return Variant();
 }
 static Variant parseVariant(string buffer) { TextData s(buffer); return parseVariant(s); }
@@ -149,11 +149,13 @@ PDF::PDF(string data) {
     array<String> xref; Dict catalog;
     {
         TextData s (data);
-        for(s.index=s.data.size-sizeof("\r\n%%EOF");!( (s[-2]=='\r' && s[-1]=='\n') || s[-1]=='\n' || (s[-2]==' ' && s[-1]=='\r') );s.index--){}
-        int index = s.integer(); assert(index>0, s.untilEnd()); s.index = index;
+        for(s.index=s.data.size-"0\r\n%%EOF"_.size;!( (s[-2]=='\r' && s[-1]=='\n') || s[-1]=='\n' || (s[-2]==' ' && s[-1]=='\r') );s.index--){}
+        assert(s.slice(s.index-"startxref\r\n"_.size, "startxref\r\n"_.size)=="startxref\r\n"_);
+        int index = s.integer(); assert_(index>0, s.untilEnd()); s.index = index;
         int root = 0;
         struct CompressedXRef { uint object, index; }; array<CompressedXRef> compressedXRefs;
         for(;;) { /// Parse XRefs
+            Variant object = ""_;
             if(s.match("xref"_)) { // Direct cross reference
                 s.whileAny(" \t\r\n");
                 uint i=s.integer(); s.whileAny(" \t\r\n");
@@ -168,14 +170,16 @@ PDF::PDF(string data) {
                 }
                 if(!s.match("trailer"_)) error("trailer");
                 s.whileAny(" \t\r\n");
+                object = parseVariant(s);
             } else { // Cross reference dictionnary
-                uint i=s.integer(); s.whileAny(" \t\r\n");
-                uint unused n=s.integer(); s.whileAny(" \t\r\n");
+                uint i=s.integer(); assert_(i!=uint(-1)); s.whileAny(" \t\r\n");
+                uint unused n=s.integer(); assert_(n==0, n); s.whileAny(" \t\r\n");
                 s.skip("obj"_);
-                if(xref.size<=i) xref.grow(i+1);
-                xref[i] = unsafeRef(s.until("endobj"_));
+                object = parseVariant(s.until("endobj"_));
+                assert_(object.data);
+                if(xref.size <= i ) xref.slice(xref.grow(i+1)).clear();
+                xref[i] = copyRef(object.data);
             }
-            Variant object = parseVariant(s);
             Dict& dict = object.dict;
             if(dict.contains("Type"_) && dict.at("Type"_).data=="XRef"_) {  // Cross reference stream
                 const array<Variant>& W = dict.at("W"_).list;
@@ -225,7 +229,7 @@ PDF::PDF(string data) {
                 objectNumber=s.integer(); s.match(' ');
                 offset=s.integer(); s.match(' ');
             }
-            xref[objectNumber] = unsafeRef( s.slice(stream.dict.at("First"_).integer()+offset) );
+            xref[objectNumber] = copyRef( s.slice(stream.dict.at("First"_).integer()+offset) );
         }
     }
     Variant kids = move(parseVariant(xref[catalog.at("Pages"_).integer()]).dict.at("Kids"_));
@@ -256,7 +260,7 @@ PDF::PDF(string data) {
                     if(!fontDict.contains("FontDescriptor"_)) { log("Missing FontDescriptor", fontDict); continue; }
                     auto descriptor = parseVariant(xref[fontDict.at("FontDescriptor"_).integer()]).dict;
                     Variant* fontFile = descriptor.find("FontFile"_)?:descriptor.find("FontFile2"_)?:descriptor.find("FontFile3"_);
-                    if(!fontFile) { log("Missing FontFile", fontDict); continue; }
+                    if(!fontFile) { /*log("Missing FontFile", fontDict);*/ continue; }
                     String name = move(fontDict.at("BaseFont"_).data);
                     Fonts& font = fonts.insert(copyRef(e.key), Fonts{move(name), parseVariant(xref[fontFile->integer()]).data, {}, {}});
                     Variant* firstChar = fontDict.find("FirstChar"_);
@@ -272,7 +276,7 @@ PDF::PDF(string data) {
                 for(auto e: dict) {
                     if( images.contains(unsafeRef(e.key)) ) continue;
                     Variant object = parseVariant(xref[e.value.integer()]);
-                    if(!object.dict.contains("Width"_) || !object.dict.contains("Height"_)) { log("Missing Width|Height", object.dict); continue; }
+                    if(!object.dict.contains("Width"_) || !object.dict.contains("Height"_)) { log("Missing Width|Height", object.dict, e.value); continue; }
                     Image image(object.dict.at("Width"_).integer(), object.dict.at("Height"_).integer());
                     int depth=object.dict.at("BitsPerComponent"_).integer();
                     assert(depth, object.dict.at("BitsPerComponent"_).integer());
@@ -421,7 +425,7 @@ PDF::PDF(string data) {
                         else if(e.type==Variant::Data) drawText(*font,fontSize,spacing,wordSpacing,e.data);
                         else error("Unexpected type",(int)e.type);
                     }
-                    OP2('T','f') font = fonts.find(args[0].data); if(!font) log("No such font", args[0].data, fonts.keys); fontSize=f(1);
+                    OP2('T','f') font = fonts.find(args[0].data); /*if(!font) log("No such font", args[0].data, fonts.keys);*/ fontSize=f(1);
                     OP2('T','m') Tm=Tlm=mat3x2(f(0),f(1),f(2),f(3),f(4),f(5));
                     OP2('T','w') wordSpacing=f(0);
                     OP2('W','*') path.clear(); // intersect odd even clip
@@ -532,11 +536,14 @@ void PDF::drawPath(const ref<array<vec2>> paths, int flags) {
             if(area>0) for(Line& e: polygon.edges) swap(e.a,e.b); // Converts to CCW winding in top-left coordinate system*/
             polygons.append( move(polygon) );
 #else
-            if(!(flags&Close)) {
-                //assert_(path[0]==path.last(), path);
-                path = path.slice(0, path.size-1);
+            if(path.size == 4 && path[1]==path[2] && path[2]==path[3]) this->lines.append(path[0], path[3]);
+            else {
+                if(!(flags&Close)) {
+                    //assert_(path[0]==path.last(), path);
+                    path = path.slice(0, path.size-1);
+                }
+                cubics.append( copyRef(path) );
             }
-            cubics.append( copyRef(path) );
 #endif
         }
         else if(flags&Stroke) this->lines.append( lines );
@@ -548,14 +555,15 @@ Font& PDF::getFont(Fonts& fonts, float size) {
 }
 
 void PDF::drawText(Fonts& fonts, float size, float spacing, float wordSpacing, string data) {
-    if(!&fonts) { log("Missing font"); return; } // FIXME
+    if(!&fonts) { /*log("Missing font");*/ return; } // FIXME
     assert_(&fonts);
     //if(!fonts) return;
     assert_(fonts.data);
     if(!(Cm*Tm)(0,0)) { log("Rotated glyph"); return; } // FIXME: rotated glyphs
     Font& font = getFont(fonts, (Cm*Tm)(0,0)*size);
     for(uint8 code : data) {
-        if(code==0 && data.size>1) { assert_(data.size==2 && data[1]!=0, data);/*Misparsed 16bit ccode*/ continue; }
+        if(code==0 && data.size==2) { /*assert_(data[1]!=0, hex(data));*//*Misparsed 16bit ccode*/ continue; }
+        if(code==0 && data.size==4) { assert_(data[1]!=0 && data[2]==0 && data[3]!=0, hex(data));/*2x Misparsed 16bit ccode*/ continue; }
         mat3x2 Trm = Cm*Tm;
         uint index = font.index(code);
         vec2 position = vec2(Trm(0,2),Trm(1,2));

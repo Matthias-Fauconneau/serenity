@@ -17,17 +17,17 @@ struct Sampler : Poll {
 	/// Samples composing the current instrument
 	array<Sample> samples;
 
-	Semaphore lock {2}; // Decoder (producer) and mixer (consumer) may use \a layers concurrently, a mutator needs to lock/acquire both
+    //Semaphore lock {2}; // Decoder (producer) and mixer (consumer) may use \a layers concurrently, a mutator needs to lock/acquire both
+    Lock lock; // Lock mixer when cleaning notes in decoder thread (no need to lock on atomic append in event thread)
     array<Layer> layers;
 
 	static constexpr uint channels = 2;
 	uint rate = 0;
-    //static constexpr uint periodSize = 64; // [1ms] Prevents samples to synchronize with shifted copies from same chord
-    //static constexpr uint periodSize = 128; // [3ms] Same as resampler latency and 1m sound propagation time
-    static constexpr uint periodSize = 256; // [5ms] Latency/convolution tradeoff (FIXME: ring buffer)
-    //static constexpr uint periodSize = 512; // [11ms] Required for efficient FFT convolution (reverb) (FIXME: ring buffer)
+    static constexpr uint periodSize = 128; // [3ms] 1m sound propagation time
 
-#if 1
+    // Last chance to poll note events before samples are mixed
+    function<void()> pollEvents;
+
     /// Convolution reverb
     uint N=0; // reverbSize+periodSize
     buffer<float> reverbFilter[2]; // Convolution reverb filter in frequency-domain
@@ -40,8 +40,6 @@ struct Sampler : Poll {
     struct FFTW : handle<fftwf_plan> { using handle<fftwf_plan>::handle; default_move(FFTW); FFTW(){} ~FFTW(); };
     FFTW forward[2]; // FFTW plan to forward transform reverb buffer
     FFTW backward; // FFTW plan to backward transform product*/
-#else
-#endif
 
     /// Emits period time to trigger MIDI file input and update the interface
 	function<void(uint)> timeChanged;

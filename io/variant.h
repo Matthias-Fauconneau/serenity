@@ -26,7 +26,7 @@ struct Variant {
 
     explicit operator bool() const { return type!=Empty; }
 
-    int64 integer() const { assert(type==Integer, *this); return number; }
+    int64 integer() const { assert_(type==Integer, *this); return number; }
     double real() const {
         if(type==Rational) { assert_((number/denominator)*denominator==number); return number/denominator; }
         assert(type==Real||type==Integer); return number;
