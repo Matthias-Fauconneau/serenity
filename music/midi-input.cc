@@ -15,7 +15,7 @@ Device getMIDIDevice() {
 MidiInput::MidiInput(Thread& thread) : Device(getMIDIDevice()), Poll(Device::fd,POLLIN,thread) {}
 
 void MidiInput::event() {
-    while(poll()) {
+    while(Stream::fd && poll()) {
         uint8 key=read<uint8>();
         if(key & 0x80) { type=key>>4; key=read<uint8>(); }
         uint8 value=0;

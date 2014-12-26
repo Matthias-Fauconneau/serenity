@@ -91,30 +91,30 @@ struct Graphics : shareable {
     array<Blit> blits;
     array<Glyph> glyphs;
     array<Line> lines;
-	array<Parallelogram> parallelograms;
+    //array<Parallelogram> parallelograms;
     //array<Polygon> polygons;
     array<Cubic> cubics;
 
     map<vec2, shared<Graphics>> graphics;
 
-	void translate(vec2 offset) {
-		for(auto& o: fills) o.origin += offset;
+    /*void translate(vec2 offset) {
+        //for(auto& o: fills) o.origin += offset;
 		assert_(!blits);
 		for(auto& o: glyphs) o.origin += offset;
 		for(auto& o: parallelograms) o.min+=offset, o.max+=offset;
 		for(auto& o: lines) o.a+=offset, o.b+=offset;
 		for(auto& o: cubics) for(vec2& p: o.points) p+=vec2(offset);
-	}
+    }*/
 	void append(const Graphics& o) {
-		fills.append(o.fills);
+        fills.append(o.fills);
 		assert_(!o.blits);
 		glyphs.append(o.glyphs);
-		parallelograms.append(o.parallelograms);
+        //parallelograms.append(o.parallelograms);
 		lines.append(o.lines);
 		cubics.append(o.cubics);
 	}
 };
 
 inline String str(const Graphics& o) {
-	return str(o.fills.size, o.blits.size, o.glyphs.size, o.lines.size, o.parallelograms.size, o.cubics.size, o.graphics.size());
+    return str(o.bounds, o.fills.size, o.blits.size, o.glyphs.size, o.lines.size, /*o.parallelograms.size,*/ o.cubics.size, o.graphics.size());
 }

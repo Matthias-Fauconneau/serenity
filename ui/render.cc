@@ -109,39 +109,7 @@ void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity) {
     }
 }
 
-void oxygen(const Image& target, int2 min, int2 max) {
-    const int y0 = -32-8, splitY = ::min(300, 3*target.size.y/4);
-	const bgr3f radial = bgr3f(246./0xFF); // linear
-    const bgr3f top = bgr3f(221, 223, 225); // sRGB
-    const bgr3f bottom = bgr3f(184, 187, 194); // sRGB
-    const bgr3f middle = (bottom+top)/2.f; //FIXME
-    // Draws upper linear gradient
-    for(int y: range(min.y, ::min(max.y, ::max(0, y0+splitY/2)))) {
-        float t = (float) (y-y0) / (splitY/2);
-        for(int x: range(min.x, max.x)) target(x,y) = byte4(byte3(round((1-t)*top + t*middle)));
-    }
-    for(int y: range(::max(min.y, y0+splitY/2), ::min(max.y, y0+splitY))) {
-        float t = (float) (y- (y0 + splitY/2)) / (splitY/2);
-        byte4 verticalGradient = byte3((1-t)*middle + t*bottom); // mid -> dark
-        for(int x: range(min.x, max.x)) target(x,y) = verticalGradient;
-    }
-    // Draws lower flat part
-    for(int y: range(::max(min.y, y0+splitY), max.y)) for(int x: range(min.x, max.x)) target(x,y) = byte3(bottom);
-    // Draws upper radial gradient (600x64)
-    const int w = ::min(600, target.size.x), h = 64;
-    const float cx = target.size.x/2.f, cy = y0+h/2.f;
-    const float sx = 2.f/w, sy = 2.f/h;
-    for(int y: range(0, ::min(max.y, y0+h))) for(int x: range(::max(min.x,(target.size.x-w)/2), ::min(max.x,(target.size.x+w)/2))) {
-        float r = sqrt( sq( sx * (x - cx) ) + sq( sy * (y - cy) ) );
-		const float r0 = 0, r1 = 1./2, r2 = 3./4, r3 = 1;
-		const float a0 = 1, a1 = 101./0xFF, a2 = 37./0xFF, a3 = 0;
-        /***/ if(r < r1) { float t = (r-r0) / (r1-r0); blend(target, x, y, radial, (1-t)*a0 + t*a1); }
-        else if(r < r2) { float t = (r-r1) / (r2-r1); blend(target, x, y, radial, (1-t)*a1 + t*a2); }
-        else if(r < r3) { float t = (r-r2) / (r3-r2); blend(target, x, y, radial, (1-t)*a2 + t*a3); }
-    }
-}
-
-void parallelogram(const Image& target, int2 p0, int2 p1, int dy, bgr3f color, float alpha) {
+/*static void parallelogram(const Image& target, int2 p0, int2 p1, int dy, bgr3f color, float alpha) {
 	if(p0.x > p1.x) swap(p0.x, p1.x);
 	for(uint x: range(max(0,p0.x), min(int(target.width),p1.x))) {
 		float y0 = float(p0.y) + float((p1.y - p0.y) * int(x - p0.x)) / float(p1.x - p0.x); // FIXME: step
@@ -154,7 +122,7 @@ void parallelogram(const Image& target, int2 p0, int2 p1, int dy, bgr3f color, f
 		}
 		if(uint(i0+dy)<target.height) blend(target, x, i0+dy, color, alpha*coverage);
 	}
-}
+}*/
 
 // 8bit signed integer (for edge flags)
 struct Image8 {
@@ -241,7 +209,7 @@ void render(const Image& target, const Graphics& graphics, vec2 offset) {
         Font::Glyph glyph = e.font.font(e.fontSize).render(e.index);
         if(glyph.image) blit(target, int2(round(offset+e.origin))+glyph.offset, glyph.image, e.color, e.opacity);
     }
-	for(const auto& e: graphics.parallelograms) parallelogram(target, int2(round(offset+e.min)), int2(round(offset+e.max)), e.dy, e.color, e.opacity);
+    //for(const auto& e: graphics.parallelograms) parallelogram(target, int2(round(offset+e.min)), int2(round(offset+e.max)), e.dy, e.color, e.opacity);
 	for(const auto& e: graphics.cubics) cubic(target, e.points, e.color, e.opacity, offset);
 	for(const auto& e: graphics.graphics) render(target, e.value, offset+e.key);
 }

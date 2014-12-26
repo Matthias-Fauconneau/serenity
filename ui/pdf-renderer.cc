@@ -308,57 +308,44 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
             Graphics page;
 
             // Conversion helpers
-            auto extend = [&page](vec2 p) { page.bounds.extend(p); };
-
-            enum Flags { Close=1,Stroke=2,Fill=4,OddEven=8,Winding=16,Trace=32 };
-            auto drawPaths = [&paths,&brushColor,&box,&page](int flags) {
-                if(brushColor ==  white) return;
+            enum Flags { Close=1<<0, Stroke=1<<1, Fill=1<<2, OddEven=1<<3, Winding=1<<4 };
+            auto drawPaths = [&paths, &brushColor, box, &page](int flags) {
+                if(brushColor ==  white) { paths.clear(); return; }
                 for(ref<vec2> path : paths) {
+                    assert_(path);
                     Rect bounds (path[0], path[0]);
                     for(vec2 p : path) if(box.contains(p)) bounds.extend(p);
-                    if(!(box & bounds)) return; // Clips
-                    /*if(flags&Stroke || (flags&Fill) || polyline.size>16) {
-                        for(uint i: range(polyline.size-1)) {
-                            if(polyline[i] != polyline[i+1])
-                                lines.append( Line{ polyline[i], polyline[i+1] } );
-                        }
-                        if(flags&Close) lines.append( Line{polyline.last(), polyline.first()} );
-                    }*/
+                    if(!(bounds.max > box.min && bounds.min < box.max)) return; // Clips
+                    page.bounds.extend(bounds.min);
+                    page.bounds.extend(bounds.max);
                     if(flags&Fill) {
                         if(path.size == 4 && path[1]==path[2] && path[2]==path[3]) page.lines.append(path[0], path[3]);
                         else {
-                            if(!(flags&Close)) {
-                                //assert_(path[0]==path.last(), path);
-                                path = path.slice(0, path.size-1);
-                            }
+                            if(!(flags&Close)) path = path.slice(0, path.size-1);
                             page.cubics.append( copyRef(path) );
                         }
                     }
                     else if(flags&Stroke) {
                         array<vec2> polyline;
                         if(path.size>=4) for(uint i=0; i<path.size-3; i+=3) {
-                            if( path[i+1] == path[i+2] && path[i+2] == path[i+3] ) {
-                                polyline.append( copy(path[i]) );
-                            } else {
-                                //for(int t=0;t<16;t++) polyline.append( cubic(path[i],path[i+1],path[i+2],path[i+3],float(t)/16) );
-                            }
+                            if(path[i+1] == path[i+2] && path[i+2] == path[i+3]) polyline.append( copy(path[i]) );
                         }
                         polyline.append( copy(path.last()) );
 
                         array<Line> lines;
-                        for(uint i: range(polyline.size-1)) {
+                        for(size_t i: range(polyline.size-1)) {
                             if(polyline[i] != polyline[i+1])
                                 lines.append( Line{ polyline[i], polyline[i+1] } );
                         }
-                        if(flags&Close) lines.append( Line{polyline.last(), polyline.first()} );
-
+                        if(flags&Close) lines.append(polyline.last(), polyline.first());
                         page.lines.append( lines );
                     }
                 }
+                paths.clear();
             };
 
-            auto drawText= [Cm,&Tm,&box,&page](FontData& fontData, float size, float spacing, float wordSpacing, string data) {
-                if(!&fontData) { /*log("Missing font");*/ return; } // FIXME
+            auto drawText= [&Cm,&Tm,box,&page](FontData& fontData, float size, float spacing, float wordSpacing, string data) {
+                if(!&fontData) { log("Missing font"); return; } // FIXME
                 assert_(&fontData && fontData.data);
                 if(!(Cm*Tm)(0,0)) { log("Rotated glyph"); return; } // FIXME: rotated glyphs
                 Font& font = fontData.font((Cm*Tm)(0,0)*size);
@@ -368,12 +355,11 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                     mat3x2 Trm = Cm*Tm;
                     uint index = font.index(code);
                     vec2 position = vec2(Trm(0,2),Trm(1,2));
-                    auto metrics = font.metrics(index);
-                    if(box.contains(position) && metrics.size) page.glyphs.append(position, Trm(0,0)*size, fontData, code, index);
+                    if(box.contains(position)) page.glyphs.append(position, Trm(0,0)*size, fontData, code, index);
                     float advance = spacing+(code==' '?wordSpacing:0);
                     if(code < fontData.widths.size) advance += size*fontData.widths[code]/1000;
-                    else advance += metrics.advance;
-                    Tm = mat3x2(advance, 0) * Tm;
+                    else advance += font.metrics(index).advance;
+                    Tm = Tm * mat3x2(advance, 0);
                 }
             };
 
@@ -402,18 +388,18 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
 #define OP3(c1,c2,c3) break;case c1|c2<<8|c3<<16:
 #define f(i) args[i].real()
 #define p(x,y) (Cm*vec2(f(x),f(y)))
-                    OP('b') drawPaths(Close|Stroke|Fill|Winding|Trace); paths.clear();
-                    OP2('b','*') drawPaths(Close|Stroke|Fill|OddEven|Trace); paths.clear();
-                    OP('B') drawPaths(Stroke|Fill|Winding|Trace);
+                    OP('b') drawPaths(Close|Stroke|Fill|Winding);
+                    OP2('b','*') drawPaths(Close|Stroke|Fill|OddEven);
+                    OP('B') drawPaths(Stroke|Fill|Winding);
                     OP2('B','I') ;
                     OP2('I','D') while(!s.match("EI"_)) s.advance(1);
-                    OP2('B','*') drawPaths(Stroke|Fill|OddEven|Trace); paths.clear();
+                    OP2('B','*') drawPaths(Stroke|Fill|OddEven);
                     OP3('B','D','C') ;
                     OP3('E','M','C') ;
                     OP('c') paths.last().append(ref<vec2>{p(0,1), p(2,3), p(4,5)});
                     OP('d') ; // setDashOffset();
-                    OP('f') drawPaths(Fill|Winding|Trace); paths.clear();
-                    OP2('f','*') drawPaths(Fill|OddEven|Trace); paths.clear();
+                    OP('f') drawPaths(Fill|Winding);
+                    OP2('f','*') drawPaths(Fill|OddEven);
                     OP('g') brushColor = f(0);
                     OP('h') ; //closePaths
                     OP2('r','g') ; // brushColor = vec3(f(0),f(1),f(2));
@@ -427,8 +413,8 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                     OP('n') paths.clear();
                     OP('q') stack.append( Cm );
                     OP('Q') Cm = stack.pop();
-                    OP('s') drawPaths(Close|Stroke|OddEven); paths.clear();
-                    OP('S') drawPaths(Stroke|OddEven|Trace); paths.clear();
+                    OP('s') drawPaths(Close|Stroke|OddEven);
+                    OP('S') drawPaths(Stroke|OddEven);
                     OP('v') ; // curveTo (replicate first)
                     OP('w') ; // setWidth(Cm.m11()*f(0));
                     OP('W') paths.clear(); //intersect winding clip
@@ -438,7 +424,7 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                     OP2('C','S') ; // setStrokeColorspace
                     OP2('c','m') Cm = Cm*mat3x2(f(0),f(1),f(2),f(3),f(4),f(5));
                     OP2('D','o') if(images.contains(args[0].data)) {
-                        extend(Cm*vec2(0,0)); extend(Cm*vec2(1,1));
+                        page.bounds.extend(Cm*vec2(0,0)); page.bounds.extend(Cm*vec2(1,1));
                         page.blits.append( Blit{Cm*vec2(0,1),Cm*vec2(1,1)-Cm*vec2(0,0), move(images.at(args[0].data)),{}} );
                     } else log("No such image", args[0].data, images.keys);
                     OP2('E','T') ;
@@ -478,8 +464,8 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
             { // Transforms from bottom-left to top left
                 mat3x2 m (1,0, 0, -1, 0, page.bounds.max.y);
                 { vec2 a = m*page.bounds.min, b = m*page.bounds.max; page.bounds.min = min(a, b); page.bounds.max = max(a, b); }
-                for(Blit& b: page.blits) b.origin = m*b.origin;
-                for(Line& l: page.lines) { l.a=m*l.a; l.b=m*l.b; }
+                for(Blit& o: page.blits) o.origin = m*o.origin;
+                for(Line& o: page.lines) o.a=m*o.a, o.b=m*o.b;
                 for(Glyph& o: page.glyphs) o.origin=m*o.origin;
                 for(Cubic& o: page.cubics) for(vec2& p: o.points) p = m*p;
             }
@@ -489,11 +475,11 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                 mat3x2 m (scale, 0,0, scale, -page.bounds.min.x*scale, -page.bounds.min.y*scale);
                 { vec2 a = m*page.bounds.min, b = m*page.bounds.max; page.bounds.min = min(a, b); page.bounds.max = max(a, b); }
                 for(Blit& o: page.blits) o.origin = m*o.origin, o.size *= scale;
-                for(Line& l: page.lines) { l.a=m*l.a; l.b=m*l.b; }
-                for(Glyph& o: page.glyphs) o.origin=m*o.origin, o.fontSize *= scale;
+                for(Line& o: page.lines) o.a=m*o.a, o.b=m*o.b;
+                for(Glyph& o: page.glyphs) o.origin = m*o.origin, o.fontSize *= scale;
+                page.glyphs.filter([](const Glyph& o) { return o.origin.x<0; });
                 for(Cubic& o: page.cubics) for(vec2& p: o.points) p = m*p;
             }
-
             pages.append(move(page));
         }
         // add any children

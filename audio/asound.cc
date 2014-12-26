@@ -128,7 +128,7 @@ bool AudioOutput::start(uint rate, uint periodSize, uint sampleBits, uint channe
 void AudioOutput::stop() {
     assert_(status);
     {int state = status->state;
-        if(state < Suspended) io<DRAIN>();
+        if(state == Running) io<DRAIN>();
         else log("Could not drain", state);}
     unregisterPoll();
     {int state = status->state;

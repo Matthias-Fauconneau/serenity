@@ -158,13 +158,10 @@ void Window::event() {
 
         Update update = updates.take(0);
         if(!update.graphics) update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size))); // TODO: partial render
-        //assert_(update.graphics);
 
         // Render background
         /***/ if(background==NoBackground) {}
         else if(background==White) fill(target, update.origin, update.size, 1, 1);
-        else if(background==Black) fill(target, update.origin, update.size, 0, 1);
-        else if(background==Oxygen) oxygen(target, update.origin, update.origin+update.size);
         else error((int)background);
 
         // Render graphics
