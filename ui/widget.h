@@ -2,21 +2,6 @@
 /// \file widget.h Widget interface to compose user interfaces
 #include "graphics.h"
 
-/// Axis-aligned rectangle with 2D integer coordinates
-struct Rect {
-	int2 min, max;
-	explicit Rect(int2 size) : min(0), max(size) {}
-	explicit Rect(int2 min, int2 max) : min(min), max(max) {}
-	static Rect fromOriginAndSize(int2 origin, int2 size) { return Rect(origin, origin+size); }
-	int2 origin() const { return min; }
-	int2 size() const { return max-min; }
-	explicit operator bool() { return min<max; }
-	bool contains(int2 p) const { return p>=min && p<max; }
-};
-inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min),min(a.max,b.max)); }
-inline String str(const Rect& r) { return "["_+str(r.min)+" - "_+str(r.max)+"]"_; }
-inline Rect operator +(int2 offset, Rect rect) { return Rect(offset+rect.min,offset+rect.max); }
-
 /// User interface colors
 static constexpr bgr3f lightBlue (7./8, 3./4, 1./2);
 static constexpr bgr3f gray (3./4, 3./4, 3./4);
@@ -43,14 +28,14 @@ struct Widget {
     virtual String title() { return {}; }
     /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
-    virtual int2 sizeHint(int2) = 0;
+    virtual vec2 sizeHint(vec2) = 0;
     /// Returns graphic elements representing this widget at the given \a size.
-	virtual shared<Graphics> graphics(int2 unused size) { error("Unimplemented, use graphics(int2 size, Rect clip)"); }
-	virtual shared<Graphics> graphics(int2 size, Rect unused clip) { return this->graphics(size); }
+    virtual shared<Graphics> graphics(vec2 unused size) { error("Unimplemented, use graphics(size, clip)"); }
+    virtual shared<Graphics> graphics(vec2 size, Rect unused clip) { return this->graphics(size); }
 	/// Returns stop position for scrolling
 	/// \arg direction Direction of requested stop (-1: previous, 0: nearest, 1: next)
 	/// \note Defaults to discrete uniform coarse stops
-    virtual int stop(int2 unused size, int unused axis, int currentPosition, int direction=0) { return currentPosition + direction * 64; }
+    virtual int stop(vec2 unused size, int unused axis, int currentPosition, int direction=0) { return currentPosition + direction * 64; }
 
 // Events
     /// Mouse event type
@@ -60,7 +45,7 @@ struct Widget {
     /// Override \a mouseEvent to handle or forward user input
     /// \note \a mouseEvent is first called on the root Window#widget
     /// \return Whether the mouse event was accepted
-    virtual bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
+    virtual bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) {
         (void)cursor, (void)size, (void)event, (void)button; (void)focus; return false;
     }
     /// Override \a keyPress to handle or forward user input

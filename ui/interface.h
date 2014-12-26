@@ -12,16 +12,16 @@ struct ScrollArea : Widget {
     bool scrollbar = false;
 	const int scrollBarWidth = 8;
 	vec2 offset=0;
-	int2 dragStartCursor = 0;
+    vec2 dragStartCursor = 0;
 	vec2 dragStartOffset = 0;
-	int2 viewSize = 0;
+    vec2 viewSize = 0;
 
     /// Overrides \a widget to return the proxied widget
     virtual Widget& widget() const abstract;
 
-    int2 sizeHint(int2 size) override { return widget().sizeHint(size); }
-	shared<Graphics> graphics(int2 size) override;
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;
+    vec2 sizeHint(vec2 size) override { return widget().sizeHint(size); }
+    shared<Graphics> graphics(vec2 size) override;
+    bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) override;
 	bool keyPress(Key key, Modifiers modifiers) override;
 };
 
@@ -46,8 +46,8 @@ struct Progress : Widget {
 
     Progress(int minimum=0, int maximum=0, int value=-1):minimum(minimum),maximum(maximum),value(value){}
 
-    int2 sizeHint(int2) override;
-	shared<Graphics> graphics(int2 size) override;
+    vec2 sizeHint(vec2) override;
+    shared<Graphics> graphics(vec2 size) override;
 
     static constexpr int height = 32;
 };
@@ -61,8 +61,8 @@ struct ImageView : Widget {
     /// Creates a widget displaying \a image
     ImageView(Image&& image) : image(move(image)) {}
 
-    int2 sizeHint(int2) override;
-	shared<Graphics> graphics(int2 size) override;
+    vec2 sizeHint(vec2) override;
+    shared<Graphics> graphics(vec2 size) override;
 };
 
 // Control
@@ -74,7 +74,7 @@ struct Slider : Progress {
 
     Slider(int minimum=0, int maximum=0, int value=-1):Progress(minimum,maximum,value){}
 
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;
+    bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) override;
 };
 
 /// Displays an icon. When clicked, calls \a triggered
@@ -83,7 +83,7 @@ struct ImageLink : ImageView {
     function<void()> triggered;
 
     ImageLink(Image&& image) : ImageView(move(image)) {}
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;
+    bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) override;
 };
 /// \typedef ImageLink TriggerButton
 /// Displays a clickable button with an icon
@@ -100,7 +100,7 @@ struct ToggleButton : ImageView {
     /// Current button state
     bool enabled = false;
 
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;
+    bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) override;
 
     Image enableIcon;
     Image disableIcon;
@@ -126,11 +126,11 @@ struct WidgetCycle : Widget {
 
 	// Forwards content
 	String title() override { return widgets[index]->title(); }
-	int2 sizeHint(int2 size) override { return widgets[index]->sizeHint(size); }
-	shared<Graphics> graphics(int2 size) override { return widgets[index]->graphics(size); }
+    vec2 sizeHint(vec2 size) override { return widgets[index]->sizeHint(size); }
+    shared<Graphics> graphics(vec2 size) override { return widgets[index]->graphics(size); }
 
 	// Forwards events
-	bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;
+    bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) override;
 	// Forwards events and cycle widgets
 	bool keyPress(Key key, Modifiers modifiers) override;
 };

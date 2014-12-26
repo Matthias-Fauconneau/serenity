@@ -45,11 +45,11 @@ struct Text : virtual Widget {
     /// Horizontal alignment
     bool center;
     /// Minimal size hint
-    int2 minimalSizeHint;
+    vec2 minimalSizeHint;
 
 	struct TextLayout layout(float wrap=0) const;
-	vec2 textSize(int2 size=0) const;
+    vec2 textSize(vec2 size=0) const;
 
-	int2 sizeHint(int2 size) override;
-	shared<Graphics> graphics(int2 size) override;
+    vec2 sizeHint(vec2 size) override;
+    shared<Graphics> graphics(vec2 size) override;
 };

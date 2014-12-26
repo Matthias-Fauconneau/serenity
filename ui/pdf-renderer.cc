@@ -292,15 +292,11 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
         }
         Variant* contents = dict.find("Contents"_);
         if(contents) {
-            // Keeps current page first geometry indices to translate the page primitives after full parse
-            //breaks.append({blits.size, lines.size, characters.size, polygons.size});
-            //uint firstBlit = blits.size, firstLine = lines.size, firstCharacter = characters.size, firstPolygon=polygons.size;
             // Parses page bounds
-            const array<Variant>& box = // Lower-left, upper-right
+            const array<Variant>& pageBox = // Lower-left, upper-right
                     (dict.find("ArtBox"_)?:dict.find("TrimBox"_)?:dict.find("BleedBox"_)?:dict.find("CropBox"_)?:&dict.at("MediaBox"_))->list;
-            vec2 boxMin = vec2(min(box[0].real(),box[2].real()),min(box[1].real(),box[3].real())); // FIXNE: BBox box.min
-            vec2 boxMax = vec2(max(box[0].real(),box[2].real()),max(box[1].real(),box[3].real())); // FIxme: BBox box.max
-            vec2 pageMin = vec2(+inf), pageMax=vec2(-inf);
+            Rect box (vec2(min(pageBox[0].real(),pageBox[2].real()),min(pageBox[1].real(),pageBox[3].real())),
+                    vec2(max(pageBox[0].real(),pageBox[2].real()),max(pageBox[1].real(),pageBox[3].real())));
 
             // Rendering context
             mat3x2 Cm, Tm; array<mat3x2> stack;
@@ -312,19 +308,15 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
             Graphics page;
 
             // Conversion helpers
-            auto extend = [&pageMin,&pageMax](vec2 p) { pageMin=min(pageMin, p), pageMax=max(pageMax, p); };
+            auto extend = [&page](vec2 p) { page.bounds.extend(p); };
 
             enum Flags { Close=1,Stroke=2,Fill=4,OddEven=8,Winding=16,Trace=32 };
-            auto drawPaths = [&paths,&brushColor,&boxMin,&boxMax,&pageMin,&pageMax,&page](int flags) {
+            auto drawPaths = [&paths,&brushColor,&box,&page](int flags) {
                 if(brushColor ==  white) return;
                 for(ref<vec2> path : paths) {
-                    vec2 min=path[0], max=path[0];
-                    for(vec2 p : path) if(p >= boxMin && p <= boxMax) {
-                        min=::min(min, p);
-                        max=::max(max, p);
-                    }
-                    pageMin = ::min(pageMin, min), pageMax = ::max(pageMax, max); // FIXME: page.bbox
-                    if(!(max > boxMin && min < boxMax)) return; // clip
+                    Rect bounds (path[0], path[0]);
+                    for(vec2 p : path) if(box.contains(p)) bounds.extend(p);
+                    if(!(box & bounds)) return; // Clips
                     /*if(flags&Stroke || (flags&Fill) || polyline.size>16) {
                         for(uint i: range(polyline.size-1)) {
                             if(polyline[i] != polyline[i+1])
@@ -365,7 +357,7 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                 }
             };
 
-            auto drawText= [Cm,&Tm,&boxMin,&boxMax,&pageMin,&pageMax,&page](FontData& fontData, float size, float spacing, float wordSpacing, string data) {
+            auto drawText= [Cm,&Tm,&box,&page](FontData& fontData, float size, float spacing, float wordSpacing, string data) {
                 if(!&fontData) { /*log("Missing font");*/ return; } // FIXME
                 assert_(&fontData && fontData.data);
                 if(!(Cm*Tm)(0,0)) { log("Rotated glyph"); return; } // FIXME: rotated glyphs
@@ -377,7 +369,7 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                     uint index = font.index(code);
                     vec2 position = vec2(Trm(0,2),Trm(1,2));
                     auto metrics = font.metrics(index);
-                    if(position > boxMin && position < boxMax && metrics.size) page.glyphs.append(position, Trm(0,0)*size, fontData, code, index);
+                    if(box.contains(position) && metrics.size) page.glyphs.append(position, Trm(0,0)*size, fontData, code, index);
                     float advance = spacing+(code==' '?wordSpacing:0);
                     if(code < fontData.widths.size) advance += size*fontData.widths[code]/1000;
                     else advance += metrics.advance;
@@ -484,8 +476,8 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                 args.clear();
             }
             { // Transforms from bottom-left to top left
-                mat3x2 m (1,0, 0, -1, 0, pageMax.y);
-                { vec2 a = m*pageMin, b = m*pageMax; pageMin = min(a, b); pageMax = max(a, b); }
+                mat3x2 m (1,0, 0, -1, 0, page.bounds.max.y);
+                { vec2 a = m*page.bounds.min, b = m*page.bounds.max; page.bounds.min = min(a, b); page.bounds.max = max(a, b); }
                 for(Blit& b: page.blits) b.origin = m*b.origin;
                 for(Line& l: page.lines) { l.a=m*l.a; l.b=m*l.b; }
                 for(Glyph& o: page.glyphs) o.origin=m*o.origin;
@@ -493,17 +485,15 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
             }
 
             { // Normalizes coordinates (Aligns top-left to 0, scales to DPI)
-                float scale = min(96.f/72, min(1366 / (pageMax.x-pageMin.x), 768 / (pageMax.y-pageMin.y))); // Fit page
-                mat3x2 m (scale, 0,0, scale, -pageMin.x*scale, -pageMin.y*scale);
-                { vec2 a = m*pageMin, b = m*pageMax; pageMin = min(a, b); pageMax = max(a, b); }
-                assert_(int2(pageMin) == int2(0), pageMin);
+                float scale = min(96.f/72, min(vec2(1366,768)/(page.bounds.size()))); // Fit page
+                mat3x2 m (scale, 0,0, scale, -page.bounds.min.x*scale, -page.bounds.min.y*scale);
+                { vec2 a = m*page.bounds.min, b = m*page.bounds.max; page.bounds.min = min(a, b); page.bounds.max = max(a, b); }
                 for(Blit& o: page.blits) o.origin = m*o.origin, o.size *= scale;
                 for(Line& l: page.lines) { l.a=m*l.a; l.b=m*l.b; }
                 for(Glyph& o: page.glyphs) o.origin=m*o.origin, o.fontSize *= scale;
                 for(Cubic& o: page.cubics) for(vec2& p: o.points) p = m*p;
             }
 
-            page.size = pageMax-pageMin;
             pages.append(move(page));
         }
         // add any children

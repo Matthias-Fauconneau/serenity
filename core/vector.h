@@ -21,14 +21,15 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
 
     /// Initializes components from another vec \a o casting from \a S to \a T
     template<Type S> notrace explicit vec(const vec<V,S,N>& o) { for(uint i: range(N)) at(i)=(T)o[i]; }
-    /// Unchecked accessor (const)
+
+    operator ref<T>() const { return ref<T>((T*)this, N); }
+
+    /// \name Accessors
     notrace const T& at(uint i) const { return ((T*)this)[i]; }
-    /// Unchecked accessor
     notrace T& at(uint i) { return ((T*)this)[i]; }
-    /// Accessor (checked in debug build, const)
-    notrace const T& operator[](uint i) const { assert(i<N); return at(i); }
-    /// Accessor (checked in debug build)
-    notrace T& operator[](uint i) { assert(i<N); return at(i); }
+    notrace const T& operator[](uint i) const { return at(i); }
+    notrace T& operator[](uint i) { return at(i); }
+
     /// \name Operators
     explicit operator bool() const { for(uint i: range(N)) if(at(i)!=0) return true; return false; }
 	notrace vec& operator +=(const vec& v) { for(uint i: range(N)) at(i)+=v[i]; return *this; }
@@ -70,6 +71,7 @@ generic vec min(const vec& a, const vec& b){ vec r; for(uint i: range(N)) r[i]=m
 generic vec max(const vec& a, const vec& b){ vec r; for(uint i: range(N)) r[i]=max(a[i],b[i]); return r; }
 generic vec clip(const vec& min, const vec& x, const vec& max){vec r; for(uint i: range(N)) r[i]=clip(min[i],x[i],max[i]); return r;}
 
+generic T min(const vec& v) { return min((ref<T>)v); }
 generic T sum(const vec& a) { T sum=0; for(uint i: range(N)) sum+=a[i]; return sum; }
 generic T product(const vec& a) { T product=1; for(uint i: range(N)) product *= a[i]; return product; }
 generic T dot(const vec& a, const vec& b) { T ssq=0; for(uint i: range(N)) ssq += a[i]*b[i]; return ssq; }

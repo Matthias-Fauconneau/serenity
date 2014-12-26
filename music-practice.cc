@@ -10,12 +10,12 @@
 
 struct GraphicsWidget : Graphics, Widget {
     GraphicsWidget(Graphics&& o) : Graphics(move(o)) {}
-    int2 sizeHint(int2) override;
-    shared<Graphics> graphics(int2) override;
+    vec2 sizeHint(vec2) override;
+    shared<Graphics> graphics(vec2) override;
 };
 
-int2 GraphicsWidget::sizeHint(int2) { return int2(this->size); }
-shared<Graphics> GraphicsWidget::graphics(int2 unused size /*TODO: center*/) { return shared<Graphics>((Graphics*)this); }
+vec2 GraphicsWidget::sizeHint(vec2) { return bounds.max; }
+shared<Graphics> GraphicsWidget::graphics(vec2 unused size /*TODO: center*/) { return shared<Graphics>((Graphics*)this); }
 
 /// SFZ sampler and PDF renderer
 struct Music {
@@ -32,7 +32,7 @@ struct Music {
 
     array<unique<FontData>> fonts;
     unique<Scroll<HList<GraphicsWidget>>> pages;
-    Window window {&pages->area(), int2(0, 768)};
+    Window window {&pages->area(), 0};
 
     Music() {
         assert_(files);

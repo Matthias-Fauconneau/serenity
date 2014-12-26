@@ -2,13 +2,13 @@
 
 // ScrollArea
 
-shared<Graphics> ScrollArea::graphics(int2 size) {
+shared<Graphics> ScrollArea::graphics(vec2 size) {
 	this->viewSize = size;
-    int2 hint = abs(widget().sizeHint(int2( horizontal||size.x<0 ? 0/*-1 FIXME*/: 1, vertical||size.y<0? 0/*-1 FIXME*/: 1 )*abs(size)));
-    int2 view (horizontal?max(hint.x,size.x):size.x, vertical?max(hint.y,size.y):size.y);
+    vec2 hint = abs(widget().sizeHint(vec2( horizontal||size.x<0 ? 0/*-1 FIXME*/: 1, vertical||size.y<0? 0/*-1 FIXME*/: 1 )*abs(size)));
+    vec2 view (horizontal?max(hint.x,size.x):size.x, vertical?max(hint.y,size.y):size.y);
 	assert_(offset <= vec2(0) && (!(size < view) || offset==vec2(0)), offset, view, size);
 	shared<Graphics> graphics;
-    graphics->graphics.insert(offset, widget().graphics(view, Rect::fromOriginAndSize(int2(-offset), size)));
+    graphics->graphics.insert(offset, widget().graphics(view, Rect::fromOriginAndSize(vec2(-offset), size)));
 	if(scrollbar) {
 		if(size.y<view.y)
 			graphics->fills.append( vec2(size.x-scrollBarWidth, -offset.y*size.y/view.y), vec2(scrollBarWidth, size.y*size.y/view.y), 1./2, 1.f/2);
@@ -18,9 +18,9 @@ shared<Graphics> ScrollArea::graphics(int2 size) {
     return graphics;
 }
 
-bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
-    //int2 hint = abs(widget().sizeHint(size));
-    int2 hint = abs(widget().sizeHint(int2(horizontal||size.x<0?0/*-1 FIXME*/:1, vertical||size.y<0?0/*-1 FIXME*/:1)*abs(size)));
+bool ScrollArea::mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) {
+    //vec2 hint = abs(widget().sizeHint(size));
+    vec2 hint = abs(widget().sizeHint(vec2(horizontal||size.x<0?0/*-1 FIXME*/:1, vertical||size.y<0?0/*-1 FIXME*/:1)*abs(size)));
     if(event==Press) {
         focus = this;
 		if((button==WheelDown || button==WheelUp)) for(int axis: range(2)) {
@@ -34,7 +34,7 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button, 
 			if(scrollbar && button==LeftButton) for(int axis: range(2)) {
 				if(size[axis]<hint[axis]) {
 					if(cursor[!axis]>size[!axis]-scrollBarWidth) {
-						offset[axis] = min(0, max(size[axis]-hint[axis], -cursor[axis]*(hint[axis]-size[axis]/2)/size[axis]));
+                        offset[axis] = min(0.f, max(size[axis]-hint[axis], -cursor[axis]*(hint[axis]-size[axis]/2)/size[axis]));
 						dragStartCursor=cursor, dragStartOffset=offset;
 						return true;
 					}
@@ -49,7 +49,7 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button, 
 			return true;
 		}
 	}
-	if(widget().mouseEvent(cursor-int2(offset), max(hint,size), event, button, focus)) return true;
+    if(widget().mouseEvent(cursor-vec2(offset), max(hint,size), event, button, focus)) return true;
 	if(event==Motion && button==LeftButton && !(hint<=size)) {
 		offset = min(vec2(0), max(-vec2(hint-size), dragStartOffset+vec2(cursor-dragStartCursor)));
         return true;
@@ -58,9 +58,9 @@ bool ScrollArea::mouseEvent(int2 cursor, int2 size, Event event, Button button, 
 }
 
 bool ScrollArea::keyPress(Key key, Modifiers) {
-    int2 size = viewSize;
-    int2 hint = abs(widget().sizeHint(int2( horizontal||size.x<0 ? 0/*-1 FIXME*/: 1, vertical||size.y<0? 0/*-1 FIXME*/: 1 )*abs(size)));
-    int2 view (horizontal?max(hint.x,size.x):size.x, vertical?max(hint.y,size.y):size.y);
+    vec2 size = viewSize;
+    vec2 hint = abs(widget().sizeHint(vec2( horizontal||size.x<0 ? 0/*-1 FIXME*/: 1, vertical||size.y<0? 0/*-1 FIXME*/: 1 )*abs(size)));
+    vec2 view (horizontal?max(hint.x,size.x):size.x, vertical?max(hint.y,size.y):size.y);
 
     if(key==Home) { offset = 0; return true; }
 	if(key==End) { offset = -vec2(hint-viewSize); return true; }
@@ -77,8 +77,8 @@ bool ScrollArea::keyPress(Key key, Modifiers) {
 
 // Progress
 
-int2 Progress::sizeHint(int2) { return int2(-height,height); }
-shared<Graphics> Progress::graphics(int2 size) {
+vec2 Progress::sizeHint(vec2) { return vec2(-height,height); }
+shared<Graphics> Progress::graphics(vec2 size) {
 	shared<Graphics> graphics;
 	assert(minimum <= value && value <= maximum, minimum, value, maximum);
     int x = size.x*uint(value-minimum)/uint(maximum-minimum);
@@ -89,20 +89,17 @@ shared<Graphics> Progress::graphics(int2 size) {
 
 // ImageView
 
-int2 ImageView::sizeHint(int2 size) { return min(image.size, size.x && image.size.x ? image.size*size.x/image.size.x : image.size); }
+vec2 ImageView::sizeHint(vec2 size) { return vec2(min(image.size, size.x && image.size.x ? int2(image.size.x*size.x/image.size.x, image.size.y*size.y/image.size.y) : image.size)); }
 
-shared<Graphics> ImageView::graphics(int2 size) {
+shared<Graphics> ImageView::graphics(vec2 size) {
 	shared<Graphics> graphics;
     if(image) {
-		// Fit
-		/*int2 target = min(image.size*size.x/image.size.x, image.size*size.y/image.size.y);
-		graphics->blits.append(max(vec2(0),vec2((size-target)/2)), vec2(target), share(image));*/
-		// Crop
-		//int2 offset = size-image.size;
-		graphics->blits.append(
-					max(vec2(0),vec2((size-image.size)/2)), // Centers
-					vec2(min(size, image.size)), // or fits
-					cropShare(image, max(int2(0),int2((image.size-size)/2)), min(size, image.size)) // by cropping center
+        // Crop
+        //vec2 offset = size-image.size;
+        graphics->blits.append(
+                    max(vec2(0),vec2((int2(size)-image.size)/2)), // Centers
+                    vec2(min(int2(size), image.size)), // or fits
+                    cropShare(image, max(int2(0),image.size-int2(size))/2, min(int2(size), image.size)) // by cropping center
 					);
     }
     return graphics;
@@ -110,7 +107,7 @@ shared<Graphics> ImageView::graphics(int2 size) {
 
 // Slider
 
-bool Slider::mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*&) {
+bool Slider::mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) {
     if((event == Motion || event==Press) && button==LeftButton) {
         value = minimum+cursor.x*uint(maximum-minimum)/size.x;
         if(valueChanged) valueChanged(value);
@@ -121,19 +118,19 @@ bool Slider::mouseEvent(int2 cursor, int2 size, Event event, Button button, Widg
 
 // ImageLink
 
-bool ImageLink::mouseEvent(int2, int2, Event event, Button, Widget*&) {
+bool ImageLink::mouseEvent(vec2, vec2, Event event, Button, Widget*&) {
     if(event==Press) { if(triggered) triggered(); return true; }
     return false;
 }
 
 //  ToggleButton
-bool ToggleButton::mouseEvent(int2, int2, Event event, Button button, Widget*&) {
+bool ToggleButton::mouseEvent(vec2, vec2, Event event, Button button, Widget*&) {
     if(event==Press && button==LeftButton) { enabled = !enabled; image = enabled?share(disableIcon):share(enableIcon); toggled(enabled); return true; }
     return false;
 }
 
 // WidgetCycle
-bool WidgetCycle::mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
+bool WidgetCycle::mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) {
 	focus = this;
 	return widgets[index]->mouseEvent(cursor, size, event, button, focus);
 }

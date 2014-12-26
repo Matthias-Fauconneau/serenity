@@ -64,11 +64,29 @@ struct Cubic {
 	Cubic(buffer<vec2>&& points, bgr3f color=black, float opacity=1) : points(move(points)), color(color), opacity(opacity) {}
 };
 
+/// Axis-aligned rectangle with 2D floating point coordinates
+struct Rect {
+    vec2 min, max;
+    explicit Rect(vec2 size) : min(0), max(size) {}
+    explicit Rect(vec2 min, vec2 max) : min(min), max(max) {}
+    static Rect fromOriginAndSize(vec2 origin, vec2 size) { return Rect(origin, origin+size); }
+    vec2 origin() const { return min; }
+    vec2 size() const { return max-min; }
+    explicit operator bool() { return min<max; }
+    bool contains(vec2 p) const { return p>=min && p<max; }
+    void extend(vec2 p) { min=::min(min, p), max=::max(max, p); }
+};
+inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min),min(a.max,b.max)); }
+inline String str(const Rect& r) { return "["_+str(r.min)+" - "_+str(r.max)+"]"_; }
+inline Rect operator +(vec2 offset, Rect rect) { return Rect(offset+rect.min,offset+rect.max); }
+
 /// Set of graphic elements
 struct Graphics : shareable {
-    vec2 size = 0;
-    vec2 offset = 0;
+    //vec2 size = 0;
+    //vec2 offset = 0;
     //vec2 scale = 1; TODO
+
+    Rect bounds = Rect(inf, -inf); // bounding box of untransformed primitives
     array<Fill> fills;
     array<Blit> blits;
     array<Glyph> glyphs;

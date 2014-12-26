@@ -13,7 +13,7 @@ Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool sho
     if(sizeHint.x<=0) size.x=Display::size.x;
     if(sizeHint.y<=0) size.y=Display::size.y;
     if((sizeHint.x<0||sizeHint.y<0) && widget) {
-        int2 hint = widget->sizeHint(size);
+        int2 hint (widget->sizeHint(vec2(size)));
 		if(sizeHint.x<0) size.x=min(max(abs(hint.x),-sizeHint.x), Display::size.x);
 		if(sizeHint.y<0) size.y=min(max(abs(hint.y),-sizeHint.y), Display::size.y-46);
     }
@@ -64,12 +64,12 @@ bool Window::processEvent(const XEvent& e) {
     uint8 type = e.type&0b01111111; //msb set if sent by SendEvent
     /**/ if(type==ButtonPress) {
 		Widget* previousFocus = focus;
-		if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Press, (Widget::Button)e.key, focus) || focus!=previousFocus) render();
+        if(widget->mouseEvent(vec2(e.x,e.y), vec2(size), Widget::Press, (Widget::Button)e.key, focus) || focus!=previousFocus) render();
 		drag = focus;
     }
     else if(type==ButtonRelease) {
         drag=0;
-        if(e.key <= Widget::RightButton && widget->mouseEvent(int2(e.x,e.y), size, Widget::Release, (Widget::Button)e.key, focus)) render();
+        if(e.key <= Widget::RightButton && widget->mouseEvent(vec2(e.x,e.y), vec2(size), Widget::Release, (Widget::Button)e.key, focus)) render();
     }
     else if(type==KeyPress) {
         Key key = (Key)keySym(e.key, e.state); Modifiers modifiers = (Modifiers)e.state;
@@ -81,13 +81,13 @@ bool Window::processEvent(const XEvent& e) {
 	}
 	else if(type==KeyRelease) {}
     else if(type==MotionNotify) {
-        if(drag && e.state&Button1Mask && drag->mouseEvent(int2(e.x,e.y), size, Widget::Motion, Widget::LeftButton, focus))
+        if(drag && e.state&Button1Mask && drag->mouseEvent(vec2(e.x,e.y), vec2(size), Widget::Motion, Widget::LeftButton, focus))
             render();
-        else if(widget->mouseEvent(int2(e.x,e.y), size, Widget::Motion, (e.state&Button1Mask)?Widget::LeftButton:Widget::NoButton, focus))
+        else if(widget->mouseEvent(vec2(e.x,e.y), vec2(size), Widget::Motion, (e.state&Button1Mask)?Widget::LeftButton:Widget::NoButton, focus))
             render();
     }
     else if(type==EnterNotify || type==LeaveNotify) {
-        if(widget->mouseEvent( int2(e.x,e.y), size, type==EnterNotify?Widget::Enter:Widget::Leave,
+        if(widget->mouseEvent( vec2(e.x,e.y), vec2(size), type==EnterNotify?Widget::Enter:Widget::Leave,
                                e.state&Button1Mask?Widget::LeftButton:Widget::NoButton, focus) ) render();
     }
     else if(type==KeymapNotify) {}
@@ -157,7 +157,7 @@ void Window::event() {
         }
 
         Update update = updates.take(0);
-		if(!update.graphics) update.graphics = widget->graphics(size, Rect::fromOriginAndSize(update.origin, update.size)); // TODO: partial render
+        if(!update.graphics) update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size))); // TODO: partial render
         //assert_(update.graphics);
 
         // Render background
