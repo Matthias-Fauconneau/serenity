@@ -5,14 +5,15 @@
 //#include "vector.h"
 
 struct Variant {
-    enum { Empty, Boolean, Integer, Real, Data, List, Dict, Rational } type = Empty;
-    double number=0;
+    enum { Null, Boolean, Integer, Real, Data, List, Dict, Rational } type = Null;
+    double number = 0;
     String data;
     array<Variant> list;
     map<String,Variant> dict;
-    double denominator=1;
+    double denominator = 1;
 
-	//Variant(bool boolean) : type(Boolean), number(boolean) {}
+    Variant(decltype(nullptr)) : type(Null) {}
+    Variant(bool boolean) : type(Boolean), number(boolean) {}
     Variant(int number) : type(Integer), number(number) {}
     Variant(int64 number) : type(Integer), number(number) {}
     Variant(uint number) : type(Integer), number(number) {}
@@ -24,7 +25,7 @@ struct Variant {
     Variant(map<String,Variant>&& dict) : type(Dict), dict(move(dict)) {}
 	Variant(int64 numerator, int64 denominator) : type(Rational), number(numerator), denominator(denominator) {}
 
-    explicit operator bool() const { return type!=Empty; }
+    explicit operator bool() const { return type != Null; }
 
     int64 integer() const { assert_(type==Integer, *this); return number; }
     double real() const {

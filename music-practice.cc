@@ -35,6 +35,7 @@ struct Music {
     Window window {&pages->area(), int2(0, 768)};
 
     Music() {
+        assert_(files);
         setTitle(arguments() ? arguments()[0] : files[0]);
         window.actions[DownArrow] = {this, &Music::nextTitle};
         window.actions[Return] = {this, &Music::nextTitle};
@@ -43,6 +44,7 @@ struct Music {
         decodeThread.spawn();
         AudioControl("Master Playback Switch") = 1;
         AudioControl("Headphone Playback Switch") = 1;
+        AudioControl("Master Playback Volume") = 100;
         audio.start(sampler.rate, Sampler::periodSize, 32, 2);
         audioThread.spawn();
      }
