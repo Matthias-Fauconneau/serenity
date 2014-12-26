@@ -19,8 +19,40 @@ String findFont(string fontName, ref<string> fontTypes) {
 }
 
 static FT_Library ft; static int fontCount=0;
-Font::Font(buffer<byte>&& data_, float size, string name, bool hint) : data(move(data_)), size(size), name(copyRef(name)), hint(hint) {
-	assert_(this->name);
+
+/*FontData::FontData(buffer<byte>&& data, string name) : data(move(data)), name(copyRef(name)) {
+    if(!ft) FT_Init_FreeType(&ft);
+    int e; if((e=FT_New_Memory_Face(ft,(const FT_Byte*)data.data,data.size,0,&face)) || !face) { error("Invalid font", data.data, data.size); return; }
+    fontCount++;
+}
+FontData::~FontData() {
+    if(face) {
+        FT_Done_Face(face); face=0; fontCount--;
+        assert_(fontCount >= 0);
+        if(fontCount == 0) {
+            assert_(ft);
+            //FT_Done_FreeType(ft), ft=0;
+        }
+    }
+}
+uint FontData::index(uint code) const {
+    for(int i=0;i<face->num_charmaps;i++) {
+        FT_Set_Charmap(face, face->charmaps[i] );
+        uint index = FT_Get_Char_Index(face, code);
+        if(index) return index;
+    }
+    //error("Missing code", code, "in", name);
+    return code;
+}
+
+uint FontData::index(string name) const {
+    uint index = FT_Get_Name_Index(face, (char*)(const char*)strz(name));
+    if(!index) for(int i=0;i<face->num_glyphs;i++) { char buffer[256]; FT_Get_Glyph_Name(face,i,buffer,sizeof(buffer)); log(buffer); }
+    assert_(index, name); return index;
+}*/
+
+
+Font::Font(ref<byte> data, float size, bool hint) : size(size), hint(hint) {
 	if(!ft) FT_Init_FreeType(&ft);
     int e; if((e=FT_New_Memory_Face(ft,(const FT_Byte*)data.data,data.size,0,&face)) || !face) { error("Invalid font", data.data, data.size); return; }
     fontCount++;
@@ -33,8 +65,6 @@ Font::Font(buffer<byte>&& data_, float size, string name, bool hint) : data(move
     bboxMin = scale*vec2(face->bbox.xMin, face->bbox.yMin);
     bboxMax = scale*vec2(face->bbox.xMax, face->bbox.yMax);
 }
-Font::Font(Map&& map, float size, string name, bool hint) : Font(unsafeRef<byte>(map), size, name, hint) { keep=move(map); }
-Font::Font(const File& file, float size, string name, bool hint) : Font(Map(file), size, name?:file.name(), hint) {}
 
 Font::~Font(){
     if(face) {

@@ -97,21 +97,21 @@ static Variant parseVariant(TextData& s) {
     if(s.match("true"_)) return true;
     if(s.match("false"_)) return false;
     if(s.match("null")) return nullptr;
-    error("Unknown type"_,s.slice(s.index-32,32),"|"_,s.slice(s.index,min(s.data.size-s.index, 32ul)),s.data.size-s.index);
-    //return Variant();
+    error("Unknown type"_);
 }
 static Variant parseVariant(string buffer) { TextData s(buffer); return parseVariant(s); }
 static Dict toDict(const array<String>& xref, Variant&& object) { return object.dict ? move(object.dict) : parseVariant(xref[object.integer()]).dict; }
 
-buffer<Graphics> decodePDF(ref<byte> file, array<unique<Font>>& outFonts) {
-    array<String> xref; Dict catalog;
-    {
+buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
+    array<String> xref;
+    array<Variant> pageXrefs;
+    { // Parses cross reference table and catalog
         TextData s (file);
         for(s.index=s.data.size-"0\r\n%%EOF\r\n"_.size; !( /*(s[-2]=='\r' && s[-1]=='\n') ||*/ s[-1]=='\n' || (/*s[-2]==' ' &&*/ s[-1]=='\r') );s.index--) {}
         //assert(s.slice(s.index-"startxref\r\n"_.size, "startxref\r\n"_.size)=="startxref\r\n"_, hex(s.slice(s.index-"startxref\r\n"_.size)));
         int index = s.integer(); assert_(index>0, index, s.slice(s.index-16)); s.index = index;
-        int root = 0;
         struct CompressedXRef { uint object, index; }; array<CompressedXRef> compressedXRefs;
+        int root = 0;
         for(;;) { /// Parse XRefs
             Variant object = ""_;
             if(s.match("xref"_)) { // Direct cross reference
@@ -180,7 +180,6 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<Font>>& outFonts) {
             s.index = dict.at("Prev"_).integer();
             assert_(int(s.index) > 0);
         }
-        catalog = parseVariant(xref[root]).dict;
         for(CompressedXRef ref: compressedXRefs) {
             Variant stream = parseVariant(xref[ref.object]);
             TextData s(stream.data);
@@ -191,27 +190,21 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<Font>>& outFonts) {
             }
             xref[objectNumber] = copyRef( s.slice(stream.dict.at("First"_).integer()+offset) );
         }
+        // Parses page references in catalog
+        Dict catalog = parseVariant(xref[root]).dict;
+        Variant kids = move(parseVariant(xref[catalog.at("Pages"_).integer()]).dict.at("Kids"_));
+        pageXrefs = kids.list ? move(kids.list) : parseVariant(xref[kids.integer()]).list;
     }
-    Variant kids = move(parseVariant(xref[catalog.at("Pages"_).integer()]).dict.at("Kids"_));
-    array<Variant> pageXrefs = kids.list ? move(kids.list) : parseVariant(xref[kids.integer()]).list;
-    //vec2 documentMin = vec2(+inf), documentMax = vec2(-inf);
-    //struct Break { size_t blits, lines, characters, polygons; };
-    //array<Break> breaks;
 
     // Ressources
-    struct Fonts {
-        String name;
-        buffer<byte> data;
-        map<float, unique<Font>> fonts;
+    struct FontData : ::FontData {
+        using ::FontData::FontData;
         array<float> widths;
-        Font& getFont(float size) { return *(fonts.find(size) ?: &fonts.insert(size, ::unique<Font>(copyRef(data)/*FIXME: shared*/, size, name))); }
     };
-    map<String, Fonts> fonts;
-    map<String, Image> images;
-    struct Blit {
-        vec2 position, size; Image image; Image resized;
-        bool operator <(const Blit& o) const{return position.y<o.position.y;}
-    };
+    map<String, unique<FontData>> fonts; // Referenced by glyphs
+    map<String, Image> images; // Moved by blits
+
+    // Device output
     array<Graphics> pages;
 
     for(size_t i=0; i<pageXrefs.size; i++) { // Does not use range as new pages might be added within loop
@@ -240,7 +233,7 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<Font>>& outFonts) {
                     Variant* fontFile = descriptor.find("FontFile"_)?:descriptor.find("FontFile2"_)?:descriptor.find("FontFile3"_);
                     if(!fontFile) { /*log("Missing FontFile", fontDict);*/ continue; }
                     String name = move(fontDict.at("BaseFont"_).data);
-                    Fonts& font = fonts.insert(copyRef(e.key), Fonts{move(name), parseVariant(xref[fontFile->integer()]).data, {}, {}});
+                    FontData& font = fonts.insert(copyRef(e.key), unique<FontData>(parseVariant(xref[fontFile->integer()]).data, move(name)));
                     Variant* firstChar = fontDict.find("FirstChar"_);
                     if(firstChar) font.widths.grow(firstChar->integer());
                     Variant* widths = fontDict.find("Widths"_);
@@ -311,19 +304,12 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<Font>>& outFonts) {
 
             // Rendering context
             mat3x2 Cm, Tm; array<mat3x2> stack;
-            Fonts* font=0; float fontSize=1,spacing=0,wordSpacing=0,leading=0; mat3x2 Tlm;
+            unique<FontData>* font=0; float fontSize=1,spacing=0,wordSpacing=0,leading=0; mat3x2 Tlm;
             bgr3f brushColor = black;
             array<array<vec2>> paths;
 
             // Device output
             Graphics page;
-            // TODO: scalable Graphics::glyph
-            struct Character {
-                Fonts* fonts; float size; uint index; vec2 position; uint code;
-                bool operator <(const Character& o) const{return position.y<o.position.y;}
-            };
-            array<Character> characters;
-            array<Blit> blits;
 
             // Conversion helpers
             auto extend = [&pageMin,&pageMax](vec2 p) { pageMin=min(pageMin, p), pageMax=max(pageMax, p); };
@@ -379,13 +365,11 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<Font>>& outFonts) {
                 }
             };
 
-            auto drawText= [Cm,&Tm,&boxMin,&boxMax,&pageMin,&pageMax,&characters](Fonts& fonts, float size, float spacing, float wordSpacing, string data) {
-                if(!&fonts) { /*log("Missing font");*/ return; } // FIXME
-                assert_(&fonts);
-                //if(!fonts) return;
-                assert_(fonts.data);
+            auto drawText= [Cm,&Tm,&boxMin,&boxMax,&pageMin,&pageMax,&page](FontData& fontData, float size, float spacing, float wordSpacing, string data) {
+                if(!&fontData) { /*log("Missing font");*/ return; } // FIXME
+                assert_(&fontData && fontData.data);
                 if(!(Cm*Tm)(0,0)) { log("Rotated glyph"); return; } // FIXME: rotated glyphs
-                Font& font = fonts.getFont((Cm*Tm)(0,0)*size);
+                Font& font = fontData.font((Cm*Tm)(0,0)*size);
                 for(uint8 code : data) {
                     if(code==0 && data.size==2) { /*assert_(data[1]!=0, hex(data));*//*Misparsed 16bit ccode*/ continue; }
                     if(code==0 && data.size==4) { assert_(data[1]!=0 && data[2]==0 && data[3]!=0, hex(data));/*2x Misparsed 16bit ccode*/ continue; }
@@ -393,15 +377,9 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<Font>>& outFonts) {
                     uint index = font.index(code);
                     vec2 position = vec2(Trm(0,2),Trm(1,2));
                     auto metrics = font.metrics(index);
-                    if(position > boxMin && position < boxMax && metrics.size) {
-                        /*if(find(font.name, "HelsinkiStd"_)) { // HACK: to trim text
-                            pageMin.x=min(pageMin.x, position.x+metrics.bearing.x), pageMax.x=max(pageMax.x, position.y+metrics.bearing.x+metrics.width);
-                            pageMin.y=min(pageMin.y, position.y-metrics.bearing.y), pageMax.y=max(pageMax.y, position.y-metrics.bearing.y+metrics.height);
-                        }*/ // Fitting paths is enough
-                        characters.append( Character{&fonts, Trm(0,0)*size, index, position, code} );
-                    }
+                    if(position > boxMin && position < boxMax && metrics.size) page.glyphs.append(position, Trm(0,0)*size, fontData, code, index);
                     float advance = spacing+(code==' '?wordSpacing:0);
-                    if(code < fonts.widths.size) advance += size*fonts.widths[code]/1000;
+                    if(code < fontData.widths.size) advance += size*fontData.widths[code]/1000;
                     else advance += metrics.advance;
                     Tm = mat3x2(advance, 0) * Tm;
                 }
@@ -469,7 +447,7 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<Font>>& outFonts) {
                     OP2('c','m') Cm = Cm*mat3x2(f(0),f(1),f(2),f(3),f(4),f(5));
                     OP2('D','o') if(images.contains(args[0].data)) {
                         extend(Cm*vec2(0,0)); extend(Cm*vec2(1,1));
-                        blits.append( Blit{Cm*vec2(0,1),Cm*vec2(1,1)-Cm*vec2(0,0), move(images.at(args[0].data)),{}} );
+                        page.blits.append( Blit{Cm*vec2(0,1),Cm*vec2(1,1)-Cm*vec2(0,0), move(images.at(args[0].data)),{}} );
                     } else log("No such image", args[0].data, images.keys);
                     OP2('E','T') ;
                     OP2('g','s') ;
@@ -508,9 +486,9 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<Font>>& outFonts) {
             { // Transforms from bottom-left to top left
                 mat3x2 m (1,0, 0, -1, 0, pageMax.y);
                 { vec2 a = m*pageMin, b = m*pageMax; pageMin = min(a, b); pageMax = max(a, b); }
-                for(Blit& b: blits) b.position = m*b.position ;
+                for(Blit& b: page.blits) b.origin = m*b.origin;
                 for(Line& l: page.lines) { l.a=m*l.a; l.b=m*l.b; }
-                for(Character& c: characters) c.position=m*c.position;
+                for(Glyph& o: page.glyphs) o.origin=m*o.origin;
                 for(Cubic& o: page.cubics) for(vec2& p: o.points) p = m*p;
             }
 
@@ -519,24 +497,18 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<Font>>& outFonts) {
                 mat3x2 m (scale, 0,0, scale, -pageMin.x*scale, -pageMin.y*scale);
                 { vec2 a = m*pageMin, b = m*pageMax; pageMin = min(a, b); pageMax = max(a, b); }
                 assert_(int2(pageMin) == int2(0), pageMin);
-                for(Blit& b: blits) b.position = m*b.position, b.size *= scale;
+                for(Blit& o: page.blits) o.origin = m*o.origin, o.size *= scale;
                 for(Line& l: page.lines) { l.a=m*l.a; l.b=m*l.b; }
-                for(Character& c: characters) c.position=m*c.position, c.size *= scale;
+                for(Glyph& o: page.glyphs) o.origin=m*o.origin, o.fontSize *= scale;
                 for(Cubic& o: page.cubics) for(vec2& p: o.points) p = m*p;
             }
 
-            // Converts to Graphics page
-            for(Character o: characters) {
-                Font& font = o.fonts->getFont(o.size);
-                if(font.metrics(o.index).size) page.glyphs.append(o.position, font, o.code, o.index);
-            }
-            for(Blit& o: blits) page.blits.append(o.position, o.size, move(o.image));
             page.size = pageMax-pageMin;
             pages.append(move(page));
         }
         // add any children
         if(dict.contains("Kids"_)) pageXrefs.append( move(dict.at("Kids"_).list) );
     }
-    for(Fonts& pdfFonts: fonts.values) outFonts.append(move(pdfFonts.fonts.values));
+    for(unique<FontData>& fonts: fonts.values) outFonts.append(move(fonts));
     return move(pages);
 }

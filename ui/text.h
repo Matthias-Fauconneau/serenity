@@ -5,7 +5,7 @@
 #include "core/image.h"
 #include "utf8.h"
 
-Font* getFont(string fontName, float size, ref<string> fontTypes={"","R","Regular"}, bool hint=false);
+FontData* getFont(string fontName, ref<string> fontTypes={"","R","Regular"});
 
 /// Rich text format control code encoded in 00-1F range
 // \note first word (until ' ') after a Link tag is not displayed but used as \a linkActivated identifier.

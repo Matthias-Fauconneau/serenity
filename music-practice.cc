@@ -30,7 +30,7 @@ struct Music {
     AudioOutput audio {{&sampler, &Sampler::read32}, audioThread};
     MidiInput input {audioThread};
 
-    array<unique<Font>> fonts;
+    array<unique<FontData>> fonts;
     unique<Scroll<HList<GraphicsWidget>>> pages;
     Window window {&pages->area(), int2(0, 768)};
 

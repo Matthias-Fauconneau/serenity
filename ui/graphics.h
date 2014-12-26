@@ -30,12 +30,11 @@ struct Blit {
 /// Text graphic element
 struct Glyph {
     vec2 origin;
-    Font& font;
+    float fontSize;
+    FontData& font;
 	uint code;
 	uint index;
 	bgr3f color = black; float opacity = 1;
-	Glyph(vec2 origin, Font& font, uint code, uint index, bgr3f color = black, float opacity=1)
-		: origin(origin), font(font), code(code), index(index), color(color), opacity(opacity) {}
 };
 
 /// Line graphic element
