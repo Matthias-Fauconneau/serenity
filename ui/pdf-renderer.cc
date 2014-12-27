@@ -9,6 +9,38 @@
 #include "matrix.h"
 #include "function.h"
 
+static Image trimWhite(const Image& image) {
+    int y0 = 0;
+    for(int y: range(image.height)) {
+        uint sum = 0;
+        for(int x : range(image.width)) sum += image(x,y).g; // Assumes r=g=b
+        if(sum < image.width*256*31/32) break;
+        y0 = y;
+    }
+    int y1 = image.height;
+    for(int y: reverse_range(image.height)) {
+        uint sum = 0;
+        for(int x : range(image.width)) sum += image(x,y).g; // Assumes r=g=b
+        if(sum < image.width*256*31/32) break;
+        y1 = y;
+    }
+    int x0 = 0;
+    for(int x: range(image.width)) {
+        uint sum = 0;
+        for(int y : range(image.height)) sum += image(x,y).g; // Assumes r=g=b
+        if(sum < image.height*255) break;
+        x0 = x;
+    }
+    int x1 = image.width;
+    for(int x: reverse_range(image.width)) {
+        uint sum = 0;
+        for(int y : range(image.height)) sum += image(x,y).g; // Assumes r=g=b
+        if(sum < image.height*255) break;
+        x1 = x;
+    }
+    return copy(cropShare(image, int2(x0, y0), int2(x1-x0, y1-y0)));
+}
+
 static Variant parseVariant(TextData& s) {
     s.whileAny(" \t\r\n");
     if("0123456789.-"_.contains(s.peek())) {
@@ -108,7 +140,6 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
     { // Parses cross reference table and catalog
         TextData s (file);
         for(s.index=s.data.size-"0\r\n%%EOF\r\n"_.size; !( /*(s[-2]=='\r' && s[-1]=='\n') ||*/ s[-1]=='\n' || (/*s[-2]==' ' &&*/ s[-1]=='\r') );s.index--) {}
-        //assert(s.slice(s.index-"startxref\r\n"_.size, "startxref\r\n"_.size)=="startxref\r\n"_, hex(s.slice(s.index-"startxref\r\n"_.size)));
         int index = s.integer(); assert_(index>0, index, s.slice(s.index-16)); s.index = index;
         struct CompressedXRef { uint object, index; }; array<CompressedXRef> compressedXRefs;
         size_t root = invalid;
@@ -155,18 +186,16 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                 for(uint l: range(list.size/2)) {
                     for(uint i=list[l*2].integer(),n=list[l*2+1].integer();n>0;n--,i++) {
                         uint8 type=b.read();
-                        if(type==0) { // free objects
+                        if(type==0) { // Free objects
                             uint16 unused offset = b.read();
                             if(w1==3) offset = offset<<16|(uint8)b.read();
                             uint8 unused g = b.read();
-                            //log("f",hex(n),g);
-                        } else if(type==1) { // uncompressed objects
+                        } else if(type==1) { // Uncompressed objects
                             uint16 offset = b.read();
                             if(w1==3) offset = offset<<16|(uint8)b.read();
                             xref[i] = unsafeRef(s.slice(offset+(i<10?1:(i<100?2:i<1000?3:4))+6));
                             b.advance(W[2].integer());
-                            //log("u",hex(offset));
-                        } else if(type==2) { // compressed objects
+                        } else if(type==2) { // Compressed objects
                             uint16 stream=b.read();
                             if(w1==3) stream = stream<<16|(uint8)b.read();
                             uint8 index=0; if(W[2].integer()) index=b.read();
@@ -256,7 +285,8 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                     if(depth==8 && object.dict.contains("ColorSpace"_)) {
                         Variant cs = object.dict.at("ColorSpace"_).data ? move(object.dict.at("ColorSpace"_).data) :
                                                                           parseVariant(xref[object.dict.at("ColorSpace"_).integer()]);
-                        if(cs.data=="DeviceGray"_ || cs.data=="DeviceRGB"_) {}
+                        if(cs.data=="DeviceGray"_ ) {}
+                        else if(cs.data=="DeviceRGB"_) { if(depth==8) depth=24; }
                         else {
                             if(cs.list[0].data=="Indexed"_ && cs.list[1].data=="DeviceGray"_ && cs.list[2].integer()==255) {
                                 TextData s (cs.list[3].data);
@@ -271,10 +301,10 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                             } else { log("Unsupported colorspace",cs,cs.list[1].integer()?parseVariant(xref[cs.list[1].integer()]).data:""_); continue; }
                         }
                     }
-                    const uint8* src = (uint8*)object.data.data; assert_(object.data.size==image.height*((image.width*depth+7)/8), object.dict, object.data.size, image.height*image.width*depth/8);
+                    const uint8* src = (uint8*)object.data.data;
+                    assert_(object.data.size==image.height*((image.width*depth+7)/8), object.dict, object.data.size, image.height*image.width*depth/8);
                     byte4* dst = (byte4*)image.data;
                     if(depth==1) {
-                        //assert(image.width%8==0, image.width%8);
                         for(uint y=0;y<image.height;y++) for(uint x=0;x<image.width; src++) {
                             for(int b=7;b>=0 && x<image.width;b--,x++,dst++) dst[0] = src[0]&(1<<b) ? 0xFF : 0;
                         }
@@ -287,7 +317,7 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                         image.alpha=true;
                     }
                     else error("Unsupported depth",depth);
-                    images.insert(copyRef(e.key), move(image));
+                    images.insert(copyRef(e.key), trimWhite(image));
                 }
             }
         }
@@ -425,7 +455,9 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                     OP2('c','m') Cm = Cm*mat3x2(f(0),f(1),f(2),f(3),f(4),f(5));
                     OP2('D','o') if(images.contains(args[0].data)) {
                         page.bounds.extend(Cm*vec2(0,0)); page.bounds.extend(Cm*vec2(1,1));
-                        page.blits.append( Blit{Cm*vec2(0,1),Cm*vec2(1,1)-Cm*vec2(0,0), move(images.at(args[0].data)),{}} );
+                        page.blits.append(Cm*vec2(0,1), Cm*vec2(1,1)-Cm*vec2(0,0), move(images.at(args[0].data)));
+                        page.blits.last().size.x = page.blits.last().image.size.x*page.blits.last().size.y/page.blits.last().image.size.y; // Fit height to preserve aspect ratio
+                        page.bounds.extend(page.blits.last().origin + vec2(page.blits.last().size.x, 0));
                     } else log("No such image", args[0].data, images.keys);
                     OP2('E','T') ;
                     OP2('g','s') ;
