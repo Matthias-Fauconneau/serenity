@@ -3,7 +3,7 @@
 #include "string.h"
 
 /// Linux error code names
-enum class LinuxError : int { OK, Interrupted=-4, Busy=-16, Invalid=-22 };
+enum class LinuxError : int { OK, Interrupted=-4, Again=-11, Busy=-16, Invalid=-22 };
 constexpr string linuxErrors[] = {
 	"OK", "PERM", "NOENT", "SRCH", "INTR", "IO", "NXIO", "TOOBIG", "NOEXEC", "BADF", "CHILD", "AGAIN", "NOMEM", "ACCES", "FAULT", "NOTBLK",
 	"BUSY", "EXIST", "XDEV", "NODEV", "NOTDIR", "ISDIR", "INVAL", "NFILE", "MFILE", "NOTTY", "TXTBSY", "FBIG", "NOSPC", "SPIPE", "ROFS", "MLINK",
@@ -144,7 +144,7 @@ struct Device : File {
     /// Sends ioctl \a request with untyped \a arguments
     int ioctl(uint request, void* arguments, int pass=0);
     /// Sends ioctl request with neither input/outputs arguments
-    template<Type IO> int io() { return ioctl(IO::io, 0); }
+    template<Type IO> int io(int pass=0) { return ioctl(IO::io, 0, pass); }
     /// Sends ioctl request with \a input arguments
 	template<Type IOW> int iow(const typename IOW::Args& input) { return ioctl(IOW::iow, (void*)&input); }
     /// Sends ioctl request with output arguments

@@ -101,7 +101,7 @@ struct Poll : pollfd {
     Poll(int fd=0, int events=POLLIN, Thread& thread=mainThread) : pollfd{fd,(short)events,0}, thread(thread) { if(fd) registerPoll(); }
 	Poll(const Poll&)=delete; Poll& operator=(const Poll&)=delete;
 	//Poll(Poll&& o);
-    ~Poll(){ if(fd) unregisterPoll(); }
+    ~Poll(){ unregisterPoll(); }
     /// Registers \a fd to the event loop
     void registerPoll();
     /// Unregisters \a fd from the event loop
@@ -127,6 +127,7 @@ struct Thread : array<Poll*>, EventFD, Poll {
     pthread_t thread;
     int tid=0; // Thread system identifier
     Lock lock;
+    bool terminationRequested = false;
 
     Thread(int priority=0);
     ~Thread(){ Poll::fd=0;/*Avoid Thread::unregistered reference in ~Poll*/ }

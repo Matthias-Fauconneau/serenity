@@ -25,9 +25,9 @@ struct Music {
 
     const uint rate = 44100;
     Thread decodeThread;
-    Sampler sampler {rate, "/Samples/Maestro.sfz"_, [](uint){}, decodeThread}; // Audio mixing (consumer thread) preempts decoder running in advance (in producer thread (main thread))
+    unique<Sampler> sampler = nullptr;
     Thread audioThread{-20};
-    AudioOutput audio {{&sampler, &Sampler::read32}, audioThread};
+    AudioOutput audio {audioThread};
     MidiInput input {audioThread};
 
     array<unique<FontData>> fonts;
@@ -35,34 +35,48 @@ struct Music {
     Window window {&pages->area(), 0};
 
     Music() {
-        assert_(files);
-        setTitle(arguments() ? arguments()[0] : files[0]);
         window.actions[DownArrow] = {this, &Music::nextTitle};
         window.actions[Return] = {this, &Music::nextTitle};
-        sampler.pollEvents = {&input, &MidiInput::event}; // Ensures all events are received right before mixing
-        input.noteEvent.connect(&sampler,&Sampler::noteEvent);
-        decodeThread.spawn();
+        window.actions[Key('1')] = [this]{ setInstrument("Maestro"); };
+        window.actions[Key('2')] = [this]{ setInstrument("Blanchet"); };
+
+        assert_(files);
+        setTitle(arguments() ? arguments()[0] : files[0]);
+
+        setInstrument("Maestro");
+
         AudioControl("Master Playback Switch") = 1;
         AudioControl("Headphone Playback Switch") = 1;
         AudioControl("Master Playback Volume") = 100;
-        audio.start(sampler.rate, Sampler::periodSize, 32, 2);
-        audioThread.spawn();
-     }
+        audio.start(sampler->rate, Sampler::periodSize, 32, 2);
+        assert_(audioThread);
+    }
     ~Music() {
         decodeThread.wait(); // ~Thread
         audioThread.wait(); // ~Thread
     }
 
-     void setTitle(string title) {
-         if(endsWith(title,".pdf"_)) title=title.slice(0,title.size-4);
-         this->title = copyRef(title);
-         pages = unique<Scroll<HList<GraphicsWidget>>>( apply(decodePDF(readFile(title+".pdf"_, folder), fonts), [](Graphics& o) { return GraphicsWidget(move(o)); }) );
-         pages->horizontal = true;
-         window.widget = window.focus = &pages->area();
-         window.render();
-         window.setTitle(title);
-     }
-     void nextTitle() {
-         for(size_t index: range(files.size-1)) if(startsWith(files[index], title) && !startsWith(files[index+1], title)) { setTitle(section(files[index+1],'.', 0, -2)); break; }
-     }
+    void setInstrument(string name) {
+        if(audioThread) audioThread.wait();
+        if(decodeThread) decodeThread.wait(); // ~Thread
+        input.noteEvent.delegates.clear();
+        sampler = unique<Sampler>(rate, "/Samples/"+name+".sfz"_, decodeThread);
+        sampler->pollEvents = {&input, &MidiInput::event}; // Ensures all events are received right before mixing
+        input.noteEvent.connect(sampler.pointer, &Sampler::noteEvent);
+        audio.read32 = {sampler.pointer, &Sampler::read32};
+        audioThread.spawn();
+        decodeThread.spawn();
+    }
+    void setTitle(string title) {
+        if(endsWith(title,".pdf"_)) title=title.slice(0,title.size-4);
+        this->title = copyRef(title);
+        pages = unique<Scroll<HList<GraphicsWidget>>>( apply(decodePDF(readFile(title+".pdf"_, folder), fonts), [](Graphics& o) { return GraphicsWidget(move(o)); }) );
+        pages->horizontal = true;
+        window.widget = window.focus = &pages->area();
+        window.render();
+        window.setTitle(title);
+    }
+    void nextTitle() {
+        for(size_t index: range(files.size-1)) if(startsWith(files[index], title) && !startsWith(files[index+1], title)) { setTitle(section(files[index+1],'.', 0, -2)); break; }
+    }
 } app;

@@ -23,32 +23,20 @@ struct Sampler : Poll {
 
 	static constexpr uint channels = 2;
 	uint rate = 0;
-    static constexpr uint periodSize = 128; // [3ms] 1m sound propagation time
+    static constexpr uint periodSize = 256; // [12ms/82Hz/4m]
 
     // Last chance to poll note events before samples are mixed
     function<void()> pollEvents;
 
-    /// Convolution reverb
-    uint N=0; // reverbSize+periodSize
-    buffer<float> reverbFilter[2]; // Convolution reverb filter in frequency-domain
-    buffer<float> reverbBuffer[2]; // Mixer output in time-domain
-
-    //uint reverbIndex=0; //ring buffer index TODO
-    buffer<float> input; // Buffer to hold transform of reverbBuffer
-    buffer<float> product; // Buffer to hold multiplication of signal and reverbFilter
-
-    struct FFTW : handle<fftwf_plan> { using handle<fftwf_plan>::handle; default_move(FFTW); FFTW(){} ~FFTW(); };
-    FFTW forward[2]; // FFTW plan to forward transform reverb buffer
-    FFTW backward; // FFTW plan to backward transform product*/
-
     /// Emits period time to trigger MIDI file input and update the interface
 	function<void(uint)> timeChanged;
-	uint audioTime=0, stopTime=0;
+    uint audioTime=0, stopTime=0;
+    float minValue=-65536*5/4, maxValue=-minValue;
 
 	explicit operator bool() const { return samples.size; }
 
-	Sampler(uint outputRate, string path, function<void(uint)> timeChanged, Thread& thread=mainThread);
-	~Sampler();
+    Sampler(uint outputRate, string path, Thread& thread=mainThread);
+    virtual ~Sampler();
 
 	void noteEvent(uint key, uint velocity);
 

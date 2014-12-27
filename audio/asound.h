@@ -21,14 +21,14 @@ struct AudioOutput : Device, Poll {
     uint sampleBits = 0;
 	uint rate = 0;
     uint periodSize = 0, bufferSize = 0;
+    uint underruns = 0;
 
 	function<size_t(mref<short2>)> read16 = [](mref<short2>){ error("read16"); return 0;};
-	function<size_t(mref<int2>)> read32 = [](mref<int2>){ error("read32"); return 0;};
-	function<size_t(mref<int>)> read32m = [](mref<int>){ error("read32 mono"); return 0;};
+    function<size_t(mref<int2>)> read32 = [](mref<int2>){ error("read32"); return 0;};
 
-	AudioOutput(decltype(read16) read, Thread& thread=mainThread);
+    AudioOutput(Thread& thread=mainThread);
+    AudioOutput(decltype(read16) read, Thread& thread=mainThread);
 	AudioOutput(decltype(read32) read, Thread& thread=mainThread);
-	AudioOutput(decltype(read32m) read, Thread& thread=mainThread);
     virtual ~AudioOutput() { if(status) stop(); }
     explicit operator bool() const { return status; }
 

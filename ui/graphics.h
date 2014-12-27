@@ -73,7 +73,7 @@ struct Rect {
     vec2 origin() const { return min; }
     vec2 size() const { return max-min; }
     explicit operator bool() { return min<max; }
-    bool contains(vec2 p) const { return p>=min && p<max; }
+    bool contains(vec2 p) const { return p>=min && p<=max; }
     void extend(vec2 p) { min=::min(min, p), max=::max(max, p); }
 };
 inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min),min(a.max,b.max)); }

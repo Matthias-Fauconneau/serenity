@@ -59,15 +59,16 @@ void Thread::run() {
     tid=gettid();
     if(priority) setpriority(0,0,priority);
     {Locker lock(threadsLock); threads.append(this);} // Adds this thread to global running thread list
-    while(!terminationRequested) {
+    while(!::terminationRequested && !this->terminationRequested) {
         assert_(size>=1);
         if(size==1 && !queue) break; // Terminates if no Poll objects (except thread queue EventFD) are registered and no job is queued)
+        while(unregistered){Locker locker(lock); Poll* poll=unregistered.pop(); remove(poll); queue.tryRemove(poll);}
 
         pollfd pollfds[size];
         for(uint i: range(size)) pollfds[i]=*at(i); //Copy pollfds as objects might unregister while processing in the loop
         if((LinuxError)check( ::poll(pollfds,size,-1) ) != LinuxError::Interrupted) {
             for(uint i: range(size)) {
-                if(terminationRequested) break;
+                if(::terminationRequested || this->terminationRequested) break;
                 Poll* poll=at(i); int revents=pollfds[i].revents;
                 if(revents && !unregistered.contains(poll)) {
                     poll->revents = revents;
@@ -75,7 +76,6 @@ void Thread::run() {
                 }
             }
         }
-        while(unregistered){Locker locker(lock); Poll* poll=unregistered.pop(); remove(poll); queue.tryRemove(poll);}
     }
     {Locker lock(threadsLock); threads.remove(this);} // Removes this thread from global running thread list
     tid = 0; thread = 0;
@@ -96,7 +96,11 @@ void Thread::event() {
 
 void Thread::wait() {
     if(!thread) return;
+    terminationRequested = true;
+    post();
     void* status; pthread_join(thread,&status);
+    terminationRequested = false;
+    queue.clear();
 }
 
 // Debugger

@@ -70,9 +70,9 @@ Device getPlaybackDevice() {
     error("No PCM playback device found"); //FIXME: Block and watch folder until connected
 }
 
+AudioOutput::AudioOutput(Thread& thread) : Poll(0, POLLOUT, thread) {}
 AudioOutput::AudioOutput(decltype(read16) read, Thread& thread) : Poll(0, POLLOUT, thread), read16(read) {}
 AudioOutput::AudioOutput(decltype(read32) read, Thread& thread) : Poll(0, POLLOUT, thread), read32(read) {}
-AudioOutput::AudioOutput(decltype(read32m) read, Thread& thread) : Poll(0, POLLOUT, thread), read32m(read) {}
 
 bool AudioOutput::start(uint rate, uint periodSize, uint sampleBits, uint channels) {
     if(!Device::fd) { Device::fd = move(getPlaybackDevice().fd); Poll::fd = Device::fd; }
@@ -87,7 +87,7 @@ bool AudioOutput::start(uint rate, uint periodSize, uint sampleBits, uint channe
         hparams.interval(FrameBits) = sampleBits*channels;
         hparams.interval(Channels) = channels;
         hparams.interval(Rate) = rate; assert(rate);
-        hparams.interval(Periods) = 2;
+        hparams.interval(Periods) = 3;
         hparams.interval(PeriodSize) = periodSize;
         if(!sampleBits || !rate || !periodSize) {
             iowr<HW_REFINE>(hparams);
@@ -127,9 +127,8 @@ bool AudioOutput::start(uint rate, uint periodSize, uint sampleBits, uint channe
 
 void AudioOutput::stop() {
     assert_(status);
-    {int state = status->state;
-        if(state == Running) io<DRAIN>();
-        else log("Could not drain", state);}
+    if(status->state == Running) io<DRAIN>(int(LinuxError::Busy));
+    else log("Could not drain", status->state);
     unregisterPoll();
     {int state = status->state;
         buffer=0, maps[0].unmap(); status=0, maps[1].unmap(); control=0, maps[2].unmap(); // Release maps
@@ -140,7 +139,7 @@ void AudioOutput::stop() {
 }
 
 void AudioOutput::event() {
-    if(status->state == XRun) { io<PREPARE>(); }
+    if(status->state == XRun) { io<PREPARE>(); underruns++; log("Underrun", underruns); }
 	int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
 		uint readSize;
@@ -280,17 +279,20 @@ typedef IOWR<'U', 0x13, Value> ELEM_WRITE;
 AudioControl::AudioControl(string name) : Device("/dev/snd/controlC1") {
     List list = {};
     iowr<ELEM_LIST>(list);
+    if(!list.count) { log("No control available"); return; }
     ID ids[list.count];
     list.capacity = list.count;
     list.pids = ids;
     iowr<ELEM_LIST>(list);
+    buffer<string> names (list.count);
     for(int i: range(list.count)) {
         Info info;
         info.id.numid = ids[i].numid;
         iowr<ELEM_INFO>(info);
+        names[i] = string(info.id.name);
         if(startsWith(string(info.id.name),name)) { id=info.id.numid; min=info.min, max=info.max; return; }
     }
-    error("No such control", name);
+    error("No such control"_, name, "in", names, list.count);
 }
 
 AudioControl::operator long() {
@@ -298,4 +300,7 @@ AudioControl::operator long() {
     iowr<ELEM_READ>(value);
     return value.values[0];
 }
-void AudioControl::operator =(long v) { Value value{.id={.numid = id}, .values = {clip(min, v, max) /*L*/, clip(min, v, max)/*R*/}}; iowr<ELEM_WRITE>(value); }
+void AudioControl::operator =(long v) {
+    if(!id) { log("No associated control"); return; }
+    Value value{.id={.numid = id}, .values = {clip(min, v, max) /*L*/, clip(min, v, max)/*R*/}}; iowr<ELEM_WRITE>(value);
+}

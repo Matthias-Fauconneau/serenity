@@ -10,35 +10,6 @@
 #include <fftw3.h> //fftw3f
 #include <fftw3.h> //fftw3f_threads
 
-#if 0
-#include <freeverb/revmodel.hpp>
-class FreeVerb : public LinuxSampler::Effect, private fv3::revmodel_f {
-public:
-    FreeVerb();
-    LinuxSampler::EffectInfo* GetEffectInfo();
-    void RenderAudio(uint Samples);
-    void InitEffect(LinuxSampler::AudioOutputDevice* pDevice) throw (LinuxSampler::Exception);
-};
-FreeVerb::FreeVerb() { setdry(0.4); setwet(0.3); setdamp(0.2);  setroomsize(0.7); setwidth(0.5); setInitialDelay(480); }
-LinuxSampler::EffectInfo* FreeVerb::GetEffectInfo() { return &info; }
-void FreeVerb::InitEffect(LinuxSampler::AudioOutputDevice* pDevice) throw (LinuxSampler::Exception) {
-  vInputChannels.push_back(pDevice->Channel(0));
-  vInputChannels.push_back(pDevice->Channel(1));
-  vOutputChannels.push_back(pDevice->Channel(0));
-  vOutputChannels.push_back(pDevice->Channel(1));
-}
-void FreeVerb::RenderAudio(uint Samples) {
-  processreplace(vInputChannels[0]->Buffer(), vInputChannels[1]->Buffer(),
-                 vOutputChannels[0]->Buffer(), vOutputChannels[1]->Buffer(), Samples );
-  static int muteDelay=0;
-  if(muteDelay<48000) {
-    memset(vOutputChannels[0]->Buffer(),0,sizeof(float)*Samples);
-    memset(vOutputChannels[1]->Buffer(),0,sizeof(float)*Samples);
-    muteDelay+=Samples;
-  }
-}
-#endif
-
 struct Audio : buffer<float2> { uint rate; Audio(buffer&& data, uint rate) : buffer(::move(data)), rate(rate){} };
 /// Decodes a full audio file
 Audio decodeAudio(const ref<byte>& data, uint duration=-1);
@@ -139,7 +110,7 @@ static double level(ref<float> envelope, size_t start, size_t duration) {
     return sqrt(sum) / duration;
 }
 
-Sampler::Sampler(uint outputRate, string path, function<void(uint)> timeChanged, Thread& thread) : Poll(0, POLLIN, thread), timeChanged(timeChanged) {
+Sampler::Sampler(uint outputRate, string path, Thread& thread) : Poll(0, POLLIN, thread) {
 	registerPoll();
     layers.clear();
     samples.clear();
@@ -240,40 +211,6 @@ Sampler::Sampler(uint outputRate, string path, function<void(uint)> timeChanged,
             }
         }
     }
-
-    Audio reverb = decodeAudio(readFile("../reverb.flac"_,folder), 8192);
-    assert_(reverb.rate == rate);
-    //reverbSize = reverb.size;
-    N = reverb.size;
-    assert_(N<=32768);
-
-    // Computes normalization
-    float sum=0; for(uint i: range(reverb.size)) sum += reverb[i][0]*reverb[i][0] + reverb[i][1]*reverb[i][1];
-    const float scale = 1./sqrt(sum); // Normalizes
-
-    // Reverses, scales and deinterleaves filter
-    buffer<float> filter[2] = {buffer<float>(N),  buffer<float>(N)};
-    for(size_t i: range(reverb.size)) for(size_t c: range(channels)) filter[c][i] = scale*reverb[i][c];
-    for(size_t i: range(reverb.size, N)) for(size_t c: range(channels)) filter[c][i] = 0;
-
-    fftwf_init_threads();
-    fftwf_plan_with_nthreads(4);
-
-    // Transforms reverb filter to frequency domain
-    for(int c=0;c<2;c++) {
-        reverbFilter[c] = buffer<float>(N);
-        FFTW p (fftwf_plan_r2r_1d(N, filter[c].begin(), reverbFilter[c].begin(), FFTW_R2HC, FFTW_ESTIMATE));
-        fftwf_execute(p);
-    }
-
-    // Allocates reverb buffer and temporary buffers
-    input = buffer<float>(N);
-    for(int c=0;c<2;c++) {
-        reverbBuffer[c] = buffer<float>(N);
-        forward[c] = fftwf_plan_r2r_1d(N, reverbBuffer[c].begin(), input.begin(), FFTW_R2HC, FFTW_ESTIMATE);
-    }
-    product = buffer<float>(N);
-    backward = fftwf_plan_r2r_1d(N, product.begin(), input.begin(), FFTW_HC2R, FFTW_ESTIMATE);
 }
 
 /// Input events (realtime thread)
@@ -420,20 +357,37 @@ size_t Sampler::read16(mref<int16> output) {
 }
 
 size_t Sampler::read32(mref<int2> output) { // Audio thread
+#if 0
     v4sf buffer[output.size*2/4];
     uint size = read(mref<float2>((float2*)buffer, output.size));
     for(uint i: range(size*2/4)) ((v4si*)output.data)[i] = cvtps2dq(buffer[i]*float4(0x1p13f)); // 16bit -> 32bit with 3bit headroom for multiple notes
+#else
+    float buffer_[output.size*2]; mref<float2> buffer((float2*)buffer_, output.size);
+    size_t size = read(buffer);
+    assert_(size==output.size);
+    for(size_t i: range(size)) for(size_t c: range(channels)) {
+        float u = buffer[i][c];
+        if(u<minValue) { minValue=u; log(minValue, maxValue); }
+        if(u>maxValue) { maxValue=u; log(minValue, maxValue); }
+        float v = (u-minValue) / (maxValue-minValue); // Normalizes range to [0-1] //((u-minValue) / (maxValue-minValue)) * 2 - 1; // Normalizes range to [-1-1]
+        int w = v*0x1p32 - 0x1p31; // Converts floating point to two-complement signed 32 bit integer
+        output[i][c] = w;
+    }
+#endif
     return size;
 }
 
 size_t Sampler::read(mref<float2> output) {
 	output.clear(0);
     int noteCount = 0;
-	{
-        //lock.acquire(1);
+    {
         pollEvents();
         Locker lock(this->lock);
         for(Layer& layer: layers) { // Mixes all notes of all layers
+            /*// Cleanups silent notes (FIXME: lock decoder)
+            layer.notes.filter([](const Note& note) {
+                return (note.flac.blockSize==0 && note.readCount<int(2*periodSize)); // || note.level[0]<0x1p-7 || note.flac.position > note.decayTime;
+            });*/
             if(layer.resampler) {
 				int need = layer.resampler.need(output.size);
                 if(need >= 0) {
@@ -450,57 +404,19 @@ size_t Sampler::read(mref<float2> output) {
             }
             noteCount += layer.notes.size;
         }
-        //lock.release(1);
     }
-    if(noteCount==0 /*&& !record*/) { // Stops audio output when all notes are released
-			if(!stopTime) stopTime=audioTime; // First waits for reverb
-			else if(audioTime>stopTime+N) {
-                stopTime=0;
-				silence = true; //silence();
-                //return 0; // Stops audio output (will be restarted on noteEvent (cf music.cc)) (FIXME: disable on video record)
-            }
-	  } else { stopTime=0; silence = false; }
-
-    if(false) { // Convolution reverb
-        if(output.size!=periodSize) error("Expected period size ",periodSize,"got",output.size);
-        // Deinterleaves mixed signal into reverb buffer
-        for(uint i: range(periodSize)) for(int c=0;c<2;c++) reverbBuffer[c][N-periodSize+i] = output[i][c];
-
-        for(int c=0;c<2;c++) {
-            // Transforms reverb buffer to frequency-domain ( reverbBuffer -> input )
-            fftwf_execute(forward[c]);
-
-            for(uint i: range(N-periodSize)) reverbBuffer[c][i] = reverbBuffer[c][i+periodSize]; // Shifts buffer for next frame (FIXME: ring buffer)
-
-            // Complex multiplies input (reverb buffer) with kernel (reverb filter)
-            const ref<float>& A = input;
-            const ref<float>& B = reverbFilter[c];
-            product[0] = A[0] * B[0];
-            for(uint j = 1; j < N/2; j++) {
-                float a = A[j];
-                float b = A[N - j];
-                float c = B[j];
-                float d = B[N - j];
-                product[j] = a*c-b*d;
-                product[N - j] = a*d+b*c;
-            }
-            product[N/2] = A[N/2] * B[N/2];
-
-            // Transforms product back to time-domain ( product -> input )
-            fftwf_execute(backward);
-
-            for(uint i: range(periodSize)) { // Normalizes and writes samples back in output buffer
-                output[i][c] = (1.f/N)*input[N-periodSize+i];
-            }
+    if(noteCount==0) { // Stops audio output when all notes are released
+        if(!stopTime) stopTime=audioTime; // First waits for reverb
+        else if(audioTime>stopTime) {
+            stopTime=0;
+            silence = true; //silence();
+            //return 0; // Stops audio output (will be restarted on noteEvent (cf music.cc)) (FIXME: disable on video record)
         }
-    }
-
+    } else { stopTime=0; silence = false; }
 	audioTime += output.size;
-	timeChanged(audioTime); // Updates active notes
+    if(timeChanged) timeChanged(audioTime); // Updates active notes
     queue(); // Decodes before mixing
     return output.size;
 }
 
-Sampler::FFTW::~FFTW() { if(pointer) fftwf_destroy_plan(pointer); }
-constexpr uint Sampler::periodSize;
 Sampler::~Sampler() {}

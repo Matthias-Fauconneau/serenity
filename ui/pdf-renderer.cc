@@ -70,7 +70,7 @@ static Variant parseVariant(TextData& s) {
         dictionaryEnd: s.whileAny(" \t\r\n");
         Variant v = move(dict);
         if(s.match("stream"_)) { s.whileAny(" \t\r\n");
-            array<byte> stream = copyRef( s.until("endstream"_) );
+            buffer<byte> stream = unsafeRef( s.until("endstream"_) );
             if(v.dict.contains("Filter"_)) {
                 string filter = v.dict.at("Filter"_).list?v.dict.at("Filter"_).list[0].data:v.dict.at("Filter"_).data;
                 if(filter=="FlateDecode"_) stream = inflate(stream, true);
@@ -115,7 +115,7 @@ static Variant parseVariant(TextData& s) {
                         src+=width; dst+=width;
                     }
                 } else error("Unsupported predictor",predictor);
-                stream.shrink(size-height);
+                stream.size = size-height;
             }
             v.data=move(stream);
         }
@@ -346,11 +346,11 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                     assert_(path);
                     Rect bounds (path[0], path[0]);
                     for(vec2 p : path) if(box.contains(p)) bounds.extend(p);
-                    if(!(bounds.max > box.min && bounds.min < box.max)) return; // Clips
+                    if(bounds.max.x < box.min.x) continue; // Clips
                     page.bounds.extend(bounds.min);
                     page.bounds.extend(bounds.max);
                     if(flags&Fill) {
-                        if(path.size == 4 && path[1]==path[2] && path[2]==path[3]) page.lines.append(path[0], path[3]);
+                        if(path.size == 4 /*&& path[1]==path[2] && path[2]==path[3]*/) page.lines.append(path[0], path[3]);
                         else {
                             if(!(flags&Close)) path = path.slice(0, path.size-1);
                             page.cubics.append( copyRef(path) );
