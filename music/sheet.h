@@ -19,8 +19,9 @@ struct Sheet : Widget {
 	float Y(Sign sign) { assert_(sign.type==Sign::Note); return staffY(sign.staff, clefStep(sign)); }
 
     // Fonts
-	Font smallFont {File("Bravura.otf", Folder("/usr/local/share/fonts"_)), 6.f*halfLineInterval, "Bravura"};
-	Font font {File("Bravura.otf", "/usr/local/share/fonts"_), 8.f*halfLineInterval, "Bravura"};
+    FontData musicFont {File("Bravura.otf", Folder("/usr/local/share/fonts"_)), "Bravura"};
+    Font& smallFont = musicFont.font(6.f*halfLineInterval);
+    Font& font = musicFont.font(8.f*halfLineInterval);
 	string textFont = "LinLibertine";
 	float textSize = 6*halfLineInterval;
     // Font helpers
@@ -36,8 +37,8 @@ struct Sheet : Widget {
 	shared<Graphics> debug;
 
 	int lowestStep = 0, highestStep = 0;
-	int2 sizeHint(int2) override { return int2(measureBars.values.last(), -((staffY(0, lowestStep)+2*lineInterval)-staffY(1, highestStep))); }
-	shared<Graphics> graphics(int2 size, Rect clip) override;
+    vec2 sizeHint(vec2) override { return vec2(measureBars.values.last(), -((staffY(0, lowestStep)+2*lineInterval)-staffY(1, highestStep))); }
+    shared<Graphics> graphics(vec2 size, Rect clip) override;
 
 	// -- Control
 	array<size_t> measureToChord; // First chord index of measure
@@ -45,7 +46,7 @@ struct Sheet : Widget {
 
 	/// Returns measure index containing position \a x
 	size_t measureIndex(float x);
-	int stop(int unused axis, int currentPosition, int direction) override;
+    //float stop(vec2 unused size, int unused axis, float currentPosition, int direction) override;
 
 	// -- MIDI Synchronization
 	uint ticksPerMinutes = 0;
@@ -58,7 +59,7 @@ struct Sheet : Widget {
 	size_t pageIndex = 0;
 
 	/// Layouts musical notations to graphic primitives
-	Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes={}, float halfLineInterval = 4, int2 pageSize=0, string title="");
+    Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize=0, float halfLineInterval = 4, ref<uint> midiNotes={}, string title="", bool pageNumbers=false);
 
 	/// Turn pages
 	bool keyPress(Key key, Modifiers modifiers) override;

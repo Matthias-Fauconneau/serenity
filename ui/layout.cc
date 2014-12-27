@@ -5,6 +5,7 @@ shared<Graphics> Layout::graphics(vec2 size, Rect clip) {
     array<Rect> widgets = layout(size);
 	shared<Graphics> graphics;
 	for(size_t i: range(count())) if(widgets[i] & clip) {
+        assert_(isNumber(widgets[i].origin()), widgets[i], size, clip);
         graphics->graphics.insert(vec2(widgets[i].origin()), at(i).graphics(widgets[i].size(), Rect(widgets[i].size()) /*& (clip-origin)*/));
 	}
     return graphics;
@@ -40,6 +41,7 @@ vec2 Linear::sizeHint(const vec2 xySize) {
 
 	for(size_t index: range(count)) {
         vec2 hint = xy(at(index).sizeHint(xySize));
+        assert_(isNumber(hint), xySize, index, hint);
 		if(hint.x<0) expandingWidth++; // Counts expanding widgets
 		widths[index] = abs(hint.x);
         remainingWidth -= abs(hint.x); // Commits minimum width for all widgets (unless evaluating required size for sizeHint)
@@ -60,9 +62,11 @@ vec2 Linear::sizeHint(const vec2 xySize) {
     float requiredWidth = 0, requiredHeight = 0;
 	for(size_t index: range(count)) {
         vec2 hint = xy(at(index).sizeHint(xy(vec2(widths[index], height))));
+        assert_(isNumber(hint), xy(vec2(widths[index], height)));
         requiredWidth += abs(hint.x);
 		requiredHeight = max(requiredHeight, abs(hint.y));
     }
+    assert_(isNumber(xy(vec2((expandingWidth||expanding?-1:1)*requiredWidth, (expandingHeight?-1:1)*requiredHeight))), expandingHeight, requiredHeight);
     return xy(vec2((expandingWidth||expanding?-1:1)*requiredWidth, (expandingHeight?-1:1)*requiredHeight));
 }
 

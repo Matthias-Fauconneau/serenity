@@ -2,14 +2,8 @@
 #include "notation.h"
 #include "text.h"
 
-static float glyph(vec2 origin, uint code, Font& font, array<Glyph>& glyphs, float opacity=1) {
-	uint index = font.index(code);
-	glyphs.append(origin, font, index, index, black, opacity);
-	return font.metrics(index).advance;
-}
-
 // Layouts notations to graphic primitives (and parses notes to MIDI keys)
-Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _halfLineInterval, int2 _pageSize, string title)
+Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfLineInterval, ref<uint> midiNotes, string title, bool pageNumbers)
 	: halfLineInterval(_halfLineInterval), pageSize(_pageSize) {
 	constexpr bool logErrors = false;
 
@@ -43,13 +37,13 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 	};
 
 	auto doPage = [&]{
-		float totalHeight = sum(apply(systems, [](const Graphics& o) { return o.size.y; }));
+        float totalHeight = sum(apply(systems, [](const Graphics& o) { return o.bounds.size().y; }));
 		if(totalHeight < pageSize.y) { // Spreads systems with margins
 			float extra = (pageSize.y - totalHeight) / (systems.size+1);
 			float offset = extra;
 			for(Graphics& system: systems) {
 				system.translate(vec2(0, offset));
-				offset += system.size.y + extra;
+                offset += system.bounds.size().y + extra;
 			}
 		}
 		if(totalHeight > pageSize.y) { // Spreads systems without margins
@@ -57,7 +51,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 			float offset = 0;
 			for(Graphics& system: systems) {
 				system.translate(vec2(0, offset));
-				offset += system.size.y + extra;
+                offset += system.bounds.size().y + extra;
 			}
 		}
 		pages.append();
@@ -67,7 +61,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 			pages.last().append(system); // Appends systems first to preserve references to glyph indices
 		}
 		if(pages.size==1) text(vec2(pageSize.x/2,0), bold(title), textSize, pages.last().glyphs, vec2(1./2, 0));
-		{// Page index at each corner
+        if(pageNumbers) {// Page index numbers at each corner
 			text(vec2(margin,margin), str(pages.size), textSize, pages.last().glyphs, vec2(0, 0));
 			text(vec2(pageSize.x-margin,margin), str(pages.size), textSize, pages.last().glyphs, vec2(1, 0));
 			text(vec2(margin,pageSize.y-margin/2), str(pages.size), textSize, pages.last().glyphs, vec2(0, 1));
@@ -76,7 +70,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 		systems.clear();
 	};
 
-	size_t lineCount = 0;//, pageLineCount = 0;
+    size_t lineCount = 0; float requiredHeight = 0;
 	for(size_t startIndex = 0; startIndex < signs.size;) { // Lines
 		struct Position { // Holds current pen position for each line
 			float staffs[staffCount];
@@ -192,9 +186,9 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 					timeTrack.at(sign.time).setStaves(x); // Does not clear directions lines
 				} else if(sign.type == Sign::Measure || sign.type==Sign::KeySignature) { // Clears all lines (including direction lines)
 					if(sign.type == Sign::Measure) {
-						//if(x > pageSize.x) break;
-						if(pageSize && breakIndex>startIndex && sign.measure.lineBreak) break;
-						if(sign.measure.lineBreak == Measure::PageBreak) pageBreak = true;
+                        if(x > pageSize.x) break;
+                        //if(pageSize && breakIndex>startIndex && sign.measure.lineBreak) break;
+                        //if(sign.measure.lineBreak == Measure::PageBreak) pageBreak = true;
 						breakIndex = signIndex+1; // Includes measure break
 						x += space;
 						allocatedLineWidth = x;
@@ -252,13 +246,15 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 		}
 
 		// Breaks page as needed
-		int highMargin = 3, lowMargin = -8-4;
-		//uint manualBreak[] = {5,6,7};
-		if((/*offsetY + staffY(0, currentLineLowestStep-7)-staffY(1, max(highMargin,currentLineHighestStep)+7) > pageSize.y ||*/
-				pageBreak) && systems) {
-			doPage();
-		}
-
+        int highMargin = 3, lowMargin = -8-4;
+        {
+            //float minY = staffY(1, max(highMargin,currentLineHighestStep)+7);
+            //float maxY = staffY(0, min(lowMargin, currentLineLowestStep)-7);
+            if(systems && (/*pageBreak ||*/ systems.size >= 3 /*requiredHeight + (maxY-minY) > pageSize.y*/)) {
+                requiredHeight = 0; // -> doPage
+                doPage();
+            }
+        }
 		// -- Layouts current system
 		Graphics system;
 
@@ -304,7 +300,14 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 			}
 		};
 
-		auto doBeam = [this, X, P, noteCode, noteSize, doLedger, text, &activeTies, &tuplets, &beams, &system, &notes, &systems](uint staff) {
+        auto glyph = [this, &system](vec2 origin, uint code, float opacity=1, float size=8) {
+            size *= halfLineInterval;
+            uint index = musicFont.font(size).index(code);
+            system.glyphs.append(origin, size, musicFont, code, index, black, opacity);
+            return musicFont.font(size).metrics(index).advance;
+        };
+
+        auto doBeam = [this, X, P, glyph, noteCode, noteSize, doLedger, text, &activeTies, &tuplets, &beams, &system, &notes, &systems](uint staff) {
 			auto& beam = beams[staff];
 			if(!beam) return;
 
@@ -342,7 +345,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 				if(sign.note.value>=Half)
 					system.lines.append(vec2(x, ::min(yBase, yStem)), vec2(x, max(yBase, yStem)), black, opacity);
 				if(sign.note.value>=Eighth)
-					glyph(vec2(x, yStem), (int(sign.note.value)-Eighth)*2 + (stemUp ? SMuFL::Flag::Above : SMuFL::Flag::Below), smallFont, system.glyphs, opacity);
+                    glyph(vec2(x, yStem), (int(sign.note.value)-Eighth)*2 + (stemUp ? SMuFL::Flag::Above : SMuFL::Flag::Below), opacity, 7);
 			} else if(beam.size==2) { // Draws pairing beam
 				float x[2], base[2], tip[2];
 				for(uint i: range(2)) {
@@ -450,12 +453,12 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 					doLedger(sign);
 					// Body
 					{note.glyphIndex = system.glyphs.size; // Records glyph index of body, i.e next glyph to be appended to system.glyphs :
-						glyph(vec2(x, y), noteCode(sign), note.grace?smallFont:font, system.glyphs, opacity); }
+                        glyph(vec2(x, y), noteCode(sign), opacity, note.grace?6:8); }
 					// Dot
 					if(note.dot) {
 						float dotOffset = glyphSize(SMuFL::NoteHead::Black).x*7/6;
 						Sign betweenLines = sign; betweenLines.note.step = note.step/2*2 +1; // Aligns dots between lines
-						glyph(P(betweenLines)+vec2((shift.contains(true) ? noteSize(sign) : 0)+dotOffset,0), SMuFL::Dot, font, system.glyphs, opacity);
+                        glyph(P(betweenLines)+vec2((shift.contains(true) ? noteSize(sign) : 0)+dotOffset,0), SMuFL::Dot, opacity);
 					}
 
 					// Accidental
@@ -463,7 +466,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 						if(abs(y-accidentalAboveY)<=4*halfLineInterval) accidentalOffset -= space/2;
 						else accidentalOffset = 0;
 						//TODO: highlight as well
-						glyph(vec2(x-glyphSize(note.accidental).x+accidentalOffset, y), note.accidental, font, system.glyphs);
+                        glyph(vec2(x-glyphSize(note.accidental).x+accidentalOffset, y), note.accidental);
 						accidentalAboveY = y;
 					}
 
@@ -538,20 +541,20 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 
 					int base = SMuFL::Articulation::Base + stemUp;
 					if(chord.first().note.accent) {
-						int code = base+SMuFL::Articulation::Accent*2; glyph(vec2(x-glyphSize(code).x/2,y), code, font, system.glyphs); y += lineInterval;
+                        int code = base+SMuFL::Articulation::Accent*2; glyph(vec2(x-glyphSize(code).x/2,y), code); y += lineInterval;
 					}
 					if(chord.first().note.staccato) {
-						int code = base+SMuFL::Articulation::Staccato*2; glyph(vec2(x-glyphSize(code).x/2,y), code, font, system.glyphs); y += lineInterval;
+                        int code = base+SMuFL::Articulation::Staccato*2; glyph(vec2(x-glyphSize(code).x/2,y), code); y += lineInterval;
 					}
 					if(chord.first().note.tenuto) {
-						int code = base+SMuFL::Articulation::Tenuto*2; glyph(vec2(x-glyphSize(code).x/2,y), code, font, system.glyphs); y += lineInterval;
+                        int code = base+SMuFL::Articulation::Tenuto*2; glyph(vec2(x-glyphSize(code).x/2,y), code); y += lineInterval;
 					}
 					baseY = stemUp ? max(baseY, y) : min(baseY, y);
-					//if(chord.first().note.trill) { glyph(vec2(x,y),"scripts.trill"_, font, system.glyphs); y+=lineInterval; }
+                    //if(chord.first().note.trill) { glyph(vec2(x,y),"scripts.trill"_); y+=lineInterval; }
 					//float y2 = staffY(staff, stemUp ? -10 : 2);
 					//y = stemUp ? max(y,y2) : min(y,y2);
 					//y -= (stemUp?0:glyphSize("scripts.sforzato"_).y/2);
-					//if(chord.first().note.accent) { glyph(vec2(x,y),"scripts.sforzato"_, font, system.glyphs); y+=lineInterval; }
+                    //if(chord.first().note.accent) { glyph(vec2(x,y),"scripts.sforzato"_); y+=lineInterval; }
 				}
 			}
 
@@ -564,10 +567,10 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 					float x = X(chord[0])+noteSize(chord[0])/2, y = baseY;
 					for(int finger: fingering.reverse()) { // Top to bottom
 						//text(vec2(x, y), str(finger), textSize/2, system.glyphs, 1./2);
-						Font& font = *getFont(textFont, textSize/2);
+                        Font& font = getFont(textFont)->font(textSize/2);
 						uint code = str(finger)[0];
 						auto metrics = font.metrics(font.index(code));
-						glyph(vec2(x-metrics.bearing.x-metrics.size.x/2,y+metrics.bearing.y), code, font, system.glyphs);
+                        glyph(vec2(x-metrics.bearing.x-metrics.size.x/2,y+metrics.bearing.y), code);
 						y += lineInterval;
 					}
 				}
@@ -607,7 +610,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 							 ClefSign clefSign = clef.clefSign;
 							 if(clef.octave==1) clefSign = ClefSign(clefSign+SMuFL::Clef::_8va);
 							 else assert_(clef.octave==0);
-							 x += glyph(vec2(x, y), clefSign, font, system.glyphs);
+                             x += glyph(vec2(x, y), clefSign);
 							 x += space;
 						 }
 						 clefs[staff] = sign.clef;
@@ -683,7 +686,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 							if(sign.rest.value == Whole) { assert_(!pendingWhole[staff]); pendingWhole[staff] = true; }
 							else {
 								vec2 p = vec2(x, staffY(staff, -4));
-								x += glyph(p, SMuFL::Rest::Whole+int(sign.rest.value), smallFont, system.glyphs, 1./2);
+                                x += glyph(p, SMuFL::Rest::Whole+int(sign.rest.value), 1./2, 6);
 								x += spaceWidth;
 							}
 							uint beatDuration = quarterDuration * 4 / timeSignature.beatUnit;
@@ -691,7 +694,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 							uint duration = sign.rest.duration();
 							if(sign.rest.value == Whole) {
 								duration = measureLength - beatTime[staff]%measureLength;
-								log("Whole rest", beatTime[staff], beatTime[staff]+duration);
+                                //log("Whole rest", beatTime[staff], beatTime[staff]+duration);
 							}
 							/*assert_(duration * ticksPerQuarter / quarterDuration == sign.duration,
 									duration, duration * ticksPerQuarter / quarterDuration, sign.duration, pages.size, systems.size,
@@ -741,14 +744,14 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 					float startX = x;
 					x = startX + (W-beats.size*w)/2;
 					for(char digit: beats) {
-						glyph(vec2(x, staffY(0, -2)), SMuFL::TimeSignature::_0+digit-'0', font, system.glyphs);
-						x += glyph(vec2(x, staffY(1, -2)),SMuFL::TimeSignature::_0+digit-'0', font, system.glyphs);
+                        glyph(vec2(x, staffY(0, -2)), SMuFL::TimeSignature::_0+digit-'0');
+                        x += glyph(vec2(x, staffY(1, -2)),SMuFL::TimeSignature::_0+digit-'0');
 					}
 					float maxX = x;
 					x = startX + (W-beatUnit.size*w)/2;
 					for(char digit: beatUnit) {
-						glyph(vec2(x, staffY(0, -6)), SMuFL::TimeSignature::_0+digit-'0', font, system.glyphs);
-						x += glyph(vec2(x, staffY(1, -6)), SMuFL::TimeSignature::_0+digit-'0', font, system.glyphs);
+                        glyph(vec2(x, staffY(0, -6)), SMuFL::TimeSignature::_0+digit-'0');
+                        x += glyph(vec2(x, staffY(1, -6)), SMuFL::TimeSignature::_0+digit-'0');
 					}
 					maxX = startX+2*glyphAdvance(SMuFL::TimeSignature::_0);
 					timeTrack.at(sign.time).setStaves(maxX); // Does not clear directions lines
@@ -758,7 +761,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 						for(size_t staff: range(staffCount)) {
 							if(pendingWhole[staff]) {
 								vec2 p = vec2((measureBars.values.last()+x)/2, staffY(staff, -2));
-								glyph(p, SMuFL::Rest::Whole+int(sign.rest.value), smallFont, system.glyphs, 1./2);
+                                glyph(p, SMuFL::Rest::Whole+int(sign.rest.value), 1./2, 6);
 							}
 							pendingWhole[staff] = false;
 						}
@@ -780,8 +783,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 						for(int i: range(abs(keySignature))) {
 							int step = keySignature<0 ? 4+(3*i+2)%7 : 6+(4*i+4)%7;
 							auto symbol = keySignature<0 ? Accidental::Flat : Accidental::Sharp;
-							glyph(vec2(x, Y(0, {clefs[0].clefSign, 0}, step - (clefs[0].clefSign==FClef ? 14 : 0))), symbol, font, system.glyphs);
-							x += glyph(vec2(x, Y(1, {clefs[1].clefSign, 0}, step - (clefs[1].clefSign==FClef ? 14 : 0))), symbol, font, system.glyphs);
+                            glyph(vec2(x, Y(0, {clefs[0].clefSign, 0}, step - (clefs[0].clefSign==FClef ? 14 : 0))), symbol);
+                            x += glyph(vec2(x, Y(1, {clefs[1].clefSign, 0}, step - (clefs[1].clefSign==FClef ? 14 : 0))), symbol);
 						}
 						x += spaceWidth;
 					}
@@ -793,8 +796,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 							float dotX = (sign.repeat==Repeat::Begin ? measureBars.values.last()+spaceWidth/2 : x-spaceWidth/2)
 									- glyphSize(SMuFL::Dot).x/2;
 							for(uint staff: range(staffCount)) {
-								glyph(vec2(dotX, staffY(staff,-5)), SMuFL::Dot, font, system.glyphs);
-								glyph(vec2(dotX, staffY(staff,-3)), SMuFL::Dot, font, system.glyphs);
+                                glyph(vec2(dotX, staffY(staff,-5)), SMuFL::Dot);
+                                glyph(vec2(dotX, staffY(staff,-3)), SMuFL::Dot);
 							}
 						}
 					}
@@ -837,7 +840,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 				}
 				else if(sign.type == Sign::Dynamic) {
 					assert_(sign.dynamic!=-1);
-					x += glyph(vec2(x, (staffY(1, -8)+staffY(0, 0))/2), sign.dynamic, font, system.glyphs);
+                    x += glyph(vec2(x, (staffY(1, -8)+staffY(0, 0))/2), sign.dynamic);
 				} else if(sign.type == Sign::Wedge) {
 					float y = (staffY(1, -8)+staffY(0, 0))/2;
 					if(sign.wedge == WedgeStop) {
@@ -847,7 +850,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 					} else wedgeStart = sign;
 				} else if(sign.type == Sign::Pedal) {
 					float y = staffY(0, min(-8,currentLineLowestStep)) + lineInterval;
-					//if(sign.pedal == Ped) glyph(vec2(x, y), SMuFL::Pedal::Mark, font, system.glyphs);
+                    //if(sign.pedal == Ped) glyph(vec2(x, y), SMuFL::Pedal::Mark);
 					if(sign.pedal == Start) {
 						pedalStart = vec2(x, y);// + glyphAdvance(SMuFL::Pedal::Mark);
 						system.lines.append(vec2(x-space/2, y), vec2(x, y+lineInterval));
@@ -932,11 +935,10 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, ref<uint> midiNotes, float _
 				}
 			}
 		}
-		lineCount++;
-		float top = -staffY(1, max(highMargin,currentLineHighestStep)+7);
-		float bottom = staffY(0, min(lowMargin, currentLineLowestStep)-7);
-		system.offset = vec2(0, top);
-		system.size = vec2(pageSize.x, bottom - top);
+        lineCount++;
+        system.bounds.min = vec2(0, staffY(1, max(highMargin,currentLineHighestStep)+7));
+        system.bounds.max = vec2(pageSize.x, staffY(0, min(lowMargin, currentLineLowestStep)-7));
+        requiredHeight += system.bounds.size().y;
 		systems.append(move(system));
 		startIndex = breakIndex;
 	}
@@ -1063,7 +1065,7 @@ inline bool operator ==(const Sign& sign, const uint& key) {
 	return sign.note.key() == key;
 }
 
-shared<Graphics> Sheet::graphics(int2, Rect) { return shared<Graphics>(&pages[pageIndex]); }
+shared<Graphics> Sheet::graphics(vec2, Rect) { return shared<Graphics>(&pages[pageIndex]); }
 
 size_t Sheet::measureIndex(float x) {
 	if(x < measureBars.values[0]) return invalid;
@@ -1071,10 +1073,10 @@ size_t Sheet::measureIndex(float x) {
 	assert_(x >= measureBars.values.last()); return measureBars.size();
 }
 
-int Sheet::stop(int unused axis, int currentPosition, int direction=0) {
+/*int Sheet::stop(int unused axis, int currentPosition, int direction=0) {
 	int currentIndex = measureIndex(currentPosition);
 	return measureBars.values[clip(0, currentIndex+direction, int(measureBars.size()-1))];
-}
+}*/
 
 bool Sheet::keyPress(Key key, Modifiers) {
 	if(key==LeftArrow) { pageIndex = max(0, int(pageIndex)-1); return true; }

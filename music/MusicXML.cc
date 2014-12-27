@@ -67,7 +67,7 @@ MusicXML::MusicXML(string document, string) {
 			map<int, int> measureAlterations; // Currently altered steps (for implicit alterations)
 			array<Sign> acciaccaturas; // Acciaccatura graces for pending principal
 			int appoggiaturaTime = 0; // Appoggiatura time to remove from pending principal
-			int lastChordTime=0; Step minStep, maxStep;
+            uint lastChordTime=0; Step minStep, maxStep;
 			Tuplet tuplet {0,{},{},{},{}};
 			for(const Element& e: m.children) {
 				if(!(e.name=="note"_ && e.contains("chord"_))) time = nextTime; // Advances time (except chords)

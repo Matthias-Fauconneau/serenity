@@ -276,7 +276,21 @@ typedef IOWR<'U', 0x11, Info> ELEM_INFO;
 typedef IOWR<'U', 0x12, Value> ELEM_READ;
 typedef IOWR<'U', 0x13, Value> ELEM_WRITE;
 
-AudioControl::AudioControl(string name) : Device("/dev/snd/controlC1") {
+Device getControlDevice() {
+    Folder snd("/dev/snd");
+    for(const String& device: snd.list(Devices)) {
+        if(!startsWith(device, "controlC")) continue;
+        Device control(device, snd, ReadWrite);
+        /*List list = {};
+        control.iowr<ELEM_LIST>(list);
+        if(!list.count) { log("No control available"); continue; }
+        log(device);*/
+        return control;
+    }
+    error("No control device found");
+}
+
+AudioControl::AudioControl(string name) : Device(getControlDevice()) {
     List list = {};
     iowr<ELEM_LIST>(list);
     if(!list.count) { log("No control available"); return; }

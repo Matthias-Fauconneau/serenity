@@ -109,7 +109,7 @@ void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity) {
     }
 }
 
-/*static void parallelogram(const Image& target, int2 p0, int2 p1, int dy, bgr3f color, float alpha) {
+static void parallelogram(const Image& target, int2 p0, int2 p1, int dy, bgr3f color, float alpha) {
 	if(p0.x > p1.x) swap(p0.x, p1.x);
 	for(uint x: range(max(0,p0.x), min(int(target.width),p1.x))) {
 		float y0 = float(p0.y) + float((p1.y - p0.y) * int(x - p0.x)) / float(p1.x - p0.x); // FIXME: step
@@ -122,7 +122,7 @@ void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity) {
 		}
 		if(uint(i0+dy)<target.height) blend(target, x, i0+dy, color, alpha*coverage);
 	}
-}*/
+}
 
 // 8bit signed integer (for edge flags)
 struct Image8 {
@@ -198,7 +198,8 @@ void cubic(const Image& target, ref<vec2> sourcePoints, bgr3f color, float alpha
 }
 
 void render(const Image& target, const Graphics& graphics, vec2 offset) {
-    //offset += graphics.offset;
+    assert_(isNumber(offset)); assert_(isNumber(graphics.offset));
+    offset += graphics.offset;
     for(const auto& e: graphics.blits) {
 		if(int2(e.size) == e.image.size) blit(target, int2(round(offset+e.origin)), e.image, e.color, e.opacity);
 		else blit(target, int2(round(offset+e.origin)), resize(int2(round(e.size)), e.image), e.color, e.opacity); // FIXME: subpixel blit
@@ -209,7 +210,7 @@ void render(const Image& target, const Graphics& graphics, vec2 offset) {
         Font::Glyph glyph = e.font.font(e.fontSize).render(e.index);
         if(glyph.image) blit(target, int2(round(offset+e.origin))+glyph.offset, glyph.image, e.color, e.opacity);
     }
-    //for(const auto& e: graphics.parallelograms) parallelogram(target, int2(round(offset+e.min)), int2(round(offset+e.max)), e.dy, e.color, e.opacity);
+    for(const auto& e: graphics.parallelograms) parallelogram(target, int2(round(offset+e.min)), int2(round(offset+e.max)), e.dy, e.color, e.opacity);
 	for(const auto& e: graphics.cubics) cubic(target, e.points, e.color, e.opacity, offset);
-	for(const auto& e: graphics.graphics) render(target, e.value, offset+e.key);
+    for(const auto& e: graphics.graphics) { assert_(isNumber(e.key)); render(target, e.value, offset+e.key); }
 }

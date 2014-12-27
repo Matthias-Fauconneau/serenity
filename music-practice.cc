@@ -4,6 +4,8 @@
 #include "sampler.h"
 #include "asound.h"
 #include "pdf-renderer.h"
+#include "MusicXML.h"
+#include "sheet.h"
 #include "layout.h"
 #include "interface.h"
 #include "window.h"
@@ -14,7 +16,7 @@ struct GraphicsWidget : Graphics, Widget {
     shared<Graphics> graphics(vec2) override;
 };
 
-vec2 GraphicsWidget::sizeHint(vec2) { return bounds.max; }
+vec2 GraphicsWidget::sizeHint(vec2) { assert_(isNumber(bounds.max), bounds); return bounds.max; }
 shared<Graphics> GraphicsWidget::graphics(vec2 unused size /*TODO: center*/) { return shared<Graphics>((Graphics*)this); }
 
 /// SFZ sampler and PDF renderer
@@ -31,6 +33,7 @@ struct Music {
     MidiInput input {audioThread};
 
     array<unique<FontData>> fonts;
+    unique<Sheet> sheet = nullptr;
     unique<Scroll<HList<GraphicsWidget>>> pages;
     Window window {&pages->area(), 0};
 
@@ -49,7 +52,7 @@ struct Music {
         AudioControl("Headphone Playback Switch") = 1;
         AudioControl("Master Playback Volume") = 100;
         audio.start(sampler->rate, Sampler::periodSize, 32, 2);
-        assert_(audioThread);
+        //assert_(audioThread);
     }
     ~Music() {
         decodeThread.wait(); // ~Thread
@@ -68,11 +71,19 @@ struct Music {
         decodeThread.spawn();
     }
     void setTitle(string title) {
-        if(endsWith(title,".pdf"_)) title=title.slice(0,title.size-4);
+        if(endsWith(title,".pdf"_)||endsWith(title,".xml"_)) title=title.slice(0,title.size-4);
         this->title = copyRef(title);
-        pages = unique<Scroll<HList<GraphicsWidget>>>( apply(decodePDF(readFile(title+".pdf"_, folder), fonts), [](Graphics& o) { return GraphicsWidget(move(o)); }) );
-        pages->horizontal = true;
-        window.widget = window.focus = &pages->area();
+        buffer<Graphics> pages;
+        if(existsFile(title+".xml"_, folder)) {
+            MusicXML musicXML (readFile(title+".xml"_, folder));
+            sheet = unique<Sheet>(musicXML.signs, musicXML.divisions, window.size);
+            pages = move(sheet->pages);
+        } else {
+            pages = decodePDF(readFile(title+".pdf"_, folder), fonts);
+        }
+        this->pages = unique<Scroll<HList<GraphicsWidget>>>( apply(pages, [](Graphics& o) { return GraphicsWidget(move(o)); }) );
+        this->pages->horizontal = true;
+        window.widget = window.focus = &this->pages->area();
         window.render();
         window.setTitle(title);
     }
