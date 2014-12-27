@@ -55,7 +55,7 @@ void Data::skip(const ref<uint8> key) {
 	if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(peek(key.size))+'\'');
 }
 void Data::skip(const string key) {
-    if(!match(key)) error("Expected '"+escape(key)+"', got '"+(string)peek(key.size)+'\'', index, data.slice(index, 128));
+    if(!match(key)) error("Expected '"+escape(key)+"', got '"+escape(peek(key.size))+'\'', escape(data.slice(index, 128)));
 }
 
 ref<uint8> BinaryData::whileNot(uint8 key) {
@@ -184,14 +184,16 @@ char TextData::character() {
     return "\'\"\n\r\t\b\f()\\"[i];
 }
 
-string TextData::whileInteger(bool sign, int base) {
+bool TextData::isInteger(int base) {
+    if(!available(1)) return false;
     assert(base==10 || base==16);
-    uint start=index;
+    char c = peek(); return (c>='0' && c<='9') || (base==16 && ((c>='a'&&c<='f')||(c>='A'&&c<='F')));
+}
+
+string TextData::whileInteger(bool sign, int base) {
+    size_t start = index;
     if(sign) matchAny("-+");
-    while(available(1)) {
-        byte c=peek();
-        if((c>='0'&&c<='9')||(base==16 && ((c>='a'&&c<='f')||(c>='A'&&c<='F')))) advance(1); else break;
-    }
+    while(isInteger(base)) advance(1);
     return slice(start,index-start);
 }
 
@@ -200,6 +202,7 @@ int TextData::integer(bool maySign, int base) {
     assert(base==10 || base==16);
     int sign=1;
     if(maySign) { if(match('-')) sign=-1; else match('+'); }
+    assert_(isInteger(base));
     long value=0;
     do {
         char c = peek();

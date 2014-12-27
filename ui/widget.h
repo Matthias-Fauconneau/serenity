@@ -35,7 +35,7 @@ struct Widget {
 	/// Returns stop position for scrolling
 	/// \arg direction Direction of requested stop (-1: previous, 0: nearest, 1: next)
 	/// \note Defaults to discrete uniform coarse stops
-    virtual int stop(vec2 unused size, int unused axis, int currentPosition, int direction=0) { return currentPosition + direction * 64; }
+    virtual float stop(vec2 unused size, int unused axis, float currentPosition, int direction=0) { return currentPosition + direction * 64; }
 
 // Events
     /// Mouse event type

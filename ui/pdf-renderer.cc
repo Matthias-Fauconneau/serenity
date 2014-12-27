@@ -111,7 +111,7 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
         //assert(s.slice(s.index-"startxref\r\n"_.size, "startxref\r\n"_.size)=="startxref\r\n"_, hex(s.slice(s.index-"startxref\r\n"_.size)));
         int index = s.integer(); assert_(index>0, index, s.slice(s.index-16)); s.index = index;
         struct CompressedXRef { uint object, index; }; array<CompressedXRef> compressedXRefs;
-        int root = 0;
+        size_t root = invalid;
         for(;;) { /// Parse XRefs
             Variant object = ""_;
             if(s.match("xref"_)) { // Direct cross reference
@@ -131,7 +131,7 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                 }
                 s.whileAny(" \t\r\n");
                 object = parseVariant(s);
-            } else { // Cross reference dictionnary
+            } else if(s.isInteger()) { // Cross reference dictionnary
                 uint i=s.integer(); assert_(i!=uint(-1)); s.whileAny(" \t\r\n");
                 uint unused n=s.integer(); assert_(n==0, n); s.whileAny(" \t\r\n");
                 s.skip("obj"_);
@@ -139,7 +139,7 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                 assert_(object.data);
                 if(xref.size <= i ) xref.slice(xref.grow(i+1)).clear();
                 xref[i] = copyRef(object.data);
-            }
+            } else { s.advance(1); continue; } // Wrong offset, advances until next cross reference //log("Wrong cross reference", escape(s.slice(s.index,128)));
             Dict& dict = object.dict;
             if(dict.contains("Type"_) && dict.at("Type"_).data=="XRef"_) {  // Cross reference stream
                 const array<Variant>& W = dict.at("W"_).list;
@@ -175,7 +175,7 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                     }
                 }
             }
-            if(!root && dict.contains("Root"_)) { assert_(dict.at("Root"_).type==Variant::Integer, dict); root = dict.at("Root"_).integer(); }
+            if(root==invalid && dict.contains("Root"_)) { assert_(dict.at("Root"_).type==Variant::Integer, dict); root = dict.at("Root"_).integer(); }
             if(!dict.contains("Prev"_)) break;
             s.index = dict.at("Prev"_).integer();
             assert_(int(s.index) > 0);
@@ -191,6 +191,7 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
             xref[objectNumber] = copyRef( s.slice(stream.dict.at("First"_).integer()+offset) );
         }
         // Parses page references in catalog
+        assert_(root!=invalid, xref.size);
         Dict catalog = parseVariant(xref[root]).dict;
         Variant kids = move(parseVariant(xref[catalog.at("Pages"_).integer()]).dict.at("Kids"_));
         pageXrefs = kids.list ? move(kids.list) : parseVariant(xref[kids.integer()]).list;
@@ -345,7 +346,6 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
             };
 
             auto drawText= [&Cm,&Tm,box,&page](FontData& fontData, float size, float spacing, float wordSpacing, string data) {
-                if(!&fontData) { log("Missing font"); return; } // FIXME
                 assert_(&fontData && fontData.data);
                 if(!(Cm*Tm)(0,0)) { log("Rotated glyph"); return; } // FIXME: rotated glyphs
                 Font& font = fontData.font((Cm*Tm)(0,0)*size);
@@ -448,11 +448,13 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                     OP2('T','r') ; // setRenderMode
                     OP2('T','z') ; // setHorizontalScaling
                     OP('\'') { Tm=Tlm=Tlm*mat3x2(0,-leading); drawText(*font,fontSize,spacing,wordSpacing,args[0].data); }
-                    OP2('T','j') drawText(*font, fontSize, spacing, wordSpacing, args[0].data);
+                    OP2('T','j') if(font) drawText(*font, fontSize, spacing, wordSpacing, args[0].data); else log("Missing font");
                     OP2('T','J') for(const auto& e : args[0].list) {
                         if(e.type==Variant::Integer||e.type==Variant::Real) Tm=Tm*mat3x2(-e.real()*fontSize/1000,0);
-                        else if(e.type==Variant::Data) drawText(*font,fontSize,spacing,wordSpacing,e.data);
-                        else error("Unexpected type",(int)e.type);
+                        else if(e.type==Variant::Data) {
+                            if(font) drawText(*font,fontSize,spacing,wordSpacing,e.data);
+                            else log("Missing font");
+                        } else error("Unexpected type",(int)e.type);
                     }
                     OP2('T','f') font = fonts.find(args[0].data); /*if(!font) log("No such font", args[0].data, fonts.keys);*/ fontSize=f(1);
                     OP2('T','m') Tm=Tlm=mat3x2(f(0),f(1),f(2),f(3),f(4),f(5));

@@ -185,6 +185,8 @@ struct TextData : Data {
 	string word(const string special=""_);
     /// Reads a identifier [a-zA-Z0-9/special/]*
 	string identifier(const string special=""_);
+    /// isInteger [0-9]
+    bool isInteger(int base=10);
     /// Matches [-+]?[0-9]*
     string whileInteger(bool sign=false, int base=10);
     /// Reads an integer
