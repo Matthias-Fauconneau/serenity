@@ -162,7 +162,7 @@ struct Build {
 		if(!lastEdit) return false;
         String object = tmp+"/"+join(flags,"-")+"/"+target+".o";
         if(!existsFile(object, folder) || lastEdit >= File(object).modifiedTime()) {
-            while(pids.size>=4) { // Waits for a job to finish before launching a new unit
+            while(pids.size>=2) { // Waits for a job to finish before launching a new unit
                 int pid = wait(); // Waits for any child to terminate
 				if(wait(pid)) { log("Failed to compile"); return false; }
                 pids.remove(pid);

@@ -31,7 +31,7 @@ struct Sampler : Poll {
     /// Emits period time to trigger MIDI file input and update the interface
 	function<void(uint)> timeChanged;
     uint audioTime=0, stopTime=0;
-    float minValue=-65536*5/4, maxValue=-minValue;
+    float minValue=-65536*3/2, maxValue=-minValue; // >88192
 
 	explicit operator bool() const { return samples.size; }
 

@@ -91,7 +91,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 		auto staffX = [&timeTrack](uint time, int type, uint staff) -> float& {
 			if(!timeTrack.contains(time)) {
 				//log("!timeTrack.contains(time)", time, int(type));
-				assert_(type==Sign::Clef || type==Sign::Wedge || type==Sign::Pedal);
+                assert_(type==Sign::Clef || type==Sign::Wedge || type==Sign::Pedal || type==Sign::Note/*FIXME*/, int(type));
 				size_t index = timeTrack.keys.linearSearch(time);
 				index = min(index, timeTrack.keys.size-1);
 				assert_(index < timeTrack.keys.size);
@@ -126,7 +126,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 		uint spaceCount = 0;
 		uint measureCount = 0;
 		uint additionnalSpaceCount = 0;
-		bool pageBreak = false;
+        //bool pageBreak = false;
 		for(size_t signIndex: range(startIndex, signs.size)) {
 			Sign sign = signs[signIndex];
 
@@ -171,7 +171,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 				//float x = X(sign); X(sign) -> float& but maximum() -> float
 				if(!timeTrack.contains(sign.time)) { // FIXME: -> X
 					log("!timeTrack.contains(sign.time)", sign.time, int(sign.type));
-					assert_(sign.type==Sign::Pedal);
+                    assert_(sign.type==Sign::Pedal || sign.type==Sign::Wedge, int(sign.type));
 					size_t index = timeTrack.keys.linearSearch(sign.time);
 					index = min(index, timeTrack.keys.size-1);
 					assert_(index < timeTrack.keys.size);
@@ -475,13 +475,13 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 						size_t tieStart = invalid;
 						for(size_t index: range(activeTies[staff].size)) {
 							if(activeTies[staff][index].step == note.step) {
-								assert_(tieStart==invalid, sign, apply(activeTies[staff],[](TieStart o){return o.step;}));
+                                //assert_(tieStart==invalid, sign, apply(activeTies[staff],[](TieStart o){return o.step;}));
 								tieStart = index;
 							}
 						}
-						assert_(tieStart != invalid, sign, apply(activeTies[staff],[](TieStart o){return o.step;}), pages.size, systems.size);
-						if(tieStart != invalid) {
-							TieStart tie = activeTies[staff].take(tieStart);
+                        if(tieStart != invalid) {
+                            assert_(tieStart != invalid, sign, apply(activeTies[staff],[](TieStart o){return o.step;}), pages.size, systems.size);
+                            TieStart tie = activeTies[staff].take(tieStart);
 							//log(apply(activeTies[staff],[](TieStart o){return o.step;}));
 
 							assert_(tie.position.y == Y(sign));
@@ -506,7 +506,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 									vec2 k0p (k0.x, k0.y + slurDown*width);
 									vec2 k1 (P1.x, P1.y + slurDown*offset);
 									vec2 k1p (k1.x, k1.y + slurDown*width);
-									systems.last().cubics.append(copyRef(ref<vec2>({p0,k0,k1,P1,k1p,k0p})), black, 1.f/2);
+                                    //assert_(systems); // over page break
+                                    if(systems) systems.last().cubics.append(copyRef(ref<vec2>({p0,k0,k1,P1,k1p,k0p})), black, 1.f/2);
 								}
 								{// Tie end
 									vec2 P0 (margin, p0.y);
@@ -726,7 +727,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 				for(size_t staff: range(staffCount)) {
 					if(beatTime[staff] % beatDuration != 0) {
 						//log(withName(staff, beatTime[staff], beatDuration, sign.measure.measure));
-						assert_(sign.measure.measure > 116);
+                        assert_(sign.measure.measure >= 6, sign.measure.measure); // FIXME
 						beatTime[staff] = 0;
 					}
 					assert_(beatTime[staff] % beatDuration == 0,
@@ -856,14 +857,16 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 						system.lines.append(vec2(x-space/2, y), vec2(x, y+lineInterval));
 					}
 					if(sign.pedal == Change || sign.pedal == PedalStop) {
-						assert_(pedalStart);
-						if(pedalStart.y == y) {
-							if(x > pedalStart.x) system.lines.append(pedalStart+vec2(0, lineInterval), vec2(x, y+lineInterval));
-						} else {
-							if(systems) systems.last().lines.append(pedalStart+vec2(0, lineInterval), vec2(pageSize.x-margin, pedalStart.y+lineInterval));
-							//else TODO: pedal line on previous page
-							system.lines.append(vec2(margin, y+lineInterval), vec2(x, y+lineInterval));
-						}
+                        if(pedalStart) {
+                            assert_(pedalStart);
+                            if(pedalStart.y == y) {
+                                if(x > pedalStart.x) system.lines.append(pedalStart+vec2(0, lineInterval), vec2(x, y+lineInterval));
+                            } else {
+                                if(systems) systems.last().lines.append(pedalStart+vec2(0, lineInterval), vec2(pageSize.x-margin, pedalStart.y+lineInterval));
+                                //else TODO: pedal line on previous page
+                                system.lines.append(vec2(margin, y+lineInterval), vec2(x, y+lineInterval));
+                            }
+                        }
 						if(sign.pedal == PedalStop) {
 							system.lines.append(vec2(x, y), vec2(x, y+lineInterval));
 							pedalStart = 0;
@@ -903,7 +906,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 						}
 
 						uint maximumBeamDuration = 2*quarterDuration;
-						assert_(timeSignature.beatUnit == 4);
+                        //assert_(timeSignature.beatUnit == 4 || timeSignature.beatUnit == 8, timeSignature.beatUnit);
 						//uint beatDuration = quarterDuration * 4 / timeSignature.beatUnit;
 
 						if(beamDuration+chordDuration > maximumBeamDuration /*Beam before too long*/

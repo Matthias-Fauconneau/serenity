@@ -40,9 +40,9 @@ MusicXML::MusicXML(string document, string) {
 	}
 
 	const size_t staffCount = 2;
-	Clef clefs[staffCount] = {{FClef,0}, {GClef,0}};
+    Clef clefs[staffCount] = {{GClef,0}, {GClef,0}};
 	Sign octaveStart[staffCount] {{.octave=OctaveStop}, {.octave=OctaveStop}}; // Current octave shift (for each staff)
-	for(uint staff: range(staffCount)) signs.insertSorted({Sign::Clef, 0, {{staff, {.clef=clefs[staff]}}}}); // Defaults
+    for(uint staff: range(staffCount)) signs.insertSorted({Sign::Clef, 0, {{staff, {.clef=clefs[staff]}}}}); // Defaults
 	size_t partIndex = 0;
 	for(const Element& p: root("score-partwise"_).children) {
 		if(p.name!="part"_) continue;
@@ -108,7 +108,7 @@ MusicXML::MusicXML(string document, string) {
 							durationCoefficientNum = parseInteger(e("time-modification"_)("normal-notes").text());
 							durationCoefficientDen = parseInteger(e("time-modification"_)("actual-notes").text());
 							notationDuration = notationDuration * durationCoefficientNum / durationCoefficientDen;
-							assert_(e("time-modification"_)("normal-type"_).text() == e("type"_).text());
+                            assert_(!e("time-modification"_).contains("normal-type"_) || e("time-modification"_)("normal-type"_).text() == e("type"_).text());
 						}
 						duration -= min(duration, appoggiaturaTime); //FIXME
 						assert_(acciaccaturaTime <= duration, acciaccaturaTime, duration, appoggiaturaTime);
@@ -174,10 +174,12 @@ MusicXML::MusicXML(string document, string) {
 								tuplet = {1,{time, {staff, step}, {staff, step}}, {time, {staff, step}, {staff, step}}, {staff, step}, {staff, step}};
 							}
 							if(e("notations"_)("tuplet"_)["type"_]=="stop") {
-								assert_(tuplet.size);
-								tuplet.last = {time, minStep, maxStep};
-								insertSign({Sign::Tuplet, time, {.tuplet=tuplet}});
-								tuplet.size = 0;
+                                if(tuplet.size) {
+                                    assert_(tuplet.size);
+                                    tuplet.last = {time, minStep, maxStep};
+                                    insertSign({Sign::Tuplet, time, {.tuplet=tuplet}});
+                                    tuplet.size = 0;
+                                }
 							}
 						}
 
@@ -201,15 +203,19 @@ MusicXML::MusicXML(string document, string) {
 						if(tie == Note::TieContinue || tie == Note::TieStop) {
 							size_t tieStart = invalid;
 							for(size_t index: range(activeTies.size)) if(signs[activeTies[index]].note.step == step) {
-								assert_(tieStart==invalid); tieStart = index;
-							}
-							assert_(tieStart != invalid, e, pageIndex, lineIndex, measureIndex,
-									apply(activeTies, [&](size_t index){ return signs[index];}),
-									apply(activeTies, [&](size_t index){ return signs[index].note.step;}), step);
-							size_t tieStartNoteIndex = activeTies[tieStart];
-							implicitAlteration = signs[tieStartNoteIndex].note.alteration;
-							if(tie == Note::TieStop) activeTies.removeAt(tieStart);
-						}
+                                //assert_(tieStart==invalid);
+                                tieStart = index;
+                            }
+                            if(tieStart != invalid) {
+                                size_t tieStartNoteIndex = activeTies[tieStart];
+                                implicitAlteration = signs[tieStartNoteIndex].note.alteration;
+                                if(tie == Note::TieStop) activeTies.removeAt(tieStart);
+                            } else if(0) {
+                                error("206", e, pageIndex, lineIndex, measureIndex,
+                                      apply(activeTies, [&](size_t index){ return signs[index];}),
+                                      apply(activeTies, [&](size_t index){ return signs[index].note.step;}), step);
+                            }
+                        }
 
 						// -- Accidental
 						Accidental accidental = e.contains("accidental"_) ?
@@ -219,8 +225,8 @@ MusicXML::MusicXML(string document, string) {
 						int alteration = accidental ? accidentalAlteration(accidental): implicitAlteration;
 						if(xmlAlteration != alteration) {
 							//log("Alteration mismatch", alteration, xmlAlteration);
-							assert_(xmlAlteration ==0 && (alteration==-1 || alteration==1));
-							accidental = alterationAccidental(xmlAlteration);
+                            assert_((xmlAlteration ==0 && (alteration==-1 || alteration==1)) || ((xmlAlteration==-1||xmlAlteration==1) && alteration==0), xmlAlteration, alteration);
+                            accidental = alterationAccidental(xmlAlteration);
 							alteration = xmlAlteration;
 						}
 
@@ -285,7 +291,9 @@ MusicXML::MusicXML(string document, string) {
 						else if(d.contains("metronome"_)) {
 							Value beatUnit = Value(ref<string>({"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_})
 												   .indexOf(d("metronome"_)("beat-unit"_).text()));
-							uint perMinute = parseInteger(d("metronome"_)("per-minute"_).text());
+                            TextData s = d("metronome"_)("per-minute"_).text();
+                            s.whileNo("0123456789"_);
+                            uint perMinute = s.integer();
 							insertSign({Sign::Metronome, time, {.metronome={beatUnit, perMinute}}});
 						}
 						else if(d.contains("pedal"_)) {
@@ -314,13 +322,15 @@ MusicXML::MusicXML(string document, string) {
 							octaveStart[staff] = signs[insertSign({Sign::OctaveShift, time, {{xmlStaffIndex, {.octave=octave}}}})];
 						}
 						else if(d.contains("other-direction"_)) {}
-						else if(d.contains("words"_)) {
-							if(isInteger(d("words").text())) fingering.append(parseInteger(d("words").text())); // Fingering
-							// else { TODO: directions }
-						}
-						else if(d.contains("rehearsal"_)) {}
+                        else if(d.contains("rehearsal"_)) {}
 						else if(d.contains("bracket"_)) {}
-						else error(e);
+                        else if(d.contains("words"_)) {
+                            d.xpath("words", [&fingering](const Element& words) {
+                                if(isInteger(words.text())) fingering.append(parseInteger(words.text())); // Fingering
+                                // else { TODO: directions }
+                            });
+                        }
+                        else error(e);
 					}
 					if(e.contains("sound"_) && e("sound"_)["tempo"_]) {
 						insertSign({Sign::Metronome, time, .metronome={Quarter, uint(parseDecimal(e("sound"_).attribute("tempo"_)))}});
@@ -455,33 +465,38 @@ MusicXML::MusicXML(string document, string) {
 		if(sign.type == Sign::Note && (sign.note.tie == Note::TieContinue || sign.note.tie == Note::TieStop)) {
 			size_t tieStart = invalid;
 			for(size_t index: range(activeTies.size)) {
-				if(signs[activeTies[index]].note.step == sign.note.step) { assert_(tieStart==invalid); tieStart = index; }
+                if(signs[activeTies[index]].note.step == sign.note.step) {
+                    //assert_(tieStart==invalid);
+                    tieStart = index;
+                }
 			}
-			assert_(tieStart != invalid, page, line, measure, activeTies, apply(activeTies, [&](size_t index){ return signs[index];}), sign);
-			size_t firstIndex = activeTies[tieStart];
-			if(sign.note.tie == Note::TieStop) activeTies.removeAt(tieStart);
-			Sign& first = signs[firstIndex];
-			bool inBetween = false;
-			// Only merges if no elements (notes, bars) would break the tie
-			for(Sign sign: signs.slice(firstIndex, signIndex-firstIndex)) { if(sign.time > first.time) { inBetween = true; break; } }
-			if(!inBetween) {
-				first.duration = sign.time+sign.duration-first.time;
-				int duration = first.note.duration() + sign.note.duration();
-				bool dot = false;
-				if(duration%3 == 0) {
-					dot = true;
-					duration = duration * 2 / 3;
-				}
-				if(isPowerOfTwo(duration)) {
-					first.note.value = Value(ref<uint>(valueDurations).size-1-log2(duration));
-					first.note.dot = dot;
-					assert_(int(first.note.value)>=0);
-					first.note.tie = Note::NoTie;
-					signs.removeAt(signIndex);
-					continue;
-				}
-			}
-		}
+            if(tieStart != invalid) {
+                assert_(tieStart != invalid, "460", page, line, measure, activeTies, apply(activeTies, [&](size_t index){ return signs[index];}), sign);
+                size_t firstIndex = activeTies[tieStart];
+                if(sign.note.tie == Note::TieStop) activeTies.removeAt(tieStart);
+                Sign& first = signs[firstIndex];
+                bool inBetween = false;
+                // Only merges if no elements (notes, bars) would break the tie
+                for(Sign sign: signs.slice(firstIndex, signIndex-firstIndex)) { if(sign.time > first.time) { inBetween = true; break; } }
+                if(!inBetween) {
+                    first.duration = sign.time+sign.duration-first.time;
+                    int duration = first.note.duration() + sign.note.duration();
+                    bool dot = false;
+                    if(duration%3 == 0) {
+                        dot = true;
+                        duration = duration * 2 / 3;
+                    }
+                    if(isPowerOfTwo(duration)) {
+                        first.note.value = Value(ref<uint>(valueDurations).size-1-log2(duration));
+                        first.note.dot = dot;
+                        assert_(int(first.note.value)>=0);
+                        first.note.tie = Note::NoTie;
+                        signs.removeAt(signIndex);
+                        continue;
+                    }
+                }
+            }
+        }
 		signIndex++;
 	}
 	}
@@ -498,12 +513,17 @@ MusicXML::MusicXML(string document, string) {
 		if(sign.type == Sign::Note && (sign.note.tie == Note::TieContinue || sign.note.tie == Note::TieStop)) {
 			size_t tieStart = invalid;
 			for(size_t index: range(activeTies.size)) {
-				if(signs[activeTies[index]].note.step == sign.note.step) { assert_(tieStart==invalid); tieStart = index; }
+                if(signs[activeTies[index]].note.step == sign.note.step) {
+                    //assert_(tieStart==invalid);
+                    tieStart = index;
+                }
 			}
-			assert_(tieStart != invalid, page, line, measure, activeTies, apply(activeTies, [&](size_t index){ return signs[index];}), sign);
-			sign.note.tieStartNoteIndex = activeTies[tieStart];
-			if(sign.note.tie == Note::TieStop) activeTies.removeAt(tieStart);
-		}
+            if(tieStart != invalid) {
+                assert_(tieStart != invalid, "503", page, line, measure, activeTies, apply(activeTies, [&](size_t index){ return signs[index];}), sign);
+                sign.note.tieStartNoteIndex = activeTies[tieStart];
+                if(sign.note.tie == Note::TieStop) activeTies.removeAt(tieStart);
+            }
+        }
 	}
 	}
 #endif
@@ -517,37 +537,45 @@ MusicXML::MusicXML(string document, string) {
 		if(sign.type == Sign::KeySignature) keySignature = sign.keySignature;
 		if(sign.type == Sign::Note) {
 			if(sign.note.tie == Note::TieContinue || sign.note.tie == Note::TieStop)  {
-				assert_(sign.note.tieStartNoteIndex);
-				assert_(signs[sign.note.tieStartNoteIndex].type == Sign::Note && (
-							signs[sign.note.tieStartNoteIndex].note.tie == Note::TieStart
-						|| signs[sign.note.tieStartNoteIndex].note.tie == Note::TieContinue), sign,
-						sign.note.tieStartNoteIndex, signs[sign.note.tieStartNoteIndex]);
-				sign.note.step = signs[sign.note.tieStartNoteIndex].note.step;
-				sign.note.alteration = signs[sign.note.tieStartNoteIndex].note.alteration;
-				assert_(!sign.note.accidental);
-				continue;
+                if(sign.note.tieStartNoteIndex) {
+                    assert_(sign.note.tieStartNoteIndex);
+                    assert_(signs[sign.note.tieStartNoteIndex].type == Sign::Note && (
+                                signs[sign.note.tieStartNoteIndex].note.tie == Note::TieStart
+                            || signs[sign.note.tieStartNoteIndex].note.tie == Note::TieContinue), sign,
+                            sign.note.tieStartNoteIndex, signs[sign.note.tieStartNoteIndex]);
+                    sign.note.step = signs[sign.note.tieStartNoteIndex].note.step;
+                    sign.note.alteration = signs[sign.note.tieStartNoteIndex].note.alteration;
+                    assert_(!sign.note.accidental);
+                    continue;
+                }
 			}
 
 			map<int, int> measureAlterations; // Currently accidented steps (for implicit accidentals)
 			for(size_t index: range(measureStartIndex, signIndex)) {
 				const Sign sign = signs[index];
-				if(sign.type == Sign::Note) measureAlterations[sign.note.step] = sign.note.alteration;
+                if(sign.type == Sign::Note) if(sign.note.accidental) measureAlterations[sign.note.step] = accidentalAlteration(sign.note.accidental);
 			}
 
 			// Recomputes accidental to reflect any previous changes in the same measure
 			sign.note.accidental =
-					(sign.note.alteration == implicitAlteration(keySignature, measureAlterations, sign.note.step) ? Accidental::None :
-																													alterationAccidental(sign.note.alteration));
+                    ((sign.note.alteration == implicitAlteration(keySignature, measureAlterations, sign.note.step)
+                     && !measureAlterations.contains(sign.note.step)) // Repeats measure alterations
+                     ? Accidental::None :
+                       alterationAccidental(sign.note.alteration));
 
 			int key = sign.note.key();
 			int step = keyStep(keySignature, key);
 			int alteration = keyAlteration(keySignature, key);
 			Accidental accidental =
-					(alteration == implicitAlteration(keySignature, measureAlterations, step) ? Accidental::None : alterationAccidental(alteration));
+                    ((alteration == implicitAlteration(keySignature, measureAlterations, step)
+                     && !measureAlterations.contains(step)) // Repeats measure alterations (TODO: except repetitions, once)
+                     ? Accidental::None :
+                       alterationAccidental(alteration));
 
-			assert_(key == noteKey(sign.note.clef.octave, step, alteration),
-					sign.note, sign.note.step, sign.note.alteration, key, step, alteration, noteKey(sign.note.clef.octave, step, alteration),
-					strNote(0, step, accidental), strKey(61), strKey(62));
+            assert(!sign.note.clef.octave);
+            assert_(key == noteKey(0/*sign.note.clef.octave*/, step, alteration),
+                    keySignature, sign.note, sign.note.step, sign.note.alteration, key, step, alteration, noteKey(0/*sign.note.clef.octave*/, step, alteration),
+                    strNote(0, step, accidental), strKey(17), strKey(5));
 
 			if(//(accidental == sign.note.accidental) || // No operation
 					(accidental && !sign.note.accidental) || // Does not introduce additional accidentals (for ambiguous tones)

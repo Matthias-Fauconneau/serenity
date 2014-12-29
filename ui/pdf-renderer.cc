@@ -480,12 +480,12 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                     OP2('T','r') ; // setRenderMode
                     OP2('T','z') ; // setHorizontalScaling
                     OP('\'') { Tm=Tlm=Tlm*mat3x2(0,-leading); drawText(*font,fontSize,spacing,wordSpacing,args[0].data); }
-                    OP2('T','j') if(font) drawText(*font, fontSize, spacing, wordSpacing, args[0].data); else log("Missing font");
+                    OP2('T','j') if(font) drawText(*font, fontSize, spacing, wordSpacing, args[0].data); //else log("Missing font");
                     OP2('T','J') for(const auto& e : args[0].list) {
                         if(e.type==Variant::Integer||e.type==Variant::Real) Tm=Tm*mat3x2(-e.real()*fontSize/1000,0);
                         else if(e.type==Variant::Data) {
                             if(font) drawText(*font,fontSize,spacing,wordSpacing,e.data);
-                            else log("Missing font");
+                            //else log("Missing font");
                         } else error("Unexpected type",(int)e.type);
                     }
                     OP2('T','f') font = fonts.find(args[0].data); /*if(!font) log("No such font", args[0].data, fonts.keys);*/ fontSize=f(1);

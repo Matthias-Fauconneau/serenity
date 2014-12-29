@@ -9,16 +9,17 @@ struct PitchClass {
 	char accidentals[12 +1];
 };
 static constexpr PitchClass pitchClasses[12] = {
-	//*7%12 //FIXME: generate
-	// C♯D♯EF♯G♯A♯B    C♯D♯EF♯G♯A♯B
-	{"10101101010", "N-N-N.-N-N-N"}, // ♭♭♭♭♭♭ G♭/F♯ e♭/d♯
+    //*7%12 //FIXME: generate
+   // C♯D♯EF♯G♯A♯B   C♯D♯EF♯G♯A♯B
+    {"10101101010", "N-N-N.-N-N-N"}, // ♭♭♭♭♭♭ G♭/F♯ e♭/d♯
 	{"10101101010", ".-N-N.-N-N-N"}, // ♭♭♭♭♭/♯♯♯♯♯♯♯ D♭ b♭
 	{"10101101010", ".-N-N.b.-N-N"}, // ♭♭♭♭ A♭ f
 	{"10101101010", ".b.-N.b.-N-N"}, // ♭♭♭ E♭ c
 	{"10101101010", ".b.-N.b.b.-N"}, // ♭♭ B♭ g
 	{"10101101010", ".b.b..b.b.-N"}, // ♭ F d
-	// C♯D♯EF♯G♯A♯B    C♯D♯EF♯G♯A♯B
-	{"01011010101", ".#.#..#.#.#."},  // ♮ C a '.b.b..b.b.b.'
+  //{"10101101010", ".b.b..b.b.b."},  // ♮ C a
+   // C♯D♯EF♯G♯A♯B   C♯D♯EF♯G♯A♯B
+    {"01011010101", ".#.#..#.#.#."},  // ♮ C a
 	{"01011010101",  ".#.#.N+.#.#."},  // ♯ G e
 	{"01011010101", "N+.#.N+.#.#."},  // ♯♯ D b
 	{"01011010101", "N+.#.N+N+.#."},  // ♯♯♯ A f♯
@@ -77,9 +78,12 @@ inline int accidentalAlteration(Accidental accidental) { return ref<int>{-1,0,1}
 
 // Converts note (octave, step, alteration) to MIDI key
 inline int noteKey(int octave, int step, int alteration) {
-	octave += step>0 ? step/7 : (step-6)/7; // Rounds towards negative
-	int octaveStep = (step - step/7*7 + 7)%7; // signed step%7 (Step offset on octave scale)
-	// C [C#] D [D#] E F [F#] G [G#] A [A#] B
+    assert_(octave==0);
+    int stepOctave = step>=0 ? step/7 : (step-6)/7; // Rounds towards negative
+    octave += stepOctave;
+    int octaveStep = (step - step/7*7 + 7)%7; // signed step%7 (Step offset on octave scale)
+    assert_(octave*7 + octaveStep == step, octave, stepOctave, octaveStep, octave*7 + octaveStep, step);
+    // C [C#] D [D#] E F [F#] G [G#] A [A#] B
 	return 60 + octave*12 + ref<uint>{0,2,4,5,7,9,11}[octaveStep] + alteration;
 }
 
@@ -112,7 +116,7 @@ struct Note {
 	size_t pageIndex = invalid, measureIndex = invalid, glyphIndex = invalid;
 	int tieStartNoteIndex = 0; // Invalidated by any insertion/deletion
 
-	uint key() const { return noteKey(clef.octave, step, alteration); }
+    uint key() const { return noteKey(0/*clef.octave*/, step, alteration); }
 	uint duration() const { // in .16 beat units
 		uint duration = valueDurations[value];
 		if(dot) duration = duration * 3 / 2;
@@ -181,7 +185,8 @@ struct Sign {
 inline bool operator <(const Sign& a, const Sign& b) {
     if(a.time==b.time) {
 		if(a.type==Sign::Note && b.type==Sign::Note) return a.note.step < b.note.step;
-		return a.type < b.type;
+        if(a.type==Sign::Measure && b.type==Sign::Repeat) return b.repeat != Repeat::End;
+        return a.type < b.type;
     }
 	return a.time < b.time;
 }
@@ -214,7 +219,8 @@ inline String str(const Sign& o) {
 		return s + ref<string>{"₀","₁"}[o.staff];
 	}
 	if(o.type==Sign::Measure) return " | "__;
-	if(o.type==Sign::KeySignature) return o.keySignature ? repeat(o.keySignature>0?"♯"_:"♭"_,abs(o.keySignature)) : "♮"__;
+    if(o.type==Sign::Repeat) return " : "__;
+    if(o.type==Sign::KeySignature) return o.keySignature ? repeat(o.keySignature>0?"♯"_:"♭"_,abs(o.keySignature)) : "♮"__;
 	if(o.type==Sign::TimeSignature) return str(o.timeSignature.beats)+"/"_+str(o.timeSignature.beatUnit);
 	if(o.type==Sign::Tuplet) return "}"_+str(o.tuplet.size);
 	if(o.type==Sign::Metronome) { assert_(o.metronome.beatUnit==Quarter); return "♩="_+str(o.metronome.perMinute); }
