@@ -8,10 +8,10 @@ struct PitchClass {
 	char keyIntervals[11 +1];
 	char accidentals[12 +1];
 };
-static constexpr PitchClass pitchClasses[12] = {
+static constexpr PitchClass pitchClasses[13] = {
     //*7%12 //FIXME: generate
    // C♯D♯EF♯G♯A♯B   C♯D♯EF♯G♯A♯B
-    {"10101101010", "N-N-N.-N-N-N"}, // ♭♭♭♭♭♭ G♭/F♯ e♭/d♯
+    {"10101101010", "N-N-N.-N-N-N"}, // ♭♭♭♭♭♭/♯♯♯♯♯♯ G♭/F♯ e♭/d♯
 	{"10101101010", ".-N-N.-N-N-N"}, // ♭♭♭♭♭/♯♯♯♯♯♯♯ D♭ b♭
 	{"10101101010", ".-N-N.b.-N-N"}, // ♭♭♭♭ A♭ f
 	{"10101101010", ".b.-N.b.-N-N"}, // ♭♭♭ E♭ c
@@ -20,11 +20,12 @@ static constexpr PitchClass pitchClasses[12] = {
   //{"10101101010", ".b.b..b.b.b."},  // ♮ C a
    // C♯D♯EF♯G♯A♯B   C♯D♯EF♯G♯A♯B
     {"01011010101", ".#.#..#.#.#."},  // ♮ C a
-	{"01011010101",  ".#.#.N+.#.#."},  // ♯ G e
+    {"01011010101", ".#.#.N+.#.#."},  // ♯ G e
 	{"01011010101", "N+.#.N+.#.#."},  // ♯♯ D b
 	{"01011010101", "N+.#.N+N+.#."},  // ♯♯♯ A f♯
 	{"01011010101", "N+N+.N+N+.#."},  // ♯♯♯♯ E c♯
-	{"01011010101", "N+N+.N+N+N+."}  // ♯♯♯♯♯/♭♭♭♭♭♭♭ B g♯
+    {"01011010101", "N+N+.N+N+N+."},  // ♯♯♯♯♯/♭♭♭♭♭♭♭ B g♯
+    {"01011010101", "N+N+NN+N+N+."}  // ♯♯♯♯♯♯/♭♭♭♭♭♭ F♯/G♭ d♯/e♭
 };
 inline int keyStep(int fifths, int key) {
 	assert_(fifths >= -6 && fifths <= 6, fifths);
@@ -64,7 +65,7 @@ enum OctaveShift { Down, Up, OctaveStop };
 
 using Accidental = SMuFL::Accidental;
 inline int keyAlteration(int fifths, int key) {
-	assert_(fifths >= -6 && fifths < 6 && key>0, fifths, key);
+    assert_(fifths >= -6 && fifths <= 6 && key>0, fifths, key);
 	char c = pitchClasses[fifths+6].accidentals[key%12/*0-11*/];
 	if(c== 'b' || c=='-') return -1;
 	if(c=='N' || c=='.') return 0;

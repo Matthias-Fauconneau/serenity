@@ -171,7 +171,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 				//float x = X(sign); X(sign) -> float& but maximum() -> float
 				if(!timeTrack.contains(sign.time)) { // FIXME: -> X
 					log("!timeTrack.contains(sign.time)", sign.time, int(sign.type));
-                    assert_(sign.type==Sign::Pedal || sign.type==Sign::Wedge, int(sign.type));
+                    assert_(sign.type==Sign::Measure || sign.type==Sign::Pedal || sign.type==Sign::Wedge, int(sign.type));
 					size_t index = timeTrack.keys.linearSearch(sign.time);
 					index = min(index, timeTrack.keys.size-1);
 					assert_(index < timeTrack.keys.size);
@@ -658,7 +658,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 								if(abs(sign.note.step-note.step) <= 1) { x += glyphAdvance(SMuFL::NoteHead::Black); break; }
 							chords[staff].insertSorted(sign);
 						} else { // Grace  note
-							error("grace");
+                            log("FIXME: render grace");
 							/*
 							const float x = X(sign) - noteSize.x - glyphSize("flags.u3"_, &smallFont).x, y = Y(sign);
 
@@ -720,14 +720,18 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 				// Clearing signs (across staves)
 				for(size_t staff : range(staffCount)) nextStaffTime(staff, sign.time);
 
-				assert_(timeTrack.contains(sign.time));
+                if(!timeTrack.contains(sign.time)) { // FIXME
+                    float x = timeTrack.values.last().maximum();
+                    timeTrack.insert(sign.time, {{x,x},x,x,x,x});
+                }
+                assert_(timeTrack.contains(sign.time), int(sign.type));
 				float x = timeTrack.at(sign.time).maximum();
 
 				uint beatDuration = quarterDuration * 4 / timeSignature.beatUnit;
 				for(size_t staff: range(staffCount)) {
 					if(beatTime[staff] % beatDuration != 0) {
 						//log(withName(staff, beatTime[staff], beatDuration, sign.measure.measure));
-                        assert_(sign.measure.measure >= 6, sign.measure.measure); // FIXME
+                        assert_(sign.measure.measure >= 1, sign.measure.measure); // FIXME
 						beatTime[staff] = 0;
 					}
 					assert_(beatTime[staff] % beatDuration == 0,
