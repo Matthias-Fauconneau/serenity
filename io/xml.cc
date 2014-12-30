@@ -103,7 +103,7 @@ void Element::xpath(string path, const function<void(const Element &)>& visitor)
     else { for(const Element& e: children) if(e.name==first) visitor(e); }
 }
 
-String Element::text() const { array<char> text; visit([&text](const Element& e){ text.append( unescape(e.content) ); }); return move(text); }
+String Element::text() const { array<char> text; visit([&text](const Element& e){ text.append(e.content); }); return move(text); }
 
 String Element::text(string path) const {
 	array<char> text;

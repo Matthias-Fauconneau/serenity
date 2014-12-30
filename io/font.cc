@@ -7,15 +7,29 @@
 #include "math.h"
 
 String findFont(string fontName, ref<string> fontTypes) {
-	for(string path: Folder("/usr/share/fonts").list(Files|Recursive)) {
-		if(endsWith(path,".ttf") || endsWith(path,".otf")) for(string fontType: fontTypes) {
-            if( find(path, fontName+     fontType+'.') ||
-                find(path, fontName+'-'+fontType+'.') ||
-                find(path, fontName+'_'+fontType+'.') ||
-				find(path, fontName+' ' +fontType+'.') ) return "/usr/share/fonts/"+path;
+    for(string folder: {"/usr/share/fonts"_,"/usr/local/share/fonts"_}) {
+        for(string path: Folder(folder).list(Files|Recursive)) {
+            if(endsWith(path,".ttf") || endsWith(path,".otf")) for(string fontType: fontTypes) {
+                if( find(path, fontName+     fontType+'.') ||
+                        find(path, fontName+'-'+fontType+'.') ||
+                        find(path, fontName+'_'+fontType+'.') ||
+                        find(path, fontName+' ' +fontType+'.') ) return folder+"/"_+path;
+            }
         }
     }
     error("No such font", fontName, fontTypes);
+}
+
+/// Returns a font, loading from disk and caching as needed
+FontData* getFont(string fontName, ref<string> fontTypes) {
+    String key = fontName+fontTypes[0];
+    assert_(!key.contains(' '));
+    static map<String, unique<FontData>> fonts; // Font cache
+    unique<FontData>* font = fonts.find(key);
+    if(font) return font->pointer;
+    String path = findFont(fontName, fontTypes);
+    String name = copyRef(section(section(path, '/', -2, -1),'.'));
+    return fonts.insert(copy(key), unique<FontData>(Map(path), name)).pointer;
 }
 
 static FT_Library ft; static int fontCount=0;

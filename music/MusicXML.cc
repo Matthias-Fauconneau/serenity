@@ -11,6 +11,7 @@ static int implicitAlteration(int keySignature, const map<int, int>& measureAlte
 MusicXML::MusicXML(string document, string) {
     Element root = parseXML(document);
 
+#if 0
 	map<uint, uint> voiceToStaff;
 	{
 		map<uint, map<uint, uint>> staffsVoicesNoteCount;
@@ -34,17 +35,32 @@ MusicXML::MusicXML(string document, string) {
 			uint staff = staffVoicesNoteCount.key;
 			const map<uint, uint>& voicesNotesCount = staffVoicesNoteCount.value;
 			uint mostCommonVoice = voicesNotesCount.keys[argmax(voicesNotesCount.values)];
-			assert_(!voiceToStaff.contains(mostCommonVoice)); // Each voice should be most common in an unique staff
-			voiceToStaff[mostCommonVoice] = staff;
+            if(voiceToStaff.contains(mostCommonVoice)) { // Only use voices for staff assignment when each voice is most common in an unique staff
+                voiceToStaff[mostCommonVoice] = staff;
+            }
 		}
 	}
+#endif
+    int xmlStaffCount = 0;
+    {size_t partIndex = 0;
+        root.xpath("score-partwise/part"_, [&partIndex, &xmlStaffCount](const Element& p) {
+            for(const Element& m: p.children) {
+                for(const Element& e: m.children) {
+                    int xmlStaffIndex = e.contains("staff") ? parseInteger(e("staff"_).text())-1 : partIndex;
+                    xmlStaffCount = max(xmlStaffCount, xmlStaffIndex+1);
+                }
+            }
+            partIndex++;
+        });
+    }
+    assert_(xmlStaffCount >= 2 && xmlStaffCount <= 3);
 
-	const size_t staffCount = 2;
+    const size_t staffCount = 2;
     Clef clefs[staffCount] = {{GClef,0}, {GClef,0}};
 	Sign octaveStart[staffCount] {{.octave=OctaveStop}, {.octave=OctaveStop}}; // Current octave shift (for each staff)
-    //for(uint staff: range(staffCount)) signs.insertSorted({Sign::Clef, 0, {{staff, {.clef=clefs[staff]}}}}); // Defaults
+    for(uint staff: range(staffCount)) signs.insertSorted({Sign::Clef, 0, {{staff, {.clef=clefs[staff]}}}}); // Defaults
 	size_t partIndex = 0;
-    root.xpath("score-partwise/part"_, [this, &partIndex, &clefs, &octaveStart](const Element& p) {
+    root.xpath("score-partwise/part"_, [xmlStaffCount, this, &partIndex, &clefs, &octaveStart](const Element& p) {
         KeySignature keySignature = 0; TimeSignature timeSignature={4,4};
         uint measureTime = 0, time = 0, nextTime = 0, maxTime = 0;
         uint globalMeasureIndex=0, pageIndex=0, lineIndex=0, measureIndex=0; // starts with 1
@@ -116,7 +132,7 @@ MusicXML::MusicXML(string document, string) {
                     if(!e.contains("chord"_) && (!e.contains("grace"_) || e("grace"_)["slash"_]!="yes"_)) nextTime = time+duration;
                     if(e["print-object"_]=="no"_) continue;
                     //assert_(e.contains("staff"), e);
-                    uint xmlStaffIndex = e.contains("staff") ? parseInteger(e("staff"_).text())-1 : partIndex;
+                    int xmlStaffIndex = e.contains("staff") ? parseInteger(e("staff"_).text())-1 : partIndex;
 #if 0
                     if(e.contains("voice")) {
                         uint voiceIndex = parseInteger(e("voice"_).text())-1;
@@ -132,7 +148,7 @@ MusicXML::MusicXML(string document, string) {
                         }
                     }
 #endif
-                    uint staff = 1-xmlStaffIndex; // Inverts staff order convention: (top/treble, bottom/bass) -> (bottom/bass, top/treble)
+                    uint staff = 1 - max(0, xmlStaffIndex-xmlStaffCount+2); // Merges first staves (i.e only split last staff), inverts staff order to bass,treble
                     assert_(staff < staffCount, staff);
                     assert_(int(value)>=0, e);
                     if(e.contains("rest"_)) insertSign({Sign::Rest, time, {{staff, {{duration, .rest={value}}}}}});
@@ -228,7 +244,7 @@ MusicXML::MusicXML(string document, string) {
                         }
 
                         // Redundant accidental
-                        //if(accidental == implicitAccidental) accidental = Accidental::None;
+                        if(alteration == implicitAlteration) accidental = Accidental::None;
 
                         // Records alteration used for the measure
                         if(accidental) measureAlterations[step] = alteration;
@@ -307,8 +323,8 @@ MusicXML::MusicXML(string document, string) {
                         }
                         else if(d.contains("octave-shift"_)) {
                             OctaveShift octave = OctaveShift(ref<string>({"down"_,"up"_,"stop"_}).indexOf(d("octave-shift"_)["type"_]));
-                            uint xmlStaffIndex = e.contains("staff") ? parseInteger(e("staff"_).text())-1 : partIndex;
-                            uint staff = 1-xmlStaffIndex; // Inverts staff order convention: (top/treble, bottom/bass) -> (bottom/bass, top/treble)
+                            int xmlStaffIndex = e.contains("staff") ? parseInteger(e("staff"_).text())-1 : partIndex;
+                            uint staff = 1 - max(0, xmlStaffIndex-xmlStaffCount+2); // Merges first staves (i.e only split last staff), inverts staff order to bass,treble
                             assert_(staff < staffCount, staff);
                             if(octave == Down) clefs[staff].octave++;
                             if(octave == Up) clefs[staff].octave--;
@@ -317,7 +333,7 @@ MusicXML::MusicXML(string document, string) {
                                 if(octaveStart[staff].octave == Down) clefs[staff].octave--;
                                 if(octaveStart[staff].octave == Up) clefs[staff].octave++;
                             }
-                            octaveStart[staff] = signs[insertSign({Sign::OctaveShift, time, {{xmlStaffIndex, {.octave=octave}}}})];
+                            octaveStart[staff] = signs[insertSign({Sign::OctaveShift, time, {{staff, {.octave=octave}}}})];
                         }
                         else if(d.contains("other-direction"_)) {}
                         else if(d.contains("rehearsal"_)) {}
@@ -337,9 +353,9 @@ MusicXML::MusicXML(string document, string) {
                 else if(e.name=="attributes"_) {
                     if(e.contains("divisions"_)) divisions = parseInteger(e("divisions"_).text());
                     e.xpath("clef"_, [&](const Element& clef) {
-                        uint xmlStaffIndex = clef["number"_] ? parseInteger(clef["number"_])-1 : partIndex;
-                        uint staff = 1-xmlStaffIndex; // Inverts staff order convention (treble, bass -> bass, treble)
-                        assert_(staff >= 0 && staff <= 1);
+                        int xmlStaffIndex = clef["number"_] ? parseInteger(clef["number"_])-1 : partIndex;
+                        uint staff = 1 - max(0, xmlStaffIndex-xmlStaffCount+2); // Merges first staves (i.e only split last staff), inverts staff order to bass,treble
+                        assert_(staff >= 0 && staff <= 1, staff, xmlStaffIndex, xmlStaffCount);
                         size_t index = "FG"_.indexOf(clef("sign"_).text()[0]);
                         if(index == invalid) { // Filters first parts with C clef
                             assert_(clef("sign"_).text() == "C"_);
@@ -397,17 +413,19 @@ MusicXML::MusicXML(string document, string) {
     });
 
 #if 1
-	// Removes unused clef change
-	for(size_t signIndex=0; signIndex <signs.size;) {
-		Sign& sign = signs[signIndex];
-		if(sign.type==Sign::Clef) {
-			for(size_t nextIndex: range(signIndex+1, signs.size)) {
-				Sign& next = signs[nextIndex];
-				if(next.type==Sign::Note) { signIndex++; break; }
-				if(next.type==Sign::Clef && next.staff == sign.staff) { signs.removeAt(signIndex); break; }
-			}
-		}
-		else signIndex++;
+    // Removes unused clef change and dynamics
+    for(size_t signIndex=0; signIndex < signs.size;) {
+        Sign& sign = signs[signIndex];
+        if(sign.type==Sign::Clef || sign.type==Sign::Dynamic) {
+            size_t nextIndex = signIndex+1;
+            while(nextIndex < signs.size && signs[nextIndex].type!=Sign::Note && (signs[nextIndex].type!=sign.type || (sign.type == Sign::Clef && signs[nextIndex].staff != sign.staff)))
+                nextIndex++;
+            if(nextIndex==signs.size || signs[nextIndex].type==sign.type) {
+                signs.removeAt(signIndex);
+                continue;
+            }
+        }
+        signIndex++;
 	}
 #endif
 
@@ -508,10 +526,24 @@ MusicXML::MusicXML(string document, string) {
 
 #if 1 // Converts accidentals to match key signature (pitch class). Tie support needs explicit tiedNoteIndex to match ties while editing steps
 	KeySignature keySignature = 0;
-	size_t measureStartIndex=0;
-	for(size_t signIndex : range(signs.size)) {
-		Sign& sign = signs[signIndex];
-		if(sign.type == Sign::Measure) measureStartIndex = signIndex;
+    size_t measureStartIndex=0;
+    map<int, int> previousMeasureAlterations; // Currently accidented steps (for implicit accidentals)
+    for(size_t signIndex : range(signs.size)) {
+        map<int, int> measureAlterations; // Currently accidented steps (for implicit accidentals)
+        map<int, int> sameAlterationCount; // Alteration occurence count
+        for(size_t index: range(measureStartIndex, signIndex)) {
+            const Sign sign = signs[index];
+            if(sign.type == Sign::Note) {
+                sameAlterationCount[sign.note.step]++;
+                if(sign.note.accidental && measureAlterations[sign.note.step] != accidentalAlteration(sign.note.accidental)) {
+                    measureAlterations[sign.note.step] = accidentalAlteration(sign.note.accidental);
+                    sameAlterationCount[sign.note.step] = 0;
+                }
+            }
+        }
+
+        Sign& sign = signs[signIndex];
+        if(sign.type == Sign::Measure) { measureStartIndex = signIndex; previousMeasureAlterations = move(measureAlterations); }
 		if(sign.type == Sign::KeySignature) keySignature = sign.keySignature;
 		if(sign.type == Sign::Note) {
 			if(sign.note.tie == Note::TieContinue || sign.note.tie == Note::TieStop)  {
@@ -528,43 +560,49 @@ MusicXML::MusicXML(string document, string) {
                 }
 			}
 
-			map<int, int> measureAlterations; // Currently accidented steps (for implicit accidentals)
-			for(size_t index: range(measureStartIndex, signIndex)) {
-				const Sign sign = signs[index];
-                if(sign.type == Sign::Note) if(sign.note.accidental) measureAlterations[sign.note.step] = accidentalAlteration(sign.note.accidental);
-			}
+            auto measureAccidental = [&](int step, int alteration) {
+                return (alteration == implicitAlteration(keySignature, measureAlterations, step)
+                        && (!measureAlterations.contains(step) || sameAlterationCount[step] > 1) // Repeats measure alterations once
+                        && alteration == previousMeasureAlterations.value(step, alteration)) // Courtesy accidental
+                        ? Accidental::None :
+                          alterationAccidental(alteration);
+            };
+            auto courtesyAccidental = [&](int step, int alteration) {
+                return alteration == implicitAlteration(keySignature, measureAlterations, step)
+                        && ((measureAlterations.contains(step) && sameAlterationCount[step] <= 1) // Repeats measure alterations once
+                            || alteration != previousMeasureAlterations.value(step, alteration)); // Courtesy accidental
+            };
 
-			// Recomputes accidental to reflect any previous changes in the same measure
-			sign.note.accidental =
-                    ((sign.note.alteration == implicitAlteration(keySignature, measureAlterations, sign.note.step)
-                     && !measureAlterations.contains(sign.note.step)) // Repeats measure alterations
-                     ? Accidental::None :
-                       alterationAccidental(sign.note.alteration));
+            // Recomputes accidental to reflect any previous changes to implicit alterations in the same measure
+            sign.note.accidental = measureAccidental(sign.note.step, sign.note.alteration);
+            sign.note.accidentalOpacity = courtesyAccidental(sign.note.step, sign.note.alteration) ? 1./2 : 1;
 
 			int key = sign.note.key();
-			int step = keyStep(keySignature, key);
+            int step = keyStep(keySignature, key) - sign.note.clef.octave*7;
 			int alteration = keyAlteration(keySignature, key);
-			Accidental accidental =
-                    ((alteration == implicitAlteration(keySignature, measureAlterations, step)
-                     && !measureAlterations.contains(step)) // Repeats measure alterations (TODO: except repetitions, once)
-                     ? Accidental::None :
-                       alterationAccidental(alteration));
+            Accidental accidental = measureAccidental(step, alteration);
 
-            assert(!sign.note.clef.octave);
-            assert_(key == noteKey(0/*sign.note.clef.octave*/, step, alteration),
-                    keySignature, sign.note, sign.note.step, sign.note.alteration, key, step, alteration, noteKey(0/*sign.note.clef.octave*/, step, alteration),
-                    strNote(0, step, accidental), strKey(17), strKey(5));
+            //assert(!sign.note.clef.octave, sign.note.clef.octave, sign.note.step);
+            assert_(key == noteKey(sign.note.clef.octave, step, alteration),
+                    keySignature, sign.note, sign.note.clef.octave, sign.note.step, sign.note.alteration, key, step, alteration, noteKey(sign.note.clef.octave, step, alteration),
+                    strNote(0, step, accidental), strKey(101), strKey(113));
 
 			if(//(accidental == sign.note.accidental) || // No operation
 					(accidental && !sign.note.accidental) || // Does not introduce additional accidentals (for ambiguous tones)
 					// Only changes an existing accidental to switch to key alteration direction
-					(accidental && sign.note.accidental && (accidental < sign.note.accidental) != (keySignature < 0))) continue;
+                    (accidental && sign.note.accidental && (accidental < sign.note.accidental) != (keySignature < 0))) {
+                if(previousMeasureAlterations.contains(sign.note.step)) previousMeasureAlterations.remove(sign.note.step); // Do not repeat courtesy accidentals
+                continue;
+            }
 			sign.note.step = step;
 			sign.note.alteration = alteration;
 			sign.note.accidental = accidental;
+            sign.note.accidentalOpacity = courtesyAccidental(sign.note.step, sign.note.alteration) ? 1./2 : 1;
+            if(previousMeasureAlterations.contains(step)) previousMeasureAlterations.remove(step); // Do not repeat courtesy accidentals
 		}
 	}
 #endif
 
 	assert_(signs);
+    log(signs);
 }

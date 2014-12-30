@@ -42,7 +42,7 @@ namespace SMuFL { //Standard Music Font Layout
 	namespace Flag { enum { Above=0xE240, Below }; }
 	enum Accidental { None=0, AccidentalBase=0xE260, Flat=AccidentalBase, Natural, Sharp, DoubleSharp, DoubleFlat };
 	static constexpr string accidental[] = {"flat"_,"natural"_,"sharp"_,"double-sharp"_,"double-flat"_};
-	namespace Articulation { enum { Base=0xE4A0, Accent=0, Staccato, Tenuto }; }
+    namespace Articulation { enum { Base=0xE4A0, Accent=0, Staccato=1, Tenuto=2 }; }
 	enum Dynamic { DynamicBase=0xE520/*Piano=DynamicBase, Mezzo, Forte, Rinforzando, Sforzando, z, n, pppppp, ppppp, pppp, ppp, pp, mp, mf, pf, ff, fff, ffff, fffff, ffffff,
 				   fp, fz, sf, sfp, sfpp, sfz, sfzp, sffz, rf, rfz*/ };
 	static constexpr string dynamic[] = {
@@ -79,11 +79,11 @@ inline int accidentalAlteration(Accidental accidental) { return ref<int>{-1,0,1}
 
 // Converts note (octave, step, alteration) to MIDI key
 inline int noteKey(int octave, int step, int alteration) {
-    assert_(octave==0);
+    //assert_(octave==0);
     int stepOctave = step>=0 ? step/7 : (step-6)/7; // Rounds towards negative
     octave += stepOctave;
     int octaveStep = (step - step/7*7 + 7)%7; // signed step%7 (Step offset on octave scale)
-    assert_(octave*7 + octaveStep == step, octave, stepOctave, octaveStep, octave*7 + octaveStep, step);
+    assert_(stepOctave*7 + octaveStep == step);
     // C [C#] D [D#] E F [F#] G [G#] A [A#] B
 	return 60 + octave*12 + ref<uint>{0,2,4,5,7,9,11}[octaveStep] + alteration;
 }
@@ -103,7 +103,7 @@ struct Note {
 	int step; // Independent from clef (0 = C4)
 	int alteration;
 	Accidental accidental;
-	enum Tie { NoTie, TieStart, TieContinue, TieStop, Merged } tie;
+    enum Tie { NoTie, TieStart, TieContinue, TieStop, Merged } tie;
 	uint durationCoefficientNum /* Tuplet duration */, durationCoefficientDen /* Tuplet note count */;
 	bool dot = false;
 	bool grace = false;
@@ -114,10 +114,11 @@ struct Note {
 	bool trill = false;
 	int finger = 0;
 	//bool stem:1; // 0: undefined, 1: down, 2: up
-	size_t pageIndex = invalid, measureIndex = invalid, glyphIndex = invalid;
+    size_t pageIndex = invalid, measureIndex = invalid, glyphIndex = invalid, accidentalGlyphIndex = invalid;
 	int tieStartNoteIndex = 0; // Invalidated by any insertion/deletion
+    float accidentalOpacity = 1;
 
-    uint key() const { return noteKey(0/*clef.octave*/, step, alteration); }
+    uint key() const { return noteKey(clef.octave, step, alteration); }
 	uint duration() const { // in .16 beat units
 		uint duration = valueDurations[value];
 		if(dot) duration = duration * 3 / 2;
@@ -140,13 +141,13 @@ struct Metronome { Value beatUnit; uint perMinute; };
 struct Step { uint staff; int step; };
 struct Tuplet { uint size; struct { uint time; Step min, max; } first, last; Step min, max; };
 using Dynamic = SMuFL::Dynamic;
-enum Wedge{ Crescendo, Diminuendo, WedgeStop };
+enum Wedge { Crescendo, Diminuendo, WedgeStop };
 enum Pedal { Start, Change, PedalStop, Ped };
 
 struct Sign {
-	enum {
+    enum {
 		Invalid,
-		Clef, OctaveShift,
+        Clef, OctaveShift,
 		Measure, Repeat, KeySignature, TimeSignature, Metronome,
 		Note, Rest,
 		Tuplet,
@@ -187,6 +188,7 @@ inline bool operator <(const Sign& a, const Sign& b) {
     if(a.time==b.time) {
 		if(a.type==Sign::Note && b.type==Sign::Note) return a.note.step < b.note.step;
         if(a.type==Sign::Measure && b.type==Sign::Repeat) return b.repeat != Repeat::End;
+        if(a.type==Sign::Measure && b.type==Sign::Pedal) return b.pedal != Pedal::PedalStop;
         return a.type < b.type;
     }
 	return a.time < b.time;
@@ -217,6 +219,7 @@ inline String str(const Sign& o) {
 		else if(o.type==Sign::Note) s = str(o.note);
 		else if(o.type==Sign::Rest) s = copyRef(str("-;,"_[clip(0, int(o.rest.value)-Value::Whole, 1)]));
 		else error(int(o.type));
+        assert_(o.staff == 0 || o.staff == 1);
 		return s + ref<string>{"₀","₁"}[o.staff];
 	}
 	if(o.type==Sign::Measure) return " | "__;
@@ -227,6 +230,6 @@ inline String str(const Sign& o) {
 	if(o.type==Sign::Metronome) { assert_(o.metronome.beatUnit==Quarter); return "♩="_+str(o.metronome.perMinute); }
 	if(o.type==Sign::Dynamic) return copyRef(SMuFL::dynamic[o.dynamic-Dynamic::DynamicBase]);
 	if(o.type==Sign::Wedge) return copyRef(ref<string>{"<"_, ">", ""_}[int(o.wedge)]);
-	if(o.type==Sign::Pedal) return copyRef(ref<string>{""_ /*"\\"_*/, "^"_, /*"⌋"_*/ ""_, "P"_}[int(o.pedal)/*-Ped*/]);
+    if(o.type==Sign::Pedal) return copyRef(ref<string>{"\\"_, "^"_, "⌋"_, "P"_}[int(o.pedal)/*-Ped*/]);
 	error(int(o.type));
 }

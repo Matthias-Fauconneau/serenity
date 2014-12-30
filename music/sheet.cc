@@ -28,7 +28,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 	array<Graphics> systems;
 
 	auto text = [this](vec2 origin, string message, float fontSize, array<Glyph>& glyphs, vec2 align=0 /*0:left|top,1/2,center,1:right|bottom*/) {
-		Text text(message, fontSize, 0, 1, 0, textFont);
+        Text text(message, fontSize, 0, 1, 0, "LinLibertine");
 		vec2 textSize = text.textSize();
 		origin -= align*textSize;
 		auto textGlyphs = move(text.graphics(0)->glyphs); // Holds a valid reference during iteration
@@ -42,7 +42,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 			float extra = (pageSize.y - totalHeight) / (systems.size+1);
 			float offset = extra;
 			for(Graphics& system: systems) {
-				system.translate(vec2(0, offset));
+                system.translate(vec2(0, round(offset)));
                 offset += system.bounds.size().y + extra;
 			}
 		}
@@ -50,7 +50,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 			float extra = (pageSize.y - totalHeight) / (systems.size-1);
 			float offset = 0;
 			for(Graphics& system: systems) {
-				system.translate(vec2(0, offset));
+                system.translate(vec2(0, round(offset)));
                 offset += system.bounds.size().y + extra;
 			}
 		}
@@ -91,7 +91,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 		auto staffX = [&timeTrack](uint time, int type, uint staff) -> float& {
 			if(!timeTrack.contains(time)) {
 				//log("!timeTrack.contains(time)", time, int(type));
-                assert_(type==Sign::Clef || type==Sign::Wedge || type==Sign::Pedal || type==Sign::Note/*FIXME*/, int(type));
+                assert_(type==Sign::Clef || type==Sign::OctaveShift || type==Sign::Wedge || type==Sign::Pedal || type==Sign::Note/*FIXME*/, int(type));
 				size_t index = timeTrack.keys.linearSearch(time);
 				index = min(index, timeTrack.keys.size-1);
 				assert_(index < timeTrack.keys.size);
@@ -127,6 +127,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 		uint measureCount = 0;
 		uint additionnalSpaceCount = 0;
         //bool pageBreak = false;
+        KeySignature lookaheadKeySignature = keySignature;
 		for(size_t signIndex: range(startIndex, signs.size)) {
 			Sign sign = signs[signIndex];
 
@@ -196,9 +197,11 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 						measureCount++;
 					}
 					else if(sign.type==Sign::KeySignature) {
-						x += abs(sign.keySignature)*glyphAdvance(sign.keySignature<0 ? Accidental::Flat : Accidental::Sharp);
+                        if(sign.keySignature == 0) x += abs(lookaheadKeySignature)*glyphAdvance(Accidental::Natural);
+                        else x += abs(sign.keySignature)*glyphAdvance(sign.keySignature<0 ? Accidental::Flat : Accidental::Sharp);
 						x += space;
 						additionnalSpaceCount++;
+                        lookaheadKeySignature = sign.keySignature;
 					}
 					else error(int(sign.type));
 					timeTrack.at(sign.time).setAll(x);
@@ -212,38 +215,39 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 		}
 		assert_(startIndex < breakIndex && spaceCount, startIndex, breakIndex, spaceCount, signs);
 
-		// Evaluates vertical bounds
-		int currentLineLowestStep = 7, currentLineHighestStep = -7; //bool lineHasTopText = false;
-		{Clef lineClefs[staffCount] = {clefs[0], clefs[1]}; Sign lineOctaveStart[staffCount] {octaveStart[0], octaveStart[1]};
-			for(size_t signIndex: range(startIndex, breakIndex)) {
-				Sign sign = signs[signIndex];
-				uint staff = sign.staff;
-				//if(sign.type==Sign::Repeat) lineHasTopText=true;
-				if(sign.type == Sign::Clef) lineClefs[staff] = sign.clef;
-				else if(sign.type == Sign::OctaveShift) {
-					if(sign.octave == Down) lineClefs[staff].octave++;
-					else if(sign.octave == Up) lineClefs[staff].octave--;
-					else if(sign.octave == OctaveStop) {
-						assert_(lineOctaveStart[staff].octave==Down || lineOctaveStart[staff].octave==Up, int(lineOctaveStart[staff].octave));
-						if(lineOctaveStart[staff].octave == Down) lineClefs[staff].octave--;
-						if(lineOctaveStart[staff].octave == Up) lineClefs[staff].octave++;
-					}
-					else error(int(sign.octave));
-					lineOctaveStart[staff] = sign;
-				}
-				if(sign.type == Sign::Note) {
-					sign.note.clef = lineClefs[staff]; // FIXME: postprocess MusicXML instead
-					if(staff==0) {
-						currentLineLowestStep = min(currentLineLowestStep, clefStep(sign));
-						lowestStep = min(lowestStep, clefStep(sign));
-					}
-					if(staff==1) {
-						currentLineHighestStep = max(currentLineHighestStep, clefStep(sign));
-						highestStep = max(highestStep, clefStep(sign));
-					}
-				}
-			}
-		}
+        // Evaluates vertical bounds until next line break
+        struct Range { int bottom, top; };
+        auto evaluateStepRanges = [&](size_t startIndex, size_t endIndex) {
+            Clef lineClefs[staffCount] = {clefs[0], clefs[1]};
+            Sign lineOctaveStart[staffCount] {octaveStart[0], octaveStart[1]};
+            Range stepRanges[staffCount] = {{7,-1},{-8,-7}};
+            for(size_t signIndex: range(startIndex, endIndex)) {
+                Sign sign = signs[signIndex];
+                uint staff = sign.staff;
+                //if(sign.type==Sign::Repeat) lineHasTopText=true;
+                if(sign.type == Sign::Clef) lineClefs[staff] = sign.clef;
+                else if(sign.type == Sign::OctaveShift) {
+                    if(sign.octave == Down) lineClefs[staff].octave++;
+                    else if(sign.octave == Up) lineClefs[staff].octave--;
+                    else if(sign.octave == OctaveStop) {
+                        assert_(lineOctaveStart[staff].octave==Down || lineOctaveStart[staff].octave==Up, int(lineOctaveStart[staff].octave));
+                        if(lineOctaveStart[staff].octave == Down) lineClefs[staff].octave--;
+                        if(lineOctaveStart[staff].octave == Up) lineClefs[staff].octave++;
+                    }
+                    else error(int(sign.octave));
+                    lineOctaveStart[staff] = sign;
+                }
+                if(sign.type == Sign::Note) {
+                    sign.note.clef = lineClefs[staff]; // FIXME: postprocess MusicXML instead
+                    stepRanges[staff].bottom = min(stepRanges[staff].bottom, clefStep(sign));
+                    stepRanges[staff].top = max(stepRanges[staff].top, clefStep(sign));
+                }
+            }
+            return copyRef(ref<Range>(stepRanges, staffCount));
+        };
+        buffer<Range> line = evaluateStepRanges(startIndex, breakIndex);
+        this->lowestStep = min(this->lowestStep, line[0].bottom);
+        this->highestStep = max(this->highestStep, line[1].top);
 
 		// Breaks page as needed
         int highMargin = 3, lowMargin = -8-4;
@@ -282,11 +286,10 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 		bool pendingWhole[staffCount] = {false, false};
 
 		auto noteCode = [](const Sign& sign) { return min(SMuFL::NoteHead::Whole+int(sign.note.value), int(SMuFL::NoteHead::Black)); };
-		auto noteSize = [&noteCode, this](const Sign& sign) { return font.metrics(font.index(noteCode(sign))).advance; };
+        auto noteSize = [&noteCode, this](const Sign& sign) { return font.metrics(font.index(noteCode(sign))).advance; };
 
-		auto doLedger = [this,&X, &noteSize, spaceWidth, &system](Sign sign) {// Ledger lines
+        auto doLedger = [this,&X, &noteSize, spaceWidth, &system](Sign sign, float x) { // Ledger lines
 			uint staff = sign.staff;
-			const float x = X(sign);
 			float ledgerLength = noteSize(sign)+min(noteSize(sign), spaceWidth/2);
 			int step = clefStep(sign);
 			float opacity = (sign.note.tie == Note::NoTie || sign.note.tie == Note::TieStart) ? 1 : 1./2;
@@ -300,11 +303,12 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 			}
 		};
 
-        auto glyph = [this, &system](vec2 origin, uint code, float opacity=1, float size=8) {
+        auto glyph = [this, &system](vec2 origin, uint code, float opacity=1, float size=8, FontData* font=0) {
+            if(!font) font=&musicFont;
             size *= halfLineInterval;
-            uint index = musicFont.font(size).index(code);
-            system.glyphs.append(origin, size, musicFont, code, index, black, opacity);
-            return musicFont.font(size).metrics(index).advance;
+            uint index = font->font(size).index(code);
+            system.glyphs.append(origin, size, *font, code, index, black, opacity);
+            return font->font(size).metrics(index).advance;
         };
 
         auto doBeam = [this, X, P, glyph, noteCode, noteSize, doLedger, text, &activeTies, &tuplets, &beams, &system, &notes, &systems](uint staff) {
@@ -321,7 +325,11 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 			int aboveDistance = maxStep-middle, belowDistance = middle-minStep;
 			bool stemUp = aboveDistance == belowDistance ? !staff  : aboveDistance < belowDistance;
 
-			auto isTied = [](const Chord& chord){
+            auto anyAccidental = [](const Chord& chord){
+                for(const Sign& a: chord) if(a.note.accidental) return true;
+                return false;
+            };
+            auto allTied = [](const Chord& chord) {
 				for(const Sign& a: chord) if(a.note.tie == Note::NoTie || a.note.tie == Note::TieStart) return false;
 				return true;
 			};
@@ -330,7 +338,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 				return false;
 			};
 			auto stemX = [&](const Chord& chord, bool stemUp) {
-				return X(chord[0]) + (stemUp||isDichord(chord) ? noteSize(chord[0]) : 0);
+                return X(chord[0]) + (stemUp||isDichord(chord) ? noteSize(chord[0])-1 : 0);
 			};
 
 			if(beam.size==1) { // Draws single stem
@@ -341,7 +349,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 				float yBase = stemUp ? yBottom-1./2 : yTop+1./2;
 				float yStem = stemUp ? yTop-stemLength : yBottom+stemLength;
 				float x = stemX(beam[0], stemUp);
-				float opacity = isTied(beam[0]) ? 1./2 : 1;
+                float opacity = allTied(beam[0]) ? 1./2 : 1;
 				if(sign.note.value>=Half)
 					system.lines.append(vec2(x, ::min(yBase, yStem)), vec2(x, max(yBase, yStem)), black, opacity);
 				if(sign.note.value>=Eighth)
@@ -358,11 +366,11 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 				float delta[2] = {clip(-lineInterval, tip[0]-midTip, lineInterval), clip(-lineInterval, tip[1]-midTip, lineInterval)};
 				Sign sign[2] = { stemUp?beam[0].last():beam[0].first(), stemUp?beam[1].last():beam[1].first()};
 				for(uint i: range(2)) {
-					float opacity = isTied(beam[i]) ? 1./2 : 1;
+                    float opacity = allTied(beam[i]) ? 1./2 : 1;
 					tip[i] = midTip+delta[i];
 					system.lines.append(vec2(x[i], ::min(base[i],tip[i])), vec2(x[i], ::max(base[i],tip[i])), black, opacity);
 				}
-				float opacity = isTied(beam[0]) && isTied(beam[1]) ? 1./2 : 1;
+                float opacity = allTied(beam[0]) && allTied(beam[1]) ? 1./2 : 1;
 				Value first = max(apply(beam[0], [](Sign sign){return sign.note.value;}));
 				Value second = max(apply(beam[1], [](Sign sign){return sign.note.value;}));
 				// Beams
@@ -399,7 +407,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 					float x = stemX(chord, stemUp);
 					Sign sign = stemUp ? chord.first() : chord.last();
 					float y = Y(sign) + (stemUp ? -1./2 : +1./2);
-					float opacity = isTied(chord) ? 1./2 : 1;
+                    float opacity = allTied(chord) ? 1./2 : 1;
 					float stemY = firstStemY + (lastStemY-firstStemY) * (x - stemX(beam[0], stemUp))
 							/ (stemX(beam.last(), stemUp) - stemX(beam[0], stemUp));
 					stemsY.append(stemY);
@@ -420,15 +428,25 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 
 			// -- Chord layout
 			float baseY = stemUp ? staffY(staff, 8) : staffY(staff, 0);
-			for(const Chord& chord: beam) {
-				// Dichord layout
+            for(Chord& chord: beam) {
+                for(Sign& sign: chord) {
+                    Note& note = sign.note;
+                    // Adds courtesy accidental to implicitly altered note in chords with any accidentals
+                    if(!note.accidental && note.alteration && anyAccidental(chord)) {
+                        // TODO: Split such transformations (and the ones on MusicXML import) in a separate module
+                        note.accidental = alterationAccidental(note.alteration);
+                        note.accidentalOpacity = 1./4;
+                    }
+                }
+
+                // -- Dichord shifts
 				buffer<bool> shift (chord.size); shift.clear();
-				int lastStep = chord[0].note.step;
-				for(size_t index: range(1, chord.size)) { // Bottom to top (TODO: same for accidentals)
-					Sign sign = chord[index];
-					Note& note = sign.note;
-					if(note.step==lastStep+1) shift[index] = !shift[index-1];
-					lastStep = note.step;
+                int previousStep = chord[0].note.step;
+                for(size_t index: range(1, chord.size)) {
+                    const Sign& sign = chord[index];
+                    const Note& note = sign.note;
+                    if(note.step==previousStep+1) shift[index] = !shift[index-1];
+                    previousStep = note.step;
 				}
 				if(shift.contains(true)) {
 					for(size_t index: range(chord.size-1)) { // Alternate
@@ -441,16 +459,32 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 						shift[0] = shift[1];
 				}
 
-				float accidentalAboveY = -inf, accidentalOffset = 0;
-				for(size_t index: reverse_range(chord.size)) { // Top to bottom (notes are sorted bass to treble)
-					Sign sign = chord[index];
+                // -- Accidental shifts
+                buffer<bool> accidentalShift (chord.size); accidentalShift.clear();
+                size_t previousAccidentalIndex = 0;
+                while(previousAccidentalIndex < chord.size && !chord[previousAccidentalIndex].note.accidental) previousAccidentalIndex++;
+                if(previousAccidentalIndex < chord.size) {
+                    int previousAccidentalStep = chord[previousAccidentalIndex].note.step;
+                    for(size_t index: range(previousAccidentalIndex+1, chord.size)) {
+                        const Sign& sign = chord[index];
+                        const Note& note = sign.note;
+                        if(note.accidental) {
+                            if(note.step<=previousAccidentalStep+3) accidentalShift[index] = !accidentalShift[previousAccidentalIndex];
+                            previousAccidentalStep = note.step;
+                            previousAccidentalIndex = index;
+                        }
+                    }
+                }
+
+                for(size_t index: range(chord.size)) {
+                    Sign& sign = chord[index];
 					assert_(sign.type==Sign::Note);
-					Note& note = sign.note;
+                    Note& note = sign.note;
 					const float x = X(sign) + (shift[index] ? noteSize(sign) : 0), y = Y(sign);
 					float opacity = (note.tie == Note::NoTie || note.tie == Note::TieStart) ? 1 : 1./2;
 
 					// Ledger
-					doLedger(sign);
+                    doLedger(sign, x);
 					// Body
 					{note.glyphIndex = system.glyphs.size; // Records glyph index of body, i.e next glyph to be appended to system.glyphs :
                         glyph(vec2(x, y), noteCode(sign), opacity, note.grace?6:8); }
@@ -461,14 +495,13 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
                         glyph(P(betweenLines)+vec2((shift.contains(true) ? noteSize(sign) : 0)+dotOffset,0), SMuFL::Dot, opacity);
 					}
 
-					// Accidental
-					if(note.accidental) {
-						if(abs(y-accidentalAboveY)<=4*halfLineInterval) accidentalOffset -= space/2;
-						else accidentalOffset = 0;
-						//TODO: highlight as well
-                        glyph(vec2(x-glyphSize(note.accidental).x+accidentalOffset, y), note.accidental);
-						accidentalAboveY = y;
-					}
+                    // Accidental
+                    if(note.accidental) {
+                        {note.accidentalGlyphIndex = system.glyphs.size; // Records glyph index of accidental, i.e next glyph to be appended to system.glyphs :
+                            glyph(vec2(x - (accidentalShift[index] ? glyphSize(note.accidental, &smallFont).x : 0)
+                                       - glyphSize(note.accidental, &smallFont).x, y), note.accidental, note.accidentalOpacity, 6);
+                        }
+                    }
 
 					// Tie
 					if(sign.note.tie == Note::TieContinue || sign.note.tie == Note::TieStop) {
@@ -540,7 +573,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 					int step = clefStep(sign);
 					float y = Y(sign) + (stemUp?1:-1) * (lineInterval+(step%2?0:halfLineInterval));
 
-					int base = SMuFL::Articulation::Base + stemUp;
+                    const int base = SMuFL::Articulation::Base + (stemUp?1:0);
+                    // TODO: combined articulations glyphs
 					if(chord.first().note.accent) {
                         int code = base+SMuFL::Articulation::Accent*2; glyph(vec2(x-glyphSize(code).x/2,y), code); y += lineInterval;
 					}
@@ -567,11 +601,10 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 					assert_(fingering.size == 1); // TODO: correct order
 					float x = X(chord[0])+noteSize(chord[0])/2, y = baseY;
 					for(int finger: fingering.reverse()) { // Top to bottom
-						//text(vec2(x, y), str(finger), textSize/2, system.glyphs, 1./2);
-                        Font& font = getFont(textFont)->font(textSize/2);
+                        Font& font = textFont.font(textSize/2);
 						uint code = str(finger)[0];
 						auto metrics = font.metrics(font.index(code));
-                        glyph(vec2(x-metrics.bearing.x-metrics.size.x/2,y+metrics.bearing.y), code);
+                        glyph(vec2(x-metrics.bearing.x-metrics.size.x/2,y+metrics.bearing.y), code, 1, 3, &textFont);
 						y += lineInterval;
 					}
 				}
@@ -579,7 +612,12 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 			beam.clear();
 		};
 
-		for(size_t signIndex: range(startIndex, breakIndex)) {
+        // Evaluates vertical bounds until next measure bar (full clear)
+        size_t nextMeasureIndex = startIndex;
+        while(nextMeasureIndex < breakIndex && signs[nextMeasureIndex].type != Sign::Measure) nextMeasureIndex++;
+        buffer<Range> measure = evaluateStepRanges(startIndex, nextMeasureIndex);
+
+        for(size_t signIndex: range(startIndex, breakIndex)) {
 			Sign sign = signs[signIndex];
 
 			auto nextStaffTime = [&](uint staff, int time) {
@@ -619,11 +657,11 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 					 } else if(sign.type == Sign::OctaveShift) {
 						 //log(staff, clefs[staff].octave);
 						 /****/  if(sign.octave == Down) {
-							 x += text(vec2(x, staffY(1, max(0,currentLineHighestStep+7))), "8"+superscript("va"), textSize, system.glyphs).x;
+                             x += text(vec2(x, staffY(1, max(0,line[1].top+7))), "8"+superscript("va"), textSize, system.glyphs).x;
 							 clefs[staff].octave++;
 							 timeTrack.at(sign.time).octave = x;
 						 } else if(sign.octave == Up) {
-							 x += text(vec2(x, staffY(1, max(0,currentLineHighestStep+7))), "8"+superscript("vb"), textSize, system.glyphs).x;
+                             x += text(vec2(x, staffY(1, max(0,line[1].top+7))), "8"+superscript("vb"), textSize, system.glyphs).x;
 							 clefs[staff].octave--;
 							 timeTrack.at(sign.time).octave = x;
 						 }
@@ -766,7 +804,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 						for(size_t staff: range(staffCount)) {
 							if(pendingWhole[staff]) {
 								vec2 p = vec2((measureBars.values.last()+x)/2, staffY(staff, -2));
-                                glyph(p, SMuFL::Rest::Whole+int(sign.rest.value), 1./2, 6);
+                                glyph(p, SMuFL::Rest::Whole, 1./2, 6);
 							}
 							pendingWhole[staff] = false;
 						}
@@ -782,21 +820,34 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 						x += spaceWidth;
 						/*text(vec2(x, staffY(1, 12)), str(page)+','+str(lineIndex)+','+str(lineMeasureIndex)+' '+str(measureIndex), textSize,
 								 debug->glyphs);*/
-					}
+
+                        nextMeasureIndex++;
+                        while(nextMeasureIndex < breakIndex && signs[nextMeasureIndex].type != Sign::Measure) nextMeasureIndex++;
+                        measure = evaluateStepRanges(signIndex, nextMeasureIndex);
+                    }
 					else if(sign.type==Sign::KeySignature) {
-						keySignature = sign.keySignature;
-						for(int i: range(abs(keySignature))) {
-							int step = keySignature<0 ? 4+(3*i+2)%7 : 6+(4*i+4)%7;
-							auto symbol = keySignature<0 ? Accidental::Flat : Accidental::Sharp;
-                            glyph(vec2(x, Y(0, {clefs[0].clefSign, 0}, step - (clefs[0].clefSign==FClef ? 14 : 0))), symbol);
-                            x += glyph(vec2(x, Y(1, {clefs[1].clefSign, 0}, step - (clefs[1].clefSign==FClef ? 14 : 0))), symbol);
-						}
+                        if(sign.keySignature == 0) {
+                            for(int i: range(abs(keySignature))) {
+                                int step = keySignature<0 ? 4+(3*i+2)%7 : 6+(4*i+4)%7;
+                                auto symbol = Accidental::Natural;
+                                glyph(vec2(x, Y(0, {clefs[0].clefSign, 0}, step - (clefs[0].clefSign==FClef ? 14 : 0))), symbol);
+                                x += glyph(vec2(x, Y(1, {clefs[1].clefSign, 0}, step - (clefs[1].clefSign==FClef ? 14 : 0))), symbol);
+                            }
+                        } else {
+                            for(int i: range(abs(sign.keySignature))) {
+                                int step = sign.keySignature<0 ? 4+(3*i+2)%7 : 6+(4*i+4)%7;
+                                auto symbol = sign.keySignature<0 ? Accidental::Flat : Accidental::Sharp;
+                                glyph(vec2(x, Y(0, {clefs[0].clefSign, 0}, step - (clefs[0].clefSign==FClef ? 14 : 0))), symbol);
+                                x += glyph(vec2(x, Y(1, {clefs[1].clefSign, 0}, step - (clefs[1].clefSign==FClef ? 14 : 0))), symbol);
+                            }
+                        }
 						x += spaceWidth;
-					}
+                        keySignature = sign.keySignature;
+                    }
 					else if(sign.type==Sign::Repeat) {
 						if(int(sign.repeat)>0) { // Ending
 							float x = measureBars.values.last();
-							text(vec2(x, staffY(1, max(0, currentLineHighestStep))), str(int(sign.repeat)), textSize, system.glyphs, vec2(0,1));
+                            text(vec2(x, staffY(1, max(0, line[1].top))), str(int(sign.repeat)), textSize, system.glyphs, vec2(0,1));
 						} else {
 							float dotX = (sign.repeat==Repeat::Begin ? measureBars.values.last()+spaceWidth/2 : x-spaceWidth/2)
 									- glyphSize(SMuFL::Dot).x/2;
@@ -845,7 +896,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 				}
 				else if(sign.type == Sign::Dynamic) {
 					assert_(sign.dynamic!=-1);
-                    x += glyph(vec2(x, (staffY(1, -8)+staffY(0, 0))/2), sign.dynamic);
+                    x += glyph(vec2(x, (staffY(0, measure[0].top) + staffY(1, measure[1].bottom))/2 + glyphSize(sign.dynamic).y/2 ), sign.dynamic);
 				} else if(sign.type == Sign::Wedge) {
 					float y = (staffY(1, -8)+staffY(0, 0))/2;
 					if(sign.wedge == WedgeStop) {
@@ -854,7 +905,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 						system.parallelograms.append( vec2(X(wedgeStart), y+(!crescendo-1)*3), vec2(x, y+(crescendo-1)*3), 1.f);
 					} else wedgeStart = sign;
 				} else if(sign.type == Sign::Pedal) {
-					float y = staffY(0, min(-8,currentLineLowestStep)) + lineInterval;
+                    float y = staffY(0, min(-8,line[0].bottom)) + lineInterval;
                     //if(sign.pedal == Ped) glyph(vec2(x, y), SMuFL::Pedal::Mark);
 					if(sign.pedal == Start) {
 						pedalStart = vec2(x, y);// + glyphAdvance(SMuFL::Pedal::Mark);
@@ -943,8 +994,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 			}
 		}
         lineCount++;
-        system.bounds.min = vec2(0, staffY(1, max(highMargin,currentLineHighestStep)+7));
-        system.bounds.max = vec2(pageSize.x, staffY(0, min(lowMargin, currentLineLowestStep)-7));
+        system.bounds.min = vec2(0, staffY(1, max(highMargin, line[1].top)+7));
+        system.bounds.max = vec2(pageSize.x, staffY(0, min(lowMargin, line[0].bottom)-7));
         requiredHeight += system.bounds.size().y;
 		systems.append(move(system));
 		startIndex = breakIndex;

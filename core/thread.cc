@@ -163,12 +163,8 @@ template<> void __attribute((noreturn)) error(const string& message) {
         reentrant = false;
     }
     log(message);
-    //requestTermination(-1); //FIXME // Sets terminationRequested flag and signals (EventFD::post) all threads to terminate
-    /*{Locker lock(threadsLock); // FIXME
-        for(Thread* thread: threads) if(thread->tid==gettid()) { threads.remove(thread); break; } } // Removes this thread from the running threads*/
     __builtin_trap(); //TODO: detect if running under debugger
-    //exit_thread(-1); // Exits this thread
-    exit_group(-1); // Exits this group (process) FIXME
+    exit_group(-1); // Exits this group (process)
 }
 
 // Entry point
@@ -179,7 +175,6 @@ int main() {
 		if(Interface<Application>::factories().contains(argument)) factory = Interface<Application>::factories().at(argument);
 	if(factory) application = factory->constructNewInstance();
     mainThread.run(); // Reuses main thread as default event loop runner when not overriden in Poll constructor
-    //for(Thread* thread: threads) thread->wait(); // Waits for all threads to terminate
     return groupExitStatus; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
 }
 

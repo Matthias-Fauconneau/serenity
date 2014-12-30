@@ -3,18 +3,6 @@
 #include "font.h"
 #include "utf8.h"
 
-/// Returns a font, loading from disk and caching as needed
-FontData* getFont(string fontName, ref<string> fontTypes) {
-    String key = fontName+fontTypes[0];
-    assert_(!key.contains(' '));
-    static map<String, unique<FontData>> fonts; // Font cache
-    unique<FontData>* font = fonts.find(key);
-    if(font) return font->pointer;
-    String path = findFont(fontName, fontTypes);
-	String name = copyRef(section(section(path, '/', -2, -1),'.'));
-    return fonts.insert(copy(key), unique<FontData>(Map(path), name)).pointer;
-}
-
 /// Layouts formatted text with wrapping, justification and links
 struct TextLayout {
     struct Glyph : Font::Metrics, ::Glyph {

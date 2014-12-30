@@ -5,8 +5,6 @@
 #include "core/image.h"
 #include "utf8.h"
 
-FontData* getFont(string fontName, ref<string> fontTypes={"","R","Regular"});
-
 /// Rich text format control code encoded in 00-1F range
 // \note first word (until ' ') after a Link tag is not displayed but used as \a linkActivated identifier.
 enum class TextFormat : char { Regular, Bold, Italic, Superscript, Subscript, Stack, Fraction, End };

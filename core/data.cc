@@ -64,6 +64,9 @@ ref<uint8> BinaryData::whileNot(uint8 key) {
     return cast<uint8>(slice(start, index-start));
 }
 
+TextData::TextData(ref<byte> data) : Data(data) {
+    if(data && uint8(data[0]) >= 0x80 && !match("\xEF\xBB\xBF")) error("Expected Unicode BOM, got", peek(3), hex(peek(3)));
+}
 
 void TextData::advance(size_t step) {
     assert(index+step<=data.size, index, data.size);

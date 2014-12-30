@@ -78,7 +78,7 @@ static Variant parseVariant(TextData& s) {
                 else { log("Unsupported filter",v.dict); return ""_; }
             }
             if(v.dict.contains("DecodeParms"_)) {
-                assert(v.dict.at("DecodeParms"_).dict.size() == 2);
+                //assert(v.dict.at("DecodeParms"_).dict.size() == 2, v);
                 uint size = stream.size;
                 uint width = v.dict.at("DecodeParms"_).dict.contains("Columns"_) ? v.dict.at("DecodeParms"_).dict.at("Columns"_).integer() : 1;
                 uint height = size/(width+1);

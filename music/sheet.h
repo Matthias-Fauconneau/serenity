@@ -19,10 +19,10 @@ struct Sheet : Widget {
 	float Y(Sign sign) { assert_(sign.type==Sign::Note); return staffY(sign.staff, clefStep(sign)); }
 
     // Fonts
-    FontData musicFont {File("Bravura.otf", Folder("/usr/local/share/fonts"_)), "Bravura"};
+    FontData& musicFont = *getFont("Bravura"_);
     Font& smallFont = musicFont.font(6.f*halfLineInterval);
     Font& font = musicFont.font(8.f*halfLineInterval);
-	string textFont = "LinLibertine";
+    FontData& textFont = *getFont("LinLibertine"_);
 	float textSize = 6*halfLineInterval;
     // Font helpers
 	vec2 glyphSize(uint code, Font* font_=0/*font*/) { Font& font=font_?*font_:this->font; return font.metrics(font.index(code)).size; }

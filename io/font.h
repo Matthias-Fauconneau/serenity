@@ -77,3 +77,5 @@ struct FontData {
     /// Returns font glyph index for glyph \a name
     uint index(string name) const;*/
 };
+
+FontData* getFont(string fontName, ref<string> fontTypes={"","R","Regular"});

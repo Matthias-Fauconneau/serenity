@@ -127,7 +127,7 @@ bool AudioOutput::start(uint rate, uint periodSize, uint sampleBits, uint channe
 
 void AudioOutput::stop() {
     assert_(status);
-    if(status->state == Running) io<DRAIN>(int(LinuxError::Busy));
+    if(status->state == Running) io<DRAIN>(int(LinuxError::Again));
     else log("Could not drain", status->state);
     unregisterPoll();
     {int state = status->state;
