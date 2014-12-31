@@ -27,7 +27,7 @@ struct Sheet : Widget {
     // Font helpers
 	vec2 glyphSize(uint code, Font* font_=0/*font*/) { Font& font=font_?*font_:this->font; return font.metrics(font.index(code)).size; }
 	float glyphAdvance(uint code, Font* font_=0/*font*/) { Font& font=font_?*font_:this->font; return font.metrics(font.index(code)).advance; }
-	float space = glyphAdvance(SMuFL::NoteHead::Black);
+    float space = glyphSize(SMuFL::Accidental::Flat, &smallFont).x+glyphSize(SMuFL::NoteHead::Black).x;
 	float margin = 1;
 
 	// Graphics

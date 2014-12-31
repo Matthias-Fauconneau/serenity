@@ -8,9 +8,10 @@ struct PitchClass {
 	char keyIntervals[11 +1];
 	char accidentals[12 +1];
 };
-static constexpr PitchClass pitchClasses[13] = {
+static constexpr PitchClass pitchClasses[14] = {
     //*7%12 //FIXME: generate
    // C♯D♯EF♯G♯A♯B   C♯D♯EF♯G♯A♯B
+    {"10101101010", "N-N-NN-N-N-N"},  // ♭♭♭♭♭♭♭/♯♯♯♯♯ B g♯
     {"10101101010", "N-N-N.-N-N-N"}, // ♭♭♭♭♭♭/♯♯♯♯♯♯ G♭/F♯ e♭/d♯
 	{"10101101010", ".-N-N.-N-N-N"}, // ♭♭♭♭♭/♯♯♯♯♯♯♯ D♭ b♭
 	{"10101101010", ".-N-N.b.-N-N"}, // ♭♭♭♭ A♭ f
@@ -28,8 +29,8 @@ static constexpr PitchClass pitchClasses[13] = {
     {"01011010101", "N+N+NN+N+N+."}  // ♯♯♯♯♯♯/♭♭♭♭♭♭ F♯/G♭ d♯/e♭
 };
 inline int keyStep(int fifths, int key) {
-	assert_(fifths >= -6 && fifths <= 6, fifths);
-	int h=key/12*7; for(int i: range(key%12)/*0-10*/) h+=pitchClasses[fifths+6].keyIntervals[i]-'0';
+    assert_(fifths >= -7 && fifths <= 6, fifths);
+    int h=key/12*7; for(int i: range(key%12)/*0-10*/) h+=pitchClasses[fifths+7].keyIntervals[i]-'0';
 	return h - 35; // 0 = C4;
 }
 
@@ -65,8 +66,8 @@ enum OctaveShift { Down, Up, OctaveStop };
 
 using Accidental = SMuFL::Accidental;
 inline int keyAlteration(int fifths, int key) {
-    assert_(fifths >= -6 && fifths <= 6 && key>0, fifths, key);
-	char c = pitchClasses[fifths+6].accidentals[key%12/*0-11*/];
+    assert_(fifths >= -7 && fifths <= 6 && key>0, fifths, key);
+    char c = pitchClasses[fifths+7].accidentals[key%12/*0-11*/];
 	if(c== 'b' || c=='-') return -1;
 	if(c=='N' || c=='.') return 0;
 	if(c=='#' || c=='+') return 1;
@@ -105,18 +106,18 @@ struct Note {
 	Accidental accidental;
     enum Tie { NoTie, TieStart, TieContinue, TieStop, Merged } tie;
 	uint durationCoefficientNum /* Tuplet duration */, durationCoefficientDen /* Tuplet note count */;
-	bool dot = false;
-	bool grace = false;
-	bool acciaccatura = false; // Before principal beat (slashed)
-	bool accent = false;
-	bool staccato = false;
-	bool tenuto = false;
-	bool trill = false;
-	int finger = 0;
+    bool dot;// = false;
+    bool grace;// = false;
+    bool acciaccatura;// = false; // Before principal beat (slashed)
+    bool accent;// = false;
+    bool staccato;// = false;
+    bool tenuto;// = false;
+    bool trill;// = false;
+    int finger;// = 0;
 	//bool stem:1; // 0: undefined, 1: down, 2: up
-    size_t pageIndex = invalid, measureIndex = invalid, glyphIndex = invalid, accidentalGlyphIndex = invalid;
-	int tieStartNoteIndex = 0; // Invalidated by any insertion/deletion
-    float accidentalOpacity = 1;
+    size_t pageIndex/* = invalid*/, measureIndex/* = invalid*/, glyphIndex/* = invalid*/, accidentalGlyphIndex/* = invalid*/;
+    int tieStartNoteIndex/* = 0*/; // Invalidated by any insertion/deletion
+    float accidentalOpacity/* = 1*/;
 
     uint key() const { return noteKey(clef.octave, step, alteration); }
 	uint duration() const { // in .16 beat units
@@ -198,7 +199,7 @@ inline String superDigit(int digit) {
 	assert_(abs(digit) <= 9); return (digit>0?""_:"⁻"_)+ref<string>{"⁰"_,"¹"_, "²"_, "³"_, "⁴"_, "⁵"_, "⁶"_, "⁷"_, "⁸"_, "⁹"_}[abs(digit)];
 }
 inline String strKey(int key) {
-	assert_(key>0); return (string[]){"A","A♯","B","C","C♯","D","D♯","E","F","F♯","G","G♯"}[(key+2*12+3)%12]+superDigit(key/12-2);
+    assert_(key>0); return (string[]){"A"_,"A♯"_,"B"_,"C"_,"C♯"_,"D"_,"D♯"_,"E"_,"F"_,"F♯"_,"G"_,"G♯"_}[(key+2*12+3)%12]+superDigit(key/12-2);
 }
 inline String strNote(int octave, int step, Accidental accidental) {
 	octave += /*lowest A-1*/3 + (step>0 ? step/7 : (step-6)/7); // Rounds towards negative

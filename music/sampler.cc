@@ -10,6 +10,8 @@
 #include <fftw3.h> //fftw3f
 #include <fftw3.h> //fftw3f_threads
 
+static Sampler* sampler; // DEBUG
+
 struct Audio : buffer<float2> { uint rate; Audio(buffer&& data, uint rate) : buffer(::move(data)), rate(rate){} };
 /// Decodes a full audio file
 Audio decodeAudio(const ref<byte>& data, uint duration=-1);
@@ -36,7 +38,6 @@ inline bool operator <(const  Sampler::Sample& a, const Sampler::Sample& b) { re
 
 struct Note {
 	default_move(Note);
-	//Note() {}
 	explicit Note(FLAC&& flac) : flac(move(flac)), readCount(this->flac.audioAvailable), writeCount(this->flac.audio.capacity-this->flac.audioAvailable) {}
 	FLAC flac;
 	v4sf level; //current note attenuation
@@ -111,14 +112,12 @@ static double level(ref<float> envelope, size_t start, size_t duration) {
 }
 
 Sampler::Sampler(uint outputRate, string path, Thread& thread) : Poll(0, POLLIN, thread) {
+    sampler = this; // DEBUG
 	registerPoll();
-    layers.clear();
-    samples.clear();
-    // parse sfz and map samples
+    // Parses sfz and map samples
 	TextData s = readFile(path);
 	Folder folder = section(path,'.',0,1); // Samples must be in a subfolder with the same name as the .sfz file
     Sample group, region; Sample* sample=&group;
-    //bool release=false;
     for(;;) {
         s.whileAny(" \n\r"_);
         if(!s) break;
@@ -148,7 +147,7 @@ Sampler::Sampler(uint outputRate, string path, Thread& thread) : Poll(0, POLLIN,
                 if(!rate) rate=sample->flac.rate;
 				else if(rate!=sample->flac.rate) error("Sample rate mismatch", rate,sample->flac.rate);
             }
-            else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1/*, release=true*/; else error("unknown trigger",value); }
+            else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1; else error("Unknown trigger",value); }
 			else if(key=="lovel"_) sample->lovel=parseInteger(value);
 			else if(key=="hivel"_) sample->hivel=parseInteger(value);
 			else if(key=="lokey"_) sample->lokey=isInteger(value)?parseInteger(value):noteToMIDI(value);
@@ -171,6 +170,7 @@ Sampler::Sampler(uint outputRate, string path, Thread& thread) : Poll(0, POLLIN,
 
     Folder("Envelope"_, folder, true);
     for(Sample& s: samples) {
+        //log(s.name);
         if(!existsFile(String("Envelope/"_+s.name+".env"_),folder)) {
             FLAC flac(s.data);
             array<float> envelope; uint size=0;
@@ -182,7 +182,7 @@ Sampler::Sampler(uint outputRate, string path, Thread& thread) : Poll(0, POLLIN,
                     size-=factor;
                 }
             }
-            log(s.name, envelope.size);
+            log(envelope.size);
             writeFile("Envelope/"_+s.name+".env"_,cast<byte>(envelope), folder, true);
         }
         s.envelope = cast<float>(readFile(String("Envelope/"_+s.name+".env"_),folder));
@@ -190,6 +190,7 @@ Sampler::Sampler(uint outputRate, string path, Thread& thread) : Poll(0, POLLIN,
         for(size_t t: reverse_range(s.envelope.size)) if(sqrt(s.envelope[t])>0x1p-16) { s.decayTime = t * factor; break; }
         //log(s.decayTime, s.flac.duration);
 
+        /*while(s.flac.audioAvailable+s.flac.blockSize < s.flac.audio.capacity)*/
         s.flac.decodeFrame(); // Decodes first frame of all samples to start mixing without latency
         s.data.lock(); // Locks compressed samples in memory
 
@@ -306,7 +307,7 @@ void Sampler::event() { // Decode thread event posted every period from Sampler:
     Locker lock(this->lock);
     // Cleanups silent notes
     for(Layer& layer: layers) layer.notes.filter([](const Note& note) {
-        return (note.flac.blockSize==0 && note.readCount<int(2*periodSize)); // || note.level[0]<0x1p-7 || note.flac.position > note.decayTime;
+        return (note.flac.blockSize==0 && note.readCount<int(2*periodSize)) || note.level[0]<0x1p-7 || note.flac.position > note.decayTime;
     });
     //lock.release(2);
 }
@@ -325,7 +326,7 @@ void Note::read(mref<float2> output) {
 	if(flac.blockSize==0 && readCount<output.size) { readCount.counter=0; return; } // End of stream
 	//assert_(readCount + writeCount == flac.audio.capacity, readCount, writeCount, flac.audio.capacity);
     if(!readCount.tryAcquire(output.size)) {
-		log("Decoder underrun", output.size, readCount.counter);
+        log("Decoder underrun", output.size, readCount.counter, flac.position, flac.duration, sampler->layers[0].notes.size);
 		readCount.acquire(output.size); // Ensures decoder follows
     }
 	uint beforeWrap = flac.audio.capacity - flac.readIndex;

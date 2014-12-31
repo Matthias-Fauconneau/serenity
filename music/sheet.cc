@@ -15,7 +15,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 	uint beamStart[staffCount] = {0,0};
 	uint beatTime[staffCount] = {0,0}; // Time after last commited chord in .16 quarters since last time signature change
 	uint staffTime[staffCount] = {0,0}; // Time after last commited chord in ticks
-	vec2 pedalStart = 0; // Last pedal start/change position
+    vec2 pedalStart = 0; size_t pedalStartSystemIndex=0; // Last pedal start/change position
 	Sign wedgeStart {.wedge={}}; // Current wedge
 	Sign octaveStart[staffCount] {{.octave=OctaveStop}, {.octave=OctaveStop}}; // Current octave shift (for each staff)
 	struct TieStart { int step; vec2 position; };
@@ -220,7 +220,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
         auto evaluateStepRanges = [&](size_t startIndex, size_t endIndex) {
             Clef lineClefs[staffCount] = {clefs[0], clefs[1]};
             Sign lineOctaveStart[staffCount] {octaveStart[0], octaveStart[1]};
-            Range stepRanges[staffCount] = {{7,-1},{-8,-7}};
+            Range stepRanges[staffCount] = {{7, 0}, {-8, -7}};
             for(size_t signIndex: range(startIndex, endIndex)) {
                 Sign sign = signs[signIndex];
                 uint staff = sign.staff;
@@ -333,12 +333,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 				for(const Sign& a: chord) if(a.note.tie == Note::NoTie || a.note.tie == Note::TieStart) return false;
 				return true;
 			};
-			auto isDichord = [](const Chord& chord) {
-				for(const Sign& a: chord) for(const Sign& b: chord) if(a.note.step != b.note.step && abs(a.note.step-b.note.step)<=1) return true;
-				return false;
-			};
-			auto stemX = [&](const Chord& chord, bool stemUp) {
-                return X(chord[0]) + (stemUp||isDichord(chord) ? noteSize(chord[0])-1 : 0);
+            auto stemX = [&](const Chord& chord, bool stemUp) {
+                return X(chord[0]) + (stemUp ? noteSize(chord[0])-1 : 0);
 			};
 
 			if(beam.size==1) { // Draws single stem
@@ -441,35 +437,60 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 
                 // -- Dichord shifts
 				buffer<bool> shift (chord.size); shift.clear();
-                int previousStep = chord[0].note.step;
-                for(size_t index: range(1, chord.size)) {
-                    const Sign& sign = chord[index];
-                    const Note& note = sign.note;
-                    if(note.step==previousStep+1) shift[index] = !shift[index-1];
-                    previousStep = note.step;
-				}
-				if(shift.contains(true)) {
-					for(size_t index: range(chord.size-1)) { // Alternate
-						if(shift[index] == shift[index+1] && abs(chord[index].note.step-chord[index+1].note.step)>2) shift[index] = !shift[index];
-					}
-					// Ensures no note head is dangling alone at the stem end
-					if(!stemUp && chord.size>1 && abs(chord[chord.size-1].note.step-chord[chord.size-1-1].note.step)>=2)
-						shift[chord.size-1] = shift[chord.size-1-1];
-					if(stemUp && chord.size>1 && abs(chord[0].note.step-chord[1].note.step)>=2)
-						shift[0] = shift[1];
-				}
+                // Alternates first starting from stem base, then again from stem end
+                if(stemUp) {
+                    {int previousStep = chord.last().note.step;
+                        for(size_t index: reverse_range(chord.size-1)) {
+                            const Sign& sign = chord[index];
+                            const Note& note = sign.note;
+                            if(abs(note.step-previousStep)<=1) shift[index] = !shift[index+1];
+                            previousStep = note.step;
+                        }}
+                    {int previousStep = chord[0].note.step;
+                        shift.first() = false;
+                        for(size_t index: range(1, chord.size)) {
+                            const Sign& sign = chord[index];
+                            const Note& note = sign.note;
+                            if(abs(note.step-previousStep)<=1) shift[index] = !shift[index-1];
+                            previousStep = note.step;
+                        }}
+                } else {
+                    {int previousStep = chord[0].note.step;
+                        for(size_t index: range(1, chord.size)) {
+                            const Sign& sign = chord[index];
+                            const Note& note = sign.note;
+                            if(abs(note.step-previousStep)<=1) shift[index] = !shift[index-1];
+                            previousStep = note.step;
+                        }}
+                    {int previousStep = chord.last().note.step;
+                        shift.last() = false;
+                        for(size_t index: reverse_range(chord.size-1)) {
+                            const Sign& sign = chord[index];
+                            const Note& note = sign.note;
+                            if(abs(note.step-previousStep)<=1) shift[index] = !shift[index+1];
+                            previousStep = note.step;
+                        }}
+                }
 
                 // -- Accidental shifts
-                buffer<bool> accidentalShift (chord.size); accidentalShift.clear();
+                buffer<int> accidentalShift (chord.size); accidentalShift.clear();
                 size_t previousAccidentalIndex = 0;
                 while(previousAccidentalIndex < chord.size && !chord[previousAccidentalIndex].note.accidental) previousAccidentalIndex++;
                 if(previousAccidentalIndex < chord.size) {
                     int previousAccidentalStep = chord[previousAccidentalIndex].note.step;
+                   {size_t index = previousAccidentalIndex;
+                        const Note& note = chord[index].note;
+                        if(!stemUp && ((index > 0            && shift[index-1] && abs(chord[index-1].note.step-note.step)<=1) ||
+                                       (index < chord.size-1 && shift[index+1] && abs(chord[index+1].note.step-note.step)<=1)))
+                            accidentalShift[index] = 2;}
                     for(size_t index: range(previousAccidentalIndex+1, chord.size)) {
                         const Sign& sign = chord[index];
                         const Note& note = sign.note;
                         if(note.accidental) {
                             if(note.step<=previousAccidentalStep+3) accidentalShift[index] = !accidentalShift[previousAccidentalIndex];
+                            if(!stemUp && ((index > 0            && shift[index-1] && abs(chord[index-1].note.step-note.step)<=1) ||
+                                           (index < chord.size-1 && shift[index+1] && abs(chord[index+1].note.step-note.step)<=1)))
+                                accidentalShift[index] = 2;
                             previousAccidentalStep = note.step;
                             previousAccidentalIndex = index;
                         }
@@ -480,7 +501,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
                     Sign& sign = chord[index];
 					assert_(sign.type==Sign::Note);
                     Note& note = sign.note;
-					const float x = X(sign) + (shift[index] ? noteSize(sign) : 0), y = Y(sign);
+                    const float x = X(sign) + (shift[index] ? (stemUp?1:-1)*noteSize(sign) : 0), y = Y(sign);
 					float opacity = (note.tie == Note::NoTie || note.tie == Note::TieStart) ? 1 : 1./2;
 
 					// Ledger
@@ -498,7 +519,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
                     // Accidental
                     if(note.accidental) {
                         {note.accidentalGlyphIndex = system.glyphs.size; // Records glyph index of accidental, i.e next glyph to be appended to system.glyphs :
-                            glyph(vec2(x - (accidentalShift[index] ? glyphSize(note.accidental, &smallFont).x : 0)
+                            glyph(vec2(X(sign) - accidentalShift[index] * glyphSize(note.accidental, &smallFont).x
                                        - glyphSize(note.accidental, &smallFont).x, y), note.accidental, note.accidentalOpacity, 6);
                         }
                     }
@@ -598,7 +619,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 				array<int> fingering;
 				for(const Sign& sign: chord) if(sign.note.finger) fingering.append( sign.note.finger );
 				if(fingering) {
-					assert_(fingering.size == 1); // TODO: correct order
+                    //assert_(fingering.size == 1); // TODO: correct order
 					float x = X(chord[0])+noteSize(chord[0])/2, y = baseY;
 					for(int finger: fingering.reverse()) { // Top to bottom
                         Font& font = textFont.font(textSize/2);
@@ -769,7 +790,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 				for(size_t staff: range(staffCount)) {
 					if(beatTime[staff] % beatDuration != 0) {
 						//log(withName(staff, beatTime[staff], beatDuration, sign.measure.measure));
-                        assert_(sign.measure.measure >= 1, sign.measure.measure); // FIXME
+                        //assert_(sign.measure.measure >= 1, sign.measure.measure); // FIXME
 						beatTime[staff] = 0;
 					}
 					assert_(beatTime[staff] % beatDuration == 0,
@@ -896,7 +917,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 				}
 				else if(sign.type == Sign::Dynamic) {
 					assert_(sign.dynamic!=-1);
-                    x += glyph(vec2(x, (staffY(0, measure[0].top) + staffY(1, measure[1].bottom))/2 + glyphSize(sign.dynamic).y/2 ), sign.dynamic);
+                    x += glyph(vec2(x, (max(staffY(1, measure[1].bottom-2), staffY(0, measure[0].top+5)) + staffY(1, measure[1].bottom-2))/2 + glyphSize(sign.dynamic).y/2 ), sign.dynamic);
 				} else if(sign.type == Sign::Wedge) {
 					float y = (staffY(1, -8)+staffY(0, 0))/2;
 					if(sign.wedge == WedgeStop) {
@@ -909,26 +930,28 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
                     //if(sign.pedal == Ped) glyph(vec2(x, y), SMuFL::Pedal::Mark);
 					if(sign.pedal == Start) {
 						pedalStart = vec2(x, y);// + glyphAdvance(SMuFL::Pedal::Mark);
-						system.lines.append(vec2(x-space/2, y), vec2(x, y+lineInterval));
+                        pedalStartSystemIndex = systems.size;
+                        system.lines.append(vec2(x-space/2, y), vec2(x, y+lineInterval));
 					}
 					if(sign.pedal == Change || sign.pedal == PedalStop) {
                         if(pedalStart) {
                             assert_(pedalStart);
-                            if(pedalStart.y == y) {
-                                if(x > pedalStart.x) system.lines.append(pedalStart+vec2(0, lineInterval), vec2(x, y+lineInterval));
-                            } else {
-                                if(systems) systems.last().lines.append(pedalStart+vec2(0, lineInterval), vec2(pageSize.x-margin, pedalStart.y+lineInterval));
-                                //else TODO: pedal line on previous page
+                            if(pedalStartSystemIndex != systems.size) {
                                 system.lines.append(vec2(margin, y+lineInterval), vec2(x, y+lineInterval));
+                            } else if(x > pedalStart.x) {
+                                assert(pedalStart.y == y);
+                                system.lines.append(pedalStart+vec2(0, lineInterval), vec2(x, y+lineInterval));
                             }
                         }
 						if(sign.pedal == PedalStop) {
 							system.lines.append(vec2(x, y), vec2(x, y+lineInterval));
 							pedalStart = 0;
+                            pedalStartSystemIndex = 0;
 						} else {
 							system.lines.append(vec2(x, y+lineInterval), vec2(x+space/2, y));
 							system.lines.append(vec2(x+space/2, y), vec2(x+space, y+lineInterval));
 							pedalStart = vec2(x+space, y);
+                            pedalStartSystemIndex = systems.size;
 						}
 					}
 				} else error(int(sign.type));
@@ -961,12 +984,12 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 						}
 
 						uint maximumBeamDuration = 2*quarterDuration;
-                        //assert_(timeSignature.beatUnit == 4 || timeSignature.beatUnit == 8, timeSignature.beatUnit);
-						//uint beatDuration = quarterDuration * 4 / timeSignature.beatUnit;
+                        assert_(timeSignature.beatUnit == 4 || timeSignature.beatUnit == 8, timeSignature.beatUnit);
+                        uint beatDuration = quarterDuration * 4 / timeSignature.beatUnit;
 
 						if(beamDuration+chordDuration > maximumBeamDuration /*Beam before too long*/
-								|| beam.size >= 5 /*Beam before too many*/
-								//|| (beatTime[staff]+chordDuration)%(2*beatDuration)==0 /*Beam before spanning*/
+                                || beam.size >= 8 /*Beam before too many*/
+                                || (beatTime[staff]/*+chordDuration*/)%(2*beatDuration)==0 /*Beam before spanning*/
 								|| beam[0][0].note.durationCoefficientDen != chord[0].note.durationCoefficientDen // Do not mix tuplet beams
 								//|| chord[0].time > beam[0][0].time + beamDuration*ticksPerQuarter/quarterDuration // Unmarked rest (completed by another staff)
 								) {
@@ -993,6 +1016,9 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 				}
 			}
 		}
+        if(pedalStart) { // Draw pressed pedal line until end of line
+            system.lines.append(pedalStart+vec2(0, lineInterval), vec2(pageSize.x-margin, pedalStart.y+lineInterval));
+        }
         lineCount++;
         system.bounds.min = vec2(0, staffY(1, max(highMargin, line[1].top)+7));
         system.bounds.max = vec2(pageSize.x, staffY(0, min(lowMargin, line[0].bottom)-7));

@@ -183,7 +183,7 @@ MusicXML::MusicXML(string document, string) {
                         }
                         if(e.contains("notations"_) && e("notations"_).contains("tuplet"_)) {
                             if(e("notations"_)("tuplet"_)["type"_]=="start") {
-                                assert_(!tuplet.size);
+                                //assert_(!tuplet.size);
                                 tuplet = {1,{time, {staff, step}, {staff, step}}, {time, {staff, step}, {staff, step}}, {staff, step}, {staff, step}};
                             }
                             if(e("notations"_)("tuplet"_)["type"_]=="stop") {
@@ -604,5 +604,4 @@ MusicXML::MusicXML(string document, string) {
 #endif
 
 	assert_(signs);
-    log(signs);
 }
