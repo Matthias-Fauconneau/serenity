@@ -121,7 +121,7 @@ MusicXML::MusicXML(string document, string) {
                             durationCoefficientNum = parseInteger(e("time-modification"_)("normal-notes").text());
                             durationCoefficientDen = parseInteger(e("time-modification"_)("actual-notes").text());
                             notationDuration = notationDuration * durationCoefficientNum / durationCoefficientDen;
-                            assert_(!e("time-modification"_).contains("normal-type"_) || e("time-modification"_)("normal-type"_).text() == e("type"_).text());
+                            //assert_(!e("time-modification"_).contains("normal-type"_) || e("time-modification"_)("normal-type"_).text() == e("type"_).text(), e);
                         }
                         duration -= min(duration, appoggiaturaTime); //FIXME
                         assert_(acciaccaturaTime <= duration, acciaccaturaTime, duration, appoggiaturaTime);
@@ -161,7 +161,9 @@ MusicXML::MusicXML(string document, string) {
                         int octaveStep = (step - step/7*7 + 7)%7; // signed step%7 (Step offset on octave scale)
                         assert_(xmlOctaveStep == octaveStep);
                         int xmlAlteration = e("pitch"_).contains("alter"_) ? parseDecimal(e("pitch"_)("alter"_).text()) : 0;
-                        assert_(xmlAlteration >= -1 && xmlAlteration <= 1, xmlAlteration);
+                        //if(xmlAlteration == 4) xmlAlteration = 2; // ?
+                        //if(xmlAlteration == 5) xmlAlteration = 3; // ?
+                        assert_(xmlAlteration >= -1 && xmlAlteration <= 5, xmlAlteration, e);
 
                         // Chord
                         if(time != lastChordTime) {
@@ -238,7 +240,8 @@ MusicXML::MusicXML(string document, string) {
                         int alteration = accidental ? accidentalAlteration(accidental): implicitAlteration;
                         if(xmlAlteration != alteration) {
                             //log("Alteration mismatch", alteration, xmlAlteration);
-                            assert_((xmlAlteration ==0 && (alteration==-1 || alteration==1)) || ((xmlAlteration==-1||xmlAlteration==1) && alteration==0), xmlAlteration, alteration);
+                            /*assert_((xmlAlteration ==0 && (alteration==-1 || alteration==1)) || ((xmlAlteration==-1||xmlAlteration==1) && alteration==0) ||
+                                    (xmlAlteration == 2 && (alteration==0 || alteration==1)) || ((xmlAlteration==3 && (alteration==0||alteration==1))), xmlAlteration, alteration);*/
                             accidental = alterationAccidental(xmlAlteration);
                             alteration = xmlAlteration;
                         }
@@ -564,6 +567,7 @@ MusicXML::MusicXML(string document, string) {
                 return (alteration == implicitAlteration(keySignature, measureAlterations, step)
                         && (!measureAlterations.contains(step) || sameAlterationCount[step] > 1) // Repeats measure alterations once
                         && alteration == previousMeasureAlterations.value(step, alteration)) // Courtesy accidental
+                        //&& TODO: courtesy accidentals for white to white key alteration (Cb, Fb, B#, E#)
                         ? Accidental::None :
                           alterationAccidental(alteration);
             };
@@ -587,10 +591,10 @@ MusicXML::MusicXML(string document, string) {
                     keySignature, sign.note, sign.note.clef.octave, sign.note.step, sign.note.alteration, key, step, alteration, noteKey(sign.note.clef.octave, step, alteration),
                     strNote(0, step, accidental), strKey(101), strKey(113));
 
-			if(//(accidental == sign.note.accidental) || // No operation
-					(accidental && !sign.note.accidental) || // Does not introduce additional accidentals (for ambiguous tones)
-					// Only changes an existing accidental to switch to key alteration direction
-                    (accidental && sign.note.accidental && (accidental < sign.note.accidental) != (keySignature < 0))) {
+            if((accidental && !sign.note.accidental) // Does not introduce additional accidentals (for ambiguous tones)
+                    || (accidental && sign.note.accidental  // Restricts changes to an existing accidental ...
+                        && (sign.note.accidental < accidental) == (keySignature < 0) // if already aligned with key alteration direction
+                        && sign.note.accidental < Accidental::DoubleSharp)) { // and if simple accidental (explicit complex accidentals)
                 if(previousMeasureAlterations.contains(sign.note.step)) previousMeasureAlterations.remove(sign.note.step); // Do not repeat courtesy accidentals
                 continue;
             }

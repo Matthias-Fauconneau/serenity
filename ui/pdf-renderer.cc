@@ -42,7 +42,7 @@ static Image trimWhite(const Image& image) {
 }
 
 static Variant parseVariant(TextData& s) {
-    s.whileAny(" \t\r\n");
+    s.whileAny(" \t\r\n"_);
     if("0123456789.-"_.contains(s.peek())) {
         string number = s.whileDecimal();
         if(s[0]==' '&&(s[1]>='0'&&s[1]<='9')&&s[2]==' '&&s[3]=='R') s.advance(4); //FIXME: regexp
@@ -69,7 +69,8 @@ static Variant parseVariant(TextData& s) {
         }
         dictionaryEnd: s.whileAny(" \t\r\n");
         Variant v = move(dict);
-        if(s.match("stream"_)) { s.whileAny(" \t\r\n");
+        if(s.match("stream"_)) {
+            s.whileAny(" \t\r\n"_);
             buffer<byte> stream = unsafeRef( s.until("endstream"_) );
             if(v.dict.contains("Filter"_)) {
                 string filter = v.dict.at("Filter"_).list?v.dict.at("Filter"_).list[0].data:v.dict.at("Filter"_).data;
@@ -129,7 +130,7 @@ static Variant parseVariant(TextData& s) {
     if(s.match("true"_)) return true;
     if(s.match("false"_)) return false;
     if(s.match("null")) return nullptr;
-    error("Unknown type"_);
+    error("Unknown type"_, escape(s.slice(s.index, 128)), hex(s.slice(s.index, 128)));
 }
 static Variant parseVariant(string buffer) { TextData s(buffer); return parseVariant(s); }
 static Dict toDict(const array<String>& xref, Variant&& object) { return object.dict ? move(object.dict) : parseVariant(xref[object.integer()]).dict; }
@@ -172,35 +173,39 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                 xref[i] = copyRef(object.data);
             } else { s.advance(1); continue; } // Wrong offset, advances until next cross reference //log("Wrong cross reference", escape(s.slice(s.index,128)));
             Dict& dict = object.dict;
-            if(dict.contains("Type"_) && dict.at("Type"_).data=="XRef"_) {  // Cross reference stream
+            if(dict.contains("Type"_) && dict.at("Type"_).data=="XRef"_) { // Cross reference stream
                 const array<Variant>& W = dict.at("W"_).list;
                 assert(W[0].integer()==1);
-                int w1 = W[1].integer(); assert(w1==2||w1==3,w1);
+                const int w1 = W[1].integer(); assert(w1==2||w1==3,w1);
                 assert(W[2].integer()==0 || W[2].integer()==1);
-                uint n=dict.at("Size"_).integer();
+                uint n = dict.at("Size"_).integer();
                 if(xref.size<n) xref.grow(n);
-                BinaryData b(object.data,true);
+                BinaryData b(object.data, true);
                 array<Variant> list;
                 if(dict.contains("Index"_)) list = move(dict.at("Index"_).list);
                 else list.append( Variant(0) ), list.append( Variant(dict.at("Size"_).integer()) );
                 for(uint l: range(list.size/2)) {
-                    for(uint i=list[l*2].integer(),n=list[l*2+1].integer();n>0;n--,i++) {
-                        uint8 type=b.read();
+                    for(uint i = list[l*2].integer(), n = list[l*2+1].integer(); n>0; n--, i++) {
+                        uint8 type = b.read();
                         if(type==0) { // Free objects
-                            uint16 unused offset = b.read();
-                            if(w1==3) offset = offset<<16|(uint8)b.read();
-                            uint8 unused g = b.read();
+                            uint unused offset = (uint16)b.read();
+                            if(w1==3) offset = (offset<<8) | (uint8)b.read();
+                            uint8 unused g = (uint8)b.read();
                         } else if(type==1) { // Uncompressed objects
-                            uint16 offset = b.read();
-                            if(w1==3) offset = offset<<16|(uint8)b.read();
-                            xref[i] = unsafeRef(s.slice(offset+(i<10?1:(i<100?2:i<1000?3:4))+6));
+                            uint offset = (uint16)b.read();
+                            if(w1==3) offset = (offset<<8) | (uint8)b.read();
                             b.advance(W[2].integer());
+                            TextData x (s.slice(offset));
+                            size_t unused index = x.integer(false);
+                            assert(index == i);
+                            x.skip(" 0 obj\r"_);
+                            xref[i] = unsafeRef(x.slice(x.index));
                         } else if(type==2) { // Compressed objects
-                            uint16 stream=b.read();
-                            if(w1==3) stream = stream<<16|(uint8)b.read();
-                            uint8 index=0; if(W[2].integer()) index=b.read();
-                            compressedXRefs.append( CompressedXRef{stream,index} );
-                        } else error("type",type);
+                            uint stream = (uint16)b.read();
+                            if(w1==3) stream = (stream<<8) | (uint8)b.read();
+                            uint8 index=0; if(W[2].integer()) index = (uint8)b.read();
+                            compressedXRefs.append( CompressedXRef{stream, index} );
+                        } else error(type);
                     }
                 }
             }

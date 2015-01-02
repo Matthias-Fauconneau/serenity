@@ -41,7 +41,7 @@ namespace SMuFL { //Standard Music Font Layout
 	namespace TimeSignature {  enum { _0=0xE080 }; }
 	enum { Dot=0xE1E7 };
 	namespace Flag { enum { Above=0xE240, Below }; }
-	enum Accidental { None=0, AccidentalBase=0xE260, Flat=AccidentalBase, Natural, Sharp, DoubleSharp, DoubleFlat };
+    enum Accidental { None=0, AccidentalBase=0xE260, Flat=AccidentalBase, Natural, Sharp, DoubleSharp, DoubleFlat, TripleSharp, TripleFlat, NaturalFlat, NaturalSharp, SharpSharp};
 	static constexpr string accidental[] = {"flat"_,"natural"_,"sharp"_,"double-sharp"_,"double-flat"_};
     namespace Articulation { enum { Base=0xE4A0, Accent=0, Staccato=1, Tenuto=2 }; }
 	enum Dynamic { DynamicBase=0xE520/*Piano=DynamicBase, Mezzo, Forte, Rinforzando, Sforzando, z, n, pppppp, ppppp, pppp, ppp, pp, mp, mf, pf, ff, fff, ffff, fffff, ffffff,
@@ -74,9 +74,15 @@ inline int keyAlteration(int fifths, int key) {
 	error(c);
 }
 inline Accidental alterationAccidental(int alteration) {
-	return ref<Accidental>{Accidental::Flat, Accidental::Natural, Accidental::Sharp}[alteration+1];
+    assert_(alteration >= -3 && alteration <= 5, alteration);
+    return ref<Accidental>{Accidental::TripleFlat, Accidental::DoubleFlat, Accidental::Flat, Accidental::Natural,
+                Accidental::Sharp, Accidental::DoubleSharp, Accidental::TripleSharp, Accidental::NaturalSharp, Accidental::SharpSharp}[alteration+3];
 }
-inline int accidentalAlteration(Accidental accidental) { return ref<int>{-1,0,1}[accidental - Accidental::AccidentalBase]; }
+inline int accidentalAlteration(Accidental accidental) {
+    size_t index = accidental - Accidental::AccidentalBase;
+    assert_(index < 10, index);
+    return ref<int>{-1,0,1,2,-2,3,-3,-4,4,5}[index];
+}
 
 // Converts note (octave, step, alteration) to MIDI key
 inline int noteKey(int octave, int step, int alteration) {

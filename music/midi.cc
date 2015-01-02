@@ -93,10 +93,10 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 						otherActive.insertAt(0, active.pop());
 						assert_(other[0]==otherActive[0]);
 					} else { // Bottom treble to top bass
-						other.append( current.take(0) );
-						otherActive.append( active.take(0/*sustain[staff]?*/) );
-						assert_(other.last()==otherActive.last());
-					}
+                        //assert_(current[0] == active[0], current, active, sustain[staff]);
+                        other.append( current.take(0) );
+                        otherActive.append( active.take( active.indexOf(other.last()) /*sustain[staff]?*/) );
+                    }
 				}
 			}
 			for(size_t staff: range(2)) commited[staff].append(::move(currents[staff]));  // Defers until duration is known (on note off)
@@ -126,7 +126,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 		uint8 type=track.type_channel>>4;
 		uint8 vel=0;
 		if(type == NoteOn) vel=s.read();
-		else if(type == NoteOff) { vel=s.read(); assert_(vel==0) ; }
+        else if(type == NoteOff) { vel=s.read(); /*assert_(vel==0, vel) ;*/ }
 		else if(/*type == Aftertouch ||*/ type == Controller/*TODO: pedal*/ /*|| type == PitchBend*/) s.advance(1);
 		else if(type == ProgramChange /*|| type == ChannelAftertouch*/) {}
 		else if(type == Meta) {
@@ -153,7 +153,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 					signs.insertSorted({Sign::KeySignature, track.time, .keySignature=keySignature});
 				}
 			}
-			else if(MIDI(key)==MIDI::TrackName || MIDI(key)==MIDI::Text || MIDI(key)==MIDI::Copyright) {}
+            else if(MIDI(key)==MIDI::TrackName || MIDI(key)==MIDI::InstrumentName || MIDI(key)==MIDI::Text || MIDI(key)==MIDI::Copyright) {}
 			else if(MIDI(key)==MIDI::EndOfTrack) {}
 			else error(hex(key));
 		}
@@ -174,27 +174,6 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 					int duration = note.time - noteOn.time;
 					if(duration) {
 						const int quarterDuration = 16*metronome.perMinute/60;
-						uint valueDuration = duration*quarterDuration/divisions;
-						if(!valueDuration) valueDuration = quarterDuration/2; //FIXME
-						assert_(valueDuration, duration, quarterDuration, divisions);
-						bool dot=false;
-						uint tuplet = 1;
-						if(valueDuration == 5 || valueDuration == 6) { // Triplet of quavers
-							tuplet = 3;
-							valueDuration = 8;
-						}
-						else if(valueDuration == 44) { // Dotted white
-							dot = true;
-							valueDuration = 32;
-						} 	else if(valueDuration == 60) { // Whole
-							valueDuration = 64;
-						} else if(valueDuration%3 == 0) { // Dot
-							dot = true;
-							valueDuration = valueDuration * 2 / 3;
-						}
-						assert_(isPowerOfTwo(valueDuration), duration, quarterDuration, divisions, duration*quarterDuration/divisions, valueDuration, strKey(key));
-						Value value = Value(ref<uint>(valueDurations).size-1-log2(valueDuration));
-						assert_(int(value) >= 0, duration, valueDuration);
 
 						if(noteOn.time > lastOff[staff]+quarterDuration/8) { // Rest
 							int duration = noteOn.time - lastOff[staff];
@@ -216,6 +195,44 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 								signs.insertSorted({Sign::Rest, lastOff[staff], {{staff, {{duration, .rest={value}}}}}});
 							}
 						}
+
+                        uint valueDuration = duration*quarterDuration/divisions;
+                        if(!valueDuration) valueDuration = quarterDuration/2; //FIXME
+                        assert_(valueDuration, duration, quarterDuration, divisions);
+                        bool dot=false;
+                        uint tuplet = 1;
+                        if(valueDuration >= 3 && valueDuration <= 4) valueDuration = 4; // Semiquaver (early release)
+                        else if(valueDuration >= 5 && valueDuration <= 6) { // Triplet of quavers
+                            tuplet = 3;
+                            valueDuration = 8;
+                        }
+                        else if(valueDuration >= 7 && valueDuration <= 8) valueDuration = 8; // Quaver (early release)
+                        else if(valueDuration >= 11 && valueDuration <= 12) { // Triplet of quarter
+                            tuplet = 3;
+                            valueDuration = 16;
+                        }
+                        else if(valueDuration >= 14 && valueDuration <= 16) valueDuration = 16; // Quarter (early release)
+                        else if(valueDuration >= 21 && valueDuration <= 24) { // Dotted quarter (early release)
+                            dot = true;
+                            valueDuration = 16;
+                        }
+                        else if(valueDuration >= 28 && valueDuration <= 32) valueDuration = 32; // Half (early release)
+                        else if(valueDuration == 36 && valueDuration <= 40) { // Half + Quaver
+                            // TODO: insert tied quaver before/after depending on beat
+                            valueDuration = 32; // FIXME: Only displays a white which is of an actual duration of a white and a quarter
+                        }
+                        else if(valueDuration >= 43 && valueDuration <= 48) { // Dotted white (early release)
+                            dot = true;
+                            valueDuration = 32;
+                        } 	else if(valueDuration >= 60 && valueDuration <= 64) { // Whole
+                            valueDuration = 64;
+                        } /*else if(valueDuration%3 == 0) { // Dot
+                            dot = true;
+                            valueDuration = valueDuration * 2 / 3;
+                        }*/ else error(duration, quarterDuration, divisions, duration*quarterDuration/divisions, valueDuration, strKey(key), dot);
+                        assert_(isPowerOfTwo(valueDuration), duration, quarterDuration, divisions, duration*quarterDuration/divisions, valueDuration, strKey(key), dot);
+                        Value value = Value(ref<uint>(valueDurations).size-1-log2(valueDuration));
+                        assert_(int(value) >= 0, duration, valueDuration);
 
 						signs.insertSorted(Sign{Sign::Note, noteOn.time, {{staff, {{duration, .note={
 																					.value = value,

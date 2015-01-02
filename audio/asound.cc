@@ -45,7 +45,6 @@ typedef IOWR<'A', 0x11,HWParams> HW_PARAMS;
 typedef IO<'A', 0x12> HW_FREE;
 typedef IOWR<'A', 0x13,SWParams> SW_PARAMS;
 typedef IO<'A', 0x40> PREPARE;
-typedef IO<'A', 0x41> RESET;
 typedef IO<'A', 0x42> START;
 typedef IO<'A', 0x43> DROP;
 typedef IO<'A', 0x44> DRAIN;
@@ -120,8 +119,11 @@ bool AudioOutput::start(uint rate, uint periodSize, uint sampleBits, uint channe
         control->availableMinimum = periodSize; // Minimum available space to trigger POLLOUT
     }
     registerPoll();
-    if(status->state < Prepared) io<PREPARE>();
-    event();
+    if(status->state < Prepared) {
+        assert_(status->state == Setup, status->state);
+        io<PREPARE>();
+    }
+    //event();
     return true;
 }
 
@@ -139,6 +141,10 @@ void AudioOutput::stop() {
 }
 
 void AudioOutput::event() {
+    if(status->state < Prepared) {
+        assert_(status->state == Setup, status->state);
+        io<PREPARE>();
+    }
     if(status->state == XRun) { io<PREPARE>(); underruns++; log("Underrun", underruns); }
 	int available = status->hwPointer + bufferSize - control->swPointer;
     if(available>=(int)periodSize) {
@@ -154,7 +160,11 @@ void AudioOutput::event() {
         control->swPointer += readSize;
 		if(readSize < periodSize) return;
     }
-    if(status->state < Running) io<START>();
+    if(status->state < Running) {
+        uint ready = control->swPointer - status->hwPointer;
+        assert_(status->state == Prepared && ready >= periodSize, status->state, ready, available);
+        io<START>();
+    }
 }
 
 /// Capture

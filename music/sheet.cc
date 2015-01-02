@@ -439,13 +439,15 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 				buffer<bool> shift (chord.size); shift.clear();
                 // Alternates first starting from stem base, then again from stem end
                 if(stemUp) {
-                    {int previousStep = chord.last().note.step;
+                    /*{int previousStep = chord.last().note.step;
                         for(size_t index: reverse_range(chord.size-1)) {
                             const Sign& sign = chord[index];
                             const Note& note = sign.note;
                             if(abs(note.step-previousStep)<=1) shift[index] = !shift[index+1];
                             previousStep = note.step;
-                        }}
+                        }}*/
+                    /*if(stemUp && chord.size>1 && abs(chord[0].note.step-chord[1].note.step)>=2)
+                        shift[0] = shift[1];*/
                     {int previousStep = chord[0].note.step;
                         shift.first() = false;
                         for(size_t index: range(1, chord.size)) {
@@ -455,13 +457,14 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
                             previousStep = note.step;
                         }}
                 } else {
-                    {int previousStep = chord[0].note.step;
+                    /*{int previousStep = chord[0].note.step;
                         for(size_t index: range(1, chord.size)) {
                             const Sign& sign = chord[index];
                             const Note& note = sign.note;
                             if(abs(note.step-previousStep)<=1) shift[index] = !shift[index-1];
                             previousStep = note.step;
-                        }}
+                        }}*/
+                    //if(shift.contains(true) && abs(chord[chord.size-1].note.step-chord[chord.size-1-1].note.step)>=2) shift[chord.size-1-1] = shift[chord.size-1];
                     {int previousStep = chord.last().note.step;
                         shift.last() = false;
                         for(size_t index: reverse_range(chord.size-1)) {
@@ -480,7 +483,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
                     int previousAccidentalStep = chord[previousAccidentalIndex].note.step;
                    {size_t index = previousAccidentalIndex;
                         const Note& note = chord[index].note;
-                        if(!stemUp && ((index > 0            && shift[index-1] && abs(chord[index-1].note.step-note.step)<=1) ||
+                        if(!stemUp && (shift[index] ||
+                                       (index > 0            && shift[index-1] && abs(chord[index-1].note.step-note.step)<=1) ||
                                        (index < chord.size-1 && shift[index+1] && abs(chord[index+1].note.step-note.step)<=1)))
                             accidentalShift[index] = 2;}
                     for(size_t index: range(previousAccidentalIndex+1, chord.size)) {
@@ -488,7 +492,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
                         const Note& note = sign.note;
                         if(note.accidental) {
                             if(note.step<=previousAccidentalStep+3) accidentalShift[index] = !accidentalShift[previousAccidentalIndex];
-                            if(!stemUp && ((index > 0            && shift[index-1] && abs(chord[index-1].note.step-note.step)<=1) ||
+                            if(!stemUp && (shift[index] ||
+                                           (index > 0            && shift[index-1] && abs(chord[index-1].note.step-note.step)<=1) ||
                                            (index < chord.size-1 && shift[index+1] && abs(chord[index+1].note.step-note.step)<=1)))
                                 accidentalShift[index] = 2;
                             previousAccidentalStep = note.step;
@@ -669,7 +674,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 							 float y = staffY(staff, clef.clefSign==GClef ? -6 : -2);
 							 ClefSign clefSign = clef.clefSign;
 							 if(clef.octave==1) clefSign = ClefSign(clefSign+SMuFL::Clef::_8va);
-							 else assert_(clef.octave==0);
+                             else if(clef.octave==-1) clefSign = ClefSign(clefSign+SMuFL::Clef::_8vb);
+                             else assert_(clef.octave==0, clef, clef.octave);
                              x += glyph(vec2(x, y), clefSign);
 							 x += space;
 						 }
@@ -984,7 +990,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 _pageSize, float _halfL
 						}
 
 						uint maximumBeamDuration = 2*quarterDuration;
-                        assert_(timeSignature.beatUnit == 4 || timeSignature.beatUnit == 8, timeSignature.beatUnit);
+                        assert_(timeSignature.beatUnit == 2 || timeSignature.beatUnit == 4 || timeSignature.beatUnit == 8, timeSignature.beatUnit);
                         uint beatDuration = quarterDuration * 4 / timeSignature.beatUnit;
 
 						if(beamDuration+chordDuration > maximumBeamDuration /*Beam before too long*/

@@ -5,6 +5,7 @@
 #include "asound.h"
 #include "pdf-renderer.h"
 #include "MusicXML.h"
+#include "midi.h"
 #include "sheet.h"
 #include "layout.h"
 #include "interface.h"
@@ -21,7 +22,7 @@ shared<Graphics> GraphicsWidget::graphics(vec2 unused size /*TODO: center*/) { r
 
 /// SFZ sampler and PDF renderer
 struct Music {
-    Folder folder {"Scores"_, home()};
+    const Folder& folder = currentWorkingDirectory();
     array<String> files = folder.list(Files|Sorted);
     String title;
 
@@ -38,6 +39,7 @@ struct Music {
     Window window {&pages->area(), 0};
 
     Music() {
+        window.actions[UpArrow] = {this, &Music::previousTitle};
         window.actions[DownArrow] = {this, &Music::nextTitle};
         window.actions[Return] = {this, &Music::nextTitle};
         window.actions[Key('1')] = [this]{ setInstrument("Maestro"); };
@@ -71,23 +73,39 @@ struct Music {
         decodeThread.spawn();
     }
     void setTitle(string title) {
-        if(endsWith(title,".pdf"_)||endsWith(title,".xml"_)) title=title.slice(0,title.size-4);
+        if(endsWith(title,".pdf"_)||endsWith(title,".xml"_)||endsWith(title,".mid"_)) title=title.slice(0,title.size-4);
         this->title = copyRef(title);
         buffer<Graphics> pages;
-        if(existsFile(title+".xml"_, folder)) {
+        /**/ if(existsFile(title+".xml"_, folder)) { // MusicXML
             MusicXML musicXML (readFile(title+".xml"_, folder));
             sheet = unique<Sheet>(musicXML.signs, musicXML.divisions, window.size);
             pages = move(sheet->pages);
-        } else {
+        }
+        else if(existsFile(title+".pdf"_, folder)) { // PDF
             pages = decodePDF(readFile(title+".pdf"_, folder), fonts);
         }
+        else if(existsFile(title+".mid"_, folder)) { // MIDI
+            MidiFile midi (readFile(title+".mid"_, folder));
+            sheet = unique<Sheet>(midi.signs, midi.divisions, window.size);
+            pages = move(sheet->pages);
+        }
+        else error(title);
         this->pages = unique<Scroll<HList<GraphicsWidget>>>( apply(pages, [](Graphics& o) { return GraphicsWidget(move(o)); }) );
         this->pages->horizontal = true;
         window.widget = window.focus = &this->pages->area();
         window.render();
         window.setTitle(title);
     }
+    void previousTitle() {
+        for(size_t index: range(1, files.size)) if(startsWith(files[index], title) && !startsWith(files[index-1], title)) {
+            setTitle(section(files[index-1],'.', 0, -2));
+            break;
+        }
+    }
     void nextTitle() {
-        for(size_t index: range(files.size-1)) if(startsWith(files[index], title) && !startsWith(files[index+1], title)) { setTitle(section(files[index+1],'.', 0, -2)); break; }
+        for(size_t index: range(files.size-1)) if(startsWith(files[index], title) && !startsWith(files[index+1], title)) {
+            setTitle(section(files[index+1],'.', 0, -2));
+            break;
+        }
     }
 } app;

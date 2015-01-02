@@ -197,7 +197,7 @@ struct Build {
         for(string flag: flags) args.append( "-D"+toUpper(flag)+"=1" );
 		if(!flags.contains("release")) args.append("-g"__);
 		if(!flags.contains("debug")) args.append("-O3"__);
-		else if(flags.contains("fast")) args.append("-O1"__); // fast-debug
+        else if(flags.contains("fast")) args.append("-Og"__); // fast-debug
 		if(flags.contains("profile")) args.append("-finstrument-functions"__);
 
         Folder(tmp, root(), true);
