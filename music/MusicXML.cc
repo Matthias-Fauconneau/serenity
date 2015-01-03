@@ -432,7 +432,7 @@ MusicXML::MusicXML(string document, string) {
 	}
 #endif
 
-#if 1
+#if 0
 	{ // Reorders clefs change to appear before elements on other staff to prevent unecessary clears
 		size_t staffIndex[staffCount] = {0, 0};
 		for(size_t signIndex : range(signs.size)) {
@@ -606,6 +606,18 @@ MusicXML::MusicXML(string document, string) {
 		}
 	}
 #endif
+
+#if 1
+    // Trims trailing rests
+    size_t lastNoteIndex = 0, lastMeasureIndex = 0;
+    for(size_t signIndex: range(signs.size)) {
+        Sign sign = signs[signIndex];
+        if(sign.type == Sign::Note) lastNoteIndex = signIndex;
+        if(sign.type == Sign::Measure && lastNoteIndex > lastMeasureIndex) lastMeasureIndex = signIndex;
+    }
+    signs.size = lastMeasureIndex+1; // Last measure with notes
+#endif
+
 
 	assert_(signs);
 }
