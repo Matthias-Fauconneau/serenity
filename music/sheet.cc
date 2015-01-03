@@ -836,8 +836,14 @@ void System::layoutNotes(uint staff) {
                 }*/
             }
             else { // Directions signs
-                //float& x = X(sign);
+                if(!timeTrack.contains(sign.time)) {
+                    size_t index = timeTrack.keys.linearSearch(sign.time);
+                    index = min(index, timeTrack.keys.size-1);
+                    assert_(index < timeTrack.keys.size);
+                    timeTrack.insert(sign.time, timeTrack.values[index]); // FIXME: interpolate
+                }
                 float x = timeTrack.at(sign.time);
+
                 if(sign.type == Sign::Metronome) {
                     if(ticksPerMinutes!=sign.metronome.perMinute*ticksPerQuarter) {
                         x += text(vec2(x, staffY(1, 12)), "♩="_+str(sign.metronome.perMinute)+" "_, textSize, system.glyphs).x;

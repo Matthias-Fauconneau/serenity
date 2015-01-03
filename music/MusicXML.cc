@@ -42,31 +42,31 @@ MusicXML::MusicXML(string document, string) {
 	}
 #endif
     int xmlStaffCount = 0;
-    {size_t partIndex = 0;
-        root.xpath("score-partwise/part"_, [&partIndex, &xmlStaffCount](const Element& p) {
+    root.xpath("score-partwise/part"_, [&xmlStaffCount](const Element& p) {
+            int partStaffCount = 0;
             for(const Element& m: p.children) {
                 for(const Element& e: m.children) {
-                    int xmlStaffIndex = e.contains("staff") ? parseInteger(e("staff"_).text())-1 : partIndex;
-                    xmlStaffCount = max(xmlStaffCount, xmlStaffIndex+1);
+                    int xmlStaffIndex = e.contains("staff") ? parseInteger(e("staff"_).text())-1 : 0;
+                    partStaffCount = max(partStaffCount, xmlStaffIndex+1);
                 }
             }
-            partIndex++;
-        });
-    }
+            xmlStaffCount += partStaffCount;
+    });
     assert_(xmlStaffCount >= 2 && xmlStaffCount <= 3);
 
     const size_t staffCount = 2;
     Clef clefs[staffCount] = {{GClef,0}, {GClef,0}};
 	Sign octaveStart[staffCount] {{.octave=OctaveStop}, {.octave=OctaveStop}}; // Current octave shift (for each staff)
     for(uint staff: range(staffCount)) signs.insertSorted({Sign::Clef, 0, {{staff, {.clef=clefs[staff]}}}}); // Defaults
-	size_t partIndex = 0;
-    root.xpath("score-partwise/part"_, [xmlStaffCount, this, &partIndex, &clefs, &octaveStart](const Element& p) {
+    size_t partIndex = 0, partFirstStaffIndex = 0;
+    root.xpath("score-partwise/part"_, [xmlStaffCount, this, &partIndex, &partFirstStaffIndex, &clefs, &octaveStart](const Element& p) {
         KeySignature keySignature = 0; TimeSignature timeSignature={4,4};
         uint measureTime = 0, time = 0, nextTime = 0, maxTime = 0;
         uint globalMeasureIndex=0, pageIndex=0, lineIndex=0, measureIndex=0; // starts with 1
         //size_t repeatIndex = invalid;
         array<int> activeTies;
         array<int> fingering;
+        int partStaffCount = 0;
         for(const Element& m: p.children) {
             measureTime = time;
             globalMeasureIndex++; measureIndex++;
@@ -152,7 +152,8 @@ MusicXML::MusicXML(string document, string) {
                     if(!e.contains("chord"_) && (!e.contains("grace"_) || e("grace"_)["slash"_]!="yes"_)) nextTime = time+duration;
                     if(e["print-object"_]=="no"_) continue;
                     //assert_(e.contains("staff"), e);
-                    int xmlStaffIndex = e.contains("staff") ? parseInteger(e("staff"_).text())-1 : partIndex;
+                    int xmlStaffIndex = partFirstStaffIndex + (e.contains("staff") ? parseInteger(e("staff"_).text())-1 : 0);
+                    partStaffCount = max(partStaffCount, xmlStaffIndex+1);
 #if 0
                     if(e.contains("voice")) {
                         uint voiceIndex = parseInteger(e("voice"_).text())-1;
@@ -168,6 +169,7 @@ MusicXML::MusicXML(string document, string) {
                         }
                     }
 #endif
+                    if(xmlStaffIndex < xmlStaffCount-2) continue; // Keeps only last two staves
                     uint staff = 1 - max(0, xmlStaffIndex-xmlStaffCount+2); // Merges first staves (i.e only split last staff), inverts staff order to bass,treble
                     assert_(staff < staffCount, staff);
                     assert_(int(value)>=0, e);
@@ -377,7 +379,8 @@ MusicXML::MusicXML(string document, string) {
                 else if(e.name=="attributes"_) {
                     if(e.contains("divisions"_)) divisions = parseInteger(e("divisions"_).text());
                     e.xpath("clef"_, [&](const Element& clef) {
-                        int xmlStaffIndex = clef["number"_] ? parseInteger(clef["number"_])-1 : partIndex;
+                        int xmlStaffIndex = partFirstStaffIndex + (clef["number"_] ? parseInteger(clef["number"_])-1 : 0);
+                        if(xmlStaffIndex < xmlStaffCount-2) return; // Keeps only last two staves
                         uint staff = 1 - max(0, xmlStaffIndex-xmlStaffCount+2); // Merges first staves (i.e only split last staff), inverts staff order to bass,treble
                         assert_(staff >= 0 && staff <= 1, staff, xmlStaffIndex, xmlStaffCount);
                         size_t index = "FG"_.indexOf(clef("sign"_).text()[0]);
@@ -434,6 +437,7 @@ MusicXML::MusicXML(string document, string) {
             if(partIndex == 0) insertSign({Sign::Measure, time, .measure={measureBreak, globalMeasureIndex, pageIndex, lineIndex, measureIndex}});
         }
         partIndex++;
+        partFirstStaffIndex += partStaffCount;
     });
 
 #if 0 // FIXME: update references (tuplet)
