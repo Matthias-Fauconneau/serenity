@@ -52,39 +52,39 @@ struct System : SheetContext {
     int noteCode(const Sign& sign) { return min(SMuFL::NoteHead::Whole+int(sign.note.value), int(SMuFL::NoteHead::Black)); };
     float noteSize(const Sign& sign) { return font.metrics(font.index(noteCode(sign))).advance; };
 
+    // Metrics
+    const float space = glyphSize(SMuFL::Accidental::Flat, &smallFont).x+glyphSize(SMuFL::NoteHead::Black).x; // Enough space for accidented dichords
+    const float spaceWidth; // Minimum space on pass 0, Space width for measure justification on pass 1
+
     // Page context
     const float pageWidth;
     size_t pageIndex, systemIndex;
     Graphics* previousSystem;
 
-    // Evaluates line break position, total fixed width and space count
+    // System context
     size_t lastMeasureBarIndex = -1;
     float allocatedLineWidth = 0;
     uint spaceCount = 0;
-    uint measureCount = 0;
     uint additionnalSpaceCount = 0;
     //bool pageBreak = false;
 
-    // Layout output
-    struct Range { int bottom, top; };
-    buffer<Range> line;
-    Graphics system;
-    map<uint, float>& measureBars;
-    struct TieStart { uint staff; int step; vec2 position; };
-    array<TieStart>* activeTies;
-    map<uint, array<Sign>>* notes;
-
+    // Measure context
     bool pendingWhole[staffCount] = {false, false};
-
     typedef array<Sign> Chord; // Signs belonging to a same chord (same time)
     array<Chord> tuplets[staffCount];
     uint beamStart[staffCount] = {0,0};
     array<Chord> beams[staffCount]; // Chords belonging to current beam (per staff) (also for correct single chord layout)
     Chord chords[staffCount]; // Current chord (per staff)
 
-    // Horizontal positioning
-    const float space = glyphSize(SMuFL::Accidental::Flat, &smallFont).x+glyphSize(SMuFL::NoteHead::Black).x;
-    const float spaceWidth; // Minimum space on pass 0, Space width for measure justification on pass 1
+    // Layout output
+    Graphics system;
+    map<uint, float>* measureBars;
+    struct TieStart { uint staff; int step; vec2 position; };
+    array<TieStart>* activeTies;
+    map<uint, array<Sign>>* notes;
+    struct Range { int bottom, top; };
+    const buffer<Range> line;
+
 
     struct Position { // Holds current pen position for each line
         float staffs[staffCount];
@@ -118,7 +118,8 @@ struct System : SheetContext {
     // Evaluates vertical bounds until next line break
     buffer<Range> evaluateStepRanges/*[clefs, octaveStart*/(ref<Sign> signs);
 
-    System(SheetContext context, float pageWidth, size_t pageIndex, size_t systemIndex, Graphics* previousSystem, ref<Sign> signs, map<uint, float>& measureBars, array<TieStart>* activeTies = 0, map<uint, array<Sign>>* notes=0, float spaceWidth=0);
+    System(SheetContext context, float pageWidth, size_t pageIndex, size_t systemIndex, Graphics* previousSystem, ref<Sign> signs,
+           map<uint, float>* measureBars = 0, array<TieStart>* activeTies = 0, map<uint, array<Sign>>* notes=0, float spaceWidth=0);
 };
 
 float& System::staffX(uint time, int type, uint staff) {
@@ -163,7 +164,7 @@ float System::glyph(vec2 origin, uint code, float opacity, float size, FontData*
 
 void System::ledger(Sign sign, float x) { // Ledger lines
     uint staff = sign.staff;
-    float ledgerLength = noteSize(sign)+min(noteSize(sign), spaceWidth/2);
+    float ledgerLength = 2*noteSize(sign);
     int step = clefStep(sign);
     float opacity = (sign.note.tie == Note::NoTie || sign.note.tie == Note::TieStart) ? 1 : 1./2;
     for(int s=2; s<=step; s+=2) {
@@ -323,30 +324,41 @@ void System::layoutNotes(uint staff) {
 
             // -- Accidental shifts
             buffer<int> accidentalShift (chord.size); accidentalShift.clear();
+            // Shifts accidental left when note is left from stem
+            for(size_t index: range(chord.size)) {
+                const Sign& sign = chord[index];
+                const Note& note = sign.note;
+                if(note.accidental && ((stemUp && !shift[index]) || (!stemUp && shift[index])) ) accidentalShift[index] = 1;
+            }
+            // Alternates accidentals shifts
             size_t previousAccidentalIndex = 0;
             while(previousAccidentalIndex < chord.size && !chord[previousAccidentalIndex].note.accidental) previousAccidentalIndex++;
             if(previousAccidentalIndex < chord.size) {
                 int previousAccidentalStep = chord[previousAccidentalIndex].note.step;
-                {size_t index = previousAccidentalIndex;
-                    const Note& note = chord[index].note;
-                    if(!stemUp && (shift[index] ||
-                                   (index > 0            && shift[index-1] && abs(chord[index-1].note.step-note.step)<=1) ||
-                                   (index < chord.size-1 && shift[index+1] && abs(chord[index+1].note.step-note.step)<=1)))
-                        accidentalShift[index] = 2;}
                 for(size_t index: range(previousAccidentalIndex+1, chord.size)) {
                     const Sign& sign = chord[index];
                     const Note& note = sign.note;
                     if(note.accidental) {
                         if(note.step<=previousAccidentalStep+3) accidentalShift[index] = !accidentalShift[previousAccidentalIndex];
-                        if(!stemUp && (shift[index] ||
-                                       (index > 0            && shift[index-1] && abs(chord[index-1].note.step-note.step)<=1) ||
-                                       (index < chord.size-1 && shift[index+1] && abs(chord[index+1].note.step-note.step)<=1)))
-                            accidentalShift[index] = 2;
                         previousAccidentalStep = note.step;
                         previousAccidentalIndex = index;
                     }
                 }
             }
+#if 0
+            // Shifts some more when a nearby note is dichord shifted
+            for(size_t index: range(chord.size)) {
+                const Sign& sign = chord[index];
+                const Note& note = sign.note;
+                if(note.accidental) {
+                    if( ((stemUp && !shift[index]) || (!stemUp && shift[index])) ||
+                            (index > 0            && abs(chord[index-1].note.step-note.step)<=1 && ((stemUp && !shift[index-1]) || (!stemUp && shift[index-1]))) ||
+                            (index < chord.size-1 && abs(chord[index+1].note.step-note.step)<=1 && ((stemUp && !shift[index+1]) || (!stemUp && shift[index+1])) )) {
+                        accidentalShift[index] = /*min(2,*/ accidentalShift[index]+1; //);
+                    }
+                }
+            }
+#endif
 
             for(size_t index: range(chord.size)) {
                 Sign& sign = chord[index];
@@ -439,7 +451,7 @@ void System::layoutNotes(uint staff) {
 
                 // Highlight
                 note.pageIndex = pageIndex;
-                note.measureIndex = measureBars.size();
+                if(measureBars) note.measureIndex = measureBars->size();
                 if(note.tie == Note::NoTie || note.tie == Note::TieStart) if(notes) notes->sorted(sign.time).append( sign );
             }
 
@@ -512,34 +524,33 @@ void System::layoutNotes(uint staff) {
     }
 
     // Layouts a system
-        System::System(SheetContext context, float pageWidth, size_t pageIndex, size_t systemIndex, Graphics* previousSystem, ref<Sign> signs, map<uint, float>& measureBars,
-                       array<TieStart>* activeTies, map<uint, array<Sign>>* notes, float spaceWidth)
-            : SheetContext(context), pageWidth(pageWidth), pageIndex(pageIndex), systemIndex(systemIndex), previousSystem(previousSystem),
-            measureBars(measureBars), activeTies(activeTies), notes(notes), spaceWidth(spaceWidth?:space) {
-        // Evaluates vertical bounds until next line break (FIXME: skip on width evaluation)
-        line = evaluateStepRanges(signs); // Current line bounds, placeholder before line break evaluation
+        System::System(SheetContext context, float pageWidth, size_t pageIndex, size_t systemIndex, Graphics* previousSystem, ref<Sign> signs,
+                       map<uint, float>* measureBars, array<TieStart>* activeTies, map<uint, array<Sign>>* notes, float spaceWidth)
+            : SheetContext(context), spaceWidth(spaceWidth?:space), pageWidth(pageWidth), pageIndex(pageIndex), systemIndex(systemIndex), previousSystem(previousSystem),
+            measureBars(measureBars), activeTies(activeTies), notes(notes), line(evaluateStepRanges(signs)) {
 
-        // Evaluates vertical bounds until next measure bar (full clear)
-        size_t nextMeasureIndex = 0;
-        while(nextMeasureIndex < signs.size && signs[nextMeasureIndex].type != Sign::Measure) nextMeasureIndex++;
-        buffer<Range> measure = evaluateStepRanges(signs.slice(0, nextMeasureIndex));
-
-        // Raster
+        // System Raster
         for(int staff: range(context.staffCount)) {
             for(int line: range(5)) {
                 float y = staffY(staff, -line*2);
                 system.lines.append(vec2(margin, y), vec2((pageWidth?pageWidth:allocatedLineWidth)-margin, y));
             }
         }
-        // System first measure bar line
+
+        // System first measure bar
         {float x = margin;
             vec2 min(x, staffY(1,0)), max(x, staffY(0,-8));
-            //system.fills.append(min, max-min);
             system.lines.append(min, max);
-            measureBars[signs[0].time] = x;
+            if(measureBars) measureBars->insert(signs[0].time, x);
+            x += spaceWidth;
+            additionnalSpaceCount++;
+            timeTrack.insert(signs[0].time, {{x,x},x,x,x,x});
         }
-        // Time track
-        {float x = margin + spaceWidth; timeTrack.insert(signs[0].time, {{x,x},x,x,x,x});}
+
+        // Evaluates vertical bounds until next measure bar (full clear)
+        size_t nextMeasureIndex = 0;
+        while(nextMeasureIndex < signs.size && signs[nextMeasureIndex].type != Sign::Measure) nextMeasureIndex++;
+        buffer<Range> measure = evaluateStepRanges(signs.slice(0, nextMeasureIndex));
 
         for(size_t signIndex: range(signs.size)) {
             Sign sign = signs[signIndex];
@@ -614,7 +625,6 @@ void System::layoutNotes(uint staff) {
                         assert_(note.tie != Note::Merged);
                         if(!note.grace) {
                             x += glyphAdvance(SMuFL::NoteHead::Black);
-                            x += spaceWidth;
                             for(Sign sign: chords[staff]) // Dichord
                                 if(abs(sign.note.step-note.step) <= 1) { x += glyphAdvance(SMuFL::NoteHead::Black); break; }
                             chords[staff].insertSorted(sign);
@@ -649,7 +659,6 @@ void System::layoutNotes(uint staff) {
                             else {
                                 vec2 p = vec2(x, staffY(staff, -4));
                                 x += glyph(p, SMuFL::Rest::Whole+int(sign.rest.value), 1./2, 6);
-                                x += spaceWidth;
                             }
                             uint beatDuration = quarterDuration * 4 / timeSignature.beatUnit;
                             uint measureLength = timeSignature.beats * beatDuration;
@@ -661,6 +670,7 @@ void System::layoutNotes(uint staff) {
                     }
                     else error(int(sign.type));
 
+                    x += spaceWidth;
                     // Updates end position for future signs
                     for(size_t index: range(timeTrack.size())) { // Updates positions of any interleaved notes
                         if(timeTrack.keys[index] > sign.time && timeTrack.keys[index] <= sign.time+sign.duration) {
@@ -707,31 +717,36 @@ void System::layoutNotes(uint staff) {
                         x += glyph(vec2(x, staffY(1, -6)), SMuFL::TimeSignature::_0+digit-'0');
                     }
                     maxX = startX+2*glyphAdvance(SMuFL::TimeSignature::_0);
+                    x += spaceWidth;
                     timeTrack.at(sign.time).setStaves(maxX); // Does not clear directions lines
                 } else { // Clears all lines (including direction lines)
                     if(sign.type == Sign::Measure) {
-                        if(x > pageWidth) return; // Includes measure break
+                        if(x > pageWidth) {
+                            if(!measureBars && !activeTies && !notes) {
+                                assert_(!measureBars && !activeTies && !notes, x, pageWidth, signIndex, signs.size, timeTrack.size(), additionnalSpaceCount,
+                                    pageWidth / timeTrack.size(), spaceWidth, space);
+                                break;
+                            }
+                        }
                         //if(pageSize && breakIndex>startIndex && sign.measure.lineBreak) break;
                         //if(sign.measure.lineBreak == Measure::PageBreak) pageBreak = true;
                         lastMeasureBarIndex = signIndex;
-                        x += space;
-                        allocatedLineWidth = x;
-                        spaceCount = timeTrack.size() + measureCount + additionnalSpaceCount;
-                        measureCount++;
+                        allocatedLineWidth = x + margin;
+                        spaceCount = timeTrack.size() + additionnalSpaceCount;
 
                         for(uint staff: range(staffCount)) layoutNotes(staff);
                         for(size_t staff: range(staffCount)) {
-                            if(pendingWhole[staff]) {
-                                vec2 p = vec2((measureBars.values.last()+x)/2, staffY(staff, -2));
+                            if(pendingWhole[staff]) if(measureBars) {
+                                vec2 p = vec2((measureBars->values.last()+x)/2, staffY(staff, -2));
                                 glyph(p, SMuFL::Rest::Whole, 1./2, 6);
                             }
                             pendingWhole[staff] = false;
                         }
 
+                        // Measure bar
                         system.lines.append(vec2(x, staffY(1,0)), vec2(x, staffY(0,-8)));
-
-                        measureBars.insert(sign.time, x);
-                        x += spaceWidth;
+                        if(signIndex == signs.size-1) break; // End of line, last measure bar
+                        if(measureBars) measureBars->insert(sign.time, x);
 
                         nextMeasureIndex++;
                         while(nextMeasureIndex < signs.size && signs[nextMeasureIndex].type != Sign::Measure) nextMeasureIndex++;
@@ -753,23 +768,26 @@ void System::layoutNotes(uint staff) {
                                 x += glyph(vec2(x, Y(1, {clefs[1].clefSign, 0}, step - (clefs[1].clefSign==FClef ? 14 : 0))), symbol);
                             }
                         }
-                        x += spaceWidth;
                         keySignature = sign.keySignature;
                     }
                     else if(sign.type==Sign::Repeat) {
-                        if(int(sign.repeat)>0) { // Ending
-                            float x = measureBars.values.last();
-                            text(vec2(x, staffY(1, max(0, line[1].top))), str(int(sign.repeat)), textSize, system.glyphs, vec2(0,1));
-                        } else {
-                            float dotX = (sign.repeat==Repeat::Begin ? measureBars.values.last()+spaceWidth/2 : x-spaceWidth/2)
-                                    - glyphSize(SMuFL::Dot).x/2;
-                            for(uint staff: range(staffCount)) {
-                                glyph(vec2(dotX, staffY(staff,-5)), SMuFL::Dot);
-                                glyph(vec2(dotX, staffY(staff,-3)), SMuFL::Dot);
+                        if(measureBars) {
+                            if(int(sign.repeat)>0) { // Ending
+                                float x = measureBars->values.last();
+                                text(vec2(x, staffY(1, max(0, line[1].top))), str(int(sign.repeat)), textSize, system.glyphs, vec2(0,1));
+                            } else {
+                                float dotX = (sign.repeat==Repeat::Begin ? measureBars->values.last()+spaceWidth/2 : x-spaceWidth/2)
+                                        - glyphSize(SMuFL::Dot).x/2;
+                                for(uint staff: range(staffCount)) {
+                                    glyph(vec2(dotX, staffY(staff,-5)), SMuFL::Dot);
+                                    glyph(vec2(dotX, staffY(staff,-3)), SMuFL::Dot);
+                                }
                             }
                         }
                     }
                     else error(int(sign.type));
+                    x += spaceWidth;
+                    additionnalSpaceCount++; // Measure, Key, Time, Repeat adds additional spaces at a single timeTrack point
                     timeTrack.at(sign.time).setAll(x);
                 }
             } else if(sign.type == Sign::Tuplet) {
@@ -960,10 +978,10 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
         size_t breakIndex;
         float spaceWidth;
         {// Evaluates next line break
-            System system(context, pageSize.x, pages.size, systems.size, systems ? &systems.last() : nullptr, signs.slice(startIndex), measureBars, 0, 0, 0);
-            breakIndex = system.lastMeasureBarIndex;
+            System system(context, pageSize.x, pages.size, systems.size, systems ? &systems.last() : nullptr, signs.slice(startIndex), 0, 0, 0, 0);
+            breakIndex = startIndex+system.lastMeasureBarIndex+1;
             assert_(startIndex < breakIndex && system.spaceCount, startIndex, breakIndex, system.spaceCount);
-            spaceWidth = system.space + (pageSize ? float(pageSize.x-2*context.margin - system.allocatedLineWidth)/float(system.spaceCount) : 0);
+            spaceWidth = system.space + (pageSize ? float(pageSize.x - system.allocatedLineWidth) / float(system.spaceCount) : 0);
         }
 
 		// Breaks page as needed
@@ -978,8 +996,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
         }
 
         // -- Layouts justified system
-        System system(context, pageSize.x, pages.size, systems.size, systems ? &systems.last() : nullptr, signs.slice(startIndex, breakIndex-startIndex), measureBars,
-                      &activeTies, &notes, spaceWidth);
+        System system(context, pageSize.x, pages.size, systems.size, systems ? &systems.last() : nullptr, signs.slice(startIndex, breakIndex-startIndex),
+                      &measureBars, &activeTies, &notes, spaceWidth);
         context = system; // Copies back context for next line
 
         lineCount++;
