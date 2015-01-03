@@ -65,23 +65,43 @@ MusicXML::MusicXML(string document, string) {
         uint measureTime = 0, time = 0, nextTime = 0, maxTime = 0;
         uint globalMeasureIndex=0, pageIndex=0, lineIndex=0, measureIndex=0; // starts with 1
         //size_t repeatIndex = invalid;
-        array<size_t> activeTies;
+        array<int> activeTies;
         array<int> fingering;
         for(const Element& m: p.children) {
-            auto insertSign = [this, &activeTies](Sign sign) {
-                size_t signIndex = signs.insertSorted(sign);
-                for(size_t& index: activeTies) if(signIndex <= index) index++;
-                return signIndex;
-            };
-
             measureTime = time;
             globalMeasureIndex++; measureIndex++;
             assert_(m.name=="measure"_, m);
             map<int, int> measureAlterations; // Currently altered steps (for implicit alterations)
             array<Sign> acciaccaturas; // Acciaccatura graces for pending principal
             int appoggiaturaTime = 0; // Appoggiatura time to remove from pending principal
-            uint lastChordTime=0; Step minStep, maxStep;
-            Tuplet tuplet {0,{},{},{},{}};
+            uint lastChordTime=0; int minStep = 0, maxStep = 0;
+            Tuplet tuplet {0, {0,0}, {0,0}, 0,0}; //{0,{},{},{},{}};
+
+            auto insertSign = [&](Sign sign) {
+                int signIndex = signs.insertSorted(sign);
+                for(int& index: activeTies) if(signIndex <= index) index++;
+                if(signIndex <= minStep) minStep++;
+                if(signIndex <= maxStep) maxStep++;
+                for(Sign& sign: signs) {
+                    if(sign.type == Sign::Tuplet) {
+                        Tuplet& tuplet = sign.tuplet;
+                        if(signIndex <= tuplet.first.min) tuplet.first.min++;
+                        if(signIndex <= tuplet.first.max) tuplet.first.max++;
+                        if(signIndex <= tuplet.last.min) tuplet.last.min++;
+                        if(signIndex <= tuplet.last.max) tuplet.last.max++;
+                        if(signIndex <= tuplet.min) tuplet.min++;
+                        if(signIndex <= tuplet.max) tuplet.max++;
+                    }
+                }
+                if(signIndex <= tuplet.first.min) tuplet.first.min++;
+                if(signIndex <= tuplet.first.max) tuplet.first.max++;
+                if(signIndex <= tuplet.last.min) tuplet.last.min++;
+                if(signIndex <= tuplet.last.max) tuplet.last.max++;
+                if(signIndex <= tuplet.min) tuplet.min++;
+                if(signIndex <= tuplet.max) tuplet.max++;
+                return signIndex;
+            };
+
             for(const Element& e: m.children) {
                 if(!(e.name=="note"_ && e.contains("chord"_))) time = nextTime; // Advances time (except chords)
                 maxTime = max(maxTime, time);
@@ -165,39 +185,6 @@ MusicXML::MusicXML(string document, string) {
                         //if(xmlAlteration == 5) xmlAlteration = 3; // ?
                         assert_(xmlAlteration >= -1 && xmlAlteration <= 5, xmlAlteration, e);
 
-                        // Chord
-                        if(time != lastChordTime) {
-                            lastChordTime = time;
-                            minStep=maxStep={staff, step};
-                            if(tuplet.size) tuplet.size++;
-                        }
-                        if(staff <= minStep.staff) minStep = {staff, min(minStep.step, step)};
-                        if(staff >= maxStep.staff) maxStep = {staff, max(maxStep.step, step)};
-
-                        // Tuplet
-                        if(tuplet.size) {
-                            if(time == tuplet.first.time) {
-                                if(staff <= tuplet.first.min.staff) tuplet.first.min = {staff, min(tuplet.first.min.step, step)};
-                                if(staff >= tuplet.first.max.staff) tuplet.first.max = {staff, max(tuplet.first.max.step, step)};
-                            }
-                            if(staff <= tuplet.min.staff) tuplet.min = {staff, min(tuplet.min.step, step)};
-                            if(staff >= tuplet.max.staff) tuplet.max = {staff, max(tuplet.max.step, step)};
-                        }
-                        if(e.contains("notations"_) && e("notations"_).contains("tuplet"_)) {
-                            if(e("notations"_)("tuplet"_)["type"_]=="start") {
-                                //assert_(!tuplet.size);
-                                tuplet = {1,{time, {staff, step}, {staff, step}}, {time, {staff, step}, {staff, step}}, {staff, step}, {staff, step}};
-                            }
-                            if(e("notations"_)("tuplet"_)["type"_]=="stop") {
-                                if(tuplet.size) {
-                                    assert_(tuplet.size);
-                                    tuplet.last = {time, minStep, maxStep};
-                                    insertSign({Sign::Tuplet, time, {.tuplet=tuplet}});
-                                    tuplet.size = 0;
-                                }
-                            }
-                        }
-
                         // Tie
                         Note::Tie tie = Note::NoTie;
                         auto tieLambda = [&](const Element& e){
@@ -278,8 +265,42 @@ MusicXML::MusicXML(string document, string) {
                             if(sign.note.acciaccatura) acciaccaturas.append( sign ); // FIXME: display after measure bar
                             else {
                                 if(sign.note.grace) appoggiaturaTime += duration; // Takes time away from principal (appoggiatura)
-                                size_t signIndex = insertSign( sign );
+                                int signIndex = insertSign( sign );
                                 if(tie == Note::TieStart) activeTies.append(signIndex);
+
+                                // Chord
+                                if(time != lastChordTime) {
+                                    lastChordTime = time;
+                                    minStep = maxStep = signIndex;
+                                    if(tuplet.size) tuplet.size++;
+                                }
+                                if(staff < signs[minStep].staff || (staff <= signs[minStep].staff && step < signs[minStep].note.step)) minStep = signIndex;
+                                if(staff > signs[maxStep].staff || (staff >= signs[maxStep].staff && step > signs[maxStep].note.step)) maxStep = signIndex;
+
+                                // Tuplet
+                                if(tuplet.size) {
+                                    if(time == signs[tuplet.first.min].time) {
+                                        if(staff < signs[tuplet.first.min].staff || (staff <= signs[tuplet.first.min].staff && step < signs[tuplet.first.min].note.step)) tuplet.first.min = signIndex;
+                                        if(staff > signs[tuplet.first.max].staff || (staff >= signs[tuplet.first.max].staff && step > signs[tuplet.first.max].note.step)) tuplet.first.max = signIndex;
+                                    }
+                                    if(staff < signs[tuplet.min].staff || (staff <= signs[tuplet.min].staff && step < signs[tuplet.min].note.step)) tuplet.min = signIndex;
+                                    if(staff > signs[tuplet.max].staff || (staff >= signs[tuplet.max].staff && step > signs[tuplet.max].note.step)) tuplet.max = signIndex;
+                                }
+                                if(e.contains("notations"_) && e("notations"_).contains("tuplet"_)) {
+                                    if(e("notations"_)("tuplet"_)["type"_]=="start") {
+                                        //assert_(!tuplet.size);
+                                        //tuplet = {1,{time, {staff, step}, {staff, step}}, {time, {staff, step}, {staff, step}}, {staff, step}, {staff, step}};
+                                        tuplet = {1, {signIndex, signIndex}, {signIndex, signIndex}, signIndex, signIndex};
+                                    }
+                                    if(e("notations"_)("tuplet"_)["type"_]=="stop") {
+                                        if(tuplet.size) {
+                                            assert_(tuplet.size);
+                                            tuplet.last = {minStep, maxStep};
+                                            insertSign({Sign::Tuplet, time, {.tuplet=tuplet}});
+                                            tuplet.size = 0;
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -415,7 +436,7 @@ MusicXML::MusicXML(string document, string) {
         partIndex++;
     });
 
-#if 1
+#if 0 // FIXME: update references (tuplet)
     // Removes unused clef change and dynamics
     for(size_t signIndex=0; signIndex < signs.size;) {
         Sign& sign = signs[signIndex];
@@ -453,7 +474,7 @@ MusicXML::MusicXML(string document, string) {
 	}
 #endif
 
-#if 1
+#if 0 // FIXME: update absolute references (tuplet)
 	{// Converts ties to longer notes (spanning beats and measures)
 	array<size_t> activeTies;
 	uint page=0, line=0, measure=0;
@@ -618,6 +639,22 @@ MusicXML::MusicXML(string document, string) {
     signs.size = lastMeasureIndex+1; // Last measure with notes
 #endif
 
+#if 1
+    // Converts absolute references to relative references
+    for(int signIndex: range(signs.size)) {
+        Sign& sign = signs[signIndex];
+        if(sign.type == Sign::Tuplet) {
+            Tuplet& tuplet = sign.tuplet;
+            tuplet.first.min = tuplet.first.min - signIndex;
+            tuplet.first.max = tuplet.first.max - signIndex;
+            tuplet.last.min = tuplet.last.min - signIndex;
+            tuplet.last.max = tuplet.last.max - signIndex;
+            tuplet.min = tuplet.min - signIndex;
+            tuplet.max = tuplet.max - signIndex;
+
+        }
+    }
+#endif
 
 	assert_(signs);
 }

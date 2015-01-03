@@ -111,19 +111,19 @@ struct Note {
 	int alteration;
 	Accidental accidental;
     enum Tie { NoTie, TieStart, TieContinue, TieStop, Merged } tie;
-	uint durationCoefficientNum /* Tuplet duration */, durationCoefficientDen /* Tuplet note count */;
-    bool dot;// = false;
-    bool grace;// = false;
-    bool acciaccatura;// = false; // Before principal beat (slashed)
-    bool accent;// = false;
-    bool staccato;// = false;
-    bool tenuto;// = false;
-    bool trill;// = false;
-    int finger;// = 0;
+    uint durationCoefficientNum = 0 /* Tuplet duration */, durationCoefficientDen = 0 /* Tuplet note count */;
+    bool dot = false;
+    bool grace = false;
+    bool acciaccatura = false; // Before principal beat (slashed)
+    bool accent = false;
+    bool staccato= false;
+    bool tenuto= false;
+    bool trill= false;
+    int finger = 0;
 	//bool stem:1; // 0: undefined, 1: down, 2: up
-    size_t pageIndex/* = invalid*/, measureIndex/* = invalid*/, glyphIndex/* = invalid*/, accidentalGlyphIndex/* = invalid*/;
-    int tieStartNoteIndex/* = 0*/; // Invalidated by any insertion/deletion
-    float accidentalOpacity/* = 1*/;
+    size_t pageIndex = invalid, measureIndex = invalid, glyphIndex = invalid, accidentalGlyphIndex = invalid;
+    int tieStartNoteIndex = 0; // Invalidated by any insertion/deletion
+    float accidentalOpacity = 1;
 
     uint key() const { return noteKey(clef.octave, step, alteration); }
 	uint duration() const { // in .16 beat units
@@ -146,7 +146,7 @@ typedef int KeySignature; // Index on the fifths circle
 struct TimeSignature { uint beats, beatUnit; };
 struct Metronome { Value beatUnit; uint perMinute; };
 struct Step { uint staff; int step; };
-struct Tuplet { uint size; struct { uint time; Step min, max; } first, last; Step min, max; };
+struct Tuplet { uint size; struct { /*uint time; Step min, max;*/ int min, max; } first, last; /*Step min, max;*/ int min, max; };
 using Dynamic = SMuFL::Dynamic;
 enum Wedge { Crescendo, Diminuendo, WedgeStop };
 enum Pedal { Start, Change, PedalStop, Ped };
