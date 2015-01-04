@@ -31,17 +31,17 @@ struct Player : Poll {
     unique<AudioFile> file = 0;
     AudioOutput audio {{this,&Player::read}};
     mref<short2> lastPeriod;
-    uint read(const mref<short2>& output) {
-        assert_(audio.rate == file->rate);
+    size_t read(mref<short2> output) {
+        assert_(audio.rate == file->audioFrameRate);
         uint readSize = 0;
         for(mref<short2> chunk=output;;) {
             if(!file) return readSize;
             assert(readSize<output.size);
-            if(audio.rate != file->rate) { queue(); return readSize; } // Returns partial period and schedule restart
-            size_t read = file->read(chunk);
+            if(audio.rate != file->audioFrameRate) { queue(); return readSize; } // Returns partial period and schedule restart
+            size_t read = file->read16(mcast<int16>(chunk));
             assert(read<=chunk.size, read);
             chunk = chunk.slice(read); readSize += read;
-            if(readSize == output.size) { update(file->position/file->rate,file->duration/file->rate); break; } // Complete chunk
+            if(readSize == output.size) { update(file->audioTime/file->audioFrameRate,file->duration/file->audioFrameRate); break; } // Complete chunk
             else next(); // End of file
         }
         if(!lastPeriod) for(uint i: range(output.size)) { // Fades in
@@ -66,7 +66,7 @@ struct Player : Poll {
     Scroll<List<Text>> titles;
     HBox main {{ &albums, &titles }};
 	VBox layout {{ &toolbar, &main }};
-	Window window {&layout, -int2(1050, 1680)/2, {}, pauseIcon()};
+    Window window {&layout, -int2(1050, 1680)/2, {}, true, pauseIcon()};
 
 // Content
     String device; // Device underlying folder
@@ -100,7 +100,7 @@ struct Player : Poll {
     void recordPosition() {
         assert_(titles.index<files.size && file);
         if(/*writableFile(".last", folder) &&*/ titles.index<files.size && file)
-			writeFile(".last",str(files[titles.index]+'\0'+str(file->position/file->rate)+(randomSequence?"\0random"_:""_)), folder, true);
+            writeFile(".last",str(files[titles.index]+'\0'+str(file->audioTime/file->audioFrameRate)+(randomSequence?"\0random"_:""_)), folder, true);
     }
     void setFolder(string path) {
         assert(folder.name() != path);
@@ -168,7 +168,7 @@ struct Player : Poll {
         if(titles.index+1<titles.count()) playTitle(titles.index+1);
         else if(albums.index+1<albums.count()) playAlbum(++albums.index);
         else if(albums.count()) playAlbum(albums.index=0);
-        else { setPlaying(false); if(file) file->close(); return; }
+        else { setPlaying(false); file = 0; return; }
         updatePlaylist();
     }
     void setRandom(bool random) {
@@ -209,7 +209,7 @@ struct Player : Poll {
         if(play) {
             assert_(file);
             if(!playButton.enabled) {
-				audio.start(file->rate, periodSize);
+                audio.start(file->audioFrameRate, periodSize, 16, 2);
                 window.setIcon(playIcon());
             }
         } else {
@@ -221,14 +221,14 @@ struct Player : Poll {
             lastPeriod=mref<short2>();
             if(audio) audio.stop();
             window.setIcon(pauseIcon());
-            file->seek(max(0, int(file->position-lastPeriod.size)));
+            file->seek(max(0, int(file->audioTime-lastPeriod.size)));
         }
         playButton.enabled=play;
         window.render();
         recordPosition();
     }
     void seek(int position) {
-        if(file) { file->seek(position*file->rate); update(file->position/file->rate,file->duration/file->rate); /*audio->cancel();*/ }
+        if(file) { file->seek(position*file->audioFrameRate); update(file->audioTime/file->audioFrameRate,file->duration/file->audioFrameRate); /*audio->cancel();*/ }
     }
     void update(uint position, uint duration) {
         if(slider.value == (int)position || position>duration) return;
@@ -237,14 +237,14 @@ struct Player : Poll {
                           16, 0, 1, 0, "DejaVuSans", true, 1, true, int2(64,32));
 		remaining = Text(String(str((duration-position)/60,2,'0')+':'+str((duration-position)%60,2,'0')),
                           16, 0, 1, 0, "DejaVuSans", true, 1, true, int2(64,32));
-        {Rect toolbarRect = layout.layout(window.size)[0];
+        {Rect toolbarRect = layout.layout(vec2(window.size))[0];
 			shared<Graphics> update;
 			update->graphics.insert(vec2(toolbarRect.origin()), toolbar.graphics(toolbarRect.size(), toolbarRect));
-			window.render(move(update), toolbarRect.origin(), toolbarRect.size());
+            window.render(move(update), int2(toolbarRect.origin()), int2(toolbarRect.size()));
         }
     }
     void event() override {
         if(audio) audio.stop();
-		if(file) audio.start(file->rate, periodSize);
+        if(file) audio.start(file->audioFrameRate, periodSize, 16, 2);
     }
 } application;

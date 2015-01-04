@@ -136,3 +136,4 @@ music/midi-input.cc
 
 music-video.cc
 music-practice.cc
+player.cc

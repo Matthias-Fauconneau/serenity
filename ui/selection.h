@@ -10,13 +10,13 @@ struct Selection : virtual Layout {
     /// Set active index and emit activeChanged
     void setActive(uint index);
 
-    bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) override;
+    bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) override;
     bool keyPress(Key key, Modifiers modifiers) override;
 };
 
 /// Displays a selection using a blue highlight
 struct HighlightSelection : virtual Selection {
-	shared<Graphics> graphics(int2 size, Rect clip) override;
+    shared<Graphics> graphics(vec2 size, Rect clip) override;
 };
 
 /// Array with Selection

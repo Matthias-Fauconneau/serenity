@@ -1,7 +1,7 @@
 #include "selection.h"
 
 // Selection
-bool Selection::mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
+bool Selection::mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) {
     array<Rect> widgets = layout(size);
     if(event==Press) focus=this;
     for(uint i: range(widgets.size)) {
@@ -26,7 +26,7 @@ void Selection::setActive(uint i) {
 }
 
 // HighlightSelection
-shared<Graphics> HighlightSelection::graphics(int2 size, Rect clip) {
+shared<Graphics> HighlightSelection::graphics(vec2 size, Rect clip) {
 	shared<Graphics> graphics;
 	graphics->graphics.insert(vec2(0), Selection::graphics(size, clip));
     if(index != invalid) {
