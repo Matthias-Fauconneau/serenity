@@ -46,13 +46,14 @@ MusicXML::MusicXML(string document, string) {
             int partStaffCount = 0;
             for(const Element& m: p.children) {
                 for(const Element& e: m.children) {
+                    if(e.name!="note"_ ) continue;
                     int xmlStaffIndex = e.contains("staff") ? parseInteger(e("staff"_).text())-1 : 0;
                     partStaffCount = max(partStaffCount, xmlStaffIndex+1);
                 }
             }
             xmlStaffCount += partStaffCount;
     });
-    assert_(xmlStaffCount >= 2 && xmlStaffCount <= 3);
+    assert_(xmlStaffCount >= 2 && xmlStaffCount <= 3, xmlStaffCount);
 
     const size_t staffCount = 2;
     Clef clefs[staffCount] = {{GClef,0}, {GClef,0}};
@@ -440,7 +441,24 @@ MusicXML::MusicXML(string document, string) {
         partFirstStaffIndex += partStaffCount;
     });
 
-#if 0 // FIXME: update references (tuplet)
+#if 1
+    // Converts absolute references to relative references
+    for(int signIndex: range(signs.size)) {
+        Sign& sign = signs[signIndex];
+        if(sign.type == Sign::Tuplet) {
+            Tuplet& tuplet = sign.tuplet;
+            tuplet.first.min = tuplet.first.min - signIndex;
+            tuplet.first.max = tuplet.first.max - signIndex;
+            tuplet.last.min = tuplet.last.min - signIndex;
+            tuplet.last.max = tuplet.last.max - signIndex;
+            tuplet.min = tuplet.min - signIndex;
+            tuplet.max = tuplet.max - signIndex;
+
+        }
+    }
+#endif
+
+#if 1 // FIXME: update references (tuplet)
     // Removes unused clef change and dynamics
     for(size_t signIndex=0; signIndex < signs.size;) {
         Sign& sign = signs[signIndex];
@@ -641,23 +659,6 @@ MusicXML::MusicXML(string document, string) {
         if(sign.type == Sign::Measure && lastNoteIndex > lastMeasureIndex) lastMeasureIndex = signIndex;
     }
     signs.size = lastMeasureIndex+1; // Last measure with notes
-#endif
-
-#if 1
-    // Converts absolute references to relative references
-    for(int signIndex: range(signs.size)) {
-        Sign& sign = signs[signIndex];
-        if(sign.type == Sign::Tuplet) {
-            Tuplet& tuplet = sign.tuplet;
-            tuplet.first.min = tuplet.first.min - signIndex;
-            tuplet.first.max = tuplet.first.max - signIndex;
-            tuplet.last.min = tuplet.last.min - signIndex;
-            tuplet.last.max = tuplet.last.max - signIndex;
-            tuplet.min = tuplet.min - signIndex;
-            tuplet.max = tuplet.max - signIndex;
-
-        }
-    }
 #endif
 
 	assert_(signs);

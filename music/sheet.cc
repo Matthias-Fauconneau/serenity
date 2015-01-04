@@ -586,6 +586,7 @@ void System::layoutNotes(uint staff) {
                 uint staff = sign.staff;
                 assert_(staff < staffCount, sign);
                 //nextStaffTime(staff, sign.time);
+                if(!timeTrack.contains(sign.time)) timeTrack.insert(sign.time, timeTrack.values[min(timeTrack.keys.linearSearch(sign.time), timeTrack.keys.size-1)]);
                 float x = timeTrack.at(sign.time); // + timeTrack.values.last()) / 2; // FIXME: proportionnal to time
 
                 if(sign.type == Sign::Clef || sign.type == Sign::OctaveShift) {
@@ -612,7 +613,9 @@ void System::layoutNotes(uint staff) {
                             if(octaveStart[staff].octave == Down) clefs[staff].octave--;
                             if(octaveStart[staff].octave == Up) clefs[staff].octave++;
                             //assert_(clefs[staff].octave == 0, staff, clefs[staff].octave, pages.size, systems.size, int(sign.octave));
-                            float start = timeTrack.at(octaveStart[staff].time) + space * 2;
+                            //if(!timeTrack.contains(sign.time)) timeTrack.insert(sign.time, timeTrack.values[min(timeTrack.keys.linearSearch(sign.time), timeTrack.keys.size-1)]);
+                            float x = octaveStart[staff].time < timeTrack.keys.first() ? 0 /*TODO: wrap*/: timeTrack.at(octaveStart[staff].time);
+                            float start = x + space * 2;
                             float end = x;
                             for(float x=start; x<=end-space; x+=space*2) {
                                 system.lines.append(vec2(x, y), vec2(x+space, y));
@@ -699,8 +702,8 @@ void System::layoutNotes(uint staff) {
                     float x = timeTrack.values.last().maximum();
                     timeTrack.insert(sign.time, {{x,x},x,x,x,x,x});
                 }*/
-                assert_(timeTrack.contains(sign.time), int(sign.type));
-                float x = timeTrack.at(sign.time);//.maximum();
+                //assert_(timeTrack.contains(sign.time), int(sign.type), sign.time, timeTrack.keys);
+                float x = timeTrack.values.last(); //timeTrack.at(sign.time);//.maximum();
 
                 uint beatDuration = quarterDuration * 4 / timeSignature.beatUnit;
                 for(size_t staff: range(staffCount)) {
@@ -813,7 +816,8 @@ void System::layoutNotes(uint staff) {
                     //timeTrack.at(sign.time).setAll(x);
                     // Sets all positions
                     for(float& X: staffs) X = x;
-                    timeTrack.at(sign.time) = x;
+                    //timeTrack.at(sign.time) = x;
+                    timeTrack[sign.time] = x;
                 }
             } else if(sign.type == Sign::Tuplet) {
                 const Tuplet tuplet = sign.tuplet;
@@ -830,18 +834,13 @@ void System::layoutNotes(uint staff) {
                 float dy = (above ? -1 : 1) * beamWidth;
                 float y = stemY+dy;
                 vec2 unused size = text(vec2(x,y), str(tuplet.size), textSize/2, system.glyphs, vec2(1./2, above ? 1 : 0));
-                /*if(uint(tuplet.last.time - tuplet.first.time) > ticksPerQuarter) { // No beam ? draw lines
+                if(uint(signs[signIndex+tuplet.last.min].time - signs[signIndex+tuplet.first.min].time) > ticksPerQuarter) { // No beam ? draw lines
                     system.lines.append(vec2(x0, y0+dy), vec2(x-size.x, y0+((x-size.x)-x0)/(x1-x0)*(y1-y0)+dy), black);
                     system.lines.append(vec2(x+size.x, y0+((x+size.x)-x0)/(x1-x0)*(y1-y0)+dy), vec2(x1, y1+dy), black);
-                }*/
+                }
             }
             else { // Directions signs
-                if(!timeTrack.contains(sign.time)) {
-                    size_t index = timeTrack.keys.linearSearch(sign.time);
-                    index = min(index, timeTrack.keys.size-1);
-                    assert_(index < timeTrack.keys.size);
-                    timeTrack.insert(sign.time, timeTrack.values[index]); // FIXME: interpolate
-                }
+                if(!timeTrack.contains(sign.time)) timeTrack.insert(sign.time, timeTrack.values[min(timeTrack.keys.linearSearch(sign.time), timeTrack.keys.size-1)]);
                 float x = timeTrack.at(sign.time);
 
                 if(sign.type == Sign::Metronome) {
@@ -923,10 +922,12 @@ void System::layoutNotes(uint staff) {
                         uint maximumBeamDuration = 2*quarterDuration;
                         assert_(timeSignature.beatUnit == 2 || timeSignature.beatUnit == 4 || timeSignature.beatUnit == 8, timeSignature.beatUnit);
                         uint beatDuration = quarterDuration * 4 / timeSignature.beatUnit;
+                        //if(timeSignature.beats == 4 && timeSignature.beatUnit == 4) beatDuration *= 2; // FIXME: not always
+
 
                         if(beamDuration+chordDuration > maximumBeamDuration /*Beam before too long*/
                                 || beam.size >= 8 /*Beam before too many*/
-                                || beatTime[staff]%(2*beatDuration)==0 /*Beam before spanning*/
+                                || beatTime[staff]%beatDuration==0 /*Beam before spanning*/
                                 //|| beam[0][0].note.durationCoefficientDen != chord[0].note.durationCoefficientDen // Do not mix tuplet beams
                                 || (beam[0][0].note.durationCoefficientDen>1 && beam.size == beam[0][0].note.durationCoefficientDen) // Full tuplet beams
                                 ) {

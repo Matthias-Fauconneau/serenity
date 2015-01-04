@@ -354,27 +354,31 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                     if(bounds.max.x < box.min.x) continue; // Clips
                     page.bounds.extend(bounds.min);
                     page.bounds.extend(bounds.max);
-                    if(flags&Fill) {
-                        if(path.size == 4 /*&& path[1]==path[2] && path[2]==path[3]*/) page.lines.append(path[0], path[3]);
-                        else {
+                    if(path.size == 4 /*&& path[1]==path[2] && path[2]==path[3]*/) {
+                        bool fuzzy = false; // Finale? seems to export files with thick lines emulated by repeated thin lines O_o
+                        for(auto& o : page.lines) if(sq(path[0]-o.a) < 1 && sq(path[3]-o.b) < 1) fuzzy=true;
+                        if(fuzzy) continue;
+                        page.lines.append(path[0], path[3]);
+                    } else {
+                        if(flags&Fill) {
                             if(!(flags&Close)) path = path.slice(0, path.size-1);
                             page.cubics.append( copyRef(path) );
                         }
-                    }
-                    else if(flags&Stroke) {
-                        array<vec2> polyline;
-                        if(path.size>=4) for(uint i=0; i<path.size-3; i+=3) {
-                            if(path[i+1] == path[i+2] && path[i+2] == path[i+3]) polyline.append( copy(path[i]) );
-                        }
-                        polyline.append( copy(path.last()) );
+                        else if(flags&Stroke) {
+                            array<vec2> polyline;
+                            if(path.size>=4) for(uint i=0; i<path.size-3; i+=3) {
+                                if(path[i+1] == path[i+2] && path[i+2] == path[i+3]) polyline.append( copy(path[i]) );
+                            }
+                            polyline.append( copy(path.last()) );
 
-                        array<Line> lines;
-                        for(size_t i: range(polyline.size-1)) {
-                            if(polyline[i] != polyline[i+1])
-                                lines.append( Line{ polyline[i], polyline[i+1] } );
+                            array<Line> lines;
+                            for(size_t i: range(polyline.size-1)) {
+                                if(polyline[i] != polyline[i+1])
+                                    lines.append( Line{ polyline[i], polyline[i+1] } );
+                            }
+                            if(flags&Close) lines.append(polyline.last(), polyline.first());
+                            page.lines.append( lines );
                         }
-                        if(flags&Close) lines.append(polyline.last(), polyline.first());
-                        page.lines.append( lines );
                     }
                 }
                 paths.clear();

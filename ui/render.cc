@@ -79,6 +79,7 @@ static void blend(const Image& target, uint x, uint y, bgr3f color, float opacit
 
 void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity) {
     assert_(bgr3f(0) <= color && color <= bgr3f(1));
+    p1 = round(p1), p2 = round(p2); // Hint
 
     float dx = p2.x - p1.x, dy = p2.y - p1.y;
     bool transpose=false;
