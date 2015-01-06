@@ -92,33 +92,13 @@ struct System : SheetContext {
     struct Range { int bottom, top; };
     const buffer<Range> line;
 
-
-    //struct Position { // Holds current pen position for each line
-        float staffs[staffCount] = {margin, margin};
-        //float staff; // Note
-        //float middle; // Dynamic, Wedge
-        //float metronome; // Metronome
-        //float octave; // OctaveShift
-        //float bottom; // Pedal
-        // Maximum position
-        //float maximum() { return max(max(max(staffs), staff), max(middle, max(max(metronome, octave), bottom))); }
-        // Synchronizes staff positions to \a x
-        //void setStaves(float x) { staff=x; for(float& staffX: staffs) staffX = max(staffX, x); }
-        // Synchronizes all positions to \a x
-        /*void setAll(float x) {
-            setStaves(x);
-            middle = x; metronome = x; octave = x; bottom = x;
-        }
-    };*/
+    // Holds current pen position for each line
+    float staffs[staffCount] = {margin, margin};
     map<uint, float> timeTrack; // Maps time to horizontal position
-
-    //float& staffX(uint time, int type, uint staff);
-    //float& X(const Sign& sign) { return staffX(sign.time, sign.type, sign.staff); };
-    //vec2 P(const Sign& sign) { return vec2(X(sign), Y(sign)); };
 
     // -- Layout output
     float glyph(vec2 origin, uint code, float opacity=1, float size=8, FontData* font=0);
-    void ledger(Sign sign, float x);
+    void ledger(Sign sign, float x, float ledgerHalfLength=0);
     void layoutNotes(uint staff);
 
     // Evaluates vertical bounds until next line break
@@ -138,18 +118,18 @@ float System::glyph(vec2 origin, uint code, float opacity, float size, FontData*
     return font->font(size).metrics(index).advance;
 }
 
-void System::ledger(Sign sign, float x) { // Ledger lines
+void System::ledger(Sign sign, float x, float ledgerHalfLength) { // Ledger lines
     uint staff = sign.staff;
-    float ledgerLength = 2*noteSize(sign);
+    if(!ledgerHalfLength) ledgerHalfLength = noteSize(sign);
     int step = clefStep(sign);
     float opacity = (sign.note.tie == Note::NoTie || sign.note.tie == Note::TieStart) ? 1 : 1./2;
     for(int s=2; s<=step; s+=2) {
         float y = staffY(staff, s);
-        system.lines.append(vec2(x+noteSize(sign)/2-ledgerLength/2,y),vec2(x+noteSize(sign)/2+ledgerLength/2,y), black, opacity);
+        system.lines.append(vec2(x+noteSize(sign)/2-ledgerHalfLength,y),vec2(x+noteSize(sign)/2+ledgerHalfLength,y), black, opacity);
     }
     for(int s=-10; s>=step; s-=2) {
         float y = staffY(staff, s);
-        system.lines.append(vec2(x+noteSize(sign)/2-ledgerLength/2,y),vec2(x+noteSize(sign)/2+ledgerLength/2,y), black, opacity);
+        system.lines.append(vec2(x+noteSize(sign)/2-ledgerHalfLength,y),vec2(x+noteSize(sign)/2+ledgerHalfLength,y), black, opacity);
     }
 };
 
@@ -631,22 +611,22 @@ void System::layoutNotes(uint staff) {
                                 if(abs(sign.note.step-note.step) <= 1) { x += glyphAdvance(SMuFL::NoteHead::Black); break; }*/
                             chords[staff].insertSorted(sign);
                         } else { // Grace  note
-                            log("FIXME: render grace");
-                            /*
-                            const float x = X(sign) - noteSize.x - glyphSize("flags.u3"_, &smallFont).x, y = Y(sign);
+                            float dx = glyphSize(SMuFL::NoteHead::Black, &smallFont).x;
+                            float gx = x - dx - glyphAdvance(SMuFL::Flag::Above, &smallFont), y = Y(sign);
 
-                            doLedger(sign);
+                            ledger(sign, gx, dx);
                             // Body
-                            note.glyphIndex = system.glyphs.size;
-                            glyph(vec2(x, y), noteCode, note.grace?smallFont:font, system.glyphs);
+                            {note.glyphIndex = system.glyphs.size;
+                                glyph(vec2(x, y), SMuFL::NoteHead::Black, 1, 6);}
                             assert_(!note.accidental);
                             // Stem
-                            float stemX = x+noteSize.x-1./2;
-                            system.lines.append(vec2(stemX, y-shortStemLength), vec2(stemX, y-1./2));
+                            float stemX = x + dx; //-1./2;
+                            system.lines.append(vec2(stemX, y-shortStemLength), vec2(stemX, y)); //-1./2
                             // Flag
-                            glyph(vec2(stemX, y-shortStemLength), "flags.u3"_, smallFont, system.glyphs);
+                            glyph(vec2(stemX, y-shortStemLength), SMuFL::Flag::Above, 6);
                             // Slash
-                            float slashY = y-shortStemLength/2;
+                            assert_(!note.acciaccatura);
+                            /*float slashY = y-shortStemLength/2;
                             if(note.slash) FIXME Use SMuFL combining slash
                                         vec2(stemX +lineInterval/2, slashY -lineInterval/2),
                                         vec2(stemX -lineInterval/2, slashY +lineInterval/2));*/
