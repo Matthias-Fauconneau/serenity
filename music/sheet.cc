@@ -82,6 +82,7 @@ struct System : SheetContext {
     array<Chord> beams[staffCount]; // Chords belonging to current beam (per staff) (also for correct single chord layout)
     Chord chords[staffCount]; // Current chord (per staff)
     array<Sign> pendingClefChange; // Pending clef change to layout right before measure bar
+    array<Chord> tremolo;
 
     // Layout output
     Graphics system;
@@ -96,13 +97,14 @@ struct System : SheetContext {
     float staffs[staffCount] = {margin, margin};
     map<uint, float> timeTrack; // Maps time to horizontal position
 
-    // -- Layout output
+    // -- Layout helpers
     float glyph(vec2 origin, uint code, float opacity=1, float size=8, FontData* font=0);
     void ledger(Sign sign, float x, float ledgerHalfLength=0);
+    float stemX(const Chord& chord, bool stemUp);
     void layoutNotes(uint staff);
 
     // Evaluates vertical bounds until next line break
-    buffer<Range> evaluateStepRanges/*[clefs, octaveStart*/(ref<Sign> signs);
+    buffer<Range> evaluateStepRanges(ref<Sign> signs);
 
     System(SheetContext context, float pageWidth, size_t pageIndex, size_t systemIndex, Graphics* previousSystem, ref<Sign> signs,
            map<uint, float>* measureBars = 0, array<TieStart>* activeTies = 0, map<uint, array<Sign>>* notes=0, float spaceWidth=0);
@@ -153,6 +155,8 @@ static bool isStemUp(ref<Chord> chords) {
     return isStemUp({minStaff, minStep}, {maxStaff, maxStep});
 }
 
+float System::stemX(const Chord& chord, bool stemUp) { return timeTrack.at(chord[0].time) + spaceWidth + (stemUp ? noteSize(chord[0])-1 : 0); }
+
 void System::layoutNotes(uint staff) {
     auto& beam = beams[staff];
     if(!beam) return;
@@ -166,9 +170,6 @@ void System::layoutNotes(uint staff) {
     auto allTied = [](const Chord& chord) {
         for(const Sign& a: chord) if(a.note.tie == Note::NoTie || a.note.tie == Note::TieStart) return false;
         return true;
-    };
-    auto stemX = [&](const Chord& chord, bool stemUp) {
-        return timeTrack.at(chord[0].time) + spaceWidth + (stemUp ? noteSize(chord[0])-1 : 0);
     };
 
         if(beam.size==1) { // Draws single stem
@@ -440,7 +441,16 @@ void System::layoutNotes(uint staff) {
                 if(chord.first().note.tenuto) {
                     int code = base+SMuFL::Articulation::Tenuto*2; glyph(vec2(x-glyphSize(code).x/2,y), code); y += lineInterval;
                 }
+                assert_(!chord.first().note.trill);
                 baseY = stemUp ? max(baseY, y) : min(baseY, y);
+            }
+            // Arpeggio
+            if(chord.first().note.arpeggio) {
+                log("arpeggio");
+                Sign sign = stemUp ? chord.first() : chord.last();
+                float x = stemX(chord, stemUp) + (stemUp ? -1 : 1) * noteSize(sign)/2 - noteSize(sign);
+                float y0 = Y(chord.first()), y1 = Y(chord.last());
+                for(float y=y0; y<y1; y+=glyphSize(SMuFL::Arpeggio).x) glyph(vec2(x, y), SMuFL::Arpeggio);
             }
         }
 
@@ -604,6 +614,31 @@ void System::layoutNotes(uint staff) {
                     if(sign.type == Sign::Note) {
                         Note& note = sign.note;
                         note.clef = clefs[staff];
+
+                        if(note.tremolo /*== Note::Start*/) { tremolo.append(); tremolo.last().append(sign); } // FIXME: tremolo chord
+                        if(note.tremolo == Note::Stop) {
+                            assert_(tremolo.size == 2, tremolo.size);
+                            log("tremolo");
+                            // Draws pairing tremolo (similar to pairing beam)
+                            bool stemUp = true;
+                            float x[2], base[2], tip[2];
+                            for(uint i: range(2)) {
+                                const Chord& chord = tremolo[i];
+                                x[i] = stemX(chord, stemUp);
+                                base[i] = Y(stemUp?chord.first():chord.last()) + (stemUp ? -1./2 : +1./2);
+                                tip[i] = Y(stemUp?chord.last():chord.first())+(stemUp?-1:1)*stemLength;
+                            }
+                            float midTip = (tip[0]+tip[1])/2; //farTip = stemUp ? min(tip[0],tip[1]) : max(tip[0],tip[1]);
+                            float delta[2] = {clip(-lineInterval, tip[0]-midTip, lineInterval), clip(-lineInterval, tip[1]-midTip, lineInterval)};
+                            for(uint i: range(2)) tip[i] = midTip+delta[i];
+                            for(size_t index: range(3 /*FIXME: parseInteger(tremolo.text())*/)) {
+                                float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1);
+                                vec2 p0 (x[0]-stemWidth/2, tip[0]-beamWidth/2 + Y);
+                                vec2 p1 (x[1]+stemWidth/2, tip[1]-beamWidth/2 + Y);
+                                system.parallelograms.append(p0, p1, beamWidth, black);
+                            }
+                            tremolo.clear();
+                        }
 
                         assert_(note.tie != Note::Merged);
                         if(!note.grace) {

@@ -74,13 +74,14 @@ bool Element::contains(string name) const {
 	return false;
 }
 
-const Element& Element::operator()(string name) const {
+const Element& Element::child(string name) const {
 	const Element* element = 0;
     for(const Element& e: children) if(e.name==name) { assert_(!element, "Multiple match for", name, "in", *this); element=&e; }
 	assert_(element, "No such element", name);
 	static Element empty;
 	return element ? *element : empty;
 }
+const Element& Element::operator()(string name) const { return child(name); }
 
 void Element::visit(const function<void(const Element&)>& visitor) const {
     for(const Element& e: children) e.visit(visitor);

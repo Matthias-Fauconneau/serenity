@@ -21,7 +21,7 @@ struct Element {
     /// Returns value for \a attribute (empty String if missing)
 	string operator[](string attribute) const;
     /// Returns child element with tag \a name (fail if missing)
-	//const Element& child(string name) const;
+    const Element& child(string name) const;
 	/// Returns whether any child element have tag \a name
 	bool contains(string name) const;
 	/// Returns child element with tag \a name (fail if missing)

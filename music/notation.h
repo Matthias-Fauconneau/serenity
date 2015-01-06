@@ -40,6 +40,7 @@ namespace SMuFL { //Standard Music Font Layout
 	namespace Clef {  enum { G=0xE050, F=0xE062 }; enum { _15mb=1, _8vb, _8va, _15ma }; }
 	namespace TimeSignature {  enum { _0=0xE080 }; }
 	enum { Dot=0xE1E7 };
+    enum Tremolos { Tremolo };
 	namespace Flag { enum { Above=0xE240, Below }; }
     enum Accidental { None=0, AccidentalBase=0xE260, Flat=AccidentalBase, Natural, Sharp, DoubleSharp, DoubleFlat, TripleSharp, TripleFlat, NaturalFlat, NaturalSharp, SharpSharp};
 	static constexpr string accidental[] = {"flat"_,"natural"_,"sharp"_,"double-sharp"_,"double-flat"_};
@@ -51,6 +52,7 @@ namespace SMuFL { //Standard Music Font Layout
 		"fp", "fz", "sf", "sfp", "sfpp", "sfz", "sfzp", "sffz", "rf", "rfz"};
     enum Ornaments { SlashUp = 0xE564, SlashDown };
 	namespace Pedal { enum { Mark = 0xE650 }; }
+    enum Segment { Arpeggio = 0xEAA9 };
 }
 
 enum Value { InvalidValue=-1,                  /*Maxima, Longa, Double,*/ Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
@@ -120,6 +122,8 @@ struct Note {
     bool staccato= false;
     bool tenuto= false;
     bool trill= false;
+    enum Tremolo { NoTremolo, Start=1, Stop=2 } tremolo = NoTremolo;
+    bool arpeggio = false;
     int finger = 0;
 	//bool stem:1; // 0: undefined, 1: down, 2: up
     size_t pageIndex = invalid, measureIndex = invalid, glyphIndex = invalid, accidentalGlyphIndex = invalid;

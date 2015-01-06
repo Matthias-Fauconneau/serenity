@@ -242,29 +242,40 @@ MusicXML::MusicXML(string document, string) {
                         // Records alteration used for the measure
                         if(accidental) measureAlterations[step] = alteration;
 
-                        bool articulations = e.contains("notations"_) && e("notations"_).contains("articulations"_);
-                        bool ornaments = e.contains("notations"_) && e("notations"_).contains("ornaments"_);
+                        const Element* notations = e.contains("notations"_) ? &e("notations") : 0;
+                        const Element* articulations = notations && notations->contains("articulations"_) ? &notations->child("articulations"_) : 0;
+                        const Element* ornaments = notations && notations->contains("ornaments"_) ? &notations->child("ornaments"_) : 0;
                         {
                             Sign sign{Sign::Note, time, {{staff, {{duration, .note={
-                                                    .value=value,
-                                                    .clef=clefs[staff],
-                                                    .step=step,
-                                                    .alteration=alteration,
-                                                    .accidental=accidental,
-                                                    .tie=tie,
+                                                    .value = value,
+                                                    .clef = clefs[staff],
+                                                    .step = step,
+                                                    .alteration = alteration,
+                                                    .accidental = accidental,
+                                                    .tie = tie,
                                                     .durationCoefficientNum = (uint)durationCoefficientNum,
                                                     .durationCoefficientDen = (uint)durationCoefficientDen,
                                                     .dot = e.contains("dot"_) ? true : false,
                                                     .grace = e.contains("grace"_)?true:false,
                                                     .acciaccatura = e.contains("grace"_) && e("grace"_)["slash"_]=="yes"_?true:false,
-                                                    .accent= articulations && e("notations"_)("articulations"_).contains("accent"_)?true:false,
-                                                    .staccato= articulations && e("notations"_)("articulations"_).contains("staccato"_)?true:false,
-                                                    .tenuto= articulations && e("notations"_)("articulations"_).contains("tenuto"_)?true:false,
-                                                    .trill=ornaments && e("notations"_)("ornaments"_).contains("trill-mark"_)?true:false,
+                                                    .accent= articulations && articulations->contains("accent"_)?true:false,
+                                                    .staccato = articulations && articulations->contains("staccato"_)?true:false,
+                                                    .tenuto = articulations && e("notations"_)("articulations"_).contains("tenuto"_)?true:false,
+                                                    .trill = ornaments && e("notations"_)("ornaments"_).contains("trill-mark"_)?true:false,
+                                                    .arpeggio = e.contains("notations"_) && e("notations"_).contains("arpeggiate"_)?true:false,
                                                     .finger = fingering ? fingering.take(0) : 0,
                                                     .measureIndex = measureIndex
                                                     //.stem = e.contains("stem"_) && e("stem").text() == "up"_,
                                                 }}}}}};
+                            const Element* tremolo = ornaments && ornaments->contains("tremolo"_) ? &ornaments->child("tremolo"_) : 0;
+                            if(tremolo) {
+                                assert_(parseInteger(tremolo->text()) == 3);
+                                auto type = tremolo->attribute("type"_);
+                                if(type=="start"_) sign.note.tremolo = Note::Tremolo::Start;
+                                else if(type=="stop"_) sign.note.tremolo = Note::Tremolo::Stop;
+                                else error(e);
+                            }
+
                             // Acciaccatura are played before principal beat. Records graces to shift in on parsing principal
                             if(sign.note.acciaccatura) acciaccaturas.append( sign ); // FIXME: display after measure bar
                             else {
