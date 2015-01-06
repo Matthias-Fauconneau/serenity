@@ -111,6 +111,7 @@ struct System : SheetContext {
 // -- Layout output
 
 float System::glyph(vec2 origin, uint code, float opacity, float size, FontData* font) {
+    assert_(opacity <= 1);
     if(!font) font=&musicFont;
     size *= halfLineInterval;
     uint index = font->font(size).index(code);
@@ -610,26 +611,26 @@ void System::layoutNotes(uint staff) {
                             /*for(Sign sign: chords[staff]) // Dichord
                                 if(abs(sign.note.step-note.step) <= 1) { x += glyphAdvance(SMuFL::NoteHead::Black); break; }*/
                             chords[staff].insertSorted(sign);
-                        } else { // Grace  note
+                        } else { // Grace note
                             float dx = glyphSize(SMuFL::NoteHead::Black, &smallFont).x;
                             float gx = x - dx - glyphAdvance(SMuFL::Flag::Above, &smallFont), y = Y(sign);
 
                             ledger(sign, gx, dx);
                             // Body
                             {note.glyphIndex = system.glyphs.size;
-                                glyph(vec2(x, y), SMuFL::NoteHead::Black, 1, 6);}
+                                glyph(vec2(gx, y), SMuFL::NoteHead::Black, 1, 6);}
                             assert_(!note.accidental);
+                            // TODO: stem down
                             // Stem
-                            float stemX = x + dx; //-1./2;
+                            float stemX = gx + dx; //-1./2;
                             system.lines.append(vec2(stemX, y-shortStemLength), vec2(stemX, y)); //-1./2
                             // Flag
-                            glyph(vec2(stemX, y-shortStemLength), SMuFL::Flag::Above, 6);
+                            glyph(vec2(stemX, y-shortStemLength), SMuFL::Flag::Above, 1, 6);
                             // Slash
-                            assert_(!note.acciaccatura);
-                            /*float slashY = y-shortStemLength/2;
-                            if(note.slash) FIXME Use SMuFL combining slash
-                                        vec2(stemX +lineInterval/2, slashY -lineInterval/2),
-                                        vec2(stemX -lineInterval/2, slashY +lineInterval/2));*/
+                            if(note.acciaccatura) {
+                                glyph(vec2(stemX, y) - glyphSize(SMuFL::SlashUp, &smallFont)/2.f, SMuFL::SlashUp, 1, 6); // FIXME: highlight as well
+                            }
+                            notes->sorted(sign.time).append(sign);
                         }
                     }
                     else if(sign.type == Sign::Rest) {

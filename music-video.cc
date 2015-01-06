@@ -26,7 +26,7 @@ MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter) {
 		if(sign.type==Sign::Metronome) {
 			notes.ticksPerSeconds = max(notes.ticksPerSeconds, sign.metronome.perMinute*ticksPerQuarter);
 		}
-		else if(sign.type == Sign::Note) {
+        else if(sign.type == Sign::Note) {
 			if(sign.note.tie == Note::NoTie || sign.note.tie == Note::TieStart)
 				notes.insertSorted({sign.time*60, sign.note.key(), 64/*FIXME: use dynamics*/});
 			if(sign.note.tie == Note::NoTie || sign.note.tie == Note::TieStop)

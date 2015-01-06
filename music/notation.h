@@ -49,6 +49,7 @@ namespace SMuFL { //Standard Music Font Layout
 	static constexpr string dynamic[] = {
 		"p", "m", "f", "r", "s", "z", "n", "pppppp", "ppppp", "pppp", "ppp", "pp", "mp", "mf", "pf", "ff", "fff", "ffff", "fffff", "ffffff",
 		"fp", "fz", "sf", "sfp", "sfpp", "sfz", "sfzp", "sffz", "rf", "rfz"};
+    enum Ornaments { SlashUp = 0xE564, SlashDown };
 	namespace Pedal { enum { Mark = 0xE650 }; }
 }
 
