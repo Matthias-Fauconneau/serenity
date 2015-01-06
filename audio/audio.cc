@@ -1,6 +1,6 @@
 #include "audio.h"
 #include "string.h"
-
+#if FFMPEG
 /// Generic audio decoder (using FFmpeg)
 extern "C" {
 #define _MATH_H // Prevent system <math.h> inclusion which conflicts with local "math.h"
@@ -14,7 +14,7 @@ extern "C" {
 
 void __attribute((constructor(1001))) initialize_FFmpeg() { av_register_all(); }
 
-AudioFile::AudioFile(string path) {
+FFmpeg::FFmpeg(string path) {
 	if(avformat_open_input(&file, strz(path), 0, 0)) { log("No such file"_, path); return; }
     avformat_find_stream_info(file, 0);
 	if(file->duration <= 0) { file=0; log("Invalid file"); return; }
@@ -47,7 +47,7 @@ AudioFile::AudioFile(string path) {
              audio->sample_fmt == AV_SAMPLE_FMT_FLTP || audio->sample_fmt == AV_SAMPLE_FMT_S32));
 }
 
-size_t AudioFile::read16(mref<int16> output) {
+size_t FFmpeg::read16(mref<int16> output) {
 	size_t readSize = 0;
 	while(readSize*channels<output.size) {
 		if(!bufferSize) {
@@ -79,7 +79,7 @@ size_t AudioFile::read16(mref<int16> output) {
 	return readSize;
 }
 
-size_t AudioFile::read32(mref<int32> output) {
+size_t FFmpeg::read32(mref<int32> output) {
 	size_t readSize = 0;
 	while(readSize*channels < output.size) {
 		while(!bufferSize) {
@@ -121,7 +121,7 @@ size_t AudioFile::read32(mref<int32> output) {
     return readSize;
 }
 
-size_t AudioFile::read(mref<float> output) {
+size_t FFmpeg::read(mref<float> output) {
 	assert_(channels);
 	size_t readSize = 0;
 	while(readSize*channels < output.size) {
@@ -157,14 +157,14 @@ size_t AudioFile::read(mref<float> output) {
 	return readSize;
 }
 
-void AudioFile::seek(uint audioTime) {
+void FFmpeg::seek(uint audioTime) {
 	assert_(audioStream->time_base.num == 1);
 	av_seek_frame(file, audioStream->index, (uint64)audioTime*audioStream->time_base.den/audioFrameRate, 0);
 	int16Buffer=buffer<int16>(); int32Buffer=buffer<int32>(); floatBuffer=buffer<float>(); bufferIndex=0, bufferSize=0;
 	this->audioTime = audioTime; // FIXME: actual
 }
 
-AudioFile::~AudioFile() {
+FFmpeg::~FFmpeg() {
     if(frame) av_frame_free(&frame);
 	duration=0; audioStream = 0; audio=0;
 	int16Buffer=buffer<int16>(); int32Buffer=buffer<int32>(); floatBuffer=buffer<float>(); bufferIndex=0, bufferSize=0;
@@ -172,8 +172,9 @@ AudioFile::~AudioFile() {
 }
 
 Audio decodeAudio(string path) {
-	AudioFile file(path);
+    FFmpeg file(path);
 	Audio audio (buffer<float>(file.duration*file.channels), file.channels, file.audioFrameRate);
 	audio.size = file.read(audio) * file.channels;
 	return audio;
 }
+#endif

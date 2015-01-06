@@ -9,7 +9,7 @@ struct Encoder {
     String path;
 
 	union { int2 size = 0; struct { uint width, height; }; };
-	int videoFrameRate=0;
+    uint videoFrameRate=0;
 	uint channels = 0; uint audioFrameRate=0; uint audioFrameSize=0;
     struct AVFormatContext* context=0;
     struct SwsContext* swsContext=0;
@@ -40,4 +40,6 @@ struct Encoder {
 	void writeAudioFrame(ref<int16> audio);
 	/// Writes an audio frame
 	void writeAudioFrame(ref<int32> audio);
+    /// Copies an audio frame
+    void copyAudioPacket(AudioFile& audio);
 };

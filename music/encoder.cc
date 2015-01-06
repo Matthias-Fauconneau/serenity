@@ -150,7 +150,7 @@ void Encoder::writeVideoFrame(const Image& image) {
 	assert_(videoStream && image.size==int2(width,height), image.size);
 	int stride = image.stride*4;
 	sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, height, frame->data, frame->linesize);
-	assert_(videoCodec->time_base.num==1 && videoCodec->time_base.den == videoFrameRate);
+    //assert_(videoCodec->time_base.num==1 && videoCodec->time_base.den == videoFrameRate);
 	frame->pts = videoTime;
 
     AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
@@ -212,6 +212,20 @@ void Encoder::writeAudioFrame(ref<int32> audio) {
     }
 
 	audioTime += audio.size/channels;
+}
+
+void Encoder::copyAudioPacket(AudioFile &audio)	{
+    AVPacket packet;
+    int status = av_read_frame(audio.file, &packet);
+    assert_(status == 0);
+    if(audio.file->streams[packet.stream_index]==audio.audioStream) {
+        assert_(audioStream->time_base.num == audio.audioStream->time_base.num);
+        packet.pts=packet.dts=audioTime=
+                packet.pts*audioStream->time_base.den/audio.audioStream->time_base.den;
+        packet.duration = (int64)packet.duration*audioStream->time_base.den/audio.audioStream->time_base.den;
+        packet.stream_index = audioStream->index;
+        av_interleaved_write_frame(context, &packet);
+    }
 }
 
 void Encoder::abort() {
