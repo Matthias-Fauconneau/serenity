@@ -35,7 +35,7 @@ struct Sampler : Poll {
 
 	explicit operator bool() const { return samples.size; }
 
-    Sampler(uint outputRate, string path, Thread& thread=mainThread);
+    Sampler(uint outputRate, string path, function<void(uint)> timeChanged, Thread& thread=mainThread);
     virtual ~Sampler();
 
 	void noteEvent(uint key, uint velocity);

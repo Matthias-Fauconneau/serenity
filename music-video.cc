@@ -293,8 +293,8 @@ struct Synchronizer : Widget {
 
 		for(float x: measureBars.values) bars.append(Bar{x, green});
 	}
-	int2 sizeHint(int2) override { return int2(measureBars.values.last(), 32); }
-	shared<Graphics> graphics(int2 size) override {
+    vec2 sizeHint(vec2) override { return vec2(measureBars.values.last(), 32); }
+    shared<Graphics> graphics(vec2 size) override {
 		assert_(size.x > 1050, size, sizeHint(size));
 		shared<Graphics> graphics;
 		for(Bar bar: bars) graphics->fills.append(vec2(bar.x, 0), vec2(2, size.y), bar.color, 1.f/2);
@@ -346,14 +346,13 @@ struct Music : Widget {
 	Thread decodeThread;
 	Sampler sampler {48000, "/Samples/Salamander.sfz"_, {this, &Music::timeChanged}, decodeThread};
 
-
 	// MusicXML
 	MusicXML xml = existsFile(name+".xml"_) ? readFile(name+".xml"_) : MusicXML();
 	// MIDI
 	MidiFile midi =  existsFile(name+".mid"_) ? MidiFile(readFile(name+".mid"_)) : MidiFile(); // if used: midi.signs are scaled in synchronizer
 	MidiNotes notes = ::scale(midi ? copy(midi.notes) : ::notes(xml.signs, xml.divisions), audioFile.audioFrameRate?: sampler.rate);
 	// Sheet
-	Sheet sheet {xml ? xml.signs : midi.signs, xml ? xml.divisions : midi.divisions,
+    Sheet sheet {xml ? xml.signs : midi.signs, xml ? xml.divisions : midi.divisions, 0, 4,
 				apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
 	Synchronizer synchronizer {audioFiles?decodeAudio(audioFiles[0]):Audio(), notes, sheet.midiToSign, sheet.measureBars};
 
@@ -415,7 +414,7 @@ struct Music : Widget {
 		}
 	}
 
-	bool follow(int timeNum, uint timeDen, int2 size, bool preview=true) {
+    bool follow(int timeNum, uint timeDen, vec2 size, bool preview=true) {
 		assert_(timeDen);
 		assert_(timeNum >= 0, timeNum);
 		bool contentChanged = false;
@@ -562,12 +561,12 @@ struct Music : Widget {
 					while((int64)encoder.audioTime*encoder.videoFrameRate <= (int64)encoder.videoTime*encoder.audioFrameRate) writeAudio();
 					while((int64)encoder.videoTime*encoder.audioFrameRate <= (int64)encoder.audioTime*encoder.videoFrameRate) {
 						followTime.start();
-						follow(time, encoder.videoFrameRate, encoder.size, false);
+                        follow(time, encoder.videoFrameRate, vec2(encoder.size), false);
 						followTime.stop();
 						renderTime.start();
 						Image target (encoder.size);
 						fill(target, 0, target.size, 1, 1);
-						::render(target, widget.graphics(target.size, Rect(target.size)));
+                        ::render(target, widget.graphics(vec2(target.size), Rect(vec2(target.size))));
 						renderTime.stop();
 						encodeTime.start();
 						encoder.writeVideoFrame(target);
@@ -597,16 +596,16 @@ struct Music : Widget {
 		}
     }
 
-	int2 sizeHint(int2 size) override { return running ? widget.sizeHint(size) : scroll.ScrollArea::sizeHint(size); }
-	shared<Graphics> graphics(int2 size) override {
+    vec2 sizeHint(vec2 size) override { return running ? widget.sizeHint(size) : scroll.ScrollArea::sizeHint(size); }
+    shared<Graphics> graphics(vec2 size) override {
 		if(running && video.videoTime < video.duration) {
-			if(audioFile) follow(audioFile.audioTime, audioFile.audioFrameRate, window.size);
-			else follow(sampler.audioTime, sampler.rate, window.size);
+            if(audioFile) follow(audioFile.audioTime, audioFile.audioFrameRate, vec2(window.size));
+            else follow(sampler.audioTime, sampler.rate, vec2(window.size));
 			window.render();
 		}
 		return running ? widget.graphics(size, Rect(size)) : scroll.ScrollArea::graphics(size);
 	}
-	bool mouseEvent(int2 cursor, int2 size, Event event, Button button, Widget*& focus) {
+    bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) override {
 		return scroll.ScrollArea::mouseEvent(cursor, size, event, button, focus);
 	}
 	bool keyPress(Key key, Modifiers modifiers) override { return scroll.ScrollArea::keyPress(key, modifiers); }

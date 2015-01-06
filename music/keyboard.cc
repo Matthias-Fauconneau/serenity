@@ -1,6 +1,6 @@
 #include "keyboard.h"
 
-shared<Graphics> Keyboard::graphics(int2 size) {
+shared<Graphics> Keyboard::graphics(vec2 size) {
 	shared<Graphics> graphics;
     int y1 = size.y*2/3;
     int y2 = size.y;

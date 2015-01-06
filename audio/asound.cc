@@ -63,9 +63,9 @@ bool playbackDeviceAvailable() {
 Device getPlaybackDevice() {
     Folder snd("/dev/snd");
     for(const String& device: snd.list(Devices))
-        if(startsWith(device, "pcm") && endsWith(device,"D0p")) return Device(device, snd, Flags(ReadWrite|NonBlocking));
+        if(startsWith(device, "pcm") && endsWith(device,"D0p")) return Device(device, snd, Flags(ReadWrite/*|NonBlocking*/));
     for(const String& device: snd.list(Devices))
-        if(startsWith(device, "pcm") && endsWith(device,"p")) return Device(device, snd, Flags(ReadWrite|NonBlocking));
+        if(startsWith(device, "pcm") && endsWith(device,"p")) return Device(device, snd, Flags(ReadWrite/*|NonBlocking*/));
     error("No PCM playback device found"); //FIXME: Block and watch folder until connected
 }
 
@@ -129,7 +129,7 @@ bool AudioOutput::start(uint rate, uint periodSize, uint sampleBits, uint channe
 
 void AudioOutput::stop() {
     assert_(status);
-    if(status->state == Running) io<DRAIN>(int(LinuxError::Again));
+    if(status->state == Running) io<DRAIN>(int(LinuxError::Again)); // FIXME: set fd to blocking first
     else if(status->state != Prepared) log("Could not drain", status->state);
     unregisterPoll();
     {int state = status->state;

@@ -923,6 +923,7 @@ void System::layoutNotes(uint staff) {
                         assert_(timeSignature.beatUnit == 2 || timeSignature.beatUnit == 4 || timeSignature.beatUnit == 8, timeSignature.beatUnit);
                         uint beatDuration = quarterDuration * 4 / timeSignature.beatUnit;
                         //if(timeSignature.beats == 4 && timeSignature.beatUnit == 4) beatDuration *= 2; // FIXME: not always
+                        if(timeSignature.beats == 6 && timeSignature.beatUnit == 8) beatDuration *= 2; // Beams quaver pairs even in 6/8 (i.e <=> 3/4)
 
 
                         if(beamDuration+chordDuration > maximumBeamDuration /*Beam before too long*/

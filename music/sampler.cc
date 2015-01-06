@@ -111,7 +111,7 @@ static double level(ref<float> envelope, size_t start, size_t duration) {
     return sqrt(sum) / duration;
 }
 
-Sampler::Sampler(uint outputRate, string path, Thread& thread) : Poll(0, POLLIN, thread) {
+Sampler::Sampler(uint outputRate, string path, function<void(uint)> timeChanged, Thread& thread) : Poll(0, POLLIN, thread), timeChanged(timeChanged) {
     sampler = this; // DEBUG
 	registerPoll();
     // Parses sfz and map samples

@@ -126,6 +126,7 @@ music/sheet.cc
 music/encoder.cc
 music/encoder.h
 music/keyboard.cc
+music/keyboard.h
 music/sampler.h
 music/sampler.cc
 music/flac.h
