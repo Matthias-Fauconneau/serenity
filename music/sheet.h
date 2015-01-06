@@ -12,8 +12,7 @@ struct Sheet : Widget {
 	shared<Graphics> debug;
 
 	int lowestStep = 0, highestStep = 0;
-    vec2 sizeHint(vec2) override;
-    shared<Graphics> graphics(vec2 size, Rect clip) override;
+    float minY, maxY;
 
 	// -- Control
 	array<size_t> measureToChord; // First chord index of measure
@@ -30,11 +29,10 @@ struct Sheet : Widget {
 
 	// -- Page layout
 	int2 pageSize;
-	size_t pageIndex = 0;
 
 	/// Layouts musical notations to graphic primitives
     Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize=0, float halfLineInterval = 4, ref<uint> midiNotes={}, string title="", bool pageNumbers=false);
 
-	/// Turn pages
-	bool keyPress(Key key, Modifiers modifiers) override;
+    vec2 sizeHint(vec2) override;
+    shared<Graphics> graphics(vec2 size, Rect clip) override;
 };

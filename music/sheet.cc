@@ -37,6 +37,11 @@ struct SheetContext {
     uint beatTime[staffCount] = {0,0}; // Time after last commited chord in .16 quarters since last time signature change
     uint staffTime[staffCount] = {0,0}; // Time after last commited chord in ticks
 
+    // Vertical positioning
+    float staffY(uint staff, int clefStep) { return (!staff)*(10*lineInterval+halfLineInterval) - clefStep * halfLineInterval; }
+    float Y(uint staff, Clef clef, int step) { return staffY(staff, clefStep(clef, step)); };
+    float Y(Sign sign) { assert_(sign.type==Sign::Note, int(sign.type)); return staffY(sign.staff, clefStep(sign)); };
+
     SheetContext(float halfLineInterval, uint ticksPerQuarter) : halfLineInterval(halfLineInterval), ticksPerQuarter(ticksPerQuarter) {}
 };
 
@@ -110,11 +115,6 @@ struct System : SheetContext {
     //float& staffX(uint time, int type, uint staff);
     //float& X(const Sign& sign) { return staffX(sign.time, sign.type, sign.staff); };
     //vec2 P(const Sign& sign) { return vec2(X(sign), Y(sign)); };
-
-    // Vertical positioning
-    float staffY(uint staff, int clefStep) { return (!staff)*(10*lineInterval+halfLineInterval) - clefStep * halfLineInterval; }
-    float Y(uint staff, Clef clef, int step) { return staffY(staff, clefStep(clef, step)); };
-    float Y(Sign sign) { assert_(sign.type==Sign::Note, int(sign.type)); return staffY(sign.staff, clefStep(sign)); };
 
     // -- Layout output
     float glyph(vec2 origin, uint code, float opacity=1, float size=8, FontData* font=0);
@@ -437,7 +437,7 @@ void System::layoutNotes(uint staff) {
 
                 // Highlight
                 note.pageIndex = pageIndex;
-                if(measureBars) note.measureIndex = measureBars->size();
+                if(measureBars) note.measureIndex = measureBars->size()-1;
                 if(note.tie == Note::NoTie || note.tie == Note::TieStart) if(notes) notes->sorted(sign.time).append( sign );
             }
 
@@ -514,14 +514,6 @@ void System::layoutNotes(uint staff) {
                        map<uint, float>* measureBars, array<TieStart>* activeTies, map<uint, array<Sign>>* notes, float _spaceWidth)
             : SheetContext(context), spaceWidth(_spaceWidth?:space), pageWidth(pageWidth), pageIndex(pageIndex), systemIndex(systemIndex), previousSystem(previousSystem),
             measureBars(measureBars), activeTies(activeTies), notes(notes), line(evaluateStepRanges(signs)) {
-
-        // System Raster
-        for(int staff: range(context.staffCount)) {
-            for(int line: range(5)) {
-                float y = staffY(staff, -line*2);
-                system.lines.append(vec2(margin, y), vec2((pageWidth?pageWidth:allocatedLineWidth)-margin, y));
-            }
-        }
 
         // System first measure bar
         {float x = margin;
@@ -953,8 +945,17 @@ void System::layoutNotes(uint staff) {
                 }
             }
         }
+        if(!pageWidth) pageWidth = measureBars->values.last();
         if(pedalStart) { // Draw pressed pedal line until end of line
-           system.lines.append(pedalStart+vec2(0, lineInterval), vec2(pageWidth - margin, pedalStart.y + lineInterval));
+            system.lines.append(pedalStart+vec2(0, lineInterval), vec2(pageWidth - margin, pedalStart.y + lineInterval));
+        }
+        // System raster
+        for(int staff: range(context.staffCount)) {
+            for(int line: range(5)) {
+                float y = staffY(staff, -line*2);
+                assert_(measureBars);
+                system.lines.append(vec2(measureBars->values[0], y), vec2(measureBars->values.last(), y));
+            }
         }
         int highMargin = 3, lowMargin = -8-4;
         system.bounds.min = vec2(0, staffY(1, max(highMargin, line[1].top)+7));
@@ -971,22 +972,31 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
 
     auto doPage = [&]{
         float totalHeight = sum(apply(systems, [](const Graphics& o) { return o.bounds.size().y; }));
-		if(totalHeight < pageSize.y) { // Spreads systems with margins
-			float extra = (pageSize.y - totalHeight) / (systems.size+1);
-			float offset = extra;
-			for(Graphics& system: systems) {
+        if(pageSize.y) {
+            if(totalHeight < pageSize.y) { // Spreads systems with margins
+                float extra = (pageSize.y - totalHeight) / (systems.size+1);
+                float offset = extra;
+                for(Graphics& system: systems) {
+                    system.translate(vec2(0, round(offset)));
+                    offset += system.bounds.size().y + extra;
+                }
+            }
+            if(totalHeight > pageSize.y) { // Spreads systems without margins
+                float extra = (pageSize.y - totalHeight) / (systems.size-1);
+                float offset = 0;
+                for(Graphics& system: systems) {
+                    system.translate(vec2(0, round(offset)));
+                    offset += system.bounds.size().y + extra;
+                }
+            }
+        } else {
+            float offset = -systems[0].bounds.min.y;
+            assert_(isNumber(offset));
+            for(Graphics& system: systems) {
                 system.translate(vec2(0, round(offset)));
-                offset += system.bounds.size().y + extra;
-			}
-		}
-		if(totalHeight > pageSize.y) { // Spreads systems without margins
-			float extra = (pageSize.y - totalHeight) / (systems.size-1);
-			float offset = 0;
-			for(Graphics& system: systems) {
-                system.translate(vec2(0, round(offset)));
-                offset += system.bounds.size().y + extra;
-			}
-		}
+                offset += system.bounds.size().y ;
+            }
+        }
 		pages.append();
 		for(Graphics& system: systems) {
 			system.translate(system.offset); // FIXME: -> append
@@ -1006,18 +1016,18 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
 
     size_t lineCount = 0; float requiredHeight = 0;
     for(size_t startIndex = 0; startIndex < signs.size;) { // Lines
-        size_t breakIndex;
-        float spaceWidth;
-        {// Evaluates next line break
+        size_t breakIndex = signs.size;
+        float spaceWidth = 0;
+        if(pageSize.x) { // Evaluates next line break
             System system(context, pageSize.x, pages.size, systems.size, systems ? &systems.last() : nullptr, signs.slice(startIndex), 0, 0, 0, 0);
             breakIndex = startIndex + system.lastMeasureBarIndex + 1;
             assert_(startIndex < breakIndex && system.spaceCount, startIndex, breakIndex, system.spaceCount);
-            spaceWidth = system.space + (pageSize ? float(pageSize.x - system.allocatedLineWidth) / float(system.spaceCount) : 0);
+            spaceWidth = system.space + float(pageSize.x - system.allocatedLineWidth) / float(system.spaceCount);
         }
 
 		// Breaks page as needed
         //int highMargin = 3, lowMargin = -8-4;
-        {
+        if(pageSize.y) {
             //float minY = staffY(1, max(highMargin,currentLineHighestStep)+7);
             //float maxY = staffY(0, min(lowMargin, currentLineLowestStep)-7);
             if(systems && (/*pageBreak ||*/ systems.size >= 3 /*requiredHeight + (maxY-minY) > pageSize.y*/)) {
@@ -1040,15 +1050,15 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
         startIndex = breakIndex;
 	}
 	doPage();
-#if 0
-    if(!ticksPerMinutes) ticksPerMinutes = 120*ticksPerQuarter;
+    if(!context.ticksPerMinutes) context.ticksPerMinutes = 120*ticksPerQuarter;
+    minY = context.staffY(1, highestStep+7);
+    maxY = context.staffY(0, lowestStep-7);
 
-    measureBars.insert(/*t*/0u, /*x*/0.f);
-
-	midiToSign = buffer<Sign>(midiNotes.size, 0);
+    midiToSign = buffer<Sign>(midiNotes.size, 0);
 	array<uint> chordExtra;
 
     constexpr bool logErrors = false;
+    float space = 2;
 	if(midiNotes) while(chordToNote.size < notes.size()) {
 		if(!notes.values[chordToNote.size]) {
 			chordToNote.append( midiToSign.size );
@@ -1159,7 +1169,6 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
     if(chordToNote.size == notes.size() || !midiNotes) {}
 	else { firstSynchronizationFailureChordIndex = chordToNote.size; }
 	if(logErrors && (extraErrors||wrongErrors||missingErrors||orderErrors)) log(extraErrors, wrongErrors, missingErrors, orderErrors);
-#endif
 }
 
 inline bool operator ==(const Sign& sign, const uint& key) {
@@ -1167,18 +1176,12 @@ inline bool operator ==(const Sign& sign, const uint& key) {
 	return sign.note.key() == key;
 }
 
-vec2 Sheet::sizeHint(vec2) { return vec2(measureBars.values.last(), 0/*FIXME*/); }
+vec2 Sheet::sizeHint(vec2) { return vec2(measureBars.values.last(), -(maxY-minY)); }
 
-shared<Graphics> Sheet::graphics(vec2, Rect) { return shared<Graphics>(&pages[pageIndex]); }
+shared<Graphics> Sheet::graphics(vec2, Rect) { assert_(pages.size == 1); return shared<Graphics>(&pages[0]); }
 
 size_t Sheet::measureIndex(float x) {
 	if(x < measureBars.values[0]) return invalid;
 	for(size_t i: range(measureBars.size()-1)) if(measureBars.values[i]<=x && x<measureBars.values[i+1]) return i;
 	assert_(x >= measureBars.values.last()); return measureBars.size();
-}
-
-bool Sheet::keyPress(Key key, Modifiers) {
-	if(key==LeftArrow) { pageIndex = max(0, int(pageIndex)-1); return true; }
-	if(key==RightArrow) { pageIndex = min(pageIndex+1, pages.size-1); return true; }
-	return false;
 }

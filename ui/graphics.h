@@ -98,6 +98,7 @@ struct Graphics : shareable {
     map<vec2, shared<Graphics>> graphics;
 
     void translate(vec2 offset) {
+        assert_(isNumber(offset));
         bounds = offset+bounds;
         for(auto& o: fills) o.origin += offset;
 		assert_(!blits);

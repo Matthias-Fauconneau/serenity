@@ -182,7 +182,7 @@ Sampler::Sampler(uint outputRate, string path, function<void(uint)> timeChanged,
                     size-=factor;
                 }
             }
-            log(envelope.size);
+            log(s.name, envelope.size);
             writeFile("Envelope/"_+s.name+".env"_,cast<byte>(envelope), folder, true);
         }
         s.envelope = cast<float>(readFile(String("Envelope/"_+s.name+".env"_),folder));
@@ -382,7 +382,7 @@ size_t Sampler::read(mref<float2> output) {
 	output.clear(0);
     int noteCount = 0;
     {
-        pollEvents();
+        if(timeChanged) timeChanged(audioTime); // Updates active notes
         Locker lock(this->lock);
         for(Layer& layer: layers) { // Mixes all notes of all layers
             /*// Cleanups silent notes (FIXME: lock decoder)
@@ -415,7 +415,6 @@ size_t Sampler::read(mref<float2> output) {
         }
     } else { stopTime=0; silence = false; }
 	audioTime += output.size;
-    if(timeChanged) timeChanged(audioTime); // Updates active notes
     queue(); // Decodes before mixing
     return output.size;
 }

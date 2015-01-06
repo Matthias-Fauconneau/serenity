@@ -63,14 +63,14 @@ MusicXML::MusicXML(string document, string) {
     root.xpath("score-partwise/part"_, [xmlStaffCount, this, &partIndex, &partFirstStaffIndex, &clefs, &octaveStart](const Element& p) {
         KeySignature keySignature = 0; TimeSignature timeSignature={4,4};
         uint measureTime = 0, time = 0, nextTime = 0, maxTime = 0;
-        uint globalMeasureIndex=0, pageIndex=0, lineIndex=0, measureIndex=0; // starts with 1
+        uint measureIndex=0, pageIndex=0, lineIndex=0, lineMeasureIndex=0; // starts with 1
         //size_t repeatIndex = invalid;
         array<int> activeTies;
         array<int> fingering;
         int partStaffCount = 0;
         for(const Element& m: p.children) {
             measureTime = time;
-            globalMeasureIndex++; measureIndex++;
+            measureIndex++; lineMeasureIndex++;
             assert_(m.name=="measure"_, m);
             map<int, int> measureAlterations; // Currently altered steps (for implicit alterations)
             array<Sign> acciaccaturas; // Acciaccatura graces for pending principal
@@ -160,7 +160,7 @@ MusicXML::MusicXML(string document, string) {
                         uint voiceIndex = parseInteger(e("voice"_).text())-1;
                         if(!voiceToStaff.contains(voiceIndex) && e.contains("rest"_)) continue;
                         if(voiceToStaff.contains(voiceIndex)) {
-                            assert_(voiceToStaff.contains(voiceIndex), e, pageIndex, lineIndex, measureIndex);
+                            assert_(voiceToStaff.contains(voiceIndex), e, pageIndex, lineIndex, lineMeasureIndex);
                             uint voiceStaffIndex = voiceToStaff.at(voiceIndex);
                             if(voiceStaffIndex != xmlStaffIndex) {
                                 log(xmlStaffIndex, voiceStaffIndex, voiceIndex);
@@ -216,7 +216,7 @@ MusicXML::MusicXML(string document, string) {
                                 implicitAlteration = signs[tieStartNoteIndex].note.alteration;
                                 if(tie == Note::TieStop) activeTies.removeAt(tieStart);
                             } else if(0) {
-                                error("206", e, pageIndex, lineIndex, measureIndex,
+                                error("206", e, pageIndex, lineIndex, lineMeasureIndex,
                                       apply(activeTies, [&](size_t index){ return signs[index];}),
                                         apply(activeTies, [&](size_t index){ return signs[index].note.step;}), step);
                             }
@@ -261,7 +261,8 @@ MusicXML::MusicXML(string document, string) {
                                                     .staccato= articulations && e("notations"_)("articulations"_).contains("staccato"_)?true:false,
                                                     .tenuto= articulations && e("notations"_)("articulations"_).contains("tenuto"_)?true:false,
                                                     .trill=ornaments && e("notations"_)("ornaments"_).contains("trill-mark"_)?true:false,
-                                                    .finger = fingering ? fingering.take(0) : 0
+                                                    .finger = fingering ? fingering.take(0) : 0,
+                                                    .measureIndex = measureIndex
                                                     //.stem = e.contains("stem"_) && e("stem").text() == "up"_,
                                                 }}}}}};
                             // Acciaccatura are played before principal beat. Records graces to shift in on parsing principal
@@ -406,7 +407,7 @@ MusicXML::MusicXML(string document, string) {
                     }
                 }
                 else if(e.name=="print"_) {
-                    if(e["new-system"]=="yes") { lineIndex++, measureIndex=1; }
+                    if(e["new-system"]=="yes") { lineIndex++, lineMeasureIndex=1; }
                     if(e["new-page"]=="yes") { pageIndex++, lineIndex=1; }
                 }
                 else if(e.name=="barline"_) {
@@ -426,7 +427,7 @@ MusicXML::MusicXML(string document, string) {
                 else if(e.name=="harmony"_) {}
                 else error(e);
 
-                assert_(time >= measureTime, int(time-measureTime), int(nextTime-measureTime), int(maxTime-measureTime), globalMeasureIndex, e);
+                assert_(time >= measureTime, int(time-measureTime), int(nextTime-measureTime), int(maxTime-measureTime), measureIndex, e);
             }
             maxTime=time=nextTime= max(maxTime, max(time, nextTime));
             Measure::Break measureBreak = Measure::NoBreak;
@@ -435,7 +436,7 @@ MusicXML::MusicXML(string document, string) {
                 else if(m("print")["new-system"]=="yes") measureBreak = Measure::LineBreak;
             }
             assert_(time > measureTime);
-            if(partIndex == 0) insertSign({Sign::Measure, time, .measure={measureBreak, globalMeasureIndex, pageIndex, lineIndex, measureIndex}});
+            if(partIndex == 0) insertSign({Sign::Measure, time, .measure={measureBreak, measureIndex, pageIndex, lineIndex, lineMeasureIndex}});
         }
         partIndex++;
         partFirstStaffIndex += partStaffCount;

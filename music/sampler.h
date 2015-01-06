@@ -25,10 +25,7 @@ struct Sampler : Poll {
 	uint rate = 0;
     static constexpr uint periodSize = 256; // [12ms/82Hz/4m]
 
-    // Last chance to poll note events before samples are mixed
-    function<void()> pollEvents;
-
-    /// Emits period time to trigger MIDI file input and update the interface
+    /// Just before samples are mixed, polls note events
 	function<void(uint)> timeChanged;
     uint audioTime=0, stopTime=0;
     float minValue=-65536*3/2, maxValue=-minValue; // >88192

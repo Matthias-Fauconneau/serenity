@@ -216,20 +216,20 @@ struct Synchronizer : Widget {
 			}
 		}
 
-		{ // Set measure times to MIDI times
+        { // Sets measure times to MIDI times
 			buffer<MidiNote> onsets = filter(notes, [](MidiNote o){return o.velocity==0;});
 			//assert_(onsets.size == signs.size || !signs.size, onsets.size, signs.size); FIXME
 			assert_(onsets.size >= signs.size, onsets.size, signs.size);
 			size_t index = 0;
 			for(size_t measureIndex: range(measureBars.size())) {
 				while(index < signs.size) {
-					if(signs[index].note.measureIndex>=measureIndex) break;
+                    if(signs[index].note.measureIndex >= measureIndex) break;
 					index++;
 				}
 				if(index == signs.size) measureBars.keys[measureIndex] =  onsets.last().time; // Last measure (FIXME: last release time)
 				else {
-					if(signs[index].note.measureIndex!=measureIndex) { // Empty measure
-						//assert_(index>0, index, measureIndex, signs[index].note.measureIndex);
+                    if(signs[index].note.measureIndex != measureIndex) { // Empty measure
+                        assert_(index>0, index, measureIndex, signs[index].note.measureIndex);
 						measureBars.keys[measureIndex] = onsets[index-1].time; // FIXME: should be onsets[index].time - measureTime[index]
 					} else measureBars.keys[measureIndex] = onsets[index].time;
 				}
@@ -340,7 +340,7 @@ struct Music : Widget {
         nullptr;
     // Sampler
 	Thread decodeThread;
-	Sampler sampler {48000, "/Samples/Salamander.sfz"_, {this, &Music::timeChanged}, decodeThread};
+    Sampler sampler {48000, "/Samples/Maestro.sfz"_, {this, &Music::timeChanged}, decodeThread};
 
 	// MusicXML
 	MusicXML xml = existsFile(name+".xml"_) ? readFile(name+".xml"_) : MusicXML();
@@ -419,6 +419,7 @@ struct Music : Widget {
 		for(;midiIndex < notes.size && (int64)notes[midiIndex].time*timeDen <= (int64)timeNum*notes.ticksPerSeconds; midiIndex++) {
 			MidiNote note = notes[midiIndex];
 			if(note.velocity) {
+                assert_(noteIndex < sheet.midiToSign.size);
 				Sign sign = sheet.midiToSign[noteIndex];
 				if(sign.type == Sign::Note) {
 					(sign.staff?keyboard.left:keyboard.right).append( sign.note.key() );
@@ -584,8 +585,8 @@ struct Music : Widget {
 			//if(!failed) seek(max(0ll, notes[0].time - notes.ticksPerSeconds));
 			window.show();
 			if(playbackDeviceAvailable()) {
-                audio.start(audioFile->audioFrameRate ? : sampler.rate, audioFile ? 1024 : sampler.periodSize, 32, 2);
-                assert_(audio.rate == audioFile->audioFrameRate ?: sampler.rate);
+                audio.start(audioFile ? audioFile->audioFrameRate : sampler.rate, audioFile ? 1024 : sampler.periodSize, 32, 2);
+                assert_(audio.rate == (audioFile ? audioFile->audioFrameRate : sampler.rate));
 				audioThread.spawn();
 			} else running = false;
 		}
