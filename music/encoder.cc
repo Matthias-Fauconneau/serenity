@@ -72,15 +72,15 @@ void Encoder::setH264(int2 size, uint videoFrameRate) {
     avpicture_alloc((AVPicture*)frame, AV_PIX_FMT_YUV420P, width, height);
 }
 
-void Encoder::setAudio(const AudioFile& audio) {
+void Encoder::setAudio(const FFmpeg& audio) {
 	assert_(!audioStream);
 	audioFrameRate = audio.audioFrameRate;
 	AVCodec* codec = avcodec_find_encoder(audio.audio->codec_id);
 	audioStream = avformat_new_stream(context, codec);
-	audioCodec = audioStream->codec;
-    if(context->oformat->flags & AVFMT_GLOBALHEADER) audioCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
-    check( avcodec_copy_context(audioCodec, audio.audio) );
-	audioCodec->codec_tag = 0;
+	check( avcodec_copy_context(audioStream->codec, audio.audio) );
+	if(context->oformat->flags & AVFMT_GLOBALHEADER) audioStream->codec->flags |= CODEC_FLAG_GLOBAL_HEADER;
+	audioStream->codec->codec_tag = 0;
+	// audioCodec is not set (to audioStream->codec) to flag audio stream as being a copy and not encoded (no encoder flush)
 }
 
 void Encoder::setAAC(uint channels, uint rate) {
@@ -214,7 +214,7 @@ void Encoder::writeAudioFrame(ref<int32> audio) {
 	audioTime += audio.size/channels;
 }
 
-void Encoder::copyAudioPacket(AudioFile &audio)	{
+void Encoder::copyAudioPacket(FFmpeg& audio)	{
     AVPacket packet;
     int status = av_read_frame(audio.file, &packet);
     assert_(status == 0);
@@ -242,41 +242,43 @@ Encoder::~Encoder() {
     if(!context) { assert(!frame && !videoStream && !audioStream && !context); return; } // Aborted
     lock.lock();
     if(frame) av_frame_free(&frame);
-    for(;;) {
-        if(!videoStream && !audioStream) break;
+	while(videoCodec || audioCodec) {
         AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
         int gotPacket = 0;
-		if(videoStream && (!audioStream || videoEncodeTime*audioFrameRate<audioEncodeTime*videoFrameRate)) {
-            assert_(videoCodec);
+		if(videoCodec && (!audioCodec || videoEncodeTime*audioFrameRate<audioEncodeTime*videoFrameRate)) {
             avcodec_encode_video2(videoCodec, &pkt, 0, &gotPacket);
 			if(gotPacket) {
+				assert_(videoStream);
 				pkt.stream_index = videoStream->index;
 				videoEncodeTime = pkt.dts;
 				pkt.dts = pkt.dts*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
 				pkt.pts = pkt.pts*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
 			} else {
+				avcodec_close(videoCodec); videoCodec=0;
 				videoStream=0; //Released by avformat_free_context
 				continue;
 			}
         }
-		if(audioStream && (!videoStream || audioEncodeTime*videoFrameRate<=videoEncodeTime*audioFrameRate)) {
+		if(audioCodec && (!videoCodec || audioEncodeTime*videoFrameRate<=videoEncodeTime*audioFrameRate)) {
             avcodec_encode_audio2(audioCodec, &pkt, 0, &gotPacket);
 			if(gotPacket) {
+				assert_(audioStream);
 				pkt.stream_index = audioStream->index;
 				audioEncodeTime = pkt.dts;
+				// No time rescale ?
 			} else {
+				avcodec_close(audioCodec); audioCodec=0;
 				audioStream=0; // Released by avformat_free_context
 				continue;
 			}
         }
+		assert_(gotPacket);
         av_interleaved_write_frame(context, &pkt);
         if(!pkt.buf) av_free_packet(&pkt);
     }
 	log(videoTime, audioTime, videoEncodeTime, audioEncodeTime);
     av_interleaved_write_frame(context, 0);
     av_write_trailer(context);
-    if(videoCodec) { avcodec_close(videoCodec); videoCodec=0; }
-    if(audioCodec) { avcodec_close(audioCodec); audioCodec=0; }
     avio_close(context->pb);
     avformat_free_context(context);
     context = 0;

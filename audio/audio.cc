@@ -1,6 +1,6 @@
 #include "audio.h"
 #include "string.h"
-#if FFMPEG
+
 /// Generic audio decoder (using FFmpeg)
 extern "C" {
 #define _MATH_H // Prevent system <math.h> inclusion which conflicts with local "math.h"
@@ -177,4 +177,3 @@ Audio decodeAudio(string path) {
 	audio.size = file.read(audio) * file.channels;
 	return audio;
 }
-#endif

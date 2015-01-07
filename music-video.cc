@@ -13,14 +13,12 @@
 #include "parallel.h"
 #include "fft.h"
 #include "biquad.h"
-
-#if FFMPEG
 #include "video.h"
 #include "encoder.h"
-#endif
 
 /// Converts signs to notes
 MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter) {
+	assert_(signs);
 	MidiNotes notes;
 	for(Sign sign: signs) {
 		if(sign.type==Sign::Metronome) {
@@ -333,11 +331,7 @@ struct Music : Widget {
 			return !startsWith(path, name) ||  (!endsWith(path, "performance.mp4") && !endsWith(path, ".mkv")); });
 
 	// Audio
-    unique<AudioFile> audioFile =
-        #if FFMPEG
-            audioFiles ? unique<FFmpeg>(audioFiles[0]) :
-        #endif
-        nullptr;
+	unique<FFmpeg> audioFile = audioFiles ? unique<FFmpeg>(audioFiles[0]) : nullptr;
     // Sampler
 	Thread decodeThread;
     Sampler sampler {48000, "/Samples/Maestro.sfz"_, {this, &Music::timeChanged}, decodeThread};
@@ -353,9 +347,7 @@ struct Music : Widget {
 	Synchronizer synchronizer {audioFiles?decodeAudio(audioFiles[0]):Audio(), notes, sheet.midiToSign, sheet.measureBars};
 
 	// Video
-    #if FFMPEG
     Decoder video = videoFiles ? Decoder(videoFiles[0]) : Decoder();
-    #endif
 
 	// State
 	bool failed = sheet.firstSynchronizationFailureChordIndex != invalid;
@@ -460,7 +452,6 @@ struct Music : Widget {
 		}
 		if(previousOffset != scroll.offset.x) contentChanged = true;
 		synchronizer.currentTime = (int64)timeNum*notes.ticksPerSeconds/timeDen;
-#if FFMPEG
         if(video) {
 			while((int64)video.videoTime*timeDen < (int64)timeNum*video.timeDen) {
 				Image image = video.read();
@@ -475,7 +466,6 @@ struct Music : Widget {
 				assert_((int64)video.videoTime*timeDen >= (int64)timeNum*video.timeDen || preview, video.videoTime, video.timeDen, timeNum, timeDen);
 			}
         }
-#endif
 		return contentChanged;
 	}
 
@@ -487,14 +477,12 @@ struct Music : Widget {
 			sampler.audioTime = time*sampler.rate/notes.ticksPerSeconds;
 			while(samplerMidiIndex < notes.size && notes[samplerMidiIndex].time*sampler.rate < time*notes.ticksPerSeconds) samplerMidiIndex++;
 		}
-#if FFMPEG
         if(video) {
 			//video.seek(time * video.videoFrameRate / notes.ticksPerSeconds); //FIXME
             assert_(notes.ticksPerSeconds == audioFile->audioFrameRate);
 			while((video.videoTime+video.timeNum)*notes.ticksPerSeconds <= time*video.timeDen) video.read();
 			return video.videoTime;
 		}
-#endif
 		return 0;
 	}
 
@@ -509,18 +497,17 @@ struct Music : Widget {
 			scroll.offset.x = -sheet.measureBars.values[max<int>(0, measureIndex-3)];
 		}
 		if(sampler) decodeThread.spawn(); // For sampler
-#if ENCODE
         if(arguments().contains("encode") || arguments().contains("export")) { // Encode
 			assert_(!failed);
 
 			Encoder encoder {name+".mp4"_};
 			encoder.setH264(int2(1280,720), 60);
-            if(audioFile && audioFile->codec==AudioFile::AAC) encoder.setAudio(audioFile);
+			if(audioFile && audioFile->codec==FFmpeg::AAC) encoder.setAudio(audioFile);
             else if(audioFile) encoder.setAAC(2 /*Youtube requires stereo*/, audioFile->audioFrameRate);
 			else encoder.setFLAC(32, 2, sampler.rate);
 			encoder.open();
 
-			int time = 0;
+			uint time = 0;
 			//int time = seek(max(0u, notes[0].time - notes.ticksPerSeconds));
 			//assert_((time*encoder.videoFrameRate)%video.videoFrameRate == 0, time, encoder.videoFrameRate, video.videoFrameRate);
 			//time = time * encoder.videoFrameRate * video.timeNum / video.timeDen; // Scales from source (30fps) to target (60fps) video timebase
@@ -530,7 +517,7 @@ struct Music : Widget {
 			for(int lastReport=0;;) {
                 //assert_(encoder.audioStream->time_base.num == 1);
 				auto writeAudio = [&]{
-                    if(audioFile && audioFile->codec==AudioFile::AAC) {
+					if(audioFile && audioFile->codec==FFmpeg::AAC) {
                         encoder.copyAudioPacket(audioFile);
 					} else if(audioFile) {
 						assert_(encoder.audioFrameSize==1024);
@@ -576,11 +563,10 @@ struct Music : Widget {
 					lastReport=percent;
 				}
 				if(time*notes.ticksPerSeconds/encoder.videoFrameRate >= uint64(onsets.last() + 4*notes.ticksPerSeconds)) break;
-				//if(time > 10*encoder.videoFrameRate) break; // DEBUG
+				//if(time > 1*encoder.videoFrameRate) break; // DEBUG
 			}
 			requestTermination(0); // Window prevents automatic termination
         } else
-#endif
         { // Preview
 			//if(!failed) seek(max(0ll, notes[0].time - notes.ticksPerSeconds));
 			window.show();

@@ -47,4 +47,5 @@ struct Audio : buffer<float> {
     Audio(buffer<float>&& data, uint channels, uint rate) : buffer<float>(::move(data)), channels(channels), rate(rate) {}
     uint channels=0, rate=0;
 };
-Audio __attribute((weak)) decodeAudio(string path);
+
+Audio /*__attribute((weak))*/ decodeAudio(string /*path*/);// { error("FFmpeg support not linked"); }

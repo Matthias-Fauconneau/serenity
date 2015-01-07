@@ -23,7 +23,7 @@ struct Encoder {
 
     void setH264(int2 size, uint videoFrameRate);
     void setMJPEG(int2 size, uint videoFrameRate);
-    void setAudio(const AudioFile& audio);
+	void setAudio(const FFmpeg& audio);
 	void setAAC(uint channels, uint rate);
 	void setFLAC(uint sampleBits, uint channels, uint rate);
     void open();
@@ -41,5 +41,5 @@ struct Encoder {
 	/// Writes an audio frame
 	void writeAudioFrame(ref<int32> audio);
     /// Copies an audio frame
-    void copyAudioPacket(AudioFile& audio);
+	void copyAudioPacket(FFmpeg& audio);
 };

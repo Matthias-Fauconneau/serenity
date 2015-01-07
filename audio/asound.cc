@@ -1,6 +1,22 @@
 #include "asound.h"
 #include "string.h"
 #include "data.h"
+#include "thread.h"
+#include "file.h"
+#include "string.h"
+
+struct CardInfo {
+	int card;                       /* card number */
+	int pad;                        /* reserved for future (was type) */
+	char id[16];           /* ID of card (user selectable) */
+	char driver[16];       /* Driver name */
+	char name[32];         /* Short name of soundcard */
+	char longname[80];     /* name + info text about soundcard */
+	char reserved_[16];    /* reserved for future (was ID of mixer) */
+	char mixername[80];    /* visual mixer identification */
+	char components[128];  /* card components / fine identification, delimited with one space (AC97 etc..) */
+};
+typedef IOR<'U', 0x01, CardInfo> CARD_INFO;
 
 enum Access { MMapInterleaved=0 };
 enum Format { S16_LE=2, S32_LE=10 };
@@ -76,6 +92,7 @@ AudioOutput::AudioOutput(decltype(read32) read, Thread& thread) : Poll(0, POLLOU
 bool AudioOutput::start(uint rate, uint periodSize, uint sampleBits, uint channels) {
     if(!Device::fd) { Device::fd = move(getPlaybackDevice().fd); Poll::fd = Device::fd; }
     if(!Device::fd) return false;
+	//{CardInfo info = ior<CARD_INFO>(); log(info.card, info.id, info.driver, info.name, info.longname, info.mixername, info.components); }
     if(!status || status->state < Setup || this->rate!=rate || this->periodSize!=periodSize || this->sampleBits!=sampleBits) {
         HWParams hparams;
         hparams.mask(Access).set(MMapInterleaved);
@@ -273,9 +290,6 @@ void AudioInput::event() {
 
 /// Control
 
-#include "thread.h"
-#include "file.h"
-#include "string.h"
 struct ID { uint numid, iface, device, subdevice; char name[44]; uint index; };
 struct List { uint offset, capacity, used, count; ID* pids; byte reserved[50]; };
 struct Info { ID id; uint type, access, count, owner; long min, max, step; byte reserved[128-sizeof(long[3])+64]; };
