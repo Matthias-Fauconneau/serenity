@@ -1,40 +1,45 @@
 /// \file dust.cc Automatic dust removal
 #include "serialization.h"
-#include "processed-source.h"
-#include "inverse-attenuation.h"
-#include "image-source-view.h"
-#include "jpeg-encoder.h"
+#include "source-view.h"
+#include "inverse-diffusion.h"
+#include "source-view.h"
+#include "export.h"
 
+struct InverseAttenuationOperation : InverseAttenuation, ImageOperation {
+	InverseAttenuationOperation(ImageRGBSource& calibration, ImageSource& source) : InverseAttenuation(calibration), ImageOperation(source, *this) {}
+};
+
+#if 0
 struct CalibrationView : Application {
     ImageFolder folder1 {Folder("Pictures", home())};
     ImageFolder folder2 {Folder("Paper", folder1.folder)};
     Calibration calibration1 {folder1};
     Calibration calibration2 {folder2};
     ImageView views[2]  = {sRGB(calibration1.sum(folder1.maximumSize()/4)),sRGB(calibration2.sum(folder2.maximumSize()/4))};
-    WidgetToggle toggleView {&views[0], &views[1]};
+	WidgetCycle toggleView {&views[0], &views[1]};
     Window window {&toggleView};
     CalibrationView() { log(withName(folder1.count(), folder2.count())); }
 };
 registerApplication(CalibrationView, calibration);
+#endif
 
 struct DustRemoval {
-    Folder folder {"Pictures", home()};
+	Folder folder {"Documents/Pictures/DustRemoval", home()};
     ImageFolder calibration {Folder("Paper", folder)};
-    InverseAttenuation correction { calibration };
-
-	PersistentValue<map<String, String>> imagesAttributes {folder,"attributes"};
-
-	ImageFolder source { folder, [this](string name, const map<String, String>& unused properties) {
-			return imagesAttributes.value(name) != "best"; //fromDecimal(properties.at("Aperture"_)) <= 5;
-		} };
-	UnarySource corrected {source, correction};
+	ImageFolder source { folder };
+	InverseAttenuationOperation target {calibration, source};
 };
 
+registerApplication(Export<DustRemoval>, export);
+
+#if 0
 struct DustRemovalTest : DustRemoval, Application {
-    DustRemovalTest() { corrected.image(0, source.size(0), true); } // Calibration: 5s, Linear: 0.8s
+	DustRemovalTest() { target.image(0, source.size(0), true); } // Calibration: 5s, Linear: 0.8s
 };
 registerApplication(DustRemovalTest, test);
+#endif
 
+#if 0
 struct DustRemovalPreview : DustRemoval, Application {
 	PersistentValue<String> lastName {folder, ".last", [this]{ return source.name(index); }};
 	const size_t lastIndex = source.keys.indexOf(lastName);
@@ -60,27 +65,9 @@ struct DustRemovalPreview : DustRemoval, Application {
 	void setCurrentImageAttributes(string currentImageAttributes) { imagesAttributes[corrected.name(index)] = String(currentImageAttributes); }
 };
 registerApplication(DustRemovalPreview);
+#endif
 
-struct DustRemovalExport : DustRemoval, Application {
-    DustRemovalExport() {
-		Folder output ("Best", folder, true);
-        for(size_t index: range(corrected.count())) {
-            String name = corrected.name(index);
-			Time correctionTime;
-			SourceImageRGB image = corrected.image(index, int2(2048,1536), true);
-			correctionTime.stop();
-			Time compressionTime;
-			writeFile(name, encodeJPEG(image, 75), output, true);
-			compressionTime.stop();
-			log(str(100*(index+1)/corrected.count())+'%', '\t',index+1,'/',corrected.count(),
-				'\t',imagesAttributes[corrected.name(index)],
-				'\t',corrected.name(index), strx(corrected.size(index)),
-				'\t',correctionTime, compressionTime);
-        }
-    }
-};
-registerApplication(DustRemovalExport, export);
-
+#if 0
 struct DustRemovalSource : DustRemoval, Application {
 	DustRemovalSource() {
 		Folder output ("Best", folder, true);
@@ -95,3 +82,4 @@ struct DustRemovalSource : DustRemoval, Application {
 	}
 };
 registerApplication(DustRemovalSource, source);
+#endif

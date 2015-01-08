@@ -1,8 +1,13 @@
-#include "inverse-attenuation.h"
+#include "inverse-diffusion.h"
 #include "parallel.h"
 
-buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green, const ImageF& blue) const {
-    const int2 size = red.size; assert_(green.size == size && blue.size == size);
+// FIXME: use Intensity operator
+static void average(mref<float> Y, ref<float> R, ref<float> G, ref<float> B) {
+	parallel::apply(Y, [&](float r, float g, float b) {  return (r+g+b)/3; }, R, G, B);
+}
+
+void InverseAttenuation::apply(ref<ImageF> Y, ref<ImageF> X) const {
+	const int2 size = X[0].size;
 
     // Calibrated parameters
     const SourceImage attenuation = Calibration::attenuation(size);
@@ -16,7 +21,8 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
     int2 origin = spotOrigin;
 	// Estimates spot movement
 	// Selects [spotLowThreshold - spotHighThreshold] band in cropped intensity image
-	ImageF intensity = crop(red, green, blue, spotOrigin, spotSize);
+	ImageF intensity (spotSize);
+	average(intensity, copy(crop(X[0], spotOrigin, spotSize)), copy(crop(X[1], spotOrigin, spotSize)), copy(crop(X[2], spotOrigin, spotSize))); // FIXME
 	//const ImageF low = gaussianBlur(intensity, spotLowBound);
 	intensity = gaussianBlur(intensity, spotHighBound);// - low;
 
@@ -35,30 +41,32 @@ buffer<ImageF> InverseAttenuation::apply(const ImageF& red, const ImageF& green,
 	//log(withName(spotOrigin, offset, origin));
 
     // Image processing
-    return ::apply(ref<ImageF>{share(red), share(green), share(blue)}, [&](const ImageF& source) -> ImageF {
+	for(size_t index: range(X.size)) {
+		const ImageF& source = X[index];
 		//return insert(source, intensity, spotOrigin); // DEBUG: Displays spot tracker field
 
         // Crops source
         const ImageF crop = ::crop(source, origin, spotSize);
 
         // Splits details
-        ImageF low_spot = gaussianBlur(crop, spotHighBound);
+		ImageF low_spot = gaussianBlur(crop, spotHighBound);
         ImageF high = crop - low_spot;
 
         // Inverses attenuation (of frequencies under spot frequency) using attenuation factors calibrated for each pixel
-        ImageF target = low_spot / attenuation;
+		ImageF corrected_low_spot = low_spot / attenuation;
 
-        float DC = parallel::mean(target);
+		float DC = parallel::mean(corrected_low_spot);
 
 		// Merges unobscuring correction near spot (i.e saturates any enlightenment to flattening)
-		vec2 center = vec2(target.size)/2.f;
-		::applyXY(target, [=](float x, float y, float source, float corrected_low_spot, float high) {
+		vec2 center = vec2(corrected_low_spot.size)/2.f;
+		::applyXY(corrected_low_spot, [=](float x, float y, float source, float corrected_low_spot, float high) {
 			float r2 = sq(vec2(x,y)-center);
 			float w = min(1.f, r2/sq(center.x));
 			return max(source, w * source + (1-w) * (DC + min(0.f, corrected_low_spot-DC) + high));
-		}, crop, target, high);
+		}, crop, corrected_low_spot, high);
 
         // Inserts cropped correction
-        return insert(source, target, origin);
-    });
+		const ImageF& target = Y[index];
+		insert(target, source, corrected_low_spot, origin);
+	}
 }

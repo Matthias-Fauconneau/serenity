@@ -140,3 +140,6 @@ music-practice.cc
 music-pdf.cc
 player.cc
 web.cc
+image/blend.cc
+image/dust.cc
+image/export.h

@@ -9,6 +9,7 @@
 #include "multiscale.h"
 #include "jpeg-encoder.h"
 #include "layout.h"
+#include "export.h"
 
 #if 0
 struct ExposureBlendAnnotate : Application {
@@ -70,9 +71,12 @@ struct ExposureBlend {
 	ImageGroupOperationT<FilterBank> splitBands {multiscale.source};
 	BinaryImageGroupOperationT<Multiply> weightedBands {normalizeWeightBands, splitBands}; // Applies weights to each band
 	ImageGroupOperationT<Sum> sumBands {weightedBands}; // Sums bands
-	ImageGroupFoldT<Sum> blend {multiscale}; // Sums images
+	ImageGroupFoldT<Sum> target {multiscale}; // Sums images
 };
 
+registerApplication(Export<ExposureBlend>, export);
+
+#if 0
 struct Transpose : OperatorT<Transpose> { /*string name() const override { return  "Transpose"; }*/ };
 /// Swaps component and group indices
 struct TransposeOperation : GenericImageOperation, ImageGroupSource, OperatorT<Transpose> {
@@ -105,6 +109,7 @@ struct ExposureBlendPreview : ExposureBlend, Application {
 	Window window {&views, -1, [this]{ return views.title(); }};
 };
 registerApplication(ExposureBlendPreview);
+#endif
 
 #if 0
 struct ExposureBlendTest : ExposureBlend, Application {
@@ -120,26 +125,6 @@ struct ExposureBlendTest : ExposureBlend, Application {
 };
 registerApplication(ExposureBlendTest, test);
 #endif
-
-struct ExposureBlendExport : ExposureBlend, Application {
-	sRGBOperation sRGB {blend};
-	ExposureBlendExport() {
-		Folder output ("Export", folder, true);
-		for(size_t index: range(sRGB.count(-1))) {
-			String name = sRGB.elementName(index);
-			Time correctionTime;
-			SourceImageRGB image = sRGB.image(index);
-			correctionTime.stop();
-			Time compressionTime;
-			writeFile(name, encodeJPEG(image), output, true);
-			compressionTime.stop();
-			log(str(100*(index+1)/sRGB.count(-1))+'%', '\t',index+1,'/',sRGB.count(-1),
-				'\t',sRGB.elementName(index),
-				'\t',correctionTime, compressionTime);
-		}
-	}
-};
-registerApplication(ExposureBlendExport, export);
 
 #if 0
 struct ExposureBlendSelect : ExposureBlend, Application {

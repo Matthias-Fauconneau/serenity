@@ -34,7 +34,12 @@ struct ImageF : buffer<float> {
 	};
 	size_t stride = 0;
 };
-inline ImageF copy(const ImageF& o) { return ImageF(copy((const buffer<float>&)o), o.size, o.stride); }
+inline ImageF copy(const ImageF& o) {
+	if(o.width == o.stride) return ImageF(copy((const buffer<float>&)o), o.size, o.stride);
+	ImageF target(o.size);
+	for(size_t y: range(o.height)) target.slice(y*target.stride, target.width).copy(o.slice(y*o.stride, o.width));
+	return target;
+}
 inline String str(const ImageF& o) { return strx(o.size); }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)

@@ -3,11 +3,11 @@
 
 /// Calibrates attenuation bias image by summing images of a white subject
 struct Calibration {
-    const ImageSource& source;
-	const Folder folder {"Calibration", source.folder()};
+	ImageRGBSource& source;
+	String path() const /*override*/ { return source.path()+"/Calibration"_; };
 
     /// Calibrates attenuation bias image by summing images of a white subject
-    Calibration(const ImageSource& source) : source(source) {}
+	Calibration(ImageRGBSource& source) : source(source) {}
 
     int64 time() const;
 

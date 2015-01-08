@@ -9,11 +9,11 @@ int64 Calibration::time() const {
 
 // Sums all images
 SourceImage Calibration::sum(int2 size) const {
-	return cache<ImageF>(folder, "sum", size, time(), [&](const ImageF& target) {
+	return cache<ImageF>(path(), "sum", size, time(), [&](const ImageF& target) {
             target.buffer::clear();
             float scale = 1./(3*source.count());
             for(size_t index: range(source.count())) {
-                SourceImageRGB source = Calibration::source.image(index, size);
+				SourceImageRGB source = Calibration::source.image(index, size);
                 parallel::apply(target, [scale](float sum, byte4 source) {
                     return sum + scale*(sRGB_reverse[source.b]+sRGB_reverse[source.g]+sRGB_reverse[source.r]);
                 }, target, source);
@@ -22,17 +22,17 @@ SourceImage Calibration::sum(int2 size) const {
 }
 
 int2 Calibration::spotPosition(int2 size) const {
-	return cache<int2>(folder, "spotPosition", strx(size), time(), [&]() {
+	return parse<int2>(cache(path(), "spotPosition", strx(size), time(), [&]() {
         int2 spotSize = Calibration::spotSize(size); // Reverse dependency but ensures spot is found inside enough
-        return spotSize/2+argmin(crop(sum(size), spotSize/2, size-spotSize));
-    });
+		return strx(spotSize/2+argmin(crop(sum(size), spotSize/2, size-spotSize)));
+	}));
 }
 
 /// Returns spot size
 int2 Calibration::spotSize(int2 size) const { return int2(min(size.x, size.y)/8); }
 
 SourceImage Calibration::attenuation(int2 size) const {
-	return cache<ImageF>(folder, "attenuation", spotSize(size), time(), [&](const ImageF& target) {
+	return cache<ImageF>(path(), "attenuation", spotSize(size), time(), [&](const ImageF& target) {
         SourceImage source = Calibration::sum(size);
 
         int2 spotPosition = Calibration::spotPosition(size);

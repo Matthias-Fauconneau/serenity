@@ -19,20 +19,20 @@ struct GenericImageSourceView : ImageView {
 		return str(index+1,'/',source.count(), source.elementName(min<size_t>(index, source.count(1)-1)), source.name());
     }
 
-    int2 sizeHint(int2 size) override {
+	vec2 sizeHint(vec2 size) override {
         assert_(size);
 		int2 maximum = source.maximumSize();
 		/*int downscaleFactor = min(max((maximum.x+size.x-1)/size.x, (maximum.y+size.y-1)/size.y), 16);
         int2 hint = maximum/downscaleFactor;
 		assert_(hint<=size, maximum, size, downscaleFactor, maximum/downscaleFactor);*/
-		return -maximum; //int2(-maximum.x, /*-size.y); //hint;
+		return -vec2(maximum); //int2(-maximum.x, /*-size.y); //hint;
     }
 
 	virtual void update(size_t index, int2 size) abstract;
 
-	shared<Graphics> graphics(int2 size) override {
+	shared<Graphics> graphics(vec2 size) override {
 		if(!source.count(1)) return shared<Graphics>();
-		update(index, size);
+		update(index, int2(size));
 		ImageView::image = share(image);
 		//assert_(image.size.x <= size.x || image.size.y <= size.y, image.size, size);
         return ImageView::graphics(size);
@@ -98,8 +98,8 @@ struct ImageGroupSourceView  : GenericImageSourceView {
 	}
 
 	/// Cycles between images of a group with the mouse wheel
-	bool mouseEvent(int2, int2 size, Event event, Button button, Widget*&) override {
-		update(index, size);
+	bool mouseEvent(vec2, vec2 size, Event event, Button button, Widget*&) override {
+		update(index, int2(size));
 		if(event == Press) {
 			if(button==WheelDown) { imageIndex=(imageIndex+1)%images.size; return true; }
 			if(button==WheelUp) { imageIndex=(imageIndex+images.size-1)%images.size; return true; }
