@@ -42,6 +42,7 @@ MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds) {
 	assert_(targetTicksPerSeconds > notes.ticksPerSeconds);
 	for(MidiNote& note: notes) {
 		note.time = (int64)note.time*targetTicksPerSeconds/notes.ticksPerSeconds;
+		assert_(note.time < 1<<30);
 		assert(note.time >= 0);
 	}
 	notes.ticksPerSeconds = targetTicksPerSeconds;
@@ -73,7 +74,7 @@ struct Synchronizer : Widget {
 			uint keyCount = lastKey+1-firstKey;
 
 			size_t T = audio.size/audio.channels; // Total sample count
-#if 0 // FFT
+#if DEBUG // FFT
 			size_t N = 8192;  // Frame size: 48KHz * 2 (Nyquist) * 2 (window) / frameSize ~ 24Hz~A0
 			size_t h = 2048; // Hop size: 48KHz * 60 s/min / 4 b/q / hopSize / 2 (Nyquist) ~ 175 bpm
 			FFT fft(N);
@@ -195,7 +196,7 @@ struct Synchronizer : Widget {
 			size_t midiIndex = 0;
 			while(i<m && j<n) {
 				int localOffset = (int(P[j][0].time) - int(notes[midiIndex].time)) - globalOffset; // >0: late, <0: early
-				const int limitDelay = notes.ticksPerSeconds/4, limitAdvance = notes.ticksPerSeconds/4;
+				const int limitDelay = notes.ticksPerSeconds/8, limitAdvance = notes.ticksPerSeconds/4;
 				if(j+1<n && ((D(i,j) == D(i,j+1) && (i==0 || localOffset < limitDelay)) || (i && localOffset < -limitAdvance))) {
 					j++;
 				} else {
@@ -221,15 +222,21 @@ struct Synchronizer : Widget {
 			size_t index = 0;
 			for(size_t measureIndex: range(measureBars.size())) {
 				while(index < signs.size) {
+					assert_(signs[index].note.measureIndex != invalid);
                     if(signs[index].note.measureIndex >= measureIndex) break;
 					index++;
 				}
-				if(index == signs.size) measureBars.keys[measureIndex] =  onsets.last().time; // Last measure (FIXME: last release time)
-				else {
+				if(index == signs.size) {
+					assert_(measureIndex == measureBars.size()-1);
+					measureBars.keys[measureIndex] =  onsets.last().time; // Last measure (FIXME: last release time)
+				} else {
                     if(signs[index].note.measureIndex != measureIndex) { // Empty measure
+						log("Empty measure", signs[index].note.measureIndex, measureIndex);
                         assert_(index>0, index, measureIndex, signs[index].note.measureIndex);
 						measureBars.keys[measureIndex] = onsets[index-1].time; // FIXME: should be onsets[index].time - measureTime[index]
-					} else measureBars.keys[measureIndex] = onsets[index].time;
+					} else {
+						measureBars.keys[measureIndex] = onsets[index].time;
+					}
 				}
 			}
 		}
@@ -436,17 +443,20 @@ struct Music : Widget {
 		}
 
 		int64 t = (int64)timeNum*notes.ticksPerSeconds;
-		int previousOffset = scroll.offset.x;
+		float previousOffset = scroll.offset.x;
 		// Cardinal cubic B-Spline
-		for(int index: range(sheet.measureBars.size()-1)) {
+		for(int index: range(sheet.measureBars.size()-2)) {
 			int64 t1 = (int64)sheet.measureBars.keys[index]*timeDen;
 			int64 t2 = (int64)sheet.measureBars.keys[index+1]*timeDen;
 			if(t1 <= t && t < t2) {
 				real f = real(t-t1)/real(t2-t1);
 				real w[4] = { 1./6 * cb(1-f), 2./3 - 1./2 * sq(f)*(2-f), 2./3 - 1./2 * sq(1-f)*(2-(1-f)), 1./6 * cb(f) };
 				auto X = [&](int index) { return clip(0.f, sheet.measureBars.values[clip<int>(0, index, sheet.measureBars.values.size)] - size.x/2,
-							(float)abs(sheet.sizeHint(size).x)-size.x); };
-				scroll.offset.x = -round( w[0]*X(index-1) + w[1]*X(index) + w[2]*X(index+1) + w[3]*X(index+2) );
+							abs(sheet.sizeHint(size).x)-size.x); };
+				float newOffset = round( w[0]*X(index-1) + w[1]*X(index) + w[2]*X(index+1) + w[3]*X(index+2) );
+				if(newOffset >= -scroll.offset.x) {
+					scroll.offset.x = -newOffset;
+				} //else log(index, scroll.offset.x, newOffset, f, w[0], X(index-1), w[1], X(index), w[2], X(index+1),  w[3], X(index+2) );
 				break;
 			}
 		}
@@ -455,7 +465,7 @@ struct Music : Widget {
         if(video) {
 			while((int64)video.videoTime*timeDen < (int64)timeNum*video.timeDen) {
 				Image image = video.read();
-				if(!image) { assert_(preview); break; }
+				if(!image) { if(!preview) log("Missing image"); break; }
 				assert_(image);
 				if(rotate) ::rotate(image);
 				Image crop = this->crop ? cropShare(image, int2(0, image.height*10/24), int2(image.width, image.height/2)) : share(image);
@@ -463,13 +473,13 @@ struct Music : Widget {
 				videoView.image = this->resize ? ::resize(scale.size*resize/(resize+1), scale) : copy(crop);
 				contentChanged=true;
 				// Only preview may have lower framerate than video
-				assert_((int64)video.videoTime*timeDen >= (int64)timeNum*video.timeDen || preview, video.videoTime, video.timeDen, timeNum, timeDen);
+				assert_((int64)video.videoTime*timeDen >= (int64)timeNum*video.timeDen || preview || video.videoTime == 0 /*First frame might have a negative timecode*/, video.videoTime, video.timeDen, timeNum, timeDen);
 			}
         }
 		return contentChanged;
 	}
 
-	int seek(int64 time) {
+	/*int seek(int64 time) {
 		if(audioFile) {
             assert_(notes.ticksPerSeconds == audioFile->audioFrameRate);
             audioFile->seek(time); //FIXME: return actual frame time
@@ -484,7 +494,7 @@ struct Music : Widget {
 			return video.videoTime;
 		}
 		return 0;
-	}
+	}*/
 
 	Music() {
 		//TODO: measureBars.t *= 60 when using MusicXML (no MIDI)
@@ -498,7 +508,7 @@ struct Music : Widget {
 		}
 		if(sampler) decodeThread.spawn(); // For sampler
         if(arguments().contains("encode") || arguments().contains("export")) { // Encode
-			assert_(!failed);
+			assert_(!failed && video && audioFile && audioFile->codec==FFmpeg::AAC);
 
 			Encoder encoder {name+".mp4"_};
 			encoder.setH264(int2(1280,720), 60);
@@ -516,9 +526,9 @@ struct Music : Widget {
 			totalTime.start();
 			for(int lastReport=0;;) {
                 //assert_(encoder.audioStream->time_base.num == 1);
-				auto writeAudio = [&]{
+				auto writeAudio = [&] {
 					if(audioFile && audioFile->codec==FFmpeg::AAC) {
-                        encoder.copyAudioPacket(audioFile);
+						return encoder.copyAudioPacket(audioFile);
 					} else if(audioFile) {
 						assert_(encoder.audioFrameSize==1024);
                         buffer<int16> source(encoder.audioFrameSize*audioFile->channels);
@@ -535,11 +545,16 @@ struct Music : Widget {
 						sampler.read16(buffer);
 						encoder.writeAudioFrame(buffer);
 					}
+					return true;
 				};
 				if(encoder.videoFrameRate) { // Interleaved AV
                     //assert_(encoder.audioStream->time_base.num == 1 && encoder.audioStream->time_base.den == (int)encoder.audioFrameRate);
 					// If both streams are at same PTS, starts with audio
-					while((int64)encoder.audioTime*encoder.videoFrameRate <= (int64)encoder.videoTime*encoder.audioFrameRate) writeAudio();
+					bool done = false;
+					while((int64)encoder.audioTime*encoder.videoFrameRate <= (int64)encoder.videoTime*encoder.audioFrameRate) {
+						if(!writeAudio()) { done = true; break /*2*/; }
+					}
+					if(done) break;
 					while((int64)encoder.videoTime*encoder.audioFrameRate <= (int64)encoder.audioTime*encoder.videoFrameRate) {
 						followTime.start();
                         follow(time, encoder.videoFrameRate, vec2(encoder.size), false);
@@ -555,14 +570,15 @@ struct Music : Widget {
 						time++;
 					}
 				} else { // Audio only
-					writeAudio();
+					if(!writeAudio()) break;
 				}
-				int percent = round(100.*encoder.audioTime/encoder.audioFrameRate/((float)notes.last().time/notes.ticksPerSeconds));
+				int percent = round(100.*video.videoTime/video.duration); //encoder.audioTime/encoder.audioFrameRate/((float)notes.last().time/notes.ticksPerSeconds));
 				if(percent!=lastReport) {
 					log(str(percent,2)+"%", str(followTime, totalTime), str(renderTime, totalTime), str(encodeTime, totalTime));
 					lastReport=percent;
 				}
 				if(time*notes.ticksPerSeconds/encoder.videoFrameRate >= uint64(onsets.last() + 4*notes.ticksPerSeconds)) break;
+				if(video.videoTime >= video.duration) break;
 				//if(time > 1*encoder.videoFrameRate) break; // DEBUG
 			}
 			requestTermination(0); // Window prevents automatic termination

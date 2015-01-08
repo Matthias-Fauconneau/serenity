@@ -77,8 +77,8 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
 			String fontID; float fontSize=0;
             vec2 last = 0;
 			for(const Glyph& glyph: graphics.glyphs) {
-                const Font& font = glyph.font;
-                if(font.name != fontID || font.size != fontSize) {
+				const FontData& font = glyph.font;
+				if(font.name != fontID || glyph.fontSize != fontSize) {
 					if(!pageFontReferences.contains(font.name)) {
                         if(!fonts.contains(font.name)) {
                             Object& xFont = objects.append();
@@ -100,13 +100,13 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
 										fontDescriptor.insert("Type"__, "/FontDescriptor"_);
 										fontDescriptor.insert("FontName"__, "/Font"_);
 										fontDescriptor.insert("Flags"__, 1<<3 /*Symbolic*/);
-                                        {array<Variant> fontBBox;
+										/*{array<Variant> fontBBox;
 											fontBBox.append(str(int(font.bboxMin .x))); fontBBox.append(str(int(font.bboxMin .y)));
 											fontBBox.append(str(int(font.bboxMax.x))); fontBBox.append(str(int(font.bboxMax.y)));
-											fontDescriptor.insert("FontBBox"__, Variant(move(fontBBox)));}
+											fontDescriptor.insert("FontBBox"__, Variant(move(fontBBox)));}*/
 										fontDescriptor.insert("ItalicAngle"__, 0);
-										fontDescriptor.insert("Ascent"__, int(font.ascender));
-										fontDescriptor.insert("Descent"__, int(font.descender));
+										//fontDescriptor.insert("Ascent"__, int(font.ascender));
+										//fontDescriptor.insert("Descent"__, int(font.descender));
 										fontDescriptor.insert("StemV"__, 1);
                                         {Object& fontFile = objects.append();
 											fontFile.insert("Filter"__, "/FlateDecode"_);
@@ -121,7 +121,7 @@ buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
                         }
 						pageFontReferences.insert(copy(font.name), copy(fonts.at(font.name)));
                     }
-					content.append('/'+font.name+' '+str(int(glyph.font.size*px))+" Tf\n"); // Font size in pixels
+					content.append('/'+font.name+' '+str(int(glyph.fontSize*px))+" Tf\n"); // Font size in pixels
                 }
 
 				uint index = glyph.index; //font.index(glyph.code);

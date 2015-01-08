@@ -73,11 +73,13 @@ Font::Font(ref<byte> data, float size, bool hint) : size(size), hint(hint) {
     assert_(size);
     FT_Size_RequestRec req = {FT_SIZE_REQUEST_TYPE_NOMINAL,long(round(size*0x1p6)),long(round(size*0x1p6)),0,0};
     FT_Request_Size(face,&req);
-    ascender=face->size->metrics.ascender*0x1p-6;
-    descender=face->size->metrics.descender*0x1p-6;
-    vec2 scale (face->size->metrics.x_scale*0x1p-16*0x1p-6, face->size->metrics.y_scale*0x1p-16*0x1p-6);
-    bboxMin = scale*vec2(face->bbox.xMin, face->bbox.yMin);
-    bboxMax = scale*vec2(face->bbox.xMax, face->bbox.yMax);
+	//ascender=face->/*size->metrics.*/ascender;//*0x1p-6;
+	//descender=face->/*size->metrics.*/descender;//*0x1p-6;
+	ascender=face->size->metrics.ascender*0x1p-6;
+	descender=face->size->metrics.descender*0x1p-6;
+	//vec2 scale (face->size->metrics.x_scale*0x1p-16*0x1p-6, face->size->metrics.y_scale*0x1p-16*0x1p-6);
+	//bboxMin = /*scale**/vec2(face->bbox.xMin, face->bbox.yMin);
+	//bboxMax = /*scale**/vec2(face->bbox.xMax, face->bbox.yMax);
 }
 
 Font::~Font(){

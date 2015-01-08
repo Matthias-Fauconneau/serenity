@@ -673,5 +673,25 @@ MusicXML::MusicXML(string document, string) {
     signs.size = lastMeasureIndex+1; // Last measure with notes
 #endif
 
+#if 1
+	// Removes double notes
+	array<Sign> chord;
+	for(size_t signIndex=1; signIndex < signs.size;) {
+		Sign sign = signs[signIndex];
+		if(sign.type == Sign::Note) {
+			if(chord && sign.time != chord[0].time) chord.clear();
+			bool contains = false;
+			for(Sign o: chord) if(sign.note.step == o.note.step) {
+				log("double", o, o.duration, sign, sign.duration, sign.note.measureIndex);
+				contains = true;
+				break;
+			}
+			if(contains) { signs.removeAt(signIndex); continue; }
+			chord.append( sign );
+		}
+		signIndex++;
+	}
+#endif
+
 	assert_(signs);
 }

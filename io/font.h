@@ -25,7 +25,7 @@ struct Font {
     bool hint;
     handle<FT_FaceRec_*> face;
     float ascender = 0, descender = 0;
-    vec2 bboxMin = 0, bboxMax = 0;
+	//vec2 bboxMin = 0, bboxMax = 0; // in font units
 
     struct Glyph {
         int2 offset; // (left bearing, min.y-baseline) //FIXME: -> Image

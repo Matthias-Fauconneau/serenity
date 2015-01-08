@@ -214,9 +214,10 @@ void Encoder::writeAudioFrame(ref<int32> audio) {
 	audioTime += audio.size/channels;
 }
 
-void Encoder::copyAudioPacket(FFmpeg& audio)	{
+bool Encoder::copyAudioPacket(FFmpeg& audio) {
     AVPacket packet;
     int status = av_read_frame(audio.file, &packet);
+	if(status != 0) { log("copyAudioPacket failed", status); return false; }
     assert_(status == 0);
     if(audio.file->streams[packet.stream_index]==audio.audioStream) {
         assert_(audioStream->time_base.num == audio.audioStream->time_base.num);
@@ -226,6 +227,7 @@ void Encoder::copyAudioPacket(FFmpeg& audio)	{
         packet.stream_index = audioStream->index;
         av_interleaved_write_frame(context, &packet);
     }
+	return true;
 }
 
 void Encoder::abort() {

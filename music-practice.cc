@@ -11,15 +11,6 @@
 #include "interface.h"
 #include "window.h"
 
-struct GraphicsWidget : Graphics, Widget {
-    GraphicsWidget(Graphics&& o) : Graphics(move(o)) {}
-    vec2 sizeHint(vec2) override;
-    shared<Graphics> graphics(vec2) override;
-};
-
-vec2 GraphicsWidget::sizeHint(vec2) { assert_(isNumber(bounds.max), bounds); return bounds.max; }
-shared<Graphics> GraphicsWidget::graphics(vec2 unused size /*TODO: center*/) { return shared<Graphics>((Graphics*)this); }
-
 /// SFZ sampler and PDF renderer
 struct Music {
     const Folder& folder = currentWorkingDirectory();

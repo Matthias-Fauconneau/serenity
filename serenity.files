@@ -134,7 +134,9 @@ music/flac.cc
 music/notation.h
 music/midi-input.h
 music/midi-input.cc
-
+music/video.cc
 music-video.cc
 music-practice.cc
+music-pdf.cc
 player.cc
+web.cc

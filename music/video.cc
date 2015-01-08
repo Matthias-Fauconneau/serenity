@@ -36,8 +36,8 @@ Decoder::Decoder(string path) {
 				//videoFrameRate = videoCodec->time_base.den/videoCodec->time_base.num;
 				//assert_(videoCodec->time_base.den == videoFrameRate, videoCodec->time_base.den);
 				//assert_(videoStream->duration != AV_NOPTS_VALUE);
-				timeNum = videoCodec->time_base.num;
-				timeDen = videoCodec->time_base.den;
+				//timeNum = videoCodec->time_base.num;
+				timeDen = videoStream->time_base.den;
 				duration = videoStream->duration; //*videoStream->time_base.num/videoStream->time_base.den;
 				//duration = file->duration*videoFrameRate/AV_TIME_BASE;
 			}
@@ -76,7 +76,7 @@ Image Decoder::read() {
 
 				//if(!firstPTS) firstPTS=frame->pkt_pts; // Ignores any embedded sync
 				//assert_(frame->pkt_pts >= firstPTS, firstPTS, packet.pts, packet.dts);
-				int nextTime = (frame->pkt_pts/*-firstPTS*/);// * videoFrameRate * videoStream->time_base.num/*+ 10*/) / videoStream->time_base.den;
+				int nextTime = frame->pkt_pts; // * videoFrameRate * videoStream->time_base.num / videoStream->time_base.den;
 				//assert_(nextTime == videoTime+1, videoTime, nextTime, videoFrameRate, frame->pkt_pts);
 				videoTime = nextTime;
 				return image;

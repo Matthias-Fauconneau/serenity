@@ -53,3 +53,11 @@ struct Widget {
     /// \return Whether the key press was accepted
 	virtual bool keyPress(Key key, Modifiers modifiers) { (void)key, (void) modifiers; return false; }
 };
+
+struct GraphicsWidget : Graphics, Widget {
+	GraphicsWidget(Graphics&& o) : Graphics(move(o)) {}
+	vec2 sizeHint(vec2) override;
+	shared<Graphics> graphics(vec2) override;
+};
+inline vec2 GraphicsWidget::sizeHint(vec2) { assert_(isNumber(bounds.max), bounds); return bounds.max; }
+inline shared<Graphics> GraphicsWidget::graphics(vec2 unused size /*TODO: center*/) { return shared<Graphics>((Graphics*)this); }

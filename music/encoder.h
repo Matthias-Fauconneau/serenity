@@ -41,5 +41,5 @@ struct Encoder {
 	/// Writes an audio frame
 	void writeAudioFrame(ref<int32> audio);
     /// Copies an audio frame
-	void copyAudioPacket(FFmpeg& audio);
+	bool copyAudioPacket(FFmpeg& audio);
 };
