@@ -113,7 +113,6 @@ static double level(ref<float> envelope, size_t start, size_t duration) {
 
 Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeChanged, Thread& thread) : Poll(0, POLLIN, thread), periodSize(periodSize), timeChanged(timeChanged) {
     sampler = this; // DEBUG
-	registerPoll();
     // Parses sfz and map samples
 	TextData s = readFile(path);
 	Folder folder = section(path,'.',0,1); // Samples must be in a subfolder with the same name as the .sfz file
@@ -202,7 +201,7 @@ Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeCh
             if(layer == 0) { // Generates pitch shifting (resampling) filter banks
 				Layer layer;
 				layer.shift = shift;
-                layer.notes.reserve(512);
+				layer.notes.reserve(1024);
 				if(shift /*|| rate!=outputRate*/) {
                     const uint size = 2048; // Accurate frequency resolution while keeping reasonnable filter bank size
 					layer.resampler = Resampler(2, size, round(size*exp2((-shift)/12.0)/**outputRate/rate*/),
@@ -212,6 +211,8 @@ Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeCh
             }
         }
     }
+
+	if(&thread != &mainThread) registerPoll();
 }
 
 /// Input events (realtime thread)
@@ -219,7 +220,7 @@ Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeCh
 
 float Note::actualLevel(uint duration) const { return ::level(envelope, flac.position, duration); }
 
-void Sampler::noteEvent(uint key, uint velocity) {
+void Sampler::noteEvent(uint key, uint velocity, float2 gain) {
 	//TODO: Pedal events
     Note* released=0;
     //if(velocity==0) { // Also releases repetitions
@@ -239,15 +240,15 @@ void Sampler::noteEvent(uint key, uint velocity) {
     //}
     for(const Sample& s : samples) {
         if(s.trigger == (released?1:0) && s.lokey <= key && key <= s.hikey && s.lovel <= velocity && velocity <= s.hivel) {
-            float level = 1;
+			float2 level = 1;
             if(released) { // Release (rt_decay is unreliable, matching levels works better), FIXME: window length for energy evaluation is arbitrary
                 float releaseLevel = s.startLevel; // 42ms
                 float releasedLevel = released->actualLevel(2048);
-                float currentAttenuation = released->level[0];
-                float estimatedLevel = min<float>(1.f, currentAttenuation * releasedLevel / releaseLevel); // 341ms/21ms
+				float2 currentAttenuation (released->level[0], released->level[1]);
+				float2 estimatedLevel = min<float2>(1.f, currentAttenuation * releasedLevel / releaseLevel); // 341ms/21ms
                 level = estimatedLevel; //min(estimatedLevel, modeledLevel);
             }
-            if(level < 0x1p-7) return;
+			if(level < float2(0x1p-7)) return;
 
             float shift = int(key)-s.pitch_keycenter; //TODO: tune
             Layer* layer=0;
@@ -260,22 +261,28 @@ void Sampler::noteEvent(uint key, uint velocity) {
             if(!released) { // Press
                 note.key = key, note.velocity = velocity;
                 //note.level = float4(1); // Velocity layers already select correct level
-                note.level = float4(s.volume * float(velocity) / s.hivel); // E ~ A^2 ~ v^2 => A ~ v (TODO: normalize levels)
-                note.level = float4(s.volume * float(velocity) / 127/*s.hivel*/); // FIXME: this is not right
+				note.level = float4(s.volume * float(velocity) / s.hivel); // E ~ A^2 ~ v^2 => A ~ v (TODO: normalize levels)
+				note.level = float4(s.volume * float(velocity) / 127/*s.hivel*/); // FIXME: this is not right
+				note.level[0] *= gain[0];
+				note.level[1] *= gain[1];
+				note.level[2] *= gain[0];
+				note.level[3] *= gain[1];
                 //log(velocity, s.lovel, s.hivel, note.level[0]);
             } else {
-                note.level = float4(level);
+				note.level = {level[0], level[1], level[0], level[1]};
             }
             note.step=(v4sf){1,1,1,1};
             note.releaseTime=s.releaseTime;
             note.envelope=s.envelope;
             //if(note.flac.sampleSize==16) note.level *= float4(0x1p8f);
 
-            assert_(layer->notes.size<layer->notes.capacity);
-			//{Locker lock(notesSizeLock); // Locks note cleanup (assumes note cleanup is only done in this same thread)
-                layer->notes.append(move(note)); // Copies predecoded buffer and corresponding FLAC decoder state
-			//}
-            queue(); //queue background decoder in main thread
+			if(layer->notes.size >= layer->notes.capacity) log(layer->notes.size >= layer->notes.capacity, layer->notes.size, layer->notes.capacity);
+			else {
+				//{Locker lock(notesSizeLock); // Locks note cleanup (assumes note cleanup is only done in this same thread)
+				layer->notes.append(move(note)); // Copies predecoded buffer and corresponding FLAC decoder state
+				//}
+				queue(); //queue background decoder in main thread
+			}
             return;
         }
     }
@@ -288,9 +295,9 @@ void Sampler::noteEvent(uint key, uint velocity) {
 
 void Sampler::event() { // Decode thread event posted every period from Sampler::read by audio thread
     for(;;) {
+		Locker lock(noteReferencesLock); // Locks note cleanup while decoding
         Note* note=0; size_t minBufferSize=-1;
 		for(Layer& layer: layers) {
-			Locker lock(noteReferencesLock); // Locks note cleanup while decoding
 			for(Note& n: layer.notes) { // Finds least buffered note
 				if(n.flac.blockSize /*!EOF*/ && n.writeCount >= n.flac.blockSize && n.flac.audioAvailable < minBufferSize) {
 					note = &n;

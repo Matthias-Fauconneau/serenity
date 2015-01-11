@@ -38,7 +38,7 @@ struct Sampler : Poll {
 	Sampler(string path, const uint periodSize=256/*[12ms/82Hz/4m]*/, function<void(uint)> timeChanged={}, Thread& thread=mainThread);
     virtual ~Sampler();
 
-	void noteEvent(uint key, uint velocity);
+	void noteEvent(uint key, uint velocity, float2 gain);
 
     /// Callback to decode samples
     void event() override;

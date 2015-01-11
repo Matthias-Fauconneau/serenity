@@ -22,12 +22,12 @@ struct Display : Socket, Poll {
 
 // Server
      /// Base resource id
-     uint id;
+	 uint id = 0;
 // Display
     /// Root window
-    uint root;
+	uint root = 0;
     /// Root visual
-    uint visual;
+	uint visual = 0;
     /// Screen size
     int2 size = 0;
 

@@ -3,6 +3,7 @@
 #include "notation.h"
 
 struct MusicXML {
+    array<string> staves; // Stave instrument names
     array<Sign> signs;
     uint divisions = 0; // Time unit per quarter note
     MusicXML() {}

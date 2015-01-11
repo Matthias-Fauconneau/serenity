@@ -41,6 +41,11 @@ MusicXML::MusicXML(string document, string) {
 		}
 	}
 #endif
+	root.xpath("score-partwise/part-list/score-part"_, [this](const Element& p) {
+		assert_(p.contains("part-name"), p);
+		staves.append(p("part-name").text());
+	});
+
     int xmlStaffCount = 0;
     root.xpath("score-partwise/part"_, [&xmlStaffCount](const Element& p) {
             int partStaffCount = 0;
@@ -55,6 +60,7 @@ MusicXML::MusicXML(string document, string) {
             xmlStaffCount += partStaffCount;
     });
 	//assert_(xmlStaffCount >= 2 && xmlStaffCount <= 3, xmlStaffCount);
+	assert_(size_t(xmlStaffCount) == staves.size, xmlStaffCount, staves);
 
 	const size_t staffCount = xmlStaffCount; //2;
 	buffer<Clef> clefs(staffCount); clefs.clear(Clef{GClef, 0});
@@ -110,7 +116,7 @@ MusicXML::MusicXML(string document, string) {
 
                 if(e.name=="note"_) {
                     Value value = e.contains("type"_) ? Value(ref<string>(valueNames).indexOf(e("type"_).text())) : Whole;
-                    assert_(int(value)!=-1);
+					assert_(int(value)!=-1, e);
                     int duration;
                     uint durationCoefficientNum=1, durationCoefficientDen=1;
                     if(e.contains("grace"_)) {
@@ -190,7 +196,7 @@ MusicXML::MusicXML(string document, string) {
                         int xmlAlteration = e("pitch"_).contains("alter"_) ? parseDecimal(e("pitch"_)("alter"_).text()) : 0;
                         //if(xmlAlteration == 4) xmlAlteration = 2; // ?
                         //if(xmlAlteration == 5) xmlAlteration = 3; // ?
-                        assert_(xmlAlteration >= -1 && xmlAlteration <= 5, xmlAlteration, e);
+						assert_(xmlAlteration >= -2 && xmlAlteration <= 5, xmlAlteration, e);
 
                         // Tie
                         Note::Tie tie = Note::NoTie;
@@ -227,9 +233,12 @@ MusicXML::MusicXML(string document, string) {
                         }
 
                         // -- Accidental
-                        Accidental accidental = e.contains("accidental"_) ?
-                                    Accidental(SMuFL::AccidentalBase + ref<string>(SMuFL::accidental).indexOf(e("accidental"_).text())) : Accidental::None;
-                        assert_(accidental != -1, e("accidental"_));
+						Accidental accidental = Accidental::None;
+						if(e.contains("accidental"_)) {
+							size_t index = ref<string>(SMuFL::accidental).indexOf(e("accidental"_).text());
+							assert_(index != invalid, e);
+							accidental = Accidental(SMuFL::AccidentalBase + index);
+						}
 
                         int alteration = accidental ? accidentalAlteration(accidental): implicitAlteration;
                         if(xmlAlteration != alteration) {

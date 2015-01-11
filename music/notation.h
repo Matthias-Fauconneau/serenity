@@ -1,6 +1,7 @@
 #pragma once
 /// notation.h Music notation definitions
 #include "string.h"
+#include "vector.h" // float2 gain
 
 inline bool isPowerOfTwo(uint v) { return !(v & (v - 1)); }
 
@@ -43,7 +44,7 @@ namespace SMuFL { //Standard Music Font Layout
     enum Tremolos { Tremolo };
 	namespace Flag { enum { Above=0xE240, Below }; }
     enum Accidental { None=0, AccidentalBase=0xE260, Flat=AccidentalBase, Natural, Sharp, DoubleSharp, DoubleFlat, TripleSharp, TripleFlat, NaturalFlat, NaturalSharp, SharpSharp};
-	static constexpr string accidental[] = {"flat"_,"natural"_,"sharp"_,"double-sharp"_,"double-flat"_};
+	static constexpr string accidental[] = {"flat"_,"natural"_,"sharp"_,"double-sharp"_,"flat-flat"_/*double-flat*/};
     namespace Articulation { enum { Base=0xE4A0, Accent=0, Staccato=1, Tenuto=2 }; }
 	enum Dynamic { DynamicBase=0xE520/*Piano=DynamicBase, Mezzo, Forte, Rinforzando, Sforzando, z, n, pppppp, ppppp, pppp, ppp, pp, mp, mf, pf, ff, fff, ffff, fffff, ffffff,
 				   fp, fz, sf, sfp, sfpp, sfz, sfzp, sffz, rf, rfz*/ };
@@ -55,9 +56,9 @@ namespace SMuFL { //Standard Music Font Layout
     enum Segment { Arpeggio = 0xEAA9 };
 }
 
-enum Value { InvalidValue=-1,                  /*Maxima, Longa, Double,*/ Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
-static constexpr string valueNames[] = {/*"maxima","longa","double"_,*/"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_,"32nd"_,"64th"_};
-static constexpr uint valueDurations[] = {/*512, 256, 128,*/       64,         32,       16,           8,             4,         2,         1};
+enum Value { InvalidValue=-1,                  /*Maxima, Longa,*/ Double /*=Breve*/, Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
+static constexpr string valueNames[] = {/*"maxima","longa",*/ "breve"_/*=double*/,"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_,"32nd"_,"64th"_};
+static constexpr uint valueDurations[] = {/*512, 256,*/ 128,       64,         32,       16,           8,             4,         2,         1};
 static constexpr uint quarterDuration = 16;
 
 enum ClefSign { NoClef=0, FClef=SMuFL::Clef::F, GClef=SMuFL::Clef::G };
@@ -83,7 +84,7 @@ inline Accidental alterationAccidental(int alteration) {
 }
 inline int accidentalAlteration(Accidental accidental) {
     size_t index = accidental - Accidental::AccidentalBase;
-    assert_(index < 10, index);
+	assert_(index < 10, index, hex(accidental));
     return ref<int>{-1,0,1,2,-2,3,-3,-4,4,5}[index];
 }
 
@@ -164,7 +165,8 @@ struct Sign {
 		Note, Rest,
 		Tuplet,
 		Dynamic, Wedge,
-		Pedal
+		Pedal,
+		Gain
 	} type;
 	uint time; // Absolute time offset
 	union {
@@ -181,6 +183,7 @@ struct Sign {
 				};
 				::Clef clef;
 				::OctaveShift octave;
+				float2 gain; // For conversion to note events
 			};
 		};
 		::Measure measure;

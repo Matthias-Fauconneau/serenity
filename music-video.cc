@@ -378,7 +378,7 @@ struct Music : Widget {
 	uint midiIndex = 0, noteIndex = 0;
 
 	// Video preview
-	Window window {this, int2(1280,720), [](){return "MusicXML"__;}, false};
+	unique<Window> window = nullptr;
 
 	// Audio preview
     Thread audioThread;
@@ -408,7 +408,7 @@ struct Music : Widget {
 	void timeChanged(uint time) {
 		while(samplerMidiIndex < notes.size && (int64)notes[samplerMidiIndex].time*sampler.rate <= (int64)time*notes.ticksPerSeconds) {
 			auto note = notes[samplerMidiIndex];
-			sampler.noteEvent(note.key, note.velocity);
+			sampler.noteEvent(note.key, note.velocity, note.gain);
 			samplerMidiIndex++;
 		}
 	}
@@ -501,8 +501,14 @@ struct Music : Widget {
 	}*/
 
 	Music() {
+		// Increases bass volume and pan to right channel
+		xml.signs.insertAt(0, Sign{Sign::Gain, 0, {{uint(xml.staves.indexOf("Bass")), { .gain=float2(1, 2)}}}});
+		// Decreases other tracks volume and pan to left channel,
+		//for(size_t staff: range(xml.staves.size)) xml.signs.insertAt(0, Sign{Sign::Gain, 0, {{staff, { .gain=float2(1./2, 0)}}}});
+		notes = ::scale(::notes(xml.signs, xml.divisions), sampler.rate); // Reconvert to MIDI notes
+
 		//TODO: measureBars.t *= 60 when using MusicXML (no MIDI)
-		window.background = Window::White;
+
 		scroll.horizontal=true, scroll.vertical=false, scroll.scrollbar = true;
         if(failed) { // Seeks to first synchronization failure
 			size_t measureIndex = 0;
@@ -510,7 +516,6 @@ struct Music : Widget {
 				if(sheet.measureToChord[measureIndex]>=sheet.firstSynchronizationFailureChordIndex) break;
 			scroll.offset.x = -sheet.measureBars.values[max<int>(0, measureIndex-3)];
 		}
-		if(sampler) decodeThread.spawn(); // For sampler
 		if(encode) { // Encode
 			assert_(!failed /*&& video && audioFile && audioFile->codec==FFmpeg::AAC*/);
 
@@ -521,12 +526,12 @@ struct Music : Widget {
 			else encoder.setAAC(sampler.channels, sampler.rate); //encoder.setFLAC(32 /*FIXME: assert(write 32)*/, sampler.channels, sampler.rate);
 			encoder.open();
 
-			uint time = 0;
+			uint videoTime = 0;
 			//int time = seek(max(0u, notes[0].time - notes.ticksPerSeconds));
 			//assert_((time*encoder.videoFrameRate)%video.videoFrameRate == 0, time, encoder.videoFrameRate, video.videoFrameRate);
 			//time = time * encoder.videoFrameRate * video.timeNum / video.timeDen; // Scales from source (30fps) to target (60fps) video timebase
 
-			Time followTime, renderTime, encodeTime, totalTime;
+			Time followTime, renderTime, videoEncodeTime, audioEncodeTime, sampleTime, totalTime;
 			totalTime.start();
 			for(int lastReport=0;;) {
                 //assert_(encoder.audioStream->time_base.num == 1);
@@ -546,8 +551,12 @@ struct Music : Widget {
 					}
 					else {
 						buffer<short2> buffer(sampler.periodSize);
+						sampleTime.start();
 						sampler.read16(buffer);
+						sampleTime.stop();
+						audioEncodeTime.start();
 						encoder.writeAudioFrame(cast<int16>(buffer));
+						audioEncodeTime.stop();
 					}
 					return true;
 				};
@@ -561,37 +570,43 @@ struct Music : Widget {
 					if(done) { log("Audio track end"); break; }
 					while((int64)encoder.videoTime*encoder.audioFrameRate <= (int64)encoder.audioTime*encoder.videoFrameRate) {
 						followTime.start();
-                        follow(time, encoder.videoFrameRate, vec2(encoder.size), false);
+						follow(videoTime, encoder.videoFrameRate, vec2(encoder.size), false);
 						followTime.stop();
 						renderTime.start();
 						Image target (encoder.size);
 						fill(target, 0, target.size, 1, 1);
                         ::render(target, widget.graphics(vec2(target.size), Rect(vec2(target.size))));
 						renderTime.stop();
-						encodeTime.start();
+						videoEncodeTime.start();
 						encoder.writeVideoFrame(target);
-						encodeTime.stop();
-						time++;
+						videoEncodeTime.stop();
+						videoTime++;
 					}
 				} else { // Audio only
 					if(!writeAudio()) { log("Audio track end"); break; }
 				}
-				int percent = video ? round(100.*video.videoTime/video.duration) : round(100.*encoder.audioTime/encoder.audioFrameRate/((float)notes.last().time/notes.ticksPerSeconds));
+				uint64 timeTicks;
+				if(encoder.videoFrameRate) timeTicks = (uint64)videoTime*notes.ticksPerSeconds/encoder.videoFrameRate;
+				else if(encoder.audioFrameRate) timeTicks = (uint64)encoder.audioTime*notes.ticksPerSeconds/encoder.audioFrameRate;
+				else error("");
+				uint64 durationTicks = onsets.last() + 4*notes.ticksPerSeconds;
+				int percent = round(100.*timeTicks/durationTicks);
 				if(percent!=lastReport) {
-					log(str(percent,2)+"%", str(followTime, totalTime), str(renderTime, totalTime), str(encodeTime, totalTime));
+					log(str(percent,2)+"%", str(followTime, totalTime), str(renderTime, totalTime), str(videoEncodeTime, totalTime), str(sampleTime, totalTime), str(audioEncodeTime, totalTime));
 					lastReport=percent;
 				}
-				if(encoder.videoFrameRate && time*notes.ticksPerSeconds/encoder.videoFrameRate >= uint64(onsets.last() + 4*notes.ticksPerSeconds)) break;
-				if(encoder.audioFrameRate && time*notes.ticksPerSeconds/encoder.audioFrameRate >= uint64(onsets.last() + 4*notes.ticksPerSeconds)) break;
+				if(timeTicks >= durationTicks) break;
 				if(video && video.videoTime >= video.duration) break;
-				//if(time > 10*encoder.videoFrameRate) break; // DEBUG
+				//if(timeTicks > 1*notes.ticksPerSeconds) break; // DEBUG
 			}
-			requestTermination(0); // Window prevents automatic termination
-        } else
-        { // Preview
+			log("Done");
+		} else { // Preview
 			//if(!failed) seek(max(0ll, notes[0].time - notes.ticksPerSeconds));
-			window.show();
+			window = unique<Window>{this, int2(1280,720), [](){return "MusicXML"__;}, false};
+			window->background = Window::White;
+			window->show();
 			if(playbackDeviceAvailable()) {
+				if(sampler) decodeThread.spawn();
                 audio.start(audioFile ? audioFile->audioFrameRate : sampler.rate, audioFile ? 1024 : sampler.periodSize, 32, 2);
                 assert_(audio.rate == (audioFile ? audioFile->audioFrameRate : sampler.rate));
 				audioThread.spawn();
@@ -602,9 +617,9 @@ struct Music : Widget {
     vec2 sizeHint(vec2 size) override { return running ? widget.sizeHint(size) : scroll.ScrollArea::sizeHint(size); }
     shared<Graphics> graphics(vec2 size) override {
         if(running /*&& video.videoTime < video.duration*/) {
-            if(audioFile) follow(audioFile->audioTime, audioFile->audioFrameRate, vec2(window.size));
-            else follow(sampler.audioTime, sampler.rate, vec2(window.size));
-			window.render();
+			if(audioFile) follow(audioFile->audioTime, audioFile->audioFrameRate, vec2(window->size));
+			else follow(sampler.audioTime, sampler.rate, vec2(window->size));
+			window->render();
 		}
 		return running ? widget.graphics(size, Rect(size)) : scroll.ScrollArea::graphics(size);
 	}

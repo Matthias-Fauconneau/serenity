@@ -8,6 +8,7 @@
 Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool show, const Image& icon)
 	: widget(widget), size(sizeHint), getTitle(title) {
     Display::onEvent.connect(this, &Window::onEvent);
+	assert_(id && root && visual);
     send(CreateColormap{ .colormap=id+Colormap, .window=root, .visual=visual});
 
     if(sizeHint.x<=0) size.x=Display::size.x;
