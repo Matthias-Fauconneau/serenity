@@ -48,12 +48,14 @@ static bool terminationRequested = false;
 // Exit status to return for process (group)
 static int groupExitStatus = 0;
 
-Thread::Thread(int priority) : Poll(EventFD::fd,POLLIN,*this), priority(priority) {}
+Thread::Thread(int priority) : Poll(EventFD::fd,POLLIN,*this), priority(priority) {
+	if(this == &mainThread) tid = gettid();
+}
 void Thread::setPriority(int priority) { setpriority(0,0,priority); }
 static void* run(void* thread) { ((Thread*)thread)->run(); return 0; }
 void Thread::spawn() { assert_(!thread); pthread_create(&thread,0,&::run,this); }
 
-static int32 gettid() { return syscall(SYS_gettid); }
+int32 gettid() { return syscall(SYS_gettid); }
 
 void Thread::run() {
     tid=gettid();
@@ -169,6 +171,7 @@ template<> void __attribute((noreturn)) error(const string& message) {
 
 // Entry point
 int main() {
+	//mainThread.tid=gettid(); // ->Thread
     unique<Application> application;
 	Interface<Application>::AbstractFactory* factory = Interface<Application>::factories().value("");
 	for(string argument: arguments())

@@ -74,7 +74,7 @@ struct Synchronizer : Widget {
 			uint keyCount = lastKey+1-firstKey;
 
 			size_t T = audio.size/audio.channels; // Total sample count
-#if DEBUG // FFT
+#if 0 // FFT
 			size_t N = 8192;  // Frame size: 48KHz * 2 (Nyquist) * 2 (window) / frameSize ~ 24Hz~A0
 			size_t h = 2048; // Hop size: 48KHz * 60 s/min / 4 b/q / hopSize / 2 (Nyquist) ~ 175 bpm
 			FFT fft(N);
@@ -341,7 +341,8 @@ struct Music : Widget {
 	unique<FFmpeg> audioFile = audioFiles ? unique<FFmpeg>(audioFiles[0]) : nullptr;
     // Sampler
 	Thread decodeThread;
-    Sampler sampler {48000, "/Samples/Maestro.sfz"_, {this, &Music::timeChanged}, decodeThread};
+	const bool encode = arguments().contains("encode") || arguments().contains("export");
+	Sampler sampler {"/Samples/Maestro.sfz"_, 1024, {this, &Music::timeChanged}, encode ? mainThread : decodeThread};
 
 	// MusicXML
 	MusicXML xml = existsFile(name+".xml"_) ? readFile(name+".xml"_) : MusicXML();
@@ -366,10 +367,11 @@ struct Music : Widget {
 	int resize = keyboardView ? 4 : 1;
 
 	// View
-	Scroll<VBox> scroll {{&sheet/*, &synchronizer*/}}; // 1/3 ~ 240
+	GraphicsWidget system {move(sheet.pages[0])};
+	Scroll<VBox> scroll {{&system/*, &synchronizer*/}}; // 1/3 ~ 240
 	ImageView videoView; // 1/2 ~ 360
 	Keyboard keyboard; // 1/6 ~ 120
-	VBox widget {{&scroll, &videoView, &keyboard}};
+	VBox widget {{&scroll/*, &videoView, &keyboard*/}};
 
 	// Highlighting
 	map<uint, Sign> active; // Maps active keys to notes (indices)
@@ -424,7 +426,8 @@ struct Music : Widget {
 					(sign.staff?keyboard.left:keyboard.right).append( sign.note.key() );
 					active.insertMulti(note.key, sign);
 					if(sign.note.pageIndex != invalid && sign.note.glyphIndex != invalid) {
-						sheet.pages[sign.note.pageIndex].glyphs[sign.note.glyphIndex].color = (sign.staff?red:green);
+						assert_(sign.note.pageIndex == 0);
+						system.glyphs[sign.note.glyphIndex].color = (sign.staff?red:green);
 						contentChanged = true;
 					}
 				}
@@ -435,7 +438,8 @@ struct Music : Widget {
 					Sign sign = active.take(note.key);
 					(sign.staff?keyboard.left:keyboard.right).remove( sign.note.key() );
 					if(sign.note.pageIndex != invalid && sign.note.glyphIndex != invalid) {
-						sheet.pages[sign.note.pageIndex].glyphs[sign.note.glyphIndex].color = black;
+						assert_(sign.note.pageIndex == 0);
+						system.glyphs[sign.note.glyphIndex].color = black;
 					}
 					contentChanged = true;
 				}
@@ -452,7 +456,7 @@ struct Music : Widget {
 				real f = real(t-t1)/real(t2-t1);
 				real w[4] = { 1./6 * cb(1-f), 2./3 - 1./2 * sq(f)*(2-f), 2./3 - 1./2 * sq(1-f)*(2-(1-f)), 1./6 * cb(f) };
 				auto X = [&](int index) { return clip(0.f, sheet.measureBars.values[clip<int>(0, index, sheet.measureBars.values.size)] - size.x/2,
-							abs(sheet.sizeHint(size).x)-size.x); };
+							abs(system.sizeHint(size).x)-size.x); };
 				float newOffset = round( w[0]*X(index-1) + w[1]*X(index) + w[2]*X(index+1) + w[3]*X(index+2) );
 				if(newOffset >= -scroll.offset.x) {
 					scroll.offset.x = -newOffset;
@@ -507,14 +511,14 @@ struct Music : Widget {
 			scroll.offset.x = -sheet.measureBars.values[max<int>(0, measureIndex-3)];
 		}
 		if(sampler) decodeThread.spawn(); // For sampler
-        if(arguments().contains("encode") || arguments().contains("export")) { // Encode
-			assert_(!failed && video && audioFile && audioFile->codec==FFmpeg::AAC);
+		if(encode) { // Encode
+			assert_(!failed /*&& video && audioFile && audioFile->codec==FFmpeg::AAC*/);
 
 			Encoder encoder {name+".mp4"_};
-			encoder.setH264(int2(1280,720), 60);
+			//encoder.setH264(int2(1280,720), 60);
 			if(audioFile && audioFile->codec==FFmpeg::AAC) encoder.setAudio(audioFile);
             else if(audioFile) encoder.setAAC(2 /*Youtube requires stereo*/, audioFile->audioFrameRate);
-			else encoder.setFLAC(32, 2, sampler.rate);
+			else encoder.setAAC(sampler.channels, sampler.rate); //encoder.setFLAC(32 /*FIXME: assert(write 32)*/, sampler.channels, sampler.rate);
 			encoder.open();
 
 			uint time = 0;
@@ -541,9 +545,9 @@ struct Music : Widget {
 						if(target.size) encoder.writeAudioFrame(target);
 					}
 					else {
-						buffer<int16> buffer(1024*sampler.channels);
+						buffer<short2> buffer(sampler.periodSize);
 						sampler.read16(buffer);
-						encoder.writeAudioFrame(buffer);
+						encoder.writeAudioFrame(cast<int16>(buffer));
 					}
 					return true;
 				};
@@ -554,7 +558,7 @@ struct Music : Widget {
 					while((int64)encoder.audioTime*encoder.videoFrameRate <= (int64)encoder.videoTime*encoder.audioFrameRate) {
 						if(!writeAudio()) { done = true; break /*2*/; }
 					}
-					if(done) break;
+					if(done) { log("Audio track end"); break; }
 					while((int64)encoder.videoTime*encoder.audioFrameRate <= (int64)encoder.audioTime*encoder.videoFrameRate) {
 						followTime.start();
                         follow(time, encoder.videoFrameRate, vec2(encoder.size), false);
@@ -570,16 +574,17 @@ struct Music : Widget {
 						time++;
 					}
 				} else { // Audio only
-					if(!writeAudio()) break;
+					if(!writeAudio()) { log("Audio track end"); break; }
 				}
-				int percent = round(100.*video.videoTime/video.duration); //encoder.audioTime/encoder.audioFrameRate/((float)notes.last().time/notes.ticksPerSeconds));
+				int percent = video ? round(100.*video.videoTime/video.duration) : round(100.*encoder.audioTime/encoder.audioFrameRate/((float)notes.last().time/notes.ticksPerSeconds));
 				if(percent!=lastReport) {
 					log(str(percent,2)+"%", str(followTime, totalTime), str(renderTime, totalTime), str(encodeTime, totalTime));
 					lastReport=percent;
 				}
-				if(time*notes.ticksPerSeconds/encoder.videoFrameRate >= uint64(onsets.last() + 4*notes.ticksPerSeconds)) break;
-				if(video.videoTime >= video.duration) break;
-				//if(time > 1*encoder.videoFrameRate) break; // DEBUG
+				if(encoder.videoFrameRate && time*notes.ticksPerSeconds/encoder.videoFrameRate >= uint64(onsets.last() + 4*notes.ticksPerSeconds)) break;
+				if(encoder.audioFrameRate && time*notes.ticksPerSeconds/encoder.audioFrameRate >= uint64(onsets.last() + 4*notes.ticksPerSeconds)) break;
+				if(video && video.videoTime >= video.duration) break;
+				//if(time > 10*encoder.videoFrameRate) break; // DEBUG
 			}
 			requestTermination(0); // Window prevents automatic termination
         } else

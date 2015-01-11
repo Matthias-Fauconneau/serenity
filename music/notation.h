@@ -62,8 +62,8 @@ static constexpr uint quarterDuration = 16;
 
 enum ClefSign { NoClef=0, FClef=SMuFL::Clef::F, GClef=SMuFL::Clef::G };
 struct Clef {
-	ClefSign clefSign;
-	int octave;
+	ClefSign clefSign = GClef;
+	int octave = 0;
 };
 enum OctaveShift { Down, Up, OctaveStop };
 
@@ -231,8 +231,8 @@ inline String str(const Sign& o) {
 		else if(o.type==Sign::Note) s = str(o.note);
 		else if(o.type==Sign::Rest) s = copyRef(str("-;,"_[clip(0, int(o.rest.value)-Value::Whole, 1)]));
 		else error(int(o.type));
-        assert_(o.staff == 0 || o.staff == 1);
-		return s + ref<string>{"₀","₁"}[o.staff];
+		assert_(o.staff <= 9);
+		return s + ref<string>{"₀","₁","₂","₃","₄","₅","₆","₇","₈","₉"}[o.staff];
 	}
 	if(o.type==Sign::Measure) return " | "__;
     if(o.type==Sign::Repeat) return " : "__;

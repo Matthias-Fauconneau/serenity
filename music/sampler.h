@@ -17,13 +17,16 @@ struct Sampler : Poll {
 	/// Samples composing the current instrument
 	array<Sample> samples;
 
-    //Semaphore lock {2}; // Decoder (producer) and mixer (consumer) may use \a layers concurrently, a mutator needs to lock/acquire both
-    Lock lock; // Lock mixer when cleaning notes in decoder thread (no need to lock on atomic append in event thread)
+	Lock noteReferencesLock; // When cleaning notes in mixer thread, locks decoding before note references are reset
+	//Lock notesSizeLock; // When cleaning notes in mixer thread, locks appending new notes before array end is reset (no need as new notes are assumed to be added in mixer thread)
+	// Using two locks as new notes may be added while decoding (except on realloc)
+
     array<Layer> layers;
 
 	static constexpr uint channels = 2;
 	uint rate = 0;
-    static constexpr uint periodSize = 256; // [12ms/82Hz/4m]
+	const uint periodSize;
+	const bool realTime = periodSize < 1024; // Whether to output decoder underrun warnings
 
     /// Just before samples are mixed, polls note events
 	function<void(uint)> timeChanged;
@@ -32,7 +35,7 @@ struct Sampler : Poll {
 
 	explicit operator bool() const { return samples.size; }
 
-    Sampler(uint outputRate, string path, function<void(uint)> timeChanged, Thread& thread=mainThread);
+	Sampler(string path, const uint periodSize=256/*[12ms/82Hz/4m]*/, function<void(uint)> timeChanged={}, Thread& thread=mainThread);
     virtual ~Sampler();
 
 	void noteEvent(uint key, uint velocity);
@@ -42,7 +45,7 @@ struct Sampler : Poll {
 
     /// Audio callback mixing each layers active notes, resample the shifted layers and mix them together to the audio buffer
 	size_t read32(mref<int2> output);
-	size_t read16(mref<int16> output);
+	size_t read16(mref<short2> output);
 	size_t read(mref<float2> output);
 
     /// Signals when all samples are done playing

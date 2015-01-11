@@ -142,7 +142,7 @@ template<int unroll> inline void interleave(const int channelMode,const float* A
 
 uint64 rice=0, predict=0, order=0;
 void FLAC::decodeFrame() {
-    assert(blockSize && blockSize<audio.capacity);
+	assert_(blockSize && blockSize<audio.capacity, blockSize, audio.capacity);
     int allocSize = align(4096,blockSize);
     float block[2][allocSize];
     setRoundMode(Down);

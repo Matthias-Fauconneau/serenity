@@ -278,7 +278,7 @@ Encoder::~Encoder() {
         av_interleaved_write_frame(context, &pkt);
         if(!pkt.buf) av_free_packet(&pkt);
     }
-	log(videoTime, audioTime, videoEncodeTime, audioEncodeTime);
+	log("videoTime", videoTime, "audioTime", audioTime, "videoEncodeTime", videoEncodeTime, "audioEncodeTime", audioEncodeTime);
     av_interleaved_write_frame(context, 0);
     av_write_trailer(context);
     avio_close(context->pb);

@@ -143,6 +143,7 @@ struct Thread : array<Poll*>, EventFD, Poll {
     /// Waits on this thread
     void wait();
 };
+int32 gettid();
 
 /// Flags all threads to terminate as soon as they return to event loop, destroys all global objects and exits process.
 void requestTermination(int status=0);
