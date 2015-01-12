@@ -33,7 +33,7 @@ struct Sampler::Sample {
     float startLevel; // Sound level of first 2K samples
     uint decayTime; // Time (in samples) where level decays below
 };
-inline String str(const  Sampler::Sample& s) { return str(s.lokey)+"-"_+str(s.pitch_keycenter)+"-"_+str(s.hikey); }
+inline String str(const Sampler::Sample& s) { return str(s.lokey)+"-"_+str(s.pitch_keycenter)+"-"_+str(s.hikey); }
 inline bool operator <(const  Sampler::Sample& a, const Sampler::Sample& b) { return a.pitch_keycenter<b.pitch_keycenter; }
 
 struct Note {
@@ -58,6 +58,9 @@ struct Note {
 	/// Computes actual sound level on the next \a size samples (using precomputed envelope)
 	float actualLevel(uint size) const;
 };
+inline String str(const Note& o) {
+	return str(o.flac.position, o.decayTime, o.flac.duration);
+}
 
 struct Sampler::Layer {
 	float shift;
@@ -201,7 +204,7 @@ Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeCh
             if(layer == 0) { // Generates pitch shifting (resampling) filter banks
 				Layer layer;
 				layer.shift = shift;
-				layer.notes.reserve(1024);
+				layer.notes.reserve(64);
 				if(shift /*|| rate!=outputRate*/) {
                     const uint size = 2048; // Accurate frequency resolution while keeping reasonnable filter bank size
 					layer.resampler = Resampler(2, size, round(size*exp2((-shift)/12.0)/**outputRate/rate*/),
@@ -223,7 +226,7 @@ float Note::actualLevel(uint duration) const { return ::level(envelope, flac.pos
 void Sampler::noteEvent(uint key, uint velocity, float2 gain) {
 	//TODO: Pedal events
     Note* released=0;
-    //if(velocity==0) { // Also releases repetitions
+	if(velocity==0) { // Do not release repetitions (i.e needs as many releases as press as if playing multiple instruments) // Also releases repetitions
         for(Layer& layer: layers) for(Note& note: layer.notes) if(note.key==key) {
             if(velocity==0) released=&note; // Triggers release sample (only release, not on repetitions)
             if(note.releaseTime) { // Releases fades out current note
@@ -237,7 +240,7 @@ void Sampler::noteEvent(uint key, uint velocity, float2 gain) {
             if(!released) return; // Already fully decayed
             velocity = released->velocity;
         }
-    //}
+	}
     for(const Sample& s : samples) {
         if(s.trigger == (released?1:0) && s.lokey <= key && key <= s.hikey && s.lovel <= velocity && velocity <= s.hivel) {
 			float2 level = 1;
@@ -409,7 +412,7 @@ size_t Sampler::read(mref<float2> output) {
 				//Locker lock (notesSizeLock) // Assumes new notes are only added in this mixer thread
 				// Cleanups silent notes
 				layer.notes.filter([this](const Note& note) {
-					return (note.flac.blockSize==0 && note.readCount<uint64(2*periodSize)); // || note.level[0]<0x1p-7 || note.flac.position > note.decayTime;
+					return (note.flac.blockSize==0 && note.readCount<uint64(periodSize)) || note.level[0]<0x1p-7 || note.flac.position > note.decayTime;
 				});
 			}
             if(layer.resampler) {

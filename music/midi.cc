@@ -42,7 +42,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 		}
 	}
 
-	KeySignature keySignature = 0; TimeSignature timeSignature = {4,4}; Metronome metronome = {Quarter, 120};
+	KeySignature keySignature = 0; TimeSignature timeSignature = {4,4}; Metronome metronome = {Quarter, 90};
 	uint measureIndex = 0;
 	int lastMeasureStart = 0;
 	Clef clefs[2] = {{FClef,0}, {GClef,0}};

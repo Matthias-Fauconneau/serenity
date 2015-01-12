@@ -1100,7 +1100,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
         startIndex = breakIndex;
 	}
 	doPage();
-    if(!context.ticksPerMinutes) context.ticksPerMinutes = 120*ticksPerQuarter;
+	if(!context.ticksPerMinutes) context.ticksPerMinutes = 90*ticksPerQuarter;
 
     midiToSign = buffer<Sign>(midiNotes.size, 0);
 	array<uint> chordExtra;

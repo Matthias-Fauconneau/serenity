@@ -17,7 +17,7 @@
 #include "encoder.h"
 
 /// Converts signs to notes
-MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter) {
+MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter, 	ref<float2> staffGains = {}) {
 	assert_(signs);
 	MidiNotes notes;
 	for(Sign sign: signs) {
@@ -26,13 +26,13 @@ MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter) {
 		}
         else if(sign.type == Sign::Note) {
 			if(sign.note.tie == Note::NoTie || sign.note.tie == Note::TieStart)
-				notes.insertSorted({sign.time*60, sign.note.key(), 64/*FIXME: use dynamics*/});
+				notes.insertSorted({sign.time*60, sign.note.key(), 64/*FIXME: use dynamics*/, staffGains?staffGains[sign.staff]:1});
 			if(sign.note.tie == Note::NoTie || sign.note.tie == Note::TieStop)
 				notes.insertSorted({(sign.time+sign.duration)*60, sign.note.key(), 0});
 		}
 	}
 	assert(notes.last().time >= 0);
-	if(!notes.ticksPerSeconds) notes.ticksPerSeconds = 120*ticksPerQuarter; //TODO: default tempo from audio
+	if(!notes.ticksPerSeconds) notes.ticksPerSeconds = 90*ticksPerQuarter; //TODO: default tempo from audio
 	assert_(notes.ticksPerSeconds);
 	return notes;
 }
@@ -348,7 +348,15 @@ struct Music : Widget {
 	MusicXML xml = existsFile(name+".xml"_) ? readFile(name+".xml"_) : MusicXML();
 	// MIDI
 	MidiFile midi =  existsFile(name+".mid"_) ? MidiFile(readFile(name+".mid"_)) : MidiFile(); // if used: midi.signs are scaled in synchronizer
-    MidiNotes notes = ::scale(midi ? copy(midi.notes) : ::notes(xml.signs, xml.divisions), audioFile ? audioFile->audioFrameRate : sampler.rate);
+				 buffer<float2> panAmplify(ref<String> staves, string selection) {
+					 buffer<float2> gains(staves.size);
+					 // Decreases other tracks volume and pan to left channel (mute right channel)
+					 gains.clear(1./2, 0);
+					 // Increases volume of a track and pans to right channel
+					 gains[xml.staves.indexOf(selection)] = float2(1, 2);
+					 return gains;
+				 }
+	MidiNotes notes = ::scale(midi ? copy(midi.notes) : ::notes(xml.signs, xml.divisions, panAmplify(xml.staves, "Bass"_)), audioFile ? audioFile->audioFrameRate : sampler.rate);
 	// Sheet
     Sheet sheet {xml ? xml.signs : midi.signs, xml ? xml.divisions : midi.divisions, 0, 4,
 				apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
@@ -501,12 +509,6 @@ struct Music : Widget {
 	}*/
 
 	Music() {
-		// Increases bass volume and pan to right channel
-		xml.signs.insertAt(0, Sign{Sign::Gain, 0, {{uint(xml.staves.indexOf("Bass")), { .gain=float2(1, 2)}}}});
-		// Decreases other tracks volume and pan to left channel,
-		//for(size_t staff: range(xml.staves.size)) xml.signs.insertAt(0, Sign{Sign::Gain, 0, {{staff, { .gain=float2(1./2, 0)}}}});
-		notes = ::scale(::notes(xml.signs, xml.divisions), sampler.rate); // Reconvert to MIDI notes
-
 		//TODO: measureBars.t *= 60 when using MusicXML (no MIDI)
 
 		scroll.horizontal=true, scroll.vertical=false, scroll.scrollbar = true;
@@ -520,7 +522,7 @@ struct Music : Widget {
 			assert_(!failed /*&& video && audioFile && audioFile->codec==FFmpeg::AAC*/);
 
 			Encoder encoder {name+".mp4"_};
-			//encoder.setH264(int2(1280,720), 60);
+			encoder.setH264(int2(1280,720), 60);
 			if(audioFile && audioFile->codec==FFmpeg::AAC) encoder.setAudio(audioFile);
             else if(audioFile) encoder.setAAC(2 /*Youtube requires stereo*/, audioFile->audioFrameRate);
 			else encoder.setAAC(sampler.channels, sampler.rate); //encoder.setFLAC(32 /*FIXME: assert(write 32)*/, sampler.channels, sampler.rate);
@@ -569,9 +571,9 @@ struct Music : Widget {
 					}
 					if(done) { log("Audio track end"); break; }
 					while((int64)encoder.videoTime*encoder.audioFrameRate <= (int64)encoder.audioTime*encoder.videoFrameRate) {
-						followTime.start();
+						//followTime.start();
 						follow(videoTime, encoder.videoFrameRate, vec2(encoder.size), false);
-						followTime.stop();
+						//followTime.stop();
 						renderTime.start();
 						Image target (encoder.size);
 						fill(target, 0, target.size, 1, 1);
@@ -592,7 +594,7 @@ struct Music : Widget {
 				uint64 durationTicks = onsets.last() + 4*notes.ticksPerSeconds;
 				int percent = round(100.*timeTicks/durationTicks);
 				if(percent!=lastReport) {
-					log(str(percent,2)+"%", str(followTime, totalTime), str(renderTime, totalTime), str(videoEncodeTime, totalTime), str(sampleTime, totalTime), str(audioEncodeTime, totalTime));
+					log(str(percent,2)+"%", /*str(followTime, totalTime),*/ str(renderTime, totalTime), str(videoEncodeTime, totalTime), str(sampleTime, totalTime), str(audioEncodeTime, totalTime));
 					lastReport=percent;
 				}
 				if(timeTicks >= durationTicks) break;

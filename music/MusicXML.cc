@@ -41,12 +41,8 @@ MusicXML::MusicXML(string document, string) {
 		}
 	}
 #endif
-	root.xpath("score-partwise/part-list/score-part"_, [this](const Element& p) {
-		assert_(p.contains("part-name"), p);
-		staves.append(p("part-name").text());
-	});
 
-    int xmlStaffCount = 0;
+	int xmlStaffCount = 0;
     root.xpath("score-partwise/part"_, [&xmlStaffCount](const Element& p) {
             int partStaffCount = 0;
             for(const Element& m: p.children) {
@@ -59,8 +55,18 @@ MusicXML::MusicXML(string document, string) {
 			assert_(partStaffCount <= 2, "#54", partStaffCount);
             xmlStaffCount += partStaffCount;
     });
-	//assert_(xmlStaffCount >= 2 && xmlStaffCount <= 3, xmlStaffCount);
-	assert_(size_t(xmlStaffCount) == staves.size, xmlStaffCount, staves);
+
+	staves = buffer<String>(xmlStaffCount); staves.clear();
+	{size_t xmlStaffIndex = 0;
+		root.xpath("score-partwise/part-list/score-part"_, [this, xmlStaffCount, &xmlStaffIndex](const Element& p) {
+			assert_(p.contains("part-name"), p);
+			uint staff = (xmlStaffCount-1) - xmlStaffIndex;
+			staves[staff] = p("part-name").text();
+			xmlStaffIndex++; // FIXME: actually associate part names
+		});
+	}
+
+	//assert_(size_t(xmlStaffCount) == staves.size, xmlStaffCount, staves);
 
 	const size_t staffCount = xmlStaffCount; //2;
 	buffer<Clef> clefs(staffCount); clefs.clear(Clef{GClef, 0});

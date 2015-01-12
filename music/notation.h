@@ -166,7 +166,6 @@ struct Sign {
 		Tuplet,
 		Dynamic, Wedge,
 		Pedal,
-		Gain
 	} type;
 	uint time; // Absolute time offset
 	union {
@@ -183,7 +182,6 @@ struct Sign {
 				};
 				::Clef clef;
 				::OctaveShift octave;
-				float2 gain; // For conversion to note events
 			};
 		};
 		::Measure measure;
