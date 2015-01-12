@@ -253,5 +253,5 @@ generic notrace ref<T> Ref<T>::slice(size_t pos) const { assert(pos<=size); retu
 /// Declares a file to be embedded in the binary
 #define FILE(name) static ref<byte> name() { \
     extern char _binary_ ## name ##_start[], _binary_ ## name ##_end[]; \
-    return ref<byte>(_binary_ ## name ##_start,_binary_ ## name ##_end); \
+	return ref<byte>(_binary_ ## name ##_start,_binary_ ## name ##_end - _binary_ ## name ##_start); \
 }

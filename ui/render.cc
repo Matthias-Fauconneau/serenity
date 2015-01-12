@@ -78,8 +78,10 @@ static void blend(const Image& target, uint x, uint y, bgr3f color, float opacit
 }
 
 void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity) {
-    assert_(bgr3f(0) <= color && color <= bgr3f(1));
-    p1 = round(p1), p2 = round(p2); // Hint
+	if(p1.y == p2.y) fill(target, int2(p1), int2(p2.x-p1.x, 1), color, opacity); // TODO: prefilter
+	if(p1.x >= target.size.x || p2.x < 0) return; // Assumes p1.x < p2.x
+	assert(bgr3f(0) <= color && color <= bgr3f(1));
+	//p1 = round(p1), p2 = round(p2); // Hint
 
     float dx = p2.x - p1.x, dy = p2.y - p1.y;
     bool transpose=false;
@@ -87,7 +89,7 @@ void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity) {
     if(p1.x > p2.x) { swap(p1.x, p2.x); swap(p1.y, p2.y); }
     if(dx==0) return; //p1==p2
     float gradient = dy / dx;
-    int i1,i2; float intery;
+	int i1; float intery;
     {
         float xend = round(p1.x), yend = p1.y + gradient * (xend - p1.x);
         float xgap = 1 - fract(p1.x + 1./2);
@@ -96,6 +98,7 @@ void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity) {
         i1 = int(xend);
         intery = yend + gradient;
     }
+	int i2;
     {
         float xend = round(p2.x), yend = p2.y + gradient * (xend - p2.x);
         float xgap = fract(p2.x + 1./2);
@@ -103,7 +106,9 @@ void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity) {
         blend(target, xend, yend+1, color, fract(yend) * xgap * opacity, transpose);
         i2 = int(xend);
     }
-    for(int x=i1+1;x<i2;x++) {
+	int x = i1+1;
+	if(x < 0) { intery += (0-x) * gradient; x = 0; }
+	for(;x<min(transpose ? target.size.y : target.size.x, i2); x++) {
         blend(target, x, intery, color, (1-fract(intery)) * opacity, transpose);
         blend(target, x, intery+1, color, fract(intery) * opacity, transpose);
         intery += gradient;
@@ -198,20 +203,58 @@ void cubic(const Image& target, ref<vec2> sourcePoints, bgr3f color, float alpha
 	}
 }
 
+#include "time.h"
 void render(const Image& target, const Graphics& graphics, vec2 offset) {
     assert_(isNumber(offset)); assert_(isNumber(graphics.offset));
     offset += graphics.offset;
-    for(const auto& e: graphics.blits) {
-		if(int2(e.size) == e.image.size) blit(target, int2(round(offset+e.origin)), e.image, e.color, e.opacity);
-		else blit(target, int2(round(offset+e.origin)), resize(int2(round(e.size)), e.image), e.color, e.opacity); // FIXME: subpixel blit
+	// TODO: cull (space partitionning)
+#if PROFILE
+	map<string, Time> profile;
+	profile["total"].start();
+#define profile(id, work... ) { profile[#id].start(); work profile[#id].stop(); }
+#else
+#define profile(id, work... ) work
+#endif
+	if(graphics.blits) {
+		profile(blit,
+		for(const auto& e: graphics.blits) {
+			if(int2(e.size) == e.image.size) blit(target, int2(round(offset+e.origin)), e.image, e.color, e.opacity);
+			else blit(target, int2(round(offset+e.origin)), resize(int2(round(e.size)), e.image), e.color, e.opacity); // FIXME: subpixel blit
+		}
+				);
 	}
-	for(const auto& e: graphics.fills) fill(target, int2(round(offset+e.origin)), int2(e.size), e.color, e.opacity);
-	for(const auto& e: graphics.lines) line(target, offset+e.a, offset+e.b, e.color, e.opacity);
-    for(const auto& e: graphics.glyphs) {
-        Font::Glyph glyph = e.font.font(e.fontSize).render(e.index);
-        if(glyph.image) blit(target, int2(round(offset+e.origin))+glyph.offset, glyph.image, e.color, e.opacity);
-    }
-    for(const auto& e: graphics.parallelograms) parallelogram(target, int2(round(offset+e.min)), int2(round(offset+e.max)), e.dy, e.color, e.opacity);
-	for(const auto& e: graphics.cubics) cubic(target, e.points, e.color, e.opacity, offset);
+	if(graphics.fills) {
+		profile(fill,
+		for(const auto& e: graphics.fills) fill(target, int2(round(offset+e.origin)), int2(e.size), e.color, e.opacity);
+		);
+	}
+	if(graphics.lines) {
+		profile(line,
+		for(const auto& e: graphics.lines) line(target, offset+e.a, offset+e.b, e.color, e.opacity);
+		);
+	}
+	if(graphics.glyphs) {
+		profile(glyph,
+		for(const auto& e: graphics.glyphs) {
+			Font::Glyph glyph = e.font.font(e.fontSize).render(e.index);
+			if(glyph.image) blit(target, int2(round(offset+e.origin))+glyph.offset, glyph.image, e.color, e.opacity);
+		}
+				);
+	}
+	if(graphics.parallelograms) {
+		profile(parallelogram,
+		for(const auto& e: graphics.parallelograms) parallelogram(target, int2(round(offset+e.min)), int2(round(offset+e.max)), e.dy, e.color, e.opacity);
+		)
+	}
+	if(graphics.cubics) {
+		profile(cubic,
+		for(const auto& e: graphics.cubics) cubic(target, e.points, e.color, e.opacity, offset);
+		)
+	}
+#if PROFILE
+	profile["total"].stop();
+	log("blits", graphics.blits.size, "fills", graphics.fills.size, "lines", graphics.lines.size, "glyphs", graphics.glyphs.size, "parallelograms", graphics.parallelograms.size, "cubics", graphics.cubics.size);
+	{array<char> s; for(auto entry: profile) s.append(entry.key+" "_+str(entry.value, profile["total"])+"\t"); log(s);}
+#endif
     for(const auto& e: graphics.graphics) { assert_(isNumber(e.key)); render(target, e.value, offset+e.key); }
 }

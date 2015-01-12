@@ -24,19 +24,22 @@ struct Display : Socket, Poll {
      /// Base resource id
 	 uint id = 0;
 // Display
-    /// Root window
-	uint root = 0;
-    /// Root visual
-	uint visual = 0;
-    /// Screen size
-    int2 size = 0;
+	 /// Root window
+	 uint root = 0;
+	 /// Root visual
+	 uint visual = 0;
+	 /// Screen size
+	 int2 size = 0;
+	 /// OpenGL
+	 struct _XDisplay* glDisplay = 0;
+	 struct __GLXcontextRec* glContext = 0;
 
 // Keyboard
     /// Keycode range
     uint8 minKeyCode=8, maxKeyCode=0xFF;
 
 // Methods
-    Display();
+	Display(bool GL);
 // Connection
     // Read
      /// Event handler

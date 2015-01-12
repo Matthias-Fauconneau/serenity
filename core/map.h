@@ -116,6 +116,6 @@ template<Type K, Type V> String str(const map<K,V>& m, string separator=", ") {
 }
 
 /// Associates each argument's name with its string conversion
-template<Type... Args> map<string,String> withName(string names, const Args&... args) { return {split(names),{str(args)...}}; }
+template<Type... Args> map<string,String> withName(string names, const Args&... args) { return {split(names,", "),{str(args)...}}; }
 #define withName(args...) withName(#args, args)
 

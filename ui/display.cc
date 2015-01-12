@@ -3,7 +3,25 @@
 #include <sys/socket.h>
 #include "data.h"
 //FIXME: undefined reference
-#include <typeinfo>
+
+#include "gl.h"
+#undef packed
+#define Time XTime
+#define Cursor XCursor
+#define Depth XXDepth
+#define Window XWindow
+#define Screen XScreen
+#define XEvent XXEvent
+#define Display XDisplay
+#include <GL/glx.h> //X11
+#undef Time
+#undef Cursor
+#undef Depth
+#undef Window
+#undef Screen
+#undef XEvent
+#undef Display
+#undef None
 
 String str(XEvent::Error e) {
     uint8 code = e.code;
@@ -36,7 +54,7 @@ namespace Shm { int EXT, event, errorBase; } using namespace Shm;
 namespace XRender { int EXT, event, errorBase; } using namespace XRender;
 namespace Present { int EXT, event, errorBase; }
 
-Display::Display() : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN) {
+Display::Display(bool GL) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN) {
     {String path = "/tmp/.X11-unix/X"+getenv("DISPLAY",":0").slice(1,1);
         struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; mref<char>(addr.path,path.size).copy(path);
         if(check(connect(Socket::fd, (const sockaddr*)&addr,2+path.size), path)) error("X connection failed"); }
@@ -78,6 +96,18 @@ Display::Display() : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN) {
         XRender::EXT=r.major; XRender::event=r.firstEvent; XRender::errorBase=r.firstError; }
     {auto r = request(QueryExtension{.length="Present"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "Present"_);
         Present::EXT=r.major; XRender::event=r.firstEvent; XRender::errorBase=r.firstError; }
+
+	if(GL) {
+		assert_(!glDisplay && !glContext);
+		glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_,":0"_))); assert_(glDisplay);
+		const int fbAttribs[] = {GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8,
+								 /*GLX_FRAMEBUFFER_SRGB_CAPABLE_EXT, 1,*/ 0};
+		int fbCount=0; GLXFBConfig* fbConfigs = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount); assert(fbConfigs && fbCount);
+		const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION_ARB, 3, GLX_CONTEXT_MINOR_VERSION_ARB, 3, 0};
+		glContext = ((PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB"))
+				(glDisplay, fbConfigs[0], 0, 1, contextAttribs);
+		assert_(glContext);
+	}
 }
 
 void Display::event() {

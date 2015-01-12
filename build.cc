@@ -125,7 +125,7 @@ struct Build {
         string file = section(path,'/',-2,-1);
         String object = filesPath+"/"+file+".o";
         assert_(!files.contains(object), name);
-        int64 lastFileEdit = File(file, subfolder).modifiedTime();
+		int64 lastFileEdit = File(file, subfolder).modifiedTime();
         if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
 			if(execute(LD, {"-r", "-b", "binary", "-o", object, file}, true, subfolder)) error("Failed to embed");
             needLink = true;

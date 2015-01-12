@@ -110,15 +110,16 @@ struct mat4 {
         return r;
     }
 
-    inline void perspective(float hfov, float width, float height, float nearPlane, float farPlane) {
+	inline mat4& perspective(float hfov, float2 size, float nearPlane, float farPlane) {
         float cotan = cos(hfov/2) / sin(hfov/2);
-        M(0,0) = cotan * height / width; M(1,1) = cotan; M(2,2) = (nearPlane+farPlane) / (nearPlane-farPlane);
+		M(0,0) = cotan * size.y / size.x; M(1,1) = cotan; M(2,2) = (nearPlane+farPlane) / (nearPlane-farPlane);
         M(2,3) = (2*nearPlane*farPlane) / (nearPlane-farPlane); M(3,2) = -1; M(3,3) = 0;
+		return *this;
     }
-    void translate(vec3 v) { for(int i=0;i<4;i++) M(i,3) += M(i,0)*v.x + M(i,1)*v.y + M(i,2)*v.z; }
-    void scale(float f) { for(int j=0;j<3;j++) for(int i=0;i<4;i++) M(i,j)*=f; }
-    void scale(vec3 v) { for(int j=0;j<3;j++) for(int i=0;i<4;i++) M(i,j)*=v[j]; }
-    void rotate(float angle, vec3 u) {
+	mat4& translate(vec3 v) { for(int i=0;i<4;i++) M(i,3) += M(i,0)*v.x + M(i,1)*v.y + M(i,2)*v.z; return *this; }
+	mat4& scale(float f) { for(int j=0;j<3;j++) for(int i=0;i<4;i++) M(i,j)*=f; return *this; }
+	mat4& scale(vec3 v) { for(int j=0;j<3;j++) for(int i=0;i<4;i++) M(i,j)*=v[j]; return *this; }
+	mat4& rotate(float angle, vec3 u) {
         float x=u.x, y=u.y, z=u.z;
         float c=cos(angle), s=sin(angle), ic=1-c;
         mat4 r;
@@ -126,11 +127,11 @@ struct mat4 {
         r(0,1) = y*x*ic + z*s; r(1,1) = y*y*ic + c; r(2,1) = y*z*ic - x*s; r(3,1) = 0;
         r(0,2) = x*z*ic - y*s; r(1,2) = y*z*ic + x*s; r(2,2) = z*z*ic + c; r(3,2) = 0;
         r(0,3) = 0; r(1,3) = 0; r(2,3) = 0; r(3,3) = 1;
-        *this = *this * r;
+		return *this = *this * r;
     }
-    void rotateX(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r.M(1,1) = c; r.M(2,2) = c; r.M(1,2) = -s; r.M(2,1) = s; *this = *this * r; }
-    void rotateY(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r.M(0,0) = c; r.M(2,2) = c; r.M(2,0) = -s; r.M(0,2) = s; *this = *this * r; }
-    void rotateZ(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r.M(0,0) = c; r.M(1,1) = c; r.M(0,1) = -s; r.M(1,0) = s; *this = *this * r; }
+	mat4& rotateX(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r.M(1,1) = c; r.M(2,2) = c; r.M(1,2) = -s; r.M(2,1) = s; return *this = *this * r; }
+	mat4& rotateY(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r.M(0,0) = c; r.M(2,2) = c; r.M(2,0) = -s; r.M(0,2) = s; return *this = *this * r; }
+	mat4& rotateZ(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r.M(0,0) = c; r.M(1,1) = c; r.M(0,1) = -s; r.M(1,0) = s; return *this = *this * r; }
 };
 inline mat4 operator*(float s, mat4 M) {mat4 r; for(int j=0;j<4;j++) for(int i=0;i<4;i++) r.M(i,j)=s*M(i,j); return r; }
 

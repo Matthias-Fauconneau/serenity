@@ -92,7 +92,7 @@ inline String simplify(string s) { return simplify((array<char>)copyRef(s)); }
 String join(ref<string> list, const string separator=""_);
 
 /// Returns an array of references splitting \a str wherever \a separator occurs
-array<string> split(const string str, string separator=", "_);
+array<string> split(const string str, string separator/*=", "_*/);
 
 /// Flatten cats
 template<class A, class B, class T> String str(const cat<A, B, T>& a) { return a; }

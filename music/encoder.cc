@@ -65,9 +65,11 @@ void Encoder::setH264(int2 size, uint videoFrameRate) {
     videoStream->time_base.den = videoCodec->time_base.den = videoFrameRate;
     videoCodec->pix_fmt = AV_PIX_FMT_YUV420P;
 	videoCodec->max_b_frames = 2; // Youtube constraint
-	videoCodec->bit_rate = 5000000;
+	//videoCodec->bit_rate = 5000000;
 	if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
-    check( avcodec_open2(videoCodec, codec, 0) );
+	AVDictionary* options = 0;
+	av_dict_set(&options, "preset", "ultrafast", 0);
+	check( avcodec_open2(videoCodec, codec, &options) );
 	frame = av_frame_alloc();
     avpicture_alloc((AVPicture*)frame, AV_PIX_FMT_YUV420P, width, height);
 }

@@ -3,10 +3,12 @@
 #include "x.h"
 #include "png.h"
 #include "time.h"
+#include "gl.h"
 #include <sys/shm.h>
+extern "C" bool glXMakeCurrent(_XDisplay *dpy, uint drawable, __GLXcontextRec* ctx);
 
-Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool show, const Image& icon)
-	: widget(widget), size(sizeHint), getTitle(title) {
+Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool show, const Image& icon, bool GL)
+	: Display(GL), widget(widget), size(sizeHint), getTitle(title) {
     Display::onEvent.connect(this, &Window::onEvent);
 	assert_(id && root && visual);
     send(CreateColormap{ .colormap=id+Colormap, .window=root, .visual=visual});
@@ -30,6 +32,9 @@ Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool sho
     actions[Escape] = []{requestTermination();};
     actions[PrintScreen] = [this]{writeFile(str(Date(currentTime())), encodePNG(target), home());};
 	if(show) this->show();
+	if(glContext) glXMakeCurrent(glDisplay, id+XWindow, glContext); // DRI2CreateDrawable
+	//glEnable(GL_FRAMEBUFFER_SRGB);
+	//((PFNGLXSWAPINTERVALMESAPROC)glXGetProcAddress((const GLubyte*)"glXSwapIntervalMESA"))(1);
 }
 
 Window::~Window() {
@@ -139,38 +144,44 @@ void Window::event() {
 	setTitle(getTitle ? getTitle() : widget->title());
     if(updates && state==Idle) {
         assert_(size);
-        if(target.size != size) {
-            if(target) {
-                send(FreePixmap{.pixmap=id+Pixmap}); target=Image();
-                assert_(shm);
-                send(Shm::Detach{.seg=id+Segment});
-                shmdt(target.data);
-                shmctl(shm, IPC_RMID, 0);
-                shm = 0;
-            } else assert_(!shm);
+		if(glContext) {
+			GLFrameBuffer::bindWindow(0, size, ClearColor, vec4(black, 1));
+			 widget->graphics(vec2(size), Rect(vec2(0), vec2(size)));
+			 glFlush();
+		} else {
+			if(target.size != size) {
+				if(target) {
+					send(FreePixmap{.pixmap=id+Pixmap}); target=Image();
+					assert_(shm);
+					send(Shm::Detach{.seg=id+Segment});
+					shmdt(target.data);
+					shmctl(shm, IPC_RMID, 0);
+					shm = 0;
+				} else assert_(!shm);
 
-            uint stride = align(16, width);
-            shm = check( shmget(0, height*stride*sizeof(byte4) , IPC_CREAT | 0777) );
-            target = Image(buffer<byte4>((byte4*)check(shmat(shm, 0, 0)), height*stride, 0), size, stride);
-			target.clear(byte4(0xFF));
-            send(Shm::Attach{.seg=id+Segment, .shm=shm});
-            send(CreatePixmap{.pixmap=id+Pixmap, .window=id+XWindow, .w=uint16(width), .h=uint16(size.y)});
-        }
+				uint stride = align(16, width);
+				shm = check( shmget(0, height*stride*sizeof(byte4) , IPC_CREAT | 0777) );
+				target = Image(buffer<byte4>((byte4*)check(shmat(shm, 0, 0)), height*stride, 0), size, stride);
+				target.clear(byte4(0xFF));
+				send(Shm::Attach{.seg=id+Segment, .shm=shm});
+				send(CreatePixmap{.pixmap=id+Pixmap, .window=id+XWindow, .w=uint16(width), .h=uint16(size.y)});
+			}
 
-        Update update = updates.take(0);
-        if(!update.graphics) update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size))); // TODO: partial render
+			Update update = updates.take(0);
+			if(!update.graphics) update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size))); // TODO: partial render
 
-        // Render background
-        /***/ if(background==NoBackground) {}
-        else if(background==White) fill(target, update.origin, update.size, 1, 1);
-        else error((int)background);
+			// Render background
+			/***/ if(background==NoBackground) {}
+			else if(background==White) fill(target, update.origin, update.size, 1, 1);
+			else error((int)background);
 
-        // Render graphics
-        ::render(target, update.graphics);
-        send(Shm::PutImage{.window=id+Pixmap, .context=id+GraphicContext, .seg=id+Segment,
-                           .totalW=uint16(target.stride), .totalH=uint16(target.height), .srcX=uint16(update.origin.x), .srcY=uint16(update.origin.y),
-                           .srcW=uint16(update.size.x), .srcH=uint16(update.size.y), .dstX=uint16(update.origin.x), .dstY=uint16(update.origin.y),});
-        state=Copy;
-        send(Present::Pixmap{.window=id+XWindow, .pixmap=id+Pixmap}); //FIXME: update region
+			// Render graphics
+			::render(target, update.graphics);
+			send(Shm::PutImage{.window=id+Pixmap, .context=id+GraphicContext, .seg=id+Segment,
+							   .totalW=uint16(target.stride), .totalH=uint16(target.height), .srcX=uint16(update.origin.x), .srcY=uint16(update.origin.y),
+							   .srcW=uint16(update.size.x), .srcH=uint16(update.size.y), .dstX=uint16(update.origin.x), .dstY=uint16(update.origin.y),});
+			state=Copy;
+			send(Present::Pixmap{.window=id+XWindow, .pixmap=id+Pixmap}); //FIXME: update region
+		}
     }
 }
