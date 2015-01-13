@@ -57,8 +57,11 @@ struct Mosaic {
 			page.bounds = Rect(round(pageSize));
 			Image target(int2(page.bounds.size()));
 			float y0 = Y;
+			// TODO: linear
+			// TODO: top white
 			for(size_t i: range(m)) {
 				float x0 = X;
+				// TODO: left white
 				for(size_t j: range(n[i])) {
 					int ix0 = round(x0), iy0 = round(y0);
 					int iw0 = ix0-round(x0-X), ih0 = iy0-round(y0-Y); // Previous border sizes
@@ -67,15 +70,43 @@ struct Mosaic {
 					int iw1 = round(x1+X)-ix1, ih1 = round(y1+Y)-iy1; // Next border sizes
 					int2 size(ix1-ix0, iy1-iy0);
 					Image source = resize(size, images[i][j]);
+					for(int y: range(ih0)) {
+						for(int x: range(size.x)) {
+							bgr3i s = 0;
+							for(int dx: range(-(y+1), (y+2))) for(int dy: range(y+3)) s += (bgr3i)source(clip(0, x+dx, size.x-1), dy).bgr();
+							s = (ih0-1-y) * s / ( (y+3) * ((y+2) - -(y+1)) * (ih0-1));
+							target(ix0+x, iy0-y-1) += byte4(s);
+						}
+					}
 					for(int y: range(size.y)) {
-						for(int x: range(iw0)) target(ix0-x-1, iy0+y) += byte4((iw0-1-x) * (bgr3i)(source(0, y).bgr()) / (iw0-1));
+						for(int x: range(iw0)) {
+							bgr3i s = 0;
+							for(int dy: range(-(x+1), (x+2))) for(int dx: range(x+3)) s += (bgr3i)source(dx, clip(0, y+dy, size.y-1)).bgr();
+							s = (iw0-1-x) * s / ( (x+3) * ((x+2) - -(x+1)) * (iw0-1));
+							target(ix0-x-1, iy0+y) += byte4(s);
+						}
 						for(int x: range(size.x)) target(ix0+x, iy0+y) = source(x, y);
-						for(int x: range(iw1)) target(ix1+x, iy0+y) += byte4((iw1-1-x) * (bgr3i)(source(size.x-1, y).bgr()) / (iw1-1));
+						for(int x: range(iw1)) {
+							bgr3i s = 0;
+							for(int dy: range(-(x+1), (x+2))) for(int dx: range(x+3)) s += (bgr3i)source(size.x-1-dx, clip(0, y+dy, size.y-1)).bgr();
+							s = (iw1-1-x) * s / ( (x+3) * ((x+2) - -(x+1)) * (iw1-1));
+							target(ix1+x, iy0+y) += byte4(s);
+						}
+					}
+					for(int y: range(ih1)) {
+						for(int x: range(size.x)) {
+							bgr3i s = 0;
+							for(int dx: range(-(y+1), (y+2))) for(int dy: range(y+3)) s += (bgr3i)source(clip(0, x+dx, size.x-1), size.y-1-dy).bgr();
+							s = (ih1-1-y) * s / ( (y+3) * ((y+2) - -(y+1)) * (ih1-1));
+							target(ix0+x, iy1+y) += byte4(s);
+						}
 					}
 					x0 += w[i][j] + X;
 				}
+				// TODO: right white
 				y0 += h[i] + Y;
 			}
+			// TODO: bottom white
 			page.blits.append(0, page.bounds.size(), move(target));
 #else   // -- No background
 			page.bounds = Rect(pageSize);
