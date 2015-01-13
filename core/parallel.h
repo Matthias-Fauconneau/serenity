@@ -24,7 +24,7 @@ inline void* start_routine(thread* t) {
 /// Runs a loop in parallel
 template<Type F> void parallel_for(uint64 start, uint64 stop, F f) {
 #if DEBUG || PROFILE
-    for(uint i : range(start, stop)) f(0, i);
+	for(uint64 i : range(start, stop)) f(0, i);
 #else
     function<void(uint, uint)> delegate = f;
     thread threads[threadCount];
