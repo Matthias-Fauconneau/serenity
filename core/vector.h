@@ -167,7 +167,7 @@ struct byte4 : vec<bgra,uint8,4> {
 	//using vec::vec;
     byte4() : vec(0) {} // Defaults initalizes to zero
     notrace byte4(byte v) : vec(v) {}
-	notrace byte4(byte b, byte g, byte r, byte a) : vec(b,g,r,a) {}
+	notrace byte4(byte b, byte g, byte r, byte a=0xFF) : vec(b,g,r,a) {}
 	// bgr
 	byte4(byte3 bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
 	//byte3 bgr() { return byte3(b, g, r); } // -> bgra
