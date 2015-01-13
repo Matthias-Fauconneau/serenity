@@ -168,11 +168,15 @@ struct byte4 : vec<bgra,uint8,4> {
     byte4() : vec(0) {} // Defaults initalizes to zero
     notrace byte4(byte v) : vec(v) {}
 	notrace byte4(byte b, byte g, byte r, byte a) : vec(b,g,r,a) {}
-    byte4(vec<rgba,uint8,4> rgba) : vec(rgba.b, rgba.g, rgba.r, rgba.a) {}
-    byte4(vec<rgb,uint8,3> rgb) : vec(rgb.b, rgb.g, rgb.r, 0xFF) {}
-    byte4(byte3 bgr) : vec(bgr.b, bgr.g, bgr.r, 0xFF) {}
-	byte4(vec<::bgr, int, 3> v) : vec(v.b, v.g, v.r, 0xFF) {}
-	vec<::bgr, uint8, 3> bgr() { return vec<::bgr, uint8, 3>(b, g, r); }
+	// bgr
+	byte4(byte3 bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
+	//byte3 bgr() { return byte3(b, g, r); } // -> bgra
+	// bgr3f
+	byte4(bgr3f bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
+	bgr3f bgr() { return bgr3f(b, g, r); }
+	// rgba
+	byte4(vec<rgba,uint8,4> rgba) : vec(rgba.b, rgba.g, rgba.r, rgba.a) {}
+	byte4(vec<rgb,uint8,3> rgb) : vec(rgb.b, rgb.g, rgb.r, 0xFF) {}
 };
 /// Integer b,g,r,a vector (32bit)
 typedef vec<bgra,int,4> int4;

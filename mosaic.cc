@@ -1,3 +1,4 @@
+#include "image/image.h"
 #include "window.h"
 #include "layout.h"
 #include "interface.h"
@@ -5,6 +6,12 @@
 #include "jpeg.h"
 #include "render.h"
 #include "jpeg-encoder.h"
+
+static int mirror(int x, int w) {
+	if(x < 0) return -x;
+	if(x >= w) return w-1-(x-w);
+	return x;
+}
 
 struct Mosaic {
 	// Name
@@ -56,12 +63,25 @@ struct Mosaic {
 #if 1     // -- Extend images over background
 			page.bounds = Rect(round(pageSize));
 			Image target(int2(page.bounds.size()));
+			// TODO: linear, round, gaussian, parallel
+			// White Top
+			for(int y: range(Y)) {
+				for(int x: range(target.size.x)) {
+					float w = float(Y-1-y) / float(Y-1);
+					target(x, y) += byte4(w * 0xFF);
+				}
+			}
+			// White Left
+			for(int y: range(target.size.y)) {
+				for(int x: range(X)) {
+					float w = float(X-1-x) / float(X-1);
+					target(x, y) += byte4(w * 0xFF);
+				}
+			}
+			const int R = min(X, Y);
 			float y0 = Y;
-			// TODO: linear
-			// TODO: top white
 			for(size_t i: range(m)) {
 				float x0 = X;
-				// TODO: left white
 				for(size_t j: range(n[i])) {
 					int ix0 = round(x0), iy0 = round(y0);
 					int iw0 = ix0-round(x0-X), ih0 = iy0-round(y0-Y); // Previous border sizes
@@ -70,43 +90,101 @@ struct Mosaic {
 					int iw1 = round(x1+X)-ix1, ih1 = round(y1+Y)-iy1; // Next border sizes
 					int2 size(ix1-ix0, iy1-iy0);
 					Image source = resize(size, images[i][j]);
+					// Top Left
 					for(int y: range(ih0)) {
-						for(int x: range(size.x)) {
-							bgr3i s = 0;
-							for(int dx: range(-(y+1), (y+2))) for(int dy: range(y+3)) s += (bgr3i)source(clip(0, x+dx, size.x-1), dy).bgr();
-							s = (ih0-1-y) * s / ( (y+3) * ((y+2) - -(y+1)) * (ih0-1));
-							target(ix0+x, iy0-y-1) += byte4(s);
-						}
-					}
-					for(int y: range(size.y)) {
 						for(int x: range(iw0)) {
-							bgr3i s = 0;
-							for(int dy: range(-(x+1), (x+2))) for(int dx: range(x+3)) s += (bgr3i)source(dx, clip(0, y+dy, size.y-1)).bgr();
-							s = (iw0-1-x) * s / ( (x+3) * ((x+2) - -(x+1)) * (iw0-1));
-							target(ix0-x-1, iy0+y) += byte4(s);
-						}
-						for(int x: range(size.x)) target(ix0+x, iy0+y) = source(x, y);
-						for(int x: range(iw1)) {
-							bgr3i s = 0;
-							for(int dy: range(-(x+1), (x+2))) for(int dx: range(x+3)) s += (bgr3i)source(size.x-1-dx, clip(0, y+dy, size.y-1)).bgr();
-							s = (iw1-1-x) * s / ( (x+3) * ((x+2) - -(x+1)) * (iw1-1));
-							target(ix1+x, iy0+y) += byte4(s);
+							bgr3f s = 0;
+							int r = max(x, y);
+							for(int dy: range(r+R)) for(int dx: range(r+R)) s += bgr3f(source(dx, dy).bgr());
+							float w = float((iw0-1-x) * (ih0-1-y)) / float( (r+R) * (iw0-1) * (r+R) * (ih0-1) );
+							target(ix0-x-1, iy0-y-1) += byte4(w * s);
 						}
 					}
+					// Top Center
+					for(int y: range(ih0)) {
+						float w = float(ih0-1-y) / float( (y+R) * ((y+R) - -(y+R)) * (ih0-1));
+						for(int x: range(size.x)) {
+							bgr3f s = 0;
+							for(int dy: range(y+R)) for(int dx: range(-(y+R), (y+R))) s += source(mirror(x+dx, size.x), dy).bgr(); // TODO: factor mirror out
+							target(ix0+x, iy0-y-1) += byte4(w * s);
+						}
+					}
+					// Top Right
+					for(int y: range(ih0)) {
+						for(int x: range(iw1)) {
+							bgr3f s = 0;
+							int r = max(x, y);
+							for(int dy: range(r+R)) for(int dx: range(r+R)) s += bgr3f(source(size.x-1-dx, dy).bgr());
+							float w = float((iw1-1-x) * (ih0-1-y)) / float( (r+R) * (iw1-1) * (r+R) * (ih0-1) );
+							target(ix1+x, iy0-y-1) += byte4(w * s);
+						}
+					}
+					// Center
+					for(int y: range(size.y)) {
+						// Center Left {Top Left Bottom, Center, Bottom Left Top}
+						for(int x: range(iw0)) {
+							bgr3f s = 0;
+							for(int dy: range(-(x+R), (x+R))) for(int dx: range(x+R)) s += source(dx, mirror(y+dy, size.y)).bgr();
+							float w = float(iw0-1-x) / float( (x+R) * ((x+R) - -(x+R)) * (iw0-1));
+							target(ix0-x-1, iy0+y) += byte4(w * s);
+						}
+						// Center Center
+						for(int x: range(size.x)) target(ix0+x, iy0+y) = source(x, y);
+						// Center Right {Top Right Bottom, Center, Bottom Right Top}
+						for(int x: range(iw1)) {
+							bgr3f s = 0;
+							for(int dy: range(-(x+R), (x+R))) for(int dx: range(x+R)) s += source(size.x-1-dx, mirror(y+dy, size.y)).bgr();
+							float w = float(iw1-1-x) / float( (x+R) * ((x+R) - -(x+R)) * (iw1-1));
+							target(ix1+x, iy0+y) += byte4(w * s);
+						}
+					}
+					// Bottom Left
+					for(int y: range(ih1)) {
+						for(int x: range(iw0)) {
+							bgr3f s = 0;
+							int r = max(x, y);
+							for(int dy: range(r+R)) for(int dx: range(r+R)) s += bgr3f(source(dx, size.y-1-dy).bgr());
+							float w = float((iw0-1-x) * (ih0-1-y)) / float( (r+R) * (iw0-1) * (r+R) * (ih0-1) );
+							target(ix0-x-1, iy1+y) += byte4(w * s);
+						}
+					}
+					// Bottom Center
 					for(int y: range(ih1)) {
 						for(int x: range(size.x)) {
-							bgr3i s = 0;
-							for(int dx: range(-(y+1), (y+2))) for(int dy: range(y+3)) s += (bgr3i)source(clip(0, x+dx, size.x-1), size.y-1-dy).bgr();
-							s = (ih1-1-y) * s / ( (y+3) * ((y+2) - -(y+1)) * (ih1-1));
-							target(ix0+x, iy1+y) += byte4(s);
+							bgr3f s = 0;
+							for(int dy: range(y+R)) for(int dx: range(-(y+R), (y+R))) s += source(mirror(x+dx, size.x), size.y-1-dy).bgr();
+							float w = float(ih1-1-y) / float( (y+R) * ((y+R) - -(y+R)) * (ih1-1));
+							target(ix0+x, iy1+y) += byte4(w * s);
+						}
+					}
+					// Bottom Right
+					for(int y: range(ih1)) {
+						for(int x: range(iw1)) {
+							bgr3f s = 0;
+							int r = max(x, y);
+							for(int dy: range(r+R)) for(int dx: range(r+R)) s += bgr3f(source(size.x-1-dx, size.y-1-dy).bgr());
+							float w = float((iw1-1-x) * (ih0-1-y)) / float( (r+R) * (iw1-1) * (r+R) * (ih0-1) );
+							target(ix1+x, iy1+y) += byte4(w * s);
 						}
 					}
 					x0 += w[i][j] + X;
 				}
-				// TODO: right white
 				y0 += h[i] + Y;
 			}
-			// TODO: bottom white
+			// White Right
+			for(int y: range(target.size.y)) {
+				for(int x: range(X)) {
+					float w = float(X-1-x) / float(X-1);
+					target(target.size.x-1-x, y) += byte4(w * 0xFF);
+				}
+			}
+			// White Bottom
+			for(int y: range(Y)) {
+				for(int x: range(target.size.x)) {
+					float w = float(Y-1-y) / float(Y-1);
+					target(x, target.size.y-1-y) += byte4(w * 0xFF);
+				}
+			}
 			page.blits.append(0, page.bounds.size(), move(target));
 #else   // -- No background
 			page.bounds = Rect(pageSize);
