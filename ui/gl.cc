@@ -125,7 +125,7 @@ GLShader::GLShader(string source, ref<string> stages) {
 			global.append( replace(stageGlobal,"$"_,str(i-1)) );
 			main.append( replace(stageMain,"$"_,str(i-1)) );
         }
-		this->source.append( "#version 130\n"_+global+"\nvoid main() {\n"_+main+"\n}\n"_ );
+		this->source.append( "#version 330\n"_+global+"\nvoid main() {\n"_+main+"\n}\n"_ );
 		uint shader = glCreateShader(type);
 		glShaderSource(shader, 1, &this->source.last().data, (int*)&this->source.last().size);
         glCompileShader(shader);
@@ -158,7 +158,7 @@ uint GLShader::attribLocation(string name) {
 		location=glGetAttribLocation(id, strz(name));
 		if(location>=0) attribLocations.insert(copyRef(name), location);
     }
-	if(location<0) error("Unknown attribute"_,name);
+	if(location<0) error("Unknown attribute '"_+str(name)+"'"_);
     return (uint)location;
 }
 
@@ -271,42 +271,47 @@ void GLIndexBuffer::draw(uint start, uint count) const {
 }
 
 /// Texture
-GLTexture::GLTexture(uint width, uint height, uint format, const void* data) : width(width), height(height), format(format) {
+GLTexture::GLTexture(uint width, uint height, uint format, const void* data) : width(width), height(height), format(format),
+	target((format&Cube)?GL_TEXTURE_CUBE_MAP:(format&Multisample)?GL_TEXTURE_2D_MULTISAMPLE:GL_TEXTURE_2D) {
     glGenTextures(1, &id);
+	glBindTexture(target, id);
     if(format&Multisample) {
-        glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, id);
         int colorSamples=0; glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES, &colorSamples);
         int depthSamples=0; glGetIntegerv(GL_MAX_DEPTH_TEXTURE_SAMPLES, &depthSamples);
         assert(colorSamples==depthSamples);
-        if(format&Depth) glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, depthSamples, GL_DEPTH_COMPONENT32, width, height, false);
-        else glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, colorSamples, GL_RGB8, width, height, false);
-    } else {
-        glBindTexture(GL_TEXTURE_2D, id);
-        /**/  if(format&Depth)
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, data);
-        else if(format&Alpha)
-            glTexImage2D(GL_TEXTURE_2D, 0, format&SRGB?GL_SRGB8_ALPHA8:GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
-        else
-            glTexImage2D(GL_TEXTURE_2D, 0, format&SRGB?GL_SRGB8:GL_RGB8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
-    }
+		if(format&Depth) glTexImage2DMultisample(target, depthSamples, GL_DEPTH_COMPONENT32, width, height, false);
+		else glTexImage2DMultisample(target, colorSamples, GL_RGB8, width, height, false);
+	}
+	else if(format&Cube) {
+		assert_(width == height/6);
+		for(size_t index: range(6))
+			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+index, 0, format&SRGB?GL_SRGB8:GL_RGB8, width, height/6, 0, GL_BGRA, GL_UNSIGNED_BYTE, ((byte4*)data)+index*height/6*width);
+		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+	}
+	else if(format&Depth)
+			glTexImage2D(target, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, data);
+	else if(format&Alpha)
+		glTexImage2D(target, 0, format&SRGB?GL_SRGB8_ALPHA8:GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
+	else
+		glTexImage2D(target, 0, format&SRGB?GL_SRGB8:GL_RGB8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
     if(format&Shadow) {
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
+		glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
     }
     if(format&Bilinear) {
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, format&Mipmap?GL_LINEAR_MIPMAP_LINEAR:GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    } else {
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, format&Mipmap?GL_NEAREST_MIPMAP_NEAREST:GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    }
+		glTexParameteri(target, GL_TEXTURE_MIN_FILTER, format&Mipmap?GL_LINEAR_MIPMAP_LINEAR:GL_LINEAR);
+		glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	} else {
+		glTexParameteri(target, GL_TEXTURE_MIN_FILTER, format&Mipmap?GL_NEAREST_MIPMAP_NEAREST:GL_NEAREST);
+		glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	}
     if(format&Anisotropic) {
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.0);
+		glTexParameterf(target, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.0);
     }
     if(format&Clamp) {
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameterf(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameterf(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     }
-    if(format&Mipmap) glGenerateMipmap(GL_TEXTURE_2D);
+	if(format&Mipmap) glGenerateMipmap(target);
 }
 GLTexture::GLTexture(const Image& image, uint format)
     : GLTexture(image.width, image.height, (image.alpha?Alpha:0)|format, image.data) {
@@ -317,7 +322,7 @@ GLTexture::~GLTexture() { if(id) glDeleteTextures(1,&id); id=0; }
 void GLTexture::bind(uint sampler) const {
     assert(id);
     glActiveTexture(GL_TEXTURE0+sampler);
-	glBindTexture(/*depth?GL_TEXTURE_3D:*/(format&Multisample)?GL_TEXTURE_2D_MULTISAMPLE:GL_TEXTURE_2D, id);
+	glBindTexture(target, id);
 }
 
 /// Framebuffer

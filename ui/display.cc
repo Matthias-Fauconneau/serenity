@@ -97,10 +97,10 @@ Display::Display(bool GL) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLI
     {auto r = request(QueryExtension{.length="Present"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "Present"_);
         Present::EXT=r.major; XRender::event=r.firstEvent; XRender::errorBase=r.firstError; }
 
-	if(GL) {
+	if(GL) { // libgl-xlib
 		assert_(!glDisplay && !glContext);
 		glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_,":0"_))); assert_(glDisplay);
-		const int fbAttribs[] = {GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8,
+		const int fbAttribs[] = {GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 24,
 								 /*GLX_FRAMEBUFFER_SRGB_CAPABLE_EXT, 1,*/ 0};
 		int fbCount=0; GLXFBConfig* fbConfigs = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount); assert(fbConfigs && fbCount);
 		const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION_ARB, 3, GLX_CONTEXT_MINOR_VERSION_ARB, 3, 0};

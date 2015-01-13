@@ -57,7 +57,7 @@ struct Surface {
 				for(uint i: range(vertices.size)) cell(vertices[i].position).append( i ); // Sorts all vertices
 			}
 
-			float minDistance=1; uint minIndex = -1;
+			float minDistance=0; uint minIndex = -1;
 			for(uint index: cell(o.position)) {
 				Vertex& v = vertices[index];
 
@@ -112,13 +112,13 @@ struct Surface {
 	}
 };
 
-/// Generates a scene (TODO: showing an L-System)
+/// Generates a scene
 struct Scene : virtual Surface {
 	Scene() {
 		const bgr3f groundColor = white;
 
 		Random random;
-		const int N = 1; // Terrain grid resolution (TODO: triangle mesh)
+		const int N = 16; // Terrain grid resolution (TODO: triangle mesh)
 		float altitude[(N+1)*(N+1)];
 		for(int y: range(N+1)) for(int x: range(N+1)) altitude[y*(N+1)+x] = 1./32 * (random()*2-1); // Uniform random altitude
 
@@ -141,7 +141,7 @@ struct Scene : virtual Surface {
 /// Views a scene
 struct View : Widget {
 	// Creates a window and an associated GL context
-	Window window {this, 1024, []{ return "Editor"__; }, true, Image(), true};
+	Window window {this, 512, []{ return "Editor"__; }, true, Image(), true};
 	// ^ GL* constructors rely on a GL context being current ^
 	struct Surface : virtual ::Surface {
 		GLVertexBuffer vertexBuffer;
@@ -154,13 +154,13 @@ struct View : Widget {
 		}
 	};
 	struct : Scene, Surface {} surface;
-	GLShader diffuse {shader(), {"transform"}}; //{"transform normal color diffuse light"}};
+	GLShader diffuse {shader(), {"transform normal color diffuse light"}};
 	// Light
-	/*struct Light {
+	struct Light {
 		float pitch = 3*PI/4;
 		bool enable = true; // Whether shadows are rendered
 		vec3 lightMin=0, lightMax=0; // Scene bounding box in sun light space
-		GLFrameBuffer shadow {GLTexture(4096,4096, Depth|Shadow|Bilinear|Clamp)};
+		/*GLFrameBuffer shadow {GLTexture(4096,4096, Depth|Shadow|Bilinear|Clamp)};
 		GLShader transform {shader(), {"transform"}};
 		Light(const Surface& surface) {
 			{// Compute scene bounds in light space to fit shadow
@@ -191,50 +191,48 @@ struct View : Widget {
 				surface.vertexBuffer.bindAttribute(transform, "aPosition", 3, offsetof(Surface::Vertex,position));
 				surface.indexBuffer.draw();
 			}
-		}
+		}*/
 		// Light to world
 		mat4 toWorld() {
 			return mat4()
 					.rotateX( -pitch );
 		}
-		// World to shadow sample coordinates [0,1]³
+		/*// World to shadow sample coordinates [0,1]³
 		mat4 toShadow() {
 			return mat4()
 					.scale(vec3(1.f/(lightMax-lightMin)))
 					.translate(-lightMin)
 					.rotateX( pitch );
-		}
-	} light {surface};*/
+		}*/
+	} light;// {surface};
 	// Sky
-	//GLShader sky {shader(), {"sky"}};
+	GLShader sky {shader(), {"sky"}};
+	GLTexture skybox {decodeImage(readFile("skybox.png"_)), SRGB|Bilinear|Cube};
+
 	// View
 	vec2 lastPos; // Last cursor position to compute relative mouse movements
 	vec2 rotation = vec2(0, -PI/3); // Current view angles (yaw,pitch)
-	/*// Render
+	// Render
 	struct Render {
 		GLVertexBuffer vertexBuffer;
 		Render() { vertexBuffer.upload<vec2>({vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(1,1)}); }
 		void draw(GLShader& shader) {
-			vertexBuffer.bindAttribute(shader," aPosition"_,2);
+			vertexBuffer.bindAttribute(shader,"aPosition"_, 2);
 			shader.bind();
 			vertexBuffer.draw(TriangleStrip);
 		}
-	} render;*/
+	} render;
 	//GLFrameBuffer frameBuffer;
 	//GLShader present {shader(), {"screen present"_}};
 	// Profile
 	//int64 lastFrameEnd = realTime(), frameInterval = 20000000/*ns*/;
-
-	View() {
-		//window.actions[Space] = [this]{ enableShadow=!enableShadow; window.render();};
-	}
 
 	// Orbital ("turntable") view control
 	bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override {
 		 vec2 delta = cursor-lastPos; lastPos=cursor;
 		 if(event==Motion && button==LeftButton) {
 			 rotation += float(2.f*PI) * delta / size; //TODO: warp
-			 rotation.y= clip(float(-PI/2), rotation.y, 0.f); // Keep pitch between [-PI/2,0]
+			 rotation.y= clip(float(-PI/*2*/), rotation.y, 0.f); // Keep pitch between [-PI, 0]
 		 }
 		 else return false;
 		 return true;
@@ -244,36 +242,41 @@ struct View : Widget {
 	shared<Graphics> graphics(vec2 unused size) override {
 		//if(frameBuffer.size != int2(size)) frameBuffer = GLFrameBuffer(int2(size));
 		//frameBuffer.bind(ClearDepth);
-		//glBlend(false);
+		glDepthTest(true);
 
 		// Computes projection transform
-		mat4 projection = mat4().perspective(PI/4, size, 1./4, 4);
+		mat4 projection = mat4()
+				.perspective(PI/4, size, 1./2, 3)
+				// .scale(vec3(size.y/size.x, 1, -1))
+				;
 		// Computes view transform
 		mat4 view = mat4()
 				.scale(1.f/surface.radius) // Fits scene (isometric approximation)
 				.translate(vec3(0,0,-1*surface.radius)) // Steps back
 				.rotateX(rotation.y) // Pitch
 				.rotateZ(rotation.x) // Yaw
-				.translate(vec3(0,0,-surface.center.z)); // Level
+				.translate(vec3(0,0,-surface.center.z-1./2)) // Level floor
+				;
 		// World-space lighting
-		//vec3 lightDirection = normalize(light.toWorld().normalMatrix()*vec3(0,0,-1));
-		//vec3 skyLightDirection = vec3(0,0,1);*/
+		vec3 lightDirection = normalize(light.toWorld().normalMatrix()*vec3(0,0,-1));
+		//vec3 skyLightDirection = vec3(0,0,1);
 
 		diffuse["modelViewProjectionTransform"] = projection*view;
-		/*diffuse["shadowTransform"] = light.toShadow();
+		//diffuse["shadowTransform"] = light.toShadow();
 		diffuse["lightDirection"] = lightDirection;
 		//diffuse["skyLightDirection"] = skyLightDirection;
-		diffuse["shadow"_] = 0; light.shadow.depthTexture.bind(0);*/
+		//diffuse["shadow"_] = 0; light.shadow.depthTexture.bind(0);
 		diffuse.bind();
-		surface.vertexBuffer.bindAttribute(diffuse, "aPosition", 3, offsetof(Vertex, position));
-		//surface.vertexBuffer.bindAttribute(diffuse, "aColor", 3, offsetof(Vertex, color));
-		//surface.vertexBuffer.bindAttribute(diffuse, "aNormal", 3, offsetof(Vertex, normal));
+		surface.vertexBuffer.bindAttribute(diffuse, "aPosition"_, 3, offsetof(Vertex, position));
+		surface.vertexBuffer.bindAttribute(diffuse, "aColor"_, 3, offsetof(Vertex, color));
+		surface.vertexBuffer.bindAttribute(diffuse, "aNormal"_, 3, offsetof(Vertex, normal));
 		surface.indexBuffer.draw();
 
-		/*//TODO: fog
-        sky["inverseProjectionMatrix"] = projection.inverse();
-		sky["lightDirection"] = normalize(view.normalMatrix() * lightDirection);
-		render.draw(sky);*/
+		//TODO: fog
+		sky["inverseViewProjectionMatrix"] = mat4(((mat3)view).transpose()) * projection.inverse();
+		//sky["lightDirection"] = normalize(view.normalMatrix() * lightDirection);
+		sky["skybox"] = 0; skybox.bind(0);
+		render.draw(sky);
 
 		/*GLTexture color(width,height,GLTexture::RGB16F);
 		frameBuffer.blit(color);

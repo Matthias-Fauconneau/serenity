@@ -145,7 +145,7 @@ void Window::event() {
     if(updates && state==Idle) {
         assert_(size);
 		if(glContext) {
-			GLFrameBuffer::bindWindow(0, size, ClearColor, vec4(black, 1));
+			GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(black, 1));
 			 widget->graphics(vec2(size), Rect(vec2(0), vec2(size)));
 			 glFlush();
 		} else {

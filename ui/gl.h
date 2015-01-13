@@ -103,11 +103,11 @@ struct GLIndexBuffer {
 };
 
 enum Format { Depth=1,
-              Alpha=1<<1, SRGB=1<<2,Mipmap=1<<3, Shadow=1<<4, Bilinear=1<<5, Anisotropic=1<<6, Clamp=1<<7, Multisample=1<<8 };
+			  Alpha=1<<1, SRGB=1<<2,Mipmap=1<<3, Shadow=1<<4, Bilinear=1<<5, Anisotropic=1<<6, Clamp=1<<7, Multisample=1<<8, Cube=1<<9 };
 struct GLTexture {
     handle<uint> id = 0;
 	union { int2 size = 0; struct { uint width, height; }; };
-    uint format;
+	uint format, target;
 
     GLTexture(){}
     default_move(GLTexture);

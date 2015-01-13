@@ -42,6 +42,12 @@ color {
 }
 
 light {
+ fragment {
+  float light = 1;
+ }
+}
+
+shadow {
  varying vec4 shadowPosition;
  vertex {
   uniform mat4 shadowTransform;
@@ -49,14 +55,35 @@ light {
  }
  fragment {
   uniform sampler2DShadow shadow;
-  float shadowLight = textureProj(shadow, vec4(shadowPosition.xy, shadowPosition.z -  1./128, shadowPosition.w));
+  light = textureProj(shadow, vec4(shadowPosition.xy, shadowPosition.z -  1./128, shadowPosition.w));
+ }
+}
+
+light {
+ fragment {
   const vec3 lightColor = vec3(1, 1, 1);
   uniform vec3 lightDirection;
-  diffuseLight += shadowLight * max(0,dot(lightDirection, normal)) * lightColor;
+  diffuseLight += light * max(0,dot(lightDirection, normal)) * lightColor;
  }
 }
 
 diffuse { fragment { color.rgb *= diffuseLight; } }
+
+sky {
+ varying vec3 vTexCoords;
+ vertex {
+  uniform mat4 inverseViewProjectionMatrix;
+  attribute vec2 aPosition;
+  gl_Position = vec4(aPosition, 0.999, 1);
+  vec4 viewPos = inverseViewProjectionMatrix * vec4(aPosition.xy, 1, 1);
+  vTexCoords = viewPos.xyz; //viewPos.w;
+ }
+ fragment {
+  uniform samplerCube skybox;
+  color.rgb = texture(skybox, vTexCoords).rgb;
+  //color.rgb = vTexCoords;
+ }
+}
 
 present {
  fragment {
