@@ -576,7 +576,7 @@ struct Music : Widget {
 						//followTime.stop();
 						renderTime.start();
 						Image target (encoder.size);
-						fill(target, 0, target.size, 1, 1);
+						target.clear(0xFF);
                         ::render(target, widget.graphics(vec2(target.size), Rect(vec2(target.size))));
 						renderTime.stop();
 						videoEncodeTime.start();

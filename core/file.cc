@@ -68,7 +68,7 @@ array<String> Folder::list(uint flags) const {
             }
         }
     }
-    return list;
+	return list;
 }
 
 bool existsFolder(const string folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY|O_DIRECTORY, 0) ).fd > 0; }

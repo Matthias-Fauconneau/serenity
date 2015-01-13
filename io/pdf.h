@@ -3,4 +3,4 @@
 
 /// \arg pageSize Page size in pixels
 /// pointPx points per pixels
-buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float pointPx = 1/*pt/px*/);
+buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float pointPx = 1/*pt/px*/);

@@ -147,3 +147,4 @@ editor.cc
 ui/gl.h
 ui/gl.cc
 shader
+mosaic.cc

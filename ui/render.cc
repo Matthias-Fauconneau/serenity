@@ -1,5 +1,4 @@
-#include "math.h"
-#include "graphics.h"
+#include "render.h"
 
 extern uint8 sRGB_forward[0x1000];
 extern float sRGB_reverse[0x100];
@@ -203,58 +202,41 @@ void cubic(const Image& target, ref<vec2> sourcePoints, bgr3f color, float alpha
 	}
 }
 
-#include "time.h"
-void render(const Image& target, const Graphics& graphics, vec2 offset) {
+void render(const Image& target, const Graphics& graphics, vec2 offset, float scale) {
     assert_(isNumber(offset)); assert_(isNumber(graphics.offset));
     offset += graphics.offset;
-	// TODO: cull (space partitionning)
-#if PROFILE
-	map<string, Time> profile;
-	profile["total"].start();
-#define profile(id, work... ) { profile[#id].start(); work profile[#id].stop(); }
-#else
-#define profile(id, work... ) work
-#endif
 	if(graphics.blits) {
-		profile(blit,
 		for(const auto& e: graphics.blits) {
-			if(int2(e.size) == e.image.size) blit(target, int2(round(offset+e.origin)), e.image, e.color, e.opacity);
-			else blit(target, int2(round(offset+e.origin)), resize(int2(round(e.size)), e.image), e.color, e.opacity); // FIXME: subpixel blit
+			if(int2(scale*e.size) == e.image.size) blit(target, int2(round(offset+e.origin)), e.image, e.color, e.opacity);
+			else blit(target, int2(round(offset+scale*e.origin)), resize(int2(round(scale*e.size)), e.image), e.color, e.opacity); // FIXME: subpixel blit
 		}
-				);
 	}
 	if(graphics.fills) {
-		profile(fill,
+		assert_(scale==1);
 		for(const auto& e: graphics.fills) fill(target, int2(round(offset+e.origin)), int2(e.size), e.color, e.opacity);
-		);
 	}
 	if(graphics.lines) {
-		profile(line,
+		assert_(scale==1);
 		for(const auto& e: graphics.lines) line(target, offset+e.a, offset+e.b, e.color, e.opacity);
-		);
 	}
 	if(graphics.glyphs) {
-		profile(glyph,
+		assert_(scale==1);
 		for(const auto& e: graphics.glyphs) {
 			Font::Glyph glyph = e.font.font(e.fontSize).render(e.index);
 			if(glyph.image) blit(target, int2(round(offset+e.origin))+glyph.offset, glyph.image, e.color, e.opacity);
 		}
-				);
 	}
 	if(graphics.parallelograms) {
-		profile(parallelogram,
+		assert_(scale==1);
 		for(const auto& e: graphics.parallelograms) parallelogram(target, int2(round(offset+e.min)), int2(round(offset+e.max)), e.dy, e.color, e.opacity);
-		)
 	}
 	if(graphics.cubics) {
-		profile(cubic,
+		assert_(scale==1);
 		for(const auto& e: graphics.cubics) cubic(target, e.points, e.color, e.opacity, offset);
-		)
 	}
-#if PROFILE
-	profile["total"].stop();
-	log("blits", graphics.blits.size, "fills", graphics.fills.size, "lines", graphics.lines.size, "glyphs", graphics.glyphs.size, "parallelograms", graphics.parallelograms.size, "cubics", graphics.cubics.size);
-	{array<char> s; for(auto entry: profile) s.append(entry.key+" "_+str(entry.value, profile["total"])+"\t"); log(s);}
-#endif
-    for(const auto& e: graphics.graphics) { assert_(isNumber(e.key)); render(target, e.value, offset+e.key); }
+	for(const auto& e: graphics.graphics) {
+		assert_(scale==1);
+		assert_(isNumber(e.key));
+		render(target, e.value, offset+e.key);
+	}
 }

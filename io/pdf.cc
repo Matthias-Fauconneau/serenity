@@ -25,7 +25,7 @@ inline String str(const Object& o) {
 	return move(s);
 }
 
-buffer<byte> toPDF(int2 pageSize, const ref<Graphics> pages, float px) {
+buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
     array<unique<Object>> objects;
 	auto ref = [&](const Object& object) -> String { return str(objects.indexOf(&object))+" 0 R"; };
 

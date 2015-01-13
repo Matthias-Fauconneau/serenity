@@ -57,7 +57,7 @@ struct Folder : Handle {
     /// Returns the last modified Unix timestamp (in nanoseconds)
     int64 modifiedTime() const;
     /// Lists all files in this folder
-    array<String> list(uint flags) const;
+	array<String> list(uint flags) const;
 };
 /// Returns whether this \a folder exists (as a folder)
 bool existsFolder(const string folder, const Folder& at=currentWorkingDirectory());
