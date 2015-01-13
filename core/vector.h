@@ -171,6 +171,8 @@ struct byte4 : vec<bgra,uint8,4> {
     byte4(vec<rgba,uint8,4> rgba) : vec(rgba.b, rgba.g, rgba.r, rgba.a) {}
     byte4(vec<rgb,uint8,3> rgb) : vec(rgb.b, rgb.g, rgb.r, 0xFF) {}
     byte4(byte3 bgr) : vec(bgr.b, bgr.g, bgr.r, 0xFF) {}
+	byte4(vec<::bgr, int, 3> v) : vec(v.b, v.g, v.r, 0xFF) {}
+	vec<::bgr, uint8, 3> bgr() { return vec<::bgr, uint8, 3>(b, g, r); }
 };
 /// Integer b,g,r,a vector (32bit)
 typedef vec<bgra,int,4> int4;

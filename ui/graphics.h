@@ -82,17 +82,13 @@ inline Rect operator +(vec2 offset, Rect rect) { return Rect(offset+rect.min,off
 
 /// Set of graphic elements
 struct Graphics : shareable {
-    //vec2 size = 0;
     vec2 offset = 0;
-    //vec2 scale = 1; TODO
-
     Rect bounds = Rect(inf, -inf); // bounding box of untransformed primitives
     array<Fill> fills;
     array<Blit> blits;
     array<Glyph> glyphs;
     array<Line> lines;
     array<Parallelogram> parallelograms;
-    //array<Polygon> polygons;
     array<Cubic> cubics;
 
     map<vec2, shared<Graphics>> graphics;
