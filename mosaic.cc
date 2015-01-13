@@ -89,16 +89,28 @@ struct Mosaic {
 			page.bounds = Rect(round(pageSize));
 			ImageF target(int2(page.bounds.size()));
 			target.clear(float4{0,0,0,0});
-			// TODO: round (corner), factorize, parallel, gaussian
+			// TODO: parallel, [gaussian], [factorize]
 			// White Top
 			for(int y: range(Y)) {
-				for(int x: range(target.size.x)) {
+				for(int x: range(X)) {
+					float xw = x / float(X-1);
+					float yw = y / float(Y-1);
+					float w = /*(xw*yw) +*/ ((1-xw)*yw) + (xw*(1-yw)) + ((1-xw)*(1-yw));
+					target(x, y) += float4_1(w);
+				}
+				for(int x: range(X, target.size.x-(X-1))) {
 					float w = float(Y-1-y) / float(Y-1);
 					target(x, y) += float4_1(w);
 				}
+				for(int x: range(X)) {
+					float xw = x / float(X-1);
+					float yw = y / float(Y-1);
+					float w = /*(xw*yw) +*/ ((1-xw)*yw) + (xw*(1-yw)) + ((1-xw)*(1-yw));
+					target(target.size.x-1-x, y) += float4_1(w);
+				}
 			}
 			// White Left
-			for(int y: range(target.size.y)) {
+			for(int y: range(Y, target.size.y-(Y-1))) {
 				for(int x: range(X)) {
 					float w = float(X-1-x) / float(X-1);
 					target(x, y) += float4_1(w);
@@ -202,7 +214,7 @@ struct Mosaic {
 				y0 += h[i] + Y;
 			}
 			// White Right
-			for(int y: range(target.size.y)) {
+			for(int y: range(Y, target.size.y-(Y-1))) {
 				for(int x: range(X)) {
 					float w = float(X-1-x) / float(X-1);
 					target(target.size.x-1-x, y) += float4_1(w);
@@ -210,9 +222,21 @@ struct Mosaic {
 			}
 			// White Bottom
 			for(int y: range(Y)) {
-				for(int x: range(target.size.x)) {
+				for(int x: range(X)) {
+					float xw = x / float(X-1);
+					float yw = y / float(Y-1);
+					float w = /*(xw*yw) +*/ ((1-xw)*yw) + (xw*(1-yw)) + ((1-xw)*(1-yw));
+					target(x, target.size.y-1-y) += float4_1(w);
+				}
+				for(int x: range(X, target.size.x-(X-1))) {
 					float w = float(Y-1-y) / float(Y-1);
 					target(x, target.size.y-1-y) += float4_1(w);
+				}
+				for(int x: range(X)) {
+					float xw = x / float(X-1);
+					float yw = y / float(Y-1);
+					float w = /*(xw*yw) +*/ ((1-xw)*yw) + (xw*(1-yw)) + ((1-xw)*(1-yw));
+					target(target.size.x-1-x, target.size.y-1-y) += float4_1(w);
 				}
 			}
 			Image iTarget (target.size);
