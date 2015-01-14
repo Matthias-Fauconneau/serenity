@@ -404,7 +404,8 @@ MusicXML::MusicXML(string document, string) {
                                 // else { TODO: directions }
                             });
                         }
-                        else error(e);
+						else if(d.contains("image"_)) {}
+						else error("Unknown direction", d);
                     }
                     if(e.contains("sound"_) && e("sound"_)["tempo"_]) {
                         insertSign({Sign::Metronome, time, .metronome={Quarter, uint(parseDecimal(e("sound"_).attribute("tempo"_)))}});
@@ -697,7 +698,7 @@ MusicXML::MusicXML(string document, string) {
     signs.size = lastMeasureIndex+1; // Last measure with notes
 #endif
 
-#if 0 // FIXME: only on same staff
+#if 1 // FIXME: only on same staff
 	// Removes double notes
 	array<Sign> chord;
 	for(size_t signIndex=1; signIndex < signs.size;) {

@@ -222,12 +222,15 @@ struct Synchronizer : Widget {
 			size_t index = 0;
 			for(size_t measureIndex: range(measureBars.size())) {
 				while(index < signs.size) {
-					assert_(signs[index].note.measureIndex != invalid);
-                    if(signs[index].note.measureIndex >= measureIndex) break;
+					if(signs[index].note.measureIndex != invalid) { // FIXME
+						assert_(signs[index].note.measureIndex != invalid);
+						if(signs[index].note.measureIndex >= measureIndex) break;
+					}
 					index++;
 				}
 				if(index == signs.size) {
-					assert_(measureIndex == measureBars.size()-1);
+					if(measureIndex < measureBars.size()-1) break; // FIXME
+					assert_(measureIndex == measureBars.size()-1, measureIndex, measureBars.size()-1);
 					measureBars.keys[measureIndex] =  onsets.last().time; // Last measure (FIXME: last release time)
 				} else {
                     if(signs[index].note.measureIndex != measureIndex) { // Empty measure
@@ -332,9 +335,9 @@ struct Music : Widget {
 	// Name
 	string name = arguments() ? arguments()[0] : (error("Expected name"), string());
 	// Files
-	buffer<String> audioFiles = filter(Folder(".").list(Files), [this](string path) { return !startsWith(path, name)
+	buffer<String> audioFiles = arguments().contains("noaudio") ? buffer<String>() : filter(Folder(".").list(Files), [this](string path) { return !startsWith(path, name)
 			|| (/*!endsWith(path, ".mp3") && !endsWith(path, ".m4a") &&*/ !endsWith(path, "performance.mp4") && !endsWith(path, ".mkv")); });
-	buffer<String> videoFiles = filter(Folder(".").list(Files), [this](string path) {
+	buffer<String> videoFiles = arguments().contains("novideo") ? buffer<String>() : filter(Folder(".").list(Files), [this](string path) {
 			return !startsWith(path, name) ||  (!endsWith(path, "performance.mp4") && !endsWith(path, ".mkv")); });
 
 	// Audio
@@ -348,15 +351,15 @@ struct Music : Widget {
 	MusicXML xml = existsFile(name+".xml"_) ? readFile(name+".xml"_) : MusicXML();
 	// MIDI
 	MidiFile midi =  existsFile(name+".mid"_) ? MidiFile(readFile(name+".mid"_)) : MidiFile(); // if used: midi.signs are scaled in synchronizer
-				 buffer<float2> panAmplify(ref<String> staves, string selection) {
+				 /*buffer<float2> panAmplify(ref<String> staves, string selection) {
 					 buffer<float2> gains(staves.size);
 					 // Decreases other tracks volume and pan to left channel (mute right channel)
 					 gains.clear(1./2, 0);
 					 // Increases volume of a track and pans to right channel
 					 gains[xml.staves.indexOf(selection)] = float2(1, 2);
 					 return gains;
-				 }
-	MidiNotes notes = ::scale(midi ? copy(midi.notes) : ::notes(xml.signs, xml.divisions, panAmplify(xml.staves, "Bass"_)), audioFile ? audioFile->audioFrameRate : sampler.rate);
+				 }*/
+	MidiNotes notes = ::scale(midi ? copy(midi.notes) : ::notes(xml.signs, xml.divisions/*, panAmplify(xml.staves, "Bass"_)*/), audioFile ? audioFile->audioFrameRate : sampler.rate);
 	// Sheet
     Sheet sheet {xml ? xml.signs : midi.signs, xml ? xml.divisions : midi.divisions, 0, 4,
 				apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
@@ -367,7 +370,7 @@ struct Music : Widget {
 
 	// State
 	bool failed = sheet.firstSynchronizationFailureChordIndex != invalid;
-	bool running = true; //!failed;
+	bool running = !arguments().contains("pause"); //!failed;
 	bool keyboardView = videoFiles ? endsWith(videoFiles[0], ".mkv") : false;
 	bool rotate = keyboardView;
 	bool crop = keyboardView;
@@ -379,7 +382,7 @@ struct Music : Widget {
 	Scroll<VBox> scroll {{&system/*, &synchronizer*/}}; // 1/3 ~ 240
 	ImageView videoView; // 1/2 ~ 360
 	Keyboard keyboard; // 1/6 ~ 120
-	VBox widget {{&scroll/*, &videoView, &keyboard*/}};
+	VBox widget {{&scroll, &videoView, &keyboard}};
 
 	// Highlighting
 	map<uint, Sign> active; // Maps active keys to notes (indices)
@@ -594,7 +597,7 @@ struct Music : Widget {
 				uint64 durationTicks = onsets.last() + 4*notes.ticksPerSeconds;
 				int percent = round(100.*timeTicks/durationTicks);
 				if(percent!=lastReport) {
-					log(str(percent,2)+"%", /*str(followTime, totalTime),*/ str(renderTime, totalTime), str(videoEncodeTime, totalTime), str(sampleTime, totalTime), str(audioEncodeTime, totalTime));
+					log(str(percent,2)+"%", /*str(followTime, totalTime),*/ "Render", str(renderTime, totalTime), "Encode", str(videoEncodeTime, totalTime));
 					lastReport=percent;
 				}
 				if(timeTicks >= durationTicks) break;
@@ -607,7 +610,7 @@ struct Music : Widget {
 			window = unique<Window>{this, int2(1280,720), [](){return "MusicXML"__;}, false};
 			window->background = Window::White;
 			window->show();
-			if(playbackDeviceAvailable()) {
+			if(running && playbackDeviceAvailable()) {
 				if(sampler) decodeThread.spawn();
                 audio.start(audioFile ? audioFile->audioFrameRate : sampler.rate, audioFile ? 1024 : sampler.periodSize, 32, 2);
                 assert_(audio.rate == (audioFile ? audioFile->audioFrameRate : sampler.rate));

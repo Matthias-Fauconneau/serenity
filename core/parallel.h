@@ -22,7 +22,7 @@ inline void* start_routine(thread* t) {
 }
 
 /// Runs a loop in parallel
-template<Type F> void parallel_for(uint64 start, uint64 stop, F f) {
+template<Type F> void parallel_for(uint64 start, uint64 stop, F f, const uint threadCount = ::threadCount) {
 #if DEBUG || PROFILE
 	for(uint64 i : range(start, stop)) f(0, i);
 #else
@@ -41,12 +41,12 @@ template<Type F> void parallel_for(uint64 start, uint64 stop, F f) {
 template<Type F> void parallel_for(uint stop, F f) { parallel_for(0,stop,f); }
 
 /// Runs a loop in parallel chunks with chunk-wise functor
-template<Type F> void parallel_chunk(uint64 totalSize, F f) {
-	constexpr uint64 chunkCount = threadCount;
+template<Type F> void parallel_chunk(uint64 totalSize, F f, const uint threadCount = ::threadCount) {
+	const uint64 chunkCount = threadCount;
 	assert_(totalSize > (chunkCount-1)*chunkCount, totalSize, (chunkCount-1)*chunkCount); // totalSize > (chunkCount-1)*chunkSize
 	const uint64 chunkSize = (totalSize+chunkCount-1)/chunkCount;
 	assert_(totalSize > (chunkCount-1)*chunkSize); // Enough elements for non-empty last chunk
-	parallel_for(chunkCount, [&](uint id, uint64 chunkIndex) { f(id, chunkIndex*chunkSize, min(chunkSize, totalSize-chunkIndex*chunkSize)); });
+	parallel_for(0, chunkCount, [&](uint id, uint64 chunkIndex) { f(id, chunkIndex*chunkSize, min(chunkSize, totalSize-chunkIndex*chunkSize)); }, threadCount);
 }
 
 /// Runs a loop in parallel chunks with element-wise functor

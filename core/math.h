@@ -35,6 +35,7 @@ const real expOverflow = 7.09782712893383973096e+02;
 inline real exp(real x) { assert(x>expUnderflow && x<expOverflow); return __builtin_exp(x); }
 inline real ln(real x) { return __builtin_log(x); }
 
+const real PI = 3.14159265358979323846;
 inline real cos(real t) { return __builtin_cos(t); }
 inline real acos(real t) { return __builtin_acos(t); }
 notrace inline real sin(real t) { return __builtin_sin(t); }
@@ -43,9 +44,8 @@ inline real tan(real t) { return __builtin_tan(t); }
 inline real atan(real y, real x) { return __builtin_atan2(y, x); }
 inline real sinh(real x) { return __builtin_sinh(x); }
 
-const real PI = 3.14159265358979323846;
-inline real rad(real t) { return t/180*PI; }
-inline real deg(real t) { return t/PI*180; }
+inline float gaussian(float sigma, float x) { return exp(-sq(x/sigma)/2); }
+
 inline real exp2(real x) { return __builtin_exp2(x); }
 inline real log2(real x) { return __builtin_log2(x); }
 inline real exp10(real x) { return __builtin_exp2(__builtin_log2(10)*x); }

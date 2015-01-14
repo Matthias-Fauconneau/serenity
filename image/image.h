@@ -1,8 +1,6 @@
 #pragma once
 #include "core/image.h"
 
-inline float gaussian(float sigma, float x) { return exp(-sq(x/sigma)/2); }
-
 template<Type F, Type... S> void forXY(int2 size, F function, const S&... sources) {
 	parallel_chunk(size.y, [&](uint, uint64 start, uint64 chunkSize) {
 		for(size_t y: range(start, start+chunkSize)) for(size_t x: range(size.x)) {
@@ -109,6 +107,8 @@ ImageF downsample(ImageF&& target, const ImageF& source);
 inline ImageF downsample(const ImageF& source) { return downsample(source.size/2, source); }
 
 // -- Convolution --
+
+void convolve(float* target, const float* source, const float* kernel, int radius, int width, int height, uint sourceStride, uint targetStride);
 
 /// Selects image (signal) components of scale (frequency) below threshold
 /// Applies a gaussian blur

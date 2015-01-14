@@ -1143,16 +1143,16 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
 		assert_(chord);
 
 		uint midiIndex = midiToSign.size;
-		assert_(midiIndex < midiNotes.size);
+		if(midiIndex == midiNotes.size) break; // FIXME
+		assert_(midiIndex < midiNotes.size, midiIndex, midiNotes.size);
 		uint midiKey = midiNotes[midiIndex];
 
-		if(extraErrors > 40 /*FIXME: tremolo*/ || wrongErrors > 9 || missingErrors > 13 || orderErrors > 8) {
-		//if(extraErrors || wrongErrors || missingErrors || orderErrors) {
+		/*if(extraErrors > 40 || wrongErrors > 9 || missingErrors > 13 || orderErrors > 8) {
 			log(midiIndex, midiNotes.size);
 			log("MID", midiNotes.slice(midiIndex,7));
 			log("XML", chord);
 			break;
-		}
+		}*/
 
 		int match = chord.indexOf(midiKey);
 		if(match >= 0) {
