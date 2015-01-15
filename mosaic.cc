@@ -75,7 +75,7 @@ struct Mosaic {
 	string name = arguments() ? arguments()[0] : "mosaic";
 	array<Graphics> pages;
 	const float inchMM = 25.4;
-	const vec2 pageSizeMM = vec2(1140,760);
+	const vec2 pageSizeMM = vec2(400, 300); //vec2(1140,760);
 	Mosaic(float inchPx = 0) {
 		if(!inchPx) inchPx = min(1680/pageSizeMM.x, 1050/pageSizeMM.y)*inchMM;
 		const vec2 pageSize = pageSizeMM * (inchPx/inchMM);
@@ -83,8 +83,8 @@ struct Mosaic {
 		array<String> images = Folder(".").list(Files);
 		images.filter([](string name){return !(endsWith(name,".png") || endsWith(name, ".jpg") || endsWith(name, ".JPG"));});
 		array<array<array<Image>>> pages;
-		if(0) { // -- Parses page definitions
-			for(TextData s= readFile(name); s;) {
+		if(existsFile(name, Folder("def"))) { // -- Parses page definitions
+			for(TextData s= readFile(name, Folder("def")); s;) {
 				array<array<Image>> page;
 				do {
 					array<Image> row;
@@ -138,14 +138,14 @@ struct Mosaic {
 			float alpha = 1./4;
 			//float alpha = 1./2;
 			//float alpha = pageSize.y / pageSize.x;
-			const bool outer = false;
+			const bool outer = true;
 			float fX = (W * sum(apply(A, [](float A){ return 1/A; })) - H) / (sum(apply(m, [&](size_t i){ return (n[i]+(outer?1:-1))/A[i]; })) - alpha*(m+(outer?1:-1))); // Border: X = ( W Σᵢ 1/Aᵢ - H) / (Σᵢ (nᵢ+1)/Aᵢ - alpha*m+1) [Y=alpha*X]
 			float fY = alpha*fX;
 			buffer<float> h = apply(m, [&](size_t i){ return (W - (n[i]+(outer?1:-1))*fX)/A[i]; }); // Row height: hᵢ = (W - (nᵢ+1)X) / Aᵢ
 			buffer<buffer<float>> w = apply(m, [&](size_t i){ return apply(n[i], [&](size_t j){ return a[i][j] * h[i]; }); }); // Elements width wᵢⱼ = aᵢⱼ hᵢ
 			log("W",W,"H",H, "X", fX, "Y", fY, "h", h, "w", w);
 			Graphics& page = this->pages.append();
-			if(0) {
+			if(1) {
 				page.bounds = Rect(round(pageSize));
 				ImageF target(int2(page.bounds.size()));
 				/*if(target.Ref::size < 8*1024*1024)*/ target.clear(float4_1(0)); // Assumes larger allocation are clear pages
@@ -239,7 +239,6 @@ struct Mosaic {
 				{// -- Large gaussian blur approximated with repeated box convolution
 					ImageF transpose(target.size.y, target.size.x);
 					const int R = min(target.size.x, target.size.y)/2;
-					log(R); assert_(R);
 					box(transpose, target, R, mean);
 					box(blur, transpose, R, mean);
 				}
