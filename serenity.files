@@ -148,3 +148,4 @@ ui/gl.h
 ui/gl.cc
 shader
 mosaic.cc
+document.cc
