@@ -149,3 +149,5 @@ ui/gl.cc
 shader
 mosaic.cc
 document.cc
+algebra.h
+algebra.cc

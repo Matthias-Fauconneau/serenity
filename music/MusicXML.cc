@@ -1,9 +1,6 @@
 #include "MusicXML.h"
 #include "xml.h"
 
-//generic uint argmin(const ref<T>& a) { uint min=0; for(uint i: range(a.size)) if(a[i] < a[min]) min=i; return min; }
-generic uint argmax(const ref<T>& a) { uint max=0; for(uint i: range(a.size)) if(a[i] > a[max]) max=i; return max; }
-
 static int implicitAlteration(int keySignature, const map<int, int>& measureAlterations, int step) {
 	return measureAlterations.contains(step) ? measureAlterations.at(step) : signatureAlteration(keySignature, step);
 }

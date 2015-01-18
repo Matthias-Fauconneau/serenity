@@ -22,7 +22,7 @@ inline void* start_routine(thread* t) {
 }
 
 /// Runs a loop in parallel
-template<Type F> void parallel_for(uint64 start, uint64 stop, F f, const uint threadCount = ::threadCount) {
+template<Type F> void parallel_for(uint64 start, uint64 stop, F f, const uint unused threadCount = ::threadCount) {
 #if DEBUG || PROFILE
 	for(uint64 i : range(start, stop)) f(0, i);
 #else

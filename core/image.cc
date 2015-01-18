@@ -41,6 +41,7 @@ string imageFileFormat(const ref<byte> file) {
 
 int2 imageSize(const ref<byte> file) {
     BinaryData s(file, true);
+	// PNG
     if(s.match(ref<uint8>{0b10001001,'P','N','G','\r','\n',0x1A,'\n'})) {
         for(;;) {
             s.advance(4); // Length
@@ -49,7 +50,9 @@ int2 imageSize(const ref<byte> file) {
                 return int2(width, height);
             }
         }
+		error("PNG");
     }
+	// JPEG
     enum Marker : uint8 {
         StartOfFrame = 0xC0, DefineHuffmanTable = 0xC4, StartOfImage = 0xD8, EndOfImage = 0xD9,
         StartOfSlice = 0xDA, DefineQuantizationTable = 0xDB, DefineRestartInterval = 0xDD, ApplicationSpecific = 0xE0 };
@@ -62,16 +65,17 @@ int2 imageSize(const ref<byte> file) {
                 while(s.available(2) && ((uint8)s.peek() != 0xFF || uint8(s.peek(2)[1])<0xC0)) s.advance(1);
             } else {
                 uint16 length = s.read(); // Length
-                if(marker==StartOfFrame) {
+				if(marker>=StartOfFrame && marker<=StartOfFrame+2) {
                     uint8 precision = s.read(); assert_(precision==8);
                     uint16 height = s.read();
                     uint16 width = s.read();
                     return int2(width, height);
                     //uint8 components = s.read();
                     //for(components) { ident:8, h_samp:4, v_samp:4, quant:8 }
-                } else s.advance(length-2);
+				} else s.advance(length-2);
             }
         }
+		error("JPG");
     }
     error("Unknown image format", hex(file.size<16?file:s.peek(16)));
 }
