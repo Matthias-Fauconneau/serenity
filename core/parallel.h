@@ -42,10 +42,11 @@ template<Type F> void parallel_for(uint stop, F f) { parallel_for(0,stop,f); }
 
 /// Runs a loop in parallel chunks with chunk-wise functor
 template<Type F> void parallel_chunk(uint64 totalSize, F f, const uint threadCount = ::threadCount) {
-	const uint64 chunkCount = threadCount;
-	assert_(totalSize > (chunkCount-1)*chunkCount, totalSize, (chunkCount-1)*chunkCount); // totalSize > (chunkCount-1)*chunkSize
-	const uint64 chunkSize = (totalSize+chunkCount-1)/chunkCount;
-	assert_(totalSize > (chunkCount-1)*chunkSize); // Enough elements for non-empty last chunk
+	const uint64 chunkSize = totalSize/threadCount;
+	const uint64 chunkCount = (totalSize+chunkSize-1)/chunkSize; // Last chunk might be smaller
+	assert_((chunkCount-1)*chunkSize < totalSize && totalSize <= chunkCount*chunkSize);
+	assert_(chunkCount >= threadCount);
+	//log(totalSize, chunkCount, chunkSize);
 	parallel_for(0, chunkCount, [&](uint id, uint64 chunkIndex) { f(id, chunkIndex*chunkSize, min(chunkSize, totalSize-chunkIndex*chunkSize)); }, threadCount);
 }
 

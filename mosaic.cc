@@ -11,6 +11,7 @@
 typedef float float4 __attribute((__vector_size__ (16)));
 inline float4 constexpr float4_1(float f) { return (float4){f,f,f,f}; }
 inline float4 mean(const ref<float4> x) { assert_(x.size); return sum(x, float4_1(0)) / float4_1(x.size); }
+template<> inline String str(const float4& v) { return "("+str(v[0], v[1], v[2], v[3])+")"; }
 
 /// 2D array of floating-point 4 component vector pixels
 struct ImageF : buffer<float4> {
@@ -254,15 +255,15 @@ struct Mosaic {
 		}
 		{
 			const size_t marginIndexBase = images.size;
-			A(equationCounter+0, marginIndexBase+0) = -1; A(equationCounter+0, marginIndexBase+1) = 1; // inner.x = inner.y
-			A(equationCounter+1, marginIndexBase+0) = -1; A(equationCounter+1, marginIndexBase+2) = 1; // inner.x = outer.x
-			A(equationCounter+2, marginIndexBase+2) = -1; A(equationCounter+2, marginIndexBase+3) = 1; // outer.x = outer.y
-			A(equationCounter+3, marginIndexBase+1) = -1; A(equationCounter+3, marginIndexBase+3) = 1; // inner.y = outer.y
+			A(equationCounter+0, marginIndexBase+0) = -1; A(equationCounter+0, marginIndexBase+1) = 1; // outer.x = outer.y
+			A(equationCounter+1, marginIndexBase+0) = -1; A(equationCounter+1, marginIndexBase+2) = 1; // outer.x = inner.x
+			A(equationCounter+2, marginIndexBase+2) = -1; A(equationCounter+2, marginIndexBase+3) = 1; // inner.x = inner.y
+			A(equationCounter+3, marginIndexBase+1) = -1; A(equationCounter+3, marginIndexBase+3) = 1; // outer.y = inner.y
 			equationCounter += 4;
 		}
 		//log(str(b)+"\n"+str(A));
-		// "Least square" system
-		// TODO: positive constraint
+		// Least square system
+		// TODO: Weighted least square
 		Matrix At = transpose(A);
 		Matrix AtA = At * A;
 		{// Regularize border parameters
@@ -276,7 +277,7 @@ struct Mosaic {
 		vec2 outer = outer0 + vec2(x[images.size], x[images.size+1]);
 		vec2 inner = inner0 + vec2(x[images.size+2], x[images.size+3]);
 		//log(heights, outer, outer0, vec2(x[images.size], x[images.size+1]), inner, inner0, vec2(x[images.size+2], x[images.size+3]));
-		if(0) {
+		if(1) {
 			array<char> s;
 			for(size_t rowIndex : range(m)) {
 				float sum = outer.x;
@@ -300,6 +301,7 @@ struct Mosaic {
 				sum += outer.x;
 				s.append(str(sum)+"\n");
 			}
+			float heightSums = 0;
 			for(size_t columnIndex : range(n)) {
 				float sum = outer.y;
 				for(size_t rowIndex : range(m)) {
@@ -316,9 +318,12 @@ struct Mosaic {
 					}
 				}
 				sum += outer.y;
+				heightSums += sum;
 				s.append(str(sum)+"\t\t");
 			}
-			log(s,"\tH", H, "\tW", W);
+			float dy = H - heightSums / n;
+			if(0) log(s,"\tH", H, "\tW", W, "dy", dy);
+			outer.y += dy; // Enforces vertical center
 		}
 		if(1) {
 			float minScale = inf, maxScale = 0;
@@ -367,6 +372,7 @@ struct Mosaic {
 		} else { // -- Blur background
 		   page.bounds = Rect(round(pageSize));
 		   ImageF target(int2(page.bounds.size()));
+		   assert_(ptr(target.data)%sizeof(float4)==0);
 		   /*if(target.Ref::size < 8*1024*1024)*/ target.clear(float4_1(0)); // Assumes larger allocation are clear pages
 		   array<Rect> mask; // To copy unblurred data on blur background
 		   array<float4> innerBackgroundColors;
@@ -407,11 +413,11 @@ struct Mosaic {
 					   float x1 = x0+w, y1 = y0+h;
 					   int ix1 = round(x1), iy1 = round(y1);
 					   int iw1 = round(x1+rightMargin) - ix1, ih1 = min(target.size.y, int(round(y1+belowMargin)))/*round(y1+belowMargin)*/ - iy1; // Next border sizes
-					   assert_(iw0 > 1 && ih0 > 1 && iw1 > 1 && ih1 > 1);
+					   assert_(iw0 >= 1 && ih0 >= 1 && iw1 >= 1 && ih1 >= 1, iw0, ih0, iw1, ih1);
 					   mask.append(vec2(ix0, iy0), vec2(ix1, iy1));
 					   int2 size(ix1-ix0, iy1-iy0);
 					   assert_(ix1+iw1 < target.size.x, ix1, iw1, target.size.x, inner, outer);
-					   assert_(iy0+size.y < target.size.y);
+					   assert_(iy0 >= ih0 && iy0+size.y < target.size.y);
 					   assert_(iy1+ih1 <= target.size.y, iy1, ih1, iy1+ih1, target.size.y, inner, outer);
 
 					   load.start();
@@ -458,64 +464,79 @@ struct Mosaic {
 							   extern float sRGB_reverse[0x100];
 							   innerBackgroundColor = {sRGB_reverse[mostCommonColor[0]], sRGB_reverse[mostCommonColor[1]], sRGB_reverse[mostCommonColor[2]], 1};
 						   } else {
-							   int hueHistogram[6*0xFF] = {}; // 1½K: 32bit / 0xFF -> 4K² images
-							   int intensityHistogram[0xFF] = {};
+							   int hueHistogram[0x100] = {}; mref<int>(hueHistogram).clear(0); // 1½K: 32bit / 0xFF -> 4K² images
+							   int intensityHistogram[0x100] = {}; mref<int>(intensityHistogram).clear(0);
+							   assert_(iSource.Ref::size < 1<<23);
 							   for(byte4 c: iSource) {
-								   int B = c.b, G = c.g, R = c.r;
-								   int M = max(max(B, G), R);
-								   int m = min(min(B, G), R);
-								   int C = M - m;
-								   int I = (B+G+R)/3;
+								   const int B = c.b, G = c.g, R = c.r;
+								   const int M = max(max(B, G), R);
+								   const int m = min(min(B, G), R);
+								   const int C = M - m;
+								   assert_(C >=0 && C < 0x100);
+								   const int I = (B+G+R)/3;
+								   assert_(I >= 0 && I < 0x100, I);
 								   intensityHistogram[I]++;
 								   if(C) {
 									   int H;
-									   if(M==R) H = ((G-B)*0xFF/C+6*0xFF)%(6*0xFF);
-									   else if(M==G) H = ((B-R)*0xFF/C+2*0xFF);
-									   else if(M==B) H = ((R-G)*0xFF/C+4*0xFF);
+									   if(M==R) H = ((G-B)*43/C+0x100)%0x100; // 5-6 0-1
+									   else if(M==G) H = (B-R)*43/C+85; // 1-3
+									   else if(M==B) H = (R-G)*43/C+171; // 3-5
 									   else error(B, G, R);
-									   assert(H >=0 && H < 6*0xFF);
+									   assert_(H >=0 && H < 0x100);
+									   assert_(hueHistogram[H] >= 0 && hueHistogram[H] < 0x40000000, H, hueHistogram[H]);
 									   hueHistogram[H] += C;
 								   }
 							   }
 							   int H = argmax(ref<int>(hueHistogram));
 							   int C = 0x40;
-							   int X = C * (0xFF - abs(H%(2*0xFF)-0xFF)) / 0xFF;
+							   int X = C * (0xFF - abs((H%85)*6 - 0xFF)) / 0xFF;
+							   assert_(X >= 0 && X < 0x100);
 							   int I = argmax(ref<int>(intensityHistogram));
 							   if(0) I = min(0x80, I);
 							   int R,G,B;
-							   if(H < 1*0xFF) R=C, G=X, B=0;
-							   else if(H < 2*0xFF) R=X, G=C, B=0;
-							   else if(H < 3*0xFF) R=0, G=C, B=X;
-							   else if(H < 4*0xFF) R=0, G=X, B=C;
-							   else if(H < 5*0xFF) R=X, G=0, B=C;
-							   else if(H < 6*0xFF) R=C, G=0, B=X;
+							   if(H < 43) R=C, G=X, B=0;
+							   else if(H < 85) R=X, G=C, B=0;
+							   else if(H < 128) R=0, G=C, B=X;
+							   else if(H < 171) R=0, G=X, B=C;
+							   else if(H < 213) R=X, G=0, B=C;
+							   else if(H < 256) R=C, G=0, B=X;
 							   else error(H);
 							   int m = I - (R+G+B)/3;
+							   // Limits intensity within sRGB
+							   m = min(m, 0xFF-R);
+							   m = min(m, 0xFF-G);
+							   m = min(m, 0xFF-B);
 							   extern float sRGB_reverse[0x100];
+							   assert_(m+B >= 0 && m+B < 0x100);
+							   assert_(m+G >= 0 && m+G < 0x100);
+							   assert_(m+R >= 0 && m+R < 0x100, m+R, m, R, G, B, I, (R+G+B)/3);
 							   innerBackgroundColor = {sRGB_reverse[m+B], sRGB_reverse[m+G], sRGB_reverse[m+R], 1};
 						   }
 						   innerBackgroundColors.append(innerBackgroundColor);
-						   parallel_chunk(ih0, [&](uint, int Y0, int DY) { // Top
-							   for(int y: range(Y0, Y0+DY)) {
-								   for(int x: range(iw0)) target(ix0-x-1, iy0-y-1) += float4_1((1-x/float(iw0-1))*(1-y/float(ih0-1))) * innerBackgroundColor; // Left
-								   for(int x: range(size.x)) target(ix0+x, iy0-y-1) += float4_1(1-y/float(ih0-1)) * innerBackgroundColor; // Center
-								   for(int x: range(iw1)) target(ix1+x, iy0-y-1) += float4_1((1-x/float(iw1-1))*(1-y/float(ih0-1))) * innerBackgroundColor; // Right
+						   for(int y: range(ih0)) {
+							   float4* line = target.begin() + (iy0-y-1)*target.stride;
+							   for(int x: range(iw0)) {
+								   float w = (1-x/float(iw0))*(1-y/float(ih0));
+								   line[ix0-x-1] += float4_1(w) * innerBackgroundColor; // Left
 							   }
-						   });
+							   for(int x: range(size.x)) line[ix0+x] += float4_1(1-y/float(ih0)) * innerBackgroundColor; // Center
+							   for(int x: range(iw1)) line[ix1+x] += float4_1((1-x/float(iw1))*(1-y/float(ih0))) * innerBackgroundColor; // Right
+						   }
 						   parallel_chunk(size.y, [&](uint, int Y0, int DY) { // Center
 							   for(int y: range(Y0, Y0+DY)) {
-								   for(int x: range(iw0)) target(ix0-x-1, iy0+y) += float4_1(1-x/float(iw0-1)) * innerBackgroundColor; // Left
-								   for(int x: range(size.x)) target(ix0+x, iy0+y) = source(x, y); // Center
-								   for(int x: range(iw1)) target(ix1+x, iy0+y) += float4_1(1-x/float(iw1-1)) * innerBackgroundColor; // Right
+								   float4* line = target.begin() + (iy0+y)*target.stride;
+								   for(int x: range(iw0)) line[ix0-x-1] += float4_1(1-x/float(iw0)) * innerBackgroundColor; // Left
+								   float4* sourceLine = source.begin() + y*source.stride;
+								   for(int x: range(size.x)) line[ix0+x] = sourceLine[x]; // Center
+								   for(int x: range(iw1)) line[ix1+x] += float4_1(1-x/float(iw1)) * innerBackgroundColor; // Right
 							   }
 						   });
-						   parallel_chunk(ih1, [&](uint, int Y0, int DY) { // Bottom
-							   for(int y: range(Y0, Y0+DY)) {
-								   for(int x: range(iw0)) target(ix0-x-1, iy1+y) += float4_1((1-x/float(iw0-1))*(1-y/float(ih1-1))) * innerBackgroundColor; // Left
-								   for(int x: range(size.x)) target(ix0+x, iy1+y) += float4_1(1-y/float(ih1-1)) * innerBackgroundColor; // Center
-								   for(int x: range(iw1)) target(ix1+x, iy1+y) += float4_1((1-x/float(iw1-1))*(1-y/float(ih1-1))) * innerBackgroundColor; // Right
-							   }
-						   });
+						   for(int y: range(ih1)) {
+							   float4* line = target.begin() + (iy1+y)*target.stride;
+							   for(int x: range(iw0)) line[ix0-x-1] += float4_1((1-x/float(iw0))*(1-y/float(ih1))) * innerBackgroundColor; // Left
+							   for(int x: range(size.x)) line[ix0+x] += float4_1(1-y/float(ih1)) * innerBackgroundColor; // Center
+							   for(int x: range(iw1)) line[ix1+x] += float4_1((1-x/float(iw1))*(1-y/float(ih1))) * innerBackgroundColor; // Right
+						   }
 					   }
 					   x0 += w + inner.x;
 				   }
@@ -532,40 +553,45 @@ struct Mosaic {
 			// Outer background vertical sides
 			parallel_chunk(target.size.y-iY-iY, [&](uint, int Y0, int DY) {
 				for(int y: range(iY+Y0, iY+Y0+DY)) {
+					float4* line = target.begin() + y*target.stride;
 					for(int x: range(iX)) {
 						float w = constantMargin ? (x>=margin.x ? 1 - (float(x)-margin.x) / float(inner.x) : 1) : float(outer.x-x) / outer.x;
-						assert_(w >= 0 && w <= 1);
+						assert(w >= 0 && w <= 1);
 						float4 c = float4_1(w) * outerBackgroundColor;;
-						target(x, y) += c;
-						target(target.size.x-1-x, y) += c;
+						line[x] += c;
+						line[target.size.x-1-x] += c;
 					}
 				}
 			});
 			// Outer background horizontal sides
 			parallel_chunk(iY, [&](uint, int Y0, int DY) {
 				for(int y: range(Y0, Y0+DY)) {
+					float4* line0 = target.begin() + y*target.stride;
+					float4* line1 = target.begin() + (target.size.y-1-y)*target.stride;
+					float w = constantMargin ? (y>=margin.y ? 1 - float(y-margin.y) / float(inner.y) : 1) : float(outer.y-y) / outer.y;
+					assert(w >= 0 && w <= 1);
 					for(int x: range(iX, target.size.x-iX)) {
-						float w = constantMargin ? (y>=margin.y ? 1 - float(y-margin.y) / float(inner.y) : 1) : float(outer.y-y) / outer.y;
-						assert_(w >= 0 && w <= 1, "y", y, w, margin.y, inner, outer, x-(margin.x-1), inner.x-1);
 						float4 c = float4_1(w) * outerBackgroundColor;
-						target(x, y) += c;
-						target(x, target.size.y-1-y) += c;
+						line0[x] += c;
+						line1[x] += c;
 					}
 				}
 			});
 			// Outer background corners
 			parallel_chunk(iY, [&](uint, int Y0, int DY) {
 				for(int y: range(Y0, Y0+DY)) {
+					float4* line0 = target.begin() + y*target.stride;
+					float4* line1 = target.begin() + (target.size.y-1-y)*target.stride;
+					float yw = constantMargin ? (y>=margin.y ? float(y-margin.y) / float(inner.y) : 0) : 1 - float(outer.y-y) / outer.y;
 					for(int x: range(iX)) {
 						float xw =  constantMargin ? (x>=margin.x ? float(x-margin.x) / float(inner.x) : 0) : 1 - float(outer.x-x) / outer.x;
-						float yw = constantMargin ? (y>=margin.y ? float(y-margin.y) / float(inner.y) : 0) : 1 - float(outer.y-y) / outer.y;
 						float w = /*xw*yw +*/ (1-xw)*yw + xw*(1-yw) + (1-xw)*(1-yw);
-						assert_(w >= 0 && w <= 1, x, y, w, margin, inner, outer, x-(margin.x-1), inner.x-1);
+						assert(w >= 0 && w <= 1);
 						float4 c = float4_1(w) * outerBackgroundColor;
-						target(x, y) += c;
-						target(target.size.x-1-x, y) += c;
-						target(x, target.size.y-1-y) += c;
-						target(target.size.x-1-x, target.size.y-1-y) += c;
+						line0[x] += c;
+						line0[target.size.x-1-x] += c;
+						line1[x] += c;
+						line1[target.size.x-1-x] += c;
 					}
 				}
 			});
