@@ -3,7 +3,7 @@
 #include "map.h"
 #include "file.h"
 #include "function.h"
-#include "vector.h" // int2
+#include "vector.h"
 
 // Enforces exact match for overload resolution
 generic T parse(TextData&) { static_assert(0&&sizeof(T), "No overload for parse<T>(TextData&)"); }
