@@ -129,7 +129,7 @@ struct Thread : array<Poll*>, EventFD, Poll {
     Lock lock;
     bool terminationRequested = false;
 
-    Thread(int priority=0);
+	Thread(int priority=0, bool spawn=false);
     ~Thread(){ Poll::fd=0;/*Avoid Thread::unregistered reference in ~Poll*/ }
     explicit operator bool() const { return thread; }
 

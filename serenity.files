@@ -151,3 +151,4 @@ mosaic.cc
 document.cc
 algebra.h
 algebra.cc
+image/stitch.cc

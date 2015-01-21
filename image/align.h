@@ -9,7 +9,10 @@ static double similarity(const ImageF& A, const ImageF& B, Transform transform) 
 /// Evaluates first \a levelCount mipmap levels (shares source as first element)
 static array<ImageF> mipmap(const ImageF& source, int levelCount) {
 	array<ImageF> mipmap; mipmap.append( share(source) );
-	for(int unused level: range(levelCount)) mipmap.append(downsample(mipmap.last()));
+	for(int unused level: range(levelCount)) {
+		mipmap.append(downsample(mipmap.last()));
+		assert_(mipmap.last());
+	}
 	return mipmap;
 }
 
@@ -24,8 +27,8 @@ struct Align : ImageTransformGroupOperator, OperatorT<Align> {
 		transforms.append(A[0].size, 0);
 		for(const ImageF& image : images.slice(1)) { // Compares each image with next one
 			array<ImageF> B = mipmap(image, levelCount);
-			Transform bestTransform (B.last().size, 0);
-			for(int level: range(levelCount)) { // From coarsest (last) to finest (first)
+			Transform bestTransform (B[0].size, int2(-B[0].size.x*3/4, 0)); // Initializes right of previous image
+			for(int level: range(max(0, levelCount-8), levelCount)) { // From coarsest (last 2Kpx) to finest (first 8px)
 				const ImageF& a = A[levelCount-1-level];
 				const ImageF& b = B[levelCount-1-level];
 				Transform levelBestTransform (b.size, bestTransform.offset*b.size/bestTransform.size);
@@ -41,6 +44,7 @@ struct Align : ImageTransformGroupOperator, OperatorT<Align> {
 																					  int2(-1,  1), int2( 0,  1), int2(1,  1),
 																										  int2(0, 2) }) {
 						Transform transform = levelBestTransform * Transform(b.size, offset); real& similarity = similarities[transform];
+						if(transform.offset.x > -B[0].size.x*3/4) continue; // Restricts overlap for similar images
 						if(!similarity) similarity = ::similarity(a, b, transform);
 						if(similarity > bestSimilarity) {
 							bestSimilarity = similarity;

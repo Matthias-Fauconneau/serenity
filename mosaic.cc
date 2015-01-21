@@ -46,11 +46,6 @@ inline ImageF copy(const ImageF& o) {
 	for(size_t y: range(o.height)) target.slice(y*target.stride, target.width).copy(o.slice(y*o.stride, o.width));
 	return target;
 }
-/*inline float4 mean(const ImageF& image, int x0, int y0, int x1, int y1) {
-	float4 sum = float4_1(0);
-	for(int y: range(y0, y1)) for(int x: range(x0, x1)) sum += image(x, y);
-	return sum / float4_1((y1-y0)*(x1-x0));
-}*/
 
 // Box convolution with constant border
 void box(const ImageF& target, const ImageF& source, const int width, const float4 border) {
@@ -88,20 +83,19 @@ void box(const ImageF& target, const ImageF& source, const int width, const floa
 }
 
 struct Mosaic {
-	// Name
-	array<String> files = Folder(".").list(Files);
-	String name = ::arguments() && existsFile(::arguments()[0]) ? copyRef(::arguments()[0]) : copyRef(filter(files, [](string name){return !endsWith(name,"mosaic");})[0]);
+	// Image source
+	Folder folder;
 
 	// - Layout definition
 	ref<string> parameters = {"page-size"_,"outer","inner","same-outer"_,"same-size","chroma"};
 	map<String, String> arguments;
 	vec2 pageSizeMM = 0, pageSizePx = 0;
-	array<string> elements; // Images
+	array<String> elements; // Images
 	array<array<int>> rows; // Index into elements (-1: row extension, -2 column extension, -3: inner extension)
 	buffer<int2> sizes; // Eleements sizes
 
 	// - Layout solution
-	vec2 innerMM, outerMM; // Margins
+	vec2 innerMM = 0, outerMM = 0; // Margins
 	Vector widthsMM, heightsMM; // Image sizes
 
 	// - Layout render
@@ -111,91 +105,81 @@ struct Mosaic {
 	function<void(string)> logChanged;
 	template<Type... Args> void log(const Args&... args) { auto message = str(args...); this->logText.append(message+"\n"); ::log(message); if(logChanged) logChanged(this->logText); }
 	array<char> errors;
-	template<Type... Args> void error(const Args&... args) { auto message = str(args...); errors.append(message+"\n"); this->logText.append(message+"\n"); ::log(message); if(logChanged) logChanged(this->logText); }
+	template<Type... Args> void error(const Args&... args) {
+		 if(logChanged) { auto message = str(args...); errors.append(message+"\n"); this->logText.append(message+"\n"); ::log(message);logChanged(this->logText); }
+		 else ::error(args...);
+	}
 #undef assert
 #define assert(expr, message...) ({ if(!(expr)) { error(#expr ""_, ## message); return; } })
 
-	Mosaic(function<void(string)> logChanged = {}) : logChanged(logChanged) {
+	Mosaic(const Folder& folder, TextData&& s, function<void(string)> logChanged = {}) : folder("."_, folder), logChanged(logChanged) {
+		// -- Parses arguments
+		for(;;) {
+			int nextLine = 0;
+			while(s && s[nextLine] != '\n') nextLine++;
+			string line = s.peek(nextLine);
+			if(line.contains('=')) {
+				string key = s.whileNo(" \t\n=");
+				assert(parameters.contains(key), "Unknown parameter", key, ", expected", parameters);
+				s.whileAny(" \t");
+				s.skip("=");
+				s.whileAny(" \t");
+				string value = s.whileNo(" \t\n");
+				s.whileAny(" \t");
+				s.skip("\n");
+				arguments.insert(copyRef(key), copyRef(value));
+			} else break;
+		}
+		s.whileAny(" \n");
+
+		// -- Parses mosaic definition
+		array<String> files = folder.list(Files);
 		files.filter([](string name){return !(endsWith(name,".png") || endsWith(name, ".jpg") || endsWith(name, ".JPG"));});
 		bool rowStructure = false, columnStructure = false, tableStructure = true;
 
-		// - Layout definition
-		if(existsFile(name)) { // -- Parses page definition
-			TextData s = readFile(name);
-			for(;;) {
-				int nextLine = 0;
-				while(s && s[nextLine] != '\n') nextLine++;
-				string line = s.peek(nextLine);
-				if(line.contains('=')) {
-					string key = s.whileNo(" \t\n=");
-					assert(parameters.contains(key), "Unknown parameter", key, ", expected", parameters);
-					s.whileAny(" \t");
-					s.skip("=");
-					s.whileAny(" \t");
-					string value = s.whileNo(" \t\n");
-					s.whileAny(" \t");
-					s.skip("\n");
-					arguments.insert(copyRef(key), copyRef(value));
-				} else break;
-			}
-			s.whileAny(" \n");
-			while(s) {
-				array<int> row;
-				for(string name; (name = s.whileNo(" \t\n"));) {
-					/***/ if(name=="-") row.append(-1); //{ assert(row); row.append(row.last()); }
-					else if(name=="|") { columnStructure=true; row.append(-2); } //{ assert(rows && rows.last().size==row.size+1); row.append(rows.last()[row.size]); }
-					else if(name=="\\") row.append(-3); //{ assert(rows && rows.last().size==row.size+1); row.append(rows.last()[row.size]); }
-					else {
-						row.append(elements.size);
-						string file = [this](string name) { for(string file: files) if(startsWith(file, name)) return file; return ""_; }(name);
-						if(!file) { error("No such image"_, name, "in", files); return; }
-						elements.append(file);
-					}
-					s.whileAny(" \t"_);
+		while(s) {
+			array<int> row;
+			for(string name; (name = s.whileNo(" \t\n"));) {
+				/***/ if(name=="-") row.append(-1); //{ assert(row); row.append(row.last()); }
+				else if(name=="|") { columnStructure=true; row.append(-2); } //{ assert(rows && rows.last().size==row.size+1); row.append(rows.last()[row.size]); }
+				else if(name=="\\") row.append(-3); //{ assert(rows && rows.last().size==row.size+1); row.append(rows.last()[row.size]); }
+				else {
+					row.append(elements.size);
+					string file = [&](string name) { for(string file: files) if(startsWith(file, name)) return file; return ""_; }(name);
+					if(!file) { error("No such image"_, name, "in", files); return; }
+					elements.append(copyRef(file));
 				}
-				assert(row);
-				// Automatically generate table structure from row structure
-				for(auto& o : rows) {
-					if(o.size < row.size) { assert(o.size==1); log(o.size, row.size); o.append(-1); rowStructure=true; tableStructure=false; }
-					if(row.size < o.size) { /*assert(row.size==1);*/ log(row.size, o.size); row.append(-1); rowStructure=true; tableStructure=false; }
-				}
-				rows.append(move(row));
-				if(!s) break;
-				s.skip('\n');
+				s.whileAny(" \t"_);
 			}
-			if(rows.size==1) rowStructure=true;
-		} else { // Layouts all elements
-			error("No such file", name, "in", currentWorkingDirectory().name());
-			int X = round(sqrt(float(files.size))), Y = X;
-			for(int y: range(Y)) {
-				array<int> row;
-				for(int x: range(X)) {
-					if(y*X+x >= int(files.size)) break;
-					elements.append(files[y*X+x]);
-					row.append(y*X+x);
-				}
-				assert(row);
-				rows.append(move(row));
+			assert(row);
+			// Automatically generate table structure from row structure
+			for(auto& o : rows) {
+				if(o.size < row.size) { assert(o.size==1); o.append(-1); rowStructure=true; tableStructure=false; }
+				if(row.size < o.size) { /*assert(row.size==1);*/ row.append(-1); rowStructure=true; tableStructure=false; }
 			}
+			rows.append(move(row));
+			if(!s) break;
+			s.skip('\n');
 		}
+		if(rows.size==1) rowStructure=true;
 		assert(rows);
 		log(arguments);
 
-		sizes = apply(elements, [=](string image){ return ::imageSize(Map(image)); }); // Image sizes
+		sizes = apply(elements, [&](string image){ return ::imageSize(Map(image, folder)); }); // Image sizes
 		for(size_t imageIndex: range(elements.size)) log(elements[imageIndex], strx(sizes[imageIndex]), (float)sizes[imageIndex].x/sizes[imageIndex].y);
 		Vector aspectRatios = apply(sizes, [=](int2 size){ return (float)size.x/size.y; }); // Image aspect ratios
 
 		// Page definition
 		pageSizeMM = 10.f*parse<vec2>(arguments.at("page-size")); // 50x40, 40x30, 114x76
+		assert_(pageSizeMM.x>0 && pageSizeMM.y>0);
 		auto value = [this](string name, float default_) { string value=arguments.value(name, ""); return value ? parseValue(value) : default_; };
 		vec2 inner0 = vec2(value("inner",15)), outer0 = vec2(value("outer",20));
 
 		// System
 		const size_t k = elements.size + 2 + 2; // Unknowns (heights + margins)
 		size_t uniformColumnCount = rows[0].size;
-		for(ref<int> row: rows) {
-			if(row.size != rows[0].size) { uniformColumnCount = 0; assert(rows[0].size == 1); break; }
-		}
+		//for(ref<int> row: rows) if(row.size != rows[0].size) { uniformColumnCount = 0; assert(rows[0].size == 1); break; }
+		for(ref<int> row: rows) assert(row.size == rows[0].size);
 		if(uniformColumnCount == 1) columnStructure=true;
 		bool sameWidthsInColumn = columnStructure && tableStructure && !rowStructure; // Disable same widths constraints when layout definition had a row structure
 		bool sameHeightsInRow = rowStructure || (!columnStructure && tableStructure && uniformColumnCount>1); // Disables same heights constraints when layout definition has no table structure or column count are not uniform
@@ -210,7 +194,7 @@ struct Mosaic {
 				(sameElementSizes?(elements.size-1)*2:0) + // Same image sizes (width, height)
 				1 + // outer.x=outer.y
 				1; // inner.x=inner.y
-		Matrix A (preallocatedEquationCount, k); Vector b(preallocatedEquationCount); // Linear system
+		Matrix A (preallocatedEquationCount, k); Vector b(preallocatedEquationCount); b.clear(0); // Linear system
 		size_t equationIndex = 0;
 		assert_(pageSizeMM);
 		for(const size_t rowIndex : range(rows.size)) { // Row fit width equations
@@ -352,18 +336,21 @@ struct Mosaic {
 		}
 		assert(k <= equationIndex && equationIndex <= A.m, k, equationIndex, A.m);
 		A.m = equationIndex;
-		log(equationIndex, "equations (constraints) for ", k, "unknowns (arguments)");
+		b.size = equationIndex; assert_(b.size <= b.capacity);
+		log(equationIndex, "equations (constraints) for", k, "unknowns (arguments)");
 		//log(str(b)+"\n"+str(A));
 		// Least square system
 		// TODO: Weighted least square
 		Matrix At = transpose(A);
 		Matrix AtA = At * A;
-		if(arguments.value("regularize","1"_) != "0"_){ // Regularizes all border size difference unknowns
+		if(arguments.value("regularize"_, "1"_) != "0"_){ // Regularizes all border size difference unknowns
 			const float a = 1;
 			for(size_t i: range(elements.size,  elements.size+4)) AtA(i,i) = AtA(i,i) + a*a;
 		}
 		Vector Atb = At * b;
+		//log(str(Atb)+"\n"_+str(AtA));
 		Vector x = solve(move(AtA),  Atb);
+		//log(x);
 		heightsMM = copyRef(x.slice(0, elements.size));
 		outerMM = outer0 + vec2(x[elements.size], x[elements.size+1]);
 		innerMM = inner0 + vec2(x[elements.size+2], x[elements.size+3]);
@@ -421,7 +408,7 @@ struct Mosaic {
 				s.append(str(sum)+"\t\t");
 			}
 			float dy = pageSizeMM.y - heightSums / uniformColumnCount;
-			log(s,"\t", pageSizeMM, "dx", dx, "dy", dy);
+			log(s,"\t", pageSizeMM, "dx", dx, "dy", dy, outerMM, innerMM);
 			//else log("dx", dx, "dy", dy, pageSize.y, heightSums / n, n, outer.y, outer.y + dy);
 			//outer.y += dy/2; // Centers vertically (i.e distribute tolerated error (least square residual) on each side) (Already done by each columns)
 		}
@@ -452,7 +439,7 @@ struct Mosaic {
 		load.start();
 		buffer<Image> images = apply(elements.size, [this](const size_t elementIndex) {
 			log("Decoding"_,elements[elementIndex]);
-			Image image = decodeImage(Map(elements[elementIndex]));
+			Image image = decodeImage(Map(elements[elementIndex], folder));
 			image.alpha = false;
 			return move(image);
 		});
@@ -609,7 +596,7 @@ struct Mosaic {
 					   W += w + rightMargin;
 				   }
 				   float dx = (pageSizeMM.x - W) / 2;
-				   log("dx=", dx);
+				   //log("dx=", dx);
 				   x0 += dx; // FIXME
 
 				   for(const size_t columnIndex: range(rows[currentRowIndex].size)) {
@@ -775,15 +762,16 @@ struct Mosaic {
 };
 
 struct MosaicPreview : Application {
-	Mosaic mosaic;
+	String name = move(Folder(".").list(Files).filter([](string name){return !endsWith(name,"mosaic");})[0]);
+	Mosaic mosaic {"."_, readFile(name)};
 	GraphicsWidget view;
 	unique<Window> window = nullptr;
 	MosaicPreview() {
 		mosaic.render(	min(1680/mosaic.pageSizeMM.x, (1050-32-24)/mosaic.pageSizeMM.y));
 		if(mosaic.errors) ::error(mosaic.errors);
 		else {
-			 view = move(mosaic.page);
-			window = unique<Window>(&view, -1, [this](){return copyRef(mosaic.name);});
+			view = move(mosaic.page);
+			window = unique<Window>(&view, -1, [this](){return copyRef(name);});
 		}
 	}
 };
@@ -796,19 +784,53 @@ struct Job : Poll {
 };
 
 struct MosaicExport : Application {
+	// UI
 	Text text;
-	Mosaic mosaic {[this](string logText){ text = logText; /*FIXME: thread safety*/}};
-	Window window {&text, -1, [this](){return copyRef(mosaic.name);}};
-	Thread workerThread; // Separate thread to render mosaic while main thread handles UI
-	MosaicExport() { if(!mosaic.errors) workerThread.spawn(); }
+	Window window {&text};
+	// Work
+	Thread workerThread {0, true}; // Separate thread to render mosaics while main thread handles UI
 	Job job {workerThread, [this]{
-			mosaic.render(0, 300 /*pixel per inch*/);
-			if(mosaic.errors) return;
-			string name = mosaic.name;
-			writeFile((endsWith(name, ".mosaic")?section(name,'.',0,-2):name)+'.'+strx(int2(round(mosaic.pageSizeMM/10.f)))+".jpg"_, encodeJPEG(::render(int2(round(mosaic.page.bounds.size())), mosaic.page)),
-					  currentWorkingDirectory(), endsWith(name, ".mosaic"));
-			//writeFile(name+".pdf"_, toPDF(pageSize, page, 72/*PostScript point per inch*/ / inchPx /*px/inch*/), Folder("out", currentWorkingDirectory(), true), true);
-			window.close();
+			String fileName;
+			if(::arguments() && existsFile(::arguments()[0])) fileName = copyRef(::arguments()[0]);
+			else if(::arguments() && existsFile(::arguments()[0]+".mosaic"_)) fileName = ::arguments()[0]+".mosaic"_;
+			else {
+				array<String> files = Folder(".").list(Files|Sorted);
+				files.filter([](string fileName){return !endsWith(fileName,"mosaic");});
+				if(files.size == 1) fileName = move(files[0]);
+			}
+			array<String> folders = Folder(".").list(Folders|Sorted);
+			if(folders && (!fileName || File(fileName).size()<=2)) { // Batch processes subfolders and write to common output folder
+				log("Collection", fileName);
+				for(string folderName: folders) {
+					Folder folder = folderName;
+					array<String> files = folder.list(Files|Sorted);
+					files.filter([](string name){return !endsWith(name,"mosaic");});
+					if(files.size == 0 && folderName=="Output") continue;
+					else if(files.size==0) { error("No mosaics in", folderName); continue; }
+					else if(files.size>1) { error("Several mosaics in", folderName); }
+					String fileName = move(files[0]);
+					string name = endsWith(fileName, ".mosaic") ? section(fileName,'.',0,-2) : fileName;
+					log(name);
+					window.setTitle(name); // FIXME: thread safety
+					if(File(fileName, folder).size()<=2) error("Empty file", fileName); // TODO: Nested collections
+					Mosaic mosaic {folder, readFile(fileName, folder), [this](string logText){ text = logText; window.render(); /*FIXME: thread safety*/}};
+					mosaic.render(0, 300 /*pixel per inch*/);
+					if(mosaic.errors) return;
+					writeFile(name+'.'+strx(int2(round(mosaic.pageSizeMM/10.f)))+".jpg"_, encodeJPEG(::render(int2(round(mosaic.page.bounds.size())), mosaic.page)), Folder("Output"_, currentWorkingDirectory(), true), true);
+				}
+			}
+			else if(existsFile(fileName)) {
+				string name = endsWith(fileName, ".mosaic") ? section(fileName,'.',0,-2) : fileName;
+				log(name);
+				window.setTitle(name); // FIXME: thread safety
+				if(File(fileName).size()<=2) error("Empty file", fileName);  // TODO: Collection argument
+				Mosaic mosaic {"."_, readFile(fileName), [this](string logText){ text = logText; window.render(); /*FIXME: thread safety*/}};
+				mosaic.render(0, 300 /*pixel per inch*/);
+				if(mosaic.errors) return;
+				writeFile(name+'.'+strx(int2(round(mosaic.pageSizeMM/10.f)))+".jpg"_, encodeJPEG(::render(int2(round(mosaic.page.bounds.size())), mosaic.page)), currentWorkingDirectory(), true);
+			}
+			window.unregisterPoll(); // Lets process termination close window to assert no windowless process remains
+			mainThread.post(); // Lets main UI thread notice window unregistration and terminate
 	}};
 };
 registerApplication(MosaicExport);

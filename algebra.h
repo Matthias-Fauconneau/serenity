@@ -9,7 +9,7 @@ struct Matrix {
 	buffer<float> elements;
 
     default_move(Matrix);
-	Matrix(uint m, uint n) : m(m), n(n), elements(m*n) { elements.clear(); }
+	Matrix(uint m, uint n) : m(m), n(n), elements(m*n) { elements.clear(0); }
 
 	float operator()(uint i, uint j) const { return elements[i*n+j]; }
 	float& operator()(uint i, uint j) { return elements[i*n+j]; }

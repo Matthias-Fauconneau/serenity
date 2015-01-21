@@ -1,11 +1,11 @@
 #include "image-folder.h"
 
-ImageFolder::ImageFolder(const Folder& source, function<bool(string name, const map<string, String>& properties)> predicate)
-	: source(Folder(".",source)) {
+ImageFolder::ImageFolder(const Folder& source, function<bool(string name, const map<string, String>& properties)> predicate, const int downsample)
+	: source(Folder(".",source)), downsample(downsample) {
 	{// Lists images and their properties
 		for(String& fileName: source.list(Files|Sorted)) {
 			Map file = Map(fileName, source);
-			if(imageFileFormat(file)!="JPEG") continue; // Only JPEG images
+			if(!ref<string>{"JPEG"_,"PNG"_}.contains(imageFileFormat(file))) continue; // Only JPEG and PNG images
 			int2 imageSize = ::imageSize(file);
 
 			map<String, Variant> exif = parseExifTags(file);
@@ -43,7 +43,7 @@ ImageFolder::ImageFolder(const Folder& source, function<bool(string name, const 
 SourceImageRGB ImageFolder::image(size_t index, string) {
 	assert_(index  < count());
 	File sourceFile (values[index].at("Path"_), source);
-	return cache<Image>(path()+"/Source", elementName(index), size(index), sourceFile.modifiedTime(), [&](const Image& target) {
+	return cache<Image>(path()+"/Source", elementName(index), parse<int2>(values[index].at("Size"_)), sourceFile.modifiedTime(), [&](const Image& target) {
 		Image source = decodeImage(Map(sourceFile));
 		assert_(source.size);
 		if(values[index].contains("Orientation") && values[index].at("Orientation") == "6") rotate(target, source);

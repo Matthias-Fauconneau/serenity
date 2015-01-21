@@ -7,9 +7,10 @@
 /// Cached collection of images backed by a source folder
 struct ImageFolder : ImageSource, ImageRGBSource, PropertySource, map<String, map<string, String>> {
 	Folder source;
+	const int downsample = 0;
     int2 maximumImageSize = 0;
 
-	ImageFolder(const Folder& source, function<bool(string name, const map<string, String>& properties)> predicate={});
+	ImageFolder(const Folder& source, function<bool(string name, const map<string, String>& properties)> predicate={}, const int downsample=0);
 
 	String path() const override { return source.name(); }
 	String name() const override { return copyRef(section(source.name(),'/',-2,-1)); }
@@ -24,9 +25,11 @@ struct ImageFolder : ImageSource, ImageRGBSource, PropertySource, map<String, ma
 		assert_(index < values.size, index, values.size, count());
 		int2 size = parse<int2>(values[index].at("Size"_));
 		int2 resize = size; // Defaults to original size
+		if(downsample) resize = size / downsample;
 		if(hint.x && hint.x < size.x) { assert_(size.x/hint.x, size, hint); resize = min(resize, size/(size.x/hint.x)); } // Fits width (Integer box resample)
 		if(hint.y && hint.y < size.y) { assert_(size.y/hint.y); resize = min(resize, size/(size.y/hint.y)); } // Fits height (Integer box resample)
-		assert_(size && resize.x/size.x == resize.y/size.y /*&& size.x/resize.x == size.y/resize.y, resize, size, vec2(size)/vec2(resize)*/);
+		if(resize == size && !(resize<=int2(4096, 3072))) resize /= 2; // Integer box downsample
+		assert_(size && resize.x/size.x == resize.y/size.y && resize<=int2(4096, 3072), size, resize);
 		return resize;
 	}
 

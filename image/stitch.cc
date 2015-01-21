@@ -109,8 +109,8 @@ struct PanoramaWeights : ImageGroupSource {
 };
 
 struct PanoramaStitch {
-	Folder folder {"Documents/Pictures/Panorama", home()};
-	ImageFolder source { folder };
+	const Folder& folder = currentWorkingDirectory();
+	ImageFolder source {folder, {}, 4};
 	AllImages groups {source};
 
 	ImageOperationT<Intensity> intensity {source};
@@ -158,7 +158,7 @@ struct PanoramaStitchPreview : PanoramaStitch, Application {
 	VBox views {toWidgets(sRGBView), VBox::Share, VBox::Expand};
 	Window window {&views, -1, [this]{ return views.title(); }};
 };
-registerApplication(PanoramaStitchPreview);
+registerApplication(PanoramaStitchPreview, preview);
 
 struct PanoramaStitchExport : PanoramaStitch, Application {
 	sRGBOperation sRGB {blend};
@@ -176,4 +176,4 @@ struct PanoramaStitchExport : PanoramaStitch, Application {
 		}
 	}
 };
-registerApplication(PanoramaStitchExport, export);
+registerApplication(PanoramaStitchExport);

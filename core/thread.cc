@@ -48,8 +48,9 @@ static bool terminationRequested = false;
 // Exit status to return for process (group)
 static int groupExitStatus = 0;
 
-Thread::Thread(int priority) : Poll(EventFD::fd,POLLIN,*this), priority(priority) {
+Thread::Thread(int priority, bool spawn) : Poll(EventFD::fd,POLLIN,*this), priority(priority) {
 	if(this == &mainThread) tid = gettid();
+	if(spawn) this->spawn();
 }
 void Thread::setPriority(int priority) { setpriority(0,0,priority); }
 static void* run(void* thread) { ((Thread*)thread)->run(); return 0; }
