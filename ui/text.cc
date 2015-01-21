@@ -239,9 +239,9 @@ struct TextLayout {
     }
 };
 
-Text::Text(const string text, float size, bgr3f color, float opacity, float wrap, string font, bool hint, float interline, bool center, int2 minimalSizeHint)
-    : text(toUCS4(text)), size(size), color(color), opacity(opacity), wrap(wrap), font(font), hint(hint), interline(interline), center(center),
-      minimalSizeHint(minimalSizeHint) {}
+Text::Text(const string text, float size, bgr3f color, float opacity, float wrap, string font, bool hint, float interline, bool center, int2 minimalSizeHint, bool justifyExplicitLineBreak)
+	: text(toUCS4(text)), size(size), color(color), opacity(opacity), wrap(wrap), font(font), hint(hint), interline(interline), center(center),
+	  justifyExplicitLineBreak(justifyExplicitLineBreak), minimalSizeHint(minimalSizeHint) {}
 
 TextLayout Text::layout(float wrap) const {
     if(center) {
@@ -249,7 +249,7 @@ TextLayout Text::layout(float wrap) const {
         wrap = layout.bbMax.x;
         assert_(wrap >= 0, wrap);
     }
-    return TextLayout(text, size, wrap, font, hint, interline, true, true, true, color);
+	return TextLayout(text, size, wrap, font, hint, interline, true, justifyExplicitLineBreak, true, color);
 }
 
 vec2 Text::textSize(vec2 size) const {

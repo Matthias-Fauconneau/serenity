@@ -55,6 +55,7 @@ struct Widget {
 };
 
 struct GraphicsWidget : Graphics, Widget {
+	GraphicsWidget() {}
 	GraphicsWidget(Graphics&& o) : Graphics(move(o)) {}
 	vec2 sizeHint(vec2) override;
 	shared<Graphics> graphics(vec2) override;

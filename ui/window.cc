@@ -7,8 +7,8 @@
 #include <sys/shm.h>
 extern "C" bool glXMakeCurrent(_XDisplay *dpy, uint drawable, __GLXcontextRec* ctx);
 
-Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool show, const Image& icon, bool GL)
-	: Display(GL), widget(widget), size(sizeHint), getTitle(title) {
+Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool show, const Image& icon, bool GL, Thread& thread)
+	: Display(GL, thread), widget(widget), size(sizeHint), getTitle(title) {
     Display::onEvent.connect(this, &Window::onEvent);
 	assert_(id && root && visual);
     send(CreateColormap{ .colormap=id+Colormap, .window=root, .visual=visual});
@@ -37,10 +37,7 @@ Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool sho
 	//((PFNGLXSWAPINTERVALMESAPROC)glXGetProcAddress((const GLubyte*)"glXSwapIntervalMESA"))(1);
 }
 
-Window::~Window() {
-    send(FreeGC{.context=id+GraphicContext});
-    send(DestroyWindow{.id=id+XWindow});
-}
+Window::~Window() { close(); }
 
 // Events
 void Window::onEvent(const ref<byte> ge) {
@@ -118,6 +115,14 @@ bool Window::processEvent(const XEvent& e) {
 
 void Window::show() { send(MapWindow{.id=id}); send(RaiseWindow{.id=id}); }
 void Window::hide() { send(UnmapWindow{.id=id}); }
+void Window::close() {
+	if(id) {
+		send(FreeGC{.context=id+GraphicContext});
+		send(DestroyWindow{.id=id+XWindow});
+		id = 0;
+	}
+	unregisterPoll();
+}
 
 void Window::setTitle(string title) {
 	if(!title || title == this->title) return;

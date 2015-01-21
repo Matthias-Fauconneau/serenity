@@ -155,7 +155,7 @@ static void bilinear(const Image& target, const Image& source) {
 }
 
 void resize(const Image& target, const Image& source) {
-	assert_(source && target && target.size != source.size, target, source);
+	assert_(source && target && source.size != target.size, source, target);
     if(source.width%target.width==0 && source.height%target.height==0) box(target, source); // Integer box downsample
     else if(target.size > source.size/2) bilinear(target, source); // Bilinear resample
     else { // Integer box downsample + Bilinear resample

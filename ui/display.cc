@@ -54,7 +54,7 @@ namespace Shm { int EXT, event, errorBase; } using namespace Shm;
 namespace XRender { int EXT, event, errorBase; } using namespace XRender;
 namespace Present { int EXT, event, errorBase; }
 
-Display::Display(bool GL) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN) {
+Display::Display(bool GL, Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread) {
     {String path = "/tmp/.X11-unix/X"+getenv("DISPLAY",":0").slice(1,1);
         struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; mref<char>(addr.path,path.size).copy(path);
         if(check(connect(Socket::fd, (const sockaddr*)&addr,2+path.size), path)) error("X connection failed"); }

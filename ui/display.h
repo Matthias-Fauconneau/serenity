@@ -39,7 +39,7 @@ struct Display : Socket, Poll {
     uint8 minKeyCode=8, maxKeyCode=0xFF;
 
 // Methods
-	Display(bool GL);
+	Display(bool GL, Thread& thread=mainThread);
 // Connection
     // Read
      /// Event handler

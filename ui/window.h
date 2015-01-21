@@ -55,7 +55,7 @@ struct Window : Display /*should reference but inherits for convenience*/ {
 // Methods
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
-	Window(Widget* widget, int2 size = -1, function<String()> title = {}, bool show = true, const Image& icon = Image(), bool GL = false);
+	Window(Widget* widget, int2 size = -1, function<String()> title = {}, bool show = true, const Image& icon = Image(), bool GL = false, Thread& thread=mainThread);
     /// Frees the graphics context and destroys the window
     virtual ~Window();
 
@@ -70,6 +70,8 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     void show();
     /// Hides window.
     void hide();
+	/// Closes window.
+	void close();
 
     /// Sets window title to \a title
     void setTitle(const string title);
