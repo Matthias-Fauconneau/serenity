@@ -114,13 +114,20 @@ struct Surface {
 
 /// Generates a scene
 struct Scene : virtual Surface {
+	static constexpr float viewHeightM = 16; // m
+	static constexpr float earthRadiusM = 6.4e6; // m
+	const float horizonDistanceM = sqrt(2*earthRadiusM*viewHeightM);
+	const float meter = 1/horizonDistanceM; // Defined by scene bounds [-1, 1]
+	const float viewHeight = viewHeightM*meter;
+	const float elevationDeviation = 50*meter;
+
 	Scene() {
 		const bgr3f groundColor = white;
 
 		Random random;
-		const int N = 16; // Terrain grid resolution (TODO: triangle mesh)
+		const int N = 256; // Terrain grid resolution (TODO: triangle mesh)
 		float altitude[(N+1)*(N+1)];
-		for(int y: range(N+1)) for(int x: range(N+1)) altitude[y*(N+1)+x] = 1./32 * (random()*2-1); // Uniform random altitude
+		for(int y: range(N+1)) for(int x: range(N+1)) altitude[y*(N+1)+x] = elevationDeviation * (random()*2-1); // Uniform random altitude
 
 		// Terrain surface
 		for(int y: range(N)) for(int x: range(N)) {
@@ -153,7 +160,7 @@ struct View : Widget {
 			indexBuffer.upload(indices);
 		}
 	};
-	struct : Scene, Surface {} surface;
+	struct : Scene, Surface {} scene;
 	GLShader diffuse {shader(), {"transform normal color diffuse light"}};
 	// Light
 	struct Light {
@@ -211,7 +218,7 @@ struct View : Widget {
 
 	// View
 	vec2 lastPos; // Last cursor position to compute relative mouse movements
-	vec2 rotation = vec2(0, -PI/3); // Current view angles (yaw,pitch)
+	vec2 rotation = vec2(0, -PI/2); // Current view angles (yaw,pitch)
 	// Render
 	struct Render {
 		GLVertexBuffer vertexBuffer;
@@ -246,16 +253,16 @@ struct View : Widget {
 
 		// Computes projection transform
 		mat4 projection = mat4()
-				.perspective(PI/4, size, 1./2, 3)
+				.perspective(PI/4, size, scene.meter, 1)
 				// .scale(vec3(size.y/size.x, 1, -1))
 				;
 		// Computes view transform
 		mat4 view = mat4()
-				.scale(1.f/surface.radius) // Fits scene (isometric approximation)
-				.translate(vec3(0,0,-1*surface.radius)) // Steps back
+				//.scale(1.f/scene.radius) // Fits scene (isometric approximation) radius=1
+				//.translate(vec3(0,0,-1*scene.radius)) // Steps back
 				.rotateX(rotation.y) // Pitch
 				.rotateZ(rotation.x) // Yaw
-				.translate(vec3(0,0,-surface.center.z-1./2)) // Level floor
+				.translate(vec3(0,0, -scene.viewHeight)) // Altitude
 				;
 		// World-space lighting
 		vec3 lightDirection = normalize(light.toWorld().normalMatrix()*vec3(0,0,-1));
@@ -267,10 +274,10 @@ struct View : Widget {
 		//diffuse["skyLightDirection"] = skyLightDirection;
 		//diffuse["shadow"_] = 0; light.shadow.depthTexture.bind(0);
 		diffuse.bind();
-		surface.vertexBuffer.bindAttribute(diffuse, "aPosition"_, 3, offsetof(Vertex, position));
-		surface.vertexBuffer.bindAttribute(diffuse, "aColor"_, 3, offsetof(Vertex, color));
-		surface.vertexBuffer.bindAttribute(diffuse, "aNormal"_, 3, offsetof(Vertex, normal));
-		surface.indexBuffer.draw();
+		scene.vertexBuffer.bindAttribute(diffuse, "aPosition"_, 3, offsetof(Vertex, position));
+		scene.vertexBuffer.bindAttribute(diffuse, "aColor"_, 3, offsetof(Vertex, color));
+		scene.vertexBuffer.bindAttribute(diffuse, "aNormal"_, 3, offsetof(Vertex, normal));
+		scene.indexBuffer.draw();
 
 		//TODO: fog
 		sky["inverseViewProjectionMatrix"] = mat4(((mat3)view).transpose()) * projection.inverse();
