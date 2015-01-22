@@ -77,6 +77,8 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     void setTitle(const string title);
     /// Sets window icon to \a icon
     void setIcon(const Image& icon);
+	/// Resizes window to \a size
+	void setSize(int2 size);
 
 // Display
     /// Schedules partial rendering after all events have been processed (\sa Poll::queue)

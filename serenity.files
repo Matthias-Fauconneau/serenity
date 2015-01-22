@@ -46,8 +46,6 @@ io/pdf.h
 io/pdf.cc
 io/jpeg.cc
 io/jpeg.h
-io/jpeg-encoder.cc
-io/jpeg-encoder.h
 io/xml.h
 io/xml.cc
 io/exif.cc

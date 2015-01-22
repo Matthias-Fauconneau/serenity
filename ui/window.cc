@@ -135,6 +135,7 @@ void Window::setIcon(const Image& icon) {
                         .length=2+icon.width*icon.height, .size=uint16(6+2+icon.width*icon.height)},
                         raw(icon.width)+raw(icon.height)+cast<byte>(icon));
 }
+void Window::setSize(int2 size) { send(SetSize{.id=id+XWindow, .w=uint(size.x), .h=uint(size.y)}); }
 
 // Render
 void Window::render(shared<Graphics>&& graphics, int2 origin, int2 size) {

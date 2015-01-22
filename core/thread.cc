@@ -75,6 +75,7 @@ void Thread::run() {
                 Poll* poll=at(i); int revents=pollfds[i].revents;
                 if(revents && !unregistered.contains(poll)) {
                     poll->revents = revents;
+					Locker lock(runLock);
                     poll->event();
                 }
             }

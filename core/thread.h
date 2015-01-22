@@ -127,6 +127,7 @@ struct Thread : array<Poll*>, EventFD, Poll {
     pthread_t thread;
     int tid=0; // Thread system identifier
     Lock lock;
+	Lock runLock;
     bool terminationRequested = false;
 
 	Thread(int priority=0, bool spawn=false);
