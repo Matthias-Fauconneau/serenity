@@ -3,7 +3,6 @@
 #include "data.h"
 #include "matrix.h"
 #include "deflate.h"
-#include "time.h"
 
 struct Object : Dict {
     buffer<byte> data;

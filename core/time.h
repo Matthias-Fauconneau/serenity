@@ -78,7 +78,7 @@ struct Timer : Stream, Poll {
     virtual ~Timer() {}
     void setAbsolute(uint64 nsec);
     void setRelative(long msec);
-    const function<void()> timeout;
+	function<void()> timeout;
     virtual void event();
 };
 

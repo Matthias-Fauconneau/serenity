@@ -1,7 +1,6 @@
 #include "window.h"
 #include "layout.h"
 #include "interface.h"
-#include "pdf.h"
 #include "render.h"
 #include "jpeg.h"
 #include "time.h"
@@ -11,8 +10,9 @@
 
 inline float parseValue(string value) {
 	TextData s(value);
-	if(s.match("1/")) return 1./s.decimal();
-	else return s.decimal();
+	float num = s.decimal();
+	if(s.match("/")) return num/s.decimal();
+	else return num;
 }
 
 typedef float float4 __attribute((__vector_size__ (16)));
@@ -86,7 +86,7 @@ struct Mosaic {
 	Folder folder;
 
 	// - Layout definition
-	ref<string> parameters = {"page-size"_,"outer","inner","same-outer"_,"same-size","chroma"};
+	ref<string> parameters = {"page-size"_,"outer","inner","same-outer"_,"same-size","chroma","intensity","hue"};
 	map<String, String> arguments;
 	vec2 pageSizeMM = 0, pageSizePx = 0;
 	array<String> elements; // Images
@@ -171,8 +171,9 @@ struct Mosaic {
 		// Page definition
 		pageSizeMM = 10.f*parse<vec2>(arguments.at("page-size")); // 50x40, 40x30, 114x76
 		assert_(pageSizeMM.x>0 && pageSizeMM.y>0);
-		auto value = [this](string name, float default_) { string value=arguments.value(name, ""); return value ? parseValue(value) : default_; };
-		vec2 inner0 = vec2(value("inner",15)), outer0 = vec2(value("outer",20));
+		auto value = [this](string name, float default_) { return arguments.contains(name) ? parseValue(arguments.at(name)) : default_; };
+		vec2 inner0 = vec2(value("inner"_,15)), outer0 = vec2(value("outer"_,20));
+		log(inner0, outer0);
 
 		// System
 		const size_t k = elements.size + 2 + 2; // Unknowns (heights + margins)
@@ -434,16 +435,15 @@ struct Mosaic {
 				"max: "+str(maxScale)+"x "+str(maxScale*mmPx)+"ppmm "+str(maxScale*inchPx)+"ppi");
 		}
 
+		log("Decoding"_, elements);
 		Time load; load.start();
 		buffer<Image> images = apply(elements.size, [this](const size_t elementIndex) {
-			log("Decoding"_,elements[elementIndex]);
 			Image image = decodeImage(Map(elements[elementIndex], folder));
 			image.alpha = false;
 			return move(image);
 		});
-		load.stop();
+		log("+", load);
 
-		Time evaluateBackgroundColors; evaluateBackgroundColors.start();
 		buffer<float4> innerBackgroundColors = apply(images.size, [&](const size_t elementIndex) {
 			const Image& iSource = images[elementIndex];
 			//float4 innerBackgroundColor = ::mean(source, 0,0, source.size.x,source.size.y);
@@ -480,11 +480,12 @@ struct Mosaic {
 					}
 				}
 				int H = argmax(ref<int>(hueHistogram));
+				if(arguments.contains("hue"_)) H = parseValue(arguments.at("hue"_)) * 0xFF;
 				int C = parseValue(arguments.value("chroma"_, "1/4"_)) * 0xFF;
 				int X = C * (0xFF - abs((H%85)*6 - 0xFF)) / 0xFF;
 				//assert(X >= 0 && X < 0x100);
 				int I = argmax(ref<int>(intensityHistogram));
-				if(0) I = min(0x80, I);
+				if(arguments.contains("intensity"_)) I = parseValue(arguments.at("intensity"_)) * 0xFF;
 				int R,G,B;
 				if(H < 43) R=C, G=X, B=0;
 				else if(H < 85) R=X, G=C, B=0;
@@ -510,7 +511,6 @@ struct Mosaic {
 			}
 			return innerBackgroundColor;
 		});
-		evaluateBackgroundColors.stop();
 
 		page.bounds = Rect(round(pageSizePx));
 		ImageF target(int2(page.bounds.size()));
@@ -518,7 +518,6 @@ struct Mosaic {
 		if(target.Ref::size < 8*1024*1024) target.clear(float4_1(0)); // Assumes larger allocation are clear pages
 
 		// -- Transitions exterior borders to background color
-		Time outerBorder; outerBorder.start();
 		const int iX = floor(outerMM.x*mmPx);
 		const int iY = floor(outerMM.y*mmPx);
 		//float4 outerBackgroundColor = float4_1(1);
@@ -574,9 +573,7 @@ struct Mosaic {
 				}
 			}
 		});
-		outerBorder.stop();
 
-		Time copy; copy.start();
 		array<Rect> mask; // To copy unblurred data on blur background
 		{ // -- Copies source images to target mosaic
 			for(const size_t currentRowIndex: range(rows.size)) {
@@ -723,8 +720,8 @@ struct Mosaic {
 					x0 += w + innerMM.x;
 				}
 			}
-			copy.stop();
 		}
+		log("Blur");
 		Time blur; blur.start();
 		if(1) {
 			ImageF blur(target.size);
@@ -748,10 +745,9 @@ struct Mosaic {
 			}
 			target = move(blur);
 		}
-		blur.stop();
+		log("+", blur);
 
 		// -- Convert back to 8bit sRGB
-		Time convert; convert.start();
 		Image iTarget (target.size);
 		assert(target.Ref::size == iTarget.Ref::size);
 		parallel_chunk(target.Ref::size, [&](uint, size_t I0, size_t DI) {
@@ -765,8 +761,6 @@ struct Mosaic {
 			//assert(!clip);
 		});
 		page.blits.append(0, page.bounds.size(), move(iTarget));
-		convert.stop();
-		log(str(load), str(evaluateBackgroundColors), str(outerBorder), str(copy), str(blur), str(convert));
 	}
 };
 
@@ -796,6 +790,12 @@ struct MosaicExport : Application {
 	// UI
 	Text text;
 	Window window {&text};
+	Timer autoclose { [this]{
+			window.unregisterPoll(); // Lets process termination close window to assert no windowless process remains
+			mainThread.post(); // Lets main UI thread notice window unregistration and terminate
+			requestTermination(); // FIXME: should not be necessary
+					  }};
+	MosaicExport() { window.actions[Space] = [this]{ autoclose.timeout = {}; }; } // Disables autoclose on input
 	// Work
 	Thread workerThread {0, true}; // Separate thread to render mosaics while main thread handles UI
 	void setText(string logText){ text = logText; Locker lock(mainThread.runLock); window.setSize(int2(ceil(text.sizeHint(0)))); window.render(); }
@@ -841,23 +841,22 @@ struct MosaicExport : Application {
 			else if(existsFile(fileName)) {
 				Time total; total.start();
 				string name = endsWith(fileName, ".mosaic") ? section(fileName,'.',0,-2) : fileName;
-				log(name);
 				setText(name);
 				if(File(fileName).size()<=2) error("Empty file", fileName);  // TODO: Collection argument
 				Mosaic mosaic {"."_, readFile(fileName), {this, &MosaicExport::setText}};
-				Time render; render.start();
+				log("Rendering", name); Time render; render.start();
 				mosaic.render(0, 300 /*pixel per inch*/);
-				render.stop();
+				log("=", render);
 				if(mosaic.errors) return;
+				log("Encoding", name);
 				Time encode; encode.start();
 				buffer<byte> file = encodeJPEG(::render(int2(round(mosaic.page.bounds.size())), mosaic.page));
 				encode.stop();
 				writeFile(name+'.'+strx(int2(round(mosaic.pageSizeMM/10.f)))+".jpg"_, file, currentWorkingDirectory(), true);
-				log(total, render, encode);
+				log("+", encode);
+				log("=","total", total);
 			}
-			window.unregisterPoll(); // Lets process termination close window to assert no windowless process remains
-			mainThread.post(); // Lets main UI thread notice window unregistration and terminate
-			requestTermination(); // FIXME: should not be necessary
+			autoclose.setRelative(1000); // Automatically close after one second of inactivity unless space bar is pressed
 	}};
 };
 registerApplication(MosaicExport);
