@@ -112,16 +112,15 @@ struct Surface {
 	}
 };
 
-/// Generates a scene
-struct Scene : virtual Surface {
+struct Terrain : virtual Surface {
 	static constexpr float viewHeightM = 16; // m
 	static constexpr float earthRadiusM = 6.4e6; // m
 	const float horizonDistanceM = sqrt(2*earthRadiusM*viewHeightM);
-	const float meter = 1/horizonDistanceM; // Defined by scene bounds [-1, 1]
+	const float meter = 1/horizonDistanceM; // Fits scene to unit
 	const float viewHeight = viewHeightM*meter;
 	const float elevationDeviation = 50*meter;
 
-	Scene() {
+	Terrain() {
 		const bgr3f groundColor = white;
 
 		Random random;
@@ -139,9 +138,31 @@ struct Scene : virtual Surface {
 					 vec3(max.x, max.y, altitude[(y+1)*(N+1)+(x+1)]),
 					 vec3(min.x, max.y, altitude[(y+1)*(N+1)+(x+0)]) }, groundColor);
 		}
+	}
+};
 
-		// Normalizes normals
-		for(Vertex& vertex: vertices) vertex.normal = normalize(vertex.normal);
+struct Tree : virtual Surface {
+	const float heightM = 60;
+	const float meter = 1/heightM; // Fits scene to unit
+	const float viewDistance= 60*meter, viewHeight = 20*meter;
+	Tree() {
+		const float trunkDiameter = 1*meter;
+		const float height = 30*meter; // 20-60
+		const bgr3f barkColor = white;
+
+		// Trunk
+		const int A = 16; // Cone resolution
+		for(int i: range(A)) {
+			float a0 = 2*PI*i/A, a1=2*PI*(i+1)/A;
+			float r0 = trunkDiameter/2, r1 = trunkDiameter/2;
+			float z0 = 0, z1 = height;
+			face((vec3[]){
+					 vec3(r0*cos(a0), r0*sin(a0), z0),
+					 vec3(r0*cos(a1), r0*sin(a1), z0),
+					 vec3(r1*cos(a1), r1*sin(a1), z1),
+					 vec3(r1*cos(a0), r0*sin(a0), z1)
+				 }, barkColor);
+		}
 	}
 };
 
@@ -155,12 +176,14 @@ struct View : Widget {
 		GLIndexBuffer indexBuffer;
 		Surface() {
 			assert_(vertices && indices);
+			// Normalizes normals
+			for(Vertex& vertex: vertices) vertex.normal = normalize(vertex.normal);
 			// Submits geometry
 			vertexBuffer.upload(vertices);
 			indexBuffer.upload(indices);
 		}
 	};
-	struct : Scene, Surface {} scene;
+	struct : Tree, Surface {} scene;
 	GLShader diffuse {shader(), {"transform normal color diffuse light"}};
 	// Light
 	struct Light {
@@ -253,13 +276,18 @@ struct View : Widget {
 
 		// Computes projection transform
 		mat4 projection = mat4()
-				.perspective(PI/4, size, scene.meter, 1)
+				.perspective(PI/4, size, scene.meter, 3)
 				// .scale(vec3(size.y/size.x, 1, -1))
 				;
 		// Computes view transform
-		mat4 view = mat4()
-				//.scale(1.f/scene.radius) // Fits scene (isometric approximation) radius=1
-				//.translate(vec3(0,0,-1*scene.radius)) // Steps back
+		mat4 view;
+		const bool orbital = true; // To view objects
+		if(orbital) {
+			view
+					//.scale(1.f/scene.radius) // Fits scene (isometric approximation) radius=1
+					.translate(vec3(0,0,-scene.viewDistance)); // Steps back
+		}
+		view
 				.rotateX(rotation.y) // Pitch
 				.rotateZ(rotation.x) // Yaw
 				.translate(vec3(0,0, -scene.viewHeight)) // Altitude
