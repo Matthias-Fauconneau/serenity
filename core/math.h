@@ -37,8 +37,10 @@ inline real ln(real x) { return __builtin_log(x); }
 
 const real PI = 3.14159265358979323846;
 inline real cos(real t) { return __builtin_cos(t); }
+inline float cos(float t) { return __builtin_cos(t); }
 inline real acos(real t) { return __builtin_acos(t); }
 notrace inline real sin(real t) { return __builtin_sin(t); }
+inline float sin(float t) { return __builtin_sin(t); }
 inline real asin(real t) { return __builtin_asin(t); }
 inline real tan(real t) { return __builtin_tan(t); }
 inline real atan(real y, real x) { return __builtin_atan2(y, x); }

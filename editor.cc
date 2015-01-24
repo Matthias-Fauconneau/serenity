@@ -142,27 +142,81 @@ struct Terrain : virtual Surface {
 };
 
 struct Tree : virtual Surface {
-	const float heightM = 60;
+	const float heightM = 10; // 20-60
 	const float meter = 1/heightM; // Fits scene to unit
-	const float viewDistance= 60*meter, viewHeight = 20*meter;
-	Tree() {
-		const float trunkDiameter = 1*meter;
-		const float height = 30*meter; // 20-60
-		const bgr3f barkColor = white;
+	const float viewDistance= 10*meter, viewHeight = 3*meter;
+	Random random;
+	const bgr3f barkColor = white;
 
-		// Trunk
-		const int A = 16; // Cone resolution
-		for(int i: range(A)) {
-			float a0 = 2*PI*i/A, a1=2*PI*(i+1)/A;
-			float r0 = trunkDiameter/2, r1 = trunkDiameter/2;
-			float z0 = 0, z1 = height;
+	void internode(vec4 A, vec4 B) {
+		vec3 a = A.xyz(), b = B.xyz();
+		float rA = A.w, rB = B.w;
+		vec3 z = normalize(b-a);
+		vec3 x = cross(z, vec3(0,1,0)); x = normalize(length(x)?x:cross(z,vec3(0,0,1)));
+		vec3 y = normalize(cross(z, x));
+		const int angleSteps = 16;
+		for(int i: range(angleSteps)) {
+			float a0 = 2*PI*i/angleSteps, a1=2*PI*(i+1)/angleSteps;
 			face((vec3[]){
-					 vec3(r0*cos(a0), r0*sin(a0), z0),
-					 vec3(r0*cos(a1), r0*sin(a1), z0),
-					 vec3(r1*cos(a1), r1*sin(a1), z1),
-					 vec3(r1*cos(a0), r0*sin(a0), z1)
+					 a + rA*cos(a0)*x + rA*sin(a0)*y,
+					 a + rA*cos(a1)*x + rA*sin(a1)*y,
+					 b + rB*cos(a1)*x + rB*sin(a1)*y,
+					 b + rB*cos(a0)*x + rB*sin(a0)*y
 				 }, barkColor);
 		}
+	}
+
+	struct Node {
+		vec3 axis;
+		float length;
+		float baseRadius, endRadius;
+		bool trunk, bud;
+		Node(vec3 axis, float length, float baseRadius, float endRadius, bool trunk, bool bud) : axis(axis), length(length), baseRadius(baseRadius), endRadius(endRadius), trunk(trunk), bud(bud) {}
+		array<unique<Node>> branches;
+
+		void grow(Random& random, float meter,  int year, vec3 origin=vec3(0)) {
+			// Grows
+			const float growthRate = 1+1./16;
+			length *= growthRate;
+			baseRadius *= growthRate;
+			vec3 end = origin+length*axis;
+			for(auto& branch: branches) branch->grow(random, meter, year, end);
+			if(bud) { // Shoots new branches
+				// Main axis
+				branches.append(axis, length*(1-1./4), endRadius, endRadius*(1-1./4), true, true);
+				// -- Whorl
+				const int branchCount = trunk ? 8 :  3;
+				// Whorl coordinate system
+				vec3 z = axis;
+				vec3 x = cross(z, vec3(0,1,0)); x = normalize(::length(x)?x:cross(z,vec3(0,0,1)));
+				vec3 y = normalize(cross(z, x));
+				float phase = 2*PI*random();
+				for(int i: range(branchCount)) {
+					float angle = phase + 2*PI*i/branchCount;
+					float zAngle = PI/4;
+					float length = this->length/2;
+					vec3 shootAxis = sin(zAngle)*(cos(angle)*x + sin(angle)*y) + cos(zAngle)*z;
+					shootAxis = normalize(shootAxis-vec3(0,0,2*length/meter)); // Weight
+					branches.append(shootAxis, endRadius+length, endRadius/2, (endRadius*(1-1./4))/2, false, true);
+				}
+				bud = false;
+			}
+			endRadius = bud ? min(baseRadius/2, 1.f/100*meter) : baseRadius*(1-1./4);
+		};
+	};
+
+	void geometry(const Node& node, vec3 origin=vec3(0)) {
+		vec3 end = origin+node.length*node.axis;
+		internode(vec4(origin, node.baseRadius), vec4(end,node.endRadius));
+		for(auto& branch: node.branches) geometry(branch, end);
+	};
+
+	Tree() {
+		assert_(meter);
+		Node root (vec3(0,0,1), 1*meter, 1.f/10*meter, 1.f/10*meter*(1-1./4), true, true); // Trunk axis root
+		const int age = 3; // 3 - 20 y
+		for(int year: range(age)) root.grow(random, meter, year);
+		geometry(root);
 	}
 };
 
@@ -276,7 +330,7 @@ struct View : Widget {
 
 		// Computes projection transform
 		mat4 projection = mat4()
-				.perspective(PI/4, size, scene.meter, 3)
+				.perspective(PI/4, size, scene.meter, 4)
 				// .scale(vec3(size.y/size.x, 1, -1))
 				;
 		// Computes view transform
@@ -308,10 +362,10 @@ struct View : Widget {
 		scene.indexBuffer.draw();
 
 		//TODO: fog
-		sky["inverseViewProjectionMatrix"] = mat4(((mat3)view).transpose()) * projection.inverse();
+		//sky["inverseViewProjectionMatrix"] = mat4(((mat3)view).transpose()) * projection.inverse();
 		//sky["lightDirection"] = normalize(view.normalMatrix() * lightDirection);
-		sky["skybox"] = 0; skybox.bind(0);
-		render.draw(sky);
+		//sky["skybox"] = 0; skybox.bind(0);
+		//render.draw(sky);
 
 		/*GLTexture color(width,height,GLTexture::RGB16F);
 		frameBuffer.blit(color);

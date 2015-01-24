@@ -28,7 +28,7 @@ struct Player : Poll {
     AudioControl volume;
 	static constexpr uint channels = 2;
 	static constexpr uint periodSize = 32768;
-    unique<AudioFile> file = 0;
+	unique<FFmpeg> file = 0;
     AudioOutput audio {{this,&Player::read}};
     mref<short2> lastPeriod;
     size_t read(mref<short2> output) {
@@ -159,7 +159,7 @@ struct Player : Poll {
     void playTitle(uint index) {
         titles.index = index;
         window.setTitle(toUTF8(titles[index].text));
-        file = unique<AudioFile>(folder.name()+'/'+files[index]);
+		file = unique<FFmpeg>(folder.name()+'/'+files[index]);
         if(!file->file) { file=0; log("Error reading", folder.name()+'/'+files[index]); return; }
         assert(file->channels==AudioOutput::channels);
         setPlaying(true);
