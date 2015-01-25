@@ -17,24 +17,20 @@ struct Surface {
 	array<uint> indices;
 
 	/// Space partionning for faster vertex index lookups
-	static constexpr uint G = 16; // Grid resolution (TODO: adapt with vertex count)
-	vec3 gridMin = -1, gridMax = 1; // current grid bounds
-	array<uint> grid[G*G*G];
+	const int3 gridSize = 0;
+	buffer<array<uint>> grid {size_t(gridSize.z*gridSize.y*gridSize.x?:1)};
+	vec3 gridMin = 0, gridMax = 0; // Grid bounds
 	array<uint>& cell(vec3 p) {
+		if(!gridSize) return grid[0];
 		assert(p>=gridMin && p<=gridMax, gridMin, p, gridMax);
-		int3 indices = min(int3(G), int3(float(G) * (p-gridMin) / (gridMax-gridMin))); // Assigns vertices on maximum limit to last cell
-		size_t index = indices.z*G*G + indices.y*G + indices.x;
-		assert_(index < G*G*G);
+		int3 indices = int3(vec3(gridSize-int3(1)) * (p-gridMin) / (gridMax-gridMin)); // Assigns vertices on maximum limit to last cell
+		size_t index = indices.z*gridSize.y*gridSize.x + indices.y*gridSize.x + indices.x;
+		assert_(index < grid.size, p, gridMin, gridMax);
 		return grid[index];
 	}
 
-	vec3 bbMin=0, bbMax=0; // Scene bounding box in world space
-	vec3 center=0; float radius=0; // Scene bounding sphere in world space
-
-	void clear() {
-		vertices.clear(); indices.clear(); bbMin=0, bbMax=0, center=0, radius=0;
-		gridMin=-1, gridMax=1; for(array<uint>& cell: grid) cell.clear(); // Clear grid
-	}
+	Surface() { grid.clear(); }
+	Surface(int3 gridSize, vec3 gridMin, vec3 gridMax) : gridSize(gridSize), gridMin(gridMin), gridMax(gridMax) { grid.clear(); }
 
 	/// Creates a new face using existing vertices when possible
 	/// \note Vertex normals are mean of adjacent face normals
@@ -44,21 +40,9 @@ struct Surface {
 		for(uint i: range(polygon.size)) { // Lookups each vertex
 			const Vertex& o = polygon[i];
 
-			// Computes scene bounds in world space to fit view
-			bbMin = min(bbMin, o.position);
-			bbMax = max(bbMax, o.position);
-			// FIXME: evaluate only once needed
-			center = (bbMin+bbMax)/2.f; radius = length(bbMax.xy()-bbMin.xy())/2.f; // FIXME: compute smallest enclosing sphere
-
-			if(!(o.position>=gridMin && o.position<=gridMax)) {
-				error(gridMin, o.position, gridMax);
-				gridMin=min(gridMin,o.position/*-vec3(1)*/); gridMax=max(gridMax,o.position/*+vec3(1)*/); // Resizes grid
-				for(array<uint>& cell: grid) cell.clear(); // Clears grid
-				for(uint i: range(vertices.size)) cell(vertices[i].position).append( i ); // Sorts all vertices
-			}
-
 			float minDistance=0; uint minIndex = -1;
-			for(uint index: cell(o.position)) {
+			array<uint>& cell = this->cell(o.position);
+			for(uint index: cell) {
 				Vertex& v = vertices[index];
 
 				if(v.color!=o.color) continue;
@@ -76,7 +60,7 @@ struct Surface {
 				//if(vertices.size()==vertices.capacity()) vertices.reserve(2*vertices.size()); // Amortized allocation is now already default dynamic array allocation policy
 				uint index = vertices.size;
 				vertices.append( o );
-				cell(o.position).append( index );
+				cell.append( index );
 				indices[i] = index;
 			}
 		}
@@ -116,6 +100,7 @@ struct Surface {
 
 static float lerp(float a, float b, float t) { return (1-t)*a + t*b; }
 static float bilinear(float* image, uint width, uint height, vec2 uv) {
+	assert_(uv.x >= 0 && uv.x <= 1 && uv.y >=0 && uv.y <= 1, uv);
 	uv *= vec2(width-1, height-1);
 	int2 i = int2(uv);
 	vec2 f = uv-floor(uv);
@@ -124,21 +109,57 @@ static float bilinear(float* image, uint width, uint height, vec2 uv) {
 				lerp( image[(i.y+1)*width+i.x], image[(i.y+1)*width+i.x+1], f.x), f.y);
 };
 
-struct Terrain {
-	static constexpr int N = 16; // Terrain grid resolution (TODO: triangle mesh)
-	float altitudeSamples[(N+1)*(N+1)];
+vec2 randomNormals[256*256];
+int modulo(int x, int y) { return (x  - x/y*y + y)%y; }
+vec2 random2D(int2 i) {
+	static unused bool init = ({Random random; for(vec2& v: randomNormals) v = normalize(vec2(random()*2-1,random()*2-1)); true; });
+	return randomNormals[modulo(i.y,256)*256+modulo(i.x,256)];
+}
+float perlin2D(vec2 p) {
+	int2 i = int2(p);
+	vec2 f = p-floor(p);
+	float v00 = dot(random2D(i+int2(0,0)), f - vec2(0,0));
+	float v01 = dot(random2D(i+int2(0,1)), f - vec2(0,1));
+	float v10 = dot(random2D(i+int2(1,0)), f - vec2(1,0));
+	float v11 = dot(random2D(i+int2(1,1)), f - vec2(1,1));
+	vec2 w = f*f*f*(f*(6.f*f-vec2(15.f))+vec2(10.f));
+	return lerp( lerp( v00, v01, w.y ), lerp( v10, v11, w.y ), w.x );
+}
+float ridgedMultifractal(const vec2 p0) {
+	const float H = 1;
+	const float lacunarity = 3;
+	const float gain = 2;
+	float frequency = 1;
+	vec2 p = p0;
+	float offset = 3./4 + perlin2D(p)/2;
+	float signal = sq(offset - abs(perlin2D(p)));
+	float r = signal;
+	for(int unused i : range(1,8)) {
+		p *= lacunarity;
+		signal = clip(0.f, signal*gain, 1.f) * sq(offset - abs(perlin2D(p)));
+		r += signal * pow(frequency, -H);
+		frequency *= lacunarity;
+	}
+	return r;
+}
+const float horizonDistance = 128;
 
-	Terrain(float meter, Surface& surface, Random& random) {
-		const float elevationDeviation = 1*meter;
+struct Terrain {
+	const float elevationDeviation = 10;
+	static constexpr int N = 64; // Terrain grid resolution (TODO: triangle mesh)
+	float altitudeSamples[(N+1)*(N+1)];
+	Surface surface;
+
+	Terrain() /*: surface(1, vec3(vec2(-horizonDistance), 0), vec3(vec2(horizonDistance), elevationDeviation))*/ {
 		const bgr3f groundColor = vec3(14./16, 14./16., 13./16);
 
-		for(int y: range(N+1)) for(int x: range(N+1)) altitudeSamples[y*(N+1)+x] = elevationDeviation * (random()*2-1); // Uniform random altitude
+		for(int y: range(N+1)) for(int x: range(N+1)) altitudeSamples[y*(N+1)+x] = elevationDeviation * ridgedMultifractal(vec2((float)x/N,(float)y/N)*2.f); // Uniform random altitude
 
 		// Terrain surface
 		for(int y: range(N)) for(int x: range(N)) {
-			vec2 min = vec2(-1 + 2.f*x/N, -1 + 2.f*y/N);
-			vec2 max = vec2(-1 + 2.f*(x+1)/N, -1 + 2.f*(y+1)/N);
-			if(1) surface.face((vec3[]){
+			vec2 min = vec2(-1 + 2.f*x/N, -1 + 2.f*y/N) * horizonDistance;
+			vec2 max = vec2(-1 + 2.f*(x+1)/N, -1 + 2.f*(y+1)/N)  * horizonDistance;
+			surface.face((vec3[]){
 					 vec3(min.x, min.y, altitudeSamples[(y+0)*(N+1)+(x+0)]),
 					 vec3(max.x, min.y, altitudeSamples[(y+0)*(N+1)+(x+1)]),
 					 vec3(max.x, max.y, altitudeSamples[(y+1)*(N+1)+(x+1)]),
@@ -146,18 +167,18 @@ struct Terrain {
 		}
 	}
 
-	float altitude(vec2 world) { return bilinear(altitudeSamples, N+1, N+1, (world+vec2(1.f))/2.f); };
+	float altitude(vec2 world) { return bilinear(altitudeSamples, N+1, N+1, (world/horizonDistance+vec2(1.f))/2.f); };
 };
 
 struct Tree {
-	const float meter;
 	const bgr3f trunkColor = vec3(14./16., 13./16, 12./16);
 	const bgr3f branchColor = vec3(15./16, 16./16., 14./16); //vec3(1./2, 1./3, 0);
+	Surface surface;
 
-	void internode(Surface& surface, vec3 a, vec3 b, float rA, float rB, vec3 zA, vec3 zB, vec3 color) {
+	void internode(vec3 a, vec3 b, float rA, float rB, vec3 zA, vec3 zB, vec3 color) {
 		vec3 xA = cross(zA, vec3(0,1,0)); xA = normalize(length(xA)?xA:cross(zA,vec3(0,0,1))); vec3 yA = normalize(cross(zA, xA));
 		vec3 xB = cross(zB, vec3(0,1,0)); xB = normalize(length(xB)?xB:cross(zB,vec3(0,0,1))); vec3 yB = normalize(cross(zB, xB));
-		const int angleSteps = clip(2, int(8*ceil(max(rA, rB)/meter)), 16);
+		const int angleSteps = clip(2, int(8*ceil(max(rA, rB))), 16);
 		for(int i: range(angleSteps)) {
 			float a0 = 2*PI*i/angleSteps, a1=2*PI*(i+1)/angleSteps;
 			surface.face((vec3[]){
@@ -180,7 +201,7 @@ struct Tree {
 		Node(vec3 axis, float length, float baseRadius, float endRadius, int order, float axisLength=0) : axis(axis), length(length), baseRadius(baseRadius), endRadius(endRadius), order(order), axisLength(axisLength), bud(true), nextAxis(axis) {}
 		array<unique<Node>> branches;
 
-		void grow(Random& random, float meter,  int year, vec3 origin=vec3(0)) {
+		void grow(Random& random, int year, vec3 origin=vec3(0)) {
 			// Tropism
 			axis = normalize(axis+vec3(0,0,1./(8*(order+1))/*+length/meter*/)); // Weight
 			// Grows
@@ -188,8 +209,8 @@ struct Tree {
 			length *= growthRate;
 			baseRadius *= growthRate;
 			vec3 end = origin+length*axis;
-			for(auto& branch: branches) branch->grow(random, meter, year, end);
-			if(order==2 || (order>=1 && axisLength>1*meter)) bud = false;
+			for(auto& branch: branches) branch->grow(random, year, end);
+			if(order==2 || (order>=1 && axisLength>1)) bud = false;
 			if(bud) { // Shoots new branches
 				// Coordinate system
 				vec3 z = axis;
@@ -210,27 +231,27 @@ struct Tree {
 						float zAngle = PI / 4 + (2*PI*random() / 16);
 						float length = this->length/2;
 						vec3 shootAxis = sin(zAngle)*(cos(angle)*x + sin(angle)*y) + cos(zAngle)*z;
-						shootAxis = normalize(shootAxis-vec3(0,0,1+length/meter)); // Weight
-						branches.append(shootAxis, endRadius+length, endRadius/2 + min(baseRadius, 1.f/10*meter), (endRadius*(1-1./4))/2 + min(baseRadius, 1.f/10*meter), order+1);
+						shootAxis = normalize(shootAxis-vec3(0,0,1+length)); // Weight
+						branches.append(shootAxis, endRadius+length, endRadius/2 + min(baseRadius, 1.f/10), (endRadius*(1-1./4))/2 + min(baseRadius, 1.f/10), order+1);
 					}
 				}
 			}
 			bud = false;
 			nextAxis = branches ? branches[0]->axis : axis; // First is main axis
-			endRadius = branches ?  branches[0]->baseRadius : min(baseRadius/2, 1.f/10*meter) ;
+			endRadius = branches ?  branches[0]->baseRadius : min(baseRadius/2, 1.f/10) ;
 		};
 	};
 
-	void geometry(Surface& surface, const Node& node, vec3 origin=vec3(0)) {
+	void geometry(const Node& node, vec3 origin=vec3(0)) {
 		vec3 end = origin+node.length*node.axis;
-		internode(surface, origin, end, node.baseRadius, node.endRadius, node.axis, node.nextAxis, node.order ? branchColor : trunkColor);
-		if(node.branches) for(auto& branch: node.branches) geometry(surface, branch, end);
+		internode(origin, end, node.baseRadius, node.endRadius, node.axis, node.nextAxis, node.order ? branchColor : trunkColor);
+		if(node.branches) for(auto& branch: node.branches) geometry(branch, end);
 		else { // Cap
 			vec3 b = end;
 			vec3 zB = node.axis;
 			vec3 xB = cross(zB, vec3(0,1,0)); xB = normalize(length(xB)?xB:cross(zB,vec3(0,0,1))); vec3 yB = normalize(cross(zB, xB));
 			float rA = node.baseRadius, rB = node.endRadius;
-			const int angleSteps = clip(2, int(8*ceil(max(rA, rB)/meter)), 16);
+			const int angleSteps = clip(2, int(8*ceil(max(rA, rB))), 16);
 			array<vec3> face;
 			for(int i: range(angleSteps)) {
 				float a = 2*PI*i/angleSteps;
@@ -240,11 +261,11 @@ struct Tree {
 		}
 	};
 
-	Tree(float meter, Surface& surface, vec3 rootOrigin, Random& random) : meter(meter) {
-		Node root (vec3(0,0,1), 1*meter, 2.f/10*meter, 2.f/10*meter*(1-1./4), 0, 0); // Trunk axis root
+	Tree(Random& random) /*: surface(vec3(-2,-2,-1), vec3(2,2,16))*/ {
+		Node root (vec3(0,0,1), 1, 2.f/10, 2.f/10*(1-1./4), 0, 0); // Trunk axis root
 		const int age = 8; // 3 - 20 y
-		for(int year: range(age)) root.grow(random, meter, year);
-		geometry(surface, root, rootOrigin); // TODO: independent object
+		for(int year: range(age)) root.grow(random, year);
+		geometry(root); // TODO: independent object
 	}
 };
 
@@ -253,18 +274,24 @@ struct View : Widget {
 	// Creates a window and an associated GL context
 	Window window {this, 512, []{ return "Editor"__; }, true, Image(), true};
 	// ^ GL* constructors rely on a GL context being current ^
-	struct Surface : virtual ::Surface {
+	struct Surface {
 		GLVertexBuffer vertexBuffer;
 		GLIndexBuffer indexBuffer;
-		void upload() {
-			assert_(vertices && indices);
+		Surface(::Surface&& surface) {
+			assert_(surface.vertices && surface.indices);
 			// Normalizes normals
-			for(Vertex& vertex: vertices) vertex.normal = normalize(vertex.normal);
+			for(Vertex& vertex: surface.vertices) vertex.normal = normalize(vertex.normal);
 			// Submits geometry
-			vertexBuffer.upload(vertices);
-			indexBuffer.upload(indices);
+			vertexBuffer.upload(surface.vertices);
+			indexBuffer.upload(surface.indices);
 		}
-	} scene;
+	};
+	array<unique<Surface>> surfaces;
+	struct Instance {
+		Surface& surface;
+		mat4 transform;
+	};
+	array<Instance> instances;
 	GLShader diffuse {shader(), {"transform normal color diffuse light"}};
 	// Light
 	struct Light {
@@ -338,24 +365,23 @@ struct View : Widget {
 	// Profile
 	//int64 lastFrameEnd = realTime(), frameInterval = 20000000/*ns*/;
 
-	static constexpr float viewHeightM = 5; // m
-	static constexpr float earthRadiusM = 6.4e6; // m
-	const float horizonDistanceM = sqrt(2*earthRadiusM*viewHeightM) / 100; //FIXME
-	const float meter = 1/horizonDistanceM; // Fits scene to unit
-	const float viewDistance = 30*meter;
+	const float viewDistance = 30;
 	float viewHeight;
 
 	View() {
 		Random random; random.seed();
-		Terrain terrain (meter, scene, random);
-		viewHeight = terrain.altitude(0) + viewHeightM*meter;
-		const int treeCount = 3*3;
+		Terrain terrain;
+		instances.append({surfaces.append(unique<Surface>(move(terrain.surface))), mat4()});
+		viewHeight = terrain.altitude(0) + 5;
+		auto treeModels = apply(1, [&random](int) { return unique<Surface>(move(Tree(random).surface)); });
+		const int treeCount = 32*32;
 		for(int unused i: range(treeCount)) {
-			const float radius = 1./2;
+			const float radius = horizonDistance / 2;
 			vec2 p = vec2(random()*2-1, random()*2-1)*radius;
-			Tree(meter, scene, vec3(p, terrain.altitude(p)), random);
+			float angle = 2*PI*random();
+			instances.append({treeModels[0], mat4().translate(vec3(p, terrain.altitude(p))).rotateZ(angle)});
 		}
-		scene.upload();
+		surfaces.append(move(treeModels)); // Holds tree models
 	}
 
 	// Orbital ("turntable") view control
@@ -378,7 +404,7 @@ struct View : Widget {
 
 		// Computes projection transform
 		mat4 projection = mat4()
-				.perspective(PI/4, size, meter, 4)
+				.perspective(PI/4, size, 1, 2*horizonDistance)
 				// .scale(vec3(size.y/size.x, 1, -1))
 				;
 		// Computes view transform
@@ -394,25 +420,28 @@ struct View : Widget {
 				.rotateZ(rotation.x) // Yaw
 				.translate(vec3(0,0, -viewHeight)) // Altitude
 				;
-		// World-space lighting
+		// Object-space lighting
 		vec3 lightDirection = normalize(light.toWorld().normalMatrix()*vec3(0,0,-1));
 		//vec3 skyLightDirection = vec3(0,0,1);
 
-		diffuse["modelViewProjectionTransform"] = projection*view;
+		mat4 viewProjection = projection*view;
 		//diffuse["shadowTransform"] = light.toShadow();
-		diffuse["lightDirection"] = lightDirection;
 		//diffuse["skyLightDirection"] = skyLightDirection;
 		//diffuse["shadow"_] = 0; light.shadow.depthTexture.bind(0);
 		diffuse.bind();
-		scene.vertexBuffer.bindAttribute(diffuse, "aPosition"_, 3, offsetof(Vertex, position));
-		scene.vertexBuffer.bindAttribute(diffuse, "aColor"_, 3, offsetof(Vertex, color));
-		scene.vertexBuffer.bindAttribute(diffuse, "aNormal"_, 3, offsetof(Vertex, normal));
-		scene.indexBuffer.draw();
+		for(Instance instance: instances) {
+			instance.surface.vertexBuffer.bindAttribute(diffuse, "aPosition"_, 3, offsetof(Vertex, position));
+			instance.surface.vertexBuffer.bindAttribute(diffuse, "aColor"_, 3, offsetof(Vertex, color));
+			instance.surface.vertexBuffer.bindAttribute(diffuse, "aNormal"_, 3, offsetof(Vertex, normal));
+			diffuse["modelViewProjectionTransform"] = viewProjection * instance.transform;
+			diffuse["lightDirection"] = normalize(instance.transform.inverse().normalMatrix() * lightDirection);
+			instance.surface.indexBuffer.draw();
+		}
 
 		//TODO: fog
 		sky["inverseViewProjectionMatrix"] = mat4(((mat3)view).transpose()) * projection.inverse();
 		//sky["lightDirection"] = normalize(view.normalMatrix() * lightDirection);
-		sky["skybox"] = 0; skybox.bind(0);
+		//sky["skybox"] = 0; skybox.bind(0);
 		render.draw(sky);
 
 		/*GLTexture color(width,height,GLTexture::RGB16F);

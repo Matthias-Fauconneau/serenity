@@ -80,7 +80,8 @@ sky {
  }
  fragment {
   uniform samplerCube skybox;
-  color.rgb = texture(skybox, vTexCoords).rgb;
+  color.rgb = vec3(1-vTexCoords.z/2, 1-vTexCoords.z/3, 1);
+  //color.rgb = texture(skybox, vTexCoords).rgb;
   //color.rgb = vTexCoords;
  }
 }
