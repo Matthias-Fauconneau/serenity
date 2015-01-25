@@ -82,7 +82,10 @@ bool Window::processEvent(const XEvent& e) {
             if(action) (*action)(); // Local window action
         }
 	}
-	else if(type==KeyRelease) {}
+	else if(type==KeyRelease) {
+		Key key = (Key)keySym(e.key, e.state); Modifiers modifiers = (Modifiers)e.state;
+		if(focus && focus->keyRelease(key, modifiers)) render();
+	}
     else if(type==MotionNotify) {
         if(drag && e.state&Button1Mask && drag->mouseEvent(vec2(e.x,e.y), vec2(size), Widget::Motion, Widget::LeftButton, focus))
             render();

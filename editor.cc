@@ -140,20 +140,24 @@ float ridgedMultifractal(const vec2 p0) {
 		r += signal * pow(frequency, -H);
 		frequency *= lacunarity;
 	}
-	return r;
+	return r; // 0-√2
 }
 const float horizonDistance = 128;
 
 struct Terrain {
 	const float elevationDeviation = 10;
-	static constexpr int N = 64; // Terrain grid resolution (TODO: triangle mesh)
+	static constexpr int N = 16; // Terrain grid resolution (TODO: triangle mesh)
 	float altitudeSamples[(N+1)*(N+1)];
 	Surface surface;
 
 	Terrain() /*: surface(1, vec3(vec2(-horizonDistance), 0), vec3(vec2(horizonDistance), elevationDeviation))*/ {
 		const bgr3f groundColor = vec3(14./16, 14./16., 13./16);
 
-		for(int y: range(N+1)) for(int x: range(N+1)) altitudeSamples[y*(N+1)+x] = elevationDeviation * ridgedMultifractal(vec2((float)x/N,(float)y/N)*2.f); // Uniform random altitude
+		for(int y: range(N+1)) for(int x: range(N+1)) {
+			vec2 p = vec2(-1 + 2*float(x)/N, -1 + 2*float(y)/N); // [-1, 1]
+			altitudeSamples[y*(N+1)+x] =
+				elevationDeviation * ( (cos(length(p))-1) + ridgedMultifractal(p) );
+		}
 
 		// Terrain surface
 		for(int y: range(N)) for(int x: range(N)) {
@@ -274,62 +278,83 @@ struct View : Widget {
 	// Creates a window and an associated GL context
 	Window window {this, 512, []{ return "Editor"__; }, true, Image(), true};
 	// ^ GL* constructors rely on a GL context being current ^
-	struct Surface {
+	struct Surface : ::Surface {
 		GLVertexBuffer vertexBuffer;
 		GLIndexBuffer indexBuffer;
-		Surface(::Surface&& surface) {
-			assert_(surface.vertices && surface.indices);
+		Surface(::Surface&& surface) : ::Surface(move(surface)) {
+			assert_(vertices && indices);
 			// Normalizes normals
-			for(Vertex& vertex: surface.vertices) vertex.normal = normalize(vertex.normal);
+			for(Vertex& vertex: vertices) vertex.normal = normalize(vertex.normal);
 			// Submits geometry
-			vertexBuffer.upload(surface.vertices);
-			indexBuffer.upload(surface.indices);
+			vertexBuffer.upload(vertices);
+			indexBuffer.upload(indices);
 		}
 	};
 	array<unique<Surface>> surfaces;
+	GLShader diffuse {shader(), {"transform normal color diffuse light"}};
+
 	struct Instance {
 		Surface& surface;
 		mat4 transform;
 	};
-	array<Instance> instances;
-	GLShader diffuse {shader(), {"transform normal color diffuse light"}};
+
+	Random random;
+	Terrain terrain;
+	array<Instance> evaluateInstances() {
+		array<Instance> instances;
+		instances.append({surfaces.append(unique<Surface>(move(terrain.surface))), mat4()});
+		auto treeModels = apply(1, [this](int) { return unique<Surface>(move(Tree(random).surface)); });
+		const int treeCount = 16*16;
+		for(int unused i: range(treeCount)) {
+			const float radius = horizonDistance;
+			vec2 p = vec2(random()*2-1, random()*2-1)*radius;
+			float angle = 2*PI*random();
+			instances.append({treeModels[0], mat4().translate(vec3(p, terrain.altitude(p))).rotateZ(angle)});
+		}
+		surfaces.append(move(treeModels)); // Holds tree models
+		return instances;
+	}
+	array<Instance> instances = evaluateInstances();
+
 	// Light
 	struct Light {
 		float pitch = 3*PI/4;
 		bool enable = true; // Whether shadows are rendered
 		vec3 lightMin=0, lightMax=0; // Scene bounding box in sun light space
-		/*GLFrameBuffer shadow {GLTexture(4096,4096, Depth|Shadow|Bilinear|Clamp)};
+		GLFrameBuffer shadow {GLTexture(4096,4096, Depth|Shadow|Bilinear|Clamp)};
 		GLShader transform {shader(), {"transform"}};
-		Light(const Surface& surface) {
+		Light(ref<Instance> instances) {
 			{// Compute scene bounds in light space to fit shadow
 				lightMin=0, lightMax=0;
 				mat4 worldToLight = mat4()
 						.rotateX( pitch );
-				for(const Surface::Vertex& vertex: surface.vertices) {
-					vec3 P = worldToLight * vertex.position;
-					lightMin = min(lightMin, P);
-					lightMax = max(lightMax, P);
+				for(const Instance& instance: instances) {
+					for(const Vertex& vertex: instance.surface.vertices) {
+						vec3 P = worldToLight * instance.transform * vertex.position;
+						lightMin = min(lightMin, P);
+						lightMax = max(lightMax, P);
+					}
 				}
 			}
-			// Renders shadow map
-			if(!shadow) {
-				// World to [-1,1]³
-				mat4 worldToLight = mat4()
-						.translate(-1) // [-1,1]
-						.scale(2.f/(lightMax-lightMin)) // [0,2]
-						.translate(-lightMin) // [0,max-min]
-						.rotateX( pitch );
+			// -- Renders shadow map
+			// World to [-1,1]³
+			mat4 worldToLight = mat4()
+					.translate(-1) // [-1,1]
+					.scale(2.f/(lightMax-lightMin)) // [0,2]
+					.translate(-lightMin) // [0,max-min]
+					.rotateX( pitch );
 
-				//glDepthTest(true);
-				//glCullFace(true);
-				shadow.bind(ClearDepth);
-				transform.bind();
-				// Draws the single scene object
-				transform["modelViewProjectionTransform"] = worldToLight;
-				surface.vertexBuffer.bindAttribute(transform, "aPosition", 3, offsetof(Surface::Vertex,position));
-				surface.indexBuffer.draw();
+			glDepthTest(true);
+			glCullFace(true);
+			shadow.bind(ClearDepth);
+			transform.bind();
+			// Draws all shadow casting instances
+			for(const Instance& instance: instances) {
+				transform["modelViewProjectionTransform"] = worldToLight * instance.transform;
+				instance.surface.vertexBuffer.bindAttribute(transform, "aPosition", 3, offsetof(Vertex, position));
+				instance.surface.indexBuffer.draw();
 			}
-		}*/
+		}
 		// Light to world
 		mat4 toWorld() {
 			return mat4()
@@ -342,7 +367,7 @@ struct View : Widget {
 					.translate(-lightMin)
 					.rotateX( pitch );
 		}*/
-	} light;// {surface};
+	} light {instances};
 	// Sky
 	GLShader sky {shader(), {"sky"}};
 	GLTexture skybox {decodeImage(readFile("skybox.png"_)), SRGB|Bilinear|Cube};
@@ -366,23 +391,7 @@ struct View : Widget {
 	//int64 lastFrameEnd = realTime(), frameInterval = 20000000/*ns*/;
 
 	const float viewDistance = 30;
-	float viewHeight;
-
-	View() {
-		Random random; random.seed();
-		Terrain terrain;
-		instances.append({surfaces.append(unique<Surface>(move(terrain.surface))), mat4()});
-		viewHeight = terrain.altitude(0) + 5;
-		auto treeModels = apply(1, [&random](int) { return unique<Surface>(move(Tree(random).surface)); });
-		const int treeCount = 32*32;
-		for(int unused i: range(treeCount)) {
-			const float radius = horizonDistance / 2;
-			vec2 p = vec2(random()*2-1, random()*2-1)*radius;
-			float angle = 2*PI*random();
-			instances.append({treeModels[0], mat4().translate(vec3(p, terrain.altitude(p))).rotateZ(angle)});
-		}
-		surfaces.append(move(treeModels)); // Holds tree models
-	}
+	vec3 position = vec3(0, 0, terrain.altitude(0) + 5);
 
 	// Orbital ("turntable") view control
 	bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override {
@@ -393,7 +402,37 @@ struct View : Widget {
 		 }
 		 else return false;
 		 return true;
-	 }
+	}
+
+	vec3 force = 0; // View coordinate system
+	bool keyPress(Key key, Modifiers) override {
+		if(key==Key('a')) force.x--;
+		if(key==Key('w')) force.z--;
+		if(key==Key('s')) force.z++;
+		if(key==Key('d')) force.x++;
+		if(key==Space) force.y++;
+		if(key==ControlKey) force.y--;
+		else return false;
+		return true;
+	}
+	bool keyRelease(Key key, Modifiers) override {
+		if(key==Key('a')) force.x++;
+		if(key==Key('w')) force.z++;
+		if(key==Key('s')) force.z--;
+		if(key==Key('d')) force.x--;
+		if(key==Space) force.y--;
+		if(key==ControlKey) force.y++;
+		else return false;
+		return true;
+	}
+
+	vec3 speed = 0;
+	bool step() { // Assumes 60 Hz (FIXME: handle dropped frames)
+		speed *= 1./2;
+		speed += mat4().rotateX(rotation.y).rotateZ(rotation.x).inverse() * force;
+		position += speed;
+		return force || length(speed) > 1./60;
+	}
 
 	vec2 sizeHint(vec2) override { return 0; }
 	shared<Graphics> graphics(vec2 unused size) override {
@@ -404,21 +443,21 @@ struct View : Widget {
 
 		// Computes projection transform
 		mat4 projection = mat4()
-				.perspective(PI/4, size, 1, 2*horizonDistance)
+				.perspective(PI/4, size, 1, 2*horizonDistance + length(position))
 				// .scale(vec3(size.y/size.x, 1, -1))
 				;
 		// Computes view transform
 		mat4 view;
-		const bool orbital = true; // To view objects
+		/*const bool orbital = false; // To view objects
 		if(orbital) {
 			view
 					//.scale(1.f/scene.radius) // Fits scene (isometric approximation) radius=1
 					.translate(vec3(0,0,-viewDistance)); // Steps back
-		}
+		}*/
 		view
 				.rotateX(rotation.y) // Pitch
 				.rotateZ(rotation.x) // Yaw
-				.translate(vec3(0,0, -viewHeight)) // Altitude
+				.translate(-position) // Position
 				;
 		// Object-space lighting
 		vec3 lightDirection = normalize(light.toWorld().normalMatrix()*vec3(0,0,-1));
@@ -465,7 +504,7 @@ struct View : Widget {
                                   userErrors ? move(userErrors) :
                                                ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(indices.size()/3)+" faces\n"_)
 				.render(int2(position+int2(16)));*/
-		//window.render(); //keep updating to get maximum performance profile
+		if(step()) window.render();
 		return nullptr;
 	}
 } app;
