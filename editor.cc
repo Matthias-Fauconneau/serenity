@@ -38,10 +38,10 @@ struct Surface {
 
 	/// Creates a new face using existing vertices when possible
 	/// \note Vertex normals are mean of adjacent face normals
-	template<uint N> void face(const Vertex (&polygon)[N]) {
-		static_assert(N>=3,"");
-		uint indices[N];
-		for(uint i: range(N)) { // Lookups each vertex
+	void face(const ref<Vertex> polygon) {
+		assert(polygon.size>=3);
+		uint indices[polygon.size];
+		for(uint i: range(polygon.size)) { // Lookups each vertex
 			const Vertex& o = polygon[i];
 
 			// Computes scene bounds in world space to fit view
@@ -83,7 +83,7 @@ struct Surface {
 		// Appends polygon indices
 		uint a = indices[0];
 		uint b = indices[1];
-		for(size_t i: range(2,N)) { // Tesselates convex polygons as fans // TODO: triangle strips with broad triangle optimization
+		for(size_t i: range(2, polygon.size)) { // Tesselates convex polygons as fans // TODO: triangle strips with broad triangle optimization
 			//if(this->indices.size()==this->indices.capacity()) this->indices.reserve(2*this->indices.size()); // Amortized allocation is now already default dynamic array allocation policy
 			uint c = indices[i];
 			this->indices.append( a );
@@ -96,11 +96,12 @@ struct Surface {
 	/// Creates a new face using existing vertices when possible
 	/// \note Vertex normals are average of adjacent face normals
 	// (vec3[] positions, color) overload
-	template<uint N> void face(const vec3 (&polygon)[N], vec3 color) {
+	void face(ref<vec3> polygon, vec3 color) {
 		vec3 a = polygon[0];
 		vec3 b = polygon[1];
-		Vertex vertices[N]={{a,color,0},{b,color,0}};
-		for(uint i: range(2,N)) { // Fan
+		buffer<Vertex> vertices (polygon.size);
+		vertices[0]={a,color,0}, vertices[1]={b,color,0};
+		for(uint i: range(2,polygon.size)) { // Fan
 			vec3 c = polygon[i];
 			vec3 surface = cross(b-a, c-a); // Weights contribution to vertex normal by face area
 			vertices[i-2].normal += surface;
@@ -110,6 +111,7 @@ struct Surface {
 		}
 		face(vertices);
 	}
+	template<uint N> void face(const vec3 (&polygon)[N], vec3 color) { face(ref<vec3>(polygon), color); }
 };
 
 struct Terrain : virtual Surface {
@@ -144,25 +146,23 @@ struct Terrain : virtual Surface {
 struct Tree : virtual Surface {
 	const float heightM = 60; // 20-60
 	const float meter = 1/heightM; // Fits scene to unit
-	const float viewDistance= 10*meter, viewHeight = 3*meter;
+	const float viewDistance= 6*meter, viewHeight = 2*meter;
 	Random random;
-	const bgr3f barkColor = white;
+	const bgr3f trunkColor = vec3(14./16., 13./16, 12./16);
+	const bgr3f branchColor = vec3(15./16, 16./16., 14./16); //vec3(1./2, 1./3, 0);
 
-	void internode(vec4 A, vec4 B) {
-		vec3 a = A.xyz(), b = B.xyz();
-		float rA = A.w, rB = B.w;
-		vec3 z = normalize(b-a);
-		vec3 x = cross(z, vec3(0,1,0)); x = normalize(length(x)?x:cross(z,vec3(0,0,1)));
-		vec3 y = normalize(cross(z, x));
-		const int angleSteps = clip(2, int(4*ceil(max(rA, rB)/meter)), 16);
+	void internode(vec3 a, vec3 b, float rA, float rB, vec3 zA, vec3 zB, vec3 color) {
+		vec3 xA = cross(zA, vec3(0,1,0)); xA = normalize(length(xA)?xA:cross(zA,vec3(0,0,1))); vec3 yA = normalize(cross(zA, xA));
+		vec3 xB = cross(zB, vec3(0,1,0)); xB = normalize(length(xB)?xB:cross(zB,vec3(0,0,1))); vec3 yB = normalize(cross(zB, xB));
+		const int angleSteps = clip(2, int(8*ceil(max(rA, rB)/meter)), 16);
 		for(int i: range(angleSteps)) {
 			float a0 = 2*PI*i/angleSteps, a1=2*PI*(i+1)/angleSteps;
 			face((vec3[]){
-					 a + rA*cos(a0)*x + rA*sin(a0)*y,
-					 a + rA*cos(a1)*x + rA*sin(a1)*y,
-					 b + rB*cos(a1)*x + rB*sin(a1)*y,
-					 b + rB*cos(a0)*x + rB*sin(a0)*y
-				 }, barkColor);
+					 a + rA*cos(a0)*xA + rA*sin(a0)*yA,
+					 a + rA*cos(a1)*xA + rA*sin(a1)*yA,
+					 b + rB*cos(a1)*xB + rB*sin(a1)*yB,
+					 b + rB*cos(a0)*xB + rB*sin(a0)*yB
+				 }, color);
 		}
 	}
 
@@ -173,7 +173,8 @@ struct Tree : virtual Surface {
 		int order;
 		float axisLength;
 		bool bud;
-		Node(vec3 axis, float length, float baseRadius, float endRadius, int order, float axisLength=0) : axis(axis), length(length), baseRadius(baseRadius), endRadius(endRadius), order(order), axisLength(axisLength), bud(true) {}
+		vec3 nextAxis;
+		Node(vec3 axis, float length, float baseRadius, float endRadius, int order, float axisLength=0) : axis(axis), length(length), baseRadius(baseRadius), endRadius(endRadius), order(order), axisLength(axisLength), bud(true), nextAxis(axis) {}
 		array<unique<Node>> branches;
 
 		void grow(Random& random, float meter,  int year, vec3 origin=vec3(0)) {
@@ -198,8 +199,8 @@ struct Tree : virtual Surface {
 					vec3 main = normalize(sin(xAngle)*x + sin(yAngle)*y + cos(xAngle)*cos(yAngle)*z);
 					branches.append(main, length*(1-1./4), endRadius, endRadius*(1-1./4), order, axisLength+length);
 				}
-				if(order<=1) {// -- Whorl
-					const int branchCount = order==0 ? 5+random%(11-5) :  2+random%(5-2);
+				if(order<=0 && year<6) {// -- Whorl
+					const int branchCount = order==0 ? 7+random%(11-7) :  2+random%(5-2);
 					float phase = 2*PI*random();
 					for(int i: range(branchCount)) {
 						float angle = phase + 2*PI*i/branchCount + (2*PI*random() / branchCount);
@@ -207,24 +208,38 @@ struct Tree : virtual Surface {
 						float length = this->length/2;
 						vec3 shootAxis = sin(zAngle)*(cos(angle)*x + sin(angle)*y) + cos(zAngle)*z;
 						shootAxis = normalize(shootAxis-vec3(0,0,1+length/meter)); // Weight
-						branches.append(shootAxis, endRadius+length, endRadius/2, (endRadius*(1-1./4))/2, order+1);
+						branches.append(shootAxis, endRadius+length, endRadius/2 + min(baseRadius, 1.f/10*meter), (endRadius*(1-1./4))/2 + min(baseRadius, 1.f/10*meter), order+1);
 					}
 				}
 			}
 			bud = false;
-			endRadius = bud ? min(baseRadius/2, 1.f/100*meter) : baseRadius*(1-1./4);
+			nextAxis = branches ? branches[0]->axis : axis; // First is main axis
+			endRadius = branches ?  branches[0]->baseRadius : min(baseRadius/2, 1.f/10*meter) ;
 		};
 	};
 
 	void geometry(const Node& node, vec3 origin=vec3(0)) {
 		vec3 end = origin+node.length*node.axis;
-		internode(vec4(origin, node.baseRadius), vec4(end,node.endRadius));
-		for(auto& branch: node.branches) geometry(branch, end);
+		internode(origin, end, node.baseRadius, node.endRadius, node.axis, node.nextAxis, node.order ? branchColor : trunkColor);
+		if(node.branches) for(auto& branch: node.branches) geometry(branch, end);
+		else { // Cap
+			vec3 b = end;
+			vec3 zB = node.axis;
+			vec3 xB = cross(zB, vec3(0,1,0)); xB = normalize(length(xB)?xB:cross(zB,vec3(0,0,1))); vec3 yB = normalize(cross(zB, xB));
+			float rA = node.baseRadius, rB = node.endRadius;
+			const int angleSteps = clip(2, int(8*ceil(max(rA, rB)/meter)), 16);
+			array<vec3> face;
+			for(int i: range(angleSteps)) {
+				float a = 2*PI*i/angleSteps;
+				face.append( b + rB*cos(a)*xB + rB*sin(a)*yB );
+			}
+			this->face(face, node.order ? branchColor : trunkColor);
+		}
 	};
 
 	Tree() {
 		assert_(meter);
-		Node root (vec3(0,0,1), 1*meter, 1.f/10*meter, 1.f/10*meter*(1-1./4), 0, 0); // Trunk axis root
+		Node root (vec3(0,0,1), 1*meter, 2.f/10*meter, 2.f/10*meter*(1-1./4), 0, 0); // Trunk axis root
 		const int age = 8; // 3 - 20 y
 		for(int year: range(age)) root.grow(random, meter, year);
 		geometry(root);
