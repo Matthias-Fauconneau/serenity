@@ -114,50 +114,53 @@ struct Surface {
 	template<uint N> void face(const vec3 (&polygon)[N], vec3 color) { face(ref<vec3>(polygon), color); }
 };
 
-struct Terrain : virtual Surface {
-	static constexpr float viewHeightM = 16; // m
-	static constexpr float earthRadiusM = 6.4e6; // m
-	const float horizonDistanceM = sqrt(2*earthRadiusM*viewHeightM);
-	const float meter = 1/horizonDistanceM; // Fits scene to unit
-	const float viewHeight = viewHeightM*meter;
-	const float elevationDeviation = 50*meter;
+static float lerp(float a, float b, float t) { return (1-t)*a + t*b; }
+static float bilinear(float* image, uint width, uint height, vec2 uv) {
+	uv *= vec2(width-1, height-1);
+	int2 i = int2(uv);
+	vec2 f = uv-floor(uv);
+	return lerp(
+				lerp( image[(i.y+0)*width+i.x], image[(i.y+0)*width+i.x+1], f.x),
+				lerp( image[(i.y+1)*width+i.x], image[(i.y+1)*width+i.x+1], f.x), f.y);
+};
 
-	Terrain() {
-		const bgr3f groundColor = white;
+struct Terrain {
+	static constexpr int N = 16; // Terrain grid resolution (TODO: triangle mesh)
+	float altitudeSamples[(N+1)*(N+1)];
 
-		Random random;
-		const int N = 256; // Terrain grid resolution (TODO: triangle mesh)
-		float altitude[(N+1)*(N+1)];
-		for(int y: range(N+1)) for(int x: range(N+1)) altitude[y*(N+1)+x] = elevationDeviation * (random()*2-1); // Uniform random altitude
+	Terrain(float meter, Surface& surface, Random& random) {
+		const float elevationDeviation = 1*meter;
+		const bgr3f groundColor = vec3(14./16, 14./16., 13./16);
+
+		for(int y: range(N+1)) for(int x: range(N+1)) altitudeSamples[y*(N+1)+x] = elevationDeviation * (random()*2-1); // Uniform random altitude
 
 		// Terrain surface
 		for(int y: range(N)) for(int x: range(N)) {
 			vec2 min = vec2(-1 + 2.f*x/N, -1 + 2.f*y/N);
 			vec2 max = vec2(-1 + 2.f*(x+1)/N, -1 + 2.f*(y+1)/N);
-			face((vec3[]){
-					 vec3(min.x, min.y, altitude[(y+0)*(N+1)+(x+0)]),
-					 vec3(max.x, min.y, altitude[(y+0)*(N+1)+(x+1)]),
-					 vec3(max.x, max.y, altitude[(y+1)*(N+1)+(x+1)]),
-					 vec3(min.x, max.y, altitude[(y+1)*(N+1)+(x+0)]) }, groundColor);
+			if(1) surface.face((vec3[]){
+					 vec3(min.x, min.y, altitudeSamples[(y+0)*(N+1)+(x+0)]),
+					 vec3(max.x, min.y, altitudeSamples[(y+0)*(N+1)+(x+1)]),
+					 vec3(max.x, max.y, altitudeSamples[(y+1)*(N+1)+(x+1)]),
+					 vec3(min.x, max.y, altitudeSamples[(y+1)*(N+1)+(x+0)]) }, groundColor);
 		}
 	}
+
+	float altitude(vec2 world) { return bilinear(altitudeSamples, N+1, N+1, (world+vec2(1.f))/2.f); };
 };
 
-struct Tree : virtual Surface {
-	const float heightM = 60; // 20-60
-	const float meter = 1/heightM; // Fits scene to unit
-	const float viewDistance= 6*meter, viewHeight = 2*meter;
-	Random random;
+struct Tree {
+	const float meter;
 	const bgr3f trunkColor = vec3(14./16., 13./16, 12./16);
 	const bgr3f branchColor = vec3(15./16, 16./16., 14./16); //vec3(1./2, 1./3, 0);
 
-	void internode(vec3 a, vec3 b, float rA, float rB, vec3 zA, vec3 zB, vec3 color) {
+	void internode(Surface& surface, vec3 a, vec3 b, float rA, float rB, vec3 zA, vec3 zB, vec3 color) {
 		vec3 xA = cross(zA, vec3(0,1,0)); xA = normalize(length(xA)?xA:cross(zA,vec3(0,0,1))); vec3 yA = normalize(cross(zA, xA));
 		vec3 xB = cross(zB, vec3(0,1,0)); xB = normalize(length(xB)?xB:cross(zB,vec3(0,0,1))); vec3 yB = normalize(cross(zB, xB));
 		const int angleSteps = clip(2, int(8*ceil(max(rA, rB)/meter)), 16);
 		for(int i: range(angleSteps)) {
 			float a0 = 2*PI*i/angleSteps, a1=2*PI*(i+1)/angleSteps;
-			face((vec3[]){
+			surface.face((vec3[]){
 					 a + rA*cos(a0)*xA + rA*sin(a0)*yA,
 					 a + rA*cos(a1)*xA + rA*sin(a1)*yA,
 					 b + rB*cos(a1)*xB + rB*sin(a1)*yB,
@@ -218,10 +221,10 @@ struct Tree : virtual Surface {
 		};
 	};
 
-	void geometry(const Node& node, vec3 origin=vec3(0)) {
+	void geometry(Surface& surface, const Node& node, vec3 origin=vec3(0)) {
 		vec3 end = origin+node.length*node.axis;
-		internode(origin, end, node.baseRadius, node.endRadius, node.axis, node.nextAxis, node.order ? branchColor : trunkColor);
-		if(node.branches) for(auto& branch: node.branches) geometry(branch, end);
+		internode(surface, origin, end, node.baseRadius, node.endRadius, node.axis, node.nextAxis, node.order ? branchColor : trunkColor);
+		if(node.branches) for(auto& branch: node.branches) geometry(surface, branch, end);
 		else { // Cap
 			vec3 b = end;
 			vec3 zB = node.axis;
@@ -233,16 +236,15 @@ struct Tree : virtual Surface {
 				float a = 2*PI*i/angleSteps;
 				face.append( b + rB*cos(a)*xB + rB*sin(a)*yB );
 			}
-			this->face(face, node.order ? branchColor : trunkColor);
+			surface.face(face, node.order ? branchColor : trunkColor);
 		}
 	};
 
-	Tree() {
-		assert_(meter);
+	Tree(float meter, Surface& surface, vec3 rootOrigin, Random& random) : meter(meter) {
 		Node root (vec3(0,0,1), 1*meter, 2.f/10*meter, 2.f/10*meter*(1-1./4), 0, 0); // Trunk axis root
 		const int age = 8; // 3 - 20 y
 		for(int year: range(age)) root.grow(random, meter, year);
-		geometry(root);
+		geometry(surface, root, rootOrigin); // TODO: independent object
 	}
 };
 
@@ -254,7 +256,7 @@ struct View : Widget {
 	struct Surface : virtual ::Surface {
 		GLVertexBuffer vertexBuffer;
 		GLIndexBuffer indexBuffer;
-		Surface() {
+		void upload() {
 			assert_(vertices && indices);
 			// Normalizes normals
 			for(Vertex& vertex: vertices) vertex.normal = normalize(vertex.normal);
@@ -262,8 +264,7 @@ struct View : Widget {
 			vertexBuffer.upload(vertices);
 			indexBuffer.upload(indices);
 		}
-	};
-	struct : Tree, Surface {} scene;
+	} scene;
 	GLShader diffuse {shader(), {"transform normal color diffuse light"}};
 	// Light
 	struct Light {
@@ -337,6 +338,26 @@ struct View : Widget {
 	// Profile
 	//int64 lastFrameEnd = realTime(), frameInterval = 20000000/*ns*/;
 
+	static constexpr float viewHeightM = 5; // m
+	static constexpr float earthRadiusM = 6.4e6; // m
+	const float horizonDistanceM = sqrt(2*earthRadiusM*viewHeightM) / 100; //FIXME
+	const float meter = 1/horizonDistanceM; // Fits scene to unit
+	const float viewDistance = 30*meter;
+	float viewHeight;
+
+	View() {
+		Random random; random.seed();
+		Terrain terrain (meter, scene, random);
+		viewHeight = terrain.altitude(0) + viewHeightM*meter;
+		const int treeCount = 3*3;
+		for(int unused i: range(treeCount)) {
+			const float radius = 1./2;
+			vec2 p = vec2(random()*2-1, random()*2-1)*radius;
+			Tree(meter, scene, vec3(p, terrain.altitude(p)), random);
+		}
+		scene.upload();
+	}
+
 	// Orbital ("turntable") view control
 	bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override {
 		 vec2 delta = cursor-lastPos; lastPos=cursor;
@@ -357,7 +378,7 @@ struct View : Widget {
 
 		// Computes projection transform
 		mat4 projection = mat4()
-				.perspective(PI/4, size, scene.meter, 4)
+				.perspective(PI/4, size, meter, 4)
 				// .scale(vec3(size.y/size.x, 1, -1))
 				;
 		// Computes view transform
@@ -366,12 +387,12 @@ struct View : Widget {
 		if(orbital) {
 			view
 					//.scale(1.f/scene.radius) // Fits scene (isometric approximation) radius=1
-					.translate(vec3(0,0,-scene.viewDistance)); // Steps back
+					.translate(vec3(0,0,-viewDistance)); // Steps back
 		}
 		view
 				.rotateX(rotation.y) // Pitch
 				.rotateZ(rotation.x) // Yaw
-				.translate(vec3(0,0, -scene.viewHeight)) // Altitude
+				.translate(vec3(0,0, -viewHeight)) // Altitude
 				;
 		// World-space lighting
 		vec3 lightDirection = normalize(light.toWorld().normalMatrix()*vec3(0,0,-1));
@@ -389,10 +410,10 @@ struct View : Widget {
 		scene.indexBuffer.draw();
 
 		//TODO: fog
-		//sky["inverseViewProjectionMatrix"] = mat4(((mat3)view).transpose()) * projection.inverse();
+		sky["inverseViewProjectionMatrix"] = mat4(((mat3)view).transpose()) * projection.inverse();
 		//sky["lightDirection"] = normalize(view.normalMatrix() * lightDirection);
-		//sky["skybox"] = 0; skybox.bind(0);
-		//render.draw(sky);
+		sky["skybox"] = 0; skybox.bind(0);
+		render.draw(sky);
 
 		/*GLTexture color(width,height,GLTexture::RGB16F);
 		frameBuffer.blit(color);
