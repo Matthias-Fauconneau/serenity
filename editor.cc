@@ -16,23 +16,9 @@ String str(const Vertex& o) { return str(o.position); }
 struct Surface {
 	array<Vertex> vertices;
 	array<uint> indices;
+};
 
-	/// Space partionning for faster vertex index lookups
-	const int3 gridSize = 0;
-	buffer<array<uint>> grid {size_t(gridSize.z*gridSize.y*gridSize.x?:1)};
-	vec3 gridMin = 0, gridMax = 0; // Grid bounds
-	array<uint>& cell(vec3 p) {
-		if(!gridSize) return grid[0];
-		assert(p>=gridMin && p<=gridMax, gridMin, p, gridMax);
-		int3 indices = int3(vec3(gridSize-int3(1)) * (p-gridMin) / (gridMax-gridMin)); // Assigns vertices on maximum limit to last cell
-		size_t index = indices.z*gridSize.y*gridSize.x + indices.y*gridSize.x + indices.x;
-		assert_(index < grid.size, p, gridMin, gridMax);
-		return grid[index];
-	}
-
-	Surface() { grid.clear(); }
-	Surface(int3 gridSize, vec3 gridMin, vec3 gridMax) : gridSize(gridSize), gridMin(gridMin), gridMax(gridMax) { grid.clear(); }
-
+struct AutoSurface : Surface {
 	/// Creates a new face using existing vertices when possible
 	/// \note Vertex normals are mean of adjacent face normals
 	void face(const ref<Vertex> polygon) {
@@ -42,8 +28,7 @@ struct Surface {
 			const Vertex& o = polygon[i];
 
 			float minDistance=0; uint minIndex = -1;
-			array<uint>& cell = this->cell(o.position);
-			for(uint index: cell) {
+			for(uint index: range(vertices.size)) {
 				Vertex& v = vertices[index];
 
 				if(v.color!=o.color) continue;
@@ -61,7 +46,6 @@ struct Surface {
 				//if(vertices.size()==vertices.capacity()) vertices.reserve(2*vertices.size()); // Amortized allocation is now already default dynamic array allocation policy
 				uint index = vertices.size;
 				vertices.append( o );
-				cell.append( index );
 				indices[i] = index;
 			}
 		}
@@ -99,59 +83,78 @@ struct Surface {
 	template<uint N> void face(const vec3 (&polygon)[N], vec3 color) { face(ref<vec3>(polygon), color); }
 };
 
-static float triangle(float* image, uint width, uint height, vec2 v) {
-	assert_(v.x >= 0 && v.x <= 1 && v.y >=0 && v.y <= 1, v);
-	vec2 uv = v * vec2(width-1, height-1);
+static float triangle(ref<Vertex> vertices, int width, int height, const vec2 v) {
+	static float dx = 30.f;
+	vec2 uv = (v/dx)+vec2(width/2, height/2);
 	int2 i = int2(uv);
+	assert_(i.x >= 0 && i.x+1 < width && i.y >=0 && i.y+1 < height, v, uv, i, width, height, v/dx);
 	vec2 f = uv-floor(uv);
 	if(f.x < f.y) {
-		vec3 v0 = vec3(0, 0, image[(i.y+0)*width+i.x]);
-		vec3 v1 = vec3(1, 0, image[(i.y+0)*width+i.x+1]);
-		vec3 v2 = vec3(1, 1, image[(i.y+1)*width+i.x+1]);
+		vec3 v0 = vertices[(i.y+0)*width+i.x].position;
+		vec3 v1 = vertices[(i.y+0)*width+i.x+1].position;
+		vec3 v2 = vertices[(i.y+1)*width+i.x+1].position;
 		return v0.z + dot(v-v0.xy(), v1.xy()-v0.xy())/sq(v1.xy()-v0.xy())*(v1.z-v0.z) + dot(v-v0.xy(), v2.xy()-v0.xy())/sq(v2.xy()-v0.xy())*(v2.z-v0.z);
 	} else {
-		vec3 v0 = vec3(0, 0, image[(i.y+0)*width+i.x]);
-		vec3 v1 = vec3(0, 1, image[(i.y+1)*width+i.x+0]);
-		vec3 v2 = vec3(1, 1, image[(i.y+1)*width+i.x+1]);
+		vec3 v0 = vertices[(i.y+0)*width+i.x].position;
+		vec3 v1 = vertices[(i.y+1)*width+i.x+0].position;
+		vec3 v2 = vertices[(i.y+1)*width+i.x+1].position;
 		return v0.z + dot(v-v0.xy(), v1.xy()-v0.xy())/sq(v1.xy()-v0.xy())*(v1.z-v0.z) + dot(v-v0.xy(), v2.xy()-v0.xy())/sq(v2.xy()-v0.xy())*(v2.z-v0.z);
 	}
 };
 
-const float horizonDistance = 256;
+static constexpr int N = 256; // Terrain grid resolution (TODO: irregular triangle mesh)
+const float horizonDistance = (N/2-1) * 30;
 
 struct Terrain {
-	const float elevationDeviation = 10;
-	static constexpr int N = 255; // Terrain grid resolution (TODO: triangle mesh)
-	float elevationGrid[(N+1)*(N+1)];
-	Surface surface;
+	static constexpr int D = 1; // Downsample
+	buffer<Vertex> vertices {N*N};
+	buffer<uint> indices {((N-1)/D)*((N-1)/D)*6};
+	vec3 max = 0;
 
-	Terrain() : surface(int3(int2(64),1), vec3(vec2(-horizonDistance), 0), vec3(vec2(horizonDistance), elevationDeviation)) {
+	Terrain() {
 		const bgr3f groundColor = vec3(3./16, 3./16., 0./16);
 
-		Tiff16 tiff(readFile("srtm_12_03.tif"));
-		uint16 elevation[N*N];
-		tiff.read(elevation, 0,0, N+1, N+1, N+1);
-		for(int y: range(N+1)) for(int x: range(N+1)) elevationGrid[y*(N+1)+x] = elevation[y*(N+1)+x];
+		Map map("srtm_12_03.tif");
+		Image16 elevation = parseTIFF(map);
+		//assert_(elevation.width == elevation.stride && elevation.width == N+1 && elevation.height == N+1, elevation.width, elevation.height, elevation.stride);
+		const float dx = 30;
+		for(int y: range(N)) for(int x: range(N)) {
+			int16 v = elevation.data[y*elevation.stride+x];
+			vertices[y*N+x] = {vec3(vec2(x - N/2, y - N/2)*dx, (v>0?v:0)), groundColor, vec3(0)};
+			if(y<N-1 && x<N-1 && vertices[y*N+x].position.z > max.z) max = vertices[y*N+x].position;
+		}
+		for(int y: range(1,N-1)) for(int x: range(1,N-1)) { // Computes normal from 4 neighbours
+			float dxZ = vertices[y*N+x+1].position.z - vertices[y*N+x-1].position.z;
+			float dyZ = vertices[(y+1)*N+x].position.z - vertices[(y-1)*N+x].position.z;
+			vertices[y*N+x].normal = normalize(vec3(-dxZ, -dyZ, dx));
+		}
 
 		// Terrain surface
-		for(int y: range(N)) for(int x: range(N)) {
-			vec2 min = vec2(-1 + 2.f*x/N, -1 + 2.f*y/N) * horizonDistance;
-			vec2 max = vec2(-1 + 2.f*(x+1)/N, -1 + 2.f*(y+1)/N)  * horizonDistance;
-			surface.face((vec3[]){
-					 vec3(min.x, min.y, elevationGrid[(y+0)*(N+1)+(x+0)]),
-					 vec3(max.x, min.y, elevationGrid[(y+0)*(N+1)+(x+1)]),
-					 vec3(max.x, max.y, elevationGrid[(y+1)*(N+1)+(x+1)]),
-					 vec3(min.x, max.y, elevationGrid[(y+1)*(N+1)+(x+0)]) }, groundColor);
+		/*for(int y: range(N-1)) for(int x: range(N-1)) {
+			indices[y*(N-1)*6+x*6+0] = y*N+x;
+			indices[y*(N-1)*6+x*6+1] = y*N+x+1;
+			indices[y*(N-1)*6+x*6+2] = (y+1)*N+x+1;
+			indices[y*(N-1)*6+x*6+3] = (y+1)*N+x+1;
+			indices[y*(N-1)*6+x*6+4] = (y+1)*N+x;
+			indices[y*(N-1)*6+x*6+5] = y*N+x;
+		}*/
+		for(int y: range((N-1)/D)) for(int x: range((N-1)/D)) {
+			indices[y*((N-1)/D)*6+x*6+0] = (y*D)*N+x*D;
+			indices[y*((N-1)/D)*6+x*6+1] = (y*D)*N+(x+1)*D;
+			indices[y*((N-1)/D)*6+x*6+2] = ((y+1)*D)*N+(x+1)*D;
+			indices[y*((N-1)/D)*6+x*6+3] = ((y+1)*D)*N+(x+1)*D;
+			indices[y*((N-1)/D)*6+x*6+4] = ((y+1)*D)*N+x*D;
+			indices[y*((N-1)/D)*6+x*6+5] = (y*D)*N+x*D;
 		}
 	}
 
-	float elevation(vec2 world) { return triangle(elevationGrid, N+1, N+1, (world/horizonDistance+vec2(1.f))/2.f); };
+	float elevation(vec2 world) { return triangle(vertices, N, N, world); };
 };
 
 struct Tree {
 	const bgr3f trunkColor = vec3(6./16., 4./16, 0./16);
 	const bgr3f branchColor = vec3(2./16, 6./16., 0./16); //vec3(1./2, 1./3, 0);
-	Surface surface;
+	AutoSurface surface;
 
 	void internode(vec3 a, vec3 b, float rA, float rB, vec3 zA, vec3 zB, vec3 color) {
 		vec3 xA = cross(zA, vec3(0,1,0)); xA = normalize(length(xA)?xA:cross(zA,vec3(0,0,1))); vec3 yA = normalize(cross(zA, xA));
@@ -239,7 +242,7 @@ struct Tree {
 		}*/
 	};
 
-	Tree(Random& random) /*: surface(vec3(-2,-2,-1), vec3(2,2,16))*/ {
+	Tree(Random& random) {
 		Node root (vec3(0,0,1), 1, 2.f/10, 2.f/10*(1-1./4), 0, 0); // Trunk axis root
 		const int age = 8; // 3 - 20 y
 		for(int year: range(age)) root.grow(random, year);
@@ -252,13 +255,12 @@ struct View : Widget {
 	// Creates a window and an associated GL context
 	Window window {this, 512, []{ return "Editor"__; }, true, Image(), true};
 	// ^ GL* constructors rely on a GL context being current ^
-	struct Surface : ::Surface {
+	struct Surface {
+		ref<Vertex> vertices;
 		GLVertexBuffer vertexBuffer;
 		GLIndexBuffer indexBuffer;
-		Surface(::Surface&& surface) : ::Surface(move(surface)) {
+		Surface(ref<Vertex> vertices, ref<uint> indices) : vertices(vertices) {
 			assert_(vertices && indices);
-			// Normalizes normals
-			for(Vertex& vertex: vertices) vertex.normal = normalize(vertex.normal);
 			// Submits geometry
 			vertexBuffer.upload(vertices);
 			indexBuffer.upload(indices);
@@ -267,25 +269,34 @@ struct View : Widget {
 	array<unique<Surface>> surfaces;
 	GLShader diffuse {shader(), {"transform normal color diffuse light shadow"}};
 
+
+	Random random;
+	Terrain terrain;
+	buffer<Tree> treeModels = apply(1, [this](int) { return Tree(random); });
+
+	const float viewDistance = 30;
+	const vec3 origin = vec3(terrain.max.xy(), 0);
+	vec3 position = vec3(origin.xy(), terrain.elevation(origin.xy()) + 5);
+
 	struct Instance {
 		Surface& surface;
 		mat4 transform;
 	};
-
-	Random random;
-	Terrain terrain;
 	array<Instance> evaluateInstances() {
 		array<Instance> instances;
-		instances.append({surfaces.append(unique<Surface>(move(terrain.surface))), mat4()});
-		auto treeModels = apply(1, [this](int) { return unique<Surface>(move(Tree(random).surface)); });
-		const int treeCount = 32*32;
-		for(int unused i: range(treeCount)) {
-			const float radius = horizonDistance;
-			vec2 p = vec2(random()*2-1, random()*2-1)*radius;
+		auto treeSurfaces = apply(treeModels, [](const Tree& tree) { return unique<Surface>(tree.surface.vertices, tree.surface.indices); });
+		const int treeCount = 64*64;
+		uint instanced=0; while(instanced < treeCount) {
+			const float radius = 1000;
+			vec2 p = origin.xy() + vec2(random()*2-1, random()*2-1)*radius;
+			float dx = 30;
+			if(p.x<=-(N-1)/2*dx || p.y<=-(N-1)/2*dx || p.x >= (N-1)/2*dx || p.y >= (N-1)/2*dx) continue;
 			float angle = 2*PI*random();
-			instances.append({treeModels[0], mat4().translate(vec3(p, terrain.elevation(p))).rotateZ(angle)});
+			instances.append({treeSurfaces[0], mat4().translate(vec3(p, terrain.elevation(p))).rotateZ(angle)});
+			instanced++;
 		}
-		surfaces.append(move(treeModels)); // Holds tree models
+		surfaces.append(move(treeSurfaces)); // Holds tree models
+		instances.append({surfaces.append(unique<Surface>(terrain.vertices, terrain.indices)), mat4()});
 		return instances;
 	}
 	array<Instance> instances = evaluateInstances();
@@ -364,8 +375,6 @@ struct View : Widget {
 	// Profile
 	//int64 lastFrameEnd = realTime(), frameInterval = 20000000/*ns*/;
 
-	const float viewDistance = 30;
-	vec3 position = vec3(0, 0, terrain.elevation(0) + 5);
 
 	// Orbital ("turntable") view control
 	bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override {
@@ -380,7 +389,8 @@ struct View : Widget {
 
 	vec3 force = 0; // View coordinate system
 	bool keyPress(Key key, Modifiers) override {
-		if(key==Key('a')) force.x--;
+		if(key==Key('q')) force = 0, speed = 0;
+		else if(key==Key('a')) force.x--;
 		else if(key==Key('w')) force.z--;
 		else if(key==Key('s')) force.z++;
 		else if(key==Key('d')) force.x++;
@@ -403,7 +413,7 @@ struct View : Widget {
 
 	vec3 speed = 0;
 	bool step() { // Assumes 60 Hz (FIXME: handle dropped frames)
-		speed *= 1./2;
+		speed *= 1-1./16;
 		speed += mat4().rotateX(rotation.y).rotateZ(rotation.x).inverse() * force;
 		position += speed;
 		return force || length(speed) > 1./60;

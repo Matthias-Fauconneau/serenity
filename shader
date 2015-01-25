@@ -74,7 +74,7 @@ sky {
  vertex {
   uniform mat4 inverseViewProjectionMatrix;
   attribute vec2 aPosition;
-  gl_Position = vec4(aPosition, 0.999, 1);
+  gl_Position = vec4(aPosition, 0.99999, 1);
   vec4 viewPos = inverseViewProjectionMatrix * vec4(aPosition.xy, 1, 1);
   vTexCoords = viewPos.xyz; //viewPos.w;
  }
