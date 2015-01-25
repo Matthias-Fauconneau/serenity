@@ -55,7 +55,7 @@ shadow {
  }
  fragment {
   uniform sampler2DShadow shadow;
-  light = textureProj(shadow, vec4(shadowPosition.xy, shadowPosition.z -  1./128, shadowPosition.w));
+  light = textureProj(shadow, vec4(shadowPosition.xy, shadowPosition.z - 1./256 /*FIXME*/, shadowPosition.w));
  }
 }
 
@@ -80,7 +80,7 @@ sky {
  }
  fragment {
   uniform samplerCube skybox;
-  color.rgb = vec3(1-vTexCoords.z/2, 1-vTexCoords.z/3, 1);
+  color.rgb = vec3(1-((vTexCoords.z+1)/2)/2, 1-((vTexCoords.z+1)/2)/3, 1);
   //color.rgb = texture(skybox, vTexCoords).rgb;
   //color.rgb = vTexCoords;
  }

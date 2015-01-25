@@ -99,7 +99,7 @@ struct Surface {
 };
 
 static float lerp(float a, float b, float t) { return (1-t)*a + t*b; }
-static float bilinear(float* image, uint width, uint height, vec2 uv) {
+/*static float bilinear(float* image, uint width, uint height, vec2 uv) {
 	assert_(uv.x >= 0 && uv.x <= 1 && uv.y >=0 && uv.y <= 1, uv);
 	uv *= vec2(width-1, height-1);
 	int2 i = int2(uv);
@@ -107,13 +107,30 @@ static float bilinear(float* image, uint width, uint height, vec2 uv) {
 	return lerp(
 				lerp( image[(i.y+0)*width+i.x], image[(i.y+0)*width+i.x+1], f.x),
 				lerp( image[(i.y+1)*width+i.x], image[(i.y+1)*width+i.x+1], f.x), f.y);
+};*/
+static float triangle(float* image, uint width, uint height, vec2 v) {
+	assert_(v.x >= 0 && v.x <= 1 && v.y >=0 && v.y <= 1, v);
+	vec2 uv = v * vec2(width-1, height-1);
+	int2 i = int2(uv);
+	vec2 f = uv-floor(uv);
+	if(f.x < f.y) {
+		vec3 v0 = vec3(0, 0, image[(i.y+0)*width+i.x]);
+		vec3 v1 = vec3(1, 0, image[(i.y+0)*width+i.x+1]);
+		vec3 v2 = vec3(1, 1, image[(i.y+1)*width+i.x+1]);
+		return v0.z + dot(v-v0.xy(), v1.xy()-v0.xy())/sq(v1.xy()-v0.xy())*(v1.z-v0.z) + dot(v-v0.xy(), v2.xy()-v0.xy())/sq(v2.xy()-v0.xy())*(v2.z-v0.z);
+	} else {
+		vec3 v0 = vec3(0, 0, image[(i.y+0)*width+i.x]);
+		vec3 v1 = vec3(0, 1, image[(i.y+1)*width+i.x+0]);
+		vec3 v2 = vec3(1, 1, image[(i.y+1)*width+i.x+1]);
+		return v0.z + dot(v-v0.xy(), v1.xy()-v0.xy())/sq(v1.xy()-v0.xy())*(v1.z-v0.z) + dot(v-v0.xy(), v2.xy()-v0.xy())/sq(v2.xy()-v0.xy())*(v2.z-v0.z);
+	}
 };
 
 vec2 randomNormals[256*256];
-int modulo(int x, int y) { return (x  - x/y*y + y)%y; }
 vec2 random2D(int2 i) {
 	static unused bool init = ({Random random; for(vec2& v: randomNormals) v = normalize(vec2(random()*2-1,random()*2-1)); true; });
-	return randomNormals[modulo(i.y,256)*256+modulo(i.x,256)];
+	assert_(i.x >= 0 && i.y>=0);
+	return randomNormals[(i.y%256)*256+(i.x%256)];
 }
 float perlin2D(vec2 p) {
 	int2 i = int2(p);
@@ -125,38 +142,22 @@ float perlin2D(vec2 p) {
 	vec2 w = f*f*f*(f*(6.f*f-vec2(15.f))+vec2(10.f));
 	return lerp( lerp( v00, v01, w.y ), lerp( v10, v11, w.y ), w.x );
 }
-float ridgedMultifractal(const vec2 p0) {
-	const float H = 1;
-	const float lacunarity = 3;
-	const float gain = 2;
-	float frequency = 1;
-	vec2 p = p0;
-	float offset = 3./4 + perlin2D(p)/2;
-	float signal = sq(offset - abs(perlin2D(p)));
-	float r = signal;
-	for(int unused i : range(1,8)) {
-		p *= lacunarity;
-		signal = clip(0.f, signal*gain, 1.f) * sq(offset - abs(perlin2D(p)));
-		r += signal * pow(frequency, -H);
-		frequency *= lacunarity;
-	}
-	return r; // 0-√2
-}
-const float horizonDistance = 128;
+
+const float horizonDistance = 256;
 
 struct Terrain {
 	const float elevationDeviation = 10;
-	static constexpr int N = 16; // Terrain grid resolution (TODO: triangle mesh)
+	static constexpr int N = 255; // Terrain grid resolution (TODO: triangle mesh)
 	float altitudeSamples[(N+1)*(N+1)];
 	Surface surface;
 
-	Terrain() /*: surface(1, vec3(vec2(-horizonDistance), 0), vec3(vec2(horizonDistance), elevationDeviation))*/ {
+	Terrain() : surface(int3(int2(64),1), vec3(vec2(-horizonDistance), 0), vec3(vec2(horizonDistance), elevationDeviation)) {
 		const bgr3f groundColor = vec3(14./16, 14./16., 13./16);
 
 		for(int y: range(N+1)) for(int x: range(N+1)) {
 			vec2 p = vec2(-1 + 2*float(x)/N, -1 + 2*float(y)/N); // [-1, 1]
 			altitudeSamples[y*(N+1)+x] =
-				elevationDeviation * ( (cos(length(p))-1) + ridgedMultifractal(p) );
+				elevationDeviation * ( 2*(cos(length(p))-1) + perlin2D((p+vec2(1))/2.f*8.f) );
 		}
 
 		// Terrain surface
@@ -171,7 +172,7 @@ struct Terrain {
 		}
 	}
 
-	float altitude(vec2 world) { return bilinear(altitudeSamples, N+1, N+1, (world/horizonDistance+vec2(1.f))/2.f); };
+	float altitude(vec2 world) { return triangle(altitudeSamples, N+1, N+1, (world/horizonDistance+vec2(1.f))/2.f); };
 };
 
 struct Tree {
@@ -182,7 +183,7 @@ struct Tree {
 	void internode(vec3 a, vec3 b, float rA, float rB, vec3 zA, vec3 zB, vec3 color) {
 		vec3 xA = cross(zA, vec3(0,1,0)); xA = normalize(length(xA)?xA:cross(zA,vec3(0,0,1))); vec3 yA = normalize(cross(zA, xA));
 		vec3 xB = cross(zB, vec3(0,1,0)); xB = normalize(length(xB)?xB:cross(zB,vec3(0,0,1))); vec3 yB = normalize(cross(zB, xB));
-		const int angleSteps = clip(2, int(8*ceil(max(rA, rB))), 16);
+		const int angleSteps = 2; //clip(2, int(8*ceil(max(rA, rB))), 16);
 		for(int i: range(angleSteps)) {
 			float a0 = 2*PI*i/angleSteps, a1=2*PI*(i+1)/angleSteps;
 			surface.face((vec3[]){
@@ -250,7 +251,7 @@ struct Tree {
 		vec3 end = origin+node.length*node.axis;
 		internode(origin, end, node.baseRadius, node.endRadius, node.axis, node.nextAxis, node.order ? branchColor : trunkColor);
 		if(node.branches) for(auto& branch: node.branches) geometry(branch, end);
-		else { // Cap
+		/*else { // Cap
 			vec3 b = end;
 			vec3 zB = node.axis;
 			vec3 xB = cross(zB, vec3(0,1,0)); xB = normalize(length(xB)?xB:cross(zB,vec3(0,0,1))); vec3 yB = normalize(cross(zB, xB));
@@ -262,7 +263,7 @@ struct Tree {
 				face.append( b + rB*cos(a)*xB + rB*sin(a)*yB );
 			}
 			surface.face(face, node.order ? branchColor : trunkColor);
-		}
+		}*/
 	};
 
 	Tree(Random& random) /*: surface(vec3(-2,-2,-1), vec3(2,2,16))*/ {
@@ -291,7 +292,7 @@ struct View : Widget {
 		}
 	};
 	array<unique<Surface>> surfaces;
-	GLShader diffuse {shader(), {"transform normal color diffuse light"}};
+	GLShader diffuse {shader(), {"transform normal color diffuse light shadow"}};
 
 	struct Instance {
 		Surface& surface;
@@ -304,7 +305,7 @@ struct View : Widget {
 		array<Instance> instances;
 		instances.append({surfaces.append(unique<Surface>(move(terrain.surface))), mat4()});
 		auto treeModels = apply(1, [this](int) { return unique<Surface>(move(Tree(random).surface)); });
-		const int treeCount = 16*16;
+		const int treeCount = 32*32;
 		for(int unused i: range(treeCount)) {
 			const float radius = horizonDistance;
 			vec2 p = vec2(random()*2-1, random()*2-1)*radius;
@@ -360,13 +361,13 @@ struct View : Widget {
 			return mat4()
 					.rotateX( -pitch );
 		}
-		/*// World to shadow sample coordinates [0,1]³
+		// World to shadow sample coordinates [0,1]³
 		mat4 toShadow() {
 			return mat4()
 					.scale(vec3(1.f/(lightMax-lightMin)))
 					.translate(-lightMin)
 					.rotateX( pitch );
-		}*/
+		}
 	} light {instances};
 	// Sky
 	GLShader sky {shader(), {"sky"}};
@@ -407,21 +408,22 @@ struct View : Widget {
 	vec3 force = 0; // View coordinate system
 	bool keyPress(Key key, Modifiers) override {
 		if(key==Key('a')) force.x--;
-		if(key==Key('w')) force.z--;
-		if(key==Key('s')) force.z++;
-		if(key==Key('d')) force.x++;
-		if(key==Space) force.y++;
-		if(key==ControlKey) force.y--;
+		else if(key==Key('w')) force.z--;
+		else if(key==Key('s')) force.z++;
+		else if(key==Key('d')) force.x++;
+		else if(key==Space) force.y++;
+		else if(key==ControlKey) force.y--;
 		else return false;
 		return true;
 	}
 	bool keyRelease(Key key, Modifiers) override {
-		if(key==Key('a')) force.x++;
-		if(key==Key('w')) force.z++;
-		if(key==Key('s')) force.z--;
-		if(key==Key('d')) force.x--;
-		if(key==Space) force.y--;
-		if(key==ControlKey) force.y++;
+		// FIXME: Missed release
+		if(key==Key('a')) force.x=0;
+		else if(key==Key('w')) force.z=0;
+		else if(key==Key('s')) force.z=0;
+		else if(key==Key('d')) force.x=0;
+		else if(key==Space) force.y=0;
+		else if(key==ControlKey) force.y=0;
 		else return false;
 		return true;
 	}
@@ -441,38 +443,25 @@ struct View : Widget {
 		glDepthTest(true);
 		glCullFace(true);
 
-		// Computes projection transform
-		mat4 projection = mat4()
-				.perspective(PI/4, size, 1, 2*horizonDistance + length(position))
-				// .scale(vec3(size.y/size.x, 1, -1))
-				;
-		// Computes view transform
-		mat4 view;
-		/*const bool orbital = false; // To view objects
-		if(orbital) {
-			view
-					//.scale(1.f/scene.radius) // Fits scene (isometric approximation) radius=1
-					.translate(vec3(0,0,-viewDistance)); // Steps back
-		}*/
-		view
+		// Computes view projection transform
+		mat4 projection = mat4().perspective(PI/4, size, 1, 2*horizonDistance + length(position));
+		mat4 view = mat4()
 				.rotateX(rotation.y) // Pitch
 				.rotateZ(rotation.x) // Yaw
-				.translate(-position) // Position
-				;
+				.translate(-position); // Position
+		mat4 viewProjection = projection*view;
+
 		// Object-space lighting
 		vec3 lightDirection = normalize(light.toWorld().normalMatrix()*vec3(0,0,-1));
-		//vec3 skyLightDirection = vec3(0,0,1);
 
-		mat4 viewProjection = projection*view;
-		//diffuse["shadowTransform"] = light.toShadow();
-		//diffuse["skyLightDirection"] = skyLightDirection;
-		//diffuse["shadow"_] = 0; light.shadow.depthTexture.bind(0);
+		diffuse["shadow"_] = 0; light.shadow.depthTexture.bind(0);
 		diffuse.bind();
 		for(Instance instance: instances) {
 			instance.surface.vertexBuffer.bindAttribute(diffuse, "aPosition"_, 3, offsetof(Vertex, position));
 			instance.surface.vertexBuffer.bindAttribute(diffuse, "aColor"_, 3, offsetof(Vertex, color));
 			instance.surface.vertexBuffer.bindAttribute(diffuse, "aNormal"_, 3, offsetof(Vertex, normal));
 			diffuse["modelViewProjectionTransform"] = viewProjection * instance.transform;
+			diffuse["shadowTransform"] = light.toShadow() * instance.transform;
 			diffuse["lightDirection"] = normalize(instance.transform.inverse().normalMatrix() * lightDirection);
 			instance.surface.indexBuffer.draw();
 		}
