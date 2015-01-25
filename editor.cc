@@ -2,6 +2,7 @@
 #include "matrix.h"
 #include "gl.h"
 #include "time.h"
+#include "tiff.h"
 FILE(shader)
 
 struct Vertex {
@@ -98,16 +99,6 @@ struct Surface {
 	template<uint N> void face(const vec3 (&polygon)[N], vec3 color) { face(ref<vec3>(polygon), color); }
 };
 
-static float lerp(float a, float b, float t) { return (1-t)*a + t*b; }
-/*static float bilinear(float* image, uint width, uint height, vec2 uv) {
-	assert_(uv.x >= 0 && uv.x <= 1 && uv.y >=0 && uv.y <= 1, uv);
-	uv *= vec2(width-1, height-1);
-	int2 i = int2(uv);
-	vec2 f = uv-floor(uv);
-	return lerp(
-				lerp( image[(i.y+0)*width+i.x], image[(i.y+0)*width+i.x+1], f.x),
-				lerp( image[(i.y+1)*width+i.x], image[(i.y+1)*width+i.x+1], f.x), f.y);
-};*/
 static float triangle(float* image, uint width, uint height, vec2 v) {
 	assert_(v.x >= 0 && v.x <= 1 && v.y >=0 && v.y <= 1, v);
 	vec2 uv = v * vec2(width-1, height-1);
@@ -126,58 +117,40 @@ static float triangle(float* image, uint width, uint height, vec2 v) {
 	}
 };
 
-vec2 randomNormals[256*256];
-vec2 random2D(int2 i) {
-	static unused bool init = ({Random random; for(vec2& v: randomNormals) v = normalize(vec2(random()*2-1,random()*2-1)); true; });
-	assert_(i.x >= 0 && i.y>=0);
-	return randomNormals[(i.y%256)*256+(i.x%256)];
-}
-float perlin2D(vec2 p) {
-	int2 i = int2(p);
-	vec2 f = p-floor(p);
-	float v00 = dot(random2D(i+int2(0,0)), f - vec2(0,0));
-	float v01 = dot(random2D(i+int2(0,1)), f - vec2(0,1));
-	float v10 = dot(random2D(i+int2(1,0)), f - vec2(1,0));
-	float v11 = dot(random2D(i+int2(1,1)), f - vec2(1,1));
-	vec2 w = f*f*f*(f*(6.f*f-vec2(15.f))+vec2(10.f));
-	return lerp( lerp( v00, v01, w.y ), lerp( v10, v11, w.y ), w.x );
-}
-
 const float horizonDistance = 256;
 
 struct Terrain {
 	const float elevationDeviation = 10;
 	static constexpr int N = 255; // Terrain grid resolution (TODO: triangle mesh)
-	float altitudeSamples[(N+1)*(N+1)];
+	float elevationGrid[(N+1)*(N+1)];
 	Surface surface;
 
 	Terrain() : surface(int3(int2(64),1), vec3(vec2(-horizonDistance), 0), vec3(vec2(horizonDistance), elevationDeviation)) {
-		const bgr3f groundColor = vec3(14./16, 14./16., 13./16);
+		const bgr3f groundColor = vec3(3./16, 3./16., 0./16);
 
-		for(int y: range(N+1)) for(int x: range(N+1)) {
-			vec2 p = vec2(-1 + 2*float(x)/N, -1 + 2*float(y)/N); // [-1, 1]
-			altitudeSamples[y*(N+1)+x] =
-				elevationDeviation * ( 2*(cos(length(p))-1) + perlin2D((p+vec2(1))/2.f*8.f) );
-		}
+		Tiff16 tiff(readFile("srtm_12_03.tif"));
+		uint16 elevation[N*N];
+		tiff.read(elevation, 0,0, N+1, N+1, N+1);
+		for(int y: range(N+1)) for(int x: range(N+1)) elevationGrid[y*(N+1)+x] = elevation[y*(N+1)+x];
 
 		// Terrain surface
 		for(int y: range(N)) for(int x: range(N)) {
 			vec2 min = vec2(-1 + 2.f*x/N, -1 + 2.f*y/N) * horizonDistance;
 			vec2 max = vec2(-1 + 2.f*(x+1)/N, -1 + 2.f*(y+1)/N)  * horizonDistance;
 			surface.face((vec3[]){
-					 vec3(min.x, min.y, altitudeSamples[(y+0)*(N+1)+(x+0)]),
-					 vec3(max.x, min.y, altitudeSamples[(y+0)*(N+1)+(x+1)]),
-					 vec3(max.x, max.y, altitudeSamples[(y+1)*(N+1)+(x+1)]),
-					 vec3(min.x, max.y, altitudeSamples[(y+1)*(N+1)+(x+0)]) }, groundColor);
+					 vec3(min.x, min.y, elevationGrid[(y+0)*(N+1)+(x+0)]),
+					 vec3(max.x, min.y, elevationGrid[(y+0)*(N+1)+(x+1)]),
+					 vec3(max.x, max.y, elevationGrid[(y+1)*(N+1)+(x+1)]),
+					 vec3(min.x, max.y, elevationGrid[(y+1)*(N+1)+(x+0)]) }, groundColor);
 		}
 	}
 
-	float altitude(vec2 world) { return triangle(altitudeSamples, N+1, N+1, (world/horizonDistance+vec2(1.f))/2.f); };
+	float elevation(vec2 world) { return triangle(elevationGrid, N+1, N+1, (world/horizonDistance+vec2(1.f))/2.f); };
 };
 
 struct Tree {
-	const bgr3f trunkColor = vec3(14./16., 13./16, 12./16);
-	const bgr3f branchColor = vec3(15./16, 16./16., 14./16); //vec3(1./2, 1./3, 0);
+	const bgr3f trunkColor = vec3(6./16., 4./16, 0./16);
+	const bgr3f branchColor = vec3(2./16, 6./16., 0./16); //vec3(1./2, 1./3, 0);
 	Surface surface;
 
 	void internode(vec3 a, vec3 b, float rA, float rB, vec3 zA, vec3 zB, vec3 color) {
@@ -310,7 +283,7 @@ struct View : Widget {
 			const float radius = horizonDistance;
 			vec2 p = vec2(random()*2-1, random()*2-1)*radius;
 			float angle = 2*PI*random();
-			instances.append({treeModels[0], mat4().translate(vec3(p, terrain.altitude(p))).rotateZ(angle)});
+			instances.append({treeModels[0], mat4().translate(vec3(p, terrain.elevation(p))).rotateZ(angle)});
 		}
 		surfaces.append(move(treeModels)); // Holds tree models
 		return instances;
@@ -371,7 +344,7 @@ struct View : Widget {
 	} light {instances};
 	// Sky
 	GLShader sky {shader(), {"sky"}};
-	GLTexture skybox {decodeImage(readFile("skybox.png"_)), SRGB|Bilinear|Cube};
+	//GLTexture skybox {decodeImage(readFile("skybox.png"_)), SRGB|Bilinear|Cube};
 
 	// View
 	vec2 lastPos; // Last cursor position to compute relative mouse movements
@@ -392,7 +365,7 @@ struct View : Widget {
 	//int64 lastFrameEnd = realTime(), frameInterval = 20000000/*ns*/;
 
 	const float viewDistance = 30;
-	vec3 position = vec3(0, 0, terrain.altitude(0) + 5);
+	vec3 position = vec3(0, 0, terrain.elevation(0) + 5);
 
 	// Orbital ("turntable") view control
 	bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override {
