@@ -142,7 +142,7 @@ struct Terrain : virtual Surface {
 };
 
 struct Tree : virtual Surface {
-	const float heightM = 10; // 20-60
+	const float heightM = 60; // 20-60
 	const float meter = 1/heightM; // Fits scene to unit
 	const float viewDistance= 10*meter, viewHeight = 3*meter;
 	Random random;
@@ -154,7 +154,7 @@ struct Tree : virtual Surface {
 		vec3 z = normalize(b-a);
 		vec3 x = cross(z, vec3(0,1,0)); x = normalize(length(x)?x:cross(z,vec3(0,0,1)));
 		vec3 y = normalize(cross(z, x));
-		const int angleSteps = 16;
+		const int angleSteps = clip(2, int(4*ceil(max(rA, rB)/meter)), 16);
 		for(int i: range(angleSteps)) {
 			float a0 = 2*PI*i/angleSteps, a1=2*PI*(i+1)/angleSteps;
 			face((vec3[]){
@@ -170,37 +170,48 @@ struct Tree : virtual Surface {
 		vec3 axis;
 		float length;
 		float baseRadius, endRadius;
-		bool trunk, bud;
-		Node(vec3 axis, float length, float baseRadius, float endRadius, bool trunk, bool bud) : axis(axis), length(length), baseRadius(baseRadius), endRadius(endRadius), trunk(trunk), bud(bud) {}
+		int order;
+		float axisLength;
+		bool bud;
+		Node(vec3 axis, float length, float baseRadius, float endRadius, int order, float axisLength=0) : axis(axis), length(length), baseRadius(baseRadius), endRadius(endRadius), order(order), axisLength(axisLength), bud(true) {}
 		array<unique<Node>> branches;
 
 		void grow(Random& random, float meter,  int year, vec3 origin=vec3(0)) {
+			// Tropism
+			axis = normalize(axis+vec3(0,0,1./(8*(order+1))/*+length/meter*/)); // Weight
 			// Grows
-			const float growthRate = 1+1./16;
+			const float growthRate = 1+1./(16*(year+1)*(order+1));
 			length *= growthRate;
 			baseRadius *= growthRate;
 			vec3 end = origin+length*axis;
 			for(auto& branch: branches) branch->grow(random, meter, year, end);
+			if(order==2 || (order>=1 && axisLength>1*meter)) bud = false;
 			if(bud) { // Shoots new branches
-				// Main axis
-				branches.append(axis, length*(1-1./4), endRadius, endRadius*(1-1./4), true, true);
-				// -- Whorl
-				const int branchCount = trunk ? 8 :  3;
-				// Whorl coordinate system
+				// Coordinate system
 				vec3 z = axis;
 				vec3 x = cross(z, vec3(0,1,0)); x = normalize(::length(x)?x:cross(z,vec3(0,0,1)));
 				vec3 y = normalize(cross(z, x));
-				float phase = 2*PI*random();
-				for(int i: range(branchCount)) {
-					float angle = phase + 2*PI*i/branchCount;
-					float zAngle = PI/4;
-					float length = this->length/2;
-					vec3 shootAxis = sin(zAngle)*(cos(angle)*x + sin(angle)*y) + cos(zAngle)*z;
-					shootAxis = normalize(shootAxis-vec3(0,0,2*length/meter)); // Weight
-					branches.append(shootAxis, endRadius+length, endRadius/2, (endRadius*(1-1./4))/2, false, true);
+				{// Main axis
+					const float gnarl = order==0 ? 1./64 : 1./32;
+					float xAngle = 2*PI*(random()*2-1) * gnarl;
+					float yAngle = 2*PI*(random()*2-1) * gnarl;
+					vec3 main = normalize(sin(xAngle)*x + sin(yAngle)*y + cos(xAngle)*cos(yAngle)*z);
+					branches.append(main, length*(1-1./4), endRadius, endRadius*(1-1./4), order, axisLength+length);
 				}
-				bud = false;
+				if(order<=1) {// -- Whorl
+					const int branchCount = order==0 ? 5+random%(11-5) :  2+random%(5-2);
+					float phase = 2*PI*random();
+					for(int i: range(branchCount)) {
+						float angle = phase + 2*PI*i/branchCount + (2*PI*random() / branchCount);
+						float zAngle = PI / 4 + (2*PI*random() / 16);
+						float length = this->length/2;
+						vec3 shootAxis = sin(zAngle)*(cos(angle)*x + sin(angle)*y) + cos(zAngle)*z;
+						shootAxis = normalize(shootAxis-vec3(0,0,1+length/meter)); // Weight
+						branches.append(shootAxis, endRadius+length, endRadius/2, (endRadius*(1-1./4))/2, order+1);
+					}
+				}
 			}
+			bud = false;
 			endRadius = bud ? min(baseRadius/2, 1.f/100*meter) : baseRadius*(1-1./4);
 		};
 	};
@@ -213,8 +224,8 @@ struct Tree : virtual Surface {
 
 	Tree() {
 		assert_(meter);
-		Node root (vec3(0,0,1), 1*meter, 1.f/10*meter, 1.f/10*meter*(1-1./4), true, true); // Trunk axis root
-		const int age = 3; // 3 - 20 y
+		Node root (vec3(0,0,1), 1*meter, 1.f/10*meter, 1.f/10*meter*(1-1./4), 0, 0); // Trunk axis root
+		const int age = 8; // 3 - 20 y
 		for(int year: range(age)) root.grow(random, meter, year);
 		geometry(root);
 	}
@@ -327,6 +338,7 @@ struct View : Widget {
 		//if(frameBuffer.size != int2(size)) frameBuffer = GLFrameBuffer(int2(size));
 		//frameBuffer.bind(ClearDepth);
 		glDepthTest(true);
+		glCullFace(true);
 
 		// Computes projection transform
 		mat4 projection = mat4()
