@@ -79,10 +79,7 @@ sky {
   vTexCoords = viewPos.xyz; //viewPos.w;
  }
  fragment {
-  uniform samplerCube skybox;
-  color.rgb = vec3(1-((vTexCoords.z+1)/2)/2, 1-((vTexCoords.z+1)/2)/3, 1);
-  //color.rgb = texture(skybox, vTexCoords).rgb;
-  //color.rgb = vTexCoords;
+  color.rgb = vec3(1-abs(vTexCoords.z)/2, 1-abs(vTexCoords.z)/3, 1);
  }
 }
 
