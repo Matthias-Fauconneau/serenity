@@ -99,7 +99,7 @@ struct GLIndexBuffer {
     handle<uint> id = 0;
     uint indexCount=0;
     uint indexSize=0;
-	bool primitiveRestart = false;
+	bool primitiveRestart = primitiveType == TriangleStrip;
 };
 
 enum Format { Depth=1,

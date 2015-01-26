@@ -84,14 +84,29 @@ struct AutoSurface : Surface {
 };
 
 static constexpr int N = 1024; // Terrain grid resolution (TODO: irregular triangle mesh)
+static const float da = 2*PI*3/(60*60*360); // 5°/6000 ~ 3 arcsec ~ 90m
+static const float R = 6.371e6;
+static const float dx = R*da;
 const float horizonDistance = (N/2-1) * 30;
 
 struct Terrain {
+	PrimitiveType primitiveType = TriangleStrip;
 	buffer<Vertex> vertices {N*N, 0};
 	buffer<int> grid {N*N}; // Grid to vertices
 	buffer<uint> indices {(N-1)*(N-1)*6, 0}; // TODO: strip
 	vec3 max = 0;
-	const float dx = 30;
+
+	int last[2] = {-1, -1}; bool even=true;
+	void triangle(int v0, int v1, int v2) {
+		if(last[0]==v0 && last[1]==v1) {
+			/*indices.append(last[0]); indices.append(last[1]);*/ indices.append(v2);
+		} else {
+			even=true;
+			indices.append(-1); indices.append(v0); indices.append(v1); indices.append(v2);
+		}
+		if(even) last[0]=v2, last[1]=v1; else last[0]=v0, last[1]=v2;
+		even=!even;
+	}
 
 	Terrain() {
 		const bgr3f groundColor = white; //vec3(3./16, 6./16., 0./16);
@@ -102,7 +117,8 @@ struct Terrain {
 			int16 z = elevation.data[y*elevation.stride+x];
 			if(z > -32768) {
 				grid[y*N+x] = vertices.size;
-				Vertex v {vec3(vec2(x - N/2, y - N/2)*dx, z), groundColor, vec3(0)};
+				vec2 a = vec2(x - N/2, y - N/2)*da;
+				Vertex v {vec3(R*sin(a.x), R*sin(a.y), (R+z)*cos(a.x)*cos(a.y)), groundColor, vec3(0)};
 				vertices.append(v);
 				if(z > max.z) max = v.position;
 			} else grid[y*N+x] = -1;
@@ -116,15 +132,11 @@ struct Terrain {
 
 		// Terrain surface
 		for(int y: range(N-1)) for(int x: range(N-1)) {
-			if(grid[y*N+x]>=0 && grid[y*N+x+1]>=0 && grid[(y+1)*N+x+1]>=0) {
-				indices.append( grid[y*N+x+1] );
-				indices.append( grid[(y+1)*N+x+1] );
-				indices.append( grid[y*N+x] );
-			}
 			if(grid[(y+1)*N+x+1]>=0 && grid[(y+1)*N+x]>=0 && grid[y*N+x]>=0) {
-				indices.append( grid[y*N+x] );
-				indices.append( grid[(y+1)*N+x+1] );
-				indices.append( grid[(y+1)*N+x] );
+				triangle(grid[(y+1)*N+x], grid[y*N+x], grid[(y+1)*N+x+1]);
+			}
+			if(grid[y*N+x]>=0 && grid[y*N+x+1]>=0 && grid[(y+1)*N+x+1]>=0) {
+				triangle(grid[(y+1)*N+x+1], grid[y*N+x],grid[y*N+x+1]);
 			}
 		}
 	}
@@ -252,7 +264,7 @@ struct View : Widget {
 		ref<Vertex> vertices;
 		GLVertexBuffer vertexBuffer;
 		GLIndexBuffer indexBuffer;
-		Surface(ref<Vertex> vertices, ref<uint> indices) : vertices(vertices) {
+		Surface(PrimitiveType primitiveType, ref<Vertex> vertices, ref<uint> indices) : vertices(vertices), indexBuffer(primitiveType) {
 			assert_(vertices && indices);
 			// Submits geometry
 			vertexBuffer.upload(vertices);
@@ -289,7 +301,7 @@ struct View : Widget {
 			instanced++;
 		}
 		surfaces.append(move(treeSurfaces)); // Holds tree models*/
-		instances.append({surfaces.append(unique<Surface>(terrain.vertices, terrain.indices)), mat4()});
+		instances.append({surfaces.append(unique<Surface>(terrain.primitiveType, terrain.vertices, terrain.indices)), mat4()});
 		return instances;
 	}
 	array<Instance> instances = evaluateInstances();

@@ -261,13 +261,9 @@ void GLIndexBuffer::upload(ref<uint> indices) {
 }
 void GLIndexBuffer::draw(uint start, uint count) const {
     assert(id);
-    if(primitiveRestart) {
-        glEnableClientState(GL_PRIMITIVE_RESTART_NV);
-        glPrimitiveRestartIndex(indexSize==GL_UNSIGNED_SHORT?0xFFFF:0xFFFFFFFF);
-    }
+	if(primitiveRestart) glEnable(GL_PRIMITIVE_RESTART_FIXED_INDEX);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
     glDrawElements(primitiveType, count==uint(-1)?indexCount:count, indexSize, (void*)uint64(start*(indexSize==GL_UNSIGNED_SHORT?2:4)));
-    if(primitiveRestart) glDisableClientState(GL_PRIMITIVE_RESTART_NV);
 }
 
 /// Texture
