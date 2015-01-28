@@ -19,10 +19,12 @@ Image16 parseTIFF(const ref<byte> file) {
 			uint32 lastOffset = offset;
 			for(uint unused i : range(1, entry.count)) {
 				uint32 nextOffset = value.read32();
-				if(!image.stride) image.stride = (nextOffset - lastOffset)/2; //16bit
+				uint32 stride = (nextOffset - lastOffset)/2;
+				//if(!image.stride) image.stride = (nextOffset - lastOffset)/2; //16bit
+				assert_(stride == image.width);
 				break;
-				assert_(nextOffset - lastOffset == image.stride*2, lastOffset, nextOffset, nextOffset-offset, image.stride);
-				lastOffset = nextOffset;
+				//assert_(nextOffset - lastOffset == image.stride*2, lastOffset, nextOffset, nextOffset-offset, image.stride);
+				//lastOffset = nextOffset;
 			}
 			image.data = (int16*)(s.data.data + offset);
 		}

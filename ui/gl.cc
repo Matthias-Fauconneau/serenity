@@ -74,7 +74,7 @@ GLShader::GLShader(string source, ref<string> stages) {
 			array<char> stageGlobal, stageMain;
             TextData s (source);
             array<uint> scope;
-            for(uint nest=0;s;) { //for each line (FIXME: line independent)
+			for(uint nest=0;s;) { // for each line (FIXME: line independent)
                 uint start = s.index;
                 s.whileAny(" \t"_);
                 string identifier = s.identifier("_!"_);
@@ -109,7 +109,11 @@ GLShader::GLShader(string source, ref<string> stages) {
                         else s.advance(1);
                     }
                 }
-				if(identifier=="uniform"_ && s.match("sampler2D "_)) s.whileAny(" \t"_), sampler2D.append( copyRef(s.identifier("_"_)) );
+				/*if(identifier=="uniform"_ && s.match("sampler"_)) {
+					if(!s.match("2D") && !s.match("Buffer")) error("Unknown sampler type", s.line());
+					s.whileAny(" \t"_);
+					sampler2D.append( copyRef(s.identifier("_"_)) );
+				}*/
                 while(s && !s.match('\n')) {
                     if(s.match('{')) nest++;
                     else if(s.match('}')) { nest--;
@@ -120,7 +124,7 @@ GLShader::GLShader(string source, ref<string> stages) {
                     else s.advance(1);
                 }
                 string line = s.slice(start, s.index-start);
-				if(trim(line)) ((function || qualifiers.contains(identifier) || startsWith(line,"#"_)) ? stageGlobal : stageMain).append( line );
+				if(trim(line) && !startsWith(trim(line), "//"_)) ((function || qualifiers.contains(identifier) || startsWith(line,"#"_)) ? stageGlobal : stageMain).append( line );
             }
 			global.append( replace(stageGlobal,"$"_,str(i-1)) );
 			main.append( replace(stageMain,"$"_,str(i-1)) );
@@ -162,108 +166,38 @@ uint GLShader::attribLocation(string name) {
     return (uint)location;
 }
 
-/// Uniform buffer
+/// Buffer
 
-GLUniformBuffer::~GLUniformBuffer() { if(id) glDeleteBuffers(1,&id); }
-void GLUniformBuffer::upload(ref<byte> data) {
-    assert(data);
-    if(!id) glGenBuffers(1, &id);
-    glBindBuffer(GL_UNIFORM_BUFFER, id);
-    glBufferData(GL_UNIFORM_BUFFER, data.size, data.data, GL_STATIC_DRAW);
-    size=data.size;
+GLBuffer::GLBuffer(uint elementSize, ref<byte> data, uint target) : elementSize(elementSize), elementCount(data.size/elementSize) {
+	glGenBuffers(1, &id);
+	glBindBuffer(target, id);
+	glBufferData(target, data.size, data.data, GL_STATIC_DRAW);
 }
-void GLUniformBuffer::bind(GLShader& program, string name) const {
-    assert(id);
-    int location = glGetUniformBlockIndex(program.id, strz(name));
-    assert(location>=0, name);
-    int size=0; glGetActiveUniformBlockiv(program.id, location, GL_UNIFORM_BLOCK_DATA_SIZE, &size);
-    assert(size == this->size, size, this->size);
-    glUniformBlockBinding(program.id, location, 0);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, id);
-}
+GLBuffer::~GLBuffer() { if(id) glDeleteBuffers(1, &id); }
+//void GLBuffer::bind() const { glBindBuffer(GL_ARRAY_BUFFER, id); }
 
-/// Vertex buffer
+/// Vertex array
 
-GLVertexBuffer::GLVertexBuffer() {
-	glGenVertexArrays(1, &array);
-	glGenBuffers(1, &buffer);
-}
-GLVertexBuffer::~GLVertexBuffer() {
-	glDeleteBuffers(1, &buffer);
-	glDeleteVertexArrays(1, &array);
-}
-void GLVertexBuffer::allocate(int vertexCount, int vertexSize) {
-    this->vertexCount = vertexCount;
-    this->vertexSize = vertexSize;
-	glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glBufferData(GL_ARRAY_BUFFER, vertexCount*vertexSize, 0, GL_STATIC_DRAW);
-}
-void* GLVertexBuffer::map() {
-	glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    return glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY );
-}
-void GLVertexBuffer::unmap() { /*Assumes bound*/ glUnmapBuffer(GL_ARRAY_BUFFER); }
-void GLVertexBuffer::upload(ref<byte> vertices) {
-	glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size, vertices.data, GL_STATIC_DRAW);
-    vertexCount = vertices.size/vertexSize;
-}
-void GLVertexBuffer::bindAttribute(GLShader& program, string name, int elementSize, uint64 offset) const {
-	assert(elementSize<=4);
-    int index = program.attribLocation(name);
-	//assert(index>=0); //if(index<0) return;
-	glBindVertexArray(array);
-	glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glVertexAttribPointer(index, elementSize, GL_FLOAT, 0, vertexSize, (void*)offset);
-	assert(!glGetError());
+GLVertexArray::GLVertexArray() {	glGenVertexArrays(1, &id); }
+GLVertexArray::~GLVertexArray() { if(id) glDeleteVertexArrays(1, &id); }
+void GLVertexArray::bind() const { glBindVertexArray(id); }
+void GLVertexArray::bindAttribute(int index, int elementSize, AttributeType type, const GLBuffer& buffer, uint64 offset) const {
+	bind();
+	glBindBuffer(GL_ARRAY_BUFFER, buffer.id);
+	glVertexAttribPointer(index, elementSize, type, 0, buffer.elementSize, (void*)offset);
 	glEnableVertexAttribArray(index);
 }
-void GLVertexBuffer::draw(PrimitiveType primitiveType) const {
-	glBindVertexArray(array);
+void GLVertexArray::draw(PrimitiveType primitiveType, uint vertexCount) const {
+	bind();
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	/*if(primitiveType==Lines) {
-        glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
-        glEnable(GL_LINE_SMOOTH);
-        glLineWidth(2);
-	}*/
     glDrawArrays(primitiveType, 0, vertexCount);
 }
 
-/// Index buffer
-
-GLIndexBuffer::~GLIndexBuffer() { if(id) glDeleteBuffers(1,&id); }
-void GLIndexBuffer::allocate(int indexCount) {
-    this->indexCount = indexCount;
-    if(indexCount) {
-        if(!id) glGenBuffers(1, &id);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexCount*sizeof(uint), 0, GL_STATIC_DRAW );
-    }
-}
-uint* GLIndexBuffer::mapIndexBuffer() {
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
-    return (uint*)glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_WRITE_ONLY);
-}
-void GLIndexBuffer::unmapIndexBuffer() { glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); }
-void GLIndexBuffer::upload(ref<uint16> indices) {
-    if(!id) glGenBuffers(1, &id);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size*sizeof(uint16), indices.data, GL_STATIC_DRAW);
-    indexCount = indices.size;
-    indexSize = GL_UNSIGNED_SHORT;
-}
-void GLIndexBuffer::upload(ref<uint> indices) {
-    if(!id) glGenBuffers(1, &id);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size*sizeof(uint32), indices.data, GL_STATIC_DRAW);
-    indexCount = indices.size;
-    indexSize = GL_UNSIGNED_INT;
-}
-void GLIndexBuffer::draw(uint start, uint count) const {
-    assert(id);
-	if(primitiveRestart) glEnable(GL_PRIMITIVE_RESTART_FIXED_INDEX);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
-    glDrawElements(primitiveType, count==uint(-1)?indexCount:count, indexSize, (void*)uint64(start*(indexSize==GL_UNSIGNED_SHORT?2:4)));
+void GLIndexBuffer::draw() {
+	glEnable(GL_PRIMITIVE_RESTART_FIXED_INDEX);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
+	assert_(elementSize==2);
+	glDrawElements(primitiveType, elementCount, GL_UNSIGNED_SHORT, 0);
 }
 
 /// Texture
@@ -284,12 +218,16 @@ GLTexture::GLTexture(uint width, uint height, uint format, const void* data) : w
 			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+index, 0, format&SRGB?GL_SRGB8:GL_RGB8, width, height/6, 0, GL_BGRA, GL_UNSIGNED_BYTE, ((byte4*)data)+index*height/6*width);
 		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 	}
-	else if(format&Depth)
+	/*else if((format&0b11) == Short)
+			glTexImage2D(target, 0, GL_RED, width, height, 0, GL_RED, GL_SHORT, data);*/
+	else if((format&0b11) == Depth)
 			glTexImage2D(target, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, data);
-	else if(format&Alpha)
+	else if((format&0b11) == RGBA8)
 		glTexImage2D(target, 0, format&SRGB?GL_SRGB8_ALPHA8:GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
-	else
+	else {
+		assert_((format&0b11) == RGB8);
 		glTexImage2D(target, 0, format&SRGB?GL_SRGB8:GL_RGB8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
+	}
     if(format&Shadow) {
 		glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
     }
@@ -310,14 +248,24 @@ GLTexture::GLTexture(uint width, uint height, uint format, const void* data) : w
 	if(format&Mipmap) glGenerateMipmap(target);
 }
 GLTexture::GLTexture(const Image& image, uint format)
-    : GLTexture(image.width, image.height, (image.alpha?Alpha:0)|format, image.data) {
+	: GLTexture(image.width, image.height, (image.alpha?RGBA8:RGB8)|format, image.data) {
     assert(width==image.stride);
 }
+/*GLTexture::GLTexture(const Image16& image, uint format)
+	: GLTexture(image.width, image.height, Short|format, image.data) {
+	assert(width==image.stride);
+}*/
+GLTexture::GLTexture(const GLBuffer& buffer, uint format) : format(format), target(GL_TEXTURE_BUFFER) {
+	glGenTextures(1, &id);
+	glBindTexture(target, id);
+	assert_(format==Short && buffer.id);
+	glTexBuffer(target, GL_R16I, buffer.id);
+}
 
-GLTexture::~GLTexture() { if(id) glDeleteTextures(1,&id); id=0; }
+GLTexture::~GLTexture() { if(id) glDeleteTextures(1, &id); id=0; }
 void GLTexture::bind(uint sampler) const {
-    assert(id);
-    glActiveTexture(GL_TEXTURE0+sampler);
+	assert_(id);
+	glActiveTexture(GL_TEXTURE0+sampler);
 	glBindTexture(target, id);
 }
 
@@ -339,7 +287,7 @@ GLFrameBuffer::GLFrameBuffer(GLTexture&& depth, GLTexture&& color)
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, target, colorTexture.id, 0);
     assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
 }
-GLFrameBuffer::GLFrameBuffer(int2 size, int sampleCount, uint format) : size(size) {
+GLFrameBuffer::GLFrameBuffer(int2 size, int sampleCount/*, uint format*/) : size(size) {
     if(sampleCount==-1) glGetIntegerv(GL_MAX_SAMPLES,&sampleCount);
 
     glGenFramebuffers(1,&id);
@@ -352,7 +300,7 @@ GLFrameBuffer::GLFrameBuffer(int2 size, int sampleCount, uint format) : size(siz
 
     glGenRenderbuffers(1, &colorBuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, colorBuffer);
-	glRenderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, format&Alpha?GL_RGBA8:GL_RGB8, size.x, size.y);
+	glRenderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, /*(format&0b11==RGBA8)?GL_RGBA8:*/GL_RGB8, size.x, size.y);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, colorBuffer);
 
     assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);

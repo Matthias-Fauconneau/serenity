@@ -66,3 +66,12 @@ void rotate(const Image& target);
 /// Resizes \a source into \a target
 void resize(const Image& target, const Image& source);
 inline Image resize(Image&& target, const Image& source) { resize(target, source); return move(target); }
+
+// -- 16bit
+
+struct Image16 : buffer<int16> {
+	union { int2 size = 0; struct { uint width, height; }; };
+	Image16() {}
+	Image16(uint width, uint height) : buffer(height*width), width(width), height(height) {}
+	inline notrace int16& operator()(uint x, uint y) const { assert(x<width && y<height); return at(y*width+x); }
+};

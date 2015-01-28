@@ -5,10 +5,30 @@
 #include "tiff.h"
 FILE(shader)
 
-struct Vertex {
+struct TriangleStrip {
+	int last[2] = {-1, -1};
+	bool even = true;
+	buffer<uint16> indices;
+
+	TriangleStrip(uint capacity) : indices(capacity, 0) {}
+
+	void triangle(int v0, int v1, int v2) {
+		assert_(v0 < 0xFFFF && v1 < 0xFFFF && v2 < 0xFFFF);
+		if(last[0] == v0 && last[1] == v1) indices.append(v2);
+		else {
+			if(indices) indices.append(0xFFFF);
+			indices.append(v0); indices.append(v1); indices.append(v2);
+			even = true;
+		}
+		if(even) last[0] = v2, last[1] = v1; else last[0] = v0, last[1] = v2;
+		even = !even;
+	}
+};
+
+/*struct Vertex {
 	vec3 position; // World-space position
-	vec3 color; // BGR albedo (TODO: texture mapping)
-	vec3 normal; // World-space vertex normals
+	//vec3 color; // BGR albedo (TODO: texture mapping)
+	//vec3 normal; // World-space vertex normals
 };
 String str(const Vertex& o) { return str(o.position); }
 
@@ -16,9 +36,9 @@ String str(const Vertex& o) { return str(o.position); }
 struct Surface {
 	array<Vertex> vertices;
 	array<uint> indices;
-};
+};*/
 
-struct AutoSurface : Surface {
+/*struct AutoSurface : Surface {
 	/// Creates a new face using existing vertices when possible
 	/// \note Vertex normals are mean of adjacent face normals
 	void face(const ref<Vertex> polygon) {
@@ -81,81 +101,103 @@ struct AutoSurface : Surface {
 		face(vertices);
 	}
 	template<uint N> void face(const vec3 (&polygon)[N], vec3 color) { face(ref<vec3>(polygon), color); }
-};
+};*/
 
-static constexpr int N = 1024; // Terrain grid resolution (TODO: irregular triangle mesh)
-static const float da = 2*PI*3/(60*60*360); // 5°/6000 ~ 3 arcsec ~ 90m
+//const int D = 1;
+//static constexpr int N = 512; // Terrain grid resolution (TODO: LOD)
+static const float da = 2*PI*3/(60*60*360); // 5°/6000 = 3 arcsec ~ 92m
 static const float R = 6.371e6;
-static const float dx = R*da;
-const float horizonDistance = (N/2-1) * 30;
+static const float dx = R*da/*, dy = dx*/;
+const float horizonDistance = R*5*PI/180; // d=√(2Rh) => h < 24km
 
 struct Terrain {
-	PrimitiveType primitiveType = TriangleStrip;
-	buffer<Vertex> vertices {N*N, 0};
-	buffer<int> grid {N*N}; // Grid to vertices
-	buffer<uint> indices {(N-1)*(N-1)*6, 0}; // TODO: strip
-	vec3 max = 0;
+	GLShader shader {::shader(), {"terrain"}};
 
-	int last[2] = {-1, -1}; bool even=true;
-	void triangle(int v0, int v1, int v2) {
-		if(last[0]==v0 && last[1]==v1) {
-			/*indices.append(last[0]); indices.append(last[1]);*/ indices.append(v2);
-		} else {
-			even=true;
-			indices.append(-1); indices.append(v0); indices.append(v1); indices.append(v2);
-		}
-		if(even) last[0]=v2, last[1]=v1; else last[0]=v0, last[1]=v2;
-		even=!even;
-	}
+	struct Tile {
+		int2 tileIndex;
+		GLIndexBuffer indexBuffer;
+		GLBuffer elevation; // Array view on elevation buffer (FIXME: split Buffer and VertexArray)
+		GLVertexArray vertexArray;
+		GLTexture textureBuffer {elevation}; // Texture view on elevation buffer
+		Tile(int2 tileIndex, ref<uint16> indices, ref<int16> elevation) : tileIndex(tileIndex), indexBuffer(indices), elevation(elevation, 0x8C2A) {}
+	};
+	array<Tile> tiles; // TODO: LOD
+
+	static constexpr int N = 128;
+	int maxZ = 0;
 
 	Terrain() {
-		const bgr3f groundColor = white; //vec3(3./16, 6./16., 0./16);
-
-		Map map("srtm_12_03.tif");
+		Map map("srtm_37_03.tif");
 		Image16 elevation = parseTIFF(map);
-		for(int y: range(N)) for(int x: range(N)) {
-			int16 z = elevation.data[y*elevation.stride+x];
-			if(z > -32768) {
-				grid[y*N+x] = vertices.size;
-				vec2 a = vec2(x - N/2, y - N/2)*da;
-				Vertex v {vec3(R*sin(a.x), R*sin(a.y), (R+z)*cos(a.x)*cos(a.y)), groundColor, vec3(0)};
-				vertices.append(v);
-				if(z > max.z) max = v.position;
-			} else grid[y*N+x] = -1;
-		}
-		for(int y: range(1,N-1)) for(int x: range(1,N-1)) { // Computes normal from 4 neighbours
-			if(grid[y*N+x]<0) continue;
-			float dxZ = (grid[y*N+x+1] >=0 ? vertices[grid[y*N+x+1]].position.z : 0) - (grid[y*N+x-1] >= 0 ? vertices[grid[y*N+x-1]].position.z : 0 );
-			float dyZ = (grid[(y+1)*N+x] >= 0 ? vertices[grid[(y+1)*N+x]].position.z : 0) - (grid[(y-1)*N+x] >=0 ? vertices[grid[(y-1)*N+x]].position.z : 0);
-			vertices[grid[y*N+x]].normal = normalize(vec3(-dxZ, -dyZ, dx));
-		}
+		const int W = 1024, H = W;
+		assert_(W <= elevation.width && H <=elevation.height);
 
-		// Terrain surface
-		for(int y: range(N-1)) for(int x: range(N-1)) {
-			if(grid[(y+1)*N+x+1]>=0 && grid[(y+1)*N+x]>=0 && grid[y*N+x]>=0) {
-				triangle(grid[(y+1)*N+x], grid[y*N+x], grid[(y+1)*N+x+1]);
+		// -> shader
+		//vec2 a = vec2(x - N/2, y - N/2)*da;
+		//Vertex v {vec3(R*sin(a.x), R*sin(a.y), (R+z)*cos(a.x)*cos(a.y))};
+
+		/*for(int y: range(1,N-1)) for(int x: range(1,N-1)) { // Computes normal from 4 neighbours
+			if(grid[y*N+x]<0) continue;
+			float dxZ = ((grid[y*N+x+1] >=0 ? vertices[grid[y*N+x+1]].position.z : 0) - (grid[y*N+x-1] >= 0 ? vertices[grid[y*N+x-1]].position.z : 0 ))/2;
+			float dyZ = ((grid[(y+1)*N+x] >= 0 ? vertices[grid[(y+1)*N+x]].position.z : 0) - (grid[(y-1)*N+x] >=0 ? vertices[grid[(y-1)*N+x]].position.z : 0))/2;
+			vertices[grid[y*N+x]].normal = normalize(vec3(-dy*dxZ, -dx*dyZ, dx*dy));
+		}*/
+
+		for(int Y: range(W/(N-1))) for(int X: range(H/(N-1))) {
+			struct TriangleStrip tile ((N-1)*(N-1)*6);
+			buffer<int16> vertices (N*N);
+			for(int y: range(N)) for(int x: range(N)) {
+				int z = elevation(X*(N-1)+x, Y*(N-1)+y);
+				vertices[y*N+x] = ::max(0, z);
+				maxZ = ::max(maxZ, z);
 			}
-			if(grid[y*N+x]>=0 && grid[y*N+x+1]>=0 && grid[(y+1)*N+x+1]>=0) {
-				triangle(grid[(y+1)*N+x+1], grid[y*N+x],grid[y*N+x+1]);
+			for(int y: range(N-1)) for(int x: range(N-1)) { // TODO: Z-order triangle strips for framebuffer locality ?
+				int v00 = (y+0)*N+x, v10 = (y+0)*N+(x+1);
+				int v01 = (y+1)*N+x, v11 = (y+1)*N+(x+1);
+				if(vertices[v00]>=0 && vertices[v11]>=0) {
+					if(vertices[v10]>=0) tile.triangle(v01, v00, v11);
+					if(vertices[v10]>=0) tile.triangle(v11, v00, v10);
+				}
 			}
+			if(tile.indices) tiles.append(int2(X, Y), tile.indices, vertices);
 		}
+		log(maxZ);
 	}
 
-	float elevation(vec2 world) {
-		vec2 uv = (world/dx)+vec2(N/2, N/2);
+#if 0
+	float elevation(vec2 unused world) {
+		return 0;
+		/*vec2 uv = (world/dx)+vec2(N/2, N/2);
 		int2 i = int2(uv);
-		assert_(i.x >= 0 && i.x+1 < N && i.y >=0 && i.y+1 < N);
+		assert_(i.x >= 0 && i.x+1 < N && i.y >=0 && i.y+1 < N, i, world);
 		vec2 f = uv-floor(uv);
-		vec3 v0 = vertices[grid[(i.y+0)*N+i.x]].position;
-		vec3 v1 = vertices[grid[f.x < f.y ? (i.y+0)*N+i.x+1 : (i.y+1)*N+i.x+0]].position;
-		vec3 v2 = vertices[grid[(i.y+1)*N+i.x+1]].position;
+		int i0 = grid[(i.y+0)*N+i.x];
+		int i1 = grid[f.x < f.y ? (i.y+0)*N+i.x+1 : (i.y+1)*N+i.x+0];
+		int i2 = grid[(i.y+1)*N+i.x+1];
+		if(i0<0 || i1<0 || i2<0) return 0;
+		vec3 v0 = vertices[i0].position, v1 = vertices[i1].position, v2 = vertices[i2].position;
 		mat3 E = mat3(vec3(v0.xy(), 1), vec3(v1.xy(), 1), vec3(v2.xy(), 1)).cofactor(); // Edge equations are now columns of E
 		vec3 iz = E * vec3(v0.z, v1.z, v2.z);
 		vec3 iw = E[0]+E[1]+E[2];
-		return dot(iz, vec3(world, 1)) / dot(iw, vec3(world, 1));
+		return dot(iz, vec3(world, 1)) / dot(iw, vec3(world, 1));*/
+	}
+#endif
+
+	void draw(const mat4 viewProjection) {
+		shader.bind();
+		shader["N"_] = N;
+		shader["tElevation"_] = 0;
+		for(Tile& tile: tiles) { // TODO: instancing
+			shader["modelViewProjectionTransform"_] = mat4(viewProjection).scale(vec3(dx,dx,1)).translate(vec3(vec2((N-1)*tile.tileIndex),0));
+			//tile.vertexArray.bindAttribute(shader.attribLocation("aElevation"), 1, Short, tile.elevation);
+			tile.vertexArray.bind(); // Empty
+			tile.textureBuffer.bind(0);
+			tile.indexBuffer.draw();
+		}
 	}
 };
 
+#if 0
 struct Tree {
 	const bgr3f trunkColor = vec3(6./16., 4./16, 0./16);
 	const bgr3f branchColor = vec3(2./16, 6./16., 0./16); //vec3(1./2, 1./3, 0);
@@ -254,13 +296,14 @@ struct Tree {
 		geometry(root); // TODO: independent object
 	}
 };
+#endif
 
 /// Views a scene
 struct View : Widget {
 	// Creates a window and an associated GL context
-	Window window {this, 512, []{ return "Editor"__; }, true, Image(), true};
+	Window window {this, 1024, []{ return "Editor"__; }, true, Image(), true};
 	// ^ GL* constructors rely on a GL context being current ^
-	struct Surface {
+	/*struct Surface {
 		ref<Vertex> vertices;
 		GLVertexBuffer vertexBuffer;
 		GLIndexBuffer indexBuffer;
@@ -272,17 +315,17 @@ struct View : Widget {
 		}
 	};
 	array<unique<Surface>> surfaces;
-	GLShader diffuse {shader(), {"transform normal color diffuse light shadow"}};
+	GLShader diffuse {shader(), {"transform normal color diffuse light shadow"}};*/
 
-
-	Random random;
+	//Random random;
 	Terrain terrain;
-	buffer<Tree> treeModels = apply(1, [this](int) { return Tree(random); });
+	//buffer<Tree> treeModels = apply(1, [this](int) { return Tree(random); });
 
 	const float viewDistance = 30;
-	const vec3 origin = vec3(terrain.max.xy(), 0);
-	vec3 position = vec3(origin.xy(), terrain.elevation(origin.xy()) + 5);
+	const vec3 origin = 0;
+	vec3 position = vec3(origin.xy(), /*terrain.elevation(origin.xy()) +*/ 128 /*N*/);
 
+#if 0
 	struct Instance {
 		Surface& surface;
 		mat4 transform;
@@ -301,13 +344,14 @@ struct View : Widget {
 			instanced++;
 		}
 		surfaces.append(move(treeSurfaces)); // Holds tree models*/
-		instances.append({surfaces.append(unique<Surface>(terrain.primitiveType, terrain.vertices, terrain.indices)), mat4()});
+		//instances.append({surfaces.append(unique<Surface>(terrain.primitiveType, terrain.vertices, terrain.indices)), mat4()});
 		return instances;
 	}
 	array<Instance> instances = evaluateInstances();
+#endif
 
 	// Light
-	struct Light {
+	/*struct Light {
 		float pitch = 3*PI/4;
 		bool enable = true; // Whether shadows are rendered
 		vec3 lightMin=0, lightMax=0; // Scene bounding box in sun light space
@@ -357,24 +401,15 @@ struct View : Widget {
 					.translate(-lightMin)
 					.rotateX( pitch );
 		}
-	} light {instances};
+	} light {instances};*/
 	// Sky
 	GLShader sky {shader(), {"sky"}};
+	GLVertexArray vertexArray;
 	//GLTexture skybox {decodeImage(readFile("skybox.png"_)), SRGB|Bilinear|Cube};
 
 	// View
 	vec2 lastPos; // Last cursor position to compute relative mouse movements
 	vec2 rotation = vec2(0, -PI/2); // Current view angles (yaw,pitch)
-	// Render
-	struct Render {
-		GLVertexBuffer vertexBuffer;
-		Render() { vertexBuffer.upload<vec2>({vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(1,1)}); }
-		void draw(GLShader& shader) {
-			vertexBuffer.bindAttribute(shader,"aPosition"_, 2);
-			shader.bind();
-			vertexBuffer.draw(TriangleStrip);
-		}
-	} render;
 	//GLFrameBuffer frameBuffer;
 	//GLShader present {shader(), {"screen present"_}};
 	// Profile
@@ -420,10 +455,10 @@ struct View : Widget {
 
 	vec3 speed = 0;
 	bool step() { // Assumes 60 Hz (FIXME: handle dropped frames)
-		if(!fast) speed *= 1-1./16;
+		if(!fast) speed *= 1-1./60;
 		speed += mat4().rotateX(rotation.y).rotateZ(rotation.x).inverse() * force;
 		position += speed;
-		return force || length(speed) > 1./60;
+		return force || length(speed); // > 1./60;
 	}
 
 	vec2 sizeHint(vec2) override { return 0; }
@@ -441,24 +476,30 @@ struct View : Widget {
 				.translate(-position); // Position
 		mat4 viewProjection = projection*view;
 
-		vec3 lightDirection = normalize(light.toWorld().normalMatrix()*vec3(0,0,-1));
+		/*vec3 lightDirection = normalize(light.toWorld().normalMatrix()*vec3(0,0,-1));
 		diffuse["shadow"_] = 0; light.shadow.depthTexture.bind(0);
 		diffuse.bind();
-		for(Instance instance: instances) {
+		diffuse["modelViewProjectionTransform"] = viewProjection;
+		diffuse["shadowTransform"] = light.toShadow();
+		diffuse["lightDirection"] = lightDirection;*/
+
+		terrain.draw(viewProjection);
+		/*for(Instance instance: instances) {
 			instance.surface.vertexBuffer.bindAttribute(diffuse, "aPosition"_, 3, offsetof(Vertex, position));
-			instance.surface.vertexBuffer.bindAttribute(diffuse, "aColor"_, 3, offsetof(Vertex, color));
-			instance.surface.vertexBuffer.bindAttribute(diffuse, "aNormal"_, 3, offsetof(Vertex, normal));
+			//instance.surface.vertexBuffer.bindAttribute(diffuse, "aColor"_, 3, offsetof(Vertex, color));
+			//instance.surface.vertexBuffer.bindAttribute(diffuse, "aNormal"_, 3, offsetof(Vertex, normal));
 			diffuse["modelViewProjectionTransform"] = viewProjection * instance.transform;
 			diffuse["shadowTransform"] = light.toShadow() * instance.transform;
 			diffuse["lightDirection"] = normalize(instance.transform.inverse().normalMatrix() * lightDirection);
 			instance.surface.indexBuffer.draw();
-		}
+		}*/
 
 		//TODO: fog
+		sky.bind();
 		sky["inverseViewProjectionMatrix"] = mat4(((mat3)view).transpose()) * projection.inverse();
 		//sky["lightDirection"] = normalize(view.normalMatrix() * lightDirection);
 		//sky["skybox"] = 0; skybox.bind(0);
-		render.draw(sky);
+		vertexArray.draw(TriangleStrip, 4);
 
 		/*GLTexture color(width,height,GLTexture::RGB16F);
 		frameBuffer.blit(color);

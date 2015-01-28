@@ -149,14 +149,15 @@ void Window::render() { assert_(size); updates.clear(); render(nullptr, int2(0),
 
 void Window::event() {
     Display::event();
-    if(heldEvent) { processEvent(heldEvent); heldEvent = nullptr; }
+	if(heldEvent) { processEvent(heldEvent); heldEvent = nullptr; return; }
 	setTitle(getTitle ? getTitle() : widget->title());
     if(updates && state==Idle) {
         assert_(size);
 		if(glContext) {
+			updates.clear();
 			GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(black, 1));
-			 widget->graphics(vec2(size), Rect(vec2(0), vec2(size)));
-			 glFlush();
+			widget->graphics(vec2(size), Rect(vec2(0), vec2(size)));
+			glFlush();
 		} else {
 			if(target.size != size) {
 				if(target) {

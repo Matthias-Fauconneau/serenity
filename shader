@@ -1,3 +1,16 @@
+terrain {
+ varying vec2 vTexCoords;
+ uniform int N;
+ vertex {
+  uniform mat4 modelViewProjectionTransform; // TODO: -> mat3
+  uniform isamplerBuffer tElevation;
+  float aElevation = texelFetch(tElevation, gl_VertexID).r;
+  vTexCoords = vec2(gl_VertexID%N, gl_VertexID/N);
+  //attribute float aElevation;
+  gl_Position = modelViewProjectionTransform*vec4(vTexCoords, aElevation, 1);
+ }
+}
+
 transform {
  vertex {
   uniform mat4 modelViewProjectionTransform;
@@ -29,6 +42,15 @@ fragment {
  color = vec4(1);
  diffuse {
    vec3 diffuseLight = vec3(0.3,0.3,0.4); // Ambient light
+ }
+}
+
+terrain {
+ fragment {
+  uniform isamplerBuffer tElevation;
+  color.rgb = vec3(float(texelFetch(tElevation, int(round(vTexCoords.y)*N+round(vTexCoords.x))).r)/200);
+  //color.r = float(int(round(vTexCoords.y)*N+round(vTexCoords.x))%N)/N;
+  //color.g = float(int(round(vTexCoords.y)*N+round(vTexCoords.x))/N)/N;
  }
 }
 
@@ -73,8 +95,12 @@ sky {
  varying vec3 vTexCoords;
  vertex {
   uniform mat4 inverseViewProjectionMatrix;
-  attribute vec2 aPosition;
-  gl_Position = vec4(aPosition, 0.99999, 1);
+  vec2 aPosition;
+  if(gl_VertexID==0) aPosition=vec2(-1,-1);
+  if(gl_VertexID==1) aPosition=vec2( 1,-1);
+  if(gl_VertexID==2) aPosition=vec2(-1, 1);
+  if(gl_VertexID==3) aPosition=vec2( 1, 1);
+  gl_Position = vec4(aPosition, 0.999999, 1);
   vec4 viewPos = inverseViewProjectionMatrix * vec4(aPosition.xy, 1, 1);
   vTexCoords = viewPos.xyz; //viewPos.w;
  }

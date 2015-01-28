@@ -40,70 +40,44 @@ struct GLShader {
     handle<uint> id = 0;
     map<String, int> attribLocations;
     map<String, int> uniformLocations;
-    array<String> sampler2D;
+	//array<String> sampler2D;
 	array<String> source;
 };
 
-struct GLUniformBuffer {
-    GLUniformBuffer(){}
-    default_move(GLUniformBuffer);
-    ~GLUniformBuffer();
+struct GLBuffer {
+	handle<uint> id;
+	uint elementSize = 0;
+	uint elementCount = 0;
 
-	void upload(ref<byte> data);
-	template<class T> void upload(ref<T> data) { upload(ref<byte>((byte*)data.data,data.size*sizeof(T))); }
-	void bind(GLShader& program, string name) const;
-
-    operator bool() const { return id; }
-
-    handle<uint> id = 0;
-    int size = 0;
+	GLBuffer(uint elementSize, ref<byte> data, uint target);
+	template<Type T> GLBuffer(ref<T> data, uint target = 0x8892/*GL_ARRAY_BUFFER*/) : GLBuffer(sizeof(T), cast<byte>(data), target) {}
+	default_move(GLBuffer);
+	~GLBuffer();
+	void bind() const;
 };
 
 enum PrimitiveType { Point, Lines, LineLoop, LineStrip, Triangles, TriangleStrip };
-struct GLVertexBuffer {
-	GLVertexBuffer();
-    default_move(GLVertexBuffer);
-    ~GLVertexBuffer();
+enum AttributeType { Byte=0x1400, UByte, Short, UShort, Int, UInt, Float };
+struct GLVertexArray {
+	handle<uint> id;
 
-    void allocate(int vertexCount, int vertexSize);
-	void* map();
-	void unmap();
-	void upload(ref<byte> vertices);
-	template<Type T> void upload(ref<T> vertices) { vertexSize=sizeof(T); upload(ref<byte>((byte*)vertices.data,vertices.size*sizeof(T))); }
-	void bindAttribute(GLShader& program, string name, int elementSize, uint64 offset = 0/*, bool instance = false*/) const;
-    void draw(PrimitiveType primitiveType) const;
+	GLVertexArray();
+	default_move(GLVertexArray);
+	~GLVertexArray();
 
-	handle<uint> array = 0;
-	handle<uint> buffer = 0;
-    uint vertexCount = 0;
-    uint vertexSize = 0;
-};
-#undef offsetof
-#define offsetof __builtin_offsetof
-
-struct GLIndexBuffer {
-    default_move(GLIndexBuffer);
-	GLIndexBuffer(PrimitiveType primitiveType = Triangles) : primitiveType(primitiveType) {}
-    ~GLIndexBuffer();
-
-    void allocate(int indexCount);
-    uint* mapIndexBuffer();
-    void unmapIndexBuffer();
-	void upload(ref<uint16> indices);
-	void upload(ref<uint> indices);
-    void draw(uint start=0, uint count=-1) const;
-
-    operator bool() { return id; }
-
-	PrimitiveType primitiveType;
-    handle<uint> id = 0;
-    uint indexCount=0;
-    uint indexSize=0;
-	bool primitiveRestart = primitiveType == TriangleStrip;
+	void bindAttribute(int index, int elementSize, AttributeType type, const GLBuffer& buffer, uint64 offset = 0) const;
+	void bind() const;
+	void draw(PrimitiveType primitiveType, uint vertexCount) const;
 };
 
-enum Format { Depth=1,
-			  Alpha=1<<1, SRGB=1<<2,Mipmap=1<<3, Shadow=1<<4, Bilinear=1<<5, Anisotropic=1<<6, Clamp=1<<7, Multisample=1<<8, Cube=1<<9 };
+struct GLIndexBuffer : GLBuffer {
+	template<Type T> GLIndexBuffer(ref<T> data) : GLBuffer(sizeof(T), cast<byte>(data), 0x8893/*GL_ELEMENT_ARRAY_BUFFER*/) {}
+	PrimitiveType primitiveType = TriangleStrip;
+	void draw();
+};
+
+enum Format { RGB8=0, R16I=1, Depth=2/*U32*/, RGBA8=3,
+			  SRGB=1<<2, Mipmap=1<<3, Shadow=1<<4, Bilinear=1<<5, Anisotropic=1<<6, Clamp=1<<7, Multisample=1<<8, Cube=1<<9 };
 struct GLTexture {
     handle<uint> id = 0;
 	union { int2 size = 0; struct { uint width, height; }; };
@@ -113,6 +87,8 @@ struct GLTexture {
     default_move(GLTexture);
     GLTexture(uint width, uint height, uint format=0, const void* data=0);
 	GLTexture(const struct Image& image, uint format=0);
+	//GLTexture(const struct Image16& image, uint format=0);
+	GLTexture(const GLBuffer& buffer, uint format=Short);
 	GLTexture(uint width, uint height, uint depth, ref<byte4> data);
     ~GLTexture();
 
@@ -126,7 +102,7 @@ struct GLFrameBuffer {
     default_move(GLFrameBuffer);
     GLFrameBuffer(GLTexture&& depth);
     GLFrameBuffer(GLTexture&& depth, GLTexture&& color);
-	GLFrameBuffer(int2 size, int sampleCount=0, uint format=0);
+	GLFrameBuffer(int2 size, int sampleCount=0/*, uint format=0*/);
     ~GLFrameBuffer();
 
     void bind(uint clearFlags=0, vec4 color=1);
