@@ -49,8 +49,8 @@ struct GLBuffer {
 	uint elementSize = 0;
 	uint elementCount = 0;
 
-	GLBuffer(uint elementSize, ref<byte> data, uint target);
-	template<Type T> GLBuffer(ref<T> data, uint target = 0x8892/*GL_ARRAY_BUFFER*/) : GLBuffer(sizeof(T), cast<byte>(data), target) {}
+	GLBuffer(uint elementSize, ref<byte> data);
+	template<Type T> GLBuffer(ref<T> data) : GLBuffer(sizeof(T), cast<byte>(data)) {}
 	default_move(GLBuffer);
 	~GLBuffer();
 	void bind() const;
@@ -71,7 +71,7 @@ struct GLVertexArray {
 };
 
 struct GLIndexBuffer : GLBuffer {
-	template<Type T> GLIndexBuffer(ref<T> data) : GLBuffer(sizeof(T), cast<byte>(data), 0x8893/*GL_ELEMENT_ARRAY_BUFFER*/) {}
+	template<Type T> GLIndexBuffer(ref<T> data) : GLBuffer(sizeof(T), cast<byte>(data)) {}
 	PrimitiveType primitiveType = TriangleStrip;
 	void draw();
 };

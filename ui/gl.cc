@@ -168,10 +168,10 @@ uint GLShader::attribLocation(string name) {
 
 /// Buffer
 
-GLBuffer::GLBuffer(uint elementSize, ref<byte> data, uint target) : elementSize(elementSize), elementCount(data.size/elementSize) {
+GLBuffer::GLBuffer(uint elementSize, ref<byte> data) : elementSize(elementSize), elementCount(data.size/elementSize) {
 	glGenBuffers(1, &id);
-	glBindBuffer(target, id);
-	glBufferData(target, data.size, data.data, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, id);
+	glBufferData(GL_ARRAY_BUFFER, data.size, data.data, GL_STATIC_DRAW);
 }
 GLBuffer::~GLBuffer() { if(id) glDeleteBuffers(1, &id); }
 //void GLBuffer::bind() const { glBindBuffer(GL_ARRAY_BUFFER, id); }

@@ -116,20 +116,21 @@ struct Terrain {
 	struct Tile {
 		int2 tileIndex;
 		GLIndexBuffer indexBuffer;
-		GLBuffer elevation; // Array view on elevation buffer (FIXME: split Buffer and VertexArray)
+		GLBuffer elevation;
 		GLVertexArray vertexArray;
-		GLTexture textureBuffer {elevation}; // Texture view on elevation buffer
-		Tile(int2 tileIndex, ref<uint16> indices, ref<int16> elevation) : tileIndex(tileIndex), indexBuffer(indices), elevation(elevation, 0x8C2A) {}
+		GLTexture textureBuffer {elevation}; // shader read access (texelFetch) to elevation buffer
+		Tile(int2 tileIndex, ref<uint16> indices, ref<int16> elevation) : tileIndex(tileIndex), indexBuffer(indices), elevation(elevation) {}
 	};
 	array<Tile> tiles; // TODO: LOD
 
-	static constexpr int N = 128;
-	int maxZ = 0;
+	static constexpr int D = 128;
+	static constexpr int N = 256-D; // Number of cells: floor(D, √(2^16-1/*restart index*/))
+	//int maxZ = 0;
 
 	Terrain() {
 		Map map("srtm_37_03.tif");
 		Image16 elevation = parseTIFF(map);
-		const int W = 1024, H = W;
+		const int W = 4*N, H = W;
 		assert_(W <= elevation.width && H <=elevation.height);
 
 		// -> shader
@@ -143,25 +144,26 @@ struct Terrain {
 			vertices[grid[y*N+x]].normal = normalize(vec3(-dy*dxZ, -dx*dyZ, dx*dy));
 		}*/
 
-		for(int Y: range(W/(N-1))) for(int X: range(H/(N-1))) {
-			struct TriangleStrip tile ((N-1)*(N-1)*6);
-			buffer<int16> vertices (N*N);
-			for(int y: range(N)) for(int x: range(N)) {
-				int z = elevation(X*(N-1)+x, Y*(N-1)+y);
-				vertices[y*N+x] = ::max(0, z);
-				maxZ = ::max(maxZ, z);
+		for(int Y: range(W/N)) for(int X: range(H/N)) {
+			struct TriangleStrip tile (N/D*N/D*6);
+			buffer<int16> vertices ((N+1)*(N+1));
+			for(int y: range(N+1)) for(int x: range(N+1)) {
+				int z = elevation(X*N+x, Y*N+y);
+				vertices[y*(N+1)+x] = ::max(0, z);
+				//maxZ = ::max(maxZ, z);
 			}
-			for(int y: range(N-1)) for(int x: range(N-1)) { // TODO: Z-order triangle strips for framebuffer locality ?
-				int v00 = (y+0)*N+x, v10 = (y+0)*N+(x+1);
-				int v01 = (y+1)*N+x, v11 = (y+1)*N+(x+1);
+			for(int y: range(N/D)) for(int x: range(N/D)) { // TODO: Z-order triangle strips for framebuffer locality ?
+				int v00 = (y+0)*D*(N+1)+x*D, v10 = (y+0)*D*(N+1)+(x+1)*D;
+				int v01 = (y+1)*D*(N+1)+x*D, v11 = (y+1)*D*(N+1)+(x+1)*D;
 				if(vertices[v00]>=0 && vertices[v11]>=0) {
 					if(vertices[v10]>=0) tile.triangle(v01, v00, v11);
 					if(vertices[v10]>=0) tile.triangle(v11, v00, v10);
 				}
 			}
+			log(vertices.size, tile.indices.size);
 			if(tile.indices) tiles.append(int2(X, Y), tile.indices, vertices);
 		}
-		log(maxZ);
+		//log(maxZ);
 	}
 
 #if 0
@@ -188,9 +190,9 @@ struct Terrain {
 		shader["N"_] = N;
 		shader["tElevation"_] = 0;
 		for(Tile& tile: tiles) { // TODO: instancing
-			shader["modelViewProjectionTransform"_] = mat4(viewProjection).scale(vec3(dx,dx,1)).translate(vec3(vec2((N-1)*tile.tileIndex),0));
-			//tile.vertexArray.bindAttribute(shader.attribLocation("aElevation"), 1, Short, tile.elevation);
-			tile.vertexArray.bind(); // Empty
+			shader["modelViewProjectionTransform"_] = mat4(viewProjection).scale(vec3(dx,dx,1)).translate(vec3(vec2(N*tile.tileIndex),0));
+			tile.vertexArray.bindAttribute(shader.attribLocation("aElevation"), 1, Short, tile.elevation);
+			tile.vertexArray.bind();
 			tile.textureBuffer.bind(0);
 			tile.indexBuffer.draw();
 		}
@@ -322,8 +324,8 @@ struct View : Widget {
 	//buffer<Tree> treeModels = apply(1, [this](int) { return Tree(random); });
 
 	const float viewDistance = 30;
-	const vec3 origin = 0;
-	vec3 position = vec3(origin.xy(), /*terrain.elevation(origin.xy()) +*/ 128 /*N*/);
+	const vec2 origin = 1024;
+	vec3 position = vec3(origin, /*terrain.elevation(origin.xy()) +*/ 512 /*N*/);
 
 #if 0
 	struct Instance {
@@ -455,10 +457,10 @@ struct View : Widget {
 
 	vec3 speed = 0;
 	bool step() { // Assumes 60 Hz (FIXME: handle dropped frames)
-		if(!fast) speed *= 1-1./60;
+		//if(!fast) speed *= 1-1./60;
 		speed += mat4().rotateX(rotation.y).rotateZ(rotation.x).inverse() * force;
 		position += speed;
-		return force || length(speed); // > 1./60;
+		return true; //force || length(speed); // > 1./60;
 	}
 
 	vec2 sizeHint(vec2) override { return 0; }
@@ -522,7 +524,7 @@ struct View : Widget {
                                   userErrors ? move(userErrors) :
                                                ftoa(1e6f/frameTime,1)+"fps "_+str(frameTime/1000)+"ms "_+str(indices.size()/3)+" faces\n"_)
 				.render(int2(position+int2(16)));*/
-		if(step()) window.render();
+		if(step() || 1) window.render();
 		return nullptr;
 	}
 } app;

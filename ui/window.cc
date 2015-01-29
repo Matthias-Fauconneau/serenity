@@ -3,9 +3,12 @@
 #include "x.h"
 #include "png.h"
 #include "time.h"
-#include "gl.h"
 #include <sys/shm.h>
-extern "C" bool glXMakeCurrent(_XDisplay *dpy, uint drawable, __GLXcontextRec* ctx);
+#include "gl.h"
+extern "C" {
+bool glXMakeCurrent(_XDisplay* dpy, uint drawable, __GLXcontextRec* ctx);
+void glXSwapBuffers(_XDisplay* dpy, uint drawable);
+}
 
 Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool show, const Image& icon, bool GL, Thread& thread)
 	: Display(GL, thread), widget(widget), size(sizeHint), getTitle(title) {
@@ -43,11 +46,11 @@ Window::~Window() { close(); }
 void Window::onEvent(const ref<byte> ge) {
     const XEvent& event = *(XEvent*)ge.data;
     uint8 type = event.type&0b01111111; //msb set if sent by SendEvent
-    if(type==MotionNotify) { heldEvent = unique<XEvent>(event); queue(); }
-    else {
+	/*if(type==MotionNotify) { heldEvent = unique<XEvent>(event); queue(); }
+	else*/ {
+		//if(heldEvent) { processEvent(heldEvent); heldEvent=nullptr; }
         // Ignores autorepeat
 		//if(heldEvent && heldEvent->type==KeyRelease && heldEvent->time==event.time && type==KeyPress) heldEvent=nullptr;
-        if(heldEvent) { processEvent(heldEvent); heldEvent=nullptr; }
 		/*if(type==KeyRelease) { heldEvent = unique<XEvent>(event); queue(); } // Hold release to detect any repeat
 		else*/ if(processEvent(event)) {}
         else if(type==GenericEvent && event.genericEvent.ext == Present::EXT && event.genericEvent.type==Present::CompleteNotify) {
@@ -143,22 +146,23 @@ void Window::setSize(int2 size) { send(SetSize{.id=id+XWindow, .w=uint(size.x), 
 // Render
 void Window::render(shared<Graphics>&& graphics, int2 origin, int2 size) {
     updates.append( Update{move(graphics),origin,size} );
-    if(updates && mapped && state == Idle) queue();
+	if(updates /*&& mapped && state == Idle*/) queue();
 }
 void Window::render() { assert_(size); updates.clear(); render(nullptr, int2(0), size); }
 
 void Window::event() {
-    Display::event();
-	if(heldEvent) { processEvent(heldEvent); heldEvent = nullptr; return; }
-	setTitle(getTitle ? getTitle() : widget->title());
-    if(updates && state==Idle) {
+	Display::event();
+	//if(heldEvent) { processEvent(heldEvent); heldEvent = nullptr; }
+	//setTitle(getTitle ? getTitle() : widget->title());
+	if(updates) {
         assert_(size);
 		if(glContext) {
+			assert_(state==Idle);
 			updates.clear();
 			GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(black, 1));
 			widget->graphics(vec2(size), Rect(vec2(0), vec2(size)));
-			glFlush();
-		} else {
+			glXSwapBuffers(glDisplay, id);
+		} else if(state==Idle) {
 			if(target.size != size) {
 				if(target) {
 					send(FreePixmap{.pixmap=id+Pixmap}); target=Image();
@@ -193,5 +197,5 @@ void Window::event() {
 			state=Copy;
 			send(Present::Pixmap{.window=id+XWindow, .pixmap=id+Pixmap}); //FIXME: update region
 		}
-    }
+	}
 }

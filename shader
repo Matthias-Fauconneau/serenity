@@ -3,10 +3,8 @@ terrain {
  uniform int N;
  vertex {
   uniform mat4 modelViewProjectionTransform; // TODO: -> mat3
-  uniform isamplerBuffer tElevation;
-  float aElevation = texelFetch(tElevation, gl_VertexID).r;
-  vTexCoords = vec2(gl_VertexID%N, gl_VertexID/N);
-  //attribute float aElevation;
+  vTexCoords = vec2(gl_VertexID%(N+1), gl_VertexID/(N+1));
+  attribute float aElevation;
   gl_Position = modelViewProjectionTransform*vec4(vTexCoords, aElevation, 1);
  }
 }
@@ -48,9 +46,7 @@ fragment {
 terrain {
  fragment {
   uniform isamplerBuffer tElevation;
-  color.rgb = vec3(float(texelFetch(tElevation, int(round(vTexCoords.y)*N+round(vTexCoords.x))).r)/200);
-  //color.r = float(int(round(vTexCoords.y)*N+round(vTexCoords.x))%N)/N;
-  //color.g = float(int(round(vTexCoords.y)*N+round(vTexCoords.x))/N)/N;
+  color.rgb = vec3(float(texelFetch(tElevation, int(vTexCoords.y)*(N+1)+int(vTexCoords.x)).r)/256);
  }
 }
 

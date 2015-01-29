@@ -44,7 +44,7 @@ struct Window : Display /*should reference but inherits for convenience*/ {
 
 // Control
     /// An event held to implement motion compression and ignore autorepeats
-    unique<XEvent> heldEvent;
+	//unique<XEvent> heldEvent;
     /// Actions triggered when a key is pressed
     map<Key, function<void()>> actions;
     /// Current widget that has the keyboard input focus
