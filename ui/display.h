@@ -30,9 +30,6 @@ struct Display : Socket, Poll {
 	 uint visual = 0;
 	 /// Screen size
 	 int2 size = 0;
-	 /// OpenGL
-	 struct _XDisplay* glDisplay = 0;
-	 struct __GLXcontextRec* glContext = 0;
 
 // Keyboard
     /// Keycode range
@@ -47,30 +44,44 @@ struct Display : Socket, Poll {
      /// Processes global events and dispatches signal
      void event(const ref<byte>);
     // Write
-     template<Type Request> uint16 send(Request request, const ref<byte> data={}) {
+	 uint16 send(ref<byte> data, int fd=-1);
+	 template<Type Request> uint16 send(Request request, const ref<byte> data, int fd=-1) {
          assert_(sizeof(request)%4==0 && sizeof(request) + align(4, data.size) == request.size*4, sizeof(request), data.size, request.size*4);
-         write(raw(request)+pad(data));
-         sequence++;
-         return sequence;
+		 return send(data?raw(request)+pad(data):raw(request), fd);
      }
+	 template<Type Request> uint16 send(Request request, int fd=-1) { return send(request, {}, fd); }
 
      /// Reads reply checking for errors and queueing events
-     array<byte> readReply(uint16 sequence, uint elementSize);
+	 array<byte> readReply(uint16 sequence, uint elementSize, buffer<int>& fds);
 
-     template<Type Request, Type T> typename Request::Reply request(Request request, buffer<T>& output, const ref<byte> data={}) {
+	 template<Type Request, Type T> typename Request::Reply request(Request request, buffer<T>& output, buffer<int>& fds, const ref<byte> data={}, int fd=-1) {
          static_assert(sizeof(typename Request::Reply)==31,"");
          Locker lock(this->lock); // Prevents a concurrent thread from reading the reply and lock event queue
-         uint16 sequence = send(request, data);
-         array<byte> replyData = readReply(sequence, sizeof(T));
+		 uint16 sequence = send(request, data, fd);
+		 array<byte> replyData = readReply(sequence, sizeof(T), fds);
          typename Request::Reply reply = *(typename Request::Reply*)replyData.data;
          assert_(replyData.size == sizeof(typename Request::Reply)+reply.size*sizeof(T));
 		 output = copyRef(cast<T>(replyData.slice(sizeof(reply), reply.size*sizeof(T))));
          return reply;
      }
 
-     template<Type Request> typename Request::Reply request(Request request, const ref<byte> data={}) {
+	 template<Type Request, Type T> typename Request::Reply request(Request request, buffer<T>& output, const ref<byte> data={}, int fd=-1) {
+		 buffer<int> fds;
+		 typename Request::Reply reply = this->request(request, output, fds, data, fd);
+		 assert_(/*reply.fdCount==0 &&*/ fds.size == 0);
+		 return reply;
+	 }
+
+	 template<Type Request> typename Request::Reply requestFD(Request request, buffer<int>& fds, const ref<byte> data={}) {
+		 buffer<byte> output;
+		 typename Request::Reply reply = this->request(request, output, fds, data);
+		 assert_(reply.size == 0 && output.size ==0, reply.size, output.size);
+		 return reply;
+	 }
+
+	 template<Type Request> typename Request::Reply request(Request request, const ref<byte> data={}, int fd=-1) {
          buffer<byte> output;
-         typename Request::Reply reply = this->request(request, output, data);
+		 typename Request::Reply reply = this->request(request, output, data, fd);
          assert_(reply.size == 0 && output.size ==0, reply.size, output.size);
          return reply;
      }

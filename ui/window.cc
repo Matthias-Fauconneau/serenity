@@ -7,16 +7,17 @@
 #include <sys/shm.h>
 #include <sys/uio.h>
 #include <sys/socket.h>
-/*extern "C" {
-bool glXMakeCurrent(_XDisplay* dpy, uint drawable, __GLXcontextRec* ctx);
-void glXSwapBuffers(_XDisplay* dpy, uint drawable);
-}*/
+#include <sys/unistd.h>
+#include <sys/fcntl.h>
+#include <gbm.h> // gbm
+#include <EGL/egl.h> // EGL
+#include <GL/gl.h> // drm
+extern "C" int drmPrimeHandleToFD(int fd, uint32_t handle, uint32_t flags, int *prime_fd);
 
 Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool show, const Image& icon, bool GL, Thread& thread)
 	: Display(GL, thread), widget(widget), size(sizeHint), getTitle(title) {
     Display::onEvent.connect(this, &Window::onEvent);
 	assert_(id && root && visual);
-    send(CreateColormap{ .colormap=id+Colormap, .window=root, .visual=visual});
 
     if(sizeHint.x<=0) size.x=Display::size.x;
     if(sizeHint.y<=0) size.y=Display::size.y;
@@ -26,35 +27,34 @@ Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool sho
 		if(sizeHint.y<0) size.y=min(max(abs(hint.y),-sizeHint.y), Display::size.y-46);
     }
     assert_(size);
+	send(CreateColormap{ .colormap=id+Colormap, .window=root, .visual=visual});
     send(CreateWindow{.id=id+XWindow, .parent=root, .width=uint16(size.x), .height=uint16(size.y), .visual=visual, .colormap=id+Colormap});
     send(ChangeProperty{.window=id+XWindow, .property=Atom("WM_PROTOCOLS"), .type=Atom("ATOM"),
                         .format=32, .length=1, .size=6+1}, raw(Atom("WM_DELETE_WINDOW")));
     send(ChangeProperty{.window=id+XWindow, .property=Atom("_KDE_OXYGEN_BACKGROUND_GRADIENT"), .type=Atom("CARDINAL"),
                         .format=32, .length=1, .size=6+1}, raw(1));
     setIcon(icon);
-    send(CreateGC{.context=id+GraphicContext, .window=id+XWindow});
     send(Present::SelectInput{.window=id+XWindow, .eid=id+PresentEvent});
     actions[Escape] = []{requestTermination();};
-    actions[PrintScreen] = [this]{writeFile(str(Date(currentTime())), encodePNG(target), home());};
+	//actions[PrintScreen] = [this]{writeFile(str(Date(currentTime())), encodePNG(dmaBuffer), home());};
 	if(show) this->show();
-	buffer<uint> providers; request(RandR::GetProviders{.window=id+XWindow}, providers);
+		// -- EGL Render node initialization
 	request(DRI3::QueryVersion());
-	send(DRI3::Open{.drawable=id+XWindow, .provider=providers[0]});
-	DRI3::Open::Reply reply;
-	iovec iov {.iov_base = &reply, .iov_len = sizeof(reply)};
-	union { cmsghdr cmsghdr; char control[CMSG_SPACE(sizeof(int))]; } cmsgu;
-	msghdr msg{.msg_name=0, .msg_namelen=0, .msg_iov=&iov, .msg_iovlen=1, .msg_control=&cmsgu, .msg_controllen = sizeof(cmsgu.control)};
-	ssize_t size = recvmsg(Socket::fd, &msg, 0);
-	assert_(size==sizeof(reply));
-	struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
-	assert_(cmsg && cmsg->cmsg_len == CMSG_LEN(sizeof(int)));
-	assert_(cmsg->cmsg_level == SOL_SOCKET);
-	assert_(cmsg->cmsg_type == SCM_RIGHTS);
-	int deviceFD = *((int *) CMSG_DATA(cmsg));
-	error(deviceFD);
-	//if(glContext) glXMakeCurrent(glDisplay, id+XWindow, glContext); // DRI3CreateDrawable
-	//glEnable(GL_FRAMEBUFFER_SRGB);
-	//((PFNGLXSWAPINTERVALMESAPROC)glXGetProcAddress((const GLubyte*)"glXSwapIntervalMESA"))(1);
+	drmDevice = ({buffer<int> fds; requestFD(DRI3::Open{.drawable=id+XWindow}, fds); fds[0]; });
+			 // = open("/dev/dri/renderD128", O_RDWR|O_CLOEXEC|O_NOCTTY|O_NONBLOCK);
+	gbmDevice = gbm_create_device(drmDevice);
+	eglDevice = eglGetDisplay((EGLNativeDisplayType)gbmDevice);
+	EGLint major, minor; eglInitialize(eglDevice, &major, &minor);
+	eglBindAPI(EGL_OPENGL_API);
+	EGLint n;
+	eglChooseConfig(eglDevice, (EGLint[]){EGL_SURFACE_TYPE, EGL_PIXMAP_BIT, EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT, EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 0, EGL_NONE}, &eglConfig, 1, &n);
+	eglContext = eglCreateContext(eglDevice, eglConfig, 0, (EGLint[]){EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE});
+	gbmSurface = gbm_surface_create(gbmDevice, width, height, GBM_FORMAT_XRGB8888, GBM_BO_USE_RENDERING);
+	EGLSurface eglSurface = eglCreatePixmapSurface(eglDevice, eglConfig, (EGLNativePixmapType)gbmSurface, 0);
+	eglMakeCurrent(eglDevice, eglSurface, eglSurface, eglContext);
+	surfaceSize = size;
+	// glEnable(GL_FRAMEBUFFER_SRGB);
+	// vsync ?
 }
 
 Window::~Window() { close(); }
@@ -74,8 +74,9 @@ void Window::onEvent(const ref<byte> ge) {
 			const auto& completeNotify = *(struct Present::CompleteNotify*)&event;
 			assert_(sizeof(XEvent)+event.genericEvent.size*4 == sizeof(completeNotify),
 					sizeof(XEvent)+event.genericEvent.size*4, sizeof(completeNotify));
-            assert_(state == Present);
-            state = Idle;
+			assert_(bo);
+			gbm_surface_release_buffer(gbmSurface, bo);
+			bo = 0;
 			currentFrameCounterValue = completeNotify.msc;
 			if(!firstFrameCounterValue) firstFrameCounterValue = currentFrameCounterValue;
         }
@@ -130,8 +131,7 @@ bool Window::processEvent(const XEvent& e) {
         else if(focus && focus->keyPress(Escape, NoModifiers)) render(); // Translates to Escape keyPress event
         else requestTermination(0); // Exits application by default
     }
-    else if(type==MappingNotify) {}
-    else if(type==Shm::event+Shm::Completion) { assert_(state == Copy); state = Present; }
+	else if(type==MappingNotify) {}
     else return false;
     return true;
 }
@@ -140,7 +140,6 @@ void Window::show() { send(MapWindow{.id=id}); send(RaiseWindow{.id=id}); }
 void Window::hide() { send(UnmapWindow{.id=id}); }
 void Window::close() {
 	if(id) {
-		send(FreeGC{.context=id+GraphicContext});
 		send(DestroyWindow{.id=id+XWindow});
 		id = 0;
 	}
@@ -167,54 +166,48 @@ void Window::render(shared<Graphics>&& graphics, int2 origin, int2 size) {
 }
 void Window::render() { assert_(size); updates.clear(); render(nullptr, int2(0), size); }
 
+struct DMABuf {
+	int fd = 0;
+	DMABuf() {}
+	DMABuf(const DMABuf&)=delete; DMABuf& operator=(const DMABuf&)=delete;
+	~DMABuf() { log("~DMA", fd); close(fd); }
+};
+static void destroy_user_data(gbm_bo*, void* dmabuf) { delete (DMABuf*)dmabuf; }
+
 void Window::event() {
 	Display::event();
 	//if(heldEvent) { processEvent(heldEvent); heldEvent = nullptr; }
 	//setTitle(getTitle ? getTitle() : widget->title());
-	if(updates) {
-        assert_(size);
-		if(glContext) {
-			assert_(state==Idle);
-			updates.clear();
-			Time gl; gl.start();
-			GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(black, 1));
-			widget->graphics(vec2(size), Rect(vec2(0), vec2(size)));
-			//glXSwapBuffers(glDisplay, id);
-			log("GL", gl);
-		} else if(state==Idle) {
-			if(target.size != size) {
-				if(target) {
-					send(FreePixmap{.pixmap=id+Pixmap}); target=Image();
-					assert_(shm);
-					send(Shm::Detach{.seg=id+Segment});
-					shmdt(target.data);
-					shmctl(shm, IPC_RMID, 0);
-					shm = 0;
-				} else assert_(!shm);
-
-				uint stride = align(16, width);
-				shm = check( shmget(0, height*stride*sizeof(byte4) , IPC_CREAT | 0777) );
-				target = Image(buffer<byte4>((byte4*)check(shmat(shm, 0, 0)), height*stride, 0), size, stride);
-				target.clear(byte4(0xFF));
-				send(Shm::Attach{.seg=id+Segment, .shm=shm});
-				send(CreatePixmap{.pixmap=id+Pixmap, .window=id+XWindow, .w=uint16(width), .h=uint16(size.y)});
-			}
-
-			Update update = updates.take(0);
-			if(!update.graphics) update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size))); // TODO: partial render
-
-			// Render background
-			/***/ if(background==NoBackground) {}
-			else if(background==White) fill(target, update.origin, update.size, 1, 1);
-			else error((int)background);
-
-			// Render graphics
-			::render(target, update.graphics);
-			send(Shm::PutImage{.window=id+Pixmap, .context=id+GraphicContext, .seg=id+Segment,
-							   .totalW=uint16(target.stride), .totalH=uint16(target.height), .srcX=uint16(update.origin.x), .srcY=uint16(update.origin.y),
-							   .srcW=uint16(update.size.x), .srcH=uint16(update.size.y), .dstX=uint16(update.origin.x), .dstY=uint16(update.origin.y),});
-			state=Copy;
-			send(Present::Pixmap{.window=id+XWindow, .pixmap=id+Pixmap}); //FIXME: update region
-		}
+	if(!updates) return;
+	assert_(size);
+	assert_(!bo);
+	if(surfaceSize != size) {
+		eglDestroySurface(eglDevice, eglSurface);
+		gbm_surface_destroy(gbmSurface);
+		gbmSurface = gbm_surface_create(gbmDevice, width, height, GBM_FORMAT_XRGB8888, GBM_BO_USE_RENDERING);
+		eglSurface = eglCreatePixmapSurface(eglDevice, eglConfig, (EGLNativePixmapType)gbmSurface, 0);
+		eglMakeCurrent(eglDevice, eglSurface, eglSurface, eglContext);
+		surfaceSize = size;
 	}
+
+	Update update = updates.take(0);
+	// Widget::graphics may renders using GL immediately and/or return primitives
+	GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(backgroundColor,1));
+	if(!update.graphics) update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size))); // TODO: partial render
+	glFinish();
+	eglSwapBuffers(eglDevice, eglSurface);
+	bo = gbm_surface_lock_front_buffer(gbmSurface);
+
+	DMABuf* dmabuf = (DMABuf*)gbm_bo_get_user_data(bo);
+	if(!dmabuf) {
+		dmabuf = new DMABuf();
+		drmPrimeHandleToFD(drmDevice, gbm_bo_get_handle(bo).u32, 0, &dmabuf->fd);
+		log("DMA", dmabuf->fd);
+		//mmap(NULL, size, PROT_READ, MAP_SHARED, b->fd, 0); TODO: software rendering
+		send(DRI3::PixmapFromBuffer{.pixmap=id+Pixmap,.drawable=id+XWindow,.bufferSize=height*width*4,.width=uint16(width),.height=uint16(height),.stride=uint16(width*4)}, dmabuf->fd);
+		gbm_bo_set_user_data(bo, dmabuf, &destroy_user_data);
+	}
+	//::render(Image(dmabuf->pointer, size), update.graphics); // FIXME: Render retained graphics
+	send(Present::Pixmap{.window=id+XWindow, .pixmap=id+Pixmap}); //FIXME: update region
+	assert_(!updates);
 }

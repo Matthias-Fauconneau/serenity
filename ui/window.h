@@ -2,7 +2,10 @@
 /// \file window.h Window display and input
 #include "display.h"
 #include "widget.h"
-struct XEvent;
+typedef void* EGLDisplay;
+typedef void* EGLConfig;
+typedef void* EGLContext;
+typedef void* EGLSurface;
 
 /// Interfaces \a widget as a window on a display server
 struct Window : Display /*should reference but inherits for convenience*/ {
@@ -18,16 +21,26 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     /// Window title
     String title;
 	function<String()> getTitle;
+	/// Background color
+	bgr3f backgroundColor = white;
 
     /// Associated window resource (relative to \a id)
-    enum Resource { XWindow, GraphicContext, Colormap, Segment, Pixmap, PresentEvent };
+	enum Resource { XWindow, Colormap, PresentEvent, Pixmap };
+	/// GPU device
+	int drmDevice;
+	struct gbm_device* gbmDevice;
+	EGLDisplay eglDevice;
+	EGLConfig eglConfig;
+	EGLContext eglContext;
+	/// GBM/EGL surface
+	struct gbm_surface* gbmSurface;
+	EGLSurface eglSurface;
+	int2 surfaceSize = 0;
+	struct gbm_bo* bo = 0;
 
-    /// System V shared memory
-    uint shm = 0;
-    /// Rendering target in shared memory
-    Image target;
-    /// Shared window buffer state
-    enum State { Idle, Copy, Present } state = Idle;
+	/// Whether this window is currently mapped. This doesn't imply the window is visible (can be covered)
+	bool mapped = false;
+
 	uint64 firstFrameCounterValue = 0;
 	uint64 currentFrameCounterValue = 0;
 	static constexpr uint framesPerSecond = 60; // FIXME: get from Window
@@ -35,12 +48,6 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     /// Updates to be rendered
 	struct Update { shared<Graphics> graphics; int2 origin, size; };
     array<Update> updates;
-
-    /// Whether this window is currently mapped. This doesn't imply the window is visible (can be covered)
-    bool mapped = false;
-
-    /// Background style
-    enum Background { NoBackground, White } background = White;
 
 // Control
     /// An event held to implement motion compression and ignore autorepeats
@@ -63,7 +70,7 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     /// Processes or holds an event
     void onEvent(const ref<byte> ge);
     /// Processes an event
-    bool processEvent(const XEvent& ge);
+	bool processEvent(const struct XEvent& ge);
 
  // Window
     /// Shows window.

@@ -8,7 +8,7 @@ struct XEvent {
     struct Generic { uint8 ext; uint16 seq; uint size; uint16 type; } packed;
     union {
         Error error;
-		struct { byte pad; uint16 seq; uint size; byte pad1[24]; } packed reply;
+		struct { byte padOrFdCount; uint16 seq; uint size; byte pad1[24]; } packed reply;
         struct { uint8 key; uint16 seq; uint time,root,event,child; int16 rootX,rootY,x,y; int16 state; int8 sameScreen; } packed; // input
         struct { byte detail; uint16 seq; uint window; uint8 mode; } packed focus;
         struct { byte pad; uint16 seq; uint window; uint16 x,y,w,h,count; } packed expose;
@@ -115,7 +115,7 @@ struct CreateColormap { int8 req=78,alloc=0; uint16 size=4; uint colormap,window
 struct FreeCursor { int8 req=95,pad=0; uint16 size=2; uint cursor; };
 struct QueryExtension {
     int8 req=98,pad=0; uint16 size=2, length, pad2=0;
-    struct Reply { byte pad; uint16 seq; uint size; uint8 present,major,firstEvent,firstError; byte pad2[20]; } packed;
+	struct Reply { byte pad; uint16 seq; uint size; uint8 present,major,firstEvent,firstError; byte pad2[20]; } packed;
 };
 struct ListExtensions {
 	int8 req=99, pad=0; uint16 size=1;
@@ -212,8 +212,15 @@ struct QueryVersion {
 	struct Reply { int8 pad; uint16 seq; uint size; uint major,minor,pad2[4]; } packed;
 };
 struct Open {
-	int8 ext=EXT, req=1; uint16 size=3; uint drawable, provider;
+	int8 ext=EXT, req=1; uint16 size=3; uint drawable, provider=0;
 	struct Reply { uint8 nfd; uint16 seq; uint size; uint pad[6]; } packed;
 } packed;
-constexpr string requests[] = {"QueryVersion","Open"};
+struct PixmapFromBuffer {
+	int8 ext=EXT, req=2; uint16 size=3; uint pixmap, drawable, bufferSize; uint16 width, height, stride; uint8 depth=32, bpp=32; //FD fd;
+} packed;
+struct BufferFromPixmap {
+	int8 ext=EXT, req=3; uint16 size=2; uint pixmap;
+	struct Reply { uint8 nfd; uint16 seq; uint size; uint16 width, height, stride; uint8 depth, bpp; uint pad[4]; } packed;
+} packed;
+constexpr string requests[] = {"QueryVersion","Open","PixmapFromBuffer","BufferFromPixmap"};
 }

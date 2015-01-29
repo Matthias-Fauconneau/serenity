@@ -83,10 +83,10 @@ Display::Display(bool GL, Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(
 		XRender::EXT=r.major; XRender::errorBase=r.firstError; }
     {auto r = request(QueryExtension{.length="Present"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "Present"_);
 		Present::EXT=r.major; }
-	{auto r = request(QueryExtension{.length="RANDR"_.size, .size=uint16(2+align(4,"RANDR"_.size)/4)}, "RANDR"_);
-		RandR::EXT=r.major; /*RandR::event=r.firstEvent; RandR::errorBase=r.firstError;*/ }
+	/*{auto r = request(QueryExtension{.length="RANDR"_.size, .size=uint16(2+align(4,"RANDR"_.size)/4)}, "RANDR"_);
+		RandR::EXT=r.major; }*/
 	{auto r = request(QueryExtension{.length="DRI3"_.size, .size=uint16(2+align(4,"DRI3"_.size)/4)}, "DRI3"_);
-		DRI3::EXT=r.major; /*DRI3::event=r.firstEvent; DRI3::errorBase=r.firstError;*/ }
+		DRI3::EXT=r.major; assert_(DRI3::EXT); /*DRI3::event=r.firstEvent; DRI3::errorBase=r.firstError;*/ }
 
 	if(GL) { // libgl-xlib
 #if 0
@@ -135,14 +135,46 @@ void Display::event(const ref<byte> ge) {
     onEvent(ge);
 }
 
-array<byte> Display::readReply(uint16 sequence, uint elementSize) {
+uint16 Display::send(ref<byte> data, int fd) {
+	iovec iov {.iov_base = (byte*)data.data, .iov_len = data.size};
+	union { cmsghdr cmsghdr; char control[CMSG_SPACE(sizeof(int))]; } cmsgu;
+	msghdr msg{.msg_name=0, .msg_namelen=0, .msg_iov=&iov, .msg_iovlen=1, .msg_control=&cmsgu, .msg_controllen = sizeof(cmsgu.control)};
+	if(fd==-1) { msg.msg_control = NULL, msg.msg_controllen = 0; }
+	else {
+		cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+		cmsg->cmsg_len = CMSG_LEN(sizeof (int));
+		cmsg->cmsg_level = SOL_SOCKET;
+		cmsg->cmsg_type = SCM_RIGHTS;
+		*((int *)CMSG_DATA(cmsg)) = fd;
+	}
+	ssize_t size = sendmsg(Socket::fd, &msg, 0);
+	assert_(size == ssize_t(data.size));
+	sequence++;
+	return sequence;
+}
+
+array<byte> Display::readReply(uint16 sequence, uint elementSize, buffer<int>& fds) {
     for(;;) {
-        XEvent e = read<XEvent>();
+		XEvent e;
+		iovec iov {.iov_base = &e, .iov_len = sizeof(e)};
+		union { cmsghdr cmsghdr; char control[CMSG_SPACE(sizeof(int))]; } cmsgu;
+		msghdr msg{.msg_name=0, .msg_namelen=0, .msg_iov=&iov, .msg_iovlen=1, .msg_control=&cmsgu, .msg_controllen = sizeof(cmsgu.control)};
+		ssize_t size = recvmsg(Socket::fd, &msg, 0);
+		assert_(size==sizeof(e));
         if(e.type==Reply) {
             assert_(e.seq==sequence);
 			array<byte> reply;
 			reply.append(raw(e.reply));
             if(e.reply.size) { assert_(elementSize); reply.append(read(e.reply.size*elementSize)); }
+			cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+			if(cmsg) {
+				assert_(cmsg && cmsg->cmsg_len == CMSG_LEN(sizeof(int)));
+				assert_(cmsg->cmsg_level == SOL_SOCKET);
+				assert_(cmsg->cmsg_type == SCM_RIGHTS);
+				assert_(e.reply.padOrFdCount == 1);
+				fds = buffer<int>(1);
+				fds[0] = *((int*)CMSG_DATA(cmsg));
+			}
             return reply;
         }
 		if(e.type==Error) { error(e); assert_(e.seq!=sequence, e.seq, sequence); continue; }
@@ -150,7 +182,7 @@ array<byte> Display::readReply(uint16 sequence, uint elementSize) {
 		o.append(raw(e));
         if(e.type==GenericEvent) o.append(read(e.genericEvent.size*4));
         events.append(move(o));
-        queue(); // Queue event to process after unwinding back to event loop
+		queue(); // Queues event to process after unwinding back to event loop
     }
 }
 
