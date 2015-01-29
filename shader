@@ -1,11 +1,19 @@
 terrain {
  varying vec2 vTexCoords;
  uniform int N;
+ uniform int W;
  vertex {
   uniform mat4 modelViewProjectionTransform; // TODO: -> mat3
-  vTexCoords = vec2(gl_VertexID%(N+1), gl_VertexID/(N+1));
+  int YXyx = gl_VertexID;
+  int x = YXyx%(N+1);
+  int YXy = YXyx/(N+1);
+  int y = YXy%(N+1);
+  int YX = YXy/(N+1);
+  int X = YX%W;
+  int Y = YX/W;
   attribute float aElevation;
-  gl_Position = modelViewProjectionTransform*vec4(vTexCoords, aElevation, 1);
+  gl_Position = modelViewProjectionTransform*vec4(X*N+x, Y*N+y, aElevation, 1);
+  vTexCoords = vec2(x, YXy);
  }
 }
 

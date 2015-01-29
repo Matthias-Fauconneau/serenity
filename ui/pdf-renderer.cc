@@ -529,6 +529,6 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
         // add any children
         if(dict.contains("Kids"_)) pageXrefs.append( move(dict.at("Kids"_).list) );
     }
-    for(unique<FontData>& fonts: fonts.values) outFonts.append(move(fonts));
-    return move(pages);
+	for(unique<FontData>& fonts: fonts.values) outFonts.append(move(fonts));
+	return move(pages);
 }

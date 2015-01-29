@@ -171,6 +171,7 @@ uint GLShader::attribLocation(string name) {
 GLBuffer::GLBuffer(uint elementSize, ref<byte> data) : elementSize(elementSize), elementCount(data.size/elementSize) {
 	glGenBuffers(1, &id);
 	glBindBuffer(GL_ARRAY_BUFFER, id);
+	assert_(int(data.size) > 0, data.size);
 	glBufferData(GL_ARRAY_BUFFER, data.size, data.data, GL_STATIC_DRAW);
 }
 GLBuffer::~GLBuffer() { if(id) glDeleteBuffers(1, &id); }
@@ -193,11 +194,12 @@ void GLVertexArray::draw(PrimitiveType primitiveType, uint vertexCount) const {
     glDrawArrays(primitiveType, 0, vertexCount);
 }
 
-void GLIndexBuffer::draw() {
+void GLIndexBuffer::draw(int /*base*/ instanceCount) {
 	glEnable(GL_PRIMITIVE_RESTART_FIXED_INDEX);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
 	assert_(elementSize==2);
-	glDrawElements(primitiveType, elementCount, GL_UNSIGNED_SHORT, 0);
+	//glDrawElementsBaseVertex(primitiveType, elementCount, GL_UNSIGNED_SHORT, 0, base);
+	glDrawElementsInstanced(primitiveType, elementCount, GL_UNSIGNED_SHORT, 0, instanceCount);
 }
 
 /// Texture
@@ -218,8 +220,8 @@ GLTexture::GLTexture(uint width, uint height, uint format, const void* data) : w
 			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+index, 0, format&SRGB?GL_SRGB8:GL_RGB8, width, height/6, 0, GL_BGRA, GL_UNSIGNED_BYTE, ((byte4*)data)+index*height/6*width);
 		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 	}
-	/*else if((format&0b11) == Short)
-			glTexImage2D(target, 0, GL_RED, width, height, 0, GL_RED, GL_SHORT, data);*/
+	else if((format&0b11) == Short)
+			glTexImage2D(target, 0, GL_R16I, width, height, 0, GL_R16I, GL_SHORT, data);
 	else if((format&0b11) == Depth)
 			glTexImage2D(target, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, data);
 	else if((format&0b11) == RGBA8)

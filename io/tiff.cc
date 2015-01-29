@@ -26,7 +26,8 @@ Image16 parseTIFF(const ref<byte> file) {
 				//assert_(nextOffset - lastOffset == image.stride*2, lastOffset, nextOffset, nextOffset-offset, image.stride);
 				//lastOffset = nextOffset;
 			}
-			image.data = (int16*)(s.data.data + offset);
+			image.Ref::data = (int16*)(s.data.data + offset);
+			image.Ref::size = image.height*image.width;
 		}
 		if(entry.tag == 278) assert_(entry.value == 1); // 1 row per trip // assert_(entry.value == image.height, entry.value, image.height); // single strip
 	}

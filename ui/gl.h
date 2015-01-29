@@ -49,6 +49,7 @@ struct GLBuffer {
 	uint elementSize = 0;
 	uint elementCount = 0;
 
+	GLBuffer() {}
 	GLBuffer(uint elementSize, ref<byte> data);
 	template<Type T> GLBuffer(ref<T> data) : GLBuffer(sizeof(T), cast<byte>(data)) {}
 	default_move(GLBuffer);
@@ -73,7 +74,8 @@ struct GLVertexArray {
 struct GLIndexBuffer : GLBuffer {
 	template<Type T> GLIndexBuffer(ref<T> data) : GLBuffer(sizeof(T), cast<byte>(data)) {}
 	PrimitiveType primitiveType = TriangleStrip;
-	void draw();
+	//void draw(int base);
+	void draw(int instanceCount=1);
 };
 
 enum Format { RGB8=0, R16I=1, Depth=2/*U32*/, RGBA8=3,

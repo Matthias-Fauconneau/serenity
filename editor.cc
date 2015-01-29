@@ -113,25 +113,35 @@ const float horizonDistance = R*5*PI/180; // d=√(2Rh) => h < 24km
 struct Terrain {
 	GLShader shader {::shader(), {"terrain"}};
 
+	GLBuffer elevation;
+	GLVertexArray vertexArray;
+	GLTexture textureBuffer;// {elevation}; // shader read access (texelFetch) to elevation buffer
+	//GLTexture elevation;
+
 	struct Tile {
 		int2 tileIndex;
 		GLIndexBuffer indexBuffer;
-		GLBuffer elevation;
-		GLVertexArray vertexArray;
-		GLTexture textureBuffer {elevation}; // shader read access (texelFetch) to elevation buffer
-		Tile(int2 tileIndex, ref<uint16> indices, ref<int16> elevation) : tileIndex(tileIndex), indexBuffer(indices), elevation(elevation) {}
 	};
 	array<Tile> tiles; // TODO: LOD
 
-	static constexpr int D = 128;
+	static constexpr int D = 4;
 	static constexpr int N = 256-D; // Number of cells: floor(D, √(2^16-1/*restart index*/))
+	const uint W = D*N, H = W;
 	//int maxZ = 0;
 
 	Terrain() {
 		Map map("srtm_37_03.tif");
-		Image16 elevation = parseTIFF(map);
-		const int W = 4*N, H = W;
-		assert_(W <= elevation.width && H <=elevation.height);
+		Image16 sourceElevation = parseTIFF(map);
+		assert_(W <= sourceElevation.width && H <=sourceElevation.height);
+		/*buffer<int16> elevation ((W/D+1)*(H/D+1));
+		for(int y: range(H/D+1)) for(int x: range(W/D+1)) {
+			int z = sourceElevation(x*D, y*D);
+			elevation[y*(W/D+1)+x] = ::max(0, z);
+			//maxZ = ::max(maxZ, z);
+		}
+		//this->elevation = GLTexture(W/D+1, H/D+1, Short, elevation.data);
+		this->elevation = elevation;
+		textureBuffer = this->elevation;*/
 
 		// -> shader
 		//vec2 a = vec2(x - N/2, y - N/2)*da;
@@ -144,25 +154,34 @@ struct Terrain {
 			vertices[grid[y*N+x]].normal = normalize(vec3(-dy*dxZ, -dx*dyZ, dx*dy));
 		}*/
 
-		for(int Y: range(W/N)) for(int X: range(H/N)) {
+		buffer<int16> elevation ((H/N)*(W/N)*(N/D+1)*(N/D+1)); //FIXME: share first/last line
+		for(int Y: range(H/N)) for(int X: range(W/N)) {
 			struct TriangleStrip tile (N/D*N/D*6);
-			buffer<int16> vertices ((N+1)*(N+1));
-			for(int y: range(N+1)) for(int x: range(N+1)) {
-				int z = elevation(X*N+x, Y*N+y);
-				vertices[y*(N+1)+x] = ::max(0, z);
+			for(int y: range(N/D+1)) for(int x: range(N/D+1)) {
+				int z = sourceElevation(X*N+x*D, Y*N+y*D);
+				elevation[(Y*(W/N)+X)*(N/D+1)*(N/D+1)+y*(N/D+1)+x] = ::max(0, z);
 				//maxZ = ::max(maxZ, z);
 			}
 			for(int y: range(N/D)) for(int x: range(N/D)) { // TODO: Z-order triangle strips for framebuffer locality ?
-				int v00 = (y+0)*D*(N+1)+x*D, v10 = (y+0)*D*(N+1)+(x+1)*D;
-				int v01 = (y+1)*D*(N+1)+x*D, v11 = (y+1)*D*(N+1)+(x+1)*D;
-				if(vertices[v00]>=0 && vertices[v11]>=0) {
-					if(vertices[v10]>=0) tile.triangle(v01, v00, v11);
-					if(vertices[v10]>=0) tile.triangle(v11, v00, v10);
+				//int v00 = (Y*(W/N)+X)*(N/D+1)*(N/D+1)+(y+0)*(N/D+1)+x, v10 = (Y*(W/N)+X)*(N/D+1)*(N/D+1)+(y+0)*(N/D+1)+(x+1);
+				//int v01 = (Y*(W/N)+X)*(N/D+1)*(N/D+1)+(y+1)*(N/D+1)+x, v11 = (Y*(W/N)+X)*(N/D+1)*(N/D+1)+(y+1)*(N/D+1)+(x+1);
+				//int v00 = (Y*(W/N)+X)*(N/D+1)*(N/D+1)+(y+0)*D*(N+1)+x*D, v10 = (Y*(W/N)+X)*(N/D+1)*(N/D+1)+(y+0)*D*(N+1)+(x+1)*D;
+				//int v01 = (Y*(W/N)+X)*(N/D+1)*(N/D+1)+(y+1)*D*(N+1)+x*D, v11 = (Y*(W/N)+X)*(N/D+1)*(N/D+1)+(y+1)*D*(N+1)+(x+1)*D;
+				//int v00 = (Y*N/D+y+0)*(W/D+1)+X*N/D+x, v10 = (Y*N/D+y+0)*(W/D+1)+(X*N/D+x+1);
+				//int v01 = (Y*N/D+y+1)*(W/D+1)+X*N/D+x, v11 = (Y*N/D+y+1)*(W/D+1)+(X*N/D+x+1);
+				//int v00 = (y+0)*D*(N+1)+x*D, v10 = (y+0)*D*(N+1)+(x+1)*D;
+				//int v01 = (y+1)*D*(N+1)+x*D, v11 = (y+1)*D*(N+1)+(x+1)*D;
+				int v00 = (y+0)*(N/D+1)+x, v10 = (y+0)*(N/D+1)+(x+1);
+				int v01 = (y+1)*(N/D+1)+x, v11 = (y+1)*(N/D+1)+(x+1);
+				if(elevation[v00]>=0 && elevation[v11]>=0) {
+					if(elevation[v10]>=0) tile.triangle(v01, v00, v11);
+					if(elevation[v10]>=0) tile.triangle(v11, v00, v10);
 				}
 			}
-			log(vertices.size, tile.indices.size);
-			if(tile.indices) tiles.append(int2(X, Y), tile.indices, vertices);
+			if(tile.indices) tiles.append(int2(X, Y), tile.indices);
 		}
+		this->elevation = elevation;
+		textureBuffer = this->elevation;
 		//log(maxZ);
 	}
 
@@ -187,15 +206,20 @@ struct Terrain {
 
 	void draw(const mat4 viewProjection) {
 		shader.bind();
-		shader["N"_] = N;
+		shader["W"_] = int(W/N);
+		shader["N"_] = N/D;
+		vertexArray.bindAttribute(shader.attribLocation("aElevation"), 1, Short, elevation);
 		shader["tElevation"_] = 0;
-		for(Tile& tile: tiles) { // TODO: instancing
-			shader["modelViewProjectionTransform"_] = mat4(viewProjection).scale(vec3(dx,dx,1)).translate(vec3(vec2(N*tile.tileIndex),0));
-			tile.vertexArray.bindAttribute(shader.attribLocation("aElevation"), 1, Short, tile.elevation);
-			tile.vertexArray.bind();
-			tile.textureBuffer.bind(0);
-			tile.indexBuffer.draw();
+		textureBuffer.bind(0);
+		Time draw; draw.start();
+		shader["modelViewProjectionTransform"_] = mat4(viewProjection).scale(vec3(vec2(dx*D),1)); //.translate(vec3(vec2(N/D*tile.tileIndex),0)); // TODO: UBO
+		for(Tile& tile: tiles) {
+			//shader["X"_] = tile.tileIndex.x;
+			//shader["Y"_] = tile.tileIndex.y;
+			int X=tile.tileIndex.x, Y=tile.tileIndex.y;
+			tile.indexBuffer.draw( (Y*(W/N)+X)*(N/D+1)*(N/D+1));
 		}
+		log("draw", draw);
 	}
 };
 
@@ -485,6 +509,7 @@ struct View : Widget {
 		diffuse["shadowTransform"] = light.toShadow();
 		diffuse["lightDirection"] = lightDirection;*/
 
+		//vertexArray.bind(); // Empty vertex array
 		terrain.draw(viewProjection);
 		/*for(Instance instance: instances) {
 			instance.surface.vertexBuffer.bindAttribute(diffuse, "aPosition"_, 3, offsetof(Vertex, position));

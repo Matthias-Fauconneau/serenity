@@ -159,9 +159,11 @@ void Window::event() {
 		if(glContext) {
 			assert_(state==Idle);
 			updates.clear();
+			Time gl; gl.start();
 			GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(black, 1));
 			widget->graphics(vec2(size), Rect(vec2(0), vec2(size)));
 			glXSwapBuffers(glDisplay, id);
+			log("GL", gl);
 		} else if(state==Idle) {
 			if(target.size != size) {
 				if(target) {

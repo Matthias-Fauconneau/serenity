@@ -151,3 +151,4 @@ algebra.h
 algebra.cc
 image/stitch.cc
 io/tiff.cc
+test.cc
