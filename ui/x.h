@@ -8,7 +8,7 @@ struct XEvent {
     struct Generic { uint8 ext; uint16 seq; uint size; uint16 type; } packed;
     union {
         Error error;
-        struct { byte unknown; uint16 seq; uint size; byte pad[24]; } packed reply;
+		struct { byte pad; uint16 seq; uint size; byte pad1[24]; } packed reply;
         struct { uint8 key; uint16 seq; uint time,root,event,child; int16 rootX,rootY,x,y; int16 state; int8 sameScreen; } packed; // input
         struct { byte detail; uint16 seq; uint window; uint8 mode; } packed focus;
         struct { byte pad; uint16 seq; uint window; uint16 x,y,w,h,count; } packed expose;
@@ -117,6 +117,10 @@ struct QueryExtension {
     int8 req=98,pad=0; uint16 size=2, length, pad2=0;
     struct Reply { byte pad; uint16 seq; uint size; uint8 present,major,firstEvent,firstError; byte pad2[20]; } packed;
 };
+struct ListExtensions {
+	int8 req=99, pad=0; uint16 size=1;
+	struct Reply { uint8 extensionCount; uint16 seq; uint size; byte pad[24]; } packed;
+};
 struct GetKeyboardMapping {
     int8 req=101; uint16 size=2; uint8 keycode, count=1; int16 pad=0;
     struct Reply { uint8 numKeySymsPerKeyCode; uint16 seq; uint size; byte pad[24]; } packed;
@@ -164,7 +168,7 @@ struct PictVisual { uint visual, format; };
 struct PictDepth { uint8 depth; uint16 numPictVisuals; uint pad; /*PictVisual[numPictVisuals]*/ };
 struct PictScreen { uint numDepths; uint fallback; /*PictDepth[numDepths]*/ };
 
-extern int EXT, event, errorBase;
+extern int EXT, errorBase;
 struct QueryVersion {
     int8 ext=EXT,req=0; uint16 size=3; uint major=0,minor=11;
     struct Reply { int8 pad; uint16 seq; uint size; uint major,minor,pad2[4]; } packed;
@@ -191,4 +195,25 @@ struct NotifyMSC { int8 ext=EXT,req=2; uint16 size=10; uint window, serial=0, pa
 struct SelectInput { int8 ext=EXT, req=3; uint16 size=4; uint eid, window, eventMask=CompleteNotifyMask; };
 enum { ConfigureNotify, CompleteNotify };
 struct CompleteNotify { uint8 type; XEvent::Generic genericEvent; uint8 kind, mode; uint event_id, window, serial; uint64 ust, msc; } packed;
+}
+
+namespace RandR {
+extern int EXT;
+struct GetProviders {
+	int8 ext=EXT, req=32; uint16 size=2; uint window;
+	struct Reply { int8 pad; uint16 seq; uint size; uint32 timestamp; uint16 providerCount, pad1; uint pad2[4]; } packed;
+};
+}
+
+namespace DRI3 {
+extern int EXT;
+struct QueryVersion {
+	int8 ext=EXT,req=0; uint16 size=3; uint major=1,minor=0;
+	struct Reply { int8 pad; uint16 seq; uint size; uint major,minor,pad2[4]; } packed;
+};
+struct Open {
+	int8 ext=EXT, req=1; uint16 size=3; uint drawable, provider;
+	struct Reply { uint8 nfd; uint16 seq; uint size; uint pad[6]; } packed;
+} packed;
+constexpr string requests[] = {"QueryVersion","Open"};
 }

@@ -3,12 +3,14 @@
 #include "x.h"
 #include "png.h"
 #include "time.h"
-#include <sys/shm.h>
 #include "gl.h"
-extern "C" {
+#include <sys/shm.h>
+#include <sys/uio.h>
+#include <sys/socket.h>
+/*extern "C" {
 bool glXMakeCurrent(_XDisplay* dpy, uint drawable, __GLXcontextRec* ctx);
 void glXSwapBuffers(_XDisplay* dpy, uint drawable);
-}
+}*/
 
 Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool show, const Image& icon, bool GL, Thread& thread)
 	: Display(GL, thread), widget(widget), size(sizeHint), getTitle(title) {
@@ -35,7 +37,22 @@ Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool sho
     actions[Escape] = []{requestTermination();};
     actions[PrintScreen] = [this]{writeFile(str(Date(currentTime())), encodePNG(target), home());};
 	if(show) this->show();
-	if(glContext) glXMakeCurrent(glDisplay, id+XWindow, glContext); // DRI2CreateDrawable
+	buffer<uint> providers; request(RandR::GetProviders{.window=id+XWindow}, providers);
+	request(DRI3::QueryVersion());
+	send(DRI3::Open{.drawable=id+XWindow, .provider=providers[0]});
+	DRI3::Open::Reply reply;
+	iovec iov {.iov_base = &reply, .iov_len = sizeof(reply)};
+	union { cmsghdr cmsghdr; char control[CMSG_SPACE(sizeof(int))]; } cmsgu;
+	msghdr msg{.msg_name=0, .msg_namelen=0, .msg_iov=&iov, .msg_iovlen=1, .msg_control=&cmsgu, .msg_controllen = sizeof(cmsgu.control)};
+	ssize_t size = recvmsg(Socket::fd, &msg, 0);
+	assert_(size==sizeof(reply));
+	struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+	assert_(cmsg && cmsg->cmsg_len == CMSG_LEN(sizeof(int)));
+	assert_(cmsg->cmsg_level == SOL_SOCKET);
+	assert_(cmsg->cmsg_type == SCM_RIGHTS);
+	int deviceFD = *((int *) CMSG_DATA(cmsg));
+	error(deviceFD);
+	//if(glContext) glXMakeCurrent(glDisplay, id+XWindow, glContext); // DRI3CreateDrawable
 	//glEnable(GL_FRAMEBUFFER_SRGB);
 	//((PFNGLXSWAPINTERVALMESAPROC)glXGetProcAddress((const GLubyte*)"glXSwapIntervalMESA"))(1);
 }
@@ -162,7 +179,7 @@ void Window::event() {
 			Time gl; gl.start();
 			GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(black, 1));
 			widget->graphics(vec2(size), Rect(vec2(0), vec2(size)));
-			glXSwapBuffers(glDisplay, id);
+			//glXSwapBuffers(glDisplay, id);
 			log("GL", gl);
 		} else if(state==Idle) {
 			if(target.size != size) {

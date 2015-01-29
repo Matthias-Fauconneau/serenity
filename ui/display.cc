@@ -2,26 +2,7 @@
 #include "x.h"
 #include <sys/socket.h>
 #include "data.h"
-//FIXME: undefined reference
-
 #include "gl.h"
-#undef packed
-#define Time XTime
-#define Cursor XCursor
-#define Depth XXDepth
-#define Window XWindow
-#define Screen XScreen
-#define XEvent XXEvent
-#define Display XDisplay
-#include <GL/glx.h> //X11
-#undef Time
-#undef Cursor
-#undef Depth
-#undef Window
-#undef Screen
-#undef XEvent
-#undef Display
-#undef None
 
 String str(XEvent::Error e) {
     uint8 code = e.code;
@@ -40,8 +21,10 @@ String str(XEvent::Error e) {
             code -= XRender::errorBase;
             errors = ref<string>(XRender::errors);
         }
-    } else request = e.major;
-    return str(requests[request], code<errors.size?errors[code]:str(code));
+	} else if(e.major==DRI3::EXT) {
+		requests = ref<string>(DRI3::requests);
+	} else request = e.major;
+	return str(request<requests.size?requests[request]:str(request), code<errors.size?errors[code]:str(code));
 }
 
 String str(XEvent e) {
@@ -51,8 +34,10 @@ String str(XEvent e) {
 
 // Globals
 namespace Shm { int EXT, event, errorBase; } using namespace Shm;
-namespace XRender { int EXT, event, errorBase; } using namespace XRender;
-namespace Present { int EXT, event, errorBase; }
+namespace XRender { int EXT, errorBase; } using namespace XRender;
+namespace Present { int EXT; }
+namespace RandR { int EXT; }
+namespace DRI3 { int EXT/*, event, errorBase*/; }
 
 Display::Display(bool GL, Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread) {
     {String path = "/tmp/.X11-unix/X"+getenv("DISPLAY",":0").slice(1,1);
@@ -90,14 +75,21 @@ Display::Display(bool GL, Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(
         assert(visual);
     }
 
+	//buffer<uint> extensions; int count=request(ListExtensions(), extensions).extensionCount; log(count, cast<char>(extensions));
+
 	{auto r = request(QueryExtension{.length="MIT-SHM"_.size, .size=uint16(2+align(4,"MIT-SHM"_.size)/4)}, "MIT-SHM"_);
         Shm::EXT=r.major; Shm::event=r.firstEvent; Shm::errorBase=r.firstError;}
     {auto r = request(QueryExtension{.length="RENDER"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "RENDER"_);
-        XRender::EXT=r.major; XRender::event=r.firstEvent; XRender::errorBase=r.firstError; }
+		XRender::EXT=r.major; XRender::errorBase=r.firstError; }
     {auto r = request(QueryExtension{.length="Present"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "Present"_);
-        Present::EXT=r.major; XRender::event=r.firstEvent; XRender::errorBase=r.firstError; }
+		Present::EXT=r.major; }
+	{auto r = request(QueryExtension{.length="RANDR"_.size, .size=uint16(2+align(4,"RANDR"_.size)/4)}, "RANDR"_);
+		RandR::EXT=r.major; /*RandR::event=r.firstEvent; RandR::errorBase=r.firstError;*/ }
+	{auto r = request(QueryExtension{.length="DRI3"_.size, .size=uint16(2+align(4,"DRI3"_.size)/4)}, "DRI3"_);
+		DRI3::EXT=r.major; /*DRI3::event=r.firstEvent; DRI3::errorBase=r.firstError;*/ }
 
 	if(GL) { // libgl-xlib
+#if 0
 		assert_(!glDisplay && !glContext);
 		glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_,":0"_))); assert_(glDisplay);
 		const int fbAttribs[] = {GLX_DOUBLEBUFFER, 1, GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 24, /*GLX_SAMPLE_BUFFERS, 1, GLX_SAMPLES, 8,*/
@@ -107,7 +99,7 @@ Display::Display(bool GL, Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(
 		glContext = ((PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB"))
 				(glDisplay, fbConfigs[0], 0, 1/*direct*/, contextAttribs);
 		assert_(glContext);
-		assert_(glXIsDirect(glDisplay, glContext));
+#endif
 	}
 }
 

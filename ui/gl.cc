@@ -194,12 +194,12 @@ void GLVertexArray::draw(PrimitiveType primitiveType, uint vertexCount) const {
     glDrawArrays(primitiveType, 0, vertexCount);
 }
 
-void GLIndexBuffer::draw(int /*base*/ instanceCount) {
+void GLIndexBuffer::draw(int base /*instanceCount*/) {
 	glEnable(GL_PRIMITIVE_RESTART_FIXED_INDEX);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
 	assert_(elementSize==2);
-	//glDrawElementsBaseVertex(primitiveType, elementCount, GL_UNSIGNED_SHORT, 0, base);
-	glDrawElementsInstanced(primitiveType, elementCount, GL_UNSIGNED_SHORT, 0, instanceCount);
+	glDrawElementsBaseVertex(primitiveType, elementCount, GL_UNSIGNED_SHORT, 0, base);
+	//glDrawElementsInstanced(primitiveType, elementCount, GL_UNSIGNED_SHORT, 0, instanceCount);
 }
 
 /// Texture
