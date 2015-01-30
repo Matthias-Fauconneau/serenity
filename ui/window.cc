@@ -11,6 +11,7 @@
 #include <sys/fcntl.h>
 #include <gbm.h> // gbm
 #include <EGL/egl.h> // EGL
+#include <EGL/eglext.h>
 #include <GL/gl.h> // drm
 extern "C" int drmPrimeHandleToFD(int fd, uint32_t handle, uint32_t flags, int *prime_fd);
 
@@ -48,7 +49,8 @@ Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool sho
 	eglBindAPI(EGL_OPENGL_API);
 	EGLint n;
 	eglChooseConfig(eglDevice, (EGLint[]){EGL_SURFACE_TYPE, EGL_PIXMAP_BIT, EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT, EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 0, EGL_NONE}, &eglConfig, 1, &n);
-	eglContext = eglCreateContext(eglDevice, eglConfig, 0, (EGLint[]){EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE});
+	eglContext = eglCreateContext(eglDevice, eglConfig, 0, (EGLint[]){EGL_CONTEXT_MAJOR_VERSION_KHR, 3, EGL_CONTEXT_MINOR_VERSION_KHR, 3,
+																	  EGL_CONTEXT_OPENGL_PROFILE_MASK_KHR, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT_KHR, EGL_NONE});
 	gbmSurface = gbm_surface_create(gbmDevice, width, height, GBM_FORMAT_XRGB8888, GBM_BO_USE_RENDERING);
 	EGLSurface eglSurface = eglCreatePixmapSurface(eglDevice, eglConfig, (EGLNativePixmapType)gbmSurface, 0);
 	eglMakeCurrent(eglDevice, eglSurface, eglSurface, eglContext);
@@ -182,6 +184,7 @@ void Window::event() {
 	assert_(size);
 	assert_(!bo);
 	if(surfaceSize != size) {
+		log("Size changed", surfaceSize, size);
 		eglDestroySurface(eglDevice, eglSurface);
 		gbm_surface_destroy(gbmSurface);
 		gbmSurface = gbm_surface_create(gbmDevice, width, height, GBM_FORMAT_XRGB8888, GBM_BO_USE_RENDERING);
@@ -192,11 +195,13 @@ void Window::event() {
 
 	Update update = updates.take(0);
 	// Widget::graphics may renders using GL immediately and/or return primitives
-	GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(backgroundColor,1));
-	if(!update.graphics) update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size))); // TODO: partial render
+	//GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(backgroundColor,1));
+	//if(!update.graphics) update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size))); // TODO: partial render
 	glFinish();
 	eglSwapBuffers(eglDevice, eglSurface);
+	log("gbm_surface_lock_front_buffer");
 	bo = gbm_surface_lock_front_buffer(gbmSurface);
+	log("OK");
 
 	DMABuf* dmabuf = (DMABuf*)gbm_bo_get_user_data(bo);
 	if(!dmabuf) {

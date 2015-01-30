@@ -47,7 +47,7 @@ struct Display : Socket, Poll {
 	 uint16 send(ref<byte> data, int fd=-1);
 	 template<Type Request> uint16 send(Request request, const ref<byte> data, int fd=-1) {
          assert_(sizeof(request)%4==0 && sizeof(request) + align(4, data.size) == request.size*4, sizeof(request), data.size, request.size*4);
-		 return send(data?raw(request)+pad(data):raw(request), fd);
+		 return send(ref<byte>(data?raw(request)+pad(data):raw(request)), fd);
      }
 	 template<Type Request> uint16 send(Request request, int fd=-1) { return send(request, {}, fd); }
 
