@@ -1,4 +1,5 @@
 #include "file.h"
+#include "data.h"
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -10,6 +11,7 @@
 #include <sys/sendfile.h>
 #include <sys/statvfs.h>
 #include <sys/syscall.h>
+#include <pwd.h>
 
 // -- Handle
 
@@ -25,8 +27,6 @@ String Handle::name() const {
 // -- Folder
 
 const Folder& currentWorkingDirectory() { static const int cwd = AT_FDCWD; return (const Folder&)cwd; }
-
-const Folder& root() { static const Folder root("/",currentWorkingDirectory()); return root; }
 
 Folder::Folder(string folder, const Folder& at, bool create) {
 	if(create && !existsFolder(folder,at)) {
@@ -216,3 +216,21 @@ int64 available(const string path, const Folder& at) { return available(File(pat
 int64 capacity(const Handle& file) { struct statvfs statvfs; check( fstatvfs(file.fd, &statvfs) ); return statvfs.f_blocks*statvfs.f_frsize; }
 
 int64 capacity(const string path, const Folder& at) { return capacity(File(path,at)); }
+
+string getenv(const string name, string value) {
+	static auto environ = File("/proc/self/environ").readUpTo/*<4096>*/(8192);
+	for(TextData s(environ);s;) {
+		string key=s.until('='); string value=s.until('\0');
+		if(key==name) return value;
+	}
+	return value;
+}
+
+ref<string> arguments() {
+	static auto cmdline = File("/proc/self/cmdline").readUpTo/*<256>*/(512);
+	assert(cmdline.size<4096);
+	static array<string> arguments = split(section(cmdline,0,1,-1),"\0");
+	return arguments;
+}
+
+const Folder& home() { static Folder home(getenv("HOME",str((const char*)getpwuid(geteuid())->pw_dir))); return home; }

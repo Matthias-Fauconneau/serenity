@@ -327,7 +327,7 @@ struct Tree {
 /// Views a scene
 struct View : Widget {
 	// Creates a window and an associated GL context
-	Window window {this, 992, []{ return "Editor"__; }, true, Image(), true};
+	Window window {this, 992, []{ return "Editor"__; }};
 	// ^ GL* constructors rely on a GL context being current ^
 	/*struct Surface {
 		ref<Vertex> vertices;

@@ -149,15 +149,6 @@ int32 gettid();
 /// Flags all threads to terminate as soon as they return to event loop, destroys all global objects and exits process.
 void requestTermination(int status=0);
 
-/// Returns command line arguments
-ref<string> arguments();
-
-/// Returns value for environment variable \a name
-string getenv(const string name, string value=""_);
-
-/// Returns standard folders
-const Folder& home(); //$HOME ?: pwuid->pw_dir
-
 /// Locates an executable
 String which(string name);
 

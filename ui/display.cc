@@ -9,19 +9,7 @@ String str(XEvent::Error e) {
     ref<string> requests (X11::requests);
     ref<string> errors (X11::errors);
     uint16 request = e.minor;
-    /***/  if(e.major==Shm::EXT) {
-        requests = ref<string>(Shm::requests);
-        if(code >= Shm::errorBase && code <= ref<string>(Shm::errors).size) {
-            code -= Shm::errorBase;
-            errors = ref<string>(Shm::errors);
-        }
-    } else if(e.major==XRender::EXT) {
-        requests = ref<string>(XRender::requests);
-        if(code >= XRender::errorBase && code <= ref<string>(XRender::errors).size) {
-            code -= XRender::errorBase;
-            errors = ref<string>(XRender::errors);
-        }
-	} else if(e.major==DRI3::EXT) {
+	/***/ if(e.major==DRI3::EXT) {
 		requests = ref<string>(DRI3::requests);
 	} else request = e.major;
 	return str(request<requests.size?requests[request]:str(request), code<errors.size?errors[code]:str(code));
@@ -33,13 +21,10 @@ String str(XEvent e) {
 }
 
 // Globals
-namespace Shm { int EXT, event, errorBase; } using namespace Shm;
-namespace XRender { int EXT, errorBase; } using namespace XRender;
+namespace DRI3 { int EXT; }
 namespace Present { int EXT; }
-namespace RandR { int EXT; }
-namespace DRI3 { int EXT/*, event, errorBase*/; }
 
-Display::Display(bool GL, Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread) {
+Display::Display(Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread) {
     {String path = "/tmp/.X11-unix/X"+getenv("DISPLAY",":0").slice(1,1);
         struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; mref<char>(addr.path,path.size).copy(path);
         if(check(connect(Socket::fd, (const sockaddr*)&addr,2+path.size), path)) error("X connection failed"); }
@@ -74,33 +59,8 @@ Display::Display(bool GL, Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(
         minKeyCode=r.minKeyCode, maxKeyCode=r.maxKeyCode;
         assert(visual);
     }
-
-	//buffer<uint> extensions; int count=request(ListExtensions(), extensions).extensionCount; log(count, cast<char>(extensions));
-
-	{auto r = request(QueryExtension{.length="MIT-SHM"_.size, .size=uint16(2+align(4,"MIT-SHM"_.size)/4)}, "MIT-SHM"_);
-        Shm::EXT=r.major; Shm::event=r.firstEvent; Shm::errorBase=r.firstError;}
-    {auto r = request(QueryExtension{.length="RENDER"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "RENDER"_);
-		XRender::EXT=r.major; XRender::errorBase=r.firstError; }
-    {auto r = request(QueryExtension{.length="Present"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "Present"_);
-		Present::EXT=r.major; }
-	/*{auto r = request(QueryExtension{.length="RANDR"_.size, .size=uint16(2+align(4,"RANDR"_.size)/4)}, "RANDR"_);
-		RandR::EXT=r.major; }*/
-	{auto r = request(QueryExtension{.length="DRI3"_.size, .size=uint16(2+align(4,"DRI3"_.size)/4)}, "DRI3"_);
-		DRI3::EXT=r.major; assert_(DRI3::EXT); /*DRI3::event=r.firstEvent; DRI3::errorBase=r.firstError;*/ }
-
-	if(GL) { // libgl-xlib
-#if 0
-		assert_(!glDisplay && !glContext);
-		glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_,":0"_))); assert_(glDisplay);
-		const int fbAttribs[] = {GLX_DOUBLEBUFFER, 1, GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 24, /*GLX_SAMPLE_BUFFERS, 1, GLX_SAMPLES, 8,*/
-								 /*GLX_FRAMEBUFFER_SRGB_CAPABLE_EXT, 1,*/ 0};
-		int fbCount=0; GLXFBConfig* fbConfigs = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount); assert(fbConfigs && fbCount);
-		const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION_ARB, 3, GLX_CONTEXT_MINOR_VERSION_ARB, 3, 0};
-		glContext = ((PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB"))
-				(glDisplay, fbConfigs[0], 0, 1/*direct*/, contextAttribs);
-		assert_(glContext);
-#endif
-	}
+	{auto r = request(QueryExtension{.length="DRI3"_.size, .size=uint16(2+align(4,"DRI3"_.size)/4)}, "DRI3"_); DRI3::EXT=r.major; assert_(DRI3::EXT); }
+	{auto r = request(QueryExtension{.length="Present"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "Present"_); Present::EXT=r.major; assert_(Present::EXT); }
 }
 
 void Display::event() {

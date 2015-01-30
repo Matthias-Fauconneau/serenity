@@ -142,50 +142,6 @@ constexpr string errors[] = {"","Request","Value","Window","Pixmap","Atom","Curs
                               "Colormap","GContext","IDChoice","Name","Length","Implementation"};
 }
 
-namespace Shm {
-extern int EXT, event, errorBase;
-struct QueryVersion {
-    int8 ext=EXT, req=0; uint16 size=1;
-    struct Reply { int8 sharedPixmaps; uint16 seq; uint size; uint16 major,minor,uid,gid; uint8 format,pad[15]; } packed;
-};
-struct Attach { int8 ext=EXT, req=1; uint16 size=4; uint seg, shm; int8 readOnly=0, pad[3]={}; };
-struct Detach { int8 ext=EXT, req=2; uint16 size=2; uint seg; };
-struct PutImage { int8 ext=EXT, req=3; uint16 size=10; uint window,context; uint16 totalW, totalH, srcX, srcY, srcW, srcH,
-                  dstX, dstY; uint8 depth=32,format=2,sendEvent=1,bpad=32; uint seg,offset=0; };
-struct GetImage {
-    int8 ext=EXT, req=4; uint16 size=8; uint window; uint16 x=0,y=0,w,h; uint mask=~0; uint8 format=2; uint seg,offset=0;
-    struct Reply { uint8 depth; uint16 seq; uint size; uint visual, length, pad[4]; } packed;
-};
-enum { Completion };
-constexpr string requests[] = {"QueryVersion","Attach","Detach","PutImage","GetImage"};
-constexpr string errors[] = {"BadSeg"};
-}
-
-namespace XRender {
-enum PICTOP { Clear, Src, Dst, Over };
-struct PictFormInfo { uint format; uint8 type,depth; uint16 direct[8]; uint colormap; };
-struct PictVisual { uint visual, format; };
-struct PictDepth { uint8 depth; uint16 numPictVisuals; uint pad; /*PictVisual[numPictVisuals]*/ };
-struct PictScreen { uint numDepths; uint fallback; /*PictDepth[numDepths]*/ };
-
-extern int EXT, errorBase;
-struct QueryVersion {
-    int8 ext=EXT,req=0; uint16 size=3; uint major=0,minor=11;
-    struct Reply { int8 pad; uint16 seq; uint size; uint major,minor,pad2[4]; } packed;
-};
-struct QueryPictFormats{
-    int8 ext=EXT,req=1; uint16 size=1;
-    struct Reply { int8 pad; uint16 seq; uint size; uint numFormats,numScreens,numDepths,numVisuals,numSubpixels,pad2; } packed;
-};
-struct CreatePicture { int8 ext=EXT,req=4; uint16 size=5; uint picture,drawable,format,valueMask=0; };
-struct FreePicture { int8 ext=EXT,req=7; uint16 size=2; uint picture; };
-struct Composite { int8 ext=EXT,req=8; uint16 size=9; uint8 op=Over; uint src,mask=0,dst; int16 srcX=0,srcY=0,maskX=0,maskY=0,dstX=0,dstY=0,width,height; };
-struct CreateCursor { int8 ext=EXT,req=27; uint16 size=4; uint cursor,picture; uint16 x,y; };
-constexpr string requests[] = {"QueryVersion", "QueryPictFormats", "QueryPictIndexValues", "QueryFilters", "CreatePicture", "ChangePicture",
-                               "SetPictureClipRectangles", "SetPictureTransform", "SetPictureFilter", "FreePicture", "Composite"};
-constexpr string errors[] = {"","PictFormat", "Picture", "PictOp", "GlyphSet", "Glyph"};
-}
-
 namespace Present {
 extern int EXT;
 enum { ConfigureNotifyMask=1<<0, CompleteNotifyMask=1<<1, RedirectNotifyMask=1<<2 };
@@ -195,14 +151,6 @@ struct NotifyMSC { int8 ext=EXT,req=2; uint16 size=10; uint window, serial=0, pa
 struct SelectInput { int8 ext=EXT, req=3; uint16 size=4; uint eid, window, eventMask=CompleteNotifyMask; };
 enum { ConfigureNotify, CompleteNotify };
 struct CompleteNotify { uint8 type; XEvent::Generic genericEvent; uint8 kind, mode; uint event_id, window, serial; uint64 ust, msc; } packed;
-}
-
-namespace RandR {
-extern int EXT;
-struct GetProviders {
-	int8 ext=EXT, req=32; uint16 size=2; uint window;
-	struct Reply { int8 pad; uint16 seq; uint size; uint32 timestamp; uint16 providerCount, pad1; uint pad2[4]; } packed;
-};
 }
 
 namespace DRI3 {

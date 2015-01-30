@@ -42,8 +42,6 @@ struct Handle {
 struct Folder;
 /// Returns a file descriptor to the current working directory
 const Folder& currentWorkingDirectory();
-/// Returns a file descriptor to the root folder
-const Folder& root();
 
 enum { Drives=1<<0, Devices=1<<1, Folders=1<<2, Files=1<<3, Recursive=1<<4, Sorted=1<<5, Hidden=1<<6 };
 struct Folder : Handle {
@@ -140,7 +138,7 @@ template<uint major, uint minor, Type T> struct IOWR { typedef T Args; static co
 /// Handle to a device
 struct Device : File {
     Device(){}
-    Device(const string path, const Folder& at=root(), Flags flags=ReadWrite) : File(path, at, flags){}
+	Device(const string path, const Folder& at=currentWorkingDirectory(), Flags flags=ReadWrite) : File(path, at, flags){}
     /// Sends ioctl \a request with untyped \a arguments
     int ioctl(uint request, void* arguments, int pass=0);
     /// Sends ioctl request with neither input/outputs arguments
@@ -202,3 +200,12 @@ int64 available(const string path, const Folder& at=currentWorkingDirectory());
 int64 capacity(const Handle& file);
 /// Returns capacity in bytes for the file system containing \a path
 int64 capacity(const string path, const Folder& at=currentWorkingDirectory());
+
+/// Returns command line arguments
+ref<string> arguments();
+
+/// Returns value for environment variable \a name
+string getenv(const string name, string value=""_);
+
+/// Returns standard folders
+const Folder& home(); //$HOME ?: pwuid->pw_dir

@@ -118,7 +118,7 @@ struct Build {
         s.skip(')');
 
         String filesPath = tmp+"/files";
-        Folder(filesPath, root(), true);
+		Folder(filesPath, currentWorkingDirectory(), true);
 		String path = find(replace(name, '_', '/'));
         assert(path, "No such file to embed", name);
         Folder subfolder = Folder(section(path,'/',0,-2), folder);
@@ -173,7 +173,7 @@ struct Build {
 				if(wait(pid)) { log("Failed to compile"); return false; }
                 pids.remove(pid);
             }
-            Folder(tmp+"/"+join(flags,"-")+"/"+section(target,'/',0,-2), root(), true);
+			Folder(tmp+"/"+join(flags,"-")+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
             log(target);
 			pids.append( execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1y", "-Wall", "-Wextra", "-Wno-overloaded-virtual", //"-fno-rtti",
                                                   "-march=native", "-o" , object, fileName, "-I/usr/local/include/libfreeverb3-3", "-I/usr/include/freetype2"} + toRefs(args), false) );
@@ -206,8 +206,8 @@ struct Build {
         else if(flags.contains("fast")) args.append("-Og"__); // fast-debug
 		if(flags.contains("profile")) args.append("-finstrument-functions"__);
 
-        Folder(tmp, root(), true);
-        Folder(tmp+"/"+join(flags,"-"), root(), true);
+		Folder(tmp, currentWorkingDirectory(), true);
+		Folder(tmp+"/"+join(flags,"-"), currentWorkingDirectory(), true);
 
         // Compiles
         if(flags.contains("profile")) if(!compileModule(find("core/profile.cc"))) { log("Failed to compile"); return; }
@@ -229,6 +229,6 @@ struct Build {
         }
 
         // Installs
-        if(install && (!existsFile(target, install) || File(binary).modifiedTime() > File(target, install).modifiedTime())) copy(root(), binary, install, target);
+		if(install && (!existsFile(target, install) || File(binary).modifiedTime() > File(target, install).modifiedTime())) copy(currentWorkingDirectory(), binary, install, target);
     }
 } build;

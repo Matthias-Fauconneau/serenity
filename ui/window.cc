@@ -16,8 +16,8 @@
 #include <sys/mman.h>
 extern "C" int drmPrimeHandleToFD(int fd, uint32_t handle, uint32_t flags, int *prime_fd);
 
-Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool show, const Image& icon, bool GL, Thread& thread)
-	: Display(GL, thread), widget(widget), size(sizeHint), getTitle(title) {
+Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool show, const Image& icon, Thread& thread)
+	: Display(thread), widget(widget), size(sizeHint), getTitle(title) {
     Display::onEvent.connect(this, &Window::onEvent);
 	assert_(id && root && visual);
 
@@ -30,12 +30,10 @@ Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool sho
     }
     assert_(size);
 	send(CreateColormap{ .colormap=id+Colormap, .window=root, .visual=visual});
-    send(CreateWindow{.id=id+XWindow, .parent=root, .width=uint16(size.x), .height=uint16(size.y), .visual=visual, .colormap=id+Colormap});
-    send(ChangeProperty{.window=id+XWindow, .property=Atom("WM_PROTOCOLS"), .type=Atom("ATOM"),
-                        .format=32, .length=1, .size=6+1}, raw(Atom("WM_DELETE_WINDOW")));
-    send(ChangeProperty{.window=id+XWindow, .property=Atom("_KDE_OXYGEN_BACKGROUND_GRADIENT"), .type=Atom("CARDINAL"),
-                        .format=32, .length=1, .size=6+1}, raw(1));
-    setIcon(icon);
+	send(CreateWindow{.id=id+XWindow, .parent=root, .width=uint16(width), .height=uint16(height), .visual=visual, .colormap=id+Colormap});
+	//send(ChangeProperty{.window=id+XWindow, .property=Atom("WM_PROTOCOLS"), .type=Atom("ATOM"), .format=32, .length=1, .size=6+1}, raw(Atom("WM_DELETE_WINDOW")));
+	//send(ChangeProperty{.window=id+XWindow, .property=Atom("_KDE_OXYGEN_BACKGROUND_GRADIENT"), .type=Atom("CARDINAL"), .format=32, .length=1, .size=6+1}, raw(1));
+	setIcon(icon);
     send(Present::SelectInput{.window=id+XWindow, .eid=id+PresentEvent});
     actions[Escape] = []{requestTermination();};
 	//actions[PrintScreen] = [this]{writeFile(str(Date(currentTime())), encodePNG(dmaBuffer), home());};
@@ -162,7 +160,7 @@ void Window::setTitle(string title) {
 						.length=uint(title.size), .size=uint16(6+align(4, title.size)/4)}, title);
 }
 void Window::setIcon(const Image& icon) {
-    send(ChangeProperty{.window=id+XWindow, .property=Atom("_NET_WM_ICON"), .type=Atom("CARDINAL"), .format=32,
+	if(icon) send(ChangeProperty{.window=id+XWindow, .property=Atom("_NET_WM_ICON"), .type=Atom("CARDINAL"), .format=32,
                         .length=2+icon.width*icon.height, .size=uint16(6+2+icon.width*icon.height)},
                         raw(icon.width)+raw(icon.height)+cast<byte>(icon));
 }

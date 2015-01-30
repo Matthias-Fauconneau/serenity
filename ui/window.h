@@ -24,17 +24,17 @@ struct Window : Display /*should reference but inherits for convenience*/ {
 	/// Background color
 	bgr3f backgroundColor = white;
 
-    /// Associated window resource (relative to \a id)
+	/// Associated window resource (relative to resource ID base Display::id)
 	enum Resource { XWindow, Colormap, PresentEvent, Pixmap };
 	/// GPU device
-	int drmDevice;
-	struct gbm_device* gbmDevice;
-	EGLDisplay eglDevice;
+	int drmDevice = 0;
+	struct gbm_device* gbmDevice = 0;
+	EGLDisplay eglDevice = 0;
 	EGLConfig eglConfig = 0;
-	EGLContext eglContext;
+	EGLContext eglContext = 0;
 	/// GBM/EGL surface
-	struct gbm_surface* gbmSurface;
-	EGLSurface eglSurface;
+	struct gbm_surface* gbmSurface = 0;
+	EGLSurface eglSurface = 0;
 	int2 surfaceSize = 0;
 	struct gbm_bo* bo = 0;
 
@@ -62,7 +62,7 @@ struct Window : Display /*should reference but inherits for convenience*/ {
 // Methods
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
-	Window(Widget* widget, int2 size = -1, function<String()> title = {}, bool show = true, const Image& icon = Image(), bool GL = false, Thread& thread=mainThread);
+	Window(Widget* widget, int2 size = -1, function<String()> title = {}, bool show = true, const Image& icon = Image(), Thread& thread=mainThread);
     /// Frees the graphics context and destroys the window
     virtual ~Window();
 
