@@ -30,7 +30,7 @@ struct Window : Display /*should reference but inherits for convenience*/ {
 	int drmDevice;
 	struct gbm_device* gbmDevice;
 	EGLDisplay eglDevice;
-	EGLConfig eglConfig;
+	EGLConfig eglConfig = 0;
 	EGLContext eglContext;
 	/// GBM/EGL surface
 	struct gbm_surface* gbmSurface;

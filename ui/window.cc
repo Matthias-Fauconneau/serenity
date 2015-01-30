@@ -13,6 +13,7 @@
 #include <EGL/egl.h> // EGL
 #include <EGL/eglext.h>
 #include <GL/gl.h> // drm
+#include <sys/mman.h>
 extern "C" int drmPrimeHandleToFD(int fd, uint32_t handle, uint32_t flags, int *prime_fd);
 
 Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool show, const Image& icon, bool GL, Thread& thread)
@@ -45,18 +46,23 @@ Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool sho
 			 // = open("/dev/dri/renderD128", O_RDWR|O_CLOEXEC|O_NOCTTY|O_NONBLOCK);
 	gbmDevice = gbm_create_device(drmDevice);
 	eglDevice = eglGetDisplay((EGLNativeDisplayType)gbmDevice);
+	assert_(eglDevice);
 	EGLint major, minor; eglInitialize(eglDevice, &major, &minor);
 	eglBindAPI(EGL_OPENGL_API);
 	EGLint n;
-	eglChooseConfig(eglDevice, (EGLint[]){EGL_SURFACE_TYPE, EGL_PIXMAP_BIT, EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT, EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 0, EGL_NONE}, &eglConfig, 1, &n);
+	//GLX_DOUBLEBUFFER, 1, GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 24, /*GLX_SAMPLE_BUFFERS, 1, GLX_SAMPLES, 8,*/
+	eglChooseConfig(eglDevice, (EGLint[]){EGL_SURFACE_TYPE, EGL_WINDOW_BIT, EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT, EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_DEPTH_SIZE, 24, EGL_NONE}, &eglConfig, 1, &n);
+	assert_(eglConfig);
 	eglContext = eglCreateContext(eglDevice, eglConfig, 0, (EGLint[]){EGL_CONTEXT_MAJOR_VERSION_KHR, 3, EGL_CONTEXT_MINOR_VERSION_KHR, 3,
 																	  EGL_CONTEXT_OPENGL_PROFILE_MASK_KHR, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT_KHR, EGL_NONE});
+	assert_(eglContext);
 	gbmSurface = gbm_surface_create(gbmDevice, width, height, GBM_FORMAT_XRGB8888, GBM_BO_USE_RENDERING);
-	EGLSurface eglSurface = eglCreatePixmapSurface(eglDevice, eglConfig, (EGLNativePixmapType)gbmSurface, 0);
+	eglSurface = eglCreateWindowSurface(eglDevice, eglConfig, (EGLNativeWindowType)gbmSurface, 0); //EGL_VG_COLORSPACE_LINEAR
+	assert_(eglSurface);
 	eglMakeCurrent(eglDevice, eglSurface, eglSurface, eglContext);
 	surfaceSize = size;
 	// glEnable(GL_FRAMEBUFFER_SRGB);
-	// vsync ?
+	// eglSwapInterval?
 }
 
 Window::~Window() { close(); }
@@ -73,6 +79,7 @@ void Window::onEvent(const ref<byte> ge) {
 		/*if(type==KeyRelease) { heldEvent = unique<XEvent>(event); queue(); } // Hold release to detect any repeat
 		else*/ if(processEvent(event)) {}
         else if(type==GenericEvent && event.genericEvent.ext == Present::EXT && event.genericEvent.type==Present::CompleteNotify) {
+			log("Complete");
 			const auto& completeNotify = *(struct Present::CompleteNotify*)&event;
 			assert_(sizeof(XEvent)+event.genericEvent.size*4 == sizeof(completeNotify),
 					sizeof(XEvent)+event.genericEvent.size*4, sizeof(completeNotify));
@@ -182,13 +189,14 @@ void Window::event() {
 	//setTitle(getTitle ? getTitle() : widget->title());
 	if(!updates) return;
 	assert_(size);
+	if(bo) return; // Wait for Present
 	assert_(!bo);
 	if(surfaceSize != size) {
 		log("Size changed", surfaceSize, size);
 		eglDestroySurface(eglDevice, eglSurface);
 		gbm_surface_destroy(gbmSurface);
 		gbmSurface = gbm_surface_create(gbmDevice, width, height, GBM_FORMAT_XRGB8888, GBM_BO_USE_RENDERING);
-		eglSurface = eglCreatePixmapSurface(eglDevice, eglConfig, (EGLNativePixmapType)gbmSurface, 0);
+		eglSurface = eglCreateWindowSurface(eglDevice, eglConfig, (EGLNativeWindowType)gbmSurface, 0);
 		eglMakeCurrent(eglDevice, eglSurface, eglSurface, eglContext);
 		surfaceSize = size;
 	}
@@ -196,23 +204,23 @@ void Window::event() {
 	Update update = updates.take(0);
 	// Widget::graphics may renders using GL immediately and/or return primitives
 	//GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(backgroundColor,1));
+	glClearColor(0, 0, 0, 1);
+	glClear(GL_COLOR_BUFFER_BIT);
 	//if(!update.graphics) update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size))); // TODO: partial render
+	assert_(gbm_surface_has_free_buffers(gbmSurface));
 	glFinish();
-	eglSwapBuffers(eglDevice, eglSurface);
-	log("gbm_surface_lock_front_buffer");
+	assert_( eglSwapBuffers(eglDevice, eglSurface) );
 	bo = gbm_surface_lock_front_buffer(gbmSurface);
-	log("OK");
-
 	DMABuf* dmabuf = (DMABuf*)gbm_bo_get_user_data(bo);
 	if(!dmabuf) {
 		dmabuf = new DMABuf();
 		drmPrimeHandleToFD(drmDevice, gbm_bo_get_handle(bo).u32, 0, &dmabuf->fd);
 		log("DMA", dmabuf->fd);
-		//mmap(NULL, size, PROT_READ, MAP_SHARED, b->fd, 0); TODO: software rendering
+		//byte4* pixels = (byte4*)mmap(0, height*width*4, PROT_READ|PROT_WRITE, MAP_SHARED, dmabuf->fd, 0); log(pixels); mref<byte4>(pixels, height*width).clear(0);
 		send(DRI3::PixmapFromBuffer{.pixmap=id+Pixmap,.drawable=id+XWindow,.bufferSize=height*width*4,.width=uint16(width),.height=uint16(height),.stride=uint16(width*4)}, dmabuf->fd);
 		gbm_bo_set_user_data(bo, dmabuf, &destroy_user_data);
 	}
 	//::render(Image(dmabuf->pointer, size), update.graphics); // FIXME: Render retained graphics
 	send(Present::Pixmap{.window=id+XWindow, .pixmap=id+Pixmap}); //FIXME: update region
-	assert_(!updates);
+	assert_(updates.size<=1);
 }

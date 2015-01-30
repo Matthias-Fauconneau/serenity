@@ -216,7 +216,7 @@ struct Open {
 	struct Reply { uint8 nfd; uint16 seq; uint size; uint pad[6]; } packed;
 } packed;
 struct PixmapFromBuffer {
-	int8 ext=EXT, req=2; uint16 size=3; uint pixmap, drawable, bufferSize; uint16 width, height, stride; uint8 depth=32, bpp=32; //FD fd;
+	int8 ext=EXT, req=2; uint16 size=6; uint pixmap, drawable, bufferSize; uint16 width, height, stride; uint8 depth=32, bpp=32; //FD fd;
 } packed;
 struct BufferFromPixmap {
 	int8 ext=EXT, req=3; uint16 size=2; uint pixmap;
