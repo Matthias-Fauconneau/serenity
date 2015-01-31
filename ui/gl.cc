@@ -175,7 +175,6 @@ GLBuffer::GLBuffer(uint elementSize, ref<byte> data) : elementSize(elementSize),
 	glBufferData(GL_ARRAY_BUFFER, data.size, data.data, GL_STATIC_DRAW);
 }
 GLBuffer::~GLBuffer() { if(id) glDeleteBuffers(1, &id); }
-//void GLBuffer::bind() const { glBindBuffer(GL_ARRAY_BUFFER, id); }
 
 /// Vertex array
 
@@ -198,13 +197,11 @@ void GLVertexArray::draw(PrimitiveType primitiveType, uint vertexCount) const {
 void GLIndexBuffer::draw(int base /*instanceCount*/) {
 	glEnable(GL_PRIMITIVE_RESTART_FIXED_INDEX);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
-	assert_(elementSize==2);
-	Time draw;
-	draw.start();
-	glDrawElementsBaseVertex(primitiveType, elementCount, GL_UNSIGNED_SHORT, 0, base);
-	draw.stop();
-	if(draw > 0.1) log("glDrawElementsBaseVertex", draw);
-	//glDrawElementsInstanced(primitiveType, elementCount, GL_UNSIGNED_SHORT, 0, instanceCount);
+	GLenum type = 0;
+	if(elementSize==2) type = GL_UNSIGNED_SHORT;
+	if(elementSize==4) type = GL_UNSIGNED_INT;
+	assert_(type);
+	glDrawElementsBaseVertex(primitiveType, elementCount, type, 0, base);
 }
 
 /// Texture
@@ -262,13 +259,13 @@ GLTexture::GLTexture(const Image& image, uint format)
 	: GLTexture(image.width, image.height, Short|format, image.data) {
 	assert(width==image.stride);
 }*/
-GLTexture::GLTexture(const GLBuffer& buffer, uint format) : format(format), target(GL_TEXTURE_BUFFER) {
+GLTexture::GLTexture(const GLBuffer& buffer, int2 size, uint format) : size(size), format(format), target(GL_TEXTURE_BUFFER) {
 	glGenTextures(1, &id);
 	glBindTexture(target, id);
 	GLenum internalFormat = 0;
-	/**/  if(format == R16I) internalFormat = GL_R16I;
-	else if(format == R32F) internalFormat = GL_R32F;
-	else error(format);
+	if(format == R16I) internalFormat = GL_R16I;
+	if(format == R32F) internalFormat = GL_R32F;
+	assert_(format);
 	glTexBuffer(target, internalFormat, buffer.id);
 }
 

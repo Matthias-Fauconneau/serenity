@@ -141,7 +141,7 @@ web.cc
 image/blend.cc
 image/dust.cc
 image/export.h
-editor.cc
+earth.cc
 ui/gl.h
 ui/gl.cc
 shader

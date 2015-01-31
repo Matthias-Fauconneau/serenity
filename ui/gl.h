@@ -72,6 +72,7 @@ struct GLVertexArray {
 };
 
 struct GLIndexBuffer : GLBuffer {
+	GLIndexBuffer() {}
 	template<Type T> GLIndexBuffer(ref<T> data) : GLBuffer(sizeof(T), cast<byte>(data)) {}
 	PrimitiveType primitiveType = TriangleStrip;
 	void draw(int base);
@@ -90,7 +91,7 @@ struct GLTexture {
     GLTexture(uint width, uint height, uint format=0, const void* data=0);
 	GLTexture(const struct Image& image, uint format=0);
 	//GLTexture(const struct Image16& image, uint format=0);
-	GLTexture(const GLBuffer& buffer, uint format=R32F);
+	GLTexture(const GLBuffer& buffer, int2 size, uint format=R32F);
 	GLTexture(uint width, uint height, uint depth, ref<byte4> data);
     ~GLTexture();
 

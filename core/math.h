@@ -35,7 +35,7 @@ const real expOverflow = 7.09782712893383973096e+02;
 inline real exp(real x) { assert(x>expUnderflow && x<expOverflow); return __builtin_exp(x); }
 inline real ln(real x) { return __builtin_log(x); }
 
-const real PI = 3.14159265358979323846;
+constexpr real PI = 3.14159265358979323846;
 inline real cos(real t) { return __builtin_cos(t); }
 inline float cos(float t) { return __builtin_cos(t); }
 inline real acos(real t) { return __builtin_acos(t); }
