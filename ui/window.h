@@ -26,6 +26,7 @@ struct Window : Display /*should reference but inherits for convenience*/ {
 
 	/// Associated window resource (relative to resource ID base Display::id)
 	enum Resource { XWindow, Colormap, PresentEvent, Pixmap };
+#if 0 // DRI3
 	/// GPU device
 	int drmDevice = 0;
 	struct gbm_device* gbmDevice = 0;
@@ -35,8 +36,13 @@ struct Window : Display /*should reference but inherits for convenience*/ {
 	/// GBM/EGL surface
 	struct gbm_surface* gbmSurface = 0;
 	EGLSurface eglSurface = 0;
-	int2 surfaceSize = 0;
 	struct gbm_bo* bo = 0;
+	int2 surfaceSize = 0;
+#else // GLX/Xlib/DRI2
+	/// OpenGL
+	struct _XDisplay* glDisplay = 0;
+	struct __GLXcontextRec* glContext = 0;
+#endif
 
 	/// Whether this window is currently mapped. This doesn't imply the window is visible (can be covered)
 	bool mapped = false;

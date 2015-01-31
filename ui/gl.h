@@ -51,7 +51,7 @@ struct GLBuffer {
 
 	GLBuffer() {}
 	GLBuffer(uint elementSize, ref<byte> data);
-	template<Type T> GLBuffer(ref<T> data) : GLBuffer(sizeof(T), cast<byte>(data)) {}
+	template<Type T> explicit GLBuffer(ref<T> data) : GLBuffer(sizeof(T), cast<byte>(data)) {}
 	default_move(GLBuffer);
 	~GLBuffer();
 	void bind() const;
@@ -78,8 +78,8 @@ struct GLIndexBuffer : GLBuffer {
 	//void draw(int instanceCount=1);
 };
 
-enum Format { RGB8=0, R16I=1, Depth=2/*U32*/, RGBA8=3,
-			  SRGB=1<<2, Mipmap=1<<3, Shadow=1<<4, Bilinear=1<<5, Anisotropic=1<<6, Clamp=1<<7, Multisample=1<<8, Cube=1<<9 };
+enum Format { RGB8=0, R16I=1, Depth=2/*U32*/, RGBA8=3, R32F=4,
+			  SRGB=1<<3, Mipmap=1<<4, Shadow=1<<5, Bilinear=1<<6, Anisotropic=1<<7, Clamp=1<<8, Multisample=1<<9, Cube=1<<10 };
 struct GLTexture {
     handle<uint> id = 0;
 	union { int2 size = 0; struct { uint width, height; }; };
@@ -90,7 +90,7 @@ struct GLTexture {
     GLTexture(uint width, uint height, uint format=0, const void* data=0);
 	GLTexture(const struct Image& image, uint format=0);
 	//GLTexture(const struct Image16& image, uint format=0);
-	GLTexture(const GLBuffer& buffer, uint format=Short);
+	GLTexture(const GLBuffer& buffer, uint format=R32F);
 	GLTexture(uint width, uint height, uint depth, ref<byte4> data);
     ~GLTexture();
 

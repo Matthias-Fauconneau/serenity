@@ -194,11 +194,16 @@ void GLVertexArray::draw(PrimitiveType primitiveType, uint vertexCount) const {
     glDrawArrays(primitiveType, 0, vertexCount);
 }
 
+#include "time.h"
 void GLIndexBuffer::draw(int base /*instanceCount*/) {
 	glEnable(GL_PRIMITIVE_RESTART_FIXED_INDEX);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
 	assert_(elementSize==2);
+	Time draw;
+	draw.start();
 	glDrawElementsBaseVertex(primitiveType, elementCount, GL_UNSIGNED_SHORT, 0, base);
+	draw.stop();
+	if(draw > 0.1) log("glDrawElementsBaseVertex", draw);
 	//glDrawElementsInstanced(primitiveType, elementCount, GL_UNSIGNED_SHORT, 0, instanceCount);
 }
 
@@ -260,8 +265,11 @@ GLTexture::GLTexture(const Image& image, uint format)
 GLTexture::GLTexture(const GLBuffer& buffer, uint format) : format(format), target(GL_TEXTURE_BUFFER) {
 	glGenTextures(1, &id);
 	glBindTexture(target, id);
-	assert_(format==Short && buffer.id);
-	glTexBuffer(target, GL_R16I, buffer.id);
+	GLenum internalFormat = 0;
+	/**/  if(format == R16I) internalFormat = GL_R16I;
+	else if(format == R32F) internalFormat = GL_R32F;
+	else error(format);
+	glTexBuffer(target, internalFormat, buffer.id);
 }
 
 GLTexture::~GLTexture() { if(id) glDeleteTextures(1, &id); id=0; }

@@ -4,6 +4,8 @@
 #include "png.h"
 #include "time.h"
 #include "gl.h"
+
+#if 0 // DRI3
 #include <sys/shm.h>
 #include <sys/uio.h>
 #include <sys/socket.h>
@@ -15,6 +17,27 @@
 #include <GL/gl.h> // drm
 #include <sys/mman.h>
 extern "C" int drmPrimeHandleToFD(int fd, uint32_t handle, uint32_t flags, int *prime_fd);
+#else // GLX/Xlib/DRI2
+#undef packed
+#define Time XTime
+#define Cursor XCursor
+#define Depth XXDepth
+#define Window XWindow
+#define Screen XScreen
+#define XEvent XXEvent
+#define Display XDisplay
+#define Font XFont
+#include <GL/glx.h> //X11
+#undef Time
+#undef Cursor
+#undef Depth
+#undef Window
+#undef Screen
+#undef XEvent
+#undef Display
+#undef Font
+#undef None
+#endif
 
 Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool show, const Image& icon, Thread& thread)
 	: Display(thread), widget(widget), size(sizeHint), getTitle(title) {
@@ -38,27 +61,36 @@ Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool sho
     actions[Escape] = []{requestTermination();};
 	//actions[PrintScreen] = [this]{writeFile(str(Date(currentTime())), encodePNG(dmaBuffer), home());};
 	if(show) this->show();
+#if 0 // DRI3
 		// -- EGL Render node initialization
-	request(DRI3::QueryVersion());
-	drmDevice = ({buffer<int> fds; requestFD(DRI3::Open{.drawable=id+XWindow}, fds); fds[0]; });
-			 // = open("/dev/dri/renderD128", O_RDWR|O_CLOEXEC|O_NOCTTY|O_NONBLOCK);
-	gbmDevice = gbm_create_device(drmDevice);
-	eglDevice = eglGetDisplay((EGLNativeDisplayType)gbmDevice);
-	assert_(eglDevice);
-	EGLint major, minor; eglInitialize(eglDevice, &major, &minor);
-	eglBindAPI(EGL_OPENGL_API);
-	EGLint n;
-	//GLX_DOUBLEBUFFER, 1, GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 24, /*GLX_SAMPLE_BUFFERS, 1, GLX_SAMPLES, 8,*/
-	eglChooseConfig(eglDevice, (EGLint[]){EGL_SURFACE_TYPE, EGL_WINDOW_BIT, EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT, EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_DEPTH_SIZE, 24, EGL_NONE}, &eglConfig, 1, &n);
-	assert_(eglConfig);
-	eglContext = eglCreateContext(eglDevice, eglConfig, 0, (EGLint[]){EGL_CONTEXT_MAJOR_VERSION_KHR, 3, EGL_CONTEXT_MINOR_VERSION_KHR, 3,
-																	  EGL_CONTEXT_OPENGL_PROFILE_MASK_KHR, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT_KHR, EGL_NONE});
-	assert_(eglContext);
-	gbmSurface = gbm_surface_create(gbmDevice, width, height, GBM_FORMAT_XRGB8888, GBM_BO_USE_RENDERING);
-	eglSurface = eglCreateWindowSurface(eglDevice, eglConfig, (EGLNativeWindowType)gbmSurface, 0); //EGL_VG_COLORSPACE_LINEAR
-	assert_(eglSurface);
-	eglMakeCurrent(eglDevice, eglSurface, eglSurface, eglContext);
-	surfaceSize = size;
+		request(DRI3::QueryVersion());
+		drmDevice = ({buffer<int> fds; requestFD(DRI3::Open{.drawable=id+XWindow}, fds); fds[0]; });
+		// = open("/dev/dri/renderD128", O_RDWR|O_CLOEXEC|O_NOCTTY|O_NONBLOCK);
+		gbmDevice = gbm_create_device(drmDevice);
+		eglDevice = eglGetDisplay((EGLNativeDisplayType)gbmDevice);
+		assert_(eglDevice);
+		EGLint major, minor; eglInitialize(eglDevice, &major, &minor);
+		eglBindAPI(EGL_OPENGL_API);
+		EGLint n;
+		//GLX_DOUBLEBUFFER, 1, GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 24, /*GLX_SAMPLE_BUFFERS, 1, GLX_SAMPLES, 8,*/
+		eglChooseConfig(eglDevice, (EGLint[]){EGL_SURFACE_TYPE, EGL_WINDOW_BIT, EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT, EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_DEPTH_SIZE, 24, EGL_NONE}, &eglConfig, 1, &n);
+		assert_(eglConfig);
+		eglContext = eglCreateContext(eglDevice, eglConfig, 0, (EGLint[]){EGL_CONTEXT_MAJOR_VERSION_KHR, 3, EGL_CONTEXT_MINOR_VERSION_KHR, 3,
+																		  EGL_CONTEXT_OPENGL_PROFILE_MASK_KHR, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT_KHR, EGL_NONE});
+		assert_(eglContext);
+		gbmSurface = gbm_surface_create(gbmDevice, width, height, GBM_FORMAT_XRGB8888, GBM_BO_USE_RENDERING);
+		eglSurface = eglCreateWindowSurface(eglDevice, eglConfig, (EGLNativeWindowType)gbmSurface, 0); //EGL_VG_COLORSPACE_LINEAR
+		assert_(eglSurface);
+		eglMakeCurrent(eglDevice, eglSurface, eglSurface, eglContext);
+		surfaceSize = size;
+#else // GLX/Xlib/DRI2
+	glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_,":0"_))); assert_(glDisplay);
+	const int fbAttribs[] = {GLX_DOUBLEBUFFER, 1, GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 24, GLX_SAMPLE_BUFFERS, 1, GLX_SAMPLES, 8, /*GLX_FRAMEBUFFER_SRGB_CAPABLE_EXT, 1,*/ 0};
+	int fbCount=0; GLXFBConfig* fbConfigs = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount); assert(fbConfigs && fbCount);
+	const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION_ARB, 3, GLX_CONTEXT_MINOR_VERSION_ARB, 3, 0};
+	glContext = ((PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB"))(glDisplay, fbConfigs[0], 0, 1, contextAttribs);
+	glXMakeCurrent(glDisplay, id+XWindow, glContext);
+#endif
 	// glEnable(GL_FRAMEBUFFER_SRGB);
 	// eglSwapInterval?
 }
@@ -77,13 +109,14 @@ void Window::onEvent(const ref<byte> ge) {
 		/*if(type==KeyRelease) { heldEvent = unique<XEvent>(event); queue(); } // Hold release to detect any repeat
 		else*/ if(processEvent(event)) {}
         else if(type==GenericEvent && event.genericEvent.ext == Present::EXT && event.genericEvent.type==Present::CompleteNotify) {
-			log("Complete");
 			const auto& completeNotify = *(struct Present::CompleteNotify*)&event;
 			assert_(sizeof(XEvent)+event.genericEvent.size*4 == sizeof(completeNotify),
 					sizeof(XEvent)+event.genericEvent.size*4, sizeof(completeNotify));
+#if DRI3
 			assert_(bo);
 			gbm_surface_release_buffer(gbmSurface, bo);
 			bo = 0;
+#endif
 			currentFrameCounterValue = completeNotify.msc;
 			if(!firstFrameCounterValue) firstFrameCounterValue = currentFrameCounterValue;
         }
@@ -173,6 +206,7 @@ void Window::render(shared<Graphics>&& graphics, int2 origin, int2 size) {
 }
 void Window::render() { assert_(size); updates.clear(); render(nullptr, int2(0), size); }
 
+#if DRI3
 struct DMABuf {
 	int fd = 0;
 	DMABuf() {}
@@ -180,6 +214,7 @@ struct DMABuf {
 	~DMABuf() { log("~DMA", fd); close(fd); }
 };
 static void destroy_user_data(gbm_bo*, void* dmabuf) { delete (DMABuf*)dmabuf; }
+#endif
 
 void Window::event() {
 	Display::event();
@@ -187,6 +222,7 @@ void Window::event() {
 	//setTitle(getTitle ? getTitle() : widget->title());
 	if(!updates) return;
 	assert_(size);
+#if DRI3
 	if(bo) return; // Wait for Present
 	assert_(!bo);
 	if(surfaceSize != size) {
@@ -198,27 +234,31 @@ void Window::event() {
 		eglMakeCurrent(eglDevice, eglSurface, eglSurface, eglContext);
 		surfaceSize = size;
 	}
+#endif
 
 	Update update = updates.take(0);
 	// Widget::graphics may renders using GL immediately and/or return primitives
-	//GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(backgroundColor,1));
-	glClearColor(0, 0, 0, 1);
-	glClear(GL_COLOR_BUFFER_BIT);
-	//if(!update.graphics) update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size))); // TODO: partial render
+	GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(backgroundColor,1));
+	if(!update.graphics) update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size))); // TODO: partial render
+#if DRI3
 	assert_(gbm_surface_has_free_buffers(gbmSurface));
+#endif
 	glFinish();
+#if DRI3
 	assert_( eglSwapBuffers(eglDevice, eglSurface) );
 	bo = gbm_surface_lock_front_buffer(gbmSurface);
 	DMABuf* dmabuf = (DMABuf*)gbm_bo_get_user_data(bo);
 	if(!dmabuf) {
 		dmabuf = new DMABuf();
 		drmPrimeHandleToFD(drmDevice, gbm_bo_get_handle(bo).u32, 0, &dmabuf->fd);
-		log("DMA", dmabuf->fd);
 		//byte4* pixels = (byte4*)mmap(0, height*width*4, PROT_READ|PROT_WRITE, MAP_SHARED, dmabuf->fd, 0); log(pixels); mref<byte4>(pixels, height*width).clear(0);
 		send(DRI3::PixmapFromBuffer{.pixmap=id+Pixmap,.drawable=id+XWindow,.bufferSize=height*width*4,.width=uint16(width),.height=uint16(height),.stride=uint16(width*4)}, dmabuf->fd);
 		gbm_bo_set_user_data(bo, dmabuf, &destroy_user_data);
 	}
 	//::render(Image(dmabuf->pointer, size), update.graphics); // FIXME: Render retained graphics
 	send(Present::Pixmap{.window=id+XWindow, .pixmap=id+Pixmap}); //FIXME: update region
+#else
+	glXSwapBuffers(glDisplay, id);
+#endif
 	assert_(updates.size<=1);
 }

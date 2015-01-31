@@ -1,7 +1,6 @@
 #include "window.h"
 #include "matrix.h"
 #include "gl.h"
-#include "time.h"
 #include "tiff.h"
 FILE(shader)
 
@@ -115,7 +114,7 @@ struct Terrain {
 
 	GLBuffer elevation;
 	GLVertexArray vertexArray;
-	GLTexture textureBuffer;// {elevation}; // shader read access (texelFetch) to elevation buffer
+	GLTexture textureBuffer;// {elevation}; // shader read access (texelFetch) to elevation buffer*/
 	//GLTexture elevation;
 
 	struct Tile {
@@ -126,13 +125,13 @@ struct Terrain {
 
 	static constexpr int D = 4;
 	static constexpr int N = 256-D; // Number of cells: floor(D, √(2^16-1/*restart index*/))
-	const uint W = D*N, H = W;
-	//int maxZ = 0;
+	uint W, H;
+	int maxZ = 0;
 
 	Terrain() {
 		Map map("srtm_37_03.tif");
 		Image16 sourceElevation = parseTIFF(map);
-		assert_(W <= sourceElevation.width && H <=sourceElevation.height);
+		W = sourceElevation.width/N*N, H = sourceElevation.height/N*N;
 		/*buffer<int16> elevation ((W/D+1)*(H/D+1));
 		for(int y: range(H/D+1)) for(int x: range(W/D+1)) {
 			int z = sourceElevation(x*D, y*D);
@@ -154,13 +153,13 @@ struct Terrain {
 			vertices[grid[y*N+x]].normal = normalize(vec3(-dy*dxZ, -dx*dyZ, dx*dy));
 		}*/
 
-		buffer<int16> elevation ((H/N)*(W/N)*(N/D+1)*(N/D+1)); //FIXME: share first/last line
+		buffer<float> elevation ((H/N)*(W/N)*(N/D+1)*(N/D+1)); // int16 stutters //FIXME: share first/last line
 		for(int Y: range(H/N)) for(int X: range(W/N)) {
 			struct TriangleStrip tile (N/D*N/D*6);
 			for(int y: range(N/D+1)) for(int x: range(N/D+1)) {
-				int z = sourceElevation(X*N+x*D, Y*N+y*D);
-				elevation[(Y*(W/N)+X)*(N/D+1)*(N/D+1)+y*(N/D+1)+x] = ::max(0, z);
-				//maxZ = ::max(maxZ, z);
+				int z = sourceElevation(X*N+x*D, sourceElevation.height-1- (Y*N+y*D)); // Flip Y
+				elevation[(Y*(W/N)+X)*(N/D+1)*(N/D+1)+y*(N/D+1)+x] = z; //::max(0, z);
+				maxZ = ::max(maxZ, z);
 			}
 			for(int y: range(N/D)) for(int x: range(N/D)) { // TODO: Z-order triangle strips for framebuffer locality ?
 				//int v00 = (Y*(W/N)+X)*(N/D+1)*(N/D+1)+(y+0)*(N/D+1)+x, v10 = (Y*(W/N)+X)*(N/D+1)*(N/D+1)+(y+0)*(N/D+1)+(x+1);
@@ -171,18 +170,19 @@ struct Terrain {
 				//int v01 = (Y*N/D+y+1)*(W/D+1)+X*N/D+x, v11 = (Y*N/D+y+1)*(W/D+1)+(X*N/D+x+1);
 				//int v00 = (y+0)*D*(N+1)+x*D, v10 = (y+0)*D*(N+1)+(x+1)*D;
 				//int v01 = (y+1)*D*(N+1)+x*D, v11 = (y+1)*D*(N+1)+(x+1)*D;
+				int base = (Y*(W/N)+X)*(N/D+1)*(N/D+1);
 				int v00 = (y+0)*(N/D+1)+x, v10 = (y+0)*(N/D+1)+(x+1);
 				int v01 = (y+1)*(N/D+1)+x, v11 = (y+1)*(N/D+1)+(x+1);
-				if(elevation[v00]>=0 && elevation[v11]>=0) {
-					if(elevation[v10]>=0) tile.triangle(v01, v00, v11);
-					if(elevation[v10]>=0) tile.triangle(v11, v00, v10);
+				if(elevation[base+v00]>-32768 && elevation[base+v11]>-32768) {
+					if(elevation[base+v01]>-32768) tile.triangle(v01, v00, v11);
+					if(elevation[base+v10]>-32768) tile.triangle(v11, v00, v10);
 				}
 			}
 			if(tile.indices) tiles.append(int2(X, Y), tile.indices);
 		}
-		this->elevation = elevation;
+		this->elevation = GLBuffer(elevation);
 		textureBuffer = this->elevation;
-		//log(maxZ);
+		vertexArray.bindAttribute(shader.attribLocation("aElevation"), 1, Float, this->elevation);
 	}
 
 #if 0
@@ -208,18 +208,13 @@ struct Terrain {
 		shader.bind();
 		shader["W"_] = int(W/N);
 		shader["N"_] = N/D;
-		vertexArray.bindAttribute(shader.attribLocation("aElevation"), 1, Short, elevation);
 		shader["tElevation"_] = 0;
 		textureBuffer.bind(0);
-		Time draw; draw.start();
-		shader["modelViewProjectionTransform"_] = mat4(viewProjection).scale(vec3(vec2(dx*D),1)); //.translate(vec3(vec2(N/D*tile.tileIndex),0)); // TODO: UBO
+		shader["modelViewProjectionTransform"_] = mat4(viewProjection).scale(vec3(vec2(dx*D),1)); //.translate(vec3(vec2(N/D*tile.tileIndex),0));
 		for(Tile& tile: tiles) {
-			//shader["X"_] = tile.tileIndex.x;
-			//shader["Y"_] = tile.tileIndex.y;
 			int X=tile.tileIndex.x, Y=tile.tileIndex.y;
 			tile.indexBuffer.draw( (Y*(W/N)+X)*(N/D+1)*(N/D+1));
 		}
-		log("draw", draw);
 	}
 };
 
@@ -327,7 +322,7 @@ struct Tree {
 /// Views a scene
 struct View : Widget {
 	// Creates a window and an associated GL context
-	Window window {this, 992, []{ return "Editor"__; }};
+	Window window {this, 896 /*%128==0*/, []{ return "Editor"__; }};
 	// ^ GL* constructors rely on a GL context being current ^
 	/*struct Surface {
 		ref<Vertex> vertices;
@@ -348,8 +343,8 @@ struct View : Widget {
 	//buffer<Tree> treeModels = apply(1, [this](int) { return Tree(random); });
 
 	const float viewDistance = 30;
-	const vec2 origin = 1024;
-	vec3 position = vec3(origin, /*terrain.elevation(origin.xy()) +*/ 512 /*N*/);
+	const vec2 origin = 4096*dx;
+	vec3 position = vec3(origin, /*terrain.elevation(origin.xy()) +*/ 4096*dx /*N*/);
 
 #if 0
 	struct Instance {
@@ -429,7 +424,7 @@ struct View : Widget {
 		}
 	} light {instances};*/
 	// Sky
-	GLShader sky {shader(), {"sky"}};
+	//GLShader sky {shader(), {"sky"}};
 	GLVertexArray vertexArray;
 	//GLTexture skybox {decodeImage(readFile("skybox.png"_)), SRGB|Bilinear|Cube};
 
@@ -488,11 +483,14 @@ struct View : Widget {
 	}
 
 	vec2 sizeHint(vec2) override { return 0; }
+	View() {
+		glDepthTest(true);
+		glCullFace(true);
+		mainThread.setPriority(-20);
+	}
 	shared<Graphics> graphics(vec2 unused size) override {
 		//if(frameBuffer.size != int2(size)) frameBuffer = GLFrameBuffer(int2(size));
 		//frameBuffer.bind(ClearDepth);
-		glDepthTest(true);
-		glCullFace(true);
 
 		// Computes view projection transform
 		mat4 projection = mat4().perspective(PI/4, size, 1, 2*horizonDistance + length(position));
@@ -522,11 +520,11 @@ struct View : Widget {
 		}*/
 
 		//TODO: fog
-		sky.bind();
+		/*sky.bind();
 		sky["inverseViewProjectionMatrix"] = mat4(((mat3)view).transpose()) * projection.inverse();
 		//sky["lightDirection"] = normalize(view.normalMatrix() * lightDirection);
 		//sky["skybox"] = 0; skybox.bind(0);
-		vertexArray.draw(TriangleStrip, 4);
+		vertexArray.draw(TriangleStrip, 4);*/
 
 		/*GLTexture color(width,height,GLTexture::RGB16F);
 		frameBuffer.blit(color);

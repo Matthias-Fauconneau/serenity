@@ -161,7 +161,7 @@ int main() {
 
 	// -- Window
 	/// Window size
-	uint width = 512, height = width;
+	uint width = 896 /*%128==0*/, height = width;
 	/// Associated window resource (relative to resource ID base Display::id)
 	enum Resource { XWindow, Colormap, PresentEvent, Pixmap };
 	/// GPU device
@@ -200,9 +200,11 @@ int main() {
 	assert_(eglSurface);
 	eglMakeCurrent(eglDevice, eglSurface, eglSurface, eglContext);
 
-	glClearColor(0, 0, 0, 1);
-	glClear(GL_COLOR_BUFFER_BIT);
-	assert_(gbm_surface_has_free_buffers(gbmSurface));
+	//glClearColor(0, 0, 0, 1);
+	//glClear(GL_COLOR_BUFFER_BIT);
+
+
+	/*assert_(gbm_surface_has_free_buffers(gbmSurface));
 	glFinish();
 	assert_( eglSwapBuffers(eglDevice, eglSurface) );
 	bo = gbm_surface_lock_front_buffer(gbmSurface);
@@ -210,5 +212,5 @@ int main() {
 	//byte4* pixels = (byte4*)mmap(0, height*width*4, PROT_READ|PROT_WRITE, MAP_SHARED, dmabuf->fd, 0); log(pixels); mref<byte4>(pixels, height*width).clear(0); // FIXME: mmap returns -1 (PERM)
 	send(DRI3::PixmapFromBuffer{.pixmap=id+Pixmap,.drawable=id+XWindow,.bufferSize=height*width*4,.width=uint16(width),.height=uint16(height),.stride=uint16(width*4)}, fd);
 	send(Present::Pixmap{.window=id+XWindow, .pixmap=id+Pixmap});
-	sleep(1);
+	sleep(1);*/
 }

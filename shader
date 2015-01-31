@@ -53,8 +53,8 @@ fragment {
 
 terrain {
  fragment {
-  uniform isamplerBuffer tElevation;
-  color.rgb = vec3(float(texelFetch(tElevation, int(vTexCoords.y)*(N+1)+int(vTexCoords.x)).r)/256);
+  uniform samplerBuffer tElevation;
+  color.rgb = vec3(float(texelFetch(tElevation, int(vTexCoords.y)*(N+1)+int(vTexCoords.x)).r)/1024);
  }
 }
 

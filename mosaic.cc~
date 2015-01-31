@@ -597,7 +597,7 @@ struct Mosaic {
 				}
 				float dx = (pageSizeMM.x - W) / 2;
 				log("dx=", dx);
-				//x0 += dx; // FIXME
+				x0 += dx; // FIXME
 
 				for(const size_t columnIndex: range(rows[currentRowIndex].size)) {
 					int elementIndex = rows[currentRowIndex][columnIndex];

@@ -101,11 +101,12 @@ struct Build {
         bool condition = !s.match('!');
         string id = s.identifier("_");
         bool value = false;
-        if(id=="1") value=true;
+		/**/  if(id=="0") value=false;
+		else if(id=="1") value=true;
         else if(flags.contains(toLower(id))) value=true; // Conditionnal build (extern use flag)
         else if(defines.contains(toLower(id))) value=true; // Conditionnal build (intern use flag)
         if(value != condition) {
-            while(!s.match("#endif")) {
+			while(!s.match("#else") && !s.match("#endif")) {
                 assert_(s, fileName+": Expected #endif, got EOD");
                 if(!tryParseConditions(s, fileName)) s.line();
             }
