@@ -11,11 +11,11 @@ struct BitReader : ref<uint8> {
 	BitReader(ref<uint8> data);
 	/// Skip \a count bits
 	void skip(int count);
-	/// Reads one bit in MSB msb encoding
+	/// Reads one bit
 	uint bit();
-	/// Reads \a size bits in MSB msb encoding
+	/// Reads \a size bits
 	uint binary(int size);
-	/// Reads \a size bits in MSB msb encoding and two complement sign extend
+	/// Reads \a size bits and two complement sign extend
 	int sbinary(int size);
 	/// Reads an unary encoded value
 	uint unary();

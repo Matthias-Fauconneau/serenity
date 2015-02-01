@@ -123,9 +123,9 @@ String join(ref<string> list, const string separator) {
 
 // -- Number conversions
 
-String str(uint64 n, int pad, char padChar, uint base) {
+String str(uint64 n, uint pad, char padChar, uint base) {
     assert(base>=2 && base<=16);
-    byte buf[64]; int i=64;
+	byte buf[64]; uint i=64;
     do {
         buf[--i] = "0123456789abcdef"[n%base];
         n /= base;
@@ -134,16 +134,16 @@ String str(uint64 n, int pad, char padChar, uint base) {
 	return copyRef(string(buf+i,64-i));
 }
 
-String str(int64 number, int pad, char padChar, uint base) {
+String str(int64 number, uint pad, char padChar, uint base) {
     assert(base>=2 && base<=16);
-	byte buf[64]; int i=64;
+	byte buf[64]; uint i=64;
     uint64 n=abs(number);
     do {
         buf[--i] = "0123456789abcdef"[n%base];
         n /= base;
     } while( n!=0 );
     if(number<0) buf[--i]='-';
-	while(64-i<pad) buf[--i] = padChar;
+	while(64<pad+i) buf[--i] = padChar;
 	return copyRef(string(buf+i,64-i));
 }
 
