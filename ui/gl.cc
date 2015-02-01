@@ -57,7 +57,7 @@ void GLUniform::operator=(mat4 m) { assert(location>=0); glUseProgram(program); 
 GLUniform GLShader::operator[](string name) {
 	int location = uniformLocations.value(name, -1);
     if(location<0) {
-		location=glGetUniformLocation(id, strz(name));
+		location = glGetUniformLocation(id, strz(name));
 		if(location<0) /*return GLUniform(id, location); //*/error("Unknown uniform"_,name);
 		uniformLocations.insert(copyRef(name), location);
     }
@@ -173,6 +173,7 @@ GLBuffer::GLBuffer(uint elementSize, ref<byte> data) : elementSize(elementSize),
 	glBindBuffer(GL_ARRAY_BUFFER, id);
 	assert_(int(data.size) > 0, data.size);
 	glBufferData(GL_ARRAY_BUFFER, data.size, data.data, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 GLBuffer::~GLBuffer() { if(id) glDeleteBuffers(1, &id); }
 
@@ -186,6 +187,8 @@ void GLVertexArray::bindAttribute(int index, int elementSize, AttributeType type
 	glBindBuffer(GL_ARRAY_BUFFER, buffer.id);
 	glVertexAttribPointer(index, elementSize, type, 0, buffer.elementSize, (void*)offset);
 	glEnableVertexAttribArray(index);
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 void GLVertexArray::draw(PrimitiveType primitiveType, uint vertexCount) const {
 	bind();
@@ -202,6 +205,7 @@ void GLIndexBuffer::draw(int base /*instanceCount*/) {
 	if(elementSize==4) type = GL_UNSIGNED_INT;
 	assert_(type);
 	glDrawElementsBaseVertex(primitiveType, elementCount, type, 0, base);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
 /// Texture
@@ -267,6 +271,7 @@ GLTexture::GLTexture(const GLBuffer& buffer, int2 size, uint format) : size(size
 	if(format == R32F) internalFormat = GL_R32F;
 	assert_(format);
 	glTexBuffer(target, internalFormat, buffer.id);
+	glBindTexture(target, 0);
 }
 
 GLTexture::~GLTexture() { if(id) glDeleteTextures(1, &id); id=0; }

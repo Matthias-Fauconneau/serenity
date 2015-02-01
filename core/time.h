@@ -24,13 +24,13 @@ struct Time {
 	uint64 startTime=realTime(), stopTime=startTime;
     void start() { if(stopTime) startTime=realTime()-(stopTime-startTime); stopTime=0; }
     void stop() { if(!stopTime) stopTime=realTime(); }
-    String reset() { stop(); String s=str((stopTime-startTime)/1000000000.,1)+'s'; startTime=stopTime; stopTime=0; return s; }
+	String reset() { stop(); String s=str((stopTime-startTime)/1000000000., 1u)+'s'; startTime=stopTime; stopTime=0; return s; }
     operator uint64() const { return ((stopTime?:realTime()) - startTime)/1000000; }
 	double toReal() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
     operator float() const { return toReal(); }
     operator double() const { return toReal(); }
 };
-inline String str(const Time& t) { return str(t.toReal())+'s'; }
+inline String str(const Time& t) { return str(t.toReal(),3u)+'s'; }
 inline bool operator<(float a, const Time& b) { return a < b.toReal(); }
 inline bool operator<(double a, const Time& b) { return a < b.toReal(); }
 inline String str(const Time& num, const Time& div) { return str(int(round(100*num.toReal()/div.toReal())))+'%'; }

@@ -20,17 +20,17 @@ void log(string message) {
 
 // Poll
 void Poll::registerPoll() {
-    Locker lock(thread.lock);
+	Locker lock(thread);
 	if(thread.contains(this)) { thread.unregistered.tryRemove(this); return; }
     assert_(!thread.unregistered.contains(this));
 	thread.append(this);
     if(thread.tid) thread.post(); // Resets poll to include this new descriptor (FIXME: only if not current)
 }
 void Poll::unregisterPoll() {
-    Locker lock(thread.lock);
+	Locker lock(thread);
     if(thread.contains(this) && !thread.unregistered.contains(this)) thread.unregistered.append(this);
 }
-void Poll::queue() {Locker lock(thread.lock); if(!thread.queue.contains(this)) thread.queue.append(this); thread.post();}
+void Poll::queue() {Locker lock(thread); if(!thread.queue.contains(this)) thread.queue.append(this); thread.post();}
 
 EventFD::EventFD():Stream(eventfd(0,EFD_SEMAPHORE)){}
 
@@ -47,8 +47,9 @@ static bool terminationRequested = false;
 // Exit status to return for process (group)
 static int groupExitStatus = 0;
 
+generic T* addressOf(T& arg)  { return reinterpret_cast<T*>(&const_cast<char&>(reinterpret_cast<const volatile char&>(arg))); }
 Thread::Thread(int priority, bool spawn) : Poll(EventFD::fd,POLLIN,*this), priority(priority) {
-	if(this == &mainThread) tid = gettid();
+	if(this == addressOf(mainThread)) tid = gettid();
 	if(spawn) this->spawn();
 }
 void Thread::setPriority(int priority) { setpriority(0,0,priority); }
@@ -64,7 +65,7 @@ void Thread::run() {
     while(!::terminationRequested && !this->terminationRequested) {
         assert_(size>=1);
         if(size==1 && !queue) break; // Terminates if no Poll objects (except thread queue EventFD) are registered and no job is queued)
-        while(unregistered){Locker locker(lock); Poll* poll=unregistered.pop(); remove(poll); queue.tryRemove(poll);}
+		while(unregistered){Locker locker(*this); Poll* poll=unregistered.pop(); remove(poll); queue.tryRemove(poll);}
 
         pollfd pollfds[size];
         for(uint i: range(size)) pollfds[i]=*at(i); //Copy pollfds as objects might unregister while processing in the loop
@@ -88,7 +89,7 @@ void Thread::event() {
     EventFD::read();
     if(queue){
         Poll* poll;
-        {Locker locker(lock);
+		{Locker locker(*this);
             poll=queue.take(0);
             if(unregistered.contains(poll)) return;
         }

@@ -85,7 +85,7 @@ Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool sho
 		surfaceSize = size;
 #else // GLX/Xlib/DRI2
 	glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_,":0"_))); assert_(glDisplay);
-	const int fbAttribs[] = {GLX_DOUBLEBUFFER, 1, GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 24, GLX_SAMPLE_BUFFERS, 1, GLX_SAMPLES, 8, /*GLX_FRAMEBUFFER_SRGB_CAPABLE_EXT, 1,*/ 0};
+	const int fbAttribs[] = {GLX_DOUBLEBUFFER, 1, GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 24,/* GLX_SAMPLE_BUFFERS, 1, GLX_SAMPLES, 8,*/ /*GLX_FRAMEBUFFER_SRGB_CAPABLE_EXT, 1,*/ 0};
 	int fbCount=0; GLXFBConfig* fbConfigs = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount); assert(fbConfigs && fbCount);
 	const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION_ARB, 3, GLX_CONTEXT_MINOR_VERSION_ARB, 3, 0};
 	glContext = ((PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB"))(glDisplay, fbConfigs[0], 0, 1, contextAttribs);
@@ -204,7 +204,7 @@ void Window::render(shared<Graphics>&& graphics, int2 origin, int2 size) {
     updates.append( Update{move(graphics),origin,size} );
 	if(updates /*&& mapped && state == Idle*/) queue();
 }
-void Window::render() { assert_(size); updates.clear(); render(nullptr, int2(0), size); }
+void Window::render() { Locker lock(this->lock); assert_(size); updates.clear(); render(nullptr, int2(0), size); }
 
 #if DRI3
 struct DMABuf {
@@ -236,7 +236,9 @@ void Window::event() {
 	}
 #endif
 
+	lock.lock();
 	Update update = updates.take(0);
+	lock.unlock();
 	// Widget::graphics may renders using GL immediately and/or return primitives
 	GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(backgroundColor,1));
 	if(!update.graphics) update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size))); // TODO: partial render
@@ -260,5 +262,5 @@ void Window::event() {
 #else
 	glXSwapBuffers(glDisplay, id);
 #endif
-	assert_(updates.size<=1);
+	//assert_(updates.size<=1);
 }

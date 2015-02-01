@@ -2,6 +2,7 @@
 /// \file process.h \link Thread threads\endlink, \link Lock synchronization\endlink, process environment and arguments
 #include "map.h"
 #include "file.h"
+#include "function.h"
 #include <poll.h>
 #include <pthread.h> //pthread
 
@@ -34,7 +35,7 @@ struct Lock : handle<pthread_mutex_t> {
     Lock() { pthread_mutex_init(&pointer,0); }
     ~Lock() { pthread_mutex_destroy(&pointer); }
     /// Locks the mutex.
-    void lock() { pthread_mutex_lock(&pointer); }
+	void lock() { pthread_mutex_lock(&pointer); }
     /// Atomically lock the mutex only if unlocked.
     bool tryLock() { return !pthread_mutex_trylock(&pointer); }
     /// Unlocks the mutex.
@@ -120,13 +121,12 @@ struct EventFD : Stream {
 };
 
 /// Concurrently runs an event loop
-struct Thread : array<Poll*>, EventFD, Poll {
+struct Thread : array<Poll*>, EventFD, Lock, Poll {
     array<Poll*> queue; // Poll objects queued on this thread
     array<Poll*> unregistered; // Poll objects removed while in event loop
     int priority=0; // Thread system priority
-    pthread_t thread;
-    int tid=0; // Thread system identifier
-    Lock lock;
+	pthread_t thread = 0;
+	int tid=0; // Thread system identifier
 	Lock runLock;
     bool terminationRequested = false;
 
@@ -145,6 +145,12 @@ struct Thread : array<Poll*>, EventFD, Poll {
     void wait();
 };
 int32 gettid();
+
+struct Job : Poll {
+	function<void()> job;
+	Job(Thread& thread, function<void()> job) : Poll(0,0,thread), job(job) { queue(); }
+	void event() { job(); }
+};
 
 /// Flags all threads to terminate as soon as they return to event loop, destroys all global objects and exits process.
 void requestTermination(int status=0);

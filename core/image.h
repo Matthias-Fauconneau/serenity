@@ -70,8 +70,8 @@ inline Image resize(Image&& target, const Image& source) { resize(target, source
 // -- 16bit
 
 struct Image16 : buffer<int16> {
-	union { int2 size = 0; struct { uint width, height; }; };
+	int2 size = 0;
 	Image16() {}
-	Image16(uint width, uint height) : buffer(height*width), width(width), height(height) {}
-	inline notrace int16& operator()(uint x, uint y) const { assert(x<width && y<height); return at(y*width+x); }
+	Image16(int2 size) : buffer(size.y*size.x), size(size) {}
+	inline notrace int16& operator()(size_t x, size_t y) const { assert(x<size_t(size.x) && y<size_t(size.y)); return at(y*size.x+x); }
 };

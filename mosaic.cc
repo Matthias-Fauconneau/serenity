@@ -780,12 +780,6 @@ struct MosaicPreview : Application {
 };
 registerApplication(MosaicPreview, preview);
 
-struct Job : Poll {
-	function<void()> job;
-	Job(Thread& thread, function<void()> job) : Poll(0,0,thread), job(job) { queue(); }
-	void event() { job(); }
-};
-
 struct MosaicExport : Application {
 	// UI
 	Text text;

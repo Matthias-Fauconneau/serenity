@@ -11,10 +11,10 @@ terrain {
   int YX = gl_VertexID;
   int X = YX%W;
   int Y = YX/W;
-  uniform float da;
-  float longitude = /*(X*N+x)*/ X*da;
+  uniform float dx, dy;
+  float longitude = /*(X*N+x)*/ X*dx;
   float PI = 3.14159265358979323846;
-  float latitude = /*(Y*N+y)*/ PI/6 + Y*da;
+  float latitude = /*(Y*N+y)*/ PI/6 + Y*dy;
   uniform float R;
   float r = 1+aElevation/R;
   attribute float aElevation;
@@ -31,6 +31,6 @@ fragment {
 terrain {
  fragment {
   uniform samplerBuffer tElevation;
-  color.rgb = vec3(float(texelFetch(tElevation, int(vTexCoords.y)*W+int(vTexCoords.x)).r)/1024);
+  color.rgb = vec3(float(texelFetch(tElevation, int(vTexCoords.y)*W+int(vTexCoords.x)).r)/4096);
  }
 }

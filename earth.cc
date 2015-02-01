@@ -2,6 +2,7 @@
 #include "matrix.h"
 #include "gl.h"
 #include "tiff.h"
+#include "time.h"
 FILE(shader)
 
 generic const T& raw(ref<byte> data) { assert_(data.size==sizeof(T)); return *(T*)data.data; }
@@ -14,15 +15,12 @@ struct BitReader : ref<byte> {
 	BitReader(ref<byte> data) : ref<byte>(data) { bitSize=8*data.size; index=0; }
 	/// Reads one lsb bit
 	uint bit() {
-		assert_(index < bitSize);
 		uint8 bit = uint8(uint8(data[index/8])<<(7-(index&7)))>>7;
 		index++;
 		return bit;
 	}
 	/// Reads \a size bits
 	uint binary(uint size) {
-		assert_(size > 0 && size < 32 && index+size <= bitSize);
-		assert(size <= 32 && index < bitSize);
 		uint value = (*(uint64*)(data+index/8) << (64-size-(index&7))) >> int8(64-size);
 		index += size;
 		return value;
@@ -43,22 +41,18 @@ buffer<byte> inflate(ref<byte> compressed, buffer<byte>&& target) { //inflate hu
 				for(uint length: lengths) if(length) count[length]++;
 				// Initializes cumulative offset
 				uint offsets[16];
-				assert_(count[0] == 0, count, lengths);
 				{int sum = 0; for(size_t i: range(16)) { offsets[i] = sum; sum += count[i]; }}
 				// Evaluates code -> symbol translation table
 				for(size_t symbol: range(lengths.size)) if(lengths[symbol]) lookup[offsets[lengths[symbol]]++] = symbol;
 			}
 			uint decode(BitReader& s) {
-				assert_(s.index < s.bitSize);
 				int code=0; uint length=0, sum=0;
 				do { // gets more bits while code value is above sum
 					code <<= 1;
 					code |= s.bit();
 					length += 1;
-					assert_(length < 16, length);
 					sum += count[length];
 					code -= count[length];
-					assert_(sum + code >= 0 && sum + code < 288);
 				} while (code >= 0);
 				return lookup[sum + code];
 			}
@@ -68,13 +62,13 @@ buffer<byte> inflate(ref<byte> compressed, buffer<byte>&& target) { //inflate hu
 
 		bool BFINAL = s.bit();
 		int BTYPE = s.binary(2);
-		log(ref<string>{"literal", "static", "dynamic", "reserved"}[BTYPE]);
 		if(BTYPE==0) { // Literal
 			s.index=align(8, s.index);
 			uint16 length = raw<uint16>(s.slice(s.index/8, 2)); s.index+=16;
 			uint16 unused nlength = raw<uint16>(s.slice(s.index/8, 2)); s.index+=16;
-			assert_(length && ~length == nlength);
-			target.append(s.slice(s.index/8, length));
+			ref<byte> source = s.slice(s.index/8, length);
+			for(size_t i: range(length)) target[targetIndex+i] = source[i];
+			targetIndex += length;
 		} else { // Compressed
 			if(BTYPE==1) { // Static Huffman codes
 				mref<uint>(literal.count).copy({0,0,0,0,0,0,24,24+144,112});
@@ -97,7 +91,6 @@ buffer<byte> inflate(ref<byte> compressed, buffer<byte>&& target) { //inflate hu
 					uint symbol = code.decode(s);
 					if(symbol < 16) lengths[i++] = symbol;
 					else if(symbol == 16) { // Repeats last
-						assert_(i>0);
 						uint last = lengths[i-1];
 						for(int unused t: range(3+s.binary(2))) lengths[i++] = last;
 					}
@@ -110,9 +103,8 @@ buffer<byte> inflate(ref<byte> compressed, buffer<byte>&& target) { //inflate hu
 			} else error("Reserved BTYPE", BTYPE);
 
 			for(;;) {
-				assert_(s.index < s.bitSize, s.index, s.bitSize);
 				uint symbol = literal.decode(s);
-				if(symbol < 256) { assert_(targetIndex < target.size, targetIndex, target.size); target[targetIndex++] = symbol; } // Literal
+				if(symbol < 256) target[targetIndex++] = symbol; // Literal
 				else if(symbol == 256) break; // Block end
 				else if(symbol < 286) { // Length-distance
 					uint length = 0;
@@ -121,13 +113,11 @@ buffer<byte> inflate(ref<byte> compressed, buffer<byte>&& target) { //inflate hu
 						uint code[7] = {257, 265, 269, 273, 277, 281, 285};
 						uint lengths[6] = {3, 11, 19, 35, 67, 131};
 						for(int i: range(6)) if(symbol < code[i+1]) { length = ((symbol-code[i])<<i)+lengths[i]+(i?s.binary(i):0); break; }
-						assert_(length);
 					}
 					uint distanceSymbol = distance.decode(s);
 					uint code[15] = {0, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30};
 					uint lengths[14] = {1, 5, 9, 17, 33, 65, 129, 257, 513, 1025, 2049, 4097, 8193, 16385};
-					uint distance = 0; for(int i: range(14)) if(distanceSymbol < code[i+1]) { distance = ((distanceSymbol-code[i])<<i)+lengths[i]+(i?s.binary(i):0); break; } assert_(distance);
-					assert_(targetIndex+length <= target.size && distance <= targetIndex, symbol, length, distanceSymbol, distance, targetIndex);
+					uint distance = 0; for(int i: range(14)) if(distanceSymbol < code[i+1]) { distance = ((distanceSymbol-code[i])<<i)+lengths[i]+(i?s.binary(i):0); break; }
 					for(size_t i : range(length)) target[targetIndex+i] = target[targetIndex-distance+i]; // length may be larger than distance
 					targetIndex += length;
 				} else error(symbol);
@@ -201,11 +191,9 @@ buffer<byte> extractZIPFile(ref<byte> zip, ref<byte> fileName) {
 			size_t offset = directory.offset;
 			for(size_t unused entryIndex: range(directory.nofEntries)) {
 				const FileHeader& header =  raw<FileHeader>(zip.slice(offset, sizeof(FileHeader)));
-				assert_(ref<byte>(header.signature, 4) == ref<byte>(FileHeader().signature, 4));
 				string name = zip.slice(offset+sizeof(header), header.nameLength);
 				if(name.last() != '/') {
 					const LocalHeader& local = raw<LocalHeader>(zip.slice(header.offset, sizeof(LocalHeader)));
-					assert_(ref<byte>(local.signature, 4) == ref<byte>(LocalHeader().signature, 4));
 					ref<byte> compressed = zip.slice(header.offset+sizeof(local)+local.nameLength+local.extraLength, local.compressedSize);
 					assert_(header.compression == 8);
 					if(name == fileName) return inflate(compressed, buffer<byte>(local.size));
@@ -247,46 +235,56 @@ struct TriangleStrip : buffer<uint> {
 };
 
 struct SRTM {
-	static constexpr int W = 360/5/*01-72*/, H=24 /*01-24*/;
-	struct { Map map; Image16 image; } tiles[W*H]; // 432000x144000 (120Gs), 13 GB, 872 images (60Gs)
-	int2 tileSize = 6000;
-	SRTM() {
-		for(size_t y: range(H)) for(size_t x: range(W)) {
-			String name = "srtm_"+str(y,2u)+"_"+str(x,2u);
-			Image16 image;
-			if(existsFile(name+".tif")) {
-				tiles[y*W+x].map = Map(name+".tif");
-				image = parseTIFF(unsafeRef(tiles[y*W+x].map)); // Weak reference to map
-			} else if(existsFile(name+".zip")) {
-				// TODO: progressive
-				image = parseTIFF(extractZIPFile(Map(name+".zip"), name+".tif"));
-			} else continue; // Ocean
-			assert_(image.size == tileSize+int2(1)); // first/last points are identical
-			tiles[y*W+x].image = move(image);
+	Lock lock;
+	function<void(int2)> changed;
+	SRTM(function<void(int2)> changed) : changed(changed) {}
+	static constexpr size_t W = 360/5/*72*/, H=24;
+	Image16 tiles[W*H] = {}; // 432000x144000 (120Gs), 13 GB, 872 images (60Gs)
+	const int2 tileSize = 6000;
+	static constexpr int D = 16; // /2⁴ = 27000x9000 (243Ms)
+	Thread workerThread {0, true}; // Separate thread to decode images while main thread renders globe
+	Job job {workerThread, [this]{
+		for(size_t Y: range(H)) for(size_t X: range(W)) {
+			String name = "srtm_"+str(Y, 2u)+"_"+str(X, 2u);
+			if(!existsFile(name+".zip")) continue; // Ocean
+			Time time; time.start();
+			buffer<byte> file = extractZIPFile(Map(name+".zip"), name+".tif");
+			Image16 source = parseTIFF(file); // WARNING: unsafe weak reference to file
+			if(source.size != tileSize && source.size != tileSize+int2(1)) error(tileSize, source.size); // first/last points are identical // FIXME
+			Image16 target (tileSize/D); // 375x375
+			for(int y: range(tileSize.y/D)) for(int x: range(tileSize.x/D)) target(x, y) = source(x*D, y*D); // FIXME: average
+			{Locker lock(this->lock); tiles[Y*W+X] = move(target);}
+			changed(int2(X, Y));
 		}
-	}
-	int2 size() const { return int2(W,H)*tileSize; }
-	int16 operator ()(size_t Xx, size_t Yy) const {
-		size_t X = Xx / tileSize.x;
-		size_t Y = Yy / tileSize.y;
-		if(!tiles[Y*W+X].image) return -32768;
-		size_t x = Xx % tileSize.x;
-		size_t y = Yy % tileSize.y;
-		return tiles[Y*W+X].image(x, (tileSize.y-1-1)-y);
+	}};
+	int2 size() const { return int2(W,H)*tileSize/D; }
+	int16 operator ()(size_t Xx, size_t Yy) {
+		size_t X = Xx / (tileSize.x/D);
+		size_t Y = Yy / (tileSize.y/D);
+		if(!tiles[Y*W+X]) return -32768;
+		size_t x = Xx % (tileSize.x/D);
+		size_t y = Yy % (tileSize.y/D);
+		Locker lock(this->lock);
+		assert_(Y < H && X < W && x<size_t(tileSize.x/D) && ((tileSize.y/D-1)-y)<size_t(tileSize.y/D), X, Y, x, y);
+		return tiles[Y*W+X](x, (tileSize.y/D-1)-y);
 	}
 };
 
 struct Terrain {
+	function<void()> changed;
+	bool needUpdate = true; // FIXME: progressive
+	SRTM srtm;
 	GLShader shader {::shader(), {"terrain"}};
 	GLBuffer elevation;
 	GLVertexArray vertexArray;
-	GLTexture textureBuffer;// {elevation}; // shader read access (texelFetch) to elevation buffer*/
+	GLTexture textureBuffer; // shader read access (texelFetch) to elevation buffer
 	GLIndexBuffer indexBuffer;
-	static constexpr int D = 128; // 3375x1125
 
-	Terrain() {
+	Terrain(function<void()> changed) : changed(changed), srtm([this](int2){ needUpdate=true; this->changed(); }) {}
+
+	void update() {
 		int maxZ = 0;
-		SRTM srtm;
+		static constexpr int D = 8; // /2⁴/2³ = 3375x1125
 		ImageF elevation (srtm.size()/D); // int16 stutters //TODO: map //FIXME: share first/last line of each tile
 		struct TriangleStrip triangleStrip (elevation.Ref::size*6);
 		for(int y: range(elevation.size.y)) for(int x: range(elevation.size.x)) {
@@ -294,29 +292,37 @@ struct Terrain {
 			elevation(x, y) = z;
 			maxZ = ::max(maxZ, z);
 		}
+		//log(maxZ); 5594
 		for(int y: range(elevation.size.y-1)) for(int x: range(elevation.size.x)) { // TODO: Z-order triangle strips for framebuffer locality ?
-			int v00 = (y+0)*elevation.size.x+x, v10 = (y+0)*elevation.size.x+(x+1)%elevation.size.x;
-			int v01 = (y+1)*elevation.size.x+x, v11 = (y+1)*elevation.size.x+(x+1)%elevation.size.x;
+			int v00 = (y+0)*elevation.size.x+x, v10 = (y+0)*elevation.size.x+((x+1)%elevation.size.x);
+			int v01 = (y+1)*elevation.size.x+x, v11 = (y+1)*elevation.size.x+((x+1)%elevation.size.x);
 			if(elevation[v00]>-32768 && elevation[v11]>-32768) {
-				if(elevation[v01]>-32768) triangleStrip(v01, v00, v11);
-				if(elevation[v10]>-32768) triangleStrip(v11, v00, v10);
+				if(elevation[v01]>-32768) triangleStrip(v10, v00, v11);
+				if(elevation[v10]>-32768) triangleStrip(v11, v00, v01);
 			}
 		}
+		if(!triangleStrip) return; // No data loaded yet
 		indexBuffer = triangleStrip;
 		this->elevation = GLBuffer(elevation);
 		textureBuffer = GLTexture(this->elevation, elevation.size);
-		vertexArray.bindAttribute(shader.attribLocation("aElevation"), 1, Float, this->elevation);
+		vertexArray = GLVertexArray();
+		vertexArray.bindAttribute(shader.attribLocation("aElevation"_), 1, Float, this->elevation);
+		needUpdate = false;
 	}
 
 	void draw(const mat4 viewProjection) {
+		if(needUpdate) update();
+		if(!indexBuffer.id) return; // No data loaded yet
 		shader.bind();
 		shader["W"_] = textureBuffer.size.x;
-		shader["da"_] = float(2*PI/textureBuffer.size.x);
+		shader["dx"_] = float(2*PI/textureBuffer.size.x);
+		shader["dy"_] = float(2*PI/(3*(textureBuffer.size.y-1)));
 		static constexpr float R = 4E7/(2*PI); // 4·10⁷/2π  ~ 6.37
 		shader["R"_] = R;
 		shader["tElevation"_] = 0;
 		textureBuffer.bind(0);
 		shader["modelViewProjectionTransform"_] = mat4(viewProjection); //.scale(vec3(vec2(dx*D),1)); //.translate(vec3(vec2(N/D*tile.tileIndex),0));
+		vertexArray.bind();
 		indexBuffer.draw(0);
 	}
 };
@@ -324,15 +330,18 @@ struct Terrain {
 /// Views a scene
 struct View : Widget {
 	Window window {this, 896 /*%128==0*/, []{ return "Editor"__; }};
-	Terrain terrain;
+	Terrain terrain {[this]{ window.render(); }};
 
 	// View
 	vec2 lastPos; // Last cursor position to compute relative mouse movements
 	vec2 rotation = vec2(0, 0); // Current view angles (longitude, latitude)
+	float scale = 1;
 
 	bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override {
 		 vec2 delta = cursor-lastPos; lastPos=cursor;
 		 if(event==Motion && button==LeftButton) rotation += float(2.f*PI) * delta / size;
+		 if(event==Press && button==WheelUp) scale = max(16., scale * 3./2);
+		 if(event==Press && button==WheelDown) scale = min(1., scale / (3./2));
 		 else return false;
 		 return true;
 	}
@@ -340,11 +349,12 @@ struct View : Widget {
 	vec2 sizeHint(vec2) override { return 0; }
 	View() {
 		glDepthTest(true);
-		//glCullFace(true);
+		glCullFace(true);
 	}
 	shared<Graphics> graphics(vec2 unused size) override {
 		mat4 view = mat4()
-				.translate(vec3(0,0,-1/**R*/)) // Altitude
+				.scale(scale)
+				.translate(vec3(0,0,-1)) // Altitude
 				.rotateX(rotation.y) // Latitude
 				.rotateZ(rotation.x) // Longitude
 				;

@@ -147,7 +147,7 @@ String str(int64 number, uint pad, char padChar, uint base) {
 	return copyRef(string(buf+i,64-i));
 }
 
-String str(double n, int precision, int exponent, uint pad) {
+String str(double n, uint precision, int exponent, uint pad) {
     bool sign = n<0; n=abs(n);
     if(__builtin_isnan(n)) return ::right("NaN", pad);
     if(n==::inf) return ::right("∞", pad+2);
