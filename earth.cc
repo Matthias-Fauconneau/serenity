@@ -239,21 +239,42 @@ struct SRTM {
 	function<void(int2)> changed;
 	SRTM(function<void(int2)> changed) : changed(changed) {}
 	static constexpr size_t W = 360/5/*72*/, H=24;
-	Image16 tiles[W*H] = {}; // 432000x144000 (120Gs), 13 GB, 872 images (60Gs)
+	struct Tile { Map map; Image16 image; } tiles[W*H] = {}; // 432000x144000 (120Gs), 13 GB, 872 images (60Gs)
 	const int2 tileSize = 6000;
 	static constexpr int D = 16; // /2⁴ = 27000x9000 (243Ms)
 	Thread workerThread {0, true}; // Separate thread to decode images while main thread renders globe
 	Job job {workerThread, [this]{
+		Folder srtm("srtm");
+		Folder cache("cache");
 		for(size_t Y: range(H)) for(size_t X: range(W)) {
-			String name = "srtm_"+str(Y, 2u)+"_"+str(X, 2u);
-			if(!existsFile(name+".zip")) continue; // Ocean
-			Time time; time.start();
-			buffer<byte> file = extractZIPFile(Map(name+".zip"), name+".tif");
-			Image16 source = parseTIFF(file); // WARNING: unsafe weak reference to file
-			if(source.size != tileSize && source.size != tileSize+int2(1)) error(tileSize, source.size); // first/last points are identical // FIXME
-			Image16 target (tileSize/D); // 375x375
-			for(int y: range(tileSize.y/D)) for(int x: range(tileSize.x/D)) target(x, y) = source(x*D, y*D); // FIXME: average
-			{Locker lock(this->lock); tiles[Y*W+X] = move(target);}
+			String name = str(X, 2u)+"_"+str(Y, 2u);
+			Map map = existsFile(name, cache)  ? Map(name, cache) : Map();
+			if(map.size != size_t(tileSize.y/D)*(tileSize.x/D)*2) {
+				if(!existsFile("srtm_"+name+".zip", srtm)) continue; // Ocean
+				Time time; time.start();
+				buffer<byte> file = extractZIPFile(Map("srtm_"+name+".zip", srtm), "srtm_"+name+".tif");
+				Image16 source = parseTIFF(file); // WARNING: unsafe weak reference to file
+				if(source.size != tileSize && source.size != tileSize+int2(1)) error(tileSize, source.size); // first/last points are identical // FIXME
+
+				map = Map(File(name+".part"_, cache, Flags(ReadWrite|Create)).resize((tileSize.y/D)*(tileSize.x/D)*2), Map::Prot(Map::Read|Map::Write));
+				Image16 target (cast<int16>(map), tileSize/D); // 375x375
+				for(size_t y: range(tileSize.y/D)) for(size_t x: range(tileSize.x/D)) {
+					int sum = 0; int N = 0;
+					int16* s = &source(x*D, y*D);
+					size_t stride = tileSize.y;
+					for(size_t dy: range(D)) {
+						int16* sY = s + dy * stride;
+						for(size_t dx: range(D)) {
+							int16 v = sY[dx];
+							if(v>-32768) N++, sum += v;
+						}
+					}
+					target(x, y) = N ? sum / N : -32768;
+				}
+				rename(name+".part"_, name, cache);
+			}
+			Image16 target (cast<int16>(map), tileSize/D); // 375x375
+			{Locker lock(this->lock); tiles[Y*W+X] = {move(map), move(target)};}
 			changed(int2(X, Y));
 		}
 	}};
@@ -261,12 +282,12 @@ struct SRTM {
 	int16 operator ()(size_t Xx, size_t Yy) {
 		size_t X = Xx / (tileSize.x/D);
 		size_t Y = Yy / (tileSize.y/D);
-		if(!tiles[Y*W+X]) return -32768;
+		if(!tiles[Y*W+X].image) return -32768;
 		size_t x = Xx % (tileSize.x/D);
 		size_t y = Yy % (tileSize.y/D);
 		Locker lock(this->lock);
 		assert_(Y < H && X < W && x<size_t(tileSize.x/D) && ((tileSize.y/D-1)-y)<size_t(tileSize.y/D), X, Y, x, y);
-		return tiles[Y*W+X](x, (tileSize.y/D-1)-y);
+		return tiles[Y*W+X].image(x, y);
 	}
 };
 
@@ -297,8 +318,8 @@ struct Terrain {
 			int v00 = (y+0)*elevation.size.x+x, v10 = (y+0)*elevation.size.x+((x+1)%elevation.size.x);
 			int v01 = (y+1)*elevation.size.x+x, v11 = (y+1)*elevation.size.x+((x+1)%elevation.size.x);
 			if(elevation[v00]>-32768 && elevation[v11]>-32768) {
-				if(elevation[v01]>-32768) triangleStrip(v10, v00, v11);
-				if(elevation[v10]>-32768) triangleStrip(v11, v00, v01);
+				if(elevation[v10]>-32768) triangleStrip(v10, v00, v11);
+				if(elevation[v01]>-32768) triangleStrip(v11, v00, v01);
 			}
 		}
 		if(!triangleStrip) return; // No data loaded yet
@@ -340,8 +361,8 @@ struct View : Widget {
 	bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override {
 		 vec2 delta = cursor-lastPos; lastPos=cursor;
 		 if(event==Motion && button==LeftButton) rotation += float(2.f*PI) * delta / size;
-		 if(event==Press && button==WheelUp) scale = max(16., scale * 3./2);
-		 if(event==Press && button==WheelDown) scale = min(1., scale / (3./2));
+		 else if(event==Press && button==WheelUp) scale = min(2., scale * pow(2,1./16));
+		 else if(event==Press && button==WheelDown) scale = max(1., scale / pow(2,1./16));
 		 else return false;
 		 return true;
 	}
