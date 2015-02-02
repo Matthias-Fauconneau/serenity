@@ -12,7 +12,7 @@ uint subExponent(float& value) {
     error("No matching subexponent for"_, value);
 }
 
-vec2 Plot::sizeHint(vec2) { return 512; }
+vec2 Plot::sizeHint(vec2) { return 1024; }
 shared<Graphics> Plot::graphics(vec2 size) {
     vec2 min=vec2(+__builtin_inf()), max=vec2(-__builtin_inf());
     if(this->min.x < this->max.x && this->min.y < this->max.y) min=this->min, max=this->max; // Custom scales

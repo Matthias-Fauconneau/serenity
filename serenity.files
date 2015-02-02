@@ -155,3 +155,5 @@ test.cc
 test.cc
 ui/plot.h
 ui/plot.cc
+io/inflate.h
+io/zip.h
