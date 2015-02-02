@@ -124,8 +124,8 @@ inline String str(int32 n, uint pad=0, char padChar=' ', uint base=10) { return 
 inline String str(long n, uint pad=0, char padChar=' ', uint base=10) { return str(int64(n), pad, padChar, base); }
 
 /// Converts a floating-point number
-String str(double number, uint precision=2, int exponent=0, uint pad=0);
-inline String str(float n, uint precision=2, int exponent=0) { return str(double(n), precision, exponent); }
+String str(double number, uint precision=2, uint exponent=0, uint pad=0);
+inline String str(float n, uint precision=2, uint exponent=0) { return str(double(n), precision, exponent); }
 
 /// Formats value using best binary prefix
 String binaryPrefix(uint64 value, string unit="B"_, string unitSuffix=""_);

@@ -252,12 +252,10 @@ TextLayout Text::layout(float wrap) const {
 	return TextLayout(text, size, wrap, font, hint, interline, true, justifyExplicitLineBreak, true, color);
 }
 
-vec2 Text::textSize(vec2 size) const {
+vec2 Text::sizeHint(vec2 size) {
 	TextLayout layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
-	return ceil(layout.bbMax - min(vec2(0),layout.bbMin));
+	return max(minimalSizeHint, ceil(layout.bbMax - min(vec2(0),layout.bbMin)));
 }
-
-vec2 Text::sizeHint(vec2 size) { return max(minimalSizeHint, textSize(size)); }
 
 shared<Graphics> Text::graphics(vec2 size) {
     TextLayout layout = this->layout(min<float>(wrap, size.x));

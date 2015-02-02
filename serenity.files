@@ -153,3 +153,5 @@ image/stitch.cc
 io/tiff.cc
 test.cc
 test.cc
+ui/plot.h
+ui/plot.cc

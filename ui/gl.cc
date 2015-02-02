@@ -342,7 +342,7 @@ void GLFrameBuffer::blit(uint target) {
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target);
     glBlitFramebuffer(0,0,width,height,0,0,width,height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 }
-void GLFrameBuffer::blit(GLTexture& color) {
+/*void GLFrameBuffer::blit(GLTexture& color) {
     assert(color.width==width && color.height==height);
     uint target=0;
     glGenFramebuffers(1,&target);
@@ -351,4 +351,14 @@ void GLFrameBuffer::blit(GLTexture& color) {
     blit(target);
     glDeleteFramebuffers(1,&target);
     if(color.format&Mipmap) { glBindTexture(GL_TEXTURE_2D, color.id); glGenerateMipmap(GL_TEXTURE_2D); }
+}*/
+void GLFrameBuffer::blitWindow(const GLTexture& source) {
+	uint framebuffer=0;
+	glGenFramebuffers(1, &framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, source.id, 0);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+	glBlitFramebuffer(0,0, source.size.x,source.size.y, 0,0,source.size.x,source.size.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+	glDeleteFramebuffers(1, &framebuffer);
 }

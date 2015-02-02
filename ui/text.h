@@ -48,8 +48,6 @@ struct Text : virtual Widget {
     vec2 minimalSizeHint;
 
 	struct TextLayout layout(float wrap=0) const;
-    vec2 textSize(vec2 size=0) const;
-
-    vec2 sizeHint(vec2 size) override;
+	vec2 sizeHint(vec2 size=0) override;
     shared<Graphics> graphics(vec2 size) override;
 };

@@ -260,6 +260,12 @@ void Window::event() {
 	//::render(Image(dmabuf->pointer, size), update.graphics); // FIXME: Render retained graphics
 	send(Present::Pixmap{.window=id+XWindow, .pixmap=id+Pixmap}); //FIXME: update region
 #else
+	if(update.graphics) {
+		Image target(size); target.clear(0xFF);
+		::render(target, update.graphics); // FIXME: Render retained graphics
+		for(int y: range(target.size.y/2)) for(int x: range(target.size.x)) swap(target(x, y), target(x, target.size.y-1-y));
+		GLFrameBuffer::blitWindow(target);
+	}
 	glXSwapBuffers(glDisplay, id);
 #endif
 	//assert_(updates.size<=1);

@@ -189,6 +189,7 @@ buffer<byte> extractZIPFile(ref<byte> zip, ref<byte> fileName) {
 		if(zip.slice(i, sizeof(DirectoryEnd::signature)) == ref<byte>(DirectoryEnd().signature, 4)) {
 			const DirectoryEnd& directory = raw<DirectoryEnd>(zip.slice(i, sizeof(DirectoryEnd)));
 			size_t offset = directory.offset;
+			array<string> files;
 			for(size_t unused entryIndex: range(directory.nofEntries)) {
 				const FileHeader& header =  raw<FileHeader>(zip.slice(offset, sizeof(FileHeader)));
 				string name = zip.slice(offset+sizeof(header), header.nameLength);
@@ -197,10 +198,11 @@ buffer<byte> extractZIPFile(ref<byte> zip, ref<byte> fileName) {
 					ref<byte> compressed = zip.slice(header.offset+sizeof(local)+local.nameLength+local.extraLength, local.compressedSize);
 					assert_(header.compression == 8);
 					if(name == fileName) return inflate(compressed, buffer<byte>(local.size));
+					files.append(name);
 				}
 				offset += sizeof(header)+header.nameLength+header.extraLength+header.commentLength;
 			}
-			error("No such file", fileName);
+			error("No such file", fileName,"in",files);
 			return {};
 		}
 	}
@@ -266,7 +268,7 @@ struct SRTM {
 						int16* sY = s + dy * stride;
 						for(size_t dx: range(D)) {
 							int16 v = sY[dx];
-							if(v>-32768) N++, sum += v;
+							if(v>-500) N++, sum += v;
 						}
 					}
 					target(x, y) = N ? sum / N : -32768;
@@ -291,25 +293,68 @@ struct SRTM {
 	}
 };
 
+String str(range r) { return str(r.start, r.stop); }
+struct Globe : Image16 {
+	static constexpr size_t W =4, H=4;
+	Globe() : Image16(int2(4*10800, 6000+4800+4800+6000))/*890 Ms*/ {
+		int y0 = 0;
+		for(size_t Y: range(H)) {
+			const int h = (Y==0 || Y==H-1) ? 4800 : 6000;
+			for(size_t X: range(W)) {
+				buffer<int16> raw= cast<int16>(extractZIPFile(Map("globe.zip"), "all10/"_+char('a'+Y*W+X)+"10g"_));
+				assert_(raw.size%10800==0);
+				Image16 source (raw, int2(10800, raw.size/10800)); // WARNING: unsafe weak reference to file
+				assert_(source.size.y == h);
+				int16* target = &at(y0*size.x+X*10800);
+				for(size_t y: range(source.size.y)) for(size_t x: range(source.size.x)) target[y*size.x+x] = source[y*source.size.x+x];
+				log(X, Y, source.size);
+			}
+			y0 += h;
+		}
+		//size_t unary = 0;
+		int predictor = 0;
+		//range valueRange = 0, residualRange = 0;
+		uint valueHistogram[16384] = {}, residualHistogram[16384] = {};
+		for(size_t y: range(size.y)) {
+			for(size_t x: range(size.x)) {
+				int value = 500+at(y*size.x + x);
+				assert_(value >= 0 && value <= 500+8752,value);
+				valueHistogram[value]++;
+				//valueRange.start = min(valueRange.start, value), valueRange.stop = max(valueRange.stop, value);
+				int residual = value - predictor;
+				assert_(residual >= -2862 && residual <= 3232);
+				residualHistogram[4096+residual]++;
+				//residualRange.start = min(residualRange.start, residual), residualRange.stop = max(residualRange.stop, residual);
+				predictor = value;
+				//unary += 1+abs(residual)+(residual<0);
+			}
+		}
+		writeFile("valueHistogram", cast<byte>(ref<uint>(valueHistogram)));
+		writeFile("residualHistogram", cast<byte>(ref<uint>(residualHistogram)));
+		//log(valueRange, residualRange, unary/(1024.*1024), (float)(16*4*10800*(2*6000+2*4800))/unary, unary/2575691952.);
+	}
+};
+
 struct Terrain {
 	function<void()> changed;
 	bool needUpdate = true; // FIXME: progressive
-	SRTM srtm;
+	Globe globe;
+	//SRTM srtm;
 	GLShader shader {::shader(), {"terrain"}};
 	GLBuffer elevation;
 	GLVertexArray vertexArray;
 	GLTexture textureBuffer; // shader read access (texelFetch) to elevation buffer
 	GLIndexBuffer indexBuffer;
 
-	Terrain(function<void()> changed) : changed(changed), srtm([this](int2){ needUpdate=true; this->changed(); }) {}
+	Terrain(function<void()> changed) : changed(changed)/*, srtm([this](int2){ needUpdate=true; this->changed(); })*/ {}
 
 	void update() {
 		int maxZ = 0;
 		static constexpr int D = 8; // /2⁴/2³ = 3375x1125
-		ImageF elevation (srtm.size()/D); // int16 stutters //TODO: map //FIXME: share first/last line of each tile
+		ImageF elevation (globe.size/D); // int16 stutters //TODO: map //FIXME: share first/last line of each tile
 		struct TriangleStrip triangleStrip (elevation.Ref::size*6);
 		for(int y: range(elevation.size.y)) for(int x: range(elevation.size.x)) {
-			int z = srtm(x*D, y*D);
+			int z = globe(x*D, y*D);
 			elevation(x, y) = z;
 			maxZ = ::max(maxZ, z);
 		}
@@ -317,9 +362,9 @@ struct Terrain {
 		for(int y: range(elevation.size.y-1)) for(int x: range(elevation.size.x)) { // TODO: Z-order triangle strips for framebuffer locality ?
 			int v00 = (y+0)*elevation.size.x+x, v10 = (y+0)*elevation.size.x+((x+1)%elevation.size.x);
 			int v01 = (y+1)*elevation.size.x+x, v11 = (y+1)*elevation.size.x+((x+1)%elevation.size.x);
-			if(elevation[v00]>-32768 && elevation[v11]>-32768) {
-				if(elevation[v10]>-32768) triangleStrip(v10, v00, v11);
-				if(elevation[v01]>-32768) triangleStrip(v11, v00, v01);
+			if(elevation[v00]>-500 && elevation[v11]>-500) {
+				if(elevation[v10]>-500) triangleStrip(v10, v00, v11);
+				if(elevation[v01]>-500) triangleStrip(v11, v00, v01);
 			}
 		}
 		if(!triangleStrip) return; // No data loaded yet
@@ -337,7 +382,7 @@ struct Terrain {
 		shader.bind();
 		shader["W"_] = textureBuffer.size.x;
 		shader["dx"_] = float(2*PI/textureBuffer.size.x);
-		shader["dy"_] = float(2*PI/(3*(textureBuffer.size.y-1)));
+		shader["dy"_] = float(2*PI/(/*3*/2*(textureBuffer.size.y-1)));
 		static constexpr float R = 4E7/(2*PI); // 4·10⁷/2π  ~ 6.37
 		shader["R"_] = R;
 		shader["tElevation"_] = 0;
@@ -360,7 +405,10 @@ struct View : Widget {
 
 	bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override {
 		 vec2 delta = cursor-lastPos; lastPos=cursor;
-		 if(event==Motion && button==LeftButton) rotation += float(2.f*PI) * delta / size;
+		 if(event==Motion && button==LeftButton) {
+			 rotation += float(2.f*PI) * delta / size;
+			 rotation.y = clip<float>(-PI, rotation.y, PI);
+		 }
 		 else if(event==Press && button==WheelUp) scale = min(2., scale * pow(2,1./16));
 		 else if(event==Press && button==WheelDown) scale = max(1., scale / pow(2,1./16));
 		 else return false;

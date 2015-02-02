@@ -14,7 +14,7 @@ terrain {
   uniform float dx, dy;
   float longitude = /*(X*N+x)*/ X*dx;
   float PI = 3.14159265358979323846;
-  float latitude = /*(Y*N+y)*/ PI/6 + Y*dy;
+  float latitude = /*(Y*N+y)*/ /*PI/6 +*/ Y*dy;
   uniform float R;
   float r = 1+aElevation/R;
   attribute float aElevation;

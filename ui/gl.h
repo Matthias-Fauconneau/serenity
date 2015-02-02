@@ -110,6 +110,7 @@ struct GLFrameBuffer {
 
     void bind(uint clearFlags=0, vec4 color=1);
     static void bindWindow(int2 position, int2 size, uint clearFlags=0, vec4 color=1);
+	static void blitWindow(const GLTexture& source);
     void blit(uint target);
     void blit(GLTexture&);
     operator bool() const { return id; }
