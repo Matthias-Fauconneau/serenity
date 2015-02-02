@@ -157,3 +157,4 @@ ui/plot.h
 ui/plot.cc
 io/inflate.h
 io/zip.h
+io/bit.h

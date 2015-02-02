@@ -2,6 +2,7 @@
 #include "plot.h"
 #include "layout.h"
 #include "window.h"
+#include "time.h"
 
 #if 0
 #include "zip.h"
@@ -69,18 +70,12 @@ struct GenerateStatistics {
 } generate;
 #endif
 
-#if 1
+#if 0
 struct AnalyzeStatistics {
-	//Plot residuals {"Residuals"};
-	//Plot runs {"Runs"};
-	//HBox layout {{&residuals/*, &runs*/}};
-	//Window window {&layout};
 	AnalyzeStatistics() {
 		buffer<uint> histogram = cast<uint>(readFile("histogram"));
 		uint valueCount=0; for(int x: range(histogram.size)) valueCount += histogram[x];
 		uint max=0; for(int x: range(histogram.size)) max=::max(max, histogram[x]);
-		//uint maxX = 0; for(int code: range(histogram.size)) if(count > max/2048) maxX = ::max(maxX, (uint)abs(sx));
-		//auto& points = residuals.dataSets.insert("Residuals"__); //if(abs(sx)<=64) points.insert(sx, count);
 		buffer<uint> runLengthHistogram = cast<uint>(readFile("runLengthHistogram"));
 		size_t nonzero = runLengthHistogram[0];
 		size_t zero = runLengthHistogram[1];
@@ -88,9 +83,7 @@ struct AnalyzeStatistics {
 		for(int length: range(2, runLengthHistogram.size)) running += length*runLengthHistogram[length];
 		assert_(nonzero+zero+running == valueCount, nonzero+zero+running, valueCount);
 		log(nonzero/1024/1024, zero/1024/1024, running/1024/1024);
-		/*for(uint minimumRunLength: range(1)) {
-			for(uint rleCode: range(minimumRunLength ? 1 : 1)) {*/
-		for(uint rleK: range(5, 8)) {
+		for(uint rleK: range(0, 8)) {
 				static constexpr uint K = 4;
 				int64 fixed = 0, GR[K] = {}, EG[K] = {}; //, huffman = 0, arithmetic = 0;
 				auto write = [&](uint x, int64 count) {
@@ -157,68 +150,109 @@ struct AnalyzeStatistics {
 } analyze;
 #endif
 
-#if 0
+#if 1
 
 struct BitWriter {
-	uint64* pointer;
+	uint8* pointer;
 	uint64 word = 0;
-	int bitsLeftCount = 64;
-	~BitWriter() { if(bitsLeftCount<64) *pointer = word; }
-	void operator()(int size, uint value) {
-#if 1 // lsb
-		word |= value << (64 - bitsLeftCount);
-		if(bitsLeftCount <= size) { // Puts the bits falling off on the left to the right of the next word
-			*pointer = word;
-			pointer++;
-			word = value >> bitsLeftCount; // LSB
-			bitsLeftCount += 64;
-		}
-#else // msb
+	//uint64 bitsLeftCount = 64;
+	uint64 bitIndex = 0;
+	BitWriter(mref<byte> buffer) : pointer((uint8*)buffer.data) {}
+	void write(uint size, uint64 value) {
+#if 0
 		if(size < bitsLeftCount) {
 			word <<= size;
 			word |= value;
 		} else {
 			word <<= bitsLeftCount;
 			word |= value >> (size - bitsLeftCount); // Puts leftmost bits in remaining space
-			*pointer = word; // 8byte LSB
-			pointer++;
+			*pointer = big64(word); // MSB
+			pointer+=8;
 			bitsLeftCount += 64;
 			word = value; // Already stored leftmost bits will be pushed out eventually
 		}
-#endif
 		bitsLeftCount -= size;
+#else
+		bitIndex += size;
+		word |= value << (64-bitIndex);
+		/*if(bitIndex > 64)*/ flush();
+	}
+	void flush() {
+		*(uint64*)pointer = big64(word);
+		word <<= (bitIndex&~7);
+		pointer += (bitIndex>>3);
+		bitIndex &= 7;
+#endif
+	}
+	void end() {
+#if 0
+		if(bitsLeftCount<64) *pointer = big64(word);
+#else
+		flush();
+		if(bitIndex>0) pointer++;
+#endif
 	}
 };
 
-static uint8 log2i[256];
-static void __attribute((constructor)) initialize_log2i() { int i=1; for(int l=0;l<=7;l++) for(int r=0;r<1<<l;r++) log2i[i++] = 7-l; assert(i==256); }
-struct Compress {
-	Compress() {
+struct BitReader {
+	uint8* pointer;
+	uint64 word;
+	int64 bitsLeftCount = 64;
+	BitReader(ref<byte> data) : pointer((uint8*)data.data) { word=big64(*(uint64*)pointer); pointer+=8; }
+	uint read(uint size) {
+		uint x = word >> (64-size);
+		word <<= size;
+		bitsLeftCount -= size;
+		if(bitsLeftCount <= 56) {
+			uint64 next8 = big64(*(uint64*)pointer);
+			int64 bytesToGet = (64-bitsLeftCount)>>3;
+			pointer += bytesToGet;
+			word |= next8 >> bitsLeftCount;
+			bitsLeftCount += bytesToGet<<3;
+		}
+		return x;
+	}
+};
+
+struct Encode {
+	Encode() {
 		//buffer<int16> source = ::source();
 		Map map ("source"); ref<int16> source = cast<int16>(map);
 
-		int predictor = 0;
-		buffer<byte> compressed (source.size*2/8*8, 0);
-		size_t size = 0;
-		{BitWriter s {(uint64*)compressed.data}; // Assumes buffer is big enough
-			constexpr uint k = 2;//, runLength = 4;
+		buffer<byte> encoded (source.size*2/8*8, 0);
+		constexpr uint r = 2;//, runLength = 4;
+		Time encode;
+		{BitWriter bitIO (encoded); // Assumes buffer is big enough
+			int predictor = 0;
 			for(int value: source) {
-				int sx = value - predictor; predictor = value;
-				int x  = -2 * sx - 1; x ^= x >> 31;
-				x++; // 0 is RLE escape
-				// Exp Golomb q + k residual
-				uint q = x >> k;
-				q++;
-				uint b = 0;
-				if(q & 0xFF00) { q >>= 8; b += 8; }
-				b += log2i[q];
-				size += b+b+1+k;
-				//s(b+b+1+k, x); // unary b, binary q[b], binary r = 0^b.1.q[b]r[k] = x[b+b+1+k]
+				int s = value - predictor; predictor = value;
+				uint u  = (s<<1) ^ (s>>31); // s>0 ? (s<<1) : (-s<<1) - 1;
+				uint x = u+1; // 0 is RLE escape
+				// Exp Golomb q + r residual
+				x += (1<<r);
+				uint b = 63 - __builtin_clzl(x); // BSR
+				bitIO.write(b+b+1-r, x); // unary b, binary q[b], binary r = 0^b.1.q[b]R[r] = x[b+b+1+r]
 			}
-			//compressed.size = (byte*)s.pointer + ((64-s.bitsLeftCount)+7)/8 - compressed.data;
-			//assert_(compressed.size < compressed.capacity);
+			encoded.size = (byte*)bitIO.pointer - encoded.data;
+			assert_(encoded.size <= encoded.capacity);
+			//~BitWriter
 		}
-		log(compressed.size, size/(8.*1024*1024), compressed.capacity*8/(8.*1024*1024));
+		log(int(round(encoded.size/(1024.*1024))),"MB", encode, int(round((encoded.size/(1024.*1024))/encode.toReal())),"MB/s"); // 115 MB/s
+
+		Time decode;
+		{BitReader bitIO (encoded);
+			int predictor = 0;
+			for(int expectedValue: source) {
+				uint b = __builtin_clzl(bitIO.word) * 2 + 1 + r;
+				uint x = bitIO.read(b) - (1<<r);
+				if(x == 0) error("RLE", bitIO.pointer-(uint8*)encoded.data, str(bitIO.word, 64u, '0', 2u), bitIO.bitsLeftCount, b, x, predictor, expectedValue);
+				uint u = x-1;
+				int s = (u>>1) ^ (-(u&1)); // u&1 ? -((u>>1) + 1) : u>>1;
+				int value = predictor + s; predictor = value;
+				assert_(value == expectedValue, value, expectedValue, bitIO.pointer-(uint8*)encoded.data, str(bitIO.word, 64u, '0', 2u), bitIO.bitsLeftCount, b, x, u, s, predictor, value, expectedValue);
+			}
+		}
+		log(encoded.size/(1024.*1024),"MB", decode, (encoded.size/(1024.*1024))/decode.toReal(),"MB/s"); // 73 MB/s
 	}
-} compress;
+} encode;
 #endif
