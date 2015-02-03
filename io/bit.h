@@ -37,7 +37,6 @@ struct BitReader {
 	uint read(uint size) {
 		if(bitLeftCount < size/*~12*/) refill(); // conservative. TODO: fit to largest code to refill less often
 		uint x = word >> (64-size);
-		log(bitLeftCount, str(word, 8u, '0', 2u), x);
 		word <<= size;
 		bitLeftCount -= size;
 		return x;

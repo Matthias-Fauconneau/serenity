@@ -4,8 +4,9 @@
 #include "flic.h"
 #include "time.h"
 
-struct Encode {
-	Encode() {
+#if 0 // Converts zipped tif tiles to an Exp Golomb RLE image
+struct Convert {
+	Convert() {
 		Time encode (false);
 		buffer<byte> encoded;
 		BitWriter bitIO;
@@ -17,11 +18,9 @@ struct Encode {
 			for(size_t X: range(W)) {
 				buffer<byte> tif = extractZIPFile(Map("dem15/15-"_+char('A'+Y*W+X)+".zip"), "15-"_+char('A'+Y*W+X)+".tif"_);
 				Image16 source = parseTIF(tif);
-				if(band) assert_(band.size==int2(W,1)*source.size); // Uniform tile size
+				if(band) assert_(band.size==int2(W,1)*(source.size-int2(1))); // Uniform tile size
 				else {
-					size_t size = (byte*)bitIO.pointer - encoded.data;
-					log((real)X*band.Ref::size/size,"x", size*8/(real)X*band.Ref::size,"bps");
-					band = Image16(int2(W,1)*source.size); log(Y, band.size);
+					band = Image16(int2(W,1)*(source.size-int2(1))); log(Y, band.size);
 					if(!encoded) {
 						encoded = ::buffer<byte>(H*band.Ref::size*2/8); // Assumes average bitrate < 2bit / sample (large RLE voids)
 						bitIO = BitWriter(encoded);// buffer capacity will be large enough
@@ -30,9 +29,9 @@ struct Encode {
 						encode.start();
 					}
 				}
-				int16* target = band.begin() + X*source.size.x;
-				for(size_t y: range(source.size.y)) for(size_t x: range(source.size.x)) target[y*band.size.x+x] = source[y*source.size.x+x];
-				log(X, Y, source.size);
+				int16* target = band.begin() + X*(source.size.x-1);
+				for(size_t y: range(band.size.y)) for(size_t x: range(source.size.x-1)) target[y*band.size.x+x] = source[y*source.size.x+x];
+				log(X, Y, source.size-int2(1));
 			}
 			ref<int16> source = band;
 			for(size_t index=0; index<source.size;) {
@@ -62,7 +61,8 @@ struct Encode {
 		bitIO.end();
 		encoded.size = (byte*)bitIO.pointer - encoded.data;
 		assert_(encoded.size <= encoded.capacity);
-		log(int(round(encoded.size/(1024.*1024))),"MB", encode, int(round((encoded.size/(1024.*1024))/encode.toReal())),"MB/s"); // 112-224 MB/s
-		writeFile("dem15.eg2rle6", encoded);
+		log(int(round(encoded.size/(1024.*1024))),"MB", encode, int(round((encoded.size/(1024.*1024))/encode.toReal())),"MB/s"); // 200 MB/s
+		writeFile("dem15.eg2rle6", encoded, currentWorkingDirectory(), true);
 	}
-} encode;
+} convert;
+#endif

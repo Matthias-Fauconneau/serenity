@@ -10,7 +10,7 @@ FILE(shader)
 /// 2D array of floating-point pixels
 struct ImageF : buffer<float> {
 	int2 size = 0;
-	ImageF(int2 size) : buffer(size.y*size.x), size(size) { assert(size>int2(0)); }
+	ImageF(int2 size) : buffer((size_t)size.y*size.x), size(size) { assert(size>int2(0)); }
 	inline float& operator()(size_t x, size_t y) const { assert(x<uint(size.x) && y<uint(size.y), x, y); return at(y*size.x+x); }
 };
 
@@ -106,28 +106,36 @@ struct Terrain {
 	Terrain(function<void()> changed) : changed(changed)/*, srtm([this](int2){ needUpdate=true; this->changed(); })*/ {}
 
 	void update() {
-		int maxZ = 0;
-		Image16 source = decodeFLIC(Map("dem15.eg2rle6"));
-		int2 targetSize = int2(2,1)*360*60*60/15/16; // 10800 x 5400
+		Map map(1 ? "dem15.eg2rle6"_ : "globe30.eg2rle6"_);
+		FLIC source(map);
+		int2 targetSize = int2(2,1)*360*60*60/15/32; // 10800 x 5400
 		const int D = source.size.x / targetSize.x;
 		assert_(D*targetSize == source.size);
-		ImageF elevation (source.size/D); // int16 stutters //TODO: map //FIXME: share first/last line of each tile
+		ImageF elevation (int2(targetSize.x+1, targetSize.y)); // x+1 as first/last vertices are repeated to generate correct texture coordinate (Nx-1..Nx and not Nx-1..0) // int16 stutters //TODO: map //FIXME: share first/last line of each tile
 		struct TriangleStrip triangleStrip (elevation.Ref::size*6);
-		for(int y: range(elevation.size.y)) for(int x: range(elevation.size.x)) {
-			int z = source(x*D, y*D);
-			elevation(x, y) = z;
-			maxZ = ::max(maxZ, z);
+		int minZ = 0, maxZ = 0;
+		for(int y: range(elevation.size.y)) {
+			Image16 band (int2(source.size.x, D));
+			for(int dy: range(D)) source.decodeLine(band.slice(dy*band.size.x));
+			for(int x: range(elevation.size.x)) {
+				int z = band(x*D, 0); // FIXME: average
+				elevation(x, y) = z;
+				minZ = ::min(minZ, z);
+				maxZ = ::max(maxZ, z);
+			}
+			elevation(elevation.size.x, y) = elevation(0, y);
 		}
-		//log(maxZ); 5594
-		for(int y: range(elevation.size.y-1)) for(int x: range(elevation.size.x)) { // TODO: Z-order triangle strips for framebuffer locality ?
-			int v00 = (y+0)*elevation.size.x+x, v10 = (y+0)*elevation.size.x+((x+1)%elevation.size.x);
-			int v01 = (y+1)*elevation.size.x+x, v11 = (y+1)*elevation.size.x+((x+1)%elevation.size.x);
-			if(elevation[v00]>-500 && elevation[v11]>-500) {
-				if(elevation[v10]>-500) triangleStrip(v10, v00, v11);
-				if(elevation[v01]>-500) triangleStrip(v11, v00, v01);
+		log(minZ, maxZ); // 7967
+		for(int y: range(elevation.size.y-1)) for(int x: range(elevation.size.x-1)) { // TODO: Z-order triangle strips for framebuffer locality ?
+			int v00 = (y+0)*elevation.size.x+(x+0), v10 = (y+0)*elevation.size.x+(x+1);
+			int v01 = (y+1)*elevation.size.x+(x+0), v11 = (y+1)*elevation.size.x+(x+1);
+			const int invalid = 0;
+			if(elevation[v00]!=invalid && elevation[v11]!=invalid) {
+				if(elevation[v10]!=invalid) triangleStrip(v10, v00, v11);
+				if(elevation[v01]!=invalid) triangleStrip(v11, v00, v01);
 			}
 		}
-		if(!triangleStrip) return; // No data loaded yet
+		//if(!triangleStrip) return; // No data loaded yet
 		indexBuffer = triangleStrip;
 		this->elevation = GLBuffer(elevation);
 		textureBuffer = GLTexture(this->elevation, elevation.size);
@@ -141,8 +149,8 @@ struct Terrain {
 		if(!indexBuffer.id) return; // No data loaded yet
 		shader.bind();
 		shader["W"_] = textureBuffer.size.x;
-		shader["dx"_] = float(2*PI/textureBuffer.size.x);
-		shader["dy"_] = float(2*PI/(/*3*/2*(textureBuffer.size.y-1)));
+		shader["dx"_] = float(2*PI/(textureBuffer.size.x-1));
+		shader["dy"_] = float(2*PI/(2*(textureBuffer.size.y-1)));
 		static constexpr float R = 4E7/(2*PI); // 4·10⁷/2π  ~ 6.37
 		shader["R"_] = R;
 		shader["tElevation"_] = 0;
