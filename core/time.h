@@ -22,6 +22,7 @@ struct tsc { uint64 total=0, tsc=0; void reset(){total=0;tsc=0;} void start(){if
 /// Logs the time spent executing a scope
 struct Time {
 	uint64 startTime=realTime(), stopTime=0;
+	Time(bool start=true) : stopTime(start?0:startTime) {}
     void start() { if(stopTime) startTime=realTime()-(stopTime-startTime); stopTime=0; }
     void stop() { if(!stopTime) stopTime=realTime(); }
 	String reset() { stop(); String s=str((stopTime-startTime)/1000000000., 1u)+'s'; startTime=stopTime; stopTime=0; return s; }

@@ -3,9 +3,10 @@
 
 /// Encodes packed bitstreams (msb)
 struct BitWriter {
-	uint8* pointer;
+	uint8* pointer = 0;
 	uint64 word = 0;
 	uint64 bitLeftCount = 64;
+	BitWriter() {}
 	BitWriter(mref<byte> buffer) : pointer((uint8*)buffer.data) {}
 	void write(uint size, uint64 value) {
 		if(size < bitLeftCount) {

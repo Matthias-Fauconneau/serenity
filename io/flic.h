@@ -2,7 +2,7 @@
 #include "bit.h"
 #include "image.h"
 #include "time.h"
-static constexpr uint egR = 2, rleK = 6;
+static constexpr uint EG = 2, RLE = 6;
 
 Image16 decodeFLIC(ref<byte> encoded) {
 	Time decode;
@@ -12,8 +12,8 @@ Image16 decodeFLIC(ref<byte> encoded) {
 	Image16 image(int2(width, height));
 	int predictor = 0;
 	for(size_t index=0; index<height*width;) {
-		uint x = bitIO.readExpGolomb<egR>();
-		if(x == 0) for(uint unused i: range(1<<rleK/*64*/)) { image[index]=predictor; index++; }
+		uint x = bitIO.readExpGolomb<EG>();
+		if(x == 0) for(uint unused i: range(1<<RLE/*64*/)) { image[index]=predictor; index++; }
 		else  {
 			uint u = x-1;
 			int s = (u>>1) ^ (-(u&1)); // u&1 ? -((u>>1) + 1) : u>>1;

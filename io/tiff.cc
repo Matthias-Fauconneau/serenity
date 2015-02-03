@@ -1,7 +1,7 @@
 #include "tiff.h"
 #include "data.h"
 
-Image16 parseTIFF(ref<byte> file) {
+Image16 parseTIF(ref<byte> file) {
 	BinaryData s(file);
 	s.skip("II\x2A\x00");
 	s.index = s.read32();

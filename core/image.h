@@ -72,7 +72,7 @@ inline Image resize(Image&& target, const Image& source) { resize(target, source
 struct Image16 : buffer<int16> {
 	int2 size = 0;
 	Image16() {}
-	Image16(ref<int16> ref, int2 size) : buffer(unsafeRef(ref)), size(size) { assert_(Ref::size == size_t(size.y*size.x), Ref::size, size); }
-	Image16(int2 size) : buffer(size.y*size.x), size(size) {}
+	Image16(ref<int16> ref, int2 size) : buffer(unsafeRef(ref)), size(size) { assert_(Ref::size == (size_t)size.y*size.x); }
+	Image16(int2 size) : buffer((size_t)size.y*size.x), size(size) {}
 	inline notrace int16& operator()(size_t x, size_t y) const { assert(x<size_t(size.x) && y<size_t(size.y)); return at(y*size.x+x); }
 };

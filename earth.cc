@@ -33,6 +33,7 @@ struct TriangleStrip : buffer<uint> {
 	}
 };
 
+#if 0
 struct SRTM {
 	Lock lock;
 	function<void(int2)> changed;
@@ -89,6 +90,7 @@ struct SRTM {
 		return tiles[Y*W+X].image(x, y);
 	}
 };
+#endif
 
 struct Terrain {
 	function<void()> changed;
@@ -105,12 +107,14 @@ struct Terrain {
 
 	void update() {
 		int maxZ = 0;
-		static constexpr int D = 8; // /2⁴/2³ = 3375x1125
-		Image16 globe = decodeFLIC(Map("globe"));
-		ImageF elevation (globe.size/D); // int16 stutters //TODO: map //FIXME: share first/last line of each tile
+		Image16 source = decodeFLIC(Map("dem15.eg2rle6"));
+		int2 targetSize = int2(2,1)*360*60*60/15/16; // 10800 x 5400
+		const int D = source.size.x / targetSize.x;
+		assert_(D*targetSize == source.size);
+		ImageF elevation (source.size/D); // int16 stutters //TODO: map //FIXME: share first/last line of each tile
 		struct TriangleStrip triangleStrip (elevation.Ref::size*6);
 		for(int y: range(elevation.size.y)) for(int x: range(elevation.size.x)) {
-			int z = globe(x*D, y*D);
+			int z = source(x*D, y*D);
 			elevation(x, y) = z;
 			maxZ = ::max(maxZ, z);
 		}
