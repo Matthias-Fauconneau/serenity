@@ -36,6 +36,7 @@ struct BitReader {
 	uint read(uint size) {
 		if(bitLeftCount < size/*~12*/) refill(); // conservative. TODO: fit to largest code to refill less often
 		uint x = word >> (64-size);
+		log(bitLeftCount, str(word, 8u, '0', 2u), x);
 		word <<= size;
 		bitLeftCount -= size;
 		return x;
@@ -47,19 +48,28 @@ struct BitReader {
 		word |= next >> bitLeftCount;
 		bitLeftCount += byteCount<<3;
 	}
-
-	void align() { bitLeftCount = bitLeftCount/8*8; }
-	ref<byte> readBytes(uint byteCount) {
-		assert(bitLeftCount%8 == 0);
-		pointer -= bitLeftCount/8;
-		bitLeftCount = 0;
-		ref<byte> slice = ref<byte>((byte*)pointer, byteCount);
-		pointer += byteCount;
-		return slice;
-	}
 	template<uint r, uint z=10> uint readExpGolomb() {
 		if(bitLeftCount <= z) refill();
 		uint b = __builtin_clzl(word) * 2 + 1 + r; // 'word' is kept left aligned, bitLeftCount should be larger than maximum exp golomb zero run length (b)
 		return read(b) - (1<<r);
+	}
+};
+
+/// Decodes packed bitstreams (lsb)
+struct BitReaderLSB : ref<byte> {
+	size_t index = 0;
+	BitReaderLSB(ref<byte> data) : ref<byte>(data) {}
+	/// Reads \a size bits
+	uint read(uint size) {
+		uint value = (*(uint64*)(data+index/8) << (64-size-(index&7))) >> /*int8*/(64-size);
+		index += size;
+		return value;
+	}
+	void align() { index = (index + 7) & ~7; }
+	ref<byte> readBytes(uint byteCount) {
+		assert(index&7 == 0);
+		ref<byte> slice = ref<byte>((byte*)data+index/8, byteCount);
+		index += byteCount*8;
+		return slice;
 	}
 };

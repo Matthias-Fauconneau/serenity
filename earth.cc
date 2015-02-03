@@ -162,11 +162,11 @@ struct View : Widget {
 	bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override {
 		 vec2 delta = cursor-lastPos; lastPos=cursor;
 		 if(event==Motion && button==LeftButton) {
-			 rotation += float(2.f*PI) * delta / size;
-			 rotation.y = clip<float>(-PI, rotation.y, PI);
+			 rotation += float(2.f*PI) * delta / size / scale;
+			 rotation.y = clip<float>(-PI, rotation.y, 0);
 		 }
-		 else if(event==Press && button==WheelUp) scale = min(2., scale * pow(2,1./16));
-		 else if(event==Press && button==WheelDown) scale = max(1., scale / pow(2,1./16));
+		 else if(event==Press && button==WheelUp) scale = min(8., scale * pow(2,1./4));
+		 else if(event==Press && button==WheelDown) scale = max(1., scale / pow(2,1./4));
 		 else return false;
 		 return true;
 	}

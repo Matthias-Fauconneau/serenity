@@ -5,7 +5,7 @@
 generic const T& raw(ref<byte> data) { assert_(data.size==sizeof(T)); return *(T*)data.data; }
 
 buffer<byte> inflate(ref<byte> compressed, buffer<byte>&& target) { //inflate huffman encoded data
-	BitReader bitIO(compressed);
+	BitReaderLSB bitIO(compressed);
 	size_t targetIndex = 0;
 	for(;;) {
 		struct Huffman {
@@ -22,11 +22,11 @@ buffer<byte> inflate(ref<byte> compressed, buffer<byte>&& target) { //inflate hu
 				// Evaluates code -> symbol translation table
 				for(size_t symbol: range(lengths.size)) if(lengths[symbol]) lookup[offsets[lengths[symbol]]++] = symbol;
 			}
-			uint decode(BitReader& s) {
+			uint decode(BitReaderLSB& bitIO) {
 				int code=0; uint length=0, sum=0;
 				do { // gets more bits while code value is above sum
 					code <<= 1;
-					code |= s.read(1);
+					code |= bitIO.read(1);
 					length += 1;
 					sum += count[length];
 					code -= count[length];

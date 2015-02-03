@@ -4,20 +4,26 @@
 #include "window.h"
 #include "time.h"
 
-#if 0
+#if 1
 #include "zip.h"
-buffer<int16> source() {
-	static constexpr size_t W=4, H=4;
-	Image16 image(int2(W*10800, 6000+(H-2)*4800+6000)); // 890 Ms
+#include "tiff.h"
+Image16 source() {
+	static constexpr size_t W=6, H=4;
+	int2 tileSize = 0;
+	Image16 image;
 	int y0 = 0;
 	for(size_t Y: range(H)) {
-		const int h = (Y==0 || Y==H-1) ? 4800 : 6000;
+		int h = 0;
 		for(size_t X: range(W)) {
-			buffer<int16> raw = cast<int16>(extractZIPFile(Map("globe.zip"), "all10/"_+char('a'+Y*W+X)+"10g"_));
-			assert_(raw.size%10800==0);
-			Image16 source (raw, int2(10800, raw.size/10800)); // WARNING: unsafe weak reference to file
-			assert_(source.size.y == h);
-			int16* target = &image(X*10800, y0);
+			auto buffer = extractZIPFile(Map("dem15/15-"_+char('A'+Y*W+X)+".zip"), "15-"_+char('A'+Y*W+X)+".tif"_);
+			Image16 source = parseTIFF(buffer);
+			if(h) assert_(source.size.y == h); else h = source.size.y;
+			if(!tileSize) {
+				tileSize = source.size;
+				{int2 size = int2(W,H)*tileSize; error(tileSize, size, (size_t)size.y*size.x/1024/1024);}
+				image = Image16(int2(W,H)*tileSize);
+			}
+			int16* target = &image(X*tileSize.x, y0);
 			for(size_t y: range(source.size.y)) for(size_t x: range(source.size.x)) target[y*image.size.x+x] = source[y*source.size.x+x];
 			log(X, Y, source.size);
 		}
@@ -25,7 +31,7 @@ buffer<int16> source() {
 	}
 	return move(image);
 }
-struct CacheSource { CacheSource() { if(!existsFile("source")) writeFile("source", cast<byte>(source())); } } cache;
+//struct CacheSource { CacheSource() { if(!existsFile("source")) writeFile("source", cast<byte>(source())); } } cache;
 #endif
 
 #if 0
@@ -151,19 +157,17 @@ struct AnalyzeStatistics {
 #endif
 
 #include "flic.h"
-#if 0
+#if 1
 struct Encode {
 	Encode() {
-		//buffer<int16> source = ::source();
-		Map map ("source"); ref<int16> source = cast<int16>(map);
-
-		buffer<byte> encoded (source.size/8*8, 0);
+		Image16 source = ::source();
+		buffer<byte> encoded (source.Ref::size, 0); // Assumes <= 8bit / sample
 		Time encode;
 		BitWriter bitIO (encoded); // Assumes buffer is big enough
-		bitIO.write(32, 4*10800); // Width
-		bitIO.write(32, 2*6000+2*4800); // Height
+		bitIO.write(32, source.size.x); // Width
+		bitIO.write(32, source.size.y); // Height
 		int predictor = 0;
-		for(size_t index=0; index<source.size;) {
+		for(size_t index=0; index<source.Ref::size;) {
 			int value, s;
 			uint runLength = 0;
 			for(;;)  {
