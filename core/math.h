@@ -2,6 +2,9 @@
 /// \file math.h Floating-point builtins
 #include "core.h"
 
+/// Aligns \a offset to \a width (only for power of two \a width)
+inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
+
 // -- Generic arithmetic
 generic inline constexpr T sq(const T& x) { return x*x; }
 generic inline constexpr T cb(const T& x) { return x*x*x; }

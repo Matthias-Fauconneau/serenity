@@ -255,3 +255,70 @@ generic notrace ref<T> Ref<T>::slice(size_t pos) const { assert(pos<=size); retu
     extern char _binary_ ## name ##_start[], _binary_ ## name ##_end[]; \
 	return ref<byte>(_binary_ ## name ##_start,_binary_ ## name ##_end - _binary_ ## name ##_start); \
 }
+
+// -- mref
+
+#ifndef _NEW
+/// Initializes memory using a constructor (placement new)
+inline void* operator new(size_t, void* p) noexcept { return p; }
+#endif
+
+/// Unmanaged fixed-size mutable reference to an array of elements
+generic struct mref : ref<T> {
+	using ref<T>::data;
+	using ref<T>::size;
+
+	/// Default constructs an empty reference
+	mref(){}
+	/// References \a size elements from \a data pointer
+	notrace mref(T* data, size_t size) : ref<T>(data,size) {}
+	/// Converts an std::initializer_list to mref
+	constexpr mref(std::initializer_list<T>&& list) : ref<T>(list.begin(), list.size()) {}
+	/// Converts a static array to ref
+	template<size_t N> mref(T (&a)[N]): mref(a,N) {}
+
+	explicit operator bool() const { assert(!size || data, size); return size; }
+	explicit operator T*() const { return (T*)data; }
+	T* begin() const { return (T*)data; }
+	T* end() const { return (T*)data+size; }
+	notrace T& at(size_t i) const { return (T&)ref<T>::at(i); }
+	notrace T& operator [](size_t i) const { return at(i); }
+	T& first() const { return at(0); }
+	T& last() const { return at(size-1); }
+
+	/// Slices a reference to elements from \a pos to \a pos + \a size
+	notrace mref<T> slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return mref<T>((T*)data+pos, size); }
+	/// Slices a reference to elements from to the end of the reference
+	mref<T> slice(size_t pos) const { assert(pos<=size); return mref<T>((T*)data+pos,size-pos); }
+	/// Slices a reference to elements from \a start to \a stop
+	mref<T> sliceRange(size_t start, size_t stop) const { return slice(start, stop-start); }
+
+	/// Initializes the element at index
+	T& set(size_t index, const T& value) const { return *(new (&at(index)) T(value)); }
+	/// Initializes the element at index
+	T& set(size_t index, T&& value) const { return *(new (&at(index)) T(::move(value))); }
+	/// Initializes the element at index
+	template<Type... Args> T& set(size_t index, Args&&... args) const { return *(new (&at(index)) T{forward<Args>(args)...}); }
+	/// Initializes reference using the same constructor for all elements
+	template<Type... Args> void clear(Args... args) const { for(T& e: *this) new (&e) T(args...); }
+	/// Initializes reference from \a source using move constructor
+	void move(const mref<T>& source) { assert(size==source.size); for(size_t index: range(size)) set(index, ::move(source[index])); }
+	/// Initializes reference from \a source using copy constructor
+	void copy(const ref<T> source) const { assert(size==source.size); for(size_t index: range(size)) set(index, ::copy(source[index])); }
+
+	/// Stores the application of a function to every index up to a size in a mref
+	template<Type Function> void apply(Function function) const { for(size_t index: range(size)) set(index, function(index)); }
+	/// Stores the application of a function to every elements of a ref in a mref
+	template<Type Function, Type... S> void apply(Function function, ref<S>... sources) const {
+		for(size_t index: range(size)) new (&at(index)) T(function(sources[index]...));
+	}
+	/// Stores the application of a function to every elements of a ref in a mref
+	template<Type Function, Type... S> void apply(Function function, mref<S>... sources) const {
+		for(size_t index: range(size)) new (&at(index)) T(function(sources[index]...));
+	}
+
+	/// Replaces in \a array every occurence of \a before with \a after
+	template<Type K> mref& replace(const K& before, const T& after) { for(T& e : *this) if(e==before) e=::copy(after); return *this; }
+};
+/// Returns mutable reference to memory used by \a t
+generic mref<byte> raw(T& t) { return mref<byte>((byte*)&t,sizeof(T)); }

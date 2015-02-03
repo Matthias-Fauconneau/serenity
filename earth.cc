@@ -1,7 +1,9 @@
 #include "window.h"
 #include "matrix.h"
 #include "gl.h"
+#include "zip.h"
 #include "tiff.h"
+#include "flic.h"
 #include "time.h"
 FILE(shader)
 
@@ -91,7 +93,7 @@ struct SRTM {
 struct Terrain {
 	function<void()> changed;
 	bool needUpdate = true; // FIXME: progressive
-	Globe globe;
+	//Globe globe;
 	//SRTM srtm;
 	GLShader shader {::shader(), {"terrain"}};
 	GLBuffer elevation;
@@ -104,6 +106,7 @@ struct Terrain {
 	void update() {
 		int maxZ = 0;
 		static constexpr int D = 8; // /2⁴/2³ = 3375x1125
+		Image16 globe = decodeFLIC(Map("globe"));
 		ImageF elevation (globe.size/D); // int16 stutters //TODO: map //FIXME: share first/last line of each tile
 		struct TriangleStrip triangleStrip (elevation.Ref::size*6);
 		for(int y: range(elevation.size.y)) for(int x: range(elevation.size.x)) {

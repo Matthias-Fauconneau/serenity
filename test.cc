@@ -150,131 +150,59 @@ struct AnalyzeStatistics {
 } analyze;
 #endif
 
-#if 1
-struct BitWriter {
-	uint8* pointer;
-	uint64 word = 0;
-#if 1
-	uint64 bitsLeftCount = 64;
-#else
-	uint64 bitIndex = 0;
-#endif
-	BitWriter(mref<byte> buffer) : pointer((uint8*)buffer.data) {}
-	void write(uint size, uint64 value) {
-#if 1
-		if(size < bitsLeftCount) {
-			word <<= size;
-			word |= value;
-		} else {
-			word <<= bitsLeftCount;
-			word |= value >> (size - bitsLeftCount); // Puts leftmost bits in remaining space
-			*(uint64*)pointer = big64(word); // MSB
-			pointer += 8;
-			bitsLeftCount += 64;
-			word = value; // Already stored leftmost bits will be pushed out eventually
-		}
-		bitsLeftCount -= size;
-#else
-		//if(bitIndex+size >= 64) flush();
-		bitIndex += size;
-		word |= value << (64-bitIndex);
-		flush();
-	}
-	void flush() {
-		*(uint64*)pointer = big64(word);
-		word <<= bitIndex&~7;
-		pointer += bitIndex>>3;
-		bitIndex &= 7;
-#endif
-	}
-	void end() {
-#if 1
-		if(bitsLeftCount<64) word <<= bitsLeftCount;
-		while(bitsLeftCount<64) { *pointer++ = word>>(64-8); word <<= 8; bitsLeftCount += 8; }
-#else
-		flush();
-		if(bitIndex>0) pointer++;
-#endif
-	}
-};
-
-struct BitReader {
-	uint8* pointer;
-	uint64 word;
-	int64 bitsLeftCount = 64;
-	BitReader(ref<byte> data) : pointer((uint8*)data.data) { word=big64(*(uint64*)pointer); pointer+=8; }
-	uint read(uint size) {
-		uint x = word >> (64-size);
-		word <<= size;
-		bitsLeftCount -= size;
-		if(bitsLeftCount <= 56) {
-			uint64 next8 = big64(*(uint64*)pointer);
-			int64 bytesToGet = (64-bitsLeftCount)>>3;
-			pointer += bytesToGet;
-			word |= next8 >> bitsLeftCount;
-			bitsLeftCount += bytesToGet<<3;
-		}
-		return x;
-	}
-};
-
+#include "flic.h"
+#if 0
 struct Encode {
 	Encode() {
 		//buffer<int16> source = ::source();
 		Map map ("source"); ref<int16> source = cast<int16>(map);
 
-		buffer<byte> encoded (source.size*2/8*8, 0);
-		constexpr uint egR = 2, rleK = 6;
+		buffer<byte> encoded (source.size/8*8, 0);
 		Time encode;
-		{BitWriter bitIO (encoded); // Assumes buffer is big enough
-			int predictor = 0;
-			for(size_t index=0; index<source.size;) {
-				int value, s;
-				uint runLength = 0;
-				for(;;)  {
-					value = source[index++];
-					s = value - predictor;
-					if(s != 0) break;
-					assert_(runLength < 0xFFFFFFFF);
-					runLength++;
-				}
-				if(runLength) {
-					uint rleCodeRepeats = runLength >> rleK; // RLE length = rleCodeRepeats · 2^k
-					for(;rleCodeRepeats > 0; rleCodeRepeats--) bitIO.write(3, 0b100);
-					uint remainingZeroes = runLength & ((1<<rleK)-1);
-					for(;remainingZeroes > 0; remainingZeroes--) bitIO.write(3, 0b101); // Explicitly encode remaining zeroes
-				}
-				predictor = value;
-				uint u  = (s<<1) ^ (s>>31); // s>0 ? (s<<1) : (-s<<1) - 1;
-				uint x = u+1; // 0 is RLE escape
-				// Exp Golomb _ r
-				x += (1<<egR);
-				uint b = 63 - __builtin_clzl(x); // BSR
-				bitIO.write(b+b+1-egR, x); // unary b, binary q[b], binary r = 0^b.1.q[b]R[r] = x[b+b+1+r]
+		BitWriter bitIO (encoded); // Assumes buffer is big enough
+		bitIO.write(32, 4*10800); // Width
+		bitIO.write(32, 2*6000+2*4800); // Height
+		int predictor = 0;
+		for(size_t index=0; index<source.size;) {
+			int value, s;
+			uint runLength = 0;
+			for(;;)  {
+				value = source[index++];
+				s = value - predictor;
+				if(s != 0) break;
+				assert_(runLength < 0xFFFFFFFF);
+				runLength++;
 			}
-			bitIO.end();
-			encoded.size = (byte*)bitIO.pointer - encoded.data;
-			assert_(encoded.size <= encoded.capacity);
+			if(runLength) {
+				uint rleCodeRepeats = runLength >> rleK; // RLE length = rleCodeRepeats · 2^k
+				for(;rleCodeRepeats > 0; rleCodeRepeats--) bitIO.write(3, 0b100);
+				uint remainingZeroes = runLength & ((1<<rleK)-1);
+				for(;remainingZeroes > 0; remainingZeroes--) bitIO.write(3, 0b101); // Explicitly encode remaining zeroes
+			}
+			predictor = value;
+			uint u  = (s<<1) ^ (s>>31); // s>0 ? (s<<1) : (-s<<1) - 1;
+			uint x = u+1; // 0 is RLE escape
+			// Exp Golomb _ r
+			x += (1<<egR);
+			uint b = 63 - __builtin_clzl(x); // BSR
+			bitIO.write(b+b+1-egR, x); // unary b, binary q[b], binary r = 0^b.1.q[b]R[r] = x[b+b+1+r]
 		}
+		bitIO.end();
+		encoded.size = (byte*)bitIO.pointer - encoded.data;
+		assert_(encoded.size <= encoded.capacity);
 		log(int(round(encoded.size/(1024.*1024))),"MB", encode, int(round((encoded.size/(1024.*1024))/encode.toReal())),"MB/s"); // 112-224 MB/s
-
-		Time decode;
-		{BitReader bitIO (encoded);
-			int predictor = 0;
-			for(size_t index=0; index<source.size;) {
-				uint b = __builtin_clzl(bitIO.word) * 2 + 1 + egR;
-				uint x = bitIO.read(b) - (1<<egR);
-				if(x == 0) for(uint unused i: range(1<<rleK)) { assert_(predictor == source[index], predictor, source[index]); index++; }
-				else  {
-					uint u = x-1;
-					int s = (u>>1) ^ (-(u&1)); // u&1 ? -((u>>1) + 1) : u>>1;
-					int value = predictor + s; predictor = value;
-					assert_(value == source[index], value, source[index]);
-					index++;
-				}
-			}
-		}
-		log(int(round(encoded.size/(1024.*1024))),"MB", decode, int(round((encoded.size/(1024.*1024))/decode.toReal())),"MB/s"); // 73-90 MB/s
+		writeFile("encoded", encoded);
 	}
 } encode;
+#endif
+
+#if 1
+struct Decode {
+	Decode() {
+		Image16 image = decodeFLIC(Map("globe"));
+		/*Map map ("source"); ref<int16> source = cast<int16>(map);
+		for(size_t index: range(source.size)) assert_(image[index] == source[index]);*/
+	}
+} decode;
+
 #endif
