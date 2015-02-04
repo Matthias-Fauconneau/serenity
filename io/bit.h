@@ -32,10 +32,15 @@ struct BitWriter {
 
 /// Decodes packed bitstreams (msb)
 struct BitReader {
-	uint8* pointer;
-	uint64 word;
-	int64 bitLeftCount = 64;
-	BitReader(ref<byte> data) : pointer((uint8*)data.data) { word=__builtin_bswap64(*(uint64*)pointer); pointer+=8; }
+	uint8* pointer = 0;
+	uint64 word = 0;
+	size_t bitLeftCount = 64;
+	uint8* end = 0;
+	BitReader() {}
+	BitReader(ref<byte> data) : pointer((uint8*)data.begin()), end((uint8*)data.end()) {
+		word = __builtin_bswap64(*(uint64*)pointer);
+		pointer += 8;
+	}
 	uint read(uint size) {
 		if(bitLeftCount < size/*~12*/) refill(); // conservative. TODO: fit to largest code to refill less often
 		uint x = word >> (64-size);
@@ -44,15 +49,17 @@ struct BitReader {
 		return x;
 	}
 	void refill() {
+		assert_(pointer+8<=end, bitLeftCount, pointer, end, end-pointer);
 		uint64 next = __builtin_bswap64(*(uint64*)pointer);
 		int64 byteCount = (64-bitLeftCount)>>3;
 		pointer += byteCount;
 		word |= next >> bitLeftCount;
 		bitLeftCount += byteCount<<3;
 	}
-	template<uint r, uint z=10> uint readExpGolomb() {
+	template<uint r, size_t z=10> uint readExpGolomb() {
 		if(bitLeftCount <= z) refill();
-		uint b = __builtin_clzl(word) * 2 + 1 + r; // 'word' is kept left aligned, bitLeftCount should be larger than maximum exp golomb zero run length (b)
+		// 'word' is kept left aligned, bitLeftCount should be larger than maximum exp golomb zero run length
+		uint b = __builtin_clzl(word) * 2 + 1 + r;
 		return read(b) - (1<<r);
 	}
 };
