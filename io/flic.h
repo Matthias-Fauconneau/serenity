@@ -14,14 +14,13 @@ struct FLIC : ref<byte> {
 		size.y = bitIO.read(32);
 	}
 	uint rleIndex = 1<<RLE;
-	void decodeLine(mref<int16> line) {
-		assert(line.size == size.x);
+	void read(mref<int16> line) {
 		size_t index = 0;
 		// Resumes any pending run length
 		while(rleIndex < (1<<RLE/*64*/)) {
 			line[index] = predictor;
 			index++; rleIndex++;
-			if(index>=size_t(size.x)) return;
+			if(index>=line.size) return;
 		}
 		for(;;) {
 			uint x = bitIO.readExpGolomb<EG>();
@@ -30,7 +29,7 @@ struct FLIC : ref<byte> {
 				while(rleIndex < (1<<RLE/*64*/)) {
 					line[index]=predictor;
 					index++; rleIndex++;
-					if(index>=size_t(size.x)) return;
+					if(index>=line.size) return;
 				}
 			} else  {
 				uint u = x-1;
@@ -38,7 +37,7 @@ struct FLIC : ref<byte> {
 				predictor += s;
 				line[index] = predictor;
 				index++;
-				if(index>=size_t(size.x)) return;
+				if(index>=line.size) return;
 			}
 		}
 	}

@@ -6,8 +6,9 @@ struct BitWriter {
 	uint8* pointer = 0;
 	uint64 word = 0;
 	uint64 bitLeftCount = 64;
+	uint8* end = 0;
 	BitWriter() {}
-	BitWriter(mref<byte> buffer) : pointer((uint8*)buffer.data) {}
+	BitWriter(mref<byte> buffer) : pointer((uint8*)buffer.begin()), end((uint8*)buffer.end()) {}
 	void write(uint size, uint64 value) {
 		if(size < bitLeftCount) {
 			word <<= size;
@@ -15,6 +16,7 @@ struct BitWriter {
 		} else {
 			word <<= bitLeftCount;
 			word |= value >> (size - bitLeftCount); // Puts leftmost bits in remaining space
+			assert_(pointer < end);
 			*(uint64*)pointer = __builtin_bswap64(word); // MSB
 			pointer += 8;
 			bitLeftCount += 64;
@@ -22,9 +24,9 @@ struct BitWriter {
 		}
 		bitLeftCount -= size;
 	}
-	void end() {
+	void flush() {
 		if(bitLeftCount<64) word <<= bitLeftCount;
-		while(bitLeftCount<64) { *pointer++ = word>>(64-8); word <<= 8; bitLeftCount += 8; }
+		while(bitLeftCount<64) { assert_(pointer < end); *pointer++ = word>>(64-8); word <<= 8; bitLeftCount += 8; }
 	}
 };
 
@@ -67,7 +69,7 @@ struct BitReaderLSB : ref<byte> {
 	}
 	void align() { index = (index + 7) & ~7; }
 	ref<byte> readBytes(uint byteCount) {
-		assert(index&7 == 0);
+		assert((index&7) == 0);
 		ref<byte> slice = ref<byte>((byte*)data+index/8, byteCount);
 		index += byteCount*8;
 		return slice;
