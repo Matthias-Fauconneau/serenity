@@ -38,8 +38,8 @@ struct GLUniform {
 
 struct GLBuffer {
 	handle<uint> id;
-	uint elementSize = 0;
-	uint elementCount = 0;
+	size_t elementSize = 0;
+	size_t elementCount = 0;
 
 	GLBuffer() {}
 	GLBuffer(uint elementSize, ref<byte> data);
@@ -72,7 +72,7 @@ struct GLIndexBuffer : GLBuffer {
 	GLIndexBuffer() {}
 	template<Type T> GLIndexBuffer(ref<T> data) : GLBuffer(sizeof(T), cast<byte>(data)) {}
 	PrimitiveType primitiveType = TriangleStrip;
-	void draw(/*int base = 0*/);
+	void draw(size_t start = 0, size_t end = 0);
 };
 
 enum Format { RGB8=0, R16I=1, Depth=2/*U32*/, RGBA8=3, R32F=4,

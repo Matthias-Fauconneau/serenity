@@ -154,23 +154,22 @@ void GLVertexArray::bindAttribute(int index, int elementSize, AttributeType type
 	glBindVertexArray(0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
-void GLVertexArray::draw(PrimitiveType primitiveType, uint vertexCount) const {
+/*void GLVertexArray::draw(PrimitiveType primitiveType, uint vertexCount) const {
 	bind();
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glDrawArrays(primitiveType, 0, vertexCount);
-}
+}*/
 
 #include "time.h"
-void GLIndexBuffer::draw(/*int base*/) {
+void GLIndexBuffer::draw(size_t start, size_t end) {
+	assert_(end > start || start==0 && end==0);
 	glEnable(GL_PRIMITIVE_RESTART_FIXED_INDEX);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
 	GLenum type = 0;
 	if(elementSize==2) type = GL_UNSIGNED_SHORT;
 	if(elementSize==4) type = GL_UNSIGNED_INT;
 	assert_(type);
-	//assert_(base == 0);
-	glDrawElements(primitiveType, elementCount, type, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	glDrawElements(primitiveType, (end-start)?: elementCount, type, (void*)(start*elementSize));
 }
 
 /// Texture

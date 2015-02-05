@@ -15,7 +15,7 @@ struct ImageF : buffer<float> {
 };
 
 struct TriangleStrip : buffer<uint> {
-	uint restart = 0xFFFFFFFF;
+	static constexpr uint restart = 0xFFFFFFFF;
 	uint last[2] = {restart, restart};
 	bool even = true;
 
@@ -32,6 +32,7 @@ struct TriangleStrip : buffer<uint> {
 		even = !even;
 	}
 };
+constexpr uint TriangleStrip::restart;
 
 struct Terrain : Poll {
 	GLShader shader {::shader(), {"terrain"}};
@@ -47,6 +48,7 @@ struct Terrain : Poll {
 		GLVertexArray vertexArray;
 		GLTexture textureBuffer; // shader read access (texelFetch) to elevation buffer
 		GLIndexBuffer indexBuffer;
+		int subTiles[4]; // Allows partial tile draw for multiresolution
 		Tile(int level, int2 index) : level(level), index(index) {}
 		void decode() { // Decodes elevation data and uploads to GPU
 			string name = 0 ? "dem15"_ : "globe30"_;
@@ -126,26 +128,30 @@ struct Terrain : Poll {
 		}
 
 		struct TriangleStrip triangleStrip (tile.size.x*tile.size.y*6);
-		for(int y: range(tile.size.y)) for(int x: range(tile.size.x)) { // TODO: Z-order triangle strips for framebuffer locality ?
-			int v00 = (y+0)*(tile.size.x+1)+(x+0), v10 = (y+0)*(tile.size.x+1)+(x+1);
-			int v01 = (y+1)*(tile.size.x+1)+(x+0), v11 = (y+1)*(tile.size.x+1)+(x+1);
-			const int invalid = tile.zRange.min;
-			if(elevation[v00]!=invalid && elevation[v11]!=invalid) {
-				if(elevation[v00]!=invalid) triangleStrip(v10, v00, v11);
-				if(elevation[v01]!=invalid) triangleStrip(v11, v00, v01);
+		for(int Y: range(2)) for(int X: range(2)) {
+			tile.subTiles[Y*2+X] = triangleStrip.size;
+			mref<uint>(triangleStrip.last).clear(TriangleStrip::restart); // Forces restarts for correct subtile rendering
+			// Index buffer can be partially rendered with 4 subtiles for multiresolution
+			for(int y: range(tile.size.y/2+Y)) for(int x: range(tile.size.x/2+X)) { // TODO: Z-order triangle strips for framebuffer locality ?
+				int v00 = (Y*tile.size.y/2+y+0)*(tile.size.x+1)+(X*tile.size.x/2+x+0), v10 = (Y*tile.size.y/2+y+0)*(tile.size.x+1)+(X*tile.size.x/2+x+1);
+				int v01 = (Y*tile.size.y/2+y+1)*(tile.size.x+1)+(X*tile.size.x/2+x+0), v11 = (Y*tile.size.y/2+y+1)*(tile.size.x+1)+(X*tile.size.x/2+x+1);
+				const int invalid = tile.zRange.min;
+				if(elevation[v00]!=invalid && elevation[v11]!=invalid) {
+					if(elevation[v00]!=invalid) triangleStrip(v10, v00, v11);
+					if(elevation[v01]!=invalid) triangleStrip(v11, v00, v01);
+				}
 			}
 		}
 		if(triangleStrip) { // Not a void tile
-			tile.indexBuffer = triangleStrip;
-			tile.textureBuffer = GLTexture(tile.elevation, tile.size+int2(1));
 			tile.vertexArray = GLVertexArray();
 			tile.vertexArray.bindAttribute(shader.attribLocation("aElevation"_), 1, Float, tile.elevation);
+			tile.textureBuffer = GLTexture(tile.elevation, tile.size+int2(1));
+			tile.indexBuffer = triangleStrip;
 		}
 		tile.loaded = true;
 	}
 
 	Terrain(Thread& thread, function<void()> contentChanged) : Poll(0,0,thread), contentChanged(contentChanged) {
-		for(uint Y: range(1)) for(uint X: range(2)) load(tile(0, int2(X, Y))); // Loads mipmap level 0 (2x1 tiles)
 		registerPoll(); // Keeps thread from bailing out
 	}
 	void event() override {
@@ -155,72 +161,68 @@ struct Terrain : Poll {
 		contentChanged();
 	}
 
-	bool isVisible(const mat4 viewProjection, int level, int2 index) {
-		log(1<<level);
-		float sphericalSize = float(PI/(1<<level));
-		vec2 sphericalOrigin = float(PI/(1<<level))*vec2(index);
-
-		// Evaluates closest tile point
-		vec3 O = normalize(viewProjection.inverse()[3].xyz()); // Projects view origin (last column: VP⁻¹·(0,0,0,1)) on the sphere
-		vec2 s = vec2(atan(O.y, O.x), acos(O.z)); // Spherical coordinates
-		if(s.x < 0) s.x+=2*PI; // [-π,π] -> [0, 2π]
-		s = clamp(sphericalOrigin, s, sphericalOrigin+vec2(sphericalSize)); // Clamps to tile
-		auto sphere = [](vec2 spherical) { return vec3(sin(spherical.y)*cos(spherical.x), sin(spherical.y)*sin(spherical.x), cos(spherical.y)); };
-		vec3 S = sphere(s); // Closest tile point (cartesian 'world' system)
-		vec3 V = viewProjection * S; // Perspective projects to view space
-		return sq(V.xy()) < 2; // View cone cull (frustum cull is not conservative as it may intersect tile without containing closest tile point)
-	}
-
-	void render(const mat4 viewProjection, vec2 size, int level, int2 index, array<Tile*>& loadQueue) {
+	/// \return Whether to skip parent subtile
+	bool render(const mat4 viewProjection, vec2 size, int level, int2 index, array<Tile*>& loadQueue) {
 		Tile& tile = this->tile(level, index);
-		if(!tile.indexBuffer) return; // Void tile
-		if(!isVisible(viewProjection, level, index)) return; // Out of view
-		assert_(tile.loaded);
 
-		float sphericalSize = float(PI/(1<<tile.level));
-		float sphericalResolution = sphericalSize/tile.size.x;
-		vec2 sphericalOrigin = float(PI/(1<<tile.level))*vec2(tile.index);
+		// Void tile
+		if(tile.loaded && !tile.indexBuffer) return true;
 
 		// Evaluates closest tile point
 		vec3 O = normalize(viewProjection.inverse()[3].xyz()); // Projects view origin (last column: VP⁻¹·(0,0,0,1)) on the sphere
 		vec2 s = vec2(atan(O.y, O.x), acos(O.z)); // Spherical coordinates
 		if(s.x < 0) s.x+=2*PI; // [-π,π] -> [0, 2π]
+		float sphericalSize = float(PI/(1<<level));
+		vec2 sphericalOrigin = sphericalSize*vec2(index);
 		s = clamp(sphericalOrigin, s, sphericalOrigin+vec2(sphericalSize)); // Clamps to tile
 		auto sphere = [](vec2 spherical) { return vec3(sin(spherical.y)*cos(spherical.x), sin(spherical.y)*sin(spherical.x), cos(spherical.y)); };
 		vec3 S = sphere(s); // Closest tile point (cartesian 'world' system)
 		vec3 V = viewProjection * S; // Perspective projects to view space
-		if(sq(V.xy()) >= 2) return; // View cone cull (frustum cull is not conservative as it may intersect tile without containing closest tile point)
+		if(!(sq(V.xy()) < 2)) return true; // View cone cull (frustum cull is not conservative as it may intersect tile without containing closest tile point)
 
 		// Projects cell size around closest tile point to increase resolution as needed
+		float sphericalResolution = sphericalSize/tile.size.x;
 		vec2 vx = (viewProjection * sphere(s+vec2(sphericalResolution/2, 0)) - viewProjection * sphere(s-vec2(sphericalResolution/2, 0))).xy();
 		float dx = length(size*vx);
 		vec2 vy = (viewProjection * sphere(s+vec2(0, sphericalResolution/2)) - viewProjection * sphere(s-vec2(0, sphericalResolution/2))).xy();
 		float dy = length(size*vy);
 		float d = max(dx, dy);
-		if(d > 4 && tile.level<5) { // Requires finer resolution
-			bool allVisibleChildrenAvailable = true;
-			for(int Y: range(2)) for(int X: range(2)) { // Queues visible children tiles for loading
-				if(!isVisible(viewProjection, level+1, tile.index*2+int2(X,Y))) continue;
-				Tile& child = this->tile(tile.level+1, tile.index*2+int2(X,Y));
-				if(child.loaded) continue;
-				allVisibleChildrenAvailable = false;
-				loadQueue.append(&child); // TODO: sort by d
-			}
-			if(allVisibleChildrenAvailable) {
-				for(int Y: range(2)) for(int X: range(2)) render(viewProjection, size, tile.level+1, tile.index*2+int2(X,Y), loadQueue);
-				return; // Skips parent tile
+		if(d < 4) return false; // Parent resolution is sufficient
+
+		if(!tile.indexBuffer) { loadQueue.append(&tile); return false; } // Not available yet
+		assert_(tile.loaded);
+
+		bool skipSubtile[4] = {0,0,0,0};
+		if(tile.level<5) { // Finer resolution exists
+			for(int Y: range(2)) for(int X: range(2)) {
+				skipSubtile[Y*2+X] = render(viewProjection, size, tile.level+1, tile.index*2+int2(X,Y), loadQueue);
 			}
 		}
-		shader["W"_] = tile.size.x+1;
-		shader["sphericalResolution"_] = sphericalResolution;
-		shader["sphericalOrigin"_] = sphericalOrigin;
-		static constexpr float R = 4E7/(2*PI); // 4·10⁷/2π  ~ 6.37
-		shader["R"_] = R;
-		shader["tElevation"_] = 0;
-		tile.textureBuffer.bind(0);
-		shader["modelViewProjectionTransform"_] = mat4(viewProjection);
-		tile.vertexArray.bind();
-		tile.indexBuffer.draw();
+		bool any = false; size_t start = invalid;
+		for(int Y: range(2)) for(int X: range(2)) {
+			if(!any) {
+				shader["W"_] = tile.size.x+1;
+				shader["sphericalResolution"_] = sphericalResolution;
+				shader["sphericalOrigin"_] = sphericalOrigin;
+				static constexpr float R = 4E7/(2*PI); // 4·10⁷/2π  ~ 6.37
+				shader["R"_] = R;
+				shader["tElevation"_] = 0;
+				tile.textureBuffer.bind(0);
+				shader["modelViewProjectionTransform"_] = mat4(viewProjection);
+				tile.vertexArray.bind();
+				any = true;
+			}
+			int index = Y*2+X;
+			if(!skipSubtile[index]) {
+				if(start==invalid) start = tile.subTiles[index];
+			}
+			if(start!=invalid && (skipSubtile[index] || index==3)) {
+				size_t end = skipSubtile[index] ? tile.subTiles[index] : tile.indexBuffer.elementCount;
+				tile.indexBuffer.draw(start, end); // Draws all subtiles as a single draw call, or two if necessary
+				start = invalid;
+			}
+		}
+		return true;
 	}
 
 	void render(const mat4 viewProjection, vec2 size) {
