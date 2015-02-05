@@ -5,9 +5,9 @@ terrain {
   uniform mat4 modelViewProjectionTransform; // TODO: -> mat3
   int yx = gl_VertexID;
   int y = yx/W, x = yx%W;
-  uniform vec2 origin;
-  uniform float da;
-  vec2 angles = origin + da * vec2(x, y);
+  uniform vec2 originAngles;
+  uniform float angularResolution;
+  vec2 angles = originAngles + angularResolution * vec2(x, y);
   uniform float R;
   float r = 1+aElevation/R;
   attribute float aElevation;
