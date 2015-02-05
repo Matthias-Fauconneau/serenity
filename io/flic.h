@@ -2,7 +2,7 @@
 #include "bit.h"
 #include "image.h"
 #include "time.h"
-static constexpr uint EG = 2, RLE = 6;
+static constexpr size_t EG = 2, RLE = 6;
 
 struct FLIC : ref<byte> {
 	BitReader bitIO;
@@ -15,8 +15,8 @@ struct FLIC : ref<byte> {
 		size.x = bitIO.read(32);
 		size.y = bitIO.read(32);
 	}
-	~FLIC() { assert_(valueCount == (size_t)size.y*size.x); }
-	uint rleIndex = 1<<RLE;
+	~FLIC() { assert_(valueCount == 0 || valueCount == (size_t)size.y*size.x, valueCount, (size_t)size.y*size.x); }
+	size_t rleIndex = 1<<RLE;
 	void read(mref<int16> buffer) {
 		valueCount += buffer.size;
 		assert_(valueCount <= (size_t)size.y*size.x);
@@ -32,7 +32,7 @@ struct FLIC : ref<byte> {
 			if(x == 0) {
 				rleIndex = 0;
 				while(rleIndex < (1<<RLE/*64*/)) {
-					buffer[index]=predictor;
+					buffer[index] = predictor;
 					index++; rleIndex++;
 					if(index>=buffer.size) return;
 				}

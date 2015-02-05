@@ -9,7 +9,7 @@ struct Encoder {
 
 	BitWriter bitIO {buffer}; // Assumes buffer capacity will be large enough
 	int predictor = 0;
-	uint runLength = 0;
+	size_t runLength = 0;
 
 	int2 size = 0;
 	size_t valueCount = 0;
@@ -44,9 +44,9 @@ struct Encoder {
 	}
 	void flushRLE() {
 		if(!runLength) return;
-		uint rleCodeRepeats = runLength >> RLE; // RLE length = rleCodeRepeats · 2^RLE
+		size_t rleCodeRepeats = runLength >> RLE; // RLE length = rleCodeRepeats · 2^RLE
 		for(;rleCodeRepeats > 0; rleCodeRepeats--) bitIO.write(3, 0b100);
-		uint remainingZeroes = runLength & ((1<<RLE)-1);
+		size_t remainingZeroes = runLength & ((1<<RLE)-1);
 		for(;remainingZeroes > 0; remainingZeroes--) bitIO.write(3, 0b101); // Explicitly encode remaining zeroes
 		runLength = 0;
 	}
@@ -155,7 +155,7 @@ struct Mipmap {
 					writeFile(str(tX, 2u)+","+str(tY, 2u), encoder.end(),
 							  Folder(name+"."_+str(1<<level)+".eg2rle6"_, currentWorkingDirectory(), true), true);
 				}
-				log(str(tY,2u,' '), "/", 1<<level);
+				log(str(1+tY,2u,' '), "/", 1<<level);
 			}
 		}
 		log(time);

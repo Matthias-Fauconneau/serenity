@@ -33,70 +33,92 @@ struct TriangleStrip : buffer<uint> {
 	}
 };
 
-struct Terrain {
+struct Terrain : Poll {
 	GLShader shader {::shader(), {"terrain"}};
 
 	struct Tile {
-		int level; int2 index, size /*without +1 repeated row/column*/;
-		struct Range { int min = 0, max= 0; } range;
-		buffer<float> firstRowColumn; // last row/column of previous tile
+		int level;
+		int2 index;
+		int2 size = 0; /*without +1 repeated row/column*/
+		struct Range { int min=0, max=0; } zRange;
+		buffer<float> firstRowColumn; // To fill last row/column of previous tile
 		GLBuffer elevation;
 		bool loaded = false;
 		GLVertexArray vertexArray;
 		GLTexture textureBuffer; // shader read access (texelFetch) to elevation buffer
 		GLIndexBuffer indexBuffer;
+		Tile(int level, int2 index) : level(level), index(index) {}
+		void decode() { // Decodes elevation data and uploads to GPU
+			string name = 0 ? "dem15"_ : "globe30"_;
+			Map map(str(index.x, 2u,'0')+","+str(index.y,2u,'0'), Folder(name+"."+str(1<<level)+".eg2rle6"));
+			FLIC source(map);
+			ImageF elevation (source.size+int2(1));
+			firstRowColumn = buffer<float>(source.size.x+source.size.y);
+			for(int y: range(source.size.y)) {
+				int16 line[source.size.x];
+				source.read(mref<int16>(line, source.size.x));
+				for(int x: range(source.size.x)) {
+					int z = line[x];
+					elevation(x, y) = z;
+					if(y==0) firstRowColumn[x] = elevation(x, 0);
+					zRange.min = ::min(zRange.min, z);
+					zRange.max = ::max(zRange.max, z);
+				}
+				firstRowColumn[source.size.x+y] = elevation(0, y);
+			}
+			size = source.size;
+			this->elevation = GLBuffer(elevation);
+			log(level, index, size, zRange.min, zRange.max);
+		}
 	};
 	array<unique<Tile>> tiles;
+	Lock lock;
 
-	Tile& tile(int level, int2 index) {
+	Lock queueLock;
+	array<Tile*> loadQueue; // LIFO
+
+	Tile* findTile(int level, int2 index) {
+		assert_(level <= 5);
 		index.x = index.x%(2*(1<<level)); // Wraps longitude
 		assert_(0 <= index.x && index.x < 2*(1<<level));
 		assert_(0 <= index.y && index.y < 1*(1<<level), index.y);
-		for(Tile& tile: tiles) if(tile.level == level && tile.index==index) return tile; // TODO: correct mixed resolution stitch
-		// Decodes requested tile
-		string name = 0 ? "dem15"_ : "globe30"_;
-		Map map(str(index.x, 2u,'0')+","+str(index.y,2u,'0'), Folder(name+"."+str(1<<level)+".eg2rle6"));
-		FLIC source(map);
-		ImageF elevation (source.size+int2(1));
-		buffer<float> firstRowColumn (source.size.x+source.size.y);
-		Tile::Range zRange;
-		for(int y: range(source.size.y)) {
-			int16 line[source.size.x];
-			source.read(mref<int16>(line, source.size.x));
-			for(int x: range(source.size.x)) {
-				int z = line[x];
-				elevation(x, y) = z;
-				if(y==0) firstRowColumn[x] = elevation(x, 0);
-				zRange.min = ::min(zRange.min, z);
-				zRange.max = ::max(zRange.max, z);
-			}
-			firstRowColumn[source.size.x+y] = elevation(0, y);
-		}
-		log(index, zRange.min, zRange.max);
-		return tiles.append(unique<Tile>(level, index, source.size, zRange, move(firstRowColumn), GLBuffer(elevation), false,
-							GLVertexArray(), GLTexture(), GLIndexBuffer()));
+		for(Tile& tile: tiles) if(tile.level == level && tile.index==index) return &tile;
+		return null;
 	}
 
-	void load(int level, int2 index) {
+	/// Returns tile (instances if missing)
+	Tile& tile(int level, int2 index) { return *(findTile(level, index) ?: tiles.append(unique<Tile>(level, index)).pointer); }
+
+	/// Returns first row/column data to stitch tiles together (decodes if missing)
+	ref<float> firstRowColumn(int level, int2 index) {
 		Tile& tile = this->tile(level, int2(index.x, index.y));
+		if(!tile.firstRowColumn) tile.decode();
+		return tile.firstRowColumn;
+	}
+
+	/// Completes tile for display by stitching with neighbours and uploading an index buffer
+	// TODO: correct multiresolution stitch
+	// TODO: share a single index buffer between all full tiles
+	void load(Tile& tile) {
 		if(tile.loaded) return;
+		if(!tile.firstRowColumn) tile.decode();
 		// Completes last row/column with first row/column of next neighbours
 		auto elevation = tile.elevation.map<float>();
 
-		if(index.y+1 < (1<<level)) {
-			Tile& nextY = this->tile(level, int2(index.x, index.y+1));
-			for(size_t x: range(tile.size.x)) elevation[(size_t)tile.size.y*(tile.size.x+1)+x] = nextY.firstRowColumn[x];
+		if(tile.index.y+1 < (1<<tile.level)) {
+			ref<float> nextY = firstRowColumn(tile.level, int2(tile.index.x, tile.index.y+1));
+			for(size_t x: range(tile.size.x)) elevation[(size_t)tile.size.y*(tile.size.x+1)+x] = nextY[x];
 		} else {
-			log(index.x, index.y, tile.level, tile.index, tile.size);
+			log(tile.index.x, tile.index.y, tile.level, tile.index, tile.size);
 			for(size_t x: range(tile.size.x)) elevation[(size_t)tile.size.y*(tile.size.x+1)+x] = 0; // Pole
 		}
 
-		Tile& nextX = this->tile(level, int2(index.x+1, index.y+0));
-		for(size_t y: range(tile.size.y)) elevation[y*(tile.size.x+1)+tile.size.x] = nextX.firstRowColumn[tile.size.x+y];
+		ref<float> nextX = firstRowColumn(tile.level, int2(tile.index.x+1, tile.index.y+0));
+		for(size_t y: range(tile.size.y)) elevation[y*(tile.size.x+1)+tile.size.x] = nextX[tile.size.x+y];
 
-		if(index.y+1 < (1<<level)) {
-			Tile& nextXY = this->tile(level, int2(index.x+1, index.y+1));
-			elevation[tile.size.y*(tile.size.x+1)+tile.size.x] = nextXY.firstRowColumn[0];
+		if(tile.index.y+1 < (1<<tile.level)) {
+			ref<float> nextXY = firstRowColumn(tile.level, int2(tile.index.x+1, tile.index.y+1));
+			elevation[tile.size.y*(tile.size.x+1)+tile.size.x] = nextXY[0];
 		} else {
 			elevation[tile.size.y*(tile.size.x+1)+tile.size.x] = 0; // Pole
 		}
@@ -105,7 +127,7 @@ struct Terrain {
 		for(int y: range(tile.size.y)) for(int x: range(tile.size.x)) { // TODO: Z-order triangle strips for framebuffer locality ?
 			int v00 = (y+0)*(tile.size.x+1)+(x+0), v10 = (y+0)*(tile.size.x+1)+(x+1);
 			int v01 = (y+1)*(tile.size.x+1)+(x+0), v11 = (y+1)*(tile.size.x+1)+(x+1);
-			const int invalid = tile.range.min;
+			const int invalid = tile.zRange.min;
 			if(elevation[v00]!=invalid && elevation[v11]!=invalid) {
 				if(elevation[v00]!=invalid) triangleStrip(v10, v00, v11);
 				if(elevation[v01]!=invalid) triangleStrip(v11, v00, v01);
@@ -119,38 +141,51 @@ struct Terrain {
 		}
 	}
 
-	Terrain() { for(uint Y: range(1)) for(uint X: range(2)) load(0, int2(X, Y)); } // Loads mipmap level 0 (2x1 tiles)
+	Terrain(Thread& thread) : Poll(0,0,thread) {
+		for(uint Y: range(1)) for(uint X: range(2)) load(tile(0, int2(X, Y))); // Loads mipmap level 0 (2x1 tiles)
+	}
+	void event() override {
+		if(!loadQueue) return;
+		load(*({Locker lock(queueLock); loadQueue.pop(); }));
+		if(loadQueue) Poll::queue();
+	}
 
 	void draw(const mat4 viewProjection, vec2 size) {
 		shader.bind();
-		int splitCount = 0;
-		for(size_t tileIndex=0; tileIndex<tiles.size;) { // Not for(tiles) as 'tiles' is edited within
+		Locker lock(this->lock);
+		for(size_t tileIndex: range(tiles.size)) { // Not for(tiles) as 'tiles' might be reallocated on queue
 			Tile& tile = tiles[tileIndex];
-			if(!tile.indexBuffer) { tileIndex++; continue; } // Void tile
+			if(!tile.indexBuffer) continue; // Unloaded or void tile
+			if(tile.level<5) { // Skips parent tile when all children are loaded
+				bool allLoaded = true;
+				for(int Y: range(2)) for(int X: range(2)) {
+					Tile* child = findTile(tile.level+1, tile.index*2+int2(X,Y));
+					allLoaded &= child && child->loaded;
+				}
+				if(allLoaded) continue; // TODO: remove
+				// TODO: Reload parent and remove children when possible
+			}
 
 			float angularSize = float(PI/(1<<tile.level));
 			float angularResolution = angularSize/tile.size.x;
 			vec2 originAngles = float(PI/(1<<tile.level))*vec2(tile.index);
-			{ // Estimates maximum cell size
+			if(1) { // Estimates maximum cell size
 				vec2 centerAngles = originAngles+vec2(angularSize/2);
 				auto sphere = [](vec2 angles) { return vec3(sin(angles.y)*cos(angles.x), sin(angles.y)*sin(angles.x), cos(angles.y)); };
 				// Center cell side lengths
 				float dx = length(size*(viewProjection * sphere(centerAngles+vec2(angularResolution/2, 0)) - viewProjection * sphere(centerAngles-vec2(angularResolution/2, 0))).xy());
 				float dy = length(size*(viewProjection * sphere(centerAngles+vec2(0, angularResolution/2)) - viewProjection * sphere(centerAngles-vec2(0, angularResolution/2))).xy());
 				float d = max(dx, dy);
-				log(d);
-				if(d > 4 && level<5 && splitCount==0) { // Splits up to one tile per frame (TODO: async)
-					int level = tile.level;
-					int2 index = tile.index;
-					tiles.removeAt(tileIndex); // Removes parent tile
-					// Loads next mipmap level
-					for(int Y: range(2)) for(int X: range(2)) load(level+1, index*2+int2(X,Y));
-					splitCount++;
+				if(d > 4 && tile.level<5) {
+					for(int Y: range(2)) for(int X: range(2)) { // Queues children tiles for loading
+						Tile& tile = this->tile(tile.level+1, tile.index*2+int2(X,Y));
+						if(!tile.loaded) { Locker lock(queueLock); loadQueue.append(&tile); Poll::queue(); }
+					}
 					continue;
 				}
 			}
 			shader["W"_] = tile.size.x+1;
-			assert_(tile.size.x == tile.size.y);
+			assert_(tile.size.x == tile.size.y, tile.size);
 			shader["angularResolution"_] = angularResolution;
 			shader["originAngles"_] = originAngles;
 			static constexpr float R = 4E7/(2*PI); // 4·10⁷/2π  ~ 6.37
@@ -160,7 +195,6 @@ struct Terrain {
 			shader["modelViewProjectionTransform"_] = mat4(viewProjection); //.scale(vec3(vec2(dx*D),1)); //.translate(vec3(vec2(N/D*tile.tileIndex),0));
 			tile.vertexArray.bind();
 			tile.indexBuffer.draw();
-			tileIndex++;
 		}
 	}
 };
@@ -168,7 +202,8 @@ struct Terrain {
 /// Views a scene
 struct View : Widget {
 	Window window {this, 1024, []{ return "Editor"__; }};
-	Terrain terrain;
+	Thread thread;
+	Terrain terrain {thread};
 
 	// View
 	vec2 lastPos; // Last cursor position to compute relative mouse movements
@@ -191,9 +226,11 @@ struct View : Widget {
 	View() {
 		glDepthTest(true);
 		glCullFace(true);
+		//window.glAddThread(thread);
+		//thread.spawn(); // Spawns tile loading (decode and upload) thread
 	}
 	shared<Graphics> graphics(vec2 unused size) override {
-		mat4 projection = mat4().perspective(2*asin(1/(1+altitude)), size, altitude-1./512 /*maximum elevation*/, altitude+1);
+		mat4 projection = mat4().perspective(sqrt(2.)*asin(1/(1+altitude)), size, altitude-1./512 /*maximum elevation*/, altitude+1);
 		mat4 view = mat4()
 				.translate(vec3(0,0,-altitude-1)) // Altitude
 				.rotateX(rotation.y) // Latitude

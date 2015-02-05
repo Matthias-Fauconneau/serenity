@@ -5,7 +5,7 @@
 struct BitWriter {
 	uint8* pointer = 0;
 	uint64 word = 0;
-	uint64 bitLeftCount = 64;
+	int64 bitLeftCount = 64;
 	uint8* end = 0;
 	BitWriter() {}
 	BitWriter(mref<byte> buffer) : pointer((uint8*)buffer.begin()), end((uint8*)buffer.end()) {}
@@ -34,33 +34,39 @@ struct BitWriter {
 struct BitReader {
 	uint8* pointer = 0;
 	uint64 word = 0;
-	size_t bitLeftCount = 64;
+	int64 bitLeftCount = 64;
+	uint8* begin = 0;
 	uint8* end = 0;
 	BitReader() {}
-	BitReader(ref<byte> data) : pointer((uint8*)data.begin()), end((uint8*)data.end()) {
+	BitReader(ref<byte> data) : pointer((uint8*)data.begin()), begin(pointer), end((uint8*)data.end()) {
 		word = __builtin_bswap64(*(uint64*)pointer);
 		pointer += 8;
 	}
-	~BitReader() { assert(pointer+14>=end, end-pointer); }
+	~BitReader() { assert_(pointer==begin+8 || pointer+14>=end, bitLeftCount, end-pointer); }
 	uint read(uint size) {
-		if(bitLeftCount < size/*~12*/) refill(); // conservative. TODO: fit to largest code to refill less often
+		if(bitLeftCount < size/*~12*/) refill(size); // conservative. TODO: fit to largest code to refill less often
+		assert_(bitLeftCount >= size);
 		uint x = word >> (64-size);
 		word <<= size;
 		bitLeftCount -= size;
+		assert_(bitLeftCount >= 0);
 		return x;
 	}
-	void refill() {
+	void refill(size_t size) {
 		assert_(pointer+8<=end, bitLeftCount, pointer, end, end-pointer);
 		uint64 next = __builtin_bswap64(*(uint64*)pointer);
 		int64 byteCount = (64-bitLeftCount)>>3;
 		pointer += byteCount;
 		word |= next >> bitLeftCount;
 		bitLeftCount += byteCount<<3;
+		assert_(bitLeftCount >= int64(size), bitLeftCount, size);
 	}
-	template<uint r, size_t z=10> uint readExpGolomb() {
-		if(bitLeftCount <= z) refill();
+	template<uint r, size_t z=14> uint readExpGolomb() {
+		if(bitLeftCount <= int64(z)) refill(z);
 		// 'word' is kept left aligned, bitLeftCount should be larger than maximum exp golomb zero run length
-		uint b = __builtin_clzl(word) * 2 + 1 + r;
+		size_t size = __builtin_clzl(word);
+		assert_(size<z, size);
+		uint b = size * 2 + 1 + r;
 		return read(b) - (1<<r);
 	}
 };

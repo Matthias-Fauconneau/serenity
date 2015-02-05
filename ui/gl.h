@@ -3,30 +3,8 @@
 #include "vector.h"
 #include "map.h"
 
-extern "C" void glFlush(void);
-extern "C" void glDepthMask(uint8 enable);
 void glCullFace(bool enable);
 void glDepthTest(bool enable);
-void glPolygonOffsetFill(bool enable);
-void glBlendNone();
-void glBlendAlpha();
-void glBlendOneAlpha();
-void glBlendColor();
-void glBlendSubstract();
-
-struct GLUniform {
-    GLUniform(int program, int location) : program(program), location(location) {}
-    explicit operator bool() { return location>=0; }
-    void operator=(int);
-    void operator=(float);
-    void operator=(vec2);
-    void operator=(vec3);
-    void operator=(vec4);
-	void operator=(struct mat3x2);
-	void operator=(struct mat3);
-	void operator=(struct mat4);
-    int program, location;
-};
 
 struct GLShader {
     GLShader(){}
@@ -35,13 +13,26 @@ struct GLShader {
     void bind();
 	void bindFragments(ref<string> fragments);
 	uint attribLocation(string);
-	GLUniform operator[](string);
+	struct GLUniform operator[](string);
 
     handle<uint> id = 0;
     map<String, int> attribLocations;
     map<String, int> uniformLocations;
-	//array<String> sampler2D;
 	array<String> source;
+};
+
+struct GLUniform {
+	GLUniform(int program, int location) : program(program), location(location) {}
+	explicit operator bool() { return location>=0; }
+	void operator=(int);
+	void operator=(float);
+	void operator=(vec2);
+	void operator=(vec3);
+	void operator=(vec4);
+	void operator=(struct mat3x2);
+	void operator=(struct mat3);
+	void operator=(struct mat4);
+	int program, location;
 };
 
 struct GLBuffer {

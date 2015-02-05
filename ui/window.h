@@ -100,4 +100,6 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     void render();
     /// Event handler
     void event() override;
+	/// Adds a thread to the GL context (i.e makes GL context the thread's current context)
+	void glAddThread(Thread& thread);
 };

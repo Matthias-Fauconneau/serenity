@@ -1,48 +1,15 @@
 #include "gl.h"
 #include "matrix.h"
-#include "data.h" //FIXME -> et/shader.cc?
-#include "image.h" //FIXME -> et/shader.cc?
+#include "data.h"
+#include "image.h"
 
 #undef packed
 #define GL_GLEXT_PROTOTYPES
 #include <GL/gl.h> //GL
 
-/// Context
-void glCullFace(bool enable) {
-    if(enable) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
-}
-void glDepthTest(bool enable) {
-    if(enable) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
-}
-void glPolygonOffsetFill(bool enable) {
-    if(enable) { glPolygonOffset(-1,-2); glEnable(GL_POLYGON_OFFSET_FILL); } else glDisable(GL_POLYGON_OFFSET_FILL);
-}
-static int blend = 0;
-void glBlendNone() {
-    if(!blend) return;
-    glDisable(GL_BLEND);
-    blend=0;
-}
-void glBlendAlpha() {
-    if(!blend) glEnable(GL_BLEND);
-    if(blend!=1) { glBlendEquation(GL_FUNC_ADD); glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE); }
-    blend=1;
-}
-void glBlendOneAlpha() {
-    if(!blend) glEnable(GL_BLEND);
-    if(blend!=2) { glBlendEquation(GL_FUNC_ADD); glBlendFuncSeparate(GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE); }
-    blend=2;
-}
-void glBlendColor() {
-    if(!blend) glEnable(GL_BLEND);
-    if(blend!=3) { glBlendEquation(GL_FUNC_ADD); glBlendFuncSeparate(GL_ZERO, GL_SRC_COLOR, GL_ZERO, GL_ONE); }
-    blend=3;
-}
-void glBlendSubstract() {
-    if(!blend) glEnable(GL_BLEND);
-    if(blend!=4) { glBlendEquation(GL_FUNC_REVERSE_SUBTRACT); glBlendFuncSeparate(GL_SRC_COLOR, GL_ONE, GL_ZERO, GL_ONE); }
-    blend=4;
-}
+/// Rasterizer
+void glCullFace(bool enable) { if(enable) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE); }
+void glDepthTest(bool enable) { if(enable) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST); }
 
 /// Shader
 void GLUniform::operator=(int v) { assert(location>=0); glUseProgram(program); glUniform1i(location,v); }
@@ -53,16 +20,6 @@ void GLUniform::operator=(vec4 v) { assert(location>=0); glUseProgram(program); 
 void GLUniform::operator=(mat3x2 m) { assert(location>=0); glUseProgram(program); glUniformMatrix3x2fv(location,1,0,m.data); }
 void GLUniform::operator=(mat3 m) { assert(location>=0); glUseProgram(program); glUniformMatrix3fv(location,1,0,m.data); }
 void GLUniform::operator=(mat4 m) { assert(location>=0); glUseProgram(program); glUniformMatrix4fv(location,1,0,m.data); }
-
-GLUniform GLShader::operator[](string name) {
-	int location = uniformLocations.value(name, -1);
-    if(location<0) {
-		location = glGetUniformLocation(id, strz(name));
-		if(location<0) /*return GLUniform(id, location); //*/error("Unknown uniform"_,name);
-		uniformLocations.insert(copyRef(name), location);
-    }
-	return GLUniform(id, location);
-}
 
 GLShader::GLShader(string source, ref<string> stages) {
     id = glCreateProgram();
@@ -92,10 +49,8 @@ GLShader::GLShader(string source, ref<string> stages) {
                             else if(s.match('}')) nest--;
                             else s.advance(1);
                         }
-                        //if(!s.match('\n')) error("Expecting newline after scope");
                     }
                     continue;
-                    //start = s.index;
                 }
                 bool function = false;
 				static array<string> types = split("void float vec2 vec3 vec4"_," ");
@@ -109,11 +64,6 @@ GLShader::GLShader(string source, ref<string> stages) {
                         else s.advance(1);
                     }
                 }
-				/*if(identifier=="uniform"_ && s.match("sampler"_)) {
-					if(!s.match("2D") && !s.match("Buffer")) error("Unknown sampler type", s.line());
-					s.whileAny(" \t"_);
-					sampler2D.append( copyRef(s.identifier("_"_)) );
-				}*/
                 while(s && !s.match('\n')) {
                     if(s.match('{')) nest++;
                     else if(s.match('}')) { nest--;
@@ -155,7 +105,6 @@ GLShader::GLShader(string source, ref<string> stages) {
     }
 }
 void GLShader::bind() { glUseProgram(id); }
-//void GLShader::bindFragments(const ref<string> &fragments) { for(uint i: range(fragments.size)) glBindFragDataLocation(id, i, fragments[i]); }
 uint GLShader::attribLocation(string name) {
 	int location = attribLocations.value(name, -1);
     if(location<0) {
@@ -164,6 +113,15 @@ uint GLShader::attribLocation(string name) {
     }
 	if(location<0) error("Unknown attribute '"_+str(name)+"'"_);
     return (uint)location;
+}
+GLUniform GLShader::operator[](string name) {
+	int location = uniformLocations.value(name, -1);
+	if(location<0) {
+		location = glGetUniformLocation(id, strz(name));
+		if(location<0) error("Unknown uniform"_,name);
+		uniformLocations.insert(copyRef(name), location);
+	}
+	return GLUniform(id, location);
 }
 
 /// Buffer

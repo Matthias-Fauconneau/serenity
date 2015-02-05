@@ -84,6 +84,7 @@ static_assert(sizeof(uint64)==8,"");
 typedef __INTPTR_TYPE__  intptr_t;
 typedef __SIZE_TYPE__ 	size_t;
 constexpr size_t invalid = -1; // Invalid index
+#define null nullptr
 
 // -- Number arithmetic
 template<Type A, Type B> bool operator >(const A& a, const B& b) { return b<a; }
