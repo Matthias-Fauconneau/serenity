@@ -177,6 +177,12 @@ GLBuffer::GLBuffer(uint elementSize, ref<byte> data) : elementSize(elementSize),
 }
 GLBuffer::~GLBuffer() { if(id) glDeleteBuffers(1, &id); }
 
+void* GLBuffer::rawMap() {
+	glBindBuffer(GL_ARRAY_BUFFER, id);
+	return glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+}
+void GLBuffer::unmap() { /*Assumes bound*/ glUnmapBuffer(GL_ARRAY_BUFFER); }
+
 /// Vertex array
 
 GLVertexArray::GLVertexArray() {	glGenVertexArrays(1, &id); }
@@ -197,14 +203,15 @@ void GLVertexArray::draw(PrimitiveType primitiveType, uint vertexCount) const {
 }
 
 #include "time.h"
-void GLIndexBuffer::draw(int base /*instanceCount*/) {
+void GLIndexBuffer::draw(/*int base*/) {
 	glEnable(GL_PRIMITIVE_RESTART_FIXED_INDEX);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
 	GLenum type = 0;
 	if(elementSize==2) type = GL_UNSIGNED_SHORT;
 	if(elementSize==4) type = GL_UNSIGNED_INT;
 	assert_(type);
-	glDrawElementsBaseVertex(primitiveType, elementCount, type, 0, base);
+	//assert_(base == 0);
+	glDrawElements(primitiveType, elementCount, type, 0);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 

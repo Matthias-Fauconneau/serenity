@@ -41,6 +41,7 @@ struct BitReader {
 		word = __builtin_bswap64(*(uint64*)pointer);
 		pointer += 8;
 	}
+	~BitReader() { assert(pointer+14>=end, end-pointer); }
 	uint read(uint size) {
 		if(bitLeftCount < size/*~12*/) refill(); // conservative. TODO: fit to largest code to refill less often
 		uint x = word >> (64-size);

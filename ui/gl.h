@@ -54,7 +54,12 @@ struct GLBuffer {
 	template<Type T> explicit GLBuffer(ref<T> data) : GLBuffer(sizeof(T), cast<byte>(data)) {}
 	default_move(GLBuffer);
 	~GLBuffer();
-	void bind() const;
+
+	explicit operator bool() { return id; }
+	void unmap();
+	generic struct Map : mref<T> { GLBuffer& o; Map(mref<T> b, GLBuffer& o) : mref<T>(b), o(o){} ~Map() { o.unmap(); } };
+	void* rawMap();
+	generic Map<T> map() { assert_(sizeof(T)==elementSize); return {mref<T>((T*)rawMap(), elementCount), *this}; }
 };
 
 enum PrimitiveType { Point, Lines, LineLoop, LineStrip, Triangles, TriangleStrip };
@@ -75,8 +80,7 @@ struct GLIndexBuffer : GLBuffer {
 	GLIndexBuffer() {}
 	template<Type T> GLIndexBuffer(ref<T> data) : GLBuffer(sizeof(T), cast<byte>(data)) {}
 	PrimitiveType primitiveType = TriangleStrip;
-	void draw(int base);
-	//void draw(int instanceCount=1);
+	void draw(/*int base = 0*/);
 };
 
 enum Format { RGB8=0, R16I=1, Depth=2/*U32*/, RGBA8=3, R32F=4,

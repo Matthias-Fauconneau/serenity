@@ -56,7 +56,7 @@ struct Encoder {
 		flushRLE();
 		bitIO.flush();
 		buffer.size = (byte*)bitIO.pointer - buffer.data;
-		buffer.size += 16; // Pads to avoid segfault with "optimized" BitReader (whose last refill may stride end) // FIXME: 7 bytes should be enough
+		buffer.size += 14; // Pads to avoid segfault with "optimized" BitReader (whose last refill may stride end) // FIXME: 7 bytes should be enough
 		assert_(buffer.size <= buffer.capacity);
 		//log(int(round(buffer.size/(1024.*1024))),"MB", encode, int(round((buffer.size/(1024.*1024))/encode.toReal())),"MB/s"); // 200 MB/s
 		return move(buffer);
@@ -95,7 +95,7 @@ struct Tile {
 	Tile() {
 		string name = 0 ? "dem15"_ : "globe30";
 		//Map map(name+".eg2rle6"_);
-		buffer<byte> map = readFile(name+".eg2rle6"_)+ref<byte>{0,0,0,0,0,0,0,0}; // FIXME
+		buffer<byte> map = readFile(name+".eg2rle6"_)+ref<byte>{0,0,0,0,0,0,0}; // FIXME
 		FLIC source(map);
 		int n = 0; while(source.size.y%(1<<n)==0) n++; n--; // Maximum mipmap level count
 		int N = 1<<n, tileSize = source.size.y/N;
@@ -148,8 +148,8 @@ struct Mipmap {
 					::buffer<int16> target (tileSize*tileSize); // In place (in source) would be less clear and prevent (TODO) parallelization
 					for(size_t y: range(tileSize)) for(size_t x: range(tileSize)) {
 						target[y*tileSize+x] =
-								(  buffer[(y*2+0)*tileSize*2+(x*2+0)] + buffer[(y*2+0)*tileSize*2+(x*2+1)]
-								+ buffer[(y*2+1)*tileSize*2+(x*2+0)] + buffer[(y*2+1)*tileSize*2+(x*2+1)] ) / 4;
+								(  int(buffer[(y*2+0)*tileSize*2+(x*2+0)]) + int(buffer[(y*2+0)*tileSize*2+(x*2+1)])
+								+ int(buffer[(y*2+1)*tileSize*2+(x*2+0)]) + int(buffer[(y*2+1)*tileSize*2+(x*2+1)]) ) / 4;
 					}
 					encoder.write(target);
 					writeFile(str(tX, 2u)+","+str(tY, 2u), encoder.end(),

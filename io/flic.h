@@ -15,6 +15,7 @@ struct FLIC : ref<byte> {
 		size.x = bitIO.read(32);
 		size.y = bitIO.read(32);
 	}
+	~FLIC() { assert_(valueCount == (size_t)size.y*size.x); }
 	uint rleIndex = 1<<RLE;
 	void read(mref<int16> buffer) {
 		valueCount += buffer.size;
