@@ -77,12 +77,15 @@ struct Terrain : Poll {
 	Lock queueLock;
 	array<Tile*> loadQueue; // LIFO
 
+	function<void()> contentChanged;
+
 	/// Returns tile (instances if missing)
 	Tile& tile(int level, int2 index) {
 		assert_(level <= 5);
 		index.x = index.x%(2*(1<<level)); // Wraps longitude
 		assert_(0 <= index.x && index.x < 2*(1<<level));
 		assert_(0 <= index.y && index.y < 1*(1<<level), index.y);
+		Locker tilesLock(this->lock); // Keeps decoder from reallocating 'tiles' while within for(tiles) loop
 		for(Tile& tile: tiles) if(tile.level == level && tile.index==index) return tile;
 		return tiles.append(unique<Tile>(level, index));
 	}
@@ -100,7 +103,7 @@ struct Terrain : Poll {
 	void load(Tile& tile) {
 		if(tile.loaded) return;
 		if(!tile.firstRowColumn) tile.decode();
-		//log("Load", tile.level, tile.index);
+		log("Load", tile.level, tile.index);
 
 		// Completes last row/column with first row/column of next neighbours
 		auto elevation = tile.elevation.map<float>();
@@ -141,7 +144,7 @@ struct Terrain : Poll {
 		tile.loaded = true;
 	}
 
-	Terrain(Thread& thread) : Poll(0,0,thread) {
+	Terrain(Thread& thread, function<void()> contentChanged) : Poll(0,0,thread), contentChanged(contentChanged) {
 		for(uint Y: range(1)) for(uint X: range(2)) load(tile(0, int2(X, Y))); // Loads mipmap level 0 (2x1 tiles)
 		registerPoll(); // Keeps thread from bailing out
 	}
@@ -149,69 +152,76 @@ struct Terrain : Poll {
 		if(!loadQueue) return;
 		load(*({Locker lock(queueLock); loadQueue.pop(); }));
 		if(loadQueue) Poll::queue();
+		contentChanged();
 	}
 
-	void draw(const mat4 viewProjection, vec2 size) {
-		shader.bind();
-		Locker lock(this->lock);
-		for(size_t tileIndex: range(tiles.size)) { // Not for(tiles) as 'tiles' might be reallocated on queue
-			Tile& tile = tiles[tileIndex];
-			if(!tile.indexBuffer) continue; // Unloaded or void tile
-			if(tile.level<5) { // Skips parent tile when all children are loaded
-				bool allLoaded = true;
-				for(int Y: range(2)) for(int X: range(2)) allLoaded &= this->tile(tile.level+1, tile.index*2+int2(X,Y)).loaded;
-				if(allLoaded) continue; // TODO: remove
-				// TODO: Reload parent and remove children when possible
-			}
+	void render(const mat4 viewProjection, vec2 size, int level, int2 index, array<Tile*>& loadQueue) {
+		Tile& tile = this->tile(level, index);
+		assert_(tile.loaded);
+		if(!tile.indexBuffer) return; // Void tile
 
-			float sphericalSize = float(PI/(1<<tile.level));
-			float sphericalResolution = sphericalSize/tile.size.x;
-			vec2 sphericalOrigin = float(PI/(1<<tile.level))*vec2(tile.index);
-			if(1) { // Estimates maximum projected cell size to increase resolution as needed
-				vec3 O = normalize(viewProjection[3].xyz()); // Projects view origin (last column: VP·(0,0,0,1)) on the sphere
-				vec2 s = vec2(atan(O.y, O.x), acos(O.z)); // Spherical coordinates
-				s = clamp(sphericalOrigin, s, sphericalOrigin+vec2(sphericalSize)); // Clamps to tile
-				auto sphere = [](vec2 angles) { return vec3(sin(angles.y)*cos(angles.x), sin(angles.y)*sin(angles.x), cos(angles.y)); };
-				vec3 S = sphere(s); // Closest tile point (cartesian 'world' system)
-				vec3 V = viewProjection * S; // Perspective projects to view space
-				if(V.x < -1 || V.x > 1 || V.y < -1 || V.y > 1) continue; // View frustum cull
-				// Projects cell size around closest tile point
-				vec2 vx = (viewProjection * sphere(s+vec2(sphericalResolution/2, 0)) - viewProjection * sphere(s-vec2(sphericalResolution/2, 0))).xy();
-				float dx = length(size*vx);
-				vec2 vy = (viewProjection * sphere(s+vec2(0, sphericalResolution/2)) - viewProjection * sphere(s-vec2(0, sphericalResolution/2))).xy();
-				float dy = length(size*vy);
-				float d = max(dx, dy);
-				if(d > 4 && tile.level<5) {
-					for(int Y: range(2)) for(int X: range(2)) { // Queues children tiles for loading
-						Tile& child = this->tile(tile.level+1, tile.index*2+int2(X,Y));
-						if(!child.loaded) {
-							Locker lock(queueLock);
-							size_t index = loadQueue.size;
-							// Sorts by level, coarsest to finest resolution
-							while(index > 0 && loadQueue[index-1]->level > child.level) index--;
-							// Queues once
-							for(size_t i = index; i > 0 && loadQueue[i-1]->level == child.level; i--) {
-								if(loadQueue[i-1]->index == child.index) { index=invalid; break; }
-							}
-							if(index!=invalid) {
-								loadQueue.insertAt(index, &child);
-								Poll::queue();
-							}
-						}
-					}
+		log(1<<tile.level);
+		float sphericalSize = float(PI/(1<<tile.level));
+		float sphericalResolution = sphericalSize/tile.size.x;
+		vec2 sphericalOrigin = float(PI/(1<<tile.level))*vec2(tile.index);
+
+		// Evaluates closest tile point
+		vec3 O = normalize(viewProjection.inverse()[3].xyz()); // Projects view origin (last column: VP⁻¹·(0,0,0,1)) on the sphere
+		vec2 s = vec2(atan(O.y, O.x), acos(O.z)); // Spherical coordinates
+		if(s.x < 0) s.x+=2*PI; // [-π,π] -> [0, 2π]
+		s = clamp(sphericalOrigin, s, sphericalOrigin+vec2(sphericalSize)); // Clamps to tile
+		auto sphere = [](vec2 spherical) { return vec3(sin(spherical.y)*cos(spherical.x), sin(spherical.y)*sin(spherical.x), cos(spherical.y)); };
+		vec3 S = sphere(s); // Closest tile point (cartesian 'world' system)
+		vec3 V = viewProjection * S; // Perspective projects to view space
+		if(sq(V.xy()) >= 2) return; // View cone cull (frustum cull is not conservative as it may intersect tile without containing closest tile point)
+
+		// Projects cell size around closest tile point to increase resolution as needed
+		vec2 vx = (viewProjection * sphere(s+vec2(sphericalResolution/2, 0)) - viewProjection * sphere(s-vec2(sphericalResolution/2, 0))).xy();
+		float dx = length(size*vx);
+		vec2 vy = (viewProjection * sphere(s+vec2(0, sphericalResolution/2)) - viewProjection * sphere(s-vec2(0, sphericalResolution/2))).xy();
+		float dy = length(size*vy);
+		float d = max(dx, dy);
+		if(d > 4 && tile.level<5) { // Requires finer resolution
+			bool allLoaded = true;
+			for(int Y: range(2)) for(int X: range(2)) { // Queues children tiles for loading
+				Tile& child = this->tile(tile.level+1, tile.index*2+int2(X,Y));
+				if(child.loaded) continue;
+				allLoaded = false;
+				//Locker lock (queueLock);
+				size_t index = loadQueue.size;
+				// Sorts by level, coarsest resolution last to finest first (LIFO pops from tail)
+				/*while(index > 0 && loadQueue[index-1]->level < child.level) index--;
+				// Queues once
+				for(size_t i = index; i > 0 && loadQueue[i-1]->level == child.level; i--) {
+					if(loadQueue[i-1]->index == child.index) { index=invalid; break; }
+				}*/
+				if(index!=invalid) {
+					loadQueue.insertAt(index, &child);
+					Poll::queue();
 				}
 			}
-			shader["W"_] = tile.size.x+1;
-			shader["sphericalResolution"_] = sphericalResolution;
-			shader["sphericalOrigin"_] = sphericalOrigin;
-			static constexpr float R = 4E7/(2*PI); // 4·10⁷/2π  ~ 6.37
-			shader["R"_] = R;
-			shader["tElevation"_] = 0;
-			tile.textureBuffer.bind(0);
-			shader["modelViewProjectionTransform"_] = mat4(viewProjection);
-			tile.vertexArray.bind();
-			tile.indexBuffer.draw();
+			if(allLoaded) {
+				for(int Y: range(2)) for(int X: range(2)) render(viewProjection, size, tile.level+1, tile.index*2+int2(X,Y), loadQueue);
+				return; // Skips parent tile
+			}
 		}
+		shader["W"_] = tile.size.x+1;
+		shader["sphericalResolution"_] = sphericalResolution;
+		shader["sphericalOrigin"_] = sphericalOrigin;
+		static constexpr float R = 4E7/(2*PI); // 4·10⁷/2π  ~ 6.37
+		shader["R"_] = R;
+		shader["tElevation"_] = 0;
+		tile.textureBuffer.bind(0);
+		shader["modelViewProjectionTransform"_] = mat4(viewProjection);
+		tile.vertexArray.bind();
+		tile.indexBuffer.draw();
+	}
+
+	void render(const mat4 viewProjection, vec2 size) {
+		shader.bind();
+		array<Tile*> loadQueue;
+		for(uint Y: range(1)) for(uint X: range(2)) render(viewProjection, size, 0, int2(X, Y), loadQueue);
+		{Locker lock (queueLock); this->loadQueue=move(loadQueue);}
 	}
 };
 
@@ -220,7 +230,7 @@ struct View : Widget {
 	Window window {this, int2(0, 1024), []{ return "Editor"__; }};
 	Thread thread;
 	Job initializeThreadGLContext {thread, [this]{ window.initializeThreadGLContext(); }};
-	Terrain terrain {thread};
+	Terrain terrain {thread, {&window, &Window::render}};
 
 	// View
 	vec2 lastPos; // Last cursor position to compute relative mouse movements
@@ -246,14 +256,14 @@ struct View : Widget {
 		thread.spawn(); // Spawns tile loading (decode and upload) thread
 	}
 	shared<Graphics> graphics(vec2 unused size) override {
-		mat4 projection = mat4().perspective(sqrt(2.)*sqrt(2.)*asin(1/(1+altitude)), size, altitude-1./512 /*maximum elevation*/, altitude+1);
+		mat4 projection = mat4().perspective(PI/3, size, altitude-1./512 /*maximum elevation*/, altitude+1);
 		mat4 view = mat4()
 				.translate(vec3(0,0,-altitude-1)) // Altitude
 				.rotateX(rotation.y) // Latitude
 				.rotateZ(rotation.x) // Longitude
 				;
 		mat4 viewProjection = projection*view;
-		terrain.draw(viewProjection, size);
+		terrain.render(viewProjection, size);
 		window.setTitle(str(terrain.loadQueue.size));
 		return nullptr;
 	}
