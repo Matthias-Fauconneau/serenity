@@ -68,7 +68,7 @@ struct Terrain : Poll {
 			}
 			size = source.size;
 			this->elevation = GLBuffer(elevation);
-			log(level, index, size, zRange.min, zRange.max);
+			log("Decode", level, index);
 		}
 	};
 	array<unique<Tile>> tiles;
@@ -77,17 +77,15 @@ struct Terrain : Poll {
 	Lock queueLock;
 	array<Tile*> loadQueue; // LIFO
 
-	Tile* findTile(int level, int2 index) {
+	/// Returns tile (instances if missing)
+	Tile& tile(int level, int2 index) {
 		assert_(level <= 5);
 		index.x = index.x%(2*(1<<level)); // Wraps longitude
 		assert_(0 <= index.x && index.x < 2*(1<<level));
 		assert_(0 <= index.y && index.y < 1*(1<<level), index.y);
-		for(Tile& tile: tiles) if(tile.level == level && tile.index==index) return &tile;
-		return null;
+		for(Tile& tile: tiles) if(tile.level == level && tile.index==index) return tile;
+		return tiles.append(unique<Tile>(level, index));
 	}
-
-	/// Returns tile (instances if missing)
-	Tile& tile(int level, int2 index) { return *(findTile(level, index) ?: tiles.append(unique<Tile>(level, index)).pointer); }
 
 	/// Returns first row/column data to stitch tiles together (decodes if missing)
 	ref<float> firstRowColumn(int level, int2 index) {
@@ -102,35 +100,37 @@ struct Terrain : Poll {
 	void load(Tile& tile) {
 		if(tile.loaded) return;
 		if(!tile.firstRowColumn) tile.decode();
-		// Completes last row/column with first row/column of next neighbours
-		auto elevation = tile.elevation.map<float>();
-
-		if(tile.index.y+1 < (1<<tile.level)) {
-			ref<float> nextY = firstRowColumn(tile.level, int2(tile.index.x, tile.index.y+1));
-			for(size_t x: range(tile.size.x)) elevation[(size_t)tile.size.y*(tile.size.x+1)+x] = nextY[x];
-		} else {
-			log(tile.index.x, tile.index.y, tile.level, tile.index, tile.size);
-			for(size_t x: range(tile.size.x)) elevation[(size_t)tile.size.y*(tile.size.x+1)+x] = 0; // Pole
-		}
-
-		ref<float> nextX = firstRowColumn(tile.level, int2(tile.index.x+1, tile.index.y+0));
-		for(size_t y: range(tile.size.y)) elevation[y*(tile.size.x+1)+tile.size.x] = nextX[tile.size.x+y];
-
-		if(tile.index.y+1 < (1<<tile.level)) {
-			ref<float> nextXY = firstRowColumn(tile.level, int2(tile.index.x+1, tile.index.y+1));
-			elevation[tile.size.y*(tile.size.x+1)+tile.size.x] = nextXY[0];
-		} else {
-			elevation[tile.size.y*(tile.size.x+1)+tile.size.x] = 0; // Pole
-		}
-
+		log("Load", tile.level, tile.index);
 		struct TriangleStrip triangleStrip (tile.size.x*tile.size.y*6);
-		for(int y: range(tile.size.y)) for(int x: range(tile.size.x)) { // TODO: Z-order triangle strips for framebuffer locality ?
-			int v00 = (y+0)*(tile.size.x+1)+(x+0), v10 = (y+0)*(tile.size.x+1)+(x+1);
-			int v01 = (y+1)*(tile.size.x+1)+(x+0), v11 = (y+1)*(tile.size.x+1)+(x+1);
-			const int invalid = tile.zRange.min;
-			if(elevation[v00]!=invalid && elevation[v11]!=invalid) {
-				if(elevation[v00]!=invalid) triangleStrip(v10, v00, v11);
-				if(elevation[v01]!=invalid) triangleStrip(v11, v00, v01);
+		{Locker lock(glLock);
+			// Completes last row/column with first row/column of next neighbours
+			auto elevation = tile.elevation.map<float>();
+
+			if(tile.index.y+1 < (1<<tile.level)) {
+				ref<float> nextY = firstRowColumn(tile.level, int2(tile.index.x, tile.index.y+1));
+				for(size_t x: range(tile.size.x)) elevation[(size_t)tile.size.y*(tile.size.x+1)+x] = nextY[x];
+			} else {
+				for(size_t x: range(tile.size.x)) elevation[(size_t)tile.size.y*(tile.size.x+1)+x] = 0; // Pole
+			}
+
+			ref<float> nextX = firstRowColumn(tile.level, int2(tile.index.x+1, tile.index.y+0));
+			for(size_t y: range(tile.size.y)) elevation[y*(tile.size.x+1)+tile.size.x] = nextX[tile.size.x+y];
+
+			if(tile.index.y+1 < (1<<tile.level)) {
+				ref<float> nextXY = firstRowColumn(tile.level, int2(tile.index.x+1, tile.index.y+1));
+				elevation[tile.size.y*(tile.size.x+1)+tile.size.x] = nextXY[0];
+			} else {
+				elevation[tile.size.y*(tile.size.x+1)+tile.size.x] = 0; // Pole
+			}
+
+			for(int y: range(tile.size.y)) for(int x: range(tile.size.x)) { // TODO: Z-order triangle strips for framebuffer locality ?
+				int v00 = (y+0)*(tile.size.x+1)+(x+0), v10 = (y+0)*(tile.size.x+1)+(x+1);
+				int v01 = (y+1)*(tile.size.x+1)+(x+0), v11 = (y+1)*(tile.size.x+1)+(x+1);
+				const int invalid = tile.zRange.min;
+				if(elevation[v00]!=invalid && elevation[v11]!=invalid) {
+					if(elevation[v00]!=invalid) triangleStrip(v10, v00, v11);
+					if(elevation[v01]!=invalid) triangleStrip(v11, v00, v01);
+				}
 			}
 		}
 		if(triangleStrip) { // Not a void tile
@@ -139,10 +139,12 @@ struct Terrain : Poll {
 			tile.vertexArray = GLVertexArray();
 			tile.vertexArray.bindAttribute(shader.attribLocation("aElevation"_), 1, Float, tile.elevation);
 		}
+		tile.loaded = true;
 	}
 
 	Terrain(Thread& thread) : Poll(0,0,thread) {
 		for(uint Y: range(1)) for(uint X: range(2)) load(tile(0, int2(X, Y))); // Loads mipmap level 0 (2x1 tiles)
+		registerPoll(); // Keeps thread from bailing out
 	}
 	void event() override {
 		if(!loadQueue) return;
@@ -158,10 +160,7 @@ struct Terrain : Poll {
 			if(!tile.indexBuffer) continue; // Unloaded or void tile
 			if(tile.level<5) { // Skips parent tile when all children are loaded
 				bool allLoaded = true;
-				for(int Y: range(2)) for(int X: range(2)) {
-					Tile* child = findTile(tile.level+1, tile.index*2+int2(X,Y));
-					allLoaded &= child && child->loaded;
-				}
+				for(int Y: range(2)) for(int X: range(2)) allLoaded &= this->tile(tile.level+1, tile.index*2+int2(X,Y)).loaded;
 				if(allLoaded) continue; // TODO: remove
 				// TODO: Reload parent and remove children when possible
 			}
@@ -178,10 +177,9 @@ struct Terrain : Poll {
 				float d = max(dx, dy);
 				if(d > 4 && tile.level<5) {
 					for(int Y: range(2)) for(int X: range(2)) { // Queues children tiles for loading
-						Tile& tile = this->tile(tile.level+1, tile.index*2+int2(X,Y));
-						if(!tile.loaded) { Locker lock(queueLock); loadQueue.append(&tile); Poll::queue(); }
+						Tile& child = this->tile(tile.level+1, tile.index*2+int2(X,Y));
+						if(!child.loaded) { Locker lock(queueLock); loadQueue.add(&child); Poll::queue(); }
 					}
-					continue;
 				}
 			}
 			shader["W"_] = tile.size.x+1;
@@ -192,7 +190,7 @@ struct Terrain : Poll {
 			shader["R"_] = R;
 			shader["tElevation"_] = 0;
 			tile.textureBuffer.bind(0);
-			shader["modelViewProjectionTransform"_] = mat4(viewProjection); //.scale(vec3(vec2(dx*D),1)); //.translate(vec3(vec2(N/D*tile.tileIndex),0));
+			shader["modelViewProjectionTransform"_] = mat4(viewProjection);
 			tile.vertexArray.bind();
 			tile.indexBuffer.draw();
 		}
@@ -203,6 +201,7 @@ struct Terrain : Poll {
 struct View : Widget {
 	Window window {this, 1024, []{ return "Editor"__; }};
 	Thread thread;
+	Job initializeThreadGLContext {thread, [this]{ window.initializeThreadGLContext(); }};
 	Terrain terrain {thread};
 
 	// View
@@ -226,8 +225,7 @@ struct View : Widget {
 	View() {
 		glDepthTest(true);
 		glCullFace(true);
-		//window.glAddThread(thread);
-		//thread.spawn(); // Spawns tile loading (decode and upload) thread
+		thread.spawn(); // Spawns tile loading (decode and upload) thread
 	}
 	shared<Graphics> graphics(vec2 unused size) override {
 		mat4 projection = mat4().perspective(sqrt(2.)*asin(1/(1+altitude)), size, altitude-1./512 /*maximum elevation*/, altitude+1);

@@ -7,6 +7,8 @@
 #define GL_GLEXT_PROTOTYPES
 #include <GL/gl.h> //GL
 
+Lock glLock;
+
 /// Rasterizer
 void glCullFace(bool enable) { if(enable) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE); }
 void glDepthTest(bool enable) { if(enable) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST); }
@@ -137,9 +139,9 @@ GLBuffer::~GLBuffer() { if(id) glDeleteBuffers(1, &id); }
 
 void* GLBuffer::rawMap() {
 	glBindBuffer(GL_ARRAY_BUFFER, id);
-	return glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+	return glMapBuffer(GL_ARRAY_BUFFER, GL_READ_WRITE);
 }
-void GLBuffer::unmap() { /*Assumes bound*/ glUnmapBuffer(GL_ARRAY_BUFFER); }
+void GLBuffer::unmap() { glBindBuffer(GL_ARRAY_BUFFER, id); glUnmapBuffer(GL_ARRAY_BUFFER); }
 
 /// Vertex array
 

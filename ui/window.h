@@ -40,6 +40,7 @@ struct Window : Display /*should reference but inherits for convenience*/ {
 	int2 surfaceSize = 0;
 #else // GLX/Xlib/DRI2
 	/// OpenGL
+	struct __GLXFBConfigRec* fbConfig = 0;
 	struct _XDisplay* glDisplay = 0;
 	struct __GLXcontextRec* glContext = 0;
 #endif
@@ -100,6 +101,8 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     void render();
     /// Event handler
     void event() override;
-	/// Adds a thread to the GL context (i.e makes GL context the thread's current context)
-	void glAddThread(Thread& thread);
+
+// DRI
+	/// Makes a new shared GL context current
+	void initializeThreadGLContext();
 };

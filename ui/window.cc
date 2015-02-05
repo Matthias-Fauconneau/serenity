@@ -85,11 +85,8 @@ Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool sho
 	glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_,":0"_))); assert_(glDisplay);
 	const int fbAttribs[] = {GLX_DOUBLEBUFFER, 1, GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 24,
 							 GLX_SAMPLE_BUFFERS, 1, GLX_SAMPLES, 8, 0};
-	int fbCount=0; GLXFBConfig* fbConfigs = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount); assert(fbConfigs && fbCount);
-	const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION_ARB, 3, GLX_CONTEXT_MINOR_VERSION_ARB, 3, 0};
-	glContext = ((PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB"))
-			(glDisplay, fbConfigs[0], 0, 1, contextAttribs);
-	glXMakeCurrent(glDisplay, id+XWindow, glContext);
+	int fbCount=0; fbConfig = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount)[0]; assert(fbConfig && fbCount);
+	initializeThreadGLContext();
 #endif
 }
 
@@ -237,14 +234,13 @@ void Window::event() {
 	lock.lock();
 	Update update = updates.take(0);
 	lock.unlock();
-	// Widget::graphics may renders using GL immediately and/or return primitives
-	GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(backgroundColor,1));
-	if(!update.graphics) update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size)));
+	{Locker lock(glLock); // FIXME
+		// Widget::graphics may renders using GL immediately and/or return primitives
+		GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(backgroundColor,1));
+		if(!update.graphics) update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size)));
+	}
 #if DRI3
 	assert_(gbm_surface_has_free_buffers(gbmSurface));
-#endif
-	glFinish();
-#if DRI3
 	assert_( eglSwapBuffers(eglDevice, eglSurface) );
 	bo = gbm_surface_lock_front_buffer(gbmSurface);
 	DMABuf* dmabuf = (DMABuf*)gbm_bo_get_user_data(bo);
@@ -266,9 +262,16 @@ void Window::event() {
 		for(int y: range(target.size.y/2)) for(int x: range(target.size.x)) swap(target(x, y), target(x, target.size.y-1-y));
 		GLFrameBuffer::blitWindow(target);
 	}
-	glXSwapBuffers(glDisplay, id);
+	{Locker lock(glLock);
+		glXSwapBuffers(glDisplay, id);
+	}
 #endif
 	//assert_(updates.size<=1);
 }
 
-void Window::glAddThread(Thread& thread) { new Job(thread, [this]{ glXMakeCurrent(glDisplay, id+XWindow, glContext); }, true /*Frees heap*/); }
+void Window::initializeThreadGLContext() {
+	const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION_ARB, 3, GLX_CONTEXT_MINOR_VERSION_ARB, 3, 0};
+	glContext = ((PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB"))
+			(glDisplay, fbConfig, glContext, 1, contextAttribs);
+	glXMakeCurrent(glDisplay, id+XWindow, glContext);
+}

@@ -148,11 +148,8 @@ int32 gettid();
 
 struct Job : Poll {
 	function<void()> job;
-	bool releaseHeapAllocation;
-	Job(Thread& thread, function<void()> job, bool releaseHeapAllocation=false)
-		: Poll(0,0,thread), job(job), releaseHeapAllocation(releaseHeapAllocation) { queue(); }
-	virtual ~Job() {}
-	void event() override { job(); if(releaseHeapAllocation) delete this; }
+	Job(Thread& thread, function<void()> job) : Poll(0,0,thread), job(job) { queue(); }
+	void event() override { job(); }
 };
 
 /// Flags all threads to terminate as soon as they return to event loop, destroys all global objects and exits process.
