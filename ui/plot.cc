@@ -81,7 +81,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
     // Evaluates colors
     buffer<vec3> colors(dataSets.size());
     if(colors.size==1) colors[0] = black;
-	else for(uint i: range(colors.size)) colors[i] = clip(bgr3f(0), LChuvtoBGR(53,179, 2*PI*i/colors.size), bgr3f(1));
+	else for(uint i: range(colors.size)) colors[i] = clamp(bgr3f(0), LChuvtoBGR(53,179, 2*PI*i/colors.size), bgr3f(1));
 
     // Draws plot
 	int2 pen = 0;

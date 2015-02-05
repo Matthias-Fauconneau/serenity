@@ -15,7 +15,7 @@ float Layout::stop(vec2 size, int axis, float currentPosition, int direction) {
     array<Rect> widgets = layout(size);
     for(int i: range(widgets.size)) {
         if((i==0 || widgets[i].min[axis] <= currentPosition) && currentPosition < widgets[i].max[axis]) {
-            return widgets[clip(0, i+direction, int(widgets.size-1))].min[axis];
+			return widgets[clamp(0, i+direction, int(widgets.size-1))].min[axis];
         }
     }
     error(currentPosition);

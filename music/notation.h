@@ -230,7 +230,7 @@ inline String str(const Sign& o) {
 		if(o.type==Sign::Clef) s = str(o.clef);
 		else if(o.type==Sign::OctaveShift) s = copyRef(ref<string>{"8va"_,"8vb"_,"⸥"_}[int(o.octave)]);
 		else if(o.type==Sign::Note) s = str(o.note);
-		else if(o.type==Sign::Rest) s = copyRef(str("-;,"_[clip(0, int(o.rest.value)-Value::Whole, 1)]));
+		else if(o.type==Sign::Rest) s = copyRef(str("-;,"_[clamp(0, int(o.rest.value)-Value::Whole, 1)]));
 		else error(int(o.type));
 		assert_(o.staff <= 9);
 		return s + ref<string>{"₀","₁","₂","₃","₄","₅","₆","₇","₈","₉"}[o.staff];

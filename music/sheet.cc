@@ -206,7 +206,7 @@ void System::layoutNotes(uint staff) {
                 tip[i] = Y(stemUp?chord.last():chord.first())+(stemUp?-1:1)*stemLength;
             }
             float midTip = (tip[0]+tip[1])/2; //farTip = stemUp ? min(tip[0],tip[1]) : max(tip[0],tip[1]);
-            float delta[2] = {clip(-lineInterval, tip[0]-midTip, lineInterval), clip(-lineInterval, tip[1]-midTip, lineInterval)};
+			float delta[2] = {clamp(-lineInterval, tip[0]-midTip, lineInterval), clamp(-lineInterval, tip[1]-midTip, lineInterval)};
             Sign sign[2] = { stemUp?beam[0].last():beam[0].first(), stemUp?beam[1].last():beam[1].first()};
             for(uint i: range(2)) {
                 float opacity = allTied(beam[i]) ? 1./2 : 1;
@@ -646,7 +646,7 @@ void System::layoutNotes(uint staff) {
                                 tip[i] = Y(stemUp?chord.last():chord.first())+(stemUp?-1:1)*stemLength;
                             }
                             float midTip = (tip[0]+tip[1])/2; //farTip = stemUp ? min(tip[0],tip[1]) : max(tip[0],tip[1]);
-                            float delta[2] = {clip(-lineInterval, tip[0]-midTip, lineInterval), clip(-lineInterval, tip[1]-midTip, lineInterval)};
+							float delta[2] = {clamp(-lineInterval, tip[0]-midTip, lineInterval), clamp(-lineInterval, tip[1]-midTip, lineInterval)};
                             for(uint i: range(2)) tip[i] = midTip+delta[i];
                             for(size_t index: range(3 /*FIXME: parseInteger(tremolo.text())*/)) {
                                 float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1);

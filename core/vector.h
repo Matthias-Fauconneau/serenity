@@ -75,7 +75,7 @@ generic vec round(const vec& v){ vec r; for(uint i: range(N)) r[i]=round(v[i]); 
 generic vec ceil(const vec& v){ vec r; for(uint i: range(N)) r[i]=ceil(v[i]); return r;  }
 generic vec min(const vec& a, const vec& b){ vec r; for(uint i: range(N)) r[i]=min(a[i],b[i]); return r; }
 generic vec max(const vec& a, const vec& b){ vec r; for(uint i: range(N)) r[i]=max(a[i],b[i]); return r; }
-generic vec clip(const vec& min, const vec& x, const vec& max){vec r; for(uint i: range(N)) r[i]=clip(min[i],x[i],max[i]); return r;}
+generic vec clamp(const vec& min, const vec& x, const vec& max){vec r; for(uint i: range(N)) r[i]=clamp(min[i],x[i],max[i]); return r;}
 
 generic T min(const vec& v) { return min((ref<T>)v); }
 generic T sum(const vec& a) { T sum=0; for(uint i: range(N)) sum+=a[i]; return sum; }

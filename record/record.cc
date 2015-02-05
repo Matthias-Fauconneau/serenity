@@ -218,7 +218,7 @@ struct Record : Poll, Widget {
             graphics->graphics.insertMulti(vec2(offset.x + x, 0), availableText.graphics(int2(size.x-offset.x-(offset.x+x), offset.y)));
         }
         for(int channel : range(audio.channels)) { // VU meters (actually mono)
-            float y = size.y * (1 - smoothedMean / 0x1p28f); //clip(1.f, float(maximumAmplitude), 0x1p28f));
+	    float y = size.y * (1 - smoothedMean / 0x1p28f); //clamp(1.f, float(maximumAmplitude), 0x1p28f));
             graphics->fills.append(vec2(channel?offset.x+image.size.x:0, 0), vec2(offset.x, y), black);
             graphics->fills.append(vec2(channel?offset.x+image.size.x:0, y), vec2(offset.x, size.y-y), maximumAmplitude < ((1<<31)-1) ? green : red);
         }

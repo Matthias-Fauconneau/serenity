@@ -168,6 +168,7 @@ struct Terrain : Poll {
 			float angularResolution = angularSize/tile.size.x;
 			vec2 originAngles = float(PI/(1<<tile.level))*vec2(tile.index);
 			if(1) { // Estimates maximum cell size
+				// TODO: View frustum culling
 				vec2 centerAngles = originAngles+vec2(angularSize/2);
 				auto sphere = [](vec2 angles) { return vec3(sin(angles.y)*cos(angles.x), sin(angles.y)*sin(angles.x), cos(angles.y)); };
 				// Center cell side lengths
@@ -197,7 +198,6 @@ struct Terrain : Poll {
 				}
 			}
 			shader["W"_] = tile.size.x+1;
-			assert_(tile.size.x == tile.size.y, tile.size);
 			shader["angularResolution"_] = angularResolution;
 			shader["originAngles"_] = originAngles;
 			static constexpr float R = 4E7/(2*PI); // 4·10⁷/2π  ~ 6.37
@@ -227,7 +227,7 @@ struct View : Widget {
 		 vec2 delta = cursor-lastPos; lastPos=cursor;
 		 if(event==Motion && button==LeftButton) {
 			 rotation += delta / size / float(asin(1/(1+altitude)));
-			 rotation.y = clip<float>(-PI, rotation.y, 0);
+			 rotation.y = clamp<float>(-PI, rotation.y, 0);
 		 }
 		 else if(event==Press && button==WheelUp) altitude = max(1./256, altitude / pow(2, 1./8));
 		 else if(event==Press && button==WheelDown) altitude = min(1., altitude * pow(2, 1./8));

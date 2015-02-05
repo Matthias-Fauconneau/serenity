@@ -758,7 +758,7 @@ struct Mosaic {
 				iTarget[i] = byte4(sRGB_forward[int(round(0xFFF*min(1.f, target[i][0])))], sRGB_forward[int(round(0xFFF*min(1.f, target[i][1])))], sRGB_forward[int(round(0xFFF*min(1.f, target[i][2])))]);
 			}
 			if(clip) log("Clip", clip);
-			//assert(!clip);
+			assert(!clip);
 		});
 		page.blits.append(0, page.bounds.size(), move(iTarget));
 	}

@@ -16,7 +16,7 @@ struct OffsetPlot : Widget {
     OffsetPlot() {
       if(!existsFile("offsets.profile",config)) return;
       TextData s = readFile("offsets.profile",config);
-      for(uint i: range(keyCount)) { offsets[i] = clip(-1./2, s.decimal()/100, 1./2); s.skip(' '); variances[i] = sq(s.decimal()/100); s.skip('\n'); }
+	  for(uint i: range(keyCount)) { offsets[i] = clamp(-1./2, s.decimal()/100, 1./2); s.skip(' '); variances[i] = sq(s.decimal()/100); s.skip('\n'); }
     }
     ~OffsetPlot() {
 		array<char> s;

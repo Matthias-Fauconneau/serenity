@@ -340,5 +340,5 @@ AudioControl::operator long() {
 }
 void AudioControl::operator =(long v) {
     if(!id) { log("No associated control"); return; }
-    Value value{.id={.numid = id}, .values = {clip(min, v, max) /*L*/, clip(min, v, max)/*R*/}}; iowr<ELEM_WRITE>(value);
+	Value value{.id={.numid = id}, .values = {clamp(min, v, max) /*L*/, clamp(min, v, max)/*R*/}}; iowr<ELEM_WRITE>(value);
 }

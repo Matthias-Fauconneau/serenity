@@ -91,7 +91,7 @@ template<Type A, Type B> bool operator >(const A& a, const B& b) { return b<a; }
 template<Type A, Type B> bool operator >=(const A& a, const B& b) { return b<=a; }
 generic notrace T min(T a, T b) { return a<b ? a : b; }
 generic notrace T max(T a, T b) { return a<b ? b : a; }
-generic T clip(T min, T x, T max) { return x < min ? min : max < x ? max : x; }
+generic T clamp(T min, T x, T max) { return x < min ? min : max < x ? max : x; }
 generic T abs(T x) { return x>=0 ? x : -x; }
 inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
 
