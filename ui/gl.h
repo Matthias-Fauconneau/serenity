@@ -4,8 +4,6 @@
 #include "map.h"
 #include "thread.h"
 
-extern Lock glLock; // FIXME
-
 void glCullFace(bool enable);
 void glDepthTest(bool enable);
 

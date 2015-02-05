@@ -68,7 +68,7 @@ struct Terrain : Poll {
 			}
 			size = source.size;
 			this->elevation = GLBuffer(elevation);
-			log("Decode", level, index);
+			//log("Decode", level, index);
 		}
 	};
 	array<unique<Tile>> tiles;
@@ -101,36 +101,35 @@ struct Terrain : Poll {
 		if(tile.loaded) return;
 		if(!tile.firstRowColumn) tile.decode();
 		log("Load", tile.level, tile.index);
+
+		// Completes last row/column with first row/column of next neighbours
+		auto elevation = tile.elevation.map<float>();
+
+		if(tile.index.y+1 < (1<<tile.level)) {
+			ref<float> nextY = firstRowColumn(tile.level, int2(tile.index.x, tile.index.y+1));
+			for(size_t x: range(tile.size.x)) elevation[(size_t)tile.size.y*(tile.size.x+1)+x] = nextY[x];
+		} else {
+			for(size_t x: range(tile.size.x)) elevation[(size_t)tile.size.y*(tile.size.x+1)+x] = 0; // Pole
+		}
+
+		ref<float> nextX = firstRowColumn(tile.level, int2(tile.index.x+1, tile.index.y+0));
+		for(size_t y: range(tile.size.y)) elevation[y*(tile.size.x+1)+tile.size.x] = nextX[tile.size.x+y];
+
+		if(tile.index.y+1 < (1<<tile.level)) {
+			ref<float> nextXY = firstRowColumn(tile.level, int2(tile.index.x+1, tile.index.y+1));
+			elevation[tile.size.y*(tile.size.x+1)+tile.size.x] = nextXY[0];
+		} else {
+			elevation[tile.size.y*(tile.size.x+1)+tile.size.x] = 0; // Pole
+		}
+
 		struct TriangleStrip triangleStrip (tile.size.x*tile.size.y*6);
-		{Locker lock(glLock);
-			// Completes last row/column with first row/column of next neighbours
-			auto elevation = tile.elevation.map<float>();
-
-			if(tile.index.y+1 < (1<<tile.level)) {
-				ref<float> nextY = firstRowColumn(tile.level, int2(tile.index.x, tile.index.y+1));
-				for(size_t x: range(tile.size.x)) elevation[(size_t)tile.size.y*(tile.size.x+1)+x] = nextY[x];
-			} else {
-				for(size_t x: range(tile.size.x)) elevation[(size_t)tile.size.y*(tile.size.x+1)+x] = 0; // Pole
-			}
-
-			ref<float> nextX = firstRowColumn(tile.level, int2(tile.index.x+1, tile.index.y+0));
-			for(size_t y: range(tile.size.y)) elevation[y*(tile.size.x+1)+tile.size.x] = nextX[tile.size.x+y];
-
-			if(tile.index.y+1 < (1<<tile.level)) {
-				ref<float> nextXY = firstRowColumn(tile.level, int2(tile.index.x+1, tile.index.y+1));
-				elevation[tile.size.y*(tile.size.x+1)+tile.size.x] = nextXY[0];
-			} else {
-				elevation[tile.size.y*(tile.size.x+1)+tile.size.x] = 0; // Pole
-			}
-
-			for(int y: range(tile.size.y)) for(int x: range(tile.size.x)) { // TODO: Z-order triangle strips for framebuffer locality ?
-				int v00 = (y+0)*(tile.size.x+1)+(x+0), v10 = (y+0)*(tile.size.x+1)+(x+1);
-				int v01 = (y+1)*(tile.size.x+1)+(x+0), v11 = (y+1)*(tile.size.x+1)+(x+1);
-				const int invalid = tile.zRange.min;
-				if(elevation[v00]!=invalid && elevation[v11]!=invalid) {
-					if(elevation[v00]!=invalid) triangleStrip(v10, v00, v11);
-					if(elevation[v01]!=invalid) triangleStrip(v11, v00, v01);
-				}
+		for(int y: range(tile.size.y)) for(int x: range(tile.size.x)) { // TODO: Z-order triangle strips for framebuffer locality ?
+			int v00 = (y+0)*(tile.size.x+1)+(x+0), v10 = (y+0)*(tile.size.x+1)+(x+1);
+			int v01 = (y+1)*(tile.size.x+1)+(x+0), v11 = (y+1)*(tile.size.x+1)+(x+1);
+			const int invalid = tile.zRange.min;
+			if(elevation[v00]!=invalid && elevation[v11]!=invalid) {
+				if(elevation[v00]!=invalid) triangleStrip(v10, v00, v11);
+				if(elevation[v01]!=invalid) triangleStrip(v11, v00, v01);
 			}
 		}
 		if(triangleStrip) { // Not a void tile
@@ -172,13 +171,28 @@ struct Terrain : Poll {
 				vec2 centerAngles = originAngles+vec2(angularSize/2);
 				auto sphere = [](vec2 angles) { return vec3(sin(angles.y)*cos(angles.x), sin(angles.y)*sin(angles.x), cos(angles.y)); };
 				// Center cell side lengths
-				float dx = length(size*(viewProjection * sphere(centerAngles+vec2(angularResolution/2, 0)) - viewProjection * sphere(centerAngles-vec2(angularResolution/2, 0))).xy());
-				float dy = length(size*(viewProjection * sphere(centerAngles+vec2(0, angularResolution/2)) - viewProjection * sphere(centerAngles-vec2(0, angularResolution/2))).xy());
+				float dx = length(size*(viewProjection * sphere(centerAngles+vec2(angularResolution/2, 0))
+										- viewProjection * sphere(centerAngles-vec2(angularResolution/2, 0))).xy());
+				float dy = length(size*(viewProjection * sphere(centerAngles+vec2(0, angularResolution/2))
+										- viewProjection * sphere(centerAngles-vec2(0, angularResolution/2))).xy());
 				float d = max(dx, dy);
 				if(d > 4 && tile.level<5) {
 					for(int Y: range(2)) for(int X: range(2)) { // Queues children tiles for loading
 						Tile& child = this->tile(tile.level+1, tile.index*2+int2(X,Y));
-						if(!child.loaded) { Locker lock(queueLock); loadQueue.add(&child); Poll::queue(); }
+						if(!child.loaded) {
+							Locker lock(queueLock);
+							size_t index = loadQueue.size;
+							// Sorts by level, coarsest to finest resolution
+							while(index > 0 && loadQueue[index-1]->level > child.level) index--;
+							// Queues once
+							for(size_t i = index; i > 0 && loadQueue[i-1]->level == child.level; i--) {
+								if(loadQueue[i-1]->index == child.index) { index=invalid; break; }
+							}
+							if(index!=invalid) {
+								loadQueue.insertAt(index, &child);
+								Poll::queue();
+							}
+						}
 					}
 				}
 			}
@@ -199,7 +213,7 @@ struct Terrain : Poll {
 
 /// Views a scene
 struct View : Widget {
-	Window window {this, 1024, []{ return "Editor"__; }};
+	Window window {this, int2(0, 1024), []{ return "Editor"__; }};
 	Thread thread;
 	Job initializeThreadGLContext {thread, [this]{ window.initializeThreadGLContext(); }};
 	Terrain terrain {thread};
@@ -236,6 +250,7 @@ struct View : Widget {
 				;
 		mat4 viewProjection = projection*view;
 		terrain.draw(viewProjection, size);
+		window.setTitle(str(terrain.loadQueue.size));
 		return nullptr;
 	}
 } app;

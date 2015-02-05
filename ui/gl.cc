@@ -7,8 +7,6 @@
 #define GL_GLEXT_PROTOTYPES
 #include <GL/gl.h> //GL
 
-Lock glLock;
-
 /// Rasterizer
 void glCullFace(bool enable) { if(enable) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE); }
 void glDepthTest(bool enable) { if(enable) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST); }

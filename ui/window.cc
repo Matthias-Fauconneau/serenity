@@ -234,11 +234,9 @@ void Window::event() {
 	lock.lock();
 	Update update = updates.take(0);
 	lock.unlock();
-	{Locker lock(glLock); // FIXME
-		// Widget::graphics may renders using GL immediately and/or return primitives
-		GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(backgroundColor,1));
-		if(!update.graphics) update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size)));
-	}
+	// Widget::graphics may renders using GL immediately and/or return primitives
+	GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(backgroundColor,1));
+	if(!update.graphics) update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size)));
 #if DRI3
 	assert_(gbm_surface_has_free_buffers(gbmSurface));
 	assert_( eglSwapBuffers(eglDevice, eglSurface) );
@@ -262,9 +260,7 @@ void Window::event() {
 		for(int y: range(target.size.y/2)) for(int x: range(target.size.x)) swap(target(x, y), target(x, target.size.y-1-y));
 		GLFrameBuffer::blitWindow(target);
 	}
-	{Locker lock(glLock);
-		glXSwapBuffers(glDisplay, id);
-	}
+	glXSwapBuffers(glDisplay, id);
 #endif
 	//assert_(updates.size<=1);
 }
