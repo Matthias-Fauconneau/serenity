@@ -155,12 +155,28 @@ struct Terrain : Poll {
 		contentChanged();
 	}
 
+	bool isVisible(const mat4 viewProjection, int level, int2 index) {
+		log(1<<level);
+		float sphericalSize = float(PI/(1<<level));
+		vec2 sphericalOrigin = float(PI/(1<<level))*vec2(index);
+
+		// Evaluates closest tile point
+		vec3 O = normalize(viewProjection.inverse()[3].xyz()); // Projects view origin (last column: VP⁻¹·(0,0,0,1)) on the sphere
+		vec2 s = vec2(atan(O.y, O.x), acos(O.z)); // Spherical coordinates
+		if(s.x < 0) s.x+=2*PI; // [-π,π] -> [0, 2π]
+		s = clamp(sphericalOrigin, s, sphericalOrigin+vec2(sphericalSize)); // Clamps to tile
+		auto sphere = [](vec2 spherical) { return vec3(sin(spherical.y)*cos(spherical.x), sin(spherical.y)*sin(spherical.x), cos(spherical.y)); };
+		vec3 S = sphere(s); // Closest tile point (cartesian 'world' system)
+		vec3 V = viewProjection * S; // Perspective projects to view space
+		return sq(V.xy()) < 2; // View cone cull (frustum cull is not conservative as it may intersect tile without containing closest tile point)
+	}
+
 	void render(const mat4 viewProjection, vec2 size, int level, int2 index, array<Tile*>& loadQueue) {
 		Tile& tile = this->tile(level, index);
-		assert_(tile.loaded);
 		if(!tile.indexBuffer) return; // Void tile
+		if(!isVisible(viewProjection, level, index)) return; // Out of view
+		assert_(tile.loaded);
 
-		log(1<<tile.level);
 		float sphericalSize = float(PI/(1<<tile.level));
 		float sphericalResolution = sphericalSize/tile.size.x;
 		vec2 sphericalOrigin = float(PI/(1<<tile.level))*vec2(tile.index);
@@ -182,25 +198,15 @@ struct Terrain : Poll {
 		float dy = length(size*vy);
 		float d = max(dx, dy);
 		if(d > 4 && tile.level<5) { // Requires finer resolution
-			bool allLoaded = true;
-			for(int Y: range(2)) for(int X: range(2)) { // Queues children tiles for loading
+			bool allVisibleChildrenAvailable = true;
+			for(int Y: range(2)) for(int X: range(2)) { // Queues visible children tiles for loading
+				if(!isVisible(viewProjection, level+1, tile.index*2+int2(X,Y))) continue;
 				Tile& child = this->tile(tile.level+1, tile.index*2+int2(X,Y));
 				if(child.loaded) continue;
-				allLoaded = false;
-				//Locker lock (queueLock);
-				size_t index = loadQueue.size;
-				// Sorts by level, coarsest resolution last to finest first (LIFO pops from tail)
-				/*while(index > 0 && loadQueue[index-1]->level < child.level) index--;
-				// Queues once
-				for(size_t i = index; i > 0 && loadQueue[i-1]->level == child.level; i--) {
-					if(loadQueue[i-1]->index == child.index) { index=invalid; break; }
-				}*/
-				if(index!=invalid) {
-					loadQueue.insertAt(index, &child);
-					Poll::queue();
-				}
+				allVisibleChildrenAvailable = false;
+				loadQueue.append(&child); // TODO: sort by d
 			}
-			if(allLoaded) {
+			if(allVisibleChildrenAvailable) {
 				for(int Y: range(2)) for(int X: range(2)) render(viewProjection, size, tile.level+1, tile.index*2+int2(X,Y), loadQueue);
 				return; // Skips parent tile
 			}
@@ -221,7 +227,7 @@ struct Terrain : Poll {
 		shader.bind();
 		array<Tile*> loadQueue;
 		for(uint Y: range(1)) for(uint X: range(2)) render(viewProjection, size, 0, int2(X, Y), loadQueue);
-		{Locker lock (queueLock); this->loadQueue=move(loadQueue);}
+		{Locker lock (queueLock); this->loadQueue=move(loadQueue); if(this->loadQueue) Poll::queue();}
 	}
 };
 
