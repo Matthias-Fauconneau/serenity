@@ -100,7 +100,7 @@ struct Terrain : Poll {
 	void load(Tile& tile) {
 		if(tile.loaded) return;
 		if(!tile.firstRowColumn) tile.decode();
-		log("Load", tile.level, tile.index);
+		//log("Load", tile.level, tile.index);
 
 		// Completes last row/column with first row/column of next neighbours
 		auto elevation = tile.elevation.map<float>();
@@ -164,18 +164,22 @@ struct Terrain : Poll {
 				// TODO: Reload parent and remove children when possible
 			}
 
-			float angularSize = float(PI/(1<<tile.level));
-			float angularResolution = angularSize/tile.size.x;
-			vec2 originAngles = float(PI/(1<<tile.level))*vec2(tile.index);
-			if(1) { // Estimates maximum cell size
-				// TODO: View frustum culling
-				vec2 centerAngles = originAngles+vec2(angularSize/2);
+			float sphericalSize = float(PI/(1<<tile.level));
+			float sphericalResolution = sphericalSize/tile.size.x;
+			vec2 sphericalOrigin = float(PI/(1<<tile.level))*vec2(tile.index);
+			if(1) { // Estimates maximum projected cell size to increase resolution as needed
+				vec3 O = normalize(viewProjection[3].xyz()); // Projects view origin (last column: VP·(0,0,0,1)) on the sphere
+				vec2 s = vec2(atan(O.y, O.x), acos(O.z)); // Spherical coordinates
+				s = clamp(sphericalOrigin, s, sphericalOrigin+vec2(sphericalSize)); // Clamps to tile
 				auto sphere = [](vec2 angles) { return vec3(sin(angles.y)*cos(angles.x), sin(angles.y)*sin(angles.x), cos(angles.y)); };
-				// Center cell side lengths
-				float dx = length(size*(viewProjection * sphere(centerAngles+vec2(angularResolution/2, 0))
-										- viewProjection * sphere(centerAngles-vec2(angularResolution/2, 0))).xy());
-				float dy = length(size*(viewProjection * sphere(centerAngles+vec2(0, angularResolution/2))
-										- viewProjection * sphere(centerAngles-vec2(0, angularResolution/2))).xy());
+				vec3 S = sphere(s); // Closest tile point (cartesian 'world' system)
+				vec3 V = viewProjection * S; // Perspective projects to view space
+				if(V.x < -1 || V.x > 1 || V.y < -1 || V.y > 1) continue; // View frustum cull
+				// Projects cell size around closest tile point
+				vec2 vx = (viewProjection * sphere(s+vec2(sphericalResolution/2, 0)) - viewProjection * sphere(s-vec2(sphericalResolution/2, 0))).xy();
+				float dx = length(size*vx);
+				vec2 vy = (viewProjection * sphere(s+vec2(0, sphericalResolution/2)) - viewProjection * sphere(s-vec2(0, sphericalResolution/2))).xy();
+				float dy = length(size*vy);
 				float d = max(dx, dy);
 				if(d > 4 && tile.level<5) {
 					for(int Y: range(2)) for(int X: range(2)) { // Queues children tiles for loading
@@ -198,8 +202,8 @@ struct Terrain : Poll {
 				}
 			}
 			shader["W"_] = tile.size.x+1;
-			shader["angularResolution"_] = angularResolution;
-			shader["originAngles"_] = originAngles;
+			shader["sphericalResolution"_] = sphericalResolution;
+			shader["sphericalOrigin"_] = sphericalOrigin;
 			static constexpr float R = 4E7/(2*PI); // 4·10⁷/2π  ~ 6.37
 			shader["R"_] = R;
 			shader["tElevation"_] = 0;
@@ -242,7 +246,7 @@ struct View : Widget {
 		thread.spawn(); // Spawns tile loading (decode and upload) thread
 	}
 	shared<Graphics> graphics(vec2 unused size) override {
-		mat4 projection = mat4().perspective(sqrt(2.)*asin(1/(1+altitude)), size, altitude-1./512 /*maximum elevation*/, altitude+1);
+		mat4 projection = mat4().perspective(sqrt(2.)*sqrt(2.)*asin(1/(1+altitude)), size, altitude-1./512 /*maximum elevation*/, altitude+1);
 		mat4 view = mat4()
 				.translate(vec3(0,0,-altitude-1)) // Altitude
 				.rotateX(rotation.y) // Latitude
