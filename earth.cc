@@ -34,7 +34,7 @@ struct TriangleStrip : buffer<uint> {
 };
 constexpr uint TriangleStrip::restart;
 
-struct Terrain : Poll {
+struct Terrain {
 	GLShader shader {::shader(), {"terrain"}};
 
 	struct Tile {
@@ -80,6 +80,25 @@ struct Terrain : Poll {
 	array<Tile*> loadQueue; // LIFO
 
 	function<void()> contentChanged;
+
+	struct GLWorker : Thread, Job {
+		Job initialize;
+		GLWorker(Window& window, function<void()> job) : Job(*this, job, false),
+			initialize(*this, [this,&window]{ window.initializeThreadGLContext(); }) {
+			Job::registerPoll(); // Keeps thread from bailing out
+			spawn();
+		}
+	};
+	buffer<GLWorker> glWorkers {1}; // Decode and uploads tiles
+
+	Terrain(Window& window) : contentChanged({&window, &Window::render}) { glWorkers.clear(window, function<void()>{this,&Terrain::work}); }
+
+	void queue() { if(loadQueue) for(GLWorker& worker: glWorkers) worker.Job::queue(); }
+	void work() {
+		load(*({Locker lock(queueLock); if(!loadQueue) return; loadQueue.pop(); }));
+		queue();
+		contentChanged();
+	}
 
 	/// Returns tile (instances if missing)
 	Tile& tile(int level, int2 index) {
@@ -151,16 +170,6 @@ struct Terrain : Poll {
 		tile.loaded = true;
 	}
 
-	Terrain(Thread& thread, function<void()> contentChanged) : Poll(0,0,thread), contentChanged(contentChanged) {
-		registerPoll(); // Keeps thread from bailing out
-	}
-	void event() override {
-		if(!loadQueue) return;
-		load(*({Locker lock(queueLock); loadQueue.pop(); }));
-		if(loadQueue) Poll::queue();
-		contentChanged();
-	}
-
 	/// \return Whether to skip parent subtile
 	bool render(const mat4 viewProjection, vec2 size, int level, int2 index, array<Tile*>& loadQueue) {
 		Tile& tile = this->tile(level, index);
@@ -229,16 +238,14 @@ struct Terrain : Poll {
 		shader.bind();
 		array<Tile*> loadQueue;
 		for(uint Y: range(1)) for(uint X: range(2)) render(viewProjection, size, 0, int2(X, Y), loadQueue);
-		{Locker lock (queueLock); this->loadQueue=move(loadQueue); if(this->loadQueue) Poll::queue();}
+		{Locker lock (queueLock); this->loadQueue=move(loadQueue); queue(); }
 	}
 };
 
 /// Views a scene
 struct View : Widget {
 	Window window {this, int2(0, 1024), []{ return "Editor"__; }};
-	Thread thread;
-	Job initializeThreadGLContext {thread, [this]{ window.initializeThreadGLContext(); }};
-	Terrain terrain {thread, {&window, &Window::render}};
+	Terrain terrain {window};
 
 	// View
 	vec2 lastPos; // Last cursor position to compute relative mouse movements
@@ -251,8 +258,8 @@ struct View : Widget {
 			 rotation += delta / size / float(asin(1/(1+altitude)));
 			 rotation.y = clamp<float>(-PI, rotation.y, 0);
 		 }
-		 else if(event==Press && button==WheelUp) altitude = max(1./256, altitude / pow(2, 1./8));
-		 else if(event==Press && button==WheelDown) altitude = min(1., altitude * pow(2, 1./8));
+		 else if(event==Press && button==WheelUp) altitude = max(1./256, altitude / pow(2, 1./4));
+		 else if(event==Press && button==WheelDown) altitude = min(1., altitude * pow(2, 1./4));
 		 else return false;
 		 return true;
 	}
@@ -261,7 +268,6 @@ struct View : Widget {
 	View() {
 		glDepthTest(true);
 		glCullFace(true);
-		thread.spawn(); // Spawns tile loading (decode and upload) thread
 	}
 	shared<Graphics> graphics(vec2 unused size) override {
 		mat4 projection = mat4().perspective(PI/3, size, altitude-1./512 /*maximum elevation*/, altitude+1);

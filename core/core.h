@@ -301,7 +301,7 @@ generic struct mref : ref<T> {
 	/// Initializes the element at index
 	template<Type... Args> T& set(size_t index, Args&&... args) const { return *(new (&at(index)) T{forward<Args>(args)...}); }
 	/// Initializes reference using the same constructor for all elements
-	template<Type... Args> void clear(Args... args) const { for(T& e: *this) new (&e) T(args...); }
+	template<Type... Args> void clear(Args&&... args) const { for(T& e: *this) new (&e) T(forward<Args>(args)...); }
 	/// Initializes reference from \a source using move constructor
 	void move(const mref<T>& source) { assert(size==source.size); for(size_t index: range(size)) set(index, ::move(source[index])); }
 	/// Initializes reference from \a source using copy constructor

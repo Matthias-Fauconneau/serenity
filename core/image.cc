@@ -135,7 +135,7 @@ static void box(const Image& target, const Image& source) {
 static Image box(Image&& target, const Image& source) { box(target, source); return move(target); }
 
 static void bilinear(const Image& target, const Image& source) {
-    assert_(!source.alpha);
+	assert_(!source.alpha, source.size, target.size);
     const uint stride = source.stride;
     chunk_parallel(target.height, [&](uint, size_t y) {
         for(uint x: range(target.width)) {

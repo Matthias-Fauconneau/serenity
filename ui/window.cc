@@ -266,6 +266,7 @@ void Window::event() {
 }
 
 void Window::initializeThreadGLContext() {
+	static Lock staticLock; Locker lock(staticLock);
 	const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION_ARB, 3, GLX_CONTEXT_MINOR_VERSION_ARB, 3, 0};
 	glContext = ((PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB"))
 			(glDisplay, fbConfig, glContext, 1, contextAttribs);

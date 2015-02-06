@@ -47,25 +47,29 @@ inline ImageF copy(const ImageF& o) {
 }
 
 // Box convolution with constant border
-void box(const ImageF& target, const ImageF& source, const int width, const float4 border) {
+void box(const ImageF& target, const ImageF& source, const int width/*, const float4 border*/) {
 	assert(target.size.y == source.size.x && target.size.x == source.size.y && uint(target.stride) == target.width && uint(source.stride)==source.width);
 	parallel_chunk(source.size.y, [&](uint, int Y0, int DY) { // Top
 		const float4* const sourceData = source.data;
 		float4* const targetData = target.begin();
 		const uint sourceStride = source.stride;
 		const uint targetStride = target.stride;
-		const float4 scale = float4_1(1./(width+1+width));
-		const float4 sum0 = float4_1(width)*border;
+		//const float4 scale = float4_1(1./(width+1/*+width*/));
+		//const float4 sum0 = 0; //float4_1(width)*border;
 		for(int y: range(Y0, Y0+DY)) {
 			const float4* const sourceRow = sourceData + y * sourceStride;
 			float4* const targetColumn = targetData + y;
-			float4 sum = sum0;
+			float4 sum = float4_1(0);//sum0;
 			for(uint x: range(width)) sum += sourceRow[x];
+			float N = width;
 			for(uint x: range(width)) {
 				sum += sourceRow[x+width];
+				N++;
+				const float4 scale = float4_1(1./N);
 				targetColumn[x * targetStride] = scale * sum;
-				sum -= border;
+				//sum -= border;
 			}
+			const float4 scale = float4_1(1./N);
 			for(uint x: range(width, sourceStride-width)) {
 				float4 const* source = sourceRow + x;
 				sum += source[width];
@@ -73,9 +77,11 @@ void box(const ImageF& target, const ImageF& source, const int width, const floa
 				sum -= source[-width];
 			}
 			for(uint x: range(sourceStride-width, sourceStride)) {
-				sum += border;
+				//sum += border;
+				const float4 scale = float4_1(1./N);
 				targetColumn[x * targetStride] = scale * sum;
 				sum -= sourceRow[x-width];
+				N--;
 			}
 		}
 	});
@@ -89,13 +95,14 @@ struct Mosaic {
 	ref<string> parameters = {"page-size"_,"outer","inner","same-outer"_,"same-inner","same-size","chroma","intensity","hue"};
 	map<String, String> arguments;
 	vec2 pageSizeMM = 0, pageSizePx = 0;
-	array<String> elements; // Images
+	array<String> elements; // Image or text elements (TODO: polymorphic object)
 	array<array<int>> rows; // Index into elements (-1: row extension, -2 column extension, -3: inner extension)
-	buffer<int2> sizes; // Eleements sizes
+	buffer<vec2> sizes; // Elements sizes
 
 	// - Layout solution
 	vec2 innerMM = 0, outerMM = 0; // Margins
 	Vector widthsMM, heightsMM; // Image sizes
+	static constexpr bool constantMargin = false;
 
 	// - Layout render
 	Graphics page;
@@ -117,6 +124,7 @@ struct Mosaic {
 			int nextLine = 0;
 			while(s && s[nextLine] != '\n') nextLine++;
 			string line = s.peek(nextLine);
+			if(startsWith(line, "#")) { s.until('\n'); continue; }
 			if(line.contains('=')) {
 				string key = s.whileNo(" \t\n=");
 				assert(parameters.contains(key), "Unknown parameter", key, ", expected", parameters);
@@ -138,15 +146,19 @@ struct Mosaic {
 
 		while(s) {
 			array<int> row;
-			for(string name; (name = s.whileNo(" \t\n"));) {
-				/***/ if(name=="-") row.append(-1); //{ assert(row); row.append(row.last()); }
-				else if(name=="|") { columnStructure=true; row.append(-2); } //{ assert(rows && rows.last().size==row.size+1); row.append(rows.last()[row.size]); }
-				else if(name=="\\") row.append(-3); //{ assert(rows && rows.last().size==row.size+1); row.append(rows.last()[row.size]); }
+			for(string element; (element = s.whileNo(" \t\n"));) {
+				/***/ if(element=="-") row.append(-1); //{ assert(row); row.append(row.last()); }
+				else if(element=="|") { columnStructure=true; row.append(-2); } //{ assert(rows && rows.last().size==row.size+1); row.append(rows.last()[row.size]); }
+				else if(element=="\\") row.append(-3); //{ assert(rows && rows.last().size==row.size+1); row.append(rows.last()[row.size]); }
 				else {
-					row.append(elements.size);
-					string file = [&](string name) { for(string file: files) if(startsWith(file, name)) return file; return ""_; }(name);
-					if(!file) { error("No such image"_, name, "in", files); return; }
-					elements.append(copyRef(file));
+					row.append(elements.size); // Appends element index to row
+					if(startsWith(element, "\"")) { // Text
+						elements.append(replace(element,"\\n","\n"));
+					} else { // Image
+						string file = [&](string name) { for(string file: files) if(startsWith(file, name)) return file; return ""_; }(element);
+						if(!file) { error("No such image"_, element, "in", files); return; }
+						elements.append(copyRef(file));
+					}
 				}
 				s.whileAny(" \t"_);
 			}
@@ -164,9 +176,14 @@ struct Mosaic {
 		assert(rows);
 		log(arguments);
 
-		sizes = apply(elements, [&](string image){ return ::imageSize(Map(image, folder)); }); // Image sizes
-		for(size_t imageIndex: range(elements.size)) log(elements[imageIndex], strx(sizes[imageIndex]), (float)sizes[imageIndex].x/sizes[imageIndex].y);
-		Vector aspectRatios = apply(sizes, [=](int2 size){ return (float)size.x/size.y; }); // Image aspect ratios
+		sizes = apply(elements, [&](string element) { // Element sizes
+				if(startsWith(element, "\"")) return Text(element.slice(1, element.size-2)).sizeHint();
+				else return vec2(::imageSize(Map(element, folder)));
+		});
+		for(size_t imageIndex: range(elements.size)) {
+			log(elements[imageIndex], strx(sizes[imageIndex]), (float)sizes[imageIndex].x/sizes[imageIndex].y);
+		}
+		Vector aspectRatios = apply(sizes, [=](vec2 size){ return (float)size.x/size.y; }); // Image aspect ratios
 
 		// Page definition
 		pageSizeMM = 10.f*parse<vec2>(arguments.at("page-size")); // 50x40, 40x30, 114x76
@@ -181,8 +198,9 @@ struct Mosaic {
 		//for(ref<int> row: rows) if(row.size != rows[0].size) { uniformColumnCount = 0; assert(rows[0].size == 1); break; }
 		for(ref<int> row: rows) assert(row.size == rows[0].size);
 		if(uniformColumnCount == 1) columnStructure=true;
+		if(uniformColumnCount == rows.size) tableStructure = true;
 		bool sameWidthsInColumn = columnStructure && tableStructure && !rowStructure; // Disable same widths constraints when layout definition had a row structure
-		bool sameHeightsInRow = rowStructure || (!columnStructure && tableStructure && uniformColumnCount>1); // Disables same heights constraints when layout definition has no table structure or column count are not uniform
+		bool sameHeightsInRow = rowStructure || (/*!columnStructure &&*/ tableStructure && uniformColumnCount>1); // Disables same heights constraints when layout definition has no table structure or column count are not uniform
 		bool sameElementSizes = arguments.value("same-size"_, ((rows.size==1&&rows[0].size==2) || (rows.size==2&&uniformColumnCount==1))?"1"_:"0"_) != "0"_; // Enables same sizes constraints on single row/column of two elements
 		log("sameWidthsInColumn", sameWidthsInColumn, "sameHeightsInRow", sameHeightsInRow, "sameElementSizes", sameElementSizes,
 		"tableStructure", tableStructure, "rowStructure", rowStructure, "columnStructure", columnStructure, "uniformColumnCount", uniformColumnCount);
@@ -411,18 +429,22 @@ struct Mosaic {
 			log(s,"\t", pageSizeMM, "dx", dx, "dy", dy, outerMM, innerMM);
 			//else log("dx", dx, "dy", dy, pageSize.y, heightSums / n, n, outer.y, outer.y + dy);
 			//outer.y += dy/2; // Centers vertically (i.e distribute tolerated error (least square residual) on each side) (Already done by each columns)
+		} else {
+			log("innerMM", innerMM);
+			// TODO: Snaps small innerMM to zero with a "non linear resolution" by iterating over inner0 parameter
 		}
 	}
 	void render(const float _mmPx, const float _inchPx=0) {
 		if(errors) return;
 
+		// -- Evaluates resolution
 		assert_((_mmPx>0) ^ (_inchPx>0));
 		const float inchMM = 25.4;
 		const float mmPx = _mmPx ? _mmPx : _inchPx/inchMM;
 		assert_(mmPx);
 		pageSizePx = pageSizeMM * mmPx;
-		if(1) {
-			const float inchPx = _inchPx ? _inchPx : _mmPx*inchMM;
+		const float inchPx = _inchPx ? _inchPx : _mmPx*inchMM;
+		{
 			assert_(inchPx);
 			float minScale = inf, maxScale = 0;
 			for(size_t elementIndex: range(elements.size)) {
@@ -435,81 +457,134 @@ struct Mosaic {
 				"max: "+str(maxScale)+"x "+str(maxScale*mmPx)+"ppmm "+str(maxScale*inchPx)+"ppi");
 		}
 
+		// -- Explicitly evaluate element layout given by solved element sizes
+		struct Element { int2 index; Rect rect; int2 size; };
+		buffer<Element> elementLayout (elements.size);
+		for(const size_t currentRowIndex: range(rows.size)) {
+			float x0 = outerMM.x;
+
+			// -- Horizontal centers individual row (i.e distribute tolerated error (least square residual) on each side)
+			float W = outerMM.x;
+			for(const size_t columnIndex: range(rows[currentRowIndex].size)) {
+				int elementIndex = rows[currentRowIndex][columnIndex];
+				if(elementIndex == -2) { // Column extension
+					int sourceRowIndex = currentRowIndex-1;
+					while(rows[sourceRowIndex][columnIndex] == -2) sourceRowIndex--;
+					elementIndex = rows[sourceRowIndex][columnIndex];
+				}
+				if(elementIndex < 0) continue;
+				float w = widthsMM[elementIndex];
+				size_t nextColumnIndex=columnIndex+1; while(nextColumnIndex < rows.size && rows[currentRowIndex][nextColumnIndex]==-1) nextColumnIndex++;
+				bool lastColumn = nextColumnIndex==rows[currentRowIndex].size;
+				float rightMargin = (!lastColumn || constantMargin) ? innerMM.x : outerMM.x;
+				W += w + rightMargin;
+			}
+			float dx = (pageSizeMM.x - W) / 2;
+			log("dx=", dx);
+			//x0 += dx; // FIXME
+
+			for(const size_t columnIndex: range(rows[currentRowIndex].size)) {
+				int elementIndex = rows[currentRowIndex][columnIndex];
+				if(elementIndex == -2) { // Column extension
+					int sourceRowIndex = currentRowIndex-1;
+					while(rows[sourceRowIndex][columnIndex] == -2) sourceRowIndex--;
+					int elementIndex = rows[sourceRowIndex][columnIndex];
+					float w = widthsMM[elementIndex];
+					x0 += w + innerMM.x;
+				}
+				if(elementIndex < 0) continue;
+
+				// -- Horizontal centers individual row (i.e distribute tolerated error (least square residual) on each side)
+				float H = outerMM.y, y0 = outerMM.y;
+				for(const size_t rowIndex: range(rows.size)) {
+					int elementIndex = rows[rowIndex][columnIndex];
+					if(elementIndex == -1) { // Row extension
+						int sourceColumnIndex = columnIndex-1;
+						while(rows[rowIndex][sourceColumnIndex] == -2) sourceColumnIndex--;
+						elementIndex = rows[rowIndex][sourceColumnIndex];
+					}
+					if(elementIndex < 0) continue;
+					size_t nextRowIndex=rowIndex+1; while(nextRowIndex < rows.size && rows[nextRowIndex][columnIndex]==-2) nextRowIndex++;
+					bool lastRow = nextRowIndex==rows.size;
+					float belowMargin = (!lastRow || constantMargin) ? innerMM.y : outerMM.y;
+					H += heightsMM[elementIndex] + belowMargin;
+					//log(H, heights[elementIndex], belowMargin, rowIndex-1, y0);
+					if(rowIndex==currentRowIndex-1) y0 = H;
+				}
+				float dy = (pageSizeMM.y - H) / 2;
+				y0 += dy;
+
+				float w = widthsMM[elementIndex], h = heightsMM[elementIndex];
+				float x1 = x0+w, y1 = y0+h;
+
+				int ix0 = round(x0*mmPx), iy0 = round(y0*mmPx);
+				int ix1 = round(x1*mmPx), iy1 = round(y1*mmPx);
+				int2 size(ix1-ix0, iy1-iy0);
+				assert(size.x>0 && size.y>0);
+				elementLayout[elementIndex] = Element{int2(currentRowIndex, columnIndex), Rect(vec2(x0, y0), vec2(x1, y1)), size};
+
+				x0 += w + innerMM.x;
+			}
+		}
+
+		// -- Decodes/renders each element
 		log("Decoding"_, elements);
-		Time load; load.start();
-		buffer<Image> images = apply(elements.size, [this](const size_t elementIndex) {
-			Image image = decodeImage(Map(elements[elementIndex], folder));
-			image.alpha = false;
-			return move(image);
+		Time load;
+		buffer<Image> images = apply(elements.size, [&](const size_t elementIndex) {
+			string element = elements[elementIndex];
+			if(startsWith(element, "\"")) { // Text
+				int2 size = elementLayout[elementIndex].size;
+				return ::render(size, Text(element.slice(1, element.size-2), 36./72*inchPx, white, 1, 0, "LinLibertine").graphics(vec2(size)));
+			} else {
+				Image image = decodeImage(Map(element, folder));
+				image.alpha = false;
+				return move(image);
+			}
 		});
 		log("+", load);
 
+		// -- Evaluates each elements dominant color (or use user argument overrides)
 		buffer<float4> innerBackgroundColors = apply(images.size, [&](const size_t elementIndex) {
 			const Image& iSource = images[elementIndex];
-			//float4 innerBackgroundColor = ::mean(source, 0,0, source.size.x,source.size.y);
-			float4 innerBackgroundColor;
-			if(0) {
-				int histogram[16*16*16] = {}; // 16K
-				for(byte4 c: iSource) histogram[c.b/16*256+c.g/16*16+c.r/16]++; // TODO: most common hue (weighted by chroma (Max-min))
-				int mostCommonIndex = argmax(ref<int>(histogram));
-				byte4 mostCommonColor = byte4(mostCommonIndex/256*16, ((mostCommonIndex/16)%16)*16, (mostCommonIndex%16)*16);
-				extern float sRGB_reverse[0x100];
-				innerBackgroundColor = {sRGB_reverse[mostCommonColor[0]], sRGB_reverse[mostCommonColor[1]], sRGB_reverse[mostCommonColor[2]], 1};
-			} else {
-				int hueHistogram[0x100] = {}; mref<int>(hueHistogram).clear(0); // 1½K: 32bit / 0xFF -> 4K² images
-				int intensityHistogram[0x100] = {}; mref<int>(intensityHistogram).clear(0);
-				//assert(iSource.Ref::size < 1<<24);
-				for(byte4 c: iSource) {
-					const int B = c.b, G = c.g, R = c.r;
-					const int M = max(max(B, G), R);
-					const int m = min(min(B, G), R);
-					const int C = M - m;
-					//assert(C >=0 && C < 0x100);
-					const int I = (B+G+R)/3;
-					//assert(I >= 0 && I < 0x100, I);
-					intensityHistogram[I]++;
-					if(C) {
-						int H;
-						if(M==R) H = ((G-B)*43/C+0x100)%0x100; // 5-6 0-1
-						else if(M==G) H = (B-R)*43/C+85; // 1-3
-						else if(M==B) H = (R-G)*43/C+171; // 3-5
-						else ::error(B, G, R);
-						//assert(H >=0 && H < 0x100);
-						//assert(hueHistogram[H] >= 0 && hueHistogram[H] < 0x40000000, H, hueHistogram[H]);
-						hueHistogram[H] += C;
-					}
+			int hueHistogram[0x100] = {}; mref<int>(hueHistogram).clear(0); // 1½K: 32bit / 0xFF -> 4K² images
+			int intensityHistogram[0x100] = {}; mref<int>(intensityHistogram).clear(0);
+			for(byte4 c: iSource) {
+				const int B = c.b, G = c.g, R = c.r;
+				const int M = max(max(B, G), R);
+				const int m = min(min(B, G), R);
+				const int C = M - m;
+				const int I = (B+G+R)/3;
+				intensityHistogram[I]++;
+				if(C) {
+					int H;
+					if(M==R) H = ((G-B)*43/C+0x100)%0x100; // 5-6 0-1
+					else if(M==G) H = (B-R)*43/C+85; // 1-3
+					else if(M==B) H = (R-G)*43/C+171; // 3-5
+					else ::error(B, G, R);
+					hueHistogram[H] += C;
 				}
-				int H = argmax(ref<int>(hueHistogram));
-				if(arguments.contains("hue"_)) H = parseValue(arguments.at("hue"_)) * 0xFF;
-				int C = parseValue(arguments.value("chroma"_, "1/4"_)) * 0xFF;
-				int X = C * (0xFF - abs((H%85)*6 - 0xFF)) / 0xFF;
-				//assert(X >= 0 && X < 0x100);
-				int I = argmax(ref<int>(intensityHistogram));
-				if(arguments.contains("intensity"_)) I = parseValue(arguments.at("intensity"_)) * 0xFF;
-				int R,G,B;
-				if(H < 43) R=C, G=X, B=0;
-				else if(H < 85) R=X, G=C, B=0;
-				else if(H < 128) R=0, G=C, B=X;
-				else if(H < 171) R=0, G=X, B=C;
-				else if(H < 213) R=X, G=0, B=C;
-				else if(H < 256) R=C, G=0, B=X;
-				else ::error(H);
-				//assert(R >= 0 && R < 0x100);
-				//assert(G >= 0 && G < 0x100);
-				//assert(B >= 0 && B < 0x100);
-				int m = max(0, I - (R+G+B)/3);
-				//assert(m >= 0 && m < 0x100, I, R, G, B, m);
-				// Limits intensity within sRGB
-				m = min(m, 0xFF-R);
-				m = min(m, 0xFF-G);
-				m = min(m, 0xFF-B);
-				extern float sRGB_reverse[0x100];
-				//assert(m+B >= 0 && m+B < 0x100);
-				//assert(m+G >= 0 && m+G < 0x100);
-				//assert(m+R >= 0 && m+R < 0x100, m+R, m, R, G, B, I, (R+G+B)/3);
-				innerBackgroundColor = {sRGB_reverse[m+B], sRGB_reverse[m+G], sRGB_reverse[m+R], 1};
 			}
-			return innerBackgroundColor;
+			int H = argmax(ref<int>(hueHistogram));
+			if(arguments.contains("hue"_)) H = parseValue(arguments.at("hue"_)) * 0xFF;
+			int C = parseValue(arguments.value("chroma"_, "1/4"_)) * 0xFF;
+			int X = C * (0xFF - abs((H%85)*6 - 0xFF)) / 0xFF;
+			int I = argmax(ref<int>(intensityHistogram));
+			if(arguments.contains("intensity"_)) I = parseValue(arguments.at("intensity"_)) * 0xFF;
+			int R,G,B;
+			if(H < 43) R=C, G=X, B=0;
+			else if(H < 85) R=X, G=C, B=0;
+			else if(H < 128) R=0, G=C, B=X;
+			else if(H < 171) R=0, G=X, B=C;
+			else if(H < 213) R=X, G=0, B=C;
+			else if(H < 256) R=C, G=0, B=X;
+			else ::error(H);
+			int m = max(0, I - (R+G+B)/3);
+			// Limits intensity within sRGB
+			m = min(m, 0xFF-R);
+			m = min(m, 0xFF-G);
+			m = min(m, 0xFF-B);
+			extern float sRGB_reverse[0x100];
+			return float4{sRGB_reverse[m+B], sRGB_reverse[m+G], sRGB_reverse[m+R], 0};
 		});
 
 		page.bounds = Rect(round(pageSizePx));
@@ -520,14 +595,10 @@ struct Mosaic {
 		// -- Transitions exterior borders to background color
 		const int iX = floor(outerMM.x*mmPx);
 		const int iY = floor(outerMM.y*mmPx);
-		//float4 outerBackgroundColor = float4_1(1);
-		//float4 outerBackgroundColor = float4_1(1./2);
-		//float4 outerBackgroundColor = ::mean(target, iX, iY, target.size.x-iX, target.size.y-iY);
-		float4 outerBackgroundColor = ::mean(innerBackgroundColors);
+		float4 outerBackgroundColor = float4_1(1) * ::mean(innerBackgroundColors);
 		vec2 margin = (outerMM-innerMM)*mmPx; // Transition on inner margin size, outer outer margin is constant
 		vec2 innerPx = innerMM*mmPx;
 		int2 size = target.size;
-		bool constantMargin = false;
 		// Outer background vertical sides
 		if(iX > 0) parallel_chunk(max(0, iY), min(size.y, size.y-iY), [&](uint, int Y0, int DY) {
 			for(int y: range(Y0, Y0+DY)) {
@@ -563,7 +634,7 @@ struct Mosaic {
 				float yw = constantMargin ? (y>=margin.y ? float(y-margin.y) / float(innerPx.y) : 0) : 1 - float(iY-y) / iY;
 				for(int x: range(iX)) {
 					float xw =  constantMargin ? (x>=margin.x ? float(x-margin.x) / float(innerPx.x) : 0) : 1 - float(iX-x) / iX;
-					float w = /*xw*yw +*/ (1-xw)*yw + xw*(1-yw) + (1-xw)*(1-yw);
+					float w = (1-xw)*yw + xw*(1-yw) + (1-xw)*(1-yw);
 					assert(w >= 0 && w <= 1);
 					float4 c = float4_1(w) * outerBackgroundColor;
 					line0[x] += c;
@@ -574,172 +645,120 @@ struct Mosaic {
 			}
 		});
 
-		array<Rect> mask; // To copy unblurred data on blur background
-		{ // -- Copies source images to target mosaic
-			for(const size_t currentRowIndex: range(rows.size)) {
-				float x0 = outerMM.x;
+		// -- Copies source images to target mosaic
+		for(size_t elementIndex: range(elements.size)) {
+			Element element = elementLayout[elementIndex];
+			int currentRowIndex = element.index[0];
+			int columnIndex = element.index[1];
+			float x0 = element.rect.min.x, x1 = element.rect.max.x;
+			float y0 = element.rect.min.y, y1 = element.rect.max.y;
+			int ix0 = round(x0*mmPx), iy0 = round(y0*mmPx);
+			int ix1 = round(x1*mmPx), iy1 = round(y1*mmPx);
+			int2 size(ix1-ix0, iy1-iy0);
+			assert(size.x>0 && size.y>0);
 
-				// -- Horizontal centers individual row (i.e distribute tolerated error (least square residual) on each side)
-				float W = outerMM.x;
-				for(const size_t columnIndex: range(rows[currentRowIndex].size)) {
-					int elementIndex = rows[currentRowIndex][columnIndex];
-					if(elementIndex == -2) { // Column extension
-						int sourceRowIndex = currentRowIndex-1;
-						while(rows[sourceRowIndex][columnIndex] == -2) sourceRowIndex--;
-						elementIndex = rows[sourceRowIndex][columnIndex];
-					}
-					if(elementIndex < 0) continue;
-					float w = widthsMM[elementIndex];
-					size_t nextColumnIndex=columnIndex+1; while(nextColumnIndex < rows.size && rows[currentRowIndex][nextColumnIndex]==-1) nextColumnIndex++;
-					bool lastColumn = nextColumnIndex==rows[currentRowIndex].size;
-					float rightMargin = (!lastColumn || constantMargin) ? innerMM.x : outerMM.x;
-					W += w + rightMargin;
+			// Element margins
+			float leftMarginMM = (constantMargin || columnIndex) ? innerMM.x : outerMM.x;
+			float aboveMarginMM = (constantMargin || currentRowIndex) ? innerMM.y : outerMM.y;
+			size_t nextColumnIndex=columnIndex+1;
+			while(nextColumnIndex < rows.size && rows[currentRowIndex][nextColumnIndex]==-1) nextColumnIndex++;
+			bool lastColumn = nextColumnIndex==rows[currentRowIndex].size;
+			float rightMarginMM = (!lastColumn || constantMargin) ? innerMM.x : outerMM.x;
+			size_t nextRowIndex=currentRowIndex+1;
+			while(nextRowIndex < rows.size && rows[nextRowIndex][columnIndex]==-2) nextRowIndex++;
+			bool lastRow = nextRowIndex==rows.size;
+			float belowMarginMM = (!lastRow || constantMargin) ? innerMM.y : outerMM.y;
+
+			// Element min,size,max pixel coordinates
+			int iw0 = ix0-round((x0-leftMarginMM)*mmPx), ih0 = iy0-round((y0-aboveMarginMM)*mmPx); // Previous border sizes
+			int iw1 = round((x1+rightMarginMM)*mmPx) - ix1, ih1 = round((y1+belowMarginMM)*mmPx) - iy1; // Next border sizes
+
+			const Image& image = images[elementIndex];
+			 // TODO: single pass linear resize, float conversion (or decode to float and resize) + direct output to target
+			Image iSource = size == image.size ? share(image) : resize(size, image);
+			ImageF source (size);
+			parallel_chunk(iSource.Ref::size, [&](uint, size_t I0, size_t DI) {
+				extern float sRGB_reverse[0x100];
+				for(size_t i: range(I0, I0+DI)) source[i] = {sRGB_reverse[iSource[i][0]], sRGB_reverse[iSource[i][1]], sRGB_reverse[iSource[i][2]],
+															 image.alpha ? float(iSource[i][2])/0xFF : 1};
+			});
+
+			// -- Margins
+			if(1) { // -- Extends images over margins with a mirror transition
+				for(int y: range(min(ih0, iy0))) {
+					mref<float4> line = target.slice((iy0-y-1)*target.stride, target.width);
+					for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4_1((1-x/float(iw0))*(1-y/float(ih0))) * source(x, y); // Left
+					for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) line[x] += float4_1(1-y/float(ih0)) * source(x-ix0, y); // Center
+					for(int x: range(iw1)) line[ix1+x] += float4_1((1-x/float(iw1))*(1-y/float(ih0))) * source(size.x-1-x, y); // Right
 				}
-				float dx = (pageSizeMM.x - W) / 2;
-				log("dx=", dx);
-				//x0 += dx; // FIXME
-
-				for(const size_t columnIndex: range(rows[currentRowIndex].size)) {
-					int elementIndex = rows[currentRowIndex][columnIndex];
-					if(elementIndex == -2) { // Column extension
-						int sourceRowIndex = currentRowIndex-1;
-						while(rows[sourceRowIndex][columnIndex] == -2) sourceRowIndex--;
-						int elementIndex = rows[sourceRowIndex][columnIndex];
-						float w = widthsMM[elementIndex];
-						x0 += w + innerMM.x;
+				parallel_chunk(max(0, iy0), min(iy0+size.y, target.size.y), [&](uint, int Y0, int DY) { // Center
+					for(int y: range(Y0, Y0+DY)) {
+						float4* line = target.begin() + y*target.stride;
+						for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4_1(1-x/float(iw0)) * source(x, y-iy0); // Left
+						float4* sourceLine = source.begin() + (y-iy0)*source.stride;
+						for(int x: range(max(0, ix0), min(target.size.x, ix0+size.x))) line[x] = sourceLine[x-ix0]; // Copy image
+						for(int x: range(iw1)) line[ix1+x] += float4_1(1-x/float(iw1)) * source(size.x-1-x, y-iy0); // Right
 					}
-					if(elementIndex < 0) continue;
-
-					// -- Horizontal centers individual row (i.e distribute tolerated error (least square residual) on each side)
-					float H = outerMM.y, y0 = outerMM.y;
-					for(const size_t rowIndex: range(rows.size)) {
-						int elementIndex = rows[rowIndex][columnIndex];
-						if(elementIndex == -1) { // Row extension
-							int sourceColumnIndex = columnIndex-1;
-							while(rows[rowIndex][sourceColumnIndex] == -2) sourceColumnIndex--;
-							elementIndex = rows[rowIndex][sourceColumnIndex];
-						}
-						if(elementIndex < 0) continue;
-						size_t nextRowIndex=rowIndex+1; while(nextRowIndex < rows.size && rows[nextRowIndex][columnIndex]==-2) nextRowIndex++;
-						bool lastRow = nextRowIndex==rows.size;
-						float belowMargin = (!lastRow || constantMargin) ? innerMM.y : outerMM.y;
-						H += heightsMM[elementIndex] + belowMargin;
-						//log(H, heights[elementIndex], belowMargin, rowIndex-1, y0);
-						if(rowIndex==currentRowIndex-1) y0 = H;
+				});
+				for(int y: range(max(0, iy1), min(iy1+ih1, target.size.y))) {
+					float4* line = target.begin() + y*target.stride;
+					for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4_1((1-x/float(iw0))*(1-(y-iy1)/float(ih1))) * source(x-ix0, size.y-1-(y-iy1)); // Left
+					for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) line[x] += float4_1(1-(y-iy1)/float(ih1)) * source(x-ix0, size.y-1-(y-iy1)); // Center
+					for(int x: range(iw1)) line[ix1+x] += float4_1((1-x/float(iw1))*(1-(y-iy1)/float(ih1))) * source(size.x-1-x, size.y-1-(y-iy1)); // Right
+				}
+			} else if(1) { // -- Blends inner background over margins with a linear transition
+				float4 innerBackgroundColor = innerBackgroundColors[elementIndex];
+				for(int y: range(min(ih0, iy0))) {
+					mref<float4> line = target.slice((iy0-y-1)*target.stride, target.width);
+					for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4_1((1-x/float(iw0))*(1-y/float(ih0))) * innerBackgroundColor; // Left
+					for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) line[x] += float4_1(1-y/float(ih0)) * innerBackgroundColor; // Center
+					for(int x: range(iw1)) line[ix1+x] += float4_1((1-x/float(iw1))*(1-y/float(ih0))) * innerBackgroundColor; // Right
+				}
+				parallel_chunk(max(0, iy0), min(iy0+size.y, target.size.y), [&](uint, int Y0, int DY) { // Center
+					for(int y: range(Y0, Y0+DY)) {
+						float4* line = target.begin() + y*target.stride;
+						for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4_1(1-x/float(iw0)) * innerBackgroundColor; // Left
+						float4* sourceLine = source.begin() + (y-iy0)*source.stride;
+						for(int x: range(max(0, ix0), min(target.size.x, ix0+size.x))) line[x] = sourceLine[x-ix0]; // Copy image
+						for(int x: range(iw1)) line[ix1+x] += float4_1(1-x/float(iw1)) * innerBackgroundColor; // Right
 					}
-					float dy = (pageSizeMM.y - H) / 2;
-					y0 += dy;
-
-					float w = widthsMM[elementIndex], h = heightsMM[elementIndex];
-					float x1 = x0+w, y1 = y0+h;
-
-					int ix0 = round(x0*mmPx), iy0 = round(y0*mmPx);
-					int ix1 = round(x1*mmPx), iy1 = round(y1*mmPx);
-					int2 size(ix1-ix0, iy1-iy0);
-					assert(size.x>0 && size.y>0, size, x0, ix0, w, x1, ix1, y0, iy0, h, y1, iy1, mmPx);
-
-					// Element margins
-					float leftMarginMM = (constantMargin || columnIndex) ? innerMM.x : outerMM.x;
-					float aboveMarginMM = (constantMargin || currentRowIndex) ? innerMM.y : outerMM.y;
-					size_t nextColumnIndex=columnIndex+1; while(nextColumnIndex < rows.size && rows[currentRowIndex][nextColumnIndex]==-1) nextColumnIndex++;
-					bool lastColumn = nextColumnIndex==rows[currentRowIndex].size;
-					float rightMarginMM = (!lastColumn || constantMargin) ? innerMM.x : outerMM.x;
-					size_t nextRowIndex=currentRowIndex+1; while(nextRowIndex < rows.size && rows[nextRowIndex][columnIndex]==-2) nextRowIndex++;
-					bool lastRow = nextRowIndex==rows.size;
-					float belowMarginMM = (!lastRow || constantMargin) ? innerMM.y : outerMM.y;
-
-					// Element min,size,max pixel coordinates
-					int iw0 = ix0-round((x0-leftMarginMM)*mmPx), ih0 = iy0-round((y0-aboveMarginMM)*mmPx); // Previous border sizes
-					int iw1 = round((x1+rightMarginMM)*mmPx) - ix1, ih1 = round((y1+belowMarginMM)*mmPx) - iy1; // Next border sizes
-					//assert(iw0 >= 1 && ih0 >= 1 && iw1 >= 1 && ih1 >= 1, iw0, ih0, iw1, ih1);
-					mask.append(vec2(ix0, iy0), vec2(ix1, iy1));
-
-					//assert(/*0 <= iw0 &&*/ iw0 <= ix0 /*&& ix0+size.x < target.size.x*/, /*iw0, ix0, size.x,*/ ix0+size.x, target.size.x);
-					//assert(ix1+iw1 <= target.size.x, ix1, iw1, target.size.x, inner, outer);
-					//assert(iy0 >= ih0 && iy0+size.y < target.size.y);
-					//assert(iy1+ih1 <= target.size.y, iy1, ih1, iy1+ih1, target.size.y, inner, outer);
-					assert(ix0 < target.size.x);
-
-					const Image& image = images[elementIndex];
-					Image iSource = size == image.size ? share(image) : resize(size, image); // TODO: single pass linear resize, float conversion (or decode to float and resize) + direct output to target
-					ImageF source (size);
-					parallel_chunk(iSource.Ref::size, [&](uint, size_t I0, size_t DI) {
-						extern float sRGB_reverse[0x100];
-						for(size_t i: range(I0, I0+DI)) source[i] = {sRGB_reverse[iSource[i][0]], sRGB_reverse[iSource[i][1]], sRGB_reverse[iSource[i][2]], 1};
-					});
-					// -- Margins
-					if(0) { // -- Extends images over margins with a mirror transition
-						   if(ih0 > 0) parallel_chunk(ih0, [&](uint, int Y0, int DY) { // Top
-							   for(int y: range(Y0, Y0+DY)) {
-								   for(int x: range(min(iw0, ix0))) target(ix0-x-1, iy0-y-1) += float4_1((1-x/float(iw0-1))*(1-y/float(ih0-1))) * source(x, y); // Left
-								   for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) target(x, iy0-y-1) += float4_1(1-y/float(ih0-1)) * source(x, y); // Center
-								   for(int x: range(iw1)) target(ix1+x, iy0-y-1) += float4_1((1-x/float(iw1-1))*(1-y/float(ih0-1))) * source(size.x-1-x, y); // Right
-							   }
-						   });
-						   parallel_chunk(size.y, [&](uint, int Y0, int DY) { // Center
-							   for(int y: range(Y0, Y0+DY)) {
-								   for(int x: range(min(iw0, ix0))) target(ix0-x-1, iy0+y) += float4_1(1-x/float(iw0-1)) * source(x, y); // Left
-								   for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) target(x, iy0+y) = source(x, y); // Center (= and not += to mask outer transition over uneven rows/columns)
-								   for(int x: range(iw1)) target(ix1+x, iy0+y) += float4_1(1-x/float(iw1-1)) * source(size.x-1-x, y); // Right
-							   }
-						   });
-						   if(ih1 > 0) parallel_chunk(ih1, [&](uint, int Y0, int DY) { // Bottom
-							   for(int y: range(Y0, Y0+DY)) {
-								   for(int x: range(min(iw0, ix0))) target(ix0-x-1, iy1+y) +=  float4_1((1-x/float(iw0-1))*(1-y/float(ih0-1))) * source(x, size.y-1-y); // Left
-								   for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) target(x, iy1+y) += float4_1(1-y/float(ih1-1)) * source(x, size.y-1-y); // Center
-								   for(int x: range(iw1)) target(ix1+x, iy1+y) += float4_1((1-x/float(iw1-1))*(1-y/float(ih0-1))) * source(size.x-1-x, size.y-1-y); // Right
-							   }
-						   });
-					} else if(1) { // -- Extends images over margins with a constant transition
-						float4 innerBackgroundColor = innerBackgroundColors[elementIndex];
-						for(int y: range(min(ih0, iy0))) {
-							mref<float4> line = target.slice((iy0-y-1)*target.stride, target.width);
-							for(int x: range(min(iw0, ix0))) {
-								float w = (1-x/float(iw0))*(1-y/float(ih0));
-								line[ix0-x-1] += float4_1(w) * innerBackgroundColor; // Left
-							}
-							for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) line[x] += float4_1(1-y/float(ih0)) * innerBackgroundColor; // Center
-							for(int x: range(iw1)) line[ix1+x] += float4_1((1-x/float(iw1))*(1-y/float(ih0))) * innerBackgroundColor; // Right
-						}
-						parallel_chunk(max(0, iy0), min(iy0+size.y, target.size.y), [&](uint, int Y0, int DY) { // Center
-							for(int y: range(Y0, Y0+DY)) {
-								float4* line = target.begin() + y*target.stride;
-								for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4_1(1-x/float(iw0)) * innerBackgroundColor; // Left
-								float4* sourceLine = source.begin() + (y-iy0)*source.stride;
-								for(int x: range(max(0, ix0), min(target.size.x, ix0+size.x))) line[x] = sourceLine[x-ix0]; // Center
-								for(int x: range(iw1)) line[ix1+x] += float4_1(1-x/float(iw1)) * innerBackgroundColor; // Right
-							}
-						});
-						for(int y: range(max(0, iy1), min(iy1+ih1, target.size.y))) {
-							float4* line = target.begin() + y*target.stride;
-							for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4_1((1-x/float(iw0))*(1-(y-iy1)/float(ih1))) * innerBackgroundColor; // Left
-							for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) line[x] += float4_1(1-(y-iy1)/float(ih1)) * innerBackgroundColor; // Center
-							for(int x: range(iw1)) line[ix1+x] += float4_1((1-x/float(iw1))*(1-(y-iy1)/float(ih1))) * innerBackgroundColor; // Right
-						}
-					}
-					x0 += w + innerMM.x;
+				});
+				for(int y: range(max(0, iy1), min(iy1+ih1, target.size.y))) {
+					float4* line = target.begin() + y*target.stride;
+					for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4_1((1-x/float(iw0))*(1-(y-iy1)/float(ih1))) * innerBackgroundColor; // Left
+					for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) line[x] += float4_1(1-(y-iy1)/float(ih1)) * innerBackgroundColor; // Center
+					for(int x: range(iw1)) line[ix1+x] += float4_1((1-x/float(iw1))*(1-(y-iy1)/float(ih1))) * innerBackgroundColor; // Right
 				}
 			}
 		}
+
+		// -- Large gaussian blur approximated with repeated box convolution
 		log("Blur");
-		Time blur; blur.start();
-		if(1) {
+		Time blur;
+		if(0) {
 			ImageF blur(target.size);
-			{// -- Large gaussian blur approximated with repeated box convolution
+			{
 				ImageF transpose(target.size.y, target.size.x);
-				const int R = min(target.size.x, target.size.y)/8;
+				const int R = min(target.size.x, target.size.y) / 8;
 				//const int R = max(min(widths), min(heights))/4; //8
-				box(transpose, target, R, outerBackgroundColor);
-				box(blur, transpose, R, outerBackgroundColor);
-				box(transpose, blur, R, outerBackgroundColor);
-				box(blur, transpose, R, outerBackgroundColor);
+				box(transpose, target, R/*, outerBackgroundColor*/);
+				box(blur, transpose, R/*, outerBackgroundColor*/);
+				box(transpose, blur, R/*, outerBackgroundColor*/);
+				box(blur, transpose, R/*, outerBackgroundColor*/);
 			}
-			for(Rect r: mask){ // -- Copies source images over blur background
-				parallel_chunk(max(0, int(r.min.y)), min(target.size.y, int(r.max.y)), [&](uint, int Y0, int DY) {
+			if(1) for(auto element: elementLayout){ // -- Copies source images over blur background
+				float x0 = element.rect.min.x, x1 = element.rect.max.x;
+				float y0 = element.rect.min.y, y1 = element.rect.max.y;
+				int ix0 = round(x0*mmPx), iy0 = round(y0*mmPx);
+				int ix1 = round(x1*mmPx), iy1 = round(y1*mmPx);
+				parallel_chunk(max(0, iy0), min(target.size.y, iy1), [&](uint, int Y0, int DY) {
 					for(int y: range(Y0, Y0+DY)) {
 						float4* blurLine = blur.begin() + y*blur.stride;
 						const float4* targetLine = target.begin() + y*target.stride;
-						for(int x: range(max(0, int(r.min.x)), min(target.size.x, int(r.max.x)))) blurLine[x] = targetLine[x];
+						for(int x: range(max(0, int(ix0)), min(target.size.x, int(ix1)))) {
+							// TODO: only blend if image.alpha
+							blurLine[x] = float4_1(targetLine[x][3]) * targetLine[x] + float4_1(1-targetLine[x][3]) * blurLine[x];
+						}
 					}
 				});
 			}
@@ -758,7 +777,7 @@ struct Mosaic {
 				iTarget[i] = byte4(sRGB_forward[int(round(0xFFF*min(1.f, target[i][0])))], sRGB_forward[int(round(0xFFF*min(1.f, target[i][1])))], sRGB_forward[int(round(0xFFF*min(1.f, target[i][2])))]);
 			}
 			if(clip) log("Clip", clip);
-			assert(!clip);
+			//assert(!clip);
 		});
 		page.blits.append(0, page.bounds.size(), move(iTarget));
 	}
@@ -770,7 +789,8 @@ struct MosaicPreview : Application {
 	GraphicsWidget view;
 	unique<Window> window = nullptr;
 	MosaicPreview() {
-		mosaic.render(	min(1680/mosaic.pageSizeMM.x, (1050-32-24)/mosaic.pageSizeMM.y));
+		//mosaic.render(min(window->Display::size.x/mosaic.pageSizeMM.x, (window->Display::size.y-32-24)/mosaic.pageSizeMM.y)); // window is not instantiated yet
+		mosaic.render(min(1050/mosaic.pageSizeMM.x, (1680-32-24)/mosaic.pageSizeMM.y));
 		if(mosaic.errors) ::error(mosaic.errors);
 		else {
 			view = move(mosaic.page);

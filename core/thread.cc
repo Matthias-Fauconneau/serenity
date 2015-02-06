@@ -13,10 +13,8 @@
 #include <sys/syscall.h>
 
 // Log
-void log(string message) {
-	String buffer = message+'\n';
-	check(write(2, buffer.data, buffer.size));
-}
+void log_(string message) { check(write(2, message.data, message.size)); }
+void log(string message) { log_(message+'\n');  }
 
 // Poll
 void Poll::registerPoll() {
@@ -115,7 +113,7 @@ static void traceAllThreads() {
     for(Thread* thread: threads) if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP); // Logs stack trace of all threads
 }
 static void handler(int sig, siginfo_t* info, void* ctx) {
-    if(sig==SIGSEGV) log("Segmentation fault");
+	if(sig==SIGSEGV) log_("Segmentation fault\n");
     if(threads.size>1) log("Thread #"+str(gettid())+':');
 	log(trace(1, (void*) ((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP]));
     if(sig!=SIGTRAP) traceAllThreads();

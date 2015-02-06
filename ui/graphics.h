@@ -30,7 +30,7 @@ struct Blit {
 /// Text graphic element
 struct Glyph {
     vec2 origin;
-    float fontSize;
+	float fontSize;
     FontData& font;
 	uint code;
 	uint index;

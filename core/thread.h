@@ -148,7 +148,7 @@ int32 gettid();
 
 struct Job : Poll {
 	function<void()> job;
-	Job(Thread& thread, function<void()> job) : Poll(0,0,thread), job(job) { queue(); }
+	Job(Thread& thread, function<void()> job, bool queue=true) : Poll(0,0,thread), job(job) { if(queue) this->queue(); }
 	void event() override { job(); }
 };
 
