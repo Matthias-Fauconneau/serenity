@@ -87,6 +87,8 @@ void box(const ImageF& target, const ImageF& source, const int width/*, const fl
 	});
 }
 
+static float4 mix(float4 x, float4 y, float a) { return float4_1(1-a)*x + float4_1(a)*y; }
+
 struct Mosaic {
 	// Image source
 	Folder folder;
@@ -735,7 +737,7 @@ struct Mosaic {
 		// -- Large gaussian blur approximated with repeated box convolution
 		log("Blur");
 		Time blur;
-		if(0) {
+		if(1) {
 			ImageF blur(target.size);
 			{
 				ImageF transpose(target.size.y, target.size.x);
@@ -746,7 +748,7 @@ struct Mosaic {
 				box(transpose, blur, R/*, outerBackgroundColor*/);
 				box(blur, transpose, R/*, outerBackgroundColor*/);
 			}
-			if(1) for(auto element: elementLayout){ // -- Copies source images over blur background
+			if(1) for(auto element: elementLayout) { // -- Copies source images over blur background
 				float x0 = element.rect.min.x, x1 = element.rect.max.x;
 				float y0 = element.rect.min.y, y1 = element.rect.max.y;
 				int ix0 = round(x0*mmPx), iy0 = round(y0*mmPx);
@@ -757,10 +759,47 @@ struct Mosaic {
 						const float4* targetLine = target.begin() + y*target.stride;
 						for(int x: range(max(0, int(ix0)), min(target.size.x, int(ix1)))) {
 							// TODO: only blend if image.alpha
-							blurLine[x] = float4_1(targetLine[x][3]) * targetLine[x] + float4_1(1-targetLine[x][3]) * blurLine[x];
+							blurLine[x] = mix(blurLine[x], targetLine[x], targetLine[x][3]);
 						}
 					}
 				});
+			}
+			if(1) for(auto element: elementLayout) { // -- Feathers
+				float x0 = element.rect.min.x, x1 = element.rect.max.x;
+				float y0 = element.rect.min.y, y1 = element.rect.max.y;
+				int ix0 = round(x0*mmPx), iy0 = round(y0*mmPx);
+				int ix1 = round(x1*mmPx), iy1 = round(y1*mmPx);
+				int2 size(ix1-ix0, iy1-iy0);
+				assert(size.x>0 && size.y>0);
+
+				// Element min,size,max pixel coordinates
+				//int2 feather = int2(floor(clamp(vec2(0), innerMM/2.f, vec2(1))*mmPx));
+				int2 feather = int2(floor(innerMM/2.f*mmPx));
+				int iw0 = feather.x, ih0 = feather.y; // Previous border sizes
+				int iw1 = feather.x, ih1 = feather.y; // Next border sizes
+
+				for(int y: range(min(ih0, iy0))) {
+					mref<float4> sourceLine = target.slice((iy0+y)*target.stride, target.width);
+					mref<float4> line = blur.slice((iy0-y-1)*target.stride, target.width);
+					for(int x: range(min(iw0, ix0))) line[ix0-x-1] = mix(line[ix0-x-1], sourceLine[ix0+x], sourceLine[ix0+x][3]*(1-x/float(iw0))*(1-y/float(ih0))); // Left
+					for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) line[x] = mix(line[x], sourceLine[x], sourceLine[x][3]*(1-y/float(ih0))); // Center
+					for(int x: range(iw1)) line[ix1+x] = mix(line[ix1+x], sourceLine[ix1+x], sourceLine[ix1+x][3]*(1-x/float(iw1))*(1-y/float(ih0))); // Right
+				}
+				parallel_chunk(max(0, iy0), min(iy0+size.y, target.size.y), [&](uint, int Y0, int DY) { // Center
+					for(int y: range(Y0, Y0+DY)) {
+						float4* sourceLine = target.begin() + y*target.stride;
+						float4* line = blur.begin() + y*target.stride;
+						for(int x: range(min(iw0, ix0))) line[ix0-x-1] = mix(line[ix0-x-1], sourceLine[ix0+x], sourceLine[ix0+x][3]*(1-x/float(iw0))); // Left
+						for(int x: range(iw1)) line[ix1+x] = mix(line[ix1+x], sourceLine[ix1-x-1], sourceLine[ix1-x-1][3]*(1-x/float(iw1))); // Right
+					}
+				});
+				for(int y: range(max(0, iy1), min(iy1+ih1, target.size.y))) {
+					float4* sourceLine = target.begin() + (iy1-1-(y-iy1))*target.stride;
+					float4* line = blur.begin() + y*target.stride;
+					for(int x: range(min(iw0, ix0))) line[ix0-x-1] = mix(line[ix0-x-1], sourceLine[ix0+x], sourceLine[ix0+x][3]*(1-x/float(iw0))*(1-(y-iy1)/float(ih1))); // Left
+					for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) line[x] = mix(line[x], sourceLine[x], sourceLine[x][3]*(1-(y-iy1)/float(ih1))); // Center
+					for(int x: range(iw1)) line[ix1+x] = mix(line[ix1+x], sourceLine[ix1-x-1], sourceLine[ix1-x-1][3]*(1-x/float(iw1))*(1-(y-iy1)/float(ih1))); // Right
+				}
 			}
 			target = move(blur);
 		}
@@ -784,7 +823,8 @@ struct Mosaic {
 };
 
 struct MosaicPreview : Application {
-	String name = move(Folder(".").list(Files).filter([](string name){return !endsWith(name,"mosaic");})[0]);
+	String name = arguments() ? (endsWith(arguments()[0],"mosaic") ? copyRef(arguments()[0]) : arguments()[0]+".mosaic") :
+		move(Folder(".").list(Files).filter([](string name){return !endsWith(name,"mosaic");})[0]);
 	Mosaic mosaic {"."_, readFile(name)};
 	GraphicsWidget view;
 	unique<Window> window = nullptr;
