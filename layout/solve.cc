@@ -149,24 +149,22 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 		float width = freeElementWidth == invalid ?
 					element.aspectRatio * height // ratio · height
 				  : x[elementsWidths+freeElementWidth]; // free width
-		vec2 cellMin =
-				margin +
+		element.margin = margin +
 				vec2(x[uniformMargin+0], x[uniformMargin+1]) +
-				vec2(x[rowMargins+rowIndex], x[columnMargins+columnIndex]) +
+				vec2(x[rowMargins+rowIndex], x[columnMargins+columnIndex]);
+		vec2 cellMin =
+				element.margin +
 				vec2(columnIndex*size.x/table.columnCount, rowIndex*size.y/table.rowCount) +
 				vec2(sum(x.slice(columnWidths, columnIndex)), sum(x.slice(rowHeights, rowIndex)));
 		vec2 cellSpanSize =
-				/*space +
-				vec2(x[uniformSpace+0], x[uniformSpace+1]) +
-				vec2(x[columnSpaces+columnIndex], x[rowSpaces+rowIndex]) +*/
 				vec2(element.cellCount.x*size.x/table.columnCount, element.cellCount.y*size.y/table.rowCount) +
 				vec2(sum(x.slice(columnWidths+element.index.x, element.cellCount.x)),
-						 sum(x.slice(rowHeights    +element.index.y, element.cellCount.y))) /*+
-				vec2(x[columnSpaces+columnIndex], x[rowSpaces+rowIndex]) +
-				vec2(x[uniformSpace+0], x[uniformSpace+1]) +
-				space*/;
+						 sum(x.slice(rowHeights    +element.index.y, element.cellCount.y)));
 		element.min = cellMin + (cellSpanSize-vec2(width, height))/2.f;
 		element.max = element.min + vec2(width, height);
+		element.space = space +
+				vec2(x[uniformSpace+0], x[uniformSpace+1]) +
+				vec2(x[columnSpaces+columnIndex], x[rowSpaces+rowIndex]);
 	}
 
 	if(1) {

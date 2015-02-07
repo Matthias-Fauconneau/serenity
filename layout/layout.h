@@ -9,6 +9,7 @@ struct Element {
 	float aspectRatio; // Element aspect ratio x/y (initialized by derived class, negative for free ratio)
 	int2 index {-1}, cellCount {-1}; // Row, column index/size in table
 	vec2 min, max; // Element geometry
+	vec2 margin, space; // Margin and space of element row/column
 	int2 size(float mmPx) const { return int2(round(max*mmPx) - round(min*mmPx)); } // Element size (in pixels)
 	virtual ~Element() {}
 	virtual struct Image image(float mmPx) const abstract;

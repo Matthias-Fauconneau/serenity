@@ -44,7 +44,7 @@ struct TextElement : Element {
 
 LayoutParse::LayoutParse(const Folder& folder, TextData&& s, function<void(string)> logChanged, FileWatcher* watcher)
 	: logChanged(logChanged) {
-	const ref<string> parameters = {"size","margin","space","chroma","intensity","hue"};
+	const ref<string> parameters = {"size","margin","space","chroma","intensity","hue","blur","background","feather"};
 	// -- Parses arguments
 	for(;;) {
 		int nextLine = 0;
