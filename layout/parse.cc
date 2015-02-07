@@ -1,7 +1,7 @@
 #include "parse.h"
 #include "file.h"
 #include "text.h"
-#include "render.h"
+#include "ui/render.h"
 #include "thread.h"
 
 struct ImageElement : Element {
@@ -30,7 +30,7 @@ struct TextElement : Element {
 		int2 size = this->size(mmPx);
 		if(transpose) swap(size.x, size.y);
 		Text text(string, textSize/72*inchMM*mmPx, white, 1, size.x, "LinLibertine", false, 1, center);
-		Image image = ::render(size, text.graphics(vec2(size)));
+		Image image = render(size, text.graphics(vec2(size)));
 		if(transpose) image = rotate(image);
 		return image;
 	}

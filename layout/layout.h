@@ -20,7 +20,7 @@ struct Cell {
 	bool horizontalExtension = false, verticalExtension = false;
 	operator size_t&() { return parentElementIndex; }
 };
-bool operator ==(const Cell& cell, size_t elementIndex) { return cell.parentElementIndex == elementIndex; }
+inline bool operator ==(const Cell& cell, size_t elementIndex) { return cell.parentElementIndex == elementIndex; }
 
 /// Table of elements
 /// \note Represented using a grid of element indices

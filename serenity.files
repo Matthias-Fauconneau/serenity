@@ -10,5 +10,8 @@ layout/parse.h
 layout/parse.cc
 layout/solve.h
 layout/solve.cc
-layout/layout.cc
+layout/preview.cc
 layout/layout.h
+layout/render.h
+layout/render.cc
+layout/export.cc
