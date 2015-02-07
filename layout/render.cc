@@ -150,6 +150,8 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			for(size_t i: range(I0, I0+DI)) source[i] = {sRGB_reverse[iSource[i][0]], sRGB_reverse[iSource[i][1]], sRGB_reverse[iSource[i][2]],
 														 image.alpha ? float(iSource[i][2])/0xFF : 1};
 		});
+		//for(size_t x: range(source.size.x)) source(x, 0) = source(x, source.size.y-1) = float4(1);
+		//for(size_t y: range(source.size.y)) source(0, y) = source(source.size.x-1, y) = float4(1);
 
 		//log(strx(int2(ix0, iy0)), strx(int2(ix1, iy1)), strx(target.size));
 #if 0

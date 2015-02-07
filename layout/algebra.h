@@ -23,6 +23,7 @@ String str(const Matrix& A);
 /// Dense vector
 typedef buffer<float> Vector;
 Vector operator*(const Matrix& A, const Vector& b);
+Vector operator-(const Vector& a, const Vector& b);
 
 /// Permutation matrix
 struct Permutation {  

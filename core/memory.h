@@ -130,7 +130,7 @@ typedef buffer<char> String;
 generic struct unique {
     unique(decltype(nullptr)):pointer(0){}
     template<Type D> unique(unique<D>&& o):pointer(o.pointer){o.pointer=0;}
-	template<Type... Args> explicit unique(Args&&... args) : pointer(new T{forward<Args>(args)...}) {}
+	template<Type... Args> explicit unique(Args&&... args) : pointer(new T(forward<Args>(args)...)) {}
     unique& operator=(unique&& o){ this->~unique(); new (this) unique(move(o)); return *this; }
     ~unique() { if(pointer) { delete pointer; } pointer=0; }
 

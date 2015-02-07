@@ -54,7 +54,7 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 		for(const size_t columnIndex : range(table.columnCount)) fitColumnWidths[columnWidths+columnIndex] = 1;
 		fitColumnWidths[uniformMargin+0] = 2; // Uniform margin x
 		fitColumnWidths[rowMargins+rowIndex] = 2; // Row margin x
-		fitColumnWidths.constant = size.x - 2*margin.x;
+		fitColumnWidths.constant = size.x -table.columnCount*size.x/table.columnCount -2*margin.x;
 	}
 
 	// • Fits row heights
@@ -63,13 +63,12 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 		for(const size_t rowIndex : range(table.rowCount)) fitRowHeights[rowHeights+rowIndex] = 1;
 		fitRowHeights[uniformMargin+1] = 2; // Uniform margin y
 		fitRowHeights[columnMargins+columnIndex] = 2; // Column margin y
-		fitRowHeights.constant = size.y - 2*margin.y;
+		fitRowHeights.constant = size.y -table.rowCount*size.y/table.rowCount -2*margin.y;
 	}
 
 	// • Fits elements to their columns/rows
 	for(size_t elementIndex : range(elements.size)) {
 		const Element& element = elements[elementIndex];
-		//log(element.index, element.cellCount);
 		{  Constraint& fitElementWidth = constraint();  // element width + 2·column space = columns width
 			setWidthCoefficient(fitElementWidth, elementIndex); // Element width
 			fitElementWidth[uniformSpace+0] = 2; // Uniform space x
@@ -82,10 +81,11 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 					fitElementWidth[columnWidths+columnIndex] = -1; // Column width
 				fitElementWidth[columnSpaces+element.index.x+element.cellCount.x-1] = 1; // Column space
 			}
-			fitElementWidth.constant = -2*space.x;
+			fitElementWidth.constant = element.cellCount.x*size.x/table.columnCount -2*space.x;
 		}
 		{  Constraint& fitElementHeight = constraint();  // Element height + 2·space = rows height
 			setHeightCoefficient(fitElementHeight, elementIndex); // Element height
+			fitElementHeight[uniformSpace+1] = 2; // Uniform space y
 			if(element.cellCount.y == 1) {
 				fitElementHeight[columnSpaces+element.index.y] = 2; // Row space
 				fitElementHeight[rowHeights+element.index.y] = -1; // Row height
@@ -95,23 +95,30 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 					fitElementHeight[rowHeights+rowIndex] = -1; // Row height
 				fitElementHeight[rowSpaces+element.index.y+element.cellCount.y-1] = 1; // Row space
 			}
-			fitElementHeight.constant = -2*space.y;
+			fitElementHeight.constant = element.cellCount.y*size.y/table.rowCount -2*space.y;
 		}
 	}
 
 	// • Horizontal anchors
-	if(1) for(size_t anchorElementIndex: horizontalAnchors) {
+	for(size_t elementIndex: horizontalAnchors) {
 		for(const size_t rowIndex : range(table.rowCount)) {
-			if(!table.row(rowIndex).contains(anchorElementIndex)) continue;
-			log("Anchor", rowIndex, elements[anchorElementIndex]->anchor.x);
+			if(!table.row(rowIndex).contains(elementIndex)) continue;
+			log("Anchor", rowIndex, elements[elementIndex]->anchor.x);
 			Constraint& anchor = constraint();
 			anchor[uniformMargin+0] = 1; // Uniform margin x
 			anchor[rowMargins+rowIndex] = 1; // Row margin x
-			int2 index = elements[anchorElementIndex]->index;
+			int2 index = elements[elementIndex]->index;
 			for(const size_t columnIndex : range(index.x)) anchor[columnWidths+columnIndex] = 1; // Previous column widths
 			anchor[columnWidths+index.x] = 1./2; // Centers anchored column
-			anchor.constant = elements[anchorElementIndex]->anchor.x * size.x - margin.x;
+			anchor.constant = elements[elementIndex]->anchor.x * size.x -(index.x+1./2)*size.x/table.columnCount -margin.x;
 		}
+	}
+
+	// • Preferred aspect ratio
+	if(0) for(size_t elementIndex: freeAspects) {
+		Constraint& preferAspectRatio = constraint();  // -ratio * height + width = 0
+		setHeightCoefficient(preferAspectRatio, elementIndex, -elements[elementIndex]->aspectRatio);
+		setWidthCoefficient(preferAspectRatio, elementIndex);
 	}
 
 	log("=", constraints.size, "constraints");
@@ -130,6 +137,7 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 	for(size_t i: range(regularizedUnknownCount)) AtA(i,i) = AtA(i,i) + 1;
 	// Solves AtA = Atb
 	Vector x = solve(move(AtA),  Atb);
+	Vector r = A*x - b; log(r);
 
 	// -- Explicitly evaluates layout
 	for(size_t elementIndex: range(elements.size)) {
@@ -144,13 +152,19 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 		vec2 cellMin =
 				margin +
 				vec2(x[uniformMargin+0], x[uniformMargin+1]) +
-				vec2(x[columnMargins+columnIndex], x[rowMargins+rowIndex]) +
-				vec2(sum(x.slice(columnWidths, columnIndex)), sum(x.slice(rowHeights, rowIndex))) +
-				space +
-				vec2(x[columnSpaces+columnIndex], x[rowSpaces+rowIndex]);
-		vec2 cellSpanSize = vec2(
-					sum(x.slice(columnWidths+element.index.x, element.cellCount.x)),
-					sum(x.slice(rowHeights+element.index.y, element.cellCount.y)));
+				vec2(x[rowMargins+rowIndex], x[columnMargins+columnIndex]) +
+				vec2(columnIndex*size.x/table.columnCount, rowIndex*size.y/table.rowCount) +
+				vec2(sum(x.slice(columnWidths, columnIndex)), sum(x.slice(rowHeights, rowIndex)));
+		vec2 cellSpanSize =
+				/*space +
+				vec2(x[uniformSpace+0], x[uniformSpace+1]) +
+				vec2(x[columnSpaces+columnIndex], x[rowSpaces+rowIndex]) +*/
+				vec2(element.cellCount.x*size.x/table.columnCount, element.cellCount.y*size.y/table.rowCount) +
+				vec2(sum(x.slice(columnWidths+element.index.x, element.cellCount.x)),
+						 sum(x.slice(rowHeights    +element.index.y, element.cellCount.y))) /*+
+				vec2(x[columnSpaces+columnIndex], x[rowSpaces+rowIndex]) +
+				vec2(x[uniformSpace+0], x[uniformSpace+1]) +
+				space*/;
 		element.min = cellMin + (cellSpanSize-vec2(width, height))/2.f;
 		element.max = element.min + vec2(width, height);
 	}
@@ -176,7 +190,8 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 				if(cell.horizontalExtension) s.append("-");
 				if(cell.verticalExtension) s.append("|");
 				const Element& e = elements[cell.parentElementIndex];
-				s.append(str(strx(int2(round(e.min))), strx(int2(round(e.max-e.min))), "\t"));
+				//s.append(str(strx(int2(round(e.min))), strx(int2(round(e.max-e.min))), "\t"));
+				s.append(str(strx(int2(round(e.min))), strx(int2(round(e.max))), "\t"));
 			}
 		}
 		log(s);

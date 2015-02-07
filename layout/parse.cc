@@ -19,13 +19,15 @@ struct ImageElement : Element {
 };
 struct TextElement : Element {
 	String string;
-	bool center = true;
 	float textSize = 12;
 	bool transpose = false;
-	TextElement(::string text) : string(copyRef(text)) {
+	bool center = true;
+	TextElement(::string text, float textSize, bool transpose, bool center)
+		: string(copyRef(text)), textSize(textSize), transpose(transpose), center(center) {
 		vec2 size = Text(text, textSize/72*72, white, 1, 0, "LinLibertine", false, 1, center).sizeHint();
 		if(transpose) swap(size.x, size.y);
-		aspectRatio = - (float)size.x/size.y;
+		aspectRatio = (float)size.x/size.y;
+		log(text, aspectRatio);
 	}
 	Image image(float mmPx) const override {
 		int2 size = this->size(mmPx);
@@ -81,16 +83,15 @@ LayoutParse::LayoutParse(const Folder& folder, TextData&& s, function<void(strin
 				unique<Element> element = nullptr;
 				/**/ if(s.match("@")) { // Indirect text
 					string name = s.whileNo(" \t\n");
-					unique<TextElement> text(readFile(name));
-					text->center = false;
-					element = move(text);
 					if(watcher) watcher->addWatch(name);
+					element = unique<TextElement>(readFile(name), 12.f, false, false);
+					freeAspects.append(elements.size);
 				} else if(s.match("\"")) { // Text
-					unique<TextElement> text (replace(s.until('"'),"\\n","\n"));
+					String text = replace(s.until('"'),"\\n","\n");
 					string textSize = s.whileDecimal();
-					text->textSize = textSize ? parseDecimal(textSize) : 12;
-					text->transpose = s.match("T");
-					element = move(text);
+					bool transpose = s.match("T");
+					element = unique<TextElement>(text, textSize ? parseDecimal(textSize) : 12, transpose, true);
+					//freeAspects.append(elements.size);
 				} else { // Image
 					string name = s.whileNo("! \t\n");
 					string file = [&](string name) { for(string file: files) if(startsWith(file, name)) return file; return ""_; }(name);
@@ -100,7 +101,6 @@ LayoutParse::LayoutParse(const Folder& folder, TextData&& s, function<void(strin
 				}
 				element->index = int2(row.size-1, rows.size);
 				if(s.match("!")) element->anchor.x = 1./2;
-				if(element->aspectRatio<0) freeAspects.append(elements.size);
 				if(element->anchor.x) horizontalAnchors.append(elements.size);
 				if(element->anchor.y) verticalAnchors.append(elements.size);
 				elements.append(move(element));

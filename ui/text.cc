@@ -264,7 +264,7 @@ shared<Graphics> Text::graphics(vec2 size) {
 
 	shared<Graphics> graphics;
     //assert_(abs(size.y - textSize.y)<=1, size, textSize);
-	vec2 offset = max(vec2(0), vec2(center ? size.x/2 : 0, (size.y-textSize.y)/2.f));
+	vec2 offset = max(vec2(0), vec2(center ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
 	//FIXME: use Graphic::offset
 	for(const auto& line: layout.glyphs) for(const auto& word: line) for(Glyph e: word) { e.origin += offset; graphics->glyphs.append( e ); }
 	for(auto e: layout.lines) { e.a += offset; e.b +=offset; graphics->lines.append( e ); }
