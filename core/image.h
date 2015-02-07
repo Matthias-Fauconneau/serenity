@@ -1,8 +1,7 @@
 #pragma once
 /// \file image.h Image container and operations
 #include "vector.h"
-#include "data.h"
-#include "parallel.h"
+#include "simd.h"
 
 /// 2D array of BGRA 8-bit unsigned integer pixels
 struct Image : buffer<byte4> {
@@ -78,3 +77,33 @@ struct Image16 : buffer<int16> {
 	Image16(int2 size) : buffer((size_t)size.y*size.x), size(size) {}
 	inline notrace int16& operator()(size_t x, size_t y) const { assert(x<size_t(size.x) && y<size_t(size.y)); return at(y*size.x+x); }
 };
+
+// -- 4x float
+
+/// 2D array of floating-point 4 component vector pixels
+struct ImageF : buffer<v4sf> {
+	ImageF(){}
+	ImageF(buffer<v4sf>&& data, int2 size, size_t stride) : buffer(::move(data)), size(size), stride(stride) {
+		assert(buffer::size==size_t(size.y*stride), buffer::size, size, stride);
+	}
+	ImageF(int width, int height) : buffer(height*width), width(width), height(height), stride(width) {
+		assert(size>int2(0), size, width, height);
+	}
+	ImageF(int2 size) : ImageF(size.x, size.y) {}
+
+	inline v4sf& operator()(size_t x, size_t y) const {assert(x<width && y<height, x, y); return at(y*stride+x); }
+
+	union {
+		int2 size = 0;
+		struct { uint width, height; };
+	};
+	size_t stride = 0;
+};
+inline ImageF copy(const ImageF& o) {
+	if(o.width == o.stride) return ImageF(copy((const buffer<v4sf>&)o), o.size, o.stride);
+	ImageF target(o.size);
+	for(size_t y: range(o.height)) target.slice(y*target.stride, target.width).copy(o.slice(y*o.stride, o.width));
+	return target;
+}
+
+void box(const ImageF& target, const ImageF& source, const int width/*, const v4sf border*/);

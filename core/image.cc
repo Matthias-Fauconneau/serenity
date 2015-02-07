@@ -164,3 +164,46 @@ void resize(const Image& target, const Image& source) {
 		bilinear(target, box((source.size/*+int2((downsampleFactor-1)/2)*/)/downsampleFactor, source));
     }
 }
+
+// -- 4x float
+
+// Box convolution with constant border
+void box(const ImageF& target, const ImageF& source, const int width/*, const v4sf border*/) {
+	assert(target.size.y == source.size.x && target.size.x == source.size.y && uint(target.stride) == target.width && uint(source.stride)==source.width);
+	parallel_chunk(source.size.y, [&](uint, int Y0, int DY) { // Top
+		const v4sf* const sourceData = source.data;
+		v4sf* const targetData = target.begin();
+		const uint sourceStride = source.stride;
+		const uint targetStride = target.stride;
+		//const v4sf scale = float4(1./(width+1/*+width*/));
+		//const v4sf sum0 = 0; //float4(width)*border;
+		for(int y: range(Y0, Y0+DY)) {
+			const v4sf* const sourceRow = sourceData + y * sourceStride;
+			v4sf* const targetColumn = targetData + y;
+			v4sf sum = float4(0);//sum0;
+			for(uint x: range(width)) sum += sourceRow[x];
+			float N = width;
+			for(uint x: range(width)) {
+				sum += sourceRow[x+width];
+				N++;
+				const v4sf scale = float4(1./N);
+				targetColumn[x * targetStride] = scale * sum;
+				//sum -= border;
+			}
+			const v4sf scale = float4(1./N);
+			for(uint x: range(width, sourceStride-width)) {
+				v4sf const* source = sourceRow + x;
+				sum += source[width];
+				targetColumn[x * targetStride] = scale * sum;
+				sum -= source[-width];
+			}
+			for(uint x: range(sourceStride-width, sourceStride)) {
+				//sum += border;
+				const v4sf scale = float4(1./N);
+				targetColumn[x * targetStride] = scale * sum;
+				sum -= sourceRow[x-width];
+				N--;
+			}
+		}
+	});
+}

@@ -10,11 +10,6 @@ inline v4si loada(const uint32* const ptr) { return *(v4si*)ptr; }
 inline v4si loadu(const uint32* const ptr) { return (v4si)__builtin_ia32_lddqu((byte*)ptr); }
 inline void storea(uint32* const ptr, v4si a) { *(v4si*)ptr = a; }
 
-// v16qi
-typedef byte v16qi  __attribute((__vector_size__ (16)));
-inline v16qi loadu(const byte* const ptr) { return __builtin_ia32_lddqu(ptr); }
-inline void storeu(byte* const ptr, v16qi a) { __builtin_ia32_storedqu(ptr, a); }
-
 // v4sf
 typedef float v4sf __attribute((__vector_size__ (16)));
 inline v4sf constexpr float4(float f) { return (v4sf){f,f,f,f}; }
@@ -33,5 +28,12 @@ inline int mask(v4sf a) { return __builtin_ia32_movmskps(a); }
 
 inline v4si cvtps2dq(v4sf a) { return __builtin_ia32_cvtps2dq(a); }
 inline v4sf cvtdq2ps(v4si a) { return __builtin_ia32_cvtdq2ps(a); }
+
+inline v4sf mix(v4sf x, v4sf y, float a) { return float4(1-a)*x + float4(a)*y; }
+
+#include "math.h"
+template<Type T> T mean(const ref<v4sf> x) { assert(x.size); return sum(x, float4(0)) / float4(x.size); }
+#include "string.h"
+template<> inline String str(const v4sf& v) { return "("+str(v[0], v[1], v[2], v[3])+")"; }
 
 #undef inline

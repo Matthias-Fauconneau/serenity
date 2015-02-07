@@ -9,10 +9,17 @@
 generic T parse(TextData&) { static_assert(0&&sizeof(T), "No overload for parse<T>(TextData&)"); }
 
 generic T parse(string str) { TextData s(str); T t = parse<T>(s); assert_(!s, s); return t; }
+/// Forwards string
 template<> inline String parse<String>(string source) { return copyRef(source); }
 
+/// Parses integer
 template<> inline int parse<int>(TextData& s) { return s.integer(); }
-template<> inline float parse<float>(TextData& s) { return s.decimal(); }
+/// Parses decimal or fraction
+template<> inline float parse<float>(TextData& s) {
+	float num = s.decimal();
+	if(s.match("/")) return num/s.decimal();
+	else return num;
+}
 
 generic array<T> parseArray(string str) { TextData s(str); auto t = parseArray<T>(s); assert_(!s, s); return t; }
 generic array<T> parseArray/*<array<T>>*/(TextData& s) {

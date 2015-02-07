@@ -1,7 +1,7 @@
 #pragma once
 /// \file vector.h Vector definitions and operations
 #include "string.h"
-#include "math.h" //round
+#include "math.h"
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
