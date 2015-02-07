@@ -97,7 +97,41 @@ struct Mosaic {
 	ref<string> parameters = {"page-size"_,"outer","inner","same-outer"_,"same-inner","same-size","chroma","intensity","hue"};
 	map<String, String> arguments;
 	vec2 pageSizeMM = 0, pageSizePx = 0;
-	array<String> elements; // Image or text elements (TODO: polymorphic object)
+	struct Element {
+		virtual ~Element() {}
+		virtual vec2 size() abstract;
+		virtual Image image(int2 size, float inchPx) abstract;
+	};
+	struct ImageElement : Element {
+		Map file;
+		ImageElement(string fileName, const Folder& folder) : file(fileName , folder) {}
+		vec2 size() override { return vec2(::imageSize(file)); }
+		Image image(int2, float) override {
+			Image image = decodeImage(file);
+			image.alpha = false;
+			return image;
+		}
+	};
+	struct TextElement : Element {
+		String string;
+		float textSize = 12;
+		Text text;
+		bool transpose;
+		TextElement(::string text) : string(copyRef(text)), text(text, textSize/72*72, white, 1, 0, "LinLibertine") {}
+		vec2 size() override {
+			vec2 size = text.sizeHint();
+			if(transpose) swap(size.x, size.y);
+			return size;
+		}
+		Image image(int2 size, float inchPx) override {
+			if(transpose) swap(size.x, size.y);
+			text = Text(string, textSize/72*inchPx, white, 1, 0, "LinLibertine");
+			Image image = ::render(size, text.graphics(vec2(size)));
+			if(transpose) image = rotate(image);
+			return image;
+		}
+	};
+	array<unique<Element>> elements; // Image or text elements (TODO: polymorphic object)
 	array<array<int>> rows; // Index into elements (-1: row extension, -2 column extension, -3: inner extension)
 	buffer<vec2> sizes; // Elements sizes
 
@@ -148,18 +182,24 @@ struct Mosaic {
 
 		while(s) {
 			array<int> row;
-			for(string element; (element = s.whileNo(" \t\n"));) {
-				/***/ if(element=="-") row.append(-1); //{ assert(row); row.append(row.last()); }
-				else if(element=="|") { columnStructure=true; row.append(-2); } //{ assert(rows && rows.last().size==row.size+1); row.append(rows.last()[row.size]); }
-				else if(element=="\\") row.append(-3); //{ assert(rows && rows.last().size==row.size+1); row.append(rows.last()[row.size]); }
+			while(!s.match("\n")) {
+				if(s.match("#")) { s.until('\n'); continue; }
+				/***/ if(s.match("-")) row.append(-1); //{ assert(row); row.append(row.last()); }
+				else if(s.match("|")) { columnStructure=true; row.append(-2); } //{ assert(rows && rows.last().size==row.size+1); row.append(rows.last()[row.size]); }
+				else if(s.match("\\")) row.append(-3); //{ assert(rows && rows.last().size==row.size+1); row.append(rows.last()[row.size]); }
 				else {
 					row.append(elements.size); // Appends element index to row
-					if(startsWith(element, "\"")) { // Text
-						elements.append(replace(element,"\\n","\n"));
+					if(s.match("\"")) { // Text
+						unique<TextElement> text (replace(s.until('"'),"\\n","\n"));
+						string textSize = s.whileDecimal();
+						text->textSize = textSize ? parseDecimal(textSize) : 12;
+						text->transpose = s.match("T");
+						elements.append(move(text));
 					} else { // Image
-						string file = [&](string name) { for(string file: files) if(startsWith(file, name)) return file; return ""_; }(element);
-						if(!file) { error("No such image"_, element, "in", files); return; }
-						elements.append(copyRef(file));
+						string name = s.whileNo(" \t\n");
+						string file = [&](string name) { for(string file: files) if(startsWith(file, name)) return file; return ""_; }(name);
+						if(!file) { error("No such image"_, name, "in", files); return; }
+						elements.append(unique<ImageElement>(file, folder));
 					}
 				}
 				s.whileAny(" \t"_);
@@ -172,19 +212,15 @@ struct Mosaic {
 			}
 			rows.append(move(row));
 			if(!s) break;
-			s.skip('\n');
 		}
 		if(rows.size==1) rowStructure=true;
 		assert(rows);
 		log(arguments);
 
-		sizes = apply(elements, [&](string element) { // Element sizes
-				if(startsWith(element, "\"")) return Text(element.slice(1, element.size-2)).sizeHint();
-				else return vec2(::imageSize(Map(element, folder)));
-		});
-		for(size_t imageIndex: range(elements.size)) {
+		sizes = apply(elements, [&](Element& element) { return element.size(); });
+		/*for(size_t imageIndex: range(elements.size)) {
 			log(elements[imageIndex], strx(sizes[imageIndex]), (float)sizes[imageIndex].x/sizes[imageIndex].y);
-		}
+		}*/
 		Vector aspectRatios = apply(sizes, [=](vec2 size){ return (float)size.x/size.y; }); // Image aspect ratios
 
 		// Page definition
@@ -530,18 +566,11 @@ struct Mosaic {
 		}
 
 		// -- Decodes/renders each element
-		log("Decoding"_, elements);
+		//log("Decoding"_, elements);
 		Time load;
-		buffer<Image> images = apply(elements.size, [&](const size_t elementIndex) {
-			string element = elements[elementIndex];
-			if(startsWith(element, "\"")) { // Text
-				int2 size = elementLayout[elementIndex].size;
-				return ::render(size, Text(element.slice(1, element.size-2), 36./72*inchPx, white, 1, 0, "LinLibertine").graphics(vec2(size)));
-			} else {
-				Image image = decodeImage(Map(element, folder));
-				image.alpha = false;
-				return move(image);
-			}
+		buffer<Image> images = apply(elements.size, [&](size_t elementIndex) {
+			int2 size = elementLayout[elementIndex].size;
+			return elements[elementIndex]->image(size, inchPx);
 		});
 		log("+", load);
 
@@ -686,12 +715,15 @@ struct Mosaic {
 			});
 
 			// -- Margins
-			if(1) { // -- Extends images over margins with a mirror transition
+			if(0) { // -- Extends images over margins with a mirror transition
+				// Clamps border transition size to image size to mirror once
+				if(iw0 > size.x) iw0 = size.x; if(iw1 > size.x) iw1 = size.x;
+				if(ih0 > size.y) ih0 = size.y; if(ih1 > size.y) ih1 = size.y;
 				for(int y: range(min(ih0, iy0))) {
 					mref<float4> line = target.slice((iy0-y-1)*target.stride, target.width);
 					for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4_1((1-x/float(iw0))*(1-y/float(ih0))) * source(x, y); // Left
 					for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) line[x] += float4_1(1-y/float(ih0)) * source(x-ix0, y); // Center
-					for(int x: range(iw1)) line[ix1+x] += float4_1((1-x/float(iw1))*(1-y/float(ih0))) * source(size.x-1-x, y); // Right
+					for(int x: range(max(0, ix1), min(ix1+iw1, target.size.x))) line[x] += float4_1(1-(x-ix1)/float(iw1)*(1-y/float(ih0))) * source(size.x-1-x, y); // Right
 				}
 				parallel_chunk(max(0, iy0), min(iy0+size.y, target.size.y), [&](uint, int Y0, int DY) { // Center
 					for(int y: range(Y0, Y0+DY)) {
@@ -699,14 +731,14 @@ struct Mosaic {
 						for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4_1(1-x/float(iw0)) * source(x, y-iy0); // Left
 						float4* sourceLine = source.begin() + (y-iy0)*source.stride;
 						for(int x: range(max(0, ix0), min(target.size.x, ix0+size.x))) line[x] = sourceLine[x-ix0]; // Copy image
-						for(int x: range(iw1)) line[ix1+x] += float4_1(1-x/float(iw1)) * source(size.x-1-x, y-iy0); // Right
+						for(int x: range(max(0, ix1), min(ix1+iw1, target.size.x))) line[x] += float4_1(1-(x-ix1)/float(iw1)) * source(size.x-1-x, y-iy0); // Right
 					}
 				});
 				for(int y: range(max(0, iy1), min(iy1+ih1, target.size.y))) {
 					float4* line = target.begin() + y*target.stride;
 					for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4_1((1-x/float(iw0))*(1-(y-iy1)/float(ih1))) * source(x-ix0, size.y-1-(y-iy1)); // Left
 					for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) line[x] += float4_1(1-(y-iy1)/float(ih1)) * source(x-ix0, size.y-1-(y-iy1)); // Center
-					for(int x: range(iw1)) line[ix1+x] += float4_1((1-x/float(iw1))*(1-(y-iy1)/float(ih1))) * source(size.x-1-x, size.y-1-(y-iy1)); // Right
+					for(int x: range(max(0, ix1), min(ix1+iw1, target.size.x))) line[x] += float4_1(1-(x-ix1)/float(iw1)*(1-(y-iy1)/float(ih1))) * source(size.x-1-x, size.y-1-(y-iy1)); // Right
 				}
 			} else if(1) { // -- Blends inner background over margins with a linear transition
 				float4 innerBackgroundColor = innerBackgroundColors[elementIndex];
@@ -714,7 +746,7 @@ struct Mosaic {
 					mref<float4> line = target.slice((iy0-y-1)*target.stride, target.width);
 					for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4_1((1-x/float(iw0))*(1-y/float(ih0))) * innerBackgroundColor; // Left
 					for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) line[x] += float4_1(1-y/float(ih0)) * innerBackgroundColor; // Center
-					for(int x: range(iw1)) line[ix1+x] += float4_1((1-x/float(iw1))*(1-y/float(ih0))) * innerBackgroundColor; // Right
+					for(int x: range(max(0, ix1), min(ix1+iw1, target.size.x))) line[x] += float4_1(1-(x-ix1)/float(iw1)*(1-y/float(ih0))) * innerBackgroundColor; // Right
 				}
 				parallel_chunk(max(0, iy0), min(iy0+size.y, target.size.y), [&](uint, int Y0, int DY) { // Center
 					for(int y: range(Y0, Y0+DY)) {
@@ -722,14 +754,14 @@ struct Mosaic {
 						for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4_1(1-x/float(iw0)) * innerBackgroundColor; // Left
 						float4* sourceLine = source.begin() + (y-iy0)*source.stride;
 						for(int x: range(max(0, ix0), min(target.size.x, ix0+size.x))) line[x] = sourceLine[x-ix0]; // Copy image
-						for(int x: range(iw1)) line[ix1+x] += float4_1(1-x/float(iw1)) * innerBackgroundColor; // Right
+						for(int x: range(max(0, ix1), min(ix1+iw1, target.size.x))) line[x] += float4_1(1-(x-ix1)/float(iw1)) * innerBackgroundColor; // Right
 					}
 				});
 				for(int y: range(max(0, iy1), min(iy1+ih1, target.size.y))) {
 					float4* line = target.begin() + y*target.stride;
 					for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4_1((1-x/float(iw0))*(1-(y-iy1)/float(ih1))) * innerBackgroundColor; // Left
 					for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) line[x] += float4_1(1-(y-iy1)/float(ih1)) * innerBackgroundColor; // Center
-					for(int x: range(iw1)) line[ix1+x] += float4_1((1-x/float(iw1))*(1-(y-iy1)/float(ih1))) * innerBackgroundColor; // Right
+					for(int x: range(max(0, ix1), min(ix1+iw1, target.size.x))) line[x] += float4_1(1-(x-ix1)/float(iw1)*(1-(y-iy1)/float(ih1))) * innerBackgroundColor; // Right
 				}
 			}
 		}

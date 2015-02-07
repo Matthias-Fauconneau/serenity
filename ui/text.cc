@@ -119,7 +119,7 @@ struct TextLayout {
             uint16 previous=spaceIndex;
             int previousRightOffset = 0; // Hinted kerning
 
-            for(uint c: text) {
+			for(uint c: text) {
                 // Breaking whitespace
                 /***/ if(c==' '||c=='\t'||c=='\n') {
                     previous = spaceIndex;
@@ -216,7 +216,7 @@ struct TextLayout {
 						//assert_(metrics.size, hex(c));
                         word.append( Glyph(metrics,::Glyph{position+offset, size, *font, c, font->font(size).index(c), color}) );
                     }
-                    position.x += metrics.advance;
+					position.x += metrics.advance;
                 }
             }
             if(word) nextWord(move(word), justify);

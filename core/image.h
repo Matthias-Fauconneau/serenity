@@ -58,8 +58,10 @@ static Image name ## Icon() { \
 
 /// Rotates an image
 void rotate(const Image& target, const Image& source);
+inline Image rotate(Image&& target, const Image& source) { rotate(target, source); return move(target); }
+inline Image rotate(const Image& source) { return rotate(Image(int2(source.size.y, source.size.x), source.alpha), source); }
 /// Rotates an image around
-void rotate(const Image& target);
+void rotateHalfTurn(const Image& target);
 
 // -- Resample (3x8bit) --
 

@@ -7,7 +7,7 @@
 
 /// Rich text format control code encoded in 00-1F range
 // \note first word (until ' ') after a Link tag is not displayed but used as \a linkActivated identifier.
-enum class TextFormat : char { Regular, Bold, Italic, Superscript, Subscript, Stack, Fraction, End };
+enum class TextFormat { Regular, Bold, Italic, Superscript, Subscript, Stack, Fraction, End };
 static_assert(TextFormat::End < (TextFormat)'\t', "");
 
 inline String regular(string s) { return char(TextFormat::Regular) + s + char(TextFormat::End); }
