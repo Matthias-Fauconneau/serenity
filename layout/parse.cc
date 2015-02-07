@@ -1,5 +1,6 @@
 #include "parse.h"
 #include "file.h"
+#include "jpeg.h"
 #include "text.h"
 #include "ui/render.h"
 #include "thread.h"

@@ -140,6 +140,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		assert(size.x>0 && size.y>0);
 
 		const Image& image = images[elementIndex];
+		if(size == image.size) log(size); else log(image.size, "→", size);
 		// TODO: single pass linear resize, float conversion (or decode to float and resize) + direct output to target
 		Image iSource = size == image.size ? share(image) : resize(size, image);
 		ImageF source (size);
@@ -149,6 +150,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 														 image.alpha ? float(iSource[i][2])/0xFF : 1};
 		});
 
+		log(strx(int2(ix0, iy0)), strx(int2(ix1, iy1)), strx(target.size));
 #if 0
 		// -- Margins
 		int currentRowIndex = element.index[0];

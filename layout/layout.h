@@ -29,7 +29,7 @@ struct Table {
 	union { int2 size = 0; struct { uint columnCount, rowCount; }; };
 	buffer<Cell> cells;
 	Table() {}
-	Table(int2 size) : size(size), cells((size_t)size.y*size.x) {}
+	Table(int2 size) : size(size), cells((size_t)size.y*size.x) { cells.clear(); }
 	inline notrace ref<Cell> row(size_t y) const { assert(y<size_t(size.y)); return cells.slice(y*size.x, size.x); }
 	inline notrace Cell& operator()(size_t x, size_t y) const { assert(x<size_t(size.x) && y<size_t(size.y), x, y); return cells[y*size.x+x]; }
 	inline notrace Cell& operator()(int2 index) const { return operator()(index.x, index.y); }

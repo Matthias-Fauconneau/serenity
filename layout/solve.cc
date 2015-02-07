@@ -30,6 +30,7 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 		float constant = 0;
 		Constraint(size_t size) : buffer(size) { clear(0); }
 		float& operator[](int unknownIndex) { assert(at(unknownIndex)==0); return at(unknownIndex); }
+		float operator[](int unknownIndex) const { return at(unknownIndex); }
 	};
 	// Sets height coefficient
 	auto setHeightCoefficient = [=](Constraint& constraint, size_t elementIndex, float coefficient=1) {
@@ -68,6 +69,7 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 	// • Fits elements to their columns/rows
 	for(size_t elementIndex : range(elements.size)) {
 		const Element& element = elements[elementIndex];
+		//log(element.index, element.cellCount);
 		{  Constraint& fitElementWidth = constraint();  // width + 2·column space = columns width
 			setWidthCoefficient(fitElementWidth, elementIndex);
 			fitElementWidth[uniformSpace+0] = 2; // Uniform space x
@@ -88,10 +90,10 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 				fitElementHeight[columnSpaces+element.index.y] = 2; // Row space
 				fitElementHeight[rowHeights+element.index.y] = -1; // Row height
 			} else {
-				fitElementHeight[rowHeights+element.index.y] = 1; // Row space
+				fitElementHeight[rowSpaces+element.index.y] = 1; // Row space
 				for(size_t rowIndex: range(element.index.y, element.index.y+element.cellCount.y))
-					fitElementHeight[rowHeights+rowIndex] = -1; // Column width
-				fitElementHeight[rowHeights+element.index.y+element.cellCount.y-1] = 1; // Row space
+					fitElementHeight[rowHeights+rowIndex] = -1; // Row height
+				fitElementHeight[rowSpaces+element.index.y+element.cellCount.y-1] = 1; // Row space
 			}
 			fitElementHeight.constant = -2*space.y;
 		}
@@ -138,8 +140,9 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 	// -- Solves regularized linear least square system
 	Matrix A (constraints.size, unknownCount); Vector b (constraints.size);
 	for(size_t i: range(constraints.size)) {
-		for(size_t j: range(unknownCount)) A(i,j) = constraints[i][j];
-		b[i] = constraints[i].constant;
+		const Constraint& constraint = constraints[i];
+		for(size_t j: range(unknownCount)) A(i,j) = constraint[j];
+		b[i] = constraint.constant;
 	}
 	Matrix At = transpose(A);
 	Matrix AtA = At * A;
@@ -186,8 +189,9 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 				if(cell.horizontalExtension) s.append("-");
 				if(cell.verticalExtension) s.append("|");
 				const Element& e = elements[cell.parentElementIndex];
-				s.append(str(e.min, e.max, "\t"));
+				s.append(str(strx(int2(round(e.min))), strx(int2(round(e.max-e.min))), "\t"));
 			}
 		}
+		log(s);
 	}
 }
