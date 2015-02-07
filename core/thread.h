@@ -5,6 +5,7 @@
 #include "function.h"
 #include <poll.h>
 #include <pthread.h> //pthread
+#include <sys/inotify.h>
 
 /// Abstract factory pattern (allows construction of class by names)
 template<class I> struct Interface {
@@ -167,3 +168,23 @@ int wait();
 /// \note Returns immediatly if process is waitable (already terminated)
 int64 wait(int pid);
 
+/// Watches a folder for new files
+struct FileWatcher : File, Poll {
+	String path;
+	function<void(string)> fileModified;
+
+	FileWatcher(string path, function<void(string)> fileModified)
+		: File(inotify_init1(IN_CLOEXEC)), Poll(File::fd), path(copyRef(path)), fileModified(fileModified) {
+		addWatch(path);
+	}
+	void addWatch(string path)  { check(inotify_add_watch(File::fd, strz(path), IN_MODIFY), path); }
+	void event() override {
+		while(poll()) {
+			::buffer<byte> buffer = readUpTo(sizeof(struct inotify_event) + 256);
+			inotify_event e = *(inotify_event*)buffer.data;
+			string name = e.len ? string(e.name, e.len-1) : path;
+			fileModified(name);
+			addWatch(name); // FIXME: should already not be one shot
+		}
+	}
+};

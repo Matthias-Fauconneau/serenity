@@ -98,6 +98,8 @@ struct Mosaic {
 	map<String, String> arguments;
 	vec2 pageSizeMM = 0, pageSizePx = 0;
 	struct Element {
+		vec2 anchor = -1; // Anchors element center to an absolute position (soft constraint)
+
 		virtual ~Element() {}
 		virtual vec2 size() abstract;
 		virtual Image image(int2 size, float inchPx) abstract;
@@ -114,18 +116,19 @@ struct Mosaic {
 	};
 	struct TextElement : Element {
 		String string;
+		bool center = true;
 		float textSize = 12;
 		Text text;
-		bool transpose;
-		TextElement(::string text) : string(copyRef(text)), text(text, textSize/72*72, white, 1, 0, "LinLibertine") {}
+		bool transpose = false;
+		TextElement(::string text) : string(copyRef(text)), text(text, textSize/72*62/*72*/, white, 1, 0, "LinLibertine", false, 1, center) {}
 		vec2 size() override {
 			vec2 size = text.sizeHint();
 			if(transpose) swap(size.x, size.y);
-			return size;
+			return -size;
 		}
 		Image image(int2 size, float inchPx) override {
 			if(transpose) swap(size.x, size.y);
-			text = Text(string, textSize/72*inchPx, white, 1, 0, "LinLibertine");
+			text = Text(string, textSize/72*inchPx, white, 1, size.x, "LinLibertine", false, 1, center);
 			Image image = ::render(size, text.graphics(vec2(size)));
 			if(transpose) image = rotate(image);
 			return image;
@@ -154,7 +157,8 @@ struct Mosaic {
 #undef assert
 #define assert(expr, message...) ({ if(!(expr)) { error(#expr ""_, ## message); return; } })
 
-	Mosaic(const Folder& folder, TextData&& s, function<void(string)> logChanged = {}) : folder("."_, folder), logChanged(logChanged) {
+	Mosaic(const Folder& folder, TextData&& s, function<void(string)> logChanged, FileWatcher* watcher = 0)
+		: folder("."_, folder), logChanged(logChanged) {
 		// -- Parses arguments
 		for(;;) {
 			int nextLine = 0;
@@ -189,18 +193,28 @@ struct Mosaic {
 				else if(s.match("\\")) row.append(-3); //{ assert(rows && rows.last().size==row.size+1); row.append(rows.last()[row.size]); }
 				else {
 					row.append(elements.size); // Appends element index to row
-					if(s.match("\"")) { // Text
+					unique<Element> element = nullptr;
+					/**/ if(s.match("@")) { // Indirect text
+						string name = s.whileNo(" \t\n");
+						unique<TextElement> text(readFile(name));
+						text->center = false;
+						element = move(text);
+						if(watcher) watcher->addWatch(name);
+					} else if(s.match("\"")) { // Text
 						unique<TextElement> text (replace(s.until('"'),"\\n","\n"));
 						string textSize = s.whileDecimal();
 						text->textSize = textSize ? parseDecimal(textSize) : 12;
 						text->transpose = s.match("T");
-						elements.append(move(text));
+						element = move(text);
 					} else { // Image
-						string name = s.whileNo(" \t\n");
+						string name = s.whileNo("! \t\n");
 						string file = [&](string name) { for(string file: files) if(startsWith(file, name)) return file; return ""_; }(name);
 						if(!file) { error("No such image"_, name, "in", files); return; }
-						elements.append(unique<ImageElement>(file, folder));
+						if(watcher) watcher->addWatch(file);
+						element = unique<ImageElement>(file, folder);
 					}
+					if(s.match("!")) element->anchor.x = 1./2;
+					elements.append(move(element));
 				}
 				s.whileAny(" \t"_);
 			}
@@ -221,7 +235,11 @@ struct Mosaic {
 		/*for(size_t imageIndex: range(elements.size)) {
 			log(elements[imageIndex], strx(sizes[imageIndex]), (float)sizes[imageIndex].x/sizes[imageIndex].y);
 		}*/
-		Vector aspectRatios = apply(sizes, [=](vec2 size){ return (float)size.x/size.y; }); // Image aspect ratios
+		Vector aspectRatios = apply(sizes, [=](vec2 size){ return (size.x>0?1:-1) * (float)size.x/size.y; }); // Image aspect ratios
+		int freeWidths = sum(apply(aspectRatios, [](float ratio) -> int { return ratio<0; }));
+		log(freeWidths, "free aspect ratios");
+		int anchors = sum(apply(elements, [](const Element& e) -> int { return e.anchor.x>0 + e.anchor.y>0; }));
+		log(anchors, "anchors");
 
 		// Page definition
 		pageSizeMM = 10.f*parse<vec2>(arguments.at("page-size")); // 50x40, 40x30, 114x76
@@ -231,7 +249,16 @@ struct Mosaic {
 		log(inner0, outer0);
 
 		// System
-		const size_t k = elements.size + 2 + 2; // Unknowns (heights + margins)
+		const size_t k = elements.size + 2 + 2 + freeWidths; // Unknowns (heights + margins + free widths)
+		buffer<int> elementIndexToUnknownIndex (elements.size);
+		{
+			size_t freeWidthIndex = elements.size + 2 + 2;
+			for(size_t elementIndex: range(elements.size)) {
+				if(sizes[elementIndex].x > 0) elementIndexToUnknownIndex[elementIndex] = elementIndex; // height
+				else elementIndexToUnknownIndex[elementIndex] = freeWidthIndex++; // width
+			}
+			assert_(freeWidthIndex == k);
+		}
 		size_t uniformColumnCount = rows[0].size;
 		//for(ref<int> row: rows) if(row.size != rows[0].size) { uniformColumnCount = 0; assert(rows[0].size == 1); break; }
 		for(ref<int> row: rows) assert(row.size == rows[0].size);
@@ -248,26 +275,33 @@ struct Mosaic {
 				(sameWidthsInColumn?uniformColumnCount*(rows.size-1):0) + // Same widths in column
 				(sameHeightsInRow?rows.size*(uniformColumnCount-1):0) + // Same heights in row
 				(sameElementSizes?(elements.size-1)*2:0) + // Same image sizes (width, height)
+				anchors + // anchor constraints
+				freeWidths + // Free width preferable aspect ratio hint constraint
 				1 + // outer.x=outer.y
 				1; // inner.x=inner.y
 		Matrix A (preallocatedEquationCount, k); Vector b(preallocatedEquationCount); b.clear(0); // Linear system
 		size_t equationIndex = 0;
 		assert_(pageSizeMM);
+		auto setWidthCoefficient = [&](int elementIndex, float w=1) {
+			assert(A(equationIndex, elementIndex)==0);
+			float widthCoefficient =
+					elementIndexToUnknownIndex[elementIndex] == elementIndex ?
+						aspectRatios[elementIndex] /*ratio*height*/
+					  : 1 /*free width*/;
+			A(equationIndex, elementIndexToUnknownIndex[elementIndex]) = w * widthCoefficient;
+		};
 		for(const size_t rowIndex : range(rows.size)) { // Row fit width equations
 			size_t imageCount = 0;
 			for(const size_t columnIndex: range(rows[rowIndex].size)) {
 				int elementIndex = rows[rowIndex][columnIndex];
 				if(elementIndex >=0) { // Normal image root origin instance
-					assert(A(equationIndex, elementIndex)==0);
-					A(equationIndex, elementIndex) = aspectRatios[elementIndex];
+					setWidthCoefficient(elementIndex);
 					imageCount++;
 				}
 				else if(elementIndex == -2) { // Column extension across rows
 					size_t sourceRowIndex = rowIndex-1;
 					while(rows[sourceRowIndex][columnIndex] == -2) sourceRowIndex--;
-					int elementIndex = rows[sourceRowIndex][columnIndex];
-					assert(A(equationIndex, elementIndex)==0);
-					A(equationIndex, elementIndex) = aspectRatios[elementIndex];
+					setWidthCoefficient(rows[sourceRowIndex][columnIndex]);
 					imageCount++;
 				}
 				else {
@@ -300,7 +334,7 @@ struct Mosaic {
 				}
 				else {
 					assert(elementIndex == -2 || elementIndex == -3);
-					//A(i, j) = 0; // Sparse
+					//A(i, j) = 0;
 				}
 			}
 			A(equationIndex, elements.size+1) = 2; // Horizontal outer margin height
@@ -308,6 +342,50 @@ struct Mosaic {
 			b[equationIndex] = pageSizeMM.y - 2*outer0.y - (imageCount-1)*inner0.y;
 			log("Column", columnIndex, "fit height");
 			equationIndex++;
+		}
+		for(int anchorElementIndex: range(elements.size)) {
+			float anchor = elements[anchorElementIndex]->anchor.x;
+			if(anchor < 0) continue;
+			for(const size_t rowIndex : range(rows.size)) { // Horizontal anchors
+				size_t imageCount = 0;
+				float anchorWeight = 1024;
+				for(const size_t columnIndex: range(rows[rowIndex].size)) {
+					int elementIndex = rows[rowIndex][columnIndex];
+					if(elementIndex >=0) { // Normal image root origin instance
+						imageCount++;
+						assert(A(equationIndex, elementIndex)==0);
+						if(elementIndex==anchorElementIndex) {
+							setWidthCoefficient(elementIndex, anchorWeight * 1./2); // Anchor center
+							break;
+						} else {
+							setWidthCoefficient(elementIndex, anchorWeight);
+						}
+					}
+					else if(elementIndex == -2) { // Column extension across rows
+						imageCount++;
+						size_t sourceRowIndex = rowIndex-1;
+						while(rows[sourceRowIndex][columnIndex] == -2) sourceRowIndex--;
+						int elementIndex = rows[sourceRowIndex][columnIndex];
+						assert(A(equationIndex, elementIndex)==0);
+						if(elementIndex==anchorElementIndex) {
+							setWidthCoefficient(elementIndex, anchorWeight * 1./2); // Anchor center
+							break;
+						} else {
+							setWidthCoefficient(elementIndex, anchorWeight);
+						}
+					}
+					else {
+						assert(elementIndex == -1 || elementIndex == -3);
+						//A(i, j) = 0; // Sparse
+					}
+				}
+				A(equationIndex, elements.size) = anchorWeight * 1; // Vertical outer margin width
+				A(equationIndex, elements.size+2) = anchorWeight * (imageCount-1); // Vertical inner margin width
+				// Sum of width of images to the left + half anchored width = anchor position
+				b[equationIndex] = anchorWeight * (anchor * pageSizeMM.x);
+				log("Row", rowIndex, "anchor");
+				equationIndex++;
+			}
 		}
 		if(sameWidthsInColumn) { // Same element widths in column
 			for(const size_t columnIndex : range(uniformColumnCount)) { // Column same width constraint
@@ -323,8 +401,8 @@ struct Mosaic {
 					if(elementIndex >=0 && (columnIndex==uniformColumnCount-1 || rows[rowIndex][columnIndex+1]!=-1)) { // Single row image
 						assert(A(equationIndex, elementIndex)==0);
 						// - w[firstColumnIndex] + w[columnIndex] = 0
-						A(equationIndex, rows[firstRowIndex][columnIndex]) = -aspectRatios[rows[firstRowIndex][columnIndex]];
-						A(equationIndex, elementIndex) = aspectRatios[elementIndex];
+						setWidthCoefficient(rows[firstRowIndex][columnIndex], -1);
+						setWidthCoefficient(elementIndex, 1);
 						b[equationIndex] = 0;
 						log("Column", columnIndex, "same element width", firstRowIndex, rowIndex);
 						equationIndex++;
@@ -365,12 +443,23 @@ struct Mosaic {
 				log("Same element height", 0, elementIndex);
 				equationIndex++;
 				// - widths[0] + widths[elementIndex] = 0
-				A(equationIndex, 0) = -aspectRatios[0];
-				A(equationIndex, elementIndex) = aspectRatios[elementIndex];
+				setWidthCoefficient(0, -1);
+				setWidthCoefficient(elementIndex, 1);
 				b[equationIndex] = 0;
 				log("Same element width", 0, elementIndex);
 				equationIndex++;
 				// FIXME: Same area would require quadratic programming
+			}
+		}
+		for(size_t elementIndex: range(elements.size)) {
+			if(aspectRatios[elementIndex] < 0) {
+				float aspectRatioWeight = 1./k;
+				A(equationIndex, elementIndex) = aspectRatioWeight* (-abs(aspectRatios[elementIndex])); // -r*h + w = 0
+				assert_(A(equationIndex, elementIndexToUnknownIndex[elementIndex]) == 0);
+				A(equationIndex, elementIndexToUnknownIndex[elementIndex]) = aspectRatioWeight* 1;
+				b[equationIndex] = aspectRatioWeight* 0;
+				log("Preferable aspect ratio hint", elementIndex);
+				equationIndex++;
 			}
 		}
 		{
@@ -410,9 +499,14 @@ struct Mosaic {
 		heightsMM = copyRef(x.slice(0, elements.size));
 		outerMM = outer0 + vec2(x[elements.size], x[elements.size+1]);
 		innerMM = inner0 + vec2(x[elements.size+2], x[elements.size+3]);
-		widthsMM = apply(heightsMM.size, [&](size_t i){ return aspectRatios[i] * heightsMM[i]; });
+		widthsMM = apply(heightsMM.size, [&](int elementIndex){
+				return elementIndexToUnknownIndex[elementIndex] == elementIndex ?
+					aspectRatios[elementIndex] * heightsMM[elementIndex] // ratio * height
+				  : x[elementIndexToUnknownIndex[elementIndex]] // free width
+				;
+	});
 
-		for(size_t elementIndex: range(elements.size)) if(widthsMM[elementIndex]<=0 || heightsMM[elementIndex]<=0) error("Negative dimensions", widthsMM[elementIndex], heightsMM[elementIndex], "for", elementIndex);
+		//for(size_t elementIndex: range(elements.size)) if(widthsMM[elementIndex]<=0 || heightsMM[elementIndex]<=0) error("Negative dimensions", widthsMM[elementIndex], heightsMM[elementIndex], "for", elementIndex);
 
 		if(errors) {
 			log(heightsMM, outerMM, outer0, vec2(x[elements.size], x[elements.size+1]), innerMM, inner0, vec2(x[elements.size+2], x[elements.size+3]));
@@ -558,7 +652,6 @@ struct Mosaic {
 				int ix0 = round(x0*mmPx), iy0 = round(y0*mmPx);
 				int ix1 = round(x1*mmPx), iy1 = round(y1*mmPx);
 				int2 size(ix1-ix0, iy1-iy0);
-				assert(size.x>0 && size.y>0);
 				elementLayout[elementIndex] = Element{int2(currentRowIndex, columnIndex), Rect(vec2(x0, y0), vec2(x1, y1)), size};
 
 				x0 += w + innerMM.x;
@@ -570,6 +663,7 @@ struct Mosaic {
 		Time load;
 		buffer<Image> images = apply(elements.size, [&](size_t elementIndex) {
 			int2 size = elementLayout[elementIndex].size;
+			if(!(size.x>0 && size.y>0)) return Image();
 			return elements[elementIndex]->image(size, inchPx);
 		});
 		log("+", load);
@@ -686,6 +780,7 @@ struct Mosaic {
 			int ix0 = round(x0*mmPx), iy0 = round(y0*mmPx);
 			int ix1 = round(x1*mmPx), iy1 = round(y1*mmPx);
 			int2 size(ix1-ix0, iy1-iy0);
+			if(!(size.x>0 && size.y>0)) continue;
 			assert(size.x>0 && size.y>0);
 
 			// Element margins
@@ -746,7 +841,7 @@ struct Mosaic {
 					mref<float4> line = target.slice((iy0-y-1)*target.stride, target.width);
 					for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4_1((1-x/float(iw0))*(1-y/float(ih0))) * innerBackgroundColor; // Left
 					for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) line[x] += float4_1(1-y/float(ih0)) * innerBackgroundColor; // Center
-					for(int x: range(max(0, ix1), min(ix1+iw1, target.size.x))) line[x] += float4_1(1-(x-ix1)/float(iw1)*(1-y/float(ih0))) * innerBackgroundColor; // Right
+					for(int x: range(max(0, ix1), min(ix1+iw1, target.size.x))) line[x] += float4_1((1-(x-ix1)/float(iw1))*(1-y/float(ih0))) * innerBackgroundColor; // Right
 				}
 				parallel_chunk(max(0, iy0), min(iy0+size.y, target.size.y), [&](uint, int Y0, int DY) { // Center
 					for(int y: range(Y0, Y0+DY)) {
@@ -761,15 +856,33 @@ struct Mosaic {
 					float4* line = target.begin() + y*target.stride;
 					for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4_1((1-x/float(iw0))*(1-(y-iy1)/float(ih1))) * innerBackgroundColor; // Left
 					for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) line[x] += float4_1(1-(y-iy1)/float(ih1)) * innerBackgroundColor; // Center
-					for(int x: range(max(0, ix1), min(ix1+iw1, target.size.x))) line[x] += float4_1(1-(x-ix1)/float(iw1)*(1-(y-iy1)/float(ih1))) * innerBackgroundColor; // Right
+					for(int x: range(max(0, ix1), min(ix1+iw1, target.size.x))) line[x] += float4_1((1-(x-ix1)/float(iw1))*(1-(y-iy1)/float(ih1))) * innerBackgroundColor; // Right
 				}
 			}
+		}
+
+		{  int clip=0, nan = 0;
+			for(size_t i : range(target.Ref::size)) {
+				for(uint c: range(3)) {
+					float v = target[i][c];
+					if(v >= 0 && v <= 1) continue;
+					if(v < 0) v = 0;
+					else if(v > 1) v = 1;
+					else {
+						nan++;
+						if(!nan) log("NaN", v, i, c);
+					}
+					if(!clip) log("Clip", v, i, c);
+					clip++;
+				}
+			}
+			if(clip) log("Clip", clip);
 		}
 
 		// -- Large gaussian blur approximated with repeated box convolution
 		log("Blur");
 		Time blur;
-		if(1) {
+		if(0) {
 			ImageF blur(target.size);
 			{
 				ImageF transpose(target.size.y, target.size.x);
@@ -780,11 +893,14 @@ struct Mosaic {
 				box(transpose, blur, R/*, outerBackgroundColor*/);
 				box(blur, transpose, R/*, outerBackgroundColor*/);
 			}
-			if(1) for(auto element: elementLayout) { // -- Copies source images over blur background
+			if(0) for(auto element: elementLayout) { // -- Copies source images over blur background
 				float x0 = element.rect.min.x, x1 = element.rect.max.x;
 				float y0 = element.rect.min.y, y1 = element.rect.max.y;
 				int ix0 = round(x0*mmPx), iy0 = round(y0*mmPx);
 				int ix1 = round(x1*mmPx), iy1 = round(y1*mmPx);
+				int2 size(ix1-ix0, iy1-iy0);
+				if(!(size.x>0 && size.y>0)) continue;
+				assert(size.x>0 && size.y>0);
 				parallel_chunk(max(0, iy0), min(target.size.y, iy1), [&](uint, int Y0, int DY) {
 					for(int y: range(Y0, Y0+DY)) {
 						float4* blurLine = blur.begin() + y*blur.stride;
@@ -796,21 +912,29 @@ struct Mosaic {
 					}
 				});
 			}
-			if(1) for(auto element: elementLayout) { // -- Feathers
+			if(0) for(size_t elementIndex: range(elements.size)) { // -- Feathers
+				if(images[elementIndex].alpha) continue;
+				const Element& element = elementLayout[elementIndex];
 				float x0 = element.rect.min.x, x1 = element.rect.max.x;
 				float y0 = element.rect.min.y, y1 = element.rect.max.y;
 				int ix0 = round(x0*mmPx), iy0 = round(y0*mmPx);
 				int ix1 = round(x1*mmPx), iy1 = round(y1*mmPx);
 				int2 size(ix1-ix0, iy1-iy0);
+				if(!(size.x>0 && size.y>0)) continue;
 				assert(size.x>0 && size.y>0);
 
 				// Element min,size,max pixel coordinates
 				//int2 feather = int2(floor(clamp(vec2(0), innerMM/2.f, vec2(1))*mmPx));
+				//int2 feather = int2(floor(min(innerMM.x, innerMM.y)/2.f*mmPx));
 				int2 feather = int2(floor(innerMM/2.f*mmPx));
 				int iw0 = feather.x, ih0 = feather.y; // Previous border sizes
 				int iw1 = feather.x, ih1 = feather.y; // Next border sizes
 
-				for(int y: range(min(ih0, iy0))) {
+				// Clamps border transition size to image size to mirror once
+				if(iw0 > size.x) iw0 = size.x; if(iw1 > size.x) iw1 = size.x;
+				if(ih0 > size.y) ih0 = size.y; if(ih1 > size.y) ih1 = size.y;
+
+				for(int y: range(min(min(ih0, iy0), target.size.y-iy0))) {
 					mref<float4> sourceLine = target.slice((iy0+y)*target.stride, target.width);
 					mref<float4> line = blur.slice((iy0-y-1)*target.stride, target.width);
 					for(int x: range(min(iw0, ix0))) line[ix0-x-1] = mix(line[ix0-x-1], sourceLine[ix0+x], sourceLine[ix0+x][3]*(1-x/float(iw0))*(1-y/float(ih0))); // Left
@@ -825,11 +949,11 @@ struct Mosaic {
 						for(int x: range(iw1)) line[ix1+x] = mix(line[ix1+x], sourceLine[ix1-x-1], sourceLine[ix1-x-1][3]*(1-x/float(iw1))); // Right
 					}
 				});
-				for(int y: range(max(0, iy1), min(iy1+ih1, target.size.y))) {
+				for(int y: range(max(0, iy1), min(iy1+min(ih1, iy1), target.size.y))) {
 					float4* sourceLine = target.begin() + (iy1-1-(y-iy1))*target.stride;
 					float4* line = blur.begin() + y*target.stride;
 					for(int x: range(min(iw0, ix0))) line[ix0-x-1] = mix(line[ix0-x-1], sourceLine[ix0+x], sourceLine[ix0+x][3]*(1-x/float(iw0))*(1-(y-iy1)/float(ih1))); // Left
-					for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) line[x] = mix(line[x], sourceLine[x], sourceLine[x][3]*(1-(y-iy1)/float(ih1))); // Center
+					for(int x: range(max(0,ix0), min(target.size.x, ix0+size.x))) line[x] = mix(line[x], sourceLine[x], sourceLine[x][3]*(1-(y-iy1)/float(ih1))); // Center
 					for(int x: range(iw1)) line[ix1+x] = mix(line[ix1+x], sourceLine[ix1-x-1], sourceLine[ix1-x-1][3]*(1-x/float(iw1))*(1-(y-iy1)/float(ih1))); // Right
 				}
 			}
@@ -844,8 +968,19 @@ struct Mosaic {
 			extern uint8 sRGB_forward[0x1000];
 			int clip = 0;
 			for(size_t i: range(I0, I0+DI)) {
-				for(uint c: range(3)) if(!(target[i][c] >= 0 && target[i][c] <= 1)) { if(!clip) log("Clip", target[i][c], i, c); clip++; }
-				iTarget[i] = byte4(sRGB_forward[int(round(0xFFF*min(1.f, target[i][0])))], sRGB_forward[int(round(0xFFF*min(1.f, target[i][1])))], sRGB_forward[int(round(0xFFF*min(1.f, target[i][2])))]);
+				int3 linear;
+				for(uint c: range(3)) {
+					float v = target[i][c];
+					if(!(v >= 0 && v <= 1)) {
+						if(v < 0) v = 0;
+						else if(v > 1) v = 1;
+						else v = 0; // NaN
+						if(!clip) log("Clip", v, i, c);
+						clip++;
+					}
+					linear[c] = int(round(0xFFF*v));
+				}
+				iTarget[i] = byte4( sRGB_forward[linear[0]], sRGB_forward[linear[1]], sRGB_forward[linear[2]] );
 			}
 			if(clip) log("Clip", clip);
 			//assert(!clip);
@@ -855,9 +990,16 @@ struct Mosaic {
 };
 
 struct MosaicPreview : Application {
-	String name = arguments() ? (endsWith(arguments()[0],"mosaic") ? copyRef(arguments()[0]) : arguments()[0]+".mosaic") :
+	String path = arguments() ? (endsWith(arguments()[0],"mosaic") ? copyRef(arguments()[0]) : arguments()[0]+".mosaic") :
 		move(Folder(".").list(Files).filter([](string name){return !endsWith(name,"mosaic");})[0]);
-	Mosaic mosaic {"."_, readFile(name)};
+	FileWatcher watcher{path, [this](string){ //TODO: watch images
+			mosaic.~Mosaic(); new (&mosaic) Mosaic("."_, readFile(path), {}, &watcher);
+			mosaic.render(min(1050/mosaic.pageSizeMM.x, (1680-32-24)/mosaic.pageSizeMM.y));
+			view = move(mosaic.page);
+			window->render();
+			window->show();
+		} };
+	Mosaic mosaic {"."_, readFile(path), {}, &watcher};
 	GraphicsWidget view;
 	unique<Window> window = nullptr;
 	MosaicPreview() {
@@ -866,7 +1008,7 @@ struct MosaicPreview : Application {
 		if(mosaic.errors) ::error(mosaic.errors);
 		else {
 			view = move(mosaic.page);
-			window = unique<Window>(&view, -1, [this](){return copyRef(name);});
+			window = unique<Window>(&view, -1, [this](){return copyRef(path);});
 		}
 	}
 };
