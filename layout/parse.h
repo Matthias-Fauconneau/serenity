@@ -20,6 +20,6 @@ struct LayoutParse : Layout {
 		errors.append(message+"\n"); this->logText.append(message+"\n"); ::log(message);logChanged(this->logText);
 	}
 
-	generic T argument(string name) { assert_(arguments.contains(name)); return parse<T>(arguments.at(name)); };
+	generic T argument(string name) { assert_(arguments.contains(name), name); return parse<T>(arguments.at(name)); };
 	generic T value(string name, T defaultValue=T()) { return arguments.contains(name) ? parse<T>(arguments.at(name)) : defaultValue; };
 };

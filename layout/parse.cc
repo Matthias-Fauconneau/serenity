@@ -41,7 +41,7 @@ struct TextElement : Element {
 
 LayoutParse::LayoutParse(const Folder& folder, TextData&& s, function<void(string)> logChanged, FileWatcher* watcher)
 	: logChanged(logChanged) {
-	const ref<string> parameters = {"page-size","outer","inner","same-outer","same-inner","same-size","chroma","intensity","hue"};
+	const ref<string> parameters = {"size","margin","space","chroma","intensity","hue"};
 	// -- Parses arguments
 	for(;;) {
 		int nextLine = 0;
@@ -119,21 +119,22 @@ LayoutParse::LayoutParse(const Folder& folder, TextData&& s, function<void(strin
 	assert(rows);
 	size_t columnCount = rows[0].size;
 	table = int2(columnCount, rows.size);
-	for(size_t y: range(rows.size)) {
+	for(const size_t y: range(table.rowCount)) {
 		assert(rows[y].size == columnCount);
-		for(size_t x: range(columnCount)) {
+		for(const size_t x: range(table.columnCount)) {
+			int2 index (x,y);
 			if(rows[y][x] >= 0) {
-				table(x, y) = {size_t(rows[y][x]), int2(x, y), 1, false, false};
+				table(index) = {size_t(rows[y][x]), index, 1, false, false};
 			} else {
 				Cell& cell = table(x, y);
 				if(rows[y][x] == -1) cell.horizontalExtension = true;
 				if(rows[y][x] == -2) cell.verticalExtension = true;
 				if(rows[y][x] == -3) cell.horizontalExtension = true, cell.verticalExtension = true;
 				int2 size = 1;
-				while(rows[y][x] == -3) x--, y--, size.x++, size.y++;
-				while(rows[y][x] == -2) y--, size.y++;
-				while(rows[y][x] == -1) x--, size.x++;
-				Cell& parent = table(x, y);
+				while(rows[index.y][index.x] == -3) index.x--, index.y--, size.x++, size.y++;
+				while(rows[index.y][index.x] == -2) index.y--, size.y++;
+				while(rows[index.y][index.x] == -1) index.x--, size.x++;
+				Cell& parent = table(index);
 				parent.parentSize = max(parent.parentSize, size);
 				cell.parentIndex = parent.parentIndex;
 			}
@@ -147,5 +148,6 @@ LayoutParse::LayoutParse(const Folder& folder, TextData&& s, function<void(strin
 	}
 	if(table.columnCount == 1) columnStructure=true;
 	if(table.columnCount == rows.size) gridStructure = true;
-	log(size, margin, space, strx(table.size), gridStructure?"grid":"", rowStructure?"row":"", columnStructure?"column":"");
+	log(strx(int2(size)), strx(int2(margin)), strx(int2(space)), strx(table.size),
+		gridStructure?"grid":"", rowStructure?"row":"", columnStructure?"column":"");
 }
