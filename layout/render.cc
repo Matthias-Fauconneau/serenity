@@ -199,7 +199,11 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 					v4sf* line = target.begin() + y*target.stride;
 					for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4(1-x/float(iw0)) * innerBackgroundColor; // Left
 					v4sf* sourceLine = source.begin() + (y-iy0)*source.stride;
-					for(int x: range(max(0, ix0), min(target.size.x, ix0+size.x))) line[x] = sourceLine[x-ix0]; // Copy image
+					if(image.alpha) {
+						for(int x: range(max(0, ix0), min(target.size.x, ix0+size.x))) if(sourceLine[x-ix0][3]) line[x] = sourceLine[x-ix0]; // Mask image
+					} else {
+						for(int x: range(max(0, ix0), min(target.size.x, ix0+size.x))) line[x] = sourceLine[x-ix0]; // Copy image
+					}
 					for(int x: range(max(0, ix1), min(ix1+iw1, target.size.x))) line[x] += float4(1-(x-ix1)/float(iw1)) * innerBackgroundColor; // Right
 				}
 			});
@@ -239,87 +243,87 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		//if(clip) log("Clip", clip);
 	}
 
-	if(arguments.value("blur","1"_)!="0"_) { // -- Large gaussian blur approximated with repeated box convolution
+	if(arguments.value("blur","1/8"_)!="0"_) { // -- Large gaussian blur approximated with repeated box convolution
 		//log("Blur");
 		//Time blurTime;
-		ImageF blur(target.size);
+		ImageF source = move(target);
+		ImageF blur(source.size);
 		{
 			ImageF transpose(target.size.y, target.size.x);
-			const int R = min(target.size.x, target.size.y) / 8;
+			const int R = min(source.size.x, source.size.y) * parse<float>(arguments.value("blur","1/8"_));
 			//const int R = max(min(widths), min(heights))/4; //8
-			box(transpose, target, R/*, outerBackgroundColor*/);
+			box(transpose, source, R/*, outerBackgroundColor*/);
 			box(blur, transpose, R/*, outerBackgroundColor*/);
 			box(transpose, blur, R/*, outerBackgroundColor*/);
 			box(blur, transpose, R/*, outerBackgroundColor*/);
+			target = copy(blur);
 		}
-		if(arguments.value("background"_,"0"_)!="1"_) {
-			for(const Element& element : elements) { // -- Copies source images over blur background
-				float x0 = element.min.x, x1 = element.max.x;
-				float y0 = element.min.y, y1 = element.max.y;
-				int ix0 = round(x0*mmPx), iy0 = round(y0*mmPx);
-				int ix1 = round(x1*mmPx), iy1 = round(y1*mmPx);
-				if(ix1<=ix0 || iy1<=iy0) continue;
-				parallel_chunk(max(0, iy0), min(target.size.y, iy1), [&](uint, int Y0, int DY) {
-					for(int y: range(Y0, Y0+DY)) {
-						v4sf* blurLine = blur.begin() + y*blur.stride;
-						const v4sf* targetLine = target.begin() + y*target.stride;
-						for(int x: range(max(0, int(ix0)), min(target.size.x, int(ix1)))) {
-							// TODO: only blend if image.alpha
-							blurLine[x] = mix(blurLine[x], targetLine[x], targetLine[x][3]);
-						}
-					}
-				});
+		// -- Copies source images over blur background
+		for(size_t elementIndex: range(elements.size)) { // -- Blends transparent images
+			if(!images[elementIndex].alpha) continue;
+			const Element& element = elements[elementIndex];
+			float x0 = element.min.x, x1 = element.max.x;
+			float y0 = element.min.y, y1 = element.max.y;
+			int ix0 = round(x0*mmPx), iy0 = round(y0*mmPx);
+			int ix1 = round(x1*mmPx), iy1 = round(y1*mmPx);
+			int2 size(ix1-ix0, iy1-iy0);
+			if(!(size.x>0 && size.y>0)) continue;
+			assert(size.x>0 && size.y>0);
+			parallel_chunk(size.y, [&](uint, int Y0, int DY) {
+				for(int y: range(Y0, Y0+DY)) {
+					v4sf* sourceLine = source.begin() + (iy0+y)*source.stride;
+					v4sf* targetLine = target.begin() + (iy0+y)*source.stride;
+					for(int x: range(size.x)) targetLine[ix0+x] = mix(targetLine[ix0+x], sourceLine[ix0+x], sourceLine[ix0+x][3]);
+					//for(int x: range(size.x)) targetLine[ix0+x] += sourceLine[ix0+x];
+				}
+			});
+		}
+		for(size_t elementIndex: range(elements.size)) { // -- Copy opaque images feathered to blur background
+			if(images[elementIndex].alpha) continue;
+			const Element& element = elements[elementIndex];
+			float x0 = element.min.x, x1 = element.max.x;
+			float y0 = element.min.y, y1 = element.max.y;
+			int ix0 = round(x0*mmPx), iy0 = round(y0*mmPx);
+			int ix1 = round(x1*mmPx), iy1 = round(y1*mmPx);
+			int2 size(ix1-ix0, iy1-iy0);
+			if(!(size.x>0 && size.y>0)) continue;
+			assert(size.x>0 && size.y>0);
+
+			int2 feather = parse<float>(arguments.value("feather","1"_))*mmPx;
+
+			for(int y: range(feather.y)) { // Top
+				mref<v4sf> sourceLine = source.slice((iy0+y)*source.stride, source.width);
+				mref<v4sf> blurLine = blur.slice((iy0+y)*source.stride, source.width);
+				mref<v4sf> targetLine = target.slice((iy0+y)*source.stride, source.width);
+				for(int x: range(feather.x)) // Left
+					targetLine[ix0+x] = mix(blurLine[ix0+x], sourceLine[ix0+x], (x/float(feather.x))*(y/float(feather.y)));
+				for(int x: range(feather.x, size.x-feather.x)) // Center
+					targetLine[ix0+x] = mix(blurLine[ix0+x], sourceLine[ix0+x], (y/float(feather.y)));
+				for(int x: range(feather.x)) // Right
+					targetLine[ix1-1-x] = mix(blurLine[ix1-1-x], sourceLine[ix1-1-x], (x/float(feather.x))*(y/float(feather.y)));
+			}
+			parallel_chunk(feather.y, size.y-feather.y, [&](uint, int Y0, int DY) { // Center
+				for(int y: range(Y0, Y0+DY)) {
+					v4sf* sourceLine = source.begin() + (iy0+y)*source.stride;
+					v4sf* blurLine = blur.begin() + (iy0+y)*source.stride;
+					v4sf* targetLine = target.begin() + (iy0+y)*source.stride;
+					for(int x: range(feather.x)) targetLine[ix0+x] = mix(blurLine[ix0+x], sourceLine[ix0+x], (x/float(feather.x))); // Left
+					for(int x: range(feather.x, size.x-feather.x)) targetLine[ix0+x] = sourceLine[ix0+x];
+					for(int x: range(feather.x)) targetLine[ix1-1-x] = mix(blurLine[ix1-1-x], sourceLine[ix1-1-x], (x/float(feather.x))); // Right
+				}
+			});
+			for(int y: range(feather.y)) { // Bottom
+				v4sf* sourceLine = source.begin() + (iy1-1-y)*source.stride;
+				v4sf* blurLine = blur.begin() + (iy1-1-y)*source.stride;
+				v4sf* targetLine = target.begin() + (iy1-1-y)*source.stride;
+				for(int x: range(feather.x)) // Left
+					targetLine[ix0+x] = mix(blurLine[ix0+x], sourceLine[ix0+x], (x/float(feather.x))*(y/float(feather.y)));
+				for(int x: range(feather.x,size.x-feather.x)) // Center
+					targetLine[ix0+x] = mix(blurLine[ix0+x], sourceLine[ix0+x], (y/float(feather.y)));
+				for(int x: range(feather.x)) // Right
+					targetLine[ix1-1-x] = mix(blurLine[ix1-1-x], sourceLine[ix1-1-x], (x/float(feather.x))*(y/float(feather.y)));
 			}
 		}
-		if(arguments.value("feather","0"_)!="0"_) {
-			for(size_t elementIndex: range(elements.size)) { // -- Feathers
-				if(images[elementIndex].alpha) continue;
-				const Element& element = elements[elementIndex];
-				float x0 = element.min.x, x1 = element.max.x;
-				float y0 = element.min.y, y1 = element.max.y;
-				int ix0 = round(x0*mmPx), iy0 = round(y0*mmPx);
-				int ix1 = round(x1*mmPx), iy1 = round(y1*mmPx);
-				int2 size(ix1-ix0, iy1-iy0);
-				if(!(size.x>0 && size.y>0)) continue;
-				assert(size.x>0 && size.y>0);
-
-				// Element min,size,max pixel coordinates
-				//int2 feather = int2(floor(clamp(vec2(0), innerMM/2.f, vec2(1))*mmPx));
-				//int2 feather = int2(floor(min(innerMM.x, innerMM.y)/2.f*mmPx));
-				//int2 feather = int2(floor(innerMM/2.f*mmPx));
-				int2 feather = 1*mmPx;
-				int iw0 = feather.x, ih0 = feather.y; // Previous border sizes
-				int iw1 = feather.x, ih1 = feather.y; // Next border sizes
-
-				// Clamps border transition size to image size to mirror once
-				if(iw0 > size.x) iw0 = size.x; if(iw1 > size.x) iw1 = size.x;
-				if(ih0 > size.y) ih0 = size.y; if(ih1 > size.y) ih1 = size.y;
-
-				for(int y: range(min(min(ih0, iy0), target.size.y-iy0))) {
-					mref<v4sf> sourceLine = target.slice((iy0+y)*target.stride, target.width);
-					mref<v4sf> line = blur.slice((iy0-y-1)*target.stride, target.width);
-					for(int x: range(min(iw0, ix0))) line[ix0-x-1] = mix(line[ix0-x-1], sourceLine[ix0+x], sourceLine[ix0+x][3]*(1-x/float(iw0))*(1-y/float(ih0))); // Left
-					for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) line[x] = mix(line[x], sourceLine[x], sourceLine[x][3]*(1-y/float(ih0))); // Center
-					for(int x: range(iw1)) line[ix1+x] = mix(line[ix1+x], sourceLine[ix1-x-1], sourceLine[ix1-x-1][3]*(1-x/float(iw1))*(1-y/float(ih0))); // Right
-				}
-				parallel_chunk(max(0, iy0), min(iy0+size.y, target.size.y), [&](uint, int Y0, int DY) { // Center
-					for(int y: range(Y0, Y0+DY)) {
-						v4sf* sourceLine = target.begin() + y*target.stride;
-						v4sf* line = blur.begin() + y*target.stride;
-						for(int x: range(min(iw0, ix0))) line[ix0-x-1] = mix(line[ix0-x-1], sourceLine[ix0+x], sourceLine[ix0+x][3]*(1-x/float(iw0))); // Left
-						for(int x: range(iw1)) line[ix1+x] = mix(line[ix1+x], sourceLine[ix1-x-1], sourceLine[ix1-x-1][3]*(1-x/float(iw1))); // Right
-					}
-				});
-				for(int y: range(max(0, iy1), min(iy1+min(ih1, iy1), target.size.y))) {
-					v4sf* sourceLine = target.begin() + (iy1-1-(y-iy1))*target.stride;
-					v4sf* line = blur.begin() + y*target.stride;
-					for(int x: range(min(iw0, ix0))) line[ix0-x-1] = mix(line[ix0-x-1], sourceLine[ix0+x], sourceLine[ix0+x][3]*(1-x/float(iw0))*(1-(y-iy1)/float(ih1))); // Left
-					for(int x: range(max(0,ix0), min(target.size.x, ix0+size.x))) line[x] = mix(line[x], sourceLine[x], sourceLine[x][3]*(1-(y-iy1)/float(ih1))); // Center
-					for(int x: range(iw1)) line[ix1+x] = mix(line[ix1+x], sourceLine[ix1-x-1], sourceLine[ix1-x-1][3]*(1-x/float(iw1))*(1-(y-iy1)/float(ih1))); // Right
-				}
-			}
-		}
-		target = move(blur);
 		//log(blurTime);
 	}
 

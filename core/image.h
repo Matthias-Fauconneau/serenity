@@ -60,7 +60,7 @@ void rotate(const Image& target, const Image& source);
 inline Image rotate(Image&& target, const Image& source) { rotate(target, source); return move(target); }
 inline Image rotate(const Image& source) { return rotate(Image(int2(source.size.y, source.size.x), source.alpha), source); }
 /// Rotates an image around
-void rotateHalfTurn(const Image& target);
+Image rotateHalfTurn(Image&& target);
 
 // -- Resample (3x8bit) --
 

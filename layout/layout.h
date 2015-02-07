@@ -7,6 +7,7 @@ static constexpr float inchMM = 25.4;
 struct Element {
 	vec2 anchor {0}; // Anchors element center to an absolute position (soft constraint)
 	float aspectRatio; // Element aspect ratio x/y (initialized by derived class, negative for free ratio)
+	vec2 sizeHint {0}; // Size hint
 	int2 index {-1}, cellCount {-1}; // Row, column index/size in table
 	vec2 min, max; // Element geometry
 	vec2 margin, space; // Margin and space of element row/column
@@ -41,7 +42,7 @@ struct Layout {
 	array<unique<Element>> elements; // Image or text elements
 	Table table;
 	map<String, String> arguments;
-	array<size_t> freeAspects, horizontalAnchors, verticalAnchors;
+	array<size_t> freeAspects, horizontalAnchors, verticalAnchors, preferredSize;
 	bool rowStructure = false, columnStructure = false, gridStructure = true;
 	vec2 size = 0, margin = 0, space = 0;
 };

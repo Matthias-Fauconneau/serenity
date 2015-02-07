@@ -68,6 +68,7 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 
 	// • Fits elements to their columns/rows
 	for(size_t elementIndex : range(elements.size)) {
+		//if(preferredSize.contains(elementIndex)) continue; // Prevents from breaking layout
 		const Element& element = elements[elementIndex];
 		{  Constraint& fitElementWidth = constraint();  // element width + 2·column space = columns width
 			setWidthCoefficient(fitElementWidth, elementIndex); // Element width
@@ -103,7 +104,6 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 	for(size_t elementIndex: horizontalAnchors) {
 		for(const size_t rowIndex : range(table.rowCount)) {
 			if(!table.row(rowIndex).contains(elementIndex)) continue;
-			log("Anchor", rowIndex, elements[elementIndex]->anchor.x);
 			Constraint& anchor = constraint();
 			anchor[uniformMargin+0] = 1; // Uniform margin x
 			anchor[rowMargins+rowIndex] = 1; // Row margin x
@@ -119,6 +119,14 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 		Constraint& preferAspectRatio = constraint();  // -ratio * height + width = 0
 		setHeightCoefficient(preferAspectRatio, elementIndex, -elements[elementIndex]->aspectRatio);
 		setWidthCoefficient(preferAspectRatio, elementIndex);
+	}
+
+	// • Preferred size
+	if(1) for(size_t elementIndex: preferredSize) {
+		Constraint& preferSize = constraint();  // height = hint
+		setHeightCoefficient(preferSize, elementIndex);
+		preferSize.constant = elements[elementIndex]->sizeHint.y;
+		log("Prefer Size", elements[elementIndex]->sizeHint, size);
 	}
 
 	log("=", constraints.size, "constraints");

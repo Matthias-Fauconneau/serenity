@@ -1,6 +1,7 @@
 #include "parse.h"
 #include "file.h"
 #include "jpeg.h"
+#include "png.h"
 #include "text.h"
 #include "ui/render.h"
 #include "thread.h"
@@ -10,10 +11,10 @@ struct ImageElement : Element {
 	ImageElement(string fileName, const Folder& folder) : file(fileName , folder) {
 		vec2 size = vec2(::imageSize(file));
 		aspectRatio = (float)size.x/size.y;
+		sizeHint = size/300.f*inchMM;
 	}
 	Image image(float) const override {
 		Image image = decodeImage(file);
-		image.alpha = false;
 		return image;
 	}
 };
@@ -27,14 +28,13 @@ struct TextElement : Element {
 		vec2 size = Text(text, textSize/72*72, white, 1, 0, "LinLibertine", false, 1, center).sizeHint();
 		if(transpose) swap(size.x, size.y);
 		aspectRatio = (float)size.x/size.y;
-		log(text, aspectRatio);
 	}
 	Image image(float mmPx) const override {
 		int2 size = this->size(mmPx);
 		if(transpose) swap(size.x, size.y);
-		Text text(string, textSize/72*inchMM*mmPx, white, 1, size.x, "LinLibertine", false, 1, center);
+		Text text(string, textSize/72*inchMM*mmPx, white, 1, (floor(max.x*mmPx) - ceil(min.x*mmPx) - 4)*2/3 /*FIXME*/, "LinLibertine", false, 1, center);
 		Image image = render(size, text.graphics(vec2(size)));
-		if(transpose) image = rotate(image);
+		if(transpose) image = rotateHalfTurn(rotate(image));
 		return image;
 	}
 };
@@ -44,7 +44,7 @@ struct TextElement : Element {
 
 LayoutParse::LayoutParse(const Folder& folder, TextData&& s, function<void(string)> logChanged, FileWatcher* watcher)
 	: logChanged(logChanged) {
-	const ref<string> parameters = {"size","margin","space","chroma","intensity","hue","blur","background","feather"};
+	const ref<string> parameters = {"size","margin","space","chroma","intensity","hue","blur","feather"};
 	// -- Parses arguments
 	for(;;) {
 		int nextLine = 0;
@@ -79,7 +79,6 @@ LayoutParse::LayoutParse(const Folder& folder, TextData&& s, function<void(strin
 			else if(s.match("|")) { columnStructure=true; row.append(-2); }
 			else if(s.match("\\")) row.append(-3);
 			else {
-				row.append(elements.size); // Appends element index to row
 				unique<Element> element = nullptr;
 				/**/ if(s.match("@")) { // Indirect text
 					string name = s.whileNo(" \t\n");
@@ -93,16 +92,18 @@ LayoutParse::LayoutParse(const Folder& folder, TextData&& s, function<void(strin
 					element = unique<TextElement>(text, textSize ? parseDecimal(textSize) : 12, transpose, true);
 					//freeAspects.append(elements.size);
 				} else { // Image
-					string name = s.whileNo("! \t\n");
-					string file = [&](string name) { for(string file: files) if(startsWith(file, name)) return file; return ""_; }(name);
+					string name = s.whileNo("*! \t\n");
+					string file = [&](string name) { for(string file: files) if(startsWith(file, name+".")) return file; return ""_; }(name);
 					if(!file) { error("No such image"_, name, "in", files); return; }
 					if(watcher) watcher->addWatch(file);
 					element = unique<ImageElement>(file, folder);
 				}
-				element->index = int2(row.size-1, rows.size);
 				if(s.match("!")) element->anchor.x = 1./2;
+				if(s.match("*")) preferredSize.append(elements.size);
 				if(element->anchor.x) horizontalAnchors.append(elements.size);
 				if(element->anchor.y) verticalAnchors.append(elements.size);
+				element->index = int2(row.size, rows.size);
+				row.append(elements.size); // Appends element index to row
 				elements.append(move(element));
 			}
 			s.whileAny(" \t"_);

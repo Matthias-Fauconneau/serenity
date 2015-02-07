@@ -1,4 +1,9 @@
+#include "parse.h"
+#include "solve.h"
 #include "render.h"
+#include "text.h"
+#include "time.h"
+#include "jpeg.h"
 
 struct LayoutExport {
 	// UI
@@ -39,36 +44,26 @@ struct LayoutExport {
 					//window.setTitle(name); // FIXME: thread safety
 					setText(name);
 					if(File(fileName, folder).size()<=2) error("Empty file", fileName); // TODO: Nested collections
-					Layout layout {folder, readFile(fileName, folder), {this, &LayoutExport::setText}};
-					render.start();
-					layout.render(0, 300 /*pixel per inch*/);
-					render.stop();
-					if(layout.errors) return;
-					encode.start();
-					buffer<byte> file = encodeJPEG(::render(int2(round(layout.page.bounds.size())), layout.page));
-					encode.stop();
-					writeFile(name+'.'+strx(int2(round(layout.pageSizeMM/10.f)))+".jpg"_, file, Folder("Output"_, currentWorkingDirectory(), true), true);
+					LayoutParse parse {folder, readFile(fileName, folder), {this, &LayoutExport::setText}};
+					if(parse.errors) return;
+					LayoutSolve solve(move(parse));
+					LayoutRender render(move(solve), 0, 300 /*pixel per inch*/);
+					buffer<byte> file = encodeJPEG(render.target);
+					writeFile(name+'.'+strx(int2(round(render.size/10.f)))+".jpg"_, file, Folder("Output"_, currentWorkingDirectory(), true), true);
 				}
 				total.stop();
 				log(total, render, encode);
 			}
 			else if(existsFile(fileName)) {
-				Time total; total.start();
 				string name = endsWith(fileName, ".layout") ? section(fileName,'.',0,-2) : fileName;
 				setText(name);
 				if(File(fileName).size()<=2) error("Empty file", fileName);  // TODO: Collection argument
-				Layout layout {"."_, readFile(fileName), {this, &LayoutExport::setText}};
-				log("Rendering", name); Time render; render.start();
-				layout.render(0, 300 /*pixel per inch*/);
-				log("=", render);
-				if(layout.errors) return;
-				log("Encoding", name);
-				Time encode; encode.start();
-				buffer<byte> file = encodeJPEG(::render(int2(round(layout.page.bounds.size())), layout.page));
-				encode.stop();
-				writeFile(name+'.'+strx(int2(round(layout.pageSizeMM/10.f)))+".jpg"_, file, currentWorkingDirectory(), true);
-				log("+", encode);
-				log("=","total", total);
+				LayoutParse parse {currentWorkingDirectory(), readFile(fileName), {this, &LayoutExport::setText}};
+				if(parse.errors) return;
+				LayoutSolve solve(move(parse));
+				LayoutRender render(move(solve), 0, 300 /*pixel per inch*/);
+				buffer<byte> file = encodeJPEG(render.target);
+				writeFile(name+'.'+strx(int2(round(render.size/10.f)))+".jpg"_, file, currentWorkingDirectory(), true);
 			}
 			autoclose.setRelative(1000); // Automatically close after one second of inactivity unless space bar is pressed
 	}};

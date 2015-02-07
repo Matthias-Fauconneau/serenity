@@ -104,15 +104,16 @@ void rotate(const Image& target, const Image& source) {
     for(int y: range(source.height)) for(int x: range(source.width)) target(source.height-1-y, x) = source(x,y);
 }
 
-void rotateHalfTurn(const Image& target) {
+Image rotateHalfTurn(Image&& target) {
     for(size_t y: range(target.height)) for(size_t x: range(target.width/2)) swap(target(x,y), target(target.width-1-x, y)); // Reverse rows
     for(size_t y: range(target.height/2)) for(size_t x: range(target.width)) swap(target(x,y), target(x, target.height-1-y)); // Reverse columns
+    return move(target);
 }
 
 // -- Resample (3x8bit) --
 
 static void box(const Image& target, const Image& source) {
-    assert_(!source.alpha); //FIXME: not alpha correct
+    //assert_(!source.alpha); //FIXME: not alpha correct
     //assert_(source.size.x/target.size.x == source.size.y/target.size.y, target, source, source.size.x/target.size.x, source.size.y/target.size.y);
     int scale = min(source.size.x/target.size.x, source.size.y/target.size.y);
     assert_(scale <= 512, target.size, source.size);
