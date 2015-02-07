@@ -9,11 +9,11 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 	assert_(mmPx);
 
 	// -- Renders each element
-	Time load;
-	buffer<Image> images = apply(elements, [=](const Element& e) { return e.image(mmPx); });
-	log(load);
+	//Time loadTime;
+	buffer<Image> images = apply(elements, [=](const Element& e) { return e.size(mmPx)>int2(0) ? e.image(mmPx) : Image(); });
+	//log(loadTime);
 
-	{  // -- Evaluates resolution
+	if(0) {  // -- Evaluates resolution
 		const float inchPx = _inchPx ? _inchPx : _mmPx*inchMM;
 		assert_(inchPx);
 		float minScale = inf, maxScale = 0;
@@ -22,9 +22,9 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			minScale = min(minScale, scale);
 			maxScale = max(maxScale, scale);
 		}
-		log("@"+str(mmPx)+"ppmm "+str(inchPx)+"ppi: \t "
-											  "min: "+str(minScale)+"x "+str(minScale*mmPx)+"ppmm "+str(minScale*inchPx)+"ppi \t"
-																														 "max: "+str(maxScale)+"x "+str(maxScale*mmPx)+"ppmm "+str(maxScale*inchPx)+"ppi");
+		log("@"+str(mmPx)+"ppmm "+str(inchPx)+"ppi: \t "+
+			"min: "+str(minScale)+"x "+str(minScale*mmPx)+"ppmm "+str(minScale*inchPx)+"ppi \t"+
+			"max: "+str(maxScale)+"x "+str(maxScale*mmPx)+"ppmm "+str(maxScale*inchPx)+"ppi");
 	}
 
 	// -- Evaluates each elements dominant color (or use user argument overrides)
@@ -72,6 +72,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 	});
 
 	ImageF target(int2(round(size * mmPx)));
+	target.clear(float4(0));
 
 #if 0 // TODO: per row column transition
 	// -- Transitions exterior borders to background color
@@ -136,11 +137,11 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		int ix0 = round(x0*mmPx), iy0 = round(y0*mmPx);
 		int ix1 = round(x1*mmPx), iy1 = round(y1*mmPx);
 		int2 size(ix1-ix0, iy1-iy0);
-		if(!(size.x>0 && size.y>0)) continue;
-		assert(size.x>0 && size.y>0);
+		if(!(size>int2(0))) continue;
+		assert(size>0);
 
 		const Image& image = images[elementIndex];
-		if(size == image.size) log(size); else log(image.size, "→", size);
+		//if(size == image.size) log(size); else log(image.size, "→", size);
 		// TODO: single pass linear resize, float conversion (or decode to float and resize) + direct output to target
 		Image iSource = size == image.size ? share(image) : resize(size, image);
 		ImageF source (size);
@@ -150,7 +151,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 														 image.alpha ? float(iSource[i][2])/0xFF : 1};
 		});
 
-		log(strx(int2(ix0, iy0)), strx(int2(ix1, iy1)), strx(target.size));
+		//log(strx(int2(ix0, iy0)), strx(int2(ix1, iy1)), strx(target.size));
 #if 0
 		// -- Margins
 		int currentRowIndex = element.index[0];
@@ -239,19 +240,18 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 				else if(v > 1) v = 1;
 				else {
 					nan++;
-					if(!nan) log("NaN", v, i, c);
+					//if(!nan) log("NaN", v, i, c);
 				}
-				if(!clip) log("Clip", v, i, c);
+				//if(!clip) log("Clip", v, i, c);
 				clip++;
 			}
 		}
-		if(clip) log("Clip", clip);
+		//if(clip) log("Clip", clip);
 	}
 
-	// -- Large gaussian blur approximated with repeated box convolution
-	log("Blur");
-	Time blur;
-	if(0) {
+	if(0) { // -- Large gaussian blur approximated with repeated box convolution
+		//log("Blur");
+		//Time blurTime;
 		ImageF blur(target.size);
 		{
 			ImageF transpose(target.size.y, target.size.x);
@@ -326,8 +326,8 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			}
 		}
 		target = move(blur);
+		//log(blurTime);
 	}
-	log("+", blur);
 
 	// -- Convert back to 8bit sRGB
 	Image iTarget (target.size);
@@ -343,14 +343,14 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 					if(v < 0) v = 0;
 					else if(v > 1) v = 1;
 					else v = 0; // NaN
-					if(!clip) log("Clip", v, i, c);
+					//if(!clip) log("Clip", v, i, c);
 					clip++;
 				}
 				linear[c] = int(round(0xFFF*v));
 			}
 			iTarget[i] = byte4( sRGB_forward[linear[0]], sRGB_forward[linear[1]], sRGB_forward[linear[2]] );
 		}
-		if(clip) log("Clip", clip);
+		//if(clip) log("Clip", clip);
 		//assert(!clip);
 	});
 	this->target = move(iTarget);

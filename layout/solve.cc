@@ -20,7 +20,7 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 	size_t rowHeights = unknownIndex; unknownIndex += table.rowCount; log(table.rowCount, "row heights");
 
 	size_t elementHeights = unknownIndex; unknownIndex += elements.size; log(elements.size, "element heights");
-	size_t elementsWidths = unknownIndex; unknownIndex += freeAspects.size; log(freeAspects.size, "element widths");
+	size_t elementsWidths = unknownIndex; unknownIndex += freeAspects.size; if(freeAspects) log(freeAspects.size, "element widths");
 
 	const size_t unknownCount = unknownIndex;
 	log("=", unknownCount, "unknowns");
@@ -31,6 +31,7 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 		Constraint(size_t size) : buffer(size) { clear(0); }
 		float& operator[](int unknownIndex) { assert(at(unknownIndex)==0); return at(unknownIndex); }
 		float operator[](int unknownIndex) const { return at(unknownIndex); }
+		void operator*=(float weight) { for(float& x: *this) x*=weight; constant*=weight; }
 	};
 	// Sets height coefficient
 	auto setHeightCoefficient = [=](Constraint& constraint, size_t elementIndex, float coefficient=1) {
@@ -38,7 +39,6 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 	};
 	// Sets width coefficient handling either fixed or free aspect ratio transparently
 	auto setWidthCoefficient = [=](Constraint& constraint, size_t elementIndex, float coefficient=1) {
-		assert(constraint[elementHeights+elementIndex]==0);
 		size_t freeElementWidth = freeAspects.indexOf(elementIndex);
 		if(freeElementWidth == invalid)
 			constraint[elementHeights+elementIndex] = elements[elementIndex]->aspectRatio * coefficient; // ratio · height
@@ -51,7 +51,7 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 	// • Fits column widths
 	for(size_t rowIndex: range(table.rowCount)) {
 		Constraint& fitColumnWidths = constraint();  // sum(widths) + 2·margin = width
-		for(const size_t columnIndex : range(table.rowCount)) fitColumnWidths[columnWidths+columnIndex] = 1;
+		for(const size_t columnIndex : range(table.columnCount)) fitColumnWidths[columnWidths+columnIndex] = 1;
 		fitColumnWidths[uniformMargin+0] = 2; // Uniform margin x
 		fitColumnWidths[rowMargins+rowIndex] = 2; // Row margin x
 		fitColumnWidths.constant = size.x - 2*margin.x;
@@ -63,15 +63,15 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 		for(const size_t rowIndex : range(table.rowCount)) fitRowHeights[rowHeights+rowIndex] = 1;
 		fitRowHeights[uniformMargin+1] = 2; // Uniform margin y
 		fitRowHeights[columnMargins+columnIndex] = 2; // Column margin y
-		fitRowHeights.constant = size.x - 2*margin.y;
+		fitRowHeights.constant = size.y - 2*margin.y;
 	}
 
 	// • Fits elements to their columns/rows
 	for(size_t elementIndex : range(elements.size)) {
 		const Element& element = elements[elementIndex];
 		//log(element.index, element.cellCount);
-		{  Constraint& fitElementWidth = constraint();  // width + 2·column space = columns width
-			setWidthCoefficient(fitElementWidth, elementIndex);
+		{  Constraint& fitElementWidth = constraint();  // element width + 2·column space = columns width
+			setWidthCoefficient(fitElementWidth, elementIndex); // Element width
 			fitElementWidth[uniformSpace+0] = 2; // Uniform space x
 			if(element.cellCount.x == 1) {
 				fitElementWidth[columnSpaces+element.index.x] = 2; // Column space
@@ -84,8 +84,8 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 			}
 			fitElementWidth.constant = -2*space.x;
 		}
-		{  Constraint& fitElementHeight = constraint();  // height + 2·space = row height
-			setHeightCoefficient(fitElementHeight, elementIndex);
+		{  Constraint& fitElementHeight = constraint();  // Element height + 2·space = rows height
+			setHeightCoefficient(fitElementHeight, elementIndex); // Element height
 			if(element.cellCount.y == 1) {
 				fitElementHeight[columnSpaces+element.index.y] = 2; // Row space
 				fitElementHeight[rowHeights+element.index.y] = -1; // Row height
@@ -100,40 +100,19 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 	}
 
 	// • Horizontal anchors
-	for(size_t anchorElementIndex: horizontalAnchors) {
+	if(1) for(size_t anchorElementIndex: horizontalAnchors) {
 		for(const size_t rowIndex : range(table.rowCount)) {
 			if(!table.row(rowIndex).contains(anchorElementIndex)) continue;
+			log("Anchor", rowIndex, elements[anchorElementIndex]->anchor.x);
 			Constraint& anchor = constraint();
-			for(const size_t columnIndex: range(table.columnCount)) {
-				Cell& cell = table(columnIndex, rowIndex);
-				size_t elementIndex = cell.parentElementIndex;
-				if(elementIndex==anchorElementIndex) {
-					setWidthCoefficient(anchor, elementIndex, 1./2); // Anchor center
-					break;
-				} else {
-					setWidthCoefficient(anchor, elementIndex);
-				}
-			}
 			anchor[uniformMargin+0] = 1; // Uniform margin x
 			anchor[rowMargins+rowIndex] = 1; // Row margin x
+			int2 index = elements[anchorElementIndex]->index;
+			for(const size_t columnIndex : range(index.x)) anchor[columnWidths+columnIndex] = 1; // Previous column widths
+			anchor[columnWidths+index.x] = 1./2; // Centers anchored column
 			anchor.constant = elements[anchorElementIndex]->anchor.x * size.x - margin.x;
 		}
 	}
-
-#if 0
-	// • Preferred aspect ratio
-	for(size_t elementIndex: range(elements.size)) {
-		if(aspectRatios[elementIndex] < 0) {
-			float aspectRatioWeight = 1; //1./k;
-			A(equationIndex, elementIndex) = aspectRatioWeight* (-abs(aspectRatios[elementIndex])); // -r*h + w = 0
-			assert_(A(equationIndex, elementIndexToUnknownIndex[elementIndex]) == 0);
-			A(equationIndex, elementIndexToUnknownIndex[elementIndex]) = aspectRatioWeight* 1;
-			b[equationIndex] = aspectRatioWeight* 0;
-			log("Preferable aspect ratio hint", elementIndex);
-			equationIndex++;
-		}
-	}
-#endif
 
 	log("=", constraints.size, "constraints");
 
@@ -162,15 +141,23 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 		float width = freeElementWidth == invalid ?
 					element.aspectRatio * height // ratio · height
 				  : x[elementsWidths+freeElementWidth]; // free width
-		element.min =
+		vec2 cellMin =
+				margin +
 				vec2(x[uniformMargin+0], x[uniformMargin+1]) +
 				vec2(x[columnMargins+columnIndex], x[rowMargins+rowIndex]) +
-				vec2(sum(x.slice(columnWidths, columnIndex)), sum(x.slice(rowHeights, rowIndex)))
-				- vec2(width, height)/2.f;
-		element.max = element.min + vec2(x[columnWidths+columnIndex], x[rowHeights+rowIndex]) + vec2(width, height)/2.f;
+				vec2(sum(x.slice(columnWidths, columnIndex)), sum(x.slice(rowHeights, rowIndex))) +
+				space +
+				vec2(x[columnSpaces+columnIndex], x[rowSpaces+rowIndex]);
+		vec2 cellSpanSize = vec2(
+					sum(x.slice(columnWidths+element.index.x, element.cellCount.x)),
+					sum(x.slice(rowHeights+element.index.y, element.cellCount.y)));
+		element.min = cellMin + (cellSpanSize-vec2(width, height))/2.f;
+		element.max = element.min + vec2(width, height);
 	}
 
 	if(1) {
+		log("Constant margin", margin);
+		log("Constant space", space);
 		log("Uniform margin", x.slice(uniformMargin, 2));
 		log("Uniform space", x.slice(uniformSpace, 2));
 		log("Row margins", x.slice(rowMargins, table.rowCount));
@@ -180,7 +167,7 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 		log("Column widths", x.slice(columnWidths, table.columnCount));
 		log("Row heights", x.slice(rowHeights, table.rowCount));
 		log("Element heights", x.slice(elementHeights, elements.size));
-		log("Element widths", x.slice(elementsWidths, freeAspects.size));
+		if(freeAspects) log("Element widths", x.slice(elementsWidths, freeAspects.size));
 
 		array<char> s;
 		for(size_t rowIndex : range(table.rowCount)) {

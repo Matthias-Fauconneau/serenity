@@ -23,9 +23,9 @@ struct TextElement : Element {
 	float textSize = 12;
 	bool transpose = false;
 	TextElement(::string text) : string(copyRef(text)) {
-		vec2 size = -Text(text, textSize/72*72, white, 1, 0, "LinLibertine", false, 1, center).sizeHint();
+		vec2 size = Text(text, textSize/72*72, white, 1, 0, "LinLibertine", false, 1, center).sizeHint();
 		if(transpose) swap(size.x, size.y);
-		aspectRatio = (float)size.x/size.y;
+		aspectRatio = - (float)size.x/size.y;
 	}
 	Image image(float mmPx) const override {
 		int2 size = this->size(mmPx);

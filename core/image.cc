@@ -9,34 +9,34 @@
 
 uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)
 void __attribute((constructor(1001))) generate_sRGB_forward() {
-	for(uint index: range(sizeof(sRGB_forward))) {
-		real linear = (real) index / (sizeof(sRGB_forward)-1);
-		real sRGB = linear > 0.0031308 ? 1.055*pow(linear,1/2.4)-0.055 : 12.92*linear;
-		assert(abs(linear-(sRGB > 0.04045 ? pow((sRGB+0.055)/1.055, 2.4) : sRGB / 12.92))<exp2(-50));
-		sRGB_forward[index] = round(0xFF*sRGB);
-	}
+    for(uint index: range(sizeof(sRGB_forward))) {
+	real linear = (real) index / (sizeof(sRGB_forward)-1);
+	real sRGB = linear > 0.0031308 ? 1.055*pow(linear,1/2.4)-0.055 : 12.92*linear;
+	assert(abs(linear-(sRGB > 0.04045 ? pow((sRGB+0.055)/1.055, 2.4) : sRGB / 12.92))<exp2(-50));
+	sRGB_forward[index] = round(0xFF*sRGB);
+    }
 }
 
 float sRGB_reverse[0x100];
 void __attribute((constructor(1001))) generate_sRGB_reverse() {
-	for(uint index: range(0x100)) {
-		real sRGB = (real) index / 0xFF;
-		real linear = sRGB > 0.04045 ? pow((sRGB+0.055)/1.055, 2.4) : sRGB / 12.92;
-		assert(abs(sRGB-(linear > 0.0031308 ? 1.055*pow(linear,1/2.4)-0.055 : 12.92*linear))<exp2(-50));
-		sRGB_reverse[index] = linear;
-		assert(sRGB_forward[int(round(0xFFF*sRGB_reverse[index]))]==index);
-	}
+    for(uint index: range(0x100)) {
+	real sRGB = (real) index / 0xFF;
+	real linear = sRGB > 0.04045 ? pow((sRGB+0.055)/1.055, 2.4) : sRGB / 12.92;
+	assert(abs(sRGB-(linear > 0.0031308 ? 1.055*pow(linear,1/2.4)-0.055 : 12.92*linear))<exp2(-50));
+	sRGB_reverse[index] = linear;
+	assert(sRGB_forward[int(round(0xFFF*sRGB_reverse[index]))]==index);
+    }
 }
 
 // -- Decode --
 
 string imageFileFormat(const ref<byte> file) {
-	if(startsWith(file,"\xFF\xD8")) return "JPEG"_;
-	else if(startsWith(file,"\x89PNG\r\n\x1A\n")) return "PNG"_;
-	else if(startsWith(file,"\x00\x00\x01\x00")) return "ICO"_;
-	else if(startsWith(file,"\x49\x49\x2A\x00") || startsWith(file,"\x4D\x4D\x00\x2A")) return "TIFF"_;
-	else if(startsWith(file,"BM")) return "BMP"_;
-	else return ""_;
+    if(startsWith(file,"\xFF\xD8")) return "JPEG"_;
+    else if(startsWith(file,"\x89PNG\r\n\x1A\n")) return "PNG"_;
+    else if(startsWith(file,"\x00\x00\x01\x00")) return "ICO"_;
+    else if(startsWith(file,"\x49\x49\x2A\x00") || startsWith(file,"\x4D\x4D\x00\x2A")) return "TIFF"_;
+    else if(startsWith(file,"BM")) return "BMP"_;
+    else return ""_;
 }
 
 int2 imageSize(const ref<byte> file) {
@@ -100,68 +100,68 @@ Image decodeImage(const ref<byte> file) {
 // -- Rotate --
 
 void rotate(const Image& target, const Image& source) {
-	assert_(target.size.x == source.size.y && target.size.y == source.size.x, source.size, target.size);
-	for(int y: range(source.height)) for(int x: range(source.width)) target(source.height-1-y, x) = source(x,y);
+    assert_(target.size.x == source.size.y && target.size.y == source.size.x, source.size, target.size);
+    for(int y: range(source.height)) for(int x: range(source.width)) target(source.height-1-y, x) = source(x,y);
 }
 
 void rotateHalfTurn(const Image& target) {
-	for(size_t y: range(target.height)) for(size_t x: range(target.width/2)) swap(target(x,y), target(target.width-1-x, y)); // Reverse rows
-	for(size_t y: range(target.height/2)) for(size_t x: range(target.width)) swap(target(x,y), target(x, target.height-1-y)); // Reverse columns
+    for(size_t y: range(target.height)) for(size_t x: range(target.width/2)) swap(target(x,y), target(target.width-1-x, y)); // Reverse rows
+    for(size_t y: range(target.height/2)) for(size_t x: range(target.width)) swap(target(x,y), target(x, target.height-1-y)); // Reverse columns
 }
 
 // -- Resample (3x8bit) --
 
 static void box(const Image& target, const Image& source) {
     assert_(!source.alpha); //FIXME: not alpha correct
-	//assert_(source.size.x/target.size.x == source.size.y/target.size.y, target, source, source.size.x/target.size.x, source.size.y/target.size.y);
-	int scale = min(source.size.x/target.size.x, source.size.y/target.size.y);
-	assert_(scale <= 512, target.size, source.size);
-	assert_((target.size-int2(1))*scale+int2(scale-1) < source.size, target, source);
+    //assert_(source.size.x/target.size.x == source.size.y/target.size.y, target, source, source.size.x/target.size.x, source.size.y/target.size.y);
+    int scale = min(source.size.x/target.size.x, source.size.y/target.size.y);
+    assert_(scale <= 512, target.size, source.size);
+    assert_((target.size-int2(1))*scale+int2(scale-1) < source.size, target, source);
     chunk_parallel(target.height, [&](uint, size_t y) {
-        const byte4* sourceLine = source.data + y * scale * source.stride;
-        byte4* targetLine = target.begin() + y * target.stride;
-        for(uint unused x: range(target.width)) {
-			const byte4* sourceSpanOrigin = sourceLine + x * scale;
-            uint4 s = 0;
-            for(uint i: range(scale)) {
-                const byte4* sourceSpan = sourceSpanOrigin + i * source.stride;
-                for(uint j: range(scale)) s += uint4(sourceSpan[j]);
-            }
-            s /= scale*scale;
-            targetLine[x] = byte4(s[0], s[1], s[2], 0xFF);
-        }
+	const byte4* sourceLine = source.data + y * scale * source.stride;
+	byte4* targetLine = target.begin() + y * target.stride;
+	for(uint unused x: range(target.width)) {
+	    const byte4* sourceSpanOrigin = sourceLine + x * scale;
+	    uint4 s = 0;
+	    for(uint i: range(scale)) {
+		const byte4* sourceSpan = sourceSpanOrigin + i * source.stride;
+		for(uint j: range(scale)) s += uint4(sourceSpan[j]);
+	    }
+	    s /= scale*scale;
+	    targetLine[x] = byte4(s[0], s[1], s[2], 0xFF);
+	}
     });
 }
 static Image box(Image&& target, const Image& source) { box(target, source); return move(target); }
 
 static void bilinear(const Image& target, const Image& source) {
-	assert_(!source.alpha, source.size, target.size);
+    assert_(!source.alpha, source.size, target.size);
     const uint stride = source.stride;
     chunk_parallel(target.height, [&](uint, size_t y) {
-        for(uint x: range(target.width)) {
-            const uint fx = x*256*(source.width-1)/target.width, fy = y*256*(source.height-1)/target.height; //TODO: incremental
-            uint ix = fx/256, iy = fy/256;
-            uint u = fx%256, v = fy%256;
-            const ref<byte4> span = source.slice(iy*stride+ix);
-			byte4 d;
-            for(int i=0; i<3; i++) { // Interpolates values as if in linear space (not sRGB)
-                d[i] = ((uint(span[      0][i]) * (256-u) + uint(span[           1][i]) * u) * (256-v)
-                       + (uint(span[stride][i]) * (256-u) + uint(span[stride+1][i]) * u) * (       v) ) / (256*256);
-            }
-            d[3] = 0xFF;
-            target(x, y) = d;
-        }
+	for(uint x: range(target.width)) {
+	    const uint fx = x*256*(source.width-1)/target.width, fy = y*256*(source.height-1)/target.height; //TODO: incremental
+	    uint ix = fx/256, iy = fy/256;
+	    uint u = fx%256, v = fy%256;
+	    const ref<byte4> span = source.slice(iy*stride+ix);
+	    byte4 d;
+	    for(int i=0; i<3; i++) { // Interpolates values as if in linear space (not sRGB)
+		d[i] = ((uint(span[      0][i]) * (256-u) + uint(span[           1][i]) * u) * (256-v)
+			+ (uint(span[stride][i]) * (256-u) + uint(span[stride+1][i]) * u) * (       v) ) / (256*256);
+	    }
+	    d[3] = 0xFF;
+	    target(x, y) = d;
+	}
     });
 }
 
 void resize(const Image& target, const Image& source) {
-	assert_(source && target && source.size != target.size, source, target);
+    assert_(source && target && source.size != target.size, source, target);
     if(source.width%target.width==0 && source.height%target.height==0) box(target, source); // Integer box downsample
     else if(target.size > source.size/2) bilinear(target, source); // Bilinear resample
     else { // Integer box downsample + Bilinear resample
         int downsampleFactor = min(source.size.x/target.size.x, source.size.y/target.size.y);
-		assert_(downsampleFactor, target, source);
-		bilinear(target, box((source.size/*+int2((downsampleFactor-1)/2)*/)/downsampleFactor, source));
+	assert_(downsampleFactor, target, source);
+	bilinear(target, box((source.size/*+int2((downsampleFactor-1)/2)*/)/downsampleFactor, source));
     }
 }
 
@@ -169,41 +169,41 @@ void resize(const Image& target, const Image& source) {
 
 // Box convolution with constant border
 void box(const ImageF& target, const ImageF& source, const int width/*, const v4sf border*/) {
-	assert(target.size.y == source.size.x && target.size.x == source.size.y && uint(target.stride) == target.width && uint(source.stride)==source.width);
-	parallel_chunk(source.size.y, [&](uint, int Y0, int DY) { // Top
-		const v4sf* const sourceData = source.data;
-		v4sf* const targetData = target.begin();
-		const uint sourceStride = source.stride;
-		const uint targetStride = target.stride;
-		//const v4sf scale = float4(1./(width+1/*+width*/));
-		//const v4sf sum0 = 0; //float4(width)*border;
-		for(int y: range(Y0, Y0+DY)) {
-			const v4sf* const sourceRow = sourceData + y * sourceStride;
-			v4sf* const targetColumn = targetData + y;
-			v4sf sum = float4(0);//sum0;
-			for(uint x: range(width)) sum += sourceRow[x];
-			float N = width;
-			for(uint x: range(width)) {
-				sum += sourceRow[x+width];
-				N++;
-				const v4sf scale = float4(1./N);
-				targetColumn[x * targetStride] = scale * sum;
-				//sum -= border;
-			}
-			const v4sf scale = float4(1./N);
-			for(uint x: range(width, sourceStride-width)) {
-				v4sf const* source = sourceRow + x;
-				sum += source[width];
-				targetColumn[x * targetStride] = scale * sum;
-				sum -= source[-width];
-			}
-			for(uint x: range(sourceStride-width, sourceStride)) {
-				//sum += border;
-				const v4sf scale = float4(1./N);
-				targetColumn[x * targetStride] = scale * sum;
-				sum -= sourceRow[x-width];
-				N--;
-			}
-		}
-	});
+    assert(target.size.y == source.size.x && target.size.x == source.size.y && uint(target.stride) == target.width && uint(source.stride)==source.width);
+    parallel_chunk(source.size.y, [&](uint, int Y0, int DY) { // Top
+	const v4sf* const sourceData = source.data;
+	v4sf* const targetData = target.begin();
+	const uint sourceStride = source.stride;
+	const uint targetStride = target.stride;
+	//const v4sf scale = float4(1./(width+1/*+width*/));
+	//const v4sf sum0 = 0; //float4(width)*border;
+	for(int y: range(Y0, Y0+DY)) {
+	    const v4sf* const sourceRow = sourceData + y * sourceStride;
+	    v4sf* const targetColumn = targetData + y;
+	    v4sf sum = float4(0);//sum0;
+	    for(uint x: range(width)) sum += sourceRow[x];
+	    float N = width;
+	    for(uint x: range(width)) {
+		sum += sourceRow[x+width];
+		N++;
+		const v4sf scale = float4(1./N);
+		targetColumn[x * targetStride] = scale * sum;
+		//sum -= border;
+	    }
+	    const v4sf scale = float4(1./N);
+	    for(uint x: range(width, sourceStride-width)) {
+		v4sf const* source = sourceRow + x;
+		sum += source[width];
+		targetColumn[x * targetStride] = scale * sum;
+		sum -= source[-width];
+	    }
+	    for(uint x: range(sourceStride-width, sourceStride)) {
+		//sum += border;
+		const v4sf scale = float4(1./N);
+		targetColumn[x * targetStride] = scale * sum;
+		sum -= sourceRow[x-width];
+		N--;
+	    }
+	}
+    });
 }
