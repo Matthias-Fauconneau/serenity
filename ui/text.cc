@@ -56,7 +56,7 @@ struct TextLayout {
 
 			// Layouts
 			float x = 0;
-			if(align == 0) x += (wrap-(length+(words.size-1)*space))/2; // Centers around wrap/2
+			//if(align == 0) x += (wrap-(length+(words.size-1)*space))/2; // Centers around wrap/2
 			if(align == 1) x += wrap-(length+(words.size-1)*space); // Aligns right before wrap
 			if(center) x-= (length+(words.size-1)*space)/2; // Centers around 0
 			auto& line = glyphs.append();
@@ -134,7 +134,7 @@ struct TextLayout {
 							position.x = 0;
 						}
 						if(c=='\n') { nextLine(justifyExplicit, align); align=-1; }
-						if(c=='\t') align++;
+						if(c=='\t') { position.x += 4*spaceAdvance;  align++; }
 					}
 					//else if(c==' ') position.x += spaceAdvance;
 					else error("Unexpected code", hex(c), toUTF8(text));

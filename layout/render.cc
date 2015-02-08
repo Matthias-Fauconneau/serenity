@@ -54,6 +54,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		int X = C * (0xFF - abs((H%85)*6 - 0xFF)) / 0xFF;
 		int I = argmax(ref<int>(intensityHistogram));
 		if(arguments.contains("intensity"_)) I = parse<float>(arguments.at("intensity"_)) * 0xFF;
+		assert_(I >= 0, I, arguments);
 		int R,G,B;
 		if(H < 43) R=C, G=X, B=0;
 		else if(H < 85) R=X, G=C, B=0;
@@ -62,13 +63,15 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		else if(H < 213) R=X, G=0, B=C;
 		else if(H < 256) R=C, G=0, B=X;
 		else ::error(H);
-		int m = max(0, I - (R+G+B)/3);
-		// Limits intensity within sRGB
+		int m = I; //max(0, I - (R+G+B)/3);
+		/*// Limits intensity within sRGB
 		m = min(m, 0xFF-R);
 		m = min(m, 0xFF-G);
-		m = min(m, 0xFF-B);
+		m = min(m, 0xFF-B);*/
+		log("H", H, "C", C, "X", X, "R", R, "G", G, "B", B, "I", I, "m", m, "m+B", m+B, "m+G", m+G, "m+R", m+R);
 		extern float sRGB_reverse[0x100];
-		return v4sf{sRGB_reverse[m+B], sRGB_reverse[m+G], sRGB_reverse[m+R], 0};
+		return v4sf{sRGB_reverse[min(0xFF,m+B)], sRGB_reverse[min(0xFF,m+G)], sRGB_reverse[min(0xFF,m+R)], 0};
+		//return v4sf{sRGB_reverse[m+B], sRGB_reverse[m+G], sRGB_reverse[m+R], 0};
 	});
 
 	ImageF target(int2(round(size * mmPx)));
@@ -76,10 +79,11 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 
 #if 1 // TODO: uniform/row/column margin/space
 	// -- Transitions exterior borders to background color
-	const int iX = floor(this->margin.x*mmPx);
-	const int iY = floor(this->margin.y*mmPx);
+	const int iX = floor((margin+space).x*mmPx);
+	const int iY = floor((margin+space).y*mmPx);
 	v4sf outerBackgroundColor = float4(1) * ::mean(innerBackgroundColors);
-	vec2 margin = (this->margin-space)*mmPx; // Transition on inner margin size, outer outer margin is constant
+	log(outerBackgroundColor);
+	vec2 marginPx = margin*mmPx; // Transition on inner margin size, outer outer margin is constant
 	vec2 innerPx = space*mmPx;
 	int2 size = target.size;
 	static constexpr bool constantMargin = false;
@@ -88,7 +92,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		for(int y: range(Y0, Y0+DY)) {
 			v4sf* line = target.begin() + y*target.stride;
 			for(int x: range(iX)) {
-				float w = constantMargin ? (x>=margin.x ? 1 - (float(x)-margin.x) / float(innerPx.x) : 1) : float(iX-x) / iX;
+				float w = constantMargin ? (x>=marginPx.x ? 1 - (float(x)-marginPx.x) / float(innerPx.x) : 1) : float(iX-x) / iX;
 				assert(w >= 0 && w <= 1);
 				v4sf c = float4(w) * outerBackgroundColor;;
 				line[x] += c;
@@ -101,7 +105,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		for(int y: range(Y0, Y0+DY)) {
 			v4sf* line0 = target.begin() + y*target.stride;
 			v4sf* line1 = target.begin() + (size.y-1-y)*target.stride;
-			float w = constantMargin ? (y>=margin.y ? 1 - float(y-margin.y) / float(innerPx.y) : 1) : float(iY-y) / iY;
+			float w = constantMargin ? (y>=marginPx.y ? 1 - float(y-marginPx.y) / float(innerPx.y) : 1) : float(iY-y) / iY;
 			assert(w >= 0 && w <= 1);
 			for(int x: range(max(0, iX), min(size.x, size.x-iX))) {
 				v4sf c = float4(w) * outerBackgroundColor;
@@ -115,9 +119,9 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		for(int y: range(Y0, Y0+DY)) {
 			v4sf* line0 = target.begin() + y*target.stride;
 			v4sf* line1 = target.begin() + (target.size.y-1-y)*target.stride;
-			float yw = constantMargin ? (y>=margin.y ? float(y-margin.y) / float(innerPx.y) : 0) : 1 - float(iY-y) / iY;
+			float yw = constantMargin ? (y>=marginPx.y ? float(y-marginPx.y) / float(innerPx.y) : 0) : 1 - float(iY-y) / iY;
 			for(int x: range(iX)) {
-				float xw =  constantMargin ? (x>=margin.x ? float(x-margin.x) / float(innerPx.x) : 0) : 1 - float(iX-x) / iX;
+				float xw =  constantMargin ? (x>=marginPx.x ? float(x-marginPx.x) / float(innerPx.x) : 0) : 1 - float(iX-x) / iX;
 				float w = (1-xw)*yw + xw*(1-yw) + (1-xw)*(1-yw);
 				assert(w >= 0 && w <= 1);
 				v4sf c = float4(w) * outerBackgroundColor;
@@ -188,6 +192,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			}
 		} else if(1) { // -- Blends inner background over margins with a linear transition
 			v4sf innerBackgroundColor = innerBackgroundColors[elementIndex];
+			log("bg", innerBackgroundColor);
 			for(int y: range(min(ih0, iy0))) {
 				mref<v4sf> line = target.slice((iy0-y-1)*target.stride, target.width);
 				for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4((1-x/float(iw0))*(1-y/float(ih0))) * innerBackgroundColor; // Left

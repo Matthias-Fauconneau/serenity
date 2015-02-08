@@ -59,11 +59,12 @@ LayoutParse::LayoutParse(const Folder& folder, TextData&& s, function<void(strin
 			s.whileAny(" \t");
 			string value = s.whileNo(" \t\n");
 			s.whileAny(" \t");
+			if(s.match("#")) s.whileNot('\n');
 			s.skip("\n");
 			arguments.insert(copyRef(key), copyRef(value));
 		} else break;
 	}
-	size = argument<vec2>("size"), margin = value<vec2>("margin"_, 20), space = value<vec2>("space"_, 15);
+	size = argument<vec2>("size"), margin = value<vec2>("margin"_, 10), space = value<vec2>("space"_, 5);
 	s.whileAny(" \n");
 
 	// -- Parses table
@@ -94,7 +95,7 @@ LayoutParse::LayoutParse(const Folder& folder, TextData&& s, function<void(strin
 				} else { // Image
 					string name = s.whileNo("*! \t\n");
 					string file = [&](string name) { for(string file: files) if(startsWith(file, name+".")) return file; return ""_; }(name);
-					if(!file) { error("No such image"_, name, "in", files); return; }
+					if(!file) { error(str(s.lineIndex)+": No such image"_, name, "in", files); return; }
 					if(watcher) watcher->addWatch(file);
 					element = unique<ImageElement>(file, folder);
 				}
