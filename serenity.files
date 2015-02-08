@@ -6,6 +6,8 @@ build.cc
 
 core/core.h
 
+ui/text.cc
+
 layout/parse.h
 layout/parse.cc
 layout/solve.h

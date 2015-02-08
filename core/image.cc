@@ -157,9 +157,8 @@ static void bilinear(const Image& target, const Image& source) {
 			+ (uint(span[stride][3]) * uint(span[stride][i]) * (256-u) + uint(span[stride+1][3]) * uint(span[stride+1][i]) * u) * (       v) )
 			/ (a*256*256);
 	    }
-	    d[3] = a; //span[      0].a;
+	    d[3] = a;
 	    target(x, y) = d;
-	    //target(x, y) = span[      0]; //  Top left
 	}
     });
 }
