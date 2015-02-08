@@ -45,4 +45,6 @@ struct Layout {
 	array<size_t> freeAspects, horizontalAnchors, verticalAnchors, preferredSize;
 	bool rowStructure = false, columnStructure = false, gridStructure = true;
 	vec2 size = 0, margin = 0, space = 0;
+	buffer<float> columnWidths, rowHeights;
+	buffer<float> columnMargins, rowMargins;
 };

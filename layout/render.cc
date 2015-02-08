@@ -74,38 +74,34 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		//return v4sf{sRGB_reverse[m+B], sRGB_reverse[m+G], sRGB_reverse[m+R], 0};
 	});
 
-	ImageF target(int2(round(size * mmPx)));
+	int2 size = int2(round(this->size * mmPx));
+	ImageF target(size);
 	target.clear(float4(0));
 
-#if 1 // TODO: uniform/row/column margin/space
-	// -- Transitions exterior borders to background color
-	const int iX = floor((margin+space).x*mmPx);
-	const int iY = floor((margin+space).y*mmPx);
 	v4sf outerBackgroundColor = float4(1) * ::mean(innerBackgroundColors);
-	log(outerBackgroundColor);
-	vec2 marginPx = margin*mmPx; // Transition on inner margin size, outer outer margin is constant
-	vec2 innerPx = space*mmPx;
-	int2 size = target.size;
-	static constexpr bool constantMargin = false;
-	// Outer background vertical sides
-	if(iX > 0) parallel_chunk(max(0, iY), min(size.y, size.y-iY), [&](uint, int Y0, int DY) {
-		for(int y: range(Y0, Y0+DY)) {
-			v4sf* line = target.begin() + y*target.stride;
-			for(int x: range(iX)) {
-				float w = constantMargin ? (x>=marginPx.x ? 1 - (float(x)-marginPx.x) / float(innerPx.x) : 1) : float(iX-x) / iX;
-				assert(w >= 0 && w <= 1);
-				v4sf c = float4(w) * outerBackgroundColor;;
+
+	// -- Weights exterior borders to let elements add their border
+	// Row sides
+	for(int row: range(table.rowCount)) {
+		float y0 = columnMargins[0]+sum(rowHeights.slice(0, row)), y1=y0+rowHeights[row];
+		float x1 = rowMargins[row];
+		for(int y: range(y0*mmPx, y1*mmPx)) {
+			mref<v4sf> line = target.slice(y*target.stride, target.width);
+			for(int x: range(x1*mmPx)) {
+				float w = 1;
+				v4sf c = float4(w) * outerBackgroundColor;
 				line[x] += c;
 				line[size.x-1-x] += c;
 			}
 		}
-	});
-	// Outer background horizontal sides
+	};
+	/*
+	// Column sides
 	if(iY > 0) parallel_chunk(iY, [&](uint, int Y0, int DY) {
 		for(int y: range(Y0, Y0+DY)) {
 			v4sf* line0 = target.begin() + y*target.stride;
 			v4sf* line1 = target.begin() + (size.y-1-y)*target.stride;
-			float w = constantMargin ? (y>=marginPx.y ? 1 - float(y-marginPx.y) / float(innerPx.y) : 1) : float(iY-y) / iY;
+			float w = constantMargin ? (y>=marginPx.y ? 1 - float(y-marginPx.y) / float(spacePx.y) : 1) : float(iY-y) / iY;
 			assert(w >= 0 && w <= 1);
 			for(int x: range(max(0, iX), min(size.x, size.x-iX))) {
 				v4sf c = float4(w) * outerBackgroundColor;
@@ -114,14 +110,14 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			}
 		}
 	});
-	// Outer background corners
+	// Corners
 	if(iX > 0 && iY > 0) parallel_chunk(iY, [&](uint, int Y0, int DY) {
 		for(int y: range(Y0, Y0+DY)) {
 			v4sf* line0 = target.begin() + y*target.stride;
 			v4sf* line1 = target.begin() + (target.size.y-1-y)*target.stride;
-			float yw = constantMargin ? (y>=marginPx.y ? float(y-marginPx.y) / float(innerPx.y) : 0) : 1 - float(iY-y) / iY;
+			float yw = constantMargin ? (y>=marginPx.y ? float(y-marginPx.y) / float(spacePx.y) : 0) : 1 - float(iY-y) / iY;
 			for(int x: range(iX)) {
-				float xw =  constantMargin ? (x>=marginPx.x ? float(x-marginPx.x) / float(innerPx.x) : 0) : 1 - float(iX-x) / iX;
+				float xw =  constantMargin ? (x>=marginPx.x ? float(x-marginPx.x) / float(spacePx.x) : 0) : 1 - float(iX-x) / iX;
 				float w = (1-xw)*yw + xw*(1-yw) + (1-xw)*(1-yw);
 				assert(w >= 0 && w <= 1);
 				v4sf c = float4(w) * outerBackgroundColor;
@@ -131,8 +127,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 				line1[size.x-1-x] += c;
 			}
 		}
-	});
-#endif
+	});*/
 
 	// -- Copies source images to target
 	for(size_t elementIndex: range(elements.size)) {

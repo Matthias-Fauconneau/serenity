@@ -145,37 +145,7 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 	for(size_t i: range(regularizedUnknownCount)) AtA(i,i) = AtA(i,i) + 1;
 	// Solves AtA = Atb
 	Vector x = solve(move(AtA),  Atb);
-	Vector r = A*x - b; log(r);
-
-	// -- Explicitly evaluates layout
-	for(size_t elementIndex: range(elements.size)) {
-		Element& element = elements[elementIndex];
-		const size_t columnIndex = element.index.x;
-		const size_t rowIndex = element.index.y;
-		float height = x[elementHeights+elementIndex];
-		size_t freeElementWidth = freeAspects.indexOf(elementIndex);
-		float width = freeElementWidth == invalid ?
-					element.aspectRatio * height // ratio · height
-				  : x[elementsWidths+freeElementWidth]; // free width
-		element.margin = margin +
-				vec2(x[uniformMargin+0], x[uniformMargin+1]) +
-				vec2(x[rowMargins+rowIndex], x[columnMargins+columnIndex]);
-		vec2 cellMin =
-				element.margin +
-				vec2(columnIndex*size.x/table.columnCount, rowIndex*size.y/table.rowCount) +
-				vec2(sum(x.slice(columnWidths, columnIndex)), sum(x.slice(rowHeights, rowIndex)));
-		vec2 cellSpanSize =
-				vec2(element.cellCount.x*size.x/table.columnCount, element.cellCount.y*size.y/table.rowCount) +
-				vec2(sum(x.slice(columnWidths+element.index.x, element.cellCount.x)),
-						 sum(x.slice(rowHeights    +element.index.y, element.cellCount.y)));
-		element.min = cellMin + (cellSpanSize-vec2(width, height))/2.f;
-		element.max = element.min + vec2(width, height);
-		element.space = space +
-				vec2(x[uniformSpace+0], x[uniformSpace+1]) +
-				vec2(x[columnSpaces+columnIndex], x[rowSpaces+rowIndex]);
-	}
-
-	if(1) {
+	if(0) {
 		log("Constant margin", margin);
 		log("Constant space", space);
 		log("Uniform margin", x.slice(uniformMargin, 2));
@@ -188,7 +158,35 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 		log("Row heights", x.slice(rowHeights, table.rowCount));
 		log("Element heights", x.slice(elementHeights, elements.size));
 		if(freeAspects) log("Element widths", x.slice(elementsWidths, freeAspects.size));
+		Vector r = A*x - b; log(r);
+	}
 
+	// -- Explicitly evaluates layout
+	margin += vec2(x[uniformMargin+0], x[uniformMargin+1]);
+	space += vec2(x[uniformSpace+0], x[uniformSpace+1]);
+	this->columnMargins = apply(x.slice(columnMargins, table.columnCount), [&](float columnMargin) { return margin.y + columnMargin; });
+	this->columnWidths = apply(x.slice(columnWidths, table.columnCount), [&](float columnWidth) { return size.x/table.columnCount + columnWidth; });
+	this->rowMargins = apply(x.slice(rowMargins, table.rowCount), [&](float rowMargin) { return margin.x + rowMargin; });
+	this->rowHeights = apply(x.slice(rowHeights, table.rowCount), [&](float rowHeight) { return size.y/table.rowCount + rowHeight; });
+
+	for(size_t elementIndex: range(elements.size)) {
+		Element& element = elements[elementIndex];
+		const size_t columnIndex = element.index.x;
+		const size_t rowIndex = element.index.y;
+		float height = x[elementHeights+elementIndex];
+		size_t freeElementWidth = freeAspects.indexOf(elementIndex);
+		float width = freeElementWidth == invalid ?
+					element.aspectRatio * height // ratio · height
+				  : x[elementsWidths+freeElementWidth]; // free width
+		element.margin = vec2(this->rowMargins[rowIndex], this->columnMargins[columnIndex]);
+		vec2 cellMin = element.margin + vec2(sum(this->columnWidths.slice(0, columnIndex)), sum(this->rowHeights.slice(0, rowIndex)));
+		vec2 cellSpanSize = vec2(sum(this->columnWidths.slice(element.index.x, element.cellCount.x)), sum(this->rowHeights.slice(element.index.y, element.cellCount.y)));
+		element.min = cellMin + (cellSpanSize-vec2(width, height))/2.f;
+		element.max = element.min + vec2(width, height);
+		element.space = space + vec2(x[columnSpaces+columnIndex], x[rowSpaces+rowIndex]);
+	}
+
+	if(0) {
 		array<char> s;
 		for(size_t rowIndex : range(table.rowCount)) {
 			for(size_t columnIndex : range(table.columnCount)) {
@@ -197,7 +195,8 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 				if(cell.verticalExtension) s.append("|");
 				const Element& e = elements[cell.parentElementIndex];
 				//s.append(str(strx(int2(round(e.min))), strx(int2(round(e.max-e.min))), "\t"));
-				s.append(str(strx(int2(round(e.min))), strx(int2(round(e.max))), "\t"));
+				//s.append(str(strx(int2(round(e.min))), strx(int2(round(e.max))), "\t"));
+				s.append(str(strx(e.size(1)), "\t"));
 			}
 		}
 		log(s);
