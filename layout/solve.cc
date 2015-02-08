@@ -165,8 +165,10 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 	margin += vec2(x[uniformMargin+0], x[uniformMargin+1]);
 	space += vec2(x[uniformSpace+0], x[uniformSpace+1]);
 	this->columnMargins = apply(x.slice(columnMargins, table.columnCount), [&](float columnMargin) { return margin.y + columnMargin; });
+	this->columnSpaces = apply(x.slice(columnSpaces, table.columnCount), [&](float columnSpace) { return space.x + columnSpace; });
 	this->columnWidths = apply(x.slice(columnWidths, table.columnCount), [&](float columnWidth) { return size.x/table.columnCount + columnWidth; });
 	this->rowMargins = apply(x.slice(rowMargins, table.rowCount), [&](float rowMargin) { return margin.x + rowMargin; });
+	this->rowSpaces = apply(x.slice(rowSpaces, table.rowCount), [&](float rowSpace) { return space.y + rowSpace; });
 	this->rowHeights = apply(x.slice(rowHeights, table.rowCount), [&](float rowHeight) { return size.y/table.rowCount + rowHeight; });
 
 	for(size_t elementIndex: range(elements.size)) {
@@ -181,9 +183,9 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 		element.margin = vec2(this->rowMargins[rowIndex], this->columnMargins[columnIndex]);
 		vec2 cellMin = element.margin + vec2(sum(this->columnWidths.slice(0, columnIndex)), sum(this->rowHeights.slice(0, rowIndex)));
 		vec2 cellSpanSize = vec2(sum(this->columnWidths.slice(element.index.x, element.cellCount.x)), sum(this->rowHeights.slice(element.index.y, element.cellCount.y)));
-		element.min = cellMin + (cellSpanSize-vec2(width, height))/2.f;
+		element.space = (cellSpanSize-vec2(width, height))/2.f;
+		element.min = cellMin + element.space;
 		element.max = element.min + vec2(width, height);
-		element.space = space + vec2(x[columnSpaces+columnIndex], x[rowSpaces+rowIndex]);
 	}
 
 	if(0) {

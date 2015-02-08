@@ -15,7 +15,8 @@ struct LayoutPreview {
 	void update() {
 		LayoutParse parse("."_, readFile(path), {}, &watcher);
 		LayoutSolve solve(move(parse));
-		float mmPx = 2*min(1680/solve.size.x, (1050/*-32-24*/)/solve.size.y);
+		//float mmPx = 2*min(1680/solve.size.x, (1050/*-32-24*/)/solve.size.y);
+		float mmPx = 2*min(1050/solve.size.x, (1680/*-32-24*/)/solve.size.y);
 		view.image = move(LayoutRender(move(solve), mmPx).target);
 		view.image = resize(view.image.size/2, view.image);
 		if(!window) window = unique<Window>(&view, -1, [this](){return copyRef(path);});

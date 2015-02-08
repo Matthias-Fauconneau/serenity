@@ -9,6 +9,7 @@ struct Element {
 	float aspectRatio; // Element aspect ratio x/y (initialized by derived class, negative for free ratio)
 	vec2 sizeHint {0}; // Size hint
 	int2 index {-1}, cellCount {-1}; // Row, column index/size in table
+	bool root = true; // Whether this element is not included by any other
 	vec2 min, max; // Element geometry
 	vec2 margin, space; // Margin and space of element row/column
 	int2 size(float mmPx) const { return int2(round(max*mmPx) - round(min*mmPx)); } // Element size (in pixels)
@@ -45,6 +46,7 @@ struct Layout {
 	array<size_t> freeAspects, horizontalAnchors, verticalAnchors, preferredSize;
 	bool rowStructure = false, columnStructure = false, gridStructure = true;
 	vec2 size = 0, margin = 0, space = 0;
-	buffer<float> columnWidths, rowHeights;
 	buffer<float> columnMargins, rowMargins;
+	buffer<float> columnSpaces, rowSpaces;
+	buffer<float> columnWidths, rowHeights;
 };

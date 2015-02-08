@@ -28,7 +28,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 	}
 
 	// -- Evaluates each elements dominant color (or use user argument overrides)
-	buffer<v4sf> innerBackgroundColors = apply(images.size, [&](const size_t elementIndex) {
+	buffer<v4sf> elementColors = apply(images.size, [&](const size_t elementIndex) {
 		const Image& iSource = images[elementIndex];
 		int hueHistogram[0x100] = {}; mref<int>(hueHistogram).clear(0); // 1½K: 32bit / 0xFF -> 4K² images
 		int intensityHistogram[0x100] = {}; mref<int>(intensityHistogram).clear(0);
@@ -68,78 +68,120 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		m = min(m, 0xFF-R);
 		m = min(m, 0xFF-G);
 		m = min(m, 0xFF-B);*/
-		log("H", H, "C", C, "X", X, "R", R, "G", G, "B", B, "I", I, "m", m, "m+B", m+B, "m+G", m+G, "m+R", m+R);
+		//log("H", H, "C", C, "X", X, "R", R, "G", G, "B", B, "I", I, "m", m, "m+B", m+B, "m+G", m+G, "m+R", m+R);
 		extern float sRGB_reverse[0x100];
 		return v4sf{sRGB_reverse[min(0xFF,m+B)], sRGB_reverse[min(0xFF,m+G)], sRGB_reverse[min(0xFF,m+R)], 0};
 		//return v4sf{sRGB_reverse[m+B], sRGB_reverse[m+G], sRGB_reverse[m+R], 0};
 	});
 
-	int2 size = int2(round(this->size * mmPx));
+#define px(x) round((x)*mmPx)
+	int2 size = int2(px(this->size));
 	ImageF target(size);
 	target.clear(float4(0));
 
-	v4sf outerBackgroundColor = float4(1) * ::mean(innerBackgroundColors);
-
-	// -- Weights exterior borders to let elements add their border
-	// Row sides
+	// -- Fills background color transition on exterior borders
+	v4sf backgroundColor = ::mean(elementColors);
+	// Left vertical side
 	for(int row: range(table.rowCount)) {
-		float y0 = columnMargins[0]+sum(rowHeights.slice(0, row)), y1=y0+rowHeights[row];
-		float x1 = rowMargins[row];
-		for(int y: range(y0*mmPx, y1*mmPx)) {
+		float yT = columnMargins[0]+sum(rowHeights.slice(0, row));
+		float yB = yT+rowHeights[row];
+		float dx = rowMargins[row];
+		for(int y: range(px(yT), px(yB))) {
 			mref<v4sf> line = target.slice(y*target.stride, target.width);
-			for(int x: range(x1*mmPx)) {
-				float w = 1;
-				v4sf c = float4(w) * outerBackgroundColor;
+			for(int x: range(px(dx))) {
+				v4sf c = float4(1-x/px(dx)) * backgroundColor;
 				line[x] += c;
+			}
+		}
+	}
+	// Right vertical side
+	for(int row: range(table.rowCount)) {
+		float yT = columnMargins.last()+sum(rowHeights.slice(0, row));
+		float yB = yT+rowHeights[row];
+		float dx = rowMargins[row];
+		for(int y: range(px(yT), px(yB))) {
+			mref<v4sf> line = target.slice(y*target.stride, target.width);
+			for(int x: range(px(dx))) {
+				v4sf c = float4(1-x/px(dx)) * backgroundColor;
 				line[size.x-1-x] += c;
 			}
 		}
-	};
-	/*
-	// Column sides
-	if(iY > 0) parallel_chunk(iY, [&](uint, int Y0, int DY) {
-		for(int y: range(Y0, Y0+DY)) {
-			v4sf* line0 = target.begin() + y*target.stride;
-			v4sf* line1 = target.begin() + (size.y-1-y)*target.stride;
-			float w = constantMargin ? (y>=marginPx.y ? 1 - float(y-marginPx.y) / float(spacePx.y) : 1) : float(iY-y) / iY;
-			assert(w >= 0 && w <= 1);
-			for(int x: range(max(0, iX), min(size.x, size.x-iX))) {
-				v4sf c = float4(w) * outerBackgroundColor;
-				line0[x] += c;
-				line1[x] += c;
+	}
+	// Top horizontal side
+	for(int column: range(table.columnCount)) {
+		float xL = rowMargins[0]+sum(columnWidths.slice(0, column));
+		float xR = xL+columnWidths[column];
+		float dy = columnMargins[column];
+		for(int y: range(px(dy))) {
+			mref<v4sf> line = target.slice(y*target.stride, target.width);
+			v4sf c = float4(1-y/px(dy)) * backgroundColor;
+			for(int x: range(px(xL), px(xR))) {
+				line[x] += c;
 			}
 		}
-	});
-	// Corners
-	if(iX > 0 && iY > 0) parallel_chunk(iY, [&](uint, int Y0, int DY) {
-		for(int y: range(Y0, Y0+DY)) {
-			v4sf* line0 = target.begin() + y*target.stride;
-			v4sf* line1 = target.begin() + (target.size.y-1-y)*target.stride;
-			float yw = constantMargin ? (y>=marginPx.y ? float(y-marginPx.y) / float(spacePx.y) : 0) : 1 - float(iY-y) / iY;
-			for(int x: range(iX)) {
-				float xw =  constantMargin ? (x>=marginPx.x ? float(x-marginPx.x) / float(spacePx.x) : 0) : 1 - float(iX-x) / iX;
-				float w = (1-xw)*yw + xw*(1-yw) + (1-xw)*(1-yw);
-				assert(w >= 0 && w <= 1);
-				v4sf c = float4(w) * outerBackgroundColor;
-				line0[x] += c;
-				line0[size.x-1-x] += c;
-				line1[x] += c;
-				line1[size.x-1-x] += c;
+	}
+	// Bottom horizontal side
+	for(int column: range(table.columnCount)) {
+		float xL = rowMargins.last()+sum(columnWidths.slice(0, column));
+		float xR = xL+columnWidths[column];
+		float dy = columnMargins[column];
+		for(int y: range(px(dy))) {
+			mref<v4sf> line = target.slice((size.y-1-y)*target.stride, target.width);
+			v4sf c = float4(1-y/px(dy)) * backgroundColor;
+			for(int x: range(px(xL), px(xR))) {
+				line[x] += c;
 			}
 		}
-	});*/
+	}
+	{  // Top Left Corner
+		float dx = rowMargins[0];
+		float dy = columnMargins[0];
+		for(int y: range(px(dy))) {
+			mref<v4sf> line = target.slice(y*target.stride, target.width);
+			for(int x: range(px(dx))) {
+				v4sf c = float4(1-(x/px(dx))*(y/px(dy))) * backgroundColor;
+				line[x] += c;
+			}
+		}
+	}
+	{  // Top Right Corner
+		float dx = size.x - px(rowMargins[0]+sum(columnWidths));
+		float dy = columnMargins.last();
+		for(int y: range(px(dy))) {
+			mref<v4sf> line = target.slice(y*target.stride, target.width);
+			for(int x: range((dx))) {
+				v4sf c = float4(1-(x/(dx))*(y/px(dy))) * backgroundColor;
+				line[size.x-1-x] += c;
+			}
+		}
+	}
+	{  // Bottom Left Corner
+		float dx = rowMargins.last();
+		float dy = columnMargins[0];
+		for(int y: range(px(dy))) {
+			mref<v4sf> line = target.slice((size.y-1-y)*target.stride, target.width);
+			for(int x: range(px(dx))) {
+				v4sf c = float4(1-((x/px(dx))*(y/px(dy)))) * backgroundColor;
+				line[x] += c;
+			}
+		}
+	}
+	{  // Bottom Right Corner
+		float dx = size.x - px(rowMargins.last()+sum(columnWidths));
+		float dy = columnMargins.last();
+		for(int y: range(px(dy))) {
+			mref<v4sf> line = target.slice((size.y-1-y)*target.stride, target.width);
+			for(int x: range(dx)) {
+				v4sf c = float4(1-((x/(dx))*(y/px(dy)))) * backgroundColor;
+				line[size.x-1-x] += c;
+			}
+		}
+	}
 
-	// -- Copies source images to target
+	// -- Copies elements
 	for(size_t elementIndex: range(elements.size)) {
 		const Element& element = elements[elementIndex];
-		float x0 = element.min.x, x1 = element.max.x;
-		float y0 = element.min.y, y1 = element.max.y;
-		int ix0 = round(x0*mmPx), iy0 = round(y0*mmPx);
-		int ix1 = round(x1*mmPx), iy1 = round(y1*mmPx);
-		int2 size(ix1-ix0, iy1-iy0);
-		if(!(size>int2(0))) continue;
-		assert(size>0);
-
+		int2 size = element.size(mmPx);
 		const Image& image = images[elementIndex];
 		//if(size == image.size) log(size); else log(image.size, "→", size);
 		// TODO: single pass linear resize, float conversion (or decode to float and resize) + direct output to target
@@ -150,97 +192,109 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			for(size_t i: range(I0, I0+DI)) source[i] = {sRGB_reverse[iSource[i][0]], sRGB_reverse[iSource[i][1]], sRGB_reverse[iSource[i][2]],
 														 image.alpha ? float(iSource[i][2])/0xFF : 1};
 		});
-		//for(size_t x: range(source.size.x)) source(x, 0) = source(x, source.size.y-1) = float4(1);
-		//for(size_t y: range(source.size.y)) source(0, y) = source(source.size.x-1, y) = float4(1);
-
-		//log(strx(int2(ix0, iy0)), strx(int2(ix1, iy1)), strx(target.size));
-#if 1
-		// -- Margins
-		// Margin sizes
-		int iw0 = ix0-round((x0-element.space.x)*mmPx), ih0 = iy0-round((y0-element.space.y)*mmPx); // Previous border sizes
-		int iw1 = round((x1+element.space.x)*mmPx) - ix1, ih1 = round((y1+element.space.y)*mmPx) - iy1; // Next border sizes
-
-		if(arguments.value("mirror",""_)=="1"_) { // -- Extends images over margins with a mirror transition
-			// Clamps border transition size to image size to mirror once
-			if(iw0 > size.x) iw0 = size.x; if(iw1 > size.x) iw1 = size.x;
-			if(ih0 > size.y) ih0 = size.y; if(ih1 > size.y) ih1 = size.y;
-			for(int y: range(min(ih0, iy0))) {
-				mref<v4sf> line = target.slice((iy0-y-1)*target.stride, target.width);
-				for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4((1-x/float(iw0))*(1-y/float(ih0))) * source(x, y); // Left
-				for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) line[x] += float4(1-y/float(ih0)) * source(x-ix0, y); // Center
-				for(int x: range(max(0, ix1), min(ix1+iw1, target.size.x))) line[x] += float4(1-(x-ix1)/float(iw1)*(1-y/float(ih0))) * source(size.x-1-x, y); // Right
-			}
-			parallel_chunk(max(0, iy0), min(iy0+size.y, target.size.y), [&](uint, int Y0, int DY) { // Center
-				for(int y: range(Y0, Y0+DY)) {
-					v4sf* line = target.begin() + y*target.stride;
-					for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4(1-x/float(iw0)) * source(x, y-iy0); // Left
-					v4sf* sourceLine = source.begin() + (y-iy0)*source.stride;
-					for(int x: range(max(0, ix0), min(target.size.x, ix0+size.x))) line[x] = sourceLine[x-ix0]; // Copy image
-					for(int x: range(max(0, ix1), min(ix1+iw1, target.size.x))) line[x] += float4(1-(x-ix1)/float(iw1)) * source(size.x-1-x, y-iy0); // Right
-				}
-			});
-			for(int y: range(max(0, iy1), min(iy1+ih1, target.size.y))) {
-				v4sf* line = target.begin() + y*target.stride;
-				for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4((1-x/float(iw0))*(1-(y-iy1)/float(ih1))) * source(x-ix0, size.y-1-(y-iy1)); // Left
-				for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) line[x] += float4(1-(y-iy1)/float(ih1)) * source(x-ix0, size.y-1-(y-iy1)); // Center
-				for(int x: range(max(0, ix1), min(ix1+iw1, target.size.x))) line[x] += float4(1-(x-ix1)/float(iw1)*(1-(y-iy1)/float(ih1))) * source(size.x-1-x, size.y-1-(y-iy1)); // Right
-			}
-		} else if(1) { // -- Blends inner background over margins with a linear transition
-			v4sf innerBackgroundColor = innerBackgroundColors[elementIndex];
-			log("bg", innerBackgroundColor);
-			for(int y: range(min(ih0, iy0))) {
-				mref<v4sf> line = target.slice((iy0-y-1)*target.stride, target.width);
-				for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4((1-x/float(iw0))*(1-y/float(ih0))) * innerBackgroundColor; // Left
-				for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) line[x] += float4(1-y/float(ih0)) * innerBackgroundColor; // Center
-				for(int x: range(max(0, ix1), min(ix1+iw1, target.size.x))) line[x] += float4((1-(x-ix1)/float(iw1))*(1-y/float(ih0))) * innerBackgroundColor; // Right
-			}
-			parallel_chunk(max(0, iy0), min(iy0+size.y, target.size.y), [&](uint, int Y0, int DY) { // Center
-				for(int y: range(Y0, Y0+DY)) {
-					v4sf* line = target.begin() + y*target.stride;
-					for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4(1-x/float(iw0)) * innerBackgroundColor; // Left
-					v4sf* sourceLine = source.begin() + (y-iy0)*source.stride;
-					if(image.alpha) {
-						for(int x: range(max(0, ix0), min(target.size.x, ix0+size.x))) if(sourceLine[x-ix0][3]) line[x] = sourceLine[x-ix0]; // Mask image
-					} else {
-						for(int x: range(max(0, ix0), min(target.size.x, ix0+size.x))) line[x] = sourceLine[x-ix0]; // Copy image
-					}
-					for(int x: range(max(0, ix1), min(ix1+iw1, target.size.x))) line[x] += float4(1-(x-ix1)/float(iw1)) * innerBackgroundColor; // Right
-				}
-			});
-			for(int y: range(max(0, iy1), min(iy1+ih1, target.size.y))) {
-				v4sf* line = target.begin() + y*target.stride;
-				for(int x: range(min(iw0, ix0))) line[ix0-x-1] += float4((1-x/float(iw0))*(1-(y-iy1)/float(ih1))) * innerBackgroundColor; // Left
-				for(int x: range(max(0,ix0),min(target.size.x, ix0+size.x))) line[x] += float4(1-(y-iy1)/float(ih1)) * innerBackgroundColor; // Center
-				for(int x: range(max(0, ix1), min(ix1+iw1, target.size.x))) line[x] += float4((1-(x-ix1)/float(iw1))*(1-(y-iy1)/float(ih1))) * innerBackgroundColor; // Right
-			}
-		}
-#else
-		parallel_chunk(max(0, iy0), min(iy0+size.y, target.size.y), [&](uint, int Y0, int DY) { // Center
+		int x0 = px(element.min.x);
+		int x1 = px(element.max.x);
+		int y0 = px(element.min.y);
+		int y1 = px(element.max.y);
+		parallel_chunk(y0, y1, [&](uint, int Y0, int DY) {
 			for(int y: range(Y0, Y0+DY)) {
-				v4sf* line = target.begin() + y*target.stride;
-				v4sf* sourceLine = source.begin() + (y-iy0)*source.stride;
-				for(int x: range(max(0, ix0), min(target.size.x, ix0+size.x))) line[x] = sourceLine[x-ix0]; // Copy image
+				mref<v4sf> line = target.slice(y*target.stride, target.width);
+				mref<v4sf> sourceLine = source.slice((y-y0)*source.stride, source.width);
+				if(image.alpha) {
+					for(int x: range(x0, x1)) if(sourceLine[x-x0][3]) line[x] = sourceLine[x-x0]; // Masks image
+				} else {
+					for(int x: range(x0, x1)) line[x] = sourceLine[x-x0]; // Copies image
+				}
 			}
 		});
-#endif
 	}
+	// -- Draws transitions between elements
+	for(size_t elementIndex: range(elements.size)) {
+		const Element& element = elements[elementIndex];
+		if(!element.root) continue;
+		int2 index = element.index;
+		float xL = rowMargins[index.y]+sum(columnWidths.slice(0, index.x));
+		int xL0 = px(index.x ? xL-columnSpaces[index.x-1] : 0);
+		int xL1 = px(xL + columnSpaces[index.x]);
+		int x0 = px(element.min.x);
+		int x1 = px(element.max.x);
+		float xR = xL+sum(columnWidths.slice(index.x, element.cellCount.x));
+		int xR0 = px(xR - columnSpaces[index.x+element.cellCount.x-1]);
+		int xR1 = px(size_t(index.x+element.cellCount.x)<table.columnCount ? xR + columnSpaces[index.x+element.cellCount.x] : this->size.x);
+		//log("x", columnSpaces[index.x], xL0, int(px(xL)), xL1, "x0", x0, "x1", x1, xR0, int(px(xR)), xR1);
 
-	{  int clip=0, nan = 0;
-		for(size_t i : range(target.Ref::size)) {
-			for(uint c: range(3)) {
-				float v = target[i][c];
-				if(v >= 0 && v <= 1) continue;
-				if(v < 0) v = 0;
-				else if(v > 1) v = 1;
-				else {
-					nan++;
-					//if(!nan) log("NaN", v, i, c);
-				}
-				//if(!clip) log("Clip", v, i, c);
-				clip++;
+		float yT = columnMargins[index.x]+sum(rowHeights.slice(0, index.y));
+		int yT0 = px(index.y ? yT-rowSpaces[index.y-1] : 0);
+		int yT1 = px(yT + rowSpaces[index.y]);
+		int y0 = px(element.min.y);
+		int y1 = px(element.max.y);
+		float yB = yT+sum(rowHeights.slice(index.y,element.cellCount.y));
+		int yB0 = px(yB - rowSpaces[index.y+element.cellCount.y-1]);
+		int yB1 = px(size_t(index.y+element.cellCount.y)<table.rowCount ? yB + rowSpaces[index.y+element.cellCount.y] : this->size.y);
+		//log("y", rowSpaces[index.y], yT0, int(px(yT)), yT1, "y0", y0, "y1", y1, yB0, int(px(yB)), yB1);
+
+		v4sf elementColor = elementColors[elementIndex];
+
+		// Top
+		for(int y: range(yT0, yT1)) {
+			mref<v4sf> line = target.slice(y*target.stride, target.width);
+			float wy = (y-yT0)/float(yT1-yT0);
+			// Left
+			for(int x: range(xL0, xL1)) {
+				float wx = (x-xL0)/float(xL1-xL0);
+				line[x] += float4(wx*wy) * elementColor;
+			}
+			// Center
+			for(int x: range(max(xL0,xL1), min(xR0,xR1))) {
+				line[x] += float4(wy) * elementColor;
+			}
+			// Right
+			for(int x: range(xR0, xR1)) {
+				float wx = (xR1-x)/float(xR1-xR0);
+				line[x] += float4(wx*wy) * elementColor;
 			}
 		}
-		//if(clip) log("Clip", clip);
+		// FIXME: yT1 - y0
+		// -- Center
+		for(int y: range(yT1, yB0)) {
+			mref<v4sf> line = target.slice(y*target.stride, target.width);
+			// Left
+			for(int x: range(xL0, xL1)) {
+				float wx = (x-xL0)/float(xL1-xL0);
+				line[x] += float4(wx) * elementColor;
+			}
+		}
+		//FIXME: xL1 - y0
+		//FIXME: x1 - yB0
+		for(int y: range(yT1, yB0)) {
+			mref<v4sf> line = target.slice(y*target.stride, target.width);
+			// Right
+			for(int x: range(xR0, xR1)) {
+				float wx = (xR1-x)/float(xR1-xR0);
+				line[x] += float4(wx) * elementColor;
+			}
+		}
+
+		//FIXME: y1 - yB0
+		// Bottom
+		for(int y: range(yB0, yB1)) {
+			mref<v4sf> line = target.slice(y*target.stride, target.width);
+			float wy = (yB1-y)/float(yB1-yB0);
+			// Left
+			for(int x: range(xL0, xL1)) {
+				float wx = (x-xL0)/float(xL1-xL0);
+				line[x] += float4(wx*wy) * elementColor;
+			}
+			// Center
+			for(int x: range(max(xL0,xL1), min(xR0,xR1))) {
+				line[x] += float4(wy) * elementColor;
+			}
+			// Right
+			for(int x: range(xR0, xR1)) {
+				float wx = (xR1-x)/float(xR1-xR0);
+				line[x] += float4(wx*wy) * elementColor;
+			}
+		}
 	}
 
 	if(arguments.value("blur","1/8"_)!="0"_) { // -- Large gaussian blur approximated with repeated box convolution

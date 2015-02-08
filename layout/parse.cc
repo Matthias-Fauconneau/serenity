@@ -149,6 +149,16 @@ LayoutParse::LayoutParse(const Folder& folder, TextData&& s, function<void(strin
 		assert_(elements[cell.parentElementIndex]->index == cell.parentIndex);
 		elements[cell.parentElementIndex]->cellCount = cell.parentSize;
 	}
+	for(size_t elementIndex : range(elements.size)) {
+		const Element& element = elements[elementIndex];
+		for(const size_t y: range(element.index.y+1, element.index.y+element.cellCount.y)) {
+			for(const size_t x: range(element.index.x+1, element.index.x+element.cellCount.x)) {
+				if(table(x, y).parentElementIndex != elementIndex) {
+					elements[table(x, y).parentElementIndex]->root = false;
+				}
+			}
+		}
+	}
 	if(table.columnCount == 1) columnStructure=true;
 	if(table.columnCount == rows.size) gridStructure = true;
 	log(strx(int2(size)), strx(int2(margin)), strx(int2(space)), strx(table.size),
