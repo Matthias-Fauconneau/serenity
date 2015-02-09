@@ -49,7 +49,7 @@ struct LayoutExport {
 					LayoutSolve solve(move(parse));
 					LayoutRender render(move(solve), 0, 300 /*pixel per inch*/);
 					buffer<byte> file = encodeJPEG(render.target);
-					writeFile(name+'.'+strx(int2(round(render.size/10.f)))+".jpg"_, file, Folder("Output"_, currentWorkingDirectory(), true), true);
+					writeFile(name+'.'+strx(int2(round(render.size)))+".jpg"_, file, Folder("Output"_, currentWorkingDirectory(), true), true);
 				}
 				total.stop();
 				log(total, render, encode);
@@ -63,7 +63,7 @@ struct LayoutExport {
 				LayoutSolve solve(move(parse));
 				LayoutRender render(move(solve), 0, 300 /*pixel per inch*/);
 				buffer<byte> file = encodeJPEG(render.target);
-				writeFile(name+'.'+strx(int2(round(render.size/10.f)))+".jpg"_, file, currentWorkingDirectory(), true);
+				writeFile(name+'.'+strx(int2(round(render.size)))+".jpg"_, file, currentWorkingDirectory(), true);
 			}
 			autoclose.setRelative(1000); // Automatically close after one second of inactivity unless space bar is pressed
 	}};

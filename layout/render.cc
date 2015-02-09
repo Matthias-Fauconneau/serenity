@@ -86,18 +86,6 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		const Element& element = elements[elementIndex];
 		if(!element.root) continue;
 		v4sf elementColor = elementColors[elementIndex];
-		// -- Fills element background color
-		int x0 = px(element.min.x);
-		int x1 = px(element.max.x);
-		int y0 = px(element.min.y);
-		int y1 = px(element.max.y);
-		parallel_chunk(y0, y1, [&](uint, int Y0, int DY) {
-			for(int y: range(Y0, Y0+DY)) {
-				mref<v4sf> line = background.slice(y*background.stride, background.width);
-				for(int x: range(x0, x1)) line[x] = elementColor;
-			}
-		});
-
 		int2 index = element.index;
 		float xL = rowMargins[index.y]+sum(columnWidths.slice(0, index.x));
 		int xL0 = px(index.x ? xL-columnSpaces[index.x-1] : 0);
@@ -105,7 +93,6 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		float xR = xL+sum(columnWidths.slice(index.x, element.cellCount.x));
 		int xR0 = px(xR - columnSpaces[index.x+element.cellCount.x-1]);
 		int xR1 = px(size_t(index.x+element.cellCount.x)<table.columnCount ? xR + columnSpaces[index.x+element.cellCount.x] : this->size.x);
-		log("x", columnSpaces[index.x], xL0, int(px(xL)), xL1, "x0", x0, "x1", x1, xR0, int(px(xR)), xR1);
 
 		float yT = columnMargins[index.x]+sum(rowHeights.slice(0, index.y));
 		int yT0 = px(index.y ? yT-rowSpaces[index.y-1] : 0);
@@ -113,7 +100,6 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		float yB = yT+sum(rowHeights.slice(index.y,element.cellCount.y));
 		int yB0 = px(yB - rowSpaces[index.y+element.cellCount.y-1]);
 		int yB1 = px(size_t(index.y+element.cellCount.y)<table.rowCount ? yB + rowSpaces[index.y+element.cellCount.y] : this->size.y);
-		//log("y", rowSpaces[index.y], yT0, int(px(yT)), yT1, "y0", y0, "y1", y1, yB0, int(px(yB)), yB1);
 
 		// Top
 		for(int y: range(yT0, yT1)) {
@@ -125,7 +111,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 				line[x] += float4(wx*wy) * elementColor;
 			}
 			// Center
-			for(int x: range(max(xL0,xL1), min(xR0,xR1))) {
+			for(int x: range(xL1, xR0)) {
 				line[x] += float4(wy) * elementColor;
 			}
 			// Right
@@ -134,7 +120,6 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 				line[x] += float4(wx*wy) * elementColor;
 			}
 		}
-		// FIXME: yT1 - y0
 		// -- Center
 		for(int y: range(yT1, yB0)) {
 			mref<v4sf> line = background.slice(y*background.stride, background.width);
@@ -143,19 +128,16 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 				float wx = index.x ? (x-xL0)/float(xL1-xL0) : 1;
 				line[x] += float4(wx) * elementColor;
 			}
-		}
-		//FIXME: xL1 - y0
-		//FIXME: x1 - yB0
-		for(int y: range(yT1, yB0)) {
-			mref<v4sf> line = background.slice(y*background.stride, background.width);
+			// Center
+			for(int x: range(xL1, xR0)) {
+				line[x] = elementColor;
+			}
 			// Right
 			for(int x: range(xR0, xR1)) {
 				float wx = size_t(index.x+element.cellCount.x)<table.columnCount ? (xR1-x)/float(xR1-xR0) : 1;
 				line[x] += float4(wx) * elementColor;
 			}
 		}
-
-		//FIXME: y1 - yB0
 		// Bottom
 		for(int y: range(yB0, yB1)) {
 			mref<v4sf> line = background.slice(y*background.stride, background.width);
@@ -166,7 +148,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 				line[x] += float4(wx*wy) * elementColor;
 			}
 			// Center
-			for(int x: range(max(xL0,xL1), min(xR0,xR1))) {
+			for(int x: range(xL1, xR0)) {
 				line[x] += float4(wy) * elementColor;
 			}
 			// Right

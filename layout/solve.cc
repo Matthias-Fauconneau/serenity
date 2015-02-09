@@ -23,7 +23,7 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 	size_t elementsWidths = unknownIndex; unknownIndex += freeAspects.size;
 
 	const size_t unknownCount = unknownIndex;
-	if(1) {
+	if(0) {
 		log(2, "uniform margin");
 		log(2, "uniform space");
 		log(table.rowCount, "row margins");
@@ -157,7 +157,7 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 	for(size_t i: range(regularizedUnknownCount)) AtA(i,i) = AtA(i,i) + 1;
 	// Solves AtA = Atb
 	Vector x = solve(move(AtA),  Atb);
-	if(1) {
+	if(0) {
 		log("Constant margin", margin);
 		log("Constant space", space);
 		log("Uniform margin", x.slice(uniformMargin, 2));
