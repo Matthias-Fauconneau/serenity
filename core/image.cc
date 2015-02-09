@@ -186,43 +186,66 @@ ImageF convert(const Image& source) {
     return target;
 }
 
-// Box convolution with constant border
-void box(const ImageF& target, const ImageF& source, const int width/*, const v4sf border*/) {
-    assert_(target.size.y == source.size.x && target.size.x == source.size.y && uint(target.stride) == target.width && uint(source.stride)==source.width);
-    parallel_chunk(source.size.y, [&](uint, int Y0, int DY) { // Top
-	const v4sf* const sourceData = source.data;
-	v4sf* const targetData = target.begin();
-	const uint sourceStride = source.stride;
-	const uint targetStride = target.stride;
-	//const v4sf scale = float4(1./(width+1/*+width*/));
-	//const v4sf sum0 = 0; //float4(width)*border;
-	for(int y: range(Y0, Y0+DY)) {
-	    const v4sf* const sourceRow = sourceData + y * sourceStride;
-	    v4sf* const targetColumn = targetData + y;
-	    v4sf sum = float4(0);//sum0;
-	    for(uint x: range(width)) sum += sourceRow[x];
-	    float N = width;
-	    for(uint x: range(width)) {
-		sum += sourceRow[x+width];
-		N++;
-		const v4sf scale = float4(1./N);
-		targetColumn[x * targetStride] = scale * sum;
-		//sum -= border;
-	    }
-	    const v4sf scale = float4(1./N);
-	    for(uint x: range(width, sourceStride-width)) {
-		v4sf const* source = sourceRow + x;
-		sum += source[width];
-		targetColumn[x * targetStride] = scale * sum;
-		sum -= source[-width];
-	    }
-	    for(uint x: range(sourceStride-width, sourceStride)) {
-		//sum += border;
-		const v4sf scale = float4(1./N);
-		targetColumn[x * targetStride] = scale * sum;
-		sum -= sourceRow[x-width];
-		N--;
-	    }
-	}
-    });
+Image convert(const ImageF& source) {
+	Image target (source.size);
+	assert(source.Ref::size == target.Ref::size);
+	parallel_chunk(source.Ref::size, [&](uint, size_t I0, size_t DI) {
+		extern uint8 sRGB_forward[0x1000];
+		int clip = 0;
+		for(size_t i: range(I0, I0+DI)) {
+			int3 linear;
+			for(uint c: range(3)) {
+				float v = source[i][c];
+				if(!(v >= 0 && v <= 1)) {
+					if(v < 0) v = 0;
+					else if(v > 1) v = 1;
+					else v = 0; // NaN
+					//if(!clip) log("Clip", v, i, c);
+					clip++;
+				}
+				linear[c] = int(round(0xFFF*v));
+			}
+			target[i] = byte4( sRGB_forward[linear[0]], sRGB_forward[linear[1]], sRGB_forward[linear[2]] );
+		}
+		//if(clip) log("Clip", clip);
+		//assert(!clip);
+	});
+	return target;
+}
+
+// Box convolution
+void box(const ImageF& target, const ImageF& source, const int width) {
+	assert_(target.size.y == source.size.x && target.size.x == source.size.y && uint(target.stride) == target.width && uint(source.stride)==source.width);
+	parallel_chunk(source.size.y, [&](uint, int Y0, int DY) { // Top
+		const v4sf* const sourceData = source.data;
+		v4sf* const targetData = target.begin();
+		const uint sourceStride = source.stride;
+		const uint targetStride = target.stride;
+		for(int y: range(Y0, Y0+DY)) {
+			const v4sf* const sourceRow = sourceData + y * sourceStride;
+			v4sf* const targetColumn = targetData + y;
+			v4sf sum = float4(0);
+			for(uint x: range(width)) sum += sourceRow[x];
+			float N = width;
+			for(uint x: range(width)) {
+				sum += sourceRow[x+width];
+				N++;
+				const v4sf scale = float4(1./N);
+				targetColumn[x * targetStride] = scale * sum;
+			}
+			const v4sf scale = float4(1./N);
+			for(uint x: range(width, sourceStride-width)) {
+				v4sf const* source = sourceRow + x;
+				sum += source[width];
+				targetColumn[x * targetStride] = scale * sum;
+				sum -= source[-width];
+			}
+			for(uint x: range(sourceStride-width, sourceStride)) {
+				const v4sf scale = float4(1./N);
+				targetColumn[x * targetStride] = scale * sum;
+				sum -= sourceRow[x-width];
+				N--;
+			}
+		}
+	});
 }

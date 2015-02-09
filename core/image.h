@@ -111,4 +111,5 @@ inline ImageF copy(const ImageF& o) {
 }
 
 ImageF convert(const Image& source);
-void box(const ImageF& target, const ImageF& source, const int width/*, const v4sf border*/);
+Image convert(const ImageF& source);
+void box(const ImageF& target, const ImageF& source, const int width);

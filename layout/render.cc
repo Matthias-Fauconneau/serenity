@@ -89,14 +89,14 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		int2 index = element.index;
 		float xL = rowMargins[index.y]+sum(columnWidths.slice(0, index.x));
 		int xL0 = px(index.x ? xL-columnSpaces[index.x-1] : 0);
-		int xL1 = px(xL + columnSpaces[index.x]);
+		int xL1 = px(xL + columnSpaces[index.x]); if(xL1<0) xL1=0;
 		float xR = xL+sum(columnWidths.slice(index.x, element.cellCount.x));
 		int xR0 = px(xR - columnSpaces[index.x+element.cellCount.x-1]);
 		int xR1 = px(size_t(index.x+element.cellCount.x)<table.columnCount ? xR + columnSpaces[index.x+element.cellCount.x] : this->size.x);
 
 		float yT = columnMargins[index.x]+sum(rowHeights.slice(0, index.y));
 		int yT0 = px(index.y ? yT-rowSpaces[index.y-1] : 0);
-		int yT1 = px(yT + rowSpaces[index.y]);
+		int yT1 = px(yT + rowSpaces[index.y]); if(yT1<0) yT1=0;
 		float yB = yT+sum(rowHeights.slice(index.y,element.cellCount.y));
 		int yB0 = px(yB - rowSpaces[index.y+element.cellCount.y-1]);
 		int yB1 = px(size_t(index.y+element.cellCount.y)<table.rowCount ? yB + rowSpaces[index.y+element.cellCount.y] : this->size.y);
@@ -139,7 +139,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			}
 		}
 		// Bottom
-		for(int y: range(yB0, yB1)) {
+		for(int y: range(yB0, min(target.size.y, yB1))) {
 			mref<v4sf> line = background.slice(y*background.stride, background.width);
 			float wy = size_t(index.y+element.cellCount.y)<table.rowCount ? (yB1-y)/float(yB1-yB0) : 1;
 			// Left
@@ -197,12 +197,14 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			const Element& element = elements[elementIndex];
 			const ImageF& source = renders[elementIndex];
 			if(source.alpha) continue;
-			int x0 = px(element.min.x);
-			int x1 = px(element.max.x);
-			int y0 = px(element.min.y);
-			int y1 = px(element.max.y);
+			//if(!(px(element.min) >= vec2(0) && px(element.max) <= vec2(target.size))) continue;
+			//assert_(px(element.min) >= vec2(0) && px(element.max) <= vec2(target.size), element.min, element.max, target.size);
+			int x0 = px(element.min.x); if(x0 < 0) x0=0;
+			int x1 = px(element.max.x); if(x1 > size.x-1) x1=size.x-1;
+			int y0 = px(element.min.y); if(y0 < 0) y0=0;
+			int y1 = px(element.max.y); if(y1 > size.y-1) y1=size.y-1;
 			int2 size = int2(x1-x0, y1-y0);
-			assert_(source.size == size);
+			assert_(source.size >= size, source.size, size);
 
 			for(int y: range(feather.y)) { // Top
 				mref<v4sf> sourceLine = source.slice((y)*source.stride, source.width);
@@ -257,28 +259,5 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 	}
 
 	// -- Convert back to 8bit sRGB
-	Image iTarget (target.size);
-	assert(target.Ref::size == iTarget.Ref::size);
-	parallel_chunk(target.Ref::size, [&](uint, size_t I0, size_t DI) {
-		extern uint8 sRGB_forward[0x1000];
-		int clip = 0;
-		for(size_t i: range(I0, I0+DI)) {
-			int3 linear;
-			for(uint c: range(3)) {
-				float v = target[i][c];
-				if(!(v >= 0 && v <= 1)) {
-					if(v < 0) v = 0;
-					else if(v > 1) v = 1;
-					else v = 0; // NaN
-					//if(!clip) log("Clip", v, i, c);
-					clip++;
-				}
-				linear[c] = int(round(0xFFF*v));
-			}
-			iTarget[i] = byte4( sRGB_forward[linear[0]], sRGB_forward[linear[1]], sRGB_forward[linear[2]] );
-		}
-		//if(clip) log("Clip", clip);
-		//assert(!clip);
-	});
-	this->target = move(iTarget);
+	this->target = convert(target);
 }
