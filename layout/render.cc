@@ -98,7 +98,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		int yT0 = px(index.y ? yT-rowSpaces[index.y-1] : 0);
 		int yT1 = px(yT + rowSpaces[index.y]); if(yT1<0) yT1=0;
 		float yB = yT+sum(rowHeights.slice(index.y,element.cellCount.y));
-		int yB0 = px(yB - rowSpaces[index.y+element.cellCount.y-1]);
+		int yB0 = px(yB - rowSpaces[index.y+element.cellCount.y-1]); if(yB0 > size.y-1) yB0=size.y-1;
 		int yB1 = px(size_t(index.y+element.cellCount.y)<table.rowCount ? yB + rowSpaces[index.y+element.cellCount.y] : this->size.y);
 
 		// Top
@@ -139,7 +139,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			}
 		}
 		// Bottom
-		for(int y: range(yB0, min(target.size.y, yB1))) {
+		for(int y: range(yB0, min(background.size.y, yB1))) {
 			mref<v4sf> line = background.slice(y*background.stride, background.width);
 			float wy = size_t(index.y+element.cellCount.y)<table.rowCount ? (yB1-y)/float(yB1-yB0) : 1;
 			// Left

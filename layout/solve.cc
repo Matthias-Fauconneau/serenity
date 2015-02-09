@@ -100,7 +100,7 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 			setHeightCoefficient(fitElementHeight, elementIndex); // Element height
 			fitElementHeight[uniformSpace+1] = 2; // Uniform space y
 			if(element.cellCount.y == 1) {
-				fitElementHeight[columnSpaces+element.index.y] = 2; // Row space
+				fitElementHeight[rowSpaces+element.index.y] = 2; // Row space
 				fitElementHeight[rowHeights+element.index.y] = -1; // Row height
 			} else {
 				fitElementHeight[rowSpaces+element.index.y] = 1; // Row space
@@ -157,7 +157,7 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 	for(size_t i: range(regularizedUnknownCount)) AtA(i,i) = AtA(i,i) + 1;
 	// Solves AtA = Atb
 	Vector x = solve(move(AtA),  Atb);
-	if(0) {
+	if(1) {
 		log("Constant margin", margin);
 		log("Constant space", space);
 		log("Uniform margin", x.slice(uniformMargin, 2));
@@ -201,9 +201,15 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 		element.max = element.min + vec2(width, height);
 	}
 
-	if(0) {
+	if(1) {
 		array<char> s;
+		s.append("\t");
+		for(size_t columnIndex : range(table.columnCount)) {
+			s.append(str(strx(int2(round(vec2(this->columnWidths[columnIndex], this->columnMargins[columnIndex])))), "\t"));
+		}
+		s.append("\n");
 		for(size_t rowIndex : range(table.rowCount)) {
+			s.append(str(strx(int2(round(vec2(this->rowMargins[rowIndex], this->rowHeights[rowIndex])))), "\t"));
 			for(size_t columnIndex : range(table.columnCount)) {
 				const Cell& cell = table(columnIndex, rowIndex);
 				if(cell.horizontalExtension) s.append("-");
@@ -213,6 +219,7 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 				//s.append(str(strx(int2(round(e.min))), strx(int2(round(e.max))), "\t"));
 				s.append(str(strx(e.size(1)), "\t"));
 			}
+			s.append("\n");
 		}
 		log(s);
 	}
