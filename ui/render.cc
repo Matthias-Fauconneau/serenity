@@ -49,7 +49,7 @@ static void blit(const Image& target, int2 origin, const Image& source, bgr3f co
             target(x,y) = byte4(s[0], s[1], s[2], 0xFF);
         }
     }
-	else if(color==bgr3f(0) && opacity==1) { // Alpha multiply (e.g. glyphs)
+	/*else if(color==bgr3f(0) && opacity==1) { // Alpha multiply (e.g. glyphs)
         for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
             int opacity = source(x-origin.x,y-origin.y).a; // FIXME: single channel images
             byte4& target_sRGB = target(x,y);
@@ -58,7 +58,7 @@ static void blit(const Image& target, int2 origin, const Image& source, bgr3f co
             target_sRGB = byte4(sRGB_forward[linearBlend[0]], sRGB_forward[linearBlend[1]], sRGB_forward[linearBlend[2]],
                     ::min(0xFF,int(target_sRGB.a)+opacity)); // Additive opacity accumulation
         }
-    }
+	}*/
     else {
         for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
             byte4 BGRA = source(x-origin.x,y-origin.y);

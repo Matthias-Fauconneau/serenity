@@ -23,7 +23,7 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 	size_t elementsWidths = unknownIndex; unknownIndex += freeAspects.size;
 
 	const size_t unknownCount = unknownIndex;
-	if(0) {
+	if(1) {
 		log(2, "uniform margin");
 		log(2, "uniform space");
 		log(table.rowCount, "row margins");
@@ -43,7 +43,7 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 		Constraint(size_t size) : buffer(size) { clear(0); }
 		float& operator[](int unknownIndex) { assert(at(unknownIndex)==0); return at(unknownIndex); }
 		float operator[](int unknownIndex) const { return at(unknownIndex); }
-		void operator*=(float weight) { for(float& x: *this) x*=weight; constant*=weight; }
+		//void operator*=(float weight) { for(float& x: *this) x*=weight; constant*=weight; }
 	};
 	// Sets height coefficient
 	auto setHeightCoefficient = [=](Constraint& constraint, size_t elementIndex, float coefficient=1) {
@@ -157,7 +157,7 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 	for(size_t i: range(regularizedUnknownCount)) AtA(i,i) = AtA(i,i) + 1;
 	// Solves AtA = Atb
 	Vector x = solve(move(AtA),  Atb);
-	if(0) {
+	if(1) {
 		log("Constant margin", margin);
 		log("Constant space", space);
 		log("Uniform margin", x.slice(uniformMargin, 2));
@@ -171,6 +171,7 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 		log("Element heights", x.slice(elementHeights, elements.size));
 		if(freeAspects) log("Element widths", x.slice(elementsWidths, freeAspects.size));
 		Vector r = A*x - b; log(r);
+		for(float v: r) if(isNaN(v)) error("No solution found");
 	}
 
 	// -- Explicitly evaluates layout

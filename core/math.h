@@ -15,6 +15,7 @@ typedef double real;
 notrace inline float abs(float x) { return __builtin_fabsf(x); }
 notrace inline real abs(real x) { return __builtin_fabs(x); }
 
+constexpr real nanf = __builtin_nanf("");
 constexpr real nan = __builtin_nan("");
 inline bool isNaN(float x) { return x!=x; }
 inline bool isNaN(real x) { return x!=x; }

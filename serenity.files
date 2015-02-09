@@ -5,9 +5,12 @@ build.sh
 build.cc
 
 core/core.h
+core/image.h
 
 ui/text.cc
 ui/render.cc
+
+io/png.cc
 
 layout/parse.h
 layout/parse.cc

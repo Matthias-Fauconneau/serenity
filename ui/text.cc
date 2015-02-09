@@ -37,7 +37,7 @@ struct TextLayout {
 	float wrap;
 	float interline;
 	float spaceAdvance;
-	bool center;
+	int align;
 
 	// Variables
 	float lineOriginY = 0;
@@ -48,7 +48,7 @@ struct TextLayout {
 	array<array<array<Glyph>>> glyphs;
 	array<Line> lines;
 
-	void nextLine(bool justify, int align=-1) {
+	void nextLine(bool justify, int align) {
 		if(words) {
 			float length=0; for(const ref<Glyph> word: words) length += advance(word); // Sums word lengths
 			if(words.last()) length += -advance(words.last()) + width(words.last()); // For last word of line, use last glyph width instead of advance
@@ -58,7 +58,7 @@ struct TextLayout {
 			float x = 0;
 			//if(align == 0) x += (wrap-(length+(words.size-1)*space))/2; // Centers around wrap/2
 			if(align == 1) x += wrap-(length+(words.size-1)*space); // Aligns right before wrap
-			if(center) x-= (length+(words.size-1)*space)/2; // Centers around 0
+			if(align == 0) x -= (length+(words.size-1)*space)/2; // Centers around 0
 			auto& line = glyphs.append();
 			for(const ref<Glyph> word: words) {
 				auto& wordOut = line.append();
@@ -80,13 +80,13 @@ struct TextLayout {
 		float length = 0;
 		for(const ref<Glyph> word: words) length += advance(word) + spaceAdvance;
 		length += width(word); // Last word
-		if(wrap && length > wrap && words) nextLine(justify, -1); // Would not fit
+		if(wrap && length > wrap && words) nextLine(justify, this->align); // Would not fit
 		assert_(word);
 		words.append( move(word) ); // Adds to current line (might be first of a new line)
 	}
 
-	TextLayout(const ref<uint> text, float size, float wrap, string fontName, bool hint, float interline, bool center,
-			   bool justify, bool justifyExplicit, bool justifyLast, bgr3f color) : size(size), wrap(wrap), interline(interline), center(center) {
+	TextLayout(const ref<uint> text, float size, float wrap, string fontName, bool hint, float interline, int align,
+			   bool justify, bool justifyExplicit, bool justifyLast, bgr3f color) : size(size), wrap(wrap), interline(interline), align(align) {
 		// Fraction lines
 		struct Context {
 			TextFormat format; FontData* font; float size; vec2 origin; size_t start; array<Context> children; vec2 position; size_t end;
@@ -128,12 +128,12 @@ struct TextLayout {
 				/***/ if(c==' '||c=='\t'||c=='\n') {
 					previous = spaceIndex;
 					auto parentFormats = apply(stack,[](const Context& c){return c.format;});
-					/***/ if(!parentFormats.contains(TextFormat::Stack) && !parentFormats.contains(TextFormat::Fraction) && (word || words || glyphs)) {
+					/***/ if(!parentFormats.contains(TextFormat::Stack) && !parentFormats.contains(TextFormat::Fraction) /*&& (word || words || glyphs)*/) {
 						if(word) {
 							nextWord(move(word), justify);
 							position.x = 0;
 						}
-						if(c=='\n') { nextLine(justifyExplicit, align); align=-1; }
+						if(c=='\n') { nextLine(justifyExplicit, this->align); align=-1; }
 						if(c=='\t') { position.x += 4*spaceAdvance;  align++; }
 					}
 					//else if(c==' ') position.x += spaceAdvance;
@@ -223,7 +223,7 @@ struct TextLayout {
 				}
 			}
 			if(word) nextWord(move(word), justify);
-			nextLine(justifyLast && glyphs.size>1/*if multiple lines*/);
+			nextLine(justifyLast && glyphs.size>1/*if multiple lines*/, this->align);
 			bbMax.y = ::max(bbMax.y, lineOriginY - interline*size /*Reverts last line space*/ + interline*(-font->font(size).descender)); // inter widget spacing
 		}
 
@@ -243,17 +243,17 @@ struct TextLayout {
 	}
 };
 
-Text::Text(const string text, float size, bgr3f color, float opacity, float wrap, string font, bool hint, float interline, bool center, int2 minimalSizeHint, bool justifyExplicitLineBreak)
-	: text(toUCS4(text)), size(size), color(color), opacity(opacity), wrap(wrap), font(font), hint(hint), interline(interline), center(center),
+Text::Text(const string text, float size, bgr3f color, float opacity, float wrap, string font, bool hint, float interline, int align, int2 minimalSizeHint, bool justifyExplicitLineBreak)
+	: text(toUCS4(text)), size(size), color(color), opacity(opacity), wrap(wrap), font(font), hint(hint), interline(interline), align(align),
 	  justifyExplicitLineBreak(justifyExplicitLineBreak), minimalSizeHint(minimalSizeHint) {}
 
 TextLayout Text::layout(float wrap) const {
-	if(center) {
-		TextLayout layout(text, size, wrap, font, hint, interline, center, false, false, false, color); // Layouts without justification
+	if(align>-1) {
+		TextLayout layout(text, size, wrap, font, hint, interline, align, false, false, false, color); // Layouts without justification
 		wrap = layout.bbMax.x;
 		assert_(wrap >= 0, wrap);
 	}
-	return TextLayout(text, size, wrap, font, hint, interline, center, true, justifyExplicitLineBreak, true, color);
+	return TextLayout(text, size, wrap, font, hint, interline, align, true, justifyExplicitLineBreak, true, color);
 }
 
 vec2 Text::sizeHint(vec2 size) {
@@ -267,7 +267,7 @@ shared<Graphics> Text::graphics(vec2 size) {
 
 	shared<Graphics> graphics;
 	//assert_(abs(size.y - textSize.y)<=1, size, textSize);
-	vec2 offset = max(vec2(0), vec2(center ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
+	vec2 offset = max(vec2(0), vec2(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
 	//FIXME: use Graphic::offset
 	for(const auto& line: layout.glyphs) for(const auto& word: line) for(Glyph e: word) { e.origin += offset; graphics->glyphs.append( e ); }
 	for(auto e: layout.lines) { e.a += offset; e.b +=offset; graphics->lines.append( e ); }

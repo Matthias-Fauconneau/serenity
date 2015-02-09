@@ -1,5 +1,5 @@
 #include "window.h"
-#include "render.h"
+#include "ui/render.h"
 #include "x.h"
 #include "png.h"
 #include "time.h"

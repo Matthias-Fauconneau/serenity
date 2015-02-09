@@ -3,16 +3,33 @@
 #include "jpeg.h"
 #include "png.h"
 #include "text.h"
-#include "ui/render.h"
 #include "thread.h"
-#include "parallel.h"
+#include "simd.h"
+
+static void blend(const ImageF& target, uint x, uint y, v4sf source_linear, float opacity) {
+	v4sf& target_linear = target(x,y);
+	v4sf linear = mix(target_linear, source_linear, opacity);
+	linear[3] = min(1.f, target_linear[3]+opacity); // Additive opacity accumulation
+	target_linear = linear;
+}
+
+static void blit(const ImageF& target, int2 origin, const Image& source, v4sf color, float opacity) {
+	int2 min = ::max(int2(0), origin);
+	int2 max = ::min(target.size, origin+source.size);
+	for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
+		byte4 BGRA = source(x-origin.x, y-origin.y);
+		extern float sRGB_reverse[0x100];
+		v4sf linear = {sRGB_reverse[BGRA[0]], sRGB_reverse[BGRA[1]], sRGB_reverse[BGRA[2]], 0};
+		blend(target, x, y, color*linear, opacity*BGRA.a/0xFF);
+	}
+}
 
 struct ImageElement : Element {
 	Map file;
 	Image image = decodeImage(file);
 	ImageElement(string fileName, const Folder& folder) : file(fileName , folder) {
 		aspectRatio = (float)image.size.x/image.size.y;
-		sizeHint = vec2(image.size)/300.f*inchMM;
+		sizeHint = vec2(image.size)/600.f*inchMM;
 	}
 	Image source() const override { return share(image); }
 	ImageF render(float mmPx) const override {
@@ -24,11 +41,11 @@ struct TextElement : Element {
 	String string;
 	float textSize = 12;
 	bool transpose = false;
-	bool center = true;
+	int align = 0;
 	bgr3f color = white;
-	TextElement(::string text, float textSize, bool transpose, bool center, bgr3f color)
-		: string(copyRef(text)), textSize(textSize), transpose(transpose), center(center), color(color) {
-		vec2 size = Text(text, textSize/72*72, color, 1, 0, "LinLibertine", false, 1, center).sizeHint();
+	TextElement(::string text, float textSize, bool transpose, int align, bgr3f color)
+		: string(copyRef(text)), textSize(textSize), transpose(transpose), align(align), color(color) {
+		vec2 size = Text(text, textSize/72*72, color, 1, 0, "LinLibertine", false, 1, align).sizeHint();
 		if(transpose) swap(size.x, size.y);
 		aspectRatio = (float)size.x/size.y;
 	}
@@ -36,10 +53,24 @@ struct TextElement : Element {
 	ImageF render(float mmPx) const override {
 		int2 size = this->size(mmPx);
 		if(transpose) swap(size.x, size.y);
-		Text text(string, textSize/72*inchMM*mmPx, color, 1, (floor(max.x*mmPx) - ceil(min.x*mmPx) - 4)*2/3 /*FIXME*/, "LinLibertine", false, 1, center);
-		Image image = ::render(size, text.graphics(vec2(size)));
+		Text text(string, textSize/72*inchMM*mmPx, color, 1, (floor(max.x*mmPx) - ceil(min.x*mmPx) - 4 -10*mmPx /*FIXME*/),
+				  "LinLibertine", false, 1, align);
+		/*Image image = ::render(size, text.graphics(vec2(size)));
 		if(transpose) image = rotateHalfTurn(rotate(image));
-		return convert(image); // TODO: direct float render
+		return convert(image); // TODO: direct float render*/
+		ImageF target (size, true); target.clear(float4(0));
+		auto graphics = text.graphics(vec2(size));
+		for(const Glyph& e: graphics->glyphs) {
+			Font::Glyph glyph = e.font.font(e.fontSize).render(e.index);
+			if(glyph.image) blit(target, int2(round(e.origin))+glyph.offset, glyph.image, v4sf{e.color.b ,e.color.g, e.color.r, 0}, e.opacity);
+		}
+		if(transpose) {
+			ImageF source = move(target);
+			target = ImageF(size.y, size.x, source.alpha);
+			assert_(target.size.x == source.size.y && target.size.y == source.size.x);
+			for(size_t y: range(size.y)) for(size_t x: range(size.x)) target(y, target.size.y-1-x) = source(x, y);
+		}
+		return target;
 	}
 };
 
@@ -86,15 +117,17 @@ LayoutParse::LayoutParse(const Folder& folder, TextData&& s, function<void(strin
 			else {
 				unique<Element> element = nullptr;
 				/**/ if(s.match("@")) { // Indirect text
-					string name = s.whileNo(" \t\n");
-					if(watcher) watcher->addWatch(name);
-					element = unique<TextElement>(readFile(name), 12.f, false, false, value<float>("color", 1));
+					string file = s.whileNo("* \t\n");
+					if(!existsFile(file)) { error(str(s.lineIndex)+": No such text"_, file, "in", files); return; }
+					if(watcher) watcher->addWatch(file);
+					element = unique<TextElement>(readFile(file), 12.f, false, -1, value<float>("color", 1));
 					freeAspects.append(elements.size);
 				} else if(s.match("\"")) { // Text
 					String text = replace(s.until('"'),"\\n","\n");
 					string textSize = s.whileDecimal();
 					bool transpose = s.match("T");
-					element = unique<TextElement>(text, textSize ? parseDecimal(textSize) : 12, transpose, true, value<float>("color", 1));
+					int align = s.match("R");
+					element = unique<TextElement>(text, textSize ? parseDecimal(textSize) : 12, transpose, align, value<float>("color", 1));
 					//freeAspects.append(elements.size);
 				} else { // Image
 					string name = s.whileNo("*! \t\n");

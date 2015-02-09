@@ -69,6 +69,7 @@ Image rotateHalfTurn(Image&& target);
 /// Resizes \a source into \a target
 void resize(const Image& target, const Image& source);
 inline Image resize(Image&& target, const Image& source) { resize(target, source); return move(target); }
+inline Image resize(int2 size, const Image& source) { return resize(Image(size, source.alpha), source); }
 
 // -- 16bit
 
@@ -85,13 +86,13 @@ struct Image16 : buffer<int16> {
 /// 2D array of floating-point 4 component vector pixels (linear colorspace)
 struct ImageF : buffer<v4sf> {
 	ImageF(){}
-	ImageF(buffer<v4sf>&& data, int2 size, size_t stride) : buffer(::move(data)), size(size), stride(stride) {
+	ImageF(buffer<v4sf>&& data, int2 size, size_t stride, bool alpha) : buffer(::move(data)), size(size), stride(stride), alpha(alpha) {
 		assert(buffer::size==size_t(size.y*stride), buffer::size, size, stride);
 	}
-	ImageF(int width, int height) : buffer(height*width), width(width), height(height), stride(width) {
+	ImageF(int width, int height, bool alpha) : buffer(height*width), width(width), height(height), stride(width), alpha(alpha) {
 		assert(size>int2(0), size, width, height);
 	}
-	ImageF(int2 size) : ImageF(size.x, size.y) {}
+	ImageF(int2 size, bool alpha=false) : ImageF(size.x, size.y, alpha) {}
 
 	inline v4sf& operator()(size_t x, size_t y) const {assert(x<width && y<height, x, y); return at(y*stride+x); }
 
@@ -103,8 +104,8 @@ struct ImageF : buffer<v4sf> {
 	bool alpha = false;
 };
 inline ImageF copy(const ImageF& o) {
-	if(o.width == o.stride) return ImageF(copy((const buffer<v4sf>&)o), o.size, o.stride);
-	ImageF target(o.size);
+	if(o.width == o.stride) return ImageF(copy((const buffer<v4sf>&)o), o.size, o.stride, o.alpha);
+	ImageF target(o.size, o.alpha);
 	for(size_t y: range(o.height)) target.slice(y*target.stride, target.width).copy(o.slice(y*o.stride, o.width));
 	return target;
 }
