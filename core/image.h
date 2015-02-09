@@ -3,36 +3,38 @@
 #include "vector.h"
 #include "simd.h"
 
-/// 2D array of BGRA 8-bit unsigned integer pixels
+/// 2D array of BGRA 8-bit unsigned integer pixels (sRGB colorspace)
 struct Image : buffer<byte4> {
 	union { int2 size = 0; struct { uint width, height; }; };
     uint stride = 0;
-    bool alpha = false, sRGB = true;
+    bool alpha = false;
 
 	Image() {}
 	default_move(Image);
-    Image(buffer<byte4>&& pixels, int2 size, uint stride=0, bool alpha=false, bool sRGB=true)
-        : buffer<byte4>(::move(pixels)), size(size), stride(stride?:size.x), alpha(alpha), sRGB(sRGB) {
+    Image(buffer<byte4>&& pixels, int2 size, uint stride=0, bool alpha=false)
+	: buffer<byte4>(::move(pixels)), size(size), stride(stride?:size.x), alpha(alpha) {
         //assert_(buffer::data && buffer::size == height*this->stride);
     }
-    Image(uint width, uint height, bool alpha=false, bool sRGB=true)
-		: buffer(height*width), width(width), height(height), stride(width), alpha(alpha), sRGB(sRGB) {
+    Image(uint width, uint height, bool alpha=false)
+		: buffer(height*width), width(width), height(height), stride(width), alpha(alpha) {
         //assert_(width && height && buffer::data);
     }
-    Image(int2 size, bool alpha=false, bool sRGB=true) : Image(size.x, size.y, alpha, sRGB) {}
+    Image(int2 size, bool alpha=false) : Image(size.x, size.y, alpha) {}
 
     explicit operator bool() const { return data && width && height; }
 	inline notrace byte4& operator()(uint x, uint y) const { assert(x<width && y<height); return at(y*stride+x); }
 };
 inline String str(const Image& o) { return strx(o.size); }
 
-inline Image copy(const Image& o) { return Image(copyRef(o), o.size, o.stride, o.alpha, o.sRGB); }
+inline Image copy(const Image& o) { return Image(copyRef(o), o.size, o.stride, o.alpha); }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
-inline notrace Image share(const Image& o) { return Image(unsafeRef(o),o.size,o.stride,o.alpha,o.sRGB); }
+inline notrace Image share(const Image& o) { return Image(unsafeRef(o),o.size,o.stride,o.alpha); }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
-inline notrace Image cropShare(const Image& o, int2 offset, int2 size) { return Image(unsafeRef(o.slice(offset.y*o.stride+offset.x, size.y*o.stride)),size,o.stride,o.alpha,o.sRGB); }
+inline notrace Image cropShare(const Image& o, int2 offset, int2 size) {
+    return Image(unsafeRef(o.slice(offset.y*o.stride+offset.x, size.y*o.stride)),size,o.stride,o.alpha);
+}
 
 // -- Decode --
 
@@ -80,7 +82,7 @@ struct Image16 : buffer<int16> {
 
 // -- 4x float
 
-/// 2D array of floating-point 4 component vector pixels
+/// 2D array of floating-point 4 component vector pixels (linear colorspace)
 struct ImageF : buffer<v4sf> {
 	ImageF(){}
 	ImageF(buffer<v4sf>&& data, int2 size, size_t stride) : buffer(::move(data)), size(size), stride(stride) {
@@ -98,6 +100,7 @@ struct ImageF : buffer<v4sf> {
 		struct { uint width, height; };
 	};
 	size_t stride = 0;
+	bool alpha = false;
 };
 inline ImageF copy(const ImageF& o) {
 	if(o.width == o.stride) return ImageF(copy((const buffer<v4sf>&)o), o.size, o.stride);
@@ -106,4 +109,5 @@ inline ImageF copy(const ImageF& o) {
 	return target;
 }
 
+ImageF convert(const Image& source);
 void box(const ImageF& target, const ImageF& source, const int width/*, const v4sf border*/);

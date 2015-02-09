@@ -138,10 +138,10 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 		Constraint& preferSize = constraint();  // height = hint
 		setHeightCoefficient(preferSize, elementIndex);
 		preferSize.constant = elements[elementIndex]->sizeHint.y;
-		log("Prefer Size", elements[elementIndex]->sizeHint, size);
+		//log("Prefer Size", elements[elementIndex]->sizeHint, size);
 	}
 
-	log("=", constraints.size, "constraints");
+	//log("=", constraints.size, "constraints");
 
 	// -- Solves regularized linear least square system
 	Matrix A (constraints.size, unknownCount); Vector b (constraints.size);

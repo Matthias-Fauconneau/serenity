@@ -176,6 +176,16 @@ void resize(const Image& target, const Image& source) {
 
 // -- 4x float
 
+ImageF convert(const Image& source) {
+    ImageF target (source.size);
+    parallel_chunk(source.Ref::size, [&](uint, size_t I0, size_t DI) {
+	extern float sRGB_reverse[0x100];
+	for(size_t i: range(I0, I0+DI)) target[i] = {sRGB_reverse[source[i][0]], sRGB_reverse[source[i][1]], sRGB_reverse[source[i][2]],
+						     source.alpha ? float(source[i][2])/0xFF : 1};
+    });
+    return target;
+}
+
 // Box convolution with constant border
 void box(const ImageF& target, const ImageF& source, const int width/*, const v4sf border*/) {
     assert(target.size.y == source.size.x && target.size.x == source.size.y && uint(target.stride) == target.width && uint(source.stride)==source.width);

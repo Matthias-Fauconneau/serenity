@@ -8,17 +8,16 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 	const float mmPx = _mmPx ? _mmPx : _inchPx/inchMM;
 	assert_(mmPx);
 
-	// -- Renders each element
-	//Time loadTime;
-	buffer<Image> images = apply(elements, [=](const Element& e) { return e.size(mmPx)>int2(0) ? e.image(mmPx) : Image(); });
-	//log(loadTime);
+	// -- Decodes sRGB8 images
+	buffer<Image> sources = apply(elements, [=](const Element& e) { return e.source(); });
 
 	if(0) {  // -- Evaluates resolution
 		const float inchPx = _inchPx ? _inchPx : _mmPx*inchMM;
 		assert_(inchPx);
 		float minScale = inf, maxScale = 0;
 		for(size_t elementIndex: range(elements.size)) {
-			float scale = images[elementIndex].size.x / elements[elementIndex]->size(mmPx).x;
+			if(!sources[elementIndex]) continue;
+			float scale = sources[elementIndex].size.x / elements[elementIndex]->size(mmPx).x;
 			minScale = min(minScale, scale);
 			maxScale = max(maxScale, scale);
 		}
@@ -28,12 +27,12 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 	}
 
 	// -- Evaluates each elements dominant color (or use user argument overrides)
-	buffer<v4sf> elementColors = apply(images.size, [&](const size_t elementIndex) {
-		const Image& iSource = images[elementIndex];
+	buffer<v4sf> elementColors = apply(sources.size, [&](const size_t elementIndex) {
+		const Image& source = sources[elementIndex];
 		int hueHistogram[0x100] = {}; mref<int>(hueHistogram).clear(0); // 1½K: 32bit / 0xFF -> 4K² images
 		int intensityHistogram[0x100] = {}; mref<int>(intensityHistogram).clear(0);
 		int chromaHistogram[0x100] = {}; mref<int>(chromaHistogram).clear(0);
-		for(byte4 c: iSource) {
+		for(byte4 c: source) {
 			const int B = c.b, G = c.g, R = c.r;
 			const int M = max(max(B, G), R);
 			const int m = min(min(B, G), R);
@@ -79,10 +78,11 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 
 #define px(x) round((x)*mmPx)
 	int2 size = int2(px(this->size));
-	ImageF target(size);
-	target.clear(float4(0));
+	ImageF background(size);
+	background.clear(float4(0));
 	const bool marginColor = false;
-	if(marginColor) { // -- Fills transition to outer color in margins
+	// -- Fills transition to outer color in margins
+	if(marginColor) {
 		v4sf marginColor = ::mean(elementColors);
 		// Left vertical side
 		for(int row: range(table.rowCount)) {
@@ -90,7 +90,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			float yB = yT+rowHeights[row];
 			float dx = rowMargins[row];
 			for(int y: range(px(yT), px(yB))) {
-				mref<v4sf> line = target.slice(y*target.stride, target.width);
+				mref<v4sf> line = background.slice(y*background.stride, background.width);
 				for(int x: range(px(dx))) {
 					v4sf c = float4(1-x/px(dx)) * marginColor;
 					line[x] += c;
@@ -103,7 +103,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			float yB = yT+rowHeights[row];
 			float dx = rowMargins[row];
 			for(int y: range(px(yT), px(yB))) {
-				mref<v4sf> line = target.slice(y*target.stride, target.width);
+				mref<v4sf> line = background.slice(y*background.stride, background.width);
 				for(int x: range(px(dx))) {
 					v4sf c = float4(1-x/px(dx)) * marginColor;
 					line[size.x-1-x] += c;
@@ -116,7 +116,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			float xR = xL+columnWidths[column];
 			float dy = columnMargins[column];
 			for(int y: range(px(dy))) {
-				mref<v4sf> line = target.slice(y*target.stride, target.width);
+				mref<v4sf> line = background.slice(y*background.stride, background.width);
 				v4sf c = float4(1-y/px(dy)) * marginColor;
 				for(int x: range(px(xL), px(xR))) {
 					line[x] += c;
@@ -129,7 +129,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			float xR = xL+columnWidths[column];
 			float dy = columnMargins[column];
 			for(int y: range(px(dy))) {
-				mref<v4sf> line = target.slice((size.y-1-y)*target.stride, target.width);
+				mref<v4sf> line = background.slice((size.y-1-y)*background.stride, background.width);
 				v4sf c = float4(1-y/px(dy)) * marginColor;
 				for(int x: range(px(xL), px(xR))) {
 					line[x] += c;
@@ -140,7 +140,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			float dx = rowMargins[0];
 			float dy = columnMargins[0];
 			for(int y: range(px(dy))) {
-				mref<v4sf> line = target.slice(y*target.stride, target.width);
+				mref<v4sf> line = background.slice(y*background.stride, background.width);
 				for(int x: range(px(dx))) {
 					v4sf c = float4(1-(x/px(dx))*(y/px(dy))) * marginColor;
 					line[x] += c;
@@ -151,7 +151,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			float dx = size.x - px(rowMargins[0]+sum(columnWidths));
 			float dy = columnMargins.last();
 			for(int y: range(px(dy))) {
-				mref<v4sf> line = target.slice(y*target.stride, target.width);
+				mref<v4sf> line = background.slice(y*background.stride, background.width);
 				for(int x: range((dx))) {
 					v4sf c = float4(1-(x/(dx))*(y/px(dy))) * marginColor;
 					line[size.x-1-x] += c;
@@ -162,7 +162,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			float dx = rowMargins.last();
 			float dy = columnMargins[0];
 			for(int y: range(px(dy))) {
-				mref<v4sf> line = target.slice((size.y-1-y)*target.stride, target.width);
+				mref<v4sf> line = background.slice((size.y-1-y)*background.stride, background.width);
 				for(int x: range(px(dx))) {
 					v4sf c = float4(1-((x/px(dx))*(y/px(dy)))) * marginColor;
 					line[x] += c;
@@ -173,7 +173,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			float dx = size.x - px(rowMargins.last()+sum(columnWidths));
 			float dy = columnMargins.last();
 			for(int y: range(px(dy))) {
-				mref<v4sf> line = target.slice((size.y-1-y)*target.stride, target.width);
+				mref<v4sf> line = background.slice((size.y-1-y)*background.stride, background.width);
 				for(int x: range(dx)) {
 					v4sf c = float4(1-((x/(dx))*(y/px(dy)))) * marginColor;
 					line[size.x-1-x] += c;
@@ -182,40 +182,24 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		}
 	}
 
-	// -- Copies elements
-	for(size_t elementIndex: range(elements.size)) {
-		const Element& element = elements[elementIndex];
-		int2 size = element.size(mmPx);
-		const Image& image = images[elementIndex];
-		//if(size == image.size) log(size); else log(image.size, "→", size);
-		// TODO: single pass linear resize, float conversion (or decode to float and resize) + direct output to target
-		Image iSource = size == image.size ? share(image) : resize(size, image);
-		ImageF source (size);
-		parallel_chunk(iSource.Ref::size, [&](uint, size_t I0, size_t DI) {
-			extern float sRGB_reverse[0x100];
-			for(size_t i: range(I0, I0+DI)) source[i] = {sRGB_reverse[iSource[i][0]], sRGB_reverse[iSource[i][1]], sRGB_reverse[iSource[i][2]],
-														 image.alpha ? float(iSource[i][2])/0xFF : 1};
-		});
-		int x0 = px(element.min.x);
-		int x1 = px(element.max.x);
-		int y0 = px(element.min.y);
-		int y1 = px(element.max.y);
-		parallel_chunk(y0, y1, [&](uint, int Y0, int DY) {
-			for(int y: range(Y0, Y0+DY)) {
-				mref<v4sf> line = target.slice(y*target.stride, target.width);
-				mref<v4sf> sourceLine = source.slice((y-y0)*source.stride, source.width);
-				if(image.alpha) {
-					for(int x: range(x0, x1)) if(sourceLine[x-x0][3]) line[x] = sourceLine[x-x0]; // Masks image
-				} else {
-					for(int x: range(x0, x1)) line[x] = sourceLine[x-x0]; // Copies image
-				}
-			}
-		});
-	}
-	// -- Draws transitions between elements
+	// -- Draws elements backgrounds and transitions between elements
 	for(size_t elementIndex: range(elements.size)) {
 		const Element& element = elements[elementIndex];
 		if(!element.root) continue;
+		v4sf elementColor = elementColors[elementIndex];
+		{ // -- Fills element background color
+			int x0 = px(element.min.x);
+			int x1 = px(element.max.x);
+			int y0 = px(element.min.y);
+			int y1 = px(element.max.y);
+			parallel_chunk(y0, y1, [&](uint, int Y0, int DY) {
+				for(int y: range(Y0, Y0+DY)) {
+					mref<v4sf> line = background.slice(y*background.stride, background.width);
+					for(int x: range(x0, x1)) line[x] = elementColor;
+				}
+			});
+		}
+
 		int2 index = element.index;
 		float xL = rowMargins[index.y]+sum(columnWidths.slice(0, index.x));
 		int xL0 = px(index.x ? xL-columnSpaces[index.x-1] : 0);
@@ -233,11 +217,9 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		int yB1 = px(size_t(index.y+element.cellCount.y)<table.rowCount ? yB + rowSpaces[index.y+element.cellCount.y] : this->size.y);
 		//log("y", rowSpaces[index.y], yT0, int(px(yT)), yT1, "y0", y0, "y1", y1, yB0, int(px(yB)), yB1);
 
-		v4sf elementColor = elementColors[elementIndex];
-
 		// Top
 		for(int y: range(yT0, yT1)) {
-			mref<v4sf> line = target.slice(y*target.stride, target.width);
+			mref<v4sf> line = background.slice(y*background.stride, background.width);
 			float wy = marginColor || index.y ? (y-yT0)/float(yT1-yT0) : 1;
 			// Left
 			for(int x: range(xL0, xL1)) {
@@ -257,7 +239,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		// FIXME: yT1 - y0
 		// -- Center
 		for(int y: range(yT1, yB0)) {
-			mref<v4sf> line = target.slice(y*target.stride, target.width);
+			mref<v4sf> line = background.slice(y*background.stride, background.width);
 			// Left
 			for(int x: range(xL0, xL1)) {
 				float wx = marginColor || index.x ? (x-xL0)/float(xL1-xL0) : 1;
@@ -267,7 +249,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		//FIXME: xL1 - y0
 		//FIXME: x1 - yB0
 		for(int y: range(yT1, yB0)) {
-			mref<v4sf> line = target.slice(y*target.stride, target.width);
+			mref<v4sf> line = background.slice(y*background.stride, background.width);
 			// Right
 			for(int x: range(xR0, xR1)) {
 				float wx = marginColor || size_t(index.x+element.cellCount.x)<table.columnCount ? (xR1-x)/float(xR1-xR0) : 1;
@@ -278,7 +260,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		//FIXME: y1 - yB0
 		// Bottom
 		for(int y: range(yB0, yB1)) {
-			mref<v4sf> line = target.slice(y*target.stride, target.width);
+			mref<v4sf> line = background.slice(y*background.stride, background.width);
 			float wy = marginColor || size_t(index.y+element.cellCount.y)<table.rowCount ? (yB1-y)/float(yB1-yB0) : 1;
 			// Left
 			for(int x: range(xL0, xL1)) {
@@ -297,100 +279,108 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		}
 	}
 
-	if(arguments.value("blur","1/8"_)!="0"_) { // -- Large gaussian blur approximated with repeated box convolution
-		//log("Blur");
-		//Time blurTime;
-		ImageF source = move(target);
-		ImageF blur(source.size);
-		{
-			ImageF transpose(target.size.y, target.size.x);
-			const int R = min(source.size.x, source.size.y) * parse<float>(arguments.value("blur","1/8"_));
-			//const int R = max(min(widths), min(heights))/4; //8
-			box(transpose, source, R/*, outerBackgroundColor*/);
-			box(blur, transpose, R/*, outerBackgroundColor*/);
-			box(transpose, blur, R/*, outerBackgroundColor*/);
-			box(blur, transpose, R/*, outerBackgroundColor*/);
-			target = copy(blur);
-		}
-		// -- Copies source images over blur background
-		for(size_t elementIndex: range(elements.size)) { // -- Blends transparent images
-			if(!images[elementIndex].alpha) continue;
+	// -- Renders elements
+	buffer<ImageF> renders = apply(elements, [=](const Element& e) { return e.render(mmPx); });
+
+	auto compose = [&]{
+		ImageF target = copy(background);
+		int2 feather = parse<float>(arguments.value("feather","1"_))*mmPx;
+		// -- Composes unfeathered elements
+		for(size_t elementIndex: range(elements.size)) {
 			const Element& element = elements[elementIndex];
-			float x0 = element.min.x, x1 = element.max.x;
-			float y0 = element.min.y, y1 = element.max.y;
-			int ix0 = round(x0*mmPx), iy0 = round(y0*mmPx);
-			int ix1 = round(x1*mmPx), iy1 = round(y1*mmPx);
-			int2 size(ix1-ix0, iy1-iy0);
-			if(!(size.x>0 && size.y>0)) continue;
-			assert(size.x>0 && size.y>0);
-			parallel_chunk(size.y, [&](uint, int Y0, int DY) {
+			const ImageF& source = renders[elementIndex];
+			if(!source.alpha && feather) continue;
+
+			int x0 = px(element.min.x);
+			int x1 = px(element.max.x);
+			int y0 = px(element.min.y);
+			int y1 = px(element.max.y);
+			parallel_chunk(y0, y1, [&](uint, int Y0, int DY) {
 				for(int y: range(Y0, Y0+DY)) {
-					v4sf* sourceLine = source.begin() + (iy0+y)*source.stride;
-					v4sf* targetLine = target.begin() + (iy0+y)*source.stride;
-					for(int x: range(size.x)) targetLine[ix0+x] = mix(targetLine[ix0+x], sourceLine[ix0+x], sourceLine[ix0+x][3]);
-					//for(int x: range(size.x)) targetLine[ix0+x] += sourceLine[ix0+x];
+					mref<v4sf> line = target.slice(y*target.stride, target.width);
+					mref<v4sf> renderLine = source.slice((y-y0)*source.stride, source.width);
+					if(source.alpha) {
+						for(int x: range(x0, x1)) line[x] = mix(line[x], renderLine[x-x0], renderLine[x-x0][3]); // Blends image
+					} else {
+						for(int x: range(x0, x1)) line[x] = renderLine[x-x0]; // Copies image
+					}
 				}
 			});
 		}
-		for(size_t elementIndex: range(elements.size)) { // -- Copy opaque images feathered to blur background
-			if(images[elementIndex].alpha) continue;
+		// -- Composes feathered elements
+		if(feather) for(size_t elementIndex: range(elements.size)) {
 			const Element& element = elements[elementIndex];
-			float x0 = element.min.x, x1 = element.max.x;
-			float y0 = element.min.y, y1 = element.max.y;
-			int ix0 = round(x0*mmPx), iy0 = round(y0*mmPx);
-			int ix1 = round(x1*mmPx), iy1 = round(y1*mmPx);
-			int2 size(ix1-ix0, iy1-iy0);
-			if(!(size.x>0 && size.y>0)) continue;
-			assert(size.x>0 && size.y>0);
-
-			int2 feather = parse<float>(arguments.value("feather","1"_))*mmPx;
+			const ImageF& source = renders[elementIndex];
+			if(source.alpha) continue;
+			int x0 = px(element.min.x);
+			int x1 = px(element.max.x);
+			int y0 = px(element.min.y);
+			int y1 = px(element.max.y);
+			int2 size = int2(x1-x0, y1-y0);
+			assert_(source.size == size);
 
 			for(int y: range(feather.y)) { // Top
-				mref<v4sf> sourceLine = source.slice((iy0+y)*source.stride, source.width);
-				mref<v4sf> blurLine = blur.slice((iy0+y)*source.stride, source.width);
-				mref<v4sf> targetLine = target.slice((iy0+y)*source.stride, source.width);
+				mref<v4sf> sourceLine = source.slice((y)*source.stride, source.width);
+				mref<v4sf> backgroundLine = background.slice((y0+y)*source.stride, source.width);
+				mref<v4sf> targetLine = background.slice((y0+y)*source.stride, source.width);
 				for(int x: range(feather.x)) // Left
-					targetLine[ix0+x] = mix(blurLine[ix0+x], sourceLine[ix0+x], (x/float(feather.x))*(y/float(feather.y)));
+					targetLine[x0+x] = mix(backgroundLine[x0+x], sourceLine[x], (x/float(feather.x))*(y/float(feather.y)));
 				for(int x: range(feather.x, size.x-feather.x)) // Center
-					targetLine[ix0+x] = mix(blurLine[ix0+x], sourceLine[ix0+x], (y/float(feather.y)));
+					targetLine[x0+x] = mix(backgroundLine[x0+x], sourceLine[x], (y/float(feather.y)));
 				for(int x: range(feather.x)) // Right
-					targetLine[ix1-1-x] = mix(blurLine[ix1-1-x], sourceLine[ix1-1-x], (x/float(feather.x))*(y/float(feather.y)));
+					targetLine[x1-1-x] = mix(backgroundLine[x1-1-x], sourceLine[size.x-1-x], (x/float(feather.x))*(y/float(feather.y)));
 			}
 			parallel_chunk(feather.y, size.y-feather.y, [&](uint, int Y0, int DY) { // Center
 				for(int y: range(Y0, Y0+DY)) {
-					v4sf* sourceLine = source.begin() + (iy0+y)*source.stride;
-					v4sf* blurLine = blur.begin() + (iy0+y)*source.stride;
-					v4sf* targetLine = target.begin() + (iy0+y)*source.stride;
-					for(int x: range(feather.x)) targetLine[ix0+x] = mix(blurLine[ix0+x], sourceLine[ix0+x], (x/float(feather.x))); // Left
-					for(int x: range(feather.x, size.x-feather.x)) targetLine[ix0+x] = sourceLine[ix0+x];
-					for(int x: range(feather.x)) targetLine[ix1-1-x] = mix(blurLine[ix1-1-x], sourceLine[ix1-1-x], (x/float(feather.x))); // Right
+					mref<v4sf> sourceLine = source.slice((y)*source.stride, source.width);
+					mref<v4sf> backgroundLine = background.slice((y0+y)*source.stride, source.width);
+					mref<v4sf> targetLine = background.slice((y0+y)*source.stride, source.width);
+					for(int x: range(feather.x)) targetLine[x0+x] = mix(backgroundLine[x0+x], sourceLine[x], (x/float(feather.x))); // Left
+					for(int x: range(feather.x, size.x-feather.x)) targetLine[x0+x] = sourceLine[x];
+					for(int x: range(feather.x)) targetLine[x1-1-x] = mix(backgroundLine[x1-1-x], sourceLine[size.x-1-x], (x/float(feather.x))); // Right
 				}
 			});
 			for(int y: range(feather.y)) { // Bottom
-				v4sf* sourceLine = source.begin() + (iy1-1-y)*source.stride;
-				v4sf* blurLine = blur.begin() + (iy1-1-y)*source.stride;
-				v4sf* targetLine = target.begin() + (iy1-1-y)*source.stride;
+				mref<v4sf> sourceLine = source.slice((size.y-1-y)*source.stride, source.width);
+				mref<v4sf> backgroundLine = background.slice((y1-1-y)*source.stride, source.width);
+				mref<v4sf> targetLine = background.slice((y1-1-y)*source.stride, source.width);
 				for(int x: range(feather.x)) // Left
-					targetLine[ix0+x] = mix(blurLine[ix0+x], sourceLine[ix0+x], (x/float(feather.x))*(y/float(feather.y)));
+					targetLine[x0+x] = mix(backgroundLine[x0+x], sourceLine[x], (x/float(feather.x))*(y/float(feather.y)));
 				for(int x: range(feather.x,size.x-feather.x)) // Center
-					targetLine[ix0+x] = mix(blurLine[ix0+x], sourceLine[ix0+x], (y/float(feather.y)));
+					targetLine[x0+x] = mix(backgroundLine[x0+x], sourceLine[x], (y/float(feather.y)));
 				for(int x: range(feather.x)) // Right
-					targetLine[ix1-1-x] = mix(blurLine[ix1-1-x], sourceLine[ix1-1-x], (x/float(feather.x))*(y/float(feather.y)));
+					targetLine[x1-1-x] = mix(backgroundLine[x1-1-x], sourceLine[size.x-1-x], (x/float(feather.x))*(y/float(feather.y)));
 			}
 		}
-		//log(blurTime);
+		return target;
+	};
+	ImageF target = compose();
+
+	// -- Replaces background with blurred target
+	if(arguments.value("blur","1/8"_)!="0"_) {
+		// -- Large gaussian blur approximated with repeated box convolution
+		ImageF blur(size);
+		ImageF transpose(size.y, size.x);
+		const int R = min(size.x, size.y) * parse<float>(arguments.value("blur","1/8"_));
+		box(transpose, target, R);
+		box(blur, transpose, R);
+		box(transpose, blur, R);
+		box(blur, transpose, R);
+		// -- Composes again over blur background
+		background = move(blur);
+		target = compose();
 	}
 
 	// -- Convert back to 8bit sRGB
-	Image iTarget (target.size);
-	assert(target.Ref::size == iTarget.Ref::size);
-	parallel_chunk(target.Ref::size, [&](uint, size_t I0, size_t DI) {
+	Image iTarget (background.size);
+	assert(background.Ref::size == iTarget.Ref::size);
+	parallel_chunk(background.Ref::size, [&](uint, size_t I0, size_t DI) {
 		extern uint8 sRGB_forward[0x1000];
 		int clip = 0;
 		for(size_t i: range(I0, I0+DI)) {
 			int3 linear;
 			for(uint c: range(3)) {
-				float v = target[i][c];
+				float v = background[i][c];
 				if(!(v >= 0 && v <= 1)) {
 					if(v < 0) v = 0;
 					else if(v > 1) v = 1;

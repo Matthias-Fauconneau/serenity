@@ -14,7 +14,8 @@ struct Element {
 	vec2 margin, space; // Margin and space of element row/column
 	int2 size(float mmPx) const { return int2(round(max*mmPx) - round(min*mmPx)); } // Element size (in pixels)
 	virtual ~Element() {}
-	virtual struct Image image(float mmPx) const abstract;
+	virtual struct ImageF render(float mmPx) const abstract;
+	virtual struct Image source() const abstract;
 };
 
 struct Cell {

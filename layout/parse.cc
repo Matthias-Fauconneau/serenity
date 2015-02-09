@@ -5,17 +5,19 @@
 #include "text.h"
 #include "ui/render.h"
 #include "thread.h"
+#include "parallel.h"
 
 struct ImageElement : Element {
 	Map file;
+	Image image = decodeImage(file);
 	ImageElement(string fileName, const Folder& folder) : file(fileName , folder) {
-		vec2 size = vec2(::imageSize(file));
-		aspectRatio = (float)size.x/size.y;
-		sizeHint = size/300.f*inchMM;
+		aspectRatio = (float)image.size.x/image.size.y;
+		sizeHint = vec2(image.size)/300.f*inchMM;
 	}
-	Image image(float) const override {
-		Image image = decodeImage(file);
-		return image;
+	Image source() const override { return share(image); }
+	ImageF render(float mmPx) const override {
+		int2 size = this->size(mmPx);
+		return size == image.size ? convert(image) : convert(resize(size, image)); // TODO: direct linear float resize
 	}
 };
 struct TextElement : Element {
@@ -23,19 +25,21 @@ struct TextElement : Element {
 	float textSize = 12;
 	bool transpose = false;
 	bool center = true;
-	TextElement(::string text, float textSize, bool transpose, bool center)
-		: string(copyRef(text)), textSize(textSize), transpose(transpose), center(center) {
-		vec2 size = Text(text, textSize/72*72, white, 1, 0, "LinLibertine", false, 1, center).sizeHint();
+	bgr3f color = white;
+	TextElement(::string text, float textSize, bool transpose, bool center, bgr3f color)
+		: string(copyRef(text)), textSize(textSize), transpose(transpose), center(center), color(color) {
+		vec2 size = Text(text, textSize/72*72, color, 1, 0, "LinLibertine", false, 1, center).sizeHint();
 		if(transpose) swap(size.x, size.y);
 		aspectRatio = (float)size.x/size.y;
 	}
-	Image image(float mmPx) const override {
+	Image source() const override { return {}; }
+	ImageF render(float mmPx) const override {
 		int2 size = this->size(mmPx);
 		if(transpose) swap(size.x, size.y);
-		Text text(string, textSize/72*inchMM*mmPx, white, 1, (floor(max.x*mmPx) - ceil(min.x*mmPx) - 4)*2/3 /*FIXME*/, "LinLibertine", false, 1, center);
-		Image image = render(size, text.graphics(vec2(size)));
+		Text text(string, textSize/72*inchMM*mmPx, color, 1, (floor(max.x*mmPx) - ceil(min.x*mmPx) - 4)*2/3 /*FIXME*/, "LinLibertine", false, 1, center);
+		Image image = ::render(size, text.graphics(vec2(size)));
 		if(transpose) image = rotateHalfTurn(rotate(image));
-		return image;
+		return convert(image); // TODO: direct float render
 	}
 };
 
@@ -44,7 +48,7 @@ struct TextElement : Element {
 
 LayoutParse::LayoutParse(const Folder& folder, TextData&& s, function<void(string)> logChanged, FileWatcher* watcher)
 	: logChanged(logChanged) {
-	const ref<string> parameters = {"size","margin","space","chroma","intensity","hue","blur","feather"};
+	const ref<string> parameters = {"size","margin","space","color","chroma","intensity","hue","blur","feather"};
 	// -- Parses arguments
 	for(;;) {
 		int nextLine = 0;
@@ -84,13 +88,13 @@ LayoutParse::LayoutParse(const Folder& folder, TextData&& s, function<void(strin
 				/**/ if(s.match("@")) { // Indirect text
 					string name = s.whileNo(" \t\n");
 					if(watcher) watcher->addWatch(name);
-					element = unique<TextElement>(readFile(name), 12.f, false, false);
+					element = unique<TextElement>(readFile(name), 12.f, false, false, value<float>("color", 1));
 					freeAspects.append(elements.size);
 				} else if(s.match("\"")) { // Text
 					String text = replace(s.until('"'),"\\n","\n");
 					string textSize = s.whileDecimal();
 					bool transpose = s.match("T");
-					element = unique<TextElement>(text, textSize ? parseDecimal(textSize) : 12, transpose, true);
+					element = unique<TextElement>(text, textSize ? parseDecimal(textSize) : 12, transpose, true, value<float>("color", 1));
 					//freeAspects.append(elements.size);
 				} else { // Image
 					string name = s.whileNo("*! \t\n");
@@ -161,6 +165,6 @@ LayoutParse::LayoutParse(const Folder& folder, TextData&& s, function<void(strin
 	}
 	if(table.columnCount == 1) columnStructure=true;
 	if(table.columnCount == rows.size) gridStructure = true;
-	log(strx(int2(size)), strx(int2(margin)), strx(int2(space)), strx(table.size),
+	if(0) log(strx(int2(size)), strx(int2(margin)), strx(int2(space)), strx(table.size),
 		gridStructure?"grid":"", rowStructure?"row":"", columnStructure?"column":"");
 }
