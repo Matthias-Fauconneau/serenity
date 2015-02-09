@@ -59,8 +59,8 @@ Display::Display(Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::f
         minKeyCode=r.minKeyCode, maxKeyCode=r.maxKeyCode;
         assert(visual);
     }
-	{auto r = request(QueryExtension{.length="DRI3"_.size, .size=uint16(2+align(4,"DRI3"_.size)/4)}, "DRI3"_); DRI3::EXT=r.major; assert_(DRI3::EXT); }
-	{auto r = request(QueryExtension{.length="Present"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "Present"_); Present::EXT=r.major; assert_(Present::EXT); }
+
+    {auto r = request(QueryExtension{.length="Present"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "Present"_); Present::EXT=r.major; assert_(Present::EXT); }
 }
 
 void Display::event() {

@@ -32,6 +32,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		const Image& iSource = images[elementIndex];
 		int hueHistogram[0x100] = {}; mref<int>(hueHistogram).clear(0); // 1½K: 32bit / 0xFF -> 4K² images
 		int intensityHistogram[0x100] = {}; mref<int>(intensityHistogram).clear(0);
+		int chromaHistogram[0x100] = {}; mref<int>(chromaHistogram).clear(0);
 		for(byte4 c: iSource) {
 			const int B = c.b, G = c.g, R = c.r;
 			const int M = max(max(B, G), R);
@@ -39,6 +40,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			const int C = M - m;
 			const int I = (B+G+R)/3;
 			intensityHistogram[I]++;
+			chromaHistogram[C]++;
 			if(C) {
 				int H;
 				if(M==R) H = ((G-B)*43/C+0x100)%0x100; // 5-6 0-1
@@ -50,7 +52,8 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		}
 		int H = argmax(ref<int>(hueHistogram));
 		if(arguments.contains("hue"_)) H = parse<float>(arguments.at("hue"_)) * 0xFF;
-		int C = parse<float>(arguments.value("chroma"_, "1/4"_)) * 0xFF;
+		int C = argmax(ref<int>(chromaHistogram));
+		if(arguments.contains("chroma"_)) C = parse<float>(arguments.at("chroma"_)) * 0xFF;
 		int X = C * (0xFF - abs((H%85)*6 - 0xFF)) / 0xFF;
 		int I = argmax(ref<int>(intensityHistogram));
 		if(arguments.contains("intensity"_)) I = parse<float>(arguments.at("intensity"_)) * 0xFF;
@@ -78,102 +81,103 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 	int2 size = int2(px(this->size));
 	ImageF target(size);
 	target.clear(float4(0));
-
-	// -- Fills background color transition on exterior borders
-	v4sf backgroundColor = ::mean(elementColors);
-	// Left vertical side
-	for(int row: range(table.rowCount)) {
-		float yT = columnMargins[0]+sum(rowHeights.slice(0, row));
-		float yB = yT+rowHeights[row];
-		float dx = rowMargins[row];
-		for(int y: range(px(yT), px(yB))) {
-			mref<v4sf> line = target.slice(y*target.stride, target.width);
-			for(int x: range(px(dx))) {
-				v4sf c = float4(1-x/px(dx)) * backgroundColor;
-				line[x] += c;
+	const bool marginColor = false;
+	if(marginColor) { // -- Fills transition to outer color in margins
+		v4sf marginColor = ::mean(elementColors);
+		// Left vertical side
+		for(int row: range(table.rowCount)) {
+			float yT = columnMargins[0]+sum(rowHeights.slice(0, row));
+			float yB = yT+rowHeights[row];
+			float dx = rowMargins[row];
+			for(int y: range(px(yT), px(yB))) {
+				mref<v4sf> line = target.slice(y*target.stride, target.width);
+				for(int x: range(px(dx))) {
+					v4sf c = float4(1-x/px(dx)) * marginColor;
+					line[x] += c;
+				}
 			}
 		}
-	}
-	// Right vertical side
-	for(int row: range(table.rowCount)) {
-		float yT = columnMargins.last()+sum(rowHeights.slice(0, row));
-		float yB = yT+rowHeights[row];
-		float dx = rowMargins[row];
-		for(int y: range(px(yT), px(yB))) {
-			mref<v4sf> line = target.slice(y*target.stride, target.width);
-			for(int x: range(px(dx))) {
-				v4sf c = float4(1-x/px(dx)) * backgroundColor;
-				line[size.x-1-x] += c;
+		// Right vertical side
+		for(int row: range(table.rowCount)) {
+			float yT = columnMargins.last()+sum(rowHeights.slice(0, row));
+			float yB = yT+rowHeights[row];
+			float dx = rowMargins[row];
+			for(int y: range(px(yT), px(yB))) {
+				mref<v4sf> line = target.slice(y*target.stride, target.width);
+				for(int x: range(px(dx))) {
+					v4sf c = float4(1-x/px(dx)) * marginColor;
+					line[size.x-1-x] += c;
+				}
 			}
 		}
-	}
-	// Top horizontal side
-	for(int column: range(table.columnCount)) {
-		float xL = rowMargins[0]+sum(columnWidths.slice(0, column));
-		float xR = xL+columnWidths[column];
-		float dy = columnMargins[column];
-		for(int y: range(px(dy))) {
-			mref<v4sf> line = target.slice(y*target.stride, target.width);
-			v4sf c = float4(1-y/px(dy)) * backgroundColor;
-			for(int x: range(px(xL), px(xR))) {
-				line[x] += c;
+		// Top horizontal side
+		for(int column: range(table.columnCount)) {
+			float xL = rowMargins[0]+sum(columnWidths.slice(0, column));
+			float xR = xL+columnWidths[column];
+			float dy = columnMargins[column];
+			for(int y: range(px(dy))) {
+				mref<v4sf> line = target.slice(y*target.stride, target.width);
+				v4sf c = float4(1-y/px(dy)) * marginColor;
+				for(int x: range(px(xL), px(xR))) {
+					line[x] += c;
+				}
 			}
 		}
-	}
-	// Bottom horizontal side
-	for(int column: range(table.columnCount)) {
-		float xL = rowMargins.last()+sum(columnWidths.slice(0, column));
-		float xR = xL+columnWidths[column];
-		float dy = columnMargins[column];
-		for(int y: range(px(dy))) {
-			mref<v4sf> line = target.slice((size.y-1-y)*target.stride, target.width);
-			v4sf c = float4(1-y/px(dy)) * backgroundColor;
-			for(int x: range(px(xL), px(xR))) {
-				line[x] += c;
+		// Bottom horizontal side
+		for(int column: range(table.columnCount)) {
+			float xL = rowMargins.last()+sum(columnWidths.slice(0, column));
+			float xR = xL+columnWidths[column];
+			float dy = columnMargins[column];
+			for(int y: range(px(dy))) {
+				mref<v4sf> line = target.slice((size.y-1-y)*target.stride, target.width);
+				v4sf c = float4(1-y/px(dy)) * marginColor;
+				for(int x: range(px(xL), px(xR))) {
+					line[x] += c;
+				}
 			}
 		}
-	}
-	{  // Top Left Corner
-		float dx = rowMargins[0];
-		float dy = columnMargins[0];
-		for(int y: range(px(dy))) {
-			mref<v4sf> line = target.slice(y*target.stride, target.width);
-			for(int x: range(px(dx))) {
-				v4sf c = float4(1-(x/px(dx))*(y/px(dy))) * backgroundColor;
-				line[x] += c;
+		{  // Top Left Corner
+			float dx = rowMargins[0];
+			float dy = columnMargins[0];
+			for(int y: range(px(dy))) {
+				mref<v4sf> line = target.slice(y*target.stride, target.width);
+				for(int x: range(px(dx))) {
+					v4sf c = float4(1-(x/px(dx))*(y/px(dy))) * marginColor;
+					line[x] += c;
+				}
 			}
 		}
-	}
-	{  // Top Right Corner
-		float dx = size.x - px(rowMargins[0]+sum(columnWidths));
-		float dy = columnMargins.last();
-		for(int y: range(px(dy))) {
-			mref<v4sf> line = target.slice(y*target.stride, target.width);
-			for(int x: range((dx))) {
-				v4sf c = float4(1-(x/(dx))*(y/px(dy))) * backgroundColor;
-				line[size.x-1-x] += c;
+		{  // Top Right Corner
+			float dx = size.x - px(rowMargins[0]+sum(columnWidths));
+			float dy = columnMargins.last();
+			for(int y: range(px(dy))) {
+				mref<v4sf> line = target.slice(y*target.stride, target.width);
+				for(int x: range((dx))) {
+					v4sf c = float4(1-(x/(dx))*(y/px(dy))) * marginColor;
+					line[size.x-1-x] += c;
+				}
 			}
 		}
-	}
-	{  // Bottom Left Corner
-		float dx = rowMargins.last();
-		float dy = columnMargins[0];
-		for(int y: range(px(dy))) {
-			mref<v4sf> line = target.slice((size.y-1-y)*target.stride, target.width);
-			for(int x: range(px(dx))) {
-				v4sf c = float4(1-((x/px(dx))*(y/px(dy)))) * backgroundColor;
-				line[x] += c;
+		{  // Bottom Left Corner
+			float dx = rowMargins.last();
+			float dy = columnMargins[0];
+			for(int y: range(px(dy))) {
+				mref<v4sf> line = target.slice((size.y-1-y)*target.stride, target.width);
+				for(int x: range(px(dx))) {
+					v4sf c = float4(1-((x/px(dx))*(y/px(dy)))) * marginColor;
+					line[x] += c;
+				}
 			}
 		}
-	}
-	{  // Bottom Right Corner
-		float dx = size.x - px(rowMargins.last()+sum(columnWidths));
-		float dy = columnMargins.last();
-		for(int y: range(px(dy))) {
-			mref<v4sf> line = target.slice((size.y-1-y)*target.stride, target.width);
-			for(int x: range(dx)) {
-				v4sf c = float4(1-((x/(dx))*(y/px(dy)))) * backgroundColor;
-				line[size.x-1-x] += c;
+		{  // Bottom Right Corner
+			float dx = size.x - px(rowMargins.last()+sum(columnWidths));
+			float dy = columnMargins.last();
+			for(int y: range(px(dy))) {
+				mref<v4sf> line = target.slice((size.y-1-y)*target.stride, target.width);
+				for(int x: range(dx)) {
+					v4sf c = float4(1-((x/(dx))*(y/px(dy)))) * marginColor;
+					line[size.x-1-x] += c;
+				}
 			}
 		}
 	}
@@ -216,8 +220,6 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		float xL = rowMargins[index.y]+sum(columnWidths.slice(0, index.x));
 		int xL0 = px(index.x ? xL-columnSpaces[index.x-1] : 0);
 		int xL1 = px(xL + columnSpaces[index.x]);
-		int x0 = px(element.min.x);
-		int x1 = px(element.max.x);
 		float xR = xL+sum(columnWidths.slice(index.x, element.cellCount.x));
 		int xR0 = px(xR - columnSpaces[index.x+element.cellCount.x-1]);
 		int xR1 = px(size_t(index.x+element.cellCount.x)<table.columnCount ? xR + columnSpaces[index.x+element.cellCount.x] : this->size.x);
@@ -226,8 +228,6 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		float yT = columnMargins[index.x]+sum(rowHeights.slice(0, index.y));
 		int yT0 = px(index.y ? yT-rowSpaces[index.y-1] : 0);
 		int yT1 = px(yT + rowSpaces[index.y]);
-		int y0 = px(element.min.y);
-		int y1 = px(element.max.y);
 		float yB = yT+sum(rowHeights.slice(index.y,element.cellCount.y));
 		int yB0 = px(yB - rowSpaces[index.y+element.cellCount.y-1]);
 		int yB1 = px(size_t(index.y+element.cellCount.y)<table.rowCount ? yB + rowSpaces[index.y+element.cellCount.y] : this->size.y);
@@ -238,10 +238,10 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		// Top
 		for(int y: range(yT0, yT1)) {
 			mref<v4sf> line = target.slice(y*target.stride, target.width);
-			float wy = (y-yT0)/float(yT1-yT0);
+			float wy = marginColor || index.y ? (y-yT0)/float(yT1-yT0) : 1;
 			// Left
 			for(int x: range(xL0, xL1)) {
-				float wx = (x-xL0)/float(xL1-xL0);
+				float wx = marginColor || index.x ? (x-xL0)/float(xL1-xL0) : 1;
 				line[x] += float4(wx*wy) * elementColor;
 			}
 			// Center
@@ -250,7 +250,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			}
 			// Right
 			for(int x: range(xR0, xR1)) {
-				float wx = (xR1-x)/float(xR1-xR0);
+				float wx = marginColor || size_t(index.x+element.cellCount.x)<table.columnCount ? (xR1-x)/float(xR1-xR0) : 1;
 				line[x] += float4(wx*wy) * elementColor;
 			}
 		}
@@ -260,7 +260,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			mref<v4sf> line = target.slice(y*target.stride, target.width);
 			// Left
 			for(int x: range(xL0, xL1)) {
-				float wx = (x-xL0)/float(xL1-xL0);
+				float wx = marginColor || index.x ? (x-xL0)/float(xL1-xL0) : 1;
 				line[x] += float4(wx) * elementColor;
 			}
 		}
@@ -270,7 +270,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			mref<v4sf> line = target.slice(y*target.stride, target.width);
 			// Right
 			for(int x: range(xR0, xR1)) {
-				float wx = (xR1-x)/float(xR1-xR0);
+				float wx = marginColor || size_t(index.x+element.cellCount.x)<table.columnCount ? (xR1-x)/float(xR1-xR0) : 1;
 				line[x] += float4(wx) * elementColor;
 			}
 		}
@@ -279,10 +279,10 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		// Bottom
 		for(int y: range(yB0, yB1)) {
 			mref<v4sf> line = target.slice(y*target.stride, target.width);
-			float wy = (yB1-y)/float(yB1-yB0);
+			float wy = marginColor || size_t(index.y+element.cellCount.y)<table.rowCount ? (yB1-y)/float(yB1-yB0) : 1;
 			// Left
 			for(int x: range(xL0, xL1)) {
-				float wx = (x-xL0)/float(xL1-xL0);
+				float wx = marginColor || index.x ? (x-xL0)/float(xL1-xL0) : 1;
 				line[x] += float4(wx*wy) * elementColor;
 			}
 			// Center
@@ -291,7 +291,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 			}
 			// Right
 			for(int x: range(xR0, xR1)) {
-				float wx = (xR1-x)/float(xR1-xR0);
+				float wx = marginColor || size_t(index.x+element.cellCount.x)<table.columnCount ? (xR1-x)/float(xR1-xR0) : 1;
 				line[x] += float4(wx*wy) * elementColor;
 			}
 		}

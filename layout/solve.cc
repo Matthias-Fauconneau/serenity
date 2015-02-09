@@ -5,25 +5,37 @@ LayoutSolve::LayoutSolve(Layout&& _this) : Layout(move(_this)) {
 	// -- Unknowns
 	size_t unknownIndex = 0;
 
-	size_t uniformMargin = unknownIndex; unknownIndex += 2; log(2, "uniform margin");
-	size_t uniformSpace = unknownIndex; unknownIndex += 2; log(2, "uniform space");
+	size_t uniformMargin = unknownIndex; unknownIndex += 2;
+	size_t uniformSpace = unknownIndex; unknownIndex += 2;
 
-	size_t rowMargins = unknownIndex; unknownIndex += table.rowCount; log(table.rowCount, "row margins");
-	size_t columnMargins = unknownIndex; unknownIndex += table.columnCount; log(table.columnCount, "column margins");
+	size_t rowMargins = unknownIndex; unknownIndex += table.rowCount;
+	size_t columnMargins = unknownIndex; unknownIndex += table.columnCount;
 
-	size_t rowSpaces = unknownIndex; unknownIndex += table.rowCount; log(table.rowCount, "row spaces");
-	size_t columnSpaces = unknownIndex; unknownIndex += table.columnCount; log(table.columnCount, "column spaces");
+	size_t rowSpaces = unknownIndex; unknownIndex += table.rowCount;
+	size_t columnSpaces = unknownIndex; unknownIndex += table.columnCount;
 
 	size_t regularizedUnknownCount = unknownIndex;
 
-	size_t columnWidths = unknownIndex; unknownIndex += table.columnCount; log(table.columnCount, "column widths");
-	size_t rowHeights = unknownIndex; unknownIndex += table.rowCount; log(table.rowCount, "row heights");
+	size_t columnWidths = unknownIndex; unknownIndex += table.columnCount;
+	size_t rowHeights = unknownIndex; unknownIndex += table.rowCount;
 
-	size_t elementHeights = unknownIndex; unknownIndex += elements.size; log(elements.size, "element heights");
-	size_t elementsWidths = unknownIndex; unknownIndex += freeAspects.size; if(freeAspects) log(freeAspects.size, "element widths");
+	size_t elementHeights = unknownIndex; unknownIndex += elements.size;
+	size_t elementsWidths = unknownIndex; unknownIndex += freeAspects.size;
 
 	const size_t unknownCount = unknownIndex;
-	log("=", unknownCount, "unknowns");
+	if(0) {
+		log(2, "uniform margin");
+		log(2, "uniform space");
+		log(table.rowCount, "row margins");
+		log(table.columnCount, "column margins");
+		log(table.rowCount, "row spaces");
+		log(table.columnCount, "column spaces");
+		log(table.columnCount, "column widths");
+		log(table.rowCount, "row heights");
+		log(elements.size, "element heights");
+		if(freeAspects) log(freeAspects.size, "element widths");
+		log("=", unknownCount, "unknowns");
+	}
 
 	// -- Constraints
 	struct Constraint : buffer<float>{
