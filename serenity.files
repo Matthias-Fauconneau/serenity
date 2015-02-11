@@ -13,13 +13,5 @@ ui/render.cc
 
 io/png.cc
 
-layout/parse.h
-layout/parse.cc
-layout/solve.h
-layout/solve.cc
-layout/preview.cc
-layout/layout.h
-layout/render.h
-layout/render.cc
-layout/export.cc
-white-balance.cc
+music/sheet.cc
+music/pdf.cc

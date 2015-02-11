@@ -63,7 +63,7 @@ bool existsFolder(const string folder, const Folder& at=currentWorkingDirectory(
 /// Handle to an Unix I/O stream
 struct Stream : Handle { //FIXME: overlaps with Data/BinaryData
     Stream(){}
-    Stream(int fd):Handle(fd){}
+    Stream(int fd) : Handle(fd) {}
 	/// Reads up to \a size bytes into \a buffer
 	int64 readUpTo(mref<byte> target);
 	/// Reads exactly \a size bytes into \a buffer

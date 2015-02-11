@@ -174,6 +174,7 @@ void resize(const Image& target, const Image& source) {
     }
 }
 
+#if 0
 // -- 4x float
 
 ImageF convert(const Image& source) {
@@ -249,3 +250,4 @@ void box(const ImageF& target, const ImageF& source, const int width) {
 		}
 	});
 }
+#endif

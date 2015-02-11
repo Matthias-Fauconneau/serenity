@@ -5,7 +5,7 @@
 #include "asound.h"
 #include "interface.h"
 #include "selection.h"
-#include "layout.h"
+#include "ui/layout.h"
 #include "window.h"
 #include "text.h"
 #include "time.h"

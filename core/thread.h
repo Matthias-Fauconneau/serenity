@@ -32,11 +32,11 @@ struct Application { virtual ~Application() {} };
 
 /// Lock is an initially released binary semaphore which can only be released by the acquiring thread
 struct Lock : handle<pthread_mutex_t> {
-	default_move(Lock);
+    default_move(Lock);
     Lock() { pthread_mutex_init(&pointer,0); }
     ~Lock() { pthread_mutex_destroy(&pointer); }
     /// Locks the mutex.
-	void lock() { pthread_mutex_lock(&pointer); }
+    void lock() { pthread_mutex_lock(&pointer); }
     /// Atomically lock the mutex only if unlocked.
     bool tryLock() { return !pthread_mutex_trylock(&pointer); }
     /// Unlocks the mutex.
@@ -101,9 +101,8 @@ struct Poll : pollfd {
     /// Creates an handle to participate in an event loop, use \a registerPoll when ready
     /// \note May be used without a file descriptor to queue jobs using \a wait, \a event will be called after all system events have been handled
     Poll(int fd=0, int events=POLLIN, Thread& thread=mainThread) : pollfd{fd,(short)events,0}, thread(thread) { if(fd) registerPoll(); }
-	Poll(const Poll&)=delete; Poll& operator=(const Poll&)=delete;
-	//Poll(Poll&& o);
-    ~Poll(){ unregisterPoll(); }
+    Poll(const Poll&)=delete; Poll& operator=(const Poll&)=delete; Poll(Poll&& o) = delete;
+    ~Poll(){ if(fd) unregisterPoll(); }
     /// Registers \a fd to the event loop
     void registerPoll();
     /// Unregisters \a fd from the event loop
@@ -126,12 +125,12 @@ struct Thread : array<Poll*>, EventFD, Lock, Poll {
     array<Poll*> queue; // Poll objects queued on this thread
     array<Poll*> unregistered; // Poll objects removed while in event loop
     int priority=0; // Thread system priority
-	pthread_t thread = 0;
-	int tid=0; // Thread system identifier
-	Lock runLock;
+    pthread_t thread = 0;
+    int tid=0; // Thread system identifier
+    Lock runLock;
     bool terminationRequested = false;
 
-	Thread(int priority=0, bool spawn=false);
+    Thread(int priority=0, bool spawn=false);
     ~Thread(){ Poll::fd=0;/*Avoid Thread::unregistered reference in ~Poll*/ }
     explicit operator bool() const { return thread; }
 

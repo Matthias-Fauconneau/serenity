@@ -4,7 +4,7 @@
 #include "audio.h"
 #include "data.h"
 #include "time.h"
-#include "layout.h"
+#include "ui/layout.h"
 #include "window.h"
 #include "display.h"
 #include "text.h"

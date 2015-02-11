@@ -1,6 +1,6 @@
 #include "MusicXML.h"
 #include "sheet.h"
-#include "layout.h"
+#include "ui/layout.h"
 #include "interface.h"
 #include "window.h"
 #include "pdf.h"
@@ -18,14 +18,14 @@ struct MusicPDF {
 };
 
 struct MusicPDFPreview : MusicPDF, Application {
-	Scroll<HList<GraphicsWidget>> pages {apply(sheet.pages, [](Graphics& o) { return GraphicsWidget(move(o)); })};
+	/*Scroll<HList<*/GraphicsWidget/*>>*/ pages {move(apply(sheet.pages, [](Graphics& o) { return GraphicsWidget(move(o)); })[0])};
 	Window window {&pages, pageSize, [this](){return unsafeRef(name);}};
 };
 registerApplication(MusicPDFPreview);
 
 struct MusicPDFExport : MusicPDF, Application {
 	MusicPDFExport() {
-		writeFile(name+".pdf"_, toPDF(sheet.pageSize, sheet.pages, 72/*PostScript point per inch*/ / inchPx /*px/inch*/), home(), true);
+		writeFile(name+".pdf"_, toPDF(vec2(sheet.pageSize), sheet.pages, 72/*PostScript point per inch*/ / inchPx /*px/inch*/), home(), true);
 	}
 };
 registerApplication(MusicPDFExport, export);

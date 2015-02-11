@@ -58,8 +58,6 @@ struct Widget {
 struct GraphicsWidget : Graphics, Widget {
 	GraphicsWidget() {}
 	GraphicsWidget(Graphics&& o) : Graphics(move(o)) {}
-	vec2 sizeHint(vec2) override;
-	shared<Graphics> graphics(vec2) override;
+	vec2 sizeHint(vec2) override { assert_(isNumber(bounds.max), bounds); return bounds.max; }
+	shared<Graphics> graphics(vec2) override { return shared<Graphics>((Graphics*)this); }
 };
-inline vec2 GraphicsWidget::sizeHint(vec2) { assert_(isNumber(bounds.max), bounds); return bounds.max; }
-inline shared<Graphics> GraphicsWidget::graphics(vec2 unused size /*TODO: center*/) { return shared<Graphics>((Graphics*)this); }

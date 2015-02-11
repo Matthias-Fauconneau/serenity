@@ -81,6 +81,7 @@ struct Image16 : buffer<int16> {
 	inline notrace int16& operator()(size_t x, size_t y) const { assert(x<size_t(size.x) && y<size_t(size.y)); return at(y*size.x+x); }
 };
 
+#if 0
 // -- 4x float
 
 /// 2D array of floating-point 4 component vector pixels (linear colorspace)
@@ -113,3 +114,4 @@ inline ImageF copy(const ImageF& o) {
 ImageF convert(const Image& source);
 Image convert(const ImageF& source);
 void box(const ImageF& target, const ImageF& source, const int width);
+#endif

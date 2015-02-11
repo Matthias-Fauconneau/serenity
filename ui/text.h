@@ -30,7 +30,7 @@ struct Text : virtual Widget {
     /// Font size
     int size;
     /// Text color
-	bgr3f color;
+    bgr3f color;
     /// Text opacity
     float opacity;
     /// Line wrap limit in pixels (0: no wrap)
@@ -48,7 +48,7 @@ struct Text : virtual Widget {
     /// Minimal size hint
     vec2 minimalSizeHint;
 
-	struct TextLayout layout(float wrap=0) const;
-	vec2 sizeHint(vec2 size=0) override;
-	shared<Graphics> graphics(vec2 size) override;
+    struct TextLayout layout(float wrap=0) const;
+    vec2 sizeHint(vec2 size=0) override;
+    shared<Graphics> graphics(vec2 size) override;
 };

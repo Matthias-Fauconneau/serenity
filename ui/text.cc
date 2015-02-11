@@ -247,10 +247,10 @@ Text::Text(const string text, float size, bgr3f color, float opacity, float wrap
 	: text(toUCS4(text)), size(size), color(color), opacity(opacity), wrap(wrap), font(font), hint(hint), interline(interline), align(align),
 	  justifyExplicitLineBreak(justifyExplicitLineBreak), minimalSizeHint(minimalSizeHint) {}
 
-TextLayout Text::layout(float wrap) const {
+TextLayout Text::layout(const float wrap) const {
 	if(align>-1) {
 		TextLayout layout(text, size, wrap, font, hint, interline, align, false, false, false, color); // Layouts without justification
-		wrap = layout.bbMax.x;
+		//wrap = layout.bbMax.x;
 		assert_(wrap >= 0, wrap);
 	}
 	return TextLayout(text, size, wrap, font, hint, interline, align, true, justifyExplicitLineBreak, true, color);
@@ -258,7 +258,7 @@ TextLayout Text::layout(float wrap) const {
 
 vec2 Text::sizeHint(vec2 size) {
 	TextLayout layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
-	return max(minimalSizeHint, ceil(layout.bbMax - min(vec2(0),layout.bbMin)));
+	return max(minimalSizeHint, ceil(layout.bbMax - /*min(vec2(0),*/layout.bbMin/*)*/));
 }
 
 shared<Graphics> Text::graphics(vec2 size) {

@@ -18,19 +18,19 @@ void log(string message) { log_(message+'\n');  }
 
 // Poll
 void Poll::registerPoll() {
-	Locker lock(thread);
-	if(thread.contains(this)) { thread.unregistered.tryRemove(this); return; }
+    Locker lock(thread);
+    if(thread.contains(this)) { thread.unregistered.tryRemove(this); return; }
     assert_(!thread.unregistered.contains(this));
-	thread.append(this);
+    thread.append(this);
     if(thread.tid) thread.post(); // Resets poll to include this new descriptor (FIXME: only if not current)
 }
 void Poll::unregisterPoll() {
-	Locker lock(thread);
+    Locker lock(thread);
     if(thread.contains(this) && !thread.unregistered.contains(this)) thread.unregistered.append(this);
 }
 void Poll::queue() {Locker lock(thread); if(!thread.queue.contains(this)) thread.queue.append(this); thread.post();}
 
-EventFD::EventFD():Stream(eventfd(0,EFD_SEMAPHORE)){}
+EventFD::EventFD() : Stream(check(eventfd(0, EFD_SEMAPHORE))) {}
 
 // Threads
 
@@ -46,9 +46,10 @@ static bool terminationRequested = false;
 static int groupExitStatus = 0;
 
 generic T* addressOf(T& arg)  { return reinterpret_cast<T*>(&const_cast<char&>(reinterpret_cast<const volatile char&>(arg))); }
-Thread::Thread(int priority, bool spawn) : Poll(EventFD::fd,POLLIN,*this), priority(priority) {
-	if(this == addressOf(mainThread)) tid = gettid();
-	if(spawn) this->spawn();
+Thread::Thread(int priority, bool spawn) : Poll(0,POLLIN,*this), priority(priority) {
+    Poll::fd = EventFD::fd; registerPoll();
+    if(this == addressOf(mainThread)) tid = gettid();
+    if(spawn) this->spawn();
 }
 void Thread::setPriority(int priority) { setpriority(0,0,priority); }
 static void* run(void* thread) { ((Thread*)thread)->run(); return 0; }
@@ -63,7 +64,7 @@ void Thread::run() {
     while(!::terminationRequested && !this->terminationRequested) {
         assert_(size>=1);
         if(size==1 && !queue) break; // Terminates if no Poll objects (except thread queue EventFD) are registered and no job is queued)
-		while(unregistered){Locker locker(*this); Poll* poll=unregistered.pop(); remove(poll); queue.tryRemove(poll);}
+	while(unregistered){Locker locker(*this); Poll* poll=unregistered.pop(); remove(poll); queue.tryRemove(poll);}
 
         pollfd pollfds[size];
         for(uint i: range(size)) pollfds[i]=*at(i); //Copy pollfds as objects might unregister while processing in the loop
@@ -87,10 +88,10 @@ void Thread::event() {
     EventFD::read();
     if(queue){
         Poll* poll;
-		{Locker locker(*this);
-            poll=queue.take(0);
-            if(unregistered.contains(poll)) return;
-        }
+	{Locker locker(*this);
+	    poll=queue.take(0);
+	    if(unregistered.contains(poll)) return;
+	}
         poll->revents=IDLE;
         poll->event();
     }
@@ -180,7 +181,8 @@ int main() {
 		if(Interface<Application>::factories().contains(argument)) factory = Interface<Application>::factories().at(argument);
 	if(factory) application = factory->constructNewInstance();
     mainThread.run(); // Reuses main thread as default event loop runner when not overriden in Poll constructor
-    return groupExitStatus; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
+    //return groupExitStatus; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
+    exit_group(groupExitStatus);
 }
 
 void requestTermination(int status) {

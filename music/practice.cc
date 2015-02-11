@@ -7,7 +7,7 @@
 #include "MusicXML.h"
 #include "midi.h"
 #include "sheet.h"
-#include "layout.h"
+#include "ui/layout.h"
 #include "interface.h"
 #include "window.h"
 
