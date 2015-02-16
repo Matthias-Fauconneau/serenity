@@ -8,10 +8,15 @@ core/core.h
 core/image.h
 core/image.cc
 
-ui/text.cc
-ui/render.cc
-
 io/png.cc
 
+ui/text.cc
+ui/render.cc
+ui/window.cc
+ui/pdf-renderer.cc
+
 music/sheet.cc
-music/pdf.cc
+music/music-pdf.cc
+music/music-practice.cc
+music/midi-input.cc
+music/MusicXML.cc

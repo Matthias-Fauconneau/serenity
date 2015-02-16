@@ -18,7 +18,7 @@ struct MusicPDF {
 };
 
 struct MusicPDFPreview : MusicPDF, Application {
-	/*Scroll<HList<*/GraphicsWidget/*>>*/ pages {move(apply(sheet.pages, [](Graphics& o) { return GraphicsWidget(move(o)); })[0])};
+    Scroll<HList<GraphicsWidget>> pages {apply(sheet.pages, [](Graphics& o) { return GraphicsWidget(move(o)); })};
 	Window window {&pages, pageSize, [this](){return unsafeRef(name);}};
 };
 registerApplication(MusicPDFPreview);

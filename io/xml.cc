@@ -76,7 +76,7 @@ bool Element::contains(string name) const {
 
 const Element& Element::child(string name) const {
 	const Element* element = 0;
-    for(const Element& e: children) if(e.name==name) { assert_(!element, "Multiple match for", name, "in", *this); element=&e; }
+    for(const Element& e: children) if(e.name==name) { if(element) log("Multiple match for", name, "in", *this); element=&e; }
 	assert_(element, "No such element", name);
 	static Element empty;
 	return element ? *element : empty;

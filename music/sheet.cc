@@ -33,7 +33,7 @@ struct SheetContext {
 	float textSize = 6*halfLineInterval;
 
 	// Vertical positioning
-	float staffY(int staff, int clefStep) { return -staff*(10*lineInterval+halfLineInterval) - clefStep * halfLineInterval; }
+    float staffY(int staff, int clefStep) { return -staff*(/*10*/(4+4+1)*lineInterval+0*halfLineInterval) - clefStep * halfLineInterval; }
 	float Y(uint staff, Clef clef, int step) { return staffY(staff, clefStep(clef, step)); };
 	float Y(Sign sign) { assert_(sign.type==Sign::Note, int(sign.type)); return staffY(sign.staff, clefStep(sign)); };
 
@@ -140,11 +140,11 @@ void System::ledger(Sign sign, float x, float ledgerHalfLength) { // Ledger line
 	float opacity = (sign.note.tie == Note::NoTie || sign.note.tie == Note::TieStart) ? 1 : 1./2;
 	for(int s=2; s<=step; s+=2) {
 		float y = staffY(staff, s);
-		system.lines.append(vec2(x+noteSize(sign)/2-ledgerHalfLength,y),vec2(x+noteSize(sign)/2+ledgerHalfLength,y), black, opacity);
+        system.lines.append(vec2(x+noteSize(sign)/2-ledgerHalfLength,y),vec2(x+noteSize(sign)/2+ledgerHalfLength,y), black, opacity, true);
 	}
 	for(int s=-10; s>=step; s-=2) {
 		float y = staffY(staff, s);
-		system.lines.append(vec2(x+noteSize(sign)/2-ledgerHalfLength,y),vec2(x+noteSize(sign)/2+ledgerHalfLength,y), black, opacity);
+        system.lines.append(vec2(x+noteSize(sign)/2-ledgerHalfLength,y),vec2(x+noteSize(sign)/2+ledgerHalfLength,y), black, opacity, true);
 	}
 };
 
@@ -965,7 +965,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 					assert_(timeSignature.beatUnit == 2 || timeSignature.beatUnit == 4 || timeSignature.beatUnit == 8, timeSignature.beatUnit);
 					uint beatDuration = quarterDuration * 4 / timeSignature.beatUnit;
 					//if(timeSignature.beats == 4 && timeSignature.beatUnit == 4) beatDuration *= 2; // FIXME: not always
-					if(timeSignature.beats == 6 && timeSignature.beatUnit == 8) beatDuration *= 2; // Beams quaver pairs even in 6/8 (i.e <=> 3/4)
+                    if(/*timeSignature.beats == 6 &&*/ timeSignature.beatUnit == 8) beatDuration *= 2; // Beams quaver pairs even in /8 (i.e <=> 3/4)
 
 
 					if(beamDuration+chordDuration > maximumBeamDuration /*Beam before too long*/
@@ -1004,7 +1004,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 		for(int line: range(5)) {
 			float y = staffY(staff, -line*2);
 			assert_(measureBars);
-			system.lines.append(vec2(measureBars->values[0], y), vec2(measureBars->values.last(), y));
+            system.lines.append(vec2(measureBars->values[0], y), vec2(measureBars->values.last(), y), black, 1.f/2, true);
 		}
 	}
 	int highMargin = 0, lowMargin = -8;
@@ -1059,7 +1059,9 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
 			system.translate(system.offset); // FIXME: -> append
 			if(!pageSize) assert_(!pages.last().glyphs);
 			pages.last().append(system); // Appends systems first to preserve references to glyph indices
-		}
+            // Hints horizontal lines (raster, ledgers)
+            //for(Line& line: pages.last().lines) if(line.a.y == line.b.y) line.a.y = line.b.y = floor(line.a.y)+1./2;
+        }
 		if(pages.size==1) text(vec2(pageSize.x/2, 0), bold(title), context.textSize, pages.last().glyphs, vec2(1./2, 0));
 		if(pageNumbers) { // Page index numbers at each corner
 			float margin = context.margin;
@@ -1078,7 +1080,8 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
 		if(pageSize.x) { // Evaluates next line break
 			System system(context, staves, pageSize.x, pages.size, systems.size, systems ? &systems.last() : nullptr, signs.slice(startIndex), 0, 0, 0, 0);
 			breakIndex = startIndex + system.lastMeasureBarIndex + 1;
-			assert_(startIndex < breakIndex && system.spaceCount, startIndex, breakIndex, system.spaceCount);
+            if(!(startIndex < breakIndex && system.spaceCount)) { log("FIXME"); break; }
+            assert_(startIndex < breakIndex && system.spaceCount, startIndex, breakIndex, system.spaceCount);
 			spaceWidth = system.space + float(pageSize.x - system.allocatedLineWidth) / float(system.spaceCount);
 
 			// Breaks page as needed
@@ -1086,7 +1089,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
 			if(pageSize.y) {
 				float minY = context.staffY(1, system.line[1].top);
 				float maxY = context.staffY(0, system.line[0].bottom);
-				if(systems && (/*system.pageBreak ||*/ systems.size >= 6 /*FIXME*/ || requiredHeight + (maxY-minY) > pageSize.y)) {
+                if(systems && (/*system.pageBreak ||*/ systems.size >= 6 /*FIXME*/ || requiredHeight + (maxY-minY) + systems.size*4*context.lineInterval > pageSize.y)) {
 					requiredHeight = 0; // -> doPage
 					doPage();
 				}

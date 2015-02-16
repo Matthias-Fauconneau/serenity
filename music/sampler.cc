@@ -114,7 +114,8 @@ static double level(ref<float> envelope, size_t start, size_t duration) {
     return sqrt(sum) / duration;
 }
 
-Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeChanged, Thread& thread) : Poll(0, POLLIN, thread), periodSize(periodSize), timeChanged(timeChanged) {
+Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeChanged, Thread& thread)
+    : Poll(0, POLLIN, thread), periodSize(periodSize), timeChanged(timeChanged) {
     sampler = this; // DEBUG
     // Parses sfz and map samples
 	TextData s = readFile(path);
@@ -226,7 +227,7 @@ float Note::actualLevel(uint duration) const { return ::level(envelope, flac.pos
 void Sampler::noteEvent(uint key, uint velocity, float2 gain) {
 	//TODO: Pedal events
     Note* released=0;
-	if(velocity==0) { // Do not release repetitions (i.e needs as many releases as press as if playing multiple instruments) // Also releases repetitions
+    //if(velocity==0) { // Do not release repetitions (i.e needs as many releases as press as if playing multiple instruments) // Also releases repetitions
         for(Layer& layer: layers) for(Note& note: layer.notes) if(note.key==key) {
             if(velocity==0) released=&note; // Triggers release sample (only release, not on repetitions)
             if(note.releaseTime) { // Releases fades out current note
@@ -240,7 +241,7 @@ void Sampler::noteEvent(uint key, uint velocity, float2 gain) {
             if(!released) return; // Already fully decayed
             velocity = released->velocity;
         }
-	}
+    //}
     for(const Sample& s : samples) {
         if(s.trigger == (released?1:0) && s.lokey <= key && key <= s.hikey && s.lovel <= velocity && velocity <= s.hivel) {
 			float2 level = 1;

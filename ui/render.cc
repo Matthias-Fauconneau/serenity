@@ -49,7 +49,7 @@ static void blit(const Image& target, int2 origin, const Image& source, bgr3f co
             target(x,y) = byte4(s[0], s[1], s[2], 0xFF);
         }
     }
-	/*else if(color==bgr3f(0) && opacity==1) { // Alpha multiply (e.g. glyphs)
+    /*else if(color==bgr3f(0) && opacity==1) { // Alpha multiply (e.g. glyphs)
         for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
             int opacity = source(x-origin.x,y-origin.y).a; // FIXME: single channel images
             byte4& target_sRGB = target(x,y);
@@ -58,7 +58,7 @@ static void blit(const Image& target, int2 origin, const Image& source, bgr3f co
             target_sRGB = byte4(sRGB_forward[linearBlend[0]], sRGB_forward[linearBlend[1]], sRGB_forward[linearBlend[2]],
                     ::min(0xFF,int(target_sRGB.a)+opacity)); // Additive opacity accumulation
         }
-	}*/
+    }*/
     else {
         for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
             byte4 BGRA = source(x-origin.x,y-origin.y);
@@ -75,11 +75,11 @@ static void blend(const Image& target, uint x, uint y, bgr3f color, float opacit
     blend(target, x,y, color, opacity);
 }
 
-void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity) {
-	if(p1.y == p2.y) fill(target, int2(p1), int2(p2.x-p1.x, 1), color, opacity); // TODO: prefilter
+void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity, bool hint) {
+    //if(hint && p1.y == p2.y) p1.y = p2.y = round(p1.y); // Hints
+    if(hint /*p1.y == p2.y*/) fill(target, int2(p1), int2(p2.x-p1.x, 1), color, opacity); // TODO: prefilter
 	if(p1.x >= target.size.x || p2.x < 0) return; // Assumes p1.x < p2.x
 	assert(bgr3f(0) <= color && color <= bgr3f(1));
-	//p1 = round(p1), p2 = round(p2); // Hint
 
     float dx = p2.x - p1.x, dy = p2.y - p1.y;
     bool transpose=false;
@@ -202,14 +202,14 @@ void cubic(const Image& target, ref<vec2> sourcePoints, bgr3f color, float alpha
 }
 
 void render(const Image& target, const Graphics& graphics, vec2 offset) {
-	assert_(isNumber(offset)); assert_(isNumber(graphics.offset));
-	offset += graphics.offset;
-	for(const auto& e: graphics.blits) {
+    assert_(isNumber(offset)); assert_(isNumber(graphics.offset));
+    offset += graphics.offset;
+    for(const auto& e: graphics.blits) {
 		if(int2(e.size) == e.image.size) blit(target, int2(round(offset+e.origin)), e.image, e.color, e.opacity);
 		else blit(target, int2(round(offset+e.origin)), resize(int2(round(e.size)), e.image), e.color, e.opacity); // FIXME: subpixel blit
 	}
 	for(const auto& e: graphics.fills) fill(target, int2(round(offset+e.origin)), int2(e.size), e.color, e.opacity);
-	for(const auto& e: graphics.lines) line(target, offset+e.a, offset+e.b, e.color, e.opacity);
+    for(const auto& e: graphics.lines) line(target, offset+e.a, offset+e.b, e.color, e.opacity, e.hint);
 	for(const auto& e: graphics.glyphs) {
 		Font::Glyph glyph = e.font.font(e.fontSize).render(e.index);
 		if(glyph.image) blit(target, int2(round(offset+e.origin))+glyph.offset, glyph.image, e.color, e.opacity);

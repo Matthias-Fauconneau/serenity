@@ -41,6 +41,7 @@ struct Glyph {
 struct Line {
     vec2 a, b;
     bgr3f color = black; float opacity = 1;
+    bool hint = false;
 };
 
 /// Parallelogram graphic element
@@ -94,23 +95,23 @@ struct Graphics : shareable {
     map<vec2, shared<Graphics>> graphics;
 
     void translate(vec2 offset) {
-	assert_(isNumber(offset));
-	bounds = offset+bounds;
-	for(auto& o: fills) o.origin += offset;
-	assert_(!blits);
-	for(auto& o: glyphs) o.origin += offset;
-	for(auto& o: parallelograms) o.min+=offset, o.max+=offset;
-	for(auto& o: lines) o.a+=offset, o.b+=offset;
-	for(auto& o: cubics) for(vec2& p: o.points) p+=vec2(offset);
+        assert_(isNumber(offset));
+        bounds = offset+bounds;
+        for(auto& o: fills) o.origin += offset;
+        assert_(!blits);
+        for(auto& o: glyphs) o.origin += offset;
+        for(auto& o: parallelograms) o.min+=offset, o.max+=offset;
+        for(auto& o: lines) o.a+=offset, o.b+=offset;
+        for(auto& o: cubics) for(vec2& p: o.points) p+=vec2(offset);
     }
     void append(const Graphics& o) {
-	bounds.extend(o.bounds.min); bounds.extend(o.bounds.max);
-	fills.append(o.fills);
-	assert_(!o.blits);
-	glyphs.append(o.glyphs);
-	parallelograms.append(o.parallelograms);
-	lines.append(o.lines);
-	cubics.append(o.cubics);
+        bounds.extend(o.bounds.min); bounds.extend(o.bounds.max);
+        fills.append(o.fills);
+        assert_(!o.blits);
+        glyphs.append(o.glyphs);
+        parallelograms.append(o.parallelograms);
+        lines.append(o.lines);
+        cubics.append(o.cubics);
     }
 };
 
