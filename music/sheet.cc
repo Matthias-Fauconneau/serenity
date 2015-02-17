@@ -140,13 +140,13 @@ void System::ledger(Sign sign, float x, float ledgerHalfLength) { // Ledger line
 	float opacity = (sign.note.tie == Note::NoTie || sign.note.tie == Note::TieStart) ? 1 : 1./2;
 	for(int s=2; s<=step; s+=2) {
 		float y = staffY(staff, s);
-        system.lines.append(vec2(x+noteSize(sign)/2-ledgerHalfLength,y),vec2(x+noteSize(sign)/2+ledgerHalfLength,y), black, opacity, true);
+        system.lines.append(vec2(x+noteSize(sign)/2-ledgerHalfLength,y),vec2(x+noteSize(sign)/2+ledgerHalfLength,y), black, opacity, true); // Ledger
 	}
 	for(int s=-10; s>=step; s-=2) {
 		float y = staffY(staff, s);
-        system.lines.append(vec2(x+noteSize(sign)/2-ledgerHalfLength,y),vec2(x+noteSize(sign)/2+ledgerHalfLength,y), black, opacity, true);
+        system.lines.append(vec2(x+noteSize(sign)/2-ledgerHalfLength,y),vec2(x+noteSize(sign)/2+ledgerHalfLength,y), black, opacity, true); // Ledger
 	}
-};
+}
 
 static bool isStemUp(Step min, Step max) {
 	const int middle = -4;
@@ -193,7 +193,7 @@ void System::layoutNotes(uint staff) {
 		float x = stemX(beam[0], stemUp);
 		float opacity = allTied(beam[0]) ? 1./2 : 1;
 		if(sign.note.value>=Half)
-			system.lines.append(vec2(x, ::min(yBase, yStem)), vec2(x, max(yBase, yStem)), black, opacity);
+            system.lines.append(vec2(x, ::min(yBase, yStem)), vec2(x, max(yBase, yStem)), black, opacity, true); // Stem
 		if(sign.note.value>=Eighth)
 			glyph(vec2(x, yStem), (int(sign.note.value)-Eighth)*2 + (stemUp ? SMuFL::Flag::Above : SMuFL::Flag::Below), opacity, 7);
 	} else if(beam.size==2) { // Draws pairing beam
@@ -210,7 +210,7 @@ void System::layoutNotes(uint staff) {
 		for(uint i: range(2)) {
 			float opacity = allTied(beam[i]) ? 1./2 : 1;
 			tip[i] = midTip+delta[i];
-			system.lines.append(vec2(x[i], ::min(base[i],tip[i])), vec2(x[i], ::max(base[i],tip[i])), black, opacity);
+            system.lines.append(vec2(x[i], ::min(base[i],tip[i])), vec2(x[i], ::max(base[i],tip[i])), black, opacity, true); // Stem
 		}
 		float opacity = allTied(beam[0]) && allTied(beam[1]) ? 1./2 : 1;
 		Value first = max(apply(beam[0], [](Sign sign){return sign.note.value;}));
@@ -253,7 +253,7 @@ void System::layoutNotes(uint staff) {
 			float stemY = firstStemY + (lastStemY-firstStemY) * (x - stemX(beam[0], stemUp))
 					/ (stemX(beam.last(), stemUp) - stemX(beam[0], stemUp));
 			stemsY.append(stemY);
-			system.lines.append(vec2(x, ::min(y, stemY)), vec2(x, ::max(stemY, y)), black, opacity);
+            system.lines.append(vec2(x, ::min(y, stemY)), vec2(x, ::max(stemY, y)), black, opacity, true); // Stem
 		}
 		// Beam
 		for(size_t chordIndex: range(beam.size-1)) {
@@ -523,11 +523,11 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 	// System first measure bar
 	{float x = margin;
 		if(1) { // Grand staff
-			system.lines.append(vec2(x, staffY(0,-8)), vec2(x, staffY(staves.size-1,0)));
+            system.lines.append(vec2(x, staffY(0,-8)), vec2(x, staffY(staves.size-1,0)), black, 1.f/2, true); // Bar
 		} else {
 			for(size_t staff : range(staves.size)) {
 				vec2 min(x, staffY(staff,0)), max(x, staffY(staff,-8));
-				if(x) system.lines.append(min, max);
+                if(x) system.lines.append(min, max, black, 1.f/2, true);
 			}
 		}
 		if(measureBars) (*measureBars)[signs[0].time] = x;
@@ -675,11 +675,12 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 						// Body
 						{note.glyphIndex = system.glyphs.size;
 							glyph(vec2(gx, y), SMuFL::NoteHead::Black, 1, 6);}
-						assert_(!note.accidental);
+                        //assert_(!note.accidental);
+                        if(note.accidental) log("TODO: accidented grace");
 						// TODO: stem down
 						// Stem
 						float stemX = gx + dx; //-1./2;
-						system.lines.append(vec2(stemX, y-shortStemLength), vec2(stemX, y)); //-1./2
+                        system.lines.append(vec2(stemX, y-shortStemLength), vec2(stemX, y), black, 1.f/2, true); // Grace stem //-1./2
 						// Flag
 						glyph(vec2(stemX, y-shortStemLength), SMuFL::Flag::Above, 1, 6);
 						// Slash
@@ -797,9 +798,9 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 					x += dx;
 					if(margin || signIndex < signs.size-1) {
 						if(1) { // Grand staff
-							system.lines.append(vec2(x, staffY(staves.size-1,0)), vec2(x, staffY(0,-8))); // FIXME: grand staff
+                            system.lines.append(vec2(x, staffY(staves.size-1,0)), vec2(x, staffY(0,-8)), black, 1.f/2, true); // Bar
 						} else {
-							for(size_t staff : range(staves.size)) system.lines.append(vec2(x, staffY(staff,0)), vec2(x, staffY(staff,-8)));
+                            for(size_t staff : range(staves.size)) system.lines.append(vec2(x, staffY(staff,0)), vec2(x, staffY(staff,-8)), black, 1.f/2, true);
 						}
 					}
 					//if(signIndex == signs.size-1) break; // End of line, last measure bar
@@ -877,7 +878,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 			float y = stemY+dy;
 			vec2 unused size = text(vec2(x,y), str(tuplet.size), textSize/2, system.glyphs, vec2(1./2, above ? 1 : 0));
 			if(uint(signs[signIndex+tuplet.last.min].time - signs[signIndex+tuplet.first.min].time) > ticksPerQuarter) { // No beam ? draw lines
-				system.lines.append(vec2(x0, y0+dy), vec2(x-size.x, y0+((x-size.x)-x0)/(x1-x0)*(y1-y0)+dy), black);
+                system.lines.append(vec2(x0, y0+dy), vec2(x-size.x, y0+((x-size.x)-x0)/(x1-x0)*(y1-y0)+dy), black);
 				system.lines.append(vec2(x+size.x, y0+((x+size.x)-x0)/(x1-x0)*(y1-y0)+dy), vec2(x1, y1+dy), black);
 			}
 		}
@@ -1004,7 +1005,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 		for(int line: range(5)) {
 			float y = staffY(staff, -line*2);
 			assert_(measureBars);
-            system.lines.append(vec2(measureBars->values[0], y), vec2(measureBars->values.last(), y), black, 1.f/2, true);
+            system.lines.append(vec2(measureBars->values[0], y), vec2(measureBars->values.last(), y), black, 3.f/4, true); // Raster
 		}
 	}
 	int highMargin = 0, lowMargin = -8;
@@ -1059,8 +1060,6 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
 			system.translate(system.offset); // FIXME: -> append
 			if(!pageSize) assert_(!pages.last().glyphs);
 			pages.last().append(system); // Appends systems first to preserve references to glyph indices
-            // Hints horizontal lines (raster, ledgers)
-            //for(Line& line: pages.last().lines) if(line.a.y == line.b.y) line.a.y = line.b.y = floor(line.a.y)+1./2;
         }
 		if(pages.size==1) text(vec2(pageSize.x/2, 0), bold(title), context.textSize, pages.last().glyphs, vec2(1./2, 0));
 		if(pageNumbers) { // Page index numbers at each corner

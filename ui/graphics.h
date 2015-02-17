@@ -34,7 +34,9 @@ struct Glyph {
     FontData& font;
     uint code;
     uint index;
-    bgr3f color = black; float opacity = 1;
+    bgr3f color = black;
+    float opacity = 1;
+    bool hint = false;
 };
 
 /// Line graphic element
