@@ -33,7 +33,8 @@ inline notrace Image share(const Image& o) { return Image(unsafeRef(o),o.size,o.
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 inline notrace Image cropShare(const Image& o, int2 offset, int2 size) {
-    return Image(unsafeRef(o.slice(offset.y*o.stride+offset.x, size.y*o.stride)),size,o.stride,o.alpha);
+    assert_(offset+size <= o.size, offset, size, o.size);
+    return Image(unsafeRef(o.slice(offset.y*o.stride+offset.x, size.y*o.stride-offset.x)),size,o.stride,o.alpha);
 }
 
 // -- Decode --

@@ -140,7 +140,7 @@ buffer<Rect> Linear::layout(const vec2 xySize) {
 buffer<Rect> GridLayout::layout(vec2 size) {
     if(!count()) return {};
 	buffer<Rect> widgets(count(), 0);
-    uint w=this->width,h=0/*this->height*/; for(;;) { if(w*h>=count()) break; if(!this->width && w<=h) w++; else h++; }
+    int w = this->width, h=0/*this->height*/; for(;;) { if(w*h >= (int)count()) break; if(!this->width && w<=h) w++; else h++; }
     float widths[w], heights[h];
     for(uint x: range(w)) {
         float maxX = 0;
@@ -190,7 +190,7 @@ buffer<Rect> GridLayout::layout(vec2 size) {
             for(float& v: heights) { v += extra; extraHeight -= extra; } // Distributes extra space
         } else {
             while(extraHeight <= -h) { // While layout is overcommited
-                float first = max(ref<float>(heights,h)); // First largest size
+                float first = max(ref<float>(heights, h)); // First largest size
                 int firstCount=0; for(float size: heights) if(size == first) firstCount++; // Counts how many widgets already have the largest size
                 float second=0; for(float size: heights) if(second<size && size<first) second=size; // Second largest size
                 float offset = max(1.f, min(-extraHeight, first-second) / firstCount); // Distributes reduction to all largest widgets

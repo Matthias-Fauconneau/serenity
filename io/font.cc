@@ -23,7 +23,7 @@ String findFont(string fontName, ref<string> fontTypes) {
 /// Returns a font, loading from disk and caching as needed
 FontData* getFont(string fontName, ref<string> fontTypes) {
     String key = fontName+fontTypes[0];
-    assert_(!key.contains(' '));
+    //assert(!key.contains(' '));
     static map<String, unique<FontData>> fonts; // Font cache
     unique<FontData>* font = fonts.find(key);
     if(font) return font->pointer;

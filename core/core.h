@@ -288,7 +288,7 @@ generic struct mref : ref<T> {
 	T& last() const { return at(size-1); }
 
 	/// Slices a reference to elements from \a pos to \a pos + \a size
-	notrace mref<T> slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return mref<T>((T*)data+pos, size); }
+    notrace mref<T> slice(size_t pos, size_t size) const { assert(pos+size <= this->size, pos, size, this->size); return mref<T>((T*)data+pos, size); }
 	/// Slices a reference to elements from to the end of the reference
 	mref<T> slice(size_t pos) const { assert(pos<=size); return mref<T>((T*)data+pos,size-pos); }
 	/// Slices a reference to elements from \a start to \a stop

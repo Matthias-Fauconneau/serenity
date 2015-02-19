@@ -9,14 +9,18 @@ core/image.h
 core/image.cc
 
 io/png.cc
+io/jpeg.cc
 
 ui/text.cc
 ui/render.cc
 ui/window.cc
 ui/pdf-renderer.cc
+ui/layout.cc
 
 music/sheet.cc
 music/music-pdf.cc
 music/music-practice.cc
 music/midi-input.cc
 music/MusicXML.cc
+
+document.cc
