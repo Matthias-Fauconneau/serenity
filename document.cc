@@ -30,7 +30,7 @@ struct Page : VBox {
     Widget* footer = 0;
 
 	Page(Linear::Extra main, uint index, vec2 marginPx)
-        : Linear(main, Linear::Expand, true), index(index), marginPx(marginPx) {}
+        : Linear(main, Linear::AlignCenter/*Expand*/, true), index(index), marginPx(marginPx) {}
 
 	shared<Graphics> graphics(vec2 size) override {
 		shared<Graphics> graphics;
@@ -69,7 +69,7 @@ struct A4 : Format {
 struct Document {
     const String source;
     string formatString;
-    Format format = formatString == "A4"_ ? A4() : Format{vec2(1366,768), vec2(0,0), "Computer Modern"_, 0, 24, 24, 32, 1};
+    Format format = formatString == "A4"_ ? A4() : Format{vec2(1366,768), vec2(0,0), "DejaVuSans"_, 0, 24, 24, 32, 1};
     const float interlineStretch = 3./2;
 
     // Document properties
@@ -206,7 +206,7 @@ struct Document {
         }
         if(type=='-') return &element<VBox>(page, move(children), VBox::Spread, VBox::AlignCenter, false);
         else if(type=='|' || type=='@') return &element<HBox>(page, move(children), HBox::Share, HBox::AlignCenter, true);
-        else if(type=='+') return &element<WidgetGrid>(page, move(children), false, false, width); //TODO: Expanding
+        else if(type=='+') return &element<WidgetGrid>(page, move(children), false, false, width);
         else if(type=='$') return &element<WidgetGrid>(page, move(children), true, true, width);
         else if(type=='\n') return &element<VBox>(page, move(children), VBox::Center, VBox::AlignCenter, false);
         else if(!type) {
@@ -259,7 +259,7 @@ struct Document {
     /// Parses a page
     /// \arg quick Quick layout for table of contents (skips images)
     Page parsePage(TextData& s, Header& currentHeader, uint pageIndex, bool quick=false) const {
-        Page page (Linear::ShareTight, pageIndex, format.marginPx);
+        Page page (Linear::Share, pageIndex, format.marginPx);
         while(s) {
             // Header
             /***/ if(s.wouldMatch('#')) {
@@ -267,7 +267,7 @@ struct Document {
                 while(s.match('#')) level++;
                 s.whileAny(' ');
                 if(s && !s.match('\n')) { // New header
-                    if(level > currentHeader.indices.size) currentHeader.indices.grow(level);
+                    if(level > currentHeader.indices.size) currentHeader.indices.slice(currentHeader.indices.grow(level)).clear();
                     if(level < currentHeader.indices.size) currentHeader.indices.shrink(level);
                     currentHeader.indices[level-1]++;
                     currentHeader.name = String(parseText(s));
@@ -291,7 +291,7 @@ struct Document {
                 if(command == "tableofcontents"_) {
                     auto& grid = element<WidgetGrid>(page, false, false, format.footerSize ? 2 /*Show page numbers*/: 1);
                     for(const Header& header: headers) {
-                        String text;
+                        array<char> text;
 						text.append(repeat(" "_, header.indices.size));
 						if(header.indices.size<=1) text.append((char)(TextFormat::Bold));
 						for(int level: header.indices) text.append(str(level)+'.');
