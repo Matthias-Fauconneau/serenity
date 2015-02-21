@@ -251,7 +251,7 @@ TextLayout Text::layout(const float wrap) const {
 	if(align>-1) {
 		TextLayout layout(text, size, wrap, font, hint, interline, align, false, false, false, color); // Layouts without justification
 		//wrap = layout.bbMax.x;
-		assert_(wrap >= 0, wrap);
+        //assert_(wrap >= 0, wrap);
 	}
 	return TextLayout(text, size, wrap, font, hint, interline, align, true, justifyExplicitLineBreak, true, color);
 }

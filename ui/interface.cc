@@ -90,17 +90,15 @@ shared<Graphics> Progress::graphics(vec2 size) {
 // ImageView
 
 vec2 ImageView::sizeHint(vec2 size) {
-    return vec2(min(image.size, size.x && image.size.x ? int2(image.size.x*size.x/image.size.x, image.size.y*size.y/image.size.y) : image.size));
+    if(size > vec2(image.size)) return vec2(image.size);
+    return size.x*image.size.y < size.y*image.size.x ?
+                vec2(image.size.x*size.x/image.size.x, image.size.y*size.x/image.size.x) :
+                vec2(image.size.x*size.y/image.size.y, image.size.y*size.y/image.size.y);
 }
 
 shared<Graphics> ImageView::graphics(vec2 size) {
 	shared<Graphics> graphics;
-    if(image) {
-        vec2 targetSize = size.x*image.size.y < size.y*image.size.x ?
-                    vec2(image.size.x*size.x/image.size.x, image.size.y*size.x/image.size.x) :
-                    vec2(image.size.x*size.y/image.size.y, image.size.y*size.y/image.size.y);
-        graphics->blits.append((size-targetSize)/2.f, targetSize, share(image) );
-    }
+    if(image) graphics->blits.append((size-sizeHint(size))/2.f, sizeHint(size), share(image) );
     return graphics;
 }
 

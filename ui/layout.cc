@@ -206,6 +206,24 @@ buffer<Rect> GridLayout::layout(vec2 size, vec2& sizeHint) {
         assert_(extraHeight > -h, extraHeight, size, "(", ref<float>(widths,w), ")", "(", ref<float>(heights,h),")", sum<float>(ref<float>(heights,h)));
     }
 
+    { // Recomputes widths with given height constraints
+        for(uint x: range(w)) {
+            float maxX = 0;
+            for(uint y : range(h)) {
+                size_t index = y*w+x;
+                if(index<count()) maxX = ::max(maxX, abs(at(index).sizeHint(vec2(size.x, heights[y])).x));
+            }
+            widths[x] = maxX;
+        }
+        if(size.x) {
+            const float requiredWidth = sum<float>(ref<float>(widths,w));
+            sizeHint.x = requiredWidth;
+            extraWidth = size.x ? size.x-requiredWidth: 0;
+            const float extra = extraWidth / w; // Extra space per column (may be negative for missing space)
+            for(float& v: widths) { v += extra; extraWidth -= extra; } // Distributes extra/missing space
+        }
+    }
+
     float Y = extraHeight/2;
 	for(size_t y : range(h)) {
         float X = extraWidth/2;
@@ -217,7 +235,7 @@ buffer<Rect> GridLayout::layout(vec2 size, vec2& sizeHint) {
             }
         }
         Y += heights[y];
-        assert_(size.y ==0 || (vec2(0) < vec2(X,Y) && vec2(X,Y) < size+vec2(w,h)), X, Y, size, ref<float>(widths,w), ref<float>(heights,h));
+        //assert_(size.y ==0 || (vec2(0) < vec2(X,Y) && vec2(X,Y) < size+vec2(w,h)), X, Y, size, ref<float>(widths,w), ref<float>(heights,h));
 	}
     return widgets;
 }
