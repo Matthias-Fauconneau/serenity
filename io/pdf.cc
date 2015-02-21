@@ -147,8 +147,12 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
 							xImage.insert("ColorSpace"__, "/DeviceRGB"_);
 							xImage.insert("BitsPerComponent"__, 8);
 							typedef vec<rgb,uint8,3> rgb3;
-							buffer<rgb3> rgb (image.height * image.width);
-							for(uint y: range(image.height)) for(uint x: range(image.width)) rgb[y*image.width+x] = image[y*image.stride+x];
+                            typedef vec<rgb,int,3> rgb3i;
+                            buffer<rgb3> rgb (image.height * image.width);
+                            for(uint y: range(image.height)) for(uint x: range(image.width)) {
+                                auto source = image[y*image.stride+x];
+                                rgb[y*image.width+x] = rgb3(rgb3i(source.r, source.g, source.b)*int(source.a)/0xFF) + rgb3(0xFF-source.a);
+                            }
 							xImage.insert("Filter"__, "/FlateDecode"_);
 							xImage = deflate(cast<byte>(rgb));
                             xObjects.insert(copy(id), ref(xImage));
