@@ -114,19 +114,21 @@ buffer<Rect> Linear::layout(const vec2 xySize) {
         width = size.x-count*size.x/count;
     }
 
-    vec2 pen = 0;
-    if(main==Spread || main==Left) pen.x+=0;
-    else if(main==Center || main==Even || main==Share || main==ShareTight) pen.x+=width/2;
-    else if(main==Right) pen.x+=size.x-width;
-    else error("");
-    if(side==AlignLeft) pen.y+=0;
-    else if(side==AlignCenter) pen.y+=(size.y-height)/2;
-    else if(side==AlignRight) pen.y+=size.y-height;
-	else if(size.y) height = size.y; // If not evaluating required size for sizeHint
-	buffer<Rect> widgets(count, 0);
+    vec2 pen;
+    if(main==Spread || main==Left) pen.x = 0;
+    else if(main==Center || main==Even || main==Share || main==ShareTight) pen.x = width/2;
+    else if(main==Right) pen.x = size.x-width;
+    else error("main");
+    if(side==AlignLeft) pen.y = 0;
+    else if(side==ShareTight) { height = (height+size.y)/2; pen.y = (size.y-height)/2; }
+    else if(side==AlignCenter) pen.y =(size.y-height)/2;
+    else if(side==AlignRight) pen.y = size.y-height;
+    else if(side==Expand) { if(size.y) height = size.y; pen.y = 0; } // If not evaluating required size for sizeHint
+    else error("side");
+    buffer<Rect> widgets(count, 0);
 	for(size_t i: range(count)) {
         float y=0;
-        if(side==AlignLeft||side==AlignCenter||side==AlignRight||side==Expand) heights[i]=height;
+        if(side==AlignLeft||side==AlignCenter||side==AlignRight||side==Expand||side==ShareTight) heights[i]=height;
         else if(side==Left) y=0;
         else if(side==Center) y=(height-heights[i])/2;
         else if(side==Right) y=height-heights[i];

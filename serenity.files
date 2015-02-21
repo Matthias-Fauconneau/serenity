@@ -17,6 +17,7 @@ ui/window.cc
 ui/pdf-renderer.cc
 ui/layout.h
 ui/layout.cc
+ui/graphics.h
 
 music/sheet.cc
 music/music-pdf.cc

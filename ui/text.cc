@@ -136,7 +136,7 @@ struct TextLayout {
 						if(c=='\n') { nextLine(justifyExplicit, this->align); align=-1; }
 						if(c=='\t') { position.x += 4*spaceAdvance;  align++; }
 					}
-					//else if(c==' ') position.x += spaceAdvance;
+                    else if(c==' ') position.x += spaceAdvance;
 					else error("Unexpected code", hex(c), toUTF8(text));
 				}
 				// Push format context

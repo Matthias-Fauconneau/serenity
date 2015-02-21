@@ -75,7 +75,7 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
 			Dict pageFontReferences;
 			String fontID; float fontSize=0;
             vec2 last = 0;
-			for(const Glyph& glyph: graphics.glyphs) {
+            for(const Glyph& glyph: graphics.glyphs) {
 				const FontData& font = glyph.font;
 				if(font.name != fontID || glyph.fontSize != fontSize) {
 					if(!pageFontReferences.contains(font.name)) {
@@ -198,10 +198,10 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
 	string header = "%PDF-1.7\n";
 	size_t fileByteIndex = header.size;
 	buffer<buffer<byte>> pdfObjects =
-			apply(objects.size-1, [&](size_t index) -> buffer<byte> { return str(1+index)+" 0 obj\n"+str(objects[1+index])+"\nendobj\n"; });
+            apply(objects.size-1, [&](size_t index) -> buffer<byte> { return str(1+index)+" 0 obj\n"_+str(objects[1+index])+"\nendobj\n"_; });
 	String xrefHeader = "xref\n0 "+str(objects.size)+"\n0000000000 65535 f\r\n";
 	String xrefTable ((objects.size-1)*20, 0);
-	for(::ref<byte> o: pdfObjects) { xrefTable.append(str(fileByteIndex, 10)+" 00000 n\r\n"); fileByteIndex += o.size; }
+    for(::ref<byte> o: pdfObjects) { xrefTable.append(str(fileByteIndex, 10u)+" 00000 n\r\n"); fileByteIndex += o.size; }
 	size_t contentSize = fileByteIndex;
 	size_t xrefTableStart = fileByteIndex;
 	Dict trailerDict; trailerDict.insert("Size"__, objects.size); trailerDict.insert("Root"__, ref(root));

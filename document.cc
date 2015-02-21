@@ -30,7 +30,7 @@ struct Page : VBox {
     Widget* footer = 0;
 
 	Page(Linear::Extra main, uint index, vec2 marginPx)
-        : Linear(main, Linear::AlignCenter/*Expand*/, true), index(index), marginPx(marginPx) {}
+        : Linear(main, Linear::ShareTight, true), index(index), marginPx(marginPx) {}
 
 	shared<Graphics> graphics(vec2 size) override {
 		shared<Graphics> graphics;
@@ -40,15 +40,6 @@ struct Page : VBox {
 			graphics->graphics.insert(vec2(0, size.y - marginPx.y), this->footer->graphics(vec2(size.x, marginPx.y)));
         return graphics;
     }
-	// FIXME: factorize to use same code for shared or direct reference
-	Graphics pageGraphics(vec2 size) {
-		Graphics graphics;
-		vec2 inner = size - 2.f*marginPx;
-		graphics.graphics.insert(marginPx, VBox::graphics(inner, Rect(inner)));
-		if(this->footer)
-			graphics.graphics.insert(vec2(0, size.y - marginPx.y), this->footer->graphics(vec2(size.x, marginPx.y)));
-		return graphics;
-	}
 };
 
 struct Format {
@@ -69,7 +60,7 @@ struct A4 : Format {
 struct Document {
     const String source;
     string formatString;
-    Format format = formatString == "A4"_ ? A4() : Format{vec2(1366,768), vec2(0,0), "DejaVuSans"_, 0, 24, 24, 32, 1};
+    Format format = formatString == "A4"_ ? A4() : Format{vec2(1366,768), vec2(0,0), "FreeSerif"_, 0, 24, 24, 32, 1};
     const float interlineStretch = 3./2;
 
     // Document properties
@@ -259,7 +250,7 @@ struct Document {
     /// Parses a page
     /// \arg quick Quick layout for table of contents (skips images)
     Page parsePage(TextData& s, Header& currentHeader, uint pageIndex, bool quick=false) const {
-        Page page (Linear::Share, pageIndex, format.marginPx);
+        Page page (Linear::ShareTight, pageIndex, format.marginPx);
         while(s) {
             // Header
             /***/ if(s.wouldMatch('#')) {
@@ -337,7 +328,8 @@ struct Document {
 
 	buffer<byte> toPDF() {
 		return ::toPDF(format.pageSize, apply( apply(pages.size, [&](int index){ return parsePage(index);}),
-											   [&](Page& page) { return page.pageGraphics(format.pageSize); }), 1./format.pointPx);
+                                               [&](Page& page) {
+                           Graphics graphics = move((Graphics&)page.graphics(format.pageSize)); graphics.flatten(); return graphics; }), 1./format.pointPx);
     }
 };
 
@@ -406,7 +398,7 @@ struct DocumentApp {
         assert_(arguments().size==2 && ref<string>({"preview"_,"export"_}).contains(arguments()[1]), "Usage: <path> preview|export");
         string path = arguments()[0], command = arguments()[1];
         /***/ if(command=="preview"_) viewer = unique<DocumentViewer>(path);
-        else if(command=="export"_) writeFile(section(path,'.',0,-2)+".pdf"_, Document(readFile(path)).toPDF());
+        else if(command=="export"_) writeFile((path.contains('.')?section(path,'.',0,-2):path)+".pdf"_, Document(readFile(path)).toPDF(), currentWorkingDirectory(), true);
         else error("Unknown command"_, arguments());
     }
 } app;
