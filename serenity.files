@@ -26,3 +26,4 @@ music/midi-input.cc
 music/MusicXML.cc
 
 document.cc
+demosaic.cc

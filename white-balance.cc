@@ -2,8 +2,8 @@
 #include "interface.h"
 #include "window.h"
 
-ImageF whiteBalance(const ImageF& source, const ImageF& reference) {
-	ImageF target (source.size);
+Image4f whiteBalance(const Image4f& source, const Image4f& reference) {
+    Image4f target (source.size);
 	v4sf mean = ::mean(reference);
 	for(size_t i: range(source.Ref::size)) target[i] = source[i] / mean;
 	return target;
@@ -11,8 +11,8 @@ ImageF whiteBalance(const ImageF& source, const ImageF& reference) {
 
 struct WhiteBalance {
 	string name = section(arguments()[0],'.');
-	ImageF source = convert(decodeImage(Map(name+".jpg"_)));
-	ImageF reference = convert(decodeImage(Map(name+".white-balance-reference.jpg"_)));
+    Image4f source = convert(decodeImage(Map(name+".jpg"_)));
+    Image4f reference = convert(decodeImage(Map(name+".white-balance-reference.jpg"_)));
 	Image target = convert(whiteBalance(source, reference));
 };
 

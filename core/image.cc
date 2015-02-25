@@ -174,11 +174,10 @@ void resize(const Image& target, const Image& source) {
     }
 }
 
-#if 0
 // -- 4x float
 
-ImageF convert(const Image& source) {
-    ImageF target (source.size, source.alpha);
+Image4f convert(const Image& source) {
+    Image4f target (source.size, source.alpha);
     parallel_chunk(source.Ref::size, [&](uint, size_t I0, size_t DI) {
 	extern float sRGB_reverse[0x100];
 	for(size_t i: range(I0, I0+DI)) target[i] = {sRGB_reverse[source[i][0]], sRGB_reverse[source[i][1]], sRGB_reverse[source[i][2]],
@@ -187,7 +186,7 @@ ImageF convert(const Image& source) {
     return target;
 }
 
-Image convert(const ImageF& source) {
+Image convert(const Image4f& source) {
 	Image target (source.size);
 	assert(source.Ref::size == target.Ref::size);
 	parallel_chunk(source.Ref::size, [&](uint, size_t I0, size_t DI) {
@@ -215,7 +214,7 @@ Image convert(const ImageF& source) {
 }
 
 // Box convolution
-void box(const ImageF& target, const ImageF& source, const int width) {
+void box(const Image4f& target, const Image4f& source, const int width) {
 	assert_(target.size.y == source.size.x && target.size.x == source.size.y && uint(target.stride) == target.width && uint(source.stride)==source.width);
 	parallel_chunk(source.size.y, [&](uint, int Y0, int DY) { // Top
 		const v4sf* const sourceData = source.data;
@@ -250,4 +249,3 @@ void box(const ImageF& target, const ImageF& source, const int width) {
 		}
 	});
 }
-#endif
