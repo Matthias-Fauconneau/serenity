@@ -14,12 +14,9 @@ ImageF fromRaw16(ref<uint16> source, uint width, uint height) {
 }
 
 Image4f demosaic(const ImageF& source) {
-    Image4f target (source.size);
-    for(size_t y: range(source.height)) for(size_t x: range(source.width)) {
-        int component = (int[]){1,2,1,0}[(y%2)*2+x%2]; // GRGB -> BGR
-        v4sf bgr = float4(0);
-        bgr[component] = source(x, y);
-        target(x, y) = bgr;
+    Image4f target (source.size/2);
+    for(size_t y: range(target.height)) for(size_t x: range(target.width)) {
+        target(x, y) = {source(x*2+1, y*2+0), (source(x*2+0, y*2+0)+source(x*2+1, y*2+1))/2, source(x*2+0, y*2+1)};
     }
     return target;
 }
@@ -28,7 +25,7 @@ struct Demosaic {
     string fileName = arguments()[0];
     string name = section(fileName,'.');
     ImageF source = fromRaw16(cast<uint16>(Map(fileName)), 4096, 3072);
-    Image target = convert(demosaic(cropShare(source, source.size*int2(5, 8)/16, source.size/4)));
+    Image target = convert(demosaic(cropShare(source, source.size*int2(3, 4)/16, source.size/2)));
 };
 
 struct Preview : Demosaic, WindowView, Application { Preview() : WindowView(move(target)) {} };
