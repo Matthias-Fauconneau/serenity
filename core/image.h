@@ -20,7 +20,7 @@ generic struct ImageT : buffer<T> {
     ImageT(int2 size, bool alpha=false) : ImageT(size.x, size.y, alpha) {}
 
     explicit operator bool() const { return buffer<T>::data && width && height; }
-    inline notrace byte4& operator()(uint x, uint y) const { assert(x<width && y<height); return buffer<T>::at(y*stride+x); }
+    inline notrace T& operator()(uint x, uint y) const { assert(x<width && y<height); return buffer<T>::at(y*stride+x); }
 };
 generic String str(const ImageT<T>& o) { return strx(o.size); }
 generic ImageT<T> copy(const ImageT<T>& o) { return ImageT<T>(copyRef(o), o.size, o.stride, o.alpha); }
