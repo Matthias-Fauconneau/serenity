@@ -25,7 +25,7 @@ struct Demosaic {
     string fileName = arguments()[0];
     string name = section(fileName,'.');
     ImageF source = fromRaw16(cast<uint16>(Map(fileName)), 4096, 3072);
-    Image target = convert(demosaic(cropShare(source, source.size*int2(3, 4)/16, source.size/2)));
+    Image target = convert(demosaic(cropShare(source, source.size*int2(1, 3)/8, source.size/2)));
 };
 
 struct Preview : Demosaic, WindowView, Application { Preview() : WindowView(move(target)) {} };

@@ -5,6 +5,7 @@ build.sh
 build.cc
 
 core/core.h
+core/vector.h
 core/image.h
 core/image.cc
 
@@ -28,3 +29,4 @@ music/MusicXML.cc
 
 document.cc
 demosaic.cc
+IT8.cc
