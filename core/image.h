@@ -3,39 +3,39 @@
 #include "vector.h"
 #include "simd.h"
 
-/// 2D array of BGRA 8-bit unsigned integer pixels (sRGB colorspace)
-struct Image : buffer<byte4> {
+/// 2D array of pixels
+generic struct ImageT : buffer<T> {
 	union { int2 size = 0; struct { uint width, height; }; };
     uint stride = 0;
     bool alpha = false;
 
-	Image() {}
-	default_move(Image);
-    Image(buffer<byte4>&& pixels, int2 size, uint stride=0, bool alpha=false)
-	: buffer<byte4>(::move(pixels)), size(size), stride(stride?:size.x), alpha(alpha) {
+    ImageT() {}
+    default_move(ImageT);
+    ImageT(buffer<T>&& pixels, int2 size, uint stride=0, bool alpha=false) : buffer<T>(::move(pixels)), size(size), stride(stride?:size.x), alpha(alpha) {
         //assert_(buffer::data && buffer::size == height*this->stride);
     }
-    Image(uint width, uint height, bool alpha=false)
-		: buffer(height*width), width(width), height(height), stride(width), alpha(alpha) {
+    ImageT(uint width, uint height, bool alpha=false) : buffer<T>(height*width), width(width), height(height), stride(width), alpha(alpha) {
         //assert_(width && height && buffer::data);
     }
-    Image(int2 size, bool alpha=false) : Image(size.x, size.y, alpha) {}
+    ImageT(int2 size, bool alpha=false) : ImageT(size.x, size.y, alpha) {}
 
-    explicit operator bool() const { return data && width && height; }
-	inline notrace byte4& operator()(uint x, uint y) const { assert(x<width && y<height); return at(y*stride+x); }
+    explicit operator bool() const { return buffer<T>::data && width && height; }
+    inline notrace byte4& operator()(uint x, uint y) const { assert(x<width && y<height); return buffer<T>::at(y*stride+x); }
 };
-inline String str(const Image& o) { return strx(o.size); }
-
-inline Image copy(const Image& o) { return Image(copyRef(o), o.size, o.stride, o.alpha); }
-
-/// Returns a weak reference to \a image (unsafe if referenced image is freed)
-inline notrace Image share(const Image& o) { return Image(unsafeRef(o),o.size,o.stride,o.alpha); }
+generic String str(const ImageT<T>& o) { return strx(o.size); }
+generic ImageT<T> copy(const ImageT<T>& o) { return ImageT<T>(copyRef(o), o.size, o.stride, o.alpha); }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
-inline notrace Image cropShare(const Image& o, int2 offset, int2 size) {
+generic ImageT<T> share(const ImageT<T>& o) { return ImageT<T>(unsafeRef(o),o.size,o.stride,o.alpha); }
+
+/// Returns a weak reference to \a image (unsafe if referenced image is freed)
+generic ImageT<T> cropShare(const ImageT<T>& o, int2 offset, int2 size) {
     assert_(offset+size <= o.size, offset, size, o.size);
-    return Image(unsafeRef(o.slice(offset.y*o.stride+offset.x, size.y*o.stride-offset.x)),size,o.stride,o.alpha);
+    return ImageT<T>(unsafeRef(o.slice(offset.y*o.stride+offset.x, size.y*o.stride-offset.x)),size,o.stride,o.alpha);
 }
+
+/// 2D array of BGRA 8-bit unsigned integer pixels (sRGB colorspace)
+typedef ImageT<byte4> Image;
 
 // -- Decode --
 
@@ -72,64 +72,12 @@ void resize(const Image& target, const Image& source);
 inline Image resize(Image&& target, const Image& source) { resize(target, source); return move(target); }
 inline Image resize(int2 size, const Image& source) { return resize(Image(size, source.alpha), source); }
 
-// -- 16bit integer
-
-struct Image16 : buffer<int16> {
-	int2 size = 0;
-	Image16() {}
-	Image16(ref<int16> ref, int2 size) : buffer(unsafeRef(ref)), size(size) { assert_(Ref::size == (size_t)size.y*size.x); }
-	Image16(int2 size) : buffer((size_t)size.y*size.x), size(size) {}
-	inline notrace int16& operator()(size_t x, size_t y) const { assert(x<size_t(size.x) && y<size_t(size.y)); return at(y*size.x+x); }
-};
-
-// -- 32bit float
-
-struct ImageF : buffer<float> {
-    ImageF(){}
-    ImageF(buffer<float>&& data, int2 size) : buffer(::move(data)), size(size) {
-        assert(buffer::size==size_t(size.y*width), buffer::size, size);
-    }
-    ImageF(int width, int height) : buffer(height*width), width(width), height(height) {
-        assert(size>int2(0), size, width, height);
-    }
-    ImageF(int2 size) : ImageF(size.x, size.y) {}
-
-    inline float& operator()(size_t x, size_t y) const {assert(x<width && y<height, x, y); return at(y*width+x); }
-
-    union {
-        int2 size = 0;
-        struct { uint width, height; };
-    };
-};
-
-// -- 4x 32bit float
-
-/// 2D array of floating-point 4 component vector pixels (linear colorspace)
-struct Image4f : buffer<v4sf> {
-    Image4f(){}
-    Image4f(buffer<v4sf>&& data, int2 size, size_t stride, bool alpha) : buffer(::move(data)), size(size), stride(stride), alpha(alpha) {
-		assert(buffer::size==size_t(size.y*stride), buffer::size, size, stride);
-	}
-    Image4f(int width, int height, bool alpha) : buffer(height*width), width(width), height(height), stride(width), alpha(alpha) {
-		assert(size>int2(0), size, width, height);
-	}
-    Image4f(int2 size, bool alpha=false) : Image4f(size.x, size.y, alpha) {}
-
-	inline v4sf& operator()(size_t x, size_t y) const {assert(x<width && y<height, x, y); return at(y*stride+x); }
-
-	union {
-		int2 size = 0;
-		struct { uint width, height; };
-	};
-	size_t stride = 0;
-	bool alpha = false;
-};
-inline Image4f copy(const Image4f& o) {
-    if(o.width == o.stride) return Image4f(copy((const buffer<v4sf>&)o), o.size, o.stride, o.alpha);
-    Image4f target(o.size, o.alpha);
-	for(size_t y: range(o.height)) target.slice(y*target.stride, target.width).copy(o.slice(y*o.stride, o.width));
-	return target;
-}
+/// 2D array of 16bit integer pixels
+typedef ImageT<uint16> Image16;
+/// 2D array of 32bit floating-point pixels
+typedef ImageT<float> ImageF;
+/// 2D array of 32bit floating-point 4 component vector pixels
+typedef ImageT<v4sf> Image4f;
 
 Image4f convert(const Image& source);
 Image convert(const Image4f& source);
