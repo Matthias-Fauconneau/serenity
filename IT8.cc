@@ -5,7 +5,12 @@
 #include "png.h"
 #include "demosaic.h"
 
-struct WindowView : ImageView { Window window {this, int2(1024, 768)}; WindowView(Image&& image) : ImageView(move(image)) {} };
+//struct WindowView : ImageView { Window window {this, int2(1024, 768)}; WindowView(Image&& image) : ImageView(move(image)) {} };
+struct WindowCycleView : WidgetCycle {
+    ImageView images[2];
+    Window window {this, int2(1024, 768)};
+    WindowCycleView(Image&& a, Image&& b) : WidgetCycle(toWidgets<ImageView>(images)), images{move(a), move(b)} {} };
+
 
 Image4f parseIT8(ref<byte> it8) {
     TextData s(it8);
@@ -74,17 +79,17 @@ static double SSE(const Image4f& A, const Image4f& B, int2 offset) {
     return energy;
 }
 
-int2 templateMatch(const Image4f& A, const Image4f& B, int2& size) {
+int2 templateMatch(const Image4f& A, Image4f& b, int2& size) {
     array<Image4f> mipmap;
     mipmap.append(share(A));
-    while(mipmap.last().size > B.size*3) mipmap.append(downsample(mipmap.last()));
-    Image4f b = share(B);
+    while(mipmap.last().size > b.size*3) mipmap.append(downsample(mipmap.last()));
     int2 bestOffset = mipmap.last().size / 2 - b.size / 2;
+    const int searchWindowHalfLength = 16;
     for(const Image4f& a: mipmap.reverse()) {
         real bestSSE = inf;
         int2 levelBestOffset = bestOffset;
-        for(int y: range(bestOffset.y-4, bestOffset.y+4)) {
-            for(int x: range(bestOffset.x-4, bestOffset.x+4)) {
+        for(int y: range(bestOffset.y-searchWindowHalfLength, bestOffset.y+searchWindowHalfLength +1)) {
+            for(int x: range(bestOffset.x-searchWindowHalfLength, bestOffset.x+searchWindowHalfLength +1)) {
                 float SSE = ::SSE(a, b, int2(x,y));
                 if(SSE < bestSSE) {
                     bestSSE = SSE;
@@ -106,6 +111,7 @@ struct IT8 {
     string fileName = arguments()[1];
     string name = section(fileName,'.');
     Image target;
+    Image b;
     IT8() {
         string it8charge = arguments()[0];
         Image4f it8bgr = XYZtoBGR(parseIT8(readFile(it8charge)));
@@ -114,10 +120,11 @@ struct IT8 {
         Image4f bgr = demosaic(bayerCFA);
         int2 size; int2 offset = templateMatch(bgr, it8bgr, size);
         target = convert(copy(cropShare(bgr, offset, size)));
+        b = convert(it8bgr);
     }
 };
 
-struct Preview : IT8, WindowView, Application { Preview() : WindowView(move(target)) {} };
+struct Preview : IT8, WindowCycleView, Application { Preview() : WindowCycleView(share(target), share(b)) {} };
 registerApplication(Preview);
 struct Export : IT8, Application { Export() { writeFile(name+".png", encodePNG(target)); } };
 registerApplication(Export, export);
