@@ -20,6 +20,10 @@ inline void storea(float* const ptr, v4sf a) { *(v4sf*)ptr = a; }
 
 inline v4sf min(v4sf a, v4sf b) { return __builtin_ia32_minps(a,b); }
 inline v4sf max(v4sf a, v4sf b) { return __builtin_ia32_maxps(a,b); }
+inline v4sf dot3(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0x7f); }
+inline v4sf sq3(v4sf a) { return dot3(a,a); }
+inline v4sf dot(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0xFF); }
+inline v4sf sq(v4sf a) { return dot(a,a); }
 inline v4sf rcp(v4sf a) { return __builtin_ia32_rcpps(a); }
 inline v4sf rsqrt(v4sf a) { return __builtin_ia32_rsqrtps(a); }
 inline v4sf sqrt(v4sf a) { return __builtin_ia32_sqrtps(a); }

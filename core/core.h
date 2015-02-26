@@ -49,7 +49,7 @@ generic constexpr T&& forward(Type remove_reference<T>::type& t) { return (T&&)t
 /// Forwards moveable values
 generic constexpr T&& forward(Type remove_reference<T>::type&& t){static_assert(!is_lvalue_reference<T>::value,""); return (T&&)t; }
 /// Base template for explicit copy (overriden by explicitly copyable types)
-generic T __attribute__((warn_unused_result))  copy(const T& o) { return o; }
+generic T __attribute__((warn_unused_result)) copy(const T& o) { return o; }
 
 /// Reference type with move semantics
 generic struct handle {

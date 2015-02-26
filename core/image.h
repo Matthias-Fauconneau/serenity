@@ -23,7 +23,12 @@ generic struct ImageT : buffer<T> {
     inline notrace T& operator()(uint x, uint y) const { assert(x<width && y<height); return buffer<T>::at(y*stride+x); }
 };
 generic String str(const ImageT<T>& o) { return strx(o.size); }
-generic ImageT<T> copy(const ImageT<T>& o) { return ImageT<T>(copyRef(o), o.size, o.stride, o.alpha); }
+generic ImageT<T> copy(const ImageT<T>& o) {
+    if(o.width == o.stride) return ImageT<T>(copyRef(o), o.size, o.stride, o.alpha);
+    ImageT<T> target(o.size, o.alpha);
+    for(size_t y: range(o.height)) target.slice(y*target.stride, target.width).copy(o.slice(y*o.stride, o.width));
+    return target;
+}
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 generic ImageT<T> share(const ImageT<T>& o) { return ImageT<T>(unsafeRef(o),o.size,o.stride,o.alpha); }

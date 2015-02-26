@@ -188,7 +188,7 @@ Image4f convert(const Image& source) {
 
 Image convert(const Image4f& source) {
 	Image target (source.size);
-	assert(source.Ref::size == target.Ref::size);
+    assert_(source.Ref::size == target.Ref::size);
 	parallel_chunk(source.Ref::size, [&](uint, size_t I0, size_t DI) {
 		extern uint8 sRGB_forward[0x1000];
 		int clip = 0;
