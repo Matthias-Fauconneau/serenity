@@ -6,12 +6,11 @@
 #include "algebra.h"
 #include "matrix.h"
 
-//struct WindowView : ImageView { Window window {this, int2(1024, 768)}; WindowView(Image&& image) : ImageView(move(image)) {} };
 struct WindowCycleView : WidgetCycle {
     ImageView images[2];
     Window window {this, int2(1024, 768)};
-    WindowCycleView(Image&& a, Image&& b) : WidgetCycle(toWidgets<ImageView>(images)), images{move(a), move(b)} {} };
-
+    WindowCycleView(Image&& a, Image&& b) : WidgetCycle(toWidgets<ImageView>(images)), images{move(a), move(b)} {}
+};
 
 Image4f parseIT8(ref<byte> it8) {
     TextData s(it8);
@@ -42,17 +41,17 @@ Image4f parseIT8(ref<byte> it8) {
     return target;
 }
 
-Image4f convert(Image4f&& target, const Image4f& source, mat3 matrix) {
+Image4f convert(Image4f&& target, const Image4f& source, mat4 matrix) {
     assert_(target.size == source.size);
-    v4sf columns[3];
-    for(size_t j: range(3)) for(size_t i: range(3)) { columns[j][i] = matrix(i, j); columns[j][3] = 0; } // Loads matrix in registers
+    v4sf columns[4];
+    for(size_t j: range(4)) for(size_t i: range(3)) { columns[j][i] = matrix(i, j); columns[j][3] = 0; } // Loads matrix in registers
     for(uint y: range(target.height)) for(uint x: range(target.width)) {
         v4sf v = source(x, y);
-        target(x, y) = columns[0] * float4(v[0]) + columns[1] * float4(v[1]) + columns[2] * float4(v[2]);
+        target(x, y) = columns[0] * float4(v[0]) + columns[1] * float4(v[1]) + columns[2] * float4(v[2]) + columns[3] /* *1 */;
     }
     return move(target);
 }
-Image4f convert(const Image4f& source, mat3 matrix) { return convert(source.size, source, matrix); }
+Image4f convert(const Image4f& source, mat4 matrix) { return convert(source.size, source, matrix); }
 
 static mat3 sRGB {vec3(0.0557, -0.9689, 3.2406), vec3(-0.2040, 1.8758, -1.5372), vec3(1.0570, 0.0415, -0.4986) }; // BGR
 
@@ -124,9 +123,30 @@ Image4f mix(const Image4f& a, const Image4f& b) {
     return target;
 }
 
+Image4f convert(Image4f&& target, const Image4f& source, ref<v4sf> sourceSpots, ref<v4sf> targetSpots) {
+    assert_(target.size == source.size && sourceSpots.size == targetSpots.size);
+    for(uint y: range(target.height)) for(uint x: range(target.width)) {
+        v4sf v = source(x, y);
+        // Searches nearest spot
+        float bestDistance = inf; size_t bestIndex;
+        for(size_t spotIndex: range(sourceSpots.size)) {
+            v4sf spot = sourceSpots[spotIndex];
+            float distance = sq3(v-spot)[0];
+            if(distance < bestDistance) {
+                bestDistance = distance;
+                bestIndex = spotIndex;
+            }
+        }
+        target(x, y) = targetSpots[bestIndex];
+    }
+    return move(target);
+}
+Image4f convert(const Image4f& source, ref<v4sf> sourceSpots, ref<v4sf> targetSpots) { return convert(source.size, source, sourceSpots, targetSpots); }
+
 struct IT8 {
     string fileName = arguments()[1];
     string name = section(fileName,'.');
+    mat4 rawRGBtoXYZ;
     Image preview;
     Image target;
     IT8() {
@@ -149,44 +169,56 @@ struct IT8 {
             int x1 = x0+(x3-x0)/4, x2 = x3-(x3-x0)/4;
             int y0 = Y*chart.size.y/it8.size.y, y3 = (Y+1)*chart.size.y/it8.size.y;
             int y1 = y0+(y3-y0)/4, y2 = y3-(y3-y0)/4;
-            for(int y: range(y1, y2))for(int x: range(x1, x2)) spotsView(x, y)[3] = 1./2; // For spots visualization (alpha=0 elsewhere)
+            for(int y: range(y1, y2))for(int x: range(x1, x2)) spotsView(x, y)[3] = 1; // For spots visualization (alpha=0 elsewhere)
             v4sf sum = float4(0);
             for(int y: range(y1, y2))for(int x: range(x1, x2)) sum += chart(x, y);
             v4sf mean = sum / float4((y2-y1)*(x2-x1));
             spots(X, Y) = mean;
         }
 
-        // -- Linear least square determination of coefficients for linear conversion of raw RGB to XYZ
-        mat3 rawRGBtoXYZ;
-        for(size_t outputIndex: range(3)) { // XYZ
-            const size_t unknownCount = 3, constraintCount = spots.Ref::size;
-            Matrix A (constraintCount, unknownCount); Vector b (constraintCount);
+        if(1) {
+            // -- Linear least square determination of coefficients for affine conversion of raw RGB to XYZ
+            for(size_t outputIndex: range(3)) { // XYZ
+                const size_t unknownCount = 4, constraintCount = spots.Ref::size;
+                Matrix A (constraintCount, unknownCount); Vector b (constraintCount);
 
-            for(const size_t constraintIndex: range(constraintCount)) { // Each IT8 spot defines a constraint for linear least square regression
-                for(size_t inputIndex: range(3)) // RGB
-                    A(constraintIndex, inputIndex) = spots[constraintIndex][inputIndex];
-                b[constraintIndex] = it8[constraintIndex][outputIndex]; // XYZ
+                for(const size_t constraintIndex: range(constraintCount)) { // Each IT8 spot defines a constraint for linear least square regression
+                    for(size_t inputIndex: range(3)) // RGB
+                        A(constraintIndex, inputIndex) = spots[constraintIndex][inputIndex];
+                    A(constraintIndex, 3) = 1; // Constant
+                    b[constraintIndex] = it8[constraintIndex][outputIndex]; // XYZ
+                }
+
+                // -- Solves linear least square system
+                Matrix At = transpose(A);
+                Matrix AtA = At * A;
+                Vector Atb = At * b;
+                Vector x = solve(move(AtA),  Atb); // Solves AtA = Atb
+                Vector r = A*x - b; // Residual
+                //log(r);
+                for(float v: r) if(isNaN(v)) error("No solution found");
+                for(size_t inputIndex: range(4)) // RGB + constant
+                    rawRGBtoXYZ(outputIndex, inputIndex) = x[inputIndex]; // Inserts solution in conversion matrix
             }
-
-            // -- Solves linear least square system
-            Matrix At = transpose(A);
-            Matrix AtA = At * A;
-            Vector Atb = At * b;
-            Vector x = solve(move(AtA),  Atb); // Solves AtA = Atb
-            Vector r = A*x - b; // Residual
-            //log(r);
-            for(float v: r) if(isNaN(v)) error("No solution found");
-            for(size_t inputIndex: range(3)) // RGB
-                rawRGBtoXYZ(outputIndex, inputIndex) = x[inputIndex]; // Inserts solution in conversion matrix
+            mat4 rawRGBtosRGB = mat4(sRGB) * rawRGBtoXYZ;
+            log(rawRGBtosRGB);
+            preview = convert(mix(convert(chart, rawRGBtosRGB), spotsView));
+            target = convert(convert(rawRGB, rawRGBtosRGB));
+        } else {
+            preview = convert(mix(convert(chart, spots, it8sRGB), spotsView));
+            target = convert(convert(rawRGB, spots, it8sRGB));
         }
-        mat3 rawRGBtosRGB = sRGB * rawRGBtoXYZ;
-        preview = convert(mix(convert(chart, rawRGBtosRGB), spotsView));
-        target = convert(convert(rawRGB, rawRGBtosRGB));
     }
 };
 
 struct Preview : IT8, WindowCycleView, Application { Preview() : WindowCycleView(share(preview), share(target)) {} };
 registerApplication(Preview);
-struct Export : IT8, Application { Export() { writeFile(name+".png", encodePNG(target)); } };
+struct Export : IT8, Application {
+    Export() {
+        writeFile(name+".xyz", str(rawRGBtoXYZ), currentWorkingDirectory(), true);
+        writeFile(name+".chart.png", encodePNG(preview), currentWorkingDirectory(), true);
+        writeFile(name+".sRGB.png", encodePNG(target), currentWorkingDirectory(), true);
+    }
+};
 registerApplication(Export, export);
 
