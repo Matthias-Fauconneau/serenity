@@ -4,14 +4,14 @@
 #define inline inline notrace
 
 // v4si
-typedef int v4si __attribute((__vector_size__ (16)));
+typedef int v4si __attribute((__vector_size__(16)));
 inline v4si set1(int i) { return (v4si){i,i,i,i}; }
 inline v4si loada(const uint32* const ptr) { return *(v4si*)ptr; }
 inline v4si loadu(const uint32* const ptr) { return (v4si)__builtin_ia32_lddqu((byte*)ptr); }
 inline void storea(uint32* const ptr, v4si a) { *(v4si*)ptr = a; }
 
 // v4sf
-typedef float v4sf __attribute((__vector_size__ (16)));
+typedef float v4sf __attribute((__vector_size__(16)));
 inline v4sf constexpr float4(float f) { return (v4sf){f,f,f,f}; }
 
 inline v4sf loada(const float* const ptr) { return *(v4sf*)ptr; }

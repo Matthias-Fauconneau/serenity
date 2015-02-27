@@ -15,7 +15,9 @@ struct mat3x2 {
     float operator()(int i, int j) const { return M(i,j); }
     float& operator()(int i, int j) { return M(i,j); }
 
-    mat3x2 operator*(mat3x2 b) const {mat3x2 r(0); for(int i=0;i<2;i++) { for(int j=0;j<3;j++) for(int k=0;k<2;k++) r.M(i,j)+=M(i,k)*b.M(k,j); r.M(i,2)+=M(i,2); } return r; }
+    mat3x2 operator*(mat3x2 b) const {
+        mat3x2 r(0); for(int i=0;i<2;i++) { for(int j=0;j<3;j++) for(int k=0;k<2;k++) r.M(i,j)+=M(i,k)*b.M(k,j); r.M(i,2)+=M(i,2); } return r;
+    }
     vec2 operator*(vec2 v) const {vec2 r; for(int i=0;i<2;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+1*M(i,2); return r; }
 };
 
