@@ -12,17 +12,18 @@ struct WindowCycleView {
     buffer<ImageView> views;
     WidgetCycle layout;
     Window window {&layout, int2(1024, 768)};
-    WindowCycleView(ref<Image> images, ref<String> captions={})
-        : views(apply(images.size, [=](size_t i) { return ImageView(share(images[i]), captions[i]); })), layout(toWidgets<ImageView>(views)) {}
+    WindowCycleView(const map<String, Image>& images)
+        : views(apply(images.size(), [&](size_t i) { return ImageView(share(images.values[i]), images.keys[i]); })),
+          layout(toWidgets<ImageView>(views)) {}
 };
 
 v4sf max(ref<v4sf> X) { v4sf y = float4(0); for(v4sf x: X) y = max(y, x); return y; }
 void multiply(mref<v4sf> X, v4sf c) { for(v4sf& x: X) x *= c; }
+Image4f normalize(Image4f&& image) { multiply(image, float4(1)/max(image)); return move(image); }
 
 struct FlatFieldCorrection {
     Folder folder {"darkframes"};
-    //array<Image> images;
-    //array<String> captions;
+    map<String, Image> images;
     FlatFieldCorrection() {
         auto maps = apply(folder.list(Files), [this](string fileName) { return Map(fileName, folder); });
         int2 size (4096, 3072);
@@ -42,27 +43,27 @@ struct FlatFieldCorrection {
         }
         ImageF c0 (size), c1 (size); // Affine fit dark energy = c0 + c1·exposureTime
         for(size_t pixelIndex: range(c0.Ref::size)) {
-            const size_t unknownCount = 2, constraintCount = images.size();
-            Matrix A (constraintCount, unknownCount); Vector b (constraintCount);
-
-            for(const size_t constraintIndex: range(constraintCount)) { // Each image defines a constraint for linear least square regression
-                A(constraintIndex, 0) = 1; // c0 (·1 constant)
-                A(constraintIndex, 1) = images.keys[constraintIndex]; // c1 (·exposureTime)
-                b[constraintIndex] = images.values[constraintIndex][pixelIndex]; // XYZ
+            // Direct evaluation of AtA and Atb
+            real a00 = 0, a01 = 0, a11 = 0, b0 = 0, b1 = 0;
+            for(const size_t constraintIndex: range(images.size())) {
+                real x = images.keys[constraintIndex]; // c1 (·exposureTime)
+                a00 += 1 * 1; // c0 (·1 constant)
+                a01 += 1 * x;
+                a11 += x * x;
+                real b = images.values[constraintIndex][pixelIndex];
+                b0 += 1 * b;
+                b1 += x * b;
             }
-
-            // -- Solves linear least square system
-            Matrix At = transpose(A);
-            Matrix AtA = At * A;
-            Vector Atb = At * b;
-            Vector x = solve(move(AtA),  Atb); // Solves AtA = Atb
-            //Vector r = A*x - b; log(r); for(float v: r) if(isNaN(v)) error("No solution found");
-            // Inserts solution
-            c0[pixelIndex] = x[0];
-            c1[pixelIndex] = x[1];
+            // Solves AtA x = Atb
+            float det = a00*a11-a01*a01; // |AtA| (a10=a01)
+            assert_(det);
+            c0[pixelIndex] = (b0*a11 - a01*b1) / det;
+            c1[pixelIndex] = (a00*b1 - b0*a01) / det;
         }
+        this->images.insert("c0"__, move(convert(normalize(demosaic(c0)))));
+        this->images.insert("c1"__, move(convert(normalize(demosaic(c1)))));
     }
 } app;
 
-//struct Preview : FlatFieldCorrection, WindowCycleView, Application { Preview() : WindowCycleView(images, captions) {} };
-//registerApplication(Preview);
+struct Preview : FlatFieldCorrection, WindowCycleView, Application { Preview() : WindowCycleView(images) {} };
+registerApplication(Preview);
