@@ -54,15 +54,17 @@ struct Progress : Widget {
 
 /// Displays an image
 struct ImageView : Widget {
-    /// Displayed image
     Image image;
+    String caption;
 
     ImageView() {}
     /// Creates a widget displaying \a image
-    ImageView(Image&& image) : image(move(image)) {}
+    ImageView(Image&& image, string caption={}) : image(move(image)), caption(copyRef(caption)) {}
 
+    String title() override { return copyRef(caption); }
     vec2 sizeHint(vec2) override;
     shared<Graphics> graphics(vec2 size) override;
+
 };
 
 // Control

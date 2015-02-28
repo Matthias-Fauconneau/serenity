@@ -214,7 +214,7 @@ static void destroy_user_data(gbm_bo*, void* dmabuf) { delete (DMABuf*)dmabuf; }
 void Window::event() {
 	Display::event();
 	//if(heldEvent) { processEvent(heldEvent); heldEvent = nullptr; }
-	//setTitle(getTitle ? getTitle() : widget->title());
+    setTitle(getTitle ? getTitle() : widget->title());
 	if(!updates) return;
 	assert_(size);
 #if DRI3

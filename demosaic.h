@@ -1,11 +1,10 @@
+#pragma once
 #include "image.h"
 
 ImageF fromRaw16(ref<uint16> source, uint width, uint height) {
     ImageF target (width, height);
-    assert_(target.Ref::size <= source.size, target.Ref::size, source.size, width, height);
-    source = source.slice(0, width*height);
-    uint16 max = ::max(source);
-    for(size_t i: range(source.Ref::size)) target[i] = (float) source[i] / max;
+    assert_(target.Ref::size == source.size);
+    for(size_t i: range(source.Ref::size)) target[i] = (float) source[i] / ((1<<16)-1);
     return target;
 }
 
