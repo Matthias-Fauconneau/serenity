@@ -146,7 +146,7 @@ Image4f convert(Image4f&& target, const Image4f& source, ref<v4sf> sourceSpots, 
 Image4f convert(const Image4f& source, ref<v4sf> sourceSpots, ref<v4sf> targetSpots) { return convert(source.size, source, sourceSpots, targetSpots); }
 
 mat4 fromIT8(ref<uint16> raw16ImageFile, ref<byte> it8Charge) {
-    ImageF bayerCFA = fromRaw16(raw16ImageFile.slice(0, raw16ImageFile.size-128), 4096, 3072); // Converts 16bit integer to 32bit floating point (normalized by maximum value)
+    ImageF bayerCFA = fromRaw16(raw16ImageFile.slice(0, raw16ImageFile.size-128), int2(4096, 3072)); // Converts 16bit integer to 32bit floating point (normalized by maximum value)
     //ImageF darkFrame = fromRaw16(cast<uint16>(Map(darkFrameFileName)), 4096, 3072);
     //substract(bayerCFA, darkFrame);
     Image4f rawRGB = demosaic(bayerCFA); // raw RGB

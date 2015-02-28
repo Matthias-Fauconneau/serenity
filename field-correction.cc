@@ -21,22 +21,11 @@ void multiply(mref<v4sf> X, v4sf c) { for(v4sf& x: X) x *= c; }
 
 struct FlatFieldCorrection {
     Folder folder {"darkframes"};
-    array<Image> images;
-    array<String> captions;
+    //array<Image> images;
+    //array<String> captions;
     FlatFieldCorrection() {
-        mat4 rawRGBtosRGB = mat4(sRGB);
-        if(0) {
-            string it8ChargeFileName = arguments()[0];
-            string it8ImageFileName = arguments()[1];
-            Map map(it8ImageFileName);
-            ref<uint16> it8Image = cast<uint16>(map);
-            mat4 rawRGBtoXYZ = fromIT8(it8Image, readFile(it8ChargeFileName));
-            rawRGBtosRGB = mat4(sRGB) * rawRGBtoXYZ;
-            images.append(convert(convert(demosaic(fromRaw16(it8Image.slice(0, it8Image.size-128), 4096, 3072)), rawRGBtosRGB)));
-            captions.append(copyRef(it8ImageFileName));
-        }
-
         auto maps = apply(folder.list(Files), [this](string fileName) { return Map(fileName, folder); });
+        int2 size (4096, 3072);
         map<real, ImageF> images;
         for(const Map& map: maps) {
             ref<uint16> file = cast<uint16>(map);
@@ -47,16 +36,33 @@ struct FlatFieldCorrection {
             int fot_overlap = (34 * (registers[82] & 0xFF)) + 1;
             real exposure = (((registers[ExposureTime+1] << 16) + registers[ExposureTime] - 1)*(registers[85] + 1) + fot_overlap) * bits / 300e6;
 
-            ImageF image = fromRaw16(file.slice(0, file.size-128), 4096, 3072);
+            ImageF image = fromRaw16(file.slice(0, file.size-128), size);
 
             images.insert(exposure, move(image));
         }
+        ImageF c0 (size), c1 (size); // Affine fit dark energy = c0 + c1·exposureTime
+        for(size_t pixelIndex: range(c0.Ref::size)) {
+            const size_t unknownCount = 2, constraintCount = images.size();
+            Matrix A (constraintCount, unknownCount); Vector b (constraintCount);
 
-        /*Image4f image_sRGB = convert(demosaic(image), rawRGBtosRGB);
-        images.append(convert(image_sRGB));
-        captions.append(copyRef(fileName));*/
+            for(const size_t constraintIndex: range(constraintCount)) { // Each image defines a constraint for linear least square regression
+                A(constraintIndex, 0) = 1; // c0 (·1 constant)
+                A(constraintIndex, 1) = images.keys[constraintIndex]; // c1 (·exposureTime)
+                b[constraintIndex] = images.values[constraintIndex][pixelIndex]; // XYZ
+            }
+
+            // -- Solves linear least square system
+            Matrix At = transpose(A);
+            Matrix AtA = At * A;
+            Vector Atb = At * b;
+            Vector x = solve(move(AtA),  Atb); // Solves AtA = Atb
+            //Vector r = A*x - b; log(r); for(float v: r) if(isNaN(v)) error("No solution found");
+            // Inserts solution
+            c0[pixelIndex] = x[0];
+            c1[pixelIndex] = x[1];
+        }
     }
-};
+} app;
 
-struct Preview : FlatFieldCorrection, WindowCycleView, Application { Preview() : WindowCycleView(images, captions) {} };
-registerApplication(Preview);
+//struct Preview : FlatFieldCorrection, WindowCycleView, Application { Preview() : WindowCycleView(images, captions) {} };
+//registerApplication(Preview);
