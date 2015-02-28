@@ -32,3 +32,5 @@ document.cc
 demosaic.h
 IT8.h
 field-correction.cc
+demosaic.cc
+raw.h

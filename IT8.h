@@ -1,7 +1,5 @@
 #include "data.h"
-#include "interface.h"
-#include "window.h"
-#include "png.h"
+#include "raw.h"
 #include "demosaic.h"
 #include "algebra.h"
 #include "matrix.h"
@@ -33,13 +31,6 @@ Image4f parseIT8(ref<byte> it8) {
     s.skip("END_DATA\r\n");
     assert_(!s);
     return target;
-}
-
-void substract(ImageF& target, const ImageF& source) {
-    assert_(target.Ref::size == source.Ref::size);
-    for(size_t i: range(target.Ref::size)) {
-        target[i] -= source[i];
-    }
 }
 
 Image4f convert(Image4f&& target, const Image4f& source, mat4 matrix) {
@@ -145,78 +136,55 @@ Image4f convert(Image4f&& target, const Image4f& source, ref<v4sf> sourceSpots, 
 }
 Image4f convert(const Image4f& source, ref<v4sf> sourceSpots, ref<v4sf> targetSpots) { return convert(source.size, source, sourceSpots, targetSpots); }
 
-mat4 fromIT8(ref<uint16> raw16ImageFile, ref<byte> it8Charge) {
-    ImageF bayerCFA = fromRaw16(raw16ImageFile.slice(0, raw16ImageFile.size-128), int2(4096, 3072)); // Converts 16bit integer to 32bit floating point (normalized by maximum value)
-    //ImageF darkFrame = fromRaw16(cast<uint16>(Map(darkFrameFileName)), 4096, 3072);
-    //substract(bayerCFA, darkFrame);
-    Image4f rawRGB = demosaic(bayerCFA); // raw RGB
-
-    Image4f it8 = parseIT8(it8Charge); // Parses IT8 spot colors (XYZ)
-    Image4f it8sRGB = convert(it8, sRGB); // Converts IT8 to an RGB colorspace (sRGB) close to raw RGB for template match
-    int2 size; int2 offset = templateMatch(rawRGB, it8sRGB, size); // Locates IT8 chart within image
-    Image4f chart = cropShare(rawRGB, offset, size); // Extracts IT8 chart
-
-    Image4f spots (it8.size); // Acquired raw RGB for each IT8 spot
-    Image4f spotsView = upsample(size, it8sRGB);
-    spotsView.alpha = true;
-    // Extracts mean raw RGB for each IT8 spot
-    for(int Y: range(it8.size.y))for(int X: range(it8.size.x)) {
-        int x0 = X*chart.size.x/it8.size.x, x3 = (X+1)*chart.size.x/it8.size.x;
-        // Reduces spot size to calibrate under slight misalignment
-        int x1 = x0+(x3-x0)/4, x2 = x3-(x3-x0)/4;
-        int y0 = Y*chart.size.y/it8.size.y, y3 = (Y+1)*chart.size.y/it8.size.y;
-        int y1 = y0+(y3-y0)/4, y2 = y3-(y3-y0)/4;
-        for(int y: range(y1, y2))for(int x: range(x1, x2)) spotsView(x, y)[3] = 1; // For spots visualization (alpha=0 elsewhere)
-        v4sf sum = float4(0);
-        for(int y: range(y1, y2))for(int x: range(x1, x2)) sum += chart(x, y);
-        v4sf mean = sum / float4((y2-y1)*(x2-x1));
-        spots(X, Y) = mean;
-    }
-
-    // -- Linear least square determination of coefficients for affine conversion of raw RGB to XYZ
+struct IT8 {
     mat4 rawRGBtoXYZ;
-    for(size_t outputIndex: range(3)) { // XYZ
-        const size_t unknownCount = 4, constraintCount = spots.Ref::size;
-        Matrix A (constraintCount, unknownCount); Vector b (constraintCount);
+    Image4f chart, spotsView;
+    IT8(const Image4f& rawRGB, ref<byte> it8Charge) {
+        Image4f it8 = parseIT8(it8Charge); // Parses IT8 spot colors (XYZ)
+        Image4f it8sRGB = convert(it8, sRGB); // Converts IT8 to an RGB colorspace (sRGB) close to raw RGB for template match
+        int2 size; int2 offset = templateMatch(rawRGB, it8sRGB, size); // Locates IT8 chart within image
+        chart = cropShare(rawRGB, offset, size); // Extracts IT8 chart
 
-        for(const size_t constraintIndex: range(constraintCount)) { // Each IT8 spot defines a constraint for linear least square regression
-            for(size_t inputIndex: range(3)) // RGB
-                A(constraintIndex, inputIndex) = spots[constraintIndex][inputIndex];
-            A(constraintIndex, 3) = 1; // Constant
-            b[constraintIndex] = it8[constraintIndex][outputIndex]; // XYZ
+        Image4f spots (it8.size); // Acquired raw RGB for each IT8 spot
+        spotsView = upsample(size, it8sRGB);
+        spotsView.alpha = true;
+        // Extracts mean raw RGB for each IT8 spot
+        for(int Y: range(it8.size.y))for(int X: range(it8.size.x)) {
+            int x0 = X*chart.size.x/it8.size.x, x3 = (X+1)*chart.size.x/it8.size.x;
+            // Reduces spot size to calibrate under slight misalignment
+            int x1 = x0+(x3-x0)/4, x2 = x3-(x3-x0)/4;
+            int y0 = Y*chart.size.y/it8.size.y, y3 = (Y+1)*chart.size.y/it8.size.y;
+            int y1 = y0+(y3-y0)/4, y2 = y3-(y3-y0)/4;
+            for(int y: range(y1, y2))for(int x: range(x1, x2)) spotsView(x, y)[3] = 1; // For spots visualization (alpha=0 elsewhere)
+            v4sf sum = float4(0);
+            for(int y: range(y1, y2))for(int x: range(x1, x2)) sum += chart(x, y);
+            v4sf mean = sum / float4((y2-y1)*(x2-x1));
+            spots(X, Y) = mean;
         }
 
-        // -- Solves linear least square system
-        Matrix At = transpose(A);
-        Matrix AtA = At * A;
-        Vector Atb = At * b;
-        Vector x = solve(move(AtA),  Atb); // Solves AtA = Atb
-        Vector r = A*x - b; // Residual
-        //log(r);
-        for(float v: r) if(isNaN(v)) error("No solution found");
-        for(size_t inputIndex: range(4)) // RGB + constant
-            rawRGBtoXYZ(outputIndex, inputIndex) = x[inputIndex]; // Inserts solution in conversion matrix
-    }
-    return rawRGBtoXYZ;
-}
+        // -- Linear least square determination of coefficients for affine conversion of raw RGB to XYZ
+        for(size_t outputIndex: range(3)) { // XYZ
+            const size_t unknownCount = 4, constraintCount = spots.Ref::size;
+            Matrix A (constraintCount, unknownCount); Vector b (constraintCount);
 
-#if 0
-struct IT8Export : Application {
-    IT8Export() {
-        string fileName = arguments()[1];
-        string name = section(fileName,'.');
-        //string darkFrameFileName = arguments()[2];
-        string it8ChargeFileName = arguments()[0];
-        cast<uint16>(Map(fileName));
-        mat4 rawRGBtosRGB = mat4(sRGB) * rawRGBtoXYZ;
-        log(rawRGBtosRGB);
-        preview = convert(mix(convert(chart, rawRGBtosRGB), spotsView));
-        target = convert(convert(rawRGB, rawRGBtosRGB));
-        writeFile(name+".xyz", str(rawRGBtoXYZ), currentWorkingDirectory(), true);
-        writeFile(name+".chart.png", encodePNG(preview), currentWorkingDirectory(), true);
-        writeFile(name+".sRGB.png", encodePNG(target), currentWorkingDirectory(), true);
+            for(const size_t constraintIndex: range(constraintCount)) { // Each IT8 spot defines a constraint for linear least square regression
+                for(size_t inputIndex: range(3)) // RGB
+                    A(constraintIndex, inputIndex) = spots[constraintIndex][inputIndex];
+                A(constraintIndex, 3) = 1; // Constant
+                b[constraintIndex] = it8[constraintIndex][outputIndex]; // XYZ
+            }
+
+            // -- Solves linear least square system
+            Matrix At = transpose(A);
+            Matrix AtA = At * A;
+            Vector Atb = At * b;
+            Vector x = solve(move(AtA),  Atb); // Solves AtA = Atb
+            Vector r = A*x - b; // Residual
+            //log(r);
+            for(float v: r) if(isNaN(v)) error("No solution found");
+            for(size_t inputIndex: range(4)) // RGB + constant
+                rawRGBtoXYZ(outputIndex, inputIndex) = x[inputIndex]; // Inserts solution in conversion matrix
+        }
     }
+    operator mat4() { return rawRGBtoXYZ; }
 };
-registerApplication(IT8Export, IT8Export);
-#endif
-

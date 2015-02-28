@@ -98,7 +98,15 @@ vec2 ImageView::sizeHint(vec2 size) {
 
 shared<Graphics> ImageView::graphics(vec2 size) {
 	shared<Graphics> graphics;
-    if(image) graphics->blits.append((size-sizeHint(size))/2.f, sizeHint(size), share(image) );
+    if(image) {
+        // Crop
+        int2 offset = max(int2(0),image.size-int2(size))/2;
+        graphics->blits.append(
+                    max(vec2(0),vec2((int2(size)-image.size)/2)), // Centers
+                    vec2(min(int2(size), image.size)), // or fits
+                    cropShare(image, offset, min(int2(size), image.size-offset)) ); // by cropping center
+        // graphics->blits.append((size-sizeHint(size))/2.f, sizeHint(size), share(image) ); // Resizes
+    }
     return graphics;
 }
 
