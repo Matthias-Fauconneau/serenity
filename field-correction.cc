@@ -1,46 +1,19 @@
 /// \file field-correction.cc Flat Field Correction
-#include "data.h"
-#include "interface.h"
-#include "window.h"
-#include "png.h"
-#include "demosaic.h"
-#include "algebra.h"
-#include "matrix.h"
-#include "IT8.h"
-
-struct WindowCycleView {
-    buffer<ImageView> views;
-    WidgetCycle layout;
-    Window window {&layout, int2(1024, 768)};
-    WindowCycleView(const map<String, Image>& images)
-        : views(apply(images.size(), [&](size_t i) { return ImageView(share(images.values[i]), images.keys[i]); })),
-          layout(toWidgets<ImageView>(views)) {}
-};
-
-v4sf max(ref<v4sf> X) { v4sf y = float4(0); for(v4sf x: X) y = max(y, x); return y; }
-void multiply(mref<v4sf> X, v4sf c) { for(v4sf& x: X) x *= c; }
-Image4f normalize(Image4f&& image) { multiply(image, float4(1)/max(image)); return move(image); }
+#include "raw.h"
+#include "thread.h"
+#include "map.h"
 
 struct FlatFieldCorrection {
-    Folder folder {"darkframes"};
-    map<String, Image> images;
     FlatFieldCorrection() {
-        auto maps = apply(folder.list(Files), [this](string fileName) { return Map(fileName, folder); });
-        int2 size (4096, 3072);
+        Folder folder {"darkframes"};
+        auto maps = apply(folder.list(Files), [&](string fileName) { return Map(fileName, folder); });
         map<real, ImageF> images;
         for(const Map& map: maps) {
             ref<uint16> file = cast<uint16>(map);
-
-            ref<uint16> registers = file.slice(file.size-128);
-            enum { ExposureTime=71 /*71-72*/, BitMode = 118 };
-            int bits = ((int[]){12, 10, 8, 0})[registers[BitMode]&0b11];
-            int fot_overlap = (34 * (registers[82] & 0xFF)) + 1;
-            real exposure = (((registers[ExposureTime+1] << 16) + registers[ExposureTime] - 1)*(registers[85] + 1) + fot_overlap) * bits / 300e6;
-
-            ImageF image = fromRaw16(file.slice(0, file.size-128), size);
-
-            images.insert(exposure, move(image));
+            ImageF image = fromRaw16(file);
+            images.insert(exposure(file), move(image));
         }
+        int2 size = images.values[0].size;
         ImageF c0 (size), c1 (size); // Affine fit dark energy = c0 + c1·exposureTime
         for(size_t pixelIndex: range(c0.Ref::size)) {
             // Direct evaluation of AtA and Atb
@@ -60,10 +33,7 @@ struct FlatFieldCorrection {
             c0[pixelIndex] = (b0*a11 - a01*b1) / det;
             c1[pixelIndex] = (a00*b1 - b0*a01) / det;
         }
-        this->images.insert("c0"__, move(convert(normalize(demosaic(c0)))));
-        this->images.insert("c1"__, move(convert(normalize(demosaic(c1)))));
+        writeFile("c0", cast<byte>(c0), currentWorkingDirectory(), true);
+        writeFile("c1", cast<byte>(c1), currentWorkingDirectory(), true);
     }
 } app;
-
-struct Preview : FlatFieldCorrection, WindowCycleView, Application { Preview() : WindowCycleView(images) {} };
-registerApplication(Preview);
