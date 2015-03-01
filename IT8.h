@@ -100,7 +100,7 @@ int2 templateMatch(const Image4f& A, const Image4f& b, int2& size) {
         }
         offset = levelBestOffset;
         size = levelBestSize;
-        log(offset, size, a.size);
+        //log(offset, size, a.size);
         if(a.size == A.size) return offset;
         size *= 2;
         offset *= 2;

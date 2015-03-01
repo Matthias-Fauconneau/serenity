@@ -147,7 +147,7 @@ void FLAC::decodeFrame() {
     float block[2][allocSize];
     setRoundMode(Down);
 	for(int channel=0;channel<2;channel++) {
-		int rawSampleSize = sampleSize; // One bit more to be able to substract full range from other channel (1 sign bit + bits per sample)
+        int rawSampleSize = sampleSize; // One bit more to be able to subtract full range from other channel (1 sign bit + bits per sample)
         if(channel == 0) { if(channelMode==RightSide) rawSampleSize++; }
         if(channel == 1) { if(channelMode==LeftSide || channelMode == MidSide) rawSampleSize++; }
 
