@@ -43,13 +43,28 @@ struct IT8Application : Application {
     IT8Application() {
         Raw raw (it8Image);
 
-        Map c0Map("c0"); ImageF c0 = ImageF(unsafeRef(cast<float>(c0Map)), Raw::size);
-        Map c1Map("c1"); ImageF c1 = ImageF(unsafeRef(cast<float>(c0Map)), Raw::size);
         ImageF FPN (raw.size); // Corrected for fixed pattern noise
-        real exposure = raw.exposure;
-        real gain = (real) raw.gain / raw.gainDiv;
-        log(it8Image,"\t",int(round(exposure*1e3)),"\t",raw.gain, raw.gainDiv);
-        for(size_t i: range(FPN.Ref::size)) FPN[i] = raw[i] - gain * (c0[i] /*+ exposure * c1[i]*/);
+        if(0) { // Statically calibrated DSNU correction (fails)
+            Map c0Map("c0"); ImageF c0 = ImageF(unsafeRef(cast<float>(c0Map)), Raw::size);
+            Map c1Map("c1"); ImageF c1 = ImageF(unsafeRef(cast<float>(c0Map)), Raw::size);
+            real exposure = raw.exposure;
+            real gain = (real) raw.gain * 3/*darkframe gainDiv*/ / raw.gainDiv;
+            for(size_t i: range(FPN.Ref::size)) FPN[i] = raw[i] - gain * (c0[i] + exposure * c1[i]);
+        } else { // Dynamic column wise DSNU correction
+            float profile[raw.size.x];
+            real sum = 0;
+            for(size_t x: range(raw.size.x)) {
+                {   real sum = 0;
+                    for(size_t y: range(raw.size.y)) sum += raw(x, y);
+                    profile[x] = sum / raw.size.y; }
+                sum += profile[x];
+            }
+            float DC = sum / raw.size.x;
+            for(size_t x: range(raw.size.x)) {
+                for(size_t y: range(raw.size.y)) FPN(x, y) = raw(x,y) - (profile[x]-DC);
+            }
+        }
+
         mat4 rawRGBtosRGB = mat4(sRGB);
         Image4f FPNRGB = demosaic(FPN);
         if(0) {
