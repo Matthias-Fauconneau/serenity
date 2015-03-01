@@ -72,7 +72,7 @@ struct IT8Application : Application {
                     float columnDSNU = window[2] - (window[0]+window[4])/2; // Consider only similar Bayer rows (red/blue)
                     for(size_t y: range(raw.size.y)) FPN(x, y) = raw(x,y) - columnDSNU;
                 }
-            } else { // Cut DC
+            } else if(0) { // Cut DC
                 float profile[raw.size.x];
                 for(size_t x: range(raw.size.x)) {
                     real sum = 0;
@@ -88,6 +88,34 @@ struct IT8Application : Application {
                 for(size_t x: range(raw.size.x/2)) {
                     for(size_t dx: range(2)) for(size_t y: range(raw.size.y)) FPN(x*2+dx, y) = raw(x*2+dx,y) - (profile[x*2+dx]-DC[dx]);
                 }
+            } else { // Gaussian high pass
+                // Sums along columns
+                real sum[raw.size.x]; mref<real>(sum,raw.size.x).clear();
+                for(size_t y: range(raw.size.y)) for(size_t x: range(raw.size.x)) sum[x] += raw(x, y);
+                int width = raw.size.x/2;
+                float profile[2][width];
+                for(size_t x: range(width)) for(size_t dx: range(2)) profile[dx][x] = sum[x*2+dx] / raw.size.y;
+
+                // Dirac-Gaussian high pass kernel (unsharp mask)
+                float sigma = 2;
+                int radius = ceil(3*sigma);
+                size_t N = radius+1+radius;
+                float kernel[N];
+                for(int dx: range(N)) kernel[dx] = -gaussian(sigma, dx-radius); // Sampled gaussian kernel (FIXME)
+                float scale = -1/::sum(ref<float>(kernel,N), 0.);
+                for(float& w: kernel) w *= scale; // Normalizes
+                kernel[radius] += 1; // Dirac
+
+                // Convolves profile with high pass kernel (mirror boundary conditions)
+                float correction[width*2];
+                for(size_t i: range(2)) for(int x: range(width)) {
+                    float sum = 0;
+                    for(int dx: range(N)) sum += kernel[dx] * profile[i][width-1-abs(abs(x-radius+dx)-(width-1))];
+                    correction[x*2+i] = sum;
+                }
+
+                // Substracts DSNU profile from columns
+                for(size_t y: range(raw.size.y)) for(size_t x: range(raw.size.x)) FPN(x, y) = raw(x,y) - correction[x];
             }
         }
 
