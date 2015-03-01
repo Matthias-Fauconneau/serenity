@@ -51,17 +51,43 @@ struct IT8Application : Application {
             real gain = (real) raw.gain * 3/*darkframe gainDiv*/ / raw.gainDiv;
             for(size_t i: range(FPN.Ref::size)) FPN[i] = raw[i] - gain * (c0[i] + exposure * c1[i]);
         } else { // Dynamic column wise DSNU correction
-            float profile[raw.size.x];
-            real sum = 0;
-            for(size_t x: range(raw.size.x)) {
-                {   real sum = 0;
+            if(0) { // High pass
+                float window[5] = {0,0,0,0,0};
+                for(size_t x: range(2)) { // First estimations
+                    real sum = 0;
                     for(size_t y: range(raw.size.y)) sum += raw(x, y);
-                    profile[x] = sum / raw.size.y; }
-                sum += profile[x];
-            }
-            float DC = sum / raw.size.x;
-            for(size_t x: range(raw.size.x)) {
-                for(size_t y: range(raw.size.y)) FPN(x, y) = raw(x,y) - (profile[x]-DC);
+                    window[2+x] = sum / raw.size.y;
+                }
+                for(size_t x: range(raw.size.x-2)) {
+                    for(size_t x: range(5-1)) window[x] = window[x+1]; // Shifts window
+                    real sum = 0;
+                    for(size_t y: range(raw.size.y)) sum += raw(x+2, y); // Next value
+                    window[4] = sum / raw.size.y;
+                    float columnDSNU = window[2] - (window[0]+window[4])/2; // Consider only similar Bayer rows (red/blue)
+                    for(size_t y: range(raw.size.y)) FPN(x, y) = raw(x,y) - columnDSNU;
+                }
+                for(size_t x: range(raw.size.x-2, raw.size.x)) { // Last corrections
+                    for(size_t x: range(5-1)) window[x] = window[x+1]; // Shifts window
+                    window[4] = 0;
+                    float columnDSNU = window[2] - (window[0]+window[4])/2; // Consider only similar Bayer rows (red/blue)
+                    for(size_t y: range(raw.size.y)) FPN(x, y) = raw(x,y) - columnDSNU;
+                }
+            } else { // Cut DC
+                float profile[raw.size.x];
+                for(size_t x: range(raw.size.x)) {
+                    real sum = 0;
+                    for(size_t y: range(raw.size.y)) sum += raw(x, y);
+                    profile[x] = sum / raw.size.y;
+                }
+                real sum[2] = {0, 0};
+                for(size_t x: range(raw.size.x/2)) {
+                    sum[0] += profile[x*2+0];
+                    sum[1] += profile[x*2+1];
+                }
+                float DC[2] = {float(sum[0] / raw.size.x), float(sum[1] / raw.size.x)}; // Consider only similar Bayer rows (red/blue)
+                for(size_t x: range(raw.size.x/2)) {
+                    for(size_t dx: range(2)) for(size_t y: range(raw.size.y)) FPN(x*2+dx, y) = raw(x*2+dx,y) - (profile[x*2+dx]-DC[dx]);
+                }
             }
         }
 
