@@ -17,9 +17,9 @@ struct List {
 } app;
 #endif
 
-v4sf max(ref<v4sf> X) { v4sf y = float4(0); for(v4sf x: X) y = max(y, x); return y; }
-void multiply(mref<v4sf> X, v4sf c) { for(v4sf& x: X) x *= c; }
-Image4f normalize(Image4f&& image) { multiply(image, float4(1)/max(image)); return move(image); }
+generic void multiply(mref<T> Y, mref<T> X, T c) { for(size_t i: range(Y.size)) Y[i] = c * X[i]; }
+ImageF normalize(ImageF&& target, const ImageF& source) { multiply(target, source, source.Ref::size/sum(source)); return move(target); }
+ImageF normalize(const ImageF& source) { return normalize(source.size, source); }
 
 #if 0
 struct CalibrationVisualization {
@@ -32,8 +32,8 @@ struct CalibrationVisualization {
 } app;
 #endif
 
-Map c0Map("c0"); ImageF c0 = ImageF(unsafeRef(cast<float>(c0Map)), Raw::size);
-Map c1Map("c1"); ImageF c1 = ImageF(unsafeRef(cast<float>(c1Map)), Raw::size);
+Map c0Map("c0"); const ImageF c0 = ImageF(unsafeRef(cast<float>(c0Map)), Raw::size);
+Map c1Map("c1"); const ImageF c1 = ImageF(unsafeRef(cast<float>(c1Map)), Raw::size);
 
 /// Statically calibrated dark signal non uniformity correction
 ImageF staticDSNU(ImageF&& target, const Raw& raw, float* DC=0) {
@@ -46,43 +46,38 @@ ImageF staticDSNU(ImageF&& target, const Raw& raw, float* DC=0) {
 ImageF staticDSNU(const Raw& raw, float* DC=0) { return staticDSNU(raw.size, raw, DC); }
 
 /// Dynamic column wise dark signal non uniformity correction
-ImageF dynamicDSNU(ImageF&& target, const ImageF& raw, const float sigma = 0) {
+ImageF dynamicDSNU(ImageF&& target, const ImageF& raw) {
     // Sums along columns
-    real sum[2][raw.size.x]; for(size_t dy: range(2)) mref<real>(sum[dy], raw.size.x).clear();
+    real sum[2][raw.size.x];
+    for(size_t dy: range(2)) mref<real>(sum[dy], raw.size.x).clear();
     for(size_t y: range(raw.size.y/2)) for(size_t dy: range(2)) for(size_t x: range(raw.size.x)) sum[dy][x] += raw(x, y*2+dy);
+    int width = raw.size.x/2;
     float correction[2][raw.size.x];
     for(size_t dy: range(2)) { // Splits similar Bayer cells (FIXME: merge both greens)
-        int width = raw.size.x/2;
         float profile[2][width];
         for(size_t x: range(width)) for(size_t dx: range(2)) profile[dx][x] = sum[dy][x*2+dx] / raw.size.y;
-
-        if(sigma == 0) { // Laplacian high pass
-            for(size_t i: range(2)) for(int x: range(width))
-                correction[dy][x*2+i] = profile[i][x] - (profile[i][abs(x-1)]+profile[i][width-1-abs((width-1)-(x+1))])/2;
-        } else { // Dirac-Gaussian high pass
-            // Kernel (unsharp mask)
-            int radius = ceil(3*sigma);
-            size_t N = radius+1+radius;
-            float kernel[N];
-            for(int dx: range(N)) kernel[dx] = -gaussian(sigma, dx-radius); // Sampled gaussian kernel (FIXME)
-            float scale = -1/::sum(ref<float>(kernel,N), 0.);
-            for(float& w: kernel) w *= scale; // Normalizes
-            kernel[radius] += 1; // Dirac
-
-            // Convolves profile with kernel (mirror boundary conditions)
-            for(size_t i: range(2)) for(int x: range(width)) {
-                float sum = 0;
-                for(int dx: range(N)) sum += kernel[dx] * profile[i][width-1-abs(abs((width-1)-x-radius+dx))];
-                //assert_(correction[x*2+i]>0);
-                correction[dy][x*2+i] = sum;
-            }
+        for(size_t dx: range(2)) for(int x: range(width))
+            correction[dy][x*2+dx] = profile[dx][x] - (profile[dx][abs(x-1)]+profile[dx][width-1-abs((width-1)-(x+1))])/2;
+    }
+#if 1
+    // Substracts DSNU profile from all cells
+    for(size_t y: range(raw.size.y/2)) for(size_t dy: range(2)) for(size_t x: range(raw.size.x)) target(x, y*2+dy) = raw(x, y*2+dy) - correction[dy][x];
+#else
+    // Substracts DSNU profile from selected cells
+    for(size_t y: range(raw.size.y/2)) {
+        for(size_t x: range(raw.size.x/2)) {
+            target(x*2+0, y*2+0) = raw(x*2+0, y*2+0) - correction[0][x][0];
+            target(x*2+1, y*2+0) = raw(x*2+1, y*2+0) - correction[0][x][1];
+        }
+        for(size_t x: range(raw.size.x/2)) {
+            target(x*2+0, y*2+1) = raw(x*2+0, y*2+1) - correction[1][x][0];
+            target(x*2+1, y*2+1) = raw(x*2+1, y*2+1) - correction[1][x][1];
         }
     }
-    // Substracts DSNU profile from columns
-    for(size_t y: range(raw.size.y/2)) for(size_t dy: range(2)) for(size_t x: range(raw.size.x)) target(x, y*2+dy) = raw(x, y*2+dy) - correction[dy][x];
+#endif
     return move(target);
 }
-ImageF dynamicDSNU(const ImageF& raw, const float sigma = 0) { return dynamicDSNU(raw.size, raw, sigma); }
+ImageF dynamicDSNU(const ImageF& raw) { return dynamicDSNU(raw.size, raw); }
 
 ImageF transpose(ImageF&& target, const ImageF& source) {
     for(size_t y: range(source.size.y)) for(size_t x: range(source.size.x)) target(y, x) = source(x, y);
@@ -103,6 +98,26 @@ ImageF subtract(ImageF&& y, const ImageF& a, const ImageF& b) {
 }
 ImageF subtract(const ImageF& a, const ImageF& b) { return subtract(a.size, a, b); }
 
+
+ImageF correlation(ImageF&& y, const ImageF& a, const ImageF& b) {
+    assert_(a.Ref::size == y.Ref::size && b.Ref::size == y.Ref::size);
+    assert_(a.size == y.size && b.size == y.size);
+    float DCa = ::sum(a, 0.) / a.Ref::size;
+    float DCb = ::sum(b, 0.) / b.Ref::size;
+    real varA = 0; for(size_t i: range(a.Ref::size)) varA += sq(a[i]-DCa); varA /= a.Ref::size;
+    real varB = 0; for(size_t i: range(b.Ref::size)) varB += sq(b[i]-DCb); varB /= b.Ref::size;
+    float stdAB = sqrt(varA)*sqrt(varB);
+    for(size_t i: range(y.Ref::size)) y[i] = (a[i]-DCa) * (b[i]-DCb) / stdAB;
+    return move(y);
+}
+ImageF correlation(const ImageF& a, const ImageF& b) { return correlation(a.size, a, b); }
+
+ImageF sqrtMultiply(ImageF&& y, const ImageF& a, const ImageF& b) {
+    for(size_t i: range(y.Ref::size)) y[i] = sqrt(a[i] * b[i]);
+    return move(y);
+}
+ImageF sqrtMultiply(const ImageF& a, const ImageF& b) { return sqrtMultiply(a.size, a, b); }
+
 #if 1
 struct IT8Application : Application {
     string it8Charge = arguments()[0];
@@ -117,10 +132,9 @@ struct IT8Application : Application {
         // Fixed pattern noise correction
         float DC;
         ImageF unused staticDSNU = ::staticDSNU(raw, &DC);
-        for(size_t i: range(raw.Ref::size)) raw[i] -= DC;
 
         mat4 rawRGBtosRGB = mat4(sRGB);
-        Image4f RGB = demosaic(raw);
+        Image4f RGB = demosaic(subtract(raw, DC));
         if(1) {
             IT8 it8(RGB, readFile(it8Charge));
             rawRGBtoXYZ = it8.rawRGBtoXYZ;
@@ -128,13 +142,17 @@ struct IT8Application : Application {
             rawRGBtosRGB = mat4(sRGB) * rawRGBtoXYZ;
             //images.insert(name+".chart", convert(mix(convert(it8.chart, rawRGBtosRGB), it8.spotsView)));
         }
-        //images.insert(name+".raw", convert(convert(demosaic(raw), rawRGBtosRGB)));
+        images.insert(name+".raw", convert(convert(demosaic(subtract(raw, DC)), rawRGBtosRGB)));
         //images.insert(name+".DSNU", convert(convert(demosaic(transpose(dynamicDSNU(transpose(dynamicDSNU(raw, 0)), 0))), rawRGBtosRGB)));
         //for(int i: {0,3}) images.insert(name+"."+str(i), convert(convert(demosaic(transpose(dynamicDSNU(transpose(dynamicDSNU(raw, i)), i))), rawRGBtosRGB)));
-        images.insert(name+".c0", convert(convert(normalize(demosaic(subtract(c0, DC))), rawRGBtosRGB)));
-        //images.insert(name+".static", convert(convert(normalize(demosaic(subtract(raw, staticDSNU))), rawRGBtosRGB)));
-        //images.insert(name+".dynamic", convert(convert(normalize(demosaic(subtract(raw, transpose(dynamicDSNU(transpose(dynamicDSNU(raw, 0)), 0))))), rawRGBtosRGB)));
-        images.insert(name+".dynamic", convert(convert(normalize(demosaic(subtract(raw, dynamicDSNU(raw, 0)))), rawRGBtosRGB)));
+        //ImageF a = subtract(c0, DC);
+        //images.insert(name+".c0", convert(convert(demosaic(a), rawRGBtosRGB)));
+        const ImageF& a = staticDSNU;
+        //images.insert(name+".static", convert(convert(demosaic(a), rawRGBtosRGB)));
+        ImageF b = dynamicDSNU(subtract(raw, DC));
+        //images.insert(name+".dynamic", convert(convert(demosaic(b), rawRGBtosRGB)));
+        //images.insert(name+".correlation", convert(convert(demosaic(correlation(subtract(raw, a), subtract(raw, b))), rawRGBtosRGB)));
+        images.insert(name+".hybrid", convert(convert(demosaic(subtract(raw, sqrtMultiply(subtract(raw, a), subtract(raw, b)))), rawRGBtosRGB)));
     }
 };
 
