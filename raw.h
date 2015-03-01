@@ -5,12 +5,12 @@
 // CMV12000
 struct Raw : ImageF {
     static constexpr int2 size {4096, 3072};
-    Map map;
     real exposure;
     int gain, gainDiv;
     int temperature;
 
-    Raw(ref<byte> fileName, bool convert=true) : map(fileName) {
+    Raw(string fileName, bool convert=true) {
+        Map map(fileName);
         ref<uint16> file = cast<uint16>(map);
         ref<uint16> registers = file.slice(file.size-128);
         enum { LineCount = 1, ExternExposure = 70, ExposureTime /*71-72[0:7]*/, BlackReferenceColumns = 89,

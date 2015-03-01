@@ -1,12 +1,30 @@
 /// \file field-correction.cc Flat Field Correction
 #include "raw.h"
 #include "thread.h"
+#include "data.h"
 #include "map.h"
+#include "tiff.h"
+
+struct DNG : ImageF {
+    real exposure;
+    DNG(string fileName, const Folder& folder) {
+        TextData s(fileName);
+        s.skip("gain4-exprow01-darkframes-"_);
+        exposure = s.decimal(); // FIXME: TIFF DNG metadata
+        Map map(fileName, folder);
+        Image16 image = parseTIF(map);
+        assert_(image.size == Raw::size, image.size);
+        new (this) ImageF(image.size);
+        assert_(image.stride == stride, image.stride, stride);
+        for(size_t i: range(image.Ref::size)) at(i) = (float) image[i] / ((1<<16)-1);
+    }
+};
 
 struct FlatFieldCorrection {
     FlatFieldCorrection() {
-        Folder folder {"darkframes"};
-        auto images = apply(folder.list(Files), [](string file) { return Raw(file); });
+        Folder folder {"gain4"};
+        //auto images = apply(folder.list(Files), [](string file) { return Raw(file); });
+        auto images = apply(folder.list(Files), [&](string file) { return DNG(file, folder); });
         ImageF c0 (Raw::size), c1 (Raw::size); // Affine fit dark energy = c0 + c1·exposureTime
         for(size_t pixelIndex: range(c0.Ref::size)) {
             // Direct evaluation of AtA and Atb
