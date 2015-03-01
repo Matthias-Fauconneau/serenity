@@ -5,13 +5,13 @@
 #include "window.h"
 #include "png.h"
 
-#if 0
+#if 1
 struct List {
     List() {
         for(string file: currentWorkingDirectory().list(Files|Recursive)) {
             if(!endsWith(file, ".raw16")) continue;
             Raw raw(file, false);
-            log(file,"\t",raw.exposure, raw.gain, raw.temperature);
+            log(file,"\t", int(round(raw.exposure*1e3)),"\t", raw.gain, raw.gainDiv, raw.temperature);
         }
     }
 } app;
@@ -47,8 +47,8 @@ struct IT8Application : Application {
         Map c1Map("c1"); ImageF c1 = ImageF(unsafeRef(cast<float>(c0Map)), Raw::size);
         ImageF FPN (raw.size); // Corrected for fixed pattern noise
         real exposure = raw.exposure;
-        real gain = raw.gain;
-        log(raw.gain, exposure*1e3);
+        real gain = (real) raw.gain / raw.gainDiv;
+        log(it8Image,"\t",int(round(exposure*1e3)),"\t",raw.gain, raw.gainDiv);
         for(size_t i: range(FPN.Ref::size)) FPN[i] = raw[i] - gain * (c0[i] /*+ exposure * c1[i]*/);
         mat4 rawRGBtosRGB = mat4(sRGB);
         Image4f FPNRGB = demosaic(FPN);
