@@ -8,7 +8,7 @@ static int clefStep(Sign sign) { assert_(sign.type==Sign::Note, int(sign.type));
 static vec2 text(vec2 origin, string message, float fontSize, array<Glyph>& glyphs, vec2 align=0 /*0:left|top,1/2,center,1:right|bottom*/) {
 	Text text(message, fontSize, 0, 1, 0, "LinLibertine", false);
 	vec2 textSize = text.sizeHint();
-	origin -= align*textSize;
+	//origin -= align*textSize;
 	auto textGlyphs = move(text.graphics(0)->glyphs); // Holds a valid reference during iteration
 	for(auto glyph: textGlyphs) { glyph.origin+=origin; glyphs.append(glyph); }
 	return textSize;
@@ -80,7 +80,8 @@ struct System : SheetContext {
 	float noteSize(const Sign& sign) { return font.metrics(font.index(noteCode(sign))).advance; };
 
 	// Metrics
-	const float space = glyphSize(SMuFL::Accidental::Flat, &smallFont).x+glyphSize(SMuFL::NoteHead::Black).x; // Enough space for accidented dichords
+	// Enough space for accidented dichords
+	const float space = /*glyphSize(SMuFL::Accidental::Flat, &smallFont).x+*/glyphSize(SMuFL::NoteHead::Black).x;
 	const float spaceWidth; // Minimum space on pass 0, Space width for measure justification on pass 1
 
 	// Page context
@@ -1086,7 +1087,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
 			if(pageSize.y) {
 				float minY = context.staffY(1, system.line[1].top);
 				float maxY = context.staffY(0, system.line[0].bottom);
-				if(systems && (/*system.pageBreak ||*/ systems.size >= 6 /*FIXME*/ || requiredHeight + (maxY-minY) > pageSize.y)) {
+				if(systems && (/*system.pageBreak ||*/ systems.size >= 7 /*FIXME*/ || requiredHeight + (maxY-minY) > pageSize.y)) {
 					requiredHeight = 0; // -> doPage
 					doPage();
 				}
