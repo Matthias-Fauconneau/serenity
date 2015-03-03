@@ -18,13 +18,13 @@ inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)
 
 /// Logs the time spent executing a scope
 struct Time {
-	uint64 startTime=realTime(), stopTime=0;
-	Time(bool start=true) : stopTime(start?0:startTime) {}
+    uint64 startTime=realTime(), stopTime=0;
+    Time(bool start=true) : stopTime(start?0:startTime) {}
     void start() { if(stopTime) startTime=realTime()-(stopTime-startTime); stopTime=0; }
     void stop() { if(!stopTime) stopTime=realTime(); }
-	String reset() { stop(); String s=str((stopTime-startTime)/1000000000., 1u)+'s'; startTime=stopTime; stopTime=0; return s; }
+    String reset() { stop(); String s=str((stopTime-startTime)/1000000000., 1u)+'s'; startTime=stopTime; stopTime=0; return s; }
     operator uint64() const { return ((stopTime?:realTime()) - startTime)/1000000; }
-	double toReal() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
+    double toReal() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
     operator float() const { return toReal(); }
     operator double() const { return toReal(); }
 };
@@ -76,7 +76,7 @@ struct Timer : Stream, Poll {
     virtual ~Timer() {}
     void setAbsolute(uint64 nsec);
     void setRelative(long msec);
-	function<void()> timeout;
+    function<void()> timeout;
     virtual void event();
 };
 
@@ -88,9 +88,9 @@ struct Random {
     void seed() { sz=rdtsc(); sw=rdtsc(); }
     void reset() { z=sz; w=sw; }
     uint64 next() {
-        z = 36969 * (z & 0xFFFF) + (z >> 16);
-        w = 18000 * (w & 0xFFFF) + (w >> 16);
-        return (z << 16) + w;
+	z = 36969 * (z & 0xFFFF) + (z >> 16);
+	w = 18000 * (w & 0xFFFF) + (w >> 16);
+	return (z << 16) + w;
     }
     operator uint64() { return next(); }
     float operator()() { float f = float(next()&((1<<24)-1))*0x1p-24f; assert(f>=0 && f<1); return f; }

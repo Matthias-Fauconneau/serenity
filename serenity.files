@@ -12,6 +12,7 @@ core/simd.h
 
 io/png.cc
 io/jpeg.cc
+io/flic.h
 
 ui/text.cc
 ui/render.cc
