@@ -15,7 +15,9 @@ struct mat3x2 {
     float operator()(int i, int j) const { return M(i,j); }
     float& operator()(int i, int j) { return M(i,j); }
 
-    mat3x2 operator*(mat3x2 b) const {mat3x2 r(0); for(int i=0;i<2;i++) { for(int j=0;j<3;j++) for(int k=0;k<2;k++) r.M(i,j)+=M(i,k)*b.M(k,j); r.M(i,2)+=M(i,2); } return r; }
+    mat3x2 operator*(mat3x2 b) const {
+        mat3x2 r(0); for(int i=0;i<2;i++) { for(int j=0;j<3;j++) for(int k=0;k<2;k++) r.M(i,j)+=M(i,k)*b.M(k,j); r.M(i,2)+=M(i,2); } return r;
+    }
     vec2 operator*(vec2 v) const {vec2 r; for(int i=0;i<2;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+1*M(i,2); return r; }
 };
 
@@ -136,18 +138,17 @@ struct mat4 {
 inline mat4 operator*(float s, mat4 M) {mat4 r; for(int j=0;j<4;j++) for(int i=0;i<4;i++) r.M(i,j)=s*M(i,j); return r; }
 
 template<int N, int M, Type T> inline String str(const T a[M*N]) {
-	array<char> s; s.append("\n[");
+    array<char> s;
     for(int i=0;i<M;i++) {
-		if(N==1) s.append("\t"+str(a[i],4));
+        if(N==1) s.append("\t"+str(a[i], 4u));
         else {
             for(int j=0;j<N;j++) {
-				s.append("\t"+str(a[j*M+i],4));
+                s.append("\t"+str(a[j*M+i], 4u));
             }
 			if(i<M-1) s.append('\n');
         }
     }
-	s.append(" ]");
-	return move(s);
+    return move(s);
 }
 inline String str(const mat3x2& M) { return str<3,2>(M.data); }
 inline String str(const mat3& M) { return str<3,3>(M.data); }

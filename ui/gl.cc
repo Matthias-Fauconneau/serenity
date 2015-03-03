@@ -323,6 +323,6 @@ void GLFrameBuffer::blitWindow(const GLTexture& source) {
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, source.id, 0);
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-	glBlitFramebuffer(0,0, source.size.x,source.size.y, 0,0,source.size.x,source.size.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glBlitFramebuffer(0,0, source.size.x,source.size.y, 0,0, source.size.x,source.size.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 	glDeleteFramebuffers(1, &framebuffer);
 }

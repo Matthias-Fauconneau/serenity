@@ -49,7 +49,7 @@ generic constexpr T&& forward(Type remove_reference<T>::type& t) { return (T&&)t
 /// Forwards moveable values
 generic constexpr T&& forward(Type remove_reference<T>::type&& t){static_assert(!is_lvalue_reference<T>::value,""); return (T&&)t; }
 /// Base template for explicit copy (overriden by explicitly copyable types)
-generic T __attribute__((warn_unused_result))  copy(const T& o) { return o; }
+generic T __attribute__((warn_unused_result)) copy(const T& o) { return o; }
 
 /// Reference type with move semantics
 generic struct handle {
@@ -288,7 +288,7 @@ generic struct mref : ref<T> {
 	T& last() const { return at(size-1); }
 
 	/// Slices a reference to elements from \a pos to \a pos + \a size
-	notrace mref<T> slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return mref<T>((T*)data+pos, size); }
+    notrace mref<T> slice(size_t pos, size_t size) const { assert(pos+size <= this->size, pos, size, this->size); return mref<T>((T*)data+pos, size); }
 	/// Slices a reference to elements from to the end of the reference
 	mref<T> slice(size_t pos) const { assert(pos<=size); return mref<T>((T*)data+pos,size-pos); }
 	/// Slices a reference to elements from \a start to \a stop

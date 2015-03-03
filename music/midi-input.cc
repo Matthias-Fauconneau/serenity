@@ -26,18 +26,18 @@ void MidiInput::event() {
                 if(!pressed.contains(key)) return; // Pressed before the device was opened
                 pressed.remove(key);
                 if(sustain) sustained.add( key );
-                else noteEvent(key,0);
+                else noteEvent(key,0,1);
             } else {
                 sustained.tryRemove(key);
                 assert_(!pressed.contains(key));
                 pressed.append(key);
-                noteEvent(key, min(127,(int)value*4/3)); // Keyboard saturates at 96
+                noteEvent(key, min(127,(int)value*4/3), 1); // Keyboard saturates at 96
             }
         } else if(type == Controller) {
             if(key==64) {
                 sustain = (value != 0);
                 if(!sustain) {
-                    for(int key : sustained) { noteEvent(key,0); assert(!pressed.contains(key)); }
+                    for(int key : sustained) { noteEvent(key,0,1); assert(!pressed.contains(key)); }
                     sustained.clear();
                 }
             }

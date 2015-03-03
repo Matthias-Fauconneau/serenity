@@ -114,19 +114,21 @@ buffer<Rect> Linear::layout(const vec2 xySize) {
         width = size.x-count*size.x/count;
     }
 
-    vec2 pen = 0;
-    if(main==Spread || main==Left) pen.x+=0;
-    else if(main==Center || main==Even || main==Share || main==ShareTight) pen.x+=width/2;
-    else if(main==Right) pen.x+=size.x-width;
-    else error("");
-    if(side==AlignLeft) pen.y+=0;
-    else if(side==AlignCenter) pen.y+=(size.y-height)/2;
-    else if(side==AlignRight) pen.y+=size.y-height;
-	else if(size.y) height = size.y; // If not evaluating required size for sizeHint
-	buffer<Rect> widgets(count, 0);
+    vec2 pen;
+    if(main==Spread || main==Left) pen.x = 0;
+    else if(main==Center || main==Even || main==Share || main==ShareTight) pen.x = width/2;
+    else if(main==Right) pen.x = size.x-width;
+    else error("main");
+    if(side==AlignLeft) pen.y = 0;
+    else if(side==ShareTight) { height = (height+size.y)/2; pen.y = (size.y-height)/2; }
+    else if(side==AlignCenter) pen.y =(size.y-height)/2;
+    else if(side==AlignRight) pen.y = size.y-height;
+    else if(side==Expand) { if(size.y) height = size.y; pen.y = 0; } // If not evaluating required size for sizeHint
+    else error("side");
+    buffer<Rect> widgets(count, 0);
 	for(size_t i: range(count)) {
         float y=0;
-        if(side==AlignLeft||side==AlignCenter||side==AlignRight||side==Expand) heights[i]=height;
+        if(side==AlignLeft||side==AlignCenter||side==AlignRight||side==Expand||side==ShareTight) heights[i]=height;
         else if(side==Left) y=0;
         else if(side==Center) y=(height-heights[i])/2;
         else if(side==Right) y=height-heights[i];
@@ -137,10 +139,10 @@ buffer<Rect> Linear::layout(const vec2 xySize) {
 }
 
 // Grid
-buffer<Rect> GridLayout::layout(vec2 size) {
+buffer<Rect> GridLayout::layout(vec2 size, vec2& sizeHint) {
     if(!count()) return {};
 	buffer<Rect> widgets(count(), 0);
-    uint w=this->width,h=0/*this->height*/; for(;;) { if(w*h>=count()) break; if(!this->width && w<=h) w++; else h++; }
+    int w = this->width, h=0/*this->height*/; for(;;) { if(w*h >= (int)count()) break; if(!this->width && w<=h) w++; else h++; }
     float widths[w], heights[h];
     for(uint x: range(w)) {
         float maxX = 0;
@@ -154,6 +156,7 @@ buffer<Rect> GridLayout::layout(vec2 size) {
     float extraWidth;
     /**/  if(uniformX) {
         const float requiredWidth = max(ref<float>(widths,w)) * w;
+        sizeHint.x = requiredWidth;
         const float availableWidth = size.x ?: requiredWidth;
         const float fixedWidth = availableWidth / w;
         for(float& v: widths) v = fixedWidth;
@@ -161,6 +164,7 @@ buffer<Rect> GridLayout::layout(vec2 size) {
     }
     else if(size.x) {
         const float requiredWidth = sum<float>(ref<float>(widths,w));
+        sizeHint.x = requiredWidth;
         extraWidth = size.x ? size.x-requiredWidth: 0;
         const float extra = extraWidth / w; // Extra space per column (may be negative for missing space)
         for(float& v: widths) { v += extra; extraWidth -= extra; } // Distributes extra/missing space
@@ -170,6 +174,7 @@ buffer<Rect> GridLayout::layout(vec2 size) {
     float extraHeight;
     if(uniformY) {
         const float requiredHeight = max(ref<float>(heights,h)) * h;
+        sizeHint.y = requiredHeight;
         const float availableHeight = size.y ?: requiredHeight;
         const float fixedHeight = availableHeight / h;
         for(float& v: heights) v = fixedHeight;
@@ -184,13 +189,14 @@ buffer<Rect> GridLayout::layout(vec2 size) {
             heights[y] = maxY;
         }
         const float requiredHeight = sum<float>(ref<float>(heights,h)); // Remaining space after fixed allocation
+        sizeHint.y = requiredHeight;
         extraHeight = size.y ? size.y-requiredHeight: 0;
         const float extra = extraHeight / h; // Extra space per cell
         if(extra > 0) {
             for(float& v: heights) { v += extra; extraHeight -= extra; } // Distributes extra space
         } else {
             while(extraHeight <= -h) { // While layout is overcommited
-                float first = max(ref<float>(heights,h)); // First largest size
+                float first = max(ref<float>(heights, h)); // First largest size
                 int firstCount=0; for(float size: heights) if(size == first) firstCount++; // Counts how many widgets already have the largest size
                 float second=0; for(float size: heights) if(second<size && size<first) second=size; // Second largest size
                 float offset = max(1.f, min(-extraHeight, first-second) / firstCount); // Distributes reduction to all largest widgets
@@ -198,6 +204,24 @@ buffer<Rect> GridLayout::layout(vec2 size) {
             }
         }
         assert_(extraHeight > -h, extraHeight, size, "(", ref<float>(widths,w), ")", "(", ref<float>(heights,h),")", sum<float>(ref<float>(heights,h)));
+    }
+
+    { // Recomputes widths with given height constraints
+        for(uint x: range(w)) {
+            float maxX = 0;
+            for(uint y : range(h)) {
+                size_t index = y*w+x;
+                if(index<count()) maxX = ::max(maxX, abs(at(index).sizeHint(vec2(size.x, heights[y])).x));
+            }
+            widths[x] = maxX;
+        }
+        if(size.x) {
+            const float requiredWidth = sum<float>(ref<float>(widths,w));
+            sizeHint.x = requiredWidth;
+            extraWidth = size.x ? size.x-requiredWidth: 0;
+            const float extra = extraWidth / w; // Extra space per column (may be negative for missing space)
+            for(float& v: widths) { v += extra; extraWidth -= extra; } // Distributes extra/missing space
+        }
     }
 
     float Y = extraHeight/2;
@@ -211,13 +235,7 @@ buffer<Rect> GridLayout::layout(vec2 size) {
             }
         }
         Y += heights[y];
-        assert_(size.y ==0 || (vec2(0) < vec2(X,Y) && vec2(X,Y) < size+vec2(w,h)), X, Y, size, ref<float>(widths,w), ref<float>(heights,h));
+        //assert_(size.y ==0 || (vec2(0) < vec2(X,Y) && vec2(X,Y) < size+vec2(w,h)), X, Y, size, ref<float>(widths,w), ref<float>(heights,h));
 	}
     return widgets;
-}
-
-vec2 GridLayout::sizeHint(vec2 size) {
-    vec2 requiredSize=0;
-    for(Rect r: layout(vec2(size.x,0))) requiredSize=max(requiredSize, r.max);
-    return requiredSize;
 }

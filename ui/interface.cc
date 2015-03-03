@@ -89,18 +89,23 @@ shared<Graphics> Progress::graphics(vec2 size) {
 
 // ImageView
 
-vec2 ImageView::sizeHint(vec2 size) { return vec2(min(image.size, size.x && image.size.x ? int2(image.size.x*size.x/image.size.x, image.size.y*size.y/image.size.y) : image.size)); }
+vec2 ImageView::sizeHint(vec2 size) {
+    if(size > vec2(image.size)) return vec2(image.size);
+    return size.x*image.size.y < size.y*image.size.x ?
+                vec2(image.size.x*size.x/image.size.x, image.size.y*size.x/image.size.x) :
+                vec2(image.size.x*size.y/image.size.y, image.size.y*size.y/image.size.y);
+}
 
 shared<Graphics> ImageView::graphics(vec2 size) {
 	shared<Graphics> graphics;
     if(image) {
         // Crop
-        //vec2 offset = size-image.size;
+        int2 offset = max(int2(0),image.size-int2(size))/2;
         graphics->blits.append(
                     max(vec2(0),vec2((int2(size)-image.size)/2)), // Centers
                     vec2(min(int2(size), image.size)), // or fits
-                    cropShare(image, max(int2(0),image.size-int2(size))/2, min(int2(size), image.size)) // by cropping center
-					);
+                    cropShare(image, offset, min(int2(size), image.size-offset)) ); // by cropping center
+        // graphics->blits.append((size-sizeHint(size))/2.f, sizeHint(size), share(image) ); // Resizes
     }
     return graphics;
 }

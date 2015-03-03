@@ -3,8 +3,8 @@
 #include "x.h"
 #include "png.h"
 #include "time.h"
-#include "gl.h"
 
+#include "gl.h"
 #if 0 // DRI3
 #include <sys/shm.h>
 #include <sys/uio.h>
@@ -84,7 +84,7 @@ Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool sho
 #else // GLX/Xlib/DRI2
 	glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_,":0"_))); assert_(glDisplay);
 	const int fbAttribs[] = {GLX_DOUBLEBUFFER, 1, GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 24,
-							 GLX_SAMPLE_BUFFERS, 1, GLX_SAMPLES, 8, 0};
+                             /*GLX_SAMPLE_BUFFERS, 1, GLX_SAMPLES, 8,*/ 0};
 	int fbCount=0; fbConfig = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount)[0]; assert(fbConfig && fbCount);
 	initializeThreadGLContext();
 #endif
@@ -214,7 +214,7 @@ static void destroy_user_data(gbm_bo*, void* dmabuf) { delete (DMABuf*)dmabuf; }
 void Window::event() {
 	Display::event();
 	//if(heldEvent) { processEvent(heldEvent); heldEvent = nullptr; }
-	//setTitle(getTitle ? getTitle() : widget->title());
+    setTitle(getTitle ? getTitle() : widget->title());
 	if(!updates) return;
 	assert_(size);
 #if DRI3
@@ -255,9 +255,9 @@ void Window::event() {
 	send(Present::Pixmap{.window=id+XWindow, .pixmap=id+Pixmap}); //FIXME: update region
 #else
 	if(update.graphics) {
-		Image target(size); target.clear(0xFF);
-		::render(target, update.graphics); // FIXME: Render retained graphics
-		for(int y: range(target.size.y/2)) for(int x: range(target.size.x)) swap(target(x, y), target(x, target.size.y-1-y));
+        Image target(size); target.clear(0xFF);
+        ::render(target, update.graphics);
+        for(int y: range(target.size.y/2)) for(int x: range(target.size.x)) swap(target(x, y), target(x, target.size.y-1-y));
 		GLFrameBuffer::blitWindow(target);
 	}
 	glXSwapBuffers(glDisplay, id);

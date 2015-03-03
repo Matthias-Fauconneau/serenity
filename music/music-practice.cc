@@ -44,7 +44,7 @@ struct Music {
         AudioControl("Master Playback Switch") = 1;
         AudioControl("Headphone Playback Switch") = 1;
         AudioControl("Master Playback Volume") = 100;
-        audio.start(sampler->rate, Sampler::periodSize, 32, 2);
+        audio.start(sampler->rate, sampler->periodSize, 32, 2);
         //assert_(audioThread);
     }
     ~Music() {
@@ -56,8 +56,7 @@ struct Music {
         if(audioThread) audioThread.wait();
         if(decodeThread) decodeThread.wait(); // ~Thread
         input.noteEvent.delegates.clear();
-        sampler = unique<Sampler>(rate, "/Samples/"+name+".sfz"_, decodeThread);
-        sampler->pollEvents = {&input, &MidiInput::event}; // Ensures all events are received right before mixing
+        sampler = unique<Sampler>("/Samples/"+name+".sfz"_, 512, [this](uint){ input.event(); }, decodeThread); // Ensures all events are received right before mixing
         input.noteEvent.connect(sampler.pointer, &Sampler::noteEvent);
         audio.read32 = {sampler.pointer, &Sampler::read32};
         audioThread.spawn();

@@ -15,10 +15,10 @@ static vec3 LuvtoXYZ(float L, float u, float v) {
 	return vec3(X, Y, Z);
 }
 static vec3 LuvtoXYZ(vec3 Luv) { return LuvtoXYZ(Luv[0], Luv[1], Luv[2]); }
-static bgr3f XYZtoBGR(float X, float Y, float Z) {
-	float R = + 3.240479 * X - 1.53715 * Y - 0.498535 * Z;
-	float G = - 0.969256 * X + 1.875992 * Y + 0.041556 * Z;
-	float B	= + 0.055648 * X - 0.204043 * Y + 1.057311 * Z;
+static bgr3f XYZtoBGR(float X, float Y, float Z) { // sRGB
+    float R = + 3.2406 * X - 1.5372 * Y - 0.4986 * Z;
+    float G = - 0.9689 * X + 1.8758 * Y + 0.0415 * Z;
+    float B	= + 0.0557 * X - 0.2040 * Y + 1.0570 * Z;
 	return bgr3f(B, G, R);
 }
 static bgr3f XYZtoBGR(vec3 XYZ) { return XYZtoBGR(XYZ[0], XYZ[1], XYZ[2]); }

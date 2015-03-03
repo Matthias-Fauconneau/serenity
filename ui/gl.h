@@ -3,6 +3,7 @@
 #include "vector.h"
 #include "map.h"
 #include "thread.h"
+#include "image.h"
 
 void glCullFace(bool enable);
 void glDepthTest(bool enable);
@@ -85,7 +86,7 @@ struct GLTexture {
     GLTexture(){}
     default_move(GLTexture);
     GLTexture(uint width, uint height, uint format=0, const void* data=0);
-	GLTexture(const struct Image& image, uint format=0);
+    GLTexture(const Image& image, uint format=0);
 	//GLTexture(const struct Image16& image, uint format=0);
 	GLTexture(const GLBuffer& buffer, int2 size, uint format=R32F);
 	GLTexture(uint width, uint height, uint depth, ref<byte4> data);

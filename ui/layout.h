@@ -123,8 +123,9 @@ struct GridLayout : virtual Layout {
 
     GridLayout(bool uniformX=false, bool uniformY=false, int width=0)
         : uniformX(uniformX), uniformY(uniformY), width(width) {}
-    vec2 sizeHint(vec2) override;
-    buffer<Rect> layout(vec2 size) override;
+    buffer<Rect> layout(vec2 size, vec2& sizeHint);
+    vec2 sizeHint(vec2 size) override { vec2 sizeHint; layout(size, sizeHint); return sizeHint; }
+    buffer<Rect> layout(vec2 size) override { vec2 sizeHint; return layout(size, sizeHint); }
 };
 
 /// Grid of heterogenous widgets. \sa Widgets

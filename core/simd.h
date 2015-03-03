@@ -4,14 +4,14 @@
 #define inline inline notrace
 
 // v4si
-typedef int v4si __attribute((__vector_size__ (16)));
+typedef int v4si __attribute((__vector_size__(16)));
 inline v4si set1(int i) { return (v4si){i,i,i,i}; }
 inline v4si loada(const uint32* const ptr) { return *(v4si*)ptr; }
 inline v4si loadu(const uint32* const ptr) { return (v4si)__builtin_ia32_lddqu((byte*)ptr); }
 inline void storea(uint32* const ptr, v4si a) { *(v4si*)ptr = a; }
 
 // v4sf
-typedef float v4sf __attribute((__vector_size__ (16)));
+typedef float v4sf __attribute((__vector_size__(16)));
 inline v4sf constexpr float4(float f) { return (v4sf){f,f,f,f}; }
 
 inline v4sf loada(const float* const ptr) { return *(v4sf*)ptr; }
@@ -20,6 +20,10 @@ inline void storea(float* const ptr, v4sf a) { *(v4sf*)ptr = a; }
 
 inline v4sf min(v4sf a, v4sf b) { return __builtin_ia32_minps(a,b); }
 inline v4sf max(v4sf a, v4sf b) { return __builtin_ia32_maxps(a,b); }
+inline v4sf dot3(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0x7f); }
+inline v4sf sq3(v4sf a) { return dot3(a,a); }
+inline v4sf dot(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0xFF); }
+inline v4sf sq(v4sf a) { return dot(a,a); }
 inline v4sf rcp(v4sf a) { return __builtin_ia32_rcpps(a); }
 inline v4sf rsqrt(v4sf a) { return __builtin_ia32_rsqrtps(a); }
 inline v4sf sqrt(v4sf a) { return __builtin_ia32_sqrtps(a); }

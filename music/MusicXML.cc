@@ -476,7 +476,7 @@ MusicXML::MusicXML(string document, string) {
     });
 
 #if 1
-    // Converts absolute references to relative references
+    // Converts absolute references to relative references (tuplet)
     for(int signIndex: range(signs.size)) {
         Sign& sign = signs[signIndex];
         if(sign.type == Sign::Tuplet) {
@@ -487,19 +487,21 @@ MusicXML::MusicXML(string document, string) {
             tuplet.last.max = tuplet.last.max - signIndex;
             tuplet.min = tuplet.min - signIndex;
             tuplet.max = tuplet.max - signIndex;
-
         }
     }
 #endif
 
-#if 1 // FIXME: update references (tuplet)
+#if 1
     // Removes unused clef change and dynamics
     for(size_t signIndex=0; signIndex < signs.size;) {
         Sign& sign = signs[signIndex];
         if(sign.type==Sign::Clef || sign.type==Sign::Dynamic) {
             size_t nextIndex = signIndex+1;
-            while(nextIndex < signs.size && signs[nextIndex].type!=Sign::Note && (signs[nextIndex].type!=sign.type || (sign.type == Sign::Clef && signs[nextIndex].staff != sign.staff)))
+            while(nextIndex < signs.size && signs[nextIndex].type!=Sign::Note &&
+                  (signs[nextIndex].type!=sign.type || (sign.type == Sign::Clef && signs[nextIndex].staff != sign.staff))) {
+                assert(signs[nextIndex].type != Sign::Tuplet);
                 nextIndex++;
+            }
             if(nextIndex==signs.size || signs[nextIndex].type==sign.type) {
                 signs.removeAt(signIndex);
                 continue;
@@ -530,7 +532,7 @@ MusicXML::MusicXML(string document, string) {
 	}
 #endif
 
-#if 0 // FIXME: update absolute references (tuplet)
+#if 0
 	{// Converts ties to longer notes (spanning beats and measures)
 	array<size_t> activeTies;
 	uint page=0, line=0, measure=0;
@@ -695,7 +697,7 @@ MusicXML::MusicXML(string document, string) {
     signs.size = lastMeasureIndex+1; // Last measure with notes
 #endif
 
-#if 1 // FIXME: only on same staff
+#if 0 // FIXME: tuplets, only on same staff
 	// Removes double notes
 	array<Sign> chord;
 	for(size_t signIndex=1; signIndex < signs.size;) {

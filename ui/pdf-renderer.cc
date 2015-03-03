@@ -394,7 +394,7 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
                     mat3x2 Trm = Cm*Tm;
                     uint index = font.index(code);
                     vec2 position = vec2(Trm(0,2),Trm(1,2));
-                    if(Trm(0,0)*size >= 16) // Filters grace notes (FIXME: select on which sheets to apply)
+                    //if(Trm(0,0)*size >= 16) // Filters grace notes (FIXME: also hides small clefs and text, select on which sheets to apply)
                     if(box.contains(position)) page.glyphs.append(position, Trm(0,0)*size, fontData, code, index);
                     float advance = spacing+(code==' '?wordSpacing:0);
                     if(code < fontData.widths.size) advance += size*fontData.widths[code]/1000;
