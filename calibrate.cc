@@ -1,4 +1,4 @@
-/// \file field-correction.cc Flat Field Correction
+/// \file calibration.cc Flat field calibration
 #include "raw.h"
 #include "thread.h"
 #include "data.h"
@@ -20,10 +20,19 @@ struct DNG : ImageF {
     }
 };
 
-struct FlatFieldCorrection {
-    FlatFieldCorrection() {
+struct FlatFieldCalibration {
+	FlatFieldCalibration() {
         Folder folder {"darkframes"};
-        auto images = apply(folder.list(Files), [&](string file) { return Raw(Map(file, folder)); });
+		auto images = apply(folder.list(Files), [&](string fileName) {
+				Raw raw(Map(fileName, folder));
+				if(!raw.exposure) {
+					TextData s(fileName);
+					s.skip("darkframe_analog_gainx4_"_);
+					raw.exposure = s.decimal();
+				}
+				assert_(raw.exposure);
+				return move(raw);
+	});
         //auto images = apply(folder.list(Files), [&](string file) { return DNG(file, folder); });
         ImageF c0 (Raw::size), c1 (Raw::size); // Affine fit dark energy = c0 + c1·exposureTime
         for(size_t pixelIndex: range(c0.Ref::size)) {
@@ -48,3 +57,21 @@ struct FlatFieldCorrection {
         writeFile("c1", cast<byte>(c1), currentWorkingDirectory(), true);
     }
 } app;
+
+#if 1
+#include "demosaic.h"
+#include "png.h"
+
+generic void multiply(mref<T> Y, mref<T> X, T c) { for(size_t i: range(Y.size)) Y[i] = c * X[i]; }
+ImageF normalize(ImageF&& target, const ImageF& source) { multiply(target, source, 1/mean(source)); return move(target); }
+ImageF normalize(const ImageF& source) { return normalize(source.size, source); }
+
+struct CalibrationPreview {
+	CalibrationPreview() {
+		Map map("c0");
+		ImageF c0 (unsafeRef(cast<float>(map)), Raw::size);
+		writeFile("c0.png", encodePNG(convert(demosaic(normalize(c0/*subtract(c0, min(c0))*/)))), currentWorkingDirectory(), true);
+		writeFile("c1.png", encodePNG(convert(demosaic(normalize(ImageF(unsafeRef(cast<float>(Map("c1"))), Raw::size))))), currentWorkingDirectory(), true);
+	}
+} preview;
+#endif

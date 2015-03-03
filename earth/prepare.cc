@@ -4,65 +4,6 @@
 #include "flic.h"
 #include "time.h"
 
-struct Encoder {
-	buffer<byte> buffer;
-
-	BitWriter bitIO {buffer}; // Assumes buffer capacity will be large enough
-	int predictor = 0;
-	size_t runLength = 0;
-
-	int2 size = 0;
-	size_t valueCount = 0;
-
-	Time encode;
-	Encoder() {}
-	Encoder(int2 size) : buffer((size_t)size.y*size.x*2), size(size) { // Assumes average bitrate < 16bit / sample (large RLE voids)
-		bitIO.write(32, size.x); bitIO.write(32, size.y);
-	}
-	void write(ref<int16> source) {
-		valueCount += source.size;
-		assert_(valueCount <= (size_t)size.y*size.x, valueCount, size.y, size.x);
-		for(size_t index=0;;) {
-			int value, s;
-			for(;;) {
-				if(index >= source.size) return;
-				value = source[index];
-				index++;
-				s = value - predictor;
-				if(s != 0) break;
-				runLength++;
-			};
-			flushRLE();
-			predictor = value;
-			uint u  = (s<<1) ^ (s>>31); // s>0 ? (s<<1) : (-s<<1) - 1;
-			uint x = u+1; // 0 is RLE escape
-			// Exp Golomb _ r
-			x += (1<<EG);
-			uint b = 63 - __builtin_clzl(x); // BSR
-			bitIO.write(b+b+1-EG, x); // unary b, binary q[b], binary r = 0^b.1.q[b]R[r] = x[b+b+1+r]
-		}
-	}
-	void flushRLE() {
-		if(!runLength) return;
-		size_t rleCodeRepeats = runLength >> RLE; // RLE length = rleCodeRepeats · 2^RLE
-		for(;rleCodeRepeats > 0; rleCodeRepeats--) bitIO.write(3, 0b100);
-		size_t remainingZeroes = runLength & ((1<<RLE)-1);
-		for(;remainingZeroes > 0; remainingZeroes--) bitIO.write(3, 0b101); // Explicitly encode remaining zeroes
-		runLength = 0;
-	}
-
-	::buffer<byte> end() {
-		assert_(valueCount == (size_t)size.y*size.x, valueCount, size);
-		flushRLE();
-		bitIO.flush();
-		buffer.size = (byte*)bitIO.pointer - buffer.data;
-		buffer.size += 14; // Pads to avoid segfault with "optimized" BitReader (whose last refill may stride end) // FIXME: 7 bytes should be enough
-		assert_(buffer.size <= buffer.capacity);
-		//log(int(round(buffer.size/(1024.*1024))),"MB", encode, int(round((buffer.size/(1024.*1024))/encode.toReal())),"MB/s"); // 200 MB/s
-		return move(buffer);
-	}
-};
-
 #if 0 // Converts zipped tif tiles to an Exp Golomb RLE image
 struct Convert {
 	Convert() {

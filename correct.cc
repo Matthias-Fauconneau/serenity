@@ -5,38 +5,11 @@
 #include "window.h"
 #include "png.h"
 
-#if 0
-struct List {
-    List() {
-        for(string file: currentWorkingDirectory().list(Files|Recursive)) {
-            if(!endsWith(file, ".raw16")) continue;
-            Raw raw(file, false);
-            log(file,"\t", int(round(raw.exposure*1e3)),"\t", raw.gain, raw.gainDiv, raw.temperature);
-        }
-    }
-} app;
-#endif
-
 generic ImageT<T> subtract(ImageT<T>&& y, const ImageT<T>& a, T b) {
     for(size_t i: range(y.Ref::size)) y[i] = a[i] - b;
     return move(y);
 }
 generic ImageT<T> subtract(const ImageT<T>& a, T b) { return subtract<T>(a.size, a, b); }
-
-generic void multiply(mref<T> Y, mref<T> X, T c) { for(size_t i: range(Y.size)) Y[i] = c * X[i]; }
-ImageF normalize(ImageF&& target, const ImageF& source) { multiply(target, source, 1/mean(source)); return move(target); }
-ImageF normalize(const ImageF& source) { return normalize(source.size, source); }
-
-#if 0
-struct CalibrationVisualization {
-    CalibrationVisualization() {
-        Map map("c0");
-        ImageF c0 (unsafeRef(cast<float>(map)), Raw::size);
-        writeFile("c0.png", encodePNG(convert(demosaic(normalize(subtract(c0, min(c0)))))), currentWorkingDirectory(), true);
-        writeFile("c1.png", encodePNG(convert(demosaic(normalize(ImageF(unsafeRef(cast<float>(Map("c1"))), Raw::size))))), currentWorkingDirectory(), true);
-    }
-} app;
-#endif
 
 Map c0Map("c0"); const ImageF c0 = ImageF(unsafeRef(cast<float>(c0Map)), Raw::size);
 Map c1Map("c1"); const ImageF c1 = ImageF(unsafeRef(cast<float>(c1Map)), Raw::size);
@@ -113,15 +86,14 @@ ImageF sqrtMultiply(ImageF&& y, const ImageF& a, const ImageF& b) {
 ImageF sqrtMultiply(const ImageF& a, const ImageF& b) { return sqrtMultiply(a.size, a, b); }
 
 #if 1
-struct IT8Application : Application {
-    string it8Charge = arguments()[0];
-    string it8Image = arguments()[1];
-    string name = section(it8Image,'.');
+struct FlatFieldCorrection : Application {
+	string fileName = arguments()[0];
+	string name = section(fileName,'.');
 
     mat4 rawRGBtoXYZ;
     map<String, Image> images;
-    IT8Application() {
-        Raw raw (it8Image);
+	FlatFieldCorrection() {
+		Raw raw {Map(fileName)};
 
         // Fixed pattern noise correction
         v4sf DC;
@@ -130,8 +102,8 @@ struct IT8Application : Application {
         mat4 rawRGBtosRGB = mat4(sRGB);
         Image4f RGB = subtract(demosaic(raw), DC);
         if(1) {
-            IT8 it8(RGB, readFile(it8Charge));
-            rawRGBtoXYZ = it8.rawRGBtoXYZ;
+			IT8 it8(RGB, readFile("R100604.txt"));
+			rawRGBtoXYZ = it8.rawRGBtoXYZ;
             //log(rawRGBtoXYZ);
             rawRGBtosRGB = mat4(sRGB) * rawRGBtoXYZ;
             //images.insert(name+".chart", convert(mix(convert(it8.chart, rawRGBtosRGB), it8.spotsView)));
@@ -158,10 +130,10 @@ struct WindowCycleView {
         : views(apply(images.size(), [&](size_t i) { return ImageView(share(images.values[i]), images.keys[i]); })),
           layout(toWidgets<ImageView>(views)) {}
 };
-struct Preview : IT8Application, WindowCycleView { Preview() : WindowCycleView(images) {} };
+struct Preview : FlatFieldCorrection, WindowCycleView { Preview() : WindowCycleView(images) {} };
 registerApplication(Preview);
 
-struct Export : IT8Application {
+struct Export : FlatFieldCorrection {
     Export() {
         writeFile(name+".xyz", str(rawRGBtoXYZ), currentWorkingDirectory(), true);
         for(auto image: images) {

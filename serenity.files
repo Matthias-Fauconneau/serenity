@@ -23,16 +23,9 @@ ui/graphics.h
 ui/interface.h
 ui/gl.h
 
-
-music/sheet.cc
-music/music-pdf.cc
-music/music-practice.cc
-music/midi-input.cc
-music/MusicXML.cc
-
-document.cc
+raw.h
 demosaic.h
 IT8.h
-field-correction.cc
-demosaic.cc
-raw.h
+compress.cc
+calibrate.cc
+correct.cc
