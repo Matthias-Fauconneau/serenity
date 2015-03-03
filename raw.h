@@ -9,10 +9,9 @@ struct Raw : ImageF {
     int gain, gainDiv;
     int temperature;
 
-    Raw(string fileName, bool convert=true) {
-        Map map(fileName);
-        ref<uint16> file = cast<uint16>(map);
-        ref<uint16> registers = file.slice(file.size-128);
+    Raw(ref<byte> file, bool convert=true) {
+        ref<uint16> data = cast<uint16>(file);
+        ref<uint16> registers = data.slice(data.size-128);
         enum { LineCount = 1, ExternExposure = 70, ExposureTime /*71-72[0:7]*/, BlackReferenceColumns = 89,
                Gain = 115, ADCRange, DigitalGain, BitMode, Temperature = 127 };
         assert_(registers[LineCount] == size.y);
@@ -35,8 +34,8 @@ struct Raw : ImageF {
 
         if(convert) { // Converts 16bit integer to 32bit floating point
             new (this) ImageF(size);
-            assert_(file.size-128 == Ref::size);
-            for(size_t i: range(file.size-128)) at(i) = (float) file[i] / ((1<<16)-1);
+            assert_(data.size-128 == Ref::size);
+            for(size_t i: range(data.size-128)) at(i) = (float) data[i] / ((1<<16)-1);
         } //else FIXME: read instead of map
     }
 };

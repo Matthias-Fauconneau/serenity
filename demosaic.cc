@@ -17,11 +17,11 @@ struct List {
 } app;
 #endif
 
-ImageF subtract(ImageF&& y, const ImageF& a, float b) {
+generic ImageT<T> subtract(ImageT<T>&& y, const ImageT<T>& a, T b) {
     for(size_t i: range(y.Ref::size)) y[i] = a[i] - b;
     return move(y);
 }
-ImageF subtract(const ImageF& a, float b) { return subtract(a.size, a, b); }
+generic ImageT<T> subtract(const ImageT<T>& a, T b) { return subtract<T>(a.size, a, b); }
 
 generic void multiply(mref<T> Y, mref<T> X, T c) { for(size_t i: range(Y.size)) Y[i] = c * X[i]; }
 ImageF normalize(ImageF&& target, const ImageF& source) { multiply(target, source, 1/mean(source)); return move(target); }
@@ -42,14 +42,14 @@ Map c0Map("c0"); const ImageF c0 = ImageF(unsafeRef(cast<float>(c0Map)), Raw::si
 Map c1Map("c1"); const ImageF c1 = ImageF(unsafeRef(cast<float>(c1Map)), Raw::size);
 
 /// Statically calibrated dark signal non uniformity correction
-ImageF staticDSNU(ImageF&& target, const Raw& raw, float* DC=0) {
-    real exposure = 0;// raw.exposure; // No effect
-    real gain = (real) 1;//raw.gain;// * 3/*darkframe gainDiv*/ / raw.gainDiv;
+ImageF staticDSNU(ImageF&& target, const Raw& raw, v4sf* DC=0) {
+    real exposure = 0; // raw.exposure; // No effect
+    real gain = (real) raw.gain / raw.gainDiv;
     for(size_t i: range(target.Ref::size)) target[i] = raw[i] - gain * (c0[i] + exposure * c1[i]);
-    if(DC) *DC = gain * (1 * mean(c0) + exposure * mean(c1));
+    if(DC) *DC = float4(gain) * (mean(demosaic(c0)) + float4(exposure) * mean(demosaic(c1)));
     return move(target);
 }
-ImageF staticDSNU(const Raw& raw, float* DC=0) { return staticDSNU(raw.size, raw, DC); }
+ImageF staticDSNU(const Raw& raw, v4sf* DC=0) { return staticDSNU(raw.size, raw, DC); }
 
 /// Dynamic column wise dark signal non uniformity correction
 ImageF dynamicDSNU(ImageF&& target, const ImageF& raw) {
@@ -83,6 +83,16 @@ ImageF subtract(ImageF&& y, const ImageF& a, const ImageF& b) {
 }
 ImageF subtract(const ImageF& a, const ImageF& b) { return subtract(a.size, a, b); }
 
+ImageF subtract(ImageF&& target, const ImageF& source, v4sf b) {
+    for(size_t y: range(target.height/2)) for(size_t x: range(target.width/2)) {
+        target(x*2+0, y*2+0) = source(x*2+0, y*2+0) - b[1];
+        target(x*2+1, y*2+0) = source(x*2+1, y*2+0) - b[0];
+        target(x*2+0, y*2+1) = source(x*2+0, y*2+1) - b[2];
+        target(x*2+1, y*2+1) = source(x*2+1, y*2+1) - b[1];
+    }
+    return move(target);
+}
+ImageF subtract(const ImageF& a, const v4sf b) { return subtract(a.size, a, b); }
 
 ImageF correlation(ImageF&& y, const ImageF& a, const ImageF& b) {
     assert_(a.Ref::size == y.Ref::size && b.Ref::size == y.Ref::size);
@@ -114,11 +124,11 @@ struct IT8Application : Application {
         Raw raw (it8Image);
 
         // Fixed pattern noise correction
-        float DC;
+        v4sf DC;
         ImageF unused staticDSNU = ::staticDSNU(raw, &DC);
 
         mat4 rawRGBtosRGB = mat4(sRGB);
-        Image4f RGB = demosaic(subtract(raw, DC));
+        Image4f RGB = subtract(demosaic(raw), DC);
         if(1) {
             IT8 it8(RGB, readFile(it8Charge));
             rawRGBtoXYZ = it8.rawRGBtoXYZ;
@@ -126,15 +136,15 @@ struct IT8Application : Application {
             rawRGBtosRGB = mat4(sRGB) * rawRGBtoXYZ;
             //images.insert(name+".chart", convert(mix(convert(it8.chart, rawRGBtosRGB), it8.spotsView)));
         }
-        images.insert(name+".raw", convert(convert(demosaic(subtract(raw, DC)), rawRGBtosRGB)));
+        //images.insert(name+".raw", convert(convert(subtract(demosaic(raw), DC), rawRGBtosRGB)));
         //images.insert(name+".DSNU", convert(convert(demosaic(transpose(dynamicDSNU(transpose(dynamicDSNU(raw, 0)), 0))), rawRGBtosRGB)));
         //ImageF a = subtract(c0, DC);
         //images.insert(name+".c0", convert(convert(demosaic(a), rawRGBtosRGB)));
         const ImageF& a = staticDSNU;
         images.insert(name+".static", convert(convert(demosaic(a), rawRGBtosRGB)));
         //ImageF b = dynamicDSNU(subtract(raw, DC));
-        //ImageF b = transpose(dynamicDSNU(transpose(dynamicDSNU(subtract(raw, DC)))));
-        //images.insert(name+".dynamic", convert(convert(demosaic(b), rawRGBtosRGB)));
+        ImageF b = transpose(dynamicDSNU(transpose(dynamicDSNU(subtract(raw, DC)))));
+        images.insert(name+".dynamic", convert(convert(demosaic(b), rawRGBtosRGB)));
         //images.insert(name+".correlation", convert(convert(demosaic(correlation(subtract(raw, a), subtract(raw, b))), rawRGBtosRGB)));
         //images.insert(name+".hybrid", convert(convert(demosaic(subtract(raw, sqrtMultiply(subtract(raw, a), subtract(raw, b)))), rawRGBtosRGB)));
     }

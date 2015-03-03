@@ -9,7 +9,7 @@ struct DNG : ImageF {
     real exposure;
     DNG(string fileName, const Folder& folder) {
         TextData s(fileName);
-        s.skip("gain4-exprow01-darkframes-"_);
+        s.skip(""_);
         exposure = s.decimal(); // FIXME: TIFF DNG metadata
         Map map(fileName, folder);
         Image16 image = parseTIF(map);
@@ -22,9 +22,9 @@ struct DNG : ImageF {
 
 struct FlatFieldCorrection {
     FlatFieldCorrection() {
-        Folder folder {"gain4"};
-        //auto images = apply(folder.list(Files), [](string file) { return Raw(file); });
-        auto images = apply(folder.list(Files), [&](string file) { return DNG(file, folder); });
+        Folder folder {"darkframes"};
+        auto images = apply(folder.list(Files), [&](string file) { return Raw(Map(file, folder)); });
+        //auto images = apply(folder.list(Files), [&](string file) { return DNG(file, folder); });
         ImageF c0 (Raw::size), c1 (Raw::size); // Affine fit dark energy = c0 + c1·exposureTime
         for(size_t pixelIndex: range(c0.Ref::size)) {
             // Direct evaluation of AtA and Atb
