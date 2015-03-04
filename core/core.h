@@ -80,9 +80,7 @@ typedef unsigned int uint;
 typedef unsigned long ptr;
 typedef signed long long int64;
 typedef unsigned long long uint64;
-static_assert(sizeof(uint64)==8,"");
-typedef __INTPTR_TYPE__  intptr_t;
-typedef __SIZE_TYPE__ 	size_t;
+typedef __SIZE_TYPE__ size_t;
 constexpr size_t invalid = -1; // Invalid index
 #define null nullptr
 
@@ -183,6 +181,7 @@ generic struct Ref {
 			const T* pointer;
 			const T& operator*() { return *pointer; }
 			iterator& operator++() { pointer--; return *this; }
+			typedef __INTPTR_TYPE__ intptr_t;
 			bool operator !=(const iterator& o) const { return intptr_t(pointer)>=intptr_t(o.pointer); }
 		};
 		iterator begin() const { return {start}; }
@@ -195,7 +194,7 @@ generic struct Ref {
     /// Returns true if the array contains an occurrence of \a value
 	template<Type K> bool contains(const K& key) const { return indexOf(key) != invalid; }
     /// Compares all elements
-    bool operator ==(const ref<T> o) const {
+	bool operator ==(const ref<T> o) const {
         if(size != o.size) return false;
         for(size_t i: range(size)) if(data[i]!=o.data[i]) return false;
         return true;

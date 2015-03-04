@@ -30,3 +30,4 @@ IT8.h
 compress.cc
 calibrate.cc
 correct.cc
+flic.cc

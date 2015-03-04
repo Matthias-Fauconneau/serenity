@@ -5,7 +5,6 @@
 // C runtime memory allocation
 extern "C" void* malloc(size_t size) noexcept;
 extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size) noexcept;
-extern "C" void* realloc(void* buffer, size_t size) noexcept;
 extern "C" void free(void* buffer) noexcept;
 #include <type_traits>
 /// Managed fixed capacity mutable reference to an array of elements
@@ -54,8 +53,6 @@ generic struct buffer : mref<T> {
     void append(const mref<T> source) { setSize(size+source.size); slice(size-source.size).move(source); }
     /// Appends another list of elements to this array by copying
     void append(const ref<T> source) { setSize(size+source.size); slice(size-source.size).copy(source); }
-    /// Appends a new element
-
 };
 /// Initializes a new buffer with the content of \a o
 generic buffer<T> copy(const buffer<T>& o){ buffer<T> t(o.capacity?:o.size, o.size); t.copy(o); return t; }

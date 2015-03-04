@@ -1,6 +1,5 @@
 #pragma once
 #include "bit.h"
-#include "image.h"
 static constexpr size_t EG = 6;
 
 struct FLIC : ref<byte> {
