@@ -66,10 +66,6 @@ generic struct mref : ref<T> {
 	/// references \a size elements from \a data pointer
 	mref(T* data, size_t size) : ref<T>(data,size) {}
 
-	explicit operator bool() const { assert(!size || data, size); return size; }
-	explicit operator T*() const { return (T*)data; }
-	T* begin() const { return (T*)data; }
-	T* end() const { return (T*)data+size; }
 	T& operator [](size_t i) const { return (T&)((ref<T>&)(*this))[i]; }
 
 	/// Slices a reference to elements from \a pos to \a pos + \a size
@@ -88,10 +84,6 @@ generic struct buffer : mref<T> {
 	using mref<T>::size;
 	size_t capacity = 0; /// 0: reference, >0: size of the owned heap allocation
 
-	using mref<T>::slice;
-
-	buffer(T* data, size_t size, size_t capacity) : mref<T>(data, size), capacity(capacity) {}
-
 	/// Allocates an uninitialized buffer for \a capacity elements
 	buffer(size_t capacity, size_t size) : mref<T>((T*)0, size), capacity(capacity) {
 		if(!capacity) return;
@@ -100,12 +92,8 @@ generic struct buffer : mref<T> {
 	explicit buffer(size_t size) : buffer(size, size) {}
 
 	/// If the buffer owns the reference, returns the memory to the allocator
-	~buffer() {
-		if(capacity) free((void*)data);
-		data=0; capacity=0; size=0;
-	}
+	~buffer() { if(capacity) free((void*)data); }
 };
-generic buffer<T> unsafeRef(const ref<T> o) { return buffer<T>((T*)o.data, o.size, 0); }
 
 /// Encodes packed bitstreams (msb)
 struct BitWriter {
@@ -261,8 +249,8 @@ buffer<uint16> interleave(ref<uint16> source, size_t X, size_t Y, const int shif
 }
 
 extern "C" int open(const char* file, int flags, int mask); // fcntl.h
-extern "C" byte* mmap (void* address, size_t size, int prot, int flags, int fd, long offset); // sys/mman.h
 #include <sys/stat.h>
+extern "C" byte* mmap (void* address, size_t size, int prot, int flags, int fd, long offset); // sys/mman.h
 extern "C" int write(int fd, const byte* data, size_t size);
 int main(int, const char* args[]) {
 	int sourceFD = open(args[1], 0/*O_RDONLY*/, 0);
