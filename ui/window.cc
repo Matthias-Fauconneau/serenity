@@ -83,7 +83,7 @@ Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool sho
 		surfaceSize = size;
 #else // GLX/Xlib/DRI2
 	glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_,":0"_))); assert_(glDisplay);
-	const int fbAttribs[] = {GLX_DOUBLEBUFFER, 1, GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 24,
+	const int fbAttribs[] = {GLX_DOUBLEBUFFER, 0/*1*/, GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 24,
                              /*GLX_SAMPLE_BUFFERS, 1, GLX_SAMPLES, 8,*/ 0};
 	int fbCount=0; fbConfig = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount)[0]; assert(fbConfig && fbCount);
 	initializeThreadGLContext();
@@ -234,9 +234,13 @@ void Window::event() {
 	lock.lock();
 	Update update = updates.take(0);
 	lock.unlock();
-	// Widget::graphics may renders using GL immediately and/or return primitives
-	GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(backgroundColor,1));
-	if(!update.graphics) update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size)));
+	if(update.graphics) {
+		GLFrameBuffer::bindWindow(int2(update.origin.x, size.y-update.origin.y-update.size.y), update.size/*, ClearColor, vec4(backgroundColor,1)*/);
+	} else {
+		// Widget::graphics may renders using GL immediately and/or return primitives
+		GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(backgroundColor,1));
+		update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size)));
+	}
 #if DRI3
 	assert_(gbm_surface_has_free_buffers(gbmSurface));
 	assert_( eglSwapBuffers(eglDevice, eglSurface) );
@@ -255,12 +259,13 @@ void Window::event() {
 	send(Present::Pixmap{.window=id+XWindow, .pixmap=id+Pixmap}); //FIXME: update region
 #else
 	if(update.graphics) {
-        Image target(size); target.clear(0xFF);
-        ::render(target, update.graphics);
+		Image target(update.size); target.clear(0xFF);
+		::render(target, update.graphics, -vec2(update.origin));
         for(int y: range(target.size.y/2)) for(int x: range(target.size.x)) swap(target(x, y), target(x, target.size.y-1-y));
-		GLFrameBuffer::blitWindow(target);
+		GLFrameBuffer::blitWindow(target, int2(update.origin.x, size.y-update.origin.y-update.size.y));
 	}
-	glXSwapBuffers(glDisplay, id);
+	glFlush();
+	//glXSwapBuffers(glDisplay, id);
 #endif
 	//assert_(updates.size<=1);
 }

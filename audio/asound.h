@@ -17,18 +17,18 @@ struct AudioOutput : Device, Poll {
     const struct Status* status = 0;
     struct Control* control = 0;
 
-	uint channels = 0;
+    uint channels = 0;
     uint sampleBits = 0;
-	uint rate = 0;
+    uint rate = 0;
     uint periodSize = 0, bufferSize = 0;
     uint underruns = 0;
 
-	function<size_t(mref<short2>)> read16 = [](mref<short2>){ error("read16"); return 0;};
+    function<size_t(mref<short2>)> read16 = [](mref<short2>){ error("read16"); return 0;};
     function<size_t(mref<int2>)> read32 = [](mref<int2>){ error("read32"); return 0;};
 
     AudioOutput(Thread& thread=mainThread);
     AudioOutput(decltype(read16) read, Thread& thread=mainThread);
-	AudioOutput(decltype(read32) read, Thread& thread=mainThread);
+    AudioOutput(decltype(read32) read, Thread& thread=mainThread);
     virtual ~AudioOutput() { if(status) stop(); }
     explicit operator bool() const { return status; }
 
@@ -48,7 +48,7 @@ struct AudioInput : Device, Poll {
     Lock lock;
 
     const uint sampleBits = 32;
-	uint channels = 0, rate = 0;
+    uint channels = 0, rate = 0;
     uint periodSize = 0, bufferSize = 0;
     uint periods = 0, overruns = 0;
     uint time = 0;

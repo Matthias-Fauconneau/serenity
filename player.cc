@@ -161,7 +161,7 @@ struct Player : Poll {
         window.setTitle(toUTF8(titles[index].text));
 		file = unique<FFmpeg>(folder.name()+'/'+files[index]);
         if(!file->file) { file=0; log("Error reading", folder.name()+'/'+files[index]); return; }
-        assert(file->channels==AudioOutput::channels);
+		assert(file->channels == 2);
         setPlaying(true);
     }
     void next() {
@@ -233,10 +233,10 @@ struct Player : Poll {
     void update(uint position, uint duration) {
         if(slider.value == (int)position || position>duration) return;
         slider.value = position; slider.maximum=duration;
-		elapsed    = Text(String(str(                position/60,2,'0')+':'+str(                 position%60,2,'0')),
-                          16, 0, 1, 0, "DejaVuSans", true, 1, true, int2(64,32));
-		remaining = Text(String(str((duration-position)/60,2,'0')+':'+str((duration-position)%60,2,'0')),
-                          16, 0, 1, 0, "DejaVuSans", true, 1, true, int2(64,32));
+		elapsed    = Text(String(str(                position/60,2u,'0')+':'+str(                 position%60,2u,'0')),
+						  16, 0, 1, 0, "DejaVuSans", true, 1, 0, int2(64,32));
+		remaining = Text(String(str((duration-position)/60,2u,'0')+':'+str((duration-position)%60,2u,'0')),
+						  16, 0, 1, 0, "DejaVuSans", true, 1, 0, int2(64,32));
         {Rect toolbarRect = layout.layout(vec2(window.size))[0];
 			shared<Graphics> update;
 			update->graphics.insert(vec2(toolbarRect.origin()), toolbar.graphics(toolbarRect.size(), toolbarRect));

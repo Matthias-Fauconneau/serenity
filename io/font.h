@@ -15,23 +15,25 @@ struct Font {
     default_move(Font);
     ~Font();
 
-    /// Returns font glyph index for Unicode codepoint \a code
-    uint index(uint code) const;
-	/// Returns font glyph index for glyph \a name
-	uint index(string name) const;
+    map<uint, uint> indexCache;
 
-// -- Size dependent
+    /// Returns font glyph index for Unicode codepoint \a code
+    uint index(uint code);
+    /// Returns font glyph index for glyph \a name
+    uint index(string name) const;
+
+    // -- Size dependent
     float size;
     bool hint;
     handle<FT_FaceRec_*> face;
     float ascender = 0, descender = 0;
-	//vec2 bboxMin = 0, bboxMax = 0; // in font units
+    //vec2 bboxMin = 0, bboxMax = 0; // in font units
 
     struct Glyph {
-        int2 offset; // (left bearing, min.y-baseline) //FIXME: -> Image
-        Image image;
-        Glyph() : offset(0) {}
-        Glyph(int2 offset, Image&& image) : offset(offset), image(move(image)) {}
+	int2 offset; // (left bearing, min.y-baseline) //FIXME: -> Image
+	Image image;
+	Glyph() : offset(0) {}
+	Glyph(int2 offset, Image&& image) : offset(offset), image(move(image)) {}
     };
     map<uint, Glyph> cache;
 
@@ -39,17 +41,18 @@ struct Font {
     float kerning(uint leftIndex, uint rightIndex);
 
     struct Metrics {
-        float advance;
-        vec2 bearing;
-        int leftOffset, rightOffset; // 26.6 bearing offset to correct kerning with hinting
-        union {
-            struct { float width, height; };
-            vec2 size;
-        };
+	float advance;
+	vec2 bearing;
+	int leftOffset, rightOffset; // 26.6 bearing offset to correct kerning with hinting
+	union {
+	    struct { float width, height; };
+	    vec2 size;
+	};
     };
+    map<uint, Metrics> metricsCache;
 
     /// Returns hinted advance for \a index
-    Metrics metrics(uint index) const;
+    Metrics metrics(uint index);
 
     /// Caches and renders glyph for \a index
     Glyph render(uint index);
@@ -71,7 +74,7 @@ struct FontData {
 
     Font& font(float size, bool hint = false) { return *(fonts.find(size) ?: &fonts.insert(size, ::unique<Font>(data, size, hint))); }
 
-/*// -- Size independant
+    /*// -- Size independant
     /// Returns font glyph index for Unicode codepoint \a code
     uint index(uint code) const;
     /// Returns font glyph index for glyph \a name

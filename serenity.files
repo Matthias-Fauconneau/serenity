@@ -13,6 +13,7 @@ core/simd.h
 io/png.cc
 io/jpeg.cc
 io/flic.h
+io/font.cc
 
 ui/text.cc
 ui/render.cc
@@ -23,6 +24,8 @@ ui/layout.cc
 ui/graphics.h
 ui/interface.h
 ui/gl.h
+
+player.cc
 
 raw.h
 demosaic.h

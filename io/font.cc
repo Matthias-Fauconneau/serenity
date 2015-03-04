@@ -93,14 +93,15 @@ Font::~Font(){
     }
 }
 
-uint Font::index(uint code) const {
+uint Font::index(uint code) {
+	const uint* index = indexCache.find(code); if(index) return *index;
     for(int i=0;i<face->num_charmaps;i++) {
         FT_Set_Charmap(face, face->charmaps[i] );
         uint index = FT_Get_Char_Index(face, code);
-        if(index) return index;
+		if(index) return indexCache.insert(code, index);
     }
     //error("Missing code", code, "in", name);
-    return code;
+	return indexCache.insert(code, code);
 }
 
 uint Font::index(string name) const {
@@ -113,13 +114,14 @@ float Font::kerning(uint leftIndex, uint rightIndex) {
     FT_Vector kerning; FT_Get_Kerning(face, leftIndex, rightIndex, FT_KERNING_DEFAULT, &kerning); return kerning.x*0x1p-6;
 }
 
-Font::Metrics Font::metrics(uint index) const {
-    FT_Load_Glyph(face, index, hint?FT_LOAD_TARGET_NORMAL:FT_LOAD_TARGET_LIGHT);
-    return {
+Font::Metrics Font::metrics(uint index) {
+	{const Metrics* metrics = metricsCache.find(index); if(metrics) return *metrics;}
+	FT_Load_Glyph(face, index, hint?FT_LOAD_TARGET_NORMAL:FT_LOAD_TARGET_LIGHT);
+	return metricsCache.insert(index, Metrics{
         face->glyph->metrics.horiAdvance*0x1p-6f,
         vec2(face->glyph->metrics.horiBearingX*0x1p-6f, face->glyph->metrics.horiBearingY*0x1p-6f),
         (int)face->glyph->lsb_delta, (int)face->glyph->rsb_delta,
-        {{face->glyph->metrics.width*0x1p-6f, face->glyph->metrics.height*0x1p-6f}}};
+	{{face->glyph->metrics.width*0x1p-6f, face->glyph->metrics.height*0x1p-6f}}});
 }
 
 Font::Glyph Font::render(uint index) {
