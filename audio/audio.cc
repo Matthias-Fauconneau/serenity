@@ -62,11 +62,19 @@ size_t FFmpeg::read16(mref<int16> output) {
 				if(audio->sample_fmt == AV_SAMPLE_FMT_S16) {
 					int16Buffer = unsafeRef(ref<int16>((int16*)frame->data[0], bufferSize*channels)); // Valid until next frame
 				}
-				else if(audio->sample_fmt == AV_SAMPLE_FMT_S32) {
-					int16Buffer = buffer<int16>(bufferSize*channels);
+				else {
+				    int16Buffer = buffer<int16>(bufferSize*channels);
+				    if(audio->sample_fmt == AV_SAMPLE_FMT_S32) {
 					for(size_t i : range(bufferSize*channels)) int16Buffer[i] = ((int32*)frame->data[0])[i] >> 16;
+				    } else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
+					for(size_t i : range(bufferSize)) for(size_t j : range(channels)) {
+					    int32 s = ((float*)frame->data[j])[i]*(1<<15); //TODO: ReplayGain
+					    if(s<-(1<<15) || s >= int(uint(1<<15)-1)) error("Clip", -(1<<15), s, 1<<15, ((float*)frame->data[j])[i]);
+					    int16Buffer[i*channels+j] = s;
+					}
+				    }
+				    else error("Unimplemented conversion to int16 from", (int)audio->sample_fmt);
 				}
-				else error("Unimplemented conversion to int16 from", (int)audio->sample_fmt);
 				audioTime = packet.pts*audioFrameRate*audioStream->time_base.num/audioStream->time_base.den;
 			}
 			av_free_packet(&packet);
