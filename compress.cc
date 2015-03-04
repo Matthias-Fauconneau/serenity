@@ -69,8 +69,8 @@ struct Compress {
 			//writeFile(section(fileName,'.')+".eg10", encoded + metadata);
 		}
 		assert_(dataSize == 3*(3072*4096*2+256));
-		const size_t zipSize = 58863037, xzSize = 48869840;
-		log(encodedSize/1024./1024, "\t/ 16bit (raw)", (real)encodedSize/dataSize, "\t/ deflate (GZ)", (real)encodedSize/zipSize, "\t/ 12bit (raw)", encodedSize/(dataSize*12/16.),  "\t/ LZMA (XZ)", (real)encodedSize/xzSize);
-		log(encodedSize/1024./1024/encodeTime.toReal(), encodedSize/1024./1024/decodeTime.toReal());
+		const size_t xzSize = 48869840;
+		log(encodedSize/1024./1024, (real)(encodedSize-3*256)*8/(3*3072*4096), "bps",  "LZMA (XZ)", (real)xzSize*8/(3*3072*4096));
+		log((3*3072*4096/1024./1024)/encodeTime.toReal(), (3*3072*4096/1024./1024)/decodeTime.toReal());
 	}
 } app;
