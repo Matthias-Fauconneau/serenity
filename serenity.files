@@ -26,6 +26,7 @@ ui/interface.h
 ui/gl.h
 
 player.cc
+web.cc
 
 raw.h
 demosaic.h
@@ -34,3 +35,4 @@ compress.cc
 calibrate.cc
 correct.cc
 flic.cc
+cat.cc
