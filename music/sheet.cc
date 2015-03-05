@@ -5,7 +5,7 @@
 static int clefStep(Clef clef, int step) { return step - (clef.clefSign==GClef ? 10 : -2) - clef.octave*7; } // Translates C4 step to top line step using clef
 static int clefStep(Sign sign) { assert_(sign.type==Sign::Note, int(sign.type)); return clefStep(sign.note.clef, sign.note.step); }
 
-static vec2 text(vec2 origin, string message, float fontSize, array<Glyph>& glyphs, vec2 align=0 /*0:left|top,1/2,center,1:right|bottom*/) {
+static vec2 text(vec2 origin, string message, float fontSize, array<Glyph>& glyphs, vec2 unused align=0 /*0:left|top,1/2,center,1:right|bottom*/) {
 	Text text(message, fontSize, 0, 1, 0, "LinLibertine", false);
 	vec2 textSize = text.sizeHint();
 	//origin -= align*textSize;
@@ -33,7 +33,7 @@ struct SheetContext {
 	float textSize = 6*halfLineInterval;
 
 	// Vertical positioning
-    float staffY(int staff, int clefStep) { return -staff*(/*10*/(4+4+1)*lineInterval+0*halfLineInterval) - clefStep * halfLineInterval; }
+	float staffY(int staff, int clefStep) { return -staff*((4+4+1)*lineInterval+0*halfLineInterval) - clefStep * halfLineInterval; }
 	float Y(uint staff, Clef clef, int step) { return staffY(staff, clefStep(clef, step)); };
 	float Y(Sign sign) { assert_(sign.type==Sign::Note, int(sign.type)); return staffY(sign.staff, clefStep(sign)); };
 
@@ -76,7 +76,7 @@ struct System : SheetContext {
 	// Glyph methods
 	vec2 glyphSize(uint code, Font* font_=0/*font*/) { Font& font=font_?*font_:this->font; return font.metrics(font.index(code)).size; }
 	float glyphAdvance(uint code, Font* font_=0/*font*/) { Font& font=font_?*font_:this->font; return font.metrics(font.index(code)).advance; }
-	int noteCode(const Sign& sign) { return min(SMuFL::NoteHead::Whole+int(sign.note.value), int(SMuFL::NoteHead::Black)); };
+	int noteCode(const Sign& sign) { assert_(sign.type==Sign::Note); return min<int>(SMuFL::NoteHead::Breve+int(sign.note.value), int(SMuFL::NoteHead::Black)); };
 	float noteSize(const Sign& sign) { return font.metrics(font.index(noteCode(sign))).advance; };
 
 	// Metrics
@@ -218,22 +218,22 @@ void System::layoutNotes(uint staff) {
 		Value second = max(apply(beam[1], [](Sign sign){return sign.note.value;}));
 		// Beams
 		for(size_t index: range(min(first,second)-Quarter)) {
-			float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1);
-			vec2 p0 (x[0]-stemWidth/2, tip[0]-beamWidth/2 + Y);
-			vec2 p1 (x[1]+stemWidth/2, tip[1]-beamWidth/2 + Y);
+			float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1) - !stemUp * beamWidth;
+			vec2 p0 (x[0]-stemWidth/2, tip[0] + Y);
+			vec2 p1 (x[1]+stemWidth/2, tip[1] + Y);
 			system.parallelograms.append(p0, p1, beamWidth, black, opacity);
 		}
 		for(size_t index: range(min(first,second)-Quarter, first-Quarter)) {
-			float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1);
-			vec2 p0 (x[0]-stemWidth/2, tip[0]-beamWidth/2 + Y);
-			vec2 p1 (x[1]+stemWidth/2, (tip[0]+tip[1])/2-beamWidth/2 + Y);
+			float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1) - !stemUp * beamWidth;
+			vec2 p0 (x[0]-stemWidth/2, tip[0] + Y);
+			vec2 p1 (x[1]+stemWidth/2, (tip[0]+tip[1])/2 + Y);
 			p1 = (float(sign[1].duration)*p0 + float(sign[0].duration)*p1)/float(sign[0].duration+sign[1].duration);
 			system.parallelograms.append(p0, p1, beamWidth, black, opacity);
 		}
 		for(size_t index: range(int(min(first,second)-Quarter), int(second-Quarter))) {
-			float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1);
-			vec2 p0 (x[0]-stemWidth/2, tip[0]-beamWidth/2 + Y);
-			vec2 p1 (x[1]+stemWidth/2, tip[1]-beamWidth/2 + Y);
+			float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1) - !stemUp * beamWidth;
+			vec2 p0 (x[0]-stemWidth/2, tip[0] + Y);
+			vec2 p1 (x[1]+stemWidth/2, tip[1] + Y);
 			p0 = (float(sign[1].duration)*p0 + float(sign[0].duration)*p1)/float(sign[0].duration+sign[1].duration);
 			system.parallelograms.append(p0, p1, beamWidth, black, opacity);
 		}
@@ -261,7 +261,7 @@ void System::layoutNotes(uint staff) {
 			const Chord& chord = beam[chordIndex];
 			Value value = chord[0].note.value;
 			for(size_t index: range(value-Quarter)) {
-				float dy = (stemUp ? 1 : -1) * float(index) * (beamWidth+1) - beamWidth/2;
+				float dy = (stemUp ? 1 : -1) * float(index) * (beamWidth+1) - !stemUp * beamWidth;
 				system.parallelograms.append(
 							vec2(stemX(beam[chordIndex], stemUp)-(chordIndex==0?1./2:0), stemsY[chordIndex]+dy),
 							vec2(stemX(beam[chordIndex+1], stemUp)+(chordIndex==beam.size-1?1./2:0), stemsY[chordIndex+1]+dy), beamWidth);
@@ -804,16 +804,16 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
                             for(size_t staff : range(staves.size)) system.lines.append(vec2(x, staffY(staff,0)), vec2(x, staffY(staff,-8)), black, 1.f/2, true);
 						}
 					}
-					//if(signIndex == signs.size-1) break; // End of line, last measure bar
 					if(measureBars) measureBars->insert(sign.time, x);
 
 					// Line break
+					if(signIndex == signs.size-1) break; // End of line, last measure bar
 					if(x > pageWidth && !measureBars && !activeTies && !notes) break;
 					//if(pageSize && breakIndex>startIndex && sign.measure.lineBreak) break;
 					// Records current parameters at the end of this measure in case next measure triggers a line break
 					if(sign.measure.lineBreak == Measure::PageBreak) pageBreak = true;
 					lastMeasureBarIndex = signIndex;
-					allocatedLineWidth = x + space + margin;
+					allocatedLineWidth = x + margin;
 					spaceCount = timeTrack.size() - 1; /*-1 as there is no space for last measure bar*/ // + additionnalSpaceCount;
 
 					// Evaluates next measure step ranges
@@ -1080,7 +1080,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
 		if(pageSize.x) { // Evaluates next line break
 			System system(context, staves, pageSize.x, pages.size, systems.size, systems ? &systems.last() : nullptr, signs.slice(startIndex), 0, 0, 0, 0);
 			breakIndex = startIndex + system.lastMeasureBarIndex + 1;
-            if(!(startIndex < breakIndex && system.spaceCount)) { log("FIXME"); break; }
+			if(!(startIndex < breakIndex && system.spaceCount)) { log("Empty line"); break; }
             assert_(startIndex < breakIndex && system.spaceCount, startIndex, breakIndex, system.spaceCount);
 			spaceWidth = system.space + float(pageSize.x - system.allocatedLineWidth) / float(system.spaceCount);
 
@@ -1089,7 +1089,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
 			if(pageSize.y) {
 				float minY = context.staffY(1, system.line[1].top);
 				float maxY = context.staffY(0, system.line[0].bottom);
-				if(systems && (/*system.pageBreak ||*/ systems.size >= 6 /*FIXME*/ || requiredHeight + (maxY-minY) + systems.size*4*context.lineInterval > pageSize.y)) {
+				if(systems && (/*system.pageBreak ||*/ systems.size >= 7 || requiredHeight + (maxY-minY) + systems.size*4*context.lineInterval > pageSize.y)) {
 					requiredHeight = 0; // -> doPage
 					doPage();
 				}

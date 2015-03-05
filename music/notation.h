@@ -36,29 +36,29 @@ inline int keyStep(int fifths, int key) {
 }
 
 namespace SMuFL { //Standard Music Font Layout
-	namespace NoteHead { enum { Double=0xE0A0, Square, Whole, Half, Black }; }
+	namespace NoteHead { enum { Breve=0xE0A1, Whole, Half, Black }; }
 	namespace Rest { enum { Maxima = 0xE4E0, Longa, Double, Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth }; }
 	namespace Clef {  enum { G=0xE050, F=0xE062 }; enum { _15mb=1, _8vb, _8va, _15ma }; }
 	namespace TimeSignature {  enum { _0=0xE080 }; }
 	enum { Dot=0xE1E7 };
-    enum Tremolos { Tremolo };
+	enum Tremolos { Tremolo };
 	namespace Flag { enum { Above=0xE240, Below }; }
-    enum Accidental { None=0, AccidentalBase=0xE260, Flat=AccidentalBase, Natural, Sharp, DoubleSharp, DoubleFlat, TripleSharp, TripleFlat, NaturalFlat, NaturalSharp, SharpSharp};
+	enum Accidental { None=0, AccidentalBase=0xE260, Flat=AccidentalBase, Natural, Sharp, DoubleSharp, DoubleFlat, TripleSharp, TripleFlat, NaturalFlat, NaturalSharp, SharpSharp};
 	static constexpr string accidental[] = {"flat"_,"natural"_,"sharp"_,"double-sharp"_,"flat-flat"_/*double-flat*/};
-    namespace Articulation { enum { Base=0xE4A0, Accent=0, Staccato=1, Tenuto=2 }; }
+	namespace Articulation { enum { Base=0xE4A0, Accent=0, Staccato=1, Tenuto=2 }; }
 	enum Dynamic { DynamicBase=0xE520/*Piano=DynamicBase, Mezzo, Forte, Rinforzando, Sforzando, z, n, pppppp, ppppp, pppp, ppp, pp, mp, mf, pf, ff, fff, ffff, fffff, ffffff,
 				   fp, fz, sf, sfp, sfpp, sfz, sfzp, sffz, rf, rfz*/ };
 	static constexpr string dynamic[] = {
 		"p", "m", "f", "r", "s", "z", "n", "pppppp", "ppppp", "pppp", "ppp", "pp", "mp", "mf", "pf", "ff", "fff", "ffff", "fffff", "ffffff",
 		"fp", "fz", "sf", "sfp", "sfpp", "sfz", "sfzp", "sffz", "rf", "rfz"};
-    enum Ornaments { SlashUp = 0xE564, SlashDown };
+	enum Ornaments { SlashUp = 0xE564, SlashDown };
 	namespace Pedal { enum { Mark = 0xE650 }; }
-    enum Segment { Arpeggio = 0xEAA9 };
+	enum Segment { Arpeggio = 0xEAA9 };
 }
 
-enum Value { InvalidValue=-1,                  /*Maxima, Longa,*/ Double /*=Breve*/, Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
-static constexpr string valueNames[] = {/*"maxima","longa",*/ "breve"_/*=double*/,"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_,"32nd"_,"64th"_};
-static constexpr uint valueDurations[] = {/*512, 256,*/ 128,       64,         32,       16,           8,             4,         2,         1};
+enum Value { InvalidValue=-1, Breve, Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
+static constexpr string valueNames[] = {"breve"_, "whole"_,"half"_, "quarter"_, "eighth"_, "16th"_, "32nd"_, "64th"_};
+static constexpr uint valueDurations[] = {128,       64,         32,       16,           8,             4,         2,         1};
 static constexpr uint quarterDuration = 16;
 
 enum ClefSign { NoClef=0, FClef=SMuFL::Clef::F, GClef=SMuFL::Clef::G };

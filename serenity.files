@@ -36,3 +36,11 @@ calibrate.cc
 correct.cc
 flic.cc
 cat.cc
+
+layout/layout.h
+layout/parse.cc
+layout/render.cc
+layout/export.cc
+
+music/sheet.cc
+music/MusicXML.cc

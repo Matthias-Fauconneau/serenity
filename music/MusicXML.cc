@@ -118,7 +118,7 @@ MusicXML::MusicXML(string document, string) {
                 maxTime = max(maxTime, time);
 
                 if(e.name=="note"_) {
-                    Value value = e.contains("type"_) ? Value(ref<string>(valueNames).indexOf(e("type"_).text())) : Whole;
+					Value value = e.contains("type"_) ? Value(ref<string>(valueNames).indexOf(e("type"_).text())) : Whole;
 					assert_(int(value)!=-1, e);
                     int duration;
                     uint durationCoefficientNum=1, durationCoefficientDen=1;
