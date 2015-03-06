@@ -171,8 +171,8 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
 
 			auto P = [&](vec2 p) { return str(p.x*px, (pageSize.y-p.y)*px); };
 			content.append("0 w\n");
+			setOpacity(1); // Always reset opacity to 1 for proper print of "cosmetic" (single dot) lines.
 			for(auto& line: graphics.lines) {
-				setOpacity(line.opacity);
 				content.append(P(line.a)+" m "+P(line.b)+" l S\n");
 			}
 

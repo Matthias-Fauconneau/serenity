@@ -380,11 +380,12 @@ void System::layoutNotes(uint staff) {
 					}
 				}
 				if(tieStart != invalid) {
-					//assert_(tieStart != invalid, sign, apply(activeTies[staff],[](TieStart o){return o.step;}), pages.size, systems.size);
+					//assert_(tieStart != invalid, sign, apply(activeTies[staff],[](TieStart o){return o.step;}), pages.size, pageSystems.size);
 					TieStart tie = activeTies->take(tieStart);
 					//log(apply(activeTies[staff],[](TieStart o){return o.step;}));
 
-					assert_(tie.position.y == Y(sign));
+					//assert_(tie.position.y == Y(sign));
+					if(tie.position.y != Y(sign)) log("tie.position.y != Y(sign)", tie.position.y, Y(sign));
 					float x = timeTrack.at(sign.time) + spaceWidth, y = Y(sign);
 					int slurDown = (chord.size>1 && index==chord.size-1) ? -1 :(y > staffY(staff, -4) ? 1 : -1);
 					vec2 p0 = vec2(tie.position.x + noteSize(sign)/2 + (note.dot?space/2:0), y + slurDown*halfLineInterval);
@@ -617,7 +618,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 						assert_(staves[staff].octaveStart.octave==Down || staves[staff].octaveStart.octave==Up, int(staves[staff].octaveStart.octave));
 						if(staves[staff].octaveStart.octave == Down) staves[staff].clef.octave--;
 						if(staves[staff].octaveStart.octave == Up) staves[staff].clef.octave++;
-						//assert_(staves[staff].clef.octave == 0, staff, staves[staff].clef.octave, pages.size, systems.size, int(sign.octave));
+						//assert_(staves[staff].clef.octave == 0, staff, staves[staff].clef.octave, pages.size, pageSystems.size, int(sign.octave));
 						//if(!timeTrack.contains(sign.time)) timeTrack.insert(sign.time, timeTrack.values[min(timeTrack.keys.linearSearch(sign.time), timeTrack.keys.size-1)]);
 						float x = staves[staff].octaveStart.time < timeTrack.keys.first() ? 0 /*TODO: wrap*/: timeTrack.at(staves[staff].octaveStart.time);
 						float start = x + space * 2;
@@ -628,7 +629,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 					}
 					else error(int(sign.octave));
 					staves[staff].octaveStart = sign;
-					//log(pages.size, systems.size, sign, staves[staff].clef.octave);
+					//log(pages.size, pageSystems.size, sign, staves[staff].clef.octave);
 				} else error(int(sign.type));
 				//timeTrack.at(sign.time).staves[staff].x = x;
 			} else {
@@ -1009,7 +1010,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
             system.lines.append(vec2(measureBars->values[0], y), vec2(measureBars->values.last(), y), black, 3.f/4, true); // Raster
 		}
 	}
-	int highMargin = 0, lowMargin = -8;
+	const int highMargin = 0, lowMargin = -18;
 	system.bounds.min = vec2(0, staffY(staves.size-1, max(highMargin, line[staves.size-1].top)+2));
 	system.bounds.max = vec2(pageWidth, staffY(0, min(lowMargin, line[0].bottom)));
 }
@@ -1027,14 +1028,14 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
 	buffer<Staff> staves {staffCount}; staves.clear(); for(Staff& staff: staves) staff.x = context.margin;
 	array<System::TieStart> activeTies;
 	map<uint, array<Sign>> notes;
-	array<Graphics> systems;
 
-	auto doPage = [&]{
+	/// Distributes systems evenly within page
+	auto doPage = [this, pageSize, title, context, pageNumbers](mref<Graphics> systems){
 		float totalHeight = sum(apply(systems, [](const Graphics& o) { return o.bounds.size().y; }));
 		if(pageSize.y) {
 			if(totalHeight < pageSize.y) { // Spreads systems with margins
 				float extra = (pageSize.y - totalHeight) / (systems.size+1);
-				float offset = extra - systems.first().bounds.min.y;
+				float offset = extra - systems[0].bounds.min.y;
 				for(Graphics& system: systems) {
 					system.translate(vec2(0, offset));
 					offset += system.bounds.size().y + extra;
@@ -1061,7 +1062,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
 			system.translate(system.offset); // FIXME: -> append
 			if(!pageSize) assert_(!pages.last().glyphs);
 			pages.last().append(system); // Appends systems first to preserve references to glyph indices
-        }
+		}
 		if(pages.size==1) text(vec2(pageSize.x/2, 0), bold(title), context.textSize, pages.last().glyphs, vec2(1./2, 0));
 		if(pageNumbers) { // Page index numbers at each corner
 			float margin = context.margin;
@@ -1070,46 +1071,73 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
 			//text(vec2(margin,pageSize.y-margin/2), str(pages.size), context.textSize, pages.last().glyphs, vec2(0, 1));
 			//text(vec2(pageSize.x-margin,pageSize.y-margin/2), str(pages.size), context.textSize, pages.last().glyphs, vec2(1, 1));
 		}
-		systems.clear();
 	};
 
-	size_t lineCount = 0; float requiredHeight = 0;
-	for(size_t startIndex = 0; startIndex < signs.size;) { // Lines
-		size_t breakIndex = signs.size;
-		float spaceWidth = 0;
-		if(pageSize.x) { // Evaluates next line break
-			System system(context, staves, pageSize.x, pages.size, systems.size, systems ? &systems.last() : nullptr, signs.slice(startIndex), 0, 0, 0, 0);
-			breakIndex = startIndex + system.lastMeasureBarIndex + 1;
-			if(!(startIndex < breakIndex && system.spaceCount)) { log("Empty line"); break; }
-            assert_(startIndex < breakIndex && system.spaceCount, startIndex, breakIndex, system.spaceCount);
-			spaceWidth = system.space + float(pageSize.x - system.allocatedLineWidth) / float(system.spaceCount);
+	/// Layouts systems and evaluates minimum page count
+	array<Graphics> totalSystems;
+	size_t pageCount = 0;
+	{
+		float requiredHeight = 0;
+		array<Graphics> pageSystems;
+		for(size_t startIndex = 0; startIndex < signs.size;) { // Lines
+			size_t breakIndex = signs.size;
+			float spaceWidth = 0;
+			if(pageSize.x) { // Evaluates next line break
+				System system(context, staves, pageSize.x, pages.size, pageSystems.size, pageSystems ? &pageSystems.last() : nullptr, signs.slice(startIndex), 0, 0, 0, 0);
+				breakIndex = startIndex + system.lastMeasureBarIndex + 1;
+				if(!(startIndex < breakIndex && system.spaceCount)) { log("Empty line"); break; }
+				assert_(startIndex < breakIndex && system.spaceCount, startIndex, breakIndex, system.spaceCount);
+				spaceWidth = system.space + float(pageSize.x - system.allocatedLineWidth) / float(system.spaceCount);
 
-			// Breaks page as needed
-			//int highMargin = 3, lowMargin = -8-4;
-			if(pageSize.y) {
-				float minY = context.staffY(1, system.line[1].top);
-				float maxY = context.staffY(0, system.line[0].bottom);
-				if(systems && (/*system.pageBreak ||*/ systems.size >= 7 || requiredHeight + (maxY-minY) + systems.size*4*context.lineInterval > pageSize.y)) {
-					requiredHeight = 0; // -> doPage
-					doPage();
+				// Breaks page as needed
+				if(pageSize.y) {
+					float height = system.system.bounds.size().y;
+					if(requiredHeight + height + pageSystems.size*4*context.lineInterval > pageSize.y) {
+						pageCount++;
+						requiredHeight = 0;
+						totalSystems.append(move(pageSystems));
+						pageSystems.clear();
+					}
 				}
 			}
+
+			// -- Layouts justified system
+			System system(context, staves, pageSize.x, pages.size, pageSystems.size, pageSystems ? &pageSystems.last() : nullptr, signs.slice(startIndex, breakIndex-startIndex),
+						  &measureBars, &activeTies, &notes, spaceWidth);
+			context = system; staves = copy(system.staves); // Copies back context for next line
+
+			requiredHeight += system.system.bounds.size().y;
+			pageSystems.append(move(system.system));
+			this->lowestStep = min(this->lowestStep, system.line[0].bottom);
+			this->highestStep = max(this->highestStep, system.line[1].top);
+
+			startIndex = breakIndex;
 		}
-
-		// -- Layouts justified system
-		System system(context, staves, pageSize.x, pages.size, systems.size, systems ? &systems.last() : nullptr, signs.slice(startIndex, breakIndex-startIndex),
-					  &measureBars, &activeTies, &notes, spaceWidth);
-		context = system; staves = copy(system.staves); // Copies back context for next line
-
-		lineCount++;
-		requiredHeight += system.system.bounds.size().y;
-		systems.append(move(system.system));
-		this->lowestStep = min(this->lowestStep, system.line[0].bottom);
-		this->highestStep = max(this->highestStep, system.line[1].top);
-
-		startIndex = breakIndex;
+		pageCount++;
+		totalSystems.append(move(pageSystems));
 	}
-	doPage();
+
+	/// Distributes systems evenly between pages
+	size_t maxSystemPerPage = (totalSystems.size+pageCount-1) / pageCount;
+	{
+		float requiredHeight = 0;
+		array<Graphics> pageSystems;
+		while(totalSystems) {
+			Graphics system = totalSystems.take(0);
+			if(pageSize.y) {
+				float height = system.bounds.size().y;
+				if(pageSystems.size >= maxSystemPerPage || requiredHeight + height+ pageSystems.size*4*context.lineInterval > pageSize.y) {
+					requiredHeight = 0;
+					doPage(pageSystems);
+					pageSystems.clear();
+				}
+			}
+			requiredHeight += system.bounds.size().y;
+			pageSystems.append(move(system));
+		}
+		doPage(pageSystems);
+	}
+
 	if(!context.ticksPerMinutes) context.ticksPerMinutes = 90*ticksPerQuarter;
 
 	midiToSign = buffer<Sign>(midiNotes.size, 0);

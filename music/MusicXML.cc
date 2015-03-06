@@ -637,7 +637,7 @@ MusicXML::MusicXML(string document, string) {
                             sign.note.tieStartNoteIndex, signs[sign.note.tieStartNoteIndex]);
                     sign.note.step = signs[sign.note.tieStartNoteIndex].note.step;
                     sign.note.alteration = signs[sign.note.tieStartNoteIndex].note.alteration;
-                    assert_(!sign.note.accidental);
+					if(sign.note.accidental) log("sign.note.accidental");
                     continue;
                 }
 			}

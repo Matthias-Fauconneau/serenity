@@ -44,3 +44,4 @@ layout/export.cc
 
 music/sheet.cc
 music/MusicXML.cc
+music/music-pdf.cc
