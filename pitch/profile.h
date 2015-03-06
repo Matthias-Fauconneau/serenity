@@ -20,13 +20,13 @@ struct OffsetPlot : Widget {
     }
     ~OffsetPlot() {
 		array<char> s;
-        for(uint i: range(keyCount)) s << str(offsets[i]*100) << ' ' << str(sqrt(variances[i])*100) << '\n';
+		for(uint i: range(keyCount)) s.append(str(offsets[i]*100)+' '+str(sqrt(variances[i])*100)+'\n');
         writeFile("offsets.profile", s, config, true);
     }
     void reset() { mref<float>(offsets).clear(); mref<float>(variances).clear(); }
-    int2 sizeHint(int2) const override { return int2(-keyCount*18, 768); }
-    Graphics graphics(int2 size) const override {
-        Graphics graphics;
+	vec2 sizeHint(vec2) override { return vec2(-keyCount*18, 768); }
+	shared<Graphics> graphics(vec2 size) override {
+		shared<Graphics> graphics;
         float minimumOffset = -1./4;
         float maximumOffset = 1./4;
         for(int key: range(keyCount)) {
@@ -44,22 +44,22 @@ struct OffsetPlot : Widget {
             // High confidence between zero and max(0, |offset|-deviation)
             float p1 = max(0.f, abs(offset)-deviation);
             int y1 = size.y * (maximumOffset-sign*p1-p0) / (maximumOffset-minimumOffset);
-            graphics.fills << Fill{vec2(x0, min(y0,y1)), vec2(dx, abs(y0-y1)), sign*p1>0 ? red : blue, 1};
+			graphics->fills.append(vec2(x0, min(y0,y1)), vec2(dx, abs(y0-y1)), sign*p1>0 ? red : blue, 1.f);
 
             // Mid confidence between max(0,|offset|-deviation) and |offset|
             float p2 = abs(offset);
             int y2 = size.y * (maximumOffset-sign*p2-p0) / (maximumOffset-minimumOffset);
-            graphics.fills << Fill{vec2(x0, min(y1,y2)), vec2(dx, abs(y1-y2)), 3.f/4*(sign*p2>0 ? red : blue), 1};
+			graphics->fills.append(vec2(x0, min(y1,y2)), vec2(dx, abs(y1-y2)), 3.f/4*(sign*p2>0 ? red : blue), 1.f);
 
             // Low confidence between |offset| and |offset|+deviation
             float p3 = abs(offset)+deviation;
             int y3 = size.y * (maximumOffset-sign*p3-p0) / (maximumOffset-minimumOffset);
-            graphics.fills << Fill{vec2(x0, min(y2,y3)), vec2(dx, abs(y2-y3)), 1.f/2*(sign*p3>0 ? red : blue), 1};
+			graphics->fills.append(vec2(x0, min(y2,y3)), vec2(dx, abs(y2-y3)), 1.f/2*(sign*p3>0 ? red : blue), 1.f);
 
             // Low confidence between min(|offset|-deviation, 0) and zero
             float p4 = min(0.f, abs(offset)-deviation);
             int y4 = size.y * (maximumOffset-sign*p4-p0) / (maximumOffset-minimumOffset);
-            graphics.fills << Fill{vec2(x0, min(y4,y0)), vec2(dx, abs(y4-y0)), 1.f/2*(sign*p4>0 ? red : blue), 1};
+			graphics->fills.append(vec2(x0, min(y4,y0)), vec2(dx, abs(y4-y0)), 1.f/2*(sign*p4>0 ? red : blue), 1.f);
         }
         return graphics;
     }
