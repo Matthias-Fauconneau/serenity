@@ -18,13 +18,13 @@ struct Record : Poll, Widget {
     float smoothedMean = 0;
 
     Thread videoThread {-20};
-    VideoInput video {{this, &Record::bufferVideo}, videoThread};
+	//VideoInput video {{this, &Record::bufferVideo}, videoThread};
     struct VideoFrame : buffer<byte> { uint64 time=0; VideoFrame() {} VideoFrame(buffer<byte>&& data, uint64 time) : buffer<byte>(::move(data)), time(time) {} };
     array<VideoFrame> videoFrames;
     uint64 firstTimeStamp = 0;
 
     const int margin = 16;
-    Window window {this, int2(video.width+2*margin,video.height+margin), [](){return "Record"__;}};
+	Window window {this, int2(/*video.width+*/2*margin,600/*video.height+margin*/), [](){return "Record"__;}};
     Lock viewLock;
     VideoFrame lastFrame;
     Image image;
@@ -53,7 +53,7 @@ struct Record : Poll, Widget {
         window.actions[Space] = {this, &Record::toggle};
         window.show();
 
-        video.start();
+		//video.start();
         videoThread.spawn();
         audio.start(2, 48000, 4096 /*ChromeOS kernel restricts maximum buffer size*/);
         audioThread.spawn(); // after registerPoll in audio.setup
@@ -69,7 +69,7 @@ struct Record : Poll, Widget {
         Locker locker(lock);
         firstTimeStamp = 0;
         encoder = unique<Encoder>(arguments()[0]+".mkv"_);
-        if(encodeVideo) encoder->setMJPEG(int2(video.width, video.height), video.frameRate);
+		//if(encodeVideo) encoder->setMJPEG(int2(video.width, video.height), video.frameRate);
         if(encodeAudio) encoder->setFLAC(audio.sampleBits, 1, 48000);
         encoder->open();
         audio.start(2, encoder->audioFrameRate, 4096 /*ChromeOS kernel restricts maximum buffer size*/);
