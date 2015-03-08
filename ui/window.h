@@ -25,7 +25,7 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     bgr3f backgroundColor = white;
 
     /// Associated window resource (relative to resource ID base Display::id)
-    enum Resource { XWindow, Colormap, PresentEvent, Pixmap };
+    enum Resource { XWindow, GraphicContext, Colormap, PresentEvent, Segment, Pixmap };
 #if 0 // DRI3
     /// GPU device
     int drmDevice = 0;
@@ -38,11 +38,18 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     EGLSurface eglSurface = 0;
     struct gbm_bo* bo = 0;
     int2 surfaceSize = 0;
-#else // GLX/Xlib/DRI2
+#elif 0 // GLX/Xlib/DRI2
     /// OpenGL
     struct __GLXFBConfigRec* fbConfig = 0;
     struct _XDisplay* glDisplay = 0;
     struct __GLXcontextRec* glContext = 0;
+#else
+    /// System V shared memory
+    uint shm = 0;
+    /// Rendering target in shared memory
+    Image target;
+    /// Shared window buffer state
+    enum State { Idle, Copy, Present } state = Idle;
 #endif
 
     /// Whether this window is currently mapped. This doesn't imply the window is visible (can be covered)

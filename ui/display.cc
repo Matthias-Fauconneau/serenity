@@ -21,6 +21,7 @@ String str(XEvent e) {
 }
 
 // Globals
+namespace Shm { int EXT, event, errorBase; };
 namespace DRI3 { int EXT; }
 namespace Present { int EXT; }
 
@@ -60,7 +61,10 @@ Display::Display(Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::f
         assert(visual);
     }
 
-    {auto r = request(QueryExtension{.length="Present"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "Present"_); Present::EXT=r.major; assert_(Present::EXT); }
+    {auto r = request(QueryExtension{.length="MIT-SHM"_.size, .size=uint16(2+align(4,"MIT-SHM"_.size)/4)}, "MIT-SHM"_);
+	Shm::EXT=r.major; Shm::event=r.firstEvent; Shm::errorBase=r.firstError;}
+    {auto r = request(QueryExtension{.length="Present"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "Present"_);
+	Present::EXT=r.major; assert_(Present::EXT); }
 }
 
 void Display::event() {

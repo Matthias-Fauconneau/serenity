@@ -4,9 +4,8 @@
 #include "png.h"
 #include "time.h"
 
-#include "gl.h"
 #if 0 // DRI3
-#include <sys/shm.h>
+#include "gl.h"
 #include <sys/uio.h>
 #include <sys/socket.h>
 #include <sys/unistd.h>
@@ -17,7 +16,7 @@
 #include <GL/gl.h> // drm
 #include <sys/mman.h>
 extern "C" int drmPrimeHandleToFD(int fd, uint32_t handle, uint32_t flags, int *prime_fd);
-#else // GLX/Xlib/DRI2
+#elif 0 // GLX/Xlib/DRI2
 #undef packed
 #define Time XTime
 #define Cursor XCursor
@@ -37,6 +36,8 @@ extern "C" int drmPrimeHandleToFD(int fd, uint32_t handle, uint32_t flags, int *
 #undef Display
 #undef Font
 #undef None
+#else
+#include <sys/shm.h>
 #endif
 
 Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool show, const Image& icon, Thread& thread)
@@ -81,12 +82,14 @@ Window::Window(Widget* widget, int2 sizeHint, function<String()> title, bool sho
 		assert_(eglSurface);
 		eglMakeCurrent(eglDevice, eglSurface, eglSurface, eglContext);
 		surfaceSize = size;
-#else // GLX/Xlib/DRI2
+#elif 0 // GLX/Xlib/DRI2
 	glDisplay = XOpenDisplay(strz(getenv("DISPLAY"_,":0"_))); assert_(glDisplay);
 	const int fbAttribs[] = {GLX_DOUBLEBUFFER, 0/*1*/, GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 24,
                              /*GLX_SAMPLE_BUFFERS, 1, GLX_SAMPLES, 8,*/ 0};
 	int fbCount=0; fbConfig = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount)[0]; assert(fbConfig && fbCount);
 	initializeThreadGLContext();
+#else
+	send(CreateGC{.context=id+GraphicContext, .window=id+XWindow});
 #endif
 }
 
@@ -107,7 +110,7 @@ void Window::onEvent(const ref<byte> ge) {
 			const auto& completeNotify = *(struct Present::CompleteNotify*)&event;
 			assert_(sizeof(XEvent)+event.genericEvent.size*4 == sizeof(completeNotify),
 					sizeof(XEvent)+event.genericEvent.size*4, sizeof(completeNotify));
-#if DRI3
+#if 0
 			assert_(bo);
 			gbm_surface_release_buffer(gbmSurface, bo);
 			bo = 0;
@@ -167,6 +170,7 @@ bool Window::processEvent(const XEvent& e) {
         else requestTermination(0); // Exits application by default
     }
 	else if(type==MappingNotify) {}
+	else if(type==Shm::event+Shm::Completion) { assert_(state == Copy); state = Present; }
     else return false;
     return true;
 }
@@ -201,7 +205,7 @@ void Window::render(shared<Graphics>&& graphics, int2 origin, int2 size) {
 }
 void Window::render() { Locker lock(this->lock); assert_(size); updates.clear(); render(nullptr, int2(0), size); }
 
-#if DRI3
+#if 0
 struct DMABuf {
 	int fd = 0;
 	DMABuf() {}
@@ -217,7 +221,7 @@ void Window::event() {
     setTitle(getTitle ? getTitle() : widget->title());
 	if(!updates) return;
 	assert_(size);
-#if DRI3
+#if 0
 	if(bo) return; // Wait for Present
 	assert_(!bo);
 	if(surfaceSize != size) {
@@ -229,19 +233,38 @@ void Window::event() {
 		eglMakeCurrent(eglDevice, eglSurface, eglSurface, eglContext);
 		surfaceSize = size;
 	}
+#else
+	if(state!=Idle) return;
+	if(target.size != size) {
+		if(target) {
+			send(FreePixmap{.pixmap=id+Pixmap}); target=Image();
+			assert_(shm);
+			send(Shm::Detach{.seg=id+Segment});
+			shmdt(target.data);
+			shmctl(shm, IPC_RMID, 0);
+			shm = 0;
+		} else assert_(!shm);
+
+		uint stride = align(16, width);
+		shm = check( shmget(0, height*stride*sizeof(byte4) , IPC_CREAT | 0777) );
+		target = Image(buffer<byte4>((byte4*)check(shmat(shm, 0, 0)), height*stride, 0), size, stride);
+		target.clear(byte4(0xFF));
+		send(Shm::Attach{.seg=id+Segment, .shm=shm});
+		send(CreatePixmap{.pixmap=id+Pixmap, .window=id+XWindow, .w=uint16(width), .h=uint16(size.y)});
+	}
 #endif
 
 	lock.lock();
 	Update update = updates.take(0);
 	lock.unlock();
 	if(update.graphics) {
-		GLFrameBuffer::bindWindow(int2(update.origin.x, size.y-update.origin.y-update.size.y), update.size/*, ClearColor, vec4(backgroundColor,1)*/);
+		//GLFrameBuffer::bindWindow(int2(update.origin.x, size.y-update.origin.y-update.size.y), update.size/*, ClearColor, vec4(backgroundColor,1)*/);
 	} else {
 		// Widget::graphics may renders using GL immediately and/or return primitives
-		GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(backgroundColor,1));
+		//GLFrameBuffer::bindWindow(0, size, ClearColor|ClearDepth, vec4(backgroundColor,1));
 		update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size)));
 	}
-#if DRI3
+#if 0
 	assert_(gbm_surface_has_free_buffers(gbmSurface));
 	assert_( eglSwapBuffers(eglDevice, eglSurface) );
 	bo = gbm_surface_lock_front_buffer(gbmSurface);
@@ -249,15 +272,12 @@ void Window::event() {
 	if(!dmabuf) {
 		dmabuf = new DMABuf();
 		drmPrimeHandleToFD(drmDevice, gbm_bo_get_handle(bo).u32, 0, &dmabuf->fd);
-		//byte4* pixels = (byte4*)mmap(0, height*width*4, PROT_READ|PROT_WRITE, MAP_SHARED, dmabuf->fd, 0);
-		//mref<byte4>(pixels, height*width).clear(0);
 		send(DRI3::PixmapFromBuffer{.pixmap=id+Pixmap,.drawable=id+XWindow,.bufferSize=height*width*4,
 									.width=uint16(width),.height=uint16(height),.stride=uint16(width*4)}, dmabuf->fd);
 		gbm_bo_set_user_data(bo, dmabuf, &destroy_user_data);
 	}
-	//::render(Image(dmabuf->pointer, size), update.graphics); // FIXME: Render retained graphics
 	send(Present::Pixmap{.window=id+XWindow, .pixmap=id+Pixmap}); //FIXME: update region
-#else
+#elif 0
 	if(update.graphics) {
 		Image target(update.size); target.clear(0xFF);
 		::render(target, update.graphics, -vec2(update.origin));
@@ -265,11 +285,19 @@ void Window::event() {
 		GLFrameBuffer::blitWindow(target, int2(update.origin.x, size.y-update.origin.y-update.size.y));
 	}
 	glFlush();
-	//glXSwapBuffers(glDisplay, id);
+#else
+
+	fill(target, update.origin, update.size, backgroundColor, 1); // Clear framebuffer
+	::render(target, update.graphics); 	// Render retained graphics
+	send(Shm::PutImage{.window=id+Pixmap, .context=id+GraphicContext, .seg=id+Segment,
+					   .totalW=uint16(target.stride), .totalH=uint16(target.height), .srcX=uint16(update.origin.x), .srcY=uint16(update.origin.y),
+					   .srcW=uint16(update.size.x), .srcH=uint16(update.size.y), .dstX=uint16(update.origin.x), .dstY=uint16(update.origin.y),});
+	state=Copy;
+	send(Present::Pixmap{.window=id+XWindow, .pixmap=id+Pixmap}); //FIXME: update region
 #endif
-	//assert_(updates.size<=1);
 }
 
+#if 0
 void Window::initializeThreadGLContext() {
 	static Lock staticLock; Locker lock(staticLock);
 	const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION_ARB, 3, GLX_CONTEXT_MINOR_VERSION_ARB, 3, 0};
@@ -277,3 +305,4 @@ void Window::initializeThreadGLContext() {
 			(glDisplay, fbConfig, glContext, 1, contextAttribs);
 	glXMakeCurrent(glDisplay, id+XWindow, glContext);
 }
+#endif

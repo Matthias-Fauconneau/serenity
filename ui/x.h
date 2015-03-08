@@ -142,6 +142,25 @@ constexpr string errors[] = {"","Request","Value","Window","Pixmap","Atom","Curs
                               "Colormap","GContext","IDChoice","Name","Length","Implementation"};
 }
 
+namespace Shm {
+extern int EXT, event, errorBase;
+struct QueryVersion {
+    int8 ext=EXT, req=0; uint16 size=1;
+    struct Reply { int8 sharedPixmaps; uint16 seq; uint size; uint16 major,minor,uid,gid; uint8 format,pad[15]; } packed;
+};
+struct Attach { int8 ext=EXT, req=1; uint16 size=4; uint seg, shm; int8 readOnly=0, pad[3]={}; };
+struct Detach { int8 ext=EXT, req=2; uint16 size=2; uint seg; };
+struct PutImage { int8 ext=EXT, req=3; uint16 size=10; uint window,context; uint16 totalW, totalH, srcX, srcY, srcW, srcH,
+		  dstX, dstY; uint8 depth=32,format=2,sendEvent=1,bpad=32; uint seg,offset=0; };
+struct GetImage {
+    int8 ext=EXT, req=4; uint16 size=8; uint window; uint16 x=0,y=0,w,h; uint mask=~0; uint8 format=2; uint seg,offset=0;
+    struct Reply { uint8 depth; uint16 seq; uint size; uint visual, length, pad[4]; } packed;
+};
+enum { Completion };
+constexpr string requests[] = {"QueryVersion","Attach","Detach","PutImage","GetImage"};
+constexpr string errors[] = {"BadSeg"};
+}
+
 namespace Present {
 extern int EXT;
 enum { ConfigureNotifyMask=1<<0, CompleteNotifyMask=1<<1, RedirectNotifyMask=1<<2 };
