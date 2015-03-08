@@ -54,27 +54,28 @@ struct Tuner : Poll {
     Tuner() {
 		if(arguments().size>0 && isInteger(arguments()[0])) minWorstKey=parseInteger(arguments()[0]);
 		if(arguments().size>1 && isInteger(arguments()[1])) maxWorstKey=parseInteger(arguments()[1]);
-        log(input.sampleBits, input.rate, input.periodSize);
 
 		window.backgroundColor = black;
         window.actions[Space] = [this]{record=!record;}; //FIXME: threads waiting on semaphores will be stuck
         window.show();
 
+		input.start(2, rate, periodSize);
+		log(input.sampleBits, input.rate, input.periodSize);
         thread.spawn();
         readCount.acquire(N-periodSize);
     }
 
 	uint write(const ref<int32> input) {
-        if(!writeCount.tryAcquire(input.size)) {
-            log("Overflow", writeCount, input.size, readCount);
-            writeCount.acquire(input.size); // Will overflow if processing thread doesn't follow
+		if(!writeCount.tryAcquire(input.size/2)) {
+			log("Overflow", writeCount, input.size/2, readCount);
+			writeCount.acquire(input.size/2); // Will overflow if processing thread doesn't follow
         }
-        assert(writeIndex+input.size<=signal.size);
-		for(uint i: range(input.size)) signal[writeIndex+i] = input[i*2] * 0x1p-24; // Use left channel only
-        writeIndex = (writeIndex+input.size)%signal.size; // Updates ring buffer pointer
-        readCount.release(input.size); // Releases new samples
+		assert(writeIndex+input.size/2<=signal.size);
+		for(uint i: range(input.size/2)) signal[writeIndex+i] = input[i*2] * 0x1p-24; // Use left channel only
+		writeIndex = (writeIndex+input.size/2)%signal.size; // Updates ring buffer pointer
+		readCount.release(input.size/2); // Releases new samples
         queue(); // Queues processing thread
-        return input.size;
+		return input.size/2;
     }
 
     void event() {
