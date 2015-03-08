@@ -47,7 +47,6 @@ struct Record : Poll, Widget {
     Record() {
         assert_(audio.sampleBits==32);
 
-        window.background = Window::NoBackground;
         window.actions[F1] = window.actions[LeftArrow] = {this, &Record::abort};
         window.actions[F8] = window.actions[DownArrow] = {this, &Record::stop};
         window.actions[F3] = window.actions[RightArrow] = {this, &Record::start};
@@ -192,8 +191,8 @@ struct Record : Poll, Widget {
         contentChanged = true;
     }
 
-    int2 sizeHint(int2) { return image.size+int2(2*margin, margin); }
-    shared<Graphics> graphics(int2 size) override {
+	vec2 sizeHint(vec2) override { return vec2(image.size+int2(2*margin, margin)); }
+	shared<Graphics> graphics(vec2 size) override {
         if(contentChanged) {
             Locker locker(viewLock);
             if(lastFrame) image = decodeJPEG(lastFrame);
@@ -211,18 +210,18 @@ struct Record : Poll, Widget {
                                                 : (encoder->audioTime+encoder->audioFrameRate-1)/encoder->audioFrameRate;
             int64 fileSizeMB = (fileSize+1023) / 1024 / 1024;
             sizeText = Text(str(fileLengthSeconds)+"s "+str(fileSizeMB)+"MB", offset.y, white); // FIXME: skip if no change
-            graphics->graphics.insertMulti(vec2(offset.x, 0), sizeText.graphics(int2(x, offset.y)));
+			graphics->graphics.insertMulti(vec2(offset.x, 0), sizeText.graphics(vec2(x, offset.y)));
             int availableLengthMinutes = int64(fileLengthSeconds) * available / fileSize / 60;
             int64 availableMB = available / 1024 / 1024;
             availableText = Text(str(availableLengthMinutes)+"min "+str(availableMB)+"MB", offset.y, white); // FIXME: skip if no change
-            graphics->graphics.insertMulti(vec2(offset.x + x, 0), availableText.graphics(int2(size.x-offset.x-(offset.x+x), offset.y)));
+			graphics->graphics.insertMulti(vec2(offset.x + x, 0), availableText.graphics(vec2(size.x-offset.x-(offset.x+x), offset.y)));
         }
         for(int channel : range(audio.channels)) { // VU meters (actually mono)
 	    float y = size.y * (1 - smoothedMean / 0x1p28f); //clamp(1.f, float(maximumAmplitude), 0x1p28f));
             graphics->fills.append(vec2(channel?offset.x+image.size.x:0, 0), vec2(offset.x, y), black);
             graphics->fills.append(vec2(channel?offset.x+image.size.x:0, y), vec2(offset.x, size.y-y), maximumAmplitude < ((1<<31)-1) ? green : red);
         }
-        if(image) graphics->blits.append(vec2(offset), vec2(size-offset), share(image));
+		if(image) graphics->blits.append(vec2(offset), size-vec2(offset), share(image));
         return graphics;
     }
 } app;

@@ -48,3 +48,4 @@ music/music-pdf.cc
 
 pitch/profile.h
 pitch/tuner.cc
+record/video-record.cc
