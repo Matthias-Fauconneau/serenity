@@ -114,6 +114,8 @@ void Window::onEvent(const ref<byte> ge) {
 			assert_(bo);
 			gbm_surface_release_buffer(gbmSurface, bo);
 			bo = 0;
+#else
+			state = Idle;
 #endif
 			currentFrameCounterValue = completeNotify.msc;
 			if(!firstFrameCounterValue) firstFrameCounterValue = currentFrameCounterValue;

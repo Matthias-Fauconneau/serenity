@@ -114,11 +114,11 @@ String join(ref<string> list, const string separator) {
     return target;
 }
 
-/*Array*/array<string> split(const string source, string separator) {
-	/*Array*/array<string> list;
+buffer<string> split(const string source, string separator) {
+    array<string> list;
     TextData s (source);
     while(s) list.append( s.until(separator) );
-    return list;
+    return move(list);
 }
 
 // -- Number conversions

@@ -9,6 +9,7 @@ core/vector.h
 core/image.h
 core/image.cc
 core/simd.h
+core/map.h
 
 io/png.cc
 io/jpeg.cc
@@ -49,3 +50,4 @@ music/music-pdf.cc
 pitch/profile.h
 pitch/tuner.cc
 record/video-record.cc
+view.h

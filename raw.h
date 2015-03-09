@@ -7,6 +7,7 @@ struct Raw : ImageF {
     real exposure;
     int gain, gainDiv;
     int temperature;
+	buffer<uint16> registers;
 
 	Raw(ref<byte> file, bool convert=true) : Raw(cast<uint16>(file), convert) {}
 	Raw(ref<uint16> data, bool convert=true) {
@@ -21,11 +22,11 @@ struct Raw : ImageF {
 			enum { LineCount = 1, ExternExposure = 70, ExposureTime /*71-72[0:7]*/, BlackReferenceColumns = 89,
 				   Gain = 115, ADCRange, DigitalGain, BitMode, Temperature = 127 };
 			if(registers[LineCount] != size.y) log("Line count:", registers[LineCount], "!= size.y:",  size.y);
-			//assert_(registers[LineCount] == size.y, registers[LineCount], size.y, registers);
+			assert_(registers[LineCount] == size.y, registers[LineCount], size.y, registers);
 			assert_(registers[ExternExposure] == 0);
 			uint exposureTime = ((registers[ExposureTime+1]&0xFF) << 16) + registers[ExposureTime] - 1;
-			//assert_((registers[BlackReferenceColumns]&(1<<15)) == 0);
-			//assert_((registers[Gain]&(1<<3))==0);
+			assert_((registers[BlackReferenceColumns]&(1<<15)) == 0);
+			assert_((registers[Gain]&(1<<3))==0);
 			gainDiv = registers[Gain]&(1<<3) ? 3 : 1;
 			gain = 1+ref<int>{0, 1, 3, 7}.indexOf(registers[Gain]&0b111);
 			assert_(registers[ADCRange]==(3<<8)||127);
@@ -38,6 +39,7 @@ struct Raw : ImageF {
 			assert_(lineTime == 258, lineTime);
 			exposure = (exposureTime * lineTime + frameOverheadTimeOverlap) * bits / LVDSClock;
 			temperature = registers[Temperature];
+			this->registers = copyRef(registers);
 		}
     }
 };

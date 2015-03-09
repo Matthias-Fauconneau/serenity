@@ -1,8 +1,7 @@
 #include "IT8.h"
 #include "raw.h"
 #include "demosaic.h"
-#include "interface.h"
-#include "window.h"
+#include "view.h"
 #include "png.h"
 
 generic ImageT<T> subtract(ImageT<T>&& y, const ImageT<T>& a, T b) {
@@ -96,8 +95,9 @@ struct FlatFieldCorrection : Application {
 		Raw raw {Map(fileName)};
 
         // Fixed pattern noise correction
-        v4sf DC;
-        ImageF unused staticDSNU = ::staticDSNU(raw, &DC);
+		v4sf DC = float4(0);
+		ImageF unused staticDSNU = ::staticDSNU(raw, &DC);
+		DC = float4(0);
 
         mat4 rawRGBtosRGB = mat4(sRGB);
         Image4f RGB = subtract(demosaic(raw), DC);
@@ -108,7 +108,7 @@ struct FlatFieldCorrection : Application {
             rawRGBtosRGB = mat4(sRGB) * rawRGBtoXYZ;
             //images.insert(name+".chart", convert(mix(convert(it8.chart, rawRGBtosRGB), it8.spotsView)));
         }
-        //images.insert(name+".raw", convert(convert(subtract(demosaic(raw), DC), rawRGBtosRGB)));
+		images.insert(name+".raw", convert(convert(subtract(demosaic(raw), DC), rawRGBtosRGB)));
         //images.insert(name+".DSNU", convert(convert(demosaic(transpose(dynamicDSNU(transpose(dynamicDSNU(raw, 0)), 0))), rawRGBtosRGB)));
         //ImageF a = subtract(c0, DC);
         //images.insert(name+".c0", convert(convert(demosaic(a), rawRGBtosRGB)));
@@ -122,14 +122,6 @@ struct FlatFieldCorrection : Application {
     }
 };
 
-struct WindowCycleView {
-    buffer<ImageView> views;
-    WidgetCycle layout;
-    Window window {&layout, int2(1024, 768)};
-    WindowCycleView(const map<String, Image>& images)
-        : views(apply(images.size(), [&](size_t i) { return ImageView(share(images.values[i]), images.keys[i]); })),
-          layout(toWidgets<ImageView>(views)) {}
-};
 struct Preview : FlatFieldCorrection, WindowCycleView { Preview() : WindowCycleView(images) {} };
 registerApplication(Preview);
 

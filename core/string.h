@@ -9,7 +9,7 @@
 generic String str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); error(); }
 
 /// Forwards string
-inline string str(string s) { return s; }
+inline String str(string s) { return unsafeRef(s); }
 /// Forwards char[]
 template<size_t N> string str(const char (&source)[N]) { return string(source); }
 
@@ -92,7 +92,7 @@ inline String simplify(string s) { return simplify((array<char>)copyRef(s)); }
 String join(ref<string> list, const string separator=""_);
 
 /// Returns an array of references splitting \a str wherever \a separator occurs
-array<string> split(const string str, string separator/*=", "_*/);
+buffer<string> split(const string str, string separator/*=", "_*/);
 
 /// Flatten cats
 template<class A, class B, class T> String str(const cat<A, B, T>& a) { return a; }
