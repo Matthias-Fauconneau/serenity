@@ -6,21 +6,6 @@
 #include "tiff.h"
 #include "IT8.h"
 
-struct DNG : ImageF {
-	real exposure;
-	DNG(string fileName, const Folder& folder) {
-		TextData s(fileName);
-		s.skip(""_);
-		exposure = s.decimal(); // FIXME: TIFF DNG metadata
-		Map map(fileName, folder);
-		Image16 image = parseTIF(map);
-		assert_(image.size == Raw::size, image.size);
-		new (this) ImageF(image.size);
-		assert_(image.stride == stride, image.stride, stride);
-		for(size_t i: range(image.Ref::size)) at(i) = (float) image[i] / ((1<<16)-1);
-	}
-};
-
 generic String diff(ref<T> a, ref<T> b) {
 	assert_(a.size == b.size);
 	array<char> s;
@@ -39,16 +24,9 @@ struct FlatFieldCalibration : Application {
 		auto images = apply(fileNames, [&](string fileName) {
 			Raw raw (Map(fileName, folder));
 			log(withName(fileName, raw.gain, raw.gainDiv, raw.exposure, raw.temperature, mean(raw)));
-			/*if(round(raw.exposure*100)==21)*/ lastRegisters = copy(raw.registers);
-			/*if(!raw.exposure) {
-				TextData s(fileName);
-				s.skip("darkframe_analog_gainx4_"_);
-				raw.exposure = s.decimal();
-			}
-			assert_(raw.exposure);*/
+			lastRegisters = copy(raw.registers);
 			return move(raw);
 		});
-		//auto images = apply(fileNames, [&](string file) { return DNG(file, folder); });
 		ImageF c0 (Raw::size), c1 (Raw::size); // Affine fit dark energy = c0 + c1·exposureTime
 		for(size_t pixelIndex: range(c0.Ref::size)) {
 			// Direct evaluation of AtA and Atb
@@ -99,12 +77,12 @@ generic void multiply(mref<T> Y, mref<T> X, T c) { for(size_t i: range(Y.size)) 
 ImageF normalize(ImageF&& target, const ImageF& source) { multiply(target, source, 1/mean(source)); return move(target); }
 ImageF normalize(const ImageF& source) { return normalize(source.size, source); }
 
-struct CalibrationPreview {
-	CalibrationPreview() {
+struct Visualization {
+	Visualization() {
 		Map map("c0");
 		ImageF c0 (unsafeRef(cast<float>(map)), Raw::size);
 		writeFile("c0.png", encodePNG(convert(demosaic(normalize(c0/*subtract(c0, min(c0))*/)))), currentWorkingDirectory(), true);
 		writeFile("c1.png", encodePNG(convert(demosaic(normalize(ImageF(unsafeRef(cast<float>(Map("c1"))), Raw::size))))), currentWorkingDirectory(), true);
 	}
-} preview;
+} app;
 #endif
