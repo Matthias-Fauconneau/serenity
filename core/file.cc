@@ -138,7 +138,7 @@ buffer<byte> readFile(const string path, const Folder& at) { File file(path,at);
 
 int64 writeFile(const string path, const ref<byte> content, const Folder& at, bool overwrite) {
     assert_(overwrite || !existsFile(path, at));
-	return File(path,at,Flags(WriteOnly|Create|Truncate)).write(content);
+    return File(path,at,Flags(WriteOnly|Create|Truncate)).write(content);
 }
 
 // -- Device

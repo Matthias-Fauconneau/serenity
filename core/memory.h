@@ -23,11 +23,11 @@ generic struct buffer : mref<T> {
     buffer(T* data, size_t size, size_t capacity) : mref<T>(data, size), capacity(capacity) {}
 
     /// Allocates an uninitialized buffer for \a capacity elements
-	buffer(size_t capacity, size_t size) : mref<T>((T*)0, size), capacity(capacity) {
-		assert(capacity>=size && size>=0); if(!capacity) return;
-        if(posix_memalign((void**)&data, 64, capacity*sizeof(T))) error("Out of memory", size, capacity, sizeof(T));
+    buffer(size_t capacity, size_t size) : mref<T>((T*)0, size), capacity(capacity) {
+	assert(capacity>=size && size>=0); if(!capacity) return;
+	if(posix_memalign((void**)&data, 64, capacity*sizeof(T))) error("Out of memory", size, capacity, sizeof(T));
     }
-	explicit buffer(size_t size) : buffer(size, size) {}
+    explicit buffer(size_t size) : buffer(size, size) {}
 
     buffer& operator=(buffer&& o) { this->~buffer(); new (this) buffer(::move(o)); return *this; }
 

@@ -61,7 +61,7 @@ inline string str(const String& s) { return s; }
 /// Null-terminated \a String with implicit conversion to const char*
 struct strz : buffer<char> {
     /// Copies a string reference, appends a null byte and allows implicit conversion to const char*
-	strz(const string s) : buffer(s.size+1) { slice(0, s.size).copy(s); last()='\0'; }
+    strz(const string s) : buffer(s.size+1) { slice(0, s.size).copy(s); last()='\0'; }
     operator const char*() { return data; }
 };
 

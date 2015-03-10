@@ -32,11 +32,10 @@ web.cc
 raw.h
 demosaic.h
 IT8.h
-compress.cc
+flic.cc
 calibrate.cc
 correct.cc
-flic.cc
-cat.cc
+flic-standalone.cc
 
 layout/layout.h
 layout/parse.cc

@@ -2,14 +2,14 @@
 #include "bit.h"
 static constexpr size_t EG = 6;
 
-struct FLIC : ref<byte> {
+struct Decoder : ref<byte> {
 	BitReader bitIO;
 	int predictor = 0;
 
-	FLIC() {}
-	FLIC(ref<byte> data) : ref<byte>(data), bitIO(data) {}
+	Decoder() {}
+	Decoder(ref<byte> data) : ref<byte>(data), bitIO(data) {}
 
-	void read(mref<uint16> buffer) {
+	ref<uint16> read(mref<uint16> buffer) {
 		size_t index = 0;
 		for(;;) {
 			uint u = bitIO.readExpGolomb<EG>();
@@ -17,8 +17,9 @@ struct FLIC : ref<byte> {
 			predictor += s;
 			buffer[index] = predictor;
 			index++;
-			if(index>=buffer.size) return;
+			if(index>=buffer.size) break;
 		}
+		return buffer;
 	}
 };
 
@@ -45,7 +46,7 @@ struct Encoder : buffer<byte>{
 	::buffer<byte> end() {
 		bitIO.flush();
 		size = (byte*)bitIO.pointer - data;
-		//buffer.size += 7; // No need to pad to avoid page fault with optimized BitReader (whose last refill may stride end) since registers will already pad
+		size += 7; // No need to pad to avoid page fault with optimized BitReader (whose last refill may stride end) since registers will already pad
 		return ::move(*this);
 	}
 };
