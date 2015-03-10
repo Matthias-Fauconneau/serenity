@@ -54,6 +54,18 @@ Image4f NLM(Image4f&& target, const Image4f& source) {
 }
 Image4f NLM(const Image4f& source) { return NLM(source.size, source); }
 
+/// Removes hot pixel
+ImageF cool(ImageF&& image) {
+	for(size_t y: range(2,image.size.y-2)) {
+		for(size_t x: range(2,image.size.y-2)) {
+			float& pixel = image(x,y);
+			float mean = (image(x,y-2) + image(x-2,y) + image(x+2,y) + image(x,y+2))/4;
+			if(pixel > 1./16 && pixel > mean+1./32) pixel = mean;
+		}
+	}
+	return move(image);
+}
+
 struct Denoise : Application {
 	string fileName = arguments()[0];
 	map<String, Image> images;
@@ -68,7 +80,7 @@ struct Denoise : Application {
 			images.insert(name+".target", convert(convert(NLM(it8.chart), rawRGBtosRGB)));
 		} else {
 			images.insert(name+".source", convert(convert(source, rawRGBtosRGB)));
-			images.insert(name+".target", convert(convert(NLM(source), rawRGBtosRGB)));
+			images.insert(name+".target", convert(convert(NLM(demosaic(cool(move(raw)))), rawRGBtosRGB)));
 		}
 	}
 };
