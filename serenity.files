@@ -51,3 +51,4 @@ pitch/profile.h
 pitch/tuner.cc
 record/video-record.cc
 view.h
+denoise.cc

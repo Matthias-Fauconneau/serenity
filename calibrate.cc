@@ -10,7 +10,7 @@ generic String diff(ref<T> a, ref<T> b) {
 	assert_(a.size == b.size);
 	array<char> s;
 	for(size_t i: range(a.size)) {
-		if(a[i] != b[i]) s.append(str(i, a[i], str(a[i], 16u, '0', 2u),"\t", b[i], str(b[i], 16u, '0', 2u),"\n"));
+		if(a[i] != b[i]) s.append(str(i)+'\t'+str(a[i])+'\t'+str(a[i], 16u, '0', 2u)+'\t'+str(b[i])+'\t'+str(b[i], 16u, '0', 2u)+'\n');
 	}
 	return move(s);
 }
