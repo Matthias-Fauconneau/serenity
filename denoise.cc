@@ -8,10 +8,8 @@
 
 /// Noise reduction using non-local means
 // FIXME: CFA
-Image4f NLM(Image4f&& target, const Image4f& source) {
-	constexpr int pHL = 2; //2-5 Patch half length (d+1+d)
-	constexpr int wHL = 2; //10-17 Window half length (d+1+d)
-	constexpr float h2 = sq(1./256); // ~ sigma/2 (sigma ~ 2-25)
+Image4f NLM(Image4f&& target, const Image4f& source, const int pHL  = 1 /*-5 Patch radius*/, const int wHL = 1 /*-17 Window radius*/) {
+	constexpr float h2 = sq(1./256); // ~ sigma/2 (sigma ~ 2-25) FIXME
 	int nX=source.size.x, nY=source.size.y;
 	chunk_parallel(nY, [&](uint, int Y) {
 		if(Y<wHL+pHL || Y>=nY-wHL-pHL) {
@@ -85,8 +83,17 @@ struct Denoise : Application {
 	}
 };
 
-#if 1
 #include "view.h"
 struct Preview : Denoise, WindowCycleView { Preview() : WindowCycleView(images) {} };
 registerApplication(Preview);
-#endif
+
+#include "png.h"
+struct Export : Denoise {
+	Export() {
+		for(auto image: images) {
+			log(image.key);
+			writeFile(image.key+".png", encodePNG(image.value), currentWorkingDirectory(), true);
+		}
+	}
+};
+registerApplication(Export, export);

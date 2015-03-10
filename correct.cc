@@ -84,7 +84,6 @@ ImageF sqrtMultiply(ImageF&& y, const ImageF& a, const ImageF& b) {
 }
 ImageF sqrtMultiply(const ImageF& a, const ImageF& b) { return sqrtMultiply(a.size, a, b); }
 
-#if 1
 struct FlatFieldCorrection : Application {
 	string fileName = arguments()[0];
 	string name = section(fileName,'.');
@@ -135,4 +134,3 @@ struct Export : FlatFieldCorrection {
     }
 };
 registerApplication(Export, export);
-#endif
