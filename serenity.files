@@ -5,6 +5,7 @@ build.sh
 build.cc
 
 core/core.h
+core/string.cc
 core/vector.h
 core/image.h
 core/image.cc

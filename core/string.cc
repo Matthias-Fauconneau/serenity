@@ -143,6 +143,9 @@ String str(int64 number, uint pad, char padChar, uint base) {
         n /= base;
     } while( n!=0 );
     if(number<0) buf[--i]='-';
+#if __GNUC__
+	assert_(i<64); // Fixes wrong 'array subscript is above array bounds' warning given by GCC
+#endif
 	while(64<pad+i) buf[--i] = padChar;
 	return copyRef(string(buf+i,64-i));
 }

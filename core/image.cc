@@ -180,7 +180,7 @@ Image4f convert(const Image& source) {
     Image4f target (source.size, source.alpha);
     parallel_chunk(source.Ref::size, [&](uint, size_t I0, size_t DI) {
 	extern float sRGB_reverse[0x100];
-	for(size_t i: range(I0, I0+DI)) target[i] = {sRGB_reverse[source[i][0]], sRGB_reverse[source[i][1]], sRGB_reverse[source[i][2]],
+	for(size_t i: range(I0, I0+DI)) target[i] = v4sf{sRGB_reverse[source[i][0]], sRGB_reverse[source[i][1]], sRGB_reverse[source[i][2]],
 						     source.alpha ? float(source[i][3])/0xFF : 1};
     });
     return target;
