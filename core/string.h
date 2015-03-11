@@ -107,8 +107,10 @@ inline String str(uint8 number, uint pad=0, char padChar='0', uint base=10) { re
 inline String str(uint16 number, uint pad=0, char padChar='0', uint base=10) { return str(uint64(number), pad, padChar, base); }
 /// Converts an unsigned integer (implicit conversion)
 inline String str(uint32 number, uint pad=0, char padChar='0', uint base=10) { return str(uint64(number), pad, padChar, base); }
+#if __x86_64__
 /// Converts an unsigned integer (implicit conversion)
 inline String str(size_t number, uint pad=0, char padChar='0', uint base=10) { return str(uint64(number), pad, padChar, base); }
+#endif
 /// Converts an unsigned integer in hexadecimal base
 inline String hex(uint64 n, uint pad=0) { return str(n, pad, '0', 16); }
 /// Converts a memory address in hexadecimal base

@@ -116,7 +116,11 @@ static void traceAllThreads() {
 static void handler(int sig, siginfo_t* info, void* ctx) {
 	if(sig==SIGSEGV) log_("Segmentation fault\n");
     if(threads.size>1) log("Thread #"+str(gettid())+':');
+#if __x86_64
 	log(trace(1, (void*) ((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP]));
+#else
+	log(trace(1, (void*) ((ucontext_t*)ctx)->uc_mcontext.gregs[REG_EIP]));
+#endif
     if(sig!=SIGTRAP) traceAllThreads();
     if(sig==SIGABRT) log("Aborted");
     static constexpr string fpErrors[] = {"", "Integer division", "Integer overflow", "Division by zero", "Overflow",

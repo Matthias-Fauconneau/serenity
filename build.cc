@@ -206,6 +206,7 @@ struct Build {
 		if(!flags.contains("debug")) args.append("-O3"__);
         else if(flags.contains("fast")) args.append("-Og"__); // fast-debug
 		if(flags.contains("profile")) args.append("-finstrument-functions"__);
+		if(flags.contains("m32"_)) args.append("-m32"__); // "-mfpmath=sse"__
 
 		Folder(tmp, currentWorkingDirectory(), true);
 		Folder(tmp+"/"+join(flags,"-"), currentWorkingDirectory(), true);
@@ -222,10 +223,11 @@ struct Build {
         if(!existsFile(binary) || needLink) {
 			// Waits for all translation units to finish compilation before final link
             for(int pid: pids) if(wait(pid)) { log("Failed to compile"); return; }
-			buffer<String> args =
+			array<String> args = (buffer<String>)(
 					move(files) +
                     mref<String>{"-o"__, unsafeRef(binary), "-L/usr/local/lib"__} +
-					apply(libraries, [this](const String& library)->String{ return "-l"+library; });
+					apply(libraries, [this](const String& library)->String{ return "-l"+library; }) );
+			if(flags.contains("m32"_)) args.append("-m32"__);
             if(execute(CXX, toRefs(args))) { log("Failed to link"); return; }
         }
 

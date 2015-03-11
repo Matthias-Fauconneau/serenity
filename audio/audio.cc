@@ -67,11 +67,13 @@ size_t FFmpeg::read16(mref<int16> output) {
 				    if(audio->sample_fmt == AV_SAMPLE_FMT_S32) {
 					for(size_t i : range(bufferSize*channels)) int16Buffer[i] = ((int32*)frame->data[0])[i] >> 16;
 				    } else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
+					int min=0, max=0;
 					for(size_t i : range(bufferSize)) for(size_t j : range(channels)) {
-					    int32 s = ((float*)frame->data[j])[i]*((1<<15)-1); //TODO: ReplayGain
-					    if(s<-(1<<15) || s >= int(uint(1<<15)-1)) error("Clip", -(1<<15), s, 1<<15, ((float*)frame->data[j])[i]);
+					    int32 s = ((float*)frame->data[j])[i]*32079; //TODO: ReplayGain
+					    if(s<-(1<<15) || s >= 1<<15) min=::min(min, s), max=::max(max, s);
 					    int16Buffer[i*channels+j] = s;
 					}
+					if(min != max) error("Clip", min, max, 32079*32767/::max(-min, max));
 				    }
 				    else error("Unimplemented conversion to int16 from", (int)audio->sample_fmt);
 				}

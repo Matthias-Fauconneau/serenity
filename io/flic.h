@@ -38,7 +38,7 @@ struct Encoder : buffer<byte>{
 			uint u  = (s<<1) ^ (s>>31); // s>0 ? (s<<1) : (-s<<1) - 1;
 			// Exp Golomb _ r
 			uint x = u + (1<<EG);
-			uint b = 63 - __builtin_clzl(x); // BSR
+			uint b = (sizeof(x)*8-1) - __builtin_clzl(x); // BSR
 			bitIO.write(b+b+1-EG, x); // unary b, binary q[b], binary r = 0^b.1.q[b]R[r] = x[b+b+1+r]
 		}
 		return *this;
@@ -46,7 +46,7 @@ struct Encoder : buffer<byte>{
 	::buffer<byte> end() {
 		bitIO.flush();
 		size = (byte*)bitIO.pointer - data;
-		size += 7; // No need to pad to avoid page fault with optimized BitReader (whose last refill may stride end) since registers will already pad
+		size += 2*sizeof(word)-1; // No need to pad to avoid page fault with optimized BitReader (whose last refill may stride end) since registers will already pad
 		return ::move(*this);
 	}
 };

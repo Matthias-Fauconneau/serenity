@@ -5,15 +5,18 @@ build.sh
 build.cc
 
 core/core.h
+core/string.h
 core/string.cc
 core/vector.h
 core/image.h
 core/image.cc
 core/simd.h
 core/map.h
+core/thread.cc
 
 io/png.cc
 io/jpeg.cc
+io/bit.h
 io/flic.h
 io/font.cc
 
@@ -36,7 +39,6 @@ IT8.h
 flic.cc
 calibrate.cc
 correct.cc
-flic-standalone.cc
 
 layout/layout.h
 layout/parse.cc

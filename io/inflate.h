@@ -4,6 +4,25 @@
 
 generic const T& raw(ref<byte> data) { assert_(data.size==sizeof(T)); return *(T*)data.data; }
 
+/// Decodes packed bitstreams (lsb)
+struct BitReaderLSB : ref<byte> {
+	size_t index = 0;
+	BitReaderLSB(ref<byte> data) : ref<byte>(data) {}
+	/// Reads \a size bits
+	uint read(uint size) {
+		uint value = (*(uint64*)(data+index/8) << (64-size-(index&7))) >> /*int8*/(64-size);
+		index += size;
+		return value;
+	}
+	void align() { index = (index + 7) & ~7; }
+	ref<byte> readBytes(uint byteCount) {
+		assert((index&7) == 0);
+		ref<byte> slice = ref<byte>((byte*)data+index/8, byteCount);
+		index += byteCount*8;
+		return slice;
+	}
+};
+
 buffer<byte> inflate(ref<byte> compressed, buffer<byte>&& target) { //inflate huffman encoded data
 	BitReaderLSB bitIO(compressed);
 	size_t targetIndex = 0;
