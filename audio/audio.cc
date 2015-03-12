@@ -69,7 +69,7 @@ size_t FFmpeg::read16(mref<int16> output) {
 				    } else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
 					int min=0, max=0;
 					for(size_t i : range(bufferSize)) for(size_t j : range(channels)) {
-					    int32 s = ((float*)frame->data[j])[i]*32079; //TODO: ReplayGain
+					    int32 s = ((float*)frame->data[j])[i]*31641; //TODO: ReplayGain
 					    if(s<-(1<<15) || s >= 1<<15) min=::min(min, s), max=::max(max, s);
 					    int16Buffer[i*channels+j] = s;
 					}

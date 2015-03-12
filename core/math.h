@@ -86,4 +86,4 @@ template<Type T, size_t N> T max(const T (&a)[N]) { return max(ref<T>(a)); }
 
 generic uint argmax(const ref<T>& a) { uint max=0; for(uint i: range(a.size)) if(a[i] > a[max]) max=i; return max; }
 
-inline float mean(const ref<float> v) { return sum(v)/v.size; }
+inline float mean(const ref<float> v) { return sum(v, 0.)/v.size; }

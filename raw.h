@@ -4,17 +4,20 @@
 // CMV12000
 struct Raw : ImageF {
     static constexpr int2 size {4096, 3072};
-    real exposure;
-    int gain, gainDiv;
-    int temperature;
+	real exposure = 0;
+	int gain = 0, gainDiv = 0;
+	int temperature = 0;
 	buffer<uint16> registers;
 
 	Raw(ref<byte> file, bool convert=true) : Raw(cast<uint16>(file), convert) {}
 	Raw(ref<uint16> data, bool convert=true) {
-        if(convert) { // Converts 16bit integer to 32bit floating point
+		if(convert) { // Converts 12bit MSB integer to 32bit floating point
             new (this) ImageF(size);
 			assert_(data.size >= Ref::size);
-			for(size_t i: range(Ref::size)) at(i) = (float) data[i] / ((1<<16)-1);
+			for(size_t i: range(Ref::size)) {
+				assert_((data[i] & 0b1111) == 0, str(data[i],16u,'0',2u));
+				at(i) = (float)(data[i]>>4) / ((1<<12)-1);
+			}
         } //else FIXME: read instead of map
 		ref<uint16> registers = data.slice(size.y*size.x);
 		if(registers) {

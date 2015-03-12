@@ -16,7 +16,7 @@ Map c1Map("c1"); const ImageF c1 = ImageF(unsafeRef(cast<float>(c1Map)), Raw::si
 /// Statically calibrated dark signal non uniformity correction
 ImageF staticDSNU(ImageF&& target, const Raw& raw, v4sf* DC=0) {
     real exposure = 0; // raw.exposure; // No effect
-    real gain = (real) raw.gain / raw.gainDiv;
+	real gain = 1; //(real) raw.gain / raw.gainDiv;
     for(size_t i: range(target.Ref::size)) target[i] = raw[i] - gain * (c0[i] + exposure * c1[i]);
     if(DC) *DC = float4(gain) * (mean(demosaic(c0)) + float4(exposure) * mean(demosaic(c1)));
     return move(target);
@@ -96,7 +96,7 @@ struct FlatFieldCorrection : Application {
         // Fixed pattern noise correction
 		v4sf DC = float4(0);
 		ImageF unused staticDSNU = ::staticDSNU(raw, &DC);
-		DC = float4(0);
+		//DC = float4(0);
 
         mat4 rawRGBtosRGB = mat4(sRGB);
         Image4f RGB = subtract(demosaic(raw), DC);
@@ -114,8 +114,8 @@ struct FlatFieldCorrection : Application {
         const ImageF& a = staticDSNU;
         images.insert(name+".static", convert(convert(demosaic(a), rawRGBtosRGB)));
         //ImageF b = dynamicDSNU(subtract(raw, DC));
-        ImageF b = transpose(dynamicDSNU(transpose(dynamicDSNU(subtract(raw, DC)))));
-        images.insert(name+".dynamic", convert(convert(demosaic(b), rawRGBtosRGB)));
+		//ImageF b = transpose(dynamicDSNU(transpose(dynamicDSNU(subtract(raw, DC)))));
+		//images.insert(name+".dynamic", convert(convert(demosaic(b), rawRGBtosRGB)));
         //images.insert(name+".correlation", convert(convert(demosaic(correlation(subtract(raw, a), subtract(raw, b))), rawRGBtosRGB)));
         //images.insert(name+".hybrid", convert(convert(demosaic(subtract(raw, sqrtMultiply(subtract(raw, a), subtract(raw, b)))), rawRGBtosRGB)));
     }

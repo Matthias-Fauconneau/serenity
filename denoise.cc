@@ -64,22 +64,29 @@ ImageF cool(ImageF&& image) {
 	return move(image);
 }
 
+v4sf SSD(ref<v4sf> X, v4sf mean) {
+	v4sf sum = float4(0);
+	for(v4sf x: X) sum += sq(x-mean);
+	return sum;
+}
+
 struct Denoise : Application {
 	string fileName = arguments()[0];
 	map<String, Image> images;
 	Denoise() {
 		string name = section(fileName,'.');
+		mat4 rawRGBtosRGB =mat4(sRGB) * IT8(demosaic(Raw(Map("scene_daylight_211ms_c2.raw16"))), readFile("R100604.txt")).rawRGBtoXYZ;
 		Raw raw {Map(fileName)};
-		Image4f source = demosaic(raw);
-		IT8 it8(source, readFile("R100604.txt"));
-		mat4 rawRGBtosRGB =mat4(sRGB) * it8.rawRGBtoXYZ;
-		if(0) {
-			images.insert(name+".source", convert(convert(it8.chart, rawRGBtosRGB)));
-			images.insert(name+".target", convert(convert(NLM(it8.chart), rawRGBtosRGB)));
-		} else {
-			images.insert(name+".source", convert(convert(source, rawRGBtosRGB)));
-			images.insert(name+".target", convert(convert(NLM(demosaic(cool(move(raw)))), rawRGBtosRGB)));
-		}
+		Image4f image = demosaic(raw);
+		v4sf mean3 = ::mean(image);
+		float mean = sum3(mean3)/3;
+		log(withName(raw.exposure*1e3, raw.gain, raw.gainDiv, raw.temperature, mean, log2(mean), 10*log10(mean)));
+		float stddev = sqrt(sum3(SSD(image, mean3))/3);
+		log(withName(stddev, log2(stddev), 10*log10(stddev)));
+		log(int(round((log2(mean)+10)/raw.exposure)), "LSB10/s");
+		log(int(round((log2(stddev))/raw.exposure)), "LSB10/s");
+		images.insert(name+".source", convert(convert(demosaic(raw), rawRGBtosRGB)));
+		images.insert(name+".NLM", convert(convert(NLM(demosaic(cool(move(raw)))), rawRGBtosRGB)));
 	}
 };
 
