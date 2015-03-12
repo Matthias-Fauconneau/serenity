@@ -40,6 +40,7 @@ struct Tuner : Poll {
     int minWorstKey = 1, maxWorstKey = keyCount;
 
     // UI
+	Lock lock;
     int currentKey = 0;
     Text currentKeyText {"", 64, white};
     int keyOffsetCents = 0;
@@ -49,7 +50,8 @@ struct Tuner : Poll {
     HBox status {{&currentKeyText, &keyOffsetText, &worstKeyText}, HBox::Even};
     OffsetPlot profile;
     VBox layout {{&status, &profile}};
-	Window window{&layout, 0, []{ return "Tuner"__;}};
+	//Thread uiThread;
+	Window window{&layout, 0, []{ return "Tuner"__;}/*, uiThread*/};
 
     Tuner() {
 		if(arguments().size>0 && isInteger(arguments()[0])) minWorstKey=parseInteger(arguments()[0]);
@@ -57,12 +59,12 @@ struct Tuner : Poll {
 
 		window.backgroundColor = black;
         window.actions[Space] = [this]{record=!record;}; //FIXME: threads waiting on semaphores will be stuck
-        window.show();
 
 		input.start(2, rate, periodSize);
 		log(input.sampleBits, input.rate, input.periodSize);
         thread.spawn();
         readCount.acquire(N-periodSize);
+		//uiThread.spawn();
     }
 
 	uint write(const ref<int32> input) {
@@ -121,6 +123,7 @@ struct Tuner : Poll {
             bool needUpdate = false;
             if(currentKey!=key) {
                 currentKey = key;
+				Locker lock(window.lock);
                 currentKeyText = Text(strKey(key), 64, white);
                 needUpdate = true;
             }
@@ -129,6 +132,7 @@ struct Tuner : Poll {
             int keyOffsetCents = round(100*(keyOffset - stretch(key-21)*12));
             if(this->keyOffsetCents != keyOffsetCents) {
                 this->keyOffsetCents = keyOffsetCents;
+				Locker lock(window.lock);
 				keyOffsetText = Text(str(keyOffsetCents), 32, white);
                 needUpdate = true;
             }
@@ -143,11 +147,13 @@ struct Tuner : Poll {
                 int worstKey = 21+k;
                 if(this->worstKey != worstKey) {
                     this->worstKey = worstKey;
+					Locker lock(window.lock);
                     worstKeyText = Text(strKey(worstKey), 64, white);
                 }
                 int keyOffsetCents = round(100*(keyOffset- stretch(key-21)*12));
                 if(this->keyOffsetCents != keyOffsetCents) {
                     this->keyOffsetCents = keyOffsetCents;
+					Locker lock(window.lock);
 					keyOffsetText = Text(str(keyOffsetCents), 64, white);
                     needUpdate = true;
                 }

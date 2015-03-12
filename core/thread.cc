@@ -185,8 +185,8 @@ int main() {
 		if(Interface<Application>::factories().contains(argument)) factory = Interface<Application>::factories().at(argument);
 	if(factory) application = factory->constructNewInstance();
     mainThread.run(); // Reuses main thread as default event loop runner when not overriden in Poll constructor
-    //return groupExitStatus; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
-    exit_group(groupExitStatus);
+	return groupExitStatus; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
+	//exit_group(groupExitStatus);
 }
 
 void requestTermination(int status) {

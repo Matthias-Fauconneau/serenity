@@ -1,5 +1,6 @@
 #include "window.h"
 #include "ui/render.h"
+#if X
 #include "x.h"
 #include "png.h"
 #include "time.h"
@@ -128,12 +129,12 @@ bool Window::processEvent(const XEvent& e) {
     uint8 type = e.type&0b01111111; //msb set if sent by SendEvent
     /**/ if(type==ButtonPress) {
 		Widget* previousFocus = focus;
-        if(widget->mouseEvent(vec2(e.x,e.y), vec2(size), Widget::Press, (Widget::Button)e.key, focus) || focus!=previousFocus) render();
+		if(widget->mouseEvent(vec2(e.x,e.y), vec2(size), Press, (Button)e.key, focus) || focus!=previousFocus) render();
 		drag = focus;
     }
     else if(type==ButtonRelease) {
         drag=0;
-        if(e.key <= Widget::RightButton && widget->mouseEvent(vec2(e.x,e.y), vec2(size), Widget::Release, (Widget::Button)e.key, focus)) render();
+		if(e.key <= RightButton && widget->mouseEvent(vec2(e.x,e.y), vec2(size), Release, (Button)e.key, focus)) render();
     }
     else if(type==KeyPress) {
         Key key = (Key)keySym(e.key, e.state); Modifiers modifiers = (Modifiers)e.state;
@@ -148,14 +149,14 @@ bool Window::processEvent(const XEvent& e) {
 		if(focus && focus->keyRelease(key, modifiers)) render();
 	}
     else if(type==MotionNotify) {
-        if(drag && e.state&Button1Mask && drag->mouseEvent(vec2(e.x,e.y), vec2(size), Widget::Motion, Widget::LeftButton, focus))
+		if(drag && e.state&Button1Mask && drag->mouseEvent(vec2(e.x,e.y), vec2(size), Motion, LeftButton, focus))
             render();
-        else if(widget->mouseEvent(vec2(e.x,e.y), vec2(size), Widget::Motion, (e.state&Button1Mask)?Widget::LeftButton:Widget::NoButton, focus))
+		else if(widget->mouseEvent(vec2(e.x,e.y), vec2(size), Motion, (e.state&Button1Mask)?LeftButton:NoButton, focus))
             render();
     }
     else if(type==EnterNotify || type==LeaveNotify) {
-        if(widget->mouseEvent( vec2(e.x,e.y), vec2(size), type==EnterNotify?Widget::Enter:Widget::Leave,
-                               e.state&Button1Mask?Widget::LeftButton:Widget::NoButton, focus) ) render();
+		if(widget->mouseEvent( vec2(e.x,e.y), vec2(size), type==EnterNotify?Enter:Leave,
+							   e.state&Button1Mask?LeftButton:NoButton, focus) ) render();
     }
     else if(type==KeymapNotify) {}
     else if(type==Expose) { if(!e.expose.count && !(e.expose.x==0 && e.expose.y==0 && e.expose.w==1 && e.expose.h==1)) render(); }
@@ -199,13 +200,6 @@ void Window::setIcon(const Image& icon) {
                         raw(icon.width)+raw(icon.height)+cast<byte>(icon));
 }
 void Window::setSize(int2 size) { send(SetSize{.id=id+XWindow, .w=uint(size.x), .h=uint(size.y)}); }
-
-// Render
-void Window::render(shared<Graphics>&& graphics, int2 origin, int2 size) {
-    updates.append( Update{move(graphics),origin,size} );
-	if(updates /*&& mapped && state == Idle*/) queue();
-}
-void Window::render() { Locker lock(this->lock); assert_(size); updates.clear(); render(nullptr, int2(0), size); }
 
 #if 0
 struct DMABuf {
@@ -307,4 +301,63 @@ void Window::initializeThreadGLContext() {
 			(glDisplay, fbConfig, glContext, 1, contextAttribs);
 	glXMakeCurrent(glDisplay, id+XWindow, glContext);
 }
+#endif
+#else
+
+void Window::render(shared<Graphics>&& graphics, int2 origin, int2 size) {
+	lock.lock();
+	updates.append( Update{move(graphics),origin,size} );
+	lock.unlock();
+	queue();
+}
+void Window::render() { assert_(size); 	lock.lock(); updates.clear(); lock.unlock(); render(nullptr, int2(0), size); }
+
+Window::Window(Widget* widget, int2, function<String()>, Thread& thread) : Poll(0,0,thread), widget(widget) {
+	if(!display) display = unique<Display>();  // Created by the first instantiation of a window, deleted at exit
+	display->windows.append(this);
+	size = display->target.size;
+	actions[Escape] = []{requestTermination();};
+	render();
+}
+Window::~Window() {
+	display->windows.remove(this);
+	if(!display->windows) display=null;
+}
+
+// FIXME: Schedules window rendering after all events have been processed
+void Window::event() {
+	if(!updates) return;
+	lock.lock();
+	Update update = updates.take(0);
+	if(!update.graphics) update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size)));
+	lock.unlock();
+	fill(display->target, update.origin, update.size, backgroundColor, 1); // Clear framebuffer
+	::render(display->target, update.graphics); // Render retained graphics
+}
+
+void Window::mouseEvent(int2 cursor, Event event, Button button) {
+	if(event==Press) {
+		Widget* previousFocus = focus;
+		if(widget->mouseEvent(vec2(cursor), vec2(size), Press, button, focus) || focus!=previousFocus) render();
+		drag = focus;
+	}
+	if(event==Release) {
+		drag=0;
+		if(button <= RightButton && widget->mouseEvent(vec2(cursor), vec2(size), Release, button, focus)) render();
+	}
+	if(event==Motion) {
+		if(drag && button==LeftButton && drag->mouseEvent(vec2(cursor), vec2(size), Motion, button, focus)) render();
+		else if(widget->mouseEvent(vec2(cursor), vec2(size), Motion, button, focus)) render();
+	}
+}
+
+void Window::keyPress(Key key) {
+	if(focus && focus->keyPress(key, NoModifiers)) render();
+	else {
+		function<void()>* action = actions.find(key);
+		if(action) (*action)(); // Local window action
+	}
+}
+
+unique<Display> Window::display = null;
 #endif

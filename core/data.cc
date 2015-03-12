@@ -39,8 +39,8 @@ bool Data::match(const string key) {
 }
 
 String escape(char c) {
-	size_t index = "\t\r\n"_.indexOf(c);
-	return index != invalid ? "\\"_+"trn"_[index] : ""_+c;
+    size_t index = "\t\r\n"_.indexOf(c);
+    return index != invalid ? "\\"_+"trn"_[index] : ""_+c;
 }
 String escape(string s) { array<char> target (s.size, 0); for(char c: s) target.append(escape(c)); return move(target); }
 
@@ -48,11 +48,11 @@ void Data::skip(const uint8 key) {
     if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(peek())+'\'');
 }
 void Data::skip(const char key) {
-	if(!match(key)) error("Expected '"+escape(key)+"', got '"+peek()+'\'', data.slice(index));
+    if(!match(key)) error("Expected '"+escape(key)+"', got '"+peek()+'\'', data.slice(index));
 }
 
 void Data::skip(const ref<uint8> key) {
-	if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(peek(key.size))+'\'');
+    if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(peek(key.size))+'\'');
 }
 void Data::skip(const string key) {
     if(!match(key)) error("Expected '"+escape(key)+"', got '"+escape(peek(key.size))+'\'', escape(data.slice(index, 128)));
@@ -82,7 +82,7 @@ char TextData::wouldMatchAny(const string any) {
 
 string TextData::wouldMatchAny(const ref<string> keys) {
     for(string key: keys) if(wouldMatch(key)) return key;
-	return ""_;
+    return ""_;
 }
 
 
@@ -94,7 +94,7 @@ char TextData::matchAny(const string any) {
 
 string TextData::matchAny(const ref<string> keys) {
     for(string key: keys) if(match(key)) return key;
-	return ""_;
+    return ""_;
 }
 
 bool TextData::matchNo(const string any) {
@@ -113,8 +113,8 @@ string TextData::whileAny(const string any) {
 string TextData::whileNot(char key) {
     uint start=index, end;
     for(;;advance(1)) {
-        if(!available(1)) { end=index; break; }
-        if(peek() == key) { end=index; break; }
+	if(!available(1)) { end=index; break; }
+	if(peek() == key) { end=index; break; }
     }
     return slice(start, end-start);
 }
@@ -124,9 +124,9 @@ string TextData::whileNo(const string any) {
 string TextData::whileNo(const string any, char left, char right) {
     uint start=index; int nest=0;
     while(available(1)) {
-        /***/ if(match(left)) nest++;
-        else if(peek()==right) { nest--; assert(nest>=0); advance(1); if(nest==0) break; }
-        else if(!matchNo(any)) { if(nest==0) break; else advance(1); }
+	/***/ if(match(left)) nest++;
+	else if(peek()==right) { nest--; assert(nest>=0); advance(1); if(nest==0) break; }
+	else if(!matchNo(any)) { if(nest==0) break; else advance(1); }
     }
     return slice(start,index-start);
 }
@@ -134,8 +134,8 @@ string TextData::whileNo(const string any, char left, char right) {
 string TextData::until(char key) {
     uint start=index, end;
     for(;;advance(1)) {
-        if(!available(1)) { end=index; break; }
-        if(peek() == key) { end=index; advance(1); break; }
+	if(!available(1)) { end=index; break; }
+	if(peek() == key) { end=index; advance(1); break; }
     }
     return slice(start, end-start);
 }
@@ -143,19 +143,19 @@ string TextData::until(char key) {
 string TextData::until(const string key) {
     uint start=index, end;
     for(;;advance(1)) {
-        if(available(key.size)<key.size) { advance(key.size-1); end=index; break; }
-         if(peek(key.size) == key) { end=index; advance(key.size); break; }
+	if(available(key.size)<key.size) { advance(key.size-1); end=index; break; }
+	if(peek(key.size) == key) { end=index; advance(key.size); break; }
     }
     return slice(start, end-start);
 }
 
 string TextData::untilAny(const string any) {
     uint start=index, end;
-	for(;;advance(1)) {
-		if(!available(1)) { end=index; break; }
-		if(matchAny(any)) { end=index-1; break; }
-	}
-	return slice(start,end-start);
+    for(;;advance(1)) {
+	if(!available(1)) { end=index; break; }
+	if(matchAny(any)) { end=index-1; break; }
+    }
+    return slice(start,end-start);
 }
 
 string TextData::line() { return until('\n'); }
@@ -170,9 +170,9 @@ string TextData::word(const string special) {
 string TextData::identifier(const string special) {
     uint start=index;
     while(available(1)) {
-        byte c=peek();
-        if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||special.contains(c))) break;
-        advance(1);
+	byte c=peek();
+	if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||special.contains(c))) break;
+	advance(1);
     }
     return slice(start,index-start);
 }
@@ -201,24 +201,24 @@ string TextData::whileInteger(bool sign, int base) {
 }
 
 int TextData::integer(bool maySign, int base) {
-	assert_(data);
+    assert_(data);
     assert(base==10 || base==16);
     int sign=1;
     if(maySign) { if(match('-')) sign=-1; else match('+'); }
     assert_(isInteger(base), "Expected integer, got '"+escape(slice(index, 64))+"'");
     long value=0;
     do {
-        char c = peek();
-        int n;
-        /**/  if(c>='0' && c<='9') n = c-'0';
-		else if(c == '.') { error("Unexpected decimal"_, data); break; }
-        else if(base!=16) break;
-        else if(c>='a' && c<='f') n = c+10-'a';
-        else if(c>='A' && c<='F') n = c+10-'A';
-        else break;
-        advance(1);
-        value *= base;
-        value += n;
+	char c = peek();
+	int n;
+	/**/  if(c>='0' && c<='9') n = c-'0';
+	else if(c == '.') { error("Unexpected decimal"_, data); break; }
+	else if(base!=16) break;
+	else if(c>='a' && c<='f') n = c+10-'a';
+	else if(c>='A' && c<='F') n = c+10-'A';
+	else break;
+	advance(1);
+	value *= base;
+	value += n;
     } while(available(1));
     return sign*value;
 }
@@ -232,11 +232,11 @@ string TextData::whileDecimal() {
     uint start=index;
     matchAny("-+");
     if(!match("∞")) for(bool gotDot=false, gotE=false;available(1);) {
-        byte c=peek();
-        /**/  if(c=='.') { if(gotDot||gotE) break; gotDot=true; advance(1); }
-        else if(c=='e' || c=='E') { if(gotE) break; gotE=true; advance(1); if(peek()=='-' || peek()=='+') advance(1); }
-        else if(c>='0'&&c<='9') advance(1);
-        else break;
+	byte c=peek();
+	/**/  if(c=='.') { if(gotDot||gotE) break; gotDot=true; advance(1); }
+	else if(c=='e' || c=='E') { if(gotE) break; gotE=true; advance(1); if(peek()=='-' || peek()=='+') advance(1); }
+	else if(c>='0'&&c<='9') advance(1);
+	else break;
     }
     return slice(start,index-start);
 }
@@ -249,23 +249,23 @@ double TextData::decimal() {
     if(match("∞")) return sign*__builtin_inf();
     assert_(isInteger());
     for(bool gotDot=false, gotE=false; available(1);) {
-        /**/  if(!gotDot && match('.')) gotDot=true;
-        else if(!gotE && matchAny("eE")) { gotE=true; if(match('-')) eSign=-1; else match('+'); }
-        else {
-            char c = peek();
-            if(c>='0' && c<='9') {
-                int n = c-'0';
-                if(gotE) {
-                    exponent *= 10;
-                    exponent += n;
-                } else {
-                    significand *= 10;
-                    significand += n;
-                    if(gotDot) decimal++;
-                }
-            } else break;
-            advance(1);
-        }
+	/**/  if(!gotDot && match('.')) gotDot=true;
+	else if(!gotE && matchAny("eE")) { gotE=true; if(match('-')) eSign=-1; else match('+'); }
+	else {
+	    char c = peek();
+	    if(c>='0' && c<='9') {
+		int n = c-'0';
+		if(gotE) {
+		    exponent *= 10;
+		    exponent += n;
+		} else {
+		    significand *= 10;
+		    significand += n;
+		    if(gotDot) decimal++;
+		}
+	    } else break;
+	    advance(1);
+	}
     }
     return sign*significand*exp10(eSign*exponent-decimal);
 }

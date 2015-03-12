@@ -13,6 +13,7 @@ core/image.cc
 core/simd.h
 core/map.h
 core/thread.cc
+core/file.h
 
 io/png.cc
 io/jpeg.cc
@@ -20,6 +21,9 @@ io/bit.h
 io/flic.h
 io/font.cc
 
+ui/display.h
+ui/display.cc
+ui/window.h
 ui/text.cc
 ui/render.cc
 ui/window.cc
@@ -29,6 +33,8 @@ ui/layout.cc
 ui/graphics.h
 ui/interface.h
 ui/gl.h
+
+audio/asound.cc
 
 player.cc
 web.cc
@@ -54,3 +60,4 @@ pitch/tuner.cc
 record/video-record.cc
 view.h
 denoise.cc
+ui/input.h

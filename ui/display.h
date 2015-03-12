@@ -1,5 +1,6 @@
 #pragma once
 /// \file display.h
+#if X
 #include "thread.h"
 #include "function.h" // onEvent
 #include "map.h" // actions
@@ -101,3 +102,54 @@ struct Display : Socket, Poll {
      /// Returns Atom for \a name
      uint Atom(const string name);
 };
+#else
+#include "image.h"
+#include "thread.h"
+#include "input.h"
+
+struct Keyboard : Device, Poll {
+	function<void(Key)> keyPress;
+
+	Keyboard(Thread& thread);
+	void event() override;
+};
+
+struct Mouse : Device, Poll {
+	int2 max;
+	int2 cursor;
+	Button button;
+	function<void(int2, Event, Button)> mouseEvent;
+
+	Mouse(Thread& thread);
+	void event() override;
+};
+
+struct Display : Device, Poll {
+	Keyboard keyboard;
+	Thread mouseThread {-20};
+	Mouse mouse;
+
+	uint connector, crtc;
+	struct _drmModeCrtc* previousMode;
+	Image target;
+	uint32 handle;
+	uint32 fb;
+	Map map;
+
+	array<struct Window*> windows;
+
+	struct MouseEvent { int2 cursor; Event event; Button button; };
+	Lock lock;
+	array<MouseEvent> eventQueue;
+
+	Display(Thread& thread=mainThread);
+	virtual ~Display();
+
+	void mouseEvent(int2, Event, Button);
+	void event() override;
+	void keyPress(Key);
+
+	void patchCursor(int2 position, bool erase);
+};
+
+#endif

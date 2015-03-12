@@ -91,15 +91,16 @@ struct Stream : Handle { //FIXME: overlaps with Data/BinaryData
     generic size_t writeRaw(T t) { return write((byte*)&t,sizeof(T)); }
 };
 
+enum Flags {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000, NonBlocking=04000, Descriptor=010000000};
+enum class FileType { Folder=0040000, Device=0020000, Drive=0060000, File=0100000 };
+
 /// Handle to a socket
 struct Socket : Stream {
     enum {PF_LOCAL=1, PF_INET};
-    enum {SOCK_STREAM=1, SOCK_DGRAM, O_NONBLOCK=04000};
+	enum {SOCK_STREAM=1, SOCK_DGRAM};
     Socket(int domain, int type);
 };
 
-enum Flags {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000, NonBlocking=04000, Descriptor=010000000};
-enum class FileType { Folder=0040000, Device=0020000, Drive=0060000, File=0100000 };
 /// Handle to a file
 struct File : Stream {
     File(){}
@@ -165,7 +166,7 @@ struct Map : mref<byte> {
 
     explicit Map(const File& file, Prot prot=Read, Flags flags=Shared);
     explicit Map(const string path, const Folder& at=currentWorkingDirectory(), Prot prot=Read, Flags flags=Shared) : Map(File(path,at), prot, flags) {}
-    Map(uint fd, uint offset, uint size, Prot prot, Flags flags=Shared);
+	Map(uint fd, uint64 offset, uint64 size, Prot prot=Prot(Read|Write), Flags flags=Shared);
     ~Map();
 
     /// Locks memory map in RAM

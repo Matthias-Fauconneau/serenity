@@ -36,8 +36,7 @@ void fill(const Image& target, int2 origin, int2 size, bgr3f color, float alpha)
     }
 }
 
-
-static void blit(const Image& target, int2 origin, const Image& source, bgr3f color, float opacity) {
+void blit(const Image& target, int2 origin, const Image& source, bgr3f color, float opacity) {
     assert_(bgr3f(0) <= color && color <= bgr3f(1));
 	assert_(source, source.size, source.data);
 

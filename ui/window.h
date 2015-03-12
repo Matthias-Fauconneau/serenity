@@ -2,11 +2,10 @@
 /// \file window.h Window display and input
 #include "display.h"
 #include "widget.h"
-typedef void* EGLDisplay;
-typedef void* EGLConfig;
-typedef void* EGLContext;
-typedef void* EGLSurface;
+#include "function.h"
+#include "map.h"
 
+#if X
 /// Interfaces \a widget as a window on a display server
 struct Window : Display /*should reference but inherits for convenience*/ {
     /// Widget managed by this window
@@ -27,6 +26,11 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     /// Associated window resource (relative to resource ID base Display::id)
     enum Resource { XWindow, GraphicContext, Colormap, PresentEvent, Segment, Pixmap };
 #if 0 // DRI3
+	typedef void* EGLDisplay;
+	typedef void* EGLConfig;
+	typedef void* EGLContext;
+	typedef void* EGLSurface;
+
     /// GPU device
     int drmDevice = 0;
     struct gbm_device* gbmDevice = 0;
@@ -113,3 +117,49 @@ struct Window : Display /*should reference but inherits for convenience*/ {
     /// Makes a new shared GL context current
     void initializeThreadGLContext();
 };
+#else
+struct Window : Poll {
+	static unique<Display> display;
+
+	/// Widget managed by this window
+	Widget* widget;
+
+	// Display
+	/// Window size
+	union {
+		struct { uint width, height; };
+		int2 size = 0;
+	};
+	/// Background color
+	bgr3f backgroundColor = white;
+
+	/// Updates to be rendered
+	struct Update { shared<Graphics> graphics; int2 origin, size; };
+	Lock lock;
+	array<Update> updates;
+
+	// Control
+	/// Actions triggered when a key is pressed
+	map<Key, function<void()>> actions;
+	/// Current widget that has the keyboard input focus
+	Widget* focus = widget;
+	/// Current widget that has the drag focus
+	Widget* drag = 0;
+
+	// Methods
+	/// Creates an initially hidden window for \a widget, use \a show to display
+	/// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
+	Window(Widget* widget, int2 size = -1, function<String()> title = {}, Thread& thread=mainThread);
+	Window(const Window&)=delete; Window& operator=(const Window&)=delete; Window(Window&& o) = delete;
+	~Window();
+
+	/// Schedules window rendering after all events have been processed (\sa Poll::queue)
+	void render(shared<Graphics>&& graphics, int2 origin, int2 size);
+	void render();
+
+	void event() override;
+
+	void mouseEvent(int2, Event, Button);
+	void keyPress(Key);
+};
+#endif

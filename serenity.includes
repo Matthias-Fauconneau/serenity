@@ -5,7 +5,7 @@ audio
 music
 tuner
 image
-/usr/include/freetype2
-/usr/local/include/libfreeverb3-3
-.
 layout
+/usr/include/libdrm
+/usr/include/freetype2
+

@@ -156,9 +156,9 @@ Map::Map(const File& file, Prot prot, Flags flags) {
 	data = size?(byte*)check(mmap(0,size,prot,flags,file.fd,0)):0;
 	}
 
-Map::Map(uint fd, uint offset, uint size, Prot prot, Flags flags){
+Map::Map(uint fd, uint64 offset, uint64 size, Prot prot, Flags flags){
 	this->size=size;
-	data=(byte*)check(mmap(0,size,prot,flags,fd,offset), fd);
+	data=(byte*)check(mmap(0,size, prot, flags, fd, offset), fd);
 }
 
 Map::~Map() { unmap(); }
