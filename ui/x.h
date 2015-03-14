@@ -1,8 +1,8 @@
 #pragma once
 /// \file x.h X protocol
 #include "core.h"
-
-struct XEvent {
+namespace X11 {
+struct Event {
     uint8 type;
     struct Error { uint8 code; uint16 seq; uint id; uint16 minor; uint8 major; } packed;
     struct Generic { uint8 ext; uint16 seq; uint size; uint16 type; } packed;
@@ -25,7 +25,7 @@ struct XEvent {
         byte pad[31];
     } packed;
 } packed;
-static_assert(sizeof(XEvent)==32,"");
+static_assert(sizeof(Event)==32,"");
 
 enum ValueMask { BackgroundPixmap=1<<0, BackgroundPixel=1<<1, BorderPixmap=1<<2, BorderPixel=1<<3, BitGravity=1<<4,
                  WinGravity=1<<5, OverrideRedirect=1<<9, SaveUnder=1<<10, EventMask=1<<11, ColorMap=1<<13, CursorMask=1<<14 };
@@ -97,7 +97,7 @@ struct GetSelectionOwner {
     struct Reply { uint8 pad; uint16 seq; uint size; uint owner, pad2[5]; } packed;
 };
 struct ConvertSelection { uint8 req=24,pad=0; uint16 size=6; uint requestor=0,selection=1,target,property=0,time=0; };
-struct SendEvent { int8 req=25,propagate=0; uint16 size=11; uint window; uint eventMask=0; uint8 type; XEvent event; };
+struct SendEvent { int8 req=25,propagate=0; uint16 size=11; uint window; uint eventMask=0; uint8 type; Event event; };
 struct GrabButton { int8 req=28,owner=0; uint16 size=6; uint window; uint16 eventMask=ButtonPressMask; uint8 pointerMode=0,keyboardMode=1; uint confine=0,cursor=0; uint8 button=0,pad; uint16 modifiers=AnyModifier; };
 struct UngrabButton { int8 req=29,button=0; uint16 size=3; uint window; uint16 modifiers=AnyModifier, pad; };
 struct GrabKey { int8 req=33,owner=0; uint16 size=4; uint window; uint16 modifiers=0x8000; uint8 keycode, pointerMode=1,keyboardMode=1, pad[3]; };
@@ -126,7 +126,6 @@ struct GetKeyboardMapping {
     struct Reply { uint8 numKeySymsPerKeyCode; uint16 seq; uint size; byte pad[24]; } packed;
 };
 
-namespace X11 {
 constexpr string requests[] = {"0","CreateWindow","ChangeWindowAttributes","GetWindowAttributes","DestroyWindow","DestroySubwindows","ChangeSaveSet","ReparentWindow","MapWindow","MapSubwindows","UnmapWindow","UnmapSubwindows",
 							   "ConfigureWindow","CirculateWindow","GetGeometry","QueryTree","InternAtom","GetAtomName","ChangeProperty","DeleteProperty","GetProperty","ListProperties","SetSelectionOwner","GetSelectionOwner","ConvertSelection",
 							   "SendEvents","GrabPointer","UngrabPointer","GrabButton","UngrabButton","ChangeActivePointerGrab","GrabKeyboard","UngrabKeyboard","GrabKey","UngrabKey","AllowEvents","GrabServer","UngrabServer","QueryPointer",
@@ -169,7 +168,7 @@ struct Pixmap { int8 ext=EXT,req=1; uint16 size=18; uint window, pixmap, serial=
 struct NotifyMSC { int8 ext=EXT,req=2; uint16 size=10; uint window, serial=0, pad; uint64 targetMSC=0, divisor=0, remainder=0; };
 struct SelectInput { int8 ext=EXT, req=3; uint16 size=4; uint eid, window, eventMask=CompleteNotifyMask; };
 enum { ConfigureNotify, CompleteNotify };
-struct CompleteNotify { uint8 type; XEvent::Generic genericEvent; uint8 kind, mode; uint event_id, window, serial; uint64 ust, msc; } packed;
+struct CompleteNotify { uint8 type; X11::Event::Generic genericEvent; uint8 kind, mode; uint event_id, window, serial; uint64 ust, msc; } packed;
 }
 
 namespace DRI3 {

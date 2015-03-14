@@ -1,6 +1,5 @@
 #pragma once
 /// \file display.h
-#if X
 #include "thread.h"
 #include "function.h" // onEvent
 #include "map.h" // actions
@@ -10,7 +9,7 @@ inline string padding(size_t size, uint width=4){ return "\0\0\0\0"_.slice(0, al
 generic auto pad(T&& t, uint width=4) -> decltype(t+padding(t.size, width)) { return move(t)+padding(t.size, width); }
 
 /// Connection to an X display server
-struct Display : Socket, Poll {
+struct XDisplay : Socket, Poll {
 // Connection
     /// Synchronizes access to connection and event queue
     Lock lock;
@@ -37,7 +36,7 @@ struct Display : Socket, Poll {
     uint8 minKeyCode=8, maxKeyCode=0xFF;
 
 // Methods
-	Display(Thread& thread=mainThread);
+	XDisplay(Thread& thread=mainThread);
 // Connection
     // Read
      /// Event handler
@@ -102,7 +101,7 @@ struct Display : Socket, Poll {
      /// Returns Atom for \a name
      uint Atom(const string name);
 };
-#else
+
 #include "image.h"
 #include "thread.h"
 #include "input.h"
@@ -140,7 +139,7 @@ struct Display : Device, Poll {
 		Map map;
 	} buffers[2];
 
-	array<struct Window*> windows;
+	array<struct DRMWindow*> windows;
 
 	struct MouseEvent { int2 cursor; Event event; Button button; };
 	Lock lock;
@@ -155,5 +154,3 @@ struct Display : Device, Poll {
 
 	void swapBuffers();
 };
-
-#endif

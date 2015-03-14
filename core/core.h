@@ -10,6 +10,7 @@
 #define generic template<Type T>
 #define abstract =0
 #define default_move(T) T(T&&)=default; T& operator=(T&&)=default
+#define no_copy(T) T(const T&)=delete; T& operator=(const T&)=delete; T(T&& o) = delete;
 
 // Traits
 struct true_type { static constexpr bool value = true; };

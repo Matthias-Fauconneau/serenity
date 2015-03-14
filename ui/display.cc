@@ -1,11 +1,12 @@
 #include "display.h"
-#if X
 #include "x.h"
 #include <sys/socket.h>
 #include "data.h"
 #include "gl.h"
 
-String str(XEvent::Error e) {
+using namespace X11;
+
+String str(X11::Event::Error e) {
     uint8 code = e.code;
     ref<string> requests (X11::requests);
     ref<string> errors (X11::errors);
@@ -16,8 +17,8 @@ String str(XEvent::Error e) {
 	return str(request<requests.size?requests[request]:str(request), code<errors.size?errors[code]:str(code));
 }
 
-String str(XEvent e) {
-    if(e.type==Error) return str(e.error);
+template<> String str(const X11::Event& e) {
+	if(e.type==X11::Error) return str(e.error);
     else error(e.type);
 }
 
@@ -26,7 +27,7 @@ namespace Shm { int EXT, event, errorBase; };
 namespace DRI3 { int EXT; }
 namespace Present { int EXT; }
 
-Display::Display(Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread) {
+XDisplay::XDisplay(Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread) {
     {String path = "/tmp/.X11-unix/X"+getenv("DISPLAY",":0").slice(1,1);
         struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; mref<char>(addr.path,path.size).copy(path);
         if(check(connect(Socket::fd, (const sockaddr*)&addr,2+path.size), path)) error("X connection failed"); }
@@ -68,7 +69,7 @@ Display::Display(Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::f
 	Present::EXT=r.major; assert_(Present::EXT); }
 }
 
-void Display::event() {
+void XDisplay::event() {
     for(;;) { // Process any pending events
         for(;;) { // Process any queued events
             array<byte> e;
@@ -81,7 +82,7 @@ void Display::event() {
 		array<byte> o;
         if(!poll()) break;
         {Locker lock(this->lock);
-            XEvent e = read<XEvent>();
+			X11::Event e = read<X11::Event>();
 			if(e.type==Error) { error(e); continue; }
 			o.append(raw(e));
             if(e.type==GenericEvent) o.append( read(e.genericEvent.size*4) );
@@ -90,8 +91,8 @@ void Display::event() {
     }
 }
 
-void Display::event(const ref<byte> ge) {
-    const XEvent& e = *(XEvent*)ge.data;
+void XDisplay::event(const ref<byte> ge) {
+	const X11::Event& e = *(X11::Event*)ge.data;
     uint8 type = e.type&0b01111111; //msb set if sent by SendEvent
     if(type==KeyPress) {
         function<void()>* action = actions.find( keySym(e.key, e.state) );
@@ -100,7 +101,7 @@ void Display::event(const ref<byte> ge) {
     onEvent(ge);
 }
 
-uint16 Display::send(ref<byte> data, int fd) {
+uint16 XDisplay::send(ref<byte> data, int fd) {
 	iovec iov {.iov_base = (byte*)data.data, .iov_len = data.size};
 	union { cmsghdr cmsghdr; char control[CMSG_SPACE(sizeof(int))]; } cmsgu;
 	msghdr msg{.msg_name=0, .msg_namelen=0, .msg_iov=&iov, .msg_iovlen=1, .msg_control=&cmsgu, .msg_controllen = sizeof(cmsgu.control)};
@@ -118,9 +119,9 @@ uint16 Display::send(ref<byte> data, int fd) {
 	return sequence;
 }
 
-array<byte> Display::readReply(uint16 sequence, uint elementSize, buffer<int>& fds) {
+array<byte> XDisplay::readReply(uint16 sequence, uint elementSize, buffer<int>& fds) {
     for(;;) {
-		XEvent e;
+		X11::Event e;
 		iovec iov {.iov_base = &e, .iov_len = sizeof(e)};
 		union { cmsghdr cmsghdr; char control[CMSG_SPACE(sizeof(int))]; } cmsgu;
 		msghdr msg{.msg_name=0, .msg_namelen=0, .msg_iov=&iov, .msg_iovlen=1, .msg_control=&cmsgu, .msg_controllen = sizeof(cmsgu.control)};
@@ -152,7 +153,7 @@ array<byte> Display::readReply(uint16 sequence, uint elementSize, buffer<int>& f
 }
 
 // Keyboard
-uint Display::keySym(uint8 code, uint8 state) {
+uint XDisplay::keySym(uint8 code, uint8 state) {
     ::buffer<uint> keysyms;
     auto r = request(GetKeyboardMapping{.keycode=code}, keysyms);
     assert_(keysyms.size == r.numKeySymsPerKeyCode, keysyms.size, r.numKeySymsPerKeyCode, r.size);
@@ -161,7 +162,7 @@ uint Display::keySym(uint8 code, uint8 state) {
     return keysyms[state&1 && keysyms.size>=2];
 }
 
-uint8 Display::keyCode(uint sym) {
+uint8 XDisplay::keyCode(uint sym) {
     uint8 keycode=0;
     for(uint8 i: range(minKeyCode,maxKeyCode+1)) if(keySym(i,0)==sym) { keycode=i; break;  }
     if(!keycode) {
@@ -171,17 +172,17 @@ uint8 Display::keyCode(uint sym) {
     return keycode;
 }
 
-function<void()>& Display::globalAction(uint key) {
+function<void()>& XDisplay::globalAction(uint key) {
     auto code = keyCode(key);
     if(code) { send(GrabKey{.window=root, .keycode=code}); }
     else error("No such key", key);
     return actions.insert(key, []{});
 }
 
-uint Display::Atom(const string name) {
+uint XDisplay::Atom(const string name) {
     return request(InternAtom{.size=uint16(2+align(4,name.size)/4),  .length=uint16(name.size)}, name).atom;
 }
-#else
+
 #include "window.h"
 #include <unistd.h>
 #include <xf86drm.h> // drm
@@ -195,7 +196,16 @@ ICON(cursor);
 Keyboard::Keyboard(Thread& thread) : Device("event3", "/dev/input"_, Flags(ReadOnly|NonBlocking)), Poll(Device::fd, POLLIN, thread) {}
 void Keyboard::event() {
 	for(input_event e; ::read(Device::fd, &e, sizeof(e)) > 0;) {
-		if(e.type == EV_KEY && e.value) keyPress(Key(e.code));
+		if(e.type == EV_KEY && e.value) {
+			enum {
+				None, Escape, _1,_2,_3,_4,_5,_6,_7,_8,_9,_0, Minus, Equal, Backspace, Tab, Q,W,E,R,T,Y,U,I,O,P, LeftBrace, RightBrace, Return, LeftCtrl,
+				A,S,D,F,G,H,J,K,L, Semicolon, Apostrophe, Grave, LeftShift, BackSlash, Z,X,C,V,B,N,M, Comma, Dot, Slash, RightShift, KP_Asterisk, LeftAlt,
+				Space, KP_7 = 71, KP_8, KP_9, KP_Minus, KP_4, KP_5, KP_6, KP_Plus, KP_1, KP_2, KP_3, KP_0, KP_Slash=98,
+				Home=102, UpArrow, PageUp, LeftArrow, RightArrow, End, DownArrow, PageDown, Insert, Delete, Macro, Mute, VolumeDown, VolumeUp,
+				Power=116
+			};
+			keyPress(Key(e.code)); // FIXME: map evdev to X11
+		}
 	}
 }
 Mouse::Mouse(Thread& thread) : Device("event4", "/dev/input"_, Flags(ReadOnly|NonBlocking)), Poll(Device::fd, POLLIN, thread) {}
@@ -204,7 +214,9 @@ void Mouse::event() {
 		   if(e.type==EV_REL) { int i = e.code; assert(i<2); cursor[i]+=e.value; cursor[i]=clamp(0,cursor[i], max[i]); } //TODO: acceleration
 		   if(e.type==EV_SYN) mouseEvent(cursor, Motion, button);
 		   if(e.type == EV_KEY) {
-			   mouseEvent(cursor, e.value?Press:Release, button = Button(e.code));
+			   enum { LeftButton=0x110, RightButton, MiddleButton, WheelDown=0x150, WheelUp };
+			   button = Button(e.code); // FIXME: map evdev to X11
+			   mouseEvent(cursor, e.value?Press:Release, button);
 			   if(!e.value) button = NoButton;
 		   }
 	}
@@ -279,7 +291,7 @@ Display::~Display() {
 	}
 }
 
-void Display::mouseEvent(int2 cursor, Event event, Button button) {
+void Display::mouseEvent(int2 cursor, ::Event event, Button button) {
 	drmModeMoveCursor(Device::fd, crtc, cursor.x, cursor.y);
 	{Locker lock(this->lock); eventQueue.append({cursor, event, button});}
 	queue();
@@ -287,8 +299,6 @@ void Display::mouseEvent(int2 cursor, Event event, Button button) {
 void Display::event() {
 	MouseEvent e;
 	{Locker lock(this->lock); e = eventQueue.take(0);}
-	for(Window* window: windows) window->mouseEvent(e.cursor, e.event, e.button);
+	for(DRMWindow* window: windows) window->mouseEvent(e.cursor, e.event, e.button);
 }
-void Display::keyPress(Key key) { for(Window* window: windows) window->keyPress(key);  }
-
-#endif
+void Display::keyPress(Key key) { for(DRMWindow* window: windows) window->keyPress(key);  }
