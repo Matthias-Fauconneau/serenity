@@ -315,7 +315,7 @@ void Window::render() { assert_(size); 	lock.lock(); updates.clear(); lock.unloc
 Window::Window(Widget* widget, int2, function<String()>, Thread& thread) : Poll(0,0,thread), widget(widget) {
 	if(!display) display = unique<Display>();  // Created by the first instantiation of a window, deleted at exit
 	display->windows.append(this);
-	size = display->target.size;
+	size = display->buffers[0].target.size;
 	actions[Escape] = []{requestTermination();};
 	render();
 }
@@ -331,8 +331,9 @@ void Window::event() {
 	Update update = updates.take(0);
 	if(!update.graphics) update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size)));
 	lock.unlock();
-	fill(display->target, update.origin, update.size, backgroundColor, 1); // Clear framebuffer
-	::render(display->target, update.graphics); // Render retained graphics
+	fill(display->buffers[1].target, update.origin, update.size, backgroundColor, 1); // Clear framebuffer
+	::render(display->buffers[1].target, update.graphics); // Render retained graphics
+	display->swapBuffers();
 }
 
 void Window::mouseEvent(int2 cursor, Event event, Button button) {

@@ -211,37 +211,43 @@ void Mouse::event() {
 }
 
 Display::Display(Thread& thread) : Device("/dev/dri/card0"), Poll(0,0,thread), keyboard(thread), mouse(mouseThread) {
-	drmModeRes* res = drmModeGetResources(Device::fd);
-	drmModeConnector* c = 0;
-	for(uint connector: ref<uint32>(res->connectors, res->count_connectors)) {
-		c = drmModeGetConnector(Device::fd, connector);
-		if(c->connection != DRM_MODE_CONNECTED) { drmModeFreeConnector(c); continue; }
-		if(c->count_modes == 0) { drmModeFreeConnector(c); continue; }
-		break;
-	}
-	connector = c->connector_id;
-	drmModeModeInfo mode = c->modes[0];
-	typedef IOWR<'d', 0xB2, drm_mode_create_dumb> CREATE_DUMB;
-	drm_mode_create_dumb creq {.width = mode.hdisplay, .height = mode.vdisplay, .bpp=32, .flags = 0};
-	iowr<CREATE_DUMB>(creq);
-	handle = creq.handle;
-	drmModeAddFB(Device::fd, mode.hdisplay, mode.vdisplay, 24, 32, creq.pitch, handle, &fb);
-
-	{drmModeEncoder *enc = drmModeGetEncoder(Device::fd, c->encoder_id);
-		crtc = enc->crtc_id;
-		drmModeFreeEncoder(enc);
+	{  drmModeConnector* c = 0;
+		{  drmModeRes* res = drmModeGetResources(Device::fd);
+			for(uint connector: ref<uint32>(res->connectors, res->count_connectors)) {
+				c = drmModeGetConnector(Device::fd, connector);
+				if(c->connection != DRM_MODE_CONNECTED) { drmModeFreeConnector(c); continue; }
+				if(c->count_modes == 0) { drmModeFreeConnector(c); continue; }
+				break;
+			}
+			drmModeFreeResources(res);
+		}
+		connector = c->connector_id;
+		mode = unique<_drmModeModeInfo>(c->modes[0]);
+		{  drmModeEncoder *enc = drmModeGetEncoder(Device::fd, c->encoder_id);
+			crtc = enc->crtc_id;
+			drmModeFreeEncoder(enc);
+		}
+		drmModeFreeConnector(c);
 	}
 	previousMode = drmModeGetCrtc(Device::fd, crtc);
-	drmModeSetCrtc(Device::fd, crtc, fb, 0, 0, &c->connector_id, 1, &mode);
-	drmModeFreeConnector(c);
-	drmModeFreeResources(res);
 
-	drm_mode_map_dumb mreq {.handle = handle};
-	typedef IOWR<'d', 0xB3, drm_mode_map_dumb> MAP_DUMB;
-	iowr<MAP_DUMB>(mreq);
-	map = Map(Device::fd, mreq.offset, creq.size);
-	target = Image(unsafeRef(cast<byte4>(map)), int2(mode.hdisplay, mode.vdisplay), creq.pitch/4);
-	mouse.max = target.size;
+	for(auto& buffer: buffers) {
+		typedef IOWR<'d', 0xB2, drm_mode_create_dumb> CREATE_DUMB;
+		drm_mode_create_dumb creq {.width = mode->hdisplay, .height = mode->vdisplay, .bpp=32, .flags = 0};
+		iowr<CREATE_DUMB>(creq);
+		buffer.handle = creq.handle;
+		drmModeAddFB(Device::fd, mode->hdisplay, mode->vdisplay, 24, 32, creq.pitch, buffer.handle, &buffer.fb);
+
+		drm_mode_map_dumb mreq {.handle = buffer.handle};
+		typedef IOWR<'d', 0xB3, drm_mode_map_dumb> MAP_DUMB;
+		iowr<MAP_DUMB>(mreq);
+		buffer.map = Map(Device::fd, mreq.offset, creq.size);
+		buffer.target = Image(unsafeRef(cast<byte4>(buffer.map)), int2(mode->hdisplay, mode->vdisplay), creq.pitch/4);
+	}
+
+	drmModeSetCrtc(Device::fd, crtc, buffers[0].fb, 0, 0, &connector, 1, mode.pointer);
+
+	mouse.max = buffers[0].target.size;
 	mouse.mouseEvent = {this, &Display::mouseEvent};
 	keyboard.keyPress = {this, &Display::keyPress};
 	Image cursor (64);
@@ -257,6 +263,22 @@ Display::Display(Thread& thread) : Device("/dev/dri/card0"), Poll(0,0,thread), k
 	registerPoll();
 }
 
+void Display::swapBuffers() {
+	swap(buffers[0], buffers[1]);
+	drmModeSetCrtc(Device::fd, crtc, buffers[0].fb, 0, 0, &connector, 1, mode.pointer);
+}
+
+Display::~Display() {
+	drmModeSetCrtc(Device::fd, previousMode->crtc_id, previousMode->buffer_id, previousMode->x, previousMode->y, &connector, 1, &previousMode->mode);
+	drmModeFreeCrtc(previousMode);
+	for(auto& buffer: buffers) {
+		drmModeRmFB(Device::fd, buffer.fb);
+		typedef IOWR<'d', 0xB4, drm_mode_destroy_dumb> DESTROY_DUMB;
+		struct drm_mode_destroy_dumb dreq {.handle = buffer.handle};
+		iowr<DESTROY_DUMB>(dreq);
+	}
+}
+
 void Display::mouseEvent(int2 cursor, Event event, Button button) {
 	drmModeMoveCursor(Device::fd, crtc, cursor.x, cursor.y);
 	{Locker lock(this->lock); eventQueue.append({cursor, event, button});}
@@ -269,12 +291,4 @@ void Display::event() {
 }
 void Display::keyPress(Key key) { for(Window* window: windows) window->keyPress(key);  }
 
-Display::~Display() {
-	drmModeSetCrtc(Device::fd, previousMode->crtc_id, previousMode->buffer_id, previousMode->x, previousMode->y, &connector, 1, &previousMode->mode);
-	drmModeFreeCrtc(previousMode);
-	drmModeRmFB(Device::fd, fb);
-	typedef IOWR<'d', 0xB4, drm_mode_destroy_dumb> DESTROY_DUMB;
-	struct drm_mode_destroy_dumb dreq {.handle = handle};
-	iowr<DESTROY_DUMB>(dreq);
-}
 #endif

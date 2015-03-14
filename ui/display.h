@@ -106,6 +106,7 @@ struct Display : Socket, Poll {
 #include "image.h"
 #include "thread.h"
 #include "input.h"
+struct _drmModeModeInfo;
 
 struct Keyboard : Device, Poll {
 	function<void(Key)> keyPress;
@@ -130,11 +131,14 @@ struct Display : Device, Poll {
 	Mouse mouse;
 
 	uint connector, crtc;
+	unique<_drmModeModeInfo> mode;
 	struct _drmModeCrtc* previousMode;
-	Image target;
-	uint32 handle;
-	uint32 fb;
-	Map map;
+	struct {
+		Image target;
+		uint32 handle;
+		uint32 fb;
+		Map map;
+	} buffers[2];
 
 	array<struct Window*> windows;
 
@@ -149,7 +153,7 @@ struct Display : Device, Poll {
 	void event() override;
 	void keyPress(Key);
 
-	void patchCursor(int2 position, bool erase);
+	void swapBuffers();
 };
 
 #endif
