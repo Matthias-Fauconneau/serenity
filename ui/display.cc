@@ -197,14 +197,18 @@ Keyboard::Keyboard(Thread& thread) : Device("event3", "/dev/input"_, Flags(ReadO
 void Keyboard::event() {
 	for(input_event e; ::read(Device::fd, &e, sizeof(e)) > 0;) {
 		if(e.type == EV_KEY && e.value) {
-			enum {
-				None, Escape, _1,_2,_3,_4,_5,_6,_7,_8,_9,_0, Minus, Equal, Backspace, Tab, Q,W,E,R,T,Y,U,I,O,P, LeftBrace, RightBrace, Return, LeftCtrl,
-				A,S,D,F,G,H,J,K,L, Semicolon, Apostrophe, Grave, LeftShift, BackSlash, Z,X,C,V,B,N,M, Comma, Dot, Slash, RightShift, KP_Asterisk, LeftAlt,
-				Space, KP_7 = 71, KP_8, KP_9, KP_Minus, KP_4, KP_5, KP_6, KP_Plus, KP_1, KP_2, KP_3, KP_0, KP_Slash=98,
-				Home=102, UpArrow, PageUp, LeftArrow, RightArrow, End, DownArrow, PageDown, Insert, Delete, Macro, Mute, VolumeDown, VolumeUp,
-				Power=116
-			};
-			keyPress(Key(e.code)); // FIXME: map evdev to X11
+			int code = 0;
+			for(auto range: ref<key_value<int, ref<int>>>{
+			{0,ref<int>{0,Escape,'1','2','3','4','5','6','7','8','9','0','-','=',Backspace, Tab, 'q','w','e','r','t','y','u','i','o','{','}',Return,LeftControl,
+				'a','s','d','f','g','h','j','k','l',';','\'','`', LeftShift, '\\', 'z','x','c','v','b','n','m',',','.','/', RightShift, KP_Asterisk, 0/*LeftAlt*/, ' '}},
+			{71, ref<int>{KP_7, KP_8, KP_9, KP_Minus, KP_4, KP_5, KP_6, KP_Plus, KP_1, KP_2, KP_3, KP_0}},
+			{98, ref<int>{KP_Slash, 0,0,0, Home, UpArrow, PageUp, LeftArrow, RightArrow, End, DownArrow, PageDown, Insert, Delete}}}) {
+				if(e.code >= range.key && e.code <= range.key+range.value.size) {
+					code = range.value[e.code-range.key];
+					break;
+				}
+			}
+			keyPress(Key(code));
 		}
 	}
 }
@@ -214,8 +218,14 @@ void Mouse::event() {
 		   if(e.type==EV_REL) { int i = e.code; assert(i<2); cursor[i]+=e.value; cursor[i]=clamp(0,cursor[i], max[i]); } //TODO: acceleration
 		   if(e.type==EV_SYN) mouseEvent(cursor, Motion, button);
 		   if(e.type == EV_KEY) {
-			   enum { LeftButton=0x110, RightButton, MiddleButton, WheelDown=0x150, WheelUp };
-			   button = Button(e.code); // FIXME: map evdev to X11
+			   for(auto range: ref<key_value<int, ref<Button>>>{
+			   {0x110, {LeftButton, RightButton, MiddleButton}},
+			   {0x150, {WheelDown, WheelUp}}}) {
+				   if(e.code >= range.key && e.code <= range.key+range.value.size) {
+					   button = range.value[e.code-range.key];
+					   break;
+				   }
+			   }
 			   mouseEvent(cursor, e.value?Press:Release, button);
 			   if(!e.value) button = NoButton;
 		   }

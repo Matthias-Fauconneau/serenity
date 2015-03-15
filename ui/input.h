@@ -7,7 +7,7 @@ enum Key {
 	Execute, Insert,
 	KP_Enter=0xff8d, KP_Asterisk=0xffaa, KP_Plus, KP_Separator, KP_Minus, KP_Decimal, KP_Slash, KP_0,KP_1,KP_2,KP_3,KP_4,KP_5,KP_6,KP_7,KP_8,KP_9,
 	F1=0xffbe,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11,
-	ShiftKey=0xffe1, ControlKey=0xffe3,
+	LeftShift=0xffe1, RightShift=0xffe1, LeftControl=0xffe3,
 	Delete=0xffff,
 	Play=0x1008ff14, Media=0x1008ff32
 };
