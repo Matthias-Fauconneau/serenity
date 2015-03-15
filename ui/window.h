@@ -15,6 +15,8 @@ struct Window : Poll {
 	int2 size = 0;
 	/// Background color
 	bgr3f backgroundColor = white;
+	/// Current cursor
+	Cursor cursor = Cursor::Arrow;
 
 	/// Updates to be rendered
 	struct Update { shared<Graphics> graphics; int2 origin, size; };

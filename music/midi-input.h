@@ -10,7 +10,7 @@ struct MidiInput : Device, Poll {
     array<uint8> pressed;
     array<uint8> sustained;
     bool sustain=false;
-    signal<uint,uint, float2> noteEvent;
+    function<void(uint,uint, float2)> noteEvent;
     struct Event { int16 time; uint8 key; uint8 vel; Event(int16 time, uint8 key, uint8 vel):time(time),key(key),vel(vel){}};
     array<Event> events;
     int lastTick=0;

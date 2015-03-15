@@ -4,6 +4,13 @@
 #include "widget.h"
 #include "font.h"
 
+struct GraphicsWidget : Graphics, Widget {
+	GraphicsWidget() {}
+	GraphicsWidget(Graphics&& o) : Graphics(move(o)) {}
+	vec2 sizeHint(vec2) override { assert_(isNumber(bounds.max), bounds); return bounds.max; }
+	shared<Graphics> graphics(vec2) override { return shared<Graphics>((Graphics*)this); }
+};
+
 /// Layouts musical notations to graphic primitives
 struct Sheet {
 	// Graphics

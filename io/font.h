@@ -8,7 +8,7 @@ struct  FT_FaceRec_;
 const Folder& fontFolder();
 String findFont(string fontName, ref<string> fontTypes={""});
 
-/// Freetype wrapper
+/// Font scaled to a given size (Freetype wrapper and glyph cache)
 struct Font {
     /// Loads font /a data scaled to /a size pixels high
     Font(ref<byte> data, float size, bool hint=false);
@@ -58,7 +58,7 @@ struct Font {
     Glyph render(uint index);
 };
 
-/// Holds scalable font data and scaled Freetype instance
+/// Holds scalable font data and a \a Font instance (glyph cache) for each size
 struct FontData {
     buffer<byte> data;
     String name;

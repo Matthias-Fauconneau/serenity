@@ -8,6 +8,10 @@
 
 using namespace X11;
 
+static Window* currentWindow = 0; // FIXME
+bool hasFocus(Widget* widget) { assert_(currentWindow); return currentWindow->focus==widget; }
+void setCursor(Cursor cursor) { assert_(currentWindow); currentWindow->cursor=cursor; }
+
 void Window::render(shared<Graphics>&& graphics, int2 origin, int2 size) {
 	lock.lock();
 	updates.append( Update{move(graphics),origin,size} );
@@ -21,7 +25,11 @@ Window::Update Window::render(const Image& target) {
 	lock.lock();
 	Update update = updates.take(0);
 	lock.unlock();
-	if(!update.graphics) update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size)));
+	if(!update.graphics) {
+		currentWindow = this; // FIXME
+		update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size)));
+		currentWindow = 0;
+	}
 	fill(target, update.origin, update.size, backgroundColor, 1); // Clear framebuffer
 	::render(target, update.graphics); 	// Render retained graphics
 	return update;
@@ -79,6 +87,7 @@ void XWindow::onEvent(const ref<byte> ge) {
 
 bool XWindow::processEvent(const X11::Event& e) {
     uint8 type = e.type&0b01111111; //msb set if sent by SendEvent
+	currentWindow = this; // FIXME
     /**/ if(type==ButtonPress) {
 		Widget* previousFocus = focus;
 		if(widget->mouseEvent(vec2(e.x,e.y), vec2(Window::size), Press, (Button)e.key, focus) || focus!=previousFocus) render();
@@ -125,7 +134,8 @@ bool XWindow::processEvent(const X11::Event& e) {
     }
 	else if(type==MappingNotify) {}
 	else if(type==Shm::event+Shm::Completion) { assert_(state == Copy); state = Present; }
-    else return false;
+	else { currentWindow = 0; return false; }
+	currentWindow = 0;
     return true;
 }
 

@@ -39,9 +39,10 @@ struct Widget {
     virtual bool keyRelease(Key key, Modifiers modifiers) { (void)key, (void) modifiers; return false; }
 };
 
-struct GraphicsWidget : Graphics, Widget {
-	GraphicsWidget() {}
-	GraphicsWidget(Graphics&& o) : Graphics(move(o)) {}
-	vec2 sizeHint(vec2) override { assert_(isNumber(bounds.max), bounds); return bounds.max; }
-	shared<Graphics> graphics(vec2) override { return shared<Graphics>((Graphics*)this); }
-};
+/// Returns whether this widget has the keyboard focus
+bool hasFocus(Widget* widget);
+
+/// Cursor icons
+enum class Cursor { Arrow, Text };
+/// Sets mouse cursor
+void setCursor(Cursor cursor);

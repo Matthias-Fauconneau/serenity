@@ -55,9 +55,8 @@ struct Music {
     void setInstrument(string name) {
         if(audioThread) audioThread.wait();
         if(decodeThread) decodeThread.wait(); // ~Thread
-        input.noteEvent.delegates.clear();
         sampler = unique<Sampler>("/Samples/"+name+".sfz"_, 512, [this](uint){ input.event(); }, decodeThread); // Ensures all events are received right before mixing
-        input.noteEvent.connect(sampler.pointer, &Sampler::noteEvent);
+	input.noteEvent = {sampler.pointer, &Sampler::noteEvent};
         audio.read32 = {sampler.pointer, &Sampler::read32};
         audioThread.spawn();
         decodeThread.spawn();
