@@ -59,7 +59,7 @@ bool TextEdit::mouseEvent(vec2 position, vec2 size, Event event, Button button, 
 	return cursorChanged;
 }
 
-size_t TextEdit::index() {
+size_t TextEdit::index(Cursor cursor) {
 	const auto& lines = lastTextLayout.glyphs;
 	if(!lines) return 0;
 	if(cursor.line==lines.size) return lines.last().last().last().sourceIndex;
@@ -71,6 +71,7 @@ size_t TextEdit::index() {
 		assert(sourceIndex < text.size);
 		return sourceIndex;
 	}
+	if(!lines) return 0;
 	size_t index = 1; // ' ', '\t' or '\n' immediately after last glyph
 	size_t lineIndex = cursor.line;
 	while(lineIndex>0 && !lines[lineIndex]) lineIndex--, index++; // Seeks last glyph backwards counting line feeds (not included as glyphs)
@@ -115,42 +116,48 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
         }
 		else if(key==Home) cursor.column = 0;
 		else if(key==End) cursor.column = line.size;
-        else if(key==Delete) {
-			if(cursor.column<line.size || cursor.line<lines.size-1) {
-				text.removeAt(index());
-				lastTextLayout = TextLayout();
-				if(textChanged) textChanged(toUTF8(text));
-            }
-        }
-        else if(key==Backspace) { //LeftArrow+Delete
-            if(cursor.column>0) cursor.column--;
-			else if(cursor.line>0) cursor.line--, cursor.column=lineStops(lines[cursor.line]).size;
-            else return false;
-            if(index()<text.size) {
-				text.removeAt(index());
-				lastTextLayout = TextLayout();
-				if(textChanged) textChanged(toUTF8(text));
-            }
-        }
-		else if(key==Return || key==KP_Enter) {
-            if(textEntered) textEntered(toUTF8(text));
-            else {
-				text.insertAt(index(), uint32('\n'));
+		else {
+			Cursor min, max;
+			if(selectionStart < cursor) min=selectionStart, max=cursor; else min=cursor, max=selectionStart;
+			size_t sourceIndex = index(min);
+			if(cursor != selectionStart) { // Delete selection
+				text = buffer<uint>(text.sliceRange(0, index(min)) + text.sliceRange(index(max), text.size));
+				selectionStart = cursor = min;
+				if(key==Delete || key==Backspace) { // Only deletes selection; returns
+					lastTextLayout = TextLayout();
+					if(textChanged) textChanged(toUTF8(text));
+					cursorX = cursor.column<line.size ? line[cursor.column].left : line ? line.last().right : 0;
+					return true;
+				}
+			}
+			const auto line = lineStops(lines[cursor.line]);
+			if(key==Delete) {
+				if(cursor.column<line.size || cursor.line<lines.size-1) text.removeAt(sourceIndex);
+				else return false;
+			}
+			else if(key==Backspace) { // <=> LeftArrow, Delete
+				if(cursor.column>0) cursor.column--;
+				else if(cursor.line>0) cursor.line--, cursor.column=lineStops(lines[cursor.line]).size;
+				else return false;
+				if(cursor.column<line.size || cursor.line<lines.size-1) text.removeAt(sourceIndex);
+				else return false;
+			}
+			else if(key==Return || key==KP_Enter) {
+				if(textEntered) { textEntered(toUTF8(text)); return false; }
+				text.insertAt(sourceIndex, uint32('\n'));
 				cursor.line++; cursor.column = 0;
-				lastTextLayout = TextLayout();
-				if(textChanged) textChanged(toUTF8(text));
-            }
-        }
-        else {
-			char c;
-			if(key>=' ' && key<=0xFF) c=key; // FIXME: Unicode
-			else if(key >= KP_Asterisk && key<=KP_9) c="*+.-./0123456789"_[key-KP_Asterisk];
-			else return false;
-			text.insertAt(index(), uint32(c));
-			cursor.column++;
+			}
+			else {
+				char c;
+				if(key>=' ' && key<=0xFF) c=key; // FIXME: Unicode
+				else if(key >= KP_Asterisk && key<=KP_9) c="*+.-./0123456789"_[key-KP_Asterisk];
+				else return false;
+				text.insertAt(index(cursor), uint32(c));
+				cursor.column++;
+			}
 			lastTextLayout = TextLayout();
 			if(textChanged) textChanged(toUTF8(text));
-        }
+		}
 
 		cursorX = cursor.column<line.size ? line[cursor.column].left : line ? line.last().right : 0;
     }

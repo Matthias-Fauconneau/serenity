@@ -13,9 +13,8 @@ struct TextEdit : Text {
 	};
 	Cursor cursor;
 	float cursorX = 0; // As of last horizontal move to keep horizontal offset constant on vertical moves
-	size_t editIndex=0;
 
-	size_t index();
+	size_t index(Cursor cursor);
     /// User edited this text
 	function<void(string)> textChanged;
     /// User pressed enter
