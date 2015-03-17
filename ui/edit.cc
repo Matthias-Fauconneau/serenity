@@ -143,7 +143,7 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
         }
         else {
 			char c;
-			if(key>=' ' && key<=0xFF) c=key; //TODO: UTF8 Compose
+			if(key>=' ' && key<=0xFF) c=key; // FIXME: Unicode
 			else if(key >= KP_Asterisk && key<=KP_9) c="*+.-./0123456789"_[key-KP_Asterisk];
 			else return false;
 			text.insertAt(index(), uint32(c));
@@ -158,16 +158,31 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 	return true;
 }
 
+vec2 TextEdit::cursorPosition(vec2 size, Cursor cursor) {
+	vec2 textSize = ceil(lastTextLayout.bbMax - min(vec2(0), lastTextLayout.bbMin));
+	vec2 offset = max(vec2(0), vec2(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
+	const auto line = lineStops(lastTextLayout.glyphs[cursor.line]);
+	float x = cursor.column<line.size ? line[cursor.column].left : line ? line.last().right : 0;
+	return offset+vec2(x,cursor.line*Text::size); // Assumes uniform line heights
+}
+
 shared<Graphics> TextEdit::graphics(vec2 size) {
 	shared<Graphics> graphics = Text::graphics(size);
-	if(hasFocus(this)) {
-		const auto& lines = lastTextLayout.glyphs;
-		assert(cursor.line < lines.size, cursor.line, lines.size);
-		const auto line = lineStops(lines[cursor.line]);
-		float x = cursor.column<line.size ? line[cursor.column].left : line ? line.last().right : 0;
-		vec2 textSize = ceil(lastTextLayout.bbMax - min(vec2(0), lastTextLayout.bbMin));
-		vec2 offset = max(vec2(0), vec2(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
-		graphics->fills.append(offset+vec2(x,cursor.line*Text::size), vec2(1,Text::size)); // Assumes uniform line heights
-    }
+
+	{Cursor min, max;
+		if(selectionStart < cursor) min=selectionStart, max=cursor; else min=cursor, max=selectionStart;
+		if(selectionStart.line == cursor.line) { // Single line selection
+			vec2 O = cursorPosition(size, min); graphics->fills.append(O, cursorPosition(size, max)-O+vec2(0,Text::size), black, 1.f/2);
+		} else { // Multiple line selection
+			{vec2 O = cursorPosition(size, {min.line, min.column});
+				graphics->fills.append(O, cursorPosition(size, {min.line, invalid})-O+vec2(0,Text::size), black, 1.f/2);}
+			for(size_t line: range(min.line+1, max.line)) {
+				vec2 O = cursorPosition(size, {line, 0}); graphics->fills.append(O, cursorPosition(size, {line, invalid})-O+vec2(0,Text::size), black, 1.f/2);
+			}
+			{vec2 O = cursorPosition(size, {max.line, 0});
+				graphics->fills.append(O, cursorPosition(size, {max.line, max.column})-O+vec2(0,Text::size), black, 1.f/2);}
+		}
+	}
+	if(hasFocus(this)) graphics->fills.append(cursorPosition(size, cursor), vec2(1,Text::size));
 	return graphics;
 }

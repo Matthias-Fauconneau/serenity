@@ -26,5 +26,6 @@ struct TextEdit : Text {
 	TextEdit(const string text="") : Text(text, 16, black, 1, 0, "DejaVuSans", true, 1, -1) {}
 	bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus /*FIXME: -> Window& window*/) override;
     bool keyPress(Key key, Modifiers modifiers) override;
+	vec2 cursorPosition(vec2 size, Cursor cursor);
 	shared<Graphics> graphics(vec2) override;
 };
