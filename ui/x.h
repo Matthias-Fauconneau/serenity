@@ -36,7 +36,9 @@ enum { Error, Reply, KeyPress, KeyRelease, ButtonPress, ButtonRelease, MotionNot
        Expose, GraphicsExpose, NoExpose, VisibilityNotify, CreateNotify, DestroyNotify, UnmapNotify, MapNotify, MapRequest, ReparentNotify,
        ConfigureNotify, ConfigureRequest, GravityNotify, ResizeRequest, CirculateNotify, CirculateRequest, PropertyNotify,
        SelectionClear, SelectionRequest, SelectionNotify, ColormapNotify , ClientMessage, MappingNotify, GenericEvent };
-enum ModifierMask { ShiftMask=1<<0, LockMask=1<<1, ControlMask=1<<2, Mod1Mask=1<<3, Mod2Mask=1<<4, Mod3Mask=1<<5, Mod4Mask=1<<6, Mod5Mask=1<<7, Button1Mask=1<<8, Button2Mask=1<<9, Button3Mask=1<<10, Button4Mask=1<<11, Button5Mask=1<<12, AnyModifier=1<<15 };
+enum ModifierMask { ShiftMask=1<<0, LockMask=1<<1, ControlMask=1<<2,
+		    Mod1Mask=1<<3, Mod2Mask=1<<4, Mod3Mask=1<<5, Mod4Mask=1<<6, Mod5Mask=1<<7,
+		    Button1Mask=1<<8, Button2Mask=1<<9, Button3Mask=1<<10, Button4Mask=1<<11, Button5Mask=1<<12, AnyModifier=1<<15 };
 enum MapState { IsUnmapped, IsUnviewable, IsViewable };
 enum ConfigureMask { X=1<<0, Y=1<<1, W=1<<2, H=1<<3, StackMode=1<<6 };
 enum StackMode { Above,Below,TopIf,BottomIf,Opposite };

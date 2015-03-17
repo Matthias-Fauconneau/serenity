@@ -154,12 +154,20 @@ array<byte> XDisplay::readReply(uint16 sequence, uint elementSize, buffer<int>& 
 
 // Keyboard
 uint XDisplay::keySym(uint8 code, uint8 state) {
-    ::buffer<uint> keysyms;
+	::buffer<uint> keysyms;
     auto r = request(GetKeyboardMapping{.keycode=code}, keysyms);
-    assert_(keysyms.size == r.numKeySymsPerKeyCode, keysyms.size, r.numKeySymsPerKeyCode, r.size);
-    assert_(keysyms, "No KeySym for code", code, "in state",state);
-    if(keysyms.size>=2 && keysyms[1]>=0xff80 && keysyms[1]<=0xffbd) state|=1;
-    return keysyms[state&1 && keysyms.size>=2];
+	assert_(keysyms.size == r.numKeySymsPerKeyCode);
+	if(keysyms.size == 1) keysyms = copyRef<uint>({keysyms[0],keysyms[0],keysyms[0],keysyms[0]});
+	if(keysyms.size == 2) keysyms = copyRef<uint>({keysyms[0],keysyms[1],keysyms[0],keysyms[1]});
+	if(keysyms.size == 3) keysyms = copyRef<uint>({keysyms[0],keysyms[1],keysyms[2],keysyms[2]});
+	assert_(keysyms.size >= 4, "No KeySym for code", code, "in state",state, keysyms);
+	if(keysyms[1]==0) keysyms[1]=keysyms[0];
+	if(keysyms[3]==0) keysyms[3]=keysyms[2];
+	int group = (state&(Mod1Mask|Mod3Mask|Mod4Mask|Mod5Mask)?1:0)<<1;
+	bool numlock = state&Mod2Mask;
+	bool keypad = keysyms[group]>=0xff80 && keysyms[group]<=0xffbd;
+	bool shift = state&(ShiftMask|LockMask);
+	return keysyms[group | (shift ^ (numlock && keypad))];
 }
 
 uint8 XDisplay::keyCode(uint sym) {

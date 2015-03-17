@@ -132,7 +132,7 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 				if(textChanged) textChanged(toUTF8(text));
             }
         }
-        else if(key==Return) {
+		else if(key==Return || key==KP_Enter) {
             if(textEntered) textEntered(toUTF8(text));
             else {
 				text.insertAt(index(), uint32('\n'));
@@ -142,12 +142,10 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
             }
         }
         else {
-            ref<uint> keypadNumbers = {KP_0, KP_1, KP_2, KP_3, KP_4, KP_5, KP_6, KP_7, KP_8, KP_9};
-            char c=0;
-            if(key>=' ' && key<=0xFF) c=key; //TODO: UTF8 Compose
-            else if(keypadNumbers.contains(key)) c='0'+keypadNumbers.indexOf(key);
-            else if(key==KP_Asterisk) c='*'; else if(key==KP_Plus) c='+'; else if(key==KP_Minus) c='-'; else if(key==KP_Slash) c='/';
-            else return false;
+			char c;
+			if(key>=' ' && key<=0xFF) c=key; //TODO: UTF8 Compose
+			else if(key >= KP_Asterisk && key<=KP_9) c="*+.-./0123456789"_[key-KP_Asterisk];
+			else return false;
 			text.insertAt(index(), uint32(c));
 			cursor.column++;
 			lastTextLayout = TextLayout();
@@ -156,7 +154,7 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 
 		cursorX = cursor.column<line.size ? line[cursor.column].left : line ? line.last().right : 0;
     }
-	if(!(modifiers&Shift)) selectionStart=cursor;
+	if(!(modifiers&Shift)) selectionStart = cursor;
 	return true;
 }
 
