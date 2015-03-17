@@ -1,26 +1,18 @@
 #include "edit.h"
 
-/*generic buffer<ref<T>> toRefs(ref<array<T>> arrays) { return apply(arrays, [](const array<T>& e) -> ref<T> { return e; }); }
-generic buffer<T> join(ref<ref<T>> list, ref<T> separator) {
-	if(!list) return {};
-	size_t size = 0; for(const auto& e: list) size += e.size;
-	buffer<T> buffer (size + (list.size-1)*separator.size, 0);
-	for(size_t index: range(list.size)) { buffer.append( list[index] ); if(index<list.size-1) buffer.append( separator ); }
-	return buffer;
-}*/
-
 struct EditStop { float left, center, right; size_t sourceIndex; };
 array<EditStop> lineStops(ref<array<TextLayout::Glyph>> line) {
 	array<EditStop> stops;
 	for(const auto& word: line) {
 		if(stops) { // Justified space
-			float left = stops.last().right, right = word[0].origin.x - word[0].bearing.x, center = (left+right)/2;
+			float left = stops.last().right, right = word[0].origin.x, center = (left+right)/2;
 			assert_(stops.last().sourceIndex+1 == word[0].sourceIndex-1);
 			//assert_(text[stops.last().sourceIndex+1]==' ');
 			stops.append({left, center, right, stops.last().sourceIndex+1});
 		}
 		for(auto& glyph: word) {
-			float left = glyph.origin.x - glyph.bearing.x, right = left + glyph.advance, center = (left+right)/2;
+			float left = glyph.origin.x, right = left + glyph.advance, center = (left+right)/2;
+			assert_(right > left);
 			stops.append({left, center, right, glyph.sourceIndex});
 		}
 	}
@@ -37,15 +29,13 @@ bool TextEdit::mouseEvent(vec2 position, vec2 size, Event event, Button button, 
 		vec2 textSize = ceil(layout.bbMax - min(vec2(0),layout.bbMin));
 		vec2 offset = max(vec2(0), vec2(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
 		position -= offset;
-		if(!Rect(textSize).contains(position)) return false;
 		Cursor cursor = this->cursor;
 		for(size_t lineIndex: range(layout.glyphs.size)) {
 			if(position.y < (lineIndex*this->size) || position.y > (lineIndex+1)*this->size) continue; // FIXME: Assumes uniform line height
 			const auto line = lineStops(layout.glyphs[lineIndex]);
 			if(!line) continue;
 			// Before first stop
-			const auto& first = line[0];
-			if(position.x <= first.center) { cursor = Cursor(lineIndex, 0); break; }
+			if(position.x <= line[0].center) { cursor = Cursor(lineIndex, 0); break; }
 			// Between stops
 			for(size_t stop: range(0, line.size-1)) {
 				if(position.x >= line[stop].center && position.x <= line[stop+1].center) { cursor = Cursor(lineIndex, stop+1); goto break2;/*break 2;*/ }
@@ -81,12 +71,11 @@ size_t TextEdit::index() {
 		assert(sourceIndex < text.size);
 		return sourceIndex;
 	}
-	return text.size;
-	/*size_t index = 1; // ' ', '\t' or '\n' immediately after last glyph
-	size_t line = cursor.line;
-	while(line>0 && !lines[line]) line--, index++; //count \n (not included as glyphs)
-	if(lines[line]) index += lines[line].last().sourceIndex;
-	return index;*/
+	size_t index = 1; // ' ', '\t' or '\n' immediately after last glyph
+	size_t lineIndex = cursor.line;
+	while(lineIndex>0 && !lines[lineIndex]) lineIndex--, index++; // Seeks last glyph backwards counting line feeds (not included as glyphs)
+	if(lines[lineIndex]) index += lineStops(lines[lineIndex]).last().sourceIndex;
+	return index;
 }
 
 bool TextEdit::keyPress(Key key, Modifiers modifiers) {
@@ -112,7 +101,7 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 
         /**/  if(key==LeftArrow) {
             if(cursor.column>0) cursor.column--;
-			else if(cursor.line>0) cursor.line--, cursor.column = lines[cursor.line].size;
+			else if(cursor.line>0) { cursor.line--, cursor.column = lineStops(lines[cursor.line]).size; }
         }
         else if(key==RightArrow) {
 			if(cursor.column<line.size) cursor.column++;
@@ -129,7 +118,7 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
         }
         else if(key==Backspace) { //LeftArrow+Delete
             if(cursor.column>0) cursor.column--;
-			else if(cursor.line>0) cursor.line--, cursor.column=lines[cursor.line].size;
+			else if(cursor.line>0) cursor.line--, cursor.column=lineStops(lines[cursor.line]).size;
             else return false;
             if(index()<text.size) {
 				text.removeAt(index());
@@ -141,6 +130,7 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
             if(textEntered) textEntered(toUTF8(text));
             else {
 				text.insertAt(index(), uint32('\n'));
+				cursor.line++; cursor.column = 0;
 				lastTextLayout = TextLayout();
 				if(textChanged) textChanged(toUTF8(text));
             }
@@ -153,6 +143,7 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
             else if(key==KP_Asterisk) c='*'; else if(key==KP_Plus) c='+'; else if(key==KP_Minus) c='-'; else if(key==KP_Slash) c='/';
             else return false;
 			text.insertAt(index(), uint32(c));
+			cursor.column++;
 			lastTextLayout = TextLayout();
 			if(textChanged) textChanged(toUTF8(text));
         }
@@ -163,34 +154,16 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 
 shared<Graphics> TextEdit::graphics(vec2 size) {
 	shared<Graphics> graphics = Text::graphics(size);
-	/* Enforces valid cursor position
-	   cursor=Cursor(0,0); uint currentIndex=0;
-	   for(const auto& line: layout.text) {
-		   TextLine line;
-		   for(const TextLayout::Glyph& o: line) {
-			   currentIndex = o.sourceIndex;
-			   if(currentIndex<=sourceIndex) { // Restores cursor after relayout
-				   cursor = Cursor(textLines.size, line.size);
-			   }
-			   line << ;
-		   }
-		   currentIndex++;
-		   if(currentIndex<=sourceIndex) cursor = Cursor(textLines.size, line.size); // End of line
-		   textLines << move(line);
-	   }
-	   if(!text.size) { assert(sourceIndex==0); cursor = Cursor(0,0); }
-	   else if(currentIndex<=sourceIndex) { assert(textLines); cursor = Cursor(textLines.size-1, textLines.last().size); } // End of text*/
-
 	if(hasFocus(this)) {
 		const auto& lines = lastTextLayout.glyphs;
-		assert(cursor.line < lines.size, cursor.line, textLines.size);
+		assert(cursor.line < lines.size, cursor.line, lines.size);
 		const auto line = lineStops(lines[cursor.line]);
 		float x = 0;
 		if(cursor.column<line.size) x = line[cursor.column].left;
 		else if(line) x = line.last().right;
 		vec2 textSize = ceil(lastTextLayout.bbMax - min(vec2(0), lastTextLayout.bbMin));
 		vec2 offset = max(vec2(0), vec2(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
-		graphics->lines.append(offset+vec2(x,cursor.line*Text::size), offset+vec2(x,(cursor.line+1)*Text::size)); // Assumes uniform line heights
+		graphics->fills.append(offset+vec2(x,cursor.line*Text::size), vec2(1,Text::size)); // Assumes uniform line heights
     }
 	return graphics;
 }

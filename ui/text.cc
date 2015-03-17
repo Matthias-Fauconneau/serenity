@@ -21,7 +21,7 @@ float TextLayout::width(const ref<Glyph> word) {
 	return max;
 }
 float TextLayout::advance(const ref<Glyph> word) {
-	assert_(word);
+	if(!word) return 0;
 	float max=-inf; for(const Glyph& g : word) max=::max(max, g.origin.x + g.advance); return max;
 }
 
@@ -33,7 +33,6 @@ void TextLayout::nextLine(bool justify, int align) {
 
 		// Layouts
 		float x = 0;
-		//if(align == 0) x += (wrap-(length+(words.size-1)*space))/2; // Centers around wrap/2
 		if(align == 1) x += wrap-(length+(words.size-1)*space); // Aligns right before wrap
 		if(align == 0) x -= (length+(words.size-1)*space)/2; // Centers around 0
 		auto& line = glyphs.append();
@@ -49,7 +48,7 @@ void TextLayout::nextLine(bool justify, int align) {
 			x += space;
 		}
 		words.clear();
-	}
+	} else glyphs.append(); // Empty line for TextEdit
 	lineOriginY += interline*size;
 }
 
@@ -67,11 +66,9 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 	// Fraction lines
 	struct Context {
 		TextFormat format; FontData* font; float size; vec2 origin; size_t start; array<Context> children; vec2 position; size_t end;
-		//mref<Glyph> word(const mref<Glyph>& word) const { return word(children[0].start, children[0].end); }
-		void translate(/*const mref<Glyph>& word, */vec2 offset) {
+		void translate(vec2 offset) {
 			origin += offset; position += offset;
 			for(auto& e: children) e.translate(offset);
-			//for(auto& e: this->word(word)) e.origin.x += offset;
 		}
 	};
 	struct Line { size_t line, word; size_t start, split, end; };
@@ -80,7 +77,6 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 		FontData* font = getFont(fontName, {"","R","Regular"});
 		uint16 spaceIndex = font->font(size, hint).index(' ');
 		spaceAdvance = font->font(size, hint).metrics(spaceIndex).advance;
-		//float xHeight = font->metrics(font->index('x')).height;
 
 		lineOriginY = interline*font->font(size, hint).ascender;
 
@@ -94,7 +90,6 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 		size_t start = 0;
 		array<Context> children;
 		vec2 position = 0;
-		int align = -1; // -1: left, 0: center, 1: right
 
 		// Kerning
 		uint16 previous=spaceIndex;
@@ -107,12 +102,21 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 				previous = spaceIndex;
 				auto parentFormats = apply(stack,[](const Context& c){return c.format;});
 				/***/ if(!parentFormats.contains(TextFormat::Stack) && !parentFormats.contains(TextFormat::Fraction) /*&& (word || words || glyphs)*/) {
-					if(word) {
-						nextWord(move(word), justify);
+					if(!justify && c==' ') { // Includes whitespace "Glyph" placeholders for editing
+						word.append(Glyph({spaceAdvance,0,0,0,{{0,0}}},{position, size, *font, c, font->font(size).index(c), color}, sourceIndex));
+						position.x += spaceAdvance;
+					}
+					if((justify && c==' ') || c=='\n') { // Splits into words for justification
+						if(word) nextWord(move(word), justify);
 						position.x = 0;
 					}
-					if(c=='\n') { nextLine(justifyExplicit, this->align); align=-1; }
-					if(c=='\t') { position.x += 4*spaceAdvance;  align++; }
+					if(c=='\n') {
+						nextLine(justifyExplicit, this->align);
+					}
+					if(c=='\t') {
+						word.append(Glyph({4*spaceAdvance,0,0,0,{{0,0}}},{position, size, *font, c, font->font(size).index(c), color}, sourceIndex));
+						position.x += 4*spaceAdvance;
+					}
 				}
 				else if(c==' ') position.x += spaceAdvance;
 				else error("Unexpected code", hex(c), toUTF8(text));
@@ -220,23 +224,21 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 	}
 }
 
-Text::Text(const string text, float size, bgr3f color, float opacity, float wrap, string font, bool hint, float interline, int align, int2 minimalSizeHint, bool justifyExplicitLineBreak)
+Text::Text(const string text, float size, bgr3f color, float opacity, float wrap, string font, bool hint, float interline, int align, int2 minimalSizeHint,
+		   bool justify, bool justifyExplicitLineBreak)
 	: text(toUCS4(text)), size(size), color(color), opacity(opacity), wrap(wrap), font(font), hint(hint), interline(interline), align(align),
-	  justifyExplicitLineBreak(justifyExplicitLineBreak), minimalSizeHint(minimalSizeHint) {}
+	  justify(justify), justifyExplicitLineBreak(justifyExplicitLineBreak), minimalSizeHint(minimalSizeHint) {}
 
 const TextLayout& Text::layout(const float wrap) {
-	 // Layouts without justification first to justify no wider than longest line
-	//TextLayout layout(text, size, wrap, font, hint, interline, align, false, false, false, color);
-	//wrap = layout.bbMax.x;
 	assert_(wrap >= 0);
 	if(!lastTextLayout || wrap != lastTextLayout.wrap)
-		lastTextLayout = TextLayout(text, size, wrap, font, hint, interline, align, true, justifyExplicitLineBreak, true, color);
+		lastTextLayout = TextLayout(text, size, wrap, font, hint, interline, align, justify, justifyExplicitLineBreak, true, color);
 	return lastTextLayout;
 }
 
 vec2 Text::sizeHint(vec2 size) {
 	const TextLayout& layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
-	return max(minimalSizeHint, ceil(layout.bbMax - /*min(vec2(0),*/layout.bbMin/*)*/));
+	return max(minimalSizeHint, ceil(layout.bbMax - layout.bbMin));
 }
 
 shared<Graphics> Text::graphics(vec2 size) {

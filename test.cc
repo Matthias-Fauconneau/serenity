@@ -2,6 +2,6 @@
 #include "window.h"
 
 struct Test {
-	TextEdit text {"Hello World!"_};
+	TextEdit text {"Hello World!\nshort.\nLONG LINE !"_};
 	unique<Window> window = ::window(&text, 512);
 } test;

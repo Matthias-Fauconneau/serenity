@@ -22,7 +22,7 @@ struct TextEdit : Text {
     /// Cursor start position for selections
     Cursor selectionStart;
 
-	using Text::Text;
+	TextEdit(const string text="") : Text(text, 16, black, 1, 0, "DejaVuSans", true, 1, -1) {}
 	bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus /*FIXME: -> Window& window*/) override;
     bool keyPress(Key key, Modifiers modifiers) override;
 	shared<Graphics> graphics(vec2) override;
