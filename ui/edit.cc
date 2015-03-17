@@ -92,11 +92,17 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
         return true;
 	}*/
 
-    if(key==UpArrow) {
-        if(cursor.line>0) cursor.line--;
-    } else if(key==DownArrow) {
-		 if(cursor.line<lines.size-1) cursor.line++;
-    } else {
+	if(key==UpArrow || key==DownArrow || key==PageUp || key==PageDown) { // Vertical move
+		if(key==UpArrow) { if(cursor.line>0) cursor.line--; }
+		else if(key==DownArrow) { if(cursor.line<lines.size-1) cursor.line++; }
+		else if(key==PageUp) cursor.line = 0;
+		else if(key==PageDown) { if(lines.size) cursor.line = lines.size-1; }
+		const auto line = lineStops(lines[cursor.line]);
+		if(line) {
+			for(size_t stop: range(0, line.size-1)) if(cursorX >= line[stop].center && cursorX <= line[stop+1].center) { cursor.column = stop+1; break; }
+			if(cursorX >= line.last().center) cursor.column = line.size;
+		}
+	} else {
 		cursor.column = min<size_t>(cursor.column, line.size);
 
         /**/  if(key==LeftArrow) {
@@ -147,9 +153,11 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 			lastTextLayout = TextLayout();
 			if(textChanged) textChanged(toUTF8(text));
         }
+
+		cursorX = cursor.column<line.size ? line[cursor.column].left : line ? line.last().right : 0;
     }
-    if(!(modifiers&Shift)) selectionStart=cursor;
-    return true;
+	if(!(modifiers&Shift)) selectionStart=cursor;
+	return true;
 }
 
 shared<Graphics> TextEdit::graphics(vec2 size) {
@@ -158,9 +166,7 @@ shared<Graphics> TextEdit::graphics(vec2 size) {
 		const auto& lines = lastTextLayout.glyphs;
 		assert(cursor.line < lines.size, cursor.line, lines.size);
 		const auto line = lineStops(lines[cursor.line]);
-		float x = 0;
-		if(cursor.column<line.size) x = line[cursor.column].left;
-		else if(line) x = line.last().right;
+		float x = cursor.column<line.size ? line[cursor.column].left : line ? line.last().right : 0;
 		vec2 textSize = ceil(lastTextLayout.bbMax - min(vec2(0), lastTextLayout.bbMin));
 		vec2 offset = max(vec2(0), vec2(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
 		graphics->fills.append(offset+vec2(x,cursor.line*Text::size), vec2(1,Text::size)); // Assumes uniform line heights

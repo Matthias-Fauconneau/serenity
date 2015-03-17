@@ -12,6 +12,7 @@ struct TextEdit : Text {
 		bool operator <(const Cursor& o) const { return line<o.line || (line==o.line && column<o.column); }
 	};
 	Cursor cursor;
+	float cursorX = 0; // As of last horizontal move to keep horizontal offset constant on vertical moves
 	size_t editIndex=0;
 
 	size_t index();
