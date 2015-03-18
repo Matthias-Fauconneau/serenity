@@ -14,7 +14,11 @@ struct TextEdit : Text {
 	Cursor cursor;
 	float cursorX = 0; // As of last horizontal move to keep horizontal offset constant on vertical moves
 
+	/// \a Cursor to source text index
 	size_t index(Cursor cursor);
+	/// Source text index to \a Cursor
+	Cursor cursorFromIndex(size_t index);
+
     /// User edited this text
 	function<void(string)> textChanged;
     /// User pressed enter

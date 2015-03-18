@@ -43,6 +43,7 @@ struct Window : Poll {
 	Update render(const Image& target);
 
 	virtual void setCursor(Cursor cursor) abstract;
+	virtual String getSelection(bool clipboard) abstract;
 };
 
 /// Interfaces \a widget as a window on a display server
@@ -102,6 +103,11 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
 	// Display
     void event() override;
 	void setCursor(::Cursor cursor) override;
+
+	// IPC
+	/// Gets current text selection
+	/// \note The selection owner might lock this process if it fails to notify
+	String getSelection(bool clipboard) override;
 };
 
 struct DRMWindow : Window {
@@ -120,6 +126,9 @@ struct DRMWindow : Window {
 	// Input
 	void mouseEvent(int2, ::Event, Button);
 	void keyPress(Key);
+
+	// IPC
+	String getSelection(bool clipboard) override;
 };
 
 unique<Window> window(Widget* widget, int2 size=-1, Thread& thread=mainThread);

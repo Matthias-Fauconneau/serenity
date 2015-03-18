@@ -10,6 +10,7 @@ using namespace X11;
 static Window* currentWindow = 0; // FIXME
 bool hasFocus(Widget* widget) { assert_(currentWindow); return currentWindow->focus==widget; }
 void setCursor(Cursor cursor) { assert_(currentWindow); currentWindow->setCursor(cursor); }
+String getSelection(bool clipboard) { assert(currentWindow); return currentWindow->getSelection(clipboard); }
 
 void Window::render(shared<Graphics>&& graphics, int2 origin, int2 size) {
 	lock.lock();
@@ -56,22 +57,17 @@ XWindow::XWindow(Widget* widget, Thread& thread,  int2 sizeHint) : ::Window(widg
 	{  uint16 sequence = send(XRender::QueryPictFormats());
 		buffer<int> fds;
 		array<byte> replyData = readReply(sequence, 0, fds);
-		auto r = *(typename XRender::QueryPictFormats::Reply*)replyData.data;
-		log(r.numFormats);
+		auto r = *(XRender::QueryPictFormats::Reply*)replyData.data;
 		buffer<XRender::PictFormInfo> formats = read<XRender::PictFormInfo>(r.numFormats);
-		log(r.numScreens);
 		for(uint unused i: range(r.numScreens)) {
 			auto screen = read<XRender::PictScreen>();
-			log(screen.numDepths);
 			for(uint unused i: range(screen.numDepths)) {
 				auto depth = read<XRender::PictDepth>();
-				log(depth.numPictVisuals);
 				array<XRender::PictVisual> visuals = read<XRender::PictVisual>(depth.numPictVisuals);
 				if(depth.depth==32) for(auto pictVisual: visuals) if(pictVisual.visual==visual) format=pictVisual.format;
 			}
 		}
 		assert(format);
-		log(r.numSubpixels);
 		read<uint>(r.numSubpixels);
 	}
 }
@@ -233,6 +229,14 @@ void XWindow::setCursor(::Cursor cursor) {
 	}
 }
 
+String XWindow::getSelection(bool clipboard) {
+	uint owner = request(GetSelectionOwner{.selection=clipboard?Atom("CLIPBOARD"_):1}).owner;
+	if(!owner) return String();
+	send(ConvertSelection{.requestor=id, .selection=clipboard?Atom("CLIPBOARD"_):1, .target=Atom("UTF8_STRING"_)});
+	waitEvent(SelectionNotify);
+	return getProperty<byte>(id, "UTF8_STRING"_);
+}
+
 // --- DRM Window
 
 DRMWindow::DRMWindow(Widget* widget, Thread& thread) : Window(widget, thread) {
@@ -279,6 +283,7 @@ void DRMWindow::keyPress(Key key) {
 }
 
 void DRMWindow::setCursor(::Cursor) {}
+String DRMWindow::getSelection(bool) { return {}; }
 
 unique<Display> DRMWindow::display = null;
 

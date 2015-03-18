@@ -19,6 +19,48 @@ array<EditStop> lineStops(ref<array<TextLayout::Glyph>> line) {
 	return stops;
 }
 
+size_t TextEdit::index(Cursor cursor) {
+	const auto& lines = lastTextLayout.glyphs;
+	if(!lines) return 0;
+	if(cursor.line==lines.size) return lines.last().last().last().sourceIndex;
+	assert(cursor.line<lines.size, cursor.line, lines.size);
+	const auto line = lineStops(lines[cursor.line]);
+	assert(cursor.column <= line.size, cursor.column, line.size);
+	if(cursor.column < line.size) {
+		size_t sourceIndex = line[cursor.column].sourceIndex;
+		assert(sourceIndex < text.size);
+		return sourceIndex;
+	}
+	if(!lines) return 0;
+	size_t index = 1; // ' ', '\t' or '\n' immediately after last glyph
+	size_t lineIndex = cursor.line;
+	while(lineIndex>0 && !lines[lineIndex]) lineIndex--, index++; // Seeks last glyph backwards counting line feeds (not included as glyphs)
+	if(lines[lineIndex]) index += lineStops(lines[lineIndex]).last().sourceIndex;
+	return index;
+}
+
+TextEdit::Cursor TextEdit::cursorFromIndex(size_t targetIndex) {
+	const auto& lines = lastTextLayout.glyphs;
+	Cursor cursor (0, 0);
+	if(!lines) return cursor;
+	size_t lastIndex = 0;
+	for(size_t lineIndex: range(lines.size)) {
+		cursor.column = 0;
+		const auto line = lineStops(lines[lineIndex]);
+		for(auto o: line) {
+			lastIndex = o.sourceIndex;
+			if(lastIndex >= targetIndex) return cursor;
+			cursor.line = lineIndex;
+			cursor.column++;
+		}
+		lastIndex++;
+		if(lastIndex>=targetIndex) return cursor;
+		cursor.column = line.size; // End of line
+	}
+	if(lastIndex>=targetIndex) return cursor;
+	return Cursor(lines.size-1, lineStops(lines.last()).size);  // End of text
+}
+
 /// TextEdit
 bool TextEdit::mouseEvent(vec2 position, vec2 size, Event event, Button button, Widget*& focus) {
 	setCursor(::Cursor::Text);
@@ -45,38 +87,20 @@ bool TextEdit::mouseEvent(vec2 position, vec2 size, Event event, Button button, 
 		}break2:;
 		cursorChanged = (cursor != this->cursor);
 		this->cursor = cursor;
+		if(event==Press) selectionStart = cursor;
 	}
     if(event==Press && button==LeftButton) { selectionStart = cursor; return true; }
-	/*if(event==Release && button==MiddleButton) {
-		Text::mouseEvent(position, size, event, button, focus);
-		array<uint32> selection = toUCS4(getSelection());
-		if(!text) { sourceIndex=selection.size; text=move(selection); }
-		else { sourceIndex=index()+selection.size; array<uint> cat; cat<<text.slice(0,index())<<selection<<text.slice(index()); text = move(cat); }
-		layout();
+	if(event==Release && button==MiddleButton) {
+		array<uint32> selection = toUCS4(getSelection(false));
+		size_t index = this->index(cursor);
+		text = buffer<uint>(text.slice(0,index) + selection + text.slice(index));
+		lastTextLayout = TextLayout();
 		if(textChanged) textChanged(toUTF8(text));
+		this->layout(size.x ? min<float>(wrap, size.x) : wrap);
+		selectionStart = cursor = cursorFromIndex(index+selection.size);
 		return true;
-	}*/
-	return cursorChanged;
-}
-
-size_t TextEdit::index(Cursor cursor) {
-	const auto& lines = lastTextLayout.glyphs;
-	if(!lines) return 0;
-	if(cursor.line==lines.size) return lines.last().last().last().sourceIndex;
-	assert(cursor.line<lines.size, cursor.line, lines.size);
-	const auto line = lineStops(lines[cursor.line]);
-	assert(cursor.column <= line.size, cursor.column, line.size);
-	if(cursor.column < line.size) {
-		size_t sourceIndex = line[cursor.column].sourceIndex;
-		assert(sourceIndex < text.size);
-		return sourceIndex;
 	}
-	if(!lines) return 0;
-	size_t index = 1; // ' ', '\t' or '\n' immediately after last glyph
-	size_t lineIndex = cursor.line;
-	while(lineIndex>0 && !lines[lineIndex]) lineIndex--, index++; // Seeks last glyph backwards counting line feeds (not included as glyphs)
-	if(lines[lineIndex]) index += lineStops(lines[lineIndex]).last().sourceIndex;
-	return index;
+	return cursorChanged;
 }
 
 bool TextEdit::keyPress(Key key, Modifiers modifiers) {
@@ -84,14 +108,17 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 	cursor.line = min<size_t>(cursor.line, lines.size-1);
 	const auto line = lineStops(lines[cursor.line]);
 
-	/*if(modifiers&Control && key=='v') {
+	if(modifiers&Control && key=='v') {
         array<uint> selection = toUCS4(getSelection(true));
-		if(!text) { text=move(selection); sourceIndex=selection.size; }
-		else { sourceIndex=index()+selection.size; array<uint> cat; cat<<text.slice(0,index())<<selection<<text.slice(index()); text = move(cat); }
-        layout();
-        if(textChanged) textChanged(toUTF8(text));
+		size_t index = this->index(cursor);
+		text = buffer<uint>(text.slice(0,index) + selection + text.slice(index));
+		float wrap = lastTextLayout.wrap;
+		lastTextLayout = TextLayout();
+		if(textChanged) textChanged(toUTF8(text));
+		this->layout(wrap);
+		selectionStart = cursor = cursorFromIndex(index+selection.size);
         return true;
-	}*/
+	}
 
 	if(key==UpArrow || key==DownArrow || key==PageUp || key==PageDown) { // Vertical move
 		if(key==UpArrow) { if(cursor.line>0) cursor.line--; }
@@ -121,7 +148,7 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 			if(selectionStart < cursor) min=selectionStart, max=cursor; else min=cursor, max=selectionStart;
 			size_t sourceIndex = index(min);
 			if(cursor != selectionStart) { // Delete selection
-				text = buffer<uint>(text.sliceRange(0, index(min)) + text.sliceRange(index(max), text.size));
+				text = buffer<uint>(text.slice(0, index(min)) + text.slice(index(max)));
 				selectionStart = cursor = min;
 				if(key==Delete || key==Backspace) { // Only deletes selection; returns
 					lastTextLayout = TextLayout();

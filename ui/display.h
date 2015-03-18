@@ -86,6 +86,8 @@ struct XDisplay : Socket, Poll {
          return reply;
      }
 
+	 void waitEvent(uint8 type);
+
 // Keyboard
      /// Returns KeySym for key \a code and modifier \a state
      uint keySym(uint8 code, uint8 state);
@@ -100,6 +102,8 @@ struct XDisplay : Socket, Poll {
 // Window
      /// Returns Atom for \a name
      uint Atom(const string name);
+	 /// Returns property \a name on \a window
+	 template<class T> buffer<T> getProperty(uint window, string name, size_t length=2+128*128);
 };
 
 #include "image.h"

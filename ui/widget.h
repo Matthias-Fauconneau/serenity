@@ -46,3 +46,5 @@ bool hasFocus(Widget* widget);
 enum class Cursor { Arrow, Text };
 /// Sets mouse cursor
 void setCursor(Cursor cursor);
+/// Returns last text selection (or if clipboard is true, last copy)
+String getSelection(bool clipboard);

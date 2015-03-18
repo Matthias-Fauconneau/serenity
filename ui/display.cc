@@ -155,6 +155,20 @@ array<byte> XDisplay::readReply(uint16 sequence, uint elementSize, buffer<int>& 
     }
 }
 
+void XDisplay::waitEvent(uint8 type) {
+	Locker lock(this->lock);
+	for(;;) {
+		X11::Event e = read<X11::Event>();
+		if((e.type&0b01111111)==type) return;
+		if(e.type==Error) { error(e); continue; }
+		array<byte> o;
+		o.append(raw(e));
+		if(e.type==GenericEvent) o.append(read(e.genericEvent.size*4));
+		XDisplay::events.append(move(o));
+		XDisplay::queue(); // Queues XDisplay::event to process event queue after unwinding back to main event loop
+	}
+}
+
 // Keyboard
 uint XDisplay::keySym(uint8 code, uint8 state) {
 	::buffer<uint> keysyms;
@@ -193,6 +207,20 @@ function<void()>& XDisplay::globalAction(uint key) {
 uint XDisplay::Atom(const string name) {
     return request(InternAtom{.size=uint16(2+align(4,name.size)/4),  .length=uint16(name.size)}, name).atom;
 }
+
+template<class T> buffer<T> XDisplay::getProperty(uint window, string name, size_t length) {
+	send(GetProperty{.window=window, .property=Atom(name), .length=uint(length)});
+	buffer<int> fds;
+	array<byte> replyData = readReply(sequence, 0, fds);
+	auto r = *(GetProperty::Reply*)replyData.data;
+	uint size = r.length*r.format/8;
+	buffer<T> property;
+	if(size) property = read<T>(size/sizeof(T));
+	int pad=align(4,size)-size; if(pad) read(pad);
+	return property;
+}
+template buffer<uint> XDisplay::getProperty(uint window, string name, size_t length);
+template buffer<byte> XDisplay::getProperty(uint window, string name, size_t length);
 
 #include "window.h"
 #include <unistd.h>
