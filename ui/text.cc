@@ -65,7 +65,7 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 					   bool justify, bool justifyExplicit, bool justifyLast, bgr3f color) : size(size), wrap(wrap), interline(interline), align(align) {
 	// Fraction lines
 	struct Context {
-		TextFormat format; FontData* font; float size; vec2 origin; size_t start; array<Context> children; vec2 position; size_t end;
+		TextFormat format; FontData* font; float size; bgr3f color; vec2 origin; size_t start; array<Context> children; vec2 position; size_t end;
 		void translate(vec2 offset) {
 			origin += offset; position += offset;
 			for(auto& e: children) e.translate(offset);
@@ -95,7 +95,8 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 		uint16 previous=spaceIndex;
 		int previousRightOffset = 0; // Hinted kerning
 
-		for(size_t sourceIndex: range(text.size)) {
+		log(text);
+		for(size_t sourceIndex=0; sourceIndex<text.size; sourceIndex++) {
 			uint c = text[sourceIndex];
 			// Breaking whitespace
 			/***/ if(c==' '||c=='\t'||c=='\n') {
@@ -122,17 +123,22 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 				else error("Unexpected code", hex(c), toUTF8(text));
 			}
 			// Push format context
-			else if(TextFormat(c)<TextFormat::End) {
-				stack.append( Context{format, font, size, origin, start, move(children), position, word.size} );
+			else if(TextFormat(c)>=TextFormat::Begin && TextFormat(c)<TextFormat::End) {
+				stack.append( Context{format, font, size, color, origin, start, move(children), position, word.size} );
 				start = word.size;
 				origin = position;
 				//String fontName = copy(font->name);
 				format = TextFormat(c);
 				if(format==TextFormat::Bold) { assert_(!find(fontName,"Bold"), toUTF8(text)); font = getFont(fontName, {"Bold","RB"}); }
-				if(format==TextFormat::Italic) { assert_(!find(fontName,"Italic")); font = getFont(fontName, {"Italic","I","Oblique"}); }
-				if(format==TextFormat::Subscript || format==TextFormat::Superscript) size *= 2./3;
-				if(format==TextFormat::Superscript) position.y -= size/4;
-				if(format==TextFormat::Subscript) position.y += font->font(size, hint).ascender/2;
+				else if(format==TextFormat::Italic) { assert_(!find(fontName,"Italic")); font = getFont(fontName, {"Italic","I","Oblique"}); }
+				else if(format==TextFormat::Subscript || format==TextFormat::Superscript) size *= 2./3;
+				else if(format==TextFormat::Superscript) position.y -= size/4;
+				else if(format==TextFormat::Subscript) position.y += font->font(size, hint).ascender/2;
+				else if(format==TextFormat::Color) {
+					color = bgr3f(*(float*)&text[sourceIndex+1], *(float*)&text[sourceIndex+2], *(float*)&text[sourceIndex+3]);
+					sourceIndex += 3;
+				}
+				else error(uint(format));
 			}
 			// Pop format context
 			else if(TextFormat(c)==TextFormat::End) {
@@ -168,11 +174,12 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 					assert_(children.size==2 && children[0].end == children[1].start, children.size);
 					lines.append( Line({glyphs.size, words.size, children[0].start, children[0].end, children[1].end}) );
 				}
-				Context child = {format, font, size, origin, start, move(children), position, word.size};
+				Context child = {format, font, size, color, origin, start, move(children), position, word.size};
 				Context context = stack.pop();
 				format = context.format;
 				font = context.font;
 				size = context.size;
+				color = context.color;
 				origin = context.origin;
 				start = context.start;
 				children = move(context.children);
@@ -224,9 +231,9 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 	}
 }
 
-Text::Text(const string text, float size, bgr3f color, float opacity, float wrap, string font, bool hint, float interline, int align, int2 minimalSizeHint,
+Text::Text(buffer<uint>&& text, float size, bgr3f color, float opacity, float wrap, string font, bool hint, float interline, int align, int2 minimalSizeHint,
 		   bool justify, bool justifyExplicitLineBreak)
-	: text(toUCS4(text)), size(size), color(color), opacity(opacity), wrap(wrap), font(font), hint(hint), interline(interline), align(align),
+	: text(move(text)), size(size), color(color), opacity(opacity), wrap(wrap), font(font), hint(hint), interline(interline), align(align),
 	  justify(justify), justifyExplicitLineBreak(justifyExplicitLineBreak), minimalSizeHint(minimalSizeHint) {}
 
 const TextLayout& Text::layout(const float wrap) {

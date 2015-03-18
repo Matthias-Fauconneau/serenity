@@ -6,9 +6,7 @@
 #include "utf8.h"
 
 /// Rich text format control code encoded in 00-1F range
-// \note first word (until ' ') after a Link tag is not displayed but used as \a linkActivated identifier.
-enum class TextFormat { Regular, Bold, Italic, Superscript, Subscript, Stack, Fraction, End };
-static_assert(TextFormat::End < (TextFormat)'\t', "");
+enum class TextFormat { Begin=14, Regular=Begin, Bold, Italic, Superscript, Subscript, Stack, Fraction, Link, Color, End };
 
 inline String regular(string s) { return char(TextFormat::Regular) + s + char(TextFormat::End); }
 inline String bold(string s) { return char(TextFormat::Bold) + s + char(TextFormat::End); }
@@ -17,6 +15,8 @@ inline String superscript(string s) { return char(TextFormat::Superscript) + s +
 inline String subscript(string s) { return char(TextFormat::Subscript) + s + char(TextFormat::End); }
 inline String stack(string s) { return char(TextFormat::Stack) + s + char(TextFormat::End); }
 inline String fraction(string s) { return char(TextFormat::Fraction) + s + char(TextFormat::End); }
+inline String link(string s, string id) { return char(TextFormat::Link) + id + '\0' + s + char(TextFormat::End); }
+inline buffer<uint> color(ref<uint> s, bgr3f bgr) { return uint(TextFormat::Color) + cast<uint>((ref<float>)bgr) + s + uint(TextFormat::End); }
 
 /// Layouts formatted text with wrapping, justification and links
 struct TextLayout {
@@ -60,9 +60,13 @@ struct TextLayout {
 
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : virtual Widget {
-    /// Create a caption that display \a text using a \a size pixel font
-    Text(const string text="", float size=16, bgr3f color=0, float opacity=1, float wrap=0, string font="DejaVuSans", bool hint=true,
+	/// Create a caption that display \a text using a \a size pixel font
+	Text(buffer<uint>&& text, float size=16, bgr3f color=0, float opacity=1, float wrap=0, string font="DejaVuSans", bool hint=true,
 	 float interline=1, int align=0, int2 minimalSizeHint=0, bool justify = false, bool justifyExplicitLineBreak = false);
+    /// Create a caption that display \a text using a \a size pixel font
+	Text(const string text="", float size=16, bgr3f color=0, float opacity=1, float wrap=0, string font="DejaVuSans", bool hint=true,
+	 float interline=1, int align=0, int2 minimalSizeHint=0, bool justify = false, bool justifyExplicitLineBreak = false) :
+		Text(toUCS4(text), size, color, opacity, wrap, font, hint, interline, align, minimalSizeHint, justify, justifyExplicitLineBreak) {}
 
 	/// Displayed text in UCS4
 	array<uint> text;
