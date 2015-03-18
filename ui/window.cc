@@ -1,16 +1,15 @@
 #include "window.h"
 #include "ui/render.h"
-
 #include "x.h"
-#include "png.h"
 #include "time.h"
 #include <sys/shm.h>
-
+ICON(text);
+Image cursorIcon();
 using namespace X11;
 
 static Window* currentWindow = 0; // FIXME
 bool hasFocus(Widget* widget) { assert_(currentWindow); return currentWindow->focus==widget; }
-void setCursor(Cursor cursor) { assert_(currentWindow); currentWindow->cursor=cursor; }
+void setCursor(Cursor cursor) { assert_(currentWindow); currentWindow->setCursor(cursor); }
 
 void Window::render(shared<Graphics>&& graphics, int2 origin, int2 size) {
 	lock.lock();
@@ -53,6 +52,28 @@ XWindow::XWindow(Widget* widget, Thread& thread,  int2 sizeHint) : ::Window(widg
 	send(Present::SelectInput{.window=id+Window, .eid=id+PresentEvent});
 	Window::actions[Escape] = []{requestTermination();};
 	send(CreateGC{.context=id+GraphicContext, .window=id+Window});
+
+	{  uint16 sequence = send(XRender::QueryPictFormats());
+		buffer<int> fds;
+		array<byte> replyData = readReply(sequence, 0, fds);
+		auto r = *(typename XRender::QueryPictFormats::Reply*)replyData.data;
+		log(r.numFormats);
+		buffer<XRender::PictFormInfo> formats = read<XRender::PictFormInfo>(r.numFormats);
+		log(r.numScreens);
+		for(uint unused i: range(r.numScreens)) {
+			auto screen = read<XRender::PictScreen>();
+			log(screen.numDepths);
+			for(uint unused i: range(screen.numDepths)) {
+				auto depth = read<XRender::PictDepth>();
+				log(depth.numPictVisuals);
+				array<XRender::PictVisual> visuals = read<XRender::PictVisual>(depth.numPictVisuals);
+				if(depth.depth==32) for(auto pictVisual: visuals) if(pictVisual.visual==visual) format=pictVisual.format;
+			}
+		}
+		assert(format);
+		log(r.numSubpixels);
+		read<uint>(r.numSubpixels);
+	}
 }
 
 XWindow::~XWindow() {
@@ -189,6 +210,31 @@ void XWindow::event() {
 	send(Present::Pixmap{.window=id+Window, .pixmap=id+Pixmap}); //FIXME: update region
 }
 
+void XWindow::setCursor(::Cursor cursor) {
+	if(this->cursor != cursor) {
+		static Image (*icons[])() = { cursorIcon, textIcon };
+		static constexpr int2 hotspots[] = { int2(5,0), int2(4,9) }; // FIXME
+		const Image& icon = icons[uint(cursor)]();
+		Image premultiplied(icon.size);
+		for(uint y: range(icon.size.y)) for(uint x: range(icon.size.x)) {
+			byte4 p=icon(x,y); premultiplied(x,y)=byte4(p.b*p.a/255,p.g*p.a/255,p.r*p.a/255,p.a);
+		}
+		send(CreatePixmap{.pixmap=id+CursorPixmap, .window=id, .w=uint16(icon.size.x), .h=uint16(icon.size.y)});
+		send(PutImage{.drawable=id+CursorPixmap, .context=id+GraphicContext, .w=uint16(icon.size.x), .h=uint16(icon.size.y),
+					  .size=uint16(6+premultiplied.Ref::size)}, cast<byte>(premultiplied));
+		send(XRender::CreatePicture{.picture=id+Picture, .drawable=id+CursorPixmap, .format=format});
+		int2 hotspot = hotspots[uint(cursor)];
+		send(XRender::CreateCursor{.cursor=id+Cursor, .picture=id+Picture, .x=uint16(hotspot.x), .y=uint16(hotspot.y)});
+		send(SetWindowCursor{.window=id, .cursor=id+Cursor});
+		send(FreeCursor{.cursor=id+Cursor});
+		send(XRender::FreePicture{.picture=id+Picture});
+		send(FreePixmap{.pixmap=id+CursorPixmap});
+		this->cursor = cursor;
+	}
+}
+
+// --- DRM Window
+
 DRMWindow::DRMWindow(Widget* widget, Thread& thread) : Window(widget, thread) {
 	if(!display) display = unique<Display>();  // Created by the first instantiation of a window, deleted at exit
 	display->windows.append(this);
@@ -231,6 +277,8 @@ void DRMWindow::keyPress(Key key) {
 		if(action) (*action)(); // Local window action
 	}
 }
+
+void DRMWindow::setCursor(::Cursor) {}
 
 unique<Display> DRMWindow::display = null;
 

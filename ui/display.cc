@@ -26,6 +26,7 @@ template<> String str(const X11::Event& e) {
 namespace Shm { int EXT, event, errorBase; };
 namespace DRI3 { int EXT; }
 namespace Present { int EXT; }
+namespace XRender { int EXT, errorBase; };
 
 XDisplay::XDisplay(Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread) {
     {String path = "/tmp/.X11-unix/X"+getenv("DISPLAY",":0").slice(1,1);
@@ -65,8 +66,10 @@ XDisplay::XDisplay(Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket:
 
     {auto r = request(QueryExtension{.length="MIT-SHM"_.size, .size=uint16(2+align(4,"MIT-SHM"_.size)/4)}, "MIT-SHM"_);
 	Shm::EXT=r.major; Shm::event=r.firstEvent; Shm::errorBase=r.firstError;}
+	{auto r = request(QueryExtension{.length="RENDER"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "RENDER"_);
+		XRender::EXT=r.major; XRender::errorBase=r.firstError; }
     {auto r = request(QueryExtension{.length="Present"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "Present"_);
-	Present::EXT=r.major; assert_(Present::EXT); }
+		Present::EXT=r.major; assert_(Present::EXT); }
 }
 
 void XDisplay::event() {
@@ -131,7 +134,7 @@ array<byte> XDisplay::readReply(uint16 sequence, uint elementSize, buffer<int>& 
             assert_(e.seq==sequence);
 			array<byte> reply;
 			reply.append(raw(e.reply));
-            if(e.reply.size) { assert_(elementSize); reply.append(read(e.reply.size*elementSize)); }
+			if(e.reply.size) { /*assert_(elementSize);*/ reply.append(read(e.reply.size*elementSize)); }
 			cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
 			if(cmsg) {
 				assert_(cmsg && cmsg->cmsg_len == CMSG_LEN(sizeof(int)));

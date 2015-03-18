@@ -113,7 +113,7 @@ struct BinaryData : Data {
     ReadOperator read() { return {this}; }
 
     /// Reads \a size raw \a T elements
-	generic ref<T> read(size_t size) { return cast<T>(Data::read(size*sizeof(T))); }
+    generic ref<T> read(size_t size) { return cast<T>(Data::read(size*sizeof(T))); }
 
     /// Provides return type overloading for reading arrays (swap as needed)
     struct ArrayReadOperator {

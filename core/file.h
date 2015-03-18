@@ -76,10 +76,10 @@ struct Stream : Handle { //FIXME: overlaps with Data/BinaryData
     generic T read() { T t; read(mref<byte>((byte*)&t,sizeof(T))); return t; }
     /// Reads \a size raw values
     generic buffer<T> read(size_t size) {
-	::buffer<byte> buffer(size*sizeof(T));
-	size_t offset=0; while(offset<buffer.size) offset+=readUpTo(buffer.slice(offset));
-	assert(offset==buffer.size);
-	return cast<T>(move(buffer));
+		::buffer<byte> buffer(size*sizeof(T));
+		size_t offset=0; while(offset<buffer.size) offset+=readUpTo(buffer.slice(offset));
+		assert(offset==buffer.size);
+		return cast<T>(move(buffer));
     }
     /// Polls whether reading would block
     bool poll(int timeout=0);

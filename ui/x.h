@@ -112,7 +112,7 @@ struct FreePixmap { int8 req=54,pad=0; uint16 size=2; uint pixmap; };
 struct CreateGC { int8 req=55,pad=0; uint16 size=4; uint context,window,mask=0; };
 struct FreeGC { int8 req=60,pad=0; uint16 size=2; uint context; };
 struct CopyArea { int8 req=62,pad=0; uint16 size=7; uint src,dst,gc; int16 srcX,srcY,dstX,dstY,w,h; };
-struct PutImage { int8 req=72,format=2; uint16 size=6; uint drawable,context; int16 w,h,x=0,y=0; uint8 leftPad=0,depth=32; int16 pad=0; };
+struct PutImage { int8 req=72,format=2; uint16 size=6; uint drawable,context; uint16 w,h,x=0,y=0; uint8 leftPad=0,depth=32; int16 pad=0; };
 struct CreateColormap { int8 req=78,alloc=0; uint16 size=4; uint colormap,window,visual; };
 struct FreeCursor { int8 req=95,pad=0; uint16 size=2; uint cursor; };
 struct QueryExtension {
@@ -160,6 +160,31 @@ struct GetImage {
 enum { Completion };
 constexpr string requests[] = {"QueryVersion","Attach","Detach","PutImage","GetImage"};
 constexpr string errors[] = {"BadSeg"};
+}
+
+namespace XRender {
+enum PICTOP { Clear, Src, Dst, Over };
+struct PictFormInfo { uint format; uint8 type,depth; uint16 direct[8]; uint colormap; };
+struct PictVisual { uint visual, format; };
+struct PictDepth { uint8 depth; uint16 numPictVisuals; uint pad; /*PictVisual[numPictVisuals]*/ };
+struct PictScreen { uint numDepths; uint fallback; /*PictDepth[numDepths]*/ };
+
+extern int EXT, errorBase;
+struct QueryVersion {
+    int8 ext=EXT,req=0; uint16 size=3; uint major=0,minor=11;
+    struct Reply { int8 pad; uint16 seq; uint size; uint major,minor,pad2[4]; } packed;
+};
+struct QueryPictFormats{
+    int8 ext=EXT,req=1; uint16 size=1;
+    struct Reply { int8 pad; uint16 seq; uint size; uint numFormats,numScreens,numDepths,numVisuals,numSubpixels,pad2; } packed;
+};
+struct CreatePicture { int8 ext=EXT, req=4; uint16 size=5; uint picture, drawable, format, valueMask=0; };
+struct FreePicture { int8 ext=EXT, req=7; uint16 size=2; uint picture; };
+struct Composite { int8 ext=EXT, req=8; uint16 size=9; uint8 op=Over; uint src,mask=0,dst; int16 srcX=0,srcY=0,maskX=0,maskY=0,dstX=0,dstY=0,width,height; };
+struct CreateCursor { int8 ext=EXT, req=27; uint16 size=4; uint cursor, picture; uint16 x,y; };
+constexpr string requests[] = {"QueryVersion", "QueryPictFormats", "QueryPictIndexValues", "QueryFilters", "CreatePicture", "ChangePicture",
+			       "SetPictureClipRectangles", "SetPictureTransform", "SetPictureFilter", "FreePicture", "Composite"};
+constexpr string errors[] = {"","PictFormat", "Picture", "PictOp", "GlyphSet", "Glyph"};
 }
 
 namespace Present {

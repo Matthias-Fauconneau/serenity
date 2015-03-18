@@ -23,7 +23,7 @@ struct Window : Poll {
 	Lock lock;
 	array<Update> updates;
 
-	// Control
+	// Input
 	/// Actions triggered when a key is pressed
 	map<Key, function<void()>> actions;
 	/// Current widget that has the keyboard input focus
@@ -41,6 +41,8 @@ struct Window : Poll {
 	void render();
 	/// Immediately renders the first pending update to target
 	Update render(const Image& target);
+
+	virtual void setCursor(Cursor cursor) abstract;
 };
 
 /// Interfaces \a widget as a window on a display server
@@ -52,7 +54,7 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
     bgr3f backgroundColor = white;
 
     /// Associated window resource (relative to resource ID base Display::id)
-	enum Resource { Window, GraphicContext, Colormap, PresentEvent, Segment, Pixmap };
+	enum Resource { Window, GraphicContext, Colormap, PresentEvent, Segment, Pixmap, Picture, Cursor, CursorPixmap };
     /// System V shared memory
     uint shm = 0;
     /// Rendering target in shared memory
@@ -66,11 +68,12 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
     uint64 firstFrameCounterValue = 0;
 	uint64 currentFrameCounterValue = 0;
 
-    // Control
     /// An event held to implement motion compression and ignore autorepeats
     //unique<XEvent> heldEvent;
 
-    // Methods
+	/// bgra32 XRender PictFormat (for Cursor)
+	uint format=0;
+
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
 	XWindow(Widget* widget, Thread& thread, int2 size);
@@ -96,22 +99,25 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
     /// Resizes window to \a size
     void setSize(int2 size);
 
-    /// Event handler
+	// Display
     void event() override;
+	void setCursor(::Cursor cursor) override;
 };
 
 struct DRMWindow : Window {
 	static unique<Display> display;
 
-	// Methods
 	/// Creates an initially hidden window for \a widget, use \a show to display
 	/// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
 	DRMWindow(Widget* widget, Thread& thread);
 	no_copy(DRMWindow);
 	~DRMWindow();
 
+	// Display
 	void event() override;
+	void setCursor(Cursor cursor) override;
 
+	// Input
 	void mouseEvent(int2, ::Event, Button);
 	void keyPress(Key);
 };

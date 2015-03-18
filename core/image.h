@@ -54,8 +54,7 @@ int2 imageSize(const ref<byte> file);
 Image decodeImage(const ref<byte> file);
 
 /// Declares a function lazily decoding an image embedded using FILE
-#define ICON(name) \
-static Image name ## Icon() { \
+#define ICON(name) Image name ## Icon() { \
     extern byte _binary_## name ##_start[]; extern byte _binary_## name ##_end[]; \
 	static Image icon = decodeImage(ref<byte>(_binary_## name ##_start, _binary_## name ##_end - _binary_## name ##_start)); \
     return share(icon); \
