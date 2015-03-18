@@ -156,16 +156,21 @@ array<byte> XDisplay::readReply(uint16 sequence, uint elementSize, buffer<int>& 
 }
 
 void XDisplay::waitEvent(uint8 type) {
-	Locker lock(this->lock);
 	for(;;) {
-		X11::Event e = read<X11::Event>();
-		if((e.type&0b01111111)==type) return;
-		if(e.type==Error) { error(e); continue; }
-		array<byte> o;
-		o.append(raw(e));
-		if(e.type==GenericEvent) o.append(read(e.genericEvent.size*4));
-		XDisplay::events.append(move(o));
-		XDisplay::queue(); // Queues XDisplay::event to process event queue after unwinding back to main event loop
+		// TODO: check if already in queue
+		X11::Event e; array<byte> o;
+		{Locker lock(this->lock);
+			e = read<X11::Event>();
+			if((e.type&0b01111111)==type) return;
+			if(e.type==Error) { error(e); continue; }
+			o.append(raw(e));
+			if(e.type==GenericEvent) o.append(read(e.genericEvent.size*4));
+		}
+		if(e.type==SelectionRequest) event(o); // Prevent deadlock waiting for SelectionNotify owned on this connection
+		else {
+			events.append(move(o));
+			queue(); // Queues event to process event queue after unwinding back to main event loop
+		}
 	}
 }
 

@@ -147,6 +147,7 @@ bool XWindow::processEvent(const X11::Event& e) {
 	else if(type==SelectionClear) {}
 	else if(type==SelectionRequest) {
 		auto r = e.selectionRequest;
+		{buffer<uint> name; request(GetAtomName{.atom=r.property}, name); log(cast<char>(name));}
 		if(r.target == Atom("TARGETS"_)) {
 			send(ChangeProperty{.window=r.requestor, .property=r.property, .type=Atom("ATOM"_), .format=32,
 								.length=uint(1), .size=uint16(6+4/4)}, cast<byte>(ref<uint>{Atom("UTF8_STRING"_)}));
@@ -154,7 +155,6 @@ bool XWindow::processEvent(const X11::Event& e) {
 							   .type=SelectionNotify,
 							   .selectionNotify = {.time=0, .requestor = r.requestor, .selection = r.selection, .target=r.target, .property=r.property} }});
 		} else {
-			log(r.selection, Atom("PRIMARY"), Atom("CLIPBOARD"));
 			int index = r.selection==1/*PRIMARY*/  ? 0 : 1;
 			send(ChangeProperty{.window=r.requestor, .property=r.property, .type=Atom("UTF8_STRING"_), .format=8,
 								.length=uint(selection[index].size), .size=uint16(6+align(4, selection[index].size)/4)}, selection[index]);
@@ -253,7 +253,8 @@ void XWindow::setCursor(::Cursor cursor) {
 String XWindow::getSelection(bool clipboard) {
 	uint owner = request(GetSelectionOwner{.selection=clipboard?Atom("CLIPBOARD"_):1}).owner;
 	if(!owner) return String();
-	send(ConvertSelection{.requestor=id, .selection=clipboard?Atom("CLIPBOARD"_):1, .target=Atom("UTF8_STRING"_)});
+	send(ConvertSelection{.requestor=id+Window, .selection=clipboard?Atom("CLIPBOARD"_):1,
+						  .target=Atom("UTF8_STRING"_), .property=Atom("UTF8_STRING"_)});
 	waitEvent(SelectionNotify);
 	return getProperty<byte>(id, "UTF8_STRING"_);
 }
