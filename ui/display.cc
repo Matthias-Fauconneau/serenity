@@ -134,7 +134,7 @@ array<byte> XDisplay::readReply(uint16 sequence, uint elementSize, buffer<int>& 
             assert_(e.seq==sequence);
 			array<byte> reply;
 			reply.append(raw(e.reply));
-			if(e.reply.size) { /*assert_(elementSize);*/ reply.append(read(e.reply.size*elementSize)); }
+			if(e.reply.size) { /*assert_(elementSize);*/ reply.append(read(align(4, e.reply.size*elementSize)).slice(0, e.reply.size*elementSize)); }
 			cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
 			if(cmsg) {
 				assert_(cmsg && cmsg->cmsg_len == CMSG_LEN(sizeof(int)));

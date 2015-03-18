@@ -11,6 +11,7 @@ static Window* currentWindow = 0; // FIXME
 bool hasFocus(Widget* widget) { assert_(currentWindow); return currentWindow->focus==widget; }
 void setCursor(Cursor cursor) { assert_(currentWindow); currentWindow->setCursor(cursor); }
 String getSelection(bool clipboard) { assert(currentWindow); return currentWindow->getSelection(clipboard); }
+void setSelection(string selection, bool clipboard) { assert(currentWindow); return currentWindow->setSelection(selection, clipboard); }
 
 void Window::render(shared<Graphics>&& graphics, int2 origin, int2 size) {
 	lock.lock();
@@ -143,6 +144,25 @@ bool XWindow::processEvent(const X11::Event& e) {
     else if(type==ReparentNotify) {}
 	else if(type==ConfigureNotify) { int2 size(e.configure.w,e.configure.h); if(size!=Window::size) { Window::size=size; render(); } }
     else if(type==GravityNotify) {}
+	else if(type==SelectionClear) {}
+	else if(type==SelectionRequest) {
+		auto r = e.selectionRequest;
+		if(r.target == Atom("TARGETS"_)) {
+			send(ChangeProperty{.window=r.requestor, .property=r.property, .type=Atom("ATOM"_), .format=32,
+								.length=uint(1), .size=uint16(6+4/4)}, cast<byte>(ref<uint>{Atom("UTF8_STRING"_)}));
+			send(SendEvent{.window=r.requestor, .event = X11::Event{
+							   .type=SelectionNotify,
+							   .selectionNotify = {.time=0, .requestor = r.requestor, .selection = r.selection, .target=r.target, .property=r.property} }});
+		} else {
+			log(r.selection, Atom("PRIMARY"), Atom("CLIPBOARD"));
+			int index = r.selection==1/*PRIMARY*/  ? 0 : 1;
+			send(ChangeProperty{.window=r.requestor, .property=r.property, .type=Atom("UTF8_STRING"_), .format=8,
+								.length=uint(selection[index].size), .size=uint16(6+align(4, selection[index].size)/4)}, selection[index]);
+			send(SendEvent{.window=r.requestor, .event = X11::Event{
+							   .type=SelectionNotify,
+							   .selectionNotify = {.time=0, .requestor = r.requestor, .selection = r.selection, .target=r.target, .property=r.property} }});
+		}
+	}
     else if(type==ClientMessage) {
 		function<void()>* action = Window::actions.find(Escape);
         if(action) (*action)(); // Local window action
@@ -198,12 +218,13 @@ void XWindow::event() {
 	}
 
 	Update update = render(target);
-
-	send(Shm::PutImage{.window=id+Pixmap, .context=id+GraphicContext, .seg=id+Segment,
-					   .totalW=uint16(target.stride), .totalH=uint16(target.height), .srcX=uint16(update.origin.x), .srcY=uint16(update.origin.y),
-					   .srcW=uint16(update.size.x), .srcH=uint16(update.size.y), .dstX=uint16(update.origin.x), .dstY=uint16(update.origin.y),});
-	state=Copy;
-	send(Present::Pixmap{.window=id+Window, .pixmap=id+Pixmap}); //FIXME: update region
+	if(update) {
+		send(Shm::PutImage{.window=id+Pixmap, .context=id+GraphicContext, .seg=id+Segment,
+						   .totalW=uint16(target.stride), .totalH=uint16(target.height), .srcX=uint16(update.origin.x), .srcY=uint16(update.origin.y),
+						   .srcW=uint16(update.size.x), .srcH=uint16(update.size.y), .dstX=uint16(update.origin.x), .dstY=uint16(update.origin.y),});
+		state=Copy;
+		send(Present::Pixmap{.window=id+Window, .pixmap=id+Pixmap}); //FIXME: update region
+	}
 }
 
 void XWindow::setCursor(::Cursor cursor) {
@@ -235,6 +256,11 @@ String XWindow::getSelection(bool clipboard) {
 	send(ConvertSelection{.requestor=id, .selection=clipboard?Atom("CLIPBOARD"_):1, .target=Atom("UTF8_STRING"_)});
 	waitEvent(SelectionNotify);
 	return getProperty<byte>(id, "UTF8_STRING"_);
+}
+
+void XWindow::setSelection(string selection, bool clipboard) {
+	this->selection[clipboard] = copyRef(selection);
+	send(SetSelectionOwner{.owner=id, .selection=clipboard?Atom("CLIPBOARD"_):1});
 }
 
 // --- DRM Window
@@ -284,6 +310,7 @@ void DRMWindow::keyPress(Key key) {
 
 void DRMWindow::setCursor(::Cursor) {}
 String DRMWindow::getSelection(bool) { return {}; }
+void DRMWindow::setSelection(string, bool) {}
 
 unique<Display> DRMWindow::display = null;
 

@@ -66,7 +66,7 @@ bool TextEdit::mouseEvent(vec2 position, vec2 size, Event event, Button button, 
 	setCursor(::Cursor::Text);
 	focus=this;
 	bool cursorChanged = false;
-	if(event==Press || (event==Motion && button)) {
+	if(event==Press || (event==Motion && button==LeftButton)) {
 		const TextLayout& layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
 		vec2 textSize = ceil(layout.bbMax - min(vec2(0),layout.bbMin));
 		vec2 offset = max(vec2(0), vec2(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
@@ -90,15 +90,22 @@ bool TextEdit::mouseEvent(vec2 position, vec2 size, Event event, Button button, 
 		if(event==Press) selectionStart = cursor;
 	}
     if(event==Press && button==LeftButton) { selectionStart = cursor; return true; }
-	if(event==Release && button==MiddleButton) {
-		array<uint32> selection = toUCS4(getSelection(false));
-		size_t index = this->index(cursor);
-		text = buffer<uint>(text.slice(0,index) + selection + text.slice(index));
-		lastTextLayout = TextLayout();
-		if(textChanged) textChanged(toUTF8(text));
-		this->layout(size.x ? min<float>(wrap, size.x) : wrap);
-		selectionStart = cursor = cursorFromIndex(index+selection.size);
-		return true;
+	if(event==Release) {
+		if(button==LeftButton) {
+			Cursor min, max;
+			if(selectionStart < cursor) min=selectionStart, max=cursor; else min=cursor, max=selectionStart;
+			if(cursor != selectionStart) setSelection(toUTF8(text.sliceRange(index(min),index(max))), false);
+		}
+		if(button==MiddleButton) {
+			array<uint32> selection = toUCS4(getSelection(false));
+			size_t index = this->index(cursor);
+			text = buffer<uint>(text.slice(0,index) + selection + text.slice(index));
+			lastTextLayout = TextLayout();
+			if(textChanged) textChanged(toUTF8(text));
+			this->layout(size.x ? min<float>(wrap, size.x) : wrap);
+			selectionStart = cursor = cursorFromIndex(index+selection.size);
+			return true;
+		}
 	}
 	return cursorChanged;
 }
@@ -107,8 +114,14 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 	const auto& lines = lastTextLayout.glyphs;
 	cursor.line = min<size_t>(cursor.line, lines.size-1);
 	const auto line = lineStops(lines[cursor.line]);
+	if((modifiers&Control) && (key=='c'||key=='C')) {
+		Cursor min, max;
+		if(selectionStart < cursor) min=selectionStart, max=cursor; else min=cursor, max=selectionStart;
+		if(cursor != selectionStart) setSelection(toUTF8(text.sliceRange(index(min),index(max))), true);
+		return false;
+	}
 
-	if(modifiers&Control && key=='v') {
+	if((modifiers&Control) && (key=='v'||key=='V')) {
         array<uint> selection = toUCS4(getSelection(true));
 		size_t index = this->index(cursor);
 		text = buffer<uint>(text.slice(0,index) + selection + text.slice(index));
@@ -130,20 +143,24 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 			for(size_t stop: range(0, line.size-1)) if(cursorX >= line[stop].center && cursorX <= line[stop+1].center) { cursor.column = stop+1; break; }
 			if(cursorX >= line.last().center) cursor.column = line.size;
 		}
+		if(!(modifiers&Shift)) selectionStart = cursor;
 	} else {
 		cursor.column = min<size_t>(cursor.column, line.size);
 
-        /**/  if(key==LeftArrow) {
-            if(cursor.column>0) cursor.column--;
-			else if(cursor.line>0) { cursor.line--, cursor.column = lineStops(lines[cursor.line]).size; }
-        }
-        else if(key==RightArrow) {
-			if(cursor.column<line.size) cursor.column++;
-			else if(cursor.line<lines.size-1) cursor.line++, cursor.column = 0;
-        }
-		else if(key==Home) cursor.column = 0;
-		else if(key==End) cursor.column = line.size;
-		else {
+		if(key==LeftArrow || key==RightArrow || key==Home || key==End) {
+			if(key==LeftArrow) {
+				if(cursor.column>0) cursor.column--;
+				else if(cursor.line>0) { cursor.line--, cursor.column = lineStops(lines[cursor.line]).size; }
+			}
+			else if(key==RightArrow) {
+				if(cursor.column<line.size) cursor.column++;
+				else if(cursor.line<lines.size-1) cursor.line++, cursor.column = 0;
+			}
+			else if(key==Home) cursor.column = 0;
+			else if(key==End) cursor.column = line.size;
+			else error("");
+			if(!(modifiers&Shift)) selectionStart = cursor;
+		} else if(key == Delete || key==Backspace || (key>=' ' && key<=0xFF) || (key >= KP_Asterisk && key<=KP_9)) {
 			Cursor min, max;
 			if(selectionStart < cursor) min=selectionStart, max=cursor; else min=cursor, max=selectionStart;
 			size_t sourceIndex = index(min);
@@ -178,17 +195,16 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 				char c;
 				if(key>=' ' && key<=0xFF) c=key; // FIXME: Unicode
 				else if(key >= KP_Asterisk && key<=KP_9) c="*+.-./0123456789"_[key-KP_Asterisk];
-				else return false;
+				else error("");
 				text.insertAt(index(cursor), uint32(c));
 				cursor.column++;
 			}
 			lastTextLayout = TextLayout();
 			if(textChanged) textChanged(toUTF8(text));
-		}
+		} else return false;
 
 		cursorX = cursor.column<line.size ? line[cursor.column].left : line ? line.last().right : 0;
     }
-	if(!(modifiers&Shift)) selectionStart = cursor;
 	return true;
 }
 

@@ -15,11 +15,12 @@ struct Event {
         struct { byte pad; uint16 seq; uint parent,window; int16 x,y,w,h,border; int8 override_redirect; } packed create;
         struct { byte pad; uint16 seq; uint event,window; int8 override_redirect; } packed map;
         struct { byte pad; uint16 seq; uint event,window; int8 from_configure; } packed unmap;
-        struct { byte pad; uint16 seq; uint parent,window; } packed map_request;
+		struct { byte pad; uint16 seq; uint parent,window; } packed mapRequest;
         struct { byte pad; uint16 seq; uint event,window,above; int16 x,y,w,h,border; int8 override_redirect; } packed configure;
-        struct { byte stackMode; uint16 seq; uint parent,window,sibling; int16 x,y,w,h,border; int16 valueMask; } packed configure_request;
+		struct { byte stackMode; uint16 seq; uint parent,window,sibling; int16 x,y,w,h,border; int16 valueMask; } packed configureRequest;
         struct { byte pad; uint16 seq; uint window, atom, time; uint8 state; } packed property;
-        struct { byte pad; uint16 seq; uint time, requestor,selection,target,property; } packed selection;
+		struct { byte pad; uint16 seq; uint time,owner,requestor,selection,target,property; } packed selectionRequest;
+		struct { byte pad; uint16 seq; uint time,          requestor,selection,target,property; } packed selectionNotify;
         struct { byte format; uint16 seq; uint window, type; uint data[5]; } packed client;
         Generic genericEvent;
         byte pad[31];
@@ -89,17 +90,24 @@ struct InternAtom {
     int8 req=16,exists=0; uint16 size=2; uint16 length, pad=0;
     struct Reply { byte pad; uint16 seq; uint size, atom; byte pad2[20]; } packed;
 };
+struct GetAtomName {
+	int8 req=17,pad=0; uint16 size=2; uint atom;
+	struct Reply { byte pad; uint16 seq; uint size; uint16 length; byte pad2[22]; } packed;
+};
 struct ChangeProperty { int8 req=18,replace=0; uint16 size=6; uint window,property,type; uint8 format,pad[3]={}; uint length; };
 struct GetProperty {
     int8 req=20,remove=0; uint16 size=6; uint window,property,type=0; uint offset=0,length=-1;
     struct Reply { uint8 format; uint16 seq; uint size; uint type,bytesAfter,length,pad[3]; } packed;
+};
+struct SetSelectionOwner {
+	uint8 req=22,pad=0; uint16 size=4; uint owner=0, selection=1, time = 0;
 };
 struct GetSelectionOwner {
     uint8 req=23,pad=0; uint16 size=2; uint selection=1;
     struct Reply { uint8 pad; uint16 seq; uint size; uint owner, pad2[5]; } packed;
 };
 struct ConvertSelection { uint8 req=24,pad=0; uint16 size=6; uint requestor=0,selection=1,target,property=0,time=0; };
-struct SendEvent { int8 req=25,propagate=0; uint16 size=11; uint window; uint eventMask=0; uint8 type; Event event; };
+struct SendEvent { int8 req=25,propagate=0; uint16 size=11; uint window; uint eventMask=0; Event event; };
 struct GrabButton { int8 req=28,owner=0; uint16 size=6; uint window; uint16 eventMask=ButtonPressMask; uint8 pointerMode=0,keyboardMode=1; uint confine=0,cursor=0; uint8 button=0,pad; uint16 modifiers=AnyModifier; };
 struct UngrabButton { int8 req=29,button=0; uint16 size=3; uint window; uint16 modifiers=AnyModifier, pad; };
 struct GrabKey { int8 req=33,owner=0; uint16 size=4; uint window; uint16 modifiers=0x8000; uint8 keycode, pointerMode=1,keyboardMode=1, pad[3]; };

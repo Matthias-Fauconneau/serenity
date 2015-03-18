@@ -19,7 +19,7 @@ struct Window : Poll {
 	Cursor cursor = Cursor::Arrow;
 
 	/// Updates to be rendered
-	struct Update { shared<Graphics> graphics; int2 origin, size; };
+	struct Update { shared<Graphics> graphics; int2 origin = 0, size = 0; explicit operator bool() { return size.x || size.y; } };
 	Lock lock;
 	array<Update> updates;
 
@@ -44,6 +44,7 @@ struct Window : Poll {
 
 	virtual void setCursor(Cursor cursor) abstract;
 	virtual String getSelection(bool clipboard) abstract;
+	virtual void setSelection(string selection, bool clipboard) abstract;
 };
 
 /// Interfaces \a widget as a window on a display server
@@ -74,6 +75,8 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
 
 	/// bgra32 XRender PictFormat (for Cursor)
 	uint format=0;
+
+	String selection[2];
 
     /// Creates an initially hidden window for \a widget, use \a show to display
     /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
@@ -108,6 +111,7 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
 	/// Gets current text selection
 	/// \note The selection owner might lock this process if it fails to notify
 	String getSelection(bool clipboard) override;
+	void setSelection(string selection, bool clipboard) override;
 };
 
 struct DRMWindow : Window {
@@ -129,6 +133,7 @@ struct DRMWindow : Window {
 
 	// IPC
 	String getSelection(bool clipboard) override;
+	void setSelection(string selection, bool clipboard) override;
 };
 
 unique<Window> window(Widget* widget, int2 size=-1, Thread& thread=mainThread);

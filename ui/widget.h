@@ -48,3 +48,4 @@ enum class Cursor { Arrow, Text };
 void setCursor(Cursor cursor);
 /// Returns last text selection (or if clipboard is true, last copy)
 String getSelection(bool clipboard);
+void setSelection(string selection, bool clipboard);

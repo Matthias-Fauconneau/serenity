@@ -21,6 +21,7 @@ io/bit.h
 io/flic.h
 io/font.cc
 
+ui/x.h
 ui/display.h
 ui/display.cc
 ui/window.h

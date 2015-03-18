@@ -60,7 +60,7 @@ struct XDisplay : Socket, Poll {
 		 uint16 sequence = send(request, data, fd);
 		 array<byte> replyData = readReply(sequence, sizeof(T), fds);
          typename Request::Reply reply = *(typename Request::Reply*)replyData.data;
-         assert_(replyData.size == sizeof(typename Request::Reply)+reply.size*sizeof(T));
+		 assert_(replyData.size == sizeof(typename Request::Reply)+reply.size*sizeof(T), replyData.size, sizeof(typename Request::Reply)+reply.size*sizeof(T), sizeof(T));
 		 output = copyRef(cast<T>(replyData.slice(sizeof(reply), reply.size*sizeof(T))));
          return reply;
      }
