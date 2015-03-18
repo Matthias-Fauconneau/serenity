@@ -150,7 +150,20 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 		return true;
 	}
 
-	if((modifiers&Control) && (key=='z'||key=='Z') && historyIndex) {
+	if((modifiers&Control) && (modifiers&Shift) && (key=='z'||key=='Z')) {
+		if(!(historyIndex<history.size-1)) return false;
+		historyIndex++;
+		const State& state = history[historyIndex];
+		text = copy(state.text);
+		selectionStart = cursor = state.cursor;
+		lastTextLayout = TextLayout();
+		if(textChanged) textChanged(toUTF8(text));
+		lastEdit=Edit::Point;
+		return true;
+	}
+
+	if((modifiers&Control) && (key=='z'||key=='Z')) {
+		if(!historyIndex) return false;
 		historyIndex--;
 		const State& state = history[historyIndex];
 		text = copy(state.text);
