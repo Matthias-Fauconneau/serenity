@@ -67,9 +67,16 @@ bool ScrollArea::keyPress(Key key, Modifiers) {
 
     if(key==Home) { offset = 0; return true; }
     if(key==End) { offset = -vec2(hint-viewSize); return true; }
-    if(key==Space || key==LeftArrow || key==RightArrow || key==Backspace) for(int axis: range(2)) {
+    if(key==Space || key==UpArrow || key==LeftArrow || key==RightArrow || key==DownArrow || key==Backspace) for(int axis: range(2)) {
 	if(viewSize[axis]<hint[axis]) {
-	    offset[axis] = -widget().stop(view[axis], axis, -offset[axis], key==LeftArrow || key==Backspace?-1:1);
+	    offset[axis] = -widget().stop(view[axis], axis, -offset[axis], key==UpArrow || key==LeftArrow || key==Backspace?-1:1);
+	    offset = min(vec2(0), max(-vec2(hint-size), offset));
+	    return true;
+	}
+    }
+    if(key==PageUp || key==PageDown) for(int axis: range(2)) {
+	if(viewSize[axis]<hint[axis]) {
+	    offset[axis] = -(-offset[axis]) + (key==PageUp?1:-1) * size.x/4;
 	    offset = min(vec2(0), max(-vec2(hint-size), offset));
 	    return true;
 	}

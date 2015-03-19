@@ -479,14 +479,14 @@ struct Test {
 			return contentChanged;
 		}
 		bool keyPress(Key key, Modifiers modifiers) {
-			if(edit.keyPress(key, modifiers) /*|| ScrollArea::keyPress(key, modifiers)*/) {
+			if(edit.keyPress(key, modifiers)) {
 				vec2 size = viewSize;
 				vec2 position = edit.cursorPosition(size, edit.cursor);
 				if(position.y < -offset.y) offset.y = -(position.y);
 				if(position.y+edit.Text::size > -offset.y+size.y) offset.y = -(position.y-size.y+edit.Text::size);
 				return true;
 			}
-			return false;
+			else return ScrollArea::keyPress(key, modifiers);
 		}
 	} text {move(Parser(readFile("test.cc")).target)};
 	unique<Window> window = ::window(&text, 1024);

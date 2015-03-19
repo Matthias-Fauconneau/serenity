@@ -121,7 +121,8 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 	cursor.line = min<size_t>(cursor.line, lines.size-1);
 	auto line = lineStops(lines[cursor.line]);
 
-	if(key==UpArrow || key==DownArrow || key==PageUp || key==PageDown) {
+	if( ( (modifiers&Control) && (key==Home || key==End)) ||
+		(!(modifiers&Control) && (key==UpArrow || key==DownArrow || key==PageUp || key==PageDown))) {
 		int lineIndex = cursor.line;
 		if(key==UpArrow) lineIndex--;
 		else if(key==DownArrow) lineIndex++;
@@ -130,6 +131,9 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 			if(key==PageUp) lineIndex -= pageLineCount/2;
 			if(key==PageDown) lineIndex += pageLineCount/2;
 		}
+		else if(key==Home) lineIndex = 0;
+		else if(key==End) lineIndex = lines.size-1;
+		else error("");
 		lineIndex = clamp(0, lineIndex, int(lines.size-1));
 		if(lineIndex == int(cursor.line)) return false;
 		cursor.line = lineIndex;
@@ -146,7 +150,22 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 	} else if(key==LeftArrow || key==RightArrow || key==Home || key==End) {
 		cursor.column = min<size_t>(cursor.column, line.size);
 
-		if(key==LeftArrow) {
+		if(key==Home) cursor.column = 0;
+		else if(key==End) cursor.column = line.size;
+		else if((modifiers&Control) && ((key==LeftArrow && cursor.column>0) || (key==RightArrow && cursor.column<line.size))) {
+			auto isWordCode = [](char c) { return (c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||"_"_.contains(c); };
+			if(key==LeftArrow) {
+				cursor.column--;
+				bool firstWordCode = isWordCode(text[index(cursor)]);
+				while(cursor.column>0 && isWordCode(text[index({cursor.line, cursor.column-1})]) == firstWordCode) cursor.column--;
+			}
+			else if(key==RightArrow) {
+				bool firstWordCode = isWordCode(text[index(cursor)]);
+				while(cursor.column<line.size && isWordCode(text[index(cursor)]) == firstWordCode) cursor.column++;
+			}
+			else error("");
+		}
+		else if(key==LeftArrow)  {
 			if(cursor.column>0) cursor.column--;
 			else if(cursor.line>0) { cursor.line--, cursor.column = lineStops(lines[cursor.line]).size; }
 		}
@@ -154,8 +173,6 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 			if(cursor.column<line.size) cursor.column++;
 			else if(cursor.line<lines.size-1) cursor.line++, cursor.column = 0;
 		}
-		else if(key==Home) cursor.column = 0;
-		else if(key==End) cursor.column = line.size;
 		else error("");
 		if(!(modifiers&Shift)) selectionStart = cursor;
 		history.last().cursor = cursor;
