@@ -35,6 +35,7 @@ struct ModuleEdit : ScrollTextEdit {
 	String fileName;
 	ModuleEdit(string fileName) : ScrollTextEdit(move(Parser(fileName).target)), fileName(copyRef(fileName)) {
 		edit.linkActivated = [this](ref<uint> identifier) {
+			assert_(identifier);
 			String fileName = toUTF8(identifier.slice(0, identifier.size-1));
 			size_t index = identifier.last();
 			assert_(fileName == this->fileName, "TODO: multiple file navigation");

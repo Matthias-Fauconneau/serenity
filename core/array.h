@@ -113,7 +113,7 @@ generic struct array : buffer<T> {
     }
 };
 /// Copies all elements in a new array
-generic array<T> copy(const array<T>& o) { array<T> copy(o.size, 0); copy.append(o); return copy; }
+generic array<T> copy(const array<T>& o) { array<T> copy(o.size); copy.append(o); return copy; }
 
 // -- Sort --
 

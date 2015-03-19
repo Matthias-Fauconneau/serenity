@@ -4,6 +4,17 @@
 #include "vector.h"
 #include "text.h"
 
+typedef buffer<uint> Location; // module name (UCS4), index
+template<> Location copy(const Location& o) { return copyRef(o); }
+
+struct Scope {
+	bool struct_ = false;
+	map<string, Location> types, variables;
+	map<string, Scope> scopes;
+};
+template<> Scope copy(const Scope& o) { return Scope{o.struct_, copy(o.types), copy(o.variables), copy(o.scopes)}; }
+String str(const Scope& o) { return str(o.variables, o.scopes); }
+
 struct Parser : TextData {
 	const ref<string> keywords = {
 		"alignas", "alignof", "asm", "auto", "bool", "break", "case", "catch", "char", "char16_t", "char32_t", "class", "const", "constexpr", "const_cast",
@@ -29,21 +40,26 @@ struct Parser : TextData {
 
 	template<Type... Args> void error(const Args&... args) { ::error(args..., "'"+slice(index-8,8)+"|"+sliceRange(index,min(data.size,index+8))+"'"); }
 
+	array<Scope> scopes;
+
 	struct State { size_t source, target; };
 	array<State> stack;
 	void push() { stack.append({index, target.size}); }
 	bool backtrack() { State state = stack.pop(); index=state.source; target.size=state.target; return false; }
-	bool commit() { stack.pop(); return true; }
+	bool commit() { assert_(stack); stack.pop(); return true; }
 
-	typedef ::buffer<uint> Location; // module name (UCS4), index
-	struct Scope {
-		bool struct_ = false;
-		map<string, Location> types, variables;
-	};
-	array<Scope> scopes;
-	//const Scope* topStructScope() { for(const Scope& scope: scopes.reverse()) if(scope.struct_) return &scope; return 0; }
+	const Scope* findScope(string name) {
+		for(const Scope& scope: scopes.reverse()) if(scope.scopes.contains(name)) return &scope.scopes.at(name);
+		return 0;
+	}
+	const Scope* findType(string name) {
+		for(const Scope& scope: scopes.reverse()) if(scope.types.contains(name)) return &scope;
+		return 0;
+	}
 	const Scope* findVariable(string name) {
-		for(const Scope& scope: scopes.reverse()) if(scope.variables.contains(name)) return &scope;
+		for(const Scope& scope: scopes.reverse()) {
+			if(scope.variables.contains(name)) return &scope;
+		}
 		return 0;
 	}
 
@@ -133,21 +149,33 @@ struct Parser : TextData {
 
 	bool struct_() {
 		if(!matchID("struct", keyword)) return false;
-		identifier(typeDeclaration);
-		if(match(":")) identifier(typeUse);
+		assert_(!stack, "struct");
+		scopes.append({true,{},{},{}});
+		string name = identifier(typeDeclaration);
+		if(match(":")) {
+			do {
+				string baseID = identifier(typeUse);
+				const Scope* base = findScope(baseID);
+				if(base) {
+					scopes.last().types.append(base->types);
+					scopes.last().variables.append(base->variables);
+				}
+			} while(match(","));
+		}
 		if(!match("{")) error("struct");
-		scopes.append({true,{},{}});
 		while(!match("}")) {
 			if(declaration() || constructor()) {}
 			else error("struct");
 		}
-		scopes.pop();
+		assert_(!stack, "struct");
+		Scope s = scopes.pop();
+		scopes.last().scopes.insert(name, move(s));
 		return true;
 	}
 
 	bool type() {
 		if(matchAnyID(ref<string>{"void"_,"bool"_,"char"_,"int"}, typeUse)) return true; // FIXME: better remove basic types from keywords
-		if(struct_()) return true;
+		//if(struct_()) return true; // Scopes prevents backtracing
 		if(!identifier(typeUse)) return false;
 		templateArguments();
 		while(match("*")) {}
@@ -165,10 +193,7 @@ struct Parser : TextData {
 		return true;
 	}
 
-	bool referenceValue() {
-		push();
-		if(type() && initializer_list()) return commit();
-		backtrack();
+	bool variable() {
 		size_t rewind = target.size;
 		string name = identifier(variableUse);
 		if(!name) return false;
@@ -176,13 +201,21 @@ struct Parser : TextData {
 		if(!scope) return true;
 		target.size = rewind;
 		const Location& location = scope->variables.at(name);
+		assert_(location);
 		target.append(color(link(name, location), scope->struct_ ? memberUse : variableUse));
 		return true;
 	}
 
+	bool mutableExpression() {
+		push();
+		if(type() && initializer_list()) return commit();
+		backtrack();
+		return variable();
+	}
+
 	bool member() {
 		if(!((!wouldMatch("...") && match(".")) || match("->"))) return false;
-		if(!identifier(variableUse)) error("operator.");
+		if(!identifier()) error("operator.");
 		return true;
 	}
 
@@ -221,8 +254,8 @@ struct Parser : TextData {
 	}
 
 	bool expression() {
-		if(referenceValue()) {
-			// referenceValue = expression
+		if(mutableExpression()) {
+			// mutableExpression = expression
 			if(!wouldMatch("==") && match("=")) {
 				if(!expression()) error("! expression");
 				return true;
@@ -261,8 +294,11 @@ struct Parser : TextData {
 			else if(match("[")) {
 				matchID("this", keyword);
 				if(!match("]")) error("lambda ]");
+				assert_(!stack, "lambda");
+				push();
 				if(!parameters()) scopes.append();
 				if(!block()) error("lambda {");
+				assert_(!stack, "lambda");
 				scopes.pop();
 			}
 			else return false;
@@ -288,22 +324,27 @@ struct Parser : TextData {
 		return true;
 	}
 
-	bool variable(bool parameter=false) {
+	bool variable_declaration(bool parameter=false) {
 		push();
 		matchID("const", keyword);
 		if(!type()) return backtrack();
 		if(parameter) { if(match("&&")) {} }
 		match("..."); // FIXME
+		return variable_name(parameter);
+	}
+	bool variable_name(bool parameter=false) {
 		uint location = target.size;
 		string variableName = name(variableDeclaration);
 		if(!variableName) return backtrack();
+		commit();
+		assert_(!stack, "variable_declaration");
 		scopes.last().variables.insert(variableName, fileName+location);
 		if(!parameter) while(match(",")) { if(!identifier(variableDeclaration)) error("variable"); }
 		if(initializer_list()) {}
 		else if(match("=")) {
 			if(!(initializer_list() || expression())) error("initializer");
 		}
-		return commit();
+		return true;
 	}
 
 	bool templateParameters() {
@@ -325,6 +366,7 @@ struct Parser : TextData {
 
 	bool block() {
 		if(!match("{")) return false;
+		assert_(!stack, "block");
 		scopes.append();
 		while(!match("}")) statement();
 		scopes.pop();
@@ -382,7 +424,7 @@ struct Parser : TextData {
 		if(!matchID("for", keyword)) return false;
 		if(!match("(")) error("for (");
 		bool range = false;
-		if(variable()) {
+		if(variable_declaration()) {
 			if(match(":"_)) range = true;
 		} else expression();
 		if(!range) {
@@ -425,10 +467,12 @@ struct Parser : TextData {
 
 	bool parameters() {
 		if(!match("(")) return false;
+		commit();
+		assert_(!stack, "parameters");
 		scopes.append();
 		while(!match(")")) {
 			matchID("const", keyword);
-			if(variable(true)) {}
+			if(variable_declaration(true)) {}
 			else error("function parameters"_);
 			match(",");
 		}
@@ -444,8 +488,9 @@ struct Parser : TextData {
 		if(!parameters()) return backtrack();
 		matchID("override", keyword);
 		if(!block()) error("function");
+		assert_(!stack);
 		scopes.pop();
-		return commit();
+		return true;
 	}
 
 	bool constructor() {
@@ -453,15 +498,16 @@ struct Parser : TextData {
 		if(!(identifier() && parameters())) return backtrack();
 		if(match(":")) {
 			do {
-				if(!identifier()) error("initializer identifier");
+				if(!variable()) error("initializer field");
 				if(!match("(")) error("initializer (");
 				if(!expression()) error("initializer expression");
 				if(!match(")")) error("initializer )");
 			} while(match(","));
 		}
 		if(!block()) error("constructor");
+		assert_(!stack);
 		scopes.pop();
-		return commit();
+		return true;
 	}
 
 	bool typedef_() {
@@ -474,7 +520,13 @@ struct Parser : TextData {
 
 	bool declaration() {
 		if(typedef_() || function()) return true;
-		if(variable() || struct_()) { // FIXME: struct declarations are parsed twice (first try as variable)
+		if(struct_()) {
+			push();
+			variable_name();
+			if(!match(";")) error("declaration"_);
+			return true;
+		}
+		if(variable_declaration()) {
 			if(!match(";")) error("declaration"_);
 			return true;
 		}
@@ -515,5 +567,6 @@ struct Parser : TextData {
 			else error("global", line() ?: peek(16));
 			space();
 		}
+		assert_(scopes.size == 1 && stack.size == 0);
 	}
 };
