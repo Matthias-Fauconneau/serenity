@@ -16,8 +16,18 @@ inline String subscript(string s) { return char(TextFormat::Subscript) + s + cha
 inline String stack(string s) { return char(TextFormat::Stack) + s + char(TextFormat::End); }
 inline String fraction(string s) { return char(TextFormat::Fraction) + s + char(TextFormat::End); }
 inline String link(string s, string id) { return char(TextFormat::Link) + id + '\0' + s + char(TextFormat::End); }
+inline buffer<uint> link(string s, ref<uint> id) { return uint(TextFormat::Link) + id + 0u + toUCS4(s) + uint(TextFormat::End); }
 inline buffer<uint> color(ref<uint> s, bgr3f bgr) { return uint(TextFormat::Color) + cast<uint>((ref<float>)bgr) + s + uint(TextFormat::End); }
 inline buffer<uint> color(string s, bgr3f bgr) { return s ? color(toUCS4(s), bgr) : buffer<uint>(); }
+
+struct Cursor {
+	size_t line=0, column=0;
+	Cursor(){}
+	Cursor(size_t line, size_t column) : line(line), column(column) {}
+	bool operator ==(const Cursor& o) const { return line==o.line && column==o.column; }
+	bool operator <(const Cursor& o) const { return line<o.line || (line==o.line && column<o.column); }
+};
+struct Link { Cursor begin,end; buffer<uint> identifier;};
 
 /// Layouts formatted text with wrapping, justification and links
 struct TextLayout {
@@ -41,6 +51,7 @@ struct TextLayout {
 	// Outputs
 	array<array<array<Glyph>>> glyphs;
 	array<Line> lines;
+	array<Link> links;
 
 	TextLayout() {}
 	TextLayout(const ref<uint> text, float size, float wrap, string fontName, bool hint, float interline, int align,

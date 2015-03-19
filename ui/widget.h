@@ -43,9 +43,9 @@ struct Widget {
 bool hasFocus(Widget* widget);
 
 /// Cursor icons
-enum class Cursor { Arrow, Text };
+enum class MouseCursor { Arrow, Text };
 /// Sets mouse cursor
-void setCursor(Cursor cursor);
+void setCursor(MouseCursor cursor);
 /// Returns last text selection (or if clipboard is true, last copy)
 String getSelection(bool clipboard);
 void setSelection(string selection, bool clipboard);

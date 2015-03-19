@@ -23,6 +23,7 @@ struct Parser : TextData {
 	const bgr3f numberLiteral = blue/2.f;
 	const bgr3f comment = green/2.f;
 
+	::buffer<uint> fileName;
 	array<uint> target;
 
 	template<Type... Args> void error(const Args&... args) { ::error(args..., "'"+slice(index-8,8)+"|"+sliceRange(index,min(data.size,index+8))+"'"); }
@@ -33,9 +34,10 @@ struct Parser : TextData {
 	bool backtrack() { State state = stack.pop(); index=state.source; target.size=state.target; return false; }
 	bool commit() { stack.pop(); return true; }
 
+	typedef ::buffer<uint> Location; // module name (UCS4), index
 	struct Scope {
 		bool struct_ = false;
-		array<string> types, variables;
+		map<string, Location> types, variables;
 	};
 	array<Scope> scopes;
 	//const Scope* topStructScope() { for(const Scope& scope: scopes.reverse()) if(scope.struct_) return &scope; return 0; }
@@ -100,6 +102,7 @@ struct Parser : TextData {
 	}
 
 	string identifier(bgr3f color=black) { // qualified identifier (may explicits scopes)
+		space();
 		size_t begin = index;
 		if(match("::")) {
 			if(!name(color)) error(":: name");
@@ -165,15 +168,15 @@ struct Parser : TextData {
 		push();
 		if(type() && initializer_list()) return commit();
 		backtrack();
-		push();
+		size_t rewind = target.size;
 		string name = identifier(variableUse);
-		if(!name) return backtrack();
-		if(findVariable(name) && findVariable(name)->struct_) {
-			backtrack();
-			identifier(memberUse);
-			return true;
-		}
-		return commit();
+		if(!name) return false;
+		const Scope* scope = findVariable(name);
+		if(!scope) return true;
+		target.size = rewind;
+		const Location& location = scope->variables.at(name);
+		target.append(color(link(name, location), scope->struct_ ? memberUse : variableUse));
+		return true;
 	}
 
 	bool member() {
@@ -254,6 +257,11 @@ struct Parser : TextData {
 			}
 			else if(initializer_list()) {}
 			else if(matchID("this", keyword)) {}
+			else if(match("[]")) {
+				if(!parameters()) scopes.append();
+				if(!block()) error("lambda");
+				scopes.pop();
+			}
 			else return false;
 		}
 
@@ -283,9 +291,10 @@ struct Parser : TextData {
 		if(!type()) return backtrack();
 		if(parameter) { if(match("&&")) {} }
 		match("..."); // FIXME
+		uint location = index;
 		string variableName = name(variableDeclaration);
 		if(!variableName) return backtrack();
-		scopes.last().variables.append(variableName);
+		scopes.last().variables.insert(variableName, fileName+location);
 		if(!parameter) while(match(",")) { if(!identifier(variableDeclaration)) error("variable"); }
 		if(initializer_list()) {}
 		else if(match("=")) {
@@ -313,7 +322,9 @@ struct Parser : TextData {
 
 	bool block() {
 		if(!match("{")) return false;
+		scopes.append();
 		while(!match("}")) statement();
+		scopes.pop();
 		return true;
 	}
 
@@ -348,7 +359,7 @@ struct Parser : TextData {
 		if(!expression()) error("if expression");
 		if(!match(")")) error("if statement )");
 		body();
-		if(matchID("else")) body();
+		if(matchID("else", keyword)) body();
 		return true;
 	}
 
@@ -385,11 +396,11 @@ struct Parser : TextData {
 	}
 
 	bool doWhile() {
-		if(!matchID("do")) return false;
+		if(!matchID("do", keyword)) return false;
 		loop++;
 		body();
 		loop--;
-		if(!matchID("while")) error("while");
+		if(!matchID("while", keyword)) error("while");
 		if(!match("(")) error("while (");
 		expression();
 		if(!match(")")) error("while )");
@@ -411,6 +422,7 @@ struct Parser : TextData {
 
 	bool parameters() {
 		if(!match("(")) return false;
+		scopes.append();
 		while(!match(")")) {
 			matchID("const", keyword);
 			if(variable(true)) {}
@@ -427,8 +439,9 @@ struct Parser : TextData {
 		if(!type()) return backtrack();
 		if(!identifier()) return backtrack();
 		if(!parameters()) return backtrack();
-		matchID("override");
+		matchID("override", keyword);
 		if(!block()) error("function");
+		scopes.pop();
 		return commit();
 	}
 
@@ -444,11 +457,20 @@ struct Parser : TextData {
 			} while(match(","));
 		}
 		if(!block()) error("constructor");
+		scopes.pop();
 		return commit();
 	}
 
+	bool typedef_() {
+		if(!matchID("typedef", keyword)) return false;
+		if(!type()) error("typedef type");
+		if(!name()) error("typedef name");
+		if(!match(";")) error("typedef ;");
+		return true;
+	}
+
 	bool declaration() {
-		if(function()) return true;
+		if(typedef_() || function()) return true;
 		if(variable() || struct_()) { // FIXME: struct declarations are parsed twice (first try as variable)
 			if(!match(";")) error("declaration"_);
 			return true;
@@ -482,8 +504,7 @@ struct Parser : TextData {
 		return true;
 	}
 
-
-	Parser(string source) : TextData(source) {
+	Parser(string fileName) : TextData(readFile(fileName)), fileName(toUCS4(fileName)) {
 		scopes.append();
 		space();
 		while(available(1)) {
@@ -494,28 +515,38 @@ struct Parser : TextData {
 	}
 };
 
+struct ScrollTextEdit : ScrollArea {
+	TextEdit edit;
+
+	ScrollTextEdit(buffer<uint>&& text) : edit(move(text)) {}
+
+	Widget& widget() override { return edit; }
+
+	void ensureCursorVisible() {
+		vec2 size = viewSize;
+		vec2 position = edit.cursorPosition(size, edit.cursor);
+		if(position.y < -offset.y) offset.y = -(position.y);
+		if(position.y+edit.Text::size > -offset.y+size.y) offset.y = -(position.y-size.y+edit.Text::size);
+	}
+
+	bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) {
+		bool contentChanged = ScrollArea::mouseEvent(cursor, size, event, button, focus) || edit.mouseEvent(cursor, size, event, button, focus);
+		focus = this;
+		return contentChanged;
+	}
+	bool keyPress(Key key, Modifiers modifiers) {
+		if(edit.keyPress(key, modifiers)) {
+			ensureCursorVisible();
+			return true;
+		}
+		else return ScrollArea::keyPress(key, modifiers);
+	}
+};
+
 struct Test {
-	struct ScrollTextEdit : ScrollArea {
-		TextEdit edit;
-
-		ScrollTextEdit(buffer<uint>&& text) : edit(move(text)) {}
-
-		Widget& widget() override { return edit; }
-		bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) {
-			bool contentChanged = ScrollArea::mouseEvent(cursor, size, event, button, focus) || edit.mouseEvent(cursor, size, event, button, focus);
-			focus = this;
-			return contentChanged;
-		}
-		bool keyPress(Key key, Modifiers modifiers) {
-			if(edit.keyPress(key, modifiers)) {
-				vec2 size = viewSize;
-				vec2 position = edit.cursorPosition(size, edit.cursor);
-				if(position.y < -offset.y) offset.y = -(position.y);
-				if(position.y+edit.Text::size > -offset.y+size.y) offset.y = -(position.y-size.y+edit.Text::size);
-				return true;
-			}
-			else return ScrollArea::keyPress(key, modifiers);
-		}
-	} text {move(Parser(readFile("test.cc")).target)};
+	ScrollTextEdit text {move(Parser("test.cc").target)};
+	Test() {
+		text.edit.linkActivated = [](ref<uint> identifier) { log(identifier); };
+	}
 	unique<Window> window = ::window(&text, 1024);
 } test;

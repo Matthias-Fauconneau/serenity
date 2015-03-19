@@ -53,7 +53,7 @@ bool ScrollArea::mouseEvent(vec2 cursor, vec2 size, Event event, Button button, 
 	}
     }
     if(widget().mouseEvent(cursor-vec2(offset), max(hint,size), event, button, focus)) return true;
-    if(event==Motion && button==LeftButton && !(hint<=size)) {
+    if(drag && event==Motion && button==LeftButton && !(hint<=size)) {
 	offset = min(vec2(0), max(-vec2(hint-size), dragStartOffset+vec2(cursor-dragStartCursor)));
 	return true;
     }

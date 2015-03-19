@@ -90,6 +90,8 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 		size_t start = 0;
 		array<Context> children;
 		vec2 position = 0;
+		uint column = 0;
+		Link link;
 
 		// Kerning
 		uint16 previous=spaceIndex;
@@ -105,17 +107,21 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 					if(!justify && c==' ') { // Includes whitespace "Glyph" placeholders for editing
 						word.append(Glyph({spaceAdvance,0,0,0,{{0,0}}},{position, size, *font, c, font->font(size).index(c), color}, sourceIndex));
 						position.x += spaceAdvance;
+						column++;
 					}
 					if((justify && c==' ') || c=='\n') { // Splits into words for justification
 						if(word) nextWord(move(word), justify);
 						position.x = 0;
+						column++;
 					}
 					if(c=='\n') {
 						nextLine(justifyExplicit, this->align);
+						column = 0;
 					}
 					if(c=='\t') {
 						word.append(Glyph({4*spaceAdvance,0,0,0,{{0,0}}},{position, size, *font, c, font->font(size).index(c), color}, sourceIndex));
 						position.x += 4*spaceAdvance;
+						column++;
 					}
 				}
 				else if(c==' ') position.x += spaceAdvance;
@@ -137,10 +143,23 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 					color = bgr3f(*(float*)&text[sourceIndex+1], *(float*)&text[sourceIndex+2], *(float*)&text[sourceIndex+3]);
 					sourceIndex += 3;
 				}
-				else error(uint(format));
+				else if(format==TextFormat::Link) {
+					sourceIndex++;
+					size_t start = sourceIndex;
+					while(text[sourceIndex]) sourceIndex++;
+					link.identifier = copyRef(text.sliceRange(start, sourceIndex));
+					// 0
+					link.begin = {lines.size, column};
+				}
+				else error("Unknown format", uint(format));
 			}
 			// Pop format context
 			else if(TextFormat(c)==TextFormat::End) {
+				if(format==TextFormat::Link) {
+					link.begin = {lines.size, column};
+					links.append(move(link));
+					link = Link();
+				}
 				if(format == TextFormat::Stack || format == TextFormat::Fraction) {
 					assert_(children.size==2 && children[0].end == children[1].start, children.size);
 					auto flatten = [](Context& c) {
@@ -206,6 +225,7 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 					if(c==toUCS4("⌊")[0] || c==toUCS4("⌋")[0]) offset.y += size/3; // Fixes too high floor signs from FreeSerif
 					//assert_(metrics.size, hex(c));
 					word.append( Glyph(metrics,::Glyph{position+offset, size, *font, c, font->font(size).index(c), color}, sourceIndex) );
+					column++;
 				}
 				position.x += metrics.advance;
 			}

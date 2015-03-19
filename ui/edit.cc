@@ -39,7 +39,7 @@ size_t TextEdit::index(Cursor cursor) const {
 	return index;
 }
 
-TextEdit::Cursor TextEdit::cursorFromIndex(size_t targetIndex) const {
+Cursor TextEdit::cursorFromIndex(size_t targetIndex) const {
 	const auto& lines = lastTextLayout.glyphs;
 	Cursor cursor (0, 0);
 	if(!lines) return cursor;
@@ -61,7 +61,7 @@ TextEdit::Cursor TextEdit::cursorFromIndex(size_t targetIndex) const {
 	return Cursor(lines.size-1, lineStops(lines.last()).size);  // End of text
 }
 
-TextEdit::Cursor TextEdit::cursorFromPosition(vec2 size, vec2 position) {
+Cursor TextEdit::cursorFromPosition(vec2 size, vec2 position) {
 	const TextLayout& layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
 	vec2 textSize = ceil(layout.bbMax - min(vec2(0),layout.bbMin));
 	vec2 offset = max(vec2(0), vec2(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
@@ -86,7 +86,7 @@ TextEdit::Cursor TextEdit::cursorFromPosition(vec2 size, vec2 position) {
 
 /// TextEdit
 bool TextEdit::mouseEvent(vec2 position, vec2 size, Event event, Button button, Widget*& focus) {
-	setCursor(::Cursor::Text);
+	setCursor(MouseCursor::Text);
 	focus=this;
 	bool cursorChanged = false;
 	if((event==Press && (button==LeftButton || button==RightButton)) || (event==Motion && button==LeftButton)) {
@@ -95,12 +95,13 @@ bool TextEdit::mouseEvent(vec2 position, vec2 size, Event event, Button button, 
 		this->cursor = cursor;
 		if(event==Press) selectionStart = cursor;
 	}
-    if(event==Press && button==LeftButton) { selectionStart = cursor; return true; }
+	if(event==Press && button==LeftButton /*FIXME: && !(modifiers&Shift)*/) { selectionStart = cursor; return true; }
 	if(event==Release) {
 		if(button==LeftButton) {
 			Cursor min, max;
 			if(selectionStart < cursor) min=selectionStart, max=cursor; else min=cursor, max=selectionStart;
 			if(cursor != selectionStart) setSelection(toUTF8(text.sliceRange(index(min),index(max))), false);
+			else for(const Link& link: lastTextLayout.links) if(link.begin<cursor && cursor<link.end) { linkActivated(link.identifier); return true; }
 		}
 		if(button==MiddleButton) {
 			array<uint32> selection = toUCS4(getSelection(false));

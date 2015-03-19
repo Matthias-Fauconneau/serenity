@@ -9,7 +9,7 @@ using namespace X11;
 
 static Window* currentWindow = 0; // FIXME
 bool hasFocus(Widget* widget) { assert_(currentWindow); return currentWindow->focus==widget; }
-void setCursor(Cursor cursor) { assert_(currentWindow); currentWindow->setCursor(cursor); }
+void setCursor(MouseCursor cursor) { assert_(currentWindow); currentWindow->setCursor(cursor); }
 String getSelection(bool clipboard) { assert(currentWindow); return currentWindow->getSelection(clipboard); }
 void setSelection(string selection, bool clipboard) { assert(currentWindow); return currentWindow->setSelection(selection, clipboard); }
 
@@ -226,7 +226,7 @@ void XWindow::event() {
 	}
 }
 
-void XWindow::setCursor(::Cursor cursor) {
+void XWindow::setCursor(MouseCursor cursor) {
 	if(this->cursor != cursor) {
 		static Image (*icons[])() = { cursorIcon, textIcon };
 		static constexpr int2 hotspots[] = { int2(5,0), int2(4,9) }; // FIXME
@@ -308,7 +308,7 @@ void DRMWindow::keyPress(Key key) {
 	}
 }
 
-void DRMWindow::setCursor(::Cursor) {}
+void DRMWindow::setCursor(MouseCursor) {}
 String DRMWindow::getSelection(bool) { return {}; }
 void DRMWindow::setSelection(string, bool) {}
 

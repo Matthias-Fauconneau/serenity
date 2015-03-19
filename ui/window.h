@@ -16,7 +16,7 @@ struct Window : Poll {
 	/// Background color
 	bgr3f backgroundColor = white;
 	/// Current cursor
-	Cursor cursor = Cursor::Arrow;
+	MouseCursor cursor = MouseCursor::Arrow;
 
 	/// Updates to be rendered
 	struct Update { shared<Graphics> graphics; int2 origin = 0, size = 0; explicit operator bool() { return size.x || size.y; } };
@@ -42,7 +42,7 @@ struct Window : Poll {
 	/// Immediately renders the first pending update to target
 	Update render(const Image& target);
 
-	virtual void setCursor(Cursor cursor) abstract;
+	virtual void setCursor(MouseCursor cursor) abstract;
 	virtual String getSelection(bool clipboard) abstract;
 	virtual void setSelection(string selection, bool clipboard) abstract;
 };
@@ -105,7 +105,7 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
 
 	// Display
     void event() override;
-	void setCursor(::Cursor cursor) override;
+	void setCursor(MouseCursor cursor) override;
 
 	// IPC
 	/// Gets current text selection
@@ -125,7 +125,7 @@ struct DRMWindow : Window {
 
 	// Display
 	void event() override;
-	void setCursor(Cursor cursor) override;
+	void setCursor(MouseCursor cursor) override;
 
 	// Input
 	void mouseEvent(int2, ::Event, Button);
