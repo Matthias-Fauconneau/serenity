@@ -95,7 +95,6 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 		uint16 previous=spaceIndex;
 		int previousRightOffset = 0; // Hinted kerning
 
-		log(text);
 		for(size_t sourceIndex=0; sourceIndex<text.size; sourceIndex++) {
 			uint c = text[sourceIndex];
 			// Breaking whitespace

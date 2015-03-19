@@ -17,6 +17,7 @@ inline String stack(string s) { return char(TextFormat::Stack) + s + char(TextFo
 inline String fraction(string s) { return char(TextFormat::Fraction) + s + char(TextFormat::End); }
 inline String link(string s, string id) { return char(TextFormat::Link) + id + '\0' + s + char(TextFormat::End); }
 inline buffer<uint> color(ref<uint> s, bgr3f bgr) { return uint(TextFormat::Color) + cast<uint>((ref<float>)bgr) + s + uint(TextFormat::End); }
+inline buffer<uint> color(string s, bgr3f bgr) { return s ? color(toUCS4(s), bgr) : buffer<uint>(); }
 
 /// Layouts formatted text with wrapping, justification and links
 struct TextLayout {

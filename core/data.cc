@@ -33,9 +33,9 @@ bool Data::match(const ref<uint8> key) {
     if(wouldMatch(key)) { advance(key.size); return true; }
     else return false;
 }
-bool Data::match(const string key) {
-    if(wouldMatch(key)) { advance(key.size); return true; }
-    else return false;
+string Data::match(const string key) {
+    if(wouldMatch(key)) { advance(key.size); return key; }
+    else return {};
 }
 
 String escape(char c) {
@@ -48,7 +48,7 @@ void Data::skip(const uint8 key) {
     if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(peek())+'\'');
 }
 void Data::skip(const char key) {
-    if(!match(key)) error("Expected '"+escape(key)+"', got '"+peek()+'\'', data.slice(index));
+    if(!match(key)) error("Expected '"+escape(key)+"', got '"+peek()+'\'', peek(16));
 }
 
 void Data::skip(const ref<uint8> key) {
@@ -75,8 +75,8 @@ void TextData::advance(size_t step) {
 
 char TextData::wouldMatchAny(const string any) {
     if(!available(1)) return false;
-    byte c=peek();
-    for(const byte& e: any) if(c == e) return c;
+    char c = peek();
+    for(char e: any) if(c == e) return c;
     return 0;
 }
 
@@ -98,8 +98,8 @@ string TextData::matchAny(const ref<string> keys) {
 }
 
 bool TextData::matchNo(const string any) {
-    byte c=peek();
-    for(const byte& e: any) if(c == e) return false;
+    char c = peek();
+    for(char e: any) if(c == e) return false;
     advance(1); return true;
 }
 
@@ -162,15 +162,17 @@ string TextData::line() { return until('\n'); }
 
 string TextData::word(const string special) {
     uint start=index;
-    while(available(1)) { byte c=peek(); if(!(c>='a'&&c<='z' ) && !(c>='A'&&c<='Z') && !special.contains(c)) break; advance(1); }
+    while(available(1)) { char c = peek(); if(!(c>='a'&&c<='z' ) && !(c>='A'&&c<='Z') && !special.contains(c)) break; advance(1); }
     assert(index>=start, line());
     return slice(start,index-start);
 }
 
 string TextData::identifier(const string special) {
     uint start=index;
+    char c = peek();
+    if(c>='0'&&c<='9') return {};
     while(available(1)) {
-	byte c=peek();
+	char c = peek();
 	if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||special.contains(c))) break;
 	advance(1);
     }
@@ -178,7 +180,7 @@ string TextData::identifier(const string special) {
 }
 
 char TextData::character() {
-    byte c = next();
+    char c = next();
     if(c!='\\') return c;
     c = peek();
     int i="\'\"nrtbf()\\"_.indexOf(c);
@@ -232,7 +234,7 @@ string TextData::whileDecimal() {
     uint start=index;
     matchAny("-+");
     if(!match("∞")) for(bool gotDot=false, gotE=false;available(1);) {
-	byte c=peek();
+	char c = peek();
 	/**/  if(c=='.') { if(gotDot||gotE) break; gotDot=true; advance(1); }
 	else if(c=='e' || c=='E') { if(gotE) break; gotE=true; advance(1); if(peek()=='-' || peek()=='+') advance(1); }
 	else if(c>='0'&&c<='9') advance(1);

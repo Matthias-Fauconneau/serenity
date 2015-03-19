@@ -6,6 +6,7 @@
 //__attribute((no_instrument_function))
 #define unused __attribute((unused))
 #define packed __attribute((packed))
+#define warn __attribute__((warn_unused_result))
 #define Type typename
 #define generic template<Type T>
 #define abstract =0
@@ -41,7 +42,7 @@ generic struct remove_reference { typedef T type; };
 generic struct remove_reference<T&> { typedef T type; };
 generic struct remove_reference<T&&> { typedef T type; };
 /// Allows move assignment
-generic inline notrace constexpr Type remove_reference<T>::type&& __attribute__((warn_unused_result)) move(T&& t)
+generic inline notrace constexpr Type remove_reference<T>::type&& warn move(T&& t)
 { return (Type remove_reference<T>::type&&)(t); }
 /// Swap values (using move semantics as necessary)
 generic inline notrace void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
@@ -50,7 +51,7 @@ generic constexpr T&& forward(Type remove_reference<T>::type& t) { return (T&&)t
 /// Forwards moveable values
 generic constexpr T&& forward(Type remove_reference<T>::type&& t){static_assert(!is_lvalue_reference<T>::value,""); return (T&&)t; }
 /// Base template for explicit copy (overriden by explicitly copyable types)
-generic T __attribute__((warn_unused_result)) copy(const T& o) { return o; }
+generic T warn copy(const T& o) { return o; }
 
 /// Reference type with move semantics
 generic struct handle {
@@ -173,6 +174,7 @@ generic struct Ref {
 
     /// Slices a reference to elements from \a pos to \a pos + \a size
 	notrace ref<T> slice(size_t pos, size_t size) const;
+	notrace ref<T> sliceRange(size_t begin, size_t end) const;
     /// Slices a reference to elements from \a pos to the end of the reference
 	notrace ref<T> slice(size_t pos) const;
 
@@ -247,6 +249,7 @@ template<> void error(const string& message) __attribute((noreturn));
 // -- ref
 generic notrace const T& Ref<T>::at(size_t i) const { assert(i<size, i, size); return data[i]; }
 generic notrace ref<T> Ref<T>::slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos, size); }
+generic notrace ref<T> Ref<T>::sliceRange(size_t begin, size_t end) const { assert(end<=this->size); return ref<T>(data+begin, end-begin); }
 generic notrace ref<T> Ref<T>::slice(size_t pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
 
 // -- FILE

@@ -16,34 +16,35 @@ struct Data {
     Data(){}
     /// Creates a Data interface to a \a ref
     explicit Data(ref<byte> data) : data(data) {}
-	/// Creates a Data interface to a \a buffer
-	Data(::buffer<byte>&& buffer) : Data(buffer) { this->buffer=move(buffer); }
+    /// Creates a Data interface to a \a buffer
+    Data(::buffer<byte>&& buffer) : Data(buffer) { this->buffer=move(buffer); }
     /// Slices a reference to the buffer from \a index to \a index + \a size
-	notrace ref<byte> slice(size_t pos, size_t size) const { return data.slice(pos,size); }
+    notrace ref<byte> slice(size_t pos, size_t size) const { return data.slice(pos,size); }
+    notrace ref<byte> sliceRange(size_t begin, size_t end) const { return data.sliceRange(begin, end); }
     /// Slices a reference to the buffer from \a index to the end of the data
-	notrace ref<byte> slice(size_t pos) const { return data.slice(pos); }
+    notrace ref<byte> slice(size_t pos) const { return data.slice(pos); }
 
     /// Buffers \a need bytes (if overridden) and returns number of bytes available
-	/*virtual*/ notrace size_t available(size_t /*need*/) { return data.size-index; }
+    /*virtual*/ notrace size_t available(size_t /*need*/) { return data.size-index; }
     /// Returns true if there is data to read
     explicit operator bool() { return available(1); }
 
     /// Returns next byte without advancing
-	notrace byte peek() const { assert(index<data.size, index, data.size); return data[index];}
+    notrace byte peek() const { assert(index<data.size, index, data.size); return data[index];}
     /// Peeks at data without advancing
     byte operator[](int i) const { assert(index+i<data.size); return data[index+i]; }
     /// Returns a reference to the next \a size bytes
-	notrace ref<byte> peek(size_t size) const { return slice(index,size); }
+    notrace ref<byte> peek(size_t size) const { return slice(index,size); }
 
     /// Advances \a count bytes
     virtual void advance(size_t step) {assert(index+step<=data.size,index,step,data.size); index+=step; }
     /// Returns next byte and advance one byte
     byte next() { byte b=peek(); advance(1); return b; }
     /// Returns a reference to the next \a size bytes and advances \a size bytes
-	ref<byte> read(size_t size) { ref<byte> t = peek(size); advance(size); return t; }
+    ref<byte> read(size_t size) { ref<byte> t = peek(size); advance(size); return t; }
 
     /// Reads until the end of input
-	ref<byte> untilEnd() { size_t size=available(-1); return read(size); }
+    ref<byte> untilEnd() { size_t size=available(-1); return read(size); }
 
     /// Returns whether input match \a key
     bool wouldMatch(uint8 key);
@@ -63,7 +64,7 @@ struct Data {
     /// If input match \a key, advances \a index by \a key size
     bool match(const ref<uint8> key);
     /// If input match \a key, advances \a index by \a key size
-    bool match(const string key);
+    string match(const string key);
 
     /// Asserts stream matches \a key and advances \a key length bytes
     void skip(uint8 key);
@@ -136,14 +137,14 @@ struct TextData : Data {
     /// 1-based line index
     int lineIndex = 1;
 
-	/// Creates a TextData interface to a \a ref
-	/// \note Matches any heading Unicode BOM
+    /// Creates a TextData interface to a \a ref
+    /// \note Matches any heading Unicode BOM
     explicit TextData(ref<byte> data);
-	/// Creates a Data interface to a \a buffer
-	/// \note Matches any heading Unicode BOM
-	TextData(::buffer<byte>&& buffer) : TextData(buffer) { this->buffer=move(buffer); }
+    /// Creates a Data interface to a \a buffer
+    /// \note Matches any heading Unicode BOM
+    TextData(::buffer<byte>&& buffer) : TextData(buffer) { this->buffer=move(buffer); }
 
-	notrace void advance(size_t step) override;
+    notrace void advance(size_t step) override;
 
     /// Returns whether input match any of \a keys
     char wouldMatchAny(const string any);
@@ -180,15 +181,15 @@ struct TextData : Data {
     /// Reads one possibly escaped character
     char character();
     /// Reads a word [a-zA-Z/special/]+
-	string word(const string special=""_);
+    string word(const string special=""_);
     /// Reads a identifier [a-zA-Z0-9/special/]*
-	string identifier(const string special=""_);
+    string identifier(const string special=""_);
     /// isInteger [0-9]
     bool isInteger(int base=10);
     /// Matches [-+]?[0-9]*
     string whileInteger(bool sign=false, int base=10);
     /// Reads an integer
-	int integer(bool sign=true, int base=10);
+    int integer(bool sign=true, int base=10);
     /// Reads a signed integer, return defaultValue if fails
     int mayInteger(int defaultValue=-1);
     /// Matches [-+]?[0-9]*\.[0-9]*
