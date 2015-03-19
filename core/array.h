@@ -24,23 +24,23 @@ generic struct array : buffer<T> {
     explicit array(size_t capacity) { reserve(capacity); }
 
     // -- Variable capacity
-    /// Allocates enough memory for \a capacity elements
-    void reserve(size_t nextCapacity) {
-	assert(nextCapacity>=size);
-	if(nextCapacity>capacity) {
-	    nextCapacity = max(nextCapacity, capacity*2); // Amortizes reallocation
-	    if(capacity) {
-		data = (T*)realloc((T*)data, nextCapacity*sizeof(T)); // Reallocates heap buffer (copy is done by allocator if necessary)
-	    } else {
-		const T* data = 0;
-		if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error("Out of memory"); // TODO: move compatible realloc
-		swap(data, this->data);
-		assert_(!size); //mref<T>::move(mref<T>((T*)data, size));
-		if(capacity) free((void*)data);
-	    }
-	    capacity = nextCapacity;
+	/// Allocates enough memory for \a capacity elements
+	void reserve(size_t nextCapacity) {
+		assert(nextCapacity>=size);
+		if(nextCapacity>capacity) {
+			nextCapacity = max(nextCapacity, capacity*2); // Amortizes reallocation
+			if(capacity) {
+				data = (T*)realloc((T*)data, nextCapacity*sizeof(T)); // Reallocates heap buffer (copy is done by allocator if necessary)
+			} else {
+				const T* data = 0;
+				if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error("Out of memory"); // TODO: move compatible realloc
+				swap(data, this->data);
+				assert_(!size); //mref<T>::move(mref<T>((T*)data, size));
+				if(capacity) free((void*)data);
+			}
+			capacity = nextCapacity;
+		}
 	}
-    }
     /// Sets the array size to \a size and destroys removed elements
     void shrink(size_t nextSize) { assert(capacity && nextSize<=size); for(size_t i: range(nextSize,size)) data[i].~T(); size=nextSize; }
     /// Removes all elements

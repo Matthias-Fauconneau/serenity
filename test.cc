@@ -15,10 +15,10 @@ struct Parser : TextData {
 	const bgr3f keyword = yellow/2.f;
 	const bgr3f module = green/2.f;
 	const bgr3f typeDeclaration = magenta/2.f;
-	const bgr3f typeUse = black; // TODO: disambiguate with variable uses
+	const bgr3f typeUse = magenta/2.f;
 	const bgr3f variableDeclaration = red/2.f;
 	const bgr3f variableUse = black;
-	// TODO: member use
+	const bgr3f memberUse = red/2.f;
 	const bgr3f stringLiteral = green/2.f;
 	const bgr3f numberLiteral = blue/2.f;
 	const bgr3f comment = green/2.f;
@@ -32,6 +32,17 @@ struct Parser : TextData {
 	void push() { stack.append({index, target.size}); }
 	bool backtrack() { State state = stack.pop(); index=state.source; target.size=state.target; return false; }
 	bool commit() { stack.pop(); return true; }
+
+	struct Scope {
+		bool struct_ = false;
+		array<string> types, variables;
+	};
+	array<Scope> scopes;
+	//const Scope* topStructScope() { for(const Scope& scope: scopes.reverse()) if(scope.struct_) return &scope; return 0; }
+	const Scope* findVariable(string name) {
+		for(const Scope& scope: scopes.reverse()) if(scope.variables.contains(name)) return &scope;
+		return 0;
+	}
 
 	bool space() {
 		for(;;) {
@@ -78,25 +89,26 @@ struct Parser : TextData {
 		return false;
 	}
 
-	bool id(bgr3f color=black) { // unqualified identifier
+	string name(bgr3f color=black) { // unqualified identifier
 		space();
 		size_t begin = index;
 		string identifier = TextData::identifier("_"_); // FIXME
-		if(!identifier) return false;
-		if(keywords.contains(identifier)) { index=begin; return false; }
+		if(!identifier) return {};
+		if(keywords.contains(identifier)) { index=begin; return {}; }
 		target.append(::color(identifier, color));
-		return true;
+		return data.sliceRange(begin, index);
 	}
 
-	bool identifier(bgr3f color=black) {
+	string identifier(bgr3f color=black) { // qualified identifier (may explicits scopes)
+		size_t begin = index;
 		if(match("::")) {
-			if(!id(color)) error(":: id");
-			while(match("::")) if(!id(color)) error(":: id");
-			return true;
+			if(!name(color)) error(":: name");
+			while(match("::")) if(!name(color)) error(":: name");
+			return data.sliceRange(begin, index);
 		}
-		if(!id(color)) return false;
-		while(match("::")) if(!id(color)) error(":: id");
-		return true;
+		if(!name(color)) return {};
+		while(match("::")) if(!name(color)) error(":: name");
+		return data.sliceRange(begin, index);
 	}
 
 	bool preprocessorExpression() { // TODO
@@ -115,17 +127,17 @@ struct Parser : TextData {
 		return true;
 	}
 
-
-
 	bool struct_() {
 		if(!matchID("struct", keyword)) return false;
 		identifier(typeDeclaration);
 		if(match(":")) identifier(typeUse);
 		if(!match("{")) error("struct");
+		scopes.append({true,{},{}});
 		while(!match("}")) {
 			if(declaration() || constructor()) {}
 			else error("struct");
 		}
+		scopes.pop();
 		return true;
 	}
 
@@ -150,15 +162,22 @@ struct Parser : TextData {
 	}
 
 	bool referenceValue() {
-		if(type()) {
-			if(initializer_list()) return true;
-			return true; // variable parsed as type //else error("referenceValue");
+		push();
+		if(type() && initializer_list()) return commit();
+		backtrack();
+		push();
+		string name = identifier(variableUse);
+		if(!name) return backtrack();
+		if(findVariable(name) && findVariable(name)->struct_) {
+			backtrack();
+			identifier(memberUse);
+			return true;
 		}
-		return identifier();
+		return commit();
 	}
 
-	bool dot() {
-		if(wouldMatch("...") || !match(".")) return false;
+	bool member() {
+		if(!((!wouldMatch("...") && match(".")) || match("->"))) return false;
 		if(!identifier(variableUse)) error("operator.");
 		return true;
 	}
@@ -224,8 +243,14 @@ struct Parser : TextData {
 			}
 			else if(string_literal()) {}
 			else if(match("(")) {
-				if(!expression()) error("( expression");
-				if(!match(")")) error("expression )");
+				if(expression()) {
+					if(!match(")")) error("expression )");
+				}
+				else if(type()) {
+					if(!match(")")) error("type )");
+					expression();
+				}
+				else error("( type | expression");
 			}
 			else if(initializer_list()) {}
 			else if(matchID("this", keyword)) {}
@@ -233,7 +258,7 @@ struct Parser : TextData {
 		}
 
 		for(;;) {
-			if(dot() || call() || matchID("_") || matchAny({"++","--"})) continue; // expression postfix
+			if(member() || call() || matchID("_") || matchAny({"++","--"})) continue; // expression postfix
 			// expression binary expression
 			if(binary()) {
 				if(!expression()) error("binary expression");
@@ -258,7 +283,9 @@ struct Parser : TextData {
 		if(!type()) return backtrack();
 		if(parameter) { if(match("&&")) {} }
 		match("..."); // FIXME
-		if(!identifier(variableDeclaration)) return backtrack();
+		string variableName = name(variableDeclaration);
+		if(!variableName) return backtrack();
+		scopes.last().variables.append(variableName);
 		if(!parameter) while(match(",")) { if(!identifier(variableDeclaration)) error("variable"); }
 		if(initializer_list()) {}
 		else if(match("=")) {
@@ -338,7 +365,7 @@ struct Parser : TextData {
 	}
 
 	bool for_() {
-		if(!matchID("for")) return false;
+		if(!matchID("for", keyword)) return false;
 		if(!match("(")) error("for (");
 		bool range = false;
 		if(variable()) {
@@ -457,6 +484,7 @@ struct Parser : TextData {
 
 
 	Parser(string source) : TextData(source) {
+		scopes.append();
 		space();
 		while(available(1)) {
 			if(include() || define() || condition() || declaration()) {}
