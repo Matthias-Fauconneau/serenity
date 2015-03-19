@@ -26,6 +26,7 @@ struct Cursor {
 	Cursor(size_t line, size_t column) : line(line), column(column) {}
 	bool operator ==(const Cursor& o) const { return line==o.line && column==o.column; }
 	bool operator <(const Cursor& o) const { return line<o.line || (line==o.line && column<o.column); }
+	bool operator <=(const Cursor& o) const { return line<o.line || (line==o.line && column<=o.column); }
 };
 struct Link { Cursor begin,end; buffer<uint> identifier;};
 

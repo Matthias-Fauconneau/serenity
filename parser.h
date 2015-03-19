@@ -223,7 +223,7 @@ struct Parser : TextData {
 	bool expression() {
 		if(referenceValue()) {
 			// referenceValue = expression
-			if(match("=")) {
+			if(!wouldMatch("==") && match("=")) {
 				if(!expression()) error("! expression");
 				return true;
 			}
@@ -258,9 +258,11 @@ struct Parser : TextData {
 			}
 			else if(initializer_list()) {}
 			else if(matchID("this", keyword)) {}
-			else if(match("[]")) {
+			else if(match("[")) {
+				matchID("this", keyword);
+				if(!match("]")) error("lambda ]");
 				if(!parameters()) scopes.append();
-				if(!block()) error("lambda");
+				if(!block()) error("lambda {");
 				scopes.pop();
 			}
 			else return false;
@@ -292,7 +294,7 @@ struct Parser : TextData {
 		if(!type()) return backtrack();
 		if(parameter) { if(match("&&")) {} }
 		match("..."); // FIXME
-		uint location = index;
+		uint location = target.size;
 		string variableName = name(variableDeclaration);
 		if(!variableName) return backtrack();
 		scopes.last().variables.insert(variableName, fileName+location);

@@ -149,14 +149,14 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 					while(text[sourceIndex]) sourceIndex++;
 					link.identifier = copyRef(text.sliceRange(start, sourceIndex));
 					// 0
-					link.begin = {lines.size, column};
+					link.begin = {glyphs.size, column};
 				}
 				else error("Unknown format", uint(format));
 			}
 			// Pop format context
 			else if(TextFormat(c)==TextFormat::End) {
 				if(format==TextFormat::Link) {
-					link.begin = {lines.size, column};
+					link.end = {glyphs.size, column};
 					links.append(move(link));
 					link = Link();
 				}

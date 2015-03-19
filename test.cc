@@ -31,10 +31,20 @@ struct ScrollTextEdit : ScrollArea {
 	}
 };
 
-struct Test {
-	ScrollTextEdit text {move(Parser("test.cc").target)};
-	Test() {
-		text.edit.linkActivated = [](ref<uint> identifier) { log(identifier); };
+struct ModuleEdit : ScrollTextEdit {
+	String fileName;
+	ModuleEdit(string fileName) : ScrollTextEdit(move(Parser(fileName).target)), fileName(copyRef(fileName)) {
+		edit.linkActivated = [this](ref<uint> identifier) {
+			String fileName = toUTF8(identifier.slice(0, identifier.size-1));
+			size_t index = identifier.last();
+			assert_(fileName == this->fileName, "TODO: multiple file navigation");
+			edit.cursor = edit.cursorFromIndex(index);
+			ensureCursorVisible();
+		};
 	}
-	unique<Window> window = ::window(&text, 1024);
-} test;
+};
+
+struct ModuleEditApplication {
+	ModuleEdit moduleEdit {"test.cc"};
+	unique<Window> window = ::window(&moduleEdit, 1024);
+} app;

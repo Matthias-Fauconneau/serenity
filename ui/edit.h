@@ -10,6 +10,7 @@ struct TextEdit : Text {
 	array<State> history;
 	enum class Edit { Point, Delete, Backspace, Insert } lastEdit = Edit::Point;
 	size_t historyIndex = 0;
+	array<Cursor> cursorHistory;
 
 	/// \a Cursor to source text index
 	size_t index(Cursor cursor) const;

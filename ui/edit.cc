@@ -87,21 +87,19 @@ Cursor TextEdit::cursorFromPosition(vec2 size, vec2 position) {
 /// TextEdit
 bool TextEdit::mouseEvent(vec2 position, vec2 size, Event event, Button button, Widget*& focus) {
 	setCursor(MouseCursor::Text);
-	focus=this;
-	bool cursorChanged = false;
+	focus = this;
+	Cursor previousCursor = this->cursor;
 	if((event==Press && (button==LeftButton || button==RightButton)) || (event==Motion && button==LeftButton)) {
-		Cursor cursor = cursorFromPosition(size, position);
-		cursorChanged = (cursor != this->cursor);
-		this->cursor = cursor;
-		if(event==Press) selectionStart = cursor;
+		cursor = cursorFromPosition(size, position);
 	}
-	if(event==Press && button==LeftButton /*FIXME: && !(modifiers&Shift)*/) { selectionStart = cursor; return true; }
 	if(event==Release) {
 		if(button==LeftButton) {
 			Cursor min, max;
 			if(selectionStart < cursor) min=selectionStart, max=cursor; else min=cursor, max=selectionStart;
 			if(cursor != selectionStart) setSelection(toUTF8(text.sliceRange(index(min),index(max))), false);
-			else for(const Link& link: lastTextLayout.links) if(link.begin<cursor && cursor<link.end) { linkActivated(link.identifier); return true; }
+			else for(const Link& link: lastTextLayout.links) {
+				if(link.begin<=cursor && cursor<link.end) { cursorHistory.append(cursor); linkActivated(link.identifier); break; }
+			}
 		}
 		if(button==MiddleButton) {
 			array<uint32> selection = toUCS4(getSelection(false));
@@ -110,11 +108,15 @@ bool TextEdit::mouseEvent(vec2 position, vec2 size, Event event, Button button, 
 			lastTextLayout = TextLayout();
 			if(textChanged) textChanged(toUTF8(text));
 			this->layout(size.x ? min<float>(wrap, size.x) : wrap);
-			selectionStart = cursor = cursorFromIndex(index+selection.size);
+			cursor = cursorFromIndex(index+selection.size);
 			return true;
 		}
 	}
-	return cursorChanged;
+	if(cursor == previousCursor) return false;
+	/*if(!(modifiers&Shift)) FIXME*/ selectionStart = cursor;
+	history.last().cursor = cursor;
+	lastEdit=Edit::Point;
+	return true;
 }
 
 bool TextEdit::keyPress(Key key, Modifiers modifiers) {
@@ -167,12 +169,22 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 			else error("");
 		}
 		else if(key==LeftArrow)  {
-			if(cursor.column>0) cursor.column--;
-			else if(cursor.line>0) { cursor.line--, cursor.column = lineStops(lines[cursor.line]).size; }
+			if(modifiers&Alt) { // Back
+				if(cursorHistory) cursor = cursorHistory.pop();
+			} else {
+				if(cursor.column>0) cursor.column--;
+				else if(cursor.line>0) { cursor.line--, cursor.column = lineStops(lines[cursor.line]).size; }
+			}
 		}
 		else if(key==RightArrow) {
-			if(cursor.column<line.size) cursor.column++;
-			else if(cursor.line<lines.size-1) cursor.line++, cursor.column = 0;
+			if(modifiers&Alt) { // Forward
+				for(const Link& link: lastTextLayout.links) {
+					if(link.begin<=cursor && cursor<link.end) { cursorHistory.append(cursor); linkActivated(link.identifier); break; }
+				}
+			} else {
+				if(cursor.column<line.size) cursor.column++;
+				else if(cursor.line<lines.size-1) cursor.line++, cursor.column = 0;
+			}
 		}
 		else error("");
 		if(!(modifiers&Shift)) selectionStart = cursor;
