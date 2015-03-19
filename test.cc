@@ -22,7 +22,7 @@ struct Parser : TextData {
 
 	array<uint> target;
 
-	template<Type... Args> void error(const Args&... args) { ::error(args..., "'"+peek(16)+"'"); }
+	template<Type... Args> void error(const Args&... args) { ::error(args..., "'"+slice(index-16,16)+"|"+peek(16)+"'"); }
 
 	bool space() {
 		for(;;) {
@@ -42,9 +42,25 @@ struct Parser : TextData {
 		}
 		return true;
 	}
-	bool match(string key, bgr3f color=black) { return target.append(::color(TextData::match(key), color)); }
-	bool matchAny(ref<string> key, bgr3f color=black) { return target.append(::color(TextData::matchAny(key), color)); }
+	bool match(string key, bgr3f color=black) {
+		space();
+		return target.append(::color(TextData::match(key), color));
+	}
+	bool matchID(string key, bgr3f color=black) {
+		space();
+		if(available(key.size)>key.size) {
+			char c = peek(key.size+1).last();
+			if((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||"_"_.contains(c)) return false;
+		}
+		return target.append(::color(TextData::match(key), color));
+	}
+	bool matchAnyID(ref<string> any, bgr3f color=black) {
+		space();
+		for(string key: any) if(matchID(key, color)) return true;
+		return false;
+	}
 	bool identifier(bgr3f color=black) {
+		space();
 		size_t begin = index;
 		string identifier = TextData::identifier("_:"_); // FIXME
 		if(!identifier) return false;
@@ -61,24 +77,71 @@ struct Parser : TextData {
 	bool templateArguments() {
 		if(match("<")) {
 			while(!match(">")) {
-				space();
 				if(identifier(typeUse)) {}
 				else error("templateArguments"_);
-				space();
 				match(",");
 			}
 		}
 		return true;
 	}
+
 	bool warn type() {
-		if(matchAny(ref<string>{"void"_,"bool"_})) return true;
+		if(matchAnyID(ref<string>{"void"_,"bool"_})) return true;
 		if(!identifier(typeUse)) return false;
-		space();
 		templateArguments();
 		return true;
 	}
+
+	bool reference() {
+		return identifier();
+	}
+
+	bool dot() {
+		if(wouldMatch("...") || !match(".")) return false;
+		if(!identifier(variableUse)) error("operator.");
+		return true;
+	}
+
+	bool call() {
+		if(!match("(")) return false;
+		while(!match(")")) {
+			if(expression()) {}
+			else error("operator() arguments"_);
+			match("..."); // FIXME
+			match(",");
+		}
+		return true;
+	}
+
 	bool expression() {
-		if(match("\"")) { // string literal
+		if(reference()) {
+			// reference = expression
+			if(match("=")) {
+				if(!expression()) error("! expression");
+			}
+			// reference postfix
+			while(dot() || call()) {}
+			return true;
+		}
+
+		// prefix !
+		if(match("!")) {
+			if(!expression()) error("! expression");
+			return true;
+		}
+
+		// value
+		if(matchID("true", numberLiteral) || matchID("false", numberLiteral)) {}
+		else if(target.append(color(whileDecimal(), numberLiteral))) {}
+		else if(match("\'")) { // character literal
+			size_t start = index;
+			while(!TextData::match('\'')) {
+				if(TextData::match('\\')) advance(1);
+				else advance(1);
+			}
+			target.append(color(sliceRange(start, index), stringLiteral));
+		}
+		else if(match("\"")) { // string literal
 			size_t start = index;
 			while(!TextData::match('"')) {
 				if(TextData::match('\\')) advance(1);
@@ -86,42 +149,25 @@ struct Parser : TextData {
 			}
 			target.append(color(sliceRange(start, index), stringLiteral));
 		}
-		else if(identifier()) {}
-		else if(target.append(color(whileDecimal(), numberLiteral))) {}
 		else return false;
-		while(!wouldMatch("...") && match(".")) {
-			if(!identifier(variableUse)) error("operator.");
-		}
-		if(match("(")) {
-			while(!match(")")) {
-				space();
-				if(expression()) {}
-				else error("operator() arguments"_);
-				space();
-				if(match("...")) space(); // FIXME
-				match(",");
-			}
-		}
+
+		// value postfix
+		while(dot() || call()) {}
+
 		return true;
 	}
 	bool warn variable() {
 		size_t begin = index;
-		match("const", keyword);
-		space();
+		matchID("const", keyword);
 		if(!type()) { index=begin; return false; }
-		space();
-		if(match("&")) space();
-		if(match("...")) space(); // FIXME
+		match("&");
+		match("...");
 		if(!identifier(variableDeclaration)) { index=begin; return false; }
-		space();
 		if(match("=")) {
-			space();
 			if(match("{")) {
 				while(!match("}")) {
-					space();
 					if(expression()) {}
 					else error("initializer list");
-					space();
 					match(",");
 				}
 			} else if(expression()) {}
@@ -133,31 +179,96 @@ struct Parser : TextData {
 	bool templateParameters() {
 		if(match("<")) {
 			while(!match(">")) {
-				space();
-				if(match("Type..."_, keyword)) space();
+				match("Type..."_, keyword);
 				if(identifier(typeDeclaration)) {}
 				else error("templateParameters"_);
-				space();
 				match(",");
 			}
 		}
 		return true;
 	}
 	bool templateDeclaration() {
-		if(!match("template", keyword)) return false;
+		if(!matchID("template", keyword)) return false;
 		templateParameters();
 		return true;
 	}
 
-	bool statement() {
-		if(match("return ")) {
-			if(!expression()) error("statement");
-			if(!match(";")) error("Return statement end ;");
+	bool block() {
+		if(!match("{")) return false;
+		while(!match("}")) statement();
+		return true;
+	}
+
+	bool return_() {
+		if(!matchID("return", keyword)) return false;
+		if(!expression()) error("return expression");
+		if(!match(";")) error("return ;");
+		return true;
+	}
+
+	bool continue_() {
+		if(!loop) return false;
+		if(!matchID("continue", keyword)) return false;
+		if(!match(";")) error("continue ;");
+		return true;
+	}
+
+	bool break_() {
+		if(!loop) return false;
+		if(!matchID("break", keyword)) return false;
+		if(!match(";")) error("break ;");
+		return true;
+	}
+
+	bool if_() {
+		if(!matchID("if", keyword)) return false;
+		if(!match("(")) error("if statement (");
+		if(!expression()) error("if expression");
+		if(!match(")")) error("if statement )");
+		if(!(block() || expression() || if_() || for_() || return_() || continue_() || break_())) error("if body");
+		if(matchID("else")) if(!(block() || expression() || if_() || for_() || return_())) error("else body");
+		return true;
+	}
+
+	int loop = 0;
+	bool while_() {
+		if(!matchID("while", keyword)) return false;
+		if(!match("(")) error("while (");
+		expression();
+		if(!match(")")) error("while )");
+		loop++;
+		if(!(block() || expression() || if_() || for_())) error("while body");
+		loop--;
+		return true;
+	}
+
+	bool for_() {
+		if(!matchID("for")) return false;
+		if(!match("(")) error("for (");
+		bool range = false;
+		if(variable()) {
+			if(match(":")) range = true;
+		} else expression();
+		if(!range) {
+			if(!match(";")) error("for ;");
+			expression();
+			if(!match(";")) error("for ; ;");
+			expression();
 		}
+		if(!match(")")) error("for )");
+		loop++;
+		if(!(block() || expression() || if_() || for_())) error("for body");
+		loop--;
+		return true;
+	}
+
+	bool statement() {
+		if(if_() || while_() || for_() || return_() || continue_() || break_()) {}
 		else if(declaration()) {}
 		else if(expression()) {
-			if(!match(";")) error("Expression statement end ;");
+			if(!match(";")) error("expression ;");
 		}
+		else if(block()) {}
 		else error("statement");
 		space();
 		return true;
@@ -167,15 +278,15 @@ struct Parser : TextData {
 		size_t begin = index;
 		templateDeclaration();
 		space();
-		if(match("const", keyword)) space();
-		if(!type()) error("return type"_);
+		if(matchID("const", keyword)) space();
+		if(!type()) { index = begin; return false; }
 		space();
 		if(!identifier()) { index = begin; return false; }
 		space();
 		if(!match("(")) { index = begin; return false; }
 		while(!match(")")) {
 			space();
-			if(match("const", keyword)) space();
+			if(matchID("const", keyword)) space();
 			if(variable()) {}
 			else error("function parameters"_);
 			space();
@@ -193,7 +304,7 @@ struct Parser : TextData {
 	}
 
 	bool warn struct_() {
-		if(!match("struct ", keyword)) return false;
+		if(!matchID("struct", keyword)) return false;
 		space();
 		identifier(typeDeclaration);
 		space();
