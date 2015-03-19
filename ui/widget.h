@@ -20,10 +20,10 @@ struct Widget {
     /// Returns graphic elements representing this widget at the given \a size.
     virtual shared<Graphics> graphics(vec2 unused size) { error("Unimplemented, use graphics(size, clip)"); }
     virtual shared<Graphics> graphics(vec2 size, Rect unused clip) { return this->graphics(size); }
-	/// Returns stop position for scrolling
-	/// \arg direction Direction of requested stop (-1: previous, 0: nearest, 1: next)
-	/// \note Defaults to discrete uniform coarse stops
-    virtual float stop(vec2 unused size, int unused axis, float currentPosition, int direction=0) { return currentPosition + direction * 64; }
+    /// Returns stop position for scrolling
+    /// \arg direction Direction of requested stop (-1: previous, 0: nearest, 1: next)
+    /// \note Defaults to discrete uniform coarse stops
+    virtual float stop(vec2 unused size, int unused axis, float currentPosition, int direction) { return currentPosition + direction * 64; }
 
 // Events
     /// Override \a mouseEvent to handle or forward user input

@@ -61,30 +61,36 @@ TextEdit::Cursor TextEdit::cursorFromIndex(size_t targetIndex) {
 	return Cursor(lines.size-1, lineStops(lines.last()).size);  // End of text
 }
 
+TextEdit::Cursor TextEdit::cursorFromPosition(vec2 size, vec2 position) {
+	const TextLayout& layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
+	vec2 textSize = ceil(layout.bbMax - min(vec2(0),layout.bbMin));
+	vec2 offset = max(vec2(0), vec2(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
+	position -= offset;
+	if(position.y < 0) return {0, 0};
+	const auto& lines = lastTextLayout.glyphs;
+	for(size_t lineIndex: range(lines.size)) {
+		if(position.y < (lineIndex*this->size) || position.y > (lineIndex+1)*this->size) continue; // FIXME: Assumes uniform line height
+		const auto line = lineStops(lines[lineIndex]);
+		if(!line) return {lineIndex, line.size};
+		// Before first stop
+		if(position.x <= line[0].center) return {lineIndex, 0};
+		// Between stops
+		for(size_t stop: range(0, line.size-1)) {
+			if(position.x >= line[stop].center && position.x <= line[stop+1].center) return {lineIndex, stop+1};
+		}
+		// After last stop
+		if(position.x >= line.last().center) return {lineIndex, line.size};
+	}
+	return {lines.size-1, lineStops(lines.last()).size};
+}
+
 /// TextEdit
 bool TextEdit::mouseEvent(vec2 position, vec2 size, Event event, Button button, Widget*& focus) {
 	setCursor(::Cursor::Text);
 	focus=this;
 	bool cursorChanged = false;
 	if((event==Press && (button==LeftButton || button==RightButton)) || (event==Motion && button==LeftButton)) {
-		const TextLayout& layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
-		vec2 textSize = ceil(layout.bbMax - min(vec2(0),layout.bbMin));
-		vec2 offset = max(vec2(0), vec2(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
-		position -= offset;
-		Cursor cursor = this->cursor;
-		for(size_t lineIndex: range(layout.glyphs.size)) {
-			if(position.y < (lineIndex*this->size) || position.y > (lineIndex+1)*this->size) continue; // FIXME: Assumes uniform line height
-			const auto line = lineStops(layout.glyphs[lineIndex]);
-			if(!line) continue;
-			// Before first stop
-			if(position.x <= line[0].center) { cursor = Cursor(lineIndex, 0); break; }
-			// Between stops
-			for(size_t stop: range(0, line.size-1)) {
-				if(position.x >= line[stop].center && position.x <= line[stop+1].center) { cursor = Cursor(lineIndex, stop+1); goto break2;/*break 2;*/ }
-			}
-			// After last stop
-			if(position.x >= line.last().center) { cursor = Cursor(lineIndex, line.size); break; }
-		}break2:;
+		Cursor cursor = cursorFromPosition(size, position);
 		cursorChanged = (cursor != this->cursor);
 		this->cursor = cursor;
 		if(event==Press) selectionStart = cursor;
@@ -116,10 +122,17 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 	auto line = lineStops(lines[cursor.line]);
 
 	if(key==UpArrow || key==DownArrow || key==PageUp || key==PageDown) {
-		if(key==UpArrow) { if(cursor.line>0) cursor.line--; }
-		else if(key==DownArrow) { if(cursor.line<lines.size-1) cursor.line++; }
-		else if(key==PageUp) cursor.line = 0;
-		else if(key==PageDown) { if(lines.size) cursor.line = lines.size-1; }
+		int lineIndex = cursor.line;
+		if(key==UpArrow) lineIndex--;
+		else if(key==DownArrow) lineIndex++;
+		else if(key==PageUp || key==PageDown) {
+			const int pageLineCount = lastClip.size().y / size; // Assumes uniform line size
+			if(key==PageUp) lineIndex -= pageLineCount/2;
+			if(key==PageDown) lineIndex += pageLineCount/2;
+		}
+		lineIndex = clamp(0, lineIndex, int(lines.size-1));
+		if(lineIndex == int(cursor.line)) return false;
+		cursor.line = lineIndex;
 		const auto line = lineStops(lines[cursor.line]);
 		if(line) {
 			if(!cursorX) cursorX = cursor.column<line.size ? line[cursor.column].left : line ? line.last().right : 0;
@@ -250,14 +263,16 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 }
 
 vec2 TextEdit::cursorPosition(vec2 size, Cursor cursor) {
-	vec2 textSize = ceil(lastTextLayout.bbMax - min(vec2(0), lastTextLayout.bbMin));
+	const TextLayout& layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
+	vec2 textSize = ceil(layout.bbMax - min(vec2(0), layout.bbMin));
 	vec2 offset = max(vec2(0), vec2(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
-	const auto line = lineStops(lastTextLayout.glyphs[cursor.line]);
+	const auto line = lineStops(layout.glyphs[cursor.line]);
 	float x = cursor.column<line.size ? line[cursor.column].left : line ? line.last().right : 0;
 	return offset+vec2(x,cursor.line*Text::size); // Assumes uniform line heights
 }
 
-shared<Graphics> TextEdit::graphics(vec2 size) {
+shared<Graphics> TextEdit::graphics(vec2 size, Rect clip) {
+	lastClip = clip;
 	shared<Graphics> graphics = Text::graphics(size);
 
 	{Cursor min, max;
@@ -274,6 +289,6 @@ shared<Graphics> TextEdit::graphics(vec2 size) {
 				graphics->fills.append(O, cursorPosition(size, {max.line, max.column})-O+vec2(0,Text::size), black, 1.f/2);}
 		}
 	}
-	if(hasFocus(this)) graphics->fills.append(cursorPosition(size, cursor), vec2(1,Text::size));
+	/*if(hasFocus(this))*/ graphics->fills.append(cursorPosition(size, cursor), vec2(1,Text::size));
 	return graphics;
 }

@@ -7,9 +7,10 @@ struct Parser : TextData {
 	const ref<string> keywords = {
 		"alignas", "alignof", "asm", "auto", "bool", "break", "case", "catch", "char", "char16_t", "char32_t", "class", "const", "constexpr", "const_cast",
 		"continue", "decltype", "default", "delete", "do", "double", "dynamic_cast", "else", "enum", "explicit", "export", "extern", "false", "float", "for",
-		"friend", "goto", "if", "inline", "int", "long", "mutable", "namespace", "new", "noexcept", "nullptr", "operator", "private", "protected", "public",
-		"register", "reinterpret_cast", "return", "short", "signed", "sizeof", "static", "static_assert", "static_cast", "struct", "switch", "template", "this",
-		"thread_local", "throw", "true", "try", "typedef", "typeid", "typename", "union", "unsigned", "using", "virtual", "void", "volatile", "wchar_t", "while"};
+		"friend", "goto", "if", "inline", "int", "long", "mutable", "namespace", "new", "noexcept", "nullptr", "operator", "override", "private", "protected",
+		"public", "register", "reinterpret_cast", "return", "short", "signed", "sizeof", "static", "static_assert", "static_cast", "struct", "switch", "template",
+		"this", "thread_local", "throw", "true", "try", "typedef", "typeid", "typename", "union", "unsigned", "using", "virtual", "void", "volatile", "wchar_t",
+		"while"};
 	const bgr3f preprocessor = blue/2.f;
 	const bgr3f keyword = yellow/2.f;
 	const bgr3f module = green/2.f;
@@ -25,6 +26,12 @@ struct Parser : TextData {
 	array<uint> target;
 
 	template<Type... Args> void error(const Args&... args) { ::error(args..., "'"+slice(index-8,8)+"|"+sliceRange(index,min(data.size,index+8))+"'"); }
+
+	struct State { size_t source, target; };
+	array<State> stack;
+	void push() { stack.append({index, target.size}); }
+	bool backtrack() { State state = stack.pop(); index=state.source; target.size=state.target; return false; }
+	bool commit() { stack.pop(); return true; }
 
 	bool space() {
 		for(;;) {
@@ -108,10 +115,27 @@ struct Parser : TextData {
 		return true;
 	}
 
+
+
+	bool struct_() {
+		if(!matchID("struct", keyword)) return false;
+		identifier(typeDeclaration);
+		if(match(":")) identifier(typeUse);
+		if(!match("{")) error("struct");
+		while(!match("}")) {
+			if(declaration() || constructor()) {}
+			else error("struct");
+		}
+		return true;
+	}
+
 	bool type() {
 		if(matchAnyID(ref<string>{"void"_,"bool"_,"char"_,"int"}, typeUse)) return true; // FIXME: better remove basic types from keywords
+		if(struct_()) return true;
 		if(!identifier(typeUse)) return false;
 		templateArguments();
+		while(match("*")) {}
+		if(!wouldMatch("&&")) match("&");
 		return true;
 	}
 
@@ -182,13 +206,13 @@ struct Parser : TextData {
 			}
 		} else { // value
 			// prefix !
-			if(matchAny({"!","&"})) {
+			if(matchAny({"!","&","-","+"})) {
 				if(!expression()) error("! expression");
 				return true;
 			}
 
 			// value
-			if(matchID("true", numberLiteral) || matchID("false", numberLiteral)) {}
+			if(matchAnyID({"true","false"}, numberLiteral)) {}
 			else if(number()) {}
 			else if(match("\'")) { // character literal
 				size_t start = index;
@@ -204,6 +228,7 @@ struct Parser : TextData {
 				if(!match(")")) error("expression )");
 			}
 			else if(initializer_list()) {}
+			else if(matchID("this", keyword)) {}
 			else return false;
 		}
 
@@ -227,18 +252,12 @@ struct Parser : TextData {
 		return true;
 	}
 
-	struct State { size_t source, target; };
-	array<State> stack;
-	void push() { stack.append({index, target.size}); }
-	bool backtrack() { State state = stack.pop(); index=state.source; target.size=state.target; return false; }
-	bool commit() { stack.pop(); return true; }
-
 	bool variable(bool parameter=false) {
 		push();
 		matchID("const", keyword);
 		if(!type()) return backtrack();
-		match("&");
-		match("...");
+		if(parameter) { if(match("&&")) {} }
+		match("..."); // FIXME
 		if(!identifier(variableDeclaration)) return backtrack();
 		if(!parameter) while(match(",")) { if(!identifier(variableDeclaration)) error("variable"); }
 		if(initializer_list()) {}
@@ -381,6 +400,7 @@ struct Parser : TextData {
 		if(!type()) return backtrack();
 		if(!identifier()) return backtrack();
 		if(!parameters()) return backtrack();
+		matchID("override");
 		if(!block()) error("function");
 		return commit();
 	}
@@ -400,30 +420,14 @@ struct Parser : TextData {
 		return commit();
 	}
 
-	bool struct_() {
-		if(!matchID("struct", keyword)) return false;
-		identifier(typeDeclaration);
-		if(match(":")) identifier(typeUse);
-		if(!match("{")) error("struct");
-		while(!match("}")) {
-			if(declaration() || constructor()) {}
-			else error("struct");
-		}
-		identifier();
-		if(!match(";")) error("struct"_);
-		return true;
-	}
-
 	bool declaration() {
 		if(function()) return true;
-		if(struct_()) return true;
-		if(variable()) {
+		if(variable() || struct_()) { // FIXME: struct declarations are parsed twice (first try as variable)
 			if(!match(";")) error("declaration"_);
 			return true;
 		}
 		return false;
 	}
-
 
 	bool include() {
 		if(!match("#include", preprocessor)) return false;
@@ -455,7 +459,7 @@ struct Parser : TextData {
 	Parser(string source) : TextData(source) {
 		space();
 		while(available(1)) {
-			if(include() || define() || condition() || struct_()) {}
+			if(include() || define() || condition() || declaration()) {}
 			else error("global", line() ?: peek(16));
 			space();
 		}
@@ -463,6 +467,27 @@ struct Parser : TextData {
 };
 
 struct Test {
-	Scroll<TextEdit> text {move(Parser(readFile("test.cc")).target)};
+	struct ScrollTextEdit : ScrollArea {
+		TextEdit edit;
+
+		ScrollTextEdit(buffer<uint>&& text) : edit(move(text)) {}
+
+		Widget& widget() override { return edit; }
+		bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) {
+			bool contentChanged = ScrollArea::mouseEvent(cursor, size, event, button, focus) || edit.mouseEvent(cursor, size, event, button, focus);
+			focus = this;
+			return contentChanged;
+		}
+		bool keyPress(Key key, Modifiers modifiers) {
+			if(edit.keyPress(key, modifiers) || ScrollArea::keyPress(key, modifiers)) {
+				vec2 size = viewSize;
+				vec2 position = edit.cursorPosition(size, edit.cursor);
+				if(position.y < -offset.y) offset.y = -(position.y);
+				if(position.y+edit.Text::size > -offset.y+size.y) offset.y = -(position.y-size.y+edit.Text::size);
+				return true;
+			}
+			return false;
+		}
+	} text {move(Parser(readFile("test.cc")).target)};
 	unique<Window> window = ::window(&text, 1024);
 } test;

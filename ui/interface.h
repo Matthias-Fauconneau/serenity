@@ -8,16 +8,16 @@
 /// Implements a scrollable area for \a widget
 struct ScrollArea : Widget {
     /// Directions (false: expand, true: scroll)
-    bool horizontal = true, vertical = false;
-    bool scrollbar = false;
-    const float scrollBarWidth = 8;
+	bool horizontal = false, vertical = true;
+	bool scrollbar = true;
+	const float scrollBarWidth = 16;
     vec2 offset = 0;
     vec2 dragStartCursor = 0;
 	vec2 dragStartOffset = 0;
     vec2 viewSize = 0;
 
     /// Overrides \a widget to return the proxied widget
-    virtual Widget& widget() const abstract;
+	virtual Widget& widget() abstract;
 
     vec2 sizeHint(vec2 size) override { return widget().sizeHint(size); }
     shared<Graphics> graphics(vec2 size) override;
@@ -29,7 +29,7 @@ struct ScrollArea : Widget {
 generic struct Scroll : ScrollArea, T {
     using T::T;
     /// Returns a reference to \a T::Widget (for ScrollArea implementation)
-    Widget& widget() const override { return (T&)*this; }
+	Widget& widget() override { return *this; }
     /// Returns a reference to \a ScrollArea::Widget (e.g to add the area to a layout)
     Widget& area() { return (ScrollArea&)*this; }
     /// Returns a reference to \a ScrollArea::Widget (e.g to add the area to a layout)
