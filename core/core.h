@@ -6,7 +6,6 @@
 //__attribute((no_instrument_function))
 #define unused __attribute((unused))
 #define packed __attribute((packed))
-#define warn __attribute__((warn_unused_result))
 #define Type typename
 #define generic template<Type T>
 #define abstract =0
@@ -42,7 +41,7 @@ generic struct remove_reference { typedef T type; };
 generic struct remove_reference<T&> { typedef T type; };
 generic struct remove_reference<T&&> { typedef T type; };
 /// Allows move assignment
-generic inline notrace constexpr Type remove_reference<T>::type&& warn move(T&& t)
+generic inline notrace constexpr Type remove_reference<T>::type&& __attribute((warn_unused_result)) move(T&& t)
 { return (Type remove_reference<T>::type&&)(t); }
 /// Swap values (using move semantics as necessary)
 generic inline notrace void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
@@ -51,7 +50,7 @@ generic constexpr T&& forward(Type remove_reference<T>::type& t) { return (T&&)t
 /// Forwards moveable values
 generic constexpr T&& forward(Type remove_reference<T>::type&& t){static_assert(!is_lvalue_reference<T>::value,""); return (T&&)t; }
 /// Base template for explicit copy (overriden by explicitly copyable types)
-generic T warn copy(const T& o) { return o; }
+generic T __attribute((warn_unused_result)) copy(const T& o) { return o; }
 
 /// Reference type with move semantics
 generic struct handle {
