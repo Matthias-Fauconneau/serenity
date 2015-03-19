@@ -1,5 +1,6 @@
 #include "data.h"
 #include "edit.h"
+#include "interface.h"
 #include "window.h"
 
 struct Parser : TextData {
@@ -9,16 +10,17 @@ struct Parser : TextData {
 		"friend", "goto", "if", "inline", "int", "long", "mutable", "namespace", "new", "noexcept", "nullptr", "operator", "private", "protected", "public",
 		"register", "reinterpret_cast", "return", "short", "signed", "sizeof", "static", "static_assert", "static_cast", "struct", "switch", "template", "this",
 		"thread_local", "throw", "true", "try", "typedef", "typeid", "typename", "union", "unsigned", "using", "virtual", "void", "volatile", "wchar_t", "while"};
-	const bgr3f preprocessor = blue;
-	const bgr3f keyword = yellow;
-	const bgr3f module = green;
-	const bgr3f typeDeclaration = magenta;
-	const bgr3f typeUse = magenta;
-	const bgr3f variableDeclaration = magenta;
+	const bgr3f preprocessor = blue/2.f;
+	const bgr3f keyword = yellow/2.f;
+	const bgr3f module = green/2.f;
+	const bgr3f typeDeclaration = magenta/2.f;
+	const bgr3f typeUse = black; // TODO: disambiguate with variable uses
+	const bgr3f variableDeclaration = red/2.f;
 	const bgr3f variableUse = black;
-	const bgr3f stringLiteral = green;
-	const bgr3f numberLiteral = blue;
-	const bgr3f comment = green;
+	// TODO: member use
+	const bgr3f stringLiteral = green/2.f;
+	const bgr3f numberLiteral = blue/2.f;
+	const bgr3f comment = green/2.f;
 
 	array<uint> target;
 
@@ -149,7 +151,26 @@ struct Parser : TextData {
 	}
 
 	bool binary() {
-		return matchAny(ref<string>{"==","=","<=","<",">=",">","&&","||"});
+		return matchAny(ref<string>{"==","=","<=","<",">=",">","&&","||","+","-","*","/"});
+	}
+
+	bool number() {
+		size_t begin = index;
+		if(!whileDecimal()) return false;
+		TextData::match("f");
+		target.append(color(sliceRange(begin, index), numberLiteral));
+		return true;
+	}
+
+	bool string_literal() {
+		size_t begin = index;
+		if(!TextData::match("\"")) return false;
+		while(!TextData::match('"')) {
+			if(TextData::match('\\')) advance(1);
+			else advance(1);
+		}
+		target.append(color(sliceRange(begin, index), stringLiteral));
+		return true;
 	}
 
 	bool expression() {
@@ -168,7 +189,7 @@ struct Parser : TextData {
 
 			// value
 			if(matchID("true", numberLiteral) || matchID("false", numberLiteral)) {}
-			else if(target.append(color(whileDecimal(), numberLiteral))) {}
+			else if(number()) {}
 			else if(match("\'")) { // character literal
 				size_t start = index;
 				while(!TextData::match('\'')) {
@@ -177,14 +198,7 @@ struct Parser : TextData {
 				}
 				target.append(color(sliceRange(start, index), stringLiteral));
 			}
-			else if(match("\"")) { // string literal
-				size_t start = index;
-				while(!TextData::match('"')) {
-					if(TextData::match('\\')) advance(1);
-					else advance(1);
-				}
-				target.append(color(sliceRange(start, index), stringLiteral));
-			}
+			else if(string_literal()) {}
 			else if(match("(")) {
 				if(!expression()) error("( expression");
 				if(!match(")")) error("expression )");
@@ -212,18 +226,26 @@ struct Parser : TextData {
 
 		return true;
 	}
-	bool variable() {
-		size_t begin = index;
+
+	struct State { size_t source, target; };
+	array<State> stack;
+	void push() { stack.append({index, target.size}); }
+	bool backtrack() { State state = stack.pop(); index=state.source; target.size=state.target; return false; }
+	bool commit() { stack.pop(); return true; }
+
+	bool variable(bool parameter=false) {
+		push();
 		matchID("const", keyword);
-		if(!type()) { index=begin; return false; }
+		if(!type()) return backtrack();
 		match("&");
 		match("...");
-		if(!identifier(variableDeclaration)) { index=begin; return false; }
+		if(!identifier(variableDeclaration)) return backtrack();
+		if(!parameter) while(match(",")) { if(!identifier(variableDeclaration)) error("variable"); }
 		if(initializer_list()) {}
 		else if(match("=")) {
 			if(!(initializer_list() || expression())) error("initializer");
 		}
-		return true;
+		return commit();
 	}
 
 	bool templateParameters() {
@@ -345,7 +367,7 @@ struct Parser : TextData {
 		if(!match("(")) return false;
 		while(!match(")")) {
 			matchID("const", keyword);
-			if(variable()) {}
+			if(variable(true)) {}
 			else error("function parameters"_);
 			match(",");
 		}
@@ -353,19 +375,19 @@ struct Parser : TextData {
 	}
 
 	bool function() {
-		size_t begin = index;
+		push();
 		templateDeclaration();
 		matchID("const", keyword);
-		if(!type()) { index = begin; return false; }
-		if(!identifier()) { index = begin; return false; }
-		if(!parameters()) { index = begin; return false; }
+		if(!type()) return backtrack();
+		if(!identifier()) return backtrack();
+		if(!parameters()) return backtrack();
 		if(!block()) error("function");
-		return true;
+		return commit();
 	}
 
 	bool constructor() {
-		size_t begin = index;
-		if(!(identifier() && parameters())) { index = begin; return false; }
+		push();
+		if(!(identifier() && parameters())) return backtrack();
 		if(match(":")) {
 			do {
 				if(!identifier()) error("initializer identifier");
@@ -375,7 +397,7 @@ struct Parser : TextData {
 			} while(match(","));
 		}
 		if(!block()) error("constructor");
-		return true;
+		return commit();
 	}
 
 	bool struct_() {
@@ -394,7 +416,8 @@ struct Parser : TextData {
 
 	bool declaration() {
 		if(function()) return true;
-		if(variable() || struct_()) {
+		if(struct_()) return true;
+		if(variable()) {
 			if(!match(";")) error("declaration"_);
 			return true;
 		}
@@ -440,6 +463,6 @@ struct Parser : TextData {
 };
 
 struct Test {
-	TextEdit text {move(Parser(readFile("test.cc")).target)};
-	unique<Window> window = ::window(&text, 512);
+	Scroll<TextEdit> text {move(Parser(readFile("test.cc")).target)};
+	unique<Window> window = ::window(&text, 1024);
 } test;

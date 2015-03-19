@@ -66,7 +66,7 @@ bool TextEdit::mouseEvent(vec2 position, vec2 size, Event event, Button button, 
 	setCursor(::Cursor::Text);
 	focus=this;
 	bool cursorChanged = false;
-	if(event==Press || (event==Motion && button==LeftButton)) {
+	if((event==Press && (button==LeftButton || button==RightButton)) || (event==Motion && button==LeftButton)) {
 		const TextLayout& layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
 		vec2 textSize = ceil(layout.bbMax - min(vec2(0),layout.bbMin));
 		vec2 offset = max(vec2(0), vec2(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
