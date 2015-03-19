@@ -40,3 +40,4 @@ ui/edit.h
 ui/edit.cc
 
 test.cc
+parser.h
