@@ -31,6 +31,10 @@ struct TextEdit : Text {
 
 	TextEdit(buffer<uint>&& text) : Text(move(text), 12, black, 1, 0, "DejaVuSans", true, 1, -1) { history.append({copy(this->text), cursor}); }
 	TextEdit(const string text="") : TextEdit(toUCS4(text)) {}
+
+	void previousWord();
+	void nextWord();
+
 	bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus /*FIXME: -> Window& window*/) override;
     bool keyPress(Key key, Modifiers modifiers) override;
 	vec2 cursorPosition(vec2 size, Cursor cursor);

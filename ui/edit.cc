@@ -119,6 +119,20 @@ bool TextEdit::mouseEvent(vec2 position, vec2 size, Event event, Button button, 
 	return true;
 }
 
+
+static bool isWordCode(char c) { return (c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||"_"_.contains(c); }
+void TextEdit::previousWord() {
+	cursor.column--;
+	bool firstWordCode = isWordCode(text[index(cursor)]);
+	while(cursor.column>0 && isWordCode(text[index({cursor.line, cursor.column-1})]) == firstWordCode) cursor.column--;
+}
+void TextEdit::nextWord() {
+	bool firstWordCode = isWordCode(text[index(cursor)]);
+	const auto& lines = lastTextLayout.glyphs;
+	auto line = lineStops(lines[cursor.line]);
+	while(cursor.column<line.size && isWordCode(text[index(cursor)]) == firstWordCode) cursor.column++;
+}
+
 bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 	const auto& lines = lastTextLayout.glyphs;
 	cursor.line = min<size_t>(cursor.line, lines.size-1);
@@ -156,16 +170,8 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 		if(key==Home) cursor.column = 0;
 		else if(key==End) cursor.column = line.size;
 		else if((modifiers&Control) && ((key==LeftArrow && cursor.column>0) || (key==RightArrow && cursor.column<line.size))) {
-			auto isWordCode = [](char c) { return (c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||"_"_.contains(c); };
-			if(key==LeftArrow) {
-				cursor.column--;
-				bool firstWordCode = isWordCode(text[index(cursor)]);
-				while(cursor.column>0 && isWordCode(text[index({cursor.line, cursor.column-1})]) == firstWordCode) cursor.column--;
-			}
-			else if(key==RightArrow) {
-				bool firstWordCode = isWordCode(text[index(cursor)]);
-				while(cursor.column<line.size && isWordCode(text[index(cursor)]) == firstWordCode) cursor.column++;
-			}
+			if(key==LeftArrow) previousWord();
+			else if(key==RightArrow) nextWord();
 			else error("");
 		}
 		else if(key==LeftArrow)  {
@@ -234,6 +240,10 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 		this->layout(wrap);
 		cursor = cursorFromIndex(index+selection.size);
 	} else {
+		if(modifiers&Control) {
+			if(key==Delete) nextWord();
+			if(key==Backspace) previousWord();
+		}
 		Cursor min, max;
 		if(selectionStart < cursor) min=selectionStart, max=cursor; else min=cursor, max=selectionStart;
 		size_t sourceIndex = index(min);
