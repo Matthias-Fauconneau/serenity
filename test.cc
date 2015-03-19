@@ -15,19 +15,41 @@ struct Parser : TextData {
 	const bgr3f typeDeclaration = magenta;
 	const bgr3f typeUse = magenta;
 	const bgr3f variableDeclaration = magenta;
+	const bgr3f variableUse = black;
 	const bgr3f stringLiteral = green;
+	const bgr3f numberLiteral = blue;
+	const bgr3f comment = green;
 
 	array<uint> target;
 
-	template<Type... Args> void error(const Args&... args) { ::error(args..., peek(16)); }
+	template<Type... Args> void error(const Args&... args) { ::error(args..., "'"+peek(16)+"'"); }
 
-	bool space() { return target.append(toUCS4(whileAny(" \t\n"))); }
+	bool space() {
+		for(;;) {
+			if(target.append(toUCS4(whileAny(" \t\n")))) continue;
+			size_t begin = index;
+			if(TextData::match("//")) {
+				until('\n');
+				target.append(::color(sliceRange(begin, index), comment));
+				continue;
+			}
+			if(TextData::match("/*")) {
+				until("*/");
+				target.append(::color(sliceRange(begin, index), comment));
+				continue;
+			}
+			break;
+		}
+		return true;
+	}
 	bool match(string key, bgr3f color=black) { return target.append(::color(TextData::match(key), color)); }
+	bool matchAny(ref<string> key, bgr3f color=black) { return target.append(::color(TextData::matchAny(key), color)); }
 	bool identifier(bgr3f color=black) {
-		string identifier = TextData::identifier(":"_); // FIXME
+		size_t begin = index;
+		string identifier = TextData::identifier("_:"_); // FIXME
 		if(!identifier) return false;
-		if(keywords.contains(identifier)) return false;
-		if(!target.append(::color(identifier, color))) { error("identifier"); return false; }
+		if(keywords.contains(identifier)) { index=begin; return false; }
+		target.append(::color(identifier, color));
 		return true;
 	}
 
@@ -49,7 +71,7 @@ struct Parser : TextData {
 		return true;
 	}
 	bool warn type() {
-		if(match("void")) return true;
+		if(matchAny(ref<string>{"void"_,"bool"_})) return true;
 		if(!identifier(typeUse)) return false;
 		space();
 		templateArguments();
@@ -63,9 +85,24 @@ struct Parser : TextData {
 				else advance(1);
 			}
 			target.append(color(sliceRange(start, index), stringLiteral));
-			return true;
 		}
-		return identifier();
+		else if(identifier()) {}
+		else if(target.append(color(whileDecimal(), numberLiteral))) {}
+		else return false;
+		while(!wouldMatch("...") && match(".")) {
+			if(!identifier(variableUse)) error("operator.");
+		}
+		if(match("(")) {
+			while(!match(")")) {
+				space();
+				if(expression()) {}
+				else error("operator() arguments"_);
+				space();
+				if(match("...")) space(); // FIXME
+				match(",");
+			}
+		}
+		return true;
 	}
 	bool warn variable() {
 		size_t begin = index;
@@ -113,17 +150,29 @@ struct Parser : TextData {
 	}
 
 	bool statement() {
-		return expression();
+		if(match("return ")) {
+			if(!expression()) error("statement");
+			if(!match(";")) error("Return statement end ;");
+		}
+		else if(declaration()) {}
+		else if(expression()) {
+			if(!match(";")) error("Expression statement end ;");
+		}
+		else error("statement");
+		space();
+		return true;
 	}
 
 	bool warn function() {
+		size_t begin = index;
 		templateDeclaration();
 		space();
-		if(!type()) error("function"_);
+		if(match("const", keyword)) space();
+		if(!type()) error("return type"_);
 		space();
-		if(!identifier()) error("function"_);
+		if(!identifier()) { index = begin; return false; }
 		space();
-		skip('(');
+		if(!match("(")) { index = begin; return false; }
 		while(!match(")")) {
 			space();
 			if(match("const", keyword)) space();
@@ -133,7 +182,8 @@ struct Parser : TextData {
 			match(",");
 		}
 		space();
-		skip('{');
+		if(!match("{")) error("function");
+		space();
 		while(!match("}")) {
 			if(statement()) {}
 			else error("function body"_);
@@ -152,7 +202,7 @@ struct Parser : TextData {
 			identifier(typeUse);
 			space();
 		}
-		skip('{');
+		if(!match("{")) error("struct");
 		space();
 		while(!match("}")) {
 			if(declaration()) {}
@@ -160,13 +210,16 @@ struct Parser : TextData {
 			space();
 		}
 		space();
+		if(!match(";")) error("struct"_);
 		return true;
 	}
-	bool declaration() {
-		if(variable() || function() || struct_()) {}
-		else error("declaration");
-		skip(';');
-		return true;
+	bool warn declaration() {
+		if(function()) return true;
+		if(variable() || struct_()) {
+			if(!match(";")) error("declaration"_);
+			return true;
+		}
+		return false;
 	}
 
 	bool warn include() {
