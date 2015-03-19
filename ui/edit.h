@@ -19,9 +19,9 @@ struct TextEdit : Text {
 	size_t historyIndex = 0;
 
 	/// \a Cursor to source text index
-	size_t index(Cursor cursor);
+	size_t index(Cursor cursor) const;
 	/// Source text index to \a Cursor
-	Cursor cursorFromIndex(size_t index);
+	Cursor cursorFromIndex(size_t index) const;
 	Cursor cursorFromPosition(vec2 size, vec2 position);
 
     /// User edited this text

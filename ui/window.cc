@@ -147,7 +147,6 @@ bool XWindow::processEvent(const X11::Event& e) {
 	else if(type==SelectionClear) {}
 	else if(type==SelectionRequest) {
 		auto r = e.selectionRequest;
-		{buffer<uint> name; request(GetAtomName{.atom=r.property}, name); log(cast<char>(name));}
 		if(r.target == Atom("TARGETS"_)) {
 			send(ChangeProperty{.window=r.requestor, .property=r.property, .type=Atom("ATOM"_), .format=32,
 								.length=uint(1), .size=uint16(6+4/4)}, cast<byte>(ref<uint>{Atom("UTF8_STRING"_)}));

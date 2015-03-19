@@ -479,7 +479,7 @@ struct Test {
 			return contentChanged;
 		}
 		bool keyPress(Key key, Modifiers modifiers) {
-			if(edit.keyPress(key, modifiers) || ScrollArea::keyPress(key, modifiers)) {
+			if(edit.keyPress(key, modifiers) /*|| ScrollArea::keyPress(key, modifiers)*/) {
 				vec2 size = viewSize;
 				vec2 position = edit.cursorPosition(size, edit.cursor);
 				if(position.y < -offset.y) offset.y = -(position.y);

@@ -19,7 +19,7 @@ array<EditStop> lineStops(ref<array<TextLayout::Glyph>> line) {
 	return stops;
 }
 
-size_t TextEdit::index(Cursor cursor) {
+size_t TextEdit::index(Cursor cursor) const {
 	const auto& lines = lastTextLayout.glyphs;
 	if(!lines) return 0;
 	if(cursor.line==lines.size) return lines.last().last().last().sourceIndex;
@@ -39,7 +39,7 @@ size_t TextEdit::index(Cursor cursor) {
 	return index;
 }
 
-TextEdit::Cursor TextEdit::cursorFromIndex(size_t targetIndex) {
+TextEdit::Cursor TextEdit::cursorFromIndex(size_t targetIndex) const {
 	const auto& lines = lastTextLayout.glyphs;
 	Cursor cursor (0, 0);
 	if(!lines) return cursor;
@@ -187,11 +187,11 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 		return true;
 	}
 
-	if((modifiers&Control) && (key=='c'||key=='C')) {
+	if((modifiers&Control) && (key=='c'||key=='C'||key=='x'||key=='X')) {
 		Cursor min, max;
 		if(selectionStart < cursor) min=selectionStart, max=cursor; else min=cursor, max=selectionStart;
 		if(cursor != selectionStart) setSelection(toUTF8(text.sliceRange(index(min),index(max))), true);
-		return false;
+		if((key=='c'||key=='C') || cursor == selectionStart) return true;
 	}
 
 	Edit edit = Edit::Point;
@@ -207,7 +207,7 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 		Cursor min, max;
 		if(selectionStart < cursor) min=selectionStart, max=cursor; else min=cursor, max=selectionStart;
 		size_t sourceIndex = index(min);
-		if(key==Delete || key==Backspace || key==Return || key==KP_Enter) {
+		if(key==Delete || key==Backspace || key==Return || key==KP_Enter || ((modifiers&Control) && (key=='x'||key=='X'))) {
 			if(cursor != selectionStart) { // Deletes selection
 				text = buffer<uint>(text.slice(0, index(min)) + text.slice(index(max)));
 				cursor = min;
@@ -233,16 +233,16 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 				else error("");
 			}
 		} else {
+			char c;
+			if(key>=' ' && key<=0xFF) c=key; // FIXME: Unicode
+			else if(key >= KP_Asterisk && key<=KP_9) c="*+.-./0123456789"_[key-KP_Asterisk];
+			else return false;
 			edit = Edit::Insert;
 			if(cursor != selectionStart) { // Deletes selection
 				text = buffer<uint>(text.slice(0, index(min)) + text.slice(index(max)));
 				cursor = min;
 				line = lineStops(lines[cursor.line]);
 			}
-			char c;
-			if(key>=' ' && key<=0xFF) c=key; // FIXME: Unicode
-			else if(key >= KP_Asterisk && key<=KP_9) c="*+.-./0123456789"_[key-KP_Asterisk];
-			else return false;
 			text.insertAt(index(cursor), uint32(c));
 			cursor.column++;
 		}
