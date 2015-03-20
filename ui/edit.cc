@@ -176,7 +176,8 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 		}
 		else if(key==LeftArrow)  {
 			if(modifiers&Alt) { // Back
-				if(cursorHistory) cursor = cursorHistory.pop();
+				if(modifiers&Shift) { back(); }
+				else { if(cursorHistory) cursor = cursorHistory.pop(); }
 			} else {
 				if(cursor.column>0) cursor.column--;
 				else if(cursor.line>0) { cursor.line--, cursor.column = lineStops(lines[cursor.line]).size; }

@@ -24,6 +24,8 @@ struct TextEdit : Text {
 	function<void(string)> textEntered;
 	/// User pressed enter
 	function<void(ref<uint>)> linkActivated;
+	/// User pressed enter
+	function<void()> back;
     /// Cursor start position for selections
     Cursor selectionStart;
 

@@ -31,23 +31,42 @@ struct ScrollTextEdit : ScrollArea {
 	}
 };
 
+struct FileTextEdit : ScrollTextEdit {
+	String fileName;
+	FileTextEdit(string fileName) : ScrollTextEdit(move(Parser(fileName).target)), fileName(copyRef(fileName)) {}
+};
+
 struct IDE {
-	map<String, ScrollTextEdit> edits;
+	map<String, FileTextEdit> edits;
+	FileTextEdit* current = 0;
 	unique<Window> window = ::window(null, 1024);
+	struct Location { String fileName; Cursor cursor; };
+	array<Location> viewHistory;
+
 	IDE() { view("test.cc"); }
+
 	void view(string fileName, uint index=0) {
 		if(!edits.contains(fileName)) {
-			edits.insert(copyRef(fileName), move(Parser(fileName).target));
-			edits.at(fileName).edit.linkActivated = [this](ref<uint> identifier) {
+			FileTextEdit edit(fileName);
+			edit.edit.linkActivated = [this](ref<uint> identifier) {
 				assert_(identifier);
 				String fileName = toUTF8(identifier.slice(0, identifier.size-1));
 				size_t index = identifier.last();
 				view(fileName, index);
 			};
+			edit.edit.back = [this] {
+				Location location = viewHistory.pop();
+				current = &edits.at(location.fileName);
+				current->edit.cursor = location.cursor;
+				current->ensureCursorVisible();
+				if(window) window->widget = current;
+			};
+			edits.insert(copyRef(fileName), move(edit));
 		}
-		ScrollTextEdit& edit = edits.at(fileName);
-		edit.edit.cursor = edit.edit.cursorFromIndex(index);
-		edit.ensureCursorVisible();
-		if(window) window->widget = &edit;
+		viewHistory.append(Location{copyRef(current->fileName), current->edit.cursor});
+		current = &edits.at(fileName);
+		current->edit.cursor = current->edit.cursorFromIndex(index);
+		current->ensureCursorVisible();
+		if(window) window->widget = current;
 	}
 } app;
