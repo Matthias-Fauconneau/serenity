@@ -70,7 +70,7 @@ TextData::TextData(ref<byte> data) : Data(data) {
 
 void TextData::advance(size_t step) {
     assert(index+step<=data.size, index, data.size);
-    for(uint start=index; index<start+step; index++) if(data[index]=='\n') lineIndex++;
+    for(uint start=index; index<start+step; index++) if(data[index]=='\n') lineIndex++, columnIndex=1; else columnIndex++;
 }
 
 char TextData::wouldMatchAny(const string any) {

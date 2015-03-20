@@ -134,8 +134,8 @@ String escape(string s);
 
 /// Provides a convenient interface to parse text streams
 struct TextData : Data {
-    /// 1-based line index
-    int lineIndex = 1;
+    /// 1-based line/column index
+    int lineIndex = 1, columnIndex = 1;
 
     /// Creates a TextData interface to a \a ref
     /// \note Matches any heading Unicode BOM

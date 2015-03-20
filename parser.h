@@ -38,12 +38,28 @@ struct Parser : TextData {
 	::buffer<uint> fileName;
 	array<uint> target;
 
-	template<Type... Args> void error(const Args&... args) { ::error(args..., "'"+slice(index-8,8)+"|"+sliceRange(index,min(data.size,index+8))+"'"); }
+	array<Scope>& scopes;
 
-	array<Scope> scopes;
+	::function<void(array<Scope>&, string)> parse;
+
+	const array<String> sources = currentWorkingDirectory().list(Files|Recursive);
 
 	struct State { size_t source, target; };
 	array<State> stack;
+
+	template<Type... Args> void error(const Args&... args) {
+		::error(toUTF8(fileName)+':'+str(lineIndex)+':'+str(columnIndex)+':',
+				args..., "'"+sliceRange(max(0,int(index)-8),index)+"|"+sliceRange(index,min(data.size,index+8))+"'");
+	}
+
+	/// Returns the first path matching file
+	String find(string name) {
+		for(string path: sources) if(path == name) return copyRef(path); // Full path match
+		for(string path: sources) if(section(path,'/',-2,-1) == name) return copyRef(path); // File name match
+		error("No such file", name, "in", sources);
+		return {};
+	}
+
 	void push() { stack.append({index, target.size}); }
 	bool backtrack() { State state = stack.pop(); index=state.source; target.size=state.target; return false; }
 	bool commit() { assert_(stack); stack.pop(); return true; }
@@ -338,7 +354,7 @@ struct Parser : TextData {
 		if(!variableName) return backtrack();
 		commit();
 		assert_(!stack, "variable_declaration");
-		scopes.last().variables.insert(variableName, fileName+location);
+		scopes.last().variables.insert(variableName, fileName+max(1u,location));
 		if(!parameter) while(match(",")) { if(!identifier(variableDeclaration)) error("variable"); }
 		if(initializer_list()) {}
 		else if(match("=")) {
@@ -533,12 +549,19 @@ struct Parser : TextData {
 		return false;
 	}
 
+	bool pragma() {
+		if(!match("#pragma", preprocessor)) return false;
+		if(!match("once", preprocessor)) return false;
+		return true;
+	}
+
 	bool include() {
 		if(!match("#include", preprocessor)) return false;
 		space();
 		if(TextData::match('"')) {
 			string name = until('"');
-			target.append(color('"'+/*link(name, name)*/name+'"', module));
+			parse(scopes, find(name));
+			target.append(color(uint('"')+link(name, toUCS4(name)+1u/*FIXME: 0u*/)+uint('"'), module));
 		} else { // library header
 			string name = until('>');
 			target.append(color(/*link(name, name)*/name, module));
@@ -559,12 +582,12 @@ struct Parser : TextData {
 		return true;
 	}
 
-	Parser(string fileName) : TextData(readFile(fileName)), fileName(toUCS4(fileName)) {
-		scopes.append();
+	Parser(string fileName, array<Scope>& scopes, ::function<void(array<Scope>&, string)> parse)
+		: TextData(readFile(fileName)), fileName(toUCS4(fileName)), scopes(scopes), parse(parse) {
 		space();
 		while(available(1)) {
-			if(include() || define() || condition() || declaration()) {}
-			else error("global", line() ?: peek(16));
+			if(pragma() || include() || define() || condition() || declaration()) {}
+			else error("global");
 			space();
 		}
 		assert_(scopes.size == 1 && stack.size == 0);

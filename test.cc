@@ -33,36 +33,42 @@ struct ScrollTextEdit : ScrollArea {
 
 struct FileTextEdit : ScrollTextEdit {
 	String fileName;
-	FileTextEdit(string fileName) : ScrollTextEdit(move(Parser(fileName).target)), fileName(copyRef(fileName)) {}
+	FileTextEdit(string fileName, array<Scope>& scopes, function<void(array<Scope>&, string)> parse) : ScrollTextEdit(move(Parser(fileName, scopes, parse).target)), fileName(copyRef(fileName)) {}
 };
 
 struct IDE {
+	array<Scope> scopes;
 	map<String, FileTextEdit> edits;
 	FileTextEdit* current = 0;
 	unique<Window> window = ::window(null, 1024);
 	struct Location { String fileName; Cursor cursor; };
 	array<Location> viewHistory;
 
-	IDE() { view("test.cc"); }
+	IDE() {
+		scopes.append(); // Global scope
+		view("test.cc");
+	}
+
+	void parse(array<Scope>& scopes, string fileName) {
+		FileTextEdit edit(fileName, scopes, {this, &IDE::parse});
+		edit.edit.linkActivated = [this](ref<uint> identifier) {
+			assert_(identifier);
+			String fileName = toUTF8(identifier.slice(0, identifier.size-1));
+			size_t index = identifier.last();
+			view(fileName, index);
+		};
+		edit.edit.back = [this] {
+			Location location = viewHistory.pop();
+			current = &edits.at(location.fileName);
+			current->edit.cursor = location.cursor;
+			current->ensureCursorVisible();
+			if(window) window->widget = current;
+		};
+		edits.insert(copyRef(fileName), move(edit));
+	}
 
 	void view(string fileName, uint index=0) {
-		if(!edits.contains(fileName)) {
-			FileTextEdit edit(fileName);
-			edit.edit.linkActivated = [this](ref<uint> identifier) {
-				assert_(identifier);
-				String fileName = toUTF8(identifier.slice(0, identifier.size-1));
-				size_t index = identifier.last();
-				view(fileName, index);
-			};
-			edit.edit.back = [this] {
-				Location location = viewHistory.pop();
-				current = &edits.at(location.fileName);
-				current->edit.cursor = location.cursor;
-				current->ensureCursorVisible();
-				if(window) window->widget = current;
-			};
-			edits.insert(copyRef(fileName), move(edit));
-		}
+		if(!edits.contains(fileName)) parse(scopes, fileName);
 		viewHistory.append(Location{copyRef(current->fileName), current->edit.cursor});
 		current = &edits.at(fileName);
 		current->edit.cursor = current->edit.cursorFromIndex(index);
