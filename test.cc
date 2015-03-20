@@ -17,12 +17,12 @@ struct ScrollTextEdit : ScrollArea {
 		if(position.y+edit.Text::size > -offset.y+size.y) offset.y = -(position.y-size.y+edit.Text::size);
 	}
 
-	bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) {
+	bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) override {
 		bool contentChanged = ScrollArea::mouseEvent(cursor, size, event, button, focus) || edit.mouseEvent(cursor, size, event, button, focus);
 		focus = this;
 		return contentChanged;
 	}
-	bool keyPress(Key key, Modifiers modifiers) {
+	bool keyPress(Key key, Modifiers modifiers) override {
 		if(edit.keyPress(key, modifiers)) {
 			ensureCursorVisible();
 			return true;
@@ -31,21 +31,23 @@ struct ScrollTextEdit : ScrollArea {
 	}
 };
 
-struct ModuleEdit : ScrollTextEdit {
-	String fileName;
-	ModuleEdit(string fileName) : ScrollTextEdit(move(Parser(fileName).target)), fileName(copyRef(fileName)) {
-		edit.linkActivated = [this](ref<uint> identifier) {
-			assert_(identifier);
-			String fileName = toUTF8(identifier.slice(0, identifier.size-1));
-			size_t index = identifier.last();
-			assert_(fileName == this->fileName, "TODO: multiple file navigation");
-			edit.cursor = edit.cursorFromIndex(index);
-			ensureCursorVisible();
-		};
+struct IDE {
+	map<String, ScrollTextEdit> edits;
+	unique<Window> window = ::window(null, 1024);
+	IDE() { view("test.cc"); }
+	void view(string fileName, uint index=0) {
+		if(!edits.contains(fileName)) {
+			edits.insert(copyRef(fileName), move(Parser(fileName).target));
+			edits.at(fileName).edit.linkActivated = [this](ref<uint> identifier) {
+				assert_(identifier);
+				String fileName = toUTF8(identifier.slice(0, identifier.size-1));
+				size_t index = identifier.last();
+				view(fileName, index);
+			};
+		}
+		ScrollTextEdit& edit = edits.at(fileName);
+		edit.edit.cursor = edit.edit.cursorFromIndex(index);
+		edit.ensureCursorVisible();
+		if(window) window->widget = &edit;
 	}
-};
-
-struct ModuleEditApplication {
-	ModuleEdit moduleEdit {"test.cc"};
-	unique<Window> window = ::window(&moduleEdit, 1024);
 } app;
