@@ -5,6 +5,7 @@ build.sh
 build.cc
 
 core/core.h
+core/memory.h
 core/array.h
 core/math.h
 core/string.h
@@ -40,6 +41,8 @@ ui/interface.h
 ui/input.h
 ui/edit.h
 ui/edit.cc
+
+audio/player.cc
 
 test.cc
 parser.h

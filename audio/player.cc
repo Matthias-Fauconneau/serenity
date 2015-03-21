@@ -66,7 +66,7 @@ struct Player : Poll {
     Scroll<List<Text>> titles;
     HBox main {{ &albums, &titles }};
 	VBox layout {{ &toolbar, &main }};
-    Window window {&layout, -int2(1050, 1680)/2, {}, true, pauseIcon()};
+	unique<Window> window = ::window(&layout, -int2(1050, 1680)/2);
 
 // Content
     String device; // Device underlying folder
@@ -76,12 +76,13 @@ struct Player : Poll {
     array<String> randomSequence;
 
     Player() {
-        albums.expanding=true; titles.expanding=true; titles.main=Linear::Center;
-        window.actions[Space] = {this, &Player::togglePlay};
+		window->setIcon(pauseIcon());
+		albums.scrollbar=false; albums.expanding=true; titles.expanding=true; titles.main=Linear::Center;
+		window->actions[Space] = {this, &Player::togglePlay};
 
-        window.globalAction(Play) = {this, &Player::togglePlay};
-        window.globalAction(Media) = [this]{ if(window.mapped) window.hide(); else window.show(); };
-        window.actions.insert(RightArrow, {this, &Player::next});
+		window->globalAction(Play) = {this, &Player::togglePlay};
+		window->globalAction(Media) = [this]{ if(window->mapped) window->hide(); else window->show(); };
+		window->actions.insert(RightArrow, {this, &Player::next});
 
         randomButton.toggled = {this, &Player::setRandom};
         playButton.toggled = {this, &Player::setPlaying};
@@ -93,7 +94,7 @@ struct Player : Poll {
 
         if(arguments()) setFolder(arguments()[0]);
         else if(!folder) setFolder("/Music");
-        window.show();
+		window->show();
         mainThread.setPriority(-20);
     }
     ~Player() { recordPosition(); /*Records current position*/ }
@@ -153,12 +154,12 @@ struct Player : Poll {
     }
     void playAlbum(uint index) {
         files.clear(); titles.clear();
-        window.setTitle(toUTF8(albums[index].text));
+		window->setTitle(toUTF8(albums[index].text));
         playAlbum(folders[index]);
     }
     void playTitle(uint index) {
         titles.index = index;
-        window.setTitle(toUTF8(titles[index].text));
+		window->setTitle(toUTF8(titles[index].text));
 		file = unique<FFmpeg>(folder.name()+'/'+files[index]);
         if(!file->file) { file=0; log("Error reading", folder.name()+'/'+files[index]); return; }
 		assert(file->channels == 2);
@@ -210,7 +211,7 @@ struct Player : Poll {
             assert_(file);
             if(!playButton.enabled) {
                 audio.start(file->audioFrameRate, periodSize, 16, 2);
-                window.setIcon(playIcon());
+				window->setIcon(playIcon());
             }
         } else {
             // Fades out the last period (assuming the hardware is not playing it (false if swap occurs right after pause))
@@ -220,11 +221,11 @@ struct Player : Poll {
             }
             lastPeriod=mref<short2>();
             if(audio) audio.stop();
-            window.setIcon(pauseIcon());
+			window->setIcon(pauseIcon());
             file->seek(max(0, int(file->audioTime-lastPeriod.size)));
         }
         playButton.enabled=play;
-        window.render();
+		window->render();
         recordPosition();
     }
     void seek(int position) {
@@ -237,10 +238,10 @@ struct Player : Poll {
 						  16, 0, 1, 0, "DejaVuSans", true, 1, 0, int2(64,32));
 		remaining = Text(String(str((duration-position)/60,2u,'0')+':'+str((duration-position)%60,2u,'0')),
 						  16, 0, 1, 0, "DejaVuSans", true, 1, 0, int2(64,32));
-        {Rect toolbarRect = layout.layout(vec2(window.size))[0];
+		{Rect toolbarRect = layout.layout(vec2(window->size))[0];
 			shared<Graphics> update;
 			update->graphics.insert(vec2(toolbarRect.origin()), toolbar.graphics(toolbarRect.size(), toolbarRect));
-            window.render(move(update), int2(toolbarRect.origin()), int2(toolbarRect.size()));
+			window->render(move(update), int2(toolbarRect.origin()), int2(toolbarRect.size()));
         }
     }
     void event() override {

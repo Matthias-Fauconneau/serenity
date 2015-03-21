@@ -249,6 +249,8 @@ void XWindow::setCursor(MouseCursor cursor) {
 	}
 }
 
+function<void()>& XWindow::globalAction(Key key) { return XDisplay::globalAction(key); }
+
 String XWindow::getSelection(bool clipboard) {
 	uint owner = request(GetSelectionOwner{.selection=clipboard?Atom("CLIPBOARD"_):1}).owner;
 	if(!owner) return String();
@@ -270,6 +272,7 @@ DRMWindow::DRMWindow(Widget* widget, Thread& thread) : Window(widget, thread) {
 	display->windows.append(this);
 	size = display->buffers[0].target.size;
 	actions[Escape] = []{requestTermination();};
+	mapped = true;
 	render();
 }
 DRMWindow::~DRMWindow() {
@@ -308,6 +311,11 @@ void DRMWindow::keyPress(Key key) {
 	}
 }
 
+function<void()>& DRMWindow::globalAction(Key key) { return actions[key]; }
+void DRMWindow::show() {}
+void DRMWindow::hide() {}
+void DRMWindow::setTitle(const string) {}
+void DRMWindow::setIcon(const Image&) {}
 void DRMWindow::setCursor(MouseCursor) {}
 String DRMWindow::getSelection(bool) { return {}; }
 void DRMWindow::setSelection(string, bool) {}

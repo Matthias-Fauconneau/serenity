@@ -23,6 +23,20 @@ struct Window : Poll {
 	Lock lock;
 	array<Update> updates;
 
+	// Window
+	/// Whether this window is currently mapped. This doesn't imply the window is visible (can be covered)
+	bool mapped = false;
+	/// Shows window.
+	virtual void show() abstract;
+	/// Hides window.
+	virtual void hide() abstract;
+
+	/// Sets window title to \a title
+	virtual void setTitle(const string title) abstract;
+	/// Sets window icon to \a icon
+	virtual void setIcon(const Image& icon) abstract;
+	virtual void setCursor(MouseCursor cursor) abstract;
+
 	// Input
 	/// Actions triggered when a key is pressed
 	map<Key, function<void()>> actions;
@@ -42,7 +56,8 @@ struct Window : Poll {
 	/// Immediately renders the first pending update to target
 	Update render(const Image& target);
 
-	virtual void setCursor(MouseCursor cursor) abstract;
+	// Control
+	virtual function<void()>& globalAction(Key) abstract;
 	virtual String getSelection(bool clipboard) abstract;
 	virtual void setSelection(string selection, bool clipboard) abstract;
 };
@@ -64,9 +79,6 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
     /// Shared window buffer state
     enum State { Idle, Copy, Present } state = Idle;
 
-    /// Whether this window is currently mapped. This doesn't imply the window is visible (can be covered)
-    bool mapped = false;
-
     uint64 firstFrameCounterValue = 0;
 	uint64 currentFrameCounterValue = 0;
 
@@ -84,22 +96,20 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
     /// Frees the graphics context and destroys the window
 	~XWindow();
 
-    // Connection
+	// Input
     /// Processes or holds an event
     void onEvent(const ref<byte> ge);
     /// Processes an event
 	bool processEvent(const X11::Event& ge);
 
-    // Window
-    /// Shows window.
-    void show();
-    /// Hides window.
-	void hide();
+	// Window
+	void show() override;
+	void hide() override;
 
     /// Sets window title to \a title
-    void setTitle(const string title);
+	void setTitle(const string title) override;
     /// Sets window icon to \a icon
-    void setIcon(const Image& icon);
+	void setIcon(const Image& icon) override;
     /// Resizes window to \a size
     void setSize(int2 size);
 
@@ -107,7 +117,9 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
     void event() override;
 	void setCursor(MouseCursor cursor) override;
 
-	// IPC
+	// Control
+	/// Registers global action on \a key
+	function<void()>& globalAction(Key) override;
 	/// Gets current text selection
 	/// \note The selection owner might lock this process if it fails to notify
 	String getSelection(bool clipboard) override;
@@ -123,15 +135,22 @@ struct DRMWindow : Window {
 	no_copy(DRMWindow);
 	~DRMWindow();
 
-	// Display
-	void event() override;
-	void setCursor(MouseCursor cursor) override;
-
 	// Input
 	void mouseEvent(int2, ::Event, Button);
 	void keyPress(Key);
 
-	// IPC
+	// Window
+	void show() override;
+	void hide() override;
+	void setTitle(const string title) override;
+	void setIcon(const Image& icon) override;
+	void setCursor(MouseCursor cursor) override;
+
+	// Display
+	void event() override;
+
+	// Control
+	function<void()>& globalAction(Key) override;
 	String getSelection(bool clipboard) override;
 	void setSelection(string selection, bool clipboard) override;
 };

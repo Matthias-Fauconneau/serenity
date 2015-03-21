@@ -83,29 +83,29 @@ struct Text : virtual Widget {
 
 	/// Displayed text in UCS4
 	array<uint> text;
-	// Parameters (all constants so any cached lastTextLayout cannot be invalidated by a parameter change)
+	// Parameters
     /// Font size
-	const int size;
+	int size;
     /// Text color
-	const bgr3f color;
+	bgr3f color;
     /// Text opacity
-	const float opacity;
+	float opacity;
     /// Line wrap limit in pixels (0: no wrap)
-	const float wrap = 0;
+	float wrap = 0;
     /// Font name
-	const string font;
+	string font;
     /// Whether font should be hinted for display
-	const bool hint;
+	bool hint;
     /// Interline stretch
-	const float interline;
+	float interline;
     /// Horizontal alignment
-	const int align;
+	int align;
 	/// Whether to justify
-	const bool justify;
+	bool justify;
 	/// Whether to justify explicit line breaks
-	const bool justifyExplicitLineBreak;
+	bool justifyExplicitLineBreak;
     /// Minimal size hint
-	const vec2 minimalSizeHint;
+	vec2 minimalSizeHint;
 
 	/// Caches last text layout (for a given wrap)
 	TextLayout lastTextLayout;
