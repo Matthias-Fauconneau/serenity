@@ -94,8 +94,8 @@ String join(ref<string> list, const string separator=""_);
 /// Returns an array of references splitting \a str wherever \a separator occurs
 buffer<string> split(const string str, string separator/*=", "_*/);
 
-/// Flatten cats
-template<class A, class B, class T> String str(const cat<A, B, T>& a) { return a; }
+/// Flattens cats
+template<Type A, Type B, Type T> String str(const cat<A, B, T>& a) { return a; }
 
 // -- Number conversions
 
@@ -146,9 +146,7 @@ generic String str(const ref<T> source, string separator=" "_) {
 generic String str(const mref<T>& source, string separator=" "_) { return str((const ref<T>)source, separator); }
 generic String str(const buffer<T>& source, string separator=" "_) { return str((const ref<T>)source, separator); }
 generic String str(const array<T>& source, string separator=" "_) { return str((const ref<T>)source, separator); }
-inline String bin(const ref<uint8> source, string separator=" "_) {
-	return str(apply(source, [](uint64 c) { return str(c, 8u, '0', 2u); }), separator);
-}
+inline String bin(const ref<uint8> source, string separator=" "_) { return str(apply(source, [](uint64 c) { return str(c, 8u, '0', 2u); }), separator); }
 inline String hex(const ref<int32> source, string separator=" "_) { return str(apply(source, [](const int32& c) { return hex(c, 8); }), separator); }
 inline String hex(const ref<uint8> source, string separator=" "_) { return str(apply(source, [](const uint8& c) { return hex(c, 2); }), separator); }
 inline String hex(const ref<byte> source, string separator=" "_) { return hex(cast<uint8>(source), separator); }

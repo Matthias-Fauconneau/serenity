@@ -8,7 +8,7 @@ generic struct luma { T i; operator byte4() const {return byte4(i,i,i,0xFF); } }
 typedef vec<rgb,uint8,3> rgb3;
 
 // Paeth median
-template<template<typename> class T, int N> vec<T, uint8, N> Paeth(vec<T, int, N> a, vec<T, int, N> b, vec<T, int, N> c) {
+template<template<Type> class T, int N> vec<T, uint8, N> Paeth(vec<T, int, N> a, vec<T, int, N> b, vec<T, int, N> c) {
     vec<T, int, N> d = a + b - c;
     vec<T, int, N> pa = abs(d-a), pb = abs(d-b), pc = abs(d-c);
     vec<T, uint8, N> p; for(int i=0;i<N;i++) p[i]=uint8(pa[i] <= pb[i] && pa[i] <= pc[i] ? a[i] : pb[i] <= pc[i] ? b[i] : c[i]);
@@ -17,7 +17,7 @@ template<template<typename> class T, int N> vec<T, uint8, N> Paeth(vec<T, int, N
 
 enum class Predictor { None, Left, Up, Average, Paeth };
 
-template<template<typename> class T, int N>
+template<template<Type> class T, int N>
 void unpredict(byte4* target, const byte* source, size_t width, size_t height, size_t xStride, size_t yStride) {
     typedef vec<T, uint8, N> U;
     typedef vec<T, int, N> V;
@@ -151,7 +151,7 @@ uint adler32(const ref<byte> data) {
     return a | (b << 16);
 }
 
-template<template<typename> class T, int N> buffer<byte> predict(const byte4* source, size_t width, size_t height) {
+template<template<Type> class T, int N> buffer<byte> predict(const byte4* source, size_t width, size_t height) {
     typedef vec<T,uint8,N> U;
     typedef vec<T, int8, N> S;
     typedef vec<T,int,N> V;

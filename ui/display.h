@@ -54,34 +54,34 @@ struct XDisplay : Socket, Poll {
      /// Reads reply checking for errors and queueing events
 	 array<byte> readReply(uint16 sequence, uint elementSize, buffer<int>& fds);
 
-	 template<Type Request, Type T> typename Request::Reply request(Request request, buffer<T>& output, buffer<int>& fds, const ref<byte> data={}, int fd=-1) {
-         static_assert(sizeof(typename Request::Reply)==31,"");
+	 template<Type Request, Type T> Type Request::Reply request(Request request, buffer<T>& output, buffer<int>& fds, const ref<byte> data={}, int fd=-1) {
+		 static_assert(sizeof(Type Request::Reply)==31,"");
          Locker lock(this->lock); // Prevents a concurrent thread from reading the reply and lock event queue
 		 uint16 sequence = send(request, data, fd);
 		 array<byte> replyData = readReply(sequence, sizeof(T), fds);
-         typename Request::Reply reply = *(typename Request::Reply*)replyData.data;
-		 assert_(replyData.size == sizeof(typename Request::Reply)+reply.size*sizeof(T), replyData.size, sizeof(typename Request::Reply)+reply.size*sizeof(T), sizeof(T));
+		 Type Request::Reply reply = *(Type Request::Reply*)replyData.data;
+		 assert_(replyData.size == sizeof(Type Request::Reply)+reply.size*sizeof(T), replyData.size, sizeof(Type Request::Reply)+reply.size*sizeof(T), sizeof(T));
 		 output = copyRef(cast<T>(replyData.slice(sizeof(reply), reply.size*sizeof(T))));
          return reply;
      }
 
-	 template<Type Request, Type T> typename Request::Reply request(Request request, buffer<T>& output, const ref<byte> data={}, int fd=-1) {
+	 template<Type Request, Type T> Type Request::Reply request(Request request, buffer<T>& output, const ref<byte> data={}, int fd=-1) {
 		 buffer<int> fds;
-		 typename Request::Reply reply = this->request(request, output, fds, data, fd);
+		 Type Request::Reply reply = this->request(request, output, fds, data, fd);
 		 assert_(/*reply.fdCount==0 &&*/ fds.size == 0);
 		 return reply;
 	 }
 
-	 template<Type Request> typename Request::Reply requestFD(Request request, buffer<int>& fds, const ref<byte> data={}) {
+	 template<Type Request> Type Request::Reply requestFD(Request request, buffer<int>& fds, const ref<byte> data={}) {
 		 buffer<byte> output;
-		 typename Request::Reply reply = this->request(request, output, fds, data);
+		 Type Request::Reply reply = this->request(request, output, fds, data);
 		 assert_(reply.size == 0 && output.size ==0, reply.size, output.size);
 		 return reply;
 	 }
 
-	 template<Type Request> typename Request::Reply request(Request request, const ref<byte> data={}, int fd=-1) {
+	 template<Type Request> Type Request::Reply request(Request request, const ref<byte> data={}, int fd=-1) {
          buffer<byte> output;
-		 typename Request::Reply reply = this->request(request, output, data, fd);
+		 Type Request::Reply reply = this->request(request, output, data, fd);
          assert_(reply.size == 0 && output.size ==0, reply.size, output.size);
          return reply;
      }

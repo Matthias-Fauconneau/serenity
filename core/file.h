@@ -145,11 +145,11 @@ struct Device : File {
     /// Sends ioctl request with neither input/outputs arguments
     template<Type IO> int io(int pass=0) { return ioctl(IO::io, 0, pass); }
     /// Sends ioctl request with \a input arguments
-    template<Type IOW> int iow(const typename IOW::Args& input) { return ioctl(IOW::iow, (void*)&input); }
+	template<Type IOW> int iow(const Type IOW::Args& input) { return ioctl(IOW::iow, (void*)&input); }
     /// Sends ioctl request with output arguments
-    template<Type IOR> typename IOR::Args ior() { typename IOR::Args output; ioctl(IOR::ior, &output); return output; }
+	template<Type IOR> Type IOR::Args ior() { Type IOR::Args output; ioctl(IOR::ior, &output); return output; }
     /// Sends ioctl request with \a reference argument
-    template<Type IOWR> int iowr(typename IOWR::Args& reference, int pass=0) { return ioctl(IOWR::iowr, &reference, pass); }
+	template<Type IOWR> int iowr(Type IOWR::Args& reference, int pass=0) { return ioctl(IOWR::iowr, &reference, pass); }
 };
 
 /// Managed memory mapping

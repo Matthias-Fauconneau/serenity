@@ -5,8 +5,8 @@
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
-template<template<typename> class V, Type T, uint N> struct vec : V<T> {
-    static_assert(sizeof(V<T>)==N*sizeof(T),"");
+template<template<Type> Type V, Type T, uint N> struct vec : V<T> {
+	static_assert(sizeof(V<T>)==N*sizeof(T));
 
     /// Defaults initializes to zero
 	inline vec() : vec(0) {}
@@ -23,7 +23,7 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
 	template<Type S> inline explicit vec(const vec<V,S,N>& o) { for(uint i: range(N)) at(i)=(T)o[i]; }
 
 	/// Initializes first components from another vec \a o and initializes remaining components with args...
-	template<template<typename> class W, Type... Args> vec(const vec<W,T,N-sizeof...(Args)>& o, Args... args){
+	template<template<Type> Type W, Type... Args> vec(const vec<W,T,N-sizeof...(Args)>& o, Args... args){
 		for(int i: range(N-sizeof...(Args))) at(i)=o[i];
 		T unpacked[]={T(args)...}; for(int i: range(sizeof...(Args))) at(N-sizeof...(Args)+i)=unpacked[i];
 	}
@@ -47,7 +47,7 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
 };
 
 #undef generic
-#define generic template<template<typename> class V, Type T, uint N> inline
+#define generic template<template<Type> Type V, Type T, uint N> inline constexpr
 #define vec vec<V,T,N>
 
 generic vec rotate(const vec& u) { vec r=u; for(uint i=0;i<N-1;i++) swap(r[i],r[i+1]); return r; }
@@ -87,13 +87,14 @@ generic vec normalize(const vec& a){ return a/length(a); }
 generic bool isNaN(const vec& v){ for(uint i: range(N)) if(isNaN(v[i])) return true; return false; }
 generic bool isNumber(const vec& v){ for(uint i: range(N)) if(!isNumber(v[i])) return false; return true; }
 
-generic String str(const vec& v) {
+#undef generic
+#define generic template<Type T>
+
+template<template<Type> Type V, Type T, uint N> inline String str(const vec& v) {
 	array<char> s(6*N, 0); s.append('('); for(uint i: range(N)) { s.append(str(v[i])); if(i<N-1) s.append(", "); } s.append(')'); return move(s);
 }
 
 #undef vec
-#undef generic
-#define generic template<Type T>
 
 generic struct xy { T x,y; };
 /// Integer x,y vector (8bit)

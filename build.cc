@@ -177,7 +177,7 @@ struct Build {
             }
 			Folder(tmp+"/"+join(flags,"-")+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
             log(target);
-			pids.append( execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1y", "-Wall", "-Wextra", "-Wno-overloaded-virtual", //"-fno-rtti",
+			pids.append( execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1z", "-Wall", "-Wextra", "-Wno-overloaded-virtual", //"-fno-rtti",
 												  "-march=native", "-o" , object, fileName,  "-I/usr/include/libdrm", "-I/usr/include/freetype2"} + toRefs(args), false) );
             needLink = true;
         }

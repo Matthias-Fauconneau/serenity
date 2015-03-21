@@ -12,9 +12,6 @@ template<Type K, Type V> struct map {
     array<V> values;
 
     map(){}
-    map(const ref<key_value<K,V>>& pairs) {
-        for(const key_value<K,V>& pair: pairs) keys<<pair.key, values<<pair.value;
-    }
 	map(buffer<K>&& keys, const mref<V> values) : keys(move(keys)), values(moveRef(values)) { assert(keys.size==values.size); }
     map(buffer<K>&& keys, buffer<V>&& values) : keys(move(keys)), values(move(values)) { assert(keys.size==values.size); }
 
@@ -98,7 +95,7 @@ template<Type K, Type V> struct map {
     iterator begin() { return iterator(keys.begin(),values.begin()); }
     iterator end() { return iterator(keys.end(),values.end()); }
 
-    template<Type F> map& filter(F f) { for(size_t i=0; i<size();) if(f(keys[i], values[i])) { keys.removeAt(i), values.removeAt(i); } else i++; return *this; }
+	template<Type F> map& filter(F f) { for(size_t i=0; i<size();) if(f(keys[i], values[i])) { keys.removeAt(i); values.removeAt(i); } else i++; return *this; }
 
 	void append(const map& b) { for(const_pair<K, V> e: b) { assert_(!contains(e.key)); insert(copy(e.key), copy(e.value)); } }
 	void append(map&& b) { for(pair<K, V> e: b) { assert_(!contains(e.key)); insert(move(e.key), move(e.value)); } }
@@ -119,5 +116,5 @@ template<Type K, Type V> String str(const map<K,V>& m, string separator=", ") {
 }
 
 /// Associates each argument's name with its string conversion
-template<Type... Args> map<string,String> withName(string names, const Args&... args) { return map<string,String>{split(names,", "),{str(args)...}}; }
+template<Type... Args> map<string,String> withName(string names, const Args&... args) { return {split(names,", "),{str(args)...}}; }
 #define withName(args...) withName(#args, args)

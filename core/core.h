@@ -272,8 +272,7 @@ generic struct mref : ref<T> {
 	mref<T> sliceRange(size_t start, size_t stop) const { return slice(start, stop-start); }
 
 	/// Initializes the element at index
-	T& set(size_t index, const T& value) const { return *(new (&at(index)) T(value)); }
-	/// Initializes the element at index
+	T& set(size_t index, const T& value) const { return *(new (&at(index)) T(value)); } /// Initializes the element at index
 	T& set(size_t index, T&& value) const { return *(new (&at(index)) T(::move(value))); }
 	/// Initializes the element at index
 	template<Type... Args> T& set(size_t index, Args&&... args) const { return *(new (&at(index)) T{forward<Args>(args)...}); }

@@ -51,7 +51,7 @@ template<> inline map<String, String> parse<map<String, String>>(TextData& s) {
 	return target;
 }
 
-template<template<typename> class V, Type T, uint N> vec<V,T,N> parseVector/*<vec<V,T,N>>*/(TextData& s) {
+template<template<Type> Type V, Type T, uint N> vec<V,T,N> parseVector/*<vec<V,T,N>>*/(TextData& s) {
 	bool bracket = s.match('(');
 	vec<V,T,N> value;
 	value[0] = parse<T>(s); // Assigns a single value to all components
