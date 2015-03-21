@@ -1,7 +1,6 @@
 #pragma once
 /// \file simd.h SIMD intrinsics (SSE, AVX, ...)
 #include "core.h"
-#define inline inline notrace
 
 // v4si
 typedef int v4si __attribute((__vector_size__(16)));

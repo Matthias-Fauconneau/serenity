@@ -133,8 +133,7 @@ inline String str(float n, uint precision=2, uint exponent=0) { return str(doubl
 String binaryPrefix(uint64 value, string unit="B"_, string unitSuffix=""_);
 
 /// Converts arrays
-template<Type T, typename enable_if<!is_same<char, T>::value>::type* = nullptr>
-String str(const ref<T> source, string separator=" "_) {
+generic String str(const ref<T> source, string separator=" "_) {
 	array<char> target;
     target.append('[');
     for(uint i: range(source.size)) {

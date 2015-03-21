@@ -6,6 +6,7 @@ build.cc
 
 core/core.h
 core/array.h
+core/math.h
 core/string.h
 core/string.cc
 core/vector.h
@@ -13,8 +14,9 @@ core/image.h
 core/image.cc
 core/simd.h
 core/map.h
-core/thread.cc
 core/file.h
+core/data.h
+core/thread.cc
 
 io/png.cc
 io/jpeg.cc

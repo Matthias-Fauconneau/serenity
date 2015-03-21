@@ -12,8 +12,8 @@ generic inline constexpr T cb(const T& x) { return x*x*x; }
 /// Declares real as a double-precision floating point number
 typedef double real;
 
-notrace inline float abs(float x) { return __builtin_fabsf(x); }
-notrace inline real abs(real x) { return __builtin_fabs(x); }
+inline float abs(float x) { return __builtin_fabsf(x); }
+inline real abs(real x) { return __builtin_fabs(x); }
 
 constexpr real nanf = __builtin_nanf("");
 constexpr real nan = __builtin_nan("");
@@ -24,9 +24,9 @@ inline bool isNumber(float x) { return !isNaN(x) && x !=inf && x !=-inf; }
 
 inline float floor(float x) { return __builtin_floorf(x); }
 inline real floor(real x) { return __builtin_floor(x); }
-notrace inline float fract(float x) { return x - floor(x); }
-notrace inline float round(float x) { return __builtin_roundf(x); }
-notrace inline real round(real x) { return __builtin_round(x); }
+inline float fract(float x) { return x - floor(x); }
+inline float round(float x) { return __builtin_roundf(x); }
+inline real round(real x) { return __builtin_round(x); }
 inline float ceil(float x) { return __builtin_ceilf(x); }
 inline real ceil(real x) { return __builtin_ceil(x); }
 inline real mod(real q, real d) { return __builtin_fmod(q, d); }
@@ -43,7 +43,7 @@ constexpr real PI = 3.14159265358979323846;
 inline real cos(real t) { return __builtin_cos(t); }
 inline float cos(float t) { return __builtin_cos(t); }
 inline real acos(real t) { return __builtin_acos(t); }
-notrace inline real sin(real t) { return __builtin_sin(t); }
+inline real sin(real t) { return __builtin_sin(t); }
 inline float sin(float t) { return __builtin_sin(t); }
 inline real asin(real t) { return __builtin_asin(t); }
 inline real tan(real t) { return __builtin_tan(t); }

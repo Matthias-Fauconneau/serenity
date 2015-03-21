@@ -2,8 +2,7 @@
 /// \file core.h Keywords, traits, move semantics, range, ref, debug
 
 // Keywords
-#define notrace
-//__attribute((no_instrument_function))
+#define inline inline __attribute((no_instrument_function))
 #define unused __attribute((unused))
 #define packed __attribute((packed))
 #define Type typename
@@ -13,38 +12,18 @@
 #define no_copy(T) T(const T&)=delete; T& operator=(const T&)=delete; T(T&& o) = delete;
 
 // Traits
-struct true_type { static constexpr bool value = true; };
-struct false_type{ static constexpr bool value = false; };
-template<Type> struct is_lvalue_reference : false_type {};
-generic struct is_lvalue_reference<T&> : true_type {};
-template<Type A, Type B> struct is_same : false_type {};
-generic struct is_same<T, T> : true_type {};
-template<bool B, Type T = void> struct enable_if {};
-generic struct enable_if<true, T> { typedef T type; };
-generic struct declval_protector {
-	static const bool stop = false;
-	static T&& delegate();
-};
-generic inline T&& declval() noexcept {
-	static_assert(declval_protector<T>::__stop, "declval() must not be used!");
-	return declval_protector<T>::__delegate();
-}
-template<Type From, Type To> struct is_convertible {
-	template<Type T> static void test(T);
-	template<Type F, Type T, Type = decltype(test<T>(declval<F>()))> static true_type test(int);
-	template<Type, Type> static false_type test(...);
-	static constexpr bool value = decltype(test<From, To>(0))::value;
-};
+template<Type> struct is_lvalue_reference { static constexpr bool value = false; };
+generic struct is_lvalue_reference<T&> { static constexpr bool value = true; };
 
 // Move semantics
 generic struct remove_reference { typedef T type; };
 generic struct remove_reference<T&> { typedef T type; };
 generic struct remove_reference<T&&> { typedef T type; };
 /// Allows move assignment
-generic inline notrace constexpr Type remove_reference<T>::type&& __attribute((warn_unused_result)) move(T&& t)
+generic inline constexpr Type remove_reference<T>::type&& __attribute((warn_unused_result)) move(T&& t)
 { return (Type remove_reference<T>::type&&)(t); }
 /// Swap values (using move semantics as necessary)
-generic inline notrace void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
+generic inline void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 /// Forwards references and copyable values
 generic constexpr T&& forward(Type remove_reference<T>::type& t) { return (T&&)t; }
 /// Forwards moveable values
@@ -88,24 +67,24 @@ constexpr size_t invalid = -1; // Invalid index
 // -- Number arithmetic
 template<Type A, Type B> bool operator >(const A& a, const B& b) { return b<a; }
 template<Type A, Type B> bool operator >=(const A& a, const B& b) { return b<=a; }
-generic notrace T min(T a, T b) { return a<b ? a : b; }
-generic notrace T max(T a, T b) { return a<b ? b : a; }
+generic inline T min(T a, T b) { return a<b ? a : b; }
+generic inline T max(T a, T b) { return a<b ? b : a; }
 generic T clamp(T min, T x, T max) { return x < min ? min : max < x ? max : x; }
 generic T abs(T x) { return x>=0 ? x : -x; }
 inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
 
 /// Numeric range
 struct range {
-	notrace range(int start, int stop) : start(start), stop(stop){}
-	notrace range(int size) : range(0, size){}
+	inline range(int start, int stop) : start(start), stop(stop){}
+	inline range(int size) : range(0, size) {}
     struct iterator {
 		int i;
-		notrace int operator*() { return i; }
-		notrace iterator& operator++() { i++; return *this; }
-		notrace bool operator !=(const iterator& o) const { return i<o.i; }
+		inline int operator*() { return i; }
+		inline iterator& operator++() { i++; return *this; }
+		inline bool operator !=(const iterator& o) const { return i<o.i; }
     };
-	notrace iterator begin() const { return {start}; }
-	notrace iterator end() const { return {stop}; }
+	inline iterator begin() const { return {start}; }
+	inline iterator end() const { return {stop}; }
     explicit operator bool() const { return start < stop; }
 	int size() { return stop-start; }
 	int start, stop;
@@ -113,16 +92,16 @@ struct range {
 
 /// Numeric range
 struct reverse_range {
-	notrace reverse_range(int start, int stop) : start(start), stop(stop){}
-	notrace reverse_range(int size) : reverse_range(size-1, -1){}
+	inline reverse_range(int start, int stop) : start(start), stop(stop){}
+	inline reverse_range(int size) : reverse_range(size-1, -1){}
 	struct iterator {
 		int i;
-		notrace int operator*() { return i; }
-		notrace iterator& operator++() { i--; return *this; }
-		notrace bool operator !=(const iterator& o) const { return i>o.i; }
+		inline int operator*() { return i; }
+		inline iterator& operator++() { i--; return *this; }
+		inline bool operator !=(const iterator& o) const { return i>o.i; }
 	};
-	notrace iterator begin() const { return {start}; }
-	notrace iterator end() const { return {stop}; }
+	inline iterator begin() const { return {start}; }
+	inline iterator end() const { return {stop}; }
 	explicit operator bool() const { return start > stop; }
 	int size() { return start-stop; }
 	int start, stop;
@@ -130,7 +109,6 @@ struct reverse_range {
 
 // -- initializer_list
 
-#ifndef _INITIALIZER_LIST
 namespace std { generic struct initializer_list {
     const T* data;
     size_t length;
@@ -139,7 +117,6 @@ namespace std { generic struct initializer_list {
     constexpr const T* begin() const noexcept { return data; }
     constexpr const T* end() const { return (T*)data+length; }
 }; }
-#endif
 
 // -- ref
 
@@ -154,9 +131,9 @@ generic struct Ref {
     size_t size = 0;
 
     /// Default constructs an empty reference
-	notrace constexpr Ref() {}
+	inline constexpr Ref() {}
     /// References \a size elements from const \a data pointer
-	notrace constexpr Ref(const T* data, size_t size) : data(data), size(size) {}
+	inline constexpr Ref(const T* data, size_t size) : data(data), size(size) {}
     /// Converts a real std::initializer_list to ref
 	constexpr Ref(const std::initializer_list<T>& list) : data(list.begin()), size(list.size()) {}
     /// Explicitly references a static array
@@ -167,15 +144,15 @@ generic struct Ref {
 
     const T* begin() const { return data; }
     const T* end() const { return data+size; }
-	notrace const T& at(size_t i) const;
-	notrace const T& operator [](size_t i) const { return at(i); }
+	inline const T& at(size_t i) const;
+	inline const T& operator [](size_t i) const { return at(i); }
     const T& last() const { return at(size-1); }
 
     /// Slices a reference to elements from \a pos to \a pos + \a size
-	notrace ref<T> slice(size_t pos, size_t size) const;
-	notrace ref<T> sliceRange(size_t begin, size_t end) const;
+	inline ref<T> slice(size_t pos, size_t size) const;
+	inline ref<T> sliceRange(size_t begin, size_t end) const;
     /// Slices a reference to elements from \a pos to the end of the reference
-	notrace ref<T> slice(size_t pos) const;
+	inline ref<T> slice(size_t pos) const;
 
 	struct reverse_ref {
 		const T* start; const T* stop;
@@ -210,9 +187,9 @@ generic struct Ref {
 template<> struct ref<char> : Ref<char> {
 	using Ref::Ref;
 	constexpr ref() {}
-	notrace constexpr ref(const char* data, size_t size) : Ref<char>(data, size) {}
+	inline constexpr ref(const char* data, size_t size) : Ref<char>(data, size) {}
 	/// Implicitly references a string literal
-	template<size_t N> constexpr ref(char const(&a)[N]) : ref(a, N-1 /*Does not include trailling zero byte*/) {}
+	template<size_t N> constexpr ref(char const (&a)[N]) : ref(a, N-1 /*Does not include trailling zero byte*/) {}
 };
 
 /// Returns const reference to memory used by \a t
@@ -222,7 +199,7 @@ generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 typedef ref<char> string;
 
 /// Returns const reference to a static string literal
-inline notrace constexpr string operator "" _(const char* data, size_t size) { return string(data,size); }
+inline constexpr string operator "" _(const char* data, size_t size) { return string(data,size); }
 
 // -- Log
 
@@ -233,8 +210,8 @@ void log(string message);
 // -- Debug
 
 /// Logs a message to standard output and signals all threads to log their stack trace and abort
-template<Type... Args> void error(const Args&... args)  __attribute((noreturn));
-template<> void error(const string& message) __attribute((noreturn));
+template<Type... Args> void  __attribute((noreturn)) error(const Args&... args);
+template<> void __attribute((noreturn)) error(const string& message);
 
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message (even in release)
 #define assert_(expr, message...) ({ if(!(expr)) error(#expr ""_, ## message); })
@@ -246,10 +223,10 @@ template<> void error(const string& message) __attribute((noreturn));
 #endif
 
 // -- ref
-generic notrace const T& Ref<T>::at(size_t i) const { assert(i<size, i, size); return data[i]; }
-generic notrace ref<T> Ref<T>::slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos, size); }
-generic notrace ref<T> Ref<T>::sliceRange(size_t begin, size_t end) const { assert(end<=this->size); return ref<T>(data+begin, end-begin); }
-generic notrace ref<T> Ref<T>::slice(size_t pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
+generic inline const T& Ref<T>::at(size_t i) const { assert(i<size, i, size); return data[i]; }
+generic inline ref<T> Ref<T>::slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos, size); }
+generic inline ref<T> Ref<T>::sliceRange(size_t begin, size_t end) const { assert(end<=this->size); return ref<T>(data+begin, end-begin); }
+generic inline ref<T> Ref<T>::slice(size_t pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
 
 // -- FILE
 
@@ -274,7 +251,7 @@ generic struct mref : ref<T> {
 	/// Default constructs an empty reference
 	mref(){}
 	/// References \a size elements from \a data pointer
-	notrace mref(T* data, size_t size) : ref<T>(data,size) {}
+	inline mref(T* data, size_t size) : ref<T>(data,size) {}
 	/// Converts an std::initializer_list to mref
 	constexpr mref(std::initializer_list<T>&& list) : ref<T>(list.begin(), list.size()) {}
 	/// Converts a static array to ref
@@ -284,13 +261,13 @@ generic struct mref : ref<T> {
 	explicit operator T*() const { return (T*)data; }
 	T* begin() const { return (T*)data; }
 	T* end() const { return (T*)data+size; }
-	notrace T& at(size_t i) const { return (T&)ref<T>::at(i); }
-	notrace T& operator [](size_t i) const { return at(i); }
+	inline T& at(size_t i) const { return (T&)ref<T>::at(i); }
+	inline T& operator [](size_t i) const { return at(i); }
 	T& first() const { return at(0); }
 	T& last() const { return at(size-1); }
 
 	/// Slices a reference to elements from \a pos to \a pos + \a size
-    notrace mref<T> slice(size_t pos, size_t size) const { assert(pos+size <= this->size, pos, size, this->size); return mref<T>((T*)data+pos, size); }
+	inline mref<T> slice(size_t pos, size_t size) const { assert(pos+size <= this->size, pos, size, this->size); return mref<T>((T*)data+pos, size); }
 	/// Slices a reference to elements from to the end of the reference
 	mref<T> slice(size_t pos) const { assert(pos<=size); return mref<T>((T*)data+pos,size-pos); }
 	/// Slices a reference to elements from \a start to \a stop

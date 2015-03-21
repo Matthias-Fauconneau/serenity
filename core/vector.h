@@ -9,18 +9,18 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
     static_assert(sizeof(V<T>)==N*sizeof(T),"");
 
     /// Defaults initializes to zero
-    notrace vec() : vec(0) {}
+	inline vec() : vec(0) {}
     /// Initializes all components to the same value \a v
-    notrace vec(T v){ for(uint i: range(N)) at(i)=v; }
+	inline vec(T v){ for(uint i: range(N)) at(i)=v; }
     /// Initializes components separately
-	template<Type... Args> notrace explicit constexpr vec(T a, T b, Args... args) : V<T>{a,b,T(args)...} {
+	template<Type... Args> inline explicit constexpr vec(T a, T b, Args... args) : V<T>{a,b,T(args)...} {
 		static_assert(sizeof...(args) == N-2, "Invalid number of arguments");
     }
     /// Initializes components from a fixed size array
-    template<Type... Args> notrace explicit vec(const T o[N]){ for(uint i: range(N)) at(i)=(T)o[i]; }
+	template<Type... Args> inline explicit vec(const T o[N]){ for(uint i: range(N)) at(i)=(T)o[i]; }
 
     /// Initializes components from another vec \a o casting from \a S to \a T
-    template<Type S> notrace explicit vec(const vec<V,S,N>& o) { for(uint i: range(N)) at(i)=(T)o[i]; }
+	template<Type S> inline explicit vec(const vec<V,S,N>& o) { for(uint i: range(N)) at(i)=(T)o[i]; }
 
 	/// Initializes first components from another vec \a o and initializes remaining components with args...
 	template<template<typename> class W, Type... Args> vec(const vec<W,T,N-sizeof...(Args)>& o, Args... args){
@@ -31,14 +31,14 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
     operator ref<T>() const { return ref<T>((T*)this, N); }
 
     /// \name Accessors
-    notrace const T& at(uint i) const { return ((T*)this)[i]; }
-    notrace T& at(uint i) { return ((T*)this)[i]; }
-    notrace const T& operator[](uint i) const { return at(i); }
-    notrace T& operator[](uint i) { return at(i); }
+	inline const T& at(uint i) const { return ((T*)this)[i]; }
+	inline T& at(uint i) { return ((T*)this)[i]; }
+	inline const T& operator[](uint i) const { return at(i); }
+	inline T& operator[](uint i) { return at(i); }
 
     /// \name Operators
     explicit operator bool() const { for(uint i: range(N)) if(at(i)!=0) return true; return false; }
-	notrace vec& operator +=(const vec& v) { for(uint i: range(N)) at(i)+=v[i]; return *this; }
+	inline vec& operator +=(const vec& v) { for(uint i: range(N)) at(i)+=v[i]; return *this; }
     vec& operator -=(const vec& v) { for(uint i: range(N)) at(i)-=v[i]; return *this; }
     vec& operator *=(const vec& v) { for(uint i: range(N)) at(i)*=v[i]; return *this; }
     vec& operator *=(const T& s) { for(uint i: range(N)) at(i)*=s; return *this; }
@@ -47,7 +47,7 @@ template<template<typename> class V, Type T, uint N> struct vec : V<T> {
 };
 
 #undef generic
-#define generic template<template<typename> class V, Type T, uint N> inline notrace
+#define generic template<template<typename> class V, Type T, uint N> inline
 #define vec vec<V,T,N>
 
 generic vec rotate(const vec& u) { vec r=u; for(uint i=0;i<N-1;i++) swap(r[i],r[i+1]); return r; }
@@ -167,8 +167,8 @@ generic struct rgba {
 struct byte4 : vec<bgra,uint8,4> {
 	//using vec::vec;
     byte4() : vec(0) {} // Defaults initalizes to zero
-    notrace byte4(byte v) : vec(v) {}
-	notrace byte4(byte b, byte g, byte r, byte a=0xFF) : vec(b,g,r,a) {}
+	inline byte4(byte v) : vec(v) {}
+	inline byte4(byte b, byte g, byte r, byte a=0xFF) : vec(b,g,r,a) {}
 	// bgr
 	byte4(byte3 bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
 	//byte3 bgr() { return byte3(b, g, r); } // -> bgra

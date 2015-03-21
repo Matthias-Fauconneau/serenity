@@ -7,7 +7,7 @@ void BitReader::skip(int count) { index+=count; }
 
 uint BitReader::bit() { uint8 bit = uint8(data[index/8]<<(index&7))>>7; index++; return bit; }
 
-notrace uint BitReader::binary(int size) {
+inline uint BitReader::binary(int size) {
 	assert(size <= 32 && index < bitSize);
     uint value = (big64(*(uint64*)(data+index/8)) << (index&7)) >> int8(64-size);
     index += size;
@@ -100,7 +100,7 @@ void FLAC::parseFrame() {
     this->blockSize = blockSize;
 }
 
-notrace inline double roundDown(double x) { // Depends on setRoundMode(Down) to round towards negative infinity
+inline double roundDown(double x) { // Depends on setRoundMode(Down) to round towards negative infinity
 	const double lead = 0x1p52+0x1p51; // Adds leading bit to force rounding (+1p51 to also force negative numbers)
     return x+lead-lead; // WARNING: miscompiles with -Ofast !
 }
