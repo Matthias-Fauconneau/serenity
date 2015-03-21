@@ -255,8 +255,8 @@ struct Parser : TextData {
 					if(type() && (wouldMatch(",") || wouldMatch(">"))) commit();
 					else {
 						backtrack();
-						if(expression()) {}
-						else return backtrack();
+						if(expression(true)) {}
+						else { error("template"); return backtrack(); }
 					}
 				} while(match(","));
 				if(!match(">")) return backtrack();
@@ -374,11 +374,12 @@ struct Parser : TextData {
 		string name = identifier(variableUse);
 		if(!name) return {};
 		const Scope* scope = findVariable(name);
-		if(!scope) return {Expression::Variable};
-		target.size = rewind;
-		const Location& location = scope->variables.at(name);
-		assert_(location);
-		target.append(color(link(name, location), scope->struct_ ? memberUse : variableUse));
+		if(scope) {
+			target.size = rewind;
+			const Location& location = scope->variables.at(name);
+			assert_(location);
+			target.append(color(link(name, location), scope->struct_ ? memberUse : variableUse));
+		}
 		return {Expression::Variable,{}, name};
 	}
 
@@ -395,9 +396,9 @@ struct Parser : TextData {
 		if(match("(")) {
 			if(!match(")")) {
 				do {
-					if(!expression()) { error("opCall"); backtrack(); return {}; }
+					if(!expression()) { error("opCall Expression"); backtrack(); return {}; }
 				} while(match(","));
-				if(!match(")")) { error("opCall"); backtrack(); return {}; }
+				if(!match(")")) { error("opCall )"); backtrack(); return {}; }
 			}
 			commit(); return {Expression::Value};
 		}
@@ -428,13 +429,20 @@ struct Parser : TextData {
 
 	Expression opPrefix() {
 		push();
-		if(matchAny({"!","&","*","-","+","~"}) && expression()) { commit(); return {Expression::Prefix}; }
+		string op = matchAny({"!","&","*","-","+","~"});
+		if(op && expression()) { commit(); return {Expression::Prefix,{}, op}; }
 		else { backtrack(); return {}; }
 	}
 
-	Expression constructorCast() {
+	/*Expression constructorCast() { = constructorCall
 		push();
 		if((type() && match("(") && expression() && match(")"))) { commit(); return {Expression::Cast}; }
+		backtrack(); return {};
+	}*/
+
+	Expression constructorCall() {
+		push();
+		if(type() && (opCall() || initializer_list())) { commit(); return {Expression::Value}; }
 		backtrack(); return {};
 	}
 
@@ -477,12 +485,16 @@ struct Parser : TextData {
 		backtrack(); return {};
 	}
 
-	Expression opBinary() { // Expr Op Expr
+	Expression opBinary(Expression& a, bool templateArgument) { // Expr op Expr
 		push();
-		string op = matchAny(ref<string>{"==","=","!=","<=","<",">=",">","&&","||","+","-","*","/","%","<<",">>","&","|"});
-		if(op && expression()) {
-			commit();
-			return {Expression::Binary};
+		string op = matchAny(ref<string>{"==","=","!=","<=","<",">=","&&","||","+","-","*","/","%","<<",">>","&","|"});
+		if(!op && !templateArgument && match(">")) op=">"; // Workaround to stop too greedy expression parse of template arguments
+		if(op) {
+			Expression b = expression(templateArgument);
+			if(b) {
+				commit();
+				return {Expression::Binary, {move(a), move(b)}, op};
+			}
 		}
 		backtrack(); return {};
 	}
@@ -498,12 +510,12 @@ struct Parser : TextData {
 		backtrack(); return {};
 	}
 
-	Expression expression() {
-		Expression e = variable() ?: constructorCast() ?: opPrefix() ?: opDynamicCast() ?: opCast() ?: opBracket()
+	Expression expression(bool templateArgument=false) {
+		Expression e = /*constructorCast() ?:*/ constructorCall() ?: variable() ?: opPrefix() ?: opDynamicCast() ?: opCast() ?: opBracket()
 						   ?: keywordLiteral() ?: number() ?: character_literal() ?: string_literal() ?: sizeofPack() ?: sizeof_() ?: initializer_list() ?: lambda() ?: this_()
 						   ?: opNew() ?: opDelete();
 		if(e) for(;;) { // Closes left recursion
-			Expression r = opAssign(e) ?: opBinary() ?: opDot(e) ?: opCall() ?: opIndex() ?: opPostfix() ?: opTernary() ?: Expression();
+			Expression r = opAssign(e) ?: opBinary(e, templateArgument) ?: opDot(e) ?: opCall() ?: opIndex() ?: opPostfix() ?: opTernary() ?: Expression();
 			if(!r) break;
 			e = move(r);
 		}
@@ -616,11 +628,13 @@ struct Parser : TextData {
 		if(!match("(")) return false;
 		commit();
 		if(scope) scopes.append();
-		while(!match(")")) {
-			matchID("const");
-			if(variable_declaration(true)) {}
-			else error("function parameters"_);
-			match(",");
+		if(!match(")")) {
+			do {
+				matchID("const");
+				if(variable_declaration(true)) {}
+				else error("function parameters"_);
+			} while(match(","));
+			if(!match(")")) error("parameters");
 		}
 		return true;
 	}
