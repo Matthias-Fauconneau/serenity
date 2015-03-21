@@ -9,14 +9,14 @@ template<> Location copy(const Location& o) { return copyRef(o); }
 
 struct Scope {
 	bool struct_ = false;
-	map<string, Location> types, variables;
+	map<String, Location> types, variables;
 	map<string, Scope> scopes;
 };
 template<> Scope copy(const Scope& o) { return Scope{o.struct_, copy(o.types), copy(o.variables), copy(o.scopes)}; }
 String str(const Scope& o) { return str(o.variables, o.scopes); }
 
 struct Expression {
-	enum { Null, Value, Variable, OpAssign, Prefix, Binary, Ternary } type = Null;
+	enum { Null, Value, Variable, OpAssign, Prefix, Cast, Binary, Ternary } type = Null;
 	explicit operator bool() { return type != Null; }
 };
 String str(const Expression& o) { return str(ref<string>{"Null", "Value", "Variable", "OpAssign", "Prefix", "Binary", "Ternary"}[o.type]); }
@@ -253,7 +253,6 @@ struct Parser : TextData {
 	}
 
 	bool type() {
-		size_t begin = index;
 		push();
 		if(match("decltype")) {
 			if(!(match("(") && expression() && match(")"))) error("decltype(expression)");
@@ -264,15 +263,15 @@ struct Parser : TextData {
 		if(matchID("signed", keyword) || matchID("unsigned", keyword)) {
 			if(!matchAnyID(ref<string>{"char"_,"short","int","long long","long"}, typeUse)) error("type");
 		}
-		else if(matchAnyID(ref<string>{"void"_,"bool"_,"char"_,"short","int","long long","long"}, typeUse)) {}
+		else if(matchAnyID(ref<string>{"void"_,"bool"_,"char"_,"short","int","float","long long","long","double"}, typeUse)) {}
 		else {
+			match("::");
 			do {
 				if(!name(typeUse)) return backtrack();
 				templateArguments();
 			} while(match("::"));
 		}
 		do { matchID("const", keyword); } while(match("*"));
-		log(sliceRange(begin, index));
 		return commit();
 	}
 
@@ -366,57 +365,69 @@ struct Parser : TextData {
 			return {Expression::Prefix};
 		} else {
 			Expression e;
-			if((e = mutableExpression())) { // mutableExpression op= expression
-				if((!wouldMatch("==") && match("=")) || match(">>=")) {
-					if(!expression()) error("expression");
-					return {Expression::OpAssign};
-				}
-			} else { // value
-				e.type = Expression::Value;
-				if(matchAnyID({"true","false"}, numberLiteral)) {}
-				else if(number()) {}
-				else if(match("\'")) { // character literal
-					size_t start = index;
-					while(!TextData::match('\'')) {
-						if(TextData::match('\\')) advance(1);
-						else advance(1);
+			push();
+			if((type() && match("(") && expression() && match(")"))) { e.type = Expression::Cast; commit(); }
+			else {
+				backtrack();
+				if((e = mutableExpression())) { // mutableExpression op= expression
+					if((!wouldMatch("==") && match("=")) || matchAny({"+=","-=","*=","/=","%=","<<=",">>="})) {
+						if(!expression()) error("expression");
+						return {Expression::OpAssign};
 					}
-					target.append(color(sliceRange(start, index), stringLiteral));
-				}
-				else if(matchID("sizeof", keyword)) {
-					if(!match("(")) error("sizeof (");
-					if(!type()) error("sizeof ( type");
-					if(!match(")")) error("sizeof )");
-				}
-				else if(string_literal()) {}
-				else if(match("[")) {
-					while((matchID("this", keyword) || match("=") || match("&")) && match(",")) {}
-					if(!match("]")) error("lambda ]");
-					assert_(!stack, "lambda");
-					push();
-					if(!parameters()) scopes.append();
-					if(!block()) error("lambda {");
-					assert_(!stack, "lambda");
-					scopes.pop();
-				}
-				else if(matchID("this", keyword)) {}
-				else if(match("(")) {
-					if(opCast()) {}
-					else {
-						if(!(e = expression())) error("( expression", e);
-						if(!match(")")) error("( expression )", e);
+				} else { // value
+					e.type = Expression::Value;
+					if(matchAnyID({"false","true","nullptr"}, numberLiteral)) {}
+					else if(number()) {}
+					else if(match("\'")) { // character literal
+						size_t start = index;
+						while(!TextData::match('\'')) {
+							if(TextData::match('\\')) advance(1);
+							else advance(1);
+						}
+						target.append(color(sliceRange(start, index), stringLiteral));
 					}
-				}
-				else if(match("new")) {
-					if(match("(")) {
-						if(!expression()) error("new ( expression");
-						if(!match(")")) error("new ( expression )");
+					else if(matchID("sizeof", keyword)) {
+						if(!match("(")) error("sizeof (");
+						if(!type()) error("sizeof ( type");
+						if(!match(")")) error("sizeof )");
 					}
-					if(!type()) error("new type");
-					call() || initializer_list();
+					else if(string_literal()) {}
+					else if(match("[")) {
+						while((matchID("this", keyword) || match("=") || match("&")) && match(",")) {}
+						if(!match("]")) error("lambda ]");
+						assert_(!stack && scopes, "lambda");
+						push();
+						if(!parameters()) scopes.append();
+						if(!block()) error("lambda {");
+						assert_(!stack, "lambda");
+						scopes.pop(); assert_(scopes);
+					}
+					else if(matchID("this", keyword)) {}
+					else if(match("(")) {
+						if(opCast()) {}
+						else {
+							if(!(e = expression())) error("( expression", e);
+							if(!match(")")) error("( expression )", e);
+						}
+					}
+					else if(matchID("new", keyword)) {
+						if(match("(")) {
+							if(!expression()) error("new ( expression");
+							if(!match(")")) error("new ( expression )");
+						}
+						if(!type()) error("new type");
+						call() || initializer_list();
+					}
+					else if(match("delete", keyword)) {
+						if(!variable()) error("delete variable");
+					}
+					else if(match("dynamic_cast", keyword)) {
+						if(match("<") && type() && match(">") && match("(") && expression() && match(")")) {}
+						else error("dynamic_cast < type > ( expression )");
+					}
+					else if(initializer_list()) {}
+					else return {};
 				}
-				else if(initializer_list()) {}
-				else return {};
 			}
 
 			for(;;) {
@@ -424,7 +435,6 @@ struct Parser : TextData {
 				 // FIXME: precedence
 				string op;
 				if((op = matchAny(ref<string>{"==","=","!=","<=","<",">=",">","&&","||","+","-","*","/","%"}))) { // expression binary expression
-					log(op);
 					if(!expression()) error(op, "expression");
 					return {Expression::Binary};
 				}
@@ -451,7 +461,8 @@ struct Parser : TextData {
 		if(!variableName) return false;
 		commit();
 		assert_(!stack, "variable_declaration");
-		scopes.last().variables.insert(variableName, fileName+max(1u,location));
+		if(scopes.last().variables.contains(variableName)) error("duplicate declaration", variableName, scopes.last().variables.keys);
+		scopes.last().variables.insert(copyRef(variableName), fileName+max(1u,location));
 		if(initializer_list()) {}
 		else if(match("=")) {
 			if(!(initializer_list() || expression())) error("initializer");
@@ -496,30 +507,26 @@ struct Parser : TextData {
 		return true;
 	}
 
-	bool templateParameters() {
-		if(match("<")) {
-			if(match(">")) return true; // Template specialization
-			do {
-				if(match("Type..."_, keyword) || matchID("Type", keyword)) {
-					string typeName = name(typeDeclaration);
-					if(typeName) {
-						if(match("=")) {
-							if(!type()) error("default type");
-						}
+	bool templateDeclaration() {
+		assert_(scopes);
+		if(matchID("generic", keyword)) { scopes.append(); return true; }
+		if(!matchID("template", keyword)) return false;
+		if(!match("<")) error("template <");
+		scopes.append();
+		if(match(">")) return true; // Template specialization
+		do {
+			if(match("Type..."_, keyword) || matchID("Type", keyword)) {
+				string typeName = name(typeDeclaration);
+				if(typeName) {
+					if(match("=")) {
+						if(!type()) error("default type");
 					}
 				}
-				else if(type()) { push(); if(!variable_name()) backtrack(); }
-				else error("templateParameters"_);
-			} while(match(","));
-			if(!match(">")) error("templateParameters >"_);
-		}
-		return true;
-	}
-
-	bool templateDeclaration() {
-		if(matchID("generic", keyword)) return true;
-		if(!matchID("template", keyword)) return false;
-		templateParameters();
+			}
+			else if(type()) { push(); if(!variable_name()) backtrack(); }
+			else error("templateParameters"_);
+		} while(match(","));
+		if(!match(">")) error("template < >"_);
 		return true;
 	}
 
@@ -542,11 +549,11 @@ struct Parser : TextData {
 		return true;
 	}
 
-	bool parameters() {
+	bool parameters(bool scope=true) {
 		if(!match("(")) return false;
 		commit();
-		assert_(!stack, "parameters");
-		scopes.append();
+		assert_(!stack && scopes, "parameters");
+		if(scope) scopes.append();
 		while(!match(")")) {
 			matchID("const", keyword);
 			if(variable_declaration(true)) {}
@@ -556,24 +563,27 @@ struct Parser : TextData {
 		return true;
 	}
 
-	bool constructor() {
+	bool constructor(bool isGeneric=false) {
 		push();
 		matchID("inline", keyword);
 		matchID("explicit", keyword);
 		matchID("constexpr", keyword);
-		if(!(identifier() && parameters())) return backtrack();
-		if(match(":")) {
-			do {
-				if(!variable()) error("initializer field");
-				if(!match("(")) error("initializer (");
-				if(!expression()) error("initializer expression");
-				while(match(",")) if(!expression()) error("initializer expression");
-				if(!match(")")) error("initializer )");
-			} while(match(","));
+		if(!(identifier() && parameters(!isGeneric))) return backtrack();
+		if(!match(";")) {
+			if(match(":")) {
+				do {
+					if(!variable()) error("initializer field");
+					if(!match("(")) error("initializer (");
+					if(!expression()) error("initializer expression");
+					while(match(",")) if(!expression()) error("initializer expression");
+					if(!match(")")) error("initializer )");
+				} while(match(","));
+			}
+			if(!block()) error("constructor");
 		}
-		if(!block()) error("constructor");
 		assert_(!stack);
 		scopes.pop();
+		assert_(scopes);
 		return true;
 	}
 
@@ -587,11 +597,15 @@ struct Parser : TextData {
 
 	bool function(bool isGeneric = false) {
 		push();
-		if(matchID("extern", keyword)) match("\"C\"", keyword);
-		matchID("static", keyword)
-		|| matchID("inline", keyword);
-		matchID("constexpr", keyword);
-		matchID("explicit", keyword);
+		for(;;) {
+			if(matchID("extern", keyword)) match("\"C\"", keyword);
+			else if(matchID("static", keyword)
+					|| matchID("inline", keyword)
+					|| matchID("virtual", keyword)) continue;
+			else if(matchID("explicit", keyword)) continue;
+			else if(matchID("constexpr", keyword)) continue;
+			else break;
+		}
 		if(matchID("operator", keyword) && type()) {
 			match("&&") || match("&");
 		}
@@ -604,8 +618,7 @@ struct Parser : TextData {
 			}
 			if(matchID("operator", keyword)) {
 				string op;
-				if((op = matchAny({"==","=","&","->","!=","<=","<",">=",">","++","+","--","-","*","/","[]","()","new"}))) {
-					log("prefix", op);
+				if((op = matchAny({"==","=","&","->","!=","!","<=","<",">=",">","++","+","--","-","*","/","[]","()","new"}))) {
 				}
 				else if(match("\"\"")) {
 					if(!name()) error("operator \"\"name");
@@ -616,24 +629,23 @@ struct Parser : TextData {
 			else return backtrack();
 		}
 		else return backtrack();
-		if(!parameters()) return backtrack();
+		if(!parameters(!isGeneric)) return backtrack();
 		matchID("const", keyword);
 		matchID("override", keyword);
 		matchID("noexcept", keyword);
 		if(match("->")) if(!type()) error("function -> type");
 		if(!(block() || match(";"))) error("function");
 		assert_(!stack);
-		scopes.pop();
+		scopes.pop(); assert_(scopes);
 		return true;
 	}
 
-	bool struct_(bool allowGeneric=true) {
+	bool struct_(bool isGeneric) {
 		push();
-		if(allowGeneric) templateDeclaration();
 		if(!matchID("struct", keyword)) return backtrack();
 		commit();
-		assert_(!stack, "struct");
-		scopes.append({true,{},{},{}});
+		assert_(!stack && scopes, "struct");
+		if(!isGeneric) scopes.append({true,{},{},{}});
 		string name = identifier(typeDeclaration);
 		templateSpecialization();
 		if(match(":")) {
@@ -656,8 +668,9 @@ struct Parser : TextData {
 			}
 			assert_(!stack, "struct");
 			Scope s = scopes.pop();
+			assert_(scopes);
 			scopes.last().scopes[name].variables.append(move(s.variables));
-		} else scopes.pop();
+		} else { scopes.pop(); assert_(scopes); }
 		return true;
 	}
 
@@ -671,16 +684,17 @@ struct Parser : TextData {
 
 	bool declaration() {
 		if(templateDeclaration()) {
-			if(function(true)) return true;
-			if(struct_(false)) {
+			if(constructor(true) || function(true)) return true;
+			else if(struct_(true)) {
 				push();
 				if(!variable_name()) backtrack();
 				if(!match(";")) error("declaration ;"_);
 				return true;
 			}
+			else error("template");
 		}
 		if(using_() || typedef_() || function(false)) return true;
-		if(struct_()) {
+		if(struct_(false)) {
 			push();
 			if(!variable_name()) backtrack();
 			if(!match(";")) error("declaration"_);
@@ -791,9 +805,10 @@ struct Parser : TextData {
 	bool block() {
 		if(!match("{")) return false;
 		assert_(!stack, "block");
+		assert_(scopes);
 		scopes.append();
 		while(!match("}")) statement();
-		scopes.pop();
+		scopes.pop(); assert_(scopes);
 		return true;
 	}
 

@@ -50,6 +50,7 @@ struct IDE {
 	}
 
 	void parse(array<Scope>& scopes, string fileName) {
+		if(edits.contains(fileName)) return;
 		FileTextEdit edit(fileName, scopes, {this, &IDE::parse});
 		edit.edit.linkActivated = [this](ref<uint> identifier) {
 			assert_(identifier);
