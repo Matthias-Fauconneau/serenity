@@ -238,10 +238,8 @@ generic inline ref<T> Ref<T>::slice(size_t pos) const { assert(pos<=size); retur
 
 // -- mref
 
-#ifndef _NEW
 /// Initializes memory using a constructor (placement new)
 inline void* operator new(size_t, void* p) noexcept { return p; }
-#endif
 
 /// Unmanaged fixed-size mutable reference to an array of elements
 generic struct mref : ref<T> {

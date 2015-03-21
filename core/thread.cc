@@ -139,14 +139,6 @@ void setExceptions(uint except) {
 }
 
 void __attribute((constructor(102))) setup_signals() {
-#if 0
-    /// Limits process ressources to avoid hanging the system when debugging
-    { rlimit limit; getrlimit(RLIMIT_STACK,&limit); limit.rlim_cur=1<<24;/*16M*/ setrlimit(RLIMIT_STACK,&limit); }
-    { rlimit limit; getrlimit(RLIMIT_DATA,&limit); limit.rlim_cur=1<<31;/*2GB*/ setrlimit(RLIMIT_DATA,&limit); }
-    { rlimit limit; getrlimit(RLIMIT_AS,&limit); limit.rlim_cur=1ul<<32;/*4GB*/ setrlimit(RLIMIT_AS,&limit); }
-    setpriority(PRIO_PROCESS,0,19);
-#endif
-#ifndef RELEASE
     /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
     struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={{}};
     check(sigaction(SIGABRT, &sa, 0));
@@ -154,7 +146,6 @@ void __attribute((constructor(102))) setup_signals() {
     check(sigaction(SIGTERM, &sa, 0));
     check(sigaction(SIGTRAP, &sa, 0));
     check(sigaction(SIGFPE, &sa, 0));
-#endif
     enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
     //setExceptions(Invalid /*| Denormal*/ | DivisionByZero /*| Overflow *//*| Underflow *//*| Precision*/);
 }

@@ -160,24 +160,28 @@ struct Parser : TextData {
 		return true;
 	}
 
+	bool ppExpression() {
+		size_t begin = index;
+		while(!TextData::match('\n')) {
+			if(TextData::match("\\\n")) {}
+			else advance(1);
+		}
+		return target.append(toUCS4(sliceRange(begin, index)));
+	}
+
 	bool define() {
 		if(!matchID("#define", preprocessor)) return false;
 		identifier();
-		preprocessorExpression();
+		ppExpression();
 		return true;
 	}
 
 	bool ppIf() {
 		if(!matchID("#if", preprocessor)) return false;
-		preprocessorExpression();
+		ppExpression();
 		while(global()) {}
 		if(matchID("#else", preprocessor)) while(global()) {}
 		if(!matchID("#endif", preprocessor)) error("#if");
-		return true;
-	}
-
-	bool preprocessorExpression() { // TODO
-		if(!target.append(toUCS4(until('\n')))) { error("preprocessorExpression"); return false; }
 		return true;
 	}
 
@@ -198,7 +202,7 @@ struct Parser : TextData {
 		space();
 		while(global()) {}
 		if(available(1)) error("global");
-		assert_(scopes.size == 1 && stack.size == 0);
+		assert_(scopes.size == 1 && stack.size == 0, scopes.size, stack.size);
 	}
 
 	// -- Type
@@ -307,7 +311,7 @@ struct Parser : TextData {
 
 	bool member() {
 		if(!((!wouldMatch("...") && match(".")) || match("->"))) return false;
-		if(!identifier()) error("operator.");
+		if(!identifier()) error("opDot");
 		return true;
 	}
 
@@ -315,8 +319,7 @@ struct Parser : TextData {
 		if(!match("(")) return false;
 		while(!match(")")) {
 			if(expression()) {}
-			else error("operator() arguments"_);
-			match("..."); // FIXME
+			else error("opCall arguments"_);
 			match(",");
 		}
 		return true;
@@ -324,8 +327,8 @@ struct Parser : TextData {
 
 	bool opIndex() {
 		if(!match("[")) return false;
-		if(!expression()) error("operator[] argument"_);
-		if(!match("]")) error("operator[] ]"_);
+		if(!expression()) error("opIndex argument"_);
+		if(!match("]")) error("opIndex ]"_);
 		return true;
 	}
 
@@ -392,13 +395,21 @@ struct Parser : TextData {
 				}
 				else error("( type | expression");
 			}
+			else if(match("new")) {
+				if(match("(")) {
+					if(!expression()) error("new ( expression");
+					if(!match(")")) error("new ( expression )");
+				}
+				if(!type()) error("new type");
+				call() || initializer_list();
+			}
 			else if(initializer_list()) {}
 
 			else return false;
 		}
 
 		for(;;) {
-			if(member() || call() || opIndex() || matchID("_",0) || matchAny({"++","--"})) continue; // expression postfix
+			if(member() || call() || opIndex() || matchID("_",0) || matchAny({"++","--","..."})) continue; // expression postfix
 			// expression binary expression
 			if(binary()) {
 				if(!expression()) error("binary expression");
@@ -563,7 +574,7 @@ struct Parser : TextData {
 				if(!match("))")) error("attribute ))");
 			}
 			if(matchID("operator", keyword)) {
-				if(matchAny({"==","=","&","->","!=","<=","<",">=",">","++","+","--","-","*","/","[]","()"})) {}
+				if(matchAny({"==","=","&","->","!=","<=","<",">=",">","++","+","--","-","*","/","[]","()","new"})) {}
 				else if(match("\"\"")) {
 					if(!name()) error("operator \"\"name");
 				}
@@ -611,7 +622,7 @@ struct Parser : TextData {
 			assert_(!stack, "struct");
 			Scope s = scopes.pop();
 			scopes.last().scopes[name].variables.append(move(s.variables));
-		}
+		} else scopes.pop();
 		return true;
 	}
 

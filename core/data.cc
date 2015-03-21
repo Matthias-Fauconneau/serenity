@@ -169,6 +169,7 @@ string TextData::word(const string special) {
 
 string TextData::identifier(const string special) {
     uint start=index;
+    if(!available(1)) return {};
     char c = peek();
     if(c>='0'&&c<='9') return {};
     while(available(1)) {
