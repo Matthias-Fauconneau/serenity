@@ -4,14 +4,14 @@
 #include "font.h"
 
 /// Primary colors
-static constexpr bgr3f black (0, 0, 0);
-static constexpr bgr3f red (0, 0, 1);
-static constexpr bgr3f green (0, 1, 0);
-static constexpr bgr3f blue (1, 0, 0);
-static constexpr bgr3f white (1, 1, 1);
-static constexpr bgr3f cyan (1, 1, 0);
-static constexpr bgr3f magenta (1, 0, 1);
-static constexpr bgr3f yellow (0, 1, 1);
+static constexpr bgr3f black {0, 0, 0};
+static constexpr bgr3f red {0, 0, 1};
+static constexpr bgr3f green {0, 1, 0};
+static constexpr bgr3f blue {1, 0, 0};
+static constexpr bgr3f white {1, 1, 1};
+static constexpr bgr3f cyan {1, 1, 0};
+static constexpr bgr3f magenta {1, 0, 1};
+static constexpr bgr3f yellow {0, 1, 1};
 
 /// Fill graphic element
 // FIXME: Implement as polygon
@@ -77,7 +77,7 @@ struct Rect {
     vec2 size() const { return max-min; }
     explicit operator bool() { return min<max; }
     bool contains(vec2 p) const { return p>=min && p<=max; }
-    void extend(vec2 p) { min=::min(min, p), max=::max(max, p); }
+	void extend(vec2 p) { min=::min(min, p); max=::max(max, p); }
 };
 inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min),min(a.max,b.max)); }
 inline String str(const Rect& r) { return "["_+str(r.min)+" - "_+str(r.max)+"]"_; }
@@ -102,8 +102,8 @@ struct Graphics : shareable {
         for(auto& o: fills) o.origin += offset;
         for(auto& o: blits) o.origin += offset;
         for(auto& o: glyphs) o.origin += offset;
-        for(auto& o: parallelograms) o.min+=offset, o.max+=offset;
-        for(auto& o: lines) o.a+=offset, o.b+=offset;
+		for(auto& o: parallelograms) { o.min+=offset; o.max+=offset; }
+		for(auto& o: lines) { o.a+=offset; o.b+=offset; }
         for(auto& o: cubics) for(vec2& p: o.points) p+=vec2(offset);
     }
     void append(const Graphics& o) {

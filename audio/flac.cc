@@ -22,7 +22,7 @@ int BitReader::sbinary(int size) {
 }
 
 static uint8 log2i[256];
-__attribute__ ((hot)) uint BitReader::unary() {
+__attribute((hot)) uint BitReader::unary() {
 	assert(index < bitSize);
     // 64bit word optimization of "uint size=0; while(!bit()) size++; assert(size<(64-8)+64);"
     uint64 w = big64(*(uint64*)(data+index/8)) << (index&7);

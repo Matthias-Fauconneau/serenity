@@ -10,21 +10,19 @@
 /// Abstract factory pattern (allows construction of class by names)
 template<Type I> struct Interface {
     struct AbstractFactory {
-        /// Returns the version of this implementation
-        virtual string version() abstract;
         virtual unique<I> constructNewInstance() abstract;
     };
     static map<string, AbstractFactory*>& factories() { static map<string, AbstractFactory*> factories; return factories; }
     template<Type C> struct Factory : AbstractFactory {
-        string version() override { return __DATE__ " " __TIME__ ""_; }
         unique<I> constructNewInstance() override { return unique<C>(); }
-		Factory(string name) { factories().insert(name, this); }
+	Factory(string name) { factories().insert(name, this); }
         static Factory registerFactory;
     };
-    static string version(const string& name) { return factories().at(name)->version(); }
     static unique<I> instance(const string& name) { return factories().at(name)->constructNewInstance(); }
 };
+#if 1
 template<Type I> template<Type C> Type Interface<I>::template Factory<C> Interface<I>::Factory<C>::registerFactory;
+#endif
 
 /// Class to inherit in order to register objects to be instanced depending on first command line argument
 struct Application { virtual ~Application() {} };

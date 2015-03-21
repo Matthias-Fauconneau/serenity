@@ -14,12 +14,12 @@ generic struct ImageT : buffer<T> {
     ImageT(buffer<T>&& pixels, int2 size, uint stride=0, bool alpha=false) : buffer<T>(::move(pixels)), size(size), stride(stride?:size.x), alpha(alpha) {
         //assert_(buffer::data && buffer::size == height*this->stride);
     }
-    ImageT(uint width, uint height, bool alpha=false) : buffer<T>(height*width), width(width), height(height), stride(width), alpha(alpha) {
+	ImageT(uint width, uint height, bool alpha=false) : buffer<T>(height*width), width(width), height(height), stride(width), alpha(alpha) {
         //assert_(width && height && buffer::data);
     }
-    ImageT(int2 size, bool alpha=false) : ImageT(size.x, size.y, alpha) {}
+	ImageT(int2 size, bool alpha=false) : ImageT(size.x, size.y, alpha) {}
 
-    explicit operator bool() const { return buffer<T>::data && width && height; }
+	explicit operator bool() const { return buffer<T>::data && width && height; }
 	inline T& operator()(uint x, uint y) const { assert(x<width && y<height); return buffer<T>::at(y*stride+x); }
 };
 generic String str(const ImageT<T>& o) { return strx(o.size); }

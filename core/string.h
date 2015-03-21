@@ -162,7 +162,7 @@ String str(const Arg0& arg0, const Arg1& arg1, const Args&... args) { return joi
 /// Logs to standard output using str(...) serialization
 template<Type... Args> void log(const Args&... args) { log((string)join(ref<string>{str(args)...}, " "_)); }
 /// Logs to standard output using str(...) serialization and terminate all threads
-template<Type... Args> void __attribute((noreturn)) error(const Args&... args) { error<string>(str(args...)); }
+template<Type... Args> __attribute((noreturn)) void error(const Args&... args) { error<string>(str(args...)); }
 
 /// Converts Strings to strings
 inline buffer<string> toRefs(ref<String> source) { return apply(source, [](const String& e) -> string { return e; }); }

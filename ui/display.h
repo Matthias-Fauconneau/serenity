@@ -103,13 +103,14 @@ struct XDisplay : Socket, Poll {
      /// Returns Atom for \a name
      uint Atom(const string name);
 	 /// Returns property \a name on \a window
-	 template<class T> buffer<T> getProperty(uint window, string name, size_t length=2+128*128);
+	 generic buffer<T> getProperty(uint window, string name, size_t length=2+128*128);
 };
 
 #include "image.h"
 #include "thread.h"
 #include "input.h"
 struct _drmModeModeInfo;
+struct _drmModeCrtc;
 
 struct Keyboard : Device, Poll {
 	function<void(Key)> keyPress;
@@ -135,7 +136,7 @@ struct Display : Device, Poll {
 
 	uint connector, crtc;
 	unique<_drmModeModeInfo> mode;
-	struct _drmModeCrtc* previousMode;
+	_drmModeCrtc* previousMode;
 	struct {
 		Image target;
 		uint32 handle;

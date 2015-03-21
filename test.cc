@@ -50,22 +50,23 @@ struct IDE {
 	}
 
 	void parse(array<Scope>& scopes, string fileName) {
-		if(edits.contains(fileName)) return;
-		FileTextEdit edit(fileName, scopes, {this, &IDE::parse});
-		edit.edit.linkActivated = [this](ref<uint> identifier) {
-			assert_(identifier);
-			String fileName = toUTF8(identifier.slice(0, identifier.size-1));
-			size_t index = identifier.last();
-			view(fileName, index);
-		};
-		edit.edit.back = [this] {
-			Location location = viewHistory.pop();
-			current = &edits.at(location.fileName);
-			current->edit.cursor = location.cursor;
-			current->ensureCursorVisible();
-			if(window) window->widget = current;
-		};
-		edits.insert(copyRef(fileName), move(edit));
+		if(!edits.contains(fileName)) {
+			FileTextEdit edit(fileName, scopes, {this, &IDE::parse});
+			edit.edit.linkActivated = [this](ref<uint> identifier) {
+				assert_(identifier);
+				String fileName = toUTF8(identifier.slice(0, identifier.size-1));
+				size_t index = identifier.last();
+				view(fileName, index);
+			};
+			edit.edit.back = [this] {
+				Location location = viewHistory.pop();
+				current = &edits.at(location.fileName);
+				current->edit.cursor = location.cursor;
+				current->ensureCursorVisible();
+				if(window) window->widget = current;
+			};
+			edits.insert(copyRef(fileName), move(edit));
+		}
 	}
 
 	void view(string fileName, uint index=0) {

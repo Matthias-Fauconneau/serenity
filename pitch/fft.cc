@@ -3,7 +3,7 @@
 #include <fftw3.h> //fftw3f fftw3f_threads
 #include "string.h"
 
-void __attribute((constructor(1001))) initialize_FFTW() {
+__attribute((constructor(1001))) void initialize_FFTW() {
     fftwf_init_threads();
     fftwf_plan_with_nthreads(4);
 }

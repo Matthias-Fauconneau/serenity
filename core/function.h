@@ -4,7 +4,7 @@
 
 // functor abstract interface
 template<Type R, Type... Args> struct functor;
-template<Type R, Type... Args> struct functor<R(Args...)> { virtual R operator()(Args... args) const=0; };
+template<Type R, Type... Args> struct functor<R(Args...)> { virtual R operator()(Args... args) const abstract; };
 // functor template specialization for anonymous functions
 template<Type F, Type R, Type... Args> struct anonymous_function;
 template<Type F, Type R, Type... Args> struct anonymous_function<F, R(Args...)> : functor<R(Args...)> {
@@ -31,8 +31,7 @@ template<Type O, Type R, Type... Args> struct const_method<O, R(Args...)> : func
 
 template<Type R, Type... Args> struct function;
 /// Provides a common interface to store functions, methods (delegates) and anonymous functions (lambdas)
-template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)> {
-    long any[8]; // Always store functor inline
+template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)> { long any[8]; // Always store functor inline
     function():any{0}{} // Invalid function (segfaults)
     /// Wraps an anonymous function (or a a function pointer)
     template<Type F> function(F f) {
@@ -49,7 +48,6 @@ template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)>
         static_assert(sizeof(const_method<O,R(Args...)>)<=sizeof(any),"");
         new (any) const_method<O,R(Args...)>(object, pmf);
     }
-#pragma GCC system_header //-Wstrict-aliasing
     virtual R operator()(Args... args) const override { assert(any[0]); return ((functor<R(Args...)>&)any)(forward<Args>(args)...); }
     explicit operator bool() { return any[0]; }
 };

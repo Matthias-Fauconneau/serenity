@@ -77,7 +77,8 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
     /// Rendering target in shared memory
     Image target;
     /// Shared window buffer state
-    enum State { Idle, Copy, Present } state = Idle;
+	enum State { Idle, Copy, Present };
+	State state = Idle;
 
     uint64 firstFrameCounterValue = 0;
 	uint64 currentFrameCounterValue = 0;

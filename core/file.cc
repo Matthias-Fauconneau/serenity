@@ -115,7 +115,7 @@ File::File(const string path, const Folder& at, Flags flags) : Stream(open(path,
 
 struct stat File::stat() const { struct stat stat; check( fstat(fd, &stat) ); return stat; }
 
-FileType File::type() const { return FileType(stat().st_mode&__S_IFMT); }
+//FileType File::type() const { return FileType(stat().st_mode&__S_IFMT); }
 
 size_t File::size() const { return stat().st_size; }
 

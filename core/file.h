@@ -3,7 +3,7 @@
 #include "string.h"
 
 /// Linux error code names
-enum class LinuxError : int { OK, Interrupted=-4, Again=-11, Busy=-16, Invalid=-22 };
+enum LinuxError { OK, Interrupted=-4, Again=-11, Busy=-16, Invalid=-22 };
 constexpr string linuxErrors[] = {
     "OK", "PERM", "NOENT", "SRCH", "INTR", "IO", "NXIO", "TOOBIG", "NOEXEC", "BADF", "CHILD", "AGAIN", "NOMEM", "ACCES", "FAULT", "NOTBLK",
     "BUSY", "EXIST", "XDEV", "NODEV", "NOTDIR", "ISDIR", "INVAL", "NFILE", "MFILE", "NOTTY", "TXTBSY", "FBIG", "NOSPC", "SPIPE", "ROFS", "MLINK",
@@ -16,7 +16,7 @@ constexpr string linuxErrors[] = {
     "CONNABORTED","CONNRESET", "NOBUFS", "ISCONN", "NOTCONN", "SHUTDOWN", "TOOMANYREFS", "TIMEDOUT", "CONNREFUSED",
     "HOSTDOWN","HOSTUNREACH","ALREADY", "INPROGRESS", "STALE", "UCLEAN", "NOTNAM", "NAVAIL", "ISNAM", "REMOTEIO", "DQUOT",
     "NOMEDIUM","MEDIUMTYPE", "CANCELED", "NOKEY", "KEYEXPIRED", "KEYREVOKED", "KEYREJECTED", "OWNERDEAD", "NOTRECOVERABLE"};
-extern "C" int* __errno_location() noexcept __attribute((const));
+extern "C" const int* __errno_location() noexcept;
 
 /// Aborts if \a expr is negative and logs corresponding error code
 #define check(expr, args...) ({ \
@@ -92,7 +92,6 @@ struct Stream : Handle { //FIXME: overlaps with Data/BinaryData
 };
 
 enum Flags {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=02000, NonBlocking=04000, Descriptor=010000000};
-enum class FileType { Folder=0040000, Device=0020000, Drive=0060000, File=0100000 };
 
 /// Handle to a socket
 struct Socket : Stream {
@@ -110,7 +109,7 @@ struct File : Stream {
     /// Returns file properties
     struct stat stat() const;
     /// Returns file type
-    FileType type() const;
+	//enum FileType { Folder=0040000, Device=0020000, Drive=0060000, File=0100000 } type() const;
     /// Returns file size
     size_t size() const;
     /// Returns the last access Unix timestamp (in nanoseconds)
@@ -161,7 +160,7 @@ struct Map : mref<byte> {
     enum Flags {Shared=1, Private=2, Anonymous=0x20, Populate=0x8000};
 
     Map(){}
-    Map(Map&& o) : mref(o) { o.data=0, o.size=0; }
+	Map(Map&& o) : mref(o) { o.data=0; o.size=0; }
     Map& operator=(Map&& o) { this->~Map(); new (this) Map(::move(o)); return *this; }
 
     explicit Map(const File& file, Prot prot=Read, Flags flags=Shared);

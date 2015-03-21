@@ -8,7 +8,8 @@ struct TextEdit : Text {
 
 	struct State { array<uint> text; Cursor cursor; }; // FIXME: delta
 	array<State> history;
-	enum class Edit { Point, Delete, Backspace, Insert } lastEdit = Edit::Point;
+	enum class Edit { Point, Delete, Backspace, Insert };
+	Edit lastEdit = Edit::Point;
 	size_t historyIndex = 0;
 	array<Cursor> cursorHistory;
 

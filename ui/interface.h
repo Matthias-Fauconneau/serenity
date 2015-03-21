@@ -97,7 +97,7 @@ struct ToggleButton : ImageView {
     ToggleButton(Image&& enable, Image&& disable) : ImageView(share(enable)), enableIcon(move(enable)), disableIcon(move(disable)) {}
 
     /// User toggled the button
-    function<void(bool state)> toggled;
+	function<void(bool /*state*/)> toggled;
 
     /// Current button state
     bool enabled = false;

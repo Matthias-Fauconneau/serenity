@@ -8,7 +8,7 @@
 // -- sRGB --
 
 uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)
-void __attribute((constructor(1001))) generate_sRGB_forward() {
+__attribute((constructor(1001))) void generate_sRGB_forward() {
     for(uint index: range(sizeof(sRGB_forward))) {
 	real linear = (real) index / (sizeof(sRGB_forward)-1);
 	real sRGB = linear > 0.0031308 ? 1.055*pow(linear,1/2.4)-0.055 : 12.92*linear;
@@ -18,7 +18,7 @@ void __attribute((constructor(1001))) generate_sRGB_forward() {
 }
 
 float sRGB_reverse[0x100];
-void __attribute((constructor(1001))) generate_sRGB_reverse() {
+__attribute((constructor(1001))) void generate_sRGB_reverse() {
     for(uint index: range(0x100)) {
 	real sRGB = (real) index / 0xFF;
 	real linear = sRGB > 0.04045 ? pow((sRGB+0.055)/1.055, 2.4) : sRGB / 12.92;
@@ -80,12 +80,12 @@ int2 imageSize(const ref<byte> file) {
     error("Unknown image format", hex(file.size<16?file:s.peek(16)));
 }
 
-Image  __attribute((weak)) decodePNG(const ref<byte>) { error("PNG support not linked"); }
-Image  __attribute((weak)) decodeJPEG(const ref<byte>) { error("JPEG support not linked"); }
-Image  __attribute((weak)) decodeICO(const ref<byte>) { error("ICO support not linked"); }
-Image  __attribute((weak)) decodeTIFF(const ref<byte>) { error("TIFF support not linked"); }
-Image  __attribute((weak)) decodeBMP(const ref<byte>) { error("BMP support not linked"); }
-Image  __attribute((weak)) decodeTGA(const ref<byte>) { error("TGA support not linked"); }
+__attribute((weak)) Image decodePNG(const ref<byte>) { error("PNG support not linked"); }
+__attribute((weak)) Image decodeJPEG(const ref<byte>) { error("JPEG support not linked"); }
+__attribute((weak)) Image decodeICO(const ref<byte>) { error("ICO support not linked"); }
+__attribute((weak)) Image decodeTIFF(const ref<byte>) { error("TIFF support not linked"); }
+__attribute((weak)) Image decodeBMP(const ref<byte>) { error("BMP support not linked"); }
+__attribute((weak)) Image decodeTGA(const ref<byte>) { error("TGA support not linked"); }
 
 Image decodeImage(const ref<byte> file) {
     if(startsWith(file,"\xFF\xD8")) return decodeJPEG(file);
