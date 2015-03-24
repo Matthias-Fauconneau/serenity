@@ -109,14 +109,16 @@ struct reverse_range {
 
 // -- initializer_list
 
-namespace std { generic struct initializer_list {
+namespace std {
+generic struct initializer_list {
     const T* data;
     size_t length;
     constexpr initializer_list(const T* data, size_t size) : data(data), length(size) {}
     constexpr size_t size() const noexcept { return length; }
     constexpr const T* begin() const noexcept { return data; }
     constexpr const T* end() const { return (T*)data+length; }
-}; }
+};
+}
 
 // -- ref
 
