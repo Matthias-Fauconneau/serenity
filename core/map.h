@@ -99,6 +99,7 @@ template<Type K, Type V> struct map {
 
 	void append(const map& b) { for(const_pair<K, V> e: b) { assert_(!contains(e.key)); insert(copy(e.key), copy(e.value)); } }
 	void append(map&& b) { for(pair<K, V> e: b) { assert_(!contains(e.key)); insert(move(e.key), move(e.value)); } }
+	void appendMulti(map&& b) { for(pair<K, V> e: b) { insertMulti(move(e.key), move(e.value)); } }
 };
 
 template<Type K, Type V> map<K,V> copy(const map<K,V>& o) {

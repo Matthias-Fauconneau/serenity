@@ -44,12 +44,13 @@ struct Folder;
 const Folder& currentWorkingDirectory();
 
 enum { Drives=1<<0, Devices=1<<1, Folders=1<<2, Files=1<<3, Recursive=1<<4, Sorted=1<<5, Hidden=1<<6 };
+struct stat;
 struct Folder : Handle {
     Folder() : Handle(0) {}
     /// Opens \a folderPath
     Folder(string folderPath, const Folder& at=currentWorkingDirectory(), bool create=false);
     /// Returns folder properties
-    struct stat stat() const;
+	stat properties() const;
     /// Returns the last access Unix timestamp (in nanoseconds)
     int64 accessTime() const;
     /// Returns the last modified Unix timestamp (in nanoseconds)

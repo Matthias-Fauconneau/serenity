@@ -33,7 +33,9 @@ struct ScrollTextEdit : ScrollArea {
 
 struct FileTextEdit : ScrollTextEdit {
 	String fileName;
-	FileTextEdit(string fileName, array<Scope>& scopes, function<void(array<Scope>&, string)> parse) : ScrollTextEdit(move(Parser(fileName, scopes, parse).target)), fileName(copyRef(fileName)) {}
+	FileTextEdit(string fileName, array<Scope>& scopes, function<void(array<Scope>&, string)> parse) :
+		ScrollTextEdit(move(Parser(fileName, scopes, parse).target)), fileName(copyRef(fileName)) {}
+	String title() override { return copyRef(fileName); }
 };
 
 struct IDE {
@@ -54,14 +56,14 @@ struct IDE {
 			FileTextEdit edit(fileName, scopes, {this, &IDE::parse});
 			edit.edit.linkActivated = [this](ref<uint> identifier) {
 				assert_(identifier);
-				String fileName = toUTF8(identifier.slice(0, identifier.size-1));
+				String fileName = find(toUTF8(identifier.slice(0, identifier.size-1)));
 				size_t index = identifier.last();
 				view(fileName, index);
 			};
 			edit.edit.back = [this] {
 				Location location = viewHistory.pop();
 				current = &edits.at(location.fileName);
-				current->edit.cursor = location.cursor;
+				current->edit.selectionStart = current->edit.cursor = location.cursor;
 				current->ensureCursorVisible();
 				if(window) window->widget = current;
 			};
@@ -71,10 +73,10 @@ struct IDE {
 
 	void view(string fileName, uint index=0) {
 		if(!edits.contains(fileName)) parse(scopes, fileName);
-		viewHistory.append(Location{copyRef(current->fileName), current->edit.cursor});
+		if(current) viewHistory.append(Location{copyRef(current->fileName), current->edit.cursor});
 		current = &edits.at(fileName);
-		current->edit.cursor = current->edit.cursorFromIndex(index);
+		current->edit.selectionStart = current->edit.cursor = current->edit.cursorFromIndex(index);
 		current->ensureCursorVisible();
-		if(window) window->widget = current;
+		if(window) { window->widget = current; window->render(); }
 	}
 } app;

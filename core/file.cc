@@ -37,11 +37,11 @@ Folder::Folder(string folder, const Folder& at, bool create) {
 	fd = check( openat(at.fd, strz(folder?:"."), O_RDONLY|O_DIRECTORY, 0), '\''+folder+'\'', at.name() );
 }
 
-struct stat Folder::stat() const { struct stat stat; check( fstat(fd, &stat) ); return stat; }
+struct stat Folder::properties() const { struct stat s; check( fstat(fd, &s) ); return s; }
 
-int64 Folder::accessTime() const { struct stat stat = Folder::stat(); return stat.st_atim.tv_sec*1000000000ull + stat.st_atim.tv_nsec; }
+int64 Folder::accessTime() const { struct stat s = Folder::properties(); return s.st_atim.tv_sec*1000000000ull + s.st_atim.tv_nsec; }
 
-int64 Folder::modifiedTime() const { struct stat stat = Folder::stat(); return stat.st_mtim.tv_sec*1000000000ull + stat.st_mtim.tv_nsec;  }
+int64 Folder::modifiedTime() const { struct stat s = Folder::properties(); return s.st_mtim.tv_sec*1000000000ull + s.st_mtim.tv_nsec;  }
 
 static int getdents(int fd, void* entry, long size) { return syscall(SYS_getdents, fd, entry, size); }
 struct dirent { long ino, off; short len; char name[]; };

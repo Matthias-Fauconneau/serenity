@@ -31,8 +31,9 @@ template<Type O, Type R, Type... Args> struct const_method<O, R(Args...)> : func
 
 template<Type R, Type... Args> struct function;
 /// Provides a common interface to store functions, methods (delegates) and anonymous functions (lambdas)
-template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)> { long any[8]; // Always store functor inline
-    function():any{0}{} // Invalid function (segfaults)
+template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)> {
+    long any[8]; // Always store functor inline
+    function() : any{0}{} // Invalid function (segfaults)
     /// Wraps an anonymous function (or a a function pointer)
     template<Type F> function(F f) {
         static_assert(sizeof(anonymous_function<F,R(Args...)>)<=sizeof(any),"");
@@ -59,7 +60,7 @@ template<Type... Args> struct signal {
     /// Connects a delegate
     template<Type... A> void connect(A&&... args) { delegates.append( forward<A>(args)... ); }
     /// Returns the emit operator as an anonymous function
-    operator function<void(Args...)>() { return {this,&signal<Args...>::operator()}; }
+    operator function<void(Args...)>() { return {this, &signal<Args...>::operator()}; }
     /// Emits the signal to all registered delegates
     void operator()(Args... args) const { for(const function<void(Args...)>& delegate: delegates) delegate(args...); }
 };

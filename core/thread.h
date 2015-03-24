@@ -88,9 +88,11 @@ struct Semaphore {
 };
 inline String str(const Semaphore& o) { return str(o.counter); }
 
+struct Thread;
 /// Original thread spawned when this process was forked, terminating this thread leader terminates the whole thread group
-extern struct Thread mainThread;
+extern Thread mainThread;
 
+struct pollfd;
 /// Poll is a convenient interface to participate in the event loop
 struct Poll : pollfd {
     enum { IDLE=64 };
@@ -118,6 +120,7 @@ struct EventFD : Stream {
     void read(){Stream::read<uint64>();}
 };
 
+typedef unsigned long pthread_t;
 /// Concurrently runs an event loop
 struct Thread : array<Poll*>, EventFD, Lock, Poll {
     array<Poll*> queue; // Poll objects queued on this thread
@@ -165,6 +168,7 @@ int wait();
 /// \note Returns immediatly if process is waitable (already terminated)
 int64 wait(int pid);
 
+struct inotify_event;
 /// Watches a folder for new files
 struct FileWatcher : File, Poll {
 	String path;
@@ -177,7 +181,7 @@ struct FileWatcher : File, Poll {
 	void addWatch(string path)  { check(inotify_add_watch(File::fd, strz(path), IN_MODIFY), path); }
 	void event() override {
 		while(poll()) {
-			::buffer<byte> buffer = readUpTo(sizeof(struct inotify_event) + 256);
+			::buffer<byte> buffer = readUpTo(sizeof(inotify_event) + 256);
 			inotify_event e = *(inotify_event*)buffer.data;
 			string name = e.len ? string(e.name, e.len-1) : path;
 			fileModified(name);

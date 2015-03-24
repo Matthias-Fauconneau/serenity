@@ -18,6 +18,7 @@ core/map.h
 core/file.h
 core/data.h
 core/thread.cc
+core/file.cc
 
 io/png.cc
 io/jpeg.cc
@@ -41,6 +42,7 @@ ui/interface.h
 ui/input.h
 ui/edit.h
 ui/edit.cc
+ui/widget.h
 
 audio/player.cc
 

@@ -129,6 +129,7 @@ struct Mouse : Device, Poll {
 	void event() override;
 };
 
+struct DRMWindow;
 struct Display : Device, Poll {
 	Keyboard keyboard;
 	Thread mouseThread {-20};
@@ -144,7 +145,7 @@ struct Display : Device, Poll {
 		Map map;
 	} buffers[2];
 
-	array<struct DRMWindow*> windows;
+	array<DRMWindow*> windows;
 
 	struct MouseEvent { int2 cursor; Event event; Button button; };
 	Lock lock;
