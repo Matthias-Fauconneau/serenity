@@ -61,11 +61,13 @@ struct IDE {
 				view(fileName, index);
 			};
 			edit.edit.back = [this] {
-				Location location = viewHistory.pop();
-				current = &edits.at(location.fileName);
-				current->edit.selectionStart = current->edit.cursor = location.cursor;
-				current->ensureCursorVisible();
-				if(window) window->widget = current;
+				if(viewHistory) {
+					Location location = viewHistory.pop();
+					current = &edits.at(location.fileName);
+					current->edit.selectionStart = current->edit.cursor = location.cursor;
+					current->ensureCursorVisible();
+					if(window) window->widget = current;
+				}
 			};
 			edits.insert(copyRef(fileName), move(edit));
 		}

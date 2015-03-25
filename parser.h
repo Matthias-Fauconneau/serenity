@@ -324,8 +324,9 @@ struct Parser : TextData {
 			if(match("::")) scope = &scopes[0];
 			for(;;) {
 				space();
-				size_t rewind = target.size;
+				size_t begin = target.size;
 				string id = name(typeUse);
+				size_t end = target.size;
 				if(!id) { backtrack(); return 0; }
 				templateArguments();
 				if(!wouldMatch("::*") && match("::")) {
@@ -335,10 +336,11 @@ struct Parser : TextData {
 					if(!scope) scope = findType(id);
 					if(scope && (scope->types.contains(id) || typeName)) {
 						if(scope->types.contains(id)) {
-							target.size = rewind;
 							const Location& location = scope->types.at(id);
 							assert_(location);
-							target.append(color(link(id, location), typeUse));
+							::buffer<uint> replace = color(link(id, location), typeUse) + target.slice(end);
+							target.shrink(begin);
+							target.append(replace);
 						}
 						if(scope->scopes.contains(id)) scope = &scope->scopes.at(id);
 						// else FIXME: basic type
@@ -1033,10 +1035,9 @@ struct Parser : TextData {
 	}
 
 	bool return_() {
-		if(!matchID("return")) return false;
-		if(!expression()) error("return expression");
-		if(!match(";")) error("return ;");
-		return true;
+		push();
+		if(matchID("return") && (expression() || true) && match(";")) return commit();
+		return backtrack();
 	}
 
 	bool imperativeStatement() {
