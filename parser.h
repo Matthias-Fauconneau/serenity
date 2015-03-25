@@ -9,11 +9,11 @@ template<> Location copy(const Location& o) { return copyRef(o); }
 
 struct Scope {
 	String id;
-	bool struct_ = false;
+	String struct_; // ID of last top struct
 	map<String, Location> types, variables;
 	map<String, Scope> scopes;
 };
-template<> Scope copy(const Scope& o) { return Scope{copyRef(o.id), o.struct_, copy(o.types), copy(o.variables), copy(o.scopes)}; }
+template<> Scope copy(const Scope& o) { return Scope{copyRef(o.id), copyRef(o.struct_), copy(o.types), copy(o.variables), copy(o.scopes)}; }
 String str(const Scope& o) { return str(o.id, o.types.keys, o.variables.keys, o.scopes); }
 
 struct Expression {
@@ -218,7 +218,7 @@ struct Parser : TextData {
 			string id = name();
 			if(match("{")) {
 				commit();
-				scopes.append({"namespace "+id,true,{},{},{}});
+				scopes.append({"namespace "+id,{},{},{},{}});
 				while(declaration()) {}
 				if(!match("}")) error("namespace");
 				Scope namespace_ = scopes.pop();
@@ -281,7 +281,7 @@ struct Parser : TextData {
 			if(!match(">")) {
 				do {
 					push();
-					if(type() && (wouldMatch(",") || wouldMatch(">") || parameters(false))) commit();
+					if(type() && (match("&&") || match("&") || wouldMatch(",") || wouldMatch(">") || parameters(false))) commit();
 					else {
 						backtrack();
 						if(expression(true)) {}
@@ -309,7 +309,8 @@ struct Parser : TextData {
 			if(!matchAnyID(ref<string>{"char"_,"short","int","long long","long"}, typeUse)) error("type");
 			scope = &scopes[0]; // placeholder
 		}
-		else if(matchAnyID(ref<string>{"void"_,"bool"_,"char"_,"short","int","float","long long","long","double","__SIZE_TYPE__","__INTPTR_TYPE__"}, typeUse)) {
+		else if(matchAnyID(
+					ref<string>{"void"_,"bool"_,"char"_,"short","int","float","long long","long","double","__SIZE_TYPE__","__INTPTR_TYPE__"}, typeUse)) {
 			if(matchID("__attribute")) {
 				if(!match("((")) error("attribute ((");
 				if(!name()) error("attribute name");
@@ -423,7 +424,7 @@ struct Parser : TextData {
 		if(!match("[")) return {};
 		while((matchID("this") || match("=") || match("&")) && match(",")) {}
 		if(!match("]")) error("lambda ]");
-		if(!parameters()) scopes.append({"lambda"__,true,{},{},{}});
+		if(!parameters()) scopes.append({"lambda"__,copyRef(scopes.last().struct_),{},{},{}});
 		if(match("->")) if(!type()) error("-> type");
 		if(!block()) error("lambda {");
 		scopes.pop();
@@ -667,7 +668,7 @@ struct Parser : TextData {
 	bool templateDeclaration() {
 		assert_(scopes);
 		if(matchID("generic")) {
-			scopes.append({"generic"__,true,{},{},{}});
+			scopes.append({"generic"__,copyRef(scopes.last().struct_),{},{},{}});
 			uint location = target.size;
 			scopes.last().types.insertMulti(copyRef("T"_), fileName+max(1u,location));
 			scopes.last().scopes.insertMulti(copyRef("T"_), Scope());
@@ -675,7 +676,7 @@ struct Parser : TextData {
 		}
 		if(!matchID("template")) return false;
 		if(!match("<")) error("template <");
-		scopes.append({"template"__,true,{},{},{}});
+		scopes.append({"template"__,copyRef(scopes.last().struct_),{},{},{}});
 		if(!match(">")) {
 			do {
 				if(matchID("Type")) {
@@ -710,20 +711,6 @@ struct Parser : TextData {
 		return true;
 	}
 
-	bool templateSpecialization() {
-		if(match("<")) {
-			if(!match(">")) {
-				do {
-					if(type()) { match("&&") || match("&"); }
-					//else if(expression()) {}
-					else error("templateSpecialization"_);
-				} while(match(","));
-				if(!match(">")) error("templateSpecialization"_);
-			}
-		}
-		return true;
-	}
-
 	bool using_() {
 		if(!matchID("using")) return false;
 		if(!identifier()) error("using identifier");
@@ -733,7 +720,7 @@ struct Parser : TextData {
 
 	bool parameters(bool scope=true) {
 		if(!match("(")) return false;
-		if(scope) scopes.append({"parameters"__,true,{},{},{}});
+		if(scope) scopes.append({"parameters"__,copyRef(scopes.last().struct_),{},{},{}});
 		push();
 		if(!match(")")) {
 			do {
@@ -749,10 +736,10 @@ struct Parser : TextData {
 
 	bool constructor(bool isGeneric=false) {
 		push();
+		if((matchID("default_move") || matchID("no_copy")) && match("(") && name()==scopes.last().struct_ && match(")") && match(";"))
+			return commit();
 		while(matchID("inline") || matchID("explicit") || matchID("constexpr")) {}
-		string id = name();
-		if(id != scopes.last().id) return backtrack();
-		if(!parameters(!isGeneric)) return backtrack();
+		if(!(name() == scopes.last().struct_ && parameters(!isGeneric))) return backtrack();
 		commit();
 		if(!match(";")) {
 			if(match(":")) {
@@ -855,17 +842,20 @@ struct Parser : TextData {
 		space();
 		uint location = target.size;
 		string id = name(typeDeclaration);
-		templateSpecialization();
-		if(isGeneric) scopes.last().id = copyRef(id);
-		else scopes.append({copyRef(id), true,{},{},{}});
+		templateArguments(); // specialization
+		if(isGeneric) {  scopes.last().id = copyRef(id); scopes.last().struct_ = copyRef(id); }
+		else scopes.append({copyRef(id), copyRef(id),{},{},{}});
 		if(match(":")) {
 			do {
 				matchID("virtual");
 				const Scope* const base = type();
 				if(!base) error("base");
-				scopes.last().types.appendMulti(base->types);
-				scopes.last().variables.appendMulti(base->variables);
-				scopes.last().scopes.appendMulti(base->scopes);
+				//assert_(base->struct_); FIXME
+				if(base->struct_) {
+					scopes.last().types.appendMulti(base->types);
+					scopes.last().variables.appendMulti(base->variables);
+					scopes.last().scopes.appendMulti(base->scopes);
+				}
 			} while(match(","));
 			if(!wouldMatch("{")) error("struct");
 		}
@@ -996,7 +986,7 @@ struct Parser : TextData {
 	bool for_() {
 		if(!matchID("for")) return false;
 		if(!match("(")) error("for (");
-		scopes.append({"for"__,true,{},{},{}});
+		scopes.append({"for"__,copyRef(scopes.last().struct_),{},{},{}});
 		bool range = false;
 		if(variable_declaration()) {
 			if(match(":"_)) range = true;
@@ -1070,7 +1060,7 @@ struct Parser : TextData {
 
 	bool block() {
 		if(!match("{")) return false;
-		scopes.append({"block"__,true,{},{},{}});
+		scopes.append({"block"__,copyRef(scopes.last().struct_),{},{},{}});
 		while(!match("}")) statement();
 		scopes.pop();
 		return true;
