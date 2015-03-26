@@ -27,11 +27,13 @@ string str(const char* source);
 bool operator <(const string a, const string b);
 bool operator <=(const string a, const string b);
 
-/// Returns true if \a str starts with \a sub
-bool startsWith(const string str, const string sub);
-/// Returns true if \a str ends with \a sub
+/// Returns whether \a a starts with \a b
+generic bool startsWith(const ref<T> a, const ref<T> b) {
+	return a.size>=b.size && a.slice(0, b.size)==b;
+}
+/// Returns whether \a str ends with \a sub
 bool endsWith(const string str, const string sub);
-/// Returns true if \a str contains the \a substring
+/// Returns whether \a str contains the \a substring
 bool find(const string str, const string substring);
 
 /// Returns a reference to the String between the {begin}th and {end}th occurence of \a separator
@@ -41,7 +43,7 @@ string section(const string str, byte separator, int begin=0, int end=1);
 /// Returns a reference with heading and trailing whitespace removed
 string trim(const string s);
 
-/// Returns true if s contains only [0-9]
+/// Returns whether s contains only [0-9]
 bool isInteger(const string s);
 /// Parses an integer value
 int64 parseInteger(const string str, int base=10);

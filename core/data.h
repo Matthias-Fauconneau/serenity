@@ -26,7 +26,7 @@ struct Data {
 
     /// Buffers \a need bytes (if overridden) and returns number of bytes available
 	/*virtual*/ inline size_t available(size_t /*need*/) { return data.size-index; }
-    /// Returns true if there is data to read
+	/// Returns whether there is data to read
     explicit operator bool() { return available(1); }
 
     /// Returns next byte without advancing

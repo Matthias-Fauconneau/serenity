@@ -22,10 +22,6 @@ bool operator <=(const string a, const string b) {
     return a.size <= b.size;
 }
 
-bool startsWith(const string s, const string a) {
-    return a.size<=s.size && string(s.data,a.size)==a;
-}
-
 bool endsWith(const string s, const string a) {
     return a.size<=s.size && string(s.data+s.size-a.size,a.size)==a;
 }

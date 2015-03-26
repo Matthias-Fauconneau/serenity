@@ -20,9 +20,7 @@ template<Type I> struct Interface {
     };
     static unique<I> instance(const string& name) { return factories().at(name)->constructNewInstance(); }
 };
-#if 1
 template<Type I> template<Type C> Type Interface<I>::template Factory<C> Interface<I>::Factory<C>::registerFactory;
-#endif
 
 /// Class to inherit in order to register objects to be instanced depending on first command line argument
 struct Application { virtual ~Application() {} };

@@ -172,7 +172,7 @@ generic struct Ref {
 
 	/// Returns the index of the first occurence of \a value. Returns invalid if \a value could not be found.
 	template<Type K> size_t indexOf(const K& key) const { for(size_t index: range(size)) { if(data[index]==key) return index; } return invalid; }
-    /// Returns true if the array contains an occurrence of \a value
+	/// Returns whether the array contains an occurrence of \a value
 	template<Type K> bool contains(const K& key) const { return indexOf(key) != invalid; }
     /// Compares all elements
 	bool operator ==(const ref<T> o) const {

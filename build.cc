@@ -7,7 +7,7 @@
 struct Node {
 	String name;
 	array<Node*> edges;
-	explicit Node(String&& name):name(move(name)){}
+	explicit Node(String&& name) : name(move(name)){}
 };
 bool operator ==(const Node* a, const string b) { return a->name==b; }
 bool operator ==(const Node& a, const string b) { return a.name==b; }
@@ -147,8 +147,8 @@ struct Build {
 					assert_(module, "No such module", name);
 					lastEdit = max(lastEdit, parse(module+".h", parent));
 					if(!parent.edges.contains(module) && existsFile(module+".cc", folder) && module != parent.name) {
-						if(!modules.contains(module)) { if(!compileModule(module)) return 0; }
-						parent.edges.append( modules[modules.indexOf(module)].pointer );
+						if(!modules.contains<string>(module)) { if(!compileModule(module)) return 0; }
+						parent.edges.append( modules[modules.indexOf<string>(module)].pointer );
 					}
 				}
 			}
@@ -189,8 +189,8 @@ struct Build {
         // Configures
         string install;
         for(string arg: arguments()) {
-			if(startsWith(arg,"-")) {} // Build command flag
-			else if(startsWith(arg,"/")) install=arg;
+			if(startsWith(arg,"-"_)) {} // Build command flag
+			else if(startsWith(arg,"/"_)) install=arg;
 			else if(find(arg+".cc") && arg!="profile") {
 				if(target) log("Multiple targets unsupported, building last target:", arg, ". Parsing arguments:", arguments());
 				target = arg;
