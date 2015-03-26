@@ -2,6 +2,8 @@
 #include "edit.h"
 #include "interface.h"
 #include "window.h"
+#include "build.h"
+// build.cc will run an initial build with the given command line arguments
 
 struct ScrollTextEdit : ScrollArea {
 	TextEdit edit;
@@ -54,17 +56,30 @@ struct FileTextEdit : ScrollTextEdit {
 	String title() override { return copyRef(fileName); }
 };
 
-struct Editor {
+struct Editor : Poll {
 	Scope module;
 	map<String, FileTextEdit*> edits;
 	FileTextEdit* current = 0;
 	unique<Window> window = ::window(null, 1024);
 	struct Location { String fileName; Cursor cursor; };
 	array<Location> viewHistory;
+	int pid = 0;
+	Stream stdout;
 
 	Editor() {
-		window->actions[]
+		window->actions[F5] = [this]{
+			if(isRunning(pid)) return; // TODO: kill
+			pid = 0; stdout=Stream();
+			Build build (arguments()); // Updates build
+			pid = execute(build.binary, {}, false, currentWorkingDirectory(), &stdout); // Runs target without arguments
+			fd = stdout.fd;
+			registerPoll();
+		};
 		view("test.cc");
+	}
+
+	void event() {
+		::stdout.write(stdout.readUpTo(4096));
 	}
 
 	void parse(Scope& module, string fileName) {

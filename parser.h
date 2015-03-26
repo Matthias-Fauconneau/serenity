@@ -77,13 +77,17 @@ struct Parser : TextData {
 	array<State> stack; // Backtrack stack
 
 	// Output
+	array<char> errors; // Source text with colors and navigation links
 	array<uint> target; // Source text with colors and navigation links
 
 	// -- Helpers
 
-	template<Type... Args> void error(const Args&... args) {
-		::error(fileName+':'+str(lineIndex)+':'+str(columnIndex)+':',
+	template<Type... Args> bool error(const Args&... args) {
+		String error = str(fileName+':'+str(lineIndex)+':'+str(columnIndex)+':',
 				args..., "'"+sliceRange(max(0,int(index)-8),index)+"|"+sliceRange(index,min(data.size,index+32))+"'");
+		log(error);
+		errors.append(error+'\n');
+		return false;
 	}
 
 	// Backtrack
@@ -116,12 +120,12 @@ struct Parser : TextData {
 			if(target.append(toUCS4(whileAny(" \t\n")))) continue;
 			size_t begin = index;
 			if(TextData::match("//")) {
-				until('\n');
+				TextData::until('\n');
 				target.append(::color(sliceRange(begin, index), comment));
 				continue;
 			}
 			if(TextData::match("/*")) {
-				until("*/");
+				TextData::until("*/");
 				target.append(::color(sliceRange(begin, index), comment));
 				continue;
 			}
@@ -161,6 +165,11 @@ struct Parser : TextData {
 		return false;
 	}
 
+	bool until(string key, bgr3f color=red) {
+		space();
+		return target.append(::color(TextData::until(key), color));
+	}
+
 	// -- Preprocessor
 
 	bool pragma() {
@@ -173,13 +182,13 @@ struct Parser : TextData {
 		if(!matchID("#include", preprocessor)) return false;
 		space();
 		if(TextData::match('"')) {
-			string name = until('"');
+			string name = TextData::until('"');
 			assert_(scopes.size == 1);
 			parse(scopes[0], find(name));
 			target.append(color(uint('"')+link(name, toUCS4(name)+1u/*FIXME: 0u*/)+uint('"'), module));
 		}
 		else if(TextData::match('<'))  { // library header
-			string name = until('>');
+			string name = TextData::until('>');
 			assert_(scopes.size == 1);
 			target.append(color(uint('<')+toUCS4(name)+uint('>'), module));
 		}
@@ -227,7 +236,7 @@ struct Parser : TextData {
 				commit();
 				scopes.append({"namespace "+id,{},copyRef(fileName),{},{},{}});
 				while(declaration()) {}
-				if(!match("}")) error("namespace");
+				if(!match("}")) return error("namespace");
 				Scope namespace_ = scopes.pop();
 				if(!scopes.last().scopes.contains(id)) {
 					scopes.last().scopes.insert(copyRef(id), move(namespace_));
@@ -309,8 +318,7 @@ struct Parser : TextData {
 	const Scope* type() {
 		const Scope* scope = 0;
 		push();
-		if(match("decltype")) {
-			if(!(match("(") && expression() && match(")"))) error("decltype(expression)");
+		if(match("decltype") && match("(") && expression() && match(")")) {
 			commit();
 			return &scopes[0]; // placeholder
 		}
@@ -404,6 +412,7 @@ struct Parser : TextData {
 		size_t begin = index;
 		if(!TextData::match("\"")) return {};
 		while(!TextData::match('"')) {
+			if(TextData::match('\n')) { error("missing terminating '\"' character"); return {}; }
 			if(TextData::match('\\')) advance(1);
 			else advance(1);
 		}
@@ -493,7 +502,7 @@ struct Parser : TextData {
 		if(match("(")) {
 			if(!match(")")) {
 				do {
-					if(!expression()) { error("opCall Expression"); backtrack(); return {}; }
+					if(!expression()) { error("expected expression"); backtrack(); return {}; }
 				} while(match(","));
 				if(!match(")")) { error("opCall )"); backtrack(); return {}; }
 			}
@@ -892,7 +901,7 @@ struct Parser : TextData {
 			scopes[scopes.size-2].types.insert(copyRef(name), toUCS4(fileName)+max(1u,location));*/ // TODO: overload
 			while(!match("}")) {
 				if(constructor() || destructor() || declaration()) {}
-				else error("struct: declaration | constructor | destructor");
+				else { error("struct: declaration | constructor | destructor"); break; }
 			}
 		} // else struct declaration (empty scope)
 		Scope current = scopes.pop();
@@ -977,7 +986,7 @@ struct Parser : TextData {
 		if(struct_(false) || union_() || enum_()) {
 			push();
 			if(!variable_name()) backtrack();
-			if(!match(";")) error("declaration"_);
+			if(!match(";")) return error("expected ';' after struct"_);
 			return true;
 		}
 		if(variable_declaration()) {
@@ -1077,20 +1086,22 @@ struct Parser : TextData {
 		return false;
 	}
 
-	void statement() {
+	bool statement() {
 		if(static_assert_()) {}
 		else if(variable_declaration()) {
-			if(!match(";")) error("statement"_);
+			if(!match(";")) { return error("statement"_); until(";"_); }
 		}
 		else if(imperativeStatement()) {}
-		else error("statement");
+		else { return error("statement"); until(";"_); }
+		return true;
 	}
 
 	bool block() {
 		if(!match("{")) return false;
 		scopes.append({"block"__,copyRef(scopes.last().struct_),copyRef(fileName),{},{},{}});
-		while(!match("}")) statement();
+		while(statement()) {}
 		scopes.pop();
+		if(!match("}")) return error("expected '}'");
 		return true;
 	}
 

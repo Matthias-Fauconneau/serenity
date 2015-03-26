@@ -55,3 +55,4 @@ audio/player.cc
 editor.cc
 parser.h
 test.cc
+build.h

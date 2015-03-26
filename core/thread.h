@@ -7,6 +7,8 @@
 #include <pthread.h> //pthread
 #include <sys/inotify.h>
 
+extern Stream stdout;
+
 /// Abstract factory pattern (allows construction of class by names)
 template<Type I> struct Interface {
     struct AbstractFactory {
@@ -159,12 +161,14 @@ String which(string name);
 
 /// Execute binary at \a path with command line arguments \a args
 /// \note if \a wait is false, Returns the PID to be used for wait
-int execute(const string path, const ref<string> args={}, bool wait=true, const Folder& workingDirectory=currentWorkingDirectory());
+int execute(const string path, const ref<string> args={}, bool wait=true, const Folder& workingDirectory=currentWorkingDirectory(), Handle* stdout = 0);
 /// Waits for any child process to change state
 int wait();
-/// Waits for process \a pid to change state
+/// Waits for process \a pid to change status
 /// \note Returns immediatly if process is waitable (already terminated)
-int64 wait(int pid);
+int wait(int pid);
+/// Returns whether process \a pid is running
+bool isRunning(int pid);
 
 struct inotify_event;
 /// Watches a folder for new files

@@ -158,6 +158,7 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 	const auto& lines = lastTextLayout.glyphs;
 	cursor.line = min<size_t>(cursor.line, lines.size-1);
 	auto line = lineStops(lines[cursor.line]);
+	cursor.column= min<size_t>(cursor.column, line.size-1);
 
 	if( ( (modifiers&Control) && (key==Home || key==End)) ||
 		(!(modifiers&Control) && (key==UpArrow || key==DownArrow || key==PageUp || key==PageDown))) {
@@ -282,9 +283,9 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 				else if(key==Backspace) { // <=> LeftArrow, Delete
 					edit = Edit::Backspace;
 					if(cursor.column>0) cursor.column--;
-					else if(cursor.line>0) cursor.line--, cursor.column=lineStops(lines[cursor.line]).size;
+					else if(cursor.line>0) { cursor.line--; cursor.column=lineStops(lines[cursor.line]).size; }
 					else return false;
-					if(cursor.column<line.size || cursor.line<lines.size-1) text.removeAt(sourceIndex);
+					if(cursor.column<line.size || cursor.line<lines.size-1) text.removeAt(index(cursor));
 					else return false;
 				}
 				else if(key==Return || key==KP_Enter) {
