@@ -19,14 +19,11 @@ struct TextEdit : Text {
 	size_t index(Cursor cursor) const;
 	/// Source text index to \a Cursor
 	Cursor cursorFromIndex(size_t index) const;
-	Cursor cursorFromPosition(vec2 size, vec2 position);
 
     /// User edited this text
 	function<void(ref<uint>)> textChanged;
     /// User pressed enter
 	function<void(ref<uint>)> textEntered;
-	/// User pressed enter
-	function<void(ref<uint>)> linkActivated;
 	/// User pressed enter
 	function<void()> back;
     /// Cursor start position for selections

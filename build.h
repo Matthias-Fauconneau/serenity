@@ -28,11 +28,13 @@ struct Build {
 	array<unique<Node>> modules;
 	array<String> files;
 	array<String> libraries;
-	struct Process {
-		int pid; Stream stdout;
+	struct Job {
+		String target;
+		int pid;
+		Stream stdout;
 		bool operator==(int pid) const { return pid=this->pid; }
 	};
-	array<Process> jobs;
+	array<Job> jobs;
 	bool needLink = false;
 	String binary;
 

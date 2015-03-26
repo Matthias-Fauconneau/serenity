@@ -143,16 +143,17 @@ bool Build::compileModule(string target) {
 		while(jobs.size>=2) { // Waits for a job to finish before launching a new unit
 			int pid = wait(); // Waits for any child to terminate
 			int status = wait(pid);
-			log(jobs.take(jobs.indexOf(pid)).stdout.readUpTo(4096));
+			Job job = jobs.take(jobs.indexOf(pid));
+			log(job.stdout.readUpTo(4096));
 			if(status) { log("Failed to compile\n"); return false; }
+			else log(job.target+'\n');
 		}
 		Folder(tmp+"/"+join(flags,"-")+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
-		log(target+'\n');
 		Stream stdout;
 		int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1z", "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-march=native",
 										   "-o", object, fileName,  "-I/usr/include/libdrm", "-I/usr/include/freetype2"} + toRefs(args),
 						  false, currentWorkingDirectory(), &stdout);
-		jobs.append({pid, move(stdout)});
+		jobs.append({copyRef(target), pid, move(stdout)});
 		needLink = true;
 	}
 	files.append( tmp+"/"+join(flags,"-")+"/"+target+".o" );
@@ -197,10 +198,11 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
 	assert_(!existsFolder(binary));
 	if(!existsFile(binary) || needLink) {
 		// Waits for all translation units to finish compilation before final link
-		for(Build::Process& job: jobs) {
+		for(Build::Job& job: jobs) {
 			int status = wait(job.pid);
 			log(job.stdout.readUpTo(4096));
 			if(status) { binary={}; return; }
+			else log(job.target+'\n');
 		}
 		array<String> args = (buffer<String>)(
 					move(files) +

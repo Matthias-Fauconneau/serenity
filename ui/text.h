@@ -71,6 +71,9 @@ struct TextLayout {
 	float advance(const ref<Glyph> word);
 };
 
+struct EditStop { float left, center, right; size_t sourceIndex; };
+array<EditStop> lineStops(ref<array<TextLayout::Glyph>> line);
+
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : virtual Widget {
 	/// Create a caption that display \a text using a \a size pixel font
@@ -106,6 +109,8 @@ struct Text : virtual Widget {
 	bool justifyExplicitLineBreak;
     /// Minimal size hint
 	vec2 minimalSizeHint;
+	/// User activated a link
+	function<void(ref<uint>)> linkActivated;
 
 	/// Caches last text layout (for a given wrap)
 	TextLayout lastTextLayout;
@@ -113,4 +118,6 @@ struct Text : virtual Widget {
 	const TextLayout& layout(float wrap=0);
     vec2 sizeHint(vec2 size=0) override;
     shared<Graphics> graphics(vec2 size) override;
+	Cursor cursorFromPosition(vec2 size, vec2 position);
+	bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus /*FIXME: -> Window& window*/) override;
 };

@@ -21,25 +21,6 @@ buffer<uint32> strip(ref<uint32> source) {
 	return target;
 }
 
-struct EditStop { float left, center, right; size_t sourceIndex; };
-array<EditStop> lineStops(ref<array<TextLayout::Glyph>> line) {
-	array<EditStop> stops;
-	for(const auto& word: line) {
-		if(stops) { // Justified space
-			float left = stops.last().right, right = word[0].origin.x, center = (left+right)/2;
-			assert_(stops.last().sourceIndex+1 == word[0].sourceIndex-1);
-			//assert_(text[stops.last().sourceIndex+1]==' ');
-			stops.append({left, center, right, stops.last().sourceIndex+1});
-		}
-		for(auto& glyph: word) {
-			float left = glyph.origin.x, right = left + glyph.advance, center = (left+right)/2;
-			assert_(right > left);
-			stops.append({left, center, right, glyph.sourceIndex});
-		}
-	}
-	return stops;
-}
-
 size_t TextEdit::index(Cursor cursor) const {
 	const auto& lines = lastTextLayout.glyphs;
 	if(!lines) return 0;
@@ -82,28 +63,6 @@ Cursor TextEdit::cursorFromIndex(size_t targetIndex) const {
 	return Cursor(lines.size-1, lineStops(lines.last()).size);  // End of text
 }
 
-Cursor TextEdit::cursorFromPosition(vec2 size, vec2 position) {
-	const TextLayout& layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
-	vec2 textSize = ceil(layout.bbMax - min(vec2(0),layout.bbMin));
-	vec2 offset = max(vec2(0), vec2(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
-	position -= offset;
-	if(position.y < 0) return {0, 0};
-	const auto& lines = lastTextLayout.glyphs;
-	for(size_t lineIndex: range(lines.size)) {
-		if(position.y < (lineIndex*this->size) || position.y > (lineIndex+1)*this->size) continue; // FIXME: Assumes uniform line height
-		const auto line = lineStops(lines[lineIndex]);
-		if(!line) return {lineIndex, line.size};
-		// Before first stop
-		if(position.x <= line[0].center) return {lineIndex, 0};
-		// Between stops
-		for(size_t stop: range(0, line.size-1)) {
-			if(position.x >= line[stop].center && position.x <= line[stop+1].center) return {lineIndex, stop+1};
-		}
-		// After last stop
-		if(position.x >= line.last().center) return {lineIndex, line.size};
-	}
-	return {lines.size-1, lineStops(lines.last()).size};
-}
 
 /// TextEdit
 bool TextEdit::mouseEvent(vec2 position, vec2 size, Event event, Button button, Widget*& focus) {

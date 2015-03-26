@@ -80,27 +80,54 @@ struct Editor : Poll {
 				registerPoll();
 			}
 		};
+		window->actions[Escape] = [this]{
+			if(vbox.tryRemove(&output) != invalid) window->render();
+			else requestTermination();
+		};
+		output.linkActivated = {this, &Editor::linkActivated};
 		view("test.cc");
 	}
 
 	void event() { log(stdout.readUpTo(4096)); }
 	void log(string message) {
+		if(!message) return;
 		::stdout.write(message);
-		output.text.append(toUCS4(message)); // TODO: link build errors
+		output.text.append(link(message));
 		output.lastTextLayout = TextLayout(); // Invalidates layout cache
 		vbox.add(&output);
 		if(window) window->render();
+	}
+	buffer<uint> link(string message) {
+		array<uint> target;
+		for(TextData s (message);s;) {
+			string line = s.until('\n');
+			TextData l (line);
+			string fileName = l.until(':');
+			if(l.isInteger() && edits.contains(fileName)) {
+				size_t lineIndex = l.integer()-1;
+				if(l.match(':') && l.isInteger()) {
+					size_t columnIndex = l.integer()-1;
+					TextEdit& edit = edits.at(fileName)->edit;
+					uint index = edit.index({lineIndex,columnIndex});
+					target.append(color(::link(line+'\n', toUCS4(fileName)+max(1u, index)), red));
+					continue;
+				}
+			}
+			target.append(toUCS4(line+'\n'));
+		}
+		return move(target);
+	}
+	void linkActivated(ref<uint> identifier) {
+		assert_(identifier);
+		String fileName = find(toUTF8(identifier.slice(0, identifier.size-1)));
+		size_t index = identifier.last();
+		view(fileName, index);
 	}
 
 	void parse(Scope& module, string fileName) {
 		if(!edits.contains(fileName)) {
 			FileTextEdit* edit = new FileTextEdit(fileName, module, {this, &Editor::parse});
-			edit->edit.linkActivated = [this](ref<uint> identifier) {
-				assert_(identifier);
-				String fileName = find(toUTF8(identifier.slice(0, identifier.size-1)));
-				size_t index = identifier.last();
-				view(fileName, index);
-			};
+			edit->edit.linkActivated = {this, &Editor::linkActivated};
 			edit->edit.back = [this] {
 				if(viewHistory) {
 					Location location = viewHistory.pop();
