@@ -56,11 +56,9 @@ struct TextElement : Element {
 	Image4f render(float mmPx) override {
 		int2 size = this->size(mmPx);
 		if(transpose) swap(size.x, size.y);
+		if(!(size.x > 0 && size.y > 0))  return {};
 		Text text(string, textSize/72*inchMM*mmPx, color, 1, (floor(max.x*mmPx) - ceil(min.x*mmPx) - 4 -10*mmPx /*FIXME*/),
 				  "LinLibertine", false, 1, align);
-		/*Image image = ::render(size, text.graphics(vec2(size)));
-		if(transpose) image = rotateHalfTurn(rotate(image));
-		return convert(image); // TODO: direct float render*/
 		Image4f target (size, true); target.clear(float4(0));
 		auto graphics = text.graphics(vec2(size));
 		for(const Glyph& e: graphics->glyphs) {

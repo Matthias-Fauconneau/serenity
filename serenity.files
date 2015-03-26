@@ -48,6 +48,7 @@ ui/widget.h
 layout/layout.h
 layout/parse.cc
 layout/preview.cc
+layout/export.cc
 
 audio/player.cc
 

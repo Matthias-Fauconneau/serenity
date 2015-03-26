@@ -76,8 +76,8 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		//return v4sf{sRGB_reverse[m+B], sRGB_reverse[m+G], sRGB_reverse[m+R], 0};
 	});
 
-#define px(x) round((x)*mmPx)
-	int2 size = int2(px(this->size));
+#define px(x) int(round((x)*mmPx))
+	int2 size = int2(round(this->size*mmPx));
 	log(size);
 	Image4f background(size);
 	background.clear(float4(0));
@@ -92,7 +92,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		int xL0 = px(index.x ? xL-columnSpaces[index.x-1] : 0);
 		int xL1 = px(xL + columnSpaces[index.x]); if(xL1<0) xL1=0;
 		float xR = xL+sum(columnWidths.slice(index.x, element.cellCount.x));
-		int xR0 = px(xR - columnSpaces[index.x+element.cellCount.x-1]);
+		int xR0 = min(size.x, px(xR - columnSpaces[index.x+element.cellCount.x-1]));
 		int xR1 = px(size_t(index.x+element.cellCount.x)<table.columnCount ? xR + columnSpaces[index.x+element.cellCount.x] : this->size.x);
 
 		float yT = columnMargins[index.x]+sum(rowHeights.slice(0, index.y));
@@ -170,7 +170,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		for(size_t elementIndex: range(elements.size)) {
 			const Element& element = elements[elementIndex];
 			const Image4f& source = renders[elementIndex];
-			if(!source.alpha && feather) continue;
+			if(!source.size.x || !source.size.y || (!source.alpha && feather)) continue;
 
 			int x0 = px(element.min.x);
 			int x1 = px(element.max.x);
@@ -197,7 +197,7 @@ LayoutRender::LayoutRender(Layout&& _this, const float _mmPx, const float _inchP
 		if(feather) for(size_t elementIndex: range(elements.size)) {
 			const Element& element = elements[elementIndex];
 			const Image4f& source = renders[elementIndex];
-			if(source.alpha) continue;
+			if(source.alpha || !source.size.x || !source.size.y) continue;
 			//if(!(px(element.min) >= vec2(0) && px(element.max) <= vec2(target.size))) continue;
 			//assert_(px(element.min) >= vec2(0) && px(element.max) <= vec2(target.size), element.min, element.max, target.size);
 			int x0 = px(element.min.x); if(x0 < 0) x0=0;
