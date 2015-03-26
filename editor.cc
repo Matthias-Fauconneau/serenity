@@ -3,6 +3,7 @@
 #include "interface.h"
 #include "window.h"
 #include "build.h"
+#include "ui/layout.h"
 // build.cc will run an initial build with the given command line arguments
 
 struct ScrollTextEdit : ScrollArea {
@@ -59,8 +60,10 @@ struct FileTextEdit : ScrollTextEdit {
 struct Editor : Poll {
 	Scope module;
 	map<String, FileTextEdit*> edits;
-	FileTextEdit* current = 0;
-	unique<Window> window = ::window(null, 1024);
+	FileTextEdit* current = null;
+	Text output {};
+	VBox vbox {{(Widget*)null}};
+	unique<Window> window = ::window(&vbox, 1024);
 	struct Location { String fileName; Cursor cursor; };
 	array<Location> viewHistory;
 	int pid = 0;
@@ -69,17 +72,24 @@ struct Editor : Poll {
 	Editor() {
 		window->actions[F5] = [this]{
 			if(isRunning(pid)) return; // TODO: kill
-			pid = 0; stdout=Stream();
-			Build build (arguments()); // Updates build
-			pid = execute(build.binary, {}, false, currentWorkingDirectory(), &stdout); // Runs target without arguments
-			fd = stdout.fd;
-			registerPoll();
+			unregisterPoll(); stdout=Stream(); pid = 0; output.text.clear();
+			Build build (arguments(), {this, &Editor::log}); // Updates build
+			if(build.binary) {
+				pid = execute(build.binary, {}, false, currentWorkingDirectory(), &stdout); // Runs target without arguments
+				fd = stdout.fd;
+				registerPoll();
+			}
 		};
 		view("test.cc");
 	}
 
-	void event() {
-		::stdout.write(stdout.readUpTo(4096));
+	void event() { log(stdout.readUpTo(4096)); }
+	void log(string message) {
+		::stdout.write(message);
+		output.text.append(toUCS4(message)); // TODO: link build errors
+		output.lastTextLayout = TextLayout(); // Invalidates layout cache
+		vbox.add(&output);
+		if(window) window->render();
 	}
 
 	void parse(Scope& module, string fileName) {
@@ -97,7 +107,8 @@ struct Editor : Poll {
 					current = edits.at(location.fileName);
 					current->edit.selectionStart = current->edit.cursor = location.cursor;
 					current->ensureCursorVisible();
-					if(window) window->widget = current;
+					vbox[0] = current;
+					if(window) { window->focus = current; window->render(); }
 				}
 			};
 			edit->edit.textChanged = [this, edit](ref<uint>) {
@@ -120,6 +131,7 @@ struct Editor : Poll {
 		current = edits.at(fileName);
 		current->edit.selectionStart = current->edit.cursor = current->edit.cursorFromIndex(index);
 		current->ensureCursorVisible();
-		if(window) { window->widget = window->focus = current; window->render(); }
+		vbox[0] = current;
+		if(window) { window->focus = current; window->render(); }
 	}
 } app;

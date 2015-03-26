@@ -222,7 +222,7 @@ int execute(const string path, const ref<string> args, bool wait, const Folder& 
     int pid = fork();
     if(pid==0) {
 		close(pipe[0]); // Child does not read
-		dup2(pipe[1], 1); // Redirect stdout to pipe
+		dup2(pipe[1], 2); // Redirect stdout to pipe
 		if(cwd!=AT_FDCWD) check(fchdir(cwd));
         if(!execve(strz(path), (char*const*)argv, (char*const*)envp)) exit_group(-1);
         __builtin_unreachable();

@@ -21,12 +21,18 @@ struct Build {
 	array<string> flags;
 	array<String> args = apply(folder.list(Folders), [this](string subfolder)->String{ return "-iquote"+subfolder; });
 
+	function<void(string)> log;
+
 	// Variables
 	array<String> defines;
 	array<unique<Node>> modules;
 	array<String> files;
 	array<String> libraries;
-	array<int> pids;
+	struct Process {
+		int pid; Stream stdout;
+		bool operator==(int pid) const { return pid=this->pid; }
+	};
+	array<Process> jobs;
 	bool needLink = false;
 	String binary;
 
@@ -46,5 +52,5 @@ struct Build {
 	/// \return Timestamp of the last modified module implementation (deep)
 	bool compileModule(string target);
 
-	Build(ref<string> arguments);
+	Build(ref<string> arguments, function<void(string)> log=log_);
 };

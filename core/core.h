@@ -207,6 +207,7 @@ inline constexpr string operator "" _(const char* data, size_t size) { return st
 
 /// Logs a message to standard output
 template<Type... Args> void log(const Args&... args);
+void log_(string message);
 void log(string message);
 
 // -- Debug

@@ -65,7 +65,7 @@ void Build::tryParseDefines(TextData& s) {
 	if(!s.match("#define ")) return;
 	string id = s.identifier("_");
 	s.whileAny(" ");
-	if(!s.match('0')) { defines.append( toLower(id) ); log(defines); }
+	if(!s.match('0')) { defines.append( toLower(id) ); }
 }
 
 bool Build::tryParseConditions(TextData& s, string fileName) {
@@ -140,29 +140,33 @@ bool Build::compileModule(string target) {
 	if(!lastEdit) return false;
 	String object = tmp+"/"+join(flags,"-")+"/"+target+".o";
 	if(!existsFile(object, folder) || lastEdit >= File(object).modifiedTime()) {
-		while(pids.size>=2) { // Waits for a job to finish before launching a new unit
+		while(jobs.size>=2) { // Waits for a job to finish before launching a new unit
 			int pid = wait(); // Waits for any child to terminate
-			if(wait(pid)) { log("Failed to compile"); return false; }
-			pids.remove(pid);
+			int status = wait(pid);
+			log(jobs.take(jobs.indexOf(pid)).stdout.readUpTo(4096));
+			if(status) { log("Failed to compile\n"); return false; }
 		}
 		Folder(tmp+"/"+join(flags,"-")+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
-		log(target);
-		pids.append( execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1z", "-Wall", "-Wextra", "-Wno-overloaded-virtual", //"-fno-rtti",
-											  "-march=native", "-o" , object, fileName,  "-I/usr/include/libdrm", "-I/usr/include/freetype2"} + toRefs(args), false) );
+		log(target+'\n');
+		Stream stdout;
+		int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1z", "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-march=native",
+										   "-o", object, fileName,  "-I/usr/include/libdrm", "-I/usr/include/freetype2"} + toRefs(args),
+						  false, currentWorkingDirectory(), &stdout);
+		jobs.append({pid, move(stdout)});
 		needLink = true;
 	}
 	files.append( tmp+"/"+join(flags,"-")+"/"+target+".o" );
 	return true;
 }
 
-Build::Build(ref<string> arguments) {
+Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
 	// Configures
 	string install;
 	for(string arg: arguments) {
 		if(startsWith(arg,"-"_)) {} // Build command flag
 		else if(startsWith(arg,"/"_)) install=arg;
 		else if(find(arg+".cc") && arg!="profile") {
-			if(target) log("Multiple targets unsupported, building last target:", arg, ". Parsing arguments:", arguments);
+			if(target) log(str("Multiple targets unsupported, building last target:", arg, ". Parsing arguments:", arguments)+'\n');
 			target = arg;
 		}
 		else flags.append( split(arg,"-") );
@@ -183,23 +187,27 @@ Build::Build(ref<string> arguments) {
 	Folder(tmp+"/"+join(flags,"-"), currentWorkingDirectory(), true);
 
 	// Compiles
-	if(flags.contains("profile")) if(!compileModule(find("core/profile.cc"))) { log("Failed to compile"); return; }
-	if(!compileModule( find(target+".cc") )) { log("Failed to compile"); return; }
+	if(flags.contains("profile")) if(!compileModule(find("core/profile.cc"))) { log("Failed to compile\n"); return; }
+	if(!compileModule( find(target+".cc") )) { log("Failed to compile\n"); return; }
 
-	//if(arguments.contains("-tree")) { log(collect(modules.first(), 1)); return; }
+	//if(arguments.contains("-tree")) { log(str(collect(modules.first(), 1))+'\n'); return; }
 
 	// Links
 	binary = tmp+"/"+join(flags,"-")+"/"+target;
 	assert_(!existsFolder(binary));
 	if(!existsFile(binary) || needLink) {
 		// Waits for all translation units to finish compilation before final link
-		for(int pid: pids) if(wait(pid)) { log("Failed to compile"); return; }
+		for(Build::Process& job: jobs) {
+			int status = wait(job.pid);
+			log(job.stdout.readUpTo(4096));
+			if(status) { binary={}; return; }
+		}
 		array<String> args = (buffer<String>)(
 					move(files) +
 					mref<String>{"-o"__, unsafeRef(binary), "-L/usr/local/lib"__} +
 					apply(libraries, [this](const String& library)->String{ return "-l"+library; }) );
 		if(flags.contains("m32"_)) args.append("-m32"__);
-		if(execute(CXX, toRefs(args))) { log("Failed to link"); return; }
+		if(execute(CXX, toRefs(args))) { log("Failed to link\n"); return; }
 	}
 
 	// Installs
