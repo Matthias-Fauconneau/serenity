@@ -43,7 +43,7 @@ struct Widget {
 bool hasFocus(Widget* widget);
 
 /// Cursor icons
-enum MouseCursor { Arrow, Text };
+enum class MouseCursor { Arrow, Text };
 /// Sets mouse cursor
 void setCursor(MouseCursor cursor);
 /// Returns last text selection (or if clipboard is true, last copy)

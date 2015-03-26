@@ -45,6 +45,10 @@ ui/edit.h
 ui/edit.cc
 ui/widget.h
 
+layout/layout.h
+layout/parse.cc
+layout/preview.cc
+
 audio/player.cc
 
 editor.cc

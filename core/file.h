@@ -29,7 +29,7 @@ struct Handle {
     handle<int> fd;
 
     Handle():fd(0){}
-    Handle(int fd):fd(fd){}
+	explicit Handle(int fd):fd(fd){}
     default_move(Handle);
     ~Handle() { close(); }
     explicit operator bool() const { return fd; }
@@ -193,9 +193,9 @@ void touchFile(const string path, const Folder& at=currentWorkingDirectory(), bo
 void copy(const Folder& oldAt, const string oldName, const Folder& newAt, const string newName);
 
 /// Returns available free space in bytes for the file system containing \a file
-int64 available(const Handle& file);
+int64 availableCapacity(const Handle& file);
 /// Returns available free space in bytes for the file system containing \a path
-int64 available(const string path, const Folder& at=currentWorkingDirectory());
+int64 availableCapacity(const string path, const Folder& at=currentWorkingDirectory());
 
 /// Returns capacity in bytes for the file system containing \a file
 int64 capacity(const Handle& file);

@@ -63,6 +63,7 @@ struct Editor {
 	array<Location> viewHistory;
 
 	Editor() {
+		window->actions[]
 		view("test.cc");
 	}
 

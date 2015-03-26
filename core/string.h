@@ -31,6 +31,8 @@ bool operator <=(const string a, const string b);
 generic bool startsWith(const ref<T> a, const ref<T> b) {
 	return a.size>=b.size && a.slice(0, b.size)==b;
 }
+inline bool startsWith(const string a, const string b) { return startsWith<char>(a, b); }
+
 /// Returns whether \a str ends with \a sub
 bool endsWith(const string str, const string sub);
 /// Returns whether \a str contains the \a substring

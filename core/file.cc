@@ -208,9 +208,9 @@ void copy(const Folder& oldAt, const string oldName, const Folder& newAt, const 
 }
 
 
-int64 available(const Handle& file) { struct statvfs statvfs; check( fstatvfs(file.fd, &statvfs) ); return statvfs.f_bavail*statvfs.f_frsize; }
+int64 availableCapacity(const Handle& file) { struct statvfs statvfs; check( fstatvfs(file.fd, &statvfs) ); return statvfs.f_bavail*statvfs.f_frsize; }
 
-int64 available(const string path, const Folder& at) { return available(File(path,at)); }
+int64 availableCapacity(const string path, const Folder& at) { return availableCapacity(File(path,at)); }
 
 
 int64 capacity(const Handle& file) { struct statvfs statvfs; check( fstatvfs(file.fd, &statvfs) ); return statvfs.f_blocks*statvfs.f_frsize; }
