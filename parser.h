@@ -187,14 +187,15 @@ struct Parser : TextData {
 		return true;
 	}
 
-	bool ppExpression() {
+	bool line() {
 		size_t begin = index;
-		while(!TextData::match('\n')) {
+		while(available(1) && !TextData::match('\n')) {
 			if(TextData::match("\\\n")) {}
 			else advance(1);
 		}
 		return target.append(toUCS4(sliceRange(begin, index)));
 	}
+	bool ppExpression() { return line(); }
 
 	bool define() {
 		if(!matchID("#define", preprocessor)) return false;
@@ -251,8 +252,11 @@ struct Parser : TextData {
 		: TextData(source), parse(parse), fileName(copyRef(fileName)) {
 		scopes.append(move(module));
 		space();
-		while(global()) {}
-		assert_(!available(1) && scopes.size == 1 && stack.size == 0);
+		while(available(1)) {
+			if(global()) {}
+			else line(); // Skips full line on invalid sequence
+		}
+		//assert_(scopes.size == 1 && stack.size == 0);
 		module = move(scopes[0]);
 	}
 

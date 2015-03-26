@@ -17,6 +17,7 @@ core/simd.h
 core/map.h
 core/file.h
 core/data.h
+core/function.h
 core/thread.cc
 core/file.cc
 
@@ -46,5 +47,6 @@ ui/widget.h
 
 audio/player.cc
 
-test.cc
+editor.cc
 parser.h
+test.cc

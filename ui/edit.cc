@@ -1,5 +1,26 @@
 #include "edit.h"
 
+/// Strips text format markers
+buffer<uint32> strip(ref<uint32> source) {
+	buffer<uint32> target(source.size, 0);
+	for(size_t index=0; index<source.size; index++) {
+		uint32 c = source[index];
+		if(TextFormat(c)>=TextFormat::Begin && TextFormat(c)<TextFormat::End) {
+			TextFormat format = TextFormat(c);
+			if(format==TextFormat::Bold || format==TextFormat::Italic || format==TextFormat::Subscript || format==TextFormat::Superscript) {}
+			else if(format==TextFormat::Color) index += 3;
+			else if(format==TextFormat::Link) { index++; while(source[index]) index++; }
+			else error("Unknown format", uint(format));
+		}
+		else if(TextFormat(c)==TextFormat::End) {}
+		else {
+			assert_(c, source);
+			target.append(c);
+		}
+	}
+	return target;
+}
+
 struct EditStop { float left, center, right; size_t sourceIndex; };
 array<EditStop> lineStops(ref<array<TextLayout::Glyph>> line) {
 	array<EditStop> stops;
@@ -96,7 +117,7 @@ bool TextEdit::mouseEvent(vec2 position, vec2 size, Event event, Button button, 
 		if(button==LeftButton) {
 			Cursor min, max;
 			if(selectionStart < cursor) min=selectionStart, max=cursor; else min=cursor, max=selectionStart;
-			if(cursor != selectionStart) setSelection(toUTF8(text.sliceRange(index(min),index(max))), false);
+			if(cursor != selectionStart) setSelection(toUTF8(strip(text.sliceRange(index(min),index(max)))), false);
 			else for(const Link& link: lastTextLayout.links) {
 				if(link.begin<=cursor && cursor<link.end) { cursorHistory.append(cursor); linkActivated(link.identifier); break; }
 			}
@@ -106,7 +127,7 @@ bool TextEdit::mouseEvent(vec2 position, vec2 size, Event event, Button button, 
 			size_t index = this->index(cursor);
 			text = buffer<uint>(text.slice(0,index) + selection + text.slice(index));
 			lastTextLayout = TextLayout();
-			if(textChanged) textChanged(toUTF8(text));
+			if(textChanged) textChanged(text);
 			this->layout(size.x ? min<float>(wrap, size.x) : wrap);
 			cursor = cursorFromIndex(index+selection.size);
 			return true;
@@ -207,7 +228,7 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 		text = copy(state.text);
 		selectionStart = cursor = state.cursor;
 		lastTextLayout = TextLayout();
-		if(textChanged) textChanged(toUTF8(text));
+		if(textChanged) textChanged(text);
 		lastEdit=Edit::Point;
 		return true;
 	}
@@ -219,7 +240,7 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 		text = copy(state.text);
 		selectionStart = cursor = state.cursor;
 		lastTextLayout = TextLayout();
-		if(textChanged) textChanged(toUTF8(text));
+		if(textChanged) textChanged(text);
 		lastEdit=Edit::Point;
 		return true;
 	}
@@ -227,7 +248,7 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 	if((modifiers&Control) && (key=='c'||key=='C'||key=='x'||key=='X')) {
 		Cursor min, max;
 		if(selectionStart < cursor) min=selectionStart, max=cursor; else min=cursor, max=selectionStart;
-		if(cursor != selectionStart) setSelection(toUTF8(text.sliceRange(index(min),index(max))), true);
+		if(cursor != selectionStart) setSelection(toUTF8(strip(text.sliceRange(index(min),index(max)))), true);
 		if((key=='c'||key=='C') || cursor == selectionStart) return true;
 	}
 
@@ -267,7 +288,7 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 					else return false;
 				}
 				else if(key==Return || key==KP_Enter) {
-					if(textEntered) { textEntered(toUTF8(text)); return false; }
+					if(textEntered) { textEntered(text); return false; }
 					text.insertAt(sourceIndex, uint32('\n'));
 					cursor.line++; cursor.column = 0;
 				}
@@ -290,7 +311,7 @@ bool TextEdit::keyPress(Key key, Modifiers modifiers) {
 		lastTextLayout = TextLayout();
 	}
 
-	if(textChanged) textChanged(toUTF8(text));
+	if(textChanged) textChanged(text);
 	selectionStart = cursor;
 	cursorX = 0;
 

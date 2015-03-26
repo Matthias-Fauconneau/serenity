@@ -1,6 +1,8 @@
 #pragma once
 #include "text.h"
 
+buffer<uint32> strip(ref<uint32> source);
+
 /// TextEdit is an editable \a Text
 struct TextEdit : Text {
 	Cursor cursor;
@@ -20,9 +22,9 @@ struct TextEdit : Text {
 	Cursor cursorFromPosition(vec2 size, vec2 position);
 
     /// User edited this text
-	function<void(string)> textChanged;
+	function<void(ref<uint>)> textChanged;
     /// User pressed enter
-	function<void(string)> textEntered;
+	function<void(ref<uint>)> textEntered;
 	/// User pressed enter
 	function<void(ref<uint>)> linkActivated;
 	/// User pressed enter
