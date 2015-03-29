@@ -50,7 +50,7 @@ struct TextElement : Element {
 		: string(copyRef(text)), textSize(textSize), transpose(transpose), align(align), color(color) {
 		vec2 size = Text(text, textSize/72*72, color, 1, 0, "LinLibertine", false, 1, align).sizeHint();
 		if(transpose) swap(size.x, size.y);
-		aspectRatio = (float)size.x/size.y;
+		aspectRatio = size ? (float)size.x/size.y : 1;
 	}
 	Image source() const override { return {}; }
 	Image4f render(float mmPx) override {

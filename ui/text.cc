@@ -63,6 +63,7 @@ void TextLayout::nextWord(array<Glyph>&& word, bool justify) {
 
 TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string fontName, bool hint, float interline, int align,
 					   bool justify, bool justifyExplicit, bool justifyLast, bgr3f color) : size(size), wrap(wrap), interline(interline), align(align) {
+	if(!text) return;
 	// Fraction lines
 	struct Context {
 		TextFormat format; FontData* font; float size; bgr3f color; vec2 origin; size_t start; array<Context> children; vec2 position; size_t end;
