@@ -116,7 +116,7 @@ int64 Build::parse(string fileName, Node& parent) {
 		{String name = tryParseIncludes(s, fileName);
 			if(name) {
 				String module = find(name+".h"); // .h to find module corresponding to header
-				assert_(module, "No such module", name);
+                assert_(module, "No such module", name, "imported from", fileName);
 				lastEdit = max(lastEdit, parse(module+".h", parent));
 				if(!parent.edges.contains(module) && existsFile(module+".cc", folder) && module != parent.name) {
 					if(!modules.contains<string>(module)) { if(!compileModule(module)) return 0; }
@@ -150,7 +150,7 @@ bool Build::compileModule(string target) {
 		}
 		Folder(tmp+"/"+join(flags,"-")+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
 		Stream stdout;
-		int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1z", "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-march=native",
+        int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1y", "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing", "-march=native",
 										   "-o", object, fileName,  "-I/usr/include/libdrm", "-I/usr/include/freetype2"} + toRefs(args),
 						  false, currentWorkingDirectory(), &stdout);
 		jobs.append({copyRef(target), pid, move(stdout)});

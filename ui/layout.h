@@ -40,6 +40,8 @@ generic struct WidgetArray : virtual Layout, array<T> {
 /// Layouts widgets on an axis
 /// \note This is an abstract class, use \a Horizontal or \a Vertical
 struct Linear : virtual Layout {
+    default_move(Linear);
+
     /// How to use any extra space when no widget is expanding
     enum Extra {
         Left,Top=Left, /// Aligns tightly packed widgets

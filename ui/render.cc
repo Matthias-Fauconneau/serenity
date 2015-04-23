@@ -75,6 +75,7 @@ static void blend(const Image& target, uint x, uint y, bgr3f color, float opacit
 }
 
 void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity, bool hint) {
+    assert_(isNumber(p1) && isNumber(p2), p1, p2);
     //if(hint && p1.y == p2.y) p1.y = p2.y = round(p1.y); // Hints
     if(hint) { // TODO: preprocess
         if(p1.x == p2.x) fill(target, int2(round(p1)), int2(1, p2.y-p1.y), color, opacity);
@@ -82,7 +83,7 @@ void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity, boo
         else error(p1, p2);
         return;
     }
-	if(p1.x >= target.size.x || p2.x < 0) return; // Assumes p1.x < p2.x
+    //if(p1.x >= target.size.x || p2.x < 0) return; // Assumes p1.x < p2.x
 	assert(bgr3f(0) <= color && color <= bgr3f(1));
 
     float dx = p2.x - p1.x, dy = p2.y - p1.y;

@@ -62,7 +62,7 @@ void TextLayout::nextWord(array<Glyph>&& word, bool justify) {
 }
 
 TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string fontName, bool hint, float interline, int align,
-					   bool justify, bool justifyExplicit, bool justifyLast, bgr3f color) : size(size), wrap(wrap), interline(interline), align(align) {
+                       bool justify, bool justifyExplicit, bool justifyLast, bgr3f color) : size(size), wrap(wrap), interline(interline), align(align) {
 	if(!text) return;
 	// Fraction lines
 	struct Context {
@@ -257,8 +257,9 @@ Text::Text(buffer<uint>&& text, float size, bgr3f color, float opacity, float wr
 	: text(move(text)), size(size), color(color), opacity(opacity), wrap(wrap), font(font), hint(hint), interline(interline), align(align),
 	  justify(justify), justifyExplicitLineBreak(justifyExplicitLineBreak), minimalSizeHint(minimalSizeHint) {}
 
-const TextLayout& Text::layout(const float wrap) {
-	assert_(wrap >= 0);
+const TextLayout& Text::layout(float wrap) {
+    wrap = max(0.f, wrap);
+    assert_(wrap >= 0, wrap);
 	if(!lastTextLayout || wrap != lastTextLayout.wrap)
 		lastTextLayout = TextLayout(text, size, wrap, font, hint, interline, align, justify, justifyExplicitLineBreak, true, color);
 	return lastTextLayout;
@@ -273,6 +274,7 @@ shared<Graphics> Text::graphics(vec2 size) {
 	const TextLayout& layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
 	vec2 textSize = ceil(layout.bbMax - min(vec2(0),layout.bbMin));
 	vec2 offset = max(vec2(0), vec2(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
+    if(align == -1) offset.x = 0;
 
 	shared<Graphics> graphics;
 	//FIXME: use Graphic::offset, cache graphics

@@ -94,7 +94,7 @@ typedef ImageLink TriggerButton;
 /// Displays an icon corresponding to state. When clicked, switches state and calls \a toggled
 struct ToggleButton : ImageView {
     /// Creates a toggle button showing \a enable icon when disabled or \a disable icon when enabled
-    ToggleButton(Image&& enable, Image&& disable) : ImageView(share(enable)), enableIcon(move(enable)), disableIcon(move(disable)) {}
+    ToggleButton(Image&& enable, Image&& disable) : ImageView(unsafeShare(enable)), enableIcon(move(enable)), disableIcon(move(disable)) {}
 
     /// User toggled the button
 	function<void(bool /*state*/)> toggled;

@@ -7,14 +7,14 @@ shared<Graphics> ScrollArea::graphics(vec2 size) {
     vec2 hint = abs(widget().sizeHint(vec2( horizontal||size.x<0 ? 0/*-1 FIXME*/: 1, vertical||size.y<0? 0/*-1 FIXME*/: 1 )*abs(size)));
     vec2 view (horizontal?max(hint.x,size.x):size.x, vertical?max(hint.y,size.y):size.y);
     offset = min(vec2(0), max(-vec2(hint-size), offset));
-    assert_(offset <= vec2(0) && (!(size < view) || offset==vec2(0)), withName(offset, view, hint, size));
+    assert_(offset <= vec2(0) && (!(size < view) || offset==vec2(0)));
     shared<Graphics> graphics;
     graphics->graphics.insert(offset, widget().graphics(view, Rect::fromOriginAndSize(vec2(-offset), size)));
     if(scrollbar) {
 	if(size.y<view.y)
-	    graphics->fills.append( vec2(size.x-scrollBarWidth, -offset.y*size.y/view.y), vec2(scrollBarWidth, size.y*size.y/view.y), 1./2, 1.f/2);
+        graphics->fills.append( vec2(size.x-scrollBarWidth, -offset.y*size.y/view.y), vec2(scrollBarWidth, size.y*size.y/view.y), 1.f/2, 1.f/2);
 	if(size.x<view.x)
-	    graphics->fills.append( vec2(-offset.x*size.x/view.x, size.y-scrollBarWidth), vec2(size.x*size.x/view.x, scrollBarWidth), 1./2, 1.f/2);
+        graphics->fills.append( vec2(-offset.x*size.x/view.x, size.y-scrollBarWidth), vec2(size.x*size.x/view.x, scrollBarWidth), 1.f/2, 1.f/2);
     }
     return graphics;
 }
@@ -140,7 +140,7 @@ bool ImageLink::mouseEvent(vec2, vec2, Event event, Button, Widget*&) {
 
 //  ToggleButton
 bool ToggleButton::mouseEvent(vec2, vec2, Event event, Button button, Widget*&) {
-    if(event==Press && button==LeftButton) { enabled = !enabled; image = enabled?share(disableIcon):share(enableIcon); toggled(enabled); return true; }
+    if(event==Press && button==LeftButton) { enabled = !enabled; image = enabled?unsafeShare(disableIcon):unsafeShare(enableIcon); toggled(enabled); return true; }
     return false;
 }
 

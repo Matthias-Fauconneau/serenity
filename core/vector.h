@@ -5,8 +5,8 @@
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
-template<template<Type> Type V, Type T, uint N> struct vec : V<T> {
-	static_assert(sizeof(V<T>)==N*sizeof(T));
+template<template<Type> /*Type*/class V, Type T, uint N> struct vec : V<T> {
+    static_assert(sizeof(V<T>)==N*sizeof(T), ""/*req C++14*/);
 
     /// Defaults initializes to zero
 	inline vec() : vec(0) {}
@@ -23,7 +23,7 @@ template<template<Type> Type V, Type T, uint N> struct vec : V<T> {
 	template<Type S> inline explicit vec(const vec<V,S,N>& o) { for(uint i: range(N)) at(i)=(T)o[i]; }
 
 	/// Initializes first components from another vec \a o and initializes remaining components with args...
-	template<template<Type> Type W, Type... Args> vec(const vec<W,T,N-sizeof...(Args)>& o, Args... args){
+    template<template<Type> /*Type*/class W, Type... Args> vec(const vec<W,T,N-sizeof...(Args)>& o, Args... args){
 		for(int i: range(N-sizeof...(Args))) at(i)=o[i];
 		T unpacked[]={T(args)...}; for(int i: range(sizeof...(Args))) at(N-sizeof...(Args)+i)=unpacked[i];
 	}
@@ -47,7 +47,7 @@ template<template<Type> Type V, Type T, uint N> struct vec : V<T> {
 };
 
 #undef generic
-#define generic template<template<Type> Type V, Type T, uint N> inline constexpr
+#define generic template<template<Type> /*Type*/class V, Type T, uint N> inline /*constexpr*/
 #define vec vec<V,T,N>
 
 generic vec rotate(const vec& u) { vec r=u; for(uint i=0;i<N-1;i++) swap(r[i],r[i+1]); return r; }
@@ -82,15 +82,15 @@ generic T sum(const vec& a) { T sum=0; for(uint i: range(N)) sum+=a[i]; return s
 generic T product(const vec& a) { T product=1; for(uint i: range(N)) product *= a[i]; return product; }
 generic T dot(const vec& a, const vec& b) { T ssq=0; for(uint i: range(N)) ssq += a[i]*b[i]; return ssq; }
 generic T sq(const vec& a) { return dot(a,a); }
-generic float length(const vec& a) { return sqrt(dot(a,a)); }
-generic vec normalize(const vec& a){ return a/length(a); }
+//generic float length(const vec& a) { return sqrt(dot(a,a)); }
+//generic vec normalize(const vec& a){ return a/length(a); }
 generic bool isNaN(const vec& v){ for(uint i: range(N)) if(isNaN(v[i])) return true; return false; }
 generic bool isNumber(const vec& v){ for(uint i: range(N)) if(!isNumber(v[i])) return false; return true; }
 
 #undef generic
 #define generic template<Type T>
 
-template<template<Type> Type V, Type T, uint N> inline String str(const vec& v) {
+template<template<Type> /*Type*/class V, Type T, uint N> inline String str(const vec& v) {
 	array<char> s(6*N, 0); s.append('('); for(uint i: range(N)) { s.append(str(v[i])); if(i<N-1) s.append(", "); } s.append(')'); return move(s);
 }
 
@@ -119,14 +119,16 @@ typedef vec<xyz,int,3> int3;
 typedef vec<xyz,uint16,3> short3;
 /// Floating-point x,y,z vector
 typedef vec<xyz,float,3> vec3;
+/// Double precision floating-point x,y,z vector
+typedef vec<xyz,double,3> dvec3;
 
 inline vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y); }
-inline vec3 normal(vec3 v) {
+/*inline vec3 normal(vec3 v) {
 	int index=0; float min=v[0];
 	for(int i: range(3)) if(abs(v[i]) < min) { index=i; min=abs(v[i]); }
 	vec3 t=0; t[index]=1;
 	return normalize(cross(v, t));
-}
+}*/
 
 generic struct xyzw {
     T x,y,z,w;

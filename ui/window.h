@@ -19,7 +19,12 @@ struct Window : Poll {
 	MouseCursor cursor = MouseCursor::Arrow;
 
 	/// Updates to be rendered
-	struct Update { shared<Graphics> graphics; int2 origin = 0, size = 0; explicit operator bool() { return size.x || size.y; } };
+    struct Update {
+        shared<Graphics> graphics;
+        int2 origin = 0, size = 0;
+        explicit operator bool() { return size.x || size.y; }
+        Update(shared<Graphics>&& graphics=nullptr, int2 origin=0, int2 size=0) : graphics(move(graphics)), origin(origin), size(size) {} //req C++14
+    };
 	Lock lock;
 	array<Update> updates;
 
@@ -44,6 +49,8 @@ struct Window : Poll {
 	Widget* focus = widget;
 	/// Current widget that has the drag focus
 	Widget* drag = 0;
+
+    function<void()> presentComplete;
 
 	Window(Widget* widget, Thread& thread, int2 size = 0) : Poll(0,0,thread), widget(widget), size(size) {}
 	virtual ~Window() {}

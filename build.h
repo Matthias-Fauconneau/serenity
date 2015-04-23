@@ -10,16 +10,16 @@ struct Node {
 
 struct Build {
 	// Parameters
-	String CXX = which(getenv("CC")) ? which(getenv("CC")) : which("clang++") ? which("clang++") : which("g++");
-	String LD = which("ld");
+    String CXX {which(environmentVariable("CC")) ? which(environmentVariable("CC")) : which("clang++") ? which("clang++") : which("g++")};
+    String LD {which("ld")};
 
 	const Folder folder {"."};
-	const String base = copyRef(section(folder.name(),'/',-2,-1));
-	const String tmp = "/var/tmp/"+base+"."+section(CXX,'/',-2,-1);
+    const String base {copyRef(section(folder.name(),'/',-2,-1))};
+    const String tmp = "/var/tmp/"+base+"."+section(CXX,'/',-2,-1);
 
 	string target;
 	array<string> flags;
-	array<String> args = apply(folder.list(Folders), [this](string subfolder)->String{ return "-iquote"+subfolder; });
+    array<String> args {apply(folder.list(Folders), [this](string subfolder)->String{ return "-iquote"+subfolder; })};
 
 	function<void(string)> log;
 
@@ -38,7 +38,8 @@ struct Build {
 	bool needLink = false;
 	String binary;
 
-	const array<String> sources = folder.list(Files|Recursive);
+    const buffer<String> sources {folder.list(Files|Recursive)};
+
 	/// Returns the first path matching file
 	String find(string file);
 

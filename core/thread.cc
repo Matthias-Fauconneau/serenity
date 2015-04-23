@@ -13,8 +13,9 @@
 #include <sys/syscall.h>
 
 // Log
-Stream stdout(2);
-void log_(string message) { stdout.write(message); }
+//Stream stdout(2);
+//void log_(string message) { /*stdout*/Stream(2).write(message); }
+void log_(string message) { ::write(2, message.data, message.size); }
 void log(string message) { log_(message+'\n');  }
 
 // Poll
@@ -169,7 +170,9 @@ template<> void __attribute((noreturn)) error(const string& message) {
 }
 
 // Entry point
-int main() {
+int argc; char** argv;
+int main(int argc, char** argv) {
+    ::argc = argc, ::argv = argv;
 	//mainThread.tid=gettid(); // ->Thread
     unique<Application> application;
 	Interface<Application>::AbstractFactory* factory = Interface<Application>::factories().value("");
@@ -177,8 +180,8 @@ int main() {
 		if(Interface<Application>::factories().contains(argument)) factory = Interface<Application>::factories().at(argument);
 	if(factory) application = factory->constructNewInstance();
     mainThread.run(); // Reuses main thread as default event loop runner when not overriden in Poll constructor
-	return groupExitStatus; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
-	//exit_group(groupExitStatus);
+    //return groupExitStatus; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
+    exit_group(groupExitStatus); // Prevents libMesh destructors to segfault
 }
 
 void requestTermination(int status) {
@@ -193,7 +196,7 @@ void requestTermination(int status) {
 String which(string name) {
     if(!name) return {};
 	if(existsFile(name)) return copyRef(name);
-    for(string folder: split(getenv("PATH","/usr/bin"),":")) if(existsFolder(folder) && existsFile(name, folder)) return folder+'/'+name;
+    for(string folder: split(environmentVariable("PATH","/usr/bin"),":")) if(existsFolder(folder) && existsFile(name, folder)) return folder+'/'+name;
     return {};
 }
 
@@ -216,19 +219,23 @@ int execute(const string path, const ref<string> args, bool wait, const Folder& 
     envp[env0.size]=0;
 
 	int pipe[2];
-	check( ::pipe(pipe) );
+    if(stdout) check( ::pipe(pipe) );
 
     int cwd = workingDirectory.fd;
     int pid = fork();
     if(pid==0) {
-		close(pipe[0]); // Child does not read
-		dup2(pipe[1], 2); // Redirect stdout to pipe
+        if(stdout) {
+            close(pipe[0]); // Child does not read
+            dup2(pipe[1], 2); // Redirect stdout to pipe
+        }
 		if(cwd!=AT_FDCWD) check(fchdir(cwd));
         if(!execve(strz(path), (char*const*)argv, (char*const*)envp)) exit_group(-1);
         __builtin_unreachable();
 	} else {
-		close(pipe[1]); // Parent does not write
-		if(stdout) stdout->fd = pipe[0];
+        if(stdout) {
+            close(pipe[1]); // Parent does not write
+            stdout->fd = pipe[0];
+        }
 		if(wait) return ::wait(pid);
 		else { isRunning(pid); return pid; }
 	}

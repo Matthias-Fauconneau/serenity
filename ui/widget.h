@@ -29,7 +29,7 @@ struct Widget {
     /// Override \a mouseEvent to handle or forward user input
     /// \note \a mouseEvent is first called on the root Window#widget
     /// \return Whether the mouse event was accepted
-    virtual bool mouseEvent(vec2 unused cursor, vec2 unused size, ::Event unused event, Button unused button, Widget*& unused focus) {
+    virtual bool mouseEvent(vec2 unused cursor, vec2 unused size, ::Event unused event, Button unused button, Widget*& unused) {
 		return false;
     }
     /// Override \a keyPress to handle or forward user input

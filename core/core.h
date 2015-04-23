@@ -2,7 +2,8 @@
 /// \file core.h Keywords, traits, move semantics, range, ref, debug
 
 // Keywords
-#define inline inline __attribute((no_instrument_function))
+#define inline inline
+//__attribute((no_instrument_function))
 #define unused __attribute((unused))
 #define packed __attribute((packed))
 #define Type typename

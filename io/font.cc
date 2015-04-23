@@ -1,6 +1,6 @@
 #include <ft2build.h>
-#include <freetype2/freetype.h> //freetype
-#include <freetype2/ftlcdfil.h> //z
+#include <freetype/freetype.h> //freetype
+#include <freetype/ftlcdfil.h> //z
 
 #include "font.h"
 #include "file.h"
@@ -126,16 +126,16 @@ Font::Metrics Font::metrics(uint index) {
 
 Font::Glyph Font::render(uint index) {
     {const Glyph* glyph = cache.find(index);
-		if(glyph) return Font::Glyph(glyph->offset, share(glyph->image));}
+        if(glyph) return Font::Glyph(glyph->offset, unsafeShare(glyph->image));}
     Glyph& glyph = cache.insert(index);
     check( FT_Load_Glyph(face, index, hint?FT_LOAD_TARGET_NORMAL:FT_LOAD_TARGET_LIGHT) );
     check( FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL) );
     glyph.offset = int2(face->glyph->bitmap_left, -face->glyph->bitmap_top);
     FT_Bitmap bitmap=face->glyph->bitmap;
-	if(!bitmap.buffer) return {glyph.offset, share(glyph.image)};
+    if(!bitmap.buffer) return {glyph.offset, unsafeShare(glyph.image)};
     int width = bitmap.width, height = bitmap.rows;
     Image image(width, height, true);
     for(int y=0;y<height;y++) for(int x=0;x<width;x++) image(x,y) = byte4(0xFF,0xFF,0xFF,bitmap.buffer[y*bitmap.pitch+x]);
     glyph.image = move(image);
-    return {glyph.offset, share(glyph.image)};
+    return {glyph.offset, unsafeShare(glyph.image)};
 }

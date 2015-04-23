@@ -1,6 +1,6 @@
 #pragma once
 /// \file graphics.h 2D graphics primitives (fill, blit, line)
-#include "core/image.h"
+#include "image.h"
 #include "font.h"
 
 /// Primary colors
@@ -18,6 +18,7 @@ static constexpr bgr3f yellow {0, 1, 1};
 struct Fill {
     vec2 origin, size;
     bgr3f color = black; float opacity = 1;
+    Fill(vec2 origin, vec2 size, bgr3f color = black, float opacity = 1) : origin(origin), size(size), color(color), opacity(opacity) {}
 };
 
 /// Image graphic element
@@ -25,6 +26,7 @@ struct Blit {
     vec2 origin, size;
     Image image;
     bgr3f color = white; float opacity = 1;
+    Blit(vec2 origin, vec2 size, Image&& image, bgr3f color = white, float opacity = 1) : origin(origin), size(size), image(move(image)), color(color), opacity(opacity) {}
 };
 
 /// Text graphic element
@@ -37,13 +39,17 @@ struct Glyph {
     bgr3f color = black;
     float opacity = 1;
     bool hint = false;
+    Glyph(vec2 origin, float fontSize, FontData& font, uint code, uint index, bgr3f color = black, float opacity = 1, bool hint = false)
+        : origin(origin), fontSize(fontSize), font(font), code(code), index(index), color(color), opacity(opacity), hint(hint) {} //req C++14
 };
 
 /// Line graphic element
 struct Line {
     vec2 a, b;
-    bgr3f color = black; float opacity = 1;
+    bgr3f color = black;
+    float opacity = 1;
     bool hint = false;
+    Line(vec2 a, vec2 b, bgr3f color = black, float opacity = 1, bool hint = false) : a(a), b(b), color(color), opacity(opacity), hint(hint) {} //req C++14
 };
 
 /// Parallelogram graphic element

@@ -2,7 +2,6 @@
 #include "x.h"
 #include <sys/socket.h>
 #include "data.h"
-#include "gl.h"
 
 using namespace X11;
 
@@ -29,7 +28,7 @@ namespace Present { int EXT; }
 namespace XRender { int EXT, errorBase; };
 
 XDisplay::XDisplay(Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread) {
-    {String path = "/tmp/.X11-unix/X"+getenv("DISPLAY",":0").slice(1,1);
+    {String path = "/tmp/.X11-unix/X"+environmentVariable("DISPLAY",":0").slice(1,1);
         struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; mref<char>(addr.path,path.size).copy(path);
         if(check(connect(Socket::fd, (const sockaddr*)&addr,2+path.size), path)) error("X connection failed"); }
     {ConnectionSetup r;
@@ -64,12 +63,12 @@ XDisplay::XDisplay(Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket:
         assert(visual);
     }
 
-    {auto r = request(QueryExtension{.length="MIT-SHM"_.size, .size=uint16(2+align(4,"MIT-SHM"_.size)/4)}, "MIT-SHM"_);
-	Shm::EXT=r.major; Shm::event=r.firstEvent; Shm::errorBase=r.firstError;}
-	{auto r = request(QueryExtension{.length="RENDER"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "RENDER"_);
-		XRender::EXT=r.major; XRender::errorBase=r.firstError; }
-    {auto r = request(QueryExtension{.length="Present"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "Present"_);
-		Present::EXT=r.major; assert_(Present::EXT); }
+    {QueryExtension r; auto re = request(({ r.length="MIT-SHM"_.size, r.size=uint16(2+align(4,"MIT-SHM"_.size)/4), r;}), "MIT-SHM"_);
+        Shm::EXT=re.major; Shm::event=re.firstEvent; Shm::errorBase=re.firstError; assert_(Shm::EXT); }
+    /*{auto r = request(QueryExtension{.length="RENDER"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "RENDER"_);
+        XRender::EXT=r.major; XRender::errorBase=r.firstError; }*/
+    /*{auto r = request(({QueryExtension r; r.length="Present"_.size, r.size=uint16(2+align(4,"Present"_.size)/4), r;}), "Present"_);
+        Present::EXT=r.major; assert_(Present::EXT); }*/
 }
 
 void XDisplay::event() {
@@ -106,8 +105,8 @@ void XDisplay::event(const ref<byte> ge) {
 
 uint16 XDisplay::send(ref<byte> data, int fd) {
 	iovec iov {.iov_base = (byte*)data.data, .iov_len = data.size};
-	union { cmsghdr cmsghdr; char control[CMSG_SPACE(sizeof(int))]; } cmsgu;
-	msghdr msg{.msg_name=0, .msg_namelen=0, .msg_iov=&iov, .msg_iovlen=1, .msg_control=&cmsgu, .msg_controllen = sizeof(cmsgu.control)};
+    union { cmsghdr header; char control[CMSG_SPACE(sizeof(int))]; } cmsgu;
+    msghdr msg{.msg_name=0, .msg_namelen=0, .msg_iov=&iov, .msg_iovlen=1, .msg_control=&cmsgu, .msg_controllen = sizeof(cmsgu.control), .msg_flags=0};
 	if(fd==-1) { msg.msg_control = NULL, msg.msg_controllen = 0; }
 	else {
 		cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
@@ -126,8 +125,8 @@ array<byte> XDisplay::readReply(uint16 sequence, uint elementSize, buffer<int>& 
     for(;;) {
 		X11::Event e;
 		iovec iov {.iov_base = &e, .iov_len = sizeof(e)};
-		union { cmsghdr cmsghdr; char control[CMSG_SPACE(sizeof(int))]; } cmsgu;
-		msghdr msg{.msg_name=0, .msg_namelen=0, .msg_iov=&iov, .msg_iovlen=1, .msg_control=&cmsgu, .msg_controllen = sizeof(cmsgu.control)};
+        union { cmsghdr header; char control[CMSG_SPACE(sizeof(int))]; } cmsgu;
+        msghdr msg{.msg_name=0, .msg_namelen=0, .msg_iov=&iov, .msg_iovlen=1, .msg_control=&cmsgu, .msg_controllen = sizeof(cmsgu.control), .msg_flags=0};
 		ssize_t size = recvmsg(Socket::fd, &msg, 0);
 		assert_(size==sizeof(e));
         if(e.type==Reply) {
@@ -177,7 +176,7 @@ void XDisplay::waitEvent(uint8 type) {
 // Keyboard
 uint XDisplay::keySym(uint8 code, uint8 state) {
 	::buffer<uint> keysyms;
-    auto r = request(GetKeyboardMapping{.keycode=code}, keysyms);
+    GetKeyboardMapping rq; auto r = request(({ rq.keycode=code, rq;}), keysyms);
 	assert_(keysyms.size == r.numKeySymsPerKeyCode);
 	if(keysyms.size == 1) keysyms = copyRef<uint>({keysyms[0],keysyms[0],keysyms[0],keysyms[0]});
 	if(keysyms.size == 2) keysyms = copyRef<uint>({keysyms[0],keysyms[1],keysyms[0],keysyms[1]});
@@ -185,7 +184,7 @@ uint XDisplay::keySym(uint8 code, uint8 state) {
 	assert_(keysyms.size >= 4, "No KeySym for code", code, "in state",state, keysyms);
 	if(keysyms[1]==0) keysyms[1]=keysyms[0];
 	if(keysyms[3]==0) keysyms[3]=keysyms[2];
-	int group = (state&(Mod1Mask|Mod3Mask|Mod4Mask|Mod5Mask)?1:0)<<1;
+    int group = (state&(Mod1Mask|Mod3Mask|Mod4Mask|Mod5Mask)?1:0)<<1;
 	bool numlock = state&Mod2Mask;
 	bool keypad = keysyms[group]>=0xff80 && keysyms[group]<=0xffbd;
 	bool shift = state&(ShiftMask|LockMask);
@@ -203,18 +202,19 @@ uint8 XDisplay::keyCode(uint sym) {
 }
 
 function<void()>& XDisplay::globalAction(uint key) {
-    auto code = keyCode(key);
+    /*auto code = keyCode(key);
     if(code) { send(GrabKey{.window=root, .keycode=code}); }
-    else error("No such key", key);
+    else error("No such key", key);*/
     return actions.insert(key, []{});
 }
 
 uint XDisplay::Atom(const string name) {
-    return request(InternAtom{.size=uint16(2+align(4,name.size)/4),  .length=uint16(name.size)}, name).atom;
+    InternAtom r;
+    return request(({r.size=uint16(2+align(4,name.size)/4), r.length=uint16(name.size), r;}), name).atom;
 }
 
 template<class T> buffer<T> XDisplay::getProperty(uint window, string name, size_t length) {
-	send(GetProperty{.window=window, .property=Atom(name), .length=uint(length)});
+    {GetProperty r; send(({ r.window=window, r.property=Atom(name), r.length=uint(length), r;}));}
 	buffer<int> fds;
 	array<byte> replyData = readReply(sequence, 0, fds);
 	auto r = *(GetProperty::Reply*)replyData.data;
@@ -227,6 +227,7 @@ template<class T> buffer<T> XDisplay::getProperty(uint window, string name, size
 template buffer<uint> XDisplay::getProperty(uint window, string name, size_t length);
 template buffer<byte> XDisplay::getProperty(uint window, string name, size_t length);
 
+#if 0
 #include "window.h"
 #include <unistd.h>
 #include <xf86drm.h> // drm
@@ -356,3 +357,4 @@ void Display::event() {
 	for(DRMWindow* window: windows) window->mouseEvent(e.cursor, e.event, e.button);
 }
 void Display::keyPress(Key key) { for(DRMWindow* window: windows) window->keyPress(key);  }
+#endif

@@ -153,7 +153,6 @@ uint adler32(const ref<byte> data) {
 
 template<template<Type> class T, int N> buffer<byte> predict(const byte4* source, size_t width, size_t height) {
     typedef vec<T,uint8,N> U;
-    typedef vec<T, int8, N> S;
     typedef vec<T,int,N> V;
 	buffer<U> prior(width); prior.clear(0);
 	buffer<byte> data ( height * ( 1 + width*sizeof(U) ));

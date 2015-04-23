@@ -7,7 +7,7 @@
 #include <pthread.h> //pthread
 #include <sys/inotify.h>
 
-extern Stream stdout;
+//extern Stream stdout;
 
 /// Abstract factory pattern (allows construction of class by names)
 template<Type I> struct Interface {

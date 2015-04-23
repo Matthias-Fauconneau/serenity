@@ -31,7 +31,7 @@ generic ImageT<T> copy(const ImageT<T>& o) {
 }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
-generic ImageT<T> share(const ImageT<T>& o) { return ImageT<T>(unsafeRef(o),o.size,o.stride,o.alpha); }
+generic ImageT<T> unsafeShare(const ImageT<T>& o) { return ImageT<T>(unsafeRef(o),o.size,o.stride,o.alpha); }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 generic ImageT<T> cropShare(const ImageT<T>& o, int2 offset, int2 size) {
@@ -57,7 +57,7 @@ Image decodeImage(const ref<byte> file);
 #define ICON(name) Image name ## Icon() { \
     extern byte _binary_## name ##_start[]; extern byte _binary_## name ##_end[]; \
 	static Image icon = decodeImage(ref<byte>(_binary_## name ##_start, _binary_## name ##_end - _binary_## name ##_start)); \
-    return share(icon); \
+    return unsafeShare(icon); \
 }
 
 // -- Rotate --

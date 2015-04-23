@@ -16,7 +16,7 @@ constexpr string linuxErrors[] = {
     "CONNABORTED","CONNRESET", "NOBUFS", "ISCONN", "NOTCONN", "SHUTDOWN", "TOOMANYREFS", "TIMEDOUT", "CONNREFUSED",
     "HOSTDOWN","HOSTUNREACH","ALREADY", "INPROGRESS", "STALE", "UCLEAN", "NOTNAM", "NAVAIL", "ISNAM", "REMOTEIO", "DQUOT",
     "NOMEDIUM","MEDIUMTYPE", "CANCELED", "NOKEY", "KEYEXPIRED", "KEYREVOKED", "KEYREJECTED", "OWNERDEAD", "NOTRECOVERABLE"};
-extern "C" const int* __errno_location() noexcept;
+extern "C" /*const*/ int* __errno_location() noexcept;
 
 /// Aborts if \a expr is negative and logs corresponding error code
 #define check(expr, args...) ({ \
@@ -206,7 +206,7 @@ int64 capacity(const string path, const Folder& at=currentWorkingDirectory());
 ref<string> arguments();
 
 /// Returns value for environment variable \a name
-string getenv(const string name, string value=""_);
+string environmentVariable(const string name, string value=""_);
 
 /// Returns standard folders
 const Folder& home(); //$HOME ?: pwuid->pw_dir

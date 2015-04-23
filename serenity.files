@@ -20,9 +20,10 @@ core/data.h
 core/function.h
 core/thread.cc
 core/file.cc
+core/serialization.h
+core/parallel.h
 
 io/png.cc
-io/jpeg.cc
 io/bit.h
 io/flic.h
 io/font.cc
@@ -44,6 +45,7 @@ ui/input.h
 ui/edit.h
 ui/edit.cc
 ui/widget.h
+ui/interface.cc
 
 layout/layout.h
 layout/parse.cc
@@ -56,3 +58,5 @@ editor.cc
 parser.h
 test.cc
 build.h
+document.cc
+DEM.cc

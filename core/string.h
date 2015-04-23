@@ -150,6 +150,7 @@ generic String str(const ref<T> source, string separator=" "_) {
 generic String str(const mref<T>& source, string separator=" "_) { return str((const ref<T>)source, separator); }
 generic String str(const buffer<T>& source, string separator=" "_) { return str((const ref<T>)source, separator); }
 generic String str(const array<T>& source, string separator=" "_) { return str((const ref<T>)source, separator); }
+inline String str(const ref<char>& a, string b) { return str(a)+" "+str(b); }
 inline String bin(const ref<uint8> source, string separator=" "_) { return str(apply(source, [](uint64 c) { return str(c, 8u, '0', 2u); }), separator); }
 inline String hex(const ref<int32> source, string separator=" "_) { return str(apply(source, [](const int32& c) { return hex(c, 8); }), separator); }
 inline String hex(const ref<uint8> source, string separator=" "_) { return str(apply(source, [](const uint8& c) { return hex(c, 2); }), separator); }

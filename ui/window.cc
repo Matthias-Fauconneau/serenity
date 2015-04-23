@@ -48,14 +48,15 @@ XWindow::XWindow(Widget* widget, Thread& thread,  int2 sizeHint) : ::Window(widg
 		if(sizeHint.y<0) Window::size.y=min(max(abs(hint.y),-sizeHint.y), XDisplay::size.y-46);
     }
 	assert_(Window::size);
-	send(CreateColormap{ .colormap=id+Colormap, .window=root, .visual=visual});
-	send(CreateWindow{.id=id+Window, .parent=root, .width=uint16(Window::size.x), .height=uint16(Window::size.y), .visual=visual,
-					  .colormap=id+Colormap});
-	send(Present::SelectInput{.window=id+Window, .eid=id+PresentEvent});
+    //send(CreateColormap{ .colormap=id+Colormap, .window=root, .visual=visual});
+    {CreateColormap r; send(({r.colormap=id+Colormap, r.window=root, r.visual=visual, r;}));}
+    //send(CreateWindow{.id=id+Window, .parent=root, .width=uint16(Window::size.x), .height=uint16(Window::size.y), .visual=visual, .colormap=id+Colormap});
+    {CreateWindow r; send(({r.id=id+Window, r.parent=root, r.width=uint16(Window::size.x), r.height=uint16(Window::size.y), r.visual=visual, r.colormap=id+Colormap, r;}));}
+    if(Present::EXT) send(({Present::SelectInput r; r.window=id+Window, r.eid=id+PresentEvent, r;}));
 	Window::actions[Escape] = []{requestTermination();};
-	send(CreateGC{.context=id+GraphicContext, .window=id+Window});
+    {CreateGC r; send(({r.context=id+GraphicContext, r.window=id+Window, r;}));}
 
-	{  uint16 sequence = send(XRender::QueryPictFormats());
+    if(XRender::EXT) {  uint16 sequence = send(XRender::QueryPictFormats());
 		buffer<int> fds;
 		array<byte> replyData = readReply(sequence, 0, fds);
 		auto r = *(XRender::QueryPictFormats::Reply*)replyData.data;
@@ -75,7 +76,7 @@ XWindow::XWindow(Widget* widget, Thread& thread,  int2 sizeHint) : ::Window(widg
 
 XWindow::~XWindow() {
 	if(id) {
-		send(DestroyWindow{.id=id+Window});
+        {DestroyWindow r; send(({r.id=id+Window, r;}));}
 		id = 0;
 	}
 }
@@ -98,6 +99,7 @@ void XWindow::onEvent(const ref<byte> ge) {
 			state = Idle;
 			currentFrameCounterValue = completeNotify.msc;
 			if(!firstFrameCounterValue) firstFrameCounterValue = currentFrameCounterValue;
+            presentComplete();
         }
 		else error("Unhandled event", ref<string>(X11::events)[type]);
     }
@@ -144,6 +146,7 @@ bool XWindow::processEvent(const X11::Event& e) {
     else if(type==ReparentNotify) {}
 	else if(type==ConfigureNotify) { int2 size(e.configure.w,e.configure.h); if(size!=Window::size) { Window::size=size; render(); } }
     else if(type==GravityNotify) {}
+#if 0
 	else if(type==SelectionClear) {}
 	else if(type==SelectionRequest) {
 		auto r = e.selectionRequest;
@@ -162,6 +165,7 @@ bool XWindow::processEvent(const X11::Event& e) {
 							   .selectionNotify = {.time=0, .requestor = r.requestor, .selection = r.selection, .target=r.target, .property=r.property} }});
 		}
 	}
+#endif
     else if(type==ClientMessage) {
 		function<void()>* action = Window::actions.find(Escape);
         if(action) (*action)(); // Local window action
@@ -169,27 +173,27 @@ bool XWindow::processEvent(const X11::Event& e) {
         else requestTermination(0); // Exits application by default
     }
 	else if(type==MappingNotify) {}
-	else if(type==Shm::event+Shm::Completion) { assert_(state == Copy); state = Present; }
+    else if(type==Shm::event+Shm::Completion) { assert_(state == Copy); if(Present::EXT) state = Present; else { state = Idle; presentComplete(); } }
 	else { currentWindow = 0; return false; }
 	currentWindow = 0;
     return true;
 }
 
-void XWindow::show() { send(MapWindow{.id=id}); send(RaiseWindow{.id=id}); }
-void XWindow::hide() { send(UnmapWindow{.id=id}); }
+void XWindow::show() { {MapWindow r; send(({ r.id=id, r;}));} {RaiseWindow r; send(({r.id=id, r;}));} }
+void XWindow::hide() { {UnmapWindow r; send(({r.id=id, r;}));} }
 
 void XWindow::setTitle(string title) {
 	if(!title || title == this->title) return;
 	this->title = copyRef(title);
-	send(ChangeProperty{.window=id+Window, .property=Atom("_NET_WM_NAME"), .type=Atom("UTF8_STRING"), .format=8,
-						.length=uint(title.size), .size=uint16(6+align(4, title.size)/4)}, title);
+    {ChangeProperty r; send(({r.window=id+Window, r.property=Atom("_NET_WM_NAME"), r.type=Atom("UTF8_STRING"), r.format=8,
+                        r.length=uint(title.size), r.size=uint16(6+align(4, title.size)/4), r;}), title);}
 }
-void XWindow::setIcon(const Image& icon) {
-	if(icon) send(ChangeProperty{.window=id+Window, .property=Atom("_NET_WM_ICON"), .type=Atom("CARDINAL"), .format=32,
+void XWindow::setIcon(const Image& /*icon*/) {
+    /*if(icon) send(ChangeProperty{.window=id+Window, .property=Atom("_NET_WM_ICON"), .type=Atom("CARDINAL"), .format=32,
                         .length=2+icon.width*icon.height, .size=uint16(6+2+icon.width*icon.height)},
-                        raw(icon.width)+raw(icon.height)+cast<byte>(icon));
+                        raw(icon.width)+raw(icon.height)+cast<byte>(icon));*/
 }
-void XWindow::setSize(int2 size) { send(SetSize{.id=id+Window, .w=uint(size.x), .h=uint(size.y)}); }
+void XWindow::setSize(int2 /*size*/) { /*send(SetSize{.id=id+Window, .w=uint(size.x), .h=uint(size.y)});*/ }
 
 void XWindow::event() {
 	XDisplay::event();
@@ -200,9 +204,9 @@ void XWindow::event() {
 
 	if(target.size != Window::size) {
 		if(target) {
-			send(FreePixmap{.pixmap=id+Pixmap}); target=Image();
+            {FreePixmap r; send(({r.pixmap=id+Pixmap, r;}));} target=Image();
 			assert_(shm);
-			send(Shm::Detach{.seg=id+Segment});
+            {Shm::Detach r; send(({r.seg=id+Segment, r;}));}
 			shmdt(target.data);
 			shmctl(shm, IPC_RMID, 0);
 			shm = 0;
@@ -212,22 +216,24 @@ void XWindow::event() {
 		shm = check( shmget(0, Window::size.y*stride*sizeof(byte4) , IPC_CREAT | 0777) );
 		target = Image(buffer<byte4>((byte4*)check(shmat(shm, 0, 0)), Window::size.y*stride, 0), Window::size, stride);
 		target.clear(byte4(0xFF));
-		send(Shm::Attach{.seg=id+Segment, .shm=shm});
-		send(CreatePixmap{.pixmap=id+Pixmap, .window=id+Window, .w=uint16(Window::size.x), .h=uint16(Window::size.y)});
+        {Shm::Attach r; send(({r.seg=id+Segment, r.shm=shm, r;}));}
+        {CreatePixmap r; send(({r.pixmap=id+Pixmap, r.window=id+Window, r.w=uint16(Window::size.x), r.h=uint16(Window::size.y), r;}));}
 	}
 
 	Update update = render(target);
 	if(update) {
-		send(Shm::PutImage{.window=id+Pixmap, .context=id+GraphicContext, .seg=id+Segment,
-						   .totalW=uint16(target.stride), .totalH=uint16(target.height), .srcX=uint16(update.origin.x), .srcY=uint16(update.origin.y),
-						   .srcW=uint16(update.size.x), .srcH=uint16(update.size.y), .dstX=uint16(update.origin.x), .dstY=uint16(update.origin.y),});
-		state=Copy;
-		send(Present::Pixmap{.window=id+Window, .pixmap=id+Pixmap}); //FIXME: update region
+        {Shm::PutImage r; send(({r.window=id+(Present::EXT?Pixmap:Window), r.context=id+GraphicContext, r.seg=id+Segment,
+                           r.totalW=uint16(target.stride), r.totalH=uint16(target.height), r.srcX=uint16(update.origin.x), r.srcY=uint16(update.origin.y),
+                           r.srcW=uint16(update.size.x), r.srcH=uint16(update.size.y), r.dstX=uint16(update.origin.x), r.dstY=uint16(update.origin.y), r;}));}
+        state = Copy;
+        if(Present::EXT) send(({Present::Pixmap r; r.window=id+Window, r.pixmap=id+Pixmap, r;})); //FIXME: update region
 	}
 }
 
-void XWindow::setCursor(MouseCursor cursor) {
-	if(this->cursor != cursor) {
+void XWindow::setCursor(MouseCursor /*cursor*/) {
+#if CURSOR
+    if(this->cursor != cursor) {
+        assert_(XRender::EXT);
 		static Image (*icons[])() = { cursorIcon, textIcon };
 		static constexpr int2 hotspots[] = { int2(5,0), int2(4,9) }; // FIXME
 		const Image& icon = icons[uint(cursor)]();
@@ -246,25 +252,28 @@ void XWindow::setCursor(MouseCursor cursor) {
 		send(XRender::FreePicture{.picture=id+Picture});
 		send(FreePixmap{.pixmap=id+CursorPixmap});
 		this->cursor = cursor;
-	}
+    }
+#endif
 }
 
 function<void()>& XWindow::globalAction(Key key) { return XDisplay::globalAction(key); }
 
-String XWindow::getSelection(bool clipboard) {
-	uint owner = request(GetSelectionOwner{.selection=clipboard?Atom("CLIPBOARD"_):1}).owner;
+String XWindow::getSelection(bool /*clipboard*/) {
+    /*uint owner = request(GetSelectionOwner{.selection=clipboard?Atom("CLIPBOARD"_):1}).owner;
 	if(!owner) return String();
 	send(ConvertSelection{.requestor=id+Window, .selection=clipboard?Atom("CLIPBOARD"_):1,
 						  .target=Atom("UTF8_STRING"_), .property=Atom("UTF8_STRING"_)});
 	waitEvent(SelectionNotify);
-	return getProperty<byte>(id, "UTF8_STRING"_);
+    return getProperty<byte>(id, "UTF8_STRING"_);*/
+    return {};
 }
 
 void XWindow::setSelection(string selection, bool clipboard) {
 	this->selection[clipboard] = copyRef(selection);
-	send(SetSelectionOwner{.owner=id, .selection=clipboard?Atom("CLIPBOARD"_):1});
+    //send(SetSelectionOwner{.owner=id, .selection=clipboard?Atom("CLIPBOARD"_):1});
 }
 
+#if DRM
 // --- DRM Window
 
 DRMWindow::DRMWindow(Widget* widget, Thread& thread) : Window(widget, thread) {
@@ -321,12 +330,15 @@ String DRMWindow::getSelection(bool) { return {}; }
 void DRMWindow::setSelection(string, bool) {}
 
 unique<Display> DRMWindow::display = null;
+#endif
 
 unique<Window> window(Widget* widget, int2 size, Thread& thread) {
-	if(getenv("DISPLAY")) {
+    if(environmentVariable("DISPLAY")) {
 		auto window = unique<XWindow>(widget, thread, size);
 		window->show();
 		return move(window);
 	}
-	return unique<DRMWindow>(widget, thread);
+    error("");
+    //return unique<DRMWindow>(widget, thread);
 }
+

@@ -173,7 +173,7 @@ void resize(const Image& target, const Image& source) {
 	bilinear(target, box(Image((source.size/*+int2((downsampleFactor-1)/2)*/)/downsampleFactor, source.alpha), source));
     }
 }
-
+#if 0
 // -- 4x float
 
 Image4f convert(const Image& source) {
@@ -249,3 +249,4 @@ void box(const Image4f& target, const Image4f& source, const int width) {
 		}
 	});
 }
+#endif
