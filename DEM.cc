@@ -29,7 +29,7 @@ struct DEM : Widget, Poll {
         quat rotation {1, 0};
         vec3 angularVelocity = 0; // Global
         vec3 torque; // Temporary
-        Particle(vec3 position, float radius=1./16)
+        Particle(vec3 position, float radius)
             : radius(radius), mass(1/**4./3*PI*cb(radius)*/), position(position) {}
     };
     array<Particle> particles;
@@ -42,7 +42,14 @@ struct DEM : Widget, Poll {
         for(auto& p: particles) {
             if(p.position.z - p.radius < -1) generate = false;
         }
-        if(generate && particles.size<1024) particles.append(vec3(random()*2-1,random()*2-1,-1));
+        if(generate && particles.size<1024) {
+            for(;;) {
+                vec3 p(random()*2-1,random()*2-1,-1);
+                if(length(p.xy())>1) continue;
+                particles.append(p, 1.f/4);
+                break;
+            }
+        }
         for(auto& p: particles) {
             vec3 force = 0;
             vec3 torque = 0; // Global
@@ -126,21 +133,21 @@ struct DEM : Widget, Poll {
         window->render();
     }
 
-    const float scale = 512;
-    unique<Window> window = ::window(this, scale*2);
+    const float scale = 256;
+    unique<Window> window = ::window(this, 1024);
     DEM() {
         /*window->actions[Space] = [this]{
             writeFile(section(title,' '), encodePNG(render(512, graphics(512))), home());
         };*/
         window->presentComplete = {this, &DEM::step};
     }
-    vec2 sizeHint(vec2) { return scale; }
-    shared<Graphics> graphics(vec2 /*size*/) {
+    vec2 sizeHint(vec2) { return 1024; }
+    shared<Graphics> graphics(vec2 size) {
         shared<Graphics> graphics;
 
         // Computes view projection transform
         mat4 projection = mat4()
-                .translate(vec3(scale,scale,0))
+                .translate(vec3(size/2.f,0))
                 .scale(scale);
                 //.perspective(PI/4, size, 1, 2*horizonDistance + length(position));
         mat4 view = mat4()
@@ -155,18 +162,20 @@ struct DEM : Widget, Poll {
                                 (viewProjection*vec3(0, 1, floorHeight)).xy());
 
         for(auto p: particles) {
-            const int N = 24;
-            for(int i: range(N)) { // TODO: Sphere
-                float a = 2*PI*i/N;
-                vec3 A = p.position + p.radius*vec3(cos(a),sin(a),0);
-                float b = 2*PI*(i+1)/N;
-                vec3 B = p.position + p.radius*vec3(cos(b),sin(b),0);
-                graphics->lines.append((viewProjection*A).xy(), (viewProjection*B).xy());
+            for(int plane: range(3)) {
+                const int N = 24;
+                for(int i: range(N)) { // TODO: Sphere
+                    float a = 2*PI*i/N;
+                    vec3 A = p.radius * (vec3[]){vec3(cos(a),sin(a),0), vec3(0,cos(a),sin(a)), vec3(sin(a),0,cos(a))}[plane];
+                    vec3 Aw = p.position + (p.rotation * quat{0, A} * p.rotation.conjugate()).v;
+
+                    float b = 2*PI*(i+1)/N;
+                    vec3 B = p.radius * (vec3[]){vec3(cos(b),sin(b),0), vec3(0,cos(b),sin(b)), vec3(sin(b),0,cos(b))}[plane];
+                    vec3 Bw = p.position + (p.rotation * quat{0, B} * p.rotation.conjugate()).v;
+
+                    graphics->lines.append((viewProjection*Aw).xy(), (viewProjection*Bw).xy());
+                }
             }
-            vec3 al = p.radius*vec3(1,0,0);
-            vec3 aw = p.position + (p.rotation * quat{0, al} * p.rotation.conjugate()).v;
-            assert_(isNumber(aw), aw, p.position, p.rotation, al);
-            graphics->lines.append((viewProjection*p.position).xy(), (viewProjection*aw).xy());
         }
         return graphics;
     }
