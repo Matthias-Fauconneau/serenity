@@ -58,13 +58,13 @@ void blit(const Image& target, int2 origin, const Image& source, bgr3f color, fl
                     ::min(0xFF,int(target_sRGB.a)+opacity)); // Additive opacity accumulation
         }
     }*/
-    else {
+    /*else {
         for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
             byte4 BGRA = source(x-origin.x,y-origin.y);
 			bgr3f linear = bgr3f(sRGB_reverse[BGRA[0]], sRGB_reverse[BGRA[1]], sRGB_reverse[BGRA[2]]);
             blend(target, x, y, color*linear, opacity*BGRA.a/0xFF);
         }
-    }
+    }*/
 }
 
 
@@ -211,7 +211,7 @@ void render(const Image& target, const Graphics& graphics, vec2 offset) {
     offset += graphics.offset;
     for(const auto& e: graphics.blits) {
 		if(int2(e.size) == e.image.size) blit(target, int2(round(offset+e.origin)), e.image, e.color, e.opacity);
-		else blit(target, int2(round(offset+e.origin)), resize(int2(round(e.size)), e.image), e.color, e.opacity); // FIXME: subpixel blit
+        //else blit(target, int2(round(offset+e.origin)), resize(int2(round(e.size)), e.image), e.color, e.opacity); // FIXME: subpixel blit
 	}
 	for(const auto& e: graphics.fills) fill(target, int2(round(offset+e.origin)), int2(e.size), e.color, e.opacity);
     for(const auto& e: graphics.lines) line(target, offset+e.a, offset+e.b, e.color, e.opacity, e.hint);

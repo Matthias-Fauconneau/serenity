@@ -21,8 +21,8 @@ struct DEM : Widget, Poll {
     const float floorNormalDamping = 10, floorTangentialDamping = 10;
 
     struct Particle {
-        const float radius;
-        const float mass;
+        float radius;
+        float mass;
         vec3 position;
         vec3 velocity = 0;
         vec3 acceleration; // Temporary
@@ -54,7 +54,7 @@ struct DEM : Widget, Poll {
             vec3 force = 0;
             vec3 torque = 0; // Global
             // Gravity
-            const vec3 g (0, 0, 0.1);
+            const vec3 g (0, 0, 1);
             force += p.mass * g;
             // Elastic sphere - half space contact
             float d = (p.position.z + p.radius) - floorHeight;
@@ -143,8 +143,6 @@ struct DEM : Widget, Poll {
     }
     vec2 sizeHint(vec2) { return 1024; }
     shared<Graphics> graphics(vec2 size) {
-        shared<Graphics> graphics;
-
         // Computes view projection transform
         mat4 projection = mat4()
                 .translate(vec3(size/2.f,0))
@@ -156,13 +154,18 @@ struct DEM : Widget, Poll {
                 ;//.translate(-position); // Position
         mat4 viewProjection = projection*view;
 
-        graphics->lines.append( (viewProjection*vec3(-1, 0, floorHeight)).xy(),
+        /*graphics->lines.append( (viewProjection*vec3(-1, 0, floorHeight)).xy(),
                                 (viewProjection*vec3(1, 0, floorHeight)).xy());
         graphics->lines.append( (viewProjection*vec3(0, -1, floorHeight)).xy(),
-                                (viewProjection*vec3(0, 1, floorHeight)).xy());
+                                (viewProjection*vec3(0, 1, floorHeight)).xy());*/
 
-        for(auto p: particles) {
-            for(int plane: range(3)) {
+        Image target = Image( int2(size) );
+        target.clear(0xFF);
+        sort<Particle>([&viewProjection](const Particle& a, const Particle& b) -> bool {
+            return (viewProjection*a.position).z < (viewProjection*b.position).z;
+        }, particles);
+        for(auto p: particles) { // TODO: Z-Sort
+            /*for(int plane: range(3)) {
                 const int N = 24;
                 for(int i: range(N)) { // TODO: Sphere
                     float a = 2*PI*i/N;
@@ -175,8 +178,32 @@ struct DEM : Widget, Poll {
 
                     graphics->lines.append((viewProjection*Aw).xy(), (viewProjection*Bw).xy());
                 }
+            }*/
+            vec2 O = (viewProjection*p.position).xy();
+            vec2 min = O - vec2(scale*p.radius); // Isometric
+            vec2 max = O + vec2(scale*p.radius); // Isometric
+            for(int y: range(::max(0.f, min.y), ::min(max.y, size.y))) {
+                for(int x: range(::max(0.f, min.x+1), ::min(max.x+1, size.x))) {
+                    vec2 R = vec2(x,y) - O;
+                    if(length(R)<scale*p.radius) {
+                        vec2 r = R / (scale*p.radius);
+                        vec3 N (r, 1-length(r));
+                        float I = ::max(0.f, dot(N, vec3(0,0,1)));
+                        assert_(I<1);
+                        extern uint8 sRGB_forward[0x1000];
+                        target(x,y) = byte4(byte3(sRGB_forward[int(0xFFF*I)]),0xFF);
+                        //assert_(N.x >= 0 && N.x < 1 && N.y >= 0 && N.y < 1 && N.z >= 0 && N.z < 1, N);
+                        /*target(x,y) = byte4( // TODO: local coordinates
+                                sRGB_forward[int(0xFFF*N.x)],
+                                sRGB_forward[int(0xFFF*N.y)],
+                                sRGB_forward[int(0xFFF*N.z)], 0xFF);*/
+                    }
+                }
             }
         }
+
+        shared<Graphics> graphics;
+        graphics->blits.append(vec2(0),vec2(target.size),move(target));
         return graphics;
     }
 
