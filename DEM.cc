@@ -2,6 +2,7 @@
 #include "window.h"
 #include "time.h"
 #include "matrix.h"
+#include "render.h"
 
 // -> vector.h
 template<template<Type> /*Type*/class V, Type T, uint N> inline /*constexpr*/ float length(const vec<V,T,N>& a) { return sqrt(dot(a,a)); }
@@ -16,7 +17,7 @@ String str(quat q) { return "["+str(q.s, q.v)+"]"; }
 struct DEM : Widget, Poll {
     Random random;
 
-    const float floorHeight = 1./2;
+    const float floorHeight = 1;
     const float floorYoung = 100000, floorPoisson = 0;
     const float floorNormalDamping = 10, floorTangentialDamping = 10;
 
@@ -33,8 +34,29 @@ struct DEM : Widget, Poll {
             : radius(radius), mass(1/**4./3*PI*cb(radius)*/), position(position) {}
     };
     array<Particle> particles;
+    const float particleRadius = 1.f/4;
     const float particleYoung = 1000, particlePoisson = 0;
     const float particleNormalDamping = 10, particleTangentialDamping = 1;
+
+    struct Node {
+        vec3 position;
+        vec3 velocity = 0;
+        vec3 acceleration; // Temporary
+        Node(vec3 position) : position(position) {}
+    };
+    const float internodeLength = 2*PI/24;
+    buffer<Node> nodes = [this](){
+        const int N = round(2*PI/internodeLength);
+        if(N != 24) error(N, 2*PI/internodeLength);
+        buffer<Node> nodes (N);
+        for(int i: range(N)) {
+            float a = 2*PI*i/N;
+            nodes[i] = vec3(cos(a), sin(a), floorHeight-particleRadius);
+        }
+        return nodes;
+    }();
+    const float wireRadius = 1.f/16;
+    const float wireYoung = 100, wirePoisson = 0;
 
     void event() { step(); }
     void step() {
@@ -46,7 +68,7 @@ struct DEM : Widget, Poll {
             for(;;) {
                 vec3 p(random()*2-1,random()*2-1,-1);
                 if(length(p.xy())>1) continue;
-                particles.append(p, 1.f/4);
+                particles.append(p, particleRadius);
                 break;
             }
         }
@@ -68,7 +90,7 @@ struct DEM : Widget, Poll {
                 force += fN * n;
                 vec3 vT = v - dot(n, v)*n;
                 float friction = -1; // mu
-                float kT = floorTangentialDamping;
+                float kT = floorTangentialDamping; // 1/(1/floorDamping + 1/particleDamping)) ?
                 const float smoothCoulomb = 0.1;
                 float sC = 1- smoothCoulomb/(smoothCoulomb+sq(vT));
                 if(length(vT)) {
@@ -78,9 +100,9 @@ struct DEM : Widget, Poll {
                 }
                 assert(isNumber(force));
             }
+            // Elastic sphere - sphere contact
             for(const auto& b: particles) {
                 if(&b == &p) continue;
-                // Elastic sphere - sphere contact
                 vec3 r = p.position - b.position;
                 float d = p.radius + b.radius - length(r);
                 if(d > 0) {
@@ -95,6 +117,38 @@ struct DEM : Widget, Poll {
                     vec3 vT = v - dot(n, v)*n;
                     float friction = -1; // mu
                     float kT = particleTangentialDamping;
+                    const float smoothCoulomb = 0.1;
+                    float sC = 1- smoothCoulomb/(smoothCoulomb+sq(vT));
+                    if(length(vT)) {
+                        vec3 fT = (friction * abs(fN) * sC / length(vT) - kT) * vT;
+                        force += fT;
+                        torque += cross(p.radius*(-n), fT);
+                    }
+                    assert(isNumber(force));
+                }
+            }
+            // Elastic sphere - cylinder contact
+            for(int i: range(nodes.size)) {
+                vec3 a = nodes[i].position, b = nodes[(i+1)%nodes.size].position;
+                float l = length(b-a);
+                vec3 n = (b-a)/l;
+                float t = dot(n, p.position-a);
+                if(t < 0 || t > l) continue;
+                vec3 P = a + t*n;
+                vec3 r = p.position - P;
+                float d = p.radius + wireRadius - length(r);
+                if(d > 0) {
+                    float E = 1/((1-sq(particlePoisson))/particleYoung + (1-sq(wirePoisson))/wireYoung);
+                    float kN = particleNormalDamping; // 1/(1/wireDamping + 1/particleDamping)) ?
+                    float R = 1/(1/p.radius+1/wireRadius);
+                    vec3 n = r/length(r);
+                    vec3 v = p.velocity + cross(p.angularVelocity, p.radius*(-n))
+                           ;//FIXME -(b.velocity + cross(b.angularVelocity, b.radius*(+n)));
+                    float fN = 4/3*E*sqrt(R)*sqrt(d)*d - kN * dot(n, v);
+                    force += fN * n;
+                    vec3 vT = v - dot(n, v)*n;
+                    float friction = -1; // mu
+                    float kT = particleTangentialDamping; // 1/(1/wireDamping + 1/particleDamping)) ?
                     const float smoothCoulomb = 0.1;
                     float sC = 1- smoothCoulomb/(smoothCoulomb+sq(vT));
                     if(length(vT)) {
@@ -143,6 +197,9 @@ struct DEM : Widget, Poll {
     }
     vec2 sizeHint(vec2) { return 1024; }
     shared<Graphics> graphics(vec2 size) {
+        Image target = Image( int2(size) );
+        target.clear(0xFF);
+
         // Computes view projection transform
         mat4 projection = mat4()
                 .translate(vec3(size/2.f,0))
@@ -154,17 +211,17 @@ struct DEM : Widget, Poll {
                 ;//.translate(-position); // Position
         mat4 viewProjection = projection*view;
 
-        /*graphics->lines.append( (viewProjection*vec3(-1, 0, floorHeight)).xy(),
-                                (viewProjection*vec3(1, 0, floorHeight)).xy());
-        graphics->lines.append( (viewProjection*vec3(0, -1, floorHeight)).xy(),
-                                (viewProjection*vec3(0, 1, floorHeight)).xy());*/
+        line(target, (viewProjection*vec3(-1, 0, floorHeight)).xy(),
+             (viewProjection*vec3(1, 0, floorHeight)).xy());
+        line(target, (viewProjection*vec3(0, -1, floorHeight)).xy(),
+             (viewProjection*vec3(0, 1, floorHeight)).xy());
 
-        Image target = Image( int2(size) );
-        target.clear(0xFF);
+        // TODO: Z-Buffer
         sort<Particle>([&viewProjection](const Particle& a, const Particle& b) -> bool {
             return (viewProjection*a.position).z < (viewProjection*b.position).z;
         }, particles);
-        for(auto p: particles) { // TODO: Z-Sort
+
+        for(auto p: particles) {
             /*for(int plane: range(3)) {
                 const int N = 24;
                 for(int i: range(N)) { // TODO: Sphere
@@ -200,6 +257,11 @@ struct DEM : Widget, Poll {
                     }
                 }
             }
+        }
+
+        for(int i: range(nodes.size)) {
+            vec3 a = nodes[i].position, b = nodes[(i+1)%nodes.size].position;
+            line(target, (viewProjection*a).xy(), (viewProjection*b).xy());
         }
 
         shared<Graphics> graphics;
