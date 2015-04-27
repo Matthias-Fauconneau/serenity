@@ -20,6 +20,7 @@ struct DEM : Widget, Poll {
     const float floorHeight = 1;
     const float floorYoung = 100000, floorPoisson = 0;
     const float floorNormalDamping = 10, floorTangentialDamping = 10;
+    const float floorFriction = 1;
 
     struct Particle {
         float radius;
@@ -37,6 +38,7 @@ struct DEM : Widget, Poll {
     const float particleRadius = 1./4;
     const float particleYoung = 1000, particlePoisson = 0;
     const float particleNormalDamping = 10, particleTangentialDamping = 1;
+    const float particleFriction = 1;
 
     struct Node {
         vec3 position;
@@ -45,11 +47,14 @@ struct DEM : Widget, Poll {
         Node(vec3 position) : position(position) {}
     };
     const float nodeMass = 1;
-    const float wireRadius = 1./16;
-    const float wireYoung = 100, wirePoisson = 0;
+    const float wireRadius = 1./8;
+    const float wireYoung = 1000, wirePoisson = 0;
     const float wireStiffness = 1;
     const float wireDamping = 1;
+    const float wireFriction = 2;
+
     float internodeLength = 1./16;
+
     array<Node> nodes = copyRef(ref<Node>{Node(vec3(1,0,floorHeight))});
 
     const float spoolerRate = 1./16;
@@ -98,7 +103,7 @@ struct DEM : Widget, Poll {
                 float fN = 4/3*E*sqrt(wireRadius)*d*sqrt(d) - kN * vN; //FIXME
                 force += fN * n;
                 vec3 vT = v - dot(n, v)*n;
-                float friction = -1; // mu
+                float friction = -floorFriction; // mu
                 float kT = floorTangentialDamping; // 1/(1/floorDamping + 1/wireDamping)) ?
                 const float smoothCoulomb = 0.1;
                 float sC = 1- smoothCoulomb/(smoothCoulomb+sq(vT));
@@ -127,7 +132,7 @@ struct DEM : Widget, Poll {
                 float fN = 4/3*E*sqrt(p.radius)*d*sqrt(d) - kN * vN;
                 force += fN * n;
                 vec3 vT = v - dot(n, v)*n;
-                float friction = -1; // mu
+                float friction = -floorFriction; // mu
                 float kT = floorTangentialDamping; // 1/(1/floorDamping + 1/particleDamping)) ?
                 const float smoothCoulomb = 0.1;
                 float sC = 1- smoothCoulomb/(smoothCoulomb+sq(vT));
@@ -153,7 +158,7 @@ struct DEM : Widget, Poll {
                     float fN = 4/3*E*sqrt(R)*sqrt(d)*d - kN * dot(n, v);
                     force += fN * n;
                     vec3 vT = v - dot(n, v)*n;
-                    float friction = -1; // mu
+                    float friction = -particleFriction; // mu
                     float kT = particleTangentialDamping;
                     const float smoothCoulomb = 0.1;
                     float sC = 1- smoothCoulomb/(smoothCoulomb+sq(vT));
@@ -188,7 +193,7 @@ struct DEM : Widget, Poll {
                     nodes[a].acceleration -= (fN * n) / (2 * nodeMass);
                     nodes[b].acceleration -= (fN * n) / (2 * nodeMass);
                     vec3 vT = v - dot(n, v)*n;
-                    float friction = -1; // mu
+                    float friction = -wireFriction; // mu
                     float kT = particleTangentialDamping; // 1/(1/wireDamping + 1/particleDamping)) ?
                     const float smoothCoulomb = 0.1;
                     float sC = 1- smoothCoulomb/(smoothCoulomb+sq(vT));
@@ -274,6 +279,8 @@ struct DEM : Widget, Poll {
     shared<Graphics> graphics(vec2 size) {
         Image target = Image( int2(size) );
         target.clear(0xFF);
+        ImageF zBuffer = ImageF(int2(size));
+        zBuffer.clear(-inf);
 
         // Computes view projection transform
         mat4 projection = mat4()
@@ -291,36 +298,24 @@ struct DEM : Widget, Poll {
         line(target, (viewProjection*vec3(0, -1, floorHeight)).xy(),
              (viewProjection*vec3(0, 1, floorHeight)).xy());
 
-        // TODO: Z-Buffer
-        sort<Particle>([&viewProjection](const Particle& a, const Particle& b) -> bool {
+        /*sort<Particle>([&viewProjection](const Particle& a, const Particle& b) -> bool {
             return (viewProjection*a.position).z < (viewProjection*b.position).z;
-        }, particles);
+        }, particles);*/
 
         for(auto p: particles) {
-            /*for(int plane: range(3)) {
-                const int N = 24;
-                for(int i: range(N)) { // TODO: Sphere
-                    float a = 2*PI*i/N;
-                    vec3 A = p.radius * (vec3[]){vec3(cos(a),sin(a),0), vec3(0,cos(a),sin(a)), vec3(sin(a),0,cos(a))}[plane];
-                    vec3 Aw = p.position + (p.rotation * quat{0, A} * p.rotation.conjugate()).v;
-
-                    float b = 2*PI*(i+1)/N;
-                    vec3 B = p.radius * (vec3[]){vec3(cos(b),sin(b),0), vec3(0,cos(b),sin(b)), vec3(sin(b),0,cos(b))}[plane];
-                    vec3 Bw = p.position + (p.rotation * quat{0, B} * p.rotation.conjugate()).v;
-
-                    graphics->lines.append((viewProjection*Aw).xy(), (viewProjection*Bw).xy());
-                }
-            }*/
-            vec2 O = (viewProjection*p.position).xy();
-            vec2 min = O - vec2(scale*p.radius); // Isometric
-            vec2 max = O + vec2(scale*p.radius); // Isometric
+            vec3 O = viewProjection*p.position;
+            vec2 min = O.xy() - vec2(scale*p.radius); // Isometric
+            vec2 max = O.xy() + vec2(scale*p.radius); // Isometric
             for(int y: range(::max(0.f, min.y), ::min(max.y, size.y))) {
                 for(int x: range(::max(0.f, min.x+1), ::min(max.x+1, size.x))) {
-                    vec2 R = vec2(x,y) - O;
+                    vec2 R = vec2(x,y) - O.xy();
                     if(length(R)<scale*p.radius) {
                         vec2 r = R / (scale*p.radius);
-                        vec3 N (r, 1-length(r));
-                        float I = ::max(0.f, dot(N, vec3(0,0,1)));
+                        vec3 N (r, 1-length(r)); // ?
+                        float z = O.z + N.z;
+                        if(z < zBuffer(x,y)) continue;
+                        zBuffer(x,y) = z;
+                        float I = /*::max(0.f,*/ dot(N, vec3(0,0,1));//);
                         assert_(I<1);
                         extern uint8 sRGB_forward[0x1000];
                         target(x,y) = byte4(byte3(sRGB_forward[int(0xFFF*I)]),0xFF);
@@ -336,9 +331,27 @@ struct DEM : Widget, Poll {
 
         for(int i: range(nodes.size-1)) {
             vec3 a = nodes[i].position, b = nodes[i+1].position;
-            vec2 A = (viewProjection*a).xy(), B = (viewProjection*b).xy();
-            line(target, A-vec2(0, scale*wireRadius), B-vec2(0, scale*wireRadius)); // Isometric
-            line(target, A+vec2(0, scale*wireRadius), B+vec2(0, scale*wireRadius)); // Isometric
+            vec3 A = viewProjection*a, B = viewProjection*b;
+            vec2 r = B.xy()-A.xy();
+            float l = length(r);
+            vec2 t = r/l;
+            vec2 n (t.y, -t.x);
+            float width = scale*wireRadius;
+            vec2 P[4] {A.xy()-width*n, A.xy()+width*n, B.xy()-width*n, B.xy()+width*n};
+            vec2 min = ::min(P), max = ::max(P);
+            for(int y: range(::max(0.f, min.y), ::min(max.y, size.y))) {
+                for(int x: range(::max(0.f, min.x+1), ::min(max.x+1, size.x))) {
+                    vec2 p = vec2(x,y) - A.xy();
+                    if(dot(p,t) < 0 || dot(p,t) > l) continue;
+                    if(dot(p,n) < -width || dot(p,n) > width) continue;
+                    float z = A.z + dot(p,t)/l*(B.z-A.z);
+                    float dz = 1-sq(dot(p,n)/width); // ?
+                    if(z+dz < zBuffer(x,y)) continue;
+                    float I = dz;
+                    extern uint8 sRGB_forward[0x1000];
+                    target(x,y) = byte4(byte3(sRGB_forward[int(0xFFF*I)]),0xFF);
+                }
+            }
         }
 
         shared<Graphics> graphics;
