@@ -3,6 +3,7 @@
 #include "time.h"
 #include "matrix.h"
 #include "render.h"
+#include "algebra.h"
 
 // -> vector.h
 template<template<Type> /*Type*/class V, Type T, uint N> inline /*constexpr*/ float length(const vec<V,T,N>& a) { return sqrt(dot(a,a)); }
@@ -78,7 +79,7 @@ void closest(vec3 a1, vec3 a2, vec3 b1, vec3 b2, vec3& A, vec3& B) {
 
 struct DEM : Widget, Poll {   
     const float smoothCoulomb = 0.01;
-    const int skip = 2; //16;
+    const int skip = 1; //16;
     const float dt = 1./(60*skip);
 
     const float floorHeight = 1;
@@ -116,10 +117,10 @@ struct DEM : Widget, Poll {
     const float wireNormalDamping = 50;
     const float wireFriction = 2;
     const float wireTangentialDamping = 10;
-    const float wireStiffness = 1000;
-    const float wireTensionDamping = 10;
-    const float wireBendStiffness = 10;
-    const float wireBendDamping = 1;
+    const float wireStiffness = 1000; //1000
+    const float wireTensionDamping = 10; //10
+    const float wireBendStiffness = 0;
+    //const float wireBendDamping = 1;
 
     float internodeLength = 1./4;
 
@@ -283,22 +284,34 @@ struct DEM : Widget, Poll {
             int a = i, b = i+1;
             vec3 A = nodes[a].position, B = nodes[b].position;
             float l = length(B-A);
-            vec3 n = (B-A)/l;
+            vec3 n = (B-A) / l;
+            // FIXME: stiff wire (>KPa) requires implicit Euler
             nodes[a].acceleration +=
-                    (wireStiffness * (l-internodeLength) - wireTensionDamping * dot(n, nodes[a].velocity)) / nodeMass * n;
+                    (+ wireStiffness * (l-internodeLength)
+                     - wireTensionDamping * dot(n, nodes[a].velocity))
+                    / nodeMass * n;
             nodes[b].acceleration +=
-                    (wireStiffness * (internodeLength-l) - wireTensionDamping * dot(n, nodes[b].velocity)) / nodeMass * n;
+                    (+ wireStiffness * (internodeLength-l)
+                     - wireTensionDamping * dot(n, nodes[b].velocity))
+                    / nodeMass * n;
         }
         for(int i: range(1, nodes.size-1)) {
             vec3 force = 0;
             // Torsion springs (Bending resistance)
             vec3 A = nodes[i-1].position, B = nodes[i].position, C = nodes[i+1].position;
-            vec3 axis = cross(B-A, C-B);
+            vec3 axis = cross(C-B, B-A);
             if(axis) {
-                float phi = atan(length(axis), dot(B-A, C-B));
+                float phi = atan(length(axis), dot(C-B, B-A));
                 float torque = wireBendStiffness * phi;
-                force += torque * cross(axis/length(axis), (B-A)/2.f)
-                        + torque * cross(axis/length(axis), (C-B)/2.f);
+                force += torque / 2.f * cross(axis/length(axis), C-A);
+                /*{FIXME
+                    vec3 A = nodes[i-1].velocity, B = nodes[i].velocity, C = nodes[i+1].velocity;
+                    vec3 axis = cross(C-B, B-A);
+                    if(axis) {
+                        float angularVelocity = atan(length(axis), dot(C-B, B-A));
+                        force += wireBendDamping * angularVelocity / 2.f * cross(axis/length(axis), C-A);
+                    }
+                }*/
             }
             //vec3 b = (A+C)/2.f;
             //vec3 n = (b-B)/length(b-B);
@@ -332,8 +345,8 @@ struct DEM : Widget, Poll {
                     assert(isNumber(force));
                 }
             };
-            /*for(int j: range(0, i-1)) contact(i, j);
-            for(int j: range(i+2, nodes.size-1)) contact(i, j);*/
+            for(int j: range(0, i-1)) contact(i, j);
+            for(int j: range(i+2, nodes.size-1)) contact(i, j);
             assert(isNumber(force));
             nodes[i].acceleration += force / nodeMass;
         }
@@ -384,7 +397,8 @@ struct DEM : Widget, Poll {
         };*/
         //window->presentComplete = {this, &DEM::step};
         //notes.append(vec3(1,0,floorHeight));
-        const int N = 16;
+        const int N = 32;
+        internodeLength = 3./N;
         for(int i: range(N)) {
             float x = float(i)/(N-1);
             nodes.append(vec3(x*2-1,0,-x));
