@@ -123,7 +123,7 @@ struct DEM : Widget, Poll {
 
     float internodeLength = 1./4;
 
-    array<Node> nodes = copyRef(ref<Node>{Node(vec3(1,0,floorHeight))});
+    array<Node> nodes;
 
     const float spoolerRate = 2./16;
     const float spoolerSpeed = 1./32;
@@ -135,7 +135,7 @@ struct DEM : Widget, Poll {
 
     void event() { step(); }
     void step() {
-        { // Generate falling particle (pouring)
+        /*{ // Generate falling particle (pouring)
             bool generate = true;
             for(auto& p: particles) {
                 if(p.position.z - p.radius < -1) generate = false;
@@ -148,8 +148,8 @@ struct DEM : Widget, Poll {
                     break;
                 }
             }
-        }
-        { // Generate wire (spooling)
+        }*/
+        /*{ // Generate wire (spooling)
             float spoolerAngle = 2*PI*spoolerRate*time;
             float spoolerHeight = floorHeight-spoolerSpeed*time;
             vec3 spoolerPosition (cos(spoolerAngle), sin(spoolerAngle), spoolerHeight);
@@ -157,7 +157,7 @@ struct DEM : Widget, Poll {
             float l = length(r);
             if(l > internodeLength*2 // *2 to keep some tension
                     && nodes.size<256) nodes.append(nodes.last().position + internodeLength/l*r);
-        }
+        }*/
         // Gravity, Wire - Floor contact, Bending resistance
         for(Node& p: nodes) {
             vec3 force = 0;
@@ -290,13 +290,16 @@ struct DEM : Widget, Poll {
                     (wireStiffness * (internodeLength-l) - wireTensionDamping * dot(n, nodes[b].velocity)) / nodeMass * n;
         }
         for(int i: range(1, nodes.size-1)) {
+            vec3 force = 0;
             // Torsion springs (Bending resistance)
             vec3 A = nodes[i-1].position, B = nodes[i].position, C = nodes[i+1].position;
             vec3 axis = cross(B-A, C-B);
-            float phi = atan(length(axis), dot(B-A, C-B));
-            float torque = wireBendStiffness * phi;
-            vec3 force = torque * cross(axis/length(axis), (B-A)/2.f)
-                    + torque * cross(axis/length(axis), (C-B)/2.f);
+            if(axis) {
+                float phi = atan(length(axis), dot(B-A, C-B));
+                float torque = wireBendStiffness * phi;
+                force += torque * cross(axis/length(axis), (B-A)/2.f)
+                        + torque * cross(axis/length(axis), (C-B)/2.f);
+            }
             //vec3 b = (A+C)/2.f;
             //vec3 n = (b-B)/length(b-B);
             //vec3 v = (nodes[i-1].velocity+nodes[i+1].velocity)/2.f - nodes[i].velocity;
@@ -329,8 +332,9 @@ struct DEM : Widget, Poll {
                     assert(isNumber(force));
                 }
             };
-            for(int j: range(0, i-1)) contact(i, j);
-            for(int j: range(i+2, nodes.size-1)) contact(i, j);
+            /*for(int j: range(0, i-1)) contact(i, j);
+            for(int j: range(i+2, nodes.size-1)) contact(i, j);*/
+            assert(isNumber(force));
             nodes[i].acceleration += force / nodeMass;
         }
         // Anchors both ends
@@ -364,7 +368,7 @@ struct DEM : Widget, Poll {
             // Leapfrog position integration
             n.velocity += dt * n.acceleration;
             n.position += dt * n.velocity;
-            assert(isNumber(n.position));
+            assert(isNumber(n.position), n.position, n.velocity, n.acceleration);
         }
         time += dt;
         timeStepCount++;
@@ -379,6 +383,12 @@ struct DEM : Widget, Poll {
             writeFile(section(title,' '), encodePNG(render(512, graphics(512))), home());
         };*/
         //window->presentComplete = {this, &DEM::step};
+        //notes.append(vec3(1,0,floorHeight));
+        const int N = 16;
+        for(int i: range(N)) {
+            float x = float(i)/(N-1);
+            nodes.append(vec3(x*2-1,0,-x));
+        }
         step();
     }
     vec2 sizeHint(vec2) { return 1024; }
