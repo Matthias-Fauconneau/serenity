@@ -64,6 +64,10 @@ struct mat3 {
     void rotateZ(float angle) { float c=cos(angle),s=sin(angle); mat3 r; r.M(0,0) = c; r.M(1,1) = c; r.M(0,1) = -s; r.M(1,0) = s; *this = *this * r; }
 };
 inline mat3 operator*(float s, mat3 M) {mat3 r; for(int j=0;j<3;j++) for(int i=0;i<3;i++) r.M(i,j)=s*M(i,j); return r; }
+inline mat3 operator+(float s, mat3 M) { for(int i=0;i<3;i++) M(i,i) = M(i,i) + s; return M; }
+inline mat3 operator-(float s, mat3 M) { for(int i=0;i<3;i++) M(i,i) = M(i,i) - s; return M; }
+inline mat3 outer(vec3 a, vec3 b) { mat3 r; for(int j=0;j<3;j++) for(int i=0;i<3;i++) r.M(i,j)=a[i]*b[j]; return r; }
+inline mat3 operator+(mat3 a, mat3 b) {mat3 r; for(int j=0;j<3;j++) for(int i=0;i<3;i++) r(i,j)=a(i,j)+b(i,j); return r; }
 
 struct mat4; inline mat4 operator*(float s, mat4 M);
 /// 3D projective transformation

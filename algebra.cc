@@ -22,13 +22,13 @@ bool operator==(const Matrix& a,const Matrix& b) {
 String str(const Matrix& a) {
     array<char> s = copyRef("[ "_);
     for(uint i: range(a.m)) {
-	if(a.n==1) s.append(str(a(i,0),1,0)+' ');
-	else {
-	    for(uint j: range(a.n)) {
-		s.append(str(a(i,j),1,0)+' ');
-	    }
-	    if(i<a.m-1) s.append("\n  "_);
-	}
+        if(a.n==1) s.append(str(a(i,0),1,0)+' ');
+        else {
+            for(uint j: range(a.n)) {
+                s.append(a(i,j)?"O"_:"  "_/*str(a(i,j),1,0)*//*+' '*/);
+            }
+            if(i<a.m-1) s.append("\n  "_);
+        }
     }
     s.append("]"_);
     return move(s);
