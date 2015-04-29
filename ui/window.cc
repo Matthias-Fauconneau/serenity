@@ -173,7 +173,7 @@ bool XWindow::processEvent(const X11::Event& e) {
         else requestTermination(0); // Exits application by default
     }
 	else if(type==MappingNotify) {}
-    else if(type==Shm::event+Shm::Completion) { assert_(state == Copy); if(Present::EXT) state = Present; else { state = Idle; presentComplete(); } }
+    else if(type==Shm::event+Shm::Completion) { assert_(state == Copy); if(Present::EXT) state = Present; else { state = Idle; if(presentComplete) presentComplete(); } }
 	else { currentWindow = 0; return false; }
 	currentWindow = 0;
     return true;

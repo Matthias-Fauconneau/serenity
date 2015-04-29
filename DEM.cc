@@ -14,8 +14,72 @@ struct quat {
 quat operator*(quat p, quat q) { return {p.s*q.s - dot(p.v, q.v), p.s*q.v + q.s*p.v + cross(p.v, q.v)}; }
 String str(quat q) { return "["+str(q.s, q.v)+"]"; }
 
-struct DEM : Widget, Poll {
-    Random random;
+// -> distance.h
+void closest(vec3 a1, vec3 a2, vec3 b1, vec3 b2, vec3& A, vec3& B) {
+    vec3 u = a2 - a1;
+    vec3 v = b2 - b1;
+    vec3 w = a1 - b1;
+    float  a = dot(u,u);        // always >= 0
+    float  b = dot(u,v);
+    float  c = dot(v,v);        // always >= 0
+    float  d = dot(u,w);
+    float  e = dot(v,w);
+    float  D = a*c - b*b;       // always >= 0
+    float  sD = D;      // sc = sN / sD, default sD = D >= 0
+    float  tD = D;      // tc = tN / tD, default tD = D >= 0
+
+    // Compute the line parameters of the two closest points
+    float sN, tN;
+    if (D < __FLT_EPSILON__) { // the lines are almost parallel
+        sN = 0;        // force using point P0 on segment S1
+        sD = 1;        // to prevent possible division by 0.0 later
+        tN = e;
+        tD = c;
+    }
+    else {                // get the closest points on the infinite lines
+        sN = (b*e - c*d);
+        tN = (a*e - b*d);
+        if (sN < 0) {       // sc < 0 => the s=0 edge is visible
+            sN = 0;
+            tN = e;
+            tD = c;
+        }
+        else if (sN > sD) {  // sc > 1 => the s=1 edge is visible
+            sN = sD;
+            tN = e + b;
+            tD = c;
+        }
+    }
+
+    if (tN < 0) {           // tc < 0 => the t=0 edge is visible
+        tN = 0;
+        // recompute sc for this edge
+        if (-d < 0) sN = 0;
+        else if (-d > a) sN = sD;
+        else { sN = -d; sD = a; }
+    }
+    else if (tN > tD) {      // tc > 1 => the t=1 edge is visible
+        tN = tD;
+        // recompute sc for this edge
+        if ((-d + b) < 0) sN = 0;
+        else if ((-d + b) > a) sN = sD;
+        else { sN = (-d + b); sD = a; }
+    }
+    // finally do the division to get sc and tc
+    float sc = (abs(sN) < __FLT_EPSILON__ ? 0 : sN / sD);
+    float tc = (abs(tN) < __FLT_EPSILON__ ? 0 : tN / tD);
+    A = a1 + (sc * u);
+    B = b1 - (tc * v);
+    // get the difference of the two closest points
+    //vec3 dP = (a1 + (sc * u)) - (b1 + (tc * v));  // = S1(sc) - S2(tc)
+    //return len( dP );   // return the closest distance
+}
+
+
+struct DEM : Widget, Poll {   
+    const float smoothCoulomb = 0.01;
+    const int skip = 2; //16;
+    const float dt = 1./(60*skip);
 
     const float floorHeight = 1;
     const float floorYoung = 100000, floorPoisson = 0;
@@ -36,8 +100,8 @@ struct DEM : Widget, Poll {
     };
     array<Particle> particles;
     const float particleRadius = 1./4;
-    const float particleYoung = 1000, particlePoisson = 0;
-    const float particleNormalDamping = 10, particleTangentialDamping = 1;
+    const float particleYoung = 2000, particlePoisson = 0;
+    const float particleNormalDamping = 50, particleTangentialDamping = 1;
     const float particleFriction = 1;
 
     struct Node {
@@ -47,19 +111,26 @@ struct DEM : Widget, Poll {
         Node(vec3 position) : position(position) {}
     };
     const float nodeMass = 1;
-    const float wireRadius = 1./8;
-    const float wireYoung = 1000, wirePoisson = 0;
-    const float wireStiffness = 1;
-    const float wireDamping = 1;
+    const float wireRadius = 1./16;
+    const float wireYoung = 2000, wirePoisson = 0;
+    const float wireNormalDamping = 50;
     const float wireFriction = 2;
+    const float wireTangentialDamping = 10;
+    const float wireStiffness = 1000;
+    const float wireTensionDamping = 10;
+    const float wireBendStiffness = 10;
+    const float wireBendDamping = 1;
 
-    float internodeLength = 1./16;
+    float internodeLength = 1./4;
 
     array<Node> nodes = copyRef(ref<Node>{Node(vec3(1,0,floorHeight))});
 
-    const float spoolerRate = 1./16;
-    const float spoolerSpeed = 1./16;
+    const float spoolerRate = 2./16;
+    const float spoolerSpeed = 1./32;
 
+    Random random;
+
+    int timeStepCount = 0;
     float time = 0;
 
     void event() { step(); }
@@ -84,13 +155,14 @@ struct DEM : Widget, Poll {
             vec3 spoolerPosition (cos(spoolerAngle), sin(spoolerAngle), spoolerHeight);
             vec3 r = spoolerPosition-nodes.last().position;
             float l = length(r);
-            if(l > internodeLength && nodes.size<256) nodes.append(nodes.last().position + internodeLength/l*r);
+            if(l > internodeLength*2 // *2 to keep some tension
+                    && nodes.size<256) nodes.append(nodes.last().position + internodeLength/l*r);
         }
         // Gravity, Wire - Floor contact, Bending resistance
         for(Node& p: nodes) {
             vec3 force = 0;
             // Gravity
-            const vec3 g (0, 0, 0.1);
+            const vec3 g (0, 0, 1);
             force += nodeMass * g;
             // Elastic sphere - Floor contact
             float d = (p.position.z + wireRadius) - floorHeight;
@@ -105,7 +177,6 @@ struct DEM : Widget, Poll {
                 vec3 vT = v - dot(n, v)*n;
                 float friction = -floorFriction; // mu
                 float kT = floorTangentialDamping; // 1/(1/floorDamping + 1/wireDamping)) ?
-                const float smoothCoulomb = 0.1;
                 float sC = 1- smoothCoulomb/(smoothCoulomb+sq(vT));
                 if(length(vT)) {
                     vec3 fT = (friction * abs(fN) * sC / length(vT) - kT) * vT;
@@ -134,7 +205,6 @@ struct DEM : Widget, Poll {
                 vec3 vT = v - dot(n, v)*n;
                 float friction = -floorFriction; // mu
                 float kT = floorTangentialDamping; // 1/(1/floorDamping + 1/particleDamping)) ?
-                const float smoothCoulomb = 0.1;
                 float sC = 1- smoothCoulomb/(smoothCoulomb+sq(vT));
                 if(length(vT)) {
                     vec3 fT = (friction * abs(fN) * sC / length(vT) - kT) * vT;
@@ -160,7 +230,6 @@ struct DEM : Widget, Poll {
                     vec3 vT = v - dot(n, v)*n;
                     float friction = -particleFriction; // mu
                     float kT = particleTangentialDamping;
-                    const float smoothCoulomb = 0.1;
                     float sC = 1- smoothCoulomb/(smoothCoulomb+sq(vT));
                     if(length(vT)) {
                         vec3 fT = (friction * abs(fN) * sC / length(vT) - kT) * vT;
@@ -183,7 +252,7 @@ struct DEM : Widget, Poll {
                 float d = p.radius + wireRadius - length(r);
                 if(d > 0) {
                     float E = 1/((1-sq(particlePoisson))/particleYoung + (1-sq(wirePoisson))/wireYoung);
-                    float kN = particleNormalDamping; // 1/(1/wireDamping + 1/particleDamping)) ?
+                    float kN = wireNormalDamping; // 1/(1/wireNormalDamping + 1/particleDamping)) ?
                     float R = 1/(1/p.radius+1/wireRadius);
                     vec3 n = r/length(r);
                     vec3 v = p.velocity + cross(p.angularVelocity, p.radius*(-n))
@@ -194,8 +263,7 @@ struct DEM : Widget, Poll {
                     nodes[b].acceleration -= (fN * n) / (2 * nodeMass);
                     vec3 vT = v - dot(n, v)*n;
                     float friction = -wireFriction; // mu
-                    float kT = particleTangentialDamping; // 1/(1/wireDamping + 1/particleDamping)) ?
-                    const float smoothCoulomb = 0.1;
+                    float kT = wireTangentialDamping; // 1/(1/wireNormalDamping + 1/particleDamping)) ?
                     float sC = 1- smoothCoulomb/(smoothCoulomb+sq(vT));
                     if(length(vT)) {
                         vec3 fT = (friction * abs(fN) * sC / length(vT) - kT) * vT;
@@ -217,23 +285,58 @@ struct DEM : Widget, Poll {
             float l = length(B-A);
             vec3 n = (B-A)/l;
             nodes[a].acceleration +=
-                    (wireStiffness * (l-internodeLength) - wireDamping * dot(n, nodes[a].velocity)) / nodeMass * n;
+                    (wireStiffness * (l-internodeLength) - wireTensionDamping * dot(n, nodes[a].velocity)) / nodeMass * n;
             nodes[b].acceleration +=
-                    (wireStiffness * (internodeLength-l) - wireDamping * dot(n, nodes[b].velocity)) / nodeMass * n;
+                    (wireStiffness * (internodeLength-l) - wireTensionDamping * dot(n, nodes[b].velocity)) / nodeMass * n;
         }
         for(int i: range(1, nodes.size-1)) {
-            // Bending resistance
+            // Torsion springs (Bending resistance)
             vec3 A = nodes[i-1].position, B = nodes[i].position, C = nodes[i+1].position;
-            vec3 b = (A+C)/2.f;
+            vec3 axis = cross(B-A, C-B);
+            float phi = atan(length(axis), dot(B-A, C-B));
+            float torque = wireBendStiffness * phi;
+            vec3 force = torque * cross(axis/length(axis), (B-A)/2.f)
+                    + torque * cross(axis/length(axis), (C-B)/2.f);
+            //vec3 b = (A+C)/2.f;
+            //vec3 n = (b-B)/length(b-B);
+            //vec3 v = (nodes[i-1].velocity+nodes[i+1].velocity)/2.f - nodes[i].velocity;
             //float d = 1+dot((A-B)/length(A-B), (C-B)/length(C-B));
-            const float k = 1;
-            nodes[i].acceleration += k * (b-B) / nodeMass;
+            //vec3 force = (wireBendStiffness * dot(n, b-B) - wireBendDamping * dot(n, v)) * n;
+            // Elastic cylinder - cylinder contact
+            auto contact = [this,&force](int i, int j) {
+                vec3 A1 = nodes[i].position, A2 = nodes[i+1].position;
+                vec3 B1 = nodes[j].position, B2 = nodes[j+1].position;
+                vec3 A, B; closest(A1, A2, B1, B2, A, B);
+                vec3 r = B-A;
+                float d = wireRadius + wireRadius - length(r);
+                if(d > 0) {
+                    float E = 10; //1/((1-sq(wirePoisson))/wireYoung + (1-sq(wirePoisson))/wireYoung);
+                    float kN = wireNormalDamping;
+                    float R = 1/(1/wireRadius+1/wireRadius);
+                    vec3 n = r/length(r);
+                    vec3 v = (nodes[i].velocity + nodes[i+1].velocity)/2.f
+                            -(nodes[j].velocity + nodes[j+1].velocity)/2.f;
+                    float fN = 4/3*E*sqrt(R)*sqrt(d)*d - kN * dot(n, v); // FIXME
+                    force += fN * n;
+                    vec3 vT = v - dot(n, v)*n;
+                    float friction = -particleFriction; // mu
+                    float kT = particleTangentialDamping;
+                    float sC = 1- smoothCoulomb/(smoothCoulomb+sq(vT));
+                    if(length(vT)) {
+                        vec3 fT = (friction * abs(fN) * sC / length(vT) - kT) * vT;
+                        force += fT;
+                    }
+                    assert(isNumber(force));
+                }
+            };
+            for(int j: range(0, i-1)) contact(i, j);
+            for(int j: range(i+2, nodes.size-1)) contact(i, j);
+            nodes[i].acceleration += force / nodeMass;
         }
         // Anchors both ends
         nodes.first().acceleration = 0;
         nodes.last().acceleration = 0;
 
-        const float dt = 1./60;
         // Particle dynamics
         for(Particle& p: particles) {
             // Leapfrog position integration
@@ -264,7 +367,9 @@ struct DEM : Widget, Poll {
             assert(isNumber(n.position));
         }
         time += dt;
-        window->render();
+        timeStepCount++;
+        if(timeStepCount%skip == 0) window->render();
+        queue();
     }
 
     const float scale = 256;
@@ -273,7 +378,8 @@ struct DEM : Widget, Poll {
         /*window->actions[Space] = [this]{
             writeFile(section(title,' '), encodePNG(render(512, graphics(512))), home());
         };*/
-        window->presentComplete = {this, &DEM::step};
+        //window->presentComplete = {this, &DEM::step};
+        step();
     }
     vec2 sizeHint(vec2) { return 1024; }
     shared<Graphics> graphics(vec2 size) {
