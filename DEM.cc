@@ -108,7 +108,7 @@ struct DEM : Widget, Poll {
     struct Node {
         vec3 position;
         vec3 velocity = 0;
-        //vec3 acceleration; // Temporary
+        vec3 acceleration; // Temporary for explicit integration
         Node(vec3 position) : position(position) {}
     };
     const float nodeMass = 1;
@@ -117,10 +117,10 @@ struct DEM : Widget, Poll {
     const float wireNormalDamping = 50;
     const float wireFriction = 2;
     const float wireTangentialDamping = 10;
-    const float wireStiffness = 1000; //1000
+    const float wireTensionStiffness = 1000; //1000
     const float wireTensionDamping = 10; //10
     const float wireBendStiffness = 100;
-    //const float wireBendDamping = 1;
+    const float wireBendDamping = -100;
 
     float internodeLength = 1./4;
 
@@ -163,13 +163,14 @@ struct DEM : Widget, Poll {
         // Gravity, Wire - Floor contact, Bending resistance
         for(int i: range(0, nodes.size-0)) {
             vec3 force = 0;
-            // Gravity
+            // Gravity (implicit)
             const vec3 g (0, 0, 1);
             force += nodeMass * g;
             for(int c: range(3)) {
                 M(i*3+c, i*3+c) = nodeMass;
                 b[i*3+c] = dt * force[c];
             }
+            nodes[i].acceleration = 0;
             /*// Elastic Wire - Floor contact
             float d = (p.position.z + wireRadius) - floorHeight;
             if(d > 0) {
@@ -286,25 +287,25 @@ struct DEM : Widget, Poll {
         }*/
         // Wire tension
         for(int i: range(1,nodes.size-1)) {
-            float k = wireStiffness;
-            float l0 = internodeLength;
-            auto stretch = [&](int i, int j) {
+            auto spring = [&](int i, int j) {
                 vec3 x = nodes[i].position - nodes[j].position;
                 float l = length(x);
                 vec3 n = x/l;
-                vec3 f = - k * (l - l0) * n;
+                vec3 v = nodes[i].velocity - nodes[j].velocity;
+                vec3 f = - wireTensionStiffness * (l - internodeLength) * n - wireTensionDamping * n * dot(n, v);
                 mat3 o = outer(n, n);
-                mat3 dxf = (1 - l0/l)*(1 - o) + o;
+                mat3 dxf = (1 - internodeLength/l)*(1 - o) + o;
+                mat3 dvf = - wireTensionDamping * o;
                 for(int c0: range(3)) {
                     for(int c1: range(3)) {
-                        M(i*3+c0, i*3+c1) -= dt*dt*dxf(c0, c1);
-                        M(j*3+c0, j*3+c1) -= dt*dt*-dxf(c0, c1);
+                        M(i*3+c0, i*3+c1) -= dt*dvf(c0, c1) + dt*dt*dxf(c0, c1);
+                        M(j*3+c0, j*3+c1) += dt*dvf(c0, c1) + dt*dt*dxf(c0, c1);
                     }
-                    b[i*3+c0] += dt*(   f[c0] + dt*dxf(c0, c0)*nodes[i].velocity[c0] );
-                    b[j*3+c0] += dt*( -f[c0] + dt*-dxf(c0, c0)*nodes[j].velocity[c0] );
+                    b[i*3+c0] += dt*(  f[c0] + dt*dxf(c0, c0)*nodes[i].velocity[c0] );
+                    b[j*3+c0] -= dt*( f[c0] + dt*dxf(c0, c0)*nodes[j].velocity[c0] );
                 }
             };
-            stretch(i-1, i);  stretch(i, i+1);
+            spring(i-1, i);  spring(i, i+1);
             /*vec3 x[] = {nodes[i-1].position, nodes[i].position, nodes[i+1].position};
             vec3 dx0 = x[1]-x[0], dx1 = x[2]-x[1];
             float l0 = length(dx0), l1=length(dx1);
@@ -324,24 +325,28 @@ struct DEM : Widget, Poll {
             for(int c0: range(3)) for(int c1: range(3)) M(i*3+c0, (i+1)*3+c1) -= dt*dt*dxf1(c0, c1);*/
             //- wireTensionDamping * dot(n, nodes[b].velocity))
         }
-#if 0
         for(int i: range(1, nodes.size-1)) {
-            vec3 force = 0;
             // Torsion springs (Bending resistance)
             vec3 A = nodes[i-1].position, B = nodes[i].position, C = nodes[i+1].position;
-            vec3 axis = cross(C-B, B-A);
-            if(axis) {
-                float phi = atan(length(axis), dot(C-B, B-A));
-                float torque = wireBendStiffness * phi;
-                force += torque / 2.f * cross(axis/length(axis), C-A);
-                /*{//FIXME
+            vec3 a = C-B, b = B-A;
+            vec3 c = cross(a, b);
+            float l = length(c);
+            if(l) {
+                float p = atan(l, dot(a, b));
+                vec3 dap = cross(a, cross(a,b)) / (sq(a) * l);
+                vec3 dbp = cross(b, cross(b,a)) / (sq(b) * l);
+                // Explicit Euler
+                nodes[i+1].acceleration += wireBendStiffness * (-p*dap) / nodeMass;
+                nodes[i].acceleration += wireBendStiffness * (p*dap - p*dbp) / nodeMass;
+                nodes[i-1].acceleration += wireBendStiffness * (p*dbp) / nodeMass;
+                {//FIXME
                     vec3 A = nodes[i-1].velocity, B = nodes[i].velocity, C = nodes[i+1].velocity;
                     vec3 axis = cross(C-B, B-A);
                     if(axis) {
                         float angularVelocity = atan(length(axis), dot(C-B, B-A));
-                        force += wireBendDamping * angularVelocity / 2.f * cross(axis/length(axis), C-A);
+                        nodes[i].acceleration += (wireBendDamping * angularVelocity / 2.f * cross(axis/length(axis), C-A)) / nodeMass;
                     }
-                }*/
+                }
             }
             /*// Elastic cylinder - cylinder contact
             auto contact = [this,&force](int i, int j) {
@@ -375,7 +380,6 @@ struct DEM : Widget, Poll {
             assert(isNumber(force));
             nodes[i].acceleration += force / nodeMass;*/
         }
-#endif
         /*// Particle dynamics
         for(Particle& p: particles) {
             // Leapfrog position integration
@@ -397,16 +401,20 @@ struct DEM : Widget, Poll {
             // Correction (multiplicative update)
             p.rotation = w2wl ? quat{cos(dt/2*w2wl), sin(dt/2*w2wl)*w2w/length(w2w)} * p.rotation : p.rotation;
             p.angularVelocity = (p.rotation * quat{0, w + dt*dw} * p.rotation.conjugate()).v; // Global
-        }
+        }*/
+        // Anchors both ends (explicit)
+        nodes.first().acceleration = 0;
+        nodes.last().acceleration = 0;
         // Wire nodes dynamics
         for(Node& n: nodes) {
             // Leapfrog position integration
             n.velocity += dt * n.acceleration;
             n.position += dt * n.velocity;
             assert(isNumber(n.position), n.position, n.velocity, n.acceleration);
-        }*/
+        }
+        // Implicit Euler
         Vector dv = solve(move(M), b);
-        // Anchors both ends
+        // Anchors both ends (implicit)
         for(int c: range(3)) dv[0             *3+c] = 0;
         for(int c: range(3)) dv[(nodes.size-1)*3+c] = 0;
         for(int i: range(nodes.size)) {
