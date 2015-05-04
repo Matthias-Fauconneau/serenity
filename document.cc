@@ -299,10 +299,13 @@ struct Document {
             // Centered text
             else if(s.match(' ')) {
                 if(s.match('#')) warn(s, "' #' will render centered text instead of header");
-                page->append(&newText(page, parseText(s), format.textSize, true));
+                bool title = s.match('!'); // Large
+                auto text = parseText(s);
+                if(title) text = bold(text);
+                page->append(&newText(page, text, title ? format.titleSize : format.textSize, true));
             }
-            // Large centered text (title)
-            else if(s.match('!')) page->append(&newText(page, bold(parseText(s)), format.titleSize, true));
+            // Large text
+            else if(s.match('!')) page->append(&newText(page, bold(parseText(s)), format.titleSize, false));
             // Page break (double blank line)
             else if(s.match("\n\n\n"_)) break;
             // Comment
