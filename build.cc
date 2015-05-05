@@ -151,7 +151,7 @@ bool Build::compileModule(string target) {
 		Folder(tmp+"/"+join(flags,"-")+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
 		Stream stdout;
         int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1y", "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing", "-march=native",
-										   "-o", object, fileName,  "-I/usr/include/libdrm", "-I/usr/include/freetype2"} + toRefs(args),
+                                           "-o", object, fileName, "-I/usr/include/freetype2"} + toRefs(args),
 						  false, currentWorkingDirectory(), &stdout);
 		jobs.append({copyRef(target), pid, move(stdout)});
 		needLink = true;
@@ -204,9 +204,10 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
 			if(status) { binary={}; return; }
 			else log(job.target+'\n');
 		}
+        // if !exists("/var/tmp/lib") copy("/var/tmp","/scratch/lib");
 		array<String> args = (buffer<String>)(
 					move(files) +
-					mref<String>{"-o"__, unsafeRef(binary), "-L/usr/local/lib"__} +
+                    mref<String>{"-o"__, unsafeRef(binary), "-L/var/tmp/lib"__, "-Wl,-rpath,/var/tmp/lib"__,} +
 					apply(libraries, [this](const String& library)->String{ return "-l"+library; }) );
 		if(flags.contains("m32"_)) args.append("-m32"__);
 		if(execute(CXX, toRefs(args))) { log("Failed to link\n"); return; }

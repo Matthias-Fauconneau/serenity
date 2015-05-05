@@ -1,22 +1,53 @@
 #include "algebra.h"
 
-Matrix transpose(const Matrix& A) {
-    Matrix At(A.n, A.m);
-    for(size_t i: range(A.m)) for(size_t j: range(A.n)) At(j, i) = (float)A(i, j);
-    return At;
+Vector operator*(real a, const Vector& b) {
+    Vector t(b.size);
+    for(uint i: range(t.size)) t[i]=a*b[i];
+    return t;
 }
 
-Matrix operator*(const Matrix& a, const Matrix& b) {
-    assert(a.n==b.m);
-    Matrix r(a.m,b.n);
-    for(uint i: range(r.m)) for(uint j: range(r.n)) for(uint k: range(a.n)) r(i,j) = r(i,j) + a(i,k)*b(k,j);
-    return r;
+Vector operator+(const Vector& a, const Vector& b) {
+    assert(a.size==b.size); Vector t(a.size);
+    for(uint i: range(t.size)) t[i]=a[i]+b[i];
+    return t;
 }
 
-bool operator==(const Matrix& a,const Matrix& b) {
-    assert(a.m==b.m && a.n==b.n);
-    for(uint i: range(a.m)) for(uint j: range(a.n)) if(a(i,j)!=b(i,j)) return false;
-    return true;
+Vector operator-(const Vector& a, const Vector& b) {
+    assert(a.size==b.size); Vector t(a.size);
+    for(uint i: range(t.size)) t[i]=a[i]-b[i];
+    return t;
+}
+
+Vector operator*(const Vector& a, const Vector& b) {
+    assert(a.size==b.size); Vector t(a.size);
+    for(uint i: range(t.size)) t[i]=a[i]*b[i];
+    return t;
+}
+
+Matrix operator*(real a, const Matrix& A) {
+    Matrix t = copy(A);
+    for(array<Matrix::Element>& column: t.columns) for(Matrix::Element& e: column) e.value *= a;
+    return t;
+}
+
+Vector operator*(const Matrix& A, const Vector& b) {
+    Vector t(b.size);
+    for(uint j: range(A.n)) for(const Matrix::Element& e: A.columns[j]) t[e.row] += e.value*b[j]; //t[i] = A[i,j]b[j]
+    return t;
+}
+
+Matrix operator+(const Matrix& A, const Matrix& B) {
+    assert(A.m == B.m && A.n == B.n);
+    Matrix t = copy(A);
+    for(uint j: range(B.n)) for(const Matrix::Element& e: B.columns[j]) t(e.row,j) += e.value;
+    return t;
+}
+
+Matrix operator-(const Matrix& A, const Matrix& B) {
+    assert(A.m == B.m && A.n == B.n);
+    Matrix t = copy(A);
+    for(uint j: range(B.n)) for(const Matrix::Element& e: B.columns[j]) t(e.row,j) -= e.value;
+    return t;
 }
 
 String str(const Matrix& a) {
@@ -25,7 +56,8 @@ String str(const Matrix& a) {
         if(a.n==1) s.append(str(a(i,0),1,0)+' ');
         else {
             for(uint j: range(a.n)) {
-                s.append(a(i,j)?"O"_:"  "_/*str(a(i,j),1,0)*//*+' '*/);
+                s.append(a(i,j)?"O"_:"  "_);
+                //s.append(str(a(i,j),1u,1u)+' ');
             }
             if(i<a.m-1) s.append("\n  "_);
         }
@@ -34,57 +66,57 @@ String str(const Matrix& a) {
     return move(s);
 }
 
-Vector operator*(const Matrix& A,const Vector& b) {
-    Vector Ab (A.m);
-    for(size_t i: range(A.m)) { float Abi = 0; for(size_t j: range(A.n)) Abi += A(i, j) * b[j]; Ab[i] = Abi; }
-    return Ab;
-}
-Vector operator-(const Vector& a,const Vector& b) {
-    assert_(a.size == b.size);
-    Vector y (a.size);
-    for(size_t i: range(a.size)) y[i] = a[i]-b[i];
-    return y;
-}
-
-PLU factorize(const Matrix& A) {
-    Matrix L (A.m, A.m);
-    Matrix U (A.m, A.n);
-    Permutation P(A.m); // FIXME: Restore pivot version
-    assert(A.m==A.n);
-    size_t n = A.n;
-    for(size_t i: range(n)) U(i, i) = 1;
-    for(size_t j: range(n)) {
-	for(size_t i: range(j,n)) {
-	    float sum = 0;
-	    for(size_t k: range(j)) sum += L(i, k) * U(k, j);
-	    L(i, j) = A(i, j) - sum;
-	}
-	for(size_t i: range(j,n)) {
-	    float sum = 0;
-	    for(size_t k: range(j)) sum += L(j, k) * U(k, i);
-	    U(j, i) = (A(j, i) - sum) / L(j, j);
-	}
-    }
-    return {move(P), move(L), move(U)};
+// Not using umfpack header as it includes stdlib.h
+//#include <suitesparse/umfpack.h> //umfpack
+//#include <suitesparse/umfpack.h> //amd
+//#include <suitesparse/umfpack.h> //suitesparseconfig
+//#include <suitesparse/umfpack.h> //cholmod
+//#include <suitesparse/umfpack.h> //colamd
+//#include <suitesparse/umfpack.h> //openblas
+extern "C" {
+uint umfpack_di_symbolic(uint m, uint n, const int* columnPointers, const int* rowIndices, const double* values, void** symbolic,
+                         const double* control, double* info);
+void umfpack_di_free_symbolic(void** symbolic);
+uint umfpack_di_numeric(const int* columnPointers, const int* rowIndices, const double* values, void* symbolic, void** numeric,
+                        const double* control, double* info);
+void umfpack_di_free_numeric(void** numeric);
+enum System { UMFPACK_A };
+uint umfpack_di_solve(System sys, const int* columnPointers, const int* rowIndices, const double* values, double* X, const double* B,
+                      void* numeric, const double* control, double* info);
 }
 
-float determinant(const Permutation& P, const Matrix& L, const Matrix& unused U) {
-    float det = P.determinant();
-    for(uint i: range(L.n)) det *= L(i,i);
-    return det;
+UMFPACK::Symbolic::~Symbolic(){ umfpack_di_free_symbolic(&pointer); }
+UMFPACK::Numeric::~Numeric(){ umfpack_di_free_numeric(&pointer); }
+
+UMFPACK::UMFPACK(const Matrix& A):m(A.m),n(A.n){
+    columnPointers = buffer<int>(n+1,n+1);
+    uint nnz=0;
+    for(uint j: range(A.n)) {
+        columnPointers[j] = nnz;
+        nnz += A.columns[j].size;
+    }
+    columnPointers[A.n] = nnz;
+    rowIndices = buffer<int>(nnz);
+    values = buffer<real>(nnz);
+    uint index=0;
+    for(const array<Matrix::Element>& column: A.columns) {
+        for(const Matrix::Element& e: column) {
+            rowIndices[index]=e.row;
+            values[index]=e.value;
+            index++;
+        }
+    }
+    Symbolic symbolic;
+    umfpack_di_symbolic(m, n, columnPointers.data, rowIndices.data, values.data, &symbolic.pointer, 0, 0);
+    umfpack_di_numeric(columnPointers.data, rowIndices.data, values.data, symbolic.pointer, &numeric.pointer, 0, 0);
 }
 
-Vector solve(const Permutation& P, const Matrix& L, const Matrix& U, const Vector& b) {
-    assert_(determinant(P,L,U), "Coefficient matrix is singular"_);
-    Vector x(U.m);
-    for(uint i: range(U.m)) x[i] = b[P[i]]; // Reorder b in x
-    for(uint i: range(U.m)) { // Forward substitution from L
-	for(size_t k: range(i)) x[i] -= L(i, k) * x[k];
-	x[i] = x[i] / L(i,i);
-    }
-    for(int i=U.m-2;i>=0;i--) { // Backward substition from U
-	for(size_t k: range(i+1, U.n)) x[i] -= U(i, k) * x[k];
-	// Implicit ones on diagonal -> no division
-    }
+Vector UMFPACK::solve(const Vector& b) {
+#if 1
+        // Asserts valid constant
+        for(real e: b) assert_(isNumber(e));
+#endif
+    Vector x(m);
+    umfpack_di_solve(UMFPACK_A, columnPointers.data, rowIndices.data, values.data, (real*)x.data, b.data, numeric.pointer, 0, 0);
     return x;
 }

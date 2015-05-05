@@ -2,6 +2,8 @@ serenity.files
 README.md
 TODO
 build.sh
+
+build.h
 build.cc
 
 core/core.h
@@ -52,11 +54,8 @@ layout/parse.cc
 layout/preview.cc
 layout/export.cc
 
-audio/player.cc
+algebra.h
+algebra.cc
 
-editor.cc
-parser.h
-test.cc
-build.h
 document.cc
 DEM.cc
