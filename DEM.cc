@@ -5,6 +5,8 @@
 #include "render.h"
 #include "algebra.h"
 #include "png.h"
+#include "time.h"
+#include "parallel.h"
 
 // -> vector.h
 template<template<Type> /*Type*/class V, Type T, uint N> inline /*constexpr*/ float length(const vec<V,T,N>& a) { return sqrt(dot(a,a)); }
@@ -103,7 +105,7 @@ struct Contact {
 bool operator==(const Contact& a, const Contact& b) { return a.index == b.index; }
 
 struct DEM : Widget, Poll {   
-    const int skip = 32; //8 16
+    const int skip = 128; //8 16
     //const float dt = 1./(60*2);
     const float dt = 1./(60*8); // 4
 
@@ -155,6 +157,9 @@ struct DEM : Widget, Poll {
     int timeStep = 0;
     float time = 0;
 
+    Time totalTime {true}, solveTime, renderTime;
+    Time sphereTime, cylinderTime;
+
     void event() { step(); }
     void step() {
         if(1) {
@@ -194,6 +199,7 @@ struct DEM : Widget, Poll {
                 }
             }
         }
+        solveTime.start();
         //Matrix M (nodes.size*3, nodes.size*3); Vector b (nodes.size*3); // TODO: CG solve, +particles
         // Cylinder: initialization, gravity
         for(int i: range(nodes.size)) {
@@ -219,7 +225,8 @@ struct DEM : Widget, Poll {
             }
         }
         // Sphere: gravity, contacts
-        for(size_t aIndex: range(particles.size)) {
+        sphereTime.start();
+        parallel_for(particles.size, [this](uint, size_t aIndex) {
             auto& a = particles[aIndex];
 
             /*// Prediction
@@ -301,7 +308,8 @@ struct DEM : Widget, Poll {
 
             a.acceleration = force / a.mass;
             a.torque = torque;
-        }
+        });
+        sphereTime.stop();
         // Wire tension
         if(nodes) for(int i: range(1,nodes.size-1)) {
             /*if(1) { // Implicit
@@ -340,7 +348,8 @@ struct DEM : Widget, Poll {
                         / nodeMass * n;
             }
         }
-        if(nodes) for(int n: range(1, nodes.size-1)) {
+        cylinderTime.start();
+        parallel_for(1, nodes.size-1, [this](uint, size_t n) {
             {// Torsion springs (Bending resistance) (explicit)
                 vec3 A = nodes[n-1].position, B = nodes[n].position, C = nodes[n+1].position;
                 vec3 a = C-B, b = B-A;
@@ -405,7 +414,8 @@ struct DEM : Widget, Poll {
 
             assert(isNumber(force));
             nodes[n].acceleration += force / nodeMass;
-        }
+        });
+        cylinderTime.stop();
         // Particle dynamics
         for(Particle& p: particles.slice(1)) {
             if(0) { // Euler
@@ -473,9 +483,12 @@ struct DEM : Widget, Poll {
                 }
             }
         }*/
+        solveTime.stop();
         time += dt;
         timeStep++;
         if(timeStep%skip == 0) window->render();
+        if(timeStep%(32*64)==0) log("render",str(renderTime, totalTime),"solve",str(solveTime, totalTime),
+                                    "sphere",str(sphereTime, solveTime), "cylinder",str(cylinderTime, solveTime));
         queue();
     }
 
@@ -501,6 +514,7 @@ struct DEM : Widget, Poll {
     }
     vec2 sizeHint(vec2) { return 1024; }
     shared<Graphics> graphics(vec2 size) {
+        renderTime.start();
         Image target = Image( int2(size) );
         target.clear(0xFF);
         ImageF zBuffer = ImageF(int2(size));
@@ -601,6 +615,7 @@ struct DEM : Widget, Poll {
 
         shared<Graphics> graphics;
         graphics->blits.append(vec2(0),vec2(target.size),move(target));
+        renderTime.stop();
         return graphics;
     }
 

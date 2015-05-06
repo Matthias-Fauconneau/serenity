@@ -24,6 +24,7 @@ core/thread.cc
 core/file.cc
 core/serialization.h
 core/parallel.h
+core/time.h
 
 io/png.cc
 io/bit.h
