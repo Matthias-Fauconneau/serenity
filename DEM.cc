@@ -133,7 +133,8 @@ struct DEM : Widget, Poll {
         array<vec3> planes;
 
         Particle(vec3 position) : Node(position), mass(4./3*PI*cb(particleRadius)) {
-            vertices = copyRef(ref<vec3>{vec3(-1,0,-1/sqrt(2.f)),vec3(+1,0,-1/sqrt(2.f)),vec3(0,-1,1/sqrt(2.f)),vec3(0,1,1/sqrt(2.f))});
+            vertices = copyRef(ref<vec3>{vec3(-1./2,0,-1/sqrt(2.f)/2),vec3(+1./2,0,-1/sqrt(2.f)/2),vec3(0,-1./2,1/sqrt(2.f)/2),
+                                         vec3(0,1./2,1/sqrt(2.f)/2)});
             for(int i : range(4)) for(int j : range(i+1,4)) for(int k : range(j+1,4)) { // Only valid for tetrahedron
                 planes.append((vertices[i]+vertices[j]+vertices[k])/3.f);
             }
@@ -463,27 +464,32 @@ struct DEM : Widget, Poll {
         mat4 viewProjection = mat4() .scale(vec3(scale, scale, -scale/4)) .rotateX(rotation.y) .rotateZ(rotation.x); // Yaw
 
         if(particles.size > 1) {
-            buffer<vec3> positions {(particles.size-1)*6};
+            buffer<vec3> positions {(particles.size-1)*4*3, 0};
+            buffer<vec3> colors {(particles.size-1)*4*3, 0};
             for(size_t i: range(particles.size-1)) {
                 const auto& p = particles[1+i];
                 // FIXME: GPU quad projection
                 vec3 O = viewProjection*p.position;
                 vec3 min = O - vec3(vec2(scale*particleRadius), 0); // Isometric
                 vec3 max = O + vec3(vec2(scale*particleRadius), 0); // Isometric
-                positions[i*6+0] = min;
-                positions[i*6+1] = vec3(max.x, min.y, O.z);
-                positions[i*6+2] = vec3(min.x, max.y, O.z);
-                positions[i*6+3] = vec3(min.x, max.y, O.z);
-                positions[i*6+4] = vec3(max.x, min.y, O.z);
-                positions[i*6+5] = max;
+                for(int i : range(4)) for(int j : range(i+1,4)) for(int k : range(j+1,4)) { // Only valid for tetrahedron
+                    positions.append(viewProjection*(p.position+p.vertices[i]));
+                    colors.append(p.vertices[i]);
+                    positions.append(viewProjection*(p.position+p.vertices[j]));
+                    colors.append(p.vertices[j]);
+                    positions.append(viewProjection*(p.position+p.vertices[k]));
+                    colors.append(p.vertices[k]);
+                }
             }
 
-            static GLShader shader {::shader(), {"sphere"}};
+            static GLShader shader {::shader(), {"flat"}};
             shader.bind();
             shader.bindFragments({"color"});
             static GLVertexArray vertexArray;
             GLBuffer positionBuffer (positions);
             vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
+            GLBuffer colorBuffer (colors);
+            vertexArray.bindAttribute(shader.attribLocation("aColor"_), 3, Float, colorBuffer);
             vertexArray.draw(Triangles, positions.size);
         }
 
