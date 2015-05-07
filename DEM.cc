@@ -160,45 +160,36 @@ struct DEM : Widget, Poll {
     Time totalTime {true}, solveTime, renderTime;
     Time sphereTime, cylinderTime;
 
+    const float structureRadius = 1;
+    float structureHeight = floorHeight;
+    float pourHeight = floorHeight;
+    float winchHeight = floorHeight;
+    float winchAngle = 0;
+    float lastPourWinchAngle = 0;
+
     void event() { step(); }
     void step() {
-        if(1) {
-            if(1) { // Generate falling particle (pouring)
-                bool generate = true;
-                for(auto& p: particles.slice(1)) {
-                    if(p.position.z + p.radius > 1) generate = false;
-                }
-                if(generate && particles.size<128) {
-                    for(;;) {
-                        vec3 p(random()*2-1,random()*2-1, 1);
-                        //vec3 p = 0;
-                        if(length(p.xy())>1) continue;
-                        particles.append(vec3((1-particleRadius)*p.xy(), p.z), particleRadius);
-                        break;
-                    }
-                }
+        particles.filter([](const Particle& p){ return length(p.position.xy()) > 2;});
+        float height = floorHeight;
+        for(const Particle& p: particles.slice(1)) height = max(height, p.position.z + p.radius);
+        if(particles.size<128 && height < structureHeight+particleRadius) { // Generate falling particle (pouring)
+            pourHeight = max(pourHeight, height+particleRadius);
+            for(;;) {
+                vec3 p(random()*2-1,random()*2-1, pourHeight);
+                if(length(p.xy())>1) continue;
+                particles.append(vec3((structureRadius-particleRadius)*p.xy(), p.z), particleRadius);
+                break;
             }
-            if(1) { // Generate wire (spooling)
-                const float spoolerRate = 1./8;
-                const float spoolerSpeed = 1./16 * exp(-time/256);
-                float spoolerAngle = 2*PI*spoolerRate*time;
-                float spoolerHeight = floorHeight + wireRadius + spoolerSpeed*time;
-                vec3 spoolerPosition (cos(spoolerAngle), sin(spoolerAngle), spoolerHeight);
-                vec3 r = spoolerPosition-nodes.last().position;
-                float l = length(r);
-                if(l > internodeLength*1.5 // *2 to keep some tension
-                        && nodes.size<256) {
-                //if(nodes.last().position.z > spoolerPosition.z + 2*internodeLength) {
-                //if(timeStepCount%(16*60) == 0 && l) {
-                    //log(nodes.last().position.z, spoolerPosition.z, 2*internodeLength);
-                    //vec3 u = nodes.last().position-nodes[nodes.size-2].position;
-                    //vec3 a(1/.128,1/.128,0);
-                    //vec3 a(0,0,1./2);
-                    //vec3 a(0,0,0);
-                    //nodes.append(nodes.last().position + internodeLength*(a*u/length(u) + (vec3(1,1,1)-a)*r/l));
-                    nodes.append(nodes.last().position + internodeLength/l*r);
-                }
-            }
+        }
+        if(1) { // Generate wire (spooling)
+            winchAngle += dt * structureRadius*internodeLength;
+            //winchHeight += /*1./16 * exp(-time/256) **/ dt * particleRadius/(structureRadius*2*PI); // Helix pitch
+            winchHeight  = pourHeight;
+            vec3 winchPosition (cos(winchAngle), sin(winchAngle), winchHeight);
+            vec3 r = winchPosition-nodes.last().position;
+            float l = length(r);
+            if(l > internodeLength*1.5 // *2 to keep some tension
+                    && nodes.size<256) nodes.append(nodes.last().position + internodeLength/l*r);
         }
         solveTime.start();
         //Matrix M (nodes.size*3, nodes.size*3); Vector b (nodes.size*3); // TODO: CG solve, +particles
@@ -227,6 +218,7 @@ struct DEM : Widget, Poll {
         }
         // Sphere: gravity, contacts
         sphereTime.start();
+        structureHeight = 0;
         parallel_for(particles.size, [this](uint, size_t aIndex) {
             auto& a = particles[aIndex];
 
@@ -253,7 +245,7 @@ struct DEM : Widget, Poll {
                 vec3 v = (a.velocity + cross(a.angularVelocity, a.radius*(+n))) - (b.velocity + cross(b.angularVelocity, b.radius*(-n)));
                 //vec3 v = a.velocity - b.velocity;
                 float fN = - 4/3*E*sqrt(R)*sqrt(d)*d - particleNormalDamping * dot(n, v);
-                assert_(isNumber(fN));
+                //assert_(isNumber(fN), particles.size, nodes.size);
                 force += fN * n;
                 //assert_(isNumber(force), aIndex, a.angularVelocity);
                 auto& c = a.contacts.add(Contact{int(bIndex), a.position+a.radius*n,0,0,0,0});
@@ -302,13 +294,15 @@ struct DEM : Widget, Poll {
                 vec3 fT;
                 if(c.friction(fT, a.position + a.radius*c.n, particleFriction)) i++; // Static
                 else a.contacts.removeAt(i); // Dynamic
-                assert(isNumber(fT));
+                //assert(isNumber(fT));
                 force += fT;
                 torque += cross(a.radius*c.n, fT);
             }
 
             a.acceleration = force / a.mass;
             a.torque = torque;
+
+            if(a.contacts) structureHeight = max(structureHeight, a.position.z); // Parallel fault
         });
         sphereTime.stop();
         // Wire tension
@@ -413,7 +407,7 @@ struct DEM : Widget, Poll {
                 }
             }
 
-            assert(isNumber(force));
+            //assert(isNumber(force));
             nodes[n].acceleration += force / nodeMass;
         });
         cylinderTime.stop();
@@ -430,7 +424,7 @@ struct DEM : Widget, Poll {
                 p.position += dt*p.velocity + dt*dt/2*p.acceleration;
                 p.velocity += dt/2*p.acceleration;
             }
-            assert(isNumber(p.position));
+            //assert(isNumber(p.position));
 
             // PCDM rotation integration
             float I (2./3*p.mass*sq(p.radius)); // mat3
@@ -466,7 +460,7 @@ struct DEM : Widget, Poll {
                 p.position += dt*p.velocity + dt*dt/2*p.acceleration;
                 p.velocity += dt/2*p.acceleration;
             }
-            assert(isNumber(p.position));
+            //assert(isNumber(p.position));
         }
         /*if(1) {
             // Implicit Euler
@@ -532,7 +526,7 @@ struct DEM : Widget, Poll {
         mat4 viewProjection = projection*view;
 
         glDepthTest(true);
-        {
+        if(particles.size > 1) {
             //buffer<vec2> positions {(particles.size-1)*4};
             //buffer<uint16> indices {(particles.size-1)*5};
             buffer<vec3> positions {(particles.size-1)*6};
