@@ -9,9 +9,12 @@ fragment {
         in vec2 vTexCoords;
         sphere {
                 if(length(vTexCoords) > 1) discard;
-                color = vec4(vec3(1-length(vTexCoords)), 1);
+                float dz = sqrt(1-dot(vTexCoords,vTexCoords));
+
         }
         cylinder {
-                color = vec4(vec3(1-abs(vTexCoords.x)), 1);
+                float dz = 1-abs(vTexCoords.x);
         }
+        color = vec4(vec3(dz), 1);
+        gl_FragDepth = gl_FragCoord.z - dz/4/2/4;
 }

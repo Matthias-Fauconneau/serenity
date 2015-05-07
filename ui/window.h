@@ -66,7 +66,7 @@ struct Window : Poll {
 	/// Schedules window rendering after all events have been processed (\sa Poll::queue)
 	void render();
 	/// Immediately renders the first pending update to target
-	Update render(const Image& target);
+    Update render(int2 size/*const Image& target*/);
 
 	// Control
 	virtual function<void()>& globalAction(Key) abstract;
@@ -87,7 +87,7 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
     /// System V shared memory
     uint shm = 0;
     /// Rendering target in shared memory
-    Image target;
+    //Image target;
     /// Shared window buffer state
 	enum State { Idle, Copy, Present };
 	State state = Idle;

@@ -46,7 +46,7 @@ void Window::render(shared<Graphics>&& graphics, int2 origin, int2 size) {
 }
 void Window::render() { assert_(size); 	lock.lock(); updates.clear(); lock.unlock(); render(nullptr, int2(0), size); }
 
-Window::Update Window::render(const Image& target) {
+Window::Update Window::render(/*const Image& target*/int2 size) {
 	if(!updates) return Update();
 	lock.lock();
 	Update update = updates.take(0);
@@ -56,8 +56,8 @@ Window::Update Window::render(const Image& target) {
 		update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size)));
 		currentWindow = 0;
 	}
-	fill(target, update.origin, update.size, backgroundColor, 1); // Clear framebuffer
-	::render(target, update.graphics); 	// Render retained graphics
+    /*fill(target, update.origin, update.size, backgroundColor, 1); // Clear framebuffer
+    ::render(target, update.graphics); 	// Render retained graphics*/
 	return update;
 }
 
@@ -235,7 +235,7 @@ void XWindow::event() {
 
 	if(state!=Idle) return;
 
-	if(target.size != Window::size) {
+    /*if(target.size != Window::size) {
 		if(target) {
             {FreePixmap r; send(({r.pixmap=id+Pixmap, r;}));} target=Image();
 			assert_(shm);
@@ -251,10 +251,10 @@ void XWindow::event() {
 		target.clear(byte4(0xFF));
         {Shm::Attach r; send(({r.seg=id+Segment, r.shm=shm, r;}));}
         {CreatePixmap r; send(({r.pixmap=id+Pixmap, r.window=id+Window, r.w=uint16(Window::size.x), r.h=uint16(Window::size.y), r;}));}
-	}
+    }*/
 
     GLFrameBuffer::bindWindow(0, Window::size, ClearColor|ClearDepth, vec4(backgroundColor,1));
-	Update update = render(target);
+    Update update = render(Window::size/*target*/);
 	if(update) {
         /*static GLShader shader {::shader(), {"blit"}};
         shader.bindFragments({"color"});
