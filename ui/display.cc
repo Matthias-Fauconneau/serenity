@@ -52,7 +52,7 @@ XDisplay::XDisplay(Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket:
                 if(depth.numVisualTypes) for(VisualType visualType: read<VisualType>(depth.numVisualTypes)) {
                     if(!visual && depth.depth==32) {
                         root = screen.root;
-                        visual=visualType.id;
+                        visual = visualType.id;
                         size = int2(screen.width, screen.height);
                     }
                 }

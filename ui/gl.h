@@ -5,8 +5,12 @@
 #include "thread.h"
 #include "image.h"
 
+void glCheck_(string message);
+#define glCheck(message ...) glCheck_(str(__FILE__, __LINE__, ## message ))
+
 void glCullFace(bool enable);
 void glDepthTest(bool enable);
+void glAlphaTest(bool enable);
 
 struct GLShader {
     GLShader(){}
@@ -116,3 +120,5 @@ struct GLFrameBuffer {
 	union { int2 size = 0; struct { uint width, height; }; };
     GLTexture depthTexture, colorTexture;
 };
+
+void glDrawRectangle(GLShader& shader, vec2 min=vec2(-1,-1), vec2 max=vec2(1,1), bool texCoord=false);

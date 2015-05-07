@@ -7,6 +7,9 @@
 #define GL_GLEXT_PROTOTYPES
 #include <GL/gl.h> //GL
 
+#include <GL/glu.h> //GLU
+void glCheck_(string message) {GLenum e = glGetError(); if(e) error(message, (const char*)gluErrorString(e));}
+
 /// Rasterizer
 void glCullFace(bool enable) { if(enable) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE); }
 void glDepthTest(bool enable) { if(enable) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST); }
@@ -25,73 +28,73 @@ GLShader::GLShader(string source, ref<string> stages) {
     id = glCreateProgram();
     array<string> knownTags;
     for(uint type: (uint[]){GL_VERTEX_SHADER,GL_FRAGMENT_SHADER}) {
-	array<char> global, main;
-	for(size_t i: range(stages.size)) {
-	    buffer<string> tags = split(stages[i], " ") + (type==GL_VERTEX_SHADER?"vertex"_:"fragment"_);
-	    array<char> stageGlobal, stageMain;
-	    TextData s (source);
-	    array<uint> scope;
-	    for(uint nest=0;s;) { // for each line (FIXME: line independent)
-		uint start = s.index;
-		s.whileAny(" \t"_);
-		string identifier = s.identifier("_!"_);
-		s.whileAny(" \t"_);
-		if(identifier && identifier!="else"_ && s.match("{"_)) { //scope: "[a-z]+ {"
-		    bool condition=true;
-		    if(startsWith(identifier,"!"_)) condition=false, identifier=identifier.slice(1);
-		    if(tags.contains(identifier) == condition) {
-			knownTags.add( identifier );
-			scope.append( nest ); nest++; // Remember nesting level to remove matching scope closing bracket
-		    } else { // Skip scope
-			for(uint nest=1; nest;) {
-			    if(!s) error(source.slice(start), "Unmatched {"_);
-			    if(s.match('{')) nest++;
-			    else if(s.match('}')) nest--;
-			    else s.advance(1);
-			}
-		    }
-		    continue;
-		}
-		bool function = false;
-		static array<string> types = split("void float vec2 vec3 vec4"_," ");
-		static array<string> qualifiers = split("struct const uniform attribute varying in out"_," ");
-		if(types.contains(identifier) && s.identifier("_"_) && s.match('(')) {
-		    function = true;
-		    s.until('{');
-		    for(uint n=nest+1;s && n>nest;) {
-			if(s.match('{')) n++;
-			else if(s.match('}')) n--;
-			else s.advance(1);
-		    }
-		}
-		while(s && !s.match('\n')) {
-		    if(s.match('{')) nest++;
-		    else if(s.match('}')) { nest--;
-			if(scope && nest==scope.last()) { //Remove matching scope closing bracket
-			    scope.pop(); stageMain.append( s.slice(start, s.index-1-start) ); start=s.index;
-			}
-		    }
-		    else s.advance(1);
-		}
-		string line = s.slice(start, s.index-start);
-		if(trim(line) && !startsWith(trim(line), "//"_)) ((function || qualifiers.contains(identifier) || startsWith(line,"#"_)) ? stageGlobal : stageMain).append( line );
-	    }
-	    global.append( replace(stageGlobal,"$"_,str(i-1)) );
-	    main.append( replace(stageMain,"$"_,str(i-1)) );
-	}
-	this->source.append( "#version 330\n"_+global+"\nvoid main() {\n"_+main+"\n}\n"_ );
-	uint shader = glCreateShader(type);
-	glShaderSource(shader, 1, &this->source.last().data, (int*)&this->source.last().size);
-	glCompileShader(shader);
+        array<char> global, main;
+        for(size_t i: range(stages.size)) {
+            buffer<string> tags = split(stages[i], " ") + (type==GL_VERTEX_SHADER?"vertex"_:"fragment"_);
+            array<char> stageGlobal, stageMain;
+            TextData s (source);
+            array<uint> scope;
+            for(uint nest=0;s;) { // for each line (FIXME: line independent)
+                uint start = s.index;
+                s.whileAny(" \t"_);
+                string identifier = s.identifier("_!"_);
+                s.whileAny(" \t"_);
+                if(identifier && identifier!="else"_ && s.match("{"_)) { //scope: "[a-z]+ {"
+                    bool condition=true;
+                    if(startsWith(identifier,"!"_)) condition=false, identifier=identifier.slice(1);
+                    if(tags.contains(identifier) == condition) {
+                        knownTags.add( identifier );
+                        scope.append( nest ); nest++; // Remember nesting level to remove matching scope closing bracket
+                    } else { // Skip scope
+                        for(uint nest=1; nest;) {
+                            if(!s) error(source.slice(start), "Unmatched {"_);
+                            if(s.match('{')) nest++;
+                            else if(s.match('}')) nest--;
+                            else s.advance(1);
+                        }
+                    }
+                    continue;
+                }
+                bool function = false;
+                static array<string> types = split("void float vec2 vec3 vec4"_," ");
+                static array<string> qualifiers = split("struct const uniform attribute varying in out"_," ");
+                if(types.contains(identifier) && s.identifier("_"_) && s.match('(')) {
+                    function = true;
+                    s.until('{');
+                    for(uint n=nest+1;s && n>nest;) {
+                        if(s.match('{')) n++;
+                        else if(s.match('}')) n--;
+                        else s.advance(1);
+                    }
+                }
+                while(s && !s.match('\n')) {
+                    if(s.match('{')) nest++;
+                    else if(s.match('}')) { nest--;
+                        if(scope && nest==scope.last()) { //Remove matching scope closing bracket
+                            scope.pop(); stageMain.append( s.slice(start, s.index-1-start) ); start=s.index;
+                        }
+                    }
+                    else s.advance(1);
+                }
+                string line = s.slice(start, s.index-start);
+                if(trim(line) && !startsWith(trim(line), "//"_)) ((function || qualifiers.contains(identifier) || startsWith(line,"#"_)) ? stageGlobal : stageMain).append( line );
+            }
+            global.append( replace(stageGlobal,"$"_,str(i-1)) );
+            main.append( replace(stageMain,"$"_,str(i-1)) );
+        }
+        this->source.append( "#version 330\n"_+global+"\nvoid main() {\n"_+main+"\n}\n"_ );
+        uint shader = glCreateShader(type);
+        glShaderSource(shader, 1, &this->source.last().data, (int*)&this->source.last().size);
+        glCompileShader(shader);
 
-	int status=0; glGetShaderiv(shader,GL_COMPILE_STATUS,&status);
-	int length=0; glGetShaderiv(shader,GL_INFO_LOG_LENGTH,&length);
-	if(!status || length>1) {
-	    ::buffer<byte> buffer(length);
-	    glGetShaderInfoLog(shader, length, 0, buffer.begin());
-	    error(this->source.last(), buffer.slice(0,buffer.size-1));
-	}
-	glAttachShader(id, shader);
+        int status=0; glGetShaderiv(shader,GL_COMPILE_STATUS,&status);
+        int length=0; glGetShaderiv(shader,GL_INFO_LOG_LENGTH,&length);
+        if(!status || length>1) {
+            ::buffer<byte> buffer(length);
+            glGetShaderInfoLog(shader, length, 0, buffer.begin());
+            error(this->source.last(), buffer.slice(0,buffer.size-1));
+        }
+        glAttachShader(id, shader);
     }
     for(string tags: stages) for(string& tag: split(tags," ")) if(!knownTags.contains(tag)) error("Unknown tag",tag, tags, stages);
     glLinkProgram(id);
@@ -99,17 +102,20 @@ GLShader::GLShader(string source, ref<string> stages) {
     int status=0; glGetProgramiv(id, GL_LINK_STATUS, &status);
     int length=0; glGetProgramiv(id , GL_INFO_LOG_LENGTH , &length);
     if(!status || length>1) {
-	::buffer<byte> buffer(length);
-	glGetProgramInfoLog(id, length, 0, buffer.begin());
-	error(this->source, stages, "Program failed\n", buffer.slice(0,buffer.size-1));
+        ::buffer<byte> buffer(length);
+        glGetProgramInfoLog(id, length, 0, buffer.begin());
+        error(this->source, stages, "Program failed\n", buffer.slice(0,buffer.size-1));
     }
 }
 void GLShader::bind() { glUseProgram(id); }
+void GLShader::bindFragments(ref<string> fragments) {
+    for(uint i: range(fragments.size)) glBindFragDataLocation(id, i, strz(fragments[i]));
+}
 uint GLShader::attribLocation(string name) {
     int location = attribLocations.value(name, -1);
     if(location<0) {
-	location=glGetAttribLocation(id, strz(name));
-	if(location>=0) attribLocations.insert(copyRef(name), location);
+        location=glGetAttribLocation(id, strz(name));
+        if(location>=0) attribLocations.insert(copyRef(name), location);
     }
     if(location<0) error("Unknown attribute '"_+str(name)+"'"_);
     return (uint)location;
@@ -117,9 +123,9 @@ uint GLShader::attribLocation(string name) {
 GLUniform GLShader::operator[](string name) {
     int location = uniformLocations.value(name, -1);
     if(location<0) {
-	location = glGetUniformLocation(id, strz(name));
-	if(location<0) error("Unknown uniform"_,name);
-	uniformLocations.insert(copyRef(name), location);
+        location = glGetUniformLocation(id, strz(name));
+        if(location<0) error("Unknown uniform"_,name);
+        uniformLocations.insert(copyRef(name), location);
     }
     return GLUniform(id, location);
 }
@@ -154,22 +160,27 @@ void GLVertexArray::bindAttribute(int index, int elementSize, AttributeType type
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
-/*void GLVertexArray::draw(PrimitiveType primitiveType, uint vertexCount) const {
-	bind();
+void GLVertexArray::draw(PrimitiveType primitiveType, uint vertexCount) const {
+    bind();
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glDrawArrays(primitiveType, 0, vertexCount);
-}*/
+}
 
-#include "time.h"
 void GLIndexBuffer::draw(size_t start, size_t end) {
+    glCheck();
     assert_(end > start || start==0 && end==0);
-    glEnable(GL_PRIMITIVE_RESTART_FIXED_INDEX);
+    //glEnable(GL_PRIMITIVE_RESTART_FIXED_INDEX);
+    glEnable(GL_PRIMITIVE_RESTART);
+    glPrimitiveRestartIndex((1u<<(elementSize*8))-1);
+    glCheck();
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
+    glCheck();
     GLenum type = 0;
     if(elementSize==2) type = GL_UNSIGNED_SHORT;
     if(elementSize==4) type = GL_UNSIGNED_INT;
     assert_(type);
     glDrawElements(primitiveType, (end-start)?: elementCount, type, (void*)(start*elementSize));
+    glCheck(int(primitiveType), start, end, elementCount, type, elementSize, (1u<<(elementSize*8))-1);
 }
 
 /// Texture
@@ -178,44 +189,45 @@ GLTexture::GLTexture(uint width, uint height, uint format, const void* data) : w
     glGenTextures(1, &id);
     glBindTexture(target, id);
     if(format&Multisample) {
-	int colorSamples=0; glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES, &colorSamples);
-	int depthSamples=0; glGetIntegerv(GL_MAX_DEPTH_TEXTURE_SAMPLES, &depthSamples);
-	assert(colorSamples==depthSamples);
-	if(format&Depth) glTexImage2DMultisample(target, depthSamples, GL_DEPTH_COMPONENT32, width, height, false);
-	else glTexImage2DMultisample(target, colorSamples, GL_RGB8, width, height, false);
+        int colorSamples=0; glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES, &colorSamples);
+        int depthSamples=0; glGetIntegerv(GL_MAX_DEPTH_TEXTURE_SAMPLES, &depthSamples);
+        assert(colorSamples==depthSamples);
+        if(format&Depth) glTexImage2DMultisample(target, depthSamples, GL_DEPTH_COMPONENT32, width, height, false);
+        else glTexImage2DMultisample(target, colorSamples, GL_RGB8, width, height, false);
     }
     else if(format&Cube) {
-	assert_(width == height/6);
-	for(size_t index: range(6))
-	    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+index, 0, format&SRGB?GL_SRGB8:GL_RGB8, width, height/6, 0, GL_BGRA, GL_UNSIGNED_BYTE, ((byte4*)data)+index*height/6*width);
-	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+        assert_(width == height/6);
+        for(size_t index: range(6))
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+index, 0, format&SRGB?GL_SRGB8:GL_RGB8, width, height/6, 0, GL_BGRA, GL_UNSIGNED_BYTE, ((byte4*)data)+index*height/6*width);
+        glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
     }
     else if((format&0b11) == Short)
-	glTexImage2D(target, 0, GL_R16I, width, height, 0, GL_R16I, GL_SHORT, data);
+        glTexImage2D(target, 0, GL_R16I, width, height, 0, GL_R16I, GL_SHORT, data);
     else if((format&0b11) == Depth)
-	glTexImage2D(target, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, data);
-    else if((format&0b11) == RGBA8)
-	glTexImage2D(target, 0, format&SRGB?GL_SRGB8_ALPHA8:GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
-    else {
-	assert_((format&0b11) == RGB8);
-	glTexImage2D(target, 0, format&SRGB?GL_SRGB8:GL_RGB8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
+        glTexImage2D(target, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, data);
+    else if((format&0b11) == RGBA8) {
+        //error("");
+        glTexImage2D(target, 0, format&SRGB?GL_SRGB8_ALPHA8:GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
+    } else {
+        assert_((format&0b11) == RGB8);
+        glTexImage2D(target, 0, format&SRGB?GL_SRGB8:GL_RGB8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
     }
     if(format&Shadow) {
-	glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
+        glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
     }
     if(format&Bilinear) {
-	glTexParameteri(target, GL_TEXTURE_MIN_FILTER, format&Mipmap?GL_LINEAR_MIPMAP_LINEAR:GL_LINEAR);
-	glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(target, GL_TEXTURE_MIN_FILTER, format&Mipmap?GL_LINEAR_MIPMAP_LINEAR:GL_LINEAR);
+        glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     } else {
-	glTexParameteri(target, GL_TEXTURE_MIN_FILTER, format&Mipmap?GL_NEAREST_MIPMAP_NEAREST:GL_NEAREST);
-	glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(target, GL_TEXTURE_MIN_FILTER, format&Mipmap?GL_NEAREST_MIPMAP_NEAREST:GL_NEAREST);
+        glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     }
     if(format&Anisotropic) {
-	glTexParameterf(target, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.0);
+        glTexParameterf(target, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.0);
     }
     if(format&Clamp) {
-	glTexParameterf(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameterf(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameterf(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameterf(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     }
     if(format&Mipmap) glGenerateMipmap(target);
 }
@@ -224,8 +236,8 @@ GLTexture::GLTexture(const Image& image, uint format)
     assert(width==image.stride);
 }
 /*GLTexture::GLTexture(const Image16& image, uint format)
-	: GLTexture(image.width, image.height, Short|format, image.data) {
-	assert(width==image.stride);
+    : GLTexture(image.width, image.height, Short|format, image.data) {
+    assert(width==image.stride);
 }*/
 GLTexture::GLTexture(const GLBuffer& buffer, int2 size, uint format) : size(size), format(format), target(GL_TEXTURE_BUFFER) {
     glGenTextures(1, &id);
@@ -290,9 +302,9 @@ void GLFrameBuffer::bind(uint clearFlags, vec4 color) {
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER,id);
     glViewport(0,0,width,height);
     if(clearFlags) {
-	if(clearFlags&ClearColor) glClearColor(color.x,color.y,color.z,color.w);
-	assert((clearFlags&(~(ClearDepth|ClearColor)))==0, clearFlags);
-	glClear(clearFlags);
+        if(clearFlags&ClearColor) glClearColor(color.x,color.y,color.z,color.w);
+        assert((clearFlags&(~(ClearDepth|ClearColor)))==0, clearFlags);
+        glClear(clearFlags);
     }
 }
 void GLFrameBuffer::bindWindow(int2 position, int2 size, uint clearFlags, vec4 color) {
@@ -325,4 +337,26 @@ void GLFrameBuffer::blitWindow(const GLTexture& source, int2 offset) {
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glBlitFramebuffer(0,0, source.size.x,source.size.y, offset.x, offset.y, offset.x+source.size.x, offset.y+source.size.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     glDeleteFramebuffers(1, &framebuffer);
+}
+
+void glDrawRectangle(GLShader& shader, vec2 min, vec2 max, bool texCoord) {
+    shader.bind();
+    glCheck();
+    static GLVertexArray vertexArray;
+    glCheck();
+    int positionIndex = shader.attribLocation("position"_);
+    assert_(positionIndex>=0);
+    GLBuffer positions {ref<vec2>{vec2(min.x,min.y), vec2(max.x,min.y), vec2(min.x,max.y), vec2(max.x,max.y)}};
+    vertexArray.bindAttribute(positionIndex, 2, Float, positions);
+    int texCoordsIndex;
+    GLBuffer texCoordsBuffer;
+    if(texCoord) {
+        texCoordsIndex = shader.attribLocation("texCoords"_);
+        assert_(texCoordsIndex>=0);
+        texCoordsBuffer = GLBuffer(ref<vec2>{vec2(0,1), vec2(1,1), vec2(0,0), vec2(1,0)}); //flip Y
+        vertexArray.bindAttribute(texCoordsIndex, 2, Float, texCoordsBuffer);
+    }
+    vertexArray.draw(TriangleStrip, 4);
+    /*glDisableVertexAttribArray(positionIndex);
+    if(texCoord) glDisableVertexAttribArray(texCoordsIndex);*/
 }

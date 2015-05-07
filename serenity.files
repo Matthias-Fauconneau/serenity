@@ -49,6 +49,8 @@ ui/edit.h
 ui/edit.cc
 ui/widget.h
 ui/interface.cc
+ui/gl.h
+ui/gl.cc
 
 layout/layout.h
 layout/parse.cc
@@ -60,3 +62,4 @@ algebra.cc
 
 document.cc
 DEM.cc
+shader

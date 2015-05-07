@@ -18,6 +18,11 @@ struct Window : Poll {
 	/// Current cursor
 	MouseCursor cursor = MouseCursor::Arrow;
 
+    // GLX/Xlib/DRI2
+    struct __GLXFBConfigRec* fbConfig = 0;
+    struct _XDisplay* glDisplay = 0;
+    struct __GLXcontextRec* glContext = 0;
+
 	/// Updates to be rendered
     struct Update {
         shared<Graphics> graphics;
@@ -124,6 +129,9 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
 	// Display
     void event() override;
 	void setCursor(MouseCursor cursor) override;
+
+    /// Makes a new shared GL context current
+    void initializeThreadGLContext();
 
 	// Control
 	/// Registers global action on \a key

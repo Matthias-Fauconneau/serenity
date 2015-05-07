@@ -2,7 +2,32 @@
 #include "ui/render.h"
 #include "x.h"
 #include "time.h"
+#include "gl.h"
+
 #include <sys/shm.h>
+
+// GLX/Xlib/DRI2
+#undef packed
+#define Time XTime
+#define Cursor XCursor
+#define Depth XXDepth
+#define Window XXWindow
+#define Screen XScreen
+#define XEvent XXEvent
+#define Display XXDisplay
+#define Font XFont
+#include <GL/glx.h> //X11
+#include <GL/glx.h> //GL
+#undef Time
+#undef Cursor
+#undef Depth
+#undef Window
+#undef Screen
+#undef XEvent
+#undef Display
+#undef Font
+#undef None
+
 ICON(text);
 Image cursorIcon();
 using namespace X11;
@@ -55,6 +80,12 @@ XWindow::XWindow(Widget* widget, Thread& thread,  int2 sizeHint) : ::Window(widg
     if(Present::EXT) send(({Present::SelectInput r; r.window=id+Window, r.eid=id+PresentEvent, r;}));
 	Window::actions[Escape] = []{requestTermination();};
     {CreateGC r; send(({r.context=id+GraphicContext, r.window=id+Window, r;}));}
+
+    glDisplay = XOpenDisplay(strz(environmentVariable("DISPLAY"_,":0"_))); assert_(glDisplay);
+    const int fbAttribs[] = {GLX_DOUBLEBUFFER, 1, GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_ALPHA_SIZE, 0,  GLX_DEPTH_SIZE, 24,
+                             GLX_SAMPLE_BUFFERS, 1, GLX_SAMPLES, 8, 0};
+    int fbCount=0; fbConfig = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount)[0]; assert(fbConfig && fbCount);
+    initializeThreadGLContext();
 
     if(XRender::EXT) {  uint16 sequence = send(XRender::QueryPictFormats());
 		buffer<int> fds;
@@ -195,6 +226,8 @@ void XWindow::setIcon(const Image& /*icon*/) {
 }
 void XWindow::setSize(int2 /*size*/) { /*send(SetSize{.id=id+Window, .w=uint(size.x), .h=uint(size.y)});*/ }
 
+//FILE(shader)
+
 void XWindow::event() {
 	XDisplay::event();
 	//if(heldEvent) { processEvent(heldEvent); heldEvent = nullptr; }
@@ -214,20 +247,36 @@ void XWindow::event() {
 
 		uint stride = align(16, Window::size.x);
 		shm = check( shmget(0, Window::size.y*stride*sizeof(byte4) , IPC_CREAT | 0777) );
-		target = Image(buffer<byte4>((byte4*)check(shmat(shm, 0, 0)), Window::size.y*stride, 0), Window::size, stride);
+        target = Image(buffer<byte4>((byte4*)check(shmat(shm, 0, 0)), Window::size.y*stride, 0), Window::size, stride, true);
 		target.clear(byte4(0xFF));
         {Shm::Attach r; send(({r.seg=id+Segment, r.shm=shm, r;}));}
         {CreatePixmap r; send(({r.pixmap=id+Pixmap, r.window=id+Window, r.w=uint16(Window::size.x), r.h=uint16(Window::size.y), r;}));}
 	}
 
+    GLFrameBuffer::bindWindow(0, Window::size, ClearColor|ClearDepth, vec4(backgroundColor,1));
 	Update update = render(target);
 	if(update) {
-        {Shm::PutImage r; send(({r.window=id+(Present::EXT?Pixmap:Window), r.context=id+GraphicContext, r.seg=id+Segment,
+        /*static GLShader shader {::shader(), {"blit"}};
+        shader.bindFragments({"color"});
+        GLTexture texture {target};
+        shader["image"]=0; texture.bind(0);
+        glDrawRectangle(shader, vec2(-1,-1), vec2(1,1), true);*/
+        glXSwapBuffers(glDisplay, id+Window);
+        //glFlush();
+        /*{Shm::PutImage r; send(({r.window=id+(Present::EXT?Pixmap:Window), r.context=id+GraphicContext, r.seg=id+Segment,
                            r.totalW=uint16(target.stride), r.totalH=uint16(target.height), r.srcX=uint16(update.origin.x), r.srcY=uint16(update.origin.y),
                            r.srcW=uint16(update.size.x), r.srcH=uint16(update.size.y), r.dstX=uint16(update.origin.x), r.dstY=uint16(update.origin.y), r;}));}
         state = Copy;
-        if(Present::EXT) send(({Present::Pixmap r; r.window=id+Window, r.pixmap=id+Pixmap, r;})); //FIXME: update region
+        if(Present::EXT) send(({Present::Pixmap r; r.window=id+Window, r.pixmap=id+Pixmap, r;})); //FIXME: update region*/
 	}
+}
+
+void XWindow::initializeThreadGLContext() {
+    static Lock staticLock; Locker lock(staticLock);
+    const int contextAttribs[] = { GLX_CONTEXT_MAJOR_VERSION_ARB, 4, GLX_CONTEXT_MINOR_VERSION_ARB, 3, 0};
+    glContext = ((PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB"))
+            (glDisplay, fbConfig, glContext, 1, contextAttribs);
+    glXMakeCurrent(glDisplay, id+Window, glContext);
 }
 
 void XWindow::setCursor(MouseCursor /*cursor*/) {

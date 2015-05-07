@@ -7,6 +7,8 @@
 #include "png.h"
 #include "time.h"
 #include "parallel.h"
+#include "gl.h"
+FILE(shader)
 
 // -> vector.h
 template<template<Type> /*Type*/class V, Type T, uint N> inline /*constexpr*/ float length(const vec<V,T,N>& a) { return sqrt(dot(a,a)); }
@@ -105,11 +107,9 @@ struct Contact {
 bool operator==(const Contact& a, const Contact& b) { return a.index == b.index; }
 
 struct DEM : Widget, Poll {   
-    const int skip = 128; //8 16
-    //const float dt = 1./(60*2);
     const float dt = 1./(60*8); // 4
 
-    const float floorHeight = 1;
+    const float floorHeight = -1;
 
     struct Particle {
         float radius;
@@ -166,11 +166,11 @@ struct DEM : Widget, Poll {
             if(1) { // Generate falling particle (pouring)
                 bool generate = true;
                 for(auto& p: particles.slice(1)) {
-                    if(p.position.z - p.radius < -1) generate = false;
+                    if(p.position.z + p.radius > 1) generate = false;
                 }
                 if(generate && particles.size<128) {
                     for(;;) {
-                        vec3 p(random()*2-1,random()*2-1,-1);
+                        vec3 p(random()*2-1,random()*2-1, 1);
                         //vec3 p = 0;
                         if(length(p.xy())>1) continue;
                         particles.append(vec3((1-particleRadius)*p.xy(), p.z), particleRadius);
@@ -182,7 +182,7 @@ struct DEM : Widget, Poll {
                 const float spoolerRate = 1./8;
                 const float spoolerSpeed = 1./16 * exp(-time/256);
                 float spoolerAngle = 2*PI*spoolerRate*time;
-                float spoolerHeight = floorHeight-wireRadius-spoolerSpeed*time;
+                float spoolerHeight = floorHeight + wireRadius + spoolerSpeed*time;
                 vec3 spoolerPosition (cos(spoolerAngle), sin(spoolerAngle), spoolerHeight);
                 vec3 r = spoolerPosition-nodes.last().position;
                 float l = length(r);
@@ -191,11 +191,12 @@ struct DEM : Widget, Poll {
                 //if(nodes.last().position.z > spoolerPosition.z + 2*internodeLength) {
                 //if(timeStepCount%(16*60) == 0 && l) {
                     //log(nodes.last().position.z, spoolerPosition.z, 2*internodeLength);
-                    vec3 u = nodes.last().position-nodes[nodes.size-2].position;
+                    //vec3 u = nodes.last().position-nodes[nodes.size-2].position;
                     //vec3 a(1/.128,1/.128,0);
                     //vec3 a(0,0,1./2);
-                    vec3 a(0,0,0);
-                    nodes.append(nodes.last().position + internodeLength*(a*u/length(u) + (vec3(1,1,1)-a)*r/l));
+                    //vec3 a(0,0,0);
+                    //nodes.append(nodes.last().position + internodeLength*(a*u/length(u) + (vec3(1,1,1)-a)*r/l));
+                    nodes.append(nodes.last().position + internodeLength/l*r);
                 }
             }
         }
@@ -213,7 +214,7 @@ struct DEM : Widget, Poll {
                 }
             }*/
             { // Gravity
-                const vec3 g (0, 0, 1);
+                const vec3 g (0, 0, -1);
                 vec3 force = nodeMass * g;
                 /*if(1) { // Implicit
                     for(int c: range(3)) {
@@ -236,7 +237,7 @@ struct DEM : Widget, Poll {
             vec3 force = 0;
             vec3 torque = 0; // Global
             // Gravity
-            const vec3 g (0, 0, 1);
+            const vec3 g (0, 0, -1);
             force += a.mass * g;
             // Sphere - Sphere
             for(size_t bIndex: range(particles.size)) { // Floor is particle #0
@@ -473,7 +474,7 @@ struct DEM : Widget, Poll {
             // Anchors both ends (implicit)
             for(int c: range(3)) dv[0             *3+c] = 0;
             for(int c: range(3)) dv[(nodes.size-1)*3+c] = 0;
-            for(int i: range(nodes.size)) {
+            for(int i: range(nodes.size)) {shared<Graphics>
                 for(int c: range(3)) {
                     assert(isNumber(dv[i*3+c]),"\n"_+str(M),"\n",b,"\n",dv);
                     Node& n = nodes[i];
@@ -486,22 +487,23 @@ struct DEM : Widget, Poll {
         solveTime.stop();
         time += dt;
         timeStep++;
-        if(timeStep%skip == 0) window->render();
-        if(timeStep%(32*64)==0) log("render",str(renderTime, totalTime),"solve",str(solveTime, totalTime),
+        window->render();
+        if(timeStep%(32*64)==0) log("solve",str(solveTime, totalTime),
                                     "sphere",str(sphereTime, solveTime), "cylinder",str(cylinderTime, solveTime));
         queue();
     }
 
-    const float scale = 256;
+    const float scale = 1./2; //256;
     unique<Window> window = ::window(this, 1024);
-    DEM() {
+    Thread solverThread;
+    DEM() : Poll(0, POLLIN, solverThread) {
         window->actions[Space] = [this]{
             writeFile(str(time), encodePNG(render(1024, graphics(1024))), home());
         };
         float floorRadius = 4096;
-        particles.append(vec3(0,0,floorHeight+floorRadius), floorRadius);
+        particles.append(vec3(0,0,-floorRadius+floorHeight), floorRadius);
         if(1) {
-            nodes.append(vec3(1,0,floorHeight-wireRadius));
+            nodes.append(vec3(1,0,floorHeight+wireRadius));
         } else if(0) { // Hanging wire
             const int N = 32;
             internodeLength = 3./N;
@@ -511,112 +513,93 @@ struct DEM : Widget, Poll {
             }
         }
         step();
+        solverThread.spawn();
     }
     vec2 sizeHint(vec2) { return 1024; }
-    shared<Graphics> graphics(vec2 size) {
+    shared<Graphics> graphics(vec2) {
         renderTime.start();
-        Image target = Image( int2(size) );
-        target.clear(0xFF);
-        ImageF zBuffer = ImageF(int2(size));
-        zBuffer.clear(-inf);
 
         // Computes view projection transform
         mat4 projection = mat4()
-                .translate(vec3(size/2.f,0))
-                .scale(scale);
+                //.translate(vec3(size/2.f,0))
+                .scale(vec3(scale, scale, -scale/4));
                 //.perspective(PI/4, size, 1, 2*horizonDistance + length(position));
+                ;
         mat4 view = mat4()
                 .rotateX(rotation.y) // Pitch
                 .rotateZ(rotation.x) // Yaw
                 ;//.translate(-position); // Position
         mat4 viewProjection = projection*view;
 
-        line(target, (viewProjection*vec3(-1, 0, floorHeight)).xy(),
-             (viewProjection*vec3(1, 0, floorHeight)).xy());
-        line(target, (viewProjection*vec3(0, -1, floorHeight)).xy(),
-             (viewProjection*vec3(0, 1, floorHeight)).xy());
-
-        /*sort<Particle>([&viewProjection](const Particle& a, const Particle& b) -> bool {
-            return (viewProjection*a.position).z < (viewProjection*b.position).z;
-        }, particles);*/
-
-        for(const auto& p: particles.slice(1)) {
-            vec3 O = viewProjection*p.position;
-            vec2 min = O.xy() - vec2(scale*p.radius); // Isometric
-            vec2 max = O.xy() + vec2(scale*p.radius); // Isometric
-            for(int y: range(::max(0.f, min.y), ::min(max.y, size.y))) {
-                for(int x: range(::max(0.f, min.x+1), ::min(max.x+1, size.x))) {
-                    vec2 R = vec2(x,y) - O.xy();
-                    if(length(R)<scale*p.radius) {
-                        vec2 r = R / (scale*p.radius);
-                        vec3 N (r, 1-length(r)); // ?
-                        float z = O.z;// + N.z;
-                        if(z < zBuffer(x,y)) continue;
-                        zBuffer(x,y) = z;
-                        float I = /*::max(0.f,*/ dot(N, vec3(0,0,1));//);
-                        if(I>=1) continue;
-                        assert_(I<1);
-                        extern uint8 sRGB_forward[0x1000];
-                        target(x,y) = byte4(byte3(sRGB_forward[int(0xFFF*I)]),0xFF);
-                        //assert_(N.x >= 0 && N.x < 1 && N.y >= 0 && N.y < 1 && N.z >= 0 && N.z < 1, N);
-                        /*target(x,y) = byte4( // TODO: local coordinates
-                                sRGB_forward[int(0xFFF*N.x)],
-                                sRGB_forward[int(0xFFF*N.y)],
-                                sRGB_forward[int(0xFFF*N.z)], 0xFF);*/
-                    }
-                }
+        glDepthTest(true);
+        {
+            //buffer<vec2> positions {(particles.size-1)*4};
+            //buffer<uint16> indices {(particles.size-1)*5};
+            buffer<vec3> positions {(particles.size-1)*6};
+            for(size_t i: range(particles.size-1)) {
+                const auto& p = particles[1+i];
+                // FIXME: GPU quad projection
+                vec3 O = viewProjection*p.position;
+                vec3 min = O - vec3(vec2(scale*p.radius), 0); // Isometric
+                vec3 max = O + vec3(vec2(scale*p.radius), 0); // Isometric
+                positions[i*6+0] = min;
+                positions[i*6+1] = vec3(max.x, min.y, O.z);
+                positions[i*6+2] = vec3(min.x, max.y, O.z);
+                positions[i*6+3] = vec3(min.x, max.y, O.z);
+                positions[i*6+4] = vec3(max.x, min.y, O.z);
+                positions[i*6+5] = max;
+#if 0
+                positions[i*4+0] = min;
+                positions[i*4+1] = vec2(max.x, min.y);
+                positions[i*4+2] = vec2(min.x, max.y);
+                positions[i*4+3] = max;
+                indices[i*5+0] = i*4+0;
+                indices[i*5+1] = i*4+1;
+                indices[i*5+2] = i*4+2;
+                indices[i*5+3] = i*4+3;
+                indices[i*5+4] = 0xFFFF;
+#endif
             }
+
+            static GLShader shader {::shader(), {"sphere"}};
+            shader.bind();
+            shader.bindFragments({"color"});
+            static GLVertexArray vertexArray;
+            GLBuffer positionBuffer (positions);
+            vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
+            //GLIndexBuffer(indices).draw();
+            vertexArray.draw(Triangles, positions.size);
         }
 
-        for(int i: range(nodes.size-1)) {
-            vec3 a = nodes[i].position, b = nodes[i+1].position;
-            vec3 A = viewProjection*a, B = viewProjection*b;
-            vec2 r = B.xy()-A.xy();
-            float l = length(r);
-            vec2 t = r/l;
-            vec2 n (t.y, -t.x);
-            float width = scale*wireRadius;
-            vec2 P[4] {A.xy()-width*n, A.xy()+width*n, B.xy()-width*n, B.xy()+width*n};
-            vec2 min = ::min(P), max = ::max(P);
-            for(int y: range(::max(0.f, min.y), ::min(max.y, size.y))) {
-                for(int x: range(::max(0.f, min.x+1), ::min(max.x+1, size.x))) {
-                    vec2 p = vec2(x,y) - A.xy();
-                    if(dot(p,t) < 0 || dot(p,t) > l) continue;
-                    if(dot(p,n) < -width || dot(p,n) > width) continue;
-                    float z = A.z + dot(p,t)/l*(B.z-A.z);
-                    float dz = 1-sq(dot(p,n)/width); // ?
-                    z += width*dz;
-                    if(z < zBuffer(x,y)) continue;
-                    zBuffer(x,y) = z;
-                    float I = dz;
-                    assert_(I>=0 && I<=1, I, a, b);
-                    extern uint8 sRGB_forward[0x1000];
-                    target(x,y) = byte4(byte3(sRGB_forward[int(0xFFF*I)]),0xFF);
-                }
+        if(nodes.size > 1) {
+            buffer<vec3> positions {(nodes.size-1)*6};
+            for(int i: range(nodes.size-1)) {
+                vec3 a = nodes[i].position, b = nodes[i+1].position;
+                // FIXME: GPU quad projection
+                vec3 A = viewProjection*a, B = viewProjection*b;
+                vec2 r = B.xy()-A.xy();
+                float l = length(r);
+                vec2 t = r/l;
+                vec3 n (t.y, -t.x, 0);
+                float width = scale*wireRadius;
+                vec3 P[4] {A-width*n, A+width*n, B-width*n, B+width*n};
+                positions[i*6+0] = P[0];
+                positions[i*6+1] = P[1];
+                positions[i*6+2] = P[2];
+                positions[i*6+3] = P[2];
+                positions[i*6+4] = P[1];
+                positions[i*6+5] = P[3];
             }
-            if(0) {const auto& a = nodes[i];
-                for(const auto& c: a.contacts) {
-                    vec2 A = (viewProjection*(a.position+wireRadius*c.n)).xy();
-                    vec2 B = (viewProjection*c.position).xy();
-                    line(target, A, B, red);
-                    if(length(B-A)) line(target, A, A+16.f*vec2((B-A).y,(B-A).x)/length(B-A), red);
-                }
-            }
+            static GLShader shader {::shader(), {"cylinder"}};
+            shader.bind();
+            shader.bindFragments({"color"});
+            static GLVertexArray vertexArray;
+            GLBuffer positionBuffer (positions);
+            vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
+            vertexArray.draw(Triangles, positions.size);
         }
-
-        if(0) for(const auto& a : particles) {
-            for(const auto& c: a.contacts) {
-                vec2 A = (viewProjection*(a.position+a.radius*c.n)).xy();
-                vec2 B = (viewProjection*c.position).xy();
-                line(target, A, B, red);
-                if(length(B-A)) line(target, A, A+16.f*vec2((B-A).y,(B-A).x)/length(B-A), red);
-            }
-        }
-
-        shared<Graphics> graphics;
-        graphics->blits.append(vec2(0),vec2(target.size),move(target));
         renderTime.stop();
-        return graphics;
+        return shared<Graphics>();
     }
 
     // View
