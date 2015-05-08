@@ -148,16 +148,16 @@ struct DEM : Widget, Poll {
     const vec3 g {0, 0, -1};
 
     const float floorHeight = -1;
-    static constexpr float spheroRadius = 1./16;
+    static constexpr float spheroRadius = 1./8;
     static constexpr float particleRadius = 1./4;
 
-    static constexpr float particleYoung = 200;
+    static constexpr float particleYoung = 256;
     static constexpr float particleNormalDamping = 16, particleTangentialDamping = 1;
     const float particleFriction = 1;
 
     const float wireMass = 1./320;
     const float wireRadius = 1./16;
-    static constexpr float wireYoung = 100;
+    static constexpr float wireYoung = 128;
     static constexpr float wireNormalDamping = 16;
     const float wireFriction = 8;
     //const float wireTangentialDamping = 0/*16*/;
@@ -227,32 +227,39 @@ struct DEM : Widget, Poll {
             for(size_t bIndex: range(particles.size)) {
                 if(aIndex == bIndex) continue;
                 const auto& b = particles[bIndex];
-                for(size_t bPlaneIndex: range(b.planes.size)) {
-                    vec3 bPl = b.planes[bPlaneIndex];
-                    vec3 bP = (b.rotation * quat{0, bPl} * b.rotation.conjugate()).v;
-                    float l = length(bP);
-                    vec3 n = bP/l;
-                    for(size_t aVertexIndex: range(a.vertices.size)) {
-                        vec3 aPl = a.vertices[aVertexIndex];
-                        vec3 aPg = (a.rotation * quat{0, aPl} * a.rotation.conjugate()).v;
-                        vec3 aP = a.position + aPg;
-                        vec3 aPr = aP - b.position;
+                for(size_t aVertexIndex: range(a.vertices.size)) {
+                    vec3 aPl = a.vertices[aVertexIndex];
+                    vec3 aPg = (a.rotation * quat{0, aPl} * a.rotation.conjugate()).v;
+                    vec3 aP = a.position + aPg;
+                    vec3 aPr = aP - b.position;
+                    int closestPlaneIndex; vec3 closestPlane; float minDepth = inf;
+                    for(size_t bPlaneIndex: range(b.planes.size)) {
+                        vec3 bPl = b.planes[bPlaneIndex];
+                        vec3 bP = (b.rotation * quat{0, bPl} * b.rotation.conjugate()).v;
+                        float l = length(bP);
+                        vec3 n = bP/l;
                         float d = dot(n, aPr);
-                        if(l-spheroRadius < d && d < l) { // Vertex - Plane contact
-                            float E = particleYoung/2;
-                            vec3 v = (a.velocity + cross(a.angularVelocity, aP)) - (b.velocity + cross(b.angularVelocity, bP));
-                            float fN = - 4/3 * E * sqrt(spheroRadius*d*d*d);
-                            vec3 force = (fN - particleNormalDamping * dot(n, v)) * n;
-                            a.force += force;
-                            a.torque += cross(aPg, force);
-                            {auto& b = particles[bIndex]; b.lock.lock(); //FIXME: float atomics ?
-                                b.force -= force;
-                                b.torque -= cross(aP-b.position, force);
-                                b.lock.unlock();}
-                            {Contact& c = a.contacts.add(Contact{int(bIndex), aP, 0,0,0,0,0});
-                                c.lastUpdate = timeStep; c.n = n; c.fN = fN; c.v = v; c.currentPosition = aP; }
+                        if(d < l)  { // Vertex - Plane contact
+                            if(l-d < minDepth) { minDepth = l-d; closestPlane = n; closestPlaneIndex=bPlaneIndex; }
                         }
+                        else goto continue_2;
                     }
+                    {float E = particleYoung/2;
+                        vec3 v = (a.velocity + cross(a.angularVelocity, aPg)) - (b.velocity + cross(b.angularVelocity, aP-b.position));
+                        float d = minDepth;
+                        float fN = - 4/3 * E * sqrt(spheroRadius*d*d*d);
+                        vec3 n = closestPlane;
+                        vec3 force = (fN - particleNormalDamping * dot(n, v)) * n;
+                        a.force += force;
+                        a.torque += cross(aPg, force);
+                        {auto& b = particles[bIndex]; b.lock.lock(); //FIXME: float atomics ?
+                            b.force -= force;
+                            b.torque -= cross(aP-b.position, force);
+                            b.lock.unlock();}
+                        /*{Contact& c = a.contacts.add(Contact{int(bIndex), aP, 0,0,0,0,0});
+                                c.lastUpdate = timeStep; c.n = n; c.fN = fN; c.v = v; c.currentPosition = aP; }*/
+                    }
+                    continue_2:;
                 }
             }
 
@@ -468,10 +475,6 @@ struct DEM : Widget, Poll {
             buffer<vec3> colors {(particles.size-1)*4*3, 0};
             for(size_t i: range(particles.size-1)) {
                 const auto& p = particles[1+i];
-                // FIXME: GPU quad projection
-                vec3 O = viewProjection*p.position;
-                vec3 min = O - vec3(vec2(scale*particleRadius), 0); // Isometric
-                vec3 max = O + vec3(vec2(scale*particleRadius), 0); // Isometric
                 for(int i : range(4)) for(int j : range(i+1,4)) for(int k : range(j+1,4)) { // Only valid for tetrahedron
                     positions.append(viewProjection*(p.position+p.vertices[i]));
                     colors.append(p.vertices[i]);
