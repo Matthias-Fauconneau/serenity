@@ -30,7 +30,7 @@ fragment {
         }
         cylinder {
                 in vec2 vTexCoords;
-                float dz = 1-abs(vTexCoords.x);
+                float dz = sqrt(1-abs(vTexCoords.x));
                 color = vec4(vec3(dz), 1);
                 gl_FragDepth = gl_FragCoord.z - dz/4/2/4;
         }
