@@ -14,7 +14,7 @@ FILE(shader)
 template<template<Type> /*Type*/class V, Type T, uint N> inline /*constexpr*/ float length(const vec<V,T,N>& a) { return sqrt(dot(a,a)); }
 
 struct quat {
-    float s; vec3 v;
+    float s = 1; vec3 v = 0;
     quat conjugate() const { return {s, -v}; }
 };
 quat operator*(quat p, quat q) { return {p.s*q.s - dot(p.v, q.v), p.s*q.v + q.s*p.v + cross(p.v, q.v)}; }
@@ -79,7 +79,7 @@ void closest(vec3 a1, vec3 a2, vec3 b1, vec3 b2, vec3& A, vec3& B) {
 }
 
 struct Contact { // 16 w
-    int index; // - wire, + particle (identify contact to avoid duplicates and evaluate friction)
+    int index; // - wire, + grain (identify contact to avoid duplicates and evaluate friction)
     vec3 initialPosition; // Initial contact position
     int lastUpdate; // Time step of last update (to remove stale contacts)
     // Evaluate once to use both for normal and friction
@@ -98,7 +98,7 @@ struct Contact { // 16 w
                 vec3 t = x-dot(n, x)*n;
                 //float l = length(t);
                 //vec3 u = t/l;
-                //if(l) fT -= particleTangentialDamping * dot(u, c.v) * u;
+                //if(l) fT -= grainTangentialDamping * dot(u, c.v) * u;
                 // else static equilibrium
                 return - staticFriction * abs(fN) * t;
             }
@@ -111,320 +111,313 @@ struct Contact { // 16 w
 bool operator==(const Contact& a, const Contact& b) { return a.index == b.index; }
 String str(const Contact& c) { return str(c.index); }
 
+struct Grid : buffer<uint16> {
+    static constexpr size_t cellCapacity = 8; // 1 cell / line
+    int3 size;
+    Grid(int3 size) : buffer(size.z*size.y*size.x*cellCapacity), size(size) { clear(); }
+    struct List : mref<uint16> {
+        List(mref<uint16> o) : mref(o) {}
+        void remove(uint16 index) {
+            size_t i = 0;
+            while(at(i)) { if(at(i)==index) break; i++; }
+            assert(i<cellCapacity);
+            while(i+1<cellCapacity) { at(i) = at(i+1); i++; }
+            assert(i<cellCapacity);
+            at(i) = 0;
+        }
+        void append(uint16 index) { // Sorted by decreasing index
+            size_t i = 0;
+            while(at(i) > index) { i++; assert(i<cellCapacity, (mref<uint16>)*this, index); }
+            size_t j=i;
+            while(index) { assert(j<cellCapacity, (mref<uint16>)*this, index); swap(index, at(j)); j++; }
+            if(j<cellCapacity) at(j) = 0;
+        }
+    };
+    List operator[](size_t i) { return slice(i*cellCapacity, cellCapacity); }
+    size_t index(int x, int y, int z) {
+        x = clamp(0, x, size.x-1);
+        y = clamp(0, y, size.y-1);
+        z = clamp(0, z, size.z-1);
+        return (z*size[1]+y)*size[0]+x;
+    }
+    int3 index3(vec3 p) { // [-1..1, 0..2] -> [1..size-1]
+        return int3(1,1,0) + int3(vec3(size-int3(2,2,1)) * (p+vec3(1,1,0))/2.f);
+    }
+    size_t index(vec3 p) { int3 i = index3(p); return index(i.x, i.y, i.z);}
+};
+
 struct DEM : Widget, Poll {
-    struct Node {
-        vec3 position;
-        vec3 velocity = 0;
-        vec3 force = 0; // Temporary for explicit integration
-        static constexpr size_t capacity = 16;
-        size_t contactCount = 0;
-        Contact contacts[capacity];
+    static constexpr size_t grainCapacity = 255;
+    // Index 0 is reserved
+    static constexpr size_t grain = 1;
+    size_t grainCount = 0;
+    static constexpr size_t wire = grain+grainCapacity;
+    static constexpr size_t wireCapacity = 256;
+    size_t wireCount = 0;
+    static constexpr size_t elementCapacity = wire+wireCapacity;
 
-        Node(vec3 position) : position(position) {}
-    };
+    Matrix M { elementCapacity*3 };
+    Vector b { elementCapacity*3 };
 
-    struct Particle : Node { // 12+1x16+12
-        float radius;
-        float mass;
+    // Grains + Wire
+    buffer<vec3> position { elementCapacity };
+    buffer<vec3> velocity { elementCapacity };
+    buffer<array<Contact>> contacts { elementCapacity };
+    // Grains only
+    buffer<quat> rotation { grainCapacity };
+    buffer<vec3> angularVelocity { grainCapacity };
+    buffer<vec3> torque { grainCapacity };
 
-        quat rotation {1, 0};
-        vec3 angularVelocity = 0; // Global
-        vec3 torque = 0; // Temporary for explicit integration
+    // Space partition
+    Grid grid {32};
 
-        Particle(vec3 position, float radius) : Node(position), radius(radius), mass(4./3*PI*cb(radius)) {}
-    };
+    // Parameters
+    static constexpr float dt = 1./2048; // 1e-4
 
-    array<Particle> particles;
-    array<Node> nodes;
+    static constexpr float grainRadius = 1./16; // 62 mm
+    static constexpr float grainMass = 4./3*PI*cb(grainRadius);
+    static constexpr float grainYoung = 512;
+    static constexpr float grainNormalDamping = 1, grainTangentialDamping = 1;
+    static constexpr float grainFriction = 1;
 
-    struct Grid : buffer<uint16> {
-        int3 size;
-        Grid(int3 size) : buffer(size.z*size.y*size.x*8), size(size) { clear(); }
-        struct List : mref<uint16> {
-            List(mref<uint16> o) : mref(o) {}
-            void remove(uint16 index) {
-                size_t i = 0;
-                while(at(i)) { if(at(i)==index) break; i++; }
-                assert(i<8);
-                while(i+1<8) { at(i) = at(i+1); i++; }
-                assert(i<8);
-                at(i) = 0;
-            }
-            void append(uint16 index) { // Sorted by decreasing index
-                size_t i = 0;
-                while(at(i) > index) i++;
-                assert(i < 8);
-                size_t j=i;
-                while(index) { swap(index, at(j)); j++; }
-                at(j) = 0;
-            }
-        };
-        List operator[](size_t i) { return slice(i*8, 8); }
-        size_t index(int x, int y, int z) {
-            x = clamp(0, x, size.x-1);
-            y = clamp(0, y, size.y-1);
-            z = clamp(0, z, size.z-1);
-            return (z*size[1]+y)*size[0]+x;
-        }
-        int3 index3(vec3 p) { // [-1..1, 0..2] -> [1..size-1]
-            return int3(1,1,0) + int3(vec3(size-int3(2,2,1)) * (p+vec3(1,1,0))/2.f);
-        }
-        size_t index(vec3 p) { int3 i = index3(p); return index(i.x, i.y, i.z);}
-    } particleGrid {32}, wireGrid {32};
-
-    static constexpr float dt = 1./8192; // 1e-7
-
-    const float particleRadius = 1./16; // 62 mm
-    static constexpr float particleYoung = 512;
-    static constexpr float particleNormalDamping = 1, particleTangentialDamping = 1;
-    const float particleFriction = 1;
-
-    const float wireRadius = 1./128; // 8 mm
-    static constexpr float wireYoung = 128;
-    static constexpr float wireNormalDamping = 1./2;
-    const float wireFriction = 1;
-    //const float wireTangentialDamping = 0/*16*/;
-    const float wireTensionStiffness = 1; // 16, 64, 1000
-    const float wireTensionDamping = 1; // 2, 8
-    const float wireBendStiffness = 1./512; // 2, 8, 100
-    const float wireBendDamping = -1./512; // -8, -100
-    static constexpr float internodeLength = 1./8;
+    static constexpr float wireRadius = 1./128; // 8 mm
+    static constexpr float internodeLength = 1./64; // 8, 4
     static constexpr float wireMass = 1./2048; //65536; //internodeLength * PI * wireRadius * wireRadius
+    static constexpr float wireYoung = 128;
+    static constexpr float wireNormalDamping = 1./2;//, wireTangentialDamping = 0;
+    static constexpr float wireFriction = 1;
 
-    Random random;
+    static constexpr float wireTensionStiffness = 1;
+    static constexpr float wireTensionDamping = 1;
 
+    // Time
     int timeStep = 0;
     float time = 0;
 
-    float forceLimit = 256,  velocityLimit = 128;
+    // Process
+    static constexpr float moldRadius = 1./2;
+    static constexpr float winchRadius = moldRadius-wireRadius;
+    static constexpr float pourRadius = winchRadius-wireRadius; // - grainRadius
+    static constexpr float winchRate = 1024, winchSpeed = 2;
+    float boundRadius = moldRadius;
+    float winchAngle = 0, winchHeight = wireRadius;
+    bool pour = true;
+    Random random;
 
+    // Performance
     int64 lastReport = realTime();
     Time totalTime {true}, solveTime, floorTime;
-    Time sphereTime, cylinderContactTime, cylinderFrictionTime, particleIntegrationTime, wireIntegrationTime;
+    Time grainTime, wireContactTime, wireFrictionTime, grainIntegrationTime, wireIntegrationTime;
 
-    bool pour = true;
-    float scaffoldRadius = 1./2;
-    const float winchRadius = scaffoldRadius-wireRadius;
-    const float pourRadius = winchRadius-wireRadius-particleRadius;
-    float winchAngle = 0, winchHeight = particleRadius;
-
-    void event() { step(); }
-
-    Lock particleLocks [threadCount];
-    Lock& particleLock(size_t index) { return particleLocks[(threadCount-1)*index/(particles.size-1)]; }
-    Lock wireLocks [threadCount];
-    Lock& wireLock(size_t index) { return wireLocks[(threadCount-1)*index/(nodes.size-1)]; }
-    Lock gridLocks [threadCount];
-    Lock& gridLock(size_t index) { return gridLocks[(threadCount-1)*index/(particleGrid.Ref::size-1)]; }
-
-    Contact& addContact(Node& a, Contact contact) {
-        for(Contact& c: mref<Contact>(a.contacts, a.contactCount)) if(c==contact) return c;
-        assert_(a.contactCount < a.capacity, contact.index, a.contacts);
-        Contact& c = a.contacts[a.contactCount];
-        a.contactCount++;
-        c = contact;
-        return c;
-    }
-
-    // Sphere - Sphere
-    void contactSphereSphere(size_t aIndex, size_t bIndex) {
-        auto& a = particles[aIndex];
-        auto& b = particles[bIndex];
-        vec3 r = b.position - a.position;
-        float l = length(r);
-        float d = a.radius + b.radius - l;
-        if(d <= 0) return;
-        constexpr float E = particleYoung; ///2;
-        float R = 1/(1/a.radius+1/b.radius);
-        vec3 n = r/l;
-        vec3 v = (a.velocity + cross(a.angularVelocity, a.radius*(+n))) - (b.velocity + cross(b.angularVelocity, b.radius*(-n)));
-        float fN = - 4/3*E*sqrt(R)*sqrt(d)*d;
-        vec3 fNormal = (fN -  particleNormalDamping * dot(n, v)) * n;
-        {Locker lock (particleLock(aIndex));
-            a.force += fNormal;
-            auto& c = addContact(a, Contact{int(bIndex), a.position+a.radius*n,0,0,0,0,0});
-            c.lastUpdate = timeStep; c.n = n; c.fN = fN; c.v = v; c.currentPosition=a.position+a.radius*n;
-        }
-        {Locker lock (particleLock(bIndex));
-            b.force -= fNormal; }
-    }
-    // Sphere - Cylinder
-    void contactSphereCylinder(size_t aIndex, size_t i) {
-        assert_(aIndex < particles.size, aIndex, particles.size);
-        auto& a = particles[aIndex];
-        vec3 A = nodes[i].position, B = nodes[i+1].position;
-        float l = length(B-A);
-        vec3 n = (B-A)/l;
-        float t = clamp(0.f, dot(n, a.position-A), l);
-        vec3 P = A + t*n;
-        vec3 r = a.position - P;
-        float d = a.radius + wireRadius - length(r);
-        if(d > 0) {
-            vec3 n = r/length(r);
-            float E = 1/(1/particleYoung + 1/wireYoung);
-            float R = 1/(1/a.radius+1/wireRadius);
-            float fN = E*R*sqrt(d)*d; // FIXME
-            float kN = wireNormalDamping; //1/(1/wireNormalDamping + 1/particleNormalDamping);
-            vec3 v = (a.velocity + cross(a.angularVelocity, a.radius*(+n))) - (nodes[i].velocity+nodes[i+1].velocity)/2.f/*FIXME*/;
-            vec3 fNormal = (fN - kN * dot(n, v)) * n;
-            a.force += fNormal;
-            {Locker lock (wireLock(i));
-                nodes[i].force -= fNormal /2.f;
-                /*vec3 nA = a.position+a.radius*n;
-                Contact& cA = addContact(nodes[i], Contact{-int(i), nA,0,0,0,0,0});
-                cA.lastUpdate = timeStep; cA.n = -n; cA.fN = fN; cA.v = v; cA.currentPosition = nA;*/
+    // Linear(FIXME) spring between two elements
+    void spring(float ks, float kb, float x0, float x, vec3 xn, size_t i, size_t j, vec3 v) {
+        vec3 f = - ks * (x - x0) * xn - kb * dot(xn, v) * xn;
+        mat3 o = outer(xn, xn);
+        mat3 dxf = - ks * ((1 - x0/x)*(1 - o) + o);
+        mat3 dvf = - kb * o;
+        for(int c0: range(3)) {
+            for(int c1: range(3)) {
+                float a = dt*dvf(c0, c1) + dt*dt*dxf(c0, c1);
+                M(i*3+c0, i*3+c1) -= a;
+                M(j*3+c0, j*3+c1) += a;
             }
-            {Locker lock (wireLock(i+1));
-                nodes[i+1].force -= fNormal /2.f; }
+            b[i*3+c0] += dt*(  f[c0] + dt*dxf(c0, c0)*velocity[i][c0] );
+            b[j*3+c0] -= dt*( f[c0] + dt*dxf(c0, c0)*velocity[j][c0] );
         }
     }
-    // Cylinder - Cylinder
-    void contactCylinderCylinder(int i, int j) {
-        vec3 A1 = nodes[i].position, A2 = nodes[i+1].position;
-        vec3 B1 = nodes[j].position, B2 = nodes[j+1].position;
-        vec3 A, B; closest(A1, A2, B1, B2, A, B);
-        vec3 r = B-A;
-        float d = wireRadius + wireRadius - length(r);
-        if(d > 0) {
-            vec3 n = r/length(r);
-            vec3 v = (nodes[i].velocity + nodes[i+1].velocity)/2.f - (nodes[j].velocity + nodes[j+1].velocity)/2.f;
-            float fN = wireRadius/2*wireYoung/2*d*d*sqrt(d);
-            vec3 fNormal = (fN - wireNormalDamping/2 * dot(n, v)) * n;
-            {Locker lock (wireLock(i));
-                nodes[i].force += fNormal / 2.f;
-                auto& c = addContact(nodes[i], Contact{j, A+wireRadius*n,0,0,0,0,0});
-                c.lastUpdate = timeStep; c.n = n; c.fN = fN; c.v = v; c.currentPosition = A+wireRadius*n;
+    // Linear(FIXME) spring to a fixed point
+    void spring(float ks, float kb, float x0, float x, vec3 xn, size_t i, vec3 v) {
+        vec3 f = - ks * (x - x0) * xn - kb * dot(xn, v) * xn;
+        mat3 o = outer(xn, xn);
+        mat3 dxf = - ks * ((1 - x0/x)*(1 - o) + o);
+        mat3 dvf = - kb * o;
+        for(int c0: range(3)) {
+            for(int c1: range(3)) {
+                float a = dt*dvf(c0, c1) + dt*dt*dxf(c0, c1);
+                M(i*3+c0, i*3+c1) -= a;
             }
-            {Locker lock (wireLock(i+1));
-                nodes[i+1].force += fNormal / 2.f;
-            }
-            {Locker lock (wireLock(j));
-                nodes[j].force -= fNormal / 2.f;
-            }
-            {Locker lock (wireLock(j+1));
-                nodes[j+1].force -= fNormal / 2.f;
-            }
+            b[i*3+c0] += dt*(  f[c0] + dt*dxf(c0, c0)*velocity[i][c0] );
         }
     }
 
+    // FIXME: factorize contacts
+
+    // Grain - Bound contact
+    void contactGrainBound(size_t a) {
+        {// Floor
+            float lx = position[a].z;
+            float x0 = grainRadius;
+            if(lx > x0) return;
+            vec3 nx (0,0,1);
+            vec3 v = velocity[a] + cross(angularVelocity[a], grainRadius*(+nx));
+            float E = grainYoung/2, R = grainRadius;
+            spring(4/3*E*sqrt(R), grainNormalDamping, x0, lx, nx, a, v);
+        }
+        {// Side
+            vec3 x = vec3(position[a].xy(), 0);
+            float lx = length(x);
+            float x0 = moldRadius + grainRadius;
+            if(lx <= x0) return;
+            vec3 nx = x/lx;
+            vec3 v = velocity[a] + cross(angularVelocity[a], grainRadius*(+nx));
+            float E = grainYoung/2, R = grainRadius;
+            spring(4/3*E*sqrt(R), grainNormalDamping, x0, lx, nx, a, v);
+        }
+    }
+    // Grain - Grain contact
+    void contactGrainGrain(size_t a, size_t b) {
+        log(a, b);
+        vec3 x = position[b] - position[a];
+        float lx = length(x);
+        float x0 = grainRadius + grainRadius;
+        if(lx >= x0) return;
+        vec3 nx = x/lx;
+        vec3 v = (velocity[a] + cross(angularVelocity[a], grainRadius*(+nx))) - (velocity[b] + cross(angularVelocity[b], grainRadius*(-nx)));
+        float E = grainYoung/2, R = 1/(1/grainRadius+1/grainRadius);
+        spring(4/3*E*sqrt(R), grainNormalDamping, x0, lx, nx, a, b, v);
+        /*auto& c =a.contacts.add(Contact{int(bIndex), a.position+a.radius*n,0,0,0,0,0});
+        c.lastUpdate = timeStep; c.n = n; c.fN = fN; c.v = v; c.currentPosition=a.position+a.radius*n;*/
+    }
+    // Grain - Wire vertex contact
+    void contactGrainWire(size_t a, size_t b) {
+        vec3 x = position[b] - position[a];
+        float lx = length(x);
+        float x0 = grainRadius + wireRadius;
+        if(lx >= x0) return;
+        vec3 nx = x/lx;
+        vec3 v = (velocity[a] + cross(angularVelocity[a], grainRadius*(+nx))) - velocity[b];
+        float E = 1/(1/grainYoung + 1/wireYoung), R = 1/(1/grainRadius+1/wireRadius);
+        spring(4/3*E*sqrt(R), grainNormalDamping, x0, lx, nx, a, b, v);
+        // FIXME: Contact
+    }
+
+    // Wire - Bound contact
+    void contactWireBound(size_t a) {
+        {// Floor
+            float lx = position[a].z;
+            float x0 = wireRadius;
+            if(lx > x0) return;
+            vec3 nx (0,0,1);
+            vec3 v = velocity[a];
+            float E = wireYoung/2, R = wireRadius;
+            spring(4/3*E*sqrt(R), wireNormalDamping, x0, lx, nx, a, v);
+        }
+        {//Side
+            vec3 x = vec3(position[a].xy(), 0);
+            float lx = length(x);
+            float x0 = moldRadius + wireRadius;
+            if(lx <= x0) return;
+            vec3 nx = x/lx;
+            vec3 v = velocity[a];
+            float E = wireYoung/2, R = wireRadius;
+            spring(4/3*E*sqrt(R), wireNormalDamping, x0, lx, nx, a, v);
+        }
+    }
+    // Wire - Wire vertices contact
+    void contactWireWire(size_t a, size_t b) {
+        vec3 x = position[b] - position[a];
+        float lx = length(x);
+        float x0 = wireRadius + wireRadius;
+        if(lx >= x0) return;
+        vec3 nx = x/lx;
+        vec3 v = velocity[a] - velocity[b];
+        float E = wireYoung/2, R = wireRadius/2;
+        spring(4/3*E*sqrt(R), grainNormalDamping, x0, lx, nx, a, b, v);
+        // FIXME: Contact
+    }
+
+    // Single implicit Euler time step
     void step() {
-        if(pour && (winchHeight>=2 || particles.size>=2048 || nodes.size>=1024)) { pour = false; scaffoldRadius *= 2; }
+        // Process
+        if(pour && (winchHeight>=2 || grainCount == grainCapacity || wireCount == wireCapacity)) { pour = false; boundRadius *= 2; }
         if(pour) {
-            // Generates falling particle (pour)
+            // Generates falling grain (pour)
             for(;;) {
-                vec3 p(random()*2-1,random()*2-1, winchHeight+particleRadius);
+                vec3 p(random()*2-1,random()*2-1, winchHeight+grainRadius);
                 if(length(p.xy())>1) continue;
-                vec3 position ((pourRadius-particleRadius)*p.xy(), p.z);
-                for(const Particle& p: particles) if(length(p.position - position) < 2*particleRadius) goto break2_;
-                particles.append(position, particleRadius); // FIXME: reuse invalid slots
-                particleGrid[particleGrid.index(position)].append(particles.size-1);
+                vec3 newPosition ((pourRadius-grainRadius)*p.xy(), p.z);
+                for(vec3 p: position.slice(grain, grainCount)) if(length(p - newPosition) < 2*grainRadius) goto break2_;
+                size_t i = grain+grainCount; grainCount++;
+                position[i] = newPosition;
+                velocity[i] = 0;
+                contacts.set(i);
+                grid[grid.index(position[i])].append(i);
+                rotation[i] = quat();
+                angularVelocity[i] = 0;
+                torque[i] = 0;
                 break;
             }
-             break2_:;
+            break2_:;
             // Generates wire (winch)
-            winchAngle += 512 * dt * winchRadius * internodeLength;
-            winchHeight += 2 * particleRadius * dt;
+            winchAngle += winchRate * dt * winchRadius * internodeLength;
+            winchHeight += winchSpeed * grainRadius * dt;
             vec3 winchPosition (winchRadius*cos(winchAngle), winchRadius*sin(winchAngle), winchHeight);
-            vec3 r = winchPosition-nodes.last().position;
+            size_t lastWire = wire+wireCount-1;
+            vec3 r = winchPosition-position[lastWire];
             float l = length(r);
             if(l > internodeLength*1.5) {
-                if(nodes.size-1) wireGrid[wireGrid.index(nodes.last().position)].append(nodes.size-1);
-                vec3 position = nodes.last().position + internodeLength/l*r;
-                nodes.append(position);
+                size_t i = wire+wireCount; wireCount++;
+                position[i] = position[lastWire] + internodeLength/l*r;
+                velocity[i] = 0;
+                contacts.set(i);
+                grid[grid.index(position[i])].append(i);
             }
         }
 
-        // Initialization, gravity, boundary
-        {constexpr vec3 g {0, 0, -1};
-            for(Node& a: nodes) {
-                a.force = wireMass * g;
-                { // Cylinder - Scaffold FIXME
-                    vec3 r (a.position.xy(), 0);
-                    float l = length(r);
-                    float d = l - scaffoldRadius;
-                    if(d > 0) {
-                        vec3 n = r/l;
-                        float fN = - wireYoung*sqrt(d)*d;  //FIXME
-                        a.force += fN * n;
-                        vec3 v = a.velocity;
-                        a.force -= wireNormalDamping * dot(n, v) * n;
-                        /*{auto& c = addContact(a, Contact{int(0), a.position+wireRadius*n,0,0,0,0,0});
-                            c.lastUpdate = timeStep; c.n = n; c.fN = fN; c.v = v; c.currentPosition=a.position+wireRadius*n;}*/
-                    }
-                }
+        // Initialization: gravity, bound, tension
+        M.clear();
+        constexpr vec3 g {0, 0, -1};
+        for(size_t i: range(grain, grain+grainCount)) {
+            torque[i] = 0;
+            vec3 force = grainMass * g;
+            for(int c: range(3)) {
+                M(i*3+c, i*3+c) = grainMass;
+                b[i*3+c] = dt *  force[c];
             }
-            for(size_t index: range(particles.size)) {
-                Particle& a = particles[index];
-                a.force = a.mass * g; a.torque = 0;
+            contactGrainBound(i);
+        }
+        for(size_t index: range(1, wireCount)) {
+            size_t i = wire+index;
+            vec3 force = wireMass * g;
+            for(int c: range(3)) {
+                M(i*3+c, i*3+c) = wireMass;
+                b[i*3+c] = dt *  force[c];
+            }
+            contactWireBound(i);
 
-                // Sphere - Boundary
-                vec3 r (a.position.xy(), 0);
-                float l = length(r);
-                float d = l - scaffoldRadius;
-                if(d > 0) {
-                    vec3 n = r/l;
-                    float fN = - particleYoung*sqrt(d)*d;  //FIXME
-                    a.force += fN * n;
-                    vec3 v = (a.velocity + cross(a.angularVelocity, a.radius*(+n)));
-                    a.force -= particleNormalDamping * dot(n, v) * n;
-                    /*{auto& c = addContact(a, Contact{int(0), a.position+a.radius*n,0,0,0,0,0});
-                        c.lastUpdate = timeStep; c.n = n; c.fN = fN; c.v = v; c.currentPosition=a.position+a.radius*n;}*/
-                }
-            }
+            // Wire tension
+            vec3 x = position[i] - position[i-1]; // Outward from A to B
+            float lx = length(x);
+            float x0 = internodeLength;
+            vec3 nx = x/lx;
+            vec3 v = velocity[i-1]  - velocity[i]; // Velocity of A relative to B
+            spring(wireTensionStiffness, wireTensionDamping, x0, lx, nx, i-1, i, v);
         }
 
-        solveTime.start();
-
-        // Floor
-        floorTime.start();
-        for(size_t i: range(particleGrid.size.y*particleGrid.size.x)) {
-            Grid::List list = particleGrid[i];
-            for(size_t i=0;; i++) {
-                size_t bIndex = list[i];
-                if(bIndex == 0) break;
-                contactSphereSphere(bIndex, 0);
-            }
-        }
-        for(size_t i: range(wireGrid.size.y*wireGrid.size.x)) {
-            Grid::List list = wireGrid[i];
-            for(size_t i=0;; i++) {
-                size_t bIndex = list[i];
-                if(bIndex == 0) break;
-                contactSphereCylinder(0, bIndex);
-            }
-        }
-        floorTime.stop();
-
-        // Sphere: gravity, contacts
-        sphereTime.start();
-        parallel_for(1, particles.size, [this](uint, size_t aIndex) {
-            Particle& a = particles[aIndex];
-            int3 index = particleGrid.index3(a.position);
-            // Sphere-Sphere
+        // Grain contacts
+        grainTime.start();
+        parallel_for(grain, grain+grainCount, [this](uint, size_t a) {
+            int3 index = grid.index3(a);
+            // Grain - (Grain|Wire)
             for(int dz: range(-1, 1+1)) for(int dy: range(-1, 1+1)) for(int dx: range(-1, 1+1)) {
                 if(index.z+dz < 0) continue;
-                Grid::List list = particleGrid[particleGrid.index(index.x+dx, index.y+dy, index.z+dz)];
+                Grid::List list = grid[grid.index(index.x+dx, index.y+dy, index.z+dz)];
                 for(size_t i=0;; i++) {
-                    size_t bIndex = list[i];
-                    if(bIndex <= aIndex) break;
-                    contactSphereSphere(aIndex, bIndex);
-                }
-            }
-            // Sphere-Cylinder
-            for(int dz: range(-1, 1+1)) for(int dy: range(-1, 1+1)) for(int dx: range(-1, 1+1)) {
-                if(index.z+dz < 0) continue;
-                Grid::List list = wireGrid[wireGrid.index(index.x+dx, index.y+dy, index.z+dz)];
-                for(size_t i=0;; i++) {
-                    size_t bIndex = list[i];
-                    if(bIndex == 0) break;
-                    contactSphereCylinder(aIndex, bIndex);
+                    size_t b = list[i];
+                    if(b) log(a, b);
+                    if(!(a < b)) break; // Single contact per pair, no Wire-Grain (only Grain-Wire), until 0
+                    if(b < grain+grainCount)
+                        contactGrainGrain(a, b);
+                    else
+                        contactGrainWire(a, b);
                 }
             }
         });
+        grainTime.stop();
 
-        // Contact frictions
-        parallel_for(1, particles.size, [this](uint, size_t aIndex) {
-            Particle& a = particles[aIndex];
+        /*// Contact frictions
+        parallel_for(1, grains.size, [this](uint, size_t aIndex) {
+            Grain& a = grains[aIndex];
             for(size_t i=0; i<a.contactCount;) {
                 Contact& c = a.contacts[i];
                 if(c.lastUpdate != timeStep) {
@@ -432,84 +425,46 @@ struct DEM : Widget, Poll {
                     a.contactCount--;
                     continue;
                 } else i++;
-                vec3 fT = c.friction(particleFriction);
-                {Locker lock (particleLock(aIndex));
+                vec3 fT = c.friction(grainFriction);
+                {Locker lock (grainLock(aIndex));
                     a.force += fT;
                     a.torque += cross(a.radius*c.n, fT); }
-                if(c.index > 0) { // Sphere - Sphere
+                if(c.index > 0) { // Grain - Grain
                     size_t bIndex = c.index;
-                    Particle& b = particles[bIndex];
+                    Grain& b = grains[bIndex];
                     assert_(aIndex != bIndex);
-                    Locker lock (particleLock(bIndex));
+                    Locker lock (grainLock(bIndex));
                     b.force -= fT;
                     b.torque += cross(b.radius*-c.n, -fT);
-                } else if(c.index < 0) { // Sphere - Cylinder
+                } else if(c.index < 0) { // Grain - Wire
                     size_t bIndex = size_t(-c.index);
-                    Node& b = nodes[bIndex];
+                    Node& b = wire[bIndex];
                     Locker lock (wireLock(bIndex));
                     b.force -= fT;
                 }
             }
-        });
-        sphereTime.stop();
+        });*/
 
-        // Wire tension
-        for(int i: range(1,nodes.size-1)) {
-            int a = i, b = i+1;
-            vec3 A = nodes[a].position, B = nodes[b].position;
-            float l = length(B-A);
-            vec3 n = (B-A) / l;
-            nodes[a].force += (wireTensionStiffness * (l-internodeLength) - wireTensionDamping * dot(n, nodes[a].velocity)) * n;
-            nodes[b].force += (wireTensionStiffness * (internodeLength-l) - wireTensionDamping * dot(n, nodes[b].velocity)) * n;
-        }
-
-        cylinderContactTime.start();
-        parallel_for(1, nodes.size-1, [this](uint, size_t i) {
-            {// Torsion springs (Bending resistance)
-                vec3 A = nodes[i-1].position, B = nodes[i].position, C = nodes[i+1].position;
-                vec3 a = C-B, b = B-A;
-                vec3 c = cross(a, b);
-                float l = length(c);
-                if(l) {
-                    float p = atan(l, dot(a, b));
-                    vec3 dap = cross(a, cross(a,b)) / (sq(a) * l);
-                    vec3 dbp = cross(b, cross(b,a)) / (sq(b) * l);
-                    {Locker lock(wireLock(i+1));
-                        nodes[i+1].force += wireBendStiffness * (-p*dap);}
-                    {Locker lock(wireLock(i));
-                        nodes[i].force += wireBendStiffness * (p*dap - p*dbp);}
-                    {Locker lock(wireLock(i-1));
-                        nodes[i-1].force += wireBendStiffness * (p*dbp);}
-                    {
-                        vec3 A = nodes[i-1].velocity, B = nodes[i].velocity, C = nodes[i+1].velocity;
-                        vec3 axis = cross(C-B, B-A);
-                        if(axis) {
-                            float angularVelocity = atan(length(axis), dot(C-B, B-A));
-                            {Locker lock(wireLock(i));
-                                nodes[i].force += (wireBendDamping * angularVelocity / 2.f * cross(axis/length(axis), C-A));}
-                        }
-                    }
-                }
-            }
-            // Cylinder - Cylinder
-            size_t aIndex = i;
-            int3 index = wireGrid.index3(nodes[aIndex].position);
+        // Wire - Wire contacts
+        /*wireContactTime.start();
+        parallel_for(wire, wire+wireCount, [this](uint, size_t a) {
+            int3 index = grid.index3(position[a]);
             for(int dz: range(-1, 1+1)) for(int dy: range(-1, 1+1)) for(int dx: range(-1, 1+1)) {
                 if(index.z+dz < 0) continue;
-                Grid::List list = wireGrid[wireGrid.index(index.x+dx, index.y+dy, index.z+dz)];
+                Grid::List list = grid[grid.index(index.x+dx, index.y+dy, index.z+dz)];
                 for(size_t i=0;; i++) {
-                    size_t bIndex = list[i];
-                    if(bIndex <= aIndex+1) break;
-                    contactCylinderCylinder(aIndex, bIndex);
+                    size_t b = list[i];
+                    if(!(b > a+1)) break; // No adjacent, single contact per pair, no Wire-Grain (only Wire-Wire), until 0
+                    contactWireWire(a, b);
                 }
             }
         });
-        cylinderContactTime.stop();
+        wireContactTime.stop();*/
 
-        // Contact frictions
-        cylinderFrictionTime.start();
-        parallel_for(1, nodes.size-1, [this](uint, size_t i) {
-            Node& a = nodes[i];
+        /*// Contact frictions
+        wireFrictionTime.start();
+        parallel_for(1, wire.size-1, [this](uint, size_t i) {
+            Node& a = wire[i];
             for(size_t i=0; i<a.contactCount;) {
                 Contact& c = a.contacts[i];
                 if(c.lastUpdate != timeStep) {
@@ -517,125 +472,99 @@ struct DEM : Widget, Poll {
                     a.contactCount--;
                     continue;
                 } else i++;
-                vec3 fT = c.friction(particleFriction);
+                vec3 fT = c.friction(grainFriction);
                 a.force += fT;
-                // Cylinder - Cylinder
+                // Wire - Wire
                 Locker lock (wireLock(c.index));
-                nodes[c.index].force -= fT;
-                // Cylinder - Sphere -> Sphere - Cylinder
+                wire[c.index].force -= fT;
+                // Wire - Grain -> Grain - Wire
             }
         });
-        cylinderFrictionTime.stop();
+        wireFrictionTime.stop();*/
 
-        // Particle dynamics
-        particleIntegrationTime.start();
-        bool stop = false;
-        parallel_for(1, particles.size, [this, &stop](uint, size_t i) {
-            Particle& p = particles[i];
+        // Implicit Euler
+        solveTime.start();
+        Vector dv = UMFPACK(M).solve(b);
+        solveTime.stop();
 
-            if(length(p.velocity) > velocityLimit) { log("PV", p.velocity, p.velocity); stop=true; }
-            if(length(p.force) > forceLimit) { log("PF", p.velocity, p.force); stop=true; }
+        // Anchors both wire ends
+        for(int c: range(3)) dv[(wire+0                  )*3+c] = 0;
+        for(int c: range(3)) dv[(wire+wireCount-1)*3+c] = 0;
 
-            // Midpoint
-            p.velocity += dt/2/wireMass*p.force;
-            size_t oldCell = particleGrid.index(p.position);
-            p.position += dt*p.velocity + dt*dt/2/wireMass*p.force;
-            size_t newCell = particleGrid.index(p.position);
+        auto update = [this, &dv](size_t i) {
+            for(int c: range(3)) velocity[i][c] += dv[i*3+c];
+            size_t oldCell = grid.index(position[i]);
+            for(int c: range(3)) position[i][c] += dt*velocity[i][c];
+            size_t newCell = grid.index(position[i]);
             if(oldCell != newCell) {
-                {Locker lock(gridLock(oldCell));
-                    particleGrid[oldCell].remove(i);}
-                //if(p.position.x >= -1 && p.position.x <= 1 && p.position.y >= -1 && p.position.y <= 1)
-                {Locker lock(gridLock(newCell));
-                    particleGrid[newCell].append(i);}
-                particleLocks[0].unlock();
+                grid[oldCell].remove(i);
+                grid[newCell].append(i);
             }
-            p.velocity += dt/2/wireMass*p.force;
+        };
+        for(size_t i: range(grain, grain+grainCount)) update(i);
+        for(size_t i: range(wire,wire+wireCount)) update(i);
 
-            // PCDM rotation integration
-            float I (2./3*p.mass*sq(p.radius)); // mat3
-            vec3 w = (p.rotation.conjugate() * quat{0, p.angularVelocity} * p.rotation).v; // Local
-            vec3 t = (p.rotation.conjugate() * quat{0, p.torque} * p.rotation).v; // Local
+        // PCDM rotation integration
+        /*//grainIntegrationTime.start();
+        parallel_for(0, grainCount, [this](uint, size_t i) {
+            static constexpr float I (2./3*grainMass*sq(grainRadius)); // mat3
+            vec3 w = (rotation[i].conjugate() * quat{0, angularVelocity[i]} * rotation[i]).v; // Local
+            vec3 t = (rotation[i].conjugate() * quat{0, torque[i]} * rotation[i]).v; // Local
             vec3 dw = 1/I * (t - cross(w, I*w));
             vec3 w4 = w + dt/4*dw;
             float w4l = length(w4);
             // Prediction (multiplicative update)
-            quat qp = w4l ? quat{cos(dt/4*w4l), sin(dt/4*w4l)*w4/w4l} * p.rotation : p.rotation;
+            quat qp = w4l ? quat{cos(dt/4*w4l), sin(dt/4*w4l)*w4/w4l} * rotation[i] : rotation[i];
             vec3 w2 = w + dt/2*dw;
             vec3 w2w = (qp * quat{0, w2} * qp.conjugate()).v; // Global
             float w2wl = length(w2w);
             // Correction (multiplicative update)
-            p.rotation = w2wl ? quat{cos(dt/2*w2wl), sin(dt/2*w2wl)*w2w/length(w2w)} * p.rotation : p.rotation;
-            p.angularVelocity = (p.rotation * quat{0, w + dt*dw} * p.rotation.conjugate()).v; // Global
+            rotation[i] = w2wl ? quat{cos(dt/2*w2wl), sin(dt/2*w2wl)*w2w/length(w2w)} * rotation[i] : rotation[i];
+            angularVelocity[i] = (rotation[i] * quat{0, w + dt*dw} * rotation[i].conjugate()).v; // Global
         });
-        particleIntegrationTime.stop();
+        //grainIntegrationTime.stop();*/
 
-        // Anchors both ends
-        nodes.first().force = 0;
-        nodes.last().force = 0;
-
-        // Wire nodes dynamics
-        wireIntegrationTime.start();
-        parallel_for(1, nodes.size, [this,&stop](uint, size_t i) {
-            Node& p = nodes[i];
-
-            if(length(p.velocity) > velocityLimit) { log("WV", p.velocity, p.velocity); stop=true; }
-            if(length(p.force) > forceLimit) { log("WF", p.velocity, p.force); stop=true; }
-
-            // Midpoint
-            p.velocity += dt/2 / wireMass * p.force;
-            size_t oldCell = wireGrid.index(p.position);
-            p.position += dt*p.velocity + dt*dt/2/wireMass*p.force;
-            size_t newCell = wireGrid.index(p.position);
-            if(oldCell != newCell) {
-                {Locker lock(gridLock(oldCell));
-                            wireGrid[oldCell].remove(i);}
-                //if(p.position.x >= -1 && p.position.x <= 1 && p.position.y >= -1 && p.position.y <= 1)
-                {Locker lock(gridLock(newCell));
-                    wireGrid[newCell].append(i);}
-            }
-            p.velocity += dt/2 / wireMass * p.force;
-        });
-        wireIntegrationTime.stop();
-        solveTime.stop();
         time += dt;
         timeStep++;
         window->render();
         if(realTime() > lastReport+2e9) {
-            log("solve",str(solveTime, totalTime), "sphere",str(sphereTime, solveTime), "cylinder",str(cylinderContactTime, solveTime),
-                 "cylinder",str(cylinderFrictionTime, solveTime), "floor",str(floorTime, solveTime),
-                "particle integration", str(particleIntegrationTime, solveTime), "wire integration", str(wireIntegrationTime, solveTime));
+            log("solve",str(solveTime, totalTime)/*, "grain",str(grainTime, solveTime), "wire",str(wireContactTime, solveTime),
+                 "wire",str(wireFrictionTime, solveTime), "floor",str(floorTime, solveTime),
+                "grain integration", str(grainIntegrationTime, solveTime), "wire integration", str(wireIntegrationTime, solveTime)*/);
             lastReport = realTime();
         }
-        if(!stop) queue();
+        queue();
     }
+    void event() { step(); }
 
     unique<Window> window = ::window(this, 1050);
     Thread solverThread;
     DEM() : Poll(0, POLLIN, solverThread) {
-        //window->actions[Space] = [this]{ writeFile(str(time), encodePNG(render(1050, graphics(1050))), home()); };
-        window->actions[Space] = [this]{ velocityLimit*=2; forceLimit*=2; queue(); solverThread.spawn(); };
-        window->actions[Return] = [this]{
-            if(pour) { pour = false; scaffoldRadius *= 2; window->setTitle("Release"); }
-        };
-        float floorRadius = 4096;
-        particles.append(vec3(0,0,-floorRadius), floorRadius);
-        nodes.append(vec3(winchRadius,0,wireRadius));
+        b.clear();
+        size_t i = wire+wireCount; wireCount++;
+        position[i] = vec3(winchRadius,0, winchHeight);
+        velocity[i] = 0;
+        contacts.set(i);
+        grid[grid.index(position[i])].append(i);
         step();
         solverThread.spawn();
+
         glDepthTest(true);
+
+        window->actions[Space] = [this]{ writeFile(str(time), encodePNG(render(1050, graphics(1050))), home()); };
+        window->actions[Return] = [this]{ if(pour) { pour = false; boundRadius *= 2; window->setTitle("2"); } };
     }
     vec2 sizeHint(vec2) { return 1050; }
     shared<Graphics> graphics(vec2) {
-        mat4 viewProjection = mat4() .scale(vec3(1, 1, -1./2)) .rotateX(rotation.y) .rotateZ(rotation.x) .translate(vec3(0,0, -1));
+        mat4 viewProjection = mat4() .scale(vec3(1, 1, -1./2)) .rotateX(viewRotation.y) .rotateZ(viewRotation.x) .translate(vec3(0,0, -1));
 
-        if(particles.size > 1) {
-            buffer<vec3> positions {(particles.size-1)*6};
-            for(size_t i: range(particles.size-1)) {
-                const auto& p = particles[1+i];
+        if(grainCount) {
+            buffer<vec3> positions {grainCount*6};
+            for(size_t i: range(grainCount)) {
                 // FIXME: GPU quad projection
-                vec3 O = viewProjection*p.position;
-                vec3 min = O - vec3(vec2(p.radius), 0); // Isometric
-                vec3 max = O + vec3(vec2(p.radius), 0); // Isometric
+                vec3 O = viewProjection*position[grain+i];
+                vec3 min = O - vec3(vec2(grainRadius), 0); // Isometric
+                vec3 max = O + vec3(vec2(grainRadius), 0); // Isometric
                 positions[i*6+0] = min;
                 positions[i*6+1] = vec3(max.x, min.y, O.z);
                 positions[i*6+2] = vec3(min.x, max.y, O.z);
@@ -653,10 +582,10 @@ struct DEM : Widget, Poll {
             vertexArray.draw(Triangles, positions.size);
         }
 
-        if(nodes.size > 1) {
-            buffer<vec3> positions {(nodes.size-1)*6};
-            for(int i: range(nodes.size-1)) {
-                vec3 a = nodes[i].position, b = nodes[i+1].position;
+        if(wireCount>1) {
+            buffer<vec3> positions {(wireCount-1)*6};
+            for(size_t i: range(wireCount-1)) {
+                vec3 a = position[wire+i], b = position[wire+i+1];
                 // FIXME: GPU quad projection
                 vec3 A = viewProjection*a, B = viewProjection*b;
                 vec2 r = B.xy()-A.xy();
@@ -685,13 +614,13 @@ struct DEM : Widget, Poll {
 
     // View
     vec2 lastPos; // Last cursor position to compute relative mouse movements
-    vec2 rotation = vec2(0, -PI/2); // Current view angles (yaw,pitch)
+    vec2 viewRotation = vec2(0, -PI/2); // Current view angles (yaw,pitch)
     // Orbital ("turntable") view control
     bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override {
         vec2 delta = cursor-lastPos; lastPos=cursor;
         if(event==Motion && button==LeftButton) {
-            rotation += float(2.f*PI) * delta / size; //TODO: warp
-            rotation.y= clamp(float(-PI/*2*/), rotation.y, 0.f); // Keep pitch between [-PI, 0]
+            viewRotation += float(2.f*PI) * delta / size; //TODO: warp
+            viewRotation.y= clamp(float(-PI/*2*/), viewRotation.y, 0.f); // Keep pitch between [-PI, 0]
         }
         else return false;
         return true;
