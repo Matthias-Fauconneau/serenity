@@ -10,73 +10,7 @@
 #include "gl.h"
 FILE(shader)
 
-// -> vector.h
-template<template<Type> /*Type*/class V, Type T, uint N> inline /*constexpr*/ float length(const vec<V,T,N>& a) { return sqrt(dot(a,a)); }
-
-struct quat {
-    float s = 1; vec3 v = 0;
-    quat conjugate() const { return {s, -v}; }
-};
-quat operator*(quat p, quat q) { return {p.s*q.s - dot(p.v, q.v), p.s*q.v + q.s*p.v + cross(p.v, q.v)}; }
-String str(quat q) { return "["+str(q.s, q.v)+"]"; }
-
-// -> distance.h
-void closest(vec3 a1, vec3 a2, vec3 b1, vec3 b2, vec3& A, vec3& B) {
-    vec3 u = a2 - a1;
-    vec3 v = b2 - b1;
-    vec3 w = a1 - b1;
-    float  a = dot(u,u);        // always >= 0
-    float  b = dot(u,v);
-    float  c = dot(v,v);        // always >= 0
-    float  d = dot(u,w);
-    float  e = dot(v,w);
-    float  D = a*c - b*b;       // always >= 0
-    float  sD = D;      // sc = sN / sD, default sD = D >= 0
-    float  tD = D;      // tc = tN / tD, default tD = D >= 0
-
-    // Compute the line parameters of the two closest points
-    float sN, tN;
-    if (D < __FLT_EPSILON__) { // the lines are almost parallel
-        sN = 0;        // force using point P0 on segment S1
-        sD = 1;        // to prevent possible division by 0.0 later
-        tN = e;
-        tD = c;
-    }
-    else {                // get the closest points on the infinite lines
-        sN = (b*e - c*d);
-        tN = (a*e - b*d);
-        if (sN < 0) {       // sc < 0 => the s=0 edge is visible
-            sN = 0;
-            tN = e;
-            tD = c;
-        }
-        else if (sN > sD) {  // sc > 1 => the s=1 edge is visible
-            sN = sD;
-            tN = e + b;
-            tD = c;
-        }
-    }
-
-    if (tN < 0) {           // tc < 0 => the t=0 edge is visible
-        tN = 0;
-        // recompute sc for this edge
-        if (-d < 0) sN = 0;
-        else if (-d > a) sN = sD;
-        else { sN = -d; sD = a; }
-    }
-    else if (tN > tD) {      // tc > 1 => the t=1 edge is visible
-        tN = tD;
-        // recompute sc for this edge
-        if ((-d + b) < 0) sN = 0;
-        else if ((-d + b) > a) sN = sD;
-        else { sN = (-d + b); sD = a; }
-    }
-    // finally do the division to get sc and tc
-    float sc = (abs(sN) < __FLT_EPSILON__ ? 0 : sN / sD);
-    float tc = (abs(tN) < __FLT_EPSILON__ ? 0 : tN / tD);
-    A = a1 + (sc * u);
-    B = b1 - (tc * v);
-}
+// Contact
 
 struct Contact { // 16 w
     int index; // - wire, + grain (identify contact to avoid duplicates and evaluate friction)
@@ -111,8 +45,10 @@ struct Contact { // 16 w
 bool operator==(const Contact& a, const Contact& b) { return a.index == b.index; }
 String str(const Contact& c) { return str(c.index); }
 
+// Grid
+
 struct Grid : buffer<uint16> {
-    static constexpr size_t cellCapacity = 8; // 1 cell / line
+    static constexpr size_t cellCapacity = 16; // 2 cell / line
     int3 size;
     Grid(int3 size) : buffer(size.z*size.y*size.x*cellCapacity), size(size) { clear(); }
     struct List : mref<uint16> {
@@ -146,10 +82,12 @@ struct Grid : buffer<uint16> {
     size_t index(vec3 p) { int3 i = index3(p); return index(i.x, i.y, i.z);}
 };
 
+
+
 struct DEM : Widget, Poll {
     static constexpr size_t grainCapacity = 255;
-    // Index 0 is reserved
-    static constexpr size_t grain = 1;
+    // Index 0 is reserved (only in grid)
+    static constexpr size_t grain = 0;
     size_t grainCount = 0;
     static constexpr size_t wire = grain+grainCapacity;
     static constexpr size_t wireCapacity = 256;
@@ -169,15 +107,15 @@ struct DEM : Widget, Poll {
     buffer<vec3> torque { grainCapacity };
 
     // Space partition
-    Grid grid {32};
+    Grid grainGrid {16}, wireGrid {128};
 
     // Parameters
-    static constexpr float dt = 1./2048; // 1e-4
+    static constexpr float dt = 1./8192; //1./2048; // 1e-4
 
     static constexpr float grainRadius = 1./16; // 62 mm
     static constexpr float grainMass = 4./3*PI*cb(grainRadius);
-    static constexpr float grainYoung = 512;
-    static constexpr float grainNormalDamping = 1, grainTangentialDamping = 1;
+    static constexpr float grainYoung = 256; // grainMass/(dt*dt);
+    static constexpr float grainNormalDamping = 1/*grainMass/dt*/, grainTangentialDamping = 1;
     static constexpr float grainFriction = 1;
 
     static constexpr float wireRadius = 1./128; // 8 mm
@@ -212,31 +150,31 @@ struct DEM : Widget, Poll {
     // Linear(FIXME) spring between two elements
     void spring(float ks, float kb, float x0, float x, vec3 xn, size_t i, size_t j, vec3 v) {
         vec3 f = - ks * (x - x0) * xn - kb * dot(xn, v) * xn;
-        mat3 o = outer(xn, xn);
-        mat3 dxf = - ks * ((1 - x0/x)*(1 - o) + o);
-        mat3 dvf = - kb * o;
+        //mat3 o = outer(xn, xn);
+        //mat3 dxf = - ks * ((1 - x0/x)*(1 - o) + o);
+        //mat3 dvf = - kb * o;
         for(int c0: range(3)) {
-            for(int c1: range(3)) {
+            /*for(int c1: range(3)) {
                 float a = dt*dvf(c0, c1) + dt*dt*dxf(c0, c1);
                 M(i*3+c0, i*3+c1) -= a;
                 M(j*3+c0, j*3+c1) += a;
-            }
-            b[i*3+c0] += dt*(  f[c0] + dt*dxf(c0, c0)*velocity[i][c0] );
-            b[j*3+c0] -= dt*( f[c0] + dt*dxf(c0, c0)*velocity[j][c0] );
+            }*/
+            b[i*3+c0] += dt*(  f[c0] /*+ dt*dxf(c0, c0)*velocity[i][c0]*/ );
+            b[j*3+c0] -= dt*( f[c0] /*+ dt*dxf(c0, c0)*velocity[j][c0]*/ );
         }
     }
     // Linear(FIXME) spring to a fixed point
-    void spring(float ks, float kb, float x0, float x, vec3 xn, size_t i, vec3 v) {
-        vec3 f = - ks * (x - x0) * xn - kb * dot(xn, v) * xn;
-        mat3 o = outer(xn, xn);
-        mat3 dxf = - ks * ((1 - x0/x)*(1 - o) + o);
-        mat3 dvf = - kb * o;
+    void spring(float ks, float kb, float x0, float xl, vec3 xn, size_t i, vec3 v) {
+        vec3 f = - ks * (xl - x0) * xn - kb * dot(xn, v) * xn;
+        //mat3 o = outer(xn, xn);
+        //mat3 dxf = - ks * ((1 - x0/xl)*(1 - o) + o);
+        //mat3 dvf = - kb * o;
         for(int c0: range(3)) {
-            for(int c1: range(3)) {
+            /*for(int c1: range(3)) {
                 float a = dt*dvf(c0, c1) + dt*dt*dxf(c0, c1);
                 M(i*3+c0, i*3+c1) -= a;
-            }
-            b[i*3+c0] += dt*(  f[c0] + dt*dxf(c0, c0)*velocity[i][c0] );
+            }*/
+            b[i*3+c0] += dt*(  f[c0] /*+ dt*dxf(c0, c0)*velocity[i][c0]*/ );
         }
     }
 
@@ -245,91 +183,102 @@ struct DEM : Widget, Poll {
     // Grain - Bound contact
     void contactGrainBound(size_t a) {
         {// Floor
-            float lx = position[a].z;
+            float xl = position[a].z;
             float x0 = grainRadius;
-            if(lx > x0) return;
-            vec3 nx (0,0,1);
-            vec3 v = velocity[a] + cross(angularVelocity[a], grainRadius*(+nx));
-            float E = grainYoung/2, R = grainRadius;
-            spring(4/3*E*sqrt(R), grainNormalDamping, x0, lx, nx, a, v);
+            if(xl < x0) {
+                vec3 xn (0,0,1);
+                vec3 v = velocity[a] + cross(angularVelocity[a], grainRadius*(+xn));
+                float E = grainYoung/2, R = grainRadius;
+                spring(4/3*E*sqrt(R), grainNormalDamping, x0, xl, xn, a, v);
+            }
         }
         {// Side
             vec3 x = vec3(position[a].xy(), 0);
-            float lx = length(x);
-            float x0 = moldRadius + grainRadius;
-            if(lx <= x0) return;
-            vec3 nx = x/lx;
-            vec3 v = velocity[a] + cross(angularVelocity[a], grainRadius*(+nx));
-            float E = grainYoung/2, R = grainRadius;
-            spring(4/3*E*sqrt(R), grainNormalDamping, x0, lx, nx, a, v);
+            float xl = length(x);
+            float x0 = moldRadius - grainRadius;
+            if(xl > x0) {
+                vec3 xn = x/xl;
+                vec3 v = velocity[a] + cross(angularVelocity[a], grainRadius*(+xn));
+                float E = grainYoung/2, R = grainRadius;
+                spring(4/3*E*sqrt(R), grainNormalDamping, x0, xl, xn, a, v);
+            }
         }
     }
     // Grain - Grain contact
     void contactGrainGrain(size_t a, size_t b) {
-        log(a, b);
-        vec3 x = position[b] - position[a];
-        float lx = length(x);
+        vec3 x = position[a] - position[b];
+        float xl = length(x);
         float x0 = grainRadius + grainRadius;
-        if(lx >= x0) return;
-        vec3 nx = x/lx;
-        vec3 v = (velocity[a] + cross(angularVelocity[a], grainRadius*(+nx))) - (velocity[b] + cross(angularVelocity[b], grainRadius*(-nx)));
-        float E = grainYoung/2, R = 1/(1/grainRadius+1/grainRadius);
-        spring(4/3*E*sqrt(R), grainNormalDamping, x0, lx, nx, a, b, v);
-        /*auto& c =a.contacts.add(Contact{int(bIndex), a.position+a.radius*n,0,0,0,0,0});
-        c.lastUpdate = timeStep; c.n = n; c.fN = fN; c.v = v; c.currentPosition=a.position+a.radius*n;*/
+        if(xl < x0) {
+            vec3 xn = x/xl;
+            //vec3 v = (velocity[a] + cross(angularVelocity[a], grainRadius*(+xn))) - (velocity[b] + cross(angularVelocity[b], grainRadius*(-xn)));
+            vec3 v = velocity[a] - velocity[b];
+            float E = grainYoung/2, R = grainRadius/2;
+            spring(4/3*E*sqrt(R), grainNormalDamping, x0, xl, xn, a, b, v);
+            //auto& c =a.contacts.add(Contact{int(bIndex), a.position+a.radius*n,0,0,0,0,0});
+            //c.lastUpdate = timeStep; c.n = n; c.fN = fN; c.v = v; c.currentPosition=a.position+a.radius*n;
+        }
     }
     // Grain - Wire vertex contact
     void contactGrainWire(size_t a, size_t b) {
-        vec3 x = position[b] - position[a];
-        float lx = length(x);
+        vec3 x = position[a] - position[b];
+        float xl = length(x);
         float x0 = grainRadius + wireRadius;
-        if(lx >= x0) return;
-        vec3 nx = x/lx;
-        vec3 v = (velocity[a] + cross(angularVelocity[a], grainRadius*(+nx))) - velocity[b];
-        float E = 1/(1/grainYoung + 1/wireYoung), R = 1/(1/grainRadius+1/wireRadius);
-        spring(4/3*E*sqrt(R), grainNormalDamping, x0, lx, nx, a, b, v);
-        // FIXME: Contact
+        if(xl < x0) {
+            vec3 xn = x/xl;
+            vec3 v = (velocity[a] + cross(angularVelocity[a], grainRadius*(+xn))) - velocity[b];
+            float E = 1/(1/grainYoung + 1/wireYoung), R = 1/(1/grainRadius+1/wireRadius);
+            spring(4/3*E*sqrt(R), grainNormalDamping, x0, xl, xn, a, b, v);
+            // FIXME: Contact
+        }
     }
 
     // Wire - Bound contact
     void contactWireBound(size_t a) {
         {// Floor
-            float lx = position[a].z;
+            float xl = position[a].z;
             float x0 = wireRadius;
-            if(lx > x0) return;
-            vec3 nx (0,0,1);
-            vec3 v = velocity[a];
-            float E = wireYoung/2, R = wireRadius;
-            spring(4/3*E*sqrt(R), wireNormalDamping, x0, lx, nx, a, v);
+            if(xl < x0) {
+                vec3 xn (0,0,1);
+                vec3 v = velocity[a];
+                float E = wireYoung/2, R = wireRadius;
+                spring(4/3*E*sqrt(R), wireNormalDamping, x0, xl, xn, a, v);
+            }
         }
         {//Side
             vec3 x = vec3(position[a].xy(), 0);
-            float lx = length(x);
+            float xl = length(x);
             float x0 = moldRadius + wireRadius;
-            if(lx <= x0) return;
-            vec3 nx = x/lx;
-            vec3 v = velocity[a];
-            float E = wireYoung/2, R = wireRadius;
-            spring(4/3*E*sqrt(R), wireNormalDamping, x0, lx, nx, a, v);
+            if(xl > x0) {
+                vec3 xn = x/xl;
+                vec3 v = velocity[a];
+                float E = wireYoung/2, R = wireRadius;
+                spring(4/3*E*sqrt(R), wireNormalDamping, x0, xl, xn, a, v);
+            }
         }
     }
     // Wire - Wire vertices contact
     void contactWireWire(size_t a, size_t b) {
-        vec3 x = position[b] - position[a];
-        float lx = length(x);
+        vec3 x = position[a] - position[b];
+        float xl = length(x);
         float x0 = wireRadius + wireRadius;
-        if(lx >= x0) return;
-        vec3 nx = x/lx;
-        vec3 v = velocity[a] - velocity[b];
-        float E = wireYoung/2, R = wireRadius/2;
-        spring(4/3*E*sqrt(R), grainNormalDamping, x0, lx, nx, a, b, v);
-        // FIXME: Contact
+        if(xl < x0) {
+            vec3 xn = x/xl;
+            vec3 v = velocity[a] - velocity[b];
+            float E = wireYoung/2, R = wireRadius/2;
+            spring(4/3*E*sqrt(R), grainNormalDamping, x0, xl, xn, a, b, v);
+            // FIXME: Contact
+        }
     }
 
     // Single implicit Euler time step
     void step() {
         // Process
-        if(pour && (winchHeight>=2 || grainCount == grainCapacity || wireCount == wireCapacity)) { pour = false; boundRadius *= 2; }
+        if(pour && (winchHeight>=2 || grainCount == grainCapacity || wireCount == wireCapacity)) {
+            log("Release");
+            pour = false;
+            //boundRadius *= 2;
+        }
         if(pour) {
             // Generates falling grain (pour)
             for(;;) {
@@ -337,11 +286,11 @@ struct DEM : Widget, Poll {
                 if(length(p.xy())>1) continue;
                 vec3 newPosition ((pourRadius-grainRadius)*p.xy(), p.z);
                 for(vec3 p: position.slice(grain, grainCount)) if(length(p - newPosition) < 2*grainRadius) goto break2_;
-                size_t i = grain+grainCount; grainCount++;
+                size_t i = grainCount; grainCount++;
                 position[i] = newPosition;
                 velocity[i] = 0;
                 contacts.set(i);
-                grid[grid.index(position[i])].append(i);
+                grainGrid[grainGrid.index(position[i])].append(1+i);
                 rotation[i] = quat();
                 angularVelocity[i] = 0;
                 torque[i] = 0;
@@ -355,18 +304,18 @@ struct DEM : Widget, Poll {
             size_t lastWire = wire+wireCount-1;
             vec3 r = winchPosition-position[lastWire];
             float l = length(r);
-            if(l > internodeLength*1.5) {
+            if(0 && l > internodeLength*1.5) {
                 size_t i = wire+wireCount; wireCount++;
                 position[i] = position[lastWire] + internodeLength/l*r;
                 velocity[i] = 0;
                 contacts.set(i);
-                grid[grid.index(position[i])].append(i);
+                wireGrid[wireGrid.index(position[i])].append(i);
             }
         }
 
         // Initialization: gravity, bound, tension
-        M.clear();
-        constexpr vec3 g {0, 0, -1};
+        M.clear(); //b.clear();
+        constexpr vec3 g {0, 0, -10};
         for(size_t i: range(grain, grain+grainCount)) {
             torque[i] = 0;
             vec3 force = grainMass * g;
@@ -394,23 +343,22 @@ struct DEM : Widget, Poll {
             spring(wireTensionStiffness, wireTensionDamping, x0, lx, nx, i-1, i, v);
         }
 
-        // Grain contacts
+        // Grain - Grain contacts
         grainTime.start();
-        parallel_for(grain, grain+grainCount, [this](uint, size_t a) {
-            int3 index = grid.index3(a);
-            // Grain - (Grain|Wire)
-            for(int dz: range(-1, 1+1)) for(int dy: range(-1, 1+1)) for(int dx: range(-1, 1+1)) {
-                if(index.z+dz < 0) continue;
-                Grid::List list = grid[grid.index(index.x+dx, index.y+dy, index.z+dz)];
-                for(size_t i=0;; i++) {
-                    size_t b = list[i];
-                    if(b) log(a, b);
-                    if(!(a < b)) break; // Single contact per pair, no Wire-Grain (only Grain-Wire), until 0
-                    if(b < grain+grainCount)
+        parallel_for(grain, grain+grainCount, [this](uint, int a) {
+            if(1) {
+                int3 index = grainGrid.index3(position[a]);
+                for(int dz: range(-1, 1+1)) for(int dy: range(-1, 1+1)) for(int dx: range(-1, 1+1)) {
+                    if(index.z+dz < 0) continue;
+                    Grid::List list = grainGrid[grainGrid.index(index.x+dx, index.y+dy, index.z+dz)];
+                    for(size_t i=0;; i++) {
+                        int b = list[i]-1;
+                        if(!(a < b)) break; // Single contact per pair, until 0
                         contactGrainGrain(a, b);
-                    else
-                        contactGrainWire(a, b);
+                    }
                 }
+            } else {
+                for(int b: range(grain, grain+grainCount)) if(a<b) contactGrainGrain(a, b);
             }
         });
         grainTime.stop();
@@ -491,18 +439,18 @@ struct DEM : Widget, Poll {
         for(int c: range(3)) dv[(wire+0                  )*3+c] = 0;
         for(int c: range(3)) dv[(wire+wireCount-1)*3+c] = 0;
 
-        auto update = [this, &dv](size_t i) {
+        auto update = [this, &dv](Grid& grid, size_t i) {
             for(int c: range(3)) velocity[i][c] += dv[i*3+c];
             size_t oldCell = grid.index(position[i]);
             for(int c: range(3)) position[i][c] += dt*velocity[i][c];
             size_t newCell = grid.index(position[i]);
             if(oldCell != newCell) {
-                grid[oldCell].remove(i);
-                grid[newCell].append(i);
+                grid[oldCell].remove(1+i);
+                grid[newCell].append(1+i);
             }
         };
-        for(size_t i: range(grain, grain+grainCount)) update(i);
-        for(size_t i: range(wire,wire+wireCount)) update(i);
+        for(size_t i: range(grain, grain+grainCount)) update(grainGrid, i);
+        for(size_t i: range(wire,wire+wireCount)) update(wireGrid, i);
 
         // PCDM rotation integration
         /*//grainIntegrationTime.start();
@@ -541,11 +489,11 @@ struct DEM : Widget, Poll {
     Thread solverThread;
     DEM() : Poll(0, POLLIN, solverThread) {
         b.clear();
-        size_t i = wire+wireCount; wireCount++;
-        position[i] = vec3(winchRadius,0, winchHeight);
-        velocity[i] = 0;
-        contacts.set(i);
-        grid[grid.index(position[i])].append(i);
+        size_t i = wireCount; wireCount++;
+        position[wire+i] = vec3(winchRadius,0, winchHeight);
+        velocity[wire+i] = 0;
+        contacts.set(wire+i);
+        wireGrid[wireGrid.index(position[i])].append(1+i);
         step();
         solverThread.spawn();
 

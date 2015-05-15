@@ -189,3 +189,42 @@ typedef vec<bgra,uint,4> uint4;
 
 /// Integer x,y vector (64bit)
 typedef vec<xy,int64,2> long2;
+
+template<template<Type> /*Type*/class V, Type T, uint N> inline /*constexpr*/ float length(const vec<V,T,N>& a) { return sqrt(dot(a,a)); }
+
+struct quat {
+    float s = 1; vec3 v = 0;
+    quat conjugate() const { return {s, -v}; }
+};
+inline quat operator*(quat p, quat q) { return {p.s*q.s - dot(p.v, q.v), p.s*q.v + q.s*p.v + cross(p.v, q.v)}; }
+inline String str(quat q) { return "["+str(q.s, q.v)+"]"; }
+
+inline void closest(vec3 a1, vec3 a2, vec3 b1, vec3 b2, vec3& A, vec3& B) {
+    const vec3 u = a2 - a1, v = b2 - b1, w = a1 - b1;
+    const float  a = dot(u,u), b = dot(u,v), c = dot(v,v), d = dot(u,w), e = dot(v,w);
+    const float D = a*c - b*b; float sD = D,  tD = D;
+    // Compute the line parameters of the two closest points
+    float sN, tN;
+    if(D < __FLT_EPSILON__) sN = 0, sD = 1, tN = e, tD = c;
+    else {
+        sN = (b*e - c*d), tN = (a*e - b*d);
+        /**/  if(sN < 0) { sN = 0, tN = e, tD = c; }
+        else if (sN > sD) { sN = sD; tN = e + b; tD = c; }
+    }
+    /**/  if(tN < 0) {
+        tN = 0;
+        /**/  if(-d < 0) sN = 0;
+        else if(-d > a) sN = sD;
+        else { sN = -d; sD = a; }
+    }
+    else if(tN > tD) {
+        tN = tD;
+        /**/  if((-d + b) < 0) sN = 0;
+        else if((-d + b) > a) sN = sD;
+        else { sN = (-d + b); sD = a; }
+    }
+    float sc = abs(sN) < __FLT_EPSILON__ ? 0 : sN / sD;
+    float tc = abs(tN) < __FLT_EPSILON__ ? 0 : tN / tD;
+    A = a1 + (sc * u);
+    B = b1 - (tc * v);
+}

@@ -47,10 +47,10 @@ void Window::render(shared<Graphics>&& graphics, int2 origin, int2 size) {
 void Window::render() { assert_(size); 	lock.lock(); updates.clear(); lock.unlock(); render(nullptr, int2(0), size); }
 
 Window::Update Window::render(/*const Image& target*/int2 size) {
-	if(!updates) return Update();
-	lock.lock();
-	Update update = updates.take(0);
-	lock.unlock();
+    lock.lock();
+    if(!updates) { lock.unlock(); return Update(); }
+    Update update = updates.take(0);
+    lock.unlock();
 	if(!update.graphics) {
 		currentWindow = this; // FIXME
 		update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size)));
