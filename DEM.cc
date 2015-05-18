@@ -22,20 +22,26 @@ struct Contact { // 16 w
     vec3 v; // Relative velocity
     vec3 currentPosition; // Current contact position
     vec3 friction(const float friction) {
-        //return 0; // DEBUG
-        const float dynamicFriction = friction;
-        vec3 fT = - dynamicFriction * fN * v / length(v);
+        vec3 fT = 0;
+        {const float dynamicFriction = friction;
+            float vl = length(v);
+            if(vl) fT -= dynamicFriction * fN * v / vl;
+        }
         const float staticFrictionVelocity = 1;
         if(length(v) < staticFrictionVelocity) { // Static friction
             vec3 x = currentPosition - initialPosition;
             vec3 t = x-dot(n, x)*n;
             float l = length(t);
             /*if(l < 1./128)*/ { // FIXME
-                const float staticFriction = friction;
+                const float staticFriction = 1./4; //friction;
                 fT -= staticFriction * abs(fN) * t;
-                vec3 u = t/l;
-                constexpr float tangentialDamping = 1./8;
-                if(l) fT -= tangentialDamping * dot(u, v) * u; // else static equilibrium
+                assert_(isNumber(fT), fN, t);
+                if(l) {
+                    vec3 u = t/l;
+                    constexpr float tangentialDamping = 1./4; //1./4; //1./8;
+                    fT -= tangentialDamping * dot(u, v) * u;
+                    assert_(isNumber(fT), "t", v, u);
+                } // else static equilibrium
             }
         } else initialPosition = currentPosition; // Dynamic friction
         return fT;
@@ -80,9 +86,6 @@ struct Grid : buffer<uint16> {
     }
     size_t index(vec3 p) {
         int3 i = index3(p);
-        /*i.x = clamp(0, i.x, size.x-1);
-        i.y = clamp(0, i.y, size.y-1);
-        i.z = clamp(0, i.z, size.z-1);*/
         assert_(i.x == clamp(0, i.x, size.x-1), p, i, size);
         assert_(i.y == clamp(0, i.y, size.y-1), p, i, size);
         assert_(i.z == clamp(0, i.z, size.z-1), p, i, size);
@@ -93,10 +96,10 @@ String str(const Grid::List& o) { return str((mref<uint16>)o); }
 
 struct DEM : Widget, Poll {
     static constexpr size_t wire = 0;
-    static constexpr size_t wireCapacity = 1024;
+    static constexpr size_t wireCapacity = 512;
     size_t wireCount = 0;
     static constexpr size_t grain = wire+wireCapacity;
-    static constexpr size_t grainCapacity = 512;
+    static constexpr size_t grainCapacity = 256;
     size_t grainCount = 0;
     static constexpr size_t elementCapacity = grain+grainCapacity;
 
@@ -113,26 +116,28 @@ struct DEM : Widget, Poll {
     buffer<vec3> torque { grainCapacity };
 
     // Space partition
-    Grid grainGrid {16}, wireGrid {128};
+    Grid grainGrid {16}, wireGrid {64};
 
     // Parameters
     static constexpr float dt = 1./1024;
 
     static constexpr float grainRadius = 1./16; // 62 mm
     static constexpr float grainMass = 4./3*PI*cb(grainRadius);
-    static constexpr float grainYoung = 16;
-    static constexpr float grainNormalDamping = 1./8;
+    static constexpr float grainYoung = 1;
+    static constexpr float grainNormalDamping = 1./64;
     static constexpr float grainFriction = 1;
 
     static constexpr float wireRadius = 1./64; // /128 = 8 mm
     static constexpr float internodeLength = 1./32; // 8, 4
-    static constexpr float wireMass = 1./2048;
-    static constexpr float wireYoung = 16;
+    static constexpr float wireMass = 1./4096;
+    static constexpr float wireYoung = 1;
     static constexpr float wireNormalDamping = 1./64;
     static constexpr float wireFriction = 1;
 
-    static constexpr float wireTensionStiffness = 4;
+    static constexpr float wireTensionStiffness = 1./4; // 4
     static constexpr float wireTensionDamping = 1./64;
+    static constexpr float wireBendStiffness = 1./512; // 2, 8, 100
+    static constexpr float wireBendDamping = 1./512; // -8, -100
 
     // Time
     int timeStep = 0;
@@ -142,7 +147,7 @@ struct DEM : Widget, Poll {
     static constexpr float moldRadius = 1./2;
     static constexpr float winchRadius = moldRadius - grainRadius - wireRadius;
     static constexpr float pourRadius = moldRadius - grainRadius;
-    static constexpr float winchRate = 1024/4, winchSpeed = 1./4;
+    static constexpr float winchRate = 128, winchSpeed = 1./4;
     float boundRadius = moldRadius;
     float winchAngle = 0, pourHeight = grainRadius;
     bool pour = true;
@@ -175,20 +180,24 @@ struct DEM : Widget, Poll {
         return fN;
     }
     // Linear(FIXME) spring to a fixed point
-    float spring(float ks, float kb, float x0, float xl, vec3 xn, size_t i, vec3 v, const bool implicit=true) {
+    float spring(float ks, float kb, float x0, float xl, vec3 xn, size_t i, vec3 v, const bool implicit=false) {
         float fN = - ks * (xl - x0);
         vec3 f = fN * xn - kb * dot(xn, v) * xn;
-        mat3 o = outer(xn, xn);
-        assert_(xl);
-        mat3 dxf = - ks * ((1 - x0/xl)*(1 - o) + o);
-        mat3 dvf = - kb * o;
-        for(int c0: range(3)) {
-            if(implicit) for(int c1: range(3)) {
-                float a = dt*dvf(c0, c1) + dt*dt*dxf(c0, c1);
-                M(i*3+c0, i*3+c1) -= a;
+        if(implicit) {
+            mat3 o = outer(xn, xn);
+            assert_(xl, ks, kb, x0, xl , xn, i , v);
+            mat3 dxf = - ks * ((1 - x0/xl)*(1 - o) + o);
+            mat3 dvf = - kb * o;
+            for(int c0: range(3)) {
+                for(int c1: range(3)) {
+                    float a = dt*dvf(c0, c1) + dt*dt*dxf(c0, c1);
+                    M(i*3+c0, i*3+c1) -= a;
+                }
+                const float a = dt*dxf(c0, c0);
+                b[i*3+c0] += dt*( f[c0] + a*velocity[i][c0] );
             }
-            const float a = implicit*dt*dxf(c0, c0);
-            b[i*3+c0] += dt*( f[c0] + a*velocity[i][c0] );
+        } else {
+            for(int c0: range(3)) b[i*3+c0] += dt*f[c0];
         }
         return fN;
     }
@@ -286,7 +295,7 @@ struct DEM : Widget, Poll {
         float x0 = wireRadius + grainRadius;
         if(l < x0) {
             vec3 n = x/l;
-            vec3 v = velocity[a] - (velocity[b] + cross(angularVelocity[b-grain], grainRadius*(-n)));
+            vec3 v = velocity[a] - (velocity[b] /*+ cross(angularVelocity[b-grain], grainRadius*(-n))*/); //FIXME
             constexpr float E = 1/(1/wireYoung + 1/grainYoung), R = 1/(1/wireRadius+1/grainRadius);
             float fN = spring(4/3*E*sqrt(R), 1/(1/wireNormalDamping+1/grainNormalDamping), x0, l, n, a, b, v);
             vec3 p = (position[a]+wireRadius*n + position[b]+grainRadius*(-n))/2.f;
@@ -309,7 +318,8 @@ struct DEM : Widget, Poll {
                 vec3 p(random()*2-1,random()*2-1, pourHeight);
                 if(length(p.xy())>1) continue;
                 vec3 newPosition (pourRadius*p.xy(), p.z);
-                for(vec3 p: position.slice(grain, grainCount)) if(length(p - newPosition) < 2*grainRadius) goto break2_;
+                for(vec3 p: position.slice(wire, wireCount)) if(length(p - newPosition) < grainRadius+wireRadius) goto break2_;
+                for(vec3 p: position.slice(grain, grainCount)) if(length(p - newPosition) < grainRadius+grainRadius) goto break2_;
                 size_t i = grainCount; grainCount++;
                 position[grain+i] = newPosition;
                 velocity[grain+i] = 0;
@@ -324,16 +334,19 @@ struct DEM : Widget, Poll {
             // Generates wire (winch)
             winchAngle += winchRate * dt * winchRadius * internodeLength;
             pourHeight += winchSpeed * grainRadius * dt;
-            vec3 winchPosition (winchRadius*cos(winchAngle), winchRadius*sin(winchAngle), pourHeight+grainRadius);
+            vec3 winchPosition (winchRadius*cos(winchAngle), winchRadius*sin(winchAngle), pourHeight);
             for(vec3 p: position.slice(grain, grainCount)) if(length(winchPosition - p) < grainRadius + wireRadius) {
-                winchPosition.z += sqrt(sq(grainRadius+wireRadius)-sq((winchPosition - p).xy())); break; // FIXME
+                winchPosition.z = p.z+sqrt(sq(grainRadius+wireRadius)-sq((winchPosition - p).xy()));
             }
-            size_t lastWire = wire+wireCount-1;
-            vec3 r = winchPosition-position[lastWire];
+            /*for(vec3 p: position.slice(grain, grainCount))
+                assert_(length(winchPosition - p) + 0x1p-12 >= grainRadius + wireRadius,
+                        log2((grainRadius + wireRadius) - length(winchPosition - p)));*/
+            vec3 lastPosition = wireCount ? position[wire+wireCount-1] : vec3(winchRadius, winchRadius, pourHeight);
+            vec3 r = winchPosition - lastPosition;
             float l = length(r);
             if(1 && l > internodeLength*1.5) {
                 size_t i = wireCount; wireCount++;
-                position[wire+i] = position[lastWire] + internodeLength/l*r;
+                position[wire+i] = lastPosition + internodeLength/l*r;
                 velocity[wire+i] = 0;
                 contacts.set(wire+i);
                 wireGrid[wireGrid.index(position[wire+i])].append(1+wire+i);
@@ -353,10 +366,10 @@ struct DEM : Widget, Poll {
             contactGrainBound(grain+i);
         }
         for(size_t i: range(1, wireCount)) {
-            vec3 force = wireMass * g;
+            vec3 force = wireMass * g;// / 16.f; // FIXME
             for(int c: range(3)) {
                 M((wire+i)*3+c, (wire+i)*3+c) = wireMass;
-                b[(wire+i)*3+c] = dt *  force[c];
+                b[(wire+i)*3+c] = dt * force[c];
             }
             contactWireBound(wire+i);
 
@@ -367,6 +380,18 @@ struct DEM : Widget, Poll {
             vec3 nx = x/xl;
             vec3 v = velocity[wire+i]  - velocity[wire+i-1]; // Velocity of A relative to B
             spring(wireTensionStiffness, wireTensionDamping, x0, xl, nx, wire+i, wire+i-1, v); // FIXME
+
+            /*// Bending resistance
+            if(i+1<wireCount) {
+                vec3 A = position[wire+i-1], B = position[wire+i], C = position[wire+i+1];
+                vec3 B0 = (A+C)/2.f;
+                vec3 x = B0 - B; // Outward from A to B
+                float xl = length(x);
+                float x0 = 0;
+                vec3 nx = x/xl;
+                vec3 v = velocity[wire+i]  - (velocity[wire+i-1]+velocity[wire+i+1])/2.f; // Velocity of B relative to A+C
+                spring(wireBendStiffness, wireBendDamping, x0, xl, nx, wire+i, v); // FIXME
+            }*/
         }
 
         // Grain - Grain contacts
@@ -479,6 +504,9 @@ struct DEM : Widget, Poll {
             for(int c: range(3)) velocity[i][c] += dv[i*3+c];
             size_t oldCell = grid.index(position[i]);
             for(int c: range(3)) position[i][c] += dt*velocity[i][c];
+            position[i].x = clamp(-1.f, position[i].x, 1.f);
+            position[i].y = clamp(-1.f, position[i].y, 1.f);
+            position[i].z = clamp(0.f, position[i].z, 2.f);
             size_t newCell = grid.index(position[i]);
             if(oldCell != newCell) {
                 grid[oldCell].remove(1+i);
@@ -525,11 +553,6 @@ struct DEM : Widget, Poll {
     Thread solverThread;
     DEM() : Poll(0, POLLIN, solverThread) {
         b.clear();
-        size_t i = wireCount; wireCount++;
-        position[wire+i] = vec3(winchRadius,0, pourHeight);
-        velocity[wire+i] = 0;
-        contacts.set(wire+i);
-        wireGrid[wireGrid.index(position[wire+i])].append(1+wire+i);
         step();
         solverThread.spawn();
 
