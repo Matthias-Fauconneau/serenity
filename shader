@@ -26,12 +26,12 @@ fragment {
                 if(length(vTexCoords) > 1) discard;
                 float dz = sqrt(1-dot(vTexCoords,vTexCoords));
                 color = vec4(vec3(dz), 1);
-                gl_FragDepth = gl_FragCoord.z - dz/16/2/2;
+                gl_FragDepth = gl_FragCoord.z - dz/32/2/2*2;
         }
         cylinder {
                 in vec2 vTexCoords;
                 float dz = sqrt(1-abs(vTexCoords.x));
                 color = vec4(vec3(dz), 1);
-                gl_FragDepth = gl_FragCoord.z - dz/128/2;
+                gl_FragDepth = gl_FragCoord.z - dz/256/2*2;
         }
 }

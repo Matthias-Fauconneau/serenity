@@ -21,29 +21,31 @@ struct Contact { // 16 w
     float fN; // Force
     vec3 v; // Relative velocity
     vec3 currentPosition; // Current contact position
-    vec3 friction(const float friction) {
+    vec3 friction(const float /*friction*/) {
         vec3 fT = 0;
-        {const float dynamicFriction = friction;
-            float vl = length(v);
-            if(vl) fT -= dynamicFriction * fN * v / vl;
+        {const float dynamicFriction = 1; //friction;
+            vec3 t = v-dot(n, v)*n;
+            float vl = length(t); // vt
+            if(vl) fT -= dynamicFriction * fN * t / vl;
+            assert_(isNumber(fT), "d", v, t, fN);
         }
-        const float staticFrictionVelocity = 1;
-        if(length(v) < staticFrictionVelocity) { // Static friction
+        if(1 || length(v) < 1) { // Static friction
             vec3 x = currentPosition - initialPosition;
             vec3 t = x-dot(n, x)*n;
             float l = length(t);
             /*if(l < 1./128)*/ { // FIXME
-                const float staticFriction = 1./4; //friction;
+                const float staticFriction = 1; //friction;
                 fT -= staticFriction * abs(fN) * t;
                 assert_(isNumber(fT), fN, t);
                 if(l) {
                     vec3 u = t/l;
-                    constexpr float tangentialDamping = 1./4; //1./4; //1./8;
+                    constexpr float tangentialDamping = 0;//0x1p-10; //FIXME
                     fT -= tangentialDamping * dot(u, v) * u;
                     assert_(isNumber(fT), "t", v, u);
                 } // else static equilibrium
             }
         } else initialPosition = currentPosition; // Dynamic friction
+        assert_(isNumber(fT), "f", v);
         return fT;
     }
 };
@@ -96,10 +98,10 @@ String str(const Grid::List& o) { return str((mref<uint16>)o); }
 
 struct DEM : Widget, Poll {
     static constexpr size_t wire = 0;
-    static constexpr size_t wireCapacity = 512;
+    static constexpr size_t wireCapacity = 1024;
     size_t wireCount = 0;
     static constexpr size_t grain = wire+wireCapacity;
-    static constexpr size_t grainCapacity = 256;
+    static constexpr size_t grainCapacity = 1536;
     size_t grainCount = 0;
     static constexpr size_t elementCapacity = grain+grainCapacity;
 
@@ -116,28 +118,30 @@ struct DEM : Widget, Poll {
     buffer<vec3> torque { grainCapacity };
 
     // Space partition
-    Grid grainGrid {16}, wireGrid {64};
+    Grid grainGrid {32}, wireGrid {256};
 
     // Parameters
-    static constexpr float dt = 1./1024;
+    static constexpr float dt = 0x1p-10;
 
-    static constexpr float grainRadius = 1./16; // 62 mm
+    static constexpr float grainRadius = 1./32; // 62 mm dia
     static constexpr float grainMass = 4./3*PI*cb(grainRadius);
-    static constexpr float grainYoung = 1;
-    static constexpr float grainNormalDamping = 1./64;
+    static constexpr float grainYoung = 8;
+    static constexpr float grainNormalDamping = 1./512;
     static constexpr float grainFriction = 1;
 
-    static constexpr float wireRadius = 1./64; // /128 = 8 mm
-    static constexpr float internodeLength = 1./32; // 8, 4
-    static constexpr float wireMass = 1./4096;
-    static constexpr float wireYoung = 1;
-    static constexpr float wireNormalDamping = 1./64;
+    static constexpr float wireRadius = 1./256; // 1/256 = 8 mm dia
+    static constexpr float internodeLength = 4*wireRadius; // 8, 4
+    static constexpr float wireMass = 0x1p-18; // internodeLength * PI * wireRadius * wireRadius
+    static constexpr float wireYoung = 8;
+    static constexpr float wireNormalDamping = 0x1p-10;
     static constexpr float wireFriction = 1;
 
-    static constexpr float wireTensionStiffness = 1./4; // 4
-    static constexpr float wireTensionDamping = 1./64;
-    static constexpr float wireBendStiffness = 1./512; // 2, 8, 100
-    static constexpr float wireBendDamping = 1./512; // -8, -100
+    static constexpr float wireTensionStiffness = 0x1p-5; // 4
+    static constexpr float wireTensionDamping = 0x1p-10;
+    //static constexpr float wireBendStiffness = 1./512; // 2, 8, 100
+    //static constexpr float wireBendDamping = 1./512; // -8, -100
+
+    static constexpr float boundYoung = 1;
 
     // Time
     int timeStep = 0;
@@ -147,13 +151,13 @@ struct DEM : Widget, Poll {
     static constexpr float moldRadius = 1./2;
     static constexpr float winchRadius = moldRadius - grainRadius - wireRadius;
     static constexpr float pourRadius = moldRadius - grainRadius;
-    static constexpr float winchRate = 128, winchSpeed = 1./4;
+    static constexpr float winchRate = 256, winchSpeed = 1./2;
     float boundRadius = moldRadius;
-    float winchAngle = 0, pourHeight = grainRadius;
+    float winchAngle = 0, pourHeight = 0;
     bool pour = true;
     Random random;
 
-    // Performance
+    // Performance assert_(xl);
     int64 lastReport = realTime();
     Time totalTime {true}, solveTime, floorTime;
     Time grainTime, wireContactTime, wireFrictionTime, grainIntegrationTime, wireIntegrationTime;
@@ -164,7 +168,8 @@ struct DEM : Widget, Poll {
         float fN = - ks * (xl - x0);
         vec3 f = fN * xn - kb * dot(xn, v) * xn;
         mat3 o = outer(xn, xn);
-        assert_(xl);
+        //assert_(xl, "spring");
+        if(!xl) return 0; //FIXME
         mat3 dxf = - ks * ((1 - x0/xl)*(1 - o) + o);
         mat3 dvf = - kb * o;
         for(int c0: range(3)) {
@@ -180,9 +185,10 @@ struct DEM : Widget, Poll {
         return fN;
     }
     // Linear(FIXME) spring to a fixed point
-    float spring(float ks, float kb, float x0, float xl, vec3 xn, size_t i, vec3 v, const bool implicit=false) {
+    float spring(float ks, float kb, float x0, float xl, vec3 xn, size_t i, vec3 v, const bool implicit=true) {
         float fN = - ks * (xl - x0);
         vec3 f = fN * xn - kb * dot(xn, v) * xn;
+        assert_(isNumber(f), "f", f, ks, kb, x0, xl, xn, i, v);
         if(implicit) {
             mat3 o = outer(xn, xn);
             assert_(xl, ks, kb, x0, xl , xn, i , v);
@@ -212,24 +218,24 @@ struct DEM : Widget, Poll {
     // Grain - Bound contact
     void contactGrainBound(size_t a) {
         {// Floor
-            float xl = position[a].z;
-            float x0 = grainRadius;
+            float xl = grainRadius + position[a].z;
+            float x0 = 2 * grainRadius;
             if(xl < x0) {
                 vec3 xn (0,0,1);
                 vec3 v = velocity[a] + cross(angularVelocity[a-grain], grainRadius*(+xn));
-                constexpr float E = grainYoung/2, R = grainRadius;
-                spring(4/3*E*sqrt(R), grainNormalDamping, x0, xl, xn, a, v);
+                constexpr float E = boundYoung/2, R = grainRadius;
+                spring(4/3*E*sqrt(R)*sqrt(x0-xl), grainNormalDamping, x0, xl, xn, a, v);
             }
         }
         {// Side
             vec3 x = vec3(position[a].xy(), 0);
             float xl = length(x);
             float x0 = boundRadius - grainRadius;
-            if(xl > x0) {
+            if(x0 < xl) {
                 vec3 xn = x/xl;
                 vec3 v = velocity[a] + cross(angularVelocity[a-grain], grainRadius*(+xn));
-                constexpr float E = grainYoung/2, R = grainRadius;
-                spring(4/3*E*sqrt(R), grainNormalDamping, x0, xl, xn, a, v);
+                constexpr float E = boundYoung/2, R = grainRadius;
+                spring(4/3*E*sqrt(R)*sqrt(xl-x0), grainNormalDamping, x0, xl, xn, a, v);
             }
         }
     }
@@ -243,7 +249,7 @@ struct DEM : Widget, Poll {
             vec3 v = (velocity[a] + cross(angularVelocity[a-grain], grainRadius*(+n)))
                           - (velocity[b] + cross(angularVelocity[b-grain], grainRadius*(-n)));
             constexpr float E = grainYoung/2, R = grainRadius/2;
-            float fN = spring(4/3*E*sqrt(R), grainNormalDamping, x0, xl, n, a, b, v);
+            float fN = spring(4/3*E*sqrt(R)*sqrt(x0-xl), grainNormalDamping, x0, xl, n, a, b, v);
             vec3 p = (position[a]+grainRadius*n + position[b]+grainRadius*(-n))/2.f;
             contact(a, b, n, v, fN, p);
         }
@@ -252,13 +258,13 @@ struct DEM : Widget, Poll {
     // Wire - Bound contact
     void contactWireBound(size_t a) {
         {// Floor
-            float xl = position[a].z;
-            float x0 = wireRadius;
+            float xl = wireRadius + position[a].z;
+            float x0 = 2 * wireRadius;
             if(xl < x0) {
                 vec3 n (0,0,1);
                 vec3 v = velocity[a];
-                constexpr float E = wireYoung/2, R = wireRadius;
-                float fN = spring(4/3*E*sqrt(R), wireNormalDamping, x0, xl, n, a, v);
+                constexpr float E = boundYoung/2, R = wireRadius;
+                float fN = spring(4/3*E*sqrt(R)*sqrt(x0-xl), wireNormalDamping, x0, xl, n, a, v);
                 vec3 p (position[a].xy(), (position[a].z-wireRadius)/2);
                 contact(a, invalid, n, v, fN, p);
             }
@@ -267,11 +273,11 @@ struct DEM : Widget, Poll {
             vec3 x = vec3(position[a].xy(), 0);
             float xl = length(x);
             float x0 = boundRadius + wireRadius;
-            if(xl > x0) {
+            if(x0 < xl) {
                 vec3 xn = x/xl;
                 vec3 v = velocity[a];
-                constexpr float E = wireYoung/2, R = wireRadius;
-                spring(4/3*E*sqrt(R), wireNormalDamping, x0, xl, xn, a, v);
+                constexpr float E = boundYoung/2, R = wireRadius;
+                spring(4/3*E*sqrt(R)*sqrt(xl-x0), wireNormalDamping, x0, xl, xn, a, v);
             }
         }
     }
@@ -279,12 +285,14 @@ struct DEM : Widget, Poll {
     void contactWireWire(size_t a, size_t b) {
         vec3 x = position[a] - position[b];
         float xl = length(x);
+        //assert_(xl, "ww", a, position[a], b, position[b]);
+        if(!xl) return; // FIXME
         float x0 = wireRadius + wireRadius;
         if(xl < x0) {
             vec3 xn = x/xl;
             vec3 v = velocity[a] - velocity[b];
             constexpr float E = wireYoung/2, R = wireRadius/2;
-            spring(4/3*E*sqrt(R), grainNormalDamping, x0, xl, xn, a, b, v);
+            spring(4/3*E*sqrt(R)*sqrt(x0-xl), grainNormalDamping, x0, xl, xn, a, b, v);
             // FIXME: Contact
         }
     }
@@ -295,9 +303,9 @@ struct DEM : Widget, Poll {
         float x0 = wireRadius + grainRadius;
         if(l < x0) {
             vec3 n = x/l;
-            vec3 v = velocity[a] - (velocity[b] /*+ cross(angularVelocity[b-grain], grainRadius*(-n))*/); //FIXME
-            constexpr float E = 1/(1/wireYoung + 1/grainYoung), R = 1/(1/wireRadius+1/grainRadius);
-            float fN = spring(4/3*E*sqrt(R), 1/(1/wireNormalDamping+1/grainNormalDamping), x0, l, n, a, b, v);
+            vec3 v = velocity[a] - (velocity[b] + cross(angularVelocity[b-grain], grainRadius*(-n)));
+            constexpr float E = wireYoung, R = wireRadius;
+            float fN = spring(4/3*E*sqrt(R)*(x0-l), wireNormalDamping, x0, l, n, a, b, v);
             vec3 p = (position[a]+wireRadius*n + position[b]+grainRadius*(-n))/2.f;
             contact(a, b, n, v, fN, p);
         }
@@ -315,7 +323,7 @@ struct DEM : Widget, Poll {
             // Generates falling grain (pour)
             for(;;) {
                 //for(vec3 p: position.slice(grain, grainCount)) pourHeight = max(pourHeight, p.z);
-                vec3 p(random()*2-1,random()*2-1, pourHeight);
+                vec3 p(random()*2-1,random()*2-1, pourHeight+grainRadius);
                 if(length(p.xy())>1) continue;
                 vec3 newPosition (pourRadius*p.xy(), p.z);
                 for(vec3 p: position.slice(wire, wireCount)) if(length(p - newPosition) < grainRadius+wireRadius) goto break2_;
@@ -335,18 +343,25 @@ struct DEM : Widget, Poll {
             winchAngle += winchRate * dt * winchRadius * internodeLength;
             pourHeight += winchSpeed * grainRadius * dt;
             vec3 winchPosition (winchRadius*cos(winchAngle), winchRadius*sin(winchAngle), pourHeight);
-            for(vec3 p: position.slice(grain, grainCount)) if(length(winchPosition - p) < grainRadius + wireRadius) {
+            position[grain+0] = vec3(winchPosition.xy(), winchPosition.z+grainRadius); // Keeps spawn clear
+            /*for(vec3 p: position.slice(grain, grainCount)) if(length(winchPosition - p) < grainRadius + wireRadius) {
                 winchPosition.z = p.z+sqrt(sq(grainRadius+wireRadius)-sq((winchPosition - p).xy()));
-            }
+            }*/
             /*for(vec3 p: position.slice(grain, grainCount))
                 assert_(length(winchPosition - p) + 0x1p-12 >= grainRadius + wireRadius,
                         log2((grainRadius + wireRadius) - length(winchPosition - p)));*/
-            vec3 lastPosition = wireCount ? position[wire+wireCount-1] : vec3(winchRadius, winchRadius, pourHeight);
+            vec3 lastPosition = wireCount ? position[wire+wireCount-1] : vec3(winchRadius, 0, pourHeight);
             vec3 r = winchPosition - lastPosition;
             float l = length(r);
             if(1 && l > internodeLength*1.5) {
                 size_t i = wireCount; wireCount++;
-                position[wire+i] = lastPosition + internodeLength/l*r;
+                vec3 pos = lastPosition + internodeLength/l*r;
+                /*for(vec3 p: position.slice(grain, grainCount)) if(length(pos - p) < grainRadius + wireRadius) {
+                    pos.z = p.z+sqrt(sq(grainRadius+wireRadius)-sq((pos - p).xy()));
+                }*/
+                /*for(vec3 p: position.slice(wire, wireCount))
+                    assert_(length(pos - p) + 0x1p-12 >= wireRadius + wireRadius, pos, p);*/
+                position[wire+i] = pos;
                 velocity[wire+i] = 0;
                 contacts.set(wire+i);
                 wireGrid[wireGrid.index(position[wire+i])].append(1+wire+i);
@@ -504,9 +519,9 @@ struct DEM : Widget, Poll {
             for(int c: range(3)) velocity[i][c] += dv[i*3+c];
             size_t oldCell = grid.index(position[i]);
             for(int c: range(3)) position[i][c] += dt*velocity[i][c];
-            position[i].x = clamp(-1.f, position[i].x, 1.f);
-            position[i].y = clamp(-1.f, position[i].y, 1.f);
-            position[i].z = clamp(0.f, position[i].z, 2.f);
+            position[i].x = clamp(-1.f, position[i].x, 1.f-0x1p-12f);
+            position[i].y = clamp(-1.f, position[i].y, 1.f-0x1p-12f);
+            position[i].z = clamp(0.f, position[i].z, 2.f-0x1p-12f);
             size_t newCell = grid.index(position[i]);
             if(oldCell != newCell) {
                 grid[oldCell].remove(1+i);
@@ -566,7 +581,8 @@ struct DEM : Widget, Poll {
     }
     vec2 sizeHint(vec2) { return 1050; }
     shared<Graphics> graphics(vec2) {
-        mat4 viewProjection = mat4() .scale(vec3(1, 1, -1./2)) .rotateX(viewRotation.y) .rotateZ(viewRotation.x) .translate(vec3(0,0, -1./2));
+        mat4 viewProjection = mat4() .scale(vec3(2, 2, -1)) .rotateX(viewRotation.y) .rotateZ(viewRotation.x)
+                .translate(vec3(0,0, -1./4));
 
         const size_t grainCount = this->grainCount;
         if(grainCount) {
@@ -574,8 +590,8 @@ struct DEM : Widget, Poll {
             for(size_t i: range(grainCount)) {
                 // FIXME: GPU quad projection
                 vec3 O = viewProjection*position[grain+i];
-                vec3 min = O - vec3(vec2(grainRadius), 0); // Isometric
-                vec3 max = O + vec3(vec2(grainRadius), 0); // Isometric
+                vec3 min = O - vec3(vec2(2*grainRadius), 0); // Isometric
+                vec3 max = O + vec3(vec2(2*grainRadius), 0); // Isometric
                 positions[i*6+0] = min;
                 positions[i*6+1] = vec3(max.x, min.y, O.z);
                 positions[i*6+2] = vec3(min.x, max.y, O.z);
@@ -604,7 +620,7 @@ struct DEM : Widget, Poll {
                 float l = length(r);
                 vec2 t = r/l;
                 vec3 n (t.y, -t.x, 0);
-                float width = wireRadius;
+                float width = 2*wireRadius;
                 vec3 P[4] {A-width*n, A+width*n, B-width*n, B+width*n};
                 positions[i*6+0] = P[0];
                 positions[i*6+1] = P[1];
