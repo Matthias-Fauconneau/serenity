@@ -70,21 +70,30 @@ struct Grid : buffer<uint16> {
     };
     List operator[](size_t i) { return slice(i*cellCapacity, cellCapacity); }
     size_t index(int x, int y, int z) {
-        x = clamp(0, x, size.x-1);
-        y = clamp(0, y, size.y-1);
-        z = clamp(0, z, size.z-1);
+        assert_(x == clamp(0, x, size.x-1));
+        assert_(y == clamp(0, y, size.y-1));
+        assert_(z == clamp(0, z, size.z-1));
         return (z*size[1]+y)*size[0]+x;
     }
     int3 index3(vec3 p) { // [-1..1, 0..2] -> [1..size-1]
-        return int3(1,1,0) + int3(vec3(size-int3(2,2,1)) * (p+vec3(1,1,0))/2.f);
+        return int3(vec3(size)/2.f * (vec3(1,1,0)+p));
     }
-    size_t index(vec3 p) { int3 i = index3(p); return index(i.x, i.y, i.z);}
+    size_t index(vec3 p) {
+        int3 i = index3(p);
+        /*i.x = clamp(0, i.x, size.x-1);
+        i.y = clamp(0, i.y, size.y-1);
+        i.z = clamp(0, i.z, size.z-1);*/
+        assert_(i.x == clamp(0, i.x, size.x-1), p, i, size);
+        assert_(i.y == clamp(0, i.y, size.y-1), p, i, size);
+        assert_(i.z == clamp(0, i.z, size.z-1), p, i, size);
+        return index(i.x, i.y, i.z);
+    }
 };
-
+String str(const Grid::List& o) { return str((mref<uint16>)o); }
 
 struct DEM : Widget, Poll {
     static constexpr size_t wire = 0;
-    static constexpr size_t wireCapacity = 2048;
+    static constexpr size_t wireCapacity = 1024;
     size_t wireCount = 0;
     static constexpr size_t grain = wire+wireCapacity;
     static constexpr size_t grainCapacity = 512;
@@ -115,8 +124,8 @@ struct DEM : Widget, Poll {
     static constexpr float grainNormalDamping = 1./8;
     static constexpr float grainFriction = 1;
 
-    static constexpr float wireRadius = 1./128; // 8 mm
-    static constexpr float internodeLength = 1./64; // 8, 4
+    static constexpr float wireRadius = 1./64; // /128 = 8 mm
+    static constexpr float internodeLength = 1./32; // 8, 4
     static constexpr float wireMass = 1./2048;
     static constexpr float wireYoung = 16;
     static constexpr float wireNormalDamping = 1./64;
@@ -133,7 +142,7 @@ struct DEM : Widget, Poll {
     static constexpr float moldRadius = 1./2;
     static constexpr float winchRadius = moldRadius - grainRadius - wireRadius;
     static constexpr float pourRadius = moldRadius - grainRadius;
-    static constexpr float winchRate = 1024, winchSpeed = 1;
+    static constexpr float winchRate = 1024/4, winchSpeed = 1./4;
     float boundRadius = moldRadius;
     float winchAngle = 0, pourHeight = grainRadius;
     bool pour = true;
@@ -296,6 +305,7 @@ struct DEM : Widget, Poll {
         if(pour) {
             // Generates falling grain (pour)
             for(;;) {
+                //for(vec3 p: position.slice(grain, grainCount)) pourHeight = max(pourHeight, p.z);
                 vec3 p(random()*2-1,random()*2-1, pourHeight);
                 if(length(p.xy())>1) continue;
                 vec3 newPosition (pourRadius*p.xy(), p.z);
@@ -304,7 +314,7 @@ struct DEM : Widget, Poll {
                 position[grain+i] = newPosition;
                 velocity[grain+i] = 0;
                 contacts.set(grain+i);
-                grainGrid[grainGrid.index(position[i])].append(1+grain+i);
+                grainGrid[grainGrid.index(position[grain+i])].append(1+grain+i);
                 rotation[i] = quat();
                 angularVelocity[i] = 0;
                 torque[i] = 0;
@@ -315,6 +325,9 @@ struct DEM : Widget, Poll {
             winchAngle += winchRate * dt * winchRadius * internodeLength;
             pourHeight += winchSpeed * grainRadius * dt;
             vec3 winchPosition (winchRadius*cos(winchAngle), winchRadius*sin(winchAngle), pourHeight+grainRadius);
+            for(vec3 p: position.slice(grain, grainCount)) if(length(winchPosition - p) < grainRadius + wireRadius) {
+                winchPosition.z += sqrt(sq(grainRadius+wireRadius)-sq((winchPosition - p).xy())); break; // FIXME
+            }
             size_t lastWire = wire+wireCount-1;
             vec3 r = winchPosition-position[lastWire];
             float l = length(r);
@@ -323,7 +336,7 @@ struct DEM : Widget, Poll {
                 position[wire+i] = position[lastWire] + internodeLength/l*r;
                 velocity[wire+i] = 0;
                 contacts.set(wire+i);
-                wireGrid[wireGrid.index(position[i])].append(1+wire+i);
+                wireGrid[wireGrid.index(position[wire+i])].append(1+wire+i);
             }
         }
 
@@ -361,13 +374,16 @@ struct DEM : Widget, Poll {
         parallel_for(grain, grain+grainCount, [this](uint, int a) {
             if(1) {
                 int3 index = grainGrid.index3(position[a]);
-                for(int dz: range(-1, 1+1)) for(int dy: range(-1, 1+1)) for(int dx: range(-1, 1+1)) {
-                    if(index.z+dz < 0) continue;
-                    Grid::List list = grainGrid[grainGrid.index(index.x+dx, index.y+dy, index.z+dz)];
-                    for(size_t i=0; i<grainGrid.cellCapacity; i++) {
-                        int b = list[i]-1;
-                        if(!(a < b)) break; // Single contact per pair, until 0
-                        contactGrainGrain(a, b);
+                for(int z: range(max(0, index.z-1), min(index.z+2, grainGrid.size.z))) {
+                    for(int y: range(max(0, index.y-1), min(index.y+2, grainGrid.size.y))) {
+                        for(int x: range(max(0, index.x-1), min(index.x+2, grainGrid.size.x))) {
+                            Grid::List list = grainGrid[grainGrid.index(x, y, z)];
+                            for(size_t i=0; i<grainGrid.cellCapacity; i++) {
+                                int b = list[i]-1;
+                                if(!(a < b)) break; // Single contact per pair, until 0
+                                contactGrainGrain(a, b);
+                            }
+                        }
                     }
                 }
             } else {
@@ -397,27 +413,35 @@ struct DEM : Widget, Poll {
         parallel_for(wire, wire+wireCount, [this](uint, int a) {
             {
                 int3 index = wireGrid.index3(position[a]);
-                for(int dz: range(-1, 1+1)) for(int dy: range(-1, 1+1)) for(int dx: range(-1, 1+1)) {
-                    if(index.z+dz < 0) continue;
-                    Grid::List list = wireGrid[wireGrid.index(index.x+dx, index.y+dy, index.z+dz)];
-                    for(size_t i=0; i<wireGrid.cellCapacity; i++) {
-                        int b = list[i]-1;
-                        if(!(a+1 < b)) break; // No adjacent, single contact per pair, until 0
-                        contactWireWire(a, b);
+                for(int z: range(max(0, index.z-1), min(index.z+2, wireGrid.size.z))) {
+                    for(int y: range(max(0, index.y-1), min(index.y+2, wireGrid.size.y))) {
+                        for(int x: range(max(0, index.x-1), min(index.x+2, wireGrid.size.x))) {
+                            Grid::List list = wireGrid[wireGrid.index(x, y, z)];
+                            for(size_t i=0; i<wireGrid.cellCapacity; i++) {
+                                int b = list[i]-1;
+                                if(!(a+1 < b)) break; // No adjacent, single contact per pair, until 0
+                                contactWireWire(a, b);
+                            }
+                        }
                     }
                 }
             }
-            {
+            if(1) {
                 int3 index = grainGrid.index3(position[a]);
-                for(int dz: range(-1, 1+1)) for(int dy: range(-1, 1+1)) for(int dx: range(-1, 1+1)) {
-                    if(index.z+dz < 0) continue;
-                    Grid::List list = grainGrid[grainGrid.index(index.x+dx, index.y+dy, index.z+dz)];
-                    for(size_t i=0; i<grainGrid.cellCapacity; i++) {
-                        int b = list[i]-1;
-                        if(b<0) break; // until 0
-                        contactWireGrain(a, b);
+                for(int z: range(max(0, index.z-1), min(index.z+2, grainGrid.size.z))) {
+                    for(int y: range(max(0, index.y-1), min(index.y+2, grainGrid.size.y))) {
+                        for(int x: range(max(0, index.x-1), min(index.x+2, grainGrid.size.x))) {
+                            Grid::List list = grainGrid[grainGrid.index(x, y, z)];
+                            for(size_t i=0; i<grainGrid.cellCapacity; i++) {
+                                int b = list[i]-1;
+                                if(b<0) break; // until 0
+                                contactWireGrain(a, b);
+                            }
+                        }
                     }
                 }
+            } else {
+                for(int b: range(grain, grain+grainCount)) contactWireGrain(a, b);
             }
         });
         wireContactTime.stop();
@@ -505,7 +529,7 @@ struct DEM : Widget, Poll {
         position[wire+i] = vec3(winchRadius,0, pourHeight);
         velocity[wire+i] = 0;
         contacts.set(wire+i);
-        wireGrid[wireGrid.index(position[i])].append(1+wire+i);
+        wireGrid[wireGrid.index(position[wire+i])].append(1+wire+i);
         step();
         solverThread.spawn();
 
