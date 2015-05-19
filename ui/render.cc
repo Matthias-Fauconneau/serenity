@@ -163,7 +163,7 @@ static void line(Image8& raster, int2 p0, int2 p1) {
 	lastStepY=sy;
 }
 
-static vec2 cubic(vec2 A,vec2 B,vec2 C,vec2 D,float t) { return ((1-t)*(1-t)*(1-t))*A + (3*(1-t)*(1-t)*t)*B + (3*(1-t)*t*t)*C + (t*t*t)*D; }
+static vec2 cubic(vec2 A, vec2 B, vec2 C, vec2 D, real t) { return ((1-t)*(1-t)*(1-t))*A + (3*(1-t)*(1-t)*t)*B + (3*(1-t)*t*t)*C + (t*t*t)*D; }
 static void cubic(Image8& raster, vec2 A, vec2 B, vec2 C, vec2 D) {
 	const int N = 16; //FIXME
 	int2 a = int2(round(A));
@@ -188,8 +188,8 @@ void cubic(const Image& target, ref<vec2> sourcePoints, bgr3f color, float alpha
 	Image8 raster(oversample*size.x+1,oversample*size.y+1);
 	lastStepY = 0;
 	for(uint i=0;i<points.size; i+=3) {
-		cubic(raster, float(oversample)*(points[i]-pMin), float(oversample)*(points[(i+1)%points.size]-pMin),
-							 float(oversample)*(points[(i+2)%points.size]-pMin), float(oversample)*(points[(i+3)%points.size]-pMin) );
+        cubic(raster, real(oversample)*(points[i]-pMin), real(oversample)*(points[(i+1)%points.size]-pMin),
+                             real(oversample)*(points[(i+2)%points.size]-pMin), real(oversample)*(points[(i+3)%points.size]-pMin) );
 	}
 	for(uint y: range(cMin.y, cMax.y)) {
 		int acc[oversample]; mref<int>(acc,oversample).clear(0);

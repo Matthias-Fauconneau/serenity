@@ -21,7 +21,7 @@ void GLUniform::operator=(vec2 v) { assert(location>=0); glUseProgram(program); 
 void GLUniform::operator=(vec3 v) { assert(location>=0); glUseProgram(program); glUniform3f(location,v.x,v.y,v.z); }
 void GLUniform::operator=(vec4 v) { assert(location>=0); glUseProgram(program); glUniform4f(location,v.x,v.y,v.z,v.w); }
 void GLUniform::operator=(mat3x2 m) { assert(location>=0); glUseProgram(program); glUniformMatrix3x2fv(location,1,0,m.data); }
-void GLUniform::operator=(mat3 m) { assert(location>=0); glUseProgram(program); glUniformMatrix3fv(location,1,0,m.data); }
+//void GLUniform::operator=(mat3 m) { assert(location>=0); glUseProgram(program); glUniformMatrix3fv(location,1,0,m.data); }
 void GLUniform::operator=(mat4 m) { assert(location>=0); glUseProgram(program); glUniformMatrix4fv(location,1,0,m.data); }
 
 GLShader::GLShader(string source, ref<string> stages) {
@@ -307,7 +307,7 @@ void GLFrameBuffer::bind(uint clearFlags, vec4 color) {
         glClear(clearFlags);
     }
 }
-void GLFrameBuffer::bindWindow(int2 position, int2 size, uint clearFlags, vec4 color) {
+void GLFrameBuffer::bindWindow(int2 position, int2 size, uint clearFlags, vec4f color) {
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glViewport(position.x, position.y, size.x, size.y);
     if(clearFlags&ClearColor) glClearColor(color.x, color.y, color.z, color.w);

@@ -253,7 +253,7 @@ void XWindow::event() {
         {CreatePixmap r; send(({r.pixmap=id+Pixmap, r.window=id+Window, r.w=uint16(Window::size.x), r.h=uint16(Window::size.y), r;}));}
     }*/
 
-    GLFrameBuffer::bindWindow(0, Window::size, ClearColor|ClearDepth, vec4(backgroundColor,1));
+    GLFrameBuffer::bindWindow(0, Window::size, ClearColor|ClearDepth, vec4f(backgroundColor, 1));
     Update update = render(Window::size/*target*/);
 	if(update) {
         /*static GLShader shader {::shader(), {"blit"}};

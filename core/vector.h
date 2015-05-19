@@ -106,7 +106,9 @@ typedef vec<xy,int,2> int2;
 inline String strx(int2 N) { return str(N.x)+'x'+str(N.y); }
 /// Single precision x,y vector
 typedef vec<xy,float,2> float2;
-typedef vec<xy,float,2> vec2;
+typedef vec<xy,float,2> vec2f;
+//typedef vec<xy,float,2> vec2;
+typedef vec<xy,real,2> vec2;
 inline String strx(vec2 N) { return str(N.x)+'x'+str(N.y); }
 
 generic struct xyz {
@@ -118,9 +120,11 @@ typedef vec<xyz,int,3> int3;
 /// Integer x,y,z vector (16bit)
 typedef vec<xyz,uint16,3> short3;
 /// Floating-point x,y,z vector
-typedef vec<xyz,float,3> vec3;
+typedef vec<xyz,float,3> float3;
+typedef vec<xyz,float,3> vec3f;
 /// Double precision floating-point x,y,z vector
-typedef vec<xyz,double,3> dvec3;
+typedef vec<xyz,double,3> vec3d;
+typedef vec<xyz,real,3> vec3;
 
 inline vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y); }
 /*inline vec3 normal(vec3 v) {
@@ -137,7 +141,8 @@ generic struct xyzw {
     vec< ::xy,T,2> xy()const{ return *(vec< ::xyz,T,2>*)this; }
 };
 /// Floating-point x,y,z,w vector
-typedef vec<xyzw,float,4> vec4;
+typedef vec<xyzw,float,4> vec4f;
+typedef vec<xyzw,real,4> vec4;
 
 generic struct bgr {
     T b,g,r;
@@ -190,10 +195,10 @@ typedef vec<bgra,uint,4> uint4;
 /// Integer x,y vector (64bit)
 typedef vec<xy,int64,2> long2;
 
-template<template<Type> /*Type*/class V, Type T, uint N> inline /*constexpr*/ float length(const vec<V,T,N>& a) { return sqrt(dot(a,a)); }
+template<template<Type> /*Type*/class V, Type T, uint N> inline /*constexpr*/ real length(const vec<V,T,N>& a) { return sqrt(dot(a,a)); }
 
 struct quat {
-    float s = 1; vec3 v = 0;
+    real s = 1; vec3 v = 0;
     quat conjugate() const { return {s, -v}; }
 };
 inline quat operator*(quat p, quat q) { return {p.s*q.s - dot(p.v, q.v), p.s*q.v + q.s*p.v + cross(p.v, q.v)}; }
@@ -201,10 +206,10 @@ inline String str(quat q) { return "["+str(q.s, q.v)+"]"; }
 
 inline void closest(vec3 a1, vec3 a2, vec3 b1, vec3 b2, vec3& A, vec3& B) {
     const vec3 u = a2 - a1, v = b2 - b1, w = a1 - b1;
-    const float  a = dot(u,u), b = dot(u,v), c = dot(v,v), d = dot(u,w), e = dot(v,w);
-    const float D = a*c - b*b; float sD = D,  tD = D;
+    const real  a = dot(u,u), b = dot(u,v), c = dot(v,v), d = dot(u,w), e = dot(v,w);
+    const real D = a*c - b*b; real sD = D,  tD = D;
     // Compute the line parameters of the two closest points
-    float sN, tN;
+    real sN, tN;
     if(D < __FLT_EPSILON__) sN = 0, sD = 1, tN = e, tD = c;
     else {
         sN = (b*e - c*d), tN = (a*e - b*d);
@@ -223,8 +228,8 @@ inline void closest(vec3 a1, vec3 a2, vec3 b1, vec3 b2, vec3& A, vec3& B) {
         else if((-d + b) > a) sN = sD;
         else { sN = (-d + b); sD = a; }
     }
-    float sc = abs(sN) < __FLT_EPSILON__ ? 0 : sN / sD;
-    float tc = abs(tN) < __FLT_EPSILON__ ? 0 : tN / tD;
+    real sc = abs(sN) < __FLT_EPSILON__ ? 0 : sN / sD;
+    real tc = abs(tN) < __FLT_EPSILON__ ? 0 : tN / tD;
     A = a1 + (sc * u);
     B = b1 - (tc * v);
 }
