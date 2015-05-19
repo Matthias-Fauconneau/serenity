@@ -159,7 +159,7 @@ String str(double n, uint precision, uint exponent, uint pad) {
         uint64 decimal = round(fract*exp10(precision));
         uint exp10=1; for(uint i unused: range(precision)) exp10*=10; // Integer exp10(precision)
         if(decimal==exp10) integer++, decimal=0; // Rounds to ceiling integer
-		assert_(isNumber(integer), integer, n);
+        assert_(isNumber(integer)/*, integer, n*/);
         s.append( str(uint64(integer)) );
         s.append('.');
 		s.append( str(decimal, precision) );
