@@ -45,7 +45,7 @@ UMFPACK::UMFPACK(const Matrix& A):m(A.m),n(A.n){
     umfpack_di_numeric(columnPointers.data, rowIndices.data, values.data, symbolic.pointer, &numeric.pointer, 0, 0);
 }
 
-Vector UMFPACK::solve(const Vector& b) {
+Vector UMFPACK::solve(const vector& b) {
 #if DEBUG
     for(real e: b) assert(isNumber(e));// Asserts valid constant
 #endif

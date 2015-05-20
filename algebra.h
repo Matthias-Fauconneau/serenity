@@ -8,7 +8,7 @@ typedef buffer<real> Vector;
 
 /// Sparse matrix using compressed column storage (CCS)
 struct Matrix {
-    uint m=0,n=0; /// row and column count
+    size_t m=0,n=0; /// row and column count
     struct Element {
         uint row; real value;
         bool operator <(uint row) const { return this->row < row; }
@@ -16,11 +16,11 @@ struct Matrix {
     buffer<array<Element>> columns;
 
     Matrix(){}
-    Matrix(uint n) : m(n), n(n), columns{n} { columns.clear();}
-    Matrix(uint m, uint n) : m(m), n(n), columns{n} { columns.clear();}
+    Matrix(size_t n) : m(n), n(n), columns{n} { columns.clear();}
+    Matrix(size_t m, size_t n) : m(m), n(n), columns{n} { columns.clear();}
     void clear() { for(auto& column: columns) column.clear(); }
 
-    inline real operator()(uint i, uint j) const {
+    inline real operator()(size_t i, size_t j) const {
         assert(i<m && j<n);
         const array<Element>& column = columns[j];
         size_t index = column.binarySearch(i);
@@ -28,12 +28,12 @@ struct Matrix {
         return 0;
     }
 
-    inline real& operator()(uint i, uint j) {
+    inline real& operator()(size_t i, size_t j) {
         assert(i<m && j<n);
         array<Element>& column = columns[j];
         size_t index = column.binarySearch(i);
         if(index<column.size && column[index].row == i) return column[index].value;
-        return column.insertAt(index,Element{i, 0.0}).value;
+        return column.insertAt(index,Element{uint(i), 0.0}).value;
     }
 };
 
@@ -41,11 +41,11 @@ struct UMFPACK {
     UMFPACK(){}
     UMFPACK(const Matrix& A);
 
-    Vector solve(const Vector& b);
+    Vector solve(const vector& b);
 
     struct Symbolic : handle<void*> { ~Symbolic(); };
     struct Numeric : handle<void*> { Numeric(){} default_move(Numeric); ~Numeric(); };
-    uint m=0,n=0;
+    size_t m=0,n=0;
     buffer<int> columnPointers;
     buffer<int> rowIndices;
     buffer<real> values;
@@ -57,15 +57,15 @@ struct CholMod {
     CholMod(){}
     CholMod(const Matrix& A) {
         columnPointers = buffer<int>(n+1,n+1);
-        uint nnz=0;
-        for(uint j: range(A.n)) {
+        size_t nnz=0;
+        for(size_t j: range(A.n)) {
             columnPointers[j] = nnz;
             nnz += A.columns[j].size;
         }
         columnPointers[A.n] = nnz;
         rowIndices = buffer<int>(nnz);
         values = buffer<real>(nnz);
-        uint index=0;
+        size_t index=0;
         for(const array<Matrix::Element>& column: A.columns) {
             for(const Matrix::Element& e: column) {
                 rowIndices[index]=e.row;
@@ -102,7 +102,7 @@ struct CholMod {
         x = cholmod_solve (CHOLMOD_A, L, b, &c);
     }
 
-    uint m=0,n=0;
+    size_t m=0,n=0;
     buffer<int> columnPointers;
     buffer<int> rowIndices;
     buffer<real> values;

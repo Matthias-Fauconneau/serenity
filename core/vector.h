@@ -204,7 +204,8 @@ struct quat {
 inline quat operator*(quat p, quat q) { return {p.s*q.s - dot(p.v, q.v), p.s*q.v + q.s*p.v + cross(p.v, q.v)}; }
 inline String str(quat q) { return "["+str(q.s, q.v)+"]"; }
 
-inline void closest(vec3 a1, vec3 a2, vec3 b1, vec3 b2, vec3& A, vec3& B) {
+template<Type A, Type B> struct pair { A a; B b; };
+inline pair<vec3, vec3> closest(vec3 a1, vec3 a2, vec3 b1, vec3 b2) {
     const vec3 u = a2 - a1, v = b2 - b1, w = a1 - b1;
     const real  a = dot(u,u), b = dot(u,v), c = dot(v,v), d = dot(u,w), e = dot(v,w);
     const real D = a*c - b*b; real sD = D,  tD = D;
@@ -230,6 +231,5 @@ inline void closest(vec3 a1, vec3 a2, vec3 b1, vec3 b2, vec3& A, vec3& B) {
     }
     real sc = abs(sN) < __FLT_EPSILON__ ? 0 : sN / sD;
     real tc = abs(tN) < __FLT_EPSILON__ ? 0 : tN / tD;
-    A = a1 + (sc * u);
-    B = b1 - (tc * v);
+    return {a1 + (sc * u), b1 - (tc * v)};
 }

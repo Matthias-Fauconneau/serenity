@@ -3,9 +3,9 @@
 #include "array.h"
 #include "string.h"
 
-template<Type K, Type V> struct const_pair { const K& key; const V& value; };
-template<Type K, Type V> struct pair { K& key; V& value; };
-template<Type K, Type V> struct key_value { K key; V value; };
+template<Type K, Type V> struct const_entry { const K& key; const V& value; };
+template<Type K, Type V> struct entry { K& key; V& value; };
+
 /// Associates keys with values
 template<Type K, Type V> struct map {
     array<K> keys;
@@ -79,7 +79,7 @@ template<Type K, Type V> struct map {
         const K* k; const V* v;
         const_iterator(const K* k, const V* v) : k(k), v(v) {}
         bool operator!=(const const_iterator& o) const { return k != o.k; }
-        const_pair<K,V> operator* () const { return {*k,*v}; }
+        const_entry<K,V> operator* () const { return {*k,*v}; }
         const const_iterator& operator++ () { k++; v++; return *this; }
     };
     const_iterator begin() const { return const_iterator(keys.begin(),values.begin()); }
@@ -89,7 +89,7 @@ template<Type K, Type V> struct map {
         K* k; V* v;
         iterator(K* k, V* v) : k(k), v(v) {}
         bool operator!=(const iterator& o) const { return k != o.k; }
-        pair<K,V> operator* () const { return {*k,*v}; }
+        entry<K,V> operator* () const { return {*k,*v}; }
         const iterator& operator++ () { k++; v++; return *this; }
     };
     iterator begin() { return iterator(keys.begin(),values.begin()); }
@@ -97,8 +97,8 @@ template<Type K, Type V> struct map {
 
 	template<Type F> map& filter(F f) { for(size_t i=0; i<size();) if(f(keys[i], values[i])) { keys.removeAt(i); values.removeAt(i); } else i++; return *this; }
 
-	void appendMulti(const map& b) { for(const_pair<K, V> e: b) { insertMulti(copy(e.key), copy(e.value)); } }
-	void appendMulti(map&& b) { for(pair<K, V> e: b) { insertMulti(move(e.key), move(e.value)); } }
+    void appendMulti(const map& b) { for(const_entry<K, V> e: b) { insertMulti(copy(e.key), copy(e.value)); } }
+    void appendMulti(map&& b) { for(entry<K, V> e: b) { insertMulti(move(e.key), move(e.value)); } }
 };
 
 template<Type K, Type V> map<K,V> copy(const map<K,V>& o) {
