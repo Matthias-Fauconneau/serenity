@@ -49,7 +49,6 @@ Vector UMFPACK::solve(const vector& b) {
 #if DEBUG
     for(real e: b) assert(isNumber(e));// Asserts valid constant
 #endif
-    for(real e: b) assert_(isNumber(e));// Asserts valid constant
     Vector x(m);
     umfpack_di_solve(UMFPACK_A, columnPointers.data, rowIndices.data, values.data, (real*)x.data, b.data, numeric.pointer, 0, 0);
     return x;
