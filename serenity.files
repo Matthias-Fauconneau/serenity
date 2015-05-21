@@ -51,6 +51,8 @@ ui/widget.h
 ui/interface.cc
 ui/gl.h
 ui/gl.cc
+ui/plot.h
+ui/plot.cc
 
 layout/layout.h
 layout/parse.cc

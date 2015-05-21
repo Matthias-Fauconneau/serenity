@@ -1,28 +1,13 @@
 vertex {
         in vec3 position;
         gl_Position = vec4(position, 1);
-        sphere {
-         out vec2 vTexCoords;
-         vTexCoords = vec2[](vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(-1,1),vec2(1,-1),vec2(1,1))[gl_VertexID%6];
-        }
-        cylinder {
-         out vec2 vTexCoords;
-         vTexCoords = vec2[](vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(-1,1),vec2(1,-1),vec2(1,1))[gl_VertexID%6];
-        }
-        flat {
-         in vec3 aColor;
-         out vec3 vColor;
-         vColor = aColor;
-        }
+        out vec2 vTexCoords;
+        vTexCoords = vec2[](vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(-1,1),vec2(1,-1),vec2(1,1))[gl_VertexID%6];
 }
 fragment {
         out vec4 color;
-        flat {
-          in vec3 vColor;
-          color = vec4(vColor, 1);
-        }
+        in vec2 vTexCoords;
         sphere {
-                in vec2 vTexCoords;
                 if(length(vTexCoords) > 1) discard;
                 float dz = sqrt(1-dot(vTexCoords,vTexCoords));
                 vec3 v = vec3(vTexCoords, dz);
@@ -40,6 +25,10 @@ fragment {
                 float dz = sqrt(1-abs(vTexCoords.x));
                 color = vec4(vec3(dz), 1);
                 gl_FragDepth = gl_FragCoord.z - dz/256/2*2;
+        }
+        blit {
+         uniform sampler2D image;
+         color = texture2D(image, vTexCoords);
         }
 }
 

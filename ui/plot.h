@@ -13,7 +13,7 @@ struct Plot : virtual Widget {
 	String name, xlabel, ylabel;
     bool log[2] = {false, false};
     map<String, map<real,real>> dataSets;
-    bool plotPoints = true, plotLines = false;
+    bool plotPoints = false, plotLines = true;
     LegendPosition legendPosition;
     vec2 min = 0, max = 0;
 };

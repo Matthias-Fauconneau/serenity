@@ -201,6 +201,8 @@ struct quat {
     quat conjugate() const { return {s, -v}; }
 };
 inline quat operator*(quat p, quat q) { return {p.s*q.s - dot(p.v, q.v), p.s*q.v + q.s*p.v + cross(p.v, q.v)}; }
+inline quat operator*(float s, quat q) { return {s*q.s, s*q.v}; }
+inline quat operator+(quat p, quat q) { return {p.s+q.s, p.v+q.v}; }
 inline String str(quat q) { return "["+str(q.s, q.v)+"]"; }
 
 template<Type A, Type B> struct pair { A a; B b; };

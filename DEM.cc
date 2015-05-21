@@ -8,6 +8,8 @@
 #include "time.h"
 #include "parallel.h"
 #include "gl.h"
+#include "layout.h"
+#include "plot.h"
 FILE(shader)
 
 struct System {
@@ -19,6 +21,8 @@ struct System {
     static constexpr float T = 1; // ~ 1 s
     static constexpr float L = 1; // ~ 1 m
     static constexpr float M = 1; // M ~ ρL³ ~ 1000 kg
+
+    HList<Plot> plots;
 
     struct Contact {
         size_t index; // Identifies contact to avoid duplicates and evaluate friction
@@ -108,7 +112,7 @@ struct System {
         static constexpr float frictionCoefficient = 1;
 
         static constexpr size_t base = 0;
-        static constexpr size_t capacity = 2;
+        static constexpr size_t capacity = 3;
         buffer<vec3> position { capacity };
         buffer<vec3> velocity { capacity };
         buffer<array<Contact>> contacts { capacity };
@@ -288,6 +292,7 @@ struct Simulation : System {
     //Time grainTime, wireContactTime, wireFrictionTime, grainIntegrationTime, wireIntegrationTime;
 
     Simulation() {
+        //plots.grow(2); plots.mref::clear();
         // Winch obstacle
         size_t i = 0;
         vec3 winchPosition (winchRadius*cos(winchAngle), winchRadius*sin(winchAngle),
@@ -452,6 +457,11 @@ struct Simulation : System {
             }
         });
 
+        /*if(grain.count >= 2) {
+            plots[0].dataSets[""__][timeStep] = length(grain.torque[1]);
+            plots[1].dataSets[""__][timeStep] = length(grain.angularVelocity[1]);
+        }*/
+
         parallel_for(wire.count, [this](uint, int a) {
             /*{ // Wire - Wire
                 int3 index = wireGrid.index3(position[a]);
@@ -512,18 +522,18 @@ struct Simulation : System {
         for(size_t i: range(grain.count)) update(dv, grainGrid, grain, i);
         for(size_t i: range(wire.count)) update(dv, wireGrid, wire, i);
 
-        // PCDM rotation integration
         //grainIntegrationTime.start();
         if(1) // FIXME
         parallel_for(1, grain.count, [this](uint, size_t i) {
             static constexpr float I (2./3*Grain::mass*sq(Grain::radius)); // mat3
+#if 0 // PCDM rotation integration
             vec3 w = (grain.rotation[i].conjugate() * quat{0, grain.angularVelocity[i]} * grain.rotation[i]).v; // Local
             vec3 t = (grain.rotation[i].conjugate() * quat{0, grain.torque[i]} * grain.rotation[i]).v; // Local
             vec3 dw = 1/I * (t - cross(w, I*w));
             vec3 w4 = w + dt/4*dw;
             float w4l = length(w4);
             // Prediction (multiplicative update)
-            quat qp = w4l ? quat{cos(dt/4*w4l), sin(dt/4*w4l)*w4/w4l} * grain.rotation[i] : grain.rotation[i];
+            quat qp = w4l ? quat{cos(dt/4*w4l), sin(dt/4*w4l)/w4l*w4} * grain.rotation[i] : grain.rotation[i];
             vec3 w2 = w + dt/2*dw;
             vec3 w2w = (qp * quat{0, w2} * qp.conjugate()).v; // Global
             float w2wl = length(w2w);
@@ -531,6 +541,11 @@ struct Simulation : System {
             grain.rotation[i] = w2wl ? quat{cos(dt/2*w2wl), float(sin(dt/2*w2wl)/length(w2w))*w2w}
                                        * grain.rotation[i] : grain.rotation[i];
             grain.angularVelocity[i] = (grain.rotation[i] * quat{0, w + dt*dw} * grain.rotation[i].conjugate()).v;
+#else // Euler
+            vec3 w = grain.angularVelocity[i];
+            grain.rotation[i] = grain.rotation[i] + dt/2 * grain.rotation[i] * quat{0, w};
+            grain.angularVelocity[i] += dt/I * (grain.torque[i] - cross(w, I*w));
+#endif
         });
         //grainIntegrationTime.stop();
 
@@ -570,7 +585,12 @@ struct SimulationView : Simulation, Widget, Poll {
         glDepthTest(true);
     }
     vec2 sizeHint(vec2) { return 1050; }
-    shared<Graphics> graphics(vec2) {
+    shared<Graphics> graphics(vec2 size) {
+        {GLTexture plot = render(int2(size), this->plots.graphics(size, Rect(size)));
+            //static GLShader shader {::shader(), {"blit"}};
+            GLFrameBuffer::blitWindow(plot);
+        }
+
         mat4 viewProjection = mat4() .scale(vec3(2, 2, -1)) .rotateX(viewRotation.y) .rotateZ(viewRotation.x)
                 .translate(vec3(0,0, -1./4));
 
@@ -629,6 +649,7 @@ struct SimulationView : Simulation, Widget, Poll {
             vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
             vertexArray.draw(Triangles, positions.size);
         }
+
         return shared<Graphics>();
     }
 
