@@ -23,18 +23,18 @@ struct mat3x2 {
     vec2 operator*(vec2 v) const {vec2 r; for(int i: range(2)) r[i] = v.x*M(i,0)+v.y*M(i,1)+1*M(i,2); return r; }
 };
 
-struct mat3; inline mat3 operator*(real s, mat3 M);
+struct mat3; inline mat3 operator*(float s, mat3 M);
 /// 2D projective transformation or 3D linear transformation
 struct mat3 {
-    real data[3*3];
+    float data[3*3];
 
     mat3(vec3 d=1) { for(int i=0;i<3*3;i++) data[i]=0; for(int i=0;i<3;i++) M(i,i)=d[i]; }
     mat3(vec3 e0, vec3 e1, vec3 e2){for(int i=0;i<3;i++) M(i,0)=e0[i], M(i,1)=e1[i], M(i,2)=e2[i]; }
 
-    real M(int i, int j) const { return data[j*3+i]; }
-    real& M(int i, int j) { return data[j*3+i]; }
-    real operator()(int i, int j) const { return M(i,j); }
-    real& operator()(int i, int j) { return M(i,j); }
+    float M(int i, int j) const { return data[j*3+i]; }
+    float& M(int i, int j) { return data[j*3+i]; }
+    float operator()(int i, int j) const { return M(i,j); }
+    float& operator()(int i, int j) { return M(i,j); }
     vec3& operator[](int j) { return (vec3&)data[j*3]; }
     const vec3& operator[](int j) const { return (vec3&)data[j*3]; }
 
@@ -43,7 +43,7 @@ struct mat3 {
     mat3 operator*(mat3 b) const {
         mat3 r(0); for(int j: range(3)) for(int i: range(3)) for(int k: range(3)) r.M(i,j)+=M(i,k)*b.M(k,j); return r; }
 
-    real det() const {
+    float det() const {
         return
                 M(0,0) * (M(1,1) * M(2,2) - M(2,1) * M(1,2)) -
                 M(0,1) * (M(1,0) * M(2,2) - M(2,0) * M(1,2)) +
@@ -61,15 +61,15 @@ struct mat3 {
     mat3 inverse() const { return 1/det() * adjugate() ; }
 
     mat3 translate(vec2 v) const { mat3 r=*this; for(int i: range(2)) r(i,2) += M(i,0)*v.x + M(i,1)*v.y; return r; }
-    mat3 scale(real f) const { mat3 r=*this; for(int j: range(2))for(int i: range(3)) r(i,j)*=f; return r; }
-    void rotateX(real angle) { real c=cos(angle),s=sin(angle); mat3 r; r.M(1,1) = c; r.M(2,2) = c; r.M(1,2) = -s; r.M(2,1) = s; *this = *this * r; }
-    void rotateY(real angle) { real c=cos(angle),s=sin(angle); mat3 r; r.M(0,0) = c; r.M(2,2) = c; r.M(2,0) = -s; r.M(0,2) = s; *this = *this * r; }
-    void rotateZ(real angle) { real c=cos(angle),s=sin(angle); mat3 r; r.M(0,0) = c; r.M(1,1) = c; r.M(0,1) = -s; r.M(1,0) = s; *this = *this * r; }
+    mat3 scale(float f) const { mat3 r=*this; for(int j: range(2))for(int i: range(3)) r(i,j)*=f; return r; }
+    void rotateX(float angle) { float c=cos(angle),s=sin(angle); mat3 r; r.M(1,1) = c; r.M(2,2) = c; r.M(1,2) = -s; r.M(2,1) = s; *this = *this * r; }
+    void rotateY(float angle) { float c=cos(angle),s=sin(angle); mat3 r; r.M(0,0) = c; r.M(2,2) = c; r.M(2,0) = -s; r.M(0,2) = s; *this = *this * r; }
+    void rotateZ(float angle) { float c=cos(angle),s=sin(angle); mat3 r; r.M(0,0) = c; r.M(1,1) = c; r.M(0,1) = -s; r.M(1,0) = s; *this = *this * r; }
 };
-inline mat3 operator*(real s, mat3 M) {
+inline mat3 operator*(float s, mat3 M) {
     mat3 r; for(int j: range(3)) for(int i: range(3)) r.M(i,j) = s * M(i,j); return r; }
-//inline mat3 operator+(real s, mat3 M) { for(int i: range(3)) M(i,i) = s + M(i,i); return M; }
-inline mat3 operator-(real s, mat3 M) {
+//inline mat3 operator+(float s, mat3 M) { for(int i: range(3)) M(i,i) = s + M(i,i); return M; }
+inline mat3 operator-(float s, mat3 M) {
     for(int j: range(3)) for(int i: range(3)) M(i,j) = -M(i,j); for(int i: range(3)) M(i,i) += s; return M; }
 inline mat3 outer(vec3 a, vec3 b) {
     mat3 r; for(int j: range(3)) for(int i: range(3)) r.M(i,j)=a[i]*b[j]; return r; }
