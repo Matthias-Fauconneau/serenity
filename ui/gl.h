@@ -20,6 +20,7 @@ struct GLShader {
 	void bindFragments(ref<string> fragments);
 	uint attribLocation(string);
 	struct GLUniform operator[](string);
+    void bind(string name, const struct GLBuffer& ssbo);
 
     handle<uint> id = 0;
     map<String, int> attribLocations;

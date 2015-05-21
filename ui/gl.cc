@@ -57,7 +57,7 @@ GLShader::GLShader(string source, ref<string> stages) {
                 }
                 bool function = false;
                 static array<string> types = split("void float vec2 vec3 vec4"_," ");
-                static array<string> qualifiers = split("struct const uniform attribute varying in out"_," ");
+                static array<string> qualifiers = split("struct layout const uniform buffer attribute varying in out"_," ");
                 if(types.contains(identifier) && s.identifier("_"_) && s.match('(')) {
                     function = true;
                     s.until('{');
@@ -82,7 +82,7 @@ GLShader::GLShader(string source, ref<string> stages) {
             global.append( replace(stageGlobal,"$"_,str(i-1)) );
             main.append( replace(stageMain,"$"_,str(i-1)) );
         }
-        this->source.append( "#version 330\n"_+global+"\nvoid main() {\n"_+main+"\n}\n"_ );
+        this->source.append( "#version 430\n"_+global+"\nvoid main() {\n"_+main+"\n}\n"_ );
         uint shader = glCreateShader(type);
         glShaderSource(shader, 1, &this->source.last().data, (int*)&this->source.last().size);
         glCompileShader(shader);
@@ -128,6 +128,11 @@ GLUniform GLShader::operator[](string name) {
         uniformLocations.insert(copyRef(name), location);
     }
     return GLUniform(id, location);
+}
+void GLShader::bind(string name, const GLBuffer& ssbo) {
+    uint index = glGetProgramResourceIndex(id, GL_SHADER_STORAGE_BLOCK, strz(name));
+    glShaderStorageBlockBinding(id, index, 1);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ssbo.id);
 }
 
 /// Buffer
