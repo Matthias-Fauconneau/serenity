@@ -11,8 +11,8 @@
 FILE(shader)
 
 struct System {
-    static constexpr bool implicit = false; //  (m - δt²·∂xf - δt·∂vf) δv = δt·(f + δt·∂xf·v) else m δv = δt f
-    static constexpr real dt = 1./60;
+    static constexpr bool implicit = true; //  (m - δt²·∂xf - δt·∂vf) δv = δt·(f + δt·∂xf·v) else m δv = δt f
+    static constexpr real dt = 1./120;
     // Characteristic dimensions
     static constexpr real T = 1; // ~ 1 s
     static constexpr real L = 1; // ~ 1 m
@@ -26,31 +26,34 @@ struct System {
         real fN = 0;
         vec3 relativeVelocity = 0;
         vec3 currentPosition = 0;
-        template<Type Ta> vec3 friction() {
-            vec3 fT = 0;
-            const real dynamicFrictionCoefficient = Ta::frictionCoefficient; // [1]
+        vec3 friction(real frictionCoefficient) {
             vec3 tangentRelativeVelocity = relativeVelocity - dot(normal, relativeVelocity) * normal;
             real tangentRelativeSpeed = ::length(tangentRelativeVelocity);
-            if(tangentRelativeSpeed)
-                fT -= dynamicFrictionCoefficient * fN * tangentRelativeVelocity / tangentRelativeSpeed;
-            return fT; // DEBUG
-            constexpr real maximumStaticFrictionTangentRelativeSpeed = Ta::thickness / T; // [L/T]
-            if(tangentRelativeSpeed < maximumStaticFrictionTangentRelativeSpeed) { // + Static friction
+            constexpr real staticFrictionTangentRelativeSpeed = L / T;
+            if(tangentRelativeSpeed < staticFrictionTangentRelativeSpeed) { // Static friction
                 vec3 x = currentPosition - initialPosition;
                 vec3 tangentOffset = x - dot(normal, x) * normal;
                 real length = ::length(tangentOffset);
-                constexpr real maximumStaticFrictionSpringLength = Ta::thickness;
-                if(length < maximumStaticFrictionSpringLength) { // FIXME
-                    const real staticFrictionStiffness = Ta::frictionCoefficient / L; // [1/L]
+                vec3 fT = 0;
+                /*constexpr real maximumStaticFrictionSpringLength = Ta::thickness;
+                if(length < maximumStaticFrictionSpringLength)*/ { // FIXME
+                    const real staticFrictionStiffness = frictionCoefficient / L;
                     fT -= staticFrictionStiffness * fN * tangentOffset; // FIXME: implicit zero length spring ?
                     if(length) {
                         vec3 springDirection = tangentOffset / length;
-                        constexpr real tangentialDamping = 1./16 * Ta::mass / T;
+                        constexpr real tangentialDamping = Wire::mass / T;
                         fT -= tangentialDamping * dot(springDirection, relativeVelocity) * springDirection;
                     } // else static equilibrium
                 }
-            } else initialPosition = currentPosition; // Dynamic friction only
-            return fT;
+                return fT;
+            } else { // Dynamic friction
+                initialPosition = currentPosition;
+                const real dynamicFrictionCoefficient = frictionCoefficient;
+                vec3 fT = 0;
+                if(tangentRelativeSpeed)
+                    fT -= dynamicFrictionCoefficient * fN * tangentRelativeVelocity / tangentRelativeSpeed;
+                return fT;
+            }
         }
         bool operator==(const Contact& b) const { return index == b.index; }
     };
@@ -100,8 +103,8 @@ struct System {
         static constexpr real volume = 4./3*PI*cb(radius);
         static constexpr real density = M/cb(L);
         static constexpr real mass = density * volume;
-        static constexpr real elasticModulus = (implicit?16:8) * M / (L*T*T);
-        static constexpr real normalDamping = (implicit?1./8:16) * mass / T; // TODO: from restitution coefficient
+        static constexpr real elasticModulus = 8 * M / (L*T*T);
+        static constexpr real normalDamping = 4 * mass / T; // TODO: from restitution coefficient
         static constexpr real frictionCoefficient = 1;
 
         static constexpr size_t base = 0;
@@ -125,8 +128,8 @@ struct System {
         static constexpr real volume = PI * sq(radius) * internodeLength;
         static constexpr real density = M/cb(L);
         static constexpr real mass = density * volume;
-        static constexpr real elasticModulus = 1./16 * M / (L*T*T);
-        static constexpr real normalDamping = (implicit?1./8:8)  * mass / T; // TODO: from restitution coefficient
+        static constexpr real elasticModulus = 8 * M / (L*T*T);
+        static constexpr real normalDamping = 4 * mass / T; // TODO: from restitution coefficient
         static constexpr real frictionCoefficient = 1;
 
         static constexpr real tensionStiffness = 256 * mass / (T*T);
@@ -203,7 +206,7 @@ struct System {
             if(tA::capacity) F[tA::base+a] += dt*f;
             if(tB::capacity) F[tB::base+b] -= dt*f;
         }
-        return fS + fB;
+        return fS;// + fB;
     }
 };
 
@@ -259,7 +262,7 @@ struct Simulation : System {
                 t.position[i].y != clamp(-1., t.position[i].y, 1.-0x1p-12) ||
                 t.position[i].z != clamp(0., t.position[i].z, 2.-0x1p-12)) {
             stop = true;
-            log(t.position[i], t.velocity[i], dv[t.base+i]);
+            log(i, "p", t.position[i], "v", t.velocity[i], "dv", dv[t.base+i], "F", F[t.base+i]);
             t.position[i].x = clamp(-1., t.position[i].x, 1.-0x1p-12);
             t.position[i].y = clamp(-1., t.position[i].y, 1.-0x1p-12);
             t.position[i].z = clamp(0., t.position[i].z, 2.-0x1p-12);
@@ -273,7 +276,7 @@ struct Simulation : System {
     }
 
     // Process
-    static constexpr real winchRadius = Side::initialRadius /*- Grain::radius*/ - Wire::radius;
+    static constexpr real winchRadius = Side::initialRadius - Grain::radius;// - Wire::radius;
     static constexpr real pourRadius = Side::initialRadius - Grain::radius;
     static constexpr real winchRate = L / T, winchSpeed = 1./2 * L / T;
     real winchAngle = 0, pourHeight = Floor::height+Grain::radius;
@@ -293,7 +296,7 @@ struct Simulation : System {
             pour = false;
         }
         if(!pour && side.currentRadius < 2) {
-            //side.currentRadius += 1./1024 * T * dt;
+            side.currentRadius += T * dt;
         }
         if(pour) {
             // Generates falling grain (pour)
@@ -345,6 +348,11 @@ struct Simulation : System {
                 wire.contacts.set(i);
                 wireGrid[wireGrid.index(wire.position[i])].append(1+i);
             }
+        } else {
+            vec3 winchPosition (winchRadius*cos(winchAngle), winchRadius*sin(winchAngle),
+                                pourHeight+Grain::radius);
+            grain.position[0] = vec3(winchPosition.xy(), winchPosition.z+Grain::radius-Wire::radius);
+            grain.velocity[0] = 0;
         }
 
         // Initialization: gravity, bound
@@ -415,7 +423,7 @@ struct Simulation : System {
                 Contact& contact = grain.contacts[a][i];
                 if(contact.lastUpdate != timeStep) { grain.contacts[a].removeAt(i); continue; } else i++;
                 size_t b = contact.index;
-                vec3 fT = contact.friction<Grain>();
+                vec3 fT = contact.friction(Grain::frictionCoefficient);
                  F[grain.base+a] += dt*fT;
                  F[grain.base+b] -= dt*fT;
                  /*vec3 torque = cross(-Grain::radius*contact.normal, fT);
@@ -457,19 +465,18 @@ struct Simulation : System {
             }
         });
 
-        /*// Wire - Grain friction
+        // Wire - Grain friction
         parallel_for(wire.count, [this](uint, size_t a) {
             for(size_t i=0; i<wire.contacts[a].size;) {
                 Contact& c = wire.contacts[a][i];
                 if(c.lastUpdate != timeStep) { wire.contacts[a].removeAt(i); continue; } else i++;
                 size_t b = c.index;
-                //const real bFriction = b >= grain ? grainFriction : wireFriction; vec3 fT = c.friction((wireFriction+bFriction)/2);
-                vec3 fT = c.friction((wire.friction+grain.friction)/2);
-                F[(wire.base+a] += dt*fT;
-                F[(grain.base+b] -= dt*fT;
-                grain.torque[b] -= cross(grain.radius*c.normal, fT);
+                vec3 fT = c.friction(2/(1/Wire::frictionCoefficient+1/Grain::frictionCoefficient));
+                F[wire.base+a] += dt*fT;
+                F[grain.base+b] -= dt*fT;
+                //grain.torque[b] -= cross(-Grain::radius*c.normal, fT);
             }
-        });*/
+        });
 
         solveTime.start();
         buffer<vec3> dv;
