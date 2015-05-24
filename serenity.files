@@ -62,6 +62,4 @@ layout/export.cc
 algebra.h
 algebra.cc
 
-document.cc
-DEM.cc
-shader
+isometric.cc
