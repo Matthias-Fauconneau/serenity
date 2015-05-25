@@ -59,7 +59,4 @@ layout/parse.cc
 layout/preview.cc
 layout/export.cc
 
-algebra.h
-algebra.cc
-
 isometric.cc
