@@ -82,8 +82,8 @@ generic T sum(const vec& a) { T sum=0; for(uint i: range(N)) sum+=a[i]; return s
 generic T product(const vec& a) { T product=1; for(uint i: range(N)) product *= a[i]; return product; }
 generic T dot(const vec& a, const vec& b) { T ssq=0; for(uint i: range(N)) ssq += a[i]*b[i]; return ssq; }
 generic T sq(const vec& a) { return dot(a,a); }
-//generic float length(const vec& a) { return sqrt(dot(a,a)); }
-//generic vec normalize(const vec& a){ return a/length(a); }
+generic float length(const vec& a) { return sqrt(dot(a,a)); }
+generic vec normalize(const vec& a){ return a/length(a); }
 generic bool isNaN(const vec& v){ for(uint i: range(N)) if(isNaN(v[i])) return true; return false; }
 generic bool isNumber(const vec& v){ for(uint i: range(N)) if(!isNumber(v[i])) return false; return true; }
 
@@ -194,7 +194,7 @@ typedef vec<bgra,uint,4> uint4;
 /// Integer x,y vector (64bit)
 typedef vec<xy,int64,2> long2;
 
-template<template<Type> /*Type*/class V, Type T, uint N> inline /*constexpr*/ float length(const vec<V,T,N>& a) { return sqrt(dot(a,a)); }
+//template<template<Type> /*Type*/class V, Type T, uint N> inline /*constexpr*/ float length(const vec<V,T,N>& a) { return sqrt(dot(a,a)); }
 
 struct quat {
     float s = 1; vec3 v = 0;
