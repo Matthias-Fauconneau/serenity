@@ -30,6 +30,8 @@ io/png.cc
 io/bit.h
 io/flic.h
 io/font.cc
+io/jpeg.h
+io/jpeg.cc
 
 ui/x.h
 ui/display.h
