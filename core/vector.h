@@ -117,11 +117,12 @@ generic struct xyz {
 /// Integer x,y,z vector
 typedef vec<xyz,int,3> int3;
 /// Integer x,y,z vector (16bit)
-typedef vec<xyz,uint16,3> short3;
+typedef vec<xyz,int16,3> short3;
 /// Floating-point x,y,z vector
 typedef vec<xyz,float,3> float3;
 typedef vec<xyz,float,3> vec3f;
 /// Double precision floating-point x,y,z vector
+typedef vec<xyz,double,3> double3;
 typedef vec<xyz,double,3> vec3d;
 typedef vec<xyz,float,3> vec3;
 
@@ -139,6 +140,8 @@ generic struct xyzw {
     vec< ::xyz,T,3> xyw() const { return vec< ::xyz,T,3>{x,y,w}; }
     vec< ::xy,T,2> xy()const{ return *(vec< ::xyz,T,2>*)this; }
 };
+/// Integer x,y,z,w vector (16bit)
+typedef vec<xyzw,int16,4> short4;
 /// Floating-point x,y,z,w vector
 typedef vec<xyzw,float,4> vec4f;
 typedef vec<xyzw,float,4> vec4;
@@ -193,6 +196,8 @@ typedef vec<bgra,uint,4> uint4;
 
 /// Integer x,y vector (64bit)
 typedef vec<xy,int64,2> long2;
+/// Integer x,y,z,w vector (64bit)
+typedef vec<xyzw,int64,4> long4;
 
 //template<template<Type> /*Type*/class V, Type T, uint N> inline /*constexpr*/ float length(const vec<V,T,N>& a) { return sqrt(dot(a,a)); }
 

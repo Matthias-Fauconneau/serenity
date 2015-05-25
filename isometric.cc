@@ -1,69 +1,71 @@
-#include "thread.h"
 #include "window.h"
-#include "gl.h"
-#define big16 __builtin_bswap16
 
 struct Isometric : Widget {
     unique<Window> window = ::window(this, 0);
-    vec2 sizeHint(vec2) { return vec2(1366, 720); }
+
+    buffer<short4> points;
+    short4 min = -1, mean, max = 0;
+    Isometric() {
+        Map map ("6805_2520.las"_, home());
+        struct Header {
+            char signature[4]; //LASF
+            uint16 source, encoding;
+            uint32 project[4];
+            uint8 version[2], system[32], software[32];
+            uint16 day, year, size;
+            uint32 data, variableRecordCount;
+            uint8 format;
+            uint16 stride;
+            uint32 count;
+            uint32 countByReturn[5];
+            double3 scale, offset;
+            double maxX, minX, maxY, minY, maxZ, minZ;
+        } packed &header = *(Header*)map.data;
+        assert(header.format==1);
+        double3 minD (header.minX, header.minY, header.minZ);
+        double3 maxD (header.maxX, header.maxY, header.maxZ);
+        struct Point {
+            int3 position;
+            uint16 intensity;
+            uint8 returnNumber:3, returnCount:3, scanDirection:1, edgeOfFlightLine:1;
+            uint8 classification, scaneAngleRank, userData; uint16 id;
+            double time;
+        } packed;
+        assert_(sizeof(Point)==header.stride, sizeof(Point), header.stride);
+        points = buffer<short4>(header.count, 0);
+        int3 minI ((minD-header.offset)/header.scale), maxI ((maxD-header.offset)/header.scale);
+        int scale = (maxI.x-minI.x) / 2048;
+        long4 sum;
+        for(Point p: cast<Point>(map.slice(header.data)).slice(0, header.count)) {
+            short4 point(short3((p.position-minI)/scale), ::min(0xFF, int(p.intensity)));
+            min = ::min(min, point);
+            max = ::max(max, point);
+            sum += long4(point);
+            points.append(point);
+        }
+        mean = short4(sum / int64(points.size));
+        for(short4& p: points) p -= short4(mean.x, mean.y, mean.z, 0);
+        log(min, mean, max, header.count, log2(float(header.count)), points.size, log2(float(points.size)));
+    }
+
+    vec2 sizeHint(vec2) { return vec2(0); }
+    float pitch = PI/6, yaw = PI/2;
     shared<Graphics> graphics(vec2 unused size) {
-        Map map ("N47E008.hgt"_, home()); // (30, 30, 1)
-        Image16 elevation (3601, 3601);
-        uint min = -1, max = 0;
-        for(int y: range(elevation.size.y)) for(int x: range(elevation.size.x)) {
-            uint s = big16(cast<uint16>(map)[y*3601+x]);
-            elevation(x, y) = s;
-            min = ::min(min, s);
-            max = ::max(max, s);
-        }
-        // Evaluate
-        struct Voxel { float intensity; vec3 normal; };
-        struct Column { int z0; int count; Voxel voxels[3]; };
-        const int N = 2048; // 64 B/column, 2K, 256MB
-        ImageT<Column> columns (N, N);
-        for(int y: range(N)) {
-            for(int x: range(N)) {
-                auto& column = columns(x, y);
-                int z = elevation(1+x, 1+y);
-                column.z0 = z/30 - 1;
-                column.count = 3;
-                float dx = 2*30, dy = 2*30;
-                float dxz = elevation(1+x+1, 1+y) - elevation(1+x-1, 1+y);
-                float dyz = elevation(1+x, 1+y+1) - elevation(1+x, 1+y+1);
-                vec3 normal = normalize(vec3(-dy*dxz, -dx*dyz, dx*dy));
-                float a = float(z-min)/float(max-min);
-                float l = dot(normal, normalize(vec3(-1,-1,1)));
-                for(int dz: range(column.count)) column.voxels[dz] = {a*l, normal};
-            }
-        }
-        // Sample
         const int W=size.x, H=size.y;
-        buffer<float3> samples (H*W*4);
-        for(int y: range(N)) {
-            for(int x: range(N)) {
-                const auto& column = columns(x, y);
-                for(int dz: range(column.count)) {
-                    int z = column.z0 + dz;
-                    int X = W + (x - N/2) + (y - N/2);
-                    int Y = H*2 - (x - N/2) + (y - N/2) - z;
-                    int ix = X/2, fx = X%2;
-                    int iy = Y/4, fy = Y%4;
-                    if(iy>=0 && iy < H && ix >= 0 && ix < W) samples[(iy*W+ix)*4+fy/2*2+fx] = float3(column.voxels[dz].intensity);
-                }
-            }
-        }
-        // Resolve
         Image target = Image(int2(size));
-        for(size_t i: range(H*W)) {
-            float3 sum = 0;
-            for(float3 sample: samples.slice(i*4, 4)) sum += sample;
-            sum /= 4;
-            int3 linear (round(float(0xFFF)*sum));
-            extern const uint8 sRGB_forward[0x1000];
-            target[i] = byte4(sRGB_forward[linear[0]], sRGB_forward[linear[1]], sRGB_forward[linear[2]], 0xFF);
+        target.clear(0);
+        float Mxx = cos(yaw), Mxy = -sin(yaw);
+        float Myx = -sin(pitch)*sin(yaw), Myy = -sin(pitch)*cos(yaw), Myz = -cos(pitch);
+        for(short4 p: points) {
+            int x = p.x, y = p.y, z = p.z;
+            int X = W/2 + Mxx * x + Mxy * y;
+            int Y = H/2 + Myx * x + Myy * y + Myz * z;
+            if(X >= 0 && Y>= 0 && Y < H && X < W) target(X, Y) = p.w;
         }
         shared<Graphics> graphics;
         graphics->blits.append(0, size, move(target));
+        yaw += PI/120;
+        window->render();
         return graphics;
     }
 } view;
