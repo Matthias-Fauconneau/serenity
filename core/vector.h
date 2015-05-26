@@ -141,7 +141,7 @@ generic struct xyzw {
     vec< ::xy,T,2> xy()const{ return *(vec< ::xyz,T,2>*)this; }
 };
 /// Integer x,y,z,w vector (16bit)
-typedef vec<xyzw,int16,4> short4;
+typedef vec<xyzw,int16,4> vec4s;
 /// Floating-point x,y,z,w vector
 typedef vec<xyzw,float,4> vec4f;
 typedef vec<xyzw,float,4> vec4;
@@ -151,6 +151,8 @@ generic struct bgr {
 };
 /// Integer b,g,r vector (8bit)
 typedef vec<bgr,uint8,3> byte3;
+/// Integer b,g,r vector (16bit)
+typedef vec<bgr,int16,3> bgr3s;
 /// Integer b,g,r vector (32bit)
 typedef vec<bgr,int,3> bgr3i;
 /// Floating-point b,g,r vector
@@ -184,11 +186,13 @@ struct byte4 : vec<bgra,uint8,4> {
 	//byte3 bgr() { return byte3(b, g, r); } // -> bgra
 	// bgr3f
 	byte4(bgr3f bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
-	bgr3f bgr() { return bgr3f(b, g, r); }
+    //bgr3f bgr() { return bgr3f(b, g, r); }
 	// rgba
 	byte4(vec<rgba,uint8,4> rgba) : vec(rgba.b, rgba.g, rgba.r, rgba.a) {}
 	byte4(vec<rgb,uint8,3> rgb) : vec(rgb.b, rgb.g, rgb.r, 0xFF) {}
 };
+/// Integer b,g,r vector (16bit)
+typedef vec<bgra,int16,4> bgr4s;
 /// Integer b,g,r,a vector (32bit)
 typedef vec<bgra,int,4> int4;
 /// Unsigned integer b,g,r,a vector (32bit)
