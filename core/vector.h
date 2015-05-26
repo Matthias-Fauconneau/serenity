@@ -157,6 +157,8 @@ generic struct bgra;
 generic struct rgb {
     T r,g,b;
 };
+/// Floating-point r,g,b vector
+typedef vec<rgb,float,3> rgb3f;
 
 generic struct rgba;
 generic struct bgra {
@@ -200,6 +202,7 @@ struct quat {
     float s = 1; vec3 v = 0;
     quat conjugate() const { return {s, -v}; }
 };
+static_assert(sizeof(quat)==4*sizeof(float),"");
 inline quat operator*(quat p, quat q) { return {p.s*q.s - dot(p.v, q.v), p.s*q.v + q.s*p.v + cross(p.v, q.v)}; }
 inline quat operator*(float s, quat q) { return {s*q.s, s*q.v}; }
 inline quat operator+(quat p, quat q) { return {p.s+q.s, p.v+q.v}; }

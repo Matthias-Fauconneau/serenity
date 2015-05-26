@@ -14,8 +14,8 @@ FILE(shader)
 
 struct System {
     static constexpr bool implicit = false; //  (m - δt²·∂xf - δt·∂vf) δv = δt·(f + δt·∂xf·v) else m δv = δt f
-    static constexpr bool useWire = false;
-    static constexpr float dt = 1./60/4/64;
+    static constexpr bool useWire = true;
+    static constexpr float dt = 1./60/32;
     // Characteristic dimensions
     static constexpr float T = 1; // ~ 1 s
     static constexpr float L = 1; // ~ 1 m
@@ -42,21 +42,27 @@ struct System {
     struct Friction {
         size_t index; // Identifies contact to avoid duplicates and evaluate friction
         vec3 localA, localB; // in relative reference frames
-        size_t lastUpdate = 0; // Time step of last update (to remove stale contacts)
+        size_t lastUpdate = 0; // Time step of last update (to remove stale frictions)
         vec3 normal = 0;
         float fN = 0;
         vec3 relativeVelocity = 0;
+        rgb3f color = 0; // DEBUG
+        bool disable = false; //DEBUG
+        //vec3 A = 0, B = 0; // DEBUG
         bool operator==(const Friction& b) const { return index == b.index; }
     };
 
     struct Floor {
-        static constexpr float height = 0; //16*L/256; //Wire::radius;
+        static constexpr float mass = inf;
+        static constexpr float radius = inf;
+        static constexpr float height = 16*L/256; //Wire::radius;
         static constexpr float thickness = L;
         static constexpr float curvature = 0;
         static constexpr float elasticModulus = 16 * M/(L*T*T);
         static constexpr float normalDamping = M / T;
         static constexpr float frictionCoefficient = 1;
-        static constexpr size_t base = 0, capacity = 0;
+        static constexpr size_t base = 0, capacity = 1;
+        static constexpr bool fixed = true;
         static constexpr vec3 position[1] {vec3(0,0,0)};
         static constexpr vec3 velocity[1] {vec3(0,0,0)};
         static constexpr vec3 angularVelocity[1] {vec3(0,0,0)};
@@ -72,11 +78,14 @@ struct System {
     }
 
     struct Side {
+        static constexpr float mass = inf;
+        static constexpr float radius = inf;
         static constexpr float thickness = L;
         static constexpr float curvature = 0; // -1/radius?
         static constexpr float elasticModulus = 16 * M/(L*T*T);
         static constexpr float normalDamping = M / T;
         static constexpr float frictionCoefficient = 1;
+        static constexpr bool fixed = true;
         static constexpr vec3 position[1] {vec3(0,0,0)};
         static constexpr vec3 velocity[1] {vec3(0,0,0)};
         static constexpr vec3 angularVelocity[1] {vec3(0,0,0)};
@@ -84,7 +93,7 @@ struct System {
         vec3 torque[0] {};
         static constexpr float initialRadius = L/2/2;
         float currentRadius = initialRadius;
-        static constexpr size_t base = 0, capacity = 0;
+        static constexpr size_t base = Floor::base+Floor::capacity, capacity = 1;
         vec3 surfaceVelocity(size_t, vec3) const { return 0; }
     } side;
     /// Sphere - Side
@@ -108,11 +117,12 @@ struct System {
         static constexpr float normalDamping = 16 * mass / T; // TODO: from restitution coefficient
         static constexpr float frictionCoefficient = 1;
 
-        static constexpr size_t base = 0;
-        static constexpr size_t capacity = 2;
+        static constexpr size_t base = Side::base+Side::capacity;
+        static constexpr size_t capacity = 512;
+        static constexpr bool fixed = false;
         buffer<vec3> position { capacity };
         buffer<vec3> velocity { capacity };
-        buffer<array<Friction>> contacts { capacity };
+        buffer<array<Friction>> frictions { capacity };
         buffer<quat> rotation { capacity };
         buffer<vec3> angularVelocity { capacity };
         buffer<vec3> torque { capacity };
@@ -135,23 +145,29 @@ struct System {
         static constexpr float tensionDamping = 0 * mass/T; // 4
 
         static constexpr size_t base = Grain::base+Grain::capacity;
-        static constexpr size_t capacity = 0;
+        static constexpr size_t capacity = useWire ? 512 : 0;
+        static constexpr bool fixed = false;
         buffer<vec3> position { capacity };
         buffer<vec3> velocity { capacity };
         buffer<quat> rotation { capacity }; // FIXME
         buffer<vec3> angularVelocity { capacity }; // FIXME
-        buffer<array<Friction>> contacts { capacity };
+        buffer<vec3> torque { capacity }; // FIXME
+        buffer<array<Friction>> frictions { capacity };
         size_t count = 0;
     } wire;
 
     // Update
-    const size_t capacity = grain.capacity+wire.capacity;
+    static constexpr size_t capacity = Wire::base+Wire::capacity;
     Matrix matrix { implicit ? capacity*3 : 0};
     buffer<vec3d> F { capacity };
     System() { F.clear(); }
 
     size_t timeStep = 0;
     bool stop = false;
+
+    template<Type tA> vec3 toGlobal(tA& A, size_t a, vec3 localA) {
+        return A.position[a] + (A.rotation[a] * quat{0, localA} * A.rotation[a].conjugate()).v;
+    }
 
     /// Evaluates contact penalty between two objects
     template<Type tA, Type tB> void penalty(const tA& A, size_t a, const tB& B, size_t b) {
@@ -170,7 +186,9 @@ struct System {
         float fN = spring<tA, tB>(a, b, Ks, c.depth, 0, Kb, c.normal, relativeVelocity);
         vec3 localA = (A.rotation[a].conjugate()*quat{0, c.relativeA}*A.rotation[a]).v;
         vec3 localB = (B.rotation[b].conjugate()*quat{0, c.relativeB}*B.rotation[b]).v;
-        Friction& friction = A.contacts[a].add(Friction{b, localA, localB});
+        /*vec3 x = toGlobal(A, a, localA) - toGlobal(B, b, localB);
+        assert_(length(x - dot(c.normal, x) * c.normal) < 0x1p-24);*/
+        Friction& friction = A.frictions[a].add(Friction{tB::base+b, localA, localB});
         friction.lastUpdate = timeStep;
         friction.normal = c.normal;
         friction.fN = fN;
@@ -188,59 +206,68 @@ struct System {
             mat3 dvf = - Kb * o;
             for(int i: range(3)) {
                 for(int j: range(3)) {
-                    if(tA::capacity) matrix((tA::base+a)*3+i, (tA::base+a)*3+j) += - dt*dt*dxf(i, j) - dt*dvf(i, j);
-                    if(tB::capacity) matrix((tB::base+b)*3+i, (tB::base+b)*3+j) -= - dt*dt*dxf(i, j) - dt*dvf(i, j);
+                    if(!tA::fixed) matrix((tA::base+a)*3+i, (tA::base+a)*3+j) += - dt*dt*dxf(i, j) - dt*dvf(i, j);
+                    if(!tB::fixed) matrix((tB::base+b)*3+i, (tB::base+b)*3+j) -= - dt*dt*dxf(i, j) - dt*dvf(i, j);
                 }
-                if(tA::capacity) F[tA::base+a][i] += dt*f[i] + dt*dt*dxf(i, i) * relativeVelocity[i];
-                if(tB::capacity) F[tB::base+b][i] -= dt*f[i] + dt*dt*dxf(i, i) * relativeVelocity[i];
+                if(!tA::fixed) F[tA::base+a][i] += dt*f[i] + dt*dt*dxf(i, i) * relativeVelocity[i];
+                if(!tB::fixed) F[tB::base+b][i] -= dt*f[i] + dt*dt*dxf(i, i) * relativeVelocity[i];
             }
         } else {
-            if(tA::capacity) F[tA::base+a] += vec3d(dt*f);
-            if(tB::capacity) F[tB::base+b] -= vec3d(dt*f);
+            if(!tA::fixed) F[tA::base+a] += vec3d(dt*f);
+            if(!tB::fixed) F[tB::base+b] -= vec3d(dt*f);
         }
         return fS;// + fB;
     }
-    template<Type tA, Type tB> bool friction(const Friction& c, tA& A, size_t a, tB& B, size_t b) {
-        if(c.lastUpdate != timeStep) return false;
+    template<Type tA, Type tB> bool friction(Friction& f, tA& A, size_t a, tB& B, size_t b) {
+        f.color = 0;
+        if(f.lastUpdate != timeStep) return false;
         vec3 fT = 0;
-        vec3 tangentRelativeVelocity = c.relativeVelocity - dot(c.normal, c.relativeVelocity) * c.normal;
+        vec3 tangentRelativeVelocity = f.relativeVelocity - dot(f.normal, f.relativeVelocity) * f.normal;
         float tangentRelativeSpeed = ::length(tangentRelativeVelocity);
-        const float staticFrictionTangentRelativeSpeed = Wire::radius / T;
-        const float frictionCoefficient = 2/(1/tA::frictionCoefficient+1/tB::frictionCoefficient);
+        constexpr float frictionCoefficient = 2/(1/tA::frictionCoefficient+1/tB::frictionCoefficient);
+        constexpr float dynamicFrictionCoefficient = frictionCoefficient;
+        const float staticFrictionTangentRelativeSpeed =
+                //dynamicFrictionCoefficient * f.fN / (min(tA::mass, tB::mass) * T/*dt*/);
+                Grain::radius / T;
         bool staticFriction = tangentRelativeSpeed < staticFrictionTangentRelativeSpeed;
-        vec3 relativeA = (A.rotation[a] * quat{0, c.localA} * A.rotation[a].conjugate()).v;
-        vec3 relativeB = (B.rotation[b] * quat{0, c.localB} * B.rotation[b].conjugate()).v;
+        vec3 relativeA = (A.rotation[a-tA::base] * quat{0, f.localA} * A.rotation[a-tA::base].conjugate()).v;
+        vec3 relativeB = (B.rotation[b-tB::base] * quat{0, f.localB} * B.rotation[b-tB::base].conjugate()).v;
         if(staticFriction) { // Static friction
-            vec3 globalA = A.position[a] + relativeA;
-            vec3 globalB = B.position[b] +  relativeB;
+            vec3 globalA = A.position[a-tA::base] + relativeA;
+            vec3 globalB = B.position[b-tB::base] +  relativeB;
+            //f.A = globalA, f.B = globalB;
             vec3 x = globalA - globalB;
-            vec3 tangentOffset = x - dot(c.normal, x) * c.normal;
-            float length = ::length(tangentOffset);
-            constexpr float maximumStaticFrictionSpringLength = Wire::radius / 2;
-            //log(withName(globalA, globalB, x, tangentOffset, length/maximumStaticFrictionSpringLength));
-            staticFriction = length < maximumStaticFrictionSpringLength;
+            float distance = ::length(x);
+            constexpr float R = min(tA::radius, tB::radius);
+            vec3 tangentOffset = x - dot(f.normal, x) * f.normal;
+            float tangentLength = ::length(tangentOffset);
+            staticFriction =  distance < R/2 && tangentLength < R/16;
+            /*if(!staticFriction > R/2 && f.normal==vec3(0,0,1)) {
+                assert_(f.localB == relativeB);
+                log(a, tangentLength);
+            }*/
             if(staticFriction) {
-                const float staticFrictionStiffness = frictionCoefficient / Grain::radius;
-                fT -= staticFrictionStiffness * c.fN * tangentOffset; // FIXME: implicit zero length spring ?
-                if(length) {
-                    vec3 springDirection = tangentOffset / length;
-                    constexpr float tangentialDamping = Wire::mass / T;
-                    fT -= tangentialDamping * dot(springDirection, c.relativeVelocity) * springDirection;
+                const float staticFrictionStiffness = 1.f/8 * frictionCoefficient / min(tA::radius, tB::radius);
+                if(tangentLength) {
+                    vec3 springDirection = tangentOffset / tangentLength;
+                    float force = staticFrictionStiffness * f.fN * tangentLength;
+                    //force = min(force, min(tA::mass, tB::mass)*tangentLength/(T*T)); // Restores in T
+                    fT -= force * springDirection; // FIXME: implicit zero length spring ?
+                    constexpr float tangentialDamping = dt / T * min(tA::mass, tB::mass) / T;
+                    fT -= tangentialDamping * dot(springDirection, f.relativeVelocity) * springDirection;
+                    f.color = rgb3f(0,1,0);
                 } // else static equilibrium
             }
         }
-        if(!staticFriction) { // Dynamic friction
-            const float dynamicFrictionCoefficient = frictionCoefficient;
-            fT = - dynamicFrictionCoefficient * c.fN * tangentRelativeVelocity / tangentRelativeSpeed;
+        // Dynamic friction
+        if(!staticFriction && tangentRelativeSpeed >= staticFrictionTangentRelativeSpeed) {
+            fT = - 1.f/64 * dynamicFrictionCoefficient * f.fN * tangentRelativeVelocity / tangentRelativeSpeed;
+            f.color = rgb3f(1,0,0);
         }
-        if(tA::capacity) F[tA::base+a] += vec3d(dt*fT);
-        if(tB::capacity) F[tB::base+b] -= vec3d(dt*fT);
-        if(tA::capacity) {
-            /*log(withName(c.localA, relativeA, c.fN/Grain::mass, c.relativeVelocity, fT/Grain::mass,
-                         A.torque[a]/Grain::mass), cross(relativeA, fT)/Grain::mass);*/
-            A.torque[a] += cross(relativeA, fT);
-        }
-        if(tB::capacity) B.torque[b] -= cross(relativeB, fT);
+        if(!tA::fixed) F[a] += vec3d(dt*fT);
+        if(!tB::fixed) F[b] -= vec3d(dt*fT);
+        if(!tA::fixed) A.torque[a-tA::base] += cross(relativeA, fT);
+        if(!tB::fixed) B.torque[b-tB::base] -= cross(relativeB, fT);
         return staticFriction;
     }
 };
@@ -305,7 +332,7 @@ struct Simulation : System {
                 t.position[i].y != clamp(-1.f, t.position[i].y, 1.f-0x1p-12f) ||
                 t.position[i].z != clamp(0.f, t.position[i].z, 2.f-0x1p-12f)) {
             stop = true;
-            //log(i, "p", t.position[i], "v", t.velocity[i], "dv", dv[t.base+i], "F", F[t.base+i]);
+            log(i, "p", t.position[i], "v", t.velocity[i], "dv", dv[t.base+i], "F", F[t.base+i]);
             t.position[i].x = clamp(-1.f, t.position[i].x, 1.f-0x1p-12f);
             t.position[i].y = clamp(-1.f, t.position[i].y, 1.f-0x1p-12f);
             t.position[i].z = clamp(0.f, t.position[i].z, 2.f-0x1p-12f);
@@ -331,15 +358,19 @@ struct Simulation : System {
     Time totalTime {true}, solveTime;
     //Time grainTime, wireContactTime, wireFrictionTime, grainIntegrationTime, wireIntegrationTime;
 
+    // DEBUG
+    Lock lock;
+
     Simulation() {
         //plots.grow(2); plots.mref::clear();
+        F[0] = 0;
         if(useWire) { // Winch obstacle
             size_t i = grain.count; grain.count++;
             vec3 winchPosition (winchRadius*cos(winchAngle), winchRadius*sin(winchAngle),
                                 pourHeight+Grain::radius);
             grain.position[i] = vec3(winchPosition.xy(), winchPosition.z+Grain::radius-Wire::radius);
             grain.velocity[i] = 0;
-            grain.contacts.set(i);
+            grain.frictions.set(i);
             grainGrid[grainGrid.index(grain.position[i])].append(1+i);
             grain.rotation[i] = quat();
             grain.angularVelocity[i] = 0;
@@ -371,9 +402,12 @@ struct Simulation : System {
                 size_t i = grain.count; grain.count++;
                 grain.position[i] = newPosition;
                 grain.velocity[i] = 0;
-                grain.contacts.set(i);
+                grain.frictions.set(i);
                 grainGrid[grainGrid.index(grain.position[i])].append(1+i);
-                grain.rotation[i] = quat();
+                float t0 = 2*PI*random();
+                float t1 = acos(1-2*random());
+                float t2 = (PI*random()+acos(random()))/2;
+                grain.rotation[i] = {cos(t2), vec3(sin(t0)*sin(t1)*sin(t2), cos(t0)*sin(t1)*sin(t2), cos(t1)*sin(t2))};
                 grain.angularVelocity[i] = 0;
                 if(grain.capacity == 1 && i == 0) { // Push single particle to center
                     grain.velocity[0]  =  vec3((- grain.position[0] / T).xy(), 0);
@@ -411,51 +445,116 @@ struct Simulation : System {
                     wire.rotation[i] = quat();
                     wire.velocity[i] = 0;
                     wire.angularVelocity[i] = 0;
-                    wire.contacts.set(i);
+                    wire.frictions.set(i);
                     wireGrid[wireGrid.index(wire.position[i])].append(1+i);
                 }
             }
         } else if(useWire) {
             vec3 winchPosition (winchRadius*cos(winchAngle), winchRadius*sin(winchAngle),
                                 pourHeight+Grain::radius);
-            grain.position[0] = vec3(winchPosition.xy(), winchPosition.z+Grain::radius-Wire::radius);
-            grain.velocity[0] = 0;
-            grain.angularVelocity[0] = 0;
+            size_t i = 0;
+            grain.position[i] = vec3(winchPosition.xy(), winchPosition.z+Grain::radius-Wire::radius);
+            grain.velocity[i] = 0;
+            grain.angularVelocity[i] = 0;
         }
 
-        // Initialization: gravity, bound
+        // Initialization
         matrix.clear();
         constexpr vec3 g {0, 0, -1};
-        for(size_t i: range(grain.count)) {
-            grain.torque[i] = 0;
-            if(implicit) for(int c: range(3)) matrix((grain.base+i)*3+c, (grain.base+i)*3+c) = Grain::mass;
-            F[grain.base+i] = vec3d(dt * Grain::mass * g);
-            penalty(grain, i, floor, 0);
-            //penalty(grain, i, side, 0);
-        }
-        for(size_t i: range(wire.count)) {
-            if(implicit) for(int c: range(3)) matrix((wire.base+i)*3+c, (wire.base+i)*3+c) = Wire::mass;
-            F[wire.base+i] = vec3d(dt * Wire::mass * g);
-            penalty(wire, i, floor, 0);
-            penalty(wire, i, side, 0);
+
+        // Grain
+        {Locker lock(this->lock);
+            // Initialization
+            for(size_t i: range(grain.count)) {
+                {//DEBUG: kept from previous step for visualization
+                    size_t a = i;
+                    for(size_t i=0; i<grain.frictions[a].size;) { // TODO: keep non-trailing slots to avoid moves
+                        Friction& f = grain.frictions[a][i];
+                        if(f.disable) { grain.frictions[a].removeAt(i); continue; }
+                        else i++;
+                    }
+                }
+            }
+            for(size_t i: range(grain.count)) {
+                grain.torque[i] = 0;
+                if(implicit) for(int c: range(3)) matrix((grain.base+i)*3+c, (grain.base+i)*3+c) = Grain::mass;
+                F[grain.base+i] = vec3d(dt * Grain::mass * g);
+                penalty(grain, i, floor, 0);
+                penalty(grain, i, side, 0);
+            }
+            // Grain - Grain frictions
+            //grainTime.start();
+            parallel_for(grain.count, [this](uint, int a) {
+                int3 index = grainGrid.index3(grain.position[a]);
+                for(int z: range(max(0, index.z-1), min(index.z+2, grainGrid.size.z))) {
+                    for(int y: range(max(0, index.y-1), min(index.y+2, grainGrid.size.y))) {
+                        for(int x: range(max(0, index.x-1), min(index.x+2, grainGrid.size.x))) {
+                            Grid::List list = grainGrid[grainGrid.index(x, y, z)];
+                            for(size_t i=0; i<grainGrid.cellCapacity; i++) {
+                                int b = list[i]-1;
+                                if(!(a < b)) break; // Single penalty per pair, until 0
+                                penalty(grain, a, grain, b);
+                            }
+                        }
+                    }
+                }
+            });
+            //grainTime.stop();
+
+            // Grain - Grain friction
+            parallel_for(grain.count, [this](uint, size_t a) {
+                for(size_t i=0; i<grain.frictions[a].size;) {
+                    Friction& f = grain.frictions[a][i];
+                    size_t b = f.index; // index 0 is bound (floor or side)
+                    //if(b>1) { f.disable = true; i++; continue; } // DEBUG: no GG
+                    bool staticFriction;
+                    if(b==0) staticFriction = friction(f, grain, Grain::base+a, floor, b);
+                    else if(b==1) staticFriction = friction(f, grain, Grain::base+a, side, b);
+                    else staticFriction = friction(f, grain, Grain::base+a, grain, b);
+                    if(staticFriction) i++;
+                    //else { grain.frictions[a].removeAt(i); continue; } // No more contact or dynamic friction
+                    else { f.disable = true; i++; } // DEBUG
+                }
+            });
         }
 
-        // Wire tension
-        for(size_t i: range(1, wire.count)) {
-            size_t a = i-1, b = i;
-            vec3 relativePosition = wire.position[a] - wire.position[b];
-            float length = ::length(relativePosition);
-            //if(!length) continue; // FIXME
-            assert_(length, "tension", i, wire.position[a], wire.position[b]);
-            float restLength = Wire::internodeLength;
-            vec3 normal = relativePosition/length;
-            vec3 relativeVelocity = wire.velocity[a] - wire.velocity[b];
-            spring<Wire, Wire>(a, b, Wire::tensionStiffness, length, restLength, Wire::tensionDamping, normal,
-                               relativeVelocity);
-        }
+        // Wire
+        // Initialization
+        {Locker lock(this->lock);
+            for(size_t i: range(wire.count)) {
+                {//DEBUG: kept from previous step for visualization
+                    size_t a = i;
+                    for(size_t i=0; i<wire.frictions[a].size;) { // TODO: keep non-trailing slots to avoid moves
+                        Friction& f = wire.frictions[a][i];
+                        if(f.disable) { wire.frictions[a].removeAt(i); continue; }
+                        else i++;
+                    }
+                }
+            }
 
-        // Bending resistance
-        /*for(size_t i: range(1, wire.count-1)) {
+            for(size_t i: range(wire.count)) {
+                if(implicit) for(int c: range(3)) matrix((wire.base+i)*3+c, (wire.base+i)*3+c) = Wire::mass;
+                F[wire.base+i] = vec3d(dt * Wire::mass * g);
+                penalty(wire, i, floor, 0);
+                penalty(wire, i, side, 0);
+            }
+
+            // Tension
+            for(size_t i: range(1, wire.count)) {
+                size_t a = i-1, b = i;
+                vec3 relativePosition = wire.position[a] - wire.position[b];
+                float length = ::length(relativePosition);
+                //if(!length) continue; // FIXME
+                assert_(length, "tension", i, wire.position[a], wire.position[b]);
+                float restLength = Wire::internodeLength;
+                vec3 normal = relativePosition/length;
+                vec3 relativeVelocity = wire.velocity[a] - wire.velocity[b];
+                spring<Wire, Wire>(a, b, Wire::tensionStiffness, length, restLength, Wire::tensionDamping, normal,
+                                   relativeVelocity);
+            }
+
+            // Bending resistance
+            /*for(size_t i: range(1, wire.count-1)) {
             vec3 A = position[wire+i-1], B = position[wire+i], C = position[wire+i+1];
             vec3 B0 = (A+C)/2.f;
             vec3 x = B0 - B; // Outward from A to B
@@ -466,42 +565,13 @@ struct Simulation : System {
             spring(wireBendStiffness, wireBendDamping, x0, xl, nx, wire+i, v);
         }*/
 
-        // Grain - Grain contacts
-        //grainTime.start();
-        parallel_for(grain.count, [this](uint, int a) {
-            int3 index = grainGrid.index3(grain.position[a]);
-            for(int z: range(max(0, index.z-1), min(index.z+2, grainGrid.size.z))) {
-                for(int y: range(max(0, index.y-1), min(index.y+2, grainGrid.size.y))) {
-                    for(int x: range(max(0, index.x-1), min(index.x+2, grainGrid.size.x))) {
-                        Grid::List list = grainGrid[grainGrid.index(x, y, z)];
-                        for(size_t i=0; i<grainGrid.cellCapacity; i++) {
-                            int b = list[i]-1;
-                            if(!(a < b)) break; // Single penalty per pair, until 0
-                            penalty(grain, a, grain, b);
-                        }
-                    }
-                }
-            }
-        });
-        //grainTime.stop();
-
-        // Grain - Grain friction
-        parallel_for(grain.count, [this](uint, size_t a) {
-            for(size_t i=0; i<grain.contacts[a].size;) {
-                Friction& f = grain.contacts[a][i];
-                size_t b = f.index; // index 0 is bound (floor or side)
-                if(b ? friction(f, grain, a, grain, b) : friction(f, grain, a, floor, 0)) i++;
-                else { grain.contacts[a].removeAt(i); continue; } // No more contact or dynamic friction
-            }
-        });
-
-        /*if(grain.count >= 2) {
+            /*if(grain.count >= 2) {
             plots[0].dataSets[""__][timeStep] = length(grain.torque[1]);
             plots[1].dataSets[""__][timeStep] = length(grain.angularVelocity[1]);
         }*/
 
-        parallel_for(wire.count, [this](uint, int a) {
-            /*{ // Wire - Wire
+            parallel_for(wire.count, [this](uint, int a) {
+                /*{ // Wire - Wire
                 int3 index = wireGrid.index3(position[a]);
                 for(int z: range(max(0, index.z-1), min(index.z+2, wireGrid.size.z))) {
                     for(int y: range(max(0, index.y-1), min(index.y+2, wireGrid.size.y))) {
@@ -516,35 +586,39 @@ struct Simulation : System {
                     }
                 }
             }*/
-            { // Wire - Grain
-                int3 index = grainGrid.index3(wire.position[a]);
-                for(int z: range(max(0, index.z-1), min(index.z+2, grainGrid.size.z))) {
-                    for(int y: range(max(0, index.y-1), min(index.y+2, grainGrid.size.y))) {
-                        for(int x: range(max(0, index.x-1), min(index.x+2, grainGrid.size.x))) {
-                            Grid::List list = grainGrid[grainGrid.index(x, y, z)];
-                            for(size_t i=0; i<grainGrid.cellCapacity; i++) {
-                                int b = list[i]-1;
-                                if(b<=0) break; // until 0, except grain #0 (winch obstacle)
-                                penalty(wire, a, grain, b);
+                { // Wire - Grain
+                    int3 index = grainGrid.index3(wire.position[a]);
+                    for(int z: range(max(0, index.z-1), min(index.z+2, grainGrid.size.z))) {
+                        for(int y: range(max(0, index.y-1), min(index.y+2, grainGrid.size.y))) {
+                            for(int x: range(max(0, index.x-1), min(index.x+2, grainGrid.size.x))) {
+                                Grid::List list = grainGrid[grainGrid.index(x, y, z)];
+                                for(size_t i=0; i<grainGrid.cellCapacity; i++) {
+                                    int b = list[i]-1;
+                                    if(b<=0) break; // until 0, except grain #0 (winch obstacle)
+                                    penalty(wire, a, grain, b);
+                                }
                             }
                         }
                     }
                 }
-            }
-        });
+            });
 
-        /*// Wire - Grain friction
-        parallel_for(wire.count, [this](uint, size_t a) {
-            for(size_t i=0; i<wire.contacts[a].size;) {
-                Friction& c = wire.contacts[a][i];
-                if(c.lastUpdate != timeStep) { wire.contacts[a].removeAt(i); continue; } else i++;
-                size_t b = c.index;
-                vec3 fT = c.friction();
-                F[wire.base+a] += vec3d(dt*fT);
-                F[grain.base+b] -= vec3d(dt*fT);
-                grain.torque[b] -= cross(-Grain::radius*c.normal, fT);
-            }
-        });*/
+            // Wire - Grain friction
+            parallel_for(wire.count, [this](uint, size_t a) {
+                for(size_t i=0; i<wire.frictions[a].size;) {
+                    Friction& f = wire.frictions[a][i];
+                    if(f.lastUpdate != timeStep) { wire.frictions[a].removeAt(i); continue; } else i++;
+                    size_t b = f.index;
+                    bool staticFriction;
+                    if(b==0) staticFriction = friction(f, wire, Wire::base+a, floor, b);
+                    else if(b==1) staticFriction = friction(f, wire, Wire::base+a, side, b);
+                    else staticFriction = friction(f, wire, Wire::base+a, grain, b);
+                    if(staticFriction) i++;
+                    //else { grain.frictions[a].removeAt(i); continue; } // No more contact or dynamic friction
+                    else { f.disable = true; i++; } // DEBUG
+                }
+            });
+        }
 
         solveTime.start();
         buffer<vec3d> dv;
@@ -560,7 +634,7 @@ struct Simulation : System {
         for(size_t i: range(wire.count)) update(dv, wireGrid, wire, i);
 
         //grainIntegrationTime.start();
-        parallel_for(grain.count, [this](uint, size_t i) {
+        if(1) parallel_for(grain.count, [this](uint, size_t i) {
             static constexpr float I (2./3*Grain::mass*sq(Grain::radius)); // mat3
 #if 0 // PCDM rotation integration
             vec3 w = (grain.rotation[i].conjugate() * quat{0, grain.angularVelocity[i]} * grain.rotation[i]).v; // Local
@@ -617,8 +691,6 @@ struct SimulationView : Simulation, Widget, Poll {
             if(pour) { pour = false; window->setTitle("2"); log("Release", wire.count, grain.count); }
         };
         window->actions[Escape] = [this]{ log(wire.count, grain.count); requestTermination(); };
-
-        glDepthTest(true);
     }
     vec2 sizeHint(vec2) { return 1050; }
     shared<Graphics> graphics(vec2 unused size) {
@@ -626,13 +698,19 @@ struct SimulationView : Simulation, Widget, Poll {
             //static GLShader shader {::shader(), {"blit"}};
             GLFrameBuffer::blitWindow(plot);
         }*/
-
-        mat4 viewProjection = mat4() .scale(vec3(2, 2, -1)) .rotateX(viewRotation.y) .rotateZ(viewRotation.x)
+        glDepthTest(true);
+        mat4 viewProjection = mat4() .scale(vec3(2, 2, -1)) .rotateX(viewYawPitch.y) .rotateZ(viewYawPitch.x)
                 .translate(vec3(0,0, -1./4));
+        quat viewRotation =
+                quat{cos(viewYawPitch.y/2), sin(viewYawPitch.y/2)*vec3(1,0,0)} *
+                quat{cos(viewYawPitch.x/2), sin(viewYawPitch.x/2)*vec3(0,0,1)};
+
+        map<rgb3f, array<vec3>> lines;
 
         if(grain.count) {
             const size_t grainCount = grain.count;
             buffer<float3> positions {grainCount*6};
+            {Locker lock(this->lock);
             for(size_t i: range(grainCount)) {
                 // FIXME: GPU quad projection
                 float3 O (viewProjection*grain.position[i]);
@@ -644,7 +722,18 @@ struct SimulationView : Simulation, Widget, Poll {
                 positions[i*6+3] = float3(min.x, max.y, O.z);
                 positions[i*6+4] = float3(max.x, min.y, O.z);
                 positions[i*6+5] = max;
-            }
+
+                /*for(const Friction& f : grain.frictions[i]) {
+                    vec3 A = toGlobal(grain, i, f.localA);
+                    size_t b = f.index;
+                    vec3 B;
+                           if(b==0) B = toGlobal(floor, b-Floor::base, f.localB);
+                    else if(b==1) B = toGlobal(side, b-Side::base, f.localB);
+                    else B = toGlobal(grain, b-Grain::base, f.localB);
+                    lines[f.color].append(viewProjection*A);
+                    lines[f.color].append(viewProjection*B);
+                }*/
+            }}
 
             static GLShader shader {::shader(), {"sphere"}};
             shader.bind();
@@ -652,7 +741,8 @@ struct SimulationView : Simulation, Widget, Poll {
             static GLVertexArray vertexArray;
             GLBuffer positionBuffer (positions);
             vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
-            GLBuffer rotationBuffer (grain.rotation);
+            GLBuffer rotationBuffer (apply(grain.rotation,
+                                           [=](quat q) -> quat { return q*viewRotation.conjugate(); }));
             shader.bind("rotationBuffer"_, rotationBuffer);
             vertexArray.draw(Triangles, positions.size);
         }
@@ -660,6 +750,7 @@ struct SimulationView : Simulation, Widget, Poll {
         if(wire.count>1) {
             const size_t wireCount = this->wire.count;
             buffer<float3> positions {(wireCount-1)*6};
+            {Locker lock(this->lock);
             for(size_t i: range(wireCount-1)) {
                 vec3 a = wire.position[i], b = wire.position[i+1];
                 // FIXME: GPU quad projection
@@ -676,7 +767,19 @@ struct SimulationView : Simulation, Widget, Poll {
                 positions[i*6+3] = P[2];
                 positions[i*6+4] = P[1];
                 positions[i*6+5] = P[3];
-            }
+
+                for(const Friction& f : wire.frictions[i]) {
+                    //vec3 A = f.A, B = f.B;
+                    vec3 A = toGlobal(wire, i, f.localA);
+                    size_t b = f.index;
+                    vec3 B;
+                    /**/  if(b==0) B = toGlobal(floor, b-Floor::base, f.localB);
+                    else if(b==1) B = toGlobal(side, b-Side::base, f.localB);
+                    else B = toGlobal(grain, b-Grain::base, f.localB);
+                    lines[f.color].append(viewProjection*A);
+                    lines[f.color].append(viewProjection*B);
+                }
+            }}
             static GLShader shader {::shader(), {"cylinder"}};
             shader.bind();
             shader.bindFragments({"color"});
@@ -686,18 +789,29 @@ struct SimulationView : Simulation, Widget, Poll {
             vertexArray.draw(Triangles, positions.size);
         }
 
+        glDepthTest(false);
+        static GLShader shader {::shader(), {"flat"}};
+        shader.bind();
+        shader.bindFragments({"color"});
+        static GLVertexArray vertexArray;
+        for(auto entry: lines) {
+            shader["uColor"] = entry.key;
+            GLBuffer positionBuffer (entry.value);
+            vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
+            vertexArray.draw(Lines, entry.value.size);
+        }
         return shared<Graphics>();
     }
 
     // View
     vec2 lastPos; // Last cursor position to compute relative mouse movements
-    vec2 viewRotation = vec2(0, 0); // Current view angles (yaw,pitch)
+    vec2 viewYawPitch = vec2(0, 0); // Current view angles (yaw,pitch)
     // Orbital ("turntable") view control
     bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override {
         vec2 delta = cursor-lastPos; lastPos=cursor;
         if(event==Motion && button==LeftButton) {
-            viewRotation += float(2.f*PI) * delta / size; //TODO: warp
-            viewRotation.y= clamp(float(-PI), viewRotation.y, 0.f); // Keep pitch between [-PI, 0]
+            viewYawPitch += float(2.f*PI) * delta / size; //TODO: warp
+            viewYawPitch.y= clamp(float(-PI), viewYawPitch.y, 0.f); // Keep pitch between [-PI, 0]
         }
         else return false;
         return true;
