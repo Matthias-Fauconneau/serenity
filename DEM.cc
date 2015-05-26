@@ -10,12 +10,14 @@
 #include "gl.h"
 #include "layout.h"
 #include "plot.h"
+#include "encoder.h"
 FILE(shader)
 
 struct System {
-    static constexpr bool implicit = false; //  (m - δt²·∂xf - δt·∂vf) δv = δt·(f + δt·∂xf·v) else m δv = δt f
+    static constexpr bool implicit = true; //  (m - δt²·∂xf - δt·∂vf) δv = δt·(f + δt·∂xf·v) else m δv = δt f
     static constexpr bool useWire = true;
-    static constexpr float dt = 1./60/32;
+    static constexpr bool useRotation = false;
+    static constexpr float dt = 1./60/8;
     // Characteristic dimensions
     static constexpr float T = 1; // ~ 1 s
     static constexpr float L = 1; // ~ 1 m
@@ -61,6 +63,7 @@ struct System {
         static constexpr float elasticModulus = 16 * M/(L*T*T);
         static constexpr float normalDamping = M / T;
         static constexpr float frictionCoefficient = 1;
+        static constexpr float staticFrictionThreshold = /*Grain::radius*/L/32 / T;
         static constexpr size_t base = 0, capacity = 1;
         static constexpr bool fixed = true;
         static constexpr vec3 position[1] {vec3(0,0,0)};
@@ -85,6 +88,7 @@ struct System {
         static constexpr float elasticModulus = 16 * M/(L*T*T);
         static constexpr float normalDamping = M / T;
         static constexpr float frictionCoefficient = 1;
+        static constexpr float staticFrictionThreshold = /*Grain::radius*/L/32 / T;
         static constexpr bool fixed = true;
         static constexpr vec3 position[1] {vec3(0,0,0)};
         static constexpr vec3 velocity[1] {vec3(0,0,0)};
@@ -115,7 +119,8 @@ struct System {
         static constexpr float mass = density * volume;
         static constexpr float elasticModulus = 8 * M / (L*T*T);
         static constexpr float normalDamping = 16 * mass / T; // TODO: from restitution coefficient
-        static constexpr float frictionCoefficient = 1;
+        static constexpr float frictionCoefficient = 2;
+        static constexpr float staticFrictionThreshold = Grain::radius / T;
 
         static constexpr size_t base = Side::base+Side::capacity;
         static constexpr size_t capacity = 512;
@@ -137,15 +142,16 @@ struct System {
         static constexpr float volume = PI * sq(radius) * internodeLength;
         static constexpr float density = M/cb(L);
         static constexpr float mass = density * volume;
-        static constexpr float elasticModulus = 8 * M / (L*T*T); // 8
-        static constexpr float normalDamping = 4 * mass / T; // TODO: from restitution coefficient
-        static constexpr float frictionCoefficient = 1;
+        static constexpr float elasticModulus = 1./2 * M / (L*T*T); // 8
+        static constexpr float normalDamping = 1./512 * mass / T; // TODO: from restitution coefficient
+        static constexpr float frictionCoefficient = 2;
+        static constexpr float staticFrictionThreshold = 1./8 * L / T;
 
         static constexpr float tensionStiffness = 0x1p15 * mass / (T*T); // 14-15
-        static constexpr float tensionDamping = 0 * mass/T; // 4
+        static constexpr float tensionDamping = (implicit?0:4) * mass/T; // 4
 
         static constexpr size_t base = Grain::base+Grain::capacity;
-        static constexpr size_t capacity = useWire ? 512 : 0;
+        static constexpr size_t capacity = useWire ? 1024 : 0;
         static constexpr bool fixed = false;
         buffer<vec3> position { capacity };
         buffer<vec3> velocity { capacity };
@@ -216,52 +222,49 @@ struct System {
             if(!tA::fixed) F[tA::base+a] += vec3d(dt*f);
             if(!tB::fixed) F[tB::base+b] -= vec3d(dt*f);
         }
-        return fS;// + fB;
+        return fS + fB;
     }
     template<Type tA, Type tB> bool friction(Friction& f, tA& A, size_t a, tB& B, size_t b) {
         f.color = 0;
         if(f.lastUpdate != timeStep) return false;
+        f.color = rgb3f(1,0,0);
         vec3 fT = 0;
         vec3 tangentRelativeVelocity = f.relativeVelocity - dot(f.normal, f.relativeVelocity) * f.normal;
         float tangentRelativeSpeed = ::length(tangentRelativeVelocity);
+        constexpr float staticFrictionThreshold = ::max(tA::staticFrictionThreshold, tB::staticFrictionThreshold);
+        bool staticFriction =  tangentRelativeSpeed < staticFrictionThreshold;
         constexpr float frictionCoefficient = 2/(1/tA::frictionCoefficient+1/tB::frictionCoefficient);
-        constexpr float dynamicFrictionCoefficient = frictionCoefficient;
-        const float staticFrictionTangentRelativeSpeed =
-                //dynamicFrictionCoefficient * f.fN / (min(tA::mass, tB::mass) * T/*dt*/);
-                Grain::radius / T;
-        bool staticFriction = tangentRelativeSpeed < staticFrictionTangentRelativeSpeed;
         vec3 relativeA = (A.rotation[a-tA::base] * quat{0, f.localA} * A.rotation[a-tA::base].conjugate()).v;
         vec3 relativeB = (B.rotation[b-tB::base] * quat{0, f.localB} * B.rotation[b-tB::base].conjugate()).v;
-        if(staticFriction) { // Static friction
+        if(staticFriction) {
             vec3 globalA = A.position[a-tA::base] + relativeA;
             vec3 globalB = B.position[b-tB::base] +  relativeB;
-            //f.A = globalA, f.B = globalB;
             vec3 x = globalA - globalB;
             float distance = ::length(x);
-            constexpr float R = min(tA::radius, tB::radius);
-            vec3 tangentOffset = x - dot(f.normal, x) * f.normal;
-            float tangentLength = ::length(tangentOffset);
-            staticFriction =  distance < R/2 && tangentLength < R/16;
-            /*if(!staticFriction > R/2 && f.normal==vec3(0,0,1)) {
-                assert_(f.localB == relativeB);
-                log(a, tangentLength);
-            }*/
+            constexpr float R = Grain::radius; //min(tA::radius, tB::radius);
+            staticFriction = distance < R; //2;
             if(staticFriction) {
-                const float staticFrictionStiffness = 1.f/8 * frictionCoefficient / min(tA::radius, tB::radius);
-                if(tangentLength) {
-                    vec3 springDirection = tangentOffset / tangentLength;
-                    float force = staticFrictionStiffness * f.fN * tangentLength;
-                    //force = min(force, min(tA::mass, tB::mass)*tangentLength/(T*T)); // Restores in T
-                    fT -= force * springDirection; // FIXME: implicit zero length spring ?
-                    constexpr float tangentialDamping = dt / T * min(tA::mass, tB::mass) / T;
-                    fT -= tangentialDamping * dot(springDirection, f.relativeVelocity) * springDirection;
-                    f.color = rgb3f(0,1,0);
-                } // else static equilibrium
+                vec3 tangentOffset = x - dot(f.normal, x) * f.normal;
+                float tangentLength = ::length(tangentOffset);
+                staticFriction = tangentLength < R; //16;
+                if(staticFriction) {
+                    const float staticFrictionStiffness = frictionCoefficient / min(tA::radius, tB::radius); //1.f/8 *
+                    if(tangentLength) {
+                        vec3 springDirection = tangentOffset / tangentLength;
+                        float force = staticFrictionStiffness * f.fN * tangentLength;
+                        //force = min(force, min(tA::mass, tB::mass)*tangentLength/(T*T)); // Restores in T
+                        fT -= force * springDirection; // FIXME: implicit zero length spring ?
+                        constexpr float tangentialDamping = dt / T * min(tA::mass, tB::mass) / T;
+                        fT -= tangentialDamping * dot(springDirection, f.relativeVelocity) * springDirection;
+                        f.color = rgb3f(0,1,0);
+                    } // else static equilibrium
+                }
             }
         }
         // Dynamic friction
-        if(!staticFriction && tangentRelativeSpeed >= staticFrictionTangentRelativeSpeed) {
-            fT = - 1.f/64 * dynamicFrictionCoefficient * f.fN * tangentRelativeVelocity / tangentRelativeSpeed;
+        if(!staticFriction && tangentRelativeSpeed >= staticFrictionThreshold) {
+            constexpr float dynamicFrictionCoefficient = frictionCoefficient;
+            fT += - 1.f/64 * dynamicFrictionCoefficient * f.fN * tangentRelativeVelocity / tangentRelativeSpeed;
             f.color = rgb3f(1,0,0);
         }
         if(!tA::fixed) F[a] += vec3d(dt*fT);
@@ -348,7 +351,7 @@ struct Simulation : System {
     // Process
     static constexpr float winchRadius = Side::initialRadius - Grain::radius;
     static constexpr float pourRadius = Side::initialRadius - Grain::radius;
-    static constexpr float winchRate = 4 / T, winchSpeed = 1 * Grain::radius / T;
+    static constexpr float winchRate = 16 / T, winchSpeed = 2 * Grain::radius / T;
     float winchAngle = 0, pourHeight = Floor::height+Grain::radius;
     Random random;
     bool pour = true;
@@ -382,7 +385,7 @@ struct Simulation : System {
         // Process
         if(pour && (pourHeight>=2 || grain.count == grain.capacity
                     || (wire.capacity && wire.count == wire.capacity))) {
-            log("Release", grain.count, wire.count);
+            log("Release", "Grain", grain.count, "Wire", wire.count);
             pour = false;
         }
         if(!pour && side.currentRadius < L-Grain::radius) {
@@ -607,7 +610,7 @@ struct Simulation : System {
             parallel_for(wire.count, [this](uint, size_t a) {
                 for(size_t i=0; i<wire.frictions[a].size;) {
                     Friction& f = wire.frictions[a][i];
-                    if(f.lastUpdate != timeStep) { wire.frictions[a].removeAt(i); continue; } else i++;
+                    //if(f.lastUpdate != timeStep) { wire.frictions[a].removeAt(i); continue; } else i++;
                     size_t b = f.index;
                     bool staticFriction;
                     if(b==0) staticFriction = friction(f, wire, Wire::base+a, floor, b);
@@ -634,7 +637,7 @@ struct Simulation : System {
         for(size_t i: range(wire.count)) update(dv, wireGrid, wire, i);
 
         //grainIntegrationTime.start();
-        if(1) parallel_for(grain.count, [this](uint, size_t i) {
+        if(useRotation) parallel_for(grain.count, [this](uint, size_t i) {
             static constexpr float I (2./3*Grain::mass*sq(Grain::radius)); // mat3
 #if 0 // PCDM rotation integration
             vec3 w = (grain.rotation[i].conjugate() * quat{0, grain.angularVelocity[i]} * grain.rotation[i]).v; // Local
@@ -679,27 +682,49 @@ struct SimulationView : Simulation, Widget, Poll {
     }
     void event() { step(); }
 
-    unique<Window> window = ::window(this, 1050);
+    unique<Window> window = ::window(this, -1);
     Thread simulationThread;
+    unique<Encoder> encoder = nullptr;
+
     SimulationView() : Poll(0, POLLIN, simulationThread) {
         step();
         simulationThread.spawn();
 
-        if(0) window->actions[Space] = [this]{
-            writeFile(str(timeStep*dt), encodePNG(render(1050, graphics(1050))), home()); };
+        window->actions[Space] = [this]{
+            writeFile(str(timeStep*dt)+".png", encodePNG(window->readback()), home()); };
         window->actions[Return] = [this]{
-            if(pour) { pour = false; window->setTitle("2"); log("Release", wire.count, grain.count); }
+            if(pour) {
+                pour = false; window->setTitle("Released");
+                log("Release", "Grain", grain.count, "Wire", wire.count);
+            }
         };
-        window->actions[Escape] = [this]{ log(wire.count, grain.count); requestTermination(); };
+        window->actions[Escape] = [this]{
+            encoder = nullptr;
+            log("Grain", grain.count, "Wire", wire.count);
+            requestTermination();
+        };
+        window->actions[Key('E')] = [this] {
+            if(!encoder) {
+                encoder = unique<Encoder>("tas.mp4");
+                encoder->setH264(window->Window::size, 60);
+                encoder->open();
+            }
+        };
+        if(arguments().contains("export")) {
+            encoder = unique<Encoder>("tas.mp4"_);
+            encoder->setH264(window->Window::size, 60);
+            encoder->open();
+        }
     }
-    vec2 sizeHint(vec2) { return 1050; }
-    shared<Graphics> graphics(vec2 unused size) {
+    vec2 sizeHint(vec2) { return arguments().contains("export") ? vec2(1050) : 1050; }
+    shared<Graphics> graphics(vec2 size) {
         /*{GLTexture plot = render(int2(size), this->plots.graphics(size, Rect(size)));
             //static GLShader shader {::shader(), {"blit"}};
             GLFrameBuffer::blitWindow(plot);
         }*/
         glDepthTest(true);
-        mat4 viewProjection = mat4() .scale(vec3(2, 2, -1)) .rotateX(viewYawPitch.y) .rotateZ(viewYawPitch.x)
+        mat4 viewProjection = mat4() .scale(vec3(2, 2*size.x/size.y, -1))
+                .rotateX(viewYawPitch.y) .rotateZ(viewYawPitch.x)
                 .translate(vec3(0,0, -1./4));
         quat viewRotation =
                 quat{cos(viewYawPitch.y/2), sin(viewYawPitch.y/2)*vec3(1,0,0)} *
@@ -708,12 +733,13 @@ struct SimulationView : Simulation, Widget, Poll {
         map<rgb3f, array<vec3>> lines;
 
         if(grain.count) {
-            const size_t grainCount = grain.count;
+            size_t start = pour ? 0 : 1;
+            const size_t grainCount = grain.count-start;
             buffer<float3> positions {grainCount*6};
             {Locker lock(this->lock);
             for(size_t i: range(grainCount)) {
                 // FIXME: GPU quad projection
-                float3 O (viewProjection*grain.position[i]);
+                float3 O (viewProjection*grain.position[start+i]);
                 float3 min = O - float3(float2(2*Grain::radius), 0); // Isometric
                 float3 max = O + float3(float2(2*Grain::radius), 0); // Isometric
                 positions[i*6+0] = min;
@@ -741,7 +767,7 @@ struct SimulationView : Simulation, Widget, Poll {
             static GLVertexArray vertexArray;
             GLBuffer positionBuffer (positions);
             vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
-            GLBuffer rotationBuffer (apply(grain.rotation,
+            GLBuffer rotationBuffer (apply(grain.rotation.slice(start),
                                            [=](quat q) -> quat { return q*viewRotation.conjugate(); }));
             shader.bind("rotationBuffer"_, rotationBuffer);
             vertexArray.draw(Triangles, positions.size);
@@ -769,7 +795,6 @@ struct SimulationView : Simulation, Widget, Poll {
                 positions[i*6+5] = P[3];
 
                 for(const Friction& f : wire.frictions[i]) {
-                    //vec3 A = f.A, B = f.B;
                     vec3 A = toGlobal(wire, i, f.localA);
                     size_t b = f.index;
                     vec3 B;
@@ -789,7 +814,7 @@ struct SimulationView : Simulation, Widget, Poll {
             vertexArray.draw(Triangles, positions.size);
         }
 
-        glDepthTest(false);
+        //glDepthTest(false);
         static GLShader shader {::shader(), {"flat"}};
         shader.bind();
         shader.bindFragments({"color"});
@@ -800,12 +825,14 @@ struct SimulationView : Simulation, Widget, Poll {
             vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
             vertexArray.draw(Lines, entry.value.size);
         }
+
+        if(encoder) encoder->writeVideoFrame(window->readback());
         return shared<Graphics>();
     }
 
     // View
     vec2 lastPos; // Last cursor position to compute relative mouse movements
-    vec2 viewYawPitch = vec2(0, 0); // Current view angles (yaw,pitch)
+    vec2 viewYawPitch = vec2(0, -PI/3); // Current view angles (yaw,pitch)
     // Orbital ("turntable") view control
     bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override {
         vec2 delta = cursor-lastPos; lastPos=cursor;

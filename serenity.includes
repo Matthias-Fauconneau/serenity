@@ -6,6 +6,7 @@ music
 tuner
 image
 layout
+video
 /usr/include/libdrm
 /usr/include/freetype2
 /scratch/include

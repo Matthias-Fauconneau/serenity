@@ -59,9 +59,10 @@ layout/parse.cc
 layout/preview.cc
 layout/export.cc
 
+video/encoder.h
+video/encoder.cc
+
 algebra.h
 algebra.cc
-
-document.cc
 DEM.cc
 shader

@@ -83,7 +83,7 @@ XWindow::XWindow(Widget* widget, Thread& thread,  int2 sizeHint) : ::Window(widg
 
     glDisplay = XOpenDisplay(strz(environmentVariable("DISPLAY"_,":0"_))); assert_(glDisplay);
     const int fbAttribs[] = {GLX_DOUBLEBUFFER, 1, GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_ALPHA_SIZE, 0,  GLX_DEPTH_SIZE, 24,
-                             GLX_SAMPLE_BUFFERS, 1, GLX_SAMPLES, 8, 0};
+                             /*GLX_SAMPLE_BUFFERS, 1, GLX_SAMPLES, 8,*/ 0};
     int fbCount=0; fbConfig = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount)[0]; assert(fbConfig && fbCount);
     initializeThreadGLContext();
 
@@ -277,6 +277,12 @@ void XWindow::initializeThreadGLContext() {
     glContext = ((PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB"))
             (glDisplay, fbConfig, glContext, 1, contextAttribs);
     glXMakeCurrent(glDisplay, id+Window, glContext);
+}
+
+Image XWindow::readback() {
+    Image target(Window::size);
+    glReadPixels(0, 0, target.size.x, target.size.y, GL_BGRA, GL_UNSIGNED_BYTE, (void*)target.data);
+    return flip(move(target));
 }
 
 void XWindow::setCursor(MouseCursor /*cursor*/) {

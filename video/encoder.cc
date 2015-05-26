@@ -13,7 +13,8 @@ extern "C" {
 #include <libavcodec/avcodec.h> //avcodec
 #include <libavcodec/avcodec.h>
 #include <libavutil/avutil.h> //avutil
-#include <libavutil/opt.h> //fdk-aac
+#include <libavutil/opt.h>
+//fdk-aac
 #include <libavutil/channel_layout.h> //x264
 #include <libavutil/mathematics.h> //swresample
 }
@@ -21,10 +22,9 @@ extern "C" {
 #undef check
 #define check(expr, args...) ({ auto e = expr; if(int(e)<0) error(#expr ""_, (const char*)av_err2str(int(e)), ##args); e; })
 
-Encoder::Encoder(String&& name) : path(move(name)) {
+Encoder::Encoder(string name) : path(copyRef(name)) {
     lock.lock();
     av_register_all();
-    if(existsFile(path)) remove(strz(path));
     avformat_alloc_output_context2(&context, NULL, NULL, strz(path));
 }
 
@@ -159,12 +159,12 @@ void Encoder::writeVideoFrame(const Image& image) {
     int gotVideoPacket;
     avcodec_encode_video2(videoCodec, &pkt, frame, &gotVideoPacket);
     if(gotVideoPacket) {
-	videoEncodeTime = pkt.dts;
-	pkt.dts = pkt.dts*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
-	pkt.pts = pkt.pts*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
-	pkt.stream_index = videoStream->index;
-	Locker locker(lock);
-	av_interleaved_write_frame(context, &pkt);
+        videoEncodeTime = pkt.dts;
+        pkt.dts = pkt.dts*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
+        pkt.pts = pkt.pts*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
+        pkt.stream_index = videoStream->index;
+        //Locker locker(lock);
+        av_interleaved_write_frame(context, &pkt);
     }
     videoTime++;
 }
@@ -183,10 +183,10 @@ void Encoder::writeAudioFrame(ref<int16> audio) {
     int gotAudioPacket;
     avcodec_encode_audio2(audioCodec, &pkt, &frame, &gotAudioPacket);
     if(gotAudioPacket) {
-	audioEncodeTime = pkt.dts;
-	pkt.stream_index = audioStream->index;
-	Locker locker(lock);
-	av_interleaved_write_frame(context, &pkt);
+        audioEncodeTime = pkt.dts;
+        pkt.stream_index = audioStream->index;
+        Locker locker(lock);
+        av_interleaved_write_frame(context, &pkt);
     }
 
     audioTime += audio.size/channels;
@@ -207,10 +207,10 @@ void Encoder::writeAudioFrame(ref<int32> audio) {
     int gotAudioPacket;
     avcodec_encode_audio2(audioCodec, &pkt, &frame, &gotAudioPacket);
     if(gotAudioPacket) {
-	audioEncodeTime = pkt.dts;
-	pkt.stream_index = audioStream->index;
-	Locker locker(lock);
-	av_interleaved_write_frame(context, &pkt);
+        audioEncodeTime = pkt.dts;
+        pkt.stream_index = audioStream->index;
+        Locker locker(lock);
+        av_interleaved_write_frame(context, &pkt);
     }
 
     audioTime += audio.size/channels;
@@ -222,12 +222,12 @@ bool Encoder::copyAudioPacket(FFmpeg& audio) {
     if(status != 0) { log("copyAudioPacket failed", status); return false; }
     assert_(status == 0);
     if(audio.file->streams[packet.stream_index]==audio.audioStream) {
-	assert_(audioStream->time_base.num == audio.audioStream->time_base.num);
-	packet.pts=packet.dts=audioTime=
-		packet.pts*audioStream->time_base.den/audio.audioStream->time_base.den;
-	packet.duration = (int64)packet.duration*audioStream->time_base.den/audio.audioStream->time_base.den;
-	packet.stream_index = audioStream->index;
-	av_interleaved_write_frame(context, &packet);
+        assert_(audioStream->time_base.num == audio.audioStream->time_base.num);
+        packet.pts=packet.dts=audioTime=
+                packet.pts*audioStream->time_base.den/audio.audioStream->time_base.den;
+        packet.duration = (int64)packet.duration*audioStream->time_base.den/audio.audioStream->time_base.den;
+        packet.stream_index = audioStream->index;
+        av_interleaved_write_frame(context, &packet);
     }
     return true;
 }
@@ -247,38 +247,38 @@ Encoder::~Encoder() {
     lock.lock();
     if(frame) av_frame_free(&frame);
     while(videoCodec || audioCodec) {
-	AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
-	int gotPacket = 0;
-	if(videoCodec && (!audioCodec || videoEncodeTime*audioFrameRate<audioEncodeTime*videoFrameRate)) {
-	    avcodec_encode_video2(videoCodec, &pkt, 0, &gotPacket);
-	    if(gotPacket) {
-		assert_(videoStream);
-		pkt.stream_index = videoStream->index;
-		videoEncodeTime = pkt.dts;
-		pkt.dts = pkt.dts*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
-		pkt.pts = pkt.pts*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
-	    } else {
-		avcodec_close(videoCodec); videoCodec=0;
-		videoStream=0; //Released by avformat_free_context
-		continue;
-	    }
-	}
-	if(audioCodec && (!videoCodec || audioEncodeTime*videoFrameRate<=videoEncodeTime*audioFrameRate)) {
-	    avcodec_encode_audio2(audioCodec, &pkt, 0, &gotPacket);
-	    if(gotPacket) {
-		assert_(audioStream);
-		pkt.stream_index = audioStream->index;
-		audioEncodeTime = pkt.dts;
-		// No time rescale ?
-	    } else {
-		avcodec_close(audioCodec); audioCodec=0;
-		audioStream=0; // Released by avformat_free_context
-		continue;
-	    }
-	}
-	assert_(gotPacket);
-	av_interleaved_write_frame(context, &pkt);
-	if(!pkt.buf) av_free_packet(&pkt);
+        AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
+        int gotPacket = 0;
+        if(videoCodec && (!audioCodec || videoEncodeTime*audioFrameRate<audioEncodeTime*videoFrameRate)) {
+            avcodec_encode_video2(videoCodec, &pkt, 0, &gotPacket);
+            if(gotPacket) {
+                assert_(videoStream);
+                pkt.stream_index = videoStream->index;
+                videoEncodeTime = pkt.dts;
+                pkt.dts = pkt.dts*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
+                pkt.pts = pkt.pts*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
+            } else {
+                avcodec_close(videoCodec); videoCodec=0;
+                videoStream=0; //Released by avformat_free_context
+                continue;
+            }
+        }
+        if(audioCodec && (!videoCodec || audioEncodeTime*videoFrameRate<=videoEncodeTime*audioFrameRate)) {
+            avcodec_encode_audio2(audioCodec, &pkt, 0, &gotPacket);
+            if(gotPacket) {
+                assert_(audioStream);
+                pkt.stream_index = audioStream->index;
+                audioEncodeTime = pkt.dts;
+                // No time rescale ?
+            } else {
+                avcodec_close(audioCodec); audioCodec=0;
+                audioStream=0; // Released by avformat_free_context
+                continue;
+            }
+        }
+        assert_(gotPacket);
+        av_interleaved_write_frame(context, &pkt);
+        if(!pkt.buf) av_free_packet(&pkt);
     }
     log("videoTime", videoTime, "audioTime", audioTime, "videoEncodeTime", videoEncodeTime, "audioEncodeTime", audioEncodeTime);
     av_interleaved_write_frame(context, 0);

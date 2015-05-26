@@ -67,6 +67,7 @@ struct Window : Poll {
 	void render();
 	/// Immediately renders the first pending update to target
     Update render(int2 size/*const Image& target*/);
+    virtual Image readback() { return Image(); }
 
 	// Control
 	virtual function<void()>& globalAction(Key) abstract;
@@ -132,6 +133,7 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
 
     /// Makes a new shared GL context current
     void initializeThreadGLContext();
+    Image readback() override;
 
 	// Control
 	/// Registers global action on \a key

@@ -19,7 +19,7 @@ struct Encoder {
     AVFrame* frame = 0;
 
     /// Starts a new file recording video
-	Encoder(String&& name);
+    Encoder(string name);
 
     void setH264(int2 size, uint videoFrameRate);
     void setMJPEG(int2 size, uint videoFrameRate);
