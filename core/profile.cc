@@ -15,12 +15,13 @@ static Frame stack[64] = {Frame{readCycleCounter(), 0, 0}};
 static Frame* top = stack;
 static constexpr size_t capacity = 0x2000;
 struct Entry { void* function=0; uint64 time=0; uint64 count=0; };
-static Entry entries[capacity];
+Entry entries[capacity];
 static size_t size = 0;
 static bool tracePaused = false;
 bool operator <(const Entry& a, const Entry& b) { return a.time < b.time; }
 //bool operator <(const Entry& a, const Entry& b) { return a.count < b.count; }
 
+void profile_reset() { mref<Entry>(entries, capacity).clear(); }
 __attribute((destructor(101))) notrace void logProfile() {
 	uint64 total = readCycleCounter() - stack[0].tsc;
 	tracePaused = true;

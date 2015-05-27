@@ -4,6 +4,7 @@
 #include "widget.h"
 #include "function.h"
 #include "map.h"
+#include "time.h"
 namespace X11 { struct Event; }
 
 struct Window : Poll {
@@ -68,6 +69,7 @@ struct Window : Poll {
 	/// Immediately renders the first pending update to target
     Update render(int2 size/*const Image& target*/);
     virtual Image readback() { return Image(); }
+    Time swapTime;
 
 	// Control
 	virtual function<void()>& globalAction(Key) abstract;
