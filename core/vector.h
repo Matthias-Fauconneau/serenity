@@ -177,10 +177,10 @@ generic struct rgba {
 
 /// Integer b,g,r,a vector (8bit)
 struct byte4 : vec<bgra,uint8,4> {
-	//using vec::vec;
+    using vec::vec;
     byte4() : vec(0) {} // Defaults initalizes to zero
-	inline byte4(byte v) : vec(v) {}
-	inline byte4(byte b, byte g, byte r, byte a=0xFF) : vec(b,g,r,a) {}
+    //inline byte4(byte v) : vec(v) {}
+    //inline byte4(byte b, byte g, byte r, byte a=0xFF) : vec(b,g,r,a) {}
 	// bgr
 	byte4(byte3 bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
 	//byte3 bgr() { return byte3(b, g, r); } // -> bgra
