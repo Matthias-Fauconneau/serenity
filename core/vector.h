@@ -206,7 +206,8 @@ static_assert(sizeof(quat)==4*sizeof(float),"");
 inline quat operator*(quat p, quat q) { return {p.s*q.s - dot(p.v, q.v), p.s*q.v + q.s*p.v + cross(p.v, q.v)}; }
 inline quat operator*(float s, quat q) { return {s*q.s, s*q.v}; }
 inline quat operator+(quat p, quat q) { return {p.s+q.s, p.v+q.v}; }
-inline quat normalize(quat q) { return 1./sqrt(sq(q.s)+sq(q.v)) * q; }
+inline float length(quat q) { return sqrt(sq(q.s)+sq(q.v)); }
+inline quat normalize(quat q) { return 1.f/length(q) * q; }
 inline String str(quat q) { return "["+str(q.s, q.v)+"]"; }
 
 template<Type A, Type B> struct pair { A a; B b; };
