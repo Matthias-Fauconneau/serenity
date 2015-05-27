@@ -51,7 +51,7 @@ generic struct array : buffer<T> {
 
     // - Append
     /// Appends a default element
-    T& append() { grow(size+1); return set(size-1, T()); }
+    T& append() { grow(size+1); return set(size-1); }
     /// Appends an implicitly copiable value
     T& append(const T& e) { grow(size+1); return set(size-1, e); }
     /// Appends a movable value

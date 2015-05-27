@@ -21,14 +21,14 @@ shared<Graphics> Plot::graphics(vec2 size) {
         for(const auto& data: dataSets.values) {
             for(auto point: data) {
                 vec2 p(point.key,point.value);
-                assert(isNumber(p.x) && isNumber(p.y), p);
+                assert_(isNumber(p.x) && isNumber(p.y), p);
                 min=::min(min,p);
                 max=::max(max,p);
             }
         }
         for(uint i: range(2)) if(!log[i]) { if(i>0 && min[i]>0) min[i] = 0; if(max[i]<0) max[i] = 0; }
     }
-    assert(min.x < max.x && min.y < max.y, min, max);
+    assert_(isNumber(min) && isNumber(max) && min.x < max.x && min.y < max.y, min, max);
 
     int tickCount[2]={};
     for(uint axis: range(2)) { //Ceils maximum using a number in the preferred sequence
