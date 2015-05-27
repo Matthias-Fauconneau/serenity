@@ -10,7 +10,7 @@ void glCheck_(string message);
 
 void glCullFace(bool enable);
 void glDepthTest(bool enable);
-void glAlphaTest(bool enable);
+void glBlendAlpha();
 
 struct GLShader {
     GLShader(){}

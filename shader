@@ -1,16 +1,16 @@
 vertex {
         in vec3 position;
         gl_Position = vec4(position, 1);
-        out vec2 vTexCoords;
-        vTexCoords = vec2[](vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(-1,1),vec2(1,-1),vec2(1,1))[gl_VertexID%6];
+        out vec2 vLocalCoords;
+        vLocalCoords = vec2[](vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(-1,1),vec2(1,-1),vec2(1,1))[gl_VertexID%6];
 }
 fragment {
         out vec4 color;
-        in vec2 vTexCoords;
+        in vec2 vLocalCoords;
         sphere {
-                if(length(vTexCoords) > 1) discard;
-                float dz = sqrt(1-dot(vTexCoords,vTexCoords));
-                vec3 v = vec3(vTexCoords, dz);
+                if(length(vLocalCoords) > 1) discard;
+                float dz = sqrt(1-dot(vLocalCoords,vLocalCoords));
+                vec3 v = vec3(vLocalCoords, dz);
                 buffer rotationBuffer { vec4[] rotation; };
                 vec4 q = rotation[gl_PrimitiveID/2].yzwx;
                 vec4 qmul(vec4 p, vec4 q) {
@@ -20,13 +20,13 @@ fragment {
                 gl_FragDepth = gl_FragCoord.z - dz/32/2/2*2;
         }
         cylinder {
-                float dz = sqrt(1-abs(vTexCoords.x));
+                float dz = sqrt(1-abs(vLocalCoords.x));
                 color = vec4(1./2*vec3(dz), 1);
                 gl_FragDepth = gl_FragCoord.z - dz/256/2*2;
         }
         blit {
          uniform sampler2D image;
-         color = texture2D(image, vTexCoords);
+         color = texture2D(image, (vLocalCoords+1)/2);
         }
         flat {
          uniform vec3 uColor;
