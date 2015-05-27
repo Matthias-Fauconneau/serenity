@@ -2,7 +2,7 @@
 #include "jpeg.h"
 
 struct Isometric : Widget {
-    const int N = 2048;
+    const int N = 1024;
     ImageT<short2> extents = ImageT<short2>(N, N); // bottom, top Z position of each column
     buffer<byte4> voxels;
 
@@ -66,12 +66,12 @@ struct Isometric : Widget {
                 if(dz > 6) break;
             }
         }
-        size_t voxelCount = 0, columnCount = 0;
+
+        // Clips anormal columns
         int16 minZ = 0x7FFF;
-        int maxHeight = 0;
-        ImageT<uint32> voxelIndex (N, N); // Records extent's first voxel for random access
         for(int y: range(extents.size.y)) for(int x: range(extents.size.x)) {
             auto& extent = extents(x, y);
+            if(extent[0] > extent[1]) { extent[1]=extent[0]-1; continue; }
             {int16 neighbourMinZ = 0x7FFF;
             for(int Y: range(max(0, y-1), min(N, y+1+1))) for(int X: range(max(0, x-1), min(N, x+1+1)))
                 if(Y != y || X != x) neighbourMinZ = min(neighbourMinZ, extents(X,Y)[0]);
@@ -81,16 +81,53 @@ struct Isometric : Widget {
             for(int Y: range(max(0, y-1), min(N, y+1+1))) for(int X: range(max(0, x-1), min(N, x+1+1)))
                 if(Y != y || X != x) neighbourMaxZ = max(neighbourMaxZ, extents(X,Y)[1]);
             extent[1] = min(min(maxClipZ, extent[1]), neighbourMaxZ);}
-
-            voxelIndex(x, y) = voxelCount;
-            if(extent[0] > extent[1]) { extent[1]=extent[0]-1; continue; }
-            voxelCount += extent[1]+1-extent[0];
-            columnCount++;
             minZ = min(minZ, extent[0]);
-            maxHeight = max(maxHeight, extent[1]+1-extent[0]);
         }
-        //log(columnCount, voxelCount, voxelCount/columnCount, maxHeight);
-        voxels = buffer<byte4>(voxelCount); // ~ 20 M
+
+        // Interpolates missing columns
+        for(int y: range(extents.size.y)) for(int x: range(extents.size.x)) {
+            auto& extent = extents(x, y);
+            if(extent[0] > extent[1]) {
+                int sumZ = 0, sampleCount = 0;
+                for(int r=1; !sampleCount; r++) { // FIXME: L2 circle radius
+                    sampleCount = 0;
+                    for(int Y: range(max(0, y-r), min(extents.size.y, y+r+1))) for(int X: range(max(0, x-r), min(extents.size.x, x+r+1))) {
+                        if(extents(X,Y)[0] <= extents(X,Y)[1]) {
+                            sumZ += extents(X,Y)[0];
+                            sampleCount++;
+                        }
+                    }
+                }
+                int meanZ = sumZ / sampleCount;
+                extent[0] = extent[1] = meanZ;
+            }
+        }
+
+        /*// Interpolates missing ground (Smooth minimum Z except edges (walls))
+        for(int y: range(1, extents.size.y-1)) for(int x: range(1, extents.size.x-1)) {
+            auto& extent = extents(x, y);
+
+            int sumZ = 0, sumD = 0;
+            for(int Y: range(y-1, y+1+1)) for(int X: range(x-1, x+1+1)) {
+                sumZ += extents(X,Y)[0];
+                sumD += extents(X,Y)[0]-extent[0];
+            }
+            if(sumD > 9) {
+                int meanZ = sumZ / 9;
+                extent[0] = meanZ;
+            }
+        }*/
+
+        // Counts voxels
+        size_t voxelCount = 0;
+        ImageT<uint32> voxelIndex (N, N); // Records extent's first voxel for random access
+        for(int y: range(extents.size.y)) for(int x: range(extents.size.x)) {
+            auto& extent = extents(x, y);
+            voxelIndex(x, y) = voxelCount;
+            voxelCount += extent[1]+1-extent[0];
+            extent[0] -= minZ, extent[1] -= minZ;
+        }
+        voxels = buffer<byte4>(voxelCount); // ~ 10~40 MS ~ 40~160 MB
 
         int maxDensity = 0;
         for(LASPoint point: cast<LASPoint>(map.slice(header.data)).slice(0, header.count)) {
@@ -104,7 +141,6 @@ struct Isometric : Widget {
             density++;
             maxDensity = max<int>(maxDensity, density);
         }
-        //log(maxDensity);
 
         {
             Image image = decodeJPEG(Map("6805_2520.jpg"_, home()));
@@ -112,9 +148,35 @@ struct Isometric : Widget {
             for(int y: range(extents.size.y)) for(int x: range(extents.size.x)) {
                 byte3 color = image(x*4096/N, 4096-1-y*4096/N).bgr();
                 auto& extent = extents(x, y);
-                extent[0] -= minZ, extent[1] -= minZ;
-                // TODO: detail (from image (dxZ,dyZ), intensity), allow concave
+                // TODO: detail (from image (dxZ,dyZ), intensity)
+                //size_t bottomVoxelIndex = voxelIndex;
                 for(int z = extent[0]; z<=extent[1]; z++, voxelIndex++) voxels[voxelIndex] = byte4(color, int(voxels[voxelIndex].a)*0xFF/maxDensity);
+                /*int sumD = 0;
+                for(int Y: range(max(0, y-1), min(N, y+1+1))) for(int X: range(max(0, x-1), min(N, x+1+1)))
+                    sumD += abs(extents(X,Y)[0]-extent[0]);
+                if(sumD < 1) voxels[bottomVoxelIndex].bgr() = byte3(0,0xFF,0);*/
+                //if(y > 0 && y < N && x > 0 && x < N) {
+                    //int dxZ = extents(x+1, y)[0]-extents(x-1, y)[0];
+                    //int dyZ = extents(x, y+1)[0]-extents(x, y-1)[0];
+                //}
+            }
+        }
+
+        // Fill "wall" columns
+        {
+            size_t voxelIndex = 0;
+            for(int y: range(extents.size.y)) for(int x: range(extents.size.x)) {
+                auto& extent = extents(x, y);
+
+                int maxD = 0;
+                for(int Y: range(max(0, y-1), min(N, y+1+1))) for(int X: range(max(0, x-1), min(N, x+1+1)))
+                    maxD = max(maxD, extents(X,Y)[0]-extent[0]);
+                if(maxD > 16)
+                    for(int z = extent[0]; z<=extent[1]; z++, voxelIndex++) voxels[voxelIndex].a = 0xFF;
+                else {
+                    voxels[voxelIndex].a = 0xFF; // Ground voxel
+                    voxelIndex += extent[1]+1-extent[0];
+                }
             }
         }
     }
@@ -160,7 +222,7 @@ struct Isometric : Widget {
                 }
             }
         }
-        for(byte4& dst: target) if(dst.a) dst = byte4(int4(dst) * 0xFF / int(dst.a)); // Normalizes opacity
+        //for(byte4& dst: target) if(dst.a) dst = byte4(int4(dst) * 0xFF / int(dst.a)); // Normalizes opacity
         shared<Graphics> graphics;
         graphics->blits.append(0, size, move(target));
         yaw += PI/120;
