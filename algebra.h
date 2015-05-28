@@ -52,11 +52,16 @@ struct UMFPACK {
     Numeric numeric;
 };
 
-/*#include <cholmod.h>
+#undef packed
+#include <cholmod.h>
 struct CholMod {
     CholMod(){}
-    CholMod(const Matrix& A) {
-        columnPointers = buffer<int>(n+1,n+1);
+    CholMod(const Matrix& A) : m(A.m), n(A.n) {
+        assert_(A.m == A.n);
+        //for(size_t i: range(A.m)) for(size_t j: range(A.n)) assert_(A(i,j)==A(j,i));
+        //for(size_t i: range(A.m)) assert_(A(i,i) > 0, i, A(i,i));
+        // FIXME: lower only, no copy
+        columnPointers = buffer<int>(A.n+1);
         size_t nnz=0;
         for(size_t j: range(A.n)) {
             columnPointers[j] = nnz;
@@ -64,48 +69,60 @@ struct CholMod {
         }
         columnPointers[A.n] = nnz;
         rowIndices = buffer<int>(nnz);
-        values = buffer<real>(nnz);
+        values = buffer<real/*float*/>(nnz);
         size_t index=0;
         for(const array<Matrix::Element>& column: A.columns) {
             for(const Matrix::Element& e: column) {
-                rowIndices[index]=e.row;
-                values[index]=e.value;
+                rowIndices[index] = e.row;
+                values[index] = e.value;
                 index++;
             }
         }
 
-        cholmod_start(&c);
-        cA.nrow = n;
-        cA.ncol = m;
+        cholmod_start(&c); // FIXME: once
+        c.supernodal = CHOLMOD_SIMPLICIAL;
+        cholmod_sparse cA;
+        cA.nrow = A.m;
+        cA.ncol = A.n;
         cA.nzmax = nnz;
-        cA.p = columnPointers.data;
-        cA.i = rowIndices.data
+        cA.p = (void*)columnPointers.data;
+        cA.i = (void*)rowIndices.data;
         cA.nz = 0;
-        cA.x = values.data;
+        cA.x = (void*)values.data;
         cA.z = 0;
-        stype;
-        itype=CHOLMOD_INT;
-        xtype = real;
-        dtype= float;
-        int sorted = true;
-        int packed = true;
-        cholmod_factor* L = cholmod_analyze (cA, &c);
-        cholmod_factorize (cA, L, &c);
+        cA.stype = -1;
+        cA.itype = CHOLMOD_INT;
+        cA.xtype = CHOLMOD_REAL;
+        cA.dtype= CHOLMOD_DOUBLE; //CHOLMOD_SINGLE;
+        cA.sorted = true;
+        cA.packed = true;
+        L = cholmod_analyze(&cA, &c);
+        cholmod_factorize(&cA, L, &c);
     }
-    ~CholdMod() {
-        cholmod_free_factor (&L, &c) ;
-        cholmod_finish (&c);
-    }
-
-    Vector solve(const Vector& b) {
-        Vector x(m);
-        x = cholmod_solve (CHOLMOD_A, L, b, &c);
+    ~CholMod() {
+        cholmod_free_factor(&L, &c) ;
+        cholmod_finish(&c); // FIXME: once
     }
 
-    size_t m=0,n=0;
+    buffer<real> solve(ref<real> b) {
+        cholmod_dense B {b.size, 1, b.size, b.size, (void*)b.data, 0, CHOLMOD_REAL, CHOLMOD_DOUBLE};
+        cholmod_dense *dst = cholmod_solve(CHOLMOD_A, L, &B, &c);
+        buffer<real> x((real*)dst->x, n, n);
+        delete dst;
+        return x;
+    }
+    /*buffer<float> solve(ref<float> b) {
+        cholmod_dense src {b.size, 1, b.size, 0, (void*)b.data, 0, CHOLMOD_REAL, CHOLMOD_SINGLE};
+        cholmod_dense *dst = cholmod_solve(CHOLMOD_A, L, &src, &c);
+        buffer<float> x((float*)dst->x, n, n);
+        delete dst;
+        return x;
+    }*/
+
+    size_t m=0, n=0;
     buffer<int> columnPointers;
     buffer<int> rowIndices;
-    buffer<real> values;
+    buffer<real/*float*/> values;
     cholmod_common c;
-    cholmod_sparse cA;
-};*/
+    cholmod_factor* L;
+};

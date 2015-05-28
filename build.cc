@@ -151,7 +151,7 @@ bool Build::compileModule(string target) {
 		Folder(tmp+"/"+join(flags,"-")+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
 		Stream stdout;
         int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1y", "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing", "-march=native",
-                                           "-o", object, fileName, "-I/usr/include/freetype2"} + toRefs(args),
+                                           "-o", object, fileName, "-I/usr/include/freetype2","-I/scratch/include"} + toRefs(args),
 						  false, currentWorkingDirectory(), &stdout);
 		jobs.append({copyRef(target), pid, move(stdout)});
 		needLink = true;

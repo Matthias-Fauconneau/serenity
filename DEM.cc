@@ -16,7 +16,7 @@ FILE(shader)
 struct System {
     static constexpr bool implicit = true; //  (m - δt²·∂xf - δt·∂vf) δv = δt·(f + δt·∂xf·v) else m δv = δt f
     static constexpr bool rollTest = false;
-    static constexpr bool useWire = !rollTest;
+    static constexpr bool useWire = false && !rollTest;
     static constexpr bool useRotation = true;
     static constexpr int subStepCount = 16 * (rollTest?64:1);
     static constexpr float dt = 1./60 / subStepCount;
@@ -126,7 +126,7 @@ struct System {
         static constexpr float frictionCoefficient = 1;
         static constexpr float staticFrictionThresholdSpeed = Grain::radius / T;
 
-        static constexpr size_t base = Side::base+Side::capacity;
+        static constexpr size_t base = 0; //Side::base+Side::capacity;
         static constexpr size_t capacity = rollTest ? 1 : 512;
         static constexpr bool fixed = false;
         buffer<vec3> position { capacity };
@@ -209,7 +209,7 @@ struct System {
         float fB = - Kb * dot(normal, relativeVelocity); // Damping
         vec3 f = (fS + fB) * normal;
         if(implicit) {
-            mat3 o = outer(normal, normal);
+            mat3 o = outer(normal, normal); // Symetric => matrix is symetric => Cholesky
             assert_(length);
             mat3 dxf = - Ks * ((1 - restLength/length)*(1 - o) + o);
             mat3 dvf = - Kb * o;
@@ -243,11 +243,11 @@ struct System {
             vec3 x = globalA - globalB;
             float distance = ::length(x);
             constexpr float R = Grain::radius; //min(tA::radius, tB::radius);
-            staticFriction = distance < R; //2;
+            //staticFriction = distance < R; //2;
             if(staticFriction) {
                 vec3 tangentOffset = x - dot(f.normal, x) * f.normal;
                 float tangentLength = ::length(tangentOffset);
-                staticFriction = tangentLength < R; //16;
+                //staticFriction = tangentLength < R; //16;
                 if(staticFriction) {
                     if(tangentLength) {
                         const float staticFrictionStiffness =
@@ -260,7 +260,7 @@ struct System {
                         //force = min(force, min(tA::mass, tB::mass)*tangentLength/(T*T)); // Restores in T
                         fT -= force * springDirection; // FIXME: implicit zero length spring ?
                     } // else static equilibrium
-                    constexpr float tangentialDamping = dt / T * min(tA::mass, tB::mass) / T;
+                    constexpr float tangentialDamping = 0; //dt / T * min(tA::mass, tB::mass) / T;
                     //fT -= tangentialDamping * dot(springDirection, tangentRelativeVelocity) * springDirection;
                     fT -= tangentialDamping * tangentRelativeVelocity;
 #if DBG_FRICTION
@@ -271,7 +271,7 @@ struct System {
         }
         // Dynamic friction
         //if(/*!staticFriction &&*/ tangentRelativeSpeed /*>= staticFrictionThresholdSpeed*/) {
-        if(tangentRelativeSpeed >= staticFrictionThresholdSpeed /*|| length(fT) > frictionCoefficient*f.fN*/) {
+        if(tangentRelativeSpeed >= staticFrictionThresholdSpeed || length(fT) > frictionCoefficient*f.fN) {
             staticFriction = false;
             constexpr float dynamicFrictionCoefficient = frictionCoefficient / 64;
             fT = - dynamicFrictionCoefficient * f.fN * tangentRelativeVelocity
@@ -491,7 +491,8 @@ struct Simulation : System {
 
         // Initialization
         miscTime.start();
-        matrix.clear();
+        //matrix.clear();
+        matrix = Matrix(grain.count*3);
         miscTime.stop();
         constexpr vec3 g {0, 0, -1};
 
@@ -655,8 +656,12 @@ struct Simulation : System {
 
         solveTime.start();
         buffer<vec3d> dv;
-        if(implicit) dv = cast<vec3d>(UMFPACK(matrix).solve(cast<real>(F)));
-        else {
+        if(implicit) {
+            //dv = cast<vec3d>(UMFPACK(matrix).solve(cast<real>(F)));
+            dv = cast<vec3d>(CholMod(matrix).solve(cast<real>(F.slice(0,grain.count))));
+            /*dv = apply(cast<vec3>(CholMod(matrix).solve(cast<float>(apply(F, [](vec3d f){ return vec3(f);})))),
+                    [](vec3 f){ return vec3d(f);});*/
+        } else {
             dv = buffer<vec3d>(F.capacity);
             for(size_t i: range(grain.count)) dv[grain.base+i] = F[grain.base+i] / real(Grain::mass);
             for(size_t i: range(wire.count)) dv[wire.base+i] = F[wire.base+i] / real(Wire::mass);
@@ -728,12 +733,15 @@ struct SimulationView : Simulation, Widget, Poll {
 
     void step() {
         Simulation::step();
-        if(timeStep%subStepCount == 0) window->render();
+#if 1 || PROFILE
+        if(timeStep%subStepCount == 0)
+#endif
+            window->render();
         if(realTime() > lastReport+2e9) {
             log("step",str(stepTime, totalTime),
                 //"render", str(renderTime, totalTime), "GPU", str(window->swapTime, totalTime),
                 //"process",str(processTime, stepTime),
-                "misc",str(miscTime, stepTime),
+                //"misc",str(miscTime, stepTime),
                 "grain",str(grainTime, stepTime),
                 "wire",str(wireContactTime, stepTime),
                 "solve",str(solveTime, stepTime),
