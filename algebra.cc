@@ -1,55 +1,56 @@
 #include "algebra.h"
+#undef packed
+#include <cholmod.h> // cholmod suitesparseconfig colamd openblas amd
 
-// Not using umfpack header as it includes stdlib.h
-//#include <suitesparse/umfpack.h> //umfpack
-//#include <suitesparse/umfpack.h> //amd
-//#include <suitesparse/umfpack.h> //suitesparseconfig
-//#include <suitesparse/umfpack.h> //cholmod
-//#include <suitesparse/umfpack.h> //colamd
-//#include <suitesparse/umfpack.h> //openblas
-extern "C" {
-uint umfpack_di_symbolic(uint m, uint n, const int* columnPointers, const int* rowIndices, const double* values, void** symbolic,
-                         const double* control, double* info);
-void umfpack_di_free_symbolic(void** symbolic);
-uint umfpack_di_numeric(const int* columnPointers, const int* rowIndices, const double* values, void* symbolic, void** numeric,
-                        const double* control, double* info);
-void umfpack_di_free_numeric(void** numeric);
-enum System { UMFPACK_A };
-uint umfpack_di_solve(System sys, const int* columnPointers, const int* rowIndices, const double* values, double* X, const double* B,
-                      void* numeric, const double* control, double* info);
-}
+static cholmod_common c;
+__attribute((constructor(1001))) void cholmod_c() { cholmod_start(&c); }
+__attribute((destructor(1001))) void cholmod_d() { cholmod_finish(&c); }
 
-UMFPACK::Symbolic::~Symbolic(){ umfpack_di_free_symbolic(&pointer); }
-UMFPACK::Numeric::~Numeric(){ umfpack_di_free_numeric(&pointer); }
-
-UMFPACK::UMFPACK(const Matrix& A):m(A.m),n(A.n){
-    columnPointers = buffer<int>(n+1,n+1);
-    uint nnz=0;
-    for(uint j: range(A.n)) {
+CholMod::CholMod(const Matrix& A) {
+    buffer<int> columnPointers(A.n+1);
+    size_t nnz=0;
+    for(size_t j: range(A.n)) {
         columnPointers[j] = nnz;
         nnz += A.columns[j].size;
     }
     columnPointers[A.n] = nnz;
-    rowIndices = buffer<int>(nnz);
-    values = buffer<real>(nnz);
-    uint index=0;
+    buffer<int> rowIndices(nnz);
+    buffer<double> values(nnz);
+    size_t index=0;
     for(const array<Matrix::Element>& column: A.columns) {
         for(const Matrix::Element& e: column) {
-            rowIndices[index]=e.row;
-            values[index]=e.value;
+            rowIndices[index] = e.row;
+            values[index] = e.value;
             index++;
         }
     }
-    Symbolic symbolic;
-    umfpack_di_symbolic(m, n, columnPointers.data, rowIndices.data, values.data, &symbolic.pointer, 0, 0);
-    umfpack_di_numeric(columnPointers.data, rowIndices.data, values.data, symbolic.pointer, &numeric.pointer, 0, 0);
+
+    cholmod_sparse cA;
+    cA.nrow = A.m;
+    cA.ncol = A.n;
+    cA.nzmax = nnz;
+    cA.p = (void*)columnPointers.data;
+    cA.i = (void*)rowIndices.data;
+    cA.nz = 0;
+    cA.x = (void*)values.data;
+    cA.z = 0;
+    cA.stype = -1;
+    cA.itype = CHOLMOD_INT;
+    cA.xtype = CHOLMOD_REAL;
+    cA.dtype= CHOLMOD_DOUBLE;
+    cA.sorted = true;
+    cA.packed = true;
+    L = cholmod_analyze(&cA, &c);
+    cholmod_factorize(&cA, L, &c);
+}
+CholMod::~CholMod() {
+    cholmod_free_factor(&L, &c) ;
 }
 
-Vector UMFPACK::solve(const vector& b) {
-#if DEBUG
-    for(real e: b) assert(isNumber(e));// Asserts valid constant
-#endif
-    Vector x(m);
-    umfpack_di_solve(UMFPACK_A, columnPointers.data, rowIndices.data, values.data, (real*)x.data, b.data, numeric.pointer, 0, 0);
+buffer<double> CholMod::solve(ref<double> b) {
+    cholmod_dense src {b.size, 1, b.size, b.size, (void*)b.data, 0, CHOLMOD_REAL, CHOLMOD_DOUBLE};
+    cholmod_dense *dst = cholmod_solve(CHOLMOD_A, L, &src, &c);
+    buffer<double> x((double*)dst->x, b.size, b.size);
+    delete dst;
     return x;
 }

@@ -657,10 +657,7 @@ struct Simulation : System {
         solveTime.start();
         buffer<vec3d> dv;
         if(implicit) {
-            //dv = cast<vec3d>(UMFPACK(matrix).solve(cast<real>(F)));
             dv = cast<vec3d>(CholMod(matrix).solve(cast<real>(F.slice(0,grain.count))));
-            /*dv = apply(cast<vec3>(CholMod(matrix).solve(cast<float>(apply(F, [](vec3d f){ return vec3(f);})))),
-                    [](vec3 f){ return vec3d(f);});*/
         } else {
             dv = buffer<vec3d>(F.capacity);
             for(size_t i: range(grain.count)) dv[grain.base+i] = F[grain.base+i] / real(Grain::mass);
