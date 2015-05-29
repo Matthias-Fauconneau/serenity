@@ -48,6 +48,7 @@ CholMod::~CholMod() {
 }
 
 buffer<double> CholMod::solve(ref<double> b) {
+    assert_(b.size == L->n, b.size, L->n);
     cholmod_dense src {b.size, 1, b.size, b.size, (void*)b.data, 0, CHOLMOD_REAL, CHOLMOD_DOUBLE};
     cholmod_dense *dst = cholmod_solve(CHOLMOD_A, L, &src, &c);
     buffer<double> x((double*)dst->x, b.size, b.size);
