@@ -208,17 +208,18 @@ struct System {
         float fB = - Kb * dot(normal, relativeVelocity); // Damping
         vec3 f = (fS + fB) * normal;
         if(implicit) {
-            mat3 o = outer(normal, normal); // Symetric => matrix is symetric => Cholesky
-            assert_(length);
-            mat3 dxf = - Ks * ((1 - restLength/length)*(1 - o) + o);
-            mat3 dvf = - Kb * o;
             for(int i: range(3)) {
-                for(int j: range(3)) {
-                    if(!fixedA) matrix(a*3+i, a*3+j) += - dt*dt*dxf(i, j) - dt*dvf(i, j);
-                    if(!fixedB) matrix(b*3+i, b*3+j) -= - dt*dt*dxf(i, j) - dt*dvf(i, j);
+                for(int j: range(i+1)) {
+                    float Nij = normal[i]*normal[j];
+                    float dxf = - Ks * ((1 - restLength/length)*(1 - Nij) + Nij);
+                    float dvf = - Kb * Nij;
+                    if(!fixedA) matrix(a*3+i, a*3+j) += - dt*dt*dxf - dt*dvf;
+                    if(!fixedB) matrix(b*3+i, b*3+j) -= - dt*dt*dxf - dt*dvf;
+                    if(i==j) { // TODO: assert inlined
+                        if(!fixedA) F[a][i] += dt*f[i] + dt*dt*dxf * relativeVelocity[i];
+                        if(!fixedB) F[b][i] -= dt*f[i] + dt*dt*dxf * relativeVelocity[i];
+                    }
                 }
-                if(!fixedA) F[a][i] += dt*f[i] + dt*dt*dxf(i, i) * relativeVelocity[i];
-                if(!fixedB) F[b][i] -= dt*f[i] + dt*dt*dxf(i, i) * relativeVelocity[i];
             }
         } else {
             if(!fixedA) F[a] += vec3d(dt*f);
@@ -596,13 +597,11 @@ struct Simulation : System {
                 size_t a = i-1, b = i;
                 vec3 relativePosition = wire.position[a] - wire.position[b];
                 float length = ::length(relativePosition);
-                //if(!length) continue; // FIXME
-                assert_(length, "tension", i, wire.position[a], wire.position[b]);
                 float restLength = Wire::internodeLength;
                 vec3 normal = relativePosition/length;
                 vec3 relativeVelocity = wire.velocity[a] - wire.velocity[b];
-                spring<>(wire.base+a, wire.base+b, Wire::tensionStiffness, length, restLength, Wire::tensionDamping, normal,
-                                   relativeVelocity);
+                spring<>(wire.base+a, wire.base+b, Wire::tensionStiffness, length, restLength,
+                         Wire::tensionDamping, normal, relativeVelocity);
             }
             wireTensionTime.stop();
 
