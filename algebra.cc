@@ -27,14 +27,8 @@ void Matrix::reset(size_t size) {
         cA.ncol = size;
         cA.nzmax = 0;
     }
-#if 1
-    columnPointers.mref::clear(0);
-    rowIndices.size = 0;
-    values.size = 0;
-#else
     // TODO: garbage collect zeroes (contact loss) to reduce artifical fill
     values.mref::clear(0);
-#endif
 }
 
 void Matrix::factorize() {

@@ -324,7 +324,7 @@ struct Grid : buffer<uint16> {
             if(j<cellCapacity) at(j) = 0;
         }
     };
-    List operator[](size_t i) { return slice(i*cellCapacity, cellCapacity); }
+    inline List operator[](size_t i) { return slice(i*cellCapacity, cellCapacity); }
     size_t index(int x, int y, int z) {
         return (z*size[1]+y)*size[0]+x;
     }
