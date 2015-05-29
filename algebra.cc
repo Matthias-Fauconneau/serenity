@@ -6,33 +6,8 @@ static cholmod_common c;
 __attribute((constructor(1001))) void cholmod_c() { cholmod_start(&c); }
 __attribute((destructor(1001))) void cholmod_d() { cholmod_finish(&c); }
 
-CholMod::CholMod(const Matrix& A) {
-    buffer<int> columnPointers(A.n+1);
-    size_t nnz=0;
-    for(size_t j: range(A.n)) {
-        columnPointers[j] = nnz;
-        nnz += A.columns[j].size;
-    }
-    columnPointers[A.n] = nnz;
-    buffer<int> rowIndices(nnz);
-    buffer<double> values(nnz);
-    size_t index=0;
-    for(const array<Matrix::Element>& column: A.columns) {
-        for(const Matrix::Element& e: column) {
-            rowIndices[index] = e.row;
-            values[index] = e.value;
-            index++;
-        }
-    }
-
-    cholmod_sparse cA;
-    cA.nrow = A.m;
-    cA.ncol = A.n;
-    cA.nzmax = nnz;
-    cA.p = (void*)columnPointers.data;
-    cA.i = (void*)rowIndices.data;
-    cA.nz = 0;
-    cA.x = (void*)values.data;
+Matrix::Matrix() {
+    cA.nz = 0; // TODO
     cA.z = 0;
     cA.stype = -1;
     cA.itype = CHOLMOD_INT;
@@ -40,17 +15,43 @@ CholMod::CholMod(const Matrix& A) {
     cA.dtype= CHOLMOD_DOUBLE;
     cA.sorted = true;
     cA.packed = true;
-    L = cholmod_analyze(&cA, &c);
-    cholmod_factorize(&cA, L, &c);
-}
-CholMod::~CholMod() {
-    cholmod_free_factor(&L, &c) ;
 }
 
-buffer<double> CholMod::solve(ref<double> b) {
-    assert_(b.size == L->n, b.size, L->n);
+void Matrix::reset(size_t size) {
+    size_t previousSize = columnPointers.size;
+    if(columnPointers.size < size+1) {
+        columnPointers.grow(size+1);
+        cA.p = (void*)columnPointers.data;
+        columnPointers.sliceRange(previousSize, size+1).clear(values.size);
+        cA.nrow = size;
+        cA.ncol = size;
+        cA.nzmax = 0;
+    }
+#if 1
+    columnPointers.mref::clear(0);
+    rowIndices.size = 0;
+    values.size = 0;
+#else
+    // TODO: garbage collect zeroes (contact loss) to reduce artifical fill
+    values.mref::clear(0);
+#endif
+}
+
+void Matrix::factorize() {
+    cA.i = (void*)rowIndices.data;
+    cA.x = (void*)values.data;
+    if(cA.nzmax != values.size) { // New values
+        cA.nzmax = values.size;
+        if(L) cholmod_free_factor(&L, &c);
+        L = cholmod_analyze(&cA, &c);
+    }
+    cholmod_factorize(&cA, L, &c);
+}
+Matrix::~Matrix() { cholmod_free_factor(&L, &c); }
+
+buffer<double> Matrix::solve(ref<double> b) {
     cholmod_dense src {b.size, 1, b.size, b.size, (void*)b.data, 0, CHOLMOD_REAL, CHOLMOD_DOUBLE};
-    cholmod_dense *dst = cholmod_solve(CHOLMOD_A, L, &src, &c);
+    cholmod_dense* dst = cholmod_solve(CHOLMOD_A, L, &src, &c);
     buffer<double> x((double*)dst->x, b.size, b.size);
     delete dst;
     return x;

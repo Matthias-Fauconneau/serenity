@@ -498,7 +498,7 @@ struct Simulation : System {
 
         F.size = grain.count+wire.count;
         miscTime.start();
-        matrix = Matrix(F.size*3);
+        matrix.reset(F.size*3);
         miscTime.stop();
         constexpr vec3 g {0, 0, -1};
 
@@ -665,7 +665,8 @@ struct Simulation : System {
         solveTime.start();
         buffer<vec3d> dv;
         if(implicit) {
-            dv = cast<vec3d>(CholMod(matrix).solve(cast<real>(F)));
+            matrix.factorize();
+            dv = cast<vec3d>(matrix.solve(cast<real>(F)));
         } else {
             dv = buffer<vec3d>(F.capacity);
             for(size_t i: range(grain.count)) dv[grain.base+i] = F[grain.base+i] / real(Grain::mass);
