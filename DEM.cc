@@ -12,18 +12,18 @@
 #include "plot.h"
 #include "encoder.h"
 FILE(shader)
+constexpr float pow5(float x) { return x*x*x*x*x; }
 
 struct System {
-    static constexpr bool implicit = false; //  (m - δt²·∂xf - δt·∂vf) δv = δt·(f + δt·∂xf·v) else m δv = δt f
+    static constexpr bool implicit = true; //  (m - δt²·∂xf - δt·∂vf) δv = δt·(f + δt·∂xf·v) else m δv = δt f
     static constexpr bool rollTest = false;
     static constexpr bool useWire = true && !rollTest;
     static constexpr bool useRotation = true;
-    static constexpr int subStepCount = 1000 * (rollTest?1:1);
-    static constexpr float dt = 1./60 / subStepCount;
+    static constexpr float dt = 1./ 2000;
     // Characteristic dimensions
-    static constexpr float T = 1; // ~ 1 s
-    static constexpr float L = 1; // ~ 1 m
-    static constexpr float M = 1; // M ~ ρL³ ~ 1000 kg
+    static constexpr float T = 1; // 1 s
+    static constexpr float L = 1; // 1 m
+    static constexpr float M = 1; // 1 kg
 
     HList<Plot> plots;
 
@@ -60,17 +60,18 @@ struct System {
 
     struct Grain {
         // Properties
-        static constexpr float radius = 2e-2; // 62 mm diameter
+        static constexpr float radius = 2e-2; // 40 mm diameter
         static constexpr float thickness = radius;
         static constexpr float curvature = 1./radius;
         static constexpr float volume = 4./3*PI*cb(radius);
         //static constexpr float density = 100* M / cb(L);
-        static constexpr float mass = 40e-3; //density * volume;
-        static constexpr float elasticModulus = 1e6 * M / (L*T*T);
-        static constexpr float normalDamping = 0.3 * mass / T; // TODO: from restitution coefficient
+        static constexpr float mass = 3e-3; //density * volume;
+        static constexpr float elasticModulus = 1e5 * M / (L*T*T);
+        static constexpr float normalDamping = 1 * M / T; // 0.3
         static constexpr float frictionCoefficient = 1;
         static constexpr float staticFrictionThresholdSpeed = Grain::radius / T;
-        static constexpr float angularMass = 2./3*mass*sq(radius);
+        static constexpr float angularMass = 2./5*mass*(pow5(radius)-pow5(radius-1e-4))
+                                                                    / (cb(radius)-cb(radius-1e-4));
 
         size_t base = 0;
         static constexpr size_t capacity = rollTest ? 1 : 512;
@@ -86,19 +87,19 @@ struct System {
     } grain;
 
     struct Wire {
-        static constexpr float radius = 1e-3; // 1/256 = 8 mm diameter
+        static constexpr float radius = 1e-3; // 2mm diameter
         static constexpr float thickness = radius;
         static constexpr float curvature = 1./radius;
-        static constexpr float internodeLength = 4*radius;
+        static constexpr float internodeLength = 1./2 * Grain::radius;
         static constexpr float volume = PI * sq(radius) * internodeLength;
-        static constexpr float density = 500* M / cb(L);
+        static constexpr float density = 500 * M / cb(L);
         static constexpr float mass = density * volume;
-        static constexpr float elasticModulus = 1e6 * M / (L*T*T); // 8
-        static constexpr float normalDamping = 0.3 * mass / T; // TODO: from restitution coefficient
+        static constexpr float elasticModulus = 1e5 * M / (L*T*T); // 1e6
+        static constexpr float normalDamping = 1 * M / T; // 0.3
         static constexpr float frictionCoefficient = 1;
         static constexpr float staticFrictionThresholdSpeed = inf; //2 * Grain::radius / T;
 
-        static constexpr float tensionStiffness = 0x1p17 * mass / (T*T); // 16
+        static constexpr float tensionStiffness = elasticModulus * sq(2*radius);
         static constexpr float tensionDamping = 0 * mass/T; // 4
 
         size_t base = 0;
@@ -121,7 +122,7 @@ struct System {
         static constexpr float thickness = L;
         static constexpr float curvature = 0;
         static constexpr float elasticModulus = 1e6 * M/(L*T*T);
-        static constexpr float normalDamping = M / T;
+        static constexpr float normalDamping = 1 * M / T;
         static constexpr float frictionCoefficient = 1;
         static constexpr float staticFrictionThresholdSpeed = /*Grain::radius*/L/32 / T;
         size_t base = 0; static constexpr size_t count = 1;
@@ -146,7 +147,7 @@ struct System {
         static constexpr float thickness = L;
         static constexpr float curvature = 0; // -1/radius?
         static constexpr float elasticModulus = 1e6 * M/(L*T*T);
-        static constexpr float normalDamping = M / T;
+        static constexpr float normalDamping = 1 * M / T;
         static constexpr float frictionCoefficient = 1;
         static constexpr float staticFrictionThresholdSpeed = /*Grain::radius*/L/32 / T;
         static constexpr bool fixed = true;
@@ -155,7 +156,7 @@ struct System {
         static constexpr vec3 angularVelocity[1] {vec3(0,0,0)};
         static constexpr quat rotation[1] {quat{1,vec3(0,0,0)}};
         vec3 torque[0] {};
-        static constexpr float initialRadius = L/2/2;
+        static constexpr float initialRadius = Grain::radius*8;
         float currentRadius = initialRadius;
         size_t base = 0; static constexpr size_t count = 1;
         vec3 surfaceVelocity(size_t, vec3) const { return 0; }
@@ -285,47 +286,50 @@ struct System {
 
 // Grid
 
-struct Grid : buffer<uint16> {
-    static constexpr size_t cellCapacity = 64; // 2 cell / line
+struct Grid {
+    float scale;
     int3 size;
-    Grid(int3 size) : buffer(size.z*size.y*size.x*cellCapacity), size(size) { clear(); }
+    static constexpr size_t cellCapacity = 64; // 2 cell / line
+    buffer<uint16> indices;
+    Grid(float scale, vec3 size) : scale(scale), size(scale*size), indices(size.z*size.y*size.x*cellCapacity)
+     { indices.clear(); }
     struct List : mref<uint16> {
         List(mref<uint16> o) : mref(o) {}
         void remove(uint16 index) {
             size_t i = 0;
             while(at(i)) { if(at(i)==index) break; i++; }
-            assert(i<cellCapacity);
             while(i+1<cellCapacity) { at(i) = at(i+1); i++; }
-            assert(i<cellCapacity);
             at(i) = 0;
         }
         void append(uint16 index) { // Sorted by decreasing index
             size_t i = 0;
-            while(at(i) > index) { i++; assert(i<cellCapacity, (mref<uint16>)*this, index); }
+            while(at(i) > index) i++;
             size_t j=i;
-            while(index) { assert(j<cellCapacity, (mref<uint16>)*this, index); swap(index, at(j)); j++; }
+            while(index) { swap(index, at(j)); j++; }
             if(j<cellCapacity) at(j) = 0;
+            else assert_(j==cellCapacity);
         }
     };
-    inline List operator[](size_t i) { return slice(i*cellCapacity, cellCapacity); }
+    inline List operator[](size_t i) { return indices.slice(i*cellCapacity, cellCapacity); }
     size_t index(int x, int y, int z) {
         return (z*size[1]+y)*size[0]+x;
     }
-    int3 index3(vec3 p) { // [-1..1, 0..2] -> [1..size-1]
-        return int3(vec3(size)/2.f * (vec3(1,1,0)+p));
+    int3 index3(vec3 p) { // [-size/2·R..size/2·R, 0..size·R] -> [0..size-1]
+        return size/2+int3(scale*p);
     }
     size_t index(vec3 p) {
         int3 i = index3(p);
-        assert_(i.x == clamp(0, i.x, size.x-1), p, i, size);
-        assert_(i.y == clamp(0, i.y, size.y-1), p, i, size);
-        assert_(i.z == clamp(0, i.z, size.z-1), p, i, size);
+        /*assert_(i.x == clamp(0, i.x, size.x-1), p, i, size, scale);
+        assert_(i.y == clamp(0, i.y, size.y-1), p, i, size, scale);
+        assert_(i.z == clamp(0, i.z, size.z-1), p, i, size, scale);*/
         return index(i.x, i.y, i.z);
     }
 };
 
 struct Simulation : System {
     // Space partition
-    Grid grainGrid {32/*2/diameter*/}, wireGrid {256/*2/diameter*/};
+    //Grid grainGrid {2./Grain::radius, 16*Grain::radius};
+    //, wireGrid {2./Grain::radius}; // FIXME: too large wire grid for efficiency
 
     template<Type T> void update(const ref<vec3d>& dv, Grid& grid, T& t, size_t i) {
         t.velocity[i] += vec3(dv[t.base+i]);
@@ -376,7 +380,7 @@ struct Simulation : System {
             grain.position[i] = vec3(winchPosition.xy(), winchPosition.z+Grain::radius-Wire::radius);
             grain.velocity[i] = 0;
             grain.frictions.set(i);
-            grainGrid[grainGrid.index(grain.position[i])].append(1+i);
+            //grainGrid[grainGrid.index(grain.position[i])].append(1+i);
             grain.rotation[i] = quat();
             grain.angularVelocity[i] = 0;
         }
@@ -390,14 +394,8 @@ struct Simulation : System {
                     || (wire.capacity && wire.count == wire.capacity))) {
             log("Release", "Grain", grain.count, "Wire", wire.count);
             pour = false;
-            /*for(size_t i: range(grain.count)) {
-                if(grain.position[i].z <= Floor::height+Grain::radius) // Floor contact
-                    fixed.append(Grain::base+i); // Fix position (no floor roll after release)
-            }*/
         }
-        if(!pour && side.currentRadius < L-Grain::radius) {
-            side.currentRadius += L / T * dt;
-        }
+        if(!pour) side.currentRadius = 16*Grain::radius;
         if(pour) {
             // Generates falling grain (pour)
             if(1) for(;;) {
@@ -413,7 +411,7 @@ struct Simulation : System {
                 grain.position[i] = newPosition;
                 grain.velocity[i] = 0;
                 grain.frictions.set(i);
-                grainGrid[grainGrid.index(grain.position[i])].append(1+i);
+                //grainGrid[grainGrid.index(grain.position[i])].append(1+i);
                 float t0 = 2*PI*random();
                 float t1 = acos(1-2*random());
                 float t2 = (PI*random()+acos(random()))/2;
@@ -438,15 +436,15 @@ struct Simulation : System {
 
                 // Moves winch obstacle keeping spawn clear
                 size_t i = 0;
-                size_t oldCell = grainGrid.index(grain.position[i]);
+                //size_t oldCell = grainGrid.index(grain.position[i]);
                 grain.position[i] = vec3(winchPosition.xy(), winchPosition.z+Grain::radius-Wire::radius);
                 grain.velocity[i] = 0;
                 grain.angularVelocity[0] = 0;
-                size_t newCell = grainGrid.index(grain.position[i]);
+                /*size_t newCell = grainGrid.index(grain.position[i]);
                 if(oldCell != newCell) {
                     grainGrid[oldCell].remove(1+i);
                     grainGrid[newCell].append(1+i);
-                }
+                }*/
                 vec3 lastPosition = wire.count ? wire.position[wire.count-1] : vec3(winchRadius, 0, pourHeight);
                 vec3 r = winchPosition - lastPosition;
                 float l = length(r);
@@ -458,7 +456,7 @@ struct Simulation : System {
                     wire.velocity[i] = 0;
                     wire.angularVelocity[i] = 0;
                     wire.frictions.set(i);
-                    wireGrid[wireGrid.index(wire.position[i])].append(1+i);
+                    //wireGrid[wireGrid.index(wire.position[i])].append(1+i);
                 }
             }
         } else if(useWire) {
@@ -510,18 +508,22 @@ struct Simulation : System {
             // Grain - Grain repulsion
             grainContactTime.start();
             parallel_for(grain.count, [this](uint, int a) {
-                int3 index = grainGrid.index3(grain.position[a]);
-                for(int z: range(max(0, index.z-1), min(index.z+2, grainGrid.size.z))) {
-                    for(int y: range(max(0, index.y-1), min(index.y+2, grainGrid.size.y))) {
-                        for(int x: range(max(0, index.x-1), min(index.x+2, grainGrid.size.x))) {
-                            Grid::List list = grainGrid[grainGrid.index(x, y, z)];
-                            for(size_t i=0; i<grainGrid.cellCapacity; i++) {
-                                int b = list[i]-1;
-                                if(!(a < b)) break; // Single penalty per pair, until 0
-                                penalty(grain, a, grain, b);
+                /*if(0) {
+                    int3 index = grainGrid.index3(grain.position[a]);
+                    for(int z: range(max(0, index.z-1), min(index.z+2, grainGrid.size.z))) {
+                        for(int y: range(max(0, index.y-1), min(index.y+2, grainGrid.size.y))) {
+                            for(int x: range(max(0, index.x-1), min(index.x+2, grainGrid.size.x))) {
+                                Grid::List list = grainGrid[grainGrid.index(x, y, z)];
+                                for(size_t i=0; i<grainGrid.cellCapacity; i++) {
+                                    int b = list[i]-1;
+                                    if(!(a < b)) break; // Single penalty per pair, until 0
+                                    penalty(grain, a, grain, b);
+                                }
                             }
                         }
                     }
+                } else*/ {
+                    for(int b: range(grain.count)) if(a!=b) penalty(grain, a, grain, b);
                 }
             });
             grainContactTime.stop();
@@ -589,7 +591,7 @@ struct Simulation : System {
                     }
                 }
             }*/
-                { // Wire - Grain
+                /*if(0) { // Wire - Grain
                     int3 index = grainGrid.index3(wire.position[a]);
                     for(int z: range(max(0, index.z-1), min(index.z+2, grainGrid.size.z))) {
                         for(int y: range(max(0, index.y-1), min(index.y+2, grainGrid.size.y))) {
@@ -603,6 +605,8 @@ struct Simulation : System {
                             }
                         }
                     }
+                } else*/ {
+                    for(int b: range(grain.count)) if(a!=b) penalty(wire, a, grain, b);
                 }
             });
             wireContactTime.stop();
@@ -641,7 +645,11 @@ struct Simulation : System {
 
         grainTime.start();
         grainIntegrationTime.start();
-        for(size_t i: range(grain.count)) update(dv, grainGrid, grain, i);
+        //for(size_t i: range(grain.count)) update(dv, grainGrid, grain, i);
+        for(size_t i: range(grain.count)) {
+            grain.velocity[i] += vec3(dv[grain.base+i]);
+            grain.position[i] += dt*grain.velocity[i];
+        }
         if(useRotation) parallel_for(grain.count, [this](uint, size_t i) {
 #if 1 // PCDM rotation integration
             quat& q = grain.rotation[i];
@@ -673,7 +681,11 @@ struct Simulation : System {
 
         wireTime.start();
         wireIntegrationTime.start();
-        for(size_t i: range(wire.count)) update(dv, wireGrid, wire, i);
+        //for(size_t i: range(wire.count)) update(dv, wireGrid, wire, i);
+        for(size_t i: range(wire.count)) {
+            wire.velocity[i] += vec3(dv[wire.base+i]);
+            wire.position[i] += dt*wire.velocity[i];
+        }
         wireIntegrationTime.stop();
         wireTime.stop();
 
@@ -711,13 +723,13 @@ struct SimulationView : Simulation, Widget, Poll {
 
     void step() {
         Simulation::step();
-#if 1 || PROFILE
+#if 0 || PROFILE
         if(timeStep%subStepCount == 0)
 #endif
             window->render();
-        int64 elapsed = realTime() > lastReport;
+        int64 elapsed = realTime() - lastReport;
         if(elapsed > 2e9) {
-            log(elapsed / (timeStep-lastReportStep),
+            log((timeStep-lastReportStep) / (elapsed*1e-9),
                  "step",str(stepTime, totalTime),
                 "misc",str(miscTime, stepTime),
                 "grain",str(grainTime, stepTime),
@@ -748,10 +760,16 @@ struct SimulationView : Simulation, Widget, Poll {
     }
 
     unique<Window> window = ::window(this, -1);
-    //Thread simulationThread;
+#if !PROFILE
+    Thread simulationThread;
     unique<Encoder> encoder = nullptr;
+#endif
 
-    SimulationView() /*: Poll(0, POLLIN, simulationThread)*/ {
+    SimulationView()
+#if !PROFILE
+        : Poll(0, POLLIN, simulationThread)
+#endif
+    {
         window->actions[Space] = [this]{
             writeFile(str(timeStep*dt)+".png", encodePNG(window->readback()), home()); };
         window->actions[Return] = [this]{
@@ -778,14 +796,17 @@ struct SimulationView : Simulation, Widget, Poll {
             encoder->open();
         }
 
-        //simulationThread.spawn();
+#if !PROFILE
+        simulationThread.spawn();
+#endif
         queue();
     }
     vec2 sizeHint(vec2) { return arguments().contains("export") ? vec2(1050) : 1050; }
     shared<Graphics> graphics(vec2 size) {
         renderTime.start();
         glDepthTest(true);
-        mat4 viewProjection = mat4() .scale(vec3(2, 2*size.x/size.y, -1))
+        const float scale = 1 / (16*Grain::radius);
+        mat4 viewProjection = mat4() .scale(vec3(scale, scale*size.x/size.y, -1))
                 .rotateX(viewYawPitch.y) .rotateZ(viewYawPitch.x)
                 .translate(vec3(0,0, -1./4));
         quat viewRotation =
@@ -804,8 +825,8 @@ struct SimulationView : Simulation, Widget, Poll {
             for(size_t i: range(grainCount)) {
                 // FIXME: GPU quad projection
                 float3 O (viewProjection*grain.position[start+i]);
-                float3 min = O - float3(float2(2*Grain::radius), 0); // Isometric
-                float3 max = O + float3(float2(2*Grain::radius), 0); // Isometric
+                float3 min = O - float3(float2(scale*Grain::radius), 0); // Isometric
+                float3 max = O + float3(float2(scale*Grain::radius), 0); // Isometric
                 positions[i*6+0] = min;
                 positions[i*6+1] = float3(max.x, min.y, O.z);
                 positions[i*6+2] = float3(min.x, max.y, O.z);
@@ -844,6 +865,7 @@ struct SimulationView : Simulation, Widget, Poll {
             GLBuffer rotationBuffer (apply(grain.rotation.slice(start),
                                            [=](quat q) -> quat { return q.conjugate()*viewRotation.conjugate(); }));
             shader.bind("rotationBuffer"_, rotationBuffer);
+            shader["radius"] = Grain::radius / 2;
             vertexArray.draw(Triangles, positions.size);
         }
 
@@ -861,7 +883,7 @@ struct SimulationView : Simulation, Widget, Poll {
                 float l = length(r);
                 float2 t = r/l;
                 float3 n (t.y, -t.x, 0);
-                float width = 2*Wire::radius;
+                float width = scale*Wire::radius;
                 float3 P[4] {A-width*n, A+width*n, B-width*n, B+width*n};
                 positions[i*6+0] = P[0];
                 positions[i*6+1] = P[1];
@@ -886,6 +908,7 @@ struct SimulationView : Simulation, Widget, Poll {
             static GLShader shader {::shader(), {"cylinder"}};
             shader.bind();
             shader.bindFragments({"color"});
+            shader["radius"] = Wire::radius / 2;
             static GLVertexArray vertexArray;
             GLBuffer positionBuffer (positions);
             vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);

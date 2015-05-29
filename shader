@@ -17,12 +17,14 @@ fragment {
                  return vec4(p.w*q.xyz + q.w*p.xyz + cross(p.xyz, q.xyz), p.w*q.w - dot(p.xyz, q.xyz));
                 }
                 color = vec4(vec3(dz)*(1+qmul(q, qmul(vec4(v, 0), vec4(-q.xyz, q.w))).xyz)/2, 1);
-                gl_FragDepth = gl_FragCoord.z - dz/32/2/2*2;
+                uniform float radius;
+                gl_FragDepth = gl_FragCoord.z - dz * radius;
         }
         cylinder {
                 float dz = sqrt(1-abs(vLocalCoords.x));
                 color = vec4(1./2*vec3(dz), 1);
-                gl_FragDepth = gl_FragCoord.z - dz/256/2*2;
+                uniform float radius;
+                gl_FragDepth = gl_FragCoord.z - dz * radius;
         }
         blit {
          uniform sampler2D image;
