@@ -18,13 +18,13 @@ int64 threadCPUTime();
 inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)::"memory"); return (((uint64)hi)<<32)|lo; }
 
 struct Time {
-    uint64 startTime=threadCPUTime(), stopTime=0;
+    uint64 startTime=realTime(), stopTime=0;
     Time(bool start=false) : stopTime(start?0:startTime) {}
-    void start() { if(stopTime) startTime=threadCPUTime()-(stopTime-startTime); stopTime=0; }
-    void stop() { if(!stopTime) stopTime=threadCPUTime(); }
+    void start() { if(stopTime) startTime=realTime()-(stopTime-startTime); stopTime=0; }
+    void stop() { if(!stopTime) stopTime=realTime(); }
     String reset() { stop(); String s=str((stopTime-startTime)/1000000000., 1u)+'s'; startTime=stopTime; stopTime=0; return s; }
-    operator uint64() const { return ((stopTime?:threadCPUTime()) - startTime)/1000000; }
-    double toReal() const { return ((stopTime?:threadCPUTime()) - startTime)/1000000000.; }
+    operator uint64() const { return ((stopTime?:realTime()) - startTime)/1000000; }
+    double toReal() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
     operator float() const { return toReal(); }
     operator double() const { return toReal(); }
 };
