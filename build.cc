@@ -88,18 +88,23 @@ bool Build::tryParseConditions(TextData& s, string fileName) {
 
 bool Build::tryParseFiles(TextData& s) {
 	if(!s.match("FILE(") && !s.match("ICON(")) return false;
-	string name = s.identifier("_-");
+ String name = copyRef(s.identifier("_-"));
 	s.skip(')');
-
-	String filesPath = tmp+"/files";
-	Folder(filesPath, currentWorkingDirectory(), true);
-	String path = find(replace(name, '_', '/'));
+ name = replace(name, '_', '.');
+ String path = find(name);
+ /*String path;
+ for(string p: sources) {
+  if(section(p.contains('.')?section(p,'.'):p,'/',-2,-1) == name)
+   { path=copyRef(p); break; }
+ }*/
 	assert(path, "No such file to embed", name);
+ String filesPath = tmp+"/files";
+ Folder(filesPath, currentWorkingDirectory(), true);
 	Folder subfolder = Folder(section(path,'/',0,-2), folder);
-	string file = section(path,'/',-2,-1);
-	String object = filesPath+"/"+file+".o";
+ string file = name; //section(path,'/',-2,-1);
+ String object = filesPath+"/"+name+".o";
 	assert_(!files.contains(object), name);
-	assert_(existsFile(file, subfolder), file, name);
+ assert_(existsFile(file, subfolder), file, name);
 	int64 lastFileEdit = File(file, subfolder).modifiedTime();
 	if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
 		if(execute(LD, {"-r", "-b", "binary", "-o", object, file}, true, subfolder)) error("Failed to embed");

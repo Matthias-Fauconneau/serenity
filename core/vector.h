@@ -112,7 +112,7 @@ inline String strx(vec2 N) { return str(N.x)+'x'+str(N.y); }
 
 generic struct xyz {
     T x,y,z;
-    vec<xy,T,2> xy() const { return vec< ::xy,T,2>(x,y); }
+    vec<xy,T,2>& xy() const { return (vec< ::xy,T,2>&)*this; }
 };
 /// Integer x,y,z vector
 typedef vec<xyz,int,3> int3;
@@ -202,8 +202,14 @@ struct quat {
     float s = 1; vec3 v = 0;
     quat conjugate() const { return {s, -v}; }
 };
+inline quat angleVector(float a, vec3 v) {
+ float l = length(v);
+ if(!l) return quat{1, 0};
+ return quat{cos(a/2*l), sin(a/2*l)/l*v};
+}
 static_assert(sizeof(quat)==4*sizeof(float),"");
 inline quat operator*(quat p, quat q) { return {p.s*q.s - dot(p.v, q.v), p.s*q.v + q.s*p.v + cross(p.v, q.v)}; }
+inline vec3 operator*(quat p, vec3 v) { return (p * quat{0, v} * p.conjugate()).v; }
 inline quat operator*(float s, quat q) { return {s*q.s, s*q.v}; }
 inline quat operator+(quat p, quat q) { return {p.s+q.s, p.v+q.v}; }
 inline float length(quat q) { return sqrt(sq(q.s)+sq(q.v)); }
