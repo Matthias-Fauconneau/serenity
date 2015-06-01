@@ -81,7 +81,8 @@ shared<Graphics> Plot::graphics(vec2 size) {
     // Evaluates colors
     buffer<vec3> colors(dataSets.size());
     if(colors.size==1) colors[0] = black;
-	else for(uint i: range(colors.size)) colors[i] = clamp(bgr3f(0), LChuvtoBGR(53,179, 2*PI*i/colors.size), bgr3f(1));
+    else for(uint i: range(colors.size))
+     colors[i] = clamp(bgr3f(0), LChuvtoBGR(53,179, 2*PI*i/colors.size), bgr3f(1));
 
     // Draws plot
 	int2 pen = 0;
@@ -96,7 +97,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
         pen.y += top;
     }
     for(uint i: range(dataSets.size())) { // Legend
-		Text text(dataSets.keys[i], 16, colors[i]); graphics->graphics.insert(vec2(pen+int2(legendPosition&1 ? -text.sizeHint().x : 0,0)), text.graphics(0)); pen.y+=text.sizeHint().y;
+     Text text(dataSets.keys[i], 16, colors[i]); graphics->graphics.insert(vec2(pen+int2(legendPosition&1 ? -text.sizeHint().x : 0,0)), text.graphics(0)); pen.y+=text.sizeHint().y;
     }
 
     // Transforms data positions to render positions

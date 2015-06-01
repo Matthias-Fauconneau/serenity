@@ -11,9 +11,9 @@ struct Plot : virtual Widget {
 	shared<Graphics> graphics(vec2 size) override;
 
 	String name, xlabel, ylabel;
-    bool log[2] = {false, false};
-    map<String, map<real,real>> dataSets;
-    bool plotPoints = false, plotLines = true;
-    LegendPosition legendPosition;
-    vec2 min = 0, max = 0;
+ bool log[2] = {false, false};
+ map<String, map<real,real>> dataSets;
+ bool plotPoints = false, plotLines = true;
+ LegendPosition legendPosition;
+ vec2 min = 0, max = 0;
 };

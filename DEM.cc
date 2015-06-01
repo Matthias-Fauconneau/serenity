@@ -17,16 +17,16 @@ constexpr float pow5(float x) { return x*x*x*x*x; }
 struct System {
  //  (m - δt²·∂xf - δt·∂vf) δv = δt·(f + δt·∂xf·v) else m δv = δt f
  static constexpr bool implicit = true;
- static constexpr bool rollTest = false;
+ static constexpr bool rollTest = true;
  static constexpr bool useWire = true && !rollTest;
  static constexpr bool useRotation = true;
- static constexpr float dt = 1./60 /32;
+ static constexpr float dt = 1./60 /32 /(rollTest?32:1);
  // Characteristic dimensions
  static constexpr float T = 1; // 1 s
  static constexpr float L = 1; // 1 m
  static constexpr float M = 1; // 1 kg
 
- HList<Plot> plots;
+ VList<Plot> plots;
 
  struct Contact {
   vec3 relativeA, relativeB; // Relative to center but world axices
@@ -52,10 +52,11 @@ struct System {
   vec3 normal = 0;
   float fN = 0;
   vec3 relativeVelocity = 0;
+#define DBG_FRICTION 1
 #if DBG_FRICTION
-  rgb3f color = 0; // DBG_FRICTION
-  bool disable = false; //DBG_FRICTION
-  array<vec3> lines = array<vec3>(); // DBG_FRICTION
+  rgb3f color = 0;
+  bool disable = false;
+  array<vec3> lines = array<vec3>();
 #endif
   bool operator==(const Friction& b) const { return index == b.index; }
  };
@@ -206,6 +207,7 @@ struct System {
                                           0, Kb, c.normal, relativeVelocity);
   vec3 localA = A.rotation[a].conjugate()*c.relativeA;
   vec3 localB = B.rotation[b].conjugate()*c.relativeB;
+  log(c.relativeA, c.relativeB, localA, localB, toGlobal(A, a, localA), toGlobal(B, b, localB));
   Friction& friction =
                    A.frictions[a].add(Friction{B.base+b, localA, localB});
   if(friction.lastUpdate < timeStep-1) { // Resets contact
@@ -250,6 +252,9 @@ struct System {
  }
  template<Type tA, Type tB> void friction(Friction& f, tA& A, size_t a,
                                                                                  tB& B, size_t b) {
+#if DBG_FRICTION
+    f.color = 0;
+#endif
   vec3 fT = 0;
   vec3 tangentRelativeVelocity
     = f.relativeVelocity - dot(f.normal, f.relativeVelocity) * f.normal;
@@ -273,15 +278,21 @@ struct System {
     float force = staticFrictionStiffness * f.fN * tangentLength;
     vec3 springDirection = tangentOffset / tangentLength;
     fT -= force * springDirection;
+#if DBG_FRICTION
+    f.color = rgb3f(0,1,0);
+#endif
    } // else static equilibrium
   }
   // Dynamic friction
-  if(tangentRelativeSpeed >= staticFrictionThresholdSpeed
+  if(1 || tangentRelativeSpeed >= staticFrictionThresholdSpeed
      /*|| length(fT) > frictionCoefficient*f.fN*/) {
    f.lastUpdate = 0;
-   constexpr float dynamicFrictionCoefficient = 0.1 / 10; //frictionCoefficient;
+   constexpr float dynamicFrictionCoefficient = 0.1; //frictionCoefficient;
    fT = - dynamicFrictionCoefficient * f.fN * tangentRelativeVelocity
         / (tangentRelativeSpeed+staticFrictionThresholdSpeed);
+#if DBG_FRICTION
+    f.color = rgb3f(1,0,0);
+#endif
   }
   if(!tA::fixed) F[A.base+a] += vec3d(dt*fT);
   if(!tB::fixed) F[B.base+b] -= vec3d(dt*fT);
@@ -716,14 +727,14 @@ break2_:;
   timeStep++;
 
   if(rollTest) {
-   if(!plots) plots.append();
+   while(plots.size<2) plots.append();
    Locker lock(this->lock);
-   /*plots[0].dataSets["Ecc"__][timeStep]
+   plots[0].dataSets["Ecc"__][timeStep]
      = 1./2*Grain::mass*sq(grain.velocity[0]);
    plots[0].dataSets["Ecr"__][timeStep]
      = 1./2*Grain::angularMass*sq(grain.angularVelocity[0]);
-   plots[0].dataSets["Vt"__][timeStep] = grain.velocity[0] +
-     cross(grain.angularVelocity[0], vec3(0,0,-Grain::radius));*/
+   plots[1].dataSets["Vt"__][timeStep] = length(grain.velocity[0] +
+     cross(grain.angularVelocity[0], vec3(0,0,-Grain::radius)));
   }
   if(wire.count) {
    //miscTime.start();
@@ -848,7 +859,8 @@ struct SimulationView : Simulation, Widget, Poll {
     max = ::max(max, grain.position[i]);
    }
    float3 rotationCenter = (min+max)/2.f;
-   this->rotationCenter = this->rotationCenter*(1-dt) + dt*rotationCenter;
+   if(!rollTest)
+    this->rotationCenter = this->rotationCenter*(1-dt) + dt*rotationCenter;
   }
 
   quat viewRotation = angleVector(viewYawPitch.y, vec3(1,0,0)) *
@@ -863,6 +875,7 @@ struct SimulationView : Simulation, Widget, Poll {
   float3 scale = 2.f*vec3(size.x/size.y, 1, -1./2)/(max-min); // GL_LESS => -Z
   scale.xy() = ::min(scale.x, scale.y);
   scale.xy() = this->scale = this->scale*(1-dt) + dt*scale.xy();
+  if(rollTest) scale = 1./(16*Grain::radius);
   scale.x *= size.y/size.x;
   float3 fitTranslation = -scale*(min+max)/2.f;
   float3 translation = this->translation = 0;
@@ -901,22 +914,24 @@ struct SimulationView : Simulation, Widget, Poll {
     positions[i*6+4] = float3(max.x, min.y, O.z);
     positions[i*6+5] = float3(max, O.z);
 
-    for(int d: range(0)) {
-     vec3 axis = 0;
-     lines[rgb3f(1,0,0)].append(viewProjection*toGlobal(grain, i, axis));
-     axis[d] = Grain::radius/2;
-     lines[rgb3f(1,0,0)].append(viewProjection*toGlobal(grain, i, axis));
+    for(int d: range(3)) {
+     vec3 axis = 0; axis[d] = 1;
+     lines[rgb3f(axis)].append(viewProjection*toGlobal(grain, i, 0));
+     lines[rgb3f(axis)].append(viewProjection*toGlobal(grain, i,
+                                                       Grain::radius/2*axis));
     }
 #if DBG_FRICTION
     for(const Friction& f : grain.frictions[i]) {
      vec3 A = toGlobal(grain, i, f.localA);
      size_t b = f.index;
      vec3 B;
-     if(b==0) B = toGlobal(floor, b-Floor::base, f.localB);
-     else if(b==1) B = toGlobal(side, b-Side::base, f.localB);
-     else B = toGlobal(grain, b-Grain::base, f.localB);
-     lines[f.color].append(viewProjection*A);
-     lines[f.color].append(viewProjection*B);
+     if(b==floor.base) B = toGlobal(floor, b-floor.base, f.localB);
+     else if(b==side.base) B = toGlobal(side, b-side.base, f.localB);
+     else B = toGlobal(grain, b-grain.base, f.localB);
+     vec3 vA = viewProjection*A, vB=viewProjection*B;
+     if(length(vA-vB) < 16/size.y) vA.y -= 8/size.y, vB.y += 8/size.y;
+     lines[f.color].append(vA);
+     lines[f.color].append(vB);
     }
 #endif
    }
@@ -962,11 +977,13 @@ struct SimulationView : Simulation, Widget, Poll {
      vec3 A = toGlobal(wire, i, f.localA);
      size_t b = f.index;
      vec3 B;
-     /**/  if(b==0) B = toGlobal(floor, b-Floor::base, f.localB);
-     else if(b==1) B = toGlobal(side, b-Side::base, f.localB);
-     else B = toGlobal(grain, b-Grain::base, f.localB);
-     lines[f.color].append(viewProjection*A);
-     lines[f.color].append(viewProjection*B);
+     /**/  if(b==floor.base) B = toGlobal(floor, b-floor.base, f.localB);
+     else if(b==side.base) B = toGlobal(side, b-side.base, f.localB);
+     else B = toGlobal(grain, b-grain.base, f.localB);
+     vec3 vA = viewProjection*A, vB=viewProjection*B;
+     /*if(length(vA-vB) < 2/size.y)*/ vA.y -= 4/size.y, vB.y += 4/size.y;
+     lines[f.color].append(vA);
+     lines[f.color].append(vB);
     }
 #endif
    }
@@ -994,8 +1011,8 @@ struct SimulationView : Simulation, Widget, Poll {
    vertexArray.draw(Lines, entry.value.size);
   }
 
-  if(0 && plots) {
-   Image target(int2(size)/2, true); target.clear(byte4(byte3(0xFF), 0));
+  if(1 && plots) {
+   Image target(int2(size.x/2,size.y), true); target.clear(byte4(byte3(0xFF), 0));
    this->lock.lock();
    auto graphics = plots.graphics(vec2(target.size),
                                             Rect(vec2(target.size)));
@@ -1007,8 +1024,10 @@ struct SimulationView : Simulation, Widget, Poll {
    shader.bindFragments({"color"});
    static GLVertexArray vertexArray;
    shader["image"] = 0; image.bind(0);
-   GLBuffer positionBuffer (ref<vec2>{ vec2(0,0),vec2(1,0),vec2(0,1),
-                                                             vec2(0,1),vec2(1,0),vec2(1,1)});
+   int2 min (0,-1), max (1,1);
+   GLBuffer positionBuffer (ref<vec2>{
+                             vec2(min.x,min.y),vec2(max.x,min.y),vec2(min.x,max.y),
+                             vec2(min.x,max.y),vec2(max.x,min.y),vec2(max.x,max.y)});
    vertexArray.bindAttribute(shader.attribLocation("position"_),
                              2, Float, positionBuffer);
    glBlendAlpha();
