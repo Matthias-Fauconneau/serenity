@@ -78,6 +78,7 @@ bool Build::tryParseConditions(TextData& s, string fileName) {
 	else if(flags.contains(toLower(id))) value=true; // Conditionnal build (extern use flag)
 	else if(defines.contains(toLower(id))) value=true; // Conditionnal build (intern use flag)
 	if(value != condition) {
+  s.whileAny(" ");
 		while(!s.match("#else") && !s.match("#endif")) {
 			assert_(s, fileName+": Expected #endif, got EOD");
 			if(!tryParseConditions(s, fileName)) s.line();
