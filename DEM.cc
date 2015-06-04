@@ -6,7 +6,7 @@
 #include "algebra.h"
 #include "png.h"
 #include "time.h"
-#include "parallel.h"
+//include "parallel.h"
 #include "gl.h"
 #include "layout.h"
 #include "plot.h"

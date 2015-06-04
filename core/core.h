@@ -2,7 +2,11 @@
 /// \file core.h Keywords, traits, move semantics, range, ref, debug
 
 // Keywords
+#ifdef PROFILE
 #define notrace __attribute((no_instrument_function))
+#else
+#define notrace
+#endif
 #define inline inline notrace
 #define unused __attribute((unused))
 #define packed __attribute((packed))

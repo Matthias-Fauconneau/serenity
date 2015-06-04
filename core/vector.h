@@ -199,8 +199,9 @@ typedef vec<xy,int64,2> long2;
 template<template<Type> /*Type*/class V, Type T, uint N> inline /*constexpr*/ float length(const vec<V,T,N>& a) { return sqrt(dot(a,a)); }
 
 struct quat {
-    float s = 1; vec3 v = 0;
-    quat conjugate() const { return {s, -v}; }
+    float s; vec3 v;
+    quat(float s = 1, vec3 v = 0) : s(s), v(v) {}
+    quat conjugate() const { return quat(s, -v); }
 };
 inline quat angleVector(float a, vec3 v) {
  float l = length(v);

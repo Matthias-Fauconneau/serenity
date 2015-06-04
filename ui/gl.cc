@@ -177,20 +177,14 @@ void GLVertexArray::draw(PrimitiveType primitiveType, uint vertexCount) const {
 }
 
 void GLIndexBuffer::draw(size_t start, size_t end) {
-    glCheck();
-    assert_(end > start || start==0 && end==0);
-    //glEnable(GL_PRIMITIVE_RESTART_FIXED_INDEX);
     glEnable(GL_PRIMITIVE_RESTART);
     glPrimitiveRestartIndex((1u<<(elementSize*8))-1);
-    glCheck();
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
-    glCheck();
     GLenum type = 0;
     if(elementSize==2) type = GL_UNSIGNED_SHORT;
     if(elementSize==4) type = GL_UNSIGNED_INT;
     assert_(type);
     glDrawElements(primitiveType, (end-start)?: elementCount, type, (void*)(start*elementSize));
-    glCheck(int(primitiveType), start, end, elementCount, type, elementSize, (1u<<(elementSize*8))-1);
 }
 
 /// Texture
@@ -351,9 +345,7 @@ void GLFrameBuffer::blitWindow(const GLTexture& source, int2 offset) {
 
 void glDrawRectangle(GLShader& shader, vec2 min, vec2 max, bool texCoord) {
     shader.bind();
-    glCheck();
     static GLVertexArray vertexArray;
-    glCheck();
     int positionIndex = shader.attribLocation("position"_);
     assert_(positionIndex>=0);
     GLBuffer positions {ref<vec2>{vec2(min.x,min.y), vec2(max.x,min.y), vec2(min.x,max.y), vec2(max.x,max.y)}};
