@@ -1,7 +1,7 @@
 #include "core/image.h"
 #include "data.h"
 #include "vector.h"
-#include "parallel.h"
+//include "parallel.h"
 #include "math.h"
 #include "map.h"
 
@@ -118,7 +118,7 @@ Image rotateHalfTurn(Image&& target) {
 
 // -- Resample (3x8bit) --
 
-static void box(const Image& target, const Image& source) {
+/*static void box(const Image& target, const Image& source) {
     //assert_(!source.alpha); //FIXME: not alpha correct
     //assert_(source.size.x/target.size.x == source.size.y/target.size.y, target, source, source.size.x/target.size.x, source.size.y/target.size.y);
     int scale = min(source.size.x/target.size.x, source.size.y/target.size.y);
@@ -144,9 +144,9 @@ static void box(const Image& target, const Image& source) {
 	}
     });
 }
-static Image box(Image&& target, const Image& source) { box(target, source); return move(target); }
+static Image box(Image&& target, const Image& source) { box(target, source); return move(target); }*/
 
-static void bilinear(const Image& target, const Image& source) {
+/*static void bilinear(const Image& target, const Image& source) {
     //assert_(!source.alpha, source.size, target.size);
     const uint stride = source.stride;
     chunk_parallel(target.height, [&](uint, size_t y) {
@@ -167,18 +167,18 @@ static void bilinear(const Image& target, const Image& source) {
 	    target(x, y) = d;
 	}
     });
-}
+}*/
 
-void resize(const Image& target, const Image& source) {
+/*void resize(const Image& target, const Image& source) {
     assert_(source && target && source.size != target.size, source, target);
     if(source.width%target.width==0 && source.height%target.height==0) box(target, source); // Integer box downsample
     else if(target.size > source.size/2) bilinear(target, source); // Bilinear resample
     else { // Integer box downsample + Bilinear resample
         int downsampleFactor = min(source.size.x/target.size.x, source.size.y/target.size.y);
 	assert_(downsampleFactor, target, source);
-	bilinear(target, box(Image((source.size/*+int2((downsampleFactor-1)/2)*/)/downsampleFactor, source.alpha), source));
+ bilinear(target, box(Image((source.size)/downsampleFactor, source.alpha), source));
     }
-}
+}*/
 #if 0
 // -- 4x float
 
