@@ -200,7 +200,7 @@ template<template<Type> /*Type*/class V, Type T, uint N> inline /*constexpr*/ fl
 
 struct quat {
     float s; vec3 v;
-    quat(float s = 1, vec3 v = 0) : s(s), v(v) {}
+    constexpr quat(float s = 1, vec3 v = 0) : s(s), v(v) {}
     quat conjugate() const { return quat(s, -v); }
 };
 inline quat angleVector(float a, vec3 v) {

@@ -6,7 +6,7 @@
 #include "algebra.h"
 #include "png.h"
 #include "time.h"
-//include "parallel.h"
+#include "parallel.h"
 #include "gl.h"
 #include "layout.h"
 #include "plot.h"
@@ -135,7 +135,7 @@ struct System {
   static constexpr vec3 position[1] {vec3(0,0,0)};
   static constexpr vec3 velocity[1] {vec3(0,0,0)};
   static constexpr vec3 angularVelocity[1] {vec3(0,0,0)};
-  static constexpr quat rotation[1] {quat{1,vec3(0,0,0)}};
+  static constexpr quat rotation[1] {quat(1,vec3(0,0,0))};
   vec3 torque[0] {};
   vec3 surfaceVelocity(size_t, vec3) const { return 0; }
  } floor;
@@ -908,16 +908,16 @@ struct SimulationView : Simulation, Widget, Poll {
     log("Release", withName(grain.count,wire.count));
    }
   };
-  window->actions[Key('E')] = [this] {
+  /*window->actions[Key('E')] = [this] {
    if(!encoder) {
     encoder = unique<Encoder>("tas.mp4");
     encoder->setH264(window->Window::size, 60);
     encoder->open();
    }
-  };
+  };*/
   if(arguments().contains("export")) {
    encoder = unique<Encoder>("tas.mp4"_);
-   encoder->setH264(window->Window::size, 60);
+   encoder->setH264(int2(1280,720), 60);
    encoder->open();
   }
 
@@ -929,8 +929,8 @@ struct SimulationView : Simulation, Widget, Poll {
  ~SimulationView() {
   if(pour) log("~", withName(grain.count, wire.count));
  }
- vec2 sizeHint(vec2) { return vec2(1024, 0?1536:1024); }
- shared<Graphics> graphics(vec2 size) {
+ vec2 sizeHint(vec2) { return vec2(1050, 1050*720/1280); }
+ shared<Graphics> graphics(vec2) {
   renderTime.start();
   size_t start = pour || rollTest ? 0 : 1;
 
@@ -959,14 +959,18 @@ struct SimulationView : Simulation, Widget, Poll {
     max = ::max(max, O + float3(float2(Grain::radius), 0)); // Parallel
    }
   }
-  vec2 viewSize (size.x, size.x);
-  float3 scale = 2.f*vec3(viewSize.x/viewSize.y, 1, -1./4)/(max-min);
-  scale.xy() = ::min(scale.x, scale.y);
+
+  static GLFrameBuffer target(int2(1280,720));
+  vec2 size (target.size.x, target.size.y);
+  vec2 viewSize = size;
+
+  vec3 scale (2*::min(viewSize/(max-min).xy())/viewSize, -1/(2*(max-min).z));
   scale.xy() = this->scale = this->scale*(1-dt) + dt*scale.xy();
   if(rollTest) scale = 1./(16*Grain::radius);
   //scale.x *= size.y/size.x;
-  scale.y *= size.x/size.y;
+  //scale.y *= size.x/size.y;
   float3 fitTranslation = -scale*(min+max)/2.f;
+  //vec2 aspectRatio (size.x/size.y, 1);
   float3 translation = this->translation = vec3((size-viewSize)/size, 0);
   //this->translation*(1-dt) + dt*fitTranslation;
   /*mat4 viewProjection;
@@ -983,6 +987,7 @@ struct SimulationView : Simulation, Widget, Poll {
 
   map<rgb3f, array<vec3>> lines;
 
+  target.bind(ClearColor|ClearDepth);
   glDepthTest(true);
 
   if(grain.count-start) {
@@ -1128,7 +1133,9 @@ struct SimulationView : Simulation, Widget, Poll {
    vertexArray.draw(Triangles, 6);
   }
 
-  if(encoder) encoder->writeVideoFrame(window->readback());
+  if(encoder) encoder->writeVideoFrame(target.readback());
+  //target.blit(0, ::max(int2(0), (target.size-window->size)/2), window->size);
+  target.blit(0, window->size);
   renderTime.stop();
   if(stop && fitTranslation != this->translation) window->render();
   return shared<Graphics>();

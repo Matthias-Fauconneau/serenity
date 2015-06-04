@@ -317,11 +317,19 @@ void GLFrameBuffer::bindWindow(int2 position, int2 size, uint clearFlags, vec4f 
     if(clearFlags&ClearColor) glClearColor(color.x, color.y, color.z, color.w);
     if(clearFlags) glClear(clearFlags);
 }
-void GLFrameBuffer::blit(uint target) {
+/*void GLFrameBuffer::blit(uint target, int2 offset, int2 size) {
     glBindFramebuffer(GL_READ_FRAMEBUFFER,id);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target);
-    glBlitFramebuffer(0,0,width,height,0,0,width,height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glBlitFramebuffer(offset.x,offset.y,size.x,size.y, 0,0,size.x,size.y,
+                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
+}*/
+void GLFrameBuffer::blit(uint target, int2 size) {
+    glBindFramebuffer(GL_READ_FRAMEBUFFER,id);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target);
+    glBlitFramebuffer(0,0,this->size.x,this->size.y, 0,0,size.x,size.y,
+                      GL_COLOR_BUFFER_BIT, GL_LINEAR);
 }
+
 /*void GLFrameBuffer::blit(GLTexture& color) {
     assert(color.width==width && color.height==height);
     uint target=0;
@@ -341,6 +349,11 @@ void GLFrameBuffer::blitWindow(const GLTexture& source, int2 offset) {
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glBlitFramebuffer(0,0, source.size.x,source.size.y, offset.x, offset.y, offset.x+source.size.x, offset.y+source.size.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     glDeleteFramebuffers(1, &framebuffer);
+}
+Image GLFrameBuffer::readback() {
+    Image target(size);
+    glReadPixels(0, 0, target.size.x, target.size.y, GL_BGRA, GL_UNSIGNED_BYTE, (void*)target.data);
+    return flip(move(target));
 }
 
 void glDrawRectangle(GLShader& shader, vec2 min, vec2 max, bool texCoord) {

@@ -235,7 +235,7 @@ void XWindow::event() {
     XDisplay::event();
     setTitle(getTitle ? getTitle() : widget->title());
 	if(state!=Idle) return;
-    GLFrameBuffer::bindWindow(0, Window::size, ClearColor|ClearDepth, vec4f(backgroundColor, 1));
+    GLFrameBuffer::bindWindow(0, Window::size, 0/*ClearColor|ClearDepth*/, vec4f(backgroundColor, 1));
     Update update = render(Window::size);
     if(update) {
         swapTime.start();
