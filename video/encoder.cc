@@ -52,7 +52,7 @@ void Encoder::setH264(int2 size, uint videoFrameRate) {
     assert_(!videoStream);
     this->size=size;
     this->videoFrameRate=videoFrameRate;
-    swsContext = sws_getContext(width, height, AV_PIX_FMT_BGRA, width, height, AV_PIX_FMT_YUV420P, SWS_FAST_BILINEAR, 0, 0, 0);
+    swsContext = sws_getContext(width, height, AV_PIX_FMT_BGR0, width, height, AV_PIX_FMT_YUV420P, SWS_FAST_BILINEAR, 0, 0, 0);
 
     AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_H264);
     videoStream = avformat_new_stream(context, codec);
@@ -69,7 +69,7 @@ void Encoder::setH264(int2 size, uint videoFrameRate) {
     if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
     AVDictionary* options = 0;
     av_dict_set(&options, "preset", "ultrafast", 0);
-    check( avcodec_open2(videoCodec, codec, &options) );
+    check( avcodec_open2(videoCodec, codec, &options), size );
     frame = av_frame_alloc();
     avpicture_alloc((AVPicture*)frame, AV_PIX_FMT_YUV420P, width, height);
 }

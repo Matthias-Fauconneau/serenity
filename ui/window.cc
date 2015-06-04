@@ -81,10 +81,13 @@ XWindow::XWindow(Widget* widget, Thread& thread,  int2 sizeHint) : ::Window(widg
 	Window::actions[Escape] = []{requestTermination();};
     {CreateGC r; send(({r.context=id+GraphicContext, r.window=id+Window, r;}));}
 
-    glDisplay = XOpenDisplay(strz(environmentVariable("DISPLAY"_,":0"_))); assert_(glDisplay);
-    const int fbAttribs[] = {GLX_DOUBLEBUFFER, 1, GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_ALPHA_SIZE, 0,  GLX_DEPTH_SIZE, 24,
-                             /*GLX_SAMPLE_BUFFERS, 1, GLX_SAMPLES, 8,*/ 0};
-    int fbCount=0; fbConfig = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount)[0]; assert(fbConfig && fbCount);
+    glDisplay = XOpenDisplay(strz(environmentVariable("DISPLAY"_,":0"_)));
+    assert_(glDisplay);
+    const int fbAttribs[] = {GLX_DOUBLEBUFFER, 0,
+                             GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8,  0};
+    int fbCount=0;
+    fbConfig = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount)[0];
+    assert(fbConfig && fbCount);
     initializeThreadGLContext();
 
     if(XRender::EXT) {  uint16 sequence = send(XRender::QueryPictFormats());

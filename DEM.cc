@@ -79,7 +79,7 @@ struct System {
                        / (cb(radius)-cb(radius-1e-4));
 
   size_t base = 0;
-  static constexpr size_t capacity = rollTest ? 1 : 512;
+  static constexpr size_t capacity = rollTest ? 1 : 1024;
   static constexpr bool fixed = false;
   buffer<vec3> position { capacity };
   buffer<vec3> velocity { capacity };
@@ -108,7 +108,7 @@ struct System {
   static constexpr float tensionDamping = 0 * mass/T;
 
   size_t base = 0;
-  static constexpr size_t capacity = useWire ? 1024 : 0;
+  static constexpr size_t capacity = useWire ? 4*2048 : 0;
   static constexpr bool fixed = false;
   buffer<vec3> position { capacity };
   buffer<vec3> velocity { capacity };
@@ -294,7 +294,7 @@ struct System {
    constexpr float dynamicFrictionCoefficient = 1./dynamic; //frictionCoefficient;
    float fS = dynamicFrictionCoefficient * f.fN;
    vec3 tangentVelocityDirection = tangentRelativeVelocity / tangentRelativeSpeed;
-   constexpr float Kb = 0x1p-28 * M / T/T;
+   constexpr float Kb = 0x1p-30 * M / T/T;
    float fB = - Kb * dot(tangentVelocityDirection, f.relativeVelocity); // Damping
    fT = - (fS+fB) * tangentVelocityDirection;
 #if DBG_FRICTION
@@ -373,9 +373,9 @@ struct Simulation : System {
   size_t oldCell = grid.index(t.position[i]);
   t.position[i] += dt*t.velocity[i];
   vec3 size (vec3(grainGrid.size)/grainGrid.scale);
-  if(t.position[i].x < -size.x/2.f || t.position[i].x >= size.x/2 ||
-     t.position[i].y < -size.x/2.f || t.position[i].y >= size.y/2 ||
-     t.position[i].z < 0 || t.position[i].z >= size.z) {
+  if(!(t.position[i].x >= -size.x/2.f && t.position[i].x < size.x/2) ||
+     !(t.position[i].y >= -size.x/2.f && t.position[i].y < size.y/2) ||
+     !(t.position[i].z >= 0 && t.position[i].z < size.z)) {
    error(i, "p", t.position[i], "v", t.velocity[i], "dv", dv[t.base+i], "F", F[t.base+i]);
    t.position[i].x = clamp(-1.f, t.position[i].x, 1.f-0x1p-12f);
    t.position[i].y = clamp(-1.f, t.position[i].y, 1.f-0x1p-12f);
@@ -398,13 +398,13 @@ struct Simulation : System {
  static constexpr float pourRadius = Side::initialRadius - Grain::radius;
  float pourHeight = Floor::height+Grain::radius;
 
- static constexpr float loopRadius = 0 * Grain::radius;
- static constexpr float winchRadius = Side::initialRadius - loopRadius - Grain::radius;
- static constexpr float winchRate = 16 / T;
+ static constexpr float loopRadius = 6 * Grain::radius;
+ static constexpr float winchRadius = Side::initialRadius - loopRadius - Wire::radius;
+ static constexpr float winchRate = 8 / T;
  static constexpr float winchSpeed = 2 * Grain::radius / T;
  float winchAngle = 0;
 
- static constexpr float loopRate = 32 / T;
+ static constexpr float loopRate = (5+1) * winchRate;
  float loopAngle = 0;
 
  Random random;
@@ -793,38 +793,40 @@ break2_:;
 
   timeStep++;
 
-  while(plots.size<2) plots.append();
-  if(rollTest) {
-   Locker lock(this->lock);
-   plots[0].dataSets["Ecc"__][timeStep]
-     = 1./2*Grain::mass*sq(grain.velocity[0]);
-   plots[0].dataSets["Ecr"__][timeStep]
-     = 1./2*Grain::angularMass*sq(grain.angularVelocity[0]);
-   plots[1].dataSets["Vt"__][timeStep] = length(grain.velocity[0] +
-     cross(grain.angularVelocity[0], vec3(0,0,-Grain::radius)));
-  }
-  if(wire.count) {
-   //miscTime.start();
-   float wireLength = 0;
-   vec3 last = wire.position[0];
-   for(vec3 p: wire.position.slice(1, wire.count-1)) {
-    wireLength += ::length(p-last);
-    last = p;
+  if(0) {
+   while(plots.size<2) plots.append();
+   if(rollTest) {
+    Locker lock(this->lock);
+    plots[0].dataSets["Ecc"__][timeStep]
+      = 1./2*Grain::mass*sq(grain.velocity[0]);
+    plots[0].dataSets["Ecr"__][timeStep]
+      = 1./2*Grain::angularMass*sq(grain.angularVelocity[0]);
+    plots[1].dataSets["Vt"__][timeStep] = length(grain.velocity[0] +
+      cross(grain.angularVelocity[0], vec3(0,0,-Grain::radius)));
    }
-   //assert_(isNumber(wireLength), wireLength);
-   if(!isNumber(wireLength)) error(withName(wireLength));
-   //if(!plots) plots.append();
-   //plots[0].dataSets["length"__][timeStep] = wireLength;
-   Locker lock(this->lock);
-   plots[0].dataSets["stretch"__][timeStep]
-     = (wireLength / wire.count) / Wire::internodeLength;
-   float ssqV = 0;
-   for(vec3 v: grain.velocity.slice(0, grain.count)) ssqV += sq(v);
-   plots[1].dataSets["Kt"__][timeStep] = 1./2*Grain::mass*ssqV;
-   float ssqR = 0;
-   for(vec3 v: grain.angularVelocity.slice(0, grain.count)) ssqR += sq(v);
-   plots[1].dataSets["Kr"__][timeStep] = 1./2*Grain::angularMass*ssqR;
-   //miscTime.stop();
+   if(wire.count) {
+    //miscTime.start();
+    float wireLength = 0;
+    vec3 last = wire.position[0];
+    for(vec3 p: wire.position.slice(1, wire.count-1)) {
+     wireLength += ::length(p-last);
+     last = p;
+    }
+    //assert_(isNumber(wireLength), wireLength);
+    if(!isNumber(wireLength)) error(withName(wireLength));
+    //if(!plots) plots.append();
+    //plots[0].dataSets["length"__][timeStep] = wireLength;
+    Locker lock(this->lock);
+    plots[0].dataSets["stretch"__][timeStep]
+      = (wireLength / wire.count) / Wire::internodeLength;
+    float ssqV = 0;
+    for(vec3 v: grain.velocity.slice(1, grain.count)) ssqV += sq(v);
+    plots[1].dataSets["Kt"__][timeStep] = 1./2*Grain::mass*ssqV;
+    float ssqR = 0;
+    for(vec3 v: grain.angularVelocity.slice(0, grain.count)) ssqR += sq(v);
+    plots[1].dataSets["Kr"__][timeStep] = 1./2*Grain::angularMass*ssqR;
+    //miscTime.stop();
+   }
   }
   stepTime.stop();
  }
@@ -843,7 +845,7 @@ struct SimulationView : Simulation, Widget, Poll {
  void step() {
   Simulation::step();
   viewYawPitch.x += 2*PI*dt / 16;
-#define THREAD 1
+#define THREAD 0
 #if !THREAD
   if(timeStep%subStepCount == 0)
 #endif
@@ -927,7 +929,7 @@ struct SimulationView : Simulation, Widget, Poll {
  ~SimulationView() {
   if(pour) log("~", withName(grain.count, wire.count));
  }
- vec2 sizeHint(vec2) { return vec2(1050, 1050*3/2); }
+ vec2 sizeHint(vec2) { return vec2(1024, 0?1536:1024); }
  shared<Graphics> graphics(vec2 size) {
   renderTime.start();
   size_t start = pour || rollTest ? 0 : 1;

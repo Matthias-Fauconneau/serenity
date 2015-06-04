@@ -66,4 +66,4 @@ video/encoder.cc
 algebra.h
 algebra.cc
 DEM.cc
-shader
+shader.glsl
