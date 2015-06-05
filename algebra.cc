@@ -44,9 +44,9 @@ void Matrix::factorize() {
 Matrix::~Matrix() { cholmod_free_factor(&L, &c); }
 
 buffer<double> Matrix::solve(ref<double> b) {
-    cholmod_dense src {b.size, 1, b.size, b.size, (void*)b.data, 0, CHOLMOD_REAL, CHOLMOD_DOUBLE};
-    cholmod_dense* dst = cholmod_solve(CHOLMOD_A, L, &src, &c);
-    buffer<double> x((double*)dst->x, b.size, b.size);
-    delete dst;
-    return x;
+ cholmod_dense src {b.size, 1, b.size, b.size, (void*)b.data, 0, CHOLMOD_REAL, CHOLMOD_DOUBLE};
+ cholmod_dense* dst = cholmod_solve(CHOLMOD_A, L, &src, &c);
+ buffer<double> x((double*)dst->x, b.size, b.size);
+ delete dst;
+ return x;
 }

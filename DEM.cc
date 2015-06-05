@@ -24,7 +24,7 @@ struct System {
  /*static constexpr*/ float loopAngle = PI*(3-sqrt(5.)); // 2· Golden angle
  static constexpr float staticFriction = 32;
  static constexpr float dynamicFriction = 1./100;
- static constexpr int subStepCount = 64; // 32 -> 1e5, 64 -> 1e6
+ static constexpr int subStepCount = 27; // 27
  static constexpr float dt = 1./60 /subStepCount /(rollTest?32:1); // ~10¯⁴
  // Characteristic dimensions (SI)
  static constexpr float T = 1; // 1 s
@@ -127,14 +127,14 @@ struct System {
  struct Floor {
   static constexpr float mass = inf;
   static constexpr float radius = inf;
-  static constexpr float height = 8*L/256; //Wire::radius;
+  static constexpr float height = 0; //8*L/256; //Wire::radius;
   static constexpr float thickness = L;
   static constexpr float curvature = 0;
   static constexpr float elasticModulus = 1e6 * M/(L*T*T);
   static constexpr float normalDamping = 1 * M / T;
   static constexpr float frictionCoefficient = 1;
   static constexpr float staticFrictionThresholdSpeed = staticFriction * Grain::radius / T;
-  size_t base = 0; static constexpr size_t count = 1;
+  size_t base = 1; static constexpr size_t count = 1;
   static constexpr bool fixed = true;
   static constexpr vec3 position[1] {vec3(0,0,0)};
   static constexpr vec3 velocity[1] {vec3(0,0,0)};
@@ -168,7 +168,7 @@ struct System {
   vec3 torque[0] {};
   static constexpr float initialRadius = Grain::radius*8;
   float currentRadius = initialRadius;
-  size_t base = 0; static constexpr size_t count = 1;
+  size_t base = 2; static constexpr size_t count = 1;
   vec3 surfaceVelocity(size_t, vec3) const { return 0; }
  } side;
  /// Sphere - Side
@@ -228,7 +228,8 @@ struct System {
  float spring(size_t a, size_t b, float Ks, float length, float restLength,
                     float Kb, vec3 normal, vec3 relativeVelocity) {
   float fS = - Ks * (length - restLength);
-  float fB = - Kb * dot(normal, relativeVelocity); // Damping
+  float normalSpeed = dot(normal, relativeVelocity);
+  float fB = - Kb * normalSpeed ; // Damping
   float fSB = fS + fB;
   if(implicit) {
    for(int i: range(3)) {
@@ -236,7 +237,7 @@ struct System {
     for(int j: range(i)) {
      float Nij = normal[i]*normal[j];
      float dvf = - Kb * Nij;
-     float dxf = - Ks * ((1 - restLength/length)*(1 - Nij) + Nij);
+     float dxf = - Ks * (((i==j?1:0) - restLength/length)*(1 - Nij) + Nij);
      if(!fixedA) matrix(a*3+i, a*3+j) += - dt*dt*dxf - dt*dvf;
      if(!fixedB) matrix(b*3+i, b*3+j) -= - dt*dt*dxf - dt*dvf;
     }
@@ -248,6 +249,8 @@ struct System {
     if(!fixedA) F[a][i] += dt*f + dt*dt*dxf * relativeVelocity[i];
     if(!fixedB) F[b][i] -= dt*f + dt*dt*dxf * relativeVelocity[i];
    }
+   assert_(::length(F[a]) < Grain::mass/2);
+   assert_(::length(F[b]) < Grain::mass/2);
   } else {
    vec3 f = fSB * normal;
    if(!fixedA) F[a] += vec3d(dt*f);
@@ -257,7 +260,6 @@ struct System {
  }
  template<Type tA, Type tB> void friction(Friction& f, tA& A, size_t a,
                                                                                  tB& B, size_t b) {
-  //assert_(length(toGlobal(A, a, f.localA)-toGlobal(B, b, f.localB))<Grain::radius);
 #if DBG_FRICTION
   f.color = 0;
 #endif
@@ -336,24 +338,17 @@ struct Grid {
         void remove(uint16 index) {
             size_t i = 0;
             while(at(i)!=index) i++;
-            assert_(i<cellCapacity);
+            assert(i<cellCapacity);
             while(i+1<cellCapacity) { at(i) = at(i+1); i++; }
             at(i) = 0;
         }
-        bool tryAppend(uint16 index) { // Sorted by decreasing index
+        void append(uint16 index) { // Sorted by decreasing index
             size_t i = 0;
             while(at(i) > index) i++;
-            if(i<cellCapacity) {
-             while(index) { swap(index, at(i)); i++; }
-             if(i<=cellCapacity) {
-              if(i<cellCapacity) at(i) = 0;
-              return true;
-             }
-            }
-            return false;
-        }
-        void append(uint16 index) {
-         if(!tryAppend(index)) error("append", index);
+            assert(i<cellCapacity);
+            while(index) { swap(index, at(i)); i++; }
+            assert(i<=cellCapacity);
+            if(i<cellCapacity) at(i) = 0;
         }
     };
     inline List operator[](size_t i) {
@@ -367,9 +362,9 @@ struct Grid {
     }
     size_t index(vec3 p) {
         int3 i = index3(p);
-        assert_(i.x == clamp(0, i.x, size.x-1), p, i, size, scale);
-        assert_(i.y == clamp(0, i.y, size.y-1), p, i, size, scale);
-        assert_(i.z == clamp(0, i.z, size.z-1), p, i, size, scale);
+        assert(i.x == clamp(0, i.x, size.x-1), p, i, size, scale);
+        assert(i.y == clamp(0, i.y, size.y-1), p, i, size, scale);
+        assert(i.z == clamp(0, i.z, size.z-1), p, i, size, scale);
         return index(i.x, i.y, i.z);
     }
 };
@@ -379,10 +374,11 @@ struct Simulation : System {
  Grid grainGrid {1./(2*Grain::radius), 32*Grain::radius};
  // wireGrid {2./Grain::radius, 16*Grain::radius};
 
- array<pair<uint16, uint16>> gridQueue;
  template<Type T> void update(ref<vec3d> dv, Grid& grid, T& t, size_t i) {
   t.velocity[i] += vec3(dv[t.base+i]);
   size_t oldCell = grid.index(t.position[i]);
+  if(length(t.velocity[i]) > Grain::radius/dt) error(i, t.velocity[i], dv[t.base+i],
+    matrix(t.base+i,t.base+i)/Grain::mass, length(F[t.base+i])/double(Grain::mass));
   t.position[i] += dt*t.velocity[i];
   vec3 size (vec3(grainGrid.size)/grainGrid.scale);
   if(!(t.position[i].x >= -size.x/2.f && t.position[i].x < size.x/2) ||
@@ -397,26 +393,7 @@ struct Simulation : System {
   size_t newCell = grid.index(t.position[i]);
   if(oldCell != newCell) {
    grid[oldCell].remove(1+i);
-   size_t c = newCell;
-   vec3 cell (c%grainGrid.size.x, (c/grainGrid.size.x)%grainGrid.size.y, c/grainGrid.size.x/grainGrid.size.y);
-   vec3 min = (cell-vec3(grainGrid.size.x/2, grainGrid.size.y/2, 0))/grainGrid.scale;
-   vec3 max = (cell-vec3(grainGrid.size.x/2, grainGrid.size.y/2, 0)+vec3(1))/grainGrid.scale;
-   for(uint16 i: grid[newCell])
-    if(i) assert_(min <= t.position[i-1] && t.position[i-1] < max,
-      i, newCell, cell, min, t.position[i-1], max, (mref<uint16>)grid[newCell],
-      grid.scale*t.position[i-1], int3(grid.scale*t.position[i-1]),
-      int3(grainGrid.size.x/2,grainGrid.size.y/2,0)+int3(grid.scale*t.position[i-1]),
-      grainGrid.size, grid.index(t.position[i-1]));
-   if(!grid[newCell].tryAppend(1+i)) gridQueue. append({uint16(newCell), uint16(i+1)});
-    /*for(auto& c: t.color) c = 1./2;
-    for(uint16 i: (mref<uint16>)grid[newCell]) {
-     t.color[i-1] = rgba4f(0,1,0,1);
-     log(t.position[i-1]);
-    }
-    t.color[i] = rgba4f(1,0,0,1);
-    error(i, "p", t.position[i], "v", t.velocity[i], (mref<uint16>)grid[newCell]);
-    return;*/
-   //assert_(grid[newCell].size()<8);
+   grid[newCell].append(1+i);
   }
  }
 
@@ -434,8 +411,15 @@ struct Simulation : System {
  float loopAngle = 0;*/
 
  map<rgb3f, array<vec3>> lines;
+ struct State {
+  buffer<vec3> grainPositions;
+  buffer<vec3> wirePositions;
+ };
+ array<State> states;
+ int stateIndex = 0;
 
- vec3 winchPosition() {
+ vec3 winchPosition(float winchAngle = -1) {
+  if(winchAngle<0) winchAngle = this->winchAngle;
 #if 0
   float t = mod(winchAngle / loopAngle, 1);
   const float dt = 1./16;
@@ -479,8 +463,9 @@ struct Simulation : System {
  Lock lock;
  array<uint16> fixed;
 
+ bool winchObstacle = useWire && false;
  Simulation() {
-  if(useWire) { // Winch obstacle
+  if(winchObstacle) { // Winch obstacle
    size_t i = addGrain();
    grain.position[i] = vec3(winchPosition().xy(),
                                          winchPosition().z+Grain::radius-Wire::radius);
@@ -529,7 +514,8 @@ struct Simulation : System {
   //Locker lock(this->lock);
   if(pour) {
    // Generates falling grain (pour)
-   if(1) for(;;) {
+   const bool pourGrain = true;
+   if(pourGrain) for(;;) {
     vec3 p(random()*2-1,random()*2-1, pourHeight);
     //vec3 p(0,0, grain.count ? 2-grain.radius : grain.radius);
     if(length(p.xy())>1) continue;
@@ -550,15 +536,15 @@ struct Simulation : System {
     grain.rotation[i] = {cos(t2), vec3( sin(t0)*sin(t1)*sin(t2),
                                                          cos(t0)*sin(t1)*sin(t2),
                                                                      cos(t1)*sin(t2))};
-    if(rollTest) grain.rotation[i] = quat{1, 0};
     grain.angularVelocity[i] = 0;
+    /*if(rollTest) grain.rotation[i] = quat{1, 0};
     if(grain.capacity == 1 && i == 0) { // Roll test
      grain.velocity[0]  =  vec3((- grain.position[0] / T).xy(), 0);
      //grain.angularVelocity[i] = vec3(0,0,1);
     }
     else if(grain.capacity == 2 && i == 1) { // Collision test
      grain.velocity[1] = (grain.position[0] - grain.position[1]) / T;
-    }
+    }*/
     break;
    }
 break2_:;
@@ -567,23 +553,23 @@ break2_:;
     winchAngle += winchRate * dt;
     //loopAngle += loopRate * dt;
 
-    // Moves winch obstacle keeping spawn clear
-    size_t i = 0;
-    size_t oldCell = grainGrid.index(grain.position[i]);
-    grain.position[i] = vec3(winchPosition().xy(),
-                                          winchPosition().z+Grain::radius-Wire::radius);
-    grain.velocity[i] = 0;
-    grain.angularVelocity[0] = 0;
-    size_t newCell = grainGrid.index(grain.position[i]);
-    if(oldCell != newCell) {
-     grainGrid[oldCell].remove(1+i);
-     grainGrid[newCell].append(1+i);
+    if(winchObstacle) { // Moves winch obstacle keeping spawn clear
+     size_t i = 0;
+     size_t oldCell = grainGrid.index(grain.position[i]);
+     grain.position[i] = vec3(winchPosition().xy(),
+                              winchPosition().z+Grain::radius-Wire::radius);
+     grain.velocity[i] = 0;
+     grain.angularVelocity[0] = 0;
+     size_t newCell = grainGrid.index(grain.position[i]);
+     if(oldCell != newCell) {
+      grainGrid[oldCell].remove(1+i);
+      grainGrid[newCell].append(1+i);
+     }
     }
-    vec3 lastPosition = wire.count ? wire.position[wire.count-1]
-      : vec3(winchRadius, 0, pourHeight);
+    vec3 lastPosition = wire.count ? wire.position[wire.count-1] : winchPosition(0);
     vec3 r = winchPosition() - lastPosition;
     float l = length(r);
-    if(l > Wire::internodeLength*(1+1./4)) {
+    if(l > Wire::internodeLength*3./2/**(1+1./4)*/) {
      Locker lock(this->lock);
      size_t i = addWire();
      vec3 pos = lastPosition + Wire::internodeLength/l*r;
@@ -595,7 +581,7 @@ break2_:;
      //wireGrid[wireGrid.index(wire.position[i])].append(1+i);
     }
    }
-  } else if(useWire) {
+  } else if(winchObstacle) {
    size_t i = 0;
    grain.position[i] = vec3(winchPosition().xy(),
                                          winchPosition().z+Grain::radius-Wire::radius);
@@ -664,12 +650,12 @@ break2_:;
 
    // Grain - Grain friction
    grainFrictionTime.start();
-   {
+   if(1) { // DEBUG
     Locker lock(this->lock);
    parallel_for(grain.count, [this](uint, size_t a) {
     for(size_t i=0; i<grain.frictions[a].size;) {
      Friction& f = grain.frictions[a][i];
-     if(f.lastUpdate >= timeStep-1)  {
+     if(f.lastUpdate >= timeStep-1) {
       if(f.lastUpdate == timeStep)  {
        size_t b = f.index;
        /**/  if(b < grain.base+grain.count) friction(f, grain, a, grain, b-grain.base);
@@ -679,11 +665,12 @@ break2_:;
        else ::error(b);
       } // else no more contact or dynamic friction
       i++;
-     }
+      continue;
+     } else
 #if DBG_FRICTION
       i++;
 #else
-     { grain.frictions[a].removeAt(i); continue; } // Garbage collection
+      { grain.frictions[a].removeAt(i); continue; } // Garbage collection
 #endif
     }
    });}
@@ -701,7 +688,7 @@ break2_:;
     F[wire.base+i] = vec3d(dt * Wire::mass * g);
     Locker lock(this->lock);
     penalty(wire, i, floor, 0);
-    penalty(wire, i, side, 0);
+    //assert_(length(F[wire.base+i].xy()) < 0x1p-14, log2(length(F[wire.base+i].xy())));
    }
    wireBoundTime.stop();
 
@@ -711,9 +698,11 @@ break2_:;
     size_t a = i-1, b = i;
     vec3 relativePosition = wire.position[a] - wire.position[b];
     float length = ::length(relativePosition);
+    assert_(isNumber(length), a, b, wire.position[a], wire.position[b], wire.count);
     float restLength = Wire::internodeLength;
     vec3 normal = relativePosition/length;
     vec3 relativeVelocity = wire.velocity[a] - wire.velocity[b];
+    //assert_(restLength/4 < length && length < 4*restLength, i, length/restLength);
     spring<>(wire.base+a, wire.base+b, Wire::tensionStiffness, length,
              restLength, Wire::tensionDamping, normal, relativeVelocity);
    }
@@ -735,7 +724,7 @@ break2_:;
         }
        }
     }*/
-    if(1) { // Wire - Grain
+    {// Wire - Grain
      int3 index = grainGrid.index3(wire.position[a]);
      for(int z: range(max(0, index.z-1), min(index.z+2, grainGrid.size.z)))
       for(int y: range(max(0, index.y-1), min(index.y+2, grainGrid.size.y)))
@@ -749,11 +738,6 @@ break2_:;
          penalty(wire, a, grain, b);
         }
        }
-    } else {
-     for(int b: range(grain.count)) {
-      Locker lock(this->lock);
-      penalty(wire, a, grain, b);
-     }
     }
    });
    wireContactTime.stop();
@@ -790,8 +774,10 @@ break2_:;
   solveTime.start();
   buffer<vec3d> dv;
   if(implicit) {
-   matrix.factorize();
-   dv = cast<vec3d>(matrix.solve(cast<real>(F)));
+   if(grain.count || wire.count) {
+    matrix.factorize();
+    dv = cast<vec3d>(matrix.solve(cast<real>(F)));
+   }
   } else {
    dv = buffer<vec3d>(F.capacity);
    for(size_t i: range(grain.count))
@@ -803,35 +789,8 @@ break2_:;
 
   grainTime.start();
   grainIntegrationTime.start();
-  for(size_t i: range(grain.count)) update(dv, grainGrid, grain, i);
-  for(auto& e: gridQueue) if(!grainGrid[e.a].tryAppend(e.b)) {
-   for(auto& c: grain.color) c = 1./4;
-   for(uint16 i: (mref<uint16>)grainGrid[e.a]) { grain.color[i-1] = rgba4f(0,1,0,1); }
-   grain.color[e.b-1] = rgba4f(1,0,0,1);
-   error(e.b-1, "p", grain.position[e.b-1], "v", grain.velocity[e.b-1], (mref<uint16>)grainGrid[e.a]);
-   vec3 cell (e.a%grainGrid.size.x, (e.a/grainGrid.size.x)%grainGrid.size.y, e.a/grainGrid.size.x/grainGrid.size.y);
-   vec3 min = (cell-vec3(grainGrid.size.x/2, grainGrid.size.y/2, 0))/grainGrid.scale;
-   vec3 max = (cell-vec3(grainGrid.size.x/2, grainGrid.size.y/2, 0)+vec3(1))/grainGrid.scale;
-      log(min, max);
-   for(int i: range(0b111 +1)) for(int j: {(i&0b110) |0b001, (i&0b101) |0b010, (i&0b011) |0b100}) {
-    log(i, j);
-    if(i<j) {
-     auto p = [=](int i) {
-      return vec3(i&0b001?max[0]:min[0], i&0b010?max[1]:min[1], i&0b100?max[2]:min[2]);
-      };
-      log(i, j, p(i), p(j));
-      lines[rgb3f(1,0,0)].append(p(i));
-      lines[rgb3f(1,0,0)].append(p(j));
-     }
-    }
-   return;
-   //assert_(grid[newCell].size()<8);
-  }
-  gridQueue.clear();
-  /*for(size_t i: range(grain.count)) {
-            grain.velocity[i] += vec3(dv[grain.base+i]);
-            grain.position[i] += dt*grain.velocity[i];
-        }*/
+  for(size_t i: range(1, grain.count)) update(dv, grainGrid, grain, i);
+
   if(useRotation) parallel_for(grain.count, [this](uint, size_t i) {
    // PCDM rotation integration
    quat& q = grain.rotation[i];
@@ -859,9 +818,18 @@ break2_:;
   for(size_t i: range(wire.count)) {
    wire.velocity[i] += vec3(dv[wire.base+i]);
    wire.position[i] += dt*wire.velocity[i];
+   if(0) assert_(wire.position[i] >= vec3(-1) && wire.position[i] <= vec3(1), i,
+           wire.position[i], wire.velocity[i], dv[wire.base+i]);
   }
   wireIntegrationTime.stop();
   wireTime.stop();
+
+  {State state;
+   state.grainPositions = copyRef(grain.position.slice(0, grain.count));
+   state.wirePositions = copyRef(wire.position.slice(0, wire.count));
+   states.append(move(state));
+   stateIndex = states.size-1;
+  }
 
   timeStep++;
 
@@ -917,7 +885,7 @@ struct SimulationView : Simulation, Widget, Poll {
  void step() {
   Simulation::step();
   viewYawPitch.x += 2*PI*dt / 16;
-#define THREAD 1
+#define THREAD 0
 #if !THREAD
   if(timeStep%subStepCount == 0)
 #endif
@@ -972,8 +940,10 @@ struct SimulationView : Simulation, Widget, Poll {
   : Poll(0, POLLIN, simulationThread)
 #endif
  {
-  window->actions[Space] = [this]{ writeFile(str(timeStep*dt)+".png",
-                                          encodePNG(window->readback()), home()); };
+  /*window->actions[Space] = [this]{ writeFile(str(timeStep*dt)+".png",
+                                          encodePNG(window->readback()), home()); };*/
+  window->actions[RightArrow] = [this]{ if(stop) queue(); };
+  window->actions[Space] = [this]{ stop=!stop; if(!stop) queue(); };
   window->actions[Return] = [this]{
    if(pour) {
     pour = false; window->setTitle("Released");
@@ -999,20 +969,26 @@ struct SimulationView : Simulation, Widget, Poll {
   queue();
  }
  ~SimulationView() {
-  if(pour) log("~", withName(grain.count, wire.count));
+  if(pour) log("~", "grain", grain.count, "wire", wire.count);
  }
  vec2 sizeHint(vec2) { return vec2(1050, 1050*720/1280); }
  shared<Graphics> graphics(vec2) {
   renderTime.start();
   size_t start = pour || rollTest ? 0 : 1;
 
+  const State& state = states[stateIndex];
+
   const float dt = 1./60;
   {
    float3 min = 0, max = 0;
    Locker lock(this->lock);
-   for(size_t i: range(start, grain.count)) { // FIXME: proper BS
-    min = ::min(min, grain.position[i]);
-    max = ::max(max, grain.position[i]);
+   for(size_t i: range(start, state.grainPositions.size)) { // FIXME: proper BS
+    min = ::min(min, state.grainPositions[i]);
+    max = ::max(max, state.grainPositions[i]);
+   }
+   for(size_t i: range(start, state.wirePositions.size)) { // FIXME: proper BS
+    min = ::min(min, state.wirePositions[i]);
+    max = ::max(max, state.wirePositions[i]);
    }
    float3 rotationCenter = (min+max)/2.f;
    rotationCenter.xy() = 0;
@@ -1023,10 +999,15 @@ struct SimulationView : Simulation, Widget, Poll {
   quat viewRotation = angleVector(viewYawPitch.y, vec3(1,0,0)) *
                                  angleVector(viewYawPitch.x, vec3(0,0,1));
 
-  float3 min = 0, max = 0;
+  float3 min = -1./32, max = 1./32;
   {Locker lock(this->lock);
-   for(size_t i: range(start, grain.count)) {
-    float3 O = viewRotation * (grain.position[i]-rotationCenter);
+   for(size_t i: range(start, state.grainPositions.size)) {
+    float3 O = viewRotation * (state.grainPositions[i]-rotationCenter);
+    min = ::min(min, O - float3(float2(Grain::radius), 0)); // Parallel
+    max = ::max(max, O + float3(float2(Grain::radius), 0)); // Parallel
+   }
+   for(size_t i: range(start, state.wirePositions.size)) {
+    float3 O = viewRotation * (state.wirePositions[i]-rotationCenter);
     min = ::min(min, O - float3(float2(Grain::radius), 0)); // Parallel
     max = ::max(max, O + float3(float2(Grain::radius), 0)); // Parallel
    }
@@ -1062,13 +1043,13 @@ struct SimulationView : Simulation, Widget, Poll {
   target.bind(ClearColor|ClearDepth);
   glDepthTest(true);
 
-  if(grain.count-start) {
-   const size_t grainCount = grain.count-start;
-   buffer<float3> positions {grainCount*6};
+
+  if(state.grainPositions) {
+   buffer<float3> positions {state.grainPositions.size*6};
    Locker lock(this->lock);
-   for(size_t i: range(grainCount)) {
+   for(size_t i: range(state.grainPositions.size)) {
     // FIXME: GPU quad projection
-    float3 O = viewProjection * grain.position[start+i];
+    float3 O = viewProjection * state.grainPositions[start+i];
     float2 min = O.xy() - scale.xy()*float2(Grain::radius); // Parallel
     float2 max = O.xy() + scale.xy()*float2(Grain::radius); // Parallel
     positions[i*6+0] = float3(min, O.z);
@@ -1117,16 +1098,15 @@ struct SimulationView : Simulation, Widget, Poll {
    GLBuffer colorBuffer (grain.color.slice(start));
    shader.bind("colorBuffer"_, colorBuffer, 1);
    shader["radius"] = scale.z/2 * Grain::radius;
-   glBlendAlpha();
+   //glBlendAlpha();
    vertexArray.draw(Triangles, positions.size);
   }
 
-  if(wire.count>1) {
-   const size_t wireCount = this->wire.count;
-   buffer<float3> positions {(wireCount-1)*6};
+  if(state.wirePositions.size>1) {
+   buffer<float3> positions {(state.wirePositions.size-1)*6};
    Locker lock(this->lock);
-   for(size_t i: range(wireCount-1)) {
-    vec3 a = wire.position[i], b = wire.position[i+1];
+   for(size_t i: range(state.wirePositions.size-1)) {
+    vec3 a = state.wirePositions[i], b = state.wirePositions[i+1];
     // FIXME: GPU quad projection
     float3 A = viewProjection * a, B= viewProjection * b;
     float2 r = B.xy()-A.xy();
@@ -1197,11 +1177,10 @@ struct SimulationView : Simulation, Widget, Poll {
    shader.bindFragments({"color"});
    static GLVertexArray vertexArray;
    shader["image"] = 0; image.bind(0);
-   /*1./3*//*(size.y-viewSize.y)*/
    vec2 min (-1,-1), max (1, (float)target.size.y/size.y*2-1);
    GLBuffer positionBuffer (ref<vec2>{
-                             vec2(min.x,min.y),vec2(max.x,min.y),vec2(min.x,max.y),
-                             vec2(min.x,max.y),vec2(max.x,min.y),vec2(max.x,max.y)});
+                             vec2(min.x,min.y), vec2(max.x,min.y), vec2(min.x,max.y),
+                             vec2(min.x,max.y), vec2(max.x,min.y), vec2(max.x,max.y)});
    vertexArray.bindAttribute(shader.attribLocation("position"_),
                              2, Float, positionBuffer);
    glBlendAlpha();
@@ -1224,6 +1203,16 @@ struct SimulationView : Simulation, Widget, Poll {
  bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button,
                                 Widget*&) override {
   vec2 delta = cursor-lastPos; lastPos=cursor;
+  if(event==Press && button==WheelDown) {
+   stateIndex = clamp(0, stateIndex-1, int(states.size-1));
+   window->setTitle(str(stateIndex));
+   return true;
+  }
+  if(event==Press && button==WheelUp) {
+   stateIndex = clamp(0, stateIndex+1, int(states.size-1));
+   window->setTitle(str(stateIndex));
+   return true;
+  }
   if(event==Motion && button==LeftButton) {
    viewYawPitch += float(2.f*PI) * delta / size; //TODO: warp
    viewYawPitch.y= clamp(float(-PI), viewYawPitch.y, 0.f);

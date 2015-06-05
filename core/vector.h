@@ -108,6 +108,7 @@ inline String strx(int2 N) { return str(N.x)+'x'+str(N.y); }
 typedef vec<xy,float,2> float2;
 typedef vec<xy,float,2> vec2f;
 typedef vec<xy,float,2> vec2;
+typedef vec<xy,double,2> vec2d;
 inline String strx(vec2 N) { return str(N.x)+'x'+str(N.y); }
 
 generic struct xyz {
