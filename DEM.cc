@@ -22,10 +22,11 @@ struct System {
  static constexpr bool useRotation = true;
  //(2*PI)/5
  /*static constexpr*/ float loopAngle = PI*(3-sqrt(5.)); // 2· Golden angle
- static constexpr float staticFriction = 32;
- static constexpr float dynamicFriction = 1./100;
- static constexpr int subStepCount = 27; // 27
- static constexpr float dt = 1./60 /subStepCount /(rollTest?32:1); // ~10¯⁴
+ static constexpr float staticFriction = 1./256;
+ static constexpr float dynamicFriction = 1./16; //1./512; // 1./100-1./16
+ static constexpr int subStepCount = 26; // 27
+ static constexpr float dt = 1./60 /subStepCount /(rollTest?1:1); // ~10¯⁴
+ #define DBG_FRICTION 1
  // Characteristic dimensions (SI)
  static constexpr float T = 1; // 1 s
  static constexpr float L = 1; // 1 m
@@ -57,7 +58,6 @@ struct System {
   vec3 normal = 0;
   float fN = 0;
   vec3 relativeVelocity = 0;
-#define DBG_FRICTION 0
 #if DBG_FRICTION
   rgb3f color = 0;
   bool disable = false;
@@ -73,7 +73,7 @@ struct System {
   static constexpr float curvature = 1./radius;
   static constexpr float mass = 3e-3;
   static constexpr float elasticModulus = 1e6 * M / (L*T*T);
-  static constexpr float normalDamping = 1 * M / T; // 0.3
+  static constexpr float normalDamping = 1./4 * M / T; // 0.3
   static constexpr float frictionCoefficient = 1;
   static constexpr float staticFrictionThresholdSpeed = staticFriction * Grain::radius / T;
   static constexpr float angularMass
@@ -81,7 +81,7 @@ struct System {
                        / (cb(radius)-cb(radius-1e-4));
 
   size_t base = 0;
-  static constexpr size_t capacity = rollTest ? 1 : 256;
+  static constexpr size_t capacity = rollTest ? 2 : 256;
   static constexpr bool fixed = false;
   buffer<vec3> position { capacity };
   buffer<vec3> velocity { capacity };
@@ -107,7 +107,7 @@ struct System {
   static constexpr float frictionCoefficient = 1;
   static constexpr float staticFrictionThresholdSpeed = staticFriction * Grain::radius / T;
 
-  static constexpr float tensionStiffness = 4 * elasticModulus * PI * sq(radius);
+  static constexpr float tensionStiffness = 3 * elasticModulus * PI * sq(radius);
   static constexpr float tensionDamping = 0 * mass/T;
 
   size_t base = 0;
@@ -229,6 +229,7 @@ struct System {
                     float Kb, vec3 normal, vec3 relativeVelocity) {
   float fS = - Ks * (length - restLength);
   float normalSpeed = dot(normal, relativeVelocity);
+  vec3 normalVelocity = normalSpeed*normal;
   float fB = - Kb * normalSpeed ; // Damping
   float fSB = fS + fB;
   if(implicit) {
@@ -246,11 +247,10 @@ struct System {
     float dxf = - Ks * ((1 - restLength/length)*(1 - Nii) + Nii);
     if(!fixedA) matrix(a*3+i, a*3+i) += - dt*dt*dxf - dt*dvf;
     if(!fixedB) matrix(b*3+i, b*3+i) -= - dt*dt*dxf - dt*dvf;
-    if(!fixedA) F[a][i] += dt*f + dt*dt*dxf * relativeVelocity[i];
-    if(!fixedB) F[b][i] -= dt*f + dt*dt*dxf * relativeVelocity[i];
+    if(!fixedA) F[a][i] += dt*f + dt*dt*dxf * normalVelocity[i]; //relativeVelocity
+    if(!fixedB) F[b][i] -= dt*f + dt*dt*dxf * normalVelocity[i]; //relativeVelocity
    }
-   assert_(::length(F[a]) < Grain::mass/2);
-   assert_(::length(F[b]) < Grain::mass/2);
+   //assert_(::length(F[a]) < Grain::mass/2 && ::length(F[b]) < Grain::mass/2);
   } else {
    vec3 f = fSB * normal;
    if(!fixedA) F[a] += vec3d(dt*f);
@@ -262,6 +262,7 @@ struct System {
                                                                                  tB& B, size_t b) {
 #if DBG_FRICTION
   f.color = 0;
+  //return;
 #endif
   vec3 tangentRelativeVelocity
     = f.relativeVelocity - dot(f.normal, f.relativeVelocity) * f.normal;
@@ -275,7 +276,7 @@ struct System {
   vec3 globalA = A.position[a] + relativeA;
   vec3 globalB = B.position[b] +  relativeB;
   bool staticFriction = tangentRelativeSpeed < staticFrictionThresholdSpeed;
-  vec3 fT;
+  vec3 fT = 0;
   if(staticFriction) {
    vec3 x = globalA - globalB;
    vec3 tangentOffset = x - dot(f.normal, x) * f.normal;
@@ -286,7 +287,7 @@ struct System {
     constexpr float staticFrictionStiffness = frictionCoefficient * E * R;
     float fS = staticFrictionStiffness * f.fN * tangentLength;
     vec3 springDirection = tangentOffset / tangentLength;
-    constexpr float Kb = 0x1p-16;
+    constexpr float Kb = 0; //0x1p-16;
     float fB = - Kb * dot(springDirection, f.relativeVelocity); // Damping
     fT = - (fS+fB) * springDirection;
 #if DBG_FRICTION
@@ -295,18 +296,19 @@ struct System {
    } // else static equilibrium
   }
   // Dynamic friction
-  if(!staticFriction || length(fT) > frictionCoefficient*f.fN) {
+  if(/*tangentRelativeSpeed &&*/ (!staticFriction || length(fT) > frictionCoefficient*f.fN)) {
    f.lastUpdate = 0;
    constexpr float dynamicFrictionCoefficient = dynamicFriction; //frictionCoefficient;
    float fS = dynamicFrictionCoefficient * f.fN;
    vec3 tangentVelocityDirection = tangentRelativeVelocity / tangentRelativeSpeed;
-   constexpr float Kb = 0x1p-30 * M / T/T;
+   constexpr float Kb = 0/*0x1p-30*/ * M / T/T;
    float fB = - Kb * dot(tangentVelocityDirection, f.relativeVelocity); // Damping
    fT = - (fS+fB) * tangentVelocityDirection;
 #if DBG_FRICTION
     f.color = rgb3f(1,0,0);
 #endif
   }
+  //if(rollTest) log(grain.velocity[1], fT/Grain::mass);
   if(!tA::fixed) F[A.base+a] += vec3d(dt*fT);
   if(!tB::fixed) F[B.base+b] -= vec3d(dt*fT);
   if(!tA::fixed) A.torque[a] += cross(relativeA, fT);
@@ -377,8 +379,8 @@ struct Simulation : System {
  template<Type T> void update(ref<vec3d> dv, Grid& grid, T& t, size_t i) {
   t.velocity[i] += vec3(dv[t.base+i]);
   size_t oldCell = grid.index(t.position[i]);
-  if(length(t.velocity[i]) > Grain::radius/dt) error(i, t.velocity[i], dv[t.base+i],
-    matrix(t.base+i,t.base+i)/Grain::mass, length(F[t.base+i])/double(Grain::mass));
+  /*if(length(t.velocity[i]) > Grain::radius/dt) error(i, t.velocity[i], dv[t.base+i],
+    matrix(t.base+i,t.base+i)/Grain::mass, length(F[t.base+i])/double(Grain::mass));*/
   t.position[i] += dt*t.velocity[i];
   vec3 size (vec3(grainGrid.size)/grainGrid.scale);
   if(!(t.position[i].x >= -size.x/2.f && t.position[i].x < size.x/2) ||
@@ -405,6 +407,7 @@ struct Simulation : System {
  static constexpr float winchRadius = Side::initialRadius /*- loopRadius*/ - Wire::radius;
  static constexpr float winchRate = 16 / T;
  static constexpr float winchSpeed = 2 * Grain::radius / T;
+ float winchRestLength = 0;
  float winchAngle = 0;
 
  /*static constexpr float loopRate = (5+1) * winchRate;
@@ -465,15 +468,75 @@ struct Simulation : System {
 
  bool winchObstacle = useWire && false;
  Simulation() {
-  if(winchObstacle) { // Winch obstacle
-   size_t i = addGrain();
-   grain.position[i] = vec3(winchPosition().xy(),
-                                         winchPosition().z+Grain::radius-Wire::radius);
-   grain.velocity[i] = 0;
-   grain.frictions.set(i);
-   grainGrid[grainGrid.index(grain.position[i])].append(1+i);
-   grain.rotation[i] = quat();
-   grain.angularVelocity[i] = 0;
+  if(useWire) {
+   {size_t i = addWire();
+   vec3 pos = winchPosition();
+   wire.position[i] = pos;
+   wire.rotation[i] = quat();
+   wire.velocity[i] = 0;
+   wire.angularVelocity[i] = 0;
+   wire.frictions.set(i);
+   //wireGrid[wireGrid.index(wire.position[i])].append(1+i);
+   }
+   /*{size_t i = addWire();
+   vec3 pos = winchPosition(winchRate*dt);
+   wire.position[i] = pos;
+   wire.rotation[i] = quat();
+   wire.velocity[i] = 0;
+   wire.angularVelocity[i] = 0;
+   wire.frictions.set(i);
+   //wireGrid[wireGrid.index(wire.position[i])].append(1+i);
+   }*/
+
+   if(winchObstacle) { // Winch obstacle
+    size_t i = addGrain();
+    grain.position[i] = vec3(winchPosition().xy(),
+                             winchPosition().z+Grain::radius-Wire::radius);
+    grain.velocity[i] = 0;
+    grain.frictions.set(i);
+    grainGrid[grainGrid.index(grain.position[i])].append(1+i);
+    grain.rotation[i] = quat();
+    grain.angularVelocity[i] = 0;
+   }
+  }
+  if(rollTest) for(;;) {
+   vec3 p(random()*2-1,random()*2-1, pourHeight);
+   //vec3 p(0,0, grain.count ? 2-grain.radius : grain.radius);
+   if(length(p.xy())>1) continue;
+   vec3 newPosition (pourRadius*p.xy(), p.z); // Within cylinder
+   for(vec3 p: wire.position.slice(0, wire.count))
+    if(length(p - newPosition) < Grain::radius+Wire::radius) goto continue2_;
+   for(vec3 p: grain.position.slice(0, grain.count))
+    if(length(p - newPosition) < Grain::radius+Grain::radius) goto continue2_;
+   {
+    Locker lock(this->lock);
+    size_t i = addGrain();
+    grain.position[i] = newPosition;
+    grain.velocity[i] = 0;
+    grain.frictions.set(i);
+    grainGrid[grainGrid.index(grain.position[i])].append(1+i);
+    float t0 = 2*PI*random();
+    float t1 = acos(1-2*random());
+    float t2 = (PI*random()+acos(random()))/2;
+    grain.rotation[i] = {cos(t2), vec3( sin(t0)*sin(t1)*sin(t2),
+                         cos(t0)*sin(t1)*sin(t2),
+                         cos(t1)*sin(t2))};
+    grain.angularVelocity[i] = 0;
+    if(rollTest) grain.rotation[i] = quat{1, 0};
+    if(grain.capacity == 1 && i == 0) { // Roll test
+     grain.velocity[0]  =  vec3((- grain.position[0] / T).xy(), 0);
+     //log(grain.velocity[0]);
+     //grain.angularVelocity[i] = vec3(0,0,1);
+     break;
+    }
+    else if(grain.capacity == 2 && i == 1) { // Collision test
+     grain.velocity[1] = (grain.position[0] - grain.position[1]) / T;
+     grain.velocity[1] /= ::length(grain.velocity[1]);
+     //log(grain.velocity[1]);
+     break;
+    }
+   }
+   continue2_:;
   }
  }
 
@@ -537,20 +600,24 @@ struct Simulation : System {
                                                          cos(t0)*sin(t1)*sin(t2),
                                                                      cos(t1)*sin(t2))};
     grain.angularVelocity[i] = 0;
-    /*if(rollTest) grain.rotation[i] = quat{1, 0};
+    if(rollTest) grain.rotation[i] = quat{1, 0};
     if(grain.capacity == 1 && i == 0) { // Roll test
      grain.velocity[0]  =  vec3((- grain.position[0] / T).xy(), 0);
+     //log(grain.velocity[0]);
      //grain.angularVelocity[i] = vec3(0,0,1);
     }
     else if(grain.capacity == 2 && i == 1) { // Collision test
      grain.velocity[1] = (grain.position[0] - grain.position[1]) / T;
-    }*/
+     grain.velocity[1] /= ::length(grain.velocity[1]);
+     //log(grain.velocity[1]);
+    }
     break;
    }
 break2_:;
    pourHeight += winchSpeed * dt;
    if(useWire) { // Generates wire (winch)
     winchAngle += winchRate * dt;
+    //winchRestLength += winchRadius * winchRate * dt;
     //loopAngle += loopRate * dt;
 
     if(winchObstacle) { // Moves winch obstacle keeping spawn clear
@@ -566,13 +633,14 @@ break2_:;
       grainGrid[newCell].append(1+i);
      }
     }
-    vec3 lastPosition = wire.count ? wire.position[wire.count-1] : winchPosition(0);
-    vec3 r = winchPosition() - lastPosition;
-    float l = length(r);
-    if(l > Wire::internodeLength*3./2/**(1+1./4)*/) {
+    //wire.position[0] = 0;
+    //vec3 r = wire.position[wire.count-1] - wire.position[wire.count-2];
+    //float l = length(r);
+    if(length(wire.position[wire.count-1]-winchPosition()) >= Wire::internodeLength) { // Stretch
+     winchRestLength = 0;
      Locker lock(this->lock);
      size_t i = addWire();
-     vec3 pos = lastPosition + Wire::internodeLength/l*r;
+     vec3 pos = winchPosition(); //lastPosition + Wire::internodeLength/l*r;
      wire.position[i] = pos;
      wire.rotation[i] = quat();
      wire.velocity[i] = 0;
@@ -650,7 +718,7 @@ break2_:;
 
    // Grain - Grain friction
    grainFrictionTime.start();
-   if(1) { // DEBUG
+   if(1) {
     Locker lock(this->lock);
    parallel_for(grain.count, [this](uint, size_t a) {
     for(size_t i=0; i<grain.frictions[a].size;) {
@@ -689,6 +757,14 @@ break2_:;
     Locker lock(this->lock);
     penalty(wire, i, floor, 0);
     //assert_(length(F[wire.base+i].xy()) < 0x1p-14, log2(length(F[wire.base+i].xy())));
+   }
+   // Winch tension
+   /*F[wire.base+i] = vec3d(dt * Wire::mass * winchRadius / sq(winchRate)
+                                         * vec3(-sin(winchAngle), cos(winchAngle). 0));*/
+   if(1 && wire.count) {
+    vec3 x = winchPosition()-wire.position[wire.count-1];
+   spring<true, false>(wire.count-1, 0, Wire::tensionStiffness,
+                       length(x), winchRestLength, Wire::tensionDamping, x/length(x), 0);
    }
    wireBoundTime.stop();
 
@@ -776,6 +852,7 @@ break2_:;
   if(implicit) {
    if(grain.count || wire.count) {
     matrix.factorize();
+    //log(F[grain.base+1]/double(Grain::mass));
     dv = cast<vec3d>(matrix.solve(cast<real>(F)));
    }
   } else {
@@ -789,7 +866,7 @@ break2_:;
 
   grainTime.start();
   grainIntegrationTime.start();
-  for(size_t i: range(1, grain.count)) update(dv, grainGrid, grain, i);
+  for(size_t i: range(grain.count)) update(dv, grainGrid, grain, i);
 
   if(useRotation) parallel_for(grain.count, [this](uint, size_t i) {
    // PCDM rotation integration
@@ -884,7 +961,7 @@ struct SimulationView : Simulation, Widget, Poll {
 
  void step() {
   Simulation::step();
-  viewYawPitch.x += 2*PI*dt / 16;
+  if(!rollTest) viewYawPitch.x += 2*PI*dt / 16;
 #define THREAD 0
 #if !THREAD
   if(timeStep%subStepCount == 0)
@@ -994,6 +1071,7 @@ struct SimulationView : Simulation, Widget, Poll {
    rotationCenter.xy() = 0;
    if(!rollTest)
     this->rotationCenter = this->rotationCenter*(1-dt) + dt*rotationCenter;
+    //this->rotationCenter = rotationCenter;
   }
 
   quat viewRotation = angleVector(viewYawPitch.y, vec3(1,0,0)) *
@@ -1018,8 +1096,10 @@ struct SimulationView : Simulation, Widget, Poll {
   vec2 viewSize = size;
 
   vec3 scale (2*::min(viewSize/(max-min).xy())/viewSize, -1/(2*(max-min).z));
+
   scale.xy() = this->scale = this->scale*(1-dt) + dt*scale.xy();
-  if(rollTest) scale = 1./(16*Grain::radius);
+
+  if(rollTest) scale.xy() = vec2(viewSize.x/(16*Grain::radius))/viewSize;
   //scale.x *= size.y/size.x;
   //scale.y *= size.x/size.y;
   float3 fitTranslation = -scale*(min+max)/2.f;
@@ -1046,7 +1126,7 @@ struct SimulationView : Simulation, Widget, Poll {
 
   if(state.grainPositions) {
    buffer<float3> positions {state.grainPositions.size*6};
-   Locker lock(this->lock);
+   //Locker lock(this->lock);
    for(size_t i: range(state.grainPositions.size)) {
     // FIXME: GPU quad projection
     float3 O = viewProjection * state.grainPositions[start+i];
@@ -1076,7 +1156,7 @@ struct SimulationView : Simulation, Widget, Poll {
      else if(b < wire.base+wire.count) B = toGlobal(wire, b-wire.base, f.localB);
      else if(b==floor.base) B = toGlobal(floor, b-floor.base, f.localB);
      else if(b==side.base) B = toGlobal(side, b-side.base, f.localB);
-     else error("grain", b);
+     else ::error("grain", b);
      vec3 vA = viewProjection*A, vB=viewProjection*B;
      if(length(vA-vB) < 16/size.y) vA.y -= 8/size.y, vB.y += 8/size.y;
      lines[f.color].append(vA);
@@ -1131,9 +1211,9 @@ struct SimulationView : Simulation, Widget, Poll {
      else if(b < wire.base+wire.count) B = toGlobal(wire, b-wire.base, f.localB);
      else if(b==floor.base) B = toGlobal(floor, b-floor.base, f.localB);
      else if(b==side.base) B = toGlobal(side, b-side.base, f.localB);
-     else error("wire", b);
+     else ::error("wire", b);
      vec3 vA = viewProjection*A, vB=viewProjection*B;
-     //if(length(vA-vB) < 2/size.y) vA.y -= 4/size.y, vB.y += 4/size.y;
+     if(length(vA-vB) < 2/size.y) vA.y -= 4/size.y, vB.y += 4/size.y;
      lines[f.color].append(vA);
      lines[f.color].append(vB);
     }
@@ -1157,11 +1237,13 @@ struct SimulationView : Simulation, Widget, Poll {
   static GLVertexArray vertexArray;
   for(auto entry: lines) {
    shader["uColor"] = entry.key;
-   GLBuffer positionBuffer (apply(entry.value, [=](vec3 p){ return viewProjection*p;}));
+   //GLBuffer positionBuffer (apply(entry.value, [=](vec3 p){ return viewProjection*p;}));
+   GLBuffer positionBuffer (entry.value);
    vertexArray.bindAttribute(shader.attribLocation("position"_),
                              3, Float, positionBuffer);
    vertexArray.draw(Lines, entry.value.size);
   }
+  lines.clear();
 
   if(1 && plots) {
    Image target(int2(size.x,/*size.y/3*/size.y-viewSize.y), true);
@@ -1195,7 +1277,7 @@ struct SimulationView : Simulation, Widget, Poll {
   target.blit(0, window->size);
   renderTime.stop();
   if(stop && fitTranslation != this->translation) window->render();
-  window->setTitle(str(grain.count, wire.count));
+  //window->setTitle(str(grain.count, wire.count));
   return shared<Graphics>();
  }
 
@@ -1215,7 +1297,7 @@ struct SimulationView : Simulation, Widget, Poll {
   }
   if(event==Motion && button==LeftButton) {
    viewYawPitch += float(2.f*PI) * delta / size; //TODO: warp
-   viewYawPitch.y= clamp(float(-PI), viewYawPitch.y, 0.f);
+   viewYawPitch.y = clamp(float(-PI), viewYawPitch.y, 0.f);
    if(encoder && !pour) encoder = nullptr;
   }
   else return false;
