@@ -134,10 +134,10 @@ GLUniform GLShader::operator[](string name) {
     }
     return GLUniform(id, location);
 }
-void GLShader::bind(string name, const GLBuffer& ssbo) {
+void GLShader::bind(string name, const GLBuffer& ssbo, uint binding) {
     uint index = glGetProgramResourceIndex(id, GL_SHADER_STORAGE_BLOCK, strz(name));
-    glShaderStorageBlockBinding(id, index, 1);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ssbo.id);
+    glShaderStorageBlockBinding(id, index, binding);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, ssbo.id);
 }
 
 /// Buffer

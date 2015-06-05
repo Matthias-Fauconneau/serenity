@@ -171,6 +171,8 @@ generic struct bgra {
 generic struct rgba {
     T r,g,b,a;
 };
+/// Floating-point r,g,b,a vector
+typedef vec<rgba,float,4> rgba4f;
 
 /// Integer b,g,r,a vector (8bit)
 struct byte4 : vec<bgra,uint8,4> {
