@@ -13,6 +13,7 @@ core/math.h
 core/string.h
 core/string.cc
 core/vector.h
+core/matrix.h
 core/image.h
 core/image.cc
 core/simd.h

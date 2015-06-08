@@ -53,7 +53,7 @@ Window::Update Window::render(/*const Image& target*/int2 size) {
     lock.unlock();
 	if(!update.graphics) {
 		currentWindow = this; // FIXME
-		update.graphics = widget->graphics(vec2(size), Rect::fromOriginAndSize(vec2(update.origin), vec2(update.size)));
+  update.graphics = widget->graphics(vec2f(size), Rect::fromOriginAndSize(vec2f(update.origin), vec2f(update.size)));
 		currentWindow = 0;
 	}
     /*fill(target, update.origin, update.size, backgroundColor, 1); // Clear framebuffer
@@ -68,7 +68,7 @@ XWindow::XWindow(Widget* widget, Thread& thread,  int2 sizeHint) : ::Window(widg
 	if(sizeHint.x<=0) Window::size.x=XDisplay::size.x;
 	if(sizeHint.y<=0) Window::size.y=XDisplay::size.y;
     if((sizeHint.x<0||sizeHint.y<0) && widget) {
-		int2 hint (widget->sizeHint(vec2(Window::size)));
+  int2 hint (widget->sizeHint(vec2f(Window::size)));
 		if(sizeHint.x<0) Window::size.x=min(max(abs(hint.x),-sizeHint.x), XDisplay::size.x);
 		if(sizeHint.y<0) Window::size.y=min(max(abs(hint.y),-sizeHint.y), XDisplay::size.y-46);
     }
@@ -144,12 +144,12 @@ bool XWindow::processEvent(const X11::Event& e) {
 	currentWindow = this; // FIXME
     /**/ if(type==ButtonPress) {
 		Widget* previousFocus = focus;
-		if(widget->mouseEvent(vec2(e.x,e.y), vec2(Window::size), Press, (Button)e.key, focus) || focus!=previousFocus) render();
+  if(widget->mouseEvent(vec2f(e.x,e.y), vec2f(Window::size), Press, (Button)e.key, focus) || focus!=previousFocus) render();
 		drag = focus;
     }
     else if(type==ButtonRelease) {
         drag=0;
-		if(e.key <= RightButton && widget->mouseEvent(vec2(e.x,e.y), vec2(Window::size), Release, (Button)e.key, focus)) render();
+  if(e.key <= RightButton && widget->mouseEvent(vec2f(e.x,e.y), vec2f(Window::size), Release, (Button)e.key, focus)) render();
     }
     else if(type==KeyPress) {
         Key key = (Key)keySym(e.key, e.state); Modifiers modifiers = (Modifiers)e.state;
@@ -164,13 +164,13 @@ bool XWindow::processEvent(const X11::Event& e) {
 		if(focus && focus->keyRelease(key, modifiers)) render();
 	}
     else if(type==MotionNotify) {
-		if(drag && e.state&Button1Mask && drag->mouseEvent(vec2(e.x,e.y), vec2(Window::size), Motion, LeftButton, focus))
+  if(drag && e.state&Button1Mask && drag->mouseEvent(vec2f(e.x,e.y), vec2f(Window::size), Motion, LeftButton, focus))
             render();
-		else if(widget->mouseEvent(vec2(e.x,e.y), vec2(Window::size), Motion, (e.state&Button1Mask)?LeftButton:NoButton, focus))
+  else if(widget->mouseEvent(vec2f(e.x,e.y), vec2f(Window::size), Motion, (e.state&Button1Mask)?LeftButton:NoButton, focus))
             render();
     }
     else if(type==EnterNotify || type==LeaveNotify) {
-		if(widget->mouseEvent( vec2(e.x,e.y), vec2(Window::size), type==EnterNotify?Enter:Leave,
+  if(widget->mouseEvent( vec2f(e.x,e.y), vec2f(Window::size), type==EnterNotify?Enter:Leave,
 							   e.state&Button1Mask?LeftButton:NoButton, focus) ) render();
     }
     else if(type==KeymapNotify) {}
@@ -327,16 +327,16 @@ void DRMWindow::event() {
 void DRMWindow::mouseEvent(int2 cursor, ::Event event, Button button) {
 	if(event==Press) {
 		Widget* previousFocus = focus;
-		if(widget->mouseEvent(vec2(cursor), vec2(size), Press, button, focus) || focus!=previousFocus) render();
+  if(widget->mouseEvent(vec2f(cursor), vec2f(size), Press, button, focus) || focus!=previousFocus) render();
 		drag = focus;
 	}
 	if(event==Release) {
 		drag=0;
-		if(button <= RightButton && widget->mouseEvent(vec2(cursor), vec2(size), Release, button, focus)) render();
+  if(button <= RightButton && widget->mouseEvent(vec2f(cursor), vec2f(size), Release, button, focus)) render();
 	}
 	if(event==Motion) {
-		if(drag && button==LeftButton && drag->mouseEvent(vec2(cursor), vec2(size), Motion, button, focus)) render();
-		else if(widget->mouseEvent(vec2(cursor), vec2(size), Motion, button, focus)) render();
+  if(drag && button==LeftButton && drag->mouseEvent(vec2f(cursor), vec2f(size), Motion, button, focus)) render();
+  else if(widget->mouseEvent(vec2f(cursor), vec2f(size), Motion, button, focus)) render();
 	}
 }
 

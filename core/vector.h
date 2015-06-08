@@ -107,7 +107,7 @@ inline String strx(int2 N) { return str(N.x)+'x'+str(N.y); }
 /// Single precision x,y vector
 typedef vec<xy,float,2> float2;
 typedef vec<xy,float,2> vec2f;
-typedef vec<xy,float,2> vec2;
+typedef vec<xy,double,2> vec2;
 typedef vec<xy,double,2> vec2d;
 inline String strx(vec2 N) { return str(N.x)+'x'+str(N.y); }
 
@@ -124,7 +124,7 @@ typedef vec<xyz,float,3> float3;
 typedef vec<xyz,float,3> vec3f;
 /// Double precision floating-point x,y,z vector
 typedef vec<xyz,double,3> vec3d;
-typedef vec<xyz,float,3> vec3;
+typedef vec<xyz,double,3> vec3;
 
 inline vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y); }
 /*inline vec3 normal(vec3 v) {
@@ -202,16 +202,15 @@ typedef vec<xy,int64,2> long2;
 template<template<Type> /*Type*/class V, Type T, uint N> inline /*constexpr*/ float length(const vec<V,T,N>& a) { return sqrt(dot(a,a)); }
 
 struct quat {
-    float s; vec3 v;
-    constexpr quat(float s = 1, vec3 v = 0) : s(s), v(v) {}
+    real s; vec3 v;
+    constexpr quat(real s = 1, vec3 v = 0) : s(s), v(v) {}
     quat conjugate() const { return quat(s, -v); }
 };
-inline quat angleVector(float a, vec3 v) {
- float l = length(v);
+inline quat angleVector(real a, vec3 v) {
+ real l = length(v);
  if(!l) return quat{1, 0};
  return quat{cos(a/2*l), sin(a/2*l)/l*v};
 }
-static_assert(sizeof(quat)==4*sizeof(float),"");
 inline quat operator*(quat p, quat q) { return {p.s*q.s - dot(p.v, q.v), p.s*q.v + q.s*p.v + cross(p.v, q.v)}; }
 inline vec3 operator*(quat p, vec3 v) { return (p * quat{0, v} * p.conjugate()).v; }
 inline quat operator*(float s, quat q) { return {s*q.s, s*q.v}; }

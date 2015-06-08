@@ -47,7 +47,7 @@ struct TextLayout {
 			: Font::Metrics(metrics), ::Glyph(glyph), sourceIndex(sourceIndex) {}
 	};
 	array<array<Glyph>> words;
-	vec2 bbMin = 0, bbMax = 0;
+ vec2f bbMin = 0, bbMax = 0;
 
 	// Outputs
 	array<array<array<Glyph>>> glyphs;
@@ -64,8 +64,8 @@ struct TextLayout {
 	void nextWord(array<Glyph>&& word, bool justify);
 
 	// Bounding box for stacking
-	vec2 min(const ref<Glyph> word);
-	vec2 max(const ref<Glyph> word);
+ vec2f min(const ref<Glyph> word);
+ vec2f max(const ref<Glyph> word);
 	// Length for justification
 	float width(const ref<Glyph> word);
 	float advance(const ref<Glyph> word);
@@ -108,7 +108,7 @@ struct Text : virtual Widget {
 	/// Whether to justify explicit line breaks
 	bool justifyExplicitLineBreak;
     /// Minimal size hint
-	vec2 minimalSizeHint;
+ vec2f minimalSizeHint;
 	/// User activated a link
 	function<void(ref<uint>)> linkActivated;
 
@@ -116,8 +116,8 @@ struct Text : virtual Widget {
 	TextLayout lastTextLayout;
 
 	const TextLayout& layout(float wrap=0);
-    vec2 sizeHint(vec2 size=0) override;
-    shared<Graphics> graphics(vec2 size) override;
-	Cursor cursorFromPosition(vec2 size, vec2 position);
-	bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus /*FIXME: -> Window& window*/) override;
+    vec2f sizeHint(vec2f size=0) override;
+    shared<Graphics> graphics(vec2f size) override;
+ Cursor cursorFromPosition(vec2f size, vec2f position);
+ bool mouseEvent(vec2f cursor, vec2f size, Event event, Button button, Widget*& focus /*FIXME: -> Window& window*/) override;
 };

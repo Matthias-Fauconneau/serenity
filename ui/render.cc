@@ -74,7 +74,7 @@ static void blend(const Image& target, uint x, uint y, bgr3f color, float opacit
     blend(target, x,y, color, opacity);
 }
 
-void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity, bool hint) {
+void line(const Image& target, vec2f p1, vec2f p2, bgr3f color, float opacity, bool hint) {
     assert_(isNumber(p1) && isNumber(p2), p1, p2);
     //if(hint && p1.y == p2.y) p1.y = p2.y = round(p1.y); // Hints
     if(hint) { // TODO: preprocess
@@ -163,8 +163,8 @@ static void line(Image8& raster, int2 p0, int2 p1) {
 	lastStepY=sy;
 }
 
-static vec2 cubic(vec2 A, vec2 B, vec2 C, vec2 D, float t) { return ((1-t)*(1-t)*(1-t))*A + (3*(1-t)*(1-t)*t)*B + (3*(1-t)*t*t)*C + (t*t*t)*D; }
-static void cubic(Image8& raster, vec2 A, vec2 B, vec2 C, vec2 D) {
+static vec2f cubic(vec2f A, vec2f B, vec2f C, vec2f D, float t) { return ((1-t)*(1-t)*(1-t))*A + (3*(1-t)*(1-t)*t)*B + (3*(1-t)*t*t)*C + (t*t*t)*D; }
+static void cubic(Image8& raster, vec2f A, vec2f B, vec2f C, vec2f D) {
 	const int N = 16; //FIXME
 	int2 a = int2(round(A));
 	for(int i : range(1,N+1)) {
@@ -175,11 +175,11 @@ static void cubic(Image8& raster, vec2 A, vec2 B, vec2 C, vec2 D) {
 }
 
 // Renders cubic spline (two control points between each end point)
-void cubic(const Image& target, ref<vec2> sourcePoints, bgr3f color, float alpha, vec2 offset, const uint oversample=4) {
-	byte points_[sourcePoints.size*sizeof(vec2)]; mref<vec2> points ((vec2*)points_, sourcePoints.size); //FIXME: stack<T> points(sourceSize.size)
+void cubic(const Image& target, ref<vec2f> sourcePoints, bgr3f color, float alpha, vec2f offset, const uint oversample=4) {
+ byte points_[sourcePoints.size*sizeof(vec2f)]; mref<vec2f> points ((vec2f*)points_, sourcePoints.size); //FIXME: stack<T> points(sourceSize.size)
 	for(size_t index: range(sourcePoints.size)) points[index] = offset+sourcePoints[index];
-	vec2 pMin = vec2(target.size), pMax = 0;
-	for(vec2 p: points) pMin = ::min(pMin, p), pMax = ::max(pMax, p);
+ vec2f pMin = vec2f(target.size), pMax = 0;
+ for(vec2f p: points) pMin = ::min(pMin, p), pMax = ::max(pMax, p);
 	pMin = floor(pMin), pMax = ceil(pMax);
 	const int2 iMin = int2(pMin), iMax = int2(pMax);
 	const int2 cMin = max(int2(0),iMin), cMax = min(target.size, iMax);
@@ -208,7 +208,7 @@ void cubic(const Image& target, ref<vec2> sourcePoints, bgr3f color, float alpha
 	}
 }
 
-void render(const Image& target, const Graphics& graphics, vec2 offset) {
+void render(const Image& target, const Graphics& graphics, vec2f offset) {
     assert_(isNumber(offset)); assert_(isNumber(graphics.offset));
     offset += graphics.offset;
     for(const auto& e: graphics.blits) {

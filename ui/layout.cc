@@ -1,17 +1,17 @@
 #include "layout.h"
 
 // Layout
-shared<Graphics> Layout::graphics(vec2 size, Rect clip) {
+shared<Graphics> Layout::graphics(vec2f size, Rect clip) {
     array<Rect> widgets = layout(size);
 	shared<Graphics> graphics;
 	for(size_t i: range(count())) if(widgets[i] & clip) {
         assert_(isNumber(widgets[i].origin()), widgets[i], size, clip);
-        graphics->graphics.insert(vec2(widgets[i].origin()), at(i).graphics(widgets[i].size(), Rect(widgets[i].size()) /*& (clip-origin)*/));
+        graphics->graphics.insert(vec2f(widgets[i].origin()), at(i).graphics(widgets[i].size(), Rect(widgets[i].size()) /*& (clip-origin)*/));
 	}
     return graphics;
 }
 
-float Layout::stop(vec2 size, int axis, float currentPosition, int direction) {
+float Layout::stop(vec2f size, int axis, float currentPosition, int direction) {
     array<Rect> widgets = layout(size);
     for(int i: range(widgets.size)) {
         if((i==0 || widgets[i].min[axis] <= currentPosition) && currentPosition < widgets[i].max[axis]) {
@@ -21,7 +21,7 @@ float Layout::stop(vec2 size, int axis, float currentPosition, int direction) {
     error(currentPosition);
 }
 
-bool Layout::mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) {
+bool Layout::mouseEvent(vec2f cursor, vec2f size, Event event, Button button, Widget*& focus) {
     array<Rect> widgets = layout(size);
     for(size_t i: range(widgets.size))
 		if(widgets[i].contains(cursor) && at(i).mouseEvent(cursor-widgets[i].origin(), widgets[i].size(), event, button, focus)) return true;
@@ -29,10 +29,10 @@ bool Layout::mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widg
 }
 
 // Linear
-vec2 Linear::sizeHint(const vec2 xySize) {
+vec2f Linear::sizeHint(const vec2f xySize) {
 	size_t count = this->count();
 	if(!count) return {};
-    const vec2 size = xy(xySize);
+    const vec2f size = xy(xySize);
     float widths[count];
     float remainingWidth = abs(size.x);
     float expandingWidth = 0;
@@ -40,7 +40,7 @@ vec2 Linear::sizeHint(const vec2 xySize) {
 	bool expandingHeight=false;
 
 	for(size_t index: range(count)) {
-        vec2 hint = xy(at(index).sizeHint(xySize));
+        vec2f hint = xy(at(index).sizeHint(xySize));
         assert_(isNumber(hint), xySize, index, hint);
 		if(hint.x<0) expandingWidth++; // Counts expanding widgets
 		widths[index] = abs(hint.x);
@@ -61,24 +61,24 @@ vec2 Linear::sizeHint(const vec2 xySize) {
 	// Evaluates new required size with fitted widgets
     float requiredWidth = 0, requiredHeight = 0;
 	for(size_t index: range(count)) {
-        vec2 hint = xy(at(index).sizeHint(xy(vec2(widths[index], height))));
-        assert_(isNumber(hint), xy(vec2(widths[index], height)));
+        vec2f hint = xy(at(index).sizeHint(xy(vec2f(widths[index], height))));
+        assert_(isNumber(hint), xy(vec2f(widths[index], height)));
         requiredWidth += abs(hint.x);
 		requiredHeight = max(requiredHeight, abs(hint.y));
     }
-    assert_(isNumber(xy(vec2((expandingWidth||expanding?-1:1)*requiredWidth, (expandingHeight?-1:1)*requiredHeight))), expandingHeight, requiredHeight);
-    return xy(vec2((expandingWidth||expanding?-1:1)*requiredWidth, (expandingHeight?-1:1)*requiredHeight));
+    assert_(isNumber(xy(vec2f((expandingWidth||expanding?-1:1)*requiredWidth, (expandingHeight?-1:1)*requiredHeight))), expandingHeight, requiredHeight);
+    return xy(vec2f((expandingWidth||expanding?-1:1)*requiredWidth, (expandingHeight?-1:1)*requiredHeight));
 }
 
-buffer<Rect> Linear::layout(const vec2 xySize) {
+buffer<Rect> Linear::layout(const vec2f xySize) {
 	size_t count = this->count();
     if(!count) return {};
-    const vec2 size = xy(xySize);
+    const vec2f size = xy(xySize);
     float width = abs(size.x) /*remaining space*/; float expanding=0, height=0;
     float widths[count], heights[count];
 
 	for(size_t index: range(count)) {
-        vec2 hint = xy(at(index).sizeHint(xySize));
+        vec2f hint = xy(at(index).sizeHint(xySize));
 		widths[index] = hint.x;
         width -= abs(widths[index]); // Commits minimum width for all widgets (unless evaluating required size for sizeHint)
 		if(hint.x<0) expanding++; // Counts expanding widgets
@@ -114,7 +114,7 @@ buffer<Rect> Linear::layout(const vec2 xySize) {
         width = size.x-count*size.x/count;
     }
 
-    vec2 pen;
+    vec2f pen;
     if(main==Spread || main==Left) pen.x = 0;
     else if(main==Center || main==Even || main==Share || main==ShareTight) pen.x = width/2;
     else if(main==Right) pen.x = size.x-width;
@@ -132,14 +132,14 @@ buffer<Rect> Linear::layout(const vec2 xySize) {
         else if(side==Left) y=0;
         else if(side==Center) y=(height-heights[i])/2;
         else if(side==Right) y=height-heights[i];
-        widgets.append( Rect::fromOriginAndSize(xy(pen+vec2(0,y)), xy(vec2(widths[i],heights[i]))) );
+        widgets.append( Rect::fromOriginAndSize(xy(pen+vec2f(0,y)), xy(vec2f(widths[i],heights[i]))) );
         pen.x += widths[i]+margin;
     }
     return widgets;
 }
 
 // Grid
-buffer<Rect> GridLayout::layout(vec2 size, vec2& sizeHint) {
+buffer<Rect> GridLayout::layout(vec2f size, vec2f& sizeHint) {
     if(!count()) return {};
 	buffer<Rect> widgets(count(), 0);
     int w = this->width, h=0/*this->height*/; for(;;) { if(w*h >= (int)count()) break; if(!this->width && w<=h) w++; else h++; }
@@ -184,7 +184,7 @@ buffer<Rect> GridLayout::layout(vec2 size, vec2& sizeHint) {
             float maxY = 0;
 			for(size_t x: range(w)) {
 				size_t index = y*w+x;
-                if(index<count()) maxY = ::max(maxY, abs(at(index).sizeHint(vec2(widths[x],size.y)).y));
+                if(index<count()) maxY = ::max(maxY, abs(at(index).sizeHint(vec2f(widths[x],size.y)).y));
             }
             heights[y] = maxY;
         }
@@ -211,7 +211,7 @@ buffer<Rect> GridLayout::layout(vec2 size, vec2& sizeHint) {
             float maxX = 0;
             for(uint y : range(h)) {
                 size_t index = y*w+x;
-                if(index<count()) maxX = ::max(maxX, abs(at(index).sizeHint(vec2(size.x, heights[y])).x));
+                if(index<count()) maxX = ::max(maxX, abs(at(index).sizeHint(vec2f(size.x, heights[y])).x));
             }
             widths[x] = maxX;
         }
@@ -230,12 +230,12 @@ buffer<Rect> GridLayout::layout(vec2 size, vec2& sizeHint) {
 		for(size_t x: range(w)) {
 			size_t i = y*w+x;
             if(i<count()) {
-                widgets.append( Rect::fromOriginAndSize(vec2(X,Y), vec2(widths[x], heights[y])) );
+                widgets.append( Rect::fromOriginAndSize(vec2f(X,Y), vec2f(widths[x], heights[y])) );
                 X += widths[x];
             }
         }
         Y += heights[y];
-        //assert_(size.y ==0 || (vec2(0) < vec2(X,Y) && vec2(X,Y) < size+vec2(w,h)), X, Y, size, ref<float>(widths,w), ref<float>(heights,h));
+        //assert_(size.y ==0 || (vec2f(0) < vec2f(X,Y) && vec2f(X,Y) < size+vec2f(w,h)), X, Y, size, ref<float>(widths,w), ref<float>(heights,h));
 	}
     return widgets;
 }

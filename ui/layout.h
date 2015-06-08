@@ -10,13 +10,13 @@ struct Layout : Widget {
 	virtual Widget& at(size_t) const abstract;
 
     /// Computes widgets layout
-    virtual buffer<Rect> layout(vec2 size) abstract;
-    virtual float stop(vec2 size, int unused axis, float currentPosition, int direction=0) override;
+    virtual buffer<Rect> layout(vec2f size) abstract;
+    virtual float stop(vec2f size, int unused axis, float currentPosition, int direction=0) override;
 
     /// Renders all visible child widgets
-    shared<Graphics> graphics(vec2 size, Rect clip) override;
+    shared<Graphics> graphics(vec2f size, Rect clip) override;
     /// Forwards event to intersecting child widgets until accepted
-    bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) override;
+    bool mouseEvent(vec2f cursor, vec2f size, Event event, Button button, Widget*& focus) override;
 };
 
 /// Implements Layout storage using array<Widget*> (i.e by reference)
@@ -64,19 +64,19 @@ struct Linear : virtual Layout {
     /// \note This constructor should be used in most derived class (any initialization in derived classes are ignored)
     Linear(Extra main=Share, Extra side=AlignCenter, bool expanding=false) : main(main), side(side), expanding(expanding) {}
 
-    vec2 sizeHint(vec2) override;
-    buffer<Rect> layout(vec2 size) override;
+    vec2f sizeHint(vec2f) override;
+    buffer<Rect> layout(vec2f size) override;
     /// Transforms coordinates so that x/y always means main/side (i.e along/across) axis to reuse same code in Vertical/Horizontal
-    virtual vec2 xy(vec2 xy) const abstract;
+    virtual vec2f xy(vec2f xy) const abstract;
 };
 
 /// Layouts widgets on the horizontal axis
 struct Horizontal : virtual Linear {
-    vec2 xy(vec2 xy) const override { return xy; }
+    vec2f xy(vec2f xy) const override { return xy; }
 };
 /// Layouts widgets on the vertical axis
 struct Vertical : virtual Linear {
-    vec2 xy(vec2 xy) const override { return vec2(xy.y,xy.x); }
+    vec2f xy(vec2f xy) const override { return vec2f(xy.y,xy.x); }
 };
 
 /// Horizontal layout of heterogenous widgets. \sa Widgets
@@ -125,9 +125,9 @@ struct GridLayout : virtual Layout {
 
     GridLayout(bool uniformX=false, bool uniformY=false, int width=0)
         : uniformX(uniformX), uniformY(uniformY), width(width) {}
-    buffer<Rect> layout(vec2 size, vec2& sizeHint);
-    vec2 sizeHint(vec2 size) override { vec2 sizeHint; layout(size, sizeHint); return sizeHint; }
-    buffer<Rect> layout(vec2 size) override { vec2 sizeHint; return layout(size, sizeHint); }
+    buffer<Rect> layout(vec2f size, vec2f& sizeHint);
+    vec2f sizeHint(vec2f size) override { vec2f sizeHint; layout(size, sizeHint); return sizeHint; }
+    buffer<Rect> layout(vec2f size) override { vec2f sizeHint; return layout(size, sizeHint); }
 };
 
 /// Grid of heterogenous widgets. \sa Widgets

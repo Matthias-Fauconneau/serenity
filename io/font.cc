@@ -77,9 +77,9 @@ Font::Font(ref<byte> data, float size, bool hint) : size(size), hint(hint) {
 	//descender=face->/*size->metrics.*/descender;//*0x1p-6;
 	ascender=face->size->metrics.ascender*0x1p-6;
 	descender=face->size->metrics.descender*0x1p-6;
-	//vec2 scale (face->size->metrics.x_scale*0x1p-16*0x1p-6, face->size->metrics.y_scale*0x1p-16*0x1p-6);
-	//bboxMin = /*scale**/vec2(face->bbox.xMin, face->bbox.yMin);
-	//bboxMax = /*scale**/vec2(face->bbox.xMax, face->bbox.yMax);
+ //vec2f scale (face->size->metrics.x_scale*0x1p-16*0x1p-6, face->size->metrics.y_scale*0x1p-16*0x1p-6);
+ //bboxMin = /*scale**/vec2f(face->bbox.xMin, face->bbox.yMin);
+ //bboxMax = /*scale**/vec2f(face->bbox.xMax, face->bbox.yMax);
 }
 
 Font::~Font(){
@@ -119,7 +119,7 @@ Font::Metrics Font::metrics(uint index) {
 	FT_Load_Glyph(face, index, hint?FT_LOAD_TARGET_NORMAL:FT_LOAD_TARGET_LIGHT);
 	return metricsCache.insert(index, Metrics{
         face->glyph->metrics.horiAdvance*0x1p-6f,
-        vec2(face->glyph->metrics.horiBearingX*0x1p-6f, face->glyph->metrics.horiBearingY*0x1p-6f),
+        vec2f(face->glyph->metrics.horiBearingX*0x1p-6f, face->glyph->metrics.horiBearingY*0x1p-6f),
         (int)face->glyph->lsb_delta, (int)face->glyph->rsb_delta,
 	{{face->glyph->metrics.width*0x1p-6f, face->glyph->metrics.height*0x1p-6f}}});
 }

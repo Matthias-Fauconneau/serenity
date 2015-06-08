@@ -33,9 +33,9 @@ struct GLUniform {
 	explicit operator bool() { return location>=0; }
 	void operator=(int);
 	void operator=(float);
-	void operator=(vec2);
-	void operator=(vec3);
-	void operator=(vec4);
+ void operator=(vec2f);
+ void operator=(vec3f);
+ void operator=(vec4f);
 	void operator=(struct mat3x2);
 	void operator=(struct mat3);
 	void operator=(struct mat4);

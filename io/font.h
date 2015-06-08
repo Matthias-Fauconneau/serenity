@@ -27,7 +27,7 @@ struct Font {
     bool hint;
     handle<FT_FaceRec_*> face;
     float ascender = 0, descender = 0;
-    //vec2 bboxMin = 0, bboxMax = 0; // in font units
+    //vec2f bboxMin = 0, bboxMax = 0; // in font units
 
     struct Glyph {
 	int2 offset; // (left bearing, min.y-baseline) //FIXME: -> Image
@@ -42,11 +42,11 @@ struct Font {
 
     struct Metrics {
 	float advance;
-	vec2 bearing;
+ vec2f bearing;
 	int leftOffset, rightOffset; // 26.6 bearing offset to correct kerning with hinting
 	union {
 	    struct { float width, height; };
-	    vec2 size;
+     vec2f size;
 	};
     };
     map<uint, Metrics> metricsCache;
