@@ -25,8 +25,8 @@ struct System {
  bool winchObstacle = 0 && useWire;
  //(2*PI)/5
  /*sconst*/ real loopAngle = PI*(3-sqrt(5.)); // 2· Golden angle
- sconst real staticFriction = 8; // 3 // Threshold speed / Grain::radius
- sconst real dynamicFriction = 1./64; // 128-16
+ sconst real staticFriction = 12; // 3 // Threshold speed / Grain::radius
+ sconst real dynamicFriction = 1./64; //32; // 128-16
  sconst real dampingFactor = 1./4; // 4-8
  sconst real elasticFactor = 1; // 16
  sconst real tensionFactor = 1; // 8
@@ -355,7 +355,7 @@ struct System {
     real fS = staticFrictionStiffness * f.fN * tangentLength; // 0.1~1 fN
     vec3 springDirection = tangentOffset / tangentLength;
     constexpr real Kb = 0; //0x1p-16; // Damping
-    real fB = - Kb * dot(springDirection, f.relativeVelocity);
+    real fB = Kb * dot(springDirection, f.relativeVelocity);
     fT = - (fS+fB) * springDirection;
 #if DBG_FRICTION
     f.color = rgb3f(0,1,0);
@@ -363,16 +363,21 @@ struct System {
    } // else static equilibrium
   }
   // Dynamic friction
-  if((!staticFriction || length(fT) > frictionCoefficient*f.fN) && tangentRelativeSpeed) {
+  if((!staticFriction || length(fT) > frictionCoefficient*f.fN)) {
    f.lastUpdate = 0;
    //frictionCoefficient;
    constexpr real dynamicFrictionCoefficient = dynamicFriction;
    real fS = dynamicFrictionCoefficient * f.fN;
+   // Stabilize for small speed ?
+   //fS *= 1/(1+staticFrictionThresholdSpeed/tangentRelativeSpeed);
+   //fS *= 1 - exp(-tangentRelativeSpeed/staticFrictionThresholdSpeed);
    vec3 tangentVelocityDirection = tangentRelativeVelocity
                                                   / tangentRelativeSpeed;
-   constexpr real Kb = 0x1p-15 * M / T/T; // Damping
-   real fB = - Kb * dot(tangentVelocityDirection, f.relativeVelocity);
-   fT = - (fS+fB) * tangentVelocityDirection;
+   //constexpr real Kb = M / T/T; // Damping
+   //real fB = Kb * tangentRelativeSpeed;
+   fT = - fS * tangentVelocityDirection;
+   //fT = - ::min(0x1p-15, fS+fB) * tangentVelocityDirection;
+   //fT = - ::min(fB, fS) * tangentVelocityDirection; // min for stability ?
 #if DBG_FRICTION
     f.color = rgb3f(1,0,0);
 #endif
