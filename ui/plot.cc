@@ -122,7 +122,7 @@ shared<Graphics> Plot::graphics(vec2f size) {
    Tick& tick = ticks[0][i];
    vec2f p(round(point(vec2f(tick.value, O.y))));
    graphics->lines.append(p, p+vec2f(0,-tickLength));
-   graphics->graphics.insert(p + vec2f(-tick.sizeHint().x/2, -min.y > max.y ? -tick.sizeHint().y : 0), tick.graphics(0));
+   graphics->graphics.insertMulti(p + vec2f(-tick.sizeHint().x/2, -min.y > max.y ? -tick.sizeHint().y : 0), tick.graphics(0));
   }
   {Text text(bold(xlabel),16); graphics->graphics.insert(vec2f(int2(point(end))+int2(tickLabelSize.x/2, -text.sizeHint().y/2)), text.graphics(0)); }
  }

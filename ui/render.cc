@@ -52,9 +52,12 @@ void blit(const Image& target, int2 origin, const Image& source, bgr3f color, fl
         for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
             int opacity = source(x-origin.x,y-origin.y).a; // FIXME: single channel images
             byte4& target_sRGB = target(x,y);
-            vec3 target_linear(sRGB_reverse[target_sRGB[0]], sRGB_reverse[target_sRGB[1]], sRGB_reverse[target_sRGB[2]]);
-            int3 linearBlend = int3(round((0xFFF*(1-float(opacity)/0xFF))*vec3(target_linear)));
-            target_sRGB = byte4(sRGB_forward[linearBlend[0]], sRGB_forward[linearBlend[1]], sRGB_forward[linearBlend[2]],
+            vec3f target_linear(sRGB_reverse[target_sRGB[0]], sRGB_reverse[target_sRGB[1]], sRGB_reverse[target_sRGB[2]]);
+            int3 linearBlend = int3( round((0xFFF*(1-float(opacity)/0xFF))
+                                                      * vec3f(target_linear)));
+            target_sRGB = byte4(sRGB_forward[linearBlend[0]],
+                                                 sRGB_forward[linearBlend[1]],
+                                                 sRGB_forward[linearBlend[2]],
                     ::min(0xFF,int(target_sRGB.a)+opacity)); // Additive opacity accumulation
         }
     }

@@ -26,6 +26,11 @@ void Matrix::reset(size_t size) {
         cA.nrow = size;
         cA.ncol = size;
         cA.nzmax = 0;
+    } else if(columnPointers.size > size+1) { // shrink
+     columnPointers.size = size+1;
+     cA.nrow = size;
+     cA.ncol = size;
+     cA.nzmax = 0;
     }
     // TODO: garbage collect zeroes (contact loss) to reduce artifical fill
     values.mref::clear(0);
