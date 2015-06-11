@@ -24,26 +24,27 @@ struct System {
  sconst bool useFriction = 1;
  bool winchObstacle = 0 && useWire;
  //(2*PI)/5
- /*sconst*/ real loopAngle = 1 ? PI*(3-sqrt(5.)) : 0; // 2· Golden angle
+ /*sconst*/ real loopAngle = 0 ? PI*(3-sqrt(5.)) : 0; // 2· Golden angle
  sconst real staticFrictionSpeed = 32; // Threshold speed / Grain::radius
- sconst real staticFrictionFactor = 1;
+ sconst real staticFrictionFactor = 1./128;
+ sconst real staticFrictionDamping = 0;
  sconst real frictionThreshold = 1;
  sconst real frictionFactor = 1;
- sconst real grainDynamicFriction = 1./16; // 128-16
+ sconst real grainDynamicFriction = 1./4; // 128-16
  sconst real wireDynamicFriction = 1./4; // 128-16
- sconst real dampingFactor = 1./4; //./4;//./8; //4; // 4-8
- sconst real elasticFactor = 4;//./32; //16; // 16 // Grain, Bounds
+ sconst real dampingFactor = 1./512; //./4;//./8; //4; // 4-8
+ sconst real elasticFactor = 1;//./32; //16; // 16 // Grain, Bounds
  sconst real wireElasticFactor = 16; //./16; //32; //128;
  sconst real tensionFactor = 1; //16 8
- sconst real tensionDampingFactor = 1./4;
+ sconst real tensionDampingFactor = 0; //1./4;
  sconst real wireBendStiffness = 0x1p-26; // 21-26
  sconst real wireBendDamping = 0x1p-24; // 23-24
  sconst real winchRateFactor = 128;
  sconst real winchSpeedFactor = 12;
  sconst int subStepCount = 16; // 16-20
- sconst real dt = 1./(60*subStepCount*2*2*2*(rollTest?4:1)); // ~10¯⁴
- sconst real viscosity= 1-32*dt;
- sconst real rotationViscosity= 1-32*dt;
+ sconst real dt = 1./(60*subStepCount*2*2*(rollTest?4:1)); // ~10¯⁴
+ sconst real viscosity= 1-8*dt; // 8
+ sconst real rotationViscosity= 1-8*dt;
  #define DBG_FRICTION 0
  // Characteristic dimensions (SI)
  sconst real T = 1; // 1 s
@@ -206,7 +207,7 @@ struct System {
  }
 
  struct Load {
-  sconst real mass = 1./2 * M; // kg
+  sconst real mass = 1./4 * M; // kg
   sconst real angularMass = 0;
   sconst real thickness = L;
   sconst real curvature = 0;
@@ -366,27 +367,29 @@ struct System {
   const bool staticFriction
     = tangentRelativeSpeed < staticFrictionThresholdSpeed;
   vec3 fT = 0;
+  vec3 x = globalA - globalB;
+  vec3 tangentOffset = x - dot(f.normal, x) * f.normal;
+  real tangentLength = ::length(tangentOffset);
+  constexpr real E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
+  constexpr real R = 1/(tA::curvature+tB::curvature);
+  constexpr real staticFrictionStiffness = staticFrictionFactor * frictionCoefficient * E * R; // 1/mm
+  real kS = staticFrictionStiffness * f.fN;
+  if(!tangentLength) return;
+  real fS = kS * tangentLength; // 0.1~1 fN
+  vec3 springDirection = tangentOffset / tangentLength;
+  constexpr real Kb = staticFrictionDamping * M/T/T; // Damping
+  real fB = Kb * dot(springDirection, f.relativeVelocity);
+
   if(staticFriction) {
-   vec3 x = globalA - globalB;
-   vec3 tangentOffset = x - dot(f.normal, x) * f.normal;
-   real tangentLength = ::length(tangentOffset);
-   if(tangentLength) {
-    constexpr real E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
-    constexpr real R = 1/(tA::curvature+tB::curvature);
-    constexpr real staticFrictionStiffness = staticFrictionFactor * frictionCoefficient * E * R; // 1/mm
-    real fS = staticFrictionStiffness * tangentLength * f.fN; // 0.1~1 fN
-    vec3 springDirection = tangentOffset / tangentLength;
-    constexpr real Kb = 0 * M/T/T; // Damping
-    real fB = Kb * dot(springDirection, f.relativeVelocity);
-    fT = - (fS+fB) * springDirection;
+   fT = - (fS+fB) * springDirection;
 #if DBG_FRICTION
-    f.color = rgb3f(0,1,0);
-    f.dynamic = false;
+   f.color = rgb3f(0,1,0);
+   f.dynamic = false;
 #endif
-   } // else static equilibrium
   }
   // Dynamic friction
-  if((!staticFriction || length(fT) > frictionThreshold*frictionCoefficient*f.fN) && tangentRelativeSpeed) {
+  if((!staticFriction || length(fT) > frictionThreshold*frictionCoefficient*f.fN)
+     && tangentRelativeSpeed) {
 #if DBG_FRICTION
    if(((void*)&A==(void*)&grain)) {} else
     /*log(tangentRelativeSpeed / staticFrictionThresholdSpeed,
@@ -421,14 +424,19 @@ struct System {
     f.color = rgb3f(1,0,0);
 #endif
     dynamicFrictionCount++;
-  } else staticFrictionCount++;
-  //if(rollTest) log(grain.velocity[1], fT/Grain::mass);
-  if(!tA::fixed) F[A.base+a] += vec3d(dt*fT);
-  if(!tB::fixed) F[B.base+b] -= vec3d(dt*fT);
-  if(A.torque) A.torque[a] +=
-     tA::angularMass / (tA::mass * sq(relativeA)) * cross(relativeA, fT);
-  if(B.torque) B.torque[b] -=
-     tB::angularMass / (tB::mass * sq(relativeB)) * cross(relativeB, fT);
+    // TODO: implicit
+    //if(rollTest) log(grain.velocity[1], fT/Grain::mass);
+    if(!tA::fixed) F[A.base+a] += vec3d(dt*fT);
+    if(!tB::fixed) F[B.base+b] -= vec3d(dt*fT);
+    if(A.torque) A.torque[a] +=
+      tA::angularMass / (tA::mass * sq(relativeA)) * cross(relativeA, fT);
+    if(B.torque) B.torque[b] -=
+      tB::angularMass / (tB::mass * sq(relativeB)) * cross(relativeB, fT);
+  } else {
+   staticFrictionCount++;
+   spring<tA, tB>(a, b, kS, tangentLength, 0, 0, springDirection,
+                  A.velocity[a], B.velocity[b]);
+  }
  }
 };
 constexpr real System::viscosity;
