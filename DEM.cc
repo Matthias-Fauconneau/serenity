@@ -25,26 +25,27 @@ struct System {
  bool winchObstacle = 0 && useWire;
  //(2*PI)/5
  /*sconst*/ real loopAngle = 0 ? PI*(3-sqrt(5.)) : 0; // 2· Golden angle
- sconst real staticFrictionSpeed = 32; // Threshold speed / Grain::radius
- sconst real staticFrictionFactor = 1./128;
- sconst real staticFrictionDamping = 0;
+ sconst real staticFrictionSpeed = 16; // Threshold speed / Grain::radius
+ sconst real staticFrictionFactor = 1;
+ sconst real staticFrictionDamping = 0; //1./512;
  sconst real frictionThreshold = 1;
  sconst real frictionFactor = 1;
- sconst real grainDynamicFriction = 1./4; // 128-16
- sconst real wireDynamicFriction = 1./4; // 128-16
- sconst real dampingFactor = 1./512; //./4;//./8; //4; // 4-8
+ sconst real dynamicFriction = 1./8;
+ sconst real dampingFactor = implicit ? 1./64 : 1./64; //./4;//./8; //4; // 4-8
  sconst real elasticFactor = 1;//./32; //16; // 16 // Grain, Bounds
- sconst real wireElasticFactor = 16; //./16; //32; //128;
+ sconst real wireElasticFactor = 2; // 8
  sconst real tensionFactor = 1; //16 8
- sconst real tensionDampingFactor = 0; //1./4;
+ sconst real tensionDampingFactor = implicit ? 1./16 : 1./4;
  sconst real wireBendStiffness = 0x1p-26; // 21-26
- sconst real wireBendDamping = 0x1p-24; // 23-24
+ sconst real wireBendDamping = 0x1p-23; // 23-24
  sconst real winchRateFactor = 128;
- sconst real winchSpeedFactor = 12;
+ sconst real winchSpeedFactor = 16;
  sconst int subStepCount = 16; // 16-20
- sconst real dt = 1./(60*subStepCount*2*2*(rollTest?4:1)); // ~10¯⁴
- sconst real viscosity= 1-8*dt; // 8
- sconst real rotationViscosity= 1-8*dt;
+ sconst real dt = 1./(60*subStepCount*2*(implicit?1:2)*(rollTest?4:1)); // ~10¯⁴
+ /*sconst real viscosity= 1-(implicit?1:1)*64*dt; // 8
+ sconst real rotationViscosity= 1-(implicit?1:1)*64*dt;*/
+ sconst real viscosity= 1-1./64;
+ sconst real rotationViscosity= viscosity;
  #define DBG_FRICTION 0
  // Characteristic dimensions (SI)
  sconst real T = 1; // 1 s
@@ -207,7 +208,7 @@ struct System {
  }
 
  struct Load {
-  sconst real mass = 1./4 * M; // kg
+  sconst real mass = 1./8 * M; // kg
   sconst real angularMass = 0;
   sconst real thickness = L;
   sconst real curvature = 0;
@@ -374,9 +375,8 @@ struct System {
   constexpr real R = 1/(tA::curvature+tB::curvature);
   constexpr real staticFrictionStiffness = staticFrictionFactor * frictionCoefficient * E * R; // 1/mm
   real kS = staticFrictionStiffness * f.fN;
-  if(!tangentLength) return;
   real fS = kS * tangentLength; // 0.1~1 fN
-  vec3 springDirection = tangentOffset / tangentLength;
+  vec3 springDirection = tangentLength ? tangentOffset / tangentLength : 0;
   constexpr real Kb = staticFrictionDamping * M/T/T; // Damping
   real fB = Kb * dot(springDirection, f.relativeVelocity);
 
@@ -391,23 +391,18 @@ struct System {
   if((!staticFriction || length(fT) > frictionThreshold*frictionCoefficient*f.fN)
      && tangentRelativeSpeed) {
 #if DBG_FRICTION
-   if(((void*)&A==(void*)&grain)) {} else
-    /*log(tangentRelativeSpeed / staticFrictionThresholdSpeed,
-        length(fT) > frictionThreshold*frictionCoefficient*f.fN);*/
    f.dynamic = true;
 #else
    f.lastUpdate = 0;
 #endif
-   //frictionCoefficient;
-   const real dynamicFrictionCoefficient =
-     ((void*)&A==(void*)&grain) ? grainDynamicFriction : wireDynamicFriction;
+   const real dynamicFrictionCoefficient = dynamicFriction * frictionCoefficient;
    real fS = dynamicFrictionCoefficient * f.fN;
    // Stabilize for small speed ?
-   fS *= 1/(1+staticFrictionThresholdSpeed/tangentRelativeSpeed);
+   //fS *= 1/(1+staticFrictionThresholdSpeed/tangentRelativeSpeed);
    //fS *= 1 - exp(-tangentRelativeSpeed/staticFrictionThresholdSpeed);
    vec3 tangentVelocityDirection = tangentRelativeVelocity
                                                   / tangentRelativeSpeed;
-   constexpr real Kb = 0x1p-12 * M / T/T; // Damping
+   constexpr real Kb = 0/*x1p-16*/ * M / T/T; // Damping
    real fB = Kb * tangentRelativeSpeed;
    if(rollTest) {
     while(plots.size<2) plots.append();
@@ -434,8 +429,16 @@ struct System {
       tB::angularMass / (tB::mass * sq(relativeB)) * cross(relativeB, fT);
   } else {
    staticFrictionCount++;
-   spring<tA, tB>(a, b, kS, tangentLength, 0, 0, springDirection,
-                  A.velocity[a], B.velocity[b]);
+   if(tangentLength)
+    /*spring<tA, tB>(a, b, kS, tangentLength, 0, Kb, springDirection,
+                   A.velocity[a], B.velocity[b]);*/
+    if(!tA::fixed) F[A.base+a] += vec3d(dt*fT);
+    if(!tB::fixed) F[B.base+b] -= vec3d(dt*fT);
+   // FIXME: implicit torque
+   if(A.torque) A.torque[a] +=
+     tA::angularMass / (tA::mass * sq(relativeA)) * cross(relativeA, fT);
+   if(B.torque) B.torque[b] -=
+     tB::angularMass / (tB::mass * sq(relativeB)) * cross(relativeB, fT);
   }
  }
 };
