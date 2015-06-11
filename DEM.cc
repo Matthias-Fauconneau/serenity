@@ -23,34 +23,34 @@ struct System {
  sconst bool useRotation = 1;
  sconst bool useFriction = 1;
  bool winchObstacle = 0 && useWire;
- //(2*PI)/5
- /*sconst*/ real loopAngle = 0 ? PI*(3-sqrt(5.)) : 0; // 2· Golden angle
- sconst real staticFrictionSpeed = 16; // Threshold speed / Grain::radius
- sconst real staticFrictionFactor = 1;
- sconst real staticFrictionDamping = 0; //1./512;
- sconst real frictionThreshold = 1;
- sconst real frictionFactor = 1;
- sconst real dynamicFriction = 1./8;
- sconst real dampingFactor = implicit ? 1./64 : 1./64; //./4;//./8; //4; // 4-8
- sconst real elasticFactor = 1;//./32; //16; // 16 // Grain, Bounds
- sconst real wireElasticFactor = 2; // 8
- sconst real tensionFactor = 1; //16 8
- sconst real tensionDampingFactor = implicit ? 1./16 : 1./4;
- sconst real wireBendStiffness = 0x1p-26; // 21-26
- sconst real wireBendDamping = 0x1p-23; // 23-24
- sconst real winchRateFactor = 128;
- sconst real winchSpeedFactor = 16;
- sconst int subStepCount = 16; // 16-20
- sconst real dt = 1./(60*subStepCount*2*(implicit?1:2)*(rollTest?4:1)); // ~10¯⁴
- /*sconst real viscosity= 1-(implicit?1:1)*64*dt; // 8
- sconst real rotationViscosity= 1-(implicit?1:1)*64*dt;*/
- sconst real viscosity= 1-1./64;
- sconst real rotationViscosity= viscosity;
- #define DBG_FRICTION 0
+
  // Characteristic dimensions (SI)
  sconst real T = 1; // 1 s
  sconst real L = 1; // 1 m
  sconst real M = 1; // 1 kg
+
+ /*sconst*/ real loopAngle = 0 ? (0 ? PI*(3-sqrt(5.)) : (2*PI)/5) : 0;
+ sconst real staticFrictionSpeed = (implicit?1./2:2) * L/T; // 1
+ sconst real staticFrictionFactor = (implicit?0x1p5:0x1p6) / L; // 5-6
+ sconst real staticFrictionDamping = implicit ? 0x1p-6 : 0x1p-6; // 5-6
+ sconst real frictionThreshold = 1;
+ sconst real frictionFactor = 1;
+ sconst real dynamicFriction = 1./32; // 16
+ sconst real dampingFactor = 1./3; //1./3-64
+ sconst real elasticFactor = 1./4; // 32 // 1-16
+ sconst real wireElasticFactor = 32; // 32-36
+ sconst real tensionFactor = 1; // 1
+ sconst real tensionDampingFactor = implicit ? 0x1p-8 : 0x1p-4; // 4-8
+ sconst real wireBendStiffness = 0x1p-27; // 21,23,26,37
+ sconst real wireBendDamping = 0x1p-25; // 23-25
+ sconst real winchRateFactor = 128;
+ sconst real winchSpeedFactor = 16; //4-16
+ sconst int subStepCount = 8;
+ sconst real dt = 1./(60*subStepCount*2*2*2*(implicit?1:2)*(rollTest?4:1));
+ //sconst real dt0 = 1./(60*subStepCount*2*2*2*(implicit?1:2)*(rollTest?4:1));
+ sconst real viscosity= 1 - 2*dt; // 2
+ sconst real rotationViscosity= 1 - 128*dt; // 64-128 (~1-1/60)
+ #define DBG_FRICTION 0
 
  HList<Plot> plots;
 
@@ -98,13 +98,13 @@ struct System {
   sconst real elasticModulus = elasticFactor * 1e6 * M / (L*T*T);
   sconst real normalDamping = dampingFactor * M / T; // 0.3
   sconst real frictionCoefficient = frictionFactor;
-  sconst real staticFrictionThresholdSpeed = staticFrictionSpeed * Grain::radius / T;
+  sconst real staticFrictionThresholdSpeed = staticFrictionSpeed;// * Grain::radius / T;
   sconst real angularMass
    = 2./5*mass*(pow5(radius)-pow5(radius-1e-4))
                        / (cb(radius)-cb(radius-1e-4));
 
   size_t base = 0;
-  sconst size_t capacity = rollTest ? 2 : 300/*527*/;
+  sconst size_t capacity = rollTest ? 2 : 1024;
   sconst bool fixed = false;
   buffer<vec3> position { capacity };
   buffer<vec3> velocity { capacity };
@@ -129,13 +129,13 @@ struct System {
   sconst real elasticModulus = wireElasticFactor * 1e6 * M / (L*T*T); // 1e6
   sconst real normalDamping = dampingFactor * M / T; // 0.3
   sconst real frictionCoefficient = frictionFactor;
-  sconst real staticFrictionThresholdSpeed = staticFrictionSpeed * Grain::radius / T;
+  sconst real staticFrictionThresholdSpeed = staticFrictionSpeed;// * Grain::radius / T;
 
   sconst real tensionStiffness = tensionFactor*elasticModulus*PI*sq(radius);
   sconst real tensionDamping = tensionDampingFactor * mass/T;
 
   size_t base = 0;
-  sconst size_t capacity = useWire ? 2000/*2692,3072*/ : 0; // 20m
+  sconst size_t capacity = useWire ? 5*1024 : 0;
   sconst bool fixed = false;
   buffer<vec3> position { capacity };
   buffer<vec3> velocity { capacity };
@@ -158,7 +158,7 @@ struct System {
   sconst real elasticModulus = elasticFactor * 1e6 * M/(L*T*T);
   sconst real normalDamping = dampingFactor * M / T;
   sconst real frictionCoefficient = frictionFactor;
-  sconst real staticFrictionThresholdSpeed = staticFrictionSpeed * Grain::radius / T;
+  sconst real staticFrictionThresholdSpeed = staticFrictionSpeed;// * Grain::radius / T;
   size_t base = 0; sconst size_t count = 1;
   sconst bool fixed = true;
   sconst vec3 position[1] {vec3(0,0,0)};
@@ -185,7 +185,7 @@ struct System {
   sconst real elasticModulus = elasticFactor * 1e6 * M/(L*T*T);
   sconst real normalDamping = dampingFactor * M / T;
   sconst real frictionCoefficient = frictionFactor;
-  sconst real staticFrictionThresholdSpeed = staticFrictionSpeed * Grain::radius / T;
+  sconst real staticFrictionThresholdSpeed = staticFrictionSpeed;// * Grain::radius / T;
   sconst bool fixed = true;
   sconst vec3 position[1] {vec3(0,0,0)};
   sconst vec3 velocity[1] {vec3(0,0,0)};
@@ -215,7 +215,7 @@ struct System {
   sconst real elasticModulus = elasticFactor * 1e6 * M/(L*T*T);
   sconst real normalDamping = dampingFactor * M / T;
   sconst real frictionCoefficient = frictionFactor;
-  sconst real staticFrictionThresholdSpeed = staticFrictionSpeed * Grain::radius / T;
+  sconst real staticFrictionThresholdSpeed = staticFrictionSpeed;// * Grain::radius / T;
   size_t base = 0;
   sconst size_t capacity = 1;
   size_t count = 0;
@@ -371,9 +371,11 @@ struct System {
   vec3 x = globalA - globalB;
   vec3 tangentOffset = x - dot(f.normal, x) * f.normal;
   real tangentLength = ::length(tangentOffset);
-  constexpr real E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
-  constexpr real R = 1/(tA::curvature+tB::curvature);
-  constexpr real staticFrictionStiffness = staticFrictionFactor * frictionCoefficient * E * R; // 1/mm
+  //constexpr real E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
+  //constexpr real R = 1/(tA::curvature+tB::curvature);
+  real staticFrictionStiffness
+    = staticFrictionFactor * frictionCoefficient;// * E * Grain::radius; //* R; // 1/mm
+  //  1./tangentLength
   real kS = staticFrictionStiffness * f.fN;
   real fS = kS * tangentLength; // 0.1~1 fN
   vec3 springDirection = tangentLength ? tangentOffset / tangentLength : 0;
@@ -388,12 +390,12 @@ struct System {
 #endif
   }
   // Dynamic friction
-  if((!staticFriction || length(fT) > frictionThreshold*frictionCoefficient*f.fN)
+  if((!staticFriction || fS > frictionThreshold*frictionCoefficient*f.fN)
      && tangentRelativeSpeed) {
 #if DBG_FRICTION
    f.dynamic = true;
 #else
-   f.lastUpdate = 0;
+   if(!staticFriction) f.lastUpdate = 0;
 #endif
    const real dynamicFrictionCoefficient = dynamicFriction * frictionCoefficient;
    real fS = dynamicFrictionCoefficient * f.fN;
@@ -501,7 +503,7 @@ struct Grid {
         int3 i = index3(p);
         assert(i.x == clamp(0, i.x, size.x-1), p, i, size, scale);
         assert(i.y == clamp(0, i.y, size.y-1), p, i, size, scale);
-        assert(i.z == clamp(0, i.z, size.z-1), p, i, size, scale);
+        assert_(i.z == clamp(0, i.z, size.z-1), p, i, size, scale);
         return index(i.x, i.y, i.z);
     }
 };
@@ -539,7 +541,7 @@ struct Simulation : System {
  const real pourRadius = side.castRadius - Wire::radius - Grain::radius;
  real pourHeight = Floor::height+Grain::radius;
 
- const real winchRadius = side.castRadius - 2*Grain::radius;
+ const real winchRadius = side.castRadius - 1*Grain::radius;
                                                               //- Wire::radius;
  sconst real winchRate = winchRateFactor / T;
  sconst real winchSpeed = winchSpeedFactor * Grain::radius / T;
@@ -802,7 +804,7 @@ struct Simulation : System {
   }
   if(processState==Release) {
    if(side.castRadius < 16*Grain::radius)
-    side.castRadius += dt * L / 8;
+    side.castRadius += dt * L / 4; // 8
    else {
     log("Released");
     processState = Done;
@@ -1127,8 +1129,11 @@ struct Simulation : System {
     directionSwitchCount++;
     if(processState == Load) {
      log(directionSwitchCount, direction);
-     if(directionSwitchCount>2) { processState=Release; log("release"); }
     }
+   }
+   if((directionSwitchCount>2 || kT < 1./4) && processState==Load) {
+    processState=Release;
+    log("release");
    }
    load.position[0] += dt*load.velocity[0];
   }
@@ -1209,7 +1214,7 @@ struct Simulation : System {
     assert_(isNumber(v));
     ssqR += sq(v);
    }
-   kR = /*1./2*Grain::angularMass**/ssqR;
+   kR = 1./2*Grain::angularMass*ssqR;
    if(!isNumber(kR)) { /*log("!isNumber(kR)");FIXME*/ kR=0; }
    assert_(isNumber(kR));
   }
@@ -1279,21 +1284,20 @@ struct SimulationView : Simulation, Widget, Poll {
  Thread simulationThread;
 #endif
  unique<Encoder> encoder = nullptr;
+ GLFrameBuffer target {int2(1280,720)};
 
  SimulationView()
 #if THREAD
   : Poll(0, POLLIN, simulationThread)
 #endif
  {
-  /*window->actions[Space] = [this]{ writeFile(str(timeStep*dt)+".png",
-                                          encodePNG(window->readback()), home()); };*/
+  window->actions[F12] = [this]{ writeFile(str(timeStep*dt)+".png",
+                                          encodePNG(target.readback()), home()); };
   window->actions[RightArrow] = [this]{ if(stop) queue(); };
   window->actions[Space] = [this]{ stop=!stop; if(!stop) queue(); };
   window->actions[Return] = [this]{
-   if(processState == Pour) {
-    processState = Load; window->setTitle("Released");
-    log("Release", "grain", grain.count, "wire", wire.count);
-   }
+   if(processState < Done) processState++;
+   log("grain", grain.count, "wire", wire.count);
   };
   /*window->actions[Key('E')] = [this] {
    if(!encoder) {
@@ -1358,7 +1362,6 @@ struct SimulationView : Simulation, Widget, Poll {
    }
   }
 
-  static GLFrameBuffer target(int2(1280,720));
   vec2 size (target.size.x, target.size.y);
   vec2 viewSize = plots.size>2 ? vec2(360,720) : plots ? vec2(720, 720) : size;
 
@@ -1565,7 +1568,9 @@ struct SimulationView : Simulation, Widget, Poll {
   renderTime.stop();
   if(stop && fitTranslation != this->translation) window->render();
 
-  window->setTitle(str(grain.count, wire.count, kT, kR, staticFrictionCount, dynamicFrictionCount));
+  array<char> s = str(grain.count, wire.count, kT, kR, staticFrictionCount, dynamicFrictionCount);
+  if(load.count) s.append(" "_+str(load.position[0].z));
+  window->setTitle(s);
   return shared<Graphics>();
  }
 
