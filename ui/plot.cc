@@ -29,9 +29,9 @@ shared<Graphics> Plot::graphics(vec2f size) {
   }
   for(uint i: range(2)) if(!log[i]) { if(i>0 && min[i]>0) min[i] = 0; if(max[i]<0) max[i] = 0; }
  }
- assert_(isNumber(min) && isNumber(max) && min.x < max.x && min.y < max.y, min, max);
  shared<Graphics> graphics;
- //if(!(min.x < max.x && min.y < max.y)) return graphics;
+ if(!(min.x < max.x && min.y < max.y)) return graphics;
+ assert_(isNumber(min) && isNumber(max) && min.x < max.x && min.y < max.y, min, max);
 
  int tickCount[2]={};
  for(uint axis: range(2)) { //Ceils maximum using a number in the preferred sequence

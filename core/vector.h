@@ -199,7 +199,7 @@ typedef vec<bgra,uint,4> uint4;
 /// Integer x,y vector (64bit)
 typedef vec<xy,int64,2> long2;
 
-template<template<Type> /*Type*/class V, Type T, uint N> inline /*constexpr*/ float length(const vec<V,T,N>& a) { return sqrt(dot(a,a)); }
+template<template<Type> /*Type*/class V, Type T, uint N> inline /*constexpr*/ T length(const vec<V,T,N>& a) { return sqrt(dot(a,a)); }
 
 struct quat {
     real s; vec3 v;
@@ -215,7 +215,7 @@ inline quat operator*(quat p, quat q) { return {p.s*q.s - dot(p.v, q.v), p.s*q.v
 inline vec3 operator*(quat p, vec3 v) { return (p * quat{0, v} * p.conjugate()).v; }
 inline quat operator*(float s, quat q) { return {s*q.s, s*q.v}; }
 inline quat operator+(quat p, quat q) { return {p.s+q.s, p.v+q.v}; }
-inline float length(quat q) { return sqrt(sq(q.s)+sq(q.v)); }
+inline real length(quat q) { return sqrt(sq(q.s)+sq(q.v)); }
 inline quat normalize(quat q) { return 1.f/length(q) * q; }
 inline String str(quat q) { return "["+str(q.s, q.v)+"]"; }
 
