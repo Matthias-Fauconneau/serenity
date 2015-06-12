@@ -9,7 +9,7 @@ inline void operator*=(mref<float> values, float factor) { values.apply([factor]
 
 // \file parallel.h
 
-static constexpr uint threadCount = 1;
+static constexpr uint threadCount = 4;
 
 struct thread { int64 id; int64* counter; int64 stop; pthread_t pthread; function<void(uint, uint)>* delegate; int64 pad[3]; };
 inline void* start_routine(thread* t) {

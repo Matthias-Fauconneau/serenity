@@ -12,7 +12,7 @@ fragment {
                 if(length(vLocalCoords) > 1) discard;
                 float dz = sqrt(1-dot(vLocalCoords,vLocalCoords));
                 vec3 v = vec3(vLocalCoords, dz);
-                buffer rotationBuffer { dvec4[] rotation; };
+                buffer rotationBuffer { vec4[] rotation; };
                 //buffer colorBuffer { vec4[] aColor; };
                 vec4 q = vec4(rotation[gl_PrimitiveID/2].yzwx);
                 vec4 qmul(vec4 p, vec4 q) {

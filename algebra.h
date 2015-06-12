@@ -19,9 +19,10 @@ struct Matrix {
     ~Matrix();
     void reset(size_t size);
 
-    inline real& operator()(int i, int j) {
+    inline double& operator()(int i, int j) {
         int start = columnPointers[j], end = columnPointers[j+1];
-        for(int index: range(start,end)) if(rowIndices[index]==i) return values[index];
+        for(int index: range(start,end))
+         if(rowIndices[index]==i) return values[index];
         //values.grow(values.size+1); rowIndices.grow(rowIndices.size+1);
         for(int& pointer: columnPointers.slice(j+1)) pointer++;
         rowIndices.insertAt(end, i);

@@ -5,8 +5,8 @@
 
 struct Ticks { float max; uint tickCount; };
 uint subExponent(float& value) {
- real subExponent = exp10(log10(abs(value)) - floor(log10(abs(value))));
- for(auto a: (real[][2]){{1,5}, {1.2,6}, {1.25,5}, {1.6,8}, {2,10}, {2.5,5}, {3,3}, {4,8}, {5,5}, {6,6}, {8,8}, {9.6,8}, {10,5}}) {
+ float subExponent = exp10(log10(abs(value)) - floor(log10(abs(value))));
+ for(auto a: (float[][2]){{1,5}, {1.2,6}, {1.25,5}, {1.6,8}, {2,10}, {2.5,5}, {3,3}, {4,8}, {5,5}, {6,6}, {8,8}, {9.6,8}, {10,5}}) {
   if(a[0] >= subExponent-0x1p-52) { value=(value>0?1:-1)*a[0]*exp10(floor(log10(abs(value)))); return a[1]; }
  }
  error("No matching subexponent for"_, value);

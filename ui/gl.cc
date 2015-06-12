@@ -61,7 +61,7 @@ GLShader::GLShader(string source, ref<string> stages) {
                     continue;
                 }
                 bool function = false;
-                static array<string> types = split("void float vec2 vec3 vec4"_," ");
+                static array<string> types = split("void float vec2f vec3 vec4"_," ");
                 static array<string> qualifiers = split("struct layout const uniform buffer attribute varying in out"_," ");
                 if(types.contains(identifier) && s.identifier("_"_) && s.match('(')) {
                     function = true;
@@ -356,19 +356,19 @@ Image GLFrameBuffer::readback() {
     return flip(move(target));
 }
 
-void glDrawRectangle(GLShader& shader, vec2 min, vec2 max, bool texCoord) {
+void glDrawRectangle(GLShader& shader, vec2f min, vec2f max, bool texCoord) {
     shader.bind();
     static GLVertexArray vertexArray;
     int positionIndex = shader.attribLocation("position"_);
     assert_(positionIndex>=0);
-    GLBuffer positions {ref<vec2>{vec2(min.x,min.y), vec2(max.x,min.y), vec2(min.x,max.y), vec2(max.x,max.y)}};
+    GLBuffer positions {ref<vec2f>{vec2f(min.x,min.y), vec2f(max.x,min.y), vec2f(min.x,max.y), vec2f(max.x,max.y)}};
     vertexArray.bindAttribute(positionIndex, 2, Float, positions);
     int texCoordsIndex;
     GLBuffer texCoordsBuffer;
     if(texCoord) {
         texCoordsIndex = shader.attribLocation("texCoords"_);
         assert_(texCoordsIndex>=0);
-        texCoordsBuffer = GLBuffer(ref<vec2>{vec2(0,1), vec2(1,1), vec2(0,0), vec2(1,0)}); //flip Y
+        texCoordsBuffer = GLBuffer(ref<vec2f>{vec2f(0,1), vec2f(1,1), vec2f(0,0), vec2f(1,0)}); //flip Y
         vertexArray.bindAttribute(texCoordsIndex, 2, Float, texCoordsBuffer);
     }
     vertexArray.draw(TriangleStrip, 4);

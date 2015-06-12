@@ -9,53 +9,53 @@ inline uint align(uint width, uint offset) { assert((width&(width-1))==0); retur
 generic inline constexpr T sq(const T& x) { return x*x; }
 generic inline constexpr T cb(const T& x) { return x*x*x; }
 
-/// Declares real as a double-precision floating point number
-typedef double real;
+/// Declares real as a single-precision floating point number
+//typedef float real;
 
 inline float abs(float x) { return __builtin_fabsf(x); }
-inline real abs(real x) { return __builtin_fabs(x); }
+inline double abs(double x) { return __builtin_fabs(x); }
 
-constexpr real nanf = __builtin_nanf("");
-constexpr real nan = __builtin_nan("");
+constexpr float nanf = __builtin_nanf("");
+constexpr double nan = __builtin_nan("");
 inline bool isNaN(float x) { return x!=x; }
-inline bool isNaN(real x) { return x!=x; }
+inline bool isNaN(double x) { return x!=x; }
 static constexpr float inf = __builtin_inff();
 inline bool isNumber(float x) { return !isNaN(x) && x !=inf && x !=-inf; }
 
 inline float floor(float x) { return __builtin_floorf(x); }
-inline real floor(real x) { return __builtin_floor(x); }
+inline double floor(double x) { return __builtin_floor(x); }
 inline float fract(float x) { return x - floor(x); }
 inline float round(float x) { return __builtin_roundf(x); }
-inline real round(real x) { return __builtin_round(x); }
+inline double round(double x) { return __builtin_round(x); }
 inline float ceil(float x) { return __builtin_ceilf(x); }
-inline real ceil(real x) { return __builtin_ceil(x); }
-inline real mod(real q, real d) { return __builtin_fmod(q, d); }
+inline double ceil(double x) { return __builtin_ceil(x); }
+inline double mod(double q, double d) { return __builtin_fmod(q, d); }
 inline float sqrt(float f) { return __builtin_sqrtf(f); }
-inline real sqrt(real f) { return __builtin_sqrt(f); }
-inline real pow(real x, real y) { return __builtin_pow(x,y); }
+inline double sqrt(double f) { return __builtin_sqrt(f); }
+inline double pow(double x, double y) { return __builtin_pow(x,y); }
 
-const real expUnderflow = -7.45133219101941108420e+02;
-const real expOverflow = 7.09782712893383973096e+02;
-inline real exp(real x) { assert(x>expUnderflow && x<expOverflow); return __builtin_exp(x); }
-inline real ln(real x) { return __builtin_log(x); }
+const double expUnderflow = -7.45133219101941108420e+02;
+const double expOverflow = 7.09782712893383973096e+02;
+inline double exp(double x) { assert(x>expUnderflow && x<expOverflow); return __builtin_exp(x); }
+inline double ln(double x) { return __builtin_log(x); }
 
-constexpr real PI = 3.14159265358979323846;
-inline real cos(real t) { return __builtin_cos(t); }
+constexpr double PI = 3.14159265358979323846;
+inline double cos(double t) { return __builtin_cos(t); }
 inline float cos(float t) { return __builtin_cos(t); }
-inline real acos(real t) { return __builtin_acos(t); }
-inline real sin(real t) { return __builtin_sin(t); }
+inline double acos(double t) { return __builtin_acos(t); }
+inline double sin(double t) { return __builtin_sin(t); }
 inline float sin(float t) { return __builtin_sin(t); }
-inline real asin(real t) { return __builtin_asin(t); }
-inline real tan(real t) { return __builtin_tan(t); }
-inline real atan(real y, real x) { return __builtin_atan2(y, x); }
-inline real sinh(real x) { return __builtin_sinh(x); }
+inline double asin(double t) { return __builtin_asin(t); }
+inline double tan(double t) { return __builtin_tan(t); }
+inline double atan(double y, double x) { return __builtin_atan2(y, x); }
+inline double sinh(double x) { return __builtin_sinh(x); }
 
 inline float gaussian(float sigma, float x) { return exp(-sq(x/sigma)/2); }
 
-inline real exp2(real x) { return __builtin_exp2(x); }
-inline real log2(real x) { return __builtin_log2(x); }
-inline real exp10(real x) { return __builtin_exp2(__builtin_log2(10)*x); }
-inline real log10(real x) { return __builtin_log10(x); }
+inline double exp2(double x) { return __builtin_exp2(x); }
+inline double log2(double x) { return __builtin_log2(x); }
+inline double exp10(double x) { return __builtin_exp2(__builtin_log2(10)*x); }
+inline double log10(double x) { return __builtin_log10(x); }
 
 // -> \file algorithm.h
 

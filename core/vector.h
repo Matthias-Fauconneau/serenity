@@ -107,9 +107,9 @@ inline String strx(int2 N) { return str(N.x)+'x'+str(N.y); }
 /// Single precision x,y vector
 typedef vec<xy,float,2> float2;
 typedef vec<xy,float,2> vec2f;
-typedef vec<xy,double,2> vec2;
+//typedef vec<xy,real,2> vec2;
 typedef vec<xy,double,2> vec2d;
-inline String strx(vec2 N) { return str(N.x)+'x'+str(N.y); }
+//inline String strx(vec2 N) { return str(N.x)+'x'+str(N.y); }
 
 generic struct xyz {
     T x,y,z;
@@ -124,15 +124,6 @@ typedef vec<xyz,float,3> float3;
 typedef vec<xyz,float,3> vec3f;
 /// Double precision floating-point x,y,z vector
 typedef vec<xyz,double,3> vec3d;
-typedef vec<xyz,double,3> vec3;
-
-inline vec3 cross(vec3 a, vec3 b) { return vec3(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y); }
-/*inline vec3 normal(vec3 v) {
-	int index=0; float min=v[0];
-	for(int i: range(3)) if(abs(v[i]) < min) { index=i; min=abs(v[i]); }
-	vec3 t=0; t[index]=1;
-	return normalize(cross(v, t));
-}*/
 
 generic struct xyzw {
     T x,y,z,w;
@@ -199,33 +190,38 @@ typedef vec<bgra,uint,4> uint4;
 /// Integer x,y vector (64bit)
 typedef vec<xy,int64,2> long2;
 
-template<template<Type> /*Type*/class V, Type T, uint N> inline /*constexpr*/ T length(const vec<V,T,N>& a) { return sqrt(dot(a,a)); }
+template<template<Type> /*Type*/class V, Type T, uint N> inline
+         /*constexpr*/ T length(vec<V,T,N> a) { return sqrt(dot(a,a)); }
+template<template<Type> /*Type*/class V, Type T> inline
+ vec<V,T,3> cross(vec<V,T,3> a, vec<V,T,3> b) {
+ return vec<V,T,3>(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y);
+}
 
 struct quat {
-    real s; vec3 v;
-    constexpr quat(real s = 1, vec3 v = 0) : s(s), v(v) {}
+    float s; vec3f v;
+    constexpr quat(float s = 1, vec3f v = 0) : s(s), v(v) {}
     quat conjugate() const { return quat(s, -v); }
 };
-inline quat angleVector(real a, vec3 v) {
- real l = length(v);
+inline quat angleVector(float a, vec3f v) {
+ float l = length(v);
  if(!l) return quat{1, 0};
  return quat{cos(a/2*l), sin(a/2*l)/l*v};
 }
 inline quat operator*(quat p, quat q) { return {p.s*q.s - dot(p.v, q.v), p.s*q.v + q.s*p.v + cross(p.v, q.v)}; }
-inline vec3 operator*(quat p, vec3 v) { return (p * quat{0, v} * p.conjugate()).v; }
+inline vec3f operator*(quat p, vec3f v) { return (p * quat{0, v} * p.conjugate()).v; }
 inline quat operator*(float s, quat q) { return {s*q.s, s*q.v}; }
 inline quat operator+(quat p, quat q) { return {p.s+q.s, p.v+q.v}; }
-inline real length(quat q) { return sqrt(sq(q.s)+sq(q.v)); }
+inline float length(quat q) { return sqrt(sq(q.s)+sq(q.v)); }
 inline quat normalize(quat q) { return 1.f/length(q) * q; }
 inline String str(quat q) { return "["+str(q.s, q.v)+"]"; }
 
 template<Type A, Type B> struct pair { A a; B b; };
-inline pair<vec3, vec3> closest(vec3 a1, vec3 a2, vec3 b1, vec3 b2) {
-    const vec3 u = a2 - a1, v = b2 - b1, w = a1 - b1;
+inline pair<vec3f, vec3f> closest(vec3f a1, vec3f a2, vec3f b1, vec3f b2) {
+    const vec3f u = a2 - a1, v = b2 - b1, w = a1 - b1;
     const float  a = dot(u,u), b = dot(u,v), c = dot(v,v), d = dot(u,w), e = dot(v,w);
     const float D = a*c - b*b; float sD = D,  tD = D;
     // Compute the line parameters of the two closest points
-    real sN, tN;
+    float sN, tN;
     if(D < __FLT_EPSILON__) sN = 0, sD = 1, tN = e, tD = c;
     else {
         sN = (b*e - c*d), tN = (a*e - b*d);

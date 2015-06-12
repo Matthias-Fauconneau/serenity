@@ -123,4 +123,4 @@ struct GLFrameBuffer {
     GLTexture depthTexture, colorTexture;
 };
 
-void glDrawRectangle(GLShader& shader, vec2 min=vec2(-1,-1), vec2 max=vec2(1,1), bool texCoord=false);
+void glDrawRectangle(GLShader& shader, vec2f min=vec2f(-1,-1), vec2f max=vec2f(1,1), bool texCoord=false);
