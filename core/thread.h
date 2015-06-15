@@ -65,8 +65,9 @@ struct Semaphore {
 	/// Acquires \a count ressources
 	void acquire(int64 count) {
 		mutex.lock();
-		while(counter<count) pthread_cond_wait(&condition,&mutex);
-		__sync_sub_and_fetch(&counter,count); assert(counter>=0);
+  while(counter<count) pthread_cond_wait(&condition, &mutex);
+  __sync_sub_and_fetch(&counter,count);
+  assert(counter>=0);
 		mutex.unlock();
 	}
 	/// Atomically tries to acquires \a count ressources only if available
@@ -80,8 +81,10 @@ struct Semaphore {
 	}
 	/// Releases \a count ressources
 	void release(int64 count) {
-		__sync_add_and_fetch(&counter,count);
+  mutex.lock();
+  __sync_add_and_fetch(&counter, count);
 		pthread_cond_signal(&condition);
+  mutex.unlock();
 	}
 	/// Returns available ressources \a count
 	operator uint64() const { return counter; }
