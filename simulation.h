@@ -5,13 +5,13 @@ struct Simulation : System {
   float scale;
   int3 size;
   buffer<uint16> indices;
-  Lattice(float radius, int3 size) : scale(sqrt(2.)/radius), size(size),
+  Lattice(float radius, int3 size) : scale(sqrt(3.)/(2*radius)), size(size),
     indices(size.z*size.y*size.x) { indices.clear(); }
  } lattice {Grain::radius, int3(16,16,16)};
 
  // Process
- const float pourRadius = side.castRadius - Wire::radius - Grain::radius;
- const real winchRadius = side.castRadius - 1*Grain::radius - Wire::radius;
+ const float pourRadius = side.castRadius /*- Wire::radius*/ - Grain::radius;
+ const real winchRadius = side.castRadius - 2*Grain::radius - Wire::radius;
  real pourHeight = Floor::height+Grain::radius;
  real winchAngle = 0;
 
@@ -158,7 +158,7 @@ break2_:;
     }
    }
   }
-  /*if(processState == Load && !load.count) {
+  if(processState == Load && !load.count) {
    Locker lock(this->lock);
    load.count++;
    float maxZ = 0;
@@ -166,8 +166,8 @@ break2_:;
    load.position[0] = vec3f(0,0,maxZ+Grain::radius);
    load.velocity[0] = 0;
    for(size_t n: range(3)) load.positionDerivatives[n][0] = 0;
-  }*/
-  /*if(processState==Release) {
+  }
+  if(processState==Release) {
    if(side.castRadius < 16*Grain::radius) {
     side.castRadius += dt * (1./16 * L/T); // Constant velocity
     // + Pressure
@@ -178,7 +178,7 @@ break2_:;
     log("Released");
     processState = Done;
    }
-  }*/
+  }
 
   // Initialization
   potentialEnergy = 0;
@@ -192,46 +192,39 @@ break2_:;
    for(size_t a: range(start, start+size)) {
     grain.force[a] = grain.mass * g;
     grain.torque[a] = penalty(grain, a, floor, 0);
-    //if(load.count) grain.torque[a] += penalty(grain, a, load, 0);
-    //if(processState != Done) grain.torque[a] += penalty(grain, a, side, 0);
+    if(load.count) grain.torque[a] += penalty(grain, a, load, 0);
+    if(processState != Done) grain.torque[a] += penalty(grain, a, side, 0);
    }
   });
-
-  parallel_chunk(grain.count, [this](uint, size_t start, size_t size) {
-   for(size_t a: range(start, start+size)) {
-      for(size_t b: range(grain.count)) if(a<b) penalty(grain, a, grain, b);
-   }
-  });
-
 
   parallel_chunk(lattice.indices.size, [this](uint, size_t start, size_t size) {
-   const size_t Y = lattice.size.y, X = lattice.size.x;
+   const int Y = lattice.size.y, X = lattice.size.x;
    const uint16* chunk = lattice.indices.begin() + start;
+   assert_(start==0);
    const uint16* end = lattice.indices.end();
    for(size_t i: range(size)) {
     const uint16* current = chunk + i;
     size_t a = *current;
     if(!a) continue;
     a--;
-    if(0) {
-     for(size_t z: range(2)) for(size_t y: range(2)) for(size_t x: range(2)) {
-      if(z==0 && y==0 && x==0) continue; // FIXME: check unrolled
-      const uint16* neighbour = current + z*Y*X + y*X + x;
-      if(neighbour >= end) continue;
-      size_t b = *neighbour;
-      if(!b) continue;
-      b--;
-      penalty(grain, a, grain, b);
-     }
-    } //else for(size_t b: range(grain.count)) if(a<b) penalty(grain, a, grain, b);
+    for(int z: range(2+1)) for(int y: range(-2, 2+1)) for(int x: range(-2, 2+1)) {
+     int di = z*Y*X + y*X + x;
+     if(di <= 0) continue; // FIXME: unroll
+     const uint16* neighbour = current + z*Y*X + y*X + x;
+     if(neighbour >= end) continue;
+     size_t b = *neighbour;
+     if(!b) continue;
+     b--;
+     penalty(grain, a, grain, b);
+    }
    }
   });
 
   // Wire
   parallel_chunk(wire.count, [this](uint, size_t start, size_t size) {
    uint16* begin = lattice.indices.begin(), *end = lattice.indices.end();\
-   size_t X = lattice.size.x, Y = lattice.size.y;
-   uint16* origin = begin + Y/2*X + X/2;
+   const int X = lattice.size.x, Y = lattice.size.y;
+   uint16* origin = begin;// + Y/2*X + X/2;
    for(size_t i: range(start, start+size)) {
     // Gravity
     wire.force[i] = wire.mass * g;
@@ -243,9 +236,9 @@ break2_:;
     // Bounds
     penalty(wire, i, floor, 0);
     // Wire - Grain
-    int3 p (lattice.scale*wire.position[i]);
+    int3 p (vec3f(X/2,Y/2,0)+ lattice.scale*wire.position[i]);
     const uint16* current = origin + p.z*Y*X + p.y*X + p.x;
-    static_assert(Wire::radius < (/*Lattice size √2*/1.4-1)*Grain::radius, "");
+    static_assert(Wire::radius < (/*Lattice size 2/√3*/2/1.8/*sqrt(3.)*/-1)*Grain::radius, "");
     for(int z: range(-1, 2)) for(int y: range(-1, 2)) for(int x: range(-1, 2)) {
      const uint16* neighbour = current + z*Y*X + y*X + x;
      if(neighbour < begin || neighbour >= end) continue;
@@ -260,23 +253,44 @@ break2_:;
     wire.force[start+size-1] += tension(start+size-1, start+size);
   });
 
-  lattice.indices.clear();
+  // Torsion springs (Bending resistance)
+  if(wireBendStiffness) for(size_t i: range(1, wire.count-1)) {
+   vec3f A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
+   vec3f a = C-B, b = B-A;
+   vec3f c = cross(a, b);
+   float l = length(c);
+   if(l) {
+    float p = atan(l, dot(a, b));
+    vec3f dap = cross(a, cross(a,b)) / (sq(a) * l);
+    vec3f dbp = cross(b, cross(b,a)) / (sq(b) * l);
+    wire.force[i+1] += wireBendStiffness * vec3(-p*dap);
+    wire.force[i] += wireBendStiffness * vec3(p*dap - p*dbp);
+    wire.force[i-1] += wireBendStiffness * vec3(p*dbp);
+    if(1) {
+     vec3f A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
+     vec3f axis = cross(C-B, B-A);
+     if(axis) {
+      float angularVelocity = atan(length(axis), dot(C-B, B-A));
+      wire.force[i] += wireBendDamping * angularVelocity
+        * vec3(cross(axis/length(axis), C-A) / float(2));
+     }
+    }
+   }
+  }
+
+  lattice.indices.clear(0);
   parallel_chunk(grain.count, [this](uint, size_t start, size_t size) {
    uint16* begin = lattice.indices.begin(), *end = lattice.indices.end();
-   size_t X = lattice.size.x, Y = lattice.size.y;
-   uint16* origin = begin + Y/2*X + X/2;
+   const int X = lattice.size.x, Y = lattice.size.y;
+   uint16* origin = begin;// + Y/2*X + X/2;
    for(size_t i: range(start, start+size)) {
     grain.step(i);
-    int3 p (lattice.scale*grain.position[i]);
+    int3 p (vec3f(X/2,Y/2,0)+ lattice.scale*grain.position[i]);
     uint16* current = origin + p.z*Y*X + p.y*X + p.x;
-    if(current < begin || current >= end) continue;
+    if(current < begin || current >= end) { error(i); continue; }
     *current = 1+i;
    }
   });
-
-  /*for(size_t i: range(grain.count)) log(i, grain.position[i], grain.velocity[i], grain.force[i],
-                                        apply(ref<buffer<vec3f>>(grain.positionDerivatives),
-                                              [=](const buffer<vec3f>& X) { return X[i]; }));*/
 
   parallel_chunk(wire.count, [this](uint, size_t start, size_t size) {
    for(size_t i: range(start, start+size)) wire.step(i);
@@ -286,7 +300,7 @@ break2_:;
    load.step(0);
    if(kT < 1./8 && processState==Load) {
     processState=Release;
-    log("release");
+    log("Release");
    }
   }
 
