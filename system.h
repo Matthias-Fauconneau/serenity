@@ -1,4 +1,4 @@
-#include "vector.h"
+#include "simd.h"
 
 struct System {
 #define sconst static constexpr
@@ -13,13 +13,12 @@ struct System {
  sconst real staticFrictionDamping = 0x1p-6 *M/T/T;
  sconst real dynamicFriction = 1./16 *M/T;
  sconst real dampingFactor = 0x1p-11; //0x1p-8;
- sconst real wireBendStiffness = 0x1p-16; //12
- sconst real wireBendDamping = 0x1p-16; //12
+ sconst real wireBendStiffness = 0x1p-16; //12-16
+ sconst real wireBendDamping = 0x1p-12; //12-16
  sconst real winchRate = 128 /T;
  sconst real winchSpeed = 1./6 *L/T;
- sconst vec3 g {0, 0, -10}; // N/kg = m·s¯²
- sconst int subStepCount = 8;
- sconst real dt = 1./(60*subStepCount*4*3*(rollTest?4:1));
+ sconst vec3f g {0, 0, -10}; // N/kg = m·s¯²
+ sconst real dt = 1./(60*64);
  #define DBG_FRICTION 0
 
  struct Contact {
@@ -123,30 +122,25 @@ struct System {
   sconst real b[] = {dt, dt*dt/2, dt*dt*dt/6, dt*dt*dt*dt/24};
   sconst real c[] = {19./90, 3/(4*dt), 2/(dt*dt), 6/(2*dt*dt*dt), 24/(12*dt*dt*dt*dt)};
   void step(size_t i) {
-   assert(isNumber(position[i]) && isNumber(velocity[i]) && isNumber(force[i]),
-          i, position[i], velocity[i], force[i]
-          );
-   /*log(i, position[i], velocity[i], force[i], positionDerivatives[0][i],
-     positionDerivatives[1][i], positionDerivatives[2][i]);*/
    // Correction
    vec3f r = (dt*dt)/2 * (force[i] / mass - positionDerivatives[0][i]);
-   /*assert(isNumber(position[i]) && isNumber(velocity[i]) && isNumber(force[i]), "|", i, position[i], velocity[i], force[i], r, force[i] / mass, force[i] / mass - positionDerivatives[0][i],
-     (dt*dt)/2, (dt*dt)/2 * (force[i] / mass - positionDerivatives[0][i]), r, capacity);*/
-
    position[i] += c[0]*r;
    velocity[i] += c[1]*r;
-   for(size_t n: range(3)) positionDerivatives[n][i] += c[2+n]*r;
+   positionDerivatives[0][i] += c[2]*r;
+   positionDerivatives[1][i] += c[3]*r;
+   positionDerivatives[2][i] += c[4]*r;
 
    // Prediction
    position[i] += b[0]*velocity[i];
-   for(size_t n: range(3)) {
-    position[i] += b[1+n]*positionDerivatives[n][i];
-    velocity[i] += b[n]*positionDerivatives[n][i];
-    for(size_t j: range(3-(n+1)))
-     positionDerivatives[n][i] += b[j]*positionDerivatives[n+1+j][i];
-   }
-   assert(isNumber(position[i]) && isNumber(velocity[i]) && isNumber(force[i]),">",
-           i, position[i], velocity[i], force[i]);
+   position[i] += b[1]*positionDerivatives[0][i];
+   position[i] += b[2]*positionDerivatives[1][i];
+   position[i] += b[3]*positionDerivatives[2][i];
+   velocity[i] += b[0]*positionDerivatives[0][i];
+   velocity[i] += b[1]*positionDerivatives[1][i];
+   velocity[i] += b[2]*positionDerivatives[2][i];
+   positionDerivatives[0][i] += b[0]*positionDerivatives[1][i];
+   positionDerivatives[0][i] += b[1]*positionDerivatives[2][i];
+   positionDerivatives[1][i] += b[0]*positionDerivatives[2][i];
   }
  };
 
@@ -172,6 +166,11 @@ struct System {
 
   void step(size_t i) {
    Particle::step(i);
+#if 1
+   vec3f& w = angularVelocity[i];
+   rotation[i] += dt/2 * rotation[i] * quat{0, w};
+   w += dt/Grain::angularMass * torque[i]; //-cross(w, Grain::angularMass*w)
+#else
    // Correction
    vec3 r = (dt*dt)/2 * (torque[i]  / angularMass - angularDerivatives[0][i]);
    rotation[i] += rotation[i] * quat{0, c[0]*r};
@@ -186,6 +185,7 @@ struct System {
     for(size_t j: range(3-(n+1)))
      angularDerivatives[n][i] += b[j]*angularDerivatives[n+1+j][i];
    }
+#endif
    rotation[i]=normalize(rotation[i]);
   }
  } grain {0, rollTest ? 2 : 1024};
@@ -202,7 +202,7 @@ struct System {
   sconst real normalDamping = dampingFactor * M / T; // 0.3
   sconst real frictionCoefficient = 1./2;
 
-  sconst real tensionStiffness = 40 * elasticModulus*PI*sq(radius);
+  sconst real tensionStiffness = 128 * elasticModulus*PI*sq(radius);
   const real tensionDamping = 0x1p-16 * mass/T;
  } wire {grain.base+grain.capacity, useWire ? 5*1024 : 0,
          Wire::density * Wire::volume};
@@ -213,7 +213,7 @@ struct System {
   sconst real elasticModulus = 1e6 * M/(L*T*T);
   sconst real normalDamping = dampingFactor * M / T;
   sconst real frictionCoefficient = 1./2;
- } load {wire.base+wire.capacity, 1, 1./8 * M};
+ } load {wire.base+wire.capacity, 1, 1./16 * M};
  /// Sphere - Load
  template<Type tA>
  Contact contact(const tA& A, size_t a, const Load& B, size_t) {
@@ -281,7 +281,7 @@ struct System {
   vec3f tangentRelativeVelocity
     = relativeVelocity - dot(c.normal, relativeVelocity) * c.normal;
   float tangentRelativeSpeed = ::length(tangentRelativeVelocity);
-  real fD = frictionCoefficient * fN;// * tangentRelativeSpeed; // FIXME
+  real fD = frictionCoefficient * fN; // * tangentRelativeSpeed ?
   vec3f fT;
   assert(isNumber(fS) && isNumber(fD), fS, fD, fN, fK, fB, c.depth);
   if(fS < fD) {
@@ -301,7 +301,8 @@ struct System {
   return cross(relativeA, fT);
  }
 };
+constexpr real System::dt;
 constexpr real System::Particle::b[];
 constexpr real System::Particle::c[];
-constexpr real System::Grain::radius;
 constexpr vec3f System::g;
+constexpr real System::Grain::radius;

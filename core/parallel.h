@@ -41,7 +41,7 @@ void atomic_sub(vec3& a, vec3 b) {
  atomic_sub(a.z, b.z);
 }
 
-static constexpr uint threadCount = 1; //4;
+static constexpr uint threadCount = 4;
 
 struct thread {
  pthread_t pthread = 0;

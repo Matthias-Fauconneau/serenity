@@ -30,30 +30,26 @@ struct SimulationView : Simulation, Widget, Poll {
  void step() {
   Simulation::step();
   if(!rollTest) viewYawPitch.x += 2*PI*dt / 16;
-#define THREAD 0
-#if !THREAD
-  if(timeStep%subStepCount == 0)
-#endif
-   window->render();
+  window->render();
   int64 elapsed = realTime() - lastReport;
   if(elapsed > 3e9) {
    /*log(//(timeStep-lastReportStep) / (elapsed*1e-9),
        "++step",str(stepTime, totalTime));*/
-   if(0) { log(
+   if(1) { log(
        //"+misc",str(miscTime, totalTime),
-       "grain",str(grainTime, totalTime),
-       "wire",str(wireTime, totalTime),
-       "solve",str(solveTime, totalTime));
+       "grain",str(grainTime, stepTime),
+       "wire",str(wireTime, stepTime)
+       /*,"solve",str(solveTime, totalTime)*/);
    log(
-       "grainContact",str(grainContactTime, totalTime),
-       "grainFriction",str(grainFrictionTime, totalTime),
-       "grainIntegration",str(grainIntegrationTime, totalTime));
-   log(
+       "grainInit",str(grainInitializationTime, grainTime),
+       "grainContact",str(grainContactTime, grainTime),
+       "grainIntegration",str(grainIntegrationTime, grainTime));
+   /*log(
        "wireContact",str(wireContactTime, totalTime),
        "wireBound",str(wireBoundTime, totalTime),
        "wireTensionTime",str(wireTensionTime, totalTime),
        "wireFriction",str(wireFrictionTime, totalTime),
-       "wireIntegration",str(wireIntegrationTime, totalTime));
+       "wireIntegration",str(wireIntegrationTime, totalTime));*/
    }
    lastReport = realTime();
    lastReportStep = timeStep;
@@ -124,7 +120,7 @@ struct SimulationView : Simulation, Widget, Poll {
  shared<Graphics> graphics(vec2f) override {
   renderTime.start();
 
-  const real dt = 1./60;
+  const real Dt = 1./60;
   {
    vec3f min = 0, max = 0;
    //Locker lock(this->lock);
@@ -139,8 +135,8 @@ struct SimulationView : Simulation, Widget, Poll {
    vec3f rotationCenter = (min+max)/float(2);
    rotationCenter.xy() = 0;
    if(!rollTest)
-    this->rotationCenter = this->rotationCenter*float(1-dt)
-                                       + float(dt)*rotationCenter;
+    this->rotationCenter = this->rotationCenter*float(1-Dt)
+                                       + float(Dt)*rotationCenter;
     //this->rotationCenter = rotationCenter;
   }
 
@@ -170,14 +166,14 @@ struct SimulationView : Simulation, Widget, Poll {
 
   vec3f scale (2*::min(viewSize/(max-min).xy())/size,
                     -1/(2*(max-min).z));
-  if(!rollTest) this->scale = this->scale*float(1-dt) + float(dt)*scale.xy();
+  if(!rollTest) this->scale = this->scale*float(1-Dt) + float(Dt)*scale.xy();
   scale.xy() = this->scale;
 
   //if(rollTest) scale.xy() = vec2f(viewSize.x/(16*Grain::radius))/viewSize;
   vec3f fitTranslation = -scale*(min+max)/float(2);
   //vec2 aspectRatio (size.x/size.y, 1);
   vec3f translation = this->translation = vec3f((size-viewSize)/size, 0);
-  //this->translation*(1-dt) + dt*fitTranslation;
+  //this->translation*(1-Dt) + Dt*fitTranslation;
   /*mat4 viewProjection;
   for(int e: range(3)) {
    vec3 axis = 0; axis[e] = 1;
@@ -370,7 +366,7 @@ struct SimulationView : Simulation, Widget, Poll {
   renderTime.stop();
   if(stop && fitTranslation != this->translation) window->render();
 
-  array<char> s = str(timeStep*dt, grain.count, wire.count/*, kT, kR*/
+  array<char> s = str(timeStep*this->dt, grain.count, wire.count/*, kT, kR*/
                       /*,staticFrictionCount, dynamicFrictionCount*/);
   if(load.count) s.append(" "_+str(load.position[0].z));
   window->setTitle(s);
