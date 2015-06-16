@@ -211,6 +211,7 @@ inline quat operator*(quat p, quat q) { return {p.s*q.s - dot(p.v, q.v), p.s*q.v
 inline vec3f operator*(quat p, vec3f v) { return (p * quat{0, v} * p.conjugate()).v; }
 inline quat operator*(float s, quat q) { return {s*q.s, s*q.v}; }
 inline quat operator+(quat p, quat q) { return {p.s+q.s, p.v+q.v}; }
+inline void operator+=(quat& p, quat q) { p.s+=q.s; p.v+=q.v; }
 inline float length(quat q) { return sqrt(sq(q.s)+sq(q.v)); }
 inline quat normalize(quat q) { return 1.f/length(q) * q; }
 inline String str(quat q) { return "["+str(q.s, q.v)+"]"; }
@@ -244,3 +245,7 @@ inline pair<vec3f, vec3f> closest(vec3f a1, vec3f a2, vec3f b1, vec3f b2) {
     float tc = abs(tN) < __FLT_EPSILON__ ? 0 : tN / tD;
     return {a1 + (sc * u), b1 - (tc * v)};
 }
+
+typedef float real;
+typedef vec<xy,float,2> vec2;
+typedef vec<xyz,float,3> vec3;

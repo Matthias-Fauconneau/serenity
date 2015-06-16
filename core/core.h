@@ -255,7 +255,7 @@ generic struct mref : ref<T> {
 	using ref<T>::size;
 
 	/// Default constructs an empty reference
-	mref(){}
+ constexpr mref(){}
 	/// References \a size elements from \a data pointer
 	inline mref(T* data, size_t size) : ref<T>(data,size) {}
 	/// Converts an std::initializer_list to mref

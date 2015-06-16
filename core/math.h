@@ -9,9 +9,6 @@ inline uint align(uint width, uint offset) { assert((width&(width-1))==0); retur
 generic inline constexpr T sq(const T& x) { return x*x; }
 generic inline constexpr T cb(const T& x) { return x*x*x; }
 
-/// Declares real as a single-precision floating point number
-//typedef float real;
-
 inline float abs(float x) { return __builtin_fabsf(x); }
 inline double abs(double x) { return __builtin_fabs(x); }
 
@@ -56,6 +53,8 @@ inline double exp2(double x) { return __builtin_exp2(x); }
 inline double log2(double x) { return __builtin_log2(x); }
 inline double exp10(double x) { return __builtin_exp2(__builtin_log2(10)*x); }
 inline double log10(double x) { return __builtin_log10(x); }
+
+constexpr float pow5(float x) { return x*x*x*x*x; }
 
 // -> \file algorithm.h
 

@@ -68,3 +68,5 @@ algebra.h
 algebra.cc
 DEM.cc
 shader.glsl
+system.h
+simulation.h
