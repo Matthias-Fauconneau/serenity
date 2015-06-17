@@ -13,8 +13,8 @@
 #include "simulation.h"
 FILE(shader_glsl)
 
-template<Type tA> vec3f toGlobal(tA& A, size_t a, vec3f localA) {
- return toVec3f(A.position[a]) + A.rotation[a] * localA;
+template<Type tA> v4sf toGlobal(tA& A, size_t a, v4sf localA) {
+ return A.position[a] + qapply(A.rotation[a], localA);
 }
 
 struct SimulationView : Simulation, Widget, Poll {
@@ -123,18 +123,18 @@ struct SimulationView : Simulation, Widget, Poll {
     //this->rotationCenter = rotationCenter;
   }
 
-  quat viewRotation = angleVector(viewYawPitch.y, vec3f(1,0,0)) *
+  v4sf viewRotation = angleVector(viewYawPitch.y, vec3f(1,0,0)) *
                                  angleVector(viewYawPitch.x, vec3f(0,0,1));
 
   vec3f min = -1./32, max = 1./32;
   {//Locker lock(this->lock);
    for(size_t i: range(grain.count)) {
-    vec3f O = viewRotation * toVec3f(grain.position[i]) - rotationCenter;
+    vec3f O = toVec3f(qapply(viewRotation, grain.position[i]) - rotationCenter);
     min = ::min(min, O - vec3f(vec2f(Grain::radius), 0)); // Parallel
     max = ::max(max, O + vec3f(vec2f(Grain::radius), 0)); // Parallel
    }
    for(size_t i: range(wire.count)) {
-    vec3f O = viewRotation * toVec3f(wire.position[i]) - rotationCenter;
+    vec3f O = toVec3f(qapply(viewRotation, wire.position[i]) - rotationCenter);
     min = ::min(min, O - vec3f(vec2f(Grain::radius), 0)); // Parallel
     max = ::max(max, O + vec3f(vec2f(Grain::radius), 0)); // Parallel
    }
@@ -193,8 +193,8 @@ struct SimulationView : Simulation, Widget, Poll {
 
     for(int d: range(0)) {
      vec3f axis = 0; axis[d] = 1;
-     lines[rgb3f(vec3f(axis))].append(viewProjection*vec3f(toGlobal(grain, i, 0)));
-     lines[rgb3f(vec3f(axis))].append(viewProjection*vec3f(toGlobal(grain, i,
+     lines[rgb3f(vec3f(axis))].append(viewProjection*toVec3f(toGlobal(grain, i, _0f)));
+     lines[rgb3f(vec3f(axis))].append(viewProjection*toVec3f(toGlobal(grain, i,
                                                        float(Grain::radius/2)*axis)));
     }
 #if DBG_FRICTION && 0
@@ -225,7 +225,7 @@ struct SimulationView : Simulation, Widget, Poll {
                              3, Float, positionBuffer);
    assert_(grain.count);
    GLBuffer rotationBuffer (apply(grain.rotation.slice(0, grain.count),
-                [=](quat q) -> quat { return (viewRotation*q).conjugate(); }));
+                [=](v4sf q) -> v4sf { return conjugate(qmul(viewRotation,q)); }));
    shader.bind("rotationBuffer"_, rotationBuffer, 0);
    /*GLBuffer colorBuffer (grain.color.slice(start));
    shader.bind("colorBuffer"_, colorBuffer, 1);*/

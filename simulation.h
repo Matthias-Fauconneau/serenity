@@ -1,34 +1,11 @@
 #include "system.h"
 
-//inline float atan(float y, float x) { return y/x; }
-/*inline float atan(float y, float x) {
- float z = y/x;
- return float(PI/4)*z - z*(abs(z) - 1)*(0.2447f + 0.0663f*abs(z));
-}*/
-
-//inline float atan(float y, float x) { return __builtin_atan2f(y, x); }
-inline float atan(float y, float x) {
-   static constexpr float c1 = PI/4, c2 = 3*c1;
-   float abs_y = abs(y); //+1e-10 // kludge to prevent 0/0 condition
-   float angle;
-   if(x>=0) { float r = (x - abs_y) / (x + abs_y); angle = c1 - c1 * r; }
-   else { float r = (x + abs_y) / (abs_y - x); angle = c2 - c1 * r; }
-   if(y < 0) return -angle; else return angle;
-}
-
 struct Simulation : System {
- /*struct Lattice {
-  v4sf scale;
-  int3 size;
-  buffer<uint16> indices;
-  Lattice(float radius, int3 size) : scale(float3(sqrt(3.)/(2*radius))), size(size),
-    indices(size.z*size.y*size.x) { indices.clear(); }
- }; //lattice {Grain::radius, int3(32,32,32)};*/
  v4sf min = _0f, max = _0f;
 
  // Process
- const float pourRadius = side.castRadius /*- Wire::radius*/ - Grain::radius;
- const real winchRadius = side.castRadius - 2*Grain::radius - Wire::radius;
+ const float pourRadius = side.castRadius - Grain::radius;
+ const real winchRadius = side.castRadius - 2*Grain::radius - 2*Wire::radius;
  real pourHeight = Floor::height+Grain::radius;
  real winchAngle = 0;
 
@@ -82,16 +59,17 @@ struct Simulation : System {
    grain.position[i] = newPosition;
    grain.velocity[i] = _0f;
    for(size_t n: range(3)) grain.positionDerivatives[n][i] = _0f;
-   for(size_t n: range(3)) grain.angularDerivatives[n][i] = _0f;
+   for(size_t n: range(3)) grain.angularDerivatives[n][i] = _0001f;
    grain.frictions.set(i);
    real t0 = 2*PI*random();
    real t1 = acos(1-2*random());
    real t2 = (PI*random()+acos(random()))/2;
-   grain.rotation[i] = {float(cos(t2)), vec3f(sin(t0)*sin(t1)*sin(t2),
-                        cos(t0)*sin(t1)*sin(t2),
-                        cos(t1)*sin(t2))};
+   grain.rotation[i] = {sin(t0)*sin(t1)*sin(t2),
+                                  cos(t0)*sin(t1)*sin(t2),
+                                  cos(t1)*sin(t2),
+                                  cos(t2)};
    grain.angularVelocity[i] = _0f;
-   grain.rotation[i] = quat{1, 0};
+   grain.rotation[i] = _0001f;
    /*if(grain.capacity == 1 && i == 0) { // Roll test
     grain.velocity[0] = vec3f((- grain.position[0] / T).xy(), 0);
     log(grain.velocity[0]);
@@ -148,15 +126,16 @@ struct Simulation : System {
      max = ::max(max, grain.position[i]);
      grain.velocity[i] = _0f;
      for(size_t n: range(3)) grain.positionDerivatives[n][i] = _0f;
-     grain.angularVelocity[i] = _0f;
-     for(size_t n: range(3)) grain.angularDerivatives[n][i] = _0f;
+     grain.angularVelocity[i] = _0001f;
+     for(size_t n: range(3)) grain.angularDerivatives[n][i] = _0001f;
      grain.frictions.set(i);
      real t0 = 2*PI*random();
      real t1 = acos(1-2*random());
      real t2 = (PI*random()+acos(random()))/2;
-     grain.rotation[i] = {float(cos(t2)), vec3f( sin(t0)*sin(t1)*sin(t2),
-                          cos(t0)*sin(t1)*sin(t2),
-                          cos(t1)*sin(t2))};
+     grain.rotation[i] = {sin(t0)*sin(t1)*sin(t2),
+                                    cos(t0)*sin(t1)*sin(t2),
+                                    cos(t1)*sin(t2),
+                                    cos(t2)};
      break;
     }
 break2_:;
@@ -252,7 +231,7 @@ break2_:;
      int di = z*Y*X + y*X + x;
      if(di <= 0) continue; // FIXME: unroll
      const uint16* neighbour = current + z*Y*X + y*X + x;
-     assert(neighbour < end);
+     //assert(neighbour < end);
      size_t b = *neighbour;
      if(!b) continue;
      b--;
@@ -505,7 +484,7 @@ break2_:;
      //assert(isNumber(v));
      ssqR += sq3(v)[0];
     }
-    kR = 1./2*grain.angularMass*ssqR;
+    kR = 1./2*grain.angularMass[0]*ssqR;
     if(!isNumber(kR)) { /*log("!isNumber(kR)");FIXME*/ kR=0; }
     assert(isNumber(kR));
     plots[i].dataSets["Er"__][timeStep*dt] = kR;

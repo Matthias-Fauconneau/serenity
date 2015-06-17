@@ -96,7 +96,7 @@ struct mat4 {
     vec4 operator*(vec4 v) const { vec4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+v.w*M(i,3); return r; }
     mat4 operator*(mat4 b) const{mat4 r(0); for(int j=0;j<4;j++) for(int i=0;i<4;i++) for(int k=0;k<4;k++) r.M(i,j) += M(i,k)*b.M(k,j); return r; }
 
-    float minor(int j0, int j1, int j2, int i0, int i1, int i2) const {
+    /*float minor(int j0, int j1, int j2, int i0, int i1, int i2) const {
         return
                 M(i0,j0) * (M(i1,j1) * M(i2,j2) - M(i2,j1) * M(i1,j2)) -
                 M(i0,j1) * (M(i1,j0) * M(i2,j2) - M(i2,j0) * M(i1,j2)) +
@@ -114,9 +114,7 @@ struct mat4 {
     mat4 transpose() {mat4 r; for(int j=0;j<4;j++) for(int i=0;i<4;i++) r(j,i)=M(i,j); return r;}
     mat4 adjugate() const { return cofactor().transpose(); }
     mat4 inverse() const { return 1/det() * adjugate() ; }
-
-    //top-left 3x3 part of the transpose of the inverse
-    mat3 normalMatrix() const { return (mat3)inverse().transpose(); }
+    mat3 normalMatrix() const { return (mat3)inverse().transpose(); }*/
     explicit operator mat3() const {
         mat3 r;
         for(int i=0;i<3;i++) for(int j=0;j<3;j++) r(i,j)=M(i,j);

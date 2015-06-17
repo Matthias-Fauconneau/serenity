@@ -204,24 +204,17 @@ template<template<Type> /*Type*/class V, Type T> inline
  return vec<V,T,3>(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y);
 }
 
-struct quat {
-    float s; vec3f v;
-    constexpr quat(float s = 1, vec3f v = 0) : s(s), v(v) {}
-    quat conjugate() const { return quat(s, -v); }
-};
-inline quat angleVector(float a, vec3f v) {
+static constexpr unused v4si _1110
+ = {int(0x80000000),int(0x80000000),int(0x80000000),0};
+inline v4sf conjugate(v4sf q) { return (v4sf)(_1110 ^ (v4si)q); }
+
+inline v4sf angleVector(float a, vec3f v) {
  float l = length(v);
- if(!l) return quat{1, 0};
- return quat{cos(a/2*l), sin(a/2*l)/l*v};
+ if(!l) return _0001f;
+ vec3f b = sin(a/2*l)/l*v;
+ return {b.x, b.y, b.z, cos(a/2*l)};
 }
-inline quat operator*(quat p, quat q) { return {p.s*q.s - dot(p.v, q.v), p.s*q.v + q.s*p.v + cross(p.v, q.v)}; }
-inline vec3f operator*(quat p, vec3f v) { return (p * quat{0, v} * p.conjugate()).v; }
-inline quat operator*(float s, quat q) { return {s*q.s, s*q.v}; }
-inline quat operator+(quat p, quat q) { return {p.s+q.s, p.v+q.v}; }
-inline void operator+=(quat& p, quat q) { p.s+=q.s; p.v+=q.v; }
-inline float length(quat q) { return sqrt(sq(q.s)+sq(q.v)); }
-inline quat normalize(quat q) { return 1.f/length(q) * q; }
-inline String str(quat q) { return "["+str(q.s, q.v)+"]"; }
+inline v4sf qapply(v4sf q, v4sf v) { return qmul(q, qmul(v, conjugate(q))); }
 
 template<Type A, Type B> struct pair { A a; B b; };
 inline pair<vec3f, vec3f> closest(vec3f a1, vec3f a2, vec3f b1, vec3f b2) {

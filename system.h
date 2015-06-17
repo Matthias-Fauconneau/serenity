@@ -42,7 +42,7 @@ struct System {
 
  struct Friction {
   size_t index; // Identifies contact to avoid duplicates
-  vec3f localA, localB; // Last static friction contact location
+  v4sf localA, localB; // Last static friction contact location
   size_t lastUpdate = 0;
   bool operator==(const Friction& b) const {
    return index == b.index;
@@ -55,7 +55,7 @@ struct System {
   sconst size_t count = 1;
   struct { v4sf operator[](size_t){ return _0f; }} position;
   struct { v4sf operator[](size_t){ return _0f; }} velocity;
-  struct { quat operator[](size_t){ return quat(); }} rotation;
+  struct { v4sf operator[](size_t){ return _0f; }} rotation;
   struct { v4sf operator[](size_t){ return _0f; }} angularVelocity;
   v4sf force[1];
  };
@@ -112,7 +112,7 @@ struct System {
   buffer<array<Friction>> frictions { capacity };
   size_t count = 0;
 
-  struct { quat operator[](size_t) const { return quat(); }} rotation;
+  struct { v4sf operator[](size_t) const { return _0f; }} rotation;
   struct { v4sf operator[](size_t) const { return _0f; }} angularVelocity;
 
   Particle(size_t base, size_t capacity, real mass) : base(base), capacity(capacity),
@@ -156,9 +156,9 @@ struct System {
   sconst real normalDamping = dampingFactor * M / T;
   sconst real frictionCoefficient = 1./2;
 
-  const float angularMass = 2./5*mass[0]*(pow5(radius)-pow5(radius-1e-4))
-                                         / (cb(radius)-cb(radius-1e-4));
-  buffer<quat> rotation { capacity };
+  const v4sf angularMass = float4(2./5*mass[0]*(pow5(radius)-pow5(radius-1e-4))
+                                         / (cb(radius)-cb(radius-1e-4)));
+  buffer<v4sf> rotation { capacity };
   buffer<v4sf> angularVelocity { capacity };
   buffer<v4sf> angularDerivatives[3]; // { [0 ... 2] = buffer<v4sf>(capacity) };
   Grain(size_t base, size_t capacity) : Particle(base, capacity, 3e-3) {
@@ -168,27 +168,28 @@ struct System {
 
   void step(size_t i) {
    Particle::step(i);
+   return;
 #if 1
    v4sf& w = angularVelocity[i];
-   rotation[i] += dt/2 * rotation[i] * quat{0, toVec3f(w)};
-   w += float4(dt/Grain::angularMass) * torque[i]; //-cross(w, Grain::angularMass*w)
+   rotation[i] += float4(dt/2) * qmul(rotation[i], w);
+   w += float4(dt)/Grain::angularMass * torque[i]; //-cross(w, Grain::angularMass*w)
 #else
    // Correction
-   vec3 r = (dt*dt)/2 * (torque[i]  / angularMass - angularDerivatives[0][i]);
-   rotation[i] += rotation[i] * quat{0, c[0]*r};
+   v4sf r = b[1] * (torque[i]  / angularMass - angularDerivatives[0][i]);
+   rotation[i] += qmul(rotation[i], c[0]*r);
    angularVelocity[i] += c[1]*r;
    for(size_t n: range(3)) angularDerivatives[n][i] += c[2+n]*r;
 
    // Prediction
-   rotation[i] += rotation[i]*quat{0, dt*angularVelocity[i]};
+   rotation[i] += qmul(rotation[i], float4(dt)*angularVelocity[i]);
    for(size_t n: range(3)) {
-    rotation[i] += rotation[i]*quat{0, b[1+n]*angularDerivatives[n][i]};
+    rotation[i] += qmul(rotation[i], b[1+n]*angularDerivatives[n][i]);
     angularVelocity[i] += b[n]*angularDerivatives[n][i];
     for(size_t j: range(3-(n+1)))
      angularDerivatives[n][i] += b[j]*angularDerivatives[n+1+j][i];
    }
 #endif
-   rotation[i]=normalize(rotation[i]);
+   rotation[i] /= sqrt(sq4(rotation[i]));
   }
  } grain {0, rollTest ? 2 : 1024};
 
@@ -258,10 +259,10 @@ struct System {
    B.force[b] -= f;
   }
 
-  Friction& f = A.frictions[a].add(Friction{B.base+b, 0, 0});
+  Friction& f = A.frictions[a].add(Friction{B.base+b, _0f, _0f});
   if(f.lastUpdate < timeStep-1) { // Resets contact (TODO: GC)
-   f.localA = A.rotation[a].conjugate()*toVec3f(c.relativeA);
-   f.localB = B.rotation[b].conjugate()*toVec3f(c.relativeB);
+   f.localA = qmul(conjugate(A.rotation[a]), c.relativeA);
+   f.localB = qmul(conjugate(B.rotation[b]), c.relativeB);
   }
   f.lastUpdate = timeStep;
 

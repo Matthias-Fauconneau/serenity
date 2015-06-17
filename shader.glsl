@@ -14,7 +14,7 @@ fragment {
                 vec3 v = vec3(vLocalCoords, dz);
                 buffer rotationBuffer { vec4[] rotation; };
                 //buffer colorBuffer { vec4[] aColor; };
-                vec4 q = vec4(rotation[gl_PrimitiveID/2].yzwx);
+                vec4 q = rotation[gl_PrimitiveID/2];
                 vec4 qmul(vec4 p, vec4 q) {
                  return vec4(p.w*q.xyz + q.w*p.xyz + cross(p.xyz, q.xyz),
                                     p.w*q.w - dot(p.xyz, q.xyz));
