@@ -45,6 +45,7 @@ inline float sin(float t) { return __builtin_sin(t); }
 inline double asin(double t) { return __builtin_asin(t); }
 inline double tan(double t) { return __builtin_tan(t); }
 inline double atan(double y, double x) { return __builtin_atan2(y, x); }
+//inline float atan(float y, float x) { return __builtin_atan2f(y, x); }
 inline double sinh(double x) { return __builtin_sinh(x); }
 
 inline float gaussian(float sigma, float x) { return exp(-sq(x/sigma)/2); }

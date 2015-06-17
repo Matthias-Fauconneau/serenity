@@ -33,7 +33,7 @@ struct SimulationView : Simulation, Widget, Poll {
   window->render();
   int64 elapsed = realTime() - lastReport;
   if(elapsed > 3e9) {
-   log(totalTime, (timeStep-lastReportStep) / (elapsed*1e-9));
+   log(timeStep*this->dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
    if(1) { log("grain",str(grainTime, stepTime), "wire",str(wireTime, stepTime));
    log("grainInit",str(grainInitializationTime, grainTime),
        "grainLattice",str(grainLatticeTime, grainTime),

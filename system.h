@@ -20,7 +20,7 @@ struct System {
  sconst real winchRate = 128 /T;
  sconst real winchSpeed = 1./6 *L/T;
  sconst v4sf g {0, 0, -10, 0}; // N/kg = m·s¯²
- sconst real dt = 1./(60*64*2);
+ sconst real dt = 1./(60*256);
  #define DBG_FRICTION 0
 
  struct Contact {

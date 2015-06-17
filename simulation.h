@@ -1,5 +1,21 @@
 #include "system.h"
 
+//inline float atan(float y, float x) { return y/x; }
+/*inline float atan(float y, float x) {
+ float z = y/x;
+ return float(PI/4)*z - z*(abs(z) - 1)*(0.2447f + 0.0663f*abs(z));
+}*/
+
+//inline float atan(float y, float x) { return __builtin_atan2f(y, x); }
+inline float atan(float y, float x) {
+   static constexpr float c1 = PI/4, c2 = 3*c1;
+   float abs_y = abs(y); //+1e-10 // kludge to prevent 0/0 condition
+   float angle;
+   if(x>=0) { float r = (x - abs_y) / (x + abs_y); angle = c1 - c1 * r; }
+   else { float r = (x + abs_y) / (abs_y - x); angle = c2 - c1 * r; }
+   if(y < 0) return -angle; else return angle;
+}
+
 struct Simulation : System {
  /*struct Lattice {
   v4sf scale;
@@ -114,8 +130,8 @@ struct Simulation : System {
     processState=Load;
    } else {
     // Generates falling grain (pour)
-    const bool pourGrain = true;
-    if(pourGrain) for(;;) {
+    const bool useGrain = 1;
+    if(useGrain) for(;;) {
      vec3f p(random()*2-1,random()*2-1, pourHeight);
      if(length(p.xy())>1) continue;
      vec3f newPosition (pourRadius*p.xy(), p.z); // Within cylinder
@@ -252,6 +268,7 @@ break2_:;
 
   wireContactTime.start();
   parallel_chunk(wire.count, [&](uint, size_t start, size_t size) {
+
    uint16* base = indices.begin();
    const int X = gridSize.x, Y = gridSize.y;
    const v4sf XYZ0 {1, float(X), float(Y*X), 0};
@@ -260,13 +277,91 @@ break2_:;
     base-X-1, base-1, base+X-1,
     base+X*Y-X-1, base+X*Y-1, base+X*Y+X-1
    };
-   for(size_t i: range(start, start+size)) {
-    // Gravity
+
+   { // First iteration
+    size_t i = start;
     wire.force[i] = wire.mass * g;
-    if(i > 0) { // Tension
+    wire.force[i+1] = wire.mass * g;
+    if(i > 0) {
+     if(start > 1) {// Previous torsion spring on first
+      size_t i = start-1;
+      v4sf A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
+      v4sf a = C-B, b = B-A;
+      v4sf c = cross(a, b);
+      v4sf l = sqrt(sq3(c));
+      if(l[0]) {
+       float p = wireBendStiffness * atan(l[0], dot3(a, b)[0]);
+       v4sf dap = cross(a, cross(a,b)) / (sq3(a) * l);
+       wire.force[i+1/*=start*/] += float4(p) * (-dap);
+      }
+     }
+     // First tension
      v4sf fT = tension(i-1, i);
-     if(i > start) wire.force[i-1] += fT; // else done as last of previous chunk
      wire.force[i] -= fT;
+     // First torsion
+     v4sf A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
+     v4sf a = C-B, b = B-A;
+     v4sf c = cross(a, b);
+     v4sf l = sqrt(sq3(c));
+     if(l[0]) {
+      float p = wireBendStiffness * atan(l[0], dot3(a, b)[0]);
+      v4sf dap = cross(a, cross(a,b)) / (sq3(a) * l);
+      v4sf dbp = cross(b, cross(b,a)) / (sq3(b) * l);
+      wire.force[i+1] += float4(p) * (-dap);
+      wire.force[i] += float4(p) * (dap - dbp);
+      //wire.force[i-1] += float4(p) * (dbp); //-> "Tension to first node of next chunk"
+      if(1) {
+       v4sf A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
+       v4sf axis = cross(C-B, B-A);
+       v4sf l = sqrt(sq3(axis));
+       if(l[0]) {
+        float angularVelocity = atan(l[0], dot3(C-B, B-A)[0]);
+        wire.force[i] += float4(wireBendDamping * angularVelocity / 2)
+          * cross(axis/l, C-A);
+       }
+      }
+     }
+    }
+    penalty(wire, i, floor, 0);
+    // Wire - Grain
+    size_t offset = dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*(wire.position[i]-min))))[0];
+    for(size_t n: range(3*3)) {
+     v4hi line = loada(neighbours[n] + offset);
+     if(line[0]) penalty(wire, i, grain, line[0]-1);
+     if(line[1]) penalty(wire, i, grain, line[1]-1);
+     if(line[2]) penalty(wire, i, grain, line[2]-1);
+    }
+   }
+   for(size_t i: range(start+1, start+size-1)) {
+    // Gravity
+    wire.force[i+1] = wire.mass * g;
+    // Tension
+    v4sf fT = tension(i-1, i);
+    wire.force[i-1] += fT;
+    wire.force[i] -= fT;
+    {// Torsion springs (Bending resistance)
+     v4sf A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
+     v4sf a = C-B, b = B-A;
+     v4sf c = cross(a, b);
+     v4sf l = sqrt(sq3(c));
+     if(l[0]) {
+      float p = wireBendStiffness * atan(l[0], dot3(a, b)[0]);
+      v4sf dap = cross(a, cross(a,b)) / (sq3(a) * l);
+      v4sf dbp = cross(b, cross(b,a)) / (sq3(b) * l);
+      wire.force[i+1] += float4(p) * (-dap);
+      wire.force[i] += float4(p) * (dap - dbp);
+      wire.force[i-1] += float4(p) * (dbp);
+      if(1) {
+       v4sf A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
+       v4sf axis = cross(C-B, B-A);
+       v4sf l = sqrt(sq3(axis));
+       if(l[0]) {
+        float angularVelocity = atan(l[0], dot3(C-B, B-A)[0]);
+        wire.force[i] += float4(wireBendDamping * angularVelocity / 2)
+          * cross(axis/l, C-A);
+       }
+      }
+     }
     }
     // Bounds
     penalty(wire, i, floor, 0);
@@ -279,39 +374,73 @@ break2_:;
      if(line[2]) penalty(wire, i, grain, line[2]-1);
     }
    }
-   // Tension to first node of next chunk
-   if(start+size < wire.count)
-    wire.force[start+size-1] += tension(start+size-1, start+size);
-  }, 1);
-  wireContactTime.stop();
 
-  // Torsion springs (Bending resistance) //FIXME: integrate within previous pass
-  wireTensionTime.start();
-  if(wireBendStiffness) for(size_t i: range(1, wire.count-1)) {
-   v4sf A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
-   v4sf a = C-B, b = B-A;
-   v4sf c = cross(a, b);
-   v4sf l = sqrt(sq3(c));
-   if(l[0]) {
-    float p = wireBendStiffness * atan(l[0], dot3(a, b)[0]);
-    v4sf dap = cross(a, cross(a,b)) / (sq3(a) * l);
-    v4sf dbp = cross(b, cross(b,a)) / (sq3(b) * l);
-    wire.force[i+1] += float4(p) * (-dap);
-    wire.force[i] += float4(p) * (dap - dbp);
-    wire.force[i-1] += float4(p) * (dbp);
-    if(1) {
-     v4sf A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
-     v4sf axis = cross(C-B, B-A);
-     v4sf l = sqrt(sq3(axis));
+   // Last iteration
+   if(size>1) {
+    size_t i = start+size-1;
+    // Gravity
+    wire.force[i] = wire.mass * g;
+    // Tension
+    v4sf fT = tension(i-1, i);
+    wire.force[i-1] += fT;
+    wire.force[i] -= fT;
+    // Torsion with next chunk
+    if(i+1 < wire.count) {
+     v4sf A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
+     v4sf a = C-B, b = B-A;
+     v4sf c = cross(a, b);
+     v4sf l = sqrt(sq3(c));
      if(l[0]) {
-      float angularVelocity = atan(l[0], dot3(C-B, B-A)[0]);
-      wire.force[i] += float4(wireBendDamping * angularVelocity / 2)
-        * cross(axis/l, C-A);
+      float p = wireBendStiffness * atan(l[0], dot3(a, b)[0]);
+      v4sf dap = cross(a, cross(a,b)) / (sq3(a) * l);
+      v4sf dbp = cross(b, cross(b,a)) / (sq3(b) * l);
+      //wire.force[i+1] += float4(p) * (-dap); //-> "Previous torsion spring on first"
+      wire.force[i] += float4(p) * (dap - dbp);
+      wire.force[i-1] += float4(p) * (dbp);
+      if(1) {
+       v4sf A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
+       v4sf axis = cross(C-B, B-A);
+       v4sf l = sqrt(sq3(axis));
+       if(l[0]) {
+        float angularVelocity = atan(l[0], dot3(C-B, B-A)[0]);
+        wire.force[i] += float4(wireBendDamping * angularVelocity / 2)
+          * cross(axis/l, C-A);
+       }
+      }
+     }
+    }
+    // Bounds
+    penalty(wire, i, floor, 0);
+    // Wire - Grain
+    size_t offset = dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*(wire.position[i]-min))))[0];
+    for(size_t n: range(3*3)) {
+     v4hi line = loada(neighbours[n] + offset);
+     if(line[0]) penalty(wire, i, grain, line[0]-1);
+     if(line[1]) penalty(wire, i, grain, line[1]-1);
+     if(line[2]) penalty(wire, i, grain, line[2]-1);
+    }
+   }
+
+   { // Tension to first node of next chunk
+    size_t i = start+size;
+    if(i < wire.count) {
+     wire.force[i-1] += tension(i-1, i);
+      // Torsion to first node of next chunk
+     if(i+1<wire.count) {
+      v4sf A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
+      v4sf a = C-B, b = B-A;
+      v4sf c = cross(a, b);
+      v4sf l = sqrt(sq3(c));
+      if(l[0]) {
+       float p = wireBendStiffness * atan(l[0], dot3(a, b)[0]);
+       v4sf dbp = cross(b, cross(b,a)) / (sq3(b) * l);
+       wire.force[i-1] += float4(p) * (dbp);
+      }
      }
     }
    }
-  }
-  wireTensionTime.stop();
+  }, 1);
+  wireContactTime.stop();
 
   // Integration
   min = _0f; max = _0f;
