@@ -1,4 +1,6 @@
 #include "simd.h"
+float length2(v4sf v) { return sqrt(sq2(v))[0]; }
+float length(v4sf v) { return sqrt(sq3(v))[0]; }
 
 struct System {
 #define sconst static constexpr
@@ -13,17 +15,17 @@ struct System {
  sconst real staticFrictionDamping = 0x1p-6 *M/T/T;
  sconst real dynamicFriction = 1./16 *M/T;
  sconst real dampingFactor = 0x1p-11; //0x1p-8;
- sconst real wireBendStiffness = 0x1p-16; //12-16
- sconst real wireBendDamping = 0x1p-12; //12-16
+ sconst real wireBendStiffness = 0x1p-17; //12-16
+ sconst real wireBendDamping = 0x1p-17; //12-16
  sconst real winchRate = 128 /T;
  sconst real winchSpeed = 1./6 *L/T;
- sconst vec3f g {0, 0, -10}; // N/kg = m·s¯²
- sconst real dt = 1./(60*64);
+ sconst v4sf g {0, 0, -10, 0}; // N/kg = m·s¯²
+ sconst real dt = 1./(60*64*2);
  #define DBG_FRICTION 0
 
  struct Contact {
-  vec3f relativeA, relativeB; // Relative to center but world axices
-  vec3f normal;
+  v4sf relativeA, relativeB; // Relative to center but world axices
+  v4sf normal;
   real depth;
  };
 
@@ -31,16 +33,16 @@ struct System {
  /// Defaults implementation for spheres
  template<Type tA, Type tB>
  Contact contact(const tA& A, size_t a, const tB& B, size_t b) {
-  vec3f relativePosition = A.position[a] - B.position[b];
-  float length = ::length(relativePosition);
-  vec3f normal = relativePosition/length; // B -> A
-  return {float(tA::radius)*(-normal), float(tB::radius)*(+normal),
-     normal, length-tA::radius-tB::radius};
+  v4sf relativePosition = A.position[a] - B.position[b];
+  v4sf length = sqrt(sq3(relativePosition));
+  v4sf normal = relativePosition/length; // B -> A
+  return {float4(tA::radius)*(-normal), float4(tB::radius)*(+normal),
+     normal, length[0]-tA::radius-tB::radius};
  }
 
  struct Friction {
   size_t index; // Identifies contact to avoid duplicates
-  vec3f localA = 0, localB = 0; // Last static friction contact location
+  vec3f localA, localB; // Last static friction contact location
   size_t lastUpdate = 0;
   bool operator==(const Friction& b) const {
    return index == b.index;
@@ -51,11 +53,11 @@ struct System {
   sconst real mass = inf;
   sconst real angularMass = 0;
   sconst size_t count = 1;
-  struct { vec3f operator[](size_t){ return 0; }} position;
-  struct { vec3f operator[](size_t){ return 0; }} velocity;
+  struct { v4sf operator[](size_t){ return _0f; }} position;
+  struct { v4sf operator[](size_t){ return _0f; }} velocity;
   struct { quat operator[](size_t){ return quat(); }} rotation;
-  struct { vec3f operator[](size_t){ return 0; }} angularVelocity;
-  vec3f force[1];
+  struct { v4sf operator[](size_t){ return _0f; }} angularVelocity;
+  v4sf force[1];
  };
 
  struct Floor : Obstacle {
@@ -71,10 +73,10 @@ struct System {
  /// Sphere - Floor
  template<Type tA>
  Contact contact(const tA& A, size_t a, const Floor&, size_t) {
-  vec3f normal (0, 0, 1);
-  return { float(tA::radius)*(-normal),
-               vec3f(A.position[a].xy(), Floor::height),
-               normal, A.position[a].z-tA::radius-Floor::height };
+  v4sf normal {0, 0, 1, 0};
+  return { float4(tA::radius)*(-normal),
+               v4sf{A.position[a][0], A.position[a][1], Floor::height, 0},
+               normal, A.position[a][2]-tA::radius-Floor::height };
  }
 
  struct Side : Obstacle {
@@ -87,43 +89,43 @@ struct System {
   struct {
    real radialSum;
    auto operator[](size_t){ return *this; }
-   void operator -=(vec3f f) { radialSum += length(f.xy()); }
+   void operator -=(v4sf f) { radialSum += length2(f); }
   } force;
  } side;
  /// Sphere - Side
  template<Type tA>
  Contact contact(const tA& A, size_t a, const Side& side, size_t) {
-  vec2f r = A.position[a].xy();
-  float length = ::length(r);
-  vec3f normal = vec3f(-r/length, 0); // Side -> Sphere
-  return { float(tA::radius)*(-normal),
-               vec3f(float(side.castRadius)*-normal.xy(), A.position[a].z),
+  float length = length2(A.position[a]);
+  v4sf normal {-A.position[a][0]/length, -A.position[a][1]/length, 0, 0}; // Side -> Sphere
+  return { float4(tA::radius)*(-normal),
+     v4sf{side.castRadius*-normal[0], side.castRadius*-normal[1], A.position[a][2], 0},
                normal, side.castRadius-tA::radius-length };
  }
 
  struct Particle {
   const size_t base, capacity;
-  const real mass;
-  buffer<vec3f> position { capacity };
-  buffer<vec3f> velocity { capacity };
-  buffer<vec3f> positionDerivatives[3]; // { [0 ... 2] = buffer<vec3f>(capacity) };
-  buffer<vec3f> force { capacity };
+  const v4sf mass;
+  buffer<v4sf> position { capacity };
+  buffer<v4sf> velocity { capacity };
+  buffer<v4sf> positionDerivatives[3]; // { [0 ... 2] = buffer<v4sf>(capacity) };
+  buffer<v4sf> force { capacity };
   buffer<array<Friction>> frictions { capacity };
   size_t count = 0;
 
   struct { quat operator[](size_t) const { return quat(); }} rotation;
-  struct { vec3f operator[](size_t) const { return 0; }} angularVelocity;
+  struct { v4sf operator[](size_t) const { return _0f; }} angularVelocity;
 
   Particle(size_t base, size_t capacity, real mass) : base(base), capacity(capacity),
-    mass(mass) {
-   for(size_t i: range(3)) positionDerivatives[i] = buffer<vec3f>(capacity);
+    mass(float4(mass)) {
+   for(size_t i: range(3)) positionDerivatives[i] = buffer<v4sf>(capacity);
    frictions.clear();
   }
-  sconst real b[] = {dt, dt*dt/2, dt*dt*dt/6, dt*dt*dt*dt/24};
-  sconst real c[] = {19./90, 3/(4*dt), 2/(dt*dt), 6/(2*dt*dt*dt), 24/(12*dt*dt*dt*dt)};
+  sconst v4sf b[] = {float4(dt), float4(dt*dt/2), float4(dt*dt*dt/6), float4(dt*dt*dt*dt/24)};
+  sconst v4sf c[] = {float4(19./90), float4(3/(4*dt)), float4(2/(dt*dt)), float4(6/(2*dt*dt*dt)),
+                                 float4(24/(12*dt*dt*dt*dt))};
   void step(size_t i) {
    // Correction
-   vec3f r = (dt*dt)/2 * (force[i] / mass - positionDerivatives[0][i]);
+   v4sf r = b[1] * (force[i] / mass - positionDerivatives[0][i]);
    position[i] += c[0]*r;
    velocity[i] += c[1]*r;
    positionDerivatives[0][i] += c[2]*r;
@@ -154,22 +156,22 @@ struct System {
   sconst real normalDamping = dampingFactor * M / T;
   sconst real frictionCoefficient = 1./2;
 
-  const float angularMass = 2./5*mass*(pow5(radius)-pow5(radius-1e-4))
+  const float angularMass = 2./5*mass[0]*(pow5(radius)-pow5(radius-1e-4))
                                          / (cb(radius)-cb(radius-1e-4));
   buffer<quat> rotation { capacity };
-  buffer<vec3f> angularVelocity { capacity };
-  buffer<vec3f> angularDerivatives[3]; // { [0 ... 2] = buffer<vec3f>(capacity) };
+  buffer<v4sf> angularVelocity { capacity };
+  buffer<v4sf> angularDerivatives[3]; // { [0 ... 2] = buffer<v4sf>(capacity) };
   Grain(size_t base, size_t capacity) : Particle(base, capacity, 3e-3) {
-   for(size_t i: range(3)) angularDerivatives[i] = buffer<vec3f>(capacity);
+   for(size_t i: range(3)) angularDerivatives[i] = buffer<v4sf>(capacity);
   }
-  buffer<vec3f> torque { capacity };
+  buffer<v4sf> torque { capacity };
 
   void step(size_t i) {
    Particle::step(i);
 #if 1
-   vec3f& w = angularVelocity[i];
-   rotation[i] += dt/2 * rotation[i] * quat{0, w};
-   w += dt/Grain::angularMass * torque[i]; //-cross(w, Grain::angularMass*w)
+   v4sf& w = angularVelocity[i];
+   rotation[i] += dt/2 * rotation[i] * quat{0, toVec3f(w)};
+   w += float4(dt/Grain::angularMass) * torque[i]; //-cross(w, Grain::angularMass*w)
 #else
    // Correction
    vec3 r = (dt*dt)/2 * (torque[i]  / angularMass - angularDerivatives[0][i]);
@@ -198,12 +200,12 @@ struct System {
   sconst real volume = PI * sq(radius) * internodeLength;
   sconst real density = 1e3 * M / cb(L);
   sconst real angularMass = 0;
-  sconst real elasticModulus = 1e4 * M / (L*T*T); // 1e6
+  sconst real elasticModulus = 0x1p15 * M / (L*T*T); // 1e6
   sconst real normalDamping = dampingFactor * M / T; // 0.3
   sconst real frictionCoefficient = 1./2;
 
-  sconst real tensionStiffness = 128 * elasticModulus*PI*sq(radius);
-  const real tensionDamping = 0x1p-16 * mass/T;
+  sconst real tensionStiffness = 1 * elasticModulus*PI*sq(radius);
+  const real tensionDamping = 0/*x1p-2*/ * mass[0]/T;
  } wire {grain.base+grain.capacity, useWire ? 5*1024 : 0,
          Wire::density * Wire::volume};
 
@@ -219,8 +221,8 @@ struct System {
  Contact contact(const tA& A, size_t a, const Load& B, size_t) {
   vec3f normal (0, 0, -1);
   return { float(tA::radius)*(-normal),
-               vec3f(A.position[a].xy(), B.position[0].z),
-               normal, B.position[0].z-(A.position[a].z+tA::radius) };
+     vec3f(A.position[a][0], A.position[a][1], B.position[0][2]),
+     normal, B.position[0][2]-(A.position[a][2]+tA::radius) };
  }
 
  // Update
@@ -231,10 +233,10 @@ struct System {
  /// Evaluates contact penalty between two objects
  /// \return torque on A
  template<Type tA, Type tB>
- vec3f penalty(const tA& A, size_t a, tB& B, size_t b) {
+ v4sf penalty(const tA& A, size_t a, tB& B, size_t b) {
   Contact c = contact(A, a, B, b);
   assert(isNumber(c.depth), c.depth, A.position[a], B.position[b]);
-  if(c.depth >= 0) return 0;
+  if(c.depth >= 0) return _0f;
   // Stiffness
   constexpr real E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
   constexpr real R = 1/(tA::curvature+tB::curvature);
@@ -244,65 +246,63 @@ struct System {
   real fK = - Ks * c.depth;
   // Damping
   const real Kb = K*(tA::normalDamping+tB::normalDamping)/2*sqrt(-c.depth);
-  vec3f relativeVelocity =
-      A.velocity[a] + cross(A.angularVelocity[a], c.relativeA);
-   - (B.velocity[b] + cross(B.angularVelocity[b], c.relativeB));
-  real normalSpeed = dot(c.normal, relativeVelocity);
+  v4sf relativeVelocity =
+      A.velocity[a]// + cross(A.angularVelocity[a], c.relativeA)
+   - (B.velocity[b]);// + cross(B.angularVelocity[b], c.relativeB));
+  real normalSpeed = dot3(c.normal, relativeVelocity)[0];
   real fB = - Kb * normalSpeed ; // Damping
   real fN = fK + fB;
   {
-   vec3f f = fN * c.normal;
+   v4sf f = float4(fN) * c.normal;
    A.force[a] += f;
    B.force[b] -= f;
   }
-  //if(!useFriction) return 0;
-  vec3f localA = A.rotation[a].conjugate()*c.relativeA;
-  vec3f localB = B.rotation[b].conjugate()*c.relativeB;
-  Friction& f = A.frictions[a].add(Friction{B.base+b});
+
+  Friction& f = A.frictions[a].add(Friction{B.base+b, 0, 0});
   if(f.lastUpdate < timeStep-1) { // Resets contact (TODO: GC)
-   f.localA = localA;
-   f.localB = localB;
+   f.localA = A.rotation[a].conjugate()*toVec3f(c.relativeA);
+   f.localB = B.rotation[b].conjugate()*toVec3f(c.relativeB);
   }
   f.lastUpdate = timeStep;
 
   constexpr real frictionCoefficient
     = min(tA::frictionCoefficient, tB::frictionCoefficient);
-  vec3f relativeA = A.rotation[a] * f.localA;
-  vec3f relativeB = B.rotation[b] * f.localB;
-  vec3f globalA = A.position[a] + relativeA;
-  vec3f globalB = B.position[b] +  relativeB;
-  vec3f x = globalA - globalB;
-  vec3f tangentOffset = x - dot(c.normal, x) * c.normal;
-  float tangentLength = ::length(tangentOffset);
+  v4sf relativeA = A.rotation[a] * f.localA;
+  v4sf relativeB = B.rotation[b] * f.localB;
+  v4sf globalA = A.position[a] + relativeA;
+  v4sf globalB = B.position[b] +  relativeB;
+  v4sf x = globalA - globalB;
+  v4sf tangentOffset = x - dot3(c.normal, x) * c.normal;
+  v4sf tangentLength = sqrt(sq3(tangentOffset));
   real staticFrictionStiffness = staticFrictionFactor * frictionCoefficient;
   real kS = staticFrictionStiffness * fN;
-  real fS = kS * tangentLength; // 0.1~1 fN
+  real fS = kS * tangentLength[0]; // 0.1~1 fN
 
-  vec3f tangentRelativeVelocity
-    = relativeVelocity - dot(c.normal, relativeVelocity) * c.normal;
-  float tangentRelativeSpeed = ::length(tangentRelativeVelocity);
+  v4sf tangentRelativeVelocity
+    = relativeVelocity - dot3(c.normal, relativeVelocity) * c.normal;
+  v4sf tangentRelativeSpeed = sqrt(sq3(tangentRelativeVelocity));
   real fD = frictionCoefficient * fN; // * tangentRelativeSpeed ?
-  vec3f fT;
+  v4sf fT;
   assert(isNumber(fS) && isNumber(fD), fS, fD, fN, fK, fB, c.depth);
   if(fS < fD) {
-   if(!tangentLength) return 0;
-   vec3f springDirection = tangentOffset / tangentLength;
-   real fB = staticFrictionDamping * dot(springDirection, relativeVelocity);
-   fT = - (fS+fB) * springDirection;
+   if(!tangentLength[0]) return _0f;
+   v4sf springDirection = tangentOffset / tangentLength;
+   real fB = staticFrictionDamping * dot3(springDirection, relativeVelocity)[0];
+   fT = - float4(fS+fB) * springDirection;
    staticFrictionCount++;
   } else {
-   if(!tangentRelativeSpeed) return 0;
-   fT = - fD * tangentRelativeVelocity / tangentRelativeSpeed;
+   if(!tangentRelativeSpeed[0]) return _0f;
+   fT = - float4(fD) * tangentRelativeVelocity / tangentRelativeSpeed;
    dynamicFrictionCount++;
   }
-  assert(isNumber(fT), fS, fD, fN, fK, fB, c.depth, fT);
+  //assert(isNumber(fT), fS, fD, fN, fK, fB, c.depth, fT);
   A.force[a] += fT;
   B.force[b] -= fT;
   return cross(relativeA, fT);
  }
 };
 constexpr real System::dt;
-constexpr real System::Particle::b[];
-constexpr real System::Particle::c[];
-constexpr vec3f System::g;
+constexpr v4sf System::Particle::b[];
+constexpr v4sf System::Particle::c[];
+constexpr v4sf System::g;
 constexpr real System::Grain::radius;

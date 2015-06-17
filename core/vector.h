@@ -111,17 +111,24 @@ typedef vec<xy,float,2> vec2f;
 typedef vec<xy,double,2> vec2d;
 //inline String strx(vec2 N) { return str(N.x)+'x'+str(N.y); }
 
+#include "simd.h"
 generic struct xyz {
     T x,y,z;
     vec<xy,T,2>& xy() const { return (vec< ::xy,T,2>&)*this; }
+    inline operator v4sf() const { return (v4sf){x,y,z,0}; }
 };
 /// Integer x,y,z vector
 typedef vec<xyz,int,3> int3;
 /// Integer x,y,z vector (16bit)
 typedef vec<xyz,uint16,3> short3;
 /// Floating-point x,y,z vector
-typedef vec<xyz,float,3> float3;
+//typedef vec<xyz,float,3> float3;
 typedef vec<xyz,float,3> vec3f;
+ /*struct vec3f : vec<xyz,float,3> {
+  using vec::vec;
+  vec3f(v4sf v) : vec{v[0],v[1],v[2]} {}
+ };*/
+inline vec3f toVec3f(v4sf v) { return vec3f(v[0],v[1],v[2]); }
 /// Double precision floating-point x,y,z vector
 typedef vec<xyz,double,3> vec3d;
 

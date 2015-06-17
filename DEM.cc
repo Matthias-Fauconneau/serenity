@@ -14,7 +14,7 @@
 FILE(shader_glsl)
 
 template<Type tA> vec3f toGlobal(tA& A, size_t a, vec3f localA) {
- return A.position[a] + A.rotation[a] * localA;
+ return toVec3f(A.position[a]) + A.rotation[a] * localA;
 }
 
 struct SimulationView : Simulation, Widget, Poll {
@@ -33,23 +33,15 @@ struct SimulationView : Simulation, Widget, Poll {
   window->render();
   int64 elapsed = realTime() - lastReport;
   if(elapsed > 3e9) {
-   /*log(//(timeStep-lastReportStep) / (elapsed*1e-9),
-       "++step",str(stepTime, totalTime));*/
-   if(1) { log(
-       //"+misc",str(miscTime, totalTime),
-       "grain",str(grainTime, stepTime),
-       "wire",str(wireTime, stepTime)
-       /*,"solve",str(solveTime, totalTime)*/);
-   log(
-       "grainInit",str(grainInitializationTime, grainTime),
+   log(totalTime, (timeStep-lastReportStep) / (elapsed*1e-9));
+   if(1) { log("grain",str(grainTime, stepTime), "wire",str(wireTime, stepTime));
+   log("grainInit",str(grainInitializationTime, grainTime),
+       "grainLattice",str(grainLatticeTime, grainTime),
        "grainContact",str(grainContactTime, grainTime),
        "grainIntegration",str(grainIntegrationTime, grainTime));
-   /*log(
-       "wireContact",str(wireContactTime, totalTime),
-       "wireBound",str(wireBoundTime, totalTime),
-       "wireTensionTime",str(wireTensionTime, totalTime),
-       "wireFriction",str(wireFrictionTime, totalTime),
-       "wireIntegration",str(wireIntegrationTime, totalTime));*/
+   log("wireContact",str(wireContactTime, wireTime),
+       "wireTension",str(wireTensionTime, wireTime),
+       "wireIntegration",str(wireIntegrationTime, wireTime));
    }
    lastReport = realTime();
    lastReportStep = timeStep;
@@ -74,18 +66,12 @@ struct SimulationView : Simulation, Widget, Poll {
  vec2f scale = 2./(32*Grain::radius);
  vec3f translation = 0;
  vec3f rotationCenter = 0;
-#if THREAD
  Thread simulationThread;
-#endif
  unique<Encoder> encoder = nullptr;
  GLFrameBuffer target {int2(1280,720)};
  bool showPlot = 0 && processState < Done;
 
- SimulationView()
-#if THREAD
-  : Poll(0, POLLIN, simulationThread)
-#endif
- {
+ SimulationView() : Poll(0, POLLIN, simulationThread) {
   window->actions[F12] = [this]{ writeFile(str(timeStep*dt)+".png",
                                           encodePNG(target.readback()), home()); };
   window->actions[RightArrow] = [this]{ if(stop) queue(); };
@@ -108,9 +94,7 @@ struct SimulationView : Simulation, Widget, Poll {
    encoder->open();
   }
 
-#if THREAD
   simulationThread.spawn();
-#endif
   queue();
  }
  ~SimulationView() {
@@ -122,21 +106,20 @@ struct SimulationView : Simulation, Widget, Poll {
 
   const real Dt = 1./60;
   {
-   vec3f min = 0, max = 0;
+   v4sf min = _0f, max = _0f;
    //Locker lock(this->lock);
    for(size_t i: range(grain.count)) { // FIXME: proper BS
-    min = ::min(min, vec3f(grain.position[i]));
-    max = ::max(max, vec3f(grain.position[i]));
+    min = ::min(min, grain.position[i]);
+    max = ::max(max, grain.position[i]);
    }
    for(size_t i: range(wire.count)) { // FIXME: proper BS
-    min = ::min(min, vec3f(wire.position[i]));
-    max = ::max(max, vec3f(wire.position[i]));
+    min = ::min(min, wire.position[i]);
+    max = ::max(max, wire.position[i]);
    }
-   vec3f rotationCenter = (min+max)/float(2);
-   rotationCenter.xy() = 0;
+   v4sf rotationCenter = (min+max)/float4(2);
+   rotationCenter[0] = rotationCenter[1] = 0;
    if(!rollTest)
-    this->rotationCenter = this->rotationCenter*float(1-Dt)
-                                       + float(Dt)*rotationCenter;
+    this->rotationCenter = this->rotationCenter*(1-Dt) + Dt*toVec3f(rotationCenter);
     //this->rotationCenter = rotationCenter;
   }
 
@@ -146,12 +129,12 @@ struct SimulationView : Simulation, Widget, Poll {
   vec3f min = -1./32, max = 1./32;
   {//Locker lock(this->lock);
    for(size_t i: range(grain.count)) {
-    vec3f O = viewRotation * vec3f(grain.position[i])-rotationCenter;
+    vec3f O = viewRotation * toVec3f(grain.position[i]) - rotationCenter;
     min = ::min(min, O - vec3f(vec2f(Grain::radius), 0)); // Parallel
     max = ::max(max, O + vec3f(vec2f(Grain::radius), 0)); // Parallel
    }
    for(size_t i: range(wire.count)) {
-    vec3f O = viewRotation * vec3f(wire.position[i])-rotationCenter;
+    vec3f O = viewRotation * toVec3f(wire.position[i]) - rotationCenter;
     min = ::min(min, O - vec3f(vec2f(Grain::radius), 0)); // Parallel
     max = ::max(max, O + vec3f(vec2f(Grain::radius), 0)); // Parallel
    }
@@ -195,18 +178,18 @@ struct SimulationView : Simulation, Widget, Poll {
 
   {Locker lock(this->lock);
   if(grain.count) {
-   buffer<float3> positions {grain.count*6};
+   buffer<vec3f> positions {grain.count*6};
    for(size_t i: range(grain.count)) {
     // FIXME: GPU quad projection
-    vec3f O = viewProjection * vec3f(grain.position[i]);
+    vec3f O = viewProjection * toVec3f(grain.position[i]);
     vec2f min = O.xy() - vec2f(scale.xy()) * vec2f(Grain::radius); // Parallel
     vec2f max = O.xy() + vec2f(scale.xy()) * vec2f(Grain::radius); // Parallel
-    positions[i*6+0] = float3(min, O.z);
-    positions[i*6+1] = float3(max.x, min.y, O.z);
-    positions[i*6+2] = float3(min.x, max.y, O.z);
-    positions[i*6+3] = float3(min.x, max.y, O.z);
-    positions[i*6+4] = float3(max.x, min.y, O.z);
-    positions[i*6+5] = float3(max, O.z);
+    positions[i*6+0] = vec3f(min, O.z);
+    positions[i*6+1] = vec3f(max.x, min.y, O.z);
+    positions[i*6+2] = vec3f(min.x, max.y, O.z);
+    positions[i*6+3] = vec3f(min.x, max.y, O.z);
+    positions[i*6+4] = vec3f(max.x, min.y, O.z);
+    positions[i*6+5] = vec3f(max, O.z);
 
     for(int d: range(0)) {
      vec3f axis = 0; axis[d] = 1;
@@ -254,16 +237,16 @@ struct SimulationView : Simulation, Widget, Poll {
   {Locker lock(this->lock);
   if(wire.count>1) {
    size_t wireCount = wire.count;
-   buffer<float3> positions {(wireCount-1)*6};
+   buffer<vec3f> positions {(wireCount-1)*6};
    for(size_t i: range(wireCount-1)) {
-    float3 a (wire.position[i]), b (wire.position[i+1]);
+    vec3f a (toVec3f(wire.position[i])), b (toVec3f(wire.position[i+1]));
     // FIXME: GPU quad projection
-    float3 A = viewProjection * a, B= viewProjection * b;
+    vec3f A = viewProjection * a, B= viewProjection * b;
     float2 r = B.xy()-A.xy();
     float l = length(r);
     float2 t = r/l;
-    float3 n = float3(scale)*float(Wire::radius)*float3(t.y, -t.x, 0);
-    float3 P[4] {A-n, A+n, B-n, B+n};
+    vec3f n = scale*float(Wire::radius)*vec3f(t.y, -t.x, 0);
+    vec3f P[4] {A-n, A+n, B-n, B+n};
     positions[i*6+0] = P[0];
     positions[i*6+1] = P[1];
     positions[i*6+2] = P[2];
@@ -308,8 +291,8 @@ struct SimulationView : Simulation, Widget, Poll {
 
   if(load.count) {
    //Locker lock(this->lock);
-   vec3 min (-vec2(-side.castRadius), load.position[0].z);
-   vec3 max (+vec2(-side.castRadius), load.position[0].z);
+   vec3 min (-vec2(-side.castRadius), load.position[0][2]);
+   vec3 max (+vec2(-side.castRadius), load.position[0][2]);
    for(int i: range(0b111 +1)) for(int j: {(i&0b110) |0b001, (i&0b101) |0b010, (i&0b011) |0b100}) {
     if(i<j) {
      auto p = [=](int i) {
@@ -368,7 +351,7 @@ struct SimulationView : Simulation, Widget, Poll {
 
   array<char> s = str(timeStep*this->dt, grain.count, wire.count/*, kT, kR*/
                       /*,staticFrictionCount, dynamicFrictionCount*/);
-  if(load.count) s.append(" "_+str(load.position[0].z));
+  if(load.count) s.append(" "_+str(load.position[0][2]));
   window->setTitle(s);
   return shared<Graphics>();
  }
