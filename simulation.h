@@ -4,8 +4,8 @@ struct Simulation : System {
  v4sf min = _0f, max = _0f;
 
  // Process
- const float pourRadius = side.castRadius - Grain::radius;
- const real winchRadius = side.castRadius - Grain::radius - Wire::radius;
+ const float pourRadius = side.castRadius - Grain::radius - Wire::radius;
+ const real winchRadius = side.castRadius - (loopAngle?Grain::radius:Wire::radius);
  real pourHeight = Floor::height+Grain::radius;
  real winchAngle = 0;
 
@@ -25,27 +25,11 @@ struct Simulation : System {
  Lock lock;
  HList<Plot> plots;
 
- vec3f winchPosition(real winchAngle = -1) {
-  if(winchAngle<0) winchAngle = this->winchAngle;
-  real r = 1;
-  if(loopAngle) {
-    real t = mod(winchAngle / loopAngle, 4);
-    /**/  if(/*0 <*/ t < 1) r = 1;
-    else if(/*1 <*/ t < 2) r = 1-2*(t-1);
-    else if(/*2 <*/ t < 3) r = -1;
-    else    /*3 <    t < 4*/r = -1+2*(t-3);
- }
-  return vec3f(winchRadius*r*cos(winchAngle),
-                      winchRadius*r*sin(winchAngle),
-                      pourHeight+2*Grain::radius);
- }
-
  Simulation() {
   //error(cross(v4sf{1,0,0,0}, v4sf{0,1,0,0}));
   if(useWire) {
    size_t i = wire.count++;
-   vec3f pos = winchPosition();
-   wire.position[i] = pos;
+   wire.position[i] = vec3f(winchRadius,0,pourHeight);
    min = ::min(min, wire.position[i]);
    max = ::max(max, wire.position[i]);
    wire.velocity[i] = _0f;
@@ -109,7 +93,7 @@ struct Simulation : System {
    } else {
     // Generates falling grain (pour)
     const bool useGrain = 1;
-    if(useGrain) for(;;) {
+    if(useGrain && pourHeight >= Grain::radius) for(;;) {
      vec3f p(random()*2-1,random()*2-1, pourHeight);
      if(length(p.xy())>1) continue;
      vec3f newPosition (pourRadius*p.xy(), p.z); // Within cylinder
@@ -140,24 +124,6 @@ struct Simulation : System {
     }
 break2_:;
     pourHeight += winchSpeed * dt;
-    if(useWire) { // Generates wire (winch)
-     winchAngle += winchRate * dt;
-
-     v4sf lastPosition = wire.count ? wire.position[wire.count-1] : winchPosition(0);
-     v4sf offset = winchPosition() - lastPosition;
-     float length = ::length(offset);
-     if(length > Wire::internodeLength*(1+1./4/*2*/)) {
-      Locker lock(this->lock);
-      size_t i = wire.count++;
-      v4sf pos = lastPosition + float4(Wire::internodeLength/length)*offset;
-      wire.position[i] = pos;
-      min = ::min(min, wire.position[i]);
-      max = ::max(max, wire.position[i]);
-      wire.velocity[i] = pos;
-      for(size_t n: range(3)) wire.positionDerivatives[n][i] = _0f;
-      wire.frictions.set(i);
-     }
-    }
    }
   }
   if(processState == Load && !load.count) {
@@ -171,11 +137,11 @@ break2_:;
   }
   if(processState==Release) {
    if(side.castRadius < 16*Grain::radius) {
-    side.castRadius += dt * (1./16 * L/T); // Constant velocity
-    // + Pressure
+    side.castRadius += dt * (16*Grain::radius/T); // Constant velocity
+    /*// + Pressure
     float h = load.count ? load.position[0][2] : pourHeight;
     float P = side.force.radialSum / (2*PI*side.castRadius*h);
-    side.castRadius += dt * (1./16 * L/T) * P / (M*L/T/T/(L*L));
+    side.castRadius += dt * (1./16 * L/T) * P / (M*L/T/T/(L*L));*/
    } else {
     log("Released");
     processState = Done;
@@ -247,12 +213,22 @@ break2_:;
 
   wireTensionTime.start();
   if(wire.count) parallel_chunk(wire.count, [&](uint, size_t start, size_t size) {
+
+   uint16* base = indices.begin();
+   const int X = gridSize.x, Y = gridSize.y;
+   const v4sf XYZ0 {1, float(X), float(Y*X), 0};
+   const uint16* neighbours[3*3] = {
+    base-X*Y-X-1, base-X*Y-1, base-X*Y+X-1,
+    base-X-1, base-1, base+X-1,
+    base+X*Y-X-1, base+X*Y-1, base+X*Y+X-1
+   };
+
    { // First iteration
     size_t i = start;
     wire.force[i] = wire.mass * g;
     wire.force[i+1] = wire.mass * g;
     if(i > 0) {
-     if(start > 1) {// Previous torsion spring on first
+     if(start > 1 && wireBendStiffness) {// Previous torsion spring on first
       size_t i = start-1;
       v4sf A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
       v4sf a = C-B, b = B-A;
@@ -267,31 +243,33 @@ break2_:;
      // First tension
      v4sf fT = tension(i-1, i);
      wire.force[i] -= fT;
-     // First torsion
-     v4sf A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
-     v4sf a = C-B, b = B-A;
-     v4sf c = cross(a, b);
-     v4sf l = sqrt(sq3(c));
-     if(l[0]) {
-      float p = wireBendStiffness * atan(l[0], dot3(a, b)[0]);
-      v4sf dap = cross(a, cross(a,b)) / (sq3(a) * l);
-      v4sf dbp = cross(b, cross(b,a)) / (sq3(b) * l);
-      wire.force[i+1] += float4(p) * (-dap);
-      wire.force[i] += float4(p) * (dap - dbp);
-      //wire.force[i-1] += float4(p) * (dbp); //-> "Tension to first node of next chunk"
-      if(1) {
-       v4sf A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
-       v4sf axis = cross(C-B, B-A);
-       v4sf l = sqrt(sq3(axis));
-       if(l[0]) {
-        float angularVelocity = atan(l[0], dot3(C-B, B-A)[0]);
-        wire.force[i] += float4(wireBendDamping * angularVelocity / 2)
-          * cross(axis/l, C-A);
+     if(wireBendStiffness) { // First torsion
+      v4sf A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
+      v4sf a = C-B, b = B-A;
+      v4sf c = cross(a, b);
+      v4sf l = sqrt(sq3(c));
+      if(l[0]) {
+       float p = wireBendStiffness * atan(l[0], dot3(a, b)[0]);
+       v4sf dap = cross(a, cross(a,b)) / (sq3(a) * l);
+       v4sf dbp = cross(b, cross(b,a)) / (sq3(b) * l);
+       wire.force[i+1] += float4(p) * (-dap);
+       wire.force[i] += float4(p) * (dap - dbp);
+       //wire.force[i-1] += float4(p) * (dbp); //-> "Tension to first node of next chunk"
+       if(1) {
+        v4sf A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
+        v4sf axis = cross(C-B, B-A);
+        v4sf l = sqrt(sq3(axis));
+        if(l[0]) {
+         float angularVelocity = atan(l[0], dot3(C-B, B-A)[0]);
+         wire.force[i] += float4(wireBendDamping * angularVelocity / 2)
+           * cross(axis/l, C-A);
+        }
        }
       }
      }
     }
-    /*penalty(wire, i, floor, 0);
+    // Bounds
+    penalty(wire, i, floor, 0);
     // Wire - Grain
     size_t offset = dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*(wire.position[i]-min))))[0];
     for(size_t n: range(3*3)) {
@@ -299,7 +277,7 @@ break2_:;
      if(line[0]) penalty(wire, i, grain, line[0]-1);
      if(line[1]) penalty(wire, i, grain, line[1]-1);
      if(line[2]) penalty(wire, i, grain, line[2]-1);
-    }*/
+    }
    }
    for(size_t i: range(start+1, start+size-1)) {
     // Gravity
@@ -308,7 +286,7 @@ break2_:;
     v4sf fT = tension(i-1, i);
     wire.force[i-1] += fT;
     wire.force[i] -= fT;
-    {// Torsion springs (Bending resistance)
+    if(wireBendStiffness) {// Torsion springs (Bending resistance)
      v4sf A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
      v4sf a = C-B, b = B-A;
      v4sf c = cross(a, b);
@@ -334,7 +312,7 @@ break2_:;
       }
      }
     }
-    /*// Bounds
+    // Bounds
     penalty(wire, i, floor, 0);
     // Wire - Grain
     size_t offset = dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*(wire.position[i]-min))))[0];
@@ -343,7 +321,7 @@ break2_:;
      if(line[0]) penalty(wire, i, grain, line[0]-1);
      if(line[1]) penalty(wire, i, grain, line[1]-1);
      if(line[2]) penalty(wire, i, grain, line[2]-1);
-    }*/
+    }
    }
 
    // Last iteration
@@ -380,7 +358,7 @@ break2_:;
       }
      }
     }
-    /*// Bounds
+    // Bounds
     penalty(wire, i, floor, 0);
     // Wire - Grain
     size_t offset = dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*(wire.position[i]-min))))[0];
@@ -389,7 +367,7 @@ break2_:;
      if(line[0]) penalty(wire, i, grain, line[0]-1);
      if(line[1]) penalty(wire, i, grain, line[1]-1);
      if(line[2]) penalty(wire, i, grain, line[2]-1);
-    }*/
+    }
    }
 
    { // Tension to first node of next chunk
@@ -397,7 +375,7 @@ break2_:;
     if(i < wire.count) {
      wire.force[i-1] += tension(i-1, i);
       // Torsion to first node of next chunk
-     if(i+1<wire.count) {
+     if(i+1<wire.count && wireBendStiffness) {
       v4sf A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
       v4sf a = C-B, b = B-A;
       v4sf c = cross(a, b);
@@ -410,10 +388,10 @@ break2_:;
      }
     }
    }
-  }, 1);
+  }, 1/*::threadCount*/);
   wireTensionTime.stop();
 
-  wireContactTime.start();
+  /*wireContactTime.start();
   // TODO: lattice split parallelization
   parallel_chunk(wire.count, [&](uint, size_t start, size_t size) {
    uint16* base = indices.begin();
@@ -436,11 +414,48 @@ break2_:;
      if(line[2]) penalty(wire, i, grain, line[2]-1);
     }
    }
-  }, ::threadCount);
-  wireContactTime.stop();
+  },1, ::threadCount);
+  wireContactTime.stop();*/
 
   // Integration
   min = _0f; max = _0f;
+
+  // 1 N tension
+  //log(Wire::tensionStiffness[0], 1/Wire::tensionStiffness[0]);
+  const float N = 1;
+  float replacementLength = Wire::internodeLength*(1+N/Wire::tensionStiffness[0]);
+  v4sf length;
+  v4sf direction;
+  {
+   //real r = (mod(winchAngle / loopAngle, 2) < 1 ? 1 : -1) * winchRadius;
+   real r = 1, dz = 0;
+   if(loopAngle) {
+     real t = mod(winchAngle / loopAngle, 4);
+     /**/  if(/*0 <*/ t < 1) r = 1;
+     else if(/*1 <*/ t < 2) r = 1-2*(t-1);
+     else if(/*2 <*/ t < 3) r = -1;
+     else    /*3 <    t < 4*/r = -1+2*(t-3);
+   }
+   dz = Grain::radius+Wire::radius;
+   r *= winchRadius;
+   vec3f end (r*cos(winchAngle),r*sin(winchAngle), pourHeight+dz);
+   // Boundary condition: constant force
+   v4sf boundaryForce = Wire::tensionStiffness
+     * float4(replacementLength-Wire::internodeLength);
+   v4sf relativePosition = end - wire.position[wire.count-1];
+   length = sqrt(sq3(relativePosition));
+   //v4sf x = length - Wire::internodeLength4;
+   //endTension = Wire::tensionStiffness * x;
+   direction = relativePosition/length;
+   if(useWire && processState==Pour) { // Pull wire
+    wire.force[wire.count-1] += boundaryForce * direction;
+    //wire.force[0] += boundaryForce * r2/sqrt(sq3(r2));
+    //v4sf r2 (vec3f(winchRadius,0,2*Grain::radius/*Wire::radius*/)-wire.position[0]);
+    //wire.force[0] += Wire::tensionStiffness * r2;
+    //wire.velocity[0] = _0f;
+    //wire.position[0] = vec3f(winchRadius,0,Grain::radius+dz/*Wire::radius*/);
+   }
+  }
 
   wireIntegrationTime.start();
   parallel_chunk(wire.count, [this](uint, size_t start, size_t size) {
@@ -466,32 +481,59 @@ break2_:;
   grainIntegrationTime.stop();
   grainTime.stop();
 
+  // kT
+  v4sf ssqV = _0f;
+  if(grain.count) for(v4sf v: grain.velocity.slice(0, grain.count)) ssqV += sq3(v);
+  kT = 1./2*grain.mass[0]*ssqV[0];
+
   if(load.count) {
    load.step(0);
-   if(kT < 1./8 && processState==Load) {
-    processState=Release;
-    log("Release");
+   if(processState==Load) {
+    if(kT < 32 * grain.count * grain.mass[0] * (Wire::radius*Wire::radius) /*/ sq(T)*/) {
+     processState=Release;
+     log("Release", kT / (grain.count * grain.mass[0] * (Wire::radius*Wire::radius)));
+   }
+    //log(load.velocity[0][2], kT / (grain.count * grain.mass[0] * (Wire::radius*Wire::radius)));
+    if(load.force[0][2] > load.mass[0] * g[2])
+     load.velocity[0][2] = ::max(-1/*6*Grain::radius*//T, load.velocity[0][2]); // Caps load velocity
    }
   }
 
   //log(staticFrictionCount, dynamicFrictionCount);
   staticFrictionCount = 0; dynamicFrictionCount = 0;
 
+  v4sf wireLength = _0f;
+  for(size_t i: range(wire.count-1))
+   wireLength += sqrt(sq3(wire.position[i]-wire.position[i+1]));
+  float stretch = (wireLength[0] / wire.count) / Wire::internodeLength;
+  //if(stretch>1.1) log(stretch);
+
+  //wire.position[0] = vec3(winchRadius, 0, Wire::radius); // Anchors first end
+  if(useWire && processState==Pour) { // Generates wire (winch)
+
+   if(length[0] >= replacementLength) {
+    Locker lock(this->lock);
+    size_t i = wire.count++;
+    wire.position[i] = wire.position[wire.count-2]
+      + float4(replacementLength) * direction;
+    //log(wire.count, direction, wire.position[wire.count-2], wire.position[i]);
+    min = ::min(min, wire.position[i]);
+    max = ::max(max, wire.position[i]);
+    wire.velocity[i] = _0f;
+    for(size_t n: range(3)) wire.positionDerivatives[n][i] = _0f;
+    wire.frictions.set(i);
+   }
+  }
+
   timeStep++;
+  winchAngle += winchRate * dt;
 
   if(0) {
    Locker lock(this->lock);
    size_t i = 0;
    if(1) {
     if(i>=plots.size) plots.append();
-    real sumV = 0, ssqV = 0;
-    if(grain.count) for(auto v: grain.velocity.slice(0, grain.count)) {
-     //if(!isNumber(v)) continue; //FIXME
-     //assert(isNumber(v));
-     sumV += length(v);
-     ssqV += sq3(v)[0];
-    }
-    kT = 1./2*grain.mass[0]*ssqV;
+
     //plots[1].dataSets["v"__][timeStep*dt] = sumV / grain.count;
     plots[i].dataSets["Et"__][timeStep*dt] = kT;
     if(!isNumber(kT)) { log("!isNumber(kT)"); kT=0; }

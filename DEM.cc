@@ -33,8 +33,8 @@ struct SimulationView : Simulation, Widget, Poll {
   window->render();
   int64 elapsed = realTime() - lastReport;
   if(elapsed > 3e9) {
-   log(timeStep*this->dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
-   if(1) {
+   if(0) {
+    log(timeStep*this->dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
     log("grain",str(grainTime, stepTime), "wire",str(wireTime, stepTime));
    log("grainInit",str(grainInitializationTime, grainTime),
        "grainLattice",str(grainLatticeTime, grainTime),
@@ -153,17 +153,9 @@ struct SimulationView : Simulation, Widget, Poll {
   if(!rollTest) this->scale = this->scale*float(1-Dt) + float(Dt)*scale.xy();
   scale.xy() = this->scale;
 
-  //if(rollTest) scale.xy() = vec2f(viewSize.x/(16*Grain::radius))/viewSize;
   vec3f fitTranslation = -scale*(min+max)/float(2);
-  //vec2 aspectRatio (size.x/size.y, 1);
   vec3f translation = this->translation = vec3f((size-viewSize)/size, 0);
-  //this->translation*(1-Dt) + Dt*fitTranslation;
-  /*mat4 viewProjection;
-  for(int e: range(3)) {
-   vec3 axis = 0; axis[e] = 1;
-   viewProjection[e] = vec4(scale*(viewRotation*axis),
-                            (translation + scale*(viewRotation*(-rotationCenter)))[e]);
-  }*/
+
   mat4 viewProjection = mat4()
     .translate(translation)
     .scale(scale)
@@ -171,7 +163,6 @@ struct SimulationView : Simulation, Widget, Poll {
     .translate(-rotationCenter);
 
   map<rgb3f, array<vec3>> lines;
-  //lines.clear();
 
   target.bind(ClearColor|ClearDepth);
   glDepthTest(true);
@@ -258,17 +249,18 @@ struct SimulationView : Simulation, Widget, Poll {
 #if DBG_FRICTION
     for(const Friction& f : wire.frictions[i]) {
      if(f.lastUpdate < timeStep-1) continue;
-     vec3f A = toGlobal(wire, i, f.localA);
+     v4sf A = toGlobal(wire, i, f.localA);
      size_t b = f.index;
-     if(b >= grain.base+grain.count) continue;
-     vec3f B =
+     //if(b >= grain.base+grain.count) continue;
+     if(b == floor.base) continue;
+     v4sf B =
       b < grain.base+grain.count ? toGlobal(grain, b-grain.base, f.localB) :
       b < wire.base+wire.count ? /*toGlobal(wire, b-wire.base, f.localB)*/
                                (::error(wire.base,b,wire.count), vec3f()) :
       b==floor.base ? toGlobal(floor, b-floor.base, f.localB) :
       b==side.base ? toGlobal(side, b-side.base, f.localB) :
       (::error("wire", b), vec3f());
-     vec3f vA = viewProjection*vec3f(A), vB=viewProjection*vec3f(B);
+     vec3f vA = viewProjection*toVec3f(A), vB=viewProjection*toVec3f(B);
      if(length(vA-vB) < 2/size.y) {
       if(vA.y<vB.y) vA.y -= 4/size.y, vB.y += 4/size.y;
       else vA.y += 4/size.y, vB.y -= 4/size.y;
