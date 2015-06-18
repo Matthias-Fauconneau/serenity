@@ -83,7 +83,7 @@ struct Semaphore {
 	void release(int64 count) {
   mutex.lock();
   __sync_add_and_fetch(&counter, count);
-		pthread_cond_signal(&condition);
+  pthread_cond_broadcast(&condition);
   mutex.unlock();
 	}
 	/// Returns available ressources \a count

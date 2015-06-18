@@ -214,7 +214,11 @@ inline v4sf angleVector(float a, vec3f v) {
  vec3f b = sin(a/2*l)/l*v;
  return {b.x, b.y, b.z, cos(a/2*l)};
 }
-inline v4sf qapply(v4sf q, v4sf v) { return qmul(q, qmul(v, conjugate(q))); }
+inline v4sf qapply(v4sf q, v4sf v) {
+ v[3]=0;
+ //assert(v[3]==0);
+ return qmul(q, qmul(v, conjugate(q)));
+}
 
 template<Type A, Type B> struct pair { A a; B b; };
 inline pair<vec3f, vec3f> closest(vec3f a1, vec3f a2, vec3f b1, vec3f b2) {

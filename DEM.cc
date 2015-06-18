@@ -34,13 +34,14 @@ struct SimulationView : Simulation, Widget, Poll {
   int64 elapsed = realTime() - lastReport;
   if(elapsed > 3e9) {
    log(timeStep*this->dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
-   if(1) { log("grain",str(grainTime, stepTime), "wire",str(wireTime, stepTime));
+   if(1) {
+    log("grain",str(grainTime, stepTime), "wire",str(wireTime, stepTime));
    log("grainInit",str(grainInitializationTime, grainTime),
        "grainLattice",str(grainLatticeTime, grainTime),
        "grainContact",str(grainContactTime, grainTime),
        "grainIntegration",str(grainIntegrationTime, grainTime));
-   log("wireContact",str(wireContactTime, wireTime),
-       "wireTension",str(wireTensionTime, wireTime),
+   log("wireTension",str(wireTensionTime, wireTime),
+       "wireContact",str(wireContactTime, wireTime),
        "wireIntegration",str(wireIntegrationTime, wireTime));
    }
    lastReport = realTime();
@@ -123,8 +124,8 @@ struct SimulationView : Simulation, Widget, Poll {
     //this->rotationCenter = rotationCenter;
   }
 
-  v4sf viewRotation = angleVector(viewYawPitch.y, vec3f(1,0,0)) *
-                                 angleVector(viewYawPitch.x, vec3f(0,0,1));
+  v4sf viewRotation = qmul(angleVector(viewYawPitch.y, vec3f(1,0,0)),
+                                 angleVector(viewYawPitch.x, vec3f(0,0,1)));
 
   vec3f min = -1./32, max = 1./32;
   {//Locker lock(this->lock);

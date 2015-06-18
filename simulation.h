@@ -5,7 +5,7 @@ struct Simulation : System {
 
  // Process
  const float pourRadius = side.castRadius - Grain::radius;
- const real winchRadius = side.castRadius - 2*Grain::radius - 2*Wire::radius;
+ const real winchRadius = side.castRadius - Grain::radius - Wire::radius;
  real pourHeight = Floor::height+Grain::radius;
  real winchAngle = 0;
 
@@ -81,16 +81,16 @@ struct Simulation : System {
   }
  }
 
- v4sf tension(size_t a, size_t b) {
+ inline v4sf tension(size_t a, size_t b) {
   v4sf relativePosition = wire.position[a] - wire.position[b];
-  float length = sqrt(sq3(relativePosition))[0];
-  float x = length - Wire::internodeLength;
-  v4sf direction = relativePosition/float4(length);
-  potentialEnergy += 1./2 * Wire::tensionStiffness * sq(x);
-  real fS = - Wire::tensionStiffness * x;
+  v4sf length = sqrt(sq3(relativePosition));
+  v4sf x = length - Wire::internodeLength4;
+  //potentialEnergy += 1./2 * Wire::tensionStiffness * sq(x);
+  v4sf fS = - Wire::tensionStiffness * x;
+  v4sf direction = relativePosition/length;
   v4sf relativeVelocity = wire.velocity[a] - wire.velocity[b];
-  real fB = - wire.tensionDamping * dot3(direction, relativeVelocity)[0];
-  return float4(fS + fB) * direction;
+  v4sf fB = - wire.tensionDamping * dot3(direction, relativeVelocity);
+  return (fS + fB) * direction;
  }
 
  void step() {
@@ -126,7 +126,7 @@ struct Simulation : System {
      max = ::max(max, grain.position[i]);
      grain.velocity[i] = _0f;
      for(size_t n: range(3)) grain.positionDerivatives[n][i] = _0f;
-     grain.angularVelocity[i] = _0001f;
+     grain.angularVelocity[i] = _0f;
      for(size_t n: range(3)) grain.angularDerivatives[n][i] = _0001f;
      grain.frictions.set(i);
      real t0 = 2*PI*random();
@@ -207,6 +207,7 @@ break2_:;
   min -= float3(2./scale[0]), max += float3(2./scale[0]); // Avoids bound check
   int3 gridSize = int3(::floor(toVec3f(scale*(max-min))))+int3(1);
   buffer<uint16> indices (gridSize.z*gridSize.y*gridSize.x);
+  //log(grain.count*(6+5)*sizeof(v4sf)/1024, wire.count*6*sizeof(v4sf)/1024);
   indices.clear(0);
   grainLatticeTime.start();
   parallel_chunk(grain.count, [&](uint, size_t start, size_t size) {
@@ -221,7 +222,7 @@ break2_:;
   parallel_chunk(indices.size, [&](uint, size_t start, size_t size) {
    const int Y = gridSize.y, X = gridSize.x;
    const uint16* chunk = indices.begin() + start;
-   assert_(start==0);
+   assert(start==0);
    for(size_t i: range(size)) {
     const uint16* current = chunk + i;
     size_t a = *current;
@@ -231,7 +232,6 @@ break2_:;
      int di = z*Y*X + y*X + x;
      if(di <= 0) continue; // FIXME: unroll
      const uint16* neighbour = current + z*Y*X + y*X + x;
-     //assert(neighbour < end);
      size_t b = *neighbour;
      if(!b) continue;
      b--;
@@ -245,18 +245,8 @@ break2_:;
   // Wire
   wireTime.start();
 
-  wireContactTime.start();
-  parallel_chunk(wire.count, [&](uint, size_t start, size_t size) {
-
-   uint16* base = indices.begin();
-   const int X = gridSize.x, Y = gridSize.y;
-   const v4sf XYZ0 {1, float(X), float(Y*X), 0};
-   const uint16* neighbours[3*3] = {
-    base-X*Y-X-1, base-X*Y-1, base-X*Y+X-1,
-    base-X-1, base-1, base+X-1,
-    base+X*Y-X-1, base+X*Y-1, base+X*Y+X-1
-   };
-
+  wireTensionTime.start();
+  if(wire.count) parallel_chunk(wire.count, [&](uint, size_t start, size_t size) {
    { // First iteration
     size_t i = start;
     wire.force[i] = wire.mass * g;
@@ -301,7 +291,7 @@ break2_:;
       }
      }
     }
-    penalty(wire, i, floor, 0);
+    /*penalty(wire, i, floor, 0);
     // Wire - Grain
     size_t offset = dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*(wire.position[i]-min))))[0];
     for(size_t n: range(3*3)) {
@@ -309,7 +299,7 @@ break2_:;
      if(line[0]) penalty(wire, i, grain, line[0]-1);
      if(line[1]) penalty(wire, i, grain, line[1]-1);
      if(line[2]) penalty(wire, i, grain, line[2]-1);
-    }
+    }*/
    }
    for(size_t i: range(start+1, start+size-1)) {
     // Gravity
@@ -322,27 +312,29 @@ break2_:;
      v4sf A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
      v4sf a = C-B, b = B-A;
      v4sf c = cross(a, b);
-     v4sf l = sqrt(sq3(c));
-     if(l[0]) {
-      float p = wireBendStiffness * atan(l[0], dot3(a, b)[0]);
-      v4sf dap = cross(a, cross(a,b)) / (sq3(a) * l);
-      v4sf dbp = cross(b, cross(b,a)) / (sq3(b) * l);
-      wire.force[i+1] += float4(p) * (-dap);
-      wire.force[i] += float4(p) * (dap - dbp);
-      wire.force[i-1] += float4(p) * (dbp);
+     v4sf length4 = sqrt(sq3(c));
+     float length = length4[0];
+     if(length) {
+      v4sf p = float4(wireBendStiffness * atan(length, dot3(a, b)[0]));
+      v4sf dap = cross(a, cross(a,b)) / (sq3(a) * length4);
+      v4sf dbp = cross(b, cross(b,a)) / (sq3(b) * length4);
+      wire.force[i+1] += p* (-dap);
+      wire.force[i] += p * (dap - dbp);
+      wire.force[i-1] += p * (dbp);
       if(1) {
        v4sf A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
        v4sf axis = cross(C-B, B-A);
-       v4sf l = sqrt(sq3(axis));
-       if(l[0]) {
-        float angularVelocity = atan(l[0], dot3(C-B, B-A)[0]);
+       v4sf length4 = sqrt(sq3(axis));
+       float length = length4[0];
+       if(length) {
+        float angularVelocity = atan(length, dot3(C-B, B-A)[0]);
         wire.force[i] += float4(wireBendDamping * angularVelocity / 2)
-          * cross(axis/l, C-A);
+          * cross(axis/length4, C-A);
        }
       }
      }
     }
-    // Bounds
+    /*// Bounds
     penalty(wire, i, floor, 0);
     // Wire - Grain
     size_t offset = dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*(wire.position[i]-min))))[0];
@@ -351,7 +343,7 @@ break2_:;
      if(line[0]) penalty(wire, i, grain, line[0]-1);
      if(line[1]) penalty(wire, i, grain, line[1]-1);
      if(line[2]) penalty(wire, i, grain, line[2]-1);
-    }
+    }*/
    }
 
    // Last iteration
@@ -388,7 +380,7 @@ break2_:;
       }
      }
     }
-    // Bounds
+    /*// Bounds
     penalty(wire, i, floor, 0);
     // Wire - Grain
     size_t offset = dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*(wire.position[i]-min))))[0];
@@ -397,7 +389,7 @@ break2_:;
      if(line[0]) penalty(wire, i, grain, line[0]-1);
      if(line[1]) penalty(wire, i, grain, line[1]-1);
      if(line[2]) penalty(wire, i, grain, line[2]-1);
-    }
+    }*/
    }
 
    { // Tension to first node of next chunk
@@ -419,6 +411,32 @@ break2_:;
     }
    }
   }, 1);
+  wireTensionTime.stop();
+
+  wireContactTime.start();
+  // TODO: lattice split parallelization
+  parallel_chunk(wire.count, [&](uint, size_t start, size_t size) {
+   uint16* base = indices.begin();
+   const int X = gridSize.x, Y = gridSize.y;
+   const v4sf XYZ0 {1, float(X), float(Y*X), 0};
+   const uint16* neighbours[3*3] = {
+    base-X*Y-X-1, base-X*Y-1, base-X*Y+X-1,
+    base-X-1, base-1, base+X-1,
+    base+X*Y-X-1, base+X*Y-1, base+X*Y+X-1
+   };
+   for(size_t i: range(start, start+size)) {
+    // Bounds
+    penalty(wire, i, floor, 0);
+    // Wire - Grain
+    size_t offset = dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*(wire.position[i]-min))))[0];
+    for(size_t n: range(3*3)) {
+     v4hi line = loada(neighbours[n] + offset);
+     if(line[0]) penalty(wire, i, grain, line[0]-1);
+     if(line[1]) penalty(wire, i, grain, line[1]-1);
+     if(line[2]) penalty(wire, i, grain, line[2]-1);
+    }
+   }
+  }, ::threadCount);
   wireContactTime.stop();
 
   // Integration
@@ -484,7 +502,7 @@ break2_:;
      //assert(isNumber(v));
      ssqR += sq3(v)[0];
     }
-    kR = 1./2*grain.angularMass[0]*ssqR;
+    kR = 1./2*grain.angularMass*ssqR;
     if(!isNumber(kR)) { /*log("!isNumber(kR)");FIXME*/ kR=0; }
     assert(isNumber(kR));
     plots[i].dataSets["Er"__][timeStep*dt] = kR;
