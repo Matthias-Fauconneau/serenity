@@ -220,10 +220,14 @@ inline v4sf qapply(v4sf q, v4sf v) {
  return qmul(q, qmul(v, conjugate(q)));
 }
 
-template<Type A, Type B> struct pair { A a; B b; };
-inline pair<vec3f, vec3f> closest(vec3f a1, vec3f a2, vec3f b1, vec3f b2) {
-    const vec3f u = a2 - a1, v = b2 - b1, w = a1 - b1;
-    const float  a = dot(u,u), b = dot(u,v), c = dot(v,v), d = dot(u,w), e = dot(v,w);
+//template<Type A, Type B> struct pair { A a; B b; };/*pair<v4sf, v4sf>*/
+inline void closest(v4sf a1, v4sf a2, v4sf b1, v4sf b2, v4sf& A, v4sf& B) {
+    const v4sf u = a2 - a1, v = b2 - b1, w = a1 - b1;
+    const float a = dot3(u,u)[0];
+    const float b = dot3(u,v)[0];
+    const float c = dot3(v,v)[0];
+    const float d = dot3(u,w)[0];
+    const float e = dot3(v,w)[0];
     const float D = a*c - b*b; float sD = D,  tD = D;
     // Compute the line parameters of the two closest points
     float sN, tN;
@@ -247,7 +251,8 @@ inline pair<vec3f, vec3f> closest(vec3f a1, vec3f a2, vec3f b1, vec3f b2) {
     }
     float sc = abs(sN) < __FLT_EPSILON__ ? 0 : sN / sD;
     float tc = abs(tN) < __FLT_EPSILON__ ? 0 : tN / tD;
-    return {a1 + (sc * u), b1 - (tc * v)};
+    A = a1 + (float4(sc) * u); B = b1 - (float4(tc) * v);
+    //return {a1 + (float4(sc) * u), b1 - (float4(tc) * v)};
 }
 
 typedef float real;

@@ -33,14 +33,14 @@ struct SimulationView : Simulation, Widget, Poll {
   window->render();
   int64 elapsed = realTime() - lastReport;
   if(elapsed > 3e9) {
-   if(0) {
+   if(1) {
     log(timeStep*this->dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
     log("grain",str(grainTime, stepTime), "wire",str(wireTime, stepTime));
    log("grainInit",str(grainInitializationTime, grainTime),
        "grainLattice",str(grainLatticeTime, grainTime),
        "grainContact",str(grainContactTime, grainTime),
        "grainIntegration",str(grainIntegrationTime, grainTime));
-   log("wireTension",str(wireTensionTime, wireTime),
+   log("wireLatticeTime",str(wireLatticeTime, wireTime),
        "wireContact",str(wireContactTime, wireTime),
        "wireIntegration",str(wireIntegrationTime, wireTime));
    }
@@ -80,7 +80,7 @@ struct SimulationView : Simulation, Widget, Poll {
   window->actions[Key('p')] = [this]{ showPlot = !showPlot; };
   window->actions[Return] = [this]{
    if(processState < Done) processState++;
-   log("grain", grain.count, "wire", wire.count);
+   log(int(processState), "grain", grain.count, "wire", wire.count);
   };
   /*window->actions[Key('E')] = [this] {
    if(!encoder) {
@@ -148,7 +148,9 @@ struct SimulationView : Simulation, Widget, Poll {
    if(plots.size>2) viewSize = vec2f(360,720);
   }
 
-  vec3f scale (2*::min(viewSize/(max-min).xy())/size,
+  vec3 scaleMax = ::min(max, vec3(vec2(16*Grain::radius), 32*Grain::radius));
+  vec3 scaleMin = ::max(min, vec3(vec2(-16*Grain::radius), 0));
+  vec3f scale (2*::min(viewSize/(scaleMax-scaleMin).xy())/size,
                     -1/(2*(max-min).z));
   if(!rollTest) this->scale = this->scale*float(1-Dt) + float(Dt)*scale.xy();
   scale.xy() = this->scale;
@@ -167,10 +169,19 @@ struct SimulationView : Simulation, Widget, Poll {
   target.bind(ClearColor|ClearDepth);
   glDepthTest(true);
 
-
   {Locker lock(this->lock);
   if(grain.count) {
    buffer<vec3f> positions {grain.count*6};
+   #if DBG_FRICTION
+   float maxR = 0, maxG = 0, maxB = 0;
+   for(size_t i: range(grain.count)) {
+    for(const Friction& f : grain.frictions[i]) {
+     maxR = ::max(maxR, length(f.red));
+     maxG = ::max(maxG, length(f.green));
+     maxB = ::max(maxB, length(f.blue));
+    }
+   }
+#endif
    for(size_t i: range(grain.count)) {
     // FIXME: GPU quad projection
     vec3f O = viewProjection * toVec3f(grain.position[i]);
@@ -189,21 +200,52 @@ struct SimulationView : Simulation, Widget, Poll {
      lines[rgb3f(vec3f(axis))].append(viewProjection*toVec3f(toGlobal(grain, i,
                                                        float(Grain::radius/2)*axis)));
     }
-#if DBG_FRICTION && 0
+#if DBG_FRICTION && 1
     for(const Friction& f : grain.frictions[i]) {
-     if(f.lastUpdate < timeStep-1) continue;
-     vec3 A = toGlobal(grain, i, f.localA);
+     if(f.lastFriction < timeStep-2) continue;
+     v4sf A = toGlobal(grain, i, f.localA);
      size_t b = f.index;
-     vec3 B =
+     v4sf B =
+       b == floor.base ? toGlobal(floor, b-floor.base, f.localB) :
+       b == side.base ? toGlobal(side, b-side.base, f.localB) :
        b < grain.base+grain.count ? toGlobal(grain, b-grain.base, f.localB) :
        b < wire.base+wire.count ? toGlobal(wire, b-wire.base, f.localB) :
-       b == floor.base ? toGlobal(floor, b-floor.base, f.localB) :
-       b==side.base ? toGlobal(side, b-side.base, f.localB) :
        (::error("grain", b), vec3());
-     vec3f vA = viewProjection*vec3f(A), vB=viewProjection*vec3f(B);
-     if(length(vA-vB) < 16/size.y) vA.y -= 8/size.y, vB.y += 8/size.y;
-     lines[f.color].append(vA);
-     lines[f.color].append(vB);
+#if 0
+     //vec3f vA = viewProjection*toVec3f(A), vB=viewProjection*toVec3f(B);
+     vec3f vA = viewProjection*toVec3f((A+B)/float4(2));
+     vec3f vB = viewProjection*toVec3f((A+B)/float4(2)+f.torque);
+     //if(length(vB-vA) < 16/size.y) { //vA.y -= 8/size.y, vB.y += 8/size.y;
+      float l = 128*length(f.torque)/maxL; //Grain::radius*512;
+      /*vA = (vA+vB)/2.f - l/size.y*(vB-vA)/length(vB-vA);
+      vB = (vA+vB)/2.f + l/size.y*(vB-vA)/length(vB-vA);*/
+      vA = vA;
+      vB = vA + l/size.y*(vB-vA)/length(vB-vA);
+     //}
+      rgb3f color = f.color;
+      lines[color].append(vA);
+      lines[color].append(vB);
+#else
+     vec3f vA = viewProjection*toVec3f((A+B)/float4(2));
+     {vec3f vB = viewProjection*toVec3f((A+B)/float4(2)+f.red);
+      float l = 128*length(f.red)/maxR; //Grain::radius*512;
+      vB = vA + l/size.y*(vB-vA)/length(vB-vA);
+      lines[rgb3f(1,0,0)].append(vA);
+      lines[rgb3f(1,0,0)].append(vB);
+     }
+     {vec3f vB = viewProjection*toVec3f((A+B)/float4(2)+f.green);
+      float l = 128*length(f.green)/maxG; //Grain::radius*512;
+      vB = vA + l/size.y*(vB-vA)/length(vB-vA);
+      lines[rgb3f(0,1,0)].append(vA);
+      lines[rgb3f(0,1,0)].append(vB);
+     }
+     {vec3f vB = viewProjection*toVec3f((A+B)/float4(2)+f.blue);
+      float l = 128*length(f.blue)/maxB; //Grain::radius*512;
+      vB = vA + l/size.y*(vB-vA)/length(vB-vA);
+      lines[rgb3f(0,0,1)].append(vA);
+      lines[rgb3f(0,0,1)].append(vB);
+     }
+#endif
     }
 #endif
    }
@@ -215,7 +257,6 @@ struct SimulationView : Simulation, Widget, Poll {
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_),
                              3, Float, positionBuffer);
-   assert_(grain.count);
    GLBuffer rotationBuffer (apply(grain.rotation.slice(0, grain.count),
                 [=](v4sf q) -> v4sf { return conjugate(qmul(viewRotation,q)); }));
    shader.bind("rotationBuffer"_, rotationBuffer, 0);
@@ -246,19 +287,18 @@ struct SimulationView : Simulation, Widget, Poll {
     positions[i*6+4] = P[1];
     positions[i*6+5] = P[3];
 
-#if DBG_FRICTION
+#if DBG_FRICTION && 0
     for(const Friction& f : wire.frictions[i]) {
-     if(f.lastUpdate < timeStep-1) continue;
+     if(f.lastUpdate < timeStep-2) continue;
      v4sf A = toGlobal(wire, i, f.localA);
      size_t b = f.index;
      //if(b >= grain.base+grain.count) continue;
-     if(b == floor.base) continue;
+     //if(b == floor.base) continue;
      v4sf B =
+       b==floor.base ? toGlobal(floor, b-floor.base, f.localB) :
+       b==side.base ? toGlobal(side, b-side.base, f.localB) :
       b < grain.base+grain.count ? toGlobal(grain, b-grain.base, f.localB) :
-      b < wire.base+wire.count ? /*toGlobal(wire, b-wire.base, f.localB)*/
-                               (::error(wire.base,b,wire.count), vec3f()) :
-      b==floor.base ? toGlobal(floor, b-floor.base, f.localB) :
-      b==side.base ? toGlobal(side, b-side.base, f.localB) :
+      b < wire.base+wire.count ? toGlobal(wire, b-wire.base, f.localB) :
       (::error("wire", b), vec3f());
      vec3f vA = viewProjection*toVec3f(A), vB=viewProjection*toVec3f(B);
      if(length(vA-vB) < 2/size.y) {
@@ -297,7 +337,7 @@ struct SimulationView : Simulation, Widget, Poll {
     }
   }
 
-  glDepthTest(false);
+  //glDepthTest(false);
   static GLShader shader {::shader_glsl(), {"flat"}};
   shader.bind();
   shader.bindFragments({"color"});
