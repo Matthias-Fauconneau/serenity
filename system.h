@@ -16,18 +16,19 @@ struct System {
 
  // Characteristic dimensions (SI)
  sconst real T = 1 /* 1 s */, L = 1 /* 1 m */, M = 1 /* 1 kg */;
- const real loopAngle = 1 ? (1 ? 2*PI*(3-sqrt(5.)) : PI/2) : 0; //1 ? (1 ? PI*(3-sqrt(5.)) : (2*PI)/5) : 0;
+ const real loopAngle = 1 ? (1 ? 3*PI*(3-sqrt(5.)) : PI/2) : 0; //1 ? (1 ? PI*(3-sqrt(5.)) : (2*PI)/5) : 0;
  sconst real staticFrictionSpeed = 1 *L/T;
- sconst real staticFrictionFactor = 0x1p8 /L;
- sconst real staticFrictionLength = 1e-3; //Wire::radius; //0x1p7 /L;
+ sconst real staticFrictionFactor = 0x1p7 /L; // 8
+ sconst real staticFrictionLength = 1e-3; // 1e-3
  sconst real staticFrictionDamping = 0x1p-6 *M/T/T; // 3-6-9-13
- sconst real dynamicFriction1 = 1./32; //16; // 16
- //sconst real dynamicFriction2 = 0x1p-16 /L; //16
+ sconst real dynamicFriction1 = 1./16; //16; // 16
+ sconst real dynamicFriction21 = 1./4; //0x1p-16 /L; //16
+ sconst real dynamicFriction2 = 1./64 / L; //16
  sconst real dampingFactor = 0x1p-11; // 9-13
- sconst real wireBendStiffness = 0x1p-14; //11-13 [F/a=MLT-2]
- sconst real wireBendDamping = 0x1p-14; //12-13
- sconst real winchRate = 256 /T;
- sconst real winchSpeed = 1./6 *L/T;
+ sconst real wireBendStiffness = 0x1p-12; //11-14 [F/a=MLT-2]
+ sconst real wireBendDamping = 0x1p-13; //12-14
+ sconst real winchRate = 256 /T; // 128-256
+ sconst real winchSpeed = 1./8 *L/T; // 7-16
  sconst v4sf g {0, 0, -10, 0}; // N/kg = m·s¯²
  sconst real dt = 1./(60*1024); // 512=>3·10¯⁵ s (~1/14 RT)
  #define DBG_FRICTION 0
@@ -96,7 +97,7 @@ struct System {
  struct Side : Obstacle {
   sconst size_t base = 1;
   sconst real curvature = 0; // -1/radius?
-  sconst real elasticModulus = 1e5 * M/(L*T*T);
+  sconst real elasticModulus = 1e4 * M/(L*T*T); // 5
   sconst real normalDamping = dampingFactor * M/T;
   sconst real frictionCoefficient = 1;
   const real initialRadius = Grain::radius*8;
@@ -107,10 +108,36 @@ struct System {
  template<Type tA>
  Contact contact(const tA& A, size_t a, const Side& side, size_t) {
   float length = length2(A.position[a]);
-  v4sf normal {-A.position[a][0]/length, -A.position[a][1]/length, 0, 0}; // Side -> Sphere
+  // Side -> Sphere
+  float r = side.castRadius;
+  v4sf normal {-A.position[a][0]/length, -A.position[a][1]/length, 0, 0};
   return { float3(tA::radius)*(-normal),
-     v4sf{side.castRadius*-normal[0], side.castRadius*-normal[1], A.position[a][2], 0},
-               normal, side.castRadius-tA::radius-length };
+     v4sf{r*-normal[0], r*-normal[1], A.position[a][2], 0},
+               normal, r-tA::radius-length };
+ }
+
+ struct Lid : Obstacle {
+  sconst size_t base = 3;
+  sconst real curvature = 0;
+  sconst real elasticModulus = 1e5 * M/(L*T*T);
+  sconst real normalDamping = dampingFactor * M / T;
+  sconst real frictionCoefficient = 1;
+ } lid;
+ /// Sphere - Lid side
+ template<Type tA>
+ Contact contact(const tA& A, size_t a, const Lid&, size_t) {
+  float length = length2(A.position[a]);
+  //if(length >= side.initialRadius) return {};
+  v4sf b {A.position[a][0]/length*side.initialRadius,
+     A.position[a][1]/length*side.initialRadius,
+     (load.position[0][2]-Grain::radius), 0};
+  //float z = A.position[a][2] - (load.position[0][2]-Grain::radius);
+  //float x = side.initialRadius - length;
+  //float d = sqrt(x*x+z*z);
+  v4sf r = A.position[a] - b;
+  float length3 = ::length(r);
+  v4sf normal = r/float4(length3);
+  return {float3(tA::radius)*(-normal), b, normal, length3-tA::radius};
  }
 
  struct Particle {
@@ -135,7 +162,7 @@ struct System {
   sconst v4sf c[] = {float3(19./90), float3(3/(4*dt)), float3(2/(dt*dt)), float3(6/(2*dt*dt*dt)),
                                  float3(24/(12*dt*dt*dt*dt))};
   sconst v4sf viscosity = float3(1-0*dt);
-  sconst v4sf angularViscosity = float3(1-16*dt);
+  sconst v4sf angularViscosity = float3(1-32*dt); //16-48-64
   void step(size_t i) {
    // Correction
    v4sf r = b[1] * (force[i] / mass - positionDerivatives[0][i]);
@@ -161,7 +188,7 @@ struct System {
  };
 
  struct Grain : Particle {
-  sconst size_t base = 2;
+  sconst size_t base = 3; //lid.base+1;
 
   // Properties
   sconst real radius = 2e-2; // 40 mm diameter
@@ -222,7 +249,7 @@ struct System {
 #endif
    rotation[i] *= rsqrt(sq4(rotation[i]));
   }
- } grain {0, rollTest ? 2 : 512};
+ } grain {0, rollTest ? 2 : 300};
 
  struct Wire : Particle {
   using Particle::Particle;
@@ -237,9 +264,9 @@ struct System {
   sconst real normalDamping = dampingFactor * M / T; // 0.3
   sconst real frictionCoefficient = 1;
 
-  sconst v4sf tensionStiffness = float3(400/*10-40*/ * elasticModulus*PI*sq(radius));
+  sconst v4sf tensionStiffness = float3(1000/*10-40*/ * elasticModulus*PI*sq(radius));
   const v4sf tensionDamping = float3(0x1p-1/*1*/ * mass[0]/T);
- } wire {grain.base+grain.capacity, useWire ? 4096 : 0, //20m
+ } wire {grain.base+grain.capacity, useWire ? 8192 : 0, //20m
          Wire::density * Wire::volume};
   /// Cylinder - Cylinder
   Contact contact(const Wire&, size_t a, const Wire&, size_t b) {
@@ -259,7 +286,7 @@ struct System {
   sconst real elasticModulus = 1e5 * M/(L*T*T);
   sconst real normalDamping = dampingFactor * M / T;
   sconst real frictionCoefficient = 1;
- } load {wire.base+wire.capacity, 1, 1./4/*1-16*/ * M};
+ } load {wire.base+wire.capacity, 1, 1./3/*1-16*/ * M};
  /// Sphere - Load
  template<Type tA>
  Contact contact(const tA& A, size_t a, const Load& B, size_t) {
@@ -324,10 +351,11 @@ struct System {
   v4sf tangentRelativeVelocity
     = relativeVelocity - dot3(c.normal, relativeVelocity) * c.normal;
   v4sf tangentRelativeSpeed = sqrt(sq3(tangentRelativeVelocity));
-  real fD = dynamicFriction1 * frictionCoefficient * fN;
-  //real fD = dynamicFriction2 * frictionCoefficient * fN * tangentRelativeSpeed[0];
-  /*real fD = min(dynamicFriction1 * frictionCoefficient * fN,
-                dynamicFriction2 * frictionCoefficient * fN * tangentRelativeSpeed[0]);*/
+  //real fD = dynamicFriction1 * frictionCoefficient * fN;
+  //real fD = dynamicFriction2 * frictionCoefficient * fN * ::tangentRelativeSpeed[0];
+  real fD = max(dynamicFriction1 * frictionCoefficient * fN,
+     min(dynamicFriction21 * frictionCoefficient * fN,
+                dynamicFriction2 * frictionCoefficient * fN * tangentRelativeSpeed[0]));
   v4sf fT;
   assert_(isNumber(fS), x, c.normal, globalA, globalB, relativeA, relativeB, A.rotation[a], B.rotation[b], friction.localA, friction.localB);
   assert_(fS >= 0 && fD >= 0, fN, fK, fB, fS, fD);
