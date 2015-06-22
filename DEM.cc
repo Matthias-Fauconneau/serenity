@@ -321,7 +321,7 @@ struct SimulationView : Simulation, Widget, Poll {
      lines[color].append(vB);
      {vec3f vA = viewProjection*toVec3f((A+B)/float4(2));
       {vec3f vB = viewProjection*toVec3f((A+B)/float4(2)+f.blue);
-       float l = 1024*length(f.blue)/maxB; //Grain::radius*512;
+       float l = ::min(256.f, 512*length(f.blue)/maxB); //Grain::radius*512;
        vB = vA + l/size.y*(vB-vA)/length(vB-vA);
        lines[rgb3f(0,0,1)].append(vA);
        lines[rgb3f(0,0,1)].append(vB);
@@ -402,8 +402,8 @@ struct SimulationView : Simulation, Widget, Poll {
   renderTime.stop();
   if(stop && fitTranslation != this->translation) window->render();
 
-  array<char> s = str(timeStep*this->dt, grain.count, wire.count/*, kT, kR*/
-                      ,staticFrictionCount, dynamicFrictionCount);
+  array<char> s = str(int(processState), timeStep*this->dt, grain.count, wire.count/*, kT, kR*/
+                      ,staticFrictionCount2, dynamicFrictionCount2);
   if(load.count) s.append(" "_+str(load.position[0][2]));
   window->setTitle(s);
   return shared<Graphics>();

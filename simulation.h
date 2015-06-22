@@ -30,8 +30,10 @@ struct Simulation : System {
 
  // Process
  const float pourRadius = side.castRadius - Grain::radius - Wire::radius;
- const real winchRadius = side.castRadius - Grain::radius;
+ const real winchRadius = side.castRadius - Grain::radius
+   /*- (loopAngle?Grain::radius:0)*/;
    //- (loopAngle&&0?Wire::radius:Grain::radius);
+ const float initialTension = 4; // -2
  real pourHeight = Floor::height+Grain::radius;
  real winchAngle = 0;
 
@@ -69,7 +71,7 @@ struct Simulation : System {
    grain.position[i] = newPosition;
    grain.velocity[i] = _0f;
    for(size_t n: range(3)) grain.positionDerivatives[n][i] = _0f;
-   for(size_t n: range(3)) grain.angularDerivatives[n][i] = _0001f;
+   for(size_t n: range(3)) grain.angularDerivatives[n][i] = _0f;
    grain.frictions.set(i);
    real t0 = 2*PI*random();
    real t1 = acos(1-2*random());
@@ -120,9 +122,9 @@ struct Simulation : System {
     // Generates falling grain (pour)
     const bool useGrain = 1;
     if(useGrain && pourHeight >= Grain::radius) for(;;) {
-     vec3f p(random()*2-1,random()*2-1, pourHeight);
-     if(length(p.xy())>1) continue;
-     vec3f newPosition (pourRadius*p.xy(), p.z); // Within cylinder
+     v4sf p {random()*2-1,random()*2-1, pourHeight, 0};
+     if(length2(p)>1) continue;
+     v4sf newPosition {pourRadius*p[0], pourRadius*p[1], p[2], 0}; // Within cylinder
      // Finds lowest Z (reduce fall/impact energy)
      //float maxZ = newPosition[2];
      newPosition[2] = Grain::radius;
@@ -154,7 +156,7 @@ struct Simulation : System {
      grain.velocity[i] = _0f;
      for(size_t n: range(3)) grain.positionDerivatives[n][i] = _0f;
      grain.angularVelocity[i] = _0f;
-     for(size_t n: range(3)) grain.angularDerivatives[n][i] = _0001f;
+     for(size_t n: range(3)) grain.angularDerivatives[n][i] = _0f;
      grain.frictions.set(i);
      real t0 = 2*PI*random();
      real t1 = acos(1-2*random());
@@ -181,14 +183,16 @@ break2_:;
   if(processState==Release) {
    if(side.castRadius < 15*Grain::radius) {
     if(!releaseTime) releaseTime = timeStep*dt;
-    /*//side.castRadius = side.initialRadius * exp(sq((timeStep*dt-releaseTime)/(16*T)));
-    side.castRadius = side.initialRadius * exp((timeStep*dt-releaseTime)/(1*T));
-    side.castRadius = 15*Grain::radius;
-    side.castRadius = ::min(side.castRadius, 15*Grain::radius);*/
+    //side.castRadius = side.initialRadius * exp(sq((timeStep*dt-releaseTime)/(16*T)));
+    //side.castRadius = side.initialRadius * exp((timeStep*dt-releaseTime)/(1*T));
+    //side.castRadius = 15*Grain::radius;
+    //side.castRadius = ::min(side.castRadius, 15*Grain::radius);*/
     // + Pressure
     float h = load.count ? load.position[0][2] : pourHeight;
     float P = side.force.radialSum / (2*PI*side.castRadius*h);
-    side.castRadius += dt * (1 * L/T) * P / (M*L/T/T/(L*L));
+    static float v = 0;
+    v += dt * (1 * L/T) * P / (M*L/T/T/(L*L));
+    side.castRadius += dt * v;
    } else {
     log("Released");
     processState = Done;
@@ -304,7 +308,7 @@ break2_:;
       if(l[0]) {
        float p = wireBendStiffness * atan(l[0], dot3(a, b)[0]);
        v4sf dap = cross(a, cross(a,b)) / (sq3(a) * l);
-       wire.force[i+1] += float4(p) * (-dap);
+       wire.force[i+1] += float3(p) * (-dap);
       }
      }
      // First tension
@@ -319,16 +323,16 @@ break2_:;
        float p = wireBendStiffness * atan(l[0], dot3(a, b)[0]);
        v4sf dap = cross(a, cross(a,b)) / (sq3(a) * l);
        v4sf dbp = cross(b, cross(b,a)) / (sq3(b) * l);
-       wire.force[i+1] += float4(p) * (-dap);
-       wire.force[i] += float4(p) * (dap - dbp);
-       //wire.force[i-1] += float4(p) * (dbp); //-> "Tension to first node of next chunk"
+       wire.force[i+1] += float3(p) * (-dap);
+       wire.force[i] += float3(p) * (dap - dbp);
+       //wire.force[i-1] += float3(p) * (dbp); //-> "Tension to first node of next chunk"
        if(1) {
         v4sf A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
         v4sf axis = cross(C-B, B-A);
         v4sf l = sqrt(sq3(axis));
         if(l[0]) {
          float angularVelocity = atan(l[0], dot3(C-B, B-A)[0]);
-         wire.force[i] += float4(wireBendDamping * angularVelocity / 2)
+         wire.force[i] += float3(wireBendDamping * angularVelocity / 2)
            * cross(axis/l, C-A);
         }
        }
@@ -377,7 +381,7 @@ break2_:;
      v4sf length4 = sqrt(sq3(c));
      float length = length4[0];
      if(length) {
-      v4sf p = float4(wireBendStiffness * atan(length, dot3(a, b)[0]));
+      v4sf p = float3(wireBendStiffness * atan(length, dot3(a, b)[0]));
       v4sf dap = cross(a, cross(a,b)) / (sq3(a) * length4);
       v4sf dbp = cross(b, cross(b,a)) / (sq3(b) * length4);
       wire.force[i+1] += p* (-dap);
@@ -390,7 +394,7 @@ break2_:;
        float length = length4[0];
        if(length) {
         float angularVelocity = atan(length, dot3(C-B, B-A)[0]);
-        wire.force[i] += float4(wireBendDamping * angularVelocity / 2)
+        wire.force[i] += float3(wireBendDamping * angularVelocity / 2)
           * cross(axis/length4, C-A);
        }
       }
@@ -444,17 +448,17 @@ break2_:;
       torsionEnergy += 1./2 * wireBendStiffness * L * sq(angle);
       v4sf dap = cross(a, cross(a,b)) / (sq3(a) * l);
       v4sf dbp = cross(b, cross(b,a)) / (sq3(b) * l);
-      //wire.force[i+1] += float4(p) * (-dap); //-> "Previous torsion spring on first"
+      //wire.force[i+1] += float3(p) * (-dap); //-> "Previous torsion spring on first"
       float p = wireBendStiffness * angle;
-      wire.force[i] += float4(p) * (dap - dbp);
-      wire.force[i-1] += float4(p) * (dbp);
+      wire.force[i] += float3(p) * (dap - dbp);
+      wire.force[i-1] += float3(p) * (dbp);
       if(1) {
        v4sf A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
        v4sf axis = cross(C-B, B-A);
        v4sf l = sqrt(sq3(axis));
        if(l[0]) {
         float angularVelocity = atan(l[0], dot3(C-B, B-A)[0]);
-        wire.force[i] += float4(wireBendDamping * angularVelocity / 2)
+        wire.force[i] += float3(wireBendDamping * angularVelocity / 2)
           * cross(axis/l, C-A);
        }
       }
@@ -502,7 +506,7 @@ break2_:;
       if(l[0]) {
        float p = wireBendStiffness * atan(l[0], dot3(a, b)[0]);
        v4sf dbp = cross(b, cross(b,a)) / (sq3(b) * l);
-       wire.force[i-1] += float4(p) * (dbp);
+       wire.force[i-1] += float3(p) * (dbp);
       }
      }
     }
@@ -550,8 +554,8 @@ break2_:;
   // Integration
   min = _0f; max = _0f;
 
-  const float N = 0; // -2
-  float replacementLength = Wire::internodeLength*(1+N/Wire::tensionStiffness[0]);
+  float replacementLength =
+    Wire::internodeLength*(1+initialTension/Wire::tensionStiffness[0]);
   v4sf length;
   v4sf direction;
   {
@@ -578,7 +582,7 @@ break2_:;
    vec3f end (r*cos(a),r*sin(a), pourHeight+dz);
    // Boundary condition: constant force
    v4sf boundaryForce = Wire::tensionStiffness
-     * float4(replacementLength-Wire::internodeLength);
+     * float3(replacementLength-Wire::internodeLength);
    v4sf relativePosition = end - wire.position[wire.count-1];
    length = sqrt(sq3(relativePosition));
    //v4sf x = length - Wire::internodeLength4;
@@ -624,7 +628,16 @@ break2_:;
   kT = 1./2*grain.mass[0]*ssqV[0];
 
   if(load.count) {
+   load.force[0][0]=0;
+   load.force[0][1]=0;
    load.step(0);
+   assert_(load.velocity[0][0]==0 &&load.velocity[0][1]==0);
+   //assert_(load.position[0][0]==0 &&load.position[0][1]==0,);
+   if(!(load.position[0][0]==0 &&load.position[0][1]==0)) {
+    log(load.position, load.velocity, load.force);
+    load.position[0][0]=0;
+    load.position[0][1]=0;
+   }
    if(processState==Load) {
     if(kT < 64 * grain.count * grain.mass[0] * (Wire::radius*Wire::radius) /*/ sq(T)*/) {
      processState=Release;
@@ -637,6 +650,8 @@ break2_:;
   }
 
   //log(staticFrictionCount, dynamicFrictionCount);
+  staticFrictionCount2 = staticFrictionCount;
+  dynamicFrictionCount2 = dynamicFrictionCount;
   staticFrictionCount = 0; dynamicFrictionCount = 0;
 
   v4sf wireLength = _0f;
@@ -652,7 +667,7 @@ break2_:;
     Locker lock(this->lock);
     size_t i = wire.count++;
     wire.position[i] = wire.position[wire.count-2]
-      + float4(replacementLength) * direction;
+      + float3(replacementLength) * direction;
     //log(wire.count, direction, wire.position[wire.count-2], wire.position[i]);
     min = ::min(min, wire.position[i]);
     max = ::max(max, wire.position[i]);
