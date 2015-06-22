@@ -172,12 +172,12 @@ struct SimulationView : Simulation, Widget, Poll {
   {Locker lock(this->lock);
   if(grain.count) {
    buffer<vec3f> positions {grain.count*6};
-   #if DBG_FRICTION
-   float maxR = 0, maxG = 0, maxB = 0;
+#if DBG_FRICTION && 0
+   float /*maxR = 0, maxG = 0,*/ maxB = 0;
    for(size_t i: range(grain.count)) {
     for(const Friction& f : grain.frictions[i]) {
-     maxR = ::max(maxR, length(f.red));
-     maxG = ::max(maxG, length(f.green));
+     //maxR = ::max(maxR, length(f.red));
+     //maxG = ::max(maxG, length(f.green));
      maxB = ::max(maxB, length(f.blue));
     }
    }
@@ -200,7 +200,7 @@ struct SimulationView : Simulation, Widget, Poll {
      lines[rgb3f(vec3f(axis))].append(viewProjection*toVec3f(toGlobal(grain, i,
                                                        float(Grain::radius/2)*axis)));
     }
-#if DBG_FRICTION && 1
+#if DBG_FRICTION && 0
     for(const Friction& f : grain.frictions[i]) {
      if(f.lastFriction < timeStep-2) continue;
      v4sf A = toGlobal(grain, i, f.localA);
@@ -271,6 +271,16 @@ struct SimulationView : Simulation, Widget, Poll {
   if(wire.count>1) {
    size_t wireCount = wire.count;
    buffer<vec3f> positions {(wireCount-1)*6};
+#if DBG_FRICTION && 1
+   static float /*maxR = 0, maxG = 0,*/ maxB = 0;
+   for(size_t i: range(wire.count)) {
+    for(const Friction& f : wire.frictions[i]) {
+     //maxR = ::max(maxR, length(f.red));
+     //maxG = ::max(maxG, length(f.green));
+     maxB = ::max(maxB, length(f.blue));
+    }
+   }
+#endif
    for(size_t i: range(wireCount-1)) {
     vec3f a (toVec3f(wire.position[i])), b (toVec3f(wire.position[i+1]));
     // FIXME: GPU quad projection
@@ -287,9 +297,9 @@ struct SimulationView : Simulation, Widget, Poll {
     positions[i*6+4] = P[1];
     positions[i*6+5] = P[3];
 
-#if DBG_FRICTION && 0
+#if DBG_FRICTION && 1
     for(const Friction& f : wire.frictions[i]) {
-     if(f.lastUpdate < timeStep-2) continue;
+     if(f.lastFriction < timeStep-2) continue;
      v4sf A = toGlobal(wire, i, f.localA);
      size_t b = f.index;
      //if(b >= grain.base+grain.count) continue;
@@ -306,8 +316,17 @@ struct SimulationView : Simulation, Widget, Poll {
       else vA.y += 4/size.y, vB.y -= 4/size.y;
      }
      //log(f.color, (vA+vec3f(1.f))/2.f*float(size.x), (vB+vec3f(1.f))/2.f*float(size.y));
-     lines[f.color].append(vA);
-     lines[f.color].append(vB);
+     rgb3f color = f.color;
+     lines[color].append(vA);
+     lines[color].append(vB);
+     {vec3f vA = viewProjection*toVec3f((A+B)/float4(2));
+      {vec3f vB = viewProjection*toVec3f((A+B)/float4(2)+f.blue);
+       float l = 1024*length(f.blue)/maxB; //Grain::radius*512;
+       vB = vA + l/size.y*(vB-vA)/length(vB-vA);
+       lines[rgb3f(0,0,1)].append(vA);
+       lines[rgb3f(0,0,1)].append(vB);
+      }
+     }
     }
 #endif
    }
@@ -337,7 +356,8 @@ struct SimulationView : Simulation, Widget, Poll {
     }
   }
 
-  //glDepthTest(false);
+  if(1) glDepthTest(false);
+
   static GLShader shader {::shader_glsl(), {"flat"}};
   shader.bind();
   shader.bindFragments({"color"});
@@ -383,7 +403,7 @@ struct SimulationView : Simulation, Widget, Poll {
   if(stop && fitTranslation != this->translation) window->render();
 
   array<char> s = str(timeStep*this->dt, grain.count, wire.count/*, kT, kR*/
-                      /*,staticFrictionCount, dynamicFrictionCount*/);
+                      ,staticFrictionCount, dynamicFrictionCount);
   if(load.count) s.append(" "_+str(load.position[0][2]));
   window->setTitle(s);
   return shared<Graphics>();

@@ -30,7 +30,8 @@ struct Simulation : System {
 
  // Process
  const float pourRadius = side.castRadius - Grain::radius - Wire::radius;
- const real winchRadius = side.castRadius - (loopAngle?Grain::radius:Wire::radius);
+ const real winchRadius = side.castRadius - Grain::radius;
+   //- (loopAngle&&0?Wire::radius:Grain::radius);
  real pourHeight = Floor::height+Grain::radius;
  real winchAngle = 0;
 
@@ -122,12 +123,29 @@ struct Simulation : System {
      vec3f p(random()*2-1,random()*2-1, pourHeight);
      if(length(p.xy())>1) continue;
      vec3f newPosition (pourRadius*p.xy(), p.z); // Within cylinder
+     // Finds lowest Z (reduce fall/impact energy)
+     //float maxZ = newPosition[2];
+     newPosition[2] = Grain::radius;
+     for(auto p: grain.position.slice(0, grain.count)) {
+      float x = length(toVec3f(p - newPosition).xy());
+      if(x < 2*Grain::radius) {
+       float dz = sqrt(sq(2*Grain::radius) - sq(x));
+       newPosition[2] = ::max(newPosition[2], p[2]+dz);
+      }
+     }
+     //assert_(newPosition[2] <= maxZ);
+     if(newPosition[2] > pourHeight) break;
      for(auto p: wire.position.slice(0, wire.count))
       if(length(p - newPosition) < Grain::radius+Wire::radius)
        goto break2_;
-     for(auto p: grain.position.slice(0, grain.count))
+     /*for(auto p: grain.position.slice(0, grain.count)) {
       if(length(p - newPosition) < Grain::radius+Grain::radius)
        goto break2_;
+     }*/
+     for(auto p: grain.position.slice(0, grain.count)) {
+      if(::length(p - newPosition) < Grain::radius+Grain::radius-0x1p-24)
+       error(newPosition, p, log2(abs(::length(p - newPosition) -  2*Grain::radius)));
+     }
      Locker lock(this->lock);
      size_t i = grain.count++;
      grain.position[i] = newPosition;
@@ -532,7 +550,7 @@ break2_:;
   // Integration
   min = _0f; max = _0f;
 
-  const float N = 2;
+  const float N = 0; // -2
   float replacementLength = Wire::internodeLength*(1+N/Wire::tensionStiffness[0]);
   v4sf length;
   v4sf direction;
@@ -554,8 +572,8 @@ break2_:;
     else if(/*2 <*/ t < 3) r = -1, a=b+loopAngle+/*-*/(t-2)*loopAngle;
     else    /*3 <    t < 4*/r = -1+2*(t-3), a=b+2*loopAngle;
 #endif
-     dz = Grain::radius+Wire::radius;
    }
+   dz = Grain::radius+Wire::radius;
    r *= winchRadius;
    vec3f end (r*cos(a),r*sin(a), pourHeight+dz);
    // Boundary condition: constant force
