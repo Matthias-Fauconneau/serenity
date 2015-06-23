@@ -126,7 +126,6 @@ struct System {
   buffer<vec4f> positionDerivatives[3]; // { [0 ... 2] = buffer<vec4f>(capacity) };
   buffer<vec4f> force { capacity };
   buffer<array<Friction>> frictions { capacity };
-  buffer<Lock> locks { capacity }; // Debug
   size_t count = 0;
 
   struct { vec4f operator[](size_t) const { return _0001f; }} rotation;
@@ -136,7 +135,6 @@ struct System {
     mass(mass), _1_mass(float3(1./mass)) {
    for(size_t i: range(3)) positionDerivatives[i] = buffer<vec4f>(capacity);
    frictions.clear();
-   locks.clear();
   }
   sconst vec4f b[] = {float3(dt), float3(dt*dt/2), float3(dt*dt*dt/6), float3(dt*dt*dt*dt/24)};
   sconst vec4f c[] = {float3(19./90), float3(3/(4*dt)), float3(2/(dt*dt)), float3(6/(2*dt*dt*dt)),

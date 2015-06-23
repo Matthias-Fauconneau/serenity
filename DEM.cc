@@ -25,7 +25,7 @@ struct SimulationView : Simulation, Widget, Poll {
   if(encoder) viewYawPitch.x += 2*PI*dt / 16;
   window->render();
   int64 elapsed = realTime() - lastReport;
-  if(elapsed > 60e9) {
+  if(elapsed > 4e9) {
    if(1) {
     log(timeStep*this->dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
     log("grain",str(grainTime, stepTime), "wire",str(wireTime, stepTime));

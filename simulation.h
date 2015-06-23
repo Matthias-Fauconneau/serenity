@@ -189,7 +189,7 @@ break2_:;
      penalty(grain, a, grain, b);
     }
    }
-  }, 1);
+  }, threadCount);
   grainContactTime.stop();
   grainTime.stop();
 
@@ -198,9 +198,8 @@ break2_:;
 
   wireContactTime.start();
   if(wire.count) parallel_chunk(wire.count,
-                                [this,&grainLattice](uint id, size_t start, size_t size) {
-   //log(id, start, size);
-   assert(size>1);
+                                [this,&grainLattice](uint, size_t start, size_t size) {
+   //assert(size>1);
    uint16* grainBase = grainLattice.indices.begin();
    const int gX = grainLattice.size.x, gY = grainLattice.size.y;
    const uint16* grainNeighbours[3*3] = {
@@ -209,14 +208,10 @@ break2_:;
     grainBase+gX*gY-gX-1, grainBase+gX*gY-1, grainBase+gX*gY+gX-1
    };
 
-   //assert_(wire.locks[start].tryLock(), id, start, size, wire.count);
    wire.force[start] = float4(wire.mass) * G;
-   //wire.locks[start].unlock();
    { // First iteration
     size_t i = start;
-    //assert_(wire.locks[i+1].tryLock());
     wire.force[i+1] = float4(wire.mass) * G;
-    //wire.locks[i+1].unlock();
     if(i > 0) {
      if(start > 1 && Wire::bendStiffness) {// Previous torsion spring on first
       size_t i = start-1;
@@ -227,16 +222,12 @@ break2_:;
       if(l[0]) {
        float p = Wire::bendStiffness * atan(l[0], dot3(a, b)[0]);
        v4sf dap = cross(a, cross(a,b)) / (sq3(a) * l);
-       assert_(wire.locks[i+1].tryLock());
        wire.force[i+1] += float3(p) * (-dap);
-       wire.locks[i+1].unlock();
       }
      }
      // First tension
      v4sf fT = tension(i-1, i);
-     assert_(wire.locks[i].tryLock());
      wire.force[i] -= fT;
-     wire.locks[i].unlock();
      if(Wire::bendStiffness) { // First torsion
       v4sf A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
       v4sf a = C-B, b = B-A;
@@ -246,59 +237,43 @@ break2_:;
        float p = Wire::bendStiffness * atan(l[0], dot3(a, b)[0]);
        v4sf dap = cross(a, cross(a,b)) / (sq3(a) * l);
        v4sf dbp = cross(b, cross(b,a)) / (sq3(b) * l);
-       assert_(wire.locks[i+1].tryLock());
        wire.force[i+1] += float3(p) * (-dap);
-       wire.locks[i+1].unlock();
-       assert_(wire.locks[i].tryLock());
        wire.force[i] += float3(p) * (dap - dbp);
-       wire.locks[i].unlock();
-       //wire.force[i-1] += float3(p) * (dbp); //-> "Tension to first node of next chunk"
+        //wire.force[i-1] += float3(p) * (dbp); //-> "Tension to first node of next chunk"
        if(1) {
         v4sf A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
         v4sf axis = cross(C-B, B-A);
         v4sf l = sqrt(sq3(axis));
         if(l[0]) {
          float angularVelocity = atan(l[0], dot3(C-B, B-A)[0]);
-         assert_(wire.locks[i].tryLock());
          wire.force[i] += float3(Wire::bendDamping * angularVelocity / 2)
            * cross(axis/l, C-A);
-         wire.locks[i].unlock();
         }
        }
       }
      }
     }
     // Bounds
-    assert_(wire.locks[i].tryLock());
     penalty(wire, i, floor, 0);
     penalty(wire, i, side, 0);
     if(load.count) penalty(wire, i, load, 0);
-    wire.locks[i].unlock();
     // Wire - Grain
     {size_t offset = grainLattice.index(wire.position[i]);
     for(size_t n: range(3*3)) {
      v4hi line = loada(grainNeighbours[n] + offset);
-     assert_(wire.locks[i].tryLock());
-     if(line[0]) penalty(wire, i, grain, line[0]-1);
+      if(line[0]) penalty(wire, i, grain, line[0]-1);
      if(line[1]) penalty(wire, i, grain, line[1]-1);
      if(line[2]) penalty(wire, i, grain, line[2]-1);
-     wire.locks[i].unlock();
-    }}
+       }}
    }
    for(size_t i: range(start+1, start+size-1)) {
     // Gravity
-    assert_(wire.locks[i+1].tryLock());
     wire.force[i+1] = float4(wire.mass) * G;
-    wire.locks[i+1].unlock();
     // Tension
     v4sf fT = tension(i-1, i);
-    assert_(wire.locks[i-1].tryLock());
     wire.force[i-1] += fT;
-    wire.locks[i-1].unlock();
-    assert_(wire.locks[i].tryLock());
     wire.force[i] -= fT;
-    wire.locks[i].unlock();
-    if(Wire::bendStiffness) {// Torsion springs (Bending resistance)
+     if(Wire::bendStiffness) {// Torsion springs (Bending resistance)
      v4sf A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
      v4sf a = C-B, b = B-A;
      v4sf c = cross(a, b);
@@ -308,15 +283,9 @@ break2_:;
       v4sf p = float3(Wire::bendStiffness * atan(length, dot3(a, b)[0]));
       v4sf dap = cross(a, cross(a,b)) / (sq3(a) * length4);
       v4sf dbp = cross(b, cross(b,a)) / (sq3(b) * length4);
-      assert_(wire.locks[i+1].tryLock());
       wire.force[i+1] += p* (-dap);
-      wire.locks[i+1].unlock();
-      assert_(wire.locks[i].tryLock());
       wire.force[i] += p * (dap - dbp);
-      wire.locks[i].unlock();
-      assert_(wire.locks[i-1].tryLock());
       wire.force[i-1] += p * (dbp);
-      wire.locks[i-1].unlock();
       if(1) {
        v4sf A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
        v4sf axis = cross(C-B, B-A);
@@ -324,16 +293,13 @@ break2_:;
        float length = length4[0];
        if(length) {
         float angularVelocity = atan(length, dot3(C-B, B-A)[0]);
-        assert_(wire.locks[i].tryLock());
         wire.force[i] += float3(Wire::bendDamping * angularVelocity / 2)
           * cross(axis/length4, C-A);
-        wire.locks[i].unlock();
        }
       }
      }
     }
     // Bounds
-    assert_(wire.locks[i].tryLock());
     penalty(wire, i, floor, 0);
     penalty(wire, i, side, 0);
     if(load.count) penalty(wire, i, load, 0);
@@ -345,24 +311,17 @@ break2_:;
      if(line[1]) penalty(wire, i, grain, line[1]-1);
      if(line[2]) penalty(wire, i, grain, line[2]-1);
     }}
-    wire.locks[i].unlock();
    }
 
    // Last iteration
    if(size>1) {
     size_t i = start+size-1;
     // Gravity
-    assert_(wire.locks[i].tryLock());
     wire.force[i] = float4(wire.mass) * G;
-    wire.locks[i].unlock();
-    // Tension
+     // Tension
     v4sf fT = tension(i-1, i);
-    assert_(wire.locks[i-1].tryLock());
     wire.force[i-1] += fT;
-    wire.locks[i-1].unlock();
-    assert_(wire.locks[i].tryLock());
     wire.force[i] -= fT;
-    wire.locks[i].unlock();
     // Torsion with next chunk
     if(i+1 < wire.count) {
      v4sf A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
@@ -376,27 +335,20 @@ break2_:;
       v4sf dbp = cross(b, cross(b,a)) / (sq3(b) * l);
       //wire.force[i+1] += float3(p) * (-dap); //-> "Previous torsion spring on first"
       float p = Wire::bendStiffness * angle;
-      assert_(wire.locks[i].tryLock());
       wire.force[i] += float3(p) * (dap - dbp);
-      wire.locks[i].unlock();
-      assert_(wire.locks[i-1].tryLock());
       wire.force[i-1] += float3(p) * (dbp);
-      wire.locks[i-1].unlock();
       if(1) {
        v4sf A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
        v4sf axis = cross(C-B, B-A);
        v4sf l = sqrt(sq3(axis));
        if(l[0]) {
         float angularVelocity = atan(l[0], dot3(C-B, B-A)[0]);
-        assert_(wire.locks[i].tryLock());
         wire.force[i] += float3(Wire::bendDamping * angularVelocity / 2)
           * cross(axis/l, C-A);
-        wire.locks[i].unlock();
-       }
+        }
       }
      }
     }
-    assert_(wire.locks[i].tryLock());
     // Bounds
     penalty(wire, i, floor, 0);
     penalty(wire, i, side, 0);
@@ -409,15 +361,12 @@ break2_:;
      if(line[1]) penalty(wire, i, grain, line[1]-1);
      if(line[2]) penalty(wire, i, grain, line[2]-1);
     }}
-    wire.locks[i].unlock();
    }
 
    { // Tension to first node of next chunk
     size_t i = start+size;
     if(i < wire.count) {
-     assert_(wire.locks[i-1].tryLock());
      wire.force[i-1] += tension(i-1, i);
-     wire.locks[i-1].unlock();
       // Torsion to first node of next chunk
      if(i+1<wire.count && Wire::bendStiffness) {
       v4sf A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
@@ -427,9 +376,7 @@ break2_:;
       if(l[0]) {
        float p = Wire::bendStiffness * atan(l[0], dot3(a, b)[0]);
        v4sf dbp = cross(b, cross(b,a)) / (sq3(b) * l);
-       assert_(wire.locks[i-1].tryLock());
        wire.force[i-1] += float3(p) * (dbp);
-       wire.locks[i-1].unlock();
       }
      }
     }
@@ -501,7 +448,7 @@ break2_:;
    load.force[0][1]=0;
    load.step(0);
    if(processState==Load) {
-    if(kT < 64 * grain.count * grain.mass * (Wire::radius*Wire::radius) /*/ sq(T)*/) {
+    if(kT < 128 * grain.count * grain.mass * (Wire::radius*Wire::radius) /*/ sq(T)*/) {
      side.castRadius = 15*Grain::radius;
      processState = Done;
     }
