@@ -82,14 +82,14 @@ struct Simulation : System {
                                   cos(t2)};
    grain.angularVelocity[i] = _0f;
    grain.rotation[i] = _0001f;
-   /*if(grain.capacity == 1 && i == 0) { // Roll test
-    grain.velocity[0] = vec3f((- grain.position[0] / T).xy(), 0);
+   if(grain.capacity == 1 && i == 0) { // Roll test
+    grain.velocity[0] = {-grain.position[0][0], -grain.position[0][1], 0, 0};
     log(grain.velocity[0]);
    }
    else if(grain.capacity == 2 && i == 1) { // Collision test
-    grain.velocity[1] = (grain.position[0] - grain.position[1]) / T;
-    grain.velocity[1] /= ::length(grain.velocity[1]);
-   }*/
+    grain.velocity[1] = (grain.position[0] - grain.position[1]);
+    grain.velocity[1] *= rsqrt(sq3(grain.velocity[1]));
+   }
   }
  }
 
@@ -200,7 +200,7 @@ break2_:;
     float h = load.count ? load.position[0][2] : pourHeight;
     float P = side.force.radialSum / (2*PI*side.castRadius*h);
     static float v = 0;
-    v += dt * (0x1p-7 * L/T) * P / (M*L/T/T/(L*L));
+    v += dt * (0x1p-5 * L/T) * P / (M*L/T/T/(L*L));
     side.castRadius += dt * v;
    } else {
     log("Released");
@@ -223,12 +223,13 @@ break2_:;
   parallel_chunk(grain.count, [this,&grainLattice](uint, size_t start, size_t size) {
    for(size_t a: range(start, start+size)) {
     grain.force[a] = grain.mass * g;
-    grain.torque[a] = penalty(grain, a, floor, 0);
+    grain.torque[a] = _0f;
+    penalty(grain, a, floor, 0);
     if(load.count) {
-     grain.torque[a] += penalty(grain, a, load, 0);
-     grain.torque[a] += penalty(grain, a, lid, 0);
+     /*grain.torque[a] +=*/ penalty(grain, a, load, 0);
+     /*grain.torque[a] +=*/ penalty(grain, a, lid, 0);
     }
-    if(processState != Done) grain.torque[a] += penalty(grain, a, side, 0);
+    if(processState != Done) /*grain.torque[a] +=*/ penalty(grain, a, side, 0);
     grainLattice(grain.position[a]) = 1+a;
    }
   }, 1);
@@ -252,9 +253,12 @@ break2_:;
      size_t b = *neighbour;
      if(!b) continue;
      b--;
-     v4sf torque = penalty(grain, a, grain, b);
-     grain.torque[a] += torque;
-     grain.torque[b] -= torque; // atomic_sub
+     penalty(grain, a, grain, b);
+     /*if(length(torque)) {
+      if(grain.history[a]) grain.history[b].append("a"_+grain.history[a].last());
+      grain.history[b].append(str(a, b, torque/grain.mass/float4(dt)));
+     }
+     grain.torque[b] += torque; // atomic_sub*/
     }
    }
   }, 1);
@@ -573,7 +577,7 @@ break2_:;
     Wire::internodeLength*(1+initialTension/Wire::tensionStiffness[0]);
   v4sf length;
   v4sf direction;
-  {
+  if(useWire && processState==Pour) {
    //real r = (mod(winchAngle / loopAngle, 2) < 1 ? 1 : -1) * winchRadius;
    real a = winchAngle, r = 1, dz = 0;
    if(loopAngle) {
@@ -603,14 +607,12 @@ break2_:;
    //v4sf x = length - Wire::internodeLength4;
    //endTension = Wire::tensionStiffness * x;
    direction = relativePosition/length;
-   if(useWire && processState==Pour) { // Pull wire
     wire.force[wire.count-1] += boundaryForce * direction;
     //wire.force[0] += boundaryForce * r2/sqrt(sq3(r2));
     //v4sf r2 (vec3f(winchRadius,0,2*Grain::radius/*Wire::radius*/)-wire.position[0]);
     //wire.force[0] += Wire::tensionStiffness * r2;
     //wire.velocity[0] = _0f;
     //wire.position[0] = vec3f(winchRadius,0,Grain::radius+dz/*Wire::radius*/);
-   }
   }
 
   wireIntegrationTime.start();
@@ -660,8 +662,17 @@ break2_:;
    }
     //log(load.velocity[0][2], kT / (grain.count * grain.mass[0] * (Wire::radius*Wire::radius)));
     //if(load.force[0][2] > load.mass[0] * g[2])
-     // Caps load velocity
-     load.velocity[0][2] = ::max(-6*Grain::radius/T, load.velocity[0][2]);
+    // Caps load velocity
+    float maxZ = 0, vz=0;
+    for(size_t i: range(grain.count)) {
+     auto p = grain.position[i];
+     if(p[2]>maxZ) {
+      maxZ = p[2];
+      vz = grain.velocity[i][2];
+     }
+    }
+    if(load.position[0][2] < maxZ+Grain::radius+Grain::radius)
+     load.velocity[0][2] = ::max(-1.f/2/T, load.velocity[0][2]);
    }
   }
 

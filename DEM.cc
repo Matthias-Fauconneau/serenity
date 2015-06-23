@@ -73,8 +73,10 @@ struct SimulationView : Simulation, Widget, Poll {
  bool showPlot = 0 && processState < Done;
 
  SimulationView() : Poll(0, POLLIN, simulationThread) {
-  window->actions[F12] = [this]{ writeFile(str(timeStep*dt)+".png",
-                                          encodePNG(target.readback()), home()); };
+  window->actions[F12] = [this]{
+   if(existsFile(str(timeStep*dt)+".png")) log(str(timeStep*dt)+".png exists");
+   else writeFile(str(timeStep*dt)+".png",encodePNG(target.readback()), home());
+  };
   window->actions[RightArrow] = [this]{ if(stop) queue(); };
   window->actions[Space] = [this]{ stop=!stop; if(!stop) queue(); };
   window->actions[Key('p')] = [this]{ showPlot = !showPlot; };
@@ -101,7 +103,7 @@ struct SimulationView : Simulation, Widget, Poll {
  ~SimulationView() {
   log("~", "grain", grain.count, "wire", wire.count);
  }
- vec2f sizeHint(vec2f) override { return vec2f(1050, 1050*720/1280); }
+ vec2f sizeHint(vec2f) override { return vec2f(1050, /*1050*720/1280*/720); }
  shared<Graphics> graphics(vec2f) override {
   renderTime.start();
 
@@ -398,7 +400,8 @@ struct SimulationView : Simulation, Widget, Poll {
    encoder->writeVideoFrame(target.readback());
    if(stop) encoder = nullptr;
   }
-  target.blit(0, window->size);
+  int offset = (target.size.x-window->size.x)/2;
+  target.blit(0, window->size, int2(offset, 0), int2(target.size.x-offset, target.size.y));
   renderTime.stop();
   if(stop && fitTranslation != this->translation) window->render();
 

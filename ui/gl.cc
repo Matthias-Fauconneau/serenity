@@ -323,10 +323,10 @@ void GLFrameBuffer::bindWindow(int2 position, int2 size, uint clearFlags, vec4f 
     glBlitFramebuffer(offset.x,offset.y,size.x,size.y, 0,0,size.x,size.y,
                       GL_COLOR_BUFFER_BIT, GL_NEAREST);
 }*/
-void GLFrameBuffer::blit(uint target, int2 size) {
+void GLFrameBuffer::blit(uint target, int2 size, int2 src1, int2 src2) {
     glBindFramebuffer(GL_READ_FRAMEBUFFER,id);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER,target);
-    glBlitFramebuffer(0,0,this->size.x,this->size.y, 0,0,size.x,size.y,
+    glBlitFramebuffer(src1.x,src1.y, src2.x,src2.y, 0,0, size.x,size.y,
                       GL_COLOR_BUFFER_BIT, GL_LINEAR);
 }
 

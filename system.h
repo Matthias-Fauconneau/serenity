@@ -2,6 +2,12 @@
 float length2(v4sf v) { return sqrt(sq2(v))[0]; }
 float length(v4sf v) { return sqrt(sq3(v))[0]; }
 
+struct NoOperation {
+ //NoOperation operator [](size_t) const { return {}; }
+};
+void operator +=(NoOperation, v4sf) {}
+void operator -=(NoOperation, v4sf) {}
+
 struct RadialSum {
  real radialSum;
  RadialSum& operator[](size_t){ return *this; }
@@ -17,18 +23,18 @@ struct System {
  // Characteristic dimensions (SI)
  sconst real T = 1 /* 1 s */, L = 1 /* 1 m */, M = 1 /* 1 kg */;
  const real loopAngle = 1 ? (1 ? 3*PI*(3-sqrt(5.)) : PI/2) : 0; //1 ? (1 ? PI*(3-sqrt(5.)) : (2*PI)/5) : 0;
- sconst real staticFrictionSpeed = 1 *L/T;
- sconst real staticFrictionFactor = 0x1p7 /L; // 8
- sconst real staticFrictionLength = 1e-3; // 1e-3
+ sconst real staticFrictionSpeed = 1./3 *L/T; // -2
+ sconst real staticFrictionFactor = 0x1p5 /L; // 8
+ sconst real staticFrictionLength = 8e-3; // 1e-3-1e-2
  sconst real staticFrictionDamping = 0x1p-6 *M/T/T; // 3-6-9-13
- sconst real dynamicFriction1 = 1./16; //16; // 16
- sconst real dynamicFriction21 = 1./4; //0x1p-16 /L; //16
- sconst real dynamicFriction2 = 1./64 / L; //16
+ sconst real dynamicFriction1 = 1./4; //16; // 16
+ /*sconst real dynamicFriction21 = 1./2; //0x1p-16 /L; //16
+ sconst real dynamicFriction2 = 1./32 / L; //16*/
  sconst real dampingFactor = 0x1p-11; // 9-13
  sconst real wireBendStiffness = 0x1p-12; //11-14 [F/a=MLT-2]
  sconst real wireBendDamping = 0x1p-13; //12-14
- sconst real winchRate = 256 /T; // 128-256
- sconst real winchSpeed = 1./8 *L/T; // 7-16
+ sconst real winchRate = 512 /T; // 128-256
+ sconst real winchSpeed = 1./4 *L/T; // 7-16
  sconst v4sf g {0, 0, -10, 0}; // N/kg = m·s¯²
  sconst real dt = 1./(60*1024); // 512=>3·10¯⁵ s (~1/14 RT)
  #define DBG_FRICTION 0
@@ -73,6 +79,7 @@ struct System {
   struct { v4sf operator[](size_t){ return _0001f; }} rotation;
   struct { v4sf operator[](size_t){ return _0f; }} angularVelocity;
   v4sf force[1];
+  v4sf torque[1];
  };
 
  struct Floor : Obstacle {
@@ -97,7 +104,7 @@ struct System {
  struct Side : Obstacle {
   sconst size_t base = 1;
   sconst real curvature = 0; // -1/radius?
-  sconst real elasticModulus = 1e4 * M/(L*T*T); // 5
+  sconst real elasticModulus = 1e5 * M/(L*T*T); // 5
   sconst real normalDamping = dampingFactor * M/T;
   sconst real frictionCoefficient = 1;
   const real initialRadius = Grain::radius*8;
@@ -148,6 +155,7 @@ struct System {
   buffer<v4sf> positionDerivatives[3]; // { [0 ... 2] = buffer<v4sf>(capacity) };
   buffer<v4sf> force { capacity };
   buffer<array<Friction>> frictions { capacity };
+  //buffer<array<String>> history { capacity }; // Debug
   size_t count = 0;
 
   struct { v4sf operator[](size_t) const { return _0001f; }} rotation;
@@ -157,12 +165,13 @@ struct System {
     mass(float3(mass)) {
    for(size_t i: range(3)) positionDerivatives[i] = buffer<v4sf>(capacity);
    frictions.clear();
+   //history.clear();
   }
   sconst v4sf b[] = {float3(dt), float3(dt*dt/2), float3(dt*dt*dt/6), float3(dt*dt*dt*dt/24)};
   sconst v4sf c[] = {float3(19./90), float3(3/(4*dt)), float3(2/(dt*dt)), float3(6/(2*dt*dt*dt)),
                                  float3(24/(12*dt*dt*dt*dt))};
   sconst v4sf viscosity = float3(1-0*dt);
-  sconst v4sf angularViscosity = float3(1-32*dt); //16-48-64
+  sconst v4sf angularViscosity = float3(1-0*dt); //16-20
   void step(size_t i) {
    // Correction
    v4sf r = b[1] * (force[i] / mass - positionDerivatives[0][i]);
@@ -220,6 +229,7 @@ struct System {
 #if 1
    rotation[i] += dt_2 * qmul(angularVelocity[i], rotation[i]);
    angularVelocity[i] += dt_angularMass * torque[i]; //-cross(w, Grain::angularMass*w)
+   //if(angularVelocity[i]) history[i].append(str(i, angularVelocity[i], dt_angularMass*torque[i]/float4(dt)));
 #elif 1 // -15%
    // Correction
    v4sf r = b[1] * (torque[i]  * _1_angularMass - angularDerivatives[0][i]);
@@ -227,14 +237,6 @@ struct System {
    angularVelocity[i] += c[1]*r;
    for(size_t n: range(3)) angularDerivatives[n][i] += c[2+n]*r;
 
-   /*// Prediction
-   rotation[i] += qmul(rotation[i], float3(dt)*angularVelocity[i]);
-   for(size_t n: range(3)) {
-    rotation[i] += qmul(rotation[i], b[1+n]*angularDerivatives[n][i]);
-    angularVelocity[i] += b[n]*angularDerivatives[n][i];
-    for(size_t j: range(3-(n+1)))
-     angularDerivatives[n][i] += b[j]*angularDerivatives[n+1+j][i];
-   }*/
    // Prediction
    rotation[i] += b[0]*qmul(angularVelocity[i], rotation[i]);
    rotation[i] += b[1]*qmul(angularDerivatives[0][i], rotation[i]);
@@ -249,10 +251,12 @@ struct System {
 #endif
    rotation[i] *= rsqrt(sq4(rotation[i]));
   }
- } grain {0, rollTest ? 2 : 300};
+ } grain {0, rollTest ? 2 : 512};
 
  struct Wire : Particle {
   using Particle::Particle;
+  struct { NoOperation operator[](size_t) const { return {}; }} torque;
+
   sconst real radius = 1e-3; // 2mm diameter
   sconst real curvature = 1./radius;
   sconst real internodeLength = Grain::radius/2;
@@ -286,7 +290,8 @@ struct System {
   sconst real elasticModulus = 1e5 * M/(L*T*T);
   sconst real normalDamping = dampingFactor * M / T;
   sconst real frictionCoefficient = 1;
- } load {wire.base+wire.capacity, 1, 1./3/*1-16*/ * M};
+  v4sf torque[1];
+ } load {wire.base+wire.capacity, 1, 1./4/*1-16*/ * M};
  /// Sphere - Load
  template<Type tA>
  Contact contact(const tA& A, size_t a, const Load& B, size_t) {
@@ -304,11 +309,10 @@ struct System {
  real gravityEnergy = 0, contactEnergy = 0, tensionEnergy = 0, torsionEnergy = 0;
 
  /// Evaluates contact penalty between two objects
- /// \return torque on A
  template<Type tA, Type tB>
- v4sf penalty(const tA& A, size_t a, tB& B, size_t b) {
+ void penalty(const tA& A, size_t a, tB& B, size_t b) {
   Contact c = contact(A, a, B, b);
-  if(c.depth >= 0) return _0f;
+  if(c.depth >= 0) return;// _0f;
   // Stiffness
   constexpr real E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
   constexpr real R = 1/(tA::curvature+tB::curvature);
@@ -351,11 +355,11 @@ struct System {
   v4sf tangentRelativeVelocity
     = relativeVelocity - dot3(c.normal, relativeVelocity) * c.normal;
   v4sf tangentRelativeSpeed = sqrt(sq3(tangentRelativeVelocity));
-  //real fD = dynamicFriction1 * frictionCoefficient * fN;
+  real fD = dynamicFriction1 * frictionCoefficient * fN;
   //real fD = dynamicFriction2 * frictionCoefficient * fN * ::tangentRelativeSpeed[0];
-  real fD = max(dynamicFriction1 * frictionCoefficient * fN,
+  /*real fD = max(dynamicFriction1 * frictionCoefficient * fN,
      min(dynamicFriction21 * frictionCoefficient * fN,
-                dynamicFriction2 * frictionCoefficient * fN * tangentRelativeSpeed[0]));
+                dynamicFriction2 * frictionCoefficient * fN * tangentRelativeSpeed[0]));*/
   v4sf fT;
   assert_(isNumber(fS), x, c.normal, globalA, globalB, relativeA, relativeB, A.rotation[a], B.rotation[b], friction.localA, friction.localB);
   assert_(fS >= 0 && fD >= 0, fN, fK, fB, fS, fD);
@@ -378,7 +382,7 @@ struct System {
    if(tangentRelativeSpeed[0]) {
     // Caps fT for correct integration on impact (i.e only damp, not induce rotations)
     //fD = min(fD, 0/*1e-10f/dt*/ * tangentRelativeSpeed[0]);
-    fT = - float3(fD) * tangentRelativeVelocity / (tangentRelativeSpeed+float3(1e-8f*staticFrictionSpeed));
+    fT = - float3(fD) * tangentRelativeVelocity / (tangentRelativeSpeed/*+float3(1e-8f*staticFrictionSpeed)*/);
     dynamicFrictionCount++;
 #if DBG_FRICTION
     friction.color = rgb3f(1,0,0);
@@ -396,7 +400,23 @@ struct System {
   A.force[a] += force;
   //B.force[b] -= force;
   atomic_sub(B.force[b], force);
-  return cross(relativeA, fT);
+#if 0
+  {float l = length(cross(relativeA, fT))/grain.mass[0];
+   float v = length(A.angularVelocity[a]);
+   String state = str(a, b, l, v, fS, fD, length(fT),
+                      dot3(cross(relativeA, fT)/grain.mass, A.angularVelocity[a])[0],
+                      tangentRelativeSpeed[0]/staticFrictionSpeed,
+     tangentLength[0]/staticFrictionLength);
+   if(/*l>1 ||*/ v > 32) {
+    log(str(A.history[a],"\n"_), state);
+    A.history[a].clear();
+   }
+   else A.history[a].append(move(state));
+  }
+#endif
+  A.torque[a] += cross(relativeA, fT);
+  //atomic_sub(B.torque[b], cross(relativeB, fT));
+  B.torque[b] -= cross(relativeB, fT);
  }
 };
 constexpr real System::dt;
