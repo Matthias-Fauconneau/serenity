@@ -204,7 +204,7 @@ inline v4sf angleVector(float a, vec3 v) {
  return {b.x, b.y, b.z, cos(a/2*l)};
 }
 inline v4sf qapply(v4sf q, v4sf v) {
- assert(abs(v[3]) <= 0x1p-29, log2(abs(v[3])));
+ assert(abs(v[3]) <= 0x1p-28, log2(abs(v[3])));
  return qmul(q, qmul(v, conjugate(q)));
 }
 

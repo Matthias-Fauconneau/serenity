@@ -70,20 +70,11 @@ struct SimulationView : Simulation, Widget, Poll {
    if(existsFile(str(timeStep*dt)+".png")) log(str(timeStep*dt)+".png exists");
    else writeFile(str(timeStep*dt)+".png",encodePNG(target.readback()), home());
   };
-  //window->actions[RightArrow] = [this]{ if(stop) queue(); };
-  //window->actions[Space] = [this]{ stop=!stop; if(!stop) queue(); };
   window->actions[Key('p')] = [this]{ showPlot = !showPlot; };
   window->actions[Return] = [this]{
    if(processState < Done) processState++;
    log(int(processState), "grain", grain.count, "wire", wire.count);
   };
-  /*window->actions[Key('E')] = [this] {
-   if(!encoder) {
-    encoder = unique<Encoder>("tas.mp4");
-    encoder->setH264(window->Window::size, 60);
-    encoder->open();
-   }
-  };*/
   if(arguments().contains("export")) {
    encoder = unique<Encoder>("tas.mp4"_);
    encoder->setH264(int2(1280,720), 60);
@@ -121,7 +112,7 @@ struct SimulationView : Simulation, Widget, Poll {
                                  angleVector(viewYawPitch.x, vec3(0,0,1)));
 
   vec3 min = -1./32, max = 1./32;
-  {//Locker lock(this->lock);
+  {
    for(vec4f p: grain.position.slice(0, grain.count)) {
     assert(p[3] == 0, p);
     vec3 O = toVec3(qapply(viewRotation, p) - rotationCenter);
@@ -165,16 +156,6 @@ struct SimulationView : Simulation, Widget, Poll {
   {Locker lock(this->lock);
   if(grain.count) {
    buffer<vec3> positions {grain.count*6};
-#if DBG_FRICTION && 0
-   float /*maxR = 0, maxG = 0,*/ maxB = 0;
-   for(size_t i: range(grain.count)) {
-    for(const Friction& f : grain.frictions[i]) {
-     //maxR = ::max(maxR, length(f.red));
-     //maxG = ::max(maxG, length(f.green));
-     maxB = ::max(maxB, length(f.blue));
-    }
-   }
-#endif
    for(size_t i: range(grain.count)) {
     // FIXME: GPU quad projection
     vec3 O = viewProjection * toVec3(grain.position[i]);
@@ -193,54 +174,6 @@ struct SimulationView : Simulation, Widget, Poll {
      lines[rgb3f(vec3(axis))].append(viewProjection*toVec3(toGlobal(grain, i,
                                                        float(Grain::radius/2)*axis)));
     }
-#if DBG_FRICTION && 0
-    for(const Friction& f : grain.frictions[i]) {
-     if(f.lastFriction < timeStep-2) continue;
-     vec4f A = toGlobal(grain, i, f.localA);
-     size_t b = f.index;
-     vec4f B =
-       b == floor.base ? toGlobal(floor, b-floor.base, f.localB) :
-       b == side.base ? toGlobal(side, b-side.base, f.localB) :
-       b < grain.base+grain.count ? toGlobal(grain, b-grain.base, f.localB) :
-       b < wire.base+wire.count ? toGlobal(wire, b-wire.base, f.localB) :
-       (::error("grain", b), vec3());
-#if 0
-     //vec3 vA = viewProjection*toVec3(A), vB=viewProjection*toVec3(B);
-     vec3 vA = viewProjection*toVec3((A+B)/float4(2));
-     vec3 vB = viewProjection*toVec3((A+B)/float4(2)+f.torque);
-     //if(length(vB-vA) < 16/size.y) { //vA.y -= 8/size.y, vB.y += 8/size.y;
-      float l = 128*length(f.torque)/maxL; //Grain::radius*512;
-      /*vA = (vA+vB)/2.f - l/size.y*(vB-vA)/length(vB-vA);
-      vB = (vA+vB)/2.f + l/size.y*(vB-vA)/length(vB-vA);*/
-      vA = vA;
-      vB = vA + l/size.y*(vB-vA)/length(vB-vA);
-     //}
-      rgb3f color = f.color;
-      lines[color].append(vA);
-      lines[color].append(vB);
-#else
-     vec3 vA = viewProjection*toVec3((A+B)/float4(2));
-     {vec3 vB = viewProjection*toVec3((A+B)/float4(2)+f.red);
-      float l = 128*length(f.red)/maxR; //Grain::radius*512;
-      vB = vA + l/size.y*(vB-vA)/length(vB-vA);
-      lines[rgb3f(1,0,0)].append(vA);
-      lines[rgb3f(1,0,0)].append(vB);
-     }
-     {vec3 vB = viewProjection*toVec3((A+B)/float4(2)+f.green);
-      float l = 128*length(f.green)/maxG; //Grain::radius*512;
-      vB = vA + l/size.y*(vB-vA)/length(vB-vA);
-      lines[rgb3f(0,1,0)].append(vA);
-      lines[rgb3f(0,1,0)].append(vB);
-     }
-     {vec3 vB = viewProjection*toVec3((A+B)/float4(2)+f.blue);
-      float l = 128*length(f.blue)/maxB; //Grain::radius*512;
-      vB = vA + l/size.y*(vB-vA)/length(vB-vA);
-      lines[rgb3f(0,0,1)].append(vA);
-      lines[rgb3f(0,0,1)].append(vB);
-     }
-#endif
-    }
-#endif
    }
 
    static GLShader shader {::shader_glsl(), {"sphere"}};
@@ -253,10 +186,7 @@ struct SimulationView : Simulation, Widget, Poll {
    GLBuffer rotationBuffer (apply(grain.rotation.slice(0, grain.count),
                 [=](vec4f q) -> vec4f { return conjugate(qmul(viewRotation,q)); }));
    shader.bind("rotationBuffer"_, rotationBuffer, 0);
-   /*GLBuffer colorBuffer (grain.color.slice(start));
-   shader.bind("colorBuffer"_, colorBuffer, 1);*/
    shader["radius"] = float(scale.z/2 * Grain::radius);
-   //glBlendAlpha();
    vertexArray.draw(Triangles, positions.size);
   }}
 
@@ -264,16 +194,6 @@ struct SimulationView : Simulation, Widget, Poll {
   if(wire.count>1) {
    size_t wireCount = wire.count;
    buffer<vec3> positions {(wireCount-1)*6};
-#if DBG_FRICTION && 1
-   static float /*maxR = 0, maxG = 0,*/ maxB = 0;
-   for(size_t i: range(wire.count)) {
-    for(const Friction& f : wire.frictions[i]) {
-     //maxR = ::max(maxR, length(f.red));
-     //maxG = ::max(maxG, length(f.green));
-     maxB = ::max(maxB, length(f.blue));
-    }
-   }
-#endif
    for(size_t i: range(wireCount-1)) {
     vec3 a (toVec3(wire.position[i])), b (toVec3(wire.position[i+1]));
     // FIXME: GPU quad projection
@@ -289,39 +209,6 @@ struct SimulationView : Simulation, Widget, Poll {
     positions[i*6+3] = P[2];
     positions[i*6+4] = P[1];
     positions[i*6+5] = P[3];
-
-#if DBG_FRICTION && 1
-    for(const Friction& f : wire.frictions[i]) {
-     if(f.lastFriction < timeStep-2) continue;
-     vec4f A = toGlobal(wire, i, f.localA);
-     size_t b = f.index;
-     //if(b >= grain.base+grain.count) continue;
-     //if(b == floor.base) continue;
-     vec4f B =
-       b==floor.base ? toGlobal(floor, b-floor.base, f.localB) :
-       b==side.base ? toGlobal(side, b-side.base, f.localB) :
-      b < grain.base+grain.count ? toGlobal(grain, b-grain.base, f.localB) :
-      b < wire.base+wire.count ? toGlobal(wire, b-wire.base, f.localB) :
-      (::error("wire", b), vec3());
-     vec3 vA = viewProjection*toVec3(A), vB=viewProjection*toVec3(B);
-     if(length(vA-vB) < 2/size.y) {
-      if(vA.y<vB.y) vA.y -= 4/size.y, vB.y += 4/size.y;
-      else vA.y += 4/size.y, vB.y -= 4/size.y;
-     }
-     //log(f.color, (vA+vec3(1.f))/2.f*float(size.x), (vB+vec3(1.f))/2.f*float(size.y));
-     rgb3f color = f.color;
-     lines[color].append(vA);
-     lines[color].append(vB);
-     {vec3 vA = viewProjection*toVec3((A+B)/float4(2));
-      {vec3 vB = viewProjection*toVec3((A+B)/float4(2)+f.blue);
-       float l = ::min(256.f, 512*length(f.blue)/maxB); //Grain::radius*512;
-       vB = vA + l/size.y*(vB-vA)/length(vB-vA);
-       lines[rgb3f(0,0,1)].append(vA);
-       lines[rgb3f(0,0,1)].append(vB);
-      }
-     }
-    }
-#endif
    }
    static GLShader shader {::shader_glsl(), {"cylinder"}};
    shader.bind();
@@ -335,7 +222,6 @@ struct SimulationView : Simulation, Widget, Poll {
   }}
 
   if(load.count) {
-   //Locker lock(this->lock);
    vec3 min (-vec2(-side.castRadius), load.position[0][2]);
    vec3 max (+vec2(-side.castRadius), load.position[0][2]);
    for(int i: range(0b111 +1)) for(int j: {(i&0b110) |0b001, (i&0b101) |0b010, (i&0b011) |0b100}) {
@@ -389,15 +275,13 @@ struct SimulationView : Simulation, Widget, Poll {
 
   if(encoder) {
    encoder->writeVideoFrame(target.readback());
-   //if(stop) encoder = nullptr;
   }
   int offset = (target.size.x-window->size.x)/2;
   target.blit(0, window->size, int2(offset, 0), int2(target.size.x-offset, target.size.y));
   renderTime.stop();
-  //if(stop && fitTranslation != this->translation) window->render();
 
   array<char> s = str(int(processState), timeStep*this->dt, grain.count, wire.count/*, kT, kR*/
-                      ,staticFrictionCount2, dynamicFrictionCount2);
+                      /*,staticFrictionCount2, dynamicFrictionCount2*/);
   if(load.count) s.append(" "_+str(load.position[0][2]));
   window->setTitle(s);
   return shared<Graphics>();
@@ -407,16 +291,6 @@ struct SimulationView : Simulation, Widget, Poll {
  bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button,
                                 Widget*&) override {
   vec2 delta = cursor-lastPos; lastPos=cursor;
-  /*if(event==Press && button==WheelDown) {
-   stateIndex = clamp(0, stateIndex-1, int(states.size-1));
-   window->setTitle(str(stateIndex));
-   return true;
-  }
-  if(event==Press && button==WheelUp) {
-   stateIndex = clamp(0, stateIndex+1, int(states.size-1));
-   window->setTitle(str(stateIndex));
-   return true;
-  }*/
   if(event==Motion && button==LeftButton) {
    viewYawPitch += float(2*PI) * delta / size; //TODO: warp
    viewYawPitch.y = clamp<float>(-PI, viewYawPitch.y, 0);

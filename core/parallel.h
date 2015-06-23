@@ -11,50 +11,41 @@ inline void operator*=(mref<float> values, float factor) { values.apply([factor]
 // \file parallel.h
 #include "vector.h"
 
+void atomic_add(v4sf& a, v4sf b) {
+#if __atomic_compare_exchange
+ v4sf expected = a;
+ v4sf desired;
+ do {
+  desired = expected+b;
+ } while(!__atomic_compare_exchange((__int128*)&a, (__int128*)&expected,
+                (__int128*)&desired, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+#else
+ v4sf expected, desired;
+ do {
+  expected = a;
+  desired = expected+b;
+ } while(!__sync_bool_compare_and_swap((__int128*)&a, *(__int128*)&expected,
+                *(__int128*)&desired));
+#endif
+}
+
 void atomic_sub(v4sf& a, v4sf b) {
- /*v4sf expected = a;
+#if __atomic_compare_exchange
+ v4sf expected = a;
  v4sf desired;
  do {
   desired = expected-b;
  } while(!__atomic_compare_exchange((__int128*)&a, (__int128*)&expected,
-                (__int128*)&desired, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED));*/
+                (__int128*)&desired, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+#else
  v4sf expected, desired;
  do {
   expected = a;
   desired = expected-b;
  } while(!__sync_bool_compare_and_swap((__int128*)&a, *(__int128*)&expected,
                 *(__int128*)&desired));
+#endif
 }
-
-/*void atomic_add(float& a, float b) {
- float expected = a;
- float desired;
- do {
-  desired = expected+b;
- } while(!__atomic_compare_exchange_n((int*)&a, (int*)&expected,
-                *(int*)&desired, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
-}
-
-void atomic_add(vec3& a, vec3 b) {
- atomic_add(a.x, b.x);
- atomic_add(a.y, b.y);
- atomic_add(a.z, b.z);
-}
-
-void atomic_sub(float& a, float b) {
- float expected = a;
- float desired;
- do {
-  desired = expected-b;
- } while(!__atomic_compare_exchange_n((int*)&a, (int*)&expected,
-                *(int*)&desired, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
-}
-
-void atomic_sub(vec3& a, vec3 b) {
- atomic_sub(a.x, b.x);
- atomic_sub(a.y, b.y);
- atomic_sub(a.z, b.z);
-}*/
 
 static constexpr uint threadCount = 8;
 
@@ -108,15 +99,19 @@ template<Type F> void parallel_for(uint stop, F f, const uint unused threadCount
 
 /// Runs a loop in parallel chunks with chunk-wise functor
 template<Type F> void parallel_chunk(int64 totalSize, F f, const uint threadCount = ::threadCount) {
- if(totalSize <= threadCount || threadCount==1) {
+ if(totalSize <= 8*threadCount || threadCount==1) {
   f(0, 0, totalSize);
   return;
  }
- const int64 chunkSize = totalSize/threadCount;
+ const int64 chunkSize = (totalSize+threadCount-1)/threadCount;
  const int64 chunkCount = (totalSize+chunkSize-1)/chunkSize; // Last chunk might be smaller
  assert_((chunkCount-1)*chunkSize < totalSize && totalSize <= chunkCount*chunkSize, (chunkCount-1)*chunkSize, totalSize, chunkCount*chunkSize);
- assert_(chunkCount >= threadCount);
- parallel_for(0, chunkCount, [&](uint id, int64 chunkIndex) { f(id, chunkIndex*chunkSize, min(chunkSize, totalSize-chunkIndex*chunkSize)); }, threadCount);
+ assert_(chunkCount == threadCount, chunkCount, threadCount, chunkSize);
+ parallel_for(0, chunkCount, [&](uint id, int64 chunkIndex) {
+   f(id, chunkIndex*chunkSize, min(chunkSize, totalSize-chunkIndex*chunkSize));
+ }, threadCount);
+ /*for(int64 chunkIndex : range(0, chunkCount))
+  f(0, chunkIndex*chunkSize, min(chunkSize, totalSize-chunkIndex*chunkSize));*/
 }
 /// Runs a loop in parallel chunks with chunk-wise functor
 template<Type F> void parallel_chunk(int64 start, int64 stop, F f, const uint threadCount = ::threadCount) { parallel_chunk(stop-start, [&](uint id, int64 I0, int64 DI) { f(id, start+I0, DI); }, threadCount); }
