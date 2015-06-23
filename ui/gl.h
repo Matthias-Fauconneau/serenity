@@ -33,9 +33,9 @@ struct GLUniform {
 	explicit operator bool() { return location>=0; }
 	void operator=(int);
 	void operator=(float);
- void operator=(vec2f);
- void operator=(vec3f);
- void operator=(vec4f);
+ void operator=(vec2);
+ void operator=(vec3);
+ void operator=(vec4);
 	void operator=(struct mat3x2);
 	void operator=(struct mat3);
 	void operator=(struct mat4);
@@ -110,8 +110,8 @@ struct GLFrameBuffer {
 	GLFrameBuffer(int2 size, int sampleCount=0/*, uint format=0*/);
     ~GLFrameBuffer();
 
-    void bind(uint clearFlags=0, vec4 color=1);
-    static void bindWindow(int2 position, int2 size, uint clearFlags=0, vec4f color=1);
+    void bind(uint clearFlags=0, rgba4f color=1);
+    static void bindWindow(int2 position, int2 size, uint clearFlags=0, rgba4f color=1);
 	static void blitWindow(const GLTexture& source, int2 offset=0);
     void blit(uint target, int2 size, int2 offset, int2 sourceSize);
     void blit(GLTexture&);
@@ -123,4 +123,4 @@ struct GLFrameBuffer {
     GLTexture depthTexture, colorTexture;
 };
 
-void glDrawRectangle(GLShader& shader, vec2f min=vec2f(-1,-1), vec2f max=vec2f(1,1), bool texCoord=false);
+void glDrawRectangle(GLShader& shader, vec2 min=vec2(-1,-1), vec2 max=vec2(1,1), bool texCoord=false);

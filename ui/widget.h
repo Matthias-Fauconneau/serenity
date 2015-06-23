@@ -16,20 +16,20 @@ struct Widget {
     virtual String title() { return {}; }
     /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))
     /// \note space is first allocated to preferred widgets, then to expanding widgets.
-    virtual vec2f sizeHint(vec2f) abstract;
+    virtual vec2 sizeHint(vec2) abstract;
     /// Returns graphic elements representing this widget at the given \a size.
-    virtual shared<Graphics> graphics(vec2f unused size) { error("Unimplemented, use graphics(size, clip)"); }
-    virtual shared<Graphics> graphics(vec2f size, Rect unused clip) { return this->graphics(size); }
+    virtual shared<Graphics> graphics(vec2 unused size) { error("Unimplemented, use graphics(size, clip)"); }
+    virtual shared<Graphics> graphics(vec2 size, Rect unused clip) { return this->graphics(size); }
     /// Returns stop position for scrolling
     /// \arg direction Direction of requested stop (-1: previous, 0: nearest, 1: next)
     /// \note Defaults to discrete uniform coarse stops
-    virtual float stop(vec2f unused size, int unused axis, float currentPosition, int direction) { return currentPosition + direction * 64; }
+    virtual float stop(vec2 unused size, int unused axis, float currentPosition, int direction) { return currentPosition + direction * 64; }
 
 // Events
     /// Override \a mouseEvent to handle or forward user input
     /// \note \a mouseEvent is first called on the root Window#widget
     /// \return Whether the mouse event was accepted
-    virtual bool mouseEvent(vec2f unused cursor, vec2f unused size, ::Event unused event, Button unused button, Widget*& unused) {
+    virtual bool mouseEvent(vec2 unused cursor, vec2 unused size, ::Event unused event, Button unused button, Widget*& unused) {
 		return false;
     }
     /// Override \a keyPress to handle or forward user input

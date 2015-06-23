@@ -3,15 +3,15 @@
 #include "font.h"
 #include "utf8.h"
 
-vec2f TextLayout::min(const ref<Glyph> word) {
+vec2 TextLayout::min(const ref<Glyph> word) {
 	assert_(word);
- vec2f min=inf;
+ vec2 min=inf;
 	for(const Glyph& g : word) min=::min(min, g.origin - g.bearing);
 	return min;
 }
-vec2f TextLayout::max(const ref<Glyph> word) {
+vec2 TextLayout::max(const ref<Glyph> word) {
 	assert_(word);
- vec2f max=-inf;
+ vec2 max=-inf;
 	for(const Glyph& g : word) max=::max(max, g.origin - g.bearing + g.size);
 	return max;
 }
@@ -39,7 +39,7 @@ void TextLayout::nextLine(bool justify, int align) {
 		for(const ref<Glyph> word: words) {
 			auto& wordOut = line.append();
 			for(Glyph glyph: word) {
-    glyph.origin += vec2f(x, lineOriginY);
+    glyph.origin += vec2(x, lineOriginY);
 				bbMin = ::min(bbMin, glyph.origin-glyph.bearing);
 				bbMax = ::max(bbMax, glyph.origin-glyph.bearing+glyph.size);
 				wordOut.append( glyph );
@@ -66,8 +66,8 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 	if(!text) return;
 	// Fraction lines
 	struct Context {
-  TextFormat format; FontData* font; float size; bgr3f color; vec2f origin; size_t start; array<Context> children; vec2f position; size_t end;
-  void translate(vec2f offset) {
+  TextFormat format; FontData* font; float size; bgr3f color; vec2 origin; size_t start; array<Context> children; vec2 position; size_t end;
+  void translate(vec2 offset) {
 			origin += offset; position += offset;
 			for(auto& e: children) e.translate(offset);
 		}
@@ -87,10 +87,10 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 		// Format context
 		array<Context> stack;
 		TextFormat format = TextFormat::Regular;
-  vec2f origin = 0;
+  vec2 origin = 0;
 		size_t start = 0;
 		array<Context> children;
-  vec2f position = 0;
+  vec2 position = 0;
 		uint column = 0;
 		Link link;
 
@@ -174,20 +174,20 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 					mref<Glyph> word0 = word.sliceRange(children[0].start, children[0].end);
 					mref<Glyph> word1 = word.sliceRange(children[1].start, children[1].end);
 					assert_(word0 && word1, word.size, word0.size, word1.size);
-     vec2f min0 = min(word0), max0 = max(word0), size0 = max0-min0;
-     vec2f min1 = min(word1), max1 = max(word1), size1 = max1-min1;
+     vec2 min0 = min(word0), max0 = max(word0), size0 = max0-min0;
+     vec2 min1 = min(word1), max1 = max(word1), size1 = max1-min1;
 					{ // Horizontal center align
-      vec2f offset ( ((min0-min1)/2.f + (size0-size1)/2.f).x, 0);
+      vec2 offset ( ((min0-min1)/2.f + (size0-size1)/2.f).x, 0);
 						if(offset.x < 0) { children[0].translate(-offset); for(auto& e: word0) e.origin -= offset; }
 						else                 { children[1].translate( offset); for(auto& e: word1) e.origin += offset; }
 					}
 					if(/*children[0].format == Regular &&*/ children[1].format==TextFormat::Subscript) { // Regular over Subscript
-      {vec2f offset (0, size1.y/2); children[1].translate(-offset); for(auto& e: word1) e.origin += offset;}
+      {vec2 offset (0, size1.y/2); children[1].translate(-offset); for(auto& e: word1) e.origin += offset;}
 					}
 					else if(children[0].format == children[1].format) { // Vertical even share
 						float margin = format == TextFormat::Fraction ? size/3 : 0;
-      {vec2f offset (0, size0.y/2 + margin); children[0].translate(-offset); for(auto& e: word0) e.origin -= offset;}
-      {vec2f offset (0, size1.y/2 + margin); children[1].translate(-offset); for(auto& e: word1) e.origin += offset;}
+      {vec2 offset (0, size0.y/2 + margin); children[0].translate(-offset); for(auto& e: word0) e.origin -= offset;}
+      {vec2 offset (0, size1.y/2 + margin); children[1].translate(-offset); for(auto& e: word1) e.origin += offset;}
 					}
 				}
 				if(format == TextFormat::Fraction) {
@@ -223,7 +223,7 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 					previousRightOffset = metrics.rightOffset;
 				}
 				if(c != 0xA0) {
-     vec2f offset = 0;
+     vec2 offset = 0;
 					if(c==toUCS4("⌊")[0] || c==toUCS4("⌋")[0]) offset.y += size/3; // Fixes too high floor signs from FreeSerif
 					//assert_(metrics.size, hex(c));
 					word.append( Glyph(metrics,::Glyph{position+offset, size, *font, c, font->font(size).index(c), color}, sourceIndex) );
@@ -248,7 +248,7 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 		float midY = (numMaxY+denMinY) / 2;
 		float minX  = ::min(apply(fract, [](const Glyph& g) { return g.origin.x - g.bearing.x; }));
 		float maxX  = ::max(apply(fract, [](const Glyph& g) { return g.origin.x - g.bearing.x + g.width; }));
-  this->lines.append( ::Line{vec2f(minX, midY), vec2f(maxX, midY), black} );
+  this->lines.append( ::Line{vec2(minX, midY), vec2(maxX, midY), black} );
 	}
 }
 
@@ -265,15 +265,15 @@ const TextLayout& Text::layout(float wrap) {
 	return lastTextLayout;
 }
 
-vec2f Text::sizeHint(vec2f size) {
+vec2 Text::sizeHint(vec2 size) {
 	const TextLayout& layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
 	return max(minimalSizeHint, ceil(layout.bbMax - layout.bbMin));
 }
 
-shared<Graphics> Text::graphics(vec2f size) {
+shared<Graphics> Text::graphics(vec2 size) {
 	const TextLayout& layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
- vec2f textSize = ceil(layout.bbMax - min(vec2f(0),layout.bbMin));
- vec2f offset = max(vec2f(0), vec2f(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
+ vec2 textSize = ceil(layout.bbMax - min(vec2(0),layout.bbMin));
+ vec2 offset = max(vec2(0), vec2(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
     if(align == -1) offset.x = 0;
 
 	shared<Graphics> graphics;
@@ -302,10 +302,10 @@ array<EditStop> lineStops(ref<array<TextLayout::Glyph>> line) {
 	return stops;
 }
 
-Cursor Text::cursorFromPosition(vec2f size, vec2f position) {
+Cursor Text::cursorFromPosition(vec2 size, vec2 position) {
 	const TextLayout& layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
- vec2f textSize = ceil(layout.bbMax - min(vec2f(0),layout.bbMin));
- vec2f offset = max(vec2f(0), vec2f(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
+ vec2 textSize = ceil(layout.bbMax - min(vec2(0),layout.bbMin));
+ vec2 offset = max(vec2(0), vec2(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
 	position -= offset;
 	if(position.y < 0) return {0, 0};
 	const auto& lines = lastTextLayout.glyphs;
@@ -325,7 +325,7 @@ Cursor Text::cursorFromPosition(vec2f size, vec2f position) {
 	return {lines.size-1, lineStops(lines.last()).size};
 }
 
-bool Text::mouseEvent(vec2f position, vec2f size, Event event, Button button, Widget*&) {
+bool Text::mouseEvent(vec2 position, vec2 size, Event event, Button button, Widget*&) {
 	if(event==Release && button==LeftButton) {
 		Cursor cursor = cursorFromPosition(size, position);
 		for(const Link& link: lastTextLayout.links) {

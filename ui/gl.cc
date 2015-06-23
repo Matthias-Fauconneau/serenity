@@ -22,9 +22,9 @@ void glBlendAlpha() {
 /// Shader
 void GLUniform::operator=(int v) { assert(location>=0); glUseProgram(program); glUniform1i(location,v); }
 void GLUniform::operator=(float v) { assert(location>=0); glUseProgram(program); glUniform1f(location,v); }
-void GLUniform::operator=(vec2f v) { assert(location>=0); glUseProgram(program); glUniform2f(location,v.x,v.y); }
-void GLUniform::operator=(vec3f v) { assert(location>=0); glUseProgram(program); glUniform3f(location,v.x,v.y,v.z); }
-void GLUniform::operator=(vec4f v) { assert(location>=0); glUseProgram(program); glUniform4f(location,v.x,v.y,v.z,v.w); }
+void GLUniform::operator=(vec2 v) { assert(location>=0); glUseProgram(program); glUniform2f(location,v.x,v.y); }
+void GLUniform::operator=(vec3 v) { assert(location>=0); glUseProgram(program); glUniform3f(location,v.x,v.y,v.z); }
+void GLUniform::operator=(vec4 v) { assert(location>=0); glUseProgram(program); glUniform4f(location,v.x,v.y,v.z,v.w); }
 void GLUniform::operator=(mat3x2 m) { assert(location>=0); glUseProgram(program); glUniformMatrix3x2fv(location,1,0,m.data); }
 //void GLUniform::operator=(mat3 m) { assert(location>=0); glUseProgram(program); glUniformMatrix3fv(location,1,0,m.data); }
 void GLUniform::operator=(mat4 m) { assert(location>=0); glUseProgram(program); glUniformMatrix4fv(location,1,0,m.data); }
@@ -61,7 +61,7 @@ GLShader::GLShader(string source, ref<string> stages) {
                     continue;
                 }
                 bool function = false;
-                static array<string> types = split("void float vec2f vec3 vec4"_," ");
+                static array<string> types = split("void float vec2 vec3 vec4"_," ");
                 static array<string> qualifiers = split("struct layout const uniform buffer attribute varying in out"_," ");
                 if(types.contains(identifier) && s.identifier("_"_) && s.match('(')) {
                     function = true;
@@ -302,19 +302,19 @@ GLFrameBuffer::~GLFrameBuffer() {
     if(colorBuffer) glDeleteRenderbuffers(1, &colorBuffer);
     if(id) glDeleteFramebuffers(1,&id);
 }
-void GLFrameBuffer::bind(uint clearFlags, vec4 color) {
+void GLFrameBuffer::bind(uint clearFlags, rgba4f color) {
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER,id);
     glViewport(0,0,width,height);
     if(clearFlags) {
-        if(clearFlags&ClearColor) glClearColor(color.x,color.y,color.z,color.w);
+        if(clearFlags&ClearColor) glClearColor(color.r,color.g,color.b,color.a);
         assert((clearFlags&(~(ClearDepth|ClearColor)))==0, clearFlags);
         glClear(clearFlags);
     }
 }
-void GLFrameBuffer::bindWindow(int2 position, int2 size, uint clearFlags, vec4f color) {
+void GLFrameBuffer::bindWindow(int2 position, int2 size, uint clearFlags, rgba4f color) {
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glViewport(position.x, position.y, size.x, size.y);
-    if(clearFlags&ClearColor) glClearColor(color.x, color.y, color.z, color.w);
+    if(clearFlags&ClearColor) glClearColor(color.r, color.g, color.b, color.a);
     if(clearFlags) glClear(clearFlags);
 }
 /*void GLFrameBuffer::blit(uint target, int2 offset, int2 size) {
@@ -356,19 +356,19 @@ Image GLFrameBuffer::readback() {
     return flip(move(target));
 }
 
-void glDrawRectangle(GLShader& shader, vec2f min, vec2f max, bool texCoord) {
+void glDrawRectangle(GLShader& shader, vec2 min, vec2 max, bool texCoord) {
     shader.bind();
     static GLVertexArray vertexArray;
     int positionIndex = shader.attribLocation("position"_);
     assert_(positionIndex>=0);
-    GLBuffer positions {ref<vec2f>{vec2f(min.x,min.y), vec2f(max.x,min.y), vec2f(min.x,max.y), vec2f(max.x,max.y)}};
+    GLBuffer positions {ref<vec2>{vec2(min.x,min.y), vec2(max.x,min.y), vec2(min.x,max.y), vec2(max.x,max.y)}};
     vertexArray.bindAttribute(positionIndex, 2, Float, positions);
     int texCoordsIndex;
     GLBuffer texCoordsBuffer;
     if(texCoord) {
         texCoordsIndex = shader.attribLocation("texCoords"_);
         assert_(texCoordsIndex>=0);
-        texCoordsBuffer = GLBuffer(ref<vec2f>{vec2f(0,1), vec2f(1,1), vec2f(0,0), vec2f(1,0)}); //flip Y
+        texCoordsBuffer = GLBuffer(ref<vec2>{vec2(0,1), vec2(1,1), vec2(0,0), vec2(1,0)}); //flip Y
         vertexArray.bindAttribute(texCoordsIndex, 2, Float, texCoordsBuffer);
     }
     vertexArray.draw(TriangleStrip, 4);

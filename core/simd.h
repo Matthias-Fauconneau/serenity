@@ -44,12 +44,6 @@ inline v4si cvtps2dq(v4sf a) { return __builtin_ia32_cvtps2dq(a); }
 inline v4si cvttps2dq(v4sf a) { return __builtin_ia32_cvttps2dq(a); }
 inline v4sf cvtdq2ps(v4si a) { return __builtin_ia32_cvtdq2ps(a); }
 
-/*inline v4sf shuffle(v4sf a, v4sf b, int x, int y, int z, int w) {
- return __builtin_ia32_shufps(a, b, w<<6|z<<4|y<<2|x);
-}*/
-/*inline v4sf shuffle(v4sf a, v4sf b, const int mask) {
-  return __builtin_ia32_shufps (a, b, mask);
-}*/
 #define shuffle(a,b, x, y, z, w) __builtin_shufflevector(a,b, x, y, z, w)
 
 inline v4sf cross(v4sf a, v4sf b) {

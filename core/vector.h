@@ -105,10 +105,7 @@ typedef vec<xy,int16,2> short2;
 typedef vec<xy,int,2> int2;
 inline String strx(int2 N) { return str(N.x)+'x'+str(N.y); }
 /// Single precision x,y vector
-typedef vec<xy,float,2> float2;
-typedef vec<xy,float,2> vec2f;
-//typedef vec<xy,real,2> vec2;
-typedef vec<xy,double,2> vec2d;
+typedef vec<xy,float,2> vec2;
 //inline String strx(vec2 N) { return str(N.x)+'x'+str(N.y); }
 
 #include "simd.h"
@@ -122,15 +119,8 @@ typedef vec<xyz,int,3> int3;
 /// Integer x,y,z vector (16bit)
 typedef vec<xyz,uint16,3> short3;
 /// Floating-point x,y,z vector
-//typedef vec<xyz,float,3> float3;
-typedef vec<xyz,float,3> vec3f;
- /*struct vec3f : vec<xyz,float,3> {
-  using vec::vec;
-  vec3f(v4sf v) : vec{v[0],v[1],v[2]} {}
- };*/
-inline vec3f toVec3f(v4sf v) { return vec3f(v[0],v[1],v[2]); }
-/// Double precision floating-point x,y,z vector
-typedef vec<xyz,double,3> vec3d;
+typedef vec<xyz,float,3> vec3;
+inline vec3 toVec3(v4sf v) { return vec3(v[0],v[1],v[2]); }
 
 generic struct xyzw {
     T x,y,z,w;
@@ -139,7 +129,6 @@ generic struct xyzw {
     vec< ::xy,T,2> xy()const{ return *(vec< ::xyz,T,2>*)this; }
 };
 /// Floating-point x,y,z,w vector
-typedef vec<xyzw,float,4> vec4f;
 typedef vec<xyzw,float,4> vec4;
 
 generic struct bgr {
@@ -208,15 +197,14 @@ static constexpr unused v4si _1110
  = {int(0x80000000),int(0x80000000),int(0x80000000),0};
 inline v4sf conjugate(v4sf q) { return (v4sf)(_1110 ^ (v4si)q); }
 
-inline v4sf angleVector(float a, vec3f v) {
+inline v4sf angleVector(float a, vec3 v) {
  float l = length(v);
  if(!l) return _0001f;
- vec3f b = sin(a/2*l)/l*v;
+ vec3 b = sin(a/2*l)/l*v;
  return {b.x, b.y, b.z, cos(a/2*l)};
 }
 inline v4sf qapply(v4sf q, v4sf v) {
- v[3]=0;
- //assert(v[3]==0);
+ assert(abs(v[3]) <= 0x1p-29, log2(abs(v[3])));
  return qmul(q, qmul(v, conjugate(q)));
 }
 
@@ -254,7 +242,3 @@ inline void closest(v4sf a1, v4sf a2, v4sf b1, v4sf b2, v4sf& A, v4sf& B) {
     A = a1 + (float4(sc) * u); B = b1 - (float4(tc) * v);
     //return {a1 + (float4(sc) * u), b1 - (float4(tc) * v)};
 }
-
-typedef float real;
-typedef vec<xy,float,2> vec2;
-typedef vec<xyz,float,3> vec3;

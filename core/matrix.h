@@ -20,7 +20,7 @@ struct mat3x2 {
         for(int i: range(2)) { for(int j: range(3)) for(int k: range(2)) r.M(i,j)+=M(i,k)*b.M(k,j); r.M(i,2)+=M(i,2); }
         return r;
     }
-    vec2f operator*(vec2f v) const {vec2f r; for(int i: range(2)) r[i] = v.x*M(i,0)+v.y*M(i,1)+1*M(i,2); return r; }
+    vec2 operator*(vec2 v) const {vec2 r; for(int i: range(2)) r[i] = v.x*M(i,0)+v.y*M(i,1)+1*M(i,2); return r; }
 };
 
 struct mat3; inline mat3 operator*(float s, mat3 M);
@@ -28,18 +28,18 @@ struct mat3; inline mat3 operator*(float s, mat3 M);
 struct mat3 {
     float data[3*3];
 
-    mat3(vec3f d=1) { for(int i=0;i<3*3;i++) data[i]=0; for(int i=0;i<3;i++) M(i,i)=d[i]; }
-    mat3(vec3f e0, vec3f e1, vec3f e2){for(int i=0;i<3;i++) M(i,0)=e0[i], M(i,1)=e1[i], M(i,2)=e2[i]; }
+    mat3(vec3 d=1) { for(int i=0;i<3*3;i++) data[i]=0; for(int i=0;i<3;i++) M(i,i)=d[i]; }
+    mat3(vec3 e0, vec3 e1, vec3 e2){for(int i=0;i<3;i++) M(i,0)=e0[i], M(i,1)=e1[i], M(i,2)=e2[i]; }
 
     float M(int i, int j) const { return data[j*3+i]; }
     float& M(int i, int j) { return data[j*3+i]; }
     float operator()(int i, int j) const { return M(i,j); }
     float& operator()(int i, int j) { return M(i,j); }
-    vec3f& operator[](int j) { return (vec3f&)data[j*3]; }
-    const vec3f& operator[](int j) const { return (vec3f&)data[j*3]; }
+    vec3& operator[](int j) { return (vec3&)data[j*3]; }
+    const vec3& operator[](int j) const { return (vec3&)data[j*3]; }
 
-    vec2f operator*(vec2f v) const {vec2f r; for(int i: range(2)) r[i] = v.x*M(i,0)+v.y*M(i,1)+1*M(i,2); return r; }
-    vec3f operator*(vec3f v) const {vec3f r; for(int i: range(3)) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2); return r; }
+    vec2 operator*(vec2 v) const {vec2 r; for(int i: range(2)) r[i] = v.x*M(i,0)+v.y*M(i,1)+1*M(i,2); return r; }
+    vec3 operator*(vec3 v) const {vec3 r; for(int i: range(3)) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2); return r; }
     mat3 operator*(mat3 b) const {
         mat3 r(0); for(int j: range(3)) for(int i: range(3)) for(int k: range(3)) r.M(i,j)+=M(i,k)*b.M(k,j); return r; }
 
@@ -60,7 +60,7 @@ struct mat3 {
     mat3 adjugate() const { return cofactor().transpose(); }
     mat3 inverse() const { return 1/det() * adjugate() ; }
 
-    mat3 translate(vec2f v) const { mat3 r=*this; for(int i: range(2)) r(i,2) += M(i,0)*v.x + M(i,1)*v.y; return r; }
+    mat3 translate(vec2 v) const { mat3 r=*this; for(int i: range(2)) r(i,2) += M(i,0)*v.x + M(i,1)*v.y; return r; }
     mat3 scale(float f) const { mat3 r=*this; for(int j: range(2))for(int i: range(3)) r(i,j)*=f; return r; }
     void rotateX(float angle) { float c=cos(angle),s=sin(angle); mat3 r; r.M(1,1) = c; r.M(2,2) = c; r.M(1,2) = -s; r.M(2,1) = s; *this = *this * r; }
     void rotateY(float angle) { float c=cos(angle),s=sin(angle); mat3 r; r.M(0,0) = c; r.M(2,2) = c; r.M(2,0) = -s; r.M(0,2) = s; *this = *this * r; }
@@ -71,7 +71,7 @@ inline mat3 operator*(float s, mat3 M) {
 //inline mat3 operator+(float s, mat3 M) { for(int i: range(3)) M(i,i) = s + M(i,i); return M; }
 inline mat3 operator-(float s, mat3 M) {
     for(int j: range(3)) for(int i: range(3)) M(i,j) = -M(i,j); for(int i: range(3)) M(i,i) += s; return M; }
-inline mat3 outer(vec3f a, vec3f b) {
+inline mat3 outer(vec3 a, vec3 b) {
     mat3 r; for(int j: range(3)) for(int i: range(3)) r.M(i,j)=a[i]*b[j]; return r; }
 inline mat3 operator+(mat3 a, mat3 b) {
     mat3 r; for(int j : range(3)) for(int i: range(3)) r(i,j)=a(i,j)+b(i,j); return r; }
@@ -91,8 +91,8 @@ struct mat4 {
     vec4& operator[](int j) { return (vec4&)data[j*4]; }
     const vec4& operator[](int j) const { return (vec4&)data[j*4]; }
 
-    //vec3f operator*(vec3f v) const { vec3f r; for(int i=0;i<3;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+1*M(i,3); return r; }
-    vec3f operator*(vec3f v) const { vec4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+1*M(i,3); return r.xyz()/r.w; }
+    //vec3 operator*(vec3 v) const { vec3 r; for(int i=0;i<3;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+1*M(i,3); return r; }
+    vec3 operator*(vec3 v) const { vec4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+1*M(i,3); return r.xyz()/r.w; }
     vec4 operator*(vec4 v) const { vec4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+v.w*M(i,3); return r; }
     mat4 operator*(mat4 b) const{mat4 r(0); for(int j=0;j<4;j++) for(int i=0;i<4;i++) for(int k=0;k<4;k++) r.M(i,j) += M(i,k)*b.M(k,j); return r; }
 
@@ -121,16 +121,16 @@ struct mat4 {
         return r;
     }
 
-	inline mat4& perspective(float hfov, float2 size, float nearPlane, float farPlane) {
+ inline mat4& perspective(float hfov, vec2 size, float nearPlane, float farPlane) {
         float cotan = cos(hfov/2) / sin(hfov/2);
 		M(0,0) = cotan * size.y / size.x; M(1,1) = cotan; M(2,2) = (nearPlane+farPlane) / (nearPlane-farPlane);
         M(2,3) = (2*nearPlane*farPlane) / (nearPlane-farPlane); M(3,2) = -1; M(3,3) = 0;
 		return *this;
     }
- mat4& translate(vec3f v) { for(int i=0;i<4;i++) M(i,3) += M(i,0)*v.x + M(i,1)*v.y + M(i,2)*v.z; return *this; }
+ mat4& translate(vec3 v) { for(int i=0;i<4;i++) M(i,3) += M(i,0)*v.x + M(i,1)*v.y + M(i,2)*v.z; return *this; }
 	mat4& scale(float f) { for(int j=0;j<3;j++) for(int i=0;i<4;i++) M(i,j)*=f; return *this; }
- mat4& scale(vec3f v) { for(int j=0;j<3;j++) for(int i=0;i<4;i++) M(i,j)*=v[j]; return *this; }
- mat4& rotate(float angle, vec3f u) {
+ mat4& scale(vec3 v) { for(int j=0;j<3;j++) for(int i=0;i<4;i++) M(i,j)*=v[j]; return *this; }
+ mat4& rotate(float angle, vec3 u) {
         float x=u.x, y=u.y, z=u.z;
         float c=cos(angle), s=sin(angle), ic=1-c;
         mat4 r;
