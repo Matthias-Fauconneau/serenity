@@ -6,8 +6,8 @@
 inline uint align(uint width, uint offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
 
 // -- Generic arithmetic
-generic inline constexpr T sq(const T& x) { return x*x; }
-generic inline constexpr T cb(const T& x) { return x*x*x; }
+generic inline constexpr T sq(const T x) { return x*x; }
+generic inline constexpr T cb(const T x) { return x*x*x; }
 
 inline float abs(float x) { return __builtin_fabsf(x); }
 inline double abs(double x) { return __builtin_fabs(x); }
@@ -62,6 +62,7 @@ inline double log2(double x) { return __builtin_log2(x); }
 inline double exp10(double x) { return __builtin_exp2(__builtin_log2(10)*x); }
 inline double log10(double x) { return __builtin_log10(x); }
 
+constexpr float pow4(float x) { return x*x*x*x; }
 constexpr float pow5(float x) { return x*x*x*x*x; }
 
 // -> \file algorithm.h

@@ -282,7 +282,7 @@ struct SimulationView : Simulation, Widget, Poll {
 
   array<char> s = str(int(processState), timeStep*this->dt, grain.count, wire.count/*, kT, kR*/
                       /*,staticFrictionCount2, dynamicFrictionCount2*/);
-  if(load.count) s.append(" "_+str(load.position[0][2]));
+  if(load.count) s.append(" "_+str(load.position[0][2], load.mass));
   window->setTitle(s);
   return shared<Graphics>();
  }

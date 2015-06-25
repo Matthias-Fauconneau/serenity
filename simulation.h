@@ -30,10 +30,8 @@ struct Simulation : System {
  float pourHeight = Floor::height+Grain::radius;
  float winchAngle = 0;
 
- float kT=0, kR=0;
-
  Random random;
- enum { Pour, Load, Done } processState = Pour;
+ enum { Pour, Release, Load, Done } processState = Pour;
  int direction = 1, directionSwitchCount = 0;
 
  // Performance
@@ -61,7 +59,7 @@ struct Simulation : System {
   v4sf relativePosition = wire.position[a] - wire.position[b];
   v4sf length = sqrt(sq3(relativePosition));
   v4sf x = length - Wire::internodeLength4;
-  //tensionEnergy += 1./2 * Wire::tensionStiffness[0] * sq3(x)[0];
+  tensionEnergy += 1./2 * Wire::tensionStiffness[0] * sq3(x)[0];
   v4sf fS = - Wire::tensionStiffness * x;
   v4sf direction = relativePosition/length;
   v4sf relativeVelocity = wire.velocity[a] - wire.velocity[b];
@@ -75,8 +73,9 @@ struct Simulation : System {
   if(processState == Pour) {
    if(pourHeight>=2 || grain.count == grain.capacity
                || (wire.capacity && wire.count == wire.capacity)) {
-    log("Poured", "Grain", grain.count, "Wire", wire.count);
-    processState=Load;
+    log("Grain count", grain.count, "Wire node count", wire.count, "Wire density",
+        (wire.count-1)*Wire::volume / ((grain.count)*Grain::volume));
+    processState++;
    } else {
     // Generates falling grain (pour)
     const bool useGrain = 1;
@@ -124,7 +123,7 @@ break2_:;
     pourHeight += winchSpeed * dt;
    }
   }
-  if(processState == Load && !load.count) {
+  if(processState == Release/*Load*/ && !load.count) {
    float maxZ = 0, vz=0;
    for(size_t i: range(grain.count)) {
     auto p = grain.position[i];
@@ -141,10 +140,22 @@ break2_:;
     for(size_t n: range(3)) load.positionDerivatives[n][0] = _0f;
    }
   }
+  if(processState==Release) {
+   if(side.castRadius < 15*Grain::radius) {
+    static float releaseTime = timeStep*dt;
+    side.castRadius = side.initialRadius * exp((timeStep*dt-releaseTime)/(1*s));
+   } else {
+    log("Released");
+    processState = Load; //Done;
+   }
+  }
+  if(processState == Load && load.position[0][2] <= 2*Grain::radius) { // 16s ~ 16kg
+   processState = Done;
+   requestTermination();
+  }
 
   // Initialization
-  //gravityEnergy = 0, contactEnergy = 0, tensionEnergy = 0, tensionEnergy = 0;
-  //side.force.radialSum = 0;
+  normalEnergy = 0, staticEnergy = 0, tensionEnergy = 0, bendEnergy = 0;
 
   // Load
   if(load.count) load.force[0] = float4(load.mass) * G;
@@ -162,7 +173,7 @@ break2_:;
     if(load.count) {
      penalty(grain, a, load, 0);
     }
-    if(processState != Done) penalty(grain, a, side, 0);
+    if(processState <= Release) penalty(grain, a, side, 0);
     grainLattice(grain.position[a]) = 1+a;
    }
   }, 1);
@@ -255,7 +266,7 @@ break2_:;
     }
     // Bounds
     penalty(wire, i, floor, 0);
-    penalty(wire, i, side, 0);
+    if(processState <= Release) penalty(wire, i, side, 0);
     if(load.count) penalty(wire, i, load, 0);
     // Wire - Grain
     {size_t offset = grainLattice.index(wire.position[i]);
@@ -301,7 +312,7 @@ break2_:;
     }
     // Bounds
     penalty(wire, i, floor, 0);
-    penalty(wire, i, side, 0);
+    if(processState <= Release) penalty(wire, i, side, 0);
     if(load.count) penalty(wire, i, load, 0);
     // Wire - Grain
     {size_t offset = grainLattice.index(wire.position[i]);
@@ -351,7 +362,7 @@ break2_:;
     }
     // Bounds
     penalty(wire, i, floor, 0);
-    penalty(wire, i, side, 0);
+    if(processState <= Release) penalty(wire, i, side, 0);
     if(load.count) penalty(wire, i, load, 0);
     // Wire - Grain
     {size_t offset = grainLattice.index(wire.position[i]);
@@ -441,23 +452,28 @@ break2_:;
   // kT
   v4sf ssqV = _0f;
   if(grain.count) for(v4sf v: grain.velocity.slice(0, grain.count)) ssqV += sq3(v);
-  kT = 1./2*grain.mass*ssqV[0];
+  kineticEnergy = 1./2*grain.mass*ssqV[0];
 
   if(load.count) {
    load.force[0][0]=0;
    load.force[0][1]=0;
    load.step(0);
    if(processState==Load) {
-    if(kT < 128 * grain.count * grain.mass * (Wire::radius*Wire::radius) /*/ sq(T)*/) {
-     side.castRadius = 15*Grain::radius;
-     processState = Done;
+    //load.mass += dt * 1 * kg / s;
+    if(timeStep%subStepCount == 0) { // Records results every 1/60s
+     String id = str(subStepCount, wire.count, grain.count, Wire::elasticModulus,
+                            frictionCoefficient, Load::initialMass);
+     assert_(!existsFile(id), "Preserving existing results", id);
+     static File file(id, currentWorkingDirectory(), Flags(WriteOnly|Create));
+     file.write(str(load.mass, load.position[0][2], tensionEnergy)+'\n');
     }
+    load.mass *= 1 + dt * 1/s; // 2x /s
+    /*if(kineticEnergy < 256 * grain.count * grain.mass * sq(Wire::radius) / sq(s)) {
+     //side.castRadius = 15*Grain::radius;
+     processState = Release;
+    }*/
+   }
   }
-  }
-
-  /*staticFrictionCount2 = staticFrictionCount;
-  dynamicFrictionCount2 = dynamicFrictionCount;
-  staticFrictionCount = 0; dynamicFrictionCount = 0;*/
 
   if(processState==Pour) { // Generates wire (winch)
    if(length[0] >= replacementLength) {
@@ -477,43 +493,15 @@ break2_:;
   winchAngle += winchRate * dt;
 
   stepTime.stop();
-  if(0) {
+  if(1) {
    Locker lock(this->lock);
-   size_t i = 0;
-   if(1) {
-    if(i>=plots.size) plots.append();
-
-    v4sf sumV = _0f;
-    for(v4sf v: grain.velocity.slice(0, grain.count)) sumV += sqrt(sq3(v));
-    /*plots[1].dataSets["v"__][timeStep*dt] =*/
-    //log(sumV[0] / grain.count); // max~0.13
-    plots[i].dataSets["Et"__][timeStep*dt] = kT;
-    if(!isNumber(kT)) { log("!isNumber(kT)"); kT=0; }
-    assert(isNumber(kT));
-    float ssqR = 0;
-    if(grain.count) for(auto v: grain.angularVelocity.slice(0, grain.count)) {
-     //if(!isNumber(v)) continue; //FIXME
-     //assert(isNumber(v));
-     ssqR += sq3(v)[0];
-    }
-    kR = 1./2*grain.angularMass*ssqR;
-    if(!isNumber(kR)) { /*log("!isNumber(kR)");FIXME*/ kR=0; }
-    assert(isNumber(kR));
-    plots[i].dataSets["Er"__][timeStep*dt] = kR;
-    //plots[i].dataSets["Eg"__][timeStep*dt] = gravityEnergy;
-    /*plots[i].dataSets["Ete"__][timeStep*dt] = tensionEnergy;
-    plots[i].dataSets["Eto"__][timeStep*dt] = torsionEnergy;
-    plots[i].dataSets["Ec"__][timeStep*dt] = contactEnergy;*/
-    //plots[i].dataSets["Em"__][timeStep*dt] = kT+kR+gravityEnergy+tensionEnergy+contactEnergy;
-    i++;
-   }
-   /*if(processState < Done) {
-    if(i>=plots.size) plots.append();
-    float h = load.count ? load.position[0][2] : pourHeight;
-    plots[i].dataSets["P"__][timeStep*dt] = side.force.radialSum /
-      (2*PI*side.castRadius*h);
-    i++;
-   }*/
+   while(plots.size < 2) plots.append();
+   plots[0].dataSets["kinetic"__][timeStep*dt] = kineticEnergy;
+   plots[0].dataSets["normal"__][timeStep*dt] = normalEnergy;
+   plots[0].dataSets["static"__][timeStep*dt] = staticEnergy;
+   plots[0].dataSets["tension"__][timeStep*dt] = tensionEnergy;
+   plots[0].dataSets["bend"__][timeStep*dt] = bendEnergy;
+   if(load.count) plots[1].dataSets["height"__][timeStep*dt] = load.position[0][2];
   }
  }
 };
