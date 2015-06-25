@@ -18,7 +18,50 @@ template<Type tA> vec4f toGlobal(tA& A, size_t a, vec4f localA) {
 }
 
 struct SimulationView : Simulation, Widget, Poll {
- Time renderTime;
+ unique<Window> window;
+ // View
+ vec2 lastPos; // for relative cursor movements
+ vec2 viewYawPitch = vec2(0, -PI/3); // Current view angles
+ vec2 scale = 2./(32*Grain::radius);
+ vec3 translation = 0;
+ vec3 rotationCenter = 0;
+ Thread simulationThread;
+ unique<Encoder> encoder = nullptr;
+ GLFrameBuffer target {int2(1280,720)};
+ bool showPlot = 0 && processState < Done;
+
+ SimulationView(Thread& uiThread, const Parameters& p)
+  : Simulation(p), Poll(0, POLLIN, simulationThread),
+    window(::window(this, -1, uiThread)) {
+  window->actions[F12] = [this]{
+   if(existsFile(str(timeStep*dt)+".png")) log(str(timeStep*dt)+".png exists");
+   else writeFile(str(timeStep*dt)+".png",encodePNG(target.readback()), home());
+  };
+  window->actions[Key('p')] = [this]{ showPlot = !showPlot; };
+  window->actions[Return] = [this]{
+   if(processState < Done) processState++;
+   log(int(processState), "grain", grain.count, "wire", wire.count);
+  };
+  if(arguments().contains("export")) {
+   encoder = unique<Encoder>("tas.mp4"_);
+   encoder->setH264(int2(1280,720), 60);
+   encoder->open();
+  }
+
+  simulationThread.spawn();
+  queue();
+ }
+ ~SimulationView() {
+  log("~", "grain", grain.count, "wire", wire.count);
+ }
+
+ void event() {
+#if PROFILE
+  static unused bool once =
+    ({ extern void profile_reset(); profile_reset(); true; });
+#endif
+  step();
+ }
 
  void step() {
   Simulation::step();
@@ -43,58 +86,15 @@ struct SimulationView : Simulation, Widget, Poll {
    requestTermination();
 #endif
   }
-  queue();
- }
- void event() {
-#if PROFILE
-  static unused bool once =
-    ({ extern void profile_reset(); profile_reset(); true; });
-#endif
-  step();
+  if(processState < Done) queue();
  }
 
- unique<Window> window = ::window(this, -1);
- // View
- vec2 lastPos; // for relative cursor movements
- vec2 viewYawPitch = vec2(0, -PI/3); // Current view angles
- vec2 scale = 2./(32*Grain::radius);
- vec3 translation = 0;
- vec3 rotationCenter = 0;
- Thread simulationThread;
- unique<Encoder> encoder = nullptr;
- GLFrameBuffer target {int2(1280,720)};
- bool showPlot = 0 && processState < Done;
-
- SimulationView() : Poll(0, POLLIN, simulationThread) {
-  window->actions[F12] = [this]{
-   if(existsFile(str(timeStep*dt)+".png")) log(str(timeStep*dt)+".png exists");
-   else writeFile(str(timeStep*dt)+".png",encodePNG(target.readback()), home());
-  };
-  window->actions[Key('p')] = [this]{ showPlot = !showPlot; };
-  window->actions[Return] = [this]{
-   if(processState < Done) processState++;
-   log(int(processState), "grain", grain.count, "wire", wire.count);
-  };
-  if(arguments().contains("export")) {
-   encoder = unique<Encoder>("tas.mp4"_);
-   encoder->setH264(int2(1280,720), 60);
-   encoder->open();
-  }
-
-  simulationThread.spawn();
-  queue();
- }
- ~SimulationView() {
-  log("~", "grain", grain.count, "wire", wire.count);
- }
  vec2 sizeHint(vec2) override { return vec2(1050, /*1050*720/1280*/720); }
  shared<Graphics> graphics(vec2) override {
-  renderTime.start();
-
   const float Dt = 1./60;
   {
    vec4f min = _0f, max = _0f;
-   //Locker lock(this->lock);
+   Locker lock(this->lock);
    for(size_t i: range(grain.count)) { // FIXME: proper BS
     min = ::min(min, grain.position[i]);
     max = ::max(max, grain.position[i]);
@@ -128,10 +128,10 @@ struct SimulationView : Simulation, Widget, Poll {
 
   vec2 size (target.size.x, target.size.y);
   vec2 viewSize = size;
-  if(showPlot) {
+  /*if(showPlot) {
    viewSize = vec2(720, 720);
    if(plots.size>2) viewSize = vec2(360,720);
-  }
+  }*/
 
   vec3 scaleMax = ::min(max, vec3(vec2(16*Grain::radius), 32*Grain::radius));
   vec3 scaleMin = ::max(min, vec3(vec2(-16*Grain::radius), 0));
@@ -250,7 +250,7 @@ struct SimulationView : Simulation, Widget, Poll {
   }
   lines.clear();
 
-  if(plots) {
+  /*if(plots) {
    Image target(int2(size.x-viewSize.x, size.y), true);
    target.clear(byte4(byte3(0xFF), 0));
    this->lock.lock();
@@ -271,14 +271,13 @@ struct SimulationView : Simulation, Widget, Poll {
                              2, Float, positionBuffer);
    glBlendAlpha();
    vertexArray.draw(Triangles, 6);
-  }
+  }*/
 
   if(encoder) {
    encoder->writeVideoFrame(target.readback());
   }
   int offset = (target.size.x-window->size.x)/2;
   target.blit(0, window->size, int2(offset, 0), int2(target.size.x-offset, target.size.y));
-  renderTime.stop();
 
   array<char> s = str(int(processState), timeStep*this->dt, grain.count, wire.count/*, kT, kR*/
                       /*,staticFrictionCount2, dynamicFrictionCount2*/);
@@ -299,4 +298,15 @@ struct SimulationView : Simulation, Widget, Poll {
   else return false;
   return true;
  }
-} view;
+};
+
+struct ParameterSweep {
+ ParameterSweep() {
+  Simulation s{System::Parameters()};
+  while(s.processState < Simulation::Done) {
+   s.step();
+   if(s.timeStep%(60*s.subStepCount) == 0) log(s.timeStep*s.dt);
+  }
+  log(int(s.processState));
+ }
+} app;

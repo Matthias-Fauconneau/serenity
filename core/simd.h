@@ -31,6 +31,7 @@ inline v4sf dot2(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0b00111111); }
 inline v4sf sq2(v4sf a) { return dot2(a,a); }
 inline v4sf dot3(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0x7f); }
 inline v4sf sq3(v4sf a) { return dot3(a,a); }
+inline float sum3(v4sf a) { return dot3(a, _1f)[0]; } // a0+a1+a2
 inline v4sf dot4(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0xFF); }
 inline v4sf sq4(v4sf a) { return dot4(a,a); }
 inline v4sf rcp(v4sf a) { return __builtin_ia32_rcpps(a); }
