@@ -17,7 +17,7 @@ template<Type tA> vec4f toGlobal(tA& A, size_t a, vec4f localA) {
  return A.position[a] + qapply(A.rotation[a], localA);
 }
 
-struct SimulationView : Simulation, Widget, Poll {
+struct SimulationView : Simulation, Widget, Poll, Application {
  unique<Window> window;
  // View
  vec2 lastPos; // for relative cursor movements
@@ -30,8 +30,8 @@ struct SimulationView : Simulation, Widget, Poll {
  GLFrameBuffer target {int2(1280,720)};
  bool showPlot = 0 && processState < Done;
 
- SimulationView(Thread& uiThread, const Parameters& p)
-  : Simulation(p), Poll(0, POLLIN, simulationThread),
+ SimulationView(Thread& uiThread=mainThread, const Parameters& p={512, 1, 8e6, 512, 4096, 100*g})
+  : Simulation(p, false), Poll(0, POLLIN, simulationThread),
     window(::window(this, -1, uiThread)) {
   window->actions[F12] = [this]{
    if(existsFile(str(timeStep*dt)+".png")) log(str(timeStep*dt)+".png exists");
@@ -299,14 +299,32 @@ struct SimulationView : Simulation, Widget, Poll {
   return true;
  }
 };
+registerApplication(SimulationView, view);
 
-struct ParameterSweep {
+struct ParameterSweep : Application {
  ParameterSweep() {
-  Simulation s{System::Parameters()};
-  while(s.processState < Simulation::Done) {
-   s.step();
-   if(s.timeStep%(60*s.subStepCount) == 0) log(s.timeStep*s.dt);
+  for(int subStepCount: {512,1024,2048,4096}) {
+    for(size_t wireCapacity: {4096, 8192, 16384, 32768}) {
+     for(float frictionCoefficient: {1.f, 1.f/2, 1.f/4, 1.f/8}) {
+      for(float initialLoad: {0.1,0.2,0.4,0.8}) {
+       for(float wireElasticModulus: {8e6,16e6,32e6,64e6}) {
+        for(float winchRate: {512,256,128,64}) {
+         Simulation s{Simulation::Parameters{subStepCount, frictionCoefficient,
+             wireElasticModulus, winchRate, wireCapacity, initialLoad}, true};
+         log(s.id);
+         Time time;
+         while(s.processState < Simulation::Done) {
+          s.step();
+          if(s.timeStep%(60*s.subStepCount) == 0) log(int(s.timeStep*s.dt));
+         }
+         if(s.processState != Simulation::Done) log("Failed");
+         log(time);
+        }
+       }
+      }
+     }
+    }
   }
-  log(int(s.processState));
  }
-} app;
+};
+registerApplication(ParameterSweep, sweep);

@@ -45,10 +45,11 @@ struct Simulation : System {
 
  const String id = str(subStepCount, wire.capacity, int(winchRate),
                        int(wire.elasticModulus/1e6), frictionCoefficient, initialLoad);
- //assert_(!existsFile(id), "Preserving existing results", id);
- File file {id, currentWorkingDirectory(), Flags(WriteOnly|Create)};
+ File file;
 
- Simulation(const Parameters& p) : System(p) {
+ Simulation(const Parameters& p, bool overwrite=false) : System(p) {
+  if(overwrite || !existsFile(id))
+  file = File(id, currentWorkingDirectory(), Flags(WriteOnly|Create));
   // Initial wire node
   size_t i = wire.count++;
   wire.position[i] = vec3(winchRadius,0,pourHeight);
@@ -79,7 +80,7 @@ struct Simulation : System {
                || (wire.capacity && wire.count == wire.capacity)) {
     float wireDensity = (wire.count-1)*Wire::volume / ((grain.count)*Grain::volume);
     //file.write(str("grain.count:", grain.count, "wire.count", wire.count, "wireDensity:"wireDensity)+"\n");
-    file.write(str(grain.count, wire.count, wireDensity)+"\n");
+    if(file) file.write(str(grain.count, wire.count, wireDensity)+"\n");
     log("Pour->Release", grain.count, wire.count, wireDensity);
     processState++;
    } else {
@@ -447,7 +448,7 @@ break2_:;
      for(size_t i: range(wire.count-1))
       wireLength += sqrt(sq3(wire.position[i]-wire.position[i+1]));
      float stretch = (wireLength[0] / wire.count) / Wire::internodeLength;
-     file.write(str(load.mass, load.position[0][2], tensionEnergy, stretch)+'\n');
+     if(file) file.write(str(load.mass, load.position[0][2], tensionEnergy, stretch)+'\n');
     }
     load.mass *= 1 + dt * 1/s; // 2x /s
     /*if(kineticEnergy < 256 * grain.count * grain.mass * sq(Wire::radius) / sq(s)) {

@@ -212,15 +212,15 @@ struct System {
  const float initialLoad = 0.01 * kg;
 
  struct Parameters {
-  int subStepCount = 512; // 512 - 2048
-  float frictionCoefficient = 1; // 1 - 1/16
-  float wireElasticModulus = 8e6 *kg/(m*s*s); // 8 - 128 Mpa
-  float winchRate = 512 /s; // 512 - 32 /m
-  size_t wireCapacity = 4096; // 4K - 64K ~ 40-640m
-  float initialLoad = 100 *g;
+  int subStepCount;
+  float frictionCoefficient;
+  float wireElasticModulus;
+  float winchRate;
+  size_t wireCapacity;
+  float initialLoad;
  };
 
- System(const Parameters& p) : // 100 - 1600 g
+ System(const Parameters& p) :
    subStepCount(p.subStepCount),
    frictionCoefficient(p.frictionCoefficient),
    wire {p.wireElasticModulus, grain.base+grain.capacity, p.wireCapacity},
