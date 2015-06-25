@@ -1,23 +1,19 @@
-#include "thread.h"
-#include "window.h"
-#include "time.h"
+#include "simulation.h"
 #include "matrix.h"
+#include "window.h"
 #include "render.h"
 #include "png.h"
-#include "time.h"
-#include "parallel.h"
 #include "gl.h"
 #include "layout.h"
 #include "plot.h"
 #include "encoder.h"
-#include "simulation.h"
 FILE(shader_glsl)
 
 template<Type tA> vec4f toGlobal(tA& A, size_t a, vec4f localA) {
  return A.position[a] + qapply(A.rotation[a], localA);
 }
 
-struct SimulationView : Simulation, Widget, Poll, Application {
+struct SimulationView : Simulation, Widget, Poll {
  unique<Window> window;
  // View
  vec2 lastPos; // for relative cursor movements
@@ -30,7 +26,8 @@ struct SimulationView : Simulation, Widget, Poll, Application {
  GLFrameBuffer target {int2(1280,720)};
  bool showPlot = 0 && processState < Done;
 
- SimulationView(Thread& uiThread=mainThread, const Parameters& p={512, 1, 8e6, 512, 4096, 100*g})
+ SimulationView(Thread& uiThread=mainThread,
+                const Parameters& p={512, 1, 8e6, 600, 4096, 0.1})
   : Simulation(p, false), Poll(0, POLLIN, simulationThread),
     window(::window(this, -1, uiThread)) {
   window->actions[F12] = [this]{
@@ -42,7 +39,7 @@ struct SimulationView : Simulation, Widget, Poll, Application {
    if(processState < Done) processState++;
    log(int(processState), "grain", grain.count, "wire", wire.count);
   };
-  if(arguments().contains("export")) {
+  if(arguments().contains("video")) {
    encoder = unique<Encoder>("tas.mp4"_);
    encoder->setH264(int2(1280,720), 60);
    encoder->open();
@@ -298,33 +295,5 @@ struct SimulationView : Simulation, Widget, Poll, Application {
   else return false;
   return true;
  }
-};
-registerApplication(SimulationView, view);
+} app;
 
-struct ParameterSweep : Application {
- ParameterSweep() {
-  for(int subStepCount: {512,1024,2048,4096}) {
-    for(size_t wireCapacity: {4096, 8192, 16384, 32768}) {
-     for(float frictionCoefficient: {1.f, 1.f/2, 1.f/4, 1.f/8}) {
-      for(float initialLoad: {0.1,0.2,0.4,0.8}) {
-       for(float wireElasticModulus: {8e6,16e6,32e6,64e6}) {
-        for(float winchRate: {512,256,128,64}) {
-         Simulation s{Simulation::Parameters{subStepCount, frictionCoefficient,
-             wireElasticModulus, winchRate, wireCapacity, initialLoad}, true};
-         log(s.id);
-         Time time;
-         while(s.processState < Simulation::Done) {
-          s.step();
-          if(s.timeStep%(60*s.subStepCount) == 0) log(int(s.timeStep*s.dt));
-         }
-         if(s.processState != Simulation::Done) log("Failed");
-         log(time);
-        }
-       }
-      }
-     }
-    }
-  }
- }
-};
-registerApplication(ParameterSweep, sweep);

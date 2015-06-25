@@ -69,7 +69,9 @@ video/encoder.cc
 
 algebra.h
 algebra.cc
-DEM.cc
+view.cc
 shader.glsl
 system.h
 simulation.h
+sweep.cc
+plot.cc

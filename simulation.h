@@ -1,4 +1,5 @@
 #include "system.h"
+#include "time.h"
 
 struct Lattice {
  const vec4f scale;
@@ -31,7 +32,6 @@ struct Simulation : System {
 
  Random random;
  enum { Pour, Release, Load, Done, Fail } processState = Pour;
- int direction = 1, directionSwitchCount = 0;
 
  // Performance
  int64 lastReport = realTime(), lastReportStep = timeStep;
@@ -41,15 +41,9 @@ struct Simulation : System {
  Time wireLatticeTime, wireContactTime, wireIntegrationTime;
 
  Lock lock;
- //HList<Plot> plots;
+ File file; //->sweep.cc
 
- const String id = str(subStepCount, wire.capacity, int(winchRate),
-                       int(wire.elasticModulus/1e6), frictionCoefficient, initialLoad);
- File file;
-
- Simulation(const Parameters& p, bool overwrite=false) : System(p) {
-  if(overwrite || !existsFile(id))
-  file = File(id, currentWorkingDirectory(), Flags(WriteOnly|Create));
+ Simulation(const Parameters& p, File&& file) : System(p), file(move(file)) {
   // Initial wire node
   size_t i = wire.count++;
   wire.position[i] = vec3(winchRadius,0,pourHeight);
@@ -170,7 +164,8 @@ break2_:;
   grainTime.start();
 
   vec4f size = float4(sqrt(3.)/(2*Grain::radius))*(max-min);
-  if(size[0]*size[1]*size[2] > 128*128*128) {  // 8 MB
+  if(size[0]*size[1]*size[2] > 256*256*256) {  // 64 MB
+   log("Domain too large", min, max, size);
    processState = Fail;
    return;
   }
@@ -210,7 +205,7 @@ break2_:;
      penalty(grain, a, grain, b);
     }
    }
-  }, threadCount);
+  }, 1/*threadCount*/); // FIXME
   grainContactTime.stop();
   grainTime.stop();
 

@@ -67,7 +67,7 @@ struct Window : Poll {
 	/// Schedules window rendering after all events have been processed (\sa Poll::queue)
 	void render();
 	/// Immediately renders the first pending update to target
-    Update render(int2 size/*const Image& target*/);
+    Update render(int2 size, const Image& target);
     virtual Image readback() { return Image(); }
     Time swapTime;
 
@@ -79,38 +79,38 @@ struct Window : Poll {
 
 /// Interfaces \a widget as a window on a display server
 struct XWindow : Window, XDisplay /*should reference but inherits for convenience*/ {
-	 /// Window title
-    String title;
-    function<String()> getTitle;
-    /// Background color
-    bgr3f backgroundColor = white;
+ /// Window title
+ String title;
+ function<String()> getTitle;
+ /// Background color
+ bgr3f backgroundColor = white;
 
-    /// Associated window resource (relative to resource ID base Display::id)
-	enum Resource { Window, GraphicContext, Colormap, PresentEvent, Segment, Pixmap, Picture, Cursor, CursorPixmap };
-    /// System V shared memory
-    uint shm = 0;
-    /// Rendering target in shared memory
-    //Image target;
-    /// Shared window buffer state
-	enum State { Idle, Copy, Present };
-	State state = Idle;
+ /// Associated window resource (relative to resource ID base Display::id)
+ enum Resource { Window, GraphicContext, Colormap, PresentEvent, Segment, Pixmap, Picture, Cursor, CursorPixmap };
+ /// System V shared memory
+ uint shm = 0;
+ /// Rendering target in shared memory
+ Image target;
+ /// Shared window buffer state
+ enum State { Idle, Copy, Present };
+ State state = Idle;
 
-    uint64 firstFrameCounterValue = 0;
-	uint64 currentFrameCounterValue = 0;
+ uint64 firstFrameCounterValue = 0;
+ uint64 currentFrameCounterValue = 0;
 
-    /// An event held to implement motion compression and ignore autorepeats
-    //unique<XEvent> heldEvent;
+ /// An event held to implement motion compression and ignore autorepeats
+ //unique<XEvent> heldEvent;
 
 	/// bgra32 XRender PictFormat (for Cursor)
 	uint format=0;
 
 	String selection[2];
 
-    /// Creates an initially hidden window for \a widget, use \a show to display
-    /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
-	XWindow(Widget* widget, Thread& thread, int2 size);
-    /// Frees the graphics context and destroys the window
-	~XWindow();
+ /// Creates an initially hidden window for \a widget, use \a show to display
+ /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
+ XWindow(Widget* widget, Thread& thread, int2 size, bool useGL);
+ /// Frees the graphics context and destroys the window
+ ~XWindow();
 
 	// Input
     /// Processes or holds an event
@@ -175,4 +175,4 @@ struct DRMWindow : Window {
 	void setSelection(string selection, bool clipboard) override;
 };
 
-unique<Window> window(Widget* widget, int2 size=-1, Thread& thread=mainThread);
+unique<Window> window(Widget* widget, int2 size=-1, Thread& thread=mainThread, bool useGL=false);
