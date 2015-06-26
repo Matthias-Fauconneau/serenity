@@ -31,7 +31,7 @@ struct Simulation : System {
  float winchAngle = 0;
 
  Random random;
- enum { Pour, Release, Load, Done, Fail } processState = Pour;
+ enum { Pour, Release, Wait, Load, Done, Fail } processState = Pour;
 
  // Performance
  int64 lastReport = realTime(), lastReportStep = timeStep;
@@ -146,9 +146,13 @@ break2_:;
     static float releaseTime = timeStep*dt;
     side.castRadius = side.initialRadius * exp((timeStep*dt-releaseTime)/(1*s));
    } else {
-    log("Release->Load");
-    processState = Load; //Done;
+    log("Release->Wait");
+    processState = Wait;
    }
+  }
+  if(processState == Wait && kineticEnergy <
+     128 * grain.count * grain.mass * (Wire::radius*Wire::radius) / sq(s)) {
+   processState = Load;
   }
   if(processState == Load && load.position[0][2] <= 2*2*Grain::radius) {
    processState = Done;
