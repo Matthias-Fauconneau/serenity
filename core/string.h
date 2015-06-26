@@ -47,6 +47,8 @@ string trim(const string s);
 
 /// Returns whether s contains only [0-9]
 bool isInteger(const string s);
+/// Returns true if s matches [0-9]*.?[0-9]*
+bool isDecimal(const string s);
 /// Parses an integer value
 int64 parseInteger(const string str, int base=10);
 /// Parses a decimal value

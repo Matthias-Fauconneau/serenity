@@ -28,6 +28,7 @@ core/parallel.h
 core/time.h
 core/profile.cc
 
+io/variant.h
 io/png.cc
 io/bit.h
 io/flic.h

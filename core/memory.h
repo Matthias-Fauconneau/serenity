@@ -19,26 +19,26 @@ generic struct buffer : mref<T> {
     using mref<T>::slice;
 
     buffer(){}
-	buffer(buffer&& o) : mref<T>(o), capacity(o.capacity) { o.data=0; o.size=0; o.capacity=0; }
+ buffer(buffer&& o) : mref<T>(o), capacity(o.capacity) { o.data=0; o.size=0; o.capacity=0; }
     buffer(T* data, size_t size, size_t capacity) : mref<T>(data, size), capacity(capacity) {}
 
     /// Allocates an uninitialized buffer for \a capacity elements
-	buffer(size_t capacity, size_t size) : mref<T>((T*)0, size), capacity(capacity) {
-		assert(capacity>=size && size>=0);
-		if(capacity && posix_memalign((void**)&data, 64, capacity*sizeof(T))) error("Out of memory", size, capacity, sizeof(T));
+ buffer(size_t capacity, size_t size) : mref<T>((T*)0, size), capacity(capacity) {
+  assert(capacity>=size && size>=0);
+  if(capacity && posix_memalign((void**)&data, 64, capacity*sizeof(T))) error("Out of memory", size, capacity, sizeof(T));
     }
     explicit buffer(size_t size) : buffer(size, size) {}
 
-	buffer& operator=(buffer&& o) { this->~buffer(); new (this) buffer(::move(o)); return *this; }
+ buffer& operator=(buffer&& o) { this->~buffer(); new (this) buffer(::move(o)); return *this; }
 
     /// If the buffer owns the reference, returns the memory to the allocator
-	~buffer() {
-		if(capacity) {
-			if(!__has_trivial_destructor(T)) for(size_t i: range(size)) at(i).~T();
-			free((void*)data);
-		}
-		data=0; capacity=0; size=0;
-	}
+ ~buffer() {
+  if(capacity) {
+   if(!__has_trivial_destructor(T)) for(size_t i: range(size)) at(i).~T();
+   free((void*)data);
+  }
+  data=0; capacity=0; size=0;
+ }
 
     void setSize(size_t size) { assert_(size<=capacity, size, capacity); this->size=size; }
     /// Appends a default element
@@ -48,7 +48,7 @@ generic struct buffer : mref<T> {
     /// Appends a movable value
     T& append(T&& e) { setSize(size+1); return set(size-1, ::move(e)); }
     template<Type A0, Type A1, Type... Args> void append(A0&& a0, A1&& a1, Args&&... args) const {
-	set(size-1, forward<A0>(a0), forward<A1>(a1), forward<Args>(args)...); }
+ set(size-1, forward<A0>(a0), forward<A1>(a1), forward<Args>(args)...); }
     /// Appends another list of elements to this array by moving
     void append(const mref<T> source) { setSize(size+source.size); slice(size-source.size).move(source); }
     /// Appends another list of elements to this array by copying
@@ -70,29 +70,29 @@ generic buffer<T> copyRef(ref<T> o) { buffer<T> copy(o.size); copy.mref<T>::copy
 
 /// Returns an array of the application of a function to every index up to a size
 template<Type Function> auto apply(size_t size, Function function) -> buffer<decltype(function(0))> {
-	buffer<decltype(function(0))> target(size); target.apply(function); return target;
+ buffer<decltype(function(0))> target(size); target.apply(function); return target;
 }
 
 /// Returns an array of the application of a function to every elements of a reference
 template<Type Function, Type T> auto apply(ref<T> source, Function function) -> buffer<decltype(function(source[0]))> {
-	buffer<decltype(function(source[0]))> target(source.size); target.apply(function, source); return target;
+ buffer<decltype(function(source[0]))> target(source.size); target.apply(function, source); return target;
 }
 
 /// Returns an array of the application of a function to every elements of a reference
 template<Type Function, Type T> auto apply(mref<T> source, Function function) -> buffer<decltype(function(source[0]))> {
-	buffer<decltype(function(source[0]))> target(source.size); target.apply(function, source); return target;
+ buffer<decltype(function(source[0]))> target(source.size); target.apply(function, source); return target;
 }
 
 /// Replaces in \a array every occurence of \a before with \a after
 template<Type T> buffer<T> replace(ref<T> source, const T& before, const T& after) {
-	return apply(source, [=](const T& e){ return e==before ? after : e; });
+ return apply(source, [=](const T& e){ return e==before ? after : e; });
 }
 
 // -- Filter  --
 
 /// Creates a new buffer containing only elements where filter \a predicate does not match
 template<Type T, Type Function> buffer<T> filter(const ref<T> source, Function predicate) {
-	buffer<T> target(source.size, 0); for(const T& e: source) if(!predicate(e)) target.append(copy(e)); return target;
+ buffer<T> target(source.size, 0); for(const T& e: source) if(!predicate(e)) target.append(copy(e)); return target;
 }
 
 // -- Reinterpret casts
@@ -117,7 +117,7 @@ template<Type T, Type O> buffer<T> cast(buffer<O>&& o) {
     buffer.size = o.size*sizeof(O)/sizeof(T);
     assert((o.capacity*sizeof(O))%sizeof(T) == 0);
     buffer.capacity = o.capacity*sizeof(O)/sizeof(T);
-	o.data=0; o.size=0; o.capacity = 0;
+ o.data=0; o.size=0; o.capacity = 0;
     return buffer;
 }
 
@@ -131,7 +131,7 @@ typedef buffer<char> String;
 generic struct unique {
     unique(decltype(nullptr)):pointer(0){}
     template<Type D> unique(unique<D>&& o):pointer(o.pointer){o.pointer=0;}
-	template<Type... Args> explicit unique(Args&&... args) : pointer(new T(forward<Args>(args)...)) {}
+ template<Type... Args> explicit unique(Args&&... args) : pointer(new T(forward<Args>(args)...)) {}
     unique& operator=(unique&& o){ this->~unique(); new (this) unique(move(o)); return *this; }
     ~unique() { if(pointer) { delete pointer; } pointer=0; }
 
@@ -159,8 +159,8 @@ generic struct shared {
     template<Type... Args> explicit shared(Args&&... args):pointer(new (malloc(sizeof(T))) T(forward<Args>(args)...)){}
     shared& operator=(shared&& o){ this->~shared(); new (this) shared(move(o)); return *this; }
     explicit shared(const shared<T>& o) : pointer(o.pointer) { if(pointer) pointer->addUser(); }
-	explicit shared(T* o) : pointer(o) { pointer->addUser();/*Unsafe as original owner might free*/ pointer->addUser(); }
-	~shared() { if(pointer) { assert(pointer->userCount); if(pointer->removeUser()==0) { pointer->~T(); free(pointer); } pointer=0; } }
+ explicit shared(T* o) : pointer(o) { pointer->addUser();/*Unsafe as original owner might free*/ pointer->addUser(); }
+ ~shared() { if(pointer) { assert(pointer->userCount); if(pointer->removeUser()==0) { pointer->~T(); free(pointer); } pointer=0; } }
 
     operator T&() { return *pointer; }
     operator const T&() const { return *pointer; }

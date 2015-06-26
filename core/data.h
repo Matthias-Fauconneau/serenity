@@ -193,7 +193,7 @@ struct TextData : Data {
     /// Reads a signed integer, return defaultValue if fails
     int mayInteger(int defaultValue=-1);
     /// Matches [-+]?[0-9]*\.[0-9]*
-	string whileDecimal();
+    string whileDecimal();
     /// Reads a decimal number
     double decimal();
 };

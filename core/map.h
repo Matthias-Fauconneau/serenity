@@ -24,12 +24,18 @@ template<Type K, Type V> struct map {
     bool operator ==(const map<K,V>& o) const { return keys==o.keys && values==o.values; }
 
     template<Type KK> bool contains(const KK& key) const { return keys.contains(key); }
-    template<Type KK> void assertNo(const KK& key) const { assert_(!contains(key), '\''+str(key)+'\'',"already in",keys); }
+    template<Type KK> void assertNo(const KK& unused key) const { assert(!contains(key), '\''+str(key)+'\'',"already in",keys); }
 
     template<Type KK> size_t indexOf(const KK& key) const {
         size_t i = keys.indexOf(key);
         if(i==invalid) error('\''+str(key)+'\'',"not in",keys);
         return i;
+    }
+
+    /// Returns whether this object has the same values for all keys in subsets.
+    bool includes(const map<K, V>& subset) const {
+        for(auto argument: subset) if(at(argument.key) != argument.value) return false;
+        return true;
     }
 
     template<Type KK> const V& at(const KK& key) const { return values[indexOf(key)]; }

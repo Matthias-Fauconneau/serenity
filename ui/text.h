@@ -77,7 +77,8 @@ array<EditStop> lineStops(ref<array<TextLayout::Glyph>> line);
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : virtual Widget {
 	/// Create a caption that display \a text using a \a size pixel font
-	Text(buffer<uint>&& text, float size=16, bgr3f color=0, float opacity=1, float wrap=0, string font="DejaVuSans", bool hint=true,
+ Text(buffer<uint>&& text, float size=16, bgr3f color=0, float opacity=1,
+      float wrap=0, string font="DejaVuSans", bool hint=true,
      float interline=1, int align=-1, int2 minimalSizeHint=0, bool justify = false, bool justifyExplicitLineBreak = false);
     /// Create a caption that display \a text using a \a size pixel font
 	Text(const string text="", float size=16, bgr3f color=0, float opacity=1, float wrap=0, string font="DejaVuSans", bool hint=true,
