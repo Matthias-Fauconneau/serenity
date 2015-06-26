@@ -204,6 +204,7 @@ int64 capacity(const string path, const Folder& at=currentWorkingDirectory());
 
 /// Returns command line arguments
 ref<string> arguments();
+ref<string> cmdline();
 
 /// Returns value for environment variable \a name
 string environmentVariable(const string name, string value=""_);

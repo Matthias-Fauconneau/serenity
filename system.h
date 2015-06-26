@@ -258,7 +258,7 @@ struct System {
   constexpr float R = 1/(tA::curvature+tB::curvature);
   const float K = 2./3*E*sqrt(R);
   const float Ks = K * sqrt(-c.depth);
-  normalEnergy += 1./2 * Ks * sq(c.depth);
+  atomic_add(normalEnergy, 1./2 * Ks * sq(c.depth));
   float fK = - Ks * c.depth;
   // Damping
   const float Kb = K*normalDamping*sqrt(-c.depth);
@@ -301,7 +301,7 @@ struct System {
    if(tangentLength[0]) {
     vec4f springDirection = tangentOffset / tangentLength;
     float fB = staticFrictionDamping * dot3(springDirection, relativeVelocity)[0];
-    staticEnergy += 1./2 * kS * sq(tangentLength[0]);
+    atomic_add(staticEnergy, 1./2 * kS * sq(tangentLength[0]));
     fT = - float3(fS+fB) * springDirection;
    } else fT = _0f;
   } else {

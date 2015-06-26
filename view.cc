@@ -29,7 +29,7 @@ struct SimulationView : Simulation, Widget, Poll {
  SimulationView(Thread& uiThread=mainThread,
                 const Parameters& p={512, 1, 8e6, 600, 4096, 0.1})
   : Simulation(p, false), Poll(0, POLLIN, simulationThread),
-    window(::window(this, -1, uiThread)) {
+    window(::window(this, -1, uiThread, true)) {
   window->actions[F12] = [this]{
    if(existsFile(str(timeStep*dt)+".png")) log(str(timeStep*dt)+".png exists");
    else writeFile(str(timeStep*dt)+".png",encodePNG(target.readback()), home());

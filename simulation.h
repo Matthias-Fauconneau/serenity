@@ -41,7 +41,7 @@ struct Simulation : System {
  Time wireLatticeTime, wireContactTime, wireIntegrationTime;
 
  Lock lock;
- File file; //->sweep.cc
+ File file;
 
  Simulation(const Parameters& p, File&& file) : System(p), file(move(file)) {
   // Initial wire node
@@ -124,7 +124,7 @@ break2_:;
     pourHeight += winchSpeed * dt;
    }
   }
-  if(processState == Release/*Load*/ && !load.count) {
+  if(processState == Release && !load.count) {
    float maxZ = 0, vz=0;
    for(size_t i: range(grain.count)) {
     auto p = grain.position[i];
@@ -150,7 +150,7 @@ break2_:;
     processState = Load; //Done;
    }
   }
-  if(processState == Load && load.position[0][2] <= 2*Grain::radius) { // 16s ~ 16kg
+  if(processState == Load && load.position[0][2] <= 2*2*Grain::radius) {
    processState = Done;
   }
 
@@ -205,7 +205,7 @@ break2_:;
      penalty(grain, a, grain, b);
     }
    }
-  }, 1/*threadCount*/); // FIXME
+  }, threadCount);
   grainContactTime.stop();
   grainTime.stop();
 
@@ -437,7 +437,6 @@ break2_:;
    load.force[0][1]=0;
    System::step(load, 0);
    if(processState==Load) {
-    //load.mass += dt * 1 * kg / s;
     if(timeStep%subStepCount == 0) { // Records results every 1/60s
      v4sf wireLength = _0f;
      for(size_t i: range(wire.count-1))
@@ -446,10 +445,6 @@ break2_:;
      if(file) file.write(str(load.mass, load.position[0][2], tensionEnergy, stretch)+'\n');
     }
     load.mass *= 1 + dt * 1/s; // 2x /s
-    /*if(kineticEnergy < 256 * grain.count * grain.mass * sq(Wire::radius) / sq(s)) {
-     //side.castRadius = 15*Grain::radius;
-     processState = Release;
-    }*/
    }
   }
 

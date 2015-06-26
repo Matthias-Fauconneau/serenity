@@ -226,11 +226,12 @@ string environmentVariable(const string name, string value) {
 	return value;
 }
 
-ref<string> arguments() {
-	static auto cmdline = File("/proc/self/cmdline").readUpTo/*<256>*/(512);
+ref<string> cmdline() {
+ static auto cmdline = File("/proc/self/cmdline").readUpTo(512);
 	assert(cmdline.size<4096);
-	static array<string> arguments = split(section(cmdline,0,1,-1),"\0");
+ static array<string> arguments = split(cmdline,"\0");
 	return arguments;
 }
+ref<string> arguments() { return cmdline().slice(1); }
 
 const Folder& home() { static Folder home(environmentVariable("HOME",str((const char*)getpwuid(geteuid())->pw_dir))); return home; }
