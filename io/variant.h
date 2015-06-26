@@ -31,11 +31,14 @@ struct Variant {
  int64 integer() const { assert_(type==Integer, *this); return number; }
  double real() const {
   if(type==Rational) { assert_((number/denominator)*denominator==number); return number/denominator; }
-  assert(type==Real||type==Integer); return number;
+  if(type==Real||type==Integer) return number;
+  if(type==Data) return parseDecimal(data);
+  error(int(type));
  }
  explicit operator string() const { assert(type==Data); return data; }
  int64 numerator() {  assert(type==Rational, *this); return number; }
  operator float() const { return real(); }
+ operator int() const { return real(); }
 };
 bool operator ==(const Variant& a, const Variant& b) {
  if((a.type == Variant::Integer || a.type == Variant::Real) &&
@@ -61,11 +64,11 @@ inline Variant copy(const Variant& v) {
  if(v.type == Variant::Data) return v.data;
  error(int(v.type));
 }
-generic String str(const map<T,Variant>& dict) {
+/*generic String str(const map<T,Variant>& dict) {
  array<char> s;
  s.append("<<"); for(auto entry: dict) s.append( '/'+entry.key+' '+str(entry.value)+' ' ); s.append(">>");
  return move(s);
-}
+}*/
 
 inline String str(const Variant& o) {
  if(o.type==Variant::Boolean) return unsafeRef(str(bool(o.number)));

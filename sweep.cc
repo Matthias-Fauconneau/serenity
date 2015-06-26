@@ -6,7 +6,7 @@ struct ParameterSweep {
   prctl(PR_SET_PDEATHSIG, 1/*SIGHUP*/);
   mainThread.setPriority(19);
   if(!arguments()) {
-   array<int> jobs;
+   array<String> cases;
    Dict parameters;
    for(int subStepCount: {512,1024,2048,4096}) {
     parameters["subStepCount"__] = subStepCount;
@@ -24,18 +24,23 @@ struct ParameterSweep {
           parameters["winchRate"__] = winchRate;
           String id = str(parameters);
           if(existsFile(id+".result")) { log("Skipping existing", id); continue; }
-          while(jobs.size >= 7) {
-           int pid = wait(); // Waits for any child to terminate
-           wait(pid);
-           jobs.take(jobs.indexOf(pid));
-          }
-          jobs.append( execute(cmdline()[0], {id}, false) );
+          cases.append(move(id));
          }
         }
        }
       }
      }
     }
+   }
+   Random random;
+   while(cases) {
+    array<int> jobs;
+    while(jobs.size >= 7) {
+     int pid = wait(); // Waits for any child to terminate
+     wait(pid);
+     jobs.take(jobs.indexOf(pid));
+    }
+    jobs.append( execute(cmdline()[0], {cases.take(random%cases.size)}, false) );
    }
   } else {
    string id = arguments()[0];

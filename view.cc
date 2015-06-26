@@ -26,9 +26,10 @@ struct SimulationView : Simulation, Widget, Poll {
  GLFrameBuffer target {int2(1280,720)};
  bool showPlot = 0 && processState < Done;
 
- SimulationView(Thread& uiThread=mainThread,
-                const Parameters& p={512, 1, 8e6, 600, 4096, 0.1})
-  : Simulation(p, false), Poll(0, POLLIN, simulationThread),
+ SimulationView(Thread& uiThread=mainThread)
+  : Simulation(parseDict("subStepCount:512,frictionCoefficient:1,initialLoad:0.1,"
+                         "wireElasticModulus:8e6,height:0.4,radius:0.2,winchRate:500"),
+               false), Poll(0, POLLIN, simulationThread),
     window(::window(this, -1, uiThread, true)) {
   window->actions[F12] = [this]{
    if(existsFile(str(timeStep*dt)+".png")) log(str(timeStep*dt)+".png exists");

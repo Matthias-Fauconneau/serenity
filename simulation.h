@@ -70,7 +70,7 @@ struct Simulation : System {
   stepTime.start();
   // Process
   if(processState == Pour) {
-   if(pourHeight>=2 || grain.count == grain.capacity
+   if(pourHeight>=height || grain.count == grain.capacity
                || (wire.capacity && wire.count == wire.capacity)) {
     float wireDensity = (wire.count-1)*Wire::volume / ((grain.count)*Grain::volume);
     //file.write(str("grain.count:", grain.count, "wire.count", wire.count, "wireDensity:"wireDensity)+"\n");
@@ -168,7 +168,7 @@ break2_:;
   grainTime.start();
 
   vec4f size = float4(sqrt(3.)/(2*Grain::radius))*(max-min);
-  if(size[0]*size[1]*size[2] > 256*256*256) {  // 64 MB
+  if(size[0]*size[1]*size[2] > 128*128*128) {  // 64 MB
    log("Domain too large", min, max, size);
    processState = Fail;
    return;

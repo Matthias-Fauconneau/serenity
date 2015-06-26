@@ -215,13 +215,16 @@ struct System {
  const float initialLoad;
 
  System(const Dict& p) :
-   subStepCount(p.at("subStepCount")),
-   frictionCoefficient(p.at("frictionCoefficient")),
-   side{p.at("radius")},
-   wire(p.at("wireElasticModulus"), grain.base+grain.capacity),
-   winchRate{p.at("winchRate")},
-   height{p.at("height")},
-   initialLoad{p.at("initialLoad")} {}
+   subStepCount(p.at("subStepCount"_)),
+   frictionCoefficient(p.at("frictionCoefficient"_)),
+   side{p.at("radius"_)},
+   wire(p.at("wireElasticModulus"_), grain.base+grain.capacity),
+   winchRate{p.at("winchRate"_)},
+   height{p.at("height"_)},
+   initialLoad{p.at("initialLoad"_)} {
+  log(p, p.at("subStepCount"_), subStepCount, frictionCoefficient, side.initialRadius, wire.elasticModulus,
+      winchRate, height, initialLoad);
+ }
 
  struct Load : Particle {
   using Particle::Particle;
