@@ -43,7 +43,7 @@ struct Simulation : System {
  Lock lock;
  File file;
 
- Simulation(const Parameters& p, File&& file) : System(p), file(move(file)) {
+ Simulation(const Dict& p, File&& file) : System(p), file(move(file)) {
   // Initial wire node
   size_t i = wire.count++;
   wire.position[i] = vec3(winchRadius,0,pourHeight);

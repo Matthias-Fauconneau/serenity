@@ -35,6 +35,7 @@ struct Variant {
  }
  explicit operator string() const { assert(type==Data); return data; }
  int64 numerator() {  assert(type==Rational, *this); return number; }
+ operator float() const { return real(); }
 };
 bool operator ==(const Variant& a, const Variant& b) {
  if((a.type == Variant::Integer || a.type == Variant::Real) &&

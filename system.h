@@ -1,5 +1,6 @@
 #include "simd.h"
 #include "parallel.h"
+#include "variant.h"
 typedef v4sf vec4f;
 float length2(vec4f v) { return sqrt(sq2(v))[0]; }
 float length(vec4f v) { return sqrt(sq3(v))[0]; }
@@ -94,9 +95,10 @@ struct System {
   sconst size_t base = 1;
   sconst float curvature = 0; // -1/radius?
   sconst float elasticModulus = 1e6 * kg/(m*s*s); // 5
-  const float initialRadius = Grain::radius*8;
+  const float initialRadius;
   float castRadius = initialRadius;
   struct { NoOperation operator[](size_t) const { return {}; }} force;
+  Side(float initialRadius) : initialRadius(initialRadius) {}
  } side;
  /// Sphere - Side
  template<Type tA>
@@ -201,31 +203,25 @@ struct System {
   sconst float bendDamping = mass / s;
   const vec4f tensionStiffness = float3(elasticModulus * PI * sq(radius));
   sconst vec4f tensionDamping = float3(mass / s);
-  Wire(float elasticModulus, size_t base, size_t capacity) :
-    Particle{base, capacity, Wire::mass}, elasticModulus(elasticModulus) {}
+  Wire(float elasticModulus, size_t base) :
+    Particle{base, 32768, Wire::mass}, elasticModulus(elasticModulus) {}
  } wire;
 
  // Process
  const float loopAngle = PI*(3-sqrt(5.));
  sconst float winchSpeed = 1 *m/s;
  const float winchRate;
- const float initialLoad = 0.01 * kg;
+ const float height;
+ const float initialLoad;
 
- struct Parameters {
-  int subStepCount;
-  float frictionCoefficient;
-  float wireElasticModulus;
-  float winchRate;
-  size_t wireCapacity;
-  float initialLoad;
- };
-
- System(const Parameters& p) :
-   subStepCount(p.subStepCount),
-   frictionCoefficient(p.frictionCoefficient),
-   wire {p.wireElasticModulus, grain.base+grain.capacity, p.wireCapacity},
-   winchRate{p.winchRate},
-   initialLoad{p.initialLoad} {}
+ System(const Dict& p) :
+   subStepCount(p.at("subStepCount")),
+   frictionCoefficient(p.at("frictionCoefficient")),
+   side{p.at("radius")},
+   wire(p.at("wireElasticModulus"), grain.base+grain.capacity),
+   winchRate{p.at("winchRate")},
+   height{p.at("height")},
+   initialLoad{p.at("initialLoad")} {}
 
  struct Load : Particle {
   using Particle::Particle;

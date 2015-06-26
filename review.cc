@@ -23,16 +23,7 @@ struct ArrayView : Widget {
   Folder results ("."_);
   for(string name: results.list(Files)) {
    if(!endsWith(name,".result")) continue;
-   //Dict configuration = parseDict(name); FIXME
-   Dict configuration;
-   {TextData s (name);
-    configuration.insert("subStepCount"__, s.integer()); s.whileAny(' ');
-    configuration.insert("frictionCoefficient"__, s.decimal()); s.whileAny(' ');
-    configuration.insert("wireElasticModulus"__, s.decimal()); s.whileAny(' ');
-    configuration.insert("winchRate"__, s.decimal()); s.whileAny(' ');
-    configuration.insert("wireCapacity"__, s.integer()); s.whileAny(' ');
-    configuration.insert("initialLoad"__, s.decimal());
-   }
+   Dict configuration = parseDict(name);
    array<array<float>> dataSets;
    TextData s (readFile(name));
    s.until('\n'); // First line: grain.count wire.count wireDensity
