@@ -30,9 +30,9 @@ struct SimulationView : Simulation, Widget, Poll {
     "Time step:1e-5,Friction coefficient:1,Wire elastic modulus:8e6,"
     "Pour height: 0.4, Radius:0.15, Winch rate:500")}) : Simulation(parameters,
   arguments().contains("result") ?
-   File(str(parameters)+".result", currentWorkingDirectory(), Flags(Create|WriteOnly)) :
-   File(2/*stdout*/)), Poll(0, POLLIN, simulationThread),
-    window(::window(this, -1, uiThread, true)) {
+   File(str(parameters)+".result", currentWorkingDirectory(),
+        Flags(WriteOnly|Create|Truncate)) : File(2/*stdout*/)),
+   Poll(0, POLLIN, simulationThread), window(::window(this, -1, uiThread, true)) {
   window->actions[F12] = [this]{
    if(existsFile(str(timeStep*dt)+".png")) log(str(timeStep*dt)+".png exists");
    else writeFile(str(timeStep*dt)+".png",encodePNG(target.readback()), home());
@@ -68,10 +68,9 @@ struct SimulationView : Simulation, Widget, Poll {
   if(encoder) viewYawPitch.x += 2*PI*dt / 16;
   window->render();
   int64 elapsed = realTime() - lastReport;
-  if(elapsed > 4e9) {
-   if(1) {
-    log(timeStep*this->dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
-    log("grain",str(grainTime, stepTime), "wire",str(wireTime, stepTime));
+  if(elapsed > 60e9) {
+   log(timeStep*this->dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
+   log("grain",str(grainTime, stepTime), "wire",str(wireTime, stepTime));
    log("grainInit",str(grainInitializationTime, grainTime),
        "grainLattice",str(grainLatticeTime, grainTime),
        "grainContact",str(grainContactTime, grainTime),
@@ -79,7 +78,6 @@ struct SimulationView : Simulation, Widget, Poll {
    log("wireLatticeTime",str(wireLatticeTime, wireTime),
        "wireContact",str(wireContactTime, wireTime),
        "wireIntegration",str(wireIntegrationTime, wireTime));
-   }
    lastReport = realTime();
    lastReportStep = timeStep;
 #if PROFILE
@@ -250,29 +248,6 @@ struct SimulationView : Simulation, Widget, Poll {
   }
   lines.clear();
 
-  /*if(plots) {
-   Image target(int2(size.x-viewSize.x, size.y), true);
-   target.clear(byte4(byte3(0xFF), 0));
-   this->lock.lock();
-   auto graphics = plots.graphics(vec2(target.size), Rect(vec2(target.size)));
-   this->lock.unlock();
-   render(target, graphics);
-   GLTexture image = flip(move(target));
-   static GLShader shader {::shader_glsl(), {"blit"}};
-   shader.bind();
-   shader.bindFragments({"color"});
-   static GLVertexArray vertexArray;
-   shader["image"] = 0; image.bind(0);
-   vec2 min (-1,-1), max (vec2(target.size)/size*float(2)-vec2(1));
-   GLBuffer positionBuffer (ref<vec2>{
-                  vec2(min.x,min.y), vec2(max.x,min.y), vec2(min.x,max.y),
-                  vec2(min.x,max.y), vec2(max.x,min.y), vec2(max.x,max.y)});
-   vertexArray.bindAttribute(shader.attribLocation("position"_),
-                             2, Float, positionBuffer);
-   glBlendAlpha();
-   vertexArray.draw(Triangles, 6);
-  }*/
-
   if(encoder) {
    encoder->writeVideoFrame(target.readback());
   }
@@ -282,7 +257,8 @@ struct SimulationView : Simulation, Widget, Poll {
   array<char> s {
    copyRef(ref<string>{"Pour","Release","Wait","Load","Done"}[processState])};
   s.append(" "_+str(int(timeStep*this->dt*1000))+"ms"_);
-  if(processState==Wait) s.append(" "_+str(grainKineticEnergy/(grain.count*grain.mass))+"J/kg");
+  //if(processState==Wait)
+  s.append(" "_+str(int(grainKineticEnergy*1e6/grain.count))+"µJ");
   if(processState>=Load) {
    s.append(" "_+str(int(load.height*1000))+"mm");
    s.append(" "_+str(int(load.force[0][2]))+"N");

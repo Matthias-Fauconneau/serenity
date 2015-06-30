@@ -6,7 +6,8 @@
 struct Ticks { float max; uint tickCount; };
 uint subExponent(float& value) {
  float subExponent = exp10(log10(abs(value)) - floor(log10(abs(value))));
- for(auto a: (float[][2]){{1,5}, {1.2,6}, {1.25,5}, {1.6,8}, {2,10}, {2.5,5}, {3,3}, {4,8}, {5,5}, {6,6}, {8,8}, {9.6,8}, {10,5}}) {
+ //for(auto a: (float[][2]){{1,5}, {1.2,6}, {1.25,5}, {1.6,8}, {2,10}, {2.5,5}, {3,3}, {4,8}, {5,5}, {6,6}, {8,8}, {9.6,8}, {10,5}}) {
+ for(auto a: (float[][2]){{1,5}, {2,10}, {10,5}}) {
   if(a[0] >= subExponent-0x1p-52) { value=(value>0?1:-1)*a[0]*exp10(floor(log10(abs(value)))); return a[1]; }
  }
  error("No matching subexponent for"_, value);
@@ -34,7 +35,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
  assert_(isNumber(min) && isNumber(max) && min.x < max.x && min.y < max.y, min, max);
 
  int tickCount[2]={};
- for(uint axis: range(2)) { //Ceils maximum using a number in the preferred sequence
+ for(uint axis: range(2)) { // Ceils maximum using a number in the preferred sequence
   if(max[axis]>-min[axis]) {
    if(log[axis]) { //FIXME
     max[axis] = exp2(ceil(log2(max[axis])));
@@ -46,7 +47,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
      float tickWidth = max[axis]/tickCount[axis];
      min[axis] = floor(min[axis]/tickWidth)*tickWidth;
      tickCount[axis] += -min[axis]/tickWidth;
-    }
+    } else min[axis] = 0;
    }
   } else {
    assert(!log[axis]); //FIXME

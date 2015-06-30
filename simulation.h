@@ -34,6 +34,7 @@ struct Simulation : System {
  float currentPourHeight = Grain::radius;
  float winchAngle = 0;
  float height = 0, initialHeight = 0;
+ size_t lastCollapseReport = 0;
 
  Random random;
  enum { Pour, Release, Wait, Load, Done, Fail } processState = Pour;
@@ -133,6 +134,7 @@ break2_:;
    if(side.castRadius < 15*Grain::radius) {
     static float releaseTime = timeStep*dt;
     side.castRadius = side.initialRadius * exp((timeStep*dt-releaseTime)/(1*s));
+    side.castRadius = 15*Grain::radius;
    } else {
     log("Release->Wait");
     processState = Wait;
@@ -142,10 +144,9 @@ break2_:;
   for(auto p: grain.position.slice(0, grain.count))
    height = ::max(height, p[2]+Grain::radius);
 
-  if(processState == Wait && grainKineticEnergy <
-     128 * grain.count * grain.mass * (Wire::radius*Wire::radius) / sq(s)) {
+  if(processState == Wait && grainKineticEnergy / grain.count < 100e-6 /*1µJ/grain*/) {
    processState = Load;
-   log("Wait->Load");
+   log("Wait->Load", grainKineticEnergy*1e6 / grain.count, "µJ / grain");
   }
   if(processState == Load) {
    if(!load.height) {
@@ -153,17 +154,23 @@ break2_:;
 
     // Strain independant results
     float wireDensity = (wire.count-1)*Wire::volume / ((grain.count)*Grain::volume);
-    String s = str("Grain count:", grain.count, "Wire count:", wire.count,
-                   "Wire density:", wireDensity, "Initial Height:", initialHeight);
-    stream.write(s+"\n");
-    stream.write("Load height, Displacement, Height, Force, Stretch, "
-                "Grain kinetic energy, Wire kinetic energy, Normal energy, Static energy, "
-                "Static energy, Tension energy, Bend energy\n");
+    stream.write(str("Grain count:", grain.count, "Wire count:", wire.count,
+          "Wire density (%):", wireDensity*100, "Initial Height (mm):", initialHeight*1e3, "\n"));
+    stream.write("Load height (mm), Displacement (mm), Height (mm), Force (N), Stretch (%), "
+                "Grain kinetic energy (mJ), Wire kinetic energy (mJ), Normal energy (mJ),"
+                "Static energy (mJ), Static energy (mJ), Tension energy (mJ), Bend energy (mJ)\n");
    }
-   if(load.height > Grain::radius) {
-    load.height -= dt * 100 * mm/s; // Drives load down at 100mm/s
+   if(load.height >= 4*Grain::radius) {
+    // Drives load down between 10-100 mm/s
+    // Depends on kinetic energy between 10-100µJ/grain
+    float Emin = 10e-6, Emax = 100e-6;
+    float a = clamp(0, ((grainKineticEnergy/grain.count)-Emin)/(Emax-Emin), 1);
+    load.height -= dt * (10*a + 100*(1-a)) * mm/s;
     if(height < load.height) {
-     log("Collapse");
+     if(lastCollapseReport > timeStep+size_t(1e-2/dt)) {
+      lastCollapseReport = timeStep;
+      log("Collapse");
+     }
      load.height = height;
     }
    }
@@ -172,9 +179,9 @@ break2_:;
    }
   }
 
-  // Initialization
-  grainKineticEnergy=0, wireKineticEnergy=0, normalEnergy=0,
-    staticEnergy=0, tensionEnergy=0, bendEnergy=0;
+  // Initialize counters
+  normalEnergy=0, staticEnergy=0, tensionEnergy=0, bendEnergy=0;
+  load.force[0] = _0f;
 
   // Grain
   grainTime.start();
@@ -243,7 +250,7 @@ break2_:;
     size_t i = start;
     wire.force[i+1] = float4(wire.mass) * G;
     if(i > 0) {
-     if(start > 1 && wire.bendStiffness) {// Previous torsion spring on first
+     if(start > 1 && wire.bendStiffness) {// Previous bending spring on first
       size_t i = start-1;
       vec4f A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
       vec4f a = C-B, b = B-A;
@@ -258,7 +265,7 @@ break2_:;
      // First tension
      vec4f fT = tension(i-1, i);
      wire.force[i] -= fT;
-     if(wire.bendStiffness) { // First torsion
+     if(wire.bendStiffness) { // First bending
       vec4f A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
       vec4f a = C-B, b = B-A;
       vec4f c = cross(a, b);
@@ -303,17 +310,19 @@ break2_:;
     vec4f fT = tension(i-1, i);
     wire.force[i-1] += fT;
     wire.force[i] -= fT;
-     if(wire.bendStiffness) {// Torsion springs (Bending resistance)
+     if(wire.bendStiffness) {// Bending resistance springs
      vec4f A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
      vec4f a = C-B, b = B-A;
      vec4f c = cross(a, b);
      vec4f length4 = sqrt(sq3(c));
      float length = length4[0];
      if(length) {
-      vec4f p = float3(wire.bendStiffness * atan(length, dot3(a, b)[0]));
+      float angle = atan(length, dot3(a, b)[0]);
+      bendEnergy += 1./2 * wire.bendStiffness * sq(angle);
+      vec4f p = float3(wire.bendStiffness * angle);
       vec4f dap = cross(a, cross(a,b)) / (sq3(a) * length4);
       vec4f dbp = cross(b, cross(b,a)) / (sq3(b) * length4);
-      wire.force[i+1] += p* (-dap);
+      wire.force[i+1] += p * (-dap);
       wire.force[i] += p * (dap - dbp);
       wire.force[i-1] += p * (dbp);
       if(1) {
@@ -352,21 +361,22 @@ break2_:;
     vec4f fT = tension(i-1, i);
     wire.force[i-1] += fT;
     wire.force[i] -= fT;
-    // Torsion with next chunk
+    // Bending with next chunk
     if(i+1 < wire.count) {
      vec4f A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
      vec4f a = C-B, b = B-A;
      vec4f c = cross(a, b);
-     vec4f l = sqrt(sq3(c));
-     if(l[0]) {
-      float angle = atan(l[0], dot3(a, b)[0]);
-      //torsionEnergy += 1./2 * wire.bendStiffness * L * sq(angle);
-      vec4f dap = cross(a, cross(a,b)) / (sq3(a) * l);
-      vec4f dbp = cross(b, cross(b,a)) / (sq3(b) * l);
-      //wire.force[i+1] += float3(p) * (-dap); //-> "Previous torsion spring on first"
-      float p = wire.bendStiffness * angle;
-      wire.force[i] += float3(p) * (dap - dbp);
-      wire.force[i-1] += float3(p) * (dbp);
+     vec4f length4 = sqrt(sq3(c));
+     float length = length4[0];
+     if(length) {
+      float angle = atan(length, dot3(a, b)[0]);
+      bendEnergy += 1./2 * wire.bendStiffness * sq(angle);
+      vec4f p = float3(wire.bendStiffness * angle);
+      vec4f dap = cross(a, cross(a,b)) / (sq3(a) * length4);
+      vec4f dbp = cross(b, cross(b,a)) / (sq3(b) * length4);
+      //wire.force[i+1] += p * (-dap); //-> "Previous bending spring on first"
+      wire.force[i] += p * (dap - dbp);
+      wire.force[i-1] += p * (dbp);
       if(1) {
        vec4f A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
        vec4f axis = cross(C-B, B-A);
@@ -397,16 +407,19 @@ break2_:;
     size_t i = start+size;
     if(i < wire.count) {
      wire.force[i-1] += tension(i-1, i);
-      // Torsion to first node of next chunk
+      // Bending with first node of next chunk
      if(i+1<wire.count && wire.bendStiffness) {
       vec4f A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
       vec4f a = C-B, b = B-A;
       vec4f c = cross(a, b);
-      vec4f l = sqrt(sq3(c));
-      if(l[0]) {
-       float p = wire.bendStiffness * atan(l[0], dot3(a, b)[0]);
-       vec4f dbp = cross(b, cross(b,a)) / (sq3(b) * l);
-       wire.force[i-1] += float3(p) * (dbp);
+      vec4f length4 = sqrt(sq3(c));
+      float length = length4[0];
+      if(length) {
+       float angle = atan(length, dot3(a, b)[0]);
+       bendEnergy += 1./2 * wire.bendStiffness * sq(angle);
+       vec4f p = float3(wire.bendStiffness * angle);
+       vec4f dbp = cross(b, cross(b,a)) / (sq3(b) * length4);
+       wire.force[i-1] += p * (dbp);
       }
      }
     }
@@ -449,15 +462,14 @@ break2_:;
    wireKineticEnergy = 1./2*wire.mass*ssqV[0];}
 
   if(processState==Load) {
-   if(timeStep%size_t((1./60)/dt) == 0) { // Records results every 1/60s
+   if(timeStep%size_t(1e-3/dt) == 0) { // Records results every milliseconds of simulation
     v4sf wireLength = _0f;
     for(size_t i: range(wire.count-1))
      wireLength += sqrt(sq3(wire.position[i]-wire.position[i+1]));
     float stretch = (wireLength[0] / wire.count) / Wire::internodeLength;
-    String s = str(load.height, initialHeight-load.height, height, load.force[0][2],
-                   stretch, grainKineticEnergy, wireKineticEnergy, normalEnergy,
-                   staticEnergy, tensionEnergy, bendEnergy);
-    stream.write(s+'\n');
+    stream.write(str(load.height*1e3, (initialHeight-load.height)*1e3, height*1e3,
+                     load.force[0][2], stretch*100, grainKineticEnergy*1e3, wireKineticEnergy*1e3,
+      normalEnergy*1e3, staticEnergy*1e3, tensionEnergy*1e3, bendEnergy*1e3)+'\n');
    }
   }
 
@@ -494,15 +506,5 @@ break2_:;
   winchAngle += winchRate * dt;
 
   stepTime.stop();
-  /*if(0) {
-   //Locker lock(this->lock);
-   while(plots.size < 2) plots.append();
-   plots[0].dataSets["kinetic"__][timeStep*dt] = kineticEnergy;
-   plots[0].dataSets["normal"__][timeStep*dt] = normalEnergy;
-   plots[0].dataSets["static"__][timeStep*dt] = staticEnergy;
-   plots[0].dataSets["tension"__][timeStep*dt] = tensionEnergy;
-   plots[0].dataSets["bend"__][timeStep*dt] = bendEnergy;
-   if(load.height) plots[1].dataSets["height"__][timeStep*dt] = load.position[0][2];
-  }*/
  }
 };
