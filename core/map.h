@@ -111,14 +111,17 @@ template<Type K, Type V> map<K,V> copy(const map<K,V>& o) {
 	map<K,V> t; t.keys=copy(o.keys); t.values=copy(o.values); return t;
 }
 
-template<Type K, Type V> String str(const map<K,V>& m, string separator=", ") {
-	array<char> s; s.append('{'); s.append(separator.last());
-    for(uint i: range(m.size())) {
-        s.append(str(m.keys[i])+": "+str(m.values[i]));
-        if(i<m.size()-1) s.append(separator);
-    }
-    s.append(separator.last());
-	s.append('}'); return move(s);
+template<Type K, Type V> String str(const map<K,V>& m, string separator=",") {
+ array<char> s;
+ //s.append('{');
+ //s.append(separator.last());
+ for(uint i: range(m.size())) {
+  s.append(str(m.keys[i])+":"+str(m.values[i]));
+  if(i<m.size()-1) s.append(separator);
+ }
+ //s.append(separator.last());
+ //s.append('}');
+ return move(s);
 }
 
 /// Associates each argument's name with its string conversion

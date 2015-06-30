@@ -26,10 +26,12 @@ struct SimulationView : Simulation, Widget, Poll {
  GLFrameBuffer target {int2(1280,720)};
  bool showPlot = 0 && processState < Done;
 
- SimulationView(Thread& uiThread=mainThread)
-  : Simulation(parseDict("subStepCount:512,frictionCoefficient:1,initialLoad:0.1,"
-                         "wireElasticModulus:8e6,height:0.4,radius:0.2,winchRate:500"),
-               false), Poll(0, POLLIN, simulationThread),
+ SimulationView(Thread& uiThread=mainThread, Dict parameters={parseDict(
+    "Time step:1e-5,Friction coefficient:1,Wire elastic modulus:8e6,"
+    "Pour height: 0.4, Radius:0.15, Winch rate:500")}) : Simulation(parameters,
+  arguments().contains("result") ?
+   File(str(parameters)+".result", currentWorkingDirectory(), Flags(Create|WriteOnly)) :
+   File(2/*stdout*/)), Poll(0, POLLIN, simulationThread),
     window(::window(this, -1, uiThread, true)) {
   window->actions[F12] = [this]{
    if(existsFile(str(timeStep*dt)+".png")) log(str(timeStep*dt)+".png exists");
@@ -220,8 +222,8 @@ struct SimulationView : Simulation, Widget, Poll {
   }}
 
   if(load.count) {
-   vec3 min (-vec2(-side.castRadius), load.position[0][2]);
-   vec3 max (+vec2(-side.castRadius), load.position[0][2]);
+   vec3 min (-vec2(-side.castRadius), load.height);
+   vec3 max (+vec2(-side.castRadius), load.height);
    for(int i: range(0b111 +1)) for(int j: {(i&0b110) |0b001, (i&0b101) |0b010, (i&0b011) |0b100}) {
     if(i<j) {
      auto p = [=](int i) {
@@ -277,9 +279,14 @@ struct SimulationView : Simulation, Widget, Poll {
   int offset = (target.size.x-window->size.x)/2;
   target.blit(0, window->size, int2(offset, 0), int2(target.size.x-offset, target.size.y));
 
-  array<char> s = str(int(processState), timeStep*this->dt, grain.count, wire.count/*, kT, kR*/
-                      /*,staticFrictionCount2, dynamicFrictionCount2*/);
-  if(load.count) s.append(" "_+str(load.position[0][2], load.mass));
+  array<char> s {
+   copyRef(ref<string>{"Pour","Release","Wait","Load","Done"}[processState])};
+  s.append(" "_+str(int(timeStep*this->dt*1000))+"ms"_);
+  if(processState==Wait) s.append(" "_+str(grainKineticEnergy/(grain.count*grain.mass))+"J/kg");
+  if(processState>=Load) {
+   s.append(" "_+str(int(load.height*1000))+"mm");
+   s.append(" "_+str(int(load.force[0][2]))+"N");
+  }
   window->setTitle(s);
   return shared<Graphics>();
  }

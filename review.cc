@@ -6,6 +6,29 @@
 #include "png.h"
 #include "variant.h"
 
+struct Rename {
+ Rename() {
+  Folder results {"."_};
+  for(string name: results.list(Files)) {
+   if(!endsWith(name,".result")) {
+    if(endsWith(name,".failed")||endsWith(name,".working")) {
+     log("-", name);
+     //remove(name);
+    } else
+     log("Unknown file", name);
+    continue;
+   }
+   Dict parameters = parseDict(name);
+   //parameters.keys.replace("subStepCount"__, "Substep count"__);
+   String newName = str(parameters)+".result";
+   if(name != newName) {
+    log(name, newName);
+    //rename(name, newName, results);
+   }
+  }
+ }
+};
+
 struct ArrayView : Widget {
  string valueName;
  map<Dict, float> points; // Data points
@@ -14,8 +37,8 @@ struct ArrayView : Widget {
  vec2 headerCellSize = vec2(160/*80*/*textSize/16, textSize);
  vec2 contentCellSize = vec2(48*textSize/16, textSize);
  buffer<string> dimensions[2] = {
-  split("subStepCount frictionCoefficient wireElasticModulus"," "),
-  split("winchRate wireCapacity initialLoad"," ")
+  split("Substep count,Friction coefficient,Wire elastic modulus,Initial load",","),
+  split("Winch rate,Height,Radius",",")
  };
 
  ArrayView(string valueName, uint textSize=16)
@@ -26,7 +49,7 @@ struct ArrayView : Widget {
    Dict configuration = parseDict(name);
    array<array<float>> dataSets;
    TextData s (readFile(name));
-   s.until('\n'); // First line: grain.count wire.count wireDensity
+   s.until('\n'); // First line: Grain count, Wire count, Wire density
    while(s) {
     for(size_t i = 0; s && !s.match('\n'); i++) {
      float decimal = s.decimal();

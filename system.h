@@ -18,8 +18,7 @@ void atomic_sub(NoOperation, vec4f) {}
 
 struct System {
  // Integration
- const int subStepCount;
- const float dt = 1./(60*subStepCount);
+ const float dt;
  const vec4f b[4] = {float3(dt), float3(dt*dt/2), float3(dt*dt*dt/6), float3(dt*dt*dt*dt/24)};
  const vec4f c[5] = {float3(19./90), float3(3/(4*dt)), float3(2/(dt*dt)), float3(6/(2*dt*dt*dt)),
                                 float3(24/(12*dt*dt*dt*dt))};
@@ -76,10 +75,8 @@ struct System {
 
  struct Floor : Obstacle {
   sconst size_t base = 0;
-  sconst float radius = inf;
-  sconst float height = 0; //8*m/256; //Wire::radius;
   sconst float curvature = 0;
-  sconst float elasticModulus = 1e5 * kg/(m*s*s);
+  sconst float elasticModulus = 1e6 * kg/(m*s*s);
   sconst float staticFrictionThresholdSpeed = staticFrictionSpeed;
  } floor;
  /// Sphere - Floor
@@ -87,8 +84,8 @@ struct System {
  Contact contact(const tA& A, size_t a, const Floor&, size_t) {
   vec4f normal {0, 0, 1, 0};
   return { float3(tA::radius)*(-normal),
-               vec4f{A.position[a][0], A.position[a][1], Floor::height, 0},
-               normal, (A.position[a][2]-tA::radius)-Floor::height };
+               vec4f{A.position[a][0], A.position[a][1], 0, 0},
+               normal, (A.position[a][2]-tA::radius) };
  }
 
  struct Side : Obstacle {
@@ -111,6 +108,23 @@ struct System {
      vec4f{r*-normal[0], r*-normal[1], A.position[a][2], 0},
                normal, r-tA::radius-length };
  }
+
+ struct Load : Obstacle {
+  sconst size_t base = 2;
+  sconst float curvature = 0;
+  sconst float elasticModulus = 1e6 * kg/(m*s*s);
+  float height = 0;
+  v4sf force[1];
+ } load;
+ /// Sphere - Load
+ template<Type tA>
+ Contact contact(const tA& A, size_t a, const Load& load, size_t) {
+  vec4f normal {0, 0, -1, 0};
+  return { float3(tA::radius)*(-normal),
+     vec4f{A.position[a][0], A.position[a][1], load.height, 0},
+     normal, load.height-(A.position[a][2]+tA::radius) };
+ }
+
 
  struct Particle {
   const size_t base, capacity;
@@ -169,7 +183,7 @@ struct System {
   buffer<vec4f> rotation { capacity };
   buffer<vec4f> angularVelocity { capacity };
   buffer<vec4f> angularDerivatives[3]; // { [0 ... 2] = buffer<vec4f>(capacity) };
-  Grain(const System& system) : Particle(2, 32768, Grain::mass), // 5 MB
+  Grain(const System& system) : Particle(3, 32768, Grain::mass), // 5 MB
    dt_angularMass(float3(system.dt/angularMass)) {
    for(size_t i: range(3)) angularDerivatives[i] = buffer<vec4f>(capacity);
   }
@@ -207,45 +221,16 @@ struct System {
     Particle{base, 32768, Wire::mass}, elasticModulus(elasticModulus) {}
  } wire;
 
- // Process
- const float loopAngle = PI*(3-sqrt(5.));
- sconst float winchSpeed = 1 *m/s;
- const float winchRate;
- const float height;
- const float initialLoad;
-
  System(const Dict& p) :
-   subStepCount(p.at("subStepCount"_)),
-   frictionCoefficient(p.at("frictionCoefficient"_)),
-   side{p.at("radius"_)},
-   wire(p.at("wireElasticModulus"_), grain.base+grain.capacity),
-   winchRate{p.at("winchRate"_)},
-   height{p.at("height"_)},
-   initialLoad{p.at("initialLoad"_)} {
-  log(p, p.at("subStepCount"_), subStepCount, frictionCoefficient, side.initialRadius, wire.elasticModulus,
-      winchRate, height, initialLoad);
- }
-
- struct Load : Particle {
-  using Particle::Particle;
-  sconst float curvature = 0;
-  sconst float elasticModulus = 1e5 * kg/(m*s*s);
-  vec4f torque[1];
- } load {wire.base+wire.capacity, 1, initialLoad};
-
- /// Sphere - Load
- template<Type tA>
- Contact contact(const tA& A, size_t a, const Load& B, size_t) {
-  vec4f normal {0, 0, -1, 0};
-  return { float3(tA::radius)*(-normal),
-     vec4f{A.position[a][0], A.position[a][1], B.position[0][2], 0},
-     normal, B.position[0][2]-(A.position[a][2]+tA::radius) };
- }
+   dt(p.at("Time step"_)),
+   frictionCoefficient(p.at("Friction coefficient"_)),
+   side{p.at("Radius"_)},
+   wire(p.at("Wire elastic modulus"_), grain.base+grain.capacity) {}
 
  // Update
  size_t timeStep = 0;
- float kineticEnergy=0, normalEnergy=0, staticEnergy=0, tensionEnergy=0;
- float bendEnergy=0;
+ float grainKineticEnergy=0, wireKineticEnergy=0, normalEnergy=0,
+         staticEnergy=0, tensionEnergy=0, bendEnergy=0;
 
  /// Evaluates contact penalty between two objects
  template<Type tA, Type tB>

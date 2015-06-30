@@ -27,8 +27,13 @@ struct Simulation : System {
  // Process
  const float pourRadius = side.castRadius - Grain::radius - Wire::radius;
  const float winchRadius = side.castRadius - Grain::radius - Wire::radius;
- float pourHeight = Floor::height+Grain::radius;
+ const float loopAngle = PI*(3-sqrt(5.));
+ sconst float winchSpeed = 1 *m/s;
+ const float winchRate;
+ const float pourHeight;
+ float currentPourHeight = Grain::radius;
  float winchAngle = 0;
+ float height = 0, initialHeight = 0;
 
  Random random;
  enum { Pour, Release, Wait, Load, Done, Fail } processState = Pour;
@@ -41,12 +46,15 @@ struct Simulation : System {
  Time wireLatticeTime, wireContactTime, wireIntegrationTime;
 
  Lock lock;
- File file;
+ Stream stream;
 
- Simulation(const Dict& p, File&& file) : System(p), file(move(file)) {
+ Simulation(const Dict& p, Stream&& stream) : System(p),
+   winchRate{p.at("Winch rate"_)},
+   pourHeight{p.at("Pour height"_)},
+   stream(move(stream)) {
   // Initial wire node
   size_t i = wire.count++;
-  wire.position[i] = vec3(winchRadius,0,pourHeight);
+  wire.position[i] = vec3(winchRadius,0,currentPourHeight);
   min = ::min(min, wire.position[i]);
   max = ::max(max, wire.position[i]);
   wire.velocity[i] = _0f;
@@ -70,18 +78,14 @@ struct Simulation : System {
   stepTime.start();
   // Process
   if(processState == Pour) {
-   if(pourHeight>=height || grain.count == grain.capacity
-               || (wire.capacity && wire.count == wire.capacity)) {
-    float wireDensity = (wire.count-1)*Wire::volume / ((grain.count)*Grain::volume);
-    //file.write(str("grain.count:", grain.count, "wire.count", wire.count, "wireDensity:"wireDensity)+"\n");
-    if(file) file.write(str(grain.count, wire.count, wireDensity)+"\n");
-    log("Pour->Release", grain.count, wire.count, wireDensity);
+   if(currentPourHeight>=pourHeight) {
     processState++;
+    log("Pour->Release", grain.count, wire.count);
    } else {
     // Generates falling grain (pour)
     const bool useGrain = 1;
-    if(useGrain && pourHeight >= Grain::radius) for(;;) {
-     vec4f p {random()*2-1,random()*2-1, pourHeight, 0};
+    if(useGrain && currentPourHeight >= Grain::radius) for(;;) {
+     vec4f p {random()*2-1,random()*2-1, currentPourHeight, 0};
      if(length2(p)>1) continue;
      vec4f newPosition {pourRadius*p[0], pourRadius*p[1], p[2], 0}; // Within cylinder
      // Finds lowest Z (reduce fall/impact energy)
@@ -93,7 +97,7 @@ struct Simulation : System {
        newPosition[2] = ::max(newPosition[2], p[2]+dz);
       }
      }
-     if(newPosition[2] > pourHeight) break;
+     if(newPosition[2] > currentPourHeight) break;
      for(auto p: wire.position.slice(0, wire.count))
       if(length(p - newPosition) < Grain::radius+Wire::radius)
        goto break2_;
@@ -102,6 +106,7 @@ struct Simulation : System {
        error(newPosition, p, log2(abs(::length(p - newPosition) -  2*Grain::radius)));
      }
      Locker lock(this->lock);
+     assert_(grain.count < grain.capacity);
      size_t i = grain.count++;
      grain.position[i] = newPosition;
      min = ::min(min, grain.position[i]);
@@ -121,24 +126,7 @@ struct Simulation : System {
      break;
     }
 break2_:;
-    pourHeight += winchSpeed * dt;
-   }
-  }
-  if(processState == Release && !load.count) {
-   float maxZ = 0, vz=0;
-   for(size_t i: range(grain.count)) {
-    auto p = grain.position[i];
-    if(p[2]>maxZ) {
-     maxZ = p[2];
-     vz = grain.velocity[i][2];
-    }
-   }
-   if(vz > -1) {
-    Locker lock(this->lock);
-    load.count++;
-    load.position[0] = vec3(0,0,maxZ+Grain::radius+Grain::radius);
-    load.velocity[0] = _0f;
-    for(size_t n: range(3)) load.positionDerivatives[n][0] = _0f;
+    currentPourHeight += winchSpeed * dt;
    }
   }
   if(processState==Release) {
@@ -150,19 +138,43 @@ break2_:;
     processState = Wait;
    }
   }
-  if(processState == Wait && kineticEnergy <
+  height = 0;
+  for(auto p: grain.position.slice(0, grain.count))
+   height = ::max(height, p[2]+Grain::radius);
+
+  if(processState == Wait && grainKineticEnergy <
      128 * grain.count * grain.mass * (Wire::radius*Wire::radius) / sq(s)) {
    processState = Load;
+   log("Wait->Load");
   }
-  if(processState == Load && load.position[0][2] <= 2*2*Grain::radius) {
-   processState = Done;
+  if(processState == Load) {
+   if(!load.height) {
+    load.height = initialHeight = height;
+
+    // Strain independant results
+    float wireDensity = (wire.count-1)*Wire::volume / ((grain.count)*Grain::volume);
+    String s = str("Grain count:", grain.count, "Wire count:", wire.count,
+                   "Wire density:", wireDensity, "Initial Height:", initialHeight);
+    stream.write(s+"\n");
+    stream.write("Load height, Displacement, Height, Force, Stretch, "
+                "Grain kinetic energy, Wire kinetic energy, Normal energy, Static energy, "
+                "Static energy, Tension energy, Bend energy\n");
+   }
+   if(load.height > Grain::radius) {
+    load.height -= dt * 100 * mm/s; // Drives load down at 100mm/s
+    if(height < load.height) {
+     log("Collapse");
+     load.height = height;
+    }
+   }
+   else {
+    processState = Done;
+   }
   }
 
   // Initialization
-  normalEnergy = 0, staticEnergy = 0, tensionEnergy = 0, bendEnergy = 0;
-
-  // Load
-  if(load.count) load.force[0] = float4(load.mass) * G;
+  grainKineticEnergy=0, wireKineticEnergy=0, normalEnergy=0,
+    staticEnergy=0, tensionEnergy=0, bendEnergy=0;
 
   // Grain
   grainTime.start();
@@ -180,9 +192,7 @@ break2_:;
     grain.force[a] = float4(grain.mass) * G;
     grain.torque[a] = _0f;
     penalty(grain, a, floor, 0);
-    if(load.count) {
-     penalty(grain, a, load, 0);
-    }
+    if(load.height) penalty(grain, a, load, 0);
     if(processState <= Release) penalty(grain, a, side, 0);
     grainLattice(grain.position[a]) = 1+a;
    }
@@ -276,7 +286,7 @@ break2_:;
     // Bounds
     penalty(wire, i, floor, 0);
     if(processState <= Release) penalty(wire, i, side, 0);
-    if(load.count) penalty(wire, i, load, 0);
+    if(load.height) penalty(wire, i, load, 0);
     // Wire - Grain
     {size_t offset = grainLattice.index(wire.position[i]);
     for(size_t n: range(3*3)) {
@@ -322,7 +332,7 @@ break2_:;
     // Bounds
     penalty(wire, i, floor, 0);
     if(processState <= Release) penalty(wire, i, side, 0);
-    if(load.count) penalty(wire, i, load, 0);
+    if(load.height) penalty(wire, i, load, 0);
     // Wire - Grain
     {size_t offset = grainLattice.index(wire.position[i]);
     for(size_t n: range(3*3)) {
@@ -372,7 +382,7 @@ break2_:;
     // Bounds
     penalty(wire, i, floor, 0);
     if(processState <= Release) penalty(wire, i, side, 0);
-    if(load.count) penalty(wire, i, load, 0);
+    if(load.height) penalty(wire, i, load, 0);
     // Wire - Grain
     {size_t offset = grainLattice.index(wire.position[i]);
     for(size_t n: range(3*3)) {
@@ -431,24 +441,23 @@ break2_:;
   grainIntegrationTime.stop();
   grainTime.stop();
 
-  // kT
-  vec4f ssqV = _0f;
-  if(grain.count) for(vec4f v: grain.velocity.slice(0, grain.count)) ssqV += sq3(v);
-  kineticEnergy = 1./2*grain.mass*ssqV[0];
+  {vec4f ssqV = _0f;
+   for(vec4f v: grain.velocity.slice(0, grain.count)) ssqV += sq3(v);
+   grainKineticEnergy = 1./2*grain.mass*ssqV[0];}
+  {vec4f ssqV = _0f;
+   for(vec4f v: wire.velocity.slice(0, wire.count)) ssqV += sq3(v);
+   wireKineticEnergy = 1./2*wire.mass*ssqV[0];}
 
-  if(load.count) {
-   load.force[0][0]=0;
-   load.force[0][1]=0;
-   System::step(load, 0);
-   if(processState==Load) {
-    if(timeStep%subStepCount == 0) { // Records results every 1/60s
-     v4sf wireLength = _0f;
-     for(size_t i: range(wire.count-1))
-      wireLength += sqrt(sq3(wire.position[i]-wire.position[i+1]));
-     float stretch = (wireLength[0] / wire.count) / Wire::internodeLength;
-     if(file) file.write(str(load.mass, load.position[0][2], tensionEnergy, stretch)+'\n');
-    }
-    load.mass *= 1 + dt * 1/s; // 2x /s
+  if(processState==Load) {
+   if(timeStep%size_t((1./60)/dt) == 0) { // Records results every 1/60s
+    v4sf wireLength = _0f;
+    for(size_t i: range(wire.count-1))
+     wireLength += sqrt(sq3(wire.position[i]-wire.position[i+1]));
+    float stretch = (wireLength[0] / wire.count) / Wire::internodeLength;
+    String s = str(load.height, initialHeight-load.height, height, load.force[0][2],
+                   stretch, grainKineticEnergy, wireKineticEnergy, normalEnergy,
+                   staticEnergy, tensionEnergy, bendEnergy);
+    stream.write(s+'\n');
    }
   }
 
@@ -464,11 +473,12 @@ break2_:;
    }
    dz = Grain::radius+Wire::radius;
    r *= winchRadius;
-   vec3 end (r*cos(a),r*sin(a), pourHeight+dz);
+   vec3 end (r*cos(a),r*sin(a), currentPourHeight+dz);
    vec4f relativePosition = end - wire.position[wire.count-1];
    vec4f length = sqrt(sq3(relativePosition));
    if(length[0] >= Wire::internodeLength) {
     Locker lock(this->lock);
+    assert_(wire.count < wire.capacity);
     size_t i = wire.count++;
     wire.position[i] = wire.position[wire.count-2]
       + float3(Wire::internodeLength) * relativePosition/length;
@@ -492,7 +502,7 @@ break2_:;
    plots[0].dataSets["static"__][timeStep*dt] = staticEnergy;
    plots[0].dataSets["tension"__][timeStep*dt] = tensionEnergy;
    plots[0].dataSets["bend"__][timeStep*dt] = bendEnergy;
-   if(load.count) plots[1].dataSets["height"__][timeStep*dt] = load.position[0][2];
+   if(load.height) plots[1].dataSets["height"__][timeStep*dt] = load.position[0][2];
   }*/
  }
 };
