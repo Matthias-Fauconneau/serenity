@@ -90,12 +90,13 @@ inline Dict parseDict(TextData& s) {
   s.whileAny(" "_);
   string key = s.whileNo(":=|},"_);
   string value; s.whileAny(" "_);
-  if(s.matchAny(":="_)) { s.whileAny(" "_); value = s.whileNo("|,"_,'{','}'); }
+  if(s.matchAny(":="_)) { s.whileAny(" "_); value = s.whileNo("|,} "_,'{','}'); }
   dict.insertSorted(copyRef(key), replace(copyRef(value),'\\','/'));
+  s.whileAny(" "_);
   if(s.matchAny("|,"_)) continue;
   else if(curly && s.match('}')) break;
   else if(!curly && !s) break;
-  else error("Invalid Dict", s.buffer);
+  else error("Invalid Dict '"+s.data.slice(s.index)+"'", (bool)s, curly, dict, s.data);
  }
  return dict;
 }

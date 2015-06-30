@@ -6,8 +6,14 @@ struct ParameterSweep {
   prctl(PR_SET_PDEATHSIG, 1/*SIGHUP*/);
   mainThread.setPriority(19);
   if(!arguments()) {
-   array<String> cases;
+   array<String> cases {4*4*4*4*4*4*4}; // 16K
    Dict parameters;
+   array<String> existing =
+     apply(Folder(".").list(Files)
+           .filter([](string name){return !endsWith(name, ".result");}),
+     [](string name)->String{
+       return copyRef(name.slice(0, name.size-".result"_.size));
+   });
    for(int subStepCount: {512,1024,2048,4096}) {
     parameters["subStepCount"__] = subStepCount;
     for(float frictionCoefficient: {1.f, 1.f/2, 1.f/4, 1.f/8}) {
@@ -23,7 +29,7 @@ struct ParameterSweep {
          for(float winchRate: {500,400,600,700}) {
           parameters["winchRate"__] = winchRate;
           String id = str(parameters);
-          if(existsFile(id+".result")) { log("Skipping existing", id); continue; }
+          if(existing.contains(id)) { log("Skipping existing", id); continue; }
           cases.append(move(id));
          }
         }
@@ -33,14 +39,16 @@ struct ParameterSweep {
     }
    }
    Random random;
+   array<int> jobs;
    while(cases) {
-    array<int> jobs;
     while(jobs.size >= 7) {
      int pid = wait(); // Waits for any child to terminate
-     wait(pid);
+     int status = wait(pid);
      jobs.take(jobs.indexOf(pid));
+     if(status) { log("Failed"); break; } // Stops spawning simulation on first failure
     }
-    jobs.append( execute(cmdline()[0], {cases.take(random%cases.size)}, false) );
+    String id = cases.take(random%cases.size);
+    jobs.append( execute(cmdline()[0], {id}, false) );
    }
   } else {
    string id = arguments()[0];
