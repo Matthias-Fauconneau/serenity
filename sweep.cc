@@ -41,7 +41,7 @@ struct ParameterSweep {
    Random random;
    array<int> jobs;
    while(cases) {
-    while(jobs.size >= 7) {
+    while(jobs.size >= 4) {
      int pid = wait(); // Waits for any child to terminate
      int status = wait(pid);
      jobs.take(jobs.indexOf(pid));
@@ -58,7 +58,7 @@ struct ParameterSweep {
    Time time (true);
    while(s.processState < Simulation::Done) {
     s.step();
-    if(s.timeStep%(60*s.subStepCount) == 0) log(int(s.timeStep*s.dt));
+    if(s.timeStep%size_t(1/dt) == 0) log(int(s.timeStep*s.dt));
    }
    if(s.processState != Simulation::Done) {
     log("Failed");

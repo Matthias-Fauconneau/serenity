@@ -14,6 +14,7 @@ template<Type tA> vec4f toGlobal(tA& A, size_t a, vec4f localA) {
 }
 
 struct SimulationView : Simulation, Widget, Poll {
+ int2 size {/*1280,720*/1050};
  unique<Window> window;
  // View
  vec2 lastPos; // for relative cursor movements
@@ -23,21 +24,16 @@ struct SimulationView : Simulation, Widget, Poll {
  vec3 rotationCenter = 0;
  Thread simulationThread;
  unique<Encoder> encoder = nullptr;
- GLFrameBuffer target {int2(1280,720)};
- bool showPlot = 0 && processState < Done;
+ GLFrameBuffer target {size};
 
  SimulationView(Thread& uiThread=mainThread, Dict parameters={parseDict(
-    "Time step:1e-5,Friction coefficient:1,Wire elastic modulus:8e6,"
-    "Pour height: 0.4, Radius:0.15, Winch rate:500")}) : Simulation(parameters,
+    "Time step:1e-6,Friction coefficient:1,Wire elastic modulus:8e6,"
+    "Pour height: 0.6, Radius:0.3, Winch rate:1000")}) : Simulation(parameters,
   arguments().contains("result") ?
    File(str(parameters)+".result", currentWorkingDirectory(),
         Flags(WriteOnly|Create|Truncate)) : File(2/*stdout*/)),
    Poll(0, POLLIN, simulationThread), window(::window(this, -1, uiThread, true)) {
-  window->actions[F12] = [this]{
-   if(existsFile(str(timeStep*dt)+".png")) log(str(timeStep*dt)+".png exists");
-   else writeFile(str(timeStep*dt)+".png",encodePNG(target.readback()), home());
-  };
-  window->actions[Key('p')] = [this]{ showPlot = !showPlot; };
+  window->actions[F12] = {this, &SimulationView::snapshot};
   window->actions[Return] = [this]{
    if(processState < Done) processState++;
    log(int(processState), "grain", grain.count, "wire", wire.count);
@@ -63,6 +59,13 @@ struct SimulationView : Simulation, Widget, Poll {
   step();
  }
 
+ void snapshot() {
+  Simulation::snapshot();
+  string name = "image"; //str(timeStep*dt)
+  /*if(existsFile(name+".png", home())) log(name+".png exists");
+  else*/ writeFile(name+".png", encodePNG(target.readback()), currentWorkingDirectory(), true);
+ }
+
  void step() {
   Simulation::step();
   if(encoder) viewYawPitch.x += 2*PI*dt / 16;
@@ -85,9 +88,10 @@ struct SimulationView : Simulation, Widget, Poll {
 #endif
   }
   if(processState < Done) queue();
+  else { snapshot(); requestTermination(0); }
  }
 
- vec2 sizeHint(vec2) override { return vec2(1050, /*1050*720/1280*/720); }
+ vec2 sizeHint(vec2) override { return vec2(1050, 1050*size.y/size.x); }
  shared<Graphics> graphics(vec2) override {
   const float Dt = 1./60;
   {
@@ -126,10 +130,6 @@ struct SimulationView : Simulation, Widget, Poll {
 
   vec2 size (target.size.x, target.size.y);
   vec2 viewSize = size;
-  /*if(showPlot) {
-   viewSize = vec2(720, 720);
-   if(plots.size>2) viewSize = vec2(360,720);
-  }*/
 
   vec3 scaleMax = ::min(max, vec3(vec2(16*Grain::radius), 32*Grain::radius));
   vec3 scaleMin = ::max(min, vec3(vec2(-16*Grain::radius), 0));
@@ -151,7 +151,7 @@ struct SimulationView : Simulation, Widget, Poll {
   target.bind(ClearColor|ClearDepth);
   glDepthTest(true);
 
-  {Locker lock(this->lock);
+  if(1) {Locker lock(this->lock);
   if(grain.count) {
    buffer<vec3> positions {grain.count*6};
    for(size_t i: range(grain.count)) {
@@ -188,7 +188,7 @@ struct SimulationView : Simulation, Widget, Poll {
    vertexArray.draw(Triangles, positions.size);
   }}
 
-  {Locker lock(this->lock);
+  if(1) {Locker lock(this->lock);
   if(wire.count>1) {
    size_t wireCount = wire.count;
    buffer<vec3> positions {(wireCount-1)*6};
@@ -219,7 +219,32 @@ struct SimulationView : Simulation, Widget, Poll {
    vertexArray.draw(Triangles, positions.size);
   }}
 
-  if(load.count) {
+  static GLShader shader {::shader_glsl(), {"flat"}};
+  shader.bind();
+  shader.bindFragments({"color"});
+
+  {Locker lock(this->lock);
+   size_t W = side.W;
+   buffer<vec3> positions {W*(side.H-1)*6-W*2};
+   for(size_t i: range(side.H-1)) for(size_t j: range(W)) {
+    vec3 a (toVec3(side.Particle::position[i*W+j]));
+    vec3 b (toVec3(side.Particle::position[i*W+(j+1)%W]));
+    vec3 c (toVec3(side.Particle::position[(i+1)*W+(j+i%2)%W]));
+    // FIXME: GPU projection
+    vec3 A = viewProjection * a, B= viewProjection * b, C = viewProjection * c;
+    size_t n = i ? W*4 + ((i-1)*W+j)*6 : j*4;
+    positions[n+0] = C; positions[n+1] = A;
+    positions[n+2] = B; positions[n+3] = C;
+    if(i) { positions[n+4] = A; positions[n+5] = B; }
+   }
+   shader["uColor"] = black;
+   static GLVertexArray vertexArray;
+   GLBuffer positionBuffer (positions);
+   vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
+   vertexArray.draw(Lines, positions.size);
+  }
+
+  /*if(load.count) {
    vec3 min (-vec2(-side.castRadius), load.height);
    vec3 max (+vec2(-side.castRadius), load.height);
    for(int i: range(0b111 +1)) for(int j: {(i&0b110) |0b001, (i&0b101) |0b010, (i&0b011) |0b100}) {
@@ -234,19 +259,16 @@ struct SimulationView : Simulation, Widget, Poll {
   }
 
   if(1) glDepthTest(false);
-
-  static GLShader shader {::shader_glsl(), {"flat"}};
-  shader.bind();
-  shader.bindFragments({"color"});
-  static GLVertexArray vertexArray;
-  for(auto entry: lines) {
-   shader["uColor"] = entry.key;
-   GLBuffer positionBuffer (entry.value);
-   vertexArray.bindAttribute(shader.attribLocation("position"_),
-                             3, Float, positionBuffer);
-   vertexArray.draw(Lines, entry.value.size);
+  {static GLVertexArray vertexArray;
+   for(auto entry: lines) {
+    shader["uColor"] = entry.key;
+    GLBuffer positionBuffer (entry.value);
+    vertexArray.bindAttribute(shader.attribLocation("position"_),
+                              3, Float, positionBuffer);
+    vertexArray.draw(Lines, entry.value.size);
+   }
   }
-  lines.clear();
+  lines.clear();*/
 
   if(encoder) {
    encoder->writeVideoFrame(target.readback());

@@ -25,19 +25,19 @@ struct Simulation : System {
  vec4f min = _0f, max = _0f;
 
  // Process
- const float pourRadius = side.castRadius - Grain::radius - Wire::radius;
- const float winchRadius = side.castRadius - Grain::radius - Wire::radius;
+ const float pourRadius = side.initialRadius - Grain::radius - Wire::radius;
+ const float winchRadius = side.initialRadius - Grain::radius - Wire::radius;
  const float loopAngle = PI*(3-sqrt(5.));
  sconst float winchSpeed = 1 *m/s;
  const float winchRate;
  const float pourHeight;
  float currentPourHeight = Grain::radius;
- float winchAngle = 0;
+ float lastAngle = 0, winchAngle = 0, currentRadius = winchRadius;
  float height = 0, initialHeight = 0;
  size_t lastCollapseReport = 0;
 
  Random random;
- enum { Pour, Release, Wait, Load, Done, Fail } processState = Pour;
+ enum { Pour, /*Release,*/ Wait, Load, Done, Fail } processState = Pour;
 
  // Performance
  int64 lastReport = realTime(), lastReportStep = timeStep;
@@ -73,6 +73,58 @@ struct Simulation : System {
   vec4f relativeVelocity = wire.velocity[a] - wire.velocity[b];
   vec4f fB = - wire.tensionDamping * dot3(direction, relativeVelocity);
   return (fS + fB) * direction;
+ }
+
+ void snapshot() {
+  {array<char> s;
+   s.append(str(grain.radius)+'\n');
+   s.append(str("X, Y, Z, grain contact count, grain contact energy (µJ), wire contact count, wire contact energy (µJ)")+'\n');
+   buffer<int> wireCount(grain.count); wireCount.clear();
+   buffer<float> wireEnergy(grain.count); wireEnergy.clear();
+   for(size_t i : range(wire.count)) {
+    for(auto& f: wire.frictions[i]) {
+     if(f.index >= grain.base && f.index < grain.base+grain.capacity) {
+      wireCount[f.index-grain.base]++;
+      wireEnergy[f.index-grain.base] += f.energy;
+     }
+    }
+   }
+   for(size_t i : range(grain.count)) {
+    int grainCount=0; float grainEnergy=0;
+    for(auto& f: grain.frictions[i]) {
+     if(f.index >= grain.base && f.index < grain.base+grain.capacity) {
+      grainCount++;
+      grainEnergy += f.energy;
+     }
+    }
+    auto p = grain.position[i];
+    s.append(str(p[0], p[1], p[2], grainCount, grainEnergy*1e6, wireCount[i], wireEnergy[i]*1e6)+'\n');
+   }
+   writeFile("grain", s, currentWorkingDirectory(), true);
+  }
+  {array<char> s;
+   s.append(str(wire.radius)+'\n');
+   s.append(str("X0, Y0, Z0, X1, Y1, Z1, grain contact count, grain contact energy (µJ)")+'\n');
+   for(size_t i: range(0, wire.count-1)) {
+    auto a = wire.position[i], b = wire.position[i+1];
+    float energy = 0;
+    for(auto& f: wire.frictions[i]) energy += f.energy;
+    s.append(str(a[0], a[1], a[2], b[0], b[1], b[2], wire.frictions[i].size, energy*1e6)+'\n');
+   }
+   writeFile("wire", s, currentWorkingDirectory(), true);
+  }
+  {array<char> s;
+   size_t W = side.W;
+   for(size_t i: range(side.H-1)) for(size_t j: range(W)) {
+    vec3 a (toVec3(side.position[i*W+j]));
+    vec3 b (toVec3(side.position[i*W+(j+1)%W]));
+    vec3 c (toVec3(side.position[(i+1)*W+(j+i%2)%W]));
+    s.append(str(a[0], a[1], a[2], c[0], c[1], c[2])+'\n');
+    s.append(str(b[0], b[1], b[2], c[0], c[1], c[2])+'\n');
+    if(i) s.append(str(a[0], a[1], a[2], b[0], b[1], b[2])+'\n');
+   }
+   writeFile("side", s, currentWorkingDirectory(), true);
+  }
  }
 
  void step() {
@@ -130,16 +182,16 @@ break2_:;
     currentPourHeight += winchSpeed * dt;
    }
   }
-  if(processState==Release) {
-   if(side.castRadius < 15*Grain::radius) {
+  /*if(processState==Release) {
+   if(side.initialRadius < 15*Grain::radius) {
     static float releaseTime = timeStep*dt;
     side.castRadius = side.initialRadius * exp((timeStep*dt-releaseTime)/(1*s));
-    side.castRadius = 15*Grain::radius;
+    //side.castRadius = 15*Grain::radius;
    } else {
     log("Release->Wait");
     processState = Wait;
    }
-  }
+  }*/
   height = 0;
   for(auto p: grain.position.slice(0, grain.count))
    height = ::max(height, p[2]+Grain::radius);
@@ -160,12 +212,15 @@ break2_:;
                 "Grain kinetic energy (mJ), Wire kinetic energy (mJ), Normal energy (mJ),"
                 "Static energy (mJ), Static energy (mJ), Tension energy (mJ), Bend energy (mJ)\n");
    }
-   if(load.height >= 4*Grain::radius) {
-    // Drives load down between 10-100 mm/s
-    // Depends on kinetic energy between 10-100µJ/grain
-    float Emin = 10e-6, Emax = 100e-6;
-    float a = clamp(0, ((grainKineticEnergy/grain.count)-Emin)/(Emax-Emin), 1);
-    load.height -= dt * (10*a + 100*(1-a)) * mm/s;
+   if(load.height >= 3*Grain::radius) {
+    if(0) { // Drives load down between 10-100 mm/s
+     // Depends on kinetic energy between 10-100µJ/grain
+     const float Emin = 10e-6, Emax = 100e-6;
+     float a = clamp(0.f, ((grainKineticEnergy/grain.count)-Emin)/(Emax-Emin), 1.f);
+     load.height -= dt * (10*a + 100*(1-a)) * mm/s;
+    } else {
+     load.height -= dt * 10 * mm/s;
+    }
     if(height < load.height) {
      if(lastCollapseReport > timeStep+size_t(1e-2/dt)) {
       lastCollapseReport = timeStep;
@@ -200,7 +255,8 @@ break2_:;
     grain.torque[a] = _0f;
     penalty(grain, a, floor, 0);
     if(load.height) penalty(grain, a, load, 0);
-    if(processState <= Release) penalty(grain, a, side, 0);
+    /*if(processState <= Release)*/ \
+    for(size_t b: range(side.faceCount)) penalty(grain, a, side, b);
     grainLattice(grain.position[a]) = 1+a;
    }
   }, 1);
@@ -292,7 +348,7 @@ break2_:;
     }
     // Bounds
     penalty(wire, i, floor, 0);
-    if(processState <= Release) penalty(wire, i, side, 0);
+    for(size_t b: range(side.faceCount)) penalty(wire, i, side, b);
     if(load.height) penalty(wire, i, load, 0);
     // Wire - Grain
     {size_t offset = grainLattice.index(wire.position[i]);
@@ -340,7 +396,7 @@ break2_:;
     }
     // Bounds
     penalty(wire, i, floor, 0);
-    if(processState <= Release) penalty(wire, i, side, 0);
+    for(size_t b: range(side.faceCount)) penalty(wire, i, side, b);
     if(load.height) penalty(wire, i, load, 0);
     // Wire - Grain
     {size_t offset = grainLattice.index(wire.position[i]);
@@ -391,7 +447,7 @@ break2_:;
     }
     // Bounds
     penalty(wire, i, floor, 0);
-    if(processState <= Release) penalty(wire, i, side, 0);
+    for(size_t b: range(side.faceCount)) penalty(wire, i, side, b);
     if(load.height) penalty(wire, i, load, 0);
     // Wire - Grain
     {size_t offset = grainLattice.index(wire.position[i]);
@@ -462,6 +518,9 @@ break2_:;
    wireKineticEnergy = 1./2*wire.mass*ssqV[0];}
 
   if(processState==Load) {
+   /*if(load.force[0][2] > 250 && load.height < 4*Grain::radius)
+    processState = Done; // Stops once only two layers are left
+   else*/
    if(timeStep%size_t(1e-3/dt) == 0) { // Records results every milliseconds of simulation
     v4sf wireLength = _0f;
     for(size_t i: range(wire.count-1))
@@ -474,19 +533,37 @@ break2_:;
   }
 
   if(processState==Pour) { // Generates wire (winch)
-   float a = winchAngle, r = 1, dz = 0;
-   if(loopAngle) {
-    float t = mod(winchAngle / loopAngle, 4);
-    float b = (winchAngle - t*loopAngle)/2;
-    /**/  if(/*0 <*/ t < 1) r = 1, a=b+t*loopAngle;
-    else if(/*1 <*/ t < 2) r = 1-2*(t-1), a=b+loopAngle;
-    else if(/*2 <*/ t < 3) r = -1, a=b+loopAngle+/*-*/(t-2)*loopAngle;
-    else    /*3 <    t < 4*/r = -1+2*(t-3), a=b+2*loopAngle;
+   vec2 end;
+   if(0) { // Simple helix
+    float a= winchAngle;
+    float r = winchRadius;
+    end = vec2(r*cos(a), r*sin(a));
+    winchAngle += winchRate * dt;
+   } else if(0) { // Cross reinforced helix
+    if(currentRadius < -winchRadius) { // Radial -> Tangential (Phase reset)
+     currentRadius = winchRadius;
+     lastAngle = winchAngle+PI;
+     winchAngle = lastAngle;
+    }
+    if(winchAngle < lastAngle+loopAngle) { // Tangential phase
+     float a = winchAngle;
+     float r = winchRadius;
+     end = vec2(r*cos(a), r*sin(a));
+     winchAngle += winchRate * dt;
+    } else { // Radial phase
+     float a = winchAngle;
+     float r = currentRadius;
+     end = vec2(r*cos(a), r*sin(a));
+     currentRadius -= winchRate*2*PI*winchRadius * dt; // Constant velocity
+    }
+   } else { // Loops
+    float A = winchAngle, a = winchAngle * loopAngle / (2*PI);
+    float R = winchRadius, r = 1./2*R;
+    end = vec2((R-r)*cos(A)+r*cos(a),(R-r)*sin(A)+r*sin(a));
+    winchAngle += winchRate * dt;
    }
-   dz = Grain::radius+Wire::radius;
-   r *= winchRadius;
-   vec3 end (r*cos(a),r*sin(a), currentPourHeight+dz);
-   vec4f relativePosition = end - wire.position[wire.count-1];
+   float z = currentPourHeight+Grain::radius+Wire::radius;
+   vec4f relativePosition = vec3(end, z) - wire.position[wire.count-1];
    vec4f length = sqrt(sq3(relativePosition));
    if(length[0] >= Wire::internodeLength) {
     Locker lock(this->lock);
@@ -503,7 +580,6 @@ break2_:;
   }
 
   timeStep++;
-  winchAngle += winchRate * dt;
 
   stepTime.stop();
  }

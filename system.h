@@ -1,6 +1,7 @@
 #include "simd.h"
 #include "parallel.h"
 #include "variant.h"
+#include "matrix.h"
 typedef v4sf vec4f;
 float length2(vec4f v) { return sqrt(sq2(v))[0]; }
 float length(vec4f v) { return sqrt(sq3(v))[0]; }
@@ -41,6 +42,7 @@ struct System {
   vec4f relativeA, relativeB; // Relative to center but world axices
   vec4f normal;
   float depth;
+  //vec3 B; // FIXME: barycentric coordinates passed from contact to force distribution
  };
 
  /// Returns contact between two objects
@@ -58,6 +60,7 @@ struct System {
   size_t index; // Identifies contact to avoid duplicates
   vec4f localA, localB; // Last static friction contact location
   size_t lastStatic = 0;
+  float energy;
   bool operator==(const Friction& b) const { return index == b.index; }
  };
 
@@ -88,29 +91,8 @@ struct System {
                normal, (A.position[a][2]-tA::radius) };
  }
 
- struct Side : Obstacle {
-  sconst size_t base = 1;
-  sconst float curvature = 0; // -1/radius?
-  sconst float elasticModulus = 1e6 * kg/(m*s*s); // 5
-  const float initialRadius;
-  float castRadius = initialRadius;
-  struct { NoOperation operator[](size_t) const { return {}; }} force;
-  Side(float initialRadius) : initialRadius(initialRadius) {}
- } side;
- /// Sphere - Side
- template<Type tA>
- Contact contact(const tA& A, size_t a, const Side& side, size_t) {
-  float length = length2(A.position[a]);
-  // Side -> Sphere
-  float r = side.castRadius;
-  vec4f normal {-A.position[a][0]/length, -A.position[a][1]/length, 0, 0};
-  return { float3(tA::radius)*(-normal),
-     vec4f{r*-normal[0], r*-normal[1], A.position[a][2], 0},
-               normal, r-tA::radius-length };
- }
-
  struct Load : Obstacle {
-  sconst size_t base = 2;
+  sconst size_t base = 1;
   sconst float curvature = 0;
   sconst float elasticModulus = 1e6 * kg/(m*s*s);
   float height = 0;
@@ -183,7 +165,7 @@ struct System {
   buffer<vec4f> rotation { capacity };
   buffer<vec4f> angularVelocity { capacity };
   buffer<vec4f> angularDerivatives[3]; // { [0 ... 2] = buffer<vec4f>(capacity) };
-  Grain(const System& system) : Particle(3, 32768, Grain::mass), // 5 MB
+  Grain(const System& system) : Particle(2, 32768, Grain::mass), // 5 MB
    dt_angularMass(float3(system.dt/angularMass)) {
    for(size_t i: range(3)) angularDerivatives[i] = buffer<vec4f>(capacity);
   }
@@ -221,11 +203,95 @@ struct System {
     Particle{base, 32768, Wire::mass}, elasticModulus(elasticModulus) {}
  } wire;
 
+ struct Side : Particle {
+  struct { v4sf operator[](size_t) const { return _0f; } } position;
+  struct {
+   System::Side& side;
+   // FIXME: pass contact barycentric coordinates to evaluate velocity
+   v4sf operator[](size_t unused faceIndex) const { return _0f; }
+  } velocity {*this};
+  struct DistributeForce {
+   System::Side& side;
+   size_t faceIndex;
+  };
+  struct {
+   System::Side& side;
+   DistributeForce operator[](size_t faceIndex) const { return {side, faceIndex}; }
+  } force {*this};
+  struct { NoOperation operator[](size_t) const { return {}; }} torque;
+
+  sconst float curvature = 0; // -1/radius?
+  sconst float elasticModulus = 1e6 * kg/(m*s*s); // 5
+  const float initialRadius;
+  const float height;
+  const size_t W, H, faceCount = 1; //(H-1)*(W-1)*2;
+  //float castRadius = initialRadius;
+  float minRadius = initialRadius;
+  Side(float initialRadius, float height, size_t base /*,
+       size_t W = int(PI*initialRadius/Grain::radius),
+       size_t H = int(height/Grain::radius)+1*/)
+   : Particle(base, /*W*H*/int(2*PI*initialRadius/Grain::radius)*
+                                         (int(height/Grain::radius*2/sqrt(3.))+1), 1*g),
+     initialRadius(initialRadius), height(height), W(int(2*PI*initialRadius/Grain::radius)),
+     H(int(height/Grain::radius*2/sqrt(3.))+1) {
+   count = W*H;
+   for(size_t i: range(H)) for(size_t j: range(W)) {
+    float z = i*height/(H-1);
+    float a = 2*PI*(j+(i%2)*1./2)/W;
+    float x = initialRadius*cos(a), y = initialRadius*sin(a);
+    Particle::position[i*W+j] = {x,y,z,0};
+   }
+   Particle::velocity.clear(_0f);
+  }
+ } side;
+ /// Sphere - Side
+ template<Type tA>
+ Contact contact(const tA& A, size_t aIndex, const Side& side, size_t faceIndex) {
+  {float length = length2(A.position[aIndex]);
+   if(side.faceCount == 1) { // Side -> Sphere
+    float r = side.initialRadius;
+    vec4f normal {-A.position[aIndex][0]/length, -A.position[aIndex][1]/length, 0, 0};
+    return { float3(tA::radius)*(-normal),
+       vec4f{r*-normal[0], r*-normal[1], A.position[aIndex][2], 0},
+     normal, r-tA::radius-length };
+   }
+   if(length+Grain::radius < side.minRadius) return {_0f,_0f,_0f,0};
+  }
+  // Triangle - Sphere
+  size_t W = side.W;
+  //for(size_t i: range(side.H-1)) for(size_t j: range(W-1)) {
+  size_t i = faceIndex/2/(W-1), j = (faceIndex/2)%(W-1), n = faceIndex%2;
+  vec3 a (toVec3(side.Particle::position[i*W+j]));
+  vec3 b (toVec3(side.Particle::position[i*W+(j+1)%W]));
+  vec3 c (toVec3(side.Particle::position[(i+1)*W+j]));
+  vec3 d (toVec3(side.Particle::position[(i+1)*W+(j+1)%W]));
+  mat3 v[2][2] {{mat3{a,c,d},mat3{a,d,b}},{mat3{c,b,a},mat3{c,d,b}}};
+  mat3 V = v[i%2][n];
+  vec3 M = toVec3(A.position[aIndex]);
+  vec3 normal = cross(V[1]-V[0], V[2]-V[0]);
+  normal /= length(normal);
+  assert_(dot(normal, M) < 0, V[0], V[1], V[2], i%2, n, A.position[aIndex], normal, dot(normal, M));
+  vec3 P = M - normal * dot(normal, M);
+  // FIXME: TODO: barycentric coordinates | 2D edge equations
+  /*mat3 e = V.inverse();
+  vec3 B = e*P;
+  B.x = clamp(0.f, B.x, 1.f);
+  B.y = clamp(0.f, B.y, 1.f);
+  B.z = clamp(0.f, B.z, 1.f);
+  vec3 p = V*B;*/
+  // Assumes concave surface (=> no vertex/edge intersection only inside)
+  // FIXME: need barycentric to distribute force
+  vec3 r = P-M;
+  float length = ::length(r);
+  //if(length < tA::radius) log(float3(tA::radius)*(-normal), P, normal, length-tA::radius);
+  return {float3(tA::radius)*(-normal), P, normal, length-tA::radius};
+ }
+
  System(const Dict& p) :
    dt(p.at("Time step"_)),
    frictionCoefficient(p.at("Friction coefficient"_)),
-   side{p.at("Radius"_)},
-   wire(p.at("Wire elastic modulus"_), grain.base+grain.capacity) {}
+   wire(p.at("Wire elastic modulus"_), grain.base+grain.capacity),
+   side{p.at("Radius"_), p.at("Pour height"_), wire.base+wire.capacity} {}
 
  // Update
  size_t timeStep = 0;
@@ -256,7 +322,7 @@ struct System {
 
   fN = fK + fB;
 
-  Friction& friction = A.frictions[a].add(Friction{B.base+b, _0f, _0f});
+  Friction& friction = A.frictions[a].add(Friction{B.base+b, _0f, _0f, 0, 0.f});
   if(friction.lastStatic < timeStep-1) { // Resets contact (TODO: GC)
    friction.localA = qapply(conjugate(A.rotation[a]), c.relativeA);
    friction.localB = qapply(conjugate(B.rotation[b]), c.relativeB);
@@ -278,6 +344,7 @@ struct System {
   vec4f tangentRelativeSpeed = sqrt(sq3(tangentRelativeVelocity));
   float fD = frictionCoefficient * fN;
   vec4f fT;
+  friction.energy = 0;
   if(fS < fD && tangentLength[0] < staticFrictionLength
     && tangentRelativeSpeed[0] < staticFrictionSpeed
      ) {
@@ -286,6 +353,7 @@ struct System {
     vec4f springDirection = tangentOffset / tangentLength;
     float fB = staticFrictionDamping * dot3(springDirection, relativeVelocity)[0];
     atomic_add(staticEnergy, 1./2 * kS * sq(tangentLength[0]));
+    friction.energy = 1./2 * kS * sq(tangentLength[0]);
     fT = - float3(fS+fB) * springDirection;
    } else fT = _0f;
   } else {
@@ -300,6 +368,18 @@ struct System {
   atomic_sub(B.torque[b], cross(relativeB, fT));
  }
 };
+
+void atomic_sub(System::Side::DistributeForce o, vec4f force) {
+ size_t W = o.side.W;
+ size_t i = o.faceIndex/2/(W-1), j = (o.faceIndex/2)%(W-1), n = o.faceIndex%2;
+ size_t a = i*W+j;
+ size_t b = i*W+(j+1)%W;
+ size_t c = (i+1)*W+j;
+ size_t d = (i+1)*W+(j+1)%W;
+ size_t v[2][2][3] {{{a,c,d},{a,d,b}},{{c,b,a},{c,d,b}}};
+ for(size_t index: v[i%2][n]) atomic_sub(o.side.Particle::force[index], force/float3(3));
+}
+
 constexpr vec4f System::G;
 constexpr float System::Grain::radius;
 constexpr float System::Grain::mass;

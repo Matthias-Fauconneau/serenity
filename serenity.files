@@ -77,3 +77,4 @@ simulation.h
 sweep.cc
 plot.cc
 review.cc
+pattern.cc
