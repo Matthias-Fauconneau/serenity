@@ -17,17 +17,17 @@ struct ParameterSweep {
    for(int subStepCount: {512,1024,2048,4096}) {
     parameters["Substep count"__] = subStepCount;
     for(float frictionCoefficient: {1.f, 1.f/2, 1.f/4, 1.f/8}) {
-     parameters["Friction coefficient"__] = frictionCoefficient;
+     parameters["Friction"__] = frictionCoefficient;
      for(float initialLoad: {0.1,0.2,0.4,0.8}) {
       parameters["Initial load"__] = initialLoad;
       for(float wireElasticModulus: {8e6,16e6,32e6,64e6}) {
-       parameters["Wire elastic modulus"__] = wireElasticModulus;
+       parameters["Elasticity"__] = wireElasticModulus;
        for(float height: {0.1, 0.2, 0.4, 0.8}) {
         parameters["Height"__] = height;
         for(float radius: {0.1, 0.2, 0.4, 0.8}) {
          parameters["Radius"__] = radius;
          for(float winchRate: {500,400,600,700}) {
-          parameters["Winch rate"__] = winchRate;
+          parameters["Rate"__] = winchRate;
           String id = str(parameters);
           if(existing.contains(id)) { log("Skipping existing", id); continue; }
           cases.append(move(id));

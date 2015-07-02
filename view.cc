@@ -27,8 +27,8 @@ struct SimulationView : Simulation, Widget, Poll {
  GLFrameBuffer target {size};
 
  SimulationView(Thread& uiThread=mainThread, Dict parameters={parseDict(
-    "Time step:1e-6,Friction coefficient:1,Wire elastic modulus:8e6,"
-    "Pour height: 0.6, Radius:0.3, Winch rate:1000")}) : Simulation(parameters,
+    "Pattern:none,Time step:1e-6,Friction:1,Elasticity:8e6,"
+    "Height: 0.6, Radius:0.3, Rate:200")}) : Simulation(parameters,
   arguments().contains("result") ?
    File(str(parameters)+".result", currentWorkingDirectory(),
         Flags(WriteOnly|Create|Truncate)) : File(2/*stdout*/)),
@@ -59,11 +59,9 @@ struct SimulationView : Simulation, Widget, Poll {
   step();
  }
 
- void snapshot() {
+ void snapshot() override {
   Simulation::snapshot();
-  string name = "image"; //str(timeStep*dt)
-  /*if(existsFile(name+".png", home())) log(name+".png exists");
-  else*/ writeFile(name+".png", encodePNG(target.readback()), currentWorkingDirectory(), true);
+  writeFile(name+".png", encodePNG(target.readback()), currentWorkingDirectory(), true);
  }
 
  void step() {
@@ -277,11 +275,12 @@ struct SimulationView : Simulation, Widget, Poll {
   target.blit(0, window->size, int2(offset, 0), int2(target.size.x-offset, target.size.y));
 
   array<char> s {
-   copyRef(ref<string>{"Pour","Release","Wait","Load","Done"}[processState])};
+   copyRef(processStates[processState])};
+  s.append(" "_+str(grain.count)+" grains"_);
   s.append(" "_+str(int(timeStep*this->dt*1000))+"ms"_);
   //if(processState==Wait)
   s.append(" "_+str(int(grainKineticEnergy*1e6/grain.count))+"µJ");
-  if(processState>=Load) {
+  if(processState>=ProcessState::Load) {
    s.append(" "_+str(int(load.height*1000))+"mm");
    s.append(" "_+str(int(load.force[0][2]))+"N");
   }

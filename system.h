@@ -30,12 +30,12 @@ struct System {
  sconst vec4f G {0, 0, -10 * N/kg/*=m·s¯²*/, 0};
 
  // Penalty model
- sconst float normalDamping = 1./4 * g/s; // 11-13
+ sconst float normalDamping = 0 * g/s;
  // Friction model
  sconst float staticFrictionSpeed = 1./3 *m/s;
  sconst float staticFrictionFactor = 1/(2e-3 *m); // Wire diameter
  sconst float staticFrictionLength = 10 *mm;
- sconst float staticFrictionDamping = 15 *g/s/s; // 3-6-9-13
+ sconst float staticFrictionDamping = 15 *g/s/s;
  const float frictionCoefficient;
 
  struct Contact {
@@ -65,6 +65,7 @@ struct System {
  };
 
  struct Obstacle {
+  sconst bool friction = false;
   sconst float mass = inf;
   sconst float angularMass = 0;
   sconst size_t count = 1;
@@ -109,6 +110,7 @@ struct System {
 
 
  struct Particle {
+  sconst bool friction = true;
   const size_t base, capacity;
   float mass;
   const vec4f _1_mass;
@@ -289,14 +291,17 @@ struct System {
 
  System(const Dict& p) :
    dt(p.at("Time step"_)),
-   frictionCoefficient(p.at("Friction coefficient"_)),
-   wire(p.at("Wire elastic modulus"_), grain.base+grain.capacity),
-   side{p.at("Radius"_), p.at("Pour height"_), wire.base+wire.capacity} {}
+   frictionCoefficient(p.at("Friction"_)),
+   wire(p.at("Elasticity"_), grain.base+grain.capacity),
+   side{p.at("Radius"_), p.at("Height"_), wire.base+wire.capacity} {}
 
  // Update
  size_t timeStep = 0;
  float grainKineticEnergy=0, wireKineticEnergy=0, normalEnergy=0,
          staticEnergy=0, tensionEnergy=0, bendEnergy=0;
+ bool recordContacts = false;
+ struct ContactForce { size_t a, b; vec3 relativeA, relativeB; vec3 force; };
+ array<ContactForce> contacts;
 
  /// Evaluates contact penalty between two objects
  template<Type tA, Type tB>
@@ -320,52 +325,55 @@ struct System {
   float fN = fK + fB;
   vec4f force = float3(fN) * c.normal;
 
-  fN = fK + fB;
+  if(B.friction) {
+   Friction& friction = A.frictions[a].add(Friction{B.base+b, _0f, _0f, 0, 0.f});
+   if(friction.lastStatic < timeStep-1) { // Resets contact (TODO: GC)
+    friction.localA = qapply(conjugate(A.rotation[a]), c.relativeA);
+    friction.localB = qapply(conjugate(B.rotation[b]), c.relativeB);
+   }
 
-  Friction& friction = A.frictions[a].add(Friction{B.base+b, _0f, _0f, 0, 0.f});
-  if(friction.lastStatic < timeStep-1) { // Resets contact (TODO: GC)
-   friction.localA = qapply(conjugate(A.rotation[a]), c.relativeA);
-   friction.localB = qapply(conjugate(B.rotation[b]), c.relativeB);
+   vec4f relativeA = qapply(A.rotation[a], friction.localA);
+   vec4f relativeB = qapply(B.rotation[b], friction.localB);
+   vec4f globalA = A.position[a] + relativeA;
+   vec4f globalB = B.position[b] + relativeB;
+   vec4f x = globalA - globalB;
+   vec4f tangentOffset = x - dot3(c.normal, x) * c.normal;
+   vec4f tangentLength = sqrt(sq3(tangentOffset));
+   float staticFrictionStiffness = staticFrictionFactor * frictionCoefficient;
+   float kS = staticFrictionStiffness * fN;
+   float fS = kS * tangentLength[0]; // 0.1~1 fN
+
+   vec4f tangentRelativeVelocity
+     = relativeVelocity - dot3(c.normal, relativeVelocity) * c.normal;
+   vec4f tangentRelativeSpeed = sqrt(sq3(tangentRelativeVelocity));
+   float fD = frictionCoefficient * fN;
+   vec4f fT;
+   friction.energy = 0;
+   if(fS < fD && tangentLength[0] < staticFrictionLength
+      && tangentRelativeSpeed[0] < staticFrictionSpeed
+      ) {
+    friction.lastStatic = timeStep; // Otherwise resets contact next step
+    if(tangentLength[0]) {
+     vec4f springDirection = tangentOffset / tangentLength;
+     float fB = staticFrictionDamping * dot3(springDirection, relativeVelocity)[0];
+     atomic_add(staticEnergy, 1./2 * kS * sq(tangentLength[0]));
+     friction.energy = 1./2 * kS * sq(tangentLength[0]);
+     fT = - float3(fS+fB) * springDirection;
+    } else fT = _0f;
+   } else {
+    if(tangentRelativeSpeed[0]) {
+     fT = - float3(fD) * tangentRelativeVelocity / tangentRelativeSpeed;
+    } else fT = _0f;
+   }
+   force += fT;
+   A.torque[a] += cross(relativeA, fT);
+   atomic_sub(B.torque[b], cross(relativeB, fT));
   }
-
-  vec4f relativeA = qapply(A.rotation[a], friction.localA);
-  vec4f relativeB = qapply(B.rotation[b], friction.localB);
-  vec4f globalA = A.position[a] + relativeA;
-  vec4f globalB = B.position[b] + relativeB;
-  vec4f x = globalA - globalB;
-  vec4f tangentOffset = x - dot3(c.normal, x) * c.normal;
-  vec4f tangentLength = sqrt(sq3(tangentOffset));
-  float staticFrictionStiffness = staticFrictionFactor * frictionCoefficient;
-  float kS = staticFrictionStiffness * fN;
-  float fS = kS * tangentLength[0]; // 0.1~1 fN
-
-  vec4f tangentRelativeVelocity
-    = relativeVelocity - dot3(c.normal, relativeVelocity) * c.normal;
-  vec4f tangentRelativeSpeed = sqrt(sq3(tangentRelativeVelocity));
-  float fD = frictionCoefficient * fN;
-  vec4f fT;
-  friction.energy = 0;
-  if(fS < fD && tangentLength[0] < staticFrictionLength
-    && tangentRelativeSpeed[0] < staticFrictionSpeed
-     ) {
-   friction.lastStatic = timeStep; // Otherwise resets contact next step
-   if(tangentLength[0]) {
-    vec4f springDirection = tangentOffset / tangentLength;
-    float fB = staticFrictionDamping * dot3(springDirection, relativeVelocity)[0];
-    atomic_add(staticEnergy, 1./2 * kS * sq(tangentLength[0]));
-    friction.energy = 1./2 * kS * sq(tangentLength[0]);
-    fT = - float3(fS+fB) * springDirection;
-   } else fT = _0f;
-  } else {
-   if(tangentRelativeSpeed[0]) {
-    fT = - float3(fD) * tangentRelativeVelocity / tangentRelativeSpeed;
-   } else fT = _0f;
-  }
-  force += fT;
   A.force[a] += force;
   atomic_sub(B.force[b], force);
-  A.torque[a] += cross(relativeA, fT);
-  atomic_sub(B.torque[b], cross(relativeB, fT));
+  if(recordContacts) {
+   contacts.append(A.base+a, B.base+b, toVec3(c.relativeA), toVec3(c.relativeB), toVec3(force));
+  }
  }
 };
 

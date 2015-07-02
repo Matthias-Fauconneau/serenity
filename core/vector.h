@@ -91,7 +91,10 @@ generic bool isNumber(const vec& v){ for(uint i: range(N)) if(!isNumber(v[i])) r
 #define generic template<Type T>
 
 template<template<Type> /*Type*/class V, Type T, uint N> inline String str(const vec& v) {
-	array<char> s(6*N, 0); s.append('('); for(uint i: range(N)) { s.append(str(v[i])); if(i<N-1) s.append(", "); } s.append(')'); return move(s);
+ array<char> s(6*N, 0);
+ s.append('(');
+ for(uint i: range(N)) { s.append(str(v[i])); if(i<N-1) s.append(", "); } s.append(')');
+ return move(s);
 }
 
 #undef vec

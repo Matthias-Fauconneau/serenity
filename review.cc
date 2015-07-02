@@ -37,8 +37,8 @@ struct ArrayView : Widget {
  vec2 headerCellSize = vec2(160/*80*/*textSize/16, textSize);
  vec2 contentCellSize = vec2(48*textSize/16, textSize);
  buffer<string> dimensions[2] = {
-  split("Substep count,Friction coefficient,Wire elastic modulus,Initial load",","),
-  split("Winch rate,Height,Radius",",")
+  split("Substep count,Friction,Elasticity",","),
+  split("Rate,Height,Radius",",")
  };
 
  ArrayView(string valueName, uint textSize=16)
