@@ -226,16 +226,16 @@ struct System {
   sconst float elasticModulus = 1e6 * kg/(m*s*s); // 5
   const float initialRadius;
   const float height;
-  const size_t W, H, faceCount = 1; //(H-1)*(W-1)*2;
+  const size_t W, H, faceCount;
   //float castRadius = initialRadius;
   float minRadius = initialRadius;
-  Side(float initialRadius, float height, size_t base /*,
+  Side(float initialRadius, float height, size_t base, bool soft /*,
        size_t W = int(PI*initialRadius/Grain::radius),
        size_t H = int(height/Grain::radius)+1*/)
    : Particle(base, /*W*H*/int(2*PI*initialRadius/Grain::radius)*
                                          (int(height/Grain::radius*2/sqrt(3.))+1), 1*g),
      initialRadius(initialRadius), height(height), W(int(2*PI*initialRadius/Grain::radius)),
-     H(int(height/Grain::radius*2/sqrt(3.))+1) {
+     H(int(height/Grain::radius*2/sqrt(3.))+1), faceCount(soft ? (H-1)*(W-1)*2 : 1) {
    count = W*H;
    for(size_t i: range(H)) for(size_t j: range(W)) {
     float z = i*height/(H-1);
@@ -293,7 +293,7 @@ struct System {
    dt(p.at("Time step"_)),
    frictionCoefficient(p.at("Friction"_)),
    wire(p.at("Elasticity"_), grain.base+grain.capacity),
-   side{p.at("Radius"_), p.at("Height"_), wire.base+wire.capacity} {}
+   side(p.at("Radius"_), p.at("Height"_), wire.base+wire.capacity, p.contains("Pressure")) {}
 
  // Update
  size_t timeStep = 0;
@@ -305,9 +305,9 @@ struct System {
 
  /// Evaluates contact penalty between two objects
  template<Type tA, Type tB>
- void penalty(const tA& A, size_t a, tB& B, size_t b) {
+ bool penalty(const tA& A, size_t a, tB& B, size_t b) {
   Contact c = contact(A, a, B, b);
-  if(c.depth >= 0) return;
+  if(c.depth >= 0) return false;
   // Stiffness
   const float E = 1/(1/A.elasticModulus+1/B.elasticModulus);
   constexpr float R = 1/(tA::curvature+tB::curvature);
@@ -374,6 +374,7 @@ struct System {
   if(recordContacts) {
    contacts.append(A.base+a, B.base+b, toVec3(c.relativeA), toVec3(c.relativeB), toVec3(force));
   }
+  return true;
  }
 };
 

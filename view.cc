@@ -22,13 +22,19 @@ struct SimulationView : Simulation, Widget, Poll {
  vec2 scale = 2./(32*Grain::radius);
  vec3 translation = 0;
  vec3 rotationCenter = 0;
- Thread simulationThread;
+ Thread simulationThread {19};
  unique<Encoder> encoder = nullptr;
  GLFrameBuffer target {size};
 
  SimulationView(Thread& uiThread=mainThread, Dict parameters={parseDict(
-    "Pattern:none,Time step:1e-6,Friction:1,Elasticity:8e6,"
-    "Height: 0.6, Radius:0.3, Rate:200")}) : Simulation(parameters,
+    //"Pattern:none,"
+    "Pattern:helix,"
+    //"Pattern:cross,"
+    //"Pattern:loop,"
+    "Friction:1, Elasticity:8e6, Rate:200,"
+    "Time step:1e-5, Height: 0.6, Radius:0.3"
+    //"Time step:1e-5, Height: 0.3, Radius:0.15, Pressure:0"
+    )}) : Simulation(parameters,
   arguments().contains("result") ?
    File(str(parameters)+".result", currentWorkingDirectory(),
         Flags(WriteOnly|Create|Truncate)) : File(2/*stdout*/)),
@@ -44,6 +50,7 @@ struct SimulationView : Simulation, Widget, Poll {
    encoder->open();
   }
 
+  mainThread.setPriority(19);
   simulationThread.spawn();
   queue();
  }
@@ -61,7 +68,7 @@ struct SimulationView : Simulation, Widget, Poll {
 
  void snapshot() override {
   Simulation::snapshot();
-  writeFile(name+".png", encodePNG(target.readback()), currentWorkingDirectory(), true);
+  writeFile(str(parameters.at("Pattern"))+".png", encodePNG(target.readback()), currentWorkingDirectory(), true);
  }
 
  void step() {
@@ -69,7 +76,7 @@ struct SimulationView : Simulation, Widget, Poll {
   if(encoder) viewYawPitch.x += 2*PI*dt / 16;
   window->render();
   int64 elapsed = realTime() - lastReport;
-  if(elapsed > 60e9) {
+  if(elapsed > 4*60e9) {
    log(timeStep*this->dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
    log("grain",str(grainTime, stepTime), "wire",str(wireTime, stepTime));
    log("grainInit",str(grainInitializationTime, grainTime),

@@ -9,6 +9,8 @@ struct Lattice {
  const vec4f XYZ0 {float(1), float(size.x), float(size.y*size.x), 0};
  Lattice(float scale, vec4f min, vec4f max) :
    scale(float3(scale)),
+   /*min(min - float3(4./scale)),
+   max(max + float3(4./scale))*/
    min(min - float3(2./scale)),
    max(max + float3(2./scale)) { // Avoids bound check
   indices.clear(0);
@@ -47,7 +49,7 @@ struct Simulation : System {
  // Lattice
  vec4f min = _0f, max = _0f;
  Lattice wireLattice{float(sqrt(3.)/(2*Wire::radius)),
-    v4sf{-side.initialRadius,-side.initialRadius,0,0},
+    v4sf{-side.initialRadius,-side.initialRadius, -Grain::radius,0},
     v4sf{ side.initialRadius, side.initialRadius, pourHeight+2*Grain::radius,0}};
 
  // Performance
@@ -59,13 +61,13 @@ struct Simulation : System {
 
  Lock lock;
  Stream stream;
- String name;
+ Dict parameters;
 
- Simulation(const Dict& params, Stream&& stream) : System(params),
-   pourHeight(params.at("Height"_)),
-   winchRate(params.at("Rate"_)),
-   pattern(Pattern(ref<string>(patterns).indexOf(params.at("Pattern")))),
-   stream(move(stream)), name(str(params)) {
+ Simulation(const Dict& parameters, Stream&& stream) : System(parameters),
+   pourHeight(parameters.at("Height"_)),
+   winchRate(parameters.at("Rate"_)),
+   pattern(Pattern(ref<string>(patterns).indexOf(parameters.at("Pattern")))),
+   stream(move(stream)), parameters(copy(parameters)) {
   if(pattern) { // Initial wire node
    size_t i = wire.count++;
    wire.position[i] = vec3(winchRadius,0,currentPourHeight);
@@ -93,6 +95,7 @@ struct Simulation : System {
  String flat(const vec3& v) { return str(v[0], v[1], v[2]); }
  String flat(const v4sf& v) { return str(v[0], v[1], v[2]); }
  virtual void snapshot() {
+  String name = str(parameters.at("Pattern"));
   {array<char> s;
    s.append(str(grain.radius)+'\n');
    s.append(str("X, Y, Z, grain contact count, grain contact energy (µJ), wire contact count, wire contact energy (µJ)")+'\n');
@@ -119,30 +122,32 @@ struct Simulation : System {
    writeFile(name+".grain", s, currentWorkingDirectory(), true);
   }
   {array<char> s;
-   s.append(str("A center, B center, A relative, B relative, Force (N)")+'\n');
+   s.append(str("A, B, Force (N)")+'\n');
    for(auto c: contacts) {
     if(c.a >= grain.base && c.a < grain.base+grain.capacity) {
      if(c.b >= grain.base && c.b < grain.base+grain.capacity) {
-      auto A = grain.position[c.a-grain.base];
+      /*auto A = grain.position[c.a-grain.base];
       auto B = grain.position[c.b-grain.base];
       auto rA = c.relativeA;
       auto rB = c.relativeB;
-      s.append(str(flat(A), flat(B), flat(rA), flat(rB), flat(c.force))+'\n');
+      s.append(str(flat(A), flat(B), flat(rA), flat(rB), flat(c.force))+'\n');*/
+      s.append(str(c.a-grain.base, c.b-grain.base, flat(c.force))+'\n');
      }
     }
    }
    writeFile(name+".grain-grain", s, currentWorkingDirectory(), true);
   }
   {array<char> s;
-   s.append(str("A center, B center, A relative, B relative, Force (N)")+'\n');
+   s.append(str("Grain, Side, Force (N)")+'\n');
    for(auto c: contacts) {
     if(c.a >= grain.base && c.a < grain.base+grain.capacity) {
      if(c.b == side.base) {
-      auto A = grain.position[c.a-grain.base];
+      /*auto A = grain.position[c.a-grain.base];
       auto B = side.position[c.b-side.base];
-      auto rA = c.relativeA;
+      auto rA = c.relativeA;*/
       auto rB = c.relativeB;
-      s.append(str(flat(A), flat(B), flat(rA), flat(rB), flat(c.force))+'\n');
+      //s.append(str(flat(A), flat(B), flat(rA), flat(rB), flat(c.force))+'\n');
+      s.append(str(c.a-grain.base, flat(rB), flat(c.force))+'\n');
      }
     }
    }
@@ -151,55 +156,55 @@ struct Simulation : System {
 
   if(wire.count) {array<char> s;
    s.append(str(wire.radius)+'\n');
-   s.append(str("X0, Y0, Z0, X1, Y1, Z1, grain contact count, grain contact energy (µJ)")+'\n');
+   s.append(str("P1, P2, grain contact count, grain contact energy (µJ)")+'\n');
    for(size_t i: range(0, wire.count-1)) {
     auto a = wire.position[i], b = wire.position[i+1];
     float energy = 0;
     for(auto& f: wire.frictions[i]) energy += f.energy;
-    s.append(str(a[0], a[1], a[2], b[0], b[1], b[2], wire.frictions[i].size, energy*1e6)+'\n');
+    s.append(str(flat(a), flat(b), wire.frictions[i].size, energy*1e6)+'\n');
    }
    writeFile(name+".wire", s, currentWorkingDirectory(), true);
   }
   if(wire.count) {array<char> s;
-   s.append(str("A center, B center, A relative, B relative, Force (N)")+'\n');
+   s.append(str("Wire, Grain, Force (N)")+'\n');
    for(auto c: contacts) {
     if(c.a >= wire.base && c.a < wire.base+wire.capacity) {
      if(c.b >= grain.base && c.b < grain.base+grain.capacity) {
-      auto A = wire.position[c.a-wire.base];
+      /*auto A = wire.position[c.a-wire.base];
       auto B = grain.position[c.b-grain.base];
       auto rA = c.relativeA;
-      auto rB = c.relativeB;
-      s.append(str(flat(A), flat(B), flat(rA), flat(rB), flat(c.force))+'\n');
+      auto rB = c.relativeB;*/
+      s.append(str(c.a-wire.base, c.b-grain.base, flat(c.force))+'\n');
      }
     }
    }
    writeFile(name+".wire-grain", s, currentWorkingDirectory(), true);
   }
   if(wire.count) {array<char> s;
-   s.append(str("A center, B center, A relative, B relative, Force (N)")+'\n');
+   s.append(str("A, B, Force (N)")+'\n');
    for(auto c: contacts) {
     if(c.a >= wire.base && c.a < wire.base+wire.capacity) {
      if(c.b >= wire.base && c.b < wire.base+wire.capacity) {
-      auto A = wire.position[c.a-wire.base];
+      /*auto A = wire.position[c.a-wire.base];
       auto B = wire.position[c.b-wire.base];
       auto rA = c.relativeA;
-      auto rB = c.relativeB;
-      s.append(str(flat(A), flat(B), flat(rA), flat(rB), flat(c.force))+'\n');
+      auto rB = c.relativeB;*/
+      s.append(str(c.a-wire.base, c.b-wire.base, flat(c.force))+'\n');
      }
     }
    }
    writeFile(name+".wire-wire", s, currentWorkingDirectory(), true);
   }
 
-  if(side.faceCount>1) {array<char> s;
+  {array<char> s;
    size_t W = side.W;
    for(size_t i: range(side.H-1)) for(size_t j: range(W)) {
     vec3 a (toVec3(side.position[i*W+j]));
     vec3 b (toVec3(side.position[i*W+(j+1)%W]));
     vec3 c (toVec3(side.position[(i+1)*W+(j+i%2)%W]));
-    s.append(str(a[0], a[1], a[2], c[0], c[1], c[2])+'\n');
-    s.append(str(b[0], b[1], b[2], c[0], c[1], c[2])+'\n');
-    if(i) s.append(str(a[0], a[1], a[2], b[0], b[1], b[2])+'\n');
+    s.append(str(flat(a), flat(c))+'\n');
+    s.append(str(flat(b), flat(c))+'\n');
+    if(i) s.append(str(flat(a), flat(b))+'\n');
    }
    writeFile(name+".side", s, currentWorkingDirectory(), true);
   }
@@ -383,8 +388,9 @@ break2_:;
   //log(wireLattice.indices.size*2/1024); // 2M
 
   wireContactTime.start();
-  if(wire.count) parallel_chunk(wire.count,
-                                [this,&grainLattice](uint, size_t start, size_t size) {
+  if(wire.count) /*parallel_chunk(wire.count,
+                                [this,&grainLattice](uint, size_t start, size_t size)*/ {
+   size_t start = 0, size = wire.count;
    //assert(size>1);
    uint16* grainBase = grainLattice.indices.begin();
    const int gX = grainLattice.size.x, gY = grainLattice.size.y;
@@ -403,12 +409,13 @@ break2_:;
       };*/
    /*const int r = int( sqrt(sq(2*Wire::radius)+sq(Wire::internodeLength/2))
                         * wireLattice.scale[0]) + 1;*/
-   const int r =  1;
+   const int r =  2;
    const int n = r+1+r, N = n*n;
    static unused bool once = ({ log(r,n,N); true; });
    const uint16* wireNeighbours[N];
    for(int z: range(n)) for(int y: range(n))
     wireNeighbours[z*n+y] = wireBase+(z-r)*wY*wX+(y-r)*wX-r;
+   bool useLattice = true;
 
    wire.force[start] = float4(wire.mass) * G;
    { // First iteration
@@ -461,30 +468,28 @@ break2_:;
     if(load.height) penalty(wire, i, load, 0);
     // Wire - Grain
     {size_t offset = grainLattice.index(wire.position[i]);
-    for(size_t n: range(3*3)) {
-     v4hi line = loada(grainNeighbours[n] + offset);
+     for(size_t n: range(3*3)) {
+      v4hi line = loada(grainNeighbours[n] + offset);
       if(line[0]) penalty(wire, i, grain, line[0]-1);
-     if(line[1]) penalty(wire, i, grain, line[1]-1);
-     if(line[2]) penalty(wire, i, grain, line[2]-1);
-       }}
+      if(line[1]) penalty(wire, i, grain, line[1]-1);
+      if(line[2]) penalty(wire, i, grain, line[2]-1);
+     }}
     // Wire - Wire
-    if(0) for(size_t b: range(i)) penalty(wire, i, wire, b);
-    else {size_t offset = wireLattice.index(wire.position[i]);
-     if(!(offset < wireLattice.indices.size)) { log(wire.position[i], max); }
-     else
-      for(size_t n: range(N)) {
-#if 0
-       v4hi line = loada(wireNeighbours[n] + offset);
-       if(line[0] > i+2) penalty(wire, i, wire, line[0]-1);
-       if(line[1] > i+2) penalty(wire, i, wire, line[1]-1);
-       if(line[2] > i+2) penalty(wire, i, wire, line[2]-1);
-#else
-       for(size_t x: range(n)) {
-        uint16 index = wireNeighbours[n][offset+x];
-        if(index > i+2) penalty(wire, i, wire, index-1);
+    if(!useLattice) for(size_t b: range(i)) penalty(wire, i, wire, b);
+    else {
+     size_t offset = wireLattice.index(wire.position[i]);
+     //array<size_t> indices;
+     for(size_t yz: range(N)) {
+      for(size_t x: range(n)) {
+       uint16 index = wireNeighbours[yz][offset+x];
+       if(index > i+2) {
+        penalty(wire, i, wire, index-1);
+        // indices.append(index-1);
        }
-#endif
       }
+     }
+     /*for(size_t b: range(i-1)) if(penalty(wire, i, wire, b))
+      assert_(indices.contains(b), i, b, indices);*/
     }
    }
    for(size_t i: range(start+1, start+size-1)) {
@@ -494,7 +499,7 @@ break2_:;
     vec4f fT = tension(i-1, i);
     wire.force[i-1] += fT;
     wire.force[i] -= fT;
-     if(wire.bendStiffness) {// Bending resistance springs
+     if(wire.bendStiffness) { // Bending resistance springs
      vec4f A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
      vec4f a = C-B, b = B-A;
      vec4f c = cross(a, b);
@@ -535,23 +540,25 @@ break2_:;
      if(line[2]) penalty(wire, i, grain, line[2]-1);
     }}
     // Wire - Wire
-    if(0) for(size_t b: range(i)) penalty(wire, i, wire, b);
-    else {size_t offset = wireLattice.index(wire.position[i]);
-     if(!(offset < wireLattice.indices.size)) { log(wire.position[i], max); }
-     else
-      for(size_t n: range(N)) {
-#if 0
-       v4hi line = loada(wireNeighbours[n] + offset);
-       if(line[0] > i+2) penalty(wire, i, wire, line[0]-1);
-       if(line[1] > i+2) penalty(wire, i, wire, line[1]-1);
-       if(line[2] > i+2) penalty(wire, i, wire, line[2]-1);
-#else
-       for(size_t x: range(n)) {
-        uint16 index = wireNeighbours[n][offset+x];
-        if(index > i+2) penalty(wire, i, wire, index-1);
+    if(!useLattice) for(size_t b: range(i)) penalty(wire, i, wire, b);
+    else {
+     size_t offset = wireLattice.index(wire.position[i]);
+     array<uint16> indices;
+     array<uint> offsets;
+     for(size_t yz: range(N)) {
+      for(size_t x: range(n)) {
+       int aoffset = wireNeighbours[yz]-wireBase;
+       assert_(aoffset+offset+x >= 0, aoffset, wire.position[i], wireLattice.min);
+       uint16 index = wireNeighbours[yz][offset+x];
+       if(index > i+2) {
+        offsets.append(aoffset+offset+x);
+        if(indices.contains(index-1)) error(offsets, indices, index-1, i, wire.position[i], offset, yz, x, aoffset, wX, wY);
+        penalty(wire, i, wire, index-1);
+        indices.append(index-1);
        }
-#endif
       }
+     }
+     //for(size_t b: range(i-1)) if(penalty(wire, i, wire, b)) assert_(indices.contains(b), b, indices);
     }
    }
 
@@ -605,26 +612,20 @@ break2_:;
      if(line[2]) penalty(wire, i, grain, line[2]-1);
     }}
     // Wire - Wire
-    if(0) for(size_t b: range(i)) penalty(wire, i, wire, b);
-    else {size_t offset = wireLattice.index(wire.position[i]);
-     if(!(offset < wireLattice.indices.size)) { log(wire.position[i], max); }
-     else
-      for(size_t n: range(N)) {
-#if 0
-       v4hi line = loada(wireNeighbours[n] + offset);
-       if(line[0] > i+2) penalty(wire, i, wire, line[0]-1);
-       if(line[1] > i+2) penalty(wire, i, wire, line[1]-1);
-       if(line[2] > i+2) penalty(wire, i, wire, line[2]-1);
-#else
-       for(size_t x: range(n)) {
-        size_t o = wireNeighbours[n]-wireBase;
-        assert_(o+offset+x < wireLattice.indices.size, o, offset, x, wireLattice.indices.size,
-                wire.position[i], wireLattice.min, wireLattice.max);
-        uint16 index = wireNeighbours[n][offset+x];
-        if(index > i+2) penalty(wire, i, wire, index-1);
+    if(!useLattice) for(size_t b: range(i)) penalty(wire, i, wire, b);
+    else {
+     size_t offset = wireLattice.index(wire.position[i]);
+     //array<size_t> indices;
+     for(size_t yz: range(N)) {
+      for(size_t x: range(n)) {
+       uint16 index = wireNeighbours[yz][offset+x];
+       if(index > i+2) {
+        penalty(wire, i, wire, index-1);
+        //indices.append(index-1);
        }
-#endif
       }
+     }
+     //for(size_t b: range(i-1)) if(penalty(wire, i, wire, b)) assert_(indices.contains(b));
     }
    }
 
@@ -649,8 +650,15 @@ break2_:;
      }
     }
    }
-  }, ::threadCount);
+  }//, ::threadCount);
   wireContactTime.stop();
+
+  wireLatticeTime.start();
+  // Clears lattice
+  parallel_chunk(wire.count, [this](uint, size_t start, size_t size) {
+   for(size_t a: range(start, start+size)) wireLattice(wire.position[a]) = 0;
+  }, 1);
+  wireLatticeTime.stop();
 
   // Integration
   min = _0f; max = _0f;
@@ -732,7 +740,7 @@ break2_:;
     float R = winchRadius, r = 1./2*R;
     end = vec2((R-r)*cos(A)+r*cos(a),(R-r)*sin(A)+r*sin(a));
     winchAngle += winchRate * dt;
-   } else error(int(pattern), name);
+   } else error(int(pattern));
    float z = currentPourHeight+Grain::radius+Wire::radius;
    vec4f relativePosition = vec3(end, z) - wire.position[wire.count-1];
    vec4f length = sqrt(sq3(relativePosition));
