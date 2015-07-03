@@ -249,7 +249,7 @@ struct SimulationView : Simulation, Widget, Poll {
    vertexArray.draw(Lines, positions.size);
   }
 
-  {Locker lock(this->lock);
+  /*{Locker lock(this->lock);
      buffer<vec3> positions {side.faceCount*3, 0};
      for(size_t faceIndex: range(side.faceCount)) {
       if(!flag2.contains(faceIndex)) continue;
@@ -274,7 +274,7 @@ struct SimulationView : Simulation, Widget, Poll {
       glCullFace(true);
       vertexArray.draw(Triangles, positions.size);
      }
-    }
+    }*/
 
   if(encoder) {
    encoder->writeVideoFrame(target.readback());

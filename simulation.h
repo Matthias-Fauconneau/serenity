@@ -5,7 +5,7 @@ struct Lattice {
  const vec4f scale;
  const vec4f min, max;
  const int3 size = int3(::floor(toVec3(scale*(max-min))))+int3(1);
- buffer<uint16> indices {size_t(size.z*size.y*size.x)};
+ buffer<uint16> cells {size_t(size.z*size.y*size.x)};
  const vec4f XYZ0 {float(1), float(size.x), float(size.y*size.x), 0};
  Lattice(float scale, vec4f min, vec4f max) :
    scale(float3(scale)),
@@ -13,14 +13,35 @@ struct Lattice {
    max(max + float3(4./scale))*/
    min(min - float3(2./scale)),
    max(max + float3(2./scale)) { // Avoids bound check
-  indices.clear(0);
+  cells.clear(0);
  }
  inline size_t index(vec4f p) {
   return dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*(p-min))))[0];
  }
  inline uint16& operator()(vec4f p) {
-  return indices[index(p)];
+  return cells[index(p)];
  }
+};
+
+struct CylinderGrid {
+ const float min, max;
+ const int2 size;
+ buffer<array<uint16>> cells {size_t(size.y*size.x)};
+ CylinderGrid(float min, float max, int2 size) : min(min), max(max), size(size) {
+  cells.clear();
+ }
+ inline int2 index2(vec4f p) {
+  float angle = PI+0x1p-23+atan(p[1], p[0]);
+  assert(angle >= 0 && angle/(2*PI+0x1p-22)*size.x < size.x, angle, log2(angle-2*PI));
+  assert_(p[2] >= min && p[2] < max, min, p, max);
+  return int2(int(angle/(2*PI+0x1p-22)*size.x), int((p[2]-min)/(max-min)*size.y));
+ }
+ inline size_t index(vec4f p) {
+  int2 i = index2(p);
+  assert_(i.x < size.x && i.y < size.y, min, p, max, i, size);
+  return i.y*size.x+i.x;
+ }
+ array<uint16>& operator()(vec4f p) { return cells[index(p)]; }
 };
 
 enum Pattern { None, Helix, Cross, Loop };
@@ -52,6 +73,11 @@ struct Simulation : System {
     v4sf{-side.initialRadius,-side.initialRadius, -Grain::radius,0},
     v4sf{ side.initialRadius, side.initialRadius, pourHeight+2*Grain::radius,0}};
 
+ // Cylinder grid
+ CylinderGrid grid {-2*Grain::radius, pourHeight+2*Grain::radius,
+    int2(2*PI*side.minRadius/Grain::radius,
+         (pourHeight+2*Grain::radius+2*Grain::radius)/Grain::radius)};
+
  // Performance
  int64 lastReport = realTime(), lastReportStep = timeStep;
  Time totalTime {true}, stepTime;
@@ -70,6 +96,7 @@ struct Simulation : System {
    winchRate(parameters.at("Rate"_)),
    pattern(Pattern(ref<string>(patterns).indexOf(parameters.at("Pattern")))),
    stream(move(stream)), parameters(copy(parameters)) {
+  load.height = pourHeight+Grain::radius;
   if(pattern) { // Initial wire node
    size_t i = wire.count++;
    wire.position[i] = vec3(winchRadius,0,currentPourHeight);
@@ -330,7 +357,20 @@ break2_:;
 
   // Side tension
   {
+   for(size_t i: range(grid.cells.size)) grid.cells[i].clear(); // FIXME: inefficient
+   assert_(side.count < 32768);
    for(size_t i: range(side.count)) side.Particle::force[i] = _0f;
+   for(size_t faceIndex: range(side.faceCount)) {
+    size_t W = side.W;
+    size_t i = faceIndex/2/W, j = (faceIndex/2)%W;
+    vec3 a (toVec3(side.Particle::position[i*W+j]));
+    vec3 b (toVec3(side.Particle::position[i*W+(j+1)%W]));
+    vec3 c (toVec3(side.Particle::position[(i+1)*W+j]));
+    vec3 d (toVec3(side.Particle::position[(i+1)*W+(j+1)%W]));
+    vec3 vertices[2][2][3] {{{a,b,c},{b,d,c}},{{a,d,c},{a,b,d}}};
+    vec3* V = vertices[i%2][faceIndex%2];
+    for(size_t i: range(3)) grid(V[i]).append(faceIndex);
+   }
    size_t W = side.W;
    for(size_t i: range(side.H-1)) for(size_t j: range(W)) {
     size_t a = i*W+j, b = i*W+(j+1)%W, c = (i+1)*W+(j+i%2)%W;
@@ -364,17 +404,24 @@ break2_:;
     penalty(grain, a, floor, 0);
     if(load.height) penalty(grain, a, load, 0);
     /*if(processState <= Release)*/ \
-    for(size_t b: range(side.faceCount)) penalty(grain, a, side, b);
+    int2 i = grid.index2(grain.position[a]);
+    for(int y: range(::max(0, i.y-1), ::min(grid.size.y-1, i.y+1))) {
+     for(int x: range(i.x-1, i.x+1)) {
+      // Wraps around (+size.x to wrap -1)
+      for(size_t b: grid.cells[y*grid.size.x+(x+grid.size.x)%grid.size.x])
+       penalty(grain, a, side, b);
+     }
+   }
     grainLattice(grain.position[a]) = 1+a;
    }
   }, 1);
   grainInitializationTime.stop();
 
   grainContactTime.start();
-  parallel_chunk(grainLattice.indices.size,
+  parallel_chunk(grainLattice.cells.size,
                  [this,&grainLattice](uint, size_t start, size_t size) {
    const int Y = grainLattice.size.y, X = grainLattice.size.x;
-   const uint16* chunk = grainLattice.indices.begin() + start;
+   const uint16* chunk = grainLattice.cells.begin() + start;
    for(size_t i: range(size)) {
     const uint16* current = chunk + i;
     size_t a = *current;
@@ -407,7 +454,7 @@ break2_:;
   if(wire.count) parallel_chunk(wire.count,
                                 [this,&grainLattice](uint, size_t start, size_t size) {
    assert(size>1);
-   uint16* grainBase = grainLattice.indices.begin();
+   uint16* grainBase = grainLattice.cells.begin();
    const int gX = grainLattice.size.x, gY = grainLattice.size.y;
    const uint16* grainNeighbours[3*3] = {
     grainBase-gX*gY-gX-1, grainBase-gX*gY-1, grainBase-gX*gY+gX-1,
@@ -415,7 +462,7 @@ break2_:;
     grainBase+gX*gY-gX-1, grainBase+gX*gY-1, grainBase+gX*gY+gX-1
    };
 
-   uint16* wireBase = wireLattice.indices.begin();
+   uint16* wireBase = wireLattice.cells.begin();
    const int wX = wireLattice.size.x, wY = wireLattice.size.y;
    const int r =  2;
    const int n = r+1+r, N = n*n;
