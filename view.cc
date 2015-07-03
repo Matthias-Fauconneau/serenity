@@ -249,33 +249,6 @@ struct SimulationView : Simulation, Widget, Poll {
    vertexArray.draw(Lines, positions.size);
   }
 
-  /*{Locker lock(this->lock);
-     buffer<vec3> positions {side.faceCount*3, 0};
-     for(size_t faceIndex: range(side.faceCount)) {
-      if(flag2.contains(faceIndex)) continue;
-      size_t W = side.W;
-      size_t i = faceIndex/2/W, j = (faceIndex/2)%W;
-      vec3 a (toVec3(side.Particle::position[i*W+j]));
-      vec3 b (toVec3(side.Particle::position[i*W+(j+1)%W]));
-      vec3 c (toVec3(side.Particle::position[(i+1)*W+j]));
-      vec3 d (toVec3(side.Particle::position[(i+1)*W+(j+1)%W]));
-      vec3 vertices[2][2][3] {{{a,c,b},{b,c,d}},{{a,c,d},{a,d,b}}};
-      vec3* V = vertices[i%2][faceIndex%2];
-      // FIXME: GPU projection
-      for(size_t i: range(3)) positions[positions.size+i] = viewProjection * V[i];
-      positions.size += 3;
-     }
-     if(positions.size) {
-      shader["uColor"] = vec4(black, 1./4);
-      static GLVertexArray vertexArray;
-      GLBuffer positionBuffer (positions);
-      vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
-      glBlendAlpha();
-      glCullFace(true);
-      glDepthTest(false);
-      vertexArray.draw(Triangles, positions.size);
-     }
-  }*/
   {Locker lock(this->lock);
      buffer<vec3> positions {side.faceCount*3, 0};
      for(size_t faceIndex: range(side.faceCount)) {

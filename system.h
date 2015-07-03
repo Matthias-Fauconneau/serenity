@@ -201,12 +201,30 @@ struct System {
   sconst float bendDamping = mass / s;
   const vec4f tensionStiffness = float3(elasticModulus * PI * sq(radius));
   sconst vec4f tensionDamping = float3(mass / s);
+  float tensionEnergy=0;
   Wire(float elasticModulus, size_t base) :
     Particle{base, 32768, Wire::mass}, elasticModulus(elasticModulus) {}
  } wire;
 
  struct Side : Particle {
   sconst bool friction = false;
+
+  sconst float curvature = 0; // -1/radius?
+  sconst float elasticModulus = 1e6 * kg/(m*s*s); // 5
+  const float initialRadius;
+  const float height;
+  const size_t W, H, faceCount;
+  //float castRadius = initialRadius;
+  float minRadius = initialRadius;
+
+  const float internodeLength = 2*PI*initialRadius/W;
+  const vec4f internodeLength4 = float3(internodeLength);
+
+  const vec4f tensionStiffness = float3(elasticModulus * PI * 8 * sq(1*mm));
+  const vec4f tensionDamping = float3(mass / s);
+
+  float tensionEnergy=0;
+
   struct { v4sf operator[](size_t) const { return _0f; } } position;
   struct {
    System::Side& side;
@@ -223,18 +241,11 @@ struct System {
   } force {*this};
   struct { NoOperation operator[](size_t) const { return {}; }} torque;
 
-  sconst float curvature = 0; // -1/radius?
-  sconst float elasticModulus = 1e6 * kg/(m*s*s); // 5
-  const float initialRadius;
-  const float height;
-  const size_t W, H, faceCount;
-  //float castRadius = initialRadius;
-  float minRadius = initialRadius;
   Side(float initialRadius, float height, size_t base, bool soft /*,
        size_t W = int(PI*initialRadius/Grain::radius),
        size_t H = int(height/Grain::radius)+1*/)
    : Particle(base, /*W*H*/int(2*PI*initialRadius/Grain::radius)*
-                                         (int(height/Grain::radius*2/sqrt(3.))+1), 1*g),
+                                         (int(height/Grain::radius*2/sqrt(3.))+1), 8*g),
      initialRadius(initialRadius), height(height), W(int(2*PI*initialRadius/Grain::radius)),
      H(int(height/Grain::radius*2/sqrt(3.))+1), faceCount(soft ? (H-1)*W*2 : 1) {
    count = W*H;
@@ -245,6 +256,7 @@ struct System {
     Particle::position[i*W+j] = {x,y,z,0};
    }
    Particle::velocity.clear(_0f);
+   for(size_t i: range(3)) positionDerivatives[i].clear(_0f);
   }
  } side;
  array<size_t> flag, flag2;
@@ -252,6 +264,7 @@ struct System {
  template<Type tA>
  Contact contact(const tA& A, size_t aIndex, const Side& side, size_t faceIndex) {
   {float length = length2(A.position[aIndex]);
+   if(length+Grain::radius < side.minRadius) return {_0f,_0f,_0f,0,0,0}; // Quick cull
    if(side.faceCount == 1) { // Side -> Sphere
     float r = side.initialRadius;
     vec4f normal {-A.position[aIndex][0]/length, -A.position[aIndex][1]/length, 0, 0};
@@ -259,7 +272,6 @@ struct System {
        vec4f{r*-normal[0], r*-normal[1], A.position[aIndex][2], 0},
      normal, r-tA::radius-length,0,0 };
    }
-   if(length+Grain::radius < side.minRadius) return {_0f,_0f,_0f,0,0,0};
   }
   // Triangle - Sphere
   size_t W = side.W;
@@ -285,8 +297,8 @@ struct System {
   float v = invDet * dot(Q, D);
   if(v < 0 || u + v  > 1) return {_0f,_0f,_0f,0,0,0};
   float t = dot(Q, E2) * invDet;
-  if(t<0) return {_0f,_0f,_0f,0,0,0};
-  flag.append(faceIndex);
+  //if(t<0) return {_0f,_0f,_0f,0,0,0};
+  if(t < tA::radius) flag.append(faceIndex);
   return {float3(tA::radius)*D, O+t*D, -D, t-tA::radius, u, v};
  }
 
@@ -299,7 +311,7 @@ struct System {
  // Update
  size_t timeStep = 0;
  float grainKineticEnergy=0, wireKineticEnergy=0, normalEnergy=0,
-         staticEnergy=0, tensionEnergy=0, bendEnergy=0;
+         staticEnergy=0, bendEnergy=0;
  bool recordContacts = false;
  struct ContactForce { size_t a, b; vec3 relativeA, relativeB; vec3 force; };
  array<ContactForce> contacts;
@@ -379,15 +391,16 @@ struct System {
  }
 };
 
-void atomic_sub(System::Side::DistributeForce o, vec4f force) {
+void atomic_sub(System::Side::DistributeForce unused o, vec4f unused force) {
  size_t W = o.side.W;
- size_t i = o.faceIndex/2/(W-1), j = (o.faceIndex/2)%(W-1), n = o.faceIndex%2;
+ size_t i = o.faceIndex/2/W, j = (o.faceIndex/2)%W, n = o.faceIndex%2;
  size_t a = i*W+j;
  size_t b = i*W+(j+1)%W;
  size_t c = (i+1)*W+j;
  size_t d = (i+1)*W+(j+1)%W;
- size_t v[2][2][3] {{{a,c,d},{a,d,b}},{{c,b,a},{c,d,b}}};
- for(size_t index: v[i%2][n]) atomic_sub(o.side.Particle::force[index], force/float3(3));
+ size_t vertices[2][2][3] {{{a,c,b},{b,c,d}},{{a,c,d},{a,d,b}}};
+ // FIXME: distribute using contact barycentric coordinates
+ for(size_t index: vertices[i%2][n]) atomic_sub(o.side.Particle::force[index], force/float3(3));
 }
 
 constexpr vec4f System::G;
@@ -395,6 +408,7 @@ constexpr float System::Grain::radius;
 constexpr float System::Grain::mass;
 constexpr float System::Wire::radius;
 constexpr float System::Wire::mass;
+constexpr vec4f System::Wire::internodeLength4;
 constexpr float System::Floor::elasticModulus;
 constexpr float System::Side::elasticModulus;
 constexpr float System::Load::elasticModulus;

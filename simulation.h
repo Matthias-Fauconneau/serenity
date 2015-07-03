@@ -81,15 +81,16 @@ struct Simulation : System {
   }
  }
 
- inline vec4f tension(size_t a, size_t b) {
-  vec4f relativePosition = wire.position[a] - wire.position[b];
+ generic vec4f tension(T& A, size_t a, size_t b) {
+  vec4f relativePosition = A.Particle::position[a] - A.Particle::position[b];
   vec4f length = sqrt(sq3(relativePosition));
-  vec4f x = length - Wire::internodeLength4;
-  tensionEnergy += 1./2 * wire.tensionStiffness[0] * sq3(x)[0];
-  vec4f fS = - wire.tensionStiffness * x;
+  vec4f x = length - A.internodeLength4;
+  A.tensionEnergy += 1./2 * A.tensionStiffness[0] * sq3(x)[0];
+  vec4f fS = - A.tensionStiffness * x;
+  assert_(length[0], a, b);
   vec4f direction = relativePosition/length;
-  vec4f relativeVelocity = wire.velocity[a] - wire.velocity[b];
-  vec4f fB = - wire.tensionDamping * dot3(direction, relativeVelocity);
+  vec4f relativeVelocity = A.velocity[a] - A.velocity[b];
+  vec4f fB = - A.tensionDamping * dot3(direction, relativeVelocity);
   return (fS + fB) * direction;
  }
 
@@ -321,10 +322,29 @@ break2_:;
   }
 
   // Initialize counters
-  normalEnergy=0, staticEnergy=0, tensionEnergy=0, bendEnergy=0;
+  normalEnergy=0, staticEnergy=0, wire.tensionEnergy=0, side.tensionEnergy=0;
+  bendEnergy=0;
   load.force[0] = _0f;
-  recordContacts = true;
+  //recordContacts = true;
   contacts.clear();
+
+  // Side tension
+  {
+   for(size_t i: range(side.count)) side.Particle::force[i] = _0f;
+   size_t W = side.W;
+   for(size_t i: range(side.H-1)) for(size_t j: range(W)) {
+    size_t a = i*W+j, b = i*W+(j+1)%W, c = (i+1)*W+(j+i%2)%W;
+    {vec4f t = tension(side, c, a);
+     side.Particle::force[c] += t;
+     side.Particle::force[a] -= t;}
+    {vec4f t = tension(side, b, c);
+     side.Particle::force[b] += t;
+     side.Particle::force[c] -= t;}
+    if(i) {vec4f t = tension(side, a, b);
+     side.Particle::force[a] += t;
+     side.Particle::force[b] -= t;}
+   }
+  }
 
   // Grain
   grainTime.start();
@@ -422,7 +442,7 @@ break2_:;
       }
      }
      // First tension
-     vec4f fT = tension(i-1, i);
+     vec4f fT = tension(wire, i-1, i);
      wire.force[i] -= fT;
      if(wire.bendStiffness) { // First bending
       vec4f A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
@@ -475,7 +495,7 @@ break2_:;
     // Gravity
     wire.force[i+1] = float4(wire.mass) * G;
     // Tension
-    vec4f fT = tension(i-1, i);
+    vec4f fT = tension(wire, i-1, i);
     wire.force[i-1] += fT;
     wire.force[i] -= fT;
      if(wire.bendStiffness) { // Bending resistance springs
@@ -535,7 +555,7 @@ break2_:;
     // Gravity
     wire.force[i] = float4(wire.mass) * G;
      // Tension
-    vec4f fT = tension(i-1, i);
+    vec4f fT = tension(wire, i-1, i);
     wire.force[i-1] += fT;
     wire.force[i] -= fT;
     // Bending with next chunk
@@ -592,7 +612,7 @@ break2_:;
    { // Tension to first node of next chunk
     size_t i = start+size;
     if(i < wire.count) {
-     wire.force[i-1] += tension(i-1, i);
+     wire.force[i-1] += tension(wire, i-1, i);
       // Bending with first node of next chunk
      if(i+1<wire.count && wire.bendStiffness) {
       vec4f A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
@@ -647,7 +667,8 @@ break2_:;
   grainIntegrationTime.stop();
   grainTime.stop();
 
-  parallel_chunk(side.count, [this](uint, size_t start, size_t size) {
+  // First and last line are fixed
+  parallel_chunk(side.W, side.count-side.W, [this](uint, size_t start, size_t size) {
    for(size_t i: range(start, start+size)) {
     System::step(side, i);
    }
@@ -668,7 +689,7 @@ break2_:;
     float stretch = (wireLength[0] / wire.count) / Wire::internodeLength;
     if(0) stream.write(str(load.height*1e3, (initialHeight-load.height)*1e3, height*1e3,
                      load.force[0][2], stretch*100, grainKineticEnergy*1e3, wireKineticEnergy*1e3,
-      normalEnergy*1e3, staticEnergy*1e3, tensionEnergy*1e3, bendEnergy*1e3)+'\n');
+      normalEnergy*1e3, staticEnergy*1e3, wire.tensionEnergy*1e3, bendEnergy*1e3)+'\n');
    }
   }
 
