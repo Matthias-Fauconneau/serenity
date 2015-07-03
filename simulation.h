@@ -62,6 +62,8 @@ struct Simulation : System {
  Lock lock;
  Stream stream;
  Dict parameters;
+ String name = str(parameters.at("Pattern"))+
+   (parameters.contains("Pressure")?"-soft"_:"");
 
  Simulation(const Dict& parameters, Stream&& stream) : System(parameters),
    pourHeight(parameters.at("Height"_)),
@@ -95,7 +97,6 @@ struct Simulation : System {
  String flat(const vec3& v) { return str(v[0], v[1], v[2]); }
  String flat(const v4sf& v) { return str(v[0], v[1], v[2]); }
  virtual void snapshot() {
-  String name = str(parameters.at("Pattern"));
   {array<char> s;
    s.append(str(grain.radius)+'\n');
    s.append(str("X, Y, Z, grain contact count, grain contact energy (µJ), wire contact count, wire contact energy (µJ)")+'\n');
@@ -199,9 +200,9 @@ struct Simulation : System {
   {array<char> s;
    size_t W = side.W;
    for(size_t i: range(side.H-1)) for(size_t j: range(W)) {
-    vec3 a (toVec3(side.position[i*W+j]));
-    vec3 b (toVec3(side.position[i*W+(j+1)%W]));
-    vec3 c (toVec3(side.position[(i+1)*W+(j+i%2)%W]));
+    vec3 a (toVec3(side.Particle::position[i*W+j]));
+    vec3 b (toVec3(side.Particle::position[i*W+(j+1)%W]));
+    vec3 c (toVec3(side.Particle::position[(i+1)*W+(j+i%2)%W]));
     s.append(str(flat(a), flat(c))+'\n');
     s.append(str(flat(b), flat(c))+'\n');
     if(i) s.append(str(flat(a), flat(b))+'\n');
@@ -211,6 +212,7 @@ struct Simulation : System {
  }
 
  void step() {
+  flag2 = move(flag);
   stepTime.start();
   // Process
   if(processState == Pour) {
@@ -279,7 +281,7 @@ break2_:;
   for(auto p: grain.position.slice(0, grain.count))
    height = ::max(height, p[2]+Grain::radius);
 
-  if(processState == Wait && grainKineticEnergy / grain.count < 100e-6 /*1µJ/grain*/) {
+  if(processState == Wait && grainKineticEnergy / grain.count < 1e-5 /*1µJ/grain*/) {
    processState = ProcessState::Load;
    log("Wait->Load", grainKineticEnergy*1e6 / grain.count, "µJ / grain");
    Simulation::snapshot();
@@ -377,21 +379,14 @@ break2_:;
 
   wireLatticeTime.start();
   parallel_chunk(wire.count, [this](uint, size_t start, size_t size) {
-   for(size_t a: range(start, start+size)) {
-    /*size_t index = wireLattice.index(wire.position[a]);
-    if(!(index < wireLattice.indices.size)) { log(wire.position[a], max); continue; }
-    wireLattice.indices[index] = 1+a;*/
-    wireLattice(wire.position[a]) = 1+a;
-   }
+   for(size_t a: range(start, start+size)) wireLattice(wire.position[a]) = 1+a;
   }, 1);
   wireLatticeTime.stop();
-  //log(wireLattice.indices.size*2/1024); // 2M
 
   wireContactTime.start();
-  if(wire.count) /*parallel_chunk(wire.count,
-                                [this,&grainLattice](uint, size_t start, size_t size)*/ {
-   size_t start = 0, size = wire.count;
-   //assert(size>1);
+  if(wire.count) parallel_chunk(wire.count,
+                                [this,&grainLattice](uint, size_t start, size_t size) {
+   assert(size>1);
    uint16* grainBase = grainLattice.indices.begin();
    const int gX = grainLattice.size.x, gY = grainLattice.size.y;
    const uint16* grainNeighbours[3*3] = {
@@ -402,20 +397,12 @@ break2_:;
 
    uint16* wireBase = wireLattice.indices.begin();
    const int wX = wireLattice.size.x, wY = wireLattice.size.y;
-   /*const uint16* wireNeighbours[3*3] = {
-       wireBase-wX*wY-wX-1, wireBase-wX*wY-1, wireBase-wX*wY+wX-1,
-       wireBase-wX-1, wireBase-1, wireBase+wX-1,
-       wireBase+wX*wY-wX-1, wireBase+wX*wY-1, wireBase+wX*wY+wX-1
-      };*/
-   /*const int r = int( sqrt(sq(2*Wire::radius)+sq(Wire::internodeLength/2))
-                        * wireLattice.scale[0]) + 1;*/
    const int r =  2;
    const int n = r+1+r, N = n*n;
    static unused bool once = ({ log(r,n,N); true; });
    const uint16* wireNeighbours[N];
    for(int z: range(n)) for(int y: range(n))
     wireNeighbours[z*n+y] = wireBase+(z-r)*wY*wX+(y-r)*wX-r;
-   bool useLattice = true;
 
    wire.force[start] = float4(wire.mass) * G;
    { // First iteration
@@ -449,7 +436,7 @@ break2_:;
        wire.force[i+1] += float3(p) * (-dap);
        wire.force[i] += float3(p) * (dap - dbp);
         //wire.force[i-1] += float3(p) * (dbp); //-> "Tension to first node of next chunk"
-       if(1) {
+       { // Damping
         vec4f A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
         vec4f axis = cross(C-B, B-A);
         vec4f l = sqrt(sq3(axis));
@@ -474,22 +461,14 @@ break2_:;
       if(line[1]) penalty(wire, i, grain, line[1]-1);
       if(line[2]) penalty(wire, i, grain, line[2]-1);
      }}
-    // Wire - Wire
-    if(!useLattice) for(size_t b: range(i)) penalty(wire, i, wire, b);
-    else {
+    {// Wire - Wire
      size_t offset = wireLattice.index(wire.position[i]);
-     //array<size_t> indices;
      for(size_t yz: range(N)) {
       for(size_t x: range(n)) {
        uint16 index = wireNeighbours[yz][offset+x];
-       if(index > i+2) {
-        penalty(wire, i, wire, index-1);
-        // indices.append(index-1);
-       }
+       if(index > i+2) penalty(wire, i, wire, index-1);
       }
      }
-     /*for(size_t b: range(i-1)) if(penalty(wire, i, wire, b))
-      assert_(indices.contains(b), i, b, indices);*/
     }
    }
    for(size_t i: range(start+1, start+size-1)) {
@@ -514,7 +493,7 @@ break2_:;
       wire.force[i+1] += p * (-dap);
       wire.force[i] += p * (dap - dbp);
       wire.force[i-1] += p * (dbp);
-      if(1) {
+      {
        vec4f A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
        vec4f axis = cross(C-B, B-A);
        vec4f length4 = sqrt(sq3(axis));
@@ -539,26 +518,14 @@ break2_:;
      if(line[1]) penalty(wire, i, grain, line[1]-1);
      if(line[2]) penalty(wire, i, grain, line[2]-1);
     }}
-    // Wire - Wire
-    if(!useLattice) for(size_t b: range(i)) penalty(wire, i, wire, b);
-    else {
+    { // Wire - Wire
      size_t offset = wireLattice.index(wire.position[i]);
-     array<uint16> indices;
-     array<uint> offsets;
      for(size_t yz: range(N)) {
       for(size_t x: range(n)) {
-       int aoffset = wireNeighbours[yz]-wireBase;
-       assert_(aoffset+offset+x >= 0, aoffset, wire.position[i], wireLattice.min);
        uint16 index = wireNeighbours[yz][offset+x];
-       if(index > i+2) {
-        offsets.append(aoffset+offset+x);
-        if(indices.contains(index-1)) error(offsets, indices, index-1, i, wire.position[i], offset, yz, x, aoffset, wX, wY);
-        penalty(wire, i, wire, index-1);
-        indices.append(index-1);
-       }
+       if(index > i+2) penalty(wire, i, wire, index-1);
       }
      }
-     //for(size_t b: range(i-1)) if(penalty(wire, i, wire, b)) assert_(indices.contains(b), b, indices);
     }
    }
 
@@ -611,21 +578,14 @@ break2_:;
      if(line[1]) penalty(wire, i, grain, line[1]-1);
      if(line[2]) penalty(wire, i, grain, line[2]-1);
     }}
-    // Wire - Wire
-    if(!useLattice) for(size_t b: range(i)) penalty(wire, i, wire, b);
-    else {
+    { // Wire - Wire
      size_t offset = wireLattice.index(wire.position[i]);
-     //array<size_t> indices;
      for(size_t yz: range(N)) {
       for(size_t x: range(n)) {
        uint16 index = wireNeighbours[yz][offset+x];
-       if(index > i+2) {
-        penalty(wire, i, wire, index-1);
-        //indices.append(index-1);
-       }
+       if(index > i+2) penalty(wire, i, wire, index-1);
       }
      }
-     //for(size_t b: range(i-1)) if(penalty(wire, i, wire, b)) assert_(indices.contains(b));
     }
    }
 
@@ -650,7 +610,7 @@ break2_:;
      }
     }
    }
-  }//, ::threadCount);
+  }, 1/*::threadCount*/);
   wireContactTime.stop();
 
   wireLatticeTime.start();
@@ -687,6 +647,12 @@ break2_:;
   grainIntegrationTime.stop();
   grainTime.stop();
 
+  parallel_chunk(side.count, [this](uint, size_t start, size_t size) {
+   for(size_t i: range(start, start+size)) {
+    System::step(side, i);
+   }
+  }, 1);
+
   {vec4f ssqV = _0f;
    for(vec4f v: grain.velocity.slice(0, grain.count)) ssqV += sq3(v);
    grainKineticEnergy = 1./2*grain.mass*ssqV[0];}
@@ -695,15 +661,12 @@ break2_:;
    wireKineticEnergy = 1./2*wire.mass*ssqV[0];}
 
   if(processState==ProcessState::Load) {
-   /*if(load.force[0][2] > 250 && load.height < 4*Grain::radius)
-    processState = Done; // Stops once only two layers are left
-   else*/
    if(timeStep%size_t(1e-3/dt) == 0) { // Records results every milliseconds of simulation
     v4sf wireLength = _0f;
     for(size_t i: range(wire.count-1))
      wireLength += sqrt(sq3(wire.position[i]-wire.position[i+1]));
     float stretch = (wireLength[0] / wire.count) / Wire::internodeLength;
-    stream.write(str(load.height*1e3, (initialHeight-load.height)*1e3, height*1e3,
+    if(0) stream.write(str(load.height*1e3, (initialHeight-load.height)*1e3, height*1e3,
                      load.force[0][2], stretch*100, grainKineticEnergy*1e3, wireKineticEnergy*1e3,
       normalEnergy*1e3, staticEnergy*1e3, tensionEnergy*1e3, bendEnergy*1e3)+'\n');
    }

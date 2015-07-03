@@ -42,7 +42,7 @@ struct System {
   vec4f relativeA, relativeB; // Relative to center but world axices
   vec4f normal;
   float depth;
-  //vec3 B; // FIXME: barycentric coordinates passed from contact to force distribution
+  float u, v; // FIXME: barycentric coordinates passed from contact to force distribution
  };
 
  /// Returns contact between two objects
@@ -53,7 +53,7 @@ struct System {
   vec4f length = sqrt(sq3(relativePosition));
   vec4f normal = relativePosition/length; // B -> A
   return {float3(tA::radius)*(-normal), float3(tB::radius)*(+normal),
-     normal, length[0]-tA::radius-tB::radius};
+     normal, length[0]-tA::radius-tB::radius,0,0};
  }
 
  struct Friction {
@@ -89,7 +89,7 @@ struct System {
   vec4f normal {0, 0, 1, 0};
   return { float3(tA::radius)*(-normal),
                vec4f{A.position[a][0], A.position[a][1], 0, 0},
-               normal, (A.position[a][2]-tA::radius) };
+               normal, (A.position[a][2]-tA::radius),0,0 };
  }
 
  struct Load : Obstacle {
@@ -105,7 +105,7 @@ struct System {
   vec4f normal {0, 0, -1, 0};
   return { float3(tA::radius)*(-normal),
      vec4f{A.position[a][0], A.position[a][1], load.height, 0},
-     normal, load.height-(A.position[a][2]+tA::radius) };
+     normal, load.height-(A.position[a][2]+tA::radius),0,0 };
  }
 
 
@@ -206,6 +206,7 @@ struct System {
  } wire;
 
  struct Side : Particle {
+  sconst bool friction = false;
   struct { v4sf operator[](size_t) const { return _0f; } } position;
   struct {
    System::Side& side;
@@ -235,7 +236,7 @@ struct System {
    : Particle(base, /*W*H*/int(2*PI*initialRadius/Grain::radius)*
                                          (int(height/Grain::radius*2/sqrt(3.))+1), 1*g),
      initialRadius(initialRadius), height(height), W(int(2*PI*initialRadius/Grain::radius)),
-     H(int(height/Grain::radius*2/sqrt(3.))+1), faceCount(soft ? (H-1)*(W-1)*2 : 1) {
+     H(int(height/Grain::radius*2/sqrt(3.))+1), faceCount(soft ? (H-1)*W*2 : 1) {
    count = W*H;
    for(size_t i: range(H)) for(size_t j: range(W)) {
     float z = i*height/(H-1);
@@ -246,6 +247,7 @@ struct System {
    Particle::velocity.clear(_0f);
   }
  } side;
+ array<size_t> flag, flag2;
  /// Sphere - Side
  template<Type tA>
  Contact contact(const tA& A, size_t aIndex, const Side& side, size_t faceIndex) {
@@ -255,38 +257,37 @@ struct System {
     vec4f normal {-A.position[aIndex][0]/length, -A.position[aIndex][1]/length, 0, 0};
     return { float3(tA::radius)*(-normal),
        vec4f{r*-normal[0], r*-normal[1], A.position[aIndex][2], 0},
-     normal, r-tA::radius-length };
+     normal, r-tA::radius-length,0,0 };
    }
-   if(length+Grain::radius < side.minRadius) return {_0f,_0f,_0f,0};
+   if(length+Grain::radius < side.minRadius) return {_0f,_0f,_0f,0,0,0};
   }
   // Triangle - Sphere
   size_t W = side.W;
-  //for(size_t i: range(side.H-1)) for(size_t j: range(W-1)) {
-  size_t i = faceIndex/2/(W-1), j = (faceIndex/2)%(W-1), n = faceIndex%2;
+  size_t i = faceIndex/2/W, j = (faceIndex/2)%W;
   vec3 a (toVec3(side.Particle::position[i*W+j]));
   vec3 b (toVec3(side.Particle::position[i*W+(j+1)%W]));
   vec3 c (toVec3(side.Particle::position[(i+1)*W+j]));
   vec3 d (toVec3(side.Particle::position[(i+1)*W+(j+1)%W]));
-  mat3 v[2][2] {{mat3{a,c,d},mat3{a,d,b}},{mat3{c,b,a},mat3{c,d,b}}};
-  mat3 V = v[i%2][n];
-  vec3 M = toVec3(A.position[aIndex]);
-  vec3 normal = cross(V[1]-V[0], V[2]-V[0]);
-  normal /= length(normal);
-  assert_(dot(normal, M) < 0, V[0], V[1], V[2], i%2, n, A.position[aIndex], normal, dot(normal, M));
-  vec3 P = M - normal * dot(normal, M);
-  // FIXME: TODO: barycentric coordinates | 2D edge equations
-  /*mat3 e = V.inverse();
-  vec3 B = e*P;
-  B.x = clamp(0.f, B.x, 1.f);
-  B.y = clamp(0.f, B.y, 1.f);
-  B.z = clamp(0.f, B.z, 1.f);
-  vec3 p = V*B;*/
-  // Assumes concave surface (=> no vertex/edge intersection only inside)
-  // FIXME: need barycentric to distribute force
-  vec3 r = P-M;
-  float length = ::length(r);
-  //if(length < tA::radius) log(float3(tA::radius)*(-normal), P, normal, length-tA::radius);
-  return {float3(tA::radius)*(-normal), P, normal, length-tA::radius};
+  vec3 vertices[2][2][3] {{{a,c,b},{b,c,d}},{{a,c,d},{a,d,b}}};
+  vec3* V = vertices[i%2][faceIndex%2];
+  vec3 O = toVec3(A.position[aIndex]);
+  vec3 E1 = V[1]-V[0], E2 = V[2]-V[0];
+  vec3 D = -cross(E1, E2);
+  D /= length(D);
+  vec3 P = cross(D, E2);
+  float det = dot(P, E1);
+  if(det < 0) { error(i%2, faceIndex%2); return {_0f,_0f,_0f,0,0,0}; }
+  vec3 T = O - V[0];
+  float invDet = 1 / det;
+  float u = invDet * dot(P, T);
+  if(u < 0 || u > 1) return {_0f,_0f,_0f,0,0,0};
+  vec3 Q = cross(T, E1);
+  float v = invDet * dot(Q, D);
+  if(v < 0 || u + v  > 1) return {_0f,_0f,_0f,0,0,0};
+  float t = dot(Q, E2) * invDet;
+  if(t<0) return {_0f,_0f,_0f,0,0,0};
+  flag.append(faceIndex);
+  return {float3(tA::radius)*D, O+t*D, -D, t-tA::radius, u, v};
  }
 
  System(const Dict& p) :

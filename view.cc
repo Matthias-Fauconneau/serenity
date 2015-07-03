@@ -27,13 +27,13 @@ struct SimulationView : Simulation, Widget, Poll {
  GLFrameBuffer target {size};
 
  SimulationView(Thread& uiThread=mainThread, Dict parameters={parseDict(
-    //"Pattern:none,"
-    "Pattern:helix,"
+    "Pattern:none,"
+    //"Pattern:helix,"
     //"Pattern:cross,"
     //"Pattern:loop,"
     "Friction:1, Elasticity:8e6, Rate:200,"
-    "Time step:1e-5, Height: 0.6, Radius:0.3"
-    //"Time step:1e-5, Height: 0.3, Radius:0.15, Pressure:0"
+    //"Time step:1e-5, Height: 0.6, Radius:0.3"
+    "Time step:1e-5, Height: 0.3, Radius:0.15, Pressure:0"
     )}) : Simulation(parameters,
   arguments().contains("result") ?
    File(str(parameters)+".result", currentWorkingDirectory(),
@@ -68,7 +68,7 @@ struct SimulationView : Simulation, Widget, Poll {
 
  void snapshot() override {
   Simulation::snapshot();
-  writeFile(str(parameters.at("Pattern"))+".png", encodePNG(target.readback()), currentWorkingDirectory(), true);
+  writeFile(name+".png", encodePNG(target.readback()), currentWorkingDirectory(), true);
  }
 
  void step() {
@@ -76,7 +76,7 @@ struct SimulationView : Simulation, Widget, Poll {
   if(encoder) viewYawPitch.x += 2*PI*dt / 16;
   window->render();
   int64 elapsed = realTime() - lastReport;
-  if(elapsed > 4*60e9) {
+  if(elapsed > 12*60e9) {
    log(timeStep*this->dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
    log("grain",str(grainTime, stepTime), "wire",str(wireTime, stepTime));
    log("grainInit",str(grainInitializationTime, grainTime),
@@ -242,38 +242,66 @@ struct SimulationView : Simulation, Widget, Poll {
     positions[n+2] = B; positions[n+3] = C;
     if(i) { positions[n+4] = A; positions[n+5] = B; }
    }
-   shader["uColor"] = black;
+   shader["uColor"] = vec4(black, 1);
    static GLVertexArray vertexArray;
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
    vertexArray.draw(Lines, positions.size);
   }
 
-  /*if(load.count) {
-   vec3 min (-vec2(-side.castRadius), load.height);
-   vec3 max (+vec2(-side.castRadius), load.height);
-   for(int i: range(0b111 +1)) for(int j: {(i&0b110) |0b001, (i&0b101) |0b010, (i&0b011) |0b100}) {
-    if(i<j) {
-     auto p = [=](int i) {
-      return vec3(i&0b001?max[0]:min[0], i&0b010?max[1]:min[1], i&0b100?max[2]:min[2]);
-      };
-      lines[rgb3f(1,0,0)].append(viewProjection*p(i));
-      lines[rgb3f(1,0,0)].append(viewProjection*p(j));
+  /*{Locker lock(this->lock);
+     buffer<vec3> positions {side.faceCount*3, 0};
+     for(size_t faceIndex: range(side.faceCount)) {
+      if(flag2.contains(faceIndex)) continue;
+      size_t W = side.W;
+      size_t i = faceIndex/2/W, j = (faceIndex/2)%W;
+      vec3 a (toVec3(side.Particle::position[i*W+j]));
+      vec3 b (toVec3(side.Particle::position[i*W+(j+1)%W]));
+      vec3 c (toVec3(side.Particle::position[(i+1)*W+j]));
+      vec3 d (toVec3(side.Particle::position[(i+1)*W+(j+1)%W]));
+      vec3 vertices[2][2][3] {{{a,c,b},{b,c,d}},{{a,c,d},{a,d,b}}};
+      vec3* V = vertices[i%2][faceIndex%2];
+      // FIXME: GPU projection
+      for(size_t i: range(3)) positions[positions.size+i] = viewProjection * V[i];
+      positions.size += 3;
+     }
+     if(positions.size) {
+      shader["uColor"] = vec4(black, 1./4);
+      static GLVertexArray vertexArray;
+      GLBuffer positionBuffer (positions);
+      vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
+      glBlendAlpha();
+      glCullFace(true);
+      glDepthTest(false);
+      vertexArray.draw(Triangles, positions.size);
+     }
+  }*/
+  {Locker lock(this->lock);
+     buffer<vec3> positions {side.faceCount*3, 0};
+     for(size_t faceIndex: range(side.faceCount)) {
+      if(!flag2.contains(faceIndex)) continue;
+      size_t W = side.W;
+      size_t i = faceIndex/2/W, j = (faceIndex/2)%W;
+      vec3 a (toVec3(side.Particle::position[i*W+j]));
+      vec3 b (toVec3(side.Particle::position[i*W+(j+1)%W]));
+      vec3 c (toVec3(side.Particle::position[(i+1)*W+j]));
+      vec3 d (toVec3(side.Particle::position[(i+1)*W+(j+1)%W]));
+      vec3 vertices[2][2][3] {{{a,b,c},{b,d,c}},{{a,d,c},{a,b,d}}};
+      vec3* V = vertices[i%2][faceIndex%2];
+      // FIXME: GPU projection
+      for(size_t i: range(3)) positions[positions.size+i] = viewProjection * V[i];
+      positions.size += 3;
+     }
+     if(positions.size) {
+      shader["uColor"] = vec4(1,0,0,1./2);
+      static GLVertexArray vertexArray;
+      GLBuffer positionBuffer (positions);
+      vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
+      glBlendAlpha();
+      glCullFace(true);
+      vertexArray.draw(Triangles, positions.size);
      }
     }
-  }
-
-  if(1) glDepthTest(false);
-  {static GLVertexArray vertexArray;
-   for(auto entry: lines) {
-    shader["uColor"] = entry.key;
-    GLBuffer positionBuffer (entry.value);
-    vertexArray.bindAttribute(shader.attribLocation("position"_),
-                              3, Float, positionBuffer);
-    vertexArray.draw(Lines, entry.value.size);
-   }
-  }
-  lines.clear();*/
 
   if(encoder) {
    encoder->writeVideoFrame(target.readback());

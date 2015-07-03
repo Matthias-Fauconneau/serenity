@@ -37,7 +37,7 @@ fragment {
          color = vec4(texture2D(image, (vLocalCoords+1)/2).rgb, 1);
         }
         flat {
-         uniform vec3 uColor;
-         color = vec4(uColor,1);
+         uniform vec4 uColor;
+         color = uColor;
         }
 }
