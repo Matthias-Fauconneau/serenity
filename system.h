@@ -222,6 +222,8 @@ struct System {
 
   const vec4f tensionStiffness = float3(elasticModulus * PI * 8 * sq(1*mm));
   const vec4f tensionDamping = float3(mass / s);
+  sconst float areaMomentOfInertia = 1e-3 * PI/4*pow4(1*mm); // FIXME
+  const float bendStiffness = elasticModulus * areaMomentOfInertia / internodeLength;
 
   float tensionEnergy=0;
 
@@ -259,11 +261,12 @@ struct System {
    for(size_t i: range(3)) positionDerivatives[i].clear(_0f);
   }
  } side;
- array<size_t> flag, flag2;
+ struct Debug { size_t index; float u, v; };
+ array<Debug> flag, flag2;
  /// Sphere - Side
  template<Type tA>
  Contact contact(const tA& A, size_t aIndex, const Side& side, size_t faceIndex) {
-  {float length = length2(A.position[aIndex]);
+  /*{float length = length2(A.position[aIndex]);
    if(length+Grain::radius < side.minRadius) return {_0f,_0f,_0f,0,0,0}; // Quick cull
    if(side.faceCount == 1) { // Side -> Sphere
     float r = side.initialRadius;
@@ -272,8 +275,7 @@ struct System {
        vec4f{r*-normal[0], r*-normal[1], A.position[aIndex][2], 0},
      normal, r-tA::radius-length,0,0 };
    }
-  }
-  // Triangle - Sphere
+  }*/
   size_t W = side.W;
   size_t i = faceIndex/2/W, j = (faceIndex/2)%W;
   vec3 a (toVec3(side.Particle::position[i*W+j]));
@@ -281,25 +283,45 @@ struct System {
   vec3 c (toVec3(side.Particle::position[(i+1)*W+j]));
   vec3 d (toVec3(side.Particle::position[(i+1)*W+(j+1)%W]));
   vec3 vertices[2][2][3] {{{a,c,b},{b,c,d}},{{a,c,d},{a,d,b}}};
-  vec3* V = vertices[i%2][faceIndex%2];
+  ref<vec3> V (vertices[i%2][faceIndex%2], 3);
+#if 0
+  // Triangle - Sphere
   vec3 O = toVec3(A.position[aIndex]);
   vec3 E1 = V[1]-V[0], E2 = V[2]-V[0];
   vec3 D = -cross(E1, E2);
   D /= length(D);
   vec3 P = cross(D, E2);
   float det = dot(P, E1);
-  if(det < 0) { error(i%2, faceIndex%2); return {_0f,_0f,_0f,0,0,0}; }
+  if(det < 0.000001) { error(i%2, faceIndex%2); return {_0f,_0f,_0f,0,0,0}; }
   vec3 T = O - V[0];
   float invDet = 1 / det;
   float u = invDet * dot(P, T);
-  if(u < 0 || u > 1) return {_0f,_0f,_0f,0,0,0};
-  vec3 Q = cross(T, E1);
-  float v = invDet * dot(Q, D);
-  if(v < 0 || u + v  > 1) return {_0f,_0f,_0f,0,0,0};
-  float t = dot(Q, E2) * invDet;
-  //if(t<0) return {_0f,_0f,_0f,0,0,0};
-  if(t < tA::radius) flag.append(faceIndex);
-  return {float3(tA::radius)*D, O+t*D, -D, t-tA::radius, u, v};
+  //u = max(0, u);
+  Contact contact {_0f,_0f,_0f,inf,0,0};
+  if(!(u < 0 || u > 1)) {
+   vec3 Q = cross(T, E1);
+   float v = invDet * dot(Q, D);
+   //v = max(0, v);
+   if(!(v < 0 || u + v  > 1)) {
+    float t = dot(Q, E2) * invDet;
+    //if(t<0) return {_0f,_0f,_0f,0,0,0};
+    if(t < tA::radius) flag.append({faceIndex,u,v});
+    contact = {float3(tA::radius)*D, O+t*D, -D, t-tA::radius, u, v};
+   }
+  }
+#else
+  Contact contact {_0f,_0f,_0f, inf,0,0};
+#endif
+  // Point - Sphere
+  for(vec3 v: V) { // FIXME: test vertices once (6x overhead)
+   vec4f relativePosition = A.position[aIndex] - v;
+   vec4f length = sqrt(sq3(relativePosition));
+   if(length[0]-tA::radius < contact.depth) {
+    vec4f normal = relativePosition/length; // B -> A
+    contact = {float3(tA::radius)*(-normal), v-V[0], normal, length[0]-tA::radius, 0, 0};
+   }
+  }
+  return contact;
  }
 
  System(const Dict& p) :

@@ -240,7 +240,9 @@ struct Simulation : System {
  }
 
  void step() {
-  flag2 = move(flag);
+  {Locker lock(this->lock);
+   flag2 = move(flag);
+  }
   stepTime.start();
   // Process
   if(processState == Pour) {
@@ -355,8 +357,8 @@ break2_:;
   //recordContacts = true;
   contacts.clear();
 
-  // Side tension
   {
+   // Grid
    for(size_t i: range(grid.cells.size)) grid.cells[i].clear(); // FIXME: inefficient
    assert_(side.count < 32768);
    for(size_t i: range(side.count)) side.Particle::force[i] = _0f;
@@ -369,8 +371,16 @@ break2_:;
     vec3 d (toVec3(side.Particle::position[(i+1)*W+(j+1)%W]));
     vec3 vertices[2][2][3] {{{a,b,c},{b,d,c}},{{a,d,c},{a,b,d}}};
     vec3* V = vertices[i%2][faceIndex%2];
-    for(size_t i: range(3)) grid(V[i]).append(faceIndex);
+    for(size_t i: range(3)) grid(V[i]).add(faceIndex); // Assumes small triangles
+    grid((V[0]+V[1]+V[2])/3.f).add(faceIndex); // Assumes small triangles
+    /*assert_(grid((V[0]+V[1]+V[2])/3.f).contains(faceIndex),
+      V[0], V[1], V[2], (V[0]+V[1]+V[2])/3.f,
+      grid.index2(V[0]), grid.index2(V[1]), grid.index2(V[2]),
+       grid.index2((V[0]+V[1]+V[2])/3.f),
+      grid(V[0]), grid(V[1]), grid(V[2]), grid((V[0]+V[1]+V[2])/3.f)
+      );*/
    }
+   // Side tension
    size_t W = side.W;
    for(size_t i: range(side.H-1)) for(size_t j: range(W)) {
     size_t a = i*W+j, b = i*W+(j+1)%W, c = (i+1)*W+(j+i%2)%W;
@@ -383,6 +393,32 @@ break2_:;
     if(i) {vec4f t = tension(side, a, b);
      side.Particle::force[a] += t;
      side.Particle::force[b] -= t;}
+   }
+   // Bending resistance
+   for(size_t i: range(side.H-1)) for(size_t j: range(W)) {
+    size_t a = i*W+j;
+    size_t b = i*W+(j+1)%W;
+    size_t c = (i+1)*W+j;
+    size_t d = (i+1)*W+(j+1)%W;
+    size_t e = (i+i%2)*W+(j+2)%W;
+    size_t vertices[2][2][4] {{{a,b,c,d},{c,b,d,e}},{{c,a,d,b},{a,b,d,e}}};
+    for(size_t n: range(2)) {
+     size_t* V = vertices[i%2][n];
+     vec3 A = toVec3(side.Particle::position[V[0]]);
+     vec3 B = toVec3(side.Particle::position[V[1]]);
+     vec3 C = toVec3(side.Particle::position[V[2]]);
+     vec3 D = toVec3(side.Particle::position[V[3]]);
+     vec3 n1 = cross(B-A, C-A), n2 = cross(B-C, D-C);
+     float angle = (dot(n1, D-A) < 0 ? 1 : -1) * acos(dot(n1, n2));
+     //bendEnergy += 1./2 * wire.bendStiffness * sq(angle);
+     vec4f p = float3(side.bendStiffness * angle);
+     vec4f N1 = n1 / sqrt(sq3(n1));
+     vec4f N2 = n2 / sqrt(sq3(n1));
+     side.Particle::force[a] += - p * N1;
+     side.Particle::force[b] += p * (N1 + N2) / float4(2);
+     side.Particle::force[c] += p * (N1 + N2) / float4(2);
+     side.Particle::force[d] += - p * N2;
+    }
    }
   }
 
@@ -398,23 +434,52 @@ break2_:;
   Lattice grainLattice(sqrt(3.)/(2*Grain::radius), min, max);
 
   parallel_chunk(grain.count, [this,&grainLattice](uint, size_t start, size_t size) {
-   for(size_t a: range(start, start+size)) {
-    grain.force[a] = float4(grain.mass) * G;
-    grain.torque[a] = _0f;
-    penalty(grain, a, floor, 0);
-    if(load.height) penalty(grain, a, load, 0);
-    /*if(processState <= Release)*/ \
-    int2 i = grid.index2(grain.position[a]);
-    for(int y: range(::max(0, i.y-1), ::min(grid.size.y-1, i.y+1))) {
-     for(int x: range(i.x-1, i.x+1)) {
-      // Wraps around (+size.x to wrap -1)
-      for(size_t b: grid.cells[y*grid.size.x+(x+grid.size.x)%grid.size.x])
-       penalty(grain, a, side, b);
+   for(size_t grainIndex: range(start, start+size)) {
+    grain.force[grainIndex] = float4(grain.mass) * G;
+    grain.torque[grainIndex] = _0f;
+    penalty(grain, grainIndex, floor, 0);
+    if(load.height) penalty(grain, grainIndex, load, 0);
+    /*if(0) for(size_t b: range(side.faceCount)) penalty(grain, grainIndex, side, b);
+    else*/ {
+     int2 index = grid.index2(grain.position[grainIndex]);
+     array<size_t> indices;
+     for(int y: range(::max(0, index.y-1), ::min(grid.size.y, index.y+1 +1))) {
+      for(int x: range(index.x-1, index.x+1 +1)) {
+       // Wraps around (+size.x to wrap -1)
+       for(size_t b: grid.cells[y*grid.size.x+(x+grid.size.x)%grid.size.x])
+        if(!indices.contains(b) && penalty(grain, grainIndex, side, b))
+         indices.append(b);
+      }
      }
-   }
-    grainLattice(grain.position[a]) = 1+a;
+     /*// FIXME
+     for(size_t faceIndex: range(side.faceCount)) if(penalty(grain, grainIndex, side, faceIndex)) {
+      size_t W = side.W;
+      size_t i = faceIndex/2/W, j = (faceIndex/2)%W;
+      vec3 a (toVec3(side.Particle::position[i*W+j]));
+      vec3 b (toVec3(side.Particle::position[i*W+(j+1)%W]));
+      vec3 c (toVec3(side.Particle::position[(i+1)*W+j]));
+      vec3 d (toVec3(side.Particle::position[(i+1)*W+(j+1)%W]));
+      vec3 vertices[2][2][3] {{{a,b,c},{b,d,c}},{{a,d,c},{a,b,d}}};
+      vec3* V = vertices[i%2][faceIndex%2];
+      if(!indices.contains(faceIndex)) {
+       log(indices, faceIndex, V[0], V[1], V[2],
+         grain.position[grainIndex], grain.radius,
+         index, grid.index2(V[0]), grid.index2(V[1]), grid.index2(V[2]),
+         grid.index2((V[0]+V[1]+V[2])/3.f), flag.last().u, flag.last().v);
+       processState = Done;
+       {Locker lock(this->lock);
+        flag2.clear();
+        assert_(flag.last().index == faceIndex);
+        flag2.append(flag.last());
+       }
+       return;
+      }
+     }*/
+    }
+    grainLattice(grain.position[grainIndex]) = 1+grainIndex;
    }
   }, 1);
+  if(processState == Done) return; // DEBUG
   grainInitializationTime.stop();
 
   grainContactTime.start();
@@ -476,15 +541,15 @@ break2_:;
     size_t i = start;
     wire.force[i+1] = float4(wire.mass) * G;
     if(i > 0) {
-     if(start > 1 && wire.bendStiffness) {// Previous bending spring on first
+     if(start > 1 && wire.bendStiffness) { // Previous bending spring on first
       size_t i = start-1;
       vec4f A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
       vec4f a = C-B, b = B-A;
       vec4f c = cross(a, b);
-      vec4f l = sqrt(sq3(c));
-      if(l[0]) {
-       float p = wire.bendStiffness * atan(l[0], dot3(a, b)[0]);
-       vec4f dap = cross(a, cross(a,b)) / (sq3(a) * l);
+      vec4f length4 = sqrt(sq3(c));
+      if(length4[0]) {
+       float p = wire.bendStiffness * atan(length4[0], dot3(a, b)[0]);
+       vec4f dap = cross(a, c) / (sqrt(sq3(a)) * length4);
        wire.force[i+1] += float3(p) * (-dap);
       }
      }
@@ -495,14 +560,14 @@ break2_:;
       vec4f A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
       vec4f a = C-B, b = B-A;
       vec4f c = cross(a, b);
-      vec4f l = sqrt(sq3(c));
-      if(l[0]) {
-       float p = wire.bendStiffness * atan(l[0], dot3(a, b)[0]);
-       vec4f dap = cross(a, cross(a,b)) / (sq3(a) * l);
-       vec4f dbp = cross(b, cross(b,a)) / (sq3(b) * l);
+      vec4f length4 = sqrt(sq3(c));
+      if(length4[0]) {
+       float p = wire.bendStiffness * atan(length4[0], dot3(a, b)[0]);
+       vec4f dap = cross(a, c) / (sqrt(sq3(a)) * length4);
+       vec4f dbp = cross(b, c) / (sqrt(sq3(b)) * length4);
        wire.force[i+1] += float3(p) * (-dap);
-       wire.force[i] += float3(p) * (dap - dbp);
-        //wire.force[i-1] += float3(p) * (dbp); //-> "Tension to first node of next chunk"
+       wire.force[i] += float3(p) * (dap + dbp);
+        //wire.force[i-1] += float3(p) * (-dbp); //-> "Tension to first node of next chunk"
        { // Damping
         vec4f A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
         vec4f axis = cross(C-B, B-A);
@@ -555,11 +620,11 @@ break2_:;
       float angle = atan(length, dot3(a, b)[0]);
       bendEnergy += 1./2 * wire.bendStiffness * sq(angle);
       vec4f p = float3(wire.bendStiffness * angle);
-      vec4f dap = cross(a, cross(a,b)) / (sq3(a) * length4);
-      vec4f dbp = cross(b, cross(b,a)) / (sq3(b) * length4);
+      vec4f dap = cross(a, c) / (sqrt(sq3(a)) * length4);
+      vec4f dbp = cross(b, c) / (sqrt(sq3(b)) * length4);
       wire.force[i+1] += p * (-dap);
-      wire.force[i] += p * (dap - dbp);
-      wire.force[i-1] += p * (dbp);
+      wire.force[i] += p * (dap + dbp);
+      wire.force[i-1] += p * (-dbp);
       {
        vec4f A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
        vec4f axis = cross(C-B, B-A);
@@ -616,11 +681,11 @@ break2_:;
       float angle = atan(length, dot3(a, b)[0]);
       bendEnergy += 1./2 * wire.bendStiffness * sq(angle);
       vec4f p = float3(wire.bendStiffness * angle);
-      vec4f dap = cross(a, cross(a,b)) / (sq3(a) * length4);
-      vec4f dbp = cross(b, cross(b,a)) / (sq3(b) * length4);
+      vec4f dap = cross(a, c) / (sqrt(sq3(a)) * length4);
+      vec4f dbp = cross(b, c) / (sqrt(sq3(b)) * length4);
       //wire.force[i+1] += p * (-dap); //-> "Previous bending spring on first"
-      wire.force[i] += p * (dap - dbp);
-      wire.force[i-1] += p * (dbp);
+      wire.force[i] += p * (dap + dbp);
+      wire.force[i-1] += p * (-dbp);
       if(1) {
        vec4f A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
        vec4f axis = cross(C-B, B-A);
@@ -671,8 +736,8 @@ break2_:;
        float angle = atan(length, dot3(a, b)[0]);
        bendEnergy += 1./2 * wire.bendStiffness * sq(angle);
        vec4f p = float3(wire.bendStiffness * angle);
-       vec4f dbp = cross(b, cross(b,a)) / (sq3(b) * length4);
-       wire.force[i-1] += p * (dbp);
+       vec4f dbp = cross(b, c) / (sqrt(sq3(b)) * length4);
+       wire.force[i-1] += p * (-dbp);
       }
      }
     }

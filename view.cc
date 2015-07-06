@@ -33,7 +33,7 @@ struct SimulationView : Simulation, Widget, Poll {
     //"Pattern:loop,"
     "Friction:1, Elasticity:8e6, Rate:200,"
     //"Time step:1e-5, Height: 0.6, Radius:0.3"
-    "Time step:1e-5, Height: 0.3, Radius:0.15, Pressure:0"
+    "Time step:1e-4, Height: 0.3, Radius:0.15, Pressure:0"
     )}) : Simulation(parameters,
   arguments().contains("result") ?
    File(str(parameters)+".result", currentWorkingDirectory(),
@@ -249,10 +249,10 @@ struct SimulationView : Simulation, Widget, Poll {
    vertexArray.draw(Lines, positions.size);
   }
 
-  /*{Locker lock(this->lock);
+  {Locker lock(this->lock);
      buffer<vec3> positions {side.faceCount*3, 0};
-     for(size_t faceIndex: range(side.faceCount)) {
-      if(!flag2.contains(faceIndex)) continue;
+     for(auto contact: flag2) {
+      size_t faceIndex = contact.index;
       size_t W = side.W;
       size_t i = faceIndex/2/W, j = (faceIndex/2)%W;
       vec3 a (toVec3(side.Particle::position[i*W+j]));
@@ -274,7 +274,7 @@ struct SimulationView : Simulation, Widget, Poll {
       glCullFace(true);
       vertexArray.draw(Triangles, positions.size);
      }
-    }*/
+    }
 
   if(encoder) {
    encoder->writeVideoFrame(target.readback());
