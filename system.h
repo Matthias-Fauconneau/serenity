@@ -27,7 +27,7 @@ struct System {
  // SI units
  sconst float s = 1, m = 1, kg = 1, N = kg*m/s/s;
  sconst float mm = 1e-3*m, g = 1e-3*kg;
- sconst vec4f G {0, 0, -10 * N/kg/*=m·s¯²*/, 0};
+ vec4f G {0, 0, -10 * N/kg/*=m·s¯²*/, 0};
 
  // Penalty model
  sconst float normalDamping = 0 * g/s;
@@ -64,52 +64,38 @@ struct System {
   bool operator==(const Friction& b) const { return index == b.index; }
  };
 
- struct Obstacle {
-  sconst bool friction = false;
+ struct Plate {
+  sconst bool friction = true;
   sconst float mass = inf;
   sconst float angularMass = 0;
-  sconst size_t count = 1;
-  struct { vec4f operator[](size_t){ return _0f; }} position;
+  sconst size_t count = 2;
+  vec4f position[2] = {_0f, _0f};
   struct { vec4f operator[](size_t){ return _0f; }} velocity;
   struct { vec4f operator[](size_t){ return _0001f; }} rotation;
   struct { vec4f operator[](size_t){ return _0f; }} angularVelocity;
-  vec4f force[1];
-  vec4f torque[1];
- };
-
- struct Floor : Obstacle {
+  vec4f force[2];
+  vec4f torque[2];
   sconst size_t base = 0;
   sconst float curvature = 0;
-  sconst float elasticModulus = 1e6 * kg/(m*s*s);
-  sconst float staticFrictionThresholdSpeed = staticFrictionSpeed;
- } floor;
- /// Sphere - Floor
+  sconst float elasticModulus = 1e9 * kg/(m*s*s); // 1 GPa
+ } plate;
+ /// Sphere - Plate
  template<Type tA>
- Contact contact(const tA& A, size_t a, const Floor&, size_t) {
-  vec4f normal {0, 0, 1, 0};
-  return { float3(tA::radius)*(-normal),
-               vec4f{A.position[a][0], A.position[a][1], 0, 0},
-               normal, (A.position[a][2]-tA::radius),0,0 };
+ Contact contact(const tA& A, size_t a, const Plate& B, size_t b) {
+  if(b == 0) { // Bottom
+   vec4f normal {0, 0, 1, 0};
+   return { float3(tA::radius)*(-normal),
+      vec4f{A.position[a][0], A.position[a][1], B.position[b][2], 0},
+      normal, (A.position[a][2]-tA::radius) - B.position[b][2],0,0 };
+  } else { // Top
+   vec4f normal {0, 0, -1, 0};
+   return { float3(tA::radius)*(-normal),
+      vec4f{A.position[a][0], A.position[a][1], B.position[b][2], 0},
+      normal, B.position[b][2] - (A.position[a][2]+tA::radius),0,0 };
+  }
  }
 
- struct Load : Obstacle {
-  sconst size_t base = 1;
-  sconst float curvature = 0;
-  sconst float elasticModulus = 1e6 * kg/(m*s*s);
-  float height = 0;
-  v4sf force[1];
- } load;
- /// Sphere - Load
- template<Type tA>
- Contact contact(const tA& A, size_t a, const Load& load, size_t) {
-  vec4f normal {0, 0, -1, 0};
-  return { float3(tA::radius)*(-normal),
-     vec4f{A.position[a][0], A.position[a][1], load.height, 0},
-     normal, load.height-(A.position[a][2]+tA::radius),0,0 };
- }
-
-
- struct Particle {
+ struct Vertex {
   sconst bool friction = true;
   const size_t base, capacity;
   float mass;
@@ -124,14 +110,14 @@ struct System {
   struct { vec4f operator[](size_t) const { return _0001f; }} rotation;
   struct { vec4f operator[](size_t) const { return _0f; }} angularVelocity;
 
-  Particle(size_t base, size_t capacity, float mass) : base(base), capacity(capacity),
+  Vertex(size_t base, size_t capacity, float mass) : base(base), capacity(capacity),
     mass(mass), _1_mass(float3(1./mass)) {
    for(size_t i: range(3)) positionDerivatives[i] = buffer<vec4f>(capacity);
    frictions.clear();
   }
  };
 
- void step(Particle& p, size_t i) {
+ void step(Vertex& p, size_t i) {
   // Correction
   vec4f r = b[1] * (p.force[i] * p._1_mass - p.positionDerivatives[0][i]);
   p.position[i] += c[0]*r;
@@ -153,7 +139,7 @@ struct System {
   p.positionDerivatives[1][i] += b[0]*p.positionDerivatives[2][i];
  }
 
- struct Grain : Particle {
+ struct Grain : Vertex {
   // Properties
   sconst float radius = 20*mm; // 40 mm diameter
   sconst float volume = 2./3 * PI * cb(radius);
@@ -167,7 +153,7 @@ struct System {
   buffer<vec4f> rotation { capacity };
   buffer<vec4f> angularVelocity { capacity };
   buffer<vec4f> angularDerivatives[3]; // { [0 ... 2] = buffer<vec4f>(capacity) };
-  Grain(const System& system) : Particle(2, 32768, Grain::mass), // 5 MB
+  Grain(const System& system) : Vertex(2, 32768, Grain::mass), // 5 MB
    dt_angularMass(float3(system.dt/angularMass)) {
    for(size_t i: range(3)) angularDerivatives[i] = buffer<vec4f>(capacity);
   }
@@ -176,14 +162,14 @@ struct System {
 
  const vec4f dt_2 = float4(dt/2);
  void step(Grain& p, size_t i) {
-  step((Particle&)p, i);
+  step((Vertex&)p, i);
   p.rotation[i] += dt_2 * qmul(p.angularVelocity[i], p.rotation[i]);
   p.angularVelocity[i] += p.dt_angularMass * p.torque[i];
   p.rotation[i] *= rsqrt(sq4(p.rotation[i]));
  }
 
- struct Wire : Particle {
-  using Particle::Particle;
+ struct Wire : Vertex {
+  using Vertex::Vertex;
   struct { NoOperation operator[](size_t) const { return {}; }} torque;
 
   sconst float radius = 1 * mm; // 2mm diameter
@@ -194,7 +180,7 @@ struct System {
   sconst float volume = section * internodeLength;
   sconst float density = 1e3 * kg / cb(m);
   sconst float angularMass = 0;
-  const float elasticModulus;
+  const float elasticModulus; // ~ 8e6
   sconst float areaMomentOfInertia = PI/4*pow4(radius);
   const float bendStiffness = elasticModulus * areaMomentOfInertia / internodeLength;
   sconst float mass = Wire::density * Wire::volume;
@@ -203,36 +189,40 @@ struct System {
   sconst vec4f tensionDamping = float3(mass / s);
   float tensionEnergy=0;
   Wire(float elasticModulus, size_t base) :
-    Particle{base, 32768, Wire::mass}, elasticModulus(elasticModulus) {}
+    Vertex{base, 32768, Wire::mass}, elasticModulus(elasticModulus) {}
  } wire;
 
- struct Side : Particle {
+ struct Side : Vertex {
   sconst bool friction = false;
 
   sconst float curvature = 0; // -1/radius?
-  sconst float elasticModulus = 1e6 * kg/(m*s*s); // 5
+  sconst float elasticModulus = 1e6 * kg/(m*s*s);
+  sconst float thickness = 1*mm;
+  sconst float resolution = Grain::radius/2;
   const float initialRadius;
   const float height;
-  const size_t W, H, faceCount;
-  //float castRadius = initialRadius;
-  float minRadius = initialRadius;
+  const size_t W, H;
+  size_t faceCount = 1;
+  //float minRadius = initialRadius;
 
   const float internodeLength = 2*PI*initialRadius/W;
   const vec4f internodeLength4 = float3(internodeLength);
 
-  const vec4f tensionStiffness = float3(elasticModulus * PI * 8 * sq(1*mm));
+  const vec4f tensionStiffness = float3(elasticModulus * internodeLength/3*thickness); // FIXME
   const vec4f tensionDamping = float3(mass / s);
-  sconst float areaMomentOfInertia = 1e-3 * PI/4*pow4(1*mm); // FIXME
-  const float bendStiffness = elasticModulus * areaMomentOfInertia / internodeLength;
+  sconst float areaMomentOfInertia = pow4(1*mm); // FIXME
+  const float bendStiffness = elasticModulus * areaMomentOfInertia / internodeLength; // FIXME
 
   float tensionEnergy=0;
 
-  struct { v4sf operator[](size_t) const { return _0f; } } position;
+  /*struct { v4sf operator[](size_t) const { return _0f; } } position;
+
   struct {
    System::Side& side;
    // FIXME: pass contact barycentric coordinates to evaluate velocity
    v4sf operator[](size_t unused faceIndex) const { return _0f; }
   } velocity {*this};
+
   struct DistributeForce {
    System::Side& side;
    size_t faceIndex;
@@ -240,24 +230,24 @@ struct System {
   struct {
    System::Side& side;
    DistributeForce operator[](size_t faceIndex) const { return {side, faceIndex}; }
-  } force {*this};
+  } force {*this};*/
+
   struct { NoOperation operator[](size_t) const { return {}; }} torque;
 
-  Side(float initialRadius, float height, size_t base, bool soft /*,
-       size_t W = int(PI*initialRadius/Grain::radius),
-       size_t H = int(height/Grain::radius)+1*/)
-   : Particle(base, /*W*H*/int(2*PI*initialRadius/Grain::radius)*
-                                         (int(height/Grain::radius*2/sqrt(3.))+1), 8*g),
-     initialRadius(initialRadius), height(height), W(int(2*PI*initialRadius/Grain::radius)),
-     H(int(height/Grain::radius*2/sqrt(3.))+1), faceCount(soft ? (H-1)*W*2 : 1) {
+  Side(float initialRadius, float height, size_t base)
+   : Vertex(base, /*W*H*/int(2*PI*initialRadius/resolution)*
+                                         (int(height/resolution*2/sqrt(3.))+1), 8*g),
+     initialRadius(initialRadius), height(height),
+     W(int(2*PI*initialRadius/resolution)),
+     H(int(height/resolution*2/sqrt(3.))+1) {
    count = W*H;
    for(size_t i: range(H)) for(size_t j: range(W)) {
     float z = i*height/(H-1);
     float a = 2*PI*(j+(i%2)*1./2)/W;
     float x = initialRadius*cos(a), y = initialRadius*sin(a);
-    Particle::position[i*W+j] = {x,y,z,0};
+    Vertex::position[i*W+j] = {x,y,z,0};
    }
-   Particle::velocity.clear(_0f);
+   Vertex::velocity.clear(_0f);
    for(size_t i: range(3)) positionDerivatives[i].clear(_0f);
   }
  } side;
@@ -266,8 +256,8 @@ struct System {
  /// Sphere - Side
  template<Type tA>
  Contact contact(const tA& A, size_t aIndex, const Side& side, size_t faceIndex) {
-  /*{float length = length2(A.position[aIndex]);
-   if(length+Grain::radius < side.minRadius) return {_0f,_0f,_0f,0,0,0}; // Quick cull
+  {float length = length2(A.position[aIndex]);
+   //if(length+Grain::radius < side.minRadius) return {_0f,_0f,_0f,0,0,0}; // Quick cull
    if(side.faceCount == 1) { // Side -> Sphere
     float r = side.initialRadius;
     vec4f normal {-A.position[aIndex][0]/length, -A.position[aIndex][1]/length, 0, 0};
@@ -275,16 +265,25 @@ struct System {
        vec4f{r*-normal[0], r*-normal[1], A.position[aIndex][2], 0},
      normal, r-tA::radius-length,0,0 };
    }
-  }*/
+  }
+#if 1
+  vec4f b = side.Vertex::position[faceIndex];
+  vec4f relativePosition = A.position[aIndex] - b;
+  vec4f length = sqrt(sq3(relativePosition));
+  assert_(length[0]);
+  vec4f normal = relativePosition/length; // B -> A
+  //if(length[0]-tA::radius<0) log(A.position[aIndex], b, relativePosition, length, normal);
+  return {float3(tA::radius)*(-normal), _0f/*b*/, normal, length[0]-tA::radius, 0, 0};
+#else
   size_t W = side.W;
   size_t i = faceIndex/2/W, j = (faceIndex/2)%W;
-  vec3 a (toVec3(side.Particle::position[i*W+j]));
-  vec3 b (toVec3(side.Particle::position[i*W+(j+1)%W]));
-  vec3 c (toVec3(side.Particle::position[(i+1)*W+j]));
-  vec3 d (toVec3(side.Particle::position[(i+1)*W+(j+1)%W]));
+  vec3 a (toVec3(side.Vertex::position[i*W+j]));
+  vec3 b (toVec3(side.Vertex::position[i*W+(j+1)%W]));
+  vec3 c (toVec3(side.Vertex::position[(i+1)*W+j]));
+  vec3 d (toVec3(side.Vertex::position[(i+1)*W+(j+1)%W]));
   vec3 vertices[2][2][3] {{{a,c,b},{b,c,d}},{{a,c,d},{a,d,b}}};
   ref<vec3> V (vertices[i%2][faceIndex%2], 3);
-#if 0
+#if 1
   // Triangle - Sphere
   vec3 O = toVec3(A.position[aIndex]);
   vec3 E1 = V[1]-V[0], E2 = V[2]-V[0];
@@ -306,7 +305,7 @@ struct System {
     float t = dot(Q, E2) * invDet;
     //if(t<0) return {_0f,_0f,_0f,0,0,0};
     if(t < tA::radius) flag.append({faceIndex,u,v});
-    contact = {float3(tA::radius)*D, O+t*D, -D, t-tA::radius, u, v};
+    contact = {float3(tA::radius)*D, O+t*D, V[0]+/*-*/D, t-tA::radius, u, v};
    }
   }
 #else
@@ -318,17 +317,18 @@ struct System {
    vec4f length = sqrt(sq3(relativePosition));
    if(length[0]-tA::radius < contact.depth) {
     vec4f normal = relativePosition/length; // B -> A
-    contact = {float3(tA::radius)*(-normal), v-V[0], normal, length[0]-tA::radius, 0, 0};
+    contact = {float3(tA::radius)*(-normal), v/*-V[0]*/, normal, length[0]-tA::radius, 0, 0};
    }
   }
   return contact;
+#endif
  }
 
  System(const Dict& p) :
    dt(p.at("Time step"_)),
    frictionCoefficient(p.at("Friction"_)),
    wire(p.at("Elasticity"_), grain.base+grain.capacity),
-   side(p.at("Radius"_), p.at("Height"_), wire.base+wire.capacity, p.contains("Pressure")) {}
+   side(p.at("Radius"_), p.at("Height"_), wire.base+wire.capacity) {}
 
  // Update
  size_t timeStep = 0;
@@ -336,7 +336,7 @@ struct System {
          staticEnergy=0, bendEnergy=0;
  bool recordContacts = false;
  struct ContactForce { size_t a, b; vec3 relativeA, relativeB; vec3 force; };
- array<ContactForce> contacts;
+ array<ContactForce> contacts, contacts2;
 
  /// Evaluates contact penalty between two objects
  template<Type tA, Type tB>
@@ -346,7 +346,7 @@ struct System {
   // Stiffness
   const float E = 1/(1/A.elasticModulus+1/B.elasticModulus);
   constexpr float R = 1/(tA::curvature+tB::curvature);
-  const float K = 2./3*E*sqrt(R);
+  const float K = 4./3*E*sqrt(R);
   const float Ks = K * sqrt(-c.depth);
   atomic_add(normalEnergy, 1./2 * Ks * sq(c.depth));
   float fK = - Ks * c.depth;
@@ -363,6 +363,8 @@ struct System {
   if(B.friction) {
    Friction& friction = A.frictions[a].add(Friction{B.base+b, _0f, _0f, 0, 0.f});
    if(friction.lastStatic < timeStep-1) { // Resets contact (TODO: GC)
+    c.relativeA[3] = 0; // FIXME
+    c.relativeB[3] = 0; // FIXME
     friction.localA = qapply(conjugate(A.rotation[a]), c.relativeA);
     friction.localB = qapply(conjugate(B.rotation[b]), c.relativeB);
    }
@@ -413,7 +415,7 @@ struct System {
  }
 };
 
-void atomic_sub(System::Side::DistributeForce unused o, vec4f unused force) {
+/*void atomic_sub(System::Side::DistributeForce unused o, vec4f unused force) {
  size_t W = o.side.W;
  size_t i = o.faceIndex/2/W, j = (o.faceIndex/2)%W, n = o.faceIndex%2;
  size_t a = i*W+j;
@@ -422,17 +424,15 @@ void atomic_sub(System::Side::DistributeForce unused o, vec4f unused force) {
  size_t d = (i+1)*W+(j+1)%W;
  size_t vertices[2][2][3] {{{a,c,b},{b,c,d}},{{a,c,d},{a,d,b}}};
  // FIXME: distribute using contact barycentric coordinates
- for(size_t index: vertices[i%2][n]) atomic_sub(o.side.Particle::force[index], force/float3(3));
-}
+ for(size_t index: vertices[i%2][n]) atomic_sub(o.side.Vertex::force[index], force/float4(3));
+}*/
 
-constexpr vec4f System::G;
 constexpr float System::Grain::radius;
 constexpr float System::Grain::mass;
 constexpr float System::Wire::radius;
 constexpr float System::Wire::mass;
 constexpr vec4f System::Wire::internodeLength4;
-constexpr float System::Floor::elasticModulus;
+constexpr float System::Plate::elasticModulus;
 constexpr float System::Side::elasticModulus;
-constexpr float System::Load::elasticModulus;
 constexpr float System::Grain::elasticModulus;
 constexpr vec4f System::Wire::tensionDamping;

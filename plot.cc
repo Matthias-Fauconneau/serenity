@@ -9,8 +9,13 @@
 struct PlotView {
  HList<Plot> plots;
  unique<Window> window = ::window(&plots, int2(0, 720));
- FileWatcher watcher{".", [this](string){ load(); window->render(); } };
- PlotView() { window->actions[F12] = {this, &PlotView::snapshot}; load(); }
+ bool shown = false;
+ FileWatcher watcher{".", [this](string){ if(shown) load(); shown=false; window->render(); } };
+ PlotView() {
+  window->actions[F12] = {this, &PlotView::snapshot};
+  window->presentComplete = [this]{ shown=true; };
+  load();
+ }
  void snapshot() {
   string name = "plot";
   if(existsFile(name+".png"_)) log(name+".png exists");
@@ -22,10 +27,10 @@ struct PlotView {
  }
  void load() {
   plots.clear();
-  for(size_t i : range(1,2)) {
+  for(size_t unused i : range(0,1)) {
    Plot& plot = plots.append();
-   plot.xlabel = copyRef(ref<string>{"Displacement (mm)","Height (mm)"}[i]);
-   plot.ylabel = "Force (N)"__;
+   plot.xlabel = "Strain (%)"__; //copyRef(ref<string>{"Displacement (mm)","Height (mm)"}[i]);
+   plot.ylabel = "Stress (Pa)"__; //"Force (N)"__;
    map<String, array<Variant>> allCoordinates;
    for(string name: currentWorkingDirectory().list(Files)) {
     if(!endsWith(name,".result")) continue;
@@ -43,8 +48,11 @@ struct PlotView {
     for(string name: names) dataSets.insert(name);
     while(s) {
      for(size_t i = 0; s && !s.match('\n'); i++) {
-      float decimal = s.decimal();
+      string d = s.whileDecimal();
+      assert_(d);
+      float decimal = parseDecimal(d);
       assert_(isNumber(decimal));
+      assert_(i < dataSets.values.size, i, dataSets);
       dataSets.values[i].append( decimal );
       s.whileAny(' ');
      }

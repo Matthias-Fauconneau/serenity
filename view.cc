@@ -27,13 +27,22 @@ struct SimulationView : Simulation, Widget, Poll {
  GLFrameBuffer target {size};
 
  SimulationView(Thread& uiThread=mainThread, Dict parameters={parseDict(
+    "Friction:1, Elasticity:8e6, Rate:300,"
+    "Time step:1e-4,"
+    //"Speed: 0.5,""Pattern:loop,""Height: 0.6, Radius:0.3,"
+    "Speed: 8,"
+    //"Speed: 0.5,"
     "Pattern:none,"
     //"Pattern:helix,"
     //"Pattern:cross,"
     //"Pattern:loop,"
-    "Friction:1, Elasticity:8e6, Rate:200,"
-    //"Time step:1e-5, Height: 0.6, Radius:0.3"
-    "Time step:1e-4, Height: 0.3, Radius:0.15, Pressure:0"
+    //"Height: 0.6, Radius:0.3"
+    "Height: 0.5, Radius:0.25"
+    //", Pressure:0"
+    ", Pressure:4e1"
+    ", Plate Speed: 0.005"
+    ", Resolution: 0.5"
+    ", Stiff"
     )}) : Simulation(parameters,
   arguments().contains("result") ?
    File(str(parameters)+".result", currentWorkingDirectory(),
@@ -41,8 +50,8 @@ struct SimulationView : Simulation, Widget, Poll {
    Poll(0, POLLIN, simulationThread), window(::window(this, -1, uiThread, true)) {
   window->actions[F12] = {this, &SimulationView::snapshot};
   window->actions[Return] = [this]{
-   if(processState < Done) processState++;
-   log(int(processState), "grain", grain.count, "wire", wire.count);
+   skip = true;
+   log("skip", int(processState), "grain", grain.count, "wire", wire.count);
   };
   if(arguments().contains("video")) {
    encoder = unique<Encoder>("tas.mp4"_);
@@ -53,6 +62,7 @@ struct SimulationView : Simulation, Widget, Poll {
   mainThread.setPriority(19);
   simulationThread.spawn();
   queue();
+  log(stream.name());
  }
  ~SimulationView() {
   log("~", "grain", grain.count, "wire", wire.count);
@@ -93,7 +103,7 @@ struct SimulationView : Simulation, Widget, Poll {
 #endif
   }
   if(processState < Done) queue();
-  else { snapshot(); requestTermination(0); }
+  else { Simulation::snapshot(); log("1"); requestTermination(0); log("2"); }
  }
 
  vec2 sizeHint(vec2) override { return vec2(1050, 1050*size.y/size.x); }
@@ -121,6 +131,7 @@ struct SimulationView : Simulation, Widget, Poll {
   vec3 min = -1./32, max = 1./32;
   {
    for(vec4f p: grain.position.slice(0, grain.count)) {
+    p[3] = 0; // FIXME
     assert(p[3] == 0, p);
     vec3 O = toVec3(qapply(viewRotation, p) - rotationCenter);
     min = ::min(min, O - vec3(vec2(Grain::radius), 0)); // Parallel
@@ -232,9 +243,9 @@ struct SimulationView : Simulation, Widget, Poll {
    size_t W = side.W;
    buffer<vec3> positions {W*(side.H-1)*6-W*2};
    for(size_t i: range(side.H-1)) for(size_t j: range(W)) {
-    vec3 a (toVec3(side.Particle::position[i*W+j]));
-    vec3 b (toVec3(side.Particle::position[i*W+(j+1)%W]));
-    vec3 c (toVec3(side.Particle::position[(i+1)*W+(j+i%2)%W]));
+    vec3 a (toVec3(side.Vertex::position[i*W+j]));
+    vec3 b (toVec3(side.Vertex::position[i*W+(j+1)%W]));
+    vec3 c (toVec3(side.Vertex::position[(i+1)*W+(j+i%2)%W]));
     // FIXME: GPU projection
     vec3 A = viewProjection * a, B= viewProjection * b, C = viewProjection * c;
     size_t n = i ? W*4 + ((i-1)*W+j)*6 : j*4;
@@ -250,33 +261,61 @@ struct SimulationView : Simulation, Widget, Poll {
   }
 
   {Locker lock(this->lock);
-     buffer<vec3> positions {side.faceCount*3, 0};
-     for(auto contact: flag2) {
-      size_t faceIndex = contact.index;
-      size_t W = side.W;
-      size_t i = faceIndex/2/W, j = (faceIndex/2)%W;
-      vec3 a (toVec3(side.Particle::position[i*W+j]));
-      vec3 b (toVec3(side.Particle::position[i*W+(j+1)%W]));
-      vec3 c (toVec3(side.Particle::position[(i+1)*W+j]));
-      vec3 d (toVec3(side.Particle::position[(i+1)*W+(j+1)%W]));
-      vec3 vertices[2][2][3] {{{a,b,c},{b,d,c}},{{a,d,c},{a,b,d}}};
-      vec3* V = vertices[i%2][faceIndex%2];
-      // FIXME: GPU projection
-      for(size_t i: range(3)) positions[positions.size+i] = viewProjection * V[i];
-      positions.size += 3;
-     }
-     if(positions.size) {
-      shader["uColor"] = vec4(1,0,0,1./2);
-      static GLVertexArray vertexArray;
-      GLBuffer positionBuffer (positions);
-      vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
-      glBlendAlpha();
-      glCullFace(true);
-      vertexArray.draw(Triangles, positions.size);
+   buffer<vec3> positions {side.faceCount*3, 0};
+   for(auto contact: flag2) {
+    size_t faceIndex = contact.index;
+    size_t W = side.W;
+    size_t i = faceIndex/2/W, j = (faceIndex/2)%W;
+    vec3 a (toVec3(side.Vertex::position[i*W+j]));
+    vec3 b (toVec3(side.Vertex::position[i*W+(j+1)%W]));
+    vec3 c (toVec3(side.Vertex::position[(i+1)*W+j]));
+    vec3 d (toVec3(side.Vertex::position[(i+1)*W+(j+1)%W]));
+    vec3 vertices[2][2][3] {{{a,b,c},{b,d,c}},{{a,d,c},{a,b,d}}};
+    vec3* V = vertices[i%2][faceIndex%2];
+    // FIXME: GPU projection
+    for(size_t i: range(3)) positions[positions.size+i] = viewProjection * V[i];
+    positions.size += 3;
+   }
+   if(positions.size) {
+    shader["uColor"] = vec4(1,0,0,1./2);
+    static GLVertexArray vertexArray;
+    GLBuffer positionBuffer (positions);
+    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
+    glBlendAlpha();
+    glCullFace(true);
+    vertexArray.draw(Triangles, positions.size);
+   }
+  }
+
+  if(plate.position[1][2]) {
+   for(size_t i: range(2)) {
+    vec3 min (-vec2(-side.initialRadius), plate.position[i][2]);
+    vec3 max (+vec2(-side.initialRadius), plate.position[i][2]);
+    for(int i: range(0b111 +1)) for(int j: {(i&0b110) |0b001, (i&0b101) |0b010, (i&0b011) |0b100}) {
+     if(i<j) {
+      auto p = [=](int i) {
+       return vec3(i&0b001?max[0]:min[0], i&0b010?max[1]:min[1], i&0b100?max[2]:min[2]);
+       };
+       lines[rgb3f(1,0,0)].append(viewProjection*p(i));
+       lines[rgb3f(1,0,0)].append(viewProjection*p(j));
+      }
      }
     }
+   }
 
-  if(encoder) {
+   if(1) glDepthTest(false);
+   {static GLVertexArray vertexArray;
+    for(auto entry: lines) {
+     shader["uColor"] = entry.key;
+     GLBuffer positionBuffer (entry.value);
+     vertexArray.bindAttribute(shader.attribLocation("position"_),
+                               3, Float, positionBuffer);
+     vertexArray.draw(Lines, entry.value.size);
+    }
+   }
+   lines.clear();
+
+   if(encoder) {
    encoder->writeVideoFrame(target.readback());
   }
   int offset = (target.size.x-window->size.x)/2;
@@ -285,12 +324,18 @@ struct SimulationView : Simulation, Widget, Poll {
   array<char> s {
    copyRef(processStates[processState])};
   s.append(" "_+str(grain.count)+" grains"_);
-  s.append(" "_+str(int(timeStep*this->dt*1000))+"ms"_);
+  s.append(" "_+str(int(timeStep*this->dt*1e3))+"ms"_);
   //if(processState==Wait)
   s.append(" "_+str(int(grainKineticEnergy*1e6/grain.count))+"µJ");
   if(processState>=ProcessState::Load) {
-   s.append(" "_+str(int(load.height*1000))+"mm");
-   s.append(" "_+str(int(load.force[0][2]))+"N");
+   s.append(" "_+str(int(plate.position[1][2]*1e3))+"mm");
+   float weight = (grain.count*grain.mass + wire.count*wire.mass) * G[2];
+   float stress = (plate.force[1][2]-(plate.force[0][2]-weight))/(2*PI*sq(side.initialRadius));
+   s.append(" "_+str(int(stress))+"Pa");
+  }
+  if(wire.count) {
+   float wireDensity = (wire.count-1)*Wire::volume / (grain.count*Grain::volume);
+   s.append(" "_+str("Wire density (%):", wireDensity*100));
   }
   window->setTitle(s);
   return shared<Graphics>();
