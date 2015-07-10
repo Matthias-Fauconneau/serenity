@@ -15,7 +15,7 @@ template<Type tA> vec4f toGlobal(tA& A, size_t a, vec4f localA) {
 
 struct SimulationView : Simulation, Widget, Poll {
  int2 size {/*1280,720*/1050};
- unique<Window> window;
+ unique<Window> window = nullptr;
  // View
  vec2 lastPos; // for relative cursor movements
  vec2 viewYawPitch = vec2(0, -PI/3); // Current view angles
@@ -29,7 +29,7 @@ struct SimulationView : Simulation, Widget, Poll {
  SimulationView(Thread& uiThread=mainThread, Dict parameters={parseDict(
     "Friction: 0.3,"
     //"Elasticity:8e6, Rate:300,"
-    "Time step:1e-3,"
+    "Time step:1e-4,"
     //"Speed: 0.5,""Pattern:loop,""Height: 0.6, Radius:0.3,"
     //"Speed: 8,"
     "Speed: 0.08,"
@@ -38,34 +38,29 @@ struct SimulationView : Simulation, Widget, Poll {
     //"Pattern:helix,"
     //"Pattern:cross,"
     //"Pattern:loop,"
-    //"Height: 0.6, Radius:0.3"
-    //"Height: 0.2, Radius:0.02"
-    //"Height: 0.1, Radius:0.03"
-    //"Height: 0.06, Radius:0.03"
-    //"Height: 0.05, Radius:0.03"
-    "Height: 0.05, Radius:0.02"
+    //"Height: 0.2, Radius:0.05"
+    //"Height: 0.1, Radius:0.025"
+    "Height: 0.05, Radius:0.0125"
     //", Pressure:0"
     //", Pressure: 80e3" FIXME
     ", Pressure: 3e6"
     //", Pressure:4e1"
-    ", Plate Speed: 1e-5"
-    ", Resolution: 1"
+    ", Plate Speed: 1e-4"
+    ", Resolution: 1.5"
     ", G: 40e-9"
-   #if RIGID
-    ", Rigid"
-   #else
-    ", Soft"
-   #endif
     )}) : Simulation(parameters,
   arguments().contains("result") ?
    File(str(parameters)+".result", currentWorkingDirectory(),
         Flags(WriteOnly|Create|Truncate)) : File(2/*stdout*/)),
-   Poll(0, POLLIN, simulationThread), window(::window(this, -1, uiThread, true)) {
-  window->actions[F12] = {this, &SimulationView::snapshot};
-  window->actions[Return] = [this]{
-   skip = true;
-   log("skip", int(processState), "grain", grain.count, "wire", wire.count);
-  };
+   Poll(0, POLLIN, simulationThread) {
+  if(arguments().contains("view")) {
+   window = ::window(this, -1, uiThread, true);
+   window->actions[F12] = {this, &SimulationView::snapshot};
+   window->actions[Return] = [this]{
+    skip = true;
+    log("skip", int(processState), "grain", grain.count, "wire", wire.count);
+   };
+  }
   if(arguments().contains("video")) {
    encoder = unique<Encoder>("tas.mp4"_);
    encoder->setH264(int2(1280,720), 60);
@@ -74,8 +69,14 @@ struct SimulationView : Simulation, Widget, Poll {
 
   mainThread.setPriority(19);
   simulationThread.spawn();
-  queue();
   log(stream.name());
+  if(window) queue();
+  else {
+   while(processState < Done) {
+    if(timeStep%size_t(1e-2/dt) == 0) log(info());
+    step();
+   }
+  }
  }
  ~SimulationView() {
   log("~", "grain", grain.count, "wire", wire.count);
@@ -97,7 +98,7 @@ struct SimulationView : Simulation, Widget, Poll {
  void step() {
   Simulation::step();
   if(encoder) viewYawPitch.x += 2*PI*dt / 16;
-  window->render();
+  if(window) window->render();
   int64 elapsed = realTime() - lastReport;
   if(elapsed > 12*60e9) {
    log(timeStep*this->dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
@@ -116,7 +117,37 @@ struct SimulationView : Simulation, Widget, Poll {
 #endif
   }
   if(processState < Done) queue();
-  else { Simulation::snapshot(); log("1"); requestTermination(0); log("2"); }
+  else { Simulation::snapshot(); requestTermination(0); }
+ }
+
+ String info() {
+  array<char> s {
+   copyRef(processStates[processState])};
+  s.append(" "_+str(grain.count)+" grains"_);
+  s.append(" "_+str(int(timeStep*this->dt/**1e3*/))+"s"_);
+  //if(processState==Wait)
+  s.append(" "_+str(int(grainKineticEnergy*1e3/*6*//grain.count))+"mJ"/*"µJ"*/);
+  if(processState>=ProcessState::Load) {
+   s.append(" "_+str(int(plate.position[1][2]*1e3))+"mm");
+   float weight = (grain.count*grain.mass + wire.count*wire.mass) * G[2];
+   float stress = (plate.force[1][2]-(plate.force[0][2]-weight))/(2*PI*sq(side.initialRadius));
+   s.append(" "_+str(int(stress*1e-6))+"MPa");
+  }
+  if(grain.count) {
+   float height = plate.position[1][2] - plate.position[0][2];
+   float voidRatio = PI*sq(side.radius)*height / (grain.count*Grain::volume) - 1;
+   s.append(" Ratio:"+str(int(voidRatio*100))+"%");
+  }
+  if(wire.count) {
+   float wireDensity = (wire.count-1)*Wire::volume / (grain.count*Grain::volume);
+   s.append(" Wire density:"+str(int(wireDensity*100))+"%");
+  }
+  s.append(" "_+str("Z:", int(plate.position[1][2]*1e3)));
+  s.append(" "_+str("R:", int(side.radius*1e3)));
+  float bottom = plate.force[0][2], top = plate.force[1][2];
+  s.append(" "_+str("KN:", int((top+bottom)*1e-3)));
+  s.append(" "_+str("Om%:", int(overlapMean/(2*Grain::radius)*100)));
+  s.append(" "_+str("OM%:", int(overlapMax/(2*Grain::radius)*100)));
  }
 
  vec2 sizeHint(vec2) override { return vec2(1050, 1050*size.y/size.x); }
@@ -291,33 +322,6 @@ struct SimulationView : Simulation, Widget, Poll {
    vertexArray.draw(Lines, positions.size);
   }
 
-  {Locker lock(this->lock);
-   buffer<vec3> positions {side.faceCount*3, 0};
-   for(auto contact: flag2) {
-    size_t faceIndex = contact.index;
-    size_t W = side.W;
-    size_t i = faceIndex/2/W, j = (faceIndex/2)%W;
-    vec3 a (toVec3(side.Vertex::position[i*W+j]));
-    vec3 b (toVec3(side.Vertex::position[i*W+(j+1)%W]));
-    vec3 c (toVec3(side.Vertex::position[(i+1)*W+j]));
-    vec3 d (toVec3(side.Vertex::position[(i+1)*W+(j+1)%W]));
-    vec3 vertices[2][2][3] {{{a,b,c},{b,d,c}},{{a,d,c},{a,b,d}}};
-    vec3* V = vertices[i%2][faceIndex%2];
-    // FIXME: GPU projection
-    for(size_t i: range(3)) positions[positions.size+i] = viewProjection * V[i];
-    positions.size += 3;
-   }
-   if(positions.size) {
-    shader["uColor"] = vec4(1,0,0,1./2);
-    static GLVertexArray vertexArray;
-    GLBuffer positionBuffer (positions);
-    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
-    glBlendAlpha();
-    glCullFace(true);
-    vertexArray.draw(Triangles, positions.size);
-   }
-  }
-
   /*if(plate.position[1][2]) {
    for(size_t i: range(2)) {
     vec3 min (-vec2(-side.initialRadius), plate.position[i][2]);
@@ -352,32 +356,7 @@ struct SimulationView : Simulation, Widget, Poll {
   int offset = (target.size.x-window->size.x)/2;
   target.blit(0, window->size, int2(offset, 0), int2(target.size.x-offset, target.size.y));
 
-  array<char> s {
-   copyRef(processStates[processState])};
-  s.append(" "_+str(grain.count)+" grains"_);
-  s.append(" "_+str(int(timeStep*this->dt/**1e3*/))+"s"_);
-  //if(processState==Wait)
-  s.append(" "_+str(int(grainKineticEnergy*1e3/*6*//grain.count))+"mJ"/*"µJ"*/);
-  if(processState>=ProcessState::Load) {
-   s.append(" "_+str(int(plate.position[1][2]*1e3))+"mm");
-   float weight = (grain.count*grain.mass + wire.count*wire.mass) * G[2];
-   float stress = (plate.force[1][2]-(plate.force[0][2]-weight))/(2*PI*sq(side.initialRadius));
-   s.append(" "_+str(int(stress*1e-6))+"MPa");
-  }
-  if(grain.count) {
-   float height = plate.position[1][2] - plate.position[0][2];
-   float voidRatio = PI*sq(side.radius)*height / (grain.count*Grain::volume) - 1;
-   s.append(" Ratio:"+str(int(voidRatio*100))+"%");
-  }
-  if(wire.count) {
-   float wireDensity = (wire.count-1)*Wire::volume / (grain.count*Grain::volume);
-   s.append(" Wire density:"+str(int(wireDensity*100))+"%");
-  }
-  s.append(" "_+str("Z:", int(plate.position[1][2]*1e3)));
-  s.append(" "_+str("R:", int(side.radius*1e3)));
-  float bottom = plate.force[0][2], top = plate.force[1][2];
-  s.append(" "_+str("KN:", int((top+bottom)*1e-3)));
-  window->setTitle(s);
+  window->setTitle(info());
   return shared<Graphics>();
  }
 
