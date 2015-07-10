@@ -6,7 +6,7 @@
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
 template<template<Type> /*Type*/class V, Type T, uint N> struct vec : V<T> {
-    static_assert(sizeof(V<T>)==N*sizeof(T), ""/*req C++14*/);
+    //static_assert(sizeof(V<T>)==N*sizeof(T), ""/*req C++14*/);
 
     /// Defaults initializes to zero
 	inline vec() : vec(0) {}
@@ -207,7 +207,7 @@ inline v4sf angleVector(float a, vec3 v) {
  float l = length(v);
  if(!l) return _0001f;
  vec3 b = sin(a/2*l)/l*v;
- return {b.x, b.y, b.z, cos(a/2*l)};
+ return (v4sf){b.x, b.y, b.z, cos(a/2*l)};
 }
 inline v4sf qapply(v4sf q, v4sf v) {
  assert(abs(v[3]) <= 0x1p-28, v);

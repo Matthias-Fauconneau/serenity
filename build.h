@@ -15,7 +15,11 @@ struct Build {
 
 	const Folder folder {"."};
     const String base {copyRef(section(folder.name(),'/',-2,-1))};
-    const String tmp = "/var/tmp/"+base+"."+section(CXX,'/',-2,-1);
+           #if __clang__
+               const String tmp = "/var/tmp/"+base+"."+section(CXX,'/',-2,-1);
+           #else
+               const String tmp {"/var/tmp/"+base+"."+section(CXX,'/',-2,-1)};
+           #endif
 
 	string target;
 	array<string> flags;

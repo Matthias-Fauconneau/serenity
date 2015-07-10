@@ -20,7 +20,7 @@ extern "C" {
 }
 
 #undef check
-#define check(expr, args...) ({ auto e = expr; if(int(e)<0) error(#expr ""_, (const char*)av_err2str(int(e)), ##args); e; })
+#define check(expr, args...) ({ auto e = expr; if(int(e)<0) error(#expr ""_,/* (const char*)av_err2str(int(e)),*/ ##args); e; })
 
 Encoder::Encoder(string name) : path(copyRef(name)) {
     lock.lock();

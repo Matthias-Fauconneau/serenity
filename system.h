@@ -11,7 +11,7 @@ float length(vec4f v) { return sqrt(sq3(v))[0]; }
 struct NoOperation {
   float operator [](size_t) const { return 0; }
 };
-string str(NoOperation) { return "NoOperation"; }
+string str(NoOperation) { return "NoOperation"_; }
 void operator +=(NoOperation, vec4f) {}
 void operator -=(NoOperation, vec4f) {}
 void atomic_add(NoOperation, vec4f) {}
@@ -38,7 +38,8 @@ struct System {
  sconst float mm = 1e-3*m, g = 1e-3*kg;
  //vec4f G = _0f; // Using downward velocity instead
  const float gz; //= 4*10*1e-9 * N/kg; // Scaled gravity
- vec4f G {0, 0, -gz, 0}; // Scaled gravity
+ sconst float densityScale = validation||0 ? 1e8 : 1e8;
+ vec4f G {0, 0, -gz/densityScale, 0}; // Scaled gravity
 
  // Penalty model
  sconst float normalDamping = 0.1;
@@ -71,8 +72,9 @@ struct System {
  struct Friction {
   size_t index; // Identifies contact to avoid duplicates
   vec4f localA, localB; // Last static friction contact location
-  size_t lastStatic = 0;
+  size_t lastStatic;// = 0;
   float energy;
+  //Friction(size_t index, vec4f localA, vec4f localB, size_t lastStatic, float energy)
   bool operator==(const Friction& b) const { return index == b.index; }
  };
 
@@ -102,6 +104,7 @@ struct System {
   // Correction
   vec4f r = b[1] * (p.force[i] * p._1_mass - p.positionDerivatives[0][i]);
   p.position[i] += c[0]*r;
+  p.velocity[i] *= float4(1-0.1*dt); // 10%/s viscosity
   p.velocity[i] += c[1]*r;
   p.positionDerivatives[0][i] += c[2]*r;
   p.positionDerivatives[1][i] += c[3]*r;
@@ -124,20 +127,10 @@ struct System {
   struct { NoOperation operator[](size_t) const { return {}; }} torque;
 
   sconst bool friction = true;
-  //sconst float mass = inf;
-  //sconst float angularMass = 0;
-  /*sconst size_t count = 2;
-  vec4f position[2] = {_0f, _0f};
-  struct { vec4f operator[](size_t){ return _0f; }} velocity;
-  struct { vec4f operator[](size_t){ return _0001f; }} rotation;
-  struct { vec4f operator[](size_t){ return _0f; }} angularVelocity;
-  vec4f force[2];
-  vec4f torque[2];
-  sconst size_t base = 0;*/
   sconst float curvature = 0;
   sconst float elasticModulus = 1e11 * kg/(m*s*s); // 1 GPa
 
-  Plate() : Vertex(0, 2, 1e8) {
+  Plate() : Vertex(0, 2, 0.1 * densityScale) {
    count = 2;
    position.clear(); velocity.clear(); force.clear();
    for(size_t i: range(3)) positionDerivatives[i].clear();
@@ -164,17 +157,17 @@ struct System {
   sconst float radius = (validation ? 2.47 : 20)*mm; // 40 mm diameter
   sconst float volume = 4./3 * PI * cb(radius);
   sconst float curvature = 1./radius;
-  //sconst float elasticModulus = 1e6 * kg / (m*s*s);
   sconst float shearModulus = 79e9 * kg / (m*s*s);
   sconst float poissonRatio = 0.28;
-  sconst float elasticModulus = 2*shearModulus*(1+poissonRatio);
+  sconst float elasticModulus = validation ? 2*shearModulus*(1+poissonRatio) : 1.4e9; // nu~0.35
 
   //sconst float mass = 3*g;
-  sconst float density = 7.8e12;
+  sconst float density = (validation ? 7.8e3 : 1.4e3) * densityScale;
   sconst float mass = density * volume;
   sconst float angularMass = 2./5*mass*sq(radius);
   /*sconst float angularMass = 2./5*mass*(pow5(radius)-pow5(radius-1e-4))
                                          / (cb(radius)-cb(radius-1e-4));*/
+
   const vec4f dt_angularMass;
   buffer<vec4f> rotation { capacity };
   buffer<vec4f> angularVelocity { capacity };
@@ -189,6 +182,7 @@ struct System {
  const vec4f dt_2 = float4(dt/2);
  void step(Grain& p, size_t i) {
   step((Vertex&)p, i);
+  p.angularVelocity[i] *= float4(1-0.1*dt); // 10%/s viscosity
   p.rotation[i] += dt_2 * qmul(p.angularVelocity[i], p.rotation[i]);
   p.angularVelocity[i] += p.dt_angularMass * p.torque[i];
   p.rotation[i] *= rsqrt(sq4(p.rotation[i]));
@@ -198,13 +192,13 @@ struct System {
   using Vertex::Vertex;
   struct { NoOperation operator[](size_t) const { return {}; }} torque;
 
-  sconst float radius = 1 * mm * 1e-1; // 2mm diameter
+  sconst float radius = 1 * mm; // 2mm diameter
   sconst float curvature = 1./radius;
   sconst float internodeLength = Grain::radius/2;
   sconst vec4f internodeLength4 = float3(internodeLength);
   sconst float section = PI * sq(radius);
   sconst float volume = section * internodeLength;
-  sconst float density = 1e3 * kg / cb(m) * 1e9; // Density scaling
+  sconst float density = 1e3 * kg / cb(m) * densityScale;
   sconst float angularMass = 0;
   const float elasticModulus; // ~ 8e6
   sconst float areaMomentOfInertia = PI/4*pow4(radius);
@@ -222,8 +216,8 @@ struct System {
   sconst bool friction = false;
 
   sconst float curvature = 0; // -1/radius?
-  sconst float rigid = 1e14 * kg/(m*s*s); // 12
-  sconst float soft = 1e8 * kg/(m*s*s);
+  sconst float rigid = (validation?1e13:1e14) * kg/(m*s*s); // 12
+  sconst float soft = (validation?1e7:1e7) * kg/(m*s*s);
   float elasticModulus = rigid;
   sconst float thickness = 1*mm;
   const float resolution;
@@ -250,7 +244,7 @@ struct System {
 
   Side(float resolution, float initialRadius, float height, size_t base)
    : Vertex(base, /*W*H*/int(2*PI*initialRadius/resolution)*
-                                         (int(height/resolution*2/sqrt(3.))+1), 1e7/*8*g*1e9*/),
+                                         (int(height/resolution*2/sqrt(3.))+1), (validation?1e-2:1e-3)*densityScale/*1e-2-1e-1 FIXME*/),
      resolution(resolution),
      initialRadius(initialRadius), height(height),
      W(int(2*PI*initialRadius/resolution)),
@@ -260,7 +254,7 @@ struct System {
     float z = i*height/(H-1);
     float a = 2*PI*(j+(i%2)*1./2)/W;
     float x = initialRadius*cos(a), y = initialRadius*sin(a);
-    Vertex::position[i*W+j] = {x,y,z,0};
+    Vertex::position[i*W+j] = (v4sf){x,y,z,0};
    }
    Vertex::velocity.clear(_0f);
    for(size_t i: range(3)) positionDerivatives[i].clear(_0f);
@@ -318,8 +312,6 @@ struct System {
   if(B.friction) {
    Friction& friction = A.frictions[a].add(Friction{B.base+b, _0f, _0f, 0, 0.f});
    if(friction.lastStatic < timeStep-1) { // Resets contact (TODO: GC)
-    //c.relativeA[3] = 0; // FIXME
-    //c.relativeB[3] = 0; // FIXME
     friction.localA = qapply(conjugate(A.rotation[a]), c.relativeA);
     friction.localB = qapply(conjugate(B.rotation[b]), c.relativeB);
    }
@@ -370,20 +362,6 @@ struct System {
   return -c.depth;
  }
 };
-
-#if TRIANGLES
-void atomic_sub(System::Side::DistributeForce unused o, vec4f unused force) {
- size_t W = o.side.W;
- size_t i = o.faceIndex/2/W, j = (o.faceIndex/2)%W, n = o.faceIndex%2;
- size_t a = i*W+j;
- size_t b = i*W+(j+1)%W;
- size_t c = (i+1)*W+j;
- size_t d = (i+1)*W+(j+1)%W;
- size_t vertices[2][2][3] {{{a,c,b},{b,c,d}},{{a,c,d},{a,d,b}}};
- // FIXME: distribute using contact barycentric coordinates
- for(size_t index: vertices[i%2][n]) atomic_sub(o.side.Vertex::force[index], force/float4(3));
-}
-#endif
 
 constexpr float System::Grain::radius;
 constexpr float System::Grain::mass;

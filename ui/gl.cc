@@ -134,6 +134,10 @@ GLUniform GLShader::operator[](string name) {
     }
     return GLUniform(id, location);
 }
+#if !__clang__
+__attribute((weak)) extern "C" GLuint glGetProgramResourceIndex (GLuint, GLenum, const GLchar*) { error(""); }
+__attribute((weak)) extern "C" void glShaderStorageBlockBinding (GLuint, GLuint, GLuint) { error(""); }
+#endif
 void GLShader::bind(string name, const GLBuffer& ssbo, uint binding) {
     uint index = glGetProgramResourceIndex(id, GL_SHADER_STORAGE_BLOCK, strz(name));
     glShaderStorageBlockBinding(id, index, binding);
@@ -196,8 +200,9 @@ GLTexture::GLTexture(uint width, uint height, uint format, const void* data) : w
         int colorSamples=0; glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES, &colorSamples);
         int depthSamples=0; glGetIntegerv(GL_MAX_DEPTH_TEXTURE_SAMPLES, &depthSamples);
         assert(colorSamples==depthSamples);
-        if(format&Depth) glTexImage2DMultisample(target, depthSamples, GL_DEPTH_COMPONENT32, width, height, false);
-        else glTexImage2DMultisample(target, colorSamples, GL_RGB8, width, height, false);
+        /*if(format&Depth) glTexImage2DMultisample(target, depthSamples, GL_DEPTH_COMPONENT32, width, height, false);
+        else glTexImage2DMultisample(target, colorSamples, GL_RGB8, width, height, false);*/
+        error("");
     }
     else if(format&Cube) {
         assert_(width == height/6);

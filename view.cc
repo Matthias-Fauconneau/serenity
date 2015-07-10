@@ -21,33 +21,37 @@ struct SimulationView : Simulation, Widget, Poll {
  vec2 viewYawPitch = vec2(0, -PI/3); // Current view angles
  vec2 scale = 2./(32*Grain::radius);
  vec3 translation = 0;
- vec3 rotationCenter = 0;
+ v4sf rotationCenter = _0f;
  Thread simulationThread {19};
  unique<Encoder> encoder = nullptr;
  GLFrameBuffer target {size};
 
  SimulationView(Thread& uiThread=mainThread, Dict parameters={parseDict(
-    "Friction: 0.3,"
+    "Friction: 0.1,"
     //"Elasticity:8e6, Rate:300,"
+    //"Time step:1e-2,"
+    //"Time step:1e-3,"
     "Time step:1e-4,"
-    //"Speed: 0.5,""Pattern:loop,""Height: 0.6, Radius:0.3,"
-    //"Speed: 8,"
-    "Speed: 0.08,"
-    //"Speed: 0.01,"
+    //"Time step:1e-5,"
+    //"Pattern:loop,""Height: 0.6, Radius:0.3,"_
+    +(validation?"Speed: 0.05,"_:"Speed: 0.1,"_)+
     "Pattern:none,"
     //"Pattern:helix,"
     //"Pattern:cross,"
-    //"Pattern:loop,"
-    //"Height: 0.2, Radius:0.05"
-    //"Height: 0.1, Radius:0.025"
-    "Height: 0.05, Radius:0.0125"
+    //"Pattern:loop,"_
+    +(validation?
+       //"Height: 0.2, Radius:0.05"_
+       "Height: 0.1, Radius:0.025"_
+       //"Height: 0.05, Radius:0.0125"_
+     :"Height: 0.5, Radius:0.2"_)+
     //", Pressure:0"
-    //", Pressure: 80e3" FIXME
-    ", Pressure: 3e6"
-    //", Pressure:4e1"
-    ", Plate Speed: 1e-4"
-    ", Resolution: 1.5"
-    ", G: 40e-9"
+    //", Pressure: 1e3"
+    ", Pressure: "+(validation?/*"3e6"*/"1e5":"1e5")+
+    ", Plate Speed: "_+(validation?"1e-5":"1e-4")+
+    //", Resolution: 1.5"
+    ", Resolution: 1"
+    ", G: 10"_
+    +(validation?", Validation"_:", Experiment"_)
     )}) : Simulation(parameters,
   arguments().contains("result") ?
    File(str(parameters)+".result", currentWorkingDirectory(),
@@ -68,10 +72,11 @@ struct SimulationView : Simulation, Widget, Poll {
   }
 
   mainThread.setPriority(19);
-  simulationThread.spawn();
   log(stream.name());
-  if(window) queue();
-  else {
+  if(window) {
+   queue();
+   simulationThread.spawn();
+  } else {
    while(processState < Done) {
     if(timeStep%size_t(1e-2/dt) == 0) log(info());
     step();
@@ -123,10 +128,10 @@ struct SimulationView : Simulation, Widget, Poll {
  String info() {
   array<char> s {
    copyRef(processStates[processState])};
-  s.append(" "_+str(grain.count)+" grains"_);
+  s.append(" "_+str(grain.count)+"grains"_);
   s.append(" "_+str(int(timeStep*this->dt/**1e3*/))+"s"_);
   //if(processState==Wait)
-  s.append(" "_+str(int(grainKineticEnergy*1e3/*6*//grain.count))+"mJ"/*"µJ"*/);
+  s.append(" "_+decimalPrefix(grainKineticEnergy/*/densityScale*//grain.count, "J"));
   if(processState>=ProcessState::Load) {
    s.append(" "_+str(int(plate.position[1][2]*1e3))+"mm");
    float weight = (grain.count*grain.mass + wire.count*wire.mass) * G[2];
@@ -144,15 +149,16 @@ struct SimulationView : Simulation, Widget, Poll {
   }
   s.append(" "_+str("Z:", int(plate.position[1][2]*1e3)));
   s.append(" "_+str("R:", int(side.radius*1e3)));
-  float bottom = plate.force[0][2], top = plate.force[1][2];
-  s.append(" "_+str("KN:", int((top+bottom)*1e-3)));
+  //float bottom = plate.force[0][2], top = plate.force[1][2];
+  //s.append(" "_+str("KN:", int((top+bottom)*1e-3)));
   s.append(" "_+str("Om%:", int(overlapMean/(2*Grain::radius)*100)));
   s.append(" "_+str("OM%:", int(overlapMax/(2*Grain::radius)*100)));
+  return move(s);
  }
 
  vec2 sizeHint(vec2) override { return vec2(1050, 1050*size.y/size.x); }
  shared<Graphics> graphics(vec2) override {
-  const float Dt = 1./60;
+  const float Dt = 1./60/2;
   {
    vec4f min = _0f, max = _0f;
    Locker lock(this->lock);
@@ -166,7 +172,7 @@ struct SimulationView : Simulation, Widget, Poll {
    }
    vec4f rotationCenter = (min+max)/float4(2);
    rotationCenter[0] = rotationCenter[1] = 0;
-   this->rotationCenter = this->rotationCenter*(1-Dt) + Dt*toVec3(rotationCenter);
+   this->rotationCenter = this->rotationCenter*float4(1-Dt) + float4(Dt)*rotationCenter;
   }
 
   vec4f viewRotation = qmul(angleVector(viewYawPitch.y, vec3(1,0,0)),
@@ -205,7 +211,7 @@ struct SimulationView : Simulation, Widget, Poll {
     .translate(translation)
     .scale(scale)
     .rotateX(viewYawPitch.y) .rotateZ(viewYawPitch.x)
-    .translate(-rotationCenter);
+    .translate(-toVec3(rotationCenter));
 
   map<rgb3f, array<vec3>> lines;
 
@@ -303,11 +309,14 @@ struct SimulationView : Simulation, Widget, Poll {
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
    vertexArray.draw(Lines, positions.size);
-  } else {
+  }
+
+  {
+   Locker lock(this->lock);
    size_t W = side.W;
-   buffer<vec3> positions {W*side.H*2};
-   for(size_t i: range(side.H)) for(size_t j: range(W)) {
-    float z = plate.position[0][2] + i * (plate.position[1][2]-plate.position[0][2])/(side.H-1);
+   buffer<vec3> positions {W*2*2};
+   for(size_t i: range(2)) for(size_t j: range(W)) {
+    float z = plate.position[0][2] + i * (plate.position[1][2]-plate.position[0][2]);
     float a1 = 2*PI*(j+0)/W; vec3 a (side.radius*cos(a1), side.radius*sin(a1), z);
     float a2 = 2*PI*(j+1)/W; vec3 b (side.radius*cos(a2), side.radius*sin(a2), z);
     // FIXME: GPU projection
@@ -321,22 +330,6 @@ struct SimulationView : Simulation, Widget, Poll {
    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
    vertexArray.draw(Lines, positions.size);
   }
-
-  /*if(plate.position[1][2]) {
-   for(size_t i: range(2)) {
-    vec3 min (-vec2(-side.initialRadius), plate.position[i][2]);
-    vec3 max (+vec2(-side.initialRadius), plate.position[i][2]);
-    for(int i: range(0b111 +1)) for(int j: {(i&0b110) |0b001, (i&0b101) |0b010, (i&0b011) |0b100}) {
-     if(i<j) {
-      auto p = [=](int i) {
-       return vec3(i&0b001?max[0]:min[0], i&0b010?max[1]:min[1], i&0b100?max[2]:min[2]);
-       };
-       lines[rgb3f(1,0,0)].append(viewProjection*p(i));
-       lines[rgb3f(1,0,0)].append(viewProjection*p(j));
-      }
-     }
-    }
-   }*/
 
    if(1) glDepthTest(false);
    {static GLVertexArray vertexArray;

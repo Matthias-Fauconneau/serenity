@@ -215,7 +215,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
                     mref<String>{"-o"__, unsafeRef(binary), "-L/var/tmp/lib"__, "-Wl,-rpath,/var/tmp/lib"__,} +
 					apply(libraries, [this](const String& library)->String{ return "-l"+library; }) );
 		if(flags.contains("m32"_)) args.append("-m32"__);
-		if(execute(CXX, toRefs(args))) { log("Failed to link\n"); return; }
+  if(execute(CXX, toRefs(args))) { ::log("Failed to link\n", CXX, args); return; }
 	}
 
 	// Installs

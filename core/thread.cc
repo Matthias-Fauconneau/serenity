@@ -210,7 +210,7 @@ int execute(const string path, const ref<string> args, bool wait, const Folder& 
  argv[args0.size]=0;
 
  array<string> env0;
- static String environ = File("/proc/self/environ").readUpTo(4096);
+ static String environ = File("/proc/self/environ").readUpTo(16384);
  for(TextData s(environ);s;) env0.append( s.until('\0') );
 
  const char* envp[env0.size+1];

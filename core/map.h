@@ -24,7 +24,7 @@ template<Type K, Type V> struct map {
  bool operator ==(const map<K,V>& o) const { return keys==o.keys && values==o.values; }
 
  template<Type KK> bool contains(const KK& key) const { return keys.contains(key); }
- template<Type KK> void assertNo(const KK& unused key) const { assert(!contains(key), '\''+str(key)+'\'',"already in",keys); }
+ template<Type KK> void assertNo(unused const KK& key) const { assert(!contains(key), '\''+str(key)+'\'',"already in",keys); }
 
  template<Type KK> size_t indexOf(const KK& key) const {
   size_t i = keys.indexOf(key);
@@ -111,7 +111,7 @@ template<Type K, Type V> map<K,V> copy(const map<K,V>& o) {
  map<K,V> t; t.keys=copy(o.keys); t.values=copy(o.values); return t;
 }
 
-template<Type K, Type V> String str(const map<K,V>& m, string separator=",") {
+template<Type K, Type V> String str(const map<K,V>& m, string separator=","_) {
  array<char> s;
  //s.append('{');
  //s.append(separator.last());

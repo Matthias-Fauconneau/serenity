@@ -179,3 +179,13 @@ String binaryPrefix(uint64 value, string unit, string unitSuffix) {
     if(value < 10u<<30) return str(value/1024.0/1024.0,"Mi"_+(unitSuffix?:unit));
     return str(value/1024.0/1024.0/1024.0,"Gi"_+(unitSuffix?:unit));
 }
+String decimalPrefix(double value, string unit, string unitSuffix) {
+    if(value < 1) {
+     if(value > 1e-3) return str(int(value*1e3))+"m"_+(unitSuffix?:unit);
+     return str(int(value*1e6))+"u"_+(unitSuffix?:unit);
+    }
+    if(value < 1e3) return str(int(value))+unit;
+    if(value < 1e6) return str(int(value/1e3))+"K"_+(unitSuffix?:unit);
+    if(value < 1e9) return str(int(value/1e6))+"M"_+(unitSuffix?:unit);
+    return str(int(value/1e9))+"G"_+(unitSuffix?:unit);
+}

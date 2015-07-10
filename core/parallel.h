@@ -115,13 +115,13 @@ void apply(mref<T> target, Function function) {
  chunk_parallel(target.size, [&](uint, size_t index) { new (&target[index]) T(function(index)); });
 }
 
-/// Stores the application of a function to every elements of a ref in a mref
+/*/// Stores the application of a function to every elements of a ref in a mref
 template<Type T, Type Function, Type... S>
 void apply(mref<T> target, Function function, ref<S>... sources) {
  for(auto size: {sources.size...}) assert_(target.size == size, target.size, sources.size...);
  if(target.size < minimumSize) return target.apply(function, sources...);
  else chunk_parallel(target.size, [&](uint, size_t index) { new (&target[index]) T(function(sources[index]...)); });
-}
+}*/
 
 template<Type A, Type T, Type F, Type... Ss> T reduce(size_t size, F fold, A initialValue) {
  assert_(size);
@@ -154,11 +154,11 @@ template<Type T, Type F> T reduce(ref<T> values, F fold) { return reduce(values,
 
 // apply
 
-inline void plus(mref<float> Y, ref<float> X) { apply(Y, [](float x) { return max(0.f, x); }, X); }
+/*inline void plus(mref<float> Y, ref<float> X) { apply(Y, [](float x) { return max(0.f, x); }, X); }
 inline void sub(mref<float> Y, ref<float> A, ref<float> B) { apply(Y, [](float a, float b) { return a-b; }, A, B); }
 inline void mul(mref<float> Y, ref<float> A, ref<float> B) { apply(Y, [](float a, float b) { return a*b; }, A, B); }
 inline void muladd(mref<float> Y, ref<float> A, ref<float> B) { apply(Y, [](float y, float a, float b) { return y + a*b; }, Y, A, B); }
-inline void div(mref<float> Y, ref<float> A, ref<float> B) { apply(Y, [](float a, float b) { return a/b; }, A, B); }
+inline void div(mref<float> Y, ref<float> A, ref<float> B) { apply(Y, [](float a, float b) { return a/b; }, A, B); }*/
 
 // reduce
 
@@ -172,7 +172,7 @@ inline double mean(ref<float> values) { return sum(values)/values.size; }
 // apply reduce
 
 // \note Cannot be a generic reduction as the final fold is single source
-template<Type A, Type T, Type F, Type... Ss> T sum(ref<T> values, F apply, A initialValue, ref<Ss>... sources) {
+/*template<Type A, Type T, Type F, Type... Ss> T sum(ref<T> values, F apply, A initialValue, ref<Ss>... sources) {
  assert_(values);
  if(values.size < minimumSize) return ::reduce(values, [&](A a, T v, Ss... s) { return a+apply(v, s...); }, initialValue, sources...);
  else {
@@ -183,14 +183,14 @@ template<Type A, Type T, Type F, Type... Ss> T sum(ref<T> values, F apply, A ini
                                 [&](A a, T v, Ss... s) { return a+apply(v, s...); }, initialValue, sources.slice(start, size)...); });
   return ::sum<A>(accumulators);
  }
-}
+}*/
 
-inline double energy(ref<float> values, float offset=0) { return sum(values, [offset](float value) { return sq(value-offset); }, 0.); }
+//inline double energy(ref<float> values, float offset=0) { return sum(values, [offset](float value) { return sq(value-offset); }, 0.); }
 
-inline double SSE(ref<float> A, ref<float> B) {
+/*inline double SSE(ref<float> A, ref<float> B) {
  assert_(A.size == B.size);
  return sum(A, [](float a, float b) { return sq(a-b); }, 0., B);
-}
+}*/
 
 // multiple accumulator reduce
 

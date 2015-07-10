@@ -137,6 +137,8 @@ inline String str(float n, uint precision=6, uint exponent=0) { return str(doubl
 
 /// Formats value using best binary prefix
 String binaryPrefix(uint64 value, string unit="B"_, string unitSuffix=""_);
+/// Formats value using best decimal prefix
+String decimalPrefix(double value, string unit=""_, string unitSuffix=""_);
 
 /// Converts arrays
 generic String str(const ref<T> source, string separator=" "_) {

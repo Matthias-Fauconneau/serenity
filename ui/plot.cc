@@ -63,7 +63,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
  }
 
  // Configures ticks
- struct Tick : Text { float value; Tick(float value, string label):Text(label), value(value) {} };
+ struct Tick : Text { float value; Tick(float value, string label) : Text(label), value(value) {} };
  array<Tick> ticks[2]; vec2 tickLabelSize = 0;
  for(uint axis: range(2)) {
   uint precision = ::max(0., ceil(-log10(::max(-min[axis],max[axis])/tickCount[axis])));
