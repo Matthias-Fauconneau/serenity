@@ -17,7 +17,7 @@ struct PlotView {
   load();
  }
  void snapshot() {
-  string name = "plot";
+  String name = plots[0].ylabel+"-"+plots[0].xlabel;
   if(existsFile(name+".png"_)) log(name+".png exists");
   else {
    int2 size(1280, 720);
@@ -30,7 +30,10 @@ struct PlotView {
   for(size_t unused i : range(0,1)) {
    Plot& plot = plots.append();
    plot.xlabel = "Strain (%)"__; //copyRef(ref<string>{"Displacement (mm)","Height (mm)"}[i]);
-   plot.ylabel = "Stress (Pa)"__; //"Force (N)"__;
+   plot.ylabel = "Normalized Deviatoric Stress"__;
+   //plot.ylabel = "Stress (Pa)"__;
+   //plot.ylabel = "Offset (N)"__;
+   //"Force (N)"__;
    map<String, array<Variant>> allCoordinates;
    for(string name: currentWorkingDirectory().list(Files)) {
     if(!endsWith(name,".result")) continue;
@@ -49,9 +52,9 @@ struct PlotView {
     while(s) {
      for(size_t i = 0; s && !s.match('\n'); i++) {
       string d = s.whileDecimal();
-      assert_(d);
+      assert_(d, s.slice(s.index-16,16),"|", s.slice(s.index));
       float decimal = parseDecimal(d);
-      assert_(isNumber(decimal));
+      assert_(isNumber(decimal), s.slice(s.index-16,16),"|", s.slice(s.index));
       assert_(i < dataSets.values.size, i, dataSets);
       dataSets.values[i].append( decimal );
       s.whileAny(' ');

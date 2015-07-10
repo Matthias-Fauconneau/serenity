@@ -153,7 +153,7 @@ String str(double n, uint precision, uint exponent, uint pad) {
     if(n==::inf) return ::right("∞", pad+2);
     if(n==-::inf) return ::right("-∞", pad+2);
     int e=0; if(n && exponent && (n<1 || log10(n)>=precision+4)) e=floor(log10(n) / exponent) * exponent, n /= exp10(e);
-	array<char> s;
+    array<char> s;
     if(sign) s.append('-');
     if(precision /*&& n!=round(n)*/) {
         double integer=1, fract=__builtin_modf(n, &integer);

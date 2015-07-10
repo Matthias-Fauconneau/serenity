@@ -1,5 +1,6 @@
 #include "system.h"
 #include "time.h"
+#include <sys/file.h>
 
 struct Lattice {
  const vec4f scale;
@@ -65,7 +66,8 @@ struct Simulation : System {
  // Process variables
  float currentPourHeight = Grain::radius;
  float lastAngle = 0, winchAngle = 0, currentRadius = winchRadius;
- float currentHeight = 0, initialHeight = 0;
+ //float /*currentHeight = 0,*/ initialHeight = 0;
+ float topZ0, bottomZ0;
  size_t lastCollapseReport = 0;
  Random random;
  ProcessState processState = Pour;
@@ -95,18 +97,19 @@ struct Simulation : System {
  Lock lock;
  Stream stream;
  Dict parameters;
- String name = str(parameters.at("Pattern"))+(parameters.at("Pattern")!="none"?"-"+str(parameters.at("Rate")):""__)+
+ String name = str(parameters.at("Pattern"))+
+   (parameters.at("Pattern")!="none"?"-"+str(parameters.value("Rate",0)):""__)+
    (parameters.contains("Pressure")?"-soft"_:"");
 
  Simulation(const Dict& parameters, Stream&& stream) : System(parameters),
    targetHeight(parameters.at("Height"_)),
    winchSpeed(parameters.at("Speed"_)),
-   winchRate(parameters.at("Rate"_)),
+   winchRate(parameters.value("Rate"_, 0)),
    pattern(Pattern(ref<string>(patterns).indexOf(parameters.at("Pattern")))),
    pressure(parameters.value("Pressure", 0)),
    plateSpeed(parameters.at("Plate Speed")),
    stream(move(stream)), parameters(copy(parameters)) {
-  plate.position[1][2] = initialHeight = targetHeight+Grain::radius;
+  plate.position[1][2] = /*initialHeight =*/ targetHeight+Grain::radius;
   if(pattern) { // Initial wire node
    size_t i = wire.count++;
    wire.position[i] = vec3(winchRadius,0,currentPourHeight);
@@ -116,6 +119,10 @@ struct Simulation : System {
    for(size_t n: range(3)) wire.positionDerivatives[n][i] = _0f;
    wire.frictions.set(i);
   }
+  if(0) { // TODO: Loads packing
+
+  }
+  flock(stream.fd, LOCK_EX);
  }
 
  generic vec4f tension(T& A, size_t a, size_t b) {
@@ -261,12 +268,18 @@ struct Simulation : System {
   }
   stepTime.start();
   // Process
+  float height = plate.position[1][2] - plate.position[0][2];
+  float voidRatio = PI*sq(side.radius)*height / (grain.count*Grain::volume) - 1;
   if(processState == Pour) {
-   if(currentHeight >= targetHeight && (skip || !parameters.contains("Pressure") || grainKineticEnergy / grain.count < 8e-6)) {
+#if !RIGID
+   side.faceCount = (side.H-1)*side.W*2; // Always soft membrane
+#endif
+   if(grain.count == grain.capacity ||
+      skip ||  (/*currentHeight >= targetHeight*/voidRatio < 0.88/*72*//*65*/ &&
+        (!parameters.contains("Pressure") || grainKineticEnergy / grain.count < 256e-3))) {
     skip = false;
     processState++;
-    G = _0f;
-    log("Pour->Pack", grain.count, wire.count,  grainKineticEnergy / grain.count*1e6);
+    log("Pour->Pack", grain.count, wire.count,  grainKineticEnergy / grain.count*1e6, voidRatio);
    } else {
     // Generates falling grain (pour)
     const bool useGrain = 1;
@@ -310,33 +323,44 @@ struct Simulation : System {
                                     cos(t1)*sin(t2),
                                     cos(t2)};
      // Speeds up pouring
-     if(parameters.contains("Pressure"_)) grain.velocity[i][2] = - ::min(grain.position[i][2], 2.f);
+     if(parameters.contains("Pressure"_)) grain.velocity[i][2] = - ::min(grain.position[i][2],  0.01f);
      break;
     }
 break2_:;
     if(currentPourHeight<targetHeight-Grain::radius) currentPourHeight += winchSpeed * dt;
    }
   }
-  currentHeight = 0;
+  float topZ = 0;
   for(auto p: grain.position.slice(0, grain.count))
-   currentHeight = ::max(currentHeight, p[2]+Grain::radius);
+   topZ = ::max(topZ, p[2]+Grain::radius);
   if(processState == Pack) {
-   plate.position[1][2] = initialHeight = ::min(initialHeight, currentHeight); // Fit plate without loading
-
+   plate.position[1][2] = ::min(plate.position[1][2], topZ); // Fit plate (Prevent initial decompression)
+   side.faceCount = (side.H-1)*side.W*2; // Switch from rigid membrane to soft in 1 sec
+   if(G[2] < 0) G[2] += dt * gz; else G[2] = 0;
+   if(side.elasticModulus > side.soft) side.elasticModulus -= dt * (side.rigid-side.soft);
+   else side.elasticModulus = side.soft;
+#if 1
    if(parameters.contains("Pressure"_)) {
-    if(skip || grainKineticEnergy / grain.count < 8e-6) {
+    if(skip || (voidRatio < 0.87/*65-85*/ && grainKineticEnergy / grain.count < 150e-3/*8-40*/
+                /*&& plate.velocity[0][2]==0 && plate.velocity[1][2]==0*/)) {
+     Simulation::snapshot();
      skip = false;
      processState = ProcessState::Load;
+     //initialHeight = plate.position[1][2];
+     bottomZ0 = plate.position[0][2];
+     topZ0 = plate.position[1][2];
      log("Pack->Load", grainKineticEnergy*1e6 / grain.count, "µJ / grain");
-     side.faceCount = (side.H-1)*side.W*2; // Switch from rigid membrane to soft
 
      // Strain independent results
      float wireDensity = (wire.count-1)*Wire::volume / (grain.count*Grain::volume);
-     float grainDensity = grain.count*Grain::volume / (currentHeight * PI*sq(side.initialRadius));
+     float height = plate.position[1][2] - plate.position[0][2];
+     float grainDensity = grain.count*Grain::volume / (height * PI*sq(side.radius));
      stream.write(str("Grain count:", grain.count, "Wire count:", wire.count,
                       "Weight", (grain.count*grain.mass + wire.count*wire.mass) * (-G[2]),
-                  "Initial Height (mm):", initialHeight*1e3,
-                  "Grain density (%):", grainDensity*100, "\n")
+                  "Initial Radius (mm):", side.radius*1e3,
+                  "Initial Height (mm):", (topZ0-bottomZ0)*1e3,
+                  "Grain density (%):", grainDensity*100,
+                  "Void Ratio (%):", voidRatio*100, "\n")
        +(wire.count?str("Wire density (%):", wireDensity*100):""__));
      /*stream.write("Bottom (mm), Top (mm), Displacement (mm), Height (mm), "
                   "Bottom Force with Weight (N), Weight (N), Bottom Force (N), Top Force (N), Force (N), "
@@ -345,7 +369,7 @@ break2_:;
                  "Grain kinetic energy (mJ), Wire kinetic energy (mJ), Normal energy (mJ),"
                  "Static energy (mJ), Static energy (mJ), Tension energy (mJ), Bend energy (mJ)\n");*/
      //Bottom (N), Top (N),
-     stream.write("Displacement (mm), Strain (%), Force (N), Stress (Pa)\n"); // Stretch (%)
+     stream.write("Displacement (mm), Strain (%), Force (N), Offset (N), Stress (Pa), Normalized Deviatoric Stress\n"); // Stretch (%)
      /*plate.position[0][2]*1e3, plate.position[1][2]*1e3, (initialHeight-plate.position[1][2]*1e3)*1e3, currentHeight*1e3,
        plate.force[0][2], plate.force[1][2], plate.force[0][2]-weight, (plate.force[0][2]-(plate.force[0][2]-weight)),
        (plate.force[0][2]-(plate.force[0][2]-weight))/(2*PI*sq(side.initialRadius)),
@@ -359,19 +383,25 @@ break2_:;
      processState = ProcessState::Done;
     }
    }
+#endif
   }
   if(processState == ProcessState::Load) {
-   if(plate.position[1][2]-plate.position[0][2] >= 4*Grain::radius && plate.position[0][2]/initialHeight < 1./8) {
-    float dz = dt * plateSpeed;
-    plate.position[1][2] -= dz;
-    plate.position[0][2] += dz;
-    if(currentHeight < plate.position[1][2]) {
+   float height = plate.position[1][2]-plate.position[0][2];
+   if(height >= 4*Grain::radius && height/(topZ0-bottomZ0) > 1-1./8) {
+    //float bottom = plate.force[0][2], top = plate.force[1][2];
+    //if(abs(top+bottom) < 1e4) {
+    //if(abs(top+bottom)/(top-bottom) < 0.01) {
+     float dz = dt * plateSpeed; // * clamp(0.f, 1-side.rigidVelocity/plateSpeed, 1.f);
+     plate.position[1][2] -= dz;
+     plate.position[0][2] += dz;
+    //}
+    /*if(currentHeight < plate.position[1][2]) {
      if(lastCollapseReport > timeStep+size_t(1e-2/dt)) {
       lastCollapseReport = timeStep;
       log("Collapse");
      }
      plate.position[1][2] = currentHeight;
-    }
+    }*/
    }
    else {
     processState = Done;
@@ -387,16 +417,16 @@ break2_:;
    contacts2 = move(contacts);
   }
 
-  if(side.faceCount > 1) {
+  if(side.faceCount > 1) { // Soft membrane
    // Grid
    for(size_t i: range(vertexGrid.cells.size)) vertexGrid.cells[i].clear(); // FIXME: inefficient
    //for(size_t i: range(faceGrid.cells.size)) faceGrid.cells[i].clear(); // FIXME: inefficient
-   assert_(side.count < 32768);
+   assert_(side.count <= 65536, side.count);
    for(size_t i: range(side.count)) {
     side.Vertex::force[i] = _0f;
-    vertexGrid(side.Vertex::position[i]).add(i);
+    //vertexGrid(side.Vertex::position[i]).add(i);
     // Plates contact
-    side.Vertex::position[i][2] = clamp(vertexGrid.min, side.Vertex::position[i][2], vertexGrid.max-Grain::radius);
+    //side.Vertex::position[i][2] = clamp(vertexGrid.min, side.Vertex::position[i][2], vertexGrid.max-Grain::radius);
     //penalty(side, i, plate, 0);
     //penalty(side, i, plate, 1);
    }
@@ -469,10 +499,21 @@ break2_:;
     }
    }
   }
+#if RIGID
+  else { // Rigid membrane
+   side.force.radialSum = 0;
+  }
+#endif
 
   // Grain
   grainTime.start();
 
+  if(!(isNumber(min) && isNumber(max))) {
+   log("Domain", min, max);
+   processState = Fail;
+   return;
+  }
+  assert_(isNumber(min) && isNumber(max));
   vec4f size = float4(sqrt(3.)/(2*Grain::radius))*(max-min);
   if(size[0]*size[1]*size[2] > 128*128*128) {  // 64 MB
    log("Domain too large", min, max, size);
@@ -501,7 +542,7 @@ break2_:;
       }
      }*/
      // Vertices
-     {int2 index = vertexGrid.index2(grain.position[grainIndex]);
+     if(0){int2 index = vertexGrid.index2(grain.position[grainIndex]);
       for(int y: range(::max(0, index.y-1), ::min(vertexGrid.size.y, index.y+1 +1))) {
        for(int x: range(index.x-1, index.x+1 +1)) {
         // Wraps around (+size.x to wrap -1)
@@ -510,7 +551,7 @@ break2_:;
        }
       }
      }
-     //for(size_t b: range(side.count)) penalty(grain, grainIndex, side, b);
+     else for(size_t b: range(side.count)) penalty(grain, grainIndex, side, b);
     } else penalty(grain, grainIndex, side, 0);
     grainLattice(grain.position[grainIndex]) = 1+grainIndex;
    }
@@ -818,13 +859,50 @@ break2_:;
   grainIntegrationTime.stop();
   grainTime.stop();
 
-  if(side.faceCount > 1)
+  if(side.faceCount > 1) {
    // First and last line are fixed
    parallel_chunk(side.W, side.count-side.W, [this](uint, size_t start, size_t size) {
     for(size_t i: range(start, start+size)) {
      System::step(side, i);
     }
    }, 1);
+  }
+#if RIGID
+  else if(processState >/**/ ProcessState::Pour) { /// All around pressure
+   float height = plate.position[1][2] - plate.position[0][2];
+   float area = 2*PI*side.radius*height;
+   float mass = area*side.thickness*1e11; //1e11
+   float force = side.force.radialSum;
+   force -= P * area;
+   float dv = dt * force / mass;
+   side.rigidVelocity += dv;
+   /*if(processState < ProcessState::Load)
+    side.rigidVelocity = ::min(side.rigidVelocity, 0.f); // Only compression*/
+   //side.rigidVelocity = ::min(side.rigidVelocity, plateSpeed);
+   if(processState < ProcessState::Load) // Quasi static balance
+    side.rigidVelocity = ::min(side.rigidVelocity, 1e-1f/*5*/);
+   side.radius += dt * side.rigidVelocity;
+   assert_(side.radius >= 0, side.radius, side.rigidVelocity, dv, mass);
+  }
+#endif
+
+  /// All around pressure
+  if(processState < ProcessState::Load) {
+   if(processState > ProcessState::Pour) {
+    plate.force[0][2] += pressure * PI * sq(side.radius);
+    System::step(plate, 0);
+    //plate.position[0][2] = ::max(0.f, plate.position[0][2]);
+    plate.velocity[0][2] = ::max(0.f, plate.velocity[0][2]); // Only compression
+   }
+
+   if(processState > ProcessState::Pour) {
+    plate.force[1][2] -= pressure * PI * sq(side.radius);
+    System::step(plate, 1);
+    //plate.position[1][2] = ::min(plate.position[1][2], currentHeight);
+    plate.velocity[1][2] = ::min(plate.velocity[1][2], 0.f); // Only compression
+   }
+  }
+
 
   {vec4f ssqV = _0f;
    for(vec4f v: grain.velocity.slice(0, grain.count)) ssqV += sq3(v);
@@ -834,16 +912,19 @@ break2_:;
    wireKineticEnergy = 1./2*wire.mass*ssqV[0];}
 
   if(processState==ProcessState::Load) {
-   if(timeStep%size_t(1e-3/dt) == 0) { // Records results every milliseconds of simulation
+   if(size_t(1e-3/dt)==0 || timeStep%size_t(1e-3/dt) == 0) { // Records results every milliseconds of simulation
     v4sf wireLength = _0f;
     for(size_t i: range(wire.count-1))
      wireLength += sqrt(sq3(wire.position[i]-wire.position[i+1]));
     float weight = (grain.count*grain.mass + wire.count*wire.mass) * G[2];
     float bottom = plate.force[0][2], top = plate.force[1][2];
     float force = (top-(bottom-weight));
-    // Displacement (mm), Force (N), Strain (%), Stress (Pa) //, Stretch (%)
-    String s = str(plate.position[0][2]*1e3,  plate.position[0][2]/initialHeight*100,
-      /*bottom, top,*/ force, force/(2*PI*sq(side.initialRadius)));
+    // Displacement (mm), Force (N), D, Strain (%), Stress (Pa), Normalized Deviatoric Stress //, Stretch (%)
+    float bottomZ = plate.position[0][2], topZ = plate.position[1][2];
+    float displacement = (topZ0-topZ+bottomZ-bottomZ0);
+    float stress = force/(2*PI*sq(side.radius));
+    String s = str(displacement*1e3,  displacement/(topZ0-bottomZ0)*100,
+      force, top+bottom, stress, (stress-pressure)/(stress+pressure));
     if(wire.count) {
      float stretch = (wireLength[0] / wire.count) / Wire::internodeLength;
      s.append(stretch*100);
@@ -852,7 +933,7 @@ break2_:;
     /*stream.write(str(
       plate.position[0][2]*1e3, plate.position[1][2]*1e3, (initialHeight-plate.position[1][2])*1e3, currentHeight*1e3,
       plate.force[0][2], weight, plate.force[0][2]-weight,  plate.force[1][2], (plate.force[1][2]-(plate.force[0][2]-weight)),
-      force/(2*PI*sq(side.initialRadius)),
+      force/(2*PI*sq(side.radius)),
       stretch*100, grainKineticEnergy*1e3, wireKineticEnergy*1e3,
       normalEnergy*1e3, staticEnergy*1e3, wire.tensionEnergy*1e3, bendEnergy*1e3)+'\n');*/
    }
