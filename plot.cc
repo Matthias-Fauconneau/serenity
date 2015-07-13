@@ -30,10 +30,10 @@ struct PlotView {
   for(size_t unused i : range(0,1)) {
    Plot& plot = plots.append();
    plot.xlabel = "Strain (%)"__; //copyRef(ref<string>{"Displacement (mm)","Height (mm)"}[i]);
-   //plot.ylabel = "Normalized Deviatoric Stress"__;
-   plot.ylabel = "Stress (Pa)"__;
+   plot.ylabel = "Normalized Deviatoric Stress"__;
+   //plot.ylabel = "Stress (Pa)"__;
    //plot.ylabel = "Offset (N)"__;
-   //"Force (N)"__;
+   //plot.ylabel = "Top (N)"__;
    map<String, array<Variant>> allCoordinates;
    for(string name: currentWorkingDirectory().list(Files)) {
     if(!endsWith(name,".result")) continue;

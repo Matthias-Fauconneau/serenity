@@ -30,7 +30,8 @@ struct SimulationView : Simulation, Widget, Poll {
     "Friction: 0.1,"
     //"Elasticity:8e6, Rate:300,"
     //"Time step:1e-2,"
-    "Time step:1e-3,"
+    //"Time step:1e-3,"
+    "Time step:4e-4,"
     //"Time step:1e-4,"
     //"Time step:1e-5,"
     //"Pattern:loop,""Height: 0.6, Radius:0.3,"_
@@ -48,9 +49,9 @@ struct SimulationView : Simulation, Widget, Poll {
     //", Pressure:0"
     //", Pressure: 1e3"
     ", Pressure: "+(validation?"3e6":"1e5")+
-    ", Plate Speed: "_+(validation?"3e-6":"1e-4")+
-    ", Resolution: 1.4"
-    //", Resolution: 1"
+    ", Plate Speed: "_+(validation?"1e-5":"1e-4")+ //3e-6
+    //", Resolution: 1.4"
+    ", Resolution: 1"
     ", G: 10"_
     +(validation?", Validation"_:", Experiment"_)
     )}) : Simulation(parameters,
@@ -106,9 +107,9 @@ struct SimulationView : Simulation, Widget, Poll {
   if(encoder) viewYawPitch.x += 2*PI*dt / 16;
   if(window) window->render();
   int64 elapsed = realTime() - lastReport;
-  if(elapsed > 30e9 || timeStep > lastReportStep + 2/this->dt) {
+  if(elapsed > 60e9 || timeStep > lastReportStep + 8/this->dt) {
    log(timeStep*this->dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
-   log(str(stepTime, totalTime), "grain",str(grainTime, stepTime), "wire",str(wireTime, stepTime), "side", str(sideTime, stepTime));
+   log(/*str(stepTime, totalTime),*/ "grain",str(grainTime, stepTime), "wire",str(wireTime, stepTime), "side", str(sideTime, stepTime));
    log("grainInit",str(grainInitializationTime, grainTime),
        "grainLattice",str(grainLatticeTime, grainTime),
        "grainContact",str(grainContactTime, grainTime),
@@ -129,15 +130,15 @@ struct SimulationView : Simulation, Widget, Poll {
  String info() {
   array<char> s {
    copyRef(processStates[processState])};
-  s.append(" "_+str(grain.count)+"grains"_);
+  s.append(" "_+str(grain.count)/*+" grains"_*/);
   s.append(" "_+str(int(timeStep*this->dt/**1e3*/))+"s"_);
   //if(processState==Wait)
   s.append(" "_+decimalPrefix(grainKineticEnergy/*/densityScale*//grain.count, "J"));
   if(processState>=ProcessState::Load) {
-   s.append(" "_+str(int(plate.position[1][2]*1e3))+"mm");
-   float weight = (grain.count*grain.mass + wire.count*wire.mass) * G[2];
+   //s.append(" "_+str(int(plate.position[1][2]*1e3))+"mm");
+   /*float weight = (grain.count*grain.mass + wire.count*wire.mass) * G[2];
    float stress = (plate.force[1][2]-(plate.force[0][2]-weight))/(2*PI*sq(side.initialRadius));
-   s.append(" "_+str(int(stress*1e-6))+"MPa");
+   s.append(" "_+str(int(stress*1e-6))+"MPa");*/
   }
   if(grain.count) {
    float height = plate.position[1][2] - plate.position[0][2];
@@ -148,12 +149,13 @@ struct SimulationView : Simulation, Widget, Poll {
    float wireDensity = (wire.count-1)*Wire::volume / (grain.count*Grain::volume);
    s.append(" Wire density:"+str(int(wireDensity*100))+"%");
   }
-  s.append(" Z:"_+str(int(plate.position[1][2]*1e3)));
-  s.append(" R:"_+str(int(side.radius*1e3)));
-  //float bottom = plate.force[0][2], top = plate.force[1][2];
-  //s.append(" "_+str("KN:", int((top+bottom)*1e-3)));
-  s.append(" Om%"_+str(int(overlapMean/(2*Grain::radius)*100)));
-  s.append(" OM%:"+str(int(overlapMax/(2*Grain::radius)*100)));
+  //s.append(" Z:"_+str(int(plate.position[1][2]*1e3)));
+  //s.append(" R:"_+str(int(side.radius*1e3)));
+  float bottom = plate.force[0][2], top = plate.force[1][2];
+  assert(bottom < 0);
+  if(top != bottom) s.append(" "_+str(int((top+bottom)/(top-bottom)*100), 2u)+"%");
+  //s.append(" Om%"_+str(int(overlapMean/(2*Grain::radius)*100)));
+  //s.append(" OM%:"+str(int(overlapMax/(2*Grain::radius)*100)));
   return move(s);
  }
 
