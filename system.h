@@ -24,8 +24,8 @@ struct RadialSum {
 };
 void atomic_sub(RadialSum& t, vec4f f) { t.radialSum += length2(f); }
 
-sconst bool validation = true;
-sconst bool quick = true;
+sconst bool validation = false;
+//sconst bool quick = true;
 
 struct System {
  // Integration
@@ -160,7 +160,7 @@ struct System {
   sconst float curvature = 1./radius;
   sconst float shearModulus = 79e9 * kg / (m*s*s);
   sconst float poissonRatio = 0.28;
-  sconst float elasticModulus = quick ? 1e10 : // 10
+  sconst float elasticModulus = //quick ? 1e10 : // 10
                                         validation ? 2*shearModulus*(1+poissonRatio) : 1.4e9; // nu~0.35
 
   //sconst float mass = 3*g;
@@ -235,7 +235,7 @@ struct System {
   const float bendStiffness = 0;//elasticModulus * areaMomentOfInertia / internodeLength; // FIXME
 
   const float pourThickness = 1e2;
-  const float loadThickness = 1*mm;
+  const float loadThickness = validation ? 1e-3 : 1e-5;
   float thickness = pourThickness;
   vec4f tensionStiffness = float3(elasticModulus * internodeLength/3*thickness); // FIXME
 
@@ -246,8 +246,8 @@ struct System {
   struct { NoOperation operator[](size_t) const { return {}; }} torque;
 
   Side(float resolution, float initialRadius, float height, size_t base)
-   : Vertex(base, /*W*H*/int(2*PI*initialRadius/resolution)*
-                                         (int(height/resolution*2/sqrt(3.))+1), (/*validation?1e-4:*//*pourThickness*/1e1*1e-3)*densityScale/*1-4*/),
+   : Vertex(base, /*W*H*/int(2*PI*initialRadius/resolution) *
+                                         (int(height/resolution*2/sqrt(3.))+1), (1e2*1e-3)*densityScale/*1-4*/),
      resolution(resolution),
      initialRadius(initialRadius), height(height),
      W(int(2*PI*initialRadius/resolution)),

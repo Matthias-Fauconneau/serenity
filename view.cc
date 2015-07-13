@@ -45,13 +45,15 @@ struct SimulationView : Simulation, Widget, Poll {
        //"Height: 0.1, Radius:0.025"_
        "Height: 0.08, Radius:0.02"_
        //"Height: 0.06, Radius:0.016"_
-     :"Height: 0.5, Radius:0.2"_)+
+     :
+       //"Height: 0.5, Radius:0.2"_
+       "Height: 0.4, Radius:0.16"_
+       )+
     //", Pressure:0"
     //", Pressure: 1e3"
-    ", Pressure: "+(validation?"3e6":"1e5")+
-    ", Plate Speed: "_+(validation?"1e-5":"1e-4")+ //3e-6
-    //", Resolution: 1.4"
-    ", Resolution: 1"
+    ", Pressure: "+(validation?"3e6":"1e4"/*4-5*/)+
+    ", Plate Speed: "_+(validation?"1e-5"_:"1e-5"_)+ //3e-6
+    ", Resolution: "_+(validation?"1.4"_ : "1.4"_)+
     ", G: 10"_
     +(validation?", Validation"_:", Experiment"_)
     )}) : Simulation(parameters,
@@ -107,7 +109,7 @@ struct SimulationView : Simulation, Widget, Poll {
   if(encoder) viewYawPitch.x += 2*PI*dt / 16;
   if(window) window->render();
   int64 elapsed = realTime() - lastReport;
-  if(elapsed > 60e9 || timeStep > lastReportStep + 8/this->dt) {
+  if(elapsed > 2*60e9 || timeStep > lastReportStep + 16/this->dt) {
    log(timeStep*this->dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
    log(/*str(stepTime, totalTime),*/ "grain",str(grainTime, stepTime), "wire",str(wireTime, stepTime), "side", str(sideTime, stepTime));
    log("grainInit",str(grainInitializationTime, grainTime),
@@ -151,9 +153,8 @@ struct SimulationView : Simulation, Widget, Poll {
   }
   //s.append(" Z:"_+str(int(plate.position[1][2]*1e3)));
   //s.append(" R:"_+str(int(side.radius*1e3)));
-  float bottom = plate.force[0][2], top = plate.force[1][2];
-  assert(bottom < 0);
-  if(top != bottom) s.append(" "_+str(int((top+bottom)/(top-bottom)*100), 2u)+"%");
+  if(processState >= ProcessState::Pack)
+   s.append(" "_+str(int((topForce+bottomForce)/(topForce-bottomForce)*100), 2u)+"%");
   //s.append(" Om%"_+str(int(overlapMean/(2*Grain::radius)*100)));
   //s.append(" OM%:"+str(int(overlapMax/(2*Grain::radius)*100)));
   return move(s);
