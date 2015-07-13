@@ -25,6 +25,7 @@ struct RadialSum {
 void atomic_sub(RadialSum& t, vec4f f) { t.radialSum += length2(f); }
 
 sconst bool validation = true;
+sconst bool quick = true;
 
 struct System {
  // Integration
@@ -81,7 +82,7 @@ struct System {
  struct Vertex {
   sconst bool friction = true;
   const size_t base, capacity;
-  const float mass;
+  float mass;
   const vec4f _1_mass;
   buffer<vec4f> position { capacity };
   buffer<vec4f> velocity { capacity };
@@ -159,7 +160,8 @@ struct System {
   sconst float curvature = 1./radius;
   sconst float shearModulus = 79e9 * kg / (m*s*s);
   sconst float poissonRatio = 0.28;
-  sconst float elasticModulus = validation ? 2*shearModulus*(1+poissonRatio) : 1.4e9; // nu~0.35
+  sconst float elasticModulus = quick ? 1e10 : // 10
+                                        validation ? 2*shearModulus*(1+poissonRatio) : 1.4e9; // nu~0.35
 
   //sconst float mass = 3*g;
   sconst float density = (validation ? 7.8e3 : 1.4e3) * densityScale;
@@ -216,10 +218,7 @@ struct System {
   sconst bool friction = false;
 
   sconst float curvature = 0; // -1/radius?
-  sconst float rigid = (validation?1e13:1e14) * kg/(m*s*s); // 12
-  sconst float soft = (validation?1e7:1e7) * kg/(m*s*s);
-  float elasticModulus = rigid;
-  sconst float thickness = 1*mm;
+  sconst float elasticModulus = 1e11; // 8
   const float resolution;
   const float initialRadius;
   const float height;
@@ -231,10 +230,14 @@ struct System {
   const float internodeLength = 2*PI*initialRadius/W;
   const vec4f internodeLength4 = float3(internodeLength);
 
-  const vec4f tensionStiffness = float3(elasticModulus * internodeLength/3*thickness); // FIXME
-  const vec4f tensionDamping = float3(mass / s);
-  sconst float areaMomentOfInertia = pow4(1*mm); // FIXME
+  vec4f tensionDamping = float3(mass / s);
+  //sconst float areaMomentOfInertia = pow4(1*mm); // FIXME
   const float bendStiffness = 0;//elasticModulus * areaMomentOfInertia / internodeLength; // FIXME
+
+  const float pourThickness = 1e2;
+  const float loadThickness = 1*mm;
+  float thickness = pourThickness;
+  vec4f tensionStiffness = float3(elasticModulus * internodeLength/3*thickness); // FIXME
 
   float tensionEnergy = 0;
 
@@ -244,7 +247,7 @@ struct System {
 
   Side(float resolution, float initialRadius, float height, size_t base)
    : Vertex(base, /*W*H*/int(2*PI*initialRadius/resolution)*
-                                         (int(height/resolution*2/sqrt(3.))+1), (validation?1e-2:1e-3)*densityScale/*1e-2-1e-1 FIXME*/),
+                                         (int(height/resolution*2/sqrt(3.))+1), (/*validation?1e-4:*//*pourThickness*/1e1*1e-3)*densityScale/*1-4*/),
      resolution(resolution),
      initialRadius(initialRadius), height(height),
      W(int(2*PI*initialRadius/resolution)),
@@ -369,8 +372,6 @@ constexpr float System::Wire::radius;
 constexpr float System::Wire::mass;
 constexpr vec4f System::Wire::internodeLength4;
 constexpr float System::Plate::elasticModulus;
-constexpr float System::Side::rigid;
-constexpr float System::Side::soft;
-constexpr float System::Side::thickness;
+constexpr float System::Side::elasticModulus;
 constexpr float System::Grain::elasticModulus;
 constexpr vec4f System::Wire::tensionDamping;

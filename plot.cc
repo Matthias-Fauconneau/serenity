@@ -30,8 +30,8 @@ struct PlotView {
   for(size_t unused i : range(0,1)) {
    Plot& plot = plots.append();
    plot.xlabel = "Strain (%)"__; //copyRef(ref<string>{"Displacement (mm)","Height (mm)"}[i]);
-   plot.ylabel = "Normalized Deviatoric Stress"__;
-   //plot.ylabel = "Stress (Pa)"__;
+   //plot.ylabel = "Normalized Deviatoric Stress"__;
+   plot.ylabel = "Stress (Pa)"__;
    //plot.ylabel = "Offset (N)"__;
    //"Force (N)"__;
    map<String, array<Variant>> allCoordinates;
@@ -52,14 +52,17 @@ struct PlotView {
     while(s) {
      for(size_t i = 0; s && !s.match('\n'); i++) {
       string d = s.whileDecimal();
-      assert_(d, s.slice(s.index-16,16),"|", s.slice(s.index));
+      if(!d) goto break2;
+      //assert_(d, s.slice(s.index-16,16),"|", s.slice(s.index));
       float decimal = parseDecimal(d);
       assert_(isNumber(decimal), s.slice(s.index-16,16),"|", s.slice(s.index));
-      assert_(i < dataSets.values.size, i, dataSets);
+      if(!(i < dataSets.values.size)) break;
+      assert_(i < dataSets.values.size, i, dataSets.keys);
       dataSets.values[i].append( decimal );
       s.whileAny(' ');
      }
     }
+    break2:;
     if(!dataSets.contains(plot.xlabel)) { /*log("Missing data", plot.xlabel);*/ continue; }
     if(!dataSets.contains(plot.ylabel)) { /*log("Missing data", plot.ylabel);*/ continue; }
     auto parameters = parseDict(name.slice(0, name.size-".result"_.size));

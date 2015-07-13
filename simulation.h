@@ -72,6 +72,7 @@ struct Simulation : System {
  Random random;
  ProcessState processState = Pour;
  bool skip = false;
+ size_t packStart;
 
  // Lattice
  vec4f min = _0f, max = _0f;
@@ -89,7 +90,7 @@ struct Simulation : System {
  // Performance
  int64 lastReport = realTime(), lastReportStep = timeStep;
  Time totalTime {true}, stepTime;
- Time miscTime, grainTime, wireTime, solveTime;
+ Time miscTime, grainTime, wireTime, sideTime;
  Time grainInitializationTime, grainLatticeTime, grainContactTime, grainIntegrationTime;
  Time wireLatticeTime, wireContactTime, wireIntegrationTime;
 
@@ -263,6 +264,7 @@ struct Simulation : System {
 
  const float pourPackThreshold = validation ? 0.3 : 1;
  const float packLoadThreshold = validation ? 0.2 : 1;
+ const float transitionTime = 4;
 
  void step() {
   stepTime.start();
@@ -277,6 +279,7 @@ struct Simulation : System {
     //processState++;
     processState = Pack;
     log("Pour->Pack", grain.count, wire.count,  grainKineticEnergy / grain.count*1e6, voidRatio);
+    packStart = timeStep;
    } else {
     // Generates falling grain (pour)
     const bool useGrain = 1;
@@ -330,14 +333,24 @@ break2_:;
   float topZ = 0;
   for(auto p: grain.position.slice(0, grain.count))
    topZ = ::max(topZ, p[2]+Grain::radius);
+  float alpha = processState == Pack ? (timeStep-packStart)*dt / transitionTime : 1;
   if(processState == Pack) {
    plate.position[1][2] = ::min(plate.position[1][2], topZ); // Fit plate (Prevent initial decompression)
-   if(G[2] < 0) G[2] += dt * gz; else G[2] = 0;
-   if(side.elasticModulus > side.soft) side.elasticModulus -= dt * (side.rigid-side.soft);
-   else side.elasticModulus = side.soft;
+   if(G[2] < 0) G[2] += dt/transitionTime * gz; else G[2] = 0;
+   if(side.thickness > side.loadThickness) side.thickness -= dt/transitionTime * (side.pourThickness-side.loadThickness);
+   else side.thickness = side.loadThickness;
+   side.mass = side.thickness*1e-3*densityScale;
+   side.tensionStiffness = float3(side.elasticModulus * side.internodeLength/3*side.thickness); // FIXME
+   side.tensionDamping = float3(side.mass / s);
+
+   float speed = alpha * plateSpeed;
+   float dz = dt * speed;
+   plate.position[1][2] -= dz;
+   plate.position[0][2] += dz;
+
    if(parameters.contains("Pressure"_)) {
     if(
-       G[2] == 0 && side.elasticModulus == side.soft &&
+       G[2] == 0 && side.thickness == side.loadThickness &&
        (skip || (voidRatio < 0.89/*65-85,87*/ && grainKineticEnergy / grain.count < packLoadThreshold))) {
      Simulation::snapshot();
      skip = false;
@@ -400,7 +413,8 @@ break2_:;
    contacts2 = move(contacts);
   }
 
-  // Soft membrane
+  sideTime.start();
+  // Soft membrane side
   // Grid
   for(size_t i: range(vertexGrid.cells.size)) vertexGrid.cells[i].clear(); // FIXME: inefficient
   //for(size_t i: range(faceGrid.cells.size)) faceGrid.cells[i].clear(); // FIXME: inefficient
@@ -481,10 +495,12 @@ break2_:;
     side.Vertex::force[d] += - p * N2;
    }
   }*/
+  sideTime.stop();
 
   // Grain
   grainTime.start();
 
+  grainInitializationTime.start();
   if(!(isNumber(min) && isNumber(max))) {
    log("Domain", min, max);
    processState = Fail;
@@ -498,7 +514,9 @@ break2_:;
    return;
   }
   Lattice grainLattice(sqrt(3.)/(2*Grain::radius), min, max);
+  grainInitializationTime.stop();
 
+  grainLatticeTime.start();
   parallel_chunk(grain.count, [this,&grainLattice](uint, size_t start, size_t size) {
    for(size_t grainIndex: range(start, start+size)) {
     grain.force[grainIndex] = float4(grain.mass) * G;
@@ -533,8 +551,9 @@ break2_:;
     grainLattice(grain.position[grainIndex]) = 1+grainIndex;
    }
   }, 1);
+  grainLatticeTime.stop();
   if(processState == Done) return; // DEBUG
-  grainInitializationTime.stop();
+
 
   grainContactTime.start();
   float overlapCount = 0, overlapSum = 0, overlapMax = 0;
@@ -843,6 +862,7 @@ break2_:;
   grainIntegrationTime.stop();
   grainTime.stop();
 
+  sideTime.start();
   if(side.faceCount > 1) {
    // First and last line are fixed
    parallel_chunk(side.W, side.count-side.W, [this](uint, size_t start, size_t size) {
@@ -851,11 +871,13 @@ break2_:;
     }
    }, 1);
   }
+  sideTime.stop();
 
   /// All around pressure
   if(processState < ProcessState::Load) {
    if(processState > ProcessState::Pour) {
     plate.force[0][2] += pressure * PI * sq(side.radius);
+    plate.force[0][2] *= (1-alpha); // Transition from force to displacement
     System::step(plate, 0);
     //plate.position[0][2] = ::max(0.f, plate.position[0][2]);
     plate.velocity[0][2] = ::max(0.f, plate.velocity[0][2]); // Only compression
@@ -863,12 +885,12 @@ break2_:;
 
    if(processState > ProcessState::Pour) {
     plate.force[1][2] -= pressure * PI * sq(side.radius);
+    plate.force[1][2] *= (1-alpha); // Transition from force to displacement
     System::step(plate, 1);
     //plate.position[1][2] = ::min(plate.position[1][2], currentHeight);
     plate.velocity[1][2] = ::min(plate.velocity[1][2], 0.f); // Only compression
    }
   }
-
 
   {vec4f ssqV = _0f;
    for(vec4f v: grain.velocity.slice(0, grain.count)) ssqV += sq3(v);

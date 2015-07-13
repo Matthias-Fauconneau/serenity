@@ -30,8 +30,8 @@ struct SimulationView : Simulation, Widget, Poll {
     "Friction: 0.1,"
     //"Elasticity:8e6, Rate:300,"
     //"Time step:1e-2,"
-    //"Time step:1e-3,"
-    "Time step:1e-4,"
+    "Time step:1e-3,"
+    //"Time step:1e-4,"
     //"Time step:1e-5,"
     //"Pattern:loop,""Height: 0.6, Radius:0.3,"_
     +(validation?"Speed: 0.05,"_:"Speed: 0.1,"_)+
@@ -41,15 +41,16 @@ struct SimulationView : Simulation, Widget, Poll {
     //"Pattern:loop,"_
     +(validation?
        //"Height: 0.2, Radius:0.05"_
-       "Height: 0.1, Radius:0.025"_
-       //"Height: 0.05, Radius:0.0125"_
+       //"Height: 0.1, Radius:0.025"_
+       "Height: 0.08, Radius:0.02"_
+       //"Height: 0.06, Radius:0.016"_
      :"Height: 0.5, Radius:0.2"_)+
     //", Pressure:0"
     //", Pressure: 1e3"
-    ", Pressure: "+(validation?/*"3e6"*/"1e5":"1e5")+
-    ", Plate Speed: "_+(validation?"1e-5":"1e-4")+
-    //", Resolution: 1.5"
-    ", Resolution: 1"
+    ", Pressure: "+(validation?"3e6":"1e5")+
+    ", Plate Speed: "_+(validation?"3e-6":"1e-4")+
+    ", Resolution: 1.4"
+    //", Resolution: 1"
     ", G: 10"_
     +(validation?", Validation"_:", Experiment"_)
     )}) : Simulation(parameters,
@@ -105,9 +106,9 @@ struct SimulationView : Simulation, Widget, Poll {
   if(encoder) viewYawPitch.x += 2*PI*dt / 16;
   if(window) window->render();
   int64 elapsed = realTime() - lastReport;
-  if(elapsed > 12*60e9) {
+  if(elapsed > 30e9 || timeStep > lastReportStep + 2/this->dt) {
    log(timeStep*this->dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
-   log("grain",str(grainTime, stepTime), "wire",str(wireTime, stepTime));
+   log(str(stepTime, totalTime), "grain",str(grainTime, stepTime), "wire",str(wireTime, stepTime), "side", str(sideTime, stepTime));
    log("grainInit",str(grainInitializationTime, grainTime),
        "grainLattice",str(grainLatticeTime, grainTime),
        "grainContact",str(grainContactTime, grainTime),
@@ -147,12 +148,12 @@ struct SimulationView : Simulation, Widget, Poll {
    float wireDensity = (wire.count-1)*Wire::volume / (grain.count*Grain::volume);
    s.append(" Wire density:"+str(int(wireDensity*100))+"%");
   }
-  s.append(" "_+str("Z:", int(plate.position[1][2]*1e3)));
-  s.append(" "_+str("R:", int(side.radius*1e3)));
+  s.append(" Z:"_+str(int(plate.position[1][2]*1e3)));
+  s.append(" R:"_+str(int(side.radius*1e3)));
   //float bottom = plate.force[0][2], top = plate.force[1][2];
   //s.append(" "_+str("KN:", int((top+bottom)*1e-3)));
-  s.append(" "_+str("Om%:", int(overlapMean/(2*Grain::radius)*100)));
-  s.append(" "_+str("OM%:", int(overlapMax/(2*Grain::radius)*100)));
+  s.append(" Om%"_+str(int(overlapMean/(2*Grain::radius)*100)));
+  s.append(" OM%:"+str(int(overlapMax/(2*Grain::radius)*100)));
   return move(s);
  }
 
