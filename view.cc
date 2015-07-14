@@ -24,7 +24,7 @@ struct SimulationView : Simulation, Widget, Poll {
  v4sf rotationCenter = _0f;
  Thread simulationThread {19};
  unique<Encoder> encoder = nullptr;
- GLFrameBuffer target {size};
+ GLFrameBuffer target;
 
  SimulationView(Thread& uiThread=mainThread, Dict parameters={parseDict(
     "Friction: 0.1,"
@@ -35,27 +35,27 @@ struct SimulationView : Simulation, Widget, Poll {
     //"Time step:1e-4,"
     //"Time step:1e-5,"
     //"Pattern:loop,""Height: 0.6, Radius:0.3,"_
-    +(validation?"Speed: 0.05,"_:"Speed: 0.1,"_)+
-    "Pattern:none,"
-    //"Pattern:helix,"
-    //"Pattern:cross,"
+    +(validation?"Speed: 0.05,"_:"Speed: 0.1,"_)
+    //"Pattern:helix,"_
+    //"Pattern:cross,"_
     //"Pattern:loop,"_
     +(validation?
        //"Height: 0.2, Radius:0.05"_
        //"Height: 0.1, Radius:0.025"_
-       "Height: 0.08, Radius:0.02"_
+       "Height: 0.1, Radius:0.02"_
+       //"Height: 0.08, Radius:0.02"_
        //"Height: 0.06, Radius:0.016"_
      :
-       //"Height: 0.5, Radius:0.2"_
-       "Height: 0.4, Radius:0.16"_
-       )+
-    //", Pressure:0"
-    //", Pressure: 1e3"
-    ", Pressure: "+(validation?"3e6":"1e4"/*4-5*/)+
-    ", Plate Speed: "_+(validation?"1e-5"_:"1e-5"_)+ //3e-6
-    ", Resolution: "_+(validation?"1.4"_ : "1.4"_)+
-    ", G: 10"_
-    +(validation?", Validation"_:", Experiment"_)
+       //"Height: 0.8, Radius:0.2"_
+       "Height: 0.6, Radius:0.15"_
+       //"Height: 0.4, Radius:0.1"_
+       )
+    +", Pressure: "+(validation?"1e5"_:"1e3"_/*4-5*/)
+    +", Plate Speed: "_+(validation?"1e-5"_:"1e-4"_) //3e-6
+    +", Resolution: "_+(validation?"1.5"_ : "1.5"_)
+    +", G: "_+(validation?"10"_:"10"_)
+    +", Thickness:"_+(validation?"1e-7"_:"1e-5"_)
+    +", Short"//(validation?", Validation"_:", Experiment"_)
     )}) : Simulation(parameters,
   arguments().contains("result") ?
    File(str(parameters)+".result", currentWorkingDirectory(),
@@ -111,14 +111,21 @@ struct SimulationView : Simulation, Widget, Poll {
   int64 elapsed = realTime() - lastReport;
   if(elapsed > 2*60e9 || timeStep > lastReportStep + 16/this->dt) {
    log(timeStep*this->dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
-   log(/*str(stepTime, totalTime),*/ "grain",str(grainTime, stepTime), "wire",str(wireTime, stepTime), "side", str(sideTime, stepTime));
-   log("grainInit",str(grainInitializationTime, grainTime),
+   log("grain",str(grainTime, stepTime),
+       "grainInit",str(grainInitializationTime, grainTime),
        "grainLattice",str(grainLatticeTime, grainTime),
        "grainContact",str(grainContactTime, grainTime),
        "grainIntegration",str(grainIntegrationTime, grainTime));
-   log("wireLatticeTime",str(wireLatticeTime, wireTime),
+   if(wire.count) log("wire",str(wireTime, stepTime),
+      "wireLatticeTime",str(wireLatticeTime, wireTime),
        "wireContact",str(wireContactTime, wireTime),
        "wireIntegration",str(wireIntegrationTime, wireTime));
+   log("side", str(sideTime, stepTime),
+       "sideClear",str(sideClearTime, sideTime),
+       "sideGrid",str(sideGridTime, sideTime),
+       "sidePressure",str(sidePressureTime, sideTime),
+       "sideTension",str(sideTensionTime, sideTime),
+         "sideIntegration",str(sideIntegrationTime, sideTime));
    lastReport = realTime();
    lastReportStep = timeStep;
 #if PROFILE
@@ -157,6 +164,7 @@ struct SimulationView : Simulation, Widget, Poll {
    s.append(" "_+str(int((topForce+bottomForce)/(topForce-bottomForce)*100), 2u)+"%");
   //s.append(" Om%"_+str(int(overlapMean/(2*Grain::radius)*100)));
   //s.append(" OM%:"+str(int(overlapMax/(2*Grain::radius)*100)));
+  //if(debug) s.append(" "+debug);
   return move(s);
  }
 
@@ -198,6 +206,7 @@ struct SimulationView : Simulation, Widget, Poll {
    }
   }
 
+  if(!target) target = GLFrameBuffer(this->size);
   vec2 size (target.size.x, target.size.y);
   vec2 viewSize = size;
 

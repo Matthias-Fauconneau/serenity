@@ -239,7 +239,7 @@ void XWindow::setSize(int2 /*size*/) { /*send(SetSize{.id=id+Window, .w=uint(siz
 void XWindow::event() {
  XDisplay::event();
  setTitle(getTitle ? getTitle() : widget->title());
- if(state!=Idle) return;
+ if(state!=Idle || !mapped) return;
 
  if(target.size != Window::size) {
   if(target) {

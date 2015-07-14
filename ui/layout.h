@@ -34,7 +34,7 @@ generic struct WidgetArray : virtual Layout, array<T> {
 	WidgetArray() {}
 	WidgetArray(array<T>&& items) : array<T>(move(items)){}
 	size_t count() const override { return array<T>::size; }
-	Widget& at(size_t i) const override { return array<T>::at(i); }
+ Widget& at(size_t i) const override { return array<T>::at(i); }
 };
 
 /// Layouts widgets on an axis

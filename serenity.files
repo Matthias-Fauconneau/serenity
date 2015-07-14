@@ -75,6 +75,6 @@ shader.glsl
 system.h
 simulation.h
 sweep.cc
-plot.cc
+plot-app.cc
 review.cc
 pattern.cc

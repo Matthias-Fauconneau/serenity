@@ -29,7 +29,7 @@ void atomic_add(float& a, float b) {
                                       *(int*)&desired, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 }
 
-static constexpr uint threadCount = 1;
+static constexpr uint threadCount = 4;
 
 struct thread {
  pthread_t pthread = 0;

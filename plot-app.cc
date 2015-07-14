@@ -6,10 +6,10 @@
 #include "plot.h"
 #include "variant.h"
 
-struct PlotView {
- HList<Plot> plots;
- unique<Window> window = ::window(&plots, int2(0, 720));
+struct PlotView : HList<Plot> {
+ unique<Window> window = ::window(this, int2(0, 720));
  bool shown = false;
+ size_t index = 0;
  FileWatcher watcher{".", [this](string){ if(shown) load(); shown=false; window->render(); } };
  PlotView() {
   window->actions[F12] = {this, &PlotView::snapshot};
@@ -17,33 +17,38 @@ struct PlotView {
   load();
  }
  void snapshot() {
-  String name = plots[0].ylabel+"-"+plots[0].xlabel;
+  String name = array<Plot>::at(0).ylabel+"-"+array<Plot>::at(0).xlabel;
   if(existsFile(name+".png"_)) log(name+".png exists");
   else {
    int2 size(1280, 720);
-   Image target = render(size, plots.graphics(vec2(size), Rect(vec2(size))));
+   Image target = render(size, graphics(vec2(size), Rect(vec2(size))));
    writeFile(name+".png", encodePNG(target), currentWorkingDirectory(), true);
   }
  }
+ bool mouseEvent(vec2, vec2, Event, Button button, Widget*&) override {
+  if(button == WheelUp || button == WheelDown) {
+   index = (++index)%2;
+   load();
+   return true;
+  }
+  return false;
+ }
  void load() {
-  plots.clear();
+  clear();
   for(size_t unused i : range(0,1)) {
-   Plot& plot = plots.append();
-   plot.xlabel = "Strain (%)"__; //copyRef(ref<string>{"Displacement (mm)","Height (mm)"}[i]);
-   plot.ylabel = "Normalized Deviatoric Stress"__;
-   //plot.ylabel = "Stress (Pa)"__;
-   //plot.ylabel = "Offset (N)"__;
-   //plot.ylabel = "Top (N)"__;
+   Plot& plot = append();
+   plot.xlabel = "Strain (%)"__;
+   plot.ylabel = unsafeRef(ref<string>{"Normalized Deviatoric Stress","Stress (Pa)"}[index]);
    map<String, array<Variant>> allCoordinates;
    for(string name: currentWorkingDirectory().list(Files)) {
     if(!endsWith(name,".result")) continue;
     auto parameters = parseDict(name.slice(0, name.size-".result"_.size));
     for(const auto parameter: parameters)
-     if(!allCoordinates[copy(parameter.key)].contains(parameter.value))
-      allCoordinates.at(parameter.key).insertSorted(copy(parameter.value));
+     if(!allCoordinates[::copy(parameter.key)].contains(parameter.value))
+      allCoordinates.at(parameter.key).insertSorted(::copy(parameter.value));
    }
    for(string name: currentWorkingDirectory().list(Files)) {
-    if(!endsWith(name,".result")) continue;
+    if(!endsWith(name,".result") || !existsFile(name)) continue;
     TextData s (readFile(name));
     s.until('\n'); // First line: constant results
     buffer<string> names = split(s.until('\n'),", "); // Second line: Headers
@@ -70,9 +75,10 @@ struct PlotView {
        [&](string key, const Variant&){ return allCoordinates.at(key).size==1; }
     );
     plot.dataSets.insert(str(parameters,", "_),
-    {move(dataSets.at(plot.xlabel)), move(dataSets.at(plot.ylabel))});
+    {::move(dataSets.at(plot.xlabel)), ::move(dataSets.at(plot.ylabel))});
    }
   }
+  window->setTitle(array<Plot>::at(0).ylabel);
  }
 } app;
 

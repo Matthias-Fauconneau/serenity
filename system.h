@@ -24,8 +24,7 @@ struct RadialSum {
 };
 void atomic_sub(RadialSum& t, vec4f f) { t.radialSum += length2(f); }
 
-sconst bool validation = false;
-//sconst bool quick = true;
+sconst bool validation = true;
 
 struct System {
  // Integration
@@ -39,7 +38,7 @@ struct System {
  sconst float mm = 1e-3*m, g = 1e-3*kg;
  //vec4f G = _0f; // Using downward velocity instead
  const float gz; //= 4*10*1e-9 * N/kg; // Scaled gravity
- sconst float densityScale = validation||0 ? 1e8 : 1e8;
+ sconst float densityScale = validation ? 1e8 : 1e8; // 7-8
  vec4f G {0, 0, -gz/densityScale, 0}; // Scaled gravity
 
  // Penalty model
@@ -47,8 +46,8 @@ struct System {
  // Friction model
  sconst bool staticFriction = true;
  sconst float staticFrictionSpeed = inf; //1./3 *m/s;
- sconst float staticFrictionFactor = 1/(2e-3 *m); // Wire diameter
- sconst float staticFrictionLength = 10 *mm;
+ sconst float staticFrictionFactor = 1/(2.47*mm); // Grain::radius Wire diameter: 2e-3 *m
+ sconst float staticFrictionLength = 2.47*mm; //Grain::radius; //10 *mm;
  sconst float staticFrictionDamping = 15 *g/s/s;
  const float frictionCoefficient;
 
@@ -160,8 +159,7 @@ struct System {
   sconst float curvature = 1./radius;
   sconst float shearModulus = 79e9 * kg / (m*s*s);
   sconst float poissonRatio = 0.28;
-  sconst float elasticModulus = //quick ? 1e10 : // 10
-                                        validation ? 2*shearModulus*(1+poissonRatio) : 1.4e9; // nu~0.35
+  sconst float elasticModulus = validation ? 2*shearModulus*(1+poissonRatio) : 1.4e9; // nu~0.35
 
   //sconst float mass = 3*g;
   sconst float density = (validation ? 7.8e3 : 1.4e3) * densityScale;
@@ -234,8 +232,8 @@ struct System {
   //sconst float areaMomentOfInertia = pow4(1*mm); // FIXME
   const float bendStiffness = 0;//elasticModulus * areaMomentOfInertia / internodeLength; // FIXME
 
-  const float pourThickness = 1e2;
-  const float loadThickness = validation ? 1e-3 : 1e-5;
+  const float pourThickness;
+  const float loadThickness;
   float thickness = pourThickness;
   vec4f tensionStiffness = float3(elasticModulus * internodeLength/3*thickness); // FIXME
 
@@ -245,13 +243,17 @@ struct System {
 
   struct { NoOperation operator[](size_t) const { return {}; }} torque;
 
-  Side(float resolution, float initialRadius, float height, size_t base)
+  Side(float resolution, float initialRadius, float height, float loadThickness, size_t base,
+       float pourThickness=1e4)
    : Vertex(base, /*W*H*/int(2*PI*initialRadius/resolution) *
-                                         (int(height/resolution*2/sqrt(3.))+1), (1e2*1e-3)*densityScale/*1-4*/),
+                                         (int(height/resolution*2/sqrt(3.))+1),
+                                         (pourThickness*1e-4)*densityScale/*1-4*/),
      resolution(resolution),
      initialRadius(initialRadius), height(height),
      W(int(2*PI*initialRadius/resolution)),
-     H(int(height/resolution*2/sqrt(3.))+1) {
+     H(int(height/resolution*2/sqrt(3.))+1),
+     pourThickness(pourThickness),
+     loadThickness(loadThickness) {
    count = W*H;
    for(size_t i: range(H)) for(size_t j: range(W)) {
     float z = i*height/(H-1);
@@ -280,15 +282,15 @@ struct System {
    gz(p.at("G")),
    frictionCoefficient(p.at("Friction"_)),
    wire(p.value("Elasticity"_, 0), grain.base+grain.capacity),
-   side(Grain::radius/(float)p.at("Resolution"), p.at("Radius"_), p.at("Height"_), wire.base+wire.capacity) {}
+   side(Grain::radius/(float)p.at("Resolution"), p.at("Radius"_), p.at("Height"_), p.at("Thickness"_), wire.base+wire.capacity) {}
 
  // Update
  size_t timeStep = 0;
  float grainKineticEnergy=0, wireKineticEnergy=0, normalEnergy=0,
          staticEnergy=0, bendEnergy=0;
- bool recordContacts = false;
+ /*bool recordContacts = false;
  struct ContactForce { size_t a, b; vec3 relativeA, relativeB; vec3 force; };
- array<ContactForce> contacts, contacts2;
+ array<ContactForce> contacts, contacts2;*/
 
  /// Evaluates contact penalty between two objects
  template<Type tA, Type tB>
@@ -359,9 +361,9 @@ struct System {
   }
   A.force[a] += force;
   atomic_sub(B.force[b], force);
-  if(recordContacts) {
+  /*if(recordContacts) {
    contacts.append(A.base+a, B.base+b, toVec3(c.relativeA), toVec3(c.relativeB), toVec3(force));
-  }
+  }*/
   return -c.depth;
  }
 };
