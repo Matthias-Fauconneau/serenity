@@ -41,8 +41,9 @@ struct SimulationView : Simulation, Widget, Poll {
     //"Pattern:loop,"_
     +(validation?
        //"Height: 0.2, Radius:0.05"_
+       "Height: 0.15, Radius:0.03"_
        //"Height: 0.1, Radius:0.025"_
-       "Height: 0.1, Radius:0.02"_
+       //"Height: 0.1, Radius:0.02"_
        //"Height: 0.08, Radius:0.02"_
        //"Height: 0.06, Radius:0.016"_
      :
@@ -50,11 +51,11 @@ struct SimulationView : Simulation, Widget, Poll {
        "Height: 0.6, Radius:0.15"_
        //"Height: 0.4, Radius:0.1"_
        )
-    +", Pressure: "+(validation?"1e5"_:"1e3"_/*4-5*/)
+    +", Pressure: "+(validation?"3e6"_:"1e3"_/*4-5*/)
     +", Plate Speed: "_+(validation?"1e-5"_:"1e-4"_) //3e-6
-    +", Resolution: "_+(validation?"1.5"_ : "1.5"_)
+    +", Resolution: "_+(validation?"1.6"_ : "1.5"_)
     +", G: "_+(validation?"10"_:"10"_)
-    +", Thickness:"_+(validation?"1e-7"_:"1e-5"_)
+    +", Thickness:"_+(validation?"1e-6"_:"1e-5"_)
     +", Short"//(validation?", Validation"_:", Experiment"_)
     )}) : Simulation(parameters,
   arguments().contains("result") ?
@@ -113,7 +114,7 @@ struct SimulationView : Simulation, Widget, Poll {
    log(timeStep*this->dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
    log("grain",str(grainTime, stepTime),
        "grainInit",str(grainInitializationTime, grainTime),
-       "grainLattice",str(grainLatticeTime, grainTime),
+       "grainLattice",str(grainGridTime, grainTime),
        "grainContact",str(grainContactTime, grainTime),
        "grainIntegration",str(grainIntegrationTime, grainTime));
    if(wire.count) log("wire",str(wireTime, stepTime),
