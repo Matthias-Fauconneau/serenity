@@ -11,6 +11,15 @@ inline void operator*=(mref<float> values, float factor) { values.apply([factor]
 // \file parallel.h
 #include "vector.h"
 
+/*void atomic_add(v4sf& a, v4sf b) {
+ v4sf expected, desired;
+ do {
+  expected = a;
+  desired = expected+b;
+ } while(!__sync_bool_compare_and_swap((__int128*)&a, *(__int128*)&expected,
+                *(__int128*)&desired));
+}*/
+
 void atomic_sub(v4sf& a, v4sf b) {
  v4sf expected, desired;
  do {

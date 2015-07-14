@@ -132,7 +132,7 @@ struct Simulation : System {
  Time miscTime, grainTime, wireTime, sideTime;
  Time grainInitializationTime, grainGridTime, grainContactTime, grainIntegrationTime;
  Time wireLatticeTime, wireContactTime, wireIntegrationTime;
- Time sideIntegrationTime, sideClearTime, sidePressureTime, sideTensionTime, sideGridTime;
+ Time sideGridTime, sideForceTime, sideIntegrationTime;
 
  Lock lock;
  Stream stream;
@@ -420,29 +420,27 @@ break2_:;
 
   // Soft membrane side
   sideTime.start();
-  sideClearTime.start();
   for(size_t i: range(vertexGrid.cells.size)) vertexGrid.cells[i].clear();
-  sideClearTime.stop();
   assert_(side.count <= 65536, side.count);
   side.minRadius = inf;
   sideGridTime.start();
   for(size_t i: range(side.count)) {
-   side.Vertex::force[i] = _0f;
+   //side.Vertex::force[i] = _0f;
    vertexGrid(side.Vertex::position[i]).add(i);
    side.minRadius = ::min(side.minRadius, length2(side.Vertex::position[i]));
   }
   sideGridTime.stop();
   side.minRadius -= Grain::radius;
-  sidePressureTime.start();
-  for(size_t faceIndex: range(side.faceCount)) {
-   size_t W = side.W;
-   size_t i = faceIndex/2/W, j = (faceIndex/2)%W;
+  sideForceTime.start();
+#if 0
+  size_t W = side.W;
+  for(size_t i: range(side.H)) for(size_t j: range(W)) for(size_t n: range(2)) {
    size_t a = i*W+j;
    size_t b = i*W+(j+1)%W;
    size_t c =(i+1)*W+j;
    size_t d = (i+1)*W+(j+1)%W;
    size_t vertices[2][2][3] {{{a,b,c},{b,d,c}},{{a,d,c},{a,b,d}}};
-   size_t* V = vertices[i%2][faceIndex%2];
+   size_t* V = vertices[i%2][n];
    // Pressure
    v4sf e0 = side.Vertex::position[V[1]]-side.Vertex::position[V[0]];
    v4sf e1 = side.Vertex::position[V[2]]-side.Vertex::position[V[0]];
@@ -452,10 +450,53 @@ break2_:;
    side.Vertex::force[V[1]] += force;
    side.Vertex::force[V[2]] += force;
   }
-  sidePressureTime.stop();
-  // Side tension
+#elif 0
+  parallel_chunk(side.faceCount, [this](uint, size_t start, size_t size) {
+   size_t W = side.W;
+   for(size_t faceIndex: range(start, start+size)) {
+    size_t i = faceIndex/2/W, j = (faceIndex/2)%W;
+    size_t a = i*W+j;
+    size_t b = i*W+(j+1)%W;
+    size_t c =(i+1)*W+j;
+    size_t d = (i+1)*W+(j+1)%W;
+    size_t vertices[2][2][3] {{{a,b,c},{b,d,c}},{{a,d,c},{a,b,d}}};
+    size_t* V = vertices[i%2][faceIndex%2];
+    // Pressure
+    v4sf e0 = side.Vertex::position[V[1]]-side.Vertex::position[V[0]];
+    v4sf e1 = side.Vertex::position[V[2]]-side.Vertex::position[V[0]];
+    v4sf cross = - ::cross(e0, e1);
+    v4sf force = float4(pressure/(2*3)) * cross; // area = length(cross)/2 / 3vertices
+    atomic_add(side.Vertex::force[V[0]], force);
+    atomic_add(side.Vertex::force[V[1]], force);
+    atomic_add(side.Vertex::force[V[2]], force);
+   }
+  });
+#else
+  parallel_for(1, side.H-1, [this](uint, int i) {
+   int W = side.W;
+   int dy[6] {-W,0,W,W,0,-W};
+   int dx[6] {-1+(i%2),-1,-1+(i%2),(i%2),1,(i%2)};
+   v4sf P = float4(pressure/(2*3));
+   for(int j: range(W)) {
+    size_t index = i*W+j;
+    // Pressure
+    v4sf O = side.Vertex::position[index];
+    v4sf cross = _0f, tension = _0f;
+    for(int e: range(6)) {
+     size_t a = i*W+dy[e]+(j+W+dx[e])%W;
+     tension += this->tension(side, index, a);
+     v4sf A = side.Vertex::position[a];
+     v4sf B = side.Vertex::position[i*W+dy[(e+1)%6]+(j+W+dx[(e+1)%6])%W];
+     v4sf eA = A-O, eB = B-O;
+     cross += ::cross(eB, eA);
+    }
+    side.Vertex::force[index] = tension + P * cross; // area = length(cross)/2 / 3vertices
+   }
+  });
+#endif
+  sideForceTime.stop();
+  /*// Side tension
   sideTensionTime.start();
-  size_t W = side.W;
   for(size_t i: range(side.H-1)) for(size_t j: range(W)) {
    size_t a = i*W+j, b = i*W+(j+1)%W, c = (i+1)*W+(j+i%2)%W;
    {vec4f t = tension(side, c, a);
@@ -468,7 +509,7 @@ break2_:;
     side.Vertex::force[a] += t;
     side.Vertex::force[b] -= t;}
   }
-  sideTensionTime.stop();
+  sideTensionTime.stop();*/
   sideTime.stop();
 
   // Grain
@@ -558,8 +599,7 @@ break2_:;
     }
    }
 #endif
-  }, 1/*threadCount*/);
-  //this->overlapMean = overlapSum/overlapCount, this->overlapMax = overlapMax;
+  }, threadCount);
   grainContactTime.stop();
   grainTime.stop();
 
@@ -812,6 +852,7 @@ break2_:;
   // Integration
   min = _0f; max = _0f;
 
+#if WIRE
   wireIntegrationTime.start();
   parallel_chunk(wire.count, [this](uint, size_t start, size_t size) {
    for(size_t i: range(start, start+size)) {
@@ -823,6 +864,7 @@ break2_:;
   }, 1);
   wireIntegrationTime.stop();
   wireTime.stop();
+#endif
 
   grainTime.start();
   grainIntegrationTime.start();

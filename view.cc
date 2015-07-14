@@ -29,10 +29,8 @@ struct SimulationView : Simulation, Widget, Poll {
  SimulationView(Thread& uiThread=mainThread, Dict parameters={parseDict(
     "Friction: 0.1,"
     //"Elasticity:8e6, Rate:300,"
-    //"Time step:1e-2,"
     //"Time step:1e-3,"
-    "Time step:4e-4,"
-    //"Time step:1e-4,"
+    "Time step:1e-4,"
     //"Time step:1e-5,"
     //"Pattern:loop,""Height: 0.6, Radius:0.3,"_
     +(validation?"Speed: 0.05,"_:"Speed: 0.1,"_)
@@ -52,8 +50,8 @@ struct SimulationView : Simulation, Widget, Poll {
        //"Height: 0.4, Radius:0.1"_
        )
     +", Pressure: "+(validation?"3e6"_:"1e3"_/*4-5*/)
-    +", Plate Speed: "_+(validation?"1e-5"_:"1e-4"_) //3e-6
-    +", Resolution: "_+(validation?"1.6"_ : "1.5"_)
+    +", Plate Speed: "_+(validation?"1e-4"_:"1e-4"_)
+    +", Resolution: "_+(validation?"1.7"_ : "1.5"_)
     +", G: "_+(validation?"10"_:"10"_)
     +", Thickness:"_+(validation?"1e-6"_:"1e-5"_)
     +", Short"//(validation?", Validation"_:", Experiment"_)
@@ -64,6 +62,7 @@ struct SimulationView : Simulation, Widget, Poll {
    Poll(0, POLLIN, simulationThread) {
   if(arguments().contains("view")) {
    window = ::window(this, -1, uiThread, true);
+   window->actions[F11] = {this, &SimulationView::report};
    window->actions[F12] = {this, &SimulationView::snapshot};
    window->actions[Return] = [this]{
     skip = true;
@@ -105,30 +104,33 @@ struct SimulationView : Simulation, Widget, Poll {
   writeFile(name+".png", encodePNG(target.readback()), currentWorkingDirectory(), true);
  }
 
+ void report() {
+  int64 elapsed = realTime() - lastReport;
+  log(timeStep*this->dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
+  log("grain",str(grainTime, stepTime),
+      "grainInit",str(grainInitializationTime, stepTime),
+      "grainLattice",str(grainGridTime, stepTime),
+      "grainContact",str(grainContactTime, stepTime),
+      "grainIntegration",str(grainIntegrationTime, stepTime));
+  if(wire.count) log("wire",str(wireTime, stepTime),
+                     "wireLatticeTime",str(wireLatticeTime, stepTime),
+                     "wireContact",str(wireContactTime, stepTime),
+                     "wireIntegration",str(wireIntegrationTime, stepTime));
+  log("side", str(sideTime, stepTime),
+      "sideGrid",str(sideGridTime, stepTime),
+      "sideForce",str(sideForceTime, stepTime),
+      "sideIntegration",str(sideIntegrationTime, stepTime));
+  lastReport = realTime();
+  lastReportStep = timeStep;
+ }
+
  void step() {
   Simulation::step();
   if(encoder) viewYawPitch.x += 2*PI*dt / 16;
   if(window) window->render();
   int64 elapsed = realTime() - lastReport;
-  if(elapsed > 2*60e9 || timeStep > lastReportStep + 16/this->dt) {
-   log(timeStep*this->dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
-   log("grain",str(grainTime, stepTime),
-       "grainInit",str(grainInitializationTime, grainTime),
-       "grainLattice",str(grainGridTime, grainTime),
-       "grainContact",str(grainContactTime, grainTime),
-       "grainIntegration",str(grainIntegrationTime, grainTime));
-   if(wire.count) log("wire",str(wireTime, stepTime),
-      "wireLatticeTime",str(wireLatticeTime, wireTime),
-       "wireContact",str(wireContactTime, wireTime),
-       "wireIntegration",str(wireIntegrationTime, wireTime));
-   log("side", str(sideTime, stepTime),
-       "sideClear",str(sideClearTime, sideTime),
-       "sideGrid",str(sideGridTime, sideTime),
-       "sidePressure",str(sidePressureTime, sideTime),
-       "sideTension",str(sideTensionTime, sideTime),
-         "sideIntegration",str(sideIntegrationTime, sideTime));
-   lastReport = realTime();
-   lastReportStep = timeStep;
+  if(elapsed > 60e9 || timeStep > lastReportStep + 8/this->dt) {
+   report();
 #if PROFILE
    requestTermination();
 #endif
