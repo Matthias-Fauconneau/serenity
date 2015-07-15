@@ -6,7 +6,10 @@
 #include "gl.h"
 #include "layout.h"
 #include "plot.h"
+#define ENCODER 0
+#if ENCODER
 #include "encoder.h"
+#endif
 FILE(shader_glsl)
 
 template<Type tA> vec4f toGlobal(tA& A, size_t a, vec4f localA) {
@@ -23,16 +26,16 @@ struct SimulationView : Simulation, Widget, Poll {
  vec3 translation = 0;
  v4sf rotationCenter = _0f;
  Thread simulationThread {19};
+#if ENCODER
  unique<Encoder> encoder = nullptr;
+#endif
  GLFrameBuffer target;
 
- SimulationView(Thread& uiThread=mainThread, Dict parameters={parseDict(
+ SimulationView(Thread& uiThread=mainThread, Dict parameters=parseDict(
     "Friction: 0.1,"
     //"Elasticity:8e6, Rate:300,"
-    //"Time step:1e-3,"
-    //"Time step:4e-4,"
-    "Time step:1e-4,"
-    //"Time step:1e-5,"
+    //"TimeStep:1e-4,"
+    "TimeStep:1e-5,"
     //"Pattern:loop,""Height: 0.6, Radius:0.3,
     "Speed: 0.05,"_
     //"Pattern:helix,"_
@@ -41,17 +44,18 @@ struct SimulationView : Simulation, Widget, Poll {
     //"Height: 0.2, Radius:0.05"_
     //"Height: 0.15, Radius:0.03"_
     "Height: 0.1, Radius:0.025"_
-    +", Pressure: 1e7"
+    +", Pressure: "_+(arguments()?arguments()[0]:"1e4"_)
     +", PlateSpeed: 1e-4"_
-    +", Resolution: 1.3"_
+    +", Resolution: 1.4"_
     +", G: 10"_
-    +", Thickness: 1e-3"_
-    )}) : Simulation(parameters,
-  arguments().contains("result") ?
+    +", Thickness: 1e-4"_
+    )) : Simulation(parameters,
+  //arguments().contains("result") ?
    File(str(parameters)+".result", currentWorkingDirectory(),
-        Flags(WriteOnly|Create|Truncate)) : File(2/*stdout*/)),
+        Flags(WriteOnly|Create|Truncate))),
    Poll(0, POLLIN, simulationThread) {
-  if(arguments().contains("view")) {
+  //if(arguments().contains("view")) {
+  if(XDisplay::hasServer()) {
    window = ::window(this, -1, uiThread, true);
    window->actions[F11] = {this, &SimulationView::report};
    window->actions[F12] = {this, &SimulationView::snapshot};
@@ -60,11 +64,13 @@ struct SimulationView : Simulation, Widget, Poll {
     log("skip", int(processState), "grain", grain.count, "wire", wire.count);
    };
   }
+#if ENCODER
   if(arguments().contains("video")) {
    encoder = unique<Encoder>("tas.mp4"_);
    encoder->setH264(int2(1280,720), 60);
    encoder->open();
   }
+#endif
 
   mainThread.setPriority(19);
   log(stream.name());
@@ -73,7 +79,7 @@ struct SimulationView : Simulation, Widget, Poll {
    simulationThread.spawn();
   } else {
    while(processState < Done) {
-    if(timeStep%size_t(1e-2/dt) == 0) log(info());
+    if(timeStep%size_t(1e-1/dt) == 0) log(info());
     step();
    }
   }
@@ -91,7 +97,7 @@ struct SimulationView : Simulation, Widget, Poll {
  }
 
  void snapshot() override {
-  Simulation::snapshot();
+  //Simulation::snapshot();
   writeFile(name+".png", encodePNG(target.readback()), currentWorkingDirectory(), true);
  }
 
@@ -117,7 +123,9 @@ struct SimulationView : Simulation, Widget, Poll {
 
  void step() {
   Simulation::step();
+#if ENCODER
   if(encoder) viewYawPitch.x += 2*PI*dt / 16;
+#endif
   if(window) window->render();
   int64 elapsed = realTime() - lastReport;
   if(elapsed > 60e9 || timeStep > lastReportStep + 8/this->dt) {
@@ -127,12 +135,14 @@ struct SimulationView : Simulation, Widget, Poll {
 #endif
   }
   if(processState < Done) queue();
-  else { Simulation::snapshot(); requestTermination(0); }
+  else { /*Simulation::snapshot();*/ requestTermination(0); }
  }
 
  String info() {
   array<char> s {
    copyRef(processStates[processState])};
+  s.append(" "_+str(pressure,0u,1u));
+  s.append(" "_+str(dt,0u,1u));
   s.append(" "_+str(grain.count)/*+" grains"_*/);
   s.append(" "_+str(int(timeStep*this->dt/**1e3*/))+"s"_);
   //if(processState==Wait)
@@ -349,10 +359,9 @@ struct SimulationView : Simulation, Widget, Poll {
     }
    }
    lines.clear();
-
-   if(encoder) {
-   encoder->writeVideoFrame(target.readback());
-  }
+#if ENCODER
+   if(encoder) encoder->writeVideoFrame(target.readback());
+#endif
   int offset = (target.size.x-window->size.x)/2;
   target.blit(0, window->size, int2(offset, 0), int2(target.size.x-offset, target.size.y));
 
@@ -367,7 +376,9 @@ struct SimulationView : Simulation, Widget, Poll {
   if(event==Motion && button==LeftButton) {
    viewYawPitch += float(2*PI) * delta / size; //TODO: warp
    viewYawPitch.y = clamp<float>(-PI, viewYawPitch.y, 0);
+#if ENCODER
    if(encoder) encoder = nullptr;
+#endif
   }
   else return false;
   return true;

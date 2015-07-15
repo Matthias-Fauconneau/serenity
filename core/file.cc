@@ -127,7 +127,7 @@ const File& File::resize(int64 size) { check(ftruncate(fd, size), fd.pointer, si
 
 void File::seek(int index) { check(::lseek(fd,index,0)); }
 
-bool existsFile(const string path, const Folder& at) { int fd = openat(at.fd, strz(path), /*O_PATH*/0, 0); if(fd>0) close(fd); return fd>0; }
+bool existsFile(const string path, const Folder& at) { int fd = openat(at.fd, strz(path), /*O_PATH*/010000000, 0); if(fd>0) close(fd); return fd>0; }
 
 bool writableFile(const string path, const Folder& at) {
 	int fd = openat(at.fd, strz(path), O_WRONLY|O_NONBLOCK, 0); if(fd>0) close(fd); return fd>0;

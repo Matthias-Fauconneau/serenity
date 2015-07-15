@@ -10,6 +10,7 @@ generic auto pad(T&& t, uint width=4) -> decltype(t+padding(t.size, width)) { re
 
 /// Connection to an X display server
 struct XDisplay : Socket, Poll {
+ static bool hasServer();
 // Connection
     /// Synchronizes access to connection and event queue
     Lock lock;

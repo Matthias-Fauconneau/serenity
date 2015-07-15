@@ -282,8 +282,8 @@ struct Simulation : System {
   }
  }
 
- const float pourPackThreshold = validation ? 1e-3 : 3;
- const float packLoadThreshold = validation ? 0.9e-3 : 1;
+ const float pourPackThreshold = validation ? 1e-2 : 3;
+ const float packLoadThreshold = validation ? 1e-2 : 1;
  const float transitionTime = validation ? 8 : 4;
 
  void step() {
@@ -371,9 +371,9 @@ break2_:;
 
    if(parameters.contains("Pressure"_)) {
     if(G[2] == 0 && side.thickness == side.loadThickness && (skip || (
-                                                              voidRatio < 0.7 &&
+                                                              voidRatio < 0.73 &&
                                                               grainKineticEnergy / grain.count < packLoadThreshold &&
-                                                              abs(topForce+bottomForce)/(topForce-bottomForce) < 0.01 ))) {
+                                                              abs(topForce+bottomForce)/(topForce-bottomForce) < 0.14 ))) {
      skip = false;
      processState = ProcessState::Load;
      bottomZ0 = plate.position[0][2];
@@ -422,8 +422,9 @@ break2_:;
   sideTime.start();
   for(size_t i: range(vertexGrid.cells.size)) vertexGrid.cells[i].clear();
   assert_(side.count <= 65536, side.count);
+  for(size_t index: range(side.count)) vertexGrid(side.Vertex::position[index]).append(index);
   sideForceTime.start();
-  float minRadii[threadCount];
+  float minRadii[maxThreadCount]; mref<float>(minRadii).clear(inf);
   parallel_for(1, side.H-1, [this,&minRadii](uint id, int i) {
    int W = side.W;
    int dy[6] {-W,            0,       W,         W,     0, -W};
@@ -433,7 +434,6 @@ break2_:;
    for(int j: range(W)) {
     size_t index = i*W+j;
     v4sf O = side.Vertex::position[index];
-    vertexGrid(O).add(index);
     minRadius = ::min(minRadius, length2(O));
     // Pressure
     v4sf cross = _0f, tension = _0f;
@@ -449,7 +449,7 @@ break2_:;
    }
    minRadii[id] = minRadius;
   });
-  side.minRadius = ::min(minRadii) - Grain::radius;
+  side.minRadius = ::min(ref<float>(minRadii, threadCount)) - Grain::radius;
   sideForceTime.stop();
   sideTime.stop();
 

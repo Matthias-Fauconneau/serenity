@@ -135,8 +135,8 @@ GLUniform GLShader::operator[](string name) {
     return GLUniform(id, location);
 }
 #if !__clang__
-__attribute((weak)) extern "C" GLuint glGetProgramResourceIndex (GLuint, GLenum, const GLchar*) { error(""); }
-__attribute((weak)) extern "C" void glShaderStorageBlockBinding (GLuint, GLuint, GLuint) { error(""); }
+extern "C" __attribute((weak)) GLuint glGetProgramResourceIndex (GLuint, GLenum, const GLchar*) { error(""); }
+extern "C" __attribute((weak)) void glShaderStorageBlockBinding (GLuint, GLuint, GLuint) { error(""); }
 #endif
 void GLShader::bind(string name, const GLBuffer& ssbo, uint binding) {
     uint index = glGetProgramResourceIndex(id, GL_SHADER_STORAGE_BLOCK, strz(name));

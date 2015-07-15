@@ -278,7 +278,7 @@ struct System {
  }
 
  System(const Dict& p) :
-   dt(p.at("Time step"_)),
+   dt(p.at("TimeStep"_)),
    gz(p.at("G")),
    frictionCoefficient(p.at("Friction"_)),
    wire(p.value("Elasticity"_, 0), grain.base+grain.capacity),

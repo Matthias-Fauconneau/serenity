@@ -27,6 +27,10 @@ namespace DRI3 { int EXT; }
 namespace Present { int EXT; }
 namespace XRender { int EXT, errorBase; };
 
+bool XDisplay::hasServer() {
+ return existsFile("/tmp/.X11-unix/X"+environmentVariable("DISPLAY",":0").slice(1,1));
+}
+
 XDisplay::XDisplay(Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket::fd,POLLIN,thread) {
     {String path = "/tmp/.X11-unix/X"+environmentVariable("DISPLAY",":0").slice(1,1);
         struct sockaddr_un { uint16 family=1; char path[108]={}; } addr; mref<char>(addr.path,path.size).copy(path);

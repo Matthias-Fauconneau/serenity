@@ -51,11 +51,15 @@ static int groupExitStatus = 0;
 Thread::Thread(int priority, bool spawn) : Poll(0,POLLIN,*this), priority(priority) {
  Poll::fd = EventFD::fd; registerPoll();
  //if(this == addressOf(mainThread)) tid = gettid();
+#if !NO_PTHREAD
  if(spawn) this->spawn();
+#endif
 }
 void Thread::setPriority(int priority) { setpriority(0,0,priority); }
+#if !NO_PTHREAD
 static void* run(void* thread) { ((Thread*)thread)->run(); return 0; }
 void Thread::spawn() { assert_(!thread); pthread_create(&thread,0,&::run,this); }
+#endif
 
 int32 gettid() { return syscall(SYS_gettid); }
 
@@ -99,6 +103,7 @@ void Thread::event() {
  }
 }
 
+#if !NO_PTHREAD
 void Thread::wait() {
  if(!thread) return;
  terminationRequested = true;
@@ -107,6 +112,7 @@ void Thread::wait() {
  terminationRequested = false;
  queue.clear();
 }
+#endif
 
 // Debugger
 

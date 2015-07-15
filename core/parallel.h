@@ -4,6 +4,7 @@
 #include "math.h"
 #include "map.h"
 #include "thread.h"
+#include "data.h"
 
 // -> \file math.h
 inline void operator*=(mref<float> values, float factor) { values.apply([factor](float v) { return factor*v; }, values); }
@@ -38,7 +39,16 @@ void atomic_add(float& a, float b) {
                                       *(int*)&desired, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 }
 
-static constexpr uint threadCount = 4;
+static const size_t maxThreadCount = 32;
+static size_t coreCount() {
+ TextData s(File("/proc/cpuinfo").readUpTo(1<<16));
+ size_t coreCount = 0;
+ while(s) { if(s.match("processor")) coreCount++; s.line(); }
+ log(coreCount);
+ assert_(coreCount <= maxThreadCount);
+ return coreCount;
+}
+static const int threadCount = coreCount();
 
 struct thread {
  pthread_t pthread = 0;
@@ -47,7 +57,7 @@ struct thread {
 };
 static Semaphore jobs;
 static Semaphore results;
-static thread threads[::threadCount];
+static thread threads[::maxThreadCount];
 inline void* start_routine(thread* t) {
  for(;;) {
   jobs.acquire(1);
@@ -62,7 +72,7 @@ inline void* start_routine(thread* t) {
 }
 
 /// Runs a loop in parallel
-template<Type F> void parallel_for(int64 start, int64 stop, F f, const uint unused threadCount = ::threadCount) {
+template<Type F> void parallel_for(int64 start, int64 stop, F f, const int unused threadCount = ::threadCount) {
 #if DEBUG || PROFILE
  for(int64 i : range(start, stop)) f(0, i);
 #else
@@ -145,7 +155,7 @@ template<Type A, Type T, Type F, Type... Ss> T reduce(size_t size, F fold, A ini
  }
 }
 
-template<Type A, Type T, Type F, Type... Ss> T reduce(ref<T> values, F fold, A initialValue) {
+/*template<Type A, Type T, Type F, Type... Ss> T reduce(ref<T> values, F fold, A initialValue) {
  assert_(values);
  if(values.size < minimumSize) return ::reduce(values, fold, initialValue);
  else {
@@ -157,7 +167,7 @@ template<Type A, Type T, Type F, Type... Ss> T reduce(ref<T> values, F fold, A i
   return ::reduce(accumulators, fold, initialValue);
  }
 }
-template<Type T, Type F> T reduce(ref<T> values, F fold) { return reduce(values, fold, values[0]); }
+template<Type T, Type F> T reduce(ref<T> values, F fold) { return reduce(values, fold, values[0]); }*/
 
 // \file arithmetic.cc Parallel arithmetic operations
 
