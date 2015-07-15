@@ -30,31 +30,22 @@ struct SimulationView : Simulation, Widget, Poll {
     "Friction: 0.1,"
     //"Elasticity:8e6, Rate:300,"
     //"Time step:1e-3,"
+    //"Time step:4e-4,"
     "Time step:1e-4,"
     //"Time step:1e-5,"
-    //"Pattern:loop,""Height: 0.6, Radius:0.3,"_
-    +(validation?"Speed: 0.05,"_:"Speed: 0.1,"_)
+    //"Pattern:loop,""Height: 0.6, Radius:0.3,
+    "Speed: 0.05,"_
     //"Pattern:helix,"_
     //"Pattern:cross,"_
     //"Pattern:loop,"_
-    +(validation?
-       //"Height: 0.2, Radius:0.05"_
-       "Height: 0.15, Radius:0.03"_
-       //"Height: 0.1, Radius:0.025"_
-       //"Height: 0.1, Radius:0.02"_
-       //"Height: 0.08, Radius:0.02"_
-       //"Height: 0.06, Radius:0.016"_
-     :
-       //"Height: 0.8, Radius:0.2"_
-       "Height: 0.6, Radius:0.15"_
-       //"Height: 0.4, Radius:0.1"_
-       )
-    +", Pressure: "+(validation?"3e6"_:"1e3"_/*4-5*/)
-    +", Plate Speed: "_+(validation?"1e-4"_:"1e-4"_)
-    +", Resolution: "_+(validation?"1.7"_ : "1.5"_)
-    +", G: "_+(validation?"10"_:"10"_)
-    +", Thickness:"_+(validation?"1e-6"_:"1e-5"_)
-    +", Short"//(validation?", Validation"_:", Experiment"_)
+    //"Height: 0.2, Radius:0.05"_
+    //"Height: 0.15, Radius:0.03"_
+    "Height: 0.1, Radius:0.025"_
+    +", Pressure: 1e7"
+    +", PlateSpeed: 1e-4"_
+    +", Resolution: 1.3"_
+    +", G: 10"_
+    +", Thickness: 1e-3"_
     )}) : Simulation(parameters,
   arguments().contains("result") ?
    File(str(parameters)+".result", currentWorkingDirectory(),

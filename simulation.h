@@ -143,11 +143,11 @@ struct Simulation : System {
 
  Simulation(const Dict& parameters, Stream&& stream) : System(parameters),
    targetHeight(parameters.at("Height"_)),
-   winchSpeed(parameters.at("Speed"_)),
-   winchRate(parameters.value("Rate"_, 0)),
+   winchSpeed(parameters.value("Speed"_, 0.f)),
+   winchRate(parameters.value("Rate"_, 0.f)),
    pattern(Pattern(ref<string>(patterns).indexOf(parameters.value("Pattern","none")))),
-   pressure(parameters.value("Pressure", 0)),
-   plateSpeed(parameters.at("Plate Speed")),
+   pressure(parameters.value("Pressure", 0.f)),
+   plateSpeed(parameters.at("PlateSpeed")),
    stream(move(stream)), parameters(copy(parameters)) {
   plate.position[1][2] = /*initialHeight =*/ targetHeight+Grain::radius;
   if(pattern) { // Initial wire node
@@ -282,8 +282,8 @@ struct Simulation : System {
   }
  }
 
- const float pourPackThreshold = validation ? 5e-4 : 3;
- const float packLoadThreshold = validation ? 1e-4 : 1;
+ const float pourPackThreshold = validation ? 1e-3 : 3;
+ const float packLoadThreshold = validation ? 0.9e-3 : 1;
  const float transitionTime = validation ? 8 : 4;
 
  void step() {
@@ -371,9 +371,9 @@ break2_:;
 
    if(parameters.contains("Pressure"_)) {
     if(G[2] == 0 && side.thickness == side.loadThickness && (skip || (
-                                                              voidRatio < 0.68 &&
+                                                              voidRatio < 0.7 &&
                                                               grainKineticEnergy / grain.count < packLoadThreshold &&
-                                                              abs(topForce+bottomForce)/(topForce-bottomForce) < 1e-3 ))) {
+                                                              abs(topForce+bottomForce)/(topForce-bottomForce) < 0.01 ))) {
      skip = false;
      processState = ProcessState::Load;
      bottomZ0 = plate.position[0][2];
@@ -422,65 +422,20 @@ break2_:;
   sideTime.start();
   for(size_t i: range(vertexGrid.cells.size)) vertexGrid.cells[i].clear();
   assert_(side.count <= 65536, side.count);
-  side.minRadius = inf;
-  sideGridTime.start();
-  for(size_t i: range(side.count)) {
-   //side.Vertex::force[i] = _0f;
-   vertexGrid(side.Vertex::position[i]).add(i);
-   side.minRadius = ::min(side.minRadius, length2(side.Vertex::position[i]));
-  }
-  sideGridTime.stop();
-  side.minRadius -= Grain::radius;
   sideForceTime.start();
-#if 0
-  size_t W = side.W;
-  for(size_t i: range(side.H)) for(size_t j: range(W)) for(size_t n: range(2)) {
-   size_t a = i*W+j;
-   size_t b = i*W+(j+1)%W;
-   size_t c =(i+1)*W+j;
-   size_t d = (i+1)*W+(j+1)%W;
-   size_t vertices[2][2][3] {{{a,b,c},{b,d,c}},{{a,d,c},{a,b,d}}};
-   size_t* V = vertices[i%2][n];
-   // Pressure
-   v4sf e0 = side.Vertex::position[V[1]]-side.Vertex::position[V[0]];
-   v4sf e1 = side.Vertex::position[V[2]]-side.Vertex::position[V[0]];
-   v4sf cross = - ::cross(e0, e1);
-   v4sf force = float4(pressure/(2*3)) * cross; // area = length(cross)/2 / 3vertices
-   side.Vertex::force[V[0]] += force;
-   side.Vertex::force[V[1]] += force;
-   side.Vertex::force[V[2]] += force;
-  }
-#elif 0
-  parallel_chunk(side.faceCount, [this](uint, size_t start, size_t size) {
-   size_t W = side.W;
-   for(size_t faceIndex: range(start, start+size)) {
-    size_t i = faceIndex/2/W, j = (faceIndex/2)%W;
-    size_t a = i*W+j;
-    size_t b = i*W+(j+1)%W;
-    size_t c =(i+1)*W+j;
-    size_t d = (i+1)*W+(j+1)%W;
-    size_t vertices[2][2][3] {{{a,b,c},{b,d,c}},{{a,d,c},{a,b,d}}};
-    size_t* V = vertices[i%2][faceIndex%2];
-    // Pressure
-    v4sf e0 = side.Vertex::position[V[1]]-side.Vertex::position[V[0]];
-    v4sf e1 = side.Vertex::position[V[2]]-side.Vertex::position[V[0]];
-    v4sf cross = - ::cross(e0, e1);
-    v4sf force = float4(pressure/(2*3)) * cross; // area = length(cross)/2 / 3vertices
-    atomic_add(side.Vertex::force[V[0]], force);
-    atomic_add(side.Vertex::force[V[1]], force);
-    atomic_add(side.Vertex::force[V[2]], force);
-   }
-  });
-#else
-  parallel_for(1, side.H-1, [this](uint, int i) {
+  float minRadii[threadCount];
+  parallel_for(1, side.H-1, [this,&minRadii](uint id, int i) {
    int W = side.W;
-   int dy[6] {-W,0,W,W,0,-W};
-   int dx[6] {-1+(i%2),-1,-1+(i%2),(i%2),1,(i%2)};
+   int dy[6] {-W,            0,       W,         W,     0, -W};
+   int dx[6] {-1+(i%2), -1, -1+(i%2), (i%2), 1, (i%2)};
    v4sf P = float4(pressure/(2*3));
+   float minRadius = inf;
    for(int j: range(W)) {
     size_t index = i*W+j;
-    // Pressure
     v4sf O = side.Vertex::position[index];
+    vertexGrid(O).add(index);
+    minRadius = ::min(minRadius, length2(O));
+    // Pressure
     v4sf cross = _0f, tension = _0f;
     for(int e: range(6)) {
      size_t a = i*W+dy[e]+(j+W+dx[e])%W;
@@ -492,24 +447,10 @@ break2_:;
     }
     side.Vertex::force[index] = tension + P * cross; // area = length(cross)/2 / 3vertices
    }
+   minRadii[id] = minRadius;
   });
-#endif
+  side.minRadius = ::min(minRadii) - Grain::radius;
   sideForceTime.stop();
-  /*// Side tension
-  sideTensionTime.start();
-  for(size_t i: range(side.H-1)) for(size_t j: range(W)) {
-   size_t a = i*W+j, b = i*W+(j+1)%W, c = (i+1)*W+(j+i%2)%W;
-   {vec4f t = tension(side, c, a);
-    side.Vertex::force[c] += t;
-    side.Vertex::force[a] -= t;}
-   {vec4f t = tension(side, b, c);
-    side.Vertex::force[b] += t;
-    side.Vertex::force[c] -= t;}
-   if(i) {vec4f t = tension(side, a, b);
-    side.Vertex::force[a] += t;
-    side.Vertex::force[b] -= t;}
-  }
-  sideTensionTime.stop();*/
   sideTime.stop();
 
   // Grain
@@ -549,31 +490,12 @@ break2_:;
   grainContactTime.start();
   parallel_chunk(grainGrid.cells.size/grainGrid.cellCapacity, [this,&grainGrid](uint, size_t start, size_t size) {
    const int Y = grainGrid.size.y, X = grainGrid.size.x;
-#if LATTICE
-   const uint16* chunk = grainGrid.cells.begin() + start;
-   for(size_t i: range(size)) {
-    const uint16* current = chunk + i;
-    size_t a = *current;
-    if(!a) continue;
-    a--;
-    for(int z: range(2+1)) for(int y: range(-2, 2+1)) for(int x: range(-2, 2+1)) {
-     int di = z*Y*X + y*X + x;
-     if(di <= 0) continue; // FIXME: unroll
-     const uint16* neighbour = current + z*Y*X + y*X + x;
-     size_t b = *neighbour;
-     if(!b) continue;
-     b--;
-     penalty(grain, a, grain, b);
-    }
-   }
-#else
    const int C = grainGrid.cellCapacity;
    const uint16* chunk = grainGrid.cells.begin() + start*C;
    int di[3*3+3+1];
    size_t i = 0;
    for(int z: range(-1,0 +1)) for(int y: range(-1, (z?1:0) +1)) for(int x: range(-1, ((z||y)?1:-1) +1))
     di[i++] = (z*Y*X + y*X + x)*C;
-   assert_(i == 3*3+3+1, i);
    for(size_t index: range(size)) {
     const uint16* current = chunk + index*C;
     for(size_t a: range(C)) {
@@ -598,12 +520,11 @@ break2_:;
      }
     }
    }
-#endif
   }, threadCount);
   grainContactTime.stop();
   grainTime.stop();
 
-#if 0
+#if WIRE
   // Wire
   wireTime.start();
 
