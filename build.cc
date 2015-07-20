@@ -130,7 +130,7 @@ int64 Build::parse(string fileName, Node& parent) {
 				}
 			}
 		}
-		//tryParseDefines(s);
+  tryParseDefines(s);
 		tryParseConditions(s, fileName);
 		do { s.whileAny(" "); } while(tryParseFiles(s));
 	}

@@ -5,6 +5,7 @@
 #include "map.h"
 #include "thread.h"
 #include "data.h"
+#include "file.h"
 
 // -> \file math.h
 inline void operator*=(mref<float> values, float factor) { values.apply([factor](float v) { return factor*v; }, values); }
@@ -40,15 +41,15 @@ void atomic_add(float& a, float b) {
 }
 
 static const size_t maxThreadCount = 32;
-static size_t coreCount() {
- TextData s(File("/proc/cpuinfo").readUpTo(1<<16));
+/*static size_t coreCount() {
+ TextData s(File("/proc/cpuinfo").readUpToLoop(1<<16));
+ assert_(s.data.size<s.buffer.capacity);
  size_t coreCount = 0;
  while(s) { if(s.match("processor")) coreCount++; s.line(); }
- log(coreCount);
  assert_(coreCount <= maxThreadCount);
  return coreCount;
-}
-static const int threadCount = coreCount();
+}*/
+static const int threadCount = parseInteger(environmentVariable("THREADS", "6")); //coreCount();
 
 struct thread {
  pthread_t pthread = 0;
@@ -100,7 +101,7 @@ template<Type F> void parallel_for(uint stop, F f, const uint unused threadCount
 
 /// Runs a loop in parallel chunks with chunk-wise functor
 template<Type F> void parallel_chunk(int64 totalSize, F f, const uint threadCount = ::threadCount) {
- if(totalSize <= 8*threadCount || threadCount==1) {
+ if(totalSize <= threadCount*threadCount || threadCount==1) {
   f(0, 0, totalSize);
   return;
  }
@@ -213,7 +214,7 @@ inline double mean(ref<float> values) { return sum(values)/values.size; }
 
 // multiple accumulator reduce
 
-/// Double accumulator reduction
+/*/// Double accumulator reduction
 template<Type A, Type T, Type F0, Type F1> void reduce(ref<T> values, F0 fold0, F1 fold1, A& accumulator0, A& accumulator1) {
  A accumulators[2][threadCount];
  mref<T>(accumulators[0]).clear(accumulator0), mref<T>(accumulators[1]).clear(accumulator1); // Some threads may not iterate
@@ -224,7 +225,7 @@ template<Type A, Type T, Type F0, Type F1> void reduce(ref<T> values, F0 fold0, 
   accumulators[1][id] = fold1(accumulators[1][id], a1);
  });
  accumulator0 = ::reduce(accumulators[0], fold0, accumulator0), accumulator1 = ::reduce(accumulators[1], fold1, accumulator1);
-}
+}*/
 
 generic void minmax(ref<T> values, T& minimum, T& maximum) {
  return reduce(values, [](T a, T v) { return ::min(a, v); }, [](T a, T v) { return ::max(a, v); }, minimum, maximum);

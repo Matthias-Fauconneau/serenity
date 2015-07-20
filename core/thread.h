@@ -183,6 +183,7 @@ struct FileWatcher : File, Poll {
 		: File(inotify_init1(IN_CLOEXEC)), Poll(File::fd), path(copyRef(path)), fileModified(fileModified) {
 		addWatch(path);
 	}
+ virtual ~FileWatcher() {}
  void addWatch(string path)  { check(inotify_add_watch(File::fd, strz(path), IN_MODIFY|IN_MOVE), path); }
 	void event() override {
 		while(poll()) {

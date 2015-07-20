@@ -82,10 +82,22 @@ void Stream::read(mref<byte> target) {
 }
 
 buffer<byte> Stream::readUpTo(size_t capacity) {
-	buffer<byte> buffer(capacity);
-    buffer.size = check( ::read(fd, (void*)buffer.data, capacity) );
-    return buffer;
+ buffer<byte> buffer(capacity);
+ buffer.size = check( ::read(fd, (void*)buffer.data, capacity) );
+ return buffer;
 }
+
+buffer<byte> Stream::readUpToLoop(size_t capacity) {
+ buffer<byte> buffer(capacity);
+ size_t offset=0; while(offset<capacity) {
+  int size = check(::read(fd, buffer.begin()+offset, capacity-offset));
+  if(!size) break;
+  offset += size;
+ }
+ buffer.size = offset;
+ return buffer;
+}
+
 
 buffer<byte> Stream::read(size_t size) {
 	buffer<byte> buffer(size);

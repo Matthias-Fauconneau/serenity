@@ -71,6 +71,7 @@ struct Stream : Handle { //FIXME: overlaps with Data/BinaryData
     void read(mref<byte> target);
     /// Reads up to \a size bytes
     buffer<byte> readUpTo(size_t size);
+    buffer<byte> readUpToLoop(size_t size);
     /// Reads exactly \a size bytes
     buffer<byte> read(size_t size);
     /// Reads a raw value
