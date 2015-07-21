@@ -38,7 +38,7 @@ struct System {
  sconst float mm = 1e-3*m, g = 1e-3*kg;
  //vec4f G = _0f; // Using downward velocity instead
  const float gz; //= 4*10*1e-9 * N/kg; // Scaled gravity
- sconst float densityScale = 1e6; // 7-8
+ sconst float densityScale = 1e7; // 6-7
  vec4f G {0, 0, -gz/densityScale, 0}; // Scaled gravity
 
  // Penalty model
@@ -104,8 +104,9 @@ struct System {
   // Correction
   vec4f r = b[1] * (p.force[i] * p._1_mass - p.positionDerivatives[0][i]);
   p.position[i] += c[0]*r;
-  //p.velocity[i] *= float4(1-0.1*dt); // 10%/s viscosity
-  p.velocity[i] *= float4(1-0.01*dt); // 1%/s viscosity
+  p.velocity[i] *= float4(1-0.1*dt); // 10%/s viscosity
+  //p.velocity[i] *= float4(1-0.05*dt); // 5%/s viscosity
+  //p.velocity[i] *= float4(1-0.01*dt); // 1%/s viscosity
   p.velocity[i] += c[1]*r;
   p.positionDerivatives[0][i] += c[2]*r;
   p.positionDerivatives[1][i] += c[3]*r;
@@ -183,7 +184,7 @@ struct System {
  const vec4f dt_2 = float4(dt/2);
  void step(Grain& p, size_t i) {
   step((Vertex&)p, i);
-  p.angularVelocity[i] *= float4(1-0.1*dt); // 10%/s viscosity
+  p.angularVelocity[i] *= float4(1-0.5*dt); // 50%/s viscosity
   p.rotation[i] += dt_2 * qmul(p.angularVelocity[i], p.rotation[i]);
   p.angularVelocity[i] += p.dt_angularMass * p.torque[i];
   p.rotation[i] *= rsqrt(sq4(p.rotation[i]));
@@ -217,7 +218,7 @@ struct System {
   sconst bool friction = false;
 
   sconst float curvature = 0; // -1/radius?
-  sconst float elasticModulus = 1e12; // 8
+  sconst float elasticModulus = 1e10; // 8
   sconst float density = 1e3;
   const float resolution;
   const float initialRadius;
@@ -234,20 +235,20 @@ struct System {
   const float loadThickness;
   float thickness = pourThickness;
 
-  vec4f tensionStiffness = float3(elasticModulus * internodeLength/(2*sqrt(3.)) * thickness); // FIXME
+  vec4f tensionStiffness = float3(elasticModulus * internodeLength * sqrt(3.)/2 * thickness); // FIXME
 
   vec4f tensionDamping = _0f; //float3(mass / s);
   //sconst float areaMomentOfInertia = pow4(1*mm); // FIXME
   const float bendStiffness = 0;//elasticModulus * areaMomentOfInertia / internodeLength; // FIXME
 
-  float tensionEnergy = 0;
+  float tensionEnergy = 0, tensionEnergy2 = 0;
 
   struct { v4sf operator[](size_t) const { return _0f; } } position;
 
   struct { NoOperation operator[](size_t) const { return {}; }} torque;
 
   Side(float resolution, float initialRadius, float height, float loadThickness, size_t base,
-       float pourThickness=1e1)
+       float pourThickness=1)
    : Vertex(base, /*W*H*/int(2*PI*initialRadius/resolution) *
                                          (int(height/resolution*2/sqrt(3.))+1),
             (pourThickness*sqrt(3.)/2*sq(2*PI*initialRadius/int(2*PI*initialRadius/resolution)))*density*densityScale/*1-4*/),
@@ -316,9 +317,13 @@ struct System {
  size_t timeStep = 0;
  float grainKineticEnergy=0, wireKineticEnergy=0, normalEnergy=0,
          staticEnergy=0, bendEnergy=0;
+
  /*bool recordContacts = false;
  struct ContactForce { size_t a, b; vec3 relativeA, relativeB; vec3 force; };
  array<ContactForce> contacts, contacts2;*/
+
+ size_t staticFrictionCount = 0, dynamicFrictionCount = 0;
+ size_t staticFrictionCount2 = 0, dynamicFrictionCount2 = 0;
 
  /// Evaluates contact penalty between two objects
  template<Type tA, Type tB>
@@ -377,10 +382,12 @@ struct System {
      atomic_add(staticEnergy, 1./2 * kS * sq(tangentLength[0]));
      friction.energy = 1./2 * kS * sq(tangentLength[0]);
      fT = - float3(fS+fB) * springDirection;
+     staticFrictionCount++;
     } else fT = _0f;
    } else {
     if(tangentRelativeSpeed[0]) {
      fT = - float3(fD) * tangentRelativeVelocity / tangentRelativeSpeed;
+     dynamicFrictionCount++;
     } else fT = _0f;
    }
    force += fT;

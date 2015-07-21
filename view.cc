@@ -1,8 +1,5 @@
 #include "simulation.h"
 #include "matrix.h"
-//#if __clang__
-#define UI 1
-//#endif
 #if UI
 #include "window.h"
 #include "render.h"
@@ -20,11 +17,13 @@ template<Type tA> vec4f toGlobal(tA& A, size_t a, vec4f localA) {
 
 Dict parameters() {
  Dict parameters = parseDict(
-    "Friction: 0.1," // 0.1
+    "Friction: 0.3," // 0.1
     //"Elasticity:8e6, Rate:300,"
-    //"TimeStep:4e-4,"
-    //"TimeStep:1e-4,"
-    "TimeStep:2e-5,"
+    "TimeStep:1e-4,"
+    //"TimeStep:8e-5,"
+    //"TimeStep:2e-5,"
+    //"TimeStep:4e-5,"
+    //"TimeStep:1e-5,"
     "Speed: 0.1,"
     //"Pattern:none,"_
     //"Pattern:helix,"_
@@ -37,10 +36,10 @@ Dict parameters() {
     "Height: 0.08, Radius:0.02"_
     //"Height: 0.08, Radius:0.015"_
     //"Height: 0.06, Radius:0.015"_
-    ", PlateSpeed: 1e-3"_ //3-5
-    ", Resolution: 1.4"_ //1.5
+    ", PlateSpeed: 1e-4"_ //3-5
+    ", Resolution: 1.6"_ //1.5
     ", G: 10"_
-    ", Thickness: 1e-3"_ // 2
+    ", Thickness: 1e-3"_
     );
  for(string argument: arguments()) if(argument.contains('=')) parameters.append(parseDict(argument));
  if(!parameters.contains("Pressure")) parameters.insert("Pressure"__,"1e5"__);
@@ -96,6 +95,8 @@ struct SimulationRun : Simulation {
    s.append(" "_+str(int((topForce+bottomForce)/(topForce-bottomForce)*100), 2u)+"%");
   //s.append(" Om%"_+str(int(overlapMean/(2*Grain::radius)*100)));
   //s.append(" OM%:"+str(int(overlapMax/(2*Grain::radius)*100)));
+  s.append(" S/D: "+str(staticFrictionCount2, dynamicFrictionCount2));
+  s.append(" T: "+str(int(side.tensionEnergy2))+"J");
   //if(debug) s.append(" "+debug);
   return move(s);
  }
@@ -193,7 +194,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
 #endif
   }
   if(processState < Done) queue();
-  else { /*Simulation::snapshot();*/ requestTermination(0); }
+  else { /*Simulation::snapshot();*/ log("Done"); requestTermination(0); }
  }
 
  vec2 sizeHint(vec2) override { return vec2(1050, 1050*size.y/size.x); }
@@ -284,7 +285,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
    GLBuffer rotationBuffer (apply(grain.rotation.slice(0, grain.count),
                 [=](vec4f q) -> vec4f { return conjugate(qmul(viewRotation,q)); }));
    shader.bind("rotationBuffer"_, rotationBuffer, 0);
-   shader["radius"] = float(scale.z/2 * Grain::radius);
+   shader["radius"] = float(scale.z/2 * Grain::radius*3/4); // reduce Z radius to see membrane mesh on/in grain
    vertexArray.draw(Triangles, positions.size);
   }}
 
@@ -371,7 +372,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
     shader["transform"] = viewProjection;
     Locker lock(this->lock);
     for(auto entry: lines) {
-     shader["uColor"] = entry.key;
+     shader["uColor"] = vec4(entry.key, 1);
      GLBuffer positionBuffer (entry.value);
      vertexArray.bindAttribute(shader.attribLocation("position"_),
                                3, Float, positionBuffer);
@@ -385,7 +386,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
   int offset = (target.size.x-window->size.x)/2;
   target.blit(0, window->size, int2(offset, 0), int2(target.size.x-offset, target.size.y));
 
-  if(timeStep > lastTitleSetStep+size_t(0.1/dt)) { lastTitleSetStep=timeStep; window->setTitle(info()); }
+  if(timeStep > lastTitleSetStep+size_t(::max(1., 0.008/dt))) { lastTitleSetStep=timeStep; window->setTitle(info()); }
   return shared<Graphics>();
  }
 
