@@ -104,6 +104,7 @@ template<Type K, Type V> struct map {
  template<Type F> map& filter(F f) { for(size_t i=0; i<size();) if(f(keys[i], values[i])) { keys.removeAt(i); values.removeAt(i); } else i++; return *this; }
 
  void append(map&& b) { for(entry<K, V> e: b) { insert(move(e.key), move(e.value)); } }
+ void appendReplace(map&& b) { for(entry<K, V> e: b) { operator[](move(e.key)) = move(e.value); } }
 
  void appendMulti(const map& b) { for(const_entry<K, V> e: b) { insertMulti(copy(e.key), copy(e.value)); } }
  void appendMulti(map&& b) { for(entry<K, V> e: b) { insertMulti(move(e.key), move(e.value)); } }

@@ -16,9 +16,9 @@ struct PlotView : HList<Plot> {
  unique<Window> window = ::window(this, int2(0, 720));
  bool shown = false;
  size_t index = 0;
- buffer<unique<FileWatcher>> watchers = apply2(arguments(), [this](string path){
+ /*buffer<unique<FileWatcher>> watchers = apply2(arguments(), [this](string path){
   return unique<FileWatcher>(path, [this](string){ if(shown) load(); shown=false; window->render(); });
-});
+});*/
  PlotView() {
   window->actions[F12] = {this, &PlotView::snapshot};
   window->presentComplete = [this]{ shown=true; };
@@ -43,10 +43,9 @@ struct PlotView : HList<Plot> {
  }
  void load() {
   clear();
-  for(size_t unused i : range(0,1)) {
-   Plot& plot = append();
-   plot.xlabel = "Strain (%)"__;
-   plot.ylabel = unsafeRef(ref<string>{"Normalized Deviatoric Stress","Stress (Pa)"}[index]);
+  Plot& plot = append();
+  plot.xlabel = "Pressure (N)"__;
+  plot.ylabel = "Stress (Pa)"__;
    map<String, array<Variant>> allCoordinates;
    for(Folder folder: arguments()) {
     for(string name: folder.list(Files)) {
@@ -56,6 +55,8 @@ struct PlotView : HList<Plot> {
       if(!allCoordinates[::copy(parameter.key)].contains(parameter.value))
        allCoordinates.at(parameter.key).insertSorted(::copy(parameter.value));
     }
+   }
+   for(Folder folder: arguments()) {
     for(string name: folder.list(Files)) {
      if((!endsWith(name,".result") && !endsWith(name,".working")) || !existsFile(name, folder)) continue;
      TextData s (readFile(name, folder));
@@ -77,27 +78,26 @@ struct PlotView : HList<Plot> {
       }
      }
 break2:;
+     if(!dataSets.contains("Stress (Pa)")) continue;
      auto parameters = parseDict(section(name,'.',0,-2));
+     float pressure = parameters.at("Pressure");
      parameters.filter(
-        [&](string key, const Variant&){ return allCoordinates.at(key).size==1; }
+        [&](string key, const Variant&){ return key=="Pressure"_ || allCoordinates.at(key).size==1
+        || key=="Speed"_ // FIXME
+        ; }
      );
-     if(!dataSets.contains(plot.xlabel)) {
-      /*log("Missing data", plot.xlabel);*/ plot.dataSets.insert(str(parameters,", "_)); continue;
-     }
-     if(!dataSets.contains(plot.ylabel)) { log("Missing data", plot.ylabel); continue; }
-     plot.dataSets.insert(str(parameters,", "_),
-     {::move(dataSets.at(plot.xlabel)), ::move(dataSets.at(plot.ylabel))});
+     auto& dataSet = plot.dataSets[str(parameters,", "_)];
+     float max = 0;
+     for(float strain: dataSets.at("Stress (Pa)")) max = ::max(max, strain);
+     dataSet.insertSorted(pressure, max);
+     //if(!dataSets.contains(plot.xlabel)) { continue; }
+     //if(!dataSets.contains(plot.ylabel)) { continue; }
+     /*plot.dataSets.insert(str(parameters,", "_),
+          {::move(dataSets.at(plot.xlabel)), ::move(dataSets.at(plot.ylabel))});*/
+
     }
    }
-   /*if(index==0) {
-    plot.min.x = 0, plot.max.x = 100./16;
-    plot.min.y = 0, plot.max.y = 1;
-   }*//* else {
-    plot.min.x = 0, plot.max.x = 100./16;
-    plot.min.y = 0, plot.max.y = 1e8;
-   }*/
-  }
-  window->setTitle(array<Plot>::at(0).ylabel);
+   window->setTitle(array<Plot>::at(0).ylabel);
  }
 } app;
 

@@ -22,7 +22,7 @@ inline void operator*=(mref<float> values, float factor) { values.apply([factor]
                 *(__int128*)&desired));
 }*/
 
-void atomic_sub(v4sf& a, v4sf b) {
+inline void atomic_sub(v4sf& a, v4sf b) {
  v4sf expected, desired;
  do {
   expected = a;
@@ -31,7 +31,7 @@ void atomic_sub(v4sf& a, v4sf b) {
                 *(__int128*)&desired));
 }
 
-void atomic_add(float& a, float b) {
+inline void atomic_add(float& a, float b) {
  float expected = a;
  float desired;
  do {
@@ -40,7 +40,7 @@ void atomic_add(float& a, float b) {
                                       *(int*)&desired, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 }
 
-static const size_t maxThreadCount = 32;
+static const size_t maxThreadCount = 8;
 /*static size_t coreCount() {
  TextData s(File("/proc/cpuinfo").readUpToLoop(1<<16));
  assert_(s.data.size<s.buffer.capacity);
@@ -49,7 +49,7 @@ static const size_t maxThreadCount = 32;
  assert_(coreCount <= maxThreadCount);
  return coreCount;
 }*/
-static const int threadCount = parseInteger(environmentVariable("THREADS", "6")); //coreCount();
+static const int threadCount = parseInteger(environmentVariable("THREADS", "1")); //coreCount();
 
 struct thread {
  pthread_t pthread = 0;

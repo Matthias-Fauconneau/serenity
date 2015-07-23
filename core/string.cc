@@ -152,7 +152,11 @@ String str(double n, uint precision, uint exponent, uint pad) {
     if(__builtin_isnan(n)) return ::right("NaN", pad);
     if(n==::inf) return ::right("∞", pad+2);
     if(n==-::inf) return ::right("-∞", pad+2);
-    int e=0; if(n && exponent && (n<1 || log10(n)>=precision+4)) e=floor(log10(n) / exponent) * exponent, n /= exp10(e);
+    int e=0;
+    if(n && exponent && (n<1 || log10(n)>=precision+4)) {
+     e=floor(log10(n) / exponent) * exponent;
+     n /= exp10(e);
+    }
     array<char> s;
     if(sign) s.append('-');
     if(precision /*&& n!=round(n)*/) {
@@ -163,7 +167,9 @@ String str(double n, uint precision, uint exponent, uint pad) {
         assert_(isNumber(integer)/*, integer, n*/);
         s.append( str(uint64(integer)) );
         s.append('.');
-		s.append( str(decimal, precision) );
+        s.append( str(decimal, precision) );
+        while(s.last()=='0') s.pop(); // Trim trailing zeroes
+        if(s.last()=='.') s.pop(); // Trim trailing dot
     } else s.append( str(uint64(round(n))) );
     if(exponent==3 && e==3) s.append('K');
     else if(exponent==3 && e==6) s.append('M');

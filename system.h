@@ -1,10 +1,11 @@
+#pragma once
 #include "simd.h"
 #include "parallel.h"
 #include "variant.h"
 #include "matrix.h"
 typedef v4sf vec4f;
-float length2(vec4f v) { return sqrt(sq2(v))[0]; }
-float length(vec4f v) { return sqrt(sq3(v))[0]; }
+inline float length2(vec4f v) { return sqrt(sq2(v))[0]; }
+inline float length(vec4f v) { return sqrt(sq3(v))[0]; }
 
 #define sconst static constexpr
 
@@ -12,17 +13,17 @@ struct NoOperation {
   float operator [](size_t) const { return 0; }
 };
 string str(NoOperation) { return "NoOperation"_; }
-void operator +=(NoOperation, vec4f) {}
-void operator -=(NoOperation, vec4f) {}
-void atomic_add(NoOperation, vec4f) {}
-void atomic_sub(NoOperation, vec4f) {}
+inline void operator +=(NoOperation, vec4f) {}
+inline void operator -=(NoOperation, vec4f) {}
+inline void atomic_add(NoOperation, vec4f) {}
+inline void atomic_sub(NoOperation, vec4f) {}
 
 struct RadialSum {
  float radialSum;
  RadialSum& operator[](size_t){ return *this; }
  void operator -=(vec4f f) { radialSum += length2(f); }
 };
-void atomic_sub(RadialSum& t, vec4f f) { t.radialSum += length2(f); }
+inline void atomic_sub(RadialSum& t, vec4f f) { t.radialSum += length2(f); }
 
 sconst bool validation = true;
 
@@ -128,11 +129,11 @@ struct System {
  struct Plate : Vertex {
   struct { NoOperation operator[](size_t) const { return {}; }} torque;
 
-  sconst bool friction = true;
+  sconst bool friction = false;
   sconst float curvature = 0;
   sconst float elasticModulus = 1e11 * kg/(m*s*s); // 1 GPa
 
-  Plate() : Vertex(0, 2, 0.1 * densityScale) {
+  Plate() : Vertex(0, 2, 1e-3 * densityScale) {
    count = 2;
    position.clear(); velocity.clear(); force.clear();
    for(size_t i: range(3)) positionDerivatives[i].clear();
@@ -194,7 +195,7 @@ struct System {
   using Vertex::Vertex;
   struct { NoOperation operator[](size_t) const { return {}; }} torque;
 
-  sconst float radius = 0.3 * mm; // 2mm diameter
+  sconst float radius = 0.5 * mm; // 2mm diameter
   sconst float curvature = 1./radius;
   sconst float internodeLength = Grain::radius/2;
   sconst vec4f internodeLength4 = float3(internodeLength);
@@ -203,12 +204,12 @@ struct System {
   sconst float density = 1e3 * kg / cb(m) * densityScale;
   sconst float angularMass = 0;
   const float elasticModulus; // ~ 8e6
+  const vec4f tensionStiffness = float3(10*/*FIXME*/ elasticModulus * PI * sq(radius));
+  sconst vec4f tensionDamping = _0f; //float3(mass / s);
   sconst float areaMomentOfInertia = PI/4*pow4(radius);
-  const float bendStiffness = elasticModulus * areaMomentOfInertia / internodeLength;
+  const float bendStiffness = 10*/*FIXME*/ elasticModulus * areaMomentOfInertia / internodeLength;
   sconst float mass = Wire::density * Wire::volume;
-  sconst float bendDamping = mass / s;
-  const vec4f tensionStiffness = float3(elasticModulus * PI * sq(radius));
-  sconst vec4f tensionDamping = float3(mass / s);
+  sconst float bendDamping = 0; //mass / s;
   float tensionEnergy=0;
   Wire(float elasticModulus, size_t base) :
     Vertex{base, 32768, Wire::mass}, elasticModulus(elasticModulus) {}
@@ -295,7 +296,7 @@ struct System {
   struct { NoOperation operator[](size_t) const { return {}; }} torque;
  } rigidSide {side.radius};
 
- /// Sphere - Side
+ /// Sphere - Rigid side
  template<Type tA>
  Contact contact(const tA& A, size_t aIndex, const RigidSide& side, size_t) {
   float length = length2(A.position[aIndex]);
@@ -308,10 +309,11 @@ struct System {
 
  System(const Dict& p) :
    dt(p.at("TimeStep"_)),
-   gz(p.at("G")),
+   gz(10/*p.at("G")*/),
    frictionCoefficient(p.at("Friction"_)),
    wire(p.value("Elasticity"_, 0), grain.base+grain.capacity),
-   side(Grain::radius/(float)p.at("Resolution"), p.at("Radius"_), p.at("Height"_), p.at("Thickness"_), wire.base+wire.capacity) {}
+   side(Grain::radius/1.7/*(float)p.at("Resolution")*/,
+        p.at("Radius"_), p.at("Height"_), /*p.at("Thickness"_)*/8e-3, wire.base+wire.capacity) {}
 
  // Update
  size_t timeStep = 0;

@@ -31,7 +31,7 @@ struct Build {
 	array<String> defines;
 	array<unique<Node>> modules;
 	array<String> files;
-	array<String> libraries;
+ array<String> libraries;
 	struct Job {
 		String target;
 		int pid;

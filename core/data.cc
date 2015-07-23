@@ -271,5 +271,9 @@ double TextData::decimal() {
    advance(1);
   }
  }
+ if(match("µ")) exponent-=6;
+ else if(match('m')) exponent-=3;
+ else if(match('K')) exponent+=3;
+ else if(match('M')) exponent+=6;
  return sign*significand*exp10(eSign*exponent-decimal);
 }

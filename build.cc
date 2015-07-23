@@ -209,7 +209,9 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
 			log(job.stdout.readUpTo(4096));
 			if(status) { binary={}; return; }
 			else log(job.target+'\n');
-		}
+  }
+  libraries.append("stdc++"__);
+  libraries.append("m"__);
 		array<String> args = (buffer<String>)(
 					move(files) +
                     mref<String>{"-o"__, unsafeRef(binary), "-L/var/tmp/lib"__, "-Wl,-rpath,/var/tmp/lib"__,} +

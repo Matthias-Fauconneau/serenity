@@ -15,42 +15,10 @@ template<Type tA> vec4f toGlobal(tA& A, size_t a, vec4f localA) {
  return A.position[a] + qapply(A.rotation[a], localA);
 }
 
-Dict parameters() {
- Dict parameters = parseDict(
-    "Friction: 0.3," // 0.1
-    //"Elasticity:8e6, Rate:300,"
-    "TimeStep:1e-4,"
-    //"TimeStep:8e-5,"
-    //"TimeStep:2e-5,"
-    //"TimeStep:4e-5,"
-    //"TimeStep:1e-5,"
-    "Speed: 0.1,"
-    //"Pattern:none,"_
-    //"Pattern:helix,"_
-    //"Pattern:cross,"_
-    //"Pattern:loop,"_
-    //"Height: 0.2, Radius:0.05"_
-    //"Height: 0.15, Radius:0.03"_
-    //"Height: 0.1, Radius:0.025"_
-    //"Height: 0.15, Radius:0.02"_
-    "Height: 0.08, Radius:0.02"_
-    //"Height: 0.08, Radius:0.015"_
-    //"Height: 0.06, Radius:0.015"_
-    ", PlateSpeed: 1e-4"_ //3-5
-    ", Resolution: 1.6"_ //1.5
-    ", G: 10"_
-    ", Thickness: 1e-3"_
-    );
- for(string argument: arguments()) if(argument.contains('=')) parameters.append(parseDict(argument));
- if(!parameters.contains("Pressure")) parameters.insert("Pressure"__,"1e5"__);
- return parameters;
-}
-
 struct SimulationRun : Simulation {
- SimulationRun(Dict parameters=::parameters()) : Simulation(parameters,
-  File(str(parameters)+".result", currentWorkingDirectory(), Flags(WriteOnly|Create|Truncate))) {
-    log(stream.name());
-    log("Threads", threadCount);
+ SimulationRun(const Dict& parameters, File&& file) : Simulation(parameters, move(file)) {
+    //log(stream.name());
+    //log("Threads", threadCount);
 #if !UI
     while(processState < Done) {
      if(timeStep%size_t(1e-1/dt) == 0) {
@@ -60,45 +28,6 @@ struct SimulationRun : Simulation {
      step();
     }
 #endif
- }
-
- String info() {
-  array<char> s {
-   copyRef(processStates[processState])};
-  s.append(" "_+str(pressure,0u,1u));
-  s.append(" "_+str(dt,0u,1u));
-  s.append(" "_+str(grain.count)/*+" grains"_*/);
-  s.append(" "_+str(int(timeStep*this->dt/**1e3*/))+"s"_);
-  //if(processState==Wait)
-  s.append(" "_+decimalPrefix(grainKineticEnergy/*/densityScale*//grain.count, "J"));
-  if(processState>=ProcessState::Load) {
-   //s.append(" "_+str(int(plate.position[1][2]*1e3))+"mm");
-   /*float weight = (grain.count*grain.mass + wire.count*wire.mass) * G[2];
-   float stress = (plate.force[1][2]-(plate.force[0][2]-weight))/(2*PI*sq(side.initialRadius));
-   s.append(" "_+str(int(stress*1e-6))+"MPa");*/
-   float bottomZ = plate.position[0][2], topZ = plate.position[1][2];
-   float displacement = (topZ0-topZ+bottomZ-bottomZ0);
-   s.append(" "_+str(displacement/(topZ0-bottomZ0)*100));
-  }
-  if(grain.count) {
-   float height = plate.position[1][2] - plate.position[0][2];
-   float voidRatio = PI*sq(side.radius)*height / (grain.count*Grain::volume) - 1;
-   s.append(" Ratio:"+str(int(voidRatio*100))+"%");
-  }
-  if(wire.count) {
-   float wireDensity = (wire.count-1)*Wire::volume / (grain.count*Grain::volume);
-   s.append(" Wire density:"+str(int(wireDensity*100))+"%");
-  }
-  //s.append(" Z:"_+str(int(plate.position[1][2]*1e3)));
-  //s.append(" R:"_+str(int(side.radius*1e3)));
-  if(processState >= ProcessState::Pack)
-   s.append(" "_+str(int((topForce+bottomForce)/(topForce-bottomForce)*100), 2u)+"%");
-  //s.append(" Om%"_+str(int(overlapMean/(2*Grain::radius)*100)));
-  //s.append(" OM%:"+str(int(overlapMax/(2*Grain::radius)*100)));
-  s.append(" S/D: "+str(staticFrictionCount2, dynamicFrictionCount2));
-  s.append(" T: "+str(int(side.tensionEnergy2))+"J");
-  //if(debug) s.append(" "+debug);
-  return move(s);
  }
 
  void report() {
@@ -139,7 +68,9 @@ struct SimulationView : SimulationRun, Widget, Poll {
  GLFrameBuffer target;
  size_t lastTitleSetStep = 0;
 
- SimulationView() : Poll(0, POLLIN, simulationThread) {
+ SimulationView(const Dict& parameters, File&& file) :
+   SimulationRun(parameters, move(file)),
+   Poll(0, POLLIN, simulationThread) {
   if(/*XDisplay::hasServer() &&*/ /*arguments().contains("view")*/1) {
    window = ::window(this, -1, mainThread, true);
    window->actions[F11] = {(SimulationRun*)this, &SimulationRun::report};
@@ -193,8 +124,16 @@ struct SimulationView : SimulationRun, Widget, Poll {
    requestTermination();
 #endif
   }
+  if(timeStep > lastTitleSetStep+size_t(0.1/dt)) { lastTitleSetStep=timeStep; window->setTitle(info()); }
   if(processState < Done) queue();
-  else { /*Simulation::snapshot();*/ log("Done"); requestTermination(0); }
+  else if(processState == Done) { /*Simulation::snapshot();*/ log("Done"); requestTermination(0); }
+  else {
+   window->setTitle(info());
+   log(plate.position[0], plate.position[1]);
+   window->show(); // Raises
+   extern int groupExitStatus;
+   groupExitStatus = -1; // Let user view and return failed exit status on window close to stop sweep
+  }
  }
 
  vec2 sizeHint(vec2) override { return vec2(1050, 1050*size.y/size.x); }
@@ -404,7 +343,5 @@ struct SimulationView : SimulationRun, Widget, Poll {
   else return false;
   return true;
  }
-} app;
-#else
-SimulationRun app;
+};
 #endif

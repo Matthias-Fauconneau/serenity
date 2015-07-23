@@ -6,7 +6,7 @@
 struct Ticks { float max; uint tickCount; };
 uint subExponent(float& value) {
  float subExponent = exp10(log10(abs(value)) - floor(log10(abs(value))));
- for(auto a: (float[][2]){{1,5},{1.2,6},{1.4,7},{2,10},{2.5,5},{3,3},{3.6,6},{4,8},{5,5},{6,6},{8,8},{10,5}}) {
+ for(auto a: (float[][2]){{1,5},{1.2,6},{1.4,7},{2,10},{2.5,5},{3,3},/*{3.6,6},*/{4,8},{5,5},{6,6},{8,8},{10,5}}) {
   if(a[0] >= subExponent-0x1p-52) {
    value=(value>0?1:-1)*a[0]*exp10(floor(log10(abs(value))));
    return a[1];
@@ -66,13 +66,13 @@ shared<Graphics> Plot::graphics(vec2 size) {
  struct Tick : Text { float value; Tick(float value, string label) : Text(label), value(value) {} };
  array<Tick> ticks[2]; vec2 tickLabelSize = 0;
  for(uint axis: range(2)) {
-  uint precision = ::max(0., ceil(-log10(::max(-min[axis],max[axis])/tickCount[axis])));
+  uint precision = ::max(1., ceil(-log10(::max(-min[axis],max[axis])/tickCount[axis])));
   for(uint i: range(tickCount[axis]+1)) {
    float lmin = log[axis] ? log2(min[axis]) : min[axis];
    float lmax = log[axis] ? log2(max[axis]) : max[axis];
    float value = lmin+(lmax-lmin)*i/tickCount[axis];
    if(log[axis]) value = exp2(value);
-   String label = str(value, precision, value>=10e5 ? 3u : value <=10e-2 ? 1u : 0u);
+   String label = str(value, precision, 3u/*value>=1e3 ? 3u : value <=10e-2 ? 1u : 0u*/);
    assert(label);
    ticks[axis].append(value, label);
    tickLabelSize = ::max(tickLabelSize, ticks[axis][i].sizeHint());

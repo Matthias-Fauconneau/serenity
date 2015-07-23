@@ -29,7 +29,7 @@ fragment {
   }
   cylinder {
     float dz = sqrt(1-abs(vLocalCoords.x));
-    color = vec4(1./2*vec3(dz), 1);
+    color = vec4(dz*(gl_PrimitiveID/2%2==0?vec3(1,0,0):vec3(0,0,1)), 1);
     uniform float radius;
     gl_FragDepth = gl_FragCoord.z + dz * radius;
   }

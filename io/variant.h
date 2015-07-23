@@ -91,6 +91,7 @@ inline Dict parseDict(TextData& s) {
   string key = s.whileNo(":=|},"_);
   string value; s.whileAny(" "_);
   if(s.matchAny(":="_)) { s.whileAny(" "_); value = s.whileNo("|,} "_,'{','}'); }
+  assert_(key && value, key, value, s.data, s.slice(s.index));
   dict.insertSorted(copyRef(key), replace(copyRef(value),'\\','/'));
   s.whileAny(" "_);
   if(s.matchAny("|,"_)) continue;

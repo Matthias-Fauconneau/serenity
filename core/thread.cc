@@ -45,7 +45,7 @@ Thread mainThread __attribute((init_priority(102))) (0);
 // Flag to cleanly terminate all threads
 static bool terminationRequested = false;
 // Exit status to return for process (group)
-static int groupExitStatus = 0;
+int groupExitStatus = 0;
 
 //generic T* addressOf(T& arg)  { return reinterpret_cast<T*>(&const_cast<char&>(reinterpret_cast<const volatile char&>(arg))); }
 Thread::Thread(int priority, bool spawn) : Poll(0,POLLIN,*this), priority(priority) {
@@ -190,7 +190,7 @@ int main(int argc, char** argv) {
 }
 
 void requestTermination(int status) {
- groupExitStatus = status;
+ if(status) groupExitStatus = status;
  terminationRequested = true;
  Locker lock(threadsLock);
  assert_(threads);

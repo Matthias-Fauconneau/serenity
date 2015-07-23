@@ -71,12 +71,12 @@ struct CylinderGrid {
  inline int2 index2(vec4f p) {
   float angle = PI+0x1p-23+atan(p[1], p[0]);
   assert(angle >= 0 && angle/(2*PI+0x1p-22)*size.x < size.x, angle, log2(angle-2*PI));
-  assert_(p[2] >= min && p[2] < max, min, p, max);
+  assert(p[2] >= min && p[2] < max, min, p, max);
   return int2(int(angle/(2*PI+0x1p-22)*size.x), int((p[2]-min)/(max-min)*size.y));
  }
  inline size_t index(vec4f p) {
   int2 i = index2(p);
-  assert_(i.x < size.x && i.y < size.y, min, p, max, i, size);
+  assert(i.x < size.x && i.y < size.y, min, p, max, i, size);
   return i.y*size.x+i.x;
  }
  array<uint16>& operator()(vec4f p) { return cells[index(p)]; }
@@ -85,7 +85,7 @@ struct CylinderGrid {
 enum Pattern { None, Helix, Cross, Loop };
 static string patterns[] {"none", "helix", "cross", "loop"};
 enum ProcessState { Pour, Pack, Load, Done, Fail };
-static string processStates[] {"pour","pack","load","done"};
+static string processStates[] {"pour","pack","load","done","failed"};
 
 struct Simulation : System {
  // Process parameters
@@ -282,8 +282,8 @@ struct Simulation : System {
   }
  }
 
- const float pourPackThreshold = 1e-3;
- const float packLoadThreshold = 1e-3;
+ const float pourPackThreshold = 2e-3;
+ const float packLoadThreshold = 2e-3;
  const float transitionTime = 1*s;
 
  void step() {
@@ -297,8 +297,9 @@ struct Simulation : System {
   float voidRatio = PI*sq(side.radius)*height / (grain.count*Grain::volume) - 1;
   if(processState == Pour) {
    if(grain.count == grain.capacity ||
-      skip || (voidRatio < 0.81 &&
-        (!parameters.contains("Pressure") || grainKineticEnergy / grain.count < pourPackThreshold))) {
+      skip || (voidRatio < 0.93 &&
+        (!parameters.contains("Pressure") || grainKineticEnergy / grain.count < pourPackThreshold))
+      || (/*wire.count &&*/ currentPourHeight >= targetHeight)) {
     skip = false;
     //processState++;
     processState = Pack;
@@ -346,8 +347,8 @@ struct Simulation : System {
                                     cos(t1)*sin(t2),
                                     cos(t2)};
      // Speeds up pouring
-     if(parameters.contains("Pressure"_))
-      grain.velocity[i][2] = - ::min(grain.position[i][2],  validation ? 0.01f : 0.01f);
+     //if(parameters.contains("Pressure"_))
+     grain.velocity[i][2] = - ::min(grain.position[i][2],  0.01f);
      break;
     }
 break2_:;
@@ -359,7 +360,7 @@ break2_:;
    topZ = ::max(topZ, p[2]+Grain::radius);
   float alpha = processState == Pack ? ::min(1.f, (timeStep-packStart)*dt / transitionTime) : 1;
   if(processState == Pack) {
-   plate.position[1][2] = ::min(plate.position[1][2], topZ); // Fit plate (Prevent initial decompression)
+   //plate.position[1][2] = ::min(plate.position[1][2], topZ); // Fit plate (Prevent initial decompression)
    if(G[2] < 0) G[2] += dt/transitionTime * gz; else G[2] = 0;
    if(side.thickness > side.loadThickness)
     side.thickness -= dt/transitionTime * (side.pourThickness-side.loadThickness);
@@ -375,9 +376,9 @@ break2_:;
 
    if(parameters.contains("Pressure"_)) {
     if(G[2] == 0 && side.thickness == side.loadThickness && (skip || (
-                                                              voidRatio < 2./3 &&
+                                                              voidRatio < 0.76 &&
                                                               grainKineticEnergy / grain.count < packLoadThreshold &&
-                                                              abs(topForce+bottomForce)/(topForce-bottomForce) < 0.1/*2*/ ))) {
+                                                              abs(topForce+bottomForce)/(topForce-bottomForce) < 0.5))) {
      skip = false;
      processState = ProcessState::Load;
      bottomZ0 = plate.position[0][2];
@@ -393,8 +394,9 @@ break2_:;
                   "Initial Radius (mm):", side.radius*1e3,
                   "Initial Height (mm):", (topZ0-bottomZ0)*1e3,
                   "Grain density (%):", grainDensity*100,
-                  "Void Ratio (%):", voidRatio*100, "\n")
-       +(wire.count?str("Wire density (%):", wireDensity*100):""__));
+                  "Void Ratio (%):", voidRatio*100)
+       +(wire.count?str(" Wire density (%):", wireDensity*100):""__)
+       +"\n");
      stream.write("Strain (%), Stress (Pa), Deviatoric Stress (Pa), Normalized Deviatoric Stress\n"); //, Tension (J)
     }
    } else {
@@ -422,7 +424,8 @@ break2_:;
   normalEnergy=0, staticEnergy=0, wire.tensionEnergy=0, side.tensionEnergy=0, bendEnergy=0;
 
   // Plate
-  plate.force[0] = plate.force[1] = _0f;
+  plate.force[0] = _0f;
+  plate.force[1] = float4(plate.mass) * G;
 
   // Soft membrane side
   sideTime.start();
@@ -507,14 +510,22 @@ break2_:;
   grainInitializationTime.stop();
 
   grainGridTime.start();
-  parallel_chunk(grain.count, [this,&grainGrid,&grainLattice,&vertexGrid](uint, size_t start, size_t size) {
+  parallel_chunk(grain.count, [this,&grainGrid,
+                 #if WIRE
+                 &grainLattice,
+               #endif
+                 &vertexGrid](uint, size_t start, size_t size) {
    for(size_t grainIndex: range(start, start+size)) {
     grain.force[grainIndex] = float4(grain.mass) * G;
     grain.torque[grainIndex] = _0f;
     penalty(grain, grainIndex, plate, 0);
     penalty(grain, grainIndex, plate, 1);
     // Side vertices
-    int2 index = vertexGrid.index2(grain.position[grainIndex]);
+    vec4f p = grain.position[grainIndex];
+    if(!(p[2] >= vertexGrid.min && p[2] < vertexGrid.max)) {
+     log("Bounds", vertexGrid.min, p, vertexGrid.max); processState = Fail; return;
+    }
+    int2 index = vertexGrid.index2(p);
     for(int y: range(::max(0, index.y-1), ::min(vertexGrid.size.y, index.y+1 +1))) {
      for(int x: range(index.x-1, index.x+1 +1)) {
       // Wraps around (+size.x to wrap -1)
@@ -528,6 +539,7 @@ break2_:;
     grainGrid(grain.position[grainIndex]).append(1+grainIndex);
    }
   }, threadCount);
+  if(processState == Fail) return;
   grainGridTime.stop();
 
   grainContactTime.start();
@@ -592,7 +604,7 @@ break2_:;
    const int wX = wireLattice.size.x, wY = wireLattice.size.y;
    const int r =  2;
    const int n = r+1+r, N = n*n;
-   static unused bool once = ({ log(r,n,N); true; });
+   //static unused bool once = ({ log(r,n,N); true; });
    const uint16* wireNeighbours[N];
    for(int z: range(n)) for(int y: range(n))
     wireNeighbours[z*n+y] = wireBase+(z-r)*wY*wX+(y-r)*wX-r;
@@ -644,6 +656,9 @@ break2_:;
     }
     // Bounds
     penalty(wire, i, plate, 0);
+    penalty(wire, i, plate, 1);
+#define WIREBOUNDS 1
+#if WIREBOUNDS
     //for(size_t b: range(side.faceCount)) penalty(wire, i, side, b);
     /*// Side vertices
     {int2 index = vertexGrid.index2(wire.position[i]);
@@ -655,7 +670,7 @@ break2_:;
      }
     }}*/
     penalty(wire, i, rigidSide, 0);
-    penalty(wire, i, plate, 1);
+#endif
     // Wire - Grain
     {size_t offset = grainLattice.index(wire.position[i]);
      for(size_t n: range(3*3)) {
@@ -709,17 +724,10 @@ break2_:;
       }
      }
     }
-    // Bounds
-    penalty(wire, i, plate, 0);
-    penalty(wire, i, plate, 1);
-    // Wire - Grain
-    {size_t offset = grainLattice.index(wire.position[i]);
-    for(size_t n: range(3*3)) {
-     v4hi line = loada(grainNeighbours[n] + offset);
-     if(line[0]) penalty(wire, i, grain, line[0]-1);
-     if(line[1]) penalty(wire, i, grain, line[1]-1);
-     if(line[2]) penalty(wire, i, grain, line[2]-1);
-    }}
+     // Bounds
+     penalty(wire, i, plate, 0);
+     penalty(wire, i, plate, 1);
+#if WIREBOUNDS
     /*// Side vertices
     {int2 index = vertexGrid.index2(wire.position[i]);
     for(int y: range(::max(0, index.y-1), ::min(vertexGrid.size.y, index.y+1 +1))) {
@@ -730,6 +738,15 @@ break2_:;
      }
     }}*/
     penalty(wire, i, rigidSide, 0);
+#endif
+    // Wire - Grain
+    {size_t offset = grainLattice.index(wire.position[i]);
+    for(size_t n: range(3*3)) {
+     v4hi line = loada(grainNeighbours[n] + offset);
+     if(line[0]) penalty(wire, i, grain, line[0]-1);
+     if(line[1]) penalty(wire, i, grain, line[1]-1);
+     if(line[2]) penalty(wire, i, grain, line[2]-1);
+    }}
     if(intersectWireWire) { // Wire - Wire
      size_t offset = wireLattice.index(wire.position[i]);
      for(size_t yz: range(N)) {
@@ -781,14 +798,7 @@ break2_:;
     // Bounds
     penalty(wire, i, plate, 0);
     penalty(wire, i, plate, 1);
-    // Wire - Grain
-    {size_t offset = grainLattice.index(wire.position[i]);
-    for(size_t n: range(3*3)) {
-     v4hi line = loada(grainNeighbours[n] + offset);
-     if(line[0]) penalty(wire, i, grain, line[0]-1);
-     if(line[1]) penalty(wire, i, grain, line[1]-1);
-     if(line[2]) penalty(wire, i, grain, line[2]-1);
-    }}
+#if WIREBOUNDS
     /*// Side vertices
     {int2 index = vertexGrid.index2(wire.position[i]);
     for(int y: range(::max(0, index.y-1), ::min(vertexGrid.size.y, index.y+1 +1))) {
@@ -799,6 +809,15 @@ break2_:;
      }
     }}*/
     penalty(wire, i, rigidSide, 0);
+#endif
+    // Wire - Grain
+    {size_t offset = grainLattice.index(wire.position[i]);
+    for(size_t n: range(3*3)) {
+     v4hi line = loada(grainNeighbours[n] + offset);
+     if(line[0]) penalty(wire, i, grain, line[0]-1);
+     if(line[1]) penalty(wire, i, grain, line[1]-1);
+     if(line[2]) penalty(wire, i, grain, line[2]-1);
+    }}
     if(intersectWireWire) { // Wire - Wire
      size_t offset = wireLattice.index(wire.position[i]);
      for(size_t yz: range(N)) {
@@ -886,14 +905,14 @@ break2_:;
  if(processState == ProcessState::Pack) {
   plate.force[0][2] += pressure * PI * sq(side.radius);
   bottomForce = plate.force[0][2];
-  plate.force[0][2] *= (1-alpha); // Transition from force to displacement
+  //plate.force[0][2] *= (1-alpha); // Transition from force to displacement
   System::step(plate, 0);
   //plate.position[0][2] = ::max(0.f, plate.position[0][2]);
   plate.velocity[0][2] = ::max(0.f, plate.velocity[0][2]); // Only compression
 
   plate.force[1][2] -= pressure * PI * sq(side.radius);
   topForce = plate.force[1][2];
-  plate.force[1][2] *= (1-alpha); // Transition from force to displacement
+  //plate.force[1][2] *= (1-alpha); // Transition from force to displacement
   System::step(plate, 1);
   //plate.position[1][2] = ::min(plate.position[1][2], currentHeight);
   plate.velocity[1][2] = ::min(plate.velocity[1][2], 0.f); // Only compression
@@ -968,6 +987,7 @@ break2_:;
     min = ::min(min, wire.position[i]);
     max = ::max(max, wire.position[i]);
     wire.velocity[i] = _0f;
+    wire.velocity[i][2] = - ::min(wire.position[i][2],  0.01f);
     for(size_t n: range(3)) wire.positionDerivatives[n][i] = _0f;
     wire.frictions.set(i);
    }
@@ -977,4 +997,44 @@ break2_:;
 
   stepTime.stop();
  }
+
+String info() {
+ array<char> s {
+  copyRef(processStates[processState])};
+ s.append(" "_+str(pressure,0u,1u));
+ s.append(" "_+str(dt,0u,1u));
+ s.append(" "_+str(grain.count)/*+" grains"_*/);
+ s.append(" "_+str(int(timeStep*this->dt/**1e3*/))+"s"_);
+ //if(processState==Wait)
+ s.append(" "_+decimalPrefix(grainKineticEnergy/*/densityScale*//grain.count, "J"));
+ if(processState>=ProcessState::Load) {
+  //s.append(" "_+str(int(plate.position[1][2]*1e3))+"mm");
+  /*float weight = (grain.count*grain.mass + wire.count*wire.mass) * G[2];
+  float stress = (plate.force[1][2]-(plate.force[0][2]-weight))/(2*PI*sq(side.initialRadius));
+  s.append(" "_+str(int(stress*1e-6))+"MPa");*/
+  float bottomZ = plate.position[0][2], topZ = plate.position[1][2];
+  float displacement = (topZ0-topZ+bottomZ-bottomZ0);
+  s.append(" "_+str(displacement/(topZ0-bottomZ0)*100));
+ }
+ if(grain.count) {
+  float height = plate.position[1][2] - plate.position[0][2];
+  float voidRatio = PI*sq(side.radius)*height / (grain.count*Grain::volume) - 1;
+  s.append(" Ratio:"+str(int(voidRatio*100))+"%");
+ }
+ if(wire.count) {
+  float wireDensity = (wire.count-1)*Wire::volume / (grain.count*Grain::volume);
+  s.append(" Wire density:"+str(int(wireDensity*100))+"%");
+ }
+ //s.append(" Z:"_+str(int(plate.position[1][2]*1e3)));
+ //s.append(" R:"_+str(int(side.radius*1e3)));
+ if(processState >= ProcessState::Pack)
+  s.append(" "_+str(int((topForce+bottomForce)/(topForce-bottomForce)*100), 2u)+"%");
+ //s.append(" Om%"_+str(int(overlapMean/(2*Grain::radius)*100)));
+ //s.append(" OM%:"+str(int(overlapMax/(2*Grain::radius)*100)));
+ s.append(" S/D: "+str(staticFrictionCount2, dynamicFrictionCount2));
+ s.append(" T: "+str(int(side.tensionEnergy2))+"J");
+ //if(debug) s.append(" "+debug);
+ return move(s);
+}
 };
+

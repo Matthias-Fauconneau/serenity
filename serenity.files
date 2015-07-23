@@ -70,7 +70,7 @@ video/encoder.cc
 
 algebra.h
 algebra.cc
-view.cc
+view.h
 shader.glsl
 system.h
 simulation.h
@@ -78,3 +78,5 @@ sweep.cc
 plot-app.cc
 review.cc
 pattern.cc
+envelope.cc
+single.cc
