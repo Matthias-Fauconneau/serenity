@@ -67,7 +67,6 @@ int daysInMonth(int month, int year);
 String str(Date date, const string format="dddd, dd MMMM yyyy hh:mm:ss");
 
 /// Parses a date from s
-/// \note dates are parsed as dddd, dd mmmm yyyy
 Date parseDate(TextData& s);
 inline Date parseDate(const string s) { TextData t(s); return parseDate(t); }
 

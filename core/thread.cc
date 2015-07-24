@@ -205,7 +205,7 @@ String which(string name) {
  return {};
 }
 
-int execute(const string path, const ref<string> args, bool wait, const Folder& workingDirectory, Handle* stdout) {
+int execute(const string path, const ref<string> args, bool wait, const Folder& workingDirectory, Handle* stdout, Handle* stderr) {
  if(!existsFile(path)) { error("Executable not found",path); return -1; }
 
  buffer<String> args0(1+args.size, 0);
@@ -223,23 +223,32 @@ int execute(const string path, const ref<string> args, bool wait, const Folder& 
  for(uint i: range(env0.size)) envp[i]=env0[i].data;
  envp[env0.size]=0;
 
- int pipe[2];
- if(stdout) check( ::pipe(pipe) );
+ int pipeOut[2], pipeErr[2];
+ if(stdout) check( ::pipe(pipeOut) );
+ if(stderr) check( ::pipe(pipeErr) );
 
  int cwd = workingDirectory.fd;
  int pid = fork();
  if(pid==0) {
   if(stdout) {
-   close(pipe[0]); // Child does not read
-   dup2(pipe[1], 2); // Redirect stdout to pipe
+   close(pipeOut[0]); // Child does not read
+   dup2(pipeOut[1], 1); // Redirect stdout to pipe
+  }
+  if(stderr) {
+   close(pipeErr[0]); // Child does not read
+   dup2(pipeErr[1], 2); // Redirect stderr to pipe
   }
   if(cwd!=AT_FDCWD) check(fchdir(cwd));
   if(!execve(strz(path), (char*const*)argv, (char*const*)envp)) exit_group(-1);
   __builtin_unreachable();
  } else {
   if(stdout) {
-   close(pipe[1]); // Parent does not write
-   stdout->fd = pipe[0];
+   close(pipeOut[1]); // Parent does not write
+   stdout->fd = pipeOut[0];
+  }
+  if(stderr) {
+   close(pipeErr[1]); // Parent does not write
+   stderr->fd = pipeErr[0];
   }
   if(wait) return ::wait(pid);
   else { isRunning(pid); return pid; }

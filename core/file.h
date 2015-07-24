@@ -210,5 +210,6 @@ ref<string> cmdline();
 /// Returns value for environment variable \a name
 string environmentVariable(const string name, string value=""_);
 
-/// Returns standard folders
+/// Returns user informations
+const string user();
 const Folder& home(); //$HOME ?: pwuid->pw_dir

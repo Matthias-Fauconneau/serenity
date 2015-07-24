@@ -124,22 +124,22 @@ String str(Date date, const string format) {
 
 Date parseDate(TextData& s) {
     Date date;
-    {
-        if(s.match("Today")) date=currentTime(), date.hours=date.minutes=date.seconds=-1;
-        else for(int i=0;i<7;i++) if(s.match(days[i])) { date.weekDay=i; goto break_; }
-        /*else*/ for(int i=0;i<7;i++) if(s.match(days[i].slice(0,3))) { date.weekDay=i; break; }
-        break_:;
-    }
+    if(s.match("Today")) date=currentTime(), date.hours=date.minutes=date.seconds=-1;
+    else for(int i=0;i<7;i++) if(s.match(days[i]) || s.match(days[i].slice(0,3))) { date.weekDay=i; break; }
     for(;;) {
         s.whileAny(" ,\t");
-        for(int i=0;i<12;i++) if(s.match(months[i])) { date.month=i; goto continue2_; }
-        /*else*/ for(int i=0;i<12;i++) if(s.match(months[i].slice(0,3))) { date.month=i; goto continue2_; }
-        /*else */ if(s.available(1) && s.peek()>='0'&&s.peek()<='9') {
+        for(int i=0;i<12;i++) {
+         if(s.match(months[i]) || s.match(months[i].slice(0,3))) { date.month=i; goto continue2_; }
+        } /*else */ if(s.available(1) && s.peek()>='0'&&s.peek()<='9') {
             int number = s.integer();
             if(s.match(":")) { date.hours=number; date.minutes=s.integer(); if(s.match(":")) date.seconds=s.integer(); }
             else if(s.match('h')) { date.hours=number; date.minutes= (s.available(2)>=2 && isInteger(s.peek(2)))? s.integer() : 0; }
+            else if(s.match("/")) {
+             date.month=number; date.day=s.integer();
+             if(s.match("/")) date.year=s.integer();
+            }
             else if(date.day==-1) date.day=number-1;
-            else if(date.month==-1) date.year=number-1;
+            //else if(date.month==-1) date.month=number-1;
             else if(date.year==-1) date.year=number;
             else error("Invalid date", s);
         } else break;

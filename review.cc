@@ -34,6 +34,8 @@ struct Rename {
 struct ArrayView : Widget {
  string valueName;
  map<Dict, float> points; // Data points
+ map<Dict, String> ids; // Job IDs
+ map<String, String> running; // Running job IDs, start time
  float min = inf, max = -inf;
  uint textSize;
  vec2 headerCellSize = vec2(80*textSize/16, textSize);
@@ -42,16 +44,45 @@ struct ArrayView : Widget {
   split("Friction,Radius,Pressure",","),
   split("TimeStep,Rate,Pattern",",")
  };
+ struct Target { Rect rect; const Dict& key; };
+ array<Target> targets;
 
  ArrayView(string valueName, uint textSize=16)
   : valueName(valueName), textSize(textSize) {
+  if(arguments() && startsWith(arguments()[0],"server-")) {
+   if(!existsFile(arguments()[0]) || File(arguments()[0]).modifiedTime() < realTime()-60*60e9) {
+    Stream stdout;
+    Time time;
+    execute("/usr/bin/ssh",{arguments()[0],"qstat","-u", user(), "-s","r"}, true, currentWorkingDirectory(), &stdout);
+    log(time);
+    auto running = stdout.readUpTo(1<<17);
+    assert_(running.size < running.capacity, running.size);
+    writeFile(arguments()[0], running);
+   }
+   TextData s = readFile(arguments()[0]);
+   assert_(s);
+   s.line(); s.line();
+   for(;;) {
+    s.whileAny(' ');
+    string id = s.whileInteger();
+    assert_(id);
+    s.whileAny(' '); s.decimal(); // Priority
+    s.whileAny(' '); s.whileNot(' '); // Short name
+    s.whileAny(' '); s.whileNot(' '); // User name
+    s.whileAny(' '); s.whileNot(' '); // Status
+    Date date = parseDate(s); // Start date
+    running.insert(copyRef(id), currentTime()-date);
+    if(!s) break;
+    s.skip('\n');
+   }
+   log(running);
+  }
   Folder results ("."_);
   for(string name: results.list(Files)) {
    if(!name.contains('.')) continue;
    auto file = readFile(name);
    if(!file) continue;
    Dict configuration = parseDict(section(name,'.',0,-2));
-   //if(points.contains(configuration)) { log("Duplicate configuration", configuration); continue; }
    if(!configuration.contains("Pattern")) continue;
    float value = 0;
    if(endsWith(name,".result") || endsWith(name,".working")) {
@@ -80,25 +111,35 @@ struct ArrayView : Widget {
    } else {
     TextData suffix {section(name,'.',-2,-1)};
     suffix.skip('e');
-    suffix.whileInteger();
+    string id = suffix.whileInteger();
     assert_(!suffix, suffix);
     TextData s (file);
     string lastTime;
     while(s) {
-     string number = s.whileDecimal();
-     if(number && number!="0"_) lastTime = number;
+     string number = s.whileDecimal(); // Simulation time
+     if(number && number!="0"_) {
+      s.skip(' ');
+      number = s.whileDecimal(); // Real time
+      assert_(number);
+      lastTime = number;
+     }
      s.line();
     }
     if(!lastTime) continue;
     value = parseDecimal(lastTime);
-    assert_(value>0, name, lastTime);
+    ids.insert(parseDict(str(configuration)), copyRef(id));
    }
    assert_(value>0, name);
+   if(points.contains(configuration)) { log("Duplicate configuration", configuration); continue; }
    points.insert(move(configuration), value);
   }
   assert_(points);
   min = ::min(points.values);
   max = ::max(points.values);
+  for(string id: running.keys) if(!ids.values.contains(id)) {
+   //log("Missing output for ", id);
+   points.insert(ids)
+  }
  }
 
  /// Returns coordinates along \a dimension occuring in points matching \a filter
@@ -174,22 +215,27 @@ struct ArrayView : Widget {
   if(level==dimensions[axis].size) {
    if(axis==0) { renderCell(graphics, cellSize, 1, 0, filterX, filterY, origin); } // Descends dimensions tree on other array axis
    else { // Renders cell
+    bool done = false;
     for(const Dict& coordinates: points.keys) if(coordinates.includes(filterX) && coordinates.includes(filterY)) {
-     //Image cell = clip(target, );
-     //const Variant& point = points.at(coordinates);
-     //assert_(isDecimal(point), point);
-     //float value = point;
+     if(done) {
+      for(const Dict& coordinates: points.keys) if(coordinates.includes(filterX) && coordinates.includes(filterY)) {
+       log(coordinates);
+      }
+     }
      float value = points.at(coordinates);
      float v = max>min ? (value-min)/(max-min) : 0;
      assert_(v>=0 && v<=1, v, value, min, max);
      vec2 cellOrigin (vec2(levelCount().yx()+int2(1))*headerCellSize+origin*cellSize);
      graphics.fills.append(cellOrigin, cellSize, bgr3f(0,1-v,v));
+     targets.append(Rect{cellOrigin, cellOrigin+cellSize}, coordinates);
      float realValue = value; //abs(value); // Values where maximum is best have been negated
      String text = str(int(round(realValue))); //point.isInteger?dec(realValue):ftoa(realValue);
-     if(value==max) text = bold(text);
+     //if(value==max) text = bold(text);
+     if(running.contains(ids.at(coordinates))) text = bold(text);
      graphics.graphics.insert(cellOrigin, Text(text, textSize, 0, 1, 0,
                                                "DejaVuSans", true, 1, 0).graphics(cellSize));
-     break;
+     done=true;
+     //break;
     }
    }
    return 1;
@@ -234,11 +280,25 @@ struct ArrayView : Widget {
   }
 
   // Content
+  targets.clear();
   Dict filterX, filterY; renderCell(graphics, cellSize, 0, 0, filterX, filterY);
 
   // Headers (and lines over fills)
   for(uint axis: range(2)) { Dict filter; renderHeader(graphics, size, cellSize, axis, 0, filter); }
   return graphics;
+ }
+
+ bool mouseEvent(vec2 cursor, vec2, Event event, Button button, Widget*&) override {
+  if(event == Press && button == LeftButton) {
+   for(auto& target: targets) {
+    if(target.rect.contains(cursor)) {
+     log(ids.at(target.key));
+     log(readFile(replace(str(target.key),":","=")+".e"+str(ids.at(target.key))));
+     return true;
+    }
+   }
+  }
+  return false;
  }
 };
 

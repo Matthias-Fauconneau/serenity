@@ -16,7 +16,8 @@ struct PlotView : HList<Plot> {
  unique<Window> window = ::window(this, int2(0, 720));
  bool shown = false;
  size_t index = 0;
- /*buffer<unique<FileWatcher>> watchers = apply2(arguments(), [this](string path){
+ ref<string> folders = {"."}; // arguments()
+ /*buffer<unique<FileWatcher>> watchers = apply2(folders, [this](string path){
   return unique<FileWatcher>(path, [this](string){ if(shown) load(); shown=false; window->render(); });
 });*/
  PlotView() {
@@ -47,7 +48,7 @@ struct PlotView : HList<Plot> {
   plot.xlabel = "Pressure (N)"__;
   plot.ylabel = "Stress (Pa)"__;
    map<String, array<Variant>> allCoordinates;
-   for(Folder folder: arguments()) {
+   for(Folder folder: folders) {
     for(string name: folder.list(Files)) {
      if(!endsWith(name,".result") && !endsWith(name,".working")) continue;
      auto parameters = parseDict(section(name,'.',0,-2));
@@ -56,7 +57,7 @@ struct PlotView : HList<Plot> {
        allCoordinates.at(parameter.key).insertSorted(::copy(parameter.value));
     }
    }
-   for(Folder folder: arguments()) {
+   for(Folder folder: folders) {
     for(string name: folder.list(Files)) {
      if((!endsWith(name,".result") && !endsWith(name,".working")) || !existsFile(name, folder)) continue;
      TextData s (readFile(name, folder));

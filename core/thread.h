@@ -164,7 +164,7 @@ String which(string name);
 
 /// Execute binary at \a path with command line arguments \a args
 /// \note if \a wait is false, Returns the PID to be used for wait
-int execute(const string path, const ref<string> args={}, bool wait=true, const Folder& workingDirectory=currentWorkingDirectory(), Handle* stdout = 0);
+int execute(const string path, const ref<string> args={}, bool wait=true, const Folder& workingDirectory=currentWorkingDirectory(), Handle* stdout = 0, Handle* stderr = 0);
 /// Waits for any child process to change state
 int wait();
 /// Waits for process \a pid to change status

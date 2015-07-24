@@ -245,4 +245,5 @@ ref<string> cmdline() {
 }
 ref<string> arguments() { return cmdline().slice(1); }
 
+const string user() { static string user = str((const char*)getpwuid(geteuid())->pw_name); return user; }
 const Folder& home() { static Folder home(environmentVariable("HOME",str((const char*)getpwuid(geteuid())->pw_dir))); return home; }
