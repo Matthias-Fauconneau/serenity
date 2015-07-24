@@ -19,20 +19,20 @@ static void fill(uint* target, uint stride, uint w, uint h, uint value) {
     }
 }
 
-void fill(const Image& target, int2 origin, int2 size, bgr3f color, float alpha) {
+void fill(const Image& target, int2 origin, int2 size, bgr3f color, float opacity) {
     assert_(bgr3f(0) <= color && color <= bgr3f(1));
 
     int2 min = ::max(int2(0), origin);
     int2 max = ::min(target.size, origin+size);
     if(max<=min) return;
 
-    if(alpha==1) { // Solid fill
+    if(opacity==1) { // Solid fill
         if(!(min < max)) return;
         bgr3i linear = bgr3i(round(float(0xFFF)*color));
         byte4 sRGB = byte4(sRGB_forward[linear[0]], sRGB_forward[linear[1]], sRGB_forward[linear[2]], 0xFF);
         fill((uint*)target.data+min.y*target.stride+min.x, target.stride, max.x-min.x, max.y-min.y, (uint&)sRGB);
     } else {
-        for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) blend(target, x, y, color, alpha);
+        for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) blend(target, x, y, color, opacity);
     }
 }
 
@@ -121,18 +121,18 @@ void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity, boo
     }
 }
 
-static void parallelogram(const Image& target, int2 p0, int2 p1, int dy, bgr3f color, float alpha) {
+static void parallelogram(const Image& target, int2 p0, int2 p1, int dy, bgr3f color, float opacity) {
 	if(p0.x > p1.x) swap(p0.x, p1.x);
 	for(uint x: range(max(0,p0.x), min(int(target.width),p1.x))) {
 		float y0 = float(p0.y) + float((p1.y - p0.y) * int(x - p0.x)) / float(p1.x - p0.x); // FIXME: step
 		float f0 = floor(y0);
 		float coverage = (y0-f0);
 		int i0 = int(f0);
-		if(uint(i0)<target.height) blend(target, x, i0, color, alpha*(1-coverage));
+  if(uint(i0)<target.height) blend(target, x, i0, color, opacity*(1-coverage));
 		for(uint y: range(max(0,i0+1), min(int(target.height),i0+1+dy-1))) { // FIXME: clip once
-			blend(target, x,y, color, alpha); // FIXME: antialias
+   blend(target, x,y, color, opacity); // FIXME: antialias
 		}
-		if(uint(i0+dy)<target.height) blend(target, x, i0+dy, color, alpha*coverage);
+  if(uint(i0+dy)<target.height) blend(target, x, i0+dy, color, opacity*coverage);
 	}
 }
 
@@ -178,7 +178,7 @@ static void cubic(Image8& raster, vec2 A, vec2 B, vec2 C, vec2 D) {
 }
 
 // Renders cubic spline (two control points between each end point)
-void cubic(const Image& target, ref<vec2> sourcePoints, bgr3f color, float alpha, vec2 offset, const uint oversample=4) {
+void cubic(const Image& target, ref<vec2> sourcePoints, bgr3f color, float opacity, vec2 offset, const uint oversample=4) {
  byte points_[sourcePoints.size*sizeof(vec2)]; mref<vec2> points ((vec2*)points_, sourcePoints.size); //FIXME: stack<T> points(sourceSize.size)
 	for(size_t index: range(sourcePoints.size)) points[index] = offset+sourcePoints[index];
  vec2 pMin = vec2(target.size), pMax = 0;
@@ -206,7 +206,7 @@ void cubic(const Image& target, ref<vec2> sourcePoints, bgr3f color, float alpha
 				acc[j] += raster((x-iMin.x)*oversample+i, (y-iMin.y)*oversample+j);
 				coverage += acc[j]!=0;
 			}
-			if(coverage) blend(target, x, y, color, float(coverage)/sq(oversample)*alpha);
+   if(coverage) blend(target, x, y, color, float(coverage)/sq(oversample)*opacity);
 		}
 	}
 }

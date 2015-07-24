@@ -6,7 +6,7 @@
 struct Ticks { float max; uint tickCount; };
 uint subExponent(float& value) {
  float subExponent = exp10(log10(abs(value)) - floor(log10(abs(value))));
- for(auto a: (float[][2]){{1,5},{1.2,6},{1.4,7},{2,10},{2.5,5},{3,3},/*{3.6,6},*/{4,8},{5,5},{6,6},{8,8},{10,5}}) {
+ for(auto a: (float[][2]){{1,5},{1.2,6},{1.4,7},{2,10},{2.5,5},{3,3},{3.2,8},{4,8},{5,5},{6,6},{8,8},{10,5}}) {
   if(a[0] >= subExponent-0x1p-52) {
    value=(value>0?1:-1)*a[0]*exp10(floor(log10(abs(value))));
    return a[1];
@@ -146,7 +146,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
   assert_(bgr3f(0) <= color && color <= bgr3f(1), color);
   const auto& data = dataSets.values[i];
   buffer<vec2> points = apply(data.size(), [&](uint i){ return point( vec2(data.keys[i],data.values[i]) ); });
-  if(plotPoints) for(uint i: range(points.size)) {
+  if(plotPoints || points.size==1) for(uint i: range(points.size)) {
    vec2 p = round(points[i]);
    if(!isNumber(p)) continue;
    const int pointRadius = 2;

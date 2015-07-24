@@ -87,16 +87,16 @@ break2:;
         ; }
      );
      auto& dataSet = plot.dataSets[str(parameters,", "_)];
-     float max = 0;
-     for(float strain: dataSets.at("Stress (Pa)")) max = ::max(max, strain);
-     dataSet.insertSorted(pressure, max);
+     float maxStress = max(dataSets.at("Stress (Pa)"));
+     dataSet.insertSorted(pressure, maxStress);
      //if(!dataSets.contains(plot.xlabel)) { continue; }
      //if(!dataSets.contains(plot.ylabel)) { continue; }
      /*plot.dataSets.insert(str(parameters,", "_),
           {::move(dataSets.at(plot.xlabel)), ::move(dataSets.at(plot.ylabel))});*/
-
     }
    }
+   plot.min.x = 0, plot.max.x = 3.2e6;
+   plot.min.y = 0, plot.max.y = 16e6;
    window->setTitle(array<Plot>::at(0).ylabel);
  }
 } app;

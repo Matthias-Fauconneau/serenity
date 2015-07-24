@@ -6,7 +6,7 @@ Dict parameters() {
  return parameters;
 }
 
-File file {str(::parameters())+".result", currentWorkingDirectory(), Flags(WriteOnly|Create|Truncate)};
+File file {str(::parameters())+".working", currentWorkingDirectory(), Flags(WriteOnly|Create|Truncate)};
 #if UI
 SimulationView app {::parameters(), move(file)};
 #else

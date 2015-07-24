@@ -17,22 +17,34 @@ template<Type tA> vec4f toGlobal(tA& A, size_t a, vec4f localA) {
 
 struct SimulationRun : Simulation {
  SimulationRun(const Dict& parameters, File&& file) : Simulation(parameters, move(file)) {
+  String id = str(parameters);
+  log(id);
     //log(stream.name());
     //log("Threads", threadCount);
 #if !UI
-    while(processState < Done) {
-     if(timeStep%size_t(1e-1/dt) == 0) {
-      report();
-      log(info());
-     }
-     step();
-    }
+  Time time (true);
+  while(processState < Done) {
+   if(timeStep%size_t(1e-1/dt) == 0) {
+    if(processState  < Load && timeStep*dt > 6*60) { log("6min limit"); break; }
+    if(processState  < Load && time > 6*60*60) { log("6h limit"); break; }
+    report();
+    log(info());
+   }
+   step();
+  }
+  if(processState != ProcessState::Done) {
+   log("Failed");
+   rename(id+".working", id+".failed", currentWorkingDirectory());
+  } else {
+   rename(id+".working", id+".result", currentWorkingDirectory());
+  }
+  log(time);
 #endif
  }
 
  void report() {
   int64 elapsed = realTime() - lastReport;
-  log(timeStep*this->dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
+  log(timeStep*dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
   log("grain",str(grainTime, stepTime),
       "grainInit",str(grainInitializationTime, stepTime),
       "grainLattice",str(grainGridTime, stepTime),

@@ -6,6 +6,7 @@
 #include "png.h"
 #include "variant.h"
 
+#if 0
 struct Rename {
  Rename() {
   Folder results {"."_};
@@ -28,42 +29,74 @@ struct Rename {
   }
  }
 };
+#endif
 
 struct ArrayView : Widget {
  string valueName;
  map<Dict, float> points; // Data points
  float min = inf, max = -inf;
  uint textSize;
- vec2 headerCellSize = vec2(160/*80*/*textSize/16, textSize);
+ vec2 headerCellSize = vec2(80*textSize/16, textSize);
  vec2 contentCellSize = vec2(48*textSize/16, textSize);
  buffer<string> dimensions[2] = {
-  split("Substep count,Friction,Elasticity",","),
-  split("Rate,Height,Radius",",")
+  split("Friction,Radius,Pressure",","),
+  split("TimeStep,Rate,Pattern",",")
  };
 
  ArrayView(string valueName, uint textSize=16)
   : valueName(valueName), textSize(textSize) {
   Folder results ("."_);
   for(string name: results.list(Files)) {
-   if(!endsWith(name,".result")) continue;
-   Dict configuration = parseDict(name);
-   array<array<float>> dataSets;
-   TextData s (readFile(name));
-   s.until('\n'); // First line: Grain count, Wire count, Wire density
-   while(s) {
-    for(size_t i = 0; s && !s.match('\n'); i++) {
-     float decimal = s.decimal();
-     assert_(isNumber(decimal));
-     if(i>=dataSets.size) dataSets.append();
-     dataSets[i].append( decimal );
-     s.whileAny(' ');
-    }
-   }
-   //static ref<string> names {"Load", "Height", "Tension energy", "stretch"};
-   float height = dataSets[1][0];
+   if(!name.contains('.')) continue;
+   auto file = readFile(name);
+   if(!file) continue;
+   Dict configuration = parseDict(section(name,'.',0,-2));
    //if(points.contains(configuration)) { log("Duplicate configuration", configuration); continue; }
-   points.insert(move(configuration), height);
+   if(!configuration.contains("Pattern")) continue;
+   float value = 0;
+   if(endsWith(name,".result") || endsWith(name,".working")) {
+    map<string, array<float>> dataSets;
+    TextData s (file);
+    s.until('\n'); // First line: constant results
+    buffer<string> names = split(s.until('\n'),", "); // Second line: Headers
+    for(string name: names) dataSets.insert(name);
+    while(s) {
+     for(size_t i = 0; s && !s.match('\n'); i++) {
+      string d = s.whileDecimal();
+      if(!d) goto break2;
+      //assert_(d, s.slice(s.index-16,16),"|", s.slice(s.index));
+      float decimal = parseDecimal(d);
+      assert_(isNumber(decimal), s.slice(s.index-16,16),"|", s.slice(s.index));
+      if(!(i < dataSets.values.size)) break;
+      assert_(i < dataSets.values.size, i, dataSets.keys);
+      dataSets.values[i].append( decimal );
+      s.whileAny(' ');
+     }
+    }
+    break2:;
+    if(!dataSets.contains("Stress (Pa)")) continue;
+    value = ::max(dataSets.at("Stress (Pa)")) / 1e6;
+    continue; // Time only
+   } else {
+    TextData suffix {section(name,'.',-2,-1)};
+    suffix.skip('e');
+    suffix.whileInteger();
+    assert_(!suffix, suffix);
+    TextData s (file);
+    string lastTime;
+    while(s) {
+     string number = s.whileDecimal();
+     if(number && number!="0"_) lastTime = number;
+     s.line();
+    }
+    if(!lastTime) continue;
+    value = parseDecimal(lastTime);
+    assert_(value>0, name, lastTime);
+   }
+   assert_(value>0, name);
+   points.insert(move(configuration), value);
   }
+  assert_(points);
   min = ::min(points.values);
   max = ::max(points.values);
  }
@@ -149,11 +182,11 @@ struct ArrayView : Widget {
      float value = points.at(coordinates);
      float v = max>min ? (value-min)/(max-min) : 0;
      assert_(v>=0 && v<=1, v, value, min, max);
-     //fill(cell, Rect(cell.size()), vec3(0,1-v,v));
-     float realValue = value; //abs(value); // Values where maximum is best have been negated
-     String text = str(realValue); //point.isInteger?dec(realValue):ftoa(realValue);
-     if(value==max) text = bold(text);
      vec2 cellOrigin (vec2(levelCount().yx()+int2(1))*headerCellSize+origin*cellSize);
+     graphics.fills.append(cellOrigin, cellSize, bgr3f(0,1-v,v));
+     float realValue = value; //abs(value); // Values where maximum is best have been negated
+     String text = str(int(round(realValue))); //point.isInteger?dec(realValue):ftoa(realValue);
+     if(value==max) text = bold(text);
      graphics.graphics.insert(cellOrigin, Text(text, textSize, 0, 1, 0,
                                                "DejaVuSans", true, 1, 0).graphics(cellSize));
      break;
@@ -179,7 +212,11 @@ struct ArrayView : Widget {
   vec2 cellSize = (size - vec2(levelCount().yx()+int2(1))*headerCellSize ) / vec2(cellCount());
   // Fixed coordinates in unused top-left corner
   array<char> fixed;
-  for(const auto& coordinate: coordinates(points)) if(coordinate.value.size==1) fixed.append(coordinate.key+": "_+str(coordinate.value)+"\n"_);
+  for(const auto& coordinate: coordinates(points)) {
+   if(coordinate.value.size==1) fixed.append(coordinate.key+": "_+str(coordinate.value)+"\n"_);
+   /*else if(!dimensions[0].contains(coordinate.key) && !dimensions[1].contains(coordinate.key))
+    log("Hidden dimension", coordinate.key);*/
+  }
   shared<Graphics> graphics;
   graphics->graphics.insert(vec2(0,0), Text(fixed, textSize).graphics(
                             vec2(dimensions[1].size,dimensions[0].size)*headerCellSize));
@@ -206,6 +243,6 @@ struct ArrayView : Widget {
 };
 
 struct Review {
- ArrayView view {"Height"};
+ ArrayView view {/*"Stress (MPa)"*/"Time (s)"};
  unique<Window> window = ::window(&view, int2(0, 720));
 } app;

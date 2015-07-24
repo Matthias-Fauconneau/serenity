@@ -234,13 +234,18 @@ int TextData::mayInteger(int defaultValue) {
 string TextData::whileDecimal() {
  uint start=index;
  matchAny("-+");
- if(!match("∞")) for(bool gotDot=false, gotE=false;available(1);) {
+ if(!match("∞")) for(bool gotNumber=false, gotDot=false, gotE=false;available(1);) {
   char c = peek();
-  /**/  if(c=='.') { if(gotDot||gotE) break; gotDot=true; advance(1); }
-  else if(c=='e' || c=='E') { if(gotE) break; gotE=true; advance(1); if(peek()=='-' || peek()=='+') advance(1); }
-  else if(c>='0'&&c<='9') advance(1);
+  /**/ if(c>='0'&&c<='9') { gotNumber=true; advance(1); }
+  else if(gotNumber && c=='.') { if(gotDot||gotE) break; gotDot=true; advance(1); }
+  else if(gotNumber &&  (c=='e' || c=='E')) {
+   if(gotE) break; gotE=true;
+   advance(1);
+   matchAny("-+");
+  }
   else break;
  }
+ if(index>start) match("µ") || matchAny("mKM");
  return slice(start,index-start);
 }
 

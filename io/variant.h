@@ -54,7 +54,10 @@ inline bool operator <(const Variant& a, const Variant& b) {
     (b.type == Variant::Integer || b.type == Variant::Real))
   return a.number < b.number;
  if(a.type != b.type) return false;
- if(a.type == Variant::Data) return a.data < b.data;
+ if(a.type == Variant::Data) {
+  if(isDecimal(a.data) && isDecimal(b.data)) return parseDecimal(a.data) < parseDecimal(b.data);
+  return a.data < b.data;
+ }
  error(int(a.type));
  //return (string)a < (string)b;
 }
@@ -91,7 +94,7 @@ inline Dict parseDict(TextData& s) {
   string key = s.whileNo(":=|},"_);
   string value; s.whileAny(" "_);
   if(s.matchAny(":="_)) { s.whileAny(" "_); value = s.whileNo("|,} "_,'{','}'); }
-  assert_(key && value, key, value, s.data, s.slice(s.index));
+  assert_(key && value);
   dict.insertSorted(copyRef(key), replace(copyRef(value),'\\','/'));
   s.whileAny(" "_);
   if(s.matchAny("|,"_)) continue;
