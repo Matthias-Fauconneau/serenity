@@ -13,15 +13,15 @@ struct ParameterSweep {
            .filter([](string name){return !endsWith(name, ".result") && !endsWith(name, ".working");}),
      [](string name)->String{ return copyRef(section(name,'.',0,-2)); });
    log(existing);
-   for(float dt: {4e-5, 1e-5}) {
+   for(float dt: {2e-5/*, 1e-5*/}) {
     parameters["TimeStep"__] = String(str(int(round(dt*1e6)))+"µ");
-    for(float frictionCoefficient: {0.1, 0.3}) {
+    for(float frictionCoefficient: {0.1/*, 0.3*/}) {
      parameters["Friction"__] = frictionCoefficient;
      for(string pattern: ref<string>{"none","helix","cross","loop"}) {
       parameters["Pattern"__] = pattern;
       for(float wireElasticModulus: {1e8}) {
        parameters["Elasticity"__] = String(str(int(round(wireElasticModulus/1e8)))+"e8");
-       for(float radius: {0.02, 0.03}) {
+       for(float radius: {/*0.02,*/ 0.03}) {
         parameters["Radius"__] = radius;
         parameters["Height"__] = radius*4;
         for(float winchRate: {100,200}) {

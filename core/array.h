@@ -57,9 +57,9 @@ generic struct array : buffer<T> {
     /// Appends a movable value
     T& append(T&& e) { grow(size+1); return set(size-1, ::move(e)); }
     /// Appends another list of elements to this array by copying
-	bool append(const ref<T> source) { grow(size+source.size); slice(size-source.size).copy(source); return source.size; }
+    bool append(const ref<T> source) { grow(size+source.size); slice(size-source.size).copy(source); return source.size; }
     /// Appends another list of elements to this array by moving
-	bool append(const mref<T> source) { grow(size+source.size); slice(size-source.size).move(source); return source.size; }
+    bool append(const mref<T> source) { grow(size+source.size); slice(size-source.size).move(source); return source.size; }
     /// Appends a new element
     template<Type Arg0, Type Arg1, Type... Args> T& append(Arg0&& arg0, Arg1&& arg1, Args&&... args) {
 	grow(size+1); return set(size-1, forward<Arg0>(arg0), forward<Arg1>(arg1), forward<Args>(args)...);
@@ -113,7 +113,12 @@ generic struct array : buffer<T> {
     }
 };
 /// Copies all elements in a new array
-generic array<T> copy(const array<T>& o) { array<T> copy(o.size); copy.append(o); return copy; }
+generic array<T> copy(const array<T>& o) { return copyRef(o); }
+generic array<buffer<T> > copy(const array<buffer<T>>& o) {
+ buffer<buffer<T>> copy(o.size);
+ for(size_t index: range(o.size)) copy.set(index, copyRef(o[index]));
+ return move(copy);
+}
 
 // -- Sort --
 

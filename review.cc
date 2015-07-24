@@ -5,37 +5,47 @@
 #include "graphics.h"
 #include "png.h"
 #include "variant.h"
+#include "xml.h"
+#include "plot.h"
+#include "layout.h"
 
-#if 0
+#define RENAME 0
+#if RENAME
 struct Rename {
  Rename() {
   Folder results {"."_};
   for(string name: results.list(Files)) {
-   if(!endsWith(name,".result")) {
+   if(!endsWith(name,".result") && !endsWith(name,".working")) {
     if(endsWith(name,".failed")||endsWith(name,".working")) {
      log("-", name);
      //remove(name);
-    } else
-     log("Unknown file", name);
+    } //else log("Unknown file", name);
     continue;
    }
-   Dict parameters = parseDict(name);
+   Dict parameters = parseDict(section(name,'.',0,-2));
    //parameters.keys.replace("subStepCount"__, "Substep count"__);
-   String newName = str(parameters)+".result";
+   String newName = str(parameters)+"."+section(name,'.',-2,-1);
+   newName = replace(newName, ".working.result", ".working");
    if(name != newName) {
     log(name, newName);
-    //rename(name, newName, results);
+    rename(name, newName, results);
    }
   }
  }
-};
+} app;
 #endif
+
+struct SGEJob { Dict dict; String id; float elapsed; };
+String str(const SGEJob& o) { return str(o.dict, o.id, o.elapsed); }
+//bool operator==(const SGEJob& o, string id) { return o.id == id; }
+bool operator==(const SGEJob& o, const Dict& dict) { return o.dict == dict; }
 
 struct ArrayView : Widget {
  string valueName;
  map<Dict, float> points; // Data points
  map<Dict, String> ids; // Job IDs
- map<String, String> running; // Running job IDs, start time
+ map<Dict, String> states; // Job states
+ array<SGEJob> running;
  float min = inf, max = -inf;
  uint textSize;
  vec2 headerCellSize = vec2(80*textSize/16, textSize);
@@ -46,37 +56,45 @@ struct ArrayView : Widget {
  };
  struct Target { Rect rect; const Dict& key; };
  array<Target> targets;
+ size_t index = 0;
+ function<void(const Dict&)> hover;
+
+ void fetchRunning(int time) {
+  if(arguments() && startsWith(arguments()[0],"server-")) {
+   if(!existsFile(arguments()[0], ".cache"_) ||
+      File(arguments()[0], ".cache"_).modifiedTime() < realTime()-time*60e9) {
+    Stream stdout;
+    Time time;
+    int pid = execute("/usr/bin/ssh",ref<string>{arguments()[0],"qstat"_,"-u"_,user(),"-s"_,"r"_,"-xml"_}, false, currentWorkingDirectory(), &stdout);
+    array<byte> status;
+    for(;;) {
+     auto packet = stdout.readUpTo(1<<16);
+     status.append(packet);
+     if(!(packet || isRunning(pid))) break;
+    }
+    log(time);
+    writeFile(arguments()[0], status, ".cache"_, true);
+   }
+   auto document = readFile(arguments()[0], ".cache"_);
+   Element root = parseXML(document);
+   for(const Element& job: root("job_info")("queue_info").children) {
+    auto dict = parseDict(job("JB_name").content);
+    running.append(SGEJob{move(dict), copyRef(job("JB_job_number").content),
+                          float(currentTime()-parseDate(job("JAT_start_time").content))});
+   }
+  }
+ }
 
  ArrayView(string valueName, uint textSize=16)
   : valueName(valueName), textSize(textSize) {
-  if(arguments() && startsWith(arguments()[0],"server-")) {
-   if(!existsFile(arguments()[0]) || File(arguments()[0]).modifiedTime() < realTime()-60*60e9) {
-    Stream stdout;
-    Time time;
-    execute("/usr/bin/ssh",{arguments()[0],"qstat","-u", user(), "-s","r"}, true, currentWorkingDirectory(), &stdout);
-    log(time);
-    auto running = stdout.readUpTo(1<<17);
-    assert_(running.size < running.capacity, running.size);
-    writeFile(arguments()[0], running);
-   }
-   TextData s = readFile(arguments()[0]);
-   assert_(s);
-   s.line(); s.line();
-   for(;;) {
-    s.whileAny(' ');
-    string id = s.whileInteger();
-    assert_(id);
-    s.whileAny(' '); s.decimal(); // Priority
-    s.whileAny(' '); s.whileNot(' '); // Short name
-    s.whileAny(' '); s.whileNot(' '); // User name
-    s.whileAny(' '); s.whileNot(' '); // Status
-    Date date = parseDate(s); // Start date
-    running.insert(copyRef(id), currentTime()-date);
-    if(!s) break;
-    s.skip('\n');
-   }
-   log(running);
-  }
+  fetchRunning(30);
+  load();
+ }
+ void load() {
+  valueName = ref<string>{"Stress (MPa)","Time (s)"}[index];
+  points.clear();
+  ids.clear();
+  states.clear();
   Folder results ("."_);
   for(string name: results.list(Files)) {
    if(!name.contains('.')) continue;
@@ -84,62 +102,81 @@ struct ArrayView : Widget {
    if(!file) continue;
    Dict configuration = parseDict(section(name,'.',0,-2));
    if(!configuration.contains("Pattern")) continue;
-   float value = 0;
-   if(endsWith(name,".result") || endsWith(name,".working")) {
-    map<string, array<float>> dataSets;
-    TextData s (file);
-    s.until('\n'); // First line: constant results
-    buffer<string> names = split(s.until('\n'),", "); // Second line: Headers
-    for(string name: names) dataSets.insert(name);
-    while(s) {
-     for(size_t i = 0; s && !s.match('\n'); i++) {
-      string d = s.whileDecimal();
-      if(!d) goto break2;
-      //assert_(d, s.slice(s.index-16,16),"|", s.slice(s.index));
-      float decimal = parseDecimal(d);
-      assert_(isNumber(decimal), s.slice(s.index-16,16),"|", s.slice(s.index));
-      if(!(i < dataSets.values.size)) break;
-      assert_(i < dataSets.values.size, i, dataSets.keys);
-      dataSets.values[i].append( decimal );
-      s.whileAny(' ');
+   if(!existsFile(name,".cache"_)) { // FIXME: check mtime
+    String data;
+    if(index == 0 && (endsWith(name,".result") || endsWith(name,".working"))) {
+     map<string, array<float>> dataSets;
+     // TODO: optimize
+     TextData s (file);
+     s.until('\n'); // First line: constant results
+     buffer<string> names = split(s.until('\n'),", "); // Second line: Headers
+     for(string name: names) dataSets.insert(name);
+     while(s) {
+      for(size_t i = 0; s && !s.match('\n'); i++) {
+       string d = s.whileDecimal();
+       if(!d) goto break2;
+       //assert_(d, s.slice(s.index-16,16),"|", s.slice(s.index));
+       float decimal = parseDecimal(d);
+       assert_(isNumber(decimal), s.slice(s.index-16,16),"|", s.slice(s.index));
+       if(!(i < dataSets.values.size)) break;
+       assert_(i < dataSets.values.size, i, dataSets.keys);
+       dataSets.values[i].append( decimal );
+       s.whileAny(' ');
+      }
      }
-    }
-    break2:;
-    if(!dataSets.contains("Stress (Pa)")) continue;
-    value = ::max(dataSets.at("Stress (Pa)")) / 1e6;
-    continue; // Time only
-   } else {
-    TextData suffix {section(name,'.',-2,-1)};
-    suffix.skip('e');
-    string id = suffix.whileInteger();
-    assert_(!suffix, suffix);
-    TextData s (file);
-    string lastTime;
-    while(s) {
-     string number = s.whileDecimal(); // Simulation time
-     if(number && number!="0"_) {
-      s.skip(' ');
-      number = s.whileDecimal(); // Real time
-      assert_(number);
-      lastTime = number;
+break2:;
+     if(!dataSets.contains("Stress (Pa)")) continue;
+     data = str(::max(dataSets.at("Stress (Pa)")) / 1e6);
+    } else if(!(endsWith(name,".result") || endsWith(name,".working"))) {
+     TextData suffix {section(name,'.',-2,-1)};
+     suffix.skip('e');
+     string id = suffix.whileInteger();
+     assert_(!suffix, suffix);
+     TextData s (file);
+     string lastTime;
+     string state;
+     while(s) {
+      if(s.match("pour")) state = "pour"_;
+      if(s.match("pack")) state = "pack"_;
+      if(s.match("load")) state = "load"_;
+      string number = s.whileDecimal(); // Simulation time
+      if(number && number!="0"_) {
+       s.skip(' ');
+       number = s.whileDecimal(); // Real time
+       assert_(number);
+       lastTime = number;
+      }
+      s.line();
      }
-     s.line();
+     data = str(lastTime?parseDecimal(lastTime)/60/60 : 0, id, state);
     }
-    if(!lastTime) continue;
-    value = parseDecimal(lastTime);
-    ids.insert(parseDict(str(configuration)), copyRef(id));
+    log(name, data);
+    writeFile(name, data, ".cache"_);
    }
-   assert_(value>0, name);
-   if(points.contains(configuration)) { log("Duplicate configuration", configuration); continue; }
-   points.insert(move(configuration), value);
+   TextData s (readFile(name, ".cache"_));
+   float value = s.decimal();
+   if(!(endsWith(name,".result") || endsWith(name,".working"))) {
+    s.skip(' ');
+    ids.insert(copy(configuration), str(s.integer()));
+    s.skip(' ');
+    states.insert(copy(configuration), copyRef(s.word()));
+    if(index == 0 && points.contains(configuration)) continue;
+   } else if(index==1) continue;
+   //assert_(value>0, name);
+   if(points.contains(configuration)) {
+    if(points.at(configuration)!=0) { log("Duplicate configuration", configuration); continue; }
+    else points.at(configuration) = value; // Replace 0 from log
+   } else
+    points.insert(move(configuration), value);
+  }
+  if(index==1) for(const SGEJob& job: running) if(!points.contains(job.dict)) {
+   //log("Missing output for ", id);
+   assert_(job.dict);
+   points.insert(copy(job.dict), job.elapsed/60/60);
   }
   assert_(points);
   min = ::min(points.values);
   max = ::max(points.values);
-  for(string id: running.keys) if(!ids.values.contains(id)) {
-   //log("Missing output for ", id);
-   points.insert(ids)
-  }
  }
 
  /// Returns coordinates along \a dimension occuring in points matching \a filter
@@ -226,13 +263,20 @@ struct ArrayView : Widget {
      float v = max>min ? (value-min)/(max-min) : 0;
      assert_(v>=0 && v<=1, v, value, min, max);
      vec2 cellOrigin (vec2(levelCount().yx()+int2(1))*headerCellSize+origin*cellSize);
-     graphics.fills.append(cellOrigin, cellSize, bgr3f(0,1-v,v));
-     targets.append(Rect{cellOrigin, cellOrigin+cellSize}, coordinates);
+     bgr3f color (1,1,1);
+     if(states.contains(coordinates)) {
+      string state = states.at(coordinates);
+      if(state=="pack") color = bgr3f(0,0,1);
+      else if(state=="load") color = bgr3f(0,1,0);
+     }
      float realValue = value; //abs(value); // Values where maximum is best have been negated
+     if(index==0 && realValue) color = bgr3f(0,1-v,v);
+     graphics.fills.append(cellOrigin, cellSize, color);
+     targets.append(Rect{cellOrigin, cellOrigin+cellSize}, coordinates);
      String text = str(int(round(realValue))); //point.isInteger?dec(realValue):ftoa(realValue);
      //if(value==max) text = bold(text);
-     if(running.contains(ids.at(coordinates))) text = bold(text);
-     graphics.graphics.insert(cellOrigin, Text(text, textSize, 0, 1, 0,
+     if(running.contains(coordinates)) text = bold(text);
+     if(realValue) graphics.graphics.insert(cellOrigin, Text(text, textSize, 0, 1, 0,
                                                "DejaVuSans", true, 1, 0).graphics(cellSize));
      done=true;
      //break;
@@ -289,12 +333,35 @@ struct ArrayView : Widget {
  }
 
  bool mouseEvent(vec2 cursor, vec2, Event event, Button button, Widget*&) override {
+  if(button == WheelUp || button == WheelDown) {
+   index = (++index)%2;
+   load();
+   return true;
+  }
   if(event == Press && button == LeftButton) {
    for(auto& target: targets) {
     if(target.rect.contains(cursor)) {
-     log(ids.at(target.key));
-     log(readFile(replace(str(target.key),":","=")+".e"+str(ids.at(target.key))));
+     log(str(target.key));
+     if(states.contains(target.key)) log(states.at(target.key));
+     if(ids.contains(target.key)) {
+      if(running.contains(target.key)) log(running[running.indexOf(target.key)]);
+      log(ids.at(target.key)); //qdel -f 669165 > /dev/null &
+      String name = replace(str(target.key),":","=")+".e"+str(ids.at(target.key));
+      if(existsFile(name)) log(section(readFile(name),'\n',-10,-1));
+     }
+     for(string name: Folder(".").list(Files)) if(startsWith(str(target.key), name)) log(name);
+     /*{String name = str(target.key)+".result";
+      if(existsFile(name)) log(section(readFile(name),'\n',-10,-1));}
+     {String name = str(target.key)+".working";
+      if(existsFile(name)) log(section(readFile(name),'\n',-10,-1));}*/
      return true;
+    }
+   }
+  }
+  if(event == Motion) {
+   for(auto& target: targets) {
+    if(target.rect.contains(cursor)) {
+     hover(target.key);
     }
    }
   }
@@ -304,5 +371,43 @@ struct ArrayView : Widget {
 
 struct Review {
  ArrayView view {/*"Stress (MPa)"*/"Time (s)"};
- unique<Window> window = ::window(&view, int2(0, 720));
-} app;
+ Plot plot;
+ VBox layout {{&view, &plot}};
+ unique<Window> window = ::window(&layout, int2(0, 1050));
+ Review() {
+  window->actions[Return] = [this](){ view.fetchRunning(0); window->render(); };
+  view.hover = [this](const Dict& point) {
+   Dict filter = copy(point);
+   filter.remove("Pressure");
+   filter.remove("Pattern");
+   plot.xlabel = "Pressure (N)"__;
+   plot.ylabel = "Stress (Pa)"__;
+   plot.dataSets.clear();
+   array<String> fixed;
+   for(const auto& coordinate: view.coordinates(view.points))
+    if(coordinate.value.size==1) fixed.append(copyRef(coordinate.key));
+   auto patterns = view.coordinates("Pattern", filter);
+   Dict parameters = copy(filter);
+   for(const Variant& pattern: patterns) {
+    parameters[copyRef("Pattern"_)] = copy(pattern);
+    auto pressures = view.coordinates("Pressure", filter);
+    for(const Variant& pressure: pressures) {
+     Dict shortSet = copy(parameters);
+     for(string dimension: fixed) shortSet.remove(dimension);
+     auto& dataSet = plot.dataSets[str(shortSet," "_)];
+     Dict key = copy(parameters);
+     key.insertSorted(copyRef("Pressure"_), copy(pressure));
+     if(view.points.contains(key)) {
+      float maxStress = view.points.at(key);
+      dataSet.insertSorted(float(pressure), maxStress);
+     }
+    }
+   }
+   window->render();
+  };
+ }
+}
+#if !RENAME
+app
+#endif
+;

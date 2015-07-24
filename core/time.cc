@@ -105,18 +105,18 @@ bool operator ==(const Date& a, const Date& b) { return a.seconds==b.seconds && 
 String str(Date date, const string format) {
 	array<char> r;
     for(TextData s(format);s;) {
-        /**/ if(s.match("ss")){ if(date.seconds>=0) r.append( str(date.seconds,2) ); else s.until(' '); }
-        else if(s.match("mm")){ if(date.minutes>=0) r.append( str(date.minutes,2) ); else s.until(' '); }
-        else if(s.match("hh")){ if(date.hours>=0) r.append( str(date.hours,2) ); else s.until(' '); }
-        else if(s.match("dddd")){ if(date.weekDay>=0) r.append( days[date.weekDay] ); else s.until(' '); }
-        else if(s.match("ddd")){ if(date.weekDay>=0) r.append( days[date.weekDay].slice(0,3) ); else s.until(' '); }
-        else if(s.match("dd")){ if(date.day>=0) r.append( str(date.day+1,2) ); else s.until(' '); }
-        else if(s.match("MMMM")){ if(date.month>=0) r.append( months[date.month] ); else s.until(' '); }
-        else if(s.match("MMM")){ if(date.month>=0) r.append( months[date.month].slice(0,3) ); else s.until(' '); }
-        else if(s.match("MM")){ if(date.month>=0) r.append( str(date.month+1,2) ); else s.until(' '); }
-        else if(s.match("yyyy")){ if(date.year>=0) r.append( str(date.year) ); else s.until(' '); }
-        else if(s.match("TZD")) r.append("GMT"); //FIXME
-        else r.append( s.next() );
+     /**/ if(s.match("ss")){ if(date.seconds>=0) r.append( str(date.seconds,2u,'0') ); else s.until(' '); }
+     else if(s.match("mm")){ if(date.minutes>=0) r.append( str(date.minutes,2u,'0') ); else s.until(' '); }
+     else if(s.match("hh")){ if(date.hours>=0) r.append( str(date.hours,2u,'0') ); else s.until(' '); }
+     else if(s.match("dddd")){ if(date.weekDay>=0) r.append( days[date.weekDay] ); else s.until(' '); }
+     else if(s.match("ddd")){ if(date.weekDay>=0) r.append( days[date.weekDay].slice(0,3) ); else s.until(' '); }
+     else if(s.match("dd")){ if(date.day>=0) r.append( str(date.day+1,2u,'0') ); else s.until(' '); }
+     else if(s.match("MMMM")){ if(date.month>=0) r.append( months[date.month] ); else s.until(' '); }
+     else if(s.match("MMM")){ if(date.month>=0) r.append( months[date.month].slice(0,3) ); else s.until(' '); }
+     else if(s.match("MM")){ if(date.month>=0) r.append( str(date.month+1,2u,'0') ); else s.until(' '); }
+     else if(s.match("yyyy")){ if(date.year>=0) r.append( str(date.year) ); else s.until(' '); }
+     else if(s.match("TZD")) r.append("GMT"); //FIXME
+     else r.append( s.next() );
     }
     if(endsWith(r,",") || endsWith(r,":")) r.pop(); //prevent dangling separator when last valid part is week day or seconds
 	return move(r);
@@ -138,9 +138,14 @@ Date parseDate(TextData& s) {
              date.month=number; date.day=s.integer();
              if(s.match("/")) date.year=s.integer();
             }
-            else if(date.day==-1) date.day=number-1;
+            else if(s.match("-")) {
+             date.year=number; date.month=s.integer()-1;
+             if(s.match("-")) date.day=s.integer()-1;
+             s.match('T');
+            }
+            //else if(date.day==-1) date.day=number-1;
             //else if(date.month==-1) date.month=number-1;
-            else if(date.year==-1) date.year=number;
+            //else if(date.year==-1) date.year=number;
             else error("Invalid date", s);
         } else break;
         continue2_:;

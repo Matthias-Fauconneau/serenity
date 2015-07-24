@@ -87,7 +87,7 @@ break2:;
         || key=="Speed"_ // FIXME
         ; }
      );
-     auto& dataSet = plot.dataSets[str(parameters,", "_)];
+     auto& dataSet = plot.dataSets[str(parameters," "_)];
      float maxStress = max(dataSets.at("Stress (Pa)"));
      dataSet.insertSorted(pressure, maxStress);
      //if(!dataSets.contains(plot.xlabel)) { continue; }

@@ -26,6 +26,7 @@ core/file.cc
 core/serialization.h
 core/parallel.h
 core/time.h
+core/time.cc
 core/profile.cc
 
 io/variant.h
@@ -34,6 +35,8 @@ io/bit.h
 io/flic.h
 io/font.cc
 io/font.h
+io/xml.h
+io/xml.cc
 
 ui/x.h
 ui/display.h

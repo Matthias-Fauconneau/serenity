@@ -62,7 +62,7 @@ inline bool operator <(const Variant& a, const Variant& b) {
  //return (string)a < (string)b;
 }
 
-inline Variant copy(const Variant& v) {
+template<> Variant copy(const Variant& v) {
  if(v.type == Variant::Integer || v.type == Variant::Real) return v.number;
  if(v.type == Variant::Data) return v.data;
  error(int(v.type));
@@ -94,8 +94,12 @@ inline Dict parseDict(TextData& s) {
   string key = s.whileNo(":=|},"_);
   string value; s.whileAny(" "_);
   if(s.matchAny(":="_)) { s.whileAny(" "_); value = s.whileNo("|,} "_,'{','}'); }
-  assert_(key && value);
-  dict.insertSorted(copyRef(key), replace(copyRef(value),'\\','/'));
+  assert_(key && value, s.data);
+  if(!dict.contains(key)) dict.insertSorted(copyRef(key), replace(copyRef(value),'\\','/'));
+  else {
+   if(dict.at(key)==value) log("Duplicate entry with same value", key, value);
+   else error("Duplicate entry with different value", key, dict.at(key), value);
+  }
   s.whileAny(" "_);
   if(s.matchAny("|,"_)) continue;
   else if(curly && s.match('}')) break;

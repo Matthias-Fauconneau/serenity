@@ -24,7 +24,7 @@ template<Type K, Type V> struct map {
  bool operator ==(const map<K,V>& o) const { return keys==o.keys && values==o.values; }
 
  template<Type KK> bool contains(const KK& key) const { return keys.contains(key); }
- template<Type KK> void assertNo(unused const KK& key) const { assert(!contains(key), '\''+str(key)+'\'',"already in",keys); }
+ template<Type KK> void assertNo(unused const KK& key) const { assert_(!contains(key), '\''+str(key)+'\'',"already in",keys); }
 
  template<Type KK> size_t indexOf(const KK& key) const {
   size_t i = keys.indexOf(key);
@@ -119,7 +119,7 @@ template<Type K, Type V> String str(const map<K,V>& m, string separator=","_) {
  //s.append('{');
  //s.append(separator.last());
  for(uint i: range(m.size())) {
-  s.append(str(m.keys[i])+":"+str(m.values[i]));
+  s.append(str(m.keys[i])+"="+str(m.values[i])); // = instead of : for compatibility as SGE job name
   if(i<m.size()-1) s.append(separator);
  }
  //s.append(separator.last());

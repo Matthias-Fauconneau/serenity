@@ -217,6 +217,7 @@ int execute(const string path, const ref<string> args, bool wait, const Folder& 
 
  array<string> env0;
  static String environ = File("/proc/self/environ").readUpTo(16384);
+ assert_(environ.size < environ.capacity);
  for(TextData s(environ);s;) env0.append( s.until('\0') );
 
  const char* envp[env0.size+1];
