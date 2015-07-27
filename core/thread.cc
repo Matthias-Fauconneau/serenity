@@ -46,6 +46,7 @@ Thread mainThread __attribute((init_priority(102))) (0);
 static bool terminationRequested = false;
 // Exit status to return for process (group)
 int groupExitStatus = 0;
+function<void(int)> userSignal;
 
 //generic T* addressOf(T& arg)  { return reinterpret_cast<T*>(&const_cast<char&>(reinterpret_cast<const volatile char&>(arg))); }
 Thread::Thread(int priority, bool spawn) : Poll(0,POLLIN,*this), priority(priority) {
@@ -122,6 +123,7 @@ static void traceAllThreads() {
  for(Thread* thread: threads) if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP); // Logs stack trace of all threads
 }
 static void handler(int sig, siginfo_t* info, void* ctx) {
+ if(sig==SIGUSR1 && userSignal) { userSignal(0); return; }
  if(sig==SIGSEGV) log_("Segmentation fault\n");
  if(threads.size>1) log("Thread #"+str(gettid())+':');
 #if __x86_64
@@ -154,6 +156,7 @@ void __attribute((constructor(102))) setup_signals() {
  check(sigaction(SIGTERM, &sa, 0));
  check(sigaction(SIGTRAP, &sa, 0));
  check(sigaction(SIGFPE, &sa, 0));
+ check(sigaction(SIGUSR1, &sa, 0));
  enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
  //setExceptions(Invalid /*| Denormal*/ | DivisionByZero /*| Overflow *//*| Underflow *//*| Precision*/);
 }

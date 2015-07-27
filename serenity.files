@@ -83,3 +83,4 @@ review.cc
 pattern.cc
 envelope.cc
 single.cc
+view-app.cc

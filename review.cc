@@ -28,6 +28,7 @@ struct Rename {
    newName = replace(newName, ".working.result", ".working");
    if(name != newName) {
     log(name, newName);
+    assert_(!existsFile(newName));
     rename(name, newName, results);
    }
   }
@@ -56,7 +57,7 @@ struct ArrayView : Widget {
  };
  struct Target { Rect rect; const Dict& key; };
  array<Target> targets;
- size_t index = 0;
+ size_t index = 1;
  function<void(const Dict&)> hover;
 
  void fetchRunning(int time) {
@@ -135,18 +136,18 @@ break2:;
      TextData s (file);
      string lastTime;
      string state;
-     while(s) {
+     for(;s; s.line()) {
       if(s.match("pour")) state = "pour"_;
-      if(s.match("pack")) state = "pack"_;
-      if(s.match("load")) state = "load"_;
+      else if(s.match("pack")) state = "pack"_;
+      else if(s.match("load")) state = "load"_;
+      else continue;
       string number = s.whileDecimal(); // Simulation time
       if(number && number!="0"_) {
-       s.skip(' ');
+       if(!s.match(' ')) { log("Expected ' ', got '"+s.peek(1)+"'"); continue; }
        number = s.whileDecimal(); // Real time
        assert_(number);
        lastTime = number;
       }
-      s.line();
      }
      data = str(lastTime?parseDecimal(lastTime)/60/60 : 0, id, state);
     }
@@ -333,9 +334,10 @@ break2:;
  }
 
  bool mouseEvent(vec2 cursor, vec2, Event event, Button button, Widget*&) override {
-  if(button == WheelUp || button == WheelDown) {
+  if(event == Press && (button == WheelUp || button == WheelDown)) {
    index = (++index)%2;
    load();
+   log(valueName);
    return true;
   }
   if(event == Press && button == LeftButton) {
@@ -345,7 +347,8 @@ break2:;
      if(states.contains(target.key)) log(states.at(target.key));
      if(ids.contains(target.key)) {
       if(running.contains(target.key)) log(running[running.indexOf(target.key)]);
-      log(ids.at(target.key)); //qdel -f 669165 > /dev/null &
+      //log("/usr/bin/ssh"+ref<string>{arguments()[0], qdel -f", ids.at(target.key), "&");
+      log("/usr/bin/ssh",arguments()[0],"'qdel -f", ids.at(target.key), ">&- 2>&- <&- &'");
       String name = replace(str(target.key),":","=")+".e"+str(ids.at(target.key));
       if(existsFile(name)) log(section(readFile(name),'\n',-10,-1));
      }
@@ -399,7 +402,7 @@ struct Review {
      key.insertSorted(copyRef("Pressure"_), copy(pressure));
      if(view.points.contains(key)) {
       float maxStress = view.points.at(key);
-      dataSet.insertSorted(float(pressure), maxStress);
+      if(maxStress) dataSet.insertSorted(float(pressure), maxStress);
      }
     }
    }

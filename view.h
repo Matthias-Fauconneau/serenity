@@ -17,10 +17,9 @@ template<Type tA> vec4f toGlobal(tA& A, size_t a, vec4f localA) {
 
 struct SimulationRun : Simulation {
  SimulationRun(const Dict& parameters, File&& file) : Simulation(parameters, move(file)) {
-  String id = str(parameters);
   log(id);
-    //log(stream.name());
-    //log("Threads", threadCount);
+  extern function<void(int)> userSignal;
+  userSignal = [this](int) { Simulation::snapshot(); };
 #if !UI
   Time time (true);
   while(processState < Done) {
@@ -31,6 +30,7 @@ struct SimulationRun : Simulation {
     log(info());
    }
    step();
+   Simulation::snapshot(); break;
   }
   if(processState != ProcessState::Done) {
    log("Failed");
@@ -120,6 +120,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
 
  void snapshot() override {
   //Simulation::snapshot();
+  log("View::snapshot");
   writeFile(name+".png", encodePNG(target.readback()), currentWorkingDirectory(), true);
  }
 

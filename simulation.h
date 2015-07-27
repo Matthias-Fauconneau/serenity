@@ -132,6 +132,7 @@ struct Simulation : System {
  Lock lock;
  Stream stream;
  Dict parameters;
+ String id = str(parameters);
  String name = str(parameters.value("Pattern","none"))+
    (parameters.contains("Pattern")?"-"+str(parameters.value("Rate",0)):""__)+
    (parameters.contains("Pressure")?"-soft"_:"");
@@ -178,7 +179,8 @@ struct Simulation : System {
  String flat(const vec3& v) { return str(v[0], v[1], v[2]); }
  String flat(const v4sf& v) { return str(v[0], v[1], v[2]); }
  virtual void snapshot() {
-  String name = this->name+"-"+processStates[int(processState)];
+  String name = copyRef(this->id); //this->name+"-"+processStates[int(processState)];
+  log("Snapshot", name);
   if(wire.count) {
    float wireDensity = (wire.count-1)*Wire::volume / (grain.count*Grain::volume);
    log("Wire density (%):", wireDensity*100);

@@ -1,7 +1,7 @@
 #include "view.h"
 
 Dict parameters() {
- Dict parameters = parseDict("Speed: 0.04,PlateSpeed: 1e-4"_);
+ Dict parameters;
  for(string argument: arguments()) /*if(argument.contains('='))*/ parameters.append(parseDict(argument));
  return parameters;
 }
