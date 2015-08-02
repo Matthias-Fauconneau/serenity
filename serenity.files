@@ -63,24 +63,5 @@ ui/plot.cc
 ui/render.h
 ui/color.h
 
-layout/layout.h
-layout/parse.cc
-layout/preview.cc
-layout/export.cc
-
-video/encoder.h
-video/encoder.cc
-
-algebra.h
-algebra.cc
-view.h
-shader.glsl
-system.h
-simulation.h
-sweep.cc
-plot-app.cc
-review.cc
-pattern.cc
-envelope.cc
-single.cc
-view-app.cc
+music/MusicXML.cc
+music/music-pdf.cc

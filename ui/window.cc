@@ -394,9 +394,10 @@ void DRMWindow::setSelection(string, bool) {}
 unique<Display> DRMWindow::display = null;
 #endif
 
-unique<Window> window(Widget* widget, int2 size, Thread& thread, bool useGL) {
+unique<Window> window(Widget* widget, int2 size, Thread& thread, bool useGL, string title) {
  if(environmentVariable("DISPLAY")) {
   auto window = unique<XWindow>(widget, thread, size, useGL);
+  window->setTitle(title);
   window->show();
   return move(window);
  }

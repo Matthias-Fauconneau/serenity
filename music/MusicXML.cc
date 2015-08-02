@@ -2,75 +2,75 @@
 #include "xml.h"
 
 static int implicitAlteration(int keySignature, const map<int, int>& measureAlterations, int step) {
-	return measureAlterations.contains(step) ? measureAlterations.at(step) : signatureAlteration(keySignature, step);
+    return measureAlterations.contains(step) ? measureAlterations.at(step) : signatureAlteration(keySignature, step);
 }
 
 MusicXML::MusicXML(string document, string) {
     Element root = parseXML(document);
 
 #if 0
-	map<uint, uint> voiceToStaff;
-	{
-		map<uint, map<uint, uint>> staffsVoicesNoteCount;
-		size_t partIndex = 0;
-		for(const Element& p: root("score-partwise"_).children) {
-			if(p.name!="part"_) continue;
-			for(const Element& m: p.children) {
-				for(const Element& e: m.children) {
-					if(e.name=="note"_) {
-						if(e["print-object"_]=="no"_) continue;
-						uint xmlStaffIndex = e.contains("staff") ? parseInteger(e("staff"_).text())-1 : partIndex;
-						uint voiceIndex = e.contains("voice") ? parseInteger(e("voice"_).text())-1 : xmlStaffIndex;
-						staffsVoicesNoteCount[xmlStaffIndex][voiceIndex]++;
-					}
-				}
-			}
-			partIndex++;
-		}
-		//log(staffVoiceCounts);
-		for(auto staffVoicesNoteCount: staffsVoicesNoteCount) {
-			uint staff = staffVoicesNoteCount.key;
-			const map<uint, uint>& voicesNotesCount = staffVoicesNoteCount.value;
-			uint mostCommonVoice = voicesNotesCount.keys[argmax(voicesNotesCount.values)];
+    map<uint, uint> voiceToStaff;
+    {
+        map<uint, map<uint, uint>> staffsVoicesNoteCount;
+        size_t partIndex = 0;
+        for(const Element& p: root("score-partwise"_).children) {
+            if(p.name!="part"_) continue;
+            for(const Element& m: p.children) {
+                for(const Element& e: m.children) {
+                    if(e.name=="note"_) {
+                        if(e["print-object"_]=="no"_) continue;
+                        uint xmlStaffIndex = e.contains("staff") ? parseInteger(e("staff"_).text())-1 : partIndex;
+                        uint voiceIndex = e.contains("voice") ? parseInteger(e("voice"_).text())-1 : xmlStaffIndex;
+                        staffsVoicesNoteCount[xmlStaffIndex][voiceIndex]++;
+                    }
+                }
+            }
+            partIndex++;
+        }
+        //log(staffVoiceCounts);
+        for(auto staffVoicesNoteCount: staffsVoicesNoteCount) {
+            uint staff = staffVoicesNoteCount.key;
+            const map<uint, uint>& voicesNotesCount = staffVoicesNoteCount.value;
+            uint mostCommonVoice = voicesNotesCount.keys[argmax(voicesNotesCount.values)];
             if(voiceToStaff.contains(mostCommonVoice)) { // Only use voices for staff assignment when each voice is most common in an unique staff
                 voiceToStaff[mostCommonVoice] = staff;
             }
-		}
-	}
+        }
+    }
 #endif
 
-	int xmlStaffCount = 0;
+    int xmlStaffCount = 0;
     root.xpath("score-partwise/part"_, [&xmlStaffCount](const Element& p) {
-            int partStaffCount = 0;
-            for(const Element& m: p.children) {
-                for(const Element& e: m.children) {
-                    if(e.name!="note"_ ) continue;
-                    int xmlStaffIndex = e.contains("staff") ? parseInteger(e("staff"_).text())-1 : 0;
-                    partStaffCount = max(partStaffCount, xmlStaffIndex+1);
-                }
+        int partStaffCount = 0;
+        for(const Element& m: p.children) {
+            for(const Element& e: m.children) {
+                if(e.name!="note"_ ) continue;
+                int xmlStaffIndex = e.contains("staff") ? parseInteger(e("staff"_).text())-1 : 0;
+                partStaffCount = max(partStaffCount, xmlStaffIndex+1);
             }
-			assert_(partStaffCount <= 2, "#54", partStaffCount);
-            xmlStaffCount += partStaffCount;
+        }
+        assert_(partStaffCount <= 2, "#54", partStaffCount);
+        xmlStaffCount += partStaffCount;
     });
 
-	staves = buffer<String>(xmlStaffCount); staves.clear();
-	{size_t xmlStaffIndex = 0;
-		root.xpath("score-partwise/part-list/score-part"_, [this, xmlStaffCount, &xmlStaffIndex](const Element& p) {
-			assert_(p.contains("part-name"), p);
-			uint staff = (xmlStaffCount-1) - xmlStaffIndex;
-			staves[staff] = p("part-name").text();
-			xmlStaffIndex++; // FIXME: actually associate part names
-		});
-	}
+    staves = buffer<String>(xmlStaffCount); staves.clear();
+    {size_t xmlStaffIndex = 0;
+        root.xpath("score-partwise/part-list/score-part"_, [this, xmlStaffCount, &xmlStaffIndex](const Element& p) {
+            assert_(p.contains("part-name"), p);
+            uint staff = (xmlStaffCount-1) - xmlStaffIndex;
+            staves[staff] = p("part-name").text();
+            xmlStaffIndex++; // FIXME: actually associate part names
+        });
+    }
 
-	//assert_(size_t(xmlStaffCount) == staves.size, xmlStaffCount, staves);
+    //assert_(size_t(xmlStaffCount) == staves.size, xmlStaffCount, staves);
 
-	const size_t staffCount = xmlStaffCount; //2;
-	buffer<Clef> clefs(staffCount); clefs.clear(Clef{GClef, 0});
-	buffer<Sign> octaveStart(staffCount); octaveStart.clear(Sign{.octave=OctaveStop}); // Current octave shift (for each staff)
+    const size_t staffCount = xmlStaffCount; //2;
+    buffer<Clef> clefs(staffCount); clefs.clear(Clef{GClef, 0});
+    buffer<Sign> octaveStart(staffCount); octaveStart.clear(Sign{.octave=OctaveStop}); // Current octave shift (for each staff)
     for(uint staff: range(staffCount)) signs.insertSorted({Sign::Clef, 0, {{staff, {.clef=clefs[staff]}}}}); // Defaults
     size_t partIndex = 0, partFirstStaffIndex = 0;
-	root.xpath("score-partwise/part"_, [xmlStaffCount, staffCount, this, &partIndex, &partFirstStaffIndex, &clefs, &octaveStart](const Element& p) {
+    root.xpath("score-partwise/part"_, [xmlStaffCount, staffCount, this, &partIndex, &partFirstStaffIndex, &clefs, &octaveStart](const Element& p) {
         KeySignature keySignature = 0; TimeSignature timeSignature={4,4};
         uint measureTime = 0, time = 0, nextTime = 0, maxTime = 0;
         uint measureIndex=0, pageIndex=0, lineIndex=0, lineMeasureIndex=0; // starts with 1
@@ -118,8 +118,8 @@ MusicXML::MusicXML(string document, string) {
                 maxTime = max(maxTime, time);
 
                 if(e.name=="note"_) {
-					Value value = e.contains("type"_) ? Value(ref<string>(valueNames).indexOf(e("type"_).text())) : Whole;
-					assert_(int(value)!=-1, e);
+                    Value value = e.contains("type"_) ? Value(ref<string>(valueNames).indexOf(e("type"_).text())) : Whole;
+                    assert_(int(value)!=-1, e);
                     int duration;
                     uint durationCoefficientNum=1, durationCoefficientDen=1;
                     if(e.contains("grace"_)) {
@@ -163,9 +163,9 @@ MusicXML::MusicXML(string document, string) {
                     if(!e.contains("chord"_) && (!e.contains("grace"_) || e("grace"_)["slash"_]!="yes"_)) nextTime = time+duration;
                     if(e["print-object"_]=="no"_) continue;
                     //assert_(e.contains("staff"), e);
-					int partStaffIndex = (e.contains("staff") ? parseInteger(e("staff"_).text())-1 : 0);
-					partStaffCount = max(partStaffCount, partStaffIndex+1);
-					int xmlStaffIndex = partFirstStaffIndex + partStaffIndex;
+                    int partStaffIndex = (e.contains("staff") ? parseInteger(e("staff"_).text())-1 : 0);
+                    partStaffCount = max(partStaffCount, partStaffIndex+1);
+                    int xmlStaffIndex = partFirstStaffIndex + partStaffIndex;
 #if 0
                     if(e.contains("voice")) {
                         uint voiceIndex = parseInteger(e("voice"_).text())-1;
@@ -181,11 +181,11 @@ MusicXML::MusicXML(string document, string) {
                         }
                     }
 #endif
-					//if(xmlStaffIndex < xmlStaffCount-2) continue; // Keeps only last two staves
-					//uint staff = 1 - max(0, xmlStaffIndex-xmlStaffCount+2); // Merges first staves (i.e only split last staff), inverts staff order to bass,treble
-					//assert_(staff < staffCount, staff);
-					assert_(xmlStaffIndex <= xmlStaffCount-1);
-					uint staff = (xmlStaffCount-1) - xmlStaffIndex;
+                    //if(xmlStaffIndex < xmlStaffCount-2) continue; // Keeps only last two staves
+                    //uint staff = 1 - max(0, xmlStaffIndex-xmlStaffCount+2); // Merges first staves (i.e only split last staff), inverts staff order to bass,treble
+                    //assert_(staff < staffCount, staff);
+                    assert_(xmlStaffIndex <= xmlStaffCount-1);
+                    uint staff = (xmlStaffCount-1) - xmlStaffIndex;
                     assert_(int(value)>=0, e);
                     if(e.contains("rest"_)) insertSign({Sign::Rest, time, {{staff, {{duration, .rest={value}}}}}});
                     else {
@@ -199,7 +199,7 @@ MusicXML::MusicXML(string document, string) {
                         int xmlAlteration = e("pitch"_).contains("alter"_) ? parseDecimal(e("pitch"_)("alter"_).text()) : 0;
                         //if(xmlAlteration == 4) xmlAlteration = 2; // ?
                         //if(xmlAlteration == 5) xmlAlteration = 3; // ?
-						assert_(xmlAlteration >= -2 && xmlAlteration <= 5, xmlAlteration, e);
+                        assert_(xmlAlteration >= -2 && xmlAlteration <= 5, xmlAlteration, e);
 
                         // Tie
                         Note::Tie tie = Note::NoTie;
@@ -236,12 +236,12 @@ MusicXML::MusicXML(string document, string) {
                         }
 
                         // -- Accidental
-						Accidental accidental = Accidental::None;
-						if(e.contains("accidental"_)) {
-							size_t index = ref<string>(SMuFL::accidental).indexOf(e("accidental"_).text());
-							assert_(index != invalid, e);
-							accidental = Accidental(SMuFL::AccidentalBase + index);
-						}
+                        Accidental accidental = Accidental::None;
+                        if(e.contains("accidental"_)) {
+                            size_t index = ref<string>(SMuFL::accidental).indexOf(e("accidental"_).text());
+                            assert_(index != invalid, e);
+                            accidental = Accidental(SMuFL::AccidentalBase + index);
+                        }
 
                         int alteration = accidental ? accidentalAlteration(accidental): implicitAlteration;
                         if(xmlAlteration != alteration) {
@@ -271,14 +271,14 @@ MusicXML::MusicXML(string document, string) {
                                                     .tie = tie,
                                                     .durationCoefficientNum = (uint)durationCoefficientNum,
                                                     .durationCoefficientDen = (uint)durationCoefficientDen,
-													.dot = e.contains("dot"_),
-													.grace = e.contains("grace"_),
-													.acciaccatura = e.contains("grace"_) && e("grace"_)["slash"_]=="yes"_,
-													.accent= articulations && articulations->contains("accent"_),
-													.staccato = articulations && articulations->contains("staccato"_),
-													.tenuto = articulations && e("notations"_)("articulations"_).contains("tenuto"_),
-													.trill = ornaments && e("notations"_)("ornaments"_).contains("trill-mark"_),
-													.arpeggio = e.contains("notations"_) && e("notations"_).contains("arpeggiate"_),
+                                                    .dot = e.contains("dot"_),
+                                                    .grace = e.contains("grace"_),
+                                                    .acciaccatura = e.contains("grace"_) && e("grace"_)["slash"_]=="yes"_,
+                                                    .accent= articulations && articulations->contains("accent"_),
+                                                    .staccato = articulations && articulations->contains("staccato"_),
+                                                    .tenuto = articulations && e("notations"_)("articulations"_).contains("tenuto"_),
+                                                    .trill = ornaments && e("notations"_)("ornaments"_).contains("trill-mark"_),
+                                                    .arpeggio = e.contains("notations"_) && e("notations"_).contains("arpeggiate"_),
                                                     .finger = fingering ? fingering.take(0) : 0,
                                                     .measureIndex = measureIndex
                                                     //.stem = e.contains("stem"_) && e("stem").text() == "up"_,
@@ -379,10 +379,10 @@ MusicXML::MusicXML(string document, string) {
                         else if(d.contains("octave-shift"_)) {
                             OctaveShift octave = OctaveShift(ref<string>({"down"_,"up"_,"stop"_}).indexOf(d("octave-shift"_)["type"_]));
                             int xmlStaffIndex = e.contains("staff") ? parseInteger(e("staff"_).text())-1 : partIndex;
-							//uint staff = 1 - max(0, xmlStaffIndex-xmlStaffCount+2); // Merges first staves (i.e only split last staff), inverts staff order to bass,treble
-							//assert_(staff < staffCount, staff);
-							assert_(xmlStaffIndex <= xmlStaffCount-1);
-							uint staff = (xmlStaffCount-1) - xmlStaffIndex;
+                            //uint staff = 1 - max(0, xmlStaffIndex-xmlStaffCount+2); // Merges first staves (i.e only split last staff), inverts staff order to bass,treble
+                            //assert_(staff < staffCount, staff);
+                            assert_(xmlStaffIndex <= xmlStaffCount-1);
+                            uint staff = (xmlStaffCount-1) - xmlStaffIndex;
                             if(octave == Down) clefs[staff].octave++;
                             if(octave == Up) clefs[staff].octave--;
                             if(octave == OctaveStop) {
@@ -401,8 +401,8 @@ MusicXML::MusicXML(string document, string) {
                                 // else { TODO: directions }
                             });
                         }
-						else if(d.contains("image"_)) {}
-						else error("Unknown direction", d);
+                        else if(d.contains("image"_)) {}
+                        else error("Unknown direction", d);
                     }
                     if(e.contains("sound"_) && e("sound"_)["tempo"_]) {
                         insertSign({Sign::Metronome, time, .metronome={Quarter, uint(parseDecimal(e("sound"_).attribute("tempo"_)))}});
@@ -412,11 +412,11 @@ MusicXML::MusicXML(string document, string) {
                     if(e.contains("divisions"_)) divisions = parseInteger(e("divisions"_).text());
                     e.xpath("clef"_, [&](const Element& clef) {
                         int xmlStaffIndex = partFirstStaffIndex + (clef["number"_] ? parseInteger(clef["number"_])-1 : 0);
-						//if(xmlStaffIndex < xmlStaffCount-2) return; // Keeps only last two staves
-						//uint staff = min(1, (xmlStaffCount-1) - xmlStaffIndex); // Merges first staves (i.e only split last staff), inverts staff order to bass,treble
-						assert_(xmlStaffIndex <= xmlStaffCount-1, partFirstStaffIndex, xmlStaffIndex, xmlStaffCount);
-						uint staff = (xmlStaffCount-1) - xmlStaffIndex;
-						//assert_(staff >= 0 /*&& staff <= 1*/, staff, xmlStaffIndex, xmlStaffCount);
+                        //if(xmlStaffIndex < xmlStaffCount-2) return; // Keeps only last two staves
+                        //uint staff = min(1, (xmlStaffCount-1) - xmlStaffIndex); // Merges first staves (i.e only split last staff), inverts staff order to bass,treble
+                        assert_(xmlStaffIndex <= xmlStaffCount-1, partFirstStaffIndex, xmlStaffIndex, xmlStaffCount);
+                        uint staff = (xmlStaffCount-1) - xmlStaffIndex;
+                        //assert_(staff >= 0 /*&& staff <= 1*/, staff, xmlStaffIndex, xmlStaffCount);
                         size_t index = "FG"_.indexOf(clef("sign"_).text()[0]);
                         if(index == invalid) { // Filters first parts with C clef
                             assert_(clef("sign"_).text() == "C"_);
@@ -464,14 +464,14 @@ MusicXML::MusicXML(string document, string) {
             maxTime=time=nextTime= max(maxTime, max(time, nextTime));
             Measure::Break measureBreak = Measure::NoBreak;
             if(m.contains("print")) {
-                if(m("print")["new-page"]=="yes") measureBreak=Measure::PageBreak;
+                if(m("print")["new-page"]=="yes") measureBreak = Measure::PageBreak;
                 else if(m("print")["new-system"]=="yes") measureBreak = Measure::LineBreak;
             }
             assert_(time > measureTime);
             if(partIndex == 0) insertSign({Sign::Measure, time, .measure={measureBreak, measureIndex, pageIndex, lineIndex, lineMeasureIndex}});
         }
         partIndex++;
-		assert_(partStaffCount <= 2, partStaffCount);
+        assert_(partStaffCount <= 2, partStaffCount);
         partFirstStaffIndex += partStaffCount;
     });
 
@@ -508,106 +508,106 @@ MusicXML::MusicXML(string document, string) {
             }
         }
         signIndex++;
-	}
+    }
 #endif
 
 #if 0
-	{ // Reorders clefs change to appear before elements on other staff to prevent unecessary clears
-		size_t staffIndex[staffCount] = {0, 0};
-		for(size_t signIndex : range(signs.size)) {
-			Sign sign = signs[signIndex];
-			if(sign.type==Sign::Clef && signIndex > staffIndex[sign.staff]+1) {
-				//log(staffIndex[sign.staff], signIndex);
-				//log(signs.slice(staffIndex[sign.staff]-1, (signIndex+1)-(staffIndex[sign.staff]-1)));
-				for(size_t index: reverse_range(signIndex, staffIndex[sign.staff]+1)) signs[index] = signs[index-1];
-				signs[staffIndex[sign.staff]+1] = sign;
-				//log(signs.slice(staffIndex[sign.staff]-1, signIndex+1-(staffIndex[sign.staff]-1)));
-			}
-			if(sign.type == Sign::Clef || sign.type == Sign::OctaveShift || sign.type==Sign::Note || sign.type==Sign::OctaveShift) {
-				staffIndex[sign.staff] = signIndex;
-			} else {
-				for(size_t staff : range(staffCount)) staffIndex[staff] = signIndex;
-			}
-		}
-	}
+    { // Reorders clefs change to appear before elements on other staff to prevent unecessary clears
+        size_t staffIndex[staffCount] = {0, 0};
+        for(size_t signIndex : range(signs.size)) {
+            Sign sign = signs[signIndex];
+            if(sign.type==Sign::Clef && signIndex > staffIndex[sign.staff]+1) {
+                //log(staffIndex[sign.staff], signIndex);
+                //log(signs.slice(staffIndex[sign.staff]-1, (signIndex+1)-(staffIndex[sign.staff]-1)));
+                for(size_t index: reverse_range(signIndex, staffIndex[sign.staff]+1)) signs[index] = signs[index-1];
+                signs[staffIndex[sign.staff]+1] = sign;
+                //log(signs.slice(staffIndex[sign.staff]-1, signIndex+1-(staffIndex[sign.staff]-1)));
+            }
+            if(sign.type == Sign::Clef || sign.type == Sign::OctaveShift || sign.type==Sign::Note || sign.type==Sign::OctaveShift) {
+                staffIndex[sign.staff] = signIndex;
+            } else {
+                for(size_t staff : range(staffCount)) staffIndex[staff] = signIndex;
+            }
+        }
+    }
 #endif
 
 #if 0
-	{// Converts ties to longer notes (spanning beats and measures)
-	array<size_t> activeTies;
-	uint page=0, line=0, measure=0;
-	for(size_t signIndex=0; signIndex < signs.size;) {
-		Sign& sign = signs[signIndex];
-		if(sign.type == Sign::Measure) { page=sign.measure.page, line=sign.measure.pageLine, measure=sign.measure.lineMeasure; }
-		if(sign.type == Sign::Note && (sign.note.tie == Note::TieStart)) activeTies.append(signIndex);
-		if(sign.type == Sign::Note && (sign.note.tie == Note::TieContinue || sign.note.tie == Note::TieStop)) {
-			size_t tieStart = invalid;
-			for(size_t index: range(activeTies.size)) {
-                if(signs[activeTies[index]].note.step == sign.note.step) {
-                    //assert_(tieStart==invalid);
-                    tieStart = index;
-                }
-			}
-            if(tieStart != invalid) {
-                assert_(tieStart != invalid, "460", page, line, measure, activeTies, apply(activeTies, [&](size_t index){ return signs[index];}), sign);
-                size_t firstIndex = activeTies[tieStart];
-                if(sign.note.tie == Note::TieStop) activeTies.removeAt(tieStart);
-                Sign& first = signs[firstIndex];
-                bool inBetween = false;
-                // Only merges if no elements (notes, bars) would break the tie
-                for(Sign sign: signs.slice(firstIndex, signIndex-firstIndex)) { if(sign.time > first.time) { inBetween = true; break; } }
-                if(!inBetween) {
-                    first.duration = sign.time+sign.duration-first.time;
-                    int duration = first.note.duration() + sign.note.duration();
-                    bool dot = false;
-                    if(duration%3 == 0) {
-                        dot = true;
-                        duration = duration * 2 / 3;
+    {// Converts ties to longer notes (spanning beats and measures)
+        array<size_t> activeTies;
+        uint page=0, line=0, measure=0;
+        for(size_t signIndex=0; signIndex < signs.size;) {
+            Sign& sign = signs[signIndex];
+            if(sign.type == Sign::Measure) { page=sign.measure.page, line=sign.measure.pageLine, measure=sign.measure.lineMeasure; }
+            if(sign.type == Sign::Note && (sign.note.tie == Note::TieStart)) activeTies.append(signIndex);
+            if(sign.type == Sign::Note && (sign.note.tie == Note::TieContinue || sign.note.tie == Note::TieStop)) {
+                size_t tieStart = invalid;
+                for(size_t index: range(activeTies.size)) {
+                    if(signs[activeTies[index]].note.step == sign.note.step) {
+                        //assert_(tieStart==invalid);
+                        tieStart = index;
                     }
-                    if(isPowerOfTwo(duration)) {
-                        first.note.value = Value(ref<uint>(valueDurations).size-1-log2(duration));
-                        first.note.dot = dot;
-                        assert_(int(first.note.value)>=0);
-                        first.note.tie = Note::NoTie;
-                        signs.removeAt(signIndex);
-                        continue;
+                }
+                if(tieStart != invalid) {
+                    assert_(tieStart != invalid, "460", page, line, measure, activeTies, apply(activeTies, [&](size_t index){ return signs[index];}), sign);
+                    size_t firstIndex = activeTies[tieStart];
+                    if(sign.note.tie == Note::TieStop) activeTies.removeAt(tieStart);
+                    Sign& first = signs[firstIndex];
+                    bool inBetween = false;
+                    // Only merges if no elements (notes, bars) would break the tie
+                    for(Sign sign: signs.slice(firstIndex, signIndex-firstIndex)) { if(sign.time > first.time) { inBetween = true; break; } }
+                    if(!inBetween) {
+                        first.duration = sign.time+sign.duration-first.time;
+                        int duration = first.note.duration() + sign.note.duration();
+                        bool dot = false;
+                        if(duration%3 == 0) {
+                            dot = true;
+                            duration = duration * 2 / 3;
+                        }
+                        if(isPowerOfTwo(duration)) {
+                            first.note.value = Value(ref<uint>(valueDurations).size-1-log2(duration));
+                            first.note.dot = dot;
+                            assert_(int(first.note.value)>=0);
+                            first.note.tie = Note::NoTie;
+                            signs.removeAt(signIndex);
+                            continue;
+                        }
                     }
                 }
             }
+            signIndex++;
         }
-		signIndex++;
-	}
-	}
+    }
 #endif
 
 #if 1
-	{// Evaluates tie note index links (invalidated by any insertion/deletion)
-	array<size_t> activeTies;
-	uint page=0, line=0, measure=0;
-	for(size_t signIndex : range(signs.size)) {
-		Sign& sign = signs[signIndex];
-		if(sign.type == Sign::Measure) { page=sign.measure.page, line=sign.measure.pageLine, measure=sign.measure.lineMeasure; }
-		if(sign.type == Sign::Note && (sign.note.tie == Note::TieStart)) activeTies.append(signIndex);
-		if(sign.type == Sign::Note && (sign.note.tie == Note::TieContinue || sign.note.tie == Note::TieStop)) {
-			size_t tieStart = invalid;
-			for(size_t index: range(activeTies.size)) {
-                if(signs[activeTies[index]].note.step == sign.note.step) {
-                    //assert_(tieStart==invalid);
-                    tieStart = index;
+    {// Evaluates tie note index links (invalidated by any insertion/deletion)
+        array<size_t> activeTies;
+        uint page=0, line=0, measure=0;
+        for(size_t signIndex : range(signs.size)) {
+            Sign& sign = signs[signIndex];
+            if(sign.type == Sign::Measure) { page=sign.measure.page, line=sign.measure.pageLine, measure=sign.measure.lineMeasure; }
+            if(sign.type == Sign::Note && (sign.note.tie == Note::TieStart)) activeTies.append(signIndex);
+            if(sign.type == Sign::Note && (sign.note.tie == Note::TieContinue || sign.note.tie == Note::TieStop)) {
+                size_t tieStart = invalid;
+                for(size_t index: range(activeTies.size)) {
+                    if(signs[activeTies[index]].note.step == sign.note.step) {
+                        //assert_(tieStart==invalid);
+                        tieStart = index;
+                    }
                 }
-			}
-            if(tieStart != invalid) {
-                assert_(tieStart != invalid, "503", page, line, measure, activeTies, apply(activeTies, [&](size_t index){ return signs[index];}), sign);
-                sign.note.tieStartNoteIndex = activeTies[tieStart];
-                if(sign.note.tie == Note::TieStop) activeTies.removeAt(tieStart);
+                if(tieStart != invalid) {
+                    assert_(tieStart != invalid, "503", page, line, measure, activeTies, apply(activeTies, [&](size_t index){ return signs[index];}), sign);
+                    sign.note.tieStartNoteIndex = activeTies[tieStart];
+                    if(sign.note.tie == Note::TieStop) activeTies.removeAt(tieStart);
+                }
             }
         }
-	}
-	}
+    }
 #endif
 
 #if 1 // Converts accidentals to match key signature (pitch class). Tie support needs explicit tiedNoteIndex to match ties while editing steps
-	KeySignature keySignature = 0;
+    KeySignature keySignature = 0;
     size_t measureStartIndex=0;
     map<int, int> previousMeasureAlterations; // Currently accidented steps (for implicit accidentals)
     for(size_t signIndex : range(signs.size)) {
@@ -626,9 +626,9 @@ MusicXML::MusicXML(string document, string) {
 
         Sign& sign = signs[signIndex];
         if(sign.type == Sign::Measure) { measureStartIndex = signIndex; previousMeasureAlterations = move(measureAlterations); }
-		if(sign.type == Sign::KeySignature) keySignature = sign.keySignature;
-		if(sign.type == Sign::Note) {
-			if(sign.note.tie == Note::TieContinue || sign.note.tie == Note::TieStop)  {
+        if(sign.type == Sign::KeySignature) keySignature = sign.keySignature;
+        if(sign.type == Sign::Note) {
+            if(sign.note.tie == Note::TieContinue || sign.note.tie == Note::TieStop)  {
                 if(sign.note.tieStartNoteIndex) {
                     assert_(sign.note.tieStartNoteIndex);
                     assert_(signs[sign.note.tieStartNoteIndex].type == Sign::Note && (
@@ -637,10 +637,10 @@ MusicXML::MusicXML(string document, string) {
                             sign.note.tieStartNoteIndex, signs[sign.note.tieStartNoteIndex]);
                     sign.note.step = signs[sign.note.tieStartNoteIndex].note.step;
                     sign.note.alteration = signs[sign.note.tieStartNoteIndex].note.alteration;
-					if(sign.note.accidental) log("sign.note.accidental");
+                    if(sign.note.accidental) log("sign.note.accidental");
                     continue;
                 }
-			}
+            }
 
             auto measureAccidental = [&](int step, int alteration) {
                 return (alteration == implicitAlteration(keySignature, measureAlterations, step)
@@ -660,9 +660,9 @@ MusicXML::MusicXML(string document, string) {
             sign.note.accidental = measureAccidental(sign.note.step, sign.note.alteration);
             sign.note.accidentalOpacity = courtesyAccidental(sign.note.step, sign.note.alteration) ? 1./2 : 1;
 
-			int key = sign.note.key();
+            int key = sign.note.key();
             int step = keyStep(keySignature, key) - sign.note.clef.octave*7;
-			int alteration = keyAlteration(keySignature, key);
+            int alteration = keyAlteration(keySignature, key);
             Accidental accidental = measureAccidental(step, alteration);
 
             //assert(!sign.note.clef.octave, sign.note.clef.octave, sign.note.step);
@@ -677,13 +677,13 @@ MusicXML::MusicXML(string document, string) {
                 if(previousMeasureAlterations.contains(sign.note.step)) previousMeasureAlterations.remove(sign.note.step); // Do not repeat courtesy accidentals
                 continue;
             }
-			sign.note.step = step;
-			sign.note.alteration = alteration;
-			sign.note.accidental = accidental;
+            sign.note.step = step;
+            sign.note.alteration = alteration;
+            sign.note.accidental = accidental;
             sign.note.accidentalOpacity = courtesyAccidental(sign.note.step, sign.note.alteration) ? 1./2 : 1;
             if(previousMeasureAlterations.contains(step)) previousMeasureAlterations.remove(step); // Do not repeat courtesy accidentals
-		}
-	}
+        }
+    }
 #endif
 
 #if 1
@@ -698,24 +698,25 @@ MusicXML::MusicXML(string document, string) {
 #endif
 
 #if 0 // FIXME: tuplets, only on same staff
-	// Removes double notes
-	array<Sign> chord;
-	for(size_t signIndex=1; signIndex < signs.size;) {
-		Sign sign = signs[signIndex];
-		if(sign.type == Sign::Note) {
-			if(chord && sign.time != chord[0].time) chord.clear();
-			bool contains = false;
-			for(Sign o: chord) if(sign.note.step == o.note.step) {
-				log("double", o, o.duration, sign, sign.duration, sign.note.measureIndex);
-				contains = true;
-				break;
-			}
-			if(contains) { signs.removeAt(signIndex); continue; }
-			chord.append( sign );
-		}
-		signIndex++;
-	}
+    // Removes double notes
+    array<Sign> chord;
+    for(size_t signIndex=1; signIndex < signs.size;) {
+        Sign sign = signs[signIndex];
+        if(sign.type == Sign::Note) {
+            if(chord && sign.time != chord[0].time) chord.clear();
+            bool contains = false;
+            for(Sign o: chord) if(sign.note.step == o.note.step) {
+                log("double", o, o.duration, sign, sign.duration, sign.note.measureIndex);
+                contains = true;
+                break;
+            }
+            if(contains) { signs.removeAt(signIndex); continue; }
+            chord.append( sign );
+        }
+        signIndex++;
+    }
 #endif
 
-	assert_(signs);
+    assert(signs && signs.last().type==Sign::Measure, (int)signs.last().type);
+    //signs.append({Sign::Measure, 0, .measure={}}); // Flushes last measure
 }

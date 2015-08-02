@@ -175,4 +175,4 @@ struct DRMWindow : Window {
 	void setSelection(string selection, bool clipboard) override;
 };
 
-unique<Window> window(Widget* widget, int2 size=-1, Thread& thread=mainThread, bool useGL=false);
+unique<Window> window(Widget* widget, int2 size=-1, Thread& thread=mainThread, bool useGL=false, string title="");
