@@ -15,7 +15,7 @@ inline void storea(uint32* const ptr, v4si a) { *(v4si*)ptr = a; }
 
 // v4sf
 typedef float __attribute((__vector_size__(16))) v4sf;
-inline v4sf constexpr float3(float f) { return (v4sf){f,f,f,0}; }
+inline v4sf constexpr float3(float f) { return (v4sf){f,f,f,0.f}; }
 inline v4sf constexpr float4(float f) { return (v4sf){f,f,f,f}; }
 static constexpr v4sf unused _0f = float4( 0 );
 static constexpr v4sf unused _1f = float4( 1 );

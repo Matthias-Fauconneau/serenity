@@ -143,12 +143,12 @@ String decimalPrefix(double value, string unit=""_, string unitSuffix=""_);
 /// Converts arrays
 generic String str(const ref<T> source, string separator=" "_) {
 	array<char> target;
-    target.append('[');
+    //target.append('[');
     for(uint i: range(source.size)) {
         target.append( str(source[i]) );
         if(i<source.size-1) target.append(separator);
     }
-    target.append(']');
+    //target.append(']');
 	return move(target);
 }
 generic String str(const mref<T>& source, string separator=" "_) { return str((const ref<T>)source, separator); }

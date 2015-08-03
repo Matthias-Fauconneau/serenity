@@ -121,18 +121,20 @@ void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity, boo
     }
 }
 
-static void parallelogram(const Image& target, int2 p0, int2 p1, int dy, bgr3f color, float opacity) {
-	if(p0.x > p1.x) swap(p0.x, p1.x);
-	for(uint x: range(max(0,p0.x), min(int(target.width),p1.x))) {
-		float y0 = float(p0.y) + float((p1.y - p0.y) * int(x - p0.x)) / float(p1.x - p0.x); // FIXME: step
+static void trapezoid(const Image& target, Trapezoid::Span s0, Trapezoid::Span s1, bgr3f color, float opacity) {
+ if(s0.x > s1.x) swap(s0, s1);
+ for(uint x: range(max(0, int(s0.x)), min(int(target.width), int(s1.x)))) {
+  float y0 = float(s0.min) + float((s1.min - s0.min) * int(x - s0.x)) / float(s1.x - s0.x); // FIXME: step
 		float f0 = floor(y0);
-		float coverage = (y0-f0);
 		int i0 = int(f0);
-  if(uint(i0)<target.height) blend(target, x, i0, color, opacity*(1-coverage));
-		for(uint y: range(max(0,i0+1), min(int(target.height),i0+1+dy-1))) { // FIXME: clip once
-   blend(target, x,y, color, opacity); // FIXME: antialias
+  float y1 = float(s0.max) + float((s1.max - s0.max) * int(x - s0.x)) / float(s1.x - s0.x); // FIXME: step
+  float f1 = floor(y1);
+  int i1 = int(f1);
+  if(uint(i0)<target.height) blend(target, x, i0, color, opacity*(1-(y0-f0)));
+  for(uint y: range(max(0,i0+1), min(int(target.height),i1))) { // FIXME: clip once
+   blend(target, x,y, color, opacity); // FIXME: antialias first last column
 		}
-  if(uint(i0+dy)<target.height) blend(target, x, i0+dy, color, opacity*coverage);
+  if(uint(i1)<target.height) blend(target, x, i1, color, opacity*(y1-f1));
 	}
 }
 
@@ -224,7 +226,11 @@ void render(const Image& target, const Graphics& graphics, vec2 offset) {
 		Font::Glyph glyph = e.font.font(e.fontSize).render(e.index);
 		if(glyph.image) blit(target, int2(round(offset+e.origin))+glyph.offset, glyph.image, e.color, e.opacity);
 	}
-	for(const auto& e: graphics.parallelograms) parallelogram(target, int2(round(offset+e.min)), int2(round(offset+e.max)), e.dy, e.color, e.opacity);
+ for(auto e: graphics.trapezoids) {
+  for(auto& span: e.span) span.x += offset.x, span.min += offset.y, span.max += offset.y;
+  trapezoid(target, e.span[0], e.span[1], e.color, e.opacity);
+ }
+  //trapezoid(target, int2(round(offset+e.min)), int2(round(offset+e.max)), e.dy, e.color, e.opacity); HINT
 	for(const auto& e: graphics.cubics) cubic(target, e.points, e.color, e.opacity, offset);
 	for(const auto& e: graphics.graphics) {
 		assert_(isNumber(e.key));

@@ -17,21 +17,6 @@ struct Grid {
     }
     struct List : mref<uint16> {
         List(mref<uint16> o) : mref(o) {}
-        /*void remove(uint16 index) {
-            size_t i = 0;
-            while(at(i)) { if(at(i)==index) break; i++; }
-            assert(i<cellCapacity);
-            while(i+1<cellCapacity) { at(i) = at(i+1); i++; }
-            assert(i<cellCapacity);
-            at(i) = 0;
-        }*/
-        /*void append(uint16 index) { // Sorted by decreasing index
-            size_t i = 0;
-            while(at(i) > index) { i++; assert(i<cellCapacity, (mref<uint16>)*this, index); }
-            size_t j=i;
-            while(index) { assert(j<cellCapacity, (mref<uint16>)*this, index); swap(index, at(j)); j++; }
-            if(j<cellCapacity) at(j) = 0;
-        }*/
         void append(uint16 index) {
          size_t i = 0;
          while(at(i)) i++;
@@ -45,20 +30,21 @@ struct Grid {
     inline List operator()(vec4f p) { return operator[](index(p)); }
 };
 
-struct Lattice {
+generic struct Lattice {
  const vec4f scale;
  const vec4f min, max;
  const int3 size = int3(::floor(toVec3(scale*(max-min))))+int3(1);
- buffer<uint16> cells {size_t(size.z*size.y*size.x)};
- const vec4f XYZ0 {float(1), float(size.x), float(size.y*size.x), 0};
+ buffer<T> cells {size_t(size.z*size.y*size.x)};
+ const vec4f XYZ0;// {float(1), float(size.x), float(size.y*size.x), 0.f}; // GCC 4.8 \/
  Lattice(float scale, vec4f min, vec4f max) :
-   scale(float3(scale)),
+   scale(float3(scale)) ,
    min(min - float3(2./scale)),
-   max(max + float3(2./scale)) { // Avoids bound check
+   max(max + float3(2./scale)), // Avoids bound check
+   XYZ0{float(1), float(size.x), float(size.y*size.x), 0.f} {                     // GCC 4.8 ^
   cells.clear(0);
  }
  inline size_t index(vec4f p) { return dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*(p-min))))[0]; }
- inline uint16& operator()(vec4f p) { return cells[index(p)]; }
+ inline T& operator()(vec4f p) { return cells[index(p)]; }
 };
 
 struct CylinderGrid {
@@ -93,10 +79,10 @@ struct Simulation : System {
  const float targetHeight;
  const float pourRadius = side.initialRadius - Grain::radius /*- (wire.count?Wire::radius:0)*/;
  const float winchRadius = side.initialRadius /*- Grain::radius*/ - Wire::radius;
- const float loopAngle = PI*(3-sqrt(5.));
+ const Pattern pattern;
+ const float loopAngle;
  const float winchSpeed;
  const float winchRate;
- const Pattern pattern;
  const float pressure;
  const float plateSpeed;
 
@@ -113,9 +99,9 @@ struct Simulation : System {
 
  // Lattice
  vec4f min = _0f, max = _0f;
- Lattice wireLattice{float(sqrt(3.)/(2*Wire::radius)),
-    v4sf{-side.initialRadius,-side.initialRadius, -Grain::radius,0},
-    v4sf{ side.initialRadius, side.initialRadius, targetHeight+2*Grain::radius,0}};
+ const vec4f wireLatticeMin {-side.initialRadius,-side.initialRadius, -Grain::radius,0.f};
+ const vec4f wireLatticeMax { side.initialRadius, side.initialRadius, targetHeight+2*Grain::radius,0.f};
+ Lattice<uint32> wireLattice {float(sqrt(3.)/(2*Wire::radius)), wireLatticeMin, wireLatticeMax};
 
  //float overlapMean = 0, overlapMax = 0;
  float topForce = 0, bottomForce  = 0;
@@ -141,13 +127,17 @@ struct Simulation : System {
 
  Simulation(const Dict& parameters, Stream&& stream) : System(parameters),
    targetHeight(parameters.at("Height"_)),
-   winchSpeed(parameters.value("Speed"_, 0.f)),
-   winchRate(parameters.value("Rate"_, 0.f)),
    pattern(parameters.contains("Pattern")?
                    Pattern(ref<string>(patterns).indexOf(parameters.at("Pattern"))):None),
+   loopAngle(parameters.value("Angle"_, PI*(3-sqrt(5.)))),
+   winchSpeed(parameters.value("Speed"_, 0.f)),
+   winchRate(parameters.value("Rate"_, 0.f)),
    pressure(parameters.value("Pressure", 0.f)),
    plateSpeed(parameters.at("PlateSpeed")),
+   random((uint)parameters.at("Seed").integer()),
    stream(move(stream)), parameters(copy(parameters)) {
+  //this->stream.write("Simulation");
+  //log("Simulation");
   assert(pattern != -1, patterns, this->parameters, this->parameters.at("Pattern"));
   plate.position[1][2] = /*initialHeight =*/ targetHeight+Grain::radius;
   if(pattern) { // Initial wire node
@@ -159,7 +149,9 @@ struct Simulation : System {
    for(size_t n: range(3)) wire.positionDerivatives[n][i] = _0f;
    wire.frictions.set(i);
   }
-  flock(stream.fd, LOCK_EX);
+  //flock(stream.fd, LOCK_EX);
+  float height = plate.position[1][2] - plate.position[0][2];
+  log(volume(), height*PI*sq(side.initialRadius), volume() / (height*PI*sq(side.initialRadius)));
  }
 
  generic vec4f tension(T& A, size_t a, size_t b) {
@@ -284,6 +276,66 @@ struct Simulation : System {
   }
  }
 
+ float volume() {
+  v4sf O = _0f;
+  for(v4sf v : side.Vertex::position) O += v;
+  O /= float4(side.Vertex::position.size); // Origin at center of mesh for stability
+  v4sf volumeSum = _0f;
+  size_t W = side.W;
+  for(size_t faceIndex: range(side.faceCount)) {
+   size_t i = faceIndex/2/W, j = (faceIndex/2)%W;
+   size_t a = i*W+j;
+   size_t b = i*W+(j+1)%W;
+   size_t c =(i+1)*W+j;
+   size_t d = (i+1)*W+(j+1)%W;
+   size_t vertices[2][2][3] {{{a,b,c},{b,d,c}},{{a,d,c},{a,b,d}}};
+   size_t* V = vertices[i%2][faceIndex%2];
+   v4sf A  = side.Vertex::position[V[0]];
+   v4sf B  = side.Vertex::position[V[1]];
+   v4sf C  = side.Vertex::position[V[2]];
+   v4sf volume = ::dot3(A-O, ::cross(B-O, C-O)) / 6;
+   assert_(volume[0] >= 0, faceIndex, volume[0], A, B, C, O);
+   volumeSum += volume;
+  }
+  float bottom, top;
+  { // Bottom fan
+   v4sf C = _0f;
+   for(v4sf v : side.Vertex::position.slice(0, W)) C += v;
+   C /= float4(W); // Origin at center of disk for stability
+   bottom = C[2];
+   for(size_t i: range(W)) {
+    v4sf A  = side.Vertex::position[i];
+    v4sf B  = side.Vertex::position[(i+1)%W];
+    v4sf volume = - ::dot3(A-O, ::cross(B-O, C-O)) / 6;
+    assert_(volume[0] >= 0, volume[0], A, B, C, O);
+    volumeSum += volume;
+   }
+  }
+  { // Bottom fan
+   v4sf C = _0f;
+   for(v4sf v : side.Vertex::position.slice(side.Vertex::position.size-W)) C += v;
+   C /= float4(W); // Origin at center of disk for stability
+   top = C[2];
+   for(size_t i: range(side.Vertex::position.size-W, side.Vertex::position.size)) {
+    v4sf A  = side.Vertex::position[i];
+    v4sf B  = side.Vertex::position[(i+1)%W];
+    v4sf volume = ::dot3(A-O, ::cross(B-O, C-O)) / 6;
+    assert_(volume[0] >= 0, volume[0], A, B, C, O);
+    volumeSum += volume;
+   }
+  }
+  float plateHeight = plate.position[1][2] - plate.position[0][2];
+  assert_(plateHeight > 0);
+  float membraneHeight = top - bottom;
+  assert_(membraneHeight > 0, top, bottom);
+  //assert_(membraneHeight >= plateHeight, membraneHeight, plateHeight);
+  float volume = volumeSum[0];
+  // Corrects for inaccessible volume clipped by plates
+  if(membraneHeight > plateHeight) volume -= (membraneHeight - plateHeight) * PI * sq(side.initialRadius);
+  // FIXME: Some extra volume between cylinder and membrane remains unclipped
+  return volume;
+ }
+
  const float pourPackThreshold = 2e-3;
  const float packLoadThreshold = 2e-3;
  const float transitionTime = 1*s;
@@ -378,9 +430,9 @@ break2_:;
 
    if(parameters.contains("Pressure"_)) {
     if(G[2] == 0 && side.thickness == side.loadThickness && (skip || (
-                                                              voidRatio < 0.76 &&
+                                                              voidRatio < 0.82 &&
                                                               grainKineticEnergy / grain.count < packLoadThreshold &&
-                                                              abs(topForce+bottomForce)/(topForce-bottomForce) < 0.5))) {
+                                                              abs(topForce+bottomForce)/(topForce-bottomForce) < 1))) {
      skip = false;
      processState = ProcessState::Load;
      bottomZ0 = plate.position[0][2];
@@ -399,7 +451,7 @@ break2_:;
                   "Void Ratio (%):", voidRatio*100)
        +(wire.count?str(" Wire density (%):", wireDensity*100):""__)
        +"\n");
-     stream.write("Strain (%), Stress (Pa), Deviatoric Stress (Pa), Normalized Deviatoric Stress\n"); //, Tension (J)
+     stream.write("Strain (%), Stress (Pa), Deviatoric Stress (Pa), Normalized Deviatoric Stress, Volume (m3)\n"); //, Tension (J)
     }
    } else {
     if(grainKineticEnergy / grain.count < 1e-6 /*1µJ/grain*/) {
@@ -506,7 +558,7 @@ break2_:;
   }
 #define WIRE 1
 #if WIRE
-  Lattice grainLattice(sqrt(3.)/(2*Grain::radius), min, max);
+  Lattice<uint16> grainLattice(sqrt(3.)/(2*Grain::radius), min, max);
 #endif
   Grid grainGrid(1/(2*Grain::radius), min, max);
   grainInitializationTime.stop();
@@ -602,12 +654,12 @@ break2_:;
     grainBase+gX*gY-gX-1, grainBase+gX*gY-1, grainBase+gX*gY+gX-1
    };
 
-   uint16* wireBase = wireLattice.cells.begin();
+   uint32* wireBase = wireLattice.cells.begin();
    const int wX = wireLattice.size.x, wY = wireLattice.size.y;
    const int r =  2;
    const int n = r+1+r, N = n*n;
    //static unused bool once = ({ log(r,n,N); true; });
-   const uint16* wireNeighbours[N];
+   const uint32* wireNeighbours[N];
    for(int z: range(n)) for(int y: range(n))
     wireNeighbours[z*n+y] = wireBase+(z-r)*wY*wX+(y-r)*wX-r;
 
@@ -685,7 +737,7 @@ break2_:;
      size_t offset = wireLattice.index(wire.position[i]);
      for(size_t yz: range(N)) {
       for(size_t x: range(n)) {
-       uint16 index = wireNeighbours[yz][offset+x];
+       uint32 index = wireNeighbours[yz][offset+x];
        if(index > i+2) penalty(wire, i, wire, index-1);
       }
      }
@@ -753,7 +805,7 @@ break2_:;
      size_t offset = wireLattice.index(wire.position[i]);
      for(size_t yz: range(N)) {
       for(size_t x: range(n)) {
-       uint16 index = wireNeighbours[yz][offset+x];
+       uint32 index = wireNeighbours[yz][offset+x];
        if(index > i+2) penalty(wire, i, wire, index-1);
       }
      }
@@ -824,7 +876,7 @@ break2_:;
      size_t offset = wireLattice.index(wire.position[i]);
      for(size_t yz: range(N)) {
       for(size_t x: range(n)) {
-       uint16 index = wireNeighbours[yz][offset+x];
+       uint32 index = wireNeighbours[yz][offset+x];
        if(index > i+2) penalty(wire, i, wire, index-1);
       }
      }
@@ -939,8 +991,9 @@ break2_:;
     float bottomZ = plate.position[0][2], topZ = plate.position[1][2];
     float displacement = (topZ0-topZ+bottomZ-bottomZ0);
     float stress = (top-bottom)/(2*PI*sq(side.radius));
+
     String s = str(displacement/(topZ0-bottomZ0)*100, stress, stress-pressure,
-                           (stress-pressure)/(stress+pressure) /*, side.tensionEnergy*/);
+                   (stress-pressure)/(stress+pressure), volume() /*, side.tensionEnergy*/);
     stream.write(s+'\n');
    }
   }
@@ -973,7 +1026,7 @@ break2_:;
    }
    else if (pattern == Loop) { // Loops
     float A = winchAngle, a = winchAngle * (2*PI) / loopAngle;
-    float R = winchRadius, r = 1./2*R;
+    float R = winchRadius, r = R * loopAngle / (2*PI);
     end = vec2((R-r)*cos(A)+r*cos(a),(R-r)*sin(A)+r*sin(a));
     winchAngle += winchRate*R/r * dt;
    } else error("Unknown pattern:", int(pattern));
@@ -982,7 +1035,7 @@ break2_:;
    vec4f length = sqrt(sq3(relativePosition));
    if(length[0] >= Wire::internodeLength) {
     Locker lock(this->lock);
-    assert_(wire.count < wire.capacity);
+    assert_(wire.count < wire.capacity, wire.capacity);
     size_t i = wire.count++;
     wire.position[i] = wire.position[wire.count-2]
       + float3(Wire::internodeLength) * relativePosition/length;

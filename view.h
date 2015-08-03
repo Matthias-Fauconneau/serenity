@@ -15,25 +15,33 @@ template<Type tA> vec4f toGlobal(tA& A, size_t a, vec4f localA) {
  return A.position[a] + qapply(A.rotation[a], localA);
 }
 
+/*struct StandardInput : Poll {
+ function<void(string)> input;
+ StandardInput(function<void(string)> input) : input(input) { registerPoll(); }
+ void event() override { input(Stream(0).readUpTo(1<<16)); }
+};*/
+
 struct SimulationRun : Simulation {
+ //StandardInput stdin {[this](string){ Simulation::snapshot(); }};
  SimulationRun(const Dict& parameters, File&& file) : Simulation(parameters, move(file)) {
   log(id);
-  extern function<void(int)> userSignal;
-  userSignal = [this](int) { Simulation::snapshot(); };
+  if(existsFile(id+".result")) log("Existing result", id);
+  /*extern function<void(int)> userSignal;
+  userSignal = [this](int) { Simulation::snapshot(); };*/
 #if !UI
   Time time (true);
   while(processState < Done) {
    if(timeStep%size_t(1e-1/dt) == 0) {
     if(processState  < Load && timeStep*dt > 6*60) { log("6min limit"); break; }
-    if(processState  < Load && time > 6*60*60) { log("6h limit"); break; }
+    if(processState  < Load && time.toReal() > 12*60*60) { log("12h limit"); break; }
     report();
     log(info());
    }
    step();
-   Simulation::snapshot(); break;
   }
   if(processState != ProcessState::Done) {
    log("Failed");
+   if(existsFile(id+".failed")) remove(id+".failed", currentWorkingDirectory());
    rename(id+".working", id+".failed", currentWorkingDirectory());
   } else {
    rename(id+".working", id+".result", currentWorkingDirectory());

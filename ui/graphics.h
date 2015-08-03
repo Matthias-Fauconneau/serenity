@@ -53,19 +53,11 @@ struct Line {
 };
 
 /// Parallelogram graphic element
-// FIXME: Implement as polygon
-struct Parallelogram {
- vec2 min,max;
- float dy;
+struct Trapezoid {
+ struct Span { float x, min, max; } span[2];
  bgr3f color = black; float opacity = 1;
- Parallelogram(vec2 min, vec2 max, float dy, bgr3f color=black, float opacity=1) : min(min), max(max), dy(dy), color(color), opacity(opacity) {}
+ Trapezoid(Span a, Span b, bgr3f color=black, float opacity=1) : span{a,b}, color(color), opacity(opacity) {}
 };
-
-/*/// Polygon graphic element
-// FIXME: Implements as cubic path
-struct Polygon {
-    vec2 min,max; array<Line> edges;
-};*/
 
 struct Cubic {
  buffer<vec2> points;
@@ -97,7 +89,7 @@ struct Graphics : shareable {
  array<Blit> blits;
  array<Glyph> glyphs;
  array<Line> lines;
- array<Parallelogram> parallelograms;
+ array<Trapezoid> trapezoids;
  array<Cubic> cubics;
 
  map<vec2, shared<Graphics>> graphics;
@@ -108,7 +100,7 @@ struct Graphics : shareable {
   for(auto& o: fills) o.origin += offset;
   for(auto& o: blits) o.origin += offset;
   for(auto& o: glyphs) o.origin += offset;
-  for(auto& o: parallelograms) { o.min+=offset; o.max+=offset; }
+  for(auto& o: trapezoids) for(auto& span: o.span) { span.x+=offset.x; span.min+=offset.y; span.max+=offset.y; }
   for(auto& o: lines) { o.a+=offset; o.b+=offset; }
   for(auto& o: cubics) for(vec2& p: o.points) p+=vec2(offset);
  }
@@ -117,7 +109,7 @@ struct Graphics : shareable {
   fills.append(o.fills);
   blits.append(o.blits);
   glyphs.append(o.glyphs);
-  parallelograms.append(o.parallelograms);
+  trapezoids.append(o.trapezoids);
   lines.append(o.lines);
   cubics.append(o.cubics);
  }
@@ -132,5 +124,5 @@ struct Graphics : shareable {
 };
 
 inline String str(const Graphics& o) {
- return str(o.bounds, o.fills.size, o.blits.size, o.glyphs.size, o.lines.size, o.parallelograms.size, o.cubics.size, o.graphics.size());
+ return str(o.bounds, o.fills.size, o.blits.size, o.glyphs.size, o.lines.size, o.trapezoids.size, o.cubics.size, o.graphics.size());
 }

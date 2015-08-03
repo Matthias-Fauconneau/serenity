@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 cd "$(dirname "$0")"
 test -z "$CC" -a ! -e "$(which $CC 2>/dev/null)" && CC="$(which clang++ 2>/dev/null)"

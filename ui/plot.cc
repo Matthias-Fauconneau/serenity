@@ -6,7 +6,7 @@
 struct Ticks { float max; uint tickCount; };
 uint subExponent(float& value) {
  float subExponent = exp10(log10(abs(value)) - floor(log10(abs(value))));
- for(auto a: (float[][2]){{1,5},{1.2,6},{1.4,7},{2,10},{2.5,5},{3,3},{3.2,8},{4,8},{5,5},{6,6},{8,8},{10,5}}) {
+ for(auto a: (float[][2]){{1,5},{1.2,6},{1.4,7},{1.6,8},{1.8,9},{2,10},{2.5,5},{3,3},{3.2,8},{4,8},{5,5},{6,6},{8,8},{10,5}}) {
   if(a[0] >= subExponent-0x1p-52) {
    value=(value>0?1:-1)*a[0]*exp10(floor(log10(abs(value))));
    return a[1];
@@ -18,26 +18,26 @@ uint subExponent(float& value) {
 vec2 Plot::sizeHint(vec2) { return 1024; }
 shared<Graphics> Plot::graphics(vec2 size) {
  vec2 min=vec2(+__builtin_inf()), max=vec2(-__builtin_inf());
- if(this->min.x < this->max.x && this->min.y < this->max.y) min=this->min, max=this->max; // Custom scales
- else {  // Computes axis scales
-  assert(dataSets);
-  for(const auto& data: dataSets.values) {
-   for(auto point: data) {
-    vec2 p(point.key,point.value);
-    if(!isNumber(p)) continue;
-    //assert_(isNumber(p.x) && isNumber(p.y), p);
-    min=::min(min,p);
-    max=::max(max,p);
-   }
+ // Computes axis scales
+ for(const auto& data: dataSets.values) {
+  for(auto point: data) {
+   vec2 p(point.key,point.value);
+   if(!isNumber(p)) continue;
+   //assert_(isNumber(p.x) && isNumber(p.y), p);
+   min=::min(min,p);
+   max=::max(max,p);
   }
-  for(uint i: range(2)) if(!log[i]) { if(i>0 && min[i]>0) min[i] = 0; if(max[i]<0) max[i] = 0; }
  }
+ for(size_t i: range(2)) if(!log[i]) { if(i>0 && min[i]>0) min[i] = 0; if(max[i]<0) max[i] = 0; }
+ if(this->min.x < this->max.x) min.x=this->min.x, max.x=this->max.x; // Custom scales
+ if(this->min.y < this->max.y) min.y=this->min.y, max.y=this->max.y; // Custom scales
+
  shared<Graphics> graphics;
  if(!(min.x < max.x && min.y < max.y)) return graphics;
  assert_(isNumber(min) && isNumber(max) && min.x < max.x && min.y < max.y, min, max);
 
  int tickCount[2]={};
- for(uint axis: range(2)) { // Ceils maximum using a number in the preferred sequence
+ for(size_t axis: range(2)) { // Ceils maximum using a number in the preferred sequence
   if(max[axis]>-min[axis]) {
    if(log[axis]) { //FIXME
     max[axis] = exp2(ceil(log2(max[axis])));
@@ -65,9 +65,9 @@ shared<Graphics> Plot::graphics(vec2 size) {
  // Configures ticks
  struct Tick : Text { float value; Tick(float value, string label) : Text(label), value(value) {} };
  array<Tick> ticks[2]; vec2 tickLabelSize = 0;
- for(uint axis: range(2)) {
+ for(size_t axis: range(2)) {
   uint precision = ::max(1., ceil(-log10(::max(-min[axis],max[axis])/tickCount[axis])));
-  for(uint i: range(tickCount[axis]+1)) {
+  for(size_t i: range(tickCount[axis]+1)) {
    float lmin = log[axis] ? log2(min[axis]) : min[axis];
    float lmax = log[axis] ? log2(max[axis]) : max[axis];
    float value = lmin+(lmax-lmin)*i/tickCount[axis];
@@ -87,7 +87,8 @@ shared<Graphics> Plot::graphics(vec2 size) {
  // Evaluates colors
  buffer<bgr3f> colors(dataSets.size());
  if(colors.size==1) colors[0] = black;
- else for(uint i: range(colors.size))
+ else if(colors.size==4) { colors[0] = red, colors[1] = green, colors[2] = blue, colors[3] = black; }
+ else for(size_t i: range(colors.size))
   colors[i] = clamp(bgr3f(0), LChuvtoBGR(53,179, 2*PI*i/colors.size), bgr3f(1));
 
  // Draws plot
@@ -98,11 +99,11 @@ shared<Graphics> Plot::graphics(vec2 size) {
  else pen.x += left+2*tickLength;
  if(legendPosition&2) {
   pen.y += size.y-bottom-tickLabelSize.y/2;
-  for(uint i: range(dataSets.size())) pen.y -= Text(dataSets.keys[i], 16).sizeHint().y;
+  for(size_t i: range(dataSets.size())) pen.y -= Text(dataSets.keys[i], 16).sizeHint().y;
  } else {
   pen.y += top;
  }
- for(uint i: range(dataSets.size())) { // Legend
+ for(size_t i: range(dataSets.size())) { // Legend
   Text text(dataSets.keys[i], 16, colors[i]); graphics->graphics.insert(vec2(pen+int2(legendPosition&1 ? -text.sizeHint().x : 0,0)), text.graphics(0)); pen.y+=text.sizeHint().y;
  }
 
@@ -121,7 +122,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
  // Draws axis and ticks
  {vec2 O=vec2(min.x, min.y>0 ? min.y : max.y<0 ? max.y : 0), end = vec2(max.x, O.y); // X
   graphics->lines.append(round(point(O)), round(point(end)));
-  for(uint i: range(tickCount[0]+1)) {
+  for(size_t i: range(tickCount[0]+1)) {
    Tick& tick = ticks[0][i];
    vec2 p(round(point(vec2(tick.value, O.y))));
    graphics->lines.append(p, p+vec2(0,-tickLength));
@@ -131,7 +132,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
  }
  {vec2 O=vec2(min.x>0 ? min.x : max.x<0 ? max.x : 0, min.y), end = vec2(O.x, max.y); // Y
   graphics->lines.append(round(point(O)), round(point(end)));
-  for(uint i: range(tickCount[1]+1)) {
+  for(size_t i: range(tickCount[1]+1)) {
    vec2 p (round(point(O+(i/float(tickCount[1]))*(end-O))));
    graphics->lines.append(p, p+vec2(tickLength,0));
    Text& tick = ticks[1][i];
@@ -141,21 +142,40 @@ shared<Graphics> Plot::graphics(vec2 size) {
  }
 
  // Plots data points
- for(uint i: range(dataSets.size())) {
+ for(size_t i: range(dataSets.size())) {
   bgr3f color = colors[i];
   assert_(bgr3f(0) <= color && color <= bgr3f(1), color);
   const auto& data = dataSets.values[i];
-  buffer<vec2> points = apply(data.size(), [&](uint i){ return point( vec2(data.keys[i],data.values[i]) ); });
-  if(plotPoints || points.size==1) for(uint i: range(points.size)) {
+  buffer<vec2> points = apply(data.size(), [&](size_t i){ return point( vec2(data.keys[i],data.values[i]) ); });
+  if(plotPoints || points.size==1) for(size_t i: range(points.size)) {
    vec2 p = round(points[i]);
    if(!isNumber(p)) continue;
    const int pointRadius = 2;
    graphics->lines.append(p-vec2(pointRadius, 0), p+vec2(pointRadius, 0), color);
    graphics->lines.append(p-vec2(0, pointRadius), p+vec2(0, pointRadius), color);
   }
-  if(plotLines) for(uint i: range(data.size()-1)) {
+  if(plotLines) for(size_t i: range(points.size-1)) {
    if(!isNumber(points[i]) || !isNumber(points[i+1])) continue;
    graphics->lines.append(points[i], points[i+1], color);
+  }
+  if(plotBands && points) {
+   vec2 O = point(vec2(0,0));
+   Trapezoid::Span span[2] = {{O.x,O.y,O.y},{points[0].x,points[0].y,points[0].y}};
+   for(vec2 p: points.slice(1)) {
+    if(p.x == span[1].x) {
+     span[1].min = ::min(span[1].min, p.y);
+     span[1].max = ::max(span[1].max, p.y);
+    } else { // Commit band
+     graphics->lines.append(vec2(span[0].x, span[0].min), vec2(span[1].x, span[1].min), color);
+     graphics->lines.append(vec2(span[0].x, span[0].max), vec2(span[1].x, span[1].max), color);
+     graphics->trapezoids.append(span[0], span[1], color, 1.f/2);
+     span[0] = span[1];
+     span[1] = {p.x, p.y, p.y};
+    }
+   }
+   graphics->lines.append(vec2(span[0].x, span[0].min), vec2(span[1].x, span[1].min), color);
+   graphics->lines.append(vec2(span[0].x, span[0].max), vec2(span[1].x, span[1].max), color);
+   graphics->trapezoids.append(span[0], span[1], color, 1.f/2);
   }
  }
  return graphics;

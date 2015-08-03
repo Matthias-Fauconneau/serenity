@@ -149,6 +149,7 @@ void setExceptions(uint except) {
 }
 
 void __attribute((constructor(102))) setup_signals() {
+ //{rlimit limit; getrlimit(RLIMIT_CORE,&limit); limit.rlim_cur=0; setrlimit(RLIMIT_CORE,&limit);}
  /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
  struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={{}};
  check(sigaction(SIGABRT, &sa, 0));
@@ -156,7 +157,7 @@ void __attribute((constructor(102))) setup_signals() {
  check(sigaction(SIGTERM, &sa, 0));
  check(sigaction(SIGTRAP, &sa, 0));
  check(sigaction(SIGFPE, &sa, 0));
- check(sigaction(SIGUSR1, &sa, 0));
+ //check(sigaction(SIGUSR1, &sa, 0));
  enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
  //setExceptions(Invalid /*| Denormal*/ | DivisionByZero /*| Overflow *//*| Underflow *//*| Precision*/);
 }

@@ -28,7 +28,7 @@ struct Variant {
 
  explicit operator bool() const { return type != Null; }
 
- int64 integer() const { assert_(type==Integer, *this); return number; }
+ int64 integer() const { /*assert_(type==Integer, (int)type, *this); return number;*/ return real(); } // FIXME
  double real() const {
   if(type==Rational) { assert_((number/denominator)*denominator==number); return number/denominator; }
   if(type==Real||type==Integer) return number;
@@ -38,7 +38,8 @@ struct Variant {
  explicit operator string() const { assert(type==Data); return data; }
  int64 numerator() {  assert(type==Rational, *this); return number; }
  operator float() const { return real(); }
- operator int() const { return real(); }
+ operator int() const { return integer(); }
+ operator uint() const { return integer(); }
 };
 bool operator ==(const Variant& a, const Variant& b) {
  if((a.type == Variant::Integer || a.type == Variant::Real) &&

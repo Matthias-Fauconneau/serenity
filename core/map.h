@@ -34,7 +34,7 @@ template<Type K, Type V> struct map {
 
  /// Returns whether this object has the same values for all keys in subsets.
  bool includes(const map<K, V>& subset) const {
-  for(auto argument: subset) if(at(argument.key) != argument.value) return false;
+  for(auto argument: subset) if(contains(argument.key) && at(argument.key) != argument.value) return false;
   return true;
  }
 

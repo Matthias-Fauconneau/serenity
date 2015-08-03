@@ -212,7 +212,7 @@ struct System {
   sconst float bendDamping = 0; //mass / s;
   float tensionEnergy=0;
   Wire(float elasticModulus, size_t base) :
-    Vertex{base, 32768, Wire::mass}, elasticModulus(elasticModulus) {}
+    Vertex{base, 1<<17, Wire::mass}, elasticModulus(elasticModulus) {}
  } wire;
 
  struct Side : Vertex {
@@ -311,9 +311,11 @@ struct System {
    dt(p.at("TimeStep"_)),
    gz(10/*p.at("G")*/),
    frictionCoefficient(p.at("Friction"_)),
-   wire(p.value("Elasticity"_, 0), grain.base+grain.capacity),
+   wire(p.value("Elasticity"_, 0.f), grain.base+grain.capacity),
    side(Grain::radius/1.7/*(float)p.at("Resolution")*/,
-        p.at("Radius"_), p.at("Height"_), /*p.at("Thickness"_)*/8e-3, wire.base+wire.capacity) {}
+        p.at("Radius"_), p.at("Height"_), /*p.at("Thickness"_)*/8e-3, wire.base+wire.capacity) {
+  //log("System");
+ }
 
  // Update
  size_t timeStep = 0;
