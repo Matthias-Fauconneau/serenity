@@ -141,19 +141,19 @@ String binaryPrefix(uint64 value, string unit="B"_, string unitSuffix=""_);
 String decimalPrefix(double value, string unit=""_, string unitSuffix=""_);
 
 /// Converts arrays
-generic String str(const ref<T> source, string separator=" "_) {
+generic String str(const ref<T> source, string separator=" "_, string bracket="[]"_) {
 	array<char> target;
-    target.append('['); // Critical for PDF compatibility
-    for(uint i: range(source.size)) {
-        target.append( str(source[i]) );
-        if(i<source.size-1) target.append(separator);
-    }
-    target.append(']');
-	return move(target);
+ if(bracket) target.append(bracket[0]); // Critical for PDF compatibility
+ for(uint i: range(source.size)) {
+  target.append( str(source[i]) );
+  if(i<source.size-1) target.append(separator);
+ }
+ if(bracket) target.append(bracket[1]);
+ return move(target);
 }
-generic String str(const mref<T>& source, string separator=" "_) { return str((const ref<T>)source, separator); }
-generic String str(const buffer<T>& source, string separator=" "_) { return str((const ref<T>)source, separator); }
-generic String str(const array<T>& source, string separator=" "_) { return str((const ref<T>)source, separator); }
+generic String str(const mref<T>& source, string separator=" "_, string bracket="[]"_) { return str((const ref<T>)source, separator, bracket); }
+generic String str(const buffer<T>& source, string separator=" "_, string bracket="[]"_) { return str((const ref<T>)source, separator, bracket); }
+generic String str(const array<T>& source, string separator=" "_, string bracket="[]"_) { return str((const ref<T>)source, separator, bracket); }
 inline String str(const ref<char>& a, string b) { return str(a)+" "+str(b); }
 inline String bin(const ref<uint8> source, string separator=" "_) { return str(apply(source, [](uint64 c) { return str(c, 8u, '0', 2u); }), separator); }
 inline String hex(const ref<int32> source, string separator=" "_) { return str(apply(source, [](const int32& c) { return hex(c, 8); }), separator); }

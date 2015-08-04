@@ -435,10 +435,11 @@ struct Review {
  Review() {
   window->actions[Return] = [this](){ view.fetchRunning(0); window->render(); };
   window->actions[Space] = [this](){
+   //remove("plot.pdf"_, home());
    static constexpr float inchMM = 25.4, inchPx = 90;
-   const vec2 pageSize (210/*mm*/ * (inchPx/inchMM), 297/*mm*/ * (inchPx/inchMM));
+   const vec2 pageSize (210/*mm*/ * (inchPx/inchMM), 210/*mm*/ * (inchPx/inchMM));
    auto graphics = plot.graphics(pageSize);
-   remove("plot.pdf"_, home());
+   graphics->flatten();
    writeFile("plot.pdf"_, toPDF(pageSize, ref<Graphics>(graphics.pointer, 1), 72 / inchPx /*px/inch*/), home(), true);
    //encodePNG(render(int2(1050), plot.graphics(vec2(1050))));
   };
@@ -476,12 +477,12 @@ struct Review {
     shortSet.remove("Pressure");
     if(!shortSet.contains("Seed")) shortSet.insert("Seed"__,"1"__);
     shortSet.remove("Seed");
-    auto& dataSet = plot.dataSets[str(shortSet.values)];
+    auto& dataSet = plot.dataSets[str(shortSet.values," "_,""_)];
     float maxStress = view.points.at(point);
     if(maxStress) dataSet.insertSortedMulti(float(point.at("Pressure")), maxStress);
    }
    window->render();
-   window->actions[Space]();
+   //window->actions[Space]();
   };
  }
 }

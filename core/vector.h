@@ -161,12 +161,14 @@ generic struct bgra {
     operator vec<rgb,T,3>() const { return vec<rgb,T,3>{r,g,b}; }
     operator vec<rgba,T,4>() const { return vec<rgba,T,4>{r,g,b,a}; }
 };
+/// Floating-point b,g,r,a vector
+typedef vec<bgra,float,4> rgba4f;
 
 generic struct rgba {
     T r,g,b,a;
 };
 /// Floating-point r,g,b,a vector
-typedef vec<rgba,float,4> rgba4f;
+typedef vec<rgba,float,4> bgra4f;
 
 /// Integer b,g,r,a vector (8bit)
 struct byte4 : vec<bgra,uint8,4> {

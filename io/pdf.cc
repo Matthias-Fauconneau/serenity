@@ -54,21 +54,24 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
    array<char> content;
 
    Dict pageGraphicStateReferences;
-   float currentOpacity=1;
-   auto setOpacity = [&](float opacity) {
-    if(opacity != currentOpacity) {
-     if(!pageGraphicStateReferences.contains(str(opacity))) {
-      if(!graphicStates.contains(str(opacity))) {
+   bgra4f currentColor=1;
+   auto setColor = [&](bgra4f color) {
+    if(color != currentColor) {
+     String id = str(color.a);
+     if(!pageGraphicStateReferences.contains(id)) {
+      if(!graphicStates.contains(id)) {
        Object& graphicState = objects.append();
        graphicState.insert("Type"__, "/ExtGState"_);
-       graphicState.insert("CA"__, opacity);
-       graphicState.insert("ca"__, opacity);
-       graphicStates.insert(str(opacity), ref(graphicState));
+       graphicState.insert("CA"__, color.a);
+       graphicState.insert("ca"__, color.a);
+       graphicStates.insert(copyRef(id), ref(graphicState));
       }
-      pageGraphicStateReferences.insert(str(opacity), copy(graphicStates.at(str(opacity))));
+      pageGraphicStateReferences.insert(copyRef(id), copy(graphicStates.at(id)));
      }
-     content.append("/"_+str(opacity)+" gs\n");
-     currentOpacity = opacity;
+     content.append("/"_+id+" gs\n");
+     content.append(str(color.r, color.g, color.b)+" RG\n");
+     content.append(str(color.r, color.g, color.b)+" rg\n");
+     currentColor = color;
     }
    };
 
@@ -76,6 +79,7 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
    Dict pageFontReferences;
    String fontID; float fontSize=0;
    vec2 last = 0;
+   assert_(graphics.glyphs);
    for(const Glyph& glyph: graphics.glyphs) {
     const FontData& font = glyph.font;
     if(font.name != fontID || glyph.fontSize != fontSize) {
@@ -129,7 +133,7 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
     vec2 origin = vec2(glyph.origin.x, pageSize.y-glyph.origin.y)*px;
     vec2 relative = origin - last; // Position update of glyph origin in pixels
     last = origin;
-    setOpacity(glyph.opacity);
+    setColor(bgra4f(glyph.color, glyph.opacity));
     content.append(str(relative.x,relative.y)+" Td <"+hex(index,4)+"> Tj\n");
    }
    content.append("ET\n");
@@ -159,7 +163,7 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
        xObjects.insert(copy(id), ref(xImage));
       }
       assert_(image.width && image.height, image.size);
-      setOpacity(blit.opacity);
+      setColor(bgra4f(blit.color, blit.opacity));
       content.append("q "+str(blit.size.x*px,0,0,blit.size.y*px, blit.origin.x*px, (pageSize.y-blit.origin.y-blit.size.y)*px)+
                      " cm /"+id+" Do Q\n");
      }
@@ -172,23 +176,24 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
 
    auto P = [&](vec2 p) { return str(p.x*px, (pageSize.y-p.y)*px); };
    content.append("0 w\n");
-   setOpacity(1); // Always reset opacity to 1 for proper print of "cosmetic" (single dot) lines.
+   //setColor(bgra4f(black, 1)); // Always resets to opaque black for proper print of thin lines.
    for(auto& line: graphics.lines) {
+    setColor(bgra4f(line.color, line.opacity)); // Always resets to opaque black for proper print of thin lines.
     content.append(P(line.a)+" m "+P(line.b)+" l S\n");
    }
 
    for(auto& p: graphics.trapezoids) {
-    setOpacity(p.opacity);
+    setColor(bgra4f(p.color, p.opacity));
     content.append(
        P(vec2(p.span[0].x, p.span[0].min))+" m"
       " "+P(vec2(p.span[0].x, p.span[0].max))+" l"
-      " "+P(vec2(p.span[1].x, p.span[0].max))+" l"
-      " "+P(vec2(p.span[1].x, p.span[0].min))+" l"
-      "f\n");
+      " "+P(vec2(p.span[1].x, p.span[1].max))+" l"
+      " "+P(vec2(p.span[1].x, p.span[1].min))+" l"
+      " f\n");
    }
 
    for(auto& c: graphics.cubics) {
-    setOpacity(c.opacity);
+    setColor(bgra4f(c.color, c.opacity));
     content.append(P(c.points[0])+" m ");
     assert_(c.points.size%3==0);
     for(size_t index=1; index<c.points.size; index+=3)
@@ -198,6 +203,7 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
 
    contents.insert("Filter"__, "/FlateDecode"_);
    contents = deflate(content);
+   //contents = copy(content);
    page.insert("Contents"__, ref(contents));
   }
   pdfPages.at("Kids").list.append( ref(page) );
@@ -209,20 +215,19 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
  size_t fileByteIndex = header.size;
  buffer<buffer<byte>> pdfObjects =
    apply(objects.size-1, [&](size_t index) -> buffer<byte> { return str(1+index)+" 0 obj\n"_+str(objects[1+index])+"\nendobj\n"_; });
-String xrefHeader = "xref\n0 "+str(objects.size)+"\n0000000000 65535 f\r\n";
-String xrefTable ((objects.size-1)*20, 0);
-for(::ref<byte> o: pdfObjects) { xrefTable.append(str(fileByteIndex, 10u)+" 00000 n\r\n"); fileByteIndex += o.size; }
-size_t contentSize = fileByteIndex;
-size_t xrefTableStart = fileByteIndex;
-Dict trailerDict; trailerDict.insert("Size"__, objects.size); trailerDict.insert("Root"__, ref(root));
-String trailer = ("trailer "+str(trailerDict)+"\n")+("startxref\n"+str(xrefTableStart)+"\r\n%%EOF");
-buffer<byte> file(contentSize+xrefHeader.size+xrefTable.size+trailer.size, 0);
-file.append(header);
-for(::ref<byte> o: pdfObjects) file.append(o);
-file.append(xrefHeader);
-file.append(xrefTable);
-file.append(trailer);
-assert_(file.size == file.capacity);
-log(file, file.size);
-return file;
+ String xrefHeader = "xref\n0 "+str(objects.size)+"\n0000000000 65535 f\r\n";
+ String xrefTable ((objects.size-1)*20, 0);
+ for(::ref<byte> o: pdfObjects) { xrefTable.append(str(fileByteIndex, 10u)+" 00000 n\r\n"); fileByteIndex += o.size; }
+ size_t contentSize = fileByteIndex;
+ size_t xrefTableStart = fileByteIndex;
+ Dict trailerDict; trailerDict.insert("Size"__, objects.size); trailerDict.insert("Root"__, ref(root));
+ String trailer = ("trailer "+str(trailerDict)+"\n")+("startxref\n"+str(xrefTableStart)+"\r\n%%EOF");
+ buffer<byte> file(contentSize+xrefHeader.size+xrefTable.size+trailer.size, 0);
+ file.append(header);
+ for(::ref<byte> o: pdfObjects) file.append(o);
+ file.append(xrefHeader);
+ file.append(xrefTable);
+ file.append(trailer);
+ assert_(file.size == file.capacity);
+ return file;
 }
