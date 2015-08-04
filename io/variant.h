@@ -41,7 +41,7 @@ struct Variant {
  operator int() const { return integer(); }
  operator uint() const { return integer(); }
 };
-bool operator ==(const Variant& a, const Variant& b) {
+inline bool operator ==(const Variant& a, const Variant& b) {
  if((a.type == Variant::Integer || a.type == Variant::Real) &&
     (b.type == Variant::Integer || b.type == Variant::Real))
   return a.number == b.number;
@@ -63,16 +63,16 @@ inline bool operator <(const Variant& a, const Variant& b) {
  //return (string)a < (string)b;
 }
 
-template<> Variant copy(const Variant& v) {
+template<> inline Variant copy(const Variant& v) {
  if(v.type == Variant::Integer || v.type == Variant::Real) return v.number;
  if(v.type == Variant::Data) return v.data;
  error(int(v.type));
 }
-/*generic String str(const map<T,Variant>& dict) {
+generic String str(const map<T,Variant>& dict) {
  array<char> s;
  s.append("<<"); for(auto entry: dict) s.append( '/'+entry.key+' '+str(entry.value)+' ' ); s.append(">>");
  return move(s);
-}*/
+}
 
 inline String str(const Variant& o) {
  if(o.type==Variant::Boolean) return unsafeRef(str(bool(o.number)));
@@ -90,12 +90,13 @@ inline Dict parseDict(TextData& s) {
  Dict dict;
  bool curly = s.match('{');
  if(curly && s.match('}')) return dict;
+ else if(!s) return dict;
  for(;;) {
   s.whileAny(" "_);
   string key = s.whileNo(":=|},"_);
   string value; s.whileAny(" "_);
   if(s.matchAny(":="_)) { s.whileAny(" "_); value = s.whileNo("|,} "_,'{','}'); }
-  assert_(key && value, s.data);
+  assert_(key && value, "'"+key+"'", "'"+value+"'", "'"+s.slice(s.index)+"'", "'"+s.data+"'");
   if(!dict.contains(key)) dict.insertSorted(copyRef(key), replace(copyRef(value),'\\','/'));
   else {
    if(dict.at(key)==value) log("Duplicate entry with same value", key, value);

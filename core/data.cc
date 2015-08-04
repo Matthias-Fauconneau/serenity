@@ -208,7 +208,7 @@ int TextData::integer(bool maySign, int base) {
  assert(base==10 || base==16);
  int sign=1;
  if(maySign) { if(match('-')) sign=-1; else match('+'); }
- assert_(isInteger(base), "Expected integer, got '"+escape(slice(index, 64))+"'");
+ assert_(isInteger(base), "Expected integer, got '"+/*escape(*/slice(index)/*)*/+"'", data);
  long value=0;
  do {
   char c = peek();
@@ -278,6 +278,7 @@ double TextData::decimal() {
  }
  if(match("µ")) exponent-=6;
  else if(match('m')) exponent-=3;
+ else if(match('%')) exponent-=2;
  else if(match('K')) exponent+=3;
  else if(match('M')) exponent+=6;
  return sign*significand*exp10(eSign*exponent-decimal);

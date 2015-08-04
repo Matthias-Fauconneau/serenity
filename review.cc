@@ -8,6 +8,8 @@
 #include "xml.h"
 #include "plot.h"
 #include "layout.h"
+#include "render.h"
+#include "pdf.h"
 
 #define RENAME 0
 #if RENAME
@@ -93,7 +95,7 @@ struct ArrayView : Widget {
   load();
  }
  void load() {
-  valueName = ref<string>{"Stress (MPa)","Time (s)","Displacement (%)"}[index];
+  valueName = ref<string>{"Stress (MPa)", "Time (s)", "Wire density (%)", "Displacement (%)"}[index];
   points.clear();
   ids.clear();
   states.clear();
@@ -110,10 +112,9 @@ struct ArrayView : Widget {
    if(!configuration.contains("Pattern")) continue;
    if(points.contains(configuration)) continue;
    array<char> data;
-   if(existsFile(id,cache) && File(id, cache).modifiedTime() >= realTime()-60*60e9)
+   if(1 && existsFile(id,cache) && File(id, cache).modifiedTime() >= realTime()-60*60e9)
     data = readFile(id, cache);
    if(!data) {
-    log(id);
     String resultName;
     if(existsFile(id+".failed")) resultName = id+".failed";
     if(existsFile(id+".working")) resultName = id+".working";
@@ -121,9 +122,18 @@ struct ArrayView : Widget {
     if(resultName) {
      map<string, array<float>> dataSets;
      TextData s (readFile(resultName));
-     s.until('\n'); // First line: constant results
-     buffer<string> names = split(s.until('\n'),", "); // Second line: Headers
+     if(!s) continue;
+     log(id);
+     string resultLine;// = s.line(); // FIXME: old bad version does not write the result line
+     //assert_(resultLine);
+     Dict results = parseDict(resultLine);
+     if(results.contains("Wire density (%)"_))
+      data.append((string)results.at("Wire density (%)"_));
+     else
+      data.append("0"_);
+     buffer<string> names = split(s.line(),", "); // Second line: Headers
      for(string name: names) dataSets.insert(name);
+     //assert_(s, resultName, s);
      while(s) {
       for(size_t i = 0; s && !s.match('\n'); i++) {
        string d = s.whileDecimal();
@@ -138,12 +148,13 @@ struct ArrayView : Widget {
       }
      }
 break2:;
-     if(dataSets.contains("Stress (Pa)")) //continue;
-      data = str(::max(dataSets.at("Stress (Pa)"))); // / 1e6
+     //if(dataSets.contains("Stress (Pa)")) //continue;
+     //assert_(dataSets.at("Stress (Pa)"_), dataSets);
+     if(dataSets.at("Stress (Pa)"_))
+      data.append(" "_+str(::max(dataSets.at("Stress (Pa)"_))));
      else
-      data.append("0");
-    }
-    //assert_(data && resultName);
+      data.append(" 0"_);
+    } else data.append("0 0");
     string logName;
     for(string name: list) {
      string jobID;
@@ -173,7 +184,8 @@ break2:;
        assert_(displacement, s);
       }
      }
-     data.append(" "+str(time?:"0", jobID, state, displacement?:"0")); // /60/60
+     assert_(jobID);
+     data.append(" "_+str(time?:"0", jobID, state, displacement?:"0")); // /60/60
      logName=name; break;
     }
     //assert_(logName);
@@ -182,6 +194,8 @@ break2:;
     writeFile(id, data, cache, true);
    }
    TextData s (data);
+   float wireDensity = s.decimal();
+   s.skip(' ');
    float stress = s.decimal();
    float time=0, displacement=0;
    if(s) {
@@ -199,7 +213,7 @@ break2:;
     if(1 || points.at(configuration)!=0) { log("Duplicate configuration", configuration); continue; }
     else points.at(configuration) = value; // Replace 0 from log
    } else*/
-   points.insert(move(configuration), ref<float>{stress,time,displacement}[index]);
+   points.insert(move(configuration), ref<float>{stress,time,wireDensity,displacement}[index]);
   }
   if(index==1) for(const SGEJob& job: running) if(!points.contains(job.dict)) {
    //log("Missing output for ", id);
@@ -377,7 +391,7 @@ break2:;
 
  bool mouseEvent(vec2 cursor, vec2, Event event, Button button, Widget*&) override {
   if(event == Press && (button == WheelUp || button == WheelDown)) {
-   index=(index+3+(button==WheelUp?1:-1))%3;
+   index=(index+4+(button==WheelUp?1:-1))%4;
    load();
    return true;
   }
@@ -420,6 +434,14 @@ struct Review {
  unique<Window> window = ::window(&layout, int2(0, 1050));
  Review() {
   window->actions[Return] = [this](){ view.fetchRunning(0); window->render(); };
+  window->actions[Space] = [this](){
+   static constexpr float inchMM = 25.4, inchPx = 90;
+   const vec2 pageSize (210/*mm*/ * (inchPx/inchMM), 297/*mm*/ * (inchPx/inchMM));
+   auto graphics = plot.graphics(pageSize);
+   remove("plot.pdf"_, home());
+   writeFile("plot.pdf"_, toPDF(pageSize, ref<Graphics>(graphics.pointer, 1), 72 / inchPx /*px/inch*/), home(), true);
+   //encodePNG(render(int2(1050), plot.graphics(vec2(1050))));
+  };
   view.hover = [this](const Dict& point) {
    if(view.index!=0) return;
    Dict filter = copy(point);
@@ -459,6 +481,7 @@ struct Review {
     if(maxStress) dataSet.insertSortedMulti(float(point.at("Pressure")), maxStress);
    }
    window->render();
+   window->actions[Space]();
   };
  }
 }

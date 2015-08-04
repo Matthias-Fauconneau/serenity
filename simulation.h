@@ -81,13 +81,16 @@ struct Simulation : System {
  const float winchRadius = side.initialRadius /*- Grain::radius*/ - Wire::radius;
  const Pattern pattern;
  const float loopAngle;
- const float winchSpeed;
+ const float initialWinchSpeed = 0.1;
+ float winchSpeed = initialWinchSpeed;
+ const float targetWireDensity;// = 1./16;
  const float winchRate;
  const float pressure;
  const float plateSpeed;
 
  // Process variables
  float currentPourHeight = Grain::radius;
+ float maxSpawnHeight = 0;
  float lastAngle = 0, winchAngle = 0, currentRadius = winchRadius;
  //float /*currentHeight = 0,*/ initialHeight = 0;
  float topZ0, bottomZ0;
@@ -130,7 +133,8 @@ struct Simulation : System {
    pattern(parameters.contains("Pattern")?
                    Pattern(ref<string>(patterns).indexOf(parameters.at("Pattern"))):None),
    loopAngle(parameters.value("Angle"_, PI*(3-sqrt(5.)))),
-   winchSpeed(parameters.value("Speed"_, 0.f)),
+   //winchSpeed(parameters.value("Speed"_, 0.f)),
+   targetWireDensity(parameters.value("Wire"_, 0.f)),
    winchRate(parameters.value("Rate"_, 0.f)),
    pressure(parameters.value("Pressure", 0.f)),
    plateSpeed(parameters.at("PlateSpeed")),
@@ -293,8 +297,8 @@ struct Simulation : System {
    v4sf A  = side.Vertex::position[V[0]];
    v4sf B  = side.Vertex::position[V[1]];
    v4sf C  = side.Vertex::position[V[2]];
-   v4sf volume = ::dot3(A-O, ::cross(B-O, C-O)) / 6;
-   assert_(volume[0] >= 0, faceIndex, volume[0], A, B, C, O);
+   v4sf volume = ::dot3(A-O, ::cross(B-O, C-O)) / float4(6);
+   //assert(volume[0] >= 0, faceIndex, volume[0], A, B, C, O);
    volumeSum += volume;
   }
   float bottom, top;
@@ -306,8 +310,8 @@ struct Simulation : System {
    for(size_t i: range(W)) {
     v4sf A  = side.Vertex::position[i];
     v4sf B  = side.Vertex::position[(i+1)%W];
-    v4sf volume = - ::dot3(A-O, ::cross(B-O, C-O)) / 6;
-    assert_(volume[0] >= 0, volume[0], A, B, C, O);
+    v4sf volume = - ::dot3(A-O, ::cross(B-O, C-O)) / float4(6);
+    //assert_(volume[0] >= 0, volume[0], A, B, C, O);
     volumeSum += volume;
    }
   }
@@ -319,15 +323,15 @@ struct Simulation : System {
    for(size_t i: range(side.Vertex::position.size-W, side.Vertex::position.size)) {
     v4sf A  = side.Vertex::position[i];
     v4sf B  = side.Vertex::position[(i+1)%W];
-    v4sf volume = ::dot3(A-O, ::cross(B-O, C-O)) / 6;
-    assert_(volume[0] >= 0, volume[0], A, B, C, O);
+    v4sf volume = ::dot3(A-O, ::cross(B-O, C-O)) / float4(6);
+    //assert_(volume[0] >= 0, volume[0], A, B, C, O);
     volumeSum += volume;
    }
   }
   float plateHeight = plate.position[1][2] - plate.position[0][2];
-  assert_(plateHeight > 0);
+  //assert_(plateHeight > 0);
   float membraneHeight = top - bottom;
-  assert_(membraneHeight > 0, top, bottom);
+  //assert_(membraneHeight > 0, top, bottom);
   //assert_(membraneHeight >= plateHeight, membraneHeight, plateHeight);
   float volume = volumeSum[0];
   // Corrects for inaccessible volume clipped by plates
@@ -374,10 +378,14 @@ struct Simulation : System {
        newPosition[2] = ::max(newPosition[2], p[2]+dz);
       }
      }
-     if(/*wire.count &&*/ newPosition[2] > currentPourHeight) break; // Do not pour over wire
+     float wireDensity = (wire.count-1)*Wire::volume / (grain.count*Grain::volume);
+     if(newPosition[2] > currentPourHeight &&
+        (wireDensity < targetWireDensity || newPosition[2] > currentPourHeight+2*Grain::radius ||
+         newPosition[2] > targetHeight) ) break;
      for(auto p: wire.position.slice(0, wire.count))
       if(length(p - newPosition) < Grain::radius+Wire::radius)
        goto break2_;
+     maxSpawnHeight = ::max(maxSpawnHeight, newPosition[2]);
      for(auto p: grain.position.slice(0, grain.count)) {
       if(::length(p - newPosition) < Grain::radius+Grain::radius-0x1p-24)
        error(newPosition, p, log2(abs(::length(p - newPosition) -  2*Grain::radius)));
@@ -406,7 +414,15 @@ struct Simulation : System {
      break;
     }
 break2_:;
-    if(currentPourHeight<targetHeight/*-Grain::radius*/) currentPourHeight += winchSpeed * dt;
+     // Weights winch vertical speed by wire density
+    float wireDensity = (wire.count-1)*Wire::volume / (grain.count*Grain::volume);
+    // Adapts winch vertical speed to achieve target wire density
+    assert_( wireDensity-targetWireDensity > -1 && wireDensity-targetWireDensity < 1,
+             wireDensity, targetWireDensity);
+    winchSpeed += dt*/*initialWinchSpeed**/(wireDensity-targetWireDensity);
+    assert_(winchSpeed > 0, winchSpeed, wireDensity, targetWireDensity);
+    if(currentPourHeight<targetHeight/*-Grain::radius*/)
+     currentPourHeight += /*wireDensity **/ winchSpeed * dt;
    }
   }
   float topZ = 0;
@@ -443,15 +459,19 @@ break2_:;
      float wireDensity = (wire.count-1)*Wire::volume / (grain.count*Grain::volume);
      float height = plate.position[1][2] - plate.position[0][2];
      float grainDensity = grain.count*Grain::volume / (height * PI*sq(side.radius));
-     stream.write(str("Grain count:", grain.count, "Wire count:", wire.count,
-                      "Weight", (grain.count*grain.mass + wire.count*wire.mass) * (-G[2]),
-                  "Initial Radius (mm):", side.radius*1e3,
-                  "Initial Height (mm):", (topZ0-bottomZ0)*1e3,
-                  "Grain density (%):", grainDensity*100,
-                  "Void Ratio (%):", voidRatio*100)
-       +(wire.count?str(" Wire density (%):", wireDensity*100):""__)
-       +"\n");
-     stream.write("Strain (%), Stress (Pa), Deviatoric Stress (Pa), Normalized Deviatoric Stress, Volume (m3)\n"); //, Tension (J)
+     Dict results;
+     //results.insert("Initial Radius (mm)"__, side.radius*1e3);
+     results.insert("Grain count"__, grain.count);
+     results.insert("Weight (N)"__, (grain.count*grain.mass + wire.count*wire.mass) * (-G[2]));
+     results.insert("Initial Height (mm)"__, (topZ0-bottomZ0)*1e3);
+     results.insert("Grain density (%)"__, grainDensity*100);
+     results.insert("Void Ratio (%)"__, voidRatio*100);
+     if(wire.count) {
+      results.insert("Wire count"__, wire.count);
+      results.insert("Wire density (%)"__, wireDensity*100);
+     }
+     stream.write(str(results)+"\n");
+     stream.write("Strain (%), Stress (Pa), Deviatoric Stress (Pa), Normalized Deviatoric Stress, Volume (m³)\n"); //, Tension (J)
     }
    } else {
     if(grainKineticEnergy / grain.count < 1e-6 /*1µJ/grain*/) {
@@ -1054,8 +1074,7 @@ break2_:;
  }
 
 String info() {
- array<char> s {
-  copyRef(processStates[processState])};
+ array<char> s {copyRef(processStates[processState])};
  s.append(" "_+str(pressure,0u,1u));
  s.append(" "_+str(dt,0u,1u));
  s.append(" "_+str(grain.count)/*+" grains"_*/);

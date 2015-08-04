@@ -32,7 +32,8 @@ core/profile.cc
 io/variant.h
 io/png.cc
 io/bit.h
-io/flic.h
+io/pdf.h
+io/pdf.cc
 io/font.cc
 io/font.h
 io/xml.h

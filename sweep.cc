@@ -7,7 +7,7 @@ struct ParameterSweep {
   mainThread.setPriority(19);
   if(!arguments()) {
    array<String> cases;
-   Dict parameters = parseDict("Speed:0.04,PlateSpeed:1e-4"_);
+   Dict parameters = parseDict("Rate:100,PlateSpeed:1e-4"_);
    array<String> existing =
      apply(Folder("Results").list(Files)
            .filter([](string name){return !endsWith(name, ".result") && !endsWith(name, ".working");}),
@@ -21,10 +21,10 @@ struct ParameterSweep {
       parameters["Pattern"__] = pattern;
       for(int pressure: {/*25,50,100,*/200,400,800,1600/*,3200*/}) {
        parameters["Pressure"__] = String(str(pressure)+"K"_);
-       for(float radius: {/*0.02,*/0.03}) {
+       for(float radius: {0.02,0.03}) {
         parameters["Radius"__] = radius;
         parameters["Height"__] = radius*4;
-        for(int seed: {2,3,4}) { // previous run (no seed) are seed=1
+        for(int seed: {1/*,2,3,4*/}) {
          parameters["Seed"__] = seed;
          auto add = [&]{
           String id = str(parameters);
@@ -34,8 +34,8 @@ struct ParameterSweep {
          if(pattern == "none") add();
          else for(float wireElasticModulus: {1e8}) {
           parameters["Elasticity"__] = String(str(int(round(wireElasticModulus/1e8)))+"e8");
-          for(float winchRate: {100,200}) {
-           parameters["Rate"__] = winchRate;
+          for(string wireDensity: {"3%"_,"6%"_,"12%"_}) {
+           parameters["Wire"__] = wireDensity;
            if(pattern == "helix") add();
            else for(float angle: {1.2, 2.4/*PI*(3-sqrt(5.))*/, 3.6}) {
             parameters["Angle"__] = angle;
