@@ -99,10 +99,13 @@ Image decodeImage(const ref<byte> file) {
 
 // -- Rotate --
 
+void flip(Image& image) {
+ for(int y=0,h=image.height;y<h/2;y++) for(int x=0,w=image.width;x<w;x++)
+  swap(image(x,y),image(x,h-1-y));
+}
 Image flip(Image&& image) {
-    for(int y=0,h=image.height;y<h/2;y++) for(int x=0,w=image.width;x<w;x++)
-        swap(image(x,y),image(x,h-1-y));
-    return move(image);
+ flip(image);
+ return move(image);
 }
 
 void rotate(const Image& target, const Image& source) {

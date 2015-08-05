@@ -10,6 +10,8 @@
 #include "layout.h"
 #include "render.h"
 #include "pdf.h"
+#include "snapshot-view.h"
+#include <unistd.h>
 
 #define RENAME 0
 #if RENAME
@@ -53,14 +55,12 @@ struct ArrayView : Widget {
  uint textSize;
  vec2 headerCellSize = vec2(80*textSize/16, textSize);
  vec2 contentCellSize = vec2(48*textSize/16, textSize);
- buffer<string> dimensions[2] = {
-  split("Radius,Pressure",","), //Friction,Radius,
-  split("Rate,Angle,Pattern",",") //TimeStep,Rate,Angle
- };
+ array<string> dimensions[2];
  struct Target { Rect rect; Dict tableCoordinates; const Dict& key; };
  array<Target> targets;
  size_t index = 0;
- function<void(const Dict&)> hover;
+ function<void(const Dict&)> hover, press;
+ function<void(string)> status;
  Folder cache {".cache", currentWorkingDirectory(), true};
 
  void fetchRunning(int time) {
@@ -86,6 +86,7 @@ struct ArrayView : Widget {
     running.append(SGEJob{move(dict), copyRef(job("JB_job_number").content),
                           float(currentTime()-parseDate(job("JAT_start_time").content))});
    }
+   if(status) status(str(running.size));
   }
  }
 
@@ -110,6 +111,7 @@ struct ArrayView : Widget {
    Dict configuration = parseDict(id);
    if(!configuration.contains("Seed")) continue;
    if(!configuration.contains("Pattern")) continue;
+   if(!existsFile(str(configuration))) continue; // Only with snapshot signal file
    if(points.contains(configuration)) continue;
    array<char> data;
    if(1 && existsFile(id,cache) && File(id, cache).modifiedTime() >= realTime()-60*60e9)
@@ -122,39 +124,45 @@ struct ArrayView : Widget {
     if(resultName) {
      map<string, array<float>> dataSets;
      TextData s (readFile(resultName));
-     if(!s) continue;
-     log(id);
-     string resultLine;// = s.line(); // FIXME: old bad version does not write the result line
-     //assert_(resultLine);
-     Dict results = parseDict(resultLine);
-     if(results.contains("Wire density (%)"_))
-      data.append((string)results.at("Wire density (%)"_));
-     else
-      data.append("0"_);
-     buffer<string> names = split(s.line(),", "); // Second line: Headers
-     for(string name: names) dataSets.insert(name);
-     //assert_(s, resultName, s);
-     while(s) {
-      for(size_t i = 0; s && !s.match('\n'); i++) {
-       string d = s.whileDecimal();
-       if(!d) goto break2;
-       //assert_(d, s.slice(s.index-16,16),"|", s.slice(s.index));
-       float decimal = parseDecimal(d);
-       assert_(isNumber(decimal), s.slice(s.index-16,16),"|", s.slice(s.index));
-       if(!(i < dataSets.values.size)) break;
-       assert_(i < dataSets.values.size, i, dataSets.keys);
-       dataSets.values[i].append( decimal );
-       s.whileAny(' ');
+     if(s) {
+      log(id);
+      string resultLine = s.line();
+      string headerLine;
+      if(resultLine.contains('=')) headerLine = s.line();
+      else { // FIXME: old bad version does not write the result line
+       headerLine = resultLine;
+       resultLine = ""_;
       }
-     }
+      Dict results = parseDict(resultLine);
+      if(results.contains("Wire density (%)"_))
+       data.append((string)results.at("Wire density (%)"_));
+      else
+       data.append("0"_);
+      buffer<string> names = split(headerLine,", "); // Second line: Headers
+      for(string name: names) dataSets.insert(name);
+      //assert_(s, resultName, s);
+      while(s) {
+       for(size_t i = 0; s && !s.match('\n'); i++) {
+        string d = s.whileDecimal();
+        if(!d) goto break2;
+        //assert_(d, s.slice(s.index-16,16),"|", s.slice(s.index));
+        float decimal = parseDecimal(d);
+        assert_(isNumber(decimal), s.slice(s.index-16,16),"|", s.slice(s.index));
+        if(!(i < dataSets.values.size)) break;
+        assert_(i < dataSets.values.size, i, dataSets.keys);
+        dataSets.values[i].append( decimal );
+        s.whileAny(' ');
+       }
+      }
 break2:;
-     //if(dataSets.contains("Stress (Pa)")) //continue;
-     //assert_(dataSets.at("Stress (Pa)"_), dataSets);
-     if(dataSets.at("Stress (Pa)"_))
-      data.append(" "_+str(::max(dataSets.at("Stress (Pa)"_))));
-     else
-      data.append(" 0"_);
-    } else data.append("0 0");
+      //if(dataSets.contains("Stress (Pa)")) //continue;
+      //assert_(dataSets.at("Stress (Pa)"_), dataSets);
+      if(dataSets.at("Stress (Pa)"_))
+       data.append(" "_+str(::max(dataSets.at("Stress (Pa)"_))));
+      else
+       data.append(" 0"_);
+     } else data.append("0 0"_);
+    } else data.append("0 0"_);
     string logName;
     for(string name: list) {
      string jobID;
@@ -185,7 +193,7 @@ break2:;
       }
      }
      assert_(jobID);
-     data.append(" "_+str(time?:"0", jobID, state, displacement?:"0")); // /60/60
+     data.append(" "_+str(time?:"0"_, jobID, state, displacement?:"0"_)); // /60/60
      logName=name; break;
     }
     //assert_(logName);
@@ -224,6 +232,15 @@ break2:;
    min = ::min(points.values);
    max = ::max(points.values);
   }
+  dimensions[0] = copyRef(ref<string>{"Radius"_,"Pressure"_});
+  //dimensions[1] = copyRef(ref<string>{"Wire"_,"Pattern"_,"Angle"_}); // FIXME
+  dimensions[1] = copyRef(ref<string>{"Wire"_,"Angle"_,"Pattern"_}); // FIXME
+  for(auto& dimensions: this->dimensions) {
+   dimensions.filter([this](const string dimension) {
+    for(const Dict& coordinates: points.keys) if(coordinates.keys.contains(dimension)) return false;
+    return true; // Filters unknown dimension
+   });
+  }
  }
 
  /// Returns coordinates along \a dimension occuring in points matching \a filter
@@ -249,6 +266,7 @@ break2:;
   string dimension = dimensions[axis][level];
   int cellCount = 0;
   assert_(!filter.contains(dimension));
+  //assert_(coordinates(dimension, filter), dimension, filter, coordinates(dimension, {}), points.keys);
   for(const Variant& coordinate: coordinates(dimension, filter)) {
    filter[copyRef(dimension)] = copy(coordinate);
    cellCount += this->cellCount(axis, level+1, filter);
@@ -275,17 +293,18 @@ break2:;
    filter[copyRef(dimension)] = copy(coordinate);
    uint childCellCount = renderHeader(graphics, viewSize, contentCellSize, axis, level+1, filter, offset+cellCount);
    vec2 headerOrigin (dimensions[!axis].size+1, level);
-   vec2 origin (offset+cellCount, 0);
+   vec2 cellCoordinates (offset+cellCount, 0);
    vec2 size (childCellCount, 1);
-   if(axis) headerOrigin=headerOrigin.yx(), origin=origin.yx(), size=size.yx();
+   if(axis) headerOrigin=headerOrigin.yx(), cellCoordinates=cellCoordinates.yx(), size=size.yx();
    vec2 cellSize = axis ? vec2(headerCellSize.x, contentCellSize.y) : vec2(contentCellSize.x, headerCellSize.y);
-   origin = headerOrigin*headerCellSize + origin*cellSize;
+   const vec2 origin = headerOrigin*headerCellSize + cellCoordinates*cellSize;
    if(level<dimensions[axis].size-1) {
     int width = dimensions[axis].size-1-level;
     if(!axis) graphics.fills.append(origin+vec2(-width/2,0), vec2((width+1)/2, viewSize.y));
     if(axis) graphics.fills.append(origin+vec2(0,-width/2), vec2(viewSize.x,(width+1)/2));
    }
-   graphics.graphics.insert(origin, Text(str(coordinate), textSize, 0, 1, 0,
+   assert_(isNumber(origin), origin, headerOrigin, headerCellSize, cellCoordinates, cellSize, contentCellSize);
+   graphics.graphics.insertMulti(origin, Text(str(coordinate), textSize, 0, 1, 0,
                                          "DejaVuSans", true, 1, 0).graphics(vec2(size*cellSize)));
    cellCount += childCellCount;
   }
@@ -320,7 +339,7 @@ break2:;
       else if(state=="pack") color = bgr3f(3./4);
       else if(state=="load") color = bgr3f(7./8);
       else if(state=="done") color = bgr3f(1);
-      else log(state);
+      else if(state) log("Unknown state", state);
       if(!running && state!="done") {color.r=1; color.b=color.g=1./2;}
      }
      //if(index==0 && value) color = bgr3f(0,1-v,v);
@@ -332,6 +351,7 @@ break2:;
      String text = str(int(round(value))); //point.isInteger?dec(value):ftoa(value);
      //if(value==max) text = bold(text);
      if(running) text = bold(text);
+     //if(existsFile(str(coordinates))) text = bold(text);
      /*if(value)*/ graphics.graphics.insertMulti(cellOrigin, Text(text, textSize, 0, 1, 0,
                                                "DejaVuSans", true, 1, 0).graphics(cellSize));
     }
@@ -381,6 +401,7 @@ break2:;
 
   // Content
   vec2 cellSize = (size - vec2(levelCount().yx()+int2(1))*headerCellSize ) / vec2(cellCount());
+  assert_(isNumber(cellSize), cellSize, cellCount());
   targets.clear();
   Dict filterX, filterY; renderCell(graphics, cellSize, 0, 0, filterX, filterY);
 
@@ -404,14 +425,15 @@ break2:;
       if(running.contains(target.key)) log(running[running.indexOf(target.key)]);
       //log("/usr/bin/ssh"+ref<string>{arguments()[0], qdel -f", ids.at(target.key), "&");
       //log("/usr/bin/ssh",arguments()[0],"'qdel -f", ids.at(target.key), ">&- 2>&- <&- &'");
-      String name = replace(str(target.key),":","=")+".o"+str(ids.at(target.key));
-      if(existsFile(name)) log(section(readFile(name),'\n',-10,-1));
+      //String name = replace(str(target.key),":","=")+".o"+str(ids.at(target.key));
+      //if(existsFile(name)) log(section(readFile(name),'\n',-10,-1));
      }
      //for(string name: Folder(".").list(Files)) if(startsWith(name, str(target.coordinates)))
      /*{String name = str(target.key)+".result";
       if(existsFile(name)) log(section(readFile(name),'\n',-10,-1));}
      {String name = str(target.key)+".working";
       if(existsFile(name)) log(section(readFile(name),'\n',-10,-1));}*/
+     press(target.key);
      return true;
     }
    }
@@ -430,8 +452,10 @@ break2:;
 struct Review {
  ArrayView view {/*"Stress (MPa)"*/"Time (s)"};
  Plot plot;
- VBox layout {{&view, &plot}};
- unique<Window> window = ::window(&layout, int2(0, 1050));
+ SnapshotView snapshotView;
+ HBox detail {{&plot, &snapshotView}};
+ VBox layout {{&view, &detail}};
+ unique<Window> window = ::window(&layout, int2(0, 1050), mainThread, true);
  Review() {
   window->actions[Return] = [this](){ view.fetchRunning(0); window->render(); };
   window->actions[Space] = [this](){
@@ -444,10 +468,11 @@ struct Review {
    //encodePNG(render(int2(1050), plot.graphics(vec2(1050))));
   };
   view.hover = [this](const Dict& point) {
+   return;
    if(view.index!=0) return;
    Dict filter = copy(point);
    filter.remove("Pressure");
-   filter.remove("Pattern");
+   if(filter.contains("Pattern")) filter.remove("Pattern");
    plot.xlabel = "Pressure (N)"__;
    plot.ylabel = "Stress (Pa)"__;
    plot.dataSets.clear();
@@ -474,16 +499,39 @@ struct Review {
    for(const auto& point: points) {
     Dict shortSet = copy(point);
     for(string dimension: fixed) if(shortSet.contains(dimension)) shortSet.remove(dimension);
-    shortSet.remove("Pressure");
+    if(shortSet.contains("Pressure")) shortSet.remove("Pressure");
     if(!shortSet.contains("Seed")) shortSet.insert("Seed"__,"1"__);
     shortSet.remove("Seed");
     auto& dataSet = plot.dataSets[str(shortSet.values," "_,""_)];
     float maxStress = view.points.at(point);
     if(maxStress) dataSet.insertSortedMulti(float(point.at("Pressure")), maxStress);
    }
+
    window->render();
    //window->actions[Space]();
   };
+  view.press = [this](const Dict& point) {
+   log(point);
+   if(existsFile(str(point))) {
+    snapshotView.~SnapshotView();
+    //assert_(existsFile(localPath), localPath);
+    /*File(localPath).write("S"_); // FIFO over NFS ?
+   String remotePath = "/home/"_+user()+"/Results/"+str(point);
+   int status = execute("/usr/bin/ssh",ref<string>{arguments()[0],"sh"_,"-c"_,"echo S > "+remotePath});
+   assert_(status == 0);*/
+    int64 time = realTime();
+    File file (str(point));
+    file.touch(time);
+    /*do { // Waits for job to dump snapshot. FIXME: NFS cache does not update, FIXME: signal back
+     log(".");
+     usleep(100*1000);
+    } while(file.modifiedTime()==time);*/
+    usleep(200*1000); // FIXME: signal back
+    new (&snapshotView) SnapshotView(str(point));
+   }
+   window->render();
+  };
+  view.status = [this](string status) { window->setTitle(status); };
  }
 }
 #if !RENAME

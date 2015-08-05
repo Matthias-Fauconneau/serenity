@@ -1,5 +1,6 @@
 #include "file.h"
 #include "data.h"
+#include "time.h"
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -98,7 +99,6 @@ buffer<byte> Stream::readUpToLoop(size_t capacity) {
  return buffer;
 }
 
-
 buffer<byte> Stream::read(size_t size) {
 	buffer<byte> buffer(size);
 	size_t offset=0; while(offset<size) offset+=check(::read(fd, buffer.begin()+offset, size-offset));
@@ -107,6 +107,17 @@ buffer<byte> Stream::read(size_t size) {
 }
 
 bool Stream::poll(int timeout) { assert(fd); pollfd pollfd{fd,POLLIN,0}; return ::poll(&pollfd,1,timeout)==1 && (pollfd.revents&POLLIN); }
+
+buffer<byte> Stream::readAll() {
+ array<byte> buffer;
+ while(poll()) {
+  buffer.reserve(buffer.size+(1<<20));
+  int size = check(::read(fd, buffer.begin()+buffer.size, buffer.capacity-buffer.size));
+  if(!size) break;
+  buffer.size += size;
+ }
+ return move(buffer);
+}
 
 size_t Stream::write(const byte* data, size_t size) {
     assert(data); size_t offset=0; while(offset<size) offset+=check(::write(fd, data+offset, size-offset), name()); return offset;
@@ -135,6 +146,11 @@ int64 File::accessTime() const { struct stat stat = File::stat(); return stat.st
 
 int64 File::modifiedTime() const { struct stat stat = File::stat(); return stat.st_mtim.tv_sec*1000000000ull + stat.st_mtim.tv_nsec;  }
 
+void File::touch(int64 time) {
+ timespec times[]={{0,0}, {time/second,time?time%second:UTIME_NOW}};
+ check(futimens(fd, times));
+}
+
 const File& File::resize(int64 size) { check(ftruncate(fd, size), fd.pointer, size); return *this; }
 
 void File::seek(int index) { check(::lseek(fd,index,0)); }
@@ -145,7 +161,7 @@ bool writableFile(const string path, const Folder& at) {
 	int fd = openat(at.fd, strz(path), O_WRONLY|O_NONBLOCK, 0); if(fd>0) close(fd); return fd>0;
 }
 
-buffer<byte> readFile(const string path, const Folder& at) { File file(path,at); return file.read( file.size() ); }
+buffer<byte> readFile(const string path, const Folder& at) { return File(path,at).readAll(); }
 
 int64 writeFile(const string path, const ref<byte> content, const Folder& at, bool overwrite) {
     assert_(overwrite || !existsFile(path, at));
@@ -206,8 +222,8 @@ void symlink(const string from,const string to, const Folder& at) {
 	check(symlinkat(strz(from), at.fd, strz(to)), from,"->",to);
 }
 
-void touchFile(const string path, const Folder& at, bool setModified) {
-    timespec times[]={{0,0}, {0,setModified?UTIME_NOW:UTIME_OMIT}};
+void touchFile(const string path, const Folder& at, int64 time) {
+ timespec times[]={{0,0}, {time/second,time?time%second:UTIME_NOW}};
 	check(utimensat(at.fd, strz(path), times, 0), path);
 }
 

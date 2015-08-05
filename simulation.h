@@ -140,6 +140,7 @@ struct Simulation : System {
    plateSpeed(parameters.at("PlateSpeed")),
    random((uint)parameters.at("Seed").integer()),
    stream(move(stream)), parameters(copy(parameters)) {
+  assert_(pattern == None || targetWireDensity > 0, parameters);
   //this->stream.write("Simulation");
   //log("Simulation");
   assert(pattern != -1, patterns, this->parameters, this->parameters.at("Pattern"));
@@ -154,8 +155,8 @@ struct Simulation : System {
    wire.frictions.set(i);
   }
   //flock(stream.fd, LOCK_EX);
-  float height = plate.position[1][2] - plate.position[0][2];
-  log(volume(), height*PI*sq(side.initialRadius), volume() / (height*PI*sq(side.initialRadius)));
+  //float height = plate.position[1][2] - plate.position[0][2];
+  //log(volume(), height*PI*sq(side.initialRadius), volume() / (height*PI*sq(side.initialRadius)));
  }
 
  generic vec4f tension(T& A, size_t a, size_t b) {
@@ -177,6 +178,9 @@ struct Simulation : System {
  virtual void snapshot() {
   String name = copyRef(this->id); //this->name+"-"+processStates[int(processState)];
   log("Snapshot", name);
+  remove(name+".grain");
+  remove(name+".wire");
+  remove(name+".side");
   if(wire.count) {
    float wireDensity = (wire.count-1)*Wire::volume / (grain.count*Grain::volume);
    log("Wire density (%):", wireDensity*100);
@@ -416,11 +420,12 @@ struct Simulation : System {
 break2_:;
      // Weights winch vertical speed by wire density
     float wireDensity = (wire.count-1)*Wire::volume / (grain.count*Grain::volume);
-    // Adapts winch vertical speed to achieve target wire density
-    assert_( wireDensity-targetWireDensity > -1 && wireDensity-targetWireDensity < 1,
-             wireDensity, targetWireDensity);
-    winchSpeed += dt*/*initialWinchSpeed**/(wireDensity-targetWireDensity);
-    assert_(winchSpeed > 0, winchSpeed, wireDensity, targetWireDensity);
+    if(targetWireDensity) { // Adapts winch vertical speed to achieve target wire density
+     assert_( wireDensity-targetWireDensity > -1 && wireDensity-targetWireDensity < 1,
+              wireDensity, targetWireDensity);
+     winchSpeed += dt*/*initialWinchSpeed**/(wireDensity-targetWireDensity);
+     assert_(winchSpeed > 0, winchSpeed, wireDensity, targetWireDensity);
+    }
     if(currentPourHeight<targetHeight/*-Grain::radius*/)
      currentPourHeight += /*wireDensity **/ winchSpeed * dt;
    }

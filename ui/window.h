@@ -94,6 +94,7 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
  /// Shared window buffer state
  enum State { Idle, Copy, Present };
  State state = Idle;
+ bool useSW;
 
  uint64 firstFrameCounterValue = 0;
  uint64 currentFrameCounterValue = 0;
@@ -108,7 +109,7 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
 
  /// Creates an initially hidden window for \a widget, use \a show to display
  /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
- XWindow(Widget* widget, Thread& thread, int2 size, bool useGL);
+ XWindow(Widget* widget, Thread& thread, int2 size, bool useGL, bool useSW);
  /// Frees the graphics context and destroys the window
  ~XWindow();
 
@@ -175,4 +176,4 @@ struct DRMWindow : Window {
 	void setSelection(string selection, bool clipboard) override;
 };
 
-unique<Window> window(Widget* widget, int2 size=-1, Thread& thread=mainThread, bool useGL=false);
+unique<Window> window(Widget* widget, int2 size=-1, Thread& thread=mainThread, bool useGL=false, bool useSW=true);

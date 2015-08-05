@@ -63,8 +63,8 @@ Window::Update Window::render(int2 size, const Image& target) {
  return update;
 }
 
-XWindow::XWindow(Widget* widget, Thread& thread, int2 sizeHint, bool useGL) :
-  ::Window(widget, thread, sizeHint), XDisplay(thread) {
+XWindow::XWindow(Widget* widget, Thread& thread, int2 sizeHint, bool useGL, bool useSW) :
+  ::Window(widget, thread, sizeHint), XDisplay(thread), useSW(useSW) {
  XDisplay::onEvent.connect(this, &XWindow::onEvent);
  assert_(id && root && visual);
 
@@ -259,13 +259,15 @@ void XWindow::event() {
   {CreatePixmap r; send(({r.pixmap=id+Pixmap, r.window=id+Window, r.w=uint16(Window::size.x), r.h=uint16(Window::size.y), r;}));}
  }
 
- if(glContext)
-  GLFrameBuffer::bindWindow(0, Window::size, 0/*ClearColor|ClearDepth*/,
+ if(glContext && !useSW) // if useSW: GL image should be composited in CPU target
+  GLFrameBuffer::bindWindow(0, Window::size, ClearColor/*|ClearDepth*/,
                             rgba4f(backgroundColor, 1));
  Update update = render(Window::size, target);
  if(update) {
-  if(glContext) {
+  if(glContext && !useSW) {
    swapTime.start();
+   //flip(target);
+   //GLFrameBuffer::blitWindow(target);
    glXSwapBuffers(glDisplay, id+Window);
    swapTime.stop();
   } else {
@@ -394,9 +396,9 @@ void DRMWindow::setSelection(string, bool) {}
 unique<Display> DRMWindow::display = null;
 #endif
 
-unique<Window> window(Widget* widget, int2 size, Thread& thread, bool useGL) {
+unique<Window> window(Widget* widget, int2 size, Thread& thread, bool useGL, bool useSW) {
  if(environmentVariable("DISPLAY")) {
-  auto window = unique<XWindow>(widget, thread, size, useGL);
+  auto window = unique<XWindow>(widget, thread, size, useGL, useSW);
   window->show();
   return move(window);
  }

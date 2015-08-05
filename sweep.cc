@@ -21,10 +21,10 @@ struct ParameterSweep {
       parameters["Pattern"__] = pattern;
       for(int pressure: {/*25,50,100,*/200,400,800,1600/*,3200*/}) {
        parameters["Pressure"__] = String(str(pressure)+"K"_);
-       for(float radius: {0.02,0.03}) {
+       for(float radius: {0.02/*,0.03*/}) {
         parameters["Radius"__] = radius;
         parameters["Height"__] = radius*4;
-        for(int seed: {1/*,2,3,4*/}) {
+        for(int seed: {1,2/*,3,4*/}) {
          parameters["Seed"__] = seed;
          auto add = [&]{
           String id = str(parameters);
@@ -56,6 +56,7 @@ struct ParameterSweep {
       log("Error");
       break;
      }
+     //log("TEST"); break;
     }
    } else {
     array<int> jobs;

@@ -245,7 +245,7 @@ string TextData::whileDecimal() {
   }
   else break;
  }
- if(index>start) match("µ") || matchAny("mKM");
+ if(index>start) match("µ") || matchAny("m%KM");
  return slice(start,index-start);
 }
 

@@ -74,14 +74,15 @@ struct Stream : Handle { //FIXME: overlaps with Data/BinaryData
     buffer<byte> readUpToLoop(size_t size);
     /// Reads exactly \a size bytes
     buffer<byte> read(size_t size);
+    buffer<byte> readAll();
     /// Reads a raw value
     generic T read() { T t; read(mref<byte>((byte*)&t,sizeof(T))); return t; }
     /// Reads \a size raw values
     generic buffer<T> read(size_t size) {
-		::buffer<byte> buffer(size*sizeof(T));
-		size_t offset=0; while(offset<buffer.size) offset+=readUpTo(buffer.slice(offset));
-		assert(offset==buffer.size);
-		return cast<T>(move(buffer));
+     ::buffer<byte> buffer(size*sizeof(T));
+     size_t offset=0; while(offset<buffer.size) offset+=readUpTo(buffer.slice(offset));
+     assert(offset==buffer.size);
+     return cast<T>(move(buffer));
     }
     /// Polls whether reading would block
     bool poll(int timeout=0);
@@ -97,9 +98,9 @@ enum Flags {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=
 
 /// Handle to a socket
 struct Socket : Stream {
-    enum {PF_LOCAL=1, PF_INET};
-	enum {SOCK_STREAM=1, SOCK_DGRAM};
-    Socket(int domain, int type);
+ enum {PF_LOCAL=1, PF_INET};
+ enum {SOCK_STREAM=1, SOCK_DGRAM};
+ Socket(int domain=PF_INET, int type=SOCK_STREAM);
 };
 
 /// Handle to a file
@@ -118,6 +119,7 @@ struct File : Stream {
     int64 accessTime() const;
     /// Returns the last modified Unix timestamp (in nanoseconds)
     int64 modifiedTime() const;
+    void touch(int64 time = 0);
 
     /// Resizes file
     const File& resize(int64 size);
@@ -189,7 +191,7 @@ void removeFolder(const string& name, const Folder& at);
 /// Creates a symbolic link to \a target at \a name, replacing any existing files or links
 void symlink(const string target,const string name, const Folder& at=currentWorkingDirectory());
 /// Sets the last modified time for \a path to current time
-void touchFile(const string path, const Folder& at=currentWorkingDirectory(), bool setModified=false);
+void touchFile(const string path, const Folder& at=currentWorkingDirectory(), int64 time=0);
 /// Copies a file replacing any existing files or links
 void copy(const Folder& oldAt, const string oldName, const Folder& newAt, const string newName);
 

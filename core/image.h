@@ -62,6 +62,7 @@ Image decodeImage(const ref<byte> file);
 
 // -- Rotate --
 
+void flip(Image& image);
 Image flip(Image&& image);
 /// Rotates an image
 void rotate(const Image& target, const Image& source);

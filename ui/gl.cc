@@ -192,7 +192,7 @@ void GLIndexBuffer::draw(size_t start, size_t end) {
 }
 
 /// Texture
-GLTexture::GLTexture(uint width, uint height, uint format, const void* data) : width(width), height(height), format(format),
+GLTexture::GLTexture(uint width, uint height, uint format, const void* data, uint stride) : width(width), height(height), format(format),
     target((format&Cube)?GL_TEXTURE_CUBE_MAP:(format&Multisample)?GL_TEXTURE_2D_MULTISAMPLE:GL_TEXTURE_2D) {
     glGenTextures(1, &id);
     glBindTexture(target, id);
@@ -216,7 +216,9 @@ GLTexture::GLTexture(uint width, uint height, uint format, const void* data) : w
         glTexImage2D(target, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, data);
     else if((format&0b11) == RGBA8) {
         //error("");
-        glTexImage2D(target, 0, format&SRGB?GL_SRGB8_ALPHA8:GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
+     if(stride) glPixelStorei(GL_UNPACK_ROW_LENGTH, stride);
+     glTexImage2D(target, 0, format&SRGB?GL_SRGB8_ALPHA8:GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
+     if(stride) glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
     } else {
         assert_((format&0b11) == RGB8);
         glTexImage2D(target, 0, format&SRGB?GL_SRGB8:GL_RGB8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
@@ -241,7 +243,7 @@ GLTexture::GLTexture(uint width, uint height, uint format, const void* data) : w
     if(format&Mipmap) glGenerateMipmap(target);
 }
 GLTexture::GLTexture(const Image& image, uint format)
-    : GLTexture(image.width, image.height, (image.alpha?RGBA8:RGB8)|format, image.data) {
+    : GLTexture(image.width, image.height, (image.alpha?RGBA8:RGB8)|format, image.data, image.stride!=image.width?image.stride:0) {
     assert(width==image.stride);
 }
 /*GLTexture::GLTexture(const Image16& image, uint format)
@@ -352,7 +354,7 @@ void GLFrameBuffer::blitWindow(const GLTexture& source, int2 offset) {
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, source.id, 0);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-    glBlitFramebuffer(0,0, source.size.x,source.size.y, offset.x, offset.y, offset.x+source.size.x, offset.y+source.size.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glBlitFramebuffer(0,0, source.size.x, source.size.y, offset.x, offset.y, offset.x+source.size.x, offset.y+source.size.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     glDeleteFramebuffers(1, &framebuffer);
 }
 Image GLFrameBuffer::readback() {

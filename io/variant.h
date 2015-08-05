@@ -68,7 +68,7 @@ template<> inline Variant copy(const Variant& v) {
  if(v.type == Variant::Data) return v.data;
  error(int(v.type));
 }
-generic String str(const map<T,Variant>& dict) {
+generic String strPDF(const map<T,Variant>& dict) {
  array<char> s;
  s.append("<<"); for(auto entry: dict) s.append( '/'+entry.key+' '+str(entry.value)+' ' ); s.append(">>");
  return move(s);
@@ -80,7 +80,7 @@ inline String str(const Variant& o) {
  if(o.type==Variant::Real || o.type==Variant::Rational) return str(o.real());
  if(o.type==Variant::Data) return copy(o.data);
  if(o.type==Variant::List) return str(o.list);
- if(o.type==Variant::Dict) return str(o.dict);
+ if(o.type==Variant::Dict) return strPDF(o.dict);
  error("Invalid Variant",int(o.type));
 }
 

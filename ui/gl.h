@@ -90,7 +90,7 @@ struct GLTexture {
 
  GLTexture(){}
  default_move(GLTexture);
- GLTexture(uint width, uint height, uint format=0, const void* data=0);
+ GLTexture(uint width, uint height, uint format=0, const void* data=0, uint stride=0);
  GLTexture(const Image& image, uint format=0);
  //GLTexture(const struct Image16& image, uint format=0);
  GLTexture(const GLBuffer& buffer, int2 size, uint format=R32F);
