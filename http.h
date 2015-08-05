@@ -20,7 +20,7 @@ struct SSLSocket : TCPSocket {
     array<byte> readUpTo(int size);
     void write(const ref<byte>& buffer);
 
-    handle<struct SSL*> ssl;
+    handle<struct ssl_st*> ssl;
 };
 
 /// Implements Data::available using Stream::readUpTo

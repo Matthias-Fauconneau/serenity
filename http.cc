@@ -24,22 +24,23 @@ TCPSocket::TCPSocket(uint host, uint16 port) : Socket(PF_INET,SOCK_STREAM|SOCK_N
     fcntl(Socket::fd, F_SETFL, 0);
 }
 
-extern "C" {
- struct SSL;
- __attribute((weak)) int SSL_library_init();
- __attribute((weak)) struct SSLContext* SSL_CTX_new(const struct SSLMethod* method);
- __attribute((weak)) const SSLMethod* TLSv1_client_method();
- __attribute((weak)) SSL* SSL_new(SSLContext *ctx);
- __attribute((weak)) int SSL_set_fd(SSL*, int fd);
- __attribute((weak)) int SSL_state(SSL*);
- __attribute((weak)) int SSL_connect(SSL*);
- __attribute((weak)) int SSL_shutdown(SSL*);
- __attribute((weak)) int SSL_read(SSL*, void* buf, int num);
- __attribute((weak)) int SSL_write(SSL*, const void* buf, int num);
-}
+/*extern "C" {
+struct SSL;
+int SSL_library_init();
+struct SSLContext* SSL_CTX_new(const struct SSLMethod* method);
+const SSLMethod* TLSv1_client_method();
+SSL* SSL_new(SSLContext *ctx);
+int SSL_set_fd(SSL*, int fd);
+int SSL_state(SSL*);
+int SSL_connect(SSL*);
+int SSL_shutdown(SSL*);
+int SSL_read(SSL*, void* buf, int num);
+int SSL_write(SSL*, const void* buf, int num);
+}*/
+#include <openssl/ssl.h> // ssl
 SSLSocket::SSLSocket(uint host, uint16 port, bool secure) : TCPSocket(host,port) {
     if(secure && fd) {
-        static SSLContext* ctx=(SSL_library_init(), SSL_CTX_new(TLSv1_client_method()));
+        static auto* ctx=(SSL_library_init(), SSL_CTX_new(TLSv1_client_method()));
         ssl = SSL_new(ctx);
         SSL_set_fd(ssl, fd);
         SSL_connect(ssl);
