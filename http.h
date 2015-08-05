@@ -38,7 +38,7 @@ struct URL {
     URL relative(URL&& url) const;
     explicit operator bool() { return (bool)host; }
 
-    String scheme, authorization, host, path, fragment;
+    String scheme, authorization, host, path, fragment, post;
 };
 String str(const URL& url);
 inline bool operator ==(const URL& a, const URL& b) {
