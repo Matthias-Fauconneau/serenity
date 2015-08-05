@@ -118,7 +118,8 @@ bool Build::tryParseFiles(TextData& s) {
 int64 Build::parse(string fileName, Node& parent) {
 	File file(fileName, folder);
 	int64 lastEdit = file.modifiedTime();
-	for(TextData s = file.read(file.size()); s; s.line()) {
+    auto data = file.read(file.size());
+    for(TextData s (data); s; s.line()) {
 		{String name = tryParseIncludes(s, fileName);
 			if(name) {
 				String module = find(name+".h"); // .h to find module corresponding to header
@@ -156,7 +157,7 @@ bool Build::compileModule(string target) {
 		}
 		Folder(tmp+"/"+join(flags,"-")+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
 		Stream stdout;
-  int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1y", "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing", "-march=native",
+  int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1z", "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing", "-march=native",
                                      "-o", object, fileName, "-I/usr/include/freetype2","-I/var/tmp/include"} + toRefs(args),
                     false, currentWorkingDirectory(), 0, &stdout);
 		jobs.append({copyRef(target), pid, move(stdout)});

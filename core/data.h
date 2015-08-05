@@ -1,6 +1,6 @@
 #pragma once
 /// \file data.h Structured data parsers (Data, BinaryData, TextData)
-#include "memory.h"
+#include "array.h"
 
 #define big16 __builtin_bswap16
 #define big32 __builtin_bswap32
@@ -11,13 +11,14 @@
 struct Data {
     ref<byte> data;
     size_t index=0;
-    ::buffer<byte> buffer;
+    ::array<byte> buffer;
 
     Data(){}
     /// Creates a Data interface to a \a ref
     explicit Data(ref<byte> data) : data(data) {}
     /// Creates a Data interface to a \a buffer
     Data(::buffer<byte>&& buffer) : Data(buffer) { this->buffer=move(buffer); }
+    virtual ~Data() {}
     /// Slices a reference to the buffer from \a index to \a index + \a size
 	inline ref<byte> slice(size_t pos, size_t size) const { return data.slice(pos,size); }
 	inline ref<byte> sliceRange(size_t begin, size_t end) const { return data.sliceRange(begin, end); }
@@ -25,7 +26,7 @@ struct Data {
 	inline ref<byte> slice(size_t pos) const { return data.slice(pos); }
 
     /// Buffers \a need bytes (if overridden) and returns number of bytes available
-	/*virtual*/ inline size_t available(size_t /*need*/) { return data.size-index; }
+    virtual inline size_t available(size_t /*need*/) { return data.size-index; }
 	/// Returns whether there is data to read
     explicit operator bool() { return available(1); }
 
@@ -133,10 +134,11 @@ struct BinaryData : Data {
 String escape(string s);
 
 /// Provides a convenient interface to parse text streams
-struct TextData : Data {
+struct TextData : virtual Data {
     /// 1-based line/column index
     int lineIndex = 1, columnIndex = 1;
 
+    TextData() {}
     /// Creates a TextData interface to a \a ref
     /// \note Matches any heading Unicode BOM
     explicit TextData(ref<byte> data);
