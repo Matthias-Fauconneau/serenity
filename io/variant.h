@@ -47,6 +47,7 @@ inline bool operator ==(const Variant& a, const Variant& b) {
   return a.number == b.number;
  if(a.type != b.type) return false;
  if(a.type == Variant::Data) return a.data == b.data;
+ if(a.type == Variant::Null && b.type == Variant::Null) return true;
  error(int(a.type));
  //return (string)a == (string)b;
 }
@@ -54,18 +55,20 @@ inline bool operator <(const Variant& a, const Variant& b) {
  if((a.type == Variant::Integer || a.type == Variant::Real) &&
     (b.type == Variant::Integer || b.type == Variant::Real))
   return a.number < b.number;
- if(a.type != b.type) return false;
- if(a.type == Variant::Data) {
+ if(a.type == Variant::Data && b.type == Variant::Data) {
   if(isDecimal(a.data) && isDecimal(b.data)) return parseDecimal(a.data) < parseDecimal(b.data);
   return a.data < b.data;
  }
- error(int(a.type));
+ if(a.type == Variant::Null && b.type != Variant::Null) return true;
+ if(a.type != Variant::Null && b.type == Variant::Null) return false;
+ error(int(a.type), int(b.type));
  //return (string)a < (string)b;
 }
 
 template<> inline Variant copy(const Variant& v) {
  if(v.type == Variant::Integer || v.type == Variant::Real) return v.number;
  if(v.type == Variant::Data) return v.data;
+ if(v.type == Variant::Null) return Variant();
  error(int(v.type));
 }
 generic String strPDF(const map<T,Variant>& dict) {
@@ -81,6 +84,7 @@ inline String str(const Variant& o) {
  if(o.type==Variant::Data) return copy(o.data);
  if(o.type==Variant::List) return str(o.list);
  if(o.type==Variant::Dict) return strPDF(o.dict);
+ if(o.type==Variant::Null) return String();
  error("Invalid Variant",int(o.type));
 }
 

@@ -10,70 +10,20 @@
 #include "gl.h"
 FILE(shader_glsl)
 #endif
-//#include <sys/stat.h>
-#include <sys/socket.h>
 
 template<Type tA> vec4f toGlobal(tA& A, size_t a, vec4f localA) {
  return A.position[a] + qapply(A.rotation[a], localA);
 }
 
-/*struct StandardInput : Poll {
- function<void(string)> input;
- StandardInput(function<void(string)> input) : input(input) { registerPoll(); }
- void event() override { input(Stream(0).readUpTo(1<<16)); }
-};*/
-
 struct SimulationRun : Simulation {
- //StandardInput stdin {[this](string){ log("snapshot"); Simulation::snapshot(); }};
  SimulationRun(const Dict& parameters, File&& file) : Simulation(parameters, move(file)) {
   log(id);
   if(existsFile(id+".result")) log("Existing result", id);
-  /*extern function<void(int)> userSignal;
-  userSignal = [this](int) { Simulation::snapshot(); };*/
 #if !UI
   Time time (true);
   if(existsFile(id)) remove(id);
   File input(id, currentWorkingDirectory(), Flags(ReadOnly|Create)); //Stream(0)
-  //log("CREATED", id, currentWorkingDirectory().name());
-  //assert_(existsFile(id));
   int64 lastTime = input.modifiedTime();
-  //mkfifo(strz(id), 0666); // not over NFS
-  //File input(id);
-
-  /*int sockfd, newsockfd, portno;
-  socklen_t clilen;
-  char buffer[256];
-  //struct sockaddr_in serv_addr, cli_addr;
-  Socket socket;
-  //struct { uint16 family=PF_INET; char path[108]={}; } addr;
-  //mref<char>(addr.path,path.size).copy(path);
-  //if(check(connect(Socket::fd, (const sockaddr*)&addr,2+path.size), path)) error("X connection failed"); }
-  if (sockfd < 0) error("ERROR opening socket");
-  bzero((char *) &serv_addr, sizeof(serv_addr));
-  portno = atoi(argv[1]);
-  struct sockaddr_in serv_addr;
-  serv_addr.sin_family = AF_INET;
-  serv_addr.sin_addr.s_addr = INADDR_ANY;
-  serv_addr.sin_port = htons(portno);
-  if (bind(sockfd, (struct sockaddr *) &serv_addr,
-           sizeof(serv_addr)) < 0)
-           error("ERROR on binding");
-  listen(sockfd,5);
-  clilen = sizeof(cli_addr);
-  newsockfd = accept(sockfd,
-              (struct sockaddr *) &cli_addr,
-              &clilen);
-  if (newsockfd < 0)
-       error("ERROR on accept");
-  bzero(buffer,256);
-  n = read(newsockfd,buffer,255);
-  if (n < 0) error("ERROR reading from socket");
-  printf("Here is the message: %s\n",buffer);
-  n = write(newsockfd,"I got your message",18);
-  if (n < 0) error("ERROR writing to socket");
-  close(newsockfd);
-  close(sockfd);
-  return 0;*/
 
   while(processState < Done) {
    if(timeStep%size_t(1e-1/dt) == 0) {
@@ -83,7 +33,6 @@ struct SimulationRun : Simulation {
     log(info());
    }
    int64 time = input.modifiedTime();
-   //if(input.poll()) { snapshot(); input.readUpTo(1<<16); }
    if(time > lastTime) { snapshot(); input.touch(); lastTime=input.modifiedTime(); } // Touch the file for snapshot
    step();
   }
@@ -95,6 +44,8 @@ struct SimulationRun : Simulation {
    rename(id+".working", id+".result", currentWorkingDirectory());
   }
   log(time);
+  assert_(mainThread.size==1);
+  exit_group(0); // FIXME
 #endif
  }
 

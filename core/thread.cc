@@ -163,7 +163,7 @@ void __attribute((constructor(102))) setup_signals() {
 }
 
 //static void __attribute((noreturn)) exit_thread(int status) { syscall(SYS_exit, status); __builtin_unreachable(); }
-static int __attribute((noreturn)) exit_group(int status) { syscall(SYS_exit_group, status); __builtin_unreachable(); }
+int __attribute((noreturn)) exit_group(int status) { syscall(SYS_exit_group, status); __builtin_unreachable(); }
 
 template<> void __attribute((noreturn)) error(const string& message) {
  static bool reentrant = false;

@@ -1,6 +1,26 @@
 #pragma once
 #include "widget.h"
 #include "map.h"
+#include "data.h"
+
+typedef String NaturalString;
+inline bool operator <(const NaturalString& a, const NaturalString& b) {
+ TextData A (a), B (b);
+ for(;;) {
+  { // Numerical
+   string a = A.whileInteger();
+   string b = B.whileInteger();
+   if(a && b && a != b) return parseInteger(a) < parseInteger(b);
+  }
+  if(!A && B) return true;
+  if(!B) return false;
+  { // Lexical
+   char a = A.next();
+   char b = B.next();
+   if(a != b) return a < b;
+  }
+ }
+}
 
 struct Plot : virtual Widget {
     enum LegendPosition { TopLeft, TopRight, BottomLeft, BottomRight };
@@ -12,7 +32,7 @@ struct Plot : virtual Widget {
 
 	String name, xlabel, ylabel;
  bool log[2] = {false, false};
- map<String, map<float,float>> dataSets;
+ map<NaturalString, map<float,float>> dataSets;
  bool plotPoints = false, plotLines = true, plotBands = true;
  LegendPosition legendPosition;
  vec2 min = 0, max = 0;

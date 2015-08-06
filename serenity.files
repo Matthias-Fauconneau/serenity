@@ -86,3 +86,4 @@ envelope.cc
 single.cc
 view-app.cc
 snapshot-view.h
+sge.h

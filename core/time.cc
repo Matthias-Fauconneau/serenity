@@ -24,12 +24,12 @@ void Date::invariant() const {
     if(year!=-1) { assert(inRange(2012, year, 2099), year); }
     if(month!=-1) { assert(year!=-1); assert(inRange(0, month, 12)); }
     if(day!=-1) { assert(month!=-1); assert(inRange(0, day, daysInMonth(month,year)),day,daysInMonth(month,year));  }
-    if(weekDay!=-1) {
+    /*if(weekDay!=-1) {
         assert(inRange(0, weekDay, 7));
         if(year!=-1 && month!=-1 && day!=-1) {
             assert(weekDay==(Thursday+days())%7,weekDay,(Thursday+days())%7,str(*this));
         }
-    }
+    }*/
     //Hour
     if(hours!=-1) { assert(inRange(0, hours, 24)); }
     if(minutes!=-1) { assert(inRange(0, minutes, 60)); assert(hours>=0); }

@@ -94,6 +94,7 @@ inline String str(const Semaphore& o) { return str(o.counter); }
 struct Thread;
 /// Original thread spawned when this process was forked, terminating this thread leader terminates the whole thread group
 extern Thread mainThread;
+int __attribute((noreturn)) exit_group(int status);
 
 struct pollfd;
 /// Poll is a convenient interface to participate in the event loop

@@ -143,7 +143,7 @@ struct Simulation : System {
   assert_(pattern == None || targetWireDensity > 0, parameters);
   //this->stream.write("Simulation");
   //log("Simulation");
-  assert(pattern != -1, patterns, this->parameters, this->parameters.at("Pattern"));
+  //assert(pattern != -1, patterns, this->parameters, this->parameters.at("Pattern"));
   plate.position[1][2] = /*initialHeight =*/ targetHeight+Grain::radius;
   if(pattern) { // Initial wire node
    size_t i = wire.count++;
@@ -178,9 +178,9 @@ struct Simulation : System {
  virtual void snapshot() {
   String name = copyRef(this->id); //this->name+"-"+processStates[int(processState)];
   log("Snapshot", name);
-  remove(name+".grain");
-  remove(name+".wire");
-  remove(name+".side");
+  if(existsFile(name+".grain")) remove(name+".grain");
+  if(existsFile(name+".wire")) remove(name+".wire");
+  if(existsFile(name+".side")) remove(name+".side");
   if(wire.count) {
    float wireDensity = (wire.count-1)*Wire::volume / (grain.count*Grain::volume);
    log("Wire density (%):", wireDensity*100);
@@ -210,7 +210,8 @@ struct Simulation : System {
     }
     s.append(str(flat(grain.position[i]), grainCount, grainEnergy*1e6, wireCount[i], wireEnergy[i]*1e6)+'\n');
    }
-   writeFile(name+".grain", s, currentWorkingDirectory(), true);
+   writeFile(name+".grain.write", s, currentWorkingDirectory(), true);
+   rename(name+".grain.write", name+".grain"); // Atomic
   }
   /*{array<char> s;
    s.append(str("A, B, Force (N)")+'\n');
@@ -245,7 +246,8 @@ struct Simulation : System {
     for(auto& f: wire.frictions[i]) energy += f.energy;
     s.append(str(flat(a), flat(b), wire.frictions[i].size, energy*1e6)+'\n');
    }
-   writeFile(name+".wire", s, currentWorkingDirectory(), true);
+   writeFile(name+".wire.write", s, currentWorkingDirectory(), true);
+   rename(name+".wire.write", name+".wire"); // Atomic
   }
   /*if(wire.count) {array<char> s;
    s.append(str("Wire, Grain, Force (N)")+'\n');
@@ -280,7 +282,8 @@ struct Simulation : System {
     s.append(str(flat(b), flat(c))+'\n');
     if(i) s.append(str(flat(a), flat(b))+'\n');
    }
-   writeFile(name+".side", s, currentWorkingDirectory(), true);
+   writeFile(name+".side.write", s, currentWorkingDirectory(), true);
+   rename(name+".side.write", name+".side"); // Atomic
   }
  }
 
@@ -424,7 +427,13 @@ break2_:;
      assert_( wireDensity-targetWireDensity > -1 && wireDensity-targetWireDensity < 1,
               wireDensity, targetWireDensity);
      winchSpeed += dt*/*initialWinchSpeed**/(wireDensity-targetWireDensity);
-     assert_(winchSpeed > 0, winchSpeed, wireDensity, targetWireDensity);
+     //assert_(winchSpeed > 0, winchSpeed, wireDensity, targetWireDensity);
+     if(winchSpeed < 0) {
+      static bool unused once = ({ log("Initial winch speed too high", initialWinchSpeed,
+                                   "for wire density:", str(targetWireDensity)+
+                                   ", current wire density:", wireDensity); true; });
+      winchSpeed = 0;
+     }
     }
     if(currentPourHeight<targetHeight/*-Grain::radius*/)
      currentPourHeight += /*wireDensity **/ winchSpeed * dt;
@@ -482,6 +491,7 @@ break2_:;
     if(grainKineticEnergy / grain.count < 1e-6 /*1µJ/grain*/) {
      log("Pack->Done", grainKineticEnergy*1e6 / grain.count, "µJ / grain");
      processState = ProcessState::Done;
+     snapshot();
     }
    }
   }
@@ -495,6 +505,7 @@ break2_:;
    else {
     log(height >= 4*Grain::radius, height/(topZ0-bottomZ0) > 1-1./8);
     processState = Done;
+    snapshot();
    }
   }
 
@@ -1020,6 +1031,15 @@ break2_:;
     String s = str(displacement/(topZ0-bottomZ0)*100, stress, stress-pressure,
                    (stress-pressure)/(stress+pressure), volume() /*, side.tensionEnergy*/);
     stream.write(s+'\n');
+    // Checks if all grains are within membrane
+    // FIXME: actually check only with enlarged rigid cylinder
+    for(vec4f p: grain.position.slice(0, grain.count)) {
+     if(length2(p) > 2*side.initialRadius) {
+      log("Grain slipped through membrane", 2*side.initialRadius, length2(p));
+      snapshot();
+      processState = ProcessState::Fail;
+     }
+    }
    }
   }
 

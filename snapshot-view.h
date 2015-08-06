@@ -38,10 +38,10 @@ struct SnapshotView : Widget {
 
  SnapshotView() {}
  SnapshotView(string id) : id(copyRef(id)) {
-  assert_(existsFile(id+".grain"), id, currentWorkingDirectory().list(Files));
+  /*assert_(existsFile(id+".grain"), id, currentWorkingDirectory().list(Files));
   assert_(existsFile(id+".wire"));
-  assert_(existsFile(id+".side"));
-  {TextData s(readFile(id+".grain"));
+  assert_(existsFile(id+".side"));*/
+  if(existsFile(id+".grain")) {TextData s(readFile(id+".grain"));
    grain.radius = s.decimal(); s.line();
    s.line(); // Header
    while(s) {
@@ -53,7 +53,7 @@ struct SnapshotView : Widget {
     s.line();
    }
   }
-  {TextData s(readFile(id+".wire"));
+  if(existsFile(id+".wire")) {TextData s(readFile(id+".wire"));
    wire.radius = s.decimal(); s.line();
    s.line(); // Header
    while(s) {
@@ -65,7 +65,7 @@ struct SnapshotView : Widget {
     s.line();
    }
   }
-  {TextData s(readFile(id+".side"));
+  if(existsFile(id+".side")) {TextData s(readFile(id+".side"));
    while(s) {
     {float x = s.decimal(); s.skip(' ');
     float y = s.decimal(); s.skip(' ');
@@ -77,15 +77,15 @@ struct SnapshotView : Widget {
     side.position.append(v4sf{x,y,z,0});}
    }
   }
-  log("Loaded snapshot", id, grain.count, wire.count, side.position.size);
+  log(id, grain.count, wire.count, side.position.size);
  }
  void snapshot() {
   writeFile(id+".png", encodePNG(target.readback()), currentWorkingDirectory(), true);
  }
 
- vec2 sizeHint(vec2) override { return vec2(1050, 1050/**size.y/size.x*/); }
+ vec2 sizeHint(vec2) override { return grain.count ? vec2(1050, 1050/**size.y/size.x*/) : 0; }
  shared<Graphics> graphics(vec2 widgetSize) override {
-  const float Dt = 0; //1./60/2;
+  const float Dt = 1; //1./60/2;
   {
    vec4f min = _0f, max = _0f;
    for(size_t i: range(grain.count)) { // FIXME: proper BS

@@ -1,5 +1,4 @@
 #include "thread.h"
-#include "variant.h"
 #include "text.h"
 #include "window.h"
 #include "graphics.h"
@@ -11,6 +10,7 @@
 #include "render.h"
 #include "pdf.h"
 #include "snapshot-view.h"
+#include "sge.h"
 #include <unistd.h>
 
 #define RENAME 0
@@ -40,17 +40,12 @@ struct Rename {
 } app;
 #endif
 
-struct SGEJob { Dict dict; String id; float elapsed; };
-String str(const SGEJob& o) { return str(o.dict, o.id, o.elapsed); }
-//bool operator==(const SGEJob& o, string id) { return o.id == id; }
-bool operator==(const SGEJob& o, const Dict& dict) { return o.dict == dict; }
-
 struct ArrayView : Widget {
  string valueName;
  map<Dict, float> points; // Data points
  map<Dict, String> ids; // Job IDs
  map<Dict, String> states; // Job states
- array<SGEJob> running;
+ array<SGEJob> jobs;
  float min = inf, max = -inf;
  uint textSize;
  vec2 headerCellSize = vec2(80*textSize/16, textSize);
@@ -63,39 +58,12 @@ struct ArrayView : Widget {
  function<void(string)> status;
  Folder cache {".cache", currentWorkingDirectory(), true};
 
- void fetchRunning(int time) {
-  if(arguments() && startsWith(arguments()[0],"server-")) {
-   if(!existsFile(arguments()[0], cache) ||
-      File(arguments()[0], cache).modifiedTime() < realTime()-time*60e9) {
-    Stream stdout;
-    Time time;
-    int pid = execute("/usr/bin/ssh",ref<string>{arguments()[0],"qstat"_,"-u"_,user(),"-s"_,"r"_,"-xml"_}, false, currentWorkingDirectory(), &stdout);
-    array<byte> status;
-    for(;;) {
-     auto packet = stdout.readUpTo(1<<16);
-     status.append(packet);
-     if(!(packet || isRunning(pid))) break;
-    }
-    log(time);
-    writeFile(arguments()[0], status, cache, true);
-   }
-   auto document = readFile(arguments()[0], cache);
-   Element root = parseXML(document);
-   for(const Element& job: root("job_info")("queue_info").children) {
-    auto dict = parseDict(job("JB_name").content);
-    running.append(SGEJob{move(dict), copyRef(job("JB_job_number").content),
-                          float(currentTime()-parseDate(job("JAT_start_time").content))});
-   }
-   if(status) status(str(running.size));
-  }
- }
-
  ArrayView(string valueName, uint textSize=16)
   : valueName(valueName), textSize(textSize) {
-  fetchRunning(30);
+  jobs = qstat(30);
   load();
  }
- void load() {
+ void load(int time=20) {
   valueName = ref<string>{"Stress (MPa)", "Time (s)", "Wire density (%)", "Displacement (%)"}[index];
   points.clear();
   ids.clear();
@@ -111,10 +79,13 @@ struct ArrayView : Widget {
    Dict configuration = parseDict(id);
    if(!configuration.contains("Seed")) continue;
    if(!configuration.contains("Pattern")) continue;
-   if(!existsFile(str(configuration))) continue; // Only with snapshot signal file
-   if(points.contains(configuration)) continue;
+   //if(!existsFile(str(configuration))) continue; // Only with snapshot signal file
+   if(points.contains(configuration)) {
+    //log("Duplicate configuration", configuration);
+    continue;
+   }
    array<char> data;
-   if(1 && existsFile(id,cache) && File(id, cache).modifiedTime() >= realTime()-60*60e9)
+   if(1 && existsFile(id,cache) && File(id, cache).modifiedTime() >= realTime()-time*60e9)
     data = readFile(id, cache);
    if(!data) {
     String resultName;
@@ -172,6 +143,7 @@ break2:;
       jobID = s.whileInteger();
       assert_(!s);
      }
+     if(logName) error("Duplicate", logName, name);
      TextData s (readFile(name));
      string time;
      string state;
@@ -215,7 +187,7 @@ break2:;
     states.insert(copy(configuration), copyRef(s.word()));
     s.skip(' ');
     displacement = s.decimal();
-    if(displacement>=12) states.at(configuration) = "done"__;
+    if(displacement>=12.4) states.at(configuration) = "done"__;
    }
    /*if(points.contains(configuration)) {
     if(1 || points.at(configuration)!=0) { log("Duplicate configuration", configuration); continue; }
@@ -223,11 +195,14 @@ break2:;
    } else*/
    points.insert(move(configuration), ref<float>{stress,time,wireDensity,displacement}[index]);
   }
-  if(index==1) for(const SGEJob& job: running) if(!points.contains(job.dict)) {
+
+  for(const SGEJob& job: jobs) if(!points.contains(job.dict)) {
    //log("Missing output for ", id);
    assert_(job.dict);
-   points.insert(copy(job.dict), job.elapsed/60/60);
+   if(index==1) points.insert(copy(job.dict), job.elapsed/60/60);
+   else points.insert(copy(job.dict), 0);
   }
+
   if(points) {
    min = ::min(points.values);
    max = ::max(points.values);
@@ -241,6 +216,68 @@ break2:;
     return true; // Filters unknown dimension
    });
   }
+
+  //array<char> zombies;
+  for(const SGEJob& job: jobs)  if(states.contains(job.dict) && states.at(job.dict) == "done") {
+   logInfo(job.dict);
+   //zombies.append(job.id+" ");
+  }
+  //log(zombies);
+
+  //array<String> failures;
+  size_t failureCount = 0, fileCount = 0;
+  for(const Dict& key: points.keys) {
+   if(states.contains(key) && states.at(key)!="done"_ && !jobs.contains(key)) {
+    //logInfo(key);
+    //failures.append(str(key));
+    for(string name: Folder(".").list(Files)) if(startsWith(name, str(key))) {
+     log(name);
+     fileCount++;
+     //remove(name);
+    }
+    //assert_(existsFile(str(key)+".working"));
+    //remove(str(key)+".working");
+    failureCount++;
+   }
+  }
+  //log(failures.size);
+  log("Failed configuration", failureCount, "files", fileCount);
+ }
+
+ void removeFailed() {
+  //array<String> failures;
+  size_t failureCount = 0, fileCount = 0;
+  for(const Dict& key: points.keys) {
+   if(states.at(key)!="done"_ && !jobs.contains(key)) {
+    //logInfo(key);
+    //failures.append(str(key));
+    for(string name: Folder(".").list(Files)) if(startsWith(name, str(key))) {
+     log(name);
+     fileCount++;
+     remove(name);
+    }
+    //assert_(existsFile(str(key)+".working"));
+    //remove(str(key)+".working");
+    failureCount++;
+   }
+  }
+  //log(failures.size);
+  log(failureCount, fileCount);
+ }
+
+ void logInfo(const Dict& key) {
+  log(key);
+  if(states.contains(key)) log(states.at(key));
+  if(ids.contains(key)) {
+   if(jobs.contains(key)) log(jobs[jobs.indexOf(key)]);
+   String name = str(key)+".o"+str(ids.at(key));
+   if(existsFile(name)) log(section(readFile(name),'\n',-10,-1));
+  }
+  //for(string name: Folder(".").list(Files)) if(startsWith(name, str(target.coordinates)))
+  /*{String name = str(key)+".result";
+  if(existsFile(name)) log(section(readFile(name),'\n',-10,-1));}
+ {String name = str(key)+".working";
+  if(existsFile(name)) log(section(readFile(name),'\n',-10,-1));}*/
  }
 
  /// Returns coordinates along \a dimension occuring in points matching \a filter
@@ -248,8 +285,9 @@ break2:;
   array<Variant> allCoordinates;
   for(const Dict& coordinates: points.keys) if(coordinates.includes(filter)) {
    //assert_(coordinates.contains(dimension), coordinates, dimension);
-   if(coordinates.contains(dimension) && !allCoordinates.contains(coordinates.at(dimension)))
-    allCoordinates.insertSorted(copy(coordinates.at(dimension)));
+   Variant value;
+   if(coordinates.contains(dimension)) value = copy(coordinates.at(dimension));
+   if(!allCoordinates.contains(value)) allCoordinates.insertSorted(move(value));
   }
   return allCoordinates;
  }
@@ -289,7 +327,7 @@ break2:;
   uint cellCount = 0;
   auto coordinates = this->coordinates(dimension, filter);
   for(const Variant& coordinate: coordinates) {
-   assert_(coordinate);
+   //assert_(coordinate);
    filter[copyRef(dimension)] = copy(coordinate);
    uint childCellCount = renderHeader(graphics, viewSize, contentCellSize, axis, level+1, filter, offset+cellCount);
    vec2 headerOrigin (dimensions[!axis].size+1, level);
@@ -318,9 +356,13 @@ break2:;
    else { // Renders cell
     const Dict* best = 0;
     float bestValue = 0;
-    bool running = false;
+    bool running = false, pending = false, hasSnapshotSignalFile = false;
     for(const Dict& coordinates: points.keys) if(coordinates.includes(filterX) && coordinates.includes(filterY)) {
-     if(this->running.contains(coordinates)) running = true;
+     if(existsFile(str(coordinates))) hasSnapshotSignalFile = true;
+     for(const auto& job: jobs) if(job.dict.includes(coordinates)) {
+      if(job.state=="running") running = true;
+      if(job.state=="pending") pending = true;
+     }
      float value = points.at(coordinates);
      if(value >= bestValue) {
       bestValue = value;
@@ -350,9 +392,12 @@ break2:;
      if(index==0) value /= 1e6; // MPa
      String text = str(int(round(value))); //point.isInteger?dec(value):ftoa(value);
      //if(value==max) text = bold(text);
+     if(pending) text = italic(text);
      if(running) text = bold(text);
      //if(existsFile(str(coordinates))) text = bold(text);
-     /*if(value)*/ graphics.graphics.insertMulti(cellOrigin, Text(text, textSize, 0, 1, 0,
+     bgr3f textColor = 0;
+     if(running && !hasSnapshotSignalFile) textColor = red; // Old version
+     /*if(value)*/ graphics.graphics.insertMulti(cellOrigin, Text(text, textSize, textColor, 1, 0,
                                                "DejaVuSans", true, 1, 0).graphics(cellSize));
     }
    }
@@ -419,24 +464,12 @@ break2:;
   if(event == Press && button == LeftButton) {
    for(const auto& target: targets) {
     if(target.rect.contains(cursor)) {
-     log(str(target.key));
-     if(states.contains(target.key)) log(states.at(target.key));
-     if(ids.contains(target.key)) {
-      if(running.contains(target.key)) log(running[running.indexOf(target.key)]);
-      //log("/usr/bin/ssh"+ref<string>{arguments()[0], qdel -f", ids.at(target.key), "&");
-      //log("/usr/bin/ssh",arguments()[0],"'qdel -f", ids.at(target.key), ">&- 2>&- <&- &'");
-      //String name = replace(str(target.key),":","=")+".o"+str(ids.at(target.key));
-      //if(existsFile(name)) log(section(readFile(name),'\n',-10,-1));
-     }
-     //for(string name: Folder(".").list(Files)) if(startsWith(name, str(target.coordinates)))
-     /*{String name = str(target.key)+".result";
-      if(existsFile(name)) log(section(readFile(name),'\n',-10,-1));}
-     {String name = str(target.key)+".working";
-      if(existsFile(name)) log(section(readFile(name),'\n',-10,-1));}*/
+     logInfo(target.key);
      press(target.key);
      return true;
     }
    }
+   press({});
   }
   if(event == Motion) {
    for(auto& target: targets) {
@@ -457,7 +490,16 @@ struct Review {
  VBox layout {{&view, &detail}};
  unique<Window> window = ::window(&layout, int2(0, 1050), mainThread, true);
  Review() {
-  window->actions[Return] = [this](){ view.fetchRunning(0); window->render(); };
+  window->actions[Key('x')] = [this](){
+   view.dimensions[0] = array<string>(view.dimensions[0].slice(1) + view.dimensions[0][0]);
+   window->render();
+  };
+  window->actions[Key('y')] = [this](){
+   view.dimensions[1] = array<string>(view.dimensions[1].slice(1) + view.dimensions[1][0]);
+   window->render();
+  };
+  window->actions[Delete] = [this]() { view.removeFailed(); view.load(10); window->render(); };
+  window->actions[Return] = [this](){ view.jobs = qstat(0); view.load(10); window->render(); };
   window->actions[Space] = [this](){
    //remove("plot.pdf"_, home());
    static constexpr float inchMM = 25.4, inchPx = 90;
@@ -468,31 +510,31 @@ struct Review {
    //encodePNG(render(int2(1050), plot.graphics(vec2(1050))));
   };
   view.hover = [this](const Dict& point) {
-   return;
    if(view.index!=0) return;
    Dict filter = copy(point);
    filter.remove("Pressure");
-   if(filter.contains("Pattern")) filter.remove("Pattern");
+   //filter.filter([](string, const Variant& value){ return !value; });
+   if(filter.contains(view.dimensions[1].last())) filter.remove(view.dimensions[1].last());
    plot.xlabel = "Pressure (N)"__;
    plot.ylabel = "Stress (Pa)"__;
    plot.dataSets.clear();
    plot.min.y = 0, plot.max.y = view.max;
    array<Dict> points;
-   auto patterns = view.coordinates("Pattern", filter);
+   //auto patterns = view.coordinates("Pattern", filter);
    Dict parameters = copy(filter);
-   for(const Variant& pattern: patterns) {
-    parameters[copyRef("Pattern"_)] = copy(pattern);
+   //for(const Variant& pattern: patterns) {
+    //parameters[copyRef("Pattern"_)] = copy(pattern);
     auto pressures = view.coordinates("Pressure", filter);
     for(const Variant& pressure: pressures) {
      Dict key = copy(parameters);
      key.insertSorted(copyRef("Pressure"_), copy(pressure));
      for(const auto& point: view.points) {
-      if(point.key.includes(key)) {
+      if(point.key.includesPassMissing(key)) {
        points.append(copy(point.key));
       }
      }
     }
-   }
+   //}
    array<String> fixed;
    for(const auto& coordinate: view.coordinates(points))
     if(coordinate.value.size==1) fixed.append(copyRef(coordinate.key));
@@ -511,9 +553,8 @@ struct Review {
    //window->actions[Space]();
   };
   view.press = [this](const Dict& point) {
-   log(point);
-   if(existsFile(str(point))) {
-    snapshotView.~SnapshotView();
+   snapshotView.~SnapshotView();
+   if(point && existsFile(str(point))) {
     //assert_(existsFile(localPath), localPath);
     /*File(localPath).write("S"_); // FIFO over NFS ?
    String remotePath = "/home/"_+user()+"/Results/"+str(point);
@@ -526,9 +567,9 @@ struct Review {
      log(".");
      usleep(100*1000);
     } while(file.modifiedTime()==time);*/
-    usleep(200*1000); // FIXME: signal back
+    usleep(300*1000); // FIXME: signal back
     new (&snapshotView) SnapshotView(str(point));
-   }
+   } else new (&snapshotView) SnapshotView();
    window->render();
   };
   view.status = [this](string status) { window->setTitle(status); };

@@ -33,8 +33,22 @@ template<Type K, Type V> struct map {
  }
 
  /// Returns whether this object has the same values for all keys in subsets.
+ /// Missing keys fail if subset value is not null
  bool includes(const map<K, V>& subset) const {
-  for(auto argument: subset) if(contains(argument.key) && at(argument.key) != argument.value) return false;
+  for(auto entry: subset) {
+   if(contains(entry.key)) { if(at(entry.key) != entry.value) return false; }
+   else if(entry.value) return false;
+  }
+  return true;
+ }
+
+ /// Returns whether this object has the same values for all keys in subsets.
+ /// Missing keys always pass regardless of subset value
+ bool includesPassMissing(const map<K, V>& subset) const {
+  for(auto entry: subset) {
+   if(!contains(entry.key) || !at(entry.key)) continue;
+   if(at(entry.key) != entry.value) return false;
+  }
   return true;
  }
 
