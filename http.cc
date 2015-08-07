@@ -168,7 +168,7 @@ String cacheFile(const URL& url) {
 // HTTP
 
 struct HTTP;
-static array<unique<HTTP>> requests; // weakly referenced by Thread::array<Poll*>
+array<unique<HTTP>> requests; // weakly referenced by Thread::array<Poll*>
 
 /// Asynchronously fetches a file over HTTP
 struct HTTP : DataStream<SSLSocket>, Poll, TextData {

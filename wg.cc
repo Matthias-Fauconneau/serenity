@@ -3,6 +3,8 @@
 #include "http.h"
 #include "xml.h"
 #include "math.h"
+#include "time.h"
+#include <unistd.h>
 
 static string key = arguments()[0];
 
@@ -29,67 +31,72 @@ struct LocationRequest {
     }
 };
 
-#if 0
-struct WG {
-    array<unique<LocationRequest>> requests;
-    map<string, vec3> locations;
-    WG() {
-        for(string address: arguments().slice(1)) {
-            unique<LocationRequest> request (nullptr);
-            request.pointer = new LocationRequest(address, {this, &WG::load}); // FIXME: does not forward properly through unique<T>(Args...)
-            requests.append(move(request));
-        }
-    }
-    void load(string address, vec3 location) {
-        log(address, location);
-        for(auto entry: locations) {
-            float R = 6371000; // Earth radius
-            float φ1 = PI/180* location.x;
-            float φ2 = PI/180* entry.value.x ;
-            float Δφ = φ1-φ2;
-            float Δλ = PI/180* (entry.value.y-location.y);
-            float a = sin(Δφ/2) * sin(Δφ/2) + cos(φ1) * cos(φ2) * sin(Δλ/2) * sin(Δλ/2);
-            float c = 2 * atan(sqrt(a), sqrt(1-a));
-            float dz = location.z - entry.value.z;
-            float d = R * c + abs(dz);
-            log(address, entry.key, round(d), abs(round(dz)));
-        }
-        locations.insert(address, location);
-    }
-} app;
-#elif 1
+vec3 distance(vec3 A, vec3 B) {
+    float R = 6371000; // Earth radius
+    float φ1 = PI/180* A.x;
+    float φ2 = PI/180* B.x;
+    float Δφ = φ1-φ2;
+    float Δλ = PI/180* (B.y-A.y);
+    float a = sin(Δφ/2) * sin(Δφ/2) + cos(φ1) * cos(φ2) * sin(Δλ/2) * sin(Δλ/2);
+    float c = 2 * atan(sqrt(a), sqrt(1-a));
+    float dz = B.z - A.z;
+    float d = R * c + abs(dz);
+    return vec3((d/15+abs(dz)/5)*60/1000, d, dz);
+}
+
 struct WG {
     struct Room {
-        String href;
+        URL url;
         String postDate;
         String startDate;
         String untilDate;
         uint price;
         String address;
+        unique<LocationRequest> locationRequest = nullptr;
+        vec3 location;
+        function<void(const Room&)> loaded;
 
         void load(const URL&, Map&& data) {
             const Element root = parseHTML(data);
             address = copyRef( root("html")("body")("#main")("#container")("#content")(".text result")
                                      .children[1]->children[3]->children[1]->children[2]->content ); // FIXME
             assert_(!address.contains('\n'));
-            log(address);
+            //log(address);
+            locationRequest.pointer = new LocationRequest(address, {this, &Room::loadLocation}); // FIXME: does not forward properly through unique<T>(Args...)
             //log(apply(content.children, [](const Element& e) { return str(e.name, e.attributes); }));
+        }
+        void loadLocation(string, vec3 location) {
+            this->location = location;
+            loaded(*this);
         }
     };
 
-    array<Room> rooms;
+    array<unique<LocationRequest>> requests;
+    map<string, vec3> locations;
+    void loadLocation(string address, vec3 location) { locations.insert(address, location); }
+
+
     WG() {
+        for(string address: arguments().slice(1)) {
+            unique<LocationRequest> request (nullptr);
+            request.pointer = new LocationRequest(address, {this, &WG::loadLocation}); // FIXME: does not forward properly through unique<T>(Args...)
+            requests.append(move(request));
+        }
         URL url ("http://www.wgzimmer.ch/wgzimmer/search/mate.html?");
         url.post = "query=&priceMin=50&priceMax=1500&state=zurich-stadt&permanent=all&student=none&country=ch&orderBy=MetaData%2F%40mgnl%3Alastmodified&orderDir=descending&startSearchMate=true&wgStartSearch=true"__;
         getURL(move(url), {this, &WG::loadIndex});
     }
+
+    array<Room> rooms;
+
     void loadIndex(const URL& url, Map&& data) {
         const Element root = parseHTML(data);
         const auto& list = root("html")("body")("#main")("#container")("#content")("ul");
         for(const Element& li: list.children) {
             const Element& a = li.children[1];
             Room& room = rooms.append();
-            room.href = copyRef(a.attribute("href"));
+            room.loaded = {this, &WG::evaluate};
+            room.url = url.relative(a.attribute("href"));
             room.postDate = copyRef(a.children[0]->children[0]->content);
             {TextData s (a.children[2]->content);
                 s.skip("Bis:");
@@ -102,11 +109,30 @@ struct WG {
                 room.price = s.integer();
                 s.skip(".00"_);
             }
-            log(room.postDate, room.startDate, room.untilDate, room.price, room.href);
-            getURL(url.relative(room.href), {&room, &Room::load});
-            break;
         }
         log(rooms.size, "rooms");
+        nextRoom();
+    }
+
+    size_t roomIndex = 0;
+    Timer timer {{this, &WG::nextRoom}};
+
+    void nextRoom() {
+        log(roomIndex, "/", rooms.size);
+        extern array<unique<HTTP>> requests;
+        while(!::requests) {
+            Room& room = rooms[roomIndex];
+            //log(room.postDate, room.startDate, room.untilDate, room.price);
+            getURL(move(room.url), {&room, &Room::load});
+            roomIndex++;
+        }
+        if(roomIndex < rooms.size) timer.setRelative(400);
+    }
+
+    void evaluate(const Room& room) {
+        for(string address: arguments().slice(1)) {
+            vec3 d = distance(room.location, locations[address]);
+            log(str(round(d.x))+"min"_, str(round(d.y)/1000, 1u)+"km", str(round(d.z))+"m", str(room.price)+"Fr", room.address);
+        }
     }
 } app;
-#endif

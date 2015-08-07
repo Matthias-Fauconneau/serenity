@@ -167,7 +167,8 @@ Date parseDate(TextData& s) {
 
 Timer::Timer(const function<void()>& timeout, long sec, Thread& thread)
     : Stream(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC)), Poll(Stream::fd, POLLIN, thread), timeout(timeout) {
-    if(sec) setAbsolute(realTime()+sec*1000000000ull);
+    //if(sec) setAbsolute(realTime()+sec*1000000000ull);
+    if(sec) setRelative(sec*1000);
 }
 void Timer::event() { read<uint64>(); timeout(); }
 void Timer::setAbsolute(uint64 nsec) {
