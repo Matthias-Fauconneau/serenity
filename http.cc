@@ -175,9 +175,9 @@ struct HTTP : DataStream<SSLSocket>, Poll, TextData {
     /// Connects to \a host and requests \a path
     /// \note \a headers and \a content will be added to request
     /// \note If \a secure is true, an SSL connection will be used
-    HTTP(URL&& url, function<void(const URL&, Map&&)> handler, array<String>&& headers, String&& post)
+    HTTP(URL&& url, function<void(const URL&, Map&&)> handler, array<String>&& headers)
         : DataStream<SSLSocket>(resolve(url.host),url.scheme=="https"_?443:80,url.scheme=="https"_), Poll(Socket::fd,POLLOUT),
-          url(move(url)), headers(move(headers)), post(move(post)), handler(handler) {
+          url(move(url)), headers(move(headers)), handler(handler) {
         if(!Socket::fd) { error("Unknown host",this->url.host); done(); return; }
         registerPoll();
     }
@@ -190,7 +190,6 @@ struct HTTP : DataStream<SSLSocket>, Poll, TextData {
    // Request
    URL url;
    array<String> headers;
-   String post;
    // Header
    uint contentLength=0;
    bool chunked=false;
@@ -203,13 +202,14 @@ struct HTTP : DataStream<SSLSocket>, Poll, TextData {
 };
 
 void HTTP::request() {
-    String request = (post?"POST"_:"GET"_)+" "_+(startsWith(url.path,"/"_)?""_:"/"_)+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\nUser-Agent: Serenity\r\n"_;
-    if(post) {
-        headers.append("Content-Length: "+str(post.size));
+    String request = (url.post?"POST"_:"GET"_)+" "_+(startsWith(url.path,"/"_)?""_:"/"_)+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\n"
+            ;//User-Agent: Serenity\r\n"_;
+    if(url.post) {
         headers.append("Content-Type: application/x-www-form-urlencoded"__);
+        headers.append("Content-Length: "+str(url.post.size));
     }
     for(string header: headers) request=request+header+"\r\n"_;
-    write(request+"\r\n"_+post); state=Header;
+    write(request+"\r\n"_+url.post); state=Header;
 }
 
 void HTTP::header() {
@@ -314,7 +314,7 @@ void getURL(URL&& url, function<void(const URL&, Map&&)> handler, int maximumAge
         headers.append( "If-Modified-Since: "_+str(Date(modified),"ddd, dd MMM yyyy hh:mm:ss TZD"_) );
     }
     for(const unique<HTTP>& request: requests) if(request->url == url) error("Duplicate request", url);
-    requests.append( unique<HTTP>(move(url),handler,move(headers),move(url.post)) );
+    requests.append( unique<HTTP>(move(url),handler,move(headers)) );
 }
 
 #if 0

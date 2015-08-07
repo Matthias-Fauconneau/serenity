@@ -59,51 +59,54 @@ struct WG {
 } app;
 #elif 1
 struct WG {
+    struct Room {
+        String href;
+        String postDate;
+        String startDate;
+        String untilDate;
+        uint price;
+        String address;
+
+        void load(const URL&, Map&& data) {
+            const Element root = parseHTML(data);
+            address = copyRef( root("html")("body")("#main")("#container")("#content")(".text result")
+                                     .children[1]->children[3]->children[1]->children[2]->content ); // FIXME
+            assert_(!address.contains('\n'));
+            log(address);
+            //log(apply(content.children, [](const Element& e) { return str(e.name, e.attributes); }));
+        }
+    };
+
+    array<Room> rooms;
     WG() {
         URL url ("http://www.wgzimmer.ch/wgzimmer/search/mate.html?");
-        url.post = "priceMin=50&priceMax=1500&state=zurich-stadt&permanent=all&studio=false&student=none&country=ch&orderBy=MetaData/@mgnl:lastmodified"
-                   "&orderDir=descending&startSearchMate=true&wgStartSearch=true"__;
-        getURL(move(url), {this, &WG::load});
+        url.post = "query=&priceMin=50&priceMax=1500&state=zurich-stadt&permanent=all&student=none&country=ch&orderBy=MetaData%2F%40mgnl%3Alastmodified&orderDir=descending&startSearchMate=true&wgStartSearch=true"__;
+        getURL(move(url), {this, &WG::loadIndex});
     }
-    void load(const URL&, Map&& data) {
-        log(/*(string)data,*/ data.size);
-    }
-} app;
-#else
-struct WG {
-    WG() {
-        const auto file = readFile("index.html");
-        const Element root = parseHTML(file);
+    void loadIndex(const URL& url, Map&& data) {
+        const Element root = parseHTML(data);
         const auto& list = root("html")("body")("#main")("#container")("#content")("ul");
         for(const Element& li: list.children) {
             const Element& a = li.children[1];
-            string href = a.attribute("href");
-            string postDate = a.children[0]->children[0]->content;
-            string untilDate;
+            Room& room = rooms.append();
+            room.href = copyRef(a.attribute("href"));
+            room.postDate = copyRef(a.children[0]->children[0]->content);
             {TextData s (a.children[2]->content);
-                s.skip("Until:");
+                s.skip("Bis:");
                 s.whileAny(" \t\n");
-                if(!s.match("No time restrictions")) untilDate = s.untilEnd();
+                if(!s.match("No time restrictions")) room.untilDate = copyRef(s.untilEnd());
             }
-            string startDate = a.children[2]->children[0]->content;
-            uint price;
+            room.startDate = copyRef(a.children[2]->children[0]->content);
             {TextData s (a.children[3]->children[0]->content);
                 s.skip("SFr. ");
-                price = s.integer();
+                room.price = s.integer();
                 s.skip(".00"_);
             }
-            log(postDate, startDate, untilDate, price, href);
-            getURL(href, {this, &WG::load});
+            log(room.postDate, room.startDate, room.untilDate, room.price, room.href);
+            getURL(url.relative(room.href), {&room, &Room::load});
             break;
         }
-        log(list.children.size);
-    }
-    void load(const URL&, Map&& data) {
-        const Element root = parseHTML(data);
-        const auto& address = root("html")("body")("#main")("#container")("#content")(".text result")
-                               .children[1]->children[3]->children[1]->children[2]->content; // FIXME
-        log(address);
-        //log(apply(content.children, [](const Element& e) { return str(e.name, e.attributes); }));
+        log(rooms.size, "rooms");
     }
 } app;
 #endif
