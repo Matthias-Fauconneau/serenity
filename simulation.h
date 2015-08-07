@@ -485,7 +485,8 @@ break2_:;
       results.insert("Wire density (%)"__, wireDensity*100);
      }
      stream.write(str(results)+"\n");
-     stream.write("Strain (%), Stress (Pa), Deviatoric Stress (Pa), Normalized Deviatoric Stress, Volume (m³)\n"); //, Tension (J)
+     //Deviatoric Stress (Pa), Normalized Deviatoric Stress,
+     stream.write("Strain (%), Stress (Pa), Volume (m³)\n"); //, Tension (J)
     }
    } else {
     if(grainKineticEnergy / grain.count < 1e-6 /*1µJ/grain*/) {
@@ -1028,8 +1029,8 @@ break2_:;
     float displacement = (topZ0-topZ+bottomZ-bottomZ0);
     float stress = (top-bottom)/(2*PI*sq(side.radius));
 
-    String s = str(displacement/(topZ0-bottomZ0)*100, stress, stress-pressure,
-                   (stress-pressure)/(stress+pressure), volume() /*, side.tensionEnergy*/);
+    String s = str(displacement/(topZ0-bottomZ0)*100, stress, /*stress-pressure,
+                   (stress-pressure)/(stress+pressure),*/ volume() /*, side.tensionEnergy*/);
     stream.write(s+'\n');
     // Checks if all grains are within membrane
     // FIXME: actually check only with enlarged rigid cylinder

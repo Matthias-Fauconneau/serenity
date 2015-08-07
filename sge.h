@@ -11,7 +11,6 @@ array<SGEJob> qstat(int time=0/*, bool running=true*/) {
  string id = arguments() ? arguments()[0] : hostname;
  if(!existsFile(id, cache) || File(id, cache).modifiedTime() < realTime()-time*60e9) {
   Stream stdout;
-  Time time;
   int pid;
   if(hostname=="ifbeval01"_ || !arguments() || !startsWith(arguments()[0],"server-"))
    pid = execute(which("qstat"),ref<string>{"-u"_,user(),"-xml"_}, false, currentWorkingDirectory(), &stdout);
@@ -23,7 +22,6 @@ array<SGEJob> qstat(int time=0/*, bool running=true*/) {
    status.append(packet);
    if(!(packet || isRunning(pid))) break;
   }
-  log(time);
   writeFile(id, status, cache, true);
  }
  auto document = readFile(id, cache);

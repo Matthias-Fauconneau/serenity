@@ -1,5 +1,5 @@
-#!/bin/bash
-set -e
+#!/bin/sh
+#set -e
 cd "$(dirname "$0")"
 test -z "$CC" -a ! -e "$(which $CC 2>/dev/null)" && CC="$(which clang++ 2>/dev/null)"
 test -z "$CC" -a ! -e "$(which $CC 2>/dev/null)" && CC="$(which g++-4.8 2>/dev/null)"

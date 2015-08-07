@@ -117,7 +117,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
   log("~", "grain", grain.count, "wire", wire.count);
  }
 
- void event() {
+ void event() override {
 #if PROFILE
   static unused bool once =
     ({ extern void profile_reset(); profile_reset(); true; });

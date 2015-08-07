@@ -86,8 +86,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
 
  // Evaluates colors
  buffer<bgr3f> colors(dataSets.size());
- if(colors.size==1) colors[0] = black;
- else if(colors.size==4) { colors[0] = red, colors[1] = green, colors[2] = blue, colors[3] = black; }
+ if(colors.size<=4) for(size_t i: range(colors.size)) colors[i] = ref<bgr3f>{black,red,green,blue}[i];
  else for(size_t i: range(colors.size))
   colors[i] = clamp(bgr3f(0), LChuvtoBGR(53,179, 2*PI*i/colors.size), bgr3f(1));
 
@@ -154,7 +153,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
    graphics->lines.append(p-vec2(pointRadius, 0), p+vec2(pointRadius, 0), color);
    graphics->lines.append(p-vec2(0, pointRadius), p+vec2(0, pointRadius), color);
   }
-  if(plotLines) for(size_t i: range(points.size-1)) {
+  if(plotLines && !plotBands) for(size_t i: range(points.size-1)) {
    if(!isNumber(points[i]) || !isNumber(points[i+1])) continue;
    graphics->lines.append(points[i], points[i+1], color);
   }

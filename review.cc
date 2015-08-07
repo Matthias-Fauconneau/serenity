@@ -13,32 +13,19 @@
 #include "sge.h"
 #include <unistd.h>
 
-#define RENAME 0
-#if RENAME
-struct Rename {
- Rename() {
-  Folder results {"."_};
-  for(string name: results.list(Files)) {
-   if(!endsWith(name,".result") && !endsWith(name,".working")) {
-    if(endsWith(name,".failed")||endsWith(name,".working")) {
-     log("-", name);
-     //remove(name);
-    } //else log("Unknown file", name);
-    continue;
-   }
-   Dict parameters = parseDict(section(name,'.',0,-2));
-   //parameters.keys.replace("subStepCount"__, "Substep count"__);
-   String newName = str(parameters)+"."+section(name,'.',-2,-1);
-   newName = replace(newName, ".working.result", ".working");
-   if(name != newName) {
-    log(name, newName);
-    assert_(!existsFile(newName));
-    rename(name, newName, results);
-   }
-  }
+constexpr size_t medianWindowRadius = 12;
+buffer<float> medianFilter(ref<float> source, size_t W=medianWindowRadius) {
+ assert_(source.size > W+1+W);
+ buffer<float> target(source.size-W);
+ target.slice(0, W).copy(source.slice(0, W));
+ buffer<float> window(W+1+W);
+ for(size_t i: range(W, source.size-W)) {
+  window.copy(source.slice(i-W, W+1+W));
+  target[i] = ::median(window); // Quickselect median mutates buffer
  }
-} app;
-#endif
+ //target.slice(target.size-W).copy(source.slice(source.size-W));
+ return target;
+}
 
 struct ArrayView : Widget {
  string valueName;
@@ -58,13 +45,44 @@ struct ArrayView : Widget {
  function<void(string)> status;
  Folder cache {".cache", currentWorkingDirectory(), true};
 
- ArrayView(string valueName, uint textSize=16)
-  : valueName(valueName), textSize(textSize) {
+ ArrayView(string valueName, uint textSize=16) : valueName(valueName), textSize(textSize) {
   jobs = qstat(30);
   load();
  }
- void load(int time=20) {
-  valueName = ref<string>{"Stress (MPa)", "Time (s)", "Wire density (%)", "Displacement (%)"}[index];
+
+ // Prepends sort key
+ void apply(Dict& dict) {
+  if(dict.contains("Pattern"_)) { // Sort key
+   int index = ref<string>{"none"_,"helix","cross","loop"}.indexOf(dict.at("Pattern"));
+   assert_(index >= 0 && index < 4);
+   dict.at("Pattern"_) = String( (char)index + (string)dict.at("Pattern"));
+  }
+ }
+
+ // Applies sort key on load
+ Dict parseDict(string id) {
+  Dict configuration = ::parseDict(id);
+  apply(configuration);
+  return move(configuration);
+ }
+ array<SGEJob> qstat(int time) {
+  auto jobs  = ::qstat(time);
+  for(auto& job: jobs) apply(job.dict);
+  return jobs;
+ }
+
+ // Strips sort keys
+ Dict stripSortKeys(const Dict& o) {
+  Dict dict = copy(o);
+  for(auto& value: dict.values) if(value.type==Variant::Data && value.data && value.data[0] < 16) {
+   value.data = copyRef(value.data.slice(1)); // Strips sort key
+   assert_(value.data && value.data[0] >= 16);
+  }
+  return dict;
+ }
+
+ void load(int time=60) {
+  valueName = ref<string>{"Peak Stress (Pa)", "Time (s)", "Wire density (%)", "Displacement (%)"}[index];
   points.clear();
   ids.clear();
   states.clear();
@@ -86,7 +104,7 @@ struct ArrayView : Widget {
    }
    array<char> data;
    if(1 && existsFile(id,cache) && File(id, cache).modifiedTime() >= realTime()-time*60e9)
-    data = readFile(id, cache);
+    data = readFile(id, cache); // FIXME: do not reload old unchanged files
    if(!data) {
     String resultName;
     if(existsFile(id+".failed")) resultName = id+".failed";
@@ -96,7 +114,6 @@ struct ArrayView : Widget {
      map<string, array<float>> dataSets;
      TextData s (readFile(resultName));
      if(s) {
-      log(id);
       string resultLine = s.line();
       string headerLine;
       if(resultLine.contains('=')) headerLine = s.line();
@@ -128,10 +145,11 @@ struct ArrayView : Widget {
 break2:;
       //if(dataSets.contains("Stress (Pa)")) //continue;
       //assert_(dataSets.at("Stress (Pa)"_), dataSets);
-      if(dataSets.at("Stress (Pa)"_))
-       data.append(" "_+str(::max(dataSets.at("Stress (Pa)"_))));
-      else
-       data.append(" 0"_);
+      if(dataSets.at("Stress (Pa)"_)) {
+       auto& stress = dataSets.at("Stress (Pa)"_);
+       if(stress.size > 2*medianWindowRadius+1) data.append(" "_+str(::max(medianFilter(stress))));
+       else data.append(" 0"_);
+      } else data.append(" 0"_);
      } else data.append("0 0"_);
     } else data.append("0 0"_);
     string logName;
@@ -207,7 +225,7 @@ break2:;
    min = ::min(points.values);
    max = ::max(points.values);
   }
-  dimensions[0] = copyRef(ref<string>{"Radius"_,"Pressure"_});
+  dimensions[0] = copyRef(ref<string>{"TimeStep"_, "Radius"_,"Pressure"_});
   //dimensions[1] = copyRef(ref<string>{"Wire"_,"Pattern"_,"Angle"_}); // FIXME
   dimensions[1] = copyRef(ref<string>{"Wire"_,"Angle"_,"Pattern"_}); // FIXME
   for(auto& dimensions: this->dimensions) {
@@ -342,7 +360,9 @@ break2:;
     if(axis) graphics.fills.append(origin+vec2(0,-width/2), vec2(viewSize.x,(width+1)/2));
    }
    assert_(isNumber(origin), origin, headerOrigin, headerCellSize, cellCoordinates, cellSize, contentCellSize);
-   graphics.graphics.insertMulti(origin, Text(str(coordinate), textSize, 0, 1, 0,
+   array<char> label = str(coordinate);
+   if(label && label[0] < 16) label.removeAt(0); // Removes sort key
+   graphics.graphics.insertMulti(origin, Text(label, textSize, 0, 1, 0,
                                          "DejaVuSans", true, 1, 0).graphics(vec2(size*cellSize)));
    cellCount += childCellCount;
   }
@@ -358,7 +378,7 @@ break2:;
     float bestValue = 0;
     bool running = false, pending = false, hasSnapshotSignalFile = false;
     for(const Dict& coordinates: points.keys) if(coordinates.includes(filterX) && coordinates.includes(filterY)) {
-     if(existsFile(str(coordinates))) hasSnapshotSignalFile = true;
+     if(existsFile(str(stripSortKeys(coordinates)))) hasSnapshotSignalFile = true;
      for(const auto& job: jobs) if(job.dict.includes(coordinates)) {
       if(job.state=="running") running = true;
       if(job.state=="pending") pending = true;
@@ -394,7 +414,6 @@ break2:;
      //if(value==max) text = bold(text);
      if(pending) text = italic(text);
      if(running) text = bold(text);
-     //if(existsFile(str(coordinates))) text = bold(text);
      bgr3f textColor = 0;
      if(running && !hasSnapshotSignalFile) textColor = red; // Old version
      /*if(value)*/ graphics.graphics.insertMulti(cellOrigin, Text(text, textSize, textColor, 1, 0,
@@ -464,7 +483,7 @@ break2:;
   if(event == Press && button == LeftButton) {
    for(const auto& target: targets) {
     if(target.rect.contains(cursor)) {
-     logInfo(target.key);
+     //logInfo(target.key);
      press(target.key);
      return true;
     }
@@ -486,9 +505,11 @@ struct Review {
  ArrayView view {/*"Stress (MPa)"*/"Time (s)"};
  Plot plot;
  SnapshotView snapshotView;
+ Plot stressStrain, volumeStrain;
  HBox detail {{&plot, &snapshotView}};
- VBox layout {{&view, &detail}};
- unique<Window> window = ::window(&layout, int2(0, 1050), mainThread, true);
+ HBox plots {{&stressStrain, &volumeStrain}};
+ VBox layout {{&view, &detail, &plots}};
+ unique<Window> window = ::window(&layout, int2(1050, 1050*3/2), mainThread, true);
  Review() {
   window->actions[Key('x')] = [this](){
    view.dimensions[0] = array<string>(view.dimensions[0].slice(1) + view.dimensions[0][0]);
@@ -499,7 +520,7 @@ struct Review {
    window->render();
   };
   window->actions[Delete] = [this]() { view.removeFailed(); view.load(10); window->render(); };
-  window->actions[Return] = [this](){ view.jobs = qstat(0); view.load(10); window->render(); };
+  window->actions[Return] = [this](){ view.jobs = view.qstat(0); view.load(30); window->render(); };
   window->actions[Space] = [this](){
    //remove("plot.pdf"_, home());
    static constexpr float inchMM = 25.4, inchPx = 90;
@@ -512,29 +533,19 @@ struct Review {
   view.hover = [this](const Dict& point) {
    if(view.index!=0) return;
    Dict filter = copy(point);
-   filter.remove("Pressure");
-   //filter.filter([](string, const Variant& value){ return !value; });
    if(filter.contains(view.dimensions[1].last())) filter.remove(view.dimensions[1].last());
+   filter.remove("Pressure");
+   plot.plotPoints = true, plot.plotLines = false, plot.plotBands = true;
    plot.xlabel = "Pressure (N)"__;
    plot.ylabel = "Stress (Pa)"__;
-   plot.dataSets.clear();
    plot.min.y = 0, plot.max.y = view.max;
+   plot.dataSets.clear();
    array<Dict> points;
-   //auto patterns = view.coordinates("Pattern", filter);
-   Dict parameters = copy(filter);
-   //for(const Variant& pattern: patterns) {
-    //parameters[copyRef("Pattern"_)] = copy(pattern);
-    auto pressures = view.coordinates("Pressure", filter);
-    for(const Variant& pressure: pressures) {
-     Dict key = copy(parameters);
-     key.insertSorted(copyRef("Pressure"_), copy(pressure));
-     for(const auto& point: view.points) {
-      if(point.key.includesPassMissing(key)) {
-       points.append(copy(point.key));
-      }
-     }
+   for(const auto& point: view.points) {
+    if(point.key.includesPassMissing(filter)) {
+     points.append(copy(point.key));
     }
-   //}
+   }
    array<String> fixed;
    for(const auto& coordinate: view.coordinates(points))
     if(coordinate.value.size==1) fixed.append(copyRef(coordinate.key));
@@ -542,31 +553,91 @@ struct Review {
     Dict shortSet = copy(point);
     for(string dimension: fixed) if(shortSet.contains(dimension)) shortSet.remove(dimension);
     if(shortSet.contains("Pressure")) shortSet.remove("Pressure");
-    if(!shortSet.contains("Seed")) shortSet.insert("Seed"__,"1"__);
     shortSet.remove("Seed");
     auto& dataSet = plot.dataSets[str(shortSet.values," "_,""_)];
     float maxStress = view.points.at(point);
     if(maxStress) dataSet.insertSortedMulti(float(point.at("Pressure")), maxStress);
    }
-
+   for(auto& key: plot.dataSets.keys) {
+    if(key && key[0] < 16) key = copyRef(key.slice(1)); // Strips sort keys
+   }
    window->render();
-   //window->actions[Space]();
   };
   view.press = [this](const Dict& point) {
+   {
+    map<string, array<float>> dataSets;
+    String resultName;
+    String id = str(view.stripSortKeys(point));
+    log("ID", id);
+    if(existsFile(id+".failed")) resultName = id+".failed";
+    if(existsFile(id+".working")) resultName = id+".working";
+    if(existsFile(id+".result")) resultName = id+".result";
+    log("resultName", resultName);
+    if(resultName) {
+     TextData s (readFile(resultName));
+     if(s) {
+      log("Results");
+      string resultLine = s.line();
+      string headerLine;
+      if(resultLine.contains('=')) headerLine = s.line();
+      else { // FIXME: old bad version does not write the result line
+       headerLine = resultLine;
+       resultLine = ""_;
+      }
+      Dict results = parseDict(resultLine);
+      buffer<string> names = split(headerLine,", "); // Second line: Headers
+      for(string name: names) dataSets.insert(name);
+      //assert_(s, resultName, s);
+      while(s) {
+       for(size_t i = 0; s && !s.match('\n'); i++) {
+        string d = s.whileDecimal();
+        if(!d) goto break2;
+        //assert_(d, s.slice(s.index-16,16),"|", s.slice(s.index));
+        float decimal = parseDecimal(d);
+        assert_(isNumber(decimal), s.slice(s.index-16,16),"|", s.slice(s.index));
+        if(!(i < dataSets.values.size)) break;
+        assert_(i < dataSets.values.size, i, dataSets.keys);
+        dataSets.values[i].append( decimal );
+        s.whileAny(' ');
+       }
+      }
+break2:;
+      {auto& plot = stressStrain;
+       plot.plotPoints = false, plot.plotLines = true, plot.plotBands = false;
+       plot.min.y = 0, plot.max.y = view.max;
+       plot.dataSets.clear();
+       plot.xlabel = "Strain (%)"__;
+       plot.ylabel = "Stress (Pa)"__;
+       auto& stress = dataSets.at(plot.ylabel);
+       if(stress.size <= 2*medianWindowRadius+1) return;
+       stress = medianFilter(stress);
+       auto& strain = dataSets.at(plot.xlabel);
+       assert_(stress.size <= strain.size);
+       strain.size = stress.size;
+       plot.dataSets.insert(""__, {::move(strain), ::move(stress)});
+      }
+      {auto& plot = volumeStrain;
+       plot.plotPoints = false, plot.plotLines = true, plot.plotBands = false;
+       //plot.min.y = 0, plot.max.y = view.max;
+       plot.dataSets.clear();
+       plot.xlabel = "Strain (%)"__;
+       plot.ylabel = "Volumetric Strain (%)"__;
+       auto& volume = dataSets.at("Volume (m³)");
+       assert_(volume);
+       for(float& v: volume) v = (v / volume[0] - 1)*100;
+       auto& strain = dataSets.at(plot.xlabel);
+       assert_(volume.size == volume.size);
+       plot.dataSets.insert(""__, {::move(strain), ::move(volume)});
+      }
+     }
+    }
+   }
+
    snapshotView.~SnapshotView();
    if(point && existsFile(str(point))) {
-    //assert_(existsFile(localPath), localPath);
-    /*File(localPath).write("S"_); // FIFO over NFS ?
-   String remotePath = "/home/"_+user()+"/Results/"+str(point);
-   int status = execute("/usr/bin/ssh",ref<string>{arguments()[0],"sh"_,"-c"_,"echo S > "+remotePath});
-   assert_(status == 0);*/
     int64 time = realTime();
     File file (str(point));
     file.touch(time);
-    /*do { // Waits for job to dump snapshot. FIXME: NFS cache does not update, FIXME: signal back
-     log(".");
-     usleep(100*1000);
-    } while(file.modifiedTime()==time);*/
     usleep(300*1000); // FIXME: signal back
     new (&snapshotView) SnapshotView(str(point));
    } else new (&snapshotView) SnapshotView();
