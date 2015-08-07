@@ -16,6 +16,7 @@ static Element parse(string document, bool html) {
 }
 
 Element parseXML(string document) { return parse(document,false); }
+Element parseHTML(string document) { return parse(document,true); }
 
 Element::Element(TextData& s, bool html) {
 	size_t begin = s.index;
@@ -42,6 +43,16 @@ Element::Element(TextData& s, bool html) {
 		attributes.insertMulti(key, value);
 		s.whileAny(" \t\n");
     }
+    if(html) {
+        static array<string> voidElements = split("area base br col command embed hr img input keygen link meta param source track wbr"_," "_);
+        if(voidElements.contains(name)) return; //HTML tags which are implicity void (i.e not explicitly closed)
+        if(name=="style"_||name=="script"_) { //Raw text elements can contain <>
+            s.whileAny(" \t\n");
+            content = s.until("</"_+name+">"_);
+            s.whileAny(" \t\n");
+            return;
+        }
+    }
     for(;;) {
 		//if(s.available(4)<4) return; // Ignores unclosed tag
 		if(s.match("<![CDATA["_)) {
@@ -53,8 +64,15 @@ Element::Element(TextData& s, bool html) {
         //else if(s.match(String("<?"_+name+">"_))) { log("Invalid tag","<?"_+name+">"_); return; }
 		else if(s.match('<')) children.append( unique<Element>(s,html) );
         else {
-			assert_(!content);
-			content = trim(s.whileNot('<'));
+            string content = s.whileNot('<');
+            if(trim(content)) {
+                assert_(!this->content, this->content, content);
+                this->content = trim(content);
+            }
+            else if(!content) {
+                //log("Unclosed tag"/*, *this*/);
+                return;
+            }
         }
     }
 }
@@ -76,8 +94,15 @@ bool Element::contains(string name) const {
 
 const Element& Element::child(string name) const {
 	const Element* element = 0;
-    for(const Element& e: children) if(e.name==name) { if(element) log("Multiple match for", name, "in", *this); element=&e; }
-	assert_(element, "No such element", name);
+    for(const Element& e: children) {
+        if(     (startsWith(name, "#") && e.attributes.contains("id") && e.attribute("id") == name.slice(1)) ||
+                (startsWith(name, ".") && e.attributes.contains("class") && e.attribute("class") == name.slice(1)) ||
+                e.name==name) {
+            if(element) log("Multiple match for", name, "in", *this);
+            element=&e;
+        }
+    }
+    assert_(element, "No such element", name, apply(children, [](const Element& e) { return e.name; }));
 	static Element empty;
 	return element ? *element : empty;
 }

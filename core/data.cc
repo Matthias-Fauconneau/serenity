@@ -215,6 +215,7 @@ int TextData::integer(bool maySign, int base) {
   int n;
   /**/  if(c>='0' && c<='9') n = c-'0';
   //else if(c == '.') { error("Unexpected decimal"_, data); break; } // Break IP parse
+  else if(c=='\'') { advance(1); continue; } // Thousands separator
   else if(base!=16) break;
   else if(c>='a' && c<='f') n = c+10-'a';
   else if(c>='A' && c<='F') n = c+10-'A';

@@ -29,7 +29,7 @@ struct LocationRequest {
     }
 };
 
-#if 1
+#if 0
 struct WG {
     array<unique<LocationRequest>> requests;
     map<string, vec3> locations;
@@ -57,7 +57,7 @@ struct WG {
         locations.insert(address, location);
     }
 } app;
-#else
+#elif 1
 struct WG {
     WG() {
         URL url ("http://www.wgzimmer.ch/wgzimmer/search/mate.html?");
@@ -67,6 +67,43 @@ struct WG {
     }
     void load(const URL&, Map&& data) {
         log(/*(string)data,*/ data.size);
+    }
+} app;
+#else
+struct WG {
+    WG() {
+        const auto file = readFile("index.html");
+        const Element root = parseHTML(file);
+        const auto& list = root("html")("body")("#main")("#container")("#content")("ul");
+        for(const Element& li: list.children) {
+            const Element& a = li.children[1];
+            string href = a.attribute("href");
+            string postDate = a.children[0]->children[0]->content;
+            string untilDate;
+            {TextData s (a.children[2]->content);
+                s.skip("Until:");
+                s.whileAny(" \t\n");
+                if(!s.match("No time restrictions")) untilDate = s.untilEnd();
+            }
+            string startDate = a.children[2]->children[0]->content;
+            uint price;
+            {TextData s (a.children[3]->children[0]->content);
+                s.skip("SFr. ");
+                price = s.integer();
+                s.skip(".00"_);
+            }
+            log(postDate, startDate, untilDate, price, href);
+            getURL(href, {this, &WG::load});
+            break;
+        }
+        log(list.children.size);
+    }
+    void load(const URL&, Map&& data) {
+        const Element root = parseHTML(data);
+        const auto& address = root("html")("body")("#main")("#container")("#content")(".text result")
+                               .children[1]->children[3]->children[1]->children[2]->content; // FIXME
+        log(address);
+        //log(apply(content.children, [](const Element& e) { return str(e.name, e.attributes); }));
     }
 } app;
 #endif

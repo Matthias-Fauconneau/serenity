@@ -204,7 +204,10 @@ struct HTTP : DataStream<SSLSocket>, Poll, TextData {
 
 void HTTP::request() {
     String request = (post?"POST"_:"GET"_)+" "_+(startsWith(url.path,"/"_)?""_:"/"_)+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\nUser-Agent: Serenity\r\n"_;
-    if(post) headers.append("Content-Type: application/x-www-form-urlencoded"__);
+    if(post) {
+        headers.append("Content-Length: "+str(post.size));
+        headers.append("Content-Type: application/x-www-form-urlencoded"__);
+    }
     for(string header: headers) request=request+header+"\r\n"_;
     write(request+"\r\n"_+post); state=Header;
 }
