@@ -69,23 +69,24 @@ void Thread::run() {
  if(priority) setpriority(0,0,priority);
  {Locker lock(threadsLock); threads.append(this);} // Adds this thread to global running thread list
  while(!::terminationRequested && !this->terminationRequested) {
-  assert_(size>=1);
-  if(size==1 && !queue) break; // Terminates if no Poll objects (except thread queue EventFD) are registered and no job is queued)
-  while(unregistered){Locker locker(*this); Poll* poll=unregistered.pop(); remove(poll); queue.tryRemove(poll);}
+     while(unregistered) { Locker locker(*this); Poll* poll=unregistered.pop(); remove(poll); queue.tryRemove(poll); }
 
-  pollfd pollfds[size];
-  for(uint i: range(size)) pollfds[i]=*at(i); //Copy pollfds as objects might unregister while processing in the loop
-  if((LinuxError)check( ::poll(pollfds,size,-1) ) != LinuxError::Interrupted) {
-   for(uint i: range(size)) {
-    if(::terminationRequested || this->terminationRequested) break;
-    Poll* poll=at(i); int revents=pollfds[i].revents;
-    if(revents && !unregistered.contains(poll)) {
-     poll->revents = revents;
-     Locker lock(runLock);
-     poll->event();
-    }
-   }
-  }
+     assert_(size>=1);
+     if(size==1 && !queue) break; // Terminates if no Poll objects (except thread queue EventFD) are registered and no job is queued)
+
+     pollfd pollfds[size];
+     for(uint i: range(size)) pollfds[i]=*at(i); //Copy pollfds as objects might unregister while processing in the loop
+     if((LinuxError)check( ::poll(pollfds,size,-1) ) != LinuxError::Interrupted) {
+         for(uint i: range(size)) {
+             if(::terminationRequested || this->terminationRequested) break;
+             Poll* poll=at(i); int revents=pollfds[i].revents;
+             if(revents && !unregistered.contains(poll)) {
+                 poll->revents = revents;
+                 Locker lock(runLock);
+                 poll->event();
+             }
+         }
+     }
  }
  {Locker lock(threadsLock); threads.remove(this);} // Removes this thread from global running thread list
  tid = 0; thread = 0;

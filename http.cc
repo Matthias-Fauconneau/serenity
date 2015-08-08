@@ -222,17 +222,18 @@ void HTTP::header() {
     else if(status==304) { //Not Modified
         assert(existsFile(cacheFileName, cache()));
         touchFile(cacheFileName, cache(), true);
-        log("Not Modified",url);
+        log("Not Modified", url);
         state = Handle;
         return;
     }
-    else if(status==400) log("Bad Request"_,url); //cache reply anyway to avoid repeating bad requests
-    else if(status==404) log("Not Found"_,url);
+    else if(status==400) log("Bad Request"_, url); //cache reply anyway to avoid repeating bad requests
+    else if(status==403) error("Denied"_, url);
+    else if(status==404) log("Not Found"_, url);
     else if(status==408) log("Request timeout"_);
     else if(status==500) log("Internal Server Error"_,untilEnd());
     else if(status==502) log("Bad gateway"_);
     else if(status==504) log("Gateway timeout"_);
-    else { log("Unhandled status",status,"from",url); done(); return; }
+    else { log("Unhandled status",status,"from", url); done(); return; }
 
     // Headers
     while(!match("\r\n"_)) {
@@ -289,7 +290,7 @@ void HTTP::event() {
         if(!content) { log("Missing content",buffer); done(); return; }
         if(content.size>1024) log("Downloaded",url,content.size/1024,"KB"); else log("Downloaded",url,content.size,"B");
         redirect.append(cacheFile(url));
-        for(string file: redirect) {Folder(section(file,'/'),cache(),true); writeFile(file,content,cache());}
+        for(string file: redirect) {Folder(section(file,'/'),cache(),true); writeFile(file,content,cache(),true);}
         state=Handle; queue(); return; //Cache other outstanding requests before handling this one
     }
     if(state==Handle) { handler(url,Map(cacheFile(url),cache())); done(); return; }
@@ -305,9 +306,9 @@ void getURL(URL&& url, function<void(const URL&, Map&&)> handler, int maximumAge
     // Check if cached
     if(existsFile(file,cache())) {
         File file (cacheFile(url), cache());
-        long modified = file.modifiedTime();
-        if(currentTime()-modified < maximumAge*60) {
-            log("Cached", url);
+        long modified = file.modifiedTime()/1000000000ull;
+        if(currentTime()-modified < maximumAge*60*60) {
+            //log("Cached", url);
             handler(url,Map(file));
             return;
         }

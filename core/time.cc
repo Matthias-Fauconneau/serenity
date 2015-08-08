@@ -143,10 +143,17 @@ Date parseDate(TextData& s) {
              if(s.match("-")) date.day=s.integer()-1;
              s.match('T');
             }
-            //else if(date.day==-1) date.day=number-1;
+            else if(s.match(".")) {
+             date.day=number-1;
+             if(s.peek()>='0'&&s.peek()<='9') {
+                 date.month=s.integer()-1;
+                 if(s.match(".")) date.year=s.integer();
+             }
+            }
+            else if(date.day==-1) date.day=number-1;
             //else if(date.month==-1) date.month=number-1;
-            //else if(date.year==-1) date.year=number;
-            else error("Invalid date", s);
+            else if(date.year==-1) { assert_(number>31, number, s); date.year=number; }
+            else return {}; //error("Invalid date", s);
         } else break;
         continue2_:;
     }
@@ -166,20 +173,18 @@ Date parseDate(TextData& s) {
 }
 
 Timer::Timer(const function<void()>& timeout, long sec, Thread& thread)
-    : Stream(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC)), Poll(Stream::fd, POLLIN, thread), timeout(timeout) {
-    //if(sec) setAbsolute(realTime()+sec*1000000000ull);
+    : Stream(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC)), Poll(0, POLLIN, thread), timeout(timeout) {
+    Poll::fd = Stream::fd; // Registers only when set
     if(sec) setRelative(sec*1000);
 }
-void Timer::event() { read<uint64>(); timeout(); }
+void Timer::event() { read<uint64>(); unregisterPoll(); /*One shot*/ timeout(); }
 void Timer::setAbsolute(uint64 nsec) {
+    registerPoll();
     timespec time[2]={{0,0},{long(nsec/1000000000ull),long(nsec%1000000000ull)}};
     timerfd_settime(Stream::fd,1,(const itimerspec*)time,0);
 }
-/*void Timer::setAbsolute(long sec, long nsec) {
-    timespec time[2]={{0,0},{sec,nsec}};
-    timerfd_settime(fd,1,(const itimerspec*)time,0);
-}*/
 void Timer::setRelative(long msec) {
+    registerPoll();
     timespec time[2]={{0,0},{msec/1000,(msec%1000)*1000000}};
     timerfd_settime(Stream::fd,0,(const itimerspec*)time,0);
 }

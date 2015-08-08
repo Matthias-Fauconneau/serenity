@@ -44,13 +44,19 @@ String str(const URL& url);
 inline bool operator ==(const URL& a, const URL& b) {
     return a.scheme==b.scheme&&a.authorization==b.authorization&&a.host==b.host&&a.path==b.path&&a.fragment==b.fragment&&a.post==b.post;
 }
+template<> inline URL copy(const URL& o) {
+    URL url;
+    url.scheme=copy(o.scheme); url.authorization=copy(o.authorization); url.host=copy(o.host); url.path=copy(o.path); url.fragment=copy(o.fragment); url.post=copy(o.post);
+    return url;
+}
+
 
 /// Returns path to cache file for \a url
 String cacheFile(const URL& url);
 
 /// Requests ressource at \a url and call \a handler when available
-/// \note Persistent disk caching will be used, no request will be sent if cache is younger than \a maximumAge minutes
-void getURL(URL&& url, function<void(const URL&, Map&&)> handler=[](const URL&, Map&&){}, int maximumAge=24*60);
+/// \note Persistent disk caching will be used, no request will be sent if cache is younger than \a maximumAge hours
+void getURL(URL&& url, function<void(const URL&, Map&&)> handler=[](const URL&, Map&&){}, int maximumAge=24);
 
 /// Requests image at \a url and call \a handler when available (if was not cached)
 void getImage(URL&& url, Image* target, function<void()> imageLoaded, int2 size=0, uint maximumAge=24*60);

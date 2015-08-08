@@ -51,6 +51,7 @@ struct Date {
     int localTimeOffset(int64 utc) const;
     /// Converts the date to Unix time (in seconds)
     operator int64() const;
+    explicit operator bool() const { return *this!=Date(); }
 };
 /// Orders two dates
 bool operator <(const Date& a, const Date& b);

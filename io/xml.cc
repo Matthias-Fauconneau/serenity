@@ -6,10 +6,11 @@ static Element parse(string document, bool html) {
 	TextData s (document);
     s.match("\xEF\xBB\xBF"_); //spurious BOM
     Element root;
+    s.whileAny(" \r\t\n");
     while(s) {
         if(s.match("</"_)) log("Unexpected","</"_+s.until('>')+">"_);
 		else if(s.match('<')) root.children.append( unique<Element>(s, html) );
-		else error(str(s.lineIndex)+": Expected end of file, got", escape(s.line()));
+        else error(str(s.lineIndex)+": Expected end of file, got '"+escape(s.line())+"'");
 		s.whileAny(" \r\t\n");
     }
     return root;
@@ -88,17 +89,19 @@ string Element::operator[](string attribute) const {
 }
 
 bool Element::contains(string name) const {
-	for(const Element& e: children) if(e.name==name) return true;
-	return false;
+    for(const Element& e: children) if( (startsWith(name, "#") && e.attributes.contains("id") && e.attribute("id") == name.slice(1)) ||
+                                        (startsWith(name, ".") && e.attributes.contains("class") && split(e.attribute("class")," ").contains(name.slice(1))) ||
+                                        e.name==name) return true;
+    return false;
 }
 
 const Element& Element::child(string name) const {
 	const Element* element = 0;
     for(const Element& e: children) {
-        if(     (startsWith(name, "#") && e.attributes.contains("id") && e.attribute("id") == name.slice(1)) ||
-                (startsWith(name, ".") && e.attributes.contains("class") && e.attribute("class") == name.slice(1)) ||
-                e.name==name) {
-            if(element) log("Multiple match for", name, "in", *this);
+        if(  (startsWith(name, "#") && e.attributes.contains("id") && e.attribute("id") == name.slice(1)) ||
+             (startsWith(name, ".") && e.attributes.contains("class") && split(e.attribute("class")," ").contains(name.slice(1))) ||
+             e.name==name) {
+            if(element) { break; /*First match*/ log("Multiple match for", name, "in", *this); }
             element=&e;
         }
     }
