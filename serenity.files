@@ -68,3 +68,5 @@ music/music-pdf.cc
 http.h
 http.cc
 wg.cc
+hike.cc
+location.h

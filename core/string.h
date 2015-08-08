@@ -76,6 +76,8 @@ char lowerCase(char c);
 /// Lowers case
 String toLower(string s);
 /// Uppers case
+char upperCase(char c);
+/// Uppers case
 String toUpper(string s);
 
 String repeat(string s, uint times);

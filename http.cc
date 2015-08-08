@@ -315,6 +315,7 @@ void getURL(URL&& url, function<void(const URL&, Map&&)> handler, int maximumAge
         headers.append( "If-Modified-Since: "_+str(Date(modified),"ddd, dd MMM yyyy hh:mm:ss TZD"_) );
     }
     for(const unique<HTTP>& request: requests) if(request->url == url) error("Duplicate request", url);
+    if(requests.size>1) error("Concurrent request limit", requests.size);
     requests.append( unique<HTTP>(move(url),handler,move(headers)) );
 }
 

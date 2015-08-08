@@ -4,47 +4,7 @@
 #include "xml.h"
 #include "math.h"
 #include "time.h"
-#include <unistd.h>
-
-static string key = arguments()[0];
-constexpr int maximumAge = 7*24;
-
-struct LocationRequest {
-    String address;
-    vec3 location;
-    function<void(string, vec3)> handler;
-    LocationRequest(string address, function<void(string, vec3)> handler) : address(copyRef(address)), handler(handler) {
-        getURL(URL("https://maps.googleapis.com/maps/api/geocode/xml?key="_+key+"&address="+replace(address," ","+")+",+Zürich"),
-               {this, &LocationRequest::parseLocation}, maximumAge);
-    }
-    void parseLocation(const URL&, Map&& data) {
-        Element root = parseXML(data);
-        const auto& xmlLocation = root("GeocodeResponse")("result")("geometry")("location");
-        vec2 location(parseDecimal(xmlLocation("lat").content), parseDecimal(xmlLocation("lng").content));
-        this->location = vec3(location, 0);
-        getURL(URL("https://maps.googleapis.com/maps/api/elevation/xml?key="_+key+"&locations="+str(location.x)+","+str(location.y)),
-                {this, &LocationRequest::parseElevation}, maximumAge);
-    }
-    void parseElevation(const URL&, Map&& data) {
-        Element root = parseXML(data);
-        location.z = parseDecimal(root("ElevationResponse")("result")("elevation").content);
-        handler(address, location);
-    }
-};
-
-vec3 distance(vec3 A, vec3 B) {
-    float R = 6371000; // Earth radius
-    float φ1 = PI/180* A.x;
-    float φ2 = PI/180* B.x;
-    float Δφ = φ1-φ2;
-    float Δλ = PI/180* (B.y-A.y);
-    float a = sin(Δφ/2) * sin(Δφ/2) + cos(φ1) * cos(φ2) * sin(Δλ/2) * sin(Δλ/2);
-    float c = 2 * atan(sqrt(a), sqrt(1-a));
-    float dz = B.z - A.z;
-    float d = R * c + abs(dz);
-    return vec3((d/15+abs(dz))*60/1000, d, dz);
-}
-
+#include "location.h"
 
 struct Room {
     URL url;
@@ -78,7 +38,7 @@ struct Room {
             string id = s.until('\'');
             getURL(url.relative(URL("/show-contact/search-mate-contact?uuid="+id)), {this, &Room::loadContact}, maximumAge);
         }
-        locationRequest.pointer = new LocationRequest(address, {this, &Room::loadLocation}); // FIXME: does not forward properly through unique<T>(Args...)
+        locationRequest.pointer = new LocationRequest(address+",+Zürich", {this, &Room::loadLocation}); // FIXME: does not forward properly through unique<T>(Args...)
     }
     void loadLocation(string, vec3 location) {
         this->location = location;
@@ -109,7 +69,7 @@ struct WG {
     WG() {
         for(string address: arguments().slice(1)) {
             unique<LocationRequest> request (nullptr);
-            request.pointer = new LocationRequest(address, {this, &WG::loadLocation}); // FIXME: does not forward properly through unique<T>(Args...)
+            request.pointer = new LocationRequest(address+",+Zürich", {this, &WG::loadLocation}); // FIXME: does not forward properly through unique<T>(Args...)
             requests.append(move(request));
         }
         URL url ("http://www.wgzimmer.ch/wgzimmer/search/mate.html?");
@@ -159,7 +119,7 @@ struct WG {
             getURL(move(room.url), {&room, &Room::load});
             roomIndex++;
             if(requests) {
-                log(roomIndex+1, "/", rooms.size);
+                log(roomIndex+1, "/", index.size);
                 requestCount++;
                 if(requestCount > 512) { timer.setRelative(30*1000); requestCount=0; }
                 else timer.setRelative(400);
@@ -173,7 +133,7 @@ struct WG {
                 vec3 d = distance(room.location, locations[address]);
                 if(round(d.x) > 23) break;//return;
                 log(str(round(d.x))+"min"_, str(round(d.y)/1000, 1u)+"km", str(round(d.z))+"m", str(room.price)+"Fr", room.address,
-                    room.postDate, room.startDate, room.untilDate, room.contact, section(room.url.path,'/',-2,-1));
+                    room.postDate, room.startDate/*, room.untilDate*/, room.contact, section(section(room.url.path,'/',-2,-1),'-',0,-3));
             }
         }
     }
@@ -181,15 +141,19 @@ struct WG {
     array<Room> rooms; // sorted by score
 
     void evaluate(const Room& room) { // FIXME: might be called before contact is filled
-        if(parseDate(room.postDate) <= Date(currentTime()-10*24*60*60)) return;
-        Date until = parseDate(room.untilDate);
-        if(until && until < Date(currentTime()+/*30*/54*24*60*60)) return;
+        bool recent = parseDate(room.postDate) >= Date(currentTime()-24*60*60);
+        if(!recent) {
+            if(parseDate(room.startDate) > Date(currentTime()+37*24*60*60)) return;
+            Date until = parseDate(room.untilDate);
+            if(until && until < Date(currentTime()+/*30*/85*24*60*60)) return;
+        }
         float score = room.price/17.;
         for(string address: arguments().slice(1)) {
             vec3 d = distance(room.location, locations[address]);
+            if(!recent && d.x > 20) return;
             score += d.x;
         }
-        if(score > 70) return;
+        if(!recent && score > 50) return;
         Room copy = ::copy(room);
         copy.score = score;
         rooms.insertSorted(move(copy));
