@@ -15,7 +15,7 @@ uint subExponent(float& value) {
  error("No matching subexponent for"_, value);
 }
 
-vec2 Plot::sizeHint(vec2) { return dataSets||1?1050:0; }
+vec2 Plot::sizeHint(vec2) { return dataSets?1050:0; }
 shared<Graphics> Plot::graphics(vec2 size) {
  vec2 min=vec2(+__builtin_inf()), max=vec2(-__builtin_inf());
  // Computes axis scales
@@ -187,7 +187,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
 
    if(plotBandsX && points) { // X bands
     vec2 O = point(vec2(0,0));
-    TrapezoidX::Span span[2] = {{O.y,O.x,O.x},{points[0].y,points[0].x,points[0].x}};
+    TrapezoidX::Span span[2] = {{O.y,O.x,O.x}, {points[0].y,points[0].x,points[0].x}};
     for(vec2 p: points.slice(1)) {
      if(p.y == span[1].y) {
       span[1].min = ::min(span[1].min, p.x);
@@ -205,20 +205,25 @@ shared<Graphics> Plot::graphics(vec2 size) {
     graphics->trapezoidsX.append(span[0], span[1], color, 1.f/2);
    }
    if(plotCircles) {
+    float xSum = 0, N = 0;
     for(size_t i : range(sortY.size())) {
      //const float x = p.key, y = abs(p.value/*-data.values[0]*/);
      //const float x = p.value, y = p.key;
      const float x = sortY.values[i], y = sortY.keys[i];
+     xSum += x;
+     N++;
      if(i+1<sortY.size() && sortY.keys[i+1]==y && sortY.values[i+1]>x) continue;
-     const vec2 O = point(vec2(x, 0/*data.values[0]*/));
-     float Rx = abs(point(vec2(x+y/2,0)).x - point(vec2(x-y/2,0)).x);
-     float Ry = abs(point(vec2(x, y/*p.key*/)).y - O.y);
-     const float N = 64;
-     for(float i: range(N/2)) {
-      graphics->lines.append(
-         O+vec2(Rx*cos(2*PI*i/N), -Ry*sin(2*PI*i/N)),
-         O+vec2(Rx*cos(2*PI*(i+1)/N), -Ry*sin(2*PI*(i+1)/N)), color);
-      //::log(graphics->lines.last().a, graphics->lines.last().b);
+     {
+      const float x = xSum / N; xSum=0; N=0;
+      const vec2 O = point(vec2(x, 0/*data.values[0]*/));
+      float Rx = abs(point(vec2(x+y/2,0)).x - point(vec2(x-y/2,0)).x);
+      float Ry = abs(point(vec2(x, y/*p.key*/)).y - O.y);
+      const float N = 64;
+      for(float i: range(N/2)) {
+       graphics->lines.append(
+          O+vec2(Rx*cos(2*PI*i/N), -Ry*sin(2*PI*i/N)),
+          O+vec2(Rx*cos(2*PI*(i+1)/N), -Ry*sin(2*PI*(i+1)/N)), color);
+      }
      }
     }
    }

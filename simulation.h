@@ -285,68 +285,8 @@ struct Simulation : System {
   }
  }
 
- /*float volume() {
-  v4sf O = _0f;
-  for(v4sf v : side.Vertex::position) O += v;
-  O /= float4(side.Vertex::position.size); // Origin at center of mesh for stability
-  v4sf volumeSum = _0f;
-  size_t W = side.W;
-  for(size_t faceIndex: range(side.faceCount)) {
-   size_t i = faceIndex/2/W, j = (faceIndex/2)%W;
-   size_t a = i*W+j;
-   size_t b = i*W+(j+1)%W;
-   size_t c =(i+1)*W+j;
-   size_t d = (i+1)*W+(j+1)%W;
-   size_t vertices[2][2][3] {{{a,b,c},{b,d,c}},{{a,d,c},{a,b,d}}};
-   size_t* V = vertices[i%2][faceIndex%2];
-   v4sf A  = side.Vertex::position[V[0]];
-   v4sf B  = side.Vertex::position[V[1]];
-   v4sf C  = side.Vertex::position[V[2]];
-   v4sf volume = ::dot3(A-O, ::cross(B-O, C-O)) / float4(6);
-   //assert(volume[0] >= 0, faceIndex, volume[0], A, B, C, O);
-   volumeSum += volume;
-  }
-  float bottom, top;
-  { // Bottom fan
-   v4sf C = _0f;
-   for(v4sf v : side.Vertex::position.slice(0, W)) C += v;
-   C /= float4(W); // Origin at center of disk for stability
-   bottom = C[2];
-   for(size_t i: range(W)) {
-    v4sf A  = side.Vertex::position[i];
-    v4sf B  = side.Vertex::position[(i+1)%W];
-    v4sf volume = - ::dot3(A-O, ::cross(B-O, C-O)) / float4(6);
-    //assert_(volume[0] >= 0, volume[0], A, B, C, O);
-    volumeSum += volume;
-   }
-  }
-  { // Bottom fan
-   v4sf C = _0f;
-   for(v4sf v : side.Vertex::position.slice(side.Vertex::position.size-W)) C += v;
-   C /= float4(W); // Origin at center of disk for stability
-   top = C[2];
-   for(size_t i: range(side.Vertex::position.size-W, side.Vertex::position.size)) {
-    v4sf A  = side.Vertex::position[i];
-    v4sf B  = side.Vertex::position[(i+1)%W];
-    v4sf volume = ::dot3(A-O, ::cross(B-O, C-O)) / float4(6);
-    //assert_(volume[0] >= 0, volume[0], A, B, C, O);
-    volumeSum += volume;
-   }
-  }
-  float plateHeight = plate.position[1][2] - plate.position[0][2];
-  //assert_(plateHeight > 0);
-  float membraneHeight = top - bottom;
-  //assert_(membraneHeight > 0, top, bottom);
-  //assert_(membraneHeight >= plateHeight, membraneHeight, plateHeight);
-  float volume = volumeSum[0];
-  // Corrects for inaccessible volume clipped by plates
-  if(membraneHeight > plateHeight) volume -= (membraneHeight - plateHeight) * PI * sq(side.initialRadius);
-  // FIXME: Some extra volume between cylinder and membrane remains unclipped
-  return volume;
- }*/
-
  const float pourPackThreshold = 2e-3;
- const float packLoadThreshold = 1e-3;
+ const float packLoadThreshold = 1e-4;
  const float transitionTime = 2*s;
 
  void step() {
@@ -463,8 +403,8 @@ break2_:;
     if(G[2] == 0 && /*alpha==1*/ (timeStep-packStart)*dt > transitionTime && (skip || (
                                                               voidRatio < 0.8 &&
                                                               grainKineticEnergy / grain.count < packLoadThreshold &&
-                                                              (abs(topForce+bottomForce)/(topForce-bottomForce) < 0.1 &&/*||*/
-                                                              abs(topForce+bottomForce) < 10)))) {
+                                                              (//abs(topForce+bottomForce)/(topForce-bottomForce) < 1./2 &&/*||*/
+                                                              abs(topForce+bottomForce) < 100)))) {
      skip = false;
      processState = ProcessState::Load;
      bottomZ0 = plate.position[0][2];
@@ -1028,7 +968,7 @@ break2_:;
     float volume = height * PI * sq(sideGrainRadiusSum/sideGrainCount);
     if(!initialVolume) initialVolume = volume;
     String s = str(displacement/(topZ0-bottomZ0)*100, stress, /*stress-pressure,
-                   (stress-pressure)/(stress+pressure),*/ (1-volume/initialVolume)*100 /*, side.tensionEnergy*/);
+                   (stress-pressure)/(stress+pressure),*/ (volume/initialVolume-1)*100 /*, side.tensionEnergy*/);
     stream.write(s+'\n');
     // Checks if all grains are within membrane
     // FIXME: actually check only with enlarged rigid cylinder

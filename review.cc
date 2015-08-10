@@ -46,6 +46,7 @@ struct ArrayView : Widget {
  function<void(string)> output;
  Folder cache {".cache", currentWorkingDirectory(), true};
  bool useMedianFilter = false;
+ enum { StressPressure, PressureStress, Deviatoric }; size_t plotIndex = Deviatoric;
 
  ArrayView(string valueName, uint textSize=16) : valueName(valueName), textSize(textSize) {
   jobs = qstat(30);
@@ -507,6 +508,10 @@ struct Review {
    view.useMedianFilter=!view.useMedianFilter;
    window->render();
   };
+  window->actions[Key('c')] = [this](){
+   view.plotIndex=(view.plotIndex++)%3;
+   window->render();
+  };
   window->actions[Key('x')] = [this](){
    view.dimensions[0] = array<string>(view.dimensions[0].slice(1) + view.dimensions[0][0]);
    window->render();
@@ -537,14 +542,20 @@ struct Review {
    if(filter.contains(view.dimensions[0].last())) filter.remove(view.dimensions[0].last());
    if(filter.contains(view.dimensions[1].last())) filter.remove(view.dimensions[1].last());
    plot.plotPoints = true, plot.plotLines = false;
-   if(1) {
-    plot.xlabel = "Stress (Pa)"__;
+   if(view.plotIndex==ArrayView::PressureStress) {
     plot.ylabel = "Pressure (Pa)"__;
+    plot.xlabel = "Stress (Pa)"__;
     plot.plotBandsX = true, plot.plotCircles = true;
-   } else {
-    plot.xlabel = "Pressure (Pa)"__;
+    plot.min = 0; plot.max = view.max;
+   } else if(view.plotIndex==ArrayView::StressPressure) {
     plot.ylabel = "Stress (Pa)"__;
+    plot.xlabel = "Pressure (Pa)"__;
     plot.plotBandsY = true;
+   } else if(view.plotIndex==ArrayView::Deviatoric) {
+    plot.ylabel = "Stress + Pressure (Pa)"__;
+    plot.xlabel = "Deviatoric Stress (Pa)"__;
+    plot.plotBandsX = true;
+    //plot.min = 0; plot.max = view.max;
    }
    plot.min.y = 0, plot.max.y = view.max;
    plot.dataSets.clear();
@@ -567,8 +578,17 @@ struct Review {
     auto& dataSet = plot.dataSets[str(shortSet.values," "_,""_)];
     float maxStress = view.points.at(point);
     if(maxStress) {
-     if(1) dataSet.insertSortedMulti(maxStress, float(point.at("Pressure")));
-     else dataSet.insertSortedMulti(float(point.at("Pressure")), maxStress);
+     if(view.plotIndex==ArrayView::Deviatoric) { // TODO: Regression
+      float s1 = maxStress, s3 = float(point.at("Pressure"));
+      dataSet.insertSortedMulti((s1-s3)/2, (s1+s3)/2); // ?
+     } else if(view.plotIndex==ArrayView::PressureStress) {
+       // Pressure (Shear Stress) vs Normal Stress (Peak)) for Mohr's circles
+      dataSet.insertSortedMulti(maxStress, float(point.at("Pressure")));
+     }
+     else if(view.plotIndex==ArrayView::StressPressure) {
+       // Experiment (Peak Stress vs Pressure)
+      dataSet.insertSortedMulti(float(point.at("Pressure")), maxStress);
+     }
     }
    }
    for(auto& key: plot.dataSets.keys) {
@@ -612,15 +632,15 @@ struct Review {
        }
       }
 break2:;
-      if(dataSets.contains("Volumetric Strain (%)") ||
-         dataSets.contains("Volumetric Stress (%)")) { // FIXME: wrong name in old version
+      /*if(dataSets.contains("Volumetric Strain (%)") ||
+         dataSets.contains("Volumetric Stress (%)"))*/ { // FIXME: wrong name in old version
        auto& plot = volumeStrain;
        plot.plotPoints = false, plot.plotLines = true;
        //plot.min.y = 0, plot.max.y = view.max;
        plot.dataSets.clear();
        plot.xlabel = "Strain (%)"__;
        plot.ylabel = /*dataSets.contains("Volumetric Strain (%)")?*/"Volumetric Strain (%)"__;
-                                                                //:"Volumetric Stress (%)"__;
+       //:"Volumetric Stress (%)"__;
        auto& volume = dataSets.at(plot.ylabel);
        //log(volume);
        assert_(volume);
@@ -643,8 +663,9 @@ break2:;
         if(1) { // Normalized deviator stress
          float pressure = point.at("Pressure"_);
          for(float& s: stress) s = (s-pressure)/(s+pressure);
+        } else {
+         plot.min.y = 0; plot.max.y = view.max;
         }
-        else plot.min.y = 0, plot.max.y = view.max;
         assert_(stress.size <= strain.size);
         strain.size = stress.size;
         plot.dataSets.insert(""__, {::copy(strain), ::move(stress)});
@@ -668,8 +689,4 @@ break2:;
   //view.status = [this](string status) { window->setTitle(status); };
   view.output = [this](string output) { this->output = output; };
  }
-}
-#if !RENAME
-app
-#endif
-;
+} app;
