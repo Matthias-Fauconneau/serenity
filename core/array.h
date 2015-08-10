@@ -69,14 +69,14 @@ generic struct array : buffer<T> {
 
     /// Inserts an element at \a index
     template<Type V> T& insertAt(size_t index, V&& e) {
-		assert(int(index)>=0);
-		grow(size+1);
-		if(int(size)-2>=int(index)) {
-			set(size-1, ::move(at(size-2))); // Initializes last slot
-			for(int i=size-3;i>=int(index);i--) at(i+1)= ::move(at(i)); // Shifts elements
-			return at(index) = ::move(e);
-		} else return set(index, ::move(e)); // index==size-1
-	}
+     assert(int(index)>=0);
+     grow(size+1);
+     if(int(size)-2>=int(index)) {
+      set(size-1, ::move(at(size-2))); // Initializes last slot
+      for(int i=size-3;i>=int(index);i--) at(i+1)= ::move(at(i)); // Shifts elements
+      return at(index) = ::move(e);
+     } else return set(index, ::move(e)); // index==size-1
+    }
 	/// Inserts immediately before the first element greater than the argument
     size_t insertSorted(T&& e) { size_t index=reverseLinearSearch(e); insertAt(index, ::move(e)); return index; }
     size_t insertSorted(const T& e) { size_t index=reverseLinearSearch(e); insertAt(index, ::copy(e)); return index; }

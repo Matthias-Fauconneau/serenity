@@ -84,6 +84,7 @@ template<Type K, Type V> struct map {
   return values.insertAt(keys.insertSorted(key),move(value));
  }
  V& insertSortedMulti(K&& key, const V& value) { return values.insertAt(keys.insertSorted(::move(key)),value); }
+ V& insertSortedMulti(const K& key, const V& value) { return values.insertAt(keys.insertSorted(key),value); }
 
  template<Type KK> V& operator [](KK&& key) { size_t i = keys.indexOf(key); return i!=invalid ? values[i] : insertSorted(key); }
  /// Returns value for \a key, inserts a new sorted key with a default value if not existing

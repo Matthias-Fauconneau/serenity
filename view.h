@@ -91,7 +91,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
    SimulationRun(parameters, move(file)),
    Poll(0, POLLIN, simulationThread) {
   if(/*XDisplay::hasServer() &&*/ /*arguments().contains("view")*/1) {
-   window = ::window(this, -1, mainThread, true);
+   window = ::window(this, -1, mainThread, true, false);
    window->actions[F11] = {(SimulationRun*)this, &SimulationRun::report};
    window->actions[F12] = {this, &SimulationView::snapshot};
    window->actions[Return] = [this]{

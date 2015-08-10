@@ -99,6 +99,7 @@ struct Simulation : System {
  ProcessState processState = Pour;
  bool skip = false;
  size_t packStart;
+ float initialVolume = 0;
 
  // Lattice
  vec4f min = _0f, max = _0f;
@@ -129,7 +130,7 @@ struct Simulation : System {
  map<rgb3f, array<vec3>> lines;
 
  Simulation(const Dict& parameters, Stream&& stream) : System(parameters),
-   targetHeight(parameters.at("Height"_)),
+   targetHeight(/*parameters.at("Height"_)*/side.height),
    pattern(parameters.contains("Pattern")?
                    Pattern(ref<string>(patterns).indexOf(parameters.at("Pattern"))):None),
    loopAngle(parameters.value("Angle"_, PI*(3-sqrt(5.)))),
@@ -154,9 +155,6 @@ struct Simulation : System {
    for(size_t n: range(3)) wire.positionDerivatives[n][i] = _0f;
    wire.frictions.set(i);
   }
-  //flock(stream.fd, LOCK_EX);
-  //float height = plate.position[1][2] - plate.position[0][2];
-  //log(volume(), height*PI*sq(side.initialRadius), volume() / (height*PI*sq(side.initialRadius)));
  }
 
  generic vec4f tension(T& A, size_t a, size_t b) {
@@ -287,7 +285,7 @@ struct Simulation : System {
   }
  }
 
- float volume() {
+ /*float volume() {
   v4sf O = _0f;
   for(v4sf v : side.Vertex::position) O += v;
   O /= float4(side.Vertex::position.size); // Origin at center of mesh for stability
@@ -345,11 +343,11 @@ struct Simulation : System {
   if(membraneHeight > plateHeight) volume -= (membraneHeight - plateHeight) * PI * sq(side.initialRadius);
   // FIXME: Some extra volume between cylinder and membrane remains unclipped
   return volume;
- }
+ }*/
 
  const float pourPackThreshold = 2e-3;
- const float packLoadThreshold = 2e-3;
- const float transitionTime = 1*s;
+ const float packLoadThreshold = 1e-3;
+ const float transitionTime = 2*s;
 
  void step() {
   staticFrictionCount2 = staticFrictionCount;
@@ -370,6 +368,9 @@ struct Simulation : System {
     processState = Pack;
     log("Pour->Pack", grain.count, wire.count,  grainKineticEnergy / grain.count*1e6, voidRatio);
     packStart = timeStep;
+    /*float maxZ = 0;
+    for(auto p: grain.position.slice(0, grain.count)) maxZ = ::max(maxZ, p[2]);
+    plate.position[1][2] = ::min(plate.position[1][2], maxZ+Grain::radius);*/
    } else {
     // Generates falling grain (pour)
     const bool useGrain = 1;
@@ -442,9 +443,9 @@ break2_:;
   float topZ = 0;
   for(auto p: grain.position.slice(0, grain.count))
    topZ = ::max(topZ, p[2]+Grain::radius);
-  float alpha = processState == Pack ? ::min(1.f, (timeStep-packStart)*dt / transitionTime) : 1;
+  //float alpha = processState == Pack ? ::min(1.f, (timeStep-packStart)*dt / transitionTime) : 1;
   if(processState == Pack) {
-   //plate.position[1][2] = ::min(plate.position[1][2], topZ); // Fit plate (Prevent initial decompression)
+   plate.position[1][2] = ::min(plate.position[1][2], topZ); // Fits plate (Prevent initial decompression)
    if(G[2] < 0) G[2] += dt/transitionTime * gz; else G[2] = 0;
    if(side.thickness > side.loadThickness)
     side.thickness -= dt/transitionTime * (side.pourThickness-side.loadThickness);
@@ -453,16 +454,17 @@ break2_:;
    side.tensionStiffness = float3(side.elasticModulus * side.internodeLength/(2*sqrt(3.)) * side.thickness);
    //side.tensionDamping = float3(side.mass / s);
 
-   float speed = alpha * plateSpeed;
+   float speed = /*alpha **/ plateSpeed;
    float dz = dt * speed;
    plate.position[1][2] -= dz;
    plate.position[0][2] += dz;
 
    if(parameters.contains("Pressure"_)) {
-    if(G[2] == 0 && side.thickness == side.loadThickness && (skip || (
-                                                              voidRatio < 0.82 &&
+    if(G[2] == 0 && /*alpha==1*/ (timeStep-packStart)*dt > transitionTime && (skip || (
+                                                              voidRatio < 0.8 &&
                                                               grainKineticEnergy / grain.count < packLoadThreshold &&
-                                                              abs(topForce+bottomForce)/(topForce-bottomForce) < 1))) {
+                                                              (abs(topForce+bottomForce)/(topForce-bottomForce) < 0.1 &&/*||*/
+                                                              abs(topForce+bottomForce) < 10)))) {
      skip = false;
      processState = ProcessState::Load;
      bottomZ0 = plate.position[0][2];
@@ -486,7 +488,7 @@ break2_:;
      }
      stream.write(str(results)+"\n");
      //Deviatoric Stress (Pa), Normalized Deviatoric Stress,
-     stream.write("Strain (%), Stress (Pa), Volume (m³)\n"); //, Tension (J)
+     stream.write("Strain (%), Stress (Pa), Volumetric Strain (%)\n"); //, Tension (J)
     }
    } else {
     if(grainKineticEnergy / grain.count < 1e-6 /*1µJ/grain*/) {
@@ -593,19 +595,13 @@ break2_:;
   if(!(isNumber(min) && isNumber(max)) || size[0]*size[1]*size[2] > 128*128*128) {
    log("Domain", min, max, size); processState = Fail; return;
   }
-#define WIRE 1
-#if WIRE
   Lattice<uint16> grainLattice(sqrt(3.)/(2*Grain::radius), min, max);
-#endif
   Grid grainGrid(1/(2*Grain::radius), min, max);
   grainInitializationTime.stop();
-
   grainGridTime.start();
-  parallel_chunk(grain.count, [this,&grainGrid,
-                 #if WIRE
-                 &grainLattice,
-               #endif
-                 &vertexGrid](uint, size_t start, size_t size) {
+  size_t sideGrainCount = 0; float sideGrainRadiusSum = 0;
+  parallel_chunk(grain.count, [this,&grainGrid, &sideGrainCount, &sideGrainRadiusSum,
+                 &grainLattice, &vertexGrid](uint, size_t start, size_t size) {
    for(size_t grainIndex: range(start, start+size)) {
     grain.force[grainIndex] = float4(grain.mass) * G;
     grain.torque[grainIndex] = _0f;
@@ -617,16 +613,19 @@ break2_:;
      log("Bounds", vertexGrid.min, p, vertexGrid.max); processState = Fail; return;
     }
     int2 index = vertexGrid.index2(p);
+    bool sideContact = false;
     for(int y: range(::max(0, index.y-1), ::min(vertexGrid.size.y, index.y+1 +1))) {
      for(int x: range(index.x-1, index.x+1 +1)) {
       // Wraps around (+size.x to wrap -1)
       for(size_t b: vertexGrid.cells[y*vertexGrid.size.x+(x+vertexGrid.size.x)%vertexGrid.size.x])
-       penalty(grain, grainIndex, side, b);
+       if( penalty(grain, grainIndex, side, b) >= 0 ) sideContact = true;
      }
     }
-#if WIRE
+    if(sideContact) {
+     sideGrainCount++;
+     sideGrainRadiusSum += length2(p);
+    }
     grainLattice(grain.position[grainIndex]) = 1+grainIndex;
-#endif
     grainGrid(grain.position[grainIndex]).append(1+grainIndex);
    }
   }, threadCount);
@@ -669,7 +668,7 @@ break2_:;
   }, threadCount);
   grainContactTime.stop();
   grainTime.stop();
-#if WIRE
+
   // Wire
   wireTime.start();
 
@@ -950,12 +949,10 @@ break2_:;
    for(size_t a: range(start, start+size)) wireLattice(wire.position[a]) = 0;
   }, 1);
   wireLatticeTime.stop();
-#endif
 
   // Integration
   min = _0f; max = _0f;
 
-#if WIRE
   wireIntegrationTime.start();
   parallel_chunk(wire.count, [this](uint, size_t start, size_t size) {
    for(size_t i: range(start, start+size)) {
@@ -967,7 +964,6 @@ break2_:;
   }, 1);
   wireIntegrationTime.stop();
   wireTime.stop();
-#endif
 
   grainTime.start();
   grainIntegrationTime.start();
@@ -1029,8 +1025,10 @@ break2_:;
     float displacement = (topZ0-topZ+bottomZ-bottomZ0);
     float stress = (top-bottom)/(2*PI*sq(side.radius));
 
+    float volume = height * PI * sq(sideGrainRadiusSum/sideGrainCount);
+    if(!initialVolume) initialVolume = volume;
     String s = str(displacement/(topZ0-bottomZ0)*100, stress, /*stress-pressure,
-                   (stress-pressure)/(stress+pressure),*/ volume() /*, side.tensionEnergy*/);
+                   (stress-pressure)/(stress+pressure),*/ (1-volume/initialVolume)*100 /*, side.tensionEnergy*/);
     stream.write(s+'\n');
     // Checks if all grains are within membrane
     // FIXME: actually check only with enlarged rigid cylinder
@@ -1127,8 +1125,10 @@ String info() {
  }
  //s.append(" Z:"_+str(int(plate.position[1][2]*1e3)));
  //s.append(" R:"_+str(int(side.radius*1e3)));
- if(processState >= ProcessState::Pack)
+ if(processState >= ProcessState::Pack) {
   s.append(" "_+str(int((topForce+bottomForce)/(topForce-bottomForce)*100), 2u)+"%");
+  s.append(" "_+str(int(abs(topForce+bottomForce))));
+ }
  //s.append(" Om%"_+str(int(overlapMean/(2*Grain::radius)*100)));
  //s.append(" OM%:"+str(int(overlapMax/(2*Grain::radius)*100)));
  s.append(" S/D: "+str(staticFrictionCount2, dynamicFrictionCount2));

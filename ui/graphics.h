@@ -53,10 +53,17 @@ struct Line {
 };
 
 /// Parallelogram graphic element
-struct Trapezoid {
+struct TrapezoidX {
+ struct Span { float y, min, max; } span[2];
+ bgr3f color = black; float opacity = 1;
+ TrapezoidX(Span a, Span b, bgr3f color=black, float opacity=1) : span{a,b}, color(color), opacity(opacity) {}
+};
+
+/// Parallelogram graphic element
+struct TrapezoidY {
  struct Span { float x, min, max; } span[2];
  bgr3f color = black; float opacity = 1;
- Trapezoid(Span a, Span b, bgr3f color=black, float opacity=1) : span{a,b}, color(color), opacity(opacity) {}
+ TrapezoidY(Span a, Span b, bgr3f color=black, float opacity=1) : span{a,b}, color(color), opacity(opacity) {}
 };
 
 struct Cubic {
@@ -77,7 +84,7 @@ struct Rect {
  bool contains(vec2 p) const { return p>=min && p<=max; }
  void extend(vec2 p) { min=::min(min, p); max=::max(max, p); }
 };
-inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min),min(a.max,b.max)); }
+inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min), min(a.max,b.max)); }
 inline String str(const Rect& r) { return "["_+str(r.min)+" - "_+str(r.max)+"]"_; }
 inline Rect operator +(vec2 offset, Rect rect) { return Rect(offset+rect.min,offset+rect.max); }
 
@@ -89,7 +96,8 @@ struct Graphics : shareable {
  array<Blit> blits;
  array<Glyph> glyphs;
  array<Line> lines;
- array<Trapezoid> trapezoids;
+ array<TrapezoidX> trapezoidsX;
+ array<TrapezoidY> trapezoidsY;
  array<Cubic> cubics;
 
  map<vec2, shared<Graphics>> graphics;
@@ -100,7 +108,8 @@ struct Graphics : shareable {
   for(auto& o: fills) o.origin += offset;
   for(auto& o: blits) o.origin += offset;
   for(auto& o: glyphs) o.origin += offset;
-  for(auto& o: trapezoids) for(auto& span: o.span) { span.x+=offset.x; span.min+=offset.y; span.max+=offset.y; }
+  for(auto& o: trapezoidsX) for(auto& span: o.span) { span.y+=offset.y; span.min+=offset.x; span.max+=offset.x; }
+  for(auto& o: trapezoidsY) for(auto& span: o.span) { span.x+=offset.x; span.min+=offset.y; span.max+=offset.y; }
   for(auto& o: lines) { o.a+=offset; o.b+=offset; }
   for(auto& o: cubics) for(vec2& p: o.points) p+=vec2(offset);
  }
@@ -109,7 +118,8 @@ struct Graphics : shareable {
   fills.append(o.fills);
   blits.append(o.blits);
   glyphs.append(o.glyphs);
-  trapezoids.append(o.trapezoids);
+  trapezoidsX.append(o.trapezoidsX);
+  trapezoidsY.append(o.trapezoidsY);
   lines.append(o.lines);
   cubics.append(o.cubics);
  }
@@ -124,5 +134,5 @@ struct Graphics : shareable {
 };
 
 inline String str(const Graphics& o) {
- return str(o.bounds, o.fills.size, o.blits.size, o.glyphs.size, o.lines.size, o.trapezoids.size, o.cubics.size, o.graphics.size());
+ return str(o.bounds, o.fills.size, o.blits.size, o.glyphs.size, o.lines.size, o.trapezoidsX.size, o.trapezoidsY.size, o.cubics.size, o.graphics.size());
 }

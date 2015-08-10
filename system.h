@@ -219,7 +219,7 @@ struct System {
   sconst bool friction = false;
 
   sconst float curvature = 0; // -1/radius?
-  sconst float elasticModulus = 1e10; // 8
+  const float elasticModulus;// = 1e10; // 8
   sconst float density = 1e3;
   const float resolution;
   const float initialRadius;
@@ -236,7 +236,7 @@ struct System {
   const float loadThickness;
   float thickness = pourThickness;
 
-  vec4f tensionStiffness = float3(elasticModulus * internodeLength * sqrt(3.)/2 * thickness); // FIXME
+  vec4f tensionStiffness = float3(2*/*FIXME*/ elasticModulus * internodeLength * sqrt(3.)/2 * thickness); // FIXME
 
   vec4f tensionDamping = _0f; //float3(mass / s);
   //sconst float areaMomentOfInertia = pow4(1*mm); // FIXME
@@ -249,12 +249,14 @@ struct System {
   struct { NoOperation operator[](size_t) const { return {}; }} torque;
 
   Side(float resolution, float initialRadius, float height, float loadThickness, size_t base,
-       float pourThickness=1)
+       float pourThickness=1, float elasticModulus = 1e8)
    : Vertex(base, /*W*H*/int(2*PI*initialRadius/resolution) *
                                          (int(height/resolution*2/sqrt(3.))+1),
             (pourThickness*sqrt(3.)/2*sq(2*PI*initialRadius/int(2*PI*initialRadius/resolution)))*density*densityScale/*1-4*/),
+     elasticModulus(elasticModulus),
      resolution(resolution),
-     initialRadius(initialRadius), height(height),
+     initialRadius(initialRadius),
+     height(height),
      W(int(2*PI*initialRadius/resolution)),
      H(int(height/resolution*2/sqrt(3.))+1),
      pourThickness(pourThickness),
@@ -312,8 +314,9 @@ struct System {
    gz(10/*p.at("G")*/),
    frictionCoefficient(p.at("Friction"_)),
    wire(p.value("Elasticity"_, 0.f), grain.base+grain.capacity),
-   side(Grain::radius/1.7/*(float)p.at("Resolution")*/,
-        p.at("Radius"_), p.at("Height"_), /*p.at("Thickness"_)*/8e-3, wire.base+wire.capacity) {
+   side(Grain::radius/(float)p.value("Resolution",1.7), p.at("Radius"_),
+        /*p.at("Height"_)*/ (float)p.at("Radius"_)*4.f,
+          p.value("Thickness"_, 20e-3), wire.base+wire.capacity, 1, p.value("Side",1e10)) {
   //log("System");
  }
 
@@ -413,7 +416,7 @@ constexpr float System::Wire::radius;
 constexpr float System::Wire::mass;
 constexpr vec4f System::Wire::internodeLength4;
 constexpr float System::Plate::elasticModulus;
-constexpr float System::Side::elasticModulus;
+//constexpr float System::Side::elasticModulus;
 constexpr float System::Grain::elasticModulus;
 constexpr vec4f System::Wire::tensionDamping;
 constexpr float System::RigidSide::elasticModulus;

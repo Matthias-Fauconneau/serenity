@@ -33,6 +33,7 @@ struct ArrayView : Widget {
  map<Dict, String> ids; // Job IDs
  map<Dict, String> states; // Job states
  array<SGEJob> jobs;
+ float minDisplacement = inf, commonDisplacement = 0;
  float min = inf, max = -inf;
  uint textSize;
  vec2 headerCellSize = vec2(80*textSize/16, textSize);
@@ -42,8 +43,9 @@ struct ArrayView : Widget {
  array<Target> targets;
  size_t index = 0;
  function<void(const Dict&)> hover, press;
- function<void(string)> status;
+ function<void(string)> output;
  Folder cache {".cache", currentWorkingDirectory(), true};
+ bool useMedianFilter = false;
 
  ArrayView(string valueName, uint textSize=16) : valueName(valueName), textSize(textSize) {
   jobs = qstat(30);
@@ -93,15 +95,8 @@ struct ArrayView : Widget {
    string id = section(fileName,'.',0,-2);
    string suffix = section(fileName,'.',-2,-1);
    if(!startsWith(suffix,"o") && suffix!="result" && suffix!="working" && suffix!="failed") continue;
-   assert_(id, fileName);
    Dict configuration = parseDict(id);
-   if(!configuration.contains("Seed")) continue;
-   if(!configuration.contains("Pattern")) continue;
-   //if(!existsFile(str(configuration))) continue; // Only with snapshot signal file
-   if(points.contains(configuration)) {
-    //log("Duplicate configuration", configuration);
-    continue;
-   }
+   if(points.contains(configuration)) continue;
    array<char> data;
    if(1 && existsFile(id,cache) && File(id, cache).modifiedTime() >= realTime()-time*60e9)
     data = readFile(id, cache); // FIXME: do not reload old unchanged files
@@ -205,6 +200,7 @@ break2:;
     states.insert(copy(configuration), copyRef(s.word()));
     s.skip(' ');
     displacement = s.decimal();
+    minDisplacement = ::min(minDisplacement, displacement);
     if(displacement>=12.4) states.at(configuration) = "done"__;
    }
    /*if(points.contains(configuration)) {
@@ -213,6 +209,7 @@ break2:;
    } else*/
    points.insert(move(configuration), ref<float>{stress,time,wireDensity,displacement}[index]);
   }
+  commonDisplacement = minDisplacement; // Used on next load
 
   for(const SGEJob& job: jobs) if(!points.contains(job.dict)) {
    //log("Missing output for ", id);
@@ -225,7 +222,7 @@ break2:;
    min = ::min(points.values);
    max = ::max(points.values);
   }
-  dimensions[0] = copyRef(ref<string>{"TimeStep"_, "Radius"_,"Pressure"_});
+  dimensions[0] = copyRef(ref<string>{"TimeStep"_, "Radius"_,"Pressure"_,"Seed"_});
   //dimensions[1] = copyRef(ref<string>{"Wire"_,"Pattern"_,"Angle"_}); // FIXME
   dimensions[1] = copyRef(ref<string>{"Wire"_,"Angle"_,"Pattern"_}); // FIXME
   for(auto& dimensions: this->dimensions) {
@@ -242,40 +239,30 @@ break2:;
   }
   //log(zombies);
 
-  //array<String> failures;
   size_t failureCount = 0, fileCount = 0;
   for(const Dict& key: points.keys) {
    if(states.contains(key) && states.at(key)!="done"_ && !jobs.contains(key)) {
-    //logInfo(key);
-    //failures.append(str(key));
-    for(string name: Folder(".").list(Files)) if(startsWith(name, str(key))) {
+    String id = str(stripSortKeys(key));
+    for(string name: Folder(".").list(Files)) if(startsWith(name, id)) {
      log(name);
      fileCount++;
-     //remove(name);
     }
-    //assert_(existsFile(str(key)+".working"));
-    //remove(str(key)+".working");
     failureCount++;
    }
   }
-  //log(failures.size);
-  log("Failed configuration", failureCount, "files", fileCount);
+  if(failureCount) log("Failed configuration", failureCount, "files", fileCount);
  }
 
  void removeFailed() {
-  //array<String> failures;
   size_t failureCount = 0, fileCount = 0;
   for(const Dict& key: points.keys) {
-   if(states.at(key)!="done"_ && !jobs.contains(key)) {
-    //logInfo(key);
-    //failures.append(str(key));
-    for(string name: Folder(".").list(Files)) if(startsWith(name, str(key))) {
+   if(states.contains(key) && states.at(key)!="done"_ && !jobs.contains(key)) {
+    String id = str(stripSortKeys(key));
+    for(string name: Folder(".").list(Files)) if(startsWith(name, id)) {
      log(name);
      fileCount++;
      remove(name);
     }
-    //assert_(existsFile(str(key)+".working"));
-    //remove(str(key)+".working");
     failureCount++;
    }
   }
@@ -284,13 +271,17 @@ break2:;
  }
 
  void logInfo(const Dict& key) {
-  log(key);
-  if(states.contains(key)) log(states.at(key));
+  String id = str(stripSortKeys(key));
+  //log(id);
+  //if(states.contains(key)) log(states.at(key));
+  auto data = readFile(id, cache);
   if(ids.contains(key)) {
    if(jobs.contains(key)) log(jobs[jobs.indexOf(key)]);
-   String name = str(key)+".o"+str(ids.at(key));
-   if(existsFile(name)) log(section(readFile(name),'\n',-10,-1));
+   String name = id+".o"+str(ids.at(key));
+   if(existsFile(name)) data.append("\n"+section(readFile(name),'\n',-10,-1));
+   else log("Missing output", name);
   }
+  if(output) output(data);
   //for(string name: Folder(".").list(Files)) if(startsWith(name, str(target.coordinates)))
   /*{String name = str(key)+".result";
   if(existsFile(name)) log(section(readFile(name),'\n',-10,-1));}
@@ -483,7 +474,7 @@ break2:;
   if(event == Press && button == LeftButton) {
    for(const auto& target: targets) {
     if(target.rect.contains(cursor)) {
-     //logInfo(target.key);
+     logInfo(target.key);
      press(target.key);
      return true;
     }
@@ -506,11 +497,16 @@ struct Review {
  Plot plot;
  SnapshotView snapshotView;
  Plot stressStrain, volumeStrain;
+ Text output;
  HBox detail {{&plot, &snapshotView}};
  HBox plots {{&stressStrain, &volumeStrain}};
- VBox layout {{&view, &detail, &plots}};
+ VBox layout {{&view, &detail, &plots, &output}};
  unique<Window> window = ::window(&layout, int2(1050, 1050*3/2), mainThread, true);
  Review() {
+  window->actions[Key('m')] = [this](){
+   view.useMedianFilter=!view.useMedianFilter;
+   window->render();
+  };
   window->actions[Key('x')] = [this](){
    view.dimensions[0] = array<string>(view.dimensions[0].slice(1) + view.dimensions[0][0]);
    window->render();
@@ -520,7 +516,11 @@ struct Review {
    window->render();
   };
   window->actions[Delete] = [this]() { view.removeFailed(); view.load(10); window->render(); };
-  window->actions[Return] = [this](){ view.jobs = view.qstat(0); view.load(30); window->render(); };
+  window->actions[Return] = [this](){
+   window->setTitle("Refreshing");
+   view.jobs = view.qstat(0); view.load(0); window->render();
+   window->setTitle(str(view.jobs.size));
+  };
   window->actions[Space] = [this](){
    //remove("plot.pdf"_, home());
    static constexpr float inchMM = 25.4, inchPx = 90;
@@ -533,11 +533,19 @@ struct Review {
   view.hover = [this](const Dict& point) {
    if(view.index!=0) return;
    Dict filter = copy(point);
+   if(filter.contains("Pressure"_)) filter.remove("Pressure");
+   if(filter.contains(view.dimensions[0].last())) filter.remove(view.dimensions[0].last());
    if(filter.contains(view.dimensions[1].last())) filter.remove(view.dimensions[1].last());
-   filter.remove("Pressure");
-   plot.plotPoints = true, plot.plotLines = false, plot.plotBands = true;
-   plot.xlabel = "Pressure (N)"__;
-   plot.ylabel = "Stress (Pa)"__;
+   plot.plotPoints = true, plot.plotLines = false;
+   if(1) {
+    plot.xlabel = "Stress (Pa)"__;
+    plot.ylabel = "Pressure (Pa)"__;
+    plot.plotBandsX = true, plot.plotCircles = true;
+   } else {
+    plot.xlabel = "Pressure (Pa)"__;
+    plot.ylabel = "Stress (Pa)"__;
+    plot.plotBandsY = true;
+   }
    plot.min.y = 0, plot.max.y = view.max;
    plot.dataSets.clear();
    array<Dict> points;
@@ -553,10 +561,15 @@ struct Review {
     Dict shortSet = copy(point);
     for(string dimension: fixed) if(shortSet.contains(dimension)) shortSet.remove(dimension);
     if(shortSet.contains("Pressure")) shortSet.remove("Pressure");
-    shortSet.remove("Seed");
+    if(shortSet.contains(view.dimensions[0].last())) shortSet.remove(view.dimensions[0].last());
+    if(view.dimensions[0].last()=="Radius"_)
+     if(shortSet.contains("Height")) shortSet.remove("Height");
     auto& dataSet = plot.dataSets[str(shortSet.values," "_,""_)];
     float maxStress = view.points.at(point);
-    if(maxStress) dataSet.insertSortedMulti(float(point.at("Pressure")), maxStress);
+    if(maxStress) {
+     if(1) dataSet.insertSortedMulti(maxStress, float(point.at("Pressure")));
+     else dataSet.insertSortedMulti(float(point.at("Pressure")), maxStress);
+    }
    }
    for(auto& key: plot.dataSets.keys) {
     if(key && key[0] < 16) key = copyRef(key.slice(1)); // Strips sort keys
@@ -568,15 +581,12 @@ struct Review {
     map<string, array<float>> dataSets;
     String resultName;
     String id = str(view.stripSortKeys(point));
-    log("ID", id);
     if(existsFile(id+".failed")) resultName = id+".failed";
     if(existsFile(id+".working")) resultName = id+".working";
     if(existsFile(id+".result")) resultName = id+".result";
-    log("resultName", resultName);
     if(resultName) {
      TextData s (readFile(resultName));
      if(s) {
-      log("Results");
       string resultLine = s.line();
       string headerLine;
       if(resultLine.contains('=')) headerLine = s.line();
@@ -602,32 +612,43 @@ struct Review {
        }
       }
 break2:;
+      if(dataSets.contains("Volumetric Strain (%)") ||
+         dataSets.contains("Volumetric Stress (%)")) { // FIXME: wrong name in old version
+       auto& plot = volumeStrain;
+       plot.plotPoints = false, plot.plotLines = true;
+       //plot.min.y = 0, plot.max.y = view.max;
+       plot.dataSets.clear();
+       plot.xlabel = "Strain (%)"__;
+       plot.ylabel = /*dataSets.contains("Volumetric Strain (%)")?*/"Volumetric Strain (%)"__;
+                                                                //:"Volumetric Stress (%)"__;
+       auto& volume = dataSets.at(plot.ylabel);
+       //log(volume);
+       assert_(volume);
+       //if(plot.ylabel=="Volumetric Stress (%)") for(float& v: volume) v = -v;
+       auto& strain = dataSets.at(plot.xlabel);
+       assert_(strain.size == volume.size, strain.size, volume.size);
+       plot.dataSets.insert(""__, {::copy(strain), ::move(volume)});
+      }
+
       {auto& plot = stressStrain;
-       plot.plotPoints = false, plot.plotLines = true, plot.plotBands = false;
-       plot.min.y = 0, plot.max.y = view.max;
+       plot.plotPoints = false, plot.plotLines = true;
+       plot.min.x = 0, plot.max.x = 100./8;
        plot.dataSets.clear();
        plot.xlabel = "Strain (%)"__;
        plot.ylabel = "Stress (Pa)"__;
        auto& stress = dataSets.at(plot.ylabel);
-       if(stress.size <= 2*medianWindowRadius+1) return;
-       stress = medianFilter(stress);
-       auto& strain = dataSets.at(plot.xlabel);
-       assert_(stress.size <= strain.size);
-       strain.size = stress.size;
-       plot.dataSets.insert(""__, {::move(strain), ::move(stress)});
-      }
-      {auto& plot = volumeStrain;
-       plot.plotPoints = false, plot.plotLines = true, plot.plotBands = false;
-       //plot.min.y = 0, plot.max.y = view.max;
-       plot.dataSets.clear();
-       plot.xlabel = "Strain (%)"__;
-       plot.ylabel = "Volumetric Strain (%)"__;
-       auto& volume = dataSets.at("Volume (m³)");
-       assert_(volume);
-       for(float& v: volume) v = (v / volume[0] - 1)*100;
-       auto& strain = dataSets.at(plot.xlabel);
-       assert_(volume.size == volume.size);
-       plot.dataSets.insert(""__, {::move(strain), ::move(volume)});
+       if(stress.size > 2*medianWindowRadius+1) {
+        if(view.useMedianFilter) stress = medianFilter(stress);
+        auto& strain = dataSets.at(plot.xlabel);
+        if(1) { // Normalized deviator stress
+         float pressure = point.at("Pressure"_);
+         for(float& s: stress) s = (s-pressure)/(s+pressure);
+        }
+        else plot.min.y = 0, plot.max.y = view.max;
+        assert_(stress.size <= strain.size);
+        strain.size = stress.size;
+        plot.dataSets.insert(""__, {::copy(strain), ::move(stress)});
+       }
       }
      }
     }
@@ -639,11 +660,13 @@ break2:;
     File file (str(point));
     file.touch(time);
     usleep(300*1000); // FIXME: signal back
-    new (&snapshotView) SnapshotView(str(point));
-   } else new (&snapshotView) SnapshotView();
+   }
+   new (&snapshotView) SnapshotView(str(view.stripSortKeys(point)));
+   //else new (&snapshotView) SnapshotView();
    window->render();
   };
-  view.status = [this](string status) { window->setTitle(status); };
+  //view.status = [this](string status) { window->setTitle(status); };
+  view.output = [this](string output) { this->output = output; };
  }
 }
 #if !RENAME

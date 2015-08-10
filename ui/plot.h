@@ -33,7 +33,7 @@ struct Plot : virtual Widget {
 	String name, xlabel, ylabel;
  bool log[2] = {false, false};
  map<NaturalString, map<float,float>> dataSets;
- bool plotPoints = false, plotLines = true, plotBands = false;
+ bool plotPoints = false, plotLines = true, plotBandsX = false, plotBandsY = false, plotCircles = false;
  LegendPosition legendPosition;
  vec2 min = 0, max = 0;
 };

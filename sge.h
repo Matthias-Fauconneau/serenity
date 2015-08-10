@@ -12,10 +12,12 @@ array<SGEJob> qstat(int time=0/*, bool running=true*/) {
  if(!existsFile(id, cache) || File(id, cache).modifiedTime() < realTime()-time*60e9) {
   Stream stdout;
   int pid;
-  if(hostname=="ifbeval01"_ || !arguments() || !startsWith(arguments()[0],"server-"))
+  if(hostname=="ifbeval01"_ || !arguments() || !startsWith(arguments()[0],"server-")) {
+   if(!which("qstat")) { log("Missing qstat"); return {}; }
    pid = execute(which("qstat"),ref<string>{"-u"_,user(),"-xml"_}, false, currentWorkingDirectory(), &stdout);
-  else
+  } else {
    pid = execute("/usr/bin/ssh",ref<string>{arguments()[0],"qstat"_,"-u"_,user(),"-xml"_}, false, currentWorkingDirectory(), &stdout);
+  }
   array<byte> status;
   for(;;) {
    auto packet = stdout.readUpTo(1<<16);

@@ -121,21 +121,38 @@ void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity, boo
     }
 }
 
-static void trapezoid(const Image& target, Trapezoid::Span s0, Trapezoid::Span s1, bgr3f color, float opacity) {
+static void trapezoidX(const Image& target, TrapezoidX::Span s0, TrapezoidX::Span s1, bgr3f color, float opacity) {
+ if(s0.y > s1.y) swap(s0, s1);
+ for(uint y: range(max(0, int(s0.y)), min(int(target.width), int(s1.y)))) {
+  float x0 = float(s0.min) + float((s1.min - s0.min) * int(y - s0.y)) / float(s1.y - s0.y); // FIXME: step
+  float f0 = floor(x0);
+		int i0 = int(f0);
+  float x1 = float(s0.max) + float((s1.max - s0.max) * int(y - s0.y)) / float(s1.y - s0.y); // FIXME: step
+  float f1 = floor(x1);
+  int i1 = int(f1);
+  if(uint(i0)<target.width) blend(target, i0, y, color, opacity*(1-(x0-f0)));
+  for(uint x: range(max(0,i0+1), min(int(target.width),i1))) { // FIXME: clip once
+   blend(target, x,y, color, opacity); // FIXME: antialias first last column
+		}
+  if(uint(i1)<target.width) blend(target, i1, y, color, opacity*(x1-f1));
+	}
+}
+
+static void trapezoidY(const Image& target, TrapezoidY::Span s0, TrapezoidY::Span s1, bgr3f color, float opacity) {
  if(s0.x > s1.x) swap(s0, s1);
  for(uint x: range(max(0, int(s0.x)), min(int(target.width), int(s1.x)))) {
   float y0 = float(s0.min) + float((s1.min - s0.min) * int(x - s0.x)) / float(s1.x - s0.x); // FIXME: step
-		float f0 = floor(y0);
-		int i0 = int(f0);
+  float f0 = floor(y0);
+  int i0 = int(f0);
   float y1 = float(s0.max) + float((s1.max - s0.max) * int(x - s0.x)) / float(s1.x - s0.x); // FIXME: step
   float f1 = floor(y1);
   int i1 = int(f1);
   if(uint(i0)<target.height) blend(target, x, i0, color, opacity*(1-(y0-f0)));
   for(uint y: range(max(0,i0+1), min(int(target.height),i1))) { // FIXME: clip once
    blend(target, x,y, color, opacity); // FIXME: antialias first last column
-		}
+  }
   if(uint(i1)<target.height) blend(target, x, i1, color, opacity*(y1-f1));
-	}
+ }
 }
 
 // 8bit signed integer (for edge flags)
@@ -214,9 +231,9 @@ void cubic(const Image& target, ref<vec2> sourcePoints, bgr3f color, float opaci
 }
 
 void render(const Image& target, const Graphics& graphics, vec2 offset) {
-    assert_(isNumber(offset)); assert_(isNumber(graphics.offset));
-    offset += graphics.offset;
-    for(const auto& e: graphics.blits) {
+ assert_(isNumber(offset)); assert_(isNumber(graphics.offset));
+ offset += graphics.offset;
+ for(const auto& e: graphics.blits) {
 		if(int2(e.size) == e.image.size) blit(target, int2(round(offset+e.origin)), e.image, e.color, e.opacity);
         //else blit(target, int2(round(offset+e.origin)), resize(int2(round(e.size)), e.image), e.color, e.opacity); // FIXME: subpixel blit
 	}
@@ -226,9 +243,15 @@ void render(const Image& target, const Graphics& graphics, vec2 offset) {
 		Font::Glyph glyph = e.font.font(e.fontSize).render(e.index);
 		if(glyph.image) blit(target, int2(round(offset+e.origin))+glyph.offset, glyph.image, e.color, e.opacity);
 	}
- for(auto e: graphics.trapezoids) {
+ for(TrapezoidX e: graphics.trapezoidsX) {
+  //log(e.span[0].y, e.span[1].y, offset.y);
+  for(TrapezoidX::Span& span: e.span) span.y += offset.y;//, span.min += offset.x, span.max += offset.x;
+  //log(e.span[0].y, e.span[1].y, offset.y);
+  trapezoidX(target, e.span[0], e.span[1], e.color, e.opacity);
+ }
+ for(TrapezoidY e: graphics.trapezoidsY) {
   for(auto& span: e.span) span.x += offset.x, span.min += offset.y, span.max += offset.y;
-  trapezoid(target, e.span[0], e.span[1], e.color, e.opacity);
+  trapezoidY(target, e.span[0], e.span[1], e.color, e.opacity);
  }
   //trapezoid(target, int2(round(offset+e.min)), int2(round(offset+e.max)), e.dy, e.color, e.opacity); HINT
 	for(const auto& e: graphics.cubics) cubic(target, e.points, e.color, e.opacity, offset);

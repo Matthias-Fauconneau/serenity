@@ -15,7 +15,7 @@ uint subExponent(float& value) {
  error("No matching subexponent for"_, value);
 }
 
-vec2 Plot::sizeHint(vec2) { return 1024; }
+vec2 Plot::sizeHint(vec2) { return dataSets||1?1050:0; }
 shared<Graphics> Plot::graphics(vec2 size) {
  vec2 min=vec2(+__builtin_inf()), max=vec2(-__builtin_inf());
  // Computes axis scales
@@ -82,6 +82,11 @@ shared<Graphics> Plot::graphics(vec2 size) {
  // Evaluates margins
  int left=tickLabelSize.x*3./2, top=tickLabelSize.y, bottom=tickLabelSize.y;
  int right=::max(tickLabelSize.x, tickLabelSize.x/2+Text(bold(xlabel)).sizeHint().x);
+ //left=right=top=bottom=::max(::max(::max(left, right), top), bottom);
+ {int margin = (left+right)-(top+bottom);
+  top += margin/2;
+  bottom += margin/2;
+ }
  const int tickLength = 4;
 
  // Evaluates colors
@@ -120,19 +125,19 @@ shared<Graphics> Plot::graphics(vec2 size) {
 
  // Draws axis and ticks
  {vec2 O=vec2(min.x, min.y>0 ? min.y : max.y<0 ? max.y : 0), end = vec2(max.x, O.y); // X
-  graphics->lines.append(round(point(O)), round(point(end)));
+  graphics->lines.append(point(O), point(end));
   for(size_t i: range(tickCount[0]+1)) {
    Tick& tick = ticks[0][i];
-   vec2 p(round(point(vec2(tick.value, O.y))));
+   vec2 p(point(vec2(tick.value, O.y)));
    graphics->lines.append(p, p+vec2(0,-tickLength));
    graphics->graphics.insertMulti(p + vec2(-tick.sizeHint().x/2, -min.y > max.y ? -tick.sizeHint().y : 0), tick.graphics(0));
   }
   {Text text(bold(xlabel),16); graphics->graphics.insert(vec2(int2(point(end))+int2(tickLabelSize.x/2, -text.sizeHint().y/2)), text.graphics(0)); }
  }
  {vec2 O=vec2(min.x>0 ? min.x : max.x<0 ? max.x : 0, min.y), end = vec2(O.x, max.y); // Y
-  graphics->lines.append(round(point(O)), round(point(end)));
+  graphics->lines.append(point(O), point(end));
   for(size_t i: range(tickCount[1]+1)) {
-   vec2 p (round(point(O+(i/float(tickCount[1]))*(end-O))));
+   vec2 p (point(O+(i/float(tickCount[1]))*(end-O)));
    graphics->lines.append(p, p+vec2(tickLength,0));
    Text& tick = ticks[1][i];
    graphics->graphics.insert(p + vec2(-tick.sizeHint().x-left/6, -tick.sizeHint().y/2), tick.graphics(0));
@@ -146,20 +151,19 @@ shared<Graphics> Plot::graphics(vec2 size) {
   assert_(bgr3f(0) <= color && color <= bgr3f(1), color);
   const auto& data = dataSets.values[i];
   buffer<vec2> points = apply(data.size(), [&](size_t i){ return point( vec2(data.keys[i],data.values[i]) ); });
-  if(plotPoints || points.size==1) for(size_t i: range(points.size)) {
-   vec2 p = round(points[i]);
+  if(plotPoints || points.size==1) for(vec2 p: points) {
    if(!isNumber(p)) continue;
    const int pointRadius = 2;
    graphics->lines.append(p-vec2(pointRadius, 0), p+vec2(pointRadius, 0), color);
    graphics->lines.append(p-vec2(0, pointRadius), p+vec2(0, pointRadius), color);
   }
-  if(plotLines && !plotBands) for(size_t i: range(points.size-1)) {
+  if(plotLines && !(plotBandsX || plotBandsY)) for(size_t i: range(points.size-1)) {
    if(!isNumber(points[i]) || !isNumber(points[i+1])) continue;
    graphics->lines.append(points[i], points[i+1], color);
   }
-  if(plotBands && points) {
+  if(plotBandsY && points) { // Y bands
    vec2 O = point(vec2(0,0));
-   Trapezoid::Span span[2] = {{O.x,O.y,O.y},{points[0].x,points[0].y,points[0].y}};
+   TrapezoidY::Span span[2] = {{O.x,O.y,O.y},{points[0].x,points[0].y,points[0].y}};
    for(vec2 p: points.slice(1)) {
     if(p.x == span[1].x) {
      span[1].min = ::min(span[1].min, p.y);
@@ -167,14 +171,57 @@ shared<Graphics> Plot::graphics(vec2 size) {
     } else { // Commit band
      graphics->lines.append(vec2(span[0].x, span[0].min), vec2(span[1].x, span[1].min), color);
      graphics->lines.append(vec2(span[0].x, span[0].max), vec2(span[1].x, span[1].max), color);
-     graphics->trapezoids.append(span[0], span[1], color, 1.f/2);
+     graphics->trapezoidsY.append(span[0], span[1], color, 1.f/2);
      span[0] = span[1];
      span[1] = {p.x, p.y, p.y};
     }
    }
    graphics->lines.append(vec2(span[0].x, span[0].min), vec2(span[1].x, span[1].min), color);
    graphics->lines.append(vec2(span[0].x, span[0].max), vec2(span[1].x, span[1].max), color);
-   graphics->trapezoids.append(span[0], span[1], color, 1.f/2);
+   graphics->trapezoidsY.append(span[0], span[1], color, 1.f/2);
+  }
+  {
+   map<float, float> sortY;
+   for(auto p: data) sortY.insertSortedMulti(p.value, p.key);
+   buffer<vec2> points = apply(sortY.size(), [&](size_t i){ return point(vec2(sortY.values[i],sortY.keys[i]) ); });
+
+   if(plotBandsX && points) { // X bands
+    vec2 O = point(vec2(0,0));
+    TrapezoidX::Span span[2] = {{O.y,O.x,O.x},{points[0].y,points[0].x,points[0].x}};
+    for(vec2 p: points.slice(1)) {
+     if(p.y == span[1].y) {
+      span[1].min = ::min(span[1].min, p.x);
+      span[1].max = ::max(span[1].max, p.x);
+     } else { // Commit band
+      graphics->lines.append(vec2(span[0].min, span[0].y), vec2(span[1].min, span[1].y), color);
+      graphics->lines.append(vec2(span[0].max, span[0].y), vec2(span[1].max, span[1].y), color);
+      graphics->trapezoidsX.append(span[0], span[1], color, 1.f/2);
+      span[0] = span[1];
+      span[1] = {p.y, p.x, p.x};
+     }
+    }
+    graphics->lines.append(vec2(span[0].min, span[0].y), vec2(span[1].min, span[1].y), color);
+    graphics->lines.append(vec2(span[0].max, span[0].y), vec2(span[1].max, span[1].y), color);
+    graphics->trapezoidsX.append(span[0], span[1], color, 1.f/2);
+   }
+   if(plotCircles) {
+    for(size_t i : range(sortY.size())) {
+     //const float x = p.key, y = abs(p.value/*-data.values[0]*/);
+     //const float x = p.value, y = p.key;
+     const float x = sortY.values[i], y = sortY.keys[i];
+     if(i+1<sortY.size() && sortY.keys[i+1]==y && sortY.values[i+1]>x) continue;
+     const vec2 O = point(vec2(x, 0/*data.values[0]*/));
+     float Rx = abs(point(vec2(x+y/2,0)).x - point(vec2(x-y/2,0)).x);
+     float Ry = abs(point(vec2(x, y/*p.key*/)).y - O.y);
+     const float N = 64;
+     for(float i: range(N/2)) {
+      graphics->lines.append(
+         O+vec2(Rx*cos(2*PI*i/N), -Ry*sin(2*PI*i/N)),
+         O+vec2(Rx*cos(2*PI*(i+1)/N), -Ry*sin(2*PI*(i+1)/N)), color);
+      //::log(graphics->lines.last().a, graphics->lines.last().b);
+     }
+    }
+   }
   }
  }
  return graphics;

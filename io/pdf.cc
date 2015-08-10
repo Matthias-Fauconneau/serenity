@@ -182,7 +182,16 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
     content.append(P(line.a)+" m "+P(line.b)+" l S\n");
    }
 
-   for(auto& p: graphics.trapezoids) {
+   for(auto& p: graphics.trapezoidsX) {
+    setColor(bgra4f(p.color, p.opacity));
+    content.append(
+       P(vec2(p.span[0].min, p.span[0].y))+" m"
+      " "+P(vec2(p.span[0].max, p.span[0].y))+" l"
+      " "+P(vec2(p.span[1].max, p.span[1].y))+" l"
+      " "+P(vec2(p.span[1].min, p.span[1].y))+" l"
+      " f\n");
+   }
+   for(auto& p: graphics.trapezoidsY) {
     setColor(bgra4f(p.color, p.opacity));
     content.append(
        P(vec2(p.span[0].x, p.span[0].min))+" m"

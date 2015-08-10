@@ -39,7 +39,7 @@ struct ParameterSweep {
     //if(queued) log("Queued jobs:", "qdel -f"+queued+" &");
    }
    size_t done = 0, running = 0, queued = 0;
-   for(float dt: {2e-5, 1e-5}) {
+   for(float dt: {2e-5}) {
     parameters["TimeStep"__] = String(str(int(round(dt*1e6)))+"µ");
     for(string plateSpeed: {"1e-4"_}) {
      parameters["PlateSpeed"__] = plateSpeed;
@@ -47,33 +47,31 @@ struct ParameterSweep {
       parameters["Friction"__] = frictionCoefficient;
       for(string pattern: ref<string>{"none","helix","cross","loop"}) {
        parameters["Pattern"__] = pattern;
-       for(int pressure: {100,400,1600}) {
+       for(int pressure: {5,10,20,40,80}) {
         parameters["Pressure"__] = String(str(pressure)+"K"_);
-        for(float radius: {0.015,0.020}) {
+        for(float radius: {0.02}) {
          parameters["Radius"__] = radius;
-         parameters["Height"__] = radius*4;
-         for(int seed: {1,2/*,3,4*/}) {
+         //parameters["Height"__] = radius*4;
+         for(int seed: {1,2,3/*,4*/}) {
           parameters["Seed"__] = seed;
           auto add = [&]{
            String id = str(parameters);
            all.append(copyRef(id));
-           //assert_(parseDict(id)==parameters, parseDict(id), parameters);
            if(jobs.contains(parseDict(id)/*parameters*/)) {
             const auto& job = jobs.at(jobs.indexOf(parseDict(id)));
             if(existing.contains(id)) {
-             //log(id, "Run");
              assert_(job.state == "running");
              running++;
             }
             else {
-             //log(id, "Queue");
              assert_(job.state == "pending", job.state, job.id, job.dict, job.elapsed);
              queued++;
             }
             jobs.take(jobs.indexOf(parseDict(id)));
             return;
            }
-           if(existing.contains(id)) {
+           if(existing.contains(id) && existsFile(id+".result") &&
+              File(id+".result").modifiedTime()/second > currentTime()-24*60*60) {
             //log(id, "Done");
             done++;
             return;
@@ -118,23 +116,28 @@ struct ParameterSweep {
     log(runningCount+queuedCount, "jobs are not included in the current sweep parameters");
    }
 
-   {// Archive existing results not in current sweep
-    size_t archive = 0;
+   {// Archive existing results not in current sweep or too old
+    size_t archiveCount = 0, removeCount = 0;
     for(string name: list) {
      if(name=="core"_) { remove("core", "Results"_); continue; }
      string id = name;
      if(endsWith(name, ".result") || endsWith(name, ".working") || find(name, ".o") ||
         endsWith(name, ".wire") || endsWith(name, ".grain") || endsWith(name, ".side"))
       id = section(name,'.',0,-2);
-     if(!all.contains(id)) {
-      assert_(!existsFile(name, "Archive"_));
+     if(!all.contains(id) ||  File(name, "Results"_).modifiedTime()/second < currentTime()-24*60*60) {
+      Folder archive("Archive"_, currentWorkingDirectory(), true);
+      //assert_(!existsFile(name, archive), name);
       log(id);
       if(jobs.contains(parseDict(id))) log("Archiving unused results of still running job");
-      //rename("Results"_, name, "Archive"_, name);
-      archive++;
+      if(existsFile(name, archive)) removeCount++;
+      if(arguments().contains("rename"_)) {
+       if(existsFile(name, archive)) remove(name, archive);
+       rename("Results"_, name, archive, name);
+      }
+      archiveCount++;
      }
     }
-    if(archive) log("Archive", archive, list.size);
+    if(archiveCount) log(removeCount, "Archive", archiveCount, list.size);
    }
 
    map<String, array<Variant>> coordinates = ::coordinates(
@@ -161,7 +164,6 @@ struct ParameterSweep {
      }
      //log("TEST"); break;
     }
-    log("Done:",done, "Running:",running, "Queued",queued, "Missing",missing.size, "=Total:", total);
    } else {
     array<int> jobs;
     int success = 0;
