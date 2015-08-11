@@ -39,7 +39,7 @@ struct ParameterSweep {
     //if(queued) log("Queued jobs:", "qdel -f"+queued+" &");
    }
    size_t done = 0, running = 0, queued = 0;
-   for(float dt: {4e-5}) {
+   for(float dt: {2e-5}) {
     parameters["TimeStep"__] = String(str(int(round(dt*1e6)))+"µ");
     for(string plateSpeed: {"1e-4"_}) {
      parameters["PlateSpeed"__] = plateSpeed;
@@ -47,11 +47,11 @@ struct ParameterSweep {
       parameters["Friction"__] = frictionCoefficient;
       for(string pattern: ref<string>{"none","helix","cross","loop"}) {
        parameters["Pattern"__] = pattern;
-       for(int pressure: {5,10,20,40,80}) {
+       for(int pressure: {80,160,320,640/*,1280*/}) {
         parameters["Pressure"__] = String(str(pressure)+"K"_);
         for(float radius: {0.02}) {
          parameters["Radius"__] = radius;
-         for(int seed: {1,2,3/*,4*/}) {
+         for(int seed: {1,2,3,4,5,6}) {
           parameters["Seed"__] = seed;
           auto add = [&]{
            String id = str(parameters);
@@ -69,8 +69,8 @@ struct ParameterSweep {
             jobs.take(jobs.indexOf(parseDict(id)));
             return;
            }
-           if(existing.contains(id) && existsFile(id+".result") &&
-              File(id+".result").modifiedTime()/second > currentTime()-24*60*60) {
+           if(existing.contains(id) /*&& existsFile(id+".result", "Results"_) &&
+              File(id+".result").modifiedTime()/second > currentTime()-24*60*60*/) {
             //log(id, "Done");
             done++;
             return;

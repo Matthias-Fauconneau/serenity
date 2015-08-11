@@ -93,7 +93,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
   if(/*XDisplay::hasServer() &&*/ /*arguments().contains("view")*/1) {
    window = ::window(this, -1, mainThread, true, false);
    window->actions[F11] = {(SimulationRun*)this, &SimulationRun::report};
-   window->actions[F12] = {this, &SimulationView::snapshot};
+   window->actions[F12] = {(Simulation*)this, &Simulation::snapshot};
    window->actions[Return] = [this]{
     skip = true;
     log("skip", int(processState), "grain", grain.count, "wire", wire.count);
@@ -125,11 +125,11 @@ struct SimulationView : SimulationRun, Widget, Poll {
   step();
  }
 
- void snapshot() override {
-  //Simulation::snapshot();
+ /*void snapshot() override {
+  Simulation::snapshot();
   log("View::snapshot");
   writeFile(name+".png", encodePNG(target.readback()), currentWorkingDirectory(), true);
- }
+ }*/
 
  void step() {
   Simulation::step();

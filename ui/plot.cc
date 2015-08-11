@@ -15,7 +15,13 @@ uint subExponent(float& value) {
  error("No matching subexponent for"_, value);
 }
 
-vec2 Plot::sizeHint(vec2) { return dataSets?1050:0; }
+vec2 Plot::sizeHint(vec2 size) {
+ if(!dataSets) return 0;
+ if(!size) size = 1024;
+ if(plotCircles) return ::min(size.x, size.y); // FIXME: margin.x > margin.y
+ else size.y = ::min(size.y, 3*size.x/4);
+ return size;
+}
 shared<Graphics> Plot::graphics(vec2 size) {
  vec2 min=vec2(+__builtin_inf()), max=vec2(-__builtin_inf());
  // Computes axis scales
@@ -162,8 +168,8 @@ shared<Graphics> Plot::graphics(vec2 size) {
    graphics->lines.append(points[i], points[i+1], color);
   }
   if(plotBandsY && points) { // Y bands
-   vec2 O = point(vec2(0,0));
-   TrapezoidY::Span span[2] = {{O.x,O.y,O.y},{points[0].x,points[0].y,points[0].y}};
+   //vec2 O = point(vec2(0,0));
+   TrapezoidY::Span span[2] = {/*{O.x,O.y,O.y}*/{points[0].x,points[0].y,points[0].y},{points[0].x,points[0].y,points[0].y}};
    for(vec2 p: points.slice(1)) {
     if(p.x == span[1].x) {
      span[1].min = ::min(span[1].min, p.y);
@@ -186,8 +192,8 @@ shared<Graphics> Plot::graphics(vec2 size) {
    buffer<vec2> points = apply(sortY.size(), [&](size_t i){ return point(vec2(sortY.values[i],sortY.keys[i]) ); });
 
    if(plotBandsX && points) { // X bands
-    vec2 O = point(vec2(0,0));
-    TrapezoidX::Span span[2] = {{O.y,O.x,O.x}, {points[0].y,points[0].x,points[0].x}};
+    //vec2 O = point(vec2(0,0));
+    TrapezoidX::Span span[2] = {/*{O.y,O.x,O.x}*/{points[0].y,points[0].x,points[0].x}, {points[0].y,points[0].x,points[0].x}};
     for(vec2 p: points.slice(1)) {
      if(p.y == span[1].y) {
       span[1].min = ::min(span[1].min, p.x);
@@ -227,6 +233,26 @@ shared<Graphics> Plot::graphics(vec2 size) {
      }
     }
    }
+#if 0
+   if(plotFit) {
+    auto f = totalLeastSquare(data.keys, data.values);
+    /*auto& fit = plot.dataSets[str(shortSet.values," "_,""_)];
+    for(auto p: dataSet) {
+     float x = p.key, y = p.value;
+     float X = x + f.a/sq(f.b)*(y - b - a*x);
+     float Y = f.a * X + f.b;
+     fit.insertSortedMulti(X, Y);
+    }*/
+    float x = data.keys.last();
+    graphics->lines.append(point(vec2(0,f.b)), point(vec2(x, f.a*x+f.b)), color);
+   }
+#endif
+  }
+  assert_(dataSets.size() >= fits.size(), dataSets.keys, fits.keys);
+  for(size_t i: range(fits.size())) {
+   float x = dataSets.values[i].keys.last();
+   auto f = fits.values[i];
+   graphics->lines.append(point(vec2(0,f.b)), point(vec2(x, f.a*x+f.b)), colors[i]);
   }
  }
  return graphics;

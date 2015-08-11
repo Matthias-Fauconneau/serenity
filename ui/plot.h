@@ -22,6 +22,8 @@ inline bool operator <(const NaturalString& a, const NaturalString& b) {
  }
 }
 
+struct Fit { float a, b; };
+
 struct Plot : virtual Widget {
     enum LegendPosition { TopLeft, TopRight, BottomLeft, BottomRight };
     Plot(string title=""_, bool plotLines=true, LegendPosition legendPosition=TopRight)
@@ -33,7 +35,9 @@ struct Plot : virtual Widget {
 	String name, xlabel, ylabel;
  bool log[2] = {false, false};
  map<NaturalString, map<float,float>> dataSets;
+ map<NaturalString, Fit> fits;
  bool plotPoints = false, plotLines = true, plotBandsX = false, plotBandsY = false, plotCircles = false;
+ bool plotFit = false;
  LegendPosition legendPosition;
  vec2 min = 0, max = 0;
 };

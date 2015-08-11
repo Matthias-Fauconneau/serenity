@@ -236,7 +236,7 @@ struct System {
   const float loadThickness;
   float thickness = pourThickness;
 
-  vec4f tensionStiffness = float3(2*/*FIXME*/ elasticModulus * internodeLength * sqrt(3.)/2 * thickness); // FIXME
+  vec4f tensionStiffness = float3(1*/*FIXME*/ elasticModulus * internodeLength * sqrt(3.)/2 * thickness); // FIXME
 
   vec4f tensionDamping = _0f; //float3(mass / s);
   //sconst float areaMomentOfInertia = pow4(1*mm); // FIXME
@@ -314,9 +314,9 @@ struct System {
    gz(10/*p.at("G")*/),
    frictionCoefficient(p.at("Friction"_)),
    wire(p.value("Elasticity"_, 0.f), grain.base+grain.capacity),
-   side(Grain::radius/(float)p.value("Resolution",1.7), p.at("Radius"_),
+   side(Grain::radius/(float)p.value("Resolution",1.8), p.at("Radius"_),
         /*p.at("Height"_)*/ (float)p.at("Radius"_)*4.f,
-          p.value("Thickness"_, 20e-3), wire.base+wire.capacity, 1, p.value("Side",1e10)) {
+          p.value("Thickness"_, 10e-3), wire.base+wire.capacity, 1, p.value("Side",1e9)) {
   //log("System");
  }
 
