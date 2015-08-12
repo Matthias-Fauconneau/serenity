@@ -152,9 +152,11 @@ struct WG {
     }
 
     array<Room> rooms; // sorted by score
+    String filterFile = readFile("filter");
+    buffer<string> filter = apply(split(filterFile,"\n"), [](string s){ return s.contains(' ')?section(s,' '):s; });
 
     void evaluate(Room& room) { // FIXME: might be called before contact is filled
-        if(room.price<=410 && find(room.profile,"JUWO"_)) return;
+        if(filter.contains(section(section(room.url.path,'/',-2,-1),'-',0,-3))) return;
         if(parseDate(room.postDate) <= Date(currentTime()-16*24*60*60)) return;
         //if(parseDate(room.startDate) > Date(currentTime()+37*24*60*60)) return;
         Date until = parseDate(room.untilDate);
