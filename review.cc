@@ -60,7 +60,7 @@ struct ArrayView : Widget {
  function<void(string)> output;
  Folder cache {".cache", currentWorkingDirectory(), true};
  bool useMedianFilter = true;
- enum { StressPressure, PressureStress, Deviatoric }; size_t plotIndex = PressureStress;
+ enum { StressPressure, Deviatoric }; size_t plotIndex = Deviatoric;
  bool deviatoric = false;
 
  ArrayView(string valueName, uint textSize=16) : valueName(valueName), textSize(textSize) {
@@ -525,7 +525,7 @@ struct Review {
    window->render();
   };
   window->actions[Key('c')] = [this](){
-   view.plotIndex=(view.plotIndex+1)%3;
+   view.plotIndex=(view.plotIndex+1)%2;
    window->render();
   };
   window->actions[Key('d')] = [this](){
@@ -563,26 +563,20 @@ struct Review {
    if(filter.contains(view.dimensions[1].last())) filter.remove(view.dimensions[1].last());
    plot.plotPoints = true, plot.plotLines = false;
    plot.min = 0; plot.max = 0;
-   if(view.plotIndex==ArrayView::PressureStress) {
-    plot.ylabel = "Pressure (Pa)"__;
-    plot.xlabel = "Stress (Pa)"__;
-    plot.plotBandsX = true;
-    plot.plotBandsY = false;
-    plot.plotCircles = -1;
-    plot.max = view.max;
-   } else if(view.plotIndex==ArrayView::StressPressure) {
+   if(view.plotIndex==ArrayView::StressPressure) {
     plot.ylabel = "Stress (Pa)"__;
     plot.xlabel = "Pressure (Pa)"__;
     plot.plotBandsY = true;
     plot.plotBandsX = false;
-    plot.plotCircles = -1;
+    plot.plotCircles = false;
     plot.min.y = 0, plot.max.y = view.max;
    } else if(view.plotIndex==ArrayView::Deviatoric) {
-    plot.ylabel = "Stress + Pressure (Pa)"__;
-    plot.xlabel = "Deviatoric Stress (Pa)"__;
-    plot.plotBandsX = true;
-    plot.plotBandsY = false;
-    plot.plotCircles = false;
+    plot.ylabel = "Deviatoric Stress (Pa)"__;
+    plot.xlabel = "Pressure (Pa)"__;
+    plot.plotBandsY = true;
+    plot.plotBandsX = false;
+    plot.plotCircles = -1;
+    plot.max = view.max;
    }
    plot.dataSets.clear();
    plot.fits.clear();
@@ -607,27 +601,21 @@ struct Review {
     auto& dataSet = plot.dataSets[::copy(id)];
     float maxStress = view.points.at(point);
     if(maxStress) {
-     float s1 = maxStress, s3 = float(point.at("Pressure"));
-     if(view.plotIndex==ArrayView::Deviatoric) { // TODO: Regression
-      dataSet.insertSortedMulti((s1-s3)/2, (s1+s3)/2); // ?
-     } else if(view.plotIndex==ArrayView::PressureStress) {
-       // Pressure (Shear Stress) vs Normal Stress (Peak)) for Mohr's circles
-      dataSet.insertSortedMulti(maxStress, float(point.at("Pressure")));
-      //deviatorics[copy(id)].insertSortedMulti((s1-s3)/2, (s1+s3)/2); // ?
-     }
-     else if(view.plotIndex==ArrayView::StressPressure) {
-       // Experiment (Peak Stress vs Pressure)
-      dataSet.insertSortedMulti(float(point.at("Pressure")), maxStress);
+     float stress = maxStress, pressure = float(point.at("Pressure"));
+     if(view.plotIndex==ArrayView::Deviatoric) {
+      dataSet.insertSortedMulti(pressure, stress-pressure);
+     } else if(view.plotIndex==ArrayView::StressPressure) {
+      dataSet.insertSortedMulti(pressure, stress);
      }
     }
    }
-   if(view.plotIndex==ArrayView::Deviatoric) {
+   /*if(view.plotIndex==ArrayView::Deviatoric) {
     for(auto entry: plot.dataSets) {
      auto f = totalLeastSquare(entry.value.keys, entry.value.values);
      plot.fits[copy(entry.key)].append(f);
     }
-   }
-   if(view.plotIndex==ArrayView::PressureStress && plot.dataSets) {
+   }*/
+   if(view.plotIndex==ArrayView::Deviatoric && plot.dataSets) {
     const size_t N = 16;
     /*buffer<map<NaturalString, map<float, float>>> tangents (N); tangents.clear();
     buffer<array<Fit>> fits (N); fits.clear();
@@ -680,11 +668,12 @@ struct Review {
        //φ = a;
       }
      }
+     //assert_(!plot.fits[copy(entry.key)]);
      plot.fits[copy(entry.key)].append(bestFit);
      //plot.fits[copy(entry.key)].append(move(fits[bestIndex]));
     }
     //plot.dataSets.append(move(tangents[bestIndex]));
-  }
+   }
    for(auto& key: plot.dataSets.keys) {
     if(key && key[0] < 16) key = copyRef(key.slice(1)); // Strips sort keys
    }

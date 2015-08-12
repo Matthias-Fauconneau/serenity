@@ -236,10 +236,22 @@ shared<Graphics> Plot::graphics(vec2 size) {
     }
    }
   }
-  float max = 0;
-  for(const auto& e: dataSets.values) if(e) max=::max(max, e.keys.last());
+ }
+ {
+  /*float max = 0;
+  for(const auto& e: dataSets.values) if(e) max=::max(max, e.keys.last());*/
+  float x = max.x;
+  map<int, int> done;
+  //for(size_t i: range(fits.size())) for(auto f: fits.values[i]) count[round(atan(f.a, 1)*180/PI)]++;
   for(size_t i: range(fits.size())) for(auto f: fits.values[i]) {
-   graphics->lines.append(point(vec2(0,f.b)), point(vec2(max, f.a*max+f.b)), colors[i]);
+   vec2 B = point(vec2(x, f.a*x+f.b));
+   graphics->lines.append(point(vec2(0,f.b)), B, colors[i]);
+   int value = round(atan(f.a, 1)*180/PI);
+   if(!done[value]) {
+    done[value]++;
+    Text text(str(value)+"°", 16, colors[i]);
+    graphics->graphics.insert(B+vec2(16, -text.sizeHint().y/2), text.graphics(0));
+   }
   }
  }
  return graphics;

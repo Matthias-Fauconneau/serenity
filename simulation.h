@@ -428,7 +428,8 @@ break2_:;
      }
      stream.write(str(results)+"\n");
      //Deviatoric Stress (Pa), Normalized Deviatoric Stress,
-     stream.write("Strain (%), Stress (Pa), Volumetric Strain (%)\n"); //, Tension (J)
+     stream.write("Strain (%), Stress (Pa), Radius (m), Height (m), Radial Force (N), Volumetric Strain (%)"
+                            ", Tension (J)\n");
     }
    } else {
     if(grainKineticEnergy / grain.count < 1e-6 /*1µJ/grain*/) {
@@ -539,8 +540,8 @@ break2_:;
   Grid grainGrid(1/(2*Grain::radius), min, max);
   grainInitializationTime.stop();
   grainGridTime.start();
-  size_t sideGrainCount = 0; float sideGrainRadiusSum = 0;
-  parallel_chunk(grain.count, [this,&grainGrid, &sideGrainCount, &sideGrainRadiusSum,
+  size_t sideGrainCount = 0; float sideGrainRadiusSum = 0; float radialForce = 0;
+  parallel_chunk(grain.count, [this,&grainGrid, &sideGrainCount, &sideGrainRadiusSum, &radialForce,
                  &grainLattice, &vertexGrid](uint, size_t start, size_t size) {
    for(size_t grainIndex: range(start, start+size)) {
     grain.force[grainIndex] = float4(grain.mass) * G;
@@ -554,11 +555,17 @@ break2_:;
     }
     int2 index = vertexGrid.index2(p);
     bool sideContact = false;
+    vec4f radialVector = grain.position[grainIndex]/sqrt(sq3(grain.position[grainIndex]));
     for(int y: range(::max(0, index.y-1), ::min(vertexGrid.size.y, index.y+1 +1))) {
      for(int x: range(index.x-1, index.x+1 +1)) {
       // Wraps around (+size.x to wrap -1)
-      for(size_t b: vertexGrid.cells[y*vertexGrid.size.x+(x+vertexGrid.size.x)%vertexGrid.size.x])
-       if( penalty(grain, grainIndex, side, b) >= 0 ) sideContact = true;
+      for(size_t b: vertexGrid.cells[y*vertexGrid.size.x+(x+vertexGrid.size.x)%vertexGrid.size.x]) {
+       vec4f normalForce = penalty(grain, grainIndex, side, b);
+       if(normalForce[0] || normalForce[1] || normalForce[2]) {
+        sideContact = true;
+        radialForce += dot3(radialVector, normalForce)[0];
+       }
+      }
      }
     }
     if(sideContact) {
@@ -965,10 +972,11 @@ break2_:;
     float displacement = (topZ0-topZ+bottomZ-bottomZ0);
     float stress = (top-bottom)/(2*PI*sq(side.radius));
 
-    float volume = height * PI * sq(sideGrainRadiusSum/sideGrainCount);
+    float radius = sideGrainRadiusSum/sideGrainCount;
+    float volume = height * PI * sq(radius);
     if(!initialVolume) initialVolume = volume;
-    String s = str(displacement/(topZ0-bottomZ0)*100, stress, /*stress-pressure,
-                   (stress-pressure)/(stress+pressure),*/ (volume/initialVolume-1)*100 /*, side.tensionEnergy*/);
+    String s = str(displacement/(topZ0-bottomZ0)*100, stress, radius, height, radialForce,
+                   (volume/initialVolume-1)*100, side.tensionEnergy);
     stream.write(s+'\n');
     // Checks if all grains are within membrane
     // FIXME: actually check only with enlarged rigid cylinder

@@ -236,7 +236,7 @@ struct System {
   const float loadThickness;
   float thickness = pourThickness;
 
-  vec4f tensionStiffness = float3(1*/*FIXME*/ elasticModulus * internodeLength * sqrt(3.)/2 * thickness); // FIXME
+  vec4f tensionStiffness = float3(elasticModulus * internodeLength * sqrt(3.)/2 * thickness); // FIXME
 
   vec4f tensionDamping = _0f; //float3(mass / s);
   //sconst float areaMomentOfInertia = pow4(1*mm); // FIXME
@@ -314,9 +314,9 @@ struct System {
    gz(10/*p.at("G")*/),
    frictionCoefficient(p.at("Friction"_)),
    wire(p.value("Elasticity"_, 0.f), grain.base+grain.capacity),
-   side(Grain::radius/(float)p.value("Resolution",1.8), p.at("Radius"_),
+   side(Grain::radius/(float)p.value("Resolution",1.9), p.at("Radius"_),
         /*p.at("Height"_)*/ (float)p.at("Radius"_)*4.f,
-          p.value("Thickness"_, 10e-3), wire.base+wire.capacity, 1, p.value("Side",1e9)) {
+          p.value("Thickness"_, 10e-3), wire.base+wire.capacity, 1, p.value("Side",5e8)) {
   //log("System");
  }
 
@@ -334,9 +334,9 @@ struct System {
 
  /// Evaluates contact penalty between two objects
  template<Type tA, Type tB>
- float penalty(const tA& A, size_t a, tB& B, size_t b) {
+ vec4f penalty(const tA& A, size_t a, tB& B, size_t b) {
   Contact c = contact(A, a, B, b);
-  if(c.depth >= 0) return -c.depth;
+  if(c.depth >= 0) return _0f; //-c.depth;
   // Stiffness
   const float E = 1/(1/A.elasticModulus+1/B.elasticModulus);
   constexpr float R = 1/(tA::curvature+tB::curvature);
@@ -352,7 +352,8 @@ struct System {
   float normalSpeed = dot3(c.normal, relativeVelocity)[0];
   float fB = - Kb * normalSpeed ; // Damping
   float fN = fK + fB;
-  vec4f force = float3(fN) * c.normal;
+  vec4f normalForce = float3(fN) * c.normal;
+  vec4f force = normalForce;
 
   if(B.friction) {
    Friction& friction = A.frictions[a].add(Friction{B.base+b, _0f, _0f, 0, 0.f});
@@ -406,7 +407,7 @@ struct System {
   /*if(recordContacts) {
    contacts.append(A.base+a, B.base+b, toVec3(c.relativeA), toVec3(c.relativeB), toVec3(force));
   }*/
-  return -c.depth;
+  return normalForce; //-c.depth;
  }
 };
 

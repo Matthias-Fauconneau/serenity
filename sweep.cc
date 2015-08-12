@@ -45,7 +45,7 @@ struct ParameterSweep {
      parameters["PlateSpeed"__] = plateSpeed;
      for(float frictionCoefficient: {0.1}) {
       parameters["Friction"__] = frictionCoefficient;
-      for(string pattern: ref<string>{"none","helix","cross","loop"}) {
+      for(string pattern: ref<string>{"none"/*,"helix","cross","loop"*/}) {
        parameters["Pattern"__] = pattern;
        for(int pressure: {80,160,320,640/*,1280*/}) {
         parameters["Pressure"__] = String(str(pressure)+"K"_);
@@ -54,7 +54,7 @@ struct ParameterSweep {
         for(float radius: radii) {
          if(pressure == 80 && radius==0.05f && pattern!="none"_) continue; // Validation
          parameters["Radius"__] = radius;
-         for(int seed: {1,2,3,4,5,6}) {
+         for(int seed: {1/*,2,3,4,5,6*/}) {
           parameters["Seed"__] = seed;
           auto add = [&]{
            String id = str(parameters);
@@ -72,8 +72,8 @@ struct ParameterSweep {
             jobs.take(jobs.indexOf(parseDict(id)));
             return;
            }
-           if(existing.contains(id) /*&& existsFile(id+".result", "Results"_) &&
-              File(id+".result").modifiedTime()/second > currentTime()-24*60*60*/) {
+           if(existing.contains(id) && existsFile(id+".result", "Results"_) &&
+              File(id+".result", "Results"_).modifiedTime()/second > currentTime()-24*60*60) {
             //log(id, "Done");
             done++;
             return;
