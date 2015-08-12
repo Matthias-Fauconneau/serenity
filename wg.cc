@@ -18,9 +18,11 @@ struct Room {
     String profile;
     String mates;
     String contact;
+    uint duration; // seconds FIXME: ->RouteRequest
+    uint durationBike; // seconds FIXME: ->RouteRequest
     float score;
     unique<LocationRequest> locationRequest = nullptr;
-    function<void(const Room&)> loaded;
+    function<void(Room&)> loaded;
 
     void load(const URL& url, Map&& data) {
         const Element root = parseHTML(data);
@@ -39,7 +41,7 @@ struct Room {
             getURL(url.relative(URL("/show-contact/search-mate-contact?uuid="+id)), {this, &Room::loadContact}, maximumAge);
         }
         locationRequest.pointer = new LocationRequest(address+",+Zürich", {this, &Room::loadLocation}); // FIXME: does not forward properly through unique<T>(Args...)
-    }
+     }
     void loadLocation(string, vec3 location) {
         this->location = location;
         loaded(*this);
@@ -50,20 +52,27 @@ struct Room {
         //assert_(root.children.size>=2, root, data.size, url, this->url);
         contact = root.children[0]->content+" <"+root.children[1]->child("a").content+">";
     }
+    void loadTransit(const URL&, Map&& data) {
+        const Element root = parseXML(data);
+        duration = parseInteger(root("DirectionsResponse")("route")("leg")("duration")("value").content);
+    }
+    void loadBike(const URL&, Map&& data) {
+        const Element root = parseXML(data);
+        durationBike = parseInteger(root("DirectionsResponse")("route")("leg")("duration")("value").content);
+    }
 };
 template<> inline Room copy(const Room& o) {
     return {copy(o.url), copy(o.postDate), copy(o.startDate), copy(o.untilDate), o.price, copy(o.address), o.location, copy(o.description), copy(o.profile), copy(o.mates),
-                copy(o.contact), o.score, nullptr, {}};
+                copy(o.contact), o.duration, o.durationBike, o.score, nullptr, {}};
 }
 inline bool operator <(const Room& a, const Room& b) {
     return a.score < b.score;
 }
 
 struct WG {
-
     array<unique<LocationRequest>> requests;
     map<string, vec3> locations;
-    void loadLocation(string address, vec3 location) { locations.insert(address, location); }
+    void loadLocation(string address, vec3 location) { assert_(location); locations.insert(address, location); }
 
 
     WG() {
@@ -116,46 +125,80 @@ struct WG {
         while(roomIndex < index.size) {
             Room& room = index[roomIndex];
             //log(room.postDate, room.startDate, room.untilDate, room.price);
-            getURL(move(room.url), {&room, &Room::load});
+            getURL(move(room.url), {&room, &Room::load}, maximumAge);
             roomIndex++;
             if(requests) {
                 log(roomIndex+1, "/", index.size);
                 requestCount++;
-                if(requestCount > 512) { timer.setRelative(30*1000); requestCount=0; }
-                else timer.setRelative(400);
+                /*if(requestCount > 512) { timer.setRelative(10*1000); requestCount=0; }
+                else*/ timer.setRelative(400);
                 return;
             }
         }
         //assert_(rooms.size == index.size, rooms.size, index.size);
         for(size_t i: reverse_range(rooms.size)) {
-            const Room& room = rooms[i];
-            for(string address: arguments().slice(1)) {
-                vec3 d = distance(room.location, locations[address]);
-                if(round(d.x) > 23) break;//return;
-                log(str(round(d.x))+"min"_, str(round(d.y)/1000, 1u)+"km", str(round(d.z))+"m", str(room.price)+"Fr", room.address,
-                    room.postDate, room.startDate/*, room.untilDate*/, room.contact, section(section(room.url.path,'/',-2,-1),'-',0,-3));
-            }
+            Room& room = rooms[i];
+            /*uint duration = ::min(room.duration, room.durationBike);
+            if(!room.duration) for(string address: arguments().slice(1)) {
+                vec3 d = distance(room.location, locations.at(address+",+Zürich"));
+                room.duration = d.x;
+            }*/
+            uint duration = ::min(room.duration, room.durationBike);
+            log(str(round(duration/60.))+"min"_/*, str(round(d.y)/1000, 1u)+"km", str(round(d.z))+"m"*/, str(room.price)+"Fr", room.address,
+                    room.postDate, room.startDate/*, room.untilDate*/, room.contact,
+                    room.url.host.slice(4)+room.url.path/*section(section(room.url.path,'/',-2,-1),'-',0,-3)*/
+                    );
         }
     }
 
     array<Room> rooms; // sorted by score
 
-    void evaluate(const Room& room) { // FIXME: might be called before contact is filled
-        bool recent = parseDate(room.postDate) >= Date(currentTime()-24*60*60);
-        if(!recent) {
-            if(parseDate(room.startDate) > Date(currentTime()+37*24*60*60)) return;
-            Date until = parseDate(room.untilDate);
-            if(until && until < Date(currentTime()+/*30*/85*24*60*60)) return;
-        }
-        float score = room.price/17.;
+    void evaluate(Room& room) { // FIXME: might be called before contact is filled
+        if(room.price<=410 && find(room.profile,"JUWO"_)) return;
+        if(parseDate(room.postDate) <= Date(currentTime()-16*24*60*60)) return;
+        //if(parseDate(room.startDate) > Date(currentTime()+37*24*60*60)) return;
+        Date until = parseDate(room.untilDate);
+        if(until && until < Date(currentTime()+26*24*60*60)) return;
+
+        //bool recent = parseDate(room.postDate) >= Date(currentTime()-24*60*60);
+        /*if(!recent) {
+            //if(parseDate(room.startDate) > Date(currentTime()+37*24*60*60)) return;
+            //Date until = parseDate(room.untilDate);
+            //if(until && until < Date(currentTime()+30*24*60*60)) return;
+        }*/
+        const float c = 17;
+        float score = room.price/c;
         for(string address: arguments().slice(1)) {
-            vec3 d = distance(room.location, locations[address]);
-            if(!recent && d.x > 20) return;
-            score += d.x;
+            vec3 d = distance(room.location, locations.at(address+",+Zürich"));
+            score += d.y/17*60/1000;
         }
-        if(!recent && score > 50) return;
+        //if(!recent && score > 50) return;
+        //log(room.address, score, score-room.price/c);
+        if(round(score) > 70) return;
+        float accScore = room.price/c;
+        for(string address: arguments().slice(1)) {
+            // Requests route for more accurate evaluation (next time if not already cached)
+            Date arrival(currentTime());
+            arrival.hours = 19, arrival.minutes = 0, arrival.seconds = 0;
+            getURL(URL("https://maps.googleapis.com/maps/api/directions/xml?key="_+key+
+                   "&origin="+replace(address," ","+")+",+Zürich"
+                   "&destination="+replace(room.address," ","+")+",+Zürich"
+                   "&mode=transit&arrival_time="+str((int64)arrival)),
+                   {&room, &Room::loadTransit});
+            getURL(URL("https://maps.googleapis.com/maps/api/directions/xml?key="_+key+
+                   "&origin="+replace(room.address," ","+")+",+Zürich"
+                   "&destination="+replace(address," ","+")+",+Zürich"
+                   "&mode=bicycling"),
+                   {&room, &Room::loadBike});
+            uint duration = ::min(room.duration, room.durationBike);
+            if(!duration) { accScore=0; break; }
+            if(duration > 682) return;
+            accScore += duration/60.;
+            //log(room.address, duration, accScore, accScore-room.price/c);
+        }
+        if(accScore > 71) return;
         Room copy = ::copy(room);
-        copy.score = score;
+        copy.score = accScore?:score;
         rooms.insertSorted(move(copy));
     }
 } app;

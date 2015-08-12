@@ -24,19 +24,6 @@ TCPSocket::TCPSocket(uint host, uint16 port) : Socket(PF_INET,SOCK_STREAM|SOCK_N
     fcntl(Socket::fd, F_SETFL, 0);
 }
 
-/*extern "C" {
-struct SSL;
-int SSL_library_init();
-struct SSLContext* SSL_CTX_new(const struct SSLMethod* method);
-const SSLMethod* TLSv1_client_method();
-SSL* SSL_new(SSLContext *ctx);
-int SSL_set_fd(SSL*, int fd);
-int SSL_state(SSL*);
-int SSL_connect(SSL*);
-int SSL_shutdown(SSL*);
-int SSL_read(SSL*, void* buf, int num);
-int SSL_write(SSL*, const void* buf, int num);
-}*/
 #include <openssl/ssl.h> // ssl
 SSLSocket::SSLSocket(uint host, uint16 port, bool secure) : TCPSocket(host,port) {
     if(secure && fd) {
@@ -314,8 +301,8 @@ void getURL(URL&& url, function<void(const URL&, Map&&)> handler, int maximumAge
         }
         headers.append( "If-Modified-Since: "_+str(Date(modified),"ddd, dd MMM yyyy hh:mm:ss TZD"_) );
     }
-    for(const unique<HTTP>& request: requests) if(request->url == url) error("Duplicate request", url);
-    if(requests.size>1) error("Concurrent request limit", requests.size);
+    for(const unique<HTTP>& request: requests) if(request->url == url) { log("Duplicate request", url); return; }
+    if(requests.size>5) error("Concurrent request limit", requests.size);
     requests.append( unique<HTTP>(move(url),handler,move(headers)) );
 }
 

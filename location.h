@@ -1,7 +1,7 @@
 #pragma once
 
 static string key = arguments()[0];
-constexpr int maximumAge = 7*24;
+constexpr int maximumAge = 14*24;
 
 struct LocationRequest {
     String address;
@@ -19,6 +19,7 @@ struct LocationRequest {
         Element root = parseXML(data);
         const auto& xmlLocation = root("GeocodeResponse")("result")("geometry")("location");
         vec2 location(parseDecimal(xmlLocation("lat").content), parseDecimal(xmlLocation("lng").content));
+        assert_(location);
         this->location = vec3(location, 0);
         getURL(URL("https://maps.googleapis.com/maps/api/elevation/xml?key="_+key+"&locations="+str(location.x)+","+str(location.y)),
                 {this, &LocationRequest::parseElevation}, maximumAge);
@@ -31,6 +32,7 @@ struct LocationRequest {
     void parseElevation(const URL&, Map&& data) {
         Element root = parseXML(data);
         location.z = parseDecimal(root("ElevationResponse")("result")("elevation").content);
+        assert_(location);
         handler(address, location);
     }
 };
