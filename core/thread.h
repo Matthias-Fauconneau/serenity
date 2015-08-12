@@ -114,6 +114,7 @@ struct Poll : pollfd {
     void queue();
     /// Callback on new poll events (or when thread is idle when triggered by \a queue)
     virtual void event() abstract;
+    bool wait();
 };
 
 /// Pollable semaphore

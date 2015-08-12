@@ -154,25 +154,18 @@ String cacheFile(const URL& url) {
 
 // HTTP
 
-struct HTTP;
-array<unique<HTTP>> requests; // weakly referenced by Thread::array<Poll*>
 
 /// Asynchronously fetches a file over HTTP
 struct HTTP : DataStream<SSLSocket>, Poll, TextData {
     /// Connects to \a host and requests \a path
     /// \note \a headers and \a content will be added to request
     /// \note If \a secure is true, an SSL connection will be used
-    HTTP(URL&& url, function<void(const URL&, Map&&)> handler, array<String>&& headers)
-        : DataStream<SSLSocket>(resolve(url.host),url.scheme=="https"_?443:80,url.scheme=="https"_), Poll(Socket::fd,POLLOUT),
-          url(move(url)), headers(move(headers)), handler(handler) {
-        if(!Socket::fd) { error("Unknown host",this->url.host); done(); return; }
-        registerPoll();
-    }
+    HTTP(URL&& url, function<void(const URL&, Map&&)> handler, array<String>&& headers);
 
    void request();
    void header();
    void event() override;
-   void done() { state=Done; /*while(requests.contains(this))*/ requests.remove(this); }
+   void done();
 
    // Request
    URL url;
@@ -187,6 +180,15 @@ struct HTTP : DataStream<SSLSocket>, Poll, TextData {
    function<void(const URL&, Map&&)> handler;
    enum { Request, Header, Content, Cache, Handle, Done } state = Request;
 };
+
+array<unique<HTTP>> requests; // weakly referenced by Thread::array<Poll*>
+
+HTTP::HTTP(URL&& url, function<void(const URL&, Map&&)> handler, array<String>&& headers)
+    : DataStream<SSLSocket>(resolve(url.host),url.scheme=="https"_?443:80,url.scheme=="https"_), Poll(Socket::fd,POLLOUT),
+      url(move(url)), headers(move(headers)), handler(handler) {
+    if(!Socket::fd) { error("Unknown host",this->url.host); done(); return; }
+    registerPoll();
+}
 
 void HTTP::request() {
     String request = (url.post?"POST"_:"GET"_)+" "_+(startsWith(url.path,"/"_)?""_:"/"_)+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\n"
@@ -283,9 +285,11 @@ void HTTP::event() {
     if(state==Handle) { handler(url,Map(cacheFile(url),cache())); done(); return; }
 }
 
+void HTTP::done() { state=Done; /*while(requests.contains(this))*/ if(requests.contains(this)) requests.remove(this); /*else was synchronous request*/ }
+
 // Requests
 
-void getURL(URL&& url, function<void(const URL&, Map&&)> handler, int maximumAge) {
+Map getURL(URL&& url, function<void(const URL&, Map&&)> handler, int maximumAge, bool wait) {
     assert(url.host,url);
     String file = cacheFile(url);
     array<String> headers;
@@ -296,14 +300,23 @@ void getURL(URL&& url, function<void(const URL&, Map&&)> handler, int maximumAge
         long modified = file.modifiedTime()/1000000000ull;
         if(currentTime()-modified < maximumAge*60*60) {
             //log("Cached", url);
-            handler(url,Map(file));
-            return;
+            if(!handler) return Map(file);
+            handler(url, Map(file));
+            return {};
         }
         headers.append( "If-Modified-Since: "_+str(Date(modified),"ddd, dd MMM yyyy hh:mm:ss TZD"_) );
     }
-    for(const unique<HTTP>& request: requests) if(request->url == url) { log("Duplicate request", url); return; }
+    for(const unique<HTTP>& request: requests) if(request->url == url) { log("Duplicate request", url); return {}; }
     if(requests.size>5) error("Concurrent request limit", requests.size);
-    requests.append( unique<HTTP>(move(url),handler,move(headers)) );
+    if(wait) {
+        HTTP request(move(url),handler,move(headers));
+        while(request.state < HTTP::Handle) assert_(request.wait(), request.events, request.revents);
+        if(!handler) return Map(cacheFile(request.url),cache());
+        handler(move(request.url), Map(cacheFile(request.url),cache()));
+    } else {
+        requests.append( unique<HTTP>(move(url),handler,move(headers)) );
+    }
+    return {};
 }
 
 #if 0

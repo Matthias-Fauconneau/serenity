@@ -132,22 +132,47 @@ Date parseDate(TextData& s) {
          if(s.match(months[i]) || s.match(months[i].slice(0,3))) { date.month=i; goto continue2_; }
         } /*else */ if(s.available(1) && s.peek()>='0'&&s.peek()<='9') {
             int number = s.integer();
-            if(s.match(":")) { date.hours=number; date.minutes=s.integer(); if(s.match(":")) date.seconds=s.integer(); }
-            else if(s.match('h')) { date.hours=number; date.minutes= (s.available(2)>=2 && isInteger(s.peek(2)))? s.integer() : 0; }
+            if(s.match(":")) {
+                assert_(date.hours==-1 && date.minutes==1);
+                date.hours=number; date.minutes=s.integer();
+                if(s.match(":")) {
+                    assert_(date.seconds==-1);
+                    date.seconds=s.integer();
+                }
+            }
+            else if(s.match('h')) {
+                assert_(date.hours==-1 && date.minutes==1);
+                date.hours=number; date.minutes=(s.available(2)>=2 && isInteger(s.peek(2)))? s.integer() : 0;
+            }
             else if(s.match("/")) {
-             date.month=number; date.day=s.integer();
-             if(s.match("/")) date.year=s.integer();
+                assert_(date.day==-1 && date.month==-1);
+                date.month=number; date.day=s.integer();
+                if(s.match("/")) {
+                    assert_(date.year==-1);
+                    date.year=s.integer();
+                }
             }
             else if(s.match("-")) {
-             date.year=number; date.month=s.integer()-1;
-             if(s.match("-")) date.day=s.integer()-1;
-             s.match('T');
+                assert_(date.year==-1 && date.month==-1);
+                date.year=number; date.month=s.integer()-1;
+                if(s.match("-")) {
+                    assert_(date.day==-1);
+                    date.day=s.integer()-1;
+                }
+                s.match('T');
             }
             else if(s.match(".")) {
-             date.day=number-1;
-             if(s.peek()>='0'&&s.peek()<='9') {
-                 date.month=s.integer()-1;
-                 if(s.match(".")) date.year=s.integer();
+             if(date.day==-1) {
+                 date.day=number-1;
+                 if(s.peek()>='0'&&s.peek()<='9') {
+                     assert_(date.month==-1);
+                     date.month=s.integer()-1;
+                     if(s.match(".")) date.year=s.integer();
+                 }
+             } else {
+                 assert_(date.year==-1);
+                 assert_(number>31, number, s);
+                 date.year=number;
              }
             }
             else if(date.day==-1) date.day=number-1;
