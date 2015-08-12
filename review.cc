@@ -31,6 +31,7 @@ inline Fit totalLeastSquare(ref<float> X, ref<float> Y) {
  assert_(X.size == Y.size);
  float mx = mean(X), my = mean(Y);
  size_t N = X.size;
+ if(N<=1) return {0,0};
  assert_(N>1);
  float sxx=0; for(float x: X) sxx += sq(x-mx); sxx /= (N-1);
  float sxy=0; for(size_t i: range(N)) sxy += (X[i]-mx)*(Y[i]-my); sxy /= (N-1);
@@ -59,7 +60,7 @@ struct ArrayView : Widget {
  function<void(string)> output;
  Folder cache {".cache", currentWorkingDirectory(), true};
  bool useMedianFilter = true;
- enum { StressPressure, PressureStress, Deviatoric }; size_t plotIndex = StressPressure;
+ enum { StressPressure, PressureStress, Deviatoric }; size_t plotIndex = PressureStress;
  bool deviatoric = false;
 
  ArrayView(string valueName, uint textSize=16) : valueName(valueName), textSize(textSize) {
@@ -567,14 +568,14 @@ struct Review {
     plot.xlabel = "Stress (Pa)"__;
     plot.plotBandsX = true;
     plot.plotBandsY = false;
-    plot.plotCircles = true;
+    plot.plotCircles = -1;
     plot.max = view.max;
    } else if(view.plotIndex==ArrayView::StressPressure) {
     plot.ylabel = "Stress (Pa)"__;
     plot.xlabel = "Pressure (Pa)"__;
     plot.plotBandsY = true;
     plot.plotBandsX = false;
-    plot.plotCircles = false;
+    plot.plotCircles = -1;
     plot.min.y = 0, plot.max.y = view.max;
    } else if(view.plotIndex==ArrayView::Deviatoric) {
     plot.ylabel = "Stress + Pressure (Pa)"__;
@@ -623,60 +624,66 @@ struct Review {
    if(view.plotIndex==ArrayView::Deviatoric) {
     for(auto entry: plot.dataSets) {
      auto f = totalLeastSquare(entry.value.keys, entry.value.values);
-     plot.fits[copy(entry.key)] = f;
+     plot.fits[copy(entry.key)].append(f);
     }
    }
-   if(view.plotIndex==ArrayView::PressureStress) {
-#if 0
-    for(auto entry: deviatorics) {
-     auto f = totalLeastSquare(entry.value.keys, entry.value.values);
-     float a = f.a, b = f.b;
-     /*float φ = asin(f.a);
-     float A = tan(φ);
-     float B = f.b/cos(φ);*/
-     float A = (1-a)/(1+a);
-     float B = (-1-a)*b;
-     log(A, B);
-     assert_(isNumber(A) && isNumber(B), A, B/*, φ, f.a, f.b*/);
-     plot.fits.insertSorted(entry.key+" fit"_, {A, B});
-     /*for(auto p: dataSet) {
-      float x = p.key, y = p.value;
-      float X = x + f.a/sq(f.b)*(y - b - a*x);
-      float Y = f.a * X + f.b;
-      fit.insertSortedMulti(X, Y);
-     }*/
-    }
-#else
+   if(view.plotIndex==ArrayView::PressureStress && plot.dataSets) {
+    const size_t N = 16;
+    /*buffer<map<NaturalString, map<float, float>>> tangents (N); tangents.clear();
+    buffer<array<Fit>> fits (N); fits.clear();
+    size_t bestIndex = 0;*/
     for(auto entry: plot.dataSets) {
-     const auto& X = entry.value.keys, &Y = entry.value.values;
+
+     map<float, float> sortY;
+     for(auto p: entry.value) sortY.insertSortedMulti(p.value, p.key);
+
+     //const auto& X = entry.value.keys, &Y = entry.value.values;
+     const auto& Y = sortY.keys, &X = sortY.values;
      buffer<float> x (X.size), y (Y.size);
-     const size_t N = 16;
+
      float bestSSR = inf; //φ = 0,
      Fit bestFit;
-     for(size_t i: range(N)) {
-      float φ = PI/2*i/N;
+     for(size_t angleIndex: range(N)) {
+      float φ = PI/2*angleIndex/N;
       for(size_t i: range(X.size)) { x[i] = X[i] - Y[i]*sin(φ); y[i] = Y[i]*cos(φ); }
       auto f = totalLeastSquare(x, y);
       float a=f.a, b=f.b;
       float SSR = 0;
+      //float lastY = 0;
       for(size_t i: range(X.size)) {
-       if(1) {
+       //if(y[i] == lastY) continue; lastY=y[i];
+       /*if(0) {
         float xi = x[i] + a*(y[i]-(a*x[i]+b));
         SSR += sq(y[i]-(a*xi+b)) + sq(x[i]-xi);
-       } else {
-        // TODO: Distance to circle tangent point
+       } else*/ { // Distance to circle tangent point
+        float xi = (X[i] - a*b) / (a*a + 1);
+        float yi = a*xi + b;
+        float R = Y[i];
+        float r = sqrt(sq(xi-X[i])+sq(yi));
+        float d = R - r;
+        //assert_(r > 0, R, d, r);
+        /*float xt = X[i] + R/r*(xi-X[i]);
+        float yt = 0 + R/r*(yi-0);
+        tangents[angleIndex][copy(entry.key)+" fit"].insertSortedMulti(xi, yi);
+        tangents[angleIndex][copy(entry.key)+" tangent"].insertSortedMulti(xt, yt);
+        //fits[angleIndex].append({-1/a, Y[i]/a});
+        {float a = yi/(xi-X[i]); float b = -a*X[i]; fits[angleIndex].append({a,b});}
+        plot.plotCircles = 1;
+        plot.plotBandsX = false;*/
+        SSR +=  d;
        }
       }
       if(SSR < bestSSR) {
        bestSSR = SSR;
        bestFit = f;
+       //bestIndex = angleIndex;
        //φ = a;
       }
      }
-     plot.fits[copy(entry.key)] = bestFit;
+     plot.fits[copy(entry.key)].append(bestFit);
+     //plot.fits[copy(entry.key)].append(move(fits[bestIndex]));
     }
-#endif
-    //plot.plotFit = true;
+    //plot.dataSets.append(move(tangents[bestIndex]));
   }
    for(auto& key: plot.dataSets.keys) {
     if(key && key[0] < 16) key = copyRef(key.slice(1)); // Strips sort keys
@@ -784,5 +791,6 @@ break2:;
   };
   //view.status = [this](string status) { window->setTitle(status); };
   view.output = [this](string output) { this->output = output; };
+  view.hover(view.parseDict("Pressure=80K,Radius=0.02,Seed=4,TimeStep=20µ,Angle=,Pattern=none,Wire="_));
  }
 } app;

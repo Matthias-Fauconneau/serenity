@@ -126,7 +126,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
    if(log[axis]) p[axis] = log2(p[axis]);
    p[axis] = (p[axis]-lmin)/(lmax-lmin);
   }
-  return vec2(left+p.x*(size.x-left-right),2*top+(1-p.y)*(size.y-2*top-bottom));
+  return vec2(left+p.x*(size.x-left-right),/*2**/top+(1-p.y)*(size.y-/*2**/top-bottom));
  };
 
  // Draws axis and ticks
@@ -210,15 +210,17 @@ shared<Graphics> Plot::graphics(vec2 size) {
     graphics->lines.append(vec2(span[0].max, span[0].y), vec2(span[1].max, span[1].y), color);
     graphics->trapezoidsX.append(span[0], span[1], color, 1.f/2);
    }
-   if(plotCircles) {
-    float xSum = 0, N = 0;
+   if(i < plotCircles) {
+    float xSum = 0, N = 0; //float lastY=0;
     for(size_t i : range(sortY.size())) {
+     const float x = sortY.values[i], y = sortY.keys[i];
+
+     //if(y==lastY) continue; lastY=y;// DEBUG
      //const float x = p.key, y = abs(p.value/*-data.values[0]*/);
      //const float x = p.value, y = p.key;
-     const float x = sortY.values[i], y = sortY.keys[i];
      xSum += x;
      N++;
-     if(i+1<sortY.size() && sortY.keys[i+1]==y && sortY.values[i+1]>x) continue;
+     //if(i+1<sortY.size() && sortY.keys[i+1]==y && sortY.values[i+1]>x) continue;
      {
       const float x = xSum / N; xSum=0; N=0;
       const vec2 O = point(vec2(x, 0/*data.values[0]*/));
@@ -228,31 +230,16 @@ shared<Graphics> Plot::graphics(vec2 size) {
       for(float i: range(N/2)) {
        graphics->lines.append(
           O+vec2(Rx*cos(2*PI*i/N), -Ry*sin(2*PI*i/N)),
-          O+vec2(Rx*cos(2*PI*(i+1)/N), -Ry*sin(2*PI*(i+1)/N)), color);
+          O+vec2(Rx*cos(2*PI*(i+1)/N), -Ry*sin(2*PI*(i+1)/N)), color, 1.f/colors.size);
       }
      }
     }
    }
-#if 0
-   if(plotFit) {
-    auto f = totalLeastSquare(data.keys, data.values);
-    /*auto& fit = plot.dataSets[str(shortSet.values," "_,""_)];
-    for(auto p: dataSet) {
-     float x = p.key, y = p.value;
-     float X = x + f.a/sq(f.b)*(y - b - a*x);
-     float Y = f.a * X + f.b;
-     fit.insertSortedMulti(X, Y);
-    }*/
-    float x = data.keys.last();
-    graphics->lines.append(point(vec2(0,f.b)), point(vec2(x, f.a*x+f.b)), color);
-   }
-#endif
   }
-  assert_(dataSets.size() >= fits.size(), dataSets.keys, fits.keys);
-  for(size_t i: range(fits.size())) {
-   float x = dataSets.values[i].keys.last();
-   auto f = fits.values[i];
-   graphics->lines.append(point(vec2(0,f.b)), point(vec2(x, f.a*x+f.b)), colors[i]);
+  float max = 0;
+  for(const auto& e: dataSets.values) if(e) max=::max(max, e.keys.last());
+  for(size_t i: range(fits.size())) for(auto f: fits.values[i]) {
+   graphics->lines.append(point(vec2(0,f.b)), point(vec2(max, f.a*max+f.b)), colors[i]);
   }
  }
  return graphics;

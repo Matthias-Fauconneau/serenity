@@ -100,7 +100,7 @@ inline Dict parseDict(TextData& s) {
   string key = s.whileNo(":=|},"_);
   string value; s.whileAny(" "_);
   if(s.matchAny(":="_)) { s.whileAny(" "_); value = s.whileNo("|,} "_,'{','}'); }
-  assert_(key && value, "'"+key+"'", "'"+value+"'", "'"+s.slice(s.index)+"'", "'"+s.data+"'");
+  assert_(key /*&& value*/, "'"+key+"'", "'"+value+"'", "'"+s.slice(s.index)+"'", "'"+s.data+"'");
   if(!dict.contains(key)) dict.insertSorted(copyRef(key), replace(copyRef(value),'\\','/'));
   else {
    if(dict.at(key)==value) log("Duplicate entry with same value", key, value);

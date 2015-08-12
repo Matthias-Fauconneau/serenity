@@ -404,7 +404,7 @@ break2_:;
                                                               voidRatio < 0.8 &&
                                                               grainKineticEnergy / grain.count < packLoadThreshold &&
                                                               (//abs(topForce+bottomForce)/(topForce-bottomForce) < 1./2 &&/*||*/
-                                                              abs(topForce+bottomForce) < 100)))) {
+                                                              abs(topForce+bottomForce) < 200)))) {
      skip = false;
      processState = ProcessState::Load;
      bottomZ0 = plate.position[0][2];

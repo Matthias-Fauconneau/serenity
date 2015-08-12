@@ -322,7 +322,8 @@ Cursor Text::cursorFromPosition(vec2 size, vec2 position) {
 		// After last stop
 		if(position.x >= line.last().center) return {lineIndex, line.size};
 	}
-	return {lines.size-1, lineStops(lines.last()).size};
+ if(!lines) return {0,0};
+ return {lines.size-1, lineStops(lines.last()).size};
 }
 
 bool Text::mouseEvent(vec2 position, vec2 size, Event event, Button button, Widget*&) {

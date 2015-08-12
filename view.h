@@ -28,7 +28,7 @@ struct SimulationRun : Simulation {
   while(processState < Done) {
    if(timeStep%size_t(1e-1/dt) == 0) {
     if(processState  < Load && timeStep*dt > 6*60) { log("6min limit"); break; }
-    if(processState  < Load && time.toReal() > 16*60*60) { log("16h limit"); break; }
+    if(processState  < Load && time.toReal() > 24*60*60) { log("24h limit"); break; }
     report();
     log(info());
    }

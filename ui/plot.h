@@ -35,9 +35,9 @@ struct Plot : virtual Widget {
 	String name, xlabel, ylabel;
  bool log[2] = {false, false};
  map<NaturalString, map<float,float>> dataSets;
- map<NaturalString, Fit> fits;
- bool plotPoints = false, plotLines = true, plotBandsX = false, plotBandsY = false, plotCircles = false;
- bool plotFit = false;
+ map<NaturalString, array<Fit>> fits;
+ bool plotPoints = false, plotLines = true, plotBandsX = false, plotBandsY = false;
+ size_t plotCircles = 0;
  LegendPosition legendPosition;
  vec2 min = 0, max = 0;
 };
