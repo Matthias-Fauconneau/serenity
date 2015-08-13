@@ -210,7 +210,7 @@ struct System {
   const float bendStiffness = 10*/*FIXME*/ elasticModulus * areaMomentOfInertia / internodeLength;
   sconst float mass = Wire::density * Wire::volume;
   sconst float bendDamping = 0; //mass / s;
-  float tensionEnergy=0;
+  //float tensionEnergy=0;
   Wire(float elasticModulus, size_t base) :
     Vertex{base, 1<<17, Wire::mass}, elasticModulus(elasticModulus) {}
  } wire;
@@ -242,7 +242,7 @@ struct System {
   //sconst float areaMomentOfInertia = pow4(1*mm); // FIXME
   const float bendStiffness = 0;//elasticModulus * areaMomentOfInertia / internodeLength; // FIXME
 
-  float tensionEnergy = 0, tensionEnergy2 = 0;
+  //float tensionEnergy = 0, tensionEnergy2 = 0;
 
   struct { v4sf operator[](size_t) const { return _0f; } } position;
 
@@ -316,14 +316,14 @@ struct System {
    wire(p.value("Elasticity"_, 0.f), grain.base+grain.capacity),
    side(Grain::radius/(float)p.value("Resolution",2), p.at("Radius"_),
         /*p.at("Height"_)*/ (float)p.at("Radius"_)*4.f,
-          p.value("Thickness"_, 10e-3), wire.base+wire.capacity, 1, p.value("Side",1e9)) {
+          p.value("Thickness"_, 1e-2), wire.base+wire.capacity, 1, p.value("Side",1e9)) {
   //log("System");
  }
 
  // Update
  size_t timeStep = 0;
- float grainKineticEnergy=0, wireKineticEnergy=0, normalEnergy=0,
-         staticEnergy=0, bendEnergy=0;
+ float grainKineticEnergy=0, wireKineticEnergy=0, normalEnergy=0, staticEnergy=0;
+ //bendEnergy=0;
 
  /*bool recordContacts = false;
  struct ContactForce { size_t a, b; vec3 relativeA, relativeB; vec3 force; };

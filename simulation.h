@@ -161,7 +161,7 @@ struct Simulation : System {
   vec4f relativePosition = A.Vertex::position[a] - A.Vertex::position[b];
   vec4f length = sqrt(sq3(relativePosition));
   vec4f x = length - A.internodeLength4;
-  A.tensionEnergy += 1./2 * A.tensionStiffness[0] * sq3(x)[0];
+  //A.tensionEnergy += 1./2 * A.tensionStiffness[0] * sq3(x)[0];
   vec4f fS = - A.tensionStiffness * x;
   assert(length[0], a, b);
   vec4f direction = relativePosition/length;
@@ -427,9 +427,8 @@ break2_:;
       results.insert("Wire density (%)"__, wireDensity*100);
      }
      stream.write(str(results)+"\n");
-     //Deviatoric Stress (Pa), Normalized Deviatoric Stress,
-     stream.write("Strain (%), Stress (Pa), Radius (m), Height (m), Radial Force (N), Volumetric Strain (%)"
-                            ", Tension (J)\n");
+     //stream.write("Strain (%), Stress (Pa), Radius (m), Height (m), Radial Force (N), Tension (J)\n");
+     stream.write("Radius (m), Height (m), Plate Force (N), Radial Force (N)\n");
     }
    } else {
     if(grainKineticEnergy / grain.count < 1e-6 /*1µJ/grain*/) {
@@ -454,8 +453,9 @@ break2_:;
   }
 
   // Energies
-  side.tensionEnergy2 = side.tensionEnergy;
-  normalEnergy=0, staticEnergy=0, wire.tensionEnergy=0, side.tensionEnergy=0, bendEnergy=0;
+  //side.tensionEnergy2 = side.tensionEnergy;
+  normalEnergy=0, staticEnergy=0;
+  //wire.tensionEnergy=0, side.tensionEnergy=0, bendEnergy=0;
 
   // Plate
   plate.force[0] = _0f;
@@ -741,7 +741,7 @@ break2_:;
      float length = length4[0];
      if(length) {
       float angle = atan(length, dot3(a, b)[0]);
-      bendEnergy += 1./2 * wire.bendStiffness * sq(angle);
+      //bendEnergy += 1./2 * wire.bendStiffness * sq(angle);
       vec4f p = float3(wire.bendStiffness * angle);
       vec4f dap = cross(a, c) / (sqrt(sq3(a)) * length4);
       vec4f dbp = cross(b, c) / (sqrt(sq3(b)) * length4);
@@ -813,7 +813,7 @@ break2_:;
      float length = length4[0];
      if(length) {
       float angle = atan(length, dot3(a, b)[0]);
-      bendEnergy += 1./2 * wire.bendStiffness * sq(angle);
+      //bendEnergy += 1./2 * wire.bendStiffness * sq(angle);
       vec4f p = float3(wire.bendStiffness * angle);
       vec4f dap = cross(a, c) / (sqrt(sq3(a)) * length4);
       vec4f dbp = cross(b, c) / (sqrt(sq3(b)) * length4);
@@ -879,7 +879,7 @@ break2_:;
       float length = length4[0];
       if(length) {
        float angle = atan(length, dot3(a, b)[0]);
-       bendEnergy += 1./2 * wire.bendStiffness * sq(angle);
+       //bendEnergy += 1./2 * wire.bendStiffness * sq(angle);
        vec4f p = float3(wire.bendStiffness * angle);
        vec4f dbp = cross(b, c) / (sqrt(sq3(b)) * length4);
        wire.force[i-1] += p * (-dbp);
@@ -964,20 +964,24 @@ break2_:;
 
   if(processState==ProcessState::Load) {
    if(size_t((1./60)/dt)==0 || timeStep%size_t((1./60)/dt) == 0) { // Records results
-    v4sf wireLength = _0f;
+    /*v4sf wireLength = _0f;
     for(size_t i: range(wire.count-1))
-     wireLength += sqrt(sq3(wire.position[i]-wire.position[i+1]));
-    float bottom = plate.force[0][2], top = plate.force[1][2];
-    float bottomZ = plate.position[0][2], topZ = plate.position[1][2];
-    float displacement = (topZ0-topZ+bottomZ-bottomZ0);
-    float stress = (top-bottom)/(2*PI*sq(side.radius));
+     wireLength += sqrt(sq3(wire.position[i]-wire.position[i+1]));*/
+    //float bottom = plate.force[0][2];
+    //float top = plate.force[1][2];
+    //float bottomZ = plate.position[0][2];
+    //float topZ = plate.position[1][2];
+    //float displacement = height0-height;
+    //float plateForce = top-bottom;
+    //float stress = (top-bottom)/(2*PI*sq(side.radius));
 
     float radius = sideGrainRadiusSum/sideGrainCount;
-    float volume = height * PI * sq(radius);
-    if(!initialVolume) initialVolume = volume;
-    String s = str(displacement/(topZ0-bottomZ0)*100, stress, radius, height, radialForce,
-                   (volume/initialVolume-1)*100, side.tensionEnergy);
-    stream.write(s+'\n');
+    float plateForce = plate.force[1][2]-plate.force[0][2];
+    //float volume = height * PI * sq(radius);
+    //if(!initialVolume) initialVolume = volume;
+    //(volume/initialVolume-1)*100
+    //displacement/(topZ0-bottomZ0)*100
+    stream.write(str(radius, height, plateForce, radialForce)+'\n'); //, side.tensionEnergy
     // Checks if all grains are within membrane
     // FIXME: actually check only with enlarged rigid cylinder
     for(vec4f p: grain.position.slice(0, grain.count)) {
@@ -1080,7 +1084,7 @@ String info() {
  //s.append(" Om%"_+str(int(overlapMean/(2*Grain::radius)*100)));
  //s.append(" OM%:"+str(int(overlapMax/(2*Grain::radius)*100)));
  s.append(" S/D: "+str(staticFrictionCount2, dynamicFrictionCount2));
- s.append(" T: "+str(int(side.tensionEnergy2))+"J");
+ //s.append(" T: "+str(int(side.tensionEnergy2))+"J");
  //if(debug) s.append(" "+debug);
  return move(s);
 }

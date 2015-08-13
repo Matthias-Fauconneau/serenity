@@ -25,19 +25,18 @@ inline bool operator <(const NaturalString& a, const NaturalString& b) {
 struct Fit { float a, b; };
 
 struct Plot : virtual Widget {
-    enum LegendPosition { TopLeft, TopRight, BottomLeft, BottomRight };
-    Plot(string title=""_, bool plotLines=true, LegendPosition legendPosition=TopRight)
-		: name(copyRef(title)), plotPoints(!plotLines), plotLines(plotLines), legendPosition(legendPosition) {}
-	String title() override { return copyRef(name); }
+ enum LegendPosition { TopLeft, TopRight, BottomLeft, BottomRight };
+ Plot(string title=""_, bool plotLines=true, LegendPosition legendPosition=TopRight)
+  : name(copyRef(title)), plotPoints(!plotLines), plotLines(plotLines), legendPosition(legendPosition) {}
+ String title() override { return copyRef(name); }
  vec2 sizeHint(vec2) override;
  shared<Graphics> graphics(vec2 size) override;
 
-	String name, xlabel, ylabel;
+ String name, xlabel, ylabel;
  bool log[2] = {false, false};
  map<NaturalString, map<float,float>> dataSets;
  map<NaturalString, array<Fit>> fits;
- bool plotPoints = false, plotLines = true, plotBandsX = false, plotBandsY = false;
- size_t plotCircles = 0;
+ bool plotPoints, plotLines, plotBandsX = false, plotBandsY = false, plotCircles = false;
  LegendPosition legendPosition;
  vec2 min = 0, max = 0;
 };

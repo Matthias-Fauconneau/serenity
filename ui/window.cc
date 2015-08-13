@@ -124,13 +124,10 @@ XWindow::~XWindow() {
 void XWindow::onEvent(const ref<byte> ge) {
  const X11::Event& event = *(X11::Event*)ge.data;
  uint8 type = event.type&0b01111111; //msb set if sent by SendEvent
- /*if(type==MotionNotify) { heldEvent = unique<XEvent>(event); queue(); }
- else*/ {
-  /*if(heldEvent) { processEvent(heldEvent); heldEvent=nullptr; }
-        // Ignores autorepeat
-  if(heldEvent && heldEvent->type==KeyRelease && heldEvent->time==event.time && type==KeyPress) heldEvent=nullptr;
-  if(type==KeyRelease) { heldEvent = unique<XEvent>(event); queue(); } // Hold release to detect any repeat
-  else*/ if(processEvent(event)) {}
+ if(type==MotionNotify) { heldEvent = unique<X11::Event>(event); Window::queue(); }
+ else {
+  if(heldEvent) { processEvent(heldEvent); heldEvent=nullptr; }
+  if(processEvent(event)) {}
   else if(type==GenericEvent && event.genericEvent.ext == Present::EXT && event.genericEvent.type==Present::CompleteNotify) {
    const auto& completeNotify = *(struct Present::CompleteNotify*)&event;
    assert_(sizeof(X11::Event)+event.genericEvent.size*4 == sizeof(completeNotify),
@@ -238,6 +235,7 @@ void XWindow::setSize(int2 /*size*/) { /*send(SetSize{.id=id+Window, .w=uint(siz
 
 void XWindow::event() {
  XDisplay::event();
+ if(heldEvent) { processEvent(heldEvent); heldEvent = nullptr; }
  setTitle(getTitle ? getTitle() : widget->title());
  if(state!=Idle || !mapped) return;
 

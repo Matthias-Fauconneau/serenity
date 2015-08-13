@@ -157,7 +157,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
   assert_(bgr3f(0) <= color && color <= bgr3f(1), color);
   const auto& data = dataSets.values[i];
   buffer<vec2> points = apply(data.size(), [&](size_t i){ return point( vec2(data.keys[i],data.values[i]) ); });
-  if(plotPoints || points.size==1) for(vec2 p: points) {
+  if(plotPoints || points.size==1 || plotBandsX || plotBandsY) for(vec2 p: points) {
    if(!isNumber(p)) continue;
    const int pointRadius = 2;
    graphics->lines.append(p-vec2(pointRadius, 0), p+vec2(pointRadius, 0), color);
@@ -210,17 +210,13 @@ shared<Graphics> Plot::graphics(vec2 size) {
     graphics->lines.append(vec2(span[0].max, span[0].y), vec2(span[1].max, span[1].y), color);
     graphics->trapezoidsX.append(span[0], span[1], color, 1.f/2);
    }
-   if(i < plotCircles) {
-    float xSum = 0, N = 0; //float lastY=0;
+   if(plotCircles) {
+    float xSum = 0, N = 0;
     for(size_t i : range(sortY.size())) {
      const float x = sortY.values[i], y = sortY.keys[i];
 
-     //if(y==lastY) continue; lastY=y;// DEBUG
-     //const float x = p.key, y = abs(p.value/*-data.values[0]*/);
-     //const float x = p.value, y = p.key;
      xSum += x;
      N++;
-     //if(i+1<sortY.size() && sortY.keys[i+1]==y && sortY.values[i+1]>x) continue;
      {
       const float x = xSum / N; xSum=0; N=0;
       const vec2 O = point(vec2(x, 0/*data.values[0]*/));
@@ -238,11 +234,8 @@ shared<Graphics> Plot::graphics(vec2 size) {
   }
  }
  {
-  /*float max = 0;
-  for(const auto& e: dataSets.values) if(e) max=::max(max, e.keys.last());*/
   float x = max.x;
   map<int, int> done;
-  //for(size_t i: range(fits.size())) for(auto f: fits.values[i]) count[round(atan(f.a, 1)*180/PI)]++;
   for(size_t i: range(fits.size())) for(auto f: fits.values[i]) {
    vec2 B = point(vec2(x, f.a*x+f.b));
    graphics->lines.append(point(vec2(0,f.b)), B, colors[i]);

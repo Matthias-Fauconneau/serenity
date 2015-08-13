@@ -39,68 +39,74 @@ struct ParameterSweep {
     //if(queued) log("Queued jobs:", "qdel -f"+queued+" &");
    }
    size_t done = 0, running = 0, queued = 0;
-   for(float dt: {2e-5}) {
+   for(float dt: {2e-5, 4e-5}) {
     parameters["TimeStep"__] = String(str(int(round(dt*1e6)))+"µ");
-    for(string plateSpeed: {"1e-4"_}) {
+    for(string plateSpeed: {"1e-4"_/*,"2e-4"_*/}) {
      parameters["PlateSpeed"__] = plateSpeed;
      for(float frictionCoefficient: {0.1}) {
       parameters["Friction"__] = frictionCoefficient;
       for(string pattern: ref<string>{"none"/*,"helix","cross","loop"*/}) {
        parameters["Pattern"__] = pattern;
-       for(int pressure: {80,160,320,640/*,1280*/}) {
+       for(int pressure: {80,160/*,320*//*,640*//*,1280*/}) {
         parameters["Pressure"__] = String(str(pressure)+"K"_);
-        array<float> radii = copyRef(ref<float>{0.02});
+        array<float> radii = copyRef(ref<float>{0.02,0.03/*,0.04*/});
         if(pressure == 80) radii.append(0.05); // Validation
         for(float radius: radii) {
          if(pressure == 80 && radius==0.05f && pattern!="none"_) continue; // Validation
          parameters["Radius"__] = radius;
-         for(int seed: {1,2,3/*,4,5,6*/}) {
-          parameters["Seed"__] = seed;
-          auto add = [&]{
-           String id = str(parameters);
-           all.append(copyRef(id));
-           if(jobs.contains(parseDict(id)/*parameters*/)) {
-            const auto& job = jobs.at(jobs.indexOf(parseDict(id)));
-            if(job.state == "running") {
-             //assert_(job.state == "running");
-             //if(!existing.contains(id)) log("Moved");
-             running++;
-            }
-            else {
-             assert_(job.state == "pending", job.state, job.id, job.dict, job.elapsed);
-             //if(existing.contains(id)) log("Existing");
-             queued++;
-            }
-            jobs.take(jobs.indexOf(parseDict(id)));
-            return;
-           }
-           if(existing.contains(id)
-              //&& existsFile(id+".result", "Results"_) && File(id+".result", "Results"_).modifiedTime()/second > currentTime()-24*60*60
-              ) {
-            //log(id, "Done");
-            done++;
-            return;
-           }
-           missing.append(move(id));
-          };
-          if(pattern == "none") add();
-          else {
-           for(float wireElasticModulus: {1e8}) {
-            parameters["Elasticity"__] = String(str(int(round(wireElasticModulus/1e8)))+"e8");
-            for(string wireDensity: {"6%"_,"12%"_}) {
-             parameters["Wire"__] = wireDensity;
-             if(pattern == "helix") add();
-             else {
-              for(float angle: {1.2, 2.4/*PI*(3-sqrt(5.))*/, 3.6}) {
-               parameters["Angle"__] = angle;
-               add();
+         for(string thickness: ref<string>{"5e-3"_, "10e-3"/*, "20e-3"*/}) {
+          parameters["Thickness"__] = thickness;
+          for(string side: ref<string>{/*"5e8",*/"10e8","20e8"}) {
+           parameters["Side"__] = side;
+           for(int seed: {1,2,3/*,4,5,6*/}) {
+            parameters["Seed"__] = seed;
+            auto add = [&]{
+             String id = str(parameters);
+             all.append(copyRef(id));
+             if(jobs.contains(parseDict(id)/*parameters*/)) {
+              const auto& job = jobs.at(jobs.indexOf(parseDict(id)));
+              if(job.state == "running") {
+               //assert_(job.state == "running");
+               //if(!existing.contains(id)) log("Moved");
+               running++;
               }
-              parameters.remove("Angle"_);
+              else {
+               assert_(job.state == "pending", job.state, job.id, job.dict, job.elapsed);
+               //if(existing.contains(id)) log("Existing");
+               queued++;
+              }
+              jobs.take(jobs.indexOf(parseDict(id)));
+              return;
              }
+             if(existing.contains(id)
+                //&& existsFile(id+".result", "Results"_) && File(id+".result", "Results"_).modifiedTime()/second > currentTime()-24*60*60
+                ) {
+              //log(id, "Done");
+              done++;
+              return;
+             }
+             missing.append(move(id));
+            };
+            if(pattern == "none") add();
+            else {
+             for(float wireElasticModulus: {1e8}) {
+              parameters["Elasticity"__] = String(str(int(round(wireElasticModulus/1e8)))+"e8");
+              for(string wireDensity: {"6%"_,"12%"_}) {
+               parameters["Wire"__] = wireDensity;
+               if(pattern == "helix") add();
+               else {
+                for(float angle: {1.2, 2.4/*PI*(3-sqrt(5.))*/, 3.6}) {
+                 parameters["Angle"__] = angle;
+                 add();
+                }
+                parameters.remove("Angle"_);
+               }
+              }
+              parameters.remove("Wire"_);
+             }
+             parameters.remove("Elasticity"_);
             }
-            parameters.remove("Wire"_);
            }
-           parameters.remove("Elasticity"_);
           }
          }
         }
@@ -154,7 +160,6 @@ struct ParameterSweep {
    Random random;
    if(existsFile("serenity/queue.sh")) {
     size_t total = done+running+queued+missing.size;
-    log("Done:",done, "Running:",running, "Queued",queued, "Missing",missing.size, "=Total:", total);
     while(missing) {
      if(arguments().contains("pretend"_)) {
       Dict shortSet = parseDict(missing.take(random%missing.size));
@@ -169,6 +174,7 @@ struct ParameterSweep {
      }
      //log("TEST"); break;
     }
+    log("Done:",done, "Running:",running, "Queued",queued, "Missing",missing.size, "=Total:", total);
    } else {
     array<int> jobs;
     int success = 0;
