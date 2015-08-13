@@ -36,7 +36,7 @@ inline String str(const Time& num, const Time& div) { return str(int(round(100*n
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;
     int weekDay=-1;
-    void invariant() const;
+    void invariant(string s=""_) const;
     /// Default constructs an undetermined date
     Date(){}
     /// Constructs a calendar date (unspecified hour)

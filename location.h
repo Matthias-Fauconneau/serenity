@@ -54,9 +54,11 @@ struct DirectionsRequest {
     }
     void parse(const URL& url, string data, uint& duration) {
         Element root = parseXML(data);
-        assert_(root("DirectionsResponse")("status").content=="OK", root, cacheFile(url));
-        duration = parseInteger(root("DirectionsResponse")("route")("leg")("duration")("value").content);
-        //assert_(duration || &duration==&transit /*FIXME: check whether address location are close*/, parseXML(data), origin, destination, url);
+        if(root("DirectionsResponse")("status").content!="NOT_FOUND"_) {
+            assert_(root("DirectionsResponse")("status").content=="OK", root, cacheFile(url));
+            duration = parseInteger(root("DirectionsResponse")("route")("leg")("duration")("value").content);
+            //assert_(duration || &duration==&transit /*FIXME: check whether address location are close*/, parseXML(data), origin, destination, url);
+        }
         if(transit && bicycling) { this->duration=min(transit, bicycling); if(handler) handler(origin, destination, duration); }
     }
 };

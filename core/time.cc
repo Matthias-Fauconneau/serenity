@@ -19,11 +19,14 @@ int daysInMonth(int month, int year=0) {
     return daysPerMonth[month];
 }
 
-void Date::invariant() const {
+void Date::invariant(string s) const {
     //Date
-    if(year!=-1) { assert(inRange(2012, year, 2099), year); }
-    if(month!=-1) { assert(year!=-1); assert(inRange(0, month, 12)); }
-    if(day!=-1) { assert(month!=-1); assert(inRange(0, day, daysInMonth(month,year)),day,daysInMonth(month,year), month, year);  }
+    if(year!=-1) { assert(inRange(2012, year, 2099), year, s); }
+    if(month!=-1) { assert(year!=-1); assert(inRange(0, month, 12), month, s); }
+    if(day!=-1) {
+        assert(month!=-1);
+        assert(inRange(0, day, daysInMonth(month,year)), day, daysInMonth(month,year), month, year, s);
+    }
     if(weekDay!=-1) {
         assert(inRange(0, weekDay, 7));
         if(year!=-1 && month!=-1 && day!=-1) {
@@ -129,7 +132,12 @@ Date parseDate(TextData& s) {
     for(;;) {
         s.whileAny(" ,\t");
         for(int i=0;i<12;i++) {
-         if(s.match(months[i]) || s.match(months[i].slice(0,3))) { date.month=i; goto continue2_; }
+         if(s.match(months[i]) || s.match(months[i].slice(0,3))) {
+             date.month=i;
+             // Corrects slightly invalid date
+             if(date.day==daysInMonth(date.month, date.year==-1?Date(currentTime()).year:date.year) && date.month<11) { date.day=0; date.month++; }
+             goto continue2_;
+         }
         } /*else */ if(s.available(1) && s.peek()>='0'&&s.peek()<='9') {
             int number = s.integer();
             if(s.match(":")) {
@@ -152,12 +160,14 @@ Date parseDate(TextData& s) {
                 if(s.match("/")) {
                     assert_(date.year==-1);
                     date.year=s.integer();
+                    if(date.year < 100) date.year += 2000;
                 }
                 assert_(date.day < daysInMonth(date.month, date.year==-1?Date(currentTime()).year:date.year));
             }
             else if(s.match("-")) {
                 assert_(date.year==-1 && date.month==-1);
-                date.year=number; date.month=s.integer()-1;
+                date.year=number;
+                date.month=s.integer()-1;
                 if(s.match("-")) {
                     assert_(date.day==-1);
                     date.day=s.integer()-1;
@@ -170,7 +180,19 @@ Date parseDate(TextData& s) {
                  if(s.peek()>='0'&&s.peek()<='9') {
                      assert_(date.month==-1);
                      date.month=s.integer()-1;
-                     if(s.match(".")) date.year=s.integer();
+                     if(s.match(".")) {
+                         assert_(date.year==-1);
+                         date.year=s.integer();
+                         if(date.year < 100) date.year += 2000;
+                     } else {
+                         if(date.day < 12 && date.month>2000) {
+                             date.year = date.month;
+                             date.month = date.day;
+                             date.day = -1;
+                         }
+                     }
+                     // Corrects slightly invalid date
+                     if(date.day==daysInMonth(date.month, date.year==-1?Date(currentTime()).year:date.year) && date.month<11) { date.day=0; date.month++; }
                  }
              } else {
                  assert_(date.year==-1);
@@ -179,7 +201,7 @@ Date parseDate(TextData& s) {
              }
             }
             else if(date.day==-1 && number <= 31) date.day=number-1;
-            //else if(date.month==-1) date.month=number-1;
+            //else if(date.month==-1 && number <= 12) date.month=number-1;
             else if(date.year==-1) { assert_(number>31, number, s); date.year=number; }
             else return {}; //error("Invalid date", s);
         } else break;
@@ -196,7 +218,7 @@ Date parseDate(TextData& s) {
             }
         }
     }
-    date.invariant();
+    date.invariant(s.data);
     return date;
 }
 
