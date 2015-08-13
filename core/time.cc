@@ -133,7 +133,7 @@ Date parseDate(TextData& s) {
         } /*else */ if(s.available(1) && s.peek()>='0'&&s.peek()<='9') {
             int number = s.integer();
             if(s.match(":")) {
-                assert_(date.hours==-1 && date.minutes==1);
+                assert_(date.hours==-1 && date.minutes==-1, date.hours, date.minutes);
                 date.hours=number; date.minutes=s.integer();
                 if(s.match(":")) {
                     assert_(date.seconds==-1);
@@ -146,11 +146,14 @@ Date parseDate(TextData& s) {
             }
             else if(s.match("/")) {
                 assert_(date.day==-1 && date.month==-1);
-                date.month=number-1; date.day=s.integer()-1;
+                date.day=number-1;
+                date.month=s.integer()-1;
+                assert_(date.month < 12, date.month, s);
                 if(s.match("/")) {
                     assert_(date.year==-1);
                     date.year=s.integer();
                 }
+                assert_(date.day < daysInMonth(date.month, date.year==-1?Date(currentTime()).year:date.year));
             }
             else if(s.match("-")) {
                 assert_(date.year==-1 && date.month==-1);

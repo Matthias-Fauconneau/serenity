@@ -59,8 +59,8 @@ struct WG {
         String destinationFile = readFile("destinations");
         buffer<string> destinations = split(destinationFile,"\n");
 
-        String filterFile = readFile("filter");
-        buffer<string> filter = apply(split(filterFile,"\n"), [](string s){ return s.contains(' ')?section(s,' '):s; });
+        String filter = readFile("filter");
+        //buffer<string> filter = apply(split(filterFile,"\n"), [](string s){ return s.contains(' ')?section(s,' '):s; });
 
         vec3 mainDestination = LocationRequest(destinations[0]+",+Zürich").location;
 
@@ -73,6 +73,7 @@ struct WG {
             const Element& a = li.children[1];
             Room room;
             room.url = url.relative(a.attribute("href"));
+            assert_(room.url, a);
             room.postDate = copyRef(a.children[0]->children[0]->content);
             {TextData s (a.children[2]->content);
                 s.skip("Bis:");
@@ -90,20 +91,25 @@ struct WG {
             }
 
             // Filters based on data available directly in index to reduce room detail requests
-            if(filter.contains(section(section(room.url.path,'/',-2,-1),'-',0,-3))) continue;
+            if(find(filter, section(section(room.url.path,'/',-2,-1),'-',0,-3))) continue;
             //if(parseDate(room.postDate) <= Date(currentTime()-16*24*60*60)) continue;
             Date until = parseDate(room.untilDate);
             if(until && until < Date(currentTime()+34*24*60*60)) continue;
-            if(room.price > 1007) continue;
+            const float threshold = 1007;
+            if(room.price > threshold) continue;
 
             // Room detail request
             room.load();
+            if(find(room.description,"WOKO") && !room.untilDate) {
+                assert_(room.price <= 870, room.price, room.url);
+                room.price += 100;
+            }
 
             const uint c = 2/*RT*/ * 3600/*Fr/month*//(40*60)/*minutes/week*/; // 3 (Fr week)/(min roundtrip month)
 
             // Duration to main destination estimate based only on straight distance between locations (without routing)
             float duration = distance(room.location, mainDestination) /1000/*m/km*/ / 17/*km/h*/ * 60 /*min/h*/;
-            log(room.price, 5*duration*c);
+            //log(room.price, 5*duration*c);
             if(room.price + 5*duration*c > 798) continue; // Reduces directions requests
 
             // Requests route to destinations for accurate evaluation of transit time per day (averaged over a typical week)
@@ -115,7 +121,7 @@ struct WG {
 
                 if(destination.contains('|')) { // Type destination
                     /*for(string location: split(destination,"|")) {
-                        uint d = DirectionsRequest(room.address, location, {}, true, true).duration;
+                        uint d = DirectionsRequest(room.address,` location, {}, true, true).duration;
                         assert_(d && d < 30*60, d, room.address, location+" near "+room.address);
                         if(!duration) duration = d;
                         duration = ::min(duration, d);
@@ -125,28 +131,41 @@ struct WG {
                                            "&rankby=distance"), {}, maximumAge);
                     Element root = parseXML(data);
                     //destination = copyRef(root("PlaceSearchResponse")("result")("place_id").content);
-                    string name;
+                    //string name;
                     for(const Element& result : root("PlaceSearchResponse").children) {
                         if(result.name!="result") continue;
-                        name = result("name").content;
+                        //name = result("name").content;
                         //if(ref<string>{"Migrol Service"_,"Knobi"}.contains(result("name").content)) continue;
-                        destination = "place_id:"+result("place_id").content;
+                        //destination = "place_id:"+result("place_id").content;
+                        destination = result("name").content+", "+result("vicinity").content;
+                        //log(room.address, name, destination);
+                        //const Element& location = result("geometry")("location");
+                        /*assert_(!find(destination, "Affoltern am Albis"), root,
+                                distance(room.location.xy(), vec2(parseDecimal(location("lat").content), parseDecimal(location("lng").content))),
+                                location,
+                                LocationRequest(destination).location,
+                                distance(room.location.xy(), LocationRequest(destination).location.xy()));*/
+                        if(distance(room.location.xy(), LocationRequest(destination).location.xy()) > 22838) continue; // Wrong result in Nearby Search
+                        //assert_(room.address != section(destination,','), room.address, result);
                         break;
                     }
-                    uint duration = DirectionsRequest(room.address, destination).duration;
-                    assert_(duration && duration/60. < 20,
-                            room.address, name,
+                    //assert_(room.address != section(destination,','));
+                    uint duration = DirectionsRequest(room.address+", Zürich", destination).duration;
+                    DirectionsRequest req(room.address+", Zürich", destination);
+                    assert_(/*duration &&*/ duration <= 1352 /*FIXME*/,
+                            room.address, //name,
                             destination,//root("PlaceSearchResponse")("result")("name").content,
-                            duration);
-                }
-                float duration = DirectionsRequest(room.address, destination).duration/60.;
-                assert_(/*duration &&FIXME*/ duration < 60, duration, room.address, destination);
+                            duration, req.bicycling, req.transit);
+                } else destination=destination+", Zürich";
+                float duration = DirectionsRequest(room.address+", Zürich", destination).duration/60.;
+                DirectionsRequest req(room.address+", Zürich", destination);
+                assert_(/*duration &&*/ duration < 60, duration, room.address, destination, req.bicycling, req.transit);
                 room.durations[destinationIndex] = duration;
                 score += roundtripPerWeek*max(3.f,duration)*c;
                 //log(score, room.price + 5*duration*c);
-                if(score > 1007) break;
+                if(score > threshold) break;
             }
-            if(score > 1007) continue;
+            if(score > threshold) continue;
             room.score = score;
             rooms.insertSorted(move(room));
         }

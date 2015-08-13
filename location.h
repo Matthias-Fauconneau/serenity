@@ -40,32 +40,28 @@ struct DirectionsRequest {
     String origin, destination;
     uint transit = 0, bicycling = 0, duration = 0;
     function<void(string, string, uint)> handler;
-    DirectionsRequest(string origin, string destination, function<void(string, string, uint)> handler={}, bool wait=true, bool near=false)
+    DirectionsRequest(string origin, string destination, function<void(string, string, uint)> handler={}, bool wait=true)
         : origin(copyRef(origin)), destination(copyRef(destination)), handler(handler) {
-        Date arrival(currentTime()); // FIXME: choose date to cache across days
-        arrival.hours = 19, arrival.minutes = 0, arrival.seconds = 0;
+        assert_(origin != destination, origin, destination);
+        Date arrival = parseDate("13/08 19:00");
         getURL(URL("https://maps.googleapis.com/maps/api/directions/xml?key="_+key+
-               "&origin="+replace(destination+(near?" near "+origin:""__)," ","+")+(startsWith(destination,"place_id:")?""_:",+Zürich"_)+
-               "&destination="+replace(origin," ","+")+(startsWith(origin,"place_id:")?""_:",+Zürich"_)+
-               "&mode=transit&arrival_time="+str((int64)arrival)),
+                   "&origin="+replace(destination," ","+")+"&destination="+replace(origin," ","+")+"&mode=transit&arrival_time="+str((int64)arrival)),
                [this](const URL& url, Map&& data) { parse(url, data, transit); }, maximumAge, wait);
         getURL(URL("https://maps.googleapis.com/maps/api/directions/xml?key="_+key+
-               "&origin="+replace(origin," ","+")+(startsWith(origin,"place_id:")?""_:",+Zürich"_)+
-               "&destination="+replace(destination+(near?" near "+origin:""__)," ","+")+(startsWith(destination,"place_id:")?""_:",+Zürich"_)+
-               "&mode=bicycling"),
+                   "&origin="+replace(origin," ","+")+"&destination="+replace(destination," ","+")+"&mode=bicycling"),
                [this](const URL& url, Map&& data) { parse(url, data, bicycling); }, maximumAge, wait);
-        if(wait) assert_(duration, transit, bicycling);
+        //if(wait) assert_(duration, transit, bicycling);
     }
     void parse(const URL& url, string data, uint& duration) {
         Element root = parseXML(data);
         assert_(root("DirectionsResponse")("status").content=="OK", root, cacheFile(url));
         duration = parseInteger(root("DirectionsResponse")("route")("leg")("duration")("value").content);
-        assert_(duration, parseXML(data), origin, destination, url);
+        //assert_(duration || &duration==&transit /*FIXME: check whether address location are close*/, parseXML(data), origin, destination, url);
         if(transit && bicycling) { this->duration=min(transit, bicycling); if(handler) handler(origin, destination, duration); }
     }
 };
 
-float distance(vec3 A, vec3 B) {
+float distance(vec2 A, vec2 B) {
     float R = 6378137;
     float φ1 = PI/180* A.x;
     float φ2 = PI/180* B.x;
@@ -73,6 +69,6 @@ float distance(vec3 A, vec3 B) {
     float Δλ = PI/180* (B.y-A.y);
     float a = sin(Δφ/2) * sin(Δφ/2) + cos(φ1) * cos(φ2) * sin(Δλ/2) * sin(Δλ/2);
     float c = 2 * atan(sqrt(a), sqrt(1-a));
-    float dz = B.z - A.z;
-    return R * c + abs(dz);
+    return R * c;
 }
+float distance(vec3 A, vec3 B) { return distance(A.xy(), B.xy()) + abs(B.z - A.z); }
