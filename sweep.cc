@@ -54,26 +54,29 @@ struct ParameterSweep {
         for(float radius: radii) {
          if(pressure == 80 && radius==0.05f && pattern!="none"_) continue; // Validation
          parameters["Radius"__] = radius;
-         for(int seed: {1/*,2,3,4,5,6*/}) {
+         for(int seed: {1,2,3/*,4,5,6*/}) {
           parameters["Seed"__] = seed;
           auto add = [&]{
            String id = str(parameters);
            all.append(copyRef(id));
            if(jobs.contains(parseDict(id)/*parameters*/)) {
             const auto& job = jobs.at(jobs.indexOf(parseDict(id)));
-            if(existing.contains(id)) {
-             assert_(job.state == "running");
+            if(job.state == "running") {
+             //assert_(job.state == "running");
+             //if(!existing.contains(id)) log("Moved");
              running++;
             }
             else {
              assert_(job.state == "pending", job.state, job.id, job.dict, job.elapsed);
+             //if(existing.contains(id)) log("Existing");
              queued++;
             }
             jobs.take(jobs.indexOf(parseDict(id)));
             return;
            }
-           if(existing.contains(id) && existsFile(id+".result", "Results"_) &&
-              File(id+".result", "Results"_).modifiedTime()/second > currentTime()-24*60*60) {
+           if(existing.contains(id)
+              //&& existsFile(id+".result", "Results"_) && File(id+".result", "Results"_).modifiedTime()/second > currentTime()-24*60*60
+              ) {
             //log(id, "Done");
             done++;
             return;

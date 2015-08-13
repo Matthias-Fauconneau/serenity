@@ -92,6 +92,6 @@ template<Type T, size_t N> T min(const T (&a)[N]) { return min(ref<T>(a)); }
 template<Type T> T max(ref<T> values) { return reduce(values, [](T accumulator, T value) { return max(accumulator, value); }, values[0]); }
 template<Type T, size_t N> T max(const T (&a)[N]) { return max(ref<T>(a)); }
 
-generic uint argmax(const ref<T>& a) { uint max=0; for(uint i: range(a.size)) if(a[i] > a[max]) max=i; return max; }
+generic size_t argmax(const ref<T>& a) { size_t argmax=0; for(size_t i: range(a.size)) if(a[i] > a[argmax]) argmax=i; return argmax; }
 
 inline float mean(const ref<float> v) { return sum(v, 0.)/v.size; }

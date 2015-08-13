@@ -12,8 +12,8 @@ template<Type K, Type V> struct map {
  array<V> values;
 
  map(){}
- map(buffer<K>&& keys, const mref<V> values) : keys(move(keys)), values(moveRef(values)) { assert(keys.size==values.size); }
- map(buffer<K>&& keys, buffer<V>&& values) : keys(move(keys)), values(move(values)) { assert(keys.size==values.size); }
+ map(buffer<K>&& keys, const mref<V> values) : keys(move(keys)), values(moveRef(values)) { assert_(keys.size==values.size); }
+ map(buffer<K>&& keys, buffer<V>&& values) : keys(move(keys)), values(move(values)) { assert_(keys.size==values.size); }
 
  size_t size() const { return keys.size; }
  size_t count() const { return keys.size; }

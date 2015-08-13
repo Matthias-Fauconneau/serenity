@@ -46,6 +46,7 @@ struct ArrayView : Widget {
  map<Dict, float> points; // Data points
  map<Dict, String> ids; // Job IDs
  map<Dict, String> states; // Job states
+ map<Dict, float> pressure;
  array<SGEJob> jobs;
  float minDisplacement = inf, commonDisplacement = 0;
  float min = inf, max = -inf;
@@ -60,8 +61,9 @@ struct ArrayView : Widget {
  function<void(string)> output;
  Folder cache {".cache", currentWorkingDirectory(), true};
  bool useMedianFilter = true;
- enum { StressPressure, Deviatoric }; size_t plotIndex = Deviatoric;
- bool deviatoric = false;
+ enum { Pressure, Stress, Deviatoric };
+ size_t pressurePlotIndex = Deviatoric;
+ size_t strainPlotIndex = Pressure;
 
  ArrayView(string valueName, uint textSize=16) : valueName(valueName), textSize(textSize) {
   jobs = qstat(30);
@@ -104,6 +106,7 @@ struct ArrayView : Widget {
   points.clear();
   ids.clear();
   states.clear();
+  pressure.clear();
   Folder results ("."_);
   auto list = results.list(Files);
   for(string fileName: list) {
@@ -114,7 +117,8 @@ struct ArrayView : Widget {
    Dict configuration = parseDict(id);
    if(points.contains(configuration)) continue;
    array<char> data;
-   if(1 && existsFile(id,cache) && File(id, cache).modifiedTime() >= realTime()-time*60e9)
+   //if(existsFile(id+".result") && File(id+".result").modifiedTime() < realTime()-12*60*60e9) continue;
+   if(0 && existsFile(id,cache) && File(id, cache).modifiedTime() >= realTime()-time*60e9)
     data = readFile(id, cache); // FIXME: do not reload old unchanged files
    if(!data) {
     String resultName;
@@ -158,11 +162,20 @@ break2:;
       //assert_(dataSets.at("Stress (Pa)"_), dataSets);
       if(dataSets.at("Stress (Pa)"_)) {
        auto& stress = dataSets.at("Stress (Pa)"_);
-       if(stress.size > 2*medianWindowRadius+1) data.append(" "_+str(::max(medianFilter(stress))));
-       else data.append(" 0"_);
-      } else data.append(" 0"_);
-     } else data.append("0 0"_);
-    } else data.append("0 0"_);
+       if(stress.size > 2*medianWindowRadius+1) {
+        size_t argmax = ::argmax(medianFilter(stress)); // !FIXME: max(stress) != max(stress-pressure)
+        data.append(" "_+str(stress[argmax]));
+        if(dataSets.contains("Radial Force (N)"_)) {
+           float force = dataSets.at("Radial Force (N)"_)[argmax];
+           float radius = dataSets.at("Radius (m)"_)[argmax];
+           float height = dataSets.at("Height (m)"_)[argmax];
+           float pressure = force / (height * 2 * PI * radius);
+           data.append(" "_+str(pressure));
+        } else { log(dataSets.keys); continue; } // data.append(" "_+str(configuration.at("Pressure")));
+       } else data.append(" 0 0"_);
+      } else data.append(" 0 0"_);
+     } else data.append("0 0 0"_);
+    } else data.append("0 0 0"_);
     string logName;
     for(string name: list) {
      string jobID;
@@ -206,6 +219,9 @@ break2:;
    float wireDensity = s.decimal();
    s.skip(' ');
    float stress = s.decimal();
+   s.skip(' ');
+   float pressure = s.decimal();
+   this->pressure.insert(copy(configuration), pressure);
    float time=0, displacement=0;
    if(s) {
     s.skip(' ');
@@ -510,26 +526,28 @@ break2:;
 };
 
 struct Review {
- ArrayView view {/*"Stress (MPa)"*/"Time (s)"};
- Plot plot;
+ ArrayView view {"Stress (MPa)"};
+ Plot pressure, strain, volumeStrain;
  SnapshotView snapshotView;
- Plot stressStrain, volumeStrain;
  Text output;
- HBox detail {{&plot, &snapshotView}};
- HBox plots {{&stressStrain, &volumeStrain}};
- VBox layout {{&view, &detail, &plots, &output}};
+ HBox plots {{&pressure, &snapshotView}};
+ HBox details {{&strain, &volumeStrain}};
+ VBox layout {{&view, &plots, &details, &output}};
+ Dict hoverPoint;
  unique<Window> window = ::window(&layout, int2(0, 0), mainThread, true);
+
  Review() {
   window->actions[Key('m')] = [this](){
    view.useMedianFilter=!view.useMedianFilter;
    window->render();
   };
-  window->actions[Key('c')] = [this](){
-   view.plotIndex=(view.plotIndex+1)%2;
+  window->actions[Key('p')] = [this](){
+   view.pressurePlotIndex = (view.pressurePlotIndex+1)%3;
+   view.hover(hoverPoint);
    window->render();
   };
-  window->actions[Key('d')] = [this](){
-   view.deviatoric = !view.deviatoric;
+  window->actions[Key('s')] = [this](){
+   view.strainPlotIndex = (view.strainPlotIndex+1)%3;
    window->render();
   };
   window->actions[Key('x')] = [this](){
@@ -550,33 +568,43 @@ struct Review {
    //remove("plot.pdf"_, home());
    static constexpr float inchMM = 25.4, inchPx = 90;
    const vec2 pageSize (210/*mm*/ * (inchPx/inchMM), 210/*mm*/ * (inchPx/inchMM));
-   auto graphics = plot.graphics(pageSize);
+   auto graphics = strain.graphics(pageSize);
    graphics->flatten();
    writeFile("plot.pdf"_, toPDF(pageSize, ref<Graphics>(graphics.pointer, 1), 72 / inchPx /*px/inch*/), home(), true);
    //encodePNG(render(int2(1050), plot.graphics(vec2(1050))));
   };
   view.hover = [this](const Dict& point) {
    if(view.index!=0) return;
+   hoverPoint = copy(point);
    Dict filter = copy(point);
    if(filter.contains("Pressure"_)) filter.remove("Pressure");
    if(filter.contains(view.dimensions[0].last())) filter.remove(view.dimensions[0].last());
    if(filter.contains(view.dimensions[1].last())) filter.remove(view.dimensions[1].last());
+   auto& plot = pressure;
    plot.plotPoints = true, plot.plotLines = false;
    plot.min = 0; plot.max = 0;
-   if(view.plotIndex==ArrayView::StressPressure) {
+   if(view.pressurePlotIndex==ArrayView::Stress) {
     plot.ylabel = "Stress (Pa)"__;
     plot.xlabel = "Pressure (Pa)"__;
     plot.plotBandsY = true;
     plot.plotBandsX = false;
     plot.plotCircles = false;
     plot.min.y = 0, plot.max.y = view.max;
-   } else if(view.plotIndex==ArrayView::Deviatoric) {
+   } else if(view.pressurePlotIndex==ArrayView::Deviatoric) {
     plot.ylabel = "Deviatoric Stress (Pa)"__;
     plot.xlabel = "Pressure (Pa)"__;
-    plot.plotBandsY = true;
-    plot.plotBandsX = false;
+    plot.plotBandsY = false;
+    plot.plotBandsX = true;
     plot.plotCircles = -1;
     plot.max = view.max;
+   } else if(view.pressurePlotIndex==ArrayView::Pressure) {
+    plot.ylabel = "Pressure (Pa)"__;
+    plot.xlabel = "Pressure (Pa)"__;
+    plot.plotLines = true;
+    plot.plotBandsY = false;
+    plot.plotBandsX = false;
+    plot.plotCircles = false;
+    //plot.min.y = 0, plot.max.y = view.max;
    }
    plot.dataSets.clear();
    plot.fits.clear();
@@ -601,10 +629,13 @@ struct Review {
     auto& dataSet = plot.dataSets[::copy(id)];
     float maxStress = view.points.at(point);
     if(maxStress) {
-     float stress = maxStress, pressure = float(point.at("Pressure"));
-     if(view.plotIndex==ArrayView::Deviatoric) {
+     float stress = maxStress, pressure = -view.pressure.at(point), staticPressure = float(point.at("Pressure"));
+     if(view.pressurePlotIndex==ArrayView::Pressure) {
+      dataSet.insertSortedMulti(staticPressure, pressure);
+     }
+     else if(view.pressurePlotIndex==ArrayView::Deviatoric) {
       dataSet.insertSortedMulti(pressure, stress-pressure);
-     } else if(view.plotIndex==ArrayView::StressPressure) {
+     } else if(view.pressurePlotIndex==ArrayView::Stress) {
       dataSet.insertSortedMulti(pressure, stress);
      }
     }
@@ -615,7 +646,7 @@ struct Review {
      plot.fits[copy(entry.key)].append(f);
     }
    }*/
-   if(view.plotIndex==ArrayView::Deviatoric && plot.dataSets) {
+   if(view.pressurePlotIndex==ArrayView::Deviatoric && plot.dataSets) {
     const size_t N = 16;
     /*buffer<map<NaturalString, map<float, float>>> tangents (N); tangents.clear();
     buffer<array<Fit>> fits (N); fits.clear();
@@ -682,7 +713,7 @@ struct Review {
   view.press = [this](const Dict& point) {
    {
     snapshotView.~SnapshotView();
-    stressStrain = Plot();
+    strain = Plot();
     volumeStrain = Plot();
 
     map<string, array<float>> dataSets;
@@ -691,6 +722,7 @@ struct Review {
     if(existsFile(id+".failed")) resultName = id+".failed";
     if(existsFile(id+".working")) resultName = id+".working";
     if(existsFile(id+".result")) resultName = id+".result";
+    if(!resultName) error(id);
     if(resultName) {
      TextData s (readFile(resultName));
      if(s) {
@@ -737,31 +769,43 @@ break2:;
        plot.dataSets.insert(""__, {::copy(strain), ::move(volume)});
       }
 
-      {auto& plot = stressStrain;
+      {auto& plot = this->strain;
        plot.plotPoints = false, plot.plotLines = true;
-       plot.min.x = 0, plot.max.x = 100./8;
+       //plot.min.x = 0, plot.max.x = 100./8;
        plot.dataSets.clear();
        plot.xlabel = "Strain (%)"__;
-       plot.ylabel = "Stress (Pa)"__;
-       auto& stress = dataSets.at(plot.ylabel);
-       auto& strain = dataSets.at(plot.xlabel);
+       ref<float> strain = dataSets.at(plot.xlabel);
+       auto& stress = dataSets.at("Stress (Pa)");
        if(stress.size > 2*medianWindowRadius+1) {
         if(view.useMedianFilter) {
          stress = medianFilter(stress);
-         strain = copyRef(strain.slice(medianWindowRadius, strain.size-2*medianWindowRadius));
+         strain = strain.slice(medianWindowRadius, strain.size-2*medianWindowRadius);
         }
-        if(view.deviatoric) { // Normalized deviator stress
-         plot.ylabel = "Normalized Deviatoric Stress"__;
-         float pressure = point.at("Pressure"_);
-         for(float& s: stress) s = (s-pressure)/(s+pressure);
-         plot.min.y = 0; plot.max.y = 1;
-        } else {
-         plot.min.y = 0; plot.max.y = view.max;
+       }
+       float pressure = point.at("Pressure"_);
+       if(view.strainPlotIndex==ArrayView::Deviatoric) { // Normalized deviator stress
+        plot.ylabel = "Normalized Deviatoric Stress"__;
+        buffer<float> deviatoric (strain.size);
+        for(size_t i: range(strain.size)) deviatoric[i] = (stress[i]-pressure)/(stress[i]+pressure);
+        plot.min.y = 0; plot.max.y = 1;
+        plot.dataSets.insert(""__, {::copyRef(strain), ::move(deviatoric)});
+       } else if(view.strainPlotIndex==ArrayView::Stress) {
+        plot.ylabel = "Stress (Pa)"__;
+        plot.min.y = 0; plot.max.y = view.max;
+        plot.dataSets.insert(""__, {::copyRef(strain), ::move(stress)});
+       } else if(view.strainPlotIndex==ArrayView::Pressure) {
+        plot.ylabel = "Pressure (Pa)"__;
+        auto& force = dataSets.at("Radial Force (N)"_);
+        auto& radius = dataSets.at("Radius (m)"_);
+        auto& height = dataSets.at("Height (m)"_);
+        buffer<float> pressure (strain.size);
+        for(size_t i: range(strain.size)) pressure[i] = - force[i] / (height[i] * 2 * PI * radius[i]);
+        if(view.useMedianFilter) {
+         const size_t medianWindowRadius = 4;
+         pressure = medianFilter(pressure , medianWindowRadius);
+         strain = strain.slice(medianWindowRadius, strain.size-2*medianWindowRadius);
         }
-        /*assert_(stress.size <= strain.size);
-        strain.size = stress.size;*/
-        assert_(stress.size == strain.size);
-        plot.dataSets.insert(""__, {::copy(strain), ::move(stress)});
+        plot.dataSets.insert(""__, {::copyRef(strain), ::move(pressure)});
        }
       }
      }
@@ -780,6 +824,7 @@ break2:;
   };
   //view.status = [this](string status) { window->setTitle(status); };
   view.output = [this](string output) { this->output = output; };
-  view.hover(view.parseDict("Pressure=80K,Radius=0.02,Seed=4,TimeStep=20µ,Angle=,Pattern=none,Wire="_));
+  view.hover(view.parseDict("Pressure=80K,Radius=0.02,Seed=1,TimeStep=20µ,Angle=,Pattern=none,Wire="_));
+  view.press(view.parseDict("Friction=0.1,Pattern=none,PlateSpeed=1e-4,Pressure=80K,Radius=0.02,Rate=100,Seed=1,TimeStep=20µ"_));
  }
 } app;

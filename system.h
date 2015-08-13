@@ -314,9 +314,9 @@ struct System {
    gz(10/*p.at("G")*/),
    frictionCoefficient(p.at("Friction"_)),
    wire(p.value("Elasticity"_, 0.f), grain.base+grain.capacity),
-   side(Grain::radius/(float)p.value("Resolution",1.9), p.at("Radius"_),
+   side(Grain::radius/(float)p.value("Resolution",2), p.at("Radius"_),
         /*p.at("Height"_)*/ (float)p.at("Radius"_)*4.f,
-          p.value("Thickness"_, 10e-3), wire.base+wire.capacity, 1, p.value("Side",5e8)) {
+          p.value("Thickness"_, 10e-3), wire.base+wire.capacity, 1, p.value("Side",1e9)) {
   //log("System");
  }
 
