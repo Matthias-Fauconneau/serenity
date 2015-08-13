@@ -23,7 +23,7 @@ void Date::invariant() const {
     //Date
     if(year!=-1) { assert(inRange(2012, year, 2099), year); }
     if(month!=-1) { assert(year!=-1); assert(inRange(0, month, 12)); }
-    if(day!=-1) { assert(month!=-1); assert(inRange(0, day, daysInMonth(month,year)),day,daysInMonth(month,year));  }
+    if(day!=-1) { assert(month!=-1); assert(inRange(0, day, daysInMonth(month,year)),day,daysInMonth(month,year), month, year);  }
     if(weekDay!=-1) {
         assert(inRange(0, weekDay, 7));
         if(year!=-1 && month!=-1 && day!=-1) {
@@ -146,7 +146,7 @@ Date parseDate(TextData& s) {
             }
             else if(s.match("/")) {
                 assert_(date.day==-1 && date.month==-1);
-                date.month=number; date.day=s.integer();
+                date.month=number-1; date.day=s.integer()-1;
                 if(s.match("/")) {
                     assert_(date.year==-1);
                     date.year=s.integer();
@@ -175,7 +175,7 @@ Date parseDate(TextData& s) {
                  date.year=number;
              }
             }
-            else if(date.day==-1) date.day=number-1;
+            else if(date.day==-1 && number <= 31) date.day=number-1;
             //else if(date.month==-1) date.month=number-1;
             else if(date.year==-1) { assert_(number>31, number, s); date.year=number; }
             else return {}; //error("Invalid date", s);

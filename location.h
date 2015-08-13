@@ -45,15 +45,15 @@ struct DirectionsRequest {
         Date arrival(currentTime()); // FIXME: choose date to cache across days
         arrival.hours = 19, arrival.minutes = 0, arrival.seconds = 0;
         getURL(URL("https://maps.googleapis.com/maps/api/directions/xml?key="_+key+
-               "&origin="+replace(destination+(near?" near "+origin:""__)," ","+")+",+Zürich"
-               "&destination="+replace(origin," ","+")+",+Zürich"
+               "&origin="+replace(destination+(near?" near "+origin:""__)," ","+")+(startsWith(destination,"place_id:")?""_:",+Zürich"_)+
+               "&destination="+replace(origin," ","+")+(startsWith(origin,"place_id:")?""_:",+Zürich"_)+
                "&mode=transit&arrival_time="+str((int64)arrival)),
-               [this](const URL& url, Map&& data) { parse(url, data, transit); }, wait );
+               [this](const URL& url, Map&& data) { parse(url, data, transit); }, maximumAge, wait);
         getURL(URL("https://maps.googleapis.com/maps/api/directions/xml?key="_+key+
-               "&origin="+replace(origin," ","+")+",+Zürich"
-               "&destination="+replace(destination+(near?" near "+origin:""__)," ","+")+",+Zürich"
+               "&origin="+replace(origin," ","+")+(startsWith(origin,"place_id:")?""_:",+Zürich"_)+
+               "&destination="+replace(destination+(near?" near "+origin:""__)," ","+")+(startsWith(destination,"place_id:")?""_:",+Zürich"_)+
                "&mode=bicycling"),
-               [this](const URL& url, Map&& data) { parse(url, data, bicycling); }, wait);
+               [this](const URL& url, Map&& data) { parse(url, data, bicycling); }, maximumAge, wait);
         if(wait) assert_(duration, transit, bicycling);
     }
     void parse(const URL& url, string data, uint& duration) {

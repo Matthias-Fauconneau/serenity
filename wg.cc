@@ -86,13 +86,14 @@ struct WG {
                 s.skip("SFr. ");
                 room.price = s.integer();
                 s.skip(".00"_);
+                if(room.price <= 210) room.price *= 4;
             }
 
             // Filters based on data available directly in index to reduce room detail requests
             if(filter.contains(section(section(room.url.path,'/',-2,-1),'-',0,-3))) continue;
             //if(parseDate(room.postDate) <= Date(currentTime()-16*24*60*60)) continue;
             Date until = parseDate(room.untilDate);
-            if(until && until < Date(currentTime()+32*24*60*60)) continue;
+            if(until && until < Date(currentTime()+34*24*60*60)) continue;
             if(room.price > 1007) continue;
 
             // Room detail request
@@ -102,8 +103,8 @@ struct WG {
 
             // Duration to main destination estimate based only on straight distance between locations (without routing)
             float duration = distance(room.location, mainDestination) /1000/*m/km*/ / 17/*km/h*/ * 60 /*min/h*/;
-            //log(5*duration*c);
-            if(room.price + 5*duration*c > 1007) continue; // Reduces directions requests
+            log(room.price, 5*duration*c);
+            if(room.price + 5*duration*c > 798) continue; // Reduces directions requests
 
             // Requests route to destinations for accurate evaluation of transit time per day (averaged over a typical week)
             float score = room.price;
@@ -119,14 +120,29 @@ struct WG {
                         if(!duration) duration = d;
                         duration = ::min(duration, d);
                     }*/
-                    destination = copyRef(parseXML(getURL(URL("https://maps.googleapis.com/maps/api/place/nearbysearch/xml?key="_+key+
-                                                              "&location="+str(room.location.x)+","+str(room.location.y)+"&types="+destination+
-                                                              "&rankby=distance")))("PlaceSearchResponse")("result")("place_id").content);
+                    auto data = getURL(URL("https://maps.googleapis.com/maps/api/place/nearbysearch/xml?key="_+key+
+                                           "&location="+str(room.location.x)+","+str(room.location.y)+"&types="+destination+
+                                           "&rankby=distance"), {}, maximumAge);
+                    Element root = parseXML(data);
+                    //destination = copyRef(root("PlaceSearchResponse")("result")("place_id").content);
+                    string name;
+                    for(const Element& result : root("PlaceSearchResponse").children) {
+                        if(result.name!="result") continue;
+                        name = result("name").content;
+                        //if(ref<string>{"Migrol Service"_,"Knobi"}.contains(result("name").content)) continue;
+                        destination = "place_id:"+result("place_id").content;
+                        break;
+                    }
+                    uint duration = DirectionsRequest(room.address, destination).duration;
+                    assert_(duration && duration/60. < 20,
+                            room.address, name,
+                            destination,//root("PlaceSearchResponse")("result")("name").content,
+                            duration);
                 }
                 float duration = DirectionsRequest(room.address, destination).duration/60.;
-                assert_(duration && duration < 60, duration, room.address, destination);
+                assert_(/*duration &&FIXME*/ duration < 60, duration, room.address, destination);
                 room.durations[destinationIndex] = duration;
-                score += roundtripPerWeek*duration*c;
+                score += roundtripPerWeek*max(3.f,duration)*c;
                 //log(score, room.price + 5*duration*c);
                 if(score > 1007) break;
             }
