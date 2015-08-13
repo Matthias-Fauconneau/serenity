@@ -99,7 +99,6 @@ struct Simulation : System {
  ProcessState processState = Pour;
  bool skip = false;
  size_t packStart;
- float initialVolume = 0;
 
  // Lattice
  vec4f min = _0f, max = _0f;
@@ -534,7 +533,10 @@ break2_:;
   grainInitializationTime.start();
   vec4f size = float4(sqrt(3.)/(2*Grain::radius))*(max-min);
   if(!(isNumber(min) && isNumber(max)) || size[0]*size[1]*size[2] > 128*128*128) {
-   log("Domain", min, max, size); processState = Fail; return;
+   log("Domain", min, max, size);
+   processState = Fail;
+   snapshot();
+   return;
   }
   Lattice<uint16> grainLattice(sqrt(3.)/(2*Grain::radius), min, max);
   Grid grainGrid(1/(2*Grain::radius), min, max);
@@ -551,7 +553,10 @@ break2_:;
     // Side vertices
     vec4f p = grain.position[grainIndex];
     if(!(p[2] >= vertexGrid.min && p[2] < vertexGrid.max)) {
-     log("Bounds", vertexGrid.min, p, vertexGrid.max); processState = Fail; return;
+     log("Bounds", vertexGrid.min, p, vertexGrid.max);
+     processState = Fail;
+     snapshot();
+     return;
     }
     int2 index = vertexGrid.index2(p);
     bool sideContact = false;

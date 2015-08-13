@@ -47,7 +47,7 @@ struct ParameterSweep {
       parameters["Friction"__] = frictionCoefficient;
       for(string pattern: ref<string>{"none"/*,"helix","cross","loop"*/}) {
        parameters["Pattern"__] = pattern;
-       for(int pressure: {80,160/*,320*//*,640*//*,1280*/}) {
+       for(int pressure: {0,80,160,320/*,640*//*,1280*/}) {
         parameters["Pressure"__] = String(str(pressure)+"K"_);
         array<float> radii = copyRef(ref<float>{0.02,0.03/*,0.04*/});
         if(pressure == 80) radii.append(0.05); // Validation
@@ -159,7 +159,7 @@ struct ParameterSweep {
 
    Random random;
    if(existsFile("serenity/queue.sh")) {
-    size_t total = done+running+queued+missing.size;
+    size_t missingCount = missing.size;
     while(missing) {
      if(arguments().contains("pretend"_)) {
       Dict shortSet = parseDict(missing.take(random%missing.size));
@@ -174,7 +174,8 @@ struct ParameterSweep {
      }
      //log("TEST"); break;
     }
-    log("Done:",done, "Running:",running, "Queued",queued, "Missing",missing.size, "=Total:", total);
+    size_t total = done+running+queued+missingCount;
+    log("Done:",done, "Running:",running, "Queued",queued, "Missing", missingCount, "=Total:", total);
    } else {
     array<int> jobs;
     int success = 0;

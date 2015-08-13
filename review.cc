@@ -97,7 +97,7 @@ struct ArrayView : Widget {
  }
 
  void load(int time=60) {
-  valueName = ref<string>{"Peak Stress (Pa)", "Time (s)", "Wire density (%)", "Displacement (%)"}[index];
+  valueName = ref<string>{"Stress (Pa)", "Time (s)", "Wire density (%)", "Displacement (%)"}[index];
   points.clear();
   ids.clear();
   states.clear();
@@ -155,29 +155,37 @@ struct ArrayView : Widget {
 break2:;
       //if(dataSets.contains("Stress (Pa)")) //continue;
       //assert_(dataSets.at("Stress (Pa)"_), dataSets);
-      if(dataSets.at("Stress (Pa)"_)) {
-       auto& stress = dataSets.at("Stress (Pa)"_);
-       if(stress.size > 2*medianWindowRadius+1) {
-        size_t argmax = ::argmax(medianFilter(stress)); // !FIXME: max(stress) != max(stress-pressure)
-        data.append(" "_+str(stress[argmax]));
-        if(dataSets.contains("Radial Force (N)"_)) {
-         /*if(0) { // pressure[argmax]
-          float force = dataSets.at("Radial Force (N)"_)[argmax];
-          float radius = dataSets.at("Radius (m)"_)[argmax];
-          float height = dataSets.at("Height (m)"_)[argmax];
-          float pressure = force / (height * 2 * PI * radius);
-         }*/
+      buffer<float> stress;
+      if(dataSets.contains("Stress (Pa)"_)) stress = move(dataSets.at("Stress (Pa)"_));
+      else {
+       ref<float> force = dataSets.at("Plate Force (N)"_);
+       float totalPlateSurface = 2* PI*sq((float)configuration.at("Radius"));
+       stress = ::apply(force, [=](float f){return f / totalPlateSurface;});
+      }
+      if(stress.size > 2*medianWindowRadius+1) {
+       size_t argmax = ::argmax(medianFilter(stress)); // !FIXME: max(stress) != max(stress-pressure)
+       data.append(" "_+str(stress[argmax]));
+       data.append(" "_+str(mean(stress.slice(argmax))));
+       if(dataSets.contains("Radial Force (N)"_)) {
+        float pressure;
+        if(1) { // pressure[argmax]
+         float force = dataSets.at("Radial Force (N)"_)[argmax];
+         float radius = dataSets.at("Radius (m)"_)[argmax];
+         float height = dataSets.at("Height (m)"_)[argmax];
+         pressure = - force / (height * 2 * PI * radius);
+        } else { // max(pressure)
          ref<float> force = dataSets.at("Radial Force (N)"_);
          ref<float> radius = dataSets.at("Radius (m)"_);
          ref<float> height = dataSets.at("Height (m)"_);
-         float pressure = ::max(::apply(stress.size, [=](size_t i){
-                                       return force[i] / (height[i] * 2 * PI * radius[i]); }));
-         data.append(" "_+str(pressure));
-        } else { log(dataSets.keys); continue; } // data.append(" "_+str(configuration.at("Pressure")));
-       } else data.append(" 0 0"_);
-      } else data.append(" 0 0"_);
-     } else data.append("0 0 0"_);
-    } else data.append("0 0 0"_);
+         pressure = ::max(::apply(stress.size, [=](size_t i) {
+          return - force[i] / (height[i] * 2 * PI * radius[i]); })); // TODO: median filter
+        }
+        assert_(pressure > 0);
+        data.append(" "_+str(pressure));
+       } else { log(dataSets.keys); continue; } // data.append(" "_+str(configuration.at("Pressure")));
+      } else data.append(" 0 0 0"_);
+     } else data.append("0 0 0 0"_); // if(s)
+    } else data.append("0 0 0 0"_); // if(resultName)
     string logName;
     for(string name: list) {
      string jobID;
@@ -214,20 +222,27 @@ break2:;
     }
     //assert_(logName);
     assert_(data, index, fileName, id, resultName, logName);
-    //log(id, data);
+    log(id, data);
     writeFile(id, data, cache, true);
    }
    TextData s (data);
    float wireDensity = s.decimal();
+   assert_(isNumber(wireDensity), s);
    s.skip(' ');
-   float stress = s.decimal();
+   float peakStress = s.decimal();
+   assert_(isNumber(peakStress));
+   s.skip(' ');
+   float postPeakStress = s.decimal();
+   assert_(isNumber(postPeakStress));
    s.skip(' ');
    float pressure = s.decimal();
+   assert_(isNumber(pressure));
    this->pressure.insert(copy(configuration), pressure);
    float time=0, displacement=0;
    if(s) {
     s.skip(' ');
     time = s.decimal();
+    assert_(isNumber(time));
     s.skip(' ');
     ids.insert(copy(configuration), str(s.integer()));
     s.skip(' ');
@@ -241,7 +256,7 @@ break2:;
     if(1 || points.at(configuration)!=0) { log("Duplicate configuration", configuration); continue; }
     else points.at(configuration) = value; // Replace 0 from log
    } else*/
-   points.insert(move(configuration), ref<float>{stress,time,wireDensity,displacement}[index]);
+   points.insert(move(configuration), ref<float>{postPeakStress,time,wireDensity,displacement}[index]);
   }
   commonDisplacement = minDisplacement; // Used on next load
 
@@ -257,8 +272,7 @@ break2:;
    max = ::max(points.values);
   }
   dimensions[0] = copyRef(ref<string>{"TimeStep"_, "Radius"_,"Pressure"_,"Seed"_});
-  //dimensions[1] = copyRef(ref<string>{"Wire"_,"Pattern"_,"Angle"_}); // FIXME
-  dimensions[1] = copyRef(ref<string>{"Wire"_,"Angle"_,"Pattern"_}); // FIXME
+  dimensions[1] = copyRef(ref<string>{"Side","Thickness","Wire"_,"Angle"_,"Pattern"_});
   for(auto& dimensions: this->dimensions) {
    dimensions.filter([this](const string dimension) {
     for(const Dict& coordinates: points.keys) if(coordinates.keys.contains(dimension)) return false;
@@ -559,7 +573,7 @@ struct Review {
    float peakStress = view.points.at(point);
    if(!peakStress) continue;
    float outsidePressure = float(point.at("Pressure"));
-   float effectivePressure = -view.pressure.at(point);
+   float effectivePressure = view.pressure.at(point);
    /***/if(index==Pressure)
     dataSet.insertSortedMulti(outsidePressure, effectivePressure);
    else if(index==Deviatoric)
@@ -569,24 +583,32 @@ struct Review {
   }
   if(index==Deviatoric && plot.dataSets) {
    const size_t N = 16;
-   for(auto entry: plot.dataSets) {
-    map<float, float> sortY;
-    for(auto p: entry.value) sortY.insertSortedMulti(p.value, p.key);
 
-    const auto& Y = sortY.keys, &X = sortY.values;
+   buffer<map<NaturalString, map<float, float>>> tangents (N); tangents.clear();
+
+   for(auto entry: plot.dataSets) {
+    /*map<float, float> sortY;
+    for(auto p: entry.value) sortY.insertSortedMulti(p.value, p.key);
+    const auto& Y = sortY.keys, &X = sortY.values;*/
+
+    ref<float> X = entry.value.keys, Y = entry.value.values;
     buffer<float> x (X.size), y (Y.size);
 
     float bestSSR = inf; //φ = 0,
     Fit bestFit;
     for(size_t angleIndex: range(N)) {
      float φ = PI/2*angleIndex/N;
-     for(size_t i: range(X.size)) { x[i] = X[i] - Y[i]*sin(φ); y[i] = Y[i]*cos(φ); }
+     for(size_t i: range(X.size)) {
+      x[i] = X[i] - Y[i]*sin(φ); y[i] = Y[i]*cos(φ);
+      tangents[angleIndex][copy(entry.key)+" fit"+str(angleIndex)].insertSortedMulti(x[i], y[i]);
+     }
      auto f = totalLeastSquare(x, y);
      float a=f.a, b=f.b;
      float SSR = 0;
      for(size_t i: range(X.size)) {
       // Distance to circle tangent point
       float xi = (X[i] - a*b) / (a*a + 1);
+      if(xi < 0) { SSR=inf; break; }
       float yi = a*xi + b;
       float R = Y[i];
       float r = sqrt(sq(xi-X[i])+sq(yi));
@@ -597,9 +619,11 @@ struct Review {
       bestSSR = SSR;
       bestFit = f;
      }
+     plot.fits[copy(entry.key)].append(f);
     }
-    plot.fits[copy(entry.key)].append(bestFit);
    }
+   //plot.dataSets.append(move(tangents[bestIndex]));
+   for(auto& t: tangents) plot.dataSets.append(move(t));
   }
   for(auto& key: plot.dataSets.keys)  if(key && key[0] < 16) key = copyRef(key.slice(1));
   return plot;
@@ -615,10 +639,10 @@ struct Review {
   Plot plot;
   if(!resultName) { log(id); return plot; }
   TextData s (readFile(resultName));
-  if(!s) { error(resultName); return plot; }
+  if(!s) { log(resultName); return plot; }
   // TODO: cache dataSets
   string resultLine = s.line();
-  assert_(resultLine.contains('='));
+  Dict results = parseDict(resultLine);
   string headerLine = s.line();
   buffer<string> names = split(headerLine,", ");
   for(string name: names) dataSets.insert(name);
@@ -639,19 +663,33 @@ struct Review {
 
   plot.xlabel = "Strain (%)"__;
   plot.max.x = 100./8;
-  buffer<float>& strain = dataSets.at(plot.xlabel);
+  buffer<float> strain;
+  if(dataSets.contains(plot.xlabel)) strain = move(dataSets.at("Strain (%)"));
+  else {
+   ref<float> height = dataSets.at("Height (m)");
+   strain = apply(height, [=](float h){ return (1-h/height[0])*100; });
+  }
 
   if(index == Volume) {
    plot.ylabel ="Volumetric Strain (%)"__;
-   buffer<float>& volume = dataSets.at(plot.ylabel);
-   for(float& v: volume) v=-v;
+   buffer<float> volume;
+   if(dataSets.contains("Volumetric Strain (%)"_)) {
+    volume = move(dataSets.at(plot.ylabel));
+    for(float& v: volume) v=-v;
+   } else {
+    ref<float> radius = dataSets.at("Radius (m)"_);
+    ref<float> height = dataSets.at("Height (m)"_);
+    float v0 = height[0] * float(PI) * sq(radius[0]);
+    volume = apply(strain.size, [=](size_t i){
+     return (1 - (height[i] * float(PI) * sq(radius[i]))/v0)*100; });
+   }
    plot.dataSets.insert(""__, {::move(strain), ::move(volume)});
   }
   else if(index==Pressure) {
    plot.ylabel = "Pressure (Pa)"__;
-   auto& force = dataSets.at("Radial Force (N)"_);
-   auto& radius = dataSets.at("Radius (m)"_);
-   auto& height = dataSets.at("Height (m)"_);
+   ref<float> force = dataSets.at("Radial Force (N)"_);
+   ref<float> radius = dataSets.at("Radius (m)"_);
+   ref<float> height = dataSets.at("Height (m)"_);
    buffer<float> pressure (strain.size);
    for(size_t i: range(strain.size)) pressure[i] = - force[i] / (height[i] * 2 * PI * radius[i]);
    if(useMedianFilter) {
@@ -662,7 +700,13 @@ struct Review {
    plot.dataSets.insert(""__, {::move(strain), ::move(pressure)});
   }
   else {
-   buffer<float>& stress = dataSets.at("Stress (Pa)");
+   buffer<float> stress;
+   if(dataSets.contains("Stress (Pa)")) stress = ::move(dataSets.at("Stress (Pa)"));
+   else {
+    ref<float> force = dataSets.at("Plate Force (N)"_);
+    float totalPlateSurface = 2* PI*sq((float)point.at("Radius"));
+    stress = ::apply(force, [=](float f){return f / totalPlateSurface;});
+   }
    if(useMedianFilter && stress.size > 2*medianWindowRadius+1) {
     stress = medianFilter(stress);
     strain = copyRef(strain.slice(medianWindowRadius, strain.size-2*medianWindowRadius));

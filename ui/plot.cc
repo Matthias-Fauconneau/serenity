@@ -89,9 +89,16 @@ shared<Graphics> Plot::graphics(vec2 size) {
  int left=tickLabelSize.x*3./2, top=tickLabelSize.y, bottom=tickLabelSize.y;
  int right=::max(tickLabelSize.x, tickLabelSize.x/2+Text(bold(xlabel)).sizeHint().x);
  //left=right=top=bottom=::max(::max(::max(left, right), top), bottom);
- {int margin = (left+right)-(top+bottom);
-  top += margin/2;
-  bottom += margin/2;
+ if(plotCircles) {
+  assert_(max.x == max.y, max);
+  int margin = (size.y-(top+bottom))-(size.x-(left+right));
+  if(margin > 0) {
+   top += margin/2;
+   bottom += margin/2;
+  } else {
+   left -= margin/2;
+   right -= margin/2;
+  }
  }
  const int tickLength = 4;
 
