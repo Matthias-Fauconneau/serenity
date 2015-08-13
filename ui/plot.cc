@@ -246,10 +246,11 @@ shared<Graphics> Plot::graphics(vec2 size) {
   for(size_t i: range(fits.size())) for(auto f: fits.values[i]) {
    vec2 B = point(vec2(x, f.a*x+f.b));
    graphics->lines.append(point(vec2(0,f.b)), B, colors[i]);
-   int value = round(atan(f.a, 1)*180/PI);
-   if(!done[value]) {
-    done[value]++;
-    Text text(str(value)+"°", 16, colors[i]);
+   int a = round(atan(f.a, 1)*180/PI);
+   int b = round(f.b/1000);
+   if(!done[a]) {
+    done[a]++;
+    Text text(str(a)+"° "+str(b)+"K", 16, colors[i]);
     graphics->graphics.insert(B+vec2(16, -text.sizeHint().y/2), text.graphics(0));
    }
   }

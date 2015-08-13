@@ -587,13 +587,9 @@ struct Review {
    buffer<map<NaturalString, map<float, float>>> tangents (N); tangents.clear();
 
    for(auto entry: plot.dataSets) {
-    /*map<float, float> sortY;
-    for(auto p: entry.value) sortY.insertSortedMulti(p.value, p.key);
-    const auto& Y = sortY.keys, &X = sortY.values;*/
-
     ref<float> X = entry.value.keys, Y = entry.value.values;
+#if 0
     buffer<float> x (X.size), y (Y.size);
-
     float bestSSR = inf; //φ = 0,
     Fit bestFit;
     for(size_t angleIndex: range(N)) {
@@ -619,11 +615,28 @@ struct Review {
       bestSSR = SSR;
       bestFit = f;
      }
-     plot.fits[copy(entry.key)].append(f);
+     //plot.fits[copy(entry.key)].append(f);
     }
    }
    //plot.dataSets.append(move(tangents[bestIndex]));
    for(auto& t: tangents) plot.dataSets.append(move(t));
+#else
+    const size_t N = 256;
+    buffer<float> sX (N), sY (N);
+    float max = X.last();
+    for(size_t sampleIndex: range(N)) {
+     float x = max * sampleIndex/(N-1);
+     float y = 0;
+     for(size_t circleIndex: range(X.size)) {
+      float y2 = sq(Y[circleIndex]) - sq(x - X[circleIndex]);
+      if(y2 > 0) y = ::max(y, sqrt(y2));
+     }
+     sX[sampleIndex] = x;
+     sY[sampleIndex] = y;
+    }
+    plot.fits[copy(entry.key)].append(totalLeastSquare(sX, sY));
+#endif
+   }
   }
   for(auto& key: plot.dataSets.keys)  if(key && key[0] < 16) key = copyRef(key.slice(1));
   return plot;
