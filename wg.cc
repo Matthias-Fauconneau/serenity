@@ -126,10 +126,9 @@ struct WG {
  HList<ImageView> images;
  VBox layout {{&text,&images}};
  unique<Window> window {nullptr};
+ array<Room> rooms; // Sorted by score
 
  WG() {
-  array<Room> rooms; // Sorted by score
-
   URL url ("http://www.wgzimmer.ch/wgzimmer/search/mate.html?");
   url.post = "query=&priceMin=50&priceMax=1500&state=zurich-stadt&permanent=all&student=none"
     "&country=ch&orderBy=MetaData%2F%40mgnl%3Alastmodified&orderDir=descending"
@@ -158,10 +157,7 @@ struct WG {
     if(room.price <= 210) room.price *= 4;
    }
 
-   if(room.evaluate()) {
-    rooms.insertSorted(move(room));
-    break;
-   }
+   if(room.evaluate()) rooms.insertSorted(move(room));
   }
   /*auto reference = readFile("reference");
   for(string line: split(reference,"\n")) {
@@ -186,17 +182,20 @@ struct WG {
   const Room& room = rooms[0];
   text = Text(
      str(round(room.score), str(apply(room.durations,[](float v){return round(v);})), str(room.price)+"Fr")+"\n"
-     +str("Posted:",room.postDate, "\tFrom:", room.startDate, "\tUntil:", room.untilDate)+"\n"
+     +str("Posted:",room.postDate, "\tFrom:", room.startDate)
+     +(room.untilDate?str("\tUntil:", room.untilDate):""__)+"\n"
      +str(room.address)+"\n"
      +room.contact+(room.url ? "\n"_+/*room.url.host.slice(4)+*/section(section(room.url.path,'/',-2,-1),'.') : ""_)+"\n"
-     +room.description+"\n"+room.profile+"\n"+room.mates+"\n"
-     +"maps.google.com/maps?q="+room.address,
-              16, black, 1, 1050/2, "DejaVuSans", true, 1, 0, 1050/2, true);
+     +room.description+"\n"+room.profile+"\n"+room.mates+"\n",
+     16, black, 1, 1050/2, "DejaVuSans", true, 1, 0, 1050/2, true);
   images.clear();
   for(string image: room.images) {
    images.append(decodeImage(getURL(room.url.relative(image))));
   }
   window = ::window(&layout, int2(1050, -1));
+  window->actions[Space] = [&](){
+   execute(which("xdg-open"),{"http://maps.google.com/maps?q="+room.address+", Zürich"});
+  };
   window->setPosition(1050/4);
  }
 } app;

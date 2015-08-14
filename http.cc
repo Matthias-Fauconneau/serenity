@@ -56,7 +56,7 @@ template<class T> size_t DataStream<T>::available(size_t need) {
 }
 
 // Cache
-static const Folder& cache() { static Folder cache(".cache", home()); return cache; }
+static const Folder& cache() { static Folder cache(".cache", currentWorkingDirectory()); return cache; }
 
 // DNS
 

@@ -100,10 +100,12 @@ shared<Graphics> Progress::graphics(vec2 size) {
 // ImageView
 
 vec2 ImageView::sizeHint(vec2 size) {
- if(size > vec2(image.size)) return vec2(image.size);
- return size.x*image.size.y < size.y*image.size.x ?
-    vec2(image.size.x*size.x/image.size.x, image.size.y*size.x/image.size.x) :
-    vec2(image.size.x*size.y/image.size.y, image.size.y*size.y/image.size.y);
+ int2 imageSize = image.size;
+ if(imageSize.x >= 1200) imageSize /= 2;
+ if(size > vec2(imageSize)) return vec2(imageSize);
+ return size.x*imageSize.y < size.y*imageSize.x ?
+    vec2(imageSize.x*size.x/imageSize.x, imageSize.y*size.x/imageSize.x) :
+    vec2(imageSize.x*size.y/imageSize.y, imageSize.y*size.y/imageSize.y);
 }
 
 shared<Graphics> ImageView::graphics(vec2 size) {
