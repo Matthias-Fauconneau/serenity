@@ -16,24 +16,28 @@ struct LocationRequest {
         getURL(URL("https://maps.googleapis.com/maps/api/geocode/xml?key="_+key+"&latlng="+str(location.x)+","+str(location.y)),
                {this, &LocationRequest::parseAddress}, maximumAge, wait);
     }
-    void parseLocation(const URL&, Map&& data) {
+    void parseLocation(const URL& url, Map&& data) {
         Element root = parseXML(data);
+        string status = root("GeocodeResponse")("status").content;
+        if(status == "ZERO_RESULTS"_) return;
+        assert_(status=="OK", status, root, cacheFile(url));
         const auto& xmlLocation = root("GeocodeResponse")("result")("geometry")("location");
         vec2 location(parseDecimal(xmlLocation("lat").content), parseDecimal(xmlLocation("lng").content));
         assert_(location);
         this->location = vec3(location, 0);
-        getURL(URL("https://maps.googleapis.com/maps/api/elevation/xml?key="_+key+"&locations="+str(location.x)+","+str(location.y)),
-                {this, &LocationRequest::parseElevation}, maximumAge, wait);
+        if(handler) handler(address, vec3(location, 0));
+        /*getURL(URL("https://maps.googleapis.com/maps/api/elevation/xml?key="_+key+"&locations="+str(location.x)+","+str(location.y)),
+                {this, &LocationRequest::parseElevation}, maximumAge, wait);*/
     }
     void parseAddress(const URL&, Map&& data) {
         this->address = copyRef( parseXML(data)("GeocodeResponse")("result")("address_component")("short_name").content );
         handler(address, location);
     }
-    void parseElevation(const URL&, Map&& data) {
+    /*void parseElevation(const URL&, Map&& data) {
         location.z = parseDecimal(parseXML(data)("ElevationResponse")("result")("elevation").content);
         assert_(location);
         if(handler) handler(address, location);
-    }
+    }*/
 };
 
 struct DirectionsRequest {
@@ -54,8 +58,9 @@ struct DirectionsRequest {
     }
     void parse(const URL& url, string data, uint& duration) {
         Element root = parseXML(data);
-        if(root("DirectionsResponse")("status").content!="NOT_FOUND"_) {
-            assert_(root("DirectionsResponse")("status").content=="OK", root, cacheFile(url));
+        string status = root("DirectionsResponse")("status").content;
+        if(status!="NOT_FOUND"_ && status!="ZERO_RESULTS") {
+            assert_(status=="OK", root, cacheFile(url));
             duration = parseInteger(root("DirectionsResponse")("route")("leg")("duration")("value").content);
             //assert_(duration || &duration==&transit /*FIXME: check whether address location are close*/, parseXML(data), origin, destination, url);
         }
@@ -73,4 +78,4 @@ float distance(vec2 A, vec2 B) {
     float c = 2 * atan(sqrt(a), sqrt(1-a));
     return R * c;
 }
-float distance(vec3 A, vec3 B) { return distance(A.xy(), B.xy()) + abs(B.z - A.z); }
+float distance(vec3 A, vec3 B) { return sqrt(sq(distance(A.xy(), B.xy())) + sq(B.z - A.z)); }

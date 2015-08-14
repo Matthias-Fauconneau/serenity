@@ -63,6 +63,7 @@ ui/plot.cc
 ui/render.h
 ui/color.h
 
+music/notation.h
 music/MusicXML.cc
 music/music-pdf.cc
 http.h

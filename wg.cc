@@ -18,10 +18,11 @@ struct Room {
     String profile;
     String mates;
     String contact;
+    array<String> images;
     buffer<float> durations;
     float score = 0;
 
-    bool evaluate(const float threshold = 1000) {
+    bool evaluate(const float threshold = 1007) {
         static String filter = readFile("filter");
         // Filters based on data available directly in index to reduce room detail requests
         if(url && find(filter, section(section(url.path,'/',-2,-1),'-',0,-3))) return false;
@@ -42,7 +43,9 @@ struct Room {
             if(address.size <= 1) address = copyRef( details(".adress-region").children[3]->content );
             assert_(address.size > 1, details(".adress-region"));
             description = copyRef( details(".mate-content")("p").content );
-            //image-content
+            if(details.contains(".image-content"))
+             for(const Element& a: details(".image-content")(".image").children)
+              images.append(copyRef(a.attribute("href")));
             profile = copyRef( details(".room-content")("p").content );
             mates = copyRef( details(".person-content")("p").content );
             location = LocationRequest(address+",+Zürich").location;
@@ -55,10 +58,10 @@ struct Room {
             }
         }
 
-        if((find(description,"WOKO") || find(profile,"WOKO")) && !untilDate) {
+        /*if((find(description,"WOKO") || find(profile,"WOKO")) && !untilDate) {
             assert_(price <= 870, price, url);
-            price += 100;
-        }
+            price += 100 - 70; //+PhD - Utilities included
+        }*/
 
         constexpr uint c = 2/*RT*/ * 3600/*Fr/month*//(40*60)/*minutes/week*/; // 3 (Fr week)/(min roundtrip month)
 
@@ -67,8 +70,8 @@ struct Room {
         static vec3 mainDestination = LocationRequest(destinations[0]+",+Zürich").location;
 
         // Duration to main destination estimate based only on straight distance between locations (without routing)
-        float duration = distance(location, mainDestination) /1000/*m/km*/ / 17/*km/h*/ * 60 /*min/h*/;
-        if((score=price + 5*duration*c) > threshold) return false; // Reduces directions requests
+        float duration = distance(location.xy(), mainDestination.xy()) /1000/*m/km*/ / 17/*km/h*/ * 60 /*min/h*/;
+        if((score=price + 5*duration*c) > 1124/*1007+117*/) return false; // Reduces directions requests
 
         // Requests route to destinations for accurate evaluation of transit time per day (averaged over a typical week)
         score = price;
@@ -85,21 +88,22 @@ struct Room {
                 for(const Element& result : root("PlaceSearchResponse").children) {
                     if(result.name!="result") continue;
                     destination = result("name").content+", "+result("vicinity").content;
-                    if(distance(location.xy(), LocationRequest(destination).location.xy()) > 22838) continue; // Wrong result in Nearby Search
+                    vec2 dstLocation = LocationRequest(destination).location.xy();
+                    if(distance(location.xy(), dstLocation) > 22838) continue; // Wrong result in Nearby Search
                     break;
                 }
                 uint duration = DirectionsRequest(address+", Zürich", destination).duration;
                 DirectionsRequest req(address+", Zürich", destination);
-                assert_(duration <= 1395, duration);
+                assert_(duration <= 1451, duration); // FIXME
             } else destination=destination+", Zürich";
             float duration = DirectionsRequest(address+", Zürich", destination).duration/60.;
             DirectionsRequest req(address+", Zürich", destination);
             assert_(duration < 44, duration);
             durations[destinationIndex] = duration;
             score += roundtripPerWeek*max(3.f,duration)*c;
-            if(score > threshold) return false;
+            if(score > 1124/*1007+117*/) return false;
         }
-        if(score > threshold) return false;
+        if(score > 1124/*1007+117*/) return false;
         return true;
     }
 };
@@ -113,7 +117,7 @@ struct WG {
 
         URL url ("http://www.wgzimmer.ch/wgzimmer/search/mate.html?");
         url.post = "query=&priceMin=50&priceMax=1500&state=zurich-stadt&permanent=all&student=none&country=ch&orderBy=MetaData%2F%40mgnl%3Alastmodified&orderDir=descending&startSearchMate=true&wgStartSearch=true"__;
-        auto data = getURL(move(url), {}, 1);
+        Map data = getURL(move(url), {}, 1);
         const Element root = parseHTML(data);
         const auto& list = root("html")("body")("#main")("#container")("#content")("ul");
         for(const Element& li: list.children) {
@@ -152,7 +156,12 @@ struct WG {
         for(size_t i: reverse_range(rooms.size)) {
             Room& room = rooms[i];
             log(round(room.score), str(apply(room.durations,[](float v){return round(v);})), str(room.price)+"Fr", room.address,
-                room.postDate, room.startDate/*, room.untilDate*/, room.contact, room.url ? room.url.host.slice(4)+room.url.path : ""_);
+                room.postDate, room.startDate, room.untilDate, room.contact, room.url ? room.url.host.slice(4)+room.url.path : ""_);
+            log(room.description);
+            log(room.profile);
+            log(room.mates);
+            if(room.images) log(room.images);
+            log("maps.google.com/maps?q="+room.address);
         }
     }
 } app;

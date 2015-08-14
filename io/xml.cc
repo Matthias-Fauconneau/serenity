@@ -105,7 +105,7 @@ const Element& Element::child(string name) const {
             element=&e;
         }
     }
-    assert_(element, "No such element", name, apply(children, [](const Element& e) { return e.name; }));
+    assert_(element, "No such element", name, "in", this->name, apply(children, [](const Element& e) { return e.name; }));
 	static Element empty;
 	return element ? *element : empty;
 }

@@ -19,7 +19,7 @@ int daysInMonth(int month, int year=0) {
     return daysPerMonth[month];
 }
 
-void Date::invariant(string s) const {
+void Date::invariant(string unused s) const {
     //Date
     if(year!=-1) { assert(inRange(2012, year, 2099), year, s); }
     if(month!=-1) { assert(year!=-1); assert(inRange(0, month, 12), month, s); }
