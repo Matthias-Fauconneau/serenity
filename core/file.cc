@@ -200,10 +200,10 @@ void Map::unmap() {
 // -- File system
 
 void rename(const Folder& oldFolder, const string oldName, const Folder& newFolder, const string newName) {
-    assert_(existsFile(oldName,oldFolder), oldFolder.name(), oldName, newName);
-    assert_(!existsFile(newName,newFolder), oldName, newFolder.name(), newName);
-    assert_(newName.size<0x100);
-	check(renameat(oldFolder.fd, strz(oldName), newFolder.fd, strz(newName)));
+ assert_(existsFile(oldName,oldFolder), oldFolder.name(), oldName, newName);
+ assert_(!existsFile(newName,newFolder), oldName, newFolder.name(), newName);
+ assert_(newName.size<0x100);
+ check(renameat(oldFolder.fd, strz(oldName), newFolder.fd, strz(newName)));
 }
 
 void rename(const string oldName,const string newName, const Folder& at) {

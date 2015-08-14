@@ -41,6 +41,34 @@ inline Fit totalLeastSquare(ref<float> X, ref<float> Y) {
  return {a, b};
 }
 
+buffer<float> radius(const map<string, array<float>>& data) {
+ ref<float> radius = data.at("Radius (m)"_);
+ // FIXME: only < 14.8 15:
+ return apply(radius, [](float r){return r+float(2.47e-3)/*Grain::radius*/;});
+}
+
+buffer<float> stress(const map<string, array<float>>& data, bool useMedianFilter=true) {
+ buffer<float> stress;
+ if(data.contains("Stress (Pa)")) stress = copyRef(data.at("Stress (Pa)"));
+ else {
+  ref<float> force = data.at("Plate Force (N)"_);
+  buffer<float> radius = ::radius(data);
+  float A0 = 2* PI*sq(radius[0]); //(float)point.at("Radius"));
+  //ref<float> height = data.at("Height (m)"_);
+  //float h0 = height[0];
+  //float V0 = height[0] * float(PI) * sq(radius[0]);
+  stress = ::apply(force.size, [&](size_t i){
+   //float V = height[i] * float(PI) * sq(radius[i]);
+   //float Ac = A0 * (V/V0) / (height[i]/h0);
+   return force[i] / A0; //Ac;
+  });
+ }
+ if(useMedianFilter && stress.size > 2*medianWindowRadius+1) {
+  stress = medianFilter(stress);
+ }
+ return  stress;
+}
+
 struct ArrayView : Widget {
  string valueName;
  map<Dict, float> points; // Data points
@@ -57,7 +85,7 @@ struct ArrayView : Widget {
  struct Target { Rect rect; Dict tableCoordinates; const Dict& key; };
  array<Target> targets;
  size_t index = 0;
- function<void(const Dict&, const Dict&)> hover;
+ function<void(const Dict&, const Dict&)> hover, press;
  Folder cache {".cache", currentWorkingDirectory(), true};
 
  ArrayView(string valueName, uint textSize=16) : valueName(valueName), textSize(textSize) {
@@ -153,36 +181,23 @@ struct ArrayView : Widget {
        }
       }
 break2:;
-      //if(dataSets.contains("Stress (Pa)")) //continue;
-      //assert_(dataSets.at("Stress (Pa)"_), dataSets);
-      buffer<float> stress;
-      if(dataSets.contains("Stress (Pa)"_)) stress = move(dataSets.at("Stress (Pa)"_));
-      else {
-       ref<float> force = dataSets.at("Plate Force (N)"_);
-       float totalPlateSurface = 2* PI*sq((float)configuration.at("Radius"));
-       stress = ::apply(force, [=](float f){return f / totalPlateSurface;});
-      }
-      if(stress.size > 2*medianWindowRadius+1) {
-       size_t argmax = ::argmax(medianFilter(stress)); // !FIXME: max(stress) != max(stress-pressure)
+      buffer<float> stress = ::stress(dataSets, true);
+      if(stress) {
+       size_t argmax = ::argmax(stress); // !FIXME: max(stress) != max(stress-pressure)
        data.append(" "_+str(stress[argmax]));
        data.append(" "_+str(mean(stress.slice(argmax))));
-       if(dataSets.contains("Radial Force (N)"_)) {
-        float pressure;
-        if(1) { // pressure[argmax]
-         float force = dataSets.at("Radial Force (N)"_)[argmax];
-         float radius = dataSets.at("Radius (m)"_)[argmax];
-         float height = dataSets.at("Height (m)"_)[argmax];
-         pressure = - force / (height * 2 * PI * radius);
-        } else { // max(pressure)
-         ref<float> force = dataSets.at("Radial Force (N)"_);
-         ref<float> radius = dataSets.at("Radius (m)"_);
-         ref<float> height = dataSets.at("Height (m)"_);
-         pressure = ::max(::apply(stress.size, [=](size_t i) {
-          return - force[i] / (height[i] * 2 * PI * radius[i]); })); // TODO: median filter
-        }
-        assert_(pressure > 0);
-        data.append(" "_+str(pressure));
-       } else { log(dataSets.keys); continue; } // data.append(" "_+str(configuration.at("Pressure")));
+
+       if(!dataSets.contains("Radial Force (N)"_)) { log(dataSets.keys); continue; }
+       ref<float> force = dataSets.at("Radial Force (N)"_);
+       buffer<float> radius = ::radius(dataSets);
+       ref<float> height = dataSets.at("Height (m)"_);
+       buffer<float> pressure = ::apply(force.size, [&](size_t i) {
+        return - force[i] / (height[i] * float(2*PI) * radius[i]); });
+       float P = mean(pressure.slice(argmax));
+       //float P = pressure[argmax];
+       //float P = ::max(pressure); // TODO: median filter
+       assert_(P > 0);
+       data.append(" "_+str(P));
       } else data.append(" 0 0 0"_);
      } else data.append("0 0 0 0"_); // if(s)
     } else data.append("0 0 0 0"_); // if(resultName)
@@ -302,7 +317,8 @@ break2:;
     for(string name: Folder(".").list(Files)) if(startsWith(name, id)) {
      log(name);
      fileCount++;
-     remove(name);
+     //remove(name);
+     rename(currentWorkingDirectory(), name, Folder("../Archive"), name);
     }
     failureCount++;
    }
@@ -493,16 +509,15 @@ break2:;
    load();
    return true;
   }
-  /*if(event == Press && button == LeftButton && press) {
+  if(event == Press && button == LeftButton && press) {
    for(const auto& target: targets) {
     if(target.rect.contains(cursor)) {
-     //logInfo(target.key);
-     press(target.key);
+     press(target.tableCoordinates, target.key);
      return true;
     }
    }
-   press({});
-  }*/
+   press({},{});
+  }
   if(event == Motion && hover) {
    for(auto& target: targets) {
     if(target.rect.contains(cursor)) {
@@ -517,67 +532,68 @@ break2:;
 };
 
 struct Review {
- ArrayView view {"Stress (MPa)"};
- Plot pressure, strain, strain2, strain3;
+ ArrayView array {"Stress (MPa)"};
+ Plot pressure;
  SnapshotView snapshotView;
  Text output;
- VBox plots2 {{&pressure, &strain}};
- HBox plots {{&plots2, &snapshotView}};
- HBox details {{&strain2, &strain3}};
- VBox layout {{&view, &plots, &details, &output}};
+ HBox hbox {{&pressure, &snapshotView}};
+ UniformGrid<Plot> strainPlots {4};
+ VBox layout {{&array, &hbox, &strainPlots, &output}};
  unique<Window> window = ::window(&layout, int2(0, 0), mainThread, true);
 
  bool useMedianFilter = true;
- enum { Pressure, Stress, Deviatoric, Volume };
+ enum { Pressure, Stress, Deviatoric, Volume, Length };
  size_t pressurePlotIndex = Deviatoric;
- size_t strainPlotIndex = Pressure;
+ size_t strainPlotIndex = Length;
  Dict group, point;
+ bool details = true, hover = true;
 
  Plot pressurePlot(const Dict& point, size_t index) {
   Dict filter = copy(point);
   if(filter.contains("Pressure"_)) filter.remove("Pressure");
-  if(filter.contains(view.dimensions[0].last())) filter.remove(view.dimensions[0].last());
-  if(filter.contains(view.dimensions[1].last())) filter.remove(view.dimensions[1].last());
+  if(filter.contains(array.dimensions[0].last())) filter.remove(array.dimensions[0].last());
+  if(filter.contains(array.dimensions[1].last())) filter.remove(array.dimensions[1].last());
   Plot plot;
   plot.xlabel = "Pressure (Pa)"__;
   if(index==Stress) {
    plot.ylabel = "Stress (Pa)"__;
    plot.plotBandsY = true;
-   plot.max.y = view.max;
+   plot.max.y = array.max;
   } else if(index==Deviatoric) {
    plot.ylabel = "Deviatoric Stress (Pa)"__;
-   plot.plotBandsX = true;
+   plot.plotPoints = true;
+   plot.plotLines = false;
    plot.plotCircles = true;
-   plot.max = view.max;
+   plot.max = array.max;
   } else if(index==Pressure) {
    plot.ylabel = "Pressure (Pa)"__;
    plot.plotBandsY = false;
    plot.plotBandsX = false;
    plot.plotCircles = false;
   }
-  array<Dict> points;
-  for(const auto& point: view.points)
+  ::array<Dict> points;
+  for(const auto& point: array.points)
    if(point.key.includesPassMissing(filter)) points.append(copy(point.key));
-  array<String> fixed;
-  for(const auto& coordinate: view.coordinates(points))
+  ::array<String> fixed;
+  for(const auto& coordinate: array.coordinates(points))
    if(coordinate.value.size==1) fixed.append(copyRef(coordinate.key));
   for(const auto& point: points) {
    Dict shortSet = copy(point);
    for(string dimension: fixed) if(shortSet.contains(dimension)) shortSet.remove(dimension);
    if(shortSet.contains("Pressure")) shortSet.remove("Pressure");
-   if(shortSet.contains(view.dimensions[0].last())) shortSet.remove(view.dimensions[0].last());
-   if(view.dimensions[0].last()=="Radius"_)
+   if(shortSet.contains(array.dimensions[0].last())) shortSet.remove(array.dimensions[0].last());
+   if(array.dimensions[0].last()=="Radius"_)
     if(shortSet.contains("Height")) shortSet.remove("Height");
    String id = str(shortSet.values," "_,""_);
    auto& dataSet = plot.dataSets[::copy(id)];
-   float peakStress = view.points.at(point);
+   float peakStress = array.points.at(point);
    if(!peakStress) continue;
    float outsidePressure = float(point.at("Pressure"));
-   float effectivePressure = view.pressure.at(point);
+   float effectivePressure = array.pressure.at(point);
    /***/if(index==Pressure)
     dataSet.insertSortedMulti(outsidePressure, effectivePressure);
    else if(index==Deviatoric)
-    dataSet.insertSortedMulti(effectivePressure, peakStress-effectivePressure);
+    dataSet.insertSortedMulti((effectivePressure+peakStress)/2, (peakStress-effectivePressure)/2);
    else if(index==Stress)
     dataSet.insertSortedMulti(effectivePressure, peakStress);
   }
@@ -621,20 +637,22 @@ struct Review {
    //plot.dataSets.append(move(tangents[bestIndex]));
    for(auto& t: tangents) plot.dataSets.append(move(t));
 #else
-    const size_t N = 256;
-    buffer<float> sX (N), sY (N);
-    float max = X.last();
-    for(size_t sampleIndex: range(N)) {
-     float x = max * sampleIndex/(N-1);
-     float y = 0;
-     for(size_t circleIndex: range(X.size)) {
-      float y2 = sq(Y[circleIndex]) - sq(x - X[circleIndex]);
-      if(y2 > 0) y = ::max(y, sqrt(y2));
+    if(X) {
+     const size_t N = 256;
+     buffer<float> sX (N), sY (N);
+     float max = X.last();
+     for(size_t sampleIndex: range(N)) {
+      float x = max * sampleIndex/(N-1);
+      float y = 0;
+      for(size_t circleIndex: range(X.size)) {
+       float y2 = sq(Y[circleIndex]) - sq(x - X[circleIndex]);
+       if(y2 > 0) y = ::max(y, sqrt(y2));
+      }
+      sX[sampleIndex] = x;
+      sY[sampleIndex] = y;
      }
-     sX[sampleIndex] = x;
-     sY[sampleIndex] = y;
+     plot.fits[copy(entry.key)].append(totalLeastSquare(sX, sY));
     }
-    plot.fits[copy(entry.key)].append(totalLeastSquare(sX, sY));
 #endif
    }
   }
@@ -643,9 +661,9 @@ struct Review {
  }
 
  Plot strainPlot(const Dict& point, size_t index) {
-  map<string, array<float>> dataSets;
+  map<string, ::array<float>> dataSets;
   String resultName;
-  String id = str(view.stripSortKeys(point));
+  String id = str(array.stripSortKeys(point));
   if(existsFile(id+".failed")) resultName = id+".failed";
   if(existsFile(id+".working")) resultName = id+".working";
   if(existsFile(id+".result")) resultName = id+".result";
@@ -690,18 +708,27 @@ struct Review {
     volume = move(dataSets.at(plot.ylabel));
     for(float& v: volume) v=-v;
    } else {
-    ref<float> radius = dataSets.at("Radius (m)"_);
+    buffer<float> radius = ::radius(dataSets);
     ref<float> height = dataSets.at("Height (m)"_);
     float v0 = height[0] * float(PI) * sq(radius[0]);
-    volume = apply(strain.size, [=](size_t i){
+    volume = apply(strain.size, [&](size_t i){
      return (1 - (height[i] * float(PI) * sq(radius[i]))/v0)*100; });
    }
    plot.dataSets.insert(""__, {::move(strain), ::move(volume)});
   }
+  else if(index==Length) {
+   plot.ylabel = "Radius (%)"__;
+   buffer<float> radius = ::radius(dataSets);
+   //ref<float> height = dataSets.at("Height (m)"_);
+   //plot.dataSets.insert("Height"__, {::move(strain), ::copyRef(height)});
+   buffer<float> radiusStrain = apply(radius.size, [&](size_t i){
+    return (radius[i]/radius[0] - 1)*100; });
+   plot.dataSets.insert("Radius"__, {::move(strain), ::copyRef(radiusStrain)});
+  }
   else if(index==Pressure) {
    plot.ylabel = "Pressure (Pa)"__;
    ref<float> force = dataSets.at("Radial Force (N)"_);
-   ref<float> radius = dataSets.at("Radius (m)"_);
+   buffer<float> radius = ::radius(dataSets);
    ref<float> height = dataSets.at("Height (m)"_);
    buffer<float> pressure (strain.size);
    for(size_t i: range(strain.size)) pressure[i] = - force[i] / (height[i] * 2 * PI * radius[i]);
@@ -713,21 +740,13 @@ struct Review {
    plot.dataSets.insert(""__, {::move(strain), ::move(pressure)});
   }
   else {
-   buffer<float> stress;
-   if(dataSets.contains("Stress (Pa)")) stress = ::move(dataSets.at("Stress (Pa)"));
-   else {
-    ref<float> force = dataSets.at("Plate Force (N)"_);
-    float totalPlateSurface = 2* PI*sq((float)point.at("Radius"));
-    stress = ::apply(force, [=](float f){return f / totalPlateSurface;});
-   }
-   if(useMedianFilter && stress.size > 2*medianWindowRadius+1) {
-    stress = medianFilter(stress);
-    strain = copyRef(strain.slice(medianWindowRadius, strain.size-2*medianWindowRadius));
-   }
+   buffer<float> stress = ::stress(dataSets);
+   if(useMedianFilter  && strain.size > 2*medianWindowRadius+1)
+      strain = copyRef(strain.slice(medianWindowRadius, strain.size-2*medianWindowRadius));
    float pressure = point.at("Pressure"_);
    if(index==Stress) {
     plot.ylabel = "Stress (Pa)"__;
-    plot.min.y = 0; plot.max.y = view.max;
+    plot.min.y = 0; plot.max.y = array.max;
     plot.dataSets.insert(""__, {::move(strain), ::move(stress)});
    }
    else if(index==Deviatoric) {
@@ -743,6 +762,17 @@ struct Review {
  }
 
  Review() {
+  window->actions[Key('d')] = [this](){
+   details=!details;
+   if(details) {
+    for(size_t i : range(4)) strainPlots[i] = strainPlot(point, (strainPlotIndex+i)%5);
+    snapshotView = SnapshotView(str(array.stripSortKeys(point)));
+   } else {
+    for(size_t i : range(4)) strainPlots[i] =Plot();
+    snapshotView = SnapshotView();
+   }
+   window->render();
+  };
   window->actions[Key('m')] = [this](){ useMedianFilter=!useMedianFilter; window->render(); };
   window->actions[Key('p')] = [this](){
    pressurePlotIndex = (pressurePlotIndex+1)%3;
@@ -750,35 +780,47 @@ struct Review {
    window->render();
   };
   window->actions[Key('s')] = [this](){
-   strainPlotIndex = (strainPlotIndex+1)%3;
-   strain = strainPlot(point, strainPlotIndex);
-   strain2 = strainPlot(point, (strainPlotIndex+1)%3);
+   strainPlotIndex = (strainPlotIndex+1)%5;
+   for(size_t i : range(4)) strainPlots[i] = strainPlot(point, (strainPlotIndex+i)%5);
    window->render();
   };
   window->actions[Key('x')] = [this](){
-   view.dimensions[0] = array<string>(view.dimensions[0].slice(1) + view.dimensions[0][0]);
+   array.dimensions[0] = ::array<string>(array.dimensions[0].slice(1) + array.dimensions[0][0]);
    window->render();
   };
   window->actions[Key('y')] = [this](){
-   view.dimensions[1] = array<string>(view.dimensions[1].slice(1) + view.dimensions[1][0]);
+   array.dimensions[1] = ::array<string>(array.dimensions[1].slice(1) + array.dimensions[1][0]);
    window->render();
   };
-  window->actions[Delete] = [this]() { view.removeFailed(); view.load(10); window->render(); };
+  window->actions[Key('h')] = [this](){ hover=!hover; };
+  window->actions[Delete] = [this]() {
+   window->setTitle("Refreshing");
+   array.jobs = array.qstat(0); array.load(0);
+   window->setTitle("Deleting");
+   array.removeFailed(); array.load(0);
+   window->setTitle(str(array.jobs.size));
+   window->render();
+  };
   window->actions[Return] = [this](){
    window->setTitle("Refreshing");
-   view.jobs = view.qstat(0); view.load(0); window->render();
-   window->setTitle(str(view.jobs.size));
+   array.jobs = array.qstat(0);
+   array.load(0);
+   window->setTitle(str(array.jobs.size));
+   window->render();
   };
   window->actions[Space] = [this](){
    //remove("plot.pdf"_, home());
    static constexpr float inchMM = 25.4, inchPx = 90;
    const vec2 pageSize (210/*mm*/ * (inchPx/inchMM), 210/*mm*/ * (inchPx/inchMM));
-   auto graphics = strain.graphics(pageSize);
+   auto graphics = layout.graphics(pageSize, Rect(pageSize));
    graphics->flatten();
    writeFile("plot.pdf"_, toPDF(pageSize, ref<Graphics>(graphics.pointer, 1), 72 / inchPx /*px/inch*/), home(), true);
    //encodePNG(render(int2(1050), plot.graphics(vec2(1050))));
   };
-  view.hover = [this](const Dict& group, const Dict& point) {
+  array.hover = [this](const Dict& group, const Dict& point) {
+   if(hover) array.press(group, point);
+  };
+  array.press = [this](const Dict& group, const Dict& point) {
    if(!point) return;
    if(existsFile(str(point))) { // Signal snapshot
     int64 time = realTime();
@@ -789,23 +831,28 @@ struct Review {
    this->group = copy(group);
    pressure = pressurePlot(group, pressurePlotIndex);
    this->point = copy(point);
-   strain = strainPlot(point, strainPlotIndex);
-   strain2 = strainPlot(point, (strainPlotIndex+1)%3);
-   strain3 = strainPlot(point, Volume);
+   if(details) {
+    for(size_t i : range(4)) strainPlots[i] = strainPlot(point, (strainPlotIndex+i)%5);
+   }
 
-   if(view.ids.contains(point)) {
-    String file = str(view.stripSortKeys(point))+".o"+str(view.ids.at(point));
+   if(array.ids.contains(point)) {
+    String file = str(array.stripSortKeys(point))+".o"+str(array.ids.at(point));
     if(existsFile(file)) output = trim(section(readFile(file),'\n',-10,-1));
     else log("Missing output", file);
    }
 
    //if(point && existsFile(str(point))) usleep(300*1000); // FIXME: signal back
-   snapshotView = SnapshotView(str(view.stripSortKeys(point)));
+   if(details) {
+    snapshotView = SnapshotView(str(array.stripSortKeys(point)));
+   }
    window->render();
   };
-  view.hover(
-     view.parseDict("Pressure=80K,Radius=0.02,Seed=1,TimeStep=20µ,Angle=,Pattern=none,Wire="_),
-     view.parseDict("Friction=0.1,Pattern=none,PlateSpeed=1e-4,Pressure=80K,Radius=0.02,Rate=100,Seed=1,TimeStep=20µ"_)
-     );
+  /*array.hover(
+     array.parseDict("Pressure=80K,Radius=0.02,Seed=1,TimeStep=20µ,Angle=,Pattern=none,Wire="_),
+     array.parseDict("Friction=0.1,Pattern=none,PlateSpeed=1e-4,Pressure=80K,Radius=0.02,Rate=100,Seed=1,TimeStep=20µ"_)
+     );*/
+  array.hover(
+     array.parseDict("Friction=0.1,Pattern=none,PlateSpeed=1e-4,Pressure=80K,Radius=0.05,Rate=100,Seed=2,TimeStep=20µ"_),
+     array.parseDict("Friction=0.1,Pattern=none,PlateSpeed=1e-4,Pressure=80K,Radius=0.05,Rate=100,Seed=2,TimeStep=20µ"_));
  }
 } app;

@@ -50,13 +50,13 @@ generic struct Lattice {
 struct CylinderGrid {
  const float min, max;
  const int2 size;
- buffer<array<uint16>> cells {size_t(size.y*size.x)};
+ buffer<array<uint32>> cells {size_t(size.y*size.x)};
  CylinderGrid(float min, float max, int2 size) : min(min), max(max), size(size) {
   cells.clear();
  }
  inline int2 index2(vec4f p) {
   float angle = PI+0x1p-23+atan(p[1], p[0]);
-  assert(angle >= 0 && angle/(2*PI+0x1p-22)*size.x < size.x, angle, log2(angle-2*PI));
+  assert(angle >= 0 && angle/(2*PI+0x1p-22)*size.x < size.x, angle, log2(angle-2*PI), p);
   assert(p[2] >= min && p[2] < max, min, p, max);
   return int2(int(angle/(2*PI+0x1p-22)*size.x), int((p[2]-min)/(max-min)*size.y));
  }
@@ -65,7 +65,7 @@ struct CylinderGrid {
   assert(i.x < size.x && i.y < size.y, min, p, max, i, size);
   return i.y*size.x+i.x;
  }
- array<uint16>& operator()(vec4f p) { return cells[index(p)]; }
+ array<uint32>& operator()(vec4f p) { return cells[index(p)]; }
 };
 
 enum Pattern { None, Helix, Cross, Loop };
@@ -285,7 +285,7 @@ struct Simulation : System {
  }
 
  const float pourPackThreshold = 2e-3;
- const float packLoadThreshold = 1e-4;
+ const float packLoadThreshold = 8e-5;
  const float transitionTime = 2*s;
 
  void step() {
@@ -399,11 +399,12 @@ break2_:;
    plate.position[0][2] += dz;
 
    if(parameters.contains("Pressure"_)) {
-    if(G[2] == 0 && /*alpha==1*/ (timeStep-packStart)*dt > transitionTime && (skip || (
+    if((timeStep-packStart)*dt > transitionTime && (skip || (
                                                               voidRatio < 0.8 &&
                                                               grainKineticEnergy / grain.count < packLoadThreshold &&
                                                               (//abs(topForce+bottomForce)/(topForce-bottomForce) < 1./2 &&/*||*/
-                                                              abs(topForce+bottomForce) < 300)))) {
+                                                              abs(topForce+bottomForce) < 250)))) {
+     assert_(G[2] == 0 && side.thickness == side.loadThickness);
      skip = false;
      processState = ProcessState::Load;
      bottomZ0 = plate.position[0][2];
@@ -427,7 +428,7 @@ break2_:;
      }
      stream.write(str(results)+"\n");
      //stream.write("Strain (%), Stress (Pa), Radius (m), Height (m), Radial Force (N), Tension (J)\n");
-     stream.write("Radius (m), Height (m), Plate Force (N), Radial Force (N)\n");
+     stream.write("Radius (m), Height (m), Plate Force (N), Radial Force (N), Kinetic Energy (J), Contacts\n");
     }
    } else {
     if(grainKineticEnergy / grain.count < 1e-6 /*1µJ/grain*/) {
@@ -699,20 +700,6 @@ break2_:;
     // Bounds
     penalty(wire, i, plate, 0);
     penalty(wire, i, plate, 1);
-#define WIREBOUNDS 1
-#if WIREBOUNDS
-    //for(size_t b: range(side.faceCount)) penalty(wire, i, side, b);
-    /*// Side vertices
-    {int2 index = vertexGrid.index2(wire.position[i]);
-    for(int y: range(::max(0, index.y-1), ::min(vertexGrid.size.y, index.y+1 +1))) {
-     for(int x: range(index.x-1, index.x+1 +1)) {
-      // Wraps around (+size.x to wrap -1)
-      for(size_t b: vertexGrid.cells[y*vertexGrid.size.x+(x+vertexGrid.size.x)%vertexGrid.size.x])
-       penalty(wire, i, side, b);
-     }
-    }}*/
-    penalty(wire, i, rigidSide, 0);
-#endif
     // Wire - Grain
     {size_t offset = grainLattice.index(wire.position[i]);
      for(size_t n: range(3*3)) {
@@ -769,18 +756,6 @@ break2_:;
      // Bounds
      penalty(wire, i, plate, 0);
      penalty(wire, i, plate, 1);
-#if WIREBOUNDS
-    /*// Side vertices
-    {int2 index = vertexGrid.index2(wire.position[i]);
-    for(int y: range(::max(0, index.y-1), ::min(vertexGrid.size.y, index.y+1 +1))) {
-     for(int x: range(index.x-1, index.x+1 +1)) {
-      // Wraps around (+size.x to wrap -1)
-      for(size_t b: vertexGrid.cells[y*vertexGrid.size.x+(x+vertexGrid.size.x)%vertexGrid.size.x])
-       penalty(wire, i, side, b);
-     }
-    }}*/
-    penalty(wire, i, rigidSide, 0);
-#endif
     // Wire - Grain
     {size_t offset = grainLattice.index(wire.position[i]);
     for(size_t n: range(3*3)) {
@@ -840,18 +815,6 @@ break2_:;
     // Bounds
     penalty(wire, i, plate, 0);
     penalty(wire, i, plate, 1);
-#if WIREBOUNDS
-    /*// Side vertices
-    {int2 index = vertexGrid.index2(wire.position[i]);
-    for(int y: range(::max(0, index.y-1), ::min(vertexGrid.size.y, index.y+1 +1))) {
-     for(int x: range(index.x-1, index.x+1 +1)) {
-      // Wraps around (+size.x to wrap -1)
-      for(size_t b: vertexGrid.cells[y*vertexGrid.size.x+(x+vertexGrid.size.x)%vertexGrid.size.x])
-       penalty(wire, i, side, b);
-     }
-    }}*/
-    penalty(wire, i, rigidSide, 0);
-#endif
     // Wire - Grain
     {size_t offset = grainLattice.index(wire.position[i]);
     for(size_t n: range(3*3)) {
@@ -935,6 +898,13 @@ break2_:;
   parallel_chunk(side.W, side.count-side.W, [this](uint, size_t start, size_t size) {
    for(size_t i: range(start, start+size)) {
     System::step(side, i);
+    float l = length2(side.Vertex::position[i]);
+    assert(l);
+    if(l < side.radius) {
+     side.Vertex::position[i][0] *= side.radius/l;
+     side.Vertex::position[i][1] *= side.radius/l;
+    }
+    side.velocity[i] *= float4(1-0.1*dt); // Additionnal viscosity
    }
   }, 1);
  sideIntegrationTime.stop();
@@ -980,13 +950,13 @@ break2_:;
     //float plateForce = top-bottom;
     //float stress = (top-bottom)/(2*PI*sq(side.radius));
 
-    float radius = sideGrainRadiusSum/sideGrainCount;
+    float radius = sideGrainRadiusSum/sideGrainCount + Grain::radius;
     float plateForce = plate.force[1][2]-plate.force[0][2];
     //float volume = height * PI * sq(radius);
     //if(!initialVolume) initialVolume = volume;
     //(volume/initialVolume-1)*100
     //displacement/(topZ0-bottomZ0)*100
-    stream.write(str(radius, height, plateForce, radialForce)+'\n'); //, side.tensionEnergy
+    stream.write(str(radius, height, plateForce, radialForce, grainKineticEnergy, sideGrainCount)+'\n'); //, side.tensionEnergy
     // Checks if all grains are within membrane
     // FIXME: actually check only with enlarged rigid cylinder
     for(vec4f p: grain.position.slice(0, grain.count)) {

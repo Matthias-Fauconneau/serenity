@@ -141,4 +141,9 @@ struct WidgetGrid : GridLayout, Widgets {
 generic struct UniformGrid : GridLayout,  WidgetArray<T> {
 	UniformGrid(buffer<T>&& widgets, bool uniformX=false, bool uniformY=false)
 		: GridLayout(uniformX, uniformY), WidgetArray<T>(move(widgets)){}
+ UniformGrid(size_t count, bool uniformX=false, bool uniformY=false)
+                              : GridLayout(uniformX, uniformY) {
+                              array<T>::grow(count);
+                              buffer<T>::clear();
+                              }
 };

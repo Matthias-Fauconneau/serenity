@@ -39,24 +39,25 @@ struct ParameterSweep {
     //if(queued) log("Queued jobs:", "qdel -f"+queued+" &");
    }
    size_t done = 0, running = 0, queued = 0;
-   for(float dt: {2e-5, 4e-5}) {
+   for(float dt: {2e-5}) {
     parameters["TimeStep"__] = String(str(int(round(dt*1e6)))+"µ");
-    for(string plateSpeed: {"1e-4"_/*,"2e-4"_*/}) {
+    for(string plateSpeed: {0?"8e-5"_:"1e-4"_}) {
      parameters["PlateSpeed"__] = plateSpeed;
      for(float frictionCoefficient: {0.1}) {
       parameters["Friction"__] = frictionCoefficient;
-      for(string pattern: ref<string>{"none"/*,"helix","cross","loop"*/}) {
+      for(string pattern: ref<string>{"none","helix","cross","loop"}) {
        parameters["Pattern"__] = pattern;
-       for(int pressure: {0,80,160,320/*,640*//*,1280*/}) {
+       for(int pressure: {0,80,160,320,640}) {
         parameters["Pressure"__] = String(str(pressure)+"K"_);
-        array<float> radii = copyRef(ref<float>{0.02,0.03/*,0.04*/});
-        if(pressure == 80) radii.append(0.05); // Validation
+        array<float> radii = copyRef(ref<float>{0.02/*,0.05*/});
+        // Validation
+        if(/*pressure == 80*//*pattern=="none" &&*/ !radii.contains(0.05)) radii.append(0.05);
         for(float radius: radii) {
-         if(pressure == 80 && radius==0.05f && pattern!="none"_) continue; // Validation
+         //if(pressure == 80 && radius==0.05f && pattern!="none"_) continue; // Validation
          parameters["Radius"__] = radius;
-         for(string thickness: ref<string>{"5e-3"_, "10e-3"/*, "20e-3"*/}) {
+         for(string thickness: ref<string>{/*"5e-3"_,*/ "10e-3"/*, "20e-3"*/}) {
           parameters["Thickness"__] = thickness;
-          for(string side: ref<string>{/*"5e8",*/"10e8","20e8"}) {
+          for(string side: ref<string>{/*"5e8",*/"10e8"/*,"20e8"*/}) {
            parameters["Side"__] = side;
            for(int seed: {1,2,3/*,4,5,6*/}) {
             parameters["Seed"__] = seed;
@@ -95,7 +96,7 @@ struct ParameterSweep {
                parameters["Wire"__] = wireDensity;
                if(pattern == "helix") add();
                else {
-                for(float angle: {1.2, 2.4/*PI*(3-sqrt(5.))*/, 3.6}) {
+                for(float angle: {1.2 /*, 2.4*//*PI*(3-sqrt(5.))*/, 3.6}) {
                  parameters["Angle"__] = angle;
                  add();
                 }
@@ -127,7 +128,7 @@ struct ParameterSweep {
     log(runningCount+queuedCount, "jobs are not included in the current sweep parameters");
    }
 
-   {// Archive existing results not in current sweep or too old
+   if(arguments().contains("archive")) {// Archive existing results not in current sweep or too old
     size_t archiveCount = 0, removeCount = 0;
     for(string name: list) {
      if(name=="core"_) { remove("core", "Results"_); continue; }
