@@ -110,7 +110,7 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 						position.x += spaceAdvance;
 						column++;
 					}
-					if((justify && c==' ') || c=='\n') { // Splits into words for justification
+     if((/*justify &&*/ c==' ') || c=='\n') { // Splits into words for wrap and justification
 						if(word) nextWord(move(word), justify);
 						position.x = 0;
 						column++;
@@ -258,11 +258,11 @@ Text::Text(buffer<uint>&& text, float size, bgr3f color, float opacity, float wr
 	  justify(justify), justifyExplicitLineBreak(justifyExplicitLineBreak), minimalSizeHint(minimalSizeHint) {}
 
 const TextLayout& Text::layout(float wrap) {
-    wrap = max(0.f, wrap);
-    assert_(wrap >= 0, wrap);
-	if(!lastTextLayout || wrap != lastTextLayout.wrap)
-		lastTextLayout = TextLayout(text, size, wrap, font, hint, interline, align, justify, justifyExplicitLineBreak, true, color);
-	return lastTextLayout;
+ wrap = max(0.f, wrap);
+ assert_(wrap >= 0, wrap);
+ if(!lastTextLayout || wrap != lastTextLayout.wrap)
+  lastTextLayout = TextLayout(text, size, wrap, font, hint, interline, align, justify, justifyExplicitLineBreak, true, color);
+ return lastTextLayout;
 }
 
 vec2 Text::sizeHint(vec2 size) {
@@ -274,7 +274,7 @@ shared<Graphics> Text::graphics(vec2 size) {
 	const TextLayout& layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
  vec2 textSize = ceil(layout.bbMax - min(vec2(0),layout.bbMin));
  vec2 offset = max(vec2(0), vec2(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
-    if(align == -1) offset.x = 0;
+ if(align == -1) offset.x = 0;
 
 	shared<Graphics> graphics;
 	//FIXME: use Graphic::offset, cache graphics

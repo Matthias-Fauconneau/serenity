@@ -232,7 +232,8 @@ void XWindow::setIcon(const Image& /*icon*/) {
                         .length=2+icon.width*icon.height, .size=uint16(6+2+icon.width*icon.height)},
                         raw(icon.width)+raw(icon.height)+cast<byte>(icon));*/
 }
-void XWindow::setSize(int2 /*size*/) { /*send(SetSize{.id=id+Window, .w=uint(size.x), .h=uint(size.y)});*/ }
+//void XWindow::setSize(int2 /*size*/) { /*send(SetSize{.id=id+Window, .w=uint(size.x), .h=uint(size.y)});*/ }
+void XWindow::setPosition(int2 p) { send(SetPosition{.id=id+Window, .x=uint(p.x), .y=uint(p.y)}); }
 
 //FILE(shader)
 
