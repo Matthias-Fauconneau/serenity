@@ -202,9 +202,15 @@ Date parseDate(TextData& s) {
             }
             else if(date.day==-1 && number <= 31) date.day=number-1;
             //else if(date.month==-1 && number <= 12) date.month=number-1;
-            else if(date.year==-1) { assert_(number>31, number, s); date.year=number; }
+            else if(date.year==-1) { assert_(number>31||number==15, number, s);
+                date.year=number;
+                if(date.year<100) date.year+=2000;
+            }
             else return {}; //error("Invalid date", s);
-        } else break;
+        }
+        else if(s.match("Anfang ")) date.day = 6;
+        else if(s.match("Ende ")) date.day = 27;
+        else break;
         continue2_:;
     }
     if(date.year<0 && (date.month>=0 || date.day>=0)) {

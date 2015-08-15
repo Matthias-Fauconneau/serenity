@@ -139,6 +139,6 @@ struct WidgetGrid : GridLayout, Widgets {
 };
 
 generic struct UniformGrid : GridLayout,  WidgetArray<T> {
-	UniformGrid(buffer<T>&& widgets, bool uniformX=false, bool uniformY=false)
+    UniformGrid(buffer<T>&& widgets={}, bool uniformX=false, bool uniformY=false)
 		: GridLayout(uniformX, uniformY), WidgetArray<T>(move(widgets)){}
 };

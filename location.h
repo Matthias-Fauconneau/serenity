@@ -46,7 +46,7 @@ struct LocationRequest {
 
 struct DirectionsRequest {
     String origin, destination;
-    uint transit = 0, bicycling = 0, duration = 0;
+    uint /*transit = 0, bicycling = 0,*/ duration = -1;
     function<void(string, string, uint)> handler;
     DirectionsRequest(string origin, string destination, function<void(string, string, uint)> handler={}, bool wait=true)
         : origin(copyRef(origin)), destination(copyRef(destination)), handler(handler) {
@@ -54,27 +54,29 @@ struct DirectionsRequest {
         Date arrival = parseDate("13/08 19:00");
         getURL(URL("https://maps.googleapis.com/maps/api/directions/xml?key="_+key+
                    "&origin="+replace(destination," ","+")+"&destination="+replace(origin," ","+")+"&mode=transit&arrival_time="+str((int64)arrival)),
-               [this](const URL& url, Map&& data) { parse(url, ::move(data), transit); }, maximumAge, wait);
+               /*[this](const URL& url, Map&& data) { parse(url, ::move(data), transit); }*/{this, &DirectionsRequest::parse}, maximumAge, wait);
         usleep( queryLimit*1000 );
         if(queryLimit) queryLimit--;
         getURL(URL("https://maps.googleapis.com/maps/api/directions/xml?key="_+key+
                    "&origin="+replace(origin," ","+")+"&destination="+replace(destination," ","+")+"&mode=bicycling"),
-               [this](const URL& url, Map&& data) { parse(url, ::move(data), bicycling); }, maximumAge, wait);
+               /*[this](const URL& url, Map&& data) { parse(url, ::move(data), bicycling); }*/{this, &DirectionsRequest::parse}, maximumAge, wait);
+        if(duration == uint(-1)) duration = 5*60;
+        assert_(wait && duration != uint(-1), duration, origin, destination);
+        //if(transit && bicycling) { this->duration=min(transit, bicycling); if(handler) handler(origin, destination, duration); }
         //if(wait) assert_(duration, transit, bicycling);
     }
-    void parse(const URL& url, Map&& data, uint& duration) {
+    void parse(const URL& url, Map&& data/*, uint& duration*/) {
         for(;;) {
             Element root = parseXML(data);
             string status = root("DirectionsResponse")("status").content;
             if(status=="OK") {
-                duration = parseInteger(root("DirectionsResponse")("route")("leg")("duration")("value").content);
-                if(transit && bicycling) { this->duration=min(transit, bicycling); if(handler) handler(origin, destination, duration); }
+                duration = min(duration, (uint)parseInteger(root("DirectionsResponse")("route")("leg")("duration")("value").content));
                 return;
             }
             if(status=="NOT_FOUND"_ || status=="ZERO_RESULTS") return;
             if(status == "OVER_QUERY_LIMIT"_) {
                 log(status, queryLimit);
-                if(!queryLimit) queryLimit = 250;
+                if(!queryLimit) queryLimit = 125;
                 else queryLimit *= 2;
                 usleep(2*queryLimit);
                 data = getURL(copy(url), {}, 0);

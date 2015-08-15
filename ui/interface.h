@@ -29,7 +29,7 @@ struct ScrollArea : Widget {
 generic struct Scroll : ScrollArea, T {
     using T::T;
     /// Returns a reference to \a T::Widget (for ScrollArea implementation)
-	Widget& widget() override { return (T&)*this; }
+    T& widget() override { return /*(T&)*/*this; }
     /// Returns a reference to \a ScrollArea::Widget (e.g to add the area to a layout)
     Widget& area() { return (ScrollArea&)*this; }
     /// Returns a reference to \a ScrollArea::Widget (e.g to add the area to a layout)

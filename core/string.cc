@@ -57,7 +57,7 @@ double parseDecimal(const string number) { return TextData(number).decimal(); }
 
 // -- String
 
-char lowerCase(char c) { return c>='A'&&c<='Z'?'a'+c-'A':c; }
+char lowerCase(char c) { return uint8(c)>=uint8('A')&&uint8(c)<=uint8('Z')?'a'+c-'A':c; }
 String toLower(string source) { return apply(source, lowerCase); }
 
 char upperCase(char c) { return c>='a'&&c<='z'?'A'+c-'a':c; }
