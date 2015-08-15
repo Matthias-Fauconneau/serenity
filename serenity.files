@@ -66,6 +66,7 @@ ui/color.h
 music/notation.h
 music/MusicXML.cc
 music/music-pdf.cc
+music/sheet.cc
 http.h
 http.cc
 wg.cc

@@ -359,7 +359,7 @@ MusicXML::MusicXML(string document, string) {
                         else if(d.contains("metronome"_)) {
                             Value beatUnit = Value(ref<string>({"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_})
                                                    .indexOf(d("metronome"_)("beat-unit"_).text()));
-                            TextData s = d("metronome"_)("per-minute"_).text();
+                            TextData s (d("metronome"_)("per-minute"_).text());
                             s.whileNo("0123456789"_);
                             float perMinute = s.decimal();
                             assert_(perMinute==uint(perMinute));
@@ -668,7 +668,7 @@ MusicXML::MusicXML(string document, string) {
             //assert(!sign.note.clef.octave, sign.note.clef.octave, sign.note.step);
             assert_(key == noteKey(sign.note.clef.octave, step, alteration),
                     keySignature, sign.note, sign.note.clef.octave, sign.note.step, sign.note.alteration, key, step, alteration, noteKey(sign.note.clef.octave, step, alteration),
-                    strNote(0, step, accidental), strKey(101), strKey(113));
+                    strNote(0, step, accidental)/*, strKey(101), strKey(113)*/);
 
             if((accidental && !sign.note.accidental) // Does not introduce additional accidentals (for ambiguous tones)
                     || (accidental && sign.note.accidental  // Restricts changes to an existing accidental ...

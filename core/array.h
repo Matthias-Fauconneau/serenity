@@ -80,6 +80,12 @@ generic struct array : buffer<T> {
 	/// Inserts immediately before the first element greater than the argument
     size_t insertSorted(T&& e) { size_t index=reverseLinearSearch(e); insertAt(index, ::move(e)); return index; }
     size_t insertSorted(const T& e) { size_t index=reverseLinearSearch(e); insertAt(index, ::copy(e)); return index; }
+    /// Appends the element, if it is not present already
+    template<Type F> T& addSorted(F&& e) {
+        size_t index=reverseLinearSearch(e);
+        if(index>0 && at(index-1)==e) return at(index-1);
+        else return insertAt(index, forward<F>(e));
+    }
 
     /// Removes one element at \a index
     void removeAt(size_t index) { at(index).~T(); for(size_t i: range(index, size-1)) raw(at(i)).copy(raw(at(i+1))); size--; }
@@ -127,7 +133,7 @@ generic uint partition(const mref<T>& at, size_t left, size_t right, size_t pivo
     const T& pivot = at[right];
     uint storeIndex = left;
     for(uint i: range(left,right)) {
-        if(pivot < at[i]) {
+        if(pivot > at[i]) {
             swap(at[i], at[storeIndex]);
             storeIndex++;
         }

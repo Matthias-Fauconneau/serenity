@@ -5,33 +5,29 @@
 
 inline bool isPowerOfTwo(uint v) { return !(v & (v - 1)); }
 
-struct PitchClass {
-    char keyIntervals[11 +1];
-    char accidentals[12 +1];
-};
-static constexpr PitchClass pitchClasses[14] = {
+static constexpr char accidentals[14][12+1] = {
     //*7%12 //FIXME: generate
     // C♯D♯EF♯G♯A♯B   C♯D♯EF♯G♯A♯B
-    {"10101101010", "N-N-NN-N-N-N"},  // ♭♭♭♭♭♭♭/♯♯♯♯♯ B g♯
-    {"10101101010", "N-N-N.-N-N-N"}, // ♭♭♭♭♭♭/♯♯♯♯♯♯ G♭/F♯ e♭/d♯
-    {"10101101010", ".-N-N.-N-N-N"}, // ♭♭♭♭♭/♯♯♯♯♯♯♯ D♭ b♭
-    {"10101101010", ".-N-N.b.-N-N"}, // ♭♭♭♭ A♭ f
-    {"10101101010", ".b.-N.b.-N-N"}, // ♭♭♭ E♭ c
-    {"10101101010", ".b.-N.b.b.-N"}, // ♭♭ B♭ g
-    {"10101101010", ".b.b..b.b.-N"}, // ♭ F d
+    {"N-N-NN-N-N-N"},  // ♭♭♭♭♭♭♭/♯♯♯♯♯ B g♯
+    {"N-N-N.-N-N-N"}, // ♭♭♭♭♭♭/♯♯♯♯♯♯ G♭/F♯ e♭/d♯
+    {".-N-N.-N-N-N"}, // ♭♭♭♭♭/♯♯♯♯♯♯♯ D♭ b♭
+    {".-N-N.b.-N-N"}, // ♭♭♭♭ A♭ f
+    {".b.-N.b.-N-N"}, // ♭♭♭ E♭ c
+    {".b.-N.b.b.-N"}, // ♭♭ B♭ g
+    {".b.b..b.b.-N"}, // ♭ F d
     //{"10101101010", ".b.b..b.b.b."},  // ♮ C a
     // C♯D♯EF♯G♯A♯B   C♯D♯EF♯G♯A♯B
-    {"01011010101", ".#.#..#.#.#."},  // ♮ C a
-    {"01011010101", ".#.#.N+.#.#."},  // ♯ G e
-    {"01011010101", "N+.#.N+.#.#."},  // ♯♯ D b
-    {"01011010101", "N+.#.N+N+.#."},  // ♯♯♯ A f♯
-    {"01011010101", "N+N+.N+N+.#."},  // ♯♯♯♯ E c♯
-    {"01011010101", "N+N+.N+N+N+."},  // ♯♯♯♯♯/♭♭♭♭♭♭♭ B g♯
-    {"01011010101", "N+N+NN+N+N+."}  // ♯♯♯♯♯♯/♭♭♭♭♭♭ F♯/G♭ d♯/e♭
+    {".#.#..#.#.#."},  // ♮ C a
+    {".#.#.N+.#.#."},  // ♯ G e
+    {"N+.#.N+.#.#."},  // ♯♯ D b
+    {"N+.#.N+N+.#."},  // ♯♯♯ A f♯
+    {"N+N+.N+N+.#."},  // ♯♯♯♯ E c♯
+    {"N+N+.N+N+N+."},  // ♯♯♯♯♯/♭♭♭♭♭♭♭ B g♯
+    {"N+N+NN+N+N+."}  // ♯♯♯♯♯♯/♭♭♭♭♭♭ F♯/G♭ d♯/e♭
 };
 inline int keyStep(int fifths, int key) {
     assert_(fifths >= -7 && fifths <= 6, fifths);
-    int h=key/12*7; for(int i: range(key%12)/*0-10*/) h+=pitchClasses[fifths+7].keyIntervals[i]-'0';
+    int h=key/12*7; for(int i: range(key%12)/*0-10*/) h+=(fifths<0?"10101101010"_:"01011010101"_)[i]-'0';
     return h - 35; // 0 = C4;
 }
 
@@ -71,7 +67,7 @@ enum OctaveShift { Down, Up, OctaveStop };
 using Accidental = SMuFL::Accidental;
 inline int keyAlteration(int fifths, int key) {
     assert_(fifths >= -7 && fifths <= 6 && key>0, fifths, key);
-    char c = pitchClasses[fifths+7].accidentals[key%12/*0-11*/];
+    char c = accidentals[fifths+7][key%12];
     if(c== 'b' || c=='-') return -1;
     if(c=='N' || c=='.') return 0;
     if(c=='#' || c=='+') return 1;
@@ -210,8 +206,12 @@ inline bool operator <(const Sign& a, const Sign& b) {
 inline String superDigit(int digit) {
     assert_(abs(digit) <= 9); return (digit>0?""_:"⁻"_)+ref<string>{"⁰"_,"¹"_, "²"_, "³"_, "⁴"_, "⁵"_, "⁶"_, "⁷"_, "⁸"_, "⁹"_}[abs(digit)];
 }
-inline String strKey(int key) {
-    assert_(key>0); return (string[]){"A"_,"A♯"_,"B"_,"C"_,"C♯"_,"D"_,"D♯"_,"E"_,"F"_,"F♯"_,"G"_,"G♯"_}[(key+2*12+3)%12]+superDigit(key/12-2);
+inline String strKey(int fifths, int key) {
+    assert_(key>0);
+    //return (string[]){"A"_,"A♯"_,"B"_,"C"_,"C♯"_,"D"_,"D♯"_,"E"_,"F"_,"F♯"_,"G"_,"G♯"_}[(key+2*12+3)%12]
+    /*+superDigit(key/12-2)*/;
+    int step = (keyStep(fifths, key)+37)%7;
+    return char('A'+step)+ref<string>{"b"_,""_,"#"_}[keyAlteration(fifths, key)+1];
 }
 inline String strNote(int octave, int step, Accidental accidental) {
     octave += /*lowest A-1*/3 + (step>0 ? step/7 : (step-6)/7); // Rounds towards negative

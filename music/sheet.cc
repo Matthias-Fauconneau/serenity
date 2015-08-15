@@ -543,6 +543,8 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
     size_t nextMeasureIndex = 0;
     while(nextMeasureIndex < signs.size && signs[nextMeasureIndex].type != Sign::Measure) nextMeasureIndex++;
     buffer<Range> measure = evaluateStepRanges(signs.slice(0, nextMeasureIndex));
+    array<uint> measureNoteKeys;
+    float measureFirstNote;
 
     for(size_t signIndex: range(signs.size)) {
         Sign sign = signs[signIndex];
@@ -665,9 +667,12 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 
                     assert_(note.tie != Note::Merged);
                     if(!note.grace) {
+                        if(!measureNoteKeys) measureFirstNote = x;
+                        measureNoteKeys.addSorted( note.key() );
+
                         x += glyphAdvance(SMuFL::NoteHead::Black);
                         /*for(Sign sign: staves[staff].chord) // Dichord
-                                                                if(abs(sign.note.step-note.step) <= 1) { x += glyphAdvance(SMuFL::NoteHead::Black); break; }*/
+                           if(abs(sign.note.step-note.step) <= 1) { x += glyphAdvance(SMuFL::NoteHead::Black); break; }*/
                         staves[staff].chord.insertSorted(sign);
                     } else { // Grace note
                         float dx = glyphSize(SMuFL::NoteHead::Black, &smallFont).x;
@@ -783,6 +788,18 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
                         staves[staff].pendingWhole = false;
                     }
 
+                    { array<uint> keys = ::move(measureNoteKeys);
+                        array<char> chord;
+                        uint root = keys[0];
+                        chord.append( strKey(keySignature, root) );
+                        uint third = keys[1];
+                        if(third-root == 3) chord.append("m");
+                        float x = measureFirstNote;
+                        text(vec2(x, staffY(staves.size-1, max(10, line[1].top))), chord, textSize, system.glyphs, vec2(-1,1));
+                        //error(chord);
+                        log_(chord+" ");
+                    }
+
                     // Clears any pending clef changes right before measure bar (FIXME: defer to new system on break)
                     float dx = space;
                     for(Sign sign: pendingClefChange) {
@@ -890,7 +907,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 
             if(sign.type == Sign::Metronome) {
                 if(ticksPerMinutes!=sign.metronome.perMinute*ticksPerQuarter) {
-                    x += text(vec2(x, staffY(staves.size-1, 12)), "♩="_+str(sign.metronome.perMinute)+" "_, textSize, system.glyphs).x;
+                    x += text(vec2(x, staffY(staves.size-1, 16)), "♩="_+str(sign.metronome.perMinute)+" "_, textSize, system.glyphs).x;
                     if(ticksPerMinutes) log(ticksPerMinutes, "->", sign.metronome.perMinute*ticksPerQuarter); // FIXME: variable tempo
                     ticksPerMinutes = max(ticksPerMinutes, sign.metronome.perMinute*ticksPerQuarter);
                 }
