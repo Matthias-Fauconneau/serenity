@@ -132,12 +132,13 @@ Date parseDate(TextData& s) {
     for(;;) {
         s.whileAny(" ,\t");
         for(int i=0;i<12;i++) {
-         if(s.match(months[i]) || s.match(months[i].slice(0,3))) {
-             date.month=i;
-             // Corrects slightly invalid date
-             if(date.day==daysInMonth(date.month, date.year==-1?Date(currentTime()).year:date.year) && date.month<11) { date.day=0; date.month++; }
-             goto continue2_;
-         }
+            constexpr string de[12] = {"Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"};
+            if(s.match(months[i]) || s.match(months[i].slice(0,3)) || s.match(de[i])) {
+                date.month=i;
+                // Corrects slightly invalid date
+                if(date.day==daysInMonth(date.month, date.year==-1?Date(currentTime()).year:date.year) && date.month<11) { date.day=0; date.month++; }
+                goto continue2_;
+            }
         } /*else */ if(s.available(1) && s.peek()>='0'&&s.peek()<='9') {
             int number = s.integer();
             if(s.match(":")) {

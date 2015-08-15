@@ -359,7 +359,7 @@ MusicXML::MusicXML(string document, string) {
                         else if(d.contains("metronome"_)) {
                             Value beatUnit = Value(ref<string>({"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_})
                                                    .indexOf(d("metronome"_)("beat-unit"_).text()));
-                            TextData s = d("metronome"_)("per-minute"_).text();
+                            TextData s (d("metronome"_)("per-minute"_).text());
                             s.whileNo("0123456789"_);
                             float perMinute = s.decimal();
                             assert_(perMinute==uint(perMinute));
