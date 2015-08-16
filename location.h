@@ -71,7 +71,7 @@ uint duration(string origin, string destination, int64 time=0) {
     };
 
     uint bicycling = getDuration(URL(url+"bicycling"));
-    assert_(duration);
+    assert(bicycling, origin, destination);
     url = url+"transit";
     if(time>0) url= url+"&departure_time="+str(time);
     if(time<0) url= url+"&arrival_time="+str(-time);

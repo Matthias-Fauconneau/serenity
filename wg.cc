@@ -56,7 +56,8 @@ struct Room {
                     "glattpark","glattbrugg","gockhausen","kichberg","kloten","küsnacht","leimbach","meilen","oberengstringen","oberrohrdorf","pfaffhausen",
                     "regensdorf","schlieren","schwerzbenbach","schwerzenbach","thalwil","uitikon","uster","wallisellen","wetzikon","zollikerberg"})
                     if(find(ort, s)) {assert_(!filter); reason=unsafeRef(s); return false;}
-                for(string s: ref<string>{"zürich","zurich","zÜrich","zurigo","oerlikon","Örlikon","zh","affoltern","wipkingen"}) if(find(ort, s)) goto break_;
+                for(string s: ref<string>{"zürich","zurich","zÜrich","zurigo","oerlikon","Örlikon","zh","affoltern","wipkingen","seebach"})
+                    if(find(ort, s)) goto break_;
                 error(ort, details(".adress-region").children[3]->content, price);
                 break_:;
             }
@@ -84,43 +85,53 @@ struct Room {
         }*/
         if((find(profile,"JUWO")||find(profile,"Juwo")) && price<=620) {assert_(!filter); reason="JUWO"__; return false;}
 
-        const float c = 3600./*Fr/month*//(40*60)/*minutes/week*/; // 1.5 (Fr week)/(min month)
-
         static String destinationFile = readFile("destinations");
         static buffer<string> destinations = split(destinationFile,"\n");
-        static vec2 mainDestination = ::location(destinations[0]+",+Zürich");
-
-        // Duration to main destination estimate based only on straight distance between locations (without routing)
-        float durationEstimate = distance(location, mainDestination) /1000/*m/km*/ / 17/*km/h*/ * 60 /*min/h*/;
-        if((score=/*price+*/ 10*durationEstimate*c) > threshold) {assert_(!filter); reason="price+time"__; return false;} // Reduces directions requests
-
-        // Requests route to destinations for accurate evaluation of transit time per day (average over typical week)
-        score = 0;//price;
-        durations = buffer<float>(destinations.size);
-        for(size_t destinationIndex: range(destinations.size)) {
-            TextData s (destinations[destinationIndex]);
-            string dest = s.until(':');
-            String destination = dest.contains('|') ? ::nearby(location, dest) : dest+", Zürich";
-            String origin = address+", Zürich";
-            float durationSum = 0, tripCount = 0;
-            while(s) {
-                s.whileAny(' ');
-                bool outbound = false;
-                if(s.match('-')) outbound = true;
-                static Date day = parseDate("13/08");
-                Date date = parseDate(s.whileNo(" -"_));
-                date.year = day.year, date.month = day.month, date.day = day.day;
-                int64 time = date;
-                string A = origin, B = destination;
-                if(outbound) time=-time;
-                else { s.skip('-'); swap(A, B); }
-                float duration = ::duration(A, B, time)/60.;
-                assert_(duration < 45, duration, durationEstimate, 5*durationEstimate*c);
-                durationSum += duration; tripCount+=1;
-                score += duration*c;
-                if(score > threshold) {assert_(!filter, durations, score, score-price, price, address, url); reason="threshold"__; return false;}
+        static buffer<vec2> locations;
+        if(!locations) {
+            locations = buffer<vec2>(destinations.size);
+            for(size_t destinationIndex: range(destinations.size)) {
+                TextData s (destinations[destinationIndex]);
+                string destination = s.until(':');
+                locations[destinationIndex] = destination.contains('|') ? 0 : ::location(destination+", Zürich");
             }
-            durations[destinationIndex] = durationSum/tripCount;
+        }
+        durations = buffer<float>(destinations.size);
+        for(bool route: range(2)) {
+            const float c = 3600./*Fr/month*//(40*60)/*minutes/week*/; // 1.5 (Fr week)/(min month)
+
+            score = 1?:price;
+            for(size_t destinationIndex: range(destinations.size)) {
+                TextData s (destinations[destinationIndex]);
+                string dest = s.until(':');
+                if(dest.contains('|') && !route) continue;
+                String destination = dest.contains('|') ? ::nearby(location, dest) : dest+", Zürich";
+                String origin = address+", Zürich";
+                float durationSum = 0, tripCount = 0;
+                while(s) {
+                    s.whileAny(' ');
+                    bool outbound = false;
+                    if(s.match('-')) outbound = true;
+                    static Date day = parseDate("13/08");
+                    Date date = parseDate(s.whileNo(" -"_));
+                    date.year = day.year, date.month = day.month, date.day = day.day;
+                    int64 time = date;
+                    string A = origin, B = destination;
+                    if(outbound) time=-time;
+                    else { s.skip('-'); swap(A, B); }
+                    // !route: Estimate duration from straight distance between locations (without routing)
+                    //  route: Requests route to destinations for accurate evaluation of transit time per week
+                    float duration = route? ::duration(A, B, time)/60. : distance(location, locations[destinationIndex])/1000/*m/km*//35/*km/h*/*60/*min/h*/;
+                    //if(route) log(A, B, duration);
+                    assert_(duration < 52, duration);
+                    durationSum += duration; tripCount+=1;
+                    score += duration*c;
+                    if(score > threshold) {assert_(!filter, durations, score, score-price, price, address, url); reason="threshold"__; return false;}
+                }
+                float perTrip = durationSum/tripCount;
+                if(route) assert_(durations[destinationIndex] <= perTrip, perTrip, durations[destinationIndex]); // Conservative estimate
+                durations[destinationIndex] = perTrip;
+            }
         }
         assert_(price>=210, durations[0], score-price, price);
         if(parseDate(postDate) <= Date(currentTime()-24*60*60)) {
