@@ -1,90 +1,8 @@
 #pragma once
 #include "http.h"
 #include "xml.h"
+#include "time.h"
 #include <unistd.h>
-
-static string key = arguments()[0];
-constexpr int maximumAge = 14*24;
-int queryLimit = 0;
-
-struct LocationRequest {
-    String address;
-    vec3 location;
-    function<void(string, vec3)> handler;
-    bool wait = false;
-    LocationRequest(string address, function<void(string, vec3)> handler={}, bool wait=true) : address(copyRef(address)), handler(handler), wait(wait) {
-        getURL(URL("https://maps.googleapis.com/maps/api/geocode/xml?key="_+key+"&address="+replace(address," ","+")),
-               {this, &LocationRequest::parseLocation}, maximumAge, wait);
-    }
-    LocationRequest(vec3 location, function<void(string, vec3)> handler) : location(location), handler(handler) {
-        getURL(URL("https://maps.googleapis.com/maps/api/geocode/xml?key="_+key+"&latlng="+str(location.x)+","+str(location.y)),
-               {this, &LocationRequest::parseAddress}, maximumAge, wait);
-    }
-    void parseLocation(const URL& url, Map&& data) {
-        Element root = parseXML(data);
-        string status = root("GeocodeResponse")("status").content;
-        if(status == "ZERO_RESULTS"_) return;
-        assert_(status=="OK", status, root, cacheFile(url));
-        const auto& xmlLocation = root("GeocodeResponse")("result")("geometry")("location");
-        vec2 location(parseDecimal(xmlLocation("lat").content), parseDecimal(xmlLocation("lng").content));
-        assert_(location);
-        this->location = vec3(location, 0);
-        if(handler) handler(address, vec3(location, 0));
-        /*getURL(URL("https://maps.googleapis.com/maps/api/elevation/xml?key="_+key+"&locations="+str(location.x)+","+str(location.y)),
-                {this, &LocationRequest::parseElevation}, maximumAge, wait);*/
-    }
-    void parseAddress(const URL&, Map&& data) {
-        this->address = copyRef( parseXML(data)("GeocodeResponse")("result")("address_component")("short_name").content );
-        handler(address, location);
-    }
-    /*void parseElevation(const URL&, Map&& data) {
-        location.z = parseDecimal(parseXML(data)("ElevationResponse")("result")("elevation").content);
-        assert_(location);
-        if(handler) handler(address, location);
-    }*/
-};
-
-struct DirectionsRequest {
-    String origin, destination;
-    uint /*transit = 0, bicycling = 0,*/ duration = -1;
-    function<void(string, string, uint)> handler;
-    DirectionsRequest(string origin, string destination, function<void(string, string, uint)> handler={}, bool wait=true)
-        : origin(copyRef(origin)), destination(copyRef(destination)), handler(handler) {
-        assert_(origin != destination, origin, destination);
-        Date arrival = parseDate("13/08 19:00");
-        getURL(URL("https://maps.googleapis.com/maps/api/directions/xml?key="_+key+
-                   "&origin="+replace(destination," ","+")+"&destination="+replace(origin," ","+")+"&mode=transit&arrival_time="+str((int64)arrival)),
-               /*[this](const URL& url, Map&& data) { parse(url, ::move(data), transit); }*/{this, &DirectionsRequest::parse}, maximumAge, wait);
-        usleep( queryLimit*1000 );
-        if(queryLimit) queryLimit--;
-        getURL(URL("https://maps.googleapis.com/maps/api/directions/xml?key="_+key+
-                   "&origin="+replace(origin," ","+")+"&destination="+replace(destination," ","+")+"&mode=bicycling"),
-               /*[this](const URL& url, Map&& data) { parse(url, ::move(data), bicycling); }*/{this, &DirectionsRequest::parse}, maximumAge, wait);
-        if(duration == uint(-1)) duration = 5*60;
-        assert_(wait && duration != uint(-1), duration, origin, destination);
-        //if(transit && bicycling) { this->duration=min(transit, bicycling); if(handler) handler(origin, destination, duration); }
-        //if(wait) assert_(duration, transit, bicycling);
-    }
-    void parse(const URL& url, Map&& data/*, uint& duration*/) {
-        for(;;) {
-            Element root = parseXML(data);
-            string status = root("DirectionsResponse")("status").content;
-            if(status=="OK") {
-                duration = min(duration, (uint)parseInteger(root("DirectionsResponse")("route")("leg")("duration")("value").content));
-                return;
-            }
-            if(status=="NOT_FOUND"_ || status=="ZERO_RESULTS") return;
-            if(status == "OVER_QUERY_LIMIT"_) {
-                log(status, queryLimit);
-                if(!queryLimit) queryLimit = 125;
-                else queryLimit *= 2;
-                usleep(2*queryLimit);
-                data = getURL(copy(url), {}, 0);
-                continue;
-            }
-        }
-    }
-};
 
 float distance(vec2 A, vec2 B) {
     float R = 6378137;
@@ -96,4 +14,68 @@ float distance(vec2 A, vec2 B) {
     float c = 2 * atan(sqrt(a), sqrt(1-a));
     return R * c;
 }
-float distance(vec3 A, vec3 B) { return sqrt(sq(distance(A.xy(), B.xy())) + sq(B.z - A.z)); }
+
+static string key = arguments()[0];
+
+vec2 location(string address) {
+    Map data = getURL(URL("https://maps.googleapis.com/maps/api/geocode/xml?key="_+key+"&address="+replace(address," ","+")));
+    Element root = parseXML(data);
+    string status = root("GeocodeResponse")("status").content;
+    if(status == "ZERO_RESULTS"_) return 0;
+    assert_(status=="OK", status);
+    const Element& location = root("GeocodeResponse")("result")("geometry")("location");
+    return vec2(parseDecimal(location("lat").content), parseDecimal(location("lng").content));
+}
+
+String nearby(vec2 location, string types) {
+    auto data = getURL(URL("https://maps.googleapis.com/maps/api/place/nearbysearch/xml?key="_+key+
+                           "&location="+str(location.x)+","+str(location.y)+"&types="+types+
+                           "&rankby=distance"));
+    Element root = parseXML(data);
+    for(const Element& result : root("PlaceSearchResponse").children) {
+        if(result.name!="result") continue;
+        String destination = result("name").content+", "+result("vicinity").content;
+        vec2 dstLocation = ::location(destination);
+        if(distance(location, dstLocation) < 22838) return destination;
+        // else wrong result in Nearby Search
+    }
+    error(location, types);
+}
+static int queryLimit = 0;
+
+uint duration(string origin, string destination, int64 time=0) {
+    if(origin == destination) return 0;
+    String url = "https://maps.googleapis.com/maps/api/directions/xml?key="_+key+"&origin="+replace(origin," ","+")
+               + "&destination="+replace(destination," ","+")+"&mode=";
+
+    auto getDuration = [](const URL& url) {
+        for(;;) {
+            usleep( queryLimit*1000 );
+            if(queryLimit>50) queryLimit--;
+            Map data = getURL(copy(url));
+            Element root = parseXML(data);
+            string status = root("DirectionsResponse")("status").content;
+            if(status=="OK") {
+                return (uint)parseInteger(root("DirectionsResponse")("route")("leg")("duration")("value").content);
+            }
+            if(status=="NOT_FOUND"_ || status=="ZERO_RESULTS") return 0u;
+            if(status == "OVER_QUERY_LIMIT"_) {
+                log(status, queryLimit);
+                if(!queryLimit) queryLimit = 100;
+                else queryLimit *= 2;
+                extern const Folder& cache();
+                remove(cacheFile(url), cache());
+                continue;
+            }
+        }
+    };
+
+    uint bicycling = getDuration(URL(url+"bicycling"));
+    assert_(duration);
+    url = url+"transit";
+    if(time>0) url= url+"&departure_time="+str(time);
+    if(time<0) url= url+"&arrival_time="+str(-time);
+    uint transit = getDuration(url);
+    if(!transit) return bicycling;
+    return ::min(bicycling, transit);
+}

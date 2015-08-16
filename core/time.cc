@@ -142,7 +142,7 @@ Date parseDate(TextData& s) {
         } /*else */ if(s.available(1) && s.peek()>='0'&&s.peek()<='9') {
             int number = s.integer();
             if(s.match(":")) {
-                assert_(date.hours==-1 && date.minutes==-1, date.hours, date.minutes);
+                assert_(date.hours==-1 && date.minutes==-1, date.hours, date.minutes, s.slice(s.index), number);
                 date.hours=number; date.minutes=s.integer();
                 if(s.match(":")) {
                     assert_(date.seconds==-1);

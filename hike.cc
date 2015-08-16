@@ -67,7 +67,7 @@ struct Hike {
             string name = s.line();
             if(name) p.name = upperCase(name[0])+toLower(name.slice(1));
             p.name = replace(p.name, "oe", "ö");
-            p.distance = distance(p.location, this->location).y/1000;
+            p.distance = distance(p.location, this->location)/1000;
             peaks.insertSorted(move(p));
         }
         peakIndex = peaks.size-1;

@@ -18,7 +18,7 @@ struct Room {
     String untilDate;
     uint price;
     String address;
-    vec3 location;
+    vec2 location;
     String description;
     String profile;
     String mates;
@@ -28,22 +28,22 @@ struct Room {
     float score = 0;
     String reason;
 
-    bool evaluate(const float threshold = 1192) {
-        // Filters based on data available directly in index to reduce room detail requests
-
-        static String filterFile = readFile("filter");
+    bool evaluate(const float threshold = 500/*1192*/) {
+        static String filterFile = readFile("WG");
         bool filter = url && (find(filterFile, section(section(url.path,'/',-2,-1),'.',0,-2)+'\n')
                            || find(filterFile, section(section(url.path,'/',-2,-1),'.',0,-2)+' '));
-        //if(filter) return false;
+        //if(filter) {reason="filter"__; return false;}
+
+        // Filters based on data available directly in index to reduce room detail requests
         //if(parseDate(postDate) <= Date(currentTime()-31*24*60*60)) {assert_(!filter); return false;}
-        if(startDate && parseDate(startDate) < Date(currentTime()-31*24*60*60)) {assert_(!filter); return false;}
+        if(startDate && parseDate(startDate) < Date(currentTime()-31*24*60*60)) {assert_(!filter,"start"); reason="start"__; return false;}
         Date until = parseDate(untilDate);
-        if(until && until < Date(currentTime()+62*24*60*60)) {assert_(!filter); reason="until"_+str(until); return false;}
-        if((score=price) > 865) {assert_(!filter); reason="price"__; return false;}
+        if(until && until < Date(currentTime()+62*24*60*60)) {assert_(!filter,"until"); reason=str("until",until); return false;}
+        if((score=price) > 1007/*865*/) {assert_(!filter,"price"); reason="price"__; return false;}
 
         // Room detail request
         if(url.host) {
-            auto data = getURL(copy(url), {}, 7*24);
+            const Map data = getURL(copy(url), {}, 7*24);
             const Element root = parseHTML(data);
             const Element& content = root("html")("body")("#main")("#container")("#content");
             assert_(content.contains(".result"));
@@ -52,11 +52,12 @@ struct Room {
             if(address.size <= 1) address = copyRef( details(".adress-region").children[3]->content );
             else {
                 String ort = toLower(details(".adress-region").children[3]->content);
-                for(string s: ref<string>{"adliswil","binz","dietikon","dietlikon","dübendorf","ehrendingen","fahrweid","glattpark","glattbrugg","kichberg","kloten",
-                    "leimbach","meilen","uster","oberengstringen","regensdorf","schlieren","schwerzenbach","wallisellen","wetzikon","8820","8105"})
-                    if(find(ort, s)) {assert_(!filter); return false;}
-                for(string s: ref<string>{"zürich","zurich","zÜrich","zurigo","oerlikon","zh","affoltern"}) if(find(ort, s)) goto break_;
-                error(ort, details(".adress-region").children[3]->content);
+                for(string s: ref<string>{"8820","8105","adliswil","binz","dietikon","dietlikon","dübendorf","ehrendingen","fahrweid","gattikon",
+                    "glattpark","glattbrugg","gockhausen","kichberg","kloten","küsnacht","leimbach","meilen","oberengstringen","oberrohrdorf","pfaffhausen",
+                    "regensdorf","schlieren","schwerzbenbach","schwerzenbach","thalwil","uitikon","uster","wallisellen","wetzikon","zollikerberg"})
+                    if(find(ort, s)) {assert_(!filter); reason=unsafeRef(s); return false;}
+                for(string s: ref<string>{"zürich","zurich","zÜrich","zurigo","oerlikon","Örlikon","zh","affoltern","wipkingen"}) if(find(ort, s)) goto break_;
+                error(ort, details(".adress-region").children[3]->content, price);
                 break_:;
             }
             assert_(address.size > 1, details(".adress-region"));
@@ -66,7 +67,7 @@ struct Room {
                     images.append(copyRef(a.attribute("href")));
             profile = copyRef( details(".room-content")("p").content );
             mates = copyRef( details(".person-content")("p").content );
-            location = LocationRequest(address+",+Zürich").location;
+            location = ::location(address+",+Zürich");
             {TextData s (details(".mate-contact")("p")("a").attribute("onclick"));
                 s.skip("Javascript:showContactDetail('");
                 string id = s.until('\'');
@@ -81,48 +82,45 @@ struct Room {
             assert_(price <= 870, price, url);
             price += 100 - 70; //+PhD - Utilities included
         }*/
-        if((find(profile,"JUWO")||find(profile,"Juwo")) && price<=620) {assert_(!filter); return false;}
+        if((find(profile,"JUWO")||find(profile,"Juwo")) && price<=620) {assert_(!filter); reason="JUWO"__; return false;}
 
-        const uint c = 2/*RT*/*3600/*Fr/month*//(40*60)/*minutes/week*/; // 3 (Fr week)/(min roundtrip month)
+        const float c = 3600./*Fr/month*//(40*60)/*minutes/week*/; // 1.5 (Fr week)/(min month)
 
         static String destinationFile = readFile("destinations");
         static buffer<string> destinations = split(destinationFile,"\n");
-        static vec3 mainDestination = LocationRequest(destinations[0]+",+Zürich").location;
+        static vec2 mainDestination = ::location(destinations[0]+",+Zürich");
 
         // Duration to main destination estimate based only on straight distance between locations (without routing)
-        float duration = distance(location.xy(), mainDestination.xy()) /1000/*m/km*/ / 17/*km/h*/ * 60 /*min/h*/;
-        if((score=price + 5*duration*c) > threshold) {assert_(!filter); return false;} // Reduces directions requests
+        float durationEstimate = distance(location, mainDestination) /1000/*m/km*/ / 17/*km/h*/ * 60 /*min/h*/;
+        if((score=/*price+*/ 10*durationEstimate*c) > threshold) {assert_(!filter); reason="price+time"__; return false;} // Reduces directions requests
 
         // Requests route to destinations for accurate evaluation of transit time per day (average over typical week)
-        score = price;
+        score = 0;//price;
         durations = buffer<float>(destinations.size);
         for(size_t destinationIndex: range(destinations.size)) {
             TextData s (destinations[destinationIndex]);
-            uint roundtripPerWeek = s.integer(); s.whileAny(" \t"); String destination = unsafeRef(s.untilEnd());
-
-            if(destination.contains('|')) { // Type destination
-                auto data = getURL(URL("https://maps.googleapis.com/maps/api/place/nearbysearch/xml?key="_+key+
-                                       "&location="+str(location.x)+","+str(location.y)+"&types="+destination+
-                                       "&rankby=distance"), {}, maximumAge);
-                Element root = parseXML(data);
-                for(const Element& result : root("PlaceSearchResponse").children) {
-                    if(result.name!="result") continue;
-                    destination = result("name").content+", "+result("vicinity").content;
-                    vec2 dstLocation = LocationRequest(destination).location.xy();
-                    if(distance(location.xy(), dstLocation) > 22838) continue; // Wrong result in Nearby Search
-                    break;
-                }
-                uint duration = DirectionsRequest(address+", Zürich", destination).duration;
-                DirectionsRequest req(address+", Zürich", destination);
-                assert_(duration <= 1451, duration); // FIXME
-            } else destination=destination+", Zürich";
-            float duration = DirectionsRequest(address+", Zürich", destination).duration/60.;
-            DirectionsRequest req(address+", Zürich", destination);
-            assert_(duration < 44, duration);
-            durations[destinationIndex] = duration;
-            float timeScore = roundtripPerWeek*max(3.f,duration)*c;
-            score += timeScore;
-            if(score > threshold) {assert_(!filter, durations, score, score-price, price, address, url); reason="threshold"__; return false;}
+            string dest = s.until(':');
+            String destination = dest.contains('|') ? ::nearby(location, dest) : dest+", Zürich";
+            String origin = address+", Zürich";
+            float durationSum = 0, tripCount = 0;
+            while(s) {
+                s.whileAny(' ');
+                bool outbound = false;
+                if(s.match('-')) outbound = true;
+                static Date day = parseDate("13/08");
+                Date date = parseDate(s.whileNo(" -"_));
+                date.year = day.year, date.month = day.month, date.day = day.day;
+                int64 time = date;
+                string A = origin, B = destination;
+                if(outbound) time=-time;
+                else { s.skip('-'); swap(A, B); }
+                float duration = ::duration(A, B, time)/60.;
+                assert_(duration < 45, duration, durationEstimate, 5*durationEstimate*c);
+                durationSum += duration; tripCount+=1;
+                score += duration*c;
+                if(score > threshold) {assert_(!filter, durations, score, score-price, price, address, url); reason="threshold"__; return false;}
+            }
+            durations[destinationIndex] = durationSum/tripCount;
         }
         assert_(price>=210, durations[0], score-price, price);
         if(parseDate(postDate) <= Date(currentTime()-24*60*60)) {
@@ -131,7 +129,7 @@ struct Room {
             if(durations[0] > 10 && score-price>351 && price >= 500) { assert_(!filter, durations, score, score-price, price, address, url); return false; }
             if(durations[0] > 17 && score-price>422 && price >= 210) { assert_(!filter, durations, score, score-price, price, address, url); return false; }
         }
-        if(1) { if(filter) return false; }
+        if(1) { if(filter) {reason="filter"__; return false;} }
         else assert_(filter, durations, score, score-price, price, address, url);
         return true;
     }
@@ -160,7 +158,7 @@ struct WG {
         url.post = "query=&priceMin=50&priceMax=1500&state=zurich-stadt&permanent=all&student=none"
                    "&country=ch&orderBy=MetaData%2F%40mgnl%3Alastmodified&orderDir=descending"
                    "&startSearchMate=true&wgStartSearch=true"__;
-        Map data = getURL(move(url), {}, 1);
+        const Map data = getURL(copy(url), {}, 1);
         const Element root = parseHTML(data);
         const auto& list = root("html")("body")("#main")("#container")("#content")("ul");
         for(const Element& li: list.children) {

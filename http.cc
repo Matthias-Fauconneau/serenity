@@ -56,7 +56,7 @@ template<class T> size_t DataStream<T>::available(size_t need) {
 }
 
 // Cache
-static const Folder& cache() { static Folder cache(".cache", currentWorkingDirectory()); return cache; }
+const Folder& cache() { static Folder cache(".cache", currentWorkingDirectory()); return cache; }
 
 // DNS
 
@@ -311,8 +311,8 @@ Map getURL(URL&& url, function<void(const URL&, Map&&)> handler, int maximumAge,
     if(wait) {
         HTTP request(move(url),handler,move(headers));
         while(request.state < HTTP::Handle) assert_(request.wait(), request.events, request.revents);
-        if(!handler) return Map(cacheFile(request.url),cache());
-        handler(move(request.url), Map(cacheFile(request.url),cache()));
+        if(!handler) return Map(cacheFile(request.url), cache());
+        handler(move(request.url), Map(cacheFile(request.url), cache()));
     } else {
         requests.append( unique<HTTP>(move(url),handler,move(headers)) );
     }
