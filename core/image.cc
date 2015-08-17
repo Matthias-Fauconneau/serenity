@@ -77,7 +77,7 @@ int2 imageSize(const ref<byte> file) {
         }
 		error("JPG");
     }
-    error("Unknown image format", hex(file.size<16?file:s.peek(16)));
+    error("Unknown image format", hex(file.size<16?file:s.peek(16)), file.size<16?file:s.peek(16));
 }
 
 __attribute((weak)) Image decodePNG(const ref<byte>) { error("PNG support not linked"); }
@@ -94,7 +94,7 @@ Image decodeImage(const ref<byte> file) {
 	else if(startsWith(file,"\x00\x00\x02\x00"_)||startsWith(file,"\x00\x00\x0A\x00"_)) return decodeTGA(file);
 	else if(startsWith(file,"\x49\x49\x2A\x00"_) || startsWith(file,"\x4D\x4D\x00\x2A"_)) return decodeTIFF(file);
 	else if(startsWith(file,"BM"_)) return decodeBMP(file);
-	else error("Unknown image format", hex(file.slice(0,min<int>(file.size,4))));
+    else error("Unknown image format", hex(file.slice(0,min<int>(file.size,4))), file.slice(0,min<int>(file.size,4)));
 }
 
 // -- Rotate --

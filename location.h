@@ -41,7 +41,9 @@ String nearby(vec2 location, string types) {
     }
     error(location, types);
 }
+
 static int queryLimit = 0;
+static int queryCount = 0;
 
 uint duration(string origin, string destination, int64 time=0) {
     if(origin == destination) return 0;
@@ -51,8 +53,10 @@ uint duration(string origin, string destination, int64 time=0) {
     auto getDuration = [](const URL& url) {
         for(;;) {
             usleep( queryLimit*1000 );
-            if(queryLimit>50) queryLimit--;
+            if(queryLimit>500) queryLimit--;
+            assert_(queryCount < 2500/4);
             Map data = getURL(copy(url));
+            queryCount++;
             Element root = parseXML(data);
             string status = root("DirectionsResponse")("status").content;
             if(status=="OK") {
@@ -61,7 +65,7 @@ uint duration(string origin, string destination, int64 time=0) {
             if(status=="NOT_FOUND"_ || status=="ZERO_RESULTS") return 0u;
             if(status == "OVER_QUERY_LIMIT"_) {
                 log(status, queryLimit);
-                if(!queryLimit) queryLimit = 100;
+                if(!queryLimit) queryLimit = 500;
                 else queryLimit *= 2;
                 extern const Folder& cache();
                 remove(cacheFile(url), cache());

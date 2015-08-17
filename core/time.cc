@@ -167,13 +167,21 @@ Date parseDate(TextData& s) {
             }
             else if(s.match("-")) {
                 assert_(date.year==-1 && date.month==-1);
-                date.year=number;
-                date.month=s.integer()-1;
-                if(s.match("-")) {
+                if(number > 2000) {
+                    date.year=number;
+                    date.month=s.integer()-1;
+                    if(s.match("-")) {
+                        assert_(date.day==-1);
+                        date.day=s.integer()-1;
+                    }
+                    s.match('T');
+                } else {
                     assert_(date.day==-1);
-                    date.day=s.integer()-1;
+                    date.day=number-1;
+                    date.month=s.integer()-1;
+                    s.skip("-");
+                    date.year=s.integer();
                 }
-                s.match('T');
             }
             else if(s.match(".")) {
              if(date.day==-1) {
