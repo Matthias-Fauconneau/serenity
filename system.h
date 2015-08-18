@@ -39,7 +39,7 @@ struct System {
  sconst float mm = 1e-3*m, g = 1e-3*kg;
  //vec4f G = _0f; // Using downward velocity instead
  const float gz; //= 4*10*1e-9 * N/kg; // Scaled gravity
- sconst float densityScale = 1e7; // 6-7
+ sconst float densityScale = 1e6; // 6-7
  vec4f G {0, 0, -gz/densityScale, 0}; // Scaled gravity
 
  // Penalty model
@@ -131,7 +131,7 @@ struct System {
 
   sconst bool friction = false;
   sconst float curvature = 0;
-  sconst float elasticModulus = 1e11 * kg/(m*s*s); // 1 GPa
+  sconst float elasticModulus = 1e10 * kg/(m*s*s); // 1 GPa
 
   Plate() : Vertex(0, 2, 1e-3 * densityScale) {
    count = 2;
@@ -162,7 +162,7 @@ struct System {
   sconst float curvature = 1./radius;
   sconst float shearModulus = 79e9 * kg / (m*s*s);
   sconst float poissonRatio = 0.28;
-  sconst float elasticModulus = validation ? 2*shearModulus*(1+poissonRatio) : 1.4e9; // nu~0.35
+  sconst float elasticModulus = 2*shearModulus*(1+poissonRatio); // ~10^11
 
   //sconst float mass = 3*g;
   sconst float density = (validation ? 7.8e3 : 1.4e3) * densityScale;
@@ -220,7 +220,7 @@ struct System {
 
   sconst float curvature = 0; // -1/radius?
   const float elasticModulus;// = 1e10; // 8
-  sconst float density = 5e2;
+  sconst float density = 5e1;
   const float resolution;
   const float initialRadius;
   const float height;
@@ -238,7 +238,7 @@ struct System {
 
   vec4f tensionStiffness = float3(elasticModulus * internodeLength * sqrt(3.)/2 * thickness); // FIXME
 
-  vec4f tensionDamping = _0f; //float3(mass / s);
+  vec4f tensionDamping = float3(mass / s);
   //sconst float areaMomentOfInertia = pow4(1*mm); // FIXME
   const float bendStiffness = 0;//elasticModulus * areaMomentOfInertia / internodeLength; // FIXME
 
@@ -249,7 +249,7 @@ struct System {
   struct { NoOperation operator[](size_t) const { return {}; }} torque;
 
   Side(float resolution, float initialRadius, float height, float loadThickness, size_t base,
-       float pourThickness=1, float elasticModulus = 1e8)
+       float pourThickness=1e-3, float elasticModulus = 1e8)
    : Vertex(base, /*W*H*/int(2*PI*initialRadius/resolution) *
                                          (int(height/resolution*2/sqrt(3.))+1),
             (pourThickness*sqrt(3.)/2*sq(2*PI*initialRadius/int(2*PI*initialRadius/resolution)))*density*densityScale/*1-4*/),
@@ -283,7 +283,7 @@ struct System {
   vec4f normal = relativePosition/length; // B -> A
   return {float3(tA::radius)*(-normal), _0f, normal, length[0]-tA::radius, 0, 0};
  }
- struct RigidSide {
+ /*struct RigidSide {
   sconst size_t base = 0;
   sconst bool friction = false;
   sconst float curvature = 0;
@@ -307,7 +307,7 @@ struct System {
   return { float3(tA::radius)*(-normal),
      vec4f{r*-normal[0], r*-normal[1], A.position[aIndex][2], 0},
    normal, r-tA::radius-length,0,0 };
-}
+}*/
 
  System(const Dict& p) :
    dt(p.at("TimeStep"_)),
@@ -316,7 +316,7 @@ struct System {
    wire(p.value("Elasticity"_, 0.f), grain.base+grain.capacity),
    side(Grain::radius/(float)p.value("Resolution",2), p.at("Radius"_),
         /*p.at("Height"_)*/ (float)p.at("Radius"_)*4.f,
-          p.value("Thickness"_, 1e-2), wire.base+wire.capacity, 1, p.value("Side",1e9)) {
+          p.value("Thickness"_, 1e-3), wire.base+wire.capacity, 1, p.value("Side",5e8)) {
   //log("System");
  }
 
@@ -418,6 +418,7 @@ constexpr float System::Wire::mass;
 constexpr vec4f System::Wire::internodeLength4;
 constexpr float System::Plate::elasticModulus;
 //constexpr float System::Side::elasticModulus;
+constexpr float System::Side::density;
 constexpr float System::Grain::elasticModulus;
 constexpr vec4f System::Wire::tensionDamping;
-constexpr float System::RigidSide::elasticModulus;
+//constexpr float System::RigidSide::elasticModulus;

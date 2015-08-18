@@ -33,7 +33,7 @@ struct SimulationRun : Simulation {
     log(info());
    }
    int64 time = input.modifiedTime();
-   if(time > lastTime) { snapshot(); input.touch(); lastTime=input.modifiedTime(); } // Touch the file for snapshot
+   if(time > lastTime) { snapshot("signal"); input.touch(); lastTime=input.modifiedTime(); } // Touch the file for snapshot
    step();
   }
   if(processState != ProcessState::Done) {
@@ -93,7 +93,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
   if(/*XDisplay::hasServer() &&*/ /*arguments().contains("view")*/1) {
    window = ::window(this, -1, mainThread, true, false);
    window->actions[F11] = {(SimulationRun*)this, &SimulationRun::report};
-   window->actions[F12] = {(Simulation*)this, &Simulation::snapshot};
+   window->actions[F12] = [this](){ snapshot("ui"); };
    window->actions[Return] = [this]{
     skip = true;
     log("skip", int(processState), "grain", grain.count, "wire", wire.count);

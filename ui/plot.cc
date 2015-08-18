@@ -17,10 +17,12 @@ uint subExponent(float& value) {
 
 vec2 Plot::sizeHint(vec2 size) {
  if(!dataSets) return 0;
- if(!size) size = 1024;
+ //if(!size) size = 1024;
+ size.x = ::min(size.x, 1680.f/5);
+ size.y = ::min(size.y, 1680.f/5);
  if(plotCircles) return ::min(size.x, size.y); // FIXME: margin.x > margin.y
  else size.y = ::min(size.y, 3*size.x/4);
- return size;
+ return -size; // Expanding
 }
 shared<Graphics> Plot::graphics(vec2 size) {
  vec2 min=vec2(+__builtin_inf()), max=vec2(-__builtin_inf());

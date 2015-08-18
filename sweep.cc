@@ -14,7 +14,7 @@ struct ParameterSweep {
  ParameterSweep() {
   prctl(PR_SET_PDEATHSIG, 1/*SIGHUP*/);
   mainThread.setPriority(19);
-  if(!arguments() || arguments().contains("pretend"_)) {
+  //if(!arguments() || arguments().contains("pretend"_)1) {
    array<String> all, missing;
    Dict parameters = parseDict("Rate:100"_);
    /*array<String> existing =
@@ -35,11 +35,11 @@ struct ParameterSweep {
      if(job.state == "running") running.append(" "+job.id);
      if(job.state == "pending") queued.append(" "+job.id);
     }
-    //if(running) log("Running jobs:", "qdel -f"+running+" &");
-    //if(queued) log("Queued jobs:", "qdel -f"+queued+" &");
+    if(running) log("Running jobs:", "qdel -f"+running+" &");
+    if(queued) log("Queued jobs:", "qdel -f"+queued+" &");
    }
    size_t done = 0, running = 0, queued = 0;
-   for(float dt: {2e-5}) {
+   for(float dt: {1e-5}) {
     parameters["TimeStep"__] = String(str(int(round(dt*1e6)))+"µ");
     for(string plateSpeed: {0?"8e-5"_:"1e-4"_}) {
      parameters["PlateSpeed"__] = plateSpeed;
@@ -47,22 +47,31 @@ struct ParameterSweep {
       parameters["Friction"__] = frictionCoefficient;
       for(string pattern: ref<string>{"none","helix","cross","loop"}) {
        parameters["Pattern"__] = pattern;
-       for(int pressure: {0,80,160,320,640}) {
+       for(int pressure: {0,80,160,320/*,640*/}) {
         parameters["Pressure"__] = String(str(pressure)+"K"_);
-        array<float> radii = copyRef(ref<float>{0.02/*,0.05*/});
+        array<float> radii = copyRef(ref<float>{/*0.02*/0.03/*,0.05*/});
         // Validation
-        if(/*pressure == 80*//*pattern=="none" &&*/ !radii.contains(0.05)) radii.append(0.05);
+        //if(/*pressure == 80*//*pattern=="none" &&*/ !radii.contains(0.05)) radii.append(0.05);
         for(float radius: radii) {
          //if(pressure == 80 && radius==0.05f && pattern!="none"_) continue; // Validation
          parameters["Radius"__] = radius;
-         for(string thickness: ref<string>{/*"5e-3"_,*/ "10e-3"/*, "20e-3"*/}) {
+#if 0
+         for(string thickness: ref<string>{"1e-3" /*"5e-3"_,*//*"10e-3"*//*, "20e-3"*/}) {
           parameters["Thickness"__] = thickness;
-          for(string side: ref<string>{/*"5e8",*/"10e8"/*,"20e8"*/}) {
+          for(string side: ref<string>{"5e8"/*"10e8"*//*,"20e8"*/}) {
            parameters["Side"__] = side;
-           for(int seed: {1,2,3/*,4,5,6*/}) {
+#else
+         {
+          {
+#endif
+           for(int seed: {1/*,2,3,4,5,6*/}) {
             parameters["Seed"__] = seed;
             auto add = [&]{
              String id = str(parameters);
+             if(arguments().size > 0 && arguments()[0].contains('=')) {
+              auto filter = parseDict(arguments()[0]);
+              if(!parameters.includes(filter)) return;
+             }
              all.append(copyRef(id));
              if(jobs.contains(parseDict(id)/*parameters*/)) {
               const auto& job = jobs.at(jobs.indexOf(parseDict(id)));
@@ -161,6 +170,7 @@ struct ParameterSweep {
    Random random;
    if(existsFile("serenity/queue.sh")) {
     size_t missingCount = missing.size;
+    size_t count = 0;
     while(missing) {
      if(arguments().contains("pretend"_)) {
       Dict shortSet = parseDict(missing.take(random%missing.size));
@@ -169,11 +179,18 @@ struct ParameterSweep {
       //if(shortSet.contains("Pressure")) shortSet.remove("Pressure");
       //shortSet.remove("Seed");
      }
-     else if(execute("/bin/sh", {"serenity/queue.sh"_, missing.take(random%missing.size)})) {
-      log("Error");
-      break;
-     }
+     else {
+      if(arguments().size > 0 && isInteger(arguments()[0]) && count>=(size_t)parseInteger(arguments()[0])) {
+       log("Limit", parseInteger(arguments()[0]));
+       break;
+      }
+      if(execute("/bin/sh", {"serenity/queue.sh"_, missing.take(random%missing.size)})) {
+       log("Error");
+       break;
+      }
+      count++;
      //log("TEST"); break;
+     }
     }
     size_t total = done+running+queued+missingCount;
     log("Done:",done, "Running:",running, "Queued",queued, "Missing", missingCount, "=Total:", total);
@@ -194,7 +211,7 @@ struct ParameterSweep {
 break2:;
     log(success);
    }
-  } else {
+  /*} else {
     string id = arguments()[0];
     log(id);
     Time time (true);
@@ -217,6 +234,6 @@ break2:;
      rename(id+".working", id+".result");
     }
     log(time);
-   }
+   }*/
   }
  } app;

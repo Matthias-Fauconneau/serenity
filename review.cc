@@ -363,8 +363,10 @@ break2:;
  int2 cellCount() { return int2(cellCount(0),cellCount(1)); }
  int2 levelCount() { return int2(dimensions[0].size,dimensions[1].size); }
  vec2 sizeHint(vec2) override {
-  return vec2(levelCount().yx()+int2(1)) * headerCellSize
+  vec2 hint = vec2(levelCount().yx()+int2(1)) * headerCellSize
               + vec2(cellCount()) * contentCellSize;
+  hint.x = -hint.x; // Expanding
+  return hint;
  }
 
  uint renderHeader(Graphics& graphics, vec2 viewSize, vec2 contentCellSize, uint axis, uint level, Dict& filter, uint offset=0) {
@@ -538,7 +540,7 @@ struct Review {
  Text output;
  HBox hbox {{&pressure, &snapshotView}};
  UniformGrid<Plot> strainPlots {4};
- VBox layout {{&array, &hbox, &strainPlots, &output}};
+ VBox layout {{&array, &hbox, &strainPlots, &output}, VBox::Even};
  unique<Window> window = ::window(&layout, int2(0, 0), mainThread, true);
 
  bool useMedianFilter = true;
@@ -732,7 +734,7 @@ struct Review {
    ref<float> height = dataSets.at("Height (m)"_);
    buffer<float> pressure (strain.size);
    for(size_t i: range(strain.size)) pressure[i] = - force[i] / (height[i] * 2 * PI * radius[i]);
-   if(useMedianFilter) {
+   if(useMedianFilter && pressure.size > 2*medianWindowRadius+1) {
     const size_t medianWindowRadius = 4;
     pressure = medianFilter(pressure , medianWindowRadius);
     strain = copyRef(strain.slice(medianWindowRadius, strain.size-2*medianWindowRadius));
@@ -837,7 +839,8 @@ struct Review {
 
    if(array.ids.contains(point)) {
     String file = str(array.stripSortKeys(point))+".o"+str(array.ids.at(point));
-    if(existsFile(file)) output = trim(section(readFile(file),'\n',-10,-1));
+    if(existsFile(file))
+     output = Text(/*bold*/(str(array.stripSortKeys(point)))+'\n'+trim(section(readFile(file),'\n',-10,-1)));
     else log("Missing output", file);
    }
 

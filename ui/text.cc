@@ -274,7 +274,7 @@ shared<Graphics> Text::graphics(vec2 size) {
 	const TextLayout& layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
  vec2 textSize = ceil(layout.bbMax - min(vec2(0),layout.bbMin));
  vec2 offset = max(vec2(0), vec2(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
-    if(align == -1) offset.x = 0;
+ //if(align == -1) offset.x = 0;
 
 	shared<Graphics> graphics;
 	//FIXME: use Graphic::offset, cache graphics
