@@ -39,7 +39,7 @@ struct System {
  sconst float mm = 1e-3*m, g = 1e-3*kg;
  //vec4f G = _0f; // Using downward velocity instead
  const float gz; //= 4*10*1e-9 * N/kg; // Scaled gravity
- sconst float densityScale = 1e4; // 4
+ sconst float densityScale = 1e5; // 4
  vec4f G {0, 0, -gz/densityScale, 0}; // Scaled gravity
 
  // Penalty model
@@ -314,9 +314,9 @@ struct System {
    gz(10/*p.at("G")*/),
    frictionCoefficient(p.at("Friction"_)),
    wire(p.value("Elasticity"_, 0.f), grain.base+grain.capacity),
-   side(Grain::radius/(float)1/*p.value("Resolution",2)*/, p.at("Radius"_),
+   side(Grain::radius/(float)1.5/*p.value("Resolution",2)*/, p.at("Radius"_),
         /*p.at("Height"_)*/ (float)p.at("Radius"_)*4.f,
-          /*p.value("Thickness"_, 1e-3)*/1e-2, wire.base+wire.capacity, 1e-2, /*p.value("Side",1e10)*/1e9/*9*/) {
+          /*p.value("Thickness"_, 1e-3)*/5e-3/*e-2*/, wire.base+wire.capacity, 5e-3, /*p.value("Side",1e10)*/5e8/*9*/) {
   //log("System");
  }
 

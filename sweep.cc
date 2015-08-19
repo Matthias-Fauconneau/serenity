@@ -39,8 +39,9 @@ struct ParameterSweep {
     if(queued) log("Queued jobs:", "qdel -f"+queued+" &");
    }
    size_t done = 0, running = 0, queued = 0;
-   for(float dt: {1e-5}) {
-    parameters["TimeStep"__] = String(str(int(round(dt*1e6)))+"µ");
+   /*for(float dt: {1e-5}) {
+    parameters["TimeStep"__] = String(str(int(round(dt*1e6)))+"µ");*/
+   {
     for(string plateSpeed: {0?"8e-5"_:"1e-4"_}) {
      parameters["PlateSpeed"__] = plateSpeed;
      for(float frictionCoefficient: {0.1}) {

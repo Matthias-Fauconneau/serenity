@@ -391,7 +391,7 @@ break2_:;
   float topZ = 0;
   for(auto p: grain.position.slice(0, grain.count))
    topZ = ::max(topZ, p[2]+Grain::radius);
-  //float alpha = processState == Pack ? ::min(1.f, (timeStep-packStart)*dt / transitionTime) : 1;
+  float alpha = processState < Pack ? 0 : processState == Pack ? ::min(1.f, (timeStep-packStart)*dt / transitionTime) : 1;
   //error(sqrt(3.)/2*sq(2*PI*side.initialRadius/int(2*PI*side.initialRadius/side.resolution))*side.density);
   if(processState == Pack) {
    if(round(timeStep*dt) > round(lastSnapshot*dt)) {
@@ -511,7 +511,7 @@ break2_:;
   float sumForce = 0;
   static float meanForce = 1;
 #endif
-  parallel_for(1, side.H-1, [this//,&minRadii
+  parallel_for(1, side.H-1, [this, alpha//,&minRadii
                #if DEBUG_TENSION
                ,&sumForce
              #endif
@@ -537,7 +537,8 @@ break2_:;
      cross += ::cross(eB, eA);
     }
     //log(length(cross)/2/6/(sq(side.internodeLength)*sqrt(3.)/4));
-    v4sf f = tension + P * cross;
+    v4sf f = tension;
+    f += float3(alpha) * P * cross;
     side.Vertex::force[index] = f; // area = length(cross)/2 / 3vertices
 #if DEBUG_TENSION
     sumForce += length(f);
@@ -616,7 +617,7 @@ break2_:;
      }
     }
 #else //DEBUG
-    if(length2(grain.position[grainIndex])/*+Grain::radius*/ > side.minRadius)
+    //if(length2(grain.position[grainIndex])/*+Grain::radius*/ > side.minRadius)
      for(size_t b: range(side.count)) penalty(grain, grainIndex, side, b);
 #endif
     grainLattice(grain.position[grainIndex]) = 1+grainIndex;
@@ -944,16 +945,18 @@ break2_:;
   sideTime.start();
   sideIntegrationTime.start();
   // First and last line are fixed
-  parallel_chunk(side.W, side.count-side.W, [this](uint, size_t start, size_t size) {
+  parallel_chunk(side.W, side.count-side.W, [this,alpha](uint, size_t start, size_t size) {
    for(size_t i: range(start, start+size)) {
     System::step(side, i);
-    /*float l = length2(side.Vertex::position[i]);
-    assert(l);
-    if(l < side.radius) {
-     side.Vertex::position[i][0] *= side.radius/l;
-     side.Vertex::position[i][1] *= side.radius/l;
-    }
-    side.velocity[i] *= float4(1-0.1*dt); // Additionnal viscosity*/
+    /*if(processState <= Pack) {
+     float l = length2(side.Vertex::position[i]);
+     assert(l);
+     if(l < side.radius) {
+      side.Vertex::position[i][0] *= 1+(1-alpha)*(side.radius/l-1);
+      side.Vertex::position[i][1] *= 1+(1-alpha)*(side.radius/l-1);
+     }
+    }*/
+    //side.velocity[i] *= float4(1-0.1*dt); // Additionnal viscosity*/
    }
   }, 1);
  sideIntegrationTime.stop();
