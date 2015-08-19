@@ -83,7 +83,7 @@ struct SnapshotView : Widget {
   writeFile(id+".png", encodePNG(target.readback()), currentWorkingDirectory(), true);
  }
 
- vec2 sizeHint(vec2) override { return grain.count ? vec2(1050, 1050/**size.y/size.x*/) : 0; }
+ vec2 sizeHint(vec2) override { return grain.count ? vec2(1050/3, 1050/3/**size.y/size.x*/) : 0; }
  shared<Graphics> graphics(vec2 widgetSize) override {
   const float Dt = 1; //1./60/2;
   {

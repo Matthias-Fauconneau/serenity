@@ -55,14 +55,13 @@ struct ParameterSweep {
         for(float radius: radii) {
          //if(pressure == 80 && radius==0.05f && pattern!="none"_) continue; // Validation
          parameters["Radius"__] = radius;
-#if 0
          for(string thickness: ref<string>{"1e-3" /*"5e-3"_,*//*"10e-3"*//*, "20e-3"*/}) {
           parameters["Thickness"__] = thickness;
-          for(string side: ref<string>{"5e8"/*"10e8"*//*,"20e8"*/}) {
+#if 1
+          for(string side: ref<string>{/*"1e9",*/"10e9"/*,"100e9"*/}) {
            parameters["Side"__] = side;
 #else
          {
-          {
 #endif
            for(int seed: {1/*,2,3,4,5,6*/}) {
             parameters["Seed"__] = seed;

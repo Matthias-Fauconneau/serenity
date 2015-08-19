@@ -324,12 +324,13 @@ struct Simulation : System {
     if(useGrain && currentPourHeight >= Grain::radius) for(uint unused t: range(::max(1.,dt/1e-5))) for(;;) {
      vec4f p {random()*2-1,random()*2-1, currentPourHeight, 0};
      if(length2(p)>1) continue;
-     vec4f newPosition {pourRadius*p[0], pourRadius*p[1], p[2], 0}; // Within cylinder
+     float r = ::min(pourRadius, side.minRadius);
+     vec4f newPosition {r*p[0], r*p[1], p[2], 0}; // Within cylinder
      // Finds lowest Z (reduce fall/impact energy)
      for(auto p: grain.position.slice(0, grain.count)) {
       float x = length(toVec3(p - newPosition).xy());
       if(x < 2*Grain::radius) {
-       float dz = sqrt(sq(2*Grain::radius) - sq(x));
+       float dz = sqrt(sq(2*Grain::radius+0x1p-24) - sq(x));
        newPosition[2] = ::max(newPosition[2], p[2]+dz);
       }
      }
@@ -342,7 +343,7 @@ struct Simulation : System {
        goto break2_;
      maxSpawnHeight = ::max(maxSpawnHeight, newPosition[2]);
      for(auto p: grain.position.slice(0, grain.count)) {
-      if(::length(p - newPosition) < Grain::radius+Grain::radius-0x1p-24)
+      if(::length(p - newPosition) < Grain::radius+Grain::radius)
        error(newPosition, p, log2(abs(::length(p - newPosition) -  2*Grain::radius)));
      }
      Locker lock(this->lock);
@@ -501,7 +502,8 @@ break2_:;
   assert_(side.count <= 65536, side.count);
   for(size_t index: range(side.count)) vertexGrid(side.Vertex::position[index]).append(index); // FIXME
   sideForceTime.start();
-  float minRadii[maxThreadCount]; mref<float>(minRadii).clear(inf);
+  //float minRadii[maxThreadCount]; mref<float>(minRadii).clear(inf);
+  side.minRadius = inf;
 #define DEBUG_TENSION 0
 #if DEBUG_TENSION
   Locker lock(this->lock);
@@ -509,20 +511,21 @@ break2_:;
   float sumForce = 0;
   static float meanForce = 1;
 #endif
-  parallel_for(1, side.H-1, [this,&minRadii
+  parallel_for(1, side.H-1, [this//,&minRadii
                #if DEBUG_TENSION
                ,&sumForce
              #endif
-               ](uint id, int i) {
+               ](uint /*id*/, int i) {
    int W = side.W;
    int dy[6] {-W,            0,       W,         W,     0, -W};
    int dx[6] {-1+(i%2), -1, -1+(i%2), (i%2), 1, (i%2)};
    v4sf P = float4(-pressure/(2*3));
-   float minRadius = inf;
-   for(int j: range(W)) {
+   //float minRadius = inf;
+   for(size_t j: range(W)) {
     size_t index = i*W+j;
     v4sf O = side.Vertex::position[index];
-    minRadius = ::min(minRadius, length2(O));
+    //minRadius = ::min(minRadius, length2(O));
+    side.minRadius = ::min(side.minRadius, length2(O));
     // Pressure
     v4sf cross = _0f, tension = _0f;
     for(int e: range(6)) {
@@ -546,7 +549,7 @@ break2_:;
     lines[rgb3f(0,1,0)].append(toVec3(side.Vertex::position[index]+f/float4(meanForce/(1*mm))));
 #endif
    }
-   minRadii[id] = minRadius;
+   //minRadii[id] = minRadius;
   },
 #if DEBUG_TENSION
   1);
@@ -554,7 +557,8 @@ break2_:;
   #else
   threadCount);
 #endif
-  side.minRadius = ::min(ref<float>(minRadii, threadCount)) - Grain::radius;
+  //side.minRadius = ::min(ref<float>(minRadii, threadCount)) - Grain::radius;
+  side.minRadius -= Grain::radius;
   sideForceTime.stop();
   sideTime.stop();
 
@@ -589,25 +593,32 @@ break2_:;
      snapshot("bounds");
      return;
     }
-    int2 index = vertexGrid.index2(p);
-    bool sideContact = false;
-    vec4f radialVector = grain.position[grainIndex]/sqrt(sq3(grain.position[grainIndex]));
-    for(int y: range(::max(0, index.y-1), ::min(vertexGrid.size.y, index.y+1 +1))) {
-     for(int x: range(index.x-1, index.x+1 +1)) {
-      // Wraps around (+size.x to wrap -1)
-      for(size_t b: vertexGrid.cells[y*vertexGrid.size.x+(x+vertexGrid.size.x)%vertexGrid.size.x]) {
-       vec4f normalForce = penalty(grain, grainIndex, side, b);
-       if(normalForce[0] || normalForce[1] || normalForce[2]) {
-        sideContact = true;
-        radialForce += dot3(radialVector, normalForce)[0];
+#if 1 // vertexGrid
+    if(length2(grain.position[grainIndex])/*+Grain::radius*/ > side.minRadius) {
+     int2 index = vertexGrid.index2(p);
+     bool sideContact = false;
+     vec4f radialVector = grain.position[grainIndex]/sqrt(sq3(grain.position[grainIndex]));
+     for(int y: range(::max(0, index.y-1), ::min(vertexGrid.size.y, index.y+1 +1))) {
+      for(int x: range(index.x-1, index.x+1 +1)) {
+       // Wraps around (+size.x to wrap -1)
+       for(size_t b: vertexGrid.cells[y*vertexGrid.size.x+(x+vertexGrid.size.x)%vertexGrid.size.x]) {
+        vec4f normalForce = penalty(grain, grainIndex, side, b);
+        if(normalForce[0] || normalForce[1] || normalForce[2]) {
+         sideContact = true;
+         radialForce += dot3(radialVector, normalForce)[0];
+        }
        }
       }
      }
+     if(sideContact) {
+      sideGrainCount++;
+      sideGrainRadiusSum += length2(p);
+     }
     }
-    if(sideContact) {
-     sideGrainCount++;
-     sideGrainRadiusSum += length2(p);
-    }
+#else //DEBUG
+    if(length2(grain.position[grainIndex])/*+Grain::radius*/ > side.minRadius)
+     for(size_t b: range(side.count)) penalty(grain, grainIndex, side, b);
+#endif
     grainLattice(grain.position[grainIndex]) = 1+grainIndex;
     grainGrid(grain.position[grainIndex]).append(1+grainIndex);
    }
@@ -936,13 +947,13 @@ break2_:;
   parallel_chunk(side.W, side.count-side.W, [this](uint, size_t start, size_t size) {
    for(size_t i: range(start, start+size)) {
     System::step(side, i);
-    float l = length2(side.Vertex::position[i]);
+    /*float l = length2(side.Vertex::position[i]);
     assert(l);
     if(l < side.radius) {
      side.Vertex::position[i][0] *= side.radius/l;
      side.Vertex::position[i][1] *= side.radius/l;
     }
-    side.velocity[i] *= float4(1-0.1*dt); // Additionnal viscosity
+    side.velocity[i] *= float4(1-0.1*dt); // Additionnal viscosity*/
    }
   }, 1);
  sideIntegrationTime.stop();

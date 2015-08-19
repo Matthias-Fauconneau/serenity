@@ -196,7 +196,7 @@ break2:;
        float P = mean(pressure.slice(argmax));
        //float P = pressure[argmax];
        //float P = ::max(pressure); // TODO: median filter
-       assert_(P > 0);
+       //assert_(P > 0);
        data.append(" "_+str(P));
       } else data.append(" 0 0 0"_);
      } else data.append("0 0 0 0"_); // if(s)
@@ -733,7 +733,7 @@ struct Review {
    buffer<float> radius = ::radius(dataSets);
    ref<float> height = dataSets.at("Height (m)"_);
    buffer<float> pressure (strain.size);
-   for(size_t i: range(strain.size)) pressure[i] = - force[i] / (height[i] * 2 * PI * radius[i]);
+   for(size_t i: range(pressure.size)) pressure[i] = - force[i] / (height[i] * 2 * PI * radius[i]);
    if(useMedianFilter && pressure.size > 2*medianWindowRadius+1) {
     const size_t medianWindowRadius = 4;
     pressure = medianFilter(pressure , medianWindowRadius);
@@ -745,16 +745,25 @@ struct Review {
    buffer<float> stress = ::stress(dataSets);
    if(useMedianFilter  && strain.size > 2*medianWindowRadius+1)
       strain = copyRef(strain.slice(medianWindowRadius, strain.size-2*medianWindowRadius));
-   float pressure = point.at("Pressure"_);
    if(index==Stress) {
     plot.ylabel = "Stress (Pa)"__;
     plot.min.y = 0; plot.max.y = array.max;
     plot.dataSets.insert(""__, {::move(strain), ::move(stress)});
    }
    else if(index==Deviatoric) {
+    //float pressure = point.at("Pressure"_);
+    buffer<float> pressure (strain.size);
+    ref<float> force = dataSets.at("Radial Force (N)"_);
+    buffer<float> radius = ::radius(dataSets);
+    ref<float> height = dataSets.at("Height (m)"_);
+    for(size_t i: range(pressure.size)) pressure[i] = - force[i] / (height[i] * 2 * PI * radius[i]);
+    /*if(useMedianFilter && pressure.size > 2*medianWindowRadius+1) {
+     const size_t medianWindowRadius = 4;
+     pressure = medianFilter(pressure , medianWindowRadius);
+    }*/
     plot.ylabel = "Normalized Deviatoric Stress"__;
     buffer<float> deviatoric (strain.size);
-    for(size_t i: range(strain.size)) deviatoric[i] = (stress[i]-pressure)/(stress[i]+pressure);
+    for(size_t i: range(deviatoric.size)) deviatoric[i] = (stress[i]-pressure[i])/(stress[i]+pressure[i]);
     plot.min.y = 0; plot.max.y = 1;
     plot.dataSets.insert(""__, {::move(strain), ::move(deviatoric)});
    }
@@ -846,8 +855,16 @@ struct Review {
 
    //if(point && existsFile(str(point))) usleep(300*1000); // FIXME: signal back
    if(details) {
-    snapshotView = SnapshotView(str(array.stripSortKeys(point)));
-   }
+    static buffer<String> files = Folder(".").list(Files|Sorted);
+    String lastSnapshot;
+    for(string file: files) if(startsWith(file, str(array.stripSortKeys(point)))) {
+     if(endsWith(file, ".grain") || endsWith(file, ".side") || endsWith(file, ".wire"))
+      lastSnapshot = copyRef(file);
+     log(file);
+    }
+    log("snap",section(lastSnapshot,'.',0,-2));
+    snapshotView = SnapshotView(/*str(array.stripSortKeys(point))*/section(lastSnapshot,'.',0,-2));
+  }
    window->render();
   };
   /*array.hover(

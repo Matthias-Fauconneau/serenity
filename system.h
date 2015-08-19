@@ -39,14 +39,14 @@ struct System {
  sconst float mm = 1e-3*m, g = 1e-3*kg;
  //vec4f G = _0f; // Using downward velocity instead
  const float gz; //= 4*10*1e-9 * N/kg; // Scaled gravity
- sconst float densityScale = 1e6; // 6-7
+ sconst float densityScale = 1e4; // 4
  vec4f G {0, 0, -gz/densityScale, 0}; // Scaled gravity
 
  // Penalty model
  sconst float normalDamping = 0.1;
  // Friction model
  sconst bool staticFriction = true;
- sconst float staticFrictionSpeed = inf; //1./3 *m/s;
+ sconst float staticFrictionSpeed = 1./3 *m/s; //inf; //1./3 *m/s;
  sconst float staticFrictionFactor = 1e5;
  sconst float staticFrictionLength = 1e-4;
  sconst float staticFrictionDamping = 15 *g/s/s;
@@ -131,7 +131,7 @@ struct System {
 
   sconst bool friction = false;
   sconst float curvature = 0;
-  sconst float elasticModulus = 1e10 * kg/(m*s*s); // 1 GPa
+  sconst float elasticModulus = 1e9/*10*/ * kg/(m*s*s); // 1 GPa
 
   Plate() : Vertex(0, 2, 1e-3 * densityScale) {
    count = 2;
@@ -157,15 +157,15 @@ struct System {
 
  struct Grain : Vertex {
   // Properties
-  sconst float radius = (validation ? 2.47 : 20)*mm; // 40 mm diameter
+  sconst float radius =  2.47*mm; // 40 mm diameter
   sconst float volume = 4./3 * PI * cb(radius);
   sconst float curvature = 1./radius;
   sconst float shearModulus = 79e9 * kg / (m*s*s);
   sconst float poissonRatio = 0.28;
-  sconst float elasticModulus = 2*shearModulus*(1+poissonRatio); // ~10^11
+  sconst float elasticModulus = 1e9; //2*shearModulus*(1+poissonRatio); // ~10^11
 
   //sconst float mass = 3*g;
-  sconst float density = (validation ? 7.8e3 : 1.4e3) * densityScale;
+  sconst float density = 7.8e3 * densityScale;
   sconst float mass = density * volume;
   sconst float angularMass = 2./5*mass*sq(radius);
   /*sconst float angularMass = 2./5*mass*(pow5(radius)-pow5(radius-1e-4))
@@ -219,8 +219,8 @@ struct System {
   sconst bool friction = false;
 
   sconst float curvature = 0; // -1/radius?
-  const float elasticModulus;// = 1e10; // 8
-  sconst float density = 5e1;
+  const float elasticModulus;
+  sconst float density = 5e3; //5e1;
   const float resolution;
   const float initialRadius;
   const float height;
@@ -238,7 +238,7 @@ struct System {
 
   vec4f tensionStiffness = float3(elasticModulus * internodeLength * sqrt(3.)/2 * thickness); // FIXME
 
-  vec4f tensionDamping = float3(mass / s);
+  vec4f tensionDamping = 0 ? float3(mass / s) : _0f;
   //sconst float areaMomentOfInertia = pow4(1*mm); // FIXME
   const float bendStiffness = 0;//elasticModulus * areaMomentOfInertia / internodeLength; // FIXME
 
@@ -249,7 +249,7 @@ struct System {
   struct { NoOperation operator[](size_t) const { return {}; }} torque;
 
   Side(float resolution, float initialRadius, float height, float loadThickness, size_t base,
-       float pourThickness=1e-3, float elasticModulus = 1e8)
+       float pourThickness, float elasticModulus)
    : Vertex(base, /*W*H*/int(2*PI*initialRadius/resolution) *
                                          (int(height/resolution*2/sqrt(3.))+1),
             (pourThickness*sqrt(3.)/2*sq(2*PI*initialRadius/int(2*PI*initialRadius/resolution)))*density*densityScale/*1-4*/),
@@ -276,7 +276,7 @@ struct System {
  /// Sphere - Side
  template<Type tA>
  Contact contact(const tA& A, size_t aIndex, const Side& side, size_t faceIndex) {
-  if(length2(A.position[aIndex])/*+Grain::radius*/ < side.minRadius) return {_0f,_0f,_0f,0,0,0}; // Quick cull
+  //if(length2(A.position[aIndex])/*+Grain::radius*/ < side.minRadius) return {_0f,_0f,_0f,0,0,0}; // Quick cull
   vec4f b = side.Vertex::position[faceIndex];
   vec4f relativePosition = A.position[aIndex] - b;
   vec4f length = sqrt(sq3(relativePosition));
@@ -314,9 +314,9 @@ struct System {
    gz(10/*p.at("G")*/),
    frictionCoefficient(p.at("Friction"_)),
    wire(p.value("Elasticity"_, 0.f), grain.base+grain.capacity),
-   side(Grain::radius/(float)p.value("Resolution",2), p.at("Radius"_),
+   side(Grain::radius/(float)1/*p.value("Resolution",2)*/, p.at("Radius"_),
         /*p.at("Height"_)*/ (float)p.at("Radius"_)*4.f,
-          p.value("Thickness"_, 1e-3), wire.base+wire.capacity, 1, p.value("Side",5e8)) {
+          /*p.value("Thickness"_, 1e-3)*/1e-2, wire.base+wire.capacity, 1e-2, /*p.value("Side",1e10)*/1e9/*9*/) {
   //log("System");
  }
 
