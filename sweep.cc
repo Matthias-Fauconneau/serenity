@@ -39,30 +39,34 @@ struct ParameterSweep {
     if(queued) log("Queued jobs:", "qdel -f"+queued+" &");
    }
    size_t done = 0, running = 0, queued = 0;
-   /*for(float dt: {1e-5}) {
-    parameters["TimeStep"__] = String(str(int(round(dt*1e6)))+"µ");*/
-   {
-    for(string plateSpeed: {0?"8e-5"_:"1e-4"_}) {
-     parameters["PlateSpeed"__] = plateSpeed;
-     for(float frictionCoefficient: {0.1}) {
-      parameters["Friction"__] = frictionCoefficient;
+   for(float dt: {1e-5}) {
+    parameters["TimeStep"__] = String(str(int(round(dt*1e6)))+"µ");
+    /*for(string plateSpeed: {0?"8e-5"_:"1e-4"_}) {
+     parameters["PlateSpeed"__] = plateSpeed;*/
+    {
+     for(float frictionCoefficient: {0.1/*,0.3*/}) {
+      parameters["Friction"__] = frictionCoefficient; // FIXME: separate Ball-Wire friction coefficient
       for(string pattern: ref<string>{"none","helix","cross","loop"}) {
        parameters["Pattern"__] = pattern;
-       for(int pressure: {0,80,160,320/*,640*/}) {
+       for(int pressure: {0,20,40,60,80,100,120,140,160}) {
         parameters["Pressure"__] = String(str(pressure)+"K"_);
-        array<float> radii = copyRef(ref<float>{/*0.02*/0.03/*,0.05*/});
+        array<float> radii = copyRef(ref<float>{0.03});
         // Validation
-        //if(/*pressure == 80*//*pattern=="none" &&*/ !radii.contains(0.05)) radii.append(0.05);
+        if(pressure == 80 && pattern=="none" && !radii.contains(0.05)) radii.append(0.05);
         for(float radius: radii) {
          //if(pressure == 80 && radius==0.05f && pattern!="none"_) continue; // Validation
          parameters["Radius"__] = radius;
-         for(string thickness: ref<string>{"1e-3" /*"5e-3"_,*//*"10e-3"*//*, "20e-3"*/}) {
+#if 0
+         for(string thickness: ref<string>{/*"10e-3",*/"20e-3"}) {
           parameters["Thickness"__] = thickness;
-#if 1
-          for(string side: ref<string>{/*"1e9",*/"10e9"/*,"100e9"*/}) {
+          for(string side: ref<string>{"10e8"/*,"20e8"*/}) {
            parameters["Side"__] = side;
+           for(string resolution: ref<string>{"1"}) {
+            parameters["Resolution"__] = resolution;
 #else
-         {
+         parameters["Thickness"__] = "1e-3"__; {
+          parameters["Side"__] = "1e8"__; {
+           parameters["Resolution"__] = "2"__; {
 #endif
            for(int seed: {1/*,2,3,4,5,6*/}) {
             parameters["Seed"__] = seed;
@@ -116,7 +120,7 @@ struct ParameterSweep {
              }
              parameters.remove("Elasticity"_);
             }
-           }
+           }}
           }
          }
         }

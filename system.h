@@ -39,14 +39,14 @@ struct System {
  sconst float mm = 1e-3*m, g = 1e-3*kg;
  //vec4f G = _0f; // Using downward velocity instead
  const float gz; //= 4*10*1e-9 * N/kg; // Scaled gravity
- sconst float densityScale = 1e5; // 4
+ sconst float densityScale = 1e6; // 5
  vec4f G {0, 0, -gz/densityScale, 0}; // Scaled gravity
 
  // Penalty model
  sconst float normalDamping = 0.1;
  // Friction model
  sconst bool staticFriction = true;
- sconst float staticFrictionSpeed = 1./3 *m/s; //inf; //1./3 *m/s;
+ sconst float staticFrictionSpeed = inf; //1./3 *m/s; //inf; //1./3 *m/s;
  sconst float staticFrictionFactor = 1e5;
  sconst float staticFrictionLength = 1e-4;
  sconst float staticFrictionDamping = 15 *g/s/s;
@@ -162,7 +162,7 @@ struct System {
   sconst float curvature = 1./radius;
   sconst float shearModulus = 79e9 * kg / (m*s*s);
   sconst float poissonRatio = 0.28;
-  sconst float elasticModulus = 1e9; //2*shearModulus*(1+poissonRatio); // ~10^11
+  sconst float elasticModulus = 1 ? 2*shearModulus*(1+poissonRatio) : 1e9; // ~10^11
 
   //sconst float mass = 3*g;
   sconst float density = 7.8e3 * densityScale;
@@ -314,9 +314,9 @@ struct System {
    gz(10/*p.at("G")*/),
    frictionCoefficient(p.at("Friction"_)),
    wire(p.value("Elasticity"_, 0.f), grain.base+grain.capacity),
-   side(Grain::radius/(float)1.5/*p.value("Resolution",2)*/, p.at("Radius"_),
+   side(Grain::radius/(float)p.at/*value*/("Resolution"/*,2*/), p.at("Radius"_),
         /*p.at("Height"_)*/ (float)p.at("Radius"_)*4.f,
-          /*p.value("Thickness"_, 1e-3)*/5e-3/*e-2*/, wire.base+wire.capacity, 5e-3, /*p.value("Side",1e10)*/5e8/*9*/) {
+          p.at("Thickness"_), wire.base+wire.capacity, p.at("Thickness"_), p.at("Side")) {
   //log("System");
  }
 
@@ -345,7 +345,7 @@ struct System {
   atomic_add(normalEnergy, 1./2 * Ks * sq(c.depth));
   float fK = - Ks * c.depth;
   // Damping
-  const float Kb = K*normalDamping*sqrt(-c.depth);
+  const float Kb = K * normalDamping * sqrt(-c.depth);
   vec4f relativeVelocity =
       A.velocity[a] + cross(A.angularVelocity[a], c.relativeA)
    - (B.velocity[b] + cross(B.angularVelocity[b], c.relativeB));

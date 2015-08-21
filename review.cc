@@ -74,6 +74,7 @@ struct ArrayView : Widget {
  map<Dict, float> points; // Data points
  map<Dict, String> ids; // Job IDs
  map<Dict, String> states; // Job states
+ map<Dict, float> displacements;
  map<Dict, float> pressure;
  array<SGEJob> jobs;
  float minDisplacement = inf, commonDisplacement = 0;
@@ -130,6 +131,7 @@ struct ArrayView : Widget {
   ids.clear();
   states.clear();
   pressure.clear();
+  displacements.clear();
   Folder results ("."_);
   auto list = results.list(Files);
   for(string fileName: list) {
@@ -235,7 +237,6 @@ break2:;
      data.append(" "_+str(time?:"0"_, jobID, state, displacement?:"0"_)); // /60/60
      logName=name; break;
     }
-    //assert_(logName);
     assert_(data, index, fileName, id, resultName, logName);
     log(id, data);
     writeFile(id, data, cache, true);
@@ -264,13 +265,10 @@ break2:;
     states.insert(copy(configuration), copyRef(s.word()));
     s.skip(' ');
     displacement = s.decimal();
+    displacements.insert(copy(configuration), displacement);
     minDisplacement = ::min(minDisplacement, displacement);
     if(displacement>=12.4) states.at(configuration) = "done"__;
    }
-   /*if(points.contains(configuration)) {
-    if(1 || points.at(configuration)!=0) { log("Duplicate configuration", configuration); continue; }
-    else points.at(configuration) = value; // Replace 0 from log
-   } else*/
    points.insert(move(configuration), ref<float>{postPeakStress,time,wireDensity,displacement}[index]);
   }
   commonDisplacement = minDisplacement; // Used on next load
@@ -287,7 +285,7 @@ break2:;
    max = ::max(points.values);
   }
   dimensions[0] = copyRef(ref<string>{"TimeStep"_, "Radius"_,"Pressure"_,"Seed"_});
-  dimensions[1] = copyRef(ref<string>{"Side","Thickness","Wire"_,"Angle"_,"Pattern"_});
+  dimensions[1] = copyRef(ref<string>{"Resolution"_, "Side","Thickness","Wire"_,"Angle"_,"Pattern"_});
   for(auto& dimensions: this->dimensions) {
    dimensions.filter([this](const string dimension) {
     for(const Dict& coordinates: points.keys) if(coordinates.keys.contains(dimension)) return false;
@@ -317,13 +315,11 @@ break2:;
     for(string name: Folder(".").list(Files)) if(startsWith(name, id)) {
      log(name);
      fileCount++;
-     //remove(name);
      rename(currentWorkingDirectory(), name, Folder("../Archive"), name);
     }
     failureCount++;
    }
   }
-  //log(failures.size);
   log(failureCount, fileCount);
  }
 
@@ -331,7 +327,6 @@ break2:;
  array<Variant> coordinates(string dimension, const Dict& filter) const {
   array<Variant> allCoordinates;
   for(const Dict& coordinates: points.keys) if(coordinates.includes(filter)) {
-   //assert_(coordinates.contains(dimension), coordinates, dimension);
    Variant value;
    if(coordinates.contains(dimension)) value = copy(coordinates.at(dimension));
    if(!allCoordinates.contains(value)) allCoordinates.insertSorted(move(value));
@@ -351,7 +346,6 @@ break2:;
   string dimension = dimensions[axis][level];
   int cellCount = 0;
   assert_(!filter.contains(dimension));
-  //assert_(coordinates(dimension, filter), dimension, filter, coordinates(dimension, {}), points.keys);
   for(const Variant& coordinate: coordinates(dimension, filter)) {
    filter[copyRef(dimension)] = copy(coordinate);
    cellCount += this->cellCount(axis, level+1, filter);
@@ -407,9 +401,8 @@ break2:;
    else { // Renders cell
     const Dict* best = 0;
     float bestValue = 0;
-    bool running = false, pending = false, hasSnapshotSignalFile = false;
+    bool running = false, pending = false;
     for(const Dict& coordinates: points.keys) if(coordinates.includes(filterX) && coordinates.includes(filterY)) {
-     if(existsFile(str(stripSortKeys(coordinates)))) hasSnapshotSignalFile = true;
      for(const auto& job: jobs) if(job.dict.includes(coordinates)) {
       if(job.state=="running") running = true;
       if(job.state=="pending") pending = true;
@@ -430,25 +423,29 @@ break2:;
       string state = states.at(coordinates);
       /**/  if(state=="pour") color = bgr3f(1./2);
       else if(state=="pack") color = bgr3f(3./4);
-      else if(state=="load") color = bgr3f(7./8);
+      else if(state=="load") {
+       color = bgr3f(7./8);
+       if(displacements.contains(coordinates)) {
+        float alpha = displacements.at(coordinates)/(100./8);
+        assert_(alpha >= 0 && alpha <= 1, alpha);
+        color = bgr3f(7./8 + alpha/8);
+       }
+      }
       else if(state=="done") color = bgr3f(1);
       else if(state) log("Unknown state", state);
       if(!running && state!="done") {color.r=1; color.b=color.g=1./2;}
      }
-     //if(index==0 && value) color = bgr3f(0,1-v,v);
      graphics.fills.append(cellOrigin, cellSize, color);
 
      Dict tableCoordinates = copy(filterX); tableCoordinates.append(copy(filterY));
      targets.append(Rect{cellOrigin, cellOrigin+cellSize}, move(tableCoordinates), coordinates);
      if(index==0) value /= 1e6; // MPa
      String text = str(int(round(value))); //point.isInteger?dec(value):ftoa(value);
-     //if(value==max) text = bold(text);
      if(pending) text = italic(text);
      if(running) text = bold(text);
      bgr3f textColor = 0;
-     if(running && !hasSnapshotSignalFile) textColor = red; // Old version
-     /*if(value)*/ graphics.graphics.insertMulti(cellOrigin, Text(text, textSize, textColor, 1, 0,
-                                               "DejaVuSans", true, 1, 0).graphics(cellSize));
+     graphics.graphics.insertMulti(cellOrigin, Text(text, textSize, textColor, 1, 0,
+                                                    "DejaVuSans", true, 1, 0).graphics(cellSize));
     }
    }
    return 1;
@@ -833,11 +830,11 @@ struct Review {
   };
   array.press = [this](const Dict& group, const Dict& point) {
    if(!point) return;
-   if(existsFile(str(point))) { // Signal snapshot
+   /*if(existsFile(str(point))) { // Signal snapshot
     int64 time = realTime();
     File file (str(point));
     file.touch(time);
-   }
+   }*/
 
    this->group = copy(group);
    pressure = pressurePlot(group, pressurePlotIndex);
@@ -858,11 +855,10 @@ struct Review {
     static buffer<String> files = Folder(".").list(Files|Sorted);
     String lastSnapshot;
     for(string file: files) if(startsWith(file, str(array.stripSortKeys(point)))) {
-     if(endsWith(file, ".grain") || endsWith(file, ".side") || endsWith(file, ".wire"))
+     if(endsWith(file, ".grain") || endsWith(file, ".side") || endsWith(file, ".wire") || endsWith(file, "domain") || endsWith(file, "s")) //.?s
       lastSnapshot = copyRef(file);
      log(file);
     }
-    log("snap",section(lastSnapshot,'.',0,-2));
     snapshotView = SnapshotView(/*str(array.stripSortKeys(point))*/section(lastSnapshot,'.',0,-2));
   }
    window->render();

@@ -142,7 +142,7 @@ struct Simulation : System {
    targetWireDensity(parameters.value("Wire"_, 0.f)),
    winchRate(parameters.value("Rate"_, 0.f)),
    pressure(parameters.value("Pressure", 0.f)),
-   plateSpeed(parameters.at("PlateSpeed")),
+   plateSpeed(/*parameters.at("PlateSpeed")*//*parameters.value("PlateSpeed",*/(1e-4)),
    random((uint)parameters.at("Seed").integer()),
    stream(move(stream)), parameters(copy(parameters)) {
   assert_(pattern == None || targetWireDensity > 0, parameters);
@@ -166,6 +166,20 @@ struct Simulation : System {
   vec4f length = sqrt(sq3(relativePosition));
   vec4f x = length - A.internodeLength4;
   //A.tensionEnergy += 1./2 * A.tensionStiffness[0] * sq3(x)[0];
+  vec4f fS = - A.tensionStiffness * x;
+  assert(length[0], a, b);
+  vec4f direction = relativePosition/length;
+  vec4f relativeVelocity = A.Vertex::velocity[a] - A.Vertex::velocity[b];
+  vec4f fB = - A.tensionDamping * dot3(direction, relativeVelocity);
+  return (fS + fB) * direction;
+ }
+
+ generic vec4f expTension(T& A, size_t a, size_t b) {
+  vec4f relativePosition = A.Vertex::position[a] - A.Vertex::position[b];
+  vec4f length = sqrt(sq3(relativePosition));
+  vec4f x = length - A.internodeLength4;
+  //A.tensionEnergy += 1./2 * A.tensionStiffness[0] * sq3(x)[0];
+  if(x[0] > 0) x = float4(exp( x[0] / A.internodeLength ) - 1); // f(0) = 0, f'(0) = 1
   vec4f fS = - A.tensionStiffness * x;
   assert(length[0], a, b);
   vec4f direction = relativePosition/length;
@@ -293,8 +307,8 @@ struct Simulation : System {
  }
 
  const float pourPackThreshold = 2e-3;
- const float packLoadThreshold = 2e-3;
- const float transitionTime = 2*s;
+ const float packLoadThreshold = 1e-4;
+ const float transitionTime = 3*s;
 
  void step() {
   staticFrictionCount2 = staticFrictionCount;
@@ -318,6 +332,7 @@ struct Simulation : System {
     /*float maxZ = 0;
     for(auto p: grain.position.slice(0, grain.count)) maxZ = ::max(maxZ, p[2]);
     plate.position[1][2] = ::min(plate.position[1][2], maxZ+Grain::radius);*/
+    snapshot("pour");
    } else {
     // Generates falling grain (pour)
     const bool useGrain = 1;
@@ -392,7 +407,6 @@ break2_:;
   for(auto p: grain.position.slice(0, grain.count))
    topZ = ::max(topZ, p[2]+Grain::radius);
   float alpha = processState < Pack ? 0 : processState == Pack ? ::min(1.f, (timeStep-packStart)*dt / transitionTime) : 1;
-  //error(sqrt(3.)/2*sq(2*PI*side.initialRadius/int(2*PI*side.initialRadius/side.resolution))*side.density);
   if(processState == Pack) {
    if(round(timeStep*dt) > round(lastSnapshot*dt)) {
     snapshot(str(uint(round(timeStep*dt)))+"s"_);
@@ -432,9 +446,9 @@ break2_:;
                                                     (
                                                      voidRatio < 0.8 &&
                                                      grainKineticEnergy / grain.count < packLoadThreshold &&
-                                                     (balanceAverage < 1000 ||
+                                                     (balanceAverage < 100 ||
                                                      // Not monotonously decreasing anymore
-                                                     (lastBalanceAverage < balanceAverage && balanceAverage < 2100))))) {
+                                                     (lastBalanceAverage < balanceAverage && balanceAverage < 1000))))) {
      assert_(G[2] == 0 && side.thickness == side.loadThickness);
      skip = false;
      processState = ProcessState::Load;
@@ -460,6 +474,7 @@ break2_:;
      stream.write(str(results)+"\n");
      //stream.write("Strain (%), Stress (Pa), Radius (m), Height (m), Radial Force (N), Tension (J)\n");
      stream.write("Radius (m), Height (m), Plate Force (N), Radial Force (N), Kinetic Energy (J), Contacts\n");
+     snapshot("pack");
     }
    } else {
     if(grainKineticEnergy / grain.count < 1e-6 /*1µJ/grain*/) {
@@ -495,15 +510,20 @@ break2_:;
   // Soft membrane side
   sideTime.start();
   // Cylinder grid for side
+  side.minRadius = inf;
+  for(size_t index: range(side.count)) {
+   v4sf O = side.Vertex::position[index];
+   side.minRadius = ::min(side.minRadius, length2(O));
+  }
   CylinderGrid vertexGrid {-4*Grain::radius, targetHeight+4*Grain::radius,
-     int2(2*PI*side.minRadius/Grain::radius,
+     int2(2*PI*side.minRadius/*+Grain::radius)*//Grain::radius,
           (targetHeight+2*Grain::radius+2*Grain::radius)/Grain::radius)};
   for(size_t i: range(vertexGrid.cells.size)) vertexGrid.cells[i].clear();
   assert_(side.count <= 65536, side.count);
   for(size_t index: range(side.count)) vertexGrid(side.Vertex::position[index]).append(index); // FIXME
   sideForceTime.start();
   //float minRadii[maxThreadCount]; mref<float>(minRadii).clear(inf);
-  side.minRadius = inf;
+  //side.minRadius = inf;
 #define DEBUG_TENSION 0
 #if DEBUG_TENSION
   Locker lock(this->lock);
@@ -525,12 +545,12 @@ break2_:;
     size_t index = i*W+j;
     v4sf O = side.Vertex::position[index];
     //minRadius = ::min(minRadius, length2(O));
-    side.minRadius = ::min(side.minRadius, length2(O));
+    //side.minRadius = ::min(side.minRadius, length2(O));
     // Pressure
     v4sf cross = _0f, tension = _0f;
     for(int e: range(6)) {
      size_t a = i*W+dy[e]+(j+W+dx[e])%W;
-     tension += this->tension(side, index, a);
+     tension += this->expTension(side, index, a);
      v4sf A = side.Vertex::position[a];
      v4sf B = side.Vertex::position[i*W+dy[(e+1)%6]+(j+W+dx[(e+1)%6])%W];
      v4sf eA = A-O, eB = B-O;
@@ -1018,8 +1038,8 @@ break2_:;
     // Checks if all grains are within membrane
     // FIXME: actually check only with enlarged rigid cylinder
     for(vec4f p: grain.position.slice(0, grain.count)) {
-     if(length2(p) > 2*side.initialRadius) {
-      log("Grain slipped through membrane", 2*side.initialRadius, length2(p));
+     if(length2(p) > 4*side.initialRadius) {
+      log("Grain slipped through membrane", 4*side.initialRadius, length2(p));
       snapshot("slip");
       processState = ProcessState::Fail;
      }
