@@ -22,7 +22,7 @@ struct ParameterSweep {
            .filter([](string name){return !endsWith(name, ".result") && !endsWith(name, ".working");}),
      [](string name)->String{ return copyRef(section(name,'.',0,-2)); });*/
    array<String> existing;
-   auto list = Folder("Results").list(Files);
+   auto list = Folder("Results", currentWorkingDirectory(), true).list(Files);
    for(string name: list) {
     if(endsWith(name, ".result") || endsWith(name, ".working"))
      name = section(name,'.',0,-2);
@@ -48,7 +48,7 @@ struct ParameterSweep {
       parameters["Friction"__] = frictionCoefficient; // FIXME: separate Ball-Wire friction coefficient
       for(string pattern: ref<string>{"none","helix","cross","loop"}) {
        parameters["Pattern"__] = pattern;
-       for(int pressure: {0,20,40,60,80,100,120,140,160}) {
+       for(int pressure: {0,/*20,*/40,/*60,*/80/*100,120,140,160*/}) {
         parameters["Pressure"__] = String(str(pressure)+"K"_);
         array<float> radii = copyRef(ref<float>{0.03});
         // Validation
@@ -64,8 +64,8 @@ struct ParameterSweep {
            for(string resolution: ref<string>{"1"}) {
             parameters["Resolution"__] = resolution;
 #else
-         parameters["Thickness"__] = "1e-3"__; {
-          parameters["Side"__] = "1e8"__; {
+         parameters["Thickness"__] = "6e-4"__; {
+          parameters["Side"__] = "2e7"__; {
            parameters["Resolution"__] = "2"__; {
 #endif
            for(int seed: {1/*,2,3,4,5,6*/}) {
@@ -134,7 +134,8 @@ struct ParameterSweep {
     size_t runningCount = 0, queuedCount = 0;
     for(SGEJob& job: jobs) {
      if(job.state == "running") { running.append(" "+job.id); runningCount++; }
-     if(job.state == "pending") { queued.append(" "+job.id); queuedCount++; }
+     else if(job.state == "pending") { queued.append(" "+job.id); queuedCount++; }
+     else error(job.state);
     }
     if(running) log("Unused running jobs:", "qdel -f"+running+" &");
     if(queued) log("Unused queued jobs:", "qdel -f"+queued+" &");

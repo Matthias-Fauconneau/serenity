@@ -220,7 +220,7 @@ struct System {
 
   sconst float curvature = 0; // -1/radius?
   const float elasticModulus;
-  sconst float density = 5e3; //5e1;
+  sconst float density = 1e3;
   const float resolution;
   const float initialRadius;
   const float height;

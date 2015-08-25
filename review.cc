@@ -44,7 +44,7 @@ inline Fit totalLeastSquare(ref<float> X, ref<float> Y) {
 buffer<float> radius(const map<string, array<float>>& data) {
  ref<float> radius = data.at("Radius (m)"_);
  // FIXME: only < 14.8 15:
- return apply(radius, [](float r){return r+float(2.47e-3)/*Grain::radius*/;});
+ return apply(radius, [](float r){return r/*+float(2.47e-3)*//*Grain::radius*/;});
 }
 
 buffer<float> stress(const map<string, array<float>>& data, bool useMedianFilter=true) {
@@ -667,9 +667,9 @@ struct Review {
   if(existsFile(id+".working")) resultName = id+".working";
   if(existsFile(id+".result")) resultName = id+".result";
   Plot plot;
-  if(!resultName) { log(id); return plot; }
+  if(!resultName) { log("Missing result", id); return plot; }
   TextData s (readFile(resultName));
-  if(!s) { log(resultName); return plot; }
+  if(!s) { log("Missing result", resultName); return plot; }
   // TODO: cache dataSets
   string resultLine = s.line();
   Dict results = parseDict(resultLine);
@@ -848,7 +848,7 @@ struct Review {
     if(existsFile(file))
      output = Text(/*bold*/(str(array.stripSortKeys(point)))+'\n'+trim(section(readFile(file),'\n',-10,-1)));
     else log("Missing output", file);
-   }
+   } else log("Missing ID", point);
 
    //if(point && existsFile(str(point))) usleep(300*1000); // FIXME: signal back
    if(details) {
@@ -860,7 +860,7 @@ struct Review {
      log(file);
     }
     snapshotView = SnapshotView(/*str(array.stripSortKeys(point))*/section(lastSnapshot,'.',0,-2));
-  }
+   } else snapshotView = SnapshotView();
    window->render();
   };
   /*array.hover(

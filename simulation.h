@@ -56,13 +56,13 @@ struct CylinderGrid {
  }
  inline int2 index2(vec4f p) {
   float angle = PI+0x1p-23+atan(p[1], p[0]);
-  assert(angle >= 0 && angle/(2*PI+0x1p-22)*size.x < size.x, angle, log2(angle-2*PI), p);
-  assert(p[2] >= min && p[2] < max, min, p, max);
+  assert_(angle >= 0 && angle/(2*PI+0x1p-22)*size.x < size.x, angle, log2(angle-2*PI), p);
+  assert_(p[2] >= min && p[2] < max, min, p, max);
   return int2(int(angle/(2*PI+0x1p-22)*size.x), int((p[2]-min)/(max-min)*size.y));
  }
  inline size_t index(vec4f p) {
   int2 i = index2(p);
-  assert(i.x < size.x && i.y < size.y, min, p, max, i, size);
+  assert_(uint(i.x) < uint(size.x) && uint(i.y) < uint(size.y), min, p, max, i, size);
   return i.y*size.x+i.x;
  }
  array<uint32>& operator()(vec4f p) { return cells[index(p)]; }
@@ -437,7 +437,7 @@ break2_:;
     balanceAverage = average;
     balanceSum = 0;
     balanceCount = 0;
-    log(lastBalanceAverage, balanceAverage);
+    //log(lastBalanceAverage, balanceAverage);
    }
 
    if(parameters.contains("Pressure"_)) {
@@ -515,12 +515,21 @@ break2_:;
    v4sf O = side.Vertex::position[index];
    side.minRadius = ::min(side.minRadius, length2(O));
   }
-  CylinderGrid vertexGrid {-4*Grain::radius, targetHeight+4*Grain::radius,
+  CylinderGrid vertexGrid {-4*Grain::radius, targetHeight+8*Grain::radius,
      int2(2*PI*side.minRadius/*+Grain::radius)*//Grain::radius,
-          (targetHeight+2*Grain::radius+2*Grain::radius)/Grain::radius)};
+          (targetHeight+4*Grain::radius+8*Grain::radius)/Grain::radius)};
   for(size_t i: range(vertexGrid.cells.size)) vertexGrid.cells[i].clear();
   assert_(side.count <= 65536, side.count);
-  for(size_t index: range(side.count)) vertexGrid(side.Vertex::position[index]).append(index); // FIXME
+  for(size_t index: range(side.count)) {
+   v4sf p = side.Vertex::position[index];
+   if(!(p[2] >= vertexGrid.min && p[2] < vertexGrid.max)) {
+       log("p.z > vertexGrid.max (targetHeight)", min, p, max);
+       processState = Fail;
+       snapshot("vertexGrid");
+       return;
+  }
+   vertexGrid(p).append(index); // FIXME
+  }
   sideForceTime.start();
   //float minRadii[maxThreadCount]; mref<float>(minRadii).clear(inf);
   //side.minRadius = inf;
@@ -968,14 +977,24 @@ break2_:;
   parallel_chunk(side.W, side.count-side.W, [this,alpha](uint, size_t start, size_t size) {
    for(size_t i: range(start, start+size)) {
     System::step(side, i);
-    /*if(processState <= Pack) {
+    if(processState <= Pack) {
+#if 0
      float l = length2(side.Vertex::position[i]);
      assert(l);
      if(l < side.radius) {
-      side.Vertex::position[i][0] *= 1+(1-alpha)*(side.radius/l-1);
-      side.Vertex::position[i][1] *= 1+(1-alpha)*(side.radius/l-1);
+      side.Vertex::position[i][0] *= side.radius/l;
+      side.Vertex::position[i][1] *= side.radius/l;
+      /*side.Vertex::position[i][0] *= 1+(1-alpha)*(side.radius/l-1);
+      side.Vertex::position[i][1] *= 1+(1-alpha)*(side.radius/l-1);*/
      }
-    }*/
+     else if(l > 2*side.radius) {
+      side.Vertex::position[i][0] *= 2*side.radius/l;
+      side.Vertex::position[i][1] *= 2*side.radius/l;
+      /*side.Vertex::position[i][0] *= 1+(1-alpha)*(side.radius/l-1);
+      side.Vertex::position[i][1] *= 1+(1-alpha)*(side.radius/l-1);*/
+     }
+#endif
+    }
     //side.velocity[i] *= float4(1-0.1*dt); // Additionnal viscosity*/
    }
   }, 1);

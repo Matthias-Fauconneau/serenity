@@ -22,8 +22,8 @@ struct SimulationRun : Simulation {
 #if !UI
   Time time (true);
   if(existsFile(id)) remove(id);
-  File input(id, currentWorkingDirectory(), Flags(ReadOnly|Create)); //Stream(0)
-  int64 lastTime = input.modifiedTime();
+  //File input(id, currentWorkingDirectory(), Flags(ReadOnly|Create)); //Stream(0)
+  //int64 lastTime = input.modifiedTime();
 
   while(processState < Done) {
    if(timeStep%size_t(1e-1/dt) == 0) {
@@ -32,8 +32,8 @@ struct SimulationRun : Simulation {
     report();
     log(info());
    }
-   int64 time = input.modifiedTime();
-   if(time > lastTime) { snapshot("signal"); input.touch(); lastTime=input.modifiedTime(); } // Touch the file for snapshot
+   /*int64 time = input.modifiedTime();
+   if(time > lastTime) { snapshot("signal"); input.touch(); lastTime=input.modifiedTime(); } // Touch the file for snapshot*/
    step();
   }
   if(processState != ProcessState::Done) {
