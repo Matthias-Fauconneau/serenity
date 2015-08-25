@@ -174,7 +174,7 @@ struct Simulation : System {
   return (fS + fB) * direction;
  }
 
- generic vec4f expTension(T& A, size_t a, size_t b) {
+ /*generic vec4f expTension(T& A, size_t a, size_t b) {
   vec4f relativePosition = A.Vertex::position[a] - A.Vertex::position[b];
   vec4f length = sqrt(sq3(relativePosition));
   vec4f x = length - A.internodeLength4;
@@ -186,7 +186,7 @@ struct Simulation : System {
   vec4f relativeVelocity = A.Vertex::velocity[a] - A.Vertex::velocity[b];
   vec4f fB = - A.tensionDamping * dot3(direction, relativeVelocity);
   return (fS + fB) * direction;
- }
+ }*/
 
  // Formats vectors as flat lists without brackets nor commas
  String flat(const vec3& v) { return str(v[0], v[1], v[2]); }
@@ -532,63 +532,42 @@ break2_:;
   }
   sideForceTime.start();
   //float minRadii[maxThreadCount]; mref<float>(minRadii).clear(inf);
-  //side.minRadius = inf;
-#define DEBUG_TENSION 0
-#if DEBUG_TENSION
-  Locker lock(this->lock);
-  lines.clear();
-  float sumForce = 0;
-  static float meanForce = 1;
-#endif
-  parallel_for(1, side.H-1, [this, alpha//,&minRadii
-               #if DEBUG_TENSION
-               ,&sumForce
-             #endif
-               ](uint /*id*/, int i) {
+  parallel_for(1, side.H-1, [this, alpha/*&minRadii*/ ](uint /*id*/, int i) {
    int W = side.W;
    int dy[6] {-W,            0,       W,         W,     0, -W};
    int dx[6] {-1+(i%2), -1, -1+(i%2), (i%2), 1, (i%2)};
-   v4sf P = float4(-pressure/(2*3));
+   v4sf P = float4(-alpha*pressure/(2*3)); // area = length(cross)/2 / 3vertices
    //float minRadius = inf;
    for(size_t j: range(W)) {
     size_t index = i*W+j;
     v4sf O = side.Vertex::position[index];
     //minRadius = ::min(minRadius, length2(O));
-    //side.minRadius = ::min(side.minRadius, length2(O));
     // Pressure
     v4sf cross = _0f, tension = _0f;
-    for(int e: range(6)) {
+    for(int e: range(6)) { // TODO: AVX
      size_t a = i*W+dy[e]+(j+W+dx[e])%W;
-     tension += this->expTension(side, index, a);
+     //tension += expTension(side, index, a);
+     vec4f relativePosition = side.Vertex::position[index] - side.Vertex::position[a];
+     vec4f sqLength = sq3(relativePosition);
+     // FIXME: scalar
+      vec4f length = sqrt(sqLength);
+      vec4f x = length - side.internodeLength4;
+      if(x[0] > 0) x += x*x/side.internodeLength4; // f(0) = 0, f'(0) = 1, f(x)|0~exp(x)-1
+      vec4f fS = - side.tensionStiffness * x;
+
+     vec4f direction = relativePosition/length;
+     tension += fS * direction;
+
      v4sf A = side.Vertex::position[a];
      v4sf B = side.Vertex::position[i*W+dy[(e+1)%6]+(j+W+dx[(e+1)%6])%W];
      v4sf eA = A-O, eB = B-O;
      cross += ::cross(eB, eA);
     }
-    //log(length(cross)/2/6/(sq(side.internodeLength)*sqrt(3.)/4));
-    v4sf f = tension;
-    f += float3(alpha) * P * cross;
-    side.Vertex::force[index] = f; // area = length(cross)/2 / 3vertices
-#if DEBUG_TENSION
-    sumForce += length(f);
-    lines[rgb3f(0,0,1)].append(toVec3(side.Vertex::position[index]));
-    lines[rgb3f(0,0,1)].append(toVec3(side.Vertex::position[index]+tension/float4(meanForce/(1*mm))));
-    lines[rgb3f(1,0,0)].append(toVec3(side.Vertex::position[index]));
-    lines[rgb3f(1,0,0)].append(toVec3(side.Vertex::position[index]+(P * cross)/float4(meanForce/(1*mm))));
-    lines[rgb3f(0,1,0)].append(toVec3(side.Vertex::position[index]));
-    lines[rgb3f(0,1,0)].append(toVec3(side.Vertex::position[index]+f/float4(meanForce/(1*mm))));
-#endif
+    side.Vertex::force[index] = tension + P * cross;
    }
    //minRadii[id] = minRadius;
-  },
-#if DEBUG_TENSION
-  1);
-  meanForce = sumForce / (side.W*(side.H-2));
-  #else
-  threadCount);
-#endif
+  },  threadCount);
   //side.minRadius = ::min(ref<float>(minRadii, threadCount)) - Grain::radius;
-  side.minRadius -= Grain::radius;
   sideForceTime.stop();
   sideTime.stop();
 
