@@ -727,6 +727,7 @@ struct Review {
   else if(index==Pressure) {
    plot.ylabel = "Pressure (Pa)"__;
    ref<float> force = dataSets.at("Radial Force (N)"_);
+   strain.size = min(strain.size, force.size);
    buffer<float> radius = ::radius(dataSets);
    ref<float> height = dataSets.at("Height (m)"_);
    buffer<float> pressure (strain.size);
@@ -734,7 +735,7 @@ struct Review {
    if(useMedianFilter && pressure.size > 2*medianWindowRadius+1) {
     const size_t medianWindowRadius = 4;
     pressure = medianFilter(pressure , medianWindowRadius);
-    strain = copyRef(strain.slice(medianWindowRadius, strain.size-2*medianWindowRadius));
+    strain = copyRef(strain.slice(medianWindowRadius, pressure.size-2*medianWindowRadius));
    }
    plot.dataSets.insert(""__, {::move(strain), ::move(pressure)});
   }

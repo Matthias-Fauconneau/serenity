@@ -149,7 +149,6 @@ struct SimulationView : SimulationRun, Widget, Poll {
   else if(processState == Done) { /*Simulation::snapshot();*/ log("Done"); requestTermination(0); }
   else {
    window->setTitle(info());
-   log(plate.position[0], plate.position[1]);
    window->show(); // Raises
    extern int groupExitStatus;
    groupExitStatus = -1; // Let user view and return failed exit status on window close to stop sweep

@@ -73,7 +73,7 @@ struct SnapshotView : Widget {
     side.position.append(v4sf{x,y,z,0});}
     {float x = s.decimal(); s.skip(' ');
     float y = s.decimal(); s.skip(' ');
-    float z = s.decimal(); s.skip('\n');
+    float z = s.decimal(); if(!s.match('\n')) break;
     side.position.append(v4sf{x,y,z,0});}
    }
   }

@@ -64,8 +64,8 @@ struct ParameterSweep {
            for(string resolution: ref<string>{"1"}) {
             parameters["Resolution"__] = resolution;
 #else
-         parameters["Thickness"__] = "6e-4"__; {
-          parameters["Side"__] = "2e7"__; {
+         parameters["Thickness"__] = "2e-3"__; {
+          parameters["Side"__] = "2e8"__; {
            parameters["Resolution"__] = "2"__; {
 #endif
            for(int seed: {1/*,2,3,4,5,6*/}) {

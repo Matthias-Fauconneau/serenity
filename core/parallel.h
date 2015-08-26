@@ -40,17 +40,18 @@ inline void atomic_add(float& a, float b) {
                                       *(int*)&desired, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 }
 
-static const size_t maxThreadCount = 8;
+static const size_t maxThreadCount = 4; //32;
 static size_t coreCount() {
  TextData s(File("/proc/cpuinfo").readUpToLoop(1<<16));
  assert_(s.data.size<s.buffer.capacity);
  size_t coreCount = 0;
  while(s) { if(s.match("processor")) coreCount++; s.line(); }
- assert_(coreCount <= maxThreadCount);
- return coreCount;
+ //assert_(coreCount <= maxThreadCount, coreCount, maxThreadCount);
+ if(environmentVariable("THREADS"_))
+  coreCount = min(coreCount, (size_t)parseInteger(environmentVariable("THREADS"_)));
+ return min(coreCount, maxThreadCount);
 }
-static const int threadCount = environmentVariable("THREADS"_) ?
-   parseInteger(environmentVariable("THREADS"_)) : coreCount();
+static const int threadCount = coreCount();
 
 struct thread {
  pthread_t pthread = 0;

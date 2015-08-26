@@ -39,7 +39,7 @@ struct System {
  sconst float mm = 1e-3*m, g = 1e-3*kg;
  //vec4f G = _0f; // Using downward velocity instead
  const float gz; //= 4*10*1e-9 * N/kg; // Scaled gravity
- sconst float densityScale = 1e6; // 5
+ sconst float densityScale = 1e6; // 5-6
  vec4f G {0, 0, -gz/densityScale, 0}; // Scaled gravity
 
  // Penalty model
@@ -82,8 +82,8 @@ struct System {
  struct Vertex {
   sconst bool friction = true;
   const size_t base, capacity;
-  float mass;
-  const vec4f _1_mass;
+  float mass = 0;
+  vec4f _1_mass = float4(0);
   buffer<vec4f> position { capacity };
   buffer<vec4f> velocity { capacity };
   buffer<vec4f> positionDerivatives[3]; // { [0 ... 2] = buffer<vec4f>(capacity) };
@@ -131,7 +131,7 @@ struct System {
 
   sconst bool friction = false;
   sconst float curvature = 0;
-  sconst float elasticModulus = 1e9/*10*/ * kg/(m*s*s); // 1 GPa
+  sconst float elasticModulus = 1e9 * kg/(m*s*s); // 1 GPa
 
   Plate() : Vertex(0, 2, 1e-3 * densityScale) {
    count = 2;
@@ -162,7 +162,7 @@ struct System {
   sconst float curvature = 1./radius;
   sconst float shearModulus = 79e9 * kg / (m*s*s);
   sconst float poissonRatio = 0.28;
-  sconst float elasticModulus = 1 ? 2*shearModulus*(1+poissonRatio) : 1e9; // ~10^11
+  sconst float elasticModulus = 0 ? 2*shearModulus*(1+poissonRatio) : 1e9/*10*/; // ~2e11
 
   //sconst float mass = 3*g;
   sconst float density = 7.8e3 * densityScale;
@@ -219,7 +219,7 @@ struct System {
   sconst bool friction = false;
 
   sconst float curvature = 0; // -1/radius?
-  const float elasticModulus;
+  const float elasticModulus = 1e9; // for contact
   sconst float density = 1e3;
   const float resolution;
   const float initialRadius;
@@ -235,8 +235,13 @@ struct System {
   const float pourThickness;
   const float loadThickness;
   float thickness = pourThickness;
+  //const float thickness;
 
-  vec4f tensionStiffness = float3(elasticModulus * internodeLength * sqrt(3.)/2 * thickness); // FIXME
+  const float tensionElasticModulus; // for contact
+  const float massCoefficient = sqrt(3.)/2*sq(internodeLength)*densityScale*density;
+  const float tensionCoefficient = sqrt(3.)/2 * internodeLength * tensionElasticModulus;
+  float tensionStiffness = tensionCoefficient  * thickness; // FIXME
+  //vec4f tensionStiffness4 = float3(tensionStiffness);
 
   vec4f tensionDamping = 0 ? float3(mass / s) : _0f;
   //sconst float areaMomentOfInertia = pow4(1*mm); // FIXME
@@ -248,28 +253,28 @@ struct System {
 
   struct { NoOperation operator[](size_t) const { return {}; }} torque;
 
-  Side(float resolution, float initialRadius, float height, float loadThickness, size_t base,
-       float pourThickness, float elasticModulus)
-   : Vertex(base, /*W*H*/int(2*PI*initialRadius/resolution) *
-                                         (int(height/resolution*2/sqrt(3.))+1),
-            (pourThickness*sqrt(3.)/2*sq(2*PI*initialRadius/int(2*PI*initialRadius/resolution)))*density*densityScale/*1-4*/),
-     elasticModulus(elasticModulus),
-     resolution(resolution),
-     initialRadius(initialRadius),
-     height(height),
-     W(int(2*PI*initialRadius/resolution)),
-     H(int(height/resolution*2/sqrt(3.))+1),
-     pourThickness(pourThickness),
-     loadThickness(loadThickness) {
-   count = W*H;
-   for(size_t i: range(H)) for(size_t j: range(W)) {
-    float z = i*height/(H-1);
-    float a = 2*PI*(j+(i%2)*1./2)/W;
-    float x = initialRadius*cos(a), y = initialRadius*sin(a);
-    Vertex::position[i*W+j] = (v4sf){x,y,z,0};
-   }
-   Vertex::velocity.clear(_0f);
-   for(size_t i: range(3)) positionDerivatives[i].clear(_0f);
+  Side(float resolution, float initialRadius, float height, size_t base, float thickness, float elasticModulus)
+      : Vertex(base, /*W*H*/int(2*PI*initialRadius/resolution) * (int(height/resolution*2/sqrt(3.))+1), 0),
+        resolution(resolution),
+        initialRadius(initialRadius),
+        height(height),
+        W(int(2*PI*initialRadius/resolution)),
+        H(int(height/resolution*2/sqrt(3.))+1),
+        pourThickness(thickness*1000),
+        loadThickness(thickness),
+        tensionElasticModulus(elasticModulus)
+  {
+      mass = massCoefficient*thickness;
+      _1_mass = float3(1./mass);
+      count = W*H;
+      for(size_t i: range(H)) for(size_t j: range(W)) {
+          float z = i*height/(H-1);
+          float a = 2*PI*(j+(i%2)*1./2)/W;
+          float x = initialRadius*cos(a), y = initialRadius*sin(a);
+          Vertex::position[i*W+j] = (v4sf){x,y,z,0};
+      }
+      Vertex::velocity.clear(_0f);
+      for(size_t i: range(3)) positionDerivatives[i].clear(_0f);
   }
  } side;
 
@@ -316,7 +321,7 @@ struct System {
    wire(p.value("Elasticity"_, 0.f), grain.base+grain.capacity),
    side(Grain::radius/(float)p.at/*value*/("Resolution"/*,2*/), p.at("Radius"_),
         /*p.at("Height"_)*/ (float)p.at("Radius"_)*4.f,
-          p.at("Thickness"_), wire.base+wire.capacity, p.at("Thickness"_), p.at("Side")) {
+          /*p.at("Thickness"_),*/ wire.base+wire.capacity, p.at("Thickness"_), p.at("Side")) {
   //log("System");
  }
 
