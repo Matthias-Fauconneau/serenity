@@ -138,7 +138,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
 #endif
   if(window) window->render();
   int64 elapsed = realTime() - lastReport;
-  if(elapsed > 60e9 || timeStep > lastReportStep + 8/this->dt) {
+  if(elapsed > 30e9 || timeStep > lastReportStep + 4/this->dt) {
    report();
 #if PROFILE
    requestTermination();

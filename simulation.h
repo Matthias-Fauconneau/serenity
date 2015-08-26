@@ -513,6 +513,8 @@ break2_:;
 
   // Soft membrane side
   sideTime.start();
+
+  //sideMinTime.start();
   // Cylinder grid for side
   side.minRadius = inf;
   for(size_t index: range(side.count)) {
@@ -520,7 +522,9 @@ break2_:;
    side.minRadius = ::min(side.minRadius, length2(O));
   }
   side.minRadius -= Grain::radius;
+  //sideMinTime.stop();
 
+  sideGridTime.start();
   CylinderGrid vertexGrid {-4*Grain::radius, targetHeight+8*Grain::radius,
      int2(2*PI*side.minRadius/*+Grain::radius)*//Grain::radius,
           (targetHeight+4*Grain::radius+8*Grain::radius)/Grain::radius)};
@@ -536,6 +540,8 @@ break2_:;
   }
    vertexGrid(p).append(index); // FIXME
   }
+  sideGridTime.stop();
+
   sideForceTime.start();
   parallel_for(1, side.H-1, [this, alpha](uint, int i) {
    int W = side.W;
@@ -565,9 +571,9 @@ break2_:;
     v8sf Fz = T * Z;
 
     if(length2(O) >= side.radius-Grain::radius) {
-        v8sf X1 = shuffle8(X, X, 1, 2, 3, 4, 5, 6, 7, 0);
-        v8sf Y1 = shuffle8(Y, Y, 1, 2, 3, 4, 5, 6, 7, 0);
-        v8sf Z1 = shuffle8(Z, Z, 1, 2, 3, 4, 5, 6, 7, 0);
+        v8sf X1 = shuffle8(X, X, 1, 2, 3, 4, 5, 0, 0, 0);
+        v8sf Y1 = shuffle8(Y, Y, 1, 2, 3, 4, 5, 0, 0, 0);
+        v8sf Z1 = shuffle8(Z, Z, 1, 2, 3, 4, 5, 0, 0, 0);
         Fx += P * (Y*Z1 - Y1*Z);
         Fy += P * (Z*X1 - Z1*X);
         Fz += P * (X*Y1 - X1*Y);
