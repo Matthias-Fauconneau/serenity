@@ -69,6 +69,7 @@ layout/parse.cc
 layout/preview.cc
 layout/export.cc
 
+audio/audio.cc
 video/encoder.h
 video/encoder.cc
 
@@ -87,3 +88,4 @@ single.cc
 view-app.cc
 snapshot-view.h
 sge.h
+serenity.config

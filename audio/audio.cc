@@ -4,7 +4,9 @@
 /// Generic audio decoder (using FFmpeg)
 extern "C" {
 #define _MATH_H // Prevent system <math.h> inclusion which conflicts with local "math.h"
+#ifndef _STDLIB_H
 #define _STDLIB_H // Prevent system <stdlib.h> inclusion which conflicts with local "thread.h"
+#endif
 #define __STDC_CONSTANT_MACROS
 #include <stdint.h>
 #include <libavformat/avformat.h> //avformat

@@ -4,6 +4,7 @@
 #include "variant.h"
 #include "matrix.h"
 typedef v4sf vec4f;
+typedef v8sf vec8f;
 inline float length2(vec4f v) { return sqrt(sq2(v))[0]; }
 inline float length(vec4f v) { return sqrt(sq3(v))[0]; }
 
@@ -230,7 +231,8 @@ struct System {
   const float radius = initialRadius;
 
   const float internodeLength = 2*PI*initialRadius/W;
-  const vec4f internodeLength4 = float3(internodeLength);
+  //const vec4f internodeLength4 = float3(internodeLength);
+  const vec8f internodeLength8 = float8(internodeLength);
 
   const float pourThickness;
   const float loadThickness;
@@ -242,10 +244,11 @@ struct System {
   const float tensionCoefficient = sqrt(3.)/2 * internodeLength * tensionElasticModulus;
   float tensionStiffness = tensionCoefficient  * thickness; // FIXME
   //vec4f tensionStiffness4 = float3(tensionStiffness);
+  vec8f tensionStiffness6 = float6(tensionStiffness);
 
-  vec4f tensionDamping = 0 ? float3(mass / s) : _0f;
+  //vec4f tensionDamping = 0 ? float3(mass / s) : _0f;
   //sconst float areaMomentOfInertia = pow4(1*mm); // FIXME
-  const float bendStiffness = 0;//elasticModulus * areaMomentOfInertia / internodeLength; // FIXME
+  //const float bendStiffness = 0;//elasticModulus * areaMomentOfInertia / internodeLength; // FIXME
 
   //float tensionEnergy = 0, tensionEnergy2 = 0;
 

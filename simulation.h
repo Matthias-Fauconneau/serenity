@@ -425,6 +425,7 @@ break2_:;
    side.mass = side.massCoefficient * side.thickness;
    side._1_mass = float3(1./side.mass);
    side.tensionStiffness = side.tensionCoefficient * side.thickness;
+   side.tensionStiffness6 = float6(side.tensionStiffness);
    //side.tensionDamping = float3(side.mass / s);
 
    float speed = /*alpha **/ plateSpeed;
@@ -536,52 +537,46 @@ break2_:;
    vertexGrid(p).append(index); // FIXME
   }
   sideForceTime.start();
-  //float minRadii[maxThreadCount]; mref<float>(minRadii).clear(inf);
-  parallel_for(1, side.H-1, [this, alpha/*&minRadii*/ ](uint /*id*/, int i) {
+  parallel_for(1, side.H-1, [this, alpha](uint, int i) {
    int W = side.W;
    int dy[6] {-W,            0,       W,         W,     0, -W};
    int dx[6] {-1+(i%2), -1, -1+(i%2), (i%2), 1, (i%2)};
-   v4sf P = float4(-alpha*pressure/(2*3)); // area = length(cross)/2 / 3vertices
-   //float minRadius = inf;
+   v8sf P = float6(-alpha*pressure/(2*3)); // area = length(cross)/2 / 3 vertices
    for(size_t j: range(W)) {
     size_t index = i*W+j;
     v4sf O = side.Vertex::position[index];
-    //minRadius = ::min(minRadius, length2(O));
     // Pressure
-    v4sf cross = _0f, tension = _0f;
-    v4sf position[7];
-    for(int e: range(6)) { // TODO: AVX
+    v8sf X, Y, Z;
+    for(size_t e: range(6)) { // assert unrolled
         size_t a = i*W+dy[e]+(j+W+dx[e])%W;
-        position[e] = side.Vertex::position[a];
+        X[e] = side.Vertex::position[a][0];
+        Y[e] = side.Vertex::position[a][1];
+        Z[e] = side.Vertex::position[a][2];
     }
-    position[6] = position[0];
-    for(int e: range(6)) {
-     //tension += expTension(side, index, a);
-     vec4f relativePosition = side.Vertex::position[index] - position[e];
-     vec4f sqLength = sq3(relativePosition);
-     // FIXME: scalar
-     vec4f length4 = sqrt(sqLength);
-     float length = length4[0];
-     float x = length - side.internodeLength;
-     //if(x > 0) x += x*x/side.internodeLength; // f(0) = 0, f'(0) = 1, f(x)|0~exp(x)-1
-     if(x > 0) x = side.internodeLength*(exp(x/side.internodeLength)-1);
-     float fS = - side.tensionStiffness * x;
+    X -= float8(O[0]);
+    Y -= float8(O[1]);
+    Z -= float8(O[2]);
+    v8sf length = sqrt(X*X+Y*Y+Z*Z);
+    v8sf x = length - side.internodeLength8;
+    //x += max(x, _0f)*x/side.internodeLength8; // f(0) = 0, f'(0) = 1, f(x)|0~exp(x)-1
+    v8sf T = side.tensionStiffness6 * x / length;
+    v8sf Fx = T * X;
+    v8sf Fy = T * Y;
+    v8sf Fz = T * Z;
 
-     vec4f direction = relativePosition / length4;
-     tension += float4(fS) * direction;
-
-     v4sf A = side.Vertex::position[e];
-     v4sf B = side.Vertex::position[e+1];
-     v4sf eA = A-O, eB = B-O;
-     cross += ::cross(eB, eA);
+    if(length2(O) >= side.radius-Grain::radius) {
+        v8sf X1 = shuffle8(X, X, 1, 2, 3, 4, 5, 6, 7, 0);
+        v8sf Y1 = shuffle8(Y, Y, 1, 2, 3, 4, 5, 6, 7, 0);
+        v8sf Z1 = shuffle8(Z, Z, 1, 2, 3, 4, 5, 6, 7, 0);
+        Fx += P * (Y*Z1 - Y1*Z);
+        Fy += P * (Z*X1 - Z1*X);
+        Fz += P * (X*Y1 - X1*Y);
     }
-    v4sf f = tension;
-    if(length2(O) >= side.radius-Grain::radius) f += P * cross;
-    side.Vertex::force[index] = f;
+    side.Vertex::force[index][0] = reduce(Fx);
+    side.Vertex::force[index][1] = reduce(Fy);
+    side.Vertex::force[index][2] = reduce(Fz);
    }
-   //minRadii[id] = minRadius;
   },  threadCount);
-  //side.minRadius = ::min(ref<float>(minRadii, threadCount)) - Grain::radius;
   sideForceTime.stop();
   sideTime.stop();
 
