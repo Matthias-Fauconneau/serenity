@@ -156,8 +156,10 @@ bool Build::compileModule(string target) {
 		}
 		Folder(tmp+"/"+join(flags,"-")+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
 		Stream stdout;
-  int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++14", "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing", "-march=native",
-                                     "-o", object, fileName, "-I/usr/include/freetype2","-I/var/tmp/include"} + toRefs(args),
+        int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1y",
+                                           "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing",
+                                           "-march=native",
+                                           "-o", object, fileName, "-I/usr/include/freetype2","-I/var/tmp/include"} + toRefs(args),
                     false, currentWorkingDirectory(), 0, &stdout);
 		jobs.append({copyRef(target), pid, move(stdout)});
 		needLink = true;
@@ -176,6 +178,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
 			if(target) log(str("Multiple targets unsupported, building last target:", arg, ". Parsing arguments:", arguments)+'\n');
 			target = arg;
 		}
+        else if(arg.contains('=')) args.append(copyRef(arg));
 		else flags.append( split(arg,"-") );
 	}
 
@@ -186,9 +189,8 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
 	for(string flag: flags) args.append( "-D"+toUpper(flag)+"=1" );
 	if(!flags.contains("release")) args.append("-g"__);
 	if(!flags.contains("debug")) args.append("-O3"__);
- else if(flags.contains("fast")) args.append("-O3"__); // fast-debug
+    else if(flags.contains("fast")) args.append("-O3"__); // fast-debug
 	if(flags.contains("profile")) args.append("-finstrument-functions"__);
-	if(flags.contains("m32"_)) args.append("-m32"__); // "-mfpmath=sse"__
 
 	Folder(tmp, currentWorkingDirectory(), true);
 	Folder(tmp+"/"+join(flags,"-"), currentWorkingDirectory(), true);

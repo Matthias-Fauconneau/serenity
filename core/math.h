@@ -45,15 +45,15 @@ inline float sin(float t) { return __builtin_sin(t); }
 inline double asin(double t) { return __builtin_asin(t); }
 inline double tan(double t) { return __builtin_tan(t); }
 inline double atan(double y, double x) { return __builtin_atan2(y, x); }
-//inline float atan(float y, float x) { return __builtin_atan2f(y, x); }
-inline float atan(float y, float x) {
+inline float atan(float y, float x) { return __builtin_atan2f(y, x); }
+/*inline float atan(float y, float x) {
    static constexpr float c1 = PI/4, c2 = 3*c1;
    float abs_y = abs(y); //+1e-10 // kludge to prevent 0/0 condition
    float angle;
    if(x>=0) { float r = (x - abs_y) / (x + abs_y); angle = c1 - c1 * r; }
    else { float r = (x + abs_y) / (abs_y - x); angle = c2 - c1 * r; }
    if(y < 0) return -angle; else return angle;
-}
+}*/
 
 inline float gaussian(float sigma, float x) { return exp(-sq(x/sigma)/2); }
 

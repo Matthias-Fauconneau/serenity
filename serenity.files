@@ -89,3 +89,6 @@ view-app.cc
 snapshot-view.h
 sge.h
 serenity.config
+side.cc
+side.h
+avx_mathfun.h

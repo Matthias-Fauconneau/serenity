@@ -51,10 +51,14 @@ struct SimulationRun : Simulation {
 
  void report() {
   int64 elapsed = realTime() - lastReport;
-  log(timeStep*dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, wire.count);
+  string build;
+#if __AVX__
+  build = "AVX";
+#endif
+  log(build, timeStep*dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, side.count, wire.count);
   log("grain",str(grainTime, stepTime),
       "grainInit",str(grainInitializationTime, stepTime),
-      "grainLattice",str(grainGridTime, stepTime),
+      "grainLattice",str(grainLatticeTime, stepTime),
       "grainContact",str(grainContactTime, stepTime),
       "grainIntegration",str(grainIntegrationTime, stepTime));
   if(wire.count) log("wire",str(wireTime, stepTime),
@@ -138,7 +142,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
 #endif
   if(window) window->render();
   int64 elapsed = realTime() - lastReport;
-  if(elapsed > 30e9 || timeStep > lastReportStep + 4/this->dt) {
+  if(elapsed > 10e9 || timeStep > lastReportStep + 1/this->dt) {
    report();
 #if PROFILE
    requestTermination();

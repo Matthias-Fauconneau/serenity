@@ -4,7 +4,7 @@
 #include "variant.h"
 #include "matrix.h"
 typedef v4sf vec4f;
-typedef v8sf vec8f;
+//typedef v8sf vec8f;
 inline float length2(vec4f v) { return sqrt(sq2(v))[0]; }
 inline float length(vec4f v) { return sqrt(sq3(v))[0]; }
 
@@ -40,7 +40,7 @@ struct System {
  sconst float mm = 1e-3*m, g = 1e-3*kg;
  //vec4f G = _0f; // Using downward velocity instead
  const float gz; //= 4*10*1e-9 * N/kg; // Scaled gravity
- sconst float densityScale = 1e6; // 5-6
+ sconst float densityScale = 5e4; // 5-6
  vec4f G {0, 0, -gz/densityScale, 0}; // Scaled gravity
 
  // Penalty model
@@ -176,8 +176,12 @@ struct System {
   buffer<vec4f> rotation { capacity };
   buffer<vec4f> angularVelocity { capacity };
   buffer<vec4f> angularDerivatives[3]; // { [0 ... 2] = buffer<vec4f>(capacity) };
+
+  v4sf g;
+
   Grain(const System& system) : Vertex(2, 3852*4/*=15408*/, Grain::mass), // 5 MB
-   dt_angularMass(float3(system.dt/angularMass)) {
+   dt_angularMass(float3(system.dt/angularMass)),
+    g(float4(mass) * system.G) {
    for(size_t i: range(3)) angularDerivatives[i] = buffer<vec4f>(capacity);
   }
   buffer<vec4f> torque { capacity };
@@ -204,8 +208,8 @@ struct System {
   sconst float volume = section * internodeLength;
   sconst float density = 1e3 * kg / cb(m) * densityScale;
   sconst float angularMass = 0;
-  const float elasticModulus; // ~ 8e6
-  const vec4f tensionStiffness = float3(10*/*FIXME*/ elasticModulus * PI * sq(radius));
+  const float elasticModulus; // ~ 1e7
+  const vec4f tensionStiffness = float3(100*/*FIXME*/ elasticModulus * PI * sq(radius));
   sconst vec4f tensionDamping = _0f; //float3(mass / s);
   sconst float areaMomentOfInertia = PI/4*pow4(radius);
   const float bendStiffness = 10*/*FIXME*/ elasticModulus * areaMomentOfInertia / internodeLength;
@@ -220,7 +224,7 @@ struct System {
   sconst bool friction = false;
 
   sconst float curvature = 0; // -1/radius?
-  const float elasticModulus = 1e9; // for contact
+  const float elasticModulus = 1e8; // for contact
   sconst float density = 1e3;
   const float resolution;
   const float initialRadius;
@@ -231,8 +235,6 @@ struct System {
   const float radius = initialRadius;
 
   const float internodeLength = 2*PI*initialRadius/W;
-  //const vec4f internodeLength4 = float3(internodeLength);
-  const vec8f internodeLength8 = float8(internodeLength);
 
   const float pourThickness;
   const float loadThickness;
@@ -243,10 +245,8 @@ struct System {
   const float massCoefficient = sqrt(3.)/2*sq(internodeLength)*densityScale*density;
   const float tensionCoefficient = sqrt(3.)/2 * internodeLength * tensionElasticModulus;
   float tensionStiffness = tensionCoefficient  * thickness; // FIXME
-  //vec4f tensionStiffness4 = float3(tensionStiffness);
-  vec8f tensionStiffness6 = float6(tensionStiffness);
 
-  //vec4f tensionDamping = 0 ? float3(mass / s) : _0f;
+  float tensionDamping = mass / s;
   //sconst float areaMomentOfInertia = pow4(1*mm); // FIXME
   //const float bendStiffness = 0;//elasticModulus * areaMomentOfInertia / internodeLength; // FIXME
 
@@ -263,7 +263,7 @@ struct System {
         height(height),
         W(int(2*PI*initialRadius/resolution)),
         H(int(height/resolution*2/sqrt(3.))+1),
-        pourThickness(thickness*1000),
+        pourThickness(thickness*10),
         loadThickness(thickness),
         tensionElasticModulus(elasticModulus)
   {
@@ -281,11 +281,21 @@ struct System {
   }
  } side;
 
+ /// Side - Sphere
+ template<Type tB>
+ Contact contact(const Side& side, size_t vertexIndex, const tB& B, size_t bIndex) {
+  //if(length2(A.position[aIndex])/*+Grain::radius*/ < side.minRadius) return {_0f,_0f,_0f,0,0,0}; // Quick cull
+  vec4f a = side.Vertex::position[vertexIndex];
+  vec4f relativePosition = a - B.position[bIndex];
+  vec4f length = sqrt(sq3(relativePosition));
+  vec4f normal = relativePosition/length; // B -> A
+  return {float3(tB::radius)*(-normal), _0f, normal, length[0]-tB::radius, 0, 0};
+ }
  /// Sphere - Side
  template<Type tA>
- Contact contact(const tA& A, size_t aIndex, const Side& side, size_t faceIndex) {
+ Contact contact(const tA& A, size_t aIndex, const Side& side, size_t vertexIndex) {
   //if(length2(A.position[aIndex])/*+Grain::radius*/ < side.minRadius) return {_0f,_0f,_0f,0,0,0}; // Quick cull
-  vec4f b = side.Vertex::position[faceIndex];
+  vec4f b = side.Vertex::position[vertexIndex];
   vec4f relativePosition = A.position[aIndex] - b;
   vec4f length = sqrt(sq3(relativePosition));
   vec4f normal = relativePosition/length; // B -> A
@@ -341,10 +351,13 @@ struct System {
  size_t staticFrictionCount2 = 0, dynamicFrictionCount2 = 0;
 
  /// Evaluates contact penalty between two objects
- template<Type tA, Type tB>
- vec4f penalty(const tA& A, size_t a, tB& B, size_t b) {
+ template<Type tA, Type tB> bool penalty(const tA& A, size_t a, tB& B, size_t b) {
+     vec4f normalForce;
+     return penalty(A, a, B, b, normalForce);
+ }
+template<Type tA, Type tB> bool penalty(const tA& A, size_t a, tB& B, size_t b, vec4f& normalForce) {
   Contact c = contact(A, a, B, b);
-  if(c.depth >= 0) return _0f; //-c.depth;
+  if(c.depth >= 0) return false;
   // Stiffness
   const float E = 1/(1/A.elasticModulus+1/B.elasticModulus);
   constexpr float R = 1/(tA::curvature+tB::curvature);
@@ -360,7 +373,7 @@ struct System {
   float normalSpeed = dot3(c.normal, relativeVelocity)[0];
   float fB = - Kb * normalSpeed ; // Damping
   float fN = fK + fB;
-  vec4f normalForce = float3(fN) * c.normal;
+  normalForce = float3(fN) * c.normal;
   vec4f force = normalForce;
 
   if(B.friction) {
@@ -415,7 +428,7 @@ struct System {
   /*if(recordContacts) {
    contacts.append(A.base+a, B.base+b, toVec3(c.relativeA), toVec3(c.relativeB), toVec3(force));
   }*/
-  return normalForce; //-c.depth;
+  return true;
  }
 };
 

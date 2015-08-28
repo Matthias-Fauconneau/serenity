@@ -53,15 +53,17 @@ buffer<float> stress(const map<string, array<float>>& data, bool useMedianFilter
  else {
   ref<float> force = data.at("Plate Force (N)"_);
   buffer<float> radius = ::radius(data);
-  float A0 = 2* PI*sq(radius[0]); //(float)point.at("Radius"));
-  //ref<float> height = data.at("Height (m)"_);
-  //float h0 = height[0];
-  //float V0 = height[0] * float(PI) * sq(radius[0]);
-  stress = ::apply(force.size, [&](size_t i){
-   //float V = height[i] * float(PI) * sq(radius[i]);
-   //float Ac = A0 * (V/V0) / (height[i]/h0);
-   return force[i] / A0; //Ac;
-  });
+  if(radius) {
+      float A0 = 2* PI*sq(radius[0]); //(float)point.at("Radius"));
+      //ref<float> height = data.at("Height (m)"_);
+      //float h0 = height[0];
+      //float V0 = height[0] * float(PI) * sq(radius[0]);
+      stress = ::apply(force.size, [&](size_t i){
+              //float V = height[i] * float(PI) * sq(radius[i]);
+              //float Ac = A0 * (V/V0) / (height[i]/h0);
+              return force[i] / A0; //Ac;
+      });
+  }
  }
  if(useMedianFilter && stress.size > 2*medianWindowRadius+1) {
   stress = medianFilter(stress);

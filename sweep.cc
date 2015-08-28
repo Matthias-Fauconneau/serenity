@@ -31,12 +31,13 @@ struct ParameterSweep {
    array<SGEJob> jobs = qstat(0);
    {
     array<char> running, queued;
+    size_t runningCount = 0, queuedCount = 0;
     for(SGEJob& job: jobs) {
-     if(job.state == "running") running.append(" "+job.id);
-     if(job.state == "pending") queued.append(" "+job.id);
+     if(job.state == "running") { running.append(" "+job.id); runningCount++; }
+     if(job.state == "pending") { queued.append(" "+job.id); queuedCount++; }
     }
-    if(running) log("Running jobs:", "qdel -f"+running+" &");
-    if(queued) log("Queued jobs:", "qdel -f"+queued+" &");
+    if(running) log("Running jobs: ["+str(runningCount)+"]: qdel -f"+running+" &");
+    if(queued) log("Queued jobs:["+str(queuedCount)+"]: qdel -f"+queued+" &");
    }
    size_t done = 0, running = 0, queued = 0;
    for(float dt: {1e-5}) {
@@ -64,9 +65,9 @@ struct ParameterSweep {
            for(string resolution: ref<string>{"1"}) {
             parameters["Resolution"__] = resolution;
 #else
-         parameters["Thickness"__] = "2e-3"__; {
-          parameters["Side"__] = "2e8"__; {
-           parameters["Resolution"__] = "2"__; {
+         parameters["Thickness"__] = "1e-3"__; {
+          parameters["Side"__] = "1e8"__; {
+           parameters["Resolution"__] = "1.8"__; {
 #endif
            for(int seed: {1/*,2,3,4,5,6*/}) {
             parameters["Seed"__] = seed;
@@ -103,7 +104,7 @@ struct ParameterSweep {
             };
             if(pattern == "none") add();
             else {
-             for(float wireElasticModulus: {1e8}) {
+             for(float wireElasticModulus: {1e7}) {
               parameters["Elasticity"__] = String(str(int(round(wireElasticModulus/1e8)))+"e8");
               for(string wireDensity: {"6%"_,"12%"_}) {
                parameters["Wire"__] = wireDensity;
@@ -137,8 +138,8 @@ struct ParameterSweep {
      else if(job.state == "pending") { queued.append(" "+job.id); queuedCount++; }
      else error(job.state);
     }
-    if(running) log("Unused running jobs:", "qdel -f"+running+" &");
-    if(queued) log("Unused queued jobs:", "qdel -f"+queued+" &");
+    if(running) log("Unused running jobs: ["+str(runningCount)+"]: qdel -f"+running+" &");
+    if(queued) log("Unused queued jobs: ["+str(queuedCount)+"]: qdel -f"+queued+" &");
     log(runningCount+queuedCount, "jobs are not included in the current sweep parameters");
    }
 
@@ -179,7 +180,7 @@ struct ParameterSweep {
     while(missing) {
      if(arguments().contains("pretend"_)) {
       Dict shortSet = parseDict(missing.take(random%missing.size));
-      for(string dimension: fixed) if(shortSet.contains(dimension)) shortSet.remove(dimension);
+      //for(string dimension: fixed) if(shortSet.contains(dimension)) shortSet.remove(dimension);
       log(shortSet);
       //if(shortSet.contains("Pressure")) shortSet.remove("Pressure");
       //shortSet.remove("Seed");

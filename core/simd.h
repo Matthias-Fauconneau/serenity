@@ -66,25 +66,6 @@ inline v4sf qmul(v4sf a, v4sf b) {
 
 inline v4sf mix(v4sf x, v4sf y, float a) { return float4(1-a)*x + float4(a)*y; }
 
-// AVX
-typedef float v8sf __attribute((__vector_size__ (32)));
-inline v8sf constexpr float6(float f) { return (v8sf){f,f,f,f,f,f,0,0}; }
-inline v8sf constexpr float8(float f) { return (v8sf){f,f,f,f,f,f,f,f}; }
-#define shuffle8(A,B, c0, c1, c2, c3, c4, c5, c6, c7) __builtin_shufflevector(A,B, c0, c1, c2, c3, c4, c5, c6, c7)
-#undef packed
-#include <immintrin.h>
-#define packed __attribute((packed))
-// QtCreator
-#include <avxintrin.h>
-static inline float reduce(v8sf x) {
-    /* ( x3+x7, x2+x6, x1+x5, x0+x4 ) */
-    const v4sf x128 = __builtin_ia32_vextractf128_ps256(x, 1) + _mm256_castps256_ps128(x);
-    const __m128 x64 = x128 + _mm_movehl_ps/*__builtin_ia32_movhlps*/(x128, x128);
-    const __m128 x32 = x64 + _mm_shuffle_ps/*__builtin_ia32_shufps*/(x64, x64, 0x55);
-    return x32[0]; //_mm_cvtss_f32/*__builtin_ia32_vec_ext_v4sf*/(x32, 0);
-}
-inline v8sf sqrt(v8sf x) { return _mm256_sqrt_ps(x); }
-
 #include "math.h"
 inline v4sf mean(const ref<v4sf> x) { assert(x.size); return sum(x, float4(0)) / float4(x.size); }
 #include "string.h"
