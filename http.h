@@ -55,7 +55,7 @@ String cacheFile(const URL& url);
 
 /// Requests ressource at \a url and call \a handler when available
 /// \note Persistent disk caching will be used, no request will be sent if cache is younger than \a maximumAge hours
-Map getURL(URL&& url, function<void(const URL&, Map&&)> handler={}, int maximumAge=14*24, bool wait=true);
+Map getURL(URL&& url, function<void(const URL&, Map&&)> handler={}, int maximumAge=15*24, bool wait=true);
 
 /// Requests image at \a url and call \a handler when available (if was not cached)
 void getImage(URL&& url, Image* target, function<void()> imageLoaded, int2 size=0, uint maximumAge=24*60);

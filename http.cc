@@ -289,6 +289,7 @@ void HTTP::done() { state=Done; /*while(requests.contains(this))*/ if(requests.c
 
 // Requests
 
+int queryCount = 0;
 Map getURL(URL&& url, function<void(const URL&, Map&&)> handler, int maximumAge, bool wait) {
     assert(url.host,url);
     String file = cacheFile(url);
@@ -308,6 +309,7 @@ Map getURL(URL&& url, function<void(const URL&, Map&&)> handler, int maximumAge,
     }
     for(const unique<HTTP>& request: requests) if(request->url == url) { log("Duplicate request", url); return {}; }
     if(requests.size>5) error("Concurrent request limit", requests.size);
+    queryCount++;
     if(wait) {
         HTTP request(move(url),handler,move(headers));
         while(request.state < HTTP::Handle) assert_(request.wait(), request.events, request.revents);

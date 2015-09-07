@@ -69,7 +69,7 @@ String str(Date date, const string format="dddd, dd MMMM yyyy hh:mm:ss");
 
 /// Parses a date from s
 Date parseDate(TextData& s);
-inline Date parseDate(const string s) { TextData t(s); return parseDate(t); }
+inline Date parseDate(string s) { TextData t(s); Date date = parseDate(t); return t ? Date() : date; }
 
 struct Timer : Stream, Poll {
     Timer(const function<void()>& timeout={}, long sec=0, Thread& thread=mainThread);

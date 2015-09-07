@@ -42,8 +42,8 @@ String nearby(vec2 location, string types) {
     error(location, types);
 }
 
-static int queryLimit = 0;
-static int queryCount = 0;
+static int queryLimit = 1;
+
 
 uint duration(string origin, string destination, int64 time=0) {
     if(origin == destination) return 0;
@@ -54,9 +54,9 @@ uint duration(string origin, string destination, int64 time=0) {
         for(;;) {
             usleep( queryLimit*1000 );
             if(queryLimit>500) queryLimit--;
+            extern int queryCount;
             assert_(queryCount < 2500/4);
             Map data = getURL(copy(url));
-            queryCount++;
             Element root = parseXML(data);
             string status = root("DirectionsResponse")("status").content;
             if(status=="OK") {
