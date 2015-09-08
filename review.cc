@@ -196,8 +196,9 @@ break2:;
        buffer<float> radius = ::radius(dataSets);
        ref<float> height = dataSets.at("Height (m)"_);
        buffer<float> pressure = ::apply(force.size, [&](size_t i) {
-        return - force[i] / (height[i] * float(2*PI) * radius[i]); });
+        return force[i] / (height[i] * float(2*PI) * radius[i]); });
        float P = mean(pressure.slice(argmax));
+       assert_( P >= 0 );
        //float P = pressure[argmax];
        //float P = ::max(pressure); // TODO: median filter
        //assert_(P > 0);
@@ -591,6 +592,7 @@ struct Review {
    if(!peakStress) continue;
    float outsidePressure = float(point.at("Pressure"));
    float effectivePressure = array.pressure.at(point);
+   assert_(effectivePressure >= 0, effectivePressure);
    /***/if(index==Pressure)
     dataSet.insertSortedMulti(outsidePressure, effectivePressure);
    else if(index==Deviatoric)
@@ -733,7 +735,7 @@ struct Review {
    buffer<float> radius = ::radius(dataSets);
    ref<float> height = dataSets.at("Height (m)"_);
    buffer<float> pressure (strain.size);
-   for(size_t i: range(pressure.size)) pressure[i] = - force[i] / (height[i] * 2 * PI * radius[i]);
+   for(size_t i: range(pressure.size)) pressure[i] = force[i] / (height[i] * 2 * PI * radius[i]);
    if(useMedianFilter && pressure.size > 2*medianWindowRadius+1) {
     const size_t medianWindowRadius = 4;
     pressure = medianFilter(pressure , medianWindowRadius);
@@ -751,18 +753,27 @@ struct Review {
     plot.dataSets.insert(""__, {::move(strain), ::move(stress)});
    }
    else if(index==Deviatoric) {
-    //float pressure = point.at("Pressure"_);
-    buffer<float> pressure (strain.size);
+#if 1
     ref<float> force = dataSets.at("Radial Force (N)"_);
     buffer<float> radius = ::radius(dataSets);
     ref<float> height = dataSets.at("Height (m)"_);
-    for(size_t i: range(pressure.size)) pressure[i] = - force[i] / (height[i] * 2 * PI * radius[i]);
-    /*if(useMedianFilter && pressure.size > 2*medianWindowRadius+1) {
+    buffer<float> pressure (force.size);
+    for(size_t i: range(pressure.size)) {
+        pressure[i] = force[i] / (height[i] * 2 * PI * radius[i]);
+        assert_(pressure[i] >= 0);
+    }
+    if(useMedianFilter && pressure.size > 2*medianWindowRadius+1) {
      const size_t medianWindowRadius = 4;
      pressure = medianFilter(pressure , medianWindowRadius);
-    }*/
+    }
+#else
+    buffer<float> pressure (strain.size);
+    float P = point.at("Pressure"_);
+    for(size_t i: range(pressure.size)) pressure[i] = P;
+#endif
     plot.ylabel = "Normalized Deviatoric Stress"__;
     buffer<float> deviatoric (strain.size);
+    assert_(strain.size <= pressure.size, strain.size, /*force.size, radius.size, height.size,*/ pressure.size);
     for(size_t i: range(deviatoric.size)) deviatoric[i] = (stress[i]-pressure[i])/(stress[i]+pressure[i]);
     plot.min.y = 0; plot.max.y = 1;
     plot.dataSets.insert(""__, {::move(strain), ::move(deviatoric)});
@@ -784,7 +795,11 @@ struct Review {
    }
    window->render();
   };
-  window->actions[Key('m')] = [this](){ useMedianFilter=!useMedianFilter; window->render(); };
+  window->actions[Key('m')] = [this](){
+      useMedianFilter=!useMedianFilter;
+      array.press(group, point);
+      window->render();
+  };
   window->actions[Key('p')] = [this](){
    pressurePlotIndex = (pressurePlotIndex+1)%3;
    pressure = pressurePlot(group, pressurePlotIndex);
@@ -864,6 +879,8 @@ struct Review {
              lastTime = time;
              lastSnapshot = copyRef(file);
          }
+         else
+             assert_(lastSnapshot);
      }
      log(file);
     }

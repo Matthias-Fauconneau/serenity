@@ -2,7 +2,7 @@
 typedef unsigned short uint16;
 typedef float __attribute((__vector_size__(16))) v4sf;
 
-#define CYLINDERGRID 0
+#define CYLINDERGRID 1
 #define GRAINGRID 0
 #if !CYLINDERGRID && GRAINGRID
 #define SINGLEGRID 1

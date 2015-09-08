@@ -6,7 +6,7 @@ inline v4si cvttps2dq(v4sf a) { return __builtin_ia32_cvttps2dq(a); }
 inline v4sf dot2(v4sf a, v4sf b) { return __builtin_ia32_dpps(a,b,0b00111111); }
 
 // AVX
-#if __AVX__ && 1
+#if /*__AVX__ &&*/ 1
 typedef float v8sf __attribute((__vector_size__ (32)));
 inline v8sf constexpr float6(float f) { return (v8sf){f,f,f,f,f,f,0,0}; }
 //inline v8sf constexpr float8(float f) { return (v8sf){f,f,f,f,f,f,f,f}; }
@@ -32,7 +32,9 @@ static constexpr v8si _11111100 = {~0,~0,~0,~0,~0,~0,0,0};
 static inline float reduce6(v8sf x) { return reduce8((v8sf)((v8si)x & _11111100)); }
 inline v8sf sqrt8(v8sf x) { return _mm256_sqrt_ps(x); }
 #include "avx_mathfun.h"
+const char* build = "AVX";
 #else
+const char* build = "";
 struct v8sf {
     v4sf a,b;
     struct Ref {

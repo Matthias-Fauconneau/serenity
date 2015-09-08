@@ -51,10 +51,7 @@ struct SimulationRun : Simulation {
 
  void report() {
   int64 elapsed = realTime() - lastReport;
-  string build;
-#if __AVX__
-  build = "AVX";
-#endif
+  extern const char* build;
   log(build, timeStep*dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, side.count, wire.count);
   log("grain",str(grainTime, stepTime),
       "grainInit",str(grainInitializationTime, stepTime),
@@ -283,12 +280,18 @@ struct SimulationView : SimulationRun, Widget, Poll {
    vertexArray.draw(Triangles, positions.size);
   }}
 
-  static GLShader shader {::shader_glsl(), {"flat"}};
+  /*static GLShader shader {::shader_glsl(), {"flat"}};
   shader.bind();
   shader.bindFragments({"color"});
-  shader["transform"] = mat4(1);
+  shader["transform"] = mat4(1);*/
 
+  // Membrane
   if(side.faceCount>1) {Locker lock(this->lock);
+      static GLShader shader {::shader_glsl(), {"color"}};
+      shader.bind();
+      shader.bindFragments({"color"});
+      shader["transform"] = viewProjection;
+
    size_t W = side.W;
    buffer<vec3> positions {W*(side.H-1)*6-W*2};
    for(size_t i: range(side.H-1)) for(size_t j: range(W)) {
@@ -296,19 +299,33 @@ struct SimulationView : SimulationRun, Widget, Poll {
     vec3 b (toVec3(side.Vertex::position[i*W+(j+1)%W]));
     vec3 c (toVec3(side.Vertex::position[(i+1)*W+(j+i%2)%W]));
     // FIXME: GPU projection
-    vec3 A = viewProjection * a, B= viewProjection * b, C = viewProjection * c;
+    vec3 A =  a, B=  b, C =  c;
     size_t n = i ? W*4 + ((i-1)*W+j)*6 : j*4;
     positions[n+0] = C; positions[n+1] = A;
     positions[n+2] = B; positions[n+3] = C;
     if(i) { positions[n+4] = A; positions[n+5] = B; }
    }
-   shader["uColor"] = vec4(black, 1);
    static GLVertexArray vertexArray;
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
+   CylinderGrid vertexGrid {0, targetHeight,
+               int2(2*PI*side.minRadius/Grain::radius, targetHeight/Grain::radius)}; // FIXME
+   buffer<vec3> colors = apply(positions, [&](vec3 p) {
+           int2 index = vertexGrid.index2(p);
+           if( (index.x%2) ^ (index.y%2) ) return vec3(1,0,0);
+           return vec3(0,1,0);
+   });
+   GLBuffer colorBuffer (colors);
+   vertexArray.bindAttribute(shader.attribLocation("color"_), 3, Float, colorBuffer);
    vertexArray.draw(Lines, positions.size);
   }
 
+  static GLShader shader {::shader_glsl(), {"flat"}};
+  shader.bind();
+  shader.bindFragments({"color"});
+  shader["transform"] = mat4(1);
+
+  // Plates
   {
    Locker lock(this->lock);
    size_t W = side.W;

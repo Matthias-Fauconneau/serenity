@@ -73,8 +73,8 @@ static inline v8si _mm256_slli_epi32(v8si x, int a)
   v4si x1, x2;
   v8si ret;
   COPY_IMM_TO_XMM(x, x1, x2);
-  x1 = _mm_slli_epi32(x1,a);
-  x2 = _mm_slli_epi32(x2,a);
+  x1 = __builtin_ia32_pslldi128/*_mm_slli_epi32*/(x1, a);
+  x2 = __builtin_ia32_pslldi128/*_mm_slli_epi32*/(x2, a);
   COPY_XMM_TO_IMM(x1, x2, ret);
   return(ret);
 }
@@ -87,8 +87,10 @@ static inline v8si _mm256_add_epi32(v8si x, v8si y)
   v8si ret;
   COPY_IMM_TO_XMM(x, x1, x2);
   COPY_IMM_TO_XMM(y, y1, y2);
-  x1 = _mm_add_epi32(x1,y1);
-  x2 = _mm_add_epi32(x2,y2);
+  //x1 = /*_mm_add_epi32*/__builtin_ia32_paddd128(x1,y1);
+  //x2 = /*_mm_add_epi32*/__builtin_ia32_paddd128(x2,y2);
+  x1 = x1 + y1;
+  x2 = x2 + y2;
   COPY_XMM_TO_IMM(x1, x2, ret);
   return(ret);
 }
@@ -155,11 +157,11 @@ v8sf exp256_ps(v8sf x) {
   y = _mm256_add_ps(y, one);
 
   /* build 2^n */
-  imm0 = _mm256_cvttps_epi32(fx);
+  imm0 = __builtin_ia32_cvttps2dq256/*_mm256_cvttps_epi32*/(fx);
   // another two AVX2 instructions
   imm0 = _mm256_add_epi32(imm0, *(v8si*)_pi32_256_0x7f);
   imm0 = _mm256_slli_epi32(imm0, 23);
-  v8sf pow2n = _mm256_castsi256_ps(imm0);
+  v8sf pow2n = /*_mm256_castsi256_ps*/(v8sf)(imm0);
   y = _mm256_mul_ps(y, pow2n);
   return y;
 }

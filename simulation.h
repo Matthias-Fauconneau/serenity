@@ -7,7 +7,11 @@ template<size_t cellCapacity> struct List : mref<uint16> {
     List(mref<uint16> o) : mref(o) {}
     bool append(uint16 index) {
      size_t i = 0;
-     while(at(i)) i++;
+     while(at(i)) {
+         i++;
+         if(i==cellCapacity) return false;
+         //assert_(i<cellCapacity, (mref<uint16>)*this);
+     }
      at(i) = index; i++;
      if(i<cellCapacity) at(i) = 0;
      else { return false; } //assert_(i == cellCapacity);
@@ -58,9 +62,9 @@ generic struct Lattice {
 struct CylinderGrid {
  const float min, max;
  const int2 size;
- static constexpr size_t cellCapacity = 32;
+ static constexpr size_t cellCapacity = 64; // FIXME
  buffer<uint16> cells {size_t(size.y*size.x*cellCapacity)};
- const vec2 scale = vec2((size.x-1)/(2*PI /*+0x1p-22*/), (size.y-1)/(max-min));
+ const vec2 scale = vec2((size.x/*-1*/)/(2*PI /*+0x1p-22*/), (size.y/*-1*/)/(max-min));
  CylinderGrid(float min, float max, int2 size) : min(min), max(max), size(size) {
   cells.clear(0);
  }
@@ -83,27 +87,32 @@ struct CylinderGrid {
  }
 #else
  inline int2 index2(vec4f p) {
-     float angle = clamp(0., PI + atan(p[1], p[0]), 2*PI);
+     //float angle = clamp(0., PI + atan(p[1], p[0]), 2*PI);
+     float angle = PI + atan(p[1], p[0]);
      //return int2(clamp(0, int(angle*scale.x), size.x-1), int((p[2]-min)*scale.y));
      int x = int(angle*scale.x);
+     x = clamp(0, x, size.x-1);
      int y = (p[2]-min)*scale.y;
+     y = clamp(0, y, size.y-1);
      assert_(uint(x) < uint(size.x) && uint(y) < uint(size.y), min, p, max, x, y, size);
      //return int2(int(angle*scale.x), int((p[2]-min)*scale.y));
      return int2(x, y);
  }
  inline size_t index(vec4f p) {
-     //float angle = PI + atan(p[1], p[0]);
-     float angle = clamp(0., PI + atan(p[1], p[0]), 2*PI);
+     float angle = PI + atan(p[1], p[0]);
+     //float angle = clamp(0., PI + atan(p[1], p[0]), 2*PI);
      //int x = clamp(0, int(angle*scale.x), size.x-1);
      int x = int(angle*scale.x);
+     x = clamp(0, x, size.x-1);
      int y = (p[2]-min)*scale.y;
+     y = clamp(0, y, size.y-1);
      assert_(uint(x) < uint(size.x) && uint(y) < uint(size.y), min, p, max, x, y, size);
      return y*size.x + x;
  }
 #endif
  //array<uint16>& operator()(vec4f p) { return cells[index(p)]; }
  //inline size_t index(vec4f p) { return dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*(p-min))))[0]; }
- List<cellCapacity> operator[](size_t i) { return cells.slice(i*cellCapacity, cellCapacity); }
+ inline List<cellCapacity> operator[](size_t i) { return cells.slice(i*cellCapacity, cellCapacity); }
  inline List<cellCapacity> operator()(vec4f p) { return operator[](index(p)); }
 };
 #endif
@@ -488,9 +497,11 @@ break2_:;
        /*float plateForce = plate.force[1][2] - plate.force[0][2];
        float stress = plateForce/(2*PI*sq(side.initialRadius));*/
 
+       float plateForce = topForce - bottomForce;
     if((timeStep-packStart)*dt > transitionTime /*&& stress > pressure*/ && (skip ||
                                                     (timeStep-packStart)*dt > 16*s ||
                                                     (
+                                                     plateForce / (PI * sq(side.radius)) > pressure
                                                      voidRatio < 0.8 &&
                                                      grainKineticEnergy / grain.count < packLoadThreshold &&
                                                      (balanceAverage < 50 ||
@@ -573,11 +584,22 @@ break2_:;
 #if CYLINDERGRID
   assert_(side.count <= 65536, side.count);
   CylinderGrid vertexGrid {0, targetHeight,
-              int2(2*PI*side.minRadius/(2*Grain::radius), targetHeight/Grain::radius)}; // FIXME
+              int2(2*PI*side.minRadius/Grain::radius, targetHeight/Grain::radius)}; // FIXME
 
   sideGridTime.start();
   // TODO: multithread SIMD
-  for(size_t index: range(side.count)) vertexGrid(side.Vertex::position[index]).append(index);
+  for(size_t index: range(side.count)) {
+      //vertexGrid(side.Vertex::position[index]).append(index);
+      if(!vertexGrid(side.Vertex::position[index]).append(index)) {
+          log("Capacity", side.minRadius, index, side.Vertex::position[index],
+              vertexGrid.index2(side.Vertex::position[index]),
+              vertexGrid.index(side.Vertex::position[index]),
+              (mref<uint16>)vertexGrid(side.Vertex::position[index]));
+          processState = Fail;
+          snapshot("capacity");
+          return;
+      }
+  }
   sideGridTime.stop();
 #endif
 
@@ -586,7 +608,7 @@ break2_:;
   parallel_chunk(1, side.H-1, [this, alpha](uint, size_t start, size_t size) {
       ::side(side.W, side.Vertex::position.data, side.Vertex::velocity.data, side.Vertex::force.begin(), pressure,
              side.internodeLength, side.tensionStiffness, side.tensionDamping,
-             side.radius - (processState<Pack ? 0 : Grain::radius),
+             side.radius - alpha*Grain::radius,
              start, size);
   },  threadCount);
   sideForceTime.stop();
@@ -609,8 +631,8 @@ break2_:;
   grainInitializationTime.stop();
 
   grainLatticeTime.start();
-  size_t sideGrainCount = 0; float sideGrainRadiusSum = 0; float radialForce = 0;
-  parallel_chunk(grain.count, [this,&grainGrid, &sideGrainCount, &sideGrainRadiusSum, &radialForce,
+  size_t sideGrainCount = 0; float sideGrainRadiusSum = 0; float radialForceSum = 0; // !parallel
+  parallel_chunk(grain.count, [this,&grainGrid, &sideGrainCount, &sideGrainRadiusSum, &radialForceSum,
                #if CYLINDERGRID
                  &vertexGrid,
                #endif
@@ -626,7 +648,7 @@ break2_:;
     if(0 || sq2(grain.position[grainIndex])[0]/*+Grain::radius*/ >= sqRadius) {
         // Side vertices
         vec4f p = grain.position[grainIndex];
-        vec4f radialVector = grain.position[grainIndex]/sqrt(sq3(grain.position[grainIndex]));
+        vec4f radialVector = grain.position[grainIndex]/sqrt(sq2(grain.position[grainIndex]));
         bool sideContact = false;
 #if CYLINDERGRID
         int2 index = vertexGrid.index2(p);
@@ -644,7 +666,9 @@ break2_:;
                         contacts.append(b);
 #endif
                         sideContact = true;
-                        radialForce += dot3(radialVector, normalForce)[0];
+                        float radialForce = dot2(radialVector, -normalForce)[0];
+                        assert(radialForce >= -0, radialForce, radialVector, normalForce, length2(radialVector));
+                        radialForceSum += radialForce;
                     }
                 }
             }
@@ -652,7 +676,15 @@ break2_:;
 #if CHECK
         for(size_t b: range(side.count)) {
             if(contact(grain, grainIndex, side, b).depth < 0 && !contacts.contains(b)) {
-                error(b, p, index, vertexGrid.cells.indexOf(b), vertexGrid.size);
+                for(int y: range(::max(0, index.y-1), ::min(vertexGrid.size.y, index.y+1 +1))) {
+                    for(int x: range(index.x-1, index.x+1 +1)) {
+                        log(x,y,"index", y*vertexGrid.size.x+(x+vertexGrid.size.x)%vertexGrid.size.x,
+                            (mref<uint16>)vertexGrid[y*vertexGrid.size.x+(x+vertexGrid.size.x)%vertexGrid.size.x]);
+                    }
+                }
+                error(b, p, index, vertexGrid.cells.indexOf(b)/vertexGrid.cellCapacity,
+                      vertexGrid.cells.indexOf(b)%vertexGrid.cellCapacity,
+                      vertexGrid.size);
             }
         }
 #endif
@@ -679,6 +711,7 @@ break2_:;
     }
    }
   }, threadCount);
+  assert_(radialForceSum >= 0, radialForceSum);
   if(processState == Fail) return;
   grainLatticeTime.stop();
 
@@ -1048,7 +1081,7 @@ break2_:;
 #endif
 #endif
     }
-    //side.Vertex::velocity[i] *= float4(1-0.1*dt); // Additionnal viscosity*/
+    side.Vertex::velocity[i] *= float4(1-0.5*dt); // Additionnal viscosity
    }
   }, 1);
  sideIntegrationTime.stop();
@@ -1105,7 +1138,7 @@ break2_:;
     //float volume = height * PI * sq(radius);
     //if(!initialVolume) initialVolume = volume;
     //(volume/initialVolume-1)*100
-    stream.write(str(radius, height, plateForce, radialForce, grainKineticEnergy, sideGrainCount)+'\n'); //, side.tensionEnergy
+    stream.write(str(radius, height, plateForce, radialForceSum, grainKineticEnergy, sideGrainCount)+'\n'); //, side.tensionEnergy
 
     // Snapshots every 1% strain
     float strain = (1-height/(topZ0-bottomZ0))*100;

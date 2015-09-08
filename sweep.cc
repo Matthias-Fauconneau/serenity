@@ -49,7 +49,7 @@ struct ParameterSweep {
       parameters["Friction"__] = frictionCoefficient; // FIXME: separate Ball-Wire friction coefficient
       for(string pattern: ref<string>{"none"/*,"helix","cross","loop"*/}) {
        parameters["Pattern"__] = pattern;
-       for(int pressure: {0,/*20,*/40,/*60,*/80/*100,120,140,160*/}) {
+       for(int pressure: {/*0,*//*20,*/40,/*60,*/80/*100,120,140,160*/}) {
         parameters["Pressure"__] = String(str(pressure)+"K"_);
         array<float> radii = copyRef(ref<float>{0.015,0.03});
         // Validation

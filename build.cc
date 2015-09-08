@@ -155,10 +155,10 @@ bool Build::compileModule(string target) {
 			else log(job.target+'\n');
 		}
 		Folder(tmp+"/"+join(flags,"-")+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
-		Stream stdout;
+        Stream stdout;
         int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1y",
                                            "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing",
-                                           "-march=native",
+                                           //"-march=native",
                                            "-o", object, fileName, "-I/usr/include/freetype2","-I/var/tmp/include"} + toRefs(args),
                     false, currentWorkingDirectory(), 0, &stdout);
 		jobs.append({copyRef(target), pid, move(stdout)});
@@ -178,7 +178,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
 			target = arg;
 		}
         else if(startsWith(arg,"-"_) && arg.contains('=')) args.append(copyRef(arg));
-        else if(startsWith(arg,"-"_)) {} // Build command flag
+        //else if(startsWith(arg,"-"_)) {} // Build command flag
 		else flags.append( split(arg,"-") );
 	}
 
@@ -218,7 +218,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
 					move(files) +
                     mref<String>{"-o"__, unsafeRef(binary), "-L/var/tmp/lib"__, "-Wl,-rpath,/var/tmp/lib"__,} +
 					apply(libraries, [this](const String& library)->String{ return "-l"+library; }) );
-		if(flags.contains("m32"_)) args.append("-m32"__);
+        //if(flags.contains("m32"_)) args.append("-m32"__);
   if(execute(CXX, toRefs(args))) { ::log("Failed to link\n", CXX, args); return; }
 	}
 

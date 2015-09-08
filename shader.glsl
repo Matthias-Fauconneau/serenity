@@ -5,6 +5,11 @@ vertex {
   out vec2 vLocalCoords;
   vLocalCoords = vec2[](vec2(-1,-1),vec2(1,-1),vec2(-1,1),
       vec2(-1,1),vec2(1,-1),vec2(1,1))[gl_VertexID%6];
+  color {
+      in vec3 color;
+      out vec3 vColor;
+      vColor = color;
+  }
 }
 fragment {
   out vec4 color;
@@ -40,5 +45,9 @@ fragment {
   flat {
     uniform vec4 uColor;
     color = uColor;
+  }
+  color {
+    in vec4 vColor;
+    color = vColor;
   }
 }

@@ -43,7 +43,7 @@ struct System {
  vec4f G {0, 0, -gz/densityScale, 0}; // Scaled gravity
 
  // Penalty model
- sconst float normalDamping = 0.1;
+ sconst float normalDamping = 0.02; //0.1;
  // Friction model
  sconst bool staticFriction = true;
  sconst float staticFrictionSpeed = inf; //1./3 *m/s; //inf; //1./3 *m/s;
@@ -347,6 +347,7 @@ template<Type tA, Type tB> bool penalty(const tA& A, size_t a, tB& B, size_t b, 
   float normalSpeed = dot3(c.normal, relativeVelocity)[0];
   float fB = - Kb * normalSpeed ; // Damping
   float fN = fK + fB;
+  //assert_(fN > 0, fK, fB);
   normalForce = float3(fN) * c.normal;
   vec4f force = normalForce;
 

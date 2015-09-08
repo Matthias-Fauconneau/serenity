@@ -38,9 +38,10 @@ struct SnapshotView : Widget {
 
  SnapshotView() {}
  SnapshotView(string id) : id(copyRef(id)) {
-  /*assert_(existsFile(id+".grain"), id, currentWorkingDirectory().list(Files));
-  assert_(existsFile(id+".wire"));
-  assert_(existsFile(id+".side"));*/
+     if(!id) return;
+  assert_(existsFile(id+".grain"), id, currentWorkingDirectory().list(Files));
+  //assert_(existsFile(id+".wire"), id, currentWorkingDirectory().list(Files));
+  assert_(existsFile(id+".side"), id, currentWorkingDirectory().list(Files));
   if(existsFile(id+".grain")) {TextData s(readFile(id+".grain"));
    grain.radius = s.decimal(); s.line();
    s.line(); // Header
