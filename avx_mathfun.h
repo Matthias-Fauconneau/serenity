@@ -31,7 +31,7 @@
 
 #include <immintrin.h>
 typedef float v8sf __attribute((__vector_size__ (32)));
-typedef __m128i v4si;
+typedef int __attribute((__vector_size__(16))) v4si;
 
 /* declare some AVX constants -- why can't I figure a better way to do that? */
 #define _PS256_CONST(Name, Val)                                            \

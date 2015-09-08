@@ -255,8 +255,9 @@ double TextData::decimal() {
  if(match('-')) sign=-1; else match('+');
  double significand=0, decimal=0, eSign=1, exponent=0;
  if(match("∞")) return sign*__builtin_inf();
- //assert_(isInteger(), data);
- if(!isInteger()) return nan;
+ if(match("NaN")) return nan;
+ assert_(isInteger(), data);
+ //if(!isInteger()) return nan;
  for(bool gotDot=false, gotE=false; available(1);) {
   /**/  if(!gotDot && match('.')) gotDot=true;
   else if(!gotE && matchAny("eE")) { gotE=true; if(match('-')) eSign=-1; else match('+'); }

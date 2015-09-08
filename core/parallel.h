@@ -40,7 +40,7 @@ inline void atomic_add(float& a, float b) {
                                       *(int*)&desired, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 }
 
-static const size_t maxThreadCount = 4; //32;
+static const size_t maxThreadCount = 1; //32;
 static size_t coreCount() {
  TextData s(File("/proc/cpuinfo").readUpToLoop(1<<16));
  assert_(s.data.size<s.buffer.capacity);

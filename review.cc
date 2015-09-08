@@ -317,7 +317,7 @@ break2:;
     for(string name: Folder(".").list(Files)) if(startsWith(name, id)) {
      log(name);
      fileCount++;
-     rename(currentWorkingDirectory(), name, Folder("../Archive"), name);
+     rename(currentWorkingDirectory(), name, Folder("../Archive", currentWorkingDirectory(), true), name);
     }
     failureCount++;
    }
@@ -856,10 +856,15 @@ struct Review {
    //if(point && existsFile(str(point))) usleep(300*1000); // FIXME: signal back
    if(details) {
     static buffer<String> files = Folder(".").list(Files|Sorted);
-    String lastSnapshot;
+    String lastSnapshot; int64 lastTime = 0;
     for(string file: files) if(startsWith(file, str(array.stripSortKeys(point)))) {
-     if(endsWith(file, ".grain") || endsWith(file, ".side") || endsWith(file, ".wire") || endsWith(file, "domain") || endsWith(file, "s")) //.?s
-      lastSnapshot = copyRef(file);
+     if(endsWith(file, ".grain") || endsWith(file, ".side") /*|| endsWith(file, ".wire")*/) {
+         int64 time = File(file).modifiedTime();
+         if(time >= lastTime) {
+             lastTime = time;
+             lastSnapshot = copyRef(file);
+         }
+     }
      log(file);
     }
     snapshotView = SnapshotView(/*str(array.stripSortKeys(point))*/section(lastSnapshot,'.',0,-2));

@@ -172,13 +172,13 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
 	// Configures
 	string install;
 	for(string arg: arguments) {
-		if(startsWith(arg,"-"_)) {} // Build command flag
-		else if(startsWith(arg,"/"_)) install=arg;
+        if(startsWith(arg,"/"_)) install=arg;
 		else if(find(arg+".cc") && arg!="profile") {
 			if(target) log(str("Multiple targets unsupported, building last target:", arg, ". Parsing arguments:", arguments)+'\n');
 			target = arg;
 		}
-        else if(arg.contains('=')) args.append(copyRef(arg));
+        else if(startsWith(arg,"-"_) && arg.contains('=')) args.append(copyRef(arg));
+        else if(startsWith(arg,"-"_)) {} // Build command flag
 		else flags.append( split(arg,"-") );
 	}
 

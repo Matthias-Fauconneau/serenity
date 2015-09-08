@@ -38,8 +38,7 @@ struct System {
  // SI units
  sconst float s = 1, m = 1, kg = 1, N = kg*m/s/s;
  sconst float mm = 1e-3*m, g = 1e-3*kg;
- //vec4f G = _0f; // Using downward velocity instead
- const float gz; //= 4*10*1e-9 * N/kg; // Scaled gravity
+ const float gz;
  sconst float densityScale = 5e4; // 5-6
  vec4f G {0, 0, -gz/densityScale, 0}; // Scaled gravity
 
@@ -224,7 +223,7 @@ struct System {
   sconst bool friction = false;
 
   sconst float curvature = 0; // -1/radius?
-  const float elasticModulus = 1e8; // for contact
+  const float elasticModulus = 5e7; // for contact
   sconst float density = 1e3;
   const float resolution;
   const float initialRadius;
@@ -232,6 +231,7 @@ struct System {
   const size_t W, H;
   size_t faceCount = (H-1)*W*2; // Always soft membrane
   float minRadius = initialRadius-Grain::radius;
+  float minRadiusSq;
   const float radius = initialRadius;
 
   const float internodeLength = 2*PI*initialRadius/W;
@@ -242,7 +242,7 @@ struct System {
   //const float thickness;
 
   const float tensionElasticModulus; // for contact
-  const float massCoefficient = sqrt(3.)/2*sq(internodeLength)*densityScale*density;
+  const float massCoefficient = sqrt(3.)/2 * sq(internodeLength) * densityScale * density;
   const float tensionCoefficient = sqrt(3.)/2 * internodeLength * tensionElasticModulus;
   float tensionStiffness = tensionCoefficient  * thickness; // FIXME
 
@@ -284,7 +284,7 @@ struct System {
  /// Side - Sphere
  template<Type tB>
  Contact contact(const Side& side, size_t vertexIndex, const tB& B, size_t bIndex) {
-  //if(length2(A.position[aIndex])/*+Grain::radius*/ < side.minRadius) return {_0f,_0f,_0f,0,0,0}; // Quick cull
+  if(sq2(B.position[bIndex])[0]/*+Grain::radius*/ < side.minRadiusSq) return {_0f,_0f,_0f,0,0,0}; // Quick cull
   vec4f a = side.Vertex::position[vertexIndex];
   vec4f relativePosition = a - B.position[bIndex];
   vec4f length = sqrt(sq3(relativePosition));
@@ -294,38 +294,12 @@ struct System {
  /// Sphere - Side
  template<Type tA>
  Contact contact(const tA& A, size_t aIndex, const Side& side, size_t vertexIndex) {
-  //if(length2(A.position[aIndex])/*+Grain::radius*/ < side.minRadius) return {_0f,_0f,_0f,0,0,0}; // Quick cull
   vec4f b = side.Vertex::position[vertexIndex];
   vec4f relativePosition = A.position[aIndex] - b;
   vec4f length = sqrt(sq3(relativePosition));
   vec4f normal = relativePosition/length; // B -> A
   return {float3(tA::radius)*(-normal), _0f, normal, length[0]-tA::radius, 0, 0};
  }
- /*struct RigidSide {
-  sconst size_t base = 0;
-  sconst bool friction = false;
-  sconst float curvature = 0;
-  sconst float elasticModulus = 1e11;
-  float radius;
-  RigidSide(float radius) : radius(radius) {}
-  struct { v4sf operator[](size_t) const { return _0f; } } position;
-  struct { v4sf operator[](size_t) const { return _0f; } } velocity;
-  struct { NoOperation operator[](size_t) const { return {}; }} force;
-  struct { vec4f operator[](size_t) const { return _0001f; }} rotation;
-  struct { v4sf operator[](size_t) const { return _0f; } } angularVelocity;
-  struct { NoOperation operator[](size_t) const { return {}; }} torque;
- } rigidSide {side.radius};
-
- /// Sphere - Rigid side
- template<Type tA>
- Contact contact(const tA& A, size_t aIndex, const RigidSide& side, size_t) {
-  float length = length2(A.position[aIndex]);
-  float r = side.radius;
-  vec4f normal {-A.position[aIndex][0]/length, -A.position[aIndex][1]/length, 0, 0};
-  return { float3(tA::radius)*(-normal),
-     vec4f{r*-normal[0], r*-normal[1], A.position[aIndex][2], 0},
-   normal, r-tA::radius-length,0,0 };
-}*/
 
  System(const Dict& p) :
    dt(p.at("TimeStep"_)),

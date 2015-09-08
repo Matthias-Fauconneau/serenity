@@ -40,18 +40,18 @@ struct ParameterSweep {
     if(queued) log("Queued jobs:["+str(queuedCount)+"]: qdel -f"+queued+" &");
    }
    size_t done = 0, running = 0, queued = 0;
-   for(float dt: {1e-5}) {
+   for(float dt: {10e-6}) {
     parameters["TimeStep"__] = String(str(int(round(dt*1e6)))+"µ");
     /*for(string plateSpeed: {0?"8e-5"_:"1e-4"_}) {
      parameters["PlateSpeed"__] = plateSpeed;*/
     {
      for(float frictionCoefficient: {0.1/*,0.3*/}) {
       parameters["Friction"__] = frictionCoefficient; // FIXME: separate Ball-Wire friction coefficient
-      for(string pattern: ref<string>{"none","helix","cross","loop"}) {
+      for(string pattern: ref<string>{"none"/*,"helix","cross","loop"*/}) {
        parameters["Pattern"__] = pattern;
        for(int pressure: {0,/*20,*/40,/*60,*/80/*100,120,140,160*/}) {
         parameters["Pressure"__] = String(str(pressure)+"K"_);
-        array<float> radii = copyRef(ref<float>{0.03});
+        array<float> radii = copyRef(ref<float>{0.015,0.03});
         // Validation
         if(pressure == 80 && pattern=="none" && !radii.contains(0.05)) radii.append(0.05);
         for(float radius: radii) {
@@ -67,7 +67,7 @@ struct ParameterSweep {
 #else
          parameters["Thickness"__] = "1e-3"__; {
           parameters["Side"__] = "1e8"__; {
-           parameters["Resolution"__] = "1.8"__; {
+           parameters["Resolution"__] = "2"__; {
 #endif
            for(int seed: {1/*,2,3,4,5,6*/}) {
             parameters["Seed"__] = seed;
