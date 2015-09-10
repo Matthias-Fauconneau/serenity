@@ -108,7 +108,8 @@ struct File : Stream {
     File(){}
     File(int fd):Stream(fd){}
     /// Opens \a path
-    explicit File(string path, const Folder& at=currentWorkingDirectory(), Flags flags=ReadOnly);
+    explicit File(string path, const Folder& at=currentWorkingDirectory(), Flags flags=ReadOnly,
+                  int permissions=0666);
     /// Returns file properties
     struct stat stat() const;
     /// Returns file type
@@ -194,6 +195,8 @@ void symlink(const string target,const string name, const Folder& at=currentWork
 void touchFile(const string path, const Folder& at=currentWorkingDirectory(), int64 time=0);
 /// Copies a file replacing any existing files or links
 void copy(const Folder& oldAt, const string oldName, const Folder& newAt, const string newName);
+
+void link(const Folder& oldAt, const string oldName, const Folder& newAt, const string newName);
 
 /// Returns available free space in bytes for the file system containing \a file
 int64 availableCapacity(const Handle& file);

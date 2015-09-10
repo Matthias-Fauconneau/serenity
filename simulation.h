@@ -501,7 +501,7 @@ break2_:;
     if((timeStep-packStart)*dt > transitionTime /*&& stress > pressure*/ && (skip ||
                                                     (timeStep-packStart)*dt > 16*s ||
                                                     (
-                                                     plateForce / (PI * sq(side.radius)) > pressure
+                                                     plateForce / (PI * sq(side.radius)) > pressure &&
                                                      voidRatio < 0.8 &&
                                                      grainKineticEnergy / grain.count < packLoadThreshold &&
                                                      (balanceAverage < 50 ||
@@ -711,7 +711,7 @@ break2_:;
     }
    }
   }, threadCount);
-  assert_(radialForceSum >= 0, radialForceSum);
+  if(processState >= Load) assert_(radialForceSum >= -0.0003, radialForceSum);
   if(processState == Fail) return;
   grainLatticeTime.stop();
 

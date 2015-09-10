@@ -162,7 +162,7 @@ struct System {
   sconst float curvature = 1./radius;
   sconst float shearModulus = 79e9 * kg / (m*s*s);
   sconst float poissonRatio = 0.28;
-  sconst float elasticModulus = 0 ? 2*shearModulus*(1+poissonRatio) : 1e9/*10*/; // ~2e11
+  sconst float elasticModulus = 1 ? 2*shearModulus*(1+poissonRatio) : 1e11; // ~2e11
 
   //sconst float mass = 3*g;
   sconst float density = 7.8e3 * densityScale;
@@ -310,6 +310,7 @@ struct System {
         /*p.at("Height"_)*/ (float)p.at("Radius"_)*4.f,
           /*p.at("Thickness"_),*/ wire.base+wire.capacity, p.at("Thickness"_), p.at("Side")) {
   //log("System");
+     if(p.at("Pattern")!="none"_) assert_(wire.elasticModulus);
  }
 
  // Update

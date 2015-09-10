@@ -1,30 +1,48 @@
 #include "variant.h"
 #include "xml.h"
+#include "file.h"
+#include "time.h"
 
 struct SGEJob { String state; Dict dict; String id; float elapsed; };
 String str(const SGEJob& o) { return str(o.dict, o.id, o.elapsed); }
 bool operator==(const SGEJob& o, const Dict& dict) { return o.dict == dict; }
 
+struct SSH : Poll {
+    Stream stdout;
+    int pid;
+    array<byte> status;
+
+    SSH(ref<string> args, bool log=false) {
+        static String hostname = File("/proc/sys/kernel/hostname").readUpTo(256);
+        if(hostname=="ifbeval01"_ || !arguments() || !startsWith(arguments()[0],"server-")) {
+            if(!which("qstat")) { ::log("Missing qstat"); return; }
+            pid = execute(which(args[0]), args.slice(1), false, currentWorkingDirectory(), &stdout);
+        } else {
+            pid = execute("/usr/bin/ssh",arguments()[0]+args, false, currentWorkingDirectory(), &stdout);
+        }
+        if(log) { fd=stdout.fd; registerPoll(); }
+    }
+    void event() {
+        read(false, true);
+    }
+    string read(bool wait=false, bool log=false) {
+        if(!stdout) return {};
+        for(;;) {
+            auto packet = stdout.readUpTo(1<<16);
+            status.append(packet);
+            if(log && packet) ::log(packet);
+            if(!wait || !(packet || isRunning(pid))) break;
+        }
+        return status;
+    }
+    operator string() { return read(true, false); }
+};
+
 array<SGEJob> qstat(int time=0/*, bool running=true*/) {
  static Folder cache {".cache", currentWorkingDirectory(), true};
- static String hostname = File("/proc/sys/kernel/hostname").readUpTo(256);
- string id = arguments() ? arguments()[0] : hostname;
+ string id = "qstat"; //arguments() ? arguments()[0] : hostname;
  if(!existsFile(id, cache) || File(id, cache).modifiedTime() < realTime()-time*60e9) {
-  Stream stdout;
-  int pid;
-  if(hostname=="ifbeval01"_ || !arguments() || !startsWith(arguments()[0],"server-")) {
-   if(!which("qstat")) { log("Missing qstat"); return {}; }
-   pid = execute(which("qstat"),ref<string>{"-u"_,user(),"-xml"_}, false, currentWorkingDirectory(), &stdout);
-  } else {
-   pid = execute("/usr/bin/ssh",ref<string>{arguments()[0],"qstat"_,"-u"_,user(),"-xml"_}, false, currentWorkingDirectory(), &stdout);
-  }
-  array<byte> status;
-  for(;;) {
-   auto packet = stdout.readUpTo(1<<16);
-   status.append(packet);
-   if(!(packet || isRunning(pid))) break;
-  }
-  writeFile(id, status, cache, true);
+  writeFile(id, SSH(ref<string>{"qstat"_,"-u"_,user(),"-xml"_}), cache, true);
  }
  auto document = readFile(id, cache);
  Element root = parseXML(document);

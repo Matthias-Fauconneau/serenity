@@ -158,8 +158,8 @@ bool Build::compileModule(string target) {
         Stream stdout;
         int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1y",
                                            "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing",
-                                           //"-march=native",
-                                           "-o", object, fileName, "-I/usr/include/freetype2","-I/var/tmp/include"} + toRefs(args),
+                                           "-I/usr/include/freetype2","-I/var/tmp/include", "-iquote.",
+                                           "-o", object, fileName} + toRefs(args),
                     false, currentWorkingDirectory(), 0, &stdout);
 		jobs.append({copyRef(target), pid, move(stdout)});
 		needLink = true;
@@ -185,12 +185,15 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
 	if(!target) target = base;
 	assert_(find(target+".cc"), "Invalid target"_, target, sources);
 
-	args.append("-iquote."__);
+    //args.append("-iquote."__);
 	for(string flag: flags) args.append( "-D"+toUpper(flag)+"=1" );
 	if(!flags.contains("release")) args.append("-g"__);
 	if(!flags.contains("debug")) args.append("-O3"__);
     else if(flags.contains("fast")) args.append("-O3"__); // fast-debug
 	if(flags.contains("profile")) args.append("-finstrument-functions"__);
+    for(string arg: args) if(startsWith(arg,"-march=")) { flags.append(section(arg,'=',1,2)); goto break_; }
+    /*else*/ args.append("-march=native"__);
+    break_:;
 
 	Folder(tmp, currentWorkingDirectory(), true);
 	Folder(tmp+"/"+join(flags,"-"), currentWorkingDirectory(), true);
@@ -223,7 +226,9 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
 	}
 
 	// Installs
-	if(install && (!existsFile(target, install) || File(binary).modifiedTime() > File(target, install).modifiedTime())) copy(currentWorkingDirectory(), binary, install, target);
+    if(install && (!existsFile(target, install) || File(binary).modifiedTime() > File(target, install).modifiedTime())) {
+        copy(currentWorkingDirectory(), binary, install, target);
+    }
 }
 
 Build build {arguments()};

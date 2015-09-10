@@ -210,7 +210,7 @@ String which(string name) {
 }
 
 int execute(const string path, const ref<string> args, bool wait, const Folder& workingDirectory, Handle* stdout, Handle* stderr) {
-    log(path, args);
+ //log(path, args);
  if(!existsFile(path)) { error("Executable not found",path); return -1; }
 
  buffer<String> args0(1+args.size, 0);

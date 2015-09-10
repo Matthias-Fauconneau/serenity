@@ -10,7 +10,7 @@ static constexpr v4hi unused _0i = {0,0,0,0};
 typedef int __attribute((__vector_size__(16))) v4si;
 inline v4si set1(int i) { return (v4si){i,i,i,i}; }
 inline v4si loada(const uint32* const ptr) { return *(v4si*)ptr; }
-inline v4si loadu(const uint32* const ptr) { return (v4si)__builtin_ia32_lddqu((byte*)ptr); }
+//inline v4si loadu(const uint32* const ptr) { return (v4si)__builtin_ia32_lddqu((byte*)ptr); }
 inline void storea(uint32* const ptr, v4si a) { *(v4si*)ptr = a; }
 
 // v4sf
@@ -22,7 +22,7 @@ static constexpr v4sf unused _1f = float4( 1 );
 static constexpr unused v4sf _0001f = {0,0,0,1};
 
 inline v4sf loada(const float* const ptr) { return *(v4sf*)ptr; }
-inline v4sf loadu(const float* const ptr) { return (v4sf)__builtin_ia32_lddqu((byte*)ptr); }
+//inline v4sf loadu(const float* const ptr) { return (v4sf)__builtin_ia32_lddqu((byte*)ptr); }
 inline void storea(float* const ptr, v4sf a) { *(v4sf*)ptr = a; }
 
 inline v4sf min(v4sf a, v4sf b) { return __builtin_ia32_minps(a,b); }

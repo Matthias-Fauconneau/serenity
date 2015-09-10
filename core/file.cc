@@ -129,12 +129,13 @@ Socket::Socket(int domain, int type):Stream(check(socket(domain,type|SOCK_CLOEXE
 
 // -- File
 
-int open(const string path, const Folder& at, Flags flags) {
-    int fd = openat(at.fd, strz(path), flags, 0666);
+static int open(const string path, const Folder& at, Flags flags, int permissions) {
+    int fd = openat(at.fd, strz(path), flags, permissions);
     if(flags&NonBlocking && -*__errno_location()==int(LinuxError::Busy)) return 0;
-    return check(fd, at.name(), path, at.list(Files));
+    return check(fd, at.name(), path/*, at.list(Files)*/);
 }
-File::File(const string path, const Folder& at, Flags flags) : Stream(open(path, at, flags)) {}
+File::File(const string path, const Folder& at, Flags flags, int permissions)
+    : Stream(open(path, at, flags, permissions)) {}
 
 struct stat File::stat() const { struct stat stat; check( fstat(fd, &stat) ); return stat; }
 
@@ -228,10 +229,16 @@ void touchFile(const string path, const Folder& at, int64 time) {
 }
 
 void copy(const Folder& oldAt, const string oldName, const Folder& newAt, const string newName) {
-    File oldFile(oldName, oldAt), newFile(newName, newAt, Flags(WriteOnly|Create|Truncate)); //FIXME: preserve executable flag
+    //FIXME: preserve executable flag
+    File oldFile(oldName, oldAt);
+    File newFile(newName, newAt, Flags(WriteOnly|Create|Truncate), oldFile.stat().st_mode);
     for(size_t offset=0, size=oldFile.size(); offset<size;)
         offset+=check(sendfile(newFile.fd, oldFile.fd, (off_t*)offset, size-offset), (int)newFile.fd, (int)oldFile.fd, offset, size-offset, size);
     assert(newFile.size() == oldFile.size());
+}
+
+void link(const Folder& oldAt, const string oldName, const Folder& newAt, const string newName) {
+    check(linkat(oldAt.fd, strz(oldName), newAt.fd, strz(newName), 0));
 }
 
 

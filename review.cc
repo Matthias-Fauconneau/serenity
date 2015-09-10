@@ -87,9 +87,13 @@ struct ArrayView : Widget {
  array<string> dimensions[2];
  struct Target { Rect rect; Dict tableCoordinates; const Dict& key; };
  array<Target> targets;
+ struct Header { Rect rect; Dict filter; };
+ array<Header> headers;
  size_t index = 0;
  function<void(const Dict&, const Dict&)> hover, press;
  Folder cache {".cache", currentWorkingDirectory(), true};
+ Dict point;
+ Dict filter;
 
  ArrayView(string valueName, uint textSize=16) : valueName(valueName), textSize(textSize) {
   jobs = qstat(30);
@@ -287,7 +291,7 @@ break2:;
    min = ::min(points.values);
    max = ::max(points.values);
   }
-  dimensions[0] = copyRef(ref<string>{"TimeStep"_, "Radius"_,"Pressure"_,"Seed"_});
+  dimensions[0] = copyRef(ref<string>{"Friction"_, "TimeStep"_, "Radius"_, "Elasticity", "Pressure"_, "Seed"_});
   dimensions[1] = copyRef(ref<string>{"Resolution"_, "Side","Thickness","Wire"_,"Angle"_,"Pattern"_});
   for(auto& dimensions: this->dimensions) {
    dimensions.filter([this](const string dimension) {
@@ -310,16 +314,24 @@ break2:;
   if(failureCount) log("Failed configuration", failureCount, "files", fileCount);
  }
 
+ void remove(const Dict& key) {
+     assert_(key);
+     String id = str(stripSortKeys(key));
+     assert_(id);
+     for(string name: Folder(".").list(Files)) if(startsWith(name, id)) {
+         log(name);
+         //fileCount++;
+         rename(currentWorkingDirectory(), name, \
+                Folder("../Archive", currentWorkingDirectory(), true), name);
+     }
+
+ }
+
  void removeFailed() {
   size_t failureCount = 0, fileCount = 0;
   for(const Dict& key: points.keys) {
    if(states.contains(key) && states.at(key)!="done"_ && !jobs.contains(key)) {
-    String id = str(stripSortKeys(key));
-    for(string name: Folder(".").list(Files)) if(startsWith(name, id)) {
-     log(name);
-     fileCount++;
-     rename(currentWorkingDirectory(), name, Folder("../Archive", currentWorkingDirectory(), true), name);
-    }
+       remove(key);
     failureCount++;
    }
   }
@@ -390,6 +402,7 @@ break2:;
    assert_(isNumber(origin), origin, headerOrigin, headerCellSize, cellCoordinates, cellSize, contentCellSize);
    array<char> label = str(coordinate);
    if(label && label[0] < 16) label.removeAt(0); // Removes sort key
+   headers.append(origin+Rect{size*cellSize}, copy(filter));
    graphics.graphics.insertMulti(origin, Text(label, textSize, 0, 1, 0,
                                          "DejaVuSans", true, 1, 0).graphics(vec2(size*cellSize)));
    cellCount += childCellCount;
@@ -447,6 +460,8 @@ break2:;
      if(pending) text = italic(text);
      if(running) text = bold(text);
      bgr3f textColor = 0;
+     if(point && coordinates == point) textColor.b = 1;
+     else if(filter && coordinates.includes(filter)) textColor.b = 1;
      graphics.graphics.insertMulti(cellOrigin, Text(text, textSize, textColor, 1, 0,
                                                     "DejaVuSans", true, 1, 0).graphics(cellSize));
     }
@@ -469,7 +484,7 @@ break2:;
  shared<Graphics> graphics(vec2 size) override {
   shared<Graphics> graphics;
 
-  if(0) {// Fixed coordinates in unused top-left corner
+  if(1) {// Fixed coordinates in unused top-left corner
    array<char> fixed;
    for(const auto& coordinate: coordinates(points.keys)) {
     if(coordinate.value.size==1) fixed.append(coordinate.key+": "_+str(coordinate.value)+"\n"_);
@@ -512,9 +527,18 @@ break2:;
    return true;
   }
   if(event == Press && button == LeftButton && press) {
+      point = {};
+      filter = {};
    for(const auto& target: targets) {
     if(target.rect.contains(cursor)) {
+     point = copy(target.key);
      press(target.tableCoordinates, target.key);
+     return true;
+    }
+   }
+   for(const auto& target: headers) {
+    if(target.rect.contains(cursor)) {
+     filter = copy(target.filter);
      return true;
     }
    }
@@ -639,7 +663,7 @@ struct Review {
    }
    //plot.dataSets.append(move(tangents[bestIndex]));
    for(auto& t: tangents) plot.dataSets.append(move(t));
-#else
+#elif 0
     if(X) {
      const size_t N = 256;
      buffer<float> sX (N), sY (N);
@@ -655,6 +679,10 @@ struct Review {
       sY[sampleIndex] = y;
      }
      plot.fits[copy(entry.key)].append(totalLeastSquare(sX, sY));
+    }
+#else
+    if(X) {
+     plot.fits[copy(entry.key)].append(totalLeastSquare(X, Y));
     }
 #endif
    }
@@ -675,8 +703,7 @@ struct Review {
   TextData s (readFile(resultName));
   if(!s) { log("Missing result", resultName); return plot; }
   // TODO: cache dataSets
-  string resultLine = s.line();
-  Dict results = parseDict(resultLine);
+  s.line();
   string headerLine = s.line();
   buffer<string> names = split(headerLine,", ");
   for(string name: names) dataSets.insert(name);
@@ -684,7 +711,6 @@ struct Review {
    for(size_t i = 0; s && !s.match('\n'); i++) {
     string d = s.whileDecimal();
     if(!d) goto break2;
-    //assert_(d, s.slice(s.index-16,16),"|", s.slice(s.index));
     float decimal = parseDecimal(d);
     assert_(isNumber(decimal), s.slice(s.index-16,16),"|", s.slice(s.index));
     if(!(i < dataSets.values.size)) break;
@@ -722,8 +748,6 @@ struct Review {
   else if(index==Length) {
    plot.ylabel = "Radius (%)"__;
    buffer<float> radius = ::radius(dataSets);
-   //ref<float> height = dataSets.at("Height (m)"_);
-   //plot.dataSets.insert("Height"__, {::move(strain), ::copyRef(height)});
    buffer<float> radiusStrain = apply(radius.size, [&](size_t i){
     return (radius[i]/radius[0] - 1)*100; });
    plot.dataSets.insert("Radius"__, {::move(strain), ::copyRef(radiusStrain)});
@@ -753,7 +777,6 @@ struct Review {
     plot.dataSets.insert(""__, {::move(strain), ::move(stress)});
    }
    else if(index==Deviatoric) {
-#if 1
     ref<float> force = dataSets.at("Radial Force (N)"_);
     buffer<float> radius = ::radius(dataSets);
     ref<float> height = dataSets.at("Height (m)"_);
@@ -766,14 +789,9 @@ struct Review {
      const size_t medianWindowRadius = 4;
      pressure = medianFilter(pressure , medianWindowRadius);
     }
-#else
-    buffer<float> pressure (strain.size);
-    float P = point.at("Pressure"_);
-    for(size_t i: range(pressure.size)) pressure[i] = P;
-#endif
     plot.ylabel = "Normalized Deviatoric Stress"__;
     buffer<float> deviatoric (strain.size);
-    assert_(strain.size <= pressure.size, strain.size, /*force.size, radius.size, height.size,*/ pressure.size);
+    assert_(strain.size <= pressure.size, strain.size, pressure.size);
     for(size_t i: range(deviatoric.size)) deviatoric[i] = (stress[i]-pressure[i])/(stress[i]+pressure[i]);
     plot.min.y = 0; plot.max.y = 1;
     plot.dataSets.insert(""__, {::move(strain), ::move(deviatoric)});
@@ -819,14 +837,37 @@ struct Review {
    window->render();
   };
   window->actions[Key('h')] = [this](){ hover=!hover; };
+#if 0
   window->actions[Delete] = [this]() {
-   window->setTitle("Refreshing");
+   /*window->setTitle("Refreshing");
    array.jobs = array.qstat(0); array.load(0);
    window->setTitle("Deleting");
    array.removeFailed(); array.load(0);
-   window->setTitle(str(array.jobs.size));
+   window->setTitle(str(array.jobs.size));*/
+      if(array.point) {
+          array.remove(array.point);
+          assert_(array.jobs.contains(array.point));
+          new SSH({"qdel","-f", array.jobs[array.jobs.indexOf(array.point)].id}, true); // FIXME: leak
+          array.jobs = qstat(0);
+          if(array.jobs.contains(array.point)) array.jobs.remove(array.point);
+      } else if(array.filter) {
+          ::array<char> ids;
+          for(const Dict& key: array.points.keys) {
+              if(key.includes(array.filter)) {
+                  array.remove(key);
+                  log(array.stripSortKeys(key));
+                  if(array.jobs.contains(key))
+                      ids.append(array.jobs[array.jobs.indexOf(key)].id+" ");
+              }
+          }
+          log("qdel -f",ids,"&");
+          new SSH({"qdel","-f", ids}, true); // FIXME: leak
+          array.load(0);
+      }
+   array.load();
    window->render();
   };
+#endif
   window->actions[Return] = [this](){
    window->setTitle("Refreshing");
    array.jobs = array.qstat(0);
@@ -841,18 +882,12 @@ struct Review {
    auto graphics = layout.graphics(pageSize, Rect(pageSize));
    graphics->flatten();
    writeFile("plot.pdf"_, toPDF(pageSize, ref<Graphics>(graphics.pointer, 1), 72 / inchPx /*px/inch*/), home(), true);
-   //encodePNG(render(int2(1050), plot.graphics(vec2(1050))));
   };
   array.hover = [this](const Dict& group, const Dict& point) {
    if(hover) array.press(group, point);
   };
   array.press = [this](const Dict& group, const Dict& point) {
    if(!point) return;
-   /*if(existsFile(str(point))) { // Signal snapshot
-    int64 time = realTime();
-    File file (str(point));
-    file.touch(time);
-   }*/
 
    this->group = copy(group);
    pressure = pressurePlot(group, pressurePlotIndex);
@@ -868,9 +903,8 @@ struct Review {
     else log("Missing output", file);
    } else log("Missing ID", point);
 
-   //if(point && existsFile(str(point))) usleep(300*1000); // FIXME: signal back
    if(details) {
-    static buffer<String> files = Folder(".").list(Files|Sorted);
+       buffer<String> files = Folder(".").list(Files|Sorted);
     String lastSnapshot; int64 lastTime = 0;
     for(string file: files) if(startsWith(file, str(array.stripSortKeys(point)))) {
      if(endsWith(file, ".grain") || endsWith(file, ".side") /*|| endsWith(file, ".wire")*/) {
@@ -884,16 +918,9 @@ struct Review {
      }
      log(file);
     }
-    snapshotView = SnapshotView(/*str(array.stripSortKeys(point))*/section(lastSnapshot,'.',0,-2));
+    snapshotView = SnapshotView(section(lastSnapshot,'.',0,-2));
    } else snapshotView = SnapshotView();
    window->render();
   };
-  /*array.hover(
-     array.parseDict("Pressure=80K,Radius=0.02,Seed=1,TimeStep=20µ,Angle=,Pattern=none,Wire="_),
-     array.parseDict("Friction=0.1,Pattern=none,PlateSpeed=1e-4,Pressure=80K,Radius=0.02,Rate=100,Seed=1,TimeStep=20µ"_)
-     );*/
-  array.hover(
-     array.parseDict("Friction=0.1,Pattern=none,PlateSpeed=1e-4,Pressure=80K,Radius=0.05,Rate=100,Seed=2,TimeStep=20µ"_),
-     array.parseDict("Friction=0.1,Pattern=none,PlateSpeed=1e-4,Pressure=80K,Radius=0.05,Rate=100,Seed=2,TimeStep=20µ"_));
  }
 } app;
