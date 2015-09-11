@@ -92,7 +92,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
  int right=::max(tickLabelSize.x, tickLabelSize.x/2+Text(bold(xlabel)).sizeHint().x);
  //left=right=top=bottom=::max(::max(::max(left, right), top), bottom);
  if(plotCircles) {
-  assert_(max.x == max.y, max);
+  //assert_(max.x == max.y, max);
   int margin = (size.y-(top+bottom))-(size.x-(left+right));
   if(margin > 0) {
    top += margin/2;

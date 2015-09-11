@@ -46,9 +46,10 @@ struct ParameterSweep {
     {
      for(float frictionCoefficient: {0.3}) {
       parameters["Friction"__] = frictionCoefficient; // FIXME: separate Ball-Wire friction coefficient
+      //parameters["Friction"__] = 0.3; // FIXME
       for(string pattern: ref<string>{"none","helix","cross","loop"}) {
        parameters["Pattern"__] = pattern;
-       for(int pressure: {/*0,*//*20,*/40,/*60,*/80/*100,120,140,160*/}) {
+       for(int pressure: {20,40,60,80,100,120}) {
         parameters["Pressure"__] = String(str(pressure)+"K"_);
         array<float> radii = copyRef(ref<float>{0.02});
         // Validation
@@ -59,9 +60,9 @@ struct ParameterSweep {
          parameters["Thickness"__] = "1e-3"__; {
           parameters["Side"__] = "1e8"__; {
            parameters["Resolution"__] = "2"__; {
-           for(int seed: {1/*,2,3,4,5,6*/}) {
+           for(int seed: {/*1,*//*2*/3/*,4,5,6*/}) {
             parameters["Seed"__] = seed;
-            auto add = [&]{
+            auto add = [&] {
              String id = str(parameters);
              if(arguments().size > 0 && arguments()[0].contains('=')) {
               auto filter = parseDict(arguments()[0]);
@@ -96,11 +97,11 @@ struct ParameterSweep {
             else {
              for(float wireElasticModulus: {1e7/*smoothly solves wire spawned within grain*/}) {
               parameters["Elasticity"__] = String(str(int(round(wireElasticModulus/1e7)))+"e7");
-              for(string wireDensity: {"6%"_,"12%"_}) {
+              for(string wireDensity: {/*"6%"_,*/"12%"_}) {
                parameters["Wire"__] = wireDensity;
                if(pattern == "helix") add();
                else {
-                for(float angle: {1.2 /*, 2.4*//*PI*(3-sqrt(5.))*/, 3.6}) {
+                for(float angle: {/*1.2,*/ 2.4,/*PI*(3-sqrt(5.))*/ 3.6}) {
                  parameters["Angle"__] = angle;
                  add();
                 }

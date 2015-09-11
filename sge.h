@@ -31,7 +31,7 @@ struct SSH : Poll {
             auto packet = stdout.readUpTo(1<<16);
             status.append(packet);
             if(log && packet) ::log(packet);
-            if(!wait || !(packet || isRunning(pid))) break;
+            if(!wait || !(packet || isRunning(pid))) { if(log) ::log("Done"); break; }
         }
         return status;
     }

@@ -1081,7 +1081,8 @@ break2_:;
 #endif
 #endif
     }
-    side.Vertex::velocity[i] *= float4(1-0.5*dt); // Additionnal viscosity
+    //side.Vertex::velocity[i] *= float4(1./2); // Additionnal viscosity
+    side.Vertex::velocity[i] *= float4(1-10*dt); // Additionnal viscosity
    }
   }, 1);
  sideIntegrationTime.stop();
@@ -1215,12 +1216,14 @@ break2_:;
      } /*else*/ break;
      break_:;
     }
+    p = wire.position[wire.count-2] + (p-wire.position[wire.count-2]) * float3(Wire::internodeLength) /
+            sqrt(sq3(p-wire.position[wire.count-2]));
 #endif
     wire.position[i] = p;
     min = ::min(min, wire.position[i]);
     max = ::max(max, wire.position[i]);
     wire.velocity[i] = _0f;
-    wire.velocity[i][2] = - ::min(wire.position[i][2],  0.01f);
+    //wire.velocity[i][2] = - ::min(wire.position[i][2],  0.01f);
     for(size_t n: range(3)) wire.positionDerivatives[n][i] = _0f;
     wire.frictions.set(i);
    }

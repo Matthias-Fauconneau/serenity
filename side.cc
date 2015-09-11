@@ -130,7 +130,8 @@ void side(int W, const v4sf* position, const v4sf* velocity __attribute((unused)
             vZ -= float6(V[2]);
             v8sf rV = (X*vX+Y*vY+Z*vZ);
             //v8sf T = (tensionStiffness6 * x - tensionDamping6 * rV) / length;
-            v8sf T = (tensionStiffness6 * (exp256_ps(x)-_11111111f) - tensionDamping6 * rV) /  length;
+            v8sf T = (tensionStiffness_internodeLength6 * (exp256_ps(x/internodeLength6)-_11111111f)
+                            - tensionDamping6 * rV) /  length;
 #else
             //v8sf T = (tensionStiffness6 * x) / length;
             //v8sf T = (tensionStiffness6 * x);// / sqLength;
@@ -205,7 +206,8 @@ void side(int W, const v4sf* position, const v4sf* velocity __attribute((unused)
             vZ -= float6(V[2]);
             v8sf rV = (X*vX+Y*vY+Z*vZ);
             //v8sf T = (tensionStiffness6 * x - tensionDamping6 * rV) / length;
-            v8sf T = (tensionStiffness6 * (exp256_ps(x)-_11111111f) - tensionDamping6 * rV) /  length;
+            v8sf T = (tensionStiffness_internodeLength6 * (exp256_ps(x/internodeLength6)-_11111111f)
+                      - tensionDamping6 * rV) /  length;
 #else
             v8sf T = (tensionStiffness_internodeLength6 * (exp256_ps(x/internodeLength6)-_11111111f))
                     /  length;

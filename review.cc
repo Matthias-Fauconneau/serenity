@@ -291,7 +291,7 @@ break2:;
    min = ::min(points.values);
    max = ::max(points.values);
   }
-  dimensions[0] = copyRef(ref<string>{"Friction"_, "TimeStep"_, "Radius"_, "Elasticity", "Pressure"_, "Seed"_});
+  dimensions[0] = copyRef(ref<string>{"Friction"_, "TimeStep"_, "Radius"_, /*"Elasticity",*/ "Pressure"_, "Seed"_});
   dimensions[1] = copyRef(ref<string>{"Resolution"_, "Side","Thickness","Wire"_,"Angle"_,"Pattern"_});
   for(auto& dimensions: this->dimensions) {
    dimensions.filter([this](const string dimension) {
@@ -590,7 +590,7 @@ struct Review {
    plot.plotPoints = true;
    plot.plotLines = false;
    plot.plotCircles = true;
-   plot.max = array.max;
+   //plot.max = array.max;
   } else if(index==Pressure) {
    plot.ylabel = "Pressure (Pa)"__;
    plot.plotBandsY = false;
@@ -837,19 +837,15 @@ struct Review {
    window->render();
   };
   window->actions[Key('h')] = [this](){ hover=!hover; };
-#if 0
   window->actions[Delete] = [this]() {
-   /*window->setTitle("Refreshing");
-   array.jobs = array.qstat(0); array.load(0);
-   window->setTitle("Deleting");
-   array.removeFailed(); array.load(0);
-   window->setTitle(str(array.jobs.size));*/
       if(array.point) {
           array.remove(array.point);
-          assert_(array.jobs.contains(array.point));
-          new SSH({"qdel","-f", array.jobs[array.jobs.indexOf(array.point)].id}, true); // FIXME: leak
-          array.jobs = qstat(0);
-          if(array.jobs.contains(array.point)) array.jobs.remove(array.point);
+          if(array.jobs.contains(array.point)) {
+              new SSH({"qdel","-f", array.jobs[array.jobs.indexOf(array.point)].id}, true); // FIXME: leak
+              array.jobs = qstat(0);
+              array.jobs.remove(array.point);
+          }
+          array.load(0);
       } else if(array.filter) {
           ::array<char> ids;
           for(const Dict& key: array.points.keys) {
@@ -863,11 +859,16 @@ struct Review {
           log("qdel -f",ids,"&");
           new SSH({"qdel","-f", ids}, true); // FIXME: leak
           array.load(0);
+      } else {
+          window->setTitle("Refreshing");
+          array.jobs = array.qstat(0); array.load(0);
+          window->setTitle("Deleting");
+          array.removeFailed(); array.load(0);
+          window->setTitle(str(array.jobs.size));
+          array.load();
       }
-   array.load();
    window->render();
   };
-#endif
   window->actions[Return] = [this](){
    window->setTitle("Refreshing");
    array.jobs = array.qstat(0);
