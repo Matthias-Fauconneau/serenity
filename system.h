@@ -230,8 +230,8 @@ struct System {
   const float height;
   const size_t W, H;
   size_t faceCount = (H-1)*W*2; // Always soft membrane
-  float minRadius = initialRadius-Grain::radius;
-  float minRadiusSq;
+  float minRadius = initialRadius-Grain::radius, maxRadius;
+  float minRadiusSq, maxRadiusSq;
   const float radius = initialRadius;
 
   const float internodeLength = 2*PI*initialRadius/W;

@@ -51,12 +51,11 @@ struct SimulationRun : Simulation {
 
  void report() {
   int64 elapsed = realTime() - lastReport;
-  extern const char* build;
-  log(build, timeStep*dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, side.count, wire.count);
-  log("grain",str(grainTime, stepTime),
+  log(timeStep*dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, side.count, wire.count);
+  /*log("grain",str(grainTime, stepTime),
       "grainInit",str(grainInitializationTime, stepTime),
-      "grainLattice",str(grainLatticeTime, stepTime),
-      "grainContact",str(grainContactTime, stepTime),
+      "grainGrain",str(grainGrainTime, stepTime),
+      "grainGrid",str(grainGridTime, stepTime),
       "grainIntegration",str(grainIntegrationTime, stepTime));
   if(wire.count) log("wire",str(wireTime, stepTime),
                      "wireLatticeTime",str(wireLatticeTime, stepTime),
@@ -65,7 +64,7 @@ struct SimulationRun : Simulation {
   log("side", str(sideTime, stepTime),
       "sideGrid",str(sideGridTime, stepTime),
       "sideForce",str(sideForceTime, stepTime),
-      "sideIntegration",str(sideIntegrationTime, stepTime));
+      "sideIntegration",str(sideIntegrationTime, stepTime));*/
   lastReport = realTime();
   lastReportStep = timeStep;
  }
@@ -308,13 +307,14 @@ struct SimulationView : SimulationRun, Widget, Poll {
    static GLVertexArray vertexArray;
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
-   CylinderGrid vertexGrid {0, targetHeight,
+   /*CylinderGrid vertexGrid {0, targetHeight,
                int2(2*PI*side.minRadius/Grain::radius, targetHeight/Grain::radius)}; // FIXME
    buffer<vec3> colors = apply(positions, [&](vec3 p) {
            int2 index = vertexGrid.index2(p);
            if( (index.x%2) ^ (index.y%2) ) return vec3(1,0,0);
            return vec3(0,1,0);
-   });
+   });*/
+   buffer<vec3> colors (positions.size); colors.clear(0);
    GLBuffer colorBuffer (colors);
    vertexArray.bindAttribute(shader.attribLocation("color"_), 3, Float, colorBuffer);
    vertexArray.draw(Lines, positions.size);
