@@ -15,7 +15,24 @@ long currentTime();
 int64 realTime();
 int64 threadCPUTime();
 
-inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)::"memory"); return (((uint64)hi)<<32)|lo; }
+//inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)::"memory"); return (((uint64)hi)<<32)|lo; }
+#if __clang__
+#define readCycleCounter  __builtin_readcyclecounter
+#else
+#define readCycleCounter __builtin_ia32_rdtsc
+#endif
+/// Returns the number of cycles used to execute \a statements (low overhead)
+#define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
+struct tsc {
+ uint64 total=0, tsc=0;
+ void reset() { total=0;tsc=0;}
+ void start() { if(!tsc) tsc=readCycleCounter(); }
+ void stop() { if(tsc) total+=readCycleCounter()-tsc; tsc=0; }
+ operator uint64() const {return total + (tsc?readCycleCounter()-tsc:0); }
+};
+inline String str(const tsc& num, const tsc& div) {
+ return str(int(round(100*double((uint64)num)/double((uint64)div))))+'%';
+}
 
 struct Time {
     uint64 startTime=realTime(), stopTime=0;
@@ -31,7 +48,8 @@ struct Time {
 inline String str(const Time& t) { return str(t.toReal(), 1u)+'s'; }
 inline bool operator<(float a, const Time& b) { return a < b.toReal(); }
 inline bool operator<(double a, const Time& b) { return a < b.toReal(); }
-inline String str(const Time& num, const Time& div) { return str(int(round(100*num.toReal()/div.toReal())))+'%'; }
+inline String str(const Time& num, const Time& div) {
+ return str(int(round(100*num.toReal()/div.toReal())))+'%'; }
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;
@@ -84,7 +102,7 @@ struct Random {
     uint sz,sw;
     uint z,w;
     Random(uint sz=1, uint sw=1) : sz(sz), sw(sw) { reset(); }
-    void seed() { sz=rdtsc(); sw=rdtsc(); }
+    void seed() { sz=readCycleCounter(); sw=readCycleCounter(); }
     void reset() { z=sz; w=sw; }
     uint64 next() {
      z = 36969 * (z & 0xFFFF) + (z >> 16);

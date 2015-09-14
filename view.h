@@ -65,9 +65,12 @@ struct SimulationRun : Simulation {
       "sideGrid",str(sideGridTime, stepTime),
       "sideForce",str(sideForceTime, stepTime),
       "sideIntegration",str(sideIntegrationTime, stepTime));*/
+  log("grain", str(grainTime, stepTime));
   log("side-grain", str(sideGrainTime, stepTime));
   log("side force", str(sideForceTime, stepTime));
-  log("grain-grain", str(grainGrainTime, stepTime));
+  log("grain-grain", str(grainGrainTime, stepTime), str(grainGrainForceTime, grainGrainTotalTime));
+  log("integration", str(integrationTime, stepTime));
+  log("process", str(processTime, stepTime));
   lastReport = realTime();
   lastReportStep = timeStep;
  }
@@ -163,7 +166,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
   const float Dt = 1./60/2;
   {
    vec4f min = _0f, max = _0f;
-   Locker lock(this->lock);
+   //Locker lock(this->lock);
    for(size_t i: range(grain.count)) { // FIXME: proper BS
     min = ::min(min, grain.position[i]);
     max = ::max(max, grain.position[i]);
@@ -219,7 +222,8 @@ struct SimulationView : SimulationRun, Widget, Poll {
   target.bind(ClearColor|ClearDepth);
   glDepthTest(true);
 
-  if(1) {Locker lock(this->lock);
+  if(1) {
+   //Locker lock(this->lock);
   if(grain.count) {
    buffer<vec3> positions {grain.count*6};
    for(size_t i: range(grain.count)) {
@@ -250,7 +254,8 @@ struct SimulationView : SimulationRun, Widget, Poll {
    vertexArray.draw(Triangles, positions.size);
   }}
 
-  if(1) {Locker lock(this->lock);
+  if(1) {
+   //Locker lock(this->lock);
   if(wire.count>1) {
    size_t wireCount = wire.count;
    buffer<vec3> positions {(wireCount-1)*6};
@@ -288,7 +293,8 @@ struct SimulationView : SimulationRun, Widget, Poll {
   shader["transform"] = mat4(1);*/
 
   // Membrane
-  if(side.faceCount>1) {Locker lock(this->lock);
+  if(side.faceCount>1) {
+   //Locker lock(this->lock);
       static GLShader shader {::shader_glsl(), {"color"}};
       shader.bind();
       shader.bindFragments({"color"});
@@ -330,7 +336,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
 
   // Plates
   {
-   Locker lock(this->lock);
+   //Locker lock(this->lock);
    size_t W = side.W;
    buffer<vec3> positions {W*2*2};
    for(size_t i: range(2)) for(size_t j: range(W)) {
@@ -352,7 +358,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
    if(1) glDepthTest(false);
    {static GLVertexArray vertexArray;
     shader["transform"] = viewProjection;
-    Locker lock(this->lock);
+    //Locker lock(this->lock);
     for(auto entry: lines) {
      shader["uColor"] = vec4(entry.key, 1);
      GLBuffer positionBuffer (entry.value);

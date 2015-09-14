@@ -45,6 +45,8 @@ inline v4si cvtps2dq(v4sf a) { return __builtin_ia32_cvtps2dq(a); }
 inline v4si cvttps2dq(v4sf a) { return __builtin_ia32_cvttps2dq(a); }
 inline v4sf cvtdq2ps(v4si a) { return __builtin_ia32_cvtdq2ps(a); }
 
+inline v4sf floor(v4sf a) { return __builtin_ia32_roundps(a, 0); }
+
 #if __clang__
 #define shuffle4(a,b, x, y, z, w) __builtin_shufflevector(a,b, x, y, z, w)
 #else

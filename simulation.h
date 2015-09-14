@@ -7,23 +7,15 @@ generic struct Lattice {
  const vec4f min, max;
  const int3 size = int3(::floor(toVec3(scale*(max-min))))+int3(1);
  int YX = size.y * size.x;
- buffer<T> cells {size_t(size.z*size.y*size.x + 2*size.y*size.x+2*size.x+2)};
- const vec4f XYZ0; // {float(1), float(size.x), float(size.y*size.x), 0.f}; // GCC 4.8 \/
- Lattice(float scale, vec4f min, vec4f max) :
-   scale(float3(scale)) ,
-   min(min),
-   max(max), // Avoids bound check
-   XYZ0{float(1), float(size.x), float(size.y*size.x), 0.f} {                     // GCC 4.8 ^
+ buffer<T> cells {size_t(size.z*size.y*size.x + 3*size.y*size.x+3*size.x+3)}; // -1 .. 2 OOB margins
+ const vec4f XYZ0 {float(1), float(size.x), float(size.y*size.x), float(size.y*size.x+size.x+1)};
+ Lattice(float scale, vec4f min, vec4f max) : scale{scale, scale, scale, 1}, min(min), max(max) {
   cells.clear(0);
  }
  inline size_t index(vec4f O) {
-  v4si xyz = cvttps2dq(scale*(O-min));
-  int x=xyz[0], y=xyz[1], z=xyz[2];
-  assert_(x >= 0 && x < size.x && y >= 0 && y < size.y && z >= 0 && z < size.z,
-          "OOB", x,y,z, O, O-min, scale*(O-min));
-  log(O, x,y,z);
-  return YX * xyz[2] + size.x * xyz[1] + xyz[0];
-  //return dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*(O-min))))[0];
+  //v4si xyz = cvttps2dq(scale*(O-min));
+  //return YX * xyz[2] + size.x * xyz[1] + xyz[0];
+  return dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*(O-min))))[0];
  }
  inline T& operator()(vec4f p) { return cells[index(p)]; }
 };
@@ -75,14 +67,12 @@ struct Simulation : System {
  // Performance
  int64 lastReport = realTime(), lastReportStep = timeStep;
  Time totalTime {true}, stepTime;
- //Time miscTime, grainTime, wireTime, sideTime;
- /*Time grainGridTime, grainForceTime, grainIntegrationTime;
- Time wireLatticeTime, wireForceTime, wireIntegrationTime;
- Time sideGridTime, sideForceTime, sideIntegrationTime;*/
  Time sideGrainTime, sideForceTime;
- Time grainGrainTime;
+ Time grainTime, grainGrainTime;
+ tsc grainGrainTotalTime, grainGrainForceTime;
+ Time integrationTime, processTime;
 
- Lock lock;
+ //Lock lock;
  Stream stream;
  Dict parameters;
  String id = str(parameters);
@@ -156,7 +146,7 @@ struct Simulation : System {
    float wireDensity = (wire.count-1)*Wire::volume / (grain.count*Grain::volume);
    log("Wire density (%):", wireDensity*100);
   }
-  Locker lock(this->lock);
+  //Locker lock(this->lock);
   {array<char> s;
    s.append(str(grain.radius)+'\n');
    s.append(str("X, Y, Z, grain contact count, grain contact energy (µJ), "
@@ -242,7 +232,8 @@ struct Simulation : System {
     // Generates falling grain (pour)
     const bool useGrain = 1;
     if(useGrain && currentPourHeight >= Grain::radius) {
-     for(uint unused t: range(::max(1.,dt/1e-5))) for(;;) {
+     processTime.start();
+     for(uint unused t: range(1/*::max(1.,dt/1e-5)*/)) for(;;) {
       vec4f p {random()*2-1,random()*2-1, currentPourHeight, 0};
       if(length2(p)>1) continue;
       float r = ::min(pourRadius, side.minRadius);
@@ -267,7 +258,7 @@ struct Simulation : System {
        if(length(p - newPosition) < Grain::radius+Wire::radius)
         goto break2_;
       maxSpawnHeight = ::max(maxSpawnHeight, newPosition[2]);
-      Locker lock(this->lock);
+      //Locker lock(this->lock);
       assert_(grain.count < grain.capacity);
       size_t i = grain.count++;
       grain.position[i] = newPosition;
@@ -289,6 +280,7 @@ struct Simulation : System {
       grain.velocity[i][2] = - ::min(grain.position[i][2],  0.01f);
       break;
      }
+     processTime.stop();
     }
 break2_:;
     // Weights winch vertical speed by wire density
@@ -308,6 +300,7 @@ break2_:;
      currentPourHeight += winchSpeed * dt;
    }
   }
+
   float topZ = 0;
   for(auto p: grain.position.slice(0, grain.count))
    topZ = ::max(topZ, p[2]+Grain::radius);
@@ -413,64 +406,71 @@ break2_:;
    return fail("Domain", min, max, size);
   }
 
+  grainTime.start();
   Lattice<uint16> grainLattice(sqrt(3.)/(2*Grain::radius), min, max);
-  parallel_chunk(grain.count, [this, &grainLattice](uint, size_t start, size_t size) {
-   for(size_t grainIndex: range(start, start+size)) {
-    grain.force[grainIndex] = grain.g;
-    grain.torque[grainIndex] = _0f;
-    penalty(grain, grainIndex, plate, 0);
-    penalty(grain, grainIndex, plate, 1);
-    grainLattice(grain.position[grainIndex]) = 1+grainIndex;
-   }
-  }, threadCount);
+  for(size_t grainIndex: range(grain.count)) {
+   grain.force[grainIndex] = grain.g;
+   grain.torque[grainIndex] = _0f;
+   penalty(grain, grainIndex, plate, 0);
+   penalty(grain, grainIndex, plate, 1);
+   grainLattice(grain.position[grainIndex]) = 1+grainIndex;
+   if(processState <= ProcessState::Pour) penalty(grain, grainIndex, rigidSide, 0);
+  }
+  grainTime.stop();
 
   // Soft membrane side
-  parallel_chunk(1, side.H-1, [this, alpha, &grainLattice](uint, size_t start, size_t size) {
+  //parallel_chunk(1, side.H-1, [this, alpha, &grainLattice](uint, size_t start, size_t size) {
+  if(processState > ProcessState::Pour) {
+   size_t start = 1, size = side.H-1;
    sideForceTime.start();
    ::side(side.W, side.Vertex::position.data, side.Vertex::force.begin(),
           pressure, side.internodeLength, side.tensionStiffness, side.radius - alpha*Grain::radius,
-          start, size
-          //, grainLattice.cells, grainLattice.size.x, grainLattice.size.y, grainLattice.scale, grainLattice.min
-          //side, grain
-          );
+          start, size);
    sideForceTime.stop();
-   sideGrainTime.start();
+
    // Side - Grain
-   const uint16* grainBase = grainLattice.cells.begin();
+   sideGrainTime.start();
+   //const uint16* grainBase = grainLattice.cells.begin();
    int gX = grainLattice.size.x, gY = grainLattice.size.y;
    v4sf scale = grainLattice.scale, min = grainLattice.min;
-   const uint16* grainNeighbours[3*3] = {
-    grainBase-gX*gY-gX-1, grainBase-gX*gY-1, grainBase-gX*gY+gX-1,
-    grainBase-gX-1, grainBase-1, grainBase+gX-1,
-    grainBase+gX*gY-gX-1, grainBase+gX*gY-1, grainBase+gX*gY+gX-1
+   /*const uint16**/ int grainNeighbours[3*3] = {
+    /*grainBase*/-gX*gY-gX-1, /*grainBase*/-gX*gY-1, /*grainBase*/-gX*gY+gX-1,
+    /*grainBase*/-gX-1, /*grainBase*/-1, /*grainBase*/+gX-1,
+    /*grainBase*/+gX*gY-gX-1, /*grainBase*/+gX*gY-1, /*grainBase*/+gX*gY+gX-1
    };
-   //const v4sf XYZ0{float(1), float(gX), float(gY*gX), 0.f};
-   int gYX = gY*gX;
+   const v4sf XYZ0 = grainLattice.XYZ0;
+   //int gYX = gY*gX;
    int W = side.W;
    for(size_t i=start; i<start+size; i++) { // FIXME: evaluate tension once per edge
     int base = i*W;
     for(int j=0; j<W; j++) {
      int index = base+j;
      v4sf O = side.Vertex::position[index];
-     v4si xyz = cvttps2dq(scale*(O-min));
-     size_t offset = gYX * xyz[2] + gX * xyz[1] + xyz[0];
-     //size_t offset = dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*(O-min))))[0];
+     //v4si xyz = cvttps2dq(scale*(O-min)); size_t offset = gYX * xyz[2] + gX * xyz[1] + xyz[0];
+
+     int offset = XYZ0[3] + dot3(XYZ0, floor(scale*(O-min)))[0];
+     assert_(offset >= 0, scale*(O-min));
      for(size_t n=0; n<3*3; n++) {
-      v4hi line = *(v4hi*)(grainNeighbours[n] + offset);
+      assert_(grainNeighbours[n]+offset >= 0, offset, grainNeighbours[n], gX, gY, XYZ0[3],
+        dot3(XYZ0, floor(scale*(O-min)))[0]);
+      v4hi line = *(v4hi*)&grainLattice.cells/*grainBase*/[offset + grainNeighbours[n]];
       if(line[0]) {
+       assert_(line[0]-1 < grain.count, line[0], grain.count);
        penalty(side, index, grain, line[0]-1);
       }
       if(line[1]) {
+       assert_(line[1]-1 < grain.count, line[1], grain.count);
        penalty(side, index, grain, line[1]-1);
       }
       if(line[2]) {
+       assert_(line[2]-1 < grain.count, line[2], grain.count);
        penalty(side, index, grain, line[2]-1);
       }
      }
     }
    }
    sideGrainTime.stop();
-  },  threadCount);
+  }//,  threadCount);
 
   /*// Side vertices
   vec4f p = grain.position[grainIndex];
@@ -499,7 +499,7 @@ break2_:;
   grainGrainTime.start();
   //parallel_chunk(grainLattice.cells.size, [this, &grainLattice](uint, size_t start, size_t size) {
   {
-   array<size_t> contacts;
+   //array<size_t> contacts;
    size_t start = 0, size = grainLattice.cells.size;
    const int Y = grainLattice.size.y, X = grainLattice.size.x;
    const uint16* chunk = grainLattice.cells.begin() + start;
@@ -508,6 +508,7 @@ break2_:;
    for(int z: range(0, 2 +1)) for(int y: range((z?-2:0), 2 +1)) for(int x: range(((z||y)?-2:1), 2 +1)) {
     di[i++] = z*Y*X + y*X + x;
    }
+   grainGrainTotalTime.start();
    for(size_t index: range(size)) {
     const uint16* current = chunk + index;
     uint16 A = *current;
@@ -518,12 +519,16 @@ break2_:;
      uint16 B = current[di[n]];
      if(!B) continue;
      B--;
-     if(penalty(grain, A, grain, B)) {
+     grainGrainForceTime.start();
+     penalty(grain, A, grain, B);
+     grainGrainForceTime.stop();
+     /*if(penalty(grain, A, grain, B)) {
       contacts.add(A);
       contacts.add(B);
-     }
+     }*/
     }
    }
+   grainGrainTotalTime.stop();
   }
   grainGrainTime.stop();
 
@@ -733,46 +738,30 @@ break2_:;
   // Integration
   min = _0f; max = _0f;
 
-  //wireIntegrationTime.start();
-  parallel_chunk(wire.count, [this](uint, size_t start, size_t size) {
-   for(size_t i: range(start, start+size)) {
-    System::step(wire, i);
-    // To avoid bound check
-    min = ::min(min, wire.position[i]);
-    max = ::max(max, wire.position[i]);
-   }
-  }, 1);
-  //wireIntegrationTime.stop();
-  //wireTime.stop();
-
-  //grainTime.start();
-  //grainIntegrationTime.start();
-  parallel_chunk(grain.count, [this](uint, size_t start, size_t size) {
-   for(size_t i: range(start, start+size)) {
-    System::step(grain, i);
-    min = ::min(min, grain.position[i]);
-    max = ::max(max, grain.position[i]);
-   }
-  }, 1);
-  //grainIntegrationTime.stop();
-  //grainTime.stop();
+  integrationTime.start();
+  for(size_t i: range(wire.count)) {
+   System::step(wire, i);
+   // To avoid bound check
+   min = ::min(min, wire.position[i]);
+   max = ::max(max, wire.position[i]);
+  }
+  for(size_t i: range(grain.count)) {
+   System::step(grain, i);
+   min = ::min(min, grain.position[i]);
+   max = ::max(max, grain.position[i]);
+  }
   // First and last line are fixed
-
-  //sideTime.start();
-  //sideIntegrationTime.start();
-  parallel_chunk(side.W, side.count-side.W, [this,alpha](uint, size_t start, size_t size) {
-   for(size_t i: range(start, start+size)) {
-    if(processState>=Pack) System::step(side, i);
-    // To avoid bound check
-    min = ::min(min, side.Vertex::position[i]);
-    max = ::max(max, side.Vertex::position[i]);
-    side.Vertex::velocity[i] *= float4(1-10*dt); // Additionnal viscosity
-   }
-  }, 1);
-  //sideIntegrationTime.stop();
-  //sideTime.stop();
+  if(processState>=Pack) for(size_t i: range(side.W, side.count-side.W)) {
+   System::step(side, i);
+   // To avoid bound check
+   min = ::min(min, side.Vertex::position[i]);
+   max = ::max(max, side.Vertex::position[i]);
+   side.Vertex::velocity[i] *= float4(1-10*dt); // Additionnal viscosity
+  }
+  integrationTime.stop();
 
   /// All around pressure
+  processTime.start();
   if(processState == ProcessState::Pack) {
    plate.force[0][2] += pressure * PI * sq(side.radius);
    bottomForce = plate.force[0][2];
@@ -858,7 +847,7 @@ break2_:;
    vec4f relativePosition = (v4sf){end[0], end[1], z, 0} - wire.position[wire.count-1];
   vec4f length = sqrt(sq3(relativePosition));
   if(length[0] >= Wire::internodeLength) {
-   Locker lock(this->lock);
+   //Locker lock(this->lock);
    assert_(wire.count < wire.capacity, wire.capacity);
    size_t i = wire.count++;
    v4sf p = wire.position[wire.count-2]
@@ -872,10 +861,9 @@ break2_:;
    wire.frictions.set(i);
   }
  }
-
- timeStep++;
-
+ processTime.stop();
  stepTime.stop();
+ timeStep++;
 }
 
 String info() {

@@ -301,6 +301,32 @@ struct System {
   return {float3(tA::radius)*(-normal), _0f, normal, length[0]-tA::radius, 0, 0};
  }
 
+ struct RigidSide {
+  sconst size_t base = 0;
+  sconst bool friction = false;
+  sconst float curvature = 0;
+  sconst float elasticModulus = 1e8;
+  float radius;
+  RigidSide(float radius) : radius(radius) {}
+  struct { v4sf operator[](size_t) const { return _0f; } } position;
+  struct { v4sf operator[](size_t) const { return _0f; } } velocity;
+  struct { NoOperation operator[](size_t) const { return {}; }} force;
+  struct { vec4f operator[](size_t) const { return _0001f; }} rotation;
+  struct { v4sf operator[](size_t) const { return _0f; } } angularVelocity;
+  struct { NoOperation operator[](size_t) const { return {}; }} torque;
+ } rigidSide {side.radius};
+
+ /// Sphere - Rigid side
+ template<Type tA>
+ Contact contact(const tA& A, size_t aIndex, const RigidSide& side, size_t) {
+  float length = length2(A.position[aIndex]);
+  float r = side.radius;
+  vec4f normal {-A.position[aIndex][0]/length, -A.position[aIndex][1]/length, 0, 0};
+  return { float3(tA::radius)*(-normal),
+     vec4f{r*-normal[0], r*-normal[1], A.position[aIndex][2], 0},
+   normal, r-tA::radius-length,0,0 };
+ }
+
  System(const Dict& p) :
    dt(p.at("TimeStep"_)),
    gz(10/*p.at("G")*/),
@@ -414,8 +440,7 @@ constexpr float System::Wire::radius;
 constexpr float System::Wire::mass;
 constexpr vec4f System::Wire::internodeLength4;
 constexpr float System::Plate::elasticModulus;
-//constexpr float System::Side::elasticModulus;
 constexpr float System::Side::density;
 constexpr float System::Grain::elasticModulus;
 constexpr vec4f System::Wire::tensionDamping;
-//constexpr float System::RigidSide::elasticModulus;
+constexpr float System::RigidSide::elasticModulus;
