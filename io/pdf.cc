@@ -14,7 +14,7 @@ struct Object : Dict {
 };
 
 inline String str(const Object& o) {
- array<char> s = str((const Dict&)o);
+ array<char> s = strPDF((const Dict&)o);
  if(o.data) {
   assert_(o.at("Length").integer() == int(o.data.size), (const Dict&)o);
   //assert_(o.data.size <= 30 || o.value("Filter","")=="/FlateDecode", o.data.size, deflate(o.data).size, o.value("Filter",""_));

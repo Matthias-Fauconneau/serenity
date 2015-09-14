@@ -76,6 +76,7 @@ generic String strPDF(const map<T,Variant>& dict) {
  s.append("<<"); for(auto entry: dict) s.append( '/'+entry.key+' '+str(entry.value)+' ' ); s.append(">>");
  return move(s);
 }
+//generic String str(const map<T,Variant>& dict) { return strPDF(dict); }
 
 inline String str(const Variant& o) {
  if(o.type==Variant::Boolean) return unsafeRef(str(bool(o.number)));
@@ -89,6 +90,7 @@ inline String str(const Variant& o) {
 }
 
 typedef map<String,Variant> Dict; /// Associative array of variants
+generic String str(const Dict& dict) { return strPDF(dict); }
 
 inline Dict parseDict(TextData& s) {
  Dict dict;

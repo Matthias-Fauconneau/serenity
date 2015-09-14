@@ -565,7 +565,7 @@ struct Review {
  HBox hbox {{&pressure, &snapshotView}};
  UniformGrid<Plot> strainPlots {4};
  VBox layout {{&array, &hbox, &strainPlots, &output}, VBox::Even};
- unique<Window> window = ::window(&layout, int2(0, 0), mainThread, true);
+ unique<Window> window = nullptr;// = ::window(&layout, int2(0, 0), mainThread, true);
 
  bool useMedianFilter = true;
  enum { Pressure, Stress, Deviatoric, Volume, Length };
@@ -574,7 +574,7 @@ struct Review {
  Dict group, point;
  bool details = true, hover = true;
 
- Plot pressurePlot(const Dict& point, size_t index) {
+ Plot pressurePlot(const Dict& point, size_t index, size_t plotIndex=-1) {
   Dict filter = copy(point);
   if(filter.contains("Pressure"_)) filter.remove("Pressure");
   if(filter.contains(array.dimensions[0].last())) filter.remove(array.dimensions[0].last());
@@ -586,11 +586,13 @@ struct Review {
    plot.plotBandsY = true;
    plot.max.y = array.max;
   } else if(index==Deviatoric) {
-   plot.ylabel = "Deviatoric Stress (Pa)"__;
+   plot.ylabel = /*Deviatoric*/"Stress (Pa)"__;
    plot.plotPoints = true;
    plot.plotLines = false;
-   plot.plotCircles = true;
-   //plot.max = array.max;
+   if(plotIndex!=invalid) {
+    plot.plotCircles = true;
+    plot.max = array.max;
+   }
   } else if(index==Pressure) {
    plot.ylabel = "Pressure (Pa)"__;
    plot.plotBandsY = false;
@@ -623,6 +625,13 @@ struct Review {
     dataSet.insertSortedMulti((effectivePressure+peakStress)/2, (peakStress-effectivePressure)/2);
    else if(index==Stress)
     dataSet.insertSortedMulti(effectivePressure, peakStress);
+  }
+  if(plotIndex!=invalid) {
+   auto key = move(plot.dataSets.keys[plotIndex]);
+   auto value = move(plot.dataSets.values[plotIndex]);
+   plot.dataSets.clear();
+   plot.dataSets.keys.append(move(key));
+   plot.dataSets.values.append(move(value));
   }
   if(index==Deviatoric && plot.dataSets) {
    const size_t N = 16;
@@ -801,7 +810,27 @@ struct Review {
   return plot;
  }
 
+void plotToPDF(string name) {
+ static constexpr float inchMM = 25.4, inchPx = 90;
+ const vec2 pageSize (210/*mm*/ * (inchPx/inchMM), 210/*mm*/ * (inchPx/inchMM));
+ //auto graphics = layout.graphics(pageSize, Rect(pageSize));
+ auto graphics = pressure.graphics(pageSize);
+ graphics->flatten();
+ writeFile(name+".pdf"_, toPDF(pageSize, ref<Graphics>(graphics.pointer, 1), 72 / inchPx /*px/inch*/), home(), true);
+}
+
+
  Review() {
+  {auto group = array.parseDict("Angle=3.6,Elasticity=1e7,Friction=0.3,Pattern=cross,Pressure=60K,Radius=0.02,Rate=100,Resolution=2,Seed=3,Side=1e8,Thickness=1e-3,TimeStep=10µ,Wire=12%");
+   for(size_t index: range(4)) {
+    pressure = pressurePlot(group, Deviatoric, index);
+    plotToPDF(pressure.dataSets.keys[0]);
+   }
+   pressure = pressurePlot(group, Deviatoric);
+   plotToPDF("plot");
+   error("plot");
+  }
+  window = ::window(&layout, int2(0, 0), mainThread, true);
   window->actions[Key('d')] = [this](){
    details=!details;
    if(details) {
@@ -837,6 +866,14 @@ struct Review {
    window->render();
   };
   window->actions[Key('h')] = [this](){ hover=!hover; };
+  window->actions[Key('f')] = [this](){
+   window->widget = window->widget == &layout ? (Widget*)&pressure : &layout;
+   window->render();
+  };
+  window->actions[Key('v')] = [this](){
+   window->widget = window->widget == &layout ? (Widget*)&snapshotView : &layout;
+   window->render();
+  };
   window->actions[Delete] = [this]() {
       if(array.point) {
           array.remove(array.point);
@@ -880,7 +917,8 @@ struct Review {
    //remove("plot.pdf"_, home());
    static constexpr float inchMM = 25.4, inchPx = 90;
    const vec2 pageSize (210/*mm*/ * (inchPx/inchMM), 210/*mm*/ * (inchPx/inchMM));
-   auto graphics = layout.graphics(pageSize, Rect(pageSize));
+   //auto graphics = layout.graphics(pageSize, Rect(pageSize));
+   auto graphics = pressure.graphics(pageSize);
    graphics->flatten();
    writeFile("plot.pdf"_, toPDF(pageSize, ref<Graphics>(graphics.pointer, 1), 72 / inchPx /*px/inch*/), home(), true);
   };
@@ -922,6 +960,8 @@ struct Review {
     snapshotView = SnapshotView(section(lastSnapshot,'.',0,-2));
    } else snapshotView = SnapshotView();
    window->render();
+   log(array.stripSortKeys(group));
+   log(array.stripSortKeys(point));
   };
  }
 } app;

@@ -50,8 +50,8 @@ struct SimulationRun : Simulation {
  }
 
  void report() {
-  int64 elapsed = realTime() - lastReport;
-  log(timeStep*dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, side.count, wire.count);
+  //int64 elapsed = realTime() - lastReport;
+  //log(timeStep*dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, side.count, wire.count);
   /*log("grain",str(grainTime, stepTime),
       "grainInit",str(grainInitializationTime, stepTime),
       "grainGrain",str(grainGrainTime, stepTime),
@@ -65,6 +65,9 @@ struct SimulationRun : Simulation {
       "sideGrid",str(sideGridTime, stepTime),
       "sideForce",str(sideForceTime, stepTime),
       "sideIntegration",str(sideIntegrationTime, stepTime));*/
+  log("side-grain", str(sideGrainTime, stepTime));
+  log("side force", str(sideForceTime, stepTime));
+  log("grain-grain", str(grainGrainTime, stepTime));
   lastReport = realTime();
   lastReportStep = timeStep;
  }
@@ -138,7 +141,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
 #endif
   if(window) window->render();
   int64 elapsed = realTime() - lastReport;
-  if(elapsed > 10e9 || timeStep > lastReportStep + 1/this->dt) {
+  if(elapsed > 5e9 || timeStep > lastReportStep + 1/this->dt) {
    report();
 #if PROFILE
    requestTermination();

@@ -153,8 +153,8 @@ String str(double n, uint precision, uint exponent, uint pad) {
     if(n==::inf) return ::right("∞", pad+2);
     if(n==-::inf) return ::right("-∞", pad+2);
     int e=0;
-    if(n && exponent && (n<1 || log10(n)>=precision+4)) {
-     e=floor(log10(n) / exponent) * exponent;
+    if(n && exponent && (n<1 || log10(n)>=precision+3/*4*/)) {
+     e = floor(log10(n) / exponent) * exponent;
      n /= exp10(e);
     }
     array<char> s;

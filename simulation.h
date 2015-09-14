@@ -7,17 +7,21 @@ generic struct Lattice {
  const vec4f min, max;
  const int3 size = int3(::floor(toVec3(scale*(max-min))))+int3(1);
  int YX = size.y * size.x;
- buffer<T> cells {size_t(size.z*size.y*size.x)};
+ buffer<T> cells {size_t(size.z*size.y*size.x + 2*size.y*size.x+2*size.x+2)};
  const vec4f XYZ0; // {float(1), float(size.x), float(size.y*size.x), 0.f}; // GCC 4.8 \/
  Lattice(float scale, vec4f min, vec4f max) :
    scale(float3(scale)) ,
-   min(min - float3(2./scale)),
-   max(max + float3(2./scale)), // Avoids bound check
+   min(min),
+   max(max), // Avoids bound check
    XYZ0{float(1), float(size.x), float(size.y*size.x), 0.f} {                     // GCC 4.8 ^
   cells.clear(0);
  }
  inline size_t index(vec4f O) {
   v4si xyz = cvttps2dq(scale*(O-min));
+  int x=xyz[0], y=xyz[1], z=xyz[2];
+  assert_(x >= 0 && x < size.x && y >= 0 && y < size.y && z >= 0 && z < size.z,
+          "OOB", x,y,z, O, O-min, scale*(O-min));
+  log(O, x,y,z);
   return YX * xyz[2] + size.x * xyz[1] + xyz[0];
   //return dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*(O-min))))[0];
  }
@@ -74,8 +78,9 @@ struct Simulation : System {
  //Time miscTime, grainTime, wireTime, sideTime;
  /*Time grainGridTime, grainForceTime, grainIntegrationTime;
  Time wireLatticeTime, wireForceTime, wireIntegrationTime;
- Time sideGridTime, sideForceTime, sideIntegrationTime;
- Time sideGrainTime;*/
+ Time sideGridTime, sideForceTime, sideIntegrationTime;*/
+ Time sideGrainTime, sideForceTime;
+ Time grainGrainTime;
 
  Lock lock;
  Stream stream;
@@ -90,6 +95,8 @@ struct Simulation : System {
  template<Type... Args> void fail(string reason, Args... args) {
   log(reason, args...); processState = Fail; snapshot(reason); return;
  }
+
+ v4sf min = _0f, max = _0f;
 
  Simulation(const Dict& parameters, Stream&& stream) : System(parameters),
    targetHeight(/*parameters.at("Height"_)*/side.height),
@@ -111,6 +118,13 @@ struct Simulation : System {
    wire.velocity[i] = _0f;
    for(size_t n: range(3)) wire.positionDerivatives[n][i] = _0f;
    wire.frictions.set(i);
+   // To avoid bound check
+   min = ::min(min, wire.position[i]);
+   max = ::max(max, wire.position[i]);
+  }
+  for(size_t i : range(side.count)) {
+   min = ::min(min, side.Vertex::position[i]);
+   max = ::max(max, side.Vertex::position[i]);
   }
  }
 
@@ -204,8 +218,6 @@ struct Simulation : System {
  const float pourPackThreshold = 2e-3;
  const float packLoadThreshold = 500e-6;
  const float transitionTime = 1*s;
-
- v4sf min = _0f, max = _0f;
 
  void step() {
   staticFrictionCount2 = staticFrictionCount;
@@ -414,13 +426,15 @@ break2_:;
 
   // Soft membrane side
   parallel_chunk(1, side.H-1, [this, alpha, &grainLattice](uint, size_t start, size_t size) {
-   ::side(side.W, side.Vertex::position.data, side.Vertex::velocity.data, side.Vertex::force.begin(),
-          pressure, side.internodeLength, side.tensionStiffness, side.tensionDamping,
-          side.radius - alpha*Grain::radius,
+   sideForceTime.start();
+   ::side(side.W, side.Vertex::position.data, side.Vertex::force.begin(),
+          pressure, side.internodeLength, side.tensionStiffness, side.radius - alpha*Grain::radius,
           start, size
           //, grainLattice.cells, grainLattice.size.x, grainLattice.size.y, grainLattice.scale, grainLattice.min
           //side, grain
           );
+   sideForceTime.stop();
+   sideGrainTime.start();
    // Side - Grain
    const uint16* grainBase = grainLattice.cells.begin();
    int gX = grainLattice.size.x, gY = grainLattice.size.y;
@@ -455,6 +469,7 @@ break2_:;
      }
     }
    }
+   sideGrainTime.stop();
   },  threadCount);
 
   /*// Side vertices
@@ -481,27 +496,36 @@ break2_:;
    sideGrainRadiusSum += length2(p);
   }*/
 
-  parallel_chunk(grainLattice.cells.size, [this, &grainLattice](uint, size_t start, size_t size) {
+  grainGrainTime.start();
+  //parallel_chunk(grainLattice.cells.size, [this, &grainLattice](uint, size_t start, size_t size) {
+  {
+   array<size_t> contacts;
+   size_t start = 0, size = grainLattice.cells.size;
    const int Y = grainLattice.size.y, X = grainLattice.size.x;
    const uint16* chunk = grainLattice.cells.begin() + start;
-   int di[3*3+3+1];
+   int di[2*5*5+2*5+2]; // 62
    size_t i = 0;
-   for(int z: range(-1,0 +1)) for(int y: range(-1, (z?1:0) +1)) for(int x: range(-1, ((z||y)?1:-1) +1))
+   for(int z: range(0, 2 +1)) for(int y: range((z?-2:0), 2 +1)) for(int x: range(((z||y)?-2:1), 2 +1)) {
     di[i++] = z*Y*X + y*X + x;
+   }
    for(size_t index: range(size)) {
     const uint16* current = chunk + index;
-     uint16 A = *current;
-     if(!A) continue;
-     A--;
-     // Neighbours
-     for(size_t n: range(3*3+3+1)) {
-      uint16 B = current[di[n]];
-      if(!B) break;
-      B--;
-      penalty(grain, A, grain, B);
+    uint16 A = *current;
+    if(!A) continue;
+    A--;
+    // Neighbours
+    for(size_t n: range(2*5*5+2*5+2)) {
+     uint16 B = current[di[n]];
+     if(!B) continue;
+     B--;
+     if(penalty(grain, A, grain, B)) {
+      contacts.add(A);
+      contacts.add(B);
      }
+    }
    }
-  }, threadCount);
+  }
+  grainGrainTime.stop();
 
   /*// Wire
   wireTime.start();
@@ -713,7 +737,7 @@ break2_:;
   parallel_chunk(wire.count, [this](uint, size_t start, size_t size) {
    for(size_t i: range(start, start+size)) {
     System::step(wire, i);
-    // for correct truncate indexing
+    // To avoid bound check
     min = ::min(min, wire.position[i]);
     max = ::max(max, wire.position[i]);
    }
@@ -733,18 +757,20 @@ break2_:;
   //grainIntegrationTime.stop();
   //grainTime.stop();
   // First and last line are fixed
-  if(processState>=Pack) {
-   //sideTime.start();
-   //sideIntegrationTime.start();
-   parallel_chunk(side.W, side.count-side.W, [this,alpha](uint, size_t start, size_t size) {
-    for(size_t i: range(start, start+size)) {
-     System::step(side, i);
-     side.Vertex::velocity[i] *= float4(1-10*dt); // Additionnal viscosity
-    }
-   }, 1);
-   //sideIntegrationTime.stop();
-   //sideTime.stop();
-  }
+
+  //sideTime.start();
+  //sideIntegrationTime.start();
+  parallel_chunk(side.W, side.count-side.W, [this,alpha](uint, size_t start, size_t size) {
+   for(size_t i: range(start, start+size)) {
+    if(processState>=Pack) System::step(side, i);
+    // To avoid bound check
+    min = ::min(min, side.Vertex::position[i]);
+    max = ::max(max, side.Vertex::position[i]);
+    side.Vertex::velocity[i] *= float4(1-10*dt); // Additionnal viscosity
+   }
+  }, 1);
+  //sideIntegrationTime.stop();
+  //sideTime.stop();
 
   /// All around pressure
   if(processState == ProcessState::Pack) {
