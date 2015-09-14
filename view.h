@@ -68,7 +68,11 @@ struct SimulationRun : Simulation {
   log("grain", str(grainTime, stepTime));
   log("side-grain", str(sideGrainTime, stepTime));
   log("side force", str(sideForceTime, stepTime));
-  log("grain-grain", str(grainGrainTime, stepTime), str(grainGrainForceTime, grainGrainTotalTime));
+  log("grain-grain check", strD(
+       (uint64)grainGrainTime*((uint64)grainGrainTotalTime-(uint64)grainGrainForceTime),
+                                (uint64)stepTime*grainGrainTotalTime));
+  log("grain-grain force", strD((uint64)grainGrainTime*grainGrainForceTime,
+                                (uint64)stepTime*grainGrainTotalTime));
   log("integration", str(integrationTime, stepTime));
   log("process", str(processTime, stepTime));
   lastReport = realTime();
@@ -164,10 +168,11 @@ struct SimulationView : SimulationRun, Widget, Poll {
  vec2 sizeHint(vec2) override { return vec2(1050, 1050*size.y/size.x); }
  shared<Graphics> graphics(vec2) override {
   const float Dt = 1./60/2;
+  size_t grainCount;
+  {Locker lock(this->lock); grainCount = grain.count;}
   {
    vec4f min = _0f, max = _0f;
-   //Locker lock(this->lock);
-   for(size_t i: range(grain.count)) { // FIXME: proper BS
+   for(size_t i: range(grainCount)) { // FIXME: proper BS
     min = ::min(min, grain.position[i]);
     max = ::max(max, grain.position[i]);
    }
@@ -185,7 +190,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
 
   vec3 min = -1./32, max = 1./32;
   {
-   for(vec4f p: grain.position.slice(0, grain.count)) {
+   for(vec4f p: grain.position.slice(0, grainCount)) {
     p[3] = 0; // FIXME
     assert(p[3] == 0, p);
     vec3 O = toVec3(qapply(viewRotation, p) - rotationCenter);
@@ -223,10 +228,9 @@ struct SimulationView : SimulationRun, Widget, Poll {
   glDepthTest(true);
 
   if(1) {
-   //Locker lock(this->lock);
-  if(grain.count) {
-   buffer<vec3> positions {grain.count*6};
-   for(size_t i: range(grain.count)) {
+  if(grainCount) {
+   buffer<vec3> positions {grainCount*6};
+   for(size_t i: range(grainCount)) {
     // FIXME: GPU quad projection
     vec3 O = viewProjection * toVec3(grain.position[i]);
     vec2 min = O.xy() - vec2(scale.xy()) * vec2(Grain::radius); // Parallel
@@ -247,7 +251,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_),
                              3, Float, positionBuffer);
-   GLBuffer rotationBuffer (apply(grain.rotation.slice(0, grain.count),
+   GLBuffer rotationBuffer (apply(grain.rotation.slice(0, grainCount),
                 [=](vec4f q) -> vec4f { return conjugate(qmul(viewRotation,q)); }));
    shader.bind("rotationBuffer"_, rotationBuffer, 0);
    shader["radius"] = float(scale.z/2 * Grain::radius*3/4); // reduce Z radius to see membrane mesh on/in grain
@@ -336,7 +340,6 @@ struct SimulationView : SimulationRun, Widget, Poll {
 
   // Plates
   {
-   //Locker lock(this->lock);
    size_t W = side.W;
    buffer<vec3> positions {W*2*2};
    for(size_t i: range(2)) for(size_t j: range(W)) {
@@ -358,7 +361,6 @@ struct SimulationView : SimulationRun, Widget, Poll {
    if(1) glDepthTest(false);
    {static GLVertexArray vertexArray;
     shader["transform"] = viewProjection;
-    //Locker lock(this->lock);
     for(auto entry: lines) {
      shader["uColor"] = vec4(entry.key, 1);
      GLBuffer positionBuffer (entry.value);

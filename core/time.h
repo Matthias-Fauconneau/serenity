@@ -30,9 +30,10 @@ struct tsc {
  void stop() { if(tsc) total+=readCycleCounter()-tsc; tsc=0; }
  operator uint64() const {return total + (tsc?readCycleCounter()-tsc:0); }
 };
-inline String str(const tsc& num, const tsc& div) {
- return str(int(round(100*double((uint64)num)/double((uint64)div))))+'%';
+inline String strD(const uint64 num, const uint64 div) {
+ return div ? str(int(round(100*double(num)/double(div))))+'%' : ""__;
 }
+inline String str(const tsc& num, const tsc& div) { return strD(num, div)+'%'; }
 
 struct Time {
     uint64 startTime=realTime(), stopTime=0;
@@ -48,8 +49,7 @@ struct Time {
 inline String str(const Time& t) { return str(t.toReal(), 1u)+'s'; }
 inline bool operator<(float a, const Time& b) { return a < b.toReal(); }
 inline bool operator<(double a, const Time& b) { return a < b.toReal(); }
-inline String str(const Time& num, const Time& div) {
- return str(int(round(100*num.toReal()/div.toReal())))+'%'; }
+inline String str(const Time& num, const Time& div) { return strD(num, div); }
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;

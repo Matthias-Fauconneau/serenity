@@ -72,7 +72,7 @@ struct Simulation : System {
  tsc grainGrainTotalTime, grainGrainForceTime;
  Time integrationTime, processTime;
 
- //Lock lock;
+ Lock lock;
  Stream stream;
  Dict parameters;
  String id = str(parameters);
@@ -134,6 +134,7 @@ struct Simulation : System {
  String flat(const vec3& v) { return str(v[0], v[1], v[2]); }
  String flat(const v4sf& v) { return str(v[0], v[1], v[2]); }
  virtual void snapshot(string step) {
+  log("Snapshot disabled"); return;
   static int snapshotCount = 0;
   assert_(snapshotCount < 64 /*8 pack + 12 strain + <10 misc (state change)*/);
   snapshotCount++;
@@ -258,7 +259,7 @@ struct Simulation : System {
        if(length(p - newPosition) < Grain::radius+Wire::radius)
         goto break2_;
       maxSpawnHeight = ::max(maxSpawnHeight, newPosition[2]);
-      //Locker lock(this->lock);
+      Locker lock(this->lock);
       assert_(grain.count < grain.capacity);
       size_t i = grain.count++;
       grain.position[i] = newPosition;
@@ -503,10 +504,21 @@ break2_:;
    size_t start = 0, size = grainLattice.cells.size;
    const int Y = grainLattice.size.y, X = grainLattice.size.x;
    const uint16* chunk = grainLattice.cells.begin() + start;
-   int di[2*5*5+2*5+2]; // 62
+   int di[58]; // 62
    size_t i = 0;
    for(int z: range(0, 2 +1)) for(int y: range((z?-2:0), 2 +1)) for(int x: range(((z||y)?-2:1), 2 +1)) {
-    di[i++] = z*Y*X + y*X + x;
+    for(int ax: range(2)) for(int ay: range(2)) for(int az: range(2)) {
+     for(int bx: range(2)) for(int by: range(2)) for(int bz: range(2)) {
+      vec3 A(ax, ay, az), B(x+bx, y+by, z+bz);
+      if(sq(B-A) < 3) {
+       //log(i, x, y, z, sq(B-A));
+       assert_(i<58);
+       di[i++] = z*Y*X + y*X + x;
+       goto break2;
+      }
+     }
+    }
+    break2:;
    }
    grainGrainTotalTime.start();
    for(size_t index: range(size)) {
@@ -515,7 +527,7 @@ break2_:;
     if(!A) continue;
     A--;
     // Neighbours
-    for(size_t n: range(2*5*5+2*5+2)) {
+    for(size_t n: range(58)) {
      uint16 B = current[di[n]];
      if(!B) continue;
      B--;
