@@ -85,7 +85,8 @@ struct Simulation : System {
  }
 
  v4sf min = _0f, max = _0f;
- float maxV = 0;
+ float globalMinD2 = 0;
+ uint skipped = 0;
  buffer<uint16> sideGrainVerletLists {side.capacity * 2};
 
  Simulation(const Dict& parameters, Stream&& stream) : System(parameters),
@@ -420,8 +421,8 @@ break2_:;
    grain.torque[grainIndex] = _0f;
    penalty(grain, grainIndex, plate, 0);
    penalty(grain, grainIndex, plate, 1);
-   grainLattice(grain.position[grainIndex]) = 1+grainIndex;
    if(processState <= ProcessState::Pour) penalty(grain, grainIndex, rigidSide, 0);
+   grainLattice(grain.position[grainIndex]) = 1+grainIndex; // for grain-grain, and grain-side
   }
   grainTime.stop();
 
@@ -435,58 +436,57 @@ break2_:;
           start, size);
    sideForceTime.stop();
 
-   // Side - Grain
-   const uint16* grainBase = grainLattice.base;
-   int gX = grainLattice.size.x, gY = grainLattice.size.y;
-   v4sf scale = grainLattice.scale, min = grainLattice.min;
-#define PTR 1
-#if PTR
-   const uint16* grainNeighbours[3*3] = {
-    grainBase-gX*gY-gX-1, grainBase-gX*gY-1, grainBase-gX*gY+gX-1,
-    grainBase-gX-1, grainBase-1, grainBase+gX-1,
-    grainBase+gX*gY-gX-1, grainBase+gX*gY-1, grainBase+gX*gY+gX-1
-   };
-#else
-   int grainNeighbours[3*3] = {
-    -gX*gY-gX-1, -gX*gY-1, -gX*gY+gX-1,
-    -gX-1, -1, +gX-1,
-    +gX*gY-gX-1, +gX*gY-1, +gX*gY+gX-1
-   };
-#endif
-   const v4sf XYZ0 = grainLattice.XYZ0;
-   int W = side.W;
    sideGrainTime.start();
    sideGrainTotalTime.start();
-   float minD = 2*Grain::radius/sqrt(3.);
-   for(size_t i=start; i<start+size; i++) {
-    int base = i*W;
-    for(int j=0; j<W; j++) {
-     int index = base+j;
+   if(globalMinD2 <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
+    // Side - Grain
+    const uint16* grainBase = grainLattice.base;
+    int gX = grainLattice.size.x, gY = grainLattice.size.y;
+    v4sf scale = grainLattice.scale, min = grainLattice.min;
+    const uint16* grainNeighbours[3*3] = {
+     grainBase-gX*gY-gX-1, grainBase-gX*gY-1, grainBase-gX*gY+gX-1,
+     grainBase-gX-1, grainBase-1, grainBase+gX-1,
+     grainBase+gX*gY-gX-1, grainBase+gX*gY-1, grainBase+gX*gY+gX-1
+    };
+    const v4sf XYZ0 = grainLattice.XYZ0;
+    globalMinD2 = 2*Grain::radius/sqrt(3.);
+    for(size_t index: range(side.W, side.count-side.W)) {
      v4sf O = side.Vertex::position[index];
      int offset = dot3(XYZ0, floor(scale*(O-min)))[0];
-     array<float> D;
+     float minD = globalMinD2, minD2 = globalMinD2;
+     uint16 first = 0, second = 0;
      for(size_t n=0; n<3*3; n++) { // FIXME: assert unrolled
       v4hi line = *(v4hi*)(offset + grainNeighbours[n]); // Gather
-      for(size_t i: range(3))if(line[i]) { // FIXME: assert unrolled
-       sideGrainForceTime.start();
-       float d = penalty(side, index, grain, line[i]-1);
-       sideGrainForceTime.stop();
-       //if(d > 0) minD = ::min(minD, d);
-       D.insertSorted(d);
+      for(size_t i: range(3)) if(line[i]) { // FIXME: assert unrolled
+       float d = contact(side, index, grain, line[i]-1).depth;
+       if(d < 0) first = line[i];
+       else if(d <= minD2) {
+        if(d <= minD) {
+         minD = d;
+         second = line[i];
+        } else {
+         minD2 = d;
+        }
+       }
       }
      }
-     if(D.size >= 2) assert_(D[1]>0); // Asserts single intersection
-     if(D.size >= 3) minD = ::min(minD, D[2]); // Keeps 2 closest in list, 3rd is cutoff
+     sideGrainVerletLists[index*2+0] = first;
+     sideGrainVerletLists[index*2+1] = second;
+     globalMinD2 = ::min(globalMinD2, minD2);
+    }
+   }
+   for(size_t index: range(side.W, side.count-side.W)) {
+    for(size_t i: range(2)) {
+     int b = sideGrainVerletLists[index*2+i];
+     if(b) {
+      sideGrainForceTime.start();
+      penalty(side, index, grain, b-1);
+      sideGrainForceTime.stop();
+     }
     }
    }
    sideGrainTotalTime.stop();
    sideGrainTime.stop();
-   /*if(maxV) {
-    static int sum = 0, N = 0;
-    int skip = minD/(dt*maxV);
-    sum += skip; N++;
-    log(sum/N, skip);
-   }*/
   }//,  threadCount);
 
   /*// Side vertices
@@ -794,7 +794,8 @@ break2_:;
    side.Vertex::velocity[i] *= float4(1-10*dt); // Additionnal viscosity
    maxSideV = ::max(maxSideV, length(side.Vertex::velocity[i]));
   }
-  maxV = maxGrainV + maxSideV;
+  float maxV = maxGrainV + maxSideV;
+  globalMinD2 -= maxV * dt;
   integrationTime.stop();
 
   /// All around pressure

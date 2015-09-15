@@ -162,7 +162,7 @@ struct System {
   sconst float curvature = 1./radius;
   sconst float shearModulus = 79e9 * kg / (m*s*s);
   sconst float poissonRatio = 0.28;
-  sconst float elasticModulus = 1 ? 2*shearModulus*(1+poissonRatio) : 1e10; // ~2e11
+  sconst float elasticModulus = 0 ? 2*shearModulus*(1+poissonRatio) : 1e10; // ~2e11
 
   //sconst float mass = 3*g;
   sconst float density = 7.8e3 * densityScale;
@@ -223,7 +223,7 @@ struct System {
   sconst bool friction = false;
 
   sconst float curvature = 0; // -1/radius?
-  const float elasticModulus = 1e9; // for contact
+  const float elasticModulus = 1e8; // for contact
   sconst float density = 1e3;
   const float resolution;
   const float initialRadius;
