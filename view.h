@@ -67,6 +67,11 @@ struct SimulationRun : Simulation {
       "sideIntegration",str(sideIntegrationTime, stepTime));*/
   log("grain", str(grainTime, stepTime));
   log("side-grain", str(sideGrainTime, stepTime));
+  log("side-grain check", strD(
+       (uint64)sideGrainTime*((uint64)sideGrainTotalTime-(uint64)sideGrainForceTime),
+                                (uint64)stepTime*sideGrainTotalTime));
+  log("side-grain force", strD((uint64)sideGrainTime*sideGrainForceTime,
+                                (uint64)stepTime*sideGrainTotalTime));
   log("side force", str(sideForceTime, stepTime));
   log("grain-grain check", strD(
        (uint64)grainGrainTime*((uint64)grainGrainTotalTime-(uint64)grainGrainForceTime),

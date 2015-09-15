@@ -162,7 +162,7 @@ struct System {
   sconst float curvature = 1./radius;
   sconst float shearModulus = 79e9 * kg / (m*s*s);
   sconst float poissonRatio = 0.28;
-  sconst float elasticModulus = 0 ? 2*shearModulus*(1+poissonRatio) : 1e10; // ~2e11
+  sconst float elasticModulus = 1 ? 2*shearModulus*(1+poissonRatio) : 1e10; // ~2e11
 
   //sconst float mass = 3*g;
   sconst float density = 7.8e3 * densityScale;
@@ -223,7 +223,7 @@ struct System {
   sconst bool friction = false;
 
   sconst float curvature = 0; // -1/radius?
-  const float elasticModulus = 1e8; //8; // for contact
+  const float elasticModulus = 1e9; // for contact
   sconst float density = 1e3;
   const float resolution;
   const float initialRadius;
@@ -305,7 +305,7 @@ struct System {
   sconst size_t base = 0;
   sconst bool friction = false;
   sconst float curvature = 0;
-  sconst float elasticModulus = 1e8;
+  sconst float elasticModulus = 1e9;
   float radius;
   RigidSide(float radius) : radius(radius) {}
   struct { v4sf operator[](size_t) const { return _0f; } } position;
@@ -352,13 +352,13 @@ struct System {
  size_t staticFrictionCount2 = 0, dynamicFrictionCount2 = 0;
 
  /// Evaluates contact penalty between two objects
- template<Type tA, Type tB> bool penalty(const tA& A, size_t a, tB& B, size_t b) {
+ template<Type tA, Type tB> float penalty(const tA& A, size_t a, tB& B, size_t b) {
      vec4f normalForce;
      return penalty(A, a, B, b, normalForce);
  }
-template<Type tA, Type tB> bool penalty(const tA& A, size_t a, tB& B, size_t b, vec4f& normalForce) {
+template<Type tA, Type tB> float penalty(const tA& A, size_t a, tB& B, size_t b, vec4f& normalForce) {
   Contact c = contact(A, a, B, b);
-  if(c.depth >= 0) return false;
+  if(c.depth >= 0) return c.depth;
   // Stiffness
   const float E = 1/(1/A.elasticModulus+1/B.elasticModulus);
   constexpr float R = 1/(tA::curvature+tB::curvature);
@@ -430,7 +430,7 @@ template<Type tA, Type tB> bool penalty(const tA& A, size_t a, tB& B, size_t b, 
   /*if(recordContacts) {
    contacts.append(A.base+a, B.base+b, toVec3(c.relativeA), toVec3(c.relativeB), toVec3(force));
   }*/
-  return true;
+  return c.depth;
  }
 };
 

@@ -8,16 +8,13 @@ generic struct Lattice {
  const int3 size = int3(::floor(toVec3(scale*(max-min))))+int3(1);
  int YX = size.y * size.x;
  buffer<T> cells {size_t(size.z*size.y*size.x + 3*size.y*size.x+3*size.x+3)}; // -1 .. 2 OOB margins
- const vec4f XYZ0 {float(1), float(size.x), float(size.y*size.x), float(size.y*size.x+size.x+1)};
+ T* const base = cells.begin()+size.y*size.x+size.x+1;
+ const vec4f XYZ0 {float(1), float(size.x), float(size.y*size.x), 0};
  Lattice(float scale, vec4f min, vec4f max) : scale{scale, scale, scale, 1}, min(min), max(max) {
   cells.clear(0);
  }
- inline size_t index(vec4f O) {
-  //v4si xyz = cvttps2dq(scale*(O-min));
-  //return YX * xyz[2] + size.x * xyz[1] + xyz[0];
-  return dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*(O-min))))[0];
- }
- inline T& operator()(vec4f p) { return cells[index(p)]; }
+ inline size_t index(vec4f O) { return dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*(O-min))))[0]; }
+ inline T& operator()(vec4f p) { return base[index(p)]; }
 };
 
 enum Pattern { None, Helix, Cross, Loop };
@@ -68,6 +65,7 @@ struct Simulation : System {
  int64 lastReport = realTime(), lastReportStep = timeStep;
  Time totalTime {true}, stepTime;
  Time sideGrainTime, sideForceTime;
+ tsc sideGrainTotalTime, sideGrainForceTime;
  Time grainTime, grainGrainTime;
  tsc grainGrainTotalTime, grainGrainForceTime;
  Time integrationTime, processTime;
@@ -87,6 +85,8 @@ struct Simulation : System {
  }
 
  v4sf min = _0f, max = _0f;
+ float maxV = 0;
+ buffer<uint16> sideGrainVerletLists {side.capacity * 2};
 
  Simulation(const Dict& parameters, Stream&& stream) : System(parameters),
    targetHeight(/*parameters.at("Height"_)*/side.height),
@@ -112,10 +112,10 @@ struct Simulation : System {
    min = ::min(min, wire.position[i]);
    max = ::max(max, wire.position[i]);
   }
-  for(size_t i : range(side.count)) {
+  /*for(size_t i : range(side.count)) { // Only needed once membrane is soft
    min = ::min(min, side.Vertex::position[i]);
    max = ::max(max, side.Vertex::position[i]);
-  }
+  }*/
  }
 
  generic vec4f tension(T& A, size_t a, size_t b) {
@@ -229,6 +229,10 @@ struct Simulation : System {
     log("Pour->Pack", grain.count, wire.count,  grainKineticEnergy / grain.count*1e6, voidRatio);
     packStart = timeStep;
     snapshot("pour");
+    for(size_t i : range(side.count)) { // Only needed once membrane is soft
+     min = ::min(min, side.Vertex::position[i]);
+     max = ::max(max, side.Vertex::position[i]);
+    }
    } else {
     // Generates falling grain (pour)
     const bool useGrain = 1;
@@ -402,12 +406,14 @@ break2_:;
   plate.force[1] = float4(plate.mass) * G;
 
   // Grain lattice
-  vec4f size = float4(sqrt(3.)/(2*Grain::radius))*(max-min);
-  if(!(isNumber(min) && isNumber(max)) || size[0]*size[1]*size[2] > 128*128*128) {
+  grainTime.start();
+  float scale = sqrt(3.)/(2*Grain::radius);
+  const int3 size = int3(::floor(toVec3(float4(scale)*(max-min))))+int3(1);
+  if(size[0] <= 2) max[0]+=1/scale, min[0]-=1/scale;
+  if(size[1] <= 2) max[1]+=1/scale, min[1]-=1/scale;
+  if(!(isNumber(min) && isNumber(max)) || size.x*size.y*size.z > 128*128*128) {
    return fail("Domain", min, max, size);
   }
-
-  grainTime.start();
   Lattice<uint16> grainLattice(sqrt(3.)/(2*Grain::radius), min, max);
   for(size_t grainIndex: range(grain.count)) {
    grain.force[grainIndex] = grain.g;
@@ -430,47 +436,57 @@ break2_:;
    sideForceTime.stop();
 
    // Side - Grain
-   sideGrainTime.start();
-   //const uint16* grainBase = grainLattice.cells.begin();
+   const uint16* grainBase = grainLattice.base;
    int gX = grainLattice.size.x, gY = grainLattice.size.y;
    v4sf scale = grainLattice.scale, min = grainLattice.min;
-   /*const uint16**/ int grainNeighbours[3*3] = {
-    /*grainBase*/-gX*gY-gX-1, /*grainBase*/-gX*gY-1, /*grainBase*/-gX*gY+gX-1,
-    /*grainBase*/-gX-1, /*grainBase*/-1, /*grainBase*/+gX-1,
-    /*grainBase*/+gX*gY-gX-1, /*grainBase*/+gX*gY-1, /*grainBase*/+gX*gY+gX-1
+#define PTR 1
+#if PTR
+   const uint16* grainNeighbours[3*3] = {
+    grainBase-gX*gY-gX-1, grainBase-gX*gY-1, grainBase-gX*gY+gX-1,
+    grainBase-gX-1, grainBase-1, grainBase+gX-1,
+    grainBase+gX*gY-gX-1, grainBase+gX*gY-1, grainBase+gX*gY+gX-1
    };
+#else
+   int grainNeighbours[3*3] = {
+    -gX*gY-gX-1, -gX*gY-1, -gX*gY+gX-1,
+    -gX-1, -1, +gX-1,
+    +gX*gY-gX-1, +gX*gY-1, +gX*gY+gX-1
+   };
+#endif
    const v4sf XYZ0 = grainLattice.XYZ0;
-   //int gYX = gY*gX;
    int W = side.W;
-   for(size_t i=start; i<start+size; i++) { // FIXME: evaluate tension once per edge
+   sideGrainTime.start();
+   sideGrainTotalTime.start();
+   float minD = 2*Grain::radius/sqrt(3.);
+   for(size_t i=start; i<start+size; i++) {
     int base = i*W;
     for(int j=0; j<W; j++) {
      int index = base+j;
      v4sf O = side.Vertex::position[index];
-     //v4si xyz = cvttps2dq(scale*(O-min)); size_t offset = gYX * xyz[2] + gX * xyz[1] + xyz[0];
-
-     int offset = XYZ0[3] + dot3(XYZ0, floor(scale*(O-min)))[0];
-     assert_(offset >= 0, scale*(O-min));
-     for(size_t n=0; n<3*3; n++) {
-      assert_(grainNeighbours[n]+offset >= 0, offset, grainNeighbours[n], gX, gY, XYZ0[3],
-        dot3(XYZ0, floor(scale*(O-min)))[0]);
-      v4hi line = *(v4hi*)&grainLattice.cells/*grainBase*/[offset + grainNeighbours[n]];
-      if(line[0]) {
-       assert_(line[0]-1 < grain.count, line[0], grain.count);
-       penalty(side, index, grain, line[0]-1);
-      }
-      if(line[1]) {
-       assert_(line[1]-1 < grain.count, line[1], grain.count);
-       penalty(side, index, grain, line[1]-1);
-      }
-      if(line[2]) {
-       assert_(line[2]-1 < grain.count, line[2], grain.count);
-       penalty(side, index, grain, line[2]-1);
+     int offset = dot3(XYZ0, floor(scale*(O-min)))[0];
+     array<float> D;
+     for(size_t n=0; n<3*3; n++) { // FIXME: assert unrolled
+      v4hi line = *(v4hi*)(offset + grainNeighbours[n]); // Gather
+      for(size_t i: range(3))if(line[i]) { // FIXME: assert unrolled
+       sideGrainForceTime.start();
+       float d = penalty(side, index, grain, line[i]-1);
+       sideGrainForceTime.stop();
+       //if(d > 0) minD = ::min(minD, d);
+       D.insertSorted(d);
       }
      }
+     if(D.size >= 2) assert_(D[1]>0); // Asserts single intersection
+     if(D.size >= 3) minD = ::min(minD, D[2]); // Keeps 2 closest in list, 3rd is cutoff
     }
    }
+   sideGrainTotalTime.stop();
    sideGrainTime.stop();
+   /*if(maxV) {
+    static int sum = 0, N = 0;
+    int skip = minD/(dt*maxV);
+    sum += skip; N++;
+    log(sum/N, skip);
+   }*/
   }//,  threadCount);
 
   /*// Side vertices
@@ -483,7 +499,7 @@ break2_:;
     // Wraps around (+size.x to wrap -1)
     for(size_t b: vertexGrid[y*vertexGrid.size.x+(x+vertexGrid.size.x)%vertexGrid.size.x]) {
      vec4f normalForce;
-     if(penalty(grain, grainIndex, side, b, normalForce)) {
+     if(penalty(grain, grainIndex, side, b, normalForce) < 0) {
       sideContact = true;
       float radialForce = dot2(radialVector, -normalForce)[0];
       assert(radialForce >= -0, radialForce, radialVector, normalForce, length2(radialVector));
@@ -510,16 +526,19 @@ break2_:;
     for(int ax: range(2)) for(int ay: range(2)) for(int az: range(2)) {
      for(int bx: range(2)) for(int by: range(2)) for(int bz: range(2)) {
       vec3 A(ax, ay, az), B(x+bx, y+by, z+bz);
+      assert_(A!=B);
       if(sq(B-A) < 3) {
        //log(i, x, y, z, sq(B-A));
        assert_(i<58);
        di[i++] = z*Y*X + y*X + x;
+       assert_(di[i-1], x, y, z, i, Y, X);
        goto break2;
       }
      }
     }
     break2:;
    }
+   assert_(i==58);
    grainGrainTotalTime.start();
    for(size_t index: range(size)) {
     const uint16* current = chunk + index;
@@ -532,9 +551,10 @@ break2_:;
      if(!B) continue;
      B--;
      grainGrainForceTime.start();
+     assert_(A!=B, A, B, di[n]);
      penalty(grain, A, grain, B);
      grainGrainForceTime.stop();
-     /*if(penalty(grain, A, grain, B)) {
+     /*if(penalty(grain, A, grain, B) < 0) {
       contacts.add(A);
       contacts.add(B);
      }*/
@@ -757,19 +777,24 @@ break2_:;
    min = ::min(min, wire.position[i]);
    max = ::max(max, wire.position[i]);
   }
+  float maxGrainV = 0;
   for(size_t i: range(grain.count)) {
    System::step(grain, i);
    min = ::min(min, grain.position[i]);
    max = ::max(max, grain.position[i]);
+   maxGrainV = ::max(maxGrainV, length(grain.velocity[i]));
   }
   // First and last line are fixed
+  float maxSideV = 0;
   if(processState>=Pack) for(size_t i: range(side.W, side.count-side.W)) {
    System::step(side, i);
    // To avoid bound check
    min = ::min(min, side.Vertex::position[i]);
    max = ::max(max, side.Vertex::position[i]);
    side.Vertex::velocity[i] *= float4(1-10*dt); // Additionnal viscosity
+   maxSideV = ::max(maxSideV, length(side.Vertex::velocity[i]));
   }
+  maxV = maxGrainV + maxSideV;
   integrationTime.stop();
 
   /// All around pressure
