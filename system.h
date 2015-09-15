@@ -352,13 +352,13 @@ struct System {
  size_t staticFrictionCount2 = 0, dynamicFrictionCount2 = 0;
 
  /// Evaluates contact penalty between two objects
- template<Type tA, Type tB> float penalty(const tA& A, size_t a, tB& B, size_t b) {
+ template<Type tA, Type tB> bool penalty(const tA& A, size_t a, tB& B, size_t b) {
      vec4f normalForce;
      return penalty(A, a, B, b, normalForce);
  }
-template<Type tA, Type tB> float penalty(const tA& A, size_t a, tB& B, size_t b, vec4f& normalForce) {
+template<Type tA, Type tB> bool penalty(const tA& A, size_t a, tB& B, size_t b, vec4f& normalForce) {
   Contact c = contact(A, a, B, b);
-  if(c.depth >= 0) return c.depth;
+  if(c.depth >= 0) return false;
   // Stiffness
   const float E = 1/(1/A.elasticModulus+1/B.elasticModulus);
   constexpr float R = 1/(tA::curvature+tB::curvature);
@@ -430,7 +430,7 @@ template<Type tA, Type tB> float penalty(const tA& A, size_t a, tB& B, size_t b,
   /*if(recordContacts) {
    contacts.append(A.base+a, B.base+b, toVec3(c.relativeA), toVec3(c.relativeB), toVec3(force));
   }*/
-  return c.depth;
+  return true;
  }
 };
 
