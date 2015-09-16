@@ -10,14 +10,14 @@ inline float length(vec4f v) { return sqrt(sq3(v))[0]; }
 
 #define sconst static constexpr
 
-struct NoOperation {
-  float operator [](size_t) const { return 0; }
-};
-string str(NoOperation) { return "NoOperation"_; }
-inline void operator +=(NoOperation, vec4f) {}
-inline void operator -=(NoOperation, vec4f) {}
-inline void atomic_add(NoOperation, vec4f) {}
-inline void atomic_sub(NoOperation, vec4f) {}
+struct NoOperation {};
+inline void operator +=(NoOperation, float) {}
+inline void operator -=(NoOperation, float) {}
+
+struct NoOperation4 { float operator [](size_t) const { return 0; } };
+inline void operator +=(NoOperation4, v4sf) {}
+inline void atomic_add(NoOperation4, v4sf) {}
+inline void atomic_sub(NoOperation4, v4sf) {}
 
 struct RadialSum {
  float radialSum;
@@ -40,7 +40,7 @@ struct System {
  sconst float mm = 1e-3*m, g = 1e-3*kg;
  const float gz;
  sconst float densityScale = 5e4; // 5-6
- vec4f G {0, 0, -gz/densityScale, 0}; // Scaled gravity
+ vec3 G {0, 0, -gz/densityScale}; // Scaled gravity
 
  // Penalty model
  sconst float normalDamping = 0.02;
@@ -84,28 +84,56 @@ struct System {
   const size_t base, capacity;
   float mass = 0;
   vec4f _1_mass = float4(0);
-  buffer<vec4f> position { capacity };
-  buffer<vec4f> velocity { capacity };
-  buffer<vec4f> positionDerivatives[3]; // { [0 ... 2] = buffer<vec4f>(capacity) };
-  buffer<vec4f> force { capacity };
+  buffer<float> Px { capacity };
+  buffer<float> Py { capacity };
+  buffer<float> Pz { capacity };
+  buffer<float> Vx { capacity };
+  buffer<float> Vy { capacity };
+  buffer<float> Vz { capacity };
+#define GEAR 0
+#define EULER !GEAR
+#if GEAR
+  buffer<float> PDx[3], PDy[3], PDz[3]; // Position derivatives
+#endif
+  buffer<float> Fx { capacity };
+  buffer<float> Fy { capacity };
+  buffer<float> Fz { capacity };
   buffer<array<Friction>> frictions { capacity };
   size_t count = 0;
+
+  struct {
+   const Vertex& this_;
+   vec3 operator[](size_t i) const { return vec3(this_.Px[i], this_.Py[i], this_.Pz[i]); }
+  } position {*this};
+  struct {
+   const Vertex& this_;
+   vec3 operator[](size_t i) const { return vec3(this_.Vx[i], this_.Vy[i], this_.Vx[i]); }
+  } velocity {*this};
 
   struct { vec4f operator[](size_t) const { return _0001f; }} rotation;
   struct { vec4f operator[](size_t) const { return _0f; }} angularVelocity;
 
   Vertex(size_t base, size_t capacity, float mass) : base(base), capacity(capacity),
     mass(mass), _1_mass(float3(1./mass)) {
-   for(size_t i: range(3)) positionDerivatives[i] = buffer<vec4f>(capacity);
+#if GEAR
+   for(size_t i: range(3)) {
+    PDx[i] = buffer<float>(capacity);
+    PDy[i] = buffer<float>(capacity);
+    PDz[i] = buffer<float>(capacity);
+   }
+#endif
    frictions.clear();
   }
  };
 
- void step(Vertex& p, size_t i) {
-#define EULER 0
+ void step(Vertex& p, size_t i) { // TODO: SIMD
 #if EULER
-  p.velocity[i] += b[0] * p._1_mass * p.force[i]; // b0 = dt
-  p.position[i] += b[0] * p.velocity[i];
+  p.Vx[i] += b[0][0] * p._1_mass[0] * p.Fx[i]; // b0 = dt
+  p.Vy[i] += b[0][0] * p._1_mass[0] * p.Fy[i]; // b0 = dt
+  p.Vz[i] += b[0][0] * p._1_mass[0] * p.Fz[i]; // b0 = dt
+  p.Px[i] += b[0][0] * p.Vx[i];
+  p.Py[i] += b[0][0] * p.Vy[i];
+  p.Pz[i] += b[0][0] * p.Vz[i];
 #else
   // Correction
   vec4f r = b[1] * (p.force[i] * p._1_mass - p.positionDerivatives[0][i]);
@@ -131,7 +159,7 @@ struct System {
  }
 
  struct Plate : Vertex {
-  struct { NoOperation operator[](size_t) const { return {}; }} torque;
+  struct { NoOperation4 operator[](size_t) const { return {}; }} torque;
 
   sconst bool friction = false;
   sconst float curvature = 0;
@@ -139,8 +167,10 @@ struct System {
 
   Plate() : Vertex(0, 2, 1e-3 * densityScale) {
    count = 2;
-   position.clear(); velocity.clear(); force.clear();
-   for(size_t i: range(3)) positionDerivatives[i].clear();
+   Px.clear(); Py.clear(); Pz.clear();
+   Vx.clear(); Vy.clear(); Vz.clear();
+   Fx.clear(); Fy.clear(); Fz.clear();
+   //for(size_t i: range(3)) { PDx[i].clear(); PDy[i].clear(); PDz[i].clear(); }
   }
  } plate;
  /// Sphere - Plate
@@ -149,13 +179,13 @@ struct System {
   if(b == 0) { // Bottom
    vec4f normal {0, 0, 1, 0};
    return { float3(tA::radius)*(-normal),
-      vec4f{A.position[a][0], A.position[a][1], B.position[b][2], 0},
-      normal, (A.position[a][2]-tA::radius) - B.position[b][2],0,0 };
+      vec4f{A.Px[a], A.Py[a], B.Pz[b], 0},
+      normal, (A.Pz[a]-tA::radius) - B.Pz[b],0,0 };
   } else { // Top
    vec4f normal {0, 0, -1, 0};
    return { float3(tA::radius)*(-normal),
-      vec4f{A.position[a][0], A.position[a][1], B.position[b][2], 0},
-      normal, B.position[b][2] - (A.position[a][2]+tA::radius),0,0 };
+      vec4f{A.Px[a], A.Py[a], B.Pz[b], 0},
+      normal, B.Pz[b] - (A.Pz[a]+tA::radius),0,0 };
   }
  }
 
@@ -168,24 +198,21 @@ struct System {
   sconst float poissonRatio = 0.28;
   sconst float elasticModulus = 0 ? 2*shearModulus*(1+poissonRatio) : 1e10; // ~2e11
 
-  //sconst float mass = 3*g;
   sconst float density = 7.8e3 * densityScale;
   sconst float mass = density * volume;
   sconst float angularMass = 2./5*mass*sq(radius);
-  /*sconst float angularMass = 2./5*mass*(pow5(radius)-pow5(radius-1e-4))
-                                         / (cb(radius)-cb(radius-1e-4));*/
 
   const vec4f dt_angularMass;
   buffer<vec4f> rotation { capacity };
   buffer<vec4f> angularVelocity { capacity };
-  buffer<vec4f> angularDerivatives[3]; // { [0 ... 2] = buffer<vec4f>(capacity) };
+  //buffer<vec4f> angularDerivatives[3]; // { [0 ... 2] = buffer<vec4f>(capacity) };
 
-  v4sf g;
+  vec3 g;
 
   Grain(const System& system) : Vertex(2, 3852*4/*=15408*/, Grain::mass), // 5 MB
    dt_angularMass(float3(system.dt/angularMass)),
-    g(float4(mass) * system.G) {
-   for(size_t i: range(3)) angularDerivatives[i] = buffer<vec4f>(capacity);
+    g(mass * system.G) {
+   //for(size_t i: range(3)) angularDerivatives[i] = buffer<vec4f>(capacity);
   }
   buffer<vec4f> torque { capacity };
  } grain {*this};
@@ -202,7 +229,7 @@ struct System {
 
  struct Wire : Vertex {
   using Vertex::Vertex;
-  struct { NoOperation operator[](size_t) const { return {}; }} torque;
+  struct { NoOperation4 operator[](size_t) const { return {}; }} torque;
 
   sconst float radius = 0.5 * mm; // 2mm diameter
   sconst float curvature = 1./radius;
@@ -216,7 +243,7 @@ struct System {
   const vec4f tensionStiffness = float3(100*/*FIXME*/ elasticModulus * PI * sq(radius));
   sconst vec4f tensionDamping = _0f; //float3(mass / s);
   sconst float areaMomentOfInertia = PI/4*pow4(radius);
-  const float bendStiffness = 10*/*FIXME*/ elasticModulus * areaMomentOfInertia / internodeLength;
+  const float bendStiffness = 0; //10*/*FIXME*/ elasticModulus * areaMomentOfInertia / internodeLength;
   sconst float mass = Wire::density * Wire::volume;
   sconst float bendDamping = 0; //mass / s;
   //float tensionEnergy=0;
@@ -259,9 +286,8 @@ struct System {
 
   //float tensionEnergy = 0, tensionEnergy2 = 0;
 
-  struct { v4sf operator[](size_t) const { return _0f; } } position;
-
-  struct { NoOperation operator[](size_t) const { return {}; }} torque;
+  //struct { v4sf operator[](size_t) const { return _0f; } } position;
+  struct { NoOperation4 operator[](size_t) const { return {}; }} torque;
 
   Side(float resolution, float initialRadius, float height, size_t base, float thickness, float elasticModulus)
       : Vertex(base, /*W*H*/(int(2*PI*initialRadius/resolution)/8*8+2) * (int(height/resolution*2/sqrt(3.))+1), 0),
@@ -282,22 +308,29 @@ struct System {
         float z = i*height/(H-1);
         float a = 2*PI*(j+(i%2)*1./2)/(W-2);
         float x = initialRadius*cos(a), y = initialRadius*sin(a);
-        Vertex::position[i*W+j] = (v4sf){x,y,z,0};
+        Px[i*W+j] = x;
+        Py[i*W+j] = y;
+        Pz[i*W+j] = z;
        }
        // Copies position back to repeated nodes
-       Vertex::position[i*W+W-2+0] = Vertex::position[i*W+0];
-       Vertex::position[i*W+W-2+1] = Vertex::position[i*W+1];
+       Px[i*W+W-2+0] = Px[i*W+0];
+       Py[i*W+W-2+0] = Py[i*W+0];
+       Pz[i*W+W-2+0] = Pz[i*W+0];
+       Px[i*W+W-2+1] = Px[i*W+1];
+       Py[i*W+W-2+1] = Py[i*W+1];
+       Pz[i*W+W-2+1] = Pz[i*W+1];
       }
-      Vertex::velocity.clear(_0f);
+      Vx.clear(); Vy.clear(); Vz.clear();
+#if GEAR
       for(size_t i: range(3)) positionDerivatives[i].clear(_0f);
+#endif
   }
  } side;
 
  /// Side - Sphere
  template<Type tB>
  Contact contact(const Side& side, size_t vertexIndex, const tB& B, size_t bIndex) {
-  //if(sq2(B.position[bIndex])[0]/*+Grain::radius*/ < side.minRadiusSq) return {_0f,_0f,_0f,0,0,0}; // Quick cull
-  vec4f a = side.Vertex::position[vertexIndex];
+  vec4f a = {side.Px[vertexIndex], side.Py[vertexIndex], side.Pz[vertexIndex]};
   vec4f relativePosition = a - B.position[bIndex];
   vec4f length = sqrt(sq3(relativePosition));
   vec4f normal = relativePosition/length; // B -> A
@@ -306,7 +339,7 @@ struct System {
  /// Sphere - Side
  template<Type tA>
  Contact contact(const tA& A, size_t aIndex, const Side& side, size_t vertexIndex) {
-  vec4f b = side.Vertex::position[vertexIndex];
+  vec4f b = {side.Px[vertexIndex], side.Py[vertexIndex], side.Pz[vertexIndex]};
   vec4f relativePosition = A.position[aIndex] - b;
   vec4f length = sqrt(sq3(relativePosition));
   vec4f normal = relativePosition/length; // B -> A
@@ -322,10 +355,10 @@ struct System {
   RigidSide(float radius) : radius(radius) {}
   struct { v4sf operator[](size_t) const { return _0f; } } position;
   struct { v4sf operator[](size_t) const { return _0f; } } velocity;
-  struct { NoOperation operator[](size_t) const { return {}; }} force;
+  struct { NoOperation operator[](size_t) const { return {}; }} Fx, Fy, Fz;
   struct { vec4f operator[](size_t) const { return _0001f; }} rotation;
   struct { v4sf operator[](size_t) const { return _0f; } } angularVelocity;
-  struct { NoOperation operator[](size_t) const { return {}; }} torque;
+  struct { NoOperation4 operator[](size_t) const { return {}; }} torque;
  } rigidSide {side.radius};
 
  /// Sphere - Rigid side
@@ -437,8 +470,13 @@ template<Type tA, Type tB> bool penalty(const tA& A, size_t a, tB& B, size_t b, 
    A.torque[a] += cross(relativeA, fT);
    atomic_sub(B.torque[b], cross(relativeB, fT));
   }
-  A.force[a] += force;
-  atomic_sub(B.force[b], force);
+  A.Fx[a] += force[0];
+  A.Fy[a] += force[1];
+  A.Fz[a] += force[2];
+  //atomic_sub(B.force[b], force);
+  B.Fx[b] -= force[0];
+  B.Fy[b] -= force[1];
+  B.Fz[b] -= force[2];
   return true;
  }
 };

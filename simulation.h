@@ -120,31 +120,37 @@ struct Simulation : System {
    random((uint)parameters.at("Seed").integer()),
    stream(move(stream)), parameters(copy(parameters)) {
   assert_(pattern == None || targetWireDensity > 0, parameters);
-  plate.position[1][2] = targetHeight+Grain::radius;
+  plate.Pz[1] = targetHeight+Grain::radius;
   if(pattern) { // Initial wire node
    size_t i = wire.count++;
-   wire.position[i] = vec3(winchRadius,0,currentPourHeight);
-   wire.velocity[i] = _0f;
+   wire.Px[i] = winchRadius;
+   wire.Py[i] = 0;
+   wire.Pz[i] = currentPourHeight;
+   wire.Vx[i] = 0;
+   wire.Vy[i] = 0;
+   wire.Vz[i] = 0;
+#if GEAR
    for(size_t n: range(3)) wire.positionDerivatives[n][i] = _0f;
+#endif
    wire.frictions.set(i);
    // To avoid bound check
-   min = ::min(min, wire.position[i]);
-   max = ::max(max, wire.position[i]);
+   min = ::min(min, vec3(wire.Px[i], wire.Py[i], wire.Pz[i]));
+   max = ::max(max, vec3(wire.Px[i], wire.Py[i], wire.Pz[i]));
   }
   /*for(size_t i : range(side.count)) { // Only needed once membrane is soft
-   min = ::min(min, side.Vertex::position[i]);
-   max = ::max(max, side.Vertex::position[i]);
+   min = ::min(min, side.position[i]);
+   max = ::max(max, side.position[i]);
   }*/
  }
 
  generic vec4f tension(T& A, size_t a, size_t b) {
-  vec4f relativePosition = A.Vertex::position[a] - A.Vertex::position[b];
+  vec4f relativePosition = A.position[a] - A.position[b];
   vec4f length = sqrt(sq3(relativePosition));
   vec4f x = length - A.internodeLength4;
   vec4f fS = - A.tensionStiffness * x;
   assert(length[0], a, b);
   vec4f direction = relativePosition/length;
-  vec4f relativeVelocity = A.Vertex::velocity[a] - A.Vertex::velocity[b];
+  vec4f relativeVelocity = A.velocity[a] - A.velocity[b];
   vec4f fB = - A.tensionDamping * dot3(direction, relativeVelocity);
   return (fS + fB) * direction;
  }
@@ -193,7 +199,7 @@ struct Simulation : System {
      }
     }
 #endif
-    s.append(str(flat(grain.position[i]), grainCount, grainEnergy*1e6, wireCount[i], wireEnergy[i]*1e6)+'\n');
+    s.append(str(grain.Px[i], grain.Py[i], grain.Pz[i], grainCount, grainEnergy*1e6, wireCount[i], wireEnergy[i]*1e6)+'\n');
    }
    writeFile(name+".grain.write", s, currentWorkingDirectory(), true);
    rename(name+".grain.write", name+".grain"); // Atomic
@@ -204,10 +210,10 @@ struct Simulation : System {
    s.append(str(wire.radius)+'\n');
    s.append(str("P1, P2, grain contact count, grain contact energy (µJ)")+'\n');
    for(size_t i: range(0, wire.count-1)) {
-    auto a = wire.position[i], b = wire.position[i+1];
     float energy = 0;
     //for(auto& f: wire.frictions[i]) energy += f.energy;
-    s.append(str(flat(a), flat(b), wire.frictions[i].size, energy*1e6)+'\n');
+    s.append(str(wire.Px[i], wire.Py[i], wire.Pz[i], wire.Px[i+1], wire.Py[i+1], wire.Pz[i+1],
+      wire.frictions[i].size, energy*1e6)+'\n');
    }
    writeFile(name+".wire.write", s, currentWorkingDirectory(), true);
    rename(name+".wire.write", name+".wire"); // Atomic
@@ -217,9 +223,9 @@ struct Simulation : System {
    array<char> s;
    size_t W = side.W;
    for(size_t i: range(side.H-1)) for(size_t j: range(W-2)) {
-    vec3 a (toVec3(side.Vertex::position[i*W+j]));
-    vec3 b (toVec3(side.Vertex::position[i*W+(j+1)%W]));
-    vec3 c (toVec3(side.Vertex::position[(i+1)*W+(j+i%2)%W]));
+    vec3 a (toVec3(side.position[i*W+j]));
+    vec3 b (toVec3(side.position[i*W+(j+1)%W]));
+    vec3 c (toVec3(side.position[(i+1)*W+(j+i%2)%W]));
     s.append(str(flat(a), flat(c))+'\n');
     s.append(str(flat(b), flat(c))+'\n');
     if(i) s.append(str(flat(a), flat(b))+'\n');
@@ -257,8 +263,8 @@ struct Simulation : System {
     for(size_t i: range(1, side.H-1)) {
      for(size_t j: range(0, side.W-2)) {
       size_t index = i*side.W+j;
-      min = ::min(min, side.Vertex::position[index]);
-      max = ::max(max, side.Vertex::position[index]);
+      min = ::min(min, side.position[index]);
+      max = ::max(max, side.position[index]);
      }
     }
    } else {
@@ -269,9 +275,10 @@ struct Simulation : System {
       vec4f p {random()*2-1,random()*2-1, currentPourHeight, 0};
       if(length2(p)>1) continue;
       float r = ::min(pourRadius, /*side.minRadius*/side.radius);
-      vec4f newPosition {r*p[0], r*p[1], p[2], 0}; // Within cylinder
+      vec3 newPosition (r*p[0], r*p[1], p[2]); // Within cylinder
       // Finds lowest Z (reduce fall/impact energy)
-      for(auto p: grain.position.slice(0, grain.count)) {
+      for(size_t index: range(grain.count)) {
+       vec3 p = grain.position[index];
        float x = length(toVec3(p - newPosition).xy());
        if(x < 2*Grain::radius) {
         float dz = sqrt(sq(2*Grain::radius+0x1p-24) - sq(x));
@@ -286,20 +293,26 @@ struct Simulation : System {
           || newPosition[2] > currentPourHeight+2*Grain::radius
           || newPosition[2] > targetHeight)
          ) break;
-      for(auto p: wire.position.slice(0, wire.count))
+      for(size_t index: range(wire.count)) {
+       vec3 p = wire.position[index];
        if(length(p - newPosition) < Grain::radius+Wire::radius)
         goto break2_;
+      }
       maxSpawnHeight = ::max(maxSpawnHeight, newPosition[2]);
       Locker lock(this->lock);
       assert_(grain.count < grain.capacity);
       size_t i = grain.count++;
-      grain.position[i] = newPosition;
+      grain.Px[i] = newPosition.x;
+      grain.Py[i] = newPosition.y;
+      grain.Pz[i] = newPosition.z;
       min = ::min(min, grain.position[i]);
       max = ::max(max, grain.position[i]);
-      grain.velocity[i] = _0f;
+      grain.Vx[i] = 0; grain.Vy[i] = 0; grain.Vz[i] = 0;
+#if GEAR
       for(size_t n: range(3)) grain.positionDerivatives[n][i] = _0f;
+#endif
       grain.angularVelocity[i] = _0f;
-      for(size_t n: range(3)) grain.angularDerivatives[n][i] = _0f;
+      //for(size_t n: range(3)) grain.angularDerivatives[n][i] = _0f;
       grain.frictions.set(i);
       float t0 = 2*PI*random();
       float t1 = acos(1-2*random());
@@ -309,7 +322,7 @@ struct Simulation : System {
         cos(t1)*sin(t2),
         cos(t2)};
       // Speeds up pouring
-      grain.velocity[i][2] = - ::min(grain.position[i][2],  0.01f);
+      grain.Vz[i] = - ::min(grain.Pz[i],  0.01f);
       break;
      }
     }
@@ -333,8 +346,8 @@ break2_:;
   }
 
   float topZ = 0;
-  for(auto p: grain.position.slice(0, grain.count))
-   topZ = ::max(topZ, p[2]+Grain::radius);
+  for(float z: grain.Pz.slice(0, grain.count))
+   topZ = ::max(topZ, z+Grain::radius);
   float alpha = processState < Pack ? 0 :
                                       (processState == Pack ? ::min(1.f, (timeStep-packStart)*dt / transitionTime) : 1);
   if(processState == Pack) {
@@ -345,7 +358,7 @@ break2_:;
 
    plate.position[1][2] = ::min(plate.position[1][2], topZ); // Fits plate (Prevents initial decompression)
    G[2] = (1-alpha)* -gz/densityScale;
-   grain.g = float4(grain.mass) * G;
+   grain.g = grain.mass * G;
    side.thickness = (1-alpha) * side.pourThickness + alpha*side.loadThickness;
    side.mass = side.massCoefficient * side.thickness;
    side._1_mass = float3(1./side.mass);
@@ -429,8 +442,8 @@ break2_:;
   normalEnergy=0, staticEnergy=0;
 
   // Plate
-  plate.force[0] = _0f;
-  plate.force[1] = float4(plate.mass) * G;
+  plate.Fx[0] = 0; plate.Fy[0] = 0; plate.Fz[0] = 0;
+  plate.Fx[1] = 0; plate.Fy[1] = 0; plate.Fz[1] = plate.mass * G.z;
 
   // Grain lattice
   grainTime.start();
@@ -442,7 +455,7 @@ break2_:;
    return fail("Domain", min, max, size);
   }
   for(size_t grainIndex: range(grain.count)) {
-   grain.force[grainIndex] = grain.g;
+   grain.Fz[grainIndex] = grain.g.z;
    grain.torque[grainIndex] = _0f;
    penalty(grain, grainIndex, plate, 0);
    penalty(grain, grainIndex, plate, 1);
@@ -458,8 +471,8 @@ break2_:;
   if(processState > ProcessState::Pour) {
    sideForceTime.start();
    // FIXME: single pass
-   side.Vertex::force.clear();
-   ::side(side.W, side.Vertex::position.data, side.Vertex::force.begin(),
+   side.Fx.clear(); side.Fy.clear(); side.Fz.clear();
+   ::side(side.W, side.Px.data, side.Py.data, side.Pz.data, side.Fx.begin(), side.Fy.begin(), side.Fz.begin(),
           pressure, side.internodeLength, side.tensionStiffness, //side.radius - alpha*Grain::radius,
           0, side.H-1);
    sideForceTime.stop();
@@ -485,7 +498,7 @@ break2_:;
     for(size_t i: range(1, side.H-1)) {
      for(size_t j: range(0, side.W-2)) {
       size_t index = i*side.W+j;
-      v4sf O = side.Vertex::position[index];
+      v4sf O = side.position[index];
       int offset = dot3(XYZ0, floor(scale*(O-min)))[0];
       list<2> D;
       for(size_t n=0; n<3*3; n++) { // FIXME: assert unrolled
@@ -600,16 +613,12 @@ break2_:;
   }
   grainGrainTime.stop();
 
-  // Wire
-  if(!grainLattice) { // FIXME: use verlet lists for wire-grain
-   grainLattice = unique<Lattice<uint16>>(sqrt(3.)/(2*Grain::radius), min, max);
-   for(size_t grainIndex: range(grain.count))
-    grainLattice->cell(grain.position[grainIndex]) = 1+grainIndex; // for grain-grain, and grain-side
-  }
-  if(wire.count>1) /*parallel_chunk(wire.count,
-                                [this,&grainLattice](uint, size_t start, size_t size)*/ {
-    size_t start = 0, size = wire.count;
-   //assert(size>1);
+  {
+   if(!grainLattice) { // FIXME: use verlet lists for wire-grain
+    grainLattice = unique<Lattice<uint16>>(sqrt(3.)/(2*Grain::radius), min, max);
+    for(size_t grainIndex: range(grain.count))
+     grainLattice->cell(grain.position[grainIndex]) = 1+grainIndex; // for grain-grain, and grain-side
+   }
    uint16* grainBase = grainLattice->base;
    const int gX = grainLattice->size.x, gY = grainLattice->size.y;
    const uint16* grainNeighbours[3*3] = {
@@ -618,55 +627,13 @@ break2_:;
     grainBase+gX*gY-gX-1, grainBase+gX*gY-1, grainBase+gX*gY+gX-1
    };
 
-   wire.force[start] = float4(wire.mass) * G;
-   { // First iteration
-    size_t i = start;
-    wire.force[i+1] = float4(wire.mass) * G;
-    if(i > 0) {
-     if(start > 1 && wire.bendStiffness) { // Previous bending spring on first
-      size_t i = start-1;
-      vec4f A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
-      vec4f a = C-B, b = B-A;
-      vec4f c = cross(a, b);
-      vec4f length4 = sqrt(sq3(c));
-      if(length4[0]) {
-       float p = wire.bendStiffness * atan(length4[0], dot3(a, b)[0]);
-       vec4f dap = cross(a, c) / (sqrt(sq3(a)) * length4);
-       wire.force[i+1] += float3(p) * (-dap);
-      }
-     }
-     // First tension
-     vec4f fT = tension(wire, i-1, i);
-     wire.force[i] -= fT;
-     if(wire.bendStiffness) { // First bending
-      vec4f A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
-      vec4f a = C-B, b = B-A;
-      vec4f c = cross(a, b);
-      vec4f length4 = sqrt(sq3(c));
-      if(length4[0]) {
-       float p = wire.bendStiffness * atan(length4[0], dot3(a, b)[0]);
-       vec4f dap = cross(a, c) / (sqrt(sq3(a)) * length4);
-       vec4f dbp = cross(b, c) / (sqrt(sq3(b)) * length4);
-       wire.force[i+1] += float3(p) * (-dap);
-       wire.force[i] += float3(p) * (dap + dbp);
-       //wire.force[i-1] += float3(p) * (-dbp); //-> "Tension to first node of next chunk"
-       { // Damping
-        vec4f A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
-        vec4f axis = cross(C-B, B-A);
-        vec4f l = sqrt(sq3(axis));
-        if(l[0]) {
-         float angularVelocity = atan(l[0], dot3(C-B, B-A)[0]);
-         wire.force[i] += float3(Wire::bendDamping * angularVelocity / 2)
-           * cross(axis/l, C-A);
-        }
-       }
-      }
-     }
-    }
-    // Bounds
+   for(size_t i: range(wire.count)) { // TODO: SIMD
+    // Gravity
+    wire.Fx[i] = 0; wire.Fy[i] = 0; wire.Fz[i] = wire.mass * G.z;
+    // Wire - Plate
     penalty(wire, i, plate, 0);
     penalty(wire, i, plate, 1);
-    // Wire - Grain
+    // Wire - Grain (FIXME: Verlet list)
     {size_t offset = grainLattice->index(wire.position[i]);
      for(size_t n: range(3*3)) {
       v4hi line = loada(grainNeighbours[n] + offset);
@@ -675,14 +642,17 @@ break2_:;
       if(line[2]) penalty(wire, i, grain, line[2]-1);
      }}
    }
-   for(size_t i: range(start+1, start+size-1)) {
-    // Gravity
-    wire.force[i+1] = float4(wire.mass) * G;
-    // Tension
+
+   // Tension
+   for(size_t i: range(1, wire.count)) { // TODO: SIMD
     vec4f fT = tension(wire, i-1, i);
-    wire.force[i-1] += fT;
-    wire.force[i] -= fT;
-    if(wire.bendStiffness) { // Bending resistance springs
+    wire.Fx[i-1] += fT[0];
+    wire.Fy[i-1] += fT[1];
+    wire.Fz[i-1] += fT[2];
+    wire.Fx[i] -= fT[0];
+    wire.Fy[i] -= fT[1];
+    wire.Fz[i] -= fT[2];
+    /*if(wire.bendStiffness) { // Bending resistance springs
      vec4f A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
      vec4f a = C-B, b = B-A;
      vec4f c = cross(a, b);
@@ -708,93 +678,9 @@ break2_:;
           * cross(axis/length4, C-A);
        }
       }
-     }
+     }*/
     }
-    // Bounds
-    penalty(wire, i, plate, 0);
-    penalty(wire, i, plate, 1);
-    // Wire - Grain
-    {size_t offset = grainLattice->index(wire.position[i]);
-     for(size_t n: range(3*3)) {
-      v4hi line = loada(grainNeighbours[n] + offset);
-      if(line[0]) penalty(wire, i, grain, line[0]-1);
-      if(line[1]) penalty(wire, i, grain, line[1]-1);
-      if(line[2]) penalty(wire, i, grain, line[2]-1);
-     }}
-   }
-
-   // Last iteration
-   if(size>1) {
-    size_t i = start+size-1;
-    // Gravity
-    wire.force[i] = float4(wire.mass) * G;
-    // Tension
-    vec4f fT = tension(wire, i-1, i);
-    wire.force[i-1] += fT;
-    wire.force[i] -= fT;
-    // Bending with next chunk
-    if(i+1 < wire.count) {
-     vec4f A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
-     vec4f a = C-B, b = B-A;
-     vec4f c = cross(a, b);
-     vec4f length4 = sqrt(sq3(c));
-     float length = length4[0];
-     if(length) {
-      float angle = atan(length, dot3(a, b)[0]);
-      //bendEnergy += 1./2 * wire.bendStiffness * sq(angle);
-      vec4f p = float3(wire.bendStiffness * angle);
-      vec4f dap = cross(a, c) / (sqrt(sq3(a)) * length4);
-      vec4f dbp = cross(b, c) / (sqrt(sq3(b)) * length4);
-      //wire.force[i+1] += p * (-dap); //-> "Previous bending spring on first"
-      wire.force[i] += p * (dap + dbp);
-      wire.force[i-1] += p * (-dbp);
-      if(1) {
-       vec4f A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
-       vec4f axis = cross(C-B, B-A);
-       vec4f l = sqrt(sq3(axis));
-       if(l[0]) {
-        float angularVelocity = atan(l[0], dot3(C-B, B-A)[0]);
-        wire.force[i] += float3(Wire::bendDamping * angularVelocity / 2)
-          * cross(axis/l, C-A);
-       }
-      }
-     }
-    }
-    // Bounds
-    penalty(wire, i, plate, 0);
-    penalty(wire, i, plate, 1);
-    // Wire - Grain
-    {size_t offset = grainLattice->index(wire.position[i]);
-     for(size_t n: range(3*3)) {
-      v4hi line = loada(grainNeighbours[n] + offset);
-      if(line[0]) penalty(wire, i, grain, line[0]-1);
-      if(line[1]) penalty(wire, i, grain, line[1]-1);
-      if(line[2]) penalty(wire, i, grain, line[2]-1);
-     }}
-   }
-
-   { // Tension to first node of next chunk
-    size_t i = start+size;
-    if(i < wire.count) {
-     wire.force[i-1] += tension(wire, i-1, i);
-     // Bending with first node of next chunk
-     if(i+1<wire.count && wire.bendStiffness) {
-      vec4f A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
-      vec4f a = C-B, b = B-A;
-      vec4f c = cross(a, b);
-      vec4f length4 = sqrt(sq3(c));
-      float length = length4[0];
-      if(length) {
-       float angle = atan(length, dot3(a, b)[0]);
-       //bendEnergy += 1./2 * wire.bendStiffness * sq(angle);
-       vec4f p = float3(wire.bendStiffness * angle);
-       vec4f dbp = cross(b, c) / (sqrt(sq3(b)) * length4);
-       wire.force[i-1] += p * (-dbp);
-      }
-     }
-    }
-   }
-  }//);
+  }
 
   // Integration
   min = _0f; max = _0f;
@@ -821,25 +707,30 @@ break2_:;
    float maxRadius = 0;
    for(size_t i: range(1, side.H-1)) {
     // Adds force from repeated nodes
-    side.Vertex::force[i*side.W+0] += side.Vertex::force[i*side.W+side.W-2+0];
-    side.Vertex::force[i*side.W+1] += side.Vertex::force[i*side.W+side.W-2+1];
+    side.Fx[i*side.W+0] += side.Fx[i*side.W+side.W-2+0];
+    side.Fy[i*side.W+0] += side.Fy[i*side.W+side.W-2+0];
+    side.Fz[i*side.W+0] += side.Fz[i*side.W+side.W-2+0];
+    side.Fx[i*side.W+1] += side.Fx[i*side.W+side.W-2+1];
+    side.Fy[i*side.W+1] += side.Fy[i*side.W+side.W-2+1];
+    side.Fz[i*side.W+1] += side.Fz[i*side.W+side.W-2+1];
     for(size_t j: range(0, side.W-2)) {
      size_t index = i*side.W+j;
      System::step(side, index);
      // To avoid bound check
-     min = ::min(min, side.Vertex::position[index]);
-     max = ::max(max, side.Vertex::position[index]);
-     side.Vertex::velocity[index] *= float4(1-10*dt); // Additionnal viscosity
-     maxSideV = ::max(maxSideV, length(side.Vertex::velocity[index]));
-     maxRadius = ::max(maxRadius, length2(side.Vertex::position[index]));
+     min = ::min(min, side.position[index]);
+     max = ::max(max, side.position[index]);
+     //side.velocity[index] *= float4(1-10*dt); // Additionnal viscosity
+     maxSideV = ::max(maxSideV, length(side.velocity[index]));
+     maxRadius = ::max(maxRadius, length2(side.position[index]));
     }
     // Copies position back to repeated nodes
-    side.Vertex::position[i*side.W+side.W-2+0] = side.Vertex::position[i*side.W+0];
-    side.Vertex::position[i*side.W+side.W-2+1] = side.Vertex::position[i*side.W+1];
+    side.position[i*side.W+side.W-2+0] = side.position[i*side.W+0];
+    side.position[i*side.W+side.W-2+1] = side.position[i*side.W+1];
    }
 
    // Checks whether grains are all within the membrane
-   for(vec4f p: grain.position.slice(0, grain.count)) {
+   for(size_t index: range(grain.count)) {
+    vec3 p (grain.Px[index], grain.Py[index], grain.Pz[index]);
     if(length2(p) > maxRadius) {
      log("Grain slipped through membrane", 4*side.initialRadius, length2(p));
      snapshot("slip");
@@ -854,26 +745,34 @@ break2_:;
 
   /// All around pressure
   if(processState == ProcessState::Pack) {
-   plate.force[0][2] += pressure * PI * sq(side.radius);
-   bottomForce = plate.force[0][2];
+   plate.Fz[0] += pressure * PI * sq(side.radius);
+   bottomForce = plate.Fz[0];
    System::step(plate, 0);
-   plate.velocity[0][2] = ::max(0.f, plate.velocity[0][2]); // Only compression
+   plate.Vz[0] = ::max(0.f, plate.Vz[0]); // Only compression
 
-   plate.force[1][2] -= pressure * PI * sq(side.radius);
-   topForce = plate.force[1][2];
+   plate.Fz[1] -= pressure * PI * sq(side.radius);
+   topForce = plate.Fz[1];
    System::step(plate, 1);
-   plate.velocity[1][2] = ::min(plate.velocity[1][2], 0.f); // Only compression
+   plate.Vz[1] = ::min(plate.Vz[1], 0.f); // Only compression
   } else {
-   bottomForce = plate.force[0][2];
-   topForce = plate.force[1][2];
+   bottomForce = plate.Fz[0];
+   topForce = plate.Fz[1];
   }
 
-  {vec4f ssqV = _0f;
-   for(vec4f v: grain.velocity.slice(0, grain.count)) ssqV += sq3(v);
-   grainKineticEnergy = 1./2*grain.mass*ssqV[0];}
-  {vec4f ssqV = _0f;
-   for(vec4f v: wire.velocity.slice(0, wire.count)) ssqV += sq3(v);
-   wireKineticEnergy = 1./2*wire.mass*ssqV[0];}
+  {
+   v8sf ssqV8 = _0f8;
+   for(v8sf v: cast<v8sf>(grain.Vx.slice(0, grain.count/8*8))) ssqV8 += v*v;
+   for(v8sf v: cast<v8sf>(grain.Vy.slice(0, grain.count/8*8))) ssqV8 += v*v;
+   for(v8sf v: cast<v8sf>(grain.Vz.slice(0, grain.count/8*8))) ssqV8 += v*v;
+   grainKineticEnergy = 1./2*grain.mass*reduce8(ssqV8);
+  }
+  {
+   v8sf ssqV8 = _0f8;
+   for(v8sf v: cast<v8sf>(wire.Vx.slice(0, wire.count/8*8))) ssqV8 += v*v;
+   for(v8sf v: cast<v8sf>(grain.Vy.slice(0, wire.count/8*8))) ssqV8 += v*v;
+   for(v8sf v: cast<v8sf>(grain.Vz.slice(0, wire.count/8*8))) ssqV8 += v*v;
+   wireKineticEnergy = 1./2*wire.mass*reduce8(ssqV8);
+  }
 
   if(size_t((1./60)/dt)==0 || timeStep%size_t((1./60)/dt) == 0) {
    if(processState==ProcessState::Load) { // Records results
@@ -882,7 +781,7 @@ break2_:;
     assert_(isNumber(radius));*/
     float radius = side.radius;
     float radialForceSum = pressure * 2 * PI * radius * height;
-    float plateForce = plate.force[1][2] - plate.force[0][2];
+    float plateForce = plate.Fz[1] - plate.Fz[0];
     stream.write(str(radius, height, plateForce, radialForceSum/*, grainKineticEnergy, sideGrainCount*/)+'\n');
 
     // Snapshots every 1% strain
@@ -935,12 +834,19 @@ break2_:;
    size_t i = wire.count++;
    v4sf p = wire.position[wire.count-2]
      + float3(Wire::internodeLength) * relativePosition/length;
-   wire.position[i] = p;
-   min = ::min(min, wire.position[i]);
-   max = ::max(max, wire.position[i]);
-   wire.velocity[i] = _0f;
-   //wire.velocity[i][2] = - ::min(wire.position[i][2],  0.01f);
+   wire.Px[i] = p[0];
+   wire.Py[i] = p[1];
+   wire.Pz[i] = p[2];
+   min[0] = ::min(min[0], wire.Px[i]);
+   min[1] = ::min(min[1], wire.Py[i]);
+   min[2] = ::min(min[2], wire.Pz[i]);
+   max[0] = ::max(max[0], wire.Px[i]);
+   max[1] = ::max(max[1], wire.Py[i]);
+   max[2] = ::max(max[2], wire.Pz[i]);
+   wire.Vx[i] = 0; wire.Vy[i] = 0; wire.Vz[i] = 0;
+#if GEAR
    for(size_t n: range(3)) wire.positionDerivatives[n][i] = _0f;
+#endif
    wire.frictions.set(i);
   }
  }

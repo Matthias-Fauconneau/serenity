@@ -174,9 +174,8 @@ struct SimulationView : SimulationRun, Widget, Poll {
 
   vec3 min = -1./32, max = 1./32;
   {
-   for(vec4f p: grain.position.slice(0, grainCount)) {
-    p[3] = 0; // FIXME
-    assert(p[3] == 0, p);
+   for(size_t index: range(grainCount)) {
+    vec3 p = grain.position[index];
     vec3 O = toVec3(qapply(viewRotation, p) - rotationCenter);
     min = ::min(min, O - vec3(vec2(Grain::radius), 0)); // Parallel
     max = ::max(max, O + vec3(vec2(Grain::radius), 0)); // Parallel
