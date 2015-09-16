@@ -33,7 +33,7 @@ struct tsc {
 inline String strD(const uint64 num, const uint64 div) {
  return div ? str(int(round(100*double(num)/double(div))))+'%' : ""__;
 }
-inline String str(const tsc& num, const tsc& div) { return strD(num, div)+'%'; }
+inline String str(const tsc& num, const tsc& div) { return strD(num, div); }
 
 struct Time {
     uint64 startTime=realTime(), stopTime=0;
@@ -45,6 +45,7 @@ struct Time {
     double toReal() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
     operator float() const { return toReal(); }
     operator double() const { return toReal(); }
+    explicit operator bool() const { return startTime != stopTime; }
 };
 inline String str(const Time& t) { return str(t.toReal(), 1u)+'s'; }
 inline bool operator<(float a, const Time& b) { return a < b.toReal(); }

@@ -50,36 +50,15 @@ struct SimulationRun : Simulation {
  }
 
  void report() {
-  //int64 elapsed = realTime() - lastReport;
-  //log(timeStep*dt, totalTime, (timeStep-lastReportStep) / (elapsed*1e-9), grain.count, side.count, wire.count);
-  /*log("grain",str(grainTime, stepTime),
-      "grainInit",str(grainInitializationTime, stepTime),
-      "grainGrain",str(grainGrainTime, stepTime),
-      "grainGrid",str(grainGridTime, stepTime),
-      "grainIntegration",str(grainIntegrationTime, stepTime));
-  if(wire.count) log("wire",str(wireTime, stepTime),
-                     "wireLatticeTime",str(wireLatticeTime, stepTime),
-                     "wireContact",str(wireContactTime, stepTime),
-                     "wireIntegration",str(wireIntegrationTime, stepTime));
-  log("side", str(sideTime, stepTime),
-      "sideGrid",str(sideGridTime, stepTime),
-      "sideForce",str(sideForceTime, stepTime),
-      "sideIntegration",str(sideIntegrationTime, stepTime));*/
-  log("grain", str(grainTime, stepTime));
-  log("side-grain", str(sideGrainTime, stepTime));
-  log("side-grain check", strD(
-       (uint64)sideGrainTime*((uint64)sideGrainTotalTime-(uint64)sideGrainForceTime),
-                                (uint64)stepTime*sideGrainTotalTime));
-  log("side-grain force", strD((uint64)sideGrainTime*sideGrainForceTime,
-                                (uint64)stepTime*sideGrainTotalTime));
-  log("side force", str(sideForceTime, stepTime));
-  log("grain-grain check", strD(
-       (uint64)grainGrainTime*((uint64)grainGrainTotalTime-(uint64)grainGrainForceTime),
-                                (uint64)stepTime*grainGrainTotalTime));
-  log("grain-grain force", strD((uint64)grainGrainTime*grainGrainForceTime,
-                                (uint64)stepTime*grainGrainTotalTime));
-  log("integration", str(integrationTime, stepTime));
-  log("process", str(processTime, stepTime));
+  log(timeStep*dt);
+  if(sideGrainTime) log("side-grain check", strD(sideGrainTime-sideGrainForceTime, stepTime));
+  if(sideGrainForceTime) log("side-grain force", strD(sideGrainForceTime, stepTime));
+  if(sideForceTime) log("side force", str(sideForceTime, stepTime));
+  //log("grain-grain check", strD(grainGrainTime-grainGrainForceTime, stepTime));
+  //log("grain-grain force", strD(grainGrainForceTime, stepTime));
+  log("grain-grain", strD(grainGrainTime, stepTime));
+  log("integration", strD(integrationTime, stepTime));
+  //log("process", str(processTime, stepTime));
   lastReport = realTime();
   lastReportStep = timeStep;
  }
@@ -153,7 +132,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
 #endif
   if(window) window->render();
   int64 elapsed = realTime() - lastReport;
-  if(elapsed > 5e9 || timeStep > lastReportStep + 1/this->dt) {
+  if(elapsed > 1e9 || timeStep > lastReportStep + 1/this->dt) {
    report();
 #if PROFILE
    requestTermination();
@@ -302,19 +281,19 @@ struct SimulationView : SimulationRun, Widget, Poll {
   shader["transform"] = mat4(1);*/
 
   // Membrane
-  if(side.faceCount>1) {
+  /*if(side.faceCount>1)*/ {
    //Locker lock(this->lock);
       static GLShader shader {::shader_glsl(), {"color"}};
       shader.bind();
       shader.bindFragments({"color"});
       shader["transform"] = viewProjection;
 
-   size_t W = side.W;
+   size_t W = side.W-2, stride=side.W;
    buffer<vec3> positions {W*(side.H-1)*6-W*2};
    for(size_t i: range(side.H-1)) for(size_t j: range(W)) {
-    vec3 a (toVec3(side.Vertex::position[i*W+j]));
-    vec3 b (toVec3(side.Vertex::position[i*W+(j+1)%W]));
-    vec3 c (toVec3(side.Vertex::position[(i+1)*W+(j+i%2)%W]));
+    vec3 a (toVec3(side.Vertex::position[i*stride+j]));
+    vec3 b (toVec3(side.Vertex::position[i*stride+(j+1)%W]));
+    vec3 c (toVec3(side.Vertex::position[(i+1)*stride+(j+i%2)%W]));
     // FIXME: GPU projection
     vec3 A =  a, B=  b, C =  c;
     size_t n = i ? W*4 + ((i-1)*W+j)*6 : j*4;
