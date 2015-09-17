@@ -464,7 +464,7 @@ break2_:;
 
   // Plate
   plate.Fx[0] = 0; plate.Fy[0] = 0; plate.Fz[0] = 0;
-  plate.Fx[1] = 0; plate.Fy[1] = 0; plate.Fz[1] = plate.mass * G.z;
+  plate.Fx[1] = 0; plate.Fy[1] = 0; plate.Fz[1] = 0; //plate.mass * G.z;
 
   // Grain lattice
   grainTime.start();
@@ -481,29 +481,33 @@ break2_:;
   buffer<int> grainBottom(grainCount8), grainTop(grainCount8), grainSide(grainCount8);
   size_t grainBottomCount = 0, grainTopCount =0, grainSideCount = 0;
   for(size_t a: range(grain.count)) {
+   grain.Fx[a] = 0;
+   grain.Fy[a] = 0;
    grain.Fz[a] = grain.g.z;
    grain.Tx[a] = 0;
    grain.Ty[a] = 0;
    grain.Tz[a] = 0;
-   if((grain.Pz[a]-Grain::radius) - plate.Pz[0] < 0) grainBottom[grainBottomCount++] = a;
-   if(plate.Pz[1] - (grain.Pz[a]+Grain::radius) < 0) grainTop[grainTopCount++] = a;
+   if(plate.Pz[0] > grain.Pz[a]-Grain::radius) grainBottom[grainBottomCount++] = a;
+   if(grain.Pz[a]+Grain::radius > plate.Pz[1]) grainTop[grainTopCount++] = a;
    if(processState <= ProcessState::Pour)
     if(sq(grain.Px[a]) + sq(grain.Py[a]) > sq(side.radius - Grain::radius))
      grainSide[grainSideCount++] = a;
   }
   {// Bottom
-   while(grainBottomCount/8*8 < grainBottomCount) grainBottom[grainBottomCount++] = grain.count;
-   assert(grainBottomCount <= grainCount8, grainBottomCount);
+   size_t gBC = grainBottomCount;
+   while(gBC/8*8 < gBC) grainBottom[gBC++] = grain.count;
+   assert(gBC <= grainCount8, gBC);
    v8sf Bz_R = float8(plate.Pz[0]+Grain::radius);
-   buffer<float> Fx(grainBottomCount), Fy(grainBottomCount), Fz(grainBottomCount);
-   for(size_t i = 0; i < grainBottomCount; i += 8) {
+   buffer<float> Fx(gBC), Fy(gBC), Fz(gBC);
+   for(size_t i = 0; i < gBC; i += 8) {
     v8si A = *(v8si*)&grainBottom[i];
-    v8sf depth = gather(grain.Pz, A) - Bz_R;
+    v8sf depth = Bz_R - gather(grain.Pz, A);
     contact(grain, A, plate, _0i, depth, _0f, _0f, -Grain::radius8, _0f, _0f, _1f,
             *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i]);
    }
    for(size_t i = 0; i < grainBottomCount; i++) { // Scalar scatter add
     size_t a = grainBottom[i];
+    assert_(isNumber(Fx[i]) && isNumber(Fy[i]) && isNumber(Fz[i]));
     grain.Fx[a] += Fx[i];
     grain.Fy[a] += Fy[i];
     grain.Fz[a] += Fz[i];
@@ -513,17 +517,19 @@ break2_:;
    }
   }
   {// Top
-   while(grainTopCount/8*8 < grainTopCount) grainTop[grainTopCount++] = grain.count;
+   size_t gTC = grainTopCount;
+   while(gTC/8*8 < gTC) grainTop[gTC++] = grain.count;
    v8sf Bz_R = float8(plate.Pz[1]-Grain::radius);
-   buffer<float> Fx(grainTopCount), Fy(grainTopCount), Fz(grainTopCount);
-   for(size_t i = 0; i < grainTopCount; i += 8) {
+   buffer<float> Fx(gTC), Fy(gTC), Fz(gTC);
+   for(size_t i = 0; i < gTC; i += 8) {
     v8si A = *(v8si*)&grainTop[i];
-    v8sf depth = Bz_R - gather(grain.Pz, A);
+    v8sf depth = gather(grain.Pz, A) - Bz_R;
     contact(grain, A, plate, _1i, depth, _0f, _0f, Grain::radius8, _0f, _0f, -_1f,
             *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i]);
    }
    for(size_t i = 0; i < grainTopCount; i++) { // Scalar scatter add
     size_t a = grainTop[i];
+    assert_(isNumber(Fx[i]) && isNumber(Fy[i]) && isNumber(Fz[i]));
     grain.Fx[a] += Fx[i];
     grain.Fy[a] += Fy[i];
     grain.Fz[a] += Fz[i];
@@ -533,33 +539,34 @@ break2_:;
    }
   }
   {// Rigid Side
-   while(grainSideCount/8*8 < grainSideCount) grainSide[grainSideCount++] = grain.count;
+   size_t gSC = grainSideCount;
+   while(gSC/8*8 < gSC) grainSide[gSC++] = grain.count;
    v8sf R = float8(side.radius-Grain::radius);
-   buffer<float> Fx(grainSideCount), Fy(grainSideCount), Fz(grainSideCount);
-   for(size_t i = 0; i < grainSideCount; i += 8) {
+   buffer<float> Fx(gSC), Fy(gSC), Fz(gSC);
+   for(size_t i = 0; i < gSC; i += 8) {
     v8si A = *(v8si*)&grainSide[i];
     v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A);
     v8sf length = sqrt(Ax*Ax + Ay*Ay);
     v8sf Nx = -Ax/length, Ny = -Ay/length;
-    v8sf depth = R - length;
+    v8sf depth = length - R;
     contact<Grain, RigidSide>(grain, A, depth, Grain::radius8*(-Nx), Grain::radius8*(-Ny), _0f,
                               Nx, Ny, _0f,
                               *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i]);
    }
    for(size_t i = 0; i < grainSideCount; i++) { // Scalar scatter add
     size_t a = grainSide[i];
+    assert_(isNumber(Fx[i]) && isNumber(Fy[i]) && isNumber(Fz[i]));
     grain.Fx[a] += Fx[i];
     grain.Fy[a] += Fy[i];
     grain.Fz[a] += Fz[i];
    }
   }
   grainTime.stop();
-#if 0
+
   unique<Lattice<uint16>> grainLattice = nullptr;
 
   // Soft membrane side
-  //parallel_chunk(1, side.H-1, [this, alpha, &grainLattice](uint, size_t start, size_t size) {
-  //assert_((side.W-2)%8 == 0);
+#if 0
   if(processState > ProcessState::Pour) {
    sideForceTime.start();
    // FIXME: single pass
@@ -746,13 +753,15 @@ break2_:;
    }
    grainSideTime.stop();
   }
+#endif
 
   if(grainGrainGlobalMinD6 <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
    buffer<int2> grainGrainIndices {grainCount8 * 6};
    grainGrainIndices.clear();
    // Index to packed frictions
    for(size_t index: range(grainGrainCount)) {
-    size_t base = grainGrainA[index]*6;
+    size_t a = grainGrainA[index];
+    size_t base = a*6;
     size_t i = 0;
     while(grainGrainIndices[base+i]) i++;
     assert_(i<6, grainGrainIndices.slice(base, 6));
@@ -804,11 +813,11 @@ break2_:;
       grainGrainB[index] = B;
       log(latticeIndex, index, a, B);
       for(size_t i: range(6)) {
-       size_t b = grainGrainIndices[index*6+i][0];
+       size_t b = grainGrainIndices[a*6+i][0];
        if(!b) break;
        b--;
        if(b == B) { // Repack existing friction
-        size_t j = grainGrainIndices[index*6+i][1];
+        size_t j = grainGrainIndices[a*6+i][1];
         grainGrainLocalAx[index] = this->grainGrainLocalAx[j];
         grainGrainLocalAy[index] = this->grainGrainLocalAy[j];
         grainGrainLocalAz[index] = this->grainGrainLocalAz[j];
@@ -863,37 +872,41 @@ break2_:;
 
   // Evaluates (packed) intersections from (packed) verlet lists
   size_t grainGrainContactCount = 0;
-  uint grainGrainContact[grainCount8*6];
+  buffer<uint> grainGrainContact(grainCount8*6);
   for(size_t index = 0; index < grainGrainCount; index += 8) {
    v8si A = *(v8si*)(grainGrainA.data+index), B = *(v8si*)(grainGrainB.data+index);
    v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
    v8sf Bx = gather(grain.Px, B), By = gather(grain.Py, B), Bz = gather(grain.Pz, B);
    v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
    v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
-   v8sf depth = length - (Grain::radius8+Grain::radius8);
-   for(size_t subIndex: range(8)) {
-    if(depth[subIndex] < 0) {
-     grainGrainContact[grainGrainContactCount] = index+subIndex; // Indirect instead of pack for friction
+   v8sf depth = (Grain::radius8+Grain::radius8) - length;
+   for(size_t k: range(8)) {
+    if(depth[k] > 0) {
+      // Indirect instead of pack to write back friction points
+     grainGrainContact[grainGrainContactCount] = index+k;
      grainGrainContactCount++;
     }
    }
   }
 
   // Aligns with invalid contacts
-  while(grainGrainContactCount/8*8 < grainGrainContactCount)
-   grainGrainContact[grainGrainContactCount++] = grainGrainCount-1;
+  size_t gGCC = grainGrainContactCount;
+  while(gGCC/8*8 < gGCC) grainGrainContact[gGCC++] = grainGrainCount /*invalid*/;
 
   // Evaluates forces from (packed) intersections
-  float FTT[grainGrainContactCount*9]; // Force, Torque A, Torque B
-  for(size_t index = 0; index < grainGrainContactCount; index += 8) {
-   v8si contacts = *(v8si*)(grainGrainContact+index);
+  buffer<float> Fx(gGCC), Fy(gGCC), Fz(gGCC);
+  buffer<float> TAx(gGCC), TAy(gGCC), TAz(gGCC);
+  buffer<float> TBx(gGCC), TBy(gGCC), TBz(gGCC);
+  for(size_t i = 0; i < gGCC; i += 8) {
+   v8si contacts = *(v8si*)&grainGrainContact[i];
    v8si A = gather(grainGrainA, contacts), B = gather(grainGrainB, contacts);
    // FIXME: Recomputing from intersection (more efficient than storing?)
    v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
    v8sf Bx = gather(grain.Px, B), By = gather(grain.Py, B), Bz = gather(grain.Pz, B);
    v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
    v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
-   v8sf depth = length - (Grain::radius8+Grain::radius8);
+   v8sf depth = (Grain::radius8+Grain::radius8) - length;
+   for(size_t k: range(8)) assert_(depth[k] >= 0, depth[k], A[k], B[k], i+k, grainGrainContact[i+k], grainGrainContactCount, gGCC);
    //log(grain.count, grainGrainCount, contacts, A, B, length);
    v8sf Nx = Rx/length, Ny = Ry/length, Nz = Rz/length;
    v8sf RBx = Grain::radius8 * Nx, RBy = Grain::radius8 * Ny, RBz = Grain::radius8 * Nz;
@@ -916,43 +929,41 @@ break2_:;
     assert_(isNumber(grain.Fx[B[k]]) && isNumber(grain.Fy[B[k]]) && isNumber(grain.Fz[B[k]]),
       B[k], grain.Fx[B[k]], grain.Fy[B[k]], grain.Fz[B[k]], A[k]);
    }*/
-   contact((v8sf*)(FTT+index*9), grain, A, grain, B, depth, RAx, RAy, RAz, RBx, RBy, RBz, Nx, Ny, Nz,
+   contact(grain, A, grain, B, depth, RAx, RAy, RAz, RBx, RBy, RBz, Nx, Ny, Nz,
            localAx, localAy, localAz, localBx, localBy, localBz,
            Ax, Ay, Az, Bx, By, Bz,
-           grainGrainLocalAx, contacts);
-   /*for(size_t k: range(8)) if(A[k] < (int)grain.count) {
+           grainGrainLocalAx, contacts,
+           *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i],
+           *(v8sf*)&TAx[i], *(v8sf*)&TAy[i], *(v8sf*)&TAz[i],
+           *(v8sf*)&TBx[i], *(v8sf*)&TBy[i], *(v8sf*)&TBz[i]
+           );
+   for(size_t k: range(8)) if(A[k] < (int)grain.count) {
     assert_(B[k] < (int)grain.count, B[k]);
     assert_(A[k]!=B[k], A[k], B[k], grain.count);
-    assert_(isNumber(grain.Fx[A[k]]) && isNumber(grain.Fy[A[k]]) && isNumber(grain.Fz[A[k]]),
-      A[k], grain.Fx[A[k]], grain.Fy[A[k]], grain.Fz[A[k]], B[k],
-      Ax[k], Ay[k], Az[k],
-      Bx[k], By[k], Bz[k]
-      );
-    assert_(isNumber(grain.Fx[B[k]]) && isNumber(grain.Fy[B[k]]) && isNumber(grain.Fz[B[k]]),
-      B[k], grain.Fx[B[k]], grain.Fy[B[k]], grain.Fz[B[k]], A[k]);
-   }*/
+    assert_(isNumber(Fx[i+k]) && isNumber(Fy[i+k]) && isNumber(Fz[i+k]),
+      i+k, grain.count, A[k], B[k], Fx[i+k], Fy[i+k], Fz[i+k], Rx[k], Ry[k], Rz[k], depth[k]);
+   }
   }
-  for(size_t index = 0; index < grainGrainContactCount; index++) { // Scalar scatter add
-   size_t i = grainGrainContact[index];
-   size_t a = grainGrainA[i];
-   size_t b = grainGrainB[i];
-   size_t I = i/8*9+i%8;
-   grain.Fx[a] += FTT[I+0*8];
-   grain.Fx[b] -= FTT[I+1*8];
-   grain.Fy[a] += FTT[I+2*8];
-   grain.Fy[b] -= FTT[I+0*8];
-   grain.Fz[a] += FTT[I+1*8];
-   grain.Fz[b] -= FTT[I+2*8];
+  for(size_t i = 0; i < grainGrainContactCount; i++) { // Scalar scatter add
+   size_t index = grainGrainContact[i];
+   size_t a = grainGrainA[index];
+   size_t b = grainGrainB[index];
+   grain.Fx[a] += Fx[i];
+   grain.Fx[b] -= Fx[i];
+   grain.Fy[a] += Fy[i];
+   grain.Fy[b] -= Fy[i];
+   grain.Fz[a] += Fz[i];
+   grain.Fz[b] -= Fz[i];
 
-   grain.Tx[a] += FTT[I+3*8];
-   grain.Ty[a] += FTT[I+4*8];
-   grain.Tz[a] += FTT[I+5*8];
-   grain.Tx[b] += FTT[I+6*8];
-   grain.Ty[b] += FTT[I+7*8];
-   grain.Tz[b] += FTT[I+8*8];
+   grain.Tx[a] += TAx[i];
+   grain.Ty[a] += TAy[i];
+   grain.Tz[a] += TAz[i];
+   grain.Tx[b] += TBx[i];
+   grain.Ty[b] += TBy[i];
+   grain.Tz[b] += TBz[i];
   }
   grainGrainTime.stop();
-#endif
+
 #if 0
   if(wire.count) {
    if(!grainLattice) { // FIXME: use verlet lists for wire-grain

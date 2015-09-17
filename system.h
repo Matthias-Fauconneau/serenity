@@ -378,12 +378,12 @@ struct System {
   static const float K = 4./3*E*sqrt(R);
   static const v8sf K8 = float8(K);
 
-  const v8sf Ks = K8 * sqrt(-depth);
-  const v8sf fK = - Ks * depth;
+  const v8sf Ks = K8 * sqrt(depth);
+  const v8sf fK = Ks * depth;
 
   // Damping
   static const v8sf KB = float8(K * normalDamping);
-  const v8sf Kb = KB * sqrt(-depth);
+  const v8sf Kb = KB * sqrt(depth);
   v8sf AVx = gather(A.AVx, a), AVy = gather(A.AVy, a), AVz = gather(A.AVz, a);
   v8sf RVx = gather(A.Vx, a) + (AVy*RAz - AVz*RAy);
   v8sf RVy = gather(A.Vy, a) + (AVz*RAx - AVx*RAz);
@@ -408,12 +408,12 @@ struct System {
   static const float K = 4./3*E*sqrt(R); // FIXME: constexpr sqrt
   static const v8sf K8 = float8(K);
 
-  const v8sf Ks = K8 * sqrt(-depth);
-  const v8sf fK = - Ks * depth;
+  const v8sf Ks = K8 * sqrt(depth);
+  const v8sf fK = Ks * depth;
 
   // Damping
   static const v8sf KB = float8(K * normalDamping);
-  const v8sf Kb = KB * sqrt(-depth);
+  const v8sf Kb = KB * sqrt(depth);
   v8sf AVx = gather(A.AVx, a), AVy = gather(A.AVy, a), AVz = gather(A.AVz, a);
   v8sf RVx = gather(A.Vx, a) + (AVy*RAz - AVz*RAy) - gather(B.Vx, b);
   v8sf RVy = gather(A.Vy, a) + (AVz*RAx - AVx*RAz) - gather(B.Vy, b);
@@ -424,20 +424,10 @@ struct System {
   Fx = fN * Nx;
   Fy = fN * Ny;
   Fz = fN * Nz;
-  /*target[0] = Fx;
-  target[1] = Fy;
-  target[2] = Fz;*/
-  /*scatter(A.Fx, a, gather(A.Fx, a) + Fx);
-  scatter(A.Fy, a, gather(A.Fy, a) + Fy);
-  scatter(A.Fz, a, gather(A.Fz, a) + Fz);
-  //atomic_sub
-  scatter(B.Fx, b, gather(B.Fx, b) - Fx);
-  scatter(B.Fy, b, gather(B.Fy, b) - Fy);
-  scatter(B.Fz, b, gather(B.Fz, b) - Fz);*/
  }
 
  /// Evaluates contact force between two objects with friction (rotating B)
- template<Type tA, Type tB> inline void contact(v8sf* target, const tA& A, v8si a, tB& B, v8si b,
+ template<Type tA, Type tB> inline void contact(const tA& A, v8si a, tB& B, v8si b,
                                          v8sf depth,
                                          v8sf RAx, v8sf RAy, v8sf RAz,
                                          v8sf RBx, v8sf RBy, v8sf RBz,
@@ -446,7 +436,10 @@ struct System {
                                          v8sf localBx, v8sf localBy, v8sf localBz,
                                          v8sf Ax, v8sf Ay, v8sf Az,
                                          v8sf Bx, v8sf By, v8sf Bz,
-                                         mref<float> contacts, v8sf contactIndices
+                                         mref<float> contacts, v8sf contactIndices,
+                                         v8sf& Fx, v8sf& Fy, v8sf& Fz,
+                                         v8sf& TAx, v8sf& TAy, v8sf& TAz,
+                                         v8sf& TBx, v8sf& TBy, v8sf& TBz
                                          ) {
   // Stiffness
   constexpr float E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
@@ -454,11 +447,11 @@ struct System {
   static const float K = 4./3*E*sqrt(R);
   static const v8sf K8 = float8(K);
 
-  const v8sf Ks = K8 * sqrt(-depth);
-  const v8sf fK = - Ks * depth;
+  const v8sf Ks = K8 * sqrt(depth);
+  const v8sf fK = Ks * depth;
 
   // Damping
-  static const v8sf KB = float8(K * normalDamping);
+  /*static const v8sf KB = float8(K * normalDamping);
   const v8sf Kb = KB * sqrt(-depth);
   v8sf AVx = gather(A.AVx, a), AVy = gather(A.AVy, a), AVz = gather(A.AVz, a);
   v8sf BVx = gather(B.AVx, b), BVy = gather(B.AVy, b), BVz = gather(B.AVz, b);
@@ -466,14 +459,15 @@ struct System {
   v8sf RVy = gather(A.Vy, a) + (AVz*RAx - AVx*RAz) - gather(B.Vy, b) - (BVz*RBx - BVx*RBz);
   v8sf RVz = gather(A.Vz, a) + (AVx*RAy - AVy*RAx) - gather(B.Vz, b) - (BVx*RBy - BVy*RBx);
   v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
-  v8sf fB = - Kb * normalSpeed ; // Damping
+  v8sf fB = - Kb * normalSpeed ; // Damping*/
+  v8sf fB = _0f;
   v8sf fN = fK + fB;
   v8sf NFx = fN * Nx;
   v8sf NFy = fN * Ny;
   v8sf NFz = fN * Nz;
-  v8sf Fx = NFx;
-  v8sf Fy = NFy;
-  v8sf Fz = NFz;
+  Fx = NFx;
+  Fy = NFy;
+  Fz = NFz;
 
   /*v8sf FRAx, FRAy, FRAz;
   v8sf FRBx, FRBy, FRBz;
@@ -558,15 +552,12 @@ struct System {
   Fx += fTx;
   Fy += fTy;
   Fz += fTz;*/
-  target[0] = Fx;
-  target[1] = Fy;
-  target[2] = Fz;
-  target[3] = _0f;
-  target[4] = _0f;
-  target[5] = _0f;
-  target[6] = _0f;
-  target[7] = _0f;
-  target[8] = _0f;
+  TAx = _0f;
+  TAy = _0f;
+  TAz = _0f;
+  TBx = _0f;
+  TBy = _0f;
+  TBz = _0f;
   /*target[3] = RAy*fTz - RAz*fTy;
   target[4] = RAz*fTx - RAx*fTz;
   target[5] = RAx*fTy - RAy*fTx;
