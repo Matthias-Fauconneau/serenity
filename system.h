@@ -258,7 +258,8 @@ struct System {
   //struct { NoOperation4 operator[](size_t) const { return {}; }} torque;
 
   Side(float resolution, float initialRadius, float height, size_t base, float thickness, float elasticModulus)
-      : Vertex(base, /*W*H*/(int(2*PI*initialRadius/resolution)/8*8+2) * (int(height/resolution*2/sqrt(3.))+1), 0),
+   : Vertex(base, /*W*H*/(int(2*PI*initialRadius/resolution)/8*8+2) * (int(height/resolution*2/sqrt(3.))+1),
+                1/*dummy*/),
         resolution(resolution),
         initialRadius(initialRadius),
         height(height),
@@ -368,7 +369,8 @@ struct System {
  template<Type tA, Type tB> inline void contact(const tA& A, v8si a,
                                          v8sf depth,
                                          v8sf RAx, v8sf RAy, v8sf RAz,
-                                         v8sf Nx, v8sf Ny, v8sf Nz
+                                         v8sf Nx, v8sf Ny, v8sf Nz,
+                                         v8sf& Fx, v8sf& Fy, v8sf& Fz
                                          ) {
   // Stiffness
   constexpr float E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
@@ -389,27 +391,11 @@ struct System {
   v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
   v8sf fB = - Kb * normalSpeed ;
   v8sf fN = fK + fB;
-  v8sf Fx = fN * Nx;
-  v8sf Fy = fN * Ny;
-  v8sf Fz = fN * Nz;
-  scatter(A.Fx, a, gather(A.Fx, a) + Fx);
-  scatter(A.Fy, a, gather(A.Fy, a) + Fy);
-  scatter(A.Fz, a, gather(A.Fz, a) + Fz);
+  Fx = fN * Nx;
+  Fy = fN * Ny;
+  Fz = fN * Nz;
  }
 
- /// Evaluates contact force between two objects without friction (non rotating B)
- template<Type tA, Type tB> inline void contact(const tA& A, v8si a, tB& B, v8si b,
-                                         v8sf depth,
-                                         v8sf RAx, v8sf RAy, v8sf RAz,
-                                         v8sf Nx, v8sf Ny, v8sf Nz
-                                         ) {
-     v8sf Fx, Fy, Fz;
-     contact(A, a, B, b,
-             depth,
-             RAx, RAy, RAz,
-             Nx, Ny, Nz,
-             Fx, Fy, Fz);
- }
  /// Evaluates contact force between two objects without friction (non rotating B)
  template<Type tA, Type tB> inline void contact(const tA& A, v8si a, tB& B, v8si b,
                                         v8sf depth,
@@ -438,17 +424,20 @@ struct System {
   Fx = fN * Nx;
   Fy = fN * Ny;
   Fz = fN * Nz;
-  scatter(A.Fx, a, gather(A.Fx, a) + Fx);
+  /*target[0] = Fx;
+  target[1] = Fy;
+  target[2] = Fz;*/
+  /*scatter(A.Fx, a, gather(A.Fx, a) + Fx);
   scatter(A.Fy, a, gather(A.Fy, a) + Fy);
   scatter(A.Fz, a, gather(A.Fz, a) + Fz);
   //atomic_sub
   scatter(B.Fx, b, gather(B.Fx, b) - Fx);
   scatter(B.Fy, b, gather(B.Fy, b) - Fy);
-  scatter(B.Fz, b, gather(B.Fz, b) - Fz);
+  scatter(B.Fz, b, gather(B.Fz, b) - Fz);*/
  }
 
  /// Evaluates contact force between two objects with friction (rotating B)
- template<Type tA, Type tB> inline void contact(const tA& A, v8si a, tB& B, v8si b,
+ template<Type tA, Type tB> inline void contact(v8sf* target, const tA& A, v8si a, tB& B, v8si b,
                                          v8sf depth,
                                          v8sf RAx, v8sf RAy, v8sf RAz,
                                          v8sf RBx, v8sf RBy, v8sf RBz,
@@ -486,7 +475,7 @@ struct System {
   v8sf Fy = NFy;
   v8sf Fz = NFz;
 
-  v8sf FRAx, FRAy, FRAz;
+  /*v8sf FRAx, FRAy, FRAz;
   v8sf FRBx, FRBy, FRBz;
   for(size_t k: range(8)) { // FIXME
    if(!localAx[k]) {
@@ -568,8 +557,23 @@ struct System {
   }
   Fx += fTx;
   Fy += fTy;
-  Fz += fTz;
-  // Force
+  Fz += fTz;*/
+  target[0] = Fx;
+  target[1] = Fy;
+  target[2] = Fz;
+  target[3] = _0f;
+  target[4] = _0f;
+  target[5] = _0f;
+  target[6] = _0f;
+  target[7] = _0f;
+  target[8] = _0f;
+  /*target[3] = RAy*fTz - RAz*fTy;
+  target[4] = RAz*fTx - RAx*fTz;
+  target[5] = RAx*fTy - RAy*fTx;
+  target[6] = RBy*fTz - RBz*fTy;
+  target[7] = RBz*fTx - RBx*fTz;
+  target[8] = RBx*fTy - RBy*fTx;*/
+  /*// Force
   scatter(A.Fx, a, gather(A.Fx, a) + Fx);
   scatter(A.Fy, a, gather(A.Fy, a) + Fy);
   scatter(A.Fz, a, gather(A.Fz, a) + Fz);
@@ -584,7 +588,7 @@ struct System {
   //atomic_sub
   scatter(B.Tx, b, gather(B.Tx, b) + RBy*fTz - RBz*fTy);
   scatter(B.Ty, b, gather(B.Ty, b) + RBz*fTx - RBx*fTz);
-  scatter(B.Tz, b, gather(B.Tz, b) + RBx*fTy - RBy*fTx);
+  scatter(B.Tz, b, gather(B.Tz, b) + RBx*fTy - RBy*fTx);*/
  }
 };
 

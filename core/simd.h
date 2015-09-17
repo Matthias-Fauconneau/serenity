@@ -90,7 +90,7 @@ static inline float reduce8(v8sf x) {
 static inline v8sf gather(ref<float> P, v8si a) {
  return {P[a[0]], P[a[1]], P[a[2]], P[a[3]], P[a[4]], P[a[5]], P[a[6]], P[a[7]]};
 }
-static inline void scatter(mref<float> P, v8si a, v8sf x) {
+/*static inline void scatter(mref<float> P, v8si a, v8sf x) {
  P[a[0]] = x[0];
  P[a[1]] = x[1];
  P[a[2]] = x[2];
@@ -99,10 +99,16 @@ static inline void scatter(mref<float> P, v8si a, v8sf x) {
  P[a[5]] = x[5];
  P[a[6]] = x[6];
  P[a[7]] = x[7];
-}
+}*/
 
 #include "math.h"
 inline v4sf mean(const ref<v4sf> x) { assert(x.size); return sum(x, float4(0)) / float4(x.size); }
 #include "string.h"
 template<> inline String str(const v4sf& v) { return "("+str(v[0], v[1], v[2], v[3])+")"; }
 inline bool isNumber(v4sf v){ for(uint i: range(4)) if(!isNumber(v[i])) return false; return true; }
+template<> inline String str(const v8si& v) {
+ return "("+str(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7])+")";
+}
+template<> inline String str(const v8sf& v) {
+ return "("+str(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7])+")";
+}
