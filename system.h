@@ -373,16 +373,16 @@ struct System {
   // Stiffness
   constexpr float E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
   constexpr float R = 1/(tA::curvature+tB::curvature);
-  constexpr float K = 4./3*E*sqrt(R);
-  static constexpr v8sf K8 = float8(K);
+  static const float K = 4./3*E*sqrt(R);
+  static const v8sf K8 = float8(K);
 
   const v8sf Ks = K8 * sqrt(-depth);
   const v8sf fK = - Ks * depth;
 
   // Damping
-  static constexpr v8sf KB = float8(K * normalDamping);
+  static const v8sf KB = float8(K * normalDamping);
   const v8sf Kb = KB * sqrt(-depth);
-  v8sf AVx = gather(A.aVx, a), AVy = gather(A.aVy, a), AVz = gather(A.aVz, a);
+  v8sf AVx = gather(A.AVx, a), AVy = gather(A.AVy, a), AVz = gather(A.AVz, a);
   v8sf RVx = gather(A.Vx, a) + (AVy*RAz - AVz*RAy);
   v8sf RVy = gather(A.Vy, a) + (AVz*RAx - AVx*RAz);
   v8sf RVz = gather(A.Vz, a) + (AVx*RAy - AVy*RAx);
@@ -392,12 +392,12 @@ struct System {
   v8sf Fx = fN * Nx;
   v8sf Fy = fN * Ny;
   v8sf Fz = fN * Nz;
-  A.Fx[a] += Fx;
-  A.Fy[a] += Fy;
-  A.Fz[a] += Fz;
+  scatter(A.Fx, a, gather(A.Fx, a) + Fx);
+  scatter(A.Fy, a, gather(A.Fy, a) + Fy);
+  scatter(A.Fz, a, gather(A.Fz, a) + Fz);
  }
 
- /*/// Evaluates contact force between two objects without friction (non rotating B)
+ /// Evaluates contact force between two objects without friction (non rotating B)
  template<Type tA, Type tB> inline void contact(const tA& A, v8si a, tB& B, v8si b,
                                          v8sf depth,
                                          v8sf RAx, v8sf RAy, v8sf RAz,
@@ -409,7 +409,7 @@ struct System {
              RAx, RAy, RAz,
              Nx, Ny, Nz,
              Fx, Fy, Fz);
- }*/
+ }
  /// Evaluates contact force between two objects without friction (non rotating B)
  template<Type tA, Type tB> inline void contact(const tA& A, v8si a, tB& B, v8si b,
                                         v8sf depth,
@@ -438,40 +438,31 @@ struct System {
   Fx = fN * Nx;
   Fy = fN * Ny;
   Fz = fN * Nz;
-  A.Fx[a] += Fx;
-  A.Fy[a] += Fy;
-  A.Fz[a] += Fz;
+  scatter(A.Fx, a, gather(A.Fx, a) + Fx);
+  scatter(A.Fy, a, gather(A.Fy, a) + Fy);
+  scatter(A.Fz, a, gather(A.Fz, a) + Fz);
   //atomic_sub
-  B.Fx[b] -= Fx;
-  B.Fy[b] -= Fy;
-  B.Fz[b] -= Fz;
+  scatter(B.Fx, b, gather(B.Fx, b) - Fx);
+  scatter(B.Fy, b, gather(B.Fy, b) - Fy);
+  scatter(B.Fz, b, gather(B.Fz, b) - Fz);
  }
 
- /// Evaluates contact force between two objects without friction (rotating B)
+ /// Evaluates contact force between two objects with friction (rotating B)
  template<Type tA, Type tB> inline void contact(const tA& A, v8si a, tB& B, v8si b,
                                          v8sf depth,
                                          v8sf RAx, v8sf RAy, v8sf RAz,
                                          v8sf RBx, v8sf RBy, v8sf RBz,
-                                         v8sf Nx, v8sf Ny, v8sf Nz
+                                         v8sf Nx, v8sf Ny, v8sf Nz,
+                                         v8sf localAx, v8sf localAy, v8sf localAz,
+                                         v8sf localBx, v8sf localBy, v8sf localBz,
+                                         v8sf Ax, v8sf Ay, v8sf Az,
+                                         v8sf Bx, v8sf By, v8sf Bz,
+                                         mref<float> contacts, v8sf contactIndices
                                          ) {
-     v8sf Fx, Fy, Fz;
-     contact(A, a, B, b,
-             depth,
-             RAx, RAy, RAz,
-             RBx, RBy, RBz,
-             Nx, Ny, Nz,
-             Fx, Fy, Fz);
- }
- template<Type tA, Type tB> inline void contact(const tA& A, v8si a, tB& B, v8si b,
-                                        v8sf depth,
-                                        v8sf RAx, v8sf RAy, v8sf RAz,
-                                        v8sf RBx, v8sf RBy, v8sf RBz,
-                                        v8sf Nx, v8sf Ny, v8sf Nz,
-                                        v8sf& Fx, v8sf& Fy, v8sf& Fz) {
   // Stiffness
   constexpr float E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
   constexpr float R = 1/(tA::curvature+tB::curvature);
-  static const float K = 4./3*E*sqrt(R); // FIXME: constexpr sqrt
+  static const float K = 4./3*E*sqrt(R);
   static const v8sf K8 = float8(K);
 
   const v8sf Ks = K8 * sqrt(-depth);
@@ -488,77 +479,9 @@ struct System {
   v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
   v8sf fB = - Kb * normalSpeed ; // Damping
   v8sf fN = fK + fB;
-  Fx = fN * Nx;
-  Fy = fN * Ny;
-  Fz = fN * Nz;
-  A.Fx[a] += Fx;
-  A.Fy[a] += Fy;
-  A.Fz[a] += Fz;
-  //atomic_sub
-  B.Fx[b] -= Fx;
-  B.Fy[b] -= Fy;
-  B.Fz[b] -= Fz;
- }
-
- /// Evaluates contact force between two objects with friction
- template<Type tA, Type tB> inline void contact(const tA& A, v8si a, tB& B, v8si b,
-                                         v8sf depth,
-                                         v8sf RAx, v8sf RAy, v8sf RAz,
-                                         v8sf RBx, v8sf RBy, v8sf RBz,
-                                         v8sf Nx, v8sf Ny, v8sf Nz,
-                                         v8sf localAx, v8sf localAy, v8sf localAz,
-                                         v8sf localBx, v8sf localBy, v8sf localBz,
-                                         v8sf Ax, v8sf Ay, v8sf Az,
-                                         v8sf Bx, v8sf By, v8sf Bz,
-                                         ref<float> contacts, v8sf contactIndices
-                                         ) {
-     v8sf NFx, NFy, NFz;
-     penalty(A, a, B, b,
-             depth,
-             RAx, RAy, RAz,
-             RBx, RBy, RBz,
-             Nx, Ny, Nz,
-             localAx, localAy, localAz, localBx, localBy, localBz,
-             Ax, Ay, Az,
-             Bx, By, Bz,
-             contacts, contactIndices,
-             NFx, NFy, NFz);
- }
- /// Evaluates contact force between two objects with friction
-template<Type tA, Type tB> inline void contact(const tA& A, v8si a, tB& B, v8si b,
-                                        v8sf depth,
-                                        v8sf RAx, v8sf RAy, v8sf RAz,
-                                        v8sf RBx, v8sf RBy, v8sf RBz,
-                                        v8sf Nx, v8sf Ny, v8sf Nz,
-                                        v8sf localAx, v8sf localAy, v8sf localAz,
-                                        v8sf localBx, v8sf localBy, v8sf localBz,
-                                        v8sf Ax, v8sf Ay, v8sf Az,
-                                        v8sf Bx, v8sf By, v8sf Bz,
-                                        mref<float> contacts, v8sf contactIndices,
-                                        v8sf& NFx, v8sf& NFy, v8sf& NFz) {
-  // Stiffness
-  constexpr float E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
-  constexpr float R = 1/(tA::curvature+tB::curvature);
-  constexpr float K = 4./3*E*sqrt(R);
-  static constexpr v8sf K8 = float8(K);
-
-  const v8sf Ks = K8 * sqrt(-depth);
-  const v8sf fK = - Ks * depth;
-
-  // Damping
-  static constexpr v8sf KB = float8(K * normalDamping);
-  const v8sf Kb = KB * sqrt(-depth);
-  v8sf AVx = gather(A.aVx, a), AVy = gather(A.aVy, a), AVz = gather(A.aVz, a);
-  v8sf BVx = gather(B.aVx, b), BVy = gather(B.aVy, b), BVz = gather(B.aVz, b);
-  v8sf RVx = gather(A.Vx, a) + (AVy*RAz - AVz*RAy) - gather(B.Vx, b) - (BVy*RBz - BVz*RBy);
-  v8sf RVy = gather(A.Vy, a) + (AVz*RAx - AVx*RAz) - gather(B.Vy, b) - (BVz*RBx - BVx*RBz);
-  v8sf RVz = gather(A.Vz, a) + (AVx*RAy - AVy*RAx) - gather(B.Vz, b) - (BVx*RBy - BVy*RBx);
-  v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
-  v8sf fB = - Kb * normalSpeed ; // Damping
-  v8sf fN = fK + fB;
-  NFx = fN * Nx;
-  NFy = fN * Ny;
-  NFz = fN * Nz;
+  v8sf NFx = fN * Nx;
+  v8sf NFy = fN * Ny;
+  v8sf NFz = fN * Nz;
   v8sf Fx = NFx;
   v8sf Fy = NFy;
   v8sf Fz = NFz;
@@ -567,20 +490,20 @@ template<Type tA, Type tB> inline void contact(const tA& A, v8si a, tB& B, v8si 
   v8sf FRBx, FRBy, FRBz;
   for(size_t k: range(8)) { // FIXME
    if(!localAx[k]) {
-    v4sf localA = qapply(conjugate(A.rotation[a[k]]), {RAx[k], RAy[k], RAz[k]});
+    v4sf localA = qapply(conjugate(A.rotation[a[k]]), (v4sf){RAx[k], RAy[k], RAz[k], 0});
     localAx[k] = localA[0];
     localAy[k] = localA[1];
     localAz[k] = localA[2];
-    v4sf localB = qapply(conjugate(B.rotation[b[k]]), {RBx[k], RBy[k], RBz[k]});
+    v4sf localB = qapply(conjugate(B.rotation[b[k]]), (v4sf){RBx[k], RBy[k], RBz[k], 0});
     localBx[k] = localB[0];
     localBy[k] = localB[1];
     localBz[k] = localB[2];
    }
-   vec4f relativeA = qapply(A.rotation[a], {localAx[k], localAy[k], localAz[k]});
+   vec4f relativeA = qapply(A.rotation[a[k]], (v4sf){localAx[k], localAy[k], localAz[k], 0});
    FRAx[k] = relativeA[0];
    FRAy[k] = relativeA[1];
    FRAz[k] = relativeA[2];
-   vec4f relativeB = qapply(B.rotation[b], {localBx[k], localBy[k], localBz[k]});
+   vec4f relativeB = qapply(B.rotation[b[k]], (v4sf){localBx[k], localBy[k], localBz[k], 0});
    FRBx[k] = relativeB[0];
    FRBy[k] = relativeB[1];
    FRBz[k] = relativeB[2];
@@ -647,21 +570,21 @@ template<Type tA, Type tB> inline void contact(const tA& A, v8si a, tB& B, v8si 
   Fy += fTy;
   Fz += fTz;
   // Force
-  A.Fx[a] += Fx;
-  A.Fy[a] += Fy;
-  A.Fz[a] += Fz;
+  scatter(A.Fx, a, gather(A.Fx, a) + Fx);
+  scatter(A.Fy, a, gather(A.Fy, a) + Fy);
+  scatter(A.Fz, a, gather(A.Fz, a) + Fz);
   //atomic_sub
-  B.Fx[b] -= Fx;
-  B.Fy[b] -= Fy;
-  B.Fz[b] -= Fz;
+  scatter(B.Fx, b, gather(B.Fx, b) - Fx);
+  scatter(B.Fy, b, gather(B.Fy, b) - Fy);
+  scatter(B.Fz, b, gather(B.Fz, b) - Fz);
   // Torque
-  A.Tx[a] += RAy*fTz - RAz*fTy;
-  A.Ty[a] += RAz*fTx - RAx*fTz;
-  A.Tz[a] += RAx*fTy - RAy*fTx;
+  scatter(A.Tx, a, gather(A.Tx, a) + RAy*fTz - RAz*fTy);
+  scatter(A.Ty, a, gather(A.Ty, a) + RAz*fTx - RAx*fTz);
+  scatter(A.Tz, a, gather(A.Tz, a) + RAx*fTy - RAy*fTx);
   //atomic_sub
-  B.Tx[b] += RBy*fTz - RBz*fTy;
-  B.Ty[b] += RBz*fTx - RBx*fTz;
-  B.Tz[b] += RBx*fTy - RBy*fTx;
+  scatter(B.Tx, b, gather(B.Tx, b) + RBy*fTz - RBz*fTy);
+  scatter(B.Ty, b, gather(B.Ty, b) + RBz*fTx - RBx*fTz);
+  scatter(B.Tz, b, gather(B.Tz, b) + RBx*fTy - RBy*fTx);
  }
 };
 
