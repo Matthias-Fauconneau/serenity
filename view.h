@@ -51,8 +51,8 @@ struct SimulationRun : Simulation {
 
  void report() {
   log(timeStep*dt);
-  if(sideGrainTime) log("side-grain check", strD(sideGrainTime-sideGrainForceTime, stepTime));
-  if(sideGrainForceTime) log("side-grain force", strD(sideGrainForceTime, stepTime));
+  if(grainSideTime) log("side-grain check", strD(grainSideTime-grainSideForceTime, stepTime));
+  if(grainSideForceTime) log("side-grain force", strD(grainSideForceTime, stepTime));
   if(sideForceTime) log("side force", str(sideForceTime, stepTime));
   //log("grain-grain check", strD(grainGrainTime-grainGrainForceTime, stepTime));
   //log("grain-grain force", strD(grainGrainForceTime, stepTime));
@@ -73,7 +73,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
  vec2 viewYawPitch = vec2(0, -PI/3); // Current view angles
  vec2 scale = 2./(32*Grain::radius);
  vec3 translation = 0;
- v4sf rotationCenter = _0f;
+ v4sf rotationCenter = _0f4;
  Thread simulationThread {19};
 #if ENCODER
  unique<Encoder> encoder = nullptr;
@@ -155,7 +155,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
   size_t grainCount;
   {Locker lock(this->lock); grainCount = grain.count;}
   {
-   vec4f min = _0f, max = _0f;
+   vec4f min = _0f4, max = _0f4;
    for(size_t i: range(grainCount)) { // FIXME: proper BS
     min = ::min(min, grain.position[i]);
     max = ::max(max, grain.position[i]);
