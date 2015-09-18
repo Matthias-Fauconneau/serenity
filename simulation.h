@@ -8,12 +8,20 @@ template<size_t N> struct list { // Small sorted list
  element elements[N];
  bool insert(float key, uint value) {
   uint i = 0;
-  for(;i<size && key<elements[i].key; i++) if(i == N) return false;
+  for(;i<size && key>elements[i].key; i++) {}
   //if(i<size) assert_(value != elements[i].value);
   if(size < N) size++;
-  for(uint j=size-1; j>i; j--) elements[j]=elements[j-1]; // Shifts right (drop last)
-  elements[i] = {key, value}; // Inserts new candidate
-  return true;
+  if(i < N) {
+   for(uint j=size-1; j>i; j--) elements[j]=elements[j-1]; // Shifts right (drop last)
+   assert_(i < N, i, N);
+   elements[i] = {key, value}; // Inserts new candidate
+   //log(ref<element>(elements, size));
+   return true;
+  }
+  else {
+   assert_(!(key < elements[i-1].key), key, size, elements);
+   return false;
+  }
  }
 };
 
@@ -779,7 +787,6 @@ break2_:;
    int di[62];
    size_t i = 0;
    for(int z: range(0, 2 +1)) for(int y: range((z?-2:0), 2 +1)) for(int x: range(((z||y)?-2:1), 2 +1)) {
-    log(X,Y, x,y,z, z*Y*X + y*X + x);
     di[i++] = z*Y*X + y*X + x;
    }
    assert_(i==62);
@@ -804,14 +811,14 @@ break2_:;
       float d = sqrt(sq(grain.Px[a]-grain.Px[b]) + sq(grain.Py[a]-grain.Py[b]) + sq(grain.Pz[a]-grain.Pz[b]));
       if(!D.insert(d, b)) minD6 = ::min(minD6, d);
      }
-     log(D.size, ref<element>(D.elements,D.size));
+     //log(D.size, ref<element>(D.elements,D.size));
      for(size_t i: range(D.size)) {
       assert(grainGrainCount < grainCount8 * 6);
       size_t index = grainGrainCount;
       grainGrainA[index] = a;
       size_t B = D.elements[i].value;
+      assert_(a!=B, a, B, i, D.size, D.elements);
       grainGrainB[index] = B;
-      log(latticeIndex, index, a, B);
       for(size_t i: range(6)) {
        size_t b = grainGrainIndices[a*6+i][0];
        if(!b) break;

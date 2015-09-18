@@ -427,20 +427,22 @@ struct System {
  }
 
  /// Evaluates contact force between two objects with friction (rotating B)
- template<Type tA, Type tB> inline void contact(const tA& A, v8si a, tB& B, v8si b,
-                                         v8sf depth,
-                                         v8sf RAx, v8sf RAy, v8sf RAz,
-                                         v8sf RBx, v8sf RBy, v8sf RBz,
-                                         v8sf Nx, v8sf Ny, v8sf Nz,
-                                         v8sf localAx, v8sf localAy, v8sf localAz,
-                                         v8sf localBx, v8sf localBy, v8sf localBz,
-                                         v8sf Ax, v8sf Ay, v8sf Az,
-                                         v8sf Bx, v8sf By, v8sf Bz,
-                                         mref<float> contacts, v8sf contactIndices,
-                                         v8sf& Fx, v8sf& Fy, v8sf& Fz,
-                                         v8sf& TAx, v8sf& TAy, v8sf& TAz,
-                                         v8sf& TBx, v8sf& TBy, v8sf& TBz
-                                         ) {
+ template<Type tA, Type tB> inline void contact(
+   const tA& unused A, v8si unused a,
+   tB& unused B, v8si unused b,
+   v8sf depth,
+   v8sf unused RAx, v8sf unused RAy, v8sf unused RAz,
+   v8sf unused RBx, v8sf unused RBy, v8sf unused RBz,
+   v8sf Nx, v8sf Ny, v8sf Nz,
+   v8sf unused localAx, v8sf unused localAy, v8sf unused localAz,
+   v8sf unused localBx, v8sf unused localBy, v8sf unused localBz,
+   v8sf unused Ax, v8sf unused Ay, v8sf unused Az,
+   v8sf unused Bx, v8sf unused By, v8sf unused Bz,
+   mref<float> unused contacts, v8sf unused contactIndices,
+   v8sf& Fx, v8sf& Fy, v8sf& Fz,
+   v8sf& TAx, v8sf& TAy, v8sf& TAz,
+   v8sf& TBx, v8sf& TBy, v8sf& TBz
+   ) {
   // Stiffness
   constexpr float E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
   constexpr float R = 1/(tA::curvature+tB::curvature);
