@@ -287,12 +287,12 @@ struct SimulationView : SimulationRun, Widget, Poll {
       shader.bindFragments({"color"});
       shader["transform"] = viewProjection;
 
-   size_t W = side.W-2, stride=side.W;
+   size_t W = side.W, stride=side.stride;
    buffer<vec3> positions {W*(side.H-1)*6-W*2};
    for(size_t i: range(side.H-1)) for(size_t j: range(W)) {
-    vec3 a (toVec3(side.Vertex::position[i*stride+j]));
-    vec3 b (toVec3(side.Vertex::position[i*stride+(j+1)%W]));
-    vec3 c (toVec3(side.Vertex::position[(i+1)*stride+(j+i%2)%W]));
+    vec3 a (toVec3(side.Vertex::position[7+i*stride+j]));
+    vec3 b (toVec3(side.Vertex::position[7+i*stride+(j+1)%W]));
+    vec3 c (toVec3(side.Vertex::position[7+(i+1)*stride+(j+i%2)%W]));
     // FIXME: GPU projection
     vec3 A =  a, B=  b, C =  c;
     size_t n = i ? W*4 + ((i-1)*W+j)*6 : j*4;

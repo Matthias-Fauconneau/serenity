@@ -80,12 +80,18 @@ typedef float v8sf __attribute((__vector_size__ (32)));
 inline v8sf constexpr float8(float f) { return (v8sf){f,f,f,f,f,f,f,f}; }
 static constexpr v8sf unused _0f = float8(0);
 static constexpr v8sf unused _1f = float8(1);
+static inline v8sf loadu8(const float* P) { return _mm256_loadu_ps(P); }
+static inline void store(float* P, v8sf A) { _mm256_storeu_ps(P, A); }
+
 inline v8sf sqrt(v8sf x) { return __builtin_ia32_sqrtps256(x); }
 static inline float reduce8(v8sf x) {
  const v4sf x128 = __builtin_ia32_vextractf128_ps256(x, 1) + _mm256_castps256_ps128(x);
  const __m128 x64 = x128 + _mm_movehl_ps/*__builtin_ia32_movhlps*/(x128, x128);
  const __m128 x32 = x64 + _mm_shuffle_ps/*__builtin_ia32_shufps*/(x64, x64, 0x55);
  return x32[0];
+}
+static inline v8sf gather(const float* P, v8si a) {
+ return {P[a[0]], P[a[1]], P[a[2]], P[a[3]], P[a[4]], P[a[5]], P[a[6]], P[a[7]]};
 }
 static inline v8sf gather(ref<float> P, v8si a) {
  return {P[a[0]], P[a[1]], P[a[2]], P[a[3]], P[a[4]], P[a[5]], P[a[6]], P[a[7]]};

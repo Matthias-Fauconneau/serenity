@@ -230,10 +230,7 @@ struct System {
   const float resolution;
   const float initialRadius;
   const float height;
-  const size_t W, H;
-  //size_t faceCount = (H-1)*W*2; // Always soft membrane
-  /*float minRadius = initialRadius-Grain::radius, maxRadius;
-  float minRadiusSq, maxRadiusSq;*/
+  const size_t W, stride, H;
   const float radius = initialRadius;
 
   const float internodeLength = 2*PI*initialRadius/W;
@@ -258,12 +255,13 @@ struct System {
   //struct { NoOperation4 operator[](size_t) const { return {}; }} torque;
 
   Side(float resolution, float initialRadius, float height, size_t base, float thickness, float elasticModulus)
-   : Vertex(base, /*W*H*/(int(2*PI*initialRadius/resolution)/8*8+2) * (int(height/resolution*2/sqrt(3.))+1),
+   : Vertex(base, /*W*H*/7+(int(2*PI*initialRadius/resolution+7)/8*8+8) * (int(height/resolution*2/sqrt(3.))+1),
                 1/*dummy*/),
         resolution(resolution),
         initialRadius(initialRadius),
         height(height),
-        W(int(2*PI*initialRadius/resolution)/8*8+2),
+        W(int(2*PI*initialRadius/resolution+7)/8*8),
+        stride(W+8),
         H(int(height/resolution*2/sqrt(3.))+1),
         pourThickness(thickness*10),
         loadThickness(thickness),
@@ -273,21 +271,21 @@ struct System {
       _1_mass = float3(1./mass);
       //count = W*H;
       for(size_t i: range(H)) {
-       for(size_t j: range(W-2)) {
+       for(size_t j: range(W)) {
         float z = i*height/(H-1);
-        float a = 2*PI*(j+(i%2)*1./2)/(W-2);
+        float a = 2*PI*(j+(i%2)*1./2)/(W);
         float x = initialRadius*cos(a), y = initialRadius*sin(a);
-        Px[i*W+j] = x;
-        Py[i*W+j] = y;
-        Pz[i*W+j] = z;
+        Px[7+i*stride+j] = x;
+        Py[7+i*stride+j] = y;
+        Pz[7+i*stride+j] = z;
        }
        // Copies position back to repeated nodes
-       Px[i*W+W-2+0] = Px[i*W+0];
-       Py[i*W+W-2+0] = Py[i*W+0];
-       Pz[i*W+W-2+0] = Pz[i*W+0];
-       Px[i*W+W-2+1] = Px[i*W+1];
-       Py[i*W+W-2+1] = Py[i*W+1];
-       Pz[i*W+W-2+1] = Pz[i*W+1];
+       Px[7+i*stride+W+0] = Px[7+i*stride+0];
+       Py[7+i*stride+W+0] = Py[7+i*stride+0];
+       Pz[7+i*stride+W+0] = Pz[7+i*stride+0];
+       Px[7+i*stride+W+1] = Px[7+i*stride+1];
+       Py[7+i*stride+W+1] = Py[7+i*stride+1];
+       Pz[7+i*stride+W+1] = Pz[7+i*stride+1];
       }
       Vx.clear(); Vy.clear(); Vz.clear();
 #if GEAR

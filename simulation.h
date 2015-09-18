@@ -38,7 +38,7 @@ generic struct Lattice {
  }
  inline size_t index(float x, float y, float z) {
   int index = dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*((v4sf){x,y,z,0}-min))))[0];
-  assert(index >= 0 && index < size.z*size.y*size.x, index, min, x,y,z, max);
+  assert_(index >= 0 && index < size.z*size.y*size.x, index, min, x,y,z, max);
   return index;
  }
  inline T& cell(float x, float y, float z) { return base[index(x, y, z)]; }
@@ -248,10 +248,10 @@ struct Simulation : System {
   {
    array<char> s;
    size_t W = side.W;
-   for(size_t i: range(side.H-1)) for(size_t j: range(W-2)) {
-    vec3 a (toVec3(side.position[i*W+j]));
-    vec3 b (toVec3(side.position[i*W+(j+1)%W]));
-    vec3 c (toVec3(side.position[(i+1)*W+(j+i%2)%W]));
+   for(size_t i: range(side.H-1)) for(size_t j: range(W)) {
+    vec3 a (toVec3(side.position[7+i*W+j]));
+    vec3 b (toVec3(side.position[7+i*W+(j+1)%W]));
+    vec3 c (toVec3(side.position[7+(i+1)*W+(j+i%2)%W]));
     s.append(str(flat(a), flat(c))+'\n');
     s.append(str(flat(b), flat(c))+'\n');
     if(i) s.append(str(flat(a), flat(b))+'\n');
@@ -287,10 +287,10 @@ struct Simulation : System {
     snapshot("pour");
     // Only needed once membrane is soft
     for(size_t i: range(1, side.H-1)) {
-     for(size_t j: range(0, side.W-2)) {
-      size_t index = i*side.W+j;
-      min = ::min(min, side.position[index]);
-      max = ::max(max, side.position[index]);
+     for(size_t j: range(0, side.W)) {
+      size_t index = i*side.stride+j;
+      min = ::min(min, side.position[7+index]);
+      max = ::max(max, side.position[7+index]);
      }
     }
    } else {
@@ -574,17 +574,14 @@ break2_:;
   unique<Lattice<uint16>> grainLattice = nullptr;
 
   // Soft membrane side
-#if 0
   if(processState > ProcessState::Pour) {
    sideForceTime.start();
    // FIXME: single pass
    side.Fx.clear(); side.Fy.clear(); side.Fz.clear();
-   /*::side(side.W, side.Px.data, side.Py.data, side.Pz.data, side.Fx.begin(), side.Fy.begin(), side.Fz.begin(),
-          pressure, side.internodeLength, side.tensionStiffness, //side.radius - alpha*Grain::radius,
-          0, side.H-1);*/
    int W = side.W;
-   const float* Px = side.Px.data, *Py = side.Py.data, *Pz = side.Pz.data;
-   float* Fx = side.Fx.begin(), *Fy =side.Fy.begin(), *Fz = side.Fz.begin();
+   /*+7 for aligned load with j=1..*/
+   const float* Px = side.Px.data+7, *Py = side.Py.data+7, *Pz = side.Pz.data+7;
+   float* Fx = side.Fx.begin()+7, *Fy =side.Fy.begin()+7, *Fz = side.Fz.begin()+7;
    int dy[6] {-W,            0,       W,         W,     0, -W};
    int dx[2][6] {{-1, -1, -1, 0, 1, 0},{0, -1, 0, 1, 1, 1}};
    int D[2][6];
@@ -597,13 +594,14 @@ break2_:;
    v8sf tensionStiffness8 = float8(side.tensionStiffness);
   #endif
    //float sqRadius = radius*radius;
-
-   if(0) for(int i=0; i<int(side.H-1); i++) {
+   assert_(W%8 == 0, W);
+   for(int i=0; i<int(side.H-1); i++) {
     int base = i*W;
-    //assert_((W-2)%8 == 0)
-    for(int j=1; j<=W-2; j+=8) {
+    //assert_((W)%8 == 0)
+    for(int j=1; j<=W; j+=8) {
      // Load
      int index = base+j;
+     assert_(size_t(Px+index)%8 == 0, index);
      v8sf Ox = *(v8sf*)(Px+index);
      v8sf Oy = *(v8sf*)(Py+index);
      v8sf Oz = *(v8sf*)(Pz+index);
@@ -611,9 +609,9 @@ break2_:;
      v8sf X[6], Y[6], Z[6];
      for(int e=0; e<6; e++) { // TODO: assert unrolled
       int a = index+D[i%2][e]; // Gather (TODO: assert reduced i%2)
-      X[e] = *(v8sf*)(Px+a) - Ox;
-      Y[e] = *(v8sf*)(Py+a) - Oy;
-      Z[e] = *(v8sf*)(Pz+a) - Oz;
+      X[e] = loadu8(Px+a) - Ox;
+      Y[e] = loadu8(Py+a) - Oy;
+      Z[e] = loadu8(Pz+a) - Oz;
      }
 
      // Tension
@@ -635,9 +633,9 @@ break2_:;
       *(v8sf*)(Fx+index) += fx;
       *(v8sf*)(Fy+index) += fy;
       *(v8sf*)(Fz+index) += fz;
-      *(v8sf*)(Fx+a) -= fx;
-      *(v8sf*)(Fy+a) -= fy;
-      *(v8sf*)(Fz+a) -= fz;
+      store(Fx+a, loadu8(Fx+a) - fx);
+      store(Fy+a, loadu8(Fy+a) - fy);
+      store(Fz+a, loadu8(Fz+a) - fz);
      }
 
      // Pressure
@@ -674,16 +672,16 @@ break2_:;
     const v4sf XYZ0 = grainLattice->XYZ0;
     float minD3 = 2*Grain::radius/sqrt(3.) - Grain::radius;
     for(size_t i: range(1, side.H-1)) {
-     for(size_t j: range(0, side.W-2)) {
-      size_t s = i*side.W+j;
-      v4sf O = side.position[s];
+     for(size_t j: range(0, side.W)) {
+      size_t s = i*side.stride+j;
+      v4sf O = side.position[7+s];
       int offset = dot3(XYZ0, floor(scale*(O-min)))[0];
       list<2> D;
       for(size_t n=0; n<3*3; n++) { // FIXME: assert unrolled
        v4hi line = *(v4hi*)(offset + grainNeighbours[n]); // Gather
        for(size_t i: range(3)) if(line[i]) { // FIXME: assert unrolled
         size_t g = line[i]-1;
-        float d = sqrt(sq(side.Px[s]-grain.Px[g]) + sq(side.Py[s]-grain.Py[g]) + sq(side.Pz[s]-grain.Pz[g]));
+        float d = sqrt(sq(side.Px[7+s]-grain.Px[g]) + sq(side.Py[7+s]-grain.Py[g]) + sq(side.Pz[7+s]-grain.Pz[g]));
         if(!D.insert(d, g)) minD3 = ::min(minD3, d);
        }
       }
@@ -710,58 +708,61 @@ break2_:;
     sideSkipped=0;
    } else sideSkipped++;
 
-   grainSideTime.start();
-   // Evaluates (packed) intersections from (packed) verlet lists
-   size_t grainSideContactCount = 0;
-   int grainSideContact[side.count * 2];
-   for(size_t index = 0; index < grainSideCount; index += 8) {
-    v8si A = *(v8si*)(grainSideA.data+index), B = *(v8si*)(grainSideB.data+index);
-    v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
-    v8sf Bx = gather(side.Px, B), By = gather(side.Py, B), Bz = gather(side.Pz, B);
-    v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-    v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
-    v8sf depth = length - Grain::radius8;
-    for(size_t subIndex: range(8)) {
-     if(depth[subIndex] < 0) {
-      grainSideContact[grainSideContactCount] = index+subIndex;
-      grainSideContactCount++;
+   {grainSideTime.start();
+    // Evaluates (packed) intersections from (packed) verlet lists
+    size_t grainSideContactCount = 0;
+    buffer<int> grainSideContact(grainSideCount);
+    for(size_t index = 0; index < grainSideCount; index += 8) {
+     v8si A = *(v8si*)(grainSideA.data+index), B = *(v8si*)(grainSideB.data+index);
+     v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
+     v8sf Bx = gather(side.Px.data+7, B), By = gather(side.Py.data+7, B), Bz = gather(side.Pz.data+7, B);
+     v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
+     v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
+     v8sf depth = Grain::radius8 - length;
+     for(size_t subIndex: range(8)) {
+      if(depth[subIndex] > 0) {
+       grainSideContact[grainSideContactCount] = index+subIndex;
+       grainSideContactCount++;
+      }
      }
     }
-   }
 
-   // Aligns with invalid contacts
-   while(grainSideContactCount/8*8 < grainSideContactCount)
-    grainSideContact[grainSideContactCount++] = grainSideCount-1;
+    // Aligns with invalid contacts
+    size_t gSCC = grainSideContactCount;
+    while(gSCC/8*8 < gSCC)
+     grainSideContact[gSCC++] = grainSideCount-1;
 
-   // Evaluates forces from (packed) intersections
-   float F[grainSideContactCount*3];
-   for(size_t index = 0; index < grainSideContactCount; index += 8) {
-    v8si contacts = *(v8si*)(grainSideContact+index);
-    v8si A = gather(grainSideA, contacts), B = gather(grainSideB, contacts);
-    // FIXME: Recomputing from intersection (more efficient than storing?)
-    v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
-    v8sf Bx = gather(side.Px, B), By = gather(side.Py, B), Bz = gather(side.Pz, B);
-    v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-    v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
-    v8sf depth = length - Grain::radius8;
-    v8sf Nx = Rx/length, Ny = Ry/length, Nz = Rz/length;
-    contact((v8sf*)(F+index*3), grain, A, side, B, depth, -Rx, -Ry, -Rz, Nx, Ny, Nz);
+    // Evaluates forces from (packed) intersections
+    buffer<float> Fx(gSCC), Fy(gSCC), Fz(gSCC);
+    for(size_t i = 0; i < gSCC; i += 8) {
+     v8si contacts = *(v8si*)(grainSideContact.data+i);
+     v8si A = gather(grainSideA, contacts), B = gather(grainSideB, contacts);
+     // FIXME: Recomputing from intersection (more efficient than storing?)
+     v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
+     v8sf Bx = gather(side.Px.data+7, B), By = gather(side.Py.data+7, B), Bz = gather(side.Pz.data+7, B);
+     v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
+     v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
+     v8sf depth = Grain::radius8 - length;
+     v8sf Nx = Rx/length, Ny = Ry/length, Nz = Rz/length;
+     contact(grain, A, side, B, depth, -Rx, -Ry, -Rz, Nx, Ny, Nz,
+             *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i]);
+    }
+    for(size_t i = 0; i < grainSideContactCount; i++) { // Scalar scatter add
+     size_t index = grainSideContact[i];
+     size_t a = grainSideA[index];
+     size_t b = grainSideB[index];
+     assert_(isNumber(Fx[i]) && isNumber(Fy[i]) && isNumber(Fz[i]), Fx[i], Fy[i], Fz[i],
+             i, grainSideContactCount, a, b, grain.count);
+     grain.Fx[a] += Fx[i];
+     side.Fx[7+b] -= Fx[i];
+     grain.Fy[a] += Fy[i];
+     side.Fy[7+b] -= Fy[i];
+     grain.Fz[a] += Fz[i];
+     side.Fz[7+b] -= Fz[i];
+    }
+    grainSideTime.stop();
    }
-   for(size_t index = 0; index < grainSideContactCount; index++) { // Scalar scatter add
-    size_t i = grainSideContact[index];
-    size_t a = grainSideA[i];
-    size_t b = grainSideB[i];
-    size_t I = i/8*3+i%8;
-    grain.Fx[a] += F[I+0*8];
-    side.Fx[b] -= F[I+1*8];
-    grain.Fy[a] += F[I+2*8];
-    side.Fy[b] -= F[I+0*8];
-    grain.Fz[a] += F[I+1*8];
-    side.Fz[b] -= F[I+2*8];
-   }
-   grainSideTime.stop();
   }
-#endif
 
   if(grainGrainGlobalMinD6 <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
    buffer<int2> grainGrainIndices {grainCount8 * 6};
@@ -1039,25 +1040,25 @@ break2_:;
    float maxRadius = 0;
    for(size_t i: range(1, side.H-1)) { // First and last line are fixed
     // Adds force from repeated nodes
-    side.Fx[i*side.W+0] += side.Fx[i*side.W+side.W-2+0];
-    side.Fy[i*side.W+0] += side.Fy[i*side.W+side.W-2+0];
-    side.Fz[i*side.W+0] += side.Fz[i*side.W+side.W-2+0];
-    side.Fx[i*side.W+1] += side.Fx[i*side.W+side.W-2+1];
-    side.Fy[i*side.W+1] += side.Fy[i*side.W+side.W-2+1];
-    side.Fz[i*side.W+1] += side.Fz[i*side.W+side.W-2+1];
-    for(size_t j: range(0, side.W-2)) {
-     size_t index = i*side.W+j;
+    side.Fx[7+i*side.stride+0] += side.Fx[7+i*side.stride+side.W+0];
+    side.Fy[7+i*side.stride+0] += side.Fy[7+i*side.stride+side.W+0];
+    side.Fz[7+i*side.stride+0] += side.Fz[7+i*side.stride+side.W+0];
+    side.Fx[7+i*side.stride+1] += side.Fx[7+i*side.stride+side.W+1];
+    side.Fy[7+i*side.stride+1] += side.Fy[7+i*side.stride+side.W+1];
+    side.Fz[7+i*side.stride+1] += side.Fz[7+i*side.stride+side.W+1];
+    for(size_t j: range(0, side.W)) {
+     size_t index = i*side.stride+j;
      System::step(side, index);
      // To avoid bound check
-     min = ::min(min, side.position[index]);
-     max = ::max(max, side.position[index]);
+     min = ::min(min, side.position[7+index]);
+     max = ::max(max, side.position[7+index]);
      //side.velocity[index] *= float4(1-10*dt); // Additionnal viscosity
-     maxSideV = ::max(maxSideV, length(side.velocity[index]));
-     maxRadius = ::max(maxRadius, length2(side.position[index]));
+     maxSideV = ::max(maxSideV, length(side.velocity[7+index]));
+     maxRadius = ::max(maxRadius, length2(side.position[7+index]));
     }
     // Copies position back to repeated nodes
-    side.position[i*side.W+side.W-2+0] = side.position[i*side.W+0];
-    side.position[i*side.W+side.W-2+1] = side.position[i*side.W+1];
+    side.position[7+i*side.stride+side.W+0] = side.position[7+i*side.stride+0];
+    side.position[7+i*side.stride+side.W+1] = side.position[7+i*side.stride+1];
    }
 
    // Checks whether grains are all within the membrane
