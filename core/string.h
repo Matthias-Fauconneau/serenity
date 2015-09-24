@@ -143,7 +143,7 @@ String decimalPrefix(double value, string unit=""_, string unitSuffix=""_);
 /// Converts arrays
 generic String str(const ref<T> source, string separator=" "_, string bracket="[]"_) {
 	array<char> target;
- if(bracket) target.append(bracket[0]); // Critical for PDF compatibility
+ if(bracket) target.append(bracket[0]);
  for(uint i: range(source.size)) {
   target.append( str(source[i]) );
   if(i<source.size-1) target.append(separator);

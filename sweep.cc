@@ -57,10 +57,10 @@ struct ParameterSweep {
         for(float radius: radii) {
          //if(pressure == 80 && radius==0.05f && pattern!="none"_) continue; // Validation
          parameters["Radius"__] = radius;
-         parameters["Thickness"__] = "1e-3"__; {
-          parameters["Side"__] = "1e8"__; {
-           parameters["Resolution"__] = "2"__; {
-           for(int seed: {/*1,*//*2*/3/*,4,5,6*/}) {
+         parameters["Thickness"__] = "1e-3"__; { // 2-3
+          parameters["Side"__] = "1e8"__; { // 8-9
+           parameters["Resolution"__] = "2"__; { //2-3
+           for(int seed: {4}) {
             parameters["Seed"__] = seed;
             auto add = [&] {
              String id = str(parameters);

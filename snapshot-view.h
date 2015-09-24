@@ -16,7 +16,7 @@ struct SnapshotView : Widget {
  vec2 viewYawPitch = vec2(0, -PI/3); // Current view angles
  vec2 scale = 2./(32*2.47*1e-3);
  vec3 translation = 0;
- v4sf rotationCenter = _0f;
+ v4sf rotationCenter = _0f4;
  GLFrameBuffer target;
 
  struct Grain {
@@ -88,7 +88,7 @@ struct SnapshotView : Widget {
  shared<Graphics> graphics(vec2 widgetSize) override {
   const float Dt = 1; //1./60/2;
   {
-   vec4f min = _0f, max = _0f;
+   vec4f min = _0f4, max = _0f4;
    for(size_t i: range(grain.count)) { // FIXME: proper BS
     min = ::min(min, grain.position[i]);
     max = ::max(max, grain.position[i]);

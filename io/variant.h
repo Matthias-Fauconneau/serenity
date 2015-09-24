@@ -73,10 +73,34 @@ template<> inline Variant copy(const Variant& v) {
 }
 generic String strPDF(const map<T,Variant>& dict) {
  array<char> s;
- s.append("<<"); for(auto entry: dict) s.append( '/'+entry.key+' '+str(entry.value)+' ' ); s.append(">>");
+ s.append("<<"); for(auto entry: dict) s.append( '/'+entry.key+' '+strPDF(entry.value)+' ' ); s.append(">>");
  return move(s);
 }
 //generic String str(const map<T,Variant>& dict) { return strPDF(dict); }
+
+inline String strPDF(const Variant& o);
+
+inline String strPDF(const ref<Variant> source) {
+ array<char> target;
+ target.append('[');
+ for(uint i: range(source.size)) {
+  target.append( strPDF(source[i]) );
+  if(i<source.size-1) target.append(' ');
+ }
+ target.append(']');
+ return move(target);
+}
+
+inline String strPDF(const Variant& o) {
+ if(o.type==Variant::Boolean) return unsafeRef(str(bool(o.number)));
+ if(o.type==Variant::Integer) { assert(o.number==int(o.number)); return str(int(o.number)); }
+ if(o.type==Variant::Real || o.type==Variant::Rational) return str(o.real());
+ if(o.type==Variant::Data) return copy(o.data);
+ if(o.type==Variant::List) return strPDF(o.list);
+ if(o.type==Variant::Dict) return strPDF(o.dict);
+ if(o.type==Variant::Null) return String();
+ error("Invalid Variant",int(o.type));
+}
 
 inline String str(const Variant& o) {
  if(o.type==Variant::Boolean) return unsafeRef(str(bool(o.number)));
@@ -84,7 +108,7 @@ inline String str(const Variant& o) {
  if(o.type==Variant::Real || o.type==Variant::Rational) return str(o.real());
  if(o.type==Variant::Data) return copy(o.data);
  if(o.type==Variant::List) return str(o.list);
- if(o.type==Variant::Dict) return strPDF(o.dict);
+ if(o.type==Variant::Dict) return str(o.dict);
  if(o.type==Variant::Null) return String();
  error("Invalid Variant",int(o.type));
 }

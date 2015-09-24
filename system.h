@@ -47,7 +47,7 @@ struct System {
  // Friction model
  sconst float staticFrictionSpeed = inf; //1./3 *m/s; //inf; //1./3 *m/s;
  sconst float staticFrictionFactor = 1e5;
- sconst float staticFrictionLength = 1e-4;
+ sconst float staticFrictionLength = 1e-4 * m;
  sconst float staticFrictionDamping = 15 *g/s/s;
  sconst float frictionCoefficient = 0.3;
  sconst v8sf frictionCoefficient8 = float8(0.3);
