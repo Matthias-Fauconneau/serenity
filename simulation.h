@@ -38,7 +38,7 @@ generic struct Lattice {
  }
  inline size_t index(float x, float y, float z) {
   int index = dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*((v4sf){x,y,z,0}-min))))[0];
-  assert_(index >= 0 && index < size.z*size.y*size.x, index, min, x,y,z, max);
+  assert_(index >= 0 && index < size.z*size.y*size.x, index, min, x,y,z, max, x-min.x, y-min.y, z-);
   return index;
  }
  inline T& cell(float x, float y, float z) { return base[index(x, y, z)]; }

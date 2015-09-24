@@ -6,7 +6,7 @@
 struct Ticks { float max; uint tickCount; };
 uint subExponent(float& value) {
  float subExponent = exp10(log10(abs(value)) - floor(log10(abs(value))));
- for(auto a: (float[][2]){{1,5},{1.2,6},{1.4,7},{1.6,8},{1.8,9},{2,10},{2.5,5},{3,3},{3.2,8},{4,8},{5,5},{6,6},{8,8},{10,5}}) {
+ for(auto a: (float[][2]){{1,5},{1.2,6},{1.4,7},{1.6,4},{2,5},{2.5,5},{3,3},{3.2,8},{4,8},{5,5},{6,6},{8,8},{10,5}}) {
   if(a[0] >= subExponent-0x1p-52) {
    value=(value>0?1:-1)*a[0]*exp10(floor(log10(abs(value))));
    return a[1];
@@ -20,7 +20,7 @@ vec2 Plot::sizeHint(vec2 size) {
  //if(!size) size = 1024;
  size.x = ::min(size.x, 1680.f/5);
  size.y = ::min(size.y, 1680.f/5);
- if(plotCircles) return ::min(size.x, size.y); // FIXME: margin.x > margin.y
+ if(plotCircles) return -::min(size.x, size.y); // FIXME: margin.x > margin.y
  else size.y = ::min(size.y, 3*size.x/4);
  return -size; // Expanding
 }
@@ -70,8 +70,9 @@ shared<Graphics> Plot::graphics(vec2 size) {
   }
  }
 
+ const float textSize = 10; const string fontName = "latinmodern-math"_;
  // Configures ticks
- struct Tick : Text { float value; Tick(float value, string label) : Text(label), value(value) {} };
+ struct Tick : Text { float value; Tick(float value, string label, float textSize, string fontName) : Text(label, textSize, 0,1,0, fontName), value(value) {} };
  array<Tick> ticks[2]; vec2 tickLabelSize = 0;
  for(size_t axis: range(2)) {
   uint precision = ::max(1., ceil(-log10(::max(-min[axis],max[axis])/tickCount[axis])));
@@ -82,14 +83,14 @@ shared<Graphics> Plot::graphics(vec2 size) {
    if(log[axis]) value = exp2(value);
    String label = str(value, precision, 3u/*value>=1e3 ? 3u : value <=10e-2 ? 1u : 0u*/);
    assert(label);
-   ticks[axis].append(value, label);
-   tickLabelSize = ::max(tickLabelSize, ticks[axis][i].sizeHint());
+   ticks[axis].append(value, label, textSize, fontName);
+   tickLabelSize = ::max(tickLabelSize, vec2(ticks[axis][i].sizeHint().x, textSize));
   }
  }
 
  // Evaluates margins
- int left=tickLabelSize.x*3./2, top=tickLabelSize.y, bottom=tickLabelSize.y;
- int right=::max(tickLabelSize.x, tickLabelSize.x/2+Text(bold(xlabel)).sizeHint().x);
+ int left=tickLabelSize.x+textSize, top=tickLabelSize.y*3/2, bottom=tickLabelSize.y*3/2;
+ int right = tickLabelSize.x/2+Text(xlabel, textSize, 0,1,0, fontName).sizeHint().x;
  //left=right=top=bottom=::max(::max(::max(left, right), top), bottom);
  if(plotCircles) {
   //assert_(max.x == max.y, max);
@@ -113,17 +114,24 @@ shared<Graphics> Plot::graphics(vec2 size) {
  // Draws plot
  int2 pen = 0;
 
- {Text text(bold(name),16); graphics->graphics.insert(vec2(pen+int2((size.x-text.sizeHint().x)/2,top)), text.graphics(0)); pen.y+=text.sizeHint().y; } // Title
- if(legendPosition&1) pen.x += size.x-right;
- else pen.x += left+2*tickLength;
+ if(name) { // Title
+  Text text(bold(name), textSize, 0,1,0, fontName);
+  graphics->graphics.insert(vec2(pen+int2((size.x-text.sizeHint().x)/2,top)), text.graphics(0));
+  pen.y+=text.sizeHint().y;
+ }
+ if(legendPosition&1) pen.x += size.x - right;
+ else pen.x += left + 2*tickLength;
  if(legendPosition&2) {
-  pen.y += size.y-bottom-tickLabelSize.y/2;
-  for(size_t i: range(dataSets.size())) pen.y -= Text(dataSets.keys[i], 16).sizeHint().y;
+  pen.y += size.y - bottom - tickLabelSize.y/2;
+  //for(size_t /: range(dataSets.size())) pen.y -= textSize; //Text(dataSets.keys[i], textSize, 0,1,0, fontName).sizeHint().y;
+  pen.y -= dataSets.size()*textSize;
  } else {
   pen.y += top;
  }
- for(size_t i: range(dataSets.size())) { // Legend
-  Text text(dataSets.keys[i], 16, colors[i]); graphics->graphics.insert(vec2(pen+int2(legendPosition&1 ? -text.sizeHint().x : 0,0)), text.graphics(0)); pen.y+=text.sizeHint().y;
+ if(dataSets.size() <= 1) for(size_t i: range(dataSets.size())) { // Legend
+  Text text(dataSets.keys[i], textSize, colors[i], 1,0, fontName);
+  graphics->graphics.insert(vec2(pen+int2(legendPosition&1 ? -text.sizeHint().x : 0,0)), text.graphics(0));
+  pen.y += textSize; //text.sizeHint().y;
  }
 
  // Transforms data positions to render positions
@@ -145,9 +153,9 @@ shared<Graphics> Plot::graphics(vec2 size) {
    Tick& tick = ticks[0][i];
    vec2 p(point(vec2(tick.value, O.y)));
    graphics->lines.append(p, p+vec2(0,-tickLength));
-   graphics->graphics.insertMulti(p + vec2(-tick.sizeHint().x/2, -min.y > max.y ? -tick.sizeHint().y : 0), tick.graphics(0));
+   graphics->graphics.insertMulti(p + vec2(-tick.sizeHint().x/2, /*-min.y > max.y ? -tick.sizeHint().y :*/  -tick.sizeHint().y/2+textSize), tick.graphics(0));
   }
-  {Text text(bold(xlabel),16); graphics->graphics.insert(vec2(int2(point(end))+int2(tickLabelSize.x/2, -text.sizeHint().y/2)), text.graphics(0)); }
+  {Text text(bold(xlabel),textSize, 0,1,0, fontName); graphics->graphics.insert(vec2(int2(point(end))+int2(tickLabelSize.x/2, -text.sizeHint().y/2)), text.graphics(0)); }
  }
  {vec2 O=vec2(min.x>0 ? min.x : max.x<0 ? max.x : 0, min.y), end = vec2(O.x, max.y); // Y
   graphics->lines.append(point(O), point(end));
@@ -155,9 +163,9 @@ shared<Graphics> Plot::graphics(vec2 size) {
    vec2 p (point(O+(i/float(tickCount[1]))*(end-O)));
    graphics->lines.append(p, p+vec2(tickLength,0));
    Text& tick = ticks[1][i];
-   graphics->graphics.insert(p + vec2(-tick.sizeHint().x-left/6, -tick.sizeHint().y/2), tick.graphics(0));
+   graphics->graphics.insert(p + vec2(-tick.sizeHint().x-textSize, -tick.sizeHint().y/2), tick.graphics(0));
   }
-  {Text text(bold(ylabel),16); graphics->graphics.insert(vec2(int2(point(end))+int2(-text.sizeHint().x/2, -text.sizeHint().y-tickLabelSize.y/2)), text.graphics(0));}
+  {Text text(bold(ylabel),textSize, 0,1,0, fontName); graphics->graphics.insert(vec2(int2(point(end))+int2(-text.sizeHint().x/2, /*-text.sizeHint().y-tickLabelSize.y/2*/-text.sizeHint().y/2-textSize)), text.graphics(0));}
  }
 
  // Plots data points
@@ -245,15 +253,19 @@ shared<Graphics> Plot::graphics(vec2 size) {
  {
   float x = max.x;
   map<int, int> done;
+  float minY = inf;
   for(size_t i: range(fits.size())) for(auto f: fits.values[i]) {
-   vec2 B = point(vec2(x, f.a*x+f.b));
+   float y = f.a*x+f.b;
+   vec2 B = point(vec2(x, y));
+   B.y = ::min(minY, B.y);
+   minY = B.y - textSize;
    graphics->lines.append(point(vec2(0,f.b)), B, colors[i]);
    int a = round(atan(f.a, 1)*180/PI);
    int b = round(f.b/1000);
    if(!done[a]) {
     done[a]++;
-    Text text(str(a)+"° "+str(b)+"K", 16, colors[i]);
-    graphics->graphics.insert(B+vec2(16, -text.sizeHint().y/2), text.graphics(0));
+    Text text(str(a)+"° "+str(b)+"K", textSize, colors[i], 1,0, fontName);
+    graphics->graphics.insert(B+vec2(textSize, -text.sizeHint().y/2), text.graphics(0));
    }
   }
  }

@@ -13,6 +13,42 @@
 #include "sge.h"
 #include <unistd.h>
 
+buffer<byte> toSVG(const Plot& plot) {
+ array<byte> svg;
+ svg.append("<?xml version='1.0'?><svg width='4cm' height='4cm' viewBox='0 0 1 1' xmlns='http://www.w3.org/2000/svg' version='1.2' baseProfile='tiny' "
+                   "viewport-fill='white'>");
+ for(const auto& dataSet: plot.dataSets.values) {
+  svg.append("<path fill='none' stroke-width='0.01' stroke='black' d='M"); //vector-effect='non-scaling-stroke'
+  array<float> X, Y;
+  for(const auto point: dataSet) {
+   X.append(point.key);
+   Y.append(point.value);
+  }
+  log(max(X), max(Y));
+  {
+   float x = X[0] / max(X);
+   float y = Y[0] / max(Y);
+   svg.append(str(x, y)+" L");
+  }
+  for(size_t i: range(dataSet.size())) {
+   float x = X[i] / max(X);
+   float y = Y[i] / max(Y);
+   svg.append(str(x, y)+" ");
+  }
+  svg.append("'/>");
+ }
+ svg.append("</svg>");
+ return move(svg);
+}
+
+buffer<byte> toPDF(Widget& widget, vec2 pageSizeMM=210/*mm*/) {
+ static constexpr float pointMM = 72 / 25.4;
+ vec2 pageSize = pageSizeMM*pointMM;
+ shared<Graphics> graphics = widget.graphics(pageSize, Rect(pageSize));
+ graphics->flatten();
+ return toPDF(pageSize, ref<Graphics>(graphics.pointer, 1), 1);
+}
+
 constexpr size_t medianWindowRadius = 12;
 buffer<float> medianFilter(ref<float> source, size_t W=medianWindowRadius) {
  assert_(source.size > W+1+W);
@@ -625,6 +661,7 @@ struct Review {
     dataSet.insertSortedMulti((effectivePressure+peakStress)/2, (peakStress-effectivePressure)/2);
    else if(index==Stress)
     dataSet.insertSortedMulti(effectivePressure, peakStress);
+   log(point);
   }
   if(plotIndex!=invalid) {
    auto key = move(plot.dataSets.keys[plotIndex]);
@@ -810,26 +847,36 @@ struct Review {
   return plot;
  }
 
-void plotToPDF(string name) {
- static constexpr float inchMM = 25.4, inchPx = 90;
- const vec2 pageSize (210/*mm*/ * (inchPx/inchMM), 210/*mm*/ * (inchPx/inchMM));
- //auto graphics = layout.graphics(pageSize, Rect(pageSize));
- auto graphics = pressure.graphics(pageSize);
- graphics->flatten();
- writeFile(name+".pdf"_, toPDF(pageSize, ref<Graphics>(graphics.pointer, 1), 72 / inchPx /*px/inch*/), home(), true);
-}
-
-
  Review() {
-  {auto group = array.parseDict("Angle=3.6,Elasticity=1e7,Friction=0.3,Pattern=cross,Pressure=60K,Radius=0.02,Rate=100,Resolution=2,Seed=3,Side=1e8,Thickness=1e-3,TimeStep=10µ,Wire=12%");
-   for(size_t index: range(4)) {
-    pressure = pressurePlot(group, Deviatoric, index);
-    plotToPDF(pressure.dataSets.keys[0]);
-   }
-   pressure = pressurePlot(group, Deviatoric);
-   plotToPDF("plot");
+  if(0) {
+   auto point = array.parseDict("Friction=0.3,Pattern=none,Pressure=80K,Radius=0.02,Rate=100,Resolution=2,Seed=1,Side=1e8,Thickness=1e-3,TimeStep=10µ");
+   writeFile("none80.svg"_, toSVG(strainPlot(point, Deviatoric)), home(), true);
+   //writeFile("none80.pdf"_, toPDF(strainPlot(point, Deviatoric)), home(), true);
    error("plot");
   }
+
+  if(1) {
+   auto group = array.parseDict("Angle=3.6,Elasticity=1e7,Friction=0.3,Pattern=cross,Pressure=60K,Radius=0.02,Rate=100,Resolution=2,Seed=3,Side=1e8,Thickness=1e-3,TimeStep=10µ,Wire=12%");
+   /*for(size_t index: range(4)) {
+    auto plot = pressurePlot(group, Deviatoric, index);
+    String name = copyRef(plot.dataSets.keys[0]);
+    plot.dataSets.keys[0] = copyRef(ref<string>{"No Wire"_, "Simple Helix"_,"Spiral Helix"_,"Radially Reinforced Helix"_}[
+                                                      ref<string>{"none"_,"helix","loop","cross"}.indexOf(name)]);
+    writeFile(name+".pdf"_, toPDF(plot), home(), true);
+   }*/
+   VList<Plot> plots (Linear::Share, Linear::Expand);
+   for(size_t index: range(4)) {
+    plots.append(pressurePlot(group, Deviatoric, index));
+    String& name = plots.last().dataSets.keys[0];
+    name = copyRef(ref<string>{"Without wire"_, "Simple helix"_,"Spiral helix"_,"Radially reinforced helix"_}[
+                                                      ref<string>{"none"_,"helix","loop","cross"}.indexOf(name)]);
+   }
+   writeFile("all.pdf"_, toPDF(plots, vec2(94.5, 267.3)), home(), true);
+   auto plot = pressurePlot(group, Deviatoric);
+   writeFile("plot.pdf"_, toPDF(plot, vec2(94.5)), home(), true);
+   error("plot");
+  }
+
   window = ::window(&layout, int2(0, 0), mainThread, true);
   window->actions[Key('d')] = [this](){
    details=!details;

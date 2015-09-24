@@ -8,7 +8,7 @@
 
 String findFont(string fontName, ref<string> fontTypes) {
     for(string folder: {"/usr/share/fonts"_,"/usr/local/share/fonts"_}) {
-        for(string path: Folder(folder).list(Files|Recursive)) {
+        if(existsFolder(folder)) for(string path: Folder(folder).list(Files|Recursive)) {
             if(endsWith(path,".ttf") || endsWith(path,".otf")) for(string fontType: fontTypes) {
                 if( find(path, fontName+     fontType+'.') ||
                         find(path, fontName+'-'+fontType+'.') ||
@@ -17,6 +17,7 @@ String findFont(string fontName, ref<string> fontTypes) {
             }
         }
     }
+    if(fontTypes) return findFont(fontName);
     error("No such font", fontName, fontTypes);
 }
 
