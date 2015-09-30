@@ -20,6 +20,7 @@ core/simd.h
 core/map.h
 core/file.h
 core/data.h
+core/data.cc
 core/function.h
 core/thread.cc
 core/file.cc
@@ -64,11 +65,6 @@ ui/render.h
 ui/color.h
 
 music/notation.h
+music/sheet.cc
 music/MusicXML.cc
 music/music-pdf.cc
-music/sheet.cc
-http.h
-http.cc
-wg.cc
-hike.cc
-location.h

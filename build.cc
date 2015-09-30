@@ -157,8 +157,8 @@ bool Build::compileModule(string target) {
 		}
 		Folder(tmp+"/"+join(flags,"-")+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
 		Stream stdout;
-  int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1z", "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing", "-march=native",
-                                     "-o", object, fileName, "-I/usr/include/freetype2","-I/var/tmp/include"} + toRefs(args),
+        int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1z", "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing", "-march=native",
+                                           "-o", object, fileName, "-I/usr/include/freetype2","-I/var/tmp/include"} + toRefs(args),
                     false, currentWorkingDirectory(), 0, &stdout);
 		jobs.append({copyRef(target), pid, move(stdout)});
 		needLink = true;
