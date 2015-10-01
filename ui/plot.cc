@@ -58,7 +58,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
      float tickWidth = max[axis]/tickCount[axis];
      min[axis] = floor(min[axis]/tickWidth)*tickWidth;
      tickCount[axis] += -min[axis]/tickWidth;
-    } //else min[axis] = 0;
+    } else min[axis] = 0;
    }
   } else {
    assert(!log[axis]); //FIXME
@@ -182,7 +182,9 @@ shared<Graphics> Plot::graphics(vec2 size) {
    graphics->graphics.insert(p + vec2(-tick.sizeHint().x-textSize, -tick.sizeHint().y/2), tick.graphics(0));
   }
   {Text text(bold(ylabel),textSize, 0,1,0, fontName);
-   graphics->graphics.insert(vec2(int2(point(end))+int2(-text.sizeHint().x/2, /*-text.sizeHint().y-tickLabelSize.y/2*/-text.sizeHint().y/2-textSize)), text.graphics(0));}
+   vec2 p(int2(point(end))+int2(-text.sizeHint().x/2, /*-text.sizeHint().y-tickLabelSize.y/2*/-text.sizeHint().y/2-textSize));
+   p.x = ::max(0.f, p.x);
+   graphics->graphics.insert(p, text.graphics(0));}
  }
 
  // Plots data points

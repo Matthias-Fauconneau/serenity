@@ -19,6 +19,20 @@ struct PlotView {
  HList<Plot> plots;
  unique<Window> window = nullptr;
  PlotView() {
+  vec2 end;
+  double length = 0;
+  double winchAngle = 0;
+  double loopAngle = 3.6, winchRadius = 0.02; // -wireRadius
+  while(winchAngle < loopAngle) {
+   double A = winchAngle, a = winchAngle * (2*PI) / loopAngle;
+   double R = winchRadius, r = R * loopAngle / (2*PI);
+   vec2 nextEnd = vec2((R-r)*cos(A)+r*cos(a),(R-r)*sin(A)+r*sin(a));
+   length += ::length(nextEnd-end);
+   end = nextEnd;
+   winchAngle += R/r * 1e-3;
+  }
+  //error(winchAngle, length*100);
+
   TextData s (readFile(arguments()[0]));
   float internodeLength = 2.47/2/1000; s.decimal(); s.until('\n');
   s.until('\n'); // Headers
@@ -57,8 +71,8 @@ struct PlotView {
    buffer<float> x (X.size), y (Y.size);
    for(size_t i : range(X.size)) {
     x[i] = X[i]*100/X.last();
-    //y[i] = Y[i]*100;
-    y[i] = (Y[i]-mean)/sqrt(variance)*100;
+    y[i] = Y[i]*100;
+    //y[i] = (Y[i]-mean)/sqrt(variance)*100;
    }
    Plot plot;
    plot.xlabel = "Position (%)"__;
@@ -92,17 +106,18 @@ struct PlotView {
     }
     r /= N*variance;
     K[k] = (float) k * internodeLength * 100;
-    R[k] = r;
+    R[k] = r *100;
     if(!firstMinimum && k && R[k]>R[k-1]) firstMinimum=k, globalMax=k; // First minimum -> Wait for next downward slope
     if(firstMinimum && R[k]>R[globalMax]) globalMax = k; // Global maximum (after first minimum)
     if(R[k]<R[globalMin]) globalMin = k; // Global maximum (after first minimum)
    }
    float xp = globalMax*internodeLength*100;
-   float th = 3.6*0.02*100;
-   log(firstMinimum, globalMax, globalMin, xp, th, xp-th, (xp-th)/th);
+   float th = length*100; //3.6*0.02*100;
+   log(/*firstMinimum, globalMax, globalMin, xp, th, xp-th, (xp-th)/th*/ xp, th,  (xp-th)/th*100, R[globalMax]);
    Plot plot;
+   //plot.min.x = 5; plot.max.x = 30;
    plot.xlabel = "Lag (cm)"__;
-   plot.ylabel = "Autocorrelation"__;
+   plot.ylabel = "Autocorrelation (%)"__;
    plot.dataSets.insert(""__, {::copyRef(K.sliceRange(firstMinimum, globalMin)), ::copyRef(R.sliceRange(firstMinimum, globalMin))});
    writeFile("wire-tension-autocorrelation-"+arguments()[1]+".pdf"_, toPDF(plot, vec2(94.5)), home(), true);
    plots.append(::move(plot));
