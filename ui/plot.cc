@@ -39,6 +39,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
  for(size_t i: range(2)) if(!log[i]) { if(i>0 && min[i]>0) min[i] = 0; if(max[i]<0) max[i] = 0; }
  if(this->min.x < this->max.x) min.x=this->min.x, max.x=this->max.x; // Custom scales
  if(this->min.y < this->max.y) min.y=this->min.y, max.y=this->max.y; // Custom scales
+ //min = 0;
 
  shared<Graphics> graphics;
  if(!(min.x < max.x && min.y < max.y)) return graphics;
@@ -57,7 +58,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
      float tickWidth = max[axis]/tickCount[axis];
      min[axis] = floor(min[axis]/tickWidth)*tickWidth;
      tickCount[axis] += -min[axis]/tickWidth;
-    } else min[axis] = 0;
+    } //else min[axis] = 0;
    }
   } else {
    assert(!log[axis]); //FIXME
@@ -89,21 +90,35 @@ shared<Graphics> Plot::graphics(vec2 size) {
  }
 
  // Evaluates margins
- int left=tickLabelSize.x+textSize, top=tickLabelSize.y*3/2, bottom=tickLabelSize.y*3/2;
- int right = tickLabelSize.x/2+Text(xlabel, textSize, 0,1,0, fontName).sizeHint().x;
+ float left=::max(Text(xlabel, textSize, 0,1,0, fontName).sizeHint().x/2, tickLabelSize.x+textSize);
+ float top=tickLabelSize.y*3/2;
+ float bottom=(tickLabelSize.y+textSize)*3/2;
+ float right = tickLabelSize.x/2;//+Text(xlabel, textSize, 0,1,0, fontName).sizeHint().x;
+ if(fits) right += Text("00° 0K", textSize, 0,1,0, fontName).sizeHint().x;
+
  //left=right=top=bottom=::max(::max(::max(left, right), top), bottom);
  if(plotCircles) {
   //assert_(max.x == max.y, max);
-  int margin = (size.y-(top+bottom))-(size.x-(left+right));
+  /*float W = size.x-(left+right), H = size.y-(top+bottom);
+  float margin = -;
   if(margin > 0) {
    top += margin/2;
    bottom += margin/2;
   } else {
    left -= margin/2;
    right -= margin/2;
-  }
+  }*/
+  float h = size.y - (size.x-(left+right)) * max.y/max.x;
+  //assert_(h > top+bottom);
+  int margin = (h-(top+bottom))/2;
+  top += margin;
+  bottom += margin;
+  //assert_(top+bottom == h, top+bottom, h);
+  /*assert_( (size.y-(top+bottom))*max.x == (size.x-(left+right))*max.y,
+           size.y, top+bottom, size.y-(top+bottom),
+           size.x, left+right, size.x-(left+right));*/
  }
- const int tickLength = 4;
+ const float tickLength = 4;
 
  // Evaluates colors
  buffer<bgr3f> colors(dataSets.size());
@@ -155,7 +170,8 @@ shared<Graphics> Plot::graphics(vec2 size) {
    graphics->lines.append(p, p+vec2(0,-tickLength));
    graphics->graphics.insertMulti(p + vec2(-tick.sizeHint().x/2, /*-min.y > max.y ? -tick.sizeHint().y :*/  -tick.sizeHint().y/2+textSize), tick.graphics(0));
   }
-  {Text text(bold(xlabel),textSize, 0,1,0, fontName); graphics->graphics.insert(vec2(int2(point(end))+int2(tickLabelSize.x/2, -text.sizeHint().y/2)), text.graphics(0)); }
+  {Text text(bold(xlabel),textSize, 0,1,0, fontName);
+   graphics->graphics.insert(vec2((left+(size.x-right))/2-text.sizeHint().x/2, size.y-bottom-textSize), text.graphics(0)); }
  }
  {vec2 O=vec2(min.x>0 ? min.x : max.x<0 ? max.x : 0, min.y), end = vec2(O.x, max.y); // Y
   graphics->lines.append(point(O), point(end));
@@ -165,7 +181,8 @@ shared<Graphics> Plot::graphics(vec2 size) {
    Text& tick = ticks[1][i];
    graphics->graphics.insert(p + vec2(-tick.sizeHint().x-textSize, -tick.sizeHint().y/2), tick.graphics(0));
   }
-  {Text text(bold(ylabel),textSize, 0,1,0, fontName); graphics->graphics.insert(vec2(int2(point(end))+int2(-text.sizeHint().x/2, /*-text.sizeHint().y-tickLabelSize.y/2*/-text.sizeHint().y/2-textSize)), text.graphics(0));}
+  {Text text(bold(ylabel),textSize, 0,1,0, fontName);
+   graphics->graphics.insert(vec2(int2(point(end))+int2(-text.sizeHint().x/2, /*-text.sizeHint().y-tickLabelSize.y/2*/-text.sizeHint().y/2-textSize)), text.graphics(0));}
  }
 
  // Plots data points
@@ -261,7 +278,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
    minY = B.y - textSize;
    graphics->lines.append(point(vec2(0,f.b)), B, colors[i]);
    int a = round(atan(f.a, 1)*180/PI);
-   int b = round(f.b/1000);
+   int b = round(f.b);
    if(!done[a]) {
     done[a]++;
     Text text(str(a)+"° "+str(b)+"K", textSize, colors[i], 1,0, fontName);

@@ -51,7 +51,7 @@ struct ParameterSweep {
        parameters["Pattern"__] = pattern;
        for(int pressure: {20,40,60,80,100,120}) {
         parameters["Pressure"__] = String(str(pressure)+"K"_);
-        array<float> radii = copyRef(ref<float>{0.02});
+        array<float> radii; // = copyRef(ref<float>{0.02});
         // Validation
         if(pressure == 80 && pattern=="none" && !radii.contains(0.05)) radii.append(0.05);
         for(float radius: radii) {
@@ -59,7 +59,7 @@ struct ParameterSweep {
          parameters["Radius"__] = radius;
          parameters["Thickness"__] = "1e-3"__; { // 2-3
           parameters["Side"__] = "1e8"__; { // 8-9
-           parameters["Resolution"__] = "2"__; { //2-3
+           parameters["Resolution"__] = radius==0.05?"2.5"__:"2"__; { //2-3
            for(int seed: {4}) {
             parameters["Seed"__] = seed;
             auto add = [&] {

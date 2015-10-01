@@ -57,7 +57,7 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
    bgra4f currentColor=1;
    auto setColor = [&](bgra4f color) {
     if(color != currentColor) {
-     String id = str(color.a);
+     /*String id = str(color.a);
      if(!pageGraphicStateReferences.contains(id)) {
       if(!graphicStates.contains(id)) {
        Object& graphicState = objects.append();
@@ -68,7 +68,7 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
       }
       pageGraphicStateReferences.insert(copyRef(id), copy(graphicStates.at(id)));
      }
-     content.append("/"_+id+" gs\n");
+     content.append("/"_+id+" gs\n");*/
      content.append(str(color.r, color.g, color.b)+" RG\n");
      content.append(str(color.r, color.g, color.b)+" rg\n");
      currentColor = color;

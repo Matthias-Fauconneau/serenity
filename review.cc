@@ -616,13 +616,13 @@ struct Review {
   if(filter.contains(array.dimensions[0].last())) filter.remove(array.dimensions[0].last());
   if(filter.contains(array.dimensions[1].last())) filter.remove(array.dimensions[1].last());
   Plot plot;
-  plot.xlabel = "Pressure (Pa)"__;
+  plot.xlabel = "Pressure (KPa)"__;
   if(index==Stress) {
    plot.ylabel = "Stress (Pa)"__;
    plot.plotBandsY = true;
    plot.max.y = array.max;
   } else if(index==Deviatoric) {
-   plot.ylabel = /*Deviatoric*/"Stress (Pa)"__;
+   plot.ylabel = /*Deviatoric*/"Stress (KPa)"__;
    plot.plotPoints = true;
    plot.plotLines = false;
    if(plotIndex!=invalid) {
@@ -650,10 +650,10 @@ struct Review {
     if(shortSet.contains("Height")) shortSet.remove("Height");
    String id = str(shortSet.values," "_,""_);
    auto& dataSet = plot.dataSets[::copy(id)];
-   float peakStress = array.points.at(point);
+   float peakStress = array.points.at(point) / 1000;
    if(!peakStress) continue;
-   float outsidePressure = float(point.at("Pressure"));
-   float effectivePressure = array.pressure.at(point);
+   float outsidePressure = float(point.at("Pressure")) / 1000;
+   float effectivePressure = array.pressure.at(point) / 1000;
    assert_(effectivePressure >= 0, effectivePressure);
    /***/if(index==Pressure)
     dataSet.insertSortedMulti(outsidePressure, effectivePressure);
@@ -855,7 +855,7 @@ struct Review {
    error("plot");
   }
 
-  if(1) {
+  if(0) {
    auto group = array.parseDict("Angle=3.6,Elasticity=1e7,Friction=0.3,Pattern=cross,Pressure=60K,Radius=0.02,Rate=100,Resolution=2,Seed=3,Side=1e8,Thickness=1e-3,TimeStep=10µ,Wire=12%");
    /*for(size_t index: range(4)) {
     auto plot = pressurePlot(group, Deviatoric, index);
@@ -865,13 +865,14 @@ struct Review {
     writeFile(name+".pdf"_, toPDF(plot), home(), true);
    }*/
    VList<Plot> plots (Linear::Share, Linear::Expand);
-   for(size_t index: range(4)) {
-    plots.append(pressurePlot(group, Deviatoric, index));
-    String& name = plots.last().dataSets.keys[0];
-    name = copyRef(ref<string>{"Without wire"_, "Simple helix"_,"Spiral helix"_,"Radially reinforced helix"_}[
-                                                      ref<string>{"none"_,"helix","loop","cross"}.indexOf(name)]);
+   for(size_t index: range(1)) {
+    auto& plot = plots.append(pressurePlot(group, Deviatoric, index));
+    plot.max = vec2(200, 100);
+    String& name = plot.dataSets.keys[0];
+    name = ""__; /*copyRef(ref<string>{"Without wire"_, "Simple helix"_,"Spiral helix"_,"Radially reinforced helix"_}[
+                                                      ref<string>{"none"_,"helix","loop","cross"}.indexOf(name)]);*/
    }
-   writeFile("all.pdf"_, toPDF(plots, vec2(94.5, 267.3)), home(), true);
+   writeFile("all.pdf"_, toPDF(plots, vec2(94.5, 94.5/*267.3*/)), home(), true);
    auto plot = pressurePlot(group, Deviatoric);
    writeFile("plot.pdf"_, toPDF(plot, vec2(94.5)), home(), true);
    error("plot");

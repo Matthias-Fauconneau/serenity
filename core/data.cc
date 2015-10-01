@@ -256,7 +256,7 @@ double TextData::decimal() {
  double significand=0, decimal=0, eSign=1, exponent=0;
  if(match("∞")) return sign*__builtin_inf();
  if(match("NaN")) return nan;
- assert_(isInteger(), data);
+ assert_(isInteger(), peek(16));
  //if(!isInteger()) return nan;
  for(bool gotDot=false, gotE=false; available(1);) {
   /**/  if(!gotDot && match('.')) gotDot=true;

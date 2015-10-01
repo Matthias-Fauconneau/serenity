@@ -90,3 +90,4 @@ snapshot-view.h
 sge.h
 serenity.config
 avx_mathfun.h
+wire-plot.cc

@@ -233,7 +233,7 @@ struct Simulation : System {
 
   if(wire.count) {
    array<char> s;
-   s.append(str(wire.radius)+'\n');
+   s.append("Radius: "+str(wire.radius)+", Internode length: "+str(wire.internodeLength)+'\n');
    s.append(str("P1, P2, grain contact count, grain contact energy (µJ)")+'\n');
    for(size_t i: range(0, wire.count-1)) {
     //float energy = 0;
