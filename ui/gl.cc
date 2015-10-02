@@ -174,9 +174,15 @@ void GLVertexArray::bindAttribute(int index, int elementSize, AttributeType type
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
+float lineWidth = 0.5;
 void GLVertexArray::draw(PrimitiveType primitiveType, uint vertexCount) const {
     bind();
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable (GL_BLEND);
+    glEnable(GL_LINE_SMOOTH);
+    glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+    glLineWidth(lineWidth);
     glDrawArrays(primitiveType, 0, vertexCount);
 }
 

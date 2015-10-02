@@ -65,15 +65,15 @@ buffer<float> medianFilter(ref<float> source, size_t W=medianWindowRadius) {
 
 inline Fit totalLeastSquare(ref<float> X, ref<float> Y) {
  assert_(X.size == Y.size);
- float mx = mean(X), my = mean(Y);
+ double mx = mean(X), my = mean(Y);
  size_t N = X.size;
  if(N<=1) return {0,0};
  assert_(N>1);
- float sxx=0; for(float x: X) sxx += sq(x-mx); sxx /= (N-1);
- float sxy=0; for(size_t i: range(N)) sxy += (X[i]-mx)*(Y[i]-my); sxy /= (N-1);
- float syy=0; for(float y: Y) syy += sq(y-my); syy /= (N-1);
- float a = (syy - sxx + sqrt(sq(syy-sxx)+4*sq(sxy))) / (2*sxy);
- float b = my - a*mx;
+ double sxx=0; for(float x: X) sxx += sq(x-mx); sxx /= (N-1);
+ double sxy=0; for(size_t i: range(N)) sxy += (X[i]-mx)*(Y[i]-my); sxy /= (N-1);
+ double syy=0; for(float y: Y) syy += sq(y-my); syy /= (N-1);
+ double a = (syy - sxx + sqrt(sq(syy-sxx)+4*sq(sxy))) / (2*sxy);
+ double b = my - a*mx;
  return {a, b};
 }
 
@@ -328,7 +328,7 @@ break2:;
    max = ::max(points.values);
   }
   dimensions[0] = copyRef(ref<string>{"Friction"_, "TimeStep"_, "Radius"_, /*"Elasticity",*/ "Pressure"_, "Seed"_});
-  dimensions[1] = copyRef(ref<string>{"Resolution"_, "Side","Thickness","Wire"_,"Angle"_,"Pattern"_});
+  dimensions[1] = copyRef(ref<string>{"Resolution"_, "Side","Thickness","Wire"_,"Rate"_,"Angle"_,"Pattern"_});
   for(auto& dimensions: this->dimensions) {
    dimensions.filter([this](const string dimension) {
     for(const Dict& coordinates: points.keys) if(coordinates.keys.contains(dimension)) return false;
@@ -598,9 +598,12 @@ struct Review {
  Plot pressure;
  SnapshotView snapshotView;
  Text output;
- HBox hbox {{&pressure, &snapshotView}};
  UniformGrid<Plot> strainPlots {4};
- VBox layout {{&array, &hbox, &strainPlots, &output}, VBox::Even};
+ //VList<Plot> strainPlots {4};
+ //HBox hbox1 {{&pressure, &strainPlots}};
+ VBox vbox {{&pressure,/*&hbox1,*/&strainPlots, &output}};
+ HBox hbox {{&vbox, &snapshotView}};
+ VBox layout {{&array, &hbox/*, &strainPlots*//*, &output*/}/*, VBox::Even*/};
  unique<Window> window = nullptr;// = ::window(&layout, int2(0, 0), mainThread, true);
 
  bool useMedianFilter = true;
@@ -651,15 +654,19 @@ struct Review {
    String id = str(shortSet.values," "_,""_);
    auto& dataSet = plot.dataSets[::copy(id)];
    float peakStress = array.points.at(point) / 1000;
-   if(!peakStress) continue;
+   if(peakStress <= 0) continue;
+   bool running = false;
+   //for(const auto& job: array.jobs) if(job.dict == point) if(job.state=="running" || job.state=="pending") { log("running"); running=true; }
+   if(running) continue;
    float outsidePressure = float(point.at("Pressure")) / 1000;
    float effectivePressure = array.pressure.at(point) / 1000;
    assert_(effectivePressure >= 0, effectivePressure);
    /***/if(index==Pressure)
     dataSet.insertSortedMulti(outsidePressure, effectivePressure);
-   else if(index==Deviatoric)
+   else if(index==Deviatoric) {
+    if( (peakStress-effectivePressure)/2 < 0) continue;
     dataSet.insertSortedMulti((effectivePressure+peakStress)/2, (peakStress-effectivePressure)/2);
-   else if(index==Stress)
+   } else if(index==Stress)
     dataSet.insertSortedMulti(effectivePressure, peakStress);
    log(point);
   }
@@ -671,9 +678,8 @@ struct Review {
    plot.dataSets.values.append(move(value));
   }
   if(index==Deviatoric && plot.dataSets) {
-   const size_t N = 16;
-
-   buffer<map<NaturalString, map<float, float>>> tangents (N); tangents.clear();
+   //const size_t N = 16;
+   //buffer<map<NaturalString, map<float, float>>> tangents (N); tangents.clear();
 
    for(auto entry: plot.dataSets) {
     ref<float> X = entry.value.keys, Y = entry.value.values;
@@ -734,6 +740,7 @@ struct Review {
    }
   }
   for(auto& key: plot.dataSets.keys)  if(key && key[0] < 16) key = copyRef(key.slice(1));
+  plot.uniformScale = true;
   return plot;
  }
 
@@ -855,26 +862,34 @@ struct Review {
    error("plot");
   }
 
-  if(0) {
+  if(1) {
    auto group = array.parseDict("Angle=3.6,Elasticity=1e7,Friction=0.3,Pattern=cross,Pressure=60K,Radius=0.02,Rate=100,Resolution=2,Seed=3,Side=1e8,Thickness=1e-3,TimeStep=10µ,Wire=12%");
-   /*for(size_t index: range(4)) {
-    auto plot = pressurePlot(group, Deviatoric, index);
-    String name = copyRef(plot.dataSets.keys[0]);
-    plot.dataSets.keys[0] = copyRef(ref<string>{"No Wire"_, "Simple Helix"_,"Spiral Helix"_,"Radially Reinforced Helix"_}[
-                                                      ref<string>{"none"_,"helix","loop","cross"}.indexOf(name)]);
-    writeFile(name+".pdf"_, toPDF(plot), home(), true);
-   }*/
-   VList<Plot> plots (Linear::Share, Linear::Expand);
-   for(size_t index: range(1)) {
-    auto& plot = plots.append(pressurePlot(group, Deviatoric, index));
-    plot.max = vec2(200, 100);
-    String& name = plot.dataSets.keys[0];
-    name = ""__; /*copyRef(ref<string>{"Without wire"_, "Simple helix"_,"Spiral helix"_,"Radially reinforced helix"_}[
+   if(0) {
+    if(1) {
+     for(size_t index: range(3,4)) {
+      Plot plot = pressurePlot(group, Deviatoric, index);
+      plot.max = vec2(200, 100);
+      String name = copyRef(plot.dataSets.keys[0]);
+      plot.dataSets.keys[0] = ""__; /*copyRef(ref<string>{"No Wire"_, "Simple Helix"_,"Spiral Helix"_,"Radially Reinforced Helix"_}[
+                                     ref<string>{"none"_,"helix","loop","cross"}.indexOf(name)]);*/
+      writeFile(name+".pdf"_, toPDF(plot, vec2(94.5, 94.5/1.5)), home(), true);
+      error(name);
+     }
+    } else {
+     VList<Plot> plots (Linear::Share, Linear::Expand);
+     for(size_t index: range(1)) {
+      auto& plot = plots.append(pressurePlot(group, Deviatoric, index));
+      plot.max = vec2(200, 100);
+      String& name = plot.dataSets.keys[0];
+      name = ""__; /*copyRef(ref<string>{"Without wire"_, "Simple helix"_,"Spiral helix"_,"Radially reinforced helix"_}[
                                                       ref<string>{"none"_,"helix","loop","cross"}.indexOf(name)]);*/
+     }
+     writeFile("none.pdf"_, toPDF(plots, vec2(94.5, 94.5/*267.3*/)), home(), true);
+    }
    }
-   writeFile("all.pdf"_, toPDF(plots, vec2(94.5, 94.5/*267.3*/)), home(), true);
-   auto plot = pressurePlot(group, Deviatoric);
-   writeFile("plot.pdf"_, toPDF(plot, vec2(94.5)), home(), true);
+   Plot plot = pressurePlot(group, Deviatoric);
+   log(plot.dataSets.keys);
+   writeFile("plot.pdf"_, toPDF(plot, vec2(94.5, 94.5/1.5)), home(), true);
    error("plot");
   }
 

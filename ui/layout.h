@@ -113,7 +113,11 @@ generic struct HList : Horizontal, WidgetArray<T> {
 /// Vertical layout of homogenous items. \sa WidgetArray
 generic struct VList : Vertical, WidgetArray<T> {
 	VList(buffer<T>&& widgets) : WidgetArray<T>(move(widgets)){}
-    VList(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
+ VList(Extra main=Share, Extra side=AlignCenter):Linear(main,side){}
+ VList(size_t count) {
+  array<T>::grow(count);
+  buffer<T>::clear();
+ }
 };
 
 /// Layouts items on a #width x #height grid

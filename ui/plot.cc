@@ -6,7 +6,7 @@
 struct Ticks { float max; uint tickCount; };
 uint subExponent(float& value) {
  float subExponent = exp10(log10(abs(value)) - floor(log10(abs(value))));
- for(auto a: (float[][2]){{1,5},{1.2,6},{1.4,7},{1.6,4},{2,5},{2.5,5},{3,3},{3.2,8},{4,8},{5,5},{6,6},{8,8},{10,5}}) {
+ for(auto a: (float[][2]){{1,5},{1.2,6},{1.4,7},{1.6,4},{2,5},{2.5,5},{3,3},{3.2,8},{4,4},{5,5},{6,6},{8,8},{10,5}}) {
   if(a[0] >= subExponent-0x1p-52) {
    value=(value>0?1:-1)*a[0]*exp10(floor(log10(abs(value))));
    return a[1];
@@ -20,7 +20,7 @@ vec2 Plot::sizeHint(vec2 size) {
  //if(!size) size = 1024;
  size.x = ::min(size.x, 1680.f/5);
  size.y = ::min(size.y, 1680.f/5);
- if(plotCircles) return -::min(size.x, size.y); // FIXME: margin.x > margin.y
+ if(plotCircles || uniformScale) return -::min(size.x, size.y); // FIXME: margin.x > margin.y
  else size.y = ::min(size.y, 3*size.x/4);
  return -size; // Expanding
 }
@@ -97,7 +97,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
  if(fits) right += Text("00° 0K", textSize, 0,1,0, fontName).sizeHint().x;
 
  //left=right=top=bottom=::max(::max(::max(left, right), top), bottom);
- if(plotCircles) {
+ if(plotCircles || uniformScale) {
   //assert_(max.x == max.y, max);
   /*float W = size.x-(left+right), H = size.y-(top+bottom);
   float margin = -;
@@ -276,15 +276,22 @@ shared<Graphics> Plot::graphics(vec2 size) {
   for(size_t i: range(fits.size())) for(auto f: fits.values[i]) {
    float y = f.a*x+f.b;
    vec2 B = point(vec2(x, y));
+   graphics->lines.append(point(vec2(0,f.b)), B, colors[i]);
    B.y = ::min(minY, B.y);
    minY = B.y - textSize;
-   graphics->lines.append(point(vec2(0,f.b)), B, colors[i]);
    int a = round(atan(f.a, 1)*180/PI);
    int b = round(f.b);
-   if(!done[a]) {
+   if(1 || !done[a]) {
     done[a]++;
     Text text(str(a)+"° "+str(b)+"K", textSize, colors[i], 1,0, fontName);
     graphics->graphics.insert(B+vec2(textSize, -text.sizeHint().y/2), text.graphics(0));
+   }
+   const auto& data = dataSets.values[i];
+   for(auto p: data) {
+    float x = p.key, y = p.value;
+    float x2 = x + f.a/(f.a*f.a+1)*(y-f.b-f.a*x);
+    float y2 = f.a*x2 + f.b;
+    graphics->lines.append(point(vec2(x,y)), point(vec2(x2, y2)), colors[i]);
    }
   }
  }
