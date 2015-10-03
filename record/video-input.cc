@@ -17,18 +17,25 @@ typedef IOW<'V', 68, uint32> SetPriority;
 
 void VideoInput::setup() {
     //for(v4l2_fmtdesc fmt {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .index=0}; iowr<EnumerateFormats>(fmt, -1) != int(-1); fmt.index++)
-    //    log(fmt.type, fmt.index, (const char*)fmt.description, fmt.flags);
-    for(v4l2_frmsizeenum frm {.index=0, .pixel_format=V4L2_PIX_FMT_MJPEG}; iowr<EnumerateFrameSizes>(frm, -1) != int(-1); frm.index++)
-        width=frm.discrete.width, height=frm.discrete.height;
-    for(v4l2_frmivalenum frm = {.index=0, .pixel_format=V4L2_PIX_FMT_MJPEG, .width=width, .height=height}; iowr<EnumerateFrameIntervals>(frm, -1) != int(-1);
+    //   log(fmt.type, fmt.index, (const char*)fmt.description, fmt.flags);
+    //for(v4l2_frmsizeenum frm {.index=0, .pixel_format=V4L2_PIX_FMT_YUYV/*V4L2_PIX_FMT_MJPEG*/}; iowr<EnumerateFrameSizes>(frm, -1) != int(-1); frm.index++) {
+    //    log(frm.discrete.width, frm.discrete.height);
+    //    width=frm.discrete.width, height=frm.discrete.height;
+    //}
+    //log(width, height);
+    width = 1280, height = 720;
+    /*for(v4l2_frmivalenum frm = {.index=0, .pixel_format=V4L2_PIX_FMT_MJPEG, .width=width, .height=height}; iowr<EnumerateFrameIntervals>(frm, -1) != int(-1);
         frm.index++) {
         assert_(frm.type==V4L2_FRMIVAL_TYPE_DISCRETE && frm.discrete.numerator == 1);
         frameRate = frm.discrete.denominator;
-    }
+        log(frameRate);
+    }*/
+    frameRate = 30;
     v4l2_format fmt = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .fmt.pix={.width=width, .height=height, .pixelformat=V4L2_PIX_FMT_MJPEG, .field=0, .bytesperline=0,
                                                                       .sizeimage=0/*uint(size.y*size.x)*/, .colorspace=0, .priv=0}};
     iowr<SetFormat>(fmt);
     width=fmt.fmt.pix.width, height=fmt.fmt.pix.height;
+    assert_(width==1280 && height==720);
     v4l2_streamparm parm {.type=V4L2_BUF_TYPE_VIDEO_CAPTURE};
     iowr<GetParameters>(parm);
     assert_(parm.parm.capture.timeperframe.numerator == 1);

@@ -17,14 +17,21 @@ struct Record : Poll, Widget {
     int32 reportedMaximumAmplitude = 1<<30;
     float smoothedMean = 0;
 
+#define VIDEO 1
+#if VIDEO
     Thread videoThread {-20};
-	//VideoInput video {{this, &Record::bufferVideo}, videoThread};
+    VideoInput video {{this, &Record::bufferVideo}, videoThread};
     struct VideoFrame : buffer<byte> { uint64 time=0; VideoFrame() {} VideoFrame(buffer<byte>&& data, uint64 time) : buffer<byte>(::move(data)), time(time) {} };
     array<VideoFrame> videoFrames;
     uint64 firstTimeStamp = 0;
 
     const int margin = 16;
-	Window window {this, int2(/*video.width+*/2*margin,600/*video.height+margin*/), [](){return "Record"__;}};
+    unique<Window> window = ::window(this, int2(video.width+2*margin,video.height+margin));
+#else
+    const int margin = 16;
+    unique<Window> window = ::window(this, int2(/*video.width+*/2*margin,600/*video.height+margin*/));
+#endif
+
     Lock viewLock;
     VideoFrame lastFrame;
     Image image;
@@ -47,20 +54,24 @@ struct Record : Poll, Widget {
     Record() {
         assert_(audio.sampleBits==32);
 
-        window.actions[F1] = window.actions[LeftArrow] = {this, &Record::abort};
-        window.actions[F8] = window.actions[DownArrow] = {this, &Record::stop};
-        window.actions[F3] = window.actions[RightArrow] = {this, &Record::start};
-        window.actions[Space] = {this, &Record::toggle};
-        window.show();
+        window->actions[F1] = window->actions[LeftArrow] = {this, &Record::abort};
+        window->actions[F8] = window->actions[DownArrow] = {this, &Record::stop};
+        window->actions[F3] = window->actions[RightArrow] = {this, &Record::start};
+        window->actions[Space] = {this, &Record::toggle};
+        window->show();
 
-		//video.start();
+#if VIDEO
+        video.start();
         videoThread.spawn();
+#endif
         audio.start(2, 48000, 4096 /*ChromeOS kernel restricts maximum buffer size*/);
         audioThread.spawn(); // after registerPoll in audio.setup
     }
     ~Record() {
         audioThread.wait();
+#if VIDEO
         videoThread.wait();
+#endif
     }
 
     void start() {
@@ -83,7 +94,9 @@ struct Record : Poll, Widget {
     void abort() {
         Locker locker(lock);
         audioFrames.clear();
+#if VIDEO
         videoFrames.clear();
+#endif
         if(encoder) {
             encoder->abort();
             encoder = nullptr;
@@ -118,6 +131,7 @@ struct Record : Poll, Widget {
         return input.size/audio.channels;
     }
 
+#if VIDEO
     void bufferVideo(ref<byte> data, uint64 time) {
         if(!encoder || !encodeVideo) {
             Locker locker(viewLock);
@@ -129,9 +143,10 @@ struct Record : Poll, Widget {
         }
         queue();
     }
+#endif
 
     // Encoder thread (TODO: multithread ?)
-    void event() {
+    void event() override {
         if(audio.overruns && encoder) {
             remainingBeepTime = 48000;
             audioOutput.start(48000, 4096, 32, 2);
@@ -140,9 +155,9 @@ struct Record : Poll, Widget {
             return;
         }
         while(encode()) {}
-        if(contentChanged) window.render(); // only when otherwise idle
+        if(contentChanged) window->render(); // only when otherwise idle
         if(maximumAmplitude > reportedMaximumAmplitude) {
-            float bit = log2(real(maximumAmplitude));
+            float bit = log2(double(maximumAmplitude));
             log("Warning: Measured maximum amplitude at",bit,"bit, leaving only ",31-bit, "headroom");
             reportedMaximumAmplitude = maximumAmplitude;
         }
@@ -151,6 +166,7 @@ struct Record : Poll, Widget {
     bool encode(bool lock=true) {
         if(!encoder) return false;
         if(lock) this->lock.lock();
+#if VIDEO
         if(videoFrames /*&& encoder->videoTime*encoder->audioFrameRate <= (encoder->audioTime+encoder->audioFrameSize)*encoder->videoFrameRate*/) {
             VideoFrame frame = videoFrames.take(0);
             if(lock) this->lock.unlock();
@@ -160,9 +176,10 @@ struct Record : Poll, Widget {
             Locker locker(viewLock);
             lastFrame = move(frame);
             contentChanged = true;
-
+            log(lastFrame.time);
             return true;
         }
+#endif
         if(audioFrames /*&& encoder->audioTime*encoder->videoFrameRate <= (encoder->videoTime+1)*encoder->audioFrameRate*/) {
             buffer<int32> frame = audioFrames.take(0);
             if(lock) this->lock.unlock();
@@ -202,7 +219,7 @@ struct Record : Poll, Widget {
         int2 offset = int2((size.x-image.size.x)/2, size.y-image.size.y);
         if(encoder) { // Capacity meter
             int64 fileSize = File(encoder->path, currentWorkingDirectory()).size();
-            int64 available = ::available(encoder->path, currentWorkingDirectory());
+            int64 available = ::availableCapacity(encoder->path, currentWorkingDirectory());
             float x = int64(size.x-2*offset.x) * fileSize / (fileSize+available);
             graphics->fills.append(vec2(offset.x, 0), vec2(offset.x + x, offset.y), green);
             graphics->fills.append(vec2(offset.x + x, 0), vec2(size.x-offset.x - (offset.x + x), offset.y), black);
@@ -221,7 +238,7 @@ struct Record : Poll, Widget {
             graphics->fills.append(vec2(channel?offset.x+image.size.x:0, 0), vec2(offset.x, y), black);
             graphics->fills.append(vec2(channel?offset.x+image.size.x:0, y), vec2(offset.x, size.y-y), maximumAmplitude < ((1<<31)-1) ? green : red);
         }
-		if(image) graphics->blits.append(vec2(offset), size-vec2(offset), share(image));
+        if(image) graphics->blits.append(vec2(offset), vec2(image.size), unsafeShare(image));
         return graphics;
     }
 } app;

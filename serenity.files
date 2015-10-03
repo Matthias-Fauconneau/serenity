@@ -68,3 +68,11 @@ music/notation.h
 music/sheet.cc
 music/MusicXML.cc
 music/music-pdf.cc
+
+pitch/fft.cc
+pitch/profile.h
+pitch/tuner.cc
+
+audio/audio.cc
+record/video-record.cc
+record/video-input.cc

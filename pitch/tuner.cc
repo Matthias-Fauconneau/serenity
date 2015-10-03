@@ -51,14 +51,14 @@ struct Tuner : Poll {
     OffsetPlot profile;
     VBox layout {{&status, &profile}};
 	//Thread uiThread;
-	Window window{&layout, 0, []{ return "Tuner"__;}};
+    unique<Window> window = ::window(&layout, 0);
 
     Tuner() {
 		if(arguments().size>0 && isInteger(arguments()[0])) minWorstKey=parseInteger(arguments()[0]);
 		if(arguments().size>1 && isInteger(arguments()[1])) maxWorstKey=parseInteger(arguments()[1]);
 
-		window.backgroundColor = black;
-        window.actions[Space] = [this]{record=!record;}; //FIXME: threads waiting on semaphores will be stuck
+        window->backgroundColor = black;
+        window->actions[Space] = [this]{record=!record;}; //FIXME: threads waiting on semaphores will be stuck
 
 		input.start(2, rate, periodSize);
 		log(input.sampleBits, input.rate, input.periodSize);
@@ -153,7 +153,7 @@ struct Tuner : Poll {
                     needUpdate = true;
                 }
             }
-            if(needUpdate) window.render();
+            if(needUpdate) window->render();
         }
     }
 } app;

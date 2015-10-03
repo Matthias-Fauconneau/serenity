@@ -1,6 +1,7 @@
 #include "file.h"
 #include "widget.h"
 #include "graphics.h"
+#include "data.h"
 
 // \file ?
 generic T sign(T x) { return x > 0 ? 1 : x < 0 ? -1 : 0; }
@@ -15,7 +16,8 @@ struct OffsetPlot : Widget {
     float variances[keyCount] = {};
     OffsetPlot() {
       if(!existsFile("offsets.profile",config)) return;
-      TextData s = readFile("offsets.profile",config);
+      auto data = readFile("offsets.profile", config);
+      TextData s (data);
 	  for(uint i: range(keyCount)) { offsets[i] = clamp(-1./2, s.decimal()/100, 1./2); s.skip(' '); variances[i] = sq(s.decimal()/100); s.skip('\n'); }
     }
     ~OffsetPlot() {
