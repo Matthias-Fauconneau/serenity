@@ -66,6 +66,7 @@ struct Record : Poll, Widget {
 #endif
         audio.start(2, 48000, 4096 /*ChromeOS kernel restricts maximum buffer size*/);
         audioThread.spawn(); // after registerPoll in audio.setup
+        //start();
     }
     ~Record() {
         audioThread.wait();
@@ -80,7 +81,9 @@ struct Record : Poll, Widget {
         Locker locker(lock);
         firstTimeStamp = 0;
         encoder = unique<Encoder>(arguments()[0]+".mkv"_);
-		//if(encodeVideo) encoder->setMJPEG(int2(video.width, video.height), video.frameRate);
+#if VIDEO
+        if(encodeVideo) encoder->setMJPEG(int2(video.width, video.height), video.frameRate);
+#endif
         if(encodeAudio) encoder->setFLAC(audio.sampleBits, 1, 48000);
         encoder->open();
         audio.start(2, encoder->audioFrameRate, 4096 /*ChromeOS kernel restricts maximum buffer size*/);
@@ -176,7 +179,6 @@ struct Record : Poll, Widget {
             Locker locker(viewLock);
             lastFrame = move(frame);
             contentChanged = true;
-            log(lastFrame.time);
             return true;
         }
 #endif
@@ -223,6 +225,7 @@ struct Record : Poll, Widget {
             float x = int64(size.x-2*offset.x) * fileSize / (fileSize+available);
             graphics->fills.append(vec2(offset.x, 0), vec2(offset.x + x, offset.y), green);
             graphics->fills.append(vec2(offset.x + x, 0), vec2(size.x-offset.x - (offset.x + x), offset.y), black);
+            assert_(encoder->videoFrameRate && encoder->audioFrameRate, encoder->videoFrameRate, encoder->audioFrameRate);
             int fileLengthSeconds = encodeVideo ? (encoder->videoTime+encoder->videoFrameRate-1)/encoder->videoFrameRate
                                                 : (encoder->audioTime+encoder->audioFrameRate-1)/encoder->audioFrameRate;
             int64 fileSizeMB = (fileSize+1023) / 1024 / 1024;

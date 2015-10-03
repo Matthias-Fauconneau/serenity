@@ -30,6 +30,7 @@ Encoder::Encoder(string name) : path(copyRef(name)) {
 
 void Encoder::setMJPEG(int2 size, uint videoFrameRate) {
     assert_(!videoStream);
+    assert_(videoFrameRate=30, videoFrameRate);
     this->size=size;
     this->videoFrameRate=videoFrameRate;
 
@@ -45,11 +46,12 @@ void Encoder::setMJPEG(int2 size, uint videoFrameRate) {
     videoCodec->pix_fmt = AV_PIX_FMT_YUVJ444P;
     if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
     check( avcodec_open2(videoCodec, codec, 0) );
-    frame = av_frame_alloc();
+    //frame = av_frame_alloc();
 }
 
 void Encoder::setH264(int2 size, uint videoFrameRate) {
     assert_(!videoStream);
+    assert_(videoFrameRate, videoFrameRate);
     this->size=size;
     this->videoFrameRate=videoFrameRate;
     swsContext = sws_getContext(width, height, AV_PIX_FMT_BGR0, width, height, AV_PIX_FMT_YUV420P, SWS_FAST_BILINEAR, 0, 0, 0);
@@ -117,6 +119,8 @@ void Encoder::setFLAC(uint sampleBits, uint channels, uint rate) {
     assert_(sampleBits==16 || sampleBits==32);
     audioCodec->sample_fmt  = sampleBits==16 ? AV_SAMPLE_FMT_S16 : AV_SAMPLE_FMT_S32;
     audioCodec->sample_rate = rate;
+    audioStream->time_base.num = audioCodec->time_base.num = 1;
+    audioStream->time_base.den = audioCodec->time_base.den = rate;
     audioCodec->channels = channels;
     audioCodec->channel_layout = ref<int>{0,AV_CH_LAYOUT_MONO,AV_CH_LAYOUT_STEREO}[channels];
     if(context->oformat->flags & AVFMT_GLOBALHEADER) audioCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
@@ -128,21 +132,23 @@ void Encoder::open() {
     assert_(context && (videoStream || audioStream));
     avio_open(&context->pb, strz(path), AVIO_FLAG_WRITE);
     AVDictionary* options = 0;
+    assert_(videoStream);
     av_dict_set(&options, "movflags", "faststart", 0);
     check( avformat_write_header(context, &options) );
-    assert(!options);
+    //if(options) { char* s; av_dict_get_string(options, &s, '=', ','); log(str((const char*)s)); }
     lock.unlock();
 }
 
-void Encoder::writeMJPEGPacket(ref<byte> data, int pts) {
+void Encoder::writeMJPEGPacket(ref<byte> data, uint64 pts) {
     assert_(videoStream);
-    frame->pts = pts*videoStream->time_base.den/(1000000*videoStream->time_base.num);
+    assert_(!frame);
 
     AVPacket pkt;
     av_init_packet(&pkt);
     pkt.data = (uint8*)data.data;
     pkt.size = data.size;
     pkt.stream_index = videoStream->index;
+    pkt.dts = pkt.pts = pts*videoStream->time_base.den/(1000000*videoStream->time_base.num);
     Locker locker(lock);
     av_interleaved_write_frame(context, &pkt);
     videoTime++;
@@ -152,7 +158,7 @@ void Encoder::writeVideoFrame(const Image& image) {
     assert_(videoStream && image.size==int2(width,height), image.size);
     int stride = image.stride*4;
     sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, height, frame->data, frame->linesize);
-    //assert_(videoCodec->time_base.num==1 && videoCodec->time_base.den == videoFrameRate);
+    assert_(videoCodec->time_base.num==1 && videoCodec->time_base.den == (int)videoFrameRate);
     frame->pts = videoTime;
 
     AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
@@ -163,7 +169,7 @@ void Encoder::writeVideoFrame(const Image& image) {
         pkt.dts = pkt.dts*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
         pkt.pts = pkt.pts*videoStream->time_base.den/(videoFrameRate*videoStream->time_base.num);
         pkt.stream_index = videoStream->index;
-        //Locker locker(lock);
+        Locker locker(lock); // ?
         av_interleaved_write_frame(context, &pkt);
     }
     videoTime++;
@@ -183,7 +189,9 @@ void Encoder::writeAudioFrame(ref<int16> audio) {
     int gotAudioPacket;
     avcodec_encode_audio2(audioCodec, &pkt, &frame, &gotAudioPacket);
     if(gotAudioPacket) {
-        audioEncodeTime = pkt.dts;
+        audioEncodeTime = pkt.pts;
+        pkt.dts = pkt.dts*audioStream->time_base.den/(audioFrameRate*audioStream->time_base.num);
+        pkt.pts = pkt.pts*audioStream->time_base.den/(audioFrameRate*audioStream->time_base.num);
         pkt.stream_index = audioStream->index;
         Locker locker(lock);
         av_interleaved_write_frame(context, &pkt);
@@ -194,12 +202,12 @@ void Encoder::writeAudioFrame(ref<int16> audio) {
 
 void Encoder::writeAudioFrame(ref<int32> audio) {
     assert_(audioStream && audioCodec->sample_fmt==AV_SAMPLE_FMT_S32);
-    AVFrame frame;
+    AVFrame frame; raw(frame).clear();
     frame.nb_samples = audio.size/channels;
     assert_(frame.nb_samples < audioCodec->frame_size);
     avcodec_fill_audio_frame(&frame, channels, AV_SAMPLE_FMT_S32, (uint8*)audio.data, audio.size * channels * sizeof(int32), 1);
     assert_(audioCodec->time_base.num == audioStream->time_base.num);
-    assert_(audioCodec->time_base.den == audioStream->time_base.den);
+    //assert_(audioCodec->time_base.den == audioStream->time_base.den, audioCodec->time_base.num, audioCodec->time_base.den, audioStream->time_base.num, audioStream->time_base.den);
     assert_(audioCodec->time_base.den == int(audioFrameRate));
     frame.pts = audioTime;
 
@@ -207,7 +215,9 @@ void Encoder::writeAudioFrame(ref<int32> audio) {
     int gotAudioPacket;
     avcodec_encode_audio2(audioCodec, &pkt, &frame, &gotAudioPacket);
     if(gotAudioPacket) {
-        audioEncodeTime = pkt.dts;
+        audioEncodeTime = pkt.pts;
+        pkt.dts = pkt.dts*audioStream->time_base.den/(audioFrameRate*audioStream->time_base.num);
+        pkt.pts = pkt.pts*audioStream->time_base.den/(audioFrameRate*audioStream->time_base.num);
         pkt.stream_index = audioStream->index;
         Locker locker(lock);
         av_interleaved_write_frame(context, &pkt);

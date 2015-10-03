@@ -76,3 +76,4 @@ pitch/tuner.cc
 audio/audio.cc
 record/video-record.cc
 record/video-input.cc
+video/encoder.cc
