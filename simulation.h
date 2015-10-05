@@ -1,5 +1,9 @@
 #include "system.h"
 #include "time.h"
+#define EXP 1
+#if EXP
+#include "avx_mathfun.h"
+#endif
 
 struct element { float key=inf; uint value=0; };
 String str(element e) { return "("+str(e.key)+", "+str(e.value)+")"; }
@@ -542,7 +546,7 @@ break2_:;
   }
   {// Bottom
    size_t gBC = grainBottomCount;
-   while(gBC/8*8 < gBC) grainBottom[gBC++] = grain.count;
+   while(gBC%8) grainBottom[gBC++] = grain.count;
    assert(gBC <= grainCount8, gBC);
    v8sf Bz_R = float8(plate.Pz[0]+Grain::radius);
    buffer<float> Fx(gBC), Fy(gBC), Fz(gBC);
@@ -565,7 +569,7 @@ break2_:;
   }
   {// Top
    size_t gTC = grainTopCount;
-   while(gTC/8*8 < gTC) grainTop[gTC++] = grain.count;
+   while(gTC%8) grainTop[gTC++] = grain.count;
    v8sf Bz_R = float8(plate.Pz[1]-Grain::radius);
    buffer<float> Fx(gTC), Fy(gTC), Fz(gTC);
    for(size_t i = 0; i < gTC; i += 8) {
@@ -587,7 +591,7 @@ break2_:;
   }
   {// Rigid Side
    size_t gSC = grainRigidSideCount;
-   while(gSC/8*8 < gSC) grainRigidSide[gSC++] = grain.count;
+   while(gSC%8) grainRigidSide[gSC++] = grain.count;
    v8sf R = float8(side.radius-Grain::radius);
    buffer<float> Fx(gSC), Fy(gSC), Fz(gSC);
    for(size_t i = 0; i < gSC; i += 8) {
@@ -629,7 +633,7 @@ break2_:;
    v8sf P = float8(pressure/(2*3)); // area = length(cross)/2 / 3 vertices
    v8sf internodeLength8 = float8(side.internodeLength);
   #if EXP
-   v8sf tensionStiffness_internodeLength8 = float8(tensionStiffness*internodeLength);
+   v8sf tensionStiffness_internodeLength8 = float8(side.tensionStiffness*side.internodeLength);
   #else
    v8sf tensionStiffness8 = float8(side.tensionStiffness);
   #endif
@@ -662,7 +666,7 @@ break2_:;
       v8sf length = sqrt(sqLength);
       v8sf delta = length - internodeLength8;
   #if EXP
-      v8sf T = (tensionStiffness_internodeLength8 * (exp256_ps(delta/internodeLength8)-_11111111f))
+      v8sf T = (tensionStiffness_internodeLength8 * (exp256_ps(delta/internodeLength8)-_1f))
         /  length;
   #else
       v8sf T = (tensionStiffness8 * delta) / length;
@@ -682,9 +686,20 @@ break2_:;
      v8sf Px = _0f, Py = _0f, Pz = _0f;
      for(int a=0; a<6; a++) { // TODO: assert peeled
       int b = (a+1)%6;
+#if 0
       Px += (Y[a]*Z[b] - Y[b]*Z[a]);
       Py += (Z[a]*X[b] - Z[b]*X[a]);
       Pz += (X[a]*Y[b] - X[b]*Y[a]);
+#else
+      v8sf px = (Y[a]*Z[b] - Y[b]*Z[a]);
+      v8sf py = (Z[a]*X[b] - Z[b]*X[a]);
+      v8sf pz = (X[a]*Y[b] - X[b]*Y[a]);
+      v8sf dot2 = Ox*px + Oy*py;
+      v8sf mask = dot2 < _0f;
+      Px += (v8sf)((v8si)px & (v8si)mask);
+      Py += (v8sf)((v8si)py & (v8si)mask);
+      Pz += (v8sf)((v8si)pz & (v8si)mask);
+#endif
      }
      *(v8sf*)(Fx+index) += P * Px;
      *(v8sf*)(Fy+index) += P * Py;
@@ -715,13 +730,17 @@ break2_:;
       v4sf O = side.position[s];
       int offset = dot3(XYZ0, floor(scale*(O-min)))[0];
       assert_(offset >= 0, O-min);
-      list<2> D;
+      list<1> D;
+#if 0
       for(size_t n=0; n<3*3; n++) { // FIXME: assert unrolled
        assert_(offset + grainNeighbours[n] >= grainLattice->cells.begin() && offset + grainNeighbours[n]+4 < grainLattice->cells.end(),
                offset, grainNeighbours[n]-grainBase, grainBase-grainLattice->cells.begin());
        v4hi line = *(v4hi*)(offset + grainNeighbours[n]); // Gather
        for(size_t i: range(3)) if(line[i]) { // FIXME: assert unrolled
         size_t g = line[i]-1;
+#else
+      for(size_t g: range(grain.count)) {{
+#endif
         float d = sqrt(sq(side.Px[s]-grain.Px[g]) + sq(side.Py[s]-grain.Py[g]) + sq(side.Pz[s]-grain.Pz[g]));
         if(!D.insert(d, g)) minD3 = ::min(minD3, d);
        }
@@ -735,19 +754,17 @@ break2_:;
     }
     //assert_(minD3 < 2*Grain::radius/sqrt(3.) - Grain::radius, minD3);
     grainSideGlobalMinD2 = minD3 - Grain::radius;
-    //assert_(grainSideGlobalMinD2 > 0, grainSideGlobalMinD2);
-    // Aligns with invalid pairs
-    // Needs at least one invalid pair for packed
-    grainSideA[grainSideCount] = grain.count;
-    grainSideB[grainSideCount] = 0;
-    grainSideCount++;
-    while(grainSideCount/8*8 < grainSideCount) {
-     grainSideA[grainSideCount] = grain.count;
-     grainSideB[grainSideCount] = 0;
-     grainSideCount++;
+    assert_(grainSideGlobalMinD2 > 0, grainSideGlobalMinD2);
+    // Aligns
+    size_t gSC = grainSideCount;
+    while(gSC%8) { // Content does not matter as long as intersection evaluation does not trigger exceptions
+     grainSideA[gSC] = 0;
+     grainSideB[gSC] = 0;
+     gSC++;
     }
+    assert_(gSC <= grainSideA.capacity);
     grainSideLatticeTime.stop();
-    log("side", sideSkipped);
+    //log("side", sideSkipped);
     sideSkipped=0;
    } else sideSkipped++;
 
@@ -763,6 +780,7 @@ break2_:;
      v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
      v8sf depth = Grain::radius8 - length;
      for(size_t subIndex: range(8)) {
+      if(index+subIndex == grainSideCount) break /*2*/;
       if(depth[subIndex] > 0) {
        grainSideContact[grainSideContactCount] = index+subIndex;
        grainSideContactCount++;
@@ -772,12 +790,12 @@ break2_:;
 
     // Aligns with invalid contacts
     size_t gSCC = grainSideContactCount;
-    while(gSCC/8*8 < gSCC)
-     grainSideContact[gSCC++] = grainSideCount-1;
+    while(gSCC%8)
+     grainSideContact[gSCC++] = grainSideCount; // Invalid entry
 
     // Evaluates forces from (packed) intersections
     buffer<float> Fx(gSCC), Fy(gSCC), Fz(gSCC);
-    for(size_t i = 0; i < gSCC; i += 8) {
+    for(size_t i = 0; i < grainSideContactCount; i += 8) {
      v8si contacts = *(v8si*)(grainSideContact.data+i);
      v8si A = gather(grainSideA, contacts), B = gather(grainSideB, contacts);
      // FIXME: Recomputing from intersection (more efficient than storing?)
@@ -794,8 +812,6 @@ break2_:;
      size_t index = grainSideContact[i];
      size_t a = grainSideA[index];
      size_t b = grainSideB[index];
-     assert_(isNumber(Fx[i]) && isNumber(Fy[i]) && isNumber(Fz[i]), Fx[i], Fy[i], Fz[i],
-             i, grainSideContactCount, a, b, grain.count);
      grain.Fx[a] += Fx[i];
      side.Fx[b] -= Fx[i];
      grain.Fy[a] += Fy[i];
@@ -900,7 +916,7 @@ break2_:;
     grainGrainA[grainGrainCount] = grain.count;
     grainGrainB[grainGrainCount] = grain.count;
     grainGrainCount++;
-    while(grainGrainCount/8*8 < grainGrainCount) {
+    while(grainGrainCount%8) {
      grainGrainA[grainGrainCount] = grain.count;
      grainGrainB[grainGrainCount] = grain.count;
      grainGrainCount++;
@@ -939,7 +955,7 @@ break2_:;
 
   // Aligns with invalid contacts
   size_t gGCC = grainGrainContactCount;
-  while(gGCC/8*8 < gGCC) grainGrainContact[gGCC++] = grainGrainCount /*invalid*/;
+  while(gGCC%8) grainGrainContact[gGCC++] = grainGrainCount /*invalid*/;
 
   // Evaluates forces from (packed) intersections
   buffer<float> Fx(gGCC), Fy(gGCC), Fz(gGCC);
@@ -1088,7 +1104,9 @@ break2_:;
      // To avoid bound check
      //min = ::min(min, side.position[7+index]);
      //max = ::max(max, side.position[7+index]);
-     //side.velocity[index] *= float4(1-10*dt); // Additionnal viscosity
+     side.Vx[index] *= (1-10*dt); // Additionnal viscosity
+     side.Vy[index] *= (1-10*dt); // Additionnal viscosity
+     side.Vz[index] *= (1-10*dt); // Additionnal viscosity
      maxSideV = ::max(maxSideV, length(side.velocity[index]));
      maxRadius = ::max(maxRadius, length2(side.position[index]));
     }

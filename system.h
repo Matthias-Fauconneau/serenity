@@ -225,7 +225,7 @@ struct System {
 
  struct Side : Vertex {
   sconst float curvature = 0; // -1/radius?
-  sconst float elasticModulus = 1e7; // for contact
+  sconst float elasticModulus = 1e8; // for contact
   sconst float density = 1e3;
   const float resolution;
   const float initialRadius;
