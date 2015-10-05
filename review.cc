@@ -862,7 +862,7 @@ struct Review {
    error("plot");
   }
 
-  if(1) {
+  if(0) {
    auto group = array.parseDict("Angle=3.6,Elasticity=1e7,Friction=0.3,Pattern=cross,Pressure=60K,Radius=0.02,Rate=100,Resolution=2,Seed=3,Side=1e8,Thickness=1e-3,TimeStep=10µ,Wire=12%");
    if(0) {
     if(1) {

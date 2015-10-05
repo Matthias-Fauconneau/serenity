@@ -151,73 +151,48 @@ struct SimulationView : SimulationRun, Widget, Poll {
 
  vec2 sizeHint(vec2) override { return vec2(1050, 1050*size.y/size.x); }
  shared<Graphics> graphics(vec2) override {
-  const float Dt = 1./60/2;
   size_t grainCount;
   {Locker lock(this->lock); grainCount = grain.count;}
-  {
-   vec4f min = _0f4, max = _0f4;
-   for(size_t i: range(grainCount)) { // FIXME: proper BS
-    min = ::min(min, grain.position[i]);
-    max = ::max(max, grain.position[i]);
-   }
-   for(size_t i: range(wire.count)) { // FIXME: proper BS
-    min = ::min(min, wire.position[i]);
-    max = ::max(max, wire.position[i]);
-   }
-   vec4f rotationCenter = (min+max)/float4(2);
-   rotationCenter[0] = rotationCenter[1] = 0;
-   this->rotationCenter = this->rotationCenter*float4(1-Dt) + float4(Dt)*rotationCenter;
-  }
 
   vec4f viewRotation = qmul(angleVector(viewYawPitch.y, vec3(1,0,0)),
-                                 angleVector(viewYawPitch.x, vec3(0,0,1)));
+                                             angleVector(viewYawPitch.x, vec3(0,0,1)));
 
-  vec3 min = -1./32, max = 1./32;
+  vec3 scale, translation; // Fit view
+  array<vec3> grainPositions (grain.count); // Rotated, Z-Sorted
   {
-   for(size_t index: range(grainCount)) {
-    vec3 p = grain.position[index];
-    vec3 O = toVec3(qapply(viewRotation, p) - rotationCenter);
-    min = ::min(min, O - vec3(vec2(Grain::radius), 0)); // Parallel
-    max = ::max(max, O + vec3(vec2(Grain::radius), 0)); // Parallel
+   vec3 min = inf, max = -inf;
+   for(size_t i: range(grainCount)) {
+    vec3 O = toVec3(qapply(viewRotation, grain.position[i]));
+    min = ::min(min, O - vec3(grain.radius));
+    max = ::max(max, O + vec3(grain.radius));
+    size_t j = 0;
+    while(j < grainPositions.size && grainPositions[j].z < O.z) j++;
+    grainPositions.insertAt(j, O);
    }
-   for(size_t i: range(wire.count)) {
-    vec3 O = toVec3(qapply(viewRotation, wire.position[i]) - rotationCenter);
-    min = ::min(min, O - vec3(vec2(Grain::radius), 0)); // Parallel
-    max = ::max(max, O + vec3(vec2(Grain::radius), 0)); // Parallel
-   }
+   scale = vec3(vec2(2/::max(max.x-min.x, max.y-min.y)), 2/(max-min).z);
+   translation = -vec3((min+max).xy()/2.f, min.z);
   }
+
+  mat4 viewProjection = mat4()
+    .scale(vec3(1,1,-1))
+    .translate(vec3(0,0,-1))
+    .scale(scale)
+    .translate(translation);
+  mat4 rotatedViewProjection = mat4(viewProjection).rotateX(viewYawPitch.y) .rotateZ(viewYawPitch.x);
 
   if(!target) target = GLFrameBuffer(this->size);
   vec2 size (target.size.x, target.size.y);
-  vec2 viewSize = size;
-
-  vec3 scaleMax = max; ::min(max, vec3(vec2(16*Grain::radius), 32*Grain::radius));
-  vec3 scaleMin = min; ::max(min, vec3(vec2(-16*Grain::radius), 0));
-  vec3 scale (2*::min(viewSize/(scaleMax-scaleMin).xy())/size,
-                    -1/(2*(max-min).z));
-  this->scale = this->scale*float(1-Dt) + float(Dt)*scale.xy();
-  //this->scale = /*this->scale*float(1-Dt) + float(Dt)**/scale.xy();
-  scale.xy() = this->scale;
-
-  vec3 translation = this->translation = vec3((size-viewSize)/size, 0);
-
-  mat4 viewProjection = mat4()
-    .translate(translation)
-    .scale(scale)
-    .rotateX(viewYawPitch.y) .rotateZ(viewYawPitch.x)
-    .translate(-toVec3(rotationCenter));
 
   target.bind(ClearColor|ClearDepth);
   glDepthTest(true);
 
-  if(1) {
   if(grainCount) {
    buffer<vec3> positions {grainCount*6};
    for(size_t i: range(grainCount)) {
     // FIXME: GPU quad projection
-    vec3 O = viewProjection * toVec3(grain.position[i]);
-    vec2 min = O.xy() - vec2(scale.xy()) * vec2(Grain::radius); // Parallel
-    vec2 max = O.xy() + vec2(scale.xy()) * vec2(Grain::radius); // Parallel
+    vec3 O = viewProjection * grainPositions[i];
+    vec2 min = O.xy() - vec2(scale.xy()) * vec2(Grain::radius) - vec2(2.f/size.x); // Parallel
+    vec2 max = O.xy() + vec2(scale.xy()) * vec2(Grain::radius) + vec2(2.f/size.x); // Parallel
     positions[i*6+0] = vec3(min, O.z);
     positions[i*6+1] = vec3(max.x, min.y, O.z);
     positions[i*6+2] = vec3(min.x, max.y, O.z);
@@ -235,84 +210,90 @@ struct SimulationView : SimulationRun, Widget, Poll {
    vertexArray.bindAttribute(shader.attribLocation("position"_),
                              3, Float, positionBuffer);
    GLBuffer rotationBuffer (apply(grain.rotation.slice(0, grainCount),
-                [=](vec4f q) -> vec4f { return conjugate(qmul(viewRotation,q)); }));
+                                  [=](vec4f q) -> vec4f { return conjugate(qmul(viewRotation,q)); }));
    shader.bind("rotationBuffer"_, rotationBuffer, 0);
    shader["radius"] = float(scale.z/2 * Grain::radius*3/4); // reduce Z radius to see membrane mesh on/in grain
+   shader["hpxRadius"] = 1 / (size.x * scale.x * grain.radius);
    vertexArray.draw(Triangles, positions.size);
-  }}
+  }
 
-  if(1) {
-   //Locker lock(this->lock);
   if(wire.count>1) {
    size_t wireCount = wire.count;
    buffer<vec3> positions {(wireCount-1)*6};
+   size_t s = 0;
    for(size_t i: range(wireCount-1)) {
     vec3 a (toVec3(wire.position[i])), b (toVec3(wire.position[i+1]));
+    if(length(a.xy()) > 0.05) continue;
+    if(length(b.xy()) > 0.05) continue;
     // FIXME: GPU quad projection
-    vec3 A = viewProjection * a, B= viewProjection * b;
+    vec3 A = rotatedViewProjection * a, B= rotatedViewProjection * b;
     vec2 r = B.xy()-A.xy();
     float l = length(r);
     vec2 t = r/l;
-    vec3 n = scale*float(Wire::radius)*vec3(t.y, -t.x, 0);
+    vec3 n = scale*float(Wire::radius)*vec3(t.y, -t.x, 0); // FIXME: hpx
     vec3 P[4] {A-n, A+n, B-n, B+n};
-    positions[i*6+0] = P[0];
-    positions[i*6+1] = P[1];
-    positions[i*6+2] = P[2];
-    positions[i*6+3] = P[2];
-    positions[i*6+4] = P[1];
-    positions[i*6+5] = P[3];
+    positions[s*6+0] = P[0];
+    positions[s*6+1] = P[1];
+    positions[s*6+2] = P[2];
+    positions[s*6+3] = P[2];
+    positions[s*6+4] = P[1];
+    positions[s*6+5] = P[3];
+    s++;
    }
+   assert_(s*6 <= positions.size);
+   positions.size = s*6;
    static GLShader shader {::shader_glsl(), {"cylinder"}};
    shader.bind();
    shader.bindFragments({"color"});
    shader["transform"] = mat4(1);
    shader["radius"] = float(scale.z/2 * Wire::radius);
+   shader["hpxRadius"] = 1 / (size.x * scale.x * wire.radius);
    static GLVertexArray vertexArray;
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_),
                              3, Float, positionBuffer);
    vertexArray.draw(Triangles, positions.size);
-  }}
-
-  /*static GLShader shader {::shader_glsl(), {"flat"}};
-  shader.bind();
-  shader.bindFragments({"color"});
-  shader["transform"] = mat4(1);*/
+  }
 
   // Membrane
-  /*if(side.faceCount>1)*/ {
-   //Locker lock(this->lock);
-      static GLShader shader {::shader_glsl(), {"color"}};
-      shader.bind();
-      shader.bindFragments({"color"});
-      shader["transform"] = viewProjection;
+  {
+   static GLShader shader {::shader_glsl(), {"color"}};
+   shader.bind();
+   shader.bindFragments({"color"});
+   shader["transform"] = rotatedViewProjection;
+
+   // World space bounding box
+   vec3 min = inf, max = -inf;
+   for(size_t i: range(grainCount)) {
+    min = ::min(min, toVec3(grain.position[i]) - vec3(grain.radius));
+    max = ::max(max, toVec3(grain.position[i]) + vec3(grain.radius));
+   }
 
    size_t W = side.W, stride=side.stride;
    buffer<vec3> positions {W*(side.H-1)*6-W*2};
+   size_t s = 0;
    for(size_t i: range(side.H-1)) for(size_t j: range(W)) {
     vec3 a (toVec3(side.Vertex::position[7+i*stride+j]));
     vec3 b (toVec3(side.Vertex::position[7+i*stride+(j+1)%W]));
     vec3 c (toVec3(side.Vertex::position[7+(i+1)*stride+(j+i%2)%W]));
+    if(a.z < min.z || a.z > max.z) continue;
+    if(b.z < min.z || b.z > max.z) continue;
+    if(c.z < min.z || c.z > max.z) continue;
     // FIXME: GPU projection
     vec3 A =  a, B=  b, C =  c;
-    size_t n = i ? W*4 + ((i-1)*W+j)*6 : j*4;
-    positions[n+0] = C; positions[n+1] = A;
-    positions[n+2] = B; positions[n+3] = C;
-    if(i) { positions[n+4] = A; positions[n+5] = B; }
+    positions[s+0] = C; positions[s+1] = A;
+    positions[s+2] = B; positions[s+3] = C;
+    if(i) { positions[s+4] = A; positions[s+5] = B; s += 6; }
+    else s += 4;
    }
+   assert_(s <= positions.size);
+   positions.size = s;
    static GLVertexArray vertexArray;
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
-   /*CylinderGrid vertexGrid {0, targetHeight,
-               int2(2*PI*side.minRadius/Grain::radius, targetHeight/Grain::radius)}; // FIXME
-   buffer<vec3> colors = apply(positions, [&](vec3 p) {
-           int2 index = vertexGrid.index2(p);
-           if( (index.x%2) ^ (index.y%2) ) return vec3(1,0,0);
-           return vec3(0,1,0);
-   });*/
-   buffer<vec3> colors (positions.size); colors.clear(0);
+   /*buffer<vec3> colors (positions.size); colors.clear(0);
    GLBuffer colorBuffer (colors);
-   vertexArray.bindAttribute(shader.attribLocation("color"_), 3, Float, colorBuffer);
+   vertexArray.bindAttribute(shader.attribLocation("color"_), 3, Float, colorBuffer);*/
    vertexArray.draw(Lines, positions.size);
   }
 
@@ -330,7 +311,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
     float a1 = 2*PI*(j+0)/W; vec3 a (side.radius*cos(a1), side.radius*sin(a1), z);
     float a2 = 2*PI*(j+1)/W; vec3 b (side.radius*cos(a2), side.radius*sin(a2), z);
     // FIXME: GPU projection
-    vec3 A = viewProjection * a, B= viewProjection * b;
+    vec3 A = rotatedViewProjection * a, B= rotatedViewProjection * b;
     size_t n = (i*W+j)*2;
     positions[n+0] = A; positions[n+1] = B;
    }
@@ -343,7 +324,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
 
    if(1) glDepthTest(false);
    {static GLVertexArray vertexArray;
-    shader["transform"] = viewProjection;
+    shader["transform"] = rotatedViewProjection;
     for(auto entry: lines) {
      shader["uColor"] = vec4(entry.key, 1);
      GLBuffer positionBuffer (entry.value);

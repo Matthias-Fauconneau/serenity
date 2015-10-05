@@ -78,7 +78,7 @@ struct System {
   } position {*this};
   struct {
    const Vertex& this_;
-   vec3 operator[](size_t i) const { return vec3(this_.Vx[i], this_.Vy[i], this_.Vx[i]); }
+   vec3 operator[](size_t i) const { return vec3(this_.Vx[i], this_.Vy[i], this_.Vz[i]); }
   } velocity {*this};
 
   //struct { vec4f operator[](size_t) const { return _0001f; }} rotation;
@@ -165,7 +165,7 @@ struct System {
   sconst float curvature = 1./radius;
   sconst float shearModulus = 79e9 * kg / (m*s*s);
   sconst float poissonRatio = 0.28;
-  sconst float elasticModulus = 0 ? 2*shearModulus*(1+poissonRatio) : 1e10; // ~2e11
+  sconst float elasticModulus = 1  ? 2*shearModulus*(1+poissonRatio) : 1e10; // ~2e11
 
   sconst float density = 7.8e3 * densityScale;
   sconst float mass = density * volume;
@@ -225,7 +225,7 @@ struct System {
 
  struct Side : Vertex {
   sconst float curvature = 0; // -1/radius?
-  sconst float elasticModulus = 1e8; // for contact
+  sconst float elasticModulus = 1e7; // for contact
   sconst float density = 1e3;
   const float resolution;
   const float initialRadius;

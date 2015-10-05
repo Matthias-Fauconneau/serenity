@@ -161,7 +161,7 @@ struct SnapshotView : Widget {
     vec2 r = B.xy()-A.xy();
     float l = length(r);
     vec2 t = r/l;
-    vec3 n = scale*float(wire.radius)*vec3(t.y, -t.x, 0);
+    vec3 n = scale*float(wire.radius)*vec3(t.y, -t.x, 0); // FIXME: hpx
     vec3 P[4] {A-n, A+n, B-n, B+n};
     positions[s*6+0] = P[0];
     positions[s*6+1] = P[1];
@@ -212,7 +212,7 @@ struct SnapshotView : Widget {
     s++;
    }
    positions.size = s*2;
-   shader["uColor"] = vec4(black, 1);
+   //shader["uColor"] = vec4(black, 1);
    static GLVertexArray vertexArray;
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
