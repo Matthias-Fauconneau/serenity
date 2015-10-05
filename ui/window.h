@@ -146,6 +146,7 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
 	void setSelection(string selection, bool clipboard) override;
 };
 
+#if DRM
 struct DRMWindow : Window {
 	static unique<Display> display;
 
@@ -174,5 +175,6 @@ struct DRMWindow : Window {
 	String getSelection(bool clipboard) override;
 	void setSelection(string selection, bool clipboard) override;
 };
+#endif
 
 unique<Window> window(Widget* widget, int2 size=-1, Thread& thread=mainThread, bool useGL=false, string title="");

@@ -112,6 +112,7 @@ typedef vec<xy,int,2> int2;
 inline String strx(int2 N) { return str(N.x)+'x'+str(N.y); }
 /// Single precision x,y vector
 typedef vec<xy,float,2> vec2;
+typedef vec<xy,float,2> float2;
 //inline String strx(vec2 N) { return str(N.x)+'x'+str(N.y); }
 
 #include "simd.h"

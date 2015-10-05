@@ -77,3 +77,9 @@ audio/audio.cc
 record/video-record.cc
 record/video-input.cc
 video/encoder.cc
+music/midi.h
+music/midi.cc
+music/flac.h
+music/music-video.cc
+music/keyboard.h
+pitch/biquad.h

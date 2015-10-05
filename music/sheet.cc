@@ -797,7 +797,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
                         float x = measureFirstNote;
                         text(vec2(x, staffY(staves.size-1, max(10, line[1].top))), chord, textSize, system.glyphs, vec2(-1,1));
                         //error(chord);
-                        log_(chord+" ");
+                        //log_(chord+" ");
                     }
 
                     // Clears any pending clef changes right before measure bar (FIXME: defer to new system on break)

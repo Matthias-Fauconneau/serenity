@@ -107,6 +107,7 @@ struct XDisplay : Socket, Poll {
 	 generic buffer<T> getProperty(uint window, string name, size_t length=2+128*128);
 };
 
+#if DRM
 #include "image.h"
 #include "thread.h"
 #include "input.h"
@@ -161,3 +162,4 @@ struct Display : Device, Poll {
 
 	void swapBuffers();
 };
+#endif

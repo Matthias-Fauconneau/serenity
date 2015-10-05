@@ -345,7 +345,7 @@ struct Music : Widget {
     // Sampler
 	Thread decodeThread;
 	const bool encode = arguments().contains("encode") || arguments().contains("export");
-	Sampler sampler {"/Samples/Maestro.sfz"_, 1024, {this, &Music::timeChanged}, encode ? mainThread : decodeThread};
+    //Sampler sampler {"/Samples/Maestro.sfz"_, 1024, {this, &Music::timeChanged}, encode ? mainThread : decodeThread};
 
 	// MusicXML
 	MusicXML xml = existsFile(name+".xml"_) ? readFile(name+".xml"_) : MusicXML();
@@ -359,7 +359,7 @@ struct Music : Widget {
 					 gains[xml.staves.indexOf(selection)] = float2(1, 2);
 					 return gains;
 				 }*/
-	MidiNotes notes = ::scale(midi ? copy(midi.notes) : ::notes(xml.signs, xml.divisions/*, panAmplify(xml.staves, "Bass"_)*/), audioFile ? audioFile->audioFrameRate : sampler.rate);
+    MidiNotes notes = ::scale(midi ? copy(midi.notes) : ::notes(xml.signs, xml.divisions/*, panAmplify(xml.staves, "Bass"_)*/), audioFile ? audioFile->audioFrameRate : /*sampler.rate*/0);
 	// Sheet
     Sheet sheet {xml ? xml.signs : midi.signs, xml ? xml.divisions : midi.divisions, 0, 4,
 				apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
@@ -399,7 +399,7 @@ struct Music : Widget {
 	buffer<uint> onsets = apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.time;});
 
 	size_t read32(mref<int2> output) {
-		if(audioFile) {
+        if(audioFile) {
             if(audioFile->channels == audio.channels) return audioFile->read32(mcast<int>(output));
             else if(audioFile->channels == 1 && audio.channels==2) {
 				int buffer[output.size];
@@ -407,13 +407,16 @@ struct Music : Widget {
 				for(size_t i: range(output.size)) output[i] = buffer[i];
 				return output.size;
             } else error(audioFile->channels);
-		} else {
-			assert_(sampler.channels == audio.channels);
+        } else {
+            /*assert_(sampler.channels == audio.channels);
 			assert_(sampler.rate == audio.rate);
-			return sampler.read32(output);
-		}
+            return sampler.read32(output);*/
+            error("UNIMPL Sampler");
+            return 0;
+        }
 	}
 
+#if SAMPLER
 	/// Adds new notes to be played (called in audio thread by sampler)
 	uint samplerMidiIndex = 0;
 	void timeChanged(uint time) {
@@ -423,6 +426,7 @@ struct Music : Widget {
 			samplerMidiIndex++;
 		}
 	}
+#endif
 
     bool follow(int timeNum, uint timeDen, vec2 size, bool unused preview=true) {
 		assert_(timeDen);
@@ -464,8 +468,8 @@ struct Music : Widget {
 			int64 t1 = (int64)sheet.measureBars.keys[index]*timeDen;
 			int64 t2 = (int64)sheet.measureBars.keys[index+1]*timeDen;
 			if(t1 <= t && t < t2) {
-				real f = real(t-t1)/real(t2-t1);
-				real w[4] = { 1./6 * cb(1-f), 2./3 - 1./2 * sq(f)*(2-f), 2./3 - 1./2 * sq(1-f)*(2-(1-f)), 1./6 * cb(f) };
+                double f = double(t-t1)/double(t2-t1);
+                double w[4] = { 1./6 * cb(1-f), 2./3 - 1./2 * sq(f)*(2-f), 2./3 - 1./2 * sq(1-f)*(2-(1-f)), 1./6 * cb(f) };
 				auto X = [&](int index) { return clamp(0.f, sheet.measureBars.values[clamp<int>(0, index, sheet.measureBars.values.size)] - size.x/2,
 							abs(system.sizeHint(size).x)-size.x); };
 				float newOffset = round( w[0]*X(index-1) + w[1]*X(index) + w[2]*X(index+1) + w[3]*X(index+2) );
@@ -483,9 +487,9 @@ struct Music : Widget {
 				if(!image) { if(!preview) log("Missing image"); break; }
 				assert_(image);
 				if(rotate) ::rotate(image);
-				Image crop = this->crop ? cropShare(image, int2(0, image.height*10/24), int2(image.width, image.height/2)) : share(image);
-				Image scale = this->scale ? ::scale(crop, 2, 1) : share(crop);
-				videoView.image = this->resize ? ::resize(scale.size*resize/(resize+1), scale) : copy(crop);
+                Image crop = this->crop ? cropShare(image, int2(0, image.height*10/24), int2(image.width, image.height/2)) : unsafeShare(image);
+                Image scale = this->scale ? ::scale(crop, 2, 1) : unsafeShare(crop);
+                videoView.image = /*this->resize ? ::resize(scale.size*resize/(resize+1), scale) :*/ copy(crop);
 				contentChanged=true;
 				// Only preview may have lower framerate than video
 				assert_((int64)video.videoTime*timeDen >= (int64)timeNum*video.timeDen || preview || video.videoTime == 0 /*First frame might have a negative timecode*/, video.videoTime, video.timeDen, timeNum, timeDen);
@@ -528,8 +532,10 @@ struct Music : Widget {
 			encoder.setH264(int2(1280,720), 60);
 			if(audioFile && audioFile->codec==FFmpeg::AAC) encoder.setAudio(audioFile);
             else if(audioFile) encoder.setAAC(2 /*Youtube requires stereo*/, audioFile->audioFrameRate);
-			else encoder.setAAC(sampler.channels, sampler.rate); //encoder.setFLAC(32 /*FIXME: assert(write 32)*/, sampler.channels, sampler.rate);
-			encoder.open();
+#if SAMPLER
+            else encoder.setAAC(sampler.channels, sampler.rate); //encoder.setFLAC(32 /*FIXME: assert(write 32)*/, sampler.channels, sampler.rate);
+#endif
+            encoder.open();
 
 			uint videoTime = 0;
 			//int time = seek(max(0u, notes[0].time - notes.ticksPerSeconds));
@@ -554,7 +560,8 @@ struct Music : Widget {
                         } else assert_(audioFile->channels == encoder.channels);
 						if(target.size) encoder.writeAudioFrame(target);
 					}
-					else {
+#if SAMPLER
+                    else {
 						buffer<short2> buffer(sampler.periodSize);
 						sampleTime.start();
 						sampler.read16(buffer);
@@ -563,7 +570,8 @@ struct Music : Widget {
 						encoder.writeAudioFrame(cast<int16>(buffer));
 						audioEncodeTime.stop();
 					}
-					return true;
+#endif
+                    return true;
 				};
 				if(encoder.videoFrameRate) { // Interleaved AV
                     //assert_(encoder.audioStream->time_base.num == 1 && encoder.audioStream->time_base.den == (int)encoder.audioFrameRate);
@@ -607,13 +615,15 @@ struct Music : Widget {
 			log("Done");
 		} else { // Preview
 			//if(!failed) seek(max(0ll, notes[0].time - notes.ticksPerSeconds));
-			window = unique<Window>{this, int2(1280,720), [](){return "MusicXML"__;}, false};
-			window->background = Window::White;
+            window = ::window(this, int2(1280,720));
+            window->backgroundColor = white;
 			window->show();
 			if(running && playbackDeviceAvailable()) {
-				if(sampler) decodeThread.spawn();
-                audio.start(audioFile ? audioFile->audioFrameRate : sampler.rate, audioFile ? 1024 : sampler.periodSize, 32, 2);
-                assert_(audio.rate == (audioFile ? audioFile->audioFrameRate : sampler.rate));
+#if SAMPLER
+                if(sampler) decodeThread.spawn();
+#endif
+                audio.start(audioFile ? audioFile->audioFrameRate : /*sampler.rate*/0, audioFile ? 1024 : /*sampler.periodSize*/0, 32, 2);
+                assert_(audio.rate == (audioFile ? audioFile->audioFrameRate : /*sampler.rate*/0));
 				audioThread.spawn();
 			} else running = false;
 		}
@@ -623,8 +633,10 @@ struct Music : Widget {
     shared<Graphics> graphics(vec2 size) override {
         if(running /*&& video.videoTime < video.duration*/) {
 			if(audioFile) follow(audioFile->audioTime, audioFile->audioFrameRate, vec2(window->size));
-			else follow(sampler.audioTime, sampler.rate, vec2(window->size));
-			window->render();
+#if SAMPLER
+            else follow(sampler.audioTime, sampler.rate, vec2(window->size));
+#endif
+            window->render();
 		}
 		return running ? widget.graphics(size, Rect(size)) : scroll.ScrollArea::graphics(size);
 	}

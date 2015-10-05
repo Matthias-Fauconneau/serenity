@@ -14,6 +14,7 @@ struct Data {
     ::array<byte> buffer;
 
     Data(){}
+    default_move(Data);
     /// Creates a Data interface to a \a ref
     explicit Data(ref<byte> data) : data(data) {}
     /// Creates a Data interface to a \a buffer
@@ -82,8 +83,9 @@ struct BinaryData : Data {
     bool isBigEndian = false;
 
     BinaryData(){}
+    default_move(BinaryData);
     /// Creates a BinaryData interface to an \a array
-    BinaryData(::buffer<byte>&& buffer, bool isBigEndian=false) : Data(move(buffer)), isBigEndian(isBigEndian) {}
+    BinaryData(::buffer<byte>&& buffer, bool isBigEndian=false) : Data(::move(buffer)), isBigEndian(isBigEndian) {}
     /// Creates a BinaryData interface to \a data
     explicit BinaryData(ref<byte> data, bool isBigEndian=false) : Data(data), isBigEndian(isBigEndian) {}
 

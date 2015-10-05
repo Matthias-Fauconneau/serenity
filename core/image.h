@@ -73,9 +73,9 @@ Image rotateHalfTurn(Image&& target);
 // -- Resample (3x8bit) --
 
 /// Resizes \a source into \a target
-void resize(const Image& target, const Image& source);
-inline Image resize(Image&& target, const Image& source) { resize(target, source); return move(target); }
-inline Image resize(int2 size, const Image& source) { return resize(Image(size, source.alpha), source); }
+//void resize(const Image& target, const Image& source);
+//inline Image resize(Image&& target, const Image& source) { resize(target, source); return move(target); }
+//inline Image resize(int2 size, const Image& source) { return resize(Image(size, source.alpha), source); }
 
 /// 2D array of 16bit integer pixels
 typedef ImageT<uint16> Image16;

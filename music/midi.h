@@ -5,10 +5,10 @@
 #include "map.h"
 #include "notation.h"
 
-struct MidiNote { uint time, key, velocity; float2 gain = 1; };
+struct MidiNote { uint time, key, velocity; vec2 gain = 1; };
 notrace inline bool operator ==(const MidiNote& a, const MidiNote& b) { return a.time == b.time && a.key == b.key && a.velocity == b.velocity; }
 notrace inline bool operator <(const MidiNote& a, const MidiNote& b) { return a.time < b.time || (a.time == b.time && a.key < b.key); }
-inline String str(const MidiNote& o) { return str(o.time, strKey(o.key)); }
+inline String str(const MidiNote& o) { return str(o.time, strKey(0, o.key)); }
 
 struct MidiNotes : array<MidiNote> {
 	MidiNotes() {}
@@ -20,8 +20,9 @@ inline String str(const MidiNotes& o) { return str(o.ticksPerSeconds, str(ref<Mi
 
 enum { NoteOff=8, NoteOn, Aftertouch, Controller, ProgramChange, ChannelAftertouch, PitchBend, Meta };
 struct Track {
-    uint time=0; uint8 type_channel=0; BinaryData data;
-    Track(uint time, BinaryData&& data):time(time),data(move(data)){}
+    BinaryData data;
+    uint time=0; uint8 type_channel=0;
+    //Track(uint time, BinaryData&& data) : time(time), data(::move(data)){}
     uint startTime=0, startIndex=0;
     void reset() { type_channel=0; time=startTime; data.index=startIndex; }
 };
