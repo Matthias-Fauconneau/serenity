@@ -614,31 +614,33 @@ break2_:;
 
   // Soft membrane side
   if(processState > ProcessState::Pour) {
+   side.Fx.clear(); side.Fy.clear(); side.Fz.clear(); // FIXME: single pass
    sideForceTime.start();
-   // FIXME: single pass
-   side.Fx.clear(); side.Fy.clear(); side.Fz.clear();
-   int W = side.W;
-   /*+7 for aligned load with j=1..*/
-   const float* Px = side.Px.data+7, *Py = side.Py.data+7, *Pz = side.Pz.data+7;
-   float* Fx = side.Fx.begin()+7, *Fy =side.Fy.begin()+7, *Fz = side.Fz.begin()+7;
-   int stride = side.stride;
-   int dy[6] {-1, -1,            0,       1,         1,     0};
-   int dx[2][6] {{0, -1, -1, -1, 0, 1},{1, 0, -1, 0, 1, 1}};
-   int D[2][6];
-   for(int i=0; i<2; i++) for(int e=0; e<6; e++) D[i][e] = dy[e]*stride+dx[i][e];
-   //v8sf P = float8(pressure/(2*3)); // area = length(cross)/2 / 3 vertices
-   v8sf internodeLength8 = float8(side.internodeLength);
-   v8sf tensionStiffness_internodeLength8 = float8(side.tensionStiffness*side.internodeLength);
-   //float sqRadius = radius*radius;
-   assert_(side.stride%8 == 0, side.stride);
-   //for(int i=0; i<int(side.H-1); i++) {
-   parallel_chunk(1, side.H-1, [&](uint, size_t start, size_t size) {
-#if 1
+   parallel_chunk(1, side.H-1, [this](uint, size_t start, size_t size) {
+    /*+7 for aligned load with j=1..*/
+    const float* Px = side.Px.data+7, *Py = side.Py.data+7, *Pz = side.Pz.data+7;
+    float* Fx = side.Fx.begin()+7, *Fy =side.Fy.begin()+7, *Fz = side.Fz.begin()+7;
+
+    int D[2][6];
+    int dy[6] {-1, -1,            0,       1,         1,     0};
+    int dx[2][6] {{0, -1, -1, -1, 0, 1},{1, 0, -1, 0, 1, 1}};
+    int stride = side.stride, W = side.W;
+    for(int i=0; i<2; i++) for(int e=0; e<6; e++) D[i][e] = dy[e]*stride+dx[i][e];
+    v8sf P = float8(pressure/(2*3)); // area = length(cross)/2 / 3 vertices
+    v8sf internodeLength8 = float8(side.internodeLength);
+    v8sf tensionStiffness_internodeLength8 = float8(side.tensionStiffness*side.internodeLength);
+
     // Tension from previous row
     {
      size_t i = start;
      int base = i*side.stride;
+     /*(v8sf*)(Fx+1) = _0f;
+     *(v8sf*)(Fy+1) = _0f;
+     *(v8sf*)(Fz+1) = _0f;*/
      for(int j=1; j<=W; j+=8) {
+      /*(v8sf*)(Fx+j+8) = _0f;
+      *(v8sf*)(Fy+j+8) = _0f;
+      *(v8sf*)(Fz+j+8) = _0f;*/
       // Load
       int index = base+j;
       v8sf Ox = *(v8sf*)(Px+index);
@@ -663,33 +665,36 @@ break2_:;
        fx += tx;
        fy += ty;
        fz += tz;
-       /*store(Fx+a, loadu8(Fx+a) - tx);
-       store(Fy+a, loadu8(Fy+a) - ty);
-       store(Fz+a, loadu8(Fz+a) - tz);*/
       }
       *(v8sf*)(Fx+index) += fx;
       *(v8sf*)(Fy+index) += fy;
       *(v8sf*)(Fz+index) += fz;
      }
     }
-#endif
 
     for(size_t i = start+1; i < start+size; i++) {
      int base = i*side.stride;
+     /**(v8sf*)(Fx+1) = _0f;
+     *(v8sf*)(Fy+1) = _0f;
+     *(v8sf*)(Fz+1) = _0f;*/
      for(int j=1; j<=W; j+=8) {
+      /**(v8sf*)(Fx+j+8) = _0f;
+      *(v8sf*)(Fy+j+8) = _0f;
+      *(v8sf*)(Fz+j+8) = _0f;*/
       int index = base+j;
       v8sf Ox = *(v8sf*)(Px+index);
       v8sf Oy = *(v8sf*)(Py+index);
       v8sf Oz = *(v8sf*)(Pz+index);
-      v8sf X[6], Y[6], Z[6];
+      //v8sf X[6], Y[6], Z[6];
+      int E[3];
+      v8sf X[3], Y[3], Z[3];
       v8sf fx = _0f, fy = _0f, fz = _0f; // Assumes accumulators stays in registers
       // Tension
-      for(int a=0; a<2/*3*/; a++) { // TODO: assert unrolled
-       int e = index+D[i%2][a]; // Gather (TODO: assert reduced i%2)
-       X[a] = loadu8(Px+e) - Ox;
-       Y[a] = loadu8(Py+e) - Oy;
-       Z[a] = loadu8(Pz+e) - Oz;
-       v8sf x = X[a], y = Y[a], z = Z[a];
+      for(int a=0; a<3; a++) { // TODO: assert unrolled
+       int e = E[a] = index+D[i%2][a]; // Gather (TODO: assert reduced i%2)
+       v8sf x = X[a] = loadu8(Px+e) - Ox;
+       v8sf y = Y[a] = loadu8(Py+e) - Oy;
+       v8sf z = Z[a] = loadu8(Pz+e) - Oz;
        v8sf sqLength = x*x+y*y+z*z;
        v8sf length = sqrt(sqLength);
        v8sf delta = length - internodeLength8;
@@ -701,30 +706,38 @@ break2_:;
        fx += tx;
        fy += ty;
        fz += tz;
-       //if(i > start || a == 2) { // FIXME: Assert peeled
-        store(Fx+e, loadu8(Fx+e) - tx);
-        store(Fy+e, loadu8(Fy+e) - ty);
-        store(Fz+e, loadu8(Fz+e) - tz);
-       //}
+       store(Fx+e, loadu8(Fx+e) - tx);
+       store(Fy+e, loadu8(Fy+e) - ty);
+       store(Fz+e, loadu8(Fz+e) - tz);
       }
-      for(int a=3; a<6; a++) { // TODO: assert unrolled
+      /*for(int a=3; a<6; a++) { // TODO: assert unrolled
        int e = index+D[i%2][a]; // Gather (TODO: assert reduced i%2)
        X[a] = loadu8(Px+e) - Ox;
        Y[a] = loadu8(Py+e) - Oy;
        Z[a] = loadu8(Pz+e) - Oz;
-      }
-      /*for(int a=0; a<6; a++) {
-       int b = (a+1)%6; // TODO: Assert peeled
+      }*/
+      for(int a=0; a<2; a++) {
+       int b = (a+1)/*%6*/; // TODO: Assert peeled
        v8sf px = (Y[a]*Z[b] - Y[b]*Z[a]);
        v8sf py = (Z[a]*X[b] - Z[b]*X[a]);
        v8sf pz = (X[a]*Y[b] - X[b]*Y[a]);
        v8sf dot2 = Ox*px + Oy*py;
-       v8sf p = (v8sf)((v8si)P & (v8si)(dot2 < _0f)); // Assumes it is an extra multiplication is more efficient than an extra accumulator
-       fx += p * px;
-       fy += p * py;
-       fz += p * pz;
-       // TODO: add each triangle once to all 3 vertices
-      }*/
+       v8sf p = (v8sf)((v8si)P & (v8si)(dot2 < _0f)); // Assumes an extra multiplication is more efficient than an extra accumulator
+       v8sf ppx = p * px;
+       v8sf ppy = p * py;
+       v8sf ppz = p * pz;
+       fx += ppx;
+       fy += ppy;
+       fz += ppz;
+       int A = E[a];
+       store(Fx+A, loadu8(Fx+A) + ppx);
+       store(Fy+A, loadu8(Fy+A) + ppy);
+       store(Fz+A, loadu8(Fz+A) + ppz);
+       int B = E[b];
+       store(Fx+B, loadu8(Fx+B) + ppx);
+       store(Fy+B, loadu8(Fy+B) + ppy);
+       store(Fz+B, loadu8(Fz+B) + ppz);
+      }
       *(v8sf*)(Fx+index) += fx;
       *(v8sf*)(Fy+index) += fy;
       *(v8sf*)(Fz+index) += fz;
@@ -734,7 +747,13 @@ break2_:;
     { // Tension from next row
      size_t i = start+size;
      int base = i*side.stride;
+     *(v8sf*)(Fx+1) = _0f;
+     *(v8sf*)(Fy+1) = _0f;
+     *(v8sf*)(Fz+1) = _0f;
      for(int j=1; j<=W; j+=8) {
+      *(v8sf*)(Fx+j+8) = _0f;
+      *(v8sf*)(Fy+j+8) = _0f;
+      *(v8sf*)(Fz+j+8) = _0f;
       // Load
       int index = base+j;
       v8sf Ox = *(v8sf*)(Px+index);
