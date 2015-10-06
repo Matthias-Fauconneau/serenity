@@ -685,10 +685,10 @@ break2_:;
       v8sf Ox = *(v8sf*)(Px+index);
       v8sf Oy = *(v8sf*)(Py+index);
       v8sf Oz = *(v8sf*)(Pz+index);
-      //v8sf X[6], Y[6], Z[6];
       int E[3];
       v8sf X[3], Y[3], Z[3];
-      v8sf fx = _0f, fy = _0f, fz = _0f; // Assumes accumulators stays in registers
+      v8sf FX[4], FY[4], FZ[4];
+      for(int a=0; a<4; a++) { FX[a]=_0f, FY[a]=_0f, FZ[a]=_0f; } // TODO: assert unrolled
       // Tension
       for(int a=0; a<3; a++) { // TODO: assert unrolled
        int e = E[a] = index+D[i%2][a]; // Gather (TODO: assert reduced i%2)
@@ -703,21 +703,15 @@ break2_:;
        v8sf tx = T * x;
        v8sf ty = T * y;
        v8sf tz = T * z;
-       fx += tx;
-       fy += ty;
-       fz += tz;
-       store(Fx+e, loadu8(Fx+e) - tx);
-       store(Fy+e, loadu8(Fy+e) - ty);
-       store(Fz+e, loadu8(Fz+e) - tz);
+       FX[a] -= tx;
+       FY[a] -= ty;
+       FZ[a] -= tz;
+       FX[3] += tx;
+       FY[3] += ty;
+       FZ[3] += tz;
       }
-      /*for(int a=3; a<6; a++) { // TODO: assert unrolled
-       int e = index+D[i%2][a]; // Gather (TODO: assert reduced i%2)
-       X[a] = loadu8(Px+e) - Ox;
-       Y[a] = loadu8(Py+e) - Oy;
-       Z[a] = loadu8(Pz+e) - Oz;
-      }*/
       for(int a=0; a<2; a++) {
-       int b = (a+1)/*%6*/; // TODO: Assert peeled
+       int b = a+1; // TODO: Assert peeled
        v8sf px = (Y[a]*Z[b] - Y[b]*Z[a]);
        v8sf py = (Z[a]*X[b] - Z[b]*X[a]);
        v8sf pz = (X[a]*Y[b] - X[b]*Y[a]);
@@ -726,21 +720,25 @@ break2_:;
        v8sf ppx = p * px;
        v8sf ppy = p * py;
        v8sf ppz = p * pz;
-       fx += ppx;
-       fy += ppy;
-       fz += ppz;
-       int A = E[a];
-       store(Fx+A, loadu8(Fx+A) + ppx);
-       store(Fy+A, loadu8(Fy+A) + ppy);
-       store(Fz+A, loadu8(Fz+A) + ppz);
-       int B = E[b];
-       store(Fx+B, loadu8(Fx+B) + ppx);
-       store(Fy+B, loadu8(Fy+B) + ppy);
-       store(Fz+B, loadu8(Fz+B) + ppz);
+       FX[a] += ppx;
+       FY[a] += ppy;
+       FZ[a] += ppz;
+       FX[b] += ppx;
+       FY[b] += ppy;
+       FZ[b] += ppz;
+       FX[3] += ppx;
+       FY[3] += ppy;
+       FZ[3] += ppz;
       }
-      *(v8sf*)(Fx+index) += fx;
-      *(v8sf*)(Fy+index) += fy;
-      *(v8sf*)(Fz+index) += fz;
+      for(int a=0; a<3; a++) {
+       int e = E[a];
+       store(Fx+e, loadu8(Fx+e) + FX[a]);
+       store(Fy+e, loadu8(Fy+e) + FY[a]);
+       store(Fz+e, loadu8(Fz+e) + FZ[a]);
+      }
+       *(v8sf*)(Fx+index) += FX[3];
+       *(v8sf*)(Fy+index) += FY[3];
+       *(v8sf*)(Fz+index) += FZ[3];
      }
     }
 
