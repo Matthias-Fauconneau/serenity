@@ -862,18 +862,18 @@ struct Review {
    error("plot");
   }
 
-  if(0) {
-   auto group = array.parseDict("Angle=3.6,Elasticity=1e7,Friction=0.3,Pattern=cross,Pressure=60K,Radius=0.02,Rate=100,Resolution=2,Seed=3,Side=1e8,Thickness=1e-3,TimeStep=10µ,Wire=12%");
-   if(0) {
+  if(1) {
+   auto group = array.parseDict("Angle=3.6,Elasticity=1e7,Friction=0.3,Pattern=cross,Pressure=60K,Radius=0.02,Rate=400,Resolution=2,Seed=3,Side=1e8,Thickness=1e-3,TimeStep=10µ,Wire=12%");
+   if(1) {
     if(1) {
-     for(size_t index: range(3,4)) {
+     for(size_t index: range(4)) {
       Plot plot = pressurePlot(group, Deviatoric, index);
       plot.max = vec2(200, 100);
       String name = copyRef(plot.dataSets.keys[0]);
       plot.dataSets.keys[0] = ""__; /*copyRef(ref<string>{"No Wire"_, "Simple Helix"_,"Spiral Helix"_,"Radially Reinforced Helix"_}[
                                      ref<string>{"none"_,"helix","loop","cross"}.indexOf(name)]);*/
       writeFile(name+".pdf"_, toPDF(plot, vec2(94.5, 94.5/1.5)), home(), true);
-      error(name);
+      //error(name);
      }
     } else {
      VList<Plot> plots (Linear::Share, Linear::Expand);

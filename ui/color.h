@@ -9,7 +9,7 @@ static vec3 LuvtoXYZ(float L, float u, float v) {
 	const float un = 4*xn/(-2*xn+12*yn+3), vn = 9*yn/(-2*xn+12*yn+3);
 	float u2 = un + u / (13*L);
 	float v2 = vn + v / (13*L);
-	float Y = L<=8 ? L * cb(3./29) : cb((L+16)/116);
+ float Y = L</*=*/8 ? L * cb(3./29) : cb((L+16)/116);
 	float X = Y * (9*u2)/(4*v2);
 	float Z = Y * (12-3*u2-20*v2)/(4*v2);
  return vec3(X, Y, Z);

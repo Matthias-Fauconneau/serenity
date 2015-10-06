@@ -280,10 +280,10 @@ shared<Graphics> Plot::graphics(vec2 size) {
    B.y = ::min(minY, B.y);
    minY = B.y - textSize;
    int a = round(atan(f.a, 1)*180/PI);
-   int b = round(f.b);
+   //int b = round(f.b);
    if(1 || !done[a]) {
     done[a]++;
-    Text text(str(a)+"° "+str(b)+"K", textSize, colors[i], 1,0, fontName);
+    Text text(str(a)+"° "/*+str(b)+"K"*/, textSize, colors[i], 1,0, fontName);
     graphics->graphics.insert(B+vec2(textSize, -text.sizeHint().y/2), text.graphics(0));
    }
    const auto& data = dataSets.values[i];

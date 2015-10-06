@@ -13,7 +13,7 @@ inline void operator*=(mref<float> values, float factor) { values.apply([factor]
 // \file parallel.h
 #include "vector.h"
 
-#if THREAD
+#if 1
 /*void atomic_add(v4sf& a, v4sf b) {
  v4sf expected, desired;
  do {
@@ -23,7 +23,7 @@ inline void operator*=(mref<float> values, float factor) { values.apply([factor]
                 *(__int128*)&desired));
 }*/
 
-inline void atomic_sub(v4sf& a, v4sf b) {
+/*inline void atomic_sub(v4sf& a, v4sf b) {
  v4sf expected, desired;
  do {
   expected = a;
@@ -39,8 +39,10 @@ inline void atomic_add(float& a, float b) {
   desired = expected+b;
  } while(!__atomic_compare_exchange_n((int*)&a, (int*)&expected,
                                       *(int*)&desired, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
-}
-static const size_t maxThreadCount = 32; // 4..32
+}*/
+
+//static const size_t maxThreadCount = 32; // 4..32
+static const size_t maxThreadCount = 4; // 4..32
 #else
 inline void atomic_sub(v4sf& a, v4sf b) { a-=b; }
 inline void atomic_add(float& a, float b) { a+=b; }

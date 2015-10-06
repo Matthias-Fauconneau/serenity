@@ -1,9 +1,5 @@
 #include "system.h"
 #include "time.h"
-#define EXP 1
-#if EXP
-#include "avx_mathfun.h"
-#endif
 
 struct element { float key=inf; uint value=0; };
 String str(element e) { return "("+str(e.key)+", "+str(e.value)+")"; }
@@ -626,91 +622,154 @@ break2_:;
    const float* Px = side.Px.data+7, *Py = side.Py.data+7, *Pz = side.Pz.data+7;
    float* Fx = side.Fx.begin()+7, *Fy =side.Fy.begin()+7, *Fz = side.Fz.begin()+7;
    int stride = side.stride;
-   int dy[6] {-stride,            0,       stride,         stride,     0, -stride};
-   int dx[2][6] {{-1, -1, -1, 0, 1, 0},{0, -1, 0, 1, 1, 1}};
+   int dy[6] {-1, -1,            0,       1,         1,     0};
+   int dx[2][6] {{0, -1, -1, -1, 0, 1},{1, 0, -1, 0, 1, 1}};
    int D[2][6];
-   for(int i=0; i<2; i++) for(int e=0; e<6; e++) D[i][e] = dy[e]+dx[i][e];
-   v8sf P = float8(pressure/(2*3)); // area = length(cross)/2 / 3 vertices
+   for(int i=0; i<2; i++) for(int e=0; e<6; e++) D[i][e] = dy[e]*stride+dx[i][e];
+   //v8sf P = float8(pressure/(2*3)); // area = length(cross)/2 / 3 vertices
    v8sf internodeLength8 = float8(side.internodeLength);
-  #if EXP
    v8sf tensionStiffness_internodeLength8 = float8(side.tensionStiffness*side.internodeLength);
-  #else
-   v8sf tensionStiffness8 = float8(side.tensionStiffness);
-  #endif
    //float sqRadius = radius*radius;
    assert_(side.stride%8 == 0, side.stride);
-   for(int i=0; i<int(side.H-1); i++) {
-    int base = i*side.stride;
-    //assert_((W)%8 == 0)
-    for(int j=1; j</*=*/W; j+=8) {
-     // Load
-     int index = base+j;
-     assert_(size_t(Px+index)%8 == 0, index);
-     v8sf Ox = *(v8sf*)(Px+index);
-     v8sf Oy = *(v8sf*)(Py+index);
-     v8sf Oz = *(v8sf*)(Pz+index);
+   //for(int i=0; i<int(side.H-1); i++) {
+   parallel_chunk(1, side.H-1, [&](uint, size_t start, size_t size) {
+#if 1
+    // Tension from previous row
+    {
+     size_t i = start;
+     int base = i*side.stride;
+     for(int j=1; j<=W; j+=8) {
+      // Load
+      int index = base+j;
+      v8sf Ox = *(v8sf*)(Px+index);
+      v8sf Oy = *(v8sf*)(Py+index);
+      v8sf Oz = *(v8sf*)(Pz+index);
 
-     v8sf X[6], Y[6], Z[6];
-     for(int e=0; e<6; e++) { // TODO: assert unrolled
-      int a = index+D[i%2][e]; // Gather (TODO: assert reduced i%2)
-      X[e] = loadu8(Px+a) - Ox;
-      Y[e] = loadu8(Py+a) - Oy;
-      Z[e] = loadu8(Pz+a) - Oz;
-     }
-
-     // Tension
-     for(int e=2; e<=4; e++) { // TODO: assert unrolled
-      int a = index+D[i%2][e]; // Gather (TODO: assert reduced i%2)
-      v8sf x = X[e], y = Y[e], z = Z[e];
-      v8sf sqLength = x*x+y*y+z*z;
-      v8sf length = sqrt(sqLength);
-      v8sf delta = length - internodeLength8;
-  #if EXP
-      v8sf T = (tensionStiffness_internodeLength8 * (exp256_ps(delta/internodeLength8)-_1f))
-        /  length;
-  #else
-      v8sf T = (tensionStiffness8 * delta) / length;
-  #endif
-      v8sf fx = T * x;
-      v8sf fy = T * y;
-      v8sf fz = T * z;
+      // Tension
+      v8sf fx = _0f, fy = _0f, fz = _0f; // Assumes accumulators stays in registers
+      for(int a=0; a<2; a++) { // TODO: assert unrolled
+       int e = index+D[i%2][a]; // Gather (TODO: assert reduced i%2)
+       v8sf x = loadu8(Px+e) - Ox;
+       v8sf y = loadu8(Py+e) - Oy;
+       v8sf z = loadu8(Pz+e) - Oz;
+       v8sf sqLength = x*x+y*y+z*z;
+       v8sf length = sqrt(sqLength);
+       v8sf delta = length - internodeLength8;
+       v8sf u = delta/internodeLength8;
+       v8sf T = (tensionStiffness_internodeLength8 * (u + u*u)) /  length;
+       v8sf tx = T * x;
+       v8sf ty = T * y;
+       v8sf tz = T * z;
+       fx += tx;
+       fy += ty;
+       fz += tz;
+       /*store(Fx+a, loadu8(Fx+a) - tx);
+       store(Fy+a, loadu8(Fy+a) - ty);
+       store(Fz+a, loadu8(Fz+a) - tz);*/
+      }
       *(v8sf*)(Fx+index) += fx;
       *(v8sf*)(Fy+index) += fy;
       *(v8sf*)(Fz+index) += fz;
-      store(Fx+a, loadu8(Fx+a) - fx);
-      store(Fy+a, loadu8(Fy+a) - fy);
-      store(Fz+a, loadu8(Fz+a) - fz);
      }
-
-     // Pressure
-     v8sf Px = _0f, Py = _0f, Pz = _0f;
-     for(int a=0; a<6; a++) { // TODO: assert peeled
-      int b = (a+1)%6;
-#if 0
-      Px += (Y[a]*Z[b] - Y[b]*Z[a]);
-      Py += (Z[a]*X[b] - Z[b]*X[a]);
-      Pz += (X[a]*Y[b] - X[b]*Y[a]);
-#else
-      v8sf px = (Y[a]*Z[b] - Y[b]*Z[a]);
-      v8sf py = (Z[a]*X[b] - Z[b]*X[a]);
-      v8sf pz = (X[a]*Y[b] - X[b]*Y[a]);
-      v8sf dot2 = Ox*px + Oy*py;
-      v8sf mask = dot2 < _0f;
-      Px += (v8sf)((v8si)px & (v8si)mask);
-      Py += (v8sf)((v8si)py & (v8si)mask);
-      Pz += (v8sf)((v8si)pz & (v8si)mask);
-#endif
-     }
-     *(v8sf*)(Fx+index) += P * Px;
-     *(v8sf*)(Fy+index) += P * Py;
-     *(v8sf*)(Fz+index) += P * Pz;
     }
-   }
+#endif
+
+    for(size_t i = start+1; i < start+size; i++) {
+     int base = i*side.stride;
+     for(int j=1; j<=W; j+=8) {
+      int index = base+j;
+      v8sf Ox = *(v8sf*)(Px+index);
+      v8sf Oy = *(v8sf*)(Py+index);
+      v8sf Oz = *(v8sf*)(Pz+index);
+      v8sf X[6], Y[6], Z[6];
+      v8sf fx = _0f, fy = _0f, fz = _0f; // Assumes accumulators stays in registers
+      // Tension
+      for(int a=0; a<2/*3*/; a++) { // TODO: assert unrolled
+       int e = index+D[i%2][a]; // Gather (TODO: assert reduced i%2)
+       X[a] = loadu8(Px+e) - Ox;
+       Y[a] = loadu8(Py+e) - Oy;
+       Z[a] = loadu8(Pz+e) - Oz;
+       v8sf x = X[a], y = Y[a], z = Z[a];
+       v8sf sqLength = x*x+y*y+z*z;
+       v8sf length = sqrt(sqLength);
+       v8sf delta = length - internodeLength8;
+       v8sf u = delta/internodeLength8;
+       v8sf T = (tensionStiffness_internodeLength8 * (u + u*u)) /  length;
+       v8sf tx = T * x;
+       v8sf ty = T * y;
+       v8sf tz = T * z;
+       fx += tx;
+       fy += ty;
+       fz += tz;
+       //if(i > start || a == 2) { // FIXME: Assert peeled
+        store(Fx+e, loadu8(Fx+e) - tx);
+        store(Fy+e, loadu8(Fy+e) - ty);
+        store(Fz+e, loadu8(Fz+e) - tz);
+       //}
+      }
+      for(int a=3; a<6; a++) { // TODO: assert unrolled
+       int e = index+D[i%2][a]; // Gather (TODO: assert reduced i%2)
+       X[a] = loadu8(Px+e) - Ox;
+       Y[a] = loadu8(Py+e) - Oy;
+       Z[a] = loadu8(Pz+e) - Oz;
+      }
+      /*for(int a=0; a<6; a++) {
+       int b = (a+1)%6; // TODO: Assert peeled
+       v8sf px = (Y[a]*Z[b] - Y[b]*Z[a]);
+       v8sf py = (Z[a]*X[b] - Z[b]*X[a]);
+       v8sf pz = (X[a]*Y[b] - X[b]*Y[a]);
+       v8sf dot2 = Ox*px + Oy*py;
+       v8sf p = (v8sf)((v8si)P & (v8si)(dot2 < _0f)); // Assumes it is an extra multiplication is more efficient than an extra accumulator
+       fx += p * px;
+       fy += p * py;
+       fz += p * pz;
+       // TODO: add each triangle once to all 3 vertices
+      }*/
+      *(v8sf*)(Fx+index) += fx;
+      *(v8sf*)(Fy+index) += fy;
+      *(v8sf*)(Fz+index) += fz;
+     }
+    }
+
+    { // Tension from next row
+     size_t i = start+size;
+     int base = i*side.stride;
+     for(int j=1; j<=W; j+=8) {
+      // Load
+      int index = base+j;
+      v8sf Ox = *(v8sf*)(Px+index);
+      v8sf Oy = *(v8sf*)(Py+index);
+      v8sf Oz = *(v8sf*)(Pz+index);
+
+      // Tension
+      for(int a=0; a<2; a++) { // TODO: assert unrolled
+       int e = index+D[i%2][a]; // Gather (TODO: assert reduced i%2)
+       v8sf x = loadu8(Px+e) - Ox;
+       v8sf y = loadu8(Py+e) - Oy;
+       v8sf z = loadu8(Pz+e) - Oz;
+       v8sf sqLength = x*x+y*y+z*z;
+       v8sf length = sqrt(sqLength);
+       v8sf delta = length - internodeLength8;
+       v8sf u = delta/internodeLength8;
+       v8sf T = (tensionStiffness_internodeLength8 * (u + u*u)) /  length;
+       v8sf tx = T * x;
+       v8sf ty = T * y;
+       v8sf tz = T * z;
+       store(Fx+e, loadu8(Fx+e) - tx);
+       store(Fy+e, loadu8(Fy+e) - ty);
+       store(Fz+e, loadu8(Fz+e) - tz);
+      }
+     }
+    }
+   }, 1);
    sideForceTime.stop();
 
    //grainSideGlobalMinD2 = 0;
    if(grainSideGlobalMinD2 <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
     grainSideLatticeTime.start();
+    float minD3 = 2*Grain::radius/sqrt(3.); // - Grain::radius;
+    grainSideCount = 0;
+#if 0
     if(!grainLattice) grainLattice = generateGrainLattice();
     // Side - Grain
     const uint16* grainBase = grainLattice->base;
@@ -722,23 +781,22 @@ break2_:;
      grainBase+gX*gY-gX-1, grainBase+gX*gY-1, grainBase+gX*gY+gX-1
     };
     const v4sf XYZ0 = grainLattice->XYZ0;
-    float minD3 = 2*Grain::radius/sqrt(3.); // - Grain::radius;
-    grainSideCount = 0;
     for(size_t i: range(1, side.H-1)) {
      for(size_t j: range(0, side.W)) {
       size_t s = 7+i*side.stride+j;
       v4sf O = side.position[s];
       int offset = dot3(XYZ0, floor(scale*(O-min)))[0];
-      assert_(offset >= 0, O-min);
       list<1> D;
-#if 0
+
       for(size_t n=0; n<3*3; n++) { // FIXME: assert unrolled
-       assert_(offset + grainNeighbours[n] >= grainLattice->cells.begin() && offset + grainNeighbours[n]+4 < grainLattice->cells.end(),
-               offset, grainNeighbours[n]-grainBase, grainBase-grainLattice->cells.begin());
        v4hi line = *(v4hi*)(offset + grainNeighbours[n]); // Gather
        for(size_t i: range(3)) if(line[i]) { // FIXME: assert unrolled
         size_t g = line[i]-1;
 #else
+    for(size_t i: range(1, side.H-1)) {
+     for(size_t j: range(0, side.W)) {
+      size_t s = 7+i*side.stride+j;
+      list<1> D;
       for(size_t g: range(grain.count)) {{
 #endif
         float d = sqrt(sq(side.Px[s]-grain.Px[g]) + sq(side.Py[s]-grain.Py[g]) + sq(side.Pz[s]-grain.Pz[g]));

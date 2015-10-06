@@ -33,7 +33,7 @@ struct PlotView {
   }
   //error(winchAngle, length*100);
 
-  TextData s (readFile(arguments()[0]));
+  TextData s (readFile(arguments()[0]+".wire"_));
   float internodeLength = 2.47/2/1000; s.decimal(); s.until('\n');
   s.until('\n'); // Headers
   array<vec3> P;

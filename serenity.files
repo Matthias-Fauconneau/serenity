@@ -92,3 +92,4 @@ serenity.config
 avx_mathfun.h
 wire-plot.cc
 snapshot.cc
+color-sample.cc
