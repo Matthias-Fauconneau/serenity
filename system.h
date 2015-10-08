@@ -376,12 +376,12 @@ struct System {
   static const float K = 4./3*E*sqrt(R);
   static const v8sf K8 = float8(K);
 
-  const v8sf Ks = K8 * sqrt(depth);
+  const v8sf Ks = K8 * sqrt8(depth);
   const v8sf fK = Ks * depth;
 
   // Damping
   static const v8sf KB = float8(K * normalDamping);
-  const v8sf Kb = KB * sqrt(depth);
+  const v8sf Kb = KB * sqrt8(depth);
   v8sf AVx = gather(A.AVx, a), AVy = gather(A.AVy, a), AVz = gather(A.AVz, a);
   v8sf RVx = gather(A.Vx, a) + (AVy*RAz - AVz*RAy);
   v8sf RVy = gather(A.Vy, a) + (AVz*RAx - AVx*RAz);
@@ -406,12 +406,12 @@ struct System {
   static const float K = 4./3*E*sqrt(R); // FIXME: constexpr sqrt
   static const v8sf K8 = float8(K);
 
-  const v8sf Ks = K8 * sqrt(depth);
+  const v8sf Ks = K8 * sqrt8(depth);
   const v8sf fK = Ks * depth;
 
   // Damping
   static const v8sf KB = float8(K * normalDamping);
-  const v8sf Kb = KB * sqrt(depth);
+  const v8sf Kb = KB * sqrt8(depth);
   v8sf AVx = gather(A.AVx, a), AVy = gather(A.AVy, a), AVz = gather(A.AVz, a);
   v8sf RVx = gather(A.Vx, a) + (AVy*RAz - AVz*RAy) - gather(B.Vx, b);
   v8sf RVy = gather(A.Vy, a) + (AVz*RAx - AVx*RAz) - gather(B.Vy, b);
@@ -436,32 +436,38 @@ struct System {
    v8sf unused localBx, v8sf unused localBy, v8sf unused localBz,
    v8sf unused Ax, v8sf unused Ay, v8sf unused Az,
    v8sf unused Bx, v8sf unused By, v8sf unused Bz,
-   mref<float> unused contacts, v8sf unused contactIndices,
+   mref<float> unused contacts, v8si unused contactIndices,
    v8sf& Fx, v8sf& Fy, v8sf& Fz,
    v8sf& TAx, v8sf& TAy, v8sf& TAz,
    v8sf& TBx, v8sf& TBy, v8sf& TBz
    ) {
-  // Stiffness
+
+  // Tension
   constexpr float E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
   constexpr float R = 1/(tA::curvature+tB::curvature);
   static const float K = 4./3*E*sqrt(R);
   static const v8sf K8 = float8(K);
 
-  const v8sf Ks = K8 * sqrt(depth);
+  const v8sf Ks = K8 * sqrt8(depth);
   const v8sf fK = Ks * depth;
 
-  // Damping
-  /*static const v8sf KB = float8(K * normalDamping);
-  const v8sf Kb = KB * sqrt(-depth);
+  // Relative velocity
   v8sf AVx = gather(A.AVx, a), AVy = gather(A.AVy, a), AVz = gather(A.AVz, a);
   v8sf BVx = gather(B.AVx, b), BVy = gather(B.AVy, b), BVz = gather(B.AVz, b);
   v8sf RVx = gather(A.Vx, a) + (AVy*RAz - AVz*RAy) - gather(B.Vx, b) - (BVy*RBz - BVz*RBy);
   v8sf RVy = gather(A.Vy, a) + (AVz*RAx - AVx*RAz) - gather(B.Vy, b) - (BVz*RBx - BVx*RBz);
   v8sf RVz = gather(A.Vz, a) + (AVx*RAy - AVy*RAx) - gather(B.Vz, b) - (BVx*RBy - BVy*RBx);
+
+  // Damping
+  static const v8sf KB = float8(K * normalDamping);
+  const v8sf Kb = KB * sqrt8(depth);
   v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
-  v8sf fB = - Kb * normalSpeed ; // Damping*/
-  v8sf fB = _0f;
+  v8sf fB = - Kb * normalSpeed ; // Damping
+  //for(size_t k: range(8)) log(fB[k], Kb[k], normalSpeed[k]);
+
+  //v8sf fB = _0f;
   v8sf fN = fK + fB;
+  //for(size_t k: range(8)) log(fN[k], fK[k], fB[k]);
   v8sf NFx = fN * Nx;
   v8sf NFy = fN * Ny;
   v8sf NFz = fN * Nz;
@@ -469,7 +475,8 @@ struct System {
   Fy = NFy;
   Fz = NFz;
 
-  /*v8sf FRAx, FRAy, FRAz;
+#if 1
+  v8sf FRAx, FRAy, FRAz;
   v8sf FRBx, FRBy, FRBz;
   for(size_t k: range(8)) { // FIXME
    if(!localAx[k]) {
@@ -506,7 +513,7 @@ struct System {
   v8sf TOx = Dx - Dn * Nx;
   v8sf TOy = Dy - Dn * Ny;
   v8sf TOz = Dz - Dn * Nz;
-  v8sf tangentLength = sqrt(TOx*TOx+TOy*TOy+TOz*TOz);
+  v8sf tangentLength = sqrt8(TOx*TOx+TOy*TOy+TOz*TOz);
   sconst v8sf staticFrictionStiffness = float8(staticFrictionFactor * frictionCoefficient);
   v8sf kS = staticFrictionStiffness * fN;
   v8sf fS = kS * tangentLength; // 0.1~1 fN
@@ -516,10 +523,11 @@ struct System {
   v8sf TRVx = RVx - RVn * Nx;
   v8sf TRVy = RVy - RVn * Ny;
   v8sf TRVz = RVz - RVn * Nz;
-  v8sf tangentRelativeSpeed = sqrt(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
+  v8sf tangentRelativeSpeed = sqrt8(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
   v8sf fD = frictionCoefficient8 * fN;
+  //for(size_t k: range(8)) log(fD[k], frictionCoefficient8[k], fN[k]);
   v8sf fTx, fTy, fTz;
-  for(size_t k: range(8)) { // FIXME
+  for(size_t k: range(8)) { // FIXME: mask
    if(fS[k] < fD[k] && tangentLength[k] < staticFrictionLength) {
     // Static
     if(tangentLength[k]) {
@@ -528,6 +536,7 @@ struct System {
      fTx[k] = - (fS[k]+fB) * springDirection[0];
      fTy[k] = - (fS[k]+fB) * springDirection[1];
      fTz[k] = - (fS[k]+fB) * springDirection[2];
+     //log("static", fTx[k], fTy[k], fTz[k]);
      staticFrictionCount++;
     } else {
      fTx[k] = 0;
@@ -538,9 +547,11 @@ struct System {
     // Dynamic
     contacts[contactIndices[k]] = 0;
     if(tangentRelativeSpeed[k]) {
-     fTx[k] = - fD[k] * TRVx[k] / tangentRelativeSpeed[k];
-     fTy[k] = - fD[k] * TRVy[k] / tangentRelativeSpeed[k];
-     fTz[k] = - fD[k] * TRVz[k] / tangentRelativeSpeed[k];
+     float scale = - fD[k] / tangentRelativeSpeed[k];
+     fTx[k] = scale * TRVx[k];
+     fTy[k] = scale * TRVy[k];
+     fTz[k] = scale * TRVz[k];
+     //log("dynamic", k, fTx[k], fTy[k], fTz[k], fD[k], tangentRelativeSpeed[k], scale, TRVx[k],TRVy[k],TRVz[k]);
      dynamicFrictionCount++;
     } else {
      fTx[k] = 0;
@@ -549,37 +560,32 @@ struct System {
     }
    }
   }
+#if DEBUG
+  /*for(size_t k: range(8)) if(A[k] < (int)grain.count) {
+   assert_(B[k] < (int)grain.count, B[k]);
+   assert_(A[k]!=B[k], A[k], B[k], grain.count);
+   assert_(isNumber(Fx[i+k]) && isNumber(Fy[i+k]) && isNumber(Fz[i+k]),
+     i+k, grain.count, A[k], B[k], Fx[i+k], Fy[i+k], Fz[i+k], Rx[k], Ry[k], Rz[k], depth[k]);
+  }*/
+  //for(size_t k: range(8)) log(fTx[k], fTy[k], fTz[k]);
+#endif
   Fx += fTx;
   Fy += fTy;
-  Fz += fTz;*/
+  Fz += fTz;
+  TAx = RAy*fTz - RAz*fTy;
+  TAy = RAz*fTx - RAx*fTz;
+  TAz = RAx*fTy - RAy*fTx;
+  TBx = RBy*fTz - RBz*fTy;
+  TBy = RBz*fTx - RBx*fTz;
+  TBz = RBx*fTy - RBy*fTx;
+#else
   TAx = _0f;
   TAy = _0f;
   TAz = _0f;
   TBx = _0f;
   TBy = _0f;
   TBz = _0f;
-  /*target[3] = RAy*fTz - RAz*fTy;
-  target[4] = RAz*fTx - RAx*fTz;
-  target[5] = RAx*fTy - RAy*fTx;
-  target[6] = RBy*fTz - RBz*fTy;
-  target[7] = RBz*fTx - RBx*fTz;
-  target[8] = RBx*fTy - RBy*fTx;*/
-  /*// Force
-  scatter(A.Fx, a, gather(A.Fx, a) + Fx);
-  scatter(A.Fy, a, gather(A.Fy, a) + Fy);
-  scatter(A.Fz, a, gather(A.Fz, a) + Fz);
-  //atomic_sub
-  scatter(B.Fx, b, gather(B.Fx, b) - Fx);
-  scatter(B.Fy, b, gather(B.Fy, b) - Fy);
-  scatter(B.Fz, b, gather(B.Fz, b) - Fz);
-  // Torque
-  scatter(A.Tx, a, gather(A.Tx, a) + RAy*fTz - RAz*fTy);
-  scatter(A.Ty, a, gather(A.Ty, a) + RAz*fTx - RAx*fTz);
-  scatter(A.Tz, a, gather(A.Tz, a) + RAx*fTy - RAy*fTx);
-  //atomic_sub
-  scatter(B.Tx, b, gather(B.Tx, b) + RBy*fTz - RBz*fTy);
-  scatter(B.Ty, b, gather(B.Ty, b) + RBz*fTx - RBx*fTz);
-  scatter(B.Tz, b, gather(B.Tz, b) + RBx*fTy - RBy*fTx);*/
+#endif
  }
 };
 

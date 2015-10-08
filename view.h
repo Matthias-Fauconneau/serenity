@@ -27,8 +27,8 @@ struct SimulationRun : Simulation {
 
   while(processState < Done) {
    if(timeStep%size_t(1e-1/dt) == 0) {
-    if(processState  < Load && timeStep*dt > 6*60) { log("6min limit"); break; }
-    if(processState  < Load && time.toReal() > 24*60*60) { log("24h limit"); break; }
+    //if(processState  < Load && timeStep*dt > 6*60) { log("6min limit"); break; }
+    //if(processState  < Load && time.toReal() > 24*60*60) { log("24h limit"); break; }
     report();
     log(info());
    }
@@ -50,15 +50,19 @@ struct SimulationRun : Simulation {
  }
 
  void report() {
-  log(timeStep*dt);
-  if(grainSideTime) log("side-grain check", strD(grainSideTime-grainSideForceTime, stepTime));
-  if(grainSideForceTime) log("side-grain force", strD(grainSideForceTime, stepTime));
+  float height = plate.position[1][2]-plate.position[0][2];
+  log(timeStep*dt, 1-height/(topZ0-bottomZ0));
+  if(grainSideTime) log("grain-side check", strD(grainSideTime-grainSideForceTime, stepTime));
+  if(grainSideForceTime) log("grain-side force", strD(grainSideForceTime, stepTime));
+  log("grain-side lattice", str(grainSideLatticeTime, stepTime));
   if(sideForceTime) log("side force", str(sideForceTime, stepTime));
   //log("grain-grain check", strD(grainGrainTime-grainGrainForceTime, stepTime));
   //log("grain-grain force", strD(grainGrainForceTime, stepTime));
   log("grain-grain", strD(grainGrainTime, stepTime));
   log("integration", strD(integrationTime, stepTime));
   //log("process", str(processTime, stepTime));
+  //log("grain", str(grainTime, stepTime));
+  //log("grain side", str(grainSideTime, stepTime));
   lastReport = realTime();
   lastReportStep = timeStep;
  }
@@ -131,8 +135,8 @@ struct SimulationView : SimulationRun, Widget, Poll {
   if(encoder) viewYawPitch.x += 2*PI*dt / 16;
 #endif
   if(window) window->render();
-  int64 elapsed = realTime() - lastReport;
-  if(elapsed > 1e9 || timeStep > lastReportStep + 1/this->dt) {
+  //int64 elapsed = realTime() - lastReport;
+  if(/*elapsed > 10e9 ||*/ timeStep > lastReportStep + 1/this->dt) {
    report();
 #if PROFILE
    requestTermination();
@@ -159,6 +163,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
 
   vec3 scale, translation; // Fit view
   array<vec3> grainPositions (grain.count); // Rotated, Z-Sorted
+  array<vec4f> grainRotations (grain.count); // Rotated, Z-Sorted
   {
    vec3 min = inf, max = -inf;
    for(size_t i: range(grainCount)) {
@@ -168,6 +173,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
     size_t j = 0;
     while(j < grainPositions.size && grainPositions[j].z < O.z) j++;
     grainPositions.insertAt(j, O);
+    grainRotations.insertAt(j, conjugate(qmul(viewRotation, grain.rotation[i])));
    }
    scale = vec3(vec2(2/::max(max.x-min.x, max.y-min.y)), 2/(max-min).z);
    translation = -vec3((min+max).xy()/2.f, min.z);
@@ -209,8 +215,8 @@ struct SimulationView : SimulationRun, Widget, Poll {
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_),
                              3, Float, positionBuffer);
-   GLBuffer rotationBuffer (apply(grain.rotation.slice(0, grainCount),
-                                  [=](vec4f q) -> vec4f { return conjugate(qmul(viewRotation,q)); }));
+   Locker lock(this->lock);
+   GLBuffer rotationBuffer (grainRotations);
    shader.bind("rotationBuffer"_, rotationBuffer, 0);
    shader["radius"] = float(scale.z/2 * Grain::radius*3/4); // reduce Z radius to see membrane mesh on/in grain
    shader["hpxRadius"] = 1 / (size.x * scale.x * grain.radius);
@@ -263,11 +269,11 @@ struct SimulationView : SimulationRun, Widget, Poll {
    shader["transform"] = rotatedViewProjection;
 
    // World space bounding box
-   vec3 min = inf, max = -inf;
+   /*vec3 min = inf, max = -inf;
    for(size_t i: range(grainCount)) {
     min = ::min(min, toVec3(grain.position[i]) - vec3(grain.radius));
     max = ::max(max, toVec3(grain.position[i]) + vec3(grain.radius));
-   }
+   }*/
 
    size_t W = side.W, stride=side.stride;
    buffer<vec3> positions {W*(side.H-1)*6-W*2};
@@ -276,9 +282,9 @@ struct SimulationView : SimulationRun, Widget, Poll {
     vec3 a (toVec3(side.Vertex::position[7+i*stride+j]));
     vec3 b (toVec3(side.Vertex::position[7+i*stride+(j+1)%W]));
     vec3 c (toVec3(side.Vertex::position[7+(i+1)*stride+(j+i%2)%W]));
-    if(a.z < min.z || a.z > max.z) continue;
+    /*if(a.z < min.z || a.z > max.z) continue;
     if(b.z < min.z || b.z > max.z) continue;
-    if(c.z < min.z || c.z > max.z) continue;
+    if(c.z < min.z || c.z > max.z) continue;*/
     // FIXME: GPU projection
     vec3 A =  a, B=  b, C =  c;
     positions[s+0] = C; positions[s+1] = A;

@@ -15,7 +15,7 @@ struct ParameterSweep {
   mainThread.setPriority(19);
   //if(!arguments() || arguments().contains("pretend"_)1) {
    array<String> all, missing;
-   Dict parameters = parseDict("Rate:100"_);
+   Dict parameters;
    /*array<String> existing =
      apply(Folder("Results").list(Files);
            .filter([](string name){return !endsWith(name, ".result") && !endsWith(name, ".working");}),
@@ -49,6 +49,8 @@ struct ParameterSweep {
       //parameters["Friction"__] = 0.3; // FIXME
       for(string pattern: ref<string>{"none","helix","cross","loop"}) {
        parameters["Pattern"__] = pattern;
+       if(pattern=="loop") parameters["Speed"__] = 0.2;
+       else parameters["Speed"__] = 0.1;
        for(int pressure: {0,20,40,60,80,100,120}) {
         parameters["Pressure"__] = String(str(pressure)+"K"_);
         array<float> radii; // = copyRef(ref<float>{0.02});
@@ -57,10 +59,10 @@ struct ParameterSweep {
         for(float radius: radii) {
          //if(pressure == 80 && radius==0.05f && pattern!="none"_) continue; // Validation
          parameters["Radius"__] = radius;
-         parameters["Thickness"__] = "1e-3"__; { // 2-3
+         parameters["Thickness"__] = "2e-3"__; { // 2-3
           parameters["Side"__] = "1e8"__; { // 8-9
-           parameters["Resolution"__] = /*radius==0.05?"2.5"__:"2"__; { //2-3
-           for(int seed: {4}) {
+           parameters["Resolution"__] = /*radius==0.05?"2.5"__:*/"2"__; { //2-3
+           for(int seed: {1}) {
             parameters["Seed"__] = seed;
             auto add = [&] {
              String id = str(parameters);
@@ -95,6 +97,7 @@ struct ParameterSweep {
             };
             if(pattern == "none") add();
             else {
+             parameters["Rate"__] = 100;
              for(float wireElasticModulus: {1e7/*smoothly solves wire spawned within grain*/}) {
               parameters["Elasticity"__] = String(str(int(round(wireElasticModulus/1e7)))+"e7");
               for(string wireDensity: {/*"6%"_,*/"12%"_}) {
@@ -111,6 +114,7 @@ struct ParameterSweep {
               parameters.remove("Wire"_);
              }
              parameters.remove("Elasticity"_);
+             parameters.remove("Rate"_);
             }
            }}
           }

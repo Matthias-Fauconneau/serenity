@@ -194,6 +194,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
     for(string arg: args) if(startsWith(arg,"-march=")) { flags.append(section(arg,'=',1,2)); goto break_; }
     /*else*/ args.append("-march=native"__);
     break_:;
+ if(!::find(CXX,"clang")) args.append("-fabi-version=0"__);
 
 	Folder(tmp, currentWorkingDirectory(), true);
 	Folder(tmp+"/"+join(flags,"-"), currentWorkingDirectory(), true);

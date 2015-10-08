@@ -15,7 +15,7 @@
 
 buffer<byte> toSVG(const Plot& plot) {
  array<byte> svg;
- svg.append("<?xml version='1.0'?><svg width='4cm' height='4cm' viewBox='0 0 1 1' xmlns='http://www.w3.org/2000/svg' version='1.2' baseProfile='tiny' "
+ svg.append("<?xml version='1.0'?><svg width='4cm' height='4cm' viewBox='0 0 12.5 0.4' xmlns='http://www.w3.org/2000/svg' version='1.2' baseProfile='tiny' "
                    "viewport-fill='white'>");
  for(const auto& dataSet: plot.dataSets.values) {
   svg.append("<path fill='none' stroke-width='0.01' stroke='black' d='M"); //vector-effect='non-scaling-stroke'
@@ -26,13 +26,13 @@ buffer<byte> toSVG(const Plot& plot) {
   }
   log(max(X), max(Y));
   {
-   float x = X[0] / max(X);
-   float y = Y[0] / max(Y);
+   float x = X[0];// / max(X);
+   float y = 0.4-Y[0];// / max(Y);
    svg.append(str(x, y)+" L");
   }
   for(size_t i: range(dataSet.size())) {
-   float x = X[i] / max(X);
-   float y = Y[i] / max(Y);
+   float x = X[i]; // / max(X);
+   float y = 0.4-Y[i]; // / max(Y);
    svg.append(str(x, y)+" ");
   }
   svg.append("'/>");
@@ -751,13 +751,14 @@ struct Review {
   if(existsFile(id+".failed")) resultName = id+".failed";
   if(existsFile(id+".working")) resultName = id+".working";
   if(existsFile(id+".result")) resultName = id+".result";
+  if(existsFile(id)) resultName = copyRef(id);
   Plot plot;
   if(!resultName) { log("Missing result", id); return plot; }
   TextData s (readFile(resultName));
   if(!s) { log("Missing result", resultName); return plot; }
   // TODO: cache dataSets
   s.line();
-  string headerLine = s.line();
+  string headerLine = s.untilAny("\n0"); //s.line();
   buffer<string> names = split(headerLine,", ");
   for(string name: names) dataSets.insert(name);
   while(s) {
@@ -856,13 +857,13 @@ struct Review {
 
  Review() {
   if(0) {
-   auto point = array.parseDict("Friction=0.3,Pattern=none,Pressure=80K,Radius=0.02,Rate=100,Resolution=2,Seed=1,Side=1e8,Thickness=1e-3,TimeStep=10µ");
+   auto point = array.parseDict("Friction=0.3,Pattern=none,Pressure=80K,Radius=0.05,Rate=100,Resolution=2,Seed=3,Side=1e8,Speed=0.1,Thickness=1e-3,TimeStep=10µ");
    writeFile("none80.svg"_, toSVG(strainPlot(point, Deviatoric)), home(), true);
    //writeFile("none80.pdf"_, toPDF(strainPlot(point, Deviatoric)), home(), true);
    error("plot");
   }
 
-  if(1) {
+  if(0) {
    auto group = array.parseDict("Angle=3.6,Elasticity=1e7,Friction=0.3,Pattern=cross,Pressure=60K,Radius=0.02,Rate=400,Resolution=2,Seed=3,Side=1e8,Thickness=1e-3,TimeStep=10µ,Wire=12%");
    if(1) {
     if(1) {

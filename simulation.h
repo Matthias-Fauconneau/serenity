@@ -1,7 +1,11 @@
 #include "system.h"
 #include "time.h"
 
-struct element { float key=inf; uint value=0; };
+struct element {
+ float key=inf; uint value=0;
+ element() /*: key(inf), value(0)*/ {}
+ element(float key, uint value) : key(key), value(value) {}
+};
 String str(element e) { return "("+str(e.key)+", "+str(e.value)+")"; }
 template<size_t N> struct list { // Small sorted list
  uint size = 0;
@@ -14,12 +18,12 @@ template<size_t N> struct list { // Small sorted list
   if(i < N) {
    for(uint j=size-1; j>i; j--) elements[j]=elements[j-1]; // Shifts right (drop last)
    assert_(i < N, i, N);
-   elements[i] = {key, value}; // Inserts new candidate
+   elements[i] = element(key, value); // Inserts new candidate
    //log(ref<element>(elements, size));
    return true;
   }
   else {
-   assert_(!(key < elements[i-1].key), key, size, elements);
+   //assert_(!(key < elements[i-1].key), key, size, elements);
    return false;
   }
  }
@@ -32,12 +36,13 @@ generic struct Lattice {
  int YX = size.y * size.x;
  buffer<T> cells {size_t(size.z*size.y*size.x + 3*size.y*size.x+3*size.x+4)}; // -1 .. 2 OOB margins
  T* const base = cells.begin()+size.y*size.x+size.x+1;
- const vec4f XYZ0 {float(1), float(size.x), float(size.y*size.x), 0};
+ //const vec4f XYZ0 {float(1), float(size.x), float(size.y*size.x), 0};
  Lattice(float scale, vec4f min, vec4f max) : scale{scale, scale, scale, 1}, min(min), max(max) {
   cells.clear(0);
  }
  inline size_t index(float x, float y, float z) {
-  int index = dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*((v4sf){x,y,z,0}-min))))[0];
+  //int index = dot3(XYZ0, cvtdq2ps(cvttps2dq(scale*((v4sf){x,y,z,0}-min))))[0];
+  int index = int(scale[2]*(z-min[2]))*(size.y*size.x) + int(scale[1]*(y-min[1]))*size.x + int(scale[0]*(x-min[0]));
   assert_(index >= 0 && index < size.z*size.y*size.x, index, min, x,y,z, max, x-min[0], y-min[1], z-min[2]);
   return index;
  }
@@ -77,6 +82,7 @@ struct Simulation : System {
  size_t packStart;
  size_t lastSnapshot = 0;
 
+ float sideForce = 0;
  float topForce = 0, bottomForce  = 0;
  float lastBalanceAverage = inf;
  float balanceAverage = 0;
@@ -123,8 +129,9 @@ struct Simulation : System {
 
  size_t grainGrainCount = 0;
  // FIXME: uint16 -> unpack
- buffer<int> grainGrainA {grain.capacity * 6};
- buffer<int> grainGrainB {grain.capacity * 6};
+ static constexpr size_t grainGrain = 8;
+ buffer<int> grainGrainA {grain.capacity * grainGrain};
+ buffer<int> grainGrainB {grain.capacity * grainGrain};
  //  Friction
  buffer<float> grainGrainLocalAx;
  buffer<float> grainGrainLocalAy;
@@ -142,7 +149,7 @@ struct Simulation : System {
    targetWireDensity(parameters.value("Wire"_, 0.f)),
    winchRate(parameters.value("Rate"_, 0.f)),
    pressure(parameters.value("Pressure", 0.f)),
-   plateSpeed(/*parameters.at("PlateSpeed")*//*parameters.value("PlateSpeed",*/(1e-4)),
+   plateSpeed(/*parameters.at("PlateSpeed")*//*parameters.value("PlateSpeed",*/(1e-3)),
    random((uint)parameters.at("Seed").integer()),
    stream(move(stream)), parameters(copy(parameters)) {
   assert_(pattern == None || targetWireDensity > 0, parameters);
@@ -295,7 +302,7 @@ struct Simulation : System {
   }
 
   float scale = sqrt(3.)/(2*Grain::radius);
-  const int3 size = int3(::floor(toVec3(float4(scale)*(max-min))))+int3(1);
+  const int3 size = int3(::floor(scale*(max-min)))+int3(1);
   if(!(isNumber(min) && isNumber(max)) || size.x*size.y*size.z > 128*128*128) error("Domain", min, max, size);
 
   unique<Lattice<uint16>> grainLattice(sqrt(3.)/(2*Grain::radius), min, max);
@@ -311,6 +318,7 @@ struct Simulation : System {
 
   partTime.start();
   stepTime.start();
+  grainTime.start();
   // Process
   float height = plate.position[1][2] - plate.position[0][2];
   float voidRatio = grain.count ? PI*sq(side.radius)*height / (grain.count*Grain::volume) - 1 : 1;
@@ -389,6 +397,7 @@ struct Simulation : System {
         cos(t0)*sin(t1)*sin(t2),
         cos(t1)*sin(t2),
         cos(t2)};
+      //grain.rotation[i] = (v4sf){1,0,0,0};
       // Speeds up pouring
       grain.Vz[i] = - ::min(grain.Pz[i],  0.01f);
       break;
@@ -480,7 +489,7 @@ break2_:;
       results.insert("Wire density (%)"__, wireDensity*100);
      }
      stream.write(str(results)+"\n");
-     stream.write("Radius (m), Height (m), Plate Force (N), Radial Force (N)"
+     stream.write("Radius (m), Height (m), Plate Force (N), Side Force (N)\n"
                   );//, Kinetic Energy (J), Contacts\n");
      snapshot("pack");
     }
@@ -514,7 +523,7 @@ break2_:;
   plate.Fx[1] = 0; plate.Fy[1] = 0; plate.Fz[1] = 0; //plate.mass * G.z;
 
   // Grain lattice
-  grainTime.start();
+  //grainTime.start();
   /*float scale = sqrt(3.)/(2*Grain::radius);
   const int3 size = int3(::floor(toVec3(float4(scale)*(max-min))))+int3(1);
   if(size[0] <= 2) max[0]+=1/scale, min[0]-=1/scale;
@@ -585,6 +594,7 @@ break2_:;
     plate.Fz[1] -= Fz[i];
    }
   }
+  float sideForce = 0;
   {// Rigid Side
    size_t gSC = grainRigidSideCount;
    while(gSC%8) grainRigidSide[gSC++] = grain.count;
@@ -593,7 +603,7 @@ break2_:;
    for(size_t i = 0; i < gSC; i += 8) {
     v8si A = *(v8si*)&grainRigidSide[i];
     v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A);
-    v8sf length = sqrt(Ax*Ax + Ay*Ay);
+    v8sf length = sqrt8(Ax*Ax + Ay*Ay);
     v8sf Nx = -Ax/length, Ny = -Ay/length;
     v8sf depth = length - R;
     contact<Grain, RigidSide>(grain, A, depth, Grain::radius8*(-Nx), Grain::radius8*(-Ny), _0f,
@@ -606,6 +616,7 @@ break2_:;
     grain.Fx[a] += Fx[i];
     grain.Fy[a] += Fy[i];
     grain.Fz[a] += Fz[i];
+    sideForce += (grain.Px[a]*Fx[i] + grain.Py[a]*Fy[i]) / sqrt(grain.Px[a]*grain.Px[a] + grain.Py[a]*grain.Py[a]); // dot(R^,F)
    }
   }
   grainTime.stop();
@@ -655,10 +666,11 @@ break2_:;
        v8sf y = loadu8(Py+e) - Oy;
        v8sf z = loadu8(Pz+e) - Oz;
        v8sf sqLength = x*x+y*y+z*z;
-       v8sf length = sqrt(sqLength);
+       v8sf length = sqrt8(sqLength);
        v8sf delta = length - internodeLength8;
        v8sf u = delta/internodeLength8;
-       v8sf T = (tensionStiffness_internodeLength8 * (u + u*u)) /  length;
+#define U u + u*u + u*u*u
+       v8sf T = (tensionStiffness_internodeLength8 * (U)) /  length;
        v8sf tx = T * x;
        v8sf ty = T * y;
        v8sf tz = T * z;
@@ -696,10 +708,10 @@ break2_:;
        v8sf y = Y[a] = loadu8(Py+e) - Oy;
        v8sf z = Z[a] = loadu8(Pz+e) - Oz;
        v8sf sqLength = x*x+y*y+z*z;
-       v8sf length = sqrt(sqLength);
+       v8sf length = sqrt8(sqLength);
        v8sf delta = length - internodeLength8;
        v8sf u = delta/internodeLength8;
-       v8sf T = (tensionStiffness_internodeLength8 * (u + u*u)) /  length;
+       v8sf T = (tensionStiffness_internodeLength8 * (U)) /  length;
        v8sf tx = T * x;
        v8sf ty = T * y;
        v8sf tz = T * z;
@@ -765,10 +777,10 @@ break2_:;
        v8sf y = loadu8(Py+e) - Oy;
        v8sf z = loadu8(Pz+e) - Oz;
        v8sf sqLength = x*x+y*y+z*z;
-       v8sf length = sqrt(sqLength);
+       v8sf length = sqrt8(sqLength);
        v8sf delta = length - internodeLength8;
        v8sf u = delta/internodeLength8;
-       v8sf T = (tensionStiffness_internodeLength8 * (u + u*u)) /  length;
+       v8sf T = (tensionStiffness_internodeLength8 * (U)) /  length;
        v8sf tx = T * x;
        v8sf ty = T * y;
        v8sf tz = T * z;
@@ -778,7 +790,7 @@ break2_:;
       }
      }
     }
-   }, 1);
+   }, 1); // FIXME
    sideForceTime.stop();
 
    //grainSideGlobalMinD2 = 0;
@@ -786,36 +798,30 @@ break2_:;
     grainSideLatticeTime.start();
     float minD3 = 2*Grain::radius/sqrt(3.); // - Grain::radius;
     grainSideCount = 0;
-#if 0
     if(!grainLattice) grainLattice = generateGrainLattice();
     // Side - Grain
     const uint16* grainBase = grainLattice->base;
     int gX = grainLattice->size.x, gY = grainLattice->size.y;
     v4sf scale = grainLattice->scale, min = grainLattice->min;
+    const int3 size = grainLattice->size;
     const uint16* grainNeighbours[3*3] = {
      grainBase-gX*gY-gX-1, grainBase-gX*gY-1, grainBase-gX*gY+gX-1,
      grainBase-gX-1, grainBase-1, grainBase+gX-1,
      grainBase+gX*gY-gX-1, grainBase+gX*gY-1, grainBase+gX*gY+gX-1
     };
-    const v4sf XYZ0 = grainLattice->XYZ0;
+    //const v4sf XYZ0 = grainLattice->XYZ0;
     for(size_t i: range(1, side.H-1)) {
      for(size_t j: range(0, side.W)) {
       size_t s = 7+i*side.stride+j;
       v4sf O = side.position[s];
-      int offset = dot3(XYZ0, floor(scale*(O-min)))[0];
-      list<1> D;
+      //int offset = dot3(XYZ0, floor(scale*(O-min)))[0];
+      int offset = int(scale[2]*(O[2]-min[2]))*(size.y*size.x) + int(scale[1]*(O[1]-min[1]))*size.x + int(scale[0]*(O[0]-min[0]));
+      list<2> D;
 
       for(size_t n=0; n<3*3; n++) { // FIXME: assert unrolled
        v4hi line = *(v4hi*)(offset + grainNeighbours[n]); // Gather
        for(size_t i: range(3)) if(line[i]) { // FIXME: assert unrolled
         size_t g = line[i]-1;
-#else
-    for(size_t i: range(1, side.H-1)) {
-     for(size_t j: range(0, side.W)) {
-      size_t s = 7+i*side.stride+j;
-      list<1> D;
-      for(size_t g: range(grain.count)) {{
-#endif
         float d = sqrt(sq(side.Px[s]-grain.Px[g]) + sq(side.Py[s]-grain.Py[g]) + sq(side.Pz[s]-grain.Pz[g]));
         if(!D.insert(d, g)) minD3 = ::min(minD3, d);
        }
@@ -843,7 +849,7 @@ break2_:;
     sideSkipped=0;
    } else sideSkipped++;
 
-   {grainSideTime.start();
+   {//grainSideTime.start();
     // Evaluates (packed) intersections from (packed) verlet lists
     size_t grainSideContactCount = 0;
     buffer<int> grainSideContact(grainSideCount);
@@ -852,7 +858,7 @@ break2_:;
      v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
      v8sf Bx = gather(side.Px.data, B), By = gather(side.Py.data, B), Bz = gather(side.Pz.data, B);
      v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-     v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
+     v8sf length = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
      v8sf depth = Grain::radius8 - length;
      for(size_t subIndex: range(8)) {
       if(index+subIndex == grainSideCount) break /*2*/;
@@ -877,7 +883,7 @@ break2_:;
      v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
      v8sf Bx = gather(side.Px.data, B), By = gather(side.Py.data, B), Bz = gather(side.Pz.data, B);
      v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-     v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
+     v8sf length = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
      v8sf depth = Grain::radius8 - length;
      v8sf Nx = Rx/length, Ny = Ry/length, Nz = Rz/length;
      contact(grain, A, side, B, depth, -Rx, -Ry, -Rz, Nx, Ny, Nz,
@@ -893,21 +899,23 @@ break2_:;
      side.Fy[b] -= Fy[i];
      grain.Fz[a] += Fz[i];
      side.Fz[b] -= Fz[i];
+     sideForce += (grain.Px[a]*Fx[i] + grain.Py[a]*Fy[i]) / sqrt(grain.Px[a]*grain.Px[a] + grain.Py[a]*grain.Py[a]); // dot(R^,F)
     }
-    grainSideTime.stop();
+    //grainSideTime.stop();
    }
   }
+  this->sideForce = sideForce;
 
   if(grainGrainGlobalMinD6 <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
-   buffer<int2> grainGrainIndices {grainCount8 * 6};
+   buffer<int2> grainGrainIndices {grainCount8 * grainGrain};
    grainGrainIndices.clear();
    // Index to packed frictions
    for(size_t index: range(grainGrainCount)) {
     size_t a = grainGrainA[index];
-    size_t base = a*6;
+    size_t base = a*grainGrain;
     size_t i = 0;
     while(grainGrainIndices[base+i]) i++;
-    assert_(i<6, grainGrainIndices.slice(base, 6));
+    assert_(i<grainGrain, grainGrainIndices.slice(base, grainGrain));
     grainGrainIndices[base+i] = int2{grainGrainB[index]+1, int(index)};
    }
 
@@ -922,19 +930,19 @@ break2_:;
    }
    assert_(i==62);
    grainGrainCount = 0;
-   {buffer<float> grainGrainLocalAx {grainCount8 * 6};
-    buffer<float> grainGrainLocalAy {grainCount8 * 6};
-    buffer<float> grainGrainLocalAz {grainCount8 * 6};
-    buffer<float> grainGrainLocalBx {grainCount8 * 6};
-    buffer<float> grainGrainLocalBy {grainCount8 * 6};
-    buffer<float> grainGrainLocalBz {grainCount8 * 6};
+   {buffer<float> grainGrainLocalAx {grainCount8 * grainGrain};
+    buffer<float> grainGrainLocalAy {grainCount8 * grainGrain};
+    buffer<float> grainGrainLocalAz {grainCount8 * grainGrain};
+    buffer<float> grainGrainLocalBx {grainCount8 * grainGrain};
+    buffer<float> grainGrainLocalBy {grainCount8 * grainGrain};
+    buffer<float> grainGrainLocalBz {grainCount8 * grainGrain};
     for(size_t latticeIndex: range(Z*Y*X)) {
      const uint16* current = grainLattice->base + latticeIndex;
      uint16 a = *current;
      if(!a) continue;
      a--;
      // Neighbours
-     list<6> D;
+     list<8> D;
      for(size_t n: range(62)) {
       uint16 b = current[di[n]];
       if(!b) continue;
@@ -944,18 +952,18 @@ break2_:;
      }
      //log(D.size, ref<element>(D.elements,D.size));
      for(size_t i: range(D.size)) {
-      assert(grainGrainCount < grainCount8 * 6);
+      //assert(grainGrainCount < grainCount8 * grainGrain);
       size_t index = grainGrainCount;
       grainGrainA[index] = a;
       size_t B = D.elements[i].value;
-      assert_(a!=B, a, B, i, D.size, D.elements);
+      //assert_(a!=B, a, B, i, D.size, D.elements);
       grainGrainB[index] = B;
-      for(size_t i: range(6)) {
-       size_t b = grainGrainIndices[a*6+i][0];
+      for(size_t i: range(grainGrain)) {
+       size_t b = grainGrainIndices[a*grainGrain+i][0];
        if(!b) break;
        b--;
        if(b == B) { // Repack existing friction
-        size_t j = grainGrainIndices[a*6+i][1];
+        size_t j = grainGrainIndices[a*grainGrain+i][1];
         grainGrainLocalAx[index] = this->grainGrainLocalAx[j];
         grainGrainLocalAy[index] = this->grainGrainLocalAy[j];
         grainGrainLocalAz[index] = this->grainGrainLocalAz[j];
@@ -983,7 +991,7 @@ break2_:;
     this->grainGrainLocalBy = move(grainGrainLocalBy);
     this->grainGrainLocalBz = move(grainGrainLocalBz);
    }
-   assert_(grainGrainCount < grainCount8 * 6);
+   assert_(grainGrainCount < grainCount8 * grainGrain);
    {// Aligns with invalid pairs
     size_t grainGrainCount = this->grainGrainCount;
     assert_(grain.count < grain.capacity);
@@ -999,7 +1007,7 @@ break2_:;
    }
 
    grainGrainGlobalMinD6 = minD6 - 2*Grain::radius;
-   assert_(grainGrainGlobalMinD6 > 0);
+   if(grainGrainGlobalMinD6 < 0) log("grainGrainGlobalMinD6", grainGrainGlobalMinD6);
 
    grainGrainLatticeTime.stop();
    //log("grain", grainSkipped);
@@ -1011,16 +1019,16 @@ break2_:;
 
   // Evaluates (packed) intersections from (packed) verlet lists
   size_t grainGrainContactCount = 0;
-  buffer<uint> grainGrainContact(grainCount8*6);
+  buffer<uint> grainGrainContact(grainCount8*grainGrain);
   for(size_t index = 0; index < grainGrainCount; index += 8) {
    v8si A = *(v8si*)(grainGrainA.data+index), B = *(v8si*)(grainGrainB.data+index);
    v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
    v8sf Bx = gather(grain.Px, B), By = gather(grain.Py, B), Bz = gather(grain.Pz, B);
    v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-   v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
+   v8sf length = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
    v8sf depth = (Grain::radius8+Grain::radius8) - length;
    for(size_t k: range(8)) {
-    if(depth[k] > 0) {
+    if(index+k < grainGrainCount && depth[k] > 0) {
       // Indirect instead of pack to write back friction points
      grainGrainContact[grainGrainContactCount] = index+k;
      grainGrainContactCount++;
@@ -1036,14 +1044,14 @@ break2_:;
   buffer<float> Fx(gGCC), Fy(gGCC), Fz(gGCC);
   buffer<float> TAx(gGCC), TAy(gGCC), TAz(gGCC);
   buffer<float> TBx(gGCC), TBy(gGCC), TBz(gGCC);
-  for(size_t i = 0; i < gGCC; i += 8) {
+  for(size_t i = 0; i < grainGrainContactCount; i += 8) {
    v8si contacts = *(v8si*)&grainGrainContact[i];
    v8si A = gather(grainGrainA, contacts), B = gather(grainGrainB, contacts);
    // FIXME: Recomputing from intersection (more efficient than storing?)
    v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
    v8sf Bx = gather(grain.Px, B), By = gather(grain.Py, B), Bz = gather(grain.Pz, B);
    v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-   v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
+   v8sf length = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
    v8sf depth = (Grain::radius8+Grain::radius8) - length;
    for(size_t k: range(8)) assert_(depth[k] >= 0, depth[k], A[k], B[k], i+k, grainGrainContact[i+k], grainGrainContactCount, gGCC);
    //log(grain.count, grainGrainCount, contacts, A, B, length);
@@ -1057,8 +1065,9 @@ break2_:;
    v8sf localBx = gather(grainGrainLocalBx, contacts);
    v8sf localBy = gather(grainGrainLocalBy, contacts);
    v8sf localBz = gather(grainGrainLocalBz, contacts);
-   /*for(size_t k: range(8)) if(A[k] < (int)grain.count) {
-    assert_(B[k] < (int)grain.count, B[k]);
+#if DEBUG
+   for(size_t k: range(8)) if(i+k < grainGrainContactCount) {
+    assert_(B[k] < (int)grain.count, B[k], i,k, grain.count, grainGrainContactCount);
     assert_(A[k]!=B[k], A[k], B[k], grain.count);
     assert_(isNumber(grain.Fx[A[k]]) && isNumber(grain.Fy[A[k]]) && isNumber(grain.Fz[A[k]]),
       A[k], grain.Fx[A[k]], grain.Fy[A[k]], grain.Fz[A[k]], B[k],
@@ -1067,8 +1076,9 @@ break2_:;
       );
     assert_(isNumber(grain.Fx[B[k]]) && isNumber(grain.Fy[B[k]]) && isNumber(grain.Fz[B[k]]),
       B[k], grain.Fx[B[k]], grain.Fy[B[k]], grain.Fz[B[k]], A[k]);
-   }*/
-   contact(grain, A, grain, B, depth, RAx, RAy, RAz, RBx, RBy, RBz, Nx, Ny, Nz,
+   }
+#endif
+   contact<Grain,Grain>(grain, A, grain, B, depth, RAx, RAy, RAz, RBx, RBy, RBz, Nx, Ny, Nz,
            localAx, localAy, localAz, localBx, localBy, localBz,
            Ax, Ay, Az, Bx, By, Bz,
            grainGrainLocalAx, contacts,
@@ -1076,8 +1086,8 @@ break2_:;
            *(v8sf*)&TAx[i], *(v8sf*)&TAy[i], *(v8sf*)&TAz[i],
            *(v8sf*)&TBx[i], *(v8sf*)&TBy[i], *(v8sf*)&TBz[i]
            );
-   for(size_t k: range(8)) if(A[k] < (int)grain.count) {
-    assert_(B[k] < (int)grain.count, B[k]);
+   for(size_t k: range(8)) if(i+k < grainGrainContactCount) {
+    assert_(B[k] < (int)grain.count, B[k], i,k, grain.count, grainGrainContactCount);
     assert_(A[k]!=B[k], A[k], B[k], grain.count);
     assert_(isNumber(Fx[i+k]) && isNumber(Fy[i+k]) && isNumber(Fz[i+k]),
       i+k, grain.count, A[k], B[k], Fx[i+k], Fy[i+k], Fz[i+k], Rx[k], Ry[k], Rz[k], depth[k]);
@@ -1152,7 +1162,7 @@ break2_:;
   for(size_t i: range(grain.count)) {
    assert_(isNumber(grain.Fx[i]) && isNumber(grain.Fy[i]) && isNumber(grain.Fz[i]),
            i, grain.Fx[i], grain.Fy[i], grain.Fz[i]);
-   //System::step(grain, i);
+   System::step(grain, i);
    assert_(isNumber(grain.position[i]), i, grain.position[i]);
    //min = ::min(min, grain.position[i]);
    //max = ::max(max, grain.position[i]);
@@ -1254,9 +1264,9 @@ break2_:;
     float radius = grainSideRadiusSum/grainSideCount + Grain::radius;
     assert_(isNumber(radius));*/
     float radius = side.radius;
-    float radialForceSum = pressure * 2 * PI * radius * height;
+    //float radialForceSum = sideForce; //pressure * 2 * PI * radius * height;
     float plateForce = plate.Fz[1] - plate.Fz[0];
-    stream.write(str(radius, height, plateForce, radialForceSum/*, grainKineticEnergy, grainSideCount*/)+'\n');
+    stream.write(str(radius, height, plateForce, -sideForce/*, grainKineticEnergy, grainSideCount*/)+'\n');
 
     // Snapshots every 1% strain
     float strain = (1-height/(topZ0-bottomZ0))*100;
@@ -1300,14 +1310,13 @@ break2_:;
     winchAngle += winchRate*R/r * dt;
    } else error("Unknown pattern:", int(pattern));
    float z = currentPourHeight+Grain::radius+Wire::radius;
-   vec4f relativePosition = (v4sf){end[0], end[1], z, 0} - wire.position[wire.count-1];
+   vec4f relativePosition = (v4sf){end[0], end[1], z, 0} - (v4sf){wire.Px[wire.count-1], wire.Py[wire.count-1], wire.Pz[wire.count-1], 0};
   vec4f length = sqrt(sq3(relativePosition));
   if(length[0] >= Wire::internodeLength) {
    //Locker lock(this->lock);
    assert_(wire.count < wire.capacity, wire.capacity);
    size_t i = wire.count++;
-   v4sf p = wire.position[wire.count-2]
-     + float3(Wire::internodeLength) * relativePosition/length;
+   v4sf p = (v4sf){wire.Px[wire.count-2], wire.Py[wire.count-2], wire.Pz[wire.count-2], 0} + float3(Wire::internodeLength) * relativePosition/length;
    wire.Px[i] = p[0];
    wire.Py[i] = p[1];
    wire.Pz[i] = p[2];
@@ -1355,7 +1364,7 @@ String info() {
   s.append(" "+str(round(lastBalanceAverage), round(balanceAverage)));
   float plateForce = topForce - bottomForce;
   float stress = plateForce/(2*PI*sq(side.initialRadius));
-  s.append(" "_+str(decimalPrefix(stress, "Pa"), decimalPrefix(pressure, "Pa")));
+  s.append(" "_+str(decimalPrefix(stress, "Pa"), decimalPrefix(pressure, "Pa"), decimalPrefix(sideForce, "Pa")));
  }
  return move(s);
 }

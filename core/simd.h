@@ -70,7 +70,7 @@ inline v8si constexpr v8i(int x) { return (v8si){x,x,x,x,x,x,x,x}; }
 static constexpr v8si unused _0i = v8i(0);
 static constexpr v8si unused _1i = v8i(1);
 static inline v8si gather(ref<int> P, v8si a) {
- return {P[a[0]], P[a[1]], P[a[2]], P[a[3]], P[a[4]], P[a[5]], P[a[6]], P[a[7]]};
+ return v8si{P[a[0]], P[a[1]], P[a[2]], P[a[3]], P[a[4]], P[a[5]], P[a[6]], P[a[7]]};
 }
 
 #undef packed
@@ -83,7 +83,7 @@ static constexpr v8sf unused _1f = float8(1);
 static inline v8sf loadu8(const float* P) { return _mm256_loadu_ps(P); }
 static inline void store(float* P, v8sf A) { _mm256_storeu_ps(P, A); }
 
-inline v8sf sqrt(v8sf x) { return __builtin_ia32_sqrtps256(x); }
+inline v8sf sqrt8(v8sf x) { return __builtin_ia32_sqrtps256(x); }
 static inline float reduce8(v8sf x) {
  const v4sf x128 = __builtin_ia32_vextractf128_ps256(x, 1) + _mm256_castps256_ps128(x);
  const __m128 x64 = x128 + _mm_movehl_ps/*__builtin_ia32_movhlps*/(x128, x128);
@@ -91,10 +91,10 @@ static inline float reduce8(v8sf x) {
  return x32[0];
 }
 static inline v8sf gather(const float* P, v8si a) {
- return {P[a[0]], P[a[1]], P[a[2]], P[a[3]], P[a[4]], P[a[5]], P[a[6]], P[a[7]]};
+ return (v8sf){P[a[0]], P[a[1]], P[a[2]], P[a[3]], P[a[4]], P[a[5]], P[a[6]], P[a[7]]};
 }
 static inline v8sf gather(ref<float> P, v8si a) {
- return {P[a[0]], P[a[1]], P[a[2]], P[a[3]], P[a[4]], P[a[5]], P[a[6]], P[a[7]]};
+ return (v8sf){P[a[0]], P[a[1]], P[a[2]], P[a[3]], P[a[4]], P[a[5]], P[a[6]], P[a[7]]};
 }
 /*static inline void scatter(mref<float> P, v8si a, v8sf x) {
  P[a[0]] = x[0];
@@ -115,6 +115,6 @@ inline bool isNumber(v4sf v){ for(uint i: range(4)) if(!isNumber(v[i])) return f
 template<> inline String str(const v8si& v) {
  return "("+str(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7])+")";
 }
-template<> inline String str(const v8sf& v) {
+/*template<> inline String str(const v8sf& v) {
  return "("+str(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7])+")";
-}
+}*/

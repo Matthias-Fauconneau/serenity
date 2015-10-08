@@ -32,9 +32,11 @@ fragment {
     vec3 mul(vec4 p, vec3 v) {
       return qmul(p, qmul(vec4(v, 0), vec4(-p.xyz, p.w))).xyz;
     }
-    //color = /*aColor[gl_PrimitiveID/2]*/vec4(dz*(1+mul(q, v))/2, 1);
     float a = ((1+hpxRadius)-l)/(2*hpxRadius);
-    color = vec4(vec3(dz), a);
+    //color = vec4(vec3(dz), a);
+    color = vec4(dz*(1+mul(q, v))/2, a);
+    //color = aColor[gl_PrimitiveID/2];
+    //color = q;
     uniform float radius;
     gl_FragDepth = gl_FragCoord.z + dz * radius;
   }
