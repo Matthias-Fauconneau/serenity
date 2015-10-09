@@ -108,7 +108,7 @@ struct SnapshotView : Widget {
 
   mat4 viewProjection = mat4()
     .scale(vec3(1,1,-1))
-    .translate(vec3(0,0,-1))
+    //.translate(vec3(0,0,-1))
     .scale(scale)
     .translate(translation);
   mat4 rotatedViewProjection = mat4(viewProjection).rotateX(viewYawPitch.y) .rotateZ(viewYawPitch.x);

@@ -149,9 +149,10 @@ struct Simulation : System {
    targetWireDensity(parameters.value("Wire"_, 0.f)),
    winchRate(parameters.value("Rate"_, 0.f)),
    pressure(parameters.value("Pressure", 0.f)),
-   plateSpeed(/*parameters.at("PlateSpeed")*//*parameters.value("PlateSpeed",*/(1e-3)),
+   plateSpeed(1e-4),
    random((uint)parameters.at("Seed").integer()),
    stream(move(stream)), parameters(copy(parameters)) {
+  assert_(plateSpeed);
   assert_(pattern == None || targetWireDensity > 0, parameters);
   plate.Pz[1] = targetHeight+Grain::radius;
   if(pattern) { // Initial wire node
@@ -320,7 +321,7 @@ struct Simulation : System {
   stepTime.start();
   grainTime.start();
   // Process
-  float height = plate.position[1][2] - plate.position[0][2];
+  float height = plate.Pz[1] - plate.Pz[0];
   float voidRatio = grain.count ? PI*sq(side.radius)*height / (grain.count*Grain::volume) - 1 : 1;
   if(processState == Pour) {
    if(grain.count == grain.capacity ||
@@ -433,7 +434,7 @@ break2_:;
     lastSnapshot = timeStep;
    }
 
-   plate.position[1][2] = ::min(plate.position[1][2], topZ); // Fits plate (Prevents initial decompression)
+   plate.Pz[1] = ::min(plate.Pz[1], topZ); // Fits plate (Prevents initial decompression)
    G[2] = (1-alpha)* -gz/densityScale;
    grain.g = grain.mass * G;
    side.thickness = (1-alpha) * side.pourThickness + alpha*side.loadThickness;
@@ -444,8 +445,8 @@ break2_:;
 
    float speed = plateSpeed;
    float dz = dt * speed;
-   plate.position[1][2] -= dz;
-   plate.position[0][2] += dz;
+   plate.Pz[1] -= dz;
+   plate.Pz[0] += dz;
 
    balanceSum += abs(topForce+bottomForce);
    balanceCount++;
@@ -470,13 +471,13 @@ break2_:;
           (lastBalanceAverage < balanceAverage && balanceAverage / (PI * sq(side.radius)) < pressure/80))))) {
      skip = false;
      processState = ProcessState::Load;
-     bottomZ0 = plate.position[0][2];
-     topZ0 = plate.position[1][2];
+     bottomZ0 = plate.Pz[0];
+     topZ0 = plate.Pz[1];
      log("Pack->Load", grainKineticEnergy*1e6 / grain.count, "µJ / grain", voidRatio);
 
      // Strain independent results
      float wireDensity = (wire.count-1)*Wire::volume / (grain.count*Grain::volume);
-     float height = plate.position[1][2] - plate.position[0][2];
+     float height = plate.Pz[1] - plate.Pz[0];
      float grainDensity = grain.count*Grain::volume / (height * PI*sq(side.radius));
      Dict results;
      results.insert("Grain count"__, grain.count);
@@ -502,11 +503,11 @@ break2_:;
    }
   }
   if(processState == ProcessState::Load) {
-   float height = plate.position[1][2]-plate.position[0][2];
-   if(height >= 4*Grain::radius && height/(topZ0-bottomZ0) > 1-1./8) {
+   float height = plate.Pz[1]-plate.Pz[0];
+   if(1-height/(topZ0-bottomZ0) < 1./8) {
     float dz = dt * plateSpeed;
-    plate.position[1][2] -= dz;
-    plate.position[0][2] += dz;
+    plate.Pz[1] -= dz;
+    plate.Pz[0] += dz;
    }
    else {
     log(height >= 4*Grain::radius, height/(topZ0-bottomZ0) > 1-1./8);
@@ -911,12 +912,22 @@ break2_:;
    grainGrainIndices.clear();
    // Index to packed frictions
    for(size_t index: range(grainGrainCount)) {
-    size_t a = grainGrainA[index];
-    size_t base = a*grainGrain;
-    size_t i = 0;
-    while(grainGrainIndices[base+i]) i++;
-    assert_(i<grainGrain, grainGrainIndices.slice(base, grainGrain));
-    grainGrainIndices[base+i] = int2{grainGrainB[index]+1, int(index)};
+    { // A<->B
+     size_t a = grainGrainA[index];
+     size_t base = a*grainGrain;
+     size_t i = 0;
+     while(grainGrainIndices[base+i]) i++;
+     assert_(i<grainGrain, grainGrainIndices.slice(base, grainGrain));
+     grainGrainIndices[base+i] = int2{grainGrainB[index]+1, int(index)};
+    }
+    /*{ // B<->A
+     size_t b = grainGrainB[index];
+     size_t base = b*grainGrain;
+     size_t i = 0;
+     while(grainGrainIndices[base+i]) i++;
+     assert_(i<grainGrain, grainGrainIndices.slice(base, grainGrain));
+     grainGrainIndices[base+i] = int2{grainGrainA[index]+1, int(index)};
+    }*/
    }
 
    grainGrainLatticeTime.start();
@@ -929,6 +940,7 @@ break2_:;
     di[i++] = z*Y*X + y*X + x;
    }
    assert_(i==62);
+   Locker lock(this->lock);
    grainGrainCount = 0;
    {buffer<float> grainGrainLocalAx {grainCount8 * grainGrain};
     buffer<float> grainGrainLocalAy {grainCount8 * grainGrain};
@@ -958,7 +970,7 @@ break2_:;
       size_t B = D.elements[i].value;
       //assert_(a!=B, a, B, i, D.size, D.elements);
       grainGrainB[index] = B;
-      for(size_t i: range(grainGrain)) {
+      for(size_t i: range(grainGrain/*8*/)) {
        size_t b = grainGrainIndices[a*grainGrain+i][0];
        if(!b) break;
        b--;
@@ -1053,7 +1065,7 @@ break2_:;
    v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
    v8sf length = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
    v8sf depth = (Grain::radius8+Grain::radius8) - length;
-   for(size_t k: range(8)) assert_(depth[k] >= 0, depth[k], A[k], B[k], i+k, grainGrainContact[i+k], grainGrainContactCount, gGCC);
+   for(size_t k: range(8)) if(i+k<grainGrainContactCount) assert_(depth[k] >= 0, depth[k], A[k], B[k], i+k, grainGrainContact[i+k], grainGrainContactCount, gGCC);
    //log(grain.count, grainGrainCount, contacts, A, B, length);
    v8sf Nx = Rx/length, Ny = Ry/length, Nz = Rz/length;
    v8sf RBx = Grain::radius8 * Nx, RBy = Grain::radius8 * Ny, RBz = Grain::radius8 * Nz;
@@ -1065,33 +1077,25 @@ break2_:;
    v8sf localBx = gather(grainGrainLocalBx, contacts);
    v8sf localBy = gather(grainGrainLocalBy, contacts);
    v8sf localBz = gather(grainGrainLocalBz, contacts);
-#if DEBUG
-   for(size_t k: range(8)) if(i+k < grainGrainContactCount) {
-    assert_(B[k] < (int)grain.count, B[k], i,k, grain.count, grainGrainContactCount);
-    assert_(A[k]!=B[k], A[k], B[k], grain.count);
-    assert_(isNumber(grain.Fx[A[k]]) && isNumber(grain.Fy[A[k]]) && isNumber(grain.Fz[A[k]]),
-      A[k], grain.Fx[A[k]], grain.Fy[A[k]], grain.Fz[A[k]], B[k],
-      Ax[k], Ay[k], Az[k],
-      Bx[k], By[k], Bz[k]
-      );
-    assert_(isNumber(grain.Fx[B[k]]) && isNumber(grain.Fy[B[k]]) && isNumber(grain.Fz[B[k]]),
-      B[k], grain.Fx[B[k]], grain.Fy[B[k]], grain.Fz[B[k]], A[k]);
-   }
-#endif
-   contact<Grain,Grain>(grain, A, grain, B, depth, RAx, RAy, RAz, RBx, RBy, RBz, Nx, Ny, Nz,
-           localAx, localAy, localAz, localBx, localBy, localBz,
-           Ax, Ay, Az, Bx, By, Bz,
-           grainGrainLocalAx, contacts,
-           *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i],
-           *(v8sf*)&TAx[i], *(v8sf*)&TAy[i], *(v8sf*)&TAz[i],
-           *(v8sf*)&TBx[i], *(v8sf*)&TBy[i], *(v8sf*)&TBz[i]
+   contact<Grain,Grain>( grain, A, grain, B, depth,
+                         RAx, RAy, RAz,
+                         RBx, RBy, RBz,
+                         Nx, Ny, Nz,
+                         Ax, Ay, Az,
+                         Bx, By, Bz,
+                         localAx, localAy, localAz,
+                         localBx, localBy, localBz,
+                         *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i],
+                         *(v8sf*)&TAx[i], *(v8sf*)&TAy[i], *(v8sf*)&TAz[i],
+                         *(v8sf*)&TBx[i], *(v8sf*)&TBy[i], *(v8sf*)&TBz[i]
            );
-   for(size_t k: range(8)) if(i+k < grainGrainContactCount) {
-    assert_(B[k] < (int)grain.count, B[k], i,k, grain.count, grainGrainContactCount);
-    assert_(A[k]!=B[k], A[k], B[k], grain.count);
-    assert_(isNumber(Fx[i+k]) && isNumber(Fy[i+k]) && isNumber(Fz[i+k]),
-      i+k, grain.count, A[k], B[k], Fx[i+k], Fy[i+k], Fz[i+k], Rx[k], Ry[k], Rz[k], depth[k]);
-   }
+   // Scatter static frictions
+   scatter(grainGrainLocalAx, contacts, localAx);
+   scatter(grainGrainLocalAy, contacts, localAy);
+   scatter(grainGrainLocalAz, contacts, localAz);
+   scatter(grainGrainLocalBx, contacts, localBx);
+   scatter(grainGrainLocalBy, contacts, localBy);
+   scatter(grainGrainLocalBz, contacts, localBz);
   }
   for(size_t i = 0; i < grainGrainContactCount; i++) { // Scalar scatter add
    size_t index = grainGrainContact[i];
@@ -1339,19 +1343,26 @@ break2_:;
 }
 
 String info() {
- array<char> s {copyRef(processStates[processState])};
- s.append(" "_+str(pressure,0u,1u));
- s.append(" "_+str(dt,0u,1u));
- s.append(" "_+str(grain.count)/*+" grains"_*/);
- s.append(" "_+str(int(timeStep*this->dt/**1e3*/))+"s"_);
- if(grain.count) s.append(" "_+decimalPrefix(grainKineticEnergy/*/densityScale*//grain.count, "J"));
+ array<char> s;
+ s.append(processStates[processState]);
+ s.append(" R="_+str(side.radius));
+ s.append(" "_+str(timeStep*dt));
  if(processState>=ProcessState::Load) {
-  float bottomZ = plate.position[0][2], topZ = plate.position[1][2];
+  float height = plate.Pz[1]-plate.Pz[0];
+  s.append(" "_+str(100*(1-height/(topZ0-bottomZ0))));
+ }
+ /*s.append(" "_+str(pressure,0u,1u));
+ s.append(" "_+str(dt,0u,1u));
+ s.append(" "_+str(grain.count));
+ s.append(" "_+str(int(timeStep*this->dt))+"s"_);
+ if(grain.count) s.append(" "_+decimalPrefix(grainKineticEnergy/grain.count, "J"));
+ if(processState>=ProcessState::Load) {
+  float bottomZ = plate.Pz[0], topZ = plate.Pz[1];
   float displacement = (topZ0-topZ+bottomZ-bottomZ0);
   s.append(" "_+str(displacement/(topZ0-bottomZ0)*100));
  }
  if(grain.count) {
-  float height = plate.position[1][2] - plate.position[0][2];
+  float height = plate.Pz[1] - plate.Pz[0];
   float voidRatio = PI*sq(side.radius)*height / (grain.count*Grain::volume) - 1;
   s.append(" Ratio:"+str(int(voidRatio*100))+"%");
  }
@@ -1365,7 +1376,8 @@ String info() {
   float plateForce = topForce - bottomForce;
   float stress = plateForce/(2*PI*sq(side.initialRadius));
   s.append(" "_+str(decimalPrefix(stress, "Pa"), decimalPrefix(pressure, "Pa"), decimalPrefix(sideForce, "Pa")));
- }
+ }*/
+ s.append(" S/D: "+str(staticFrictionCount2, dynamicFrictionCount2));
  return move(s);
 }
 };

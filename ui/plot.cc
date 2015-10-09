@@ -94,7 +94,10 @@ shared<Graphics> Plot::graphics(vec2 size) {
  float top=tickLabelSize.y*3/2;
  float bottom=(tickLabelSize.y+textSize)*3/2;
  float right = tickLabelSize.x/2;//+Text(xlabel, textSize, 0,1,0, fontName).sizeHint().x;
- if(fits) right += Text("00° 0K", textSize, 0,1,0, fontName).sizeHint().x;
+ //if(fits) right += Text("00° 0K", textSize, 0,1,0, fontName)
+ float maxTextX = 0;
+ for(size_t i: range(fits.size())) maxTextX = ::max(maxTextX, Text("00° "+dataSets.keys[i], textSize, black, 1,0, fontName).sizeHint().x);
+ right += maxTextX;
 
  //left=right=top=bottom=::max(::max(::max(left, right), top), bottom);
  if(plotCircles || uniformScale) {
@@ -167,21 +170,21 @@ shared<Graphics> Plot::graphics(vec2 size) {
   for(size_t i: range(tickCount[0]+1)) {
    Tick& tick = ticks[0][i];
    vec2 p(point(vec2(tick.value, O.y)));
-   graphics->lines.append(p, p+vec2(0,-tickLength));
+   graphics->lines.append(p, p+vec2(0,tickLength));
    graphics->graphics.insertMulti(p + vec2(-tick.sizeHint().x/2, /*-min.y > max.y ? -tick.sizeHint().y :*/  -tick.sizeHint().y/2+textSize), tick.graphics(0));
   }
-  {Text text(bold(xlabel),textSize, 0,1,0, fontName);
+  {Text text(/*bold*/(xlabel),textSize, 0,1,0, fontName);
    graphics->graphics.insert(vec2((left+(size.x-right))/2-text.sizeHint().x/2, size.y-bottom-textSize), text.graphics(0)); }
  }
  {vec2 O=vec2(min.x>0 ? min.x : max.x<0 ? max.x : 0, min.y), end = vec2(O.x, max.y); // Y
   graphics->lines.append(point(O), point(end));
   for(size_t i: range(tickCount[1]+1)) {
    vec2 p (point(O+(i/float(tickCount[1]))*(end-O)));
-   graphics->lines.append(p, p+vec2(tickLength,0));
+   graphics->lines.append(p, p+vec2(-tickLength,0));
    Text& tick = ticks[1][i];
    graphics->graphics.insert(p + vec2(-tick.sizeHint().x-textSize, -tick.sizeHint().y/2), tick.graphics(0));
   }
-  {Text text(bold(ylabel),textSize, 0,1,0, fontName);
+  {Text text(/*bold*/(ylabel),textSize, 0,1,0, fontName);
    vec2 p(int2(point(end))+int2(-text.sizeHint().x/2, /*-text.sizeHint().y-tickLabelSize.y/2*/-text.sizeHint().y/2-textSize));
    p.x = ::max(0.f, p.x);
    graphics->graphics.insert(p, text.graphics(0));}
@@ -196,8 +199,26 @@ shared<Graphics> Plot::graphics(vec2 size) {
   if(plotPoints || points.size==1 || plotBandsX || plotBandsY) for(vec2 p: points) {
    if(!isNumber(p)) continue;
    const int pointRadius = 2;
-   graphics->lines.append(p-vec2(pointRadius, 0), p+vec2(pointRadius, 0), color);
-   graphics->lines.append(p-vec2(0, pointRadius), p+vec2(0, pointRadius), color);
+   if(i==0) {
+    graphics->lines.append(p-vec2(pointRadius, 0), p+vec2(pointRadius, 0), color);
+    graphics->lines.append(p-vec2(0, pointRadius), p+vec2(0, pointRadius), color);
+   } else if(i==1) {
+    float d = pointRadius/sqrt(2.);
+    graphics->lines.append(p+vec2(-d, -d), p+vec2(d, d), color);
+    graphics->lines.append(p+vec2(-d, d), p+vec2(d, -d), color);
+   } else if(i==2) {
+    float d = pointRadius/sqrt(2.);
+    graphics->lines.append(p+vec2(-d, -d), p+vec2(d, -d), color);
+    graphics->lines.append(p+vec2(d, -d), p+vec2(d, d), color);
+    graphics->lines.append(p+vec2(d, d), p+vec2(-d, d), color);
+    graphics->lines.append(p+vec2(-d, d), p+vec2(-d, -d), color);
+   } else if(i==3) {
+    float d = pointRadius;
+    graphics->lines.append(p-vec2(0, -d), p+vec2(d, 0), color);
+    graphics->lines.append(p-vec2(d, 0), p+vec2(0, d), color);
+    graphics->lines.append(p-vec2(0, d), p+vec2(-d, 0), color);
+    graphics->lines.append(p-vec2(-d, 0), p+vec2(0, -d), color);
+   }
   }
   if(plotLines && !(plotBandsX || plotBandsY)) for(size_t i: range(points.size-1)) {
    if(!isNumber(points[i]) || !isNumber(points[i+1])) continue;
@@ -283,7 +304,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
    //int b = round(f.b);
    if(1 || !done[a]) {
     done[a]++;
-    Text text(str(a)+"° "/*+str(b)+"K"*/, textSize, colors[i], 1,0, fontName);
+    Text text(str(a)+"° "+/*section(*/dataSets.keys[i]/*,' ')*//*+str(b)+"K"*/, textSize, colors[i], 1,0, fontName);
     graphics->graphics.insert(B+vec2(textSize, -text.sizeHint().y/2), text.graphics(0));
    }
    const auto& data = dataSets.values[i];

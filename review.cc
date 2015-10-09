@@ -139,7 +139,7 @@ struct ArrayView : Widget {
  // Prepends sort key
  void apply(Dict& dict) {
   if(dict.contains("Pattern"_)) { // Sort key
-   int index = ref<string>{"none"_,"helix","cross","loop"}.indexOf(dict.at("Pattern"));
+   int index = ref<string>{"none"_,"cross","helix","loop"}.indexOf(dict.at("Pattern"));
    assert_(index >= 0 && index < 4);
    dict.at("Pattern"_) = String( (char)index + (string)dict.at("Pattern"));
   }
@@ -231,8 +231,9 @@ break2:;
        data.append(" "_+str(stress[argmax]));
        data.append(" "_+str(mean(stress.slice(argmax))));
 
-       if(!dataSets.contains("Radial Force (N)"_)) { log(dataSets.keys); continue; }
-       ref<float> force = dataSets.at("Radial Force (N)"_);
+       string sideForce = dataSets.contains("Side Force (N)"_) ? "Side Force (N)"_ : "Radial Force (N)"_;
+       if(!dataSets.contains(sideForce)) { log(dataSets.keys); continue; }
+       ref<float> force = dataSets.at(sideForce);
        buffer<float> radius = ::radius(dataSets);
        ref<float> height = dataSets.at("Height (m)"_);
        buffer<float> pressure = ::apply(force.size, [&](size_t i) {
@@ -625,7 +626,7 @@ struct Review {
    plot.plotBandsY = true;
    plot.max.y = array.max;
   } else if(index==Deviatoric) {
-   plot.ylabel = /*Deviatoric*/"Stress (KPa)"__;
+   plot.ylabel = /*Deviatoric*/"Shear stress (KPa)"__;
    plot.plotPoints = true;
    plot.plotLines = false;
    if(plotIndex!=invalid) {
@@ -740,7 +741,7 @@ struct Review {
    }
   }
   for(auto& key: plot.dataSets.keys)  if(key && key[0] < 16) key = copyRef(key.slice(1));
-  plot.uniformScale = true;
+  //plot.uniformScale = true;
   return plot;
  }
 
@@ -780,6 +781,7 @@ struct Review {
   buffer<float> strain;
   if(dataSets.contains(plot.xlabel)) strain = move(dataSets.at("Strain (%)"));
   else {
+   if(!dataSets.contains("Height (m)")) return plot;
    ref<float> height = dataSets.at("Height (m)");
    strain = apply(height, [=](float h){ return (1-h/height[0])*100; });
   }
@@ -808,7 +810,7 @@ struct Review {
   }
   else if(index==Pressure) {
    plot.ylabel = "Pressure (Pa)"__;
-   ref<float> force = dataSets.at("Radial Force (N)"_);
+   ref<float> force = dataSets.at(dataSets.contains("Side Force (N)"_) ? "Side Force (N)"_ : "Radial Force (N)"_);
    strain.size = min(strain.size, force.size);
    buffer<float> radius = ::radius(dataSets);
    ref<float> height = dataSets.at("Height (m)"_);
@@ -831,13 +833,13 @@ struct Review {
     plot.dataSets.insert(""__, {::move(strain), ::move(stress)});
    }
    else if(index==Deviatoric) {
-    ref<float> force = dataSets.at("Radial Force (N)"_);
+    ref<float> force = dataSets.at(dataSets.contains("Side Force (N)"_) ? "Side Force (N)"_ : "Radial Force (N)"_);
     buffer<float> radius = ::radius(dataSets);
     ref<float> height = dataSets.at("Height (m)"_);
     buffer<float> pressure (force.size);
     for(size_t i: range(pressure.size)) {
         pressure[i] = force[i] / (height[i] * 2 * PI * radius[i]);
-        assert_(pressure[i] >= 0);
+        //assert_(pressure[i] >= 0);
     }
     if(useMedianFilter && pressure.size > 2*medianWindowRadius+1) {
      const size_t medianWindowRadius = 4;
@@ -863,7 +865,7 @@ struct Review {
    error("plot");
   }
 
-  if(0) {
+  if(1) {
    auto group = array.parseDict("Angle=3.6,Elasticity=1e7,Friction=0.3,Pattern=cross,Pressure=60K,Radius=0.02,Rate=400,Resolution=2,Seed=3,Side=1e8,Thickness=1e-3,TimeStep=10µ,Wire=12%");
    if(1) {
     if(1) {
@@ -880,7 +882,7 @@ struct Review {
      VList<Plot> plots (Linear::Share, Linear::Expand);
      for(size_t index: range(1)) {
       auto& plot = plots.append(pressurePlot(group, Deviatoric, index));
-      plot.max = vec2(200, 100);
+      //plot.max = vec2(200, 100);
       String& name = plot.dataSets.keys[0];
       name = ""__; /*copyRef(ref<string>{"Without wire"_, "Simple helix"_,"Spiral helix"_,"Radially reinforced helix"_}[
                                                       ref<string>{"none"_,"helix","loop","cross"}.indexOf(name)]);*/
@@ -889,6 +891,11 @@ struct Review {
     }
    }
    Plot plot = pressurePlot(group, Deviatoric);
+   for(String& name: plot.dataSets.keys) {
+    int index = ref<string>{"none"_,"helix","loop","cross"}.indexOf(section(name,' '));
+    assert_(index >=0, index, name);
+    name = copyRef(ref<string>{"Without"_, "Simple"_,"Spiral"_,"Radial"_}[index]);
+   }
    log(plot.dataSets.keys);
    writeFile("plot.pdf"_, toPDF(plot, vec2(94.5, 94.5/1.5)), home(), true);
    error("plot");

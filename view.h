@@ -215,7 +215,6 @@ struct SimulationView : SimulationRun, Widget, Poll {
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_),
                              3, Float, positionBuffer);
-   Locker lock(this->lock);
    GLBuffer rotationBuffer (grainRotations);
    shader.bind("rotationBuffer"_, rotationBuffer, 0);
    shader["radius"] = float(scale.z/2 * Grain::radius*3/4); // reduce Z radius to see membrane mesh on/in grain
@@ -262,7 +261,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
   }
 
   // Membrane
-  {
+  if(0) {
    static GLShader shader {::shader_glsl(), {"color"}};
    shader.bind();
    shader.bindFragments({"color"});
@@ -330,13 +329,24 @@ struct SimulationView : SimulationRun, Widget, Poll {
 
    if(1) glDepthTest(false);
    {static GLVertexArray vertexArray;
-    shader["transform"] = rotatedViewProjection;
-    for(auto entry: lines) {
-     shader["uColor"] = vec4(entry.key, 1);
-     GLBuffer positionBuffer (entry.value);
-     vertexArray.bindAttribute(shader.attribLocation("position"_),
-                               3, Float, positionBuffer);
-     vertexArray.draw(Lines, entry.value.size);
+    array<vec3> positions;
+    Locker lock(this->lock);
+    for(size_t i: range(grainGrainCount)) {
+     int a = grainGrainA[i];
+     int b = grainGrainB[i];
+     float d = sqrt(sq(grain.Px[a]-grain.Px[b]) + sq(grain.Py[a]-grain.Py[b]) + sq(grain.Pz[a]-grain.Pz[b]));
+     if(d < 2*Grain::radius && grainGrainLocalAx[i]) {
+      positions.append( grain.position[a] + toVec3(qapply(grain.rotation[a], (v4sf){grainGrainLocalAx[i], grainGrainLocalAy[i], grainGrainLocalAz[i], 0})) );
+      positions.append( grain.position[b] + toVec3(qapply(grain.rotation[b], (v4sf){grainGrainLocalBx[i], grainGrainLocalBy[i], grainGrainLocalBz[i], 0})) );
+     }
+    }
+    if(positions) {
+     GLBuffer positionBuffer (positions);
+     vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
+     shader["transform"] = rotatedViewProjection;
+     shader["uColor"] = vec4(1,0,0, 1);
+     extern float lineWidth; lineWidth = 1;
+     vertexArray.draw(Lines, positions.size);
     }
    }
    //lines.clear();

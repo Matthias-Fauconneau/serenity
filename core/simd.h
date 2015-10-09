@@ -96,7 +96,7 @@ static inline v8sf gather(const float* P, v8si a) {
 static inline v8sf gather(ref<float> P, v8si a) {
  return (v8sf){P[a[0]], P[a[1]], P[a[2]], P[a[3]], P[a[4]], P[a[5]], P[a[6]], P[a[7]]};
 }
-/*static inline void scatter(mref<float> P, v8si a, v8sf x) {
+static inline void scatter(mref<float> P, v8si a, v8sf x) {
  P[a[0]] = x[0];
  P[a[1]] = x[1];
  P[a[2]] = x[2];
@@ -105,7 +105,7 @@ static inline v8sf gather(ref<float> P, v8si a) {
  P[a[5]] = x[5];
  P[a[6]] = x[6];
  P[a[7]] = x[7];
-}*/
+}
 
 #include "math.h"
 inline v4sf mean(const ref<v4sf> x) { assert(x.size); return sum(x, float4(0)) / float4(x.size); }

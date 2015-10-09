@@ -43,12 +43,12 @@ struct System {
  vec3 G {0, 0, -gz/densityScale}; // Scaled gravity
 
  // Penalty model
- sconst float normalDamping = 0.02;
+ sconst float normalDamping = 0.05;
  // Friction model
- sconst float staticFrictionSpeed = inf; //1./3 *m/s; //inf; //1./3 *m/s;
- sconst float staticFrictionFactor = 1e5;
- sconst float staticFrictionLength = 1e-4 * m;
- sconst float staticFrictionDamping = 15 *g/s/s;
+ sconst float staticFrictionSpeed = inf; //1e-1 *m/s; // inf
+ sconst float staticFrictionFactor = 1e3;// 5e3-1e5
+ sconst float staticFrictionLength = 3e-4 * m;
+ sconst float staticFrictionDamping = 15 *g/s;
  sconst float frictionCoefficient = 0.3;
  sconst v8sf frictionCoefficient8 = float8(0.3);
 
@@ -74,11 +74,11 @@ struct System {
 
   struct {
    const Vertex& this_;
-   vec3 operator[](size_t i) const { return vec3(this_.Px[i], this_.Py[i], this_.Pz[i]); }
+   const vec3 operator[](size_t i) const { return vec3(this_.Px[i], this_.Py[i], this_.Pz[i]); }
   } position {*this};
   struct {
    const Vertex& this_;
-   vec3 operator[](size_t i) const { return vec3(this_.Vx[i], this_.Vy[i], this_.Vz[i]); }
+   const vec3 operator[](size_t i) const { return vec3(this_.Vx[i], this_.Vy[i], this_.Vz[i]); }
   } velocity {*this};
 
   //struct { vec4f operator[](size_t) const { return _0001f; }} rotation;
@@ -108,7 +108,6 @@ struct System {
   // Correction
   vec4f r = b[1] * (p.force[i] * p._1_mass - p.positionDerivatives[0][i]);
   p.position[i] += c[0]*r;
-  //p.velocity[i] *= float4(1-0.1*dt); // 10%/s viscosity
   p.velocity[i] += c[1]*r;
   p.positionDerivatives[0][i] += c[2]*r;
   p.positionDerivatives[1][i] += c[3]*r;
@@ -165,7 +164,7 @@ struct System {
   sconst float curvature = 1./radius;
   sconst float shearModulus = 79e9 * kg / (m*s*s);
   sconst float poissonRatio = 0.28;
-  sconst float elasticModulus = 1  ? 2*shearModulus*(1+poissonRatio) : 1e10; // ~2e11
+  sconst float elasticModulus = 0 ? 2*shearModulus*(1+poissonRatio) : 1e10; // ~2e11
 
   sconst float density = 7.8e3 * densityScale;
   sconst float mass = density * volume;
@@ -188,7 +187,9 @@ struct System {
  const vec4f dt_2 = float4(dt/2);
  void step(Grain& p, size_t i) {
   step((Vertex&)p, i);
-  //p.angularVelocity[i] *= float4(1-0.5*dt); // Rotation viscosity
+   // Rotation viscosity FIXME
+  p.AVx[i] *= 1-10*dt; p.AVy[i] *= 1-10*dt; p.AVz[i] *= 1-10*dt;
+  //p.AVx[i] *= 1./2; p.AVy[i] *= 1./2; p.AVz[i] *= 1./2;
   // Euler
   p.rotation[i] += dt_2 * qmul((v4sf){p.AVx[i],p.AVy[i],p.AVz[i],0}, p.rotation[i]);
   p.AVx[i] += p.dt_angularMass * p.Tx[i];
@@ -426,17 +427,16 @@ struct System {
 
  /// Evaluates contact force between two objects with friction (rotating B)
  template<Type tA, Type tB> inline void contact(
-   const tA& unused A, v8si unused a,
-   tB& unused B, v8si unused b,
+   const tA& A, v8si a,
+   tB& B, v8si b,
    v8sf depth,
-   v8sf unused RAx, v8sf unused RAy, v8sf unused RAz,
-   v8sf unused RBx, v8sf unused RBy, v8sf unused RBz,
+   v8sf RAx, v8sf RAy, v8sf RAz,
+   v8sf RBx, v8sf RBy, v8sf RBz,
    v8sf Nx, v8sf Ny, v8sf Nz,
-   v8sf unused localAx, v8sf unused localAy, v8sf unused localAz,
-   v8sf unused localBx, v8sf unused localBy, v8sf unused localBz,
-   v8sf unused Ax, v8sf unused Ay, v8sf unused Az,
-   v8sf unused Bx, v8sf unused By, v8sf unused Bz,
-   mref<float> unused contacts, v8si unused contactIndices,
+   v8sf Ax, v8sf Ay, v8sf Az,
+   v8sf Bx, v8sf By, v8sf Bz,
+   v8sf& localAx, v8sf& localAy, v8sf& localAz,
+   v8sf& localBx, v8sf& localBy, v8sf& localBz,
    v8sf& Fx, v8sf& Fy, v8sf& Fz,
    v8sf& TAx, v8sf& TAy, v8sf& TAz,
    v8sf& TBx, v8sf& TBy, v8sf& TBz
@@ -463,11 +463,8 @@ struct System {
   const v8sf Kb = KB * sqrt8(depth);
   v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
   v8sf fB = - Kb * normalSpeed ; // Damping
-  //for(size_t k: range(8)) log(fB[k], Kb[k], normalSpeed[k]);
 
-  //v8sf fB = _0f;
   v8sf fN = fK + fB;
-  //for(size_t k: range(8)) log(fN[k], fK[k], fB[k]);
   v8sf NFx = fN * Nx;
   v8sf NFy = fN * Ny;
   v8sf NFz = fN * Nz;
@@ -475,7 +472,6 @@ struct System {
   Fy = NFy;
   Fz = NFz;
 
-#if 1
   v8sf FRAx, FRAy, FRAz;
   v8sf FRBx, FRBy, FRBz;
   for(size_t k: range(8)) { // FIXME
@@ -488,6 +484,8 @@ struct System {
     localBx[k] = localB[0];
     localBy[k] = localB[1];
     localBz[k] = localB[2];
+    //log(localAx[k], localAy[k], localAz[k]);
+    //log(localBx[k], localBy[k], localBz[k]);
    }
    vec4f relativeA = qapply(A.rotation[a[k]], (v4sf){localAx[k], localAy[k], localAz[k], 0});
    FRAx[k] = relativeA[0];
@@ -515,8 +513,9 @@ struct System {
   v8sf TOz = Dz - Dn * Nz;
   v8sf tangentLength = sqrt8(TOx*TOx+TOy*TOy+TOz*TOz);
   sconst v8sf staticFrictionStiffness = float8(staticFrictionFactor * frictionCoefficient);
-  v8sf kS = staticFrictionStiffness * fN;
+  v8sf kS = staticFrictionStiffness * fK; //fN;
   v8sf fS = kS * tangentLength; // 0.1~1 fN
+  //for(size_t k: range(8)) log(fS[k]);
 
   // tangentRelativeVelocity
   v8sf RVn = Nx*RVx + Ny*RVy + Nz*RVz;
@@ -524,8 +523,7 @@ struct System {
   v8sf TRVy = RVy - RVn * Ny;
   v8sf TRVz = RVz - RVn * Nz;
   v8sf tangentRelativeSpeed = sqrt8(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
-  v8sf fD = frictionCoefficient8 * fN;
-  //for(size_t k: range(8)) log(fD[k], frictionCoefficient8[k], fN[k]);
+  v8sf fD = frictionCoefficient8 * fK; //fN;
   v8sf fTx, fTy, fTz;
   for(size_t k: range(8)) { // FIXME: mask
    if(fS[k] < fD[k] && tangentLength[k] < staticFrictionLength) {
@@ -545,7 +543,7 @@ struct System {
     }
    } else {
     // Dynamic
-    contacts[contactIndices[k]] = 0;
+    localAx[k] = 0; // if(!localAx[k]) {
     if(tangentRelativeSpeed[k]) {
      float scale = - fD[k] / tangentRelativeSpeed[k];
      fTx[k] = scale * TRVx[k];
@@ -560,15 +558,6 @@ struct System {
     }
    }
   }
-#if DEBUG
-  /*for(size_t k: range(8)) if(A[k] < (int)grain.count) {
-   assert_(B[k] < (int)grain.count, B[k]);
-   assert_(A[k]!=B[k], A[k], B[k], grain.count);
-   assert_(isNumber(Fx[i+k]) && isNumber(Fy[i+k]) && isNumber(Fz[i+k]),
-     i+k, grain.count, A[k], B[k], Fx[i+k], Fy[i+k], Fz[i+k], Rx[k], Ry[k], Rz[k], depth[k]);
-  }*/
-  //for(size_t k: range(8)) log(fTx[k], fTy[k], fTz[k]);
-#endif
   Fx += fTx;
   Fy += fTy;
   Fz += fTz;
@@ -578,14 +567,6 @@ struct System {
   TBx = RBy*fTz - RBz*fTy;
   TBy = RBz*fTx - RBx*fTz;
   TBz = RBx*fTy - RBy*fTx;
-#else
-  TAx = _0f;
-  TAy = _0f;
-  TAz = _0f;
-  TBx = _0f;
-  TBy = _0f;
-  TBz = _0f;
-#endif
  }
 };
 
