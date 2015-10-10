@@ -39,14 +39,17 @@ MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter, 	ref<float2> staffGains =
 
 /// Converts MIDI time base to audio sample rate
 MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds) {
-    //assert_(targetTicksPerSeconds > notes.ticksPerSeconds, targetTicksPerSeconds, notes.ticksPerSeconds);
-	for(MidiNote& note: notes) {
-		note.time = (int64)note.time*targetTicksPerSeconds/notes.ticksPerSeconds;
+    assert_(targetTicksPerSeconds > notes.ticksPerSeconds, targetTicksPerSeconds, notes.ticksPerSeconds);
+    //log(notes.size, notes.ticksPerSeconds, notes.last().time, notes.last().time / (float)notes.ticksPerSeconds);
+    for(MidiNote& note: notes) {
+        /*log(note.time, targetTicksPerSeconds, notes.ticksPerSeconds, (int64)note.time*targetTicksPerSeconds/notes.ticksPerSeconds,
+            (int64)note.time*targetTicksPerSeconds/notes.ticksPerSeconds / (float)targetTicksPerSeconds);*/
+        note.time = (int64)note.time*targetTicksPerSeconds/notes.ticksPerSeconds;
 		assert_(note.time < 1<<30);
 		assert(note.time >= 0);
-	}
+    }
 	notes.ticksPerSeconds = targetTicksPerSeconds;
-	return move(notes);
+    return move(notes);
 }
 
 struct Peak { int time; uint key; float value; };

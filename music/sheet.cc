@@ -439,7 +439,7 @@ void System::layoutNotes(uint staff) {
                     notes->sorted(sign.time).append( sign );
                     //log("note", notes->size(), sign.time, notes->sorted(sign.time));
                 }
-            } else log("-");
+            } //else log("-");
         }
 
         // Articulations
@@ -1170,9 +1170,55 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
     // Associates MIDI notes with score notes
     // chordToNote: First MIDI note index of chord
     midiToSign = buffer<Sign>(midiNotes.size, 0);
-    array<uint> chordExtra;
-    constexpr bool logErrors = true;
     float space = 2;
+    constexpr bool logErrors = true;
+    //midiNotes = midiNotes.slice(11);
+
+#if 1
+    if(midiNotes) {
+        array<uint> scoreNotes;
+        for(ref<Sign> chord: notes.values) for(Sign note: chord) scoreNotes.append(note.note.key());
+        log(scoreNotes.slice(0,60));
+        log(midiNotes.slice(0,60));
+        //error("SYNC");
+
+        while(chordToNote.size < notes.size()) { // While map is not complete (iterates over notes)
+            if(!notes.values[chordToNote.size]) { // Current chord depleted (all notes have been matched)
+                chordToNote.append( midiToSign.size ); // Maps next chord to next index
+                if(chordToNote.size==notes.size()) { // Was last chord
+                    assert(midiToSign.size == midiNotes.size, midiToSign.size == midiNotes.size);
+                    break;
+                }
+            }
+
+            // Next note
+            assert_(chordToNote.size<notes.size());
+            array<Sign>& chord = notes.values[chordToNote.size]; // Current chord
+            assert_(chord);
+
+            uint midiIndex = midiToSign.size;
+            if(midiIndex == midiNotes.size) { log("midiIndex == midiNotes.size"); break; } // FIXME
+            assert_(midiIndex < midiNotes.size, midiIndex, midiNotes.size);
+            uint midiKey = midiNotes[midiIndex]; // Current key
+
+            // Finds current key in current chord
+            int match = chord.indexOf(midiKey);
+            if(match < 0) match = 0; // Take first if mismatch
+            if(match >= 0) { // Key found in current chord
+                Sign sign = chord.take(match);
+                Note note = sign.note;
+                //assert_(note.key() == midiKey);
+                midiToSign.append( sign );
+                if(note.pageIndex != invalid && note.glyphIndex != invalid) {
+                    vec2 p = pages[note.pageIndex].glyphs[note.glyphIndex].origin;
+                    text(p+vec2(space, 2), str(note.key()), 12, debug->glyphs);
+                }
+                //log("match", midiKey);
+            } else error(chord, strKey(0, midiKey));
+        }
+    }
+#else
+    array<uint> chordExtra;
     if(midiNotes) {
         while(chordToNote.size < notes.size()) { // While map is not complete (iterates over notes)
 
@@ -1324,8 +1370,12 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
     log(midiToSign.size, midiNotes.size, chordToNote.size, notes.size());
     //assert_(!chordExtra);
     if(chordExtra) log(chordExtra);
-    assert_(midiToSign.size == midiNotes.size, midiToSign.size, midiNotes.size);
+#endif
+    //assert_(midiToSign.size == midiNotes.size, midiToSign.size, midiNotes.size);
+    assert_(midiToSign.size <= midiNotes.size, midiToSign.size, midiNotes.size);
     if(chordToNote.size == notes.size() || !midiNotes) {}
     else { firstSynchronizationFailureChordIndex = chordToNote.size; }
     if(logErrors && (extraErrors||wrongErrors||missingErrors||orderErrors)) log(extraErrors, wrongErrors, missingErrors, orderErrors);
+    pages[0].graphics.insertMulti(vec2(0), share(debug));
+
 }

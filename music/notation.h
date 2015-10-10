@@ -203,21 +203,24 @@ inline bool operator <(const Sign& a, const Sign& b) {
     return a.time < b.time;
 }
 
-inline String superDigit(int digit) {
+/*inline String superDigit(int digit) {
     assert_(abs(digit) <= 9); return (digit>0?""_:"⁻"_)+ref<string>{"⁰"_,"¹"_, "²"_, "³"_, "⁴"_, "⁵"_, "⁶"_, "⁷"_, "⁸"_, "⁹"_}[abs(digit)];
-}
+}*/
 inline String strKey(int fifths, int key) {
     assert_(key>0);
     //return (string[]){"A"_,"A♯"_,"B"_,"C"_,"C♯"_,"D"_,"D♯"_,"E"_,"F"_,"F♯"_,"G"_,"G♯"_}[(key+2*12+3)%12]
     /*+superDigit(key/12-2)*/;
-    int step = (keyStep(fifths, key)+37)%7;
-    return char('A'+step)+ref<string>{"b"_,""_,"#"_}[keyAlteration(fifths, key)+1];
+    int step = keyStep(fifths, key)+37;
+    //int octave = key/12-2; ///*lowest A-1*/3 + (step>0 ? step/7 : (step-6)/7); // Rounds towards negative
+    int alt = keyAlteration(fifths, key)+1;
+    assert_(alt >= 0 && alt <= 2);
+    return char('A'+step%7)+ref<string>{"b"_,""_,"#"_}[alt];//+str(octave);
 }
 inline String strNote(int octave, int step, Accidental accidental) {
     octave += /*lowest A-1*/3 + (step>0 ? step/7 : (step-6)/7); // Rounds towards negative
     int octaveStep = (step - step/7*7 + 7)%7; // signed step%7 (Step offset on octave scale)
     //return "CDEFGAB"_[octaveStep]+(accidental?ref<string>{"♭"_,"♮","♯"_}[accidental-Accidental::AccidentalBase]:""_)+superDigit(octave);
-    return "CDEFGAB"_[octaveStep]+(accidental?ref<string>{"B"_,"N","#"_}[accidental-Accidental::AccidentalBase]:""_)+str(octave);
+    return "CDEFGAB"_[octaveStep]+(accidental?ref<string>{"B"_,"N"_,"#"_}[accidental-Accidental::AccidentalBase]:""_)+str(octave);
 }
 inline String str(const Note& o) { return strNote(o.clef.octave, o.step, o.accidental); }
 inline String str(const Clef& o) {
@@ -230,11 +233,11 @@ inline String str(const Sign& o) {
         String s;
         if(o.type==Sign::Clef) s = str(o.clef);
         else if(o.type==Sign::OctaveShift) s = copyRef(ref<string>{"8va"_,"8vb"_,"⸥"_}[int(o.octave)]);
-        else if(o.type==Sign::Note) s = str(o.note);
+        else if(o.type==Sign::Note) s = strKey(0, o.note.key()); //str(o.note);
         else if(o.type==Sign::Rest) s = copyRef(str("-;,"_[clamp(0, int(o.rest.value)-Value::Whole, 1)]));
         else error(int(o.type));
         assert_(o.staff <= 9);
-        return s + ref<string>{"₀","₁","₂","₃","₄","₅","₆","₇","₈","₉"}[o.staff];
+        return s;// + ref<string>{"₀","₁","₂","₃","₄","₅","₆","₇","₈","₉"}[o.staff];
     }
     if(o.type==Sign::Measure) return " | "__;
     if(o.type==Sign::Repeat) return " : "__;

@@ -161,7 +161,6 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
             }
             else if(MIDI(key)==MIDI::TrackName || MIDI(key)==MIDI::InstrumentName || MIDI(key)==MIDI::Text || MIDI(key)==MIDI::Copyright) {}
             else if(MIDI(key)==MIDI::EndOfTrack) {}
-            else if(MIDI(key)==MIDI::SequenceNumber) {log("SeqNumber", c, data);}
             else error("Meta", hex(key));
         }
         else error("Type", type);
@@ -198,7 +197,8 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
                             if(valueDuration>=valueDurations[Eighth]) {
                                 assert_(valueDuration>=valueDurations[Eighth], duration, quarterDuration, divisions, valueDuration, strKey(0, key), "rest");
                                 Value value = Value(ref<uint>(valueDurations).size-1-log2(valueDuration));
-                                assert_(int(value) >= 0, duration, valueDuration);
+                                //assert_(int(value) >= 0, duration, valueDuration);
+                                if(int(value) >= 0) // FIXME
                                 signs.insertSorted({Sign::Rest, lastOff[staff], {{staff, {{duration, .rest={value}}}}}});
                             }
                         }
@@ -233,27 +233,27 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
                         else if(valueDuration >= 41/*43*/ && valueDuration <= 50/*48*/) { // Dotted white
                             dot = true;
                             valueDuration = 32;
-                        } else if(valueDuration >= 52/*60*/ && valueDuration <= 67/*64*/) { // Whole
+                        } else if(valueDuration >= 51/*60*/ && valueDuration <= 67/*64*/) { // Whole
                             valueDuration = 64;
                         } else if(valueDuration >= 68/*72*/ && valueDuration <= 81/*72*/) { // Whole + Quaver
                             // TODO: insert tied quaver before/after depending on beat
                             valueDuration = 64; // FIXME: Only displays a whole which is of an actual duration of a white and a quaver
-                        } else if(valueDuration >= 82/*96*/ && valueDuration <= 96) { // Dotted Whole
+                        } else if(valueDuration >= 82/*96*/ && valueDuration <= 101/*96*/) { // Dotted Whole
                             dot = true;
                             valueDuration = 64;
-                        } else if(valueDuration>=106/*120*/ && valueDuration <= 128) { // Double
+                        } else if(valueDuration>=105/*120*/ && valueDuration <= 136/*128*/) { // Double
                             valueDuration = 128;
-                        } else if(valueDuration>=144 && valueDuration <= 144) { // Double + Quarter
+                        } else if(valueDuration>=144 && valueDuration <= 147) { // Double + Quarter
                             // TODO: insert tied quarter before/after depending on beat
                             valueDuration = 128;// FIXME: Only displays a double which is of an actual duration of a white and a quarter
-                        } else if(valueDuration>=160 && valueDuration <= 183) { // Long
+                        } else if(valueDuration>=160 && valueDuration <= 212) { // Long
                             valueDuration = 256;
                         }
-                        else error("Unsupported duration ",valueDuration, duration, quarterDuration, divisions, duration*quarterDuration/divisions, strKey(0, key), dot);
+                        else error("Unsupported duration",valueDuration, duration, quarterDuration, divisions, duration*quarterDuration/divisions, strKey(0, key), dot);
                         assert_(isPowerOfTwo(valueDuration), duration, quarterDuration, divisions, duration*quarterDuration/divisions, valueDuration, strKey(0, key), dot);
                         Value value = Value(ref<uint>(valueDurations).size-1-log2(valueDuration));
-                        assert_(int(value) >= 0, duration, valueDuration);
-
+                        //assert_(int(value) >= 0, duration, valueDuration, note.time - noteOn.time);
+                        if(int(value) >= 0) // FIXME
                         signs.insertSorted(Sign{Sign::Note, noteOn.time, {{staff, {{duration, .note={
                                                                                         .value = value,
                                                                                         .clef = clefs[staff],
@@ -283,6 +283,9 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
         if(s) {
             uint8 c=s.read(); uint t=c&0x7f;
             if(c&0x80){c=s.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=s.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=s.read();t=(t<<7)|c;}}}
+            if(t>=6730) { log(trackIndex, track.time, t, notes.size, type); t=0; } //FIXME
+            //if(t>=3808) { log(trackIndex, track.time, t, notes.size, type); notes.clear(); track.startTime=track.time=lastTime=t=0; } //FIXME
+            //if(t>=1090) log(track.time, t, notes.size);
             track.time += t;
         }
     }
