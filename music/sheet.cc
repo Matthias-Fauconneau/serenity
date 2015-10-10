@@ -433,10 +433,13 @@ void System::layoutNotes(uint staff) {
             // Highlight
             note.pageIndex = pageIndex;
             if(measureBars) note.measureIndex = measureBars->size()-1;
-            if(note.tie == Note::NoTie || note.tie == Note::TieStart) if(notes) {
-                assert_(sign.note.measureIndex != invalid);
-                notes->sorted(sign.time).append( sign );
-            }
+            if(note.tie == Note::NoTie || note.tie == Note::TieStart) {
+                if(notes) {
+                    assert_(sign.note.measureIndex != invalid);
+                    notes->sorted(sign.time).append( sign );
+                    //log("note", notes->size(), sign.time, notes->sorted(sign.time));
+                }
+            } else log("-");
         }
 
         // Articulations
@@ -699,6 +702,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
                         if(notes) {
                             assert_(sign.note.measureIndex != invalid);
                             notes->sorted(sign.time).append(sign);
+                            //log("grace", notes->size(), sign.time, notes->sorted(sign.time));
                         }
                     }
                 }
@@ -826,7 +830,10 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 
                     // Line break
                     //if(signIndex == signs.size-1) break; // End of line, last measure bar FIXME: skips last measure
-                    if(x > pageWidth && !measureBars && !activeTies && !notes) break;
+                    if(x > pageWidth && !measureBars && !activeTies && !notes) {
+                        log("end of line", pageWidth, x);
+                        break;
+                    }
                     // Records current parameters at the end of this measure in case next measure triggers a line break
                     if(sign.measure.lineBreak == Measure::PageBreak) pageBreak = true;
                     lastMeasureBarIndex = signIndex;
@@ -836,7 +843,10 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
                     // Evaluates next measure step ranges
                     nextMeasureIndex++;
                     while(nextMeasureIndex < signs.size && signs[nextMeasureIndex].type != Sign::Measure) nextMeasureIndex++;
-                    if(nextMeasureIndex < signs.size && signs[nextMeasureIndex].measure.lineBreak) break;
+                    /*if(pageWidth && nextMeasureIndex < signs.size && signs[nextMeasureIndex].measure.lineBreak) {
+                        log("Line break", pageWidth);
+                        break;
+                    }*/
                     measure = evaluateStepRanges(signs.slice(signIndex, nextMeasureIndex-signIndex));
                 }
                 else if(sign.type==Sign::KeySignature) {
@@ -1157,120 +1167,164 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
 
     if(!context.ticksPerMinutes) context.ticksPerMinutes = 90*ticksPerQuarter;
 
+    // Associates MIDI notes with score notes
+    // chordToNote: First MIDI note index of chord
     midiToSign = buffer<Sign>(midiNotes.size, 0);
     array<uint> chordExtra;
-
     constexpr bool logErrors = true;
     float space = 2;
-    if(midiNotes) while(chordToNote.size < notes.size()) {
-        if(!notes.values[chordToNote.size]) {
-            chordToNote.append( midiToSign.size );
-            if(chordToNote.size==notes.size()) break;
-            array<Sign>& chord = notes.values[chordToNote.size];
-            chordExtra.filter([&](uint midiIndex){ // Tries to match any previous extra to next notes
-                uint midiKey = midiNotes[midiIndex];
-                int match = chord.indexOf(midiKey);
-                if(match < 0) return false; // Keeps
-                Sign sign = chord.take(match); Note note = sign.note;
-                assert_(note.key() == midiKey);
-                midiToSign[midiIndex] = sign;
-                if(logErrors) log("O",str(note.key()));
-                if(note.pageIndex != invalid && note.glyphIndex != invalid) {
-                    vec2 p = pages[note.pageIndex].glyphs[note.glyphIndex].origin;
-                    text(p+vec2(space, 2), "O"_+str(note.key()), 12, debug->glyphs);
+    if(midiNotes) {
+        while(chordToNote.size < notes.size()) { // While map is not complete (iterates over notes)
+
+            if(0) {
+            //if(extraErrors > 40 || wrongErrors > 9 || missingErrors > 13 || orderErrors > 8) {
+            //if(extraErrors || wrongErrors || missingErrors || orderErrors) {
+                log(extraErrors, wrongErrors, missingErrors, orderErrors);
+                log(midiToSign.size, midiNotes.size);
+                log("MID", midiNotes.slice(midiToSign.size,7));
+                log("XML", notes.values[chordToNote.size]);
+                break;
+            }
+
+            // Next chord, match extras
+            if(!notes.values[chordToNote.size]) { // Current chord depleted (all notes have been matched)
+                chordToNote.append( midiToSign.size ); // Maps next chord to next index
+                if(chordToNote.size==notes.size()) { // Was last chord
+                    assert_(!chordExtra);
+                    assert(midiToSign.size == midiNotes.size, midiToSign.size == midiNotes.size);
+                    break;
                 }
-                orderErrors++;
-                return true; // Discards
-            });
-            if(chordExtra) {
-                if(logErrors) log("+"_+str(apply(chordExtra, [&](const uint index){return midiNotes[index];})));
-                if(!(chordExtra.size<=2)) { log("chordExtra.size<=2"); break; }
-                assert_(chordExtra.size<=2, chordExtra.size);
-                extraErrors+=chordExtra.size;
-                chordExtra.clear();
-            }
-            if(!notes.values[chordToNote.size]) chordToNote.append( midiToSign.size );
-            assert_(chordToNote.size<notes.size());
-            if(chordToNote.size==notes.size()) break;
-        }
-        assert_(chordToNote.size<notes.size());
-        array<Sign>& chord = notes.values[chordToNote.size];
-        assert_(chord);
-
-        uint midiIndex = midiToSign.size;
-        if(midiIndex == midiNotes.size) break; // FIXME
-        assert_(midiIndex < midiNotes.size, midiIndex, midiNotes.size);
-        uint midiKey = midiNotes[midiIndex];
-
-        /*if(extraErrors > 40 || wrongErrors > 9 || missingErrors > 13 || orderErrors > 8) {
-                        log(midiIndex, midiNotes.size);
-                        log("MID", midiNotes.slice(midiIndex,7));
-                        log("XML", chord);
-                        break;
-                }*/
-
-        int match = chord.indexOf(midiKey);
-        if(match >= 0) {
-            Sign sign = chord.take(match); Note note = sign.note;
-            assert_(note.key() == midiKey);
-            midiToSign.append( sign );
-            if(note.pageIndex != invalid && note.glyphIndex != invalid) {
-                vec2 p = pages[note.pageIndex].glyphs[note.glyphIndex].origin;
-                text(p+vec2(space, 2), str(note.key()), 12, debug->glyphs);
-            }
-        } else if(chordExtra && chord.size == chordExtra.size) {
-            int match = notes.values[chordToNote.size+1].indexOf(midiNotes[chordExtra[0]]);
-            if(match >= 0) {
-                assert_(chord.size<=3/*, chord*/);
-                if(logErrors) log("-"_+str(chord));
-                missingErrors += chord.size;
-                chord.clear();
-                chordExtra.filter([&](uint index){
-                    if(!notes.values[chordToNote.size]) chordToNote.append( midiToSign.size );
-                    array<Sign>& chord = notes.values[chordToNote.size];
-                    assert_(chord, chordToNote.size, notes.size());
-                    int match = chord.indexOf(midiNotes[index]);
-                    if(match<0) return false; // Keeps as extra
-                    midiKey = midiNotes[index];
-                    Sign sign = chord.take(match); Note note = sign.note;
-                    assert_(midiKey == note.key());
-                    midiToSign[index] = sign;
-                    if(note.pageIndex != invalid && note.glyphIndex != invalid) {
-                        vec2 p = pages[note.pageIndex].glyphs[note.glyphIndex].origin;
-                        text(p+vec2(space, 2), str(note.key()), 12, debug->glyphs);
-                    }
-                    return true; // Discards extra as matched to next chord
-                });
-            } else {
-                assert_(midiKey != chord[0].note.key());
-                uint previousSize = chord.size;
-                chord.filter([&](const Sign& sign) { Note note = sign.note;
-                    if(midiNotes.slice(midiIndex,5).contains(note.key())) return false; // Keeps as extra
-                    uint midiIndex = chordExtra.take(0);
+                array<Sign>& chord = notes.values[chordToNote.size]; // Current chord
+                // Tries to match any previous extra to next notes
+                chordExtra.filter([&](uint midiIndex) {
                     uint midiKey = midiNotes[midiIndex];
-                    assert_(note.key() != midiKey);
-                    if(logErrors) log("!"_+str(note.key(), midiKey), note.measureIndex);
+                    int match = chord.indexOf(midiKey);
+                    if(match < 0) return false; // Keeps
+                    Sign sign = chord.take(match); Note note = sign.note;
+                    assert_(note.key() == midiKey);
+                    midiToSign[midiIndex] = sign;
+                    if(logErrors) log("O",str(note.key()));
                     if(note.pageIndex != invalid && note.glyphIndex != invalid) {
                         vec2 p = pages[note.pageIndex].glyphs[note.glyphIndex].origin;
-                        text(p+vec2(space, 2), str(note.key())+"?"_+str(midiKey)+"!"_, 12, debug->glyphs);
+                        text(p+vec2(space, 2), "O"_+str(note.key()), 12, debug->glyphs);
                     }
-                    wrongErrors++;
-                    midiToSign[midiIndex] = sign; // Match highlight anyway (in case sync is wrong)
-                    return true; // Discards as wrong
+                    orderErrors++;
+                    log("order error");
+                    return true; // Discards
                 });
-                if(previousSize == chord.size) { // No notes have been filtered out as wrong, remaining are extras
-                    assert_(chordExtra && chordExtra.size<=3, chordExtra.size);
+                if(chordExtra) {
                     if(logErrors) log("+"_+str(apply(chordExtra, [&](const uint index){return midiNotes[index];})));
-                    extraErrors += chordExtra.size;
+                    //if(!(chordExtra.size<=2)) { log("chordExtra.size<=2", chordExtra.size); break; }
+                    //assert_(chordExtra.size<=2, chordExtra.size);
+                    extraErrors+=chordExtra.size;
                     chordExtra.clear();
                 }
+                if(!notes.values[chordToNote.size]) { // Current chord depleted (all notes have been matched with extras)
+                    chordToNote.append( midiToSign.size );
+                }
+                assert_(chordToNote.size<notes.size());
+                if(chordToNote.size==notes.size()) {
+                    assert_(!chordExtra);
+                    assert(midiToSign.size == midiNotes.size, midiToSign.size == midiNotes.size);
+                    break;
+                }
             }
-        } else {
-            midiToSign.append({.note={}});
-            chordExtra.append( midiIndex );
-            if(logErrors) log("?"_,midiKey);
+
+            // Next note
+            assert_(chordToNote.size<notes.size());
+            array<Sign>& chord = notes.values[chordToNote.size]; // Current chord
+            assert_(chord);
+            
+            uint midiIndex = midiToSign.size;
+            if(midiIndex == midiNotes.size) { log("midiIndex == midiNotes.size"); break; } // FIXME
+            assert_(midiIndex < midiNotes.size, midiIndex, midiNotes.size);
+            uint midiKey = midiNotes[midiIndex]; // Current key
+            
+            // Finds current key in current chord
+            int match = chord.indexOf(midiKey);
+            if(match >= 0) { // Key found in current chord
+                Sign sign = chord.take(match);
+                Note note = sign.note;
+                assert_(note.key() == midiKey);
+                midiToSign.append( sign );
+                if(note.pageIndex != invalid && note.glyphIndex != invalid) {
+                    vec2 p = pages[note.pageIndex].glyphs[note.glyphIndex].origin;
+                    text(p+vec2(space, 2), str(note.key()), 12, debug->glyphs);
+                }
+                //log("match", midiKey);
+            }
+            else { // Key not found
+                // Tries to match current chord with previous extra MIDI notes (chord ordering error)
+                //assert_(chordExtra.size <= chord.size);
+                if(/*chordExtra &&*/ chord.size == chordExtra.size) {
+                    int match = notes.values[chordToNote.size+1].indexOf(midiNotes[chordExtra[0]]);
+                    if(match >= 0) { // First extra MIDI note match any notes from next chord
+                        //assert_(chord.size<=3/*, chord*/);
+                        if(chord.size>3) log(chord);
+                        if(logErrors) log("-"_+str(chord));
+                        missingErrors += chord.size;
+                        chord.clear(); // Assumes full chord has been played
+                        chordToNote.append( midiToSign.size ); // Next chord
+                        chordExtra.filter([&](uint index) {
+                            //*chord.clear() => if(!notes.values[chordToNote.size])*/ chordToNote.append( midiToSign.size );
+                            array<Sign>& chord = notes.values[chordToNote.size];
+                            //assert_(chord, chordToNote.size, notes.size());
+                            int match = chord.indexOf(midiNotes[index]);
+                            if(match<0) {
+                                return false; // Keeps extra notes which do not match with current chord
+                            }
+                            midiKey = midiNotes[index];
+                            Sign sign = chord.take(match); Note note = sign.note;
+                            assert_(midiKey == note.key());
+                            midiToSign[index] = sign; // Maps extra MIDI notes to next chord score notes
+                            if(note.pageIndex != invalid && note.glyphIndex != invalid) {
+                                vec2 p = pages[note.pageIndex].glyphs[note.glyphIndex].origin;
+                                text(p+vec2(space, 2), str(note.key()), 12, debug->glyphs);
+                            }
+                            return true; // Discards extra which have now just been matched to next chord
+                        });
+                    } else { // First extra MIDI notes did not match any notes from next chord
+                        assert_(midiKey != chord[0].note.key());
+                        uint previousSize = chord.size;
+                        // Removes any score notes which are not found within the next 5 MIDI notes
+                        chord.filter([&](const Sign& sign) {
+                            Note note = sign.note;
+                            if(midiNotes.slice(midiIndex,5).contains(note.key())) { // If found
+                                return false; // Keeps extra score note to be matched later
+                            }
+                            // If not found: Matches extra score notes to extra MIDI notes
+                            uint midiIndex = chordExtra.take(0);
+                            uint midiKey = midiNotes[midiIndex];
+                            assert_(note.key() != midiKey);
+                            if(logErrors) log("!"_+str(note.key(), (int)midiKey));//, note.measureIndex==invalid?"invalid"__:str(note.measureIndex));
+                            if(note.pageIndex != invalid && note.glyphIndex != invalid) {
+                                vec2 p = pages[note.pageIndex].glyphs[note.glyphIndex].origin;
+                                text(p+vec2(space, 2), str(note.key())+"?"_+str(midiKey)+"!"_, 12, debug->glyphs);
+                            }
+                            wrongErrors++;
+                            midiToSign[midiIndex] = sign; // Match highlight anyway (in case sync is wrong)
+                            return true; // Discards as wrong
+                        });
+                        if(previousSize == chord.size) { // No notes have been filtered out as wrong, remaining notes are extra MIDI notes
+                            assert_(chordExtra && chordExtra.size<=3, chordExtra.size);
+                            if(logErrors) log("+"_+str(apply(chordExtra, [&](const uint index){return midiNotes[index];})));
+                            extraErrors += chordExtra.size;
+                            chordExtra.clear();
+                        }
+                    }
+                } else { // Not enough extra MIDI notes to match current chord
+                    // Records next MIDI note as an extra note to be matched later
+                    midiToSign.append({.note={}});
+                    chordExtra.append( midiIndex );
+                    if(logErrors) log("?"_,midiKey);
+                }
+            }
         }
     }
+    log(midiToSign.size, midiNotes.size, chordToNote.size, notes.size());
+    //assert_(!chordExtra);
+    if(chordExtra) log(chordExtra);
+    assert_(midiToSign.size == midiNotes.size, midiToSign.size, midiNotes.size);
     if(chordToNote.size == notes.size() || !midiNotes) {}
     else { firstSynchronizationFailureChordIndex = chordToNote.size; }
     if(logErrors && (extraErrors||wrongErrors||missingErrors||orderErrors)) log(extraErrors, wrongErrors, missingErrors, orderErrors);

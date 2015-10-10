@@ -39,7 +39,7 @@ MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter, 	ref<float2> staffGains =
 
 /// Converts MIDI time base to audio sample rate
 MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds) {
-	assert_(targetTicksPerSeconds > notes.ticksPerSeconds);
+    //assert_(targetTicksPerSeconds > notes.ticksPerSeconds, targetTicksPerSeconds, notes.ticksPerSeconds);
 	for(MidiNote& note: notes) {
 		note.time = (int64)note.time*targetTicksPerSeconds/notes.ticksPerSeconds;
 		assert_(note.time < 1<<30);
@@ -54,7 +54,7 @@ bool operator <(const Peak& a, const Peak& b) { return a.value > b.value; } // D
 typedef array<Peak> Bin;
 
 inline float keyToPitch(float key) { return 440*exp2((key-69)/12); }
-//inline float pitchToKey(float pitch) { return 69+log2(pitch/440)*12; }
+inline float pitchToKey(float pitch) { return 69+log2(pitch/440)*12; }
 
 struct Synchronizer : Widget {
 	map<uint, float>& measureBars;
@@ -74,7 +74,7 @@ struct Synchronizer : Widget {
 			uint keyCount = lastKey+1-firstKey;
 
 			size_t T = audio.size/audio.channels; // Total sample count
-#if 0 // FFT
+#if 1 // FFT
 			size_t N = 8192;  // Frame size: 48KHz * 2 (Nyquist) * 2 (window) / frameSize ~ 24Hz~A0
 			size_t h = 2048; // Hop size: 48KHz * 60 s/min / 4 b/q / hopSize / 2 (Nyquist) ~ 175 bpm
 			FFT fft(N);
@@ -85,8 +85,8 @@ struct Synchronizer : Widget {
 			for(size_t frameIndex: range(frameCount)) {
 				ref<float> X = audio.slice(frameIndex*h*audio.channels, N*audio.channels);
 				if(audio.channels==1) for(size_t i: range(N)) fft.windowed[i] = fft.window[i] * X[i];
-				//else if(audio.channels==2) for(size_t i: range(N)) fft.windowed[i] = fft.window[i] * (X[i*2+0]+X[i*2+1])/2;
-				else error(audio.channels);
+                else if(audio.channels==2) for(size_t i: range(N)) fft.windowed[i] = fft.window[i] * (X[i*2+0]+X[i*2+1])/2;
+                else error(audio.channels, "channels");
 				fft.transform();
 				for(size_t k: range(firstK, lastK+1)) { // For each bin
 					// For each intersected key
@@ -112,7 +112,7 @@ struct Synchronizer : Widget {
 					ref<float> X = audio.slice(frameIndex*h*audio.channels, h*audio.channels);
 					if(audio.channels==1) for(size_t i: range(h)) sum += filter(X[i]);
 					else if(audio.channels==2) for(size_t i: range(h)) sum += filter((X[i*2+0]+X[i*2+1])/2);
-					else error(audio.channels);
+                    else error(audio.channels, "channels");
 					F[frameIndex] = max(0.f, float(sum / h) - (frameIndex>0 ? F[frameIndex-1] : 0));
 				}
 			});
@@ -335,13 +335,11 @@ struct Music : Widget {
 	// Name
 	string name = arguments() ? arguments()[0] : (error("Expected name"), string());
 	// Files
-	buffer<String> audioFiles = arguments().contains("noaudio") ? buffer<String>() : filter(Folder(".").list(Files), [this](string path) { return !startsWith(path, name)
-			|| (/*!endsWith(path, ".mp3") && !endsWith(path, ".m4a") &&*/ !endsWith(path, "performance.mp4") && !endsWith(path, ".mkv")); });
-	buffer<String> videoFiles = arguments().contains("novideo") ? buffer<String>() : filter(Folder(".").list(Files), [this](string path) {
-			return !startsWith(path, name) ||  (!endsWith(path, "performance.mp4") && !endsWith(path, ".mkv")); });
+    String audioFileName = arguments().contains("noaudio") ? ""__ : name+".mp4";
+    String videoFile = arguments().contains("novideo") ? ""__ : name+".mp4";
 
 	// Audio
-	unique<FFmpeg> audioFile = audioFiles ? unique<FFmpeg>(audioFiles[0]) : nullptr;
+    unique<FFmpeg> audioFile = audioFileName ? unique<FFmpeg>(audioFileName) : nullptr;
     // Sampler
 	Thread decodeThread;
 	const bool encode = arguments().contains("encode") || arguments().contains("export");
@@ -350,7 +348,7 @@ struct Music : Widget {
 	// MusicXML
 	MusicXML xml = existsFile(name+".xml"_) ? readFile(name+".xml"_) : MusicXML();
 	// MIDI
-	MidiFile midi =  existsFile(name+".mid"_) ? MidiFile(readFile(name+".mid"_)) : MidiFile(); // if used: midi.signs are scaled in synchronizer
+    MidiFile midi = existsFile(name+".mid"_) ? MidiFile(readFile(name+".mid"_)) : MidiFile(); // if used: midi.signs are scaled in synchronizer
 				 /*buffer<float2> panAmplify(ref<String> staves, string selection) {
 					 buffer<float2> gains(staves.size);
 					 // Decreases other tracks volume and pan to left channel (mute right channel)
@@ -363,15 +361,15 @@ struct Music : Widget {
 	// Sheet
     Sheet sheet {xml ? xml.signs : midi.signs, xml ? xml.divisions : midi.divisions, 0, 4,
 				apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
-	Synchronizer synchronizer {audioFiles?decodeAudio(audioFiles[0]):Audio(), notes, sheet.midiToSign, sheet.measureBars};
+    Synchronizer synchronizer {/*audioFileName&&!midi?decodeAudio(audioFileName):*/Audio(), notes, sheet.midiToSign, sheet.measureBars};
 
 	// Video
-    Decoder video = videoFiles ? Decoder(videoFiles[0]) : Decoder();
+    Decoder video = videoFile ? Decoder(videoFile) : Decoder();
 
 	// State
 	bool failed = sheet.firstSynchronizationFailureChordIndex != invalid;
 	bool running = !arguments().contains("pause"); //!failed;
-	bool keyboardView = videoFiles ? endsWith(videoFiles[0], ".mkv") : false;
+    bool keyboardView = false; //videoFile ? endsWith(videoFile, ".mkv") : false;
 	bool rotate = keyboardView;
 	bool crop = keyboardView;
 	bool scale = keyboardView;
@@ -435,7 +433,7 @@ struct Music : Widget {
 		for(;midiIndex < notes.size && (int64)notes[midiIndex].time*timeDen <= (int64)timeNum*notes.ticksPerSeconds; midiIndex++) {
 			MidiNote note = notes[midiIndex];
 			if(note.velocity) {
-                assert_(noteIndex < sheet.midiToSign.size);
+                assert_(noteIndex < sheet.midiToSign.size, noteIndex, sheet.midiToSign.size);
 				Sign sign = sheet.midiToSign[noteIndex];
 				if(sign.type == Sign::Note) {
 					(sign.staff?keyboard.left:keyboard.right).append( sign.note.key() );
@@ -487,10 +485,12 @@ struct Music : Widget {
 				if(!image) { if(!preview) log("Missing image"); break; }
 				assert_(image);
 				if(rotate) ::rotate(image);
-                Image crop = this->crop ? cropShare(image, int2(0, image.height*10/24), int2(image.width, image.height/2)) : unsafeShare(image);
-                Image scale = this->scale ? ::scale(crop, 2, 1) : unsafeShare(crop);
-                videoView.image = /*this->resize ? ::resize(scale.size*resize/(resize+1), scale) :*/ copy(crop);
-				contentChanged=true;
+                Image crop = this->crop||1 ? cropShare(image, int2(0, image.height*10/24), int2(image.width, image.height/2)) : unsafeShare(image);
+                //Image crop = cropShare(image, int2(0, image.height*10/24), int2(image.width, image.height/2)) : unsafeShare(image);
+                //Image scale = this->scale||1 ? ::scale(crop, 2, 1) : unsafeShare(crop);
+                //videoView.image = ::move(scale); ///*this->resize ? ::resize(scale.size*resize/(resize+1), scale) :*/ copy(crop);
+                videoView.image = copy(crop);
+                contentChanged=true;
 				// Only preview may have lower framerate than video
 				assert_((int64)video.videoTime*timeDen >= (int64)timeNum*video.timeDen || preview || video.videoTime == 0 /*First frame might have a negative timecode*/, video.videoTime, video.timeDen, timeNum, timeDen);
 			}
@@ -516,6 +516,7 @@ struct Music : Widget {
 	}*/
 
 	Music() {
+        assert_(midi);
 		//TODO: measureBars.t *= 60 when using MusicXML (no MIDI)
 
 		scroll.horizontal=true, scroll.vertical=false, scroll.scrollbar = true;
@@ -529,7 +530,7 @@ struct Music : Widget {
 			assert_(!failed /*&& video && audioFile && audioFile->codec==FFmpeg::AAC*/);
 
 			Encoder encoder {name+".mp4"_};
-			encoder.setH264(int2(1280,720), 60);
+            encoder.setH264(int2(1280,720), 30/*60*/);
 			if(audioFile && audioFile->codec==FFmpeg::AAC) encoder.setAudio(audioFile);
             else if(audioFile) encoder.setAAC(2 /*Youtube requires stereo*/, audioFile->audioFrameRate);
 #if SAMPLER

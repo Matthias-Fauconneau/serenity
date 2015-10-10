@@ -26,7 +26,8 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
             // Reads first time (next event time will always be kept to read events in time)
             uint8 c=track.read(); uint t=c&0x7f;
             if(c&0x80){c=track.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=track.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=track.read();t=(t<<7)|c;}}}
-            tracks.append(copyRef(track.data), t);
+            //tracks.append(copyRef(track.data), t);
+            tracks.append(::move(track), t);
         }
         s.advance(length);
     }
@@ -68,6 +69,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
                 array<MidiNote>& otherActive = actives[!staff];
                 array<MidiNote>& current = currents[staff];
                 array<MidiNote>& other = currents[!staff];
+                if(0)
                 while(
                       current && // Any notes to move from staff to !staff ?
                       ((staff==0 && current.last().key>parseKey("F2")) || (staff==1 && current.first().key<68)) && // Prevents stealing from far notes (TODO: relative to last active)
@@ -106,10 +108,10 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
             for(size_t staff: range(2)) commited[staff].append(::move(currents[staff]));  // Defers until duration is known (on note off)
             for(size_t staff: range(2)) currents[staff].clear(); // FIXME: ^ move should already clear currents[staff]
             for(size_t staff: range(2)) assert_(!currents[staff], currents, commited);
-            if(measureIndex > 35) {
+            /*if(measureIndex > 35) {
                 signs.insertSorted({Sign::Measure, track.time, .measure={Measure::NoBreak, measureIndex, 1, 1, measureIndex}});
                 break; // HACK: Stops 'Brave Adventurers' before repeat
-            }
+            }*/
         }
 
         lastTime = track.time;
@@ -159,9 +161,10 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
             }
             else if(MIDI(key)==MIDI::TrackName || MIDI(key)==MIDI::InstrumentName || MIDI(key)==MIDI::Text || MIDI(key)==MIDI::Copyright) {}
             else if(MIDI(key)==MIDI::EndOfTrack) {}
-            else error(hex(key));
+            else if(MIDI(key)==MIDI::SequenceNumber) {log("SeqNumber", c, data);}
+            else error("Meta", hex(key));
         }
-        else error(type);
+        else error("Type", type);
 
         if(type==NoteOff) type=NoteOn, vel=0;
         if(type==NoteOn) {
@@ -181,7 +184,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 
                         if(noteOn.time > lastOff[staff]+quarterDuration/8) { // Rest
                             int duration = noteOn.time - lastOff[staff];
-                            assert_(duration > quarterDuration/4);
+                            assert_(duration >=/*>*/ quarterDuration/6/*4*/, duration, quarterDuration);
                             const uint quarterDuration = 16*metronome.perMinute/60;
                             uint valueDuration = duration*quarterDuration/divisions;
                             if(!valueDuration) valueDuration = quarterDuration/2; //FIXME
@@ -205,7 +208,9 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
                         assert_(valueDuration, duration, quarterDuration, divisions);
                         bool dot=false;
                         uint tuplet = 1;
-                        if(valueDuration >= 3 && valueDuration <= 4) valueDuration = 4; // Semiquaver
+                        if(valueDuration >= 1 && valueDuration <= 1) valueDuration = 1; // Grace
+                        else if(valueDuration >= 2 && valueDuration <= 2) valueDuration = 2; // Grace
+                        else if(valueDuration >= 3 && valueDuration <= 4) valueDuration = 4; // Semiquaver
                         else if(valueDuration >= 5 && valueDuration <= 6) { // Triplet of quavers
                             tuplet = 3;
                             valueDuration = 8;
@@ -215,32 +220,34 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
                             tuplet = 3;
                             valueDuration = 16;
                         }
-                        else if(valueDuration >= 14 && valueDuration <= 16) valueDuration = 16; // Quarter
-                        else if(valueDuration >= 21 && valueDuration <= 24) { // Dotted quarter
+                        else if(valueDuration >= 13/*14*/ && valueDuration <= 19/*16*/) valueDuration = 16; // Quarter
+                        else if(valueDuration >= 20/*21*/ && valueDuration <= 24) { // Dotted quarter
                             dot = true;
                             valueDuration = 16;
                         }
-                        else if(valueDuration >= 28 && valueDuration <= 32) valueDuration = 32; // Half
-                        else if(valueDuration == 36 && valueDuration <= 40) { // Half + Quaver
+                        else if(valueDuration >= 25/*28*/ && valueDuration <= 35/*32*/) valueDuration = 32; // Half
+                        else if(valueDuration >= 36 && valueDuration <= 40) { // Half + Quaver
                             // TODO: insert tied quaver before/after depending on beat
                             valueDuration = 32; // FIXME: Only displays a white which is of an actual duration of a white and a quaver
                         }
-                        else if(valueDuration >= 43 && valueDuration <= 48) { // Dotted white
+                        else if(valueDuration >= 41/*43*/ && valueDuration <= 50/*48*/) { // Dotted white
                             dot = true;
                             valueDuration = 32;
-                        } else if(valueDuration >= 60 && valueDuration <= 64) { // Whole
+                        } else if(valueDuration >= 52/*60*/ && valueDuration <= 67/*64*/) { // Whole
                             valueDuration = 64;
-                        } else if(valueDuration >= 72 && valueDuration <= 72) { // Whole + Quaver
+                        } else if(valueDuration >= 68/*72*/ && valueDuration <= 81/*72*/) { // Whole + Quaver
                             // TODO: insert tied quaver before/after depending on beat
                             valueDuration = 64; // FIXME: Only displays a whole which is of an actual duration of a white and a quaver
-                        } else if(valueDuration >= 96 && valueDuration <= 96) { // Dotted Whole
+                        } else if(valueDuration >= 82/*96*/ && valueDuration <= 96) { // Dotted Whole
                             dot = true;
                             valueDuration = 64;
-                        } else if(valueDuration>=120 && valueDuration <= 128) { // Double
+                        } else if(valueDuration>=106/*120*/ && valueDuration <= 128) { // Double
                             valueDuration = 128;
                         } else if(valueDuration>=144 && valueDuration <= 144) { // Double + Quarter
                             // TODO: insert tied quarter before/after depending on beat
                             valueDuration = 128;// FIXME: Only displays a double which is of an actual duration of a white and a quarter
+                        } else if(valueDuration>=160 && valueDuration <= 183) { // Long
+                            valueDuration = 256;
                         }
                         else error("Unsupported duration ",valueDuration, duration, quarterDuration, divisions, duration*quarterDuration/divisions, strKey(0, key), dot);
                         assert_(isPowerOfTwo(valueDuration), duration, quarterDuration, divisions, duration*quarterDuration/divisions, valueDuration, strKey(0, key), dot);

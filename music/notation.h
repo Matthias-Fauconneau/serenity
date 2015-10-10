@@ -52,9 +52,9 @@ namespace Pedal { enum { Mark = 0xE650 }; }
 enum Segment { Arpeggio = 0xEAA9 };
 }
 
-enum Value { InvalidValue=-1, Breve, Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
-static constexpr string valueNames[] = {"breve"_, "whole"_,"half"_, "quarter"_, "eighth"_, "16th"_, "32nd"_, "64th"_};
-static constexpr uint valueDurations[] = {128,       64,         32,       16,           8,             4,         2,         1};
+enum Value { InvalidValue=-1, Long, Breve, Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
+static constexpr string valueNames[] = {"long", "breve"_, "whole"_,"half"_, "quarter"_, "eighth"_, "16th"_, "32nd"_, "64th"_};
+static constexpr uint valueDurations[] = {256, 128,       64,         32,       16,           8,             4,         2,         1};
 static constexpr uint quarterDuration = 16;
 
 enum ClefSign { NoClef=0, FClef=SMuFL::Clef::F, GClef=SMuFL::Clef::G };
@@ -216,7 +216,8 @@ inline String strKey(int fifths, int key) {
 inline String strNote(int octave, int step, Accidental accidental) {
     octave += /*lowest A-1*/3 + (step>0 ? step/7 : (step-6)/7); // Rounds towards negative
     int octaveStep = (step - step/7*7 + 7)%7; // signed step%7 (Step offset on octave scale)
-    return "CDEFGAB"_[octaveStep]+(accidental?ref<string>{"♭"_,"♮","♯"_}[accidental-Accidental::AccidentalBase]:""_)+superDigit(octave);
+    //return "CDEFGAB"_[octaveStep]+(accidental?ref<string>{"♭"_,"♮","♯"_}[accidental-Accidental::AccidentalBase]:""_)+superDigit(octave);
+    return "CDEFGAB"_[octaveStep]+(accidental?ref<string>{"B"_,"N","#"_}[accidental-Accidental::AccidentalBase]:""_)+str(octave);
 }
 inline String str(const Note& o) { return strNote(o.clef.octave, o.step, o.accidental); }
 inline String str(const Clef& o) {

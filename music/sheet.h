@@ -22,7 +22,7 @@ struct Sheet {
 
     // -- Control
     array<size_t> measureToChord; // First chord index of measure
-    array<size_t> chordToNote; // First note index of chord
+    array<size_t> chordToNote; // First MIDI note index for each chord
 
     //float stop(vec2 unused size, int unused axis, float currentPosition, int direction) override;
 

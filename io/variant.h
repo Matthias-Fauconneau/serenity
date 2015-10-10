@@ -67,11 +67,11 @@ template<> Variant copy(const Variant& v) {
  if(v.type == Variant::Data) return v.data;
  error(int(v.type));
 }
-/*generic String str(const map<T,Variant>& dict) {
+generic String str(const map<T,Variant>& dict) {
  array<char> s;
  s.append("<<"); for(auto entry: dict) s.append( '/'+entry.key+' '+str(entry.value)+' ' ); s.append(">>");
  return move(s);
-}*/
+}
 
 inline String str(const Variant& o) {
  if(o.type==Variant::Boolean) return unsafeRef(str(bool(o.number)));
