@@ -90,14 +90,11 @@ shared<Graphics> Plot::graphics(vec2 size) {
  }
 
  // Evaluates margins
- float left=::max(Text(xlabel, textSize, 0,1,0, fontName).sizeHint().x/2, tickLabelSize.x+textSize);
+ float left = tickLabelSize.x+textSize; //::max(Text(xlabel, textSize, 0,1,0, fontName).sizeHint().x/2, tickLabelSize.x+textSize);
  float top=tickLabelSize.y*3/2;
  float bottom=(tickLabelSize.y+textSize)*3/2;
  float right = tickLabelSize.x/2;//+Text(xlabel, textSize, 0,1,0, fontName).sizeHint().x;
- //if(fits) right += Text("00° 0K", textSize, 0,1,0, fontName)
- float maxTextX = 0;
- for(size_t i: range(fits.size())) maxTextX = ::max(maxTextX, Text("00° "+dataSets.keys[i], textSize, black, 1,0, fontName).sizeHint().x);
- right += maxTextX;
+ if(fits) right += Text("000", textSize, 0,1,0, fontName).sizeHint().x;
 
  //left=right=top=bottom=::max(::max(::max(left, right), top), bottom);
  if(plotCircles || uniformScale) {
@@ -146,7 +143,8 @@ shared<Graphics> Plot::graphics(vec2 size) {
  } else {
   pen.y += top;
  }
- if(dataSets.size() <= 1) for(size_t i: range(dataSets.size())) { // Legend
+ /*if(dataSets.size() <= 1)*/ //for(size_t i: range(dataSets.size())) { // Legend
+ for(size_t i: reverse_range(dataSets.size())) { // Legend
   Text text(dataSets.keys[i], textSize, colors[i], 1,0, fontName);
   graphics->graphics.insert(vec2(pen+int2(legendPosition&1 ? -text.sizeHint().x : 0,0)), text.graphics(0));
   pen.y += textSize; //text.sizeHint().y;
@@ -296,16 +294,27 @@ shared<Graphics> Plot::graphics(vec2 size) {
   float minY = inf;
   for(size_t i: range(fits.size())) for(auto f: fits.values[i]) {
    float y = f.a*x+f.b;
+   vec2 A = point(vec2(0,f.b));
    vec2 B = point(vec2(x, y));
-   graphics->lines.append(point(vec2(0,f.b)), B, colors[i]);
+   if(fits.size() == 1)
+    graphics->lines.append(point(vec2(0,f.b)), B, colors[i]);
+   else {
+    //vec2 A = point(vec2(x,f.a*x + f.b));
+    //vec2 B = point(vec2(x1, f.a*x1 + f.b));
+    float l = (B.x-A.x)/16;
+    float o = (i+1)*l/4; //l/(i+1);
+    for(float x=A.x; x<B.x-l; x+=l) {
+     graphics->lines.append(vec2(x, A.y+(x-A.x)/(B.x-A.x)*(B.y-A.y)), vec2(x+o, A.y+((x+o)-A.x)/(B.x-A.x)*(B.y-A.y)), colors[i]);
+    }
+   }
    B.y = ::min(minY, B.y);
    minY = B.y - textSize;
    int a = round(atan(f.a, 1)*180/PI);
    //int b = round(f.b);
    if(1 || !done[a]) {
     done[a]++;
-    Text text(str(a)+"° "+/*section(*/dataSets.keys[i]/*,' ')*//*+str(b)+"K"*/, textSize, colors[i], 1,0, fontName);
-    graphics->graphics.insert(B+vec2(textSize, -text.sizeHint().y/2), text.graphics(0));
+    Text text(str(a)+"°"_, textSize, colors[i], 1,0, fontName);
+    graphics->graphics.insert(B+vec2(0/*textSize*/, -text.sizeHint().y/2), text.graphics(0));
    }
    const auto& data = dataSets.values[i];
    for(auto p: data) {

@@ -89,6 +89,7 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
        xFont.insert("Type"__, "/Font"_);
        xFont.insert("Subtype"__, "/Type0"_);
        xFont.insert("BaseFont"__, "/Font"_);
+#if 1
        xFont.insert("Encoding"__, "/Identity-H"_);
        {array<Variant> descendantFonts;
         {Dict cidFont;
@@ -104,13 +105,7 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
           fontDescriptor.insert("Type"__, "/FontDescriptor"_);
           fontDescriptor.insert("FontName"__, "/Font"_);
           fontDescriptor.insert("Flags"__, 1<<3 /*Symbolic*/);
-          /*{array<Variant> fontBBox;
-           fontBBox.append(str(int(font.bboxMin .x))); fontBBox.append(str(int(font.bboxMin .y)));
-           fontBBox.append(str(int(font.bboxMax.x))); fontBBox.append(str(int(font.bboxMax.y)));
-           fontDescriptor.insert("FontBBox"__, Variant(move(fontBBox)));}*/
           fontDescriptor.insert("ItalicAngle"__, 0);
-          //fontDescriptor.insert("Ascent"__, int(font.ascender));
-          //fontDescriptor.insert("Descent"__, int(font.descender));
           fontDescriptor.insert("StemV"__, 1);
           {Object& fontFile = objects.append();
            fontFile.insert("Filter"__, "/FlateDecode"_);
@@ -120,6 +115,20 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
          cidFont.insert("CIDToGIDMap"__, "/Identity"_);
          descendantFonts.append(move(cidFont));}
         xFont.insert("DescendantFonts"__, Variant(move(descendantFonts)));}
+#else
+       {Object& fontDescriptor = objects.append();
+        fontDescriptor.insert("Type"__, "/FontDescriptor"_);
+        fontDescriptor.insert("FontName"__, "/Font"_);
+        fontDescriptor.insert("Flags"__, 1<<3 /*Symbolic*/);
+        fontDescriptor.insert("ItalicAngle"__, 0);
+        fontDescriptor.insert("StemV"__, 1);
+        {Object& fontFile = objects.append();
+         fontFile.insert("Filter"__, "/FlateDecode"_);
+         fontFile = deflate(font.data);
+         fontDescriptor.insert("FontFile2"__, ref(fontFile));}
+        xFont.insert("FontDescriptor"__, ref(fontDescriptor));
+       }
+#endif
        //TODO: ToUnicode
        fonts.insert(copy(font.name), ref(xFont));
       }
@@ -135,6 +144,8 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
     last = origin;
     setColor(bgra4f(glyph.color, glyph.opacity));
     content.append(str(relative.x,relative.y)+" Td <"+hex(index,4)+"> Tj\n");
+    //content.append(str(relative.x,relative.y)+" Td ("+(char)glyph.code+") Tj\n");
+    //log(str(relative.x,relative.y)+" Td ("+(char)glyph.code+") Tj\n", glyph.code);
    }
    content.append("ET\n");
 

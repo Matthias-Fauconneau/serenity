@@ -224,8 +224,9 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 				}
 				if(c != 0xA0) {
      vec2 offset = 0;
-					if(c==toUCS4("⌊")[0] || c==toUCS4("⌋")[0]) offset.y += size/3; // Fixes too high floor signs from FreeSerif
+     //if(c==toUCS4("⌊")[0] || c==toUCS4("⌋")[0]) offset.y += size/3; // Fixes too high floor signs from FreeSerif
 					//assert_(metrics.size, hex(c));
+     //assert_(c < 127, c, hex(c), text);
 					word.append( Glyph(metrics,::Glyph{position+offset, size, *font, c, font->font(size).index(c), color}, sourceIndex) );
 					column++;
 				}

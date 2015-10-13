@@ -93,3 +93,4 @@ avx_mathfun.h
 wire-plot.cc
 snapshot.cc
 color-sample.cc
+document.cc

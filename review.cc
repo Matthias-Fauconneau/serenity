@@ -742,6 +742,7 @@ struct Review {
   }
   for(auto& key: plot.dataSets.keys)  if(key && key[0] < 16) key = copyRef(key.slice(1));
   //plot.uniformScale = true;
+  plot.legendPosition = Plot::TopLeft;
   return plot;
  }
 
@@ -894,7 +895,8 @@ struct Review {
    for(String& name: plot.dataSets.keys) {
     int index = ref<string>{"none"_,"helix","loop","cross"}.indexOf(section(name,' '));
     assert_(index >=0, index, name);
-    name = copyRef(ref<string>{"Without"_, "Simple"_,"Spiral"_,"Radial"_}[index]);
+    //name = copyRef(ref<string>{"Without"_, "Simple"_,"Spiral"_,"Radial"_}[index]);
+    name = copyRef(ref<string>{"Without (short dash) "_, "Simple (long dash)"_,"Spiral (solid)"_,"Radial (medium dash)"_}[index]);
    }
    log(plot.dataSets.keys);
    writeFile("plot.pdf"_, toPDF(plot, vec2(94.5, 94.5/1.5)), home(), true);

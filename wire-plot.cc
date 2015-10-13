@@ -71,6 +71,7 @@ struct PlotView {
 
    double sum = 0;
    for(size_t i : range(N)) sum += Y[i];
+   //double mean = 0;
    double mean = sum / N;
 
    double SSE = 0;
@@ -91,7 +92,7 @@ struct PlotView {
     /*plot.min.y = 0;
     plot.max.y = ::max(y);*/
     plot.dataSets.insert(""__, {::move(x), ::move(y)});
-    writeFile("wire-tension-"+str(parameters.at("Pattern"))+".pdf"_, toPDF(plot, vec2(94.5)), home(), true);
+    writeFile("wire-tension-"+str(parameters.at("Pattern"))+".pdf"_, toPDF(plot, vec2(94.5, 94.5/1.5)), home(), true);
     plots.append(::move(plot));
    }
    /*if(0) { // Verifies X[i] ~ i
@@ -119,7 +120,7 @@ struct PlotView {
      }
      r /= N*variance;
      K[k] = (float) k * internodeLength * 100;
-     if(K[k] >= 40) break;
+     if(K[k] >= 30) break;
      R[k] = r *100;
      if(R[k] < 0) break;
      //if(R[k] >= 40) firstMinimum = k;
@@ -132,12 +133,15 @@ struct PlotView {
     //log(/*firstMinimum, globalMax, globalMin, xp, th, xp-th, (xp-th)/th*/ xp, th,  (xp-th)/th*100, R[globalMax]);
     Plot plot;
     //plot.min.x = 5; plot.max.x = 30;
-    plot.xlabel = "Lag (cm)"__;
+    plot.xlabel = "Lag (cm)"__; //plot.xlabel = "Offset (cm)"__;
     plot.ylabel = "Autocorrelation (%)"__;
-    plot.dataSets.insert(""__, {::copyRef(K.sliceRange(0/*firstMinimum*/, globalMin)), ::copyRef(R.sliceRange(0/*firstMinimum*/, globalMin))});
+    /*if(id==arguments[0])*/ firstMinimum=0;
+    plot.dataSets.insert(""__, {::copyRef(K.sliceRange(firstMinimum, globalMin)), ::copyRef(R.sliceRange(firstMinimum, globalMin))});
     /*plot.min.y = 0;
     plot.max.y = 40;*/
-    writeFile("wire-tension-autocorrelation-"+str(parameters.at("Pattern"))+".pdf"_, toPDF(plot, vec2(94.5)), home(), true);
+    /*plot.min.x = 0;
+    plot.max.x = 30;*/
+    writeFile("wire-tension-autocorrelation-"+str(parameters.at("Pattern"))+".pdf"_, toPDF(plot, vec2(94.5, 94.5/1.5)), home(), true);
     plots.append(::move(plot));
    }
   }
