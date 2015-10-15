@@ -52,17 +52,20 @@ struct SimulationRun : Simulation {
  void report() {
   float height = plate.position[1][2]-plate.position[0][2];
   log(timeStep*dt, 1-height/(topZ0-bottomZ0));
-  if(grainSideTime) log("grain-side check", strD(grainSideTime-grainSideForceTime, stepTime));
+  assert_((float)partTime/(float)totalTime > 0.91, (float)partTime/(float)totalTime);
+  //log(strD(partTime, totalTime));
+  log(strD(grainTime+grainSideIntersectTime+grainSideForceTime+grainSideAddTime+sideForceTime+grainGrainTime+grainIntegrationTime+sideIntegrationTime, stepTime));
+  if(grainTime) log("grain", strD(grainTime, stepTime));
+  if(grainSideIntersectTime) log("grain-side intersect", strD(grainSideIntersectTime, stepTime));
   if(grainSideForceTime) log("grain-side force", strD(grainSideForceTime, stepTime));
-  log("grain-side lattice", str(grainSideLatticeTime, stepTime));
+  if(grainSideAddTime) log("grain-side add", strD(grainSideAddTime, stepTime));
+  if(grainSideLatticeTime/stepTime > 0.01) log("grain-side lattice", str(grainSideLatticeTime, stepTime));
   if(sideForceTime) log("side force", str(sideForceTime, stepTime));
-  //log("grain-grain check", strD(grainGrainTime-grainGrainForceTime, stepTime));
-  //log("grain-grain force", strD(grainGrainForceTime, stepTime));
   log("grain-grain", strD(grainGrainTime, stepTime));
-  log("integration", strD(integrationTime, stepTime));
-  //log("process", str(processTime, stepTime));
-  //log("grain", str(grainTime, stepTime));
-  //log("grain side", str(grainSideTime, stepTime));
+  if(grainGrainLatticeTime/stepTime > 0.01) log("grain-grain lattice", strD(grainGrainLatticeTime, stepTime));
+  log("grain integration", strD(grainIntegrationTime, stepTime));
+  if(sideIntegrationTime/stepTime > 0.01) log("side integration", strD(sideIntegrationTime, stepTime));
+  //log("wire integration", strD(grainIntegrationTime, stepTime));
   lastReport = realTime();
   lastReportStep = timeStep;
  }

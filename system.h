@@ -46,8 +46,8 @@ struct System {
  sconst float normalDamping = 0.2;
  // Friction model
  sconst float staticFrictionSpeed = inf; //1e-1 *m/s; // inf
- sconst float staticFrictionFactor = 50; ///0.3; //e4; // 5e3-1e5
- sconst float staticFrictionLength = 1e-3 * m;
+ sconst float staticFrictionFactor = 4e3;
+ sconst float staticFrictionLength = 5e-4 * m;
  sconst float staticFrictionDamping = 15 *g/s;
  sconst float frictionCoefficient = 0.3;
  sconst v8sf frictionCoefficient8 = float8(0.3);
@@ -187,8 +187,8 @@ struct System {
  const vec4f dt_2 = float4(dt/2);
  void step(Grain& p, size_t i) {
   step((Vertex&)p, i);
-   // Rotation viscosity FIXME
-  p.AVx[i] *= 1-100*dt; p.AVy[i] *= 1-100*dt; p.AVz[i] *= 1-100*dt;
+   // Rotation viscosity
+  p.AVx[i] *= 1-4000*dt; p.AVy[i] *= 1-4000*dt; p.AVz[i] *= 1-4000*dt; //2K-3K
   //p.AVx[i] *= 1./2; p.AVy[i] *= 1./2; p.AVz[i] *= 1./2;
   // Euler
   p.rotation[i] += dt_2 * qmul((v4sf){p.AVx[i],p.AVy[i],p.AVz[i],0}, p.rotation[i]);

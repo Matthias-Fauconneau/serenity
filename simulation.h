@@ -93,10 +93,10 @@ struct Simulation : System {
  // Performance
  int64 lastReport = realTime(), lastReportStep = timeStep;
  Time totalTime {true}, partTime;
- tsc stepTime;
- tsc sideForceTime, grainSideLatticeTime, grainSideTime, grainSideForceTime;
+ tsc stepTime, totalTimeTsc;
+ tsc sideForceTime, grainSideLatticeTime, grainSideIntersectTime, grainSideForceTime, grainSideAddTime;
  tsc grainTime, grainGrainLatticeTime, grainGrainTime, grainGrainForceTime;
- tsc integrationTime;
+ tsc grainIntegrationTime, sideIntegrationTime, wireIntegrationTime;
 
  Lock lock;
  Stream stream;
@@ -266,7 +266,7 @@ struct Simulation : System {
  }
 
  const float pourPackThreshold = 2e-3;
- const float packLoadThreshold = 500e-6;
+ const float packLoadThreshold = 2e-3;
  const float transitionTime = 1*s;
 
  unique<Lattice<uint16> > generateGrainLattice() {
@@ -462,9 +462,9 @@ break2_:;
     //float plateForce = topForce - bottomForce;
     if((timeStep-packStart)*dt > transitionTime /*&& stress > pressure*/ &&
        (skip ||
-        (timeStep-packStart)*dt > 8*s || (
+        (timeStep-packStart)*dt > 5*s || (
          //plateForce / (PI * sq(side.radius)) > pressure &&
-         voidRatio < 0.8 &&
+         voidRatio < 0.9 &&
          grainKineticEnergy / grain.count < packLoadThreshold &&
          // Not monotonously decreasing anymore
          (balanceAverage / (PI * sq(side.radius)) < pressure/80 ||
@@ -524,15 +524,6 @@ break2_:;
   plate.Fx[1] = 0; plate.Fy[1] = 0; plate.Fz[1] = 0; //plate.mass * G.z;
 
   // Grain lattice
-  //grainTime.start();
-  /*float scale = sqrt(3.)/(2*Grain::radius);
-  const int3 size = int3(::floor(toVec3(float4(scale)*(max-min))))+int3(1);
-  if(size[0] <= 2) max[0]+=1/scale, min[0]-=1/scale;
-  if(size[1] <= 2) max[1]+=1/scale, min[1]-=1/scale;
-  if(!(isNumber(min) && isNumber(max)) || size.x*size.y*size.z > 128*128*128) {
-   return fail("Domain", min, max, size);
-  }*/
-
   // Grain
   size_t grainCount8 = (grain.count+7)/8*8;
   buffer<int> grainBottom(grainCount8), grainTop(grainCount8), grainRigidSide(grainCount8);
@@ -852,10 +843,11 @@ break2_:;
     sideSkipped=0;
    } else sideSkipped++;
 
-   {//grainSideTime.start();
+   {
     // Evaluates (packed) intersections from (packed) verlet lists
     size_t grainSideContactCount = 0;
     buffer<int> grainSideContact(grainSideCount);
+    grainSideIntersectTime.start();
     for(size_t index = 0; index < grainSideCount; index += 8) {
      v8si A = *(v8si*)(grainSideA.data+index), B = *(v8si*)(grainSideB.data+index);
      v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
@@ -871,6 +863,7 @@ break2_:;
       }
      }
     }
+    grainSideIntersectTime.stop();
 
     // Aligns with invalid contacts
     size_t gSCC = grainSideContactCount;
@@ -879,6 +872,7 @@ break2_:;
 
     // Evaluates forces from (packed) intersections
     buffer<float> Fx(gSCC), Fy(gSCC), Fz(gSCC);
+    grainSideForceTime.start();
     for(size_t i = 0; i < grainSideContactCount; i += 8) {
      v8si contacts = *(v8si*)(grainSideContact.data+i);
      v8si A = gather(grainSideA, contacts), B = gather(grainSideB, contacts);
@@ -892,6 +886,9 @@ break2_:;
      contact(grain, A, side, B, depth, -Rx, -Ry, -Rz, Nx, Ny, Nz,
              *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i]);
     }
+    grainSideForceTime.stop();
+
+    grainSideAddTime.start();
     for(size_t i = 0; i < grainSideContactCount; i++) { // Scalar scatter add
      size_t index = grainSideContact[i];
      size_t a = grainSideA[index];
@@ -904,12 +901,14 @@ break2_:;
      side.Fz[b] -= Fz[i];
      sideForce += (grain.Px[a]*Fx[i] + grain.Py[a]*Fy[i]) / sqrt(grain.Px[a]*grain.Px[a] + grain.Py[a]*grain.Py[a]); // dot(R^,F)
     }
-    //grainSideTime.stop();
+    grainSideAddTime.stop();
    }
   }
   this->sideForce = sideForce;
 
   if(grainGrainGlobalMinD6 <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
+
+   grainGrainLatticeTime.start();
    buffer<int2> grainGrainIndices {grainCount8 * grainGrain};
    grainGrainIndices.clear();
    // Index to packed frictions
@@ -932,7 +931,6 @@ break2_:;
     }*/
    }
 
-   grainGrainLatticeTime.start();
    if(!grainLattice) grainLattice = generateGrainLattice();
    float minD6 = 2*(2*Grain::radius/sqrt(3.)/*-Grain::radius*/);
    const int Z = grainLattice->size.z, Y = grainLattice->size.y, X = grainLattice->size.x;
@@ -1028,9 +1026,7 @@ break2_:;
    grainSkipped=0;
   } else grainSkipped++;
 
-
   grainGrainTime.start();
-
   // Evaluates (packed) intersections from (packed) verlet lists
   size_t grainGrainContactCount = 0;
   buffer<uint> grainGrainContact(grainCount8*grainGrain);
@@ -1058,7 +1054,10 @@ break2_:;
   buffer<float> Fx(gGCC), Fy(gGCC), Fz(gGCC);
   buffer<float> TAx(gGCC), TAy(gGCC), TAz(gGCC);
   buffer<float> TBx(gGCC), TBy(gGCC), TBz(gGCC);
-  for(size_t i = 0; i < grainGrainContactCount; i += 8) {
+
+  //for(size_t i = 0; i < grainGrainContactCount; i += 8) {
+  parallel_chunk((grainGrainContactCount+7)/8, [&](uint, size_t start, size_t size) {
+   for(size_t i=start*8; i < start*8+size*8; i+=8) {
    v8si contacts = *(v8si*)&grainGrainContact[i];
    v8si A = gather(grainGrainA, contacts), B = gather(grainGrainB, contacts);
    // FIXME: Recomputing from intersection (more efficient than storing?)
@@ -1098,7 +1097,8 @@ break2_:;
    scatter(grainGrainLocalBx, contacts, localBx);
    scatter(grainGrainLocalBy, contacts, localBy);
    scatter(grainGrainLocalBz, contacts, localBz);
-  }
+  }});
+
   for(size_t i = 0; i < grainGrainContactCount; i++) { // Scalar scatter add
    size_t index = grainGrainContact[i];
    size_t a = grainGrainA[index];
@@ -1160,19 +1160,19 @@ break2_:;
 #endif
 
   // Integration
-  integrationTime.start();
   //min = _0f4; max = _0f4;
 
   // Grain
   float maxGrainV = 0;
   vec3 minGrain = inf, maxGrain = -inf;
+  grainIntegrationTime.start();
   for(size_t i: range(grain.count)) {
    assert(isNumber(grain.Fx[i]) && isNumber(grain.Fy[i]) && isNumber(grain.Fz[i]),
            i, grain.Fx[i], grain.Fy[i], grain.Fz[i]);
    System::step(grain, i);
-   /*grain.Vx[i] *= (1-1*dt); // Additionnal viscosity
+   grain.Vx[i] *= (1-1*dt); // Additionnal viscosity
    grain.Vy[i] *= (1-1*dt); // Additionnal viscosity
-   grain.Vz[i] *= (1-1*dt); // Additionnal viscosity*/
+   grain.Vz[i] *= (1-1*dt); // Additionnal viscosity
    assert(isNumber(grain.position[i]), i, grain.position[i]);
    //min = ::min(min, grain.position[i]);
    //max = ::max(max, grain.position[i]);
@@ -1180,6 +1180,15 @@ break2_:;
    maxGrain = ::max(maxGrain, grain.position[i]);
    maxGrainV = ::max(maxGrainV, length(grain.velocity[i]));
   }
+
+  {
+   v8sf ssqV8 = _0f;
+   for(v8sf v: cast<v8sf>(grain.Vx.slice(0, grain.count/8*8))) ssqV8 += v*v;
+   for(v8sf v: cast<v8sf>(grain.Vy.slice(0, grain.count/8*8))) ssqV8 += v*v;
+   for(v8sf v: cast<v8sf>(grain.Vz.slice(0, grain.count/8*8))) ssqV8 += v*v;
+   grainKineticEnergy = 1./2*grain.mass*reduce8(ssqV8);
+  }
+  grainIntegrationTime.stop();
   float maxGrainGrainV = maxGrainV + maxGrainV;
   grainGrainGlobalMinD6 -= maxGrainGrainV * dt;
 
@@ -1187,6 +1196,7 @@ break2_:;
   float maxSideV = 0;
   if(processState>=Pack) {
    float maxRadius = 0;
+   sideIntegrationTime.start();
    for(size_t i: range(1, side.H-1)) { // First and last line are fixed
     // Adds force from repeated nodes
     side.Fx[7+i*side.stride+0] += side.Fx[7+i*side.stride+side.W+0];
@@ -1204,19 +1214,25 @@ break2_:;
        side.Px[index] *= side.initialRadius/length;
        side.Py[index] *= side.initialRadius/length;
       }*/
-      /*side.Vx[index] *= 1./2; // Additionnal viscosity
+      /*side.Vx[index] *= (1-1e4*dt); // Additionnal viscosity
+      side.Vy[index] *= (1-1e4*dt); // Additionnal viscosity
+      side.Vz[index] *= (1-1e4*dt); // Additionnal viscosity*/
+      side.Vx[index] *= 1./2; // Additionnal viscosity
       side.Vy[index] *= 1./2;
-      side.Vz[index] *= 1./2;*/
-      side.Vx[index] *= (1-1000*dt); // Additionnal viscosity
-      side.Vy[index] *= (1-1000*dt); // Additionnal viscosity
-      side.Vz[index] *= (1-1000*dt); // Additionnal viscosity
+      side.Vz[index] *= 1./2;
      } else {
       // To avoid bound check
       //min = ::min(min, side.position[7+index]);
       //max = ::max(max, side.position[7+index]);
-      side.Vx[index] *= (1-10*dt); // Additionnal viscosity
+      /*side.Vx[index] *= (1-10*dt); // Additionnal viscosity
      side.Vy[index] *= (1-10*dt); // Additionnal viscosity
-     side.Vz[index] *= (1-10*dt); // Additionnal viscosity
+     side.Vz[index] *= (1-10*dt); // Additionnal viscosity*/
+      side.Vx[index] *= (1-10*dt); // Additionnal viscosity
+      side.Vy[index] *= (1-10*dt); // Additionnal viscosity
+      side.Vz[index] *= (1-10*dt); // Additionnal viscosity
+      /*side.Vx[index] *= 1./2; // Additionnal viscosity
+     side.Vy[index] *= 1./2; // Additionnal viscosity
+     side.Vz[index] *= 1./2; // Additionnal viscosity*/
      }
      maxSideV = ::max(maxSideV, length(side.velocity[index]));
      maxRadius = ::max(maxRadius, length2(side.position[index]));
@@ -1229,9 +1245,6 @@ break2_:;
     side.Py[7+i*side.stride+side.W+1] = side.Py[7+i*side.stride+1];
     side.Pz[7+i*side.stride+side.W+1] = side.Pz[7+i*side.stride+1];
    }
-   float maxSideGrainV = maxGrainV + maxSideV;
-   grainSideGlobalMinD2 -= maxSideGrainV * dt;
-
    // Checks whether grains are all within the membrane
    for(size_t index: range(grain.count)) {
     vec3 p (grain.Px[index], grain.Py[index], grain.Pz[index]);
@@ -1241,17 +1254,26 @@ break2_:;
      processState = ProcessState::Fail;
     }
    }
+   float maxSideGrainV = maxGrainV + maxSideV;
+   grainSideGlobalMinD2 -= maxSideGrainV * dt;
+   sideIntegrationTime.stop();
   }
 
   // Wire
+  wireIntegrationTime.start();
   for(size_t i: range(wire.count)) {
    System::step(wire, i);
    // To avoid bound check
    //min = ::min(min, wire.position[i]);
    //max = ::max(max, wire.position[i]);
   }
-
-  integrationTime.stop();
+  {
+   v8sf ssqV8 = _0f;
+   for(v8sf v: cast<v8sf>(wire.Vx.slice(0, wire.count/8*8))) ssqV8 += v*v;
+   for(v8sf v: cast<v8sf>(grain.Vy.slice(0, wire.count/8*8))) ssqV8 += v*v;
+   for(v8sf v: cast<v8sf>(grain.Vz.slice(0, wire.count/8*8))) ssqV8 += v*v;
+   wireKineticEnergy = 1./2*wire.mass*reduce8(ssqV8);
+  }
 
   /// All around pressure
   if(processState == ProcessState::Pack) {
@@ -1267,21 +1289,6 @@ break2_:;
   } else {
    bottomForce = plate.Fz[0];
    topForce = plate.Fz[1];
-  }
-
-  {
-   v8sf ssqV8 = _0f;
-   for(v8sf v: cast<v8sf>(grain.Vx.slice(0, grain.count/8*8))) ssqV8 += v*v;
-   for(v8sf v: cast<v8sf>(grain.Vy.slice(0, grain.count/8*8))) ssqV8 += v*v;
-   for(v8sf v: cast<v8sf>(grain.Vz.slice(0, grain.count/8*8))) ssqV8 += v*v;
-   grainKineticEnergy = 1./2*grain.mass*reduce8(ssqV8);
-  }
-  {
-   v8sf ssqV8 = _0f;
-   for(v8sf v: cast<v8sf>(wire.Vx.slice(0, wire.count/8*8))) ssqV8 += v*v;
-   for(v8sf v: cast<v8sf>(grain.Vy.slice(0, wire.count/8*8))) ssqV8 += v*v;
-   for(v8sf v: cast<v8sf>(grain.Vz.slice(0, wire.count/8*8))) ssqV8 += v*v;
-   wireKineticEnergy = 1./2*wire.mass*reduce8(ssqV8);
   }
 
   if(size_t((1./60)/dt)==0 || timeStep%size_t((1./60)/dt) == 0) {
@@ -1360,6 +1367,7 @@ break2_:;
    //wire.frictions.set(i);
   }
  }
+ wireIntegrationTime.stop();
  stepTime.stop();
  partTime.stop();
  timeStep++;
