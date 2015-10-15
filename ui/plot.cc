@@ -6,7 +6,7 @@
 struct Ticks { float max; uint tickCount; };
 uint subExponent(float& value) {
  float subExponent = exp10(log10(abs(value)) - floor(log10(abs(value))));
- for(auto a: (float[][2]){{1,5},{1.2,6},{1.4,7},{1.6,4},{2,5},{2.5,5},{3,3},{3.2,8},{4,4},{5,5},{6,6},{8,8},{10,5}}) {
+ for(auto a: (float[][2]){{1,5},{1.2,6},{1.4,7},{1.6,4},{2,2},{2.5,5},{3,3},{3.2,8},{4,4},{5,5},{6,6},{8,8},{10,5}}) {
   if(a[0] >= subExponent-0x1p-52) {
    value=(value>0?1:-1)*a[0]*exp10(floor(log10(abs(value))));
    return a[1];
@@ -292,7 +292,8 @@ shared<Graphics> Plot::graphics(vec2 size) {
   float x = max.x;
   map<int, int> done;
   float minY = inf;
-  for(size_t i: range(fits.size())) for(auto f: fits.values[i]) {
+  //extern bool hack;
+  for(size_t i: range(0/*hack*//*HACK*/, fits.size())) for(auto f: fits.values[i]) {
    float y = f.a*x+f.b;
    vec2 A = point(vec2(0,f.b));
    vec2 B = point(vec2(x, y));
@@ -311,13 +312,13 @@ shared<Graphics> Plot::graphics(vec2 size) {
    minY = B.y - textSize;
    int a = round(atan(f.a, 1)*180/PI);
    //int b = round(f.b);
-   if(1 || !done[a]) {
+   if(/*!hack*/1 /*&& !done[a]*/) {
     done[a]++;
     Text text(str(a)+"°"_, textSize, colors[i], 1,0, fontName);
     graphics->graphics.insert(B+vec2(0/*textSize*/, -text.sizeHint().y/2), text.graphics(0));
    }
    const auto& data = dataSets.values[i];
-   for(auto p: data) {
+   if(plotPoints) for(auto p: data) {
     float x = p.key, y = p.value;
     float x2 = x + f.a/(f.a*f.a+1)*(y-f.b-f.a*x);
     float y2 = f.a*x2 + f.b;

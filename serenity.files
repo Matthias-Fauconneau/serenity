@@ -94,3 +94,4 @@ wire-plot.cc
 snapshot.cc
 color-sample.cc
 document.cc
+io/jpeg.cc

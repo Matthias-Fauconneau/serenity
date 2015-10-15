@@ -79,8 +79,8 @@ Font::Font(ref<byte> data, float size, bool hint) : size(size), hint(hint) {
 	ascender=face->size->metrics.ascender*0x1p-6;
 	descender=face->size->metrics.descender*0x1p-6;
  //vec2 scale (face->size->metrics.x_scale*0x1p-16*0x1p-6, face->size->metrics.y_scale*0x1p-16*0x1p-6);
- //bboxMin = /*scale**/vec2(face->bbox.xMin, face->bbox.yMin);
- //bboxMax = /*scale**/vec2(face->bbox.xMax, face->bbox.yMax);
+ bboxMin = /*scale**/vec2(face->bbox.xMin, face->bbox.yMin);
+ bboxMax = /*scale**/vec2(face->bbox.xMax, face->bbox.yMax);
 }
 
 Font::~Font(){

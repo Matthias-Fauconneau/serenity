@@ -4,6 +4,7 @@
 #include "window.h"
 #include "interface.h"
 //#include "png.h"
+//#include "jpeg.h
 #include "pdf.h"
 
 struct Placeholder : Widget {
@@ -60,7 +61,7 @@ struct A4 : Format {
 struct Document {
  const String source;
  string formatString;
- Format format = formatString == "A4"_ ? A4() : Format{vec2(1366,1024), vec2(0,0), "FreeSerif"_, 0, 24, 24, 32, 1};
+ Format format = formatString == "A4"_ ? A4() : Format{vec2(1024,768), vec2(0,0), "FreeSerif"_, 0, 24, 24, 32, 1};
  const float interlineStretch = 3./2;
 
  // Document properties
@@ -203,7 +204,7 @@ break_:;
   else if(type=='\n') return &element<VBox>(page, move(children), VBox::Center, VBox::AlignCenter, false);
   else if(!type) {
    if(!children) return &warnText(s, page, "Empty layout");
-   assert_(children.size==1);
+   assert_(children.size==1, children.size);
    return children.first();
   }
   else error("Unknown layout type", type);
@@ -381,6 +382,7 @@ struct DocumentViewer {
    window->setTitle(str(pageIndex));
    writeFile(lastPageIndexPath, str(pageIndex), currentWorkingDirectory(), true);
   }
+  document.~Document(); new (&document) Document(readFile(path)); // FIXME: FileWatcher does not work properly
   return document.parsePage(pageIndex);
  }
 

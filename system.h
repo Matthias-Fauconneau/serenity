@@ -43,11 +43,11 @@ struct System {
  vec3 G {0, 0, -gz/densityScale}; // Scaled gravity
 
  // Penalty model
- sconst float normalDamping = 0.05;
+ sconst float normalDamping = 0.2;
  // Friction model
  sconst float staticFrictionSpeed = inf; //1e-1 *m/s; // inf
- sconst float staticFrictionFactor = 1e3;// 5e3-1e5
- sconst float staticFrictionLength = 3e-4 * m;
+ sconst float staticFrictionFactor = 50; ///0.3; //e4; // 5e3-1e5
+ sconst float staticFrictionLength = 1e-3 * m;
  sconst float staticFrictionDamping = 15 *g/s;
  sconst float frictionCoefficient = 0.3;
  sconst v8sf frictionCoefficient8 = float8(0.3);
@@ -188,7 +188,7 @@ struct System {
  void step(Grain& p, size_t i) {
   step((Vertex&)p, i);
    // Rotation viscosity FIXME
-  p.AVx[i] *= 1-10*dt; p.AVy[i] *= 1-10*dt; p.AVz[i] *= 1-10*dt;
+  p.AVx[i] *= 1-100*dt; p.AVy[i] *= 1-100*dt; p.AVz[i] *= 1-100*dt;
   //p.AVx[i] *= 1./2; p.AVy[i] *= 1./2; p.AVz[i] *= 1./2;
   // Euler
   p.rotation[i] += dt_2 * qmul((v4sf){p.AVx[i],p.AVy[i],p.AVz[i],0}, p.rotation[i]);
@@ -226,7 +226,7 @@ struct System {
 
  struct Side : Vertex {
   sconst float curvature = 0; // -1/radius?
-  sconst float elasticModulus = 1e8; // for contact
+  sconst float elasticModulus = 1e7; // for contact
   sconst float density = 1e3;
   const float resolution;
   const float initialRadius;
@@ -513,7 +513,7 @@ struct System {
   v8sf TOz = Dz - Dn * Nz;
   v8sf tangentLength = sqrt8(TOx*TOx+TOy*TOy+TOz*TOz);
   sconst v8sf staticFrictionStiffness = float8(staticFrictionFactor * frictionCoefficient);
-  v8sf kS = staticFrictionStiffness * fK; //fN;
+  v8sf kS = staticFrictionStiffness * fN;
   v8sf fS = kS * tangentLength; // 0.1~1 fN
   //for(size_t k: range(8)) log(fS[k]);
 
@@ -523,10 +523,10 @@ struct System {
   v8sf TRVy = RVy - RVn * Ny;
   v8sf TRVz = RVz - RVn * Nz;
   v8sf tangentRelativeSpeed = sqrt8(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
-  v8sf fD = frictionCoefficient8 * fK; //fN;
+  v8sf fD = frictionCoefficient8 * fN;
   v8sf fTx, fTy, fTz;
   for(size_t k: range(8)) { // FIXME: mask
-   if(fS[k] < fD[k] && tangentLength[k] < staticFrictionLength) {
+   if(/*fS[k] < fD[k] &&*/ tangentLength[k] < staticFrictionLength) {
     // Static
     if(tangentLength[k]) {
      vec4f springDirection = vec4f{TOx[k], TOy[k], TOz[k], 0} / float4(tangentLength[k]);
@@ -543,20 +543,25 @@ struct System {
     }
    } else {
     // Dynamic
+    //log(fS[k] < fD[k], tangentLength[k] < staticFrictionLength);
     localAx[k] = 0; // if(!localAx[k]) {
+    fTx[k] = 0;
+    fTy[k] = 0;
+    fTz[k] = 0;
+   }
     if(tangentRelativeSpeed[k]) {
      float scale = - fD[k] / tangentRelativeSpeed[k];
-     fTx[k] = scale * TRVx[k];
-     fTy[k] = scale * TRVy[k];
-     fTz[k] = scale * TRVz[k];
+     fTx[k] += scale * TRVx[k];
+     fTy[k] += scale * TRVy[k];
+     fTz[k] += scale * TRVz[k];
      //log("dynamic", k, fTx[k], fTy[k], fTz[k], fD[k], tangentRelativeSpeed[k], scale, TRVx[k],TRVy[k],TRVz[k]);
      dynamicFrictionCount++;
-    } else {
+    } /*else {
      fTx[k] = 0;
      fTy[k] = 0;
      fTz[k] = 0;
-    }
-   }
+    }*/
+   //}
   }
   Fx += fTx;
   Fy += fTy;

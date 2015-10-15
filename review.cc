@@ -12,6 +12,7 @@
 #include "snapshot-view.h"
 #include "sge.h"
 #include <unistd.h>
+bool hack = false;
 
 buffer<byte> toSVG(const Plot& plot) {
  array<byte> svg;
@@ -239,7 +240,7 @@ break2:;
        buffer<float> pressure = ::apply(force.size, [&](size_t i) {
         return force[i] / (height[i] * float(2*PI) * radius[i]); });
        float P = mean(pressure.slice(argmax));
-       assert_( P >= 0 );
+       //assert_( P >= 0, P );
        //float P = pressure[argmax];
        //float P = ::max(pressure); // TODO: median filter
        //assert_(P > 0);
@@ -661,7 +662,7 @@ struct Review {
    if(running) continue;
    float outsidePressure = float(point.at("Pressure")) / 1000;
    float effectivePressure = array.pressure.at(point) / 1000;
-   assert_(effectivePressure >= 0, effectivePressure);
+   //assert_(effectivePressure >= 0, effectivePressure);
    /***/if(index==Pressure)
     dataSet.insertSortedMulti(outsidePressure, effectivePressure);
    else if(index==Deviatoric) {
@@ -830,7 +831,7 @@ struct Review {
       strain = copyRef(strain.slice(medianWindowRadius, strain.size-2*medianWindowRadius));
    if(index==Stress) {
     plot.ylabel = "Stress (Pa)"__;
-    plot.min.y = 0; plot.max.y = array.max;
+    //plot.min.y = 0; plot.max.y = array.max;
     plot.dataSets.insert(""__, {::move(strain), ::move(stress)});
    }
    else if(index==Deviatoric) {
@@ -838,8 +839,11 @@ struct Review {
     buffer<float> radius = ::radius(dataSets);
     ref<float> height = dataSets.at("Height (m)"_);
     buffer<float> pressure (force.size);
+    float outsidePressure = float(point.at("Pressure"));
+    assert_(outsidePressure > 0);
     for(size_t i: range(pressure.size)) {
         pressure[i] = force[i] / (height[i] * 2 * PI * radius[i]);
+        pressure[i] = ::min(pressure[i], outsidePressure); // Not corrected
         //assert_(pressure[i] >= 0);
     }
     if(useMedianFilter && pressure.size > 2*medianWindowRadius+1) {
@@ -850,7 +854,7 @@ struct Review {
     buffer<float> deviatoric (strain.size);
     assert_(strain.size <= pressure.size, strain.size, pressure.size);
     for(size_t i: range(deviatoric.size)) deviatoric[i] = (stress[i]-pressure[i])/(stress[i]+pressure[i]);
-    plot.min.y = 0; plot.max.y = 1;
+    //plot.min.y = 0; plot.max.y = 0.4;
     plot.dataSets.insert(""__, {::move(strain), ::move(deviatoric)});
    }
    else error(index);
@@ -866,9 +870,9 @@ struct Review {
    error("plot");
   }
 
-  if(1) {
+  if(0) {
    auto group = array.parseDict("Angle=3.6,Elasticity=1e7,Friction=0.3,Pattern=cross,Pressure=60K,Radius=0.02,Rate=400,Resolution=2,Seed=3,Side=1e8,Thickness=1e-3,TimeStep=10µ,Wire=12%");
-   if(1) {
+   if(0) {
     if(1) {
      for(size_t index: range(4)) {
       Plot plot = pressurePlot(group, Deviatoric, index);
@@ -892,14 +896,24 @@ struct Review {
     }
    }
    Plot plot = pressurePlot(group, Deviatoric);
+   //plot.dataSets.keys.take(0); plot.dataSets.values.take(0);
    for(String& name: plot.dataSets.keys) {
     int index = ref<string>{"none"_,"helix","loop","cross"}.indexOf(section(name,' '));
-    assert_(index >=0, index, name);
+    //assert_(index >=0, index, name);
     //name = copyRef(ref<string>{"Without"_, "Simple"_,"Spiral"_,"Radial"_}[index]);
     name = copyRef(ref<string>{"Without (short dash) "_, "Simple (long dash)"_,"Spiral (solid)"_,"Radial (medium dash)"_}[index]);
    }
-   log(plot.dataSets.keys);
-   writeFile("plot.pdf"_, toPDF(plot, vec2(94.5, 94.5/1.5)), home(), true);
+   vec2 pageSizeMM=vec2(94.5, 94.5/1.5); //210/*mm*/;
+   static constexpr float pointMM = 72 / 25.4;
+   vec2 pageSize = pageSizeMM*pointMM;
+   shared<Graphics> graphics = plot.graphics(pageSize);
+
+   for(String& name: plot.dataSets.keys) name = {};
+   hack = true;
+   plot.max = vec2(4,2); plot.xlabel = {}; plot.ylabel = {}; plot.plotPoints=false;
+   graphics->graphics.insert(vec2(pageSize.x/2, pageSize.y*12/24), plot.graphics(vec2(pageSize.x/2, pageSize.y*9/24)));
+   graphics->flatten();
+   writeFile("plot.pdf"_, toPDF(pageSize, ref<Graphics>(graphics.pointer, 1), 1), home(), true);
    error("plot");
   }
 

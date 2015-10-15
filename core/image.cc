@@ -81,7 +81,7 @@ int2 imageSize(const ref<byte> file) {
 }
 
 __attribute((weak)) Image decodePNG(const ref<byte>) { error("PNG support not linked"); }
-__attribute((weak)) Image decodeJPEG(const ref<byte>) { error("JPEG support not linked"); }
+__attribute((weak)) Image decodeJPEG(const ref<byte>) { log("JPEG support not linked"); return {}; }
 __attribute((weak)) Image decodeICO(const ref<byte>) { error("ICO support not linked"); }
 __attribute((weak)) Image decodeTIFF(const ref<byte>) { error("TIFF support not linked"); }
 __attribute((weak)) Image decodeBMP(const ref<byte>) { error("BMP support not linked"); }

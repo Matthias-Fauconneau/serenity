@@ -105,7 +105,13 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
           fontDescriptor.insert("Type"__, "/FontDescriptor"_);
           fontDescriptor.insert("FontName"__, "/Font"_);
           fontDescriptor.insert("Flags"__, 1<<3 /*Symbolic*/);
+          {array<Variant> fontBBox;
+           fontBBox.append(str(int(font.fonts.values[0]->bboxMin .x))); fontBBox.append(str(int(font.fonts.values[0]->bboxMin .y)));
+           fontBBox.append(str(int(font.fonts.values[0]->bboxMax.x))); fontBBox.append(str(int(font.fonts.values[0]->bboxMax.y)));
+           fontDescriptor.insert("FontBBox"__, Variant(move(fontBBox)));}
           fontDescriptor.insert("ItalicAngle"__, 0);
+          //fontDescriptor.insert("Ascent"__, int(font.ascender));
+          //fontDescriptor.insert("Descent"__, int(font.descender));
           fontDescriptor.insert("StemV"__, 1);
           {Object& fontFile = objects.append();
            fontFile.insert("Filter"__, "/FlateDecode"_);
@@ -152,7 +158,7 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
    {Dict resources;
     if(graphics.blits) {
      map<String, Variant> xObjects;
-     for(int index: range(graphics.blits.size)) {
+     for(int index: reverse_range(graphics.blits.size)) { // FIXME: HACK reverse_range
       const Blit& blit = graphics.blits[index];
       const Image& image = blit.image;
       String id = "Image"+str(pdfPages.at("Count").number)+str(index);

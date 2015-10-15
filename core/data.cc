@@ -125,8 +125,11 @@ string TextData::whileNo(const string any, char left, char right) {
  uint start=index; int nest=0;
  while(available(1)) {
   /***/ if(match(left)) nest++;
-  else if(peek()==right) { nest--; assert(nest>=0); advance(1); if(nest==0) break; }
-  else if(!matchNo(any)) { if(nest==0) break; else advance(1); }
+  else {
+   if(peek()==right) { nest--; assert(nest>=0); }
+   if(nest) advance(1);
+   else if(!matchNo(any)) break;
+  }
  }
  return slice(start,index-start);
 }

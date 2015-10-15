@@ -261,7 +261,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
   }
 
   // Membrane
-  if(0) {
+  if(1) {
    static GLShader shader {::shader_glsl(), {"color"}};
    shader.bind();
    shader.bindFragments({"color"});
@@ -327,8 +327,9 @@ struct SimulationView : SimulationRun, Widget, Poll {
    vertexArray.draw(Lines, positions.size);
   }
 
-   if(1) glDepthTest(false);
-   {static GLVertexArray vertexArray;
+   if(1) {
+    glDepthTest(false);
+    static GLVertexArray vertexArray;
     array<vec3> positions;
     Locker lock(this->lock);
     for(size_t i: range(grainGrainCount)) {
