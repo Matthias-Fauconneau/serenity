@@ -5,10 +5,10 @@
 static int clefStep(Clef clef, int step) { return step - (clef.clefSign==GClef ? 10 : -2) - clef.octave*7; } // Translates C4 step to top line step using clef
 static int clefStep(Sign sign) { assert_(sign.type==Sign::Note, int(sign.type)); return clefStep(sign.note.clef, sign.note.step); }
 
-static vec2 text(vec2 origin, string message, float fontSize, array<Glyph>& glyphs, vec2 unused align=0 /*0:left|top,1/2,center,1:right|bottom*/) {
+static vec2 text(vec2 origin, string message, float fontSize, array<Glyph>& glyphs, vec2 unused align=0 /*0:right|top,1/2,center,1:left|bottom*/) {
     Text text(message, fontSize, 0, 1, 0, "LinLibertine", false);
     vec2 textSize = text.sizeHint();
-    //origin -= align*textSize;
+    origin -= align*textSize;
     auto textGlyphs = move(text.graphics(0)->glyphs); // Holds a valid reference during iteration
     for(auto glyph: textGlyphs) { glyph.origin+=origin; glyphs.append(glyph); }
     return textSize;
@@ -77,7 +77,9 @@ struct System : SheetContext {
     vec2 glyphSize(uint code, Font* font_=0/*font*/) { Font& font=font_?*font_:this->font; return font.metrics(font.index(code)).size; }
     float glyphAdvance(uint code, Font* font_=0/*font*/) { Font& font=font_?*font_:this->font; return font.metrics(font.index(code)).advance; }
     int noteCode(const Sign& sign) { assert_(sign.type==Sign::Note); return min<int>(SMuFL::NoteHead::Breve+int(sign.note.value), int(SMuFL::NoteHead::Black)); };
-    float noteSize(const Sign& sign) { return font.metrics(font.index(noteCode(sign))).advance; };
+    float noteSize(const Sign& sign) {
+        return font.metrics(font.index(noteCode(sign))).advance;
+    };
 
     // Metrics
     // Enough space for accidented dichords
@@ -169,7 +171,7 @@ static bool isStemUp(ref<Chord> chords) {
 }
 
 float System::stemX(const Chord& chord, bool stemUp) {
-    return timeTrack.at(chord[0].time) + spaceWidth + (stemUp ? noteSize(chord[0])-1 : 0);
+    return timeTrack.at(chord[0].time) + spaceWidth + (stemUp ? noteSize(chord.last())-1 : 0);
     }
 
     bool anyAccidental(const Chord& chord){ for(const Sign& a: chord) if(a.note.accidental) return true; return false; }
@@ -306,11 +308,11 @@ void System::layoutNotes(uint staff) {
         // -- Accidental shifts
         buffer<int> accidentalShift (chord.size); accidentalShift.clear();
         // Shifts accidental left when note is left from stem
-        for(size_t index: range(chord.size)) {
+        /*for(size_t index: range(chord.size)) {
             const Sign& sign = chord[index];
             const Note& note = sign.note;
             if(note.accidental && ((stemUp && !shift[index]) || (!stemUp && shift[index])) ) accidentalShift[index] = 1;
-        }
+        }*/
         // Alternates accidentals shifts
         size_t previousAccidentalIndex = 0;
         while(previousAccidentalIndex < chord.size && !chord[previousAccidentalIndex].note.accidental) previousAccidentalIndex++;
@@ -678,6 +680,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
                            if(abs(sign.note.step-note.step) <= 1) { x += glyphAdvance(SMuFL::NoteHead::Black); break; }*/
                         staves[staff].chord.insertSorted(sign);
                     } else { // Grace note
+#if 0
                         float dx = glyphSize(SMuFL::NoteHead::Black, &smallFont).x;
                         float gx = x - dx - glyphAdvance(SMuFL::Flag::Above, &smallFont), y = Y(sign);
 
@@ -697,6 +700,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
                         if(note.acciaccatura) {
                             glyph(vec2(stemX, y) - glyphSize(SMuFL::SlashUp, &smallFont)/2.f, SMuFL::SlashUp, 1, 6); // FIXME: highlight as well
                         }
+#endif
                         note.pageIndex = pageIndex;
                         if(measureBars) note.measureIndex = measureBars->size()-1;
                         if(notes) {
@@ -707,14 +711,15 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
                     }
                 }
                 else if(sign.type == Sign::Rest) {
-                    if(sign.time != staves[staff].time) {
-                        //log("Unexpected rest start time", sign.time, staves[staff].time, pagesIndex, measureBars.size());
+                    if(sign.time != staves[staff].time && !sign.rest.dot) {
+                        //log("Unexpected rest start time", sign.time, (int)sign.rest.value, sign.rest.dot, staves[staff].time, pageIndex);
                     } else {
                         layoutNotes(staff);
-                        if(sign.rest.value == Whole) { assert_(!staves[staff].pendingWhole); staves[staff].pendingWhole = true; }
+                        if(sign.rest.value == Whole) { assert_(!sign.rest.dot && !staves[staff].pendingWhole); staves[staff].pendingWhole = true; }
                         else {
                             vec2 p = vec2(x, staffY(staff, -4));
                             x += glyph(p, SMuFL::Rest::Double+int(sign.rest.value), 1./2, 6);
+                            //assert_(!sign.rest.dot);
                         }
                         uint beatDuration = quarterDuration * 4 / timeSignature.beatUnit;
                         uint measureLength = timeSignature.beats * beatDuration;
@@ -799,7 +804,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
                         uint third = keys[1];
                         if(third-root == 3) chord.append("m");
                         float x = measureFirstNote;
-                        text(vec2(x, staffY(staves.size-1, max(10, line[1].top))), chord, textSize, system.glyphs, vec2(-1,1));
+                        text(vec2(x, staffY(staves.size-1, max(10, line[1].top))), chord, textSize, system.glyphs, vec2(1./2,0/*1*/));
                         //error(chord);
                         //log_(chord+" ");
                     }
@@ -831,7 +836,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
                     // Line break
                     //if(signIndex == signs.size-1) break; // End of line, last measure bar FIXME: skips last measure
                     if(x > pageWidth && !measureBars && !activeTies && !notes) {
-                        log("end of line", pageWidth, x);
+                        //log("end of line", pageWidth, x);
                         break;
                     }
                     // Records current parameters at the end of this measure in case next measure triggers a line break
@@ -897,15 +902,16 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
             bool above = stemUp;
 
             float x0 = timeTrack.at((signs[signIndex + (above ? tuplet.first.max : tuplet.first.min)]).time) + spaceWidth;
-            float x1 = timeTrack.at((signs[signIndex + (above ? tuplet. last.max : tuplet. last.min)]).time) + spaceWidth;
-            float x = (x0+x1)/2 + glyphSize(SMuFL::NoteHead::Black).x/2;
+            float x1 = timeTrack.at((signs[signIndex + (above ? tuplet. last.max : tuplet. last.min)]).time) + spaceWidth + glyphSize(SMuFL::NoteHead::Black).x;
+            //float tx = Text(str(tupletSize.size), textSize, 0, 1, 0, "LinLibertine", false).sizeHint().x;
+            float x = (x0+x1)/2;// + glyphSize(SMuFL::NoteHead::Black).x/2;// - tx;
 
             float y0 = Y(signs[signIndex + (above ? tuplet.max : tuplet.min)]) + (stemUp?-1:1)*stemLength;
             float y1 = Y(signs[signIndex + (above ? tuplet.max : tuplet.min)]) + (stemUp?-1:1)*stemLength;
             float stemY = (y0 + y1) / 2;
             float dy = (above ? -1 : 1) * beamWidth;
             float y = stemY+dy;
-            vec2 unused size = text(vec2(x,y), str(tuplet.size), textSize/2, system.glyphs, vec2(1./2, above ? 1 : 0));
+            vec2 unused size = text(vec2(x,y), str(tuplet.size), textSize/2, system.glyphs, vec2(1./2, 1./2/*above ? 1 : 0*/));
             if(uint(signs[signIndex+tuplet.last.min].time - signs[signIndex+tuplet.first.min].time) > ticksPerQuarter) { // No beam ? draw lines
                 system.lines.append(vec2(x0, y0+dy), vec2(x-size.x, y0+((x-size.x)-x0)/(x1-x0)*(y1-y0)+dy), black);
                 system.lines.append(vec2(x+size.x, y0+((x+size.x)-x0)/(x1-x0)*(y1-y0)+dy), vec2(x1, y1+dy), black);
@@ -917,13 +923,15 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 
             if(sign.type == Sign::Metronome) {
                 if(ticksPerMinutes!=sign.metronome.perMinute*ticksPerQuarter) {
-                    x += text(vec2(x, staffY(staves.size-1, 16)), "♩="_+str(sign.metronome.perMinute)+" "_, textSize, system.glyphs).x;
+                    x += text(vec2(x, staffY(staves.size-1, 16)), "♩="_+str(sign.metronome.perMinute)+" "_, textSize, system.glyphs, vec2(0,0)).x;
                     if(ticksPerMinutes) log(ticksPerMinutes, "->", sign.metronome.perMinute*ticksPerQuarter); // FIXME: variable tempo
                     ticksPerMinutes = max(ticksPerMinutes, sign.metronome.perMinute*ticksPerQuarter);
                 }
             } else if(sign.type == Sign::Dynamic) {
                 assert_(sign.dynamic!=-1);
-                x += glyph(vec2(x+spaceWidth, (max(staffY(1, measure[1].bottom-2), staffY(0, measure[0].top+5)) + staffY(1, measure[1].bottom-2))/2 + glyphSize(sign.dynamic).y/2 ), sign.dynamic); // FIXME: staff assignment
+                //float y = (max(staffY(1, measure[1].bottom-2), staffY(0, measure[0].top/*+5*/)) + staffY(1, measure[1].bottom-2))/2;
+                float y = (min(staffY(0, 0), staffY(0, measure[0].top)) + max(staffY(1, -8), staffY(1, measure[1].bottom-2)))/2;
+                x += glyph(vec2(x+spaceWidth, y), sign.dynamic); // FIXME: staff assignment
             } else if(sign.type == Sign::Wedge) {
                 float y = (staffY(1, -8)+staffY(0, 0))/2; // FIXME: staff assignment
                 if(sign.wedge == WedgeStop) {

@@ -15,9 +15,9 @@ static constexpr char accidentals[14][12+1] = {
     {".b.-N.b.-N-N"}, // ♭♭♭ E♭ c
     {".b.-N.b.b.-N"}, // ♭♭ B♭ g
     {".b.b..b.b.-N"}, // ♭ F d
-    //{"10101101010", ".b.b..b.b.b."},  // ♮ C a
+    {".b.b..b.b.b."},  // ♮ C a (HACK)
     // C♯D♯EF♯G♯A♯B   C♯D♯EF♯G♯A♯B
-    {".#.#..#.#.#."},  // ♮ C a
+    //{".#.#..#.#.#."},  // ♮ C a (FIXME)
     {".#.#.N+.#.#."},  // ♯ G e
     {"N+.#.N+.#.#."},  // ♯♯ D b
     {"N+.#.N+N+.#."},  // ♯♯♯ A f♯
@@ -27,7 +27,7 @@ static constexpr char accidentals[14][12+1] = {
 };
 inline int keyStep(int fifths, int key) {
     assert_(fifths >= -7 && fifths <= 6, fifths);
-    int h=key/12*7; for(int i: range(key%12)/*0-10*/) h+=(fifths<0?"10101101010"_:"01011010101"_)[i]-'0';
+    int h=key/12*7; for(int i: range(key%12)/*0-10*/) h+=(fifths<=/*!!!*/0?"10101101010"_:"01011010101"_)[i]-'0';
     return h - 35; // 0 = C4;
 }
 
@@ -52,9 +52,9 @@ namespace Pedal { enum { Mark = 0xE650 }; }
 enum Segment { Arpeggio = 0xEAA9 };
 }
 
-enum Value { InvalidValue=-1, Long, Breve, Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
-static constexpr string valueNames[] = {"long", "breve"_, "whole"_,"half"_, "quarter"_, "eighth"_, "16th"_, "32nd"_, "64th"_};
-static constexpr uint valueDurations[] = {256, 128,       64,         32,       16,           8,             4,         2,         1};
+enum Value { InvalidValue=-1, /*Long,*/ Breve, Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
+static constexpr string valueNames[] = {/*"long",*/ "breve"_, "whole"_,"half"_, "quarter"_, "eighth"_, "16th"_, "32nd"_, "64th"_};
+static constexpr uint valueDurations[] = {/*256,*/ 128,       64,         32,       16,           8,             4,         2,         1};
 static constexpr uint quarterDuration = 16;
 
 enum ClefSign { NoClef=0, FClef=SMuFL::Clef::F, GClef=SMuFL::Clef::G };
@@ -137,6 +137,7 @@ struct Note {
 };
 struct Rest {
     Value value;
+    bool dot = false;
     uint duration() const { return valueDurations[value]; };
 };
 struct Measure {
@@ -203,9 +204,9 @@ inline bool operator <(const Sign& a, const Sign& b) {
     return a.time < b.time;
 }
 
-/*inline String superDigit(int digit) {
+inline String superDigit(int digit) {
     assert_(abs(digit) <= 9); return (digit>0?""_:"⁻"_)+ref<string>{"⁰"_,"¹"_, "²"_, "³"_, "⁴"_, "⁵"_, "⁶"_, "⁷"_, "⁸"_, "⁹"_}[abs(digit)];
-}*/
+}
 inline String strKey(int fifths, int key) {
     assert_(key>0);
     //return (string[]){"A"_,"A♯"_,"B"_,"C"_,"C♯"_,"D"_,"D♯"_,"E"_,"F"_,"F♯"_,"G"_,"G♯"_}[(key+2*12+3)%12]
@@ -214,13 +215,13 @@ inline String strKey(int fifths, int key) {
     //int octave = key/12-2; ///*lowest A-1*/3 + (step>0 ? step/7 : (step-6)/7); // Rounds towards negative
     int alt = keyAlteration(fifths, key)+1;
     assert_(alt >= 0 && alt <= 2);
-    return char('A'+step%7)+ref<string>{"b"_,""_,"#"_}[alt];//+str(octave);
+    return char('A'+step%7)+ref<string>{"♭"_,""_,"♯"_}[alt];//+str(octave);
 }
 inline String strNote(int octave, int step, Accidental accidental) {
     octave += /*lowest A-1*/3 + (step>0 ? step/7 : (step-6)/7); // Rounds towards negative
     int octaveStep = (step - step/7*7 + 7)%7; // signed step%7 (Step offset on octave scale)
-    //return "CDEFGAB"_[octaveStep]+(accidental?ref<string>{"♭"_,"♮","♯"_}[accidental-Accidental::AccidentalBase]:""_)+superDigit(octave);
-    return "CDEFGAB"_[octaveStep]+(accidental?ref<string>{"B"_,"N"_,"#"_}[accidental-Accidental::AccidentalBase]:""_)+str(octave);
+    return "CDEFGAB"_[octaveStep]+(accidental?ref<string>{"♭"_,"♮","♯"_}[accidental-Accidental::AccidentalBase]:""_)+superDigit(octave);
+    //return "CDEFGAB"_[octaveStep]+(accidental?ref<string>{"B"_,"N"_,"#"_}[accidental-Accidental::AccidentalBase]:""_)+str(octave);
 }
 inline String str(const Note& o) { return strNote(o.clef.octave, o.step, o.accidental); }
 inline String str(const Clef& o) {

@@ -41,13 +41,13 @@ struct Font {
     float kerning(uint leftIndex, uint rightIndex);
 
     struct Metrics {
-	float advance;
- vec2 bearing;
-	int leftOffset, rightOffset; // 26.6 bearing offset to correct kerning with hinting
-	union {
-	    struct { float width, height; };
-     vec2 size;
-	};
+        float advance;
+        vec2 bearing;
+        int leftOffset, rightOffset; // 26.6 bearing offset to correct kerning with hinting
+        union {
+            struct { float width, height; };
+            vec2 size;
+        };
     };
     map<uint, Metrics> metricsCache;
 

@@ -187,7 +187,7 @@ MusicXML::MusicXML(string document, string) {
                     assert_(xmlStaffIndex <= xmlStaffCount-1);
                     uint staff = (xmlStaffCount-1) - xmlStaffIndex;
                     assert_(int(value)>=0, e);
-                    if(e.contains("rest"_)) insertSign({Sign::Rest, time, {{staff, {{duration, .rest={value}}}}}});
+                    if(e.contains("rest"_)) insertSign({Sign::Rest, time, {{staff, {{duration, .rest={value, e.contains("dot"_)}}}}}});
                     else {
                         assert_(e("pitch"_)("step"_).text(), e);
                         int xmlOctaveStep = "CDEFGAB"_.indexOf(e("pitch"_)("step"_).text()[0]);
