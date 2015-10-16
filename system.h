@@ -47,7 +47,7 @@ struct System {
  // Friction model
  sconst float staticFrictionSpeed = inf; //1e-1 *m/s; // inf
  sconst float staticFrictionFactor = 4e3;
- sconst float staticFrictionLength = 5e-4 * m;
+ sconst float staticFrictionLength = 4e-4 * m;
  sconst float staticFrictionDamping = 15 *g/s;
  sconst float frictionCoefficient = 0.3;
  sconst v8sf frictionCoefficient8 = float8(0.3);
@@ -62,7 +62,7 @@ struct System {
   buffer<float> Vx { capacity };
   buffer<float> Vy { capacity };
   buffer<float> Vz { capacity };
-#define GEAR 0
+#define GEAR 1
 #define EULER !GEAR
 #if GEAR
   buffer<float> PDx[3], PDy[3], PDz[3]; // Position derivatives
@@ -106,24 +106,56 @@ struct System {
   p.Pz[i] += b[0][0] * p.Vz[i];
 #else
   // Correction
-  vec4f r = b[1] * (p.force[i] * p._1_mass - p.positionDerivatives[0][i]);
-  p.position[i] += c[0]*r;
-  p.velocity[i] += c[1]*r;
-  p.positionDerivatives[0][i] += c[2]*r;
-  p.positionDerivatives[1][i] += c[3]*r;
-  p.positionDerivatives[2][i] += c[4]*r;
+  float rx = b[1][0] * (p.Fx[i] * p._1_mass[0] - p.PDx[0][i]);
+  float ry = b[1][0] * (p.Fy[i] * p._1_mass[0] - p.PDy[0][i]);
+  float rz = b[1][0] * (p.Fz[i] * p._1_mass[0] - p.PDz[0][i]);
+  p.Px[i] += c[0][0]*rx;
+  p.Py[i] += c[0][0]*ry;
+  p.Pz[i] += c[0][0]*rz;
+  p.Vx[i] += c[1][0]*rx;
+  p.Vy[i] += c[1][0]*ry;
+  p.Vz[i] += c[1][0]*rz;
+  p.PDx[0][i] += c[2][0]*rx;
+  p.PDy[0][i] += c[2][0]*ry;
+  p.PDz[0][i] += c[2][0]*rz;
+  p.PDx[1][i] += c[3][0]*rx;
+  p.PDy[1][i] += c[3][0]*ry;
+  p.PDz[1][i] += c[3][0]*rz;
+  p.PDx[2][i] += c[4][0]*rx;
+  p.PDy[2][i] += c[4][0]*ry;
+  p.PDz[2][i] += c[4][0]*rz;
 
   // Prediction
-  p.position[i] += b[0]*p.velocity[i];
-  p.position[i] += b[1]*p.positionDerivatives[0][i];
-  p.position[i] += b[2]*p.positionDerivatives[1][i];
-  p.position[i] += b[3]*p.positionDerivatives[2][i];
-  p.velocity[i] += b[0]*p.positionDerivatives[0][i];
-  p.velocity[i] += b[1]*p.positionDerivatives[1][i];
-  p.velocity[i] += b[2]*p.positionDerivatives[2][i];
-  p.positionDerivatives[0][i] += b[0]*p.positionDerivatives[1][i];
-  p.positionDerivatives[0][i] += b[1]*p.positionDerivatives[2][i];
-  p.positionDerivatives[1][i] += b[0]*p.positionDerivatives[2][i];
+  p.Px[i] += b[0][0]*p.Vx[i];
+  p.Py[i] += b[0][0]*p.Vy[i];
+  p.Pz[i] += b[0][0]*p.Vz[i];
+  p.Px[i] += b[1][0]*p.PDx[0][i];
+  p.Py[i] += b[1][0]*p.PDy[0][i];
+  p.Pz[i] += b[1][0]*p.PDz[0][i];
+  p.Px[i] += b[2][0]*p.PDx[1][i];
+  p.Py[i] += b[2][0]*p.PDy[1][i];
+  p.Pz[i] += b[2][0]*p.PDz[1][i];
+  p.Px[i] += b[3][0]*p.PDx[2][i];
+  p.Py[i] += b[3][0]*p.PDy[2][i];
+  p.Pz[i] += b[3][0]*p.PDz[2][i];
+  p.Vx[i] += b[0][0]*p.PDx[0][i];
+  p.Vy[i] += b[0][0]*p.PDy[0][i];
+  p.Vz[i] += b[0][0]*p.PDz[0][i];
+  p.Vx[i] += b[1][0]*p.PDx[1][i];
+  p.Vy[i] += b[1][0]*p.PDy[1][i];
+  p.Vz[i] += b[1][0]*p.PDz[1][i];
+  p.Vx[i] += b[2][0]*p.PDx[2][i];
+  p.Vy[i] += b[2][0]*p.PDy[2][i];
+  p.Vz[i] += b[2][0]*p.PDz[2][i];
+  p.PDx[0][i] += b[0][0]*p.PDx[1][i];
+  p.PDy[0][i] += b[0][0]*p.PDy[1][i];
+  p.PDz[0][i] += b[0][0]*p.PDz[1][i];
+  p.PDx[0][i] += b[1][0]*p.PDx[2][i];
+  p.PDy[0][i] += b[1][0]*p.PDy[2][i];
+  p.PDz[0][i] += b[1][0]*p.PDz[2][i];
+  p.PDx[1][i] += b[0][0]*p.PDx[2][i];
+  p.PDy[1][i] += b[0][0]*p.PDy[2][i];
+  p.PDz[1][i] += b[0][0]*p.PDz[2][i];
 #endif
  }
 
@@ -290,7 +322,11 @@ struct System {
       }
       Vx.clear(); Vy.clear(); Vz.clear();
 #if GEAR
-      for(size_t i: range(3)) positionDerivatives[i].clear(_0f);
+      for(size_t i: range(3)) {
+       PDx[i].clear(0);
+       PDy[i].clear(0);
+       PDz[i].clear(0);
+      }
 #endif
   }
  } side;
@@ -350,6 +386,7 @@ struct System {
   //log("System");
      if(p.at("Pattern")!="none"_) assert_(wire.elasticModulus);
      assert_((float)p.at("Friction"_) == frictionCoefficient);
+     log(4000*dt);
  }
 
  // Update

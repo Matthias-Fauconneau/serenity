@@ -164,7 +164,11 @@ struct Simulation : System {
    wire.Vy[i] = 0;
    wire.Vz[i] = 0;
 #if GEAR
-   for(size_t n: range(3)) wire.positionDerivatives[n][i] = _0f;
+   for(size_t n: range(3)) {
+    wire.PDx[n][i] = 0;
+    wire.PDy[n][i] = 0;
+    wire.PDz[n][i] = 0;
+   }
 #endif
    //wire.frictions.set(i);
    // To avoid bound check
@@ -384,7 +388,11 @@ struct Simulation : System {
       //max = ::max(max, grain.position[i]);
       grain.Vx[i] = 0; grain.Vy[i] = 0; grain.Vz[i] = 0;
 #if GEAR
-      for(size_t n: range(3)) grain.positionDerivatives[n][i] = _0f;
+      for(size_t n: range(3)) {
+       grain.PDx[n][i] = 0;
+       grain.PDy[n][i] = 0;
+       grain.PDz[n][i] = 0;
+      }
 #endif
       grain.AVx[i] = 0;
       grain.AVy[i] = 0;
@@ -1362,7 +1370,11 @@ break2_:;
    max[2] = ::max(max[2], wire.Pz[i]);*/
    wire.Vx[i] = 0; wire.Vy[i] = 0; wire.Vz[i] = 0;
 #if GEAR
-   for(size_t n: range(3)) wire.positionDerivatives[n][i] = _0f;
+   for(size_t n: range(3)) {
+    wire.PDx[n][i] = 0;
+    wire.PDy[n][i] = 0;
+    wire.PDz[n][i] = 0;
+   }
 #endif
    //wire.frictions.set(i);
   }
