@@ -112,7 +112,7 @@ typedef vec<xy,int,2> int2;
 inline String strx(int2 N) { return str(N.x)+'x'+str(N.y); }
 /// Single precision x,y vector
 typedef vec<xy,float,2> vec2;
-//inline String strx(vec2 N) { return str(N.x)+'x'+str(N.y); }
+inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
 
 #include "simd.h"
 generic struct xyz {
@@ -169,6 +169,9 @@ generic struct rgba {
 typedef vec<rgba,float,4> rgba4f;
 
 /// Integer b,g,r,a vector (8bit)
+/// Floating-point b,g,r,a vector
+typedef vec<bgra,float,4> bgra4f;
+
 struct byte4 : vec<bgra,uint8,4> {
 	//using vec::vec;
     byte4() : vec(0) {} // Defaults initalizes to zero
@@ -180,8 +183,10 @@ struct byte4 : vec<bgra,uint8,4> {
 	// bgr3f
 	byte4(bgr3f bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
 	bgr3f bgr() { return bgr3f(b, g, r); }
-	// rgba
-	byte4(vec<rgba,uint8,4> rgba) : vec(rgba.b, rgba.g, rgba.r, rgba.a) {}
+    byte4(bgra4f bgra) : vec(bgra.b, bgra.g, bgra.r, bgra.a) {}
+    inline byte4(v4sf v) : vec(v[0], v[1], v[2], v[3]) {}
+    // rgba
+    byte4(vec<rgba,uint8,4> rgba) : vec(rgba.b, rgba.g, rgba.r, rgba.a) {}
 	byte4(vec<rgb,uint8,3> rgb) : vec(rgb.b, rgb.g, rgb.r, 0xFF) {}
 };
 /// Integer b,g,r,a vector (32bit)

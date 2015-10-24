@@ -71,3 +71,4 @@ http.cc
 wg.cc
 hike.cc
 location.h
+bspline.cc

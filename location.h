@@ -44,8 +44,7 @@ String nearby(vec2 location, string types) {
 
 static int queryLimit = 1;
 
-
-uint duration(string origin, string destination, int64 time=0) {
+uint duration(string origin, string destination, int64 unused time=0) {
     if(origin == destination) return 0;
     String url = "https://maps.googleapis.com/maps/api/directions/xml?key="_+key+"&origin="+replace(origin," ","+")
                + "&destination="+replace(destination," ","+")+"&mode=";
@@ -76,10 +75,14 @@ uint duration(string origin, string destination, int64 time=0) {
 
     uint bicycling = getDuration(URL(url+"bicycling"));
     assert(bicycling, origin, destination);
+#if 1
     url = url+"transit";
     if(time>0) url= url+"&departure_time="+str(time);
     if(time<0) url= url+"&arrival_time="+str(-time);
     uint transit = getDuration(url);
     if(!transit) return bicycling;
     return ::min(bicycling, transit);
+#else
+    return bicycling;
+#endif
 }
