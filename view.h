@@ -73,13 +73,13 @@ struct SimulationRun : Simulation {
 
 #if UI
 struct SimulationView : SimulationRun, Widget, Poll {
- int2 size {/*1280,720*/1050};
+ int2 size {/*1280,720*//*1050*/768};
  unique<Window> window = nullptr;
  // View
  vec2 lastPos; // for relative cursor movements
  vec2 viewYawPitch = vec2(0, -PI/3); // Current view angles
- vec2 scale = 2./(32*Grain::radius);
- vec3 translation = 0;
+ vec2 scale = 0;
+ vec2 translation = 0;
  v4sf rotationCenter = _0f4;
  Thread simulationThread {19};
 #if ENCODER
@@ -92,7 +92,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
    SimulationRun(parameters, move(file)),
    Poll(0, POLLIN, simulationThread) {
   if(/*XDisplay::hasServer() &&*/ /*arguments().contains("view")*/1) {
-   window = ::window(this, -1, mainThread, true, false);
+   window = ::window(this, /*-1*/768, mainThread, true, false);
    window->actions[F11] = {(SimulationRun*)this, &SimulationRun::report};
    window->actions[F12] = [this](){ snapshot("ui"); };
    window->actions[Return] = [this]{
@@ -103,7 +103,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
 #if ENCODER
   if(arguments().contains("video")) {
    encoder = unique<Encoder>("tas.mp4"_);
-   encoder->setH264(int2(1280,720), 60);
+   encoder->setH264(/*int2(1280,720)*/int2(768), 60);
    encoder->open();
   }
 #endif
@@ -178,8 +178,13 @@ struct SimulationView : SimulationRun, Widget, Poll {
     grainPositions.insertAt(j, O);
     grainRotations.insertAt(j, conjugate(qmul(viewRotation, grain.rotation[i])));
    }
-   scale = vec3(vec2(2/::max(max.x-min.x, max.y-min.y)), 2/(max-min).z);
+   scale = vec3(vec2(2/::max(max.x-min.x, max.y-min.y)/1.2), 2/(max-min).z);
    translation = -vec3((min+max).xy()/2.f, min.z);
+
+   if(!this->scale && !this->translation) this->scale = scale.xy(), this->translation = translation.xy();
+   const float Dt = 1./60;
+   scale.xy() = this->scale = this->scale*float(1-Dt) + float(Dt)*scale.xy();
+   translation.xy() = this->translation = this->translation*float(1-Dt) + float(Dt)*translation.xy();
   }
 
   mat4 viewProjection = mat4()
@@ -195,7 +200,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
   target.bind(ClearColor|ClearDepth);
   glDepthTest(true);
 
-  if(grainCount) {
+  if(grainCount && 1) {
    buffer<vec3> positions {grainCount*6};
    for(size_t i: range(grainCount)) {
     // FIXME: GPU quad projection
@@ -264,7 +269,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
   }
 
   // Membrane
-  if(1) {
+  if(0) {
    static GLShader shader {::shader_glsl(), {"color"}};
    shader.bind();
    shader.bindFragments({"color"});
@@ -330,7 +335,8 @@ struct SimulationView : SimulationRun, Widget, Poll {
    vertexArray.draw(Lines, positions.size);
   }
 
-   if(1) {
+  // Contacts
+   if(0) {
     glDepthTest(false);
     static GLVertexArray vertexArray;
     array<vec3> positions;

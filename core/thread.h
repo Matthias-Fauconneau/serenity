@@ -185,14 +185,14 @@ struct FileWatcher : File, Poll {
 		addWatch(path);
 	}
  virtual ~FileWatcher() {}
- void addWatch(string path)  { check(inotify_add_watch(File::fd, strz(path), IN_MODIFY|IN_MOVE), path); }
+ void addWatch(string path)  { check(inotify_add_watch(File::fd, strz(path), IN_MODIFY|IN_MOVED_TO), path); }
 	void event() override {
 		while(poll()) {
 			::buffer<byte> buffer = readUpTo(sizeof(inotify_event) + 256);
 			inotify_event e = *(inotify_event*)buffer.data;
 			string name = e.len ? string(e.name, e.len-1) : path;
 			fileModified(name);
-   //addWatch(name); // FIXME: should already not be one shot
+   addWatch(name); // FIXME: should not be one shot
 		}
 	}
 };

@@ -35,8 +35,8 @@ struct Page : VBox {
 
  shared<Graphics> graphics(vec2 size) override {
   shared<Graphics> graphics;
-  vec2 inner = size - 2.f*marginPx;
-  graphics->graphics.insert(marginPx, VBox::graphics(inner, Rect(inner)));
+  vec2 inner = size;// - 2.f*marginPx;
+  graphics->graphics.insert(vec2(0)/*marginPx*/, VBox::graphics(inner, Rect(inner)));
   if(this->footer)
    graphics->graphics.insert(vec2(0, size.y - marginPx.y), this->footer->graphics(vec2(size.x, marginPx.y)));
   return graphics;
@@ -54,31 +54,33 @@ struct A4 : Format {
  static constexpr float inchMM = 25.4, inchPx = 90;
  static constexpr int pageWidth = 210/*mm*/ * (inchPx/inchMM), pageHeight = 297/*mm*/ * (inchPx/inchMM);
  static constexpr float pointPx = inchPx / 72;
- A4() : Format{vec2(pageWidth, pageHeight), vec2(1.5 * inchPx), "FreeSerif"_, /*0*/12 * pointPx, 12 * pointPx, 14 * pointPx, 16 * pointPx, pointPx} {}
+ A4() : Format{vec2(pageWidth, pageHeight), vec2(1.5 * inchPx), "FreeSerif"_, 0, 12 * pointPx, 14 * pointPx, 16 * pointPx, pointPx} {}
 };
 
 /// Layouts a document
 struct Document {
  const String source;
  string formatString;
- Format format = formatString == "A4"_ ? A4() : Format{vec2(1024,768), vec2(0,0), "FreeSerif"_, 0, 24, 24, 32, 1};
+ Format format = formatString == "A4"_ ? A4() : Format{vec2(1024,768), 16, "FreeSerif"_, 16, 24, 32, 32, 1};
  const float interlineStretch = 3./2;
 
  // Document properties
- array<Header> headers;
+ array<Header> headers; // All headers
  array<string> pages; // Source slices for each page
- array<Header> firstHeaders; // first header of each page
+ array<Header> firstHeaders; // First header of each page (necessary context to parse a page)
+ array<Header> topHeaders; // Top header of each page
 
  /// Generates page starts table, table of contents
  Document(String&& source_) : source(move(source_)), formatString(startsWith(source,"%"_)?section(source.slice(1),'\n'):"A4"_) {
   assert_(format.pageSize - 2.f*format.marginPx > vec2(0), format.pageSize, format.marginPx);
   assert_(!source.contains('\r'));
   array<uint> indices;
-  Header current;
+  Header current, top;
   for(TextData s (source); s;) {
    uint start = s.index;
    firstHeaders.append( copy(current) );
-   unique<Page> page = parsePage(s, current, pages.size, true);
+   topHeaders.append( copy(top) );
+   unique<Page> page = parsePage(s, current, top, pages.size, true);
    pages.append( source.slice(start, s.index-start) );
    headers.append( move(page->headers) );
   }
@@ -93,7 +95,7 @@ struct Document {
  }
  /// Registers a new text element and returns it
  Text& newText(Page& page, string text, float size, bool center) const {
-  return element<Text>(page, text, size, 0, 1, (format.pageSize - 2.f*format.marginPx).x, format.font, false, interlineStretch, center ? 0 : -1);
+  return element<Text>(page, text, size, 0, 1, (format.pageSize /*- 2.f*format.marginPx*/).x, format.font, false, interlineStretch, center ? 0 : -1);
  }
 
  // Parser
@@ -127,7 +129,7 @@ struct Document {
       goto break_;
      }
     } /*else*/
-    if(s.wouldMatchAny(" \t\n,.;()^/+-|*"_) || s.wouldMatchAny({"\xC2\xA0"_,"·"_,"⌋"_,"²"_})) break;
+    if(s.wouldMatchAny(" \t\n,.;()^+-|*"_) || s.wouldMatchAny({"\xC2\xA0"_,"·"_,"⌋"_,"²"_})) break;
     else e.append( s.next() );
 break_:;
    }
@@ -154,14 +156,14 @@ break_:;
     else text.append( s.next() );
    } else if(s.match('_')) text.append( subscript(parseScript(s, delimiters)) );
    else if(s.match('^')) text.append( superscript(parseScript(s, delimiters)) );
-   /*else if(s.match('{')) {
-                String num = regular(trim(parseText(s, {"/"_,"}"_,"\n"_})));
-                if(!s.match('/')) warn(s, "Expected / stack delimiter, got '"_+string{s.peek()}+"'"_);
-                bool fraction = s.match('/');
-                String den = regular(trim(parseText(s, {"}"_,"\n"_})) ?: "?"_);
-                if(!s.match('}')) warn(s, "Expected } stack delimiter, got '"_+string{s.peek()}+"'"_);
+   else if(s.match('{')) {
+    String num = regular(trim(parseText(s, {"/"_,"}"_,"\n"_, "\""_})));
+    if(!s.match('/')) warn(s, "Expected / stack delimiter, got '"_+string{s.peek()}+"'"_);
+    bool fraction = s.match('/');
+    String den = regular(trim(parseText(s, {"}"_,"\n"_})) ?: "?"_);
+    if(!s.match('}')) warn(s, "Expected } stack delimiter, got '"_+string{s.peek()}+"'"_);
     text.append(fraction ? ::fraction(num+den) : ::stack(num+den));
-            }*/
+   }
    else text.append(s.next());
   }
   if(bold) warn(s, "Expected bold end delimiter *, got end of line");
@@ -213,7 +215,7 @@ break_:;
  Widget* parseImage(TextData& s, Page& page, bool quick) const {
   s.skip('@');
   //bool negate = s.match('-');
-  string path = s.whileNo(" \t\n)-|+$"_);
+  string path = s.whileNo(" \t\n)|+$"_);
   if(quick) return &element<Placeholder>(page); //FIXME
   Image image;
   /**/ if(existsFile(path)) image = decodeImage(readFile(path));
@@ -251,7 +253,7 @@ break_:;
 
  /// Parses a page
  /// \arg quick Quick layout for table of contents (skips images)
- unique<Page> parsePage(TextData& s, Header& currentHeader, uint pageIndex, bool quick=false) const {
+ unique<Page> parsePage(TextData& s, Header& currentHeader, Header& topHeader, uint pageIndex, bool quick=false) const {
   unique<Page> page (Linear::ShareTight, pageIndex, format.marginPx);
   while(s) {
    // Header
@@ -268,11 +270,14 @@ break_:;
      if(pageIndex==pages.size) // Table of contents pass
       page->headers.append( copy(currentHeader) );
     }
-    array<char> text {(char)TextFormat::Bold};
-    for(int level: currentHeader.indices) text.append( str(level)+'.' );
-    assert_(currentHeader.name, apply(firstHeaders,[](const Header& e)->string{ return e.name; }));
-    text.append(' ' +currentHeader.name);
-    page->append(&newText(page, bold(text), format.headerSize, false));
+    if(level > 1) { // Do not display top level headers
+     array<char> text {(char)TextFormat::Bold};
+     //for(int level: currentHeader.indices) text.append( str(level)+'.' );
+     assert_(currentHeader.name, apply(firstHeaders,[](const Header& e)->string{ return e.name; }));
+     text.append(' ' +currentHeader.name);
+     page->append(&newText(page, bold(text), format.headerSize, false));
+    }
+    else topHeader = ::copy(currentHeader); // Will be displayed as footer on every slide
    }
    // Widget
    else if(s.wouldMatchAny("(@-\""_)) {
@@ -282,6 +287,7 @@ break_:;
    else if(s.match('\\')) {
     string command = s.whileNot('\n');
     if(command == "tableofcontents"_) {
+#if 0
      auto& grid = element<WidgetGrid>(page, true, false, format.footerSize ? 2 /*Show page numbers*/: 1);
      for(const Header& header: headers) {
       array<char> text;
@@ -294,6 +300,37 @@ break_:;
        grid.append(&newText(page, " "_+str(header.page), format.textSize, false)); // Show page numbers
      }
      page->append(&grid);
+#elif 1
+     auto& grid = element<WidgetGrid>(page, false, false);
+     VBox* list = 0;
+     uint topIndex = -1;
+     for(const Header& header: headers) {
+      if(header.indices[0] != topIndex) {
+       if(list) grid.append(list);
+       list = &element<VBox>(page, VBox::Center, VBox::AlignCenter, false);
+      }
+      topIndex = header.indices[0];
+      array<char> text;
+      text.append(repeat(" "_, header.indices.size));
+      if(header.indices.size<=1) text.append((char)(TextFormat::Bold));
+      //for(int level: header.indices) text.append(str(level)+'.');
+      text.append(' '+TextData(header.name).until('('));
+      list->append(&newText(page, text, format.textSize, false));
+     }
+     if(list) grid.append(list);
+     page->append(&grid);
+#else
+     auto& list = element<VBox>(page, VBox::Center, VBox::AlignLeft, false);
+     for(const Header& header: headers) {
+      array<char> text;
+      text.append(repeat(" "_, header.indices.size));
+      if(header.indices.size<=1) text.append((char)(TextFormat::Bold));
+      //for(int level: header.indices) text.append(str(level)+'.');
+      text.append(' '+TextData(header.name).until('('));
+      list.append(&newText(page, text, format.textSize, false));
+     }
+     page->append(&list);
+#endif
     } else error(command);
     continue;
    }
@@ -322,10 +359,13 @@ break_:;
     page->append(&newText(page, "\t"_+text, format.textSize, false));
    }
   }
-  if(format.footerSize && page->index>=3) page->footer = &newText(page, str(page->index), format.textSize, false);
+  if(format.footerSize && page->index>=2) {
+   //page->footer = &newText(page, str(page->index), format.textSize, false);
+   page->footer = &newText(page, topHeaders[page->index].name+" "+str(page->index-2+1)+"/"+str(pages.size-2), format.textSize, false);
+  }
   return page;
  }
- unique<Page> parsePage(TextData&& s, Header&& firstHeader, uint pageIndex) const { return parsePage(s, firstHeader, pageIndex); }
+ unique<Page> parsePage(TextData&& s, Header&& firstHeader, uint pageIndex) const { Header top; return parsePage(s, firstHeader, top, pageIndex); }
  unique<Page> parsePage(uint pageIndex) const {
   assert_(pageIndex<pages.size, pageIndex, pages.size);
   return parsePage(TextData(pages[pageIndex]), copy(firstHeaders[pageIndex]), pageIndex);
@@ -382,7 +422,7 @@ struct DocumentViewer {
    window->setTitle(str(pageIndex));
    writeFile(lastPageIndexPath, str(pageIndex), currentWorkingDirectory(), true);
   }
-  document.~Document(); new (&document) Document(readFile(path)); // FIXME: FileWatcher does not work properly
+  //document.~Document(); new (&document) Document(readFile(path)); // FIXME: FileWatcher does not work properly
   return document.parsePage(pageIndex);
  }
 

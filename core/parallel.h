@@ -13,7 +13,7 @@ inline void operator*=(mref<float> values, float factor) { values.apply([factor]
 // \file parallel.h
 #include "vector.h"
 
-#if 1
+#if 0
 /*void atomic_add(v4sf& a, v4sf b) {
  v4sf expected, desired;
  do {

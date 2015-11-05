@@ -39,15 +39,15 @@ struct System {
  sconst float s = 1, m = 1, kg = 1, N = kg*m/s/s;
  sconst float mm = 1e-3*m, g = 1e-3*kg;
  const float gz;
- sconst float densityScale = 5e4; // 5-6
+ sconst float densityScale = 1; // 5-6
  vec3 G {0, 0, -gz/densityScale}; // Scaled gravity
 
  // Penalty model
- sconst float normalDamping = 0.2;
+ sconst float normalDamping = 0.001; //0.2;
  // Friction model
  sconst float staticFrictionSpeed = inf; //1e-1 *m/s; // inf
- sconst float staticFrictionFactor = 4e3;
- sconst float staticFrictionLength = 4e-4 * m;
+ sconst float staticFrictionFactor = 1e3;
+ sconst float staticFrictionLength = 1e-4 * m; //4e-4 * m;
  sconst float staticFrictionDamping = 15 *g/s;
  sconst float frictionCoefficient = 0.3;
  sconst v8sf frictionCoefficient8 = float8(0.3);
@@ -62,7 +62,7 @@ struct System {
   buffer<float> Vx { capacity };
   buffer<float> Vy { capacity };
   buffer<float> Vz { capacity };
-#define GEAR 1
+#define GEAR 0
 #define EULER !GEAR
 #if GEAR
   buffer<float> PDx[3], PDy[3], PDz[3]; // Position derivatives
@@ -163,7 +163,7 @@ struct System {
   //struct { NoOperation4 operator[](size_t) const { return {}; }} torque;
 
   sconst float curvature = 0;
-  sconst float elasticModulus = 1e9 * kg/(m*s*s); // 1 GPa
+  sconst float elasticModulus = 1e8 * kg/(m*s*s); // 1 GPa
 
   Plate() : Vertex(0, 2, 1e-3 * densityScale) {
    count = 2;
@@ -196,7 +196,7 @@ struct System {
   sconst float curvature = 1./radius;
   sconst float shearModulus = 79e9 * kg / (m*s*s);
   sconst float poissonRatio = 0.28;
-  sconst float elasticModulus = 0 ? 2*shearModulus*(1+poissonRatio) : 1e10; // ~2e11
+  sconst float elasticModulus = 0 ? 2*shearModulus*(1+poissonRatio) : 1e8; // ~2e11
 
   sconst float density = 7.8e3 * densityScale;
   sconst float mass = density * volume;
@@ -220,7 +220,7 @@ struct System {
  void step(Grain& p, size_t i) {
   step((Vertex&)p, i);
    // Rotation viscosity
-  p.AVx[i] *= 1-4000*dt; p.AVy[i] *= 1-4000*dt; p.AVz[i] *= 1-4000*dt; //2K-3K
+  p.AVx[i] *= 1-1000*dt; p.AVy[i] *= 1-1000*dt; p.AVz[i] *= 1-1000*dt; //2K-3K
   //p.AVx[i] *= 1./2; p.AVy[i] *= 1./2; p.AVz[i] *= 1./2;
   // Euler
   p.rotation[i] += dt_2 * qmul((v4sf){p.AVx[i],p.AVy[i],p.AVz[i],0}, p.rotation[i]);
@@ -563,7 +563,7 @@ struct System {
   v8sf fD = frictionCoefficient8 * fN;
   v8sf fTx, fTy, fTz;
   for(size_t k: range(8)) { // FIXME: mask
-   if(/*fS[k] < fD[k] &&*/ tangentLength[k] < staticFrictionLength) {
+   if(0 && fS[k] > fD[k] && tangentLength[k] < staticFrictionLength) {
     // Static
     if(tangentLength[k]) {
      vec4f springDirection = vec4f{TOx[k], TOy[k], TOz[k], 0} / float4(tangentLength[k]);
@@ -586,14 +586,14 @@ struct System {
     fTy[k] = 0;
     fTz[k] = 0;
    }
-    if(tangentRelativeSpeed[k]) {
+    /*if(tangentRelativeSpeed[k]) {
      float scale = - fD[k] / tangentRelativeSpeed[k];
      fTx[k] += scale * TRVx[k];
      fTy[k] += scale * TRVy[k];
      fTz[k] += scale * TRVz[k];
      //log("dynamic", k, fTx[k], fTy[k], fTz[k], fD[k], tangentRelativeSpeed[k], scale, TRVx[k],TRVy[k],TRVz[k]);
      dynamicFrictionCount++;
-    } /*else {
+    }*/ /*else {
      fTx[k] = 0;
      fTy[k] = 0;
      fTz[k] = 0;

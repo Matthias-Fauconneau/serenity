@@ -62,7 +62,7 @@ struct Simulation : System {
  const float winchRadius = side.initialRadius - Wire::radius;
  const Pattern pattern;
  const float loopAngle;
- const float initialWinchSpeed = 0.1;
+ const float initialWinchSpeed = 0.1 / 2;
  float winchSpeed = initialWinchSpeed;
  const float targetWireDensity;
  const float winchRate;
@@ -130,6 +130,7 @@ struct Simulation : System {
  size_t grainGrainCount = 0;
  // FIXME: uint16 -> unpack
  static constexpr size_t grainGrain = 8;
+ //const size_t grainGrain = grain.capacity;
  buffer<int> grainGrainA {grain.capacity * grainGrain};
  buffer<int> grainGrainB {grain.capacity * grainGrain};
  //  Friction
@@ -153,7 +154,7 @@ struct Simulation : System {
    random((uint)parameters.at("Seed").integer()),
    stream(move(stream)), parameters(copy(parameters)) {
   assert(plateSpeed);
-  assert(pattern == None || targetWireDensity > 0, parameters);
+  assert_(pattern == None || (targetWireDensity > 0 && winchRate > 0), parameters);
   plate.Pz[1] = targetHeight+Grain::radius;
   if(pattern) { // Initial wire node
    size_t i = wire.count++;
@@ -184,8 +185,8 @@ struct Simulation : System {
   vec4f fS = - A.tensionStiffness * x;
   assert(length[0], a, b);
   vec4f direction = relativePosition/length;
-  vec4f relativeVelocity = A.velocity[a] - A.velocity[b];
-  vec4f fB = - A.tensionDamping * dot3(direction, relativeVelocity);
+  vec4f unused relativeVelocity = A.velocity[a] - A.velocity[b];
+  vec4f fB = _0f4; //- A.tensionDamping * dot3(direction, relativeVelocity);
   return (fS + fB) * direction;
  }
 
@@ -308,7 +309,11 @@ struct Simulation : System {
 
   float scale = sqrt(3.)/(2*Grain::radius);
   const int3 size = int3(::floor(scale*(max-min)))+int3(1);
-  if(!(isNumber(min) && isNumber(max)) || size.x*size.y*size.z > 128*128*128) error("Domain", min, max, size);
+  if(!(isNumber(min) && isNumber(max)) || uint(size.x*size.y*size.z) > 128*128*128) {
+   /*error*/log("Domain", min, max, size);
+   processState = ProcessState::Fail;
+   return nullptr;
+  }
 
   unique<Lattice<uint16>> grainLattice(sqrt(3.)/(2*Grain::radius), min, max);
   for(size_t i: range(grain.count))
@@ -418,7 +423,7 @@ break2_:;
     if(targetWireDensity) { // Adapts winch vertical speed to achieve target wire density
      assert( wireDensity-targetWireDensity > -1 && wireDensity-targetWireDensity < 1,
               wireDensity, targetWireDensity);
-     winchSpeed += dt*/*initialWinchSpeed**/(wireDensity-targetWireDensity);
+     //winchSpeed += dt*/*initialWinchSpeed**/(wireDensity-targetWireDensity);
      if(winchSpeed < 0) {
       static bool unused once = ({ log("Initial winch speed too high", initialWinchSpeed,
                                    "for wire density:", str(targetWireDensity)+
@@ -801,6 +806,7 @@ break2_:;
     float minD3 = 2*Grain::radius/sqrt(3.); // - Grain::radius;
     grainSideCount = 0;
     if(!grainLattice) grainLattice = generateGrainLattice();
+    if(!grainLattice) return;
     // Side - Grain
     const uint16* grainBase = grainLattice->base;
     int gX = grainLattice->size.x, gY = grainLattice->size.y;
@@ -914,7 +920,7 @@ break2_:;
   }
   this->sideForce = sideForce;
 
-  if(grainGrainGlobalMinD6 <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
+  if(grainGrainGlobalMinD6 <= 0 || 1) { // Re-evaluates verlet lists (using a lattice for grains)
 
    grainGrainLatticeTime.start();
    buffer<int2> grainGrainIndices {grainCount8 * grainGrain};
@@ -940,6 +946,7 @@ break2_:;
    }
 
    if(!grainLattice) grainLattice = generateGrainLattice();
+   if(!grainLattice) return;
    float minD6 = 2*(2*Grain::radius/sqrt(3.)/*-Grain::radius*/);
    const int Z = grainLattice->size.z, Y = grainLattice->size.y, X = grainLattice->size.x;
    int di[62];
@@ -950,7 +957,7 @@ break2_:;
    assert(i==62);
    Locker lock(this->lock);
    grainGrainCount = 0;
-   {buffer<float> grainGrainLocalAx {grainCount8 * grainGrain};
+   if(1) {buffer<float> grainGrainLocalAx {grainCount8 * grainGrain};
     buffer<float> grainGrainLocalAy {grainCount8 * grainGrain};
     buffer<float> grainGrainLocalAz {grainCount8 * grainGrain};
     buffer<float> grainGrainLocalBx {grainCount8 * grainGrain};
@@ -1010,6 +1017,18 @@ break2_:;
     this->grainGrainLocalBx = move(grainGrainLocalBx);
     this->grainGrainLocalBy = move(grainGrainLocalBy);
     this->grainGrainLocalBz = move(grainGrainLocalBz);
+   } else {
+    assert_(grainGrain > 8);
+    for(size_t a: range(grain.count)) {
+     for(size_t b: range(a)) {
+      size_t index = grainGrainCount;
+      grainGrainA[index] = a;
+      size_t B = b;
+      assert(a!=B);
+      grainGrainB[index] = B;
+      grainGrainCount++;
+     }
+    }
    }
    assert(grainGrainCount < grainCount8 * grainGrain);
    {// Aligns with invalid pairs
@@ -1127,7 +1146,7 @@ break2_:;
   }
   grainGrainTime.stop();
 
-#if 0
+#if 1 // FIXME: restore wire-grain, wire-plate contacts
   if(wire.count) {
    if(!grainLattice) grainLattice = generateGrainLattice(); // FIXME: use verlet lists for wire-grain
    uint16* grainBase = grainLattice->base;
@@ -1142,19 +1161,19 @@ break2_:;
     // Gravity
     wire.Fx[i] = 0; wire.Fy[i] = 0; wire.Fz[i] = wire.mass * G.z;
     // Wire - Plate
-    contact(wire, i, plate, 0);
-    contact(wire, i, plate, 1);
+    /*contact(wire, i, plate, 0);
+    contact(wire, i, plate, 1);*/
     // Wire - Grain (FIXME: Verlet list)
-    {size_t offset = grainLattice->index(wire.position[i]);
+    {size_t offset = grainLattice->index(wire.Px[i], wire.Py[i], wire.Pz[i]);
      for(size_t n: range(3*3)) {
-      v4hi line = loada(grainNeighbours[n] + offset);
+      v4hi unused line = loada(grainNeighbours[n] + offset);
       if(line[0]) contact(wire, i, grain, line[0]-1);
       if(line[1]) contact(wire, i, grain, line[1]-1);
       if(line[2]) contact(wire, i, grain, line[2]-1);
      }}
    }
 
-   // Tension
+   /*// Tension
    for(size_t i: range(1, wire.count)) { // TODO: SIMD
     vec4f fT = tension(wire, i-1, i);
     wire.Fx[i-1] += fT[0];
@@ -1163,7 +1182,7 @@ break2_:;
     wire.Fx[i] -= fT[0];
     wire.Fy[i] -= fT[1];
     wire.Fz[i] -= fT[2];
-    }
+    }*/
   }
 #endif
 

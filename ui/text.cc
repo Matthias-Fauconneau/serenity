@@ -139,8 +139,8 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 				else if(format==TextFormat::Italic) { assert_(!find(fontName,"Italic")); font = getFont(fontName, {"Italic","I","Oblique"}); }
 				else if(format==TextFormat::Subscript || format==TextFormat::Superscript) {
 					size *= 2./3;
-					if(format==TextFormat::Superscript) position.y -= size/4;
-					else /*format==TextFormat::Subscript*/ position.y += font->font(size, hint).ascender/2;
+     if(format==TextFormat::Superscript) position.y -= size/2; ///4;
+     else /*format==TextFormat::Subscript*/ position.y += font->font(size, hint).ascender/3;
 				} else if(format==TextFormat::Color) {
 					color = bgr3f(*(float*)&text[sourceIndex+1], *(float*)&text[sourceIndex+2], *(float*)&text[sourceIndex+3]);
 					sourceIndex += 3;
@@ -153,6 +153,8 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
 					// 0
 					link.begin = {glyphs.size, column};
 				}
+    else if(format==TextFormat::Stack || format==TextFormat::Fraction) {}
+    else if(format==TextFormat::Regular) {}
 				else error("Unknown format", uint(format));
 			}
 			// Pop format context
