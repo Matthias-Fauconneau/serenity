@@ -164,7 +164,7 @@ struct System {
   //struct { NoOperation4 operator[](size_t) const { return {}; }} torque;
 
   sconst float curvature = 0;
-  sconst float elasticModulus = 1e8 * kg/(m*s*s); // 1 GPa
+  sconst float elasticModulus = 1e7 * kg/(m*s*s); // 1 GPa
 
   Plate() : Vertex(0, 2, 1e-3 * densityScale) {
    count = 2;
@@ -197,7 +197,7 @@ struct System {
   sconst float curvature = 1./radius;
   sconst float shearModulus = 79e9 * kg / (m*s*s);
   sconst float poissonRatio = 0.28;
-  sconst float elasticModulus = 0 ? 2*shearModulus*(1+poissonRatio) : 1e8; // ~2e11
+  sconst float elasticModulus = 0 ? 2*shearModulus*(1+poissonRatio) : 1e7; // ~2e11
 
   sconst float density = 7.8e3 * densityScale;
   sconst float mass = density * volume;
@@ -246,11 +246,11 @@ struct System {
   sconst float angularMass = 0;
   sconst float elasticModulus = 1e6; // ~ 1e7
   const vec4f tensionStiffness = float3(/*100**//*FIXME*/ elasticModulus * PI * sq(radius));
-  //sconst vec4f tensionDamping = _0f; //float3(mass / s);
-  sconst float areaMomentOfInertia = PI/4*pow4(radius);
-  const float bendStiffness = 0; //10*/*FIXME*/ elasticModulus * areaMomentOfInertia / internodeLength;
   sconst float mass = Wire::density * Wire::volume;
-  sconst float bendDamping = 0; //mass / s;
+  sconst vec4f tensionDamping = float3(mass / s);
+  sconst float areaMomentOfInertia = PI/4*pow4(radius);
+  const float bendStiffness = 1*/*FIXME*/ elasticModulus * areaMomentOfInertia / internodeLength;
+  sconst float bendDamping = mass / s;
   //float tensionEnergy=0;
   Wire(float unused elasticModulus, size_t base) :
     Vertex{base, 1<<16, Wire::mass}/*, elasticModulus(elasticModulus)*/ {
@@ -693,5 +693,5 @@ constexpr float System::Wire::elasticModulus;
 constexpr float System::Plate::elasticModulus;
 constexpr float System::Side::density;
 constexpr float System::Grain::elasticModulus;
-//constexpr vec4f System::Wire::tensionDamping;
+constexpr vec4f System::Wire::tensionDamping;
 constexpr float System::RigidSide::elasticModulus;

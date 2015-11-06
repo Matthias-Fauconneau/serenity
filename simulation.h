@@ -194,7 +194,7 @@ struct Simulation : System {
   assert(length[0], a, b);
   vec4f direction = relativePosition/length;
   vec4f unused relativeVelocity = A.velocity[a] - A.velocity[b];
-  vec4f fB = _0f4; //- A.tensionDamping * dot3(direction, relativeVelocity);
+  vec4f fB = - A.tensionDamping * dot3(direction, relativeVelocity);
   return (fS + fB) * direction;
  }
 
@@ -1334,6 +1334,47 @@ break2_:;
     wire.Fy[i] -= fT[1];
     wire.Fz[i] -= fT[2];
     }
+
+   // Bend Stiffness
+   for(size_t i: range(1, wire.count-1)) { // TODO: SIMD
+    if(wire.bendStiffness) { // Bending resistance springs
+     vec4f A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
+     vec4f a = C-B, b = B-A;
+     vec4f c = cross(a, b);
+     vec4f length4 = sqrt(sq3(c));
+     float length = length4[0];
+     if(length) {
+      float angle = atan(length, dot3(a, b)[0]);
+      //bendEnergy += 1./2 * wire.bendStiffness * sq(angle);
+      float p = wire.bendStiffness * angle;
+      vec4f dap = cross(a, c) / (sqrt(sq3(a)) * length4);
+      vec4f dbp = cross(b, c) / (sqrt(sq3(b)) * length4);
+      wire.Fx[i+1] += p * (-dap)[0];
+      wire.Fy[i+1] += p * (-dap)[1];
+      wire.Fz[i+1] += p * (-dap)[2];
+      wire.Fx[i] += p * (dap + dbp)[0];
+      wire.Fy[i] += p * (dap + dbp)[1];
+      wire.Fz[i] += p * (dap + dbp)[2];
+      wire.Fx[i-1] += p * (-dbp)[0];
+      wire.Fy[i-1] += p * (-dbp)[1];
+      wire.Fz[i-1] += p * (-dbp)[2];
+      //assert_(!Wire::bendDamping);
+      {
+       vec4f A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
+       vec4f axis = cross(C-B, B-A);
+       vec4f length4 = sqrt(sq3(axis));
+       float length = length4[0];
+       if(length) {
+        float angularVelocity = atan(length, dot3(C-B, B-A)[0]);
+        vec4f f = float3(Wire::bendDamping * angularVelocity / 2) * cross(axis/length4, C-A);
+        wire.Fx[i] += f[0];
+        wire.Fy[i] += f[1];
+        wire.Fz[i] += f[2];
+       }
+      }
+     }
+    }
+   }
   }
 
   // Integration

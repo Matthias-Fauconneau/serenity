@@ -158,8 +158,8 @@ struct SimulationView : SimulationRun, Widget, Poll {
 
  vec2 sizeHint(vec2) override { return vec2(1050, 1050*size.y/size.x); }
  shared<Graphics> graphics(vec2) override {
-  size_t grainCount;
-  {Locker lock(this->lock); grainCount = grain.count;}
+  size_t grainCount, wireCount;
+  {Locker lock(this->lock); grainCount = grain.count; wireCount = wire.count;}
 
   vec4f viewRotation = qmul(angleVector(viewYawPitch.y, vec3(1,0,0)),
                                              angleVector(viewYawPitch.x, vec3(0,0,1)));
@@ -177,6 +177,11 @@ struct SimulationView : SimulationRun, Widget, Poll {
     while(j < grainPositions.size && grainPositions[j].z < O.z) j++;
     grainPositions.insertAt(j, O);
     grainRotations.insertAt(j, conjugate(qmul(viewRotation, grain.rotation[i])));
+   }
+   for(size_t i: range(wireCount)) {
+    vec3 O = toVec3(qapply(viewRotation, wire.position[i]));
+    min = ::min(min, O - vec3(wire.radius));
+    max = ::max(max, O + vec3(wire.radius));
    }
    scale = vec3(vec2(2/::max(max.x-min.x, max.y-min.y)/1.2), 2/(max-min).z);
    translation = -vec3((min+max).xy()/2.f, min.z);
@@ -231,7 +236,6 @@ struct SimulationView : SimulationRun, Widget, Poll {
   }
 
   if(wire.count>1) {
-   size_t wireCount = wire.count;
    buffer<vec3> positions {(wireCount-1)*6};
    size_t s = 0;
    for(size_t i: range(wireCount-1)) {
