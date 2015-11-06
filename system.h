@@ -614,55 +614,33 @@ struct System {
   v8sf fD = dynamicFrictionCoefficient8 * fN;
   v8sf fTx, fTy, fTz;
   for(size_t k: range(8)) { // FIXME: mask
-   if(1 && /*fD[k] > fS[k] &&*/ tangentLength[k] < staticFrictionLength) {
+   fTx[k] = 0;
+   fTy[k] = 0;
+   fTz[k] = 0;
+   if( tangentLength[k] < staticFrictionLength
+       //&& tangentRelativeSpeed[0] < staticFrictionSpeed
+       //&& fS[k] < fD[k]
+       ) {
     // Static
-    if(1 && tangentLength[k]) {
+    if(tangentLength[k]) {
      vec4f springDirection = vec4f{TOx[k], TOy[k], TOz[k], 0} / float4(tangentLength[k]);
      float fB = staticFrictionDamping * dot3(springDirection, v4sf{RVx[k], RVy[k], RVz[k], 0})[0];
      fTx[k] = - (fS[k]+fB) * springDirection[0];
      fTy[k] = - (fS[k]+fB) * springDirection[1];
      fTz[k] = - (fS[k]+fB) * springDirection[2];
-     //log("static", fTx[k], fTy[k], fTz[k]);
      staticFrictionCount++;
-    } else {
-     fTx[k] = 0;
-     fTy[k] = 0;
-     fTz[k] = 0;
     }
    } else {
-#define ADD 0
-#if ADD
-    // Dynamic
-    //log(fS[k] < fD[k], tangentLength[k] < staticFrictionLength);
-    localAx[k] = 0; // if(!localAx[k]) {
-    fTx[k] = 0;
-    fTy[k] = 0;
-    fTz[k] = 0;
+    localAx[k] = 0;
+    localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0; // DEBUG
    }
-    if(1 && tangentRelativeSpeed[k]) {
-     /*float scale = - fD[k] / tangentRelativeSpeed[k];
+   if(tangentRelativeSpeed[k]) {
+    float scale = - fD[k] / tangentRelativeSpeed[k];
      fTx[k] += scale * TRVx[k];
      fTy[k] += scale * TRVy[k];
-     fTz[k] += scale * TRVz[k];*/
-     //log("dynamic", k, fTx[k], fTy[k], fTz[k], fD[k], tangentRelativeSpeed[k], scale, TRVx[k],TRVy[k],TRVz[k]);
-     dynamicFrictionCount++;
-    }
-#else
-    if(1 && tangentRelativeSpeed[k]) {
-     float scale = - fD[k] / tangentRelativeSpeed[k];
-     fTx[k] = scale * TRVx[k];
-     fTy[k] = scale * TRVy[k];
-     fTz[k] = scale * TRVz[k];
-     //log("dynamic", k, fTx[k], fTy[k], fTz[k], fD[k], tangentRelativeSpeed[k], scale, TRVx[k],TRVy[k],TRVz[k]);
-     dynamicFrictionCount++;
-    }
-    else {
-     fTx[k] = 0;
-     fTy[k] = 0;
-     fTz[k] = 0;
-    }
+     fTz[k] += scale * TRVz[k];
+    dynamicFrictionCount++;
    }
-#endif
   }
   Fx += fTx;
   Fy += fTy;
@@ -773,55 +751,33 @@ struct System {
   v8sf fD = dynamicFrictionCoefficient8 * fN;
   v8sf fTx, fTy, fTz;
   for(size_t k: range(8)) { // FIXME: mask
-   if(1 && /*fD[k] > fS[k] &&*/ tangentLength[k] < staticFrictionLength) {
+   fTx[k] = 0;
+   fTy[k] = 0;
+   fTz[k] = 0;
+   if( tangentLength[k] < staticFrictionLength
+       //&& tangentRelativeSpeed[0] < staticFrictionSpeed
+       //&& fS[k] < fD[k]
+       ) {
     // Static
-    if(1 && tangentLength[k]) {
+    if(tangentLength[k]) {
      vec4f springDirection = vec4f{TOx[k], TOy[k], TOz[k], 0} / float4(tangentLength[k]);
      float fB = staticFrictionDamping * dot3(springDirection, v4sf{RVx[k], RVy[k], RVz[k], 0})[0];
      fTx[k] = - (fS[k]+fB) * springDirection[0];
      fTy[k] = - (fS[k]+fB) * springDirection[1];
      fTz[k] = - (fS[k]+fB) * springDirection[2];
-     //log("static", fTx[k], fTy[k], fTz[k]);
      staticFrictionCount++;
-    } else {
-     fTx[k] = 0;
-     fTy[k] = 0;
-     fTz[k] = 0;
     }
    } else {
-#define ADD 0
-#if ADD
-    // Dynamic
-    //log(fS[k] < fD[k], tangentLength[k] < staticFrictionLength);
-    localAx[k] = 0; // if(!localAx[k]) {
-    fTx[k] = 0;
-    fTy[k] = 0;
-    fTz[k] = 0;
+    localAx[k] = 0;
+    localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0; // DEBUG
    }
-    if(1 && tangentRelativeSpeed[k]) {
-     /*float scale = - fD[k] / tangentRelativeSpeed[k];
+   if(tangentRelativeSpeed[k]) {
+    float scale = - fD[k] / tangentRelativeSpeed[k];
      fTx[k] += scale * TRVx[k];
      fTy[k] += scale * TRVy[k];
-     fTz[k] += scale * TRVz[k];*/
-     //log("dynamic", k, fTx[k], fTy[k], fTz[k], fD[k], tangentRelativeSpeed[k], scale, TRVx[k],TRVy[k],TRVz[k]);
-     dynamicFrictionCount++;
-    }
-#else
-    if(1 && tangentRelativeSpeed[k]) {
-     float scale = - fD[k] / tangentRelativeSpeed[k];
-     fTx[k] = scale * TRVx[k];
-     fTy[k] = scale * TRVy[k];
-     fTz[k] = scale * TRVz[k];
-     //log("dynamic", k, fTx[k], fTy[k], fTz[k], fD[k], tangentRelativeSpeed[k], scale, TRVx[k],TRVy[k],TRVz[k]);
-     dynamicFrictionCount++;
-    }
-    else {
-     fTx[k] = 0;
-     fTy[k] = 0;
-     fTz[k] = 0;
-    }
+     fTz[k] += scale * TRVz[k];
+    dynamicFrictionCount++;
    }
-#endif
   }
   Fx += fTx;
   Fy += fTy;

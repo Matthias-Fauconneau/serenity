@@ -1015,12 +1015,8 @@ break2_:;
         goto break_;
        }
       } /*else*/ {
-       grainGrainLocalAx[index] = 0;
-       grainGrainLocalAy[index] = 0;
-       grainGrainLocalAz[index] = 0;
-       grainGrainLocalBx[index] = 0;
-       grainGrainLocalBy[index] = 0;
-       grainGrainLocalBz[index] = 0;
+       grainGrainLocalAx[index] = 0; grainGrainLocalAy[index] = 0; grainGrainLocalAz[index] = 0;
+       grainGrainLocalBx[index] = 0; grainGrainLocalBy[index] = 0; grainGrainLocalBz[index] = 0;
       }
       break_:;
       grainGrainCount++;
@@ -1084,6 +1080,9 @@ break2_:;
       // Indirect instead of pack to write back friction points
      grainGrainContact[grainGrainContactCount] = index+k;
      grainGrainContactCount++;
+    } else {
+     grainGrainLocalAx[index+k] = 0; grainGrainLocalAy[index+k] = 0; grainGrainLocalAz[index+k] = 0;
+     grainGrainLocalBx[index+k] = 0; grainGrainLocalBy[index+k] = 0; grainGrainLocalBz[index+k] = 0;
     }
    }
   }
@@ -1241,12 +1240,8 @@ break2_:;
          goto break__;
         }
        } /*else*/ {
-        grainWireLocalAx[index] = 0;
-        grainWireLocalAy[index] = 0;
-        grainWireLocalAz[index] = 0;
-        grainWireLocalBx[index] = 0;
-        grainWireLocalBy[index] = 0;
-        grainWireLocalBz[index] = 0;
+        grainWireLocalAx[index] = 0; grainWireLocalAy[index] = 0; grainWireLocalAz[index] = 0;
+        grainWireLocalBx[index] = 0; grainWireLocalBy[index] = 0; grainWireLocalBz[index] = 0;
        }
        break__:;
        grainWireCount++;
@@ -1295,11 +1290,15 @@ break2_:;
      v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
      v8sf length = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
      v8sf depth = Grain::radius8 + Wire::radius8 - length;
-     for(size_t subIndex: range(8)) {
-      if(index+subIndex == grainWireCount) break /*2*/;
-      if(depth[subIndex] > 0) {
-       grainWireContact[grainWireContactCount] = index+subIndex;
+     for(size_t k: range(8)) {
+      if(index+k == grainWireCount) break /*2*/;
+      if(depth[k] > 0) {
+       grainWireContact[grainWireContactCount] = index+k;
        grainWireContactCount++;
+      } else {
+       // DEBUG:
+       grainWireLocalAx[index+k] = 0; grainWireLocalAy[index+k] = 0; grainWireLocalAz[index+k] = 0;
+       grainWireLocalBx[index+k] = 0; grainWireLocalBy[index+k] = 0; grainWireLocalBz[index+k] = 0;
       }
      }
     }
