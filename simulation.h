@@ -96,6 +96,7 @@ struct Simulation : System {
  tsc stepTime, totalTimeTsc;
  tsc sideForceTime, grainSideLatticeTime, grainSideIntersectTime, grainSideForceTime, grainSideAddTime;
  tsc grainTime, grainGrainLatticeTime, grainGrainTime, grainGrainForceTime;
+ tsc grainWireIntersectTime, grainWireForceTime, grainWireAddTime;
  tsc grainIntegrationTime, sideIntegrationTime, wireIntegrationTime;
 
  Lock lock;
@@ -114,12 +115,12 @@ struct Simulation : System {
 
  //v4sf min = _0f4, max = _0f4;
 
- // Side - Grain
+ // Grain - Side
  float grainSideGlobalMinD2 = 0;
  uint sideSkipped = 0;
 
- size_t grainSideCount = 0;
  // FIXME: uint16 -> unpack
+ size_t grainSideCount = 0;
  buffer<int> grainSideA {side.capacity * 2};
  buffer<int> grainSideB {side.capacity * 2};
 
@@ -140,6 +141,13 @@ struct Simulation : System {
  buffer<float> grainGrainLocalBx;
  buffer<float> grainGrainLocalBy;
  buffer<float> grainGrainLocalBz;
+
+ // Grain - Wire
+ // TODO: Verlet
+ // FIXME: uint16 -> unpack
+ size_t grainWireCount = 0;
+ buffer<int> grainWireA {wire.capacity};
+ buffer<int> grainWireB {wire.capacity};
 
  Simulation(const Dict& parameters, Stream&& stream) : System(parameters),
    targetHeight(/*parameters.at("Height"_)*/side.height),
@@ -1146,7 +1154,7 @@ break2_:;
   }
   grainGrainTime.stop();
 
-#if 1 // FIXME: restore wire-grain, wire-plate contacts
+  // FIXME: restore wire-grain contact
   if(wire.count) {
    if(!grainLattice) grainLattice = generateGrainLattice(); // FIXME: use verlet lists for wire-grain
    uint16* grainBase = grainLattice->base;
@@ -1157,23 +1165,166 @@ break2_:;
     grainBase+gX*gY-gX-1, grainBase+gX*gY-1, grainBase+gX*gY+gX-1
    };
 
-   for(size_t i: range(wire.count)) { // TODO: SIMD
+   size_t wireCount8 = (wire.count+7)/8*8;
+   buffer<int> wireBottom(wireCount8), wireTop(wireCount8); //, wireRigidSide(wireCount8);
+   size_t wireBottomCount = 0, wireTopCount =0; //, wireRigidSideCount = 0;
+   grainWireCount = 0;
+   for(size_t a: range(wire.count)) { // TODO: SIMD
     // Gravity
-    wire.Fx[i] = 0; wire.Fy[i] = 0; wire.Fz[i] = wire.mass * G.z;
-    // Wire - Plate
-    /*contact(wire, i, plate, 0);
-    contact(wire, i, plate, 1);*/
-    // Wire - Grain (FIXME: Verlet list)
-    {size_t offset = grainLattice->index(wire.Px[i], wire.Py[i], wire.Pz[i]);
+    wire.Fx[a] = 0; wire.Fy[a] = 0; wire.Fz[a] = wire.mass * G.z;
+    if(plate.Pz[0] > wire.Pz[a]-Wire::radius) wireBottom[wireBottomCount++] = a;
+    if(wire.Pz[a]+Wire::radius > plate.Pz[1]) wireTop[wireTopCount++] = a;
+    /*if(processState <= ProcessState::Pour)
+     if(sq(wire.Px[a]) + sq(wire.Py[a]) > sq(side.radius - wire::radius))
+      wireRigidSide[wireRigidSideCount++] = a;*/
+
+#if 1
+    // Wire - Grain (TODO: Verlet)
+    {size_t offset = grainLattice->index(wire.Px[a], wire.Py[a], wire.Pz[a]);
      for(size_t n: range(3*3)) {
       v4hi unused line = loada(grainNeighbours[n] + offset);
-      if(line[0]) contact(wire, i, grain, line[0]-1);
-      if(line[1]) contact(wire, i, grain, line[1]-1);
-      if(line[2]) contact(wire, i, grain, line[2]-1);
-     }}
+      /*if(line[0]) contact(wire, a, grain, line[0]-1);
+      if(line[1]) contact(wire, a, grain, line[1]-1);
+      if(line[2]) contact(wire, a, grain, line[2]-1);*/
+      for(size_t i: range(3)) if(line[i]) {
+       assert_(grainWireCount < grainWireA.capacity);
+       grainWireA[grainWireCount] = line[i]-1;
+       grainWireB[grainWireCount] = a;
+       grainWireCount++;
+      }
+     }
+    }
+#else
+    for(size_t b: range(grain.count)) {
+        assert_(grainWireCount < grainWireA.capacity,  grainWireCount, grainWireA.capacity);
+        grainWireA[grainWireCount] = b;
+        grainWireB[grainWireCount] = a;
+        grainWireCount++;
+   }
+#endif
+   }
+   /*//assert(minD3 < 2*Grain::radius/sqrt(3.) - Grain::radius, minD3);
+   grainSideGlobalMinD2 = minD3 - Grain::radius;
+   assert(grainSideGlobalMinD2 > 0, grainSideGlobalMinD2);*/
+   // Aligns
+   size_t gWC = grainWireCount;
+   while(gWC%8) { // Content does not matter as long as intersection evaluation does not trigger exceptions
+    grainWireA[gWC] = 0;
+    grainWireB[gWC] = 0;
+    gWC++;
+   }
+   assert(gWC <= grainWireA.capacity);
+
+#if 1
+   {
+    // Evaluates (packed) intersections from (packed) (TODO: verlet) lists
+    size_t grainWireContactCount = 0;
+    buffer<int> grainWireContact(grainWireCount);
+    grainWireIntersectTime.start();
+    for(size_t index = 0; index < grainWireCount; index += 8) {
+     v8si A = *(v8si*)(grainWireA.data+index), B = *(v8si*)(grainWireB.data+index);
+     v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
+     v8sf Bx = gather(wire.Px.data, B), By = gather(wire.Py.data, B), Bz = gather(wire.Pz.data, B);
+     v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
+     v8sf length = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
+     v8sf depth = Grain::radius8 + Wire::radius8 - length;
+     for(size_t subIndex: range(8)) {
+      if(index+subIndex == grainWireCount) break /*2*/;
+      if(depth[subIndex] > 0) {
+       grainWireContact[grainWireContactCount] = index+subIndex;
+       grainWireContactCount++;
+      }
+     }
+    }
+    grainWireIntersectTime.stop();
+
+    // Aligns with invalid contacts
+    size_t gWCC = grainWireContactCount;
+    while(gWCC%8)
+     grainWireContact[gWCC++] = grainWireCount; // Invalid entry
+
+    // Evaluates forces from (packed) intersections
+    buffer<float> Fx(gWCC), Fy(gWCC), Fz(gWCC);
+    grainWireForceTime.start();
+    for(size_t i = 0; i < grainWireContactCount; i += 8) {
+     v8si contacts = *(v8si*)(grainWireContact.data+i);
+     v8si A = gather(grainWireA, contacts), B = gather(grainWireB, contacts);
+     // FIXME: Recomputing from intersection (more efficient than storing?)
+     v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
+     v8sf Bx = gather(wire.Px.data, B), By = gather(wire.Py.data, B), Bz = gather(wire.Pz.data, B);
+     v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
+     v8sf length = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
+     v8sf depth = Grain::radius8 + Wire::radius8 - length;
+     v8sf Nx = Rx/length, Ny = Ry/length, Nz = Rz/length;
+     contact(grain, A, wire, B, depth, -Rx, -Ry, -Rz, Nx, Ny, Nz,
+             *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i]);
+    }
+    grainWireForceTime.stop();
+
+    grainWireAddTime.start();
+    for(size_t i = 0; i < grainWireContactCount; i++) { // Scalar scatter add
+     size_t index = grainWireContact[i];
+     size_t a = grainWireA[index];
+     size_t b = grainWireB[index];
+     grain.Fx[a] += Fx[i];
+     wire.Fx[b] -= Fx[i];
+     grain.Fy[a] += Fy[i];
+     wire.Fy[b] -= Fy[i];
+     grain.Fz[a] += Fz[i];
+     wire.Fz[b] -= Fz[i];
+    }
+    grainWireAddTime.stop();
+   }
+#endif
+
+   {// Bottom
+    size_t gBC = wireBottomCount;
+    while(gBC%8) wireBottom[gBC++] = wire.count;
+    assert(gBC <= wireCount8, gBC);
+    v8sf Bz_R = float8(plate.Pz[0]+Wire::radius);
+    buffer<float> Fx(gBC), Fy(gBC), Fz(gBC);
+    for(size_t i = 0; i < gBC; i += 8) {
+     v8si A = *(v8si*)&wireBottom[i];
+     v8sf depth = Bz_R - gather(wire.Pz, A);
+     contact(wire, A, plate, _0i, depth, _0f, _0f, _1f,
+             *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i]);
+    }
+    for(size_t i = 0; i < wireBottomCount; i++) { // Scalar scatter add
+     size_t a = wireBottom[i];
+     assert(isNumber(Fx[i]) && isNumber(Fy[i]) && isNumber(Fz[i]));
+     wire.Fx[a] += Fx[i];
+     wire.Fy[a] += Fy[i];
+     wire.Fz[a] += Fz[i];
+     plate.Fx[0] -= Fx[i];
+     plate.Fy[0] -= Fy[i];
+     plate.Fz[0] -= Fz[i];
+    }
    }
 
-   /*// Tension
+   {// Top
+    size_t gTC = wireTopCount;
+    while(gTC%8) wireTop[gTC++] = wire.count;
+    v8sf Bz_R = float8(plate.Pz[1]-Wire::radius);
+    buffer<float> Fx(gTC), Fy(gTC), Fz(gTC);
+    for(size_t i = 0; i < gTC; i += 8) {
+     v8si A = *(v8si*)&wireTop[i];
+     v8sf depth = gather(wire.Pz, A) - Bz_R;
+     contact(wire, A, plate, _1i, depth, _0f, _0f, -_1f,
+             *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i]);
+    }
+    for(size_t i = 0; i < wireTopCount; i++) { // Scalar scatter add
+     size_t a = wireTop[i];
+     assert(isNumber(Fx[i]) && isNumber(Fy[i]) && isNumber(Fz[i]));
+     wire.Fx[a] += Fx[i];
+     wire.Fy[a] += Fy[i];
+     wire.Fz[a] += Fz[i];
+     plate.Fx[1] -= Fx[i];
+     plate.Fy[1] -= Fy[i];
+     plate.Fz[1] -= Fz[i];
+    }
+   }
+
+   // Tension
    for(size_t i: range(1, wire.count)) { // TODO: SIMD
     vec4f fT = tension(wire, i-1, i);
     wire.Fx[i-1] += fT[0];
@@ -1182,9 +1333,8 @@ break2_:;
     wire.Fx[i] -= fT[0];
     wire.Fy[i] -= fT[1];
     wire.Fz[i] -= fT[2];
-    }*/
+    }
   }
-#endif
 
   // Integration
   //min = _0f4; max = _0f4;
