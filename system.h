@@ -403,6 +403,8 @@ struct System {
  size_t staticFrictionCount = 0, dynamicFrictionCount = 0;
  size_t staticFrictionCount2 = 0, dynamicFrictionCount2 = 0;
 
+ // FIXME: factorize contacts
+
  /// Evaluates contact force between a non-rotating object and an obstacle without friction
  template<Type tA, Type tB> inline void contact(const tA& A, v8si a,
                                          v8sf depth,
@@ -521,7 +523,156 @@ struct System {
   Fz = fN * Nz;
  }
 
- /// Evaluates contact force between two objects with friction (rotating B)
+ /// Evaluates contact force between two objects with friction (rotating A, non rotating B)
+ template<Type tA, Type tB> inline void contact(
+   const tA& A, v8si a,
+   tB& B, v8si b,
+   v8sf depth,
+   v8sf RAx, v8sf RAy, v8sf RAz,
+   v8sf Nx, v8sf Ny, v8sf Nz,
+   v8sf Ax, v8sf Ay, v8sf Az,
+   v8sf Bx, v8sf By, v8sf Bz,
+   v8sf& localAx, v8sf& localAy, v8sf& localAz,
+   v8sf& localBx, v8sf& localBy, v8sf& localBz,
+   v8sf& Fx, v8sf& Fy, v8sf& Fz,
+   v8sf& TAx, v8sf& TAy, v8sf& TAz
+   ) {
+
+  // Tension
+  constexpr float E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
+  constexpr float R = 1/(tA::curvature+tB::curvature);
+  static const float K = 4./3*E*sqrt(R);
+  static const v8sf K8 = float8(K);
+
+  const v8sf Ks = K8 * sqrt8(depth);
+  const v8sf fK = Ks * depth;
+
+  // Relative velocity
+  v8sf AVx = gather(A.AVx, a), AVy = gather(A.AVy, a), AVz = gather(A.AVz, a);
+  v8sf RVx = gather(A.Vx, a) + (AVy*RAz - AVz*RAy) - gather(B.Vx, b);
+  v8sf RVy = gather(A.Vy, a) + (AVz*RAx - AVx*RAz) - gather(B.Vy, b);
+  v8sf RVz = gather(A.Vz, a) + (AVx*RAy - AVy*RAx) - gather(B.Vz, b);
+
+  // Damping
+  static const v8sf KB = float8(K * normalDamping);
+  const v8sf Kb = KB * sqrt8(depth);
+  v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
+  v8sf fB = - Kb * normalSpeed ; // Damping
+
+  v8sf fN = fK + fB;
+  v8sf NFx = fN * Nx;
+  v8sf NFy = fN * Ny;
+  v8sf NFz = fN * Nz;
+  Fx = NFx;
+  Fy = NFy;
+  Fz = NFz;
+
+  v8sf FRAx, FRAy, FRAz;
+  v8sf FRBx, FRBy, FRBz;
+  for(size_t k: range(8)) { // FIXME
+   if(!localAx[k]) {
+    v4sf localA = qapply(conjugate(A.rotation[a[k]]), (v4sf){RAx[k], RAy[k], RAz[k], 0});
+    localAx[k] = localA[0];
+    localAy[k] = localA[1];
+    localAz[k] = localA[2];
+   }
+   vec4f relativeA = qapply(A.rotation[a[k]], (v4sf){localAx[k], localAy[k], localAz[k], 0});
+   FRAx[k] = relativeA[0];
+   FRAy[k] = relativeA[1];
+   FRAz[k] = relativeA[2];
+   FRBx[k] = localBx[k];
+   FRBy[k] = localBy[k];
+   FRBz[k] = localBz[k];
+  }
+
+  v8sf gAx = Ax + FRAx;
+  v8sf gAy = Ay + FRAy;
+  v8sf gAz = Az + FRAz;
+  v8sf gBx = Bx + FRBx;
+  v8sf gBy = By + FRBy;
+  v8sf gBz = Bz + FRBz;
+  v8sf Dx = gAx - gBx;
+  v8sf Dy = gAy - gBy;
+  v8sf Dz = gAz - gBz;
+  v8sf Dn = Nx*Dx + Ny*Dy + Nz*Dz;
+  // tangentOffset
+  v8sf TOx = Dx - Dn * Nx;
+  v8sf TOy = Dy - Dn * Ny;
+  v8sf TOz = Dz - Dn * Nz;
+  v8sf tangentLength = sqrt8(TOx*TOx+TOy*TOy+TOz*TOz);
+  sconst v8sf staticFrictionStiffness = float8(staticFrictionFactor * staticFrictionCoefficient);
+  v8sf kS = staticFrictionStiffness * fN;
+  v8sf fS = kS * tangentLength; // 0.1~1 fN
+  //for(size_t k: range(8)) log(fS[k]);
+
+  // tangentRelativeVelocity
+  v8sf RVn = Nx*RVx + Ny*RVy + Nz*RVz;
+  v8sf TRVx = RVx - RVn * Nx;
+  v8sf TRVy = RVy - RVn * Ny;
+  v8sf TRVz = RVz - RVn * Nz;
+  v8sf tangentRelativeSpeed = sqrt8(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
+  v8sf fD = dynamicFrictionCoefficient8 * fN;
+  v8sf fTx, fTy, fTz;
+  for(size_t k: range(8)) { // FIXME: mask
+   if(1 && /*fD[k] > fS[k] &&*/ tangentLength[k] < staticFrictionLength) {
+    // Static
+    if(1 && tangentLength[k]) {
+     vec4f springDirection = vec4f{TOx[k], TOy[k], TOz[k], 0} / float4(tangentLength[k]);
+     float fB = staticFrictionDamping * dot3(springDirection, v4sf{RVx[k], RVy[k], RVz[k], 0})[0];
+     fTx[k] = - (fS[k]+fB) * springDirection[0];
+     fTy[k] = - (fS[k]+fB) * springDirection[1];
+     fTz[k] = - (fS[k]+fB) * springDirection[2];
+     //log("static", fTx[k], fTy[k], fTz[k]);
+     staticFrictionCount++;
+    } else {
+     fTx[k] = 0;
+     fTy[k] = 0;
+     fTz[k] = 0;
+    }
+   } else {
+#define ADD 0
+#if ADD
+    // Dynamic
+    //log(fS[k] < fD[k], tangentLength[k] < staticFrictionLength);
+    localAx[k] = 0; // if(!localAx[k]) {
+    fTx[k] = 0;
+    fTy[k] = 0;
+    fTz[k] = 0;
+   }
+    if(1 && tangentRelativeSpeed[k]) {
+     /*float scale = - fD[k] / tangentRelativeSpeed[k];
+     fTx[k] += scale * TRVx[k];
+     fTy[k] += scale * TRVy[k];
+     fTz[k] += scale * TRVz[k];*/
+     //log("dynamic", k, fTx[k], fTy[k], fTz[k], fD[k], tangentRelativeSpeed[k], scale, TRVx[k],TRVy[k],TRVz[k]);
+     dynamicFrictionCount++;
+    }
+#else
+    if(1 && tangentRelativeSpeed[k]) {
+     float scale = - fD[k] / tangentRelativeSpeed[k];
+     fTx[k] = scale * TRVx[k];
+     fTy[k] = scale * TRVy[k];
+     fTz[k] = scale * TRVz[k];
+     //log("dynamic", k, fTx[k], fTy[k], fTz[k], fD[k], tangentRelativeSpeed[k], scale, TRVx[k],TRVy[k],TRVz[k]);
+     dynamicFrictionCount++;
+    }
+    else {
+     fTx[k] = 0;
+     fTy[k] = 0;
+     fTz[k] = 0;
+    }
+   }
+#endif
+  }
+  Fx += fTx;
+  Fy += fTy;
+  Fz += fTz;
+  TAx = RAy*fTz - RAz*fTy;
+  TAy = RAz*fTx - RAx*fTz;
+  TAz = RAx*fTy - RAy*fTx;
+ }
+
+ /// Evaluates contact force between two objects with friction (rotating A, rotating B)
  template<Type tA, Type tB> inline void contact(
    const tA& A, v8si a,
    tB& B, v8si b,

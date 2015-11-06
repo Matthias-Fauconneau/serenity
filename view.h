@@ -205,7 +205,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
   target.bind(ClearColor|ClearDepth);
   glDepthTest(true);
 
-  if(grainCount && 1) {
+  if(grainCount) {
    buffer<vec3> positions {grainCount*6};
    for(size_t i: range(grainCount)) {
     // FIXME: GPU quad projection
@@ -340,18 +340,31 @@ struct SimulationView : SimulationRun, Widget, Poll {
   }
 
   // Contacts
-   if(0) {
+   if(1) {
     glDepthTest(false);
     static GLVertexArray vertexArray;
     array<vec3> positions;
     Locker lock(this->lock);
+#if 0
     for(size_t i: range(grainGrainCount)) {
      int a = grainGrainA[i];
      int b = grainGrainB[i];
-     float d = sqrt(sq(grain.Px[a]-grain.Px[b]) + sq(grain.Py[a]-grain.Py[b]) + sq(grain.Pz[a]-grain.Pz[b]));
-     if(d < 2*Grain::radius && grainGrainLocalAx[i]) {
+     //float d = sqrt(sq(grain.Px[a]-grain.Px[b]) + sq(grain.Py[a]-grain.Py[b]) + sq(grain.Pz[a]-grain.Pz[b]));
+     if(/*d < 2*Grain::radius &&*/ grainGrainLocalAx[i]) {
       positions.append( grain.position[a] + toVec3(qapply(grain.rotation[a], (v4sf){grainGrainLocalAx[i], grainGrainLocalAy[i], grainGrainLocalAz[i], 0})) );
       positions.append( grain.position[b] + toVec3(qapply(grain.rotation[b], (v4sf){grainGrainLocalBx[i], grainGrainLocalBy[i], grainGrainLocalBz[i], 0})) );
+     }
+    }
+#endif
+    for(size_t i: range(grainWireCount)) {
+     uint a = grainWireA[i];
+     if(a >= grain.count) { log("a", a, grain.count);  continue; }
+     uint b = grainWireB[i];
+     if(b >= wire.count) { log("b", b, wire.count);  continue; }
+     //float d = sqrt(sq(grain.Px[a]-wire.Px[b]) + sq(grain.Py[a]-wire.Py[b]) + sq(grain.Pz[a]-wire.Pz[b]));
+     if(/*d < 2*Grain::radius &&*/ grainWireLocalAx[i]) {
+      positions.append( grain.position[a] + toVec3(qapply(grain.rotation[a], (v4sf){grainWireLocalAx[i], grainWireLocalAy[i], grainWireLocalAz[i], 0})) );
+      positions.append( wire.position[b] + vec3(grainWireLocalBx[i], grainWireLocalBy[i], grainWireLocalBz[i]) );
      }
     }
     if(positions) {
