@@ -114,7 +114,8 @@ MusicXML::MusicXML(string document, string) {
             };
 
             for(const Element& e: m.children) {
-                if(!(e.name=="note"_ && e.contains("chord"_))) time = nextTime; // Advances time (except chords)
+                if(e.name=="note"_ && e.contains("grace"_)) continue; // FIXME: graces
+                if(e.name!="note"_ || (!e.contains("chord"_) && !e.contains("grace"_))) time = nextTime; // Advances time (except chords and graces)
                 maxTime = max(maxTime, time);
 
                 if(e.name=="note"_) {
@@ -154,13 +155,13 @@ MusicXML::MusicXML(string document, string) {
                             notationDuration = notationDuration * durationCoefficientNum / durationCoefficientDen;
                             //assert_(!e("time-modification"_).contains("normal-type"_) || e("time-modification"_)("normal-type"_).text() == e("type"_).text(), e);
                         }
-                        duration -= min(duration, appoggiaturaTime); //FIXME
+                        //duration -= min(duration, appoggiaturaTime); //FIXME
                         assert_(acciaccaturaTime <= duration, acciaccaturaTime, duration, appoggiaturaTime);
                         acciaccaturas.clear();
                         appoggiaturaTime = 0;
                     }
                     assert_(duration >= 0, duration);
-                    if(!e.contains("chord"_) && (!e.contains("grace"_) || e("grace"_)["slash"_]!="yes"_)) nextTime = time+duration;
+                    if(!e.contains("chord"_) && (!e.contains("grace"_) /*|| e("grace"_)["slash"_]!="yes"_*/)) nextTime = time+duration;
                     if(e["print-object"_]=="no"_) continue;
                     //assert_(e.contains("staff"), e);
                     int partStaffIndex = (e.contains("staff") ? parseInteger(e("staff"_).text())-1 : 0);
@@ -352,6 +353,7 @@ MusicXML::MusicXML(string document, string) {
                     for(const Element& d : e.children) {
                         if(d.name !="direction-type"_) continue;
                         if(d.contains("dynamics"_)) {
+                            continue;
                             Dynamic dynamic = Dynamic(SMuFL::DynamicBase + ref<string>(SMuFL::dynamic).indexOf(d("dynamics"_).children.first()->name));
                             assert_(dynamic!=-1, d);
                             insertSign({Sign::Dynamic, time, {.dynamic=dynamic}});

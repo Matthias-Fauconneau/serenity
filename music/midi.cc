@@ -283,8 +283,9 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
         if(s) {
             uint8 c=s.read(); uint t=c&0x7f;
             if(c&0x80){c=s.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=s.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=s.read();t=(t<<7)|c;}}}
-            if(t>=6730) { log(trackIndex, track.time, t, notes.size, type); t=0; } //FIXME
+            //if(t>=6730) { log(trackIndex, track.time, t, notes.size, type); t=0; } //FIXME
             //if(t>=3808) { log(trackIndex, track.time, t, notes.size, type); notes.clear(); track.startTime=track.time=lastTime=t=0; } //FIXME
+            //if(t>=1680) { log(track.time, t, notes.size); t=0; }
             //if(t>=1090) log(track.time, t, notes.size);
             track.time += t;
         }

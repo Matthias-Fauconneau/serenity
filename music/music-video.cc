@@ -40,7 +40,7 @@ MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter, 	ref<float2> staffGains =
 /// Converts MIDI time base to audio sample rate
 MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds) {
     assert_(targetTicksPerSeconds > notes.ticksPerSeconds, targetTicksPerSeconds, notes.ticksPerSeconds);
-    //log(notes.size, notes.ticksPerSeconds, notes.last().time, notes.last().time / (float)notes.ticksPerSeconds);
+    log(notes.size, notes.ticksPerSeconds, notes.last().time, notes.last().time / (float)notes.ticksPerSeconds);
     for(MidiNote& note: notes) {
         /*log(note.time, targetTicksPerSeconds, notes.ticksPerSeconds, (int64)note.time*targetTicksPerSeconds/notes.ticksPerSeconds,
             (int64)note.time*targetTicksPerSeconds/notes.ticksPerSeconds / (float)targetTicksPerSeconds);*/
@@ -48,7 +48,7 @@ MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds) {
 		assert_(note.time < 1<<30);
 		assert(note.time >= 0);
     }
-	notes.ticksPerSeconds = targetTicksPerSeconds;
+    notes.ticksPerSeconds = targetTicksPerSeconds; //*5.25/4.58; //*9.6/6; // Skew
     return move(notes);
 }
 
@@ -628,7 +628,7 @@ struct Music : Widget {
 #endif
                 audio.start(audioFile ? audioFile->audioFrameRate : /*sampler.rate*/0, audioFile ? 1024 : /*sampler.periodSize*/0, 32, 2);
                 assert_(audio.rate == (audioFile ? audioFile->audioFrameRate : /*sampler.rate*/0));
-				audioThread.spawn();
+                audioThread.spawn();
 			} else running = false;
 		}
     }

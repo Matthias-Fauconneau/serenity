@@ -33,7 +33,7 @@ struct SheetContext {
     float textSize = 6*halfLineInterval;
 
     // Vertical positioning
-    float staffY(int staff, int clefStep) { return -staff*((4+4+1)*lineInterval+0*halfLineInterval) - clefStep * halfLineInterval; }
+    float staffY(int staff, int clefStep) { return -staff*10*lineInterval - clefStep * halfLineInterval; }
     float Y(uint staff, Clef clef, int step) { return staffY(staff, clefStep(clef, step)); };
     float Y(Sign sign) { assert_(sign.type==Sign::Note, int(sign.type)); return staffY(sign.staff, clefStep(sign)); };
 
@@ -239,7 +239,9 @@ void System::layoutNotes(uint staff) {
             p0 = (float(sign[1].duration)*p0 + float(sign[0].duration)*p1)/float(sign[0].duration+sign[1].duration);
             system.parallelograms.append(p0, p1, beamWidth, black, opacity);
         }
-    } else { // Draws grouping beam
+    }
+    else // Draws grouping beam
+    {
         float firstStemY = Y(stemUp?beam.first().last():beam.first().first())+(stemUp?-1:1)*stemLength;
         float lastStemY = Y(stemUp?beam.last().last():beam.last().first())+(stemUp?-1:1)*stemLength;
         for(const Chord& chord: beam) {
@@ -260,8 +262,7 @@ void System::layoutNotes(uint staff) {
         }
         // Beam
         for(size_t chordIndex: range(beam.size-1)) {
-            const Chord& chord = beam[chordIndex];
-            Value value = chord[0].note.value;
+            Value value = ::min(beam[chordIndex][0].note.value, beam[chordIndex+1][0].note.value);
             for(size_t index: range(value-Quarter)) {
                 float dy = (stemUp ? 1 : -1) * float(index) * (beamWidth+1) - !stemUp * beamWidth;
                 system.parallelograms.append(
@@ -553,8 +554,9 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 
     for(size_t signIndex: range(signs.size)) {
         Sign sign = signs[signIndex];
-        //if(sign.type != Sign::Note && sign.type != Sign::Measure) continue;
-
+        if(0 && sign.type == Sign::Rest && sign.rest.value == Whole) {
+            continue; // FIXME: Skips whole rest (spacing workaround)
+        }
         /*auto nextStaffTime = [&](uint staff, int time) {
                                 assert_(staff < staffCount);
                                 //assert_(sign.time >= staves[staff].time);
@@ -680,7 +682,8 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
                            if(abs(sign.note.step-note.step) <= 1) { x += glyphAdvance(SMuFL::NoteHead::Black); break; }*/
                         staves[staff].chord.insertSorted(sign);
                     } else { // Grace note
-#if 0
+                        error("Grace");
+#if GRACE || 1
                         float dx = glyphSize(SMuFL::NoteHead::Black, &smallFont).x;
                         float gx = x - dx - glyphAdvance(SMuFL::Flag::Above, &smallFont), y = Y(sign);
 
@@ -703,19 +706,23 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 #endif
                         note.pageIndex = pageIndex;
                         if(measureBars) note.measureIndex = measureBars->size()-1;
-                        if(notes) {
+                        /*if(notes) {
                             assert_(sign.note.measureIndex != invalid);
                             notes->sorted(sign.time).append(sign);
                             //log("grace", notes->size(), sign.time, notes->sorted(sign.time));
-                        }
+                        }*/
                     }
                 }
                 else if(sign.type == Sign::Rest) {
-                    if(sign.time != staves[staff].time && !sign.rest.dot) {
+                    /*if(sign.time != staves[staff].time && !sign.rest.dot) {
                         //log("Unexpected rest start time", sign.time, (int)sign.rest.value, sign.rest.dot, staves[staff].time, pageIndex);
-                    } else {
+                    } else*/ {
                         layoutNotes(staff);
-                        if(sign.rest.value == Whole) { assert_(!sign.rest.dot && !staves[staff].pendingWhole); staves[staff].pendingWhole = true; }
+                        if(sign.rest.value == Whole) {
+                            assert_(!sign.rest.dot && !staves[staff].pendingWhole);
+                            staves[staff].pendingWhole = true;
+                            x += glyphAdvance(SMuFL::NoteHead::Black); // FIXME
+                        }
                         else {
                             vec2 p = vec2(x, staffY(staff, -4));
                             x += glyph(p, SMuFL::Rest::Double+int(sign.rest.value), 1./2, 6);
@@ -799,6 +806,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 
                     { array<uint> keys = ::move(measureNoteKeys);
                         array<char> chord;
+                        if(measureBars) chord.append(str(measureBars->size())+" "_);
                         uint root = keys[0];
                         chord.append( strKey(keySignature, root) );
                         uint third = keys[1];
@@ -1184,10 +1192,11 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
 
 #if 1
     if(midiNotes) {
+        firstSynchronizationFailureChordIndex = 0;
         array<uint> scoreNotes;
         for(ref<Sign> chord: notes.values) for(Sign note: chord) scoreNotes.append(note.note.key());
-        log(scoreNotes.slice(0,60));
-        log(midiNotes.slice(0,60));
+        log(scoreNotes.slice(0,60), scoreNotes.size);
+        log(midiNotes.slice(0,60), midiNotes.size);
         //error("SYNC");
 
         while(chordToNote.size < notes.size()) { // While map is not complete (iterates over notes)
