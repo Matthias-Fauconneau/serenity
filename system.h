@@ -45,12 +45,12 @@ struct System {
  // Penalty model
  sconst float normalDamping = 0.001; //0.2;
  // Friction model
- sconst float staticFrictionSpeed = inf; //1e-1 *m/s; // inf
- sconst float staticFrictionFactor = 1e1; //3;
+ sconst float staticFrictionSpeed = 1e-1 *m/s; // inf
+ sconst float staticFrictionFactor = 1; //3;
  sconst float staticFrictionLength = 1e-4 * m; //4e-4 * m;
- sconst float staticFrictionDamping = 15 *g/s;
+ sconst float staticFrictionDamping = /*15*/0 *g/s;
  sconst float staticFrictionCoefficient = 0.3;
- sconst float dynamicFrictionCoefficient = 0.01;
+ sconst float dynamicFrictionCoefficient = 1e-3; // 0.01
  sconst v8sf dynamicFrictionCoefficient8 = float8(dynamicFrictionCoefficient);
 
  struct Vertex {
@@ -221,7 +221,7 @@ struct System {
  void step(Grain& p, size_t i) {
   step((Vertex&)p, i);
    // Rotation viscosity FIXME
-  p.AVx[i] *= 1-100*dt; p.AVy[i] *= 1-100*dt; p.AVz[i] *= 1-100*dt; //2K-3K
+  p.AVx[i] *= 1-10*dt; p.AVy[i] *= 1-10*dt; p.AVz[i] *= 1-10*dt; //2K-3K
   //p.AVx[i] *= 1./2; p.AVy[i] *= 1./2; p.AVz[i] *= 1./2;
   // Euler
   p.rotation[i] += dt_2 * qmul((v4sf){p.AVx[i],p.AVy[i],p.AVz[i],0}, p.rotation[i]);
@@ -617,9 +617,10 @@ struct System {
    fTx[k] = 0;
    fTy[k] = 0;
    fTz[k] = 0;
-   if( tangentLength[k] < staticFrictionLength
-       //&& tangentRelativeSpeed[0] < staticFrictionSpeed
-       //&& fS[k] < fD[k]
+   // Wire - Grain
+   if( 0/*tangentLength[k] < staticFrictionLength
+       && tangentRelativeSpeed[0] < staticFrictionSpeed
+       && fS[k] < fD[k]*/
        ) {
     // Static
     if(tangentLength[k]) {
@@ -634,7 +635,7 @@ struct System {
     localAx[k] = 0;
     localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0; // DEBUG
    }
-   if(tangentRelativeSpeed[k]) {
+   if(/*tangentRelativeSpeed[k]*/ 0) {
     float scale = - fD[k] / tangentRelativeSpeed[k];
      fTx[k] += scale * TRVx[k];
      fTy[k] += scale * TRVy[k];

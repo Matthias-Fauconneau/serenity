@@ -158,8 +158,9 @@ struct SimulationView : SimulationRun, Widget, Poll {
 
  vec2 sizeHint(vec2) override { return vec2(1050, 1050*size.y/size.x); }
  shared<Graphics> graphics(vec2) override {
+  Locker lock(this->lock);
   size_t grainCount, wireCount;
-  {Locker lock(this->lock); grainCount = grain.count; wireCount = wire.count;}
+  {/*Locker lock(this->lock);*/ grainCount = grain.count; wireCount = wire.count;}
 
   vec4f viewRotation = qmul(angleVector(viewYawPitch.y, vec3(1,0,0)),
                                              angleVector(viewYawPitch.x, vec3(0,0,1)));
@@ -180,6 +181,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
    }
    for(size_t i: range(wireCount)) {
     vec3 O = toVec3(qapply(viewRotation, wire.position[i]));
+    if(O.z > 1) continue;
     min = ::min(min, O - vec3(wire.radius));
     max = ::max(max, O + vec3(wire.radius));
    }
@@ -273,7 +275,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
   }
 
   // Membrane
-  if(0) {
+  if(1) {
    static GLShader shader {::shader_glsl(), {"color"}};
    shader.bind();
    shader.bindFragments({"color"});
@@ -344,9 +346,9 @@ struct SimulationView : SimulationRun, Widget, Poll {
     glDepthTest(false);
     static GLVertexArray vertexArray;
     array<vec3> positions;
-    Locker lock(this->lock);
+    {//Locker lock(this->lock);
 #if 0
-    for(size_t i: range(grainGrainCount)) {
+    for(size_t i: range(grainGrainCount2)) {
      int a = grainGrainA[i];
      int b = grainGrainB[i];
      //float d = sqrt(sq(grain.Px[a]-grain.Px[b]) + sq(grain.Py[a]-grain.Py[b]) + sq(grain.Pz[a]-grain.Pz[b]));
@@ -356,16 +358,17 @@ struct SimulationView : SimulationRun, Widget, Poll {
      }
     }
 #endif
-    for(size_t i: range(grainWireCount)) {
+    for(size_t i: range(grainWireCount2)) {
      uint a = grainWireA[i];
-     if(a >= grain.count) { log("a", a, grain.count);  continue; }
+     //if(a >= grain.count) { log("a", a, grain.count);  continue; }
      uint b = grainWireB[i];
-     if(b >= wire.count) { log("b", b, wire.count);  continue; }
+     //if(b >= wire.count) { log("b", b, wire.count);  continue; }
      //float d = sqrt(sq(grain.Px[a]-wire.Px[b]) + sq(grain.Py[a]-wire.Py[b]) + sq(grain.Pz[a]-wire.Pz[b]));
      if(/*d < 2*Grain::radius &&*/ grainWireLocalAx[i]) {
       positions.append( grain.position[a] + toVec3(qapply(grain.rotation[a], (v4sf){grainWireLocalAx[i], grainWireLocalAy[i], grainWireLocalAz[i], 0})) );
       positions.append( wire.position[b] + vec3(grainWireLocalBx[i], grainWireLocalBy[i], grainWireLocalBz[i]) );
      }
+    }
     }
     if(positions) {
      GLBuffer positionBuffer (positions);
