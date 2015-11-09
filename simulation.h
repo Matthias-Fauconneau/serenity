@@ -90,6 +90,8 @@ struct Simulation : System {
  size_t balanceCount = 0;
  String debug;
 
+ array<size_t> highlightWire, highlightGrain;
+
  // Performance
  int64 lastReport = realTime(), lastReportStep = timeStep;
  Time totalTime {true}, partTime;
@@ -145,7 +147,7 @@ struct Simulation : System {
  // Grain - Wire
  // TODO: Verlet
  // FIXME: uint16 -> unpack
- static constexpr size_t grainWire = 16; // FIXME: rcp -> wire / grain
+ static constexpr size_t grainWire = 32; // FIXME: rcp -> wire / grain
  size_t grainWireCount = 0;
  buffer<int> grainWireA {wire.capacity};
  buffer<int> grainWireB {wire.capacity};
@@ -426,7 +428,7 @@ struct Simulation : System {
         cos(t2)};
       //grain.rotation[i] = (v4sf){1,0,0,0};
       // Speeds up pouring
-      grain.Vz[i] = - ::min(grain.Pz[i],  0.01f);
+      //grain.Vz[i] = - ::min(grain.Pz[i],  0.01f);
       grain.count++;
       break;
      }
@@ -970,7 +972,8 @@ break2_:;
    assert(i==62);
    Locker lock(this->lock);
    grainGrainCount = 0;
-   if(1) {buffer<float> grainGrainLocalAx {grainCount8 * grainGrain};
+   if(1) {
+    buffer<float> grainGrainLocalAx {grainCount8 * grainGrain};
     buffer<float> grainGrainLocalAy {grainCount8 * grainGrain};
     buffer<float> grainGrainLocalAz {grainCount8 * grainGrain};
     buffer<float> grainGrainLocalBx {grainCount8 * grainGrain};
@@ -978,13 +981,13 @@ break2_:;
     buffer<float> grainGrainLocalBz {grainCount8 * grainGrain};
     for(size_t latticeIndex: range(Z*Y*X)) {
      const uint16* current = grainLattice->base + latticeIndex;
-     uint16 a = *current;
+     size_t a = *current;
      if(!a) continue;
      a--;
      // Neighbours
      list<8> D;
      for(size_t n: range(62)) {
-      uint16 b = current[di[n]];
+      size_t b = current[di[n]];
       if(!b) continue;
       b--;
       float d = sqrt(sq(grain.Px[a]-grain.Px[b]) + sq(grain.Py[a]-grain.Py[b]) + sq(grain.Pz[a]-grain.Pz[b]));
@@ -1183,7 +1186,7 @@ break2_:;
    };
 
    buffer<int2> grainWireIndices {grainCount8 * grainWire};
-   grainWireIndices.clear();
+   grainWireIndices.clear(int2(0,0));
    // Index to packed frictions
    for(size_t index: range(grainWireCount)) {
     { // A<->B
@@ -1192,12 +1195,13 @@ break2_:;
      size_t base = a*grainWire;
      size_t i = 0;
      while(i<grainWire && grainWireIndices[base+i]) i++;
-     //assert(i<grainWire, grainWireIndices.slice(base, grainWire));
-     if(i>grainWire) {
-      log(grainWireIndices.slice(base, grainWire));
+     if(i>=grainWire) {
+      log(index, a, base, i, grainWireIndices.slice(base, grainWire));
       processState = ProcessState::Fail;
       return;
      }
+     assert_(i<grainWire, grainWireIndices.slice(base, grainWire));
+     assert_(base+i < grainWireIndices.size);
      grainWireIndices[base+i] = int2{grainWireB[index]+1, int(index)};
     }
    }
@@ -1212,22 +1216,17 @@ break2_:;
     buffer<float> grainWireLocalBy {grainCount8 * grainWire};
     buffer<float> grainWireLocalBz {grainCount8 * grainWire};
 
+    //buffer<size_t> found (16, 0);
     for(size_t B: range(wire.count)) { // TODO: SIMD
-     /*// Gravity
-    wire.Fx[B] = 0; wire.Fy[B] = 0; wire.Fz[B] = wire.mass * G.z;
-    if(plate.Pz[0] > wire.Pz[B]-Wire::radius) wireBottom[wireBottomCount++] = B;
-    if(wire.Pz[B]+Wire::radius > plate.Pz[1]) wireTop[wireTopCount++] = B;*/
-     /*if(processState <= ProcessState::Pour)
-     if(sq(wire.Px[a]) + sq(wire.Py[a]) > sq(side.radius - wire::radius))
-      wireRigidSide[wireRigidSideCount++] = a;*/
-
      // Wire - Grain (TODO: Verlet)
+     //found.size = 0;
      {size_t offset = grainLattice->index(wire.Px[B], wire.Py[B], wire.Pz[B]); // offset
       for(size_t n: range(3*3)) {
        v4hi unused line = loada(grainNeighbours[n] + offset);
        for(size_t i: range(3)) if(line[i]) {
         assert_(grainWireCount < grainWireA.capacity, grainWireCount, grainWireA.capacity);
         size_t a = line[i]-1;
+        //found.append(a);
         size_t index = grainWireCount;
         grainWireA[index] = a;
         grainWireB[index] = B;
@@ -1249,11 +1248,20 @@ break2_:;
          grainWireLocalAx[index] = 0; grainWireLocalAy[index] = 0; grainWireLocalAz[index] = 0;
          grainWireLocalBx[index] = 0; grainWireLocalBy[index] = 0; grainWireLocalBz[index] = 0;
         }
-break__:;
+        break__:;
         grainWireCount++;
        }
       }
      }
+     /*for(size_t a: range(grain.count)) {
+      float Ax = grain.Px[a], Ay = grain.Py[a], Az = grain.Pz[a];
+      float Bx = wire.Px[B], By = wire.Py[B], Bz = wire.Pz[B];
+      float Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
+      float length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
+      float depth = Grain::radius + Wire::radius - length;
+      if(depth > 0) assert_(found.contains(a), found, a, Ax,Ay,Az, Bx,By,Bz);
+      //else assert_(!found.contains(b));
+     }*/
     }
 
     {//Locker lock(this->lock);
@@ -1294,6 +1302,17 @@ break__:;
      for(size_t k: range(8)) {
       if(index+k == grainWireCount) break /*2*/;
       if(depth[k] > 0) {
+       static float depthMax = 0.00007;
+       /*if(B[k] == 266 || (A[k] == 110 || A[k] == 113)) log(timeStep, B[k], A[k], depth[k], Wire::radius/depth[k], Ax[k],Ay[k],Az[k], Bx[k],By[k],Bz[k], Rx[k],Ry[k],Rz[k], length[k],
+                                          grain.Vx[A[k]], grain.Vy[A[k]], grain.Vz[A[k]],
+                                          wire.Vx[B[k]], wire.Vy[B[k]], wire.Vz[B[k]]);*/
+       if(depth[k] > depthMax) {
+        log("Max", B[k], A[k], depth[k], Wire::radius/depth[k]);
+        depthMax=depth[k];
+        highlightWire.append(B[k]);
+        highlightGrain.append(A[k]);
+        if(depth[k] > 0.0007/*1*//*9*/) { processState = ProcessState::Fail; return; }
+       }
        grainWireContact[grainWireContactCount] = index+k;
        grainWireContactCount++;
       } else {
@@ -1461,7 +1480,7 @@ break__:;
     wire.Fz[i] -= fT[2];
     }
 
-   // Bend Stiffness
+   /*// Bend Stiffness
    for(size_t i: range(1, wire.count-1)) { // TODO: SIMD
     if(wire.bendStiffness) { // Bending resistance springs
      vec4f A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
@@ -1500,7 +1519,7 @@ break__:;
       }
      }
     }
-   }
+   }*/
   }
 
   // Integration
@@ -1514,9 +1533,9 @@ break__:;
    assert(isNumber(grain.Fx[i]) && isNumber(grain.Fy[i]) && isNumber(grain.Fz[i]),
            i, grain.Fx[i], grain.Fy[i], grain.Fz[i]);
    System::step(grain, i);
-   grain.Vx[i] *= (1-1*dt); // Additionnal viscosity
-   grain.Vy[i] *= (1-1*dt); // Additionnal viscosity
-   grain.Vz[i] *= (1-1*dt); // Additionnal viscosity
+   grain.Vx[i] *= (1-100*dt); // Additionnal viscosity
+   grain.Vy[i] *= (1-100*dt); // Additionnal viscosity
+   grain.Vz[i] *= (1-100*dt); // Additionnal viscosity
    assert(isNumber(grain.position[i]), i, grain.position[i]);
    //min = ::min(min, grain.position[i]);
    //max = ::max(max, grain.position[i]);

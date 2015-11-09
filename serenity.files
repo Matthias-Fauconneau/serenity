@@ -95,3 +95,4 @@ snapshot.cc
 color-sample.cc
 document.cc
 io/jpeg.cc
+polyhedra.cc

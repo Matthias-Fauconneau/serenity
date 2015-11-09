@@ -168,6 +168,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
   vec3 scale, translation; // Fit view
   array<vec3> grainPositions (grain.count); // Rotated, Z-Sorted
   array<vec4f> grainRotations (grain.count); // Rotated, Z-Sorted
+  array<size_t> grainIndices (grain.count);
   {
    vec3 min = inf, max = -inf;
    for(size_t i: range(grainCount)) {
@@ -178,6 +179,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
     while(j < grainPositions.size && grainPositions[j].z < O.z) j++;
     grainPositions.insertAt(j, O);
     grainRotations.insertAt(j, conjugate(qmul(viewRotation, grain.rotation[i])));
+    grainIndices.insertAt(j, i);
    }
    for(size_t i: range(wireCount)) {
     vec3 O = toVec3(qapply(viewRotation, wire.position[i]));
@@ -209,6 +211,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
 
   if(grainCount) {
    buffer<vec3> positions {grainCount*6};
+   buffer<vec4> colors {grainCount};
    for(size_t i: range(grainCount)) {
     // FIXME: GPU quad projection
     vec3 O = viewProjection * grainPositions[i];
@@ -220,6 +223,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
     positions[i*6+3] = vec3(min.x, max.y, O.z);
     positions[i*6+4] = vec3(max.x, min.y, O.z);
     positions[i*6+5] = vec3(max, O.z);
+    colors[i] = highlightGrain.contains(grainIndices[i]) ? vec4(0, 0, 1, 1) : vec4(1,1,1,1);
    }
 
    static GLShader shader {::shader_glsl(), {"sphere"}};
@@ -228,10 +232,11 @@ struct SimulationView : SimulationRun, Widget, Poll {
    shader.bindFragments({"color"});
    static GLVertexArray vertexArray;
    GLBuffer positionBuffer (positions);
-   vertexArray.bindAttribute(shader.attribLocation("position"_),
-                             3, Float, positionBuffer);
+   vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
    GLBuffer rotationBuffer (grainRotations);
    shader.bind("rotationBuffer"_, rotationBuffer, 0);
+   GLBuffer colorBuffer (colors);
+   shader.bind("colorBuffer"_, colorBuffer, 1);
    shader["radius"] = float(scale.z/2 * Grain::radius*3/4); // reduce Z radius to see membrane mesh on/in grain
    shader["hpxRadius"] = 1 / (size.x * scale.x * grain.radius);
    vertexArray.draw(Triangles, positions.size);
@@ -239,6 +244,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
 
   if(wire.count>1) {
    buffer<vec3> positions {(wireCount-1)*6};
+   buffer<vec4> colors {(wireCount-1)};
    size_t s = 0;
    for(size_t i: range(wireCount-1)) {
     vec3 a (toVec3(wire.position[i])), b (toVec3(wire.position[i+1]));
@@ -257,6 +263,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
     positions[s*6+3] = P[2];
     positions[s*6+4] = P[1];
     positions[s*6+5] = P[3];
+    colors[s] = highlightWire.contains(s) ? vec4(0, 0, 1, 1) : vec4(1, 1, 1, 1);
     s++;
    }
    assert_(s*6 <= positions.size);
@@ -271,6 +278,8 @@ struct SimulationView : SimulationRun, Widget, Poll {
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_),
                              3, Float, positionBuffer);
+   GLBuffer colorBuffer (colors);
+   shader.bind("colorBuffer"_, colorBuffer, 1);
    vertexArray.draw(Triangles, positions.size);
   }
 

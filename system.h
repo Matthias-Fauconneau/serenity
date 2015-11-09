@@ -191,7 +191,7 @@ struct System {
 
  struct Grain : Vertex {
   // Properties
-  sconst float radius =  2.47*mm; // 40 mm diameter
+  sconst float radius =  3*mm; //2.5*mm; //47*mm; // 40 mm diameter
   sconst v8sf radius8 = float8(radius); // 40 mm diameter
   sconst float volume = 4./3 * PI * cb(radius);
   sconst float curvature = 1./radius;
@@ -235,7 +235,7 @@ struct System {
   using Vertex::Vertex;
   //struct { NoOperation4 operator[](size_t) const { return {}; }} torque;
 
-  sconst float radius = 0.5 * mm; // 2mm diameter
+  sconst float radius = /*(2-sqrt(3))/sqrt(3)*/ 0.4*mm; //0.5 * mm; // 0.8mm diameter < (2-sqrt(3))/sqrt(3) Grain::radius
   sconst v8sf radius8 = float8(radius);
   sconst float curvature = 1./radius;
   sconst float internodeLength = Grain::radius/2;
@@ -388,7 +388,8 @@ struct System {
   //log("System");
      if(p.at("Pattern")!="none"_) assert_(wire.elasticModulus);
      //assert_((float)p.at("Friction"_) == frictionCoefficient);
-     log(4000*dt);
+     //log(4000*dt);
+     assert_(Wire::radius + Grain::radius <= 2*Grain::radius/sqrt(3.), Wire::radius + Grain::radius, 2*Grain::radius/sqrt(3.), 2*Grain::radius/sqrt(3.) / (Wire::radius + Grain::radius));
  }
 
  // Update
