@@ -83,15 +83,16 @@ template<Type A, Type T, Type F, size_t N> T reduce(const T (&values)[N], F fold
 template<Type A, Type T> T sum(ref<T> values, A initialValue) {
 	return reduce(values, [](A accumulator, T value) { return accumulator + value; }, initialValue);
 }
-template<Type T> T sum(ref<T> values) { return sum(values, T()); }
+generic T sum(ref<T> values) { return sum(values, T()); }
 template<Type T, size_t N> T sum(const T (&values)[N]) { return sum(ref<T>(values)); }
 
-template<Type T> T min(ref<T> values) { return reduce(values, [](T accumulator, T value) { return min(accumulator, value); }, values[0]); }
+generic T min(ref<T> values) { return reduce(values, [](T accumulator, T value) { return min(accumulator, value); }, values[0]); }
 template<Type T, size_t N> T min(const T (&a)[N]) { return min(ref<T>(a)); }
 
-template<Type T> T max(ref<T> values) { return reduce(values, [](T accumulator, T value) { return max(accumulator, value); }, values[0]); }
+generic T max(ref<T> values) { return reduce(values, [](T accumulator, T value) { return max(accumulator, value); }, values[0]); }
 template<Type T, size_t N> T max(const T (&a)[N]) { return max(ref<T>(a)); }
 
 generic size_t argmax(const ref<T>& a) { size_t argmax=0; for(size_t i: range(a.size)) if(a[i] > a[argmax]) argmax=i; return argmax; }
 
-inline double mean(const ref<float> v) { return sum(v, 0.)/v.size; }
+generic T mean(const ref<T> values) { return sum(values) / float(values.size); }
+//inline double mean(const ref<float> v) { return sum(v, 0.)/v.size; }
