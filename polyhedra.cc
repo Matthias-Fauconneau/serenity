@@ -16,20 +16,23 @@ struct Polyhedra {
  buffer<Face> faces;
  buffer<Edge> edges;
  buffer<vec3> global; // Vertex positions in global frame
+ float radius;
 };
 
 struct Contact {
  size_t a, b;
- size_t vertex;
+ /*size_t vertex;
  size_t face;
- float u, v, t;
- explicit operator bool() { return face != invalid; }
+ float u, v, t;*/
+ vec3 P1, P2;
+ float t;
+ //explicit operator bool() { return face != invalid; }
 };
 
 // Sphere - Triangle
 Contact vertexFace(const Polyhedra& A, const Polyhedra& B, float R = 0) {
  for(size_t vertexIndex: range(A.global.size)) {
-  Contact contact {0, 0, vertexIndex, invalid, nanf, nanf, -inf};
+  Contact contact {0, 0, {}, {}, -inf /*vertexIndex, invalid, nanf, nanf*/};
   vec3 O = A.global[vertexIndex];
   for(size_t faceIndex: range(B.faces.size)) {
    Face f = B.faces[faceIndex];
@@ -59,21 +62,36 @@ Contact vertexFace(const Polyhedra& A, const Polyhedra& B, float R = 0) {
    //contact = {float3(tA::radius)*D, O+t*D, V[0]+/*-*/D, t-tA::radius, u, v};
    if(t > R) goto break_;
    if(t > contact.t) {
-    contact.face = faceIndex;
+    /*contact.face = faceIndex;
     contact.u = u;
     contact.v = v;
-    contact.t = t;
+    contact.t = t;*/
+    contact.P1 = O;
+    contact.P2 = O + t * D;
    }
   } /*else*/ { // Inside all faces
    return contact;
   }
   break_:;
  }
- return {0, 0, invalid, invalid, nanf, nanf, nanf};
+ return {0, 0, {}, {}, -inf};
+}
+
+// Cylinder - Cylinder
+void edgeEdge(const Polyhedra& A, const Polyhedra& B, float R = 0) {
+ for(Edge a: A.edges) {
+  Contact contact {0, 0, {}, {}, -inf};
+  vec3 A1 = A.global[a.a], A2 = A.global[a.b];
+  for(Edge b: B.edges) {
+   vec3 B1 = A.global[b.a], B2 = A.global[b.b];
+   v4sf A, B;
+   closest(A1, A2, B1, B2, A, B);
+  }
+ }
 }
 
 Contact contact(const Polyhedra& A, const Polyhedra& B, float R = 0) {
- return vertexFace(A, B, R) ?: vertexFace(B, A, R);
+ return vertexFace(A, B, R) ?: vertexFace(B, A, R) ?: edgeEdge(A, B, R);
 }
 
 struct PolyhedraSimulation {
@@ -84,24 +102,32 @@ struct PolyhedraSimulation {
  PolyhedraSimulation() {
   Random random;
   while(polyhedras.size < 2) {
-   float t0 = 2*PI*random();
-   float t1 = acos(1-2*random());
-   float t2 = (PI*random()+acos(random()))/2;
-   const float d = 4;
-   Polyhedra p{
-    vec3(d*random(), d*random(), d*random()),
-    {sin(t0)*sin(t1)*sin(t2),  cos(t0)*sin(t1)*sin(t2), cos(t1)*sin(t2), cos(t2)},
-    copyRef(ref<vec3>{vec3(1,1,1), vec3(1,-1,-1), vec3(-1,1,-1), vec3(-1,-1,1)}),
-    //copyRef(ref<Face>{{0,2,1}, {0,3,2}, {0,1,3}, {1,2,3}}),
-      copyRef(ref<Face>{{0,1,2}, {0,2,3}, {0,3,1}, {1,3,2}}),
-    copyRef(ref<Edge>{{0,1}, {0,2}, {0,3}, {1,2}, {1,3}, {2,3}}),
-    buffer<vec3>(4)
-   };
-   polyhedras.append(move(p));
+   const float d = 16;
+   vec3 position(d*random(), d*random(), d*random());
+   ref<vec3> vertices{vec3(1,1,1), vec3(1,-1,-1), vec3(-1,1,-1), vec3(-1,-1,1)};
+   float radius = 0; for(vec3 v: vertices) radius = ::max(radius, length(v));
+   for(auto& p: polyhedras) {
+    if(length(p.position - position) <= p.radius + radius)
+     goto break_;
+   } /*else*/ {
+    float t0 = 2*PI*random();
+    float t1 = acos(1-2*random());
+    float t2 = (PI*random()+acos(random()))/2;
+    Polyhedra p{
+     position,
+     {sin(t0)*sin(t1)*sin(t2),  cos(t0)*sin(t1)*sin(t2), cos(t1)*sin(t2), cos(t2)},
+       copyRef(vertices),
+       copyRef(ref<Face>{{0,1,2}, {0,2,3}, {0,3,1}, {1,3,2}}),
+       copyRef(ref<Edge>{{0,1}, {0,2}, {0,3}, {1,2}, {1,3}, {2,3}}),
+     buffer<vec3>(4), radius
+    };
+    polyhedras.append(move(p));
+   }
+   break_:;
   }
  }
  void step() {
-  const float dt = 1./600;
+  const float dt = 1./60;
   vec3 center = ::mean(apply(polyhedras, [](const Polyhedra& p)->vec3{ return p.position;}));
   contacts.clear();
   for(auto& p: polyhedras) {
@@ -158,7 +184,7 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
   // Transforms vertices and evaluates scene bounds
   vec3 min = -5/*inf*/, max = 5/*-inf*/;
   for(auto& p: polyhedras) {
-   for(vec3 a: p.local) {
+   for(vec3 a: p.global) {
     vec3 A = toVec3(qapply(viewRotation, a - center));
     min = ::min(min, A);
     max = ::max(max, A);
@@ -190,7 +216,7 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
   for(Contact& contact: contacts) {
    const Polyhedra& A = polyhedras[contact.a];
    const Polyhedra& B = polyhedras[contact.b];
-   Face f = A.faces[contact.face];
+   /*Face f = A.faces[contact.face];
    vec3 a = A.global[f.a];
    vec3 b = A.global[f.b];
    vec3 c = A.global[f.c];
@@ -201,8 +227,10 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
    vec3 O = B.global[contact.vertex] - center;
    vec3 R = O + contact.t * D;
    vec2 P1 = offset + scale * toVec3(qapply(viewRotation, O)).xy();
-   vec2 P2 = offset + scale * toVec3(qapply(viewRotation, R)).xy();
+   vec2 P2 = offset + scale * toVec3(qapply(viewRotation, R)).xy();*/
    //log(P1, P2, length(P2-P1));
+   P1 = contact.P1;
+   P2 = contact.P2;
    graphics->lines.append(P1, P2);
   }
   return graphics;
