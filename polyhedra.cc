@@ -93,22 +93,22 @@ Contact contact(const Polyhedra& A, const Polyhedra& B) {
 struct PolyhedraSimulation {
  array<Polyhedra> polyhedras;
  buffer<vec3> velocity, angularVelocity;
- const float dt = 1./60000;
+ const float dt = 1./10000;
  const float damping = 10;
- const float density = 1./60;
- const float E = 10;
+ const float density = 1;
+ const float E = 100;
  const float R = 1;
  const float volume = 1; // FIXME
  const float angularMass = 1; // FIXME
  const vec3 g {0,0,-10};
- const float d = 2, D = 3;
+ const float d = 4, D = 5;
  const float frictionCoefficient = 1;//0.1;
 
  array<Contact> contacts;
 
  PolyhedraSimulation() {
   Random random;
-  while(polyhedras.size < 2) {
+  while(polyhedras.size < 8) {
    vec3 position(d*random(), d*random(), 1+d*random());
    const float r = 1./sqrt(3.);
    ref<vec3> vertices{vec3(r,r,r), vec3(r,-r,-r), vec3(-r,r,-r), vec3(-r,-r,r)};
@@ -281,8 +281,8 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
    }
   }
   for(Contact& contact: contacts) {
-   vec2 A = offset + scale * toVec3(qapply(viewRotation, contact.A - center)).xy();
-   vec2 B = offset + scale * toVec3(qapply(viewRotation, contact.B - center)).xy();
+   vec2 A = offset + scale * toVec3(qapply(viewRotation, polyhedras[contact.a].position + qapply(polyhedras[contact.a].rotation, contact.A) - center)).xy();
+   vec2 B = offset + scale * toVec3(qapply(viewRotation, polyhedras[contact.b].position + qapply(polyhedras[contact.b].rotation, contact.B) - center)).xy();
    graphics->lines.append(A, B);
    }
   return graphics;
