@@ -80,6 +80,7 @@ typedef float v8sf __attribute((__vector_size__ (32)));
 inline v8sf constexpr float8(float f) { return (v8sf){f,f,f,f,f,f,f,f}; }
 static constexpr v8sf unused _0f = float8(0);
 static constexpr v8sf unused _1f = float8(1);
+#if __AVX__
 static inline v8sf loadu8(const float* P) { return _mm256_loadu_ps(P); }
 static inline void store(float* P, v8sf A) { _mm256_storeu_ps(P, A); }
 
@@ -90,6 +91,7 @@ static inline float reduce8(v8sf x) {
  const __m128 x32 = x64 + _mm_shuffle_ps/*__builtin_ia32_shufps*/(x64, x64, 0x55);
  return x32[0];
 }
+#endif
 static inline v8sf gather(const float* P, v8si a) {
  return (v8sf){P[a[0]], P[a[1]], P[a[2]], P[a[3]], P[a[4]], P[a[5]], P[a[6]], P[a[7]]};
 }

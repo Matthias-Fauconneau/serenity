@@ -218,35 +218,34 @@ inline v4sf qapply(v4sf q, v4sf v) {
 
 //template<Type A, Type B> struct pair { A a; B b; };/*pair<v4sf, v4sf>*/
 inline void closest(v4sf a1, v4sf a2, v4sf b1, v4sf b2, v4sf& A, v4sf& B) {
-    const v4sf u = a2 - a1, v = b2 - b1, w = a1 - b1;
-    const float a = dot3(u,u)[0];
-    const float b = dot3(u,v)[0];
-    const float c = dot3(v,v)[0];
-    const float d = dot3(u,w)[0];
-    const float e = dot3(v,w)[0];
-    const float D = a*c - b*b; float sD = D,  tD = D;
-    // Compute the line parameters of the two closest points
-    float sN, tN;
-    if(D < __FLT_EPSILON__) sN = 0, sD = 1, tN = e, tD = c;
-    else {
-        sN = (b*e - c*d), tN = (a*e - b*d);
-        /**/  if(sN < 0) { sN = 0, tN = e, tD = c; }
-        else if (sN > sD) { sN = sD; tN = e + b; tD = c; }
-    }
-    /**/  if(tN < 0) {
-        tN = 0;
-        /**/  if(-d < 0) sN = 0;
-        else if(-d > a) sN = sD;
-        else { sN = -d; sD = a; }
-    }
-    else if(tN > tD) {
-        tN = tD;
-        /**/  if((-d + b) < 0) sN = 0;
-        else if((-d + b) > a) sN = sD;
-        else { sN = (-d + b); sD = a; }
-    }
-    float sc = abs(sN) < __FLT_EPSILON__ ? 0 : sN / sD;
-    float tc = abs(tN) < __FLT_EPSILON__ ? 0 : tN / tD;
-    A = a1 + (float4(sc) * u); B = b1 - (float4(tc) * v);
-    //return {a1 + (float4(sc) * u), b1 - (float4(tc) * v)};
+ const v4sf u = a2 - a1, v = b2 - b1, w = a1 - b1;
+ const float a = dot3(u,u)[0];
+ const float b = dot3(u,v)[0];
+ const float c = dot3(v,v)[0];
+ const float d = dot3(u,w)[0];
+ const float e = dot3(v,w)[0];
+ const float D = a*c - b*b; float sD = D, tD = D;
+ // Compute the line parameters of the two closest points
+ float sN, tN;
+ if(D < __FLT_EPSILON__) sN = 0, sD = 1, tN = e, tD = c;
+ else {
+  sN = (b*e - c*d), tN = (a*e - b*d);
+  /**/ if(sN < 0) { sN = 0, tN = e, tD = c; }
+  else if (sN > sD) { sN = sD; tN = e + b; tD = c; }
+ }
+ /**/ if(tN < 0) {
+  tN = 0;
+  /**/ if(-d < 0) sN = 0;
+  else if(-d > a) sN = sD;
+  else { sN = -d; sD = a; }
+ }
+ else if(tN > tD) {
+  tN = tD;
+  /**/ if((-d + b) < 0) sN = 0;
+  else if((-d + b) > a) sN = sD;
+  else { sN = (-d + b); sD = a; }
+ }
+ float sc = abs(sD) < __FLT_EPSILON__ ? 0 : sN / sD;
+ float tc = abs(tD) < __FLT_EPSILON__ ? 0 : tN / tD;
+ A = a1 + (float4(sc) * u); B = b1 + (float4(tc) * v);
 }

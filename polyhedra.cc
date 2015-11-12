@@ -26,30 +26,58 @@ struct Contact {
  float u, v, t;*/
  vec3 P1, P2;
  float t;
- explicit operator bool() { return t != nan; }
+ explicit operator bool() { return t > -inf; }
 };
 
 // Point - Plane
 Contact vertexFace(const Polyhedra& A, const Polyhedra& B) {
  for(size_t vertexIndex: range(A.global.size)) {
-  Contact contact {0, 0, {}, {}, -inf /*vertexIndex, invalid, nanf, nanf*/};
-  vec3 O = A.global[vertexIndex];
-  for(size_t faceIndex: range(B.planes.size)) {
-   vec4 f = B.planes[faceIndex];
-   vec3 P = toVec3(qapply(conjugate(B.rotation), O - B.position)); // Transforms vertex to B local frame
-   vec3 N = f.xyz(); float d = f.w;
-   float t = dot(N, P) - d;
-   vec3 M = P - t * N; // Projects vertex on plane (B frame)
-   // Clips against all planes (convex polyhedra)
-   for(vec4 p: B.planes) {
-    if(dot(p.xyz(), M) <= p.w) continue; // Inside
-    goto break_;
-   } /*else*/ {
+  vec3 a = toVec3(qapply(conjugate(B.rotation), A.global[vertexIndex] - B.position)); // Transforms vertex to B local frame
+  // Clips against all planes (convex polyhedra)
+  for(vec4 plane: B.planes) {
+   if(dot(plane.xyz(), a) <= plane.w) continue; // Inside
+   goto break_;
+  } /*else*/ { // P inside polyhedra B
+   Contact contact {0, 0, {}, {}, -inf /*vertexIndex, invalid, nanf, nanf*/};
+   for(vec4 plane: B.planes) {
+    // Projects vertex on plane (B frame)
+    float t = dot(plane.xyz(), a) - plane.w;
     if(t > contact.t) {
      contact.t = t;
-     contact.P1 = P;
-     contact.P2 = M;
+     contact.P1 = A.global[vertexIndex];
+     contact.P2 = B.position + toVec3(qapply(B.rotation, a - t * plane.xyz()));
     }
+   }
+   return contact;
+  }
+  break_:;
+ }
+ return {0, 0, {}, {}, -inf};
+}
+
+// Cylinder - Cylinder
+Contact edgeEdge(const Polyhedra& A, const Polyhedra& B) {
+ for(Edge eA: A.edges) {
+  vec3 A1 = A.global[eA.a], A2 = A.global[eA.b];
+  for(Edge eB: B.edges) {
+   vec3 B1 = B.global[eB.a], B2 = B.global[eB.b];
+   v4sf gA, gB;
+   closest(A1, A2, B1, B2, gA, gB);
+   vec3 a = toVec3(qapply(conjugate(B.rotation), gA - B.position)); // Transforms global position gA to B local frame
+   for(vec4 plane: B.planes) {
+    if(dot(plane.xyz(), toVec3(a)) <= plane.w) continue; // Inside
+    goto break_;
+   } /*else*/ { // a inside polyhedra B
+    vec3 b = toVec3(qapply(conjugate(A.rotation), gB - A.position)); // Transforms global position gB to A local frame
+    for(vec4 plane: A.planes) {
+     if(dot(plane.xyz(), toVec3(b)) <= plane.w) continue; // Inside
+     log(gA, gB, dot(plane.xyz(), toVec3(b)), plane.w);
+     //goto break2_;
+    } /*else*/ { // b inside polyhedra A
+     return {0,0, toVec3(gA), toVec3(gB), 0};
+    }
+    //break2_:;
+    //error(gA, gB);
    }
    break_:;
   }
@@ -57,21 +85,8 @@ Contact vertexFace(const Polyhedra& A, const Polyhedra& B) {
  return {0, 0, {}, {}, -inf};
 }
 
-// Cylinder - Cylinder
-/*void edgeEdge(const Polyhedra& A, const Polyhedra& B, float R = 0) {
- for(Edge a: A.edges) {
-  Contact contact {0, 0, {}, {}, -inf};
-  vec3 A1 = A.global[a.a], A2 = A.global[a.b];
-  for(Edge b: B.edges) {
-   vec3 B1 = A.global[b.a], B2 = A.global[b.b];
-   v4sf A, B;
-   closest(A1, A2, B1, B2, A, B);
-  }
- }
-}*/
-
 Contact contact(const Polyhedra& A, const Polyhedra& B) {
- return vertexFace(A, B) ?: vertexFace(B, A);// ?: edgeEdge(A, B, R);
+ return vertexFace(A, B) ?: vertexFace(B, A) ?: edgeEdge(A, B);
 }
 
 struct PolyhedraSimulation {
@@ -114,9 +129,10 @@ struct PolyhedraSimulation {
    break_:;
   }
  }
- void step() {
+ bool step() {
   const float dt = 1./60;
   vec3 center = ::mean(apply(polyhedras, [](const Polyhedra& p)->vec3{ return p.position;}));
+  bool hadContacts = contacts.size;
   contacts.clear();
   for(auto& p: polyhedras) {
    for(size_t a: range(p.local.size)) {
@@ -140,6 +156,7 @@ struct PolyhedraSimulation {
     A.position += (center - A.position) * dt;
    }
   }
+  return !contacts || !hadContacts;
  }
 };
 
@@ -183,45 +200,33 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
   scale.x = scale.y = ::min(scale.x, scale.y);
   vec2 offset = - scale * min.xy();
 
-  for(Polyhedra& p: polyhedras) {
-   for(Edge e: p.edges) {
-    vec2 A = offset + scale * toVec3(qapply(viewRotation, p.global[e.a] - center)).xy();
-    vec2 B = offset + scale * toVec3(qapply(viewRotation, p.global[e.b] - center)).xy();
-    graphics->lines.append(A, B);
+  for(const Polyhedra& A: polyhedras) {
+   for(Edge eA: A.edges) {
+    vec3 A1 = A.global[eA.a], A2 = A.global[eA.b];
+    {
+     vec2 P1 = offset + scale * toVec3(qapply(viewRotation, A1 - center)).xy();
+     vec2 P2 = offset + scale * toVec3(qapply(viewRotation, A2 - center)).xy();
+     graphics->lines.append(P1, P2);
+    }
+    if(0) for(const Polyhedra& B: polyhedras) {
+     if(&A == &B) continue;
+     for(Edge eB: B.edges) {
+      vec3 B1 = B.global[eB.a], B2 = B.global[eB.b];
+      v4sf gA, gB;
+      closest(A1, A2, B1, B2, gA, gB);
+      vec2 P1 = offset + scale * toVec3(qapply(viewRotation, gA - center)).xy();
+      vec2 P2 = offset + scale * toVec3(qapply(viewRotation, gB - center)).xy();
+      graphics->lines.append(P1, P2);
+      break;
+     }
+    }
    }
-   /*for(Face f: p.faces) {
-    vec3 A = p.global[f.a], B = p.global[f.b], C = p.global[f.c];
-    vec3 F = (A+B+C)/3.f;
-    vec3 N = cross(B-A, C-A);
-    assert_(length(N), A,B,C);
-    N /= length(N);
-    vec2 P1 = offset + scale * toVec3(qapply(viewRotation, F - center)).xy();
-    vec2 P2 = offset + scale * toVec3(qapply(viewRotation, F+N - center)).xy();
-    graphics->lines.append(P1, P2);
-   }*/
   }
-#if 0
   for(Contact& contact: contacts) {
-   const Polyhedra& A = polyhedras[contact.a];
-   const Polyhedra& B = polyhedras[contact.b];
-   /*Face f = A.faces[contact.face];
-   vec3 a = A.global[f.a];
-   vec3 b = A.global[f.b];
-   vec3 c = A.global[f.c];
-   vec3 E1 = b-a, E2 = c-a;
-   vec3 D = -cross(E1, E2);
-   D /= length(D);
-
-   vec3 O = B.global[contact.vertex] - center;
-   vec3 R = O + contact.t * D;
-   vec2 P1 = offset + scale * toVec3(qapply(viewRotation, O)).xy();
-   vec2 P2 = offset + scale * toVec3(qapply(viewRotation, R)).xy();*/
-   //log(P1, P2, length(P2-P1));
-   vec3 P1 = contact.P1;
-   vec3 P2 = contact.P2;
+   vec2 P1 = offset + scale * toVec3(qapply(viewRotation, contact.P1 - center)).xy();
+   vec2 P2 = offset + scale * toVec3(qapply(viewRotation, contact.P2 - center)).xy();
    graphics->lines.append(P1, P2);
-  }
-#endif
+   }
   return graphics;
  }
 };
@@ -230,6 +235,6 @@ struct PolyhedraApp : PolyhedraView {
  unique<Window> window = ::window(this);
  PolyhedraApp() {
   step();
-  window->presentComplete = [this]{ step(); window->render(); };
+  window->presentComplete = [this]{ if(step()) window->render(); };
  }
 } polyhedra;
