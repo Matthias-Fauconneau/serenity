@@ -94,24 +94,25 @@ struct PolyhedraSimulation {
  array<Polyhedra> polyhedras;
  buffer<vec3> velocity, angularVelocity;
  const float dt = 1./60000;
- const float damping = 1;
+ const float damping = 10;
  const float density = 1./60;
- const float E = 1;
+ const float E = 10;
  const float R = 1;
  const float volume = 1; // FIXME
  const float angularMass = 1; // FIXME
  const vec3 g {0,0,-10};
- const float d = 1, D = 2;
+ const float d = 2, D = 3;
+ const float frictionCoefficient = 1;//0.1;
 
  array<Contact> contacts;
 
  PolyhedraSimulation() {
   Random random;
-  while(polyhedras.size < 1) {
+  while(polyhedras.size < 2) {
    vec3 position(d*random(), d*random(), 1+d*random());
    const float r = 1./sqrt(3.);
    ref<vec3> vertices{vec3(r,r,r), vec3(r,-r,-r), vec3(-r,r,-r), vec3(-r,-r,r)};
-   float radius = 1; //float radius = 0; for(vec3 v: vertices) radius = ::max(radius, length(v));
+   float radius = 1;
    for(auto& p: polyhedras) {
     if(length(p.position - position) <= p.radius + radius)
      goto break_;
@@ -119,7 +120,6 @@ struct PolyhedraSimulation {
     float t0 = 2*PI*random();
     float t1 = acos(1-2*random());
     float t2 = (PI*random()+acos(random()))/2;
-    //t0=t1=t2=0;
     ref<Face> faces{{0,1,2}, {0,2,3}, {0,3,1}, {1,3,2}};
     buffer<vec4> planes (faces.size);
     for(size_t i: range(planes.size)) {
@@ -155,16 +155,21 @@ struct PolyhedraSimulation {
    vec3 N(0,0,1);
    for(size_t vertexIndex: range(polyhedras[a].local.size)) {
     vec3 A = p.local[vertexIndex];
-    vec3 gA = p.global[vertexIndex] = toVec3(p.position + qapply(p.rotation, A));
+    vec3 rA = toVec3(qapply(p.rotation, A));
+    vec3 gA = p.global[vertexIndex] = toVec3(p.position + rA);
     float depth = 0 - gA.z;
     if(depth > 0) {
-     vec3 f = 4.f/3 * E * sqrt(R) * sqrt(depth) * (depth - damping * dot(N, velocity[a])) * N;
+     vec3 v = velocity[a] + cross(angularVelocity[a], rA);
+     float fN = 4.f/3 * E * sqrt(R) * sqrt(depth) * (depth - damping * dot(N, v));
+     vec3 tV = v - dot(N, v) * N;
+     vec3 fT = - frictionCoefficient * fN * tV;
+     vec3 f = fN * N + fT;
      force[a] += f;
-     torque[a] += cross(A, f);
+     torque[a] += cross(rA, f);
     }
    }
   }
-  if(0) for(size_t a: range(polyhedras.size)) {
+  if(1) for(size_t a: range(polyhedras.size)) {
    Polyhedra& A = polyhedras[a];
    for(size_t b: range(polyhedras.size)) {
     if(a==b) continue;
@@ -174,8 +179,7 @@ struct PolyhedraSimulation {
      vec3 N = contact.N; float depth = contact.depth;
      vec3 f = 4.f/3 * E * sqrt(R) * sqrt(depth) * (depth - damping * dot(N, velocity[a])) * N;
      force[a] += f;
-     //torque[a] += cross(contact.A, f);
-     assert_(isNumber(force[a]), contact.depth, contact.N);
+     torque[a] += cross(toVec3(qapply(conjugate(A.rotation), contact.A)), f);
      contact.a = a, contact.b = b;
      contacts.append(contact);
     }
