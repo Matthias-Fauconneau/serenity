@@ -25,8 +25,9 @@ struct Contact {
  size_t face;
  float u, v, t;*/
  vec3 P1, P2;
- float t;
- explicit operator bool() { return t > -inf; }
+ vec3 N;
+ float depth;
+ explicit operator bool() { return depth < inf; }
 };
 
 // Point - Plane
@@ -38,21 +39,22 @@ Contact vertexFace(const Polyhedra& A, const Polyhedra& B) {
    if(dot(plane.xyz(), a) <= plane.w) continue; // Inside
    goto break_;
   } /*else*/ { // P inside polyhedra B
-   Contact contact {0, 0, {}, {}, -inf /*vertexIndex, invalid, nanf, nanf*/};
+   Contact contact {0, 0, {}, {}, {}, inf};
    for(vec4 plane: B.planes) {
     // Projects vertex on plane (B frame)
-    float t = dot(plane.xyz(), a) - plane.w;
-    if(t > contact.t) {
-     contact.t = t;
+    float depth = plane.w - dot(plane.xyz(), a);
+    if(depth < contact.depth) {
+     contact.N = plane.xyz();
+     contact.depth = depth;
      contact.P1 = A.global[vertexIndex];
-     contact.P2 = B.position + toVec3(qapply(B.rotation, a - t * plane.xyz()));
+     contact.P2 = B.position + toVec3(qapply(B.rotation, a + depth * plane.xyz()));
     }
    }
    return contact;
   }
   break_:;
  }
- return {0, 0, {}, {}, -inf};
+ return {0, 0, {}, {}, {}, inf};
 }
 
 // Cylinder - Cylinder
@@ -71,18 +73,17 @@ Contact edgeEdge(const Polyhedra& A, const Polyhedra& B) {
     vec3 b = toVec3(qapply(conjugate(A.rotation), gB - A.position)); // Transforms global position gB to A local frame
     for(vec4 plane: A.planes) {
      if(dot(plane.xyz(), toVec3(b)) <= plane.w) continue; // Inside
-     log(gA, gB, dot(plane.xyz(), toVec3(b)), plane.w);
-     //goto break2_;
+     //error(gA, gB, dot(plane.xyz(), toVec3(b)), plane.w);
     } /*else*/ { // b inside polyhedra A
-     return {0,0, toVec3(gA), toVec3(gB), 0};
+     vec3 r = toVec3(gB-gA);
+     float L = ::length(r);
+     return {0,0, toVec3(gA), toVec3(gB), r/L, L};
     }
-    //break2_:;
-    //error(gA, gB);
    }
    break_:;
   }
  }
- return {0, 0, {}, {}, -inf};
+ return {0, 0, {}, {}, {}, inf};
 }
 
 Contact contact(const Polyhedra& A, const Polyhedra& B) {
@@ -91,13 +92,21 @@ Contact contact(const Polyhedra& A, const Polyhedra& B) {
 
 struct PolyhedraSimulation {
  array<Polyhedra> polyhedras;
+ buffer<vec3> velocity;
+ const float dt = 1./60;
+ const float damping = 1;
+ const float density = 1;
+ const float E = 1;
+ const float R = 1;
+ const float volume = 1;
+ const vec3 g {0,0,-1};
 
  array<Contact> contacts;
 
  PolyhedraSimulation() {
   Random random;
-  while(polyhedras.size < 2) {
-   const float d = 16;
+  while(polyhedras.size < 5) {
+   const float d = 8;
    vec3 position(d*random(), d*random(), d*random());
    ref<vec3> vertices{vec3(1,1,1), vec3(1,-1,-1), vec3(-1,1,-1), vec3(-1,-1,1)};
    float radius = 0; for(vec3 v: vertices) radius = ::max(radius, length(v));
@@ -128,35 +137,44 @@ struct PolyhedraSimulation {
    }
    break_:;
   }
+  velocity = buffer<vec3>(polyhedras.size);
+  velocity.clear(0);
  }
  bool step() {
-  const float dt = 1./60;
-  vec3 center = ::mean(apply(polyhedras, [](const Polyhedra& p)->vec3{ return p.position;}));
-  bool hadContacts = contacts.size;
+  //vec3 center = ::mean(apply(polyhedras, [](const Polyhedra& p)->vec3{ return p.position;}));
+  //bool hadContacts = contacts.size;
   contacts.clear();
   for(auto& p: polyhedras) {
    for(size_t a: range(p.local.size)) {
     p.global[a] = toVec3(p.position + qapply(p.rotation, p.local[a]));
    }
   }
+  buffer<vec3> force (polyhedras.size); // TODO: torque
   for(size_t a: range(polyhedras.size)) {
-   size_t contactCount = 0;
+   force[a] = g* density * volume;
+   float depth = 0 - polyhedras[a].position.z;
+   vec3 n(0,0,1);
+   if(depth > 0) force[a] += 4.f/3 * E * sqrt(R) * sqrt(depth) * (depth - damping * dot(n, velocity[a])) * n;
+  }
+  for(size_t a: range(polyhedras.size)) {
    Polyhedra& A = polyhedras[a];
    for(size_t b: range(polyhedras.size)) {
     if(a==b) continue;
     Polyhedra& B = polyhedras[b];
     Contact contact = ::contact(A, B);
     if(contact) {
+     force[a] += contact.depth * contact.N;
+     assert_(isNumber(force[a]), contact.depth, contact.N);
      contact.a = a, contact.b = b;
      contacts.append(contact);
-     contactCount++;
     }
    }
-   if(contactCount == 0) { // Moves toward center while no contacts
-    A.position += (center - A.position) * dt;
-   }
   }
-  return !contacts || !hadContacts;
+  for(size_t a: range(polyhedras.size)) {
+   velocity[a] += dt * force[a];
+   polyhedras[a].position += dt * velocity[a];
+  }
+  return true; //!contacts || !hadContacts;
  }
 };
 
