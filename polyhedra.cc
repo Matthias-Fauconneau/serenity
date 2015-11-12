@@ -17,15 +17,12 @@ struct Polyhedra {
  buffer<Edge> edges;
  buffer<vec3> global; // Vertex positions in global frame
  float radius;
- static constexpr float R = 0; //1./16;
+ static constexpr float R = 1./16;
 };
 constexpr float Polyhedra::R;
 
 struct Contact {
  size_t a, b;
- /*size_t vertex;
- size_t face;
- float u, v, t;*/
  vec3 A, B;
  vec3 N;
  float depth;
@@ -44,9 +41,10 @@ Contact vertexFace(const Polyhedra& A, const Polyhedra& B) {
    Contact contact {0, 0, {}, {}, {}, inf};
    for(vec4 plane: B.planes) {
     // Projects vertex on plane (B frame)
-    float depth = plane.w - dot(plane.xyz(), a);
+    float depth = plane.w + A.R + B.R - dot(plane.xyz(), a);
     if(depth < contact.depth) {
      contact.N = plane.xyz();
+     assert_(depth > 0);
      contact.depth = depth;
      contact.A = A.local[vertexIndex];
      contact.B = a + depth * plane.xyz(); //B.position + toVec3(qapply(B.rotation, a + depth * plane.xyz()));
@@ -79,7 +77,7 @@ Contact edgeEdge(const Polyhedra& A, const Polyhedra& B) {
      //error(gA, gB, dot(plane.xyz(), toVec3(b)), plane.w);
     } /*else*/ { // b inside polyhedra A
      vec3 r = toVec3(gB-gA);
-     float L = ::length(r);
+     float L = ::length(r) + A.R + B.R;
      return {0,0, toVec3(b), toVec3(a), r/L, L};
     }
    }
@@ -97,7 +95,7 @@ struct PolyhedraSimulation {
  Lock lock;
  array<Polyhedra> polyhedras;
  buffer<vec3> velocity, angularVelocity;
- const float dt = 1./1000;
+ const float dt = 1./50000;
  const float damping = 1;
  const float density = 1;
  const float E = 1000;
@@ -149,7 +147,7 @@ struct PolyhedraSimulation {
   angularVelocity = buffer<vec3>(polyhedras.size);
   angularVelocity.clear(0);
  }
- void step() {
+ bool step() {
   //Locker lock(this->lock);
   buffer<vec3> force (polyhedras.size), torque (polyhedras.size);
   for(size_t a: range(polyhedras.size)) {
@@ -168,6 +166,11 @@ struct PolyhedraSimulation {
      vec3 tV = v - dot(N, v) * N;
      vec3 fT = - frictionCoefficient * fN * tV;
      vec3 f = fN * N + fT;
+     if(!isNumber(f)) {
+      log("FAIL", E, R, depth, damping, N, velocity[a], f);
+      return false;
+     }
+     assert_(isNumber(f), E, R, depth, damping, N, velocity[a], f);
      force[a] += f;
      torque[a] += cross(rA, f);
     }
@@ -181,7 +184,9 @@ struct PolyhedraSimulation {
     Contact contact = ::contact(A, B);
     if(contact) {
      vec3 N = contact.N; float depth = contact.depth;
+     assert_(depth > 0, depth);
      vec3 f = 4.f/3 * E * sqrt(R) * sqrt(depth) * (depth - damping * dot(N, velocity[a])) * N;
+     assert_(isNumber(f), E, R, depth, damping, N, velocity[a]);
      force[a] += f;
      torque[a] += cross(toVec3(qapply(conjugate(A.rotation), contact.A)), f);
      contact.a = a, contact.b = b;
@@ -203,6 +208,7 @@ struct PolyhedraSimulation {
   {Locker lock(this->lock);
    contacts2 = ::move(contacts);
   }
+  return true;
  }
 };
 
@@ -316,5 +322,5 @@ struct PolyhedraApp : PolyhedraView, Poll {
   physicThread.spawn();
   queue();
  }
- void event() { step(); queue(); }
+ void event() { if(step()) queue(); }
 } polyhedra;
