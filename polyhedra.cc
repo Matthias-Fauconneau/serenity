@@ -98,12 +98,12 @@ struct PolyhedraSimulation {
  const float dt = 1./50000;
  const float damping = 1;
  const float density = 1;
- const float E = 1000;
+ const float E = 100; //1000
  const float R = 1;
  const float volume = 1; // FIXME
  const float angularMass = 1; // FIXME
  const vec3 g {0,0,-10};
- const float d = 4, D = 5;
+ const float d = 4, D = 8;
  const float frictionCoefficient = 1;//0.1;
 
  array<Contact> contacts, contacts2;
@@ -197,7 +197,10 @@ struct PolyhedraSimulation {
   for(size_t a: range(polyhedras.size)) {
    assert_(isNumber(force[a]));
    velocity[a] += dt * force[a];
-   polyhedras[a].position += dt * velocity[a];
+   vec3 dx = dt * velocity[a];
+   if(length(dx) > 1) { log("STOP", dx, length(dx)); return false; }
+   polyhedras[a].position += dx;
+   if(length(polyhedras[a].position) > D) { log("STOP", polyhedras[a].position, length(polyhedras[a].position)); return false; }
    assert_(isNumber(polyhedras[a].position));
 
    polyhedras[a].rotation += float4(dt/2.f) * qmul(angularVelocity[a], polyhedras[a].rotation);
@@ -214,9 +217,16 @@ struct PolyhedraSimulation {
 
 
 struct PolyhedraView : PolyhedraSimulation, Widget {
+ buffer<array<vec3>> trajectories;
 
  vec2 lastPos; // for relative cursor movements
  vec2 viewYawPitch = vec2(0, PI/3); // Current view angles
+
+ PolyhedraView() {
+  trajectories = buffer<array<vec3>>(polyhedras.size);
+  trajectories.clear();
+ }
+
  // Orbital ("turntable") view control
  bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button,
                                 Widget*&) override {
@@ -229,7 +239,7 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
   return true;
  }
 
- vec2 sizeHint(vec2) override { return 512; }
+ vec2 sizeHint(vec2) override { return 1024; }
  shared<Graphics> graphics(vec2 size) override {
   //Locker lock(this->lock);
   shared<Graphics> graphics;
@@ -240,7 +250,7 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
 
   // Transforms vertices and evaluates scene bounds
   vec3 min = -D, max = D;
-  for(auto& p: polyhedras) {
+  for(const Polyhedra& p: polyhedras) {
    for(vec3 a: p.global) {
     vec3 A = toVec3(qapply(viewRotation, a - center));
     min = ::min(min, A);
@@ -276,6 +286,18 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
    vec2 P2 = offset + scale * toVec3(qapply(viewRotation, vec3(0, 0, d))).xy();
    assert_(isNumber(P1) && isNumber(P2));
    graphics->lines.append(P1, P2);}
+
+  for(size_t p: range(polyhedras.size)) {
+   trajectories[p].append(polyhedras[p].position);
+  }
+  for(const auto& t: trajectories) {
+   for(size_t i: range(t.size-1)) {
+    {vec2 P1 = offset + scale * toVec3(qapply(viewRotation, t[i])).xy();
+     vec2 P2 = offset + scale * toVec3(qapply(viewRotation, t[i+1])).xy();
+     assert_(isNumber(P1) && isNumber(P2));
+     graphics->lines.append(P1, P2);}
+   }
+  }
 
   for(const Polyhedra& A: polyhedras) {
    for(Edge eA: A.edges) {
