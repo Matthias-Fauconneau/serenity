@@ -66,6 +66,7 @@ Contact edgeEdge(const Polyhedra& A, const Polyhedra& B) {
    v4sf gA, gB;
    closest(A1, A2, B1, B2, gA, gB);
    assert_(isNumber(A1) && isNumber(A2) && isNumber(B1) && isNumber(B2) && isNumber(gA) && isNumber(gB), A1, A2, B1, B2);
+#if 0
    vec3 a = toVec3(qapply(conjugate(B.rotation), gA - B.position)); // Transforms global position gA to B local frame
    for(vec4 plane: B.planes) {
     if(dot(plane.xyz(), toVec3(a)) <= plane.w + A.R + B.R) continue; // Inside
@@ -82,13 +83,24 @@ Contact edgeEdge(const Polyhedra& A, const Polyhedra& B) {
     }
    }
    break_:;
+#else
+   vec3 r = toVec3(gB-gA);
+   float L = ::length(r);
+   if(A.R + B.R - L > 0) {
+    assert_(L > 0, L, gA, gB);
+    vec3 a = toVec3(qapply(conjugate(B.rotation), gA - B.position)); // Transforms global position gA to B local frame
+    vec3 b = toVec3(qapply(conjugate(A.rotation), gB - A.position)); // Transforms global position gB to A local frame
+    assert_(isNumber(r/L));
+    return {0,0, toVec3(b), toVec3(a), r/L,  A.R + B.R - L};
+   }
+#endif
   }
  }
  return {0, 0, {}, {}, {}, inf};
 }
 
 Contact contact(const Polyhedra& A, const Polyhedra& B) {
- return vertexFace(A, B) ?: vertexFace(B, A) ?: edgeEdge(A, B);
+ return edgeEdge(A, B) ?: vertexFace(A, B) ?: vertexFace(B, A);
 }
 
 struct PolyhedraSimulation {
@@ -103,10 +115,12 @@ struct PolyhedraSimulation {
  const float volume = 1; // FIXME
  const float angularMass = 1; // FIXME
  const vec3 g {0,0,-10};
- const float d = 4, D = 8;
+ const float d = 4, D = 5;
  const float frictionCoefficient = 1;//0.1;
 
+ size_t t = 0;
  array<Contact> contacts, contacts2;
+ float maxF = 0;
 
  PolyhedraSimulation() {
   Random random;
@@ -167,10 +181,10 @@ struct PolyhedraSimulation {
      vec3 fT = - frictionCoefficient * fN * tV;
      vec3 f = fN * N + fT;
      if(!isNumber(f)) {
-      log("FAIL", E, R, depth, damping, N, velocity[a], f);
+      log("FAIL Floor", E, R, depth, damping, N, velocity[a], f);
       return false;
      }
-     assert_(isNumber(f), E, R, depth, damping, N, velocity[a], f);
+     assert_(isNumber(f), "Floor", E, R, depth, damping, N, velocity[a], f);
      force[a] += f;
      torque[a] += cross(rA, f);
     }
@@ -183,10 +197,14 @@ struct PolyhedraSimulation {
     Polyhedra& B = polyhedras[b];
     Contact contact = ::contact(A, B);
     if(contact) {
+     assert_(isNumber(contact.N));
      vec3 N = contact.N; float depth = contact.depth;
      assert_(depth > 0, depth);
      vec3 f = 4.f/3 * E * sqrt(R) * sqrt(depth) * (depth - damping * dot(N, velocity[a])) * N;
-     assert_(isNumber(f), E, R, depth, damping, N, velocity[a]);
+     assert_(isNumber(f), "contact", E, R, depth, damping, N, velocity[a]);
+     //if(length(f) > maxF) { maxF=length(f); log(t, f, length(f)); }
+     if(length(f) > 338) { log("STOP", length(f), f); return false; }
+     if(contact.depth > (A.R+B.R)/2) { log("Overlap", contact.depth); return false; }
      force[a] += f;
      torque[a] += cross(toVec3(qapply(conjugate(A.rotation), contact.A)), f);
      contact.a = a, contact.b = b;
@@ -198,9 +216,9 @@ struct PolyhedraSimulation {
    assert_(isNumber(force[a]));
    velocity[a] += dt * force[a];
    vec3 dx = dt * velocity[a];
-   if(length(dx) > 1) { log("STOP", dx, length(dx)); return false; }
+   if(length(dx) > 1) { log("STOP1", dx, length(dx), velocity[a], force[a]); return false; }
    polyhedras[a].position += dx;
-   if(length(polyhedras[a].position) > D) { log("STOP", polyhedras[a].position, length(polyhedras[a].position)); return false; }
+   //if(length(polyhedras[a].position) > D) { log("STOP2", polyhedras[a].position, length(polyhedras[a].position)); return false; }
    assert_(isNumber(polyhedras[a].position));
 
    polyhedras[a].rotation += float4(dt/2.f) * qmul(angularVelocity[a], polyhedras[a].rotation);
@@ -211,21 +229,24 @@ struct PolyhedraSimulation {
   {Locker lock(this->lock);
    contacts2 = ::move(contacts);
   }
+  t++;
   return true;
  }
 };
 
 
 struct PolyhedraView : PolyhedraSimulation, Widget {
- buffer<array<vec3>> trajectories;
+ struct State {
+  buffer<vec3> position;
+  buffer<v4sf> rotation;
+  buffer<Contact> contacts;
+ };
+ array<State> states;
+ size_t viewT = 0;
+ bool running = true;
 
  vec2 lastPos; // for relative cursor movements
  vec2 viewYawPitch = vec2(0, PI/3); // Current view angles
-
- PolyhedraView() {
-  trajectories = buffer<array<vec3>>(polyhedras.size);
-  trajectories.clear();
- }
 
  // Orbital ("turntable") view control
  bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button,
@@ -235,11 +256,15 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
    viewYawPitch += float(2*PI) * delta / size; //TODO: warp
    viewYawPitch.y = clamp<float>(0, viewYawPitch.y, PI);
   }
+  else if(event==Motion && button==RightButton) {
+   if(states) viewT = clamp<int>(0, int(viewT) + (states.size-1) * delta.x / (size.x-1), states.size-1); // Relative
+   running = false;
+  }
   else return false;
   return true;
  }
 
- vec2 sizeHint(vec2) override { return 1024; }
+ vec2 sizeHint(vec2) override { return 768; }
  shared<Graphics> graphics(vec2 size) override {
   //Locker lock(this->lock);
   shared<Graphics> graphics;
@@ -287,20 +312,42 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
    assert_(isNumber(P1) && isNumber(P2));
    graphics->lines.append(P1, P2);}
 
-  for(size_t p: range(polyhedras.size)) {
-   trajectories[p].append(polyhedras[p].position);
+  {State state;
+   state.position = buffer<vec3>(polyhedras.size);
+   state.rotation = buffer<v4sf>(polyhedras.size);
+   for(size_t p: range(polyhedras.size)) {
+    state.position[p] = polyhedras[p].position;
+    state.rotation[p] = polyhedras[p].rotation;
+    //assert_(viewT < trajectories[p].size, viewT, trajectories[p].size);
+   }
+   state.contacts = ::move(contacts2);
+   states.append(move(state));
   }
-  for(const auto& t: trajectories) {
+  /*for(const auto& t: trajectories) {
    for(size_t i: range(t.size-1)) {
     {vec2 P1 = offset + scale * toVec3(qapply(viewRotation, t[i])).xy();
      vec2 P2 = offset + scale * toVec3(qapply(viewRotation, t[i+1])).xy();
      assert_(isNumber(P1) && isNumber(P2));
      graphics->lines.append(P1, P2);}
    }
-  }
+  }*/
 
-  for(const Polyhedra& A: polyhedras) {
+  //for(const Polyhedra& A: polyhedras) {
+  for(size_t p: range(polyhedras.size)) {
+   const Polyhedra& A = polyhedras[p];
+   vec3 position = states[viewT].position[p];
+   v4sf rotation = states[viewT].rotation[p];
    for(Edge eA: A.edges) {
+    vec3 A1 = position + toVec3(qapply(rotation, A.local[eA.a]));
+    vec3 A2 = position + toVec3(qapply(rotation, A.local[eA.b]));
+    {
+     vec2 P1 = offset + scale * toVec3(qapply(viewRotation, A1 - center)).xy();
+     vec2 P2 = offset + scale * toVec3(qapply(viewRotation, A2 - center)).xy();
+     assert_(isNumber(P1) && isNumber(P2));
+     graphics->lines.append(P1, P2);
+    }
+   }
+   if(0) for(Edge eA: A.edges) {
     vec3 A1 = A.global[eA.a], A2 = A.global[eA.b];
     {
      vec2 P1 = offset + scale * toVec3(qapply(viewRotation, A1 - center)).xy();
@@ -324,13 +371,15 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
    }
   }
   {Locker lock(this->lock);
-   for(Contact& contact: contacts2) {
+   for(const Contact& contact: states[viewT].contacts) {
     vec2 A = offset + scale * toVec3(qapply(viewRotation, polyhedras[contact.a].position + qapply(polyhedras[contact.a].rotation, contact.A) - center)).xy();
     vec2 B = offset + scale * toVec3(qapply(viewRotation, polyhedras[contact.b].position + qapply(polyhedras[contact.b].rotation, contact.B) - center)).xy();
     assert_(isNumber(A) && isNumber(B));
     graphics->lines.append(A, B);
    }
   }
+
+  if(running) viewT++;
   return graphics;
  }
 };
@@ -344,5 +393,5 @@ struct PolyhedraApp : PolyhedraView, Poll {
   physicThread.spawn();
   queue();
  }
- void event() { if(step()) queue(); }
+ void event() { if(running && step()) queue(); else running=false; }
 } polyhedra;

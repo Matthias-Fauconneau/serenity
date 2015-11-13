@@ -166,9 +166,9 @@ bool XWindow::processEvent(const X11::Event& e) {
   if(focus && focus->keyRelease(key, modifiers)) render();
  }
  else if(type==MotionNotify) {
-  if(drag && e.state&Button1Mask && drag->mouseEvent(vec2(e.x,e.y), vec2(Window::size), Motion, LeftButton, focus))
+  /*if(drag && e.state&Button1Mask && drag->mouseEvent(vec2(e.x,e.y), vec2(Window::size), Motion, LeftButton, focus))
    render();
-  else if(widget->mouseEvent(vec2(e.x,e.y), vec2(Window::size), Motion, (e.state&Button1Mask)?LeftButton:NoButton, focus))
+  else*/ if(widget->mouseEvent(vec2(e.x,e.y), vec2(Window::size), Motion, (e.state&Button1Mask)?LeftButton:(e.state&Button3Mask)?RightButton:NoButton, focus))
    render();
  }
  else if(type==EnterNotify || type==LeaveNotify) {
