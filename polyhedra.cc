@@ -299,7 +299,7 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
   return true;
  }
 
- vec2 sizeHint(vec2) override { return 768; }
+ vec2 sizeHint(vec2) override { return 1024; }
  shared<Graphics> graphics(vec2 size) override {
   //Locker lock(this->lock);
   shared<Graphics> graphics;
@@ -309,7 +309,8 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
                                              angleVector(viewYawPitch.x, vec3(0,0,1)));
 
   // Transforms vertices and evaluates scene bounds
-  vec3 min = -D, max = D;
+  //vec3 min = -D, max = D;
+  vec3 min = inf, max = -inf;
   for(const Polyhedra& p: polyhedras) {
    for(vec3 a: p.global) {
     vec3 A = toVec3(qapply(viewRotation, a - center));
@@ -322,30 +323,32 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
   scale.x = scale.y = ::min(scale.x, scale.y);
   vec2 offset = - scale * min.xy();
 
-  {vec2 P1 = offset + scale * toVec3(qapply(viewRotation, vec3(-d, -d, 0))).xy();
-   vec2 P2 = offset + scale * toVec3(qapply(viewRotation, vec3(d, -d, 0))).xy();
-   assert_(isNumber(P1) && isNumber(P2));
-   graphics->lines.append(P1, P2);}
+  if(0) {
+   {vec2 P1 = offset + scale * toVec3(qapply(viewRotation, vec3(-d, -d, 0))).xy();
+    vec2 P2 = offset + scale * toVec3(qapply(viewRotation, vec3(d, -d, 0))).xy();
+    assert_(isNumber(P1) && isNumber(P2));
+    graphics->lines.append(P1, P2);}
 
-  {vec2 P1 = offset + scale * toVec3(qapply(viewRotation, vec3(d, -d, 0))).xy();
-   vec2 P2 = offset + scale * toVec3(qapply(viewRotation, vec3(d, d, 0))).xy();
-   assert_(isNumber(P1) && isNumber(P2));
-   graphics->lines.append(P1, P2);}
+   {vec2 P1 = offset + scale * toVec3(qapply(viewRotation, vec3(d, -d, 0))).xy();
+    vec2 P2 = offset + scale * toVec3(qapply(viewRotation, vec3(d, d, 0))).xy();
+    assert_(isNumber(P1) && isNumber(P2));
+    graphics->lines.append(P1, P2);}
 
-  {vec2 P1 = offset + scale * toVec3(qapply(viewRotation, vec3(d, d, 0))).xy();
-   vec2 P2 = offset + scale * toVec3(qapply(viewRotation, vec3(-d, d, 0))).xy();
-   assert_(isNumber(P1) && isNumber(P2));
-   graphics->lines.append(P1, P2);}
+   {vec2 P1 = offset + scale * toVec3(qapply(viewRotation, vec3(d, d, 0))).xy();
+    vec2 P2 = offset + scale * toVec3(qapply(viewRotation, vec3(-d, d, 0))).xy();
+    assert_(isNumber(P1) && isNumber(P2));
+    graphics->lines.append(P1, P2);}
 
-  {vec2 P1 = offset + scale * toVec3(qapply(viewRotation, vec3(-d, d, 0))).xy();
-   vec2 P2 = offset + scale * toVec3(qapply(viewRotation, vec3(-d, -d, 0))).xy();
-   assert_(isNumber(P1) && isNumber(P2));
-   graphics->lines.append(P1, P2);}
+   {vec2 P1 = offset + scale * toVec3(qapply(viewRotation, vec3(-d, d, 0))).xy();
+    vec2 P2 = offset + scale * toVec3(qapply(viewRotation, vec3(-d, -d, 0))).xy();
+    assert_(isNumber(P1) && isNumber(P2));
+    graphics->lines.append(P1, P2);}
 
-  {vec2 P1 = offset + scale * toVec3(qapply(viewRotation, vec3(0, 0, 0))).xy();
-   vec2 P2 = offset + scale * toVec3(qapply(viewRotation, vec3(0, 0, d))).xy();
-   assert_(isNumber(P1) && isNumber(P2));
-   graphics->lines.append(P1, P2);}
+   {vec2 P1 = offset + scale * toVec3(qapply(viewRotation, vec3(0, 0, 0))).xy();
+    vec2 P2 = offset + scale * toVec3(qapply(viewRotation, vec3(0, 0, d))).xy();
+    assert_(isNumber(P1) && isNumber(P2));
+    graphics->lines.append(P1, P2);}
+  }
 
   if(running) {
    State state;
@@ -379,11 +382,17 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
    for(Edge eA: A.edges) { // TODO: show cylinder radius
     vec3 A1 = position + toVec3(qapply(rotation, A.local[eA.a]));
     vec3 A2 = position + toVec3(qapply(rotation, A.local[eA.b]));
-    {
-     vec2 P1 = offset + scale * toVec3(qapply(viewRotation, A1 - center)).xy();
-     vec2 P2 = offset + scale * toVec3(qapply(viewRotation, A2 - center)).xy();
-     assert_(isNumber(P1) && isNumber(P2));
-     graphics->lines.append(P1, P2);
+    vec2 P1 = offset + scale * toVec3(qapply(viewRotation, A1 - center)).xy();
+    vec2 P2 = offset + scale * toVec3(qapply(viewRotation, A2 - center)).xy();
+    assert_(isNumber(P1) && isNumber(P2), P1, P2);
+
+    vec2 r = P2-P1;
+    float l = length(r);
+    if(l) {
+     vec2 t = r/l;
+     vec2 n = scale*A.R*vec2(t.y, -t.x);
+     graphics->lines.append(P1-n, P2-n);
+     graphics->lines.append(P1+n, P2+n);
     }
    }
    if(0) for(Edge eA: A.edges) {
