@@ -153,7 +153,7 @@ struct PolyhedraSimulation {
  const float volume = 1; // FIXME
  const float angularMass = 1; // FIXME
  const vec3 g {0,0,-10};
- const float d = 4, D = 5;
+ const float N = 32, d = pow(N, 1./3), D = d+1;
  const float frictionCoefficient = 1;//0.1;
 
  size_t t = 0;
@@ -164,13 +164,12 @@ struct PolyhedraSimulation {
 
  PolyhedraSimulation() {
   Random random;
-  while(polyhedras.size < 8) {
-   vec3 position(d*random(), d*random(), d*random());
+  while(polyhedras.size < N) {
+   vec3 position(d*(2*random()-1), d*(2*random()-1), d*(2*random()-1));
    const float r = 1./sqrt(3.);
    ref<vec3> vertices{vec3(r,r,r), vec3(r,-r,-r), vec3(-r,r,-r), vec3(-r,-r,r)};
-   float boundingRadius = 1;
    for(auto& p: polyhedras) {
-    if(length(p.position - position) <= p.boundingRadius + boundingRadius)
+    if(length(p.position - position) <= p.boundingRadius + Polyhedra::boundingRadius)
      goto break_;
    } /*else*/ {
     float t0 = 2*PI*random();
@@ -196,7 +195,7 @@ struct PolyhedraSimulation {
    break_:;
   }
   float minZ = inf; for(const Polyhedra& p: polyhedras) for(vec3 v: p.vertices) minZ = ::min(minZ, p.position.z + qapply(p.rotation, v).z);
-  for( Polyhedra& p: polyhedras) p.position -= minZ;
+  for( Polyhedra& p: polyhedras) p.position.z -= minZ;
   velocity = buffer<vec3>(polyhedras.size);
   velocity.clear(0);
   angularVelocity = buffer<vec3>(polyhedras.size);
@@ -290,9 +289,7 @@ struct PolyhedraSimulation {
      }
      if(a < b) { // Edge - Edge (Cylinder - Cylinder)
       for(size_t eiA: range(A.edges.size)) {
-       Edge eA = A.edges[eiA];
        for(size_t eiB: range(B.edges.size)) {
-        Edge eB = B.edges[eiB];
         Contact contact = ::edgeEdge(A, eiA, B, eiB);
         if(contact) {
          contact.a = a, contact.b = b;
@@ -406,14 +403,21 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
   const State& state = states[viewT];
 
   // Transforms vertices and evaluates scene bounds
-  vec3 min = -D, max = D;
+  /*vec3 min = -D, max = D;
   for(size_t p: range(polyhedras.size)) {
    for(size_t vertexIndex: range(polyhedras[p].vertices.size)) {
     vec3 A = qapply(viewRotation, state.position[p] + qapply(state.rotation[p], polyhedras[p].vertices[vertexIndex]));
     min = ::min(min, A);
     max = ::max(max, A);
    }
+  }*/
+  float maxL = 0;
+  for(size_t p: range(polyhedras.size)) {
+   for(size_t vertexIndex: range(polyhedras[p].vertices.size)) {
+    maxL = ::max(maxL, length(qapply(viewRotation, state.position[p] + qapply(state.rotation[p], polyhedras[p].vertices[vertexIndex]))));
+   }
   }
+  vec3 min = -maxL, max = +maxL;
 
   vec2 scale = size/(max-min).xy();
   scale.x = scale.y = ::min(scale.x, scale.y);
