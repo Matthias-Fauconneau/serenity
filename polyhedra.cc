@@ -1,5 +1,7 @@
 #include "window.h"
 #include "matrix.h"
+inline vec3 qapply(v4sf q, vec3 v) { return toVec3(qapply(q, (v4sf)v)); }
+inline void closest(v4sf a1, v4sf a2, v4sf b1, v4sf b2, vec3& A, vec3& B) { v4sf a, b; closest(a1, a2, b1, b2, a, b);  A=toVec3(a), B=toVec3(b); }
 
 struct Face {
  size_t a, b, c;
@@ -12,120 +14,134 @@ struct Edge {
 struct Polyhedra {
  vec3 position;
  v4sf rotation;
- buffer<vec3> local; // Vertex positions in local frame
- buffer<vec4> planes; // normal, distance
- buffer<Edge> edges;
- buffer<vec3> global; // Vertex positions in global frame
- float radius;
- static constexpr float R = 1./16;
+ buffer<vec3> vertices; // Vertex positions in local frame
+ buffer<vec4> faces; // Face planes in local frame (normal, distance)
+ buffer<Edge> edges; // Edge vertex indices
+ //buffer<vec3> global; // Vertex positions in global frame
+ static constexpr float boundingRadius = 1;
+ static constexpr float overlapRadius = 1./16;
 };
-constexpr float Polyhedra::R;
+constexpr float Polyhedra::boundingRadius;
+constexpr float Polyhedra::overlapRadius;
+
+vec3 global(const Polyhedra& A, size_t vertexIndex) {
+ vec3 laA = A.vertices[vertexIndex];
+ vec3 raA = qapply(A.rotation, laA);
+ vec3 gA = A.position + raA;
+ return gA;
+}
 
 struct Contact {
- size_t a, b;
- vec3 rbA; // Closest point of A (relative to B position (unrotated))
- vec3 raB; // Closest point of B (relative to A position (unrotated))
- vec3 N;
- float depth;
- vec3 fA, fB;
+ size_t a = invalid, b = invalid;
+ size_t vertexIndex = invalid, edgeIndex = invalid, faceIndex = invalid;
+ vec3 rbC = 0; // contact point relative to B position (unrotated)
+ vec3 raC = 0; // Contact point relative to A position (unrotated)
+ vec3 N = 0;
+ float depth = inf;
  explicit operator bool() { return depth < inf; }
 };
 
-// Point - Plane
-Contact vertexFace(const Polyhedra& A, const Polyhedra& B) {
- for(size_t vertexIndex: range(A.global.size)) {
-  vec3 rbA = A.global[vertexIndex] - B.position;
-  vec3 lbA = toVec3(qapply(conjugate(B.rotation), rbA)); // Transforms vertex to B local frame
-  // Clips against all planes (convex polyhedra)
-  for(vec4 plane: B.planes) {
-   if(dot(plane.xyz(), lbA) <= plane.w + A.R + B.R) continue; // Inside
-   goto break_;
-  } /*else*/ { // P inside polyhedra B
-   Contact contact {0, 0, {}, {}, {}, inf, {}, {}};
-   for(vec4 plane: B.planes) {
-    // Projects vertex on plane (B frame)
-    float t = plane.w - dot(plane.xyz(), lbA);
-    float depth = t + A.R + B.R;
-    if(depth < contact.depth) {
-     contact.N = plane.xyz();
-     assert_(depth > 0);
-     contact.depth = depth;
-     contact.rbA = rbA;
-     vec3 lbB = lbA + t * plane.xyz();
-     vec3 gB = B.position + toVec3(qapply(B.rotation, lbB));
-     contact.raB = gB - A.position;
-    }
+Contact vertexFace(const Polyhedra& A, size_t vertexIndex, const Polyhedra& B) {
+ Contact contact;
+ vec3 laA = A.vertices[vertexIndex];
+ vec3 raA = qapply(A.rotation, laA);
+ vec3 gA = A.position + raA;
+ vec3 rbA = gA - B.position;
+ vec3 lbA = qapply(conjugate(B.rotation), rbA); // Transforms vertex to B local frame
+ // Clips against all planes (convex polyhedra)
+ for(vec4 plane: B.faces) {
+  if(dot(plane.xyz(), lbA) <= plane.w) continue;
+  goto break_;
+ } /*else*/ { // P inside polyhedra B
+  for(size_t faceIndex: range(B.faces.size)) {
+   vec4 plane = B.faces[faceIndex];
+   // Projects vertex on plane (B frame)
+   float t = plane.w - dot(plane.xyz(), lbA);
+   if(t <= -A.overlapRadius-B.overlapRadius || t >= A.overlapRadius+B.overlapRadius) continue;
+   float depth = t + A.overlapRadius + B.overlapRadius;
+   if(depth < contact.depth) {
+    contact.vertexIndex = vertexIndex;
+    contact.faceIndex = faceIndex;
+    contact.N = plane.xyz();
+    assert_(depth > 0);
+    contact.depth = depth;
+    vec3 lbB = lbA + t * plane.xyz();
+    vec3 rbB = qapply(B.rotation, lbB);
+    vec3 rbC = (rbA + rbB)/2.f;
+    contact.rbC = rbC;
+    contact.raC = rbC + B.position - A.position;
    }
-   return contact;
   }
-  break_:;
  }
- return {0, 0, {}, {}, {}, inf, {}, {}};
+ break_:;
+ return contact;
 }
 
-// Cylinder - Cylinder
 Contact edgeEdge(const Polyhedra& A, const Polyhedra& B) {
  for(Edge eA: A.edges) {
-  vec3 A1 = A.global[eA.a], A2 = A.global[eA.b];
+  vec3 A1 = global(A, eA.a), A2 = global(A, eA.b);
   for(Edge eB: B.edges) {
-   vec3 B1 = B.global[eB.a], B2 = B.global[eB.b];
-   v4sf gA, gB;
+   vec3 B1 = global(B, eB.a), B2 = global(B, eB.b);
+   vec3 gA, gB;
    closest(A1, A2, B1, B2, gA, gB);
-   assert_(isNumber(A1) && isNumber(A2) && isNumber(B1) && isNumber(B2) && isNumber(gA) && isNumber(gB), A1, A2, B1, B2);
-#if 0
-   vec3 a = toVec3(qapply(conjugate(B.rotation), gA - B.position)); // Transforms global position gA to B local frame
-   for(vec4 plane: B.planes) {
-    if(dot(plane.xyz(), toVec3(a)) <= plane.w + A.R + B.R) continue; // Inside
-    goto break_;
-   } /*else*/ { // a inside polyhedra B
-    vec3 b = toVec3(qapply(conjugate(A.rotation), gB - A.position)); // Transforms global position gB to A local frame
-    for(vec4 plane: A.planes) {
-     if(dot(plane.xyz(), toVec3(b)) <= plane.w + A.R + B.R) continue; // Inside
-     //error(gA, gB, dot(plane.xyz(), toVec3(b)), plane.w);
-    } /*else*/ { // b inside polyhedra A
-     vec3 r = toVec3(gB-gA);
-     float L = ::length(r) + A.R + B.R;
-     return {0,0, toVec3(b), toVec3(a), r/L, L, {}, {}};
-    }
-   }
-   break_:;
-#else
-   vec3 r = toVec3(gB-gA);
+   vec3 r = gB-gA;
    float L = ::length(r);
-   float depth = A.R + B.R - L;
+   float depth = A.overlapRadius + B.overlapRadius - L;
    if(depth > 0) {
-    assert_(L > 0, L, gA, gB);
-    //vec3 a = toVec3(qapply(conjugate(B.rotation), gA - B.position)); // Transforms global position gA to B local frame
-    //vec3 b = toVec3(qapply(conjugate(A.rotation), gB - A.position)); // Transforms global position gB to A local frame
-    assert_(isNumber(r/L));
-    Contact contact {0, 0, {}, {}, {}, inf, {}, {}};
+    Contact contact;
     contact.N = r/L;
     contact.depth = depth;
-    vec3 rbA = toVec3(gA) - B.position;
-    contact.rbA = rbA;
-    contact.raB = toVec3(gB) - A.position;
-    //return {0,0, toVec3(b), toVec3(a), r/L,  A.R + B.R - L, {}, {}};
+    vec3 gC = (gA+gB)/2.f;
+    contact.rbC = gC - B.position;
+    contact.raC = gC - A.position;
+    return contact;
    }
-#endif
   }
  }
- return {0, 0, {}, {}, {}, inf, {}, {}};
+ return Contact();
 }
 
-Contact contact(const Polyhedra& A, const Polyhedra& B) {
- return vertexFace(A, B) ?: vertexFace(B, A);
- return edgeEdge(A, B); // ?: vertexFace(A, B) ?: vertexFace(B, A);
+Contact vertexEdge(const Polyhedra& A, size_t vertexIndex, const Polyhedra& B) {
+ vec3 laA = A.vertices[vertexIndex];
+ vec3 raA = qapply(A.rotation, laA);
+ vec3 gA = A.position + raA;
+ vec3 rbA = gA - B.position;
+ vec3 lbA = qapply(conjugate(B.rotation), rbA); // Transforms vertex to B local frame
+  for(size_t edgeIndex: range(B.edges.size)) {
+   Edge e = B.edges[edgeIndex];
+   vec3 P1 = B.vertices[e.a];
+   vec3 P2 = B.vertices[e.b];
+   vec3 E = P2 - P1;
+   // Projects vertex on edge (B frame)
+   float t = dot(lbA - P1, E);
+   if(t <= 0 || t >= length(E)) continue;
+   vec3 lbB = P1 + t * (P2 - P1);
+   vec3 R = lbA-lbB;
+   float L = length(R);
+   float depth = A.overlapRadius + B.overlapRadius - L;
+   if(depth > 0) {
+    Contact contact;
+    contact.vertexIndex = vertexIndex;
+    contact.edgeIndex = edgeIndex;
+    contact.N = R/L;
+    contact.depth = depth;
+    vec3 rbB = qapply(B.rotation, lbB);
+    vec3 rbC = (rbA + rbB)/2.f;
+    contact.rbC = rbC;
+    contact.raC = rbC + B.position - A.position;
+    return contact;
+   }
+  }
+  return Contact();
 }
 
 struct PolyhedraSimulation {
- Lock lock;
  array<Polyhedra> polyhedras;
  buffer<vec3> velocity, angularVelocity;
  const float dt = 1./(60*16);
  const float damping = 1;
  const float density = 1;
- const float E = 1000; //1000
- const float R = 1;
+ const float E = 1000;
  const float volume = 1; // FIXME
  const float angularMass = 1; // FIXME
  const vec3 g {0,0,-10};
@@ -133,11 +149,10 @@ struct PolyhedraSimulation {
  const float frictionCoefficient = 1;//0.1;
 
  size_t t = 0;
- array<Contact> contacts, contacts2;
+ array<Contact> contacts;
 
- float maxF = 0;
  struct Force { vec3 origin, force; };
- array<Force> forces, forces2;
+ array<Force> forces;
 
  PolyhedraSimulation() {
   Random random;
@@ -145,29 +160,29 @@ struct PolyhedraSimulation {
    vec3 position(d*random(), d*random(), 1+d*random());
    const float r = 1./sqrt(3.);
    ref<vec3> vertices{vec3(r,r,r), vec3(r,-r,-r), vec3(-r,r,-r), vec3(-r,-r,r)};
-   float radius = 1;
+   float boundingRadius = 1;
    for(auto& p: polyhedras) {
-    if(length(p.position - position) <= p.radius + radius)
+    if(length(p.position - position) <= p.boundingRadius + boundingRadius)
      goto break_;
    } /*else*/ {
     float t0 = 2*PI*random();
     float t1 = acos(1-2*random());
     float t2 = (PI*random()+acos(random()))/2;
-    ref<Face> faces{{0,1,2}, {0,2,3}, {0,3,1}, {1,3,2}};
-    buffer<vec4> planes (faces.size);
-    for(size_t i: range(planes.size)) {
-     Face f = faces[i];
+    ref<Face> faceIndices{{0,1,2}, {0,2,3}, {0,3,1}, {1,3,2}};
+    buffer<vec4> faces (faceIndices.size);
+    for(size_t i: range(faces.size)) {
+     Face f = faceIndices[i];
      vec3 N = (vertices[f.a]+vertices[f.b]+vertices[f.c])/3.f;
      float l = length(N);
-     planes[i] = vec4(N/l, l);
+     faces[i] = vec4(N/l, l);
     }
     Polyhedra p{
      position,
      {sin(t0)*sin(t1)*sin(t2),  cos(t0)*sin(t1)*sin(t2), cos(t1)*sin(t2), cos(t2)},
        copyRef(vertices),
-       move(planes),
-       copyRef(ref<Edge>{{0,1}, {0,2}, {0,3}, {1,2}, {1,3}, {2,3}}),
-     buffer<vec3>(4), radius
+       move(faces),
+       copyRef(ref<Edge>{{0,1}, {0,2}, {0,3}, {1,2}, {1,3}, {2,3}})
+         //,radius
     };
     polyhedras.append(move(p));
    }
@@ -178,74 +193,114 @@ struct PolyhedraSimulation {
   angularVelocity = buffer<vec3>(polyhedras.size);
   angularVelocity.clear(0);
  }
+
  bool step() {
-  //Locker lock(this->lock);
+  bool status = false;
   buffer<vec3> force (polyhedras.size), torque (polyhedras.size);
   for(size_t a: range(polyhedras.size)) {
    Polyhedra& p = polyhedras[a];
    {
     vec3 f = g * density * volume;
     forces.append(p.position, f);
-    maxF = ::max(maxF, length(f));
     force[a] = f;
    }
    torque[a] = 0;
    vec3 N(0,0,1);
-   for(size_t vertexIndex: range(polyhedras[a].local.size)) {
-    vec3 A = p.local[vertexIndex];
-    vec3 rA = toVec3(qapply(p.rotation, A));
-    vec3 gA = p.global[vertexIndex] = toVec3(p.position + rA);
+   for(size_t vertexIndex: range(polyhedras[a].vertices.size)) {
+    vec3 A = p.vertices[vertexIndex];
+    vec3 rA = qapply(p.rotation, A);
+    vec3 gA = p.position + rA;
     float depth = 0 - gA.z;
     if(depth > 0) {
      vec3 v = velocity[a] + cross(angularVelocity[a], rA);
-     float fN = 4.f/3 * E * sqrt(R) * sqrt(depth) * (depth - damping * dot(N, v));
+     float fN = 4.f/3 * E * sqrt(polyhedras[a].overlapRadius) * sqrt(depth) * (depth - damping * dot(N, v));
      vec3 tV = v - dot(N, v) * N;
      vec3 fT = - frictionCoefficient * fN * tV;
      vec3 f = fN * N + fT;
-     if(!isNumber(f)) {
-      log("FAIL Floor", E, R, depth, damping, N, velocity[a], f);
-      return false;
-     }
-     assert_(isNumber(f), "Floor", E, R, depth, damping, N, velocity[a], f);
      force[a] += f;
      torque[a] += cross(rA, f);
      forces.append(gA, f);
-     maxF = ::max(maxF, length(f));
     }
    }
   }
-  if(1) for(size_t a: range(polyhedras.size)) {
+
+  array<Contact> contacts;
+  for(size_t a: range(polyhedras.size)) {
    Polyhedra& A = polyhedras[a];
    for(size_t b: range(polyhedras.size)) {
-    if(a==b) continue; // FIXME: double force evaluation
+    if(a==b) continue;
     Polyhedra& B = polyhedras[b];
-    Contact contact = ::contact(A, B);
-    if(contact) {
-     assert_(isNumber(contact.N));
-     vec3 N = contact.N; float depth = contact.depth;
-     assert_(depth > 0, depth);
-     vec3 f = 4.f/3 * E * sqrt(R) * sqrt(depth) * (depth - damping * dot(N, velocity[a])) * N;
-     assert_(isNumber(f), "contact", E, R, depth, damping, N, velocity[a]);
-     if(length(f) > maxF) { maxF=length(f); /*log(t, f, length(f));*/ }
-     if(length(f) > 338) { log("STOP", length(f), f); return false; }
-     if(contact.depth > (A.R+B.R)/2) { log("Overlap", contact.depth); return false; }
-     force[a] += f;
-     //torque[a] += cross(toVec3(qapply(conjugate(A.rotation), contact.rA)), f);
-     torque[a] += cross(contact.raB, f);
-     contact.a = a, contact.b = b;
-     //contact.fA = f, contact.fB = -f;
-     contacts.append(contact);
-     forces.append(A.position + contact.raB, f);
+    for(size_t vertexIndex: range(A.vertices.size)) {
+     {// Vertex - Face (Sphere - Plane)
+      Contact contact = ::vertexFace(A, vertexIndex, B);
+      if(contact) {
+       contact.a = a, contact.b = b;
+       contacts.append(contact);
+
+       vec3 N = contact.N; float depth = contact.depth;
+       vec3 f = 4.f/3 * E * sqrt(A.overlapRadius) * sqrt(depth) * (depth - damping * dot(N, velocity[a])) * N;
+
+       force[a] += f;
+       torque[a] += cross(contact.raC, f);
+       forces.append(A.position + contact.raC, f);
+
+       force[b] += -f;
+       torque[b] += cross(contact.rbC, -f);
+       forces.append(B.position + contact.rbC, -f);
+
+       if(contact.depth > (A.overlapRadius+B.overlapRadius)/2) { log("SP", a, b, contact.depth, A.overlapRadius+B.overlapRadius);  goto end; }
+      }
+     }
+     if(a < b) {// Edge - Edge (Cylinder - Cylinder) // FIXME: double force evaluation
+      Contact contact = ::edgeEdge(A, B);
+      if(contact) {
+       contact.a = a, contact.b = b;
+       contacts.append(contact);
+
+       vec3 N = contact.N; float depth = contact.depth;
+       vec3 f = 4.f/3 * E * sqrt(A.overlapRadius) * sqrt(depth) * (depth - damping * dot(N, velocity[a])) * N;
+
+       force[a] += f;
+       torque[a] += cross(contact.raC, f);
+       forces.append(A.position + contact.raC, f);
+
+       force[b] += -f;
+       torque[b] += cross(contact.rbC, -f);
+       forces.append(B.position + contact.rbC, -f);
+
+       //if(contact.depth > (A.overlapRadius+B.overlapRadius)/2) { log("EE", a, b, contact.depth, A.overlapRadius+B.overlapRadius);  goto end; }
+      }
+     }
+     // Vertex - Edge (Sphere - Cylinder)
+     Contact contact = ::vertexFace(A, vertexIndex, B);
+     if(contact) {
+      contact.a = a, contact.b = b;
+      contacts.append(contact);
+
+      vec3 N = contact.N; float depth = contact.depth;
+      vec3 f = 4.f/3 * E * sqrt(2.f/3*A.overlapRadius) * sqrt(depth) * (depth - damping * dot(N, velocity[a])) * N;
+
+      force[a] += f;
+      torque[a] += cross(contact.raC, f);
+      forces.append(A.position + contact.raC, f);
+
+      force[b] += -f;
+      torque[b] += cross(contact.rbC, -f);
+      forces.append(B.position + contact.rbC, -f);
+
+      if(contact.depth > (A.overlapRadius+B.overlapRadius)/2) { log("VE", a, b, contact.depth, A.overlapRadius+B.overlapRadius);  goto end; }
+     }
+     // Vertex - Vertex
+     //TODO
     }
    }
   }
+
   for(size_t a: range(polyhedras.size)) {
    assert_(isNumber(force[a]));
    velocity[a] += dt * force[a];
    vec3 dx = dt * velocity[a];
-   if(length(dx) > 1) { log("STOP1", dx, length(dx), velocity[a], force[a]); return false; }
    polyhedras[a].position += dx;
-   //if(length(polyhedras[a].position) > D) { log("STOP2", polyhedras[a].position, length(polyhedras[a].position)); return false; }
    assert_(isNumber(polyhedras[a].position));
 
    polyhedras[a].rotation += float4(dt/2.f) * qmul(angularVelocity[a], polyhedras[a].rotation);
@@ -253,12 +308,12 @@ struct PolyhedraSimulation {
    polyhedras[a].rotation *= rsqrt(sq4(polyhedras[a].rotation));
 
   }
-  {Locker lock(this->lock);
-   contacts2 = ::move(contacts);
-   forces2 = ::move(forces);
-  }
+  status = true;
+  end:
+  this->contacts = ::move(contacts);
+  this->forces = ::move(forces);
   t++;
-  return true;
+  return status;
  }
 };
 
@@ -271,8 +326,21 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
   buffer<Force> forces;
  };
  array<State> states;
- bool running = true;
- size_t viewT = -1;
+
+ void record() {
+  State state;
+  state.position = buffer<vec3>(polyhedras.size);
+  state.rotation = buffer<v4sf>(polyhedras.size);
+  for(size_t p: range(polyhedras.size)) {
+   state.position[p] = polyhedras[p].position;
+   state.rotation[p] = polyhedras[p].rotation;
+  }
+  state.contacts = ::move(contacts);
+  state.forces = ::move(forces);
+  states.append(move(state));
+ }
+
+ size_t viewT;
 
  vec2 viewYawPitch = vec2(0, PI/3); // Current view angles
 
@@ -293,7 +361,6 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
   }
   else if(event==Motion && button==RightButton) {
    if(states) viewT = clamp<int>(0, int(dragStart.viewT) + (states.size-1) * (cursor.x - dragStart.cursor.x) / (size.x/2-1), states.size-1); // Relative
-   running = false;
   }
   else return false;
   return true;
@@ -301,19 +368,18 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
 
  vec2 sizeHint(vec2) override { return 1024; }
  shared<Graphics> graphics(vec2 size) override {
-  //Locker lock(this->lock);
   shared<Graphics> graphics;
 
-  vec3 center = 0;
-  v4sf viewRotation = qmul(angleVector(viewYawPitch.y, vec3(1,0,0)),
-                                             angleVector(viewYawPitch.x, vec3(0,0,1)));
+  v4sf viewRotation = qmul(angleVector(viewYawPitch.y, vec3(1,0,0)), angleVector(viewYawPitch.x, vec3(0,0,1)));
+
+  assert_(viewT < states.size, viewT, states.size);
+  const State& state = states[viewT];
 
   // Transforms vertices and evaluates scene bounds
-  //vec3 min = -D, max = D;
   vec3 min = inf, max = -inf;
-  for(const Polyhedra& p: polyhedras) {
-   for(vec3 a: p.global) {
-    vec3 A = toVec3(qapply(viewRotation, a - center));
+  for(size_t p: range(polyhedras.size)) {
+   for(size_t vertexIndex: range(polyhedras[p].vertices.size)) {
+    vec3 A = qapply(viewRotation, state.position[p] + qapply(state.rotation[p], polyhedras[p].vertices[vertexIndex]));
     min = ::min(min, A);
     max = ::max(max, A);
    }
@@ -323,141 +389,56 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
   scale.x = scale.y = ::min(scale.x, scale.y);
   vec2 offset = - scale * min.xy();
 
-  if(0) {
-   {vec2 P1 = offset + scale * toVec3(qapply(viewRotation, vec3(-d, -d, 0))).xy();
-    vec2 P2 = offset + scale * toVec3(qapply(viewRotation, vec3(d, -d, 0))).xy();
+  if(0) for(size_t i: range(4)) {
+   vec2 P1 = offset + scale * qapply(viewRotation, vec3(i%2, i<2, 0)*d).xy();
+   vec2 P2 = offset + scale * qapply(viewRotation, vec3((i+1)%2, ((i+1)%4)<2, 0)*d).xy();
     assert_(isNumber(P1) && isNumber(P2));
-    graphics->lines.append(P1, P2);}
+    graphics->lines.append(P1, P2);
+ }
 
-   {vec2 P1 = offset + scale * toVec3(qapply(viewRotation, vec3(d, -d, 0))).xy();
-    vec2 P2 = offset + scale * toVec3(qapply(viewRotation, vec3(d, d, 0))).xy();
-    assert_(isNumber(P1) && isNumber(P2));
-    graphics->lines.append(P1, P2);}
 
-   {vec2 P1 = offset + scale * toVec3(qapply(viewRotation, vec3(d, d, 0))).xy();
-    vec2 P2 = offset + scale * toVec3(qapply(viewRotation, vec3(-d, d, 0))).xy();
-    assert_(isNumber(P1) && isNumber(P2));
-    graphics->lines.append(P1, P2);}
-
-   {vec2 P1 = offset + scale * toVec3(qapply(viewRotation, vec3(-d, d, 0))).xy();
-    vec2 P2 = offset + scale * toVec3(qapply(viewRotation, vec3(-d, -d, 0))).xy();
-    assert_(isNumber(P1) && isNumber(P2));
-    graphics->lines.append(P1, P2);}
-
-   {vec2 P1 = offset + scale * toVec3(qapply(viewRotation, vec3(0, 0, 0))).xy();
-    vec2 P2 = offset + scale * toVec3(qapply(viewRotation, vec3(0, 0, d))).xy();
-    assert_(isNumber(P1) && isNumber(P2));
-    graphics->lines.append(P1, P2);}
-  }
-
-  if(running) {
-   State state;
-   state.position = buffer<vec3>(polyhedras.size);
-   state.rotation = buffer<v4sf>(polyhedras.size);
-   for(size_t p: range(polyhedras.size)) {
-    state.position[p] = polyhedras[p].position;
-    state.rotation[p] = polyhedras[p].rotation;
-   }
-   Locker lock(this->lock);
-   state.contacts = ::move(contacts2);
-   state.forces = ::move(forces2);
-   states.append(move(state));
-   viewT++;
-  }
-  assert_(viewT < states.size, viewT, states.size);
-  /*for(const auto& t: trajectories) {
-   for(size_t i: range(t.size-1)) {
-    {vec2 P1 = offset + scale * toVec3(qapply(viewRotation, t[i])).xy();
-     vec2 P2 = offset + scale * toVec3(qapply(viewRotation, t[i+1])).xy();
-     assert_(isNumber(P1) && isNumber(P2));
-     graphics->lines.append(P1, P2);}
-   }
-  }*/
-
-  //for(const Polyhedra& A: polyhedras) {
   for(size_t p: range(polyhedras.size)) {
+   vec3 color = black;
+   for(Contact& contact: state.contacts) if(p == contact.a || p == contact.b) color = blue;
    const Polyhedra& A = polyhedras[p];
    vec3 position = states[viewT].position[p];
    v4sf rotation = states[viewT].rotation[p];
-   for(Edge eA: A.edges) { // TODO: show cylinder radius
-    vec3 A1 = position + toVec3(qapply(rotation, A.local[eA.a]));
-    vec3 A2 = position + toVec3(qapply(rotation, A.local[eA.b]));
-    vec2 P1 = offset + scale * toVec3(qapply(viewRotation, A1 - center)).xy();
-    vec2 P2 = offset + scale * toVec3(qapply(viewRotation, A2 - center)).xy();
+   for(Edge eA: A.edges) {
+    vec3 A1 = position + qapply(rotation, A.vertices[eA.a]);
+    vec3 A2 = position + qapply(rotation, A.vertices[eA.b]);
+    vec2 P1 = offset + scale * qapply(viewRotation, A1).xy();
+    vec2 P2 = offset + scale * qapply(viewRotation, A2).xy();
     assert_(isNumber(P1) && isNumber(P2), P1, P2);
 
     vec2 r = P2-P1;
     float l = length(r);
     if(l) {
      vec2 t = r/l;
-     vec2 n = scale*A.R*vec2(t.y, -t.x);
-     graphics->lines.append(P1-n, P2-n);
-     graphics->lines.append(P1+n, P2+n);
-    }
-   }
-   if(0) for(Edge eA: A.edges) {
-    vec3 A1 = A.global[eA.a], A2 = A.global[eA.b];
-    {
-     vec2 P1 = offset + scale * toVec3(qapply(viewRotation, A1 - center)).xy();
-     vec2 P2 = offset + scale * toVec3(qapply(viewRotation, A2 - center)).xy();
-     assert_(isNumber(P1) && isNumber(P2));
-     graphics->lines.append(P1, P2);
-    }
-    if(0) for(const Polyhedra& B: polyhedras) {
-     if(&A == &B) continue;
-     for(Edge eB: B.edges) {
-      vec3 B1 = B.global[eB.a], B2 = B.global[eB.b];
-      v4sf gA, gB;
-      closest(A1, A2, B1, B2, gA, gB);
-      vec2 P1 = offset + scale * toVec3(qapply(viewRotation, gA - center)).xy();
-      vec2 P2 = offset + scale * toVec3(qapply(viewRotation, gB - center)).xy();
-      assert_(isNumber(P1) && isNumber(P2));
-      graphics->lines.append(P1, P2);
-      break;
-     }
+     vec2 n = scale*A.overlapRadius*vec2(t.y, -t.x);
+     graphics->lines.append(P1-n, P2-n, color);
+     graphics->lines.append(P1+n, P2+n, color);
     }
    }
   }
-  {Locker lock(this->lock);
-   const State& state = states[viewT];
+  float maxF = 0; for(const Force& force: state.forces) maxF = ::max(maxF, length(force.force));
+  for(const Force& force: state.forces) {
    constexpr float maxForcePx = 256;
-   for(const Contact& contact: state.contacts) {
-    vec2 A = offset + scale * toVec3(qapply(viewRotation, state.position[contact.b] + /*qapply(state.rotation[contact.a],*/ contact.rbA/*)*/ - center)).xy();
-    vec2 B = offset + scale * toVec3(qapply(viewRotation, state.position[contact.a] + /*qapply(state.rotation[contact.b],*/ contact.raB/*)*/ - center)).xy();
-    assert_(isNumber(A) && isNumber(B));
-    graphics->lines.append(A, B);
-    /*{// Force
-     vec2 A = offset + scale * toVec3(qapply(viewRotation, state.position[contact.a] + qapply(state.rotation[contact.a], contact.A) - center)).xy();
-     vec2 B = offset + scale * toVec3(qapply(viewRotation, state.position[contact.b] + qapply(state.rotation[contact.b], contact.B) + contact.fA/maxF*maxForcePx - center)).xy();
-     assert_(isNumber(A) && isNumber(B));
-     graphics->lines.append(A, B, red);
-    }*/
-   }
-   for(const Force& force: state.forces) {// Force
-    vec2 A = offset + scale * toVec3(qapply(viewRotation, force.origin - center)).xy();
-    vec2 B = offset + scale * toVec3(qapply(viewRotation, force.origin + force.force/maxF*maxForcePx - center)).xy();
-    assert_(isNumber(A) && isNumber(B), force.origin, force.force, maxF);
-    graphics->lines.append(A, B, red);
-   }
+   vec2 A = offset + scale * qapply(viewRotation, force.origin).xy();
+   vec2 B = offset + scale * qapply(viewRotation, force.origin + force.force/maxF*maxForcePx).xy();
+   graphics->lines.append(A, B, red);
   }
-
   return graphics;
  }
 };
 
-struct PolyhedraApp : PolyhedraView/*, Poll*/ {
+struct PolyhedraApp : PolyhedraView {
  unique<Window> window = ::window(this);
- //Thread physicThread;`
- PolyhedraApp() /*: Poll(0,0,physicThread)*/ {
-  //step();
+ PolyhedraApp()  {
+  record(); viewT=states.size-1;
   window->presentComplete = [this]{
-   if(running) {
-    for(int unused t: range(16/*1/(dt*60)*/)) if(!step()) { running=false; break; }
+    for(int unused t: range(16)) if(!step()) { window->presentComplete = {};  break; }
+    record(); viewT=states.size-1;
     window->render();
-   }
   };
-  //physicThread.spawn();
-  //queue();
  }
- //void event() { if(running && step()) queue(); else running=false; }
 } polyhedra;
