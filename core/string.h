@@ -95,7 +95,9 @@ inline String simplify(string s) { return simplify((array<char>)copyRef(s)); }
 // -- string[]
 
 /// Joins \a list into a single String with each element separated by \a separator
-String join(ref<string> list, const string separator=""_);
+//String join(ref<string> list, const string separator=""_);
+
+
 
 /// Returns an array of references splitting \a str wherever \a separator occurs
 buffer<string> split(const string str, string separator/*=", "_*/);

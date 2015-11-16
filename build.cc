@@ -144,7 +144,7 @@ bool Build::compileModule(string target) {
 	String fileName = target+".cc";
 	int64 lastEdit = parse(fileName, module);
 	if(!lastEdit) return false;
-	String object = tmp+"/"+join(flags,"-")+"/"+target+".o";
+ String object = tmp+"/"+join(flags,"-"_)+"/"+target+".o";
 	if(!existsFile(object, folder) || lastEdit >= File(object).modifiedTime()) {
 		while(jobs.size>=2) { // Waits for a job to finish before launching a new unit
 			int pid = wait(); // Waits for any child to terminate
@@ -154,7 +154,7 @@ bool Build::compileModule(string target) {
 			if(status) { log("Failed to compile\n"); return false; }
 			else log(job.target+'\n');
 		}
-		Folder(tmp+"/"+join(flags,"-")+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
+  Folder(tmp+"/"+join(flags,"-"_)+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
         Stream stdout;
         int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1y",
                                            "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing",
@@ -164,7 +164,7 @@ bool Build::compileModule(string target) {
 		jobs.append({copyRef(target), pid, move(stdout)});
 		needLink = true;
 	}
-	files.append( tmp+"/"+join(flags,"-")+"/"+target+".o" );
+ files.append( tmp+"/"+join(flags,"-"_)+"/"+target+".o" );
 	return true;
 }
 
@@ -197,7 +197,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
  if(!::find(CXX,"clang")) args.append("-fabi-version=0"__);
 
 	Folder(tmp, currentWorkingDirectory(), true);
-	Folder(tmp+"/"+join(flags,"-"), currentWorkingDirectory(), true);
+ Folder(tmp+"/"+join(flags,"-"_), currentWorkingDirectory(), true);
 
 	// Compiles
 	if(flags.contains("profile")) if(!compileModule(find("core/profile.cc"))) { log("Failed to compile\n"); return; }
@@ -206,7 +206,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
 	//if(arguments.contains("-tree")) { log(str(collect(modules.first(), 1))+'\n'); return; }
 
 	// Links
-	binary = tmp+"/"+join(flags,"-")+"/"+target;
+ binary = tmp+"/"+join(flags,"-"_)+"/"+target;
 	assert_(!existsFolder(binary));
 	if(!existsFile(binary) || needLink) {
 		// Waits for all translation units to finish compilation before final link

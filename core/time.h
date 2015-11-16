@@ -42,14 +42,14 @@ struct Time {
     void stop() { if(!stopTime) stopTime=realTime(); }
     String reset() { stop(); String s=str((stopTime-startTime)/1000000000., 1u)+'s'; startTime=stopTime; stopTime=0; return s; }
     operator uint64() const { return ((stopTime?:realTime()) - startTime)/1000000; }
-    double toReal() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
-    operator float() const { return toReal(); }
-    operator double() const { return toReal(); }
+    double elapsed() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
+    operator float() const { return elapsed(); }
+    operator double() const { return elapsed(); }
     explicit operator bool() const { return startTime != stopTime; }
 };
-inline String str(const Time& t) { return str(t.toReal(), 1u)+'s'; }
-inline bool operator<(float a, const Time& b) { return a < b.toReal(); }
-inline bool operator<(double a, const Time& b) { return a < b.toReal(); }
+inline String str(const Time& t) { return str(t.elapsed(), 1u)+'s'; }
+inline bool operator<(float a, const Time& b) { return a < b.elapsed(); }
+inline bool operator<(double a, const Time& b) { return a < b.elapsed(); }
 inline String str(const Time& num, const Time& div) { return strD(num, div); }
 
 struct Date {

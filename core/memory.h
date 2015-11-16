@@ -95,6 +95,16 @@ template<Type T, Type Function> buffer<T> filter(const ref<T> source, Function p
  buffer<T> target(source.size, 0); for(const T& e: source) if(!predicate(e)) target.append(copy(e)); return target;
 }
 
+// -- Join --
+
+generic buffer<T> join(ref<ref<T>> list, const ref<T> separator) {
+    if(!list) return {};
+    size_t size = 0; for(auto e: list) size += e.size;
+    buffer<T> target ( size + (list.size-1)*separator.size, 0);
+    for(size_t i: range(list.size)) { target.append( list[i] ); if(i<list.size-1) target.append( separator ); }
+    return target;
+}
+
 // -- Reinterpret casts
 
 /// Reinterpret casts a const reference to another type
