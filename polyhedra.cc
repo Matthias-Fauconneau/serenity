@@ -12,13 +12,17 @@ struct Edge {
 
 // Convex polyhedra
 struct Polyhedra {
+ static constexpr float boundingRadius = 1;
+ static constexpr float overlapRadius = 1./16;
+
+ const float mass = 1; // FIXME
+ const float angularMass = 1; // FIXME
+
  vec3 position;
  v4sf rotation;
  buffer<vec3> vertices; // Vertex positions in local frame
  buffer<vec4> faces; // Face planes in local frame (normal, distance)
  buffer<Edge> edges; // Edge vertex indices
- static constexpr float boundingRadius = 1;
- static constexpr float overlapRadius = 1./16;
 };
 constexpr float Polyhedra::boundingRadius;
 constexpr float Polyhedra::overlapRadius;
@@ -150,10 +154,8 @@ struct PolyhedraSimulation {
  const float damping = 0.1;
  const float density = 1;
  const float E = 10000;
- const float volume = 1; // FIXME
- const float angularMass = 1; // FIXME
  const vec3 g {0,0,-10};
- const float N = 32, d = pow(N, 1./3), D = d+1;
+ const float N = 2, d = pow(N, 1./3), D = d+1;
  const float frictionCoefficient = 1;//0.1;
 
  size_t t = 0;
@@ -184,6 +186,7 @@ struct PolyhedraSimulation {
      faces[i] = vec4(N/l, l);
     }
     Polyhedra p{
+     1, 1,
      position,
      {sin(t0)*sin(t1)*sin(t2),  cos(t0)*sin(t1)*sin(t2), cos(t1)*sin(t2), cos(t2)},
        copyRef(vertices),
@@ -209,7 +212,7 @@ struct PolyhedraSimulation {
   for(size_t a: range(polyhedras.size)) {
    Polyhedra& p = polyhedras[a];
    {
-    vec3 f = g * density * volume;
+    vec3 f = g * p.mass;
     forces.append(p.position, f);
     force[a] = f;
    }
@@ -325,13 +328,22 @@ struct PolyhedraSimulation {
    assert_(isNumber(polyhedras[a].position));
 
    polyhedras[a].rotation += float4(dt/2.f) * qmul(angularVelocity[a], polyhedras[a].rotation);
-   angularVelocity[a] += dt / angularMass * torque[a];
+   angularVelocity[a] += dt / polyhedras[a].angularMass * torque[a];
    polyhedras[a].rotation *= rsqrt(sq4(polyhedras[a].rotation));
-
   }
+
   {
    float maxL = 0; for(const Polyhedra& p: polyhedras) for(vec3 v: p.vertices) maxL = ::max(maxL, length(p.position + qapply(p.rotation, v)));
    if(maxL > 16) goto end;
+  }
+
+  {
+    float kE = 0;
+    for(size_t i: range(polyhedras.size)) {
+     kE += 1./2 * polyhedras[i].mass * sq(velocity[i]);
+     kE += 1./2 * polyhedras[i].angularMass * sq(angularVelocity[i]);
+    }
+    log(t, kE);
   }
   status = true;
   end:
@@ -509,4 +521,4 @@ struct PolyhedraApp : PolyhedraView {
   };
   window->actions[Space] = [this] { running = true; window->render(); };
  }
-} polyhedra;
+};
