@@ -1,15 +1,22 @@
 #include "polyhedra.h"
 
 struct PolyhedraTest : PolyhedraSimulation {
-  PolyhedraTest()  {
+ size_t VF = 0, VE = 0, EE = 0;
+ PolyhedraTest(Random& random)  : PolyhedraSimulation(random) {
    int64 start = threadCPUTime();
    const size_t timeStepCount = 2048;
    buffer<vec3> positions {timeStepCount * polyhedras.capacity, 0};
    bool record = arguments().contains("record"), test = arguments().contains("test");
    while(t < timeStepCount) {
     step();
-    if(record || test)
+    if(record || test) {
      for(const Polyhedra& p: polyhedras) positions.append(p.position);
+    }
+    for(const Contact& c: contacts) {
+     if(c.vertexIndexA != invalid && c.faceIndexB != invalid) VF++;
+     if(c.vertexIndexA != invalid && c.edgeIndexB != invalid) VE++;
+     if(c.edgeIndexA != invalid && c.edgeIndexB != invalid) EE++;
+    }
    }
    if(record) {
     writeFile("positions", cast<byte>(positions));
@@ -20,6 +27,20 @@ struct PolyhedraTest : PolyhedraSimulation {
     assert_(referencePositions == positions);
    }
    int64 end = threadCPUTime();
-   log(t, str((end-start)/1e6)+"ms", t*1e6/(end-start), "/ms"); // TODO: only intersection time, +amortize on large particle count (+SIMD, +thread)
+   log(VF, VE, EE, t, str((end-start)/1e6)+"ms", t*1e6/(end-start), "/ms"); // TODO: only intersection time, +amortize on large particle count (+SIMD, +thread)
  }
-} test;
+};
+
+struct PolyhedraApp {
+ PolyhedraApp() {
+  Random random {2218508943, 1141633963};
+  for(;;) {
+   Random randomStartState = random;
+   PolyhedraTest test {random};
+   if(test.VF && test.VE && test.EE) {
+    //log(str(randomStartState.z)+", "+str(randomStartState.w));
+    break;
+   }
+  }
+ }
+} app;

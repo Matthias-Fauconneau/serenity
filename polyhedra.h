@@ -164,8 +164,7 @@ struct PolyhedraSimulation {
  struct Force { vec3 origin, force; };
  array<Force> forces;
 
- PolyhedraSimulation() {
-  Random random;
+ PolyhedraSimulation(Random& random) {
   while(polyhedras.size < N) {
    vec3 position(d*(2*random()-1), d*(2*random()-1), d*(2*random()-1));
    const float r = 1./sqrt(3.);
@@ -267,7 +266,7 @@ struct PolyhedraSimulation {
        //if(contact.depth > (A.overlapRadius+B.overlapRadius)/2) { log("SP", a, b, contact.depth, A.overlapRadius+B.overlapRadius); goto end; }
       } else {
        // Vertex - Edge (Sphere - Cylinder) (FIXME: double contact with Edge - Edge ?)
-       Contact contact = ::vertexFace(A, vertexIndex, B);
+       Contact contact = ::vertexEdge(A, vertexIndex, B);
        if(contact) {
         contact.a = a, contact.b = b;
         contacts.append(contact);
