@@ -166,7 +166,12 @@ struct PolyhedraSimulation {
 
  PolyhedraSimulation(Random& random) {
   while(polyhedras.size < N) {
-   vec3 position(d*(2*random()-1), d*(2*random()-1), d*(2*random()-1));
+#if 0
+   //vec3 position(d*(2*random()-1), d*(2*random()-1), d*(2*random()-1));
+#else
+   vec3 position (0,0,0);
+   if(polyhedras.size) position = vec3(random()-1./2, random()-1./2, 1+random());
+#endif
    const float r = 1./sqrt(3.);
    ref<vec3> vertices{vec3(r,r,r), vec3(r,-r,-r), vec3(-r,r,-r), vec3(-r,-r,r)};
    for(auto& p: polyhedras) {

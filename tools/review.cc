@@ -736,7 +736,28 @@ struct Review {
     }
 #else
     if(X) {
-     plot.fits[copy(entry.key)].append(totalLeastSquare(X, Y));
+     Fit fit {0, 0};
+     buffer<float> sX (X.size), sY (X.size);
+     for(size_t unused t: range(2)) {
+      float r = sqrt(sq(fit.a)+sq(1));
+      float sdx = 1/r, sdy = fit.a/r;
+      float tdx = -sdy, tdy = sdx;
+      log(tdx, tdy);
+      log(sqrt(sq(tdx)+sq(tdy)));
+      for(size_t circleIndex: range(X.size)) {
+       float x = X[circleIndex];
+       float y = Y[circleIndex], R = y;
+       sX[circleIndex] = x + tdx*R;
+       sY[circleIndex] = tdy*R;
+      }
+      fit = totalLeastSquare(sX, sY);
+      log(fit.a, fit.b);
+     }
+     plot.fits[copy(entry.key)].append(fit);
+     plot.circles.keys = move(entry.value.keys);
+     plot.circles.values = move(entry.value.values);
+     entry.value.keys = move(sX);
+     entry.value.values = move(sY);
     }
 #endif
    }
@@ -870,7 +891,7 @@ struct Review {
    error("plot");
   }
 
-  if(0) {
+  if(1) {
    auto group = array.parseDict("Angle=3.6,Elasticity=1e7,Friction=0.3,Pattern=cross,Pressure=60K,Radius=0.02,Rate=400,Resolution=2,Seed=3,Side=1e8,Thickness=1e-3,TimeStep=10µ,Wire=12%");
    if(0) {
     if(1) {
@@ -881,7 +902,7 @@ struct Review {
       plot.dataSets.keys[0] = ""__; /*copyRef(ref<string>{"No Wire"_, "Simple Helix"_,"Spiral Helix"_,"Radially Reinforced Helix"_}[
                                      ref<string>{"none"_,"helix","loop","cross"}.indexOf(name)]);*/
       writeFile(name+".pdf"_, toPDF(plot, vec2(94.5, 94.5/1.5)), home(), true);
-      //error(name);
+      error(name);
      }
     } else {
      VList<Plot> plots (Linear::Share, Linear::Expand);
@@ -908,10 +929,14 @@ struct Review {
    vec2 pageSize = pageSizeMM*pointMM;
    shared<Graphics> graphics = plot.graphics(pageSize);
 
+   /*plot.dataSets.keys.take(0);
+   plot.dataSets.values.take(0);
+   plot.fits.values.take(0);
+   plot.fits.keys.take(0);*/
    for(String& name: plot.dataSets.keys) name = {};
    hack = true;
-   plot.max = vec2(4,2); plot.xlabel = {}; plot.ylabel = {}; plot.plotPoints=false;
-   graphics->graphics.insert(vec2(pageSize.x/2, pageSize.y*12/24), plot.graphics(vec2(pageSize.x/2, pageSize.y*9/24)));
+   plot.max = vec2(4,2); plot.xlabel = {}; plot.ylabel = {}; plot.plotPoints=false; plot.plotAngles = false;
+   graphics->graphics.insert(vec2(pageSize.x*2/3, pageSize.y*12/24), plot.graphics(vec2(pageSize.x*1/3, pageSize.y*9/24)));
    graphics->flatten();
    writeFile("plot.pdf"_, toPDF(pageSize, ref<Graphics>(graphics.pointer, 1), 1), home(), true);
    error("plot");

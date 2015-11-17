@@ -267,8 +267,8 @@ shared<Graphics> Plot::graphics(vec2 size) {
    }
    if(plotCircles) {
     float xSum = 0, N = 0;
-    for(size_t i : range(sortY.size())) {
-     const float x = sortY.values[i], y = sortY.keys[i];
+    for(size_t i : range(/*sortY*/circles.size())) {
+     const float x = /*sortY*/circles.keys[i], y = /*sortY*/circles.values[i];
 
      xSum += x;
      N++;
@@ -292,8 +292,8 @@ shared<Graphics> Plot::graphics(vec2 size) {
   float x = max.x;
   map<int, int> done;
   float minY = inf;
-  //extern bool hack;
-  for(size_t i: range(0/*hack*//*HACK*/, fits.size())) for(auto f: fits.values[i]) {
+  extern bool hack;
+  for(size_t i: range(hack, fits.size())) for(auto f: fits.values[i]) {
    float y = f.a*x+f.b;
    vec2 A = point(vec2(0,f.b));
    vec2 B = point(vec2(x, y));
@@ -312,7 +312,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
    minY = B.y - textSize;
    int a = round(atan(f.a, 1)*180/PI);
    //int b = round(f.b);
-   if(/*!hack*/1 /*&& !done[a]*/) {
+   if(/*!hack*/ /*&& !done[a]*/ plotAngles) {
     done[a]++;
     Text text(str(a)+"°"_, textSize, colors[i], 1,0, fontName);
     graphics->graphics.insert(B+vec2(0/*textSize*/, -text.sizeHint().y/2), text.graphics(0));

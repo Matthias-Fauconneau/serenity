@@ -33,12 +33,13 @@ struct PolyhedraTest : PolyhedraSimulation {
 
 struct PolyhedraApp {
  PolyhedraApp() {
-  Random random {2218508943, 1141633963};
+  //Random random {2218508943, 1141633963};
+  Random random;
   for(;;) {
    Random randomStartState = random;
    PolyhedraTest test {random};
-   if(test.VF && test.VE && test.EE) {
-    //log(str(randomStartState.z)+", "+str(randomStartState.w));
+   if(test.VF > 64 && test.VE > 64 && test.EE > 64) {
+    log(str(randomStartState.z)+", "+str(randomStartState.w));
     break;
    }
   }

@@ -1,6 +1,8 @@
 #include "polyhedra.h"
 
 struct PolyhedraView : PolyhedraSimulation, Widget {
+ using PolyhedraSimulation::PolyhedraSimulation;
+
  struct State {
   buffer<vec3> position;
   buffer<v4sf> rotation;
@@ -154,9 +156,10 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
  }
 };
 
+Random randomState{2068481770, 118513808};
 struct PolyhedraApp : PolyhedraView {
  unique<Window> window = ::window(this);
- PolyhedraApp()  {
+ PolyhedraApp() : PolyhedraView(randomState) {
   record(); viewT=states.size-1;
   window->presentComplete = [this]{
    if(!running) return;
@@ -166,4 +169,4 @@ struct PolyhedraApp : PolyhedraView {
   };
   window->actions[Space] = [this] { running = true; window->render(); };
  }
-};
+} app;
