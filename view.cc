@@ -89,7 +89,6 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
     graphics->lines.append(P1, P2);
  }
 
-
   for(size_t p: range(polyhedras.size)) {
    const Polyhedra& A = polyhedras[p];
    vec3 position = states[viewT].position[p];
@@ -156,7 +155,7 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
  }
 };
 
-Random randomState{2068481770, 118513808};
+Random randomState{2375560308, 689823083};
 struct PolyhedraApp : PolyhedraView {
  unique<Window> window = ::window(this);
  PolyhedraApp() : PolyhedraView(randomState) {

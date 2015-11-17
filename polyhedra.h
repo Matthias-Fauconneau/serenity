@@ -163,6 +163,8 @@ struct PolyhedraSimulation {
  struct Force { vec3 origin, force; };
  array<Force> forces;
 
+ tsc stepTime, contactTime, vertexFaceTime, edgeEdgeTime;
+
  PolyhedraSimulation(Random& random) {
   while(polyhedras.size < N) {
 #if 0
@@ -209,6 +211,8 @@ struct PolyhedraSimulation {
  }
 
  bool step() {
+  stepTime.start();
+
   buffer<vec3> force (polyhedras.size), torque (polyhedras.size);
   array<Force> forces;
 
@@ -242,14 +246,17 @@ struct PolyhedraSimulation {
 
   bool status = false;
   array<Contact> contacts;
+  contactTime.start();
   for(size_t a: range(polyhedras.size)) {
    Polyhedra& A = polyhedras[a];
    for(size_t b: range(polyhedras.size)) {
     if(a==b) continue;
     Polyhedra& B = polyhedras[b];
+    // Vertex - Face (Sphere - Plane)
     for(size_t vertexIndex: range(A.vertices.size)) {
-     {// Vertex - Face (Sphere - Plane)
+      vertexFaceTime.start();
       Contact contact = ::vertexFace(A, vertexIndex, B);
+      vertexFaceTime.stop();
       if(contact) {
        contact.a = a, contact.b = b;
        contacts.append(contact);
@@ -266,31 +273,9 @@ struct PolyhedraSimulation {
        force[b] += -f;
        torque[b] += cross(contact.rbC, -f);
        forces.append(B.position + contact.rbC, -f);
-      } /*else {
-       // Vertex - Edge (Sphere - Cylinder) (FIXME: min(VE, Edge - Edge))
-       Contact contact = ::vertexEdge(A, vertexIndex, B);
-       if(contact) {
-        contact.a = a, contact.b = b;
-        contacts.append(contact);
-
-        vec3 N = contact.N; float depth = contact.depth;
-        vec3 rV = velocity[a] + cross(angularVelocity[a], contact.raC) - (velocity[b] + cross(angularVelocity[b], contact.rbC));
-        vec3 f = 4.f/3 * E * sqrt(2.f/3*A.overlapRadius) * sqrt(depth) * (depth - damping * dot(N, rV)) * N;
-        assert_(isNumber(f));
-
-        force[a] += f;
-        torque[a] += cross(contact.raC, f);
-        forces.append(A.position + contact.raC, f);
-
-        force[b] += -f;
-        torque[b] += cross(contact.rbC, -f);
-        forces.append(B.position + contact.rbC, -f);
-
-        if(contact.depth > (A.overlapRadius+B.overlapRadius)/2) { log("VE", a, b, contact.depth, A.overlapRadius+B.overlapRadius);  goto end; }
-       }
-       // else TODO: Vertex - Vertex
-      }*/
-     }
+       goto break_;
+      }
+    } /*else*/ {
      if(a < b) { // Edge - Edge (generalized: also Vertex-Edge and Vertex-Vertex)
       // FIXME: should be strictly "Cylinder - Cylinder" but "spheropolyhedra" does not split VE and VV cases out and always use Sphere - Sphere contacts
       // Vertex contacts will be computed as generalized Edge - Edge. Evaluating only the contact with maximum overlap ensures no duplicates
@@ -298,7 +283,9 @@ struct PolyhedraSimulation {
       Contact contact; // Approximated by maximum depth
       for(size_t eiA: range(A.edges.size)) {
        for(size_t eiB: range(B.edges.size)) {
+        edgeEdgeTime.start();
         Contact candidate = ::edgeEdge(A, eiA, B, eiB);
+        edgeEdgeTime.stop();
         if(candidate.depth > contact.depth) {
          contact = candidate;
         }
@@ -324,8 +311,10 @@ struct PolyhedraSimulation {
       }
      }
     }
+    break_:;
    }
   }
+  contactTime.stop();
 
   for(size_t a: range(polyhedras.size)) {
    assert_(isNumber(force[a]));
@@ -356,6 +345,7 @@ struct PolyhedraSimulation {
   this->contacts = ::move(contacts);
   this->forces = ::move(forces);
   t++;
+  stepTime.stop();
   return status;
  }
 };
