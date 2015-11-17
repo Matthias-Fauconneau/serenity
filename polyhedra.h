@@ -40,53 +40,50 @@ struct Contact {
  vec3 rbC = 0; // contact point relative to B position (unrotated)
  vec3 raC = 0; // Contact point relative to A position (unrotated)
  vec3 N = 0;
- float depth = inf;
- explicit operator bool() { return depth < inf; }
+ float depth = -inf;
+ explicit operator bool() { return depth > -inf; }
 };
 
 Contact vertexFace(const Polyhedra& A, size_t vertexIndex, const Polyhedra& B) {
- Contact contact;
  vec3 laA = A.vertices[vertexIndex];
  vec3 raA = qapply(A.rotation, laA);
  vec3 gA = A.position + raA;
  vec3 rbA = gA - B.position;
  vec3 lbA = qapply(conjugate(B.rotation), rbA); // Transforms vertex to B local frame
- // Clips against all planes (convex polyhedra)
- for(vec4 plane: B.faces) {
-  if(dot(plane.xyz(), lbA) <= plane.w + A.overlapRadius + B.overlapRadius) continue;
-  goto break_;
- } /*else*/ { // P inside polyhedra B
+ // Clips against all planes (convex hull of the spheropolyhedra)
+ for(vec4 plane: B.faces) if(dot(plane.xyz(), lbA) > plane.w + A.overlapRadius + B.overlapRadius) return Contact();
+ /*else*/ { // P inside polyhedra B
   for(size_t faceIndex: range(B.faces.size)) {
    // Tighter clips against all other planes (convex polyhedra)
    for(size_t planeIndex: range(B.faces.size)) {
     if(planeIndex == faceIndex) continue;
     vec4 plane = B.faces[planeIndex];
-    if(dot(plane.xyz(), lbA) <= plane.w) continue;
+    if(dot(plane.xyz(), lbA) <= plane.w) continue; // FIXME: reuse dot(P, lba) - w
     goto continue2_;
-   } /*else*/ {
+   } /*else*/ { // Contact
     vec4 bPlane = B.faces[faceIndex];
     // Projects vertex on plane (B frame)
     float t = bPlane.w - dot(bPlane.xyz(), lbA);
-    if(t <= -A.overlapRadius-B.overlapRadius || t >= A.overlapRadius+B.overlapRadius) continue;
+    assert_(t < 0); // Maximum overlap length: A.overlapRadius + B.overlapRadius
     float depth = t + A.overlapRadius + B.overlapRadius;
-    if(depth < contact.depth) {
-     contact.vertexIndexA = vertexIndex;
-     contact.faceIndexB = faceIndex;
-     contact.N = qapply(B.rotation, bPlane.xyz());
-     assert_(depth > 0);
-     contact.depth = depth;
-     vec3 lbB = lbA + t * bPlane.xyz();
-     vec3 rbB = qapply(B.rotation, lbB);
-     vec3 rbC = (rbA + rbB)/2.f;
-     contact.rbC = rbC;
-     contact.raC = rbC + B.position - A.position;
-    }
+    assert_(depth > 0); // Implied by initial convex hull cull
+    Contact contact;
+    contact.vertexIndexA = vertexIndex;
+    contact.faceIndexB = faceIndex;
+    contact.N = qapply(B.rotation, bPlane.xyz());
+    assert_(depth > 0);
+    contact.depth = depth;
+    vec3 lbB = lbA + t * bPlane.xyz();
+    vec3 rbB = qapply(B.rotation, lbB);
+    vec3 rbC = (rbA + rbB)/2.f;
+    contact.rbC = rbC;
+    contact.raC = rbC + B.position - A.position;
+    return contact;
    }
    continue2_:;
   }
  }
- break_:;
- return contact;
+ return Contact();
 }
 
 Contact edgeEdge(const Polyhedra& A, size_t eiA, const Polyhedra& B, size_t eiB) {
@@ -113,6 +110,7 @@ Contact edgeEdge(const Polyhedra& A, size_t eiA, const Polyhedra& B, size_t eiB)
  return Contact();
 }
 
+#if 0 // EdgeEdge
 Contact vertexEdge(const Polyhedra& A, size_t vertexIndex, const Polyhedra& B) {
  vec3 laA = A.vertices[vertexIndex];
  vec3 raA = qapply(A.rotation, laA);
@@ -146,6 +144,7 @@ Contact vertexEdge(const Polyhedra& A, size_t vertexIndex, const Polyhedra& B) {
   }
   return Contact();
 }
+#endif
 
 struct PolyhedraSimulation {
  array<Polyhedra> polyhedras;
@@ -267,10 +266,8 @@ struct PolyhedraSimulation {
        force[b] += -f;
        torque[b] += cross(contact.rbC, -f);
        forces.append(B.position + contact.rbC, -f);
-
-       //if(contact.depth > (A.overlapRadius+B.overlapRadius)/2) { log("SP", a, b, contact.depth, A.overlapRadius+B.overlapRadius); goto end; }
-      } else {
-       // Vertex - Edge (Sphere - Cylinder) (FIXME: double contact with Edge - Edge ?)
+      } /*else {
+       // Vertex - Edge (Sphere - Cylinder) (FIXME: min(VE, Edge - Edge))
        Contact contact = ::vertexEdge(A, vertexIndex, B);
        if(contact) {
         contact.a = a, contact.b = b;
@@ -292,32 +289,38 @@ struct PolyhedraSimulation {
         if(contact.depth > (A.overlapRadius+B.overlapRadius)/2) { log("VE", a, b, contact.depth, A.overlapRadius+B.overlapRadius);  goto end; }
        }
        // else TODO: Vertex - Vertex
-      }
+      }*/
      }
-     if(a < b) { // Edge - Edge (Cylinder - Cylinder)
+     if(a < b) { // Edge - Edge (generalized: also Vertex-Edge and Vertex-Vertex)
+      // FIXME: should be strictly "Cylinder - Cylinder" but "spheropolyhedra" does not split VE and VV cases out and always use Sphere - Sphere contacts
+      // Vertex contacts will be computed as generalized Edge - Edge. Evaluating only the contact with maximum overlap ensures no duplicates
+      // FIXME: Detect cap case to avoid further intersection tests (allows fast path usage) and use VE and VV overlap volumes
+      Contact contact; // Approximated by maximum depth
       for(size_t eiA: range(A.edges.size)) {
        for(size_t eiB: range(B.edges.size)) {
-        Contact contact = ::edgeEdge(A, eiA, B, eiB);
-        if(contact) {
-         contact.a = a, contact.b = b;
-         contacts.append(contact);
-
-         vec3 N = contact.N; float depth = contact.depth;
-         vec3 rV = velocity[a] + cross(angularVelocity[a], contact.raC) - (velocity[b] + cross(angularVelocity[b], contact.rbC));
-         vec3 f = 4.f/3 * E * sqrt(A.overlapRadius) * sqrt(depth) * (depth - damping * dot(N, rV)) * N;
-         assert_(isNumber(f), "EE", depth);
-
-         force[a] += f;
-         torque[a] += cross(contact.raC, f);
-         forces.append(A.position + contact.raC, f);
-
-         force[b] += -f;
-         torque[b] += cross(contact.rbC, -f);
-         forces.append(B.position + contact.rbC, -f);
-
-         //if(contact.depth > (A.overlapRadius+B.overlapRadius)/2) { log("EE", a, b, contact.depth, A.overlapRadius+B.overlapRadius);  goto end; }
+        Contact candidate = ::edgeEdge(A, eiA, B, eiB);
+        if(candidate.depth > contact.depth) {
+         contact = candidate;
         }
        }
+      }
+      if(contact) {
+       contact.a = a, contact.b = b;
+       contacts.append(contact);
+
+       vec3 N = contact.N; float depth = contact.depth;
+       vec3 rV = velocity[a] + cross(angularVelocity[a], contact.raC) - (velocity[b] + cross(angularVelocity[b], contact.rbC));
+       //vec3 f = 4.f/3 * E * sqrt(A.overlapRadius) * sqrt(depth) * (depth - damping * dot(N, rV)) * N; // Orthogonal Cylinder - Cylinder
+       vec3 f = 4.f/3 * E * sqrt(1.f/2*A.overlapRadius) * sqrt(depth) * (depth - damping * dot(N, rV)) * N; // Sphere - Sphere (TODO: split out Cylinder - Cylinder and Sphere - Cylinder)
+       assert_(isNumber(f), "EE", depth);
+
+       force[a] += f;
+       torque[a] += cross(contact.raC, f);
+       forces.append(A.position + contact.raC, f);
+
+       force[b] += -f;
+       torque[b] += cross(contact.rbC, -f);
+       forces.append(B.position + contact.rbC, -f);
       }
      }
     }
