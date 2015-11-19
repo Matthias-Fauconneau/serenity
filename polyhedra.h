@@ -37,7 +37,7 @@ vec3 global(const Polyhedra& A, size_t vertexIndex) {
 struct Contact {
  size_t a = invalid, b = invalid;
  size_t vertexIndexA = invalid, edgeIndexA = invalid, edgeIndexB = invalid, faceIndexB = invalid;
- vec3 rbC = 0; // contact point relative to B position (unrotated)
+ vec3 rbC = 0; // Contact point relative to B position (unrotated)
  vec3 raC = 0; // Contact point relative to A position (unrotated)
  vec3 N = 0;
  float depth = -inf;

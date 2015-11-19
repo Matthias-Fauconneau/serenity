@@ -78,6 +78,21 @@ inline Fit totalLeastSquare(ref<float> X, ref<float> Y) {
  return {a, b};
 }
 
+inline Fit leastSquare0(ref<float> X, ref<float> Y) {
+ assert_(X.size == Y.size);
+ double mx = mean(X), my = mean(Y);
+ /*size_t N = X.size;
+ if(N<=1) return {0,0};
+ assert_(N>1);
+ double sxx=0; for(float x: X) sxx += sq(x-mx); sxx /= (N-1);
+ double sxy=0; for(size_t i: range(N)) sxy += (X[i]-mx)*(Y[i]-my); sxy /= (N-1);
+ double syy=0; for(float y: Y) syy += sq(y-my); syy /= (N-1);
+ double a = (syy - sxx + sqrt(sq(syy-sxx)+4*sq(sxy))) / (2*sxy);
+ double b = my - a*mx;
+ return {a, b};*/
+ return {my/mx, 0};
+}
+
 buffer<float> radius(const map<string, array<float>>& data) {
  ref<float> radius = data.at("Radius (m)"_);
  // FIXME: only < 14.8 15:
@@ -683,8 +698,8 @@ struct Review {
    //const size_t N = 16;
    //buffer<map<NaturalString, map<float, float>>> tangents (N); tangents.clear();
 
-   for(auto entry: plot.dataSets) {
-    ref<float> X = entry.value.keys, Y = entry.value.values;
+   for(size_t entryIndex: range(plot.dataSets.size())) {
+    ref<float> X = plot.dataSets.values[entryIndex].keys, Y = plot.dataSets.values[entryIndex].values;
 #if 0
     buffer<float> x (X.size), y (Y.size);
     float bestSSR = inf; //φ = 0,
@@ -737,7 +752,8 @@ struct Review {
 #else
     if(X) {
      Fit fit {0, 0};
-     buffer<float> sX (X.size), sY (X.size);
+     //buffer<float> sX (X.size), sY (X.size);
+     buffer<float> sX (X.size+1), sY (X.size+1);
      for(size_t unused t: range(2)) {
       float r = sqrt(sq(fit.a)+sq(1));
       float sdx = 1/r, sdy = fit.a/r;
@@ -750,14 +766,16 @@ struct Review {
        sX[circleIndex] = x + tdx*R;
        sY[circleIndex] = tdy*R;
       }
-      fit = totalLeastSquare(sX, sY);
+      //sX[X.size] = 0, sY[X.size] = 0;
+      if(entryIndex==0) fit = leastSquare0(sX, sY);
+       else fit = totalLeastSquare(sX, sY);
       log(fit.a, fit.b);
      }
-     plot.fits[copy(entry.key)].append(fit);
-     plot.circles.keys = move(entry.value.keys);
-     plot.circles.values = move(entry.value.values);
-     entry.value.keys = move(sX);
-     entry.value.values = move(sY);
+     plot.fits[copy(plot.dataSets.keys[entryIndex])].append(fit);
+     plot.circles.keys = move(plot.dataSets.values[entryIndex].keys);
+     plot.circles.values = move(plot.dataSets.values[entryIndex].values);
+     plot.dataSets.values[entryIndex].keys = move(sX);
+     plot.dataSets.values[entryIndex].values = move(sY);
     }
 #endif
    }
@@ -893,7 +911,7 @@ struct Review {
 
   if(1) {
    auto group = array.parseDict("Angle=3.6,Elasticity=1e7,Friction=0.3,Pattern=cross,Pressure=60K,Radius=0.02,Rate=400,Resolution=2,Seed=3,Side=1e8,Thickness=1e-3,TimeStep=10µ,Wire=12%");
-   if(0) {
+   if(1) {
     if(1) {
      for(size_t index: range(4)) {
       Plot plot = pressurePlot(group, Deviatoric, index);
