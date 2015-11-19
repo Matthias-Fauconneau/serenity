@@ -52,9 +52,9 @@ struct SimulationRun : Simulation {
  void report() {
   float height = plate.position[1][2]-plate.position[0][2];
   log(timeStep*dt, 1-height/(topZ0-bottomZ0));
-  assert_((float)partTime/(float)totalTime > 0.91, (float)partTime/(float)totalTime);
+  //assert_((float)partTime/(float)totalTime > 0.91, (float)partTime/(float)totalTime);
   //log(strD(partTime, totalTime));
-  log(strD(grainTime+grainSideIntersectTime+grainSideForceTime+grainSideAddTime+sideForceTime+grainGrainTime+grainIntegrationTime+sideIntegrationTime, stepTime));
+  /*log(strD(grainTime+grainSideIntersectTime+grainSideForceTime+grainSideAddTime+sideForceTime+grainGrainTime+grainIntegrationTime+sideIntegrationTime, stepTime));
   if(grainTime) log("grain", strD(grainTime, stepTime));
   if(grainSideIntersectTime) log("grain-side intersect", strD(grainSideIntersectTime, stepTime));
   if(grainSideForceTime) log("grain-side force", strD(grainSideForceTime, stepTime));
@@ -64,7 +64,7 @@ struct SimulationRun : Simulation {
   log("grain-grain", strD(grainGrainTime, stepTime));
   if(grainGrainLatticeTime/stepTime > 0.01) log("grain-grain lattice", strD(grainGrainLatticeTime, stepTime));
   log("grain integration", strD(grainIntegrationTime, stepTime));
-  if(sideIntegrationTime/stepTime > 0.01) log("side integration", strD(sideIntegrationTime, stepTime));
+  if(sideIntegrationTime/stepTime > 0.01) log("side integration", strD(sideIntegrationTime, stepTime));*/
   //log("wire integration", strD(grainIntegrationTime, stepTime));
   lastReport = realTime();
   lastReportStep = timeStep;
@@ -72,7 +72,7 @@ struct SimulationRun : Simulation {
 };
 
 #if UI
-struct SimulationView : SimulationRun, Widget, Poll {
+struct SimulationView : SimulationRun, Widget/*, Poll*/ {
  int2 size {/*1280,720*//*1050*/768};
  unique<Window> window = nullptr;
  // View
@@ -81,16 +81,29 @@ struct SimulationView : SimulationRun, Widget, Poll {
  vec2 scale = 0;
  vec2 translation = 0;
  v4sf rotationCenter = _0f4;
- Thread simulationThread {19};
+ //Thread simulationThread {19};
 #if ENCODER
  unique<Encoder> encoder = nullptr;
 #endif
  GLFrameBuffer target;
  size_t lastTitleSetStep = 0;
 
+ struct State {
+  struct Side {
+   //size_t size;
+   buffer<float> Px;
+   buffer<float> Py;
+   buffer<float> Pz;
+   vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]); }
+  } side;
+ };
+ array<State> states;
+ size_t viewT;
+ bool running = true;
+
  SimulationView(const Dict& parameters, File&& file) :
-   SimulationRun(parameters, move(file)),
-   Poll(0, POLLIN, simulationThread) {
+   SimulationRun(parameters, move(file))
+   /*, Poll(0, POLLIN, simulationThread)*/ {
   if(/*XDisplay::hasServer() &&*/ /*arguments().contains("view")*/1) {
    window = ::window(this, /*-1*/768, mainThread, true, false);
    window->actions[F11] = {(SimulationRun*)this, &SimulationRun::report};
@@ -108,23 +121,30 @@ struct SimulationView : SimulationRun, Widget, Poll {
   }
 #endif
 
-  mainThread.setPriority(19);
-  if(window) {
+  //mainThread.setPriority(19);
+  /*if(window) {
    queue();
    simulationThread.spawn();
-  }
+  }*/
+  record(); viewT=states.size-1;
+  window->presentComplete = [this]{
+   if(!running) return;
+   for(int unused t: range(256)) if(!step()) { running = false;  break; }
+   record(); viewT=states.size-1;
+   window->render();
+  };
  }
- ~SimulationView() {
+ /*~SimulationView() {
   log("~", "grain", grain.count, "wire", wire.count);
- }
+ }*/
 
- void event() override {
+ /*void event() override {
 #if PROFILE
   static unused bool once =
     ({ extern void profile_reset(); profile_reset(); true; });
 #endif
   step();
- }
+ }*/
 
  /*void snapshot() override {
   Simulation::snapshot();
@@ -132,8 +152,22 @@ struct SimulationView : SimulationRun, Widget, Poll {
   writeFile(name+".png", encodePNG(target.readback()), currentWorkingDirectory(), true);
  }*/
 
- void step() {
+ void record() {
+  State state;
+  //state.side.size = side.count;
+  /*state.side.Px = copyRef(side.Px.slice(0, side.count));
+  state.side.Py = copyRef(side.Py.slice(0, side.count));
+  state.side.Pz = copyRef(side.Pz.slice(0, side.count));*/
+  state.side.Px = copy(side.Px);
+  state.side.Py = copy(side.Py);
+  state.side.Pz = copy(side.Pz);
+  states.append(::move(state));
+ }
+
+ bool step() {
   Simulation::step();
+  /*if(timeStep%16) record();
+  viewT=states.size-1;*/
 #if ENCODER
   if(encoder) viewYawPitch.x += 2*PI*dt / 16;
 #endif
@@ -146,6 +180,7 @@ struct SimulationView : SimulationRun, Widget, Poll {
 #endif
   }
   if(timeStep > lastTitleSetStep+size_t(0.1/dt)) { lastTitleSetStep=timeStep; window->setTitle(info()); }
+#if 0
   if(processState < Done) queue();
   else if(processState == Done) { /*Simulation::snapshot();*/ log("Done"); requestTermination(0); }
   else {
@@ -154,6 +189,8 @@ struct SimulationView : SimulationRun, Widget, Poll {
    extern int groupExitStatus;
    groupExitStatus = -1; // Let user view and return failed exit status on window close to stop sweep
   }
+#endif
+  return processState < Done;
  }
 
  vec2 sizeHint(vec2) override { return vec2(1050, 1050*size.y/size.x); }
@@ -189,11 +226,14 @@ struct SimulationView : SimulationRun, Widget, Poll {
    }
    scale = vec3(vec2(2/::max(max.x-min.x, max.y-min.y)/1.2), 2/(max-min).z);
    translation = -vec3((min+max).xy()/2.f, min.z);
+   if(!isNumber(translation.xy())) translation.xy() = this->translation;
 
    if(!this->scale && !this->translation) this->scale = scale.xy(), this->translation = translation.xy();
    const float Dt = 1./60;
    scale.xy() = this->scale = this->scale*float(1-Dt) + float(Dt)*scale.xy();
    translation.xy() = this->translation = this->translation*float(1-Dt) + float(Dt)*translation.xy();
+   /*scale.xy() = this->scale = scale.xy();
+   translation.xy() = this->translation = translation.xy();*/
   }
 
   mat4 viewProjection = mat4()
@@ -300,10 +340,14 @@ struct SimulationView : SimulationRun, Widget, Poll {
    size_t W = side.W, stride=side.stride;
    buffer<vec3> positions {W*(side.H-1)*6-W*2};
    size_t s = 0;
+   const State& state = states[viewT];
    for(size_t i: range(side.H-1)) for(size_t j: range(W)) {
-    vec3 a (toVec3(side.Vertex::position[7+i*stride+j]));
+    /*vec3 a (toVec3(side.Vertex::position[7+i*stride+j]));
     vec3 b (toVec3(side.Vertex::position[7+i*stride+(j+1)%W]));
-    vec3 c (toVec3(side.Vertex::position[7+(i+1)*stride+(j+i%2)%W]));
+    vec3 c (toVec3(side.Vertex::position[7+(i+1)*stride+(j+i%2)%W]));*/
+    vec3 a (toVec3(state.side.position(7+i*stride+j)));
+    vec3 b (toVec3(state.side.position(7+i*stride+(j+1)%W)));
+    vec3 c (toVec3(state.side.position(7+(i+1)*stride+(j+i%2)%W)));
     /*if(a.z < min.z || a.z > max.z) continue;
     if(b.z < min.z || b.z > max.z) continue;
     if(c.z < min.z || c.z > max.z) continue;*/
@@ -399,19 +443,29 @@ struct SimulationView : SimulationRun, Widget, Poll {
   return shared<Graphics>();
  }
 
+ struct {
+  vec2 cursor;
+  vec2 viewYawPitch;
+  size_t viewT;
+ } dragStart;
+
  // Orbital ("turntable") view control
  bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button,
                                 Widget*&) override {
-  vec2 delta = cursor-lastPos; lastPos=cursor;
-  if(event==Motion && button==LeftButton) {
-   viewYawPitch += float(2*PI) * delta / size; //TODO: warp
-   viewYawPitch.y = clamp<float>(-PI, viewYawPitch.y, 0);
+   if(event == Press) dragStart = {cursor, viewYawPitch, viewT};
+   if(event==Motion && button==LeftButton) {
+    viewYawPitch = dragStart.viewYawPitch + float(2*PI) * (cursor - dragStart.cursor) / size;
+    viewYawPitch.y = clamp<float>(-PI, viewYawPitch.y, 0);
 #if ENCODER
    if(encoder) encoder = nullptr;
 #endif
-  }
-  else return false;
-  return true;
+   }
+   else if(event==Motion && button==RightButton) {
+    viewT = clamp<int>(0, int(dragStart.viewT) + (states.size-1) * (cursor.x - dragStart.cursor.x) / (size.x/2-1), states.size-1); // Relative
+    running = false;
+   }
+   else return false;
+   return true;
  }
 };
 #endif

@@ -291,7 +291,7 @@ struct Simulation : System {
 
  const float pourPackThreshold = 2e-3;
  const float packLoadThreshold = 2e-3;
- const float transitionTime = 1*s;
+ const float transitionTime = 1 *s;
 
  unique<Lattice<uint16> > generateGrainLattice() {
   vec3 min = inf, max = -inf;
@@ -647,7 +647,7 @@ break2_:;
   if(processState > ProcessState::Pour) {
    side.Fx.clear(); side.Fy.clear(); side.Fz.clear(); // FIXME: single pass
    sideForceTime.start();
-   parallel_chunk(1, side.H-1, [this](uint, size_t start, size_t size) {
+   parallel_chunk(1, side.H-1, [this,alpha](uint, size_t start, size_t size) {
     /*+7 for aligned load with j=1..*/
     const float* Px = side.Px.data+7, *Py = side.Py.data+7, *Pz = side.Pz.data+7;
     float* Fx = side.Fx.begin()+7, *Fy =side.Fy.begin()+7, *Fz = side.Fz.begin()+7;
@@ -657,7 +657,7 @@ break2_:;
     int dx[2][6] {{0, -1, -1, -1, 0, 1},{1, 0, -1, 0, 1, 1}};
     int stride = side.stride, W = side.W;
     for(int i=0; i<2; i++) for(int e=0; e<6; e++) D[i][e] = dy[e]*stride+dx[i][e];
-    v8sf P = float8(pressure/(2*3)); // area = length(cross)/2 / 3 vertices
+    v8sf P = float8(alpha*pressure/(2*3)); // area = length(cross)/2 / 3 vertices
     v8sf internodeLength8 = float8(side.internodeLength);
     v8sf tensionStiffness_internodeLength8 = float8(side.tensionStiffness*side.internodeLength);
 
@@ -1590,12 +1590,12 @@ break2_:;
       /*side.Vx[index] *= (1-10*dt); // Additionnal viscosity
      side.Vy[index] *= (1-10*dt); // Additionnal viscosity
      side.Vz[index] *= (1-10*dt); // Additionnal viscosity*/
-      side.Vx[index] *= (1-10*dt); // Additionnal viscosity
+      /*side.Vx[index] *= (1-10*dt); // Additionnal viscosity
       side.Vy[index] *= (1-10*dt); // Additionnal viscosity
-      side.Vz[index] *= (1-10*dt); // Additionnal viscosity
-      /*side.Vx[index] *= 1./2; // Additionnal viscosity
+      side.Vz[index] *= (1-10*dt); // Additionnal viscosity*/
+      side.Vx[index] *= 1./2; // Additionnal viscosity
      side.Vy[index] *= 1./2; // Additionnal viscosity
-     side.Vz[index] *= 1./2; // Additionnal viscosity*/
+     side.Vz[index] *= 1./2; // Additionnal viscosity
      }
      maxSideV = ::max(maxSideV, length(side.velocity[index]));
      maxRadius = ::max(maxRadius, length2(side.position[index]));
@@ -1643,15 +1643,17 @@ break2_:;
 
   /// All around pressure
   if(processState == ProcessState::Pack) {
-   plate.Fz[0] += pressure * PI * sq(side.radius);
+   plate.Fz[0] += alpha * pressure * PI * sq(side.radius);
    bottomForce = plate.Fz[0];
    System::step(plate, 0);
    plate.Vz[0] = ::max(0.f, plate.Vz[0]); // Only compression
+   plate.Vz[0] /= 2;
 
-   plate.Fz[1] -= pressure * PI * sq(side.radius);
+   plate.Fz[1] -= alpha * pressure * PI * sq(side.radius);
    topForce = plate.Fz[1];
    System::step(plate, 1);
    plate.Vz[1] = ::min(plate.Vz[1], 0.f); // Only compression
+   plate.Vz[1] /= 2;
   } else {
    bottomForce = plate.Fz[0];
    topForce = plate.Fz[1];

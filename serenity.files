@@ -79,3 +79,5 @@ test.cc
 tools/review.cc
 tools/single.cc
 tools/sweep.cc
+tools/simulation.h
+tools/view.h

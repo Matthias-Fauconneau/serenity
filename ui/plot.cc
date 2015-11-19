@@ -292,8 +292,8 @@ shared<Graphics> Plot::graphics(vec2 size) {
   float x = max.x;
   map<int, int> done;
   float minY = inf;
-  extern bool hack;
-  for(size_t i: range(hack, fits.size())) for(auto f: fits.values[i]) {
+  //extern bool hack;
+  for(size_t i: range(/*hack*/0, fits.size())) for(auto f: fits.values[i]) {
    float y = f.a*x+f.b;
    vec2 A = point(vec2(0,f.b));
    vec2 B = point(vec2(x, y));

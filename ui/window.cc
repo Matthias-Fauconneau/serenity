@@ -268,6 +268,7 @@ void XWindow::event() {
    //GLFrameBuffer::blitWindow(target);
    glXSwapBuffers(glDisplay, id+Window);
    swapTime.stop();
+   presentComplete();
   } else {
    {Shm::PutImage r; send(({r.window=id+(Present::EXT?Pixmap:Window), r.context=id+GraphicContext, r.seg=id+Segment,
                             r.totalW=uint16(target.stride), r.totalH=uint16(target.height), r.srcX=uint16(update.origin.x), r.srcY=uint16(update.origin.y),

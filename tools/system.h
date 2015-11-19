@@ -166,7 +166,7 @@ struct System {
   sconst float curvature = 0;
   sconst float elasticModulus = 1e7 * kg/(m*s*s); // 1 GPa
 
-  Plate() : Vertex(0, 2, 1e-3 * densityScale) {
+  Plate() : Vertex(0, 2, 1e3) {
    count = 2;
    Px.clear(); Py.clear(); Pz.clear();
    Vx.clear(); Vy.clear(); Vz.clear();
