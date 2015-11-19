@@ -3,9 +3,11 @@
 inline vec3 qapply(v4sf q, vec3 v) { return toVec3(qapply(q, (v4sf)v)); }
 inline void closest(v4sf a1, v4sf a2, v4sf b1, v4sf b2, vec3& A, vec3& B) { v4sf a, b; closest(a1, a2, b1, b2, a, b);  A=toVec3(a), B=toVec3(b); }
 
-struct Face {
- size_t a, b, c;
-};
+/*struct Face {
+ static constexpr size_t maxDegree = 3; // \/ 3 faces for every vertex (FIXME: Allow polyhedras with arbitrary degree at vertices | Higher max (duplicate face indices))
+ size_t a, b, c; // (FIXME: Allow polyhedras with arbitrary degree at faces | Higher max (duplicate vertex indices))
+ operator ref<size_t>() const { return {&a, maxDegree}; }
+};*/
 struct Edge {
  size_t a, b;
 };
@@ -22,17 +24,14 @@ struct Polyhedra {
  v4sf rotation;
  buffer<vec3> vertices; // Vertex positions in local frame
  buffer<vec4> faces; // Face planes in local frame (normal, distance)
+ static constexpr size_t maxVertexDegree = 3; // \/ 3 edges for every vertex (FIXME: Allow polyhedras with arbitrary degree at vertices | Higher max (duplicate indices))
+ buffer<size_t> vertexToFace;
+ static constexpr size_t maxFaceDegree = 3; // \/ 3 edges for every face (FIXME: Allow polyhedras with arbitrary degree at faces | Higher max (duplicate indices) | Triangulate)
+ buffer<size_t> faceToFace;
  buffer<Edge> edges; // Edge vertex indices
 };
 constexpr float Polyhedra::boundingRadius;
 constexpr float Polyhedra::overlapRadius;
-
-vec3 global(const Polyhedra& A, size_t vertexIndex) {
- vec3 laA = A.vertices[vertexIndex];
- vec3 raA = qapply(A.rotation, laA);
- vec3 gA = A.position + raA;
- return gA;
-}
 
 struct Contact {
  size_t a = invalid, b = invalid;
@@ -43,110 +42,6 @@ struct Contact {
  float depth = -inf;
  explicit operator bool() { return depth > -inf; }
 };
-
-#if 0
-Contact vertexFace(const Polyhedra& A, size_t vertexIndex, const Polyhedra& B) {
- vec3 laA = A.vertices[vertexIndex];
- vec3 raA = qapply(A.rotation, laA);
- vec3 gA = A.position + raA;
- vec3 rbA = gA - B.position;
- vec3 lbA = qapply(conjugate(B.rotation), rbA); // Transforms vertex to B local frame
- // Clips against all planes (convex hull of the spheropolyhedra)
- for(vec4 plane: B.faces) if(dot(plane.xyz(), lbA) > plane.w + A.overlapRadius + B.overlapRadius) return Contact();
- /*else*/ { // P inside polyhedra B
-  for(size_t faceIndex: range(B.faces.size)) {
-   // Tighter clips against all other planes (convex polyhedra)
-   for(size_t planeIndex: range(B.faces.size)) {
-    if(planeIndex == faceIndex) continue;
-    vec4 plane = B.faces[planeIndex];
-    if(dot(plane.xyz(), lbA) <= plane.w) continue; // FIXME: reuse dot(P, lba) - w
-    goto continue2_;
-   } /*else*/ { // Contact
-    vec4 bPlane = B.faces[faceIndex];
-    // Projects vertex on plane (B frame)
-    float t = bPlane.w - dot(bPlane.xyz(), lbA);
-    assert_(t < 0); // Maximum overlap length: A.overlapRadius + B.overlapRadius
-    float depth = t + A.overlapRadius + B.overlapRadius;
-    assert_(depth > 0); // Implied by initial convex hull cull
-    Contact contact;
-    contact.vertexIndexA = vertexIndex;
-    contact.faceIndexB = faceIndex;
-    contact.N = qapply(B.rotation, bPlane.xyz());
-    assert_(depth > 0);
-    contact.depth = depth;
-    vec3 lbB = lbA + t * bPlane.xyz();
-    vec3 rbB = qapply(B.rotation, lbB);
-    vec3 rbC = (rbA + rbB)/2.f;
-    contact.rbC = rbC;
-    contact.raC = rbC + B.position - A.position;
-    return contact;
-   }
-   continue2_:;
-  }
- }
- return Contact();
-}
-
-Contact edgeEdge(const Polyhedra& A, size_t eiA, const Polyhedra& B, size_t eiB) {
- Edge eA = A.edges[eiA];
- vec3 A1 = global(A, eA.a), A2 = global(A, eA.b);
- Edge eB = B.edges[eiB];
- vec3 B1 = global(B, eB.a), B2 = global(B, eB.b);
- vec3 gA, gB;
- closest(A1, A2, B1, B2, gA, gB);
- vec3 r = gA-gB;
- float L = ::length(r);
- float depth = A.overlapRadius + B.overlapRadius - L;
- if(depth > 0) {
-  Contact contact;
-  contact.N = r/L;
-  contact.depth = depth;
-  contact.edgeIndexA = eiA;
-  contact.edgeIndexB = eiB;
-  vec3 gC = (gA+gB)/2.f;
-  contact.rbC = gC - B.position;
-  contact.raC = gC - A.position;
-  return contact;
- }
- return Contact();
-}
-
-#if 0 // EdgeEdge
-Contact vertexEdge(const Polyhedra& A, size_t vertexIndex, const Polyhedra& B) {
- vec3 laA = A.vertices[vertexIndex];
- vec3 raA = qapply(A.rotation, laA);
- vec3 gA = A.position + raA;
- vec3 rbA = gA - B.position;
- vec3 lbA = qapply(conjugate(B.rotation), rbA); // Transforms vertex to B local frame
-  for(size_t edgeIndex: range(B.edges.size)) {
-   Edge e = B.edges[edgeIndex];
-   vec3 P1 = B.vertices[e.a];
-   vec3 P2 = B.vertices[e.b];
-   vec3 E = P2 - P1;
-   // Projects vertex on edge (B frame)
-   float t = dot(lbA - P1, E);
-   if(t <= 0 || t >= length(E)) continue;
-   vec3 lbB = P1 + t * (P2 - P1);
-   vec3 R = lbA-lbB;
-   float L = length(R);
-   float depth = A.overlapRadius + B.overlapRadius - L;
-   if(depth > 0) {
-    Contact contact;
-    contact.vertexIndexA = vertexIndex;
-    contact.edgeIndexB = edgeIndex;
-    contact.N = R/L;
-    contact.depth = depth;
-    vec3 rbB = qapply(B.rotation, lbB);
-    vec3 rbC = (rbA + rbB)/2.f;
-    contact.rbC = rbC;
-    contact.raC = rbC + B.position - A.position;
-    return contact;
-   }
-  }
-  return Contact();
-}
-#endif
-#endif
 
 struct PolyhedraSimulation {
  array<Polyhedra> polyhedras;
@@ -176,7 +71,6 @@ struct PolyhedraSimulation {
    else position = vec3(d*(2*random()-1), d*(2*random()-1), d*(2*random()-1));
 
    const float r = 1./sqrt(3.);
-   ref<vec3> vertices{vec3(r,r,r), vec3(r,-r,-r), vec3(-r,r,-r), vec3(-r,-r,r)};
    // TODO: Asserts origin is centroid
    for(auto& p: polyhedras) {
     if(length(p.position - position) <= p.boundingRadius + Polyhedra::boundingRadius)
@@ -185,21 +79,48 @@ struct PolyhedraSimulation {
     float t0 = 2*PI*random();
     float t1 = acos(1-2*random());
     float t2 = (PI*random()+acos(random()))/2;
-    ref<Face> faceIndices{{0,1,2}, {0,2,3}, {0,3,1}, {1,3,2}};
-    buffer<vec4> faces (faceIndices.size);
+    ref<Edge> edgesVertexIndices{{0,1}, {0,2}, {0,3}, {1,2}, {1,3}, {2,3}};
+    ref<Face> faceVertexIndices {{0,1,2}, {0,2,3}, {0,3,1}, {1,3,2}}; // FIXME: generate from edge list
+    ref<vec3> vertices{vec3(r,r,r), vec3(r,-r,-r), vec3(-r,r,-r), vec3(-r,-r,r)};
+    buffer<vec4> faces (faceVertexIndices.size);
     for(size_t i: range(faces.size)) {
-     Face f = faceIndices[i];
+     Face f = faceVertexIndices[i];
      vec3 N = (vertices[f.a]+vertices[f.b]+vertices[f.c])/3.f;
      float l = length(N);
      faces[i] = vec4(N/l, l);
     }
+    // Vertex to Face
+    buffer<size_t> vertexToFace(vertices.size*Polyhedra::maxVertexDegree);
+    vertexToFace.clear(invalid);
+    for(size_t faceIndex: range(faceVertexIndices.size)) {
+     for(size_t vertexIndex: (ref<size_t>)faceVertexIndices[faceIndex]) {
+      size_t i = 0;
+      while(vertexToFace[vertexIndex*Polyhedra::maxVertexDegree+i]!=invalid) {
+       i++;
+       assert_(i < Polyhedra::maxVertexDegree, vertexToFace, vertexIndex, faceIndex);
+      }
+      vertexToFace[vertexIndex*Polyhedra::maxVertexDegree+i] = faceIndex;
+    }
+    }
+    // Face to Face
+    buffer<size_t> faceToFace(vertices.size*Polyhedra::maxFaceDegree);
+    faceToFace.clear(invalid);
+    for(Edge e: edgesVertexIndices) {
+     for(size_t vertexIndex: (ref<size_t>)faceVertexIndices[faceIndex]) {
+      size_t i = 0;
+      while(faceToFace[vertexIndex*Polyhedra::maxVertexDegree+i]!=invalid) {
+       i++;
+       assert_(i < Polyhedra::maxVertexDegree, faceToFace, vertexIndex, faceIndex);
+      }
+      faceToFace[vertexIndex*Polyhedra::maxVertexDegree+i] = faceIndex;
+    }
+    }
+    error(faceToFace);
     Polyhedra p{
      1, 1,
      position,
      {sin(t0)*sin(t1)*sin(t2),  cos(t0)*sin(t1)*sin(t2), cos(t1)*sin(t2), cos(t2)},
-       copyRef(vertices),
-       move(faces),
-       copyRef(ref<Edge>{{0,1}, {0,2}, {0,3}, {1,2}, {1,3}, {2,3}})
+       copyRef(vertices), move(faces), move(vertexToFace), move(faceToFace), copyRef(edgesVertexIndices)
     };
     polyhedras.append(move(p));
    }
@@ -323,6 +244,40 @@ struct PolyhedraSimulation {
     vec3 N = AB/length(AB);
     float d = dot(N, (A.position + B.position)/2.f);
     planes.append(N, d);
+    vec3 PQ[2]; size_t index[2];
+    {float maxD = -inf;
+     for(size_t vertexIndex : range(A.vertices.size)) {
+      vec3 gA = A.position +  qapply(A.rotation, A.vertices[vertexIndex]);
+      float d = dot(N, gA);
+      if(d > maxD) { maxD=d; index[0] = vertexIndex; PQ[0]=gA;}
+     }
+    }
+    {float minD = inf;
+     for(size_t vertexIndex : range(B.vertices.size)) {
+      vec3 gB = B.position +  qapply(B.rotation, B.vertices[vertexIndex]);
+      float d = dot(N, gB);
+      if(d < minD) { minD=d; index[1] = vertexIndex; PQ[1]=gB; }
+     }
+    }
+    enum { Vertex, Edge, Face } type[2] = {Face, Face};
+    // Shortest link method iterations
+    for(;;) {
+     const Polyhedra* AB[2] = {&A, &B};
+     for(size_t i : range(2)) { // Optimizes distance to contact plane alternating between point on A/B
+      // Variables are named as in the i=0 case, i.e Finds closest point on A to Q (on B) starting from P (on A)
+      const Polyhedra& A = AB[i], B = AB[!i]; // A and B alternates roles
+      vec3 P = PQ[i], Q = PQ[!i]; // P and Q alternates roles
+      if(type[i] == Vertex) { // Finds closest point to Q on the 3 adjacent faces of P
+       size_t pVertexIndex = index[i];
+       for(size_t AfaceIndex: A.vertexToFace.slice(pVertexIndex*Polyhedra::maxVertexDegree, Polyhedra::maxVertexDegree)) {
+        vec4 face = A.faces[AfaceIndex];
+        vec3 N = face.xyz(); float d = face.w;
+        vec3 Pc = Q - (dot(N, Q) - d) * N; // Projects Q on candidate face
+
+       }
+      }
+     }
+    }
 #endif
    }
   }
