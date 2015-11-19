@@ -160,6 +160,8 @@ struct Simulation : System {
  buffer<float> grainWireLocalBz;
  size_t grainWireCount2 = 0;
 
+ float maxSideVt = 0, maxSideF = 0;
+
  Simulation(const Dict& parameters, Stream&& stream) : System(parameters),
    targetHeight(/*parameters.at("Height"_)*/side.height),
    pattern(parameters.contains("Pattern")?
@@ -198,13 +200,13 @@ struct Simulation : System {
  }
 
  generic vec4f tension(T& A, size_t a, size_t b) {
-  vec4f relativePosition = A.position[a] - A.position[b];
+  vec4f relativePosition = A.position(a) - A.position(b);
   vec4f length = sqrt(sq3(relativePosition));
   vec4f x = length - A.internodeLength4;
   vec4f fS = - A.tensionStiffness * x;
   assert(length[0], a, b);
   vec4f direction = relativePosition/length;
-  vec4f unused relativeVelocity = A.velocity[a] - A.velocity[b];
+  vec4f unused relativeVelocity = A.velocity(a) - A.velocity(b);
   vec4f fB = - A.tensionDamping * dot3(direction, relativeVelocity);
   return (fS + fB) * direction;
  }
@@ -277,9 +279,9 @@ struct Simulation : System {
    array<char> s;
    size_t W = side.W;
    for(size_t i: range(side.H-1)) for(size_t j: range(W)) {
-    vec3 a (toVec3(side.position[7+i*side.stride+j]));
-    vec3 b (toVec3(side.position[7+i*side.stride+(j+1)%W]));
-    vec3 c (toVec3(side.position[7+(i+1)*side.stride+(j+i%2)%W]));
+    vec3 a (toVec3(side.position(7+i*side.stride+j)));
+    vec3 b (toVec3(side.position(7+i*side.stride+(j+1)%W)));
+    vec3 c (toVec3(side.position(7+(i+1)*side.stride+(j+i%2)%W)));
     s.append(str(flat(a), flat(c))+'\n');
     s.append(str(flat(b), flat(c))+'\n');
     if(i) s.append(str(flat(a), flat(b))+'\n');
@@ -361,8 +363,8 @@ struct Simulation : System {
     /*for(size_t i: range(1, side.H-1)) {
      for(size_t j: range(0, side.W)) {
       size_t index = i*side.stride+j;
-      min = ::min(min, side.position[7+index]);
-      max = ::max(max, side.position[7+index]);
+      min = ::min(min, side.position(7+index));
+      max = ::max(max, side.position(7+index));
      }
     }*/
    } else {
@@ -376,7 +378,7 @@ struct Simulation : System {
       vec3 newPosition (r*p[0], r*p[1], p[2]); // Within cylinder
       // Finds lowest Z (reduce fall/impact energy)
       for(size_t index: range(grain.count)) {
-       vec3 p = grain.position[index];
+       vec3 p = grain.position(index);
        float x = length(toVec3(p - newPosition).xy());
        if(x < 2*Grain::radius) {
         float dz = sqrt(sq(2*Grain::radius+0x1p-24) - sq(x));
@@ -392,7 +394,7 @@ struct Simulation : System {
           || newPosition[2] > targetHeight)
          ) break;
       for(size_t index: range(wire.count)) {
-       vec3 p = wire.position[index];
+       vec3 p = wire.position(index);
        if(length(p - newPosition) < Grain::radius+Wire::radius)
         goto break2_;
       }
@@ -404,8 +406,8 @@ struct Simulation : System {
       grain.Px[i] = newPosition.x;
       grain.Py[i] = newPosition.y;
       grain.Pz[i] = newPosition.z;
-      //min = ::min(min, grain.position[i]);
-      //max = ::max(max, grain.position[i]);
+      //min = ::min(min, grain.position(i));
+      //max = ::max(max, grain.position(i));
       grain.Vx[i] = 0; grain.Vy[i] = 0; grain.Vz[i] = 0;
 #if GEAR
       for(size_t n: range(3)) {
@@ -836,7 +838,7 @@ break2_:;
     for(size_t i: range(1, side.H-1)) {
      for(size_t j: range(0, side.W)) {
       size_t s = 7+i*side.stride+j;
-      v4sf O = side.position[s];
+      v4sf O = side.position(s);
       //int offset = dot3(XYZ0, floor(scale*(O-min)))[0];
       int offset = int(scale[2]*(O[2]-min[2]))*(size.y*size.x) + int(scale[1]*(O[1]-min[1]))*size.x + int(scale[0]*(O[0]-min[0]));
       list<2> D;
@@ -1483,7 +1485,7 @@ break2_:;
    /*// Bend Stiffness
    for(size_t i: range(1, wire.count-1)) { // TODO: SIMD
     if(wire.bendStiffness) { // Bending resistance springs
-     vec4f A = wire.position[i-1], B = wire.position[i], C = wire.position[i+1];
+     vec4f A = wire.position(i-1), B = wire.position(i), C = wire.position(i+1);
      vec4f a = C-B, b = B-A;
      vec4f c = cross(a, b);
      vec4f length4 = sqrt(sq3(c));
@@ -1505,7 +1507,7 @@ break2_:;
       wire.Fz[i-1] += p * (-dbp)[2];
       //assert_(!Wire::bendDamping);
       {
-       vec4f A = wire.velocity[i-1], B = wire.velocity[i], C = wire.velocity[i+1];
+       vec4f A = wire.velocity(i-1), B = wire.velocity(i), C = wire.velocity(i+1);
        vec4f axis = cross(C-B, B-A);
        vec4f length4 = sqrt(sq3(axis));
        float length = length4[0];
@@ -1536,12 +1538,12 @@ break2_:;
    grain.Vx[i] *= (1-100*dt); // Additionnal viscosity
    grain.Vy[i] *= (1-100*dt); // Additionnal viscosity
    grain.Vz[i] *= (1-100*dt); // Additionnal viscosity
-   assert(isNumber(grain.position[i]), i, grain.position[i]);
-   //min = ::min(min, grain.position[i]);
-   //max = ::max(max, grain.position[i]);
-   minGrain = ::min(minGrain, grain.position[i]);
-   maxGrain = ::max(maxGrain, grain.position[i]);
-   maxGrainV = ::max(maxGrainV, length(grain.velocity[i]));
+   assert(isNumber(grain.position(i)), i, grain.position(i));
+   //min = ::min(min, grain.position(i));
+   //max = ::max(max, grain.position(i));
+   minGrain = ::min(minGrain, grain.position(i));
+   maxGrain = ::max(maxGrain, grain.position(i));
+   maxGrainV = ::max(maxGrainV, length(grain.velocity(i)));
   }
 
   {
@@ -1570,9 +1572,10 @@ break2_:;
     side.Fz[7+i*side.stride+1] += side.Fz[7+i*side.stride+side.W+1];
     for(size_t j: range(0, side.W)) {
      size_t index = 7+i*side.stride+j;
+     {float F = length(side.force(index)); if(F >maxSideF) { maxSideF = F; log(F); }}
      System::step(side, index);
-     if(side.position[index].z < minGrain.z-Grain::radius || side.position[index].z > maxGrain.z+Grain::radius) {
-      /*float length = ::length2(side.position[index]);
+     if(side.position(index).z < minGrain.z-Grain::radius || side.position(index).z > maxGrain.z+Grain::radius) {
+      /*float length = ::length2(side.position(index));
       if(length < side.initialRadius) {
        side.Px[index] *= side.initialRadius/length;
        side.Py[index] *= side.initialRadius/length;
@@ -1585,8 +1588,8 @@ break2_:;
       side.Vz[index] *= 1./2;
      } else {
       // To avoid bound check
-      //min = ::min(min, side.position[7+index]);
-      //max = ::max(max, side.position[7+index]);
+      //min = ::min(min, side.position(7+index));
+      //max = ::max(max, side.position(7+index));
       /*side.Vx[index] *= (1-10*dt); // Additionnal viscosity
      side.Vy[index] *= (1-10*dt); // Additionnal viscosity
      side.Vz[index] *= (1-10*dt); // Additionnal viscosity*/
@@ -1597,8 +1600,9 @@ break2_:;
      side.Vy[index] *= 1./2; // Additionnal viscosity
      side.Vz[index] *= 1./2; // Additionnal viscosity
      }
-     maxSideV = ::max(maxSideV, length(side.velocity[index]));
-     maxRadius = ::max(maxRadius, length2(side.position[index]));
+     {float v = length(side.velocity(index)); if(v >maxSideVt) { maxSideVt = v; log(v); }}
+     maxSideV = ::max(maxSideV, length(side.velocity(index)));
+     maxRadius = ::max(maxRadius, length2(side.position(index)));
     }
     // Copies position back to repeated nodes
     side.Px[7+i*side.stride+side.W+0] = side.Px[7+i*side.stride+0];
@@ -1630,8 +1634,8 @@ break2_:;
    wire.Vy[i] *= (1-100*dt); // Additionnal viscosity
    wire.Vz[i] *= (1-100*dt); // Additionnal viscosity
    // To avoid bound check
-   //min = ::min(min, wire.position[i]);
-   //max = ::max(max, wire.position[i]);
+   //min = ::min(min, wire.position(i));
+   //max = ::max(max, wire.position(i));
   }
   {
    v8sf ssqV8 = _0f;

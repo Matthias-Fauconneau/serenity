@@ -72,16 +72,9 @@ struct System {
   buffer<float> Fy { capacity };
   buffer<float> Fz { capacity };
   size_t count = 0;
-
-  struct {
-   const Vertex& this_;
-   const vec3 operator[](size_t i) const { return vec3(this_.Px[i], this_.Py[i], this_.Pz[i]); }
-  } position {*this};
-  struct {
-   const Vertex& this_;
-   const vec3 operator[](size_t i) const { return vec3(this_.Vx[i], this_.Vy[i], this_.Vz[i]); }
-  } velocity {*this};
-
+  const vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]);  }
+  const vec3 velocity(size_t i) const { return vec3(Vx[i], Vy[i], Vz[i]);  }
+  const vec3 force(size_t i) const { return vec3(Fx[i], Fy[i], Fz[i]);  }
   //struct { vec4f operator[](size_t) const { return _0001f; }} rotation;
   //struct { vec4f operator[](size_t) const { return _0f4; }} angularVelocity;
 

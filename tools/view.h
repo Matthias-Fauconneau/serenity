@@ -12,7 +12,7 @@ FILE(shader_glsl)
 #endif
 
 template<Type tA> vec4f toGlobal(tA& A, size_t a, vec4f localA) {
- return A.position[a] + qapply(A.rotation[a], localA);
+ return A.position(a) + qapply(A.rotation[a], localA);
 }
 
 struct SimulationRun : Simulation {
@@ -50,7 +50,7 @@ struct SimulationRun : Simulation {
  }
 
  void report() {
-  float height = plate.position[1][2]-plate.position[0][2];
+  float height = plate.position(1)[2]-plate.position(0)[2];
   log(timeStep*dt, 1-height/(topZ0-bottomZ0));
   //assert_((float)partTime/(float)totalTime > 0.91, (float)partTime/(float)totalTime);
   //log(strD(partTime, totalTime));
@@ -209,7 +209,7 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
   {
    vec3 min = inf, max = -inf;
    for(size_t i: range(grainCount)) {
-    vec3 O = toVec3(qapply(viewRotation, grain.position[i]));
+    vec3 O = toVec3(qapply(viewRotation, grain.position(i)));
     min = ::min(min, O - vec3(grain.radius));
     max = ::max(max, O + vec3(grain.radius));
     size_t j = 0;
@@ -219,7 +219,7 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
     grainIndices.insertAt(j, i);
    }
    for(size_t i: range(wireCount)) {
-    vec3 O = toVec3(qapply(viewRotation, wire.position[i]));
+    vec3 O = toVec3(qapply(viewRotation, wire.position(i)));
     if(O.z > 1) continue;
     min = ::min(min, O - vec3(wire.radius));
     max = ::max(max, O + vec3(wire.radius));
@@ -287,7 +287,7 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
    buffer<vec4> colors {(wireCount-1)};
    size_t s = 0;
    for(size_t i: range(wireCount-1)) {
-    vec3 a (toVec3(wire.position[i])), b (toVec3(wire.position[i+1]));
+    vec3 a (toVec3(wire.position(i))), b (toVec3(wire.position(i+1)));
     if(length(a.xy()) > 0.05) continue;
     if(length(b.xy()) > 0.05) continue;
     // FIXME: GPU quad projection
@@ -333,8 +333,8 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
    // World space bounding box
    /*vec3 min = inf, max = -inf;
    for(size_t i: range(grainCount)) {
-    min = ::min(min, toVec3(grain.position[i]) - vec3(grain.radius));
-    max = ::max(max, toVec3(grain.position[i]) + vec3(grain.radius));
+    min = ::min(min, toVec3(grain.position(i)) - vec3(grain.radius));
+    max = ::max(max, toVec3(grain.position(i)) + vec3(grain.radius));
    }*/
 
    size_t W = side.W, stride=side.stride;
@@ -379,7 +379,7 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
    size_t W = side.W;
    buffer<vec3> positions {W*2*2};
    for(size_t i: range(2)) for(size_t j: range(W)) {
-    float z = plate.position[0][2] + i * (plate.position[1][2]-plate.position[0][2]);
+    float z = plate.position(0)[2] + i * (plate.position(1)[2]-plate.position(0)[2]);
     float a1 = 2*PI*(j+0)/W; vec3 a (side.radius*cos(a1), side.radius*sin(a1), z);
     float a2 = 2*PI*(j+1)/W; vec3 b (side.radius*cos(a2), side.radius*sin(a2), z);
     // FIXME: GPU projection
@@ -406,8 +406,8 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
      int b = grainGrainB[i];
      //float d = sqrt(sq(grain.Px[a]-grain.Px[b]) + sq(grain.Py[a]-grain.Py[b]) + sq(grain.Pz[a]-grain.Pz[b]));
      if(/*d < 2*Grain::radius &&*/ grainGrainLocalAx[i]) {
-      positions.append( grain.position[a] + toVec3(qapply(grain.rotation[a], (v4sf){grainGrainLocalAx[i], grainGrainLocalAy[i], grainGrainLocalAz[i], 0})) );
-      positions.append( grain.position[b] + toVec3(qapply(grain.rotation[b], (v4sf){grainGrainLocalBx[i], grainGrainLocalBy[i], grainGrainLocalBz[i], 0})) );
+      positions.append( grain.position(a) + toVec3(qapply(grain.rotation[a], (v4sf){grainGrainLocalAx[i], grainGrainLocalAy[i], grainGrainLocalAz[i], 0})) );
+      positions.append( grain.position(b) + toVec3(qapply(grain.rotation[b], (v4sf){grainGrainLocalBx[i], grainGrainLocalBy[i], grainGrainLocalBz[i], 0})) );
      }
     }
 #endif
@@ -418,8 +418,8 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
      //if(b >= wire.count) { log("b", b, wire.count);  continue; }
      //float d = sqrt(sq(grain.Px[a]-wire.Px[b]) + sq(grain.Py[a]-wire.Py[b]) + sq(grain.Pz[a]-wire.Pz[b]));
      if(/*d < 2*Grain::radius &&*/ grainWireLocalAx[i]) {
-      positions.append( grain.position[a] + toVec3(qapply(grain.rotation[a], (v4sf){grainWireLocalAx[i], grainWireLocalAy[i], grainWireLocalAz[i], 0})) );
-      positions.append( wire.position[b] + vec3(grainWireLocalBx[i], grainWireLocalBy[i], grainWireLocalBz[i]) );
+      positions.append( grain.position(a) + toVec3(qapply(grain.rotation[a], (v4sf){grainWireLocalAx[i], grainWireLocalAy[i], grainWireLocalAz[i], 0})) );
+      positions.append( wire.position(b) + vec3(grainWireLocalBx[i], grainWireLocalBy[i], grainWireLocalBz[i]) );
      }
     }
     }
