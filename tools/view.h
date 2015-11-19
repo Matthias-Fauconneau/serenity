@@ -96,6 +96,7 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
    buffer<float> Pz;
    vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]); }
   } side;
+  buffer<Force> forces;
  };
  array<State> states;
  size_t viewT;
@@ -161,6 +162,7 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
   state.side.Px = copy(side.Px);
   state.side.Py = copy(side.Py);
   state.side.Pz = copy(side.Pz);
+  state.forces = move(forces);
   states.append(::move(state));
  }
 
@@ -323,6 +325,7 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
    vertexArray.draw(Triangles, positions.size);
   }
 
+  const State& state = states[viewT];
   // Membrane
   if(1) {
    static GLShader shader {::shader_glsl(), {"color"}};
@@ -340,7 +343,6 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
    size_t W = side.W, stride=side.stride;
    buffer<vec3> positions {W*(side.H-1)*6-W*2};
    size_t s = 0;
-   const State& state = states[viewT];
    for(size_t i: range(side.H-1)) for(size_t j: range(W)) {
     /*vec3 a (toVec3(side.Vertex::position[7+i*stride+j]));
     vec3 b (toVec3(side.Vertex::position[7+i*stride+(j+1)%W]));
@@ -432,6 +434,29 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
      vertexArray.draw(Lines, positions.size);
     }
    }
+
+   // Forces
+   if(1) {
+    glDepthTest(false);
+    static GLVertexArray vertexArray;
+    array<vec3> positions;
+    float maxF = 0; for(const Force& force: state.forces) maxF = ::max(maxF, length(force.force));
+    maxF /= 0.01; // 1cm
+    for(const Force& force: state.forces) {
+     positions.append(force.origin);
+     positions.append(force.origin + force.force/maxF);
+    }
+    if(positions) {
+     GLBuffer positionBuffer (positions);
+     vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
+     shader["transform"] = rotatedViewProjection;
+     shader["uColor"] = vec4(0,0,1, 1./2);
+     extern float lineWidth; lineWidth = 1./2;
+     glBlendAlpha();
+     vertexArray.draw(Lines, positions.size);
+    }
+   }
+
    //lines.clear();
 #if ENCODER
    if(encoder) encoder->writeVideoFrame(target.readback());

@@ -162,6 +162,9 @@ struct Simulation : System {
 
  float maxSideVt = 0, maxSideF = 0;
 
+ struct Force { vec3 origin, force; };
+ array<Force> forces;
+
  Simulation(const Dict& parameters, Stream&& stream) : System(parameters),
    targetHeight(/*parameters.at("Height"_)*/side.height),
    pattern(parameters.contains("Pattern")?
@@ -337,7 +340,7 @@ struct Simulation : System {
   return move(grainLattice);
  }
 
- void step() {
+ bool step() {
   //Locker lock(this->lock);
   staticFrictionCount2 = staticFrictionCount;
   dynamicFrictionCount2 = dynamicFrictionCount;
@@ -817,13 +820,13 @@ break2_:;
    }, 1); // FIXME
    sideForceTime.stop();
 
-   //grainSideGlobalMinD2 = 0;
+   //grainSideGlobalMinD2 = 0; // DEBUG
    if(grainSideGlobalMinD2 <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
     grainSideLatticeTime.start();
     float minD3 = 2*Grain::radius/sqrt(3.); // - Grain::radius;
     grainSideCount = 0;
     if(!grainLattice) grainLattice = generateGrainLattice();
-    if(!grainLattice) return;
+    if(!grainLattice) return false;
     // Side - Grain
     const uint16* grainBase = grainLattice->base;
     int gX = grainLattice->size.x, gY = grainLattice->size.y;
@@ -931,6 +934,7 @@ break2_:;
      grain.Fz[a] += Fz[i];
      side.Fz[b] -= Fz[i];
      sideForce += (grain.Px[a]*Fx[i] + grain.Py[a]*Fy[i]) / sqrt(grain.Px[a]*grain.Px[a] + grain.Py[a]*grain.Py[a]); // dot(R^,F)
+     forces.append(side.position(b), -vec3(Fx[i], Fy[i], Fz[i]));
     }
     grainSideAddTime.stop();
    }
@@ -963,7 +967,7 @@ break2_:;
    }
 
    if(!grainLattice) grainLattice = generateGrainLattice();
-   if(!grainLattice) return;
+   if(!grainLattice) return false;
    float minD6 = 2*(2*Grain::radius/sqrt(3.)/*-Grain::radius*/);
    const int Z = grainLattice->size.z, Y = grainLattice->size.y, X = grainLattice->size.x;
    int di[62];
@@ -1178,7 +1182,7 @@ break2_:;
    }
 #if 1
    if(!grainLattice) grainLattice = generateGrainLattice(); // FIXME: use verlet lists for wire-grain
-   if(!grainLattice) return;
+   if(!grainLattice) return false;
    uint16* grainBase = grainLattice->base;
    const int gX = grainLattice->size.x, gY = grainLattice->size.y;
    const uint16* grainNeighbours[3*3] = {
@@ -1200,7 +1204,7 @@ break2_:;
      if(i>=grainWire) {
       log(index, a, base, i, grainWireIndices.slice(base, grainWire));
       processState = ProcessState::Fail;
-      return;
+      return false;
      }
      assert_(i<grainWire, grainWireIndices.slice(base, grainWire));
      assert_(base+i < grainWireIndices.size);
@@ -1313,7 +1317,7 @@ break2_:;
         depthMax=depth[k];
         highlightWire.append(B[k]);
         highlightGrain.append(A[k]);
-        if(depth[k] > 0.0007/*1*//*9*/) { processState = ProcessState::Fail; return; }
+        if(depth[k] > 0.0007/*1*//*9*/) { processState = ProcessState::Fail; return false; }
        }
        grainWireContact[grainWireContactCount] = index+k;
        grainWireContactCount++;
@@ -1532,8 +1536,7 @@ break2_:;
   vec3 minGrain = inf, maxGrain = -inf;
   grainIntegrationTime.start();
   for(size_t i: range(grain.count)) {
-   assert(isNumber(grain.Fx[i]) && isNumber(grain.Fy[i]) && isNumber(grain.Fz[i]),
-           i, grain.Fx[i], grain.Fy[i], grain.Fz[i]);
+   assert(isNumber(grain.Fx[i]) && isNumber(grain.Fy[i]) && isNumber(grain.Fz[i]), i, grain.Fx[i], grain.Fy[i], grain.Fz[i]);
    System::step(grain, i);
    grain.Vx[i] *= (1-100*dt); // Additionnal viscosity
    grain.Vy[i] *= (1-100*dt); // Additionnal viscosity
@@ -1572,7 +1575,7 @@ break2_:;
     side.Fz[7+i*side.stride+1] += side.Fz[7+i*side.stride+side.W+1];
     for(size_t j: range(0, side.W)) {
      size_t index = 7+i*side.stride+j;
-     {float F = length(side.force(index)); if(F >maxSideF) { maxSideF = F; log(F); }}
+     {float F = length(side.force(index)); if(F >maxSideF) { maxSideF = F; if(F > 8) { log("F", F); processState = ProcessState::Fail; return false; } }}
      System::step(side, index);
      if(side.position(index).z < minGrain.z-Grain::radius || side.position(index).z > maxGrain.z+Grain::radius) {
       /*float length = ::length2(side.position(index));
@@ -1600,7 +1603,7 @@ break2_:;
      side.Vy[index] *= 1./2; // Additionnal viscosity
      side.Vz[index] *= 1./2; // Additionnal viscosity
      }
-     {float v = length(side.velocity(index)); if(v >maxSideVt) { maxSideVt = v; log(v); }}
+     {float v = length(side.velocity(index)); if(v >maxSideVt) { maxSideVt = v; if(v > 4) { log("v", v); processState = ProcessState::Fail; return false; } }}
      maxSideV = ::max(maxSideV, length(side.velocity(index)));
      maxRadius = ::max(maxRadius, length2(side.position(index)));
     }
@@ -1747,6 +1750,7 @@ break2_:;
  stepTime.stop();
  partTime.stop();
  timeStep++;
+ return true;
 }
 
 String info() {
