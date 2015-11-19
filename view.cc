@@ -8,6 +8,7 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
   buffer<v4sf> rotation;
   buffer<Contact> contacts;
   buffer<Force> forces;
+  buffer<vec4> planes;
  };
  array<State> states;
 
@@ -21,6 +22,7 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
   }
   state.contacts = ::move(contacts);
   state.forces = ::move(forces);
+  state.planes = ::move(planes);
   states.append(move(state));
  }
 
@@ -81,13 +83,6 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
   vec2 scale = size/(max-min).xy();
   scale.x = scale.y = ::min(scale.x, scale.y);
   vec2 offset = (size - scale * (min.xy()+max.xy())) / 2.f;
-
-  if(0) for(size_t i: range(4)) {
-   vec2 P1 = offset + scale * qapply(viewRotation, vec3(i%2, i<2, 0)*d).xy();
-   vec2 P2 = offset + scale * qapply(viewRotation, vec3((i+1)%2, ((i+1)%4)<2, 0)*d).xy();
-    assert_(isNumber(P1) && isNumber(P2));
-    graphics->lines.append(P1, P2);
- }
 
   for(size_t p: range(polyhedras.size)) {
    const Polyhedra& A = polyhedras[p];
@@ -150,6 +145,23 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
    vec2 A = offset + scale * qapply(viewRotation, force.origin).xy();
    vec2 B = offset + scale * qapply(viewRotation, force.origin + force.force/maxF).xy();
    graphics->lines.append(A, B, blue);
+  }
+
+  for(vec4 plane: state.planes) {
+   vec3 N = plane.xyz();
+   float d = plane.w;
+   vec3 X = cross(N, vec3(0,0,1));
+   if(length(X) <= __FLT_EPSILON__) X = cross(N, vec3(0,1,0)); // N~0,0,1. X~1,0,0
+   X = X/length(X);
+   vec3 Y = cross(N, X);
+   Y = Y/length(Y);
+   vec2 loop[] {vec2(0,0),vec2(1,0),vec2(1,1),vec2(0,1)};
+   for(size_t i: range(4)) {
+    vec2 P1 = offset + scale * qapply(viewRotation, loop[i             ].x*X + loop[i             ].y*Y + d*N).xy();
+    vec2 P2 = offset + scale * qapply(viewRotation, loop[(i+1)%4].x*X + loop[(i+1)%4].y*Y + d*N).xy();
+    assert_(isNumber(P1) && isNumber(P2));
+    graphics->lines.append(P1, P2);
+   }
   }
   return graphics;
  }

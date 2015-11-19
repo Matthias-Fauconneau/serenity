@@ -44,6 +44,7 @@ struct Contact {
  explicit operator bool() { return depth > -inf; }
 };
 
+#if 0
 Contact vertexFace(const Polyhedra& A, size_t vertexIndex, const Polyhedra& B) {
  vec3 laA = A.vertices[vertexIndex];
  vec3 raA = qapply(A.rotation, laA);
@@ -145,6 +146,7 @@ Contact vertexEdge(const Polyhedra& A, size_t vertexIndex, const Polyhedra& B) {
   return Contact();
 }
 #endif
+#endif
 
 struct PolyhedraSimulation {
  array<Polyhedra> polyhedras;
@@ -163,18 +165,19 @@ struct PolyhedraSimulation {
  struct Force { vec3 origin, force; };
  array<Force> forces;
 
+ array<vec4> planes; // CP visualization
+
  tsc stepTime, contactTime, vertexFaceTime, edgeEdgeTime;
 
  PolyhedraSimulation(Random& random) {
   while(polyhedras.size < N) {
-#if 0
-   //vec3 position(d*(2*random()-1), d*(2*random()-1), d*(2*random()-1));
-#else
-   vec3 position (0,0,0);
-   if(polyhedras.size) position = vec3(random()-1./2, random()-1./2, 1+random());
-#endif
+   vec3 position;
+   if(N==2) position = polyhedras.size==0 ? vec3(0,0,0) : vec3(random()-1./2, random()-1./2, 1+random());
+   else position = vec3(d*(2*random()-1), d*(2*random()-1), d*(2*random()-1));
+
    const float r = 1./sqrt(3.);
    ref<vec3> vertices{vec3(r,r,r), vec3(r,-r,-r), vec3(-r,r,-r), vec3(-r,-r,r)};
+   // TODO: Asserts origin is centroid
    for(auto& p: polyhedras) {
     if(length(p.position - position) <= p.boundingRadius + Polyhedra::boundingRadius)
      goto break_;
@@ -246,12 +249,14 @@ struct PolyhedraSimulation {
 
   bool status = false;
   array<Contact> contacts;
+  array<vec4> planes;
   contactTime.start();
   for(size_t a: range(polyhedras.size)) {
    Polyhedra& A = polyhedras[a];
    for(size_t b: range(polyhedras.size)) {
     if(a==b) continue;
     Polyhedra& B = polyhedras[b];
+#if 0
     // Vertex - Face (Sphere - Plane)
     for(size_t vertexIndex: range(A.vertices.size)) {
       vertexFaceTime.start();
@@ -312,6 +317,13 @@ struct PolyhedraSimulation {
      }
     }
     break_:;
+#else
+    // Initial contact plane as perpendicular bisector plane of centroids
+    vec3 AB = B.position - A.position; // Assumes origin is centroid
+    vec3 N = AB/length(AB);
+    float d = dot(N, (A.position + B.position)/2.f);
+    planes.append(N, d);
+#endif
    }
   }
   contactTime.stop();
@@ -344,6 +356,7 @@ struct PolyhedraSimulation {
   end:
   this->contacts = ::move(contacts);
   this->forces = ::move(forces);
+  this->planes = ::move(planes);
   t++;
   stepTime.stop();
   return status;
