@@ -11,9 +11,8 @@
 FILE(shader_glsl)
 #endif
 
-template<Type tA> vec4f toGlobal(tA& A, size_t a, vec4f localA) {
- return A.position(a) + qapply(A.rotation[a], localA);
-}
+template<Type tA> vec4f toGlobal(tA& A, size_t a, vec4f localA) { return A.position(a) + qapply(A.rotation[a], localA); }
+inline vec3 qapply(v4sf q, vec3 v) { return toVec3(qapply(q, (v4sf)v)); }
 
 struct SimulationRun : Simulation {
  SimulationRun(const Dict& parameters, File&& file) : Simulation(parameters, move(file)) {
@@ -71,15 +70,15 @@ struct SimulationRun : Simulation {
  }
 };
 
-#if UI
+#if UI || !__GXX_EXPERIMENTAL_CXX0X__ // FIXME: QtCreator does not get the UI def in serenity.config for some reason ...
 struct SimulationView : SimulationRun, Widget/*, Poll*/ {
  int2 size {/*1280,720*//*1050*/768};
  unique<Window> window = nullptr;
  // View
  vec2 lastPos; // for relative cursor movements
  vec2 viewYawPitch = vec2(0, -PI/3); // Current view angles
- vec2 scale = 0;
- vec2 translation = 0;
+ vec2 scale = 87;
+ vec2 translation = vec2(0.0002, -0.005);
  v4sf rotationCenter = _0f4;
  //Thread simulationThread {19};
 #if ENCODER
@@ -212,7 +211,7 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
   {
    vec3 min = inf, max = -inf;
    for(size_t i: range(grainCount)) {
-    vec3 O = toVec3(qapply(viewRotation, grain.position(i)));
+    vec3 O = qapply(viewRotation, grain.position(i));
     min = ::min(min, O - vec3(grain.radius));
     max = ::max(max, O + vec3(grain.radius));
     size_t j = 0;
@@ -222,7 +221,7 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
     grainIndices.insertAt(j, i);
    }
    for(size_t i: range(wireCount)) {
-    vec3 O = toVec3(qapply(viewRotation, wire.position(i)));
+    vec3 O = qapply(viewRotation, wire.position(i));
     if(O.z > 1) continue;
     min = ::min(min, O - vec3(wire.radius));
     max = ::max(max, O + vec3(wire.radius));
@@ -233,10 +232,9 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
 
    if(!this->scale && !this->translation) this->scale = scale.xy(), this->translation = translation.xy();
    const float Dt = 1./60;
+   if(scale.xy() != this->scale || translation.xy() != this->translation) window->render();
    scale.xy() = this->scale = this->scale*float(1-Dt) + float(Dt)*scale.xy();
    translation.xy() = this->translation = this->translation*float(1-Dt) + float(Dt)*translation.xy();
-   /*scale.xy() = this->scale = scale.xy();
-   translation.xy() = this->translation = translation.xy();*/
   }
 
   mat4 viewProjection = mat4()
@@ -290,7 +288,7 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
    buffer<vec4> colors {(wireCount-1)};
    size_t s = 0;
    for(size_t i: range(wireCount-1)) {
-    vec3 a (toVec3(wire.position(i))), b (toVec3(wire.position(i+1)));
+    vec3 a (wire.position(i)), b (wire.position(i+1));
     if(length(a.xy()) > 0.05) continue;
     if(length(b.xy()) > 0.05) continue;
     // FIXME: GPU quad projection
@@ -328,7 +326,7 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
 
   const State& state = states[viewT];
   // Membrane
-  if(1) {
+  if(state.side.Px) {
    static GLShader shader {::shader_glsl(), {"color"}};
    shader.bind();
    shader.bindFragments({"color"});
@@ -337,20 +335,20 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
    // World space bounding box
    /*vec3 min = inf, max = -inf;
    for(size_t i: range(grainCount)) {
-    min = ::min(min, toVec3(grain.position(i)) - vec3(grain.radius));
-    max = ::max(max, toVec3(grain.position(i)) + vec3(grain.radius));
+    min = ::min(min, grain.position(i) - vec3(grain.radius));
+    max = ::max(max, grain.position(i) + vec3(grain.radius));
    }*/
 
    size_t W = side.W, stride=side.stride;
    buffer<vec3> positions {W*(side.H-1)*6-W*2};
    size_t s = 0;
    for(size_t i: range(side.H-1)) for(size_t j: range(W)) {
-    /*vec3 a (toVec3(side.Vertex::position[7+i*stride+j]));
-    vec3 b (toVec3(side.Vertex::position[7+i*stride+(j+1)%W]));
-    vec3 c (toVec3(side.Vertex::position[7+(i+1)*stride+(j+i%2)%W]));*/
-    vec3 a (toVec3(state.side.position(7+i*stride+j)));
-    vec3 b (toVec3(state.side.position(7+i*stride+(j+1)%W)));
-    vec3 c (toVec3(state.side.position(7+(i+1)*stride+(j+i%2)%W)));
+    /*vec3 a (side.Vertex::position[7+i*stride+j]);
+    vec3 b (side.Vertex::position[7+i*stride+(j+1%W]));
+    vec3 c (side.Vertex::position[7+(i+1*stride+(j+i%2)%W]));*/
+    vec3 a (state.side.position(7+i*stride+j));
+    vec3 b (state.side.position(7+i*stride+(j+1%W)));
+    vec3 c (state.side.position(7+(i+1*stride+(j+i%2)%W)));
     /*if(a.z < min.z || a.z > max.z) continue;
     if(b.z < min.z || b.z > max.z) continue;
     if(c.z < min.z || c.z > max.z) continue;*/
@@ -409,8 +407,8 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
      int b = grainGrainB[i];
      //float d = sqrt(sq(grain.Px[a]-grain.Px[b]) + sq(grain.Py[a]-grain.Py[b]) + sq(grain.Pz[a]-grain.Pz[b]));
      if(/*d < 2*Grain::radius &&*/ grainGrainLocalAx[i]) {
-      positions.append( grain.position(a) + toVec3(qapply(grain.rotation[a], (v4sf){grainGrainLocalAx[i], grainGrainLocalAy[i], grainGrainLocalAz[i], 0})) );
-      positions.append( grain.position(b) + toVec3(qapply(grain.rotation[b], (v4sf){grainGrainLocalBx[i], grainGrainLocalBy[i], grainGrainLocalBz[i], 0})) );
+      positions.append( grain.position(a) + qapply(grain.rotation[a], (v4sf{grainGrainLocalAx[i], grainGrainLocalAy[i], grainGrainLocalAz[i], 0})) );
+      positions.append( grain.position(b) + qapply(grain.rotation[b], (v4sf{grainGrainLocalBx[i], grainGrainLocalBy[i], grainGrainLocalBz[i], 0})) );
      }
     }
 #endif
@@ -421,7 +419,7 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
      //if(b >= wire.count) { log("b", b, wire.count);  continue; }
      //float d = sqrt(sq(grain.Px[a]-wire.Px[b]) + sq(grain.Py[a]-wire.Py[b]) + sq(grain.Pz[a]-wire.Pz[b]));
      if(/*d < 2*Grain::radius &&*/ grainWireLocalAx[i]) {
-      positions.append( grain.position(a) + toVec3(qapply(grain.rotation[a], (v4sf){grainWireLocalAx[i], grainWireLocalAy[i], grainWireLocalAz[i], 0})) );
+      positions.append( grain.position(a) + qapply(grain.rotation[a], vec3(grainWireLocalAx[i], grainWireLocalAy[i], grainWireLocalAz[i])) );
       positions.append( wire.position(b) + vec3(grainWireLocalBx[i], grainWireLocalBy[i], grainWireLocalBz[i]) );
      }
     }
