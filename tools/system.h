@@ -214,7 +214,8 @@ struct System {
  void step(Grain& p, size_t i) {
   step((Vertex&)p, i);
    // Rotation viscosity FIXME
-  p.AVx[i] *= 1-10*dt; p.AVy[i] *= 1-10*dt; p.AVz[i] *= 1-10*dt; //2K-3K
+  //p.AVx[i] *= 1-10*dt; p.AVy[i] *= 1-10*dt; p.AVz[i] *= 1-10*dt; //2K-3K
+  p.AVx[i] *= 1-1000*dt; p.AVy[i] *= 1-1000*dt; p.AVz[i] *= 1-1000*dt; //2K-3K
   //p.AVx[i] *= 1./2; p.AVy[i] *= 1./2; p.AVz[i] *= 1./2;
   // Euler
   p.rotation[i] += dt_2 * qmul((v4sf){p.AVx[i],p.AVy[i],p.AVz[i],0}, p.rotation[i]);
@@ -254,7 +255,7 @@ struct System {
  struct Side : Vertex {
   sconst float curvature = 0; // -1/radius?
   sconst float elasticModulus = 1e7; // for contact
-  sconst float density = 1e3;
+  sconst float density = 10e3;
   const float resolution;
   const float initialRadius;
   const float height;

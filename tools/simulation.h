@@ -164,6 +164,7 @@ struct Simulation : System {
 
  struct Force { vec3 origin, force; };
  array<Force> forces;
+ vec3 highlight;
 
  Simulation(const Dict& parameters, Stream&& stream) : System(parameters),
    targetHeight(/*parameters.at("Height"_)*/side.height),
@@ -707,6 +708,7 @@ break2_:;
       *(v8sf*)(Fx+index) += fx;
       *(v8sf*)(Fy+index) += fy;
       *(v8sf*)(Fz+index) += fz;
+      for(size_t k: range(8)) forces.append(side.position(7+index+k), -vec3(fx[k], fy[k], fz[k]));
      }
     }
 
@@ -1538,9 +1540,12 @@ break2_:;
   for(size_t i: range(grain.count)) {
    assert(isNumber(grain.Fx[i]) && isNumber(grain.Fy[i]) && isNumber(grain.Fz[i]), i, grain.Fx[i], grain.Fy[i], grain.Fz[i]);
    System::step(grain, i);
-   grain.Vx[i] *= (1-100*dt); // Additionnal viscosity
+   /*grain.Vx[i] *= (1-100*dt); // Additionnal viscosity
    grain.Vy[i] *= (1-100*dt); // Additionnal viscosity
-   grain.Vz[i] *= (1-100*dt); // Additionnal viscosity
+   grain.Vz[i] *= (1-100*dt); // Additionnal viscosity*/
+   grain.Vx[i] *= (1-1000*dt); // Additionnal viscosity
+   grain.Vy[i] *= (1-1000*dt); // Additionnal viscosity
+   grain.Vz[i] *= (1-1000*dt); // Additionnal viscosity
    assert(isNumber(grain.position(i)), i, grain.position(i));
    //min = ::min(min, grain.position(i));
    //max = ::max(max, grain.position(i));
@@ -1575,7 +1580,8 @@ break2_:;
     side.Fz[7+i*side.stride+1] += side.Fz[7+i*side.stride+side.W+1];
     for(size_t j: range(0, side.W)) {
      size_t index = 7+i*side.stride+j;
-     {float F = length(side.force(index)); if(F >maxSideF) { maxSideF = F; if(F > 8) { log("F", F); processState = ProcessState::Fail; return false; } }}
+     forces.append(side.position(index), side.force(index));
+     {float F = length(side.force(index)); if(F >maxSideF) { maxSideF = F; if(F > 8192) { log("F", F); processState = ProcessState::Fail; return false; } }}
      System::step(side, index);
      if(side.position(index).z < minGrain.z-Grain::radius || side.position(index).z > maxGrain.z+Grain::radius) {
       /*float length = ::length2(side.position(index));
@@ -1600,10 +1606,10 @@ break2_:;
       side.Vy[index] *= (1-10*dt); // Additionnal viscosity
       side.Vz[index] *= (1-10*dt); // Additionnal viscosity*/
       side.Vx[index] *= 1./2; // Additionnal viscosity
-     side.Vy[index] *= 1./2; // Additionnal viscosity
-     side.Vz[index] *= 1./2; // Additionnal viscosity
+      side.Vy[index] *= 1./2; // Additionnal viscosity
+      side.Vz[index] *= 1./2; // Additionnal viscosity
      }
-     {float v = length(side.velocity(index)); if(v >maxSideVt) { maxSideVt = v; if(v > 4) { log("v", v); processState = ProcessState::Fail; return false; } }}
+     {float v = length(side.velocity(index)); if(v >maxSideVt) { maxSideVt = v; if(v > 4096) { log("v", v); highlight=side.position(index); processState = ProcessState::Fail; return false; } }}
      maxSideV = ::max(maxSideV, length(side.velocity(index)));
      maxRadius = ::max(maxRadius, length2(side.position(index)));
     }

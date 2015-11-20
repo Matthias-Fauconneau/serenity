@@ -127,7 +127,7 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
    queue();
    simulationThread.spawn();
   }*/
-  record(); viewT=states.size-1;
+  /*record();*/  states.append(); viewT=states.size-1;
   window->presentComplete = [this]{
    if(!running) return;
    for(int unused t: range(256)) if(!step()) { running = false;  break; }
@@ -154,6 +154,7 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
  }*/
 
  void record() {
+  return;
   State state;
   //state.side.size = side.count;
   /*state.side.Px = copyRef(side.Px.slice(0, side.count));
@@ -437,8 +438,6 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
 
    // Forces
    if(1) {
-    glDepthTest(false);
-    static GLVertexArray vertexArray;
     array<vec3> positions;
     float maxF = 0; for(const Force& force: state.forces) maxF = ::max(maxF, length(force.force));
     maxF /= 0.01; // 1cm
@@ -447,6 +446,8 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
      positions.append(force.origin + force.force/maxF);
     }
     if(positions) {
+     glDepthTest(false);
+     static GLVertexArray vertexArray;
      GLBuffer positionBuffer (positions);
      vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
      shader["transform"] = rotatedViewProjection;
