@@ -664,7 +664,7 @@ break2_:;
    for(size_t i = 0; i < gBC; i += 8) {
     v8si A = *(v8si*)&grainBottom[i];
     v8sf depth = Bz_R - gather(grain.Pz, A);
-    contact(grain, A, plate, _0i, depth, _0f, _0f, -Grain::radius8, _0f, _0f, _1f,
+    contact<Grain, Plate>(grain, A, depth, _0f, _0f, -Grain::radius8, _0f, _0f, _1f,
             *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i]);
    }
    for(size_t i = 0; i < grainBottomCount; i++) { // Scalar scatter add
@@ -1219,8 +1219,8 @@ break2_:;
    v8sf localBx = gather(grainGrainLocalBx, contacts);
    v8sf localBy = gather(grainGrainLocalBy, contacts);
    v8sf localBz = gather(grainGrainLocalBz, contacts);
-   for(size_t k: range(8)) if(i+k<grainGrainContactCount)
-    assert_(grain.AVx[A[k]] == 0, grain.AVx[A[k]]);
+   /*for(size_t k: range(8)) if(i+k<grainGrainContactCount)
+    assert_(grain.AVx[A[k]] == 0, grain.AVx[A[k]]);*/
    contact<Grain, Grain>( grain, A, grain, B, depth,
                          RAx, RAy, RAz,
                          RBx, RBy, RBz,
@@ -1233,8 +1233,7 @@ break2_:;
                          *(v8sf*)&TAx[i], *(v8sf*)&TAy[i], *(v8sf*)&TAz[i],
                          *(v8sf*)&TBx[i], *(v8sf*)&TBy[i], *(v8sf*)&TBz[i]
            );
-   for(size_t k: range(8)) if(i+k<grainGrainContactCount)
-    assert_(TAx[i+k] == 0, TAx[i+k]);
+   //for(size_t k: range(8)) if(i+k<grainGrainContactCount) assert_(TAx[i+k] == 0, TAx[i+k]);
    // Scatter static frictions
    scatter(grainGrainLocalAx, contacts, localAx);
    scatter(grainGrainLocalAy, contacts, localAy);
@@ -1255,7 +1254,7 @@ break2_:;
    grain.Fz[a] += Fz[i];
    grain.Fz[b] -= Fz[i];
 
-   assert_(TAx[i] == 0, TAx[i]);
+   //assert_(TAx[i] == 0, TAx[i]);
    grain.Tx[a] += TAx[i];
    grain.Ty[a] += TAy[i];
    grain.Tz[a] += TAz[i];
