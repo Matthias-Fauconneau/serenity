@@ -169,7 +169,7 @@ struct Simulation : System {
 
  size_t grainGrainCount = 0;
  // FIXME: uint16 -> unpack
- static constexpr size_t grainGrain = 8;
+ static constexpr size_t grainGrain = 12;
  buffer<int> grainGrainA {grain.capacity * grainGrain};
  buffer<int> grainGrainB {grain.capacity * grainGrain};
  // Grain-Grain Friction
@@ -349,7 +349,11 @@ struct Simulation : System {
    min.z = ::min(min.z, grain.Pz[i]);
    max.z = ::max(max.z, grain.Pz[i]);
   }
-  if(!(min > vec3(-1) && max < vec3(1))) { log("Domain grain", min, max); processState = ProcessState::Fail; return false; }
+  if(!(min > vec3(-1) && max < vec3(1))) {
+   log("Domain grain", min, max);
+   processState = ProcessState::Fail;
+   return false;
+  }
   // Side
   // Avoids bound checks on grain-side/wire-side
   // Only needed once membrane is soft
@@ -364,7 +368,11 @@ struct Simulation : System {
     max.z = ::max(max.z, side.Pz[7+s]);
    }
   }
-  if(!(min > vec3(-1) && max < vec3(1))) { log("Domain side", min, max); processState = ProcessState::Fail; return false; }
+  if(!(min > vec3(-1) && max < vec3(1))) {
+   log("Domain side", min, max);
+   processState = ProcessState::Fail;
+   return false;
+  }
   // Wire
   // Avoids bound checks on grain-wire
   for(size_t i: range(wire.count)) {
@@ -375,7 +383,11 @@ struct Simulation : System {
    min.z = ::min(min.z, wire.Pz[i]);
    max.z = ::max(max.z, wire.Pz[i]);
   }
-  if(!(min > vec3(-1) && max < vec3(1))) { log("Domain wire", min, max); processState = ProcessState::Fail; return false; }
+  if(!(min > vec3(-1) && max < vec3(1))) {
+   log("Domain wire", min, max);
+   processState = ProcessState::Fail;
+   return false;
+  }
   return true;
  }
 
@@ -433,36 +445,42 @@ struct Simulation : System {
     const bool useGrain = 1;
     if(useGrain && currentPourHeight >= Grain::radius) {
      for(uint unused t: range(1/*::max(1.,dt/1e-5)*/)) for(;;) {
-      vec4f p {random()*2-1,random()*2-1, currentPourHeight, 0};
+      vec3 p(random()*2-1,random()*2-1, currentPourHeight);
       if(length2(p)>1) continue;
       float r = ::min(pourRadius, /*side.minRadius*/side.radius);
-      vec3 newPosition (r*p[0], r*p[1], p[2]); // Within cylinder
+      vec3 newPosition (r*p.x, r*p.y, p.z); // Within cylinder
       // //Finds lowest Z (reduce fall/impact energy) (FIXME: might prevent wire to spawn under pour height)
       // Finds max Z without grain overlap
       for(size_t index: range(grain.count)) {
        vec3 other = grain.position(index);
-       float x = length(toVec3(other - newPosition).xy());
-       if(x < 2*Grain::radius) {
-        float dz = sqrt(sq(2*Grain::radius+0x1p-24) - sq(x));
-        newPosition[2] = ::max(newPosition[2], other[2]+dz);
+       float Dxy = length((other - newPosition).xy());
+       if(Dxy < 2*Grain::radius) {
+        float dz = sqrt(sq(2*Grain::radius+0x1p-24) - sq(Dxy));
+        newPosition.z = ::max(newPosition.z, other.z+dz/*+Wire::radius*//*margin*/);
        }
       }
       //assert_(newPosition[2] >= currentPourHeight);
-      if(newPosition[2] > currentPourHeight) break; // Let wire pour over grain first
+      if(newPosition.z> currentPourHeight) break; // Let wire pour over grain first
+      /*// Finds max Z without grain overlap
+      for(size_t index: range(grain.count)) {
+       vec3 other = grain.position(index);
+       float Dxyz = length(other - newPosition);
+       assert_(Dxyz > 2*Grain::radius,"would overlap", newPosition, other); goto break2_; }
+      }*/
       float wireDensity = grain.count ? (wire.count-1)*Wire::volume / (grain.count*Grain::volume) : 1;
-      if(newPosition[2] > currentPourHeight
+      if(newPosition.z > currentPourHeight
          // ?
          && (
           wireDensity < targetWireDensity
-          || newPosition[2] > currentPourHeight+2*Grain::radius
-          || newPosition[2] > targetHeight)
+          || newPosition.z > currentPourHeight+2*Grain::radius
+          || newPosition.z > targetHeight)
          ) break;
       for(size_t index: range(wire.count)) {
        vec3 p = wire.position(index);
        if(length(p - newPosition) < Grain::radius+Wire::radius)
         goto break2_;
       }
-      maxSpawnHeight = ::max(maxSpawnHeight, newPosition[2]);
+      maxSpawnHeight = ::max(maxSpawnHeight, newPosition.z);
       //Locker lock(this->lock);
       assert(grain.count < grain.capacity);
       size_t i = grain.count;
@@ -685,7 +703,7 @@ break2_:;
   }
 #endif
   float sideForce = 0;
-  {// Rigid Side
+  if(processState <= ProcessState::Pour) { // Rigid Side
    size_t gSC = grainRigidSideCount;
    while(gSC%8) grainRigidSide[gSC++] = grain.count;
    v8sf R = float8(side.radius-Grain::radius);
@@ -1009,8 +1027,8 @@ break2_:;
   this->sideForce = sideForce;
 #endif
 
+  //grainGrainGlobalMinD6 = 0; // DEBUG
   if(grainGrainGlobalMinD6 <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
-
    grainGrainLatticeTime.start();
    buffer<int2> grainGrainIndices {grainCount8 * grainGrain};
    grainGrainIndices.clear();
@@ -1021,7 +1039,7 @@ break2_:;
      size_t base = a*grainGrain;
      size_t i = 0;
      while(grainGrainIndices[base+i]) i++;
-     assert(i<grainGrain, grainGrainIndices.slice(base, grainGrain));
+     assert_(i<grainGrain, grainGrainIndices.slice(base, grainGrain));
      grainGrainIndices[base+i] = int2{grainGrainB[index]+1, int(index)};
     }
     /*{ // B<->A FIXME?
@@ -1046,20 +1064,20 @@ break2_:;
    assert(i==62);
    Locker lock(this->lock);
    grainGrainCount = 0;
-   if(1) {
-    buffer<float> grainGrainLocalAx {grainCount8 * grainGrain};
-    buffer<float> grainGrainLocalAy {grainCount8 * grainGrain};
-    buffer<float> grainGrainLocalAz {grainCount8 * grainGrain};
-    buffer<float> grainGrainLocalBx {grainCount8 * grainGrain};
-    buffer<float> grainGrainLocalBy {grainCount8 * grainGrain};
-    buffer<float> grainGrainLocalBz {grainCount8 * grainGrain};
+   buffer<float> grainGrainLocalAx {grainCount8 * grainGrain};
+   buffer<float> grainGrainLocalAy {grainCount8 * grainGrain};
+   buffer<float> grainGrainLocalAz {grainCount8 * grainGrain};
+   buffer<float> grainGrainLocalBx {grainCount8 * grainGrain};
+   buffer<float> grainGrainLocalBy {grainCount8 * grainGrain};
+   buffer<float> grainGrainLocalBz {grainCount8 * grainGrain};
+   if(grainGrain <= 12) { // Grid || Exhaustive search
     for(size_t latticeIndex: range(Z*Y*X)) {
      const uint16* current = grainLattice->base + latticeIndex;
      size_t a = *current;
      if(!a) continue;
      a--;
      // Neighbours
-     list<8> D;
+     list<grainGrain/*12*/> D;
      for(size_t n: range(62)) {
       size_t b = current[di[n]];
       if(!b) continue;
@@ -1067,6 +1085,7 @@ break2_:;
       float d = sqrt(sq(grain.Px[a]-grain.Px[b]) + sq(grain.Py[a]-grain.Py[b]) + sq(grain.Pz[a]-grain.Pz[b]));
       if(!D.insert(d, b)) minD6 = ::min(minD6, d);
      }
+     assert_(minD6 > 0, minD6);
      //log(D.size, ref<element>(D.elements,D.size));
      for(size_t i: range(D.size)) {
       //assert(grainGrainCount < grainCount8 * grainGrain);
@@ -1075,7 +1094,7 @@ break2_:;
       size_t B = D.elements[i].value;
       //assert(a!=B, a, B, i, D.size, D.elements);
       grainGrainB[index] = B;
-      for(size_t i: range(grainGrain/*8*/)) {
+      for(size_t i: range(grainGrain/*12*/)) {
        size_t b = grainGrainIndices[a*grainGrain+i][0];
        if(!b) break;
        b--;
@@ -1097,19 +1116,13 @@ break2_:;
       grainGrainCount++;
      }
     }
-    //grainGrainCount2 = ::min(grainGrainCount2, grainGrainCount);
-    this->grainGrainLocalAx = move(grainGrainLocalAx);
-    this->grainGrainLocalAy = move(grainGrainLocalAy);
-    this->grainGrainLocalAz = move(grainGrainLocalAz);
-    this->grainGrainLocalBx = move(grainGrainLocalBx);
-    this->grainGrainLocalBy = move(grainGrainLocalBy);
-    this->grainGrainLocalBz = move(grainGrainLocalBz);
-    //grainGrainCount2 = grainGrainCount;
    } else {
-    assert_(grainGrain > 8);
+    static bool unused once = ({ log("WARNING: Exhaustive Grain-Grain search enabled"); true; });
+    assert_(grainGrain > 12);
     for(size_t a: range(grain.count)) {
      for(size_t b: range(a)) {
       size_t index = grainGrainCount;
+      assert_(index < grainGrainA.size && index < grainGrainB.size);
       grainGrainA[index] = a;
       size_t B = b;
       assert(a!=B);
@@ -1118,6 +1131,16 @@ break2_:;
      }
     }
    }
+
+   //grainGrainCount2 = ::min(grainGrainCount2, grainGrainCount);
+   this->grainGrainLocalAx = move(grainGrainLocalAx);
+   this->grainGrainLocalAy = move(grainGrainLocalAy);
+   this->grainGrainLocalAz = move(grainGrainLocalAz);
+   this->grainGrainLocalBx = move(grainGrainLocalBx);
+   this->grainGrainLocalBy = move(grainGrainLocalBy);
+   this->grainGrainLocalBz = move(grainGrainLocalBz);
+   //grainGrainCount2 = grainGrainCount;
+
    assert(grainGrainCount < grainCount8 * grainGrain);
    {// Aligns with invalid pairs
     size_t grainGrainCount = this->grainGrainCount;
@@ -1196,7 +1219,9 @@ break2_:;
    v8sf localBx = gather(grainGrainLocalBx, contacts);
    v8sf localBy = gather(grainGrainLocalBy, contacts);
    v8sf localBz = gather(grainGrainLocalBz, contacts);
-   contact<Grain,Grain>( grain, A, grain, B, depth,
+   for(size_t k: range(8)) if(i+k<grainGrainContactCount)
+    assert_(grain.AVx[A[k]] == 0, grain.AVx[A[k]]);
+   contact<Grain, Grain>( grain, A, grain, B, depth,
                          RAx, RAy, RAz,
                          RBx, RBy, RBz,
                          Nx, Ny, Nz,
@@ -1208,6 +1233,8 @@ break2_:;
                          *(v8sf*)&TAx[i], *(v8sf*)&TAy[i], *(v8sf*)&TAz[i],
                          *(v8sf*)&TBx[i], *(v8sf*)&TBy[i], *(v8sf*)&TBz[i]
            );
+   for(size_t k: range(8)) if(i+k<grainGrainContactCount)
+    assert_(TAx[i+k] == 0, TAx[i+k]);
    // Scatter static frictions
    scatter(grainGrainLocalAx, contacts, localAx);
    scatter(grainGrainLocalAy, contacts, localAy);
@@ -1228,6 +1255,7 @@ break2_:;
    grain.Fz[a] += Fz[i];
    grain.Fz[b] -= Fz[i];
 
+   assert_(TAx[i] == 0, TAx[i]);
    grain.Tx[a] += TAx[i];
    grain.Ty[a] += TAy[i];
    grain.Tz[a] += TAz[i];
@@ -1657,9 +1685,9 @@ break2_:;
    /*grain.Vx[i] *= (1-100*dt); // Additionnal viscosity
    grain.Vy[i] *= (1-100*dt); // Additionnal viscosity
    grain.Vz[i] *= (1-100*dt); // Additionnal viscosity*/
-   grain.Vx[i] *= (1-1000*dt); // Additionnal viscosity
+   /*grain.Vx[i] *= (1-1000*dt); // Additionnal viscosity
    grain.Vy[i] *= (1-1000*dt); // Additionnal viscosity
-   grain.Vz[i] *= (1-1000*dt); // Additionnal viscosity
+   grain.Vz[i] *= (1-1000*dt); // Additionnal viscosity*/
    assert(isNumber(grain.position(i)), i, grain.position(i));
    //min = ::min(min, grain.position(i));
    //max = ::max(max, grain.position(i));
@@ -1679,6 +1707,7 @@ break2_:;
   float maxGrainGrainV = maxGrainV + maxGrainV;
   grainGrainGlobalMinD6 -= maxGrainGrainV * dt;
 
+#if TRIAXIAL
   // Side
   float maxSideV = 0;
   if(processState>=Pack) {
@@ -1749,6 +1778,7 @@ break2_:;
    grainSideGlobalMinD2 -= maxSideGrainV * dt;
    sideIntegrationTime.stop();
   }
+#endif
 
   // Wire
   wireIntegrationTime.start();

@@ -43,14 +43,14 @@ struct System {
  vec3 G {0, 0, -gz/densityScale}; // Scaled gravity
 
  // Penalty model
- sconst float normalDamping = 1e-6;
+ sconst float normalDamping = 100e-6 * s; // ~dt
  // Friction model
  sconst float staticFrictionSpeed = inf;
  sconst float staticFrictionFactor = 1e2;
  sconst float staticFrictionLength = 10 * mm;
- sconst float staticFrictionDamping = 1000 *g/s;
- sconst float staticFrictionCoefficient = 1;
- sconst float dynamicFrictionCoefficient = 1;
+ sconst float staticFrictionDamping = 0/*2.7*/ * g/s; // TODO: relative to k ?
+ sconst float staticFrictionCoefficient = 0;
+ sconst float dynamicFrictionCoefficient = 0;
  sconst v8sf dynamicFrictionCoefficient8 = float8(dynamicFrictionCoefficient);
 
  struct Vertex {
@@ -157,7 +157,7 @@ struct System {
   //struct { NoOperation4 operator[](size_t) const { return {}; }} torque;
 
   sconst float curvature = 0;
-  sconst float elasticModulus = 1e7 * kg/(m*s*s); // 1 GPa
+  sconst float elasticModulus = 2e6 * kg/(m*s*s); // 1 GPa
 
   Plate() : Vertex(0, 2, 1e3) {
    count = 2;
@@ -191,11 +191,14 @@ struct System {
   //sconst float shearModulus = 79e9 * kg / (m*s*s);
   //sconst float poissonRatio = 0.28; // 0.35
   //sconst float elasticModulus = 0 ? 2*shearModulus*(1+poissonRatio) : 1e7; // ~2e11
-  sconst float elasticModulus = 1400e6;
+  sconst float elasticModulus = 2e6;
 
   //sconst float density = 7.8e3 * densityScale;
   sconst float mass = 2.7 * g; //density * volume;
-  sconst float angularMass = 2./5*mass*sq(radius);
+  //sconst float angularMass = 2./5*mass*sq(radius);
+  /*sconst float angularMass = 2./5*mass*(pow5(radius)-pow5(radius-4e-4)) // 0.4mm
+                                                             /(cb(radius)-cb(radius-4e-4));*/
+  sconst float angularMass = 2./5*5./3*mass*sq(radius); // Limit for r2-r1 -> 0
 
   const float dt_angularMass;
   vec3 g;
@@ -216,11 +219,12 @@ struct System {
   step((Vertex&)p, i);
    // Rotation viscosity FIXME
   //p.AVx[i] *= 1-10*dt; p.AVy[i] *= 1-10*dt; p.AVz[i] *= 1-10*dt; //2K-3K
-  p.AVx[i] *= 1-1000*dt; p.AVy[i] *= 1-1000*dt; p.AVz[i] *= 1-1000*dt; //2K-3K
+  //p.AVx[i] *= 1-1000*dt; p.AVy[i] *= 1-1000*dt; p.AVz[i] *= 1-1000*dt; //2K-3K
   //p.AVx[i] *= 1./2; p.AVy[i] *= 1./2; p.AVz[i] *= 1./2;
-  p.AVx[i] = 0; p.AVy[i] = 0; p.AVz[i] = 0; // Disables rotation
+  //p.AVx[i] = 0; p.AVy[i] = 0; p.AVz[i] = 0; // Disables rotation
   // Euler
   p.rotation[i] += dt_2 * qmul((v4sf){p.AVx[i],p.AVy[i],p.AVz[i],0}, p.rotation[i]);
+  assert_(p.Tx[i] == 0, p.Tx[i]);
   p.AVx[i] += p.dt_angularMass * p.Tx[i];
   p.AVy[i] += p.dt_angularMass * p.Ty[i];
   p.AVz[i] += p.dt_angularMass * p.Tz[i];
@@ -240,7 +244,7 @@ struct System {
   sconst float volume = section * internodeLength;
   sconst float density = 1e3 * kg / cb(m) * densityScale;
   sconst float angularMass = 0;
-  sconst float elasticModulus = 1e9;
+  sconst float elasticModulus = 2e6;
   const vec4f tensionStiffness = float3(/*100**//*FIXME*/ elasticModulus * PI * sq(radius));
   sconst float mass = Wire::density * Wire::volume;
   sconst vec4f tensionDamping = float3(mass / s);
@@ -256,7 +260,7 @@ struct System {
 
  struct Side : Vertex {
   sconst float curvature = 0; // -1/radius?
-  sconst float elasticModulus = 1e7; // for contact
+  sconst float elasticModulus = 2e6; // for contact
   sconst float density = 1e3;
   const float resolution;
   const float initialRadius;
@@ -351,7 +355,7 @@ struct System {
  struct RigidSide {
   sconst size_t base = 0;
   sconst float curvature = 0;
-  sconst float elasticModulus = 1e8;
+  sconst float elasticModulus = 2e6;
   float radius;
   RigidSide(float radius) : radius(radius) {}
   /*struct { v4sf operator[](size_t) const { return _0f; } } position;
@@ -763,6 +767,7 @@ struct System {
      fTx[k] = - (fS[k]+fB) * springDirection[0];
      fTy[k] = - (fS[k]+fB) * springDirection[1];
      fTz[k] = - (fS[k]+fB) * springDirection[2];
+     //for(size_t k: range(8)) assert_(fTx[k] == 0, fTx[k], fS[k], fB);
      staticFrictionCount++;
     }
    } else {
@@ -774,12 +779,14 @@ struct System {
      fTx[k] += scale * TRVx[k];
      fTy[k] += scale * TRVy[k];
      fTz[k] += scale * TRVz[k];
+     //for(size_t k: range(8)) assert_(fTx[k] == 0, fTx[k], scale);
     dynamicFrictionCount++;
    }
   }
   Fx += fTx;
   Fy += fTy;
   Fz += fTz;
+  //for(size_t k: range(8)) assert_(fTx[k] == 0, fTx[k]);
   TAx = RAy*fTz - RAz*fTy;
   TAy = RAz*fTx - RAx*fTz;
   TAz = RAx*fTy - RAy*fTx;

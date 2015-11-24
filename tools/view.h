@@ -93,6 +93,7 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
    buffer<float> Px;
    buffer<float> Py;
    buffer<float> Pz;
+   buffer<vec4f> rotation;
    vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]); }
   } grain;
   struct Wire {
@@ -174,6 +175,7 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
   state.grain.Px = copy(grain.Px);
   state.grain.Py = copy(grain.Py);
   state.grain.Pz = copy(grain.Pz);
+  state.grain.rotation = copy(grain.rotation);
 
   state.wire.count = wire.count;
   state.wire.Px = copy(wire.Px);
@@ -195,7 +197,7 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
  bool step() {
   Simulation::step();
   assert_(states.size < 8192);
-  if(timeStep%128 == 0) { record(); log(states.size); } viewT=states.size-1;
+  if(timeStep%2048 == 0) { record(); log(states.size); } viewT=states.size-1;
 #if ENCODER
   if(encoder) viewYawPitch.x += 2*PI*dt / 16;
 #endif
@@ -241,7 +243,7 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
     size_t j = 0;
     while(j < grainPositions.size && grainPositions[j].z < O.z) j++;
     grainPositions.insertAt(j, O);
-    grainRotations.insertAt(j, conjugate(qmul(viewRotation, grain.rotation[i])));
+    grainRotations.insertAt(j, conjugate(qmul(viewRotation, state.grain.rotation[i])));
     grainIndices.insertAt(j, i);
    }
    for(size_t i: range(state.wire.count)) {
@@ -351,7 +353,7 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
   }
 
   // Membrane
-  if(state.side.Px) {
+  if(state.side.Px && 0) {
    static GLShader shader {::shader_glsl(), {"color"}};
    shader.bind();
    shader.bindFragments({"color"});
@@ -432,8 +434,8 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
      int b = grainGrainB[i];
      //float d = sqrt(sq(grain.Px[a]-grain.Px[b]) + sq(grain.Py[a]-grain.Py[b]) + sq(grain.Pz[a]-grain.Pz[b]));
      if(/*d < 2*Grain::radius &&*/ grainGrainLocalAx[i]) {
-      positions.append( grain.position(a) + qapply(grain.rotation[a], (v4sf{grainGrainLocalAx[i], grainGrainLocalAy[i], grainGrainLocalAz[i], 0})) );
-      positions.append( grain.position(b) + qapply(grain.rotation[b], (v4sf{grainGrainLocalBx[i], grainGrainLocalBy[i], grainGrainLocalBz[i], 0})) );
+      positions.append( grain.position(a) + qapply(state.grain.rotation[a], (v4sf{grainGrainLocalAx[i], grainGrainLocalAy[i], grainGrainLocalAz[i], 0})) );
+      positions.append( grain.position(b) + qapply(state.grain.rotation[b], (v4sf{grainGrainLocalBx[i], grainGrainLocalBy[i], grainGrainLocalBz[i], 0})) );
      }
     }
 #endif
@@ -444,7 +446,7 @@ struct SimulationView : SimulationRun, Widget/*, Poll*/ {
      //if(b >= wire.count) { log("b", b, wire.count);  continue; }
      //float d = sqrt(sq(grain.Px[a]-wire.Px[b]) + sq(grain.Py[a]-wire.Py[b]) + sq(grain.Pz[a]-wire.Pz[b]));
      if(/*d < 2*Grain::radius &&*/ grainWireLocalAx[i]) {
-      positions.append( state.grain.position(a) + qapply(grain.rotation[a], vec3(grainWireLocalAx[i], grainWireLocalAy[i], grainWireLocalAz[i])) );
+      positions.append( state.grain.position(a) + qapply(state.grain.rotation[a], vec3(grainWireLocalAx[i], grainWireLocalAy[i], grainWireLocalAz[i])) );
       positions.append( state.wire.position(b) + vec3(grainWireLocalBx[i], grainWireLocalBy[i], grainWireLocalBz[i]) );
      }
     }
