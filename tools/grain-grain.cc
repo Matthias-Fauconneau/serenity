@@ -3,6 +3,7 @@
 
 bool Simulation::stepGrainGrain() {
  if(grainGrainGlobalMinD12 <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
+#if 0
   buffer<int2> grainGrainIndices {align(8, grain.count) * grainGrain};
   grainGrainIndices.clear();
   // Index to packed frictions
@@ -24,6 +25,7 @@ bool Simulation::stepGrainGrain() {
      grainGrainIndices[base+i] = int2{grainGrainA[index]+1, int(index)};
     }*/
   }
+#endif
 
   unique<Lattice<uint16>> grainLattice = generateLattice(grain, Grain::radius);
   if(!grainLattice) return false;
@@ -37,14 +39,15 @@ bool Simulation::stepGrainGrain() {
   }
   assert(i==62);
 
-  grainGrainCount = 0;
-  buffer<float> grainGrainLocalAx {align(8, grain.count) * grainGrain};
-  buffer<float> grainGrainLocalAy {align(8, grain.count) * grainGrain};
-  buffer<float> grainGrainLocalAz {align(8, grain.count) * grainGrain};
-  buffer<float> grainGrainLocalBx {align(8, grain.count) * grainGrain};
-  buffer<float> grainGrainLocalBy {align(8, grain.count) * grainGrain};
-  buffer<float> grainGrainLocalBz {align(8, grain.count) * grainGrain};
-  for(size_t latticeIndex: range(Z*Y*X)) {
+  //grainGrainCount = 0;
+  size_t averageGrainGrainContactCount = 8;
+  buffer<float> grainGrainLocalAx {grain.count * averageGrainGrainContactCount};
+  buffer<float> grainGrainLocalAy {grain.count * averageGrainGrainContactCount};
+  buffer<float> grainGrainLocalAz {grain.count * averageGrainGrainContactCount};
+  buffer<float> grainGrainLocalBx {grain.count * averageGrainGrainContactCount};
+  buffer<float> grainGrainLocalBy {grain.count * averageGrainGrainContactCount};
+  buffer<float> grainGrainLocalBz {grain.count * averageGrainGrainContactCount};
+  for(size_t latticeIndex: range(Z*Y*X)) { // FIXME: grain ordered traversal to map previous frictions
    const uint16* current = grainLattice->base + latticeIndex;
    size_t a = *current;
    if(!a) continue;
@@ -120,7 +123,7 @@ break_:;
 
  // Evaluates (packed) intersections from (packed) verlet lists
  size_t grainGrainContactCount = 0;
- buffer<uint> grainGrainContact(align(8, grain.count) * grainGrain);
+ buffer<uint> grainGrainContact(grain.count * averageGrainGrainContactCount);
  for(size_t index = 0; index < grainGrainCount; index += 8) {
   v8si A = *(v8si*)(grainGrainA.data+index), B = *(v8si*)(grainGrainB.data+index);
   v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);

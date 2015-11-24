@@ -1,28 +1,30 @@
 #include "simulation.h"
 
+/*/// For each index A, maps B to packed A-B contact index
+buffer<int2> contactMap(size_t ACount, size_t maxBforA, size_t ABCount,
+                                         ref<int> ABA, ref<int> ABB) {
+ buffer<int2> contactMap {ACount * maxBforA};
+ contactMap.clear(int2(0,0));
+ for(size_t index: range(ABCount)) {
+  size_t a = ABA[index];
+  size_t base = a*maxBforA;
+  size_t i = 0;
+  while(i<maxBforA && contactMap[base+i]) i++; // Finds next available slot
+  assert_(i<maxBforA);
+  contactMap[base+i] = int2(ABB[index]+1, int(index));
+ }
+ return contactMap;
+}*/
+
 bool Simulation::stepGrainWire() {
  if(!wire.count) return true;
 
- buffer<int2> grainWireIndices {align(8, grain.count) * grainWire};
- grainWireIndices.clear(int2(0,0));
- // Index to packed frictions
- for(size_t index: range(grainWireCount)) {
-  { // A<->B
-   size_t a = grainWireA[index];
-   assert_(a < grain.count, a, grain.count, index);
-   size_t base = a*grainWire;
-   size_t i = 0;
-   while(i<grainWire && grainWireIndices[base+i]) i++;
-   assert_(i < grainWire && base+i < grainWireIndices.size);
-   assert_((size_t)grainWireB[index] < wire.count);
-   assert_(index < grainWireCount);
-   grainWireIndices[base+i] = int2(grainWireB[index]+1, int(index)); // For each grain (a), maps wire (b) to grain-wire contact index
-  }
- }
- grainWireCount = 0;
+ //buffer<int2> contactMap = ::contactMap(grain.count, maxWireforGrain);
+ //grainWireCount = 0;
 
  unique<Grid> wireGrid = generateGrid(wire, Grain::radius+Wire::radius);
  if(!wireGrid) return false;
+
  uint16* wireBase = wireGrid->base;
  const int gX = wireGrid->size.x, gY = wireGrid->size.y;
  const uint16* wireNeighbours[3*3] = {
@@ -32,45 +34,46 @@ bool Simulation::stepGrainWire() {
  };
 
  {
-  buffer<float> grainWireLocalAx {align(8, grain.count) * grainWire};
-  buffer<float> grainWireLocalAy {align(8, grain.count) * grainWire};
-  buffer<float> grainWireLocalAz {align(8, grain.count) * grainWire};
-  buffer<float> grainWireLocalBx {align(8, grain.count) * grainWire};
-  buffer<float> grainWireLocalBy {align(8, grain.count) * grainWire};
-  buffer<float> grainWireLocalBz {align(8, grain.count) * grainWire};
+  size_t averageGrainWireContactCount = 8;
+  buffer<float> grainWireLocalAx {grain.count * averageGrainWireContactCount};
+  buffer<float> grainWireLocalAy {grain.count * averageGrainWireContactCount};
+  buffer<float> grainWireLocalAz {grain.count * averageGrainWireContactCount};
+  buffer<float> grainWireLocalBx {grain.count * averageGrainWireContactCount};
+  buffer<float> grainWireLocalBy {grain.count * averageGrainWireContactCount};
+  buffer<float> grainWireLocalBz {grain.count * averageGrainWireContactCount};
 
+  // TODO: Verlet
+  size_t firstAContactIndex = 0; // Index of first contact with A in old grainWire[Local]A|B list
   for(size_t a: range(grain.count)) { // TODO: SIMD
-   // Wire - Grain (TODO: Verlet)
-   {size_t offset = wireGrid->index(grain.Px[a], grain.Py[a], grain.Pz[a]); // offset
-    for(size_t n: range(3*3)) for(size_t i: range(3)) {
-     ref<uint16> list(wireNeighbours[n] + offset + i * Grid::cellCapacity, Grid::cellCapacity);
-     for(size_t j=0; list[j] && j<Grid::cellCapacity; j++) {
-      assert_(grainWireCount < grainWireA.capacity, grainWireCount, grainWireA.capacity);
-      size_t B = list[j]-1;
-      size_t index = grainWireCount;
-      grainWireA[index] = a; // Grain
-      grainWireB[index] = B; // Wire
-      for(size_t i: range(grainWire)) {
-       size_t b = grainWireIndices[a*grainWire+i][0]; // wire index + 1
-       if(!b) break;
-       b--;
-       if(b == B) { // Repack existing friction
-        size_t j = grainWireIndices[a*grainWire+i][1];
-        grainWireLocalAx[index] = this->grainWireLocalAx[j];
-        grainWireLocalAy[index] = this->grainWireLocalAy[j];
-        grainWireLocalAz[index] = this->grainWireLocalAz[j];
-        grainWireLocalBx[index] = this->grainWireLocalBx[j];
-        grainWireLocalBy[index] = this->grainWireLocalBy[j];
-        grainWireLocalBz[index] = this->grainWireLocalBz[j];
-        goto break__;
-       }
-      } /*else*/ {
-       grainWireLocalAx[index] = 0; grainWireLocalAy[index] = 0; grainWireLocalAz[index] = 0;
-       grainWireLocalBx[index] = 0; grainWireLocalBy[index] = 0; grainWireLocalBz[index] = 0;
+   size_t offset = wireGrid->index(grain.Px[a], grain.Py[a], grain.Pz[a]); // offset
+   for(size_t n: range(3*3)) for(size_t i: range(3)) {
+    ref<uint16> list(wireNeighbours[n] + offset + i * Grid::cellCapacity, Grid::cellCapacity);
+    for(size_t j=0; list[j] && j<Grid::cellCapacity; j++) {
+     assert_(grainWireCount < grainWireA.capacity, grainWireCount, grainWireA.capacity);
+     size_t B = list[j]-1;
+     size_t index = grainWireCount;
+     grainWireA[index] = a; // Grain
+     grainWireB[index] = B; // Wire
+     for(size_t i: range(grainWire)) {
+      size_t b = grainWireIndices[a*grainWire+i][0]; // wire index + 1
+      if(!b) break;
+      b--;
+      if(b == B) { // Repack existing friction
+       size_t j = grainWireIndices[a*grainWire+i][1];
+       grainWireLocalAx[index] = this->grainWireLocalAx[j];
+       grainWireLocalAy[index] = this->grainWireLocalAy[j];
+       grainWireLocalAz[index] = this->grainWireLocalAz[j];
+       grainWireLocalBx[index] = this->grainWireLocalBx[j];
+       grainWireLocalBy[index] = this->grainWireLocalBy[j];
+       grainWireLocalBz[index] = this->grainWireLocalBz[j];
+       goto break__;
       }
-break__:;
-      grainWireCount++;
+     } /*else*/ {
+      grainWireLocalAx[index] = 0; grainWireLocalAy[index] = 0; grainWireLocalAz[index] = 0;
+      grainWireLocalBx[index] = 0; grainWireLocalBy[index] = 0; grainWireLocalBz[index] = 0;
      }
+break__:;
+     grainWireCount++;
     }
    }
   }
