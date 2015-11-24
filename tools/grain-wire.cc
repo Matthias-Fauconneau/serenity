@@ -1,10 +1,9 @@
 #include "simulation.h"
 
-void Simulation::grain_wire() {
- if(!wire.count) return;
+bool Simulation::stepGrainWire() {
+ if(!wire.count) return true;
 
-
- buffer<int2> grainWireIndices {grainCount8 * grainWire};
+ buffer<int2> grainWireIndices {align(8, grain.count) * grainWire};
  grainWireIndices.clear(int2(0,0));
  // Index to packed frictions
  for(size_t index: range(grainWireCount)) {
@@ -14,25 +13,15 @@ void Simulation::grain_wire() {
    size_t base = a*grainWire;
    size_t i = 0;
    while(i<grainWire && grainWireIndices[base+i]) i++;
-   if(i>=grainWire) {
-    log("i>=grainWire", "gWC index", index,  "/", grainWireCount, "a grain", a, "/", grain.count,  "base", base, "i", i/*, "gWI[base..+grainWire]", grainWireIndices.slice(base, grainWire)*/);
-    //for(int2 gwc: grainWireIndices.slice(base, grainWire)) log("wire b", gwc[0], "contact #", gwc[1]);
-    processState = ProcessState::Error;
-    highlightGrain.append( a );
-    for(int2 gwc: grainWireIndices.slice(base, grainWire)) highlightWire.append( gwc[0] );
-    return false;
-   }
-   assert_(i<grainWire, grainWireIndices.slice(base, grainWire));
-   assert_(base+i < grainWireIndices.size);
-   assert_((size_t)grainWireB[index] < wire.count, grainWireB[index], wire.count);
-   assert_(index < grainWireCount, index, grainWireCount);
+   assert_(i < grainWire && base+i < grainWireIndices.size);
+   assert_((size_t)grainWireB[index] < wire.count);
+   assert_(index < grainWireCount);
    grainWireIndices[base+i] = int2(grainWireB[index]+1, int(index)); // For each grain (a), maps wire (b) to grain-wire contact index
   }
  }
  grainWireCount = 0;
 
- unique<Grid> wireGrid = nullptr;
- if(!wireGrid) wireGrid = generateGrid(wire, Grain::radius+Wire::radius);
+ unique<Grid> wireGrid = generateGrid(wire, Grain::radius+Wire::radius);
  if(!wireGrid) return false;
  uint16* wireBase = wireGrid->base;
  const int gX = wireGrid->size.x, gY = wireGrid->size.y;
@@ -43,13 +32,12 @@ void Simulation::grain_wire() {
  };
 
  {
-  //Locker lock(this->lock);
-  buffer<float> grainWireLocalAx {grainCount8 * grainWire};
-  buffer<float> grainWireLocalAy {grainCount8 * grainWire};
-  buffer<float> grainWireLocalAz {grainCount8 * grainWire};
-  buffer<float> grainWireLocalBx {grainCount8 * grainWire};
-  buffer<float> grainWireLocalBy {grainCount8 * grainWire};
-  buffer<float> grainWireLocalBz {grainCount8 * grainWire};
+  buffer<float> grainWireLocalAx {align(8, grain.count) * grainWire};
+  buffer<float> grainWireLocalAy {align(8, grain.count) * grainWire};
+  buffer<float> grainWireLocalAz {align(8, grain.count) * grainWire};
+  buffer<float> grainWireLocalBx {align(8, grain.count) * grainWire};
+  buffer<float> grainWireLocalBy {align(8, grain.count) * grainWire};
+  buffer<float> grainWireLocalBz {align(8, grain.count) * grainWire};
 
   for(size_t a: range(grain.count)) { // TODO: SIMD
    // Wire - Grain (TODO: Verlet)
@@ -106,107 +94,92 @@ break__:;
  }
  assert(gWC <= grainWireA.capacity);
 
- {
-  // Evaluates (packed) intersections from (packed) (TODO: verlet) lists
-  size_t grainWireContactCount = 0;
-  buffer<int> grainWireContact(grainWireCount);
-  grainWireIntersectTime.start();
-  for(size_t index = 0; index < grainWireCount; index += 8) {
-   v8si A = *(v8si*)(grainWireA.data+index), B = *(v8si*)(grainWireB.data+index);
-   v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
-   v8sf Bx = gather(wire.Px.data, B), By = gather(wire.Py.data, B), Bz = gather(wire.Pz.data, B);
-   v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-   v8sf length = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
-   v8sf depth = Grain::radius8 + Wire::radius8 - length;
-   for(size_t k: range(8)) {
-    if(index+k == grainWireCount) break /*2*/;
-    if(depth[k] > 0) {
-     static float depthMax = 0.01;
-     if(depth[k] > depthMax) {
-      log("Max overlap", B[k], A[k], depth[k], Wire::radius/depth[k]);
-      depthMax=depth[k];
-      if(depth[k] >  0.02) {
-       highlightWire.append(B[k]);
-       highlightGrain.append(A[k]);
-       processState = ProcessState::Error;
-       return false;
-      }
-     }
-     grainWireContact[grainWireContactCount] = index+k;
-     grainWireContactCount++;
-    } else {
-     // DEBUG:
-     grainWireLocalAx[index+k] = 0; grainWireLocalAy[index+k] = 0; grainWireLocalAz[index+k] = 0;
-     grainWireLocalBx[index+k] = 0; grainWireLocalBy[index+k] = 0; grainWireLocalBz[index+k] = 0;
-    }
+ // Evaluates (packed) intersections from (packed) (TODO: verlet) lists
+ size_t grainWireContactCount = 0;
+ buffer<int> grainWireContact(grainWireCount);
+ for(size_t index = 0; index < grainWireCount; index += 8) {
+  v8si A = *(v8si*)(grainWireA.data+index), B = *(v8si*)(grainWireB.data+index);
+  v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
+  v8sf Bx = gather(wire.Px.data, B), By = gather(wire.Py.data, B), Bz = gather(wire.Pz.data, B);
+  v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
+  v8sf length = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
+  v8sf depth = float8(Grain::radius+Wire::radius) - length;
+  for(size_t k: range(8)) {
+   if(index+k == grainWireCount) break /*2*/;
+   if(depth[k] > 0) {
+    assert_(depth[k] < 0.02);
+    grainWireContact[grainWireContactCount] = index+k;
+    grainWireContactCount++;
+   } else {
+    // DEBUG:
+    grainWireLocalAx[index+k] = 0; grainWireLocalAy[index+k] = 0; grainWireLocalAz[index+k] = 0;
+    grainWireLocalBx[index+k] = 0; grainWireLocalBy[index+k] = 0; grainWireLocalBz[index+k] = 0;
    }
   }
-  grainWireIntersectTime.stop();
+ }
 
-  // Aligns with invalid contacts
-  size_t gWCC = grainWireContactCount;
-  while(gWCC%8)
-   grainWireContact[gWCC++] = grainWireCount; // Invalid entry
+ // Aligns with invalid contacts
+ size_t gWCC = grainWireContactCount;
+ while(gWCC%8)
+  grainWireContact[gWCC++] = grainWireCount; // Invalid entry
 
-  // Evaluates forces from (packed) intersections
-  buffer<float> Fx(gWCC), Fy(gWCC), Fz(gWCC);
-  buffer<float> TAx(gWCC), TAy(gWCC), TAz(gWCC);
-  grainWireForceTime.start();
-  for(size_t i = 0; i < grainWireContactCount; i += 8) {
-   v8si contacts = *(v8si*)(grainWireContact.data+i);
-   v8si A = gather(grainWireA, contacts), B = gather(grainWireB, contacts);
-   // FIXME: Recomputing from intersection (more efficient than storing?)
-   v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
-   v8sf Bx = gather(wire.Px.data, B), By = gather(wire.Py.data, B), Bz = gather(wire.Pz.data, B);
-   v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-   v8sf length = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
-   v8sf depth = Grain::radius8 + Wire::radius8 - length;
-   v8sf Nx = Rx/length, Ny = Ry/length, Nz = Rz/length;
-   /*contact(grain, A, wire, B, depth, -Rx, -Ry, -Rz, Nx, Ny, Nz,
+ // Evaluates forces from (packed) intersections
+ buffer<float> Fx(gWCC), Fy(gWCC), Fz(gWCC);
+ buffer<float> TAx(gWCC), TAy(gWCC), TAz(gWCC);
+ for(size_t i = 0; i < grainWireContactCount; i += 8) {
+  v8si contacts = *(v8si*)(grainWireContact.data+i);
+  v8si A = gather(grainWireA, contacts), B = gather(grainWireB, contacts);
+  // FIXME: Recomputing from intersection (more efficient than storing?)
+  v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
+  v8sf Bx = gather(wire.Px.data, B), By = gather(wire.Py.data, B), Bz = gather(wire.Pz.data, B);
+  v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
+  v8sf length = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
+  v8sf depth = float8(Grain::radius+Wire::radius) - length;
+  v8sf Nx = Rx/length, Ny = Ry/length, Nz = Rz/length;
+  /*contact(grain, A, wire, B, depth, -Rx, -Ry, -Rz, Nx, Ny, Nz,
              *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i]);*/
-   v8sf RAx = - Grain::radius8 * Nx, RAy = - Grain::radius8 * Ny, RAz = - Grain::radius8 * Nz;
-   // Gather static frictions
-   v8sf localAx = gather(grainWireLocalAx, contacts);
-   v8sf localAy = gather(grainWireLocalAy, contacts);
-   v8sf localAz = gather(grainWireLocalAz, contacts);
-   v8sf localBx = gather(grainWireLocalBx, contacts);
-   v8sf localBy = gather(grainWireLocalBy, contacts);
-   v8sf localBz = gather(grainWireLocalBz, contacts);
-   contact<Grain,Wire>(grain, A, wire, B, depth,
-                       RAx, RAy, RAz,
-                       Nx, Ny, Nz,
-                       Ax, Ay, Az,
-                       Bx, By, Bz,
-                       localAx, localAy, localAz,
-                       localBx, localBy, localBz,
-                       *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i],
-                       *(v8sf*)&TAx[i], *(v8sf*)&TAy[i], *(v8sf*)&TAz[i]
-                       );
-   // Scatter static frictions
-   scatter(grainWireLocalAx, contacts, localAx);
-   scatter(grainWireLocalAy, contacts, localAy);
-   scatter(grainWireLocalAz, contacts, localAz);
-   scatter(grainWireLocalBx, contacts, localBx);
-   scatter(grainWireLocalBy, contacts, localBy);
-   scatter(grainWireLocalBz, contacts, localBz);
-  }
+  v8sf R = float8(Grain::radius);
+  v8sf RAx = - R  * Nx, RAy = - R * Ny, RAz = - R * Nz;
+  // Gather static frictions
+  v8sf localAx = gather(grainWireLocalAx, contacts);
+  v8sf localAy = gather(grainWireLocalAy, contacts);
+  v8sf localAz = gather(grainWireLocalAz, contacts);
+  v8sf localBx = gather(grainWireLocalBx, contacts);
+  v8sf localBy = gather(grainWireLocalBy, contacts);
+  v8sf localBz = gather(grainWireLocalBz, contacts);
+  contact<Grain,Wire>(grain, A, wire, B, depth,
+                      RAx, RAy, RAz,
+                      Nx, Ny, Nz,
+                      Ax, Ay, Az,
+                      Bx, By, Bz,
+                      localAx, localAy, localAz,
+                      localBx, localBy, localBz,
+                      *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i],
+                      *(v8sf*)&TAx[i], *(v8sf*)&TAy[i], *(v8sf*)&TAz[i]
+                      );
+  // Scatter static frictions
+  scatter(grainWireLocalAx, contacts, localAx);
+  scatter(grainWireLocalAy, contacts, localAy);
+  scatter(grainWireLocalAz, contacts, localAz);
+  scatter(grainWireLocalBx, contacts, localBx);
+  scatter(grainWireLocalBy, contacts, localBy);
+  scatter(grainWireLocalBz, contacts, localBz);
+ }
 
-  grainWireAddTime.start();
-  for(size_t i = 0; i < grainWireContactCount; i++) { // Scalar scatter add
-   size_t index = grainWireContact[i];
-   size_t a = grainWireA[index];
-   size_t b = grainWireB[index];
-   grain.Fx[a] += Fx[i];
-   wire.Fx[b] -= Fx[i];
-   grain.Fy[a] += Fy[i];
-   wire.Fy[b] -= Fy[i];
-   grain.Fz[a] += Fz[i];
-   wire.Fz[b] -= Fz[i];
-   grain.Tx[a] += TAx[i];
-   grain.Ty[a] += TAy[i];
-   grain.Tz[a] += TAz[i];
-   highlightWire.append(b);
-  }
-  grainWireAddTime.stop();
- } // GrainWireContact
+ for(size_t i = 0; i < grainWireContactCount; i++) { // Scalar scatter add
+  size_t index = grainWireContact[i];
+  size_t a = grainWireA[index];
+  size_t b = grainWireB[index];
+  grain.Fx[a] += Fx[i];
+  wire.Fx[b] -= Fx[i];
+  grain.Fy[a] += Fy[i];
+  wire.Fy[b] -= Fy[i];
+  grain.Fz[a] += Fz[i];
+  wire.Fz[b] -= Fz[i];
+  grain.Tx[a] += TAx[i];
+  grain.Ty[a] += TAy[i];
+  grain.Tz[a] += TAz[i];
+ }
+
+ return true;
 }

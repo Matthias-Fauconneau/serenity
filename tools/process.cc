@@ -89,7 +89,7 @@ void Simulation::stepProcess() {
       cos(t2)};
     grain.count++;
     // Forces lattice reevaluation
-    grainGrainGlobalMinD6 = 0;
+    grainGrainGlobalMinD12 = 0;
    }
   }
  }

@@ -70,9 +70,8 @@ bool Simulation::step() {
  stepProcess();
 
  stepGrain();
- stepGrainGrain();
-
- stepGrainWire();
+ if(!stepGrainGrain()) return false;
+ if(!stepGrainWire()) return false;
 
  stepWire();
 
@@ -83,7 +82,7 @@ bool Simulation::step() {
   maxGrainV = ::max(maxGrainV, length(grain.velocity(i)));
  }
  float maxGrainGrainV = maxGrainV + maxGrainV;
- grainGrainGlobalMinD6 -= maxGrainGrainV * dt;
+ grainGrainGlobalMinD12 -= maxGrainGrainV * dt;
 
  // Wire
  for(size_t i: range(wire.count)) { // TODO: SIMD

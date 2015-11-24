@@ -43,7 +43,7 @@ struct Simulation : System {
  buffer<float> grainSideLocalBz;
 
  // Grain - Grain
- float grainGrainGlobalMinD6 = 0;
+ float grainGrainGlobalMinD12 = 0;
  uint grainSkipped = 0;
 
  size_t grainGrainCount = 0;
@@ -87,8 +87,8 @@ struct Simulation : System {
 
  void stepProcess();
  void stepGrain();
- void stepGrainGrain();
- void stepGrainWire();
+ bool stepGrainGrain();
+ bool stepGrainWire();
  void stepWire();
 };
 

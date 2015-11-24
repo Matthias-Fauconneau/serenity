@@ -1,9 +1,9 @@
 #include "simulation.h"
+#include "parallel.h"
 
-void Simulation::stepGrainGrain() {
- if(grainGrainGlobalMinD6 <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
-  grainGrainLatticeTime.start();
-  buffer<int2> grainGrainIndices {grainCount8 * grainGrain};
+bool Simulation::stepGrainGrain() {
+ if(grainGrainGlobalMinD12 <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
+  buffer<int2> grainGrainIndices {align(8, grain.count) * grainGrain};
   grainGrainIndices.clear();
   // Index to packed frictions
   for(size_t index: range(grainGrainCount)) {
@@ -25,25 +25,25 @@ void Simulation::stepGrainGrain() {
     }*/
   }
 
-  unique<Lattice<uint16>> grainLattice = nullptr;
-  if(!grainLattice) grainLattice = generateLattice(grain, Grain::radius);
+  unique<Lattice<uint16>> grainLattice = generateLattice(grain, Grain::radius);
   if(!grainLattice) return false;
   float minD12= 2*(2*Grain::radius/sqrt(3.));
   const int Z = grainLattice->size.z, Y = grainLattice->size.y, X = grainLattice->size.x;
+
   int di[62];
   size_t i = 0;
   for(int z: range(0, 2 +1)) for(int y: range((z?-2:0), 2 +1)) for(int x: range(((z||y)?-2:1), 2 +1)) {
    di[i++] = z*Y*X + y*X + x;
   }
   assert(i==62);
-  Locker lock(this->lock);
+
   grainGrainCount = 0;
-  buffer<float> grainGrainLocalAx {grainCount8 * grainGrain};
-  buffer<float> grainGrainLocalAy {grainCount8 * grainGrain};
-  buffer<float> grainGrainLocalAz {grainCount8 * grainGrain};
-  buffer<float> grainGrainLocalBx {grainCount8 * grainGrain};
-  buffer<float> grainGrainLocalBy {grainCount8 * grainGrain};
-  buffer<float> grainGrainLocalBz {grainCount8 * grainGrain};
+  buffer<float> grainGrainLocalAx {align(8, grain.count) * grainGrain};
+  buffer<float> grainGrainLocalAy {align(8, grain.count) * grainGrain};
+  buffer<float> grainGrainLocalAz {align(8, grain.count) * grainGrain};
+  buffer<float> grainGrainLocalBx {align(8, grain.count) * grainGrain};
+  buffer<float> grainGrainLocalBy {align(8, grain.count) * grainGrain};
+  buffer<float> grainGrainLocalBz {align(8, grain.count) * grainGrain};
   for(size_t latticeIndex: range(Z*Y*X)) {
    const uint16* current = grainLattice->base + latticeIndex;
    size_t a = *current;
@@ -111,25 +111,23 @@ break_:;
    }
   }
 
-  grainGrainGlobalMinD6 = minD6 - 2*Grain::radius;
-  if(grainGrainGlobalMinD6 < 0) log("grainGrainGlobalMinD6", grainGrainGlobalMinD6);
+  grainGrainGlobalMinD12 = minD12 - 2*Grain::radius;
+  if(grainGrainGlobalMinD12 < 0) log("grainGrainGlobalMinD12", grainGrainGlobalMinD12);
 
-  grainGrainLatticeTime.stop();
   //log("grain", grainSkipped);
   grainSkipped=0;
  } else grainSkipped++;
 
- grainGrainTime.start();
  // Evaluates (packed) intersections from (packed) verlet lists
  size_t grainGrainContactCount = 0;
- buffer<uint> grainGrainContact(grainCount8*grainGrain);
+ buffer<uint> grainGrainContact(align(8, grain.count) * grainGrain);
  for(size_t index = 0; index < grainGrainCount; index += 8) {
   v8si A = *(v8si*)(grainGrainA.data+index), B = *(v8si*)(grainGrainB.data+index);
   v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
   v8sf Bx = gather(grain.Px, B), By = gather(grain.Py, B), Bz = gather(grain.Pz, B);
   v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
   v8sf length = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
-  v8sf depth = (Grain::radius8+Grain::radius8) - length;
+  v8sf depth = float8(Grain::radius+Grain::radius) - length;
   for(size_t k: range(8)) {
    if(index+k < grainGrainCount && depth[k] > 0) {
     // Indirect instead of pack to write back friction points
@@ -160,11 +158,10 @@ break_:;
    v8sf Bx = gather(grain.Px, B), By = gather(grain.Py, B), Bz = gather(grain.Pz, B);
    v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
    v8sf length = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
-   v8sf depth = (Grain::radius8+Grain::radius8) - length;
-   //for(size_t k: range(8)) if(i+k<grainGrainContactCount) assert(depth[k] >= 0, depth[k], A[k], B[k], i+k, grainGrainContact[i+k], grainGrainContactCount, gGCC);
-   //log(grain.count, grainGrainCount, contacts, A, B, length);
+   v8sf depth = float8(Grain::radius+Grain::radius) - length;
    v8sf Nx = Rx/length, Ny = Ry/length, Nz = Rz/length;
-   v8sf RBx = Grain::radius8 * Nx, RBy = Grain::radius8 * Ny, RBz = Grain::radius8 * Nz;
+   sconst v8sf R = float8(Grain::radius);
+   v8sf RBx = R * Nx, RBy = R * Ny, RBz = R * Nz;
    v8sf RAx = -RBx, RAy = -RBy, RAz = -RBz;
    // Gather static frictions
    v8sf localAx = gather(grainGrainLocalAx, contacts);
@@ -173,8 +170,6 @@ break_:;
    v8sf localBx = gather(grainGrainLocalBx, contacts);
    v8sf localBy = gather(grainGrainLocalBy, contacts);
    v8sf localBz = gather(grainGrainLocalBz, contacts);
-   /*for(size_t k: range(8)) if(i+k<grainGrainContactCount)
-    assert_(grain.AVx[A[k]] == 0, grain.AVx[A[k]]);*/
    contact<Grain, Grain>( grain, A, grain, B, depth,
                           RAx, RAy, RAz,
                           RBx, RBy, RBz,
@@ -187,7 +182,6 @@ break_:;
                           *(v8sf*)&TAx[i], *(v8sf*)&TAy[i], *(v8sf*)&TAz[i],
                           *(v8sf*)&TBx[i], *(v8sf*)&TBy[i], *(v8sf*)&TBz[i]
                           );
-   //for(size_t k: range(8)) if(i+k<grainGrainContactCount) assert_(TAx[i+k] == 0, TAx[i+k]);
    // Scatter static frictions
    scatter(grainGrainLocalAx, contacts, localAx);
    scatter(grainGrainLocalAy, contacts, localAy);
@@ -208,7 +202,6 @@ break_:;
   grain.Fz[a] += Fz[i];
   grain.Fz[b] -= Fz[i];
 
-  //assert_(TAx[i] == 0, TAx[i]);
   grain.Tx[a] += TAx[i];
   grain.Ty[a] += TAy[i];
   grain.Tz[a] += TAz[i];
@@ -216,5 +209,6 @@ break_:;
   grain.Ty[b] += TBy[i];
   grain.Tz[b] += TBz[i];
  }
- grainGrainTime.stop();
+
+ return true;
 }

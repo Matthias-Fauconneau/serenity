@@ -205,8 +205,12 @@ generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 /// ref<char> holding a UTF8 text string
 typedef ref<char> string;
 
+#if !__GXX_EXPERIMENTAL_CXX0X__
+#define _ // QtCreator doesn't parse custom literal operators (""_)
+#else
 /// Returns const reference to a static string literal
 inline constexpr string operator "" _(const char* data, size_t size) { return string(data,size); }
+#endif
 
 // -- Log
 
