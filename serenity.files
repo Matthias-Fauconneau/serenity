@@ -85,3 +85,7 @@ tools/view.h
 tools/list.h
 tools/lattice.h
 tools/grid.h
+tools/simulation.cc
+tools/process.cc
+tools/grain-grain.cc
+tools/grain-wire.cc
