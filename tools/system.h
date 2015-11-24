@@ -43,14 +43,14 @@ struct System {
  vec3 G {0, 0, -gz/densityScale}; // Scaled gravity
 
  // Penalty model
- sconst float normalDamping = 0.001; //0.2;
+ sconst float normalDamping = 1e-6;
  // Friction model
- sconst float staticFrictionSpeed = 1e-1 *m/s; // inf
- sconst float staticFrictionFactor = 1; //3;
- sconst float staticFrictionLength = 1e-4 * m; //4e-4 * m;
- sconst float staticFrictionDamping = /*15*/0 *g/s;
- sconst float staticFrictionCoefficient = 0.3;
- sconst float dynamicFrictionCoefficient = 1e-3; // 0.01
+ sconst float staticFrictionSpeed = inf;
+ sconst float staticFrictionFactor = 1e2;
+ sconst float staticFrictionLength = 10 * mm;
+ sconst float staticFrictionDamping = 1000 *g/s;
+ sconst float staticFrictionCoefficient = 1;
+ sconst float dynamicFrictionCoefficient = 1;
  sconst v8sf dynamicFrictionCoefficient8 = float8(dynamicFrictionCoefficient);
 
  struct Vertex {
@@ -184,16 +184,17 @@ struct System {
 
  struct Grain : Vertex {
   // Properties
-  sconst float radius =  3*mm; //2.5*mm; //47*mm; // 40 mm diameter
+  sconst float radius =  40*mm; //3*mm; //2.5*mm; //47*mm; // 40 mm diameter
   sconst v8sf radius8 = float8(radius); // 40 mm diameter
   sconst float volume = 4./3 * PI * cb(radius);
   sconst float curvature = 1./radius;
-  sconst float shearModulus = 79e9 * kg / (m*s*s);
-  sconst float poissonRatio = 0.28;
-  sconst float elasticModulus = 0 ? 2*shearModulus*(1+poissonRatio) : 1e7; // ~2e11
+  //sconst float shearModulus = 79e9 * kg / (m*s*s);
+  //sconst float poissonRatio = 0.28; // 0.35
+  //sconst float elasticModulus = 0 ? 2*shearModulus*(1+poissonRatio) : 1e7; // ~2e11
+  sconst float elasticModulus = 1400e6;
 
-  sconst float density = 7.8e3 * densityScale;
-  sconst float mass = density * volume;
+  //sconst float density = 7.8e3 * densityScale;
+  sconst float mass = 2.7 * g; //density * volume;
   sconst float angularMass = 2./5*mass*sq(radius);
 
   const float dt_angularMass;
@@ -217,6 +218,7 @@ struct System {
   //p.AVx[i] *= 1-10*dt; p.AVy[i] *= 1-10*dt; p.AVz[i] *= 1-10*dt; //2K-3K
   p.AVx[i] *= 1-1000*dt; p.AVy[i] *= 1-1000*dt; p.AVz[i] *= 1-1000*dt; //2K-3K
   //p.AVx[i] *= 1./2; p.AVy[i] *= 1./2; p.AVz[i] *= 1./2;
+  p.AVx[i] = 0; p.AVy[i] = 0; p.AVz[i] = 0; // Disables rotation
   // Euler
   p.rotation[i] += dt_2 * qmul((v4sf){p.AVx[i],p.AVy[i],p.AVz[i],0}, p.rotation[i]);
   p.AVx[i] += p.dt_angularMass * p.Tx[i];
@@ -229,16 +231,16 @@ struct System {
   using Vertex::Vertex;
   //struct { NoOperation4 operator[](size_t) const { return {}; }} torque;
 
-  sconst float radius = /*(2-sqrt(3))/sqrt(3)*/ 0.4*mm; //0.5 * mm; // 0.8mm diameter < (2-sqrt(3))/sqrt(3) Grain::radius
+  sconst float radius = 3*mm;
   sconst v8sf radius8 = float8(radius);
   sconst float curvature = 1./radius;
-  sconst float internodeLength = Grain::radius/2;
+  sconst float internodeLength = Grain::radius;///2;
   sconst vec4f internodeLength4 = float3(internodeLength);
   sconst float section = PI * sq(radius);
   sconst float volume = section * internodeLength;
   sconst float density = 1e3 * kg / cb(m) * densityScale;
   sconst float angularMass = 0;
-  sconst float elasticModulus = 1e6; // ~ 1e7
+  sconst float elasticModulus = 1e9;
   const vec4f tensionStiffness = float3(/*100**//*FIXME*/ elasticModulus * PI * sq(radius));
   sconst float mass = Wire::density * Wire::volume;
   sconst vec4f tensionDamping = float3(mass / s);
@@ -247,7 +249,7 @@ struct System {
   sconst float bendDamping = mass / s;
   //float tensionEnergy=0;
   Wire(float unused elasticModulus, size_t base) :
-    Vertex{base, 1<<16, Wire::mass}/*, elasticModulus(elasticModulus)*/ {
+    Vertex{base, (1<<16)-1, Wire::mass}/*, elasticModulus(elasticModulus)*/ {
    //assert_(elasticModulus == Wire::elasticModulus);
   }
  } wire;
@@ -255,7 +257,7 @@ struct System {
  struct Side : Vertex {
   sconst float curvature = 0; // -1/radius?
   sconst float elasticModulus = 1e7; // for contact
-  sconst float density = 10e3;
+  sconst float density = 1e3;
   const float resolution;
   const float initialRadius;
   const float height;
@@ -613,7 +615,7 @@ struct System {
    fTy[k] = 0;
    fTz[k] = 0;
    // Wire - Grain
-   if( 0/*tangentLength[k] < staticFrictionLength
+   if( 1/*tangentLength[k] < staticFrictionLength
        && tangentRelativeSpeed[0] < staticFrictionSpeed
        && fS[k] < fD[k]*/
        ) {
@@ -626,11 +628,11 @@ struct System {
      fTz[k] = - (fS[k]+fB) * springDirection[2];
      staticFrictionCount++;
     }
-   } else {
+   } else { // 0
     localAx[k] = 0;
     localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0; // DEBUG
    }
-   if(/*tangentRelativeSpeed[k]*/ 0) {
+   if(/*tangentRelativeSpeed[k]*/ 1) {
     float scale = - fD[k] / tangentRelativeSpeed[k];
      fTx[k] += scale * TRVx[k];
      fTy[k] += scale * TRVy[k];

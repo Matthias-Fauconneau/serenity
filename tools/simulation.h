@@ -32,7 +32,7 @@ template<size_t N> struct list { // Small sorted list
 generic struct Lattice {
  const vec4f scale;
  const vec4f min, max;
- const int3 size = ::max(int3(5,5,1), int3(::floor(toVec3(scale*(max-min))))+int3(1));
+ const int3 size = ::max(int3(5,5,1), int3(::floor(toVec3(scale*(max-min))))+int3(2));
  int YX = size.y * size.x;
  buffer<T> cells {size_t(size.z*size.y*size.x + 3*size.y*size.x+3*size.x+4)}; // -1 .. 2 OOB margins
  T* const base = cells.begin()+size.y*size.x+size.x+1;
@@ -49,6 +49,43 @@ generic struct Lattice {
  inline T& cell(float x, float y, float z) { return base[index(x, y, z)]; }
 };
 
+template<size_t cellCapacity> struct List : mref<uint16> {
+    List(mref<uint16> o) : mref(o) {}
+    bool append(uint16 index) {
+     assert(index != 0);
+     size_t i = 0;
+     while(at(i)) {
+         i++;
+         //if(i==cellCapacity) return false;
+         assert_(i<cellCapacity, (mref<uint16>)*this);
+     }
+     at(i) = index; i++;
+     assert_(i < cellCapacity, index, i, cellCapacity, (mref<uint16>)*this);
+     /*if(i<cellCapacity)*/ at(i) = 0;
+     /*else { return false; }*/
+     return true;
+    }
+};
+
+struct Grid {
+ static constexpr size_t cellCapacity = 16;
+ const vec4f scale;
+ const vec4f min, max;
+ const int3 size = ::max(int3(5,5,1), int3(::floor(toVec3(scale*(max-min))))+int3(2));
+ int YX = size.y * size.x;
+ buffer<uint16> cells {size_t(size.z*size.y*size.x + 3*size.y*size.x+3*size.x+4)*cellCapacity}; // -1 .. 2 OOB margins
+ uint16* const base = cells.begin()+(size.y*size.x+size.x+1)*Grid::cellCapacity;
+ Grid(float scale, vec4f min, vec4f max) : scale{scale, scale, scale, 1}, min(min), max(max) {
+  cells.clear(0);
+ }
+ inline size_t index(float x, float y, float z) {
+  int index = int(scale[2]*(z-min[2]))*(size.y*size.x) + int(scale[1]*(y-min[1]))*size.x + int(scale[0]*(x-min[0]));
+  assert_(index >= 0 && index < size.z*size.y*size.x, index, min, x,y,z, max, x-min[0], y-min[1], z-min[2], size.z*size.y*size.x);
+  return index * cellCapacity;
+ }
+ inline List<cellCapacity> cell(float x, float y, float z) { return mref<uint16>(base+index(x, y, z), cellCapacity); }
+};
+
 enum Pattern { None, Helix, Cross, Loop };
 static string patterns[] {"none", "helix", "cross", "loop"};
 enum ProcessState { Pour, Pack, Load, Done, Fail };
@@ -58,8 +95,8 @@ struct Simulation : System {
  // Process parameters
  sconst bool intersectWireWire = false;
  const float targetHeight;
- const float pourRadius = side.initialRadius - Grain::radius;
- const float winchRadius = side.initialRadius - Wire::radius;
+ const float pourRadius = side.initialRadius - Grain::radius; // - 2*Wire::radius;
+ const float winchRadius = side.initialRadius - Grain::radius; //2*Wire::radius;
  const Pattern pattern;
  const float loopAngle;
  const float initialWinchSpeed = 0.1 / 2;
@@ -74,7 +111,7 @@ struct Simulation : System {
  float maxSpawnHeight = 0;
  float lastAngle = 0, winchAngle = 0, currentRadius = winchRadius;
  float topZ0, bottomZ0;
- float lastSnapshotStrain = 0;
+ //float lastSnapshotStrain = 0;
  size_t lastCollapseReport = 0;
  Random random;
  ProcessState processState = Pour;
@@ -109,11 +146,11 @@ struct Simulation : System {
    (parameters.contains("Pattern")?"-"+str(parameters.value("Rate",0)):""__)+
    (parameters.contains("Pressure")?"-soft"_:"");
 
- map<rgb3f, array<vec3>> lines;
+ //map<rgb3f, array<vec3>> lines;
 
- template<Type... Args> void fail(string reason, Args... args) {
+ /*template<Type... Args> void fail(string reason, Args... args) {
   log(reason, args...); processState = Fail; snapshot(reason); return;
- }
+ }*/
 
  //v4sf min = _0f4, max = _0f4;
 
@@ -142,12 +179,12 @@ struct Simulation : System {
  buffer<float> grainGrainLocalBx;
  buffer<float> grainGrainLocalBy;
  buffer<float> grainGrainLocalBz;
- size_t grainGrainCount2 = 0;
+ //size_t grainGrainCount2 = 0;
 
  // Grain - Wire
  // TODO: Verlet
  // FIXME: uint16 -> unpack
- static constexpr size_t grainWire = 32; // FIXME: rcp -> wire / grain
+ static constexpr size_t grainWire = 64;
  size_t grainWireCount = 0;
  buffer<int> grainWireA {wire.capacity};
  buffer<int> grainWireB {wire.capacity};
@@ -158,13 +195,12 @@ struct Simulation : System {
  buffer<float> grainWireLocalBx;
  buffer<float> grainWireLocalBy;
  buffer<float> grainWireLocalBz;
- size_t grainWireCount2 = 0;
+ //size_t grainWireCount2 = 0;
 
  float maxSideVt = 0, maxSideF = 0;
 
  struct Force { vec3 origin, force; };
  array<Force> forces;
- vec3 highlight;
 
  Simulation(const Dict& parameters, Stream&& stream) : System(parameters),
    targetHeight(/*parameters.at("Height"_)*/side.height),
@@ -215,6 +251,7 @@ struct Simulation : System {
   return (fS + fB) * direction;
  }
 
+#if 0
  // Formats vectors as flat lists without brackets nor commas
  String flat(const vec3& v) { return str(v[0], v[1], v[2]); }
  String flat(const v4sf& v) { return str(v[0], v[1], v[2]); }
@@ -294,13 +331,16 @@ struct Simulation : System {
    rename(name+".side.write", name+".side"); // Atomic
   }
  }
+#endif
 
  const float pourPackThreshold = 2e-3;
  const float packLoadThreshold = 2e-3;
  const float transitionTime = 1 *s;
 
- unique<Lattice<uint16> > generateGrainLattice() {
-  vec3 min = inf, max = -inf;
+ bool domain(vec3& min, vec3& max) {
+  min = inf, max = -inf;
+  // Grain
+  // Avoids bound checks on grain-wire
   for(size_t i: range(grain.count)) {
    min.x = ::min(min.x, grain.Px[i]);
    max.x = ::max(max.x, grain.Px[i]);
@@ -309,8 +349,9 @@ struct Simulation : System {
    min.z = ::min(min.z, grain.Pz[i]);
    max.z = ::max(max.z, grain.Pz[i]);
   }
-  if(!(min > vec3(-1) && max < vec3(1))) { log("Domain grain", min, max); processState = ProcessState::Fail; return nullptr; }
-  // Avoids bound checks on grain-side
+  if(!(min > vec3(-1) && max < vec3(1))) { log("Domain grain", min, max); processState = ProcessState::Fail; return false; }
+  // Side
+  // Avoids bound checks on grain-side/wire-side
   // Only needed once membrane is soft
   for(size_t i: range(1, side.H-1)) {
    for(size_t j: range(0, side.W)) {
@@ -323,7 +364,8 @@ struct Simulation : System {
     max.z = ::max(max.z, side.Pz[7+s]);
    }
   }
-  if(!(min > vec3(-1) && max < vec3(1))) { log("Domain side", min, max); processState = ProcessState::Fail; return nullptr; }
+  if(!(min > vec3(-1) && max < vec3(1))) { log("Domain side", min, max); processState = ProcessState::Fail; return false; }
+  // Wire
   // Avoids bound checks on grain-wire
   for(size_t i: range(wire.count)) {
    min.x = ::min(min.x, wire.Px[i]);
@@ -333,12 +375,26 @@ struct Simulation : System {
    min.z = ::min(min.z, wire.Pz[i]);
    max.z = ::max(max.z, wire.Pz[i]);
   }
-  if(!(min > vec3(-1) && max < vec3(1))) { log("Domain wire", min, max); processState = ProcessState::Fail; return nullptr; }
+  if(!(min > vec3(-1) && max < vec3(1))) { log("Domain wire", min, max); processState = ProcessState::Fail; return false; }
+  return true;
+ }
 
-  unique<Lattice<uint16>> grainLattice(sqrt(3.)/(2*Grain::radius), min, max);
-  for(size_t i: range(grain.count))
-   grainLattice->cell(grain.Px[i], grain.Py[i], grain.Pz[i]) = 1+i; // for grain-grain, grain-side, grain-wire
-  return move(grainLattice);
+ unique<Lattice<uint16> > generateLattice(const Vertex& vertices, float radius) {
+  vec3 min, max;
+  if(!domain(min, max)) return nullptr;
+  unique<Lattice<uint16>> lattice(sqrt(3.)/(2*radius), min, max);
+  for(size_t i: range(vertices.count))
+   lattice->cell(vertices.Px[i], vertices.Py[i], vertices.Pz[i]) = 1+i; // for grain-grain, grain-side, grain-wire
+  return move(lattice);
+ }
+
+ unique<Grid> generateGrid(const Vertex& vertices, float length) {
+  vec3 min, max;
+  if(!domain(min, max)) return nullptr;
+  unique<Grid> grid(1/length, min, max);
+  for(size_t i: range(vertices.count))
+   grid->cell(vertices.Px[i], vertices.Py[i], vertices.Pz[i]).append(1+i); // for grain-grain, grain-side, grain-wire
+  return move(grid);
  }
 
  bool step() {
@@ -346,6 +402,7 @@ struct Simulation : System {
   staticFrictionCount2 = staticFrictionCount;
   dynamicFrictionCount2 = dynamicFrictionCount;
   staticFrictionCount = 0; dynamicFrictionCount = 0;
+  highlightWire.clear();
 
   partTime.start();
   stepTime.start();
@@ -362,7 +419,7 @@ struct Simulation : System {
     processState = Pack;
     log("Pour->Pack", grain.count, wire.count,  grainKineticEnergy / grain.count*1e6, voidRatio);
     packStart = timeStep;
-    snapshot("pour");
+    //snapshot("pour");
     // Only needed once membrane is soft
     /*for(size_t i: range(1, side.H-1)) {
      for(size_t j: range(0, side.W)) {
@@ -380,15 +437,18 @@ struct Simulation : System {
       if(length2(p)>1) continue;
       float r = ::min(pourRadius, /*side.minRadius*/side.radius);
       vec3 newPosition (r*p[0], r*p[1], p[2]); // Within cylinder
-      // Finds lowest Z (reduce fall/impact energy)
+      // //Finds lowest Z (reduce fall/impact energy) (FIXME: might prevent wire to spawn under pour height)
+      // Finds max Z without grain overlap
       for(size_t index: range(grain.count)) {
-       vec3 p = grain.position(index);
-       float x = length(toVec3(p - newPosition).xy());
+       vec3 other = grain.position(index);
+       float x = length(toVec3(other - newPosition).xy());
        if(x < 2*Grain::radius) {
         float dz = sqrt(sq(2*Grain::radius+0x1p-24) - sq(x));
-        newPosition[2] = ::max(newPosition[2], p[2]+dz);
+        newPosition[2] = ::max(newPosition[2], other[2]+dz);
        }
       }
+      //assert_(newPosition[2] >= currentPourHeight);
+      if(newPosition[2] > currentPourHeight) break; // Let wire pour over grain first
       float wireDensity = grain.count ? (wire.count-1)*Wire::volume / (grain.count*Grain::volume) : 1;
       if(newPosition[2] > currentPourHeight
          // ?
@@ -464,10 +524,10 @@ break2_:;
   float alpha = processState < Pack ? 0 :
                                       (processState == Pack ? ::min(1.f, (timeStep-packStart)*dt / transitionTime) : 1);
   if(processState == Pack) {
-   if(round(timeStep*dt) > round(lastSnapshot*dt)) {
+   /*if(round(timeStep*dt) > round(lastSnapshot*dt)) {
     snapshot(str(uint(round(timeStep*dt)))+"s"_);
     lastSnapshot = timeStep;
-   }
+   }*/
 
    plate.Pz[1] = ::min(plate.Pz[1], topZ); // Fits plate (Prevents initial decompression)
    G[2] = (1-alpha)* -gz/densityScale;
@@ -478,10 +538,12 @@ break2_:;
    side.tensionStiffness = side.tensionCoefficient * side.thickness;
    side.tensionDamping = side.mass / s;
 
+#if TRIAXIAL
    float speed = plateSpeed;
    float dz = dt * speed;
    plate.Pz[1] -= dz;
    plate.Pz[0] += dz;
+#endif
 
    balanceSum += abs(topForce+bottomForce);
    balanceCount++;
@@ -527,13 +589,13 @@ break2_:;
      stream.write(str(results)+"\n");
      stream.write("Radius (m), Height (m), Plate Force (N), Side Force (N)\n"
                   );//, Kinetic Energy (J), Contacts\n");
-     snapshot("pack");
+     //snapshot("pack");
     }
    } else {
     if(grainKineticEnergy / grain.count < 1e-6 /*1µJ/grain*/) {
      log("Pack->Done", grainKineticEnergy*1e6 / grain.count, "µJ / grain");
      processState = ProcessState::Done;
-     snapshot("done");
+     //snapshot("done");
     }
    }
   }
@@ -547,7 +609,7 @@ break2_:;
    else {
     log(height >= 4*Grain::radius, height/(topZ0-bottomZ0) > 1-1./8);
     processState = Done;
-    snapshot("done");
+    //snapshot("done");
    }
   }
 
@@ -598,6 +660,7 @@ break2_:;
     plate.Fz[0] -= Fz[i];
    }
   }
+#if TRIAXIAL
   {// Top
    size_t gTC = grainTopCount;
    while(gTC%8) grainTop[gTC++] = grain.count;
@@ -620,6 +683,7 @@ break2_:;
     plate.Fz[1] -= Fz[i];
    }
   }
+#endif
   float sideForce = 0;
   {// Rigid Side
    size_t gSC = grainRigidSideCount;
@@ -648,7 +712,8 @@ break2_:;
   grainTime.stop();
 
   unique<Lattice<uint16>> grainLattice = nullptr;
-
+  unique<Grid> wireGrid = nullptr;
+#if TRIAXIAL
   // Soft membrane side
   if(processState > ProcessState::Pour) {
    side.Fx.clear(); side.Fy.clear(); side.Fz.clear(); // FIXME: single pass
@@ -827,7 +892,7 @@ break2_:;
     grainSideLatticeTime.start();
     float minD3 = 2*Grain::radius/sqrt(3.); // - Grain::radius;
     grainSideCount = 0;
-    if(!grainLattice) grainLattice = generateGrainLattice();
+    if(!grainLattice) grainLattice = generateLattice(grain, Grain::radius);
     if(!grainLattice) return false;
     // Side - Grain
     const uint16* grainBase = grainLattice->base;
@@ -942,6 +1007,7 @@ break2_:;
    }
   }
   this->sideForce = sideForce;
+#endif
 
   if(grainGrainGlobalMinD6 <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
 
@@ -968,7 +1034,7 @@ break2_:;
     }*/
    }
 
-   if(!grainLattice) grainLattice = generateGrainLattice();
+   if(!grainLattice) grainLattice = generateLattice(grain, Grain::radius);
    if(!grainLattice) return false;
    float minD6 = 2*(2*Grain::radius/sqrt(3.)/*-Grain::radius*/);
    const int Z = grainLattice->size.z, Y = grainLattice->size.y, X = grainLattice->size.x;
@@ -1031,14 +1097,14 @@ break2_:;
       grainGrainCount++;
      }
     }
-    grainGrainCount2 = ::min(grainGrainCount2, grainGrainCount);
+    //grainGrainCount2 = ::min(grainGrainCount2, grainGrainCount);
     this->grainGrainLocalAx = move(grainGrainLocalAx);
     this->grainGrainLocalAy = move(grainGrainLocalAy);
     this->grainGrainLocalAz = move(grainGrainLocalAz);
     this->grainGrainLocalBx = move(grainGrainLocalBx);
     this->grainGrainLocalBy = move(grainGrainLocalBy);
     this->grainGrainLocalBz = move(grainGrainLocalBz);
-    grainGrainCount2 = grainGrainCount;
+    //grainGrainCount2 = grainGrainCount;
    } else {
     assert_(grainGrain > 8);
     for(size_t a: range(grain.count)) {
@@ -1183,16 +1249,6 @@ break2_:;
     if(wire.Pz[B]+Wire::radius > plate.Pz[1]) wireTop[wireTopCount++] = B;
    }
 #if 1
-   if(!grainLattice) grainLattice = generateGrainLattice(); // FIXME: use verlet lists for wire-grain
-   if(!grainLattice) return false;
-   uint16* grainBase = grainLattice->base;
-   const int gX = grainLattice->size.x, gY = grainLattice->size.y;
-   const uint16* grainNeighbours[3*3] = {
-    grainBase-gX*gY-gX-1, grainBase-gX*gY-1, grainBase-gX*gY+gX-1,
-    grainBase-gX-1, grainBase-1, grainBase+gX-1,
-    grainBase+gX*gY-gX-1, grainBase+gX*gY-1, grainBase+gX*gY+gX-1
-   };
-
    buffer<int2> grainWireIndices {grainCount8 * grainWire};
    grainWireIndices.clear(int2(0,0));
    // Index to packed frictions
@@ -1204,16 +1260,31 @@ break2_:;
      size_t i = 0;
      while(i<grainWire && grainWireIndices[base+i]) i++;
      if(i>=grainWire) {
-      log(index, a, base, i, grainWireIndices.slice(base, grainWire));
+      log("i>=grainWire", "gWC index", index,  "/", grainWireCount, "a grain", a, "/", grain.count,  "base", base, "i", i/*, "gWI[base..+grainWire]", grainWireIndices.slice(base, grainWire)*/);
+      //for(int2 gwc: grainWireIndices.slice(base, grainWire)) log("wire b", gwc[0], "contact #", gwc[1]);
       processState = ProcessState::Fail;
+      highlightGrain.append( a );
+      for(int2 gwc: grainWireIndices.slice(base, grainWire)) highlightWire.append( gwc[0] );
       return false;
      }
      assert_(i<grainWire, grainWireIndices.slice(base, grainWire));
      assert_(base+i < grainWireIndices.size);
-     grainWireIndices[base+i] = int2{grainWireB[index]+1, int(index)};
+     assert_((size_t)grainWireB[index] < wire.count, grainWireB[index], wire.count);
+     assert_(index < grainWireCount, index, grainWireCount);
+     grainWireIndices[base+i] = int2(grainWireB[index]+1, int(index)); // For each grain (a), maps wire (b) to grain-wire contact index
     }
    }
    grainWireCount = 0;
+
+   if(!wireGrid) wireGrid = generateGrid(wire, Grain::radius+Wire::radius);
+   if(!wireGrid) return false;
+   uint16* wireBase = wireGrid->base;
+   const int gX = wireGrid->size.x, gY = wireGrid->size.y;
+   const uint16* wireNeighbours[3*3] = {
+    wireBase+(-gX*gY-gX-1)*Grid::cellCapacity, wireBase+(-gX*gY-1)*Grid::cellCapacity, wireBase+(-gX*gY+gX-1)*Grid::cellCapacity,
+    wireBase+(-gX-1)*Grid::cellCapacity, wireBase+(-1)*Grid::cellCapacity, wireBase+(gX-1)*Grid::cellCapacity,
+    wireBase+(gX*gY-gX-1)*Grid::cellCapacity, wireBase+(gX*gY-1)*Grid::cellCapacity, wireBase+(gX*gY+gX-1)*Grid::cellCapacity
+   };
 
    {
     //Locker lock(this->lock);
@@ -1224,6 +1295,7 @@ break2_:;
     buffer<float> grainWireLocalBy {grainCount8 * grainWire};
     buffer<float> grainWireLocalBz {grainCount8 * grainWire};
 
+#if 0 // Grain lattice (FIXME: too many wire hits requires too large grainWire for grainWireIndices (fast lookup for grain-wire contacts conservation across verlet list updates)
     //buffer<size_t> found (16, 0);
     for(size_t B: range(wire.count)) { // TODO: SIMD
      // Wire - Grain (TODO: Verlet)
@@ -1236,10 +1308,10 @@ break2_:;
         size_t a = line[i]-1;
         //found.append(a);
         size_t index = grainWireCount;
-        grainWireA[index] = a;
-        grainWireB[index] = B;
+        grainWireA[index] = a; // Grain
+        grainWireB[index] = B; // Wire
         for(size_t i: range(grainWire)) {
-         size_t b = grainWireIndices[a*grainWire+i][0];
+         size_t b = grainWireIndices[a*grainWire+i][0]; // wire index + 1
          if(!b) break;
          b--;
          if(b == B) { // Repack existing friction
@@ -1261,6 +1333,43 @@ break2_:;
        }
       }
      }
+#else
+    for(size_t a: range(grain.count)) { // TODO: SIMD
+     // Wire - Grain (TODO: Verlet)
+     {size_t offset = wireGrid->index(grain.Px[a], grain.Py[a], grain.Pz[a]); // offset
+      for(size_t n: range(3*3)) for(size_t i: range(3)) {
+       ref<uint16> list(wireNeighbours[n] + offset + i * Grid::cellCapacity, Grid::cellCapacity);
+       for(size_t j=0; list[j] && j<Grid::cellCapacity; j++) {
+        assert_(grainWireCount < grainWireA.capacity, grainWireCount, grainWireA.capacity);
+        size_t B = list[j]-1;
+        //found.append(a);
+        size_t index = grainWireCount;
+        grainWireA[index] = a; // Grain
+        grainWireB[index] = B; // Wire
+        for(size_t i: range(grainWire)) {
+         size_t b = grainWireIndices[a*grainWire+i][0]; // wire index + 1
+         if(!b) break;
+         b--;
+         if(b == B) { // Repack existing friction
+          size_t j = grainWireIndices[a*grainWire+i][1];
+          grainWireLocalAx[index] = this->grainWireLocalAx[j];
+          grainWireLocalAy[index] = this->grainWireLocalAy[j];
+          grainWireLocalAz[index] = this->grainWireLocalAz[j];
+          grainWireLocalBx[index] = this->grainWireLocalBx[j];
+          grainWireLocalBy[index] = this->grainWireLocalBy[j];
+          grainWireLocalBz[index] = this->grainWireLocalBz[j];
+          goto break__;
+         }
+        } /*else*/ {
+         grainWireLocalAx[index] = 0; grainWireLocalAy[index] = 0; grainWireLocalAz[index] = 0;
+         grainWireLocalBx[index] = 0; grainWireLocalBy[index] = 0; grainWireLocalBz[index] = 0;
+        }
+        break__:;
+        grainWireCount++;
+       }
+      }
+     }
+#endif
      /*for(size_t a: range(grain.count)) {
       float Ax = grain.Px[a], Ay = grain.Py[a], Az = grain.Pz[a];
       float Bx = wire.Px[B], By = wire.Py[B], Bz = wire.Pz[B];
@@ -1273,14 +1382,14 @@ break2_:;
     }
 
     {//Locker lock(this->lock);
-     grainWireCount2 = ::min(grainWireCount2, grainWireCount);
+     //grainWireCount2 = ::min(grainWireCount2, grainWireCount);
      this->grainWireLocalAx = move(grainWireLocalAx);
      this->grainWireLocalAy = move(grainWireLocalAy);
      this->grainWireLocalAz = move(grainWireLocalAz);
      this->grainWireLocalBx = move(grainWireLocalBx);
      this->grainWireLocalBy = move(grainWireLocalBy);
      this->grainWireLocalBz = move(grainWireLocalBz);
-     grainWireCount2 = grainWireCount;
+     //grainWireCount2 = grainWireCount;
     }
    }
    /*//assert(minD3 < 2*Grain::radius/sqrt(3.) - Grain::radius, minD3);
@@ -1310,16 +1419,19 @@ break2_:;
      for(size_t k: range(8)) {
       if(index+k == grainWireCount) break /*2*/;
       if(depth[k] > 0) {
-       static float depthMax = 0.00007;
+       static float depthMax = 0.01;
        /*if(B[k] == 266 || (A[k] == 110 || A[k] == 113)) log(timeStep, B[k], A[k], depth[k], Wire::radius/depth[k], Ax[k],Ay[k],Az[k], Bx[k],By[k],Bz[k], Rx[k],Ry[k],Rz[k], length[k],
                                           grain.Vx[A[k]], grain.Vy[A[k]], grain.Vz[A[k]],
                                           wire.Vx[B[k]], wire.Vy[B[k]], wire.Vz[B[k]]);*/
        if(depth[k] > depthMax) {
-        log("Max", B[k], A[k], depth[k], Wire::radius/depth[k]);
+        log("Max overlap", B[k], A[k], depth[k], Wire::radius/depth[k]);
         depthMax=depth[k];
-        highlightWire.append(B[k]);
-        highlightGrain.append(A[k]);
-        if(depth[k] > 0.0007/*1*//*9*/) { processState = ProcessState::Fail; return false; }
+        if(depth[k] >  0.02) {
+         highlightWire.append(B[k]);
+         highlightGrain.append(A[k]);
+         processState = ProcessState::Fail;
+         return false;
+        }
        }
        grainWireContact[grainWireContactCount] = index+k;
        grainWireContactCount++;
@@ -1379,6 +1491,7 @@ break2_:;
      /*contact(grain, A, wire, B, depth, -Rx, -Ry, -Rz, Nx, Ny, Nz,
              *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i]);*/
      v8sf RAx = - Grain::radius8 * Nx, RAy = - Grain::radius8 * Ny, RAz = - Grain::radius8 * Nz;
+#define FRICTION 1
 #if FRICTION
      // Gather static frictions
      v8sf localAx = gather(grainWireLocalAx, contacts);
@@ -1426,6 +1539,7 @@ break2_:;
      grain.Tx[a] += TAx[i];
      grain.Ty[a] += TAy[i];
      grain.Tz[a] += TAz[i];
+     highlightWire.append(b);
     }
     grainWireAddTime.stop();
    } // GrainWireContact
@@ -1609,7 +1723,8 @@ break2_:;
       side.Vy[index] *= 1./2; // Additionnal viscosity
       side.Vz[index] *= 1./2; // Additionnal viscosity
      }
-     {float v = length(side.velocity(index)); if(v >maxSideVt) { maxSideVt = v; if(v > 4096) { log("v", v); highlight=side.position(index); processState = ProcessState::Fail; return false; } }}
+     {float v = length(side.velocity(index));
+      if(v >maxSideVt) { maxSideVt = v; if(v > 4096) { log("v", v); /*highlight=side.position(index);*/ processState = ProcessState::Fail; return false; } }}
      maxSideV = ::max(maxSideV, length(side.velocity(index)));
      maxRadius = ::max(maxRadius, length2(side.position(index)));
     }
@@ -1626,7 +1741,7 @@ break2_:;
     vec3 p (grain.Px[index], grain.Py[index], grain.Pz[index]);
     if(length2(p) > maxRadius) {
      log("Grain slipped through membrane", 4*side.initialRadius, length2(p));
-     snapshot("slip");
+     //snapshot("slip");
      processState = ProcessState::Fail;
     }
    }
@@ -1684,15 +1799,15 @@ break2_:;
     stream.write(str(radius, height, plateForce, -sideForce/*, grainKineticEnergy, grainSideCount*/)+'\n');
 
     // Snapshots every 1% strain
-    float strain = (1-height/(topZ0-bottomZ0))*100;
+    /*float strain = (1-height/(topZ0-bottomZ0))*100;
     if(round(strain) > round(lastSnapshotStrain)) {
      lastSnapshotStrain = strain;
      snapshot(str(round(strain))+"%");
-    }
+    }*/
    }
   }
 
-  if(processState==Pour && pattern) { // Generates wire (winch)
+  if(processState==Pour && pattern /*&& currentPourHeight-Grain::radius-Wire::radius > 0*/) { // Generates wire (winch)
    vec2 end;
    if(pattern == Helix) { // Simple helix
     float a = winchAngle;
@@ -1724,32 +1839,40 @@ break2_:;
     end = vec2((R-r)*cos(A)+r*cos(a),(R-r)*sin(A)+r*sin(a));
     winchAngle += winchRate*R/r * dt;
    } else error("Unknown pattern:", int(pattern));
-   float z = currentPourHeight+Grain::radius+Wire::radius;
+   float z = currentPourHeight+Grain::radius+Wire::radius; // Over pour
+   //float z = currentPourHeight-Grain::radius-Wire::radius; // Under pour
    vec4f relativePosition = (v4sf){end[0], end[1], z, 0} - (v4sf){wire.Px[wire.count-1], wire.Py[wire.count-1], wire.Pz[wire.count-1], 0};
   vec4f length = sqrt(sq3(relativePosition));
   if(length[0] >= Wire::internodeLength) {
    //Locker lock(this->lock);
    assert(wire.count < wire.capacity, wire.capacity);
-   size_t i = wire.count++;
-   v4sf p = (v4sf){wire.Px[wire.count-2], wire.Py[wire.count-2], wire.Pz[wire.count-2], 0} + float3(Wire::internodeLength) * relativePosition/length;
-   wire.Px[i] = p[0];
-   wire.Py[i] = p[1];
-   wire.Pz[i] = p[2];
-   /*min[0] = ::min(min[0], wire.Px[i]);
+   v4sf p = (v4sf){wire.Px[wire.count-1], wire.Py[wire.count-1], wire.Pz[wire.count-1], 0} + float3(Wire::internodeLength) * relativePosition/length;
+   if(p[2] >= plate.Pz[1]) {
+    skip = false;
+    processState = Pack;
+    log("Pour->Pack", grain.count, wire.count,  grainKineticEnergy / grain.count*1e6, voidRatio);
+    packStart = timeStep;
+   } else {
+    size_t i = wire.count++;
+    wire.Px[i] = p[0];
+    wire.Py[i] = p[1];
+    wire.Pz[i] = p[2];
+    /*min[0] = ::min(min[0], wire.Px[i]);
    min[1] = ::min(min[1], wire.Py[i]);
    min[2] = ::min(min[2], wire.Pz[i]);
    max[0] = ::max(max[0], wire.Px[i]);
    max[1] = ::max(max[1], wire.Py[i]);
    max[2] = ::max(max[2], wire.Pz[i]);*/
-   wire.Vx[i] = 0; wire.Vy[i] = 0; wire.Vz[i] = 0;
+    wire.Vx[i] = 0; wire.Vy[i] = 0; wire.Vz[i] = 0;
 #if GEAR
-   for(size_t n: range(3)) {
-    wire.PDx[n][i] = 0;
-    wire.PDy[n][i] = 0;
-    wire.PDz[n][i] = 0;
-   }
+    for(size_t n: range(3)) {
+     wire.PDx[n][i] = 0;
+     wire.PDy[n][i] = 0;
+     wire.PDz[n][i] = 0;
+    }
 #endif
-   //wire.frictions.set(i);
+    //wire.frictions.set(i);
+   }
   }
  }
  wireIntegrationTime.stop();

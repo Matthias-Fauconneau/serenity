@@ -12,8 +12,8 @@ template<Type K, Type V> struct map {
  array<V> values;
 
  map(){}
- map(buffer<K>&& keys, const mref<V> values) : keys(move(keys)), values(moveRef(values)) { assert_(keys.size==values.size); }
- map(buffer<K>&& keys, buffer<V>&& values) : keys(move(keys)), values(move(values)) { assert_(keys.size==values.size); }
+ map(buffer<K>&& keys, const mref<V> values) : keys(move(keys)), values(moveRef(values)) { assert_(keys.size==values.size, keys.size, values.size); }
+ map(buffer<K>&& keys, buffer<V>&& values) : keys(move(keys)), values(move(values)) { assert_(keys.size==values.size, keys.size, values.size); }
 
  size_t size() const { return keys.size; }
  size_t count() const { return keys.size; }
@@ -143,5 +143,5 @@ template<Type K, Type V> String str(const map<K,V>& m, string separator=","_) {
 }
 
 /// Associates each argument's name with its string conversion
-template<Type... Args> map<string,String> withName(string names, const Args&... args) { return {split(names,", "),{str(args)...}}; }
+template<Type... Args> map<string,String> withName(string names, const Args&... args) { log(names, split(names,", "_)); return map<string,String>(split(names,", "_),{str(args)...}); }
 #define withName(args...) withName(#args, args)
