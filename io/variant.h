@@ -2,7 +2,6 @@
 #include "string.h"
 #include "map.h"
 #include "data.h"
-//#include "vector.h"
 
 struct Variant {
  enum { Null, Boolean, Integer, Real, Data, List, Dict, Rational } type = Null;

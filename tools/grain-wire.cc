@@ -2,16 +2,7 @@
 
 void Simulation::grain_wire() {
  if(!wire.count) return;
- size_t wireCount8 = align(8, wire.count);
- buffer<int> wireBottom(wireCount8), wireTop(wireCount8); //, wireRigidSide(wireCount8);
- size_t wireBottomCount = 0, wireTopCount =0; //, wireRigidSideCount = 0;
 
- for(size_t B: range(wire.count)) { // TODO: SIMD
-  // Gravity
-  wire.Fx[B] = 0; wire.Fy[B] = 0; wire.Fz[B] = wire.mass * G.z;
-  if(plate.Pz[0] > wire.Pz[B]-Wire::radius) wireBottom[wireBottomCount++] = B;
-  if(wire.Pz[B]+Wire::radius > plate.Pz[1]) wireTop[wireTopCount++] = B;
- }
 
  buffer<int2> grainWireIndices {grainCount8 * grainWire};
  grainWireIndices.clear(int2(0,0));

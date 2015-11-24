@@ -3,8 +3,8 @@
 #include "layout.h"
 #include "window.h"
 #include "interface.h"
-//#include "png.h"
-//#include "jpeg.h
+#include "png.h"
+#include "jpeg.h
 #include "pdf.h"
 
 struct Placeholder : Widget {

@@ -74,7 +74,7 @@ video/encoder.h
 video/encoder.cc
 
 polyhedra.h
-view.cc
+polyhedra-view.cc
 test.cc
 tools/review.cc
 tools/single.cc

@@ -157,60 +157,38 @@ void Simulation::stepGrain() {
 }
 
 
-void Simulation::wire() {
+void Simulation::stepWire() {
+ buffer<int> wireBottom(wire.count, 0);
+
+ for(size_t i: range(wire.count)) { // TODO: SIMD
+  wire.Fx[i] = 0; wire.Fy[i] = 0; wire.Fz[i] = wire.mass * Gz;
+  if(wire.Pz[i]-Wire::radius < 0) wireBottom.append( i );
+ }
+
  {// Bottom
-  size_t gBC = wireBottomCount;
-  while(gBC%8) wireBottom[gBC++] = wire.count;
-  assert(gBC <= wireCount8, gBC);
-  v8sf Bz_R = float8(plate.Pz[0]+Wire::radius);
-  buffer<float> Fx(gBC), Fy(gBC), Fz(gBC);
-  for(size_t i = 0; i < gBC; i += 8) {
+  buffer<float> Fx(wireBottom.size), Fy(wireBottom.size), Fz(wireBottom.size);
+  for(size_t i = 0; i < wireBottom.size; i += 8) {
    v8si A = *(v8si*)&wireBottom[i];
-   v8sf depth = Bz_R - gather(wire.Pz, A);
-   contact(wire, A, plate, _0i, depth, _0f, _0f, _1f,
+   v8sf depth = float8(Wire::radius) - gather(wire.Pz, A);
+   v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
+   contact(wire, A, depth,
+           _0f, _0f, _1f,
+           Ax, Ay, Az,
            *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i]);
   }
   for(size_t i = 0; i < wireBottomCount; i++) { // Scalar scatter add
    size_t a = wireBottom[i];
-   assert(isNumber(Fx[i]) && isNumber(Fy[i]) && isNumber(Fz[i]));
    wire.Fx[a] += Fx[i];
    wire.Fy[a] += Fy[i];
    wire.Fz[a] += Fz[i];
-   plate.Fx[0] -= Fx[i];
-   plate.Fy[0] -= Fy[i];
-   plate.Fz[0] -= Fz[i];
-  }
- }
-
- {// Top
-  size_t gTC = wireTopCount;
-  while(gTC%8) wireTop[gTC++] = wire.count;
-  v8sf Bz_R = float8(plate.Pz[1]-Wire::radius);
-  buffer<float> Fx(gTC), Fy(gTC), Fz(gTC);
-  for(size_t i = 0; i < gTC; i += 8) {
-   v8si A = *(v8si*)&wireTop[i];
-   v8sf depth = gather(wire.Pz, A) - Bz_R;
-   contact(wire, A, plate, _1i, depth, _0f, _0f, -_1f,
-           *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i]);
-  }
-  for(size_t i = 0; i < wireTopCount; i++) { // Scalar scatter add
-   size_t a = wireTop[i];
-   assert(isNumber(Fx[i]) && isNumber(Fy[i]) && isNumber(Fz[i]));
-   wire.Fx[a] += Fx[i];
-   wire.Fy[a] += Fy[i];
-   wire.Fz[a] += Fz[i];
-   plate.Fx[1] -= Fx[i];
-   plate.Fy[1] -= Fy[i];
-   plate.Fz[1] -= Fz[i];
   }
  }
 
  // Tension
  for(size_t i: range(1, wire.count)) { // TODO: SIMD
-  //vec4f fT = tension(wire, i-1, i);
   size_t a = i-1, b = i;
   vec3 relativePosition = wire.position(a) - wire.position(b);
-  vec3 length = ::length(relativePosition));
+  vec3 length = ::length(relativePosition);
   vec3 x = length - wire.internodeLength;
   vec3 fS = - wire.tensionStiffness * x;
   vec3 direction = relativePosition/length;

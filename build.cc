@@ -17,29 +17,18 @@ String str(const Branch& o, int depth=0) {
 	return repeat(" ", depth)+o.name+'\n'+join(apply(o.children, [=](const Branch& child){ return str(child, depth+1); }));
 };
 
-/*/// Breaks cycles (converts a directed graph to a directed acyclic graph (DAG))
-Branch collect(const Node* source, array<const Node*>& stack, int maxDepth) {
-	stack.append(source);
-	Branch branch (copy(source->name));
-	if(stack.size <= maxDepth) {
-		for(const Node* child: source->edges) {
-			if(!stack.contains(child))
-				branch.children.append( collect(child, stack, maxDepth) );
-		}
-	}
-	stack.pop();
-	return branch;
-}
-Branch collect(const Node& source, int maxDepth) { array<const Node*> stack; return collect(&source, stack, maxDepth); }*/
-
 String Build::find(string file) {
-	for(string path: sources) if(path == file) return copyRef(path.contains('.') ? section(path,'.',0,-2) : path); // Exact match
-	for(string path: sources) if(section(path,'/',-2,-1) == file) return copyRef(path.contains('.') ? section(path,'.',0,-2) : path); // Sub match
+ for(string path: sources)
+  if(path == file)
+   return copyRef(path.contains('.') ? section(path,'.',0,-2) : path); // Exact match
+ for(string path: sources)
+  if(section(path,'/',-2,-1) == file)
+   return copyRef(path.contains('.') ? section(path,'.',0,-2) : path); // Sub match
 	return {};
 }
 
 String Build::tryParseIncludes(TextData& s, string fileName) {
-	if(!s.match("#include ") && !s.match("//#include ")) return {};
+ if(!s.match("#include ") && !s.match("//#include ")) return {};
 	if(s.match('"')) { // module header
 		string name = s.until('.');
 		return copyRef(name);
@@ -93,11 +82,6 @@ bool Build::tryParseFiles(TextData& s) {
 	s.skip(')');
  name = replace(name, '_', '.');
  String path = find(name);
- /*String path;
- for(string p: sources) {
-  if(section(p.contains('.')?section(p,'.'):p,'/',-2,-1) == name)
-   { path=copyRef(p); break; }
- }*/
 	assert(path, "No such file to embed", name);
  String filesPath = tmp+"/files";
  Folder(filesPath, currentWorkingDirectory(), true);
@@ -121,9 +105,9 @@ int64 Build::parse(string fileName, Node& parent) {
 	for(TextData s = file.read(file.size()); s; s.line()) {
 		{String name = tryParseIncludes(s, fileName);
 			if(name) {
-				String module = find(name+".h"); // .h to find module corresponding to header
-                assert_(module, "No such module", name, "imported from", fileName);
-				lastEdit = max(lastEdit, parse(module+".h", parent));
+    String module = find(name+".h") ?: find(name+".cc");
+    assert_(module, "No such module", name, "imported from", fileName);
+    if(existsFile(module+".h")) lastEdit = max(lastEdit, parse(module+".h", parent));
 				if(!parent.edges.contains(module) && existsFile(module+".cc", folder) && module != parent.name) {
 					if(!modules.contains<string>(module)) { if(!compileModule(module)) return 0; }
 					parent.edges.append( modules[modules.indexOf<string>(module)].pointer );
@@ -203,8 +187,6 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
 	if(flags.contains("profile")) if(!compileModule(find("core/profile.cc"))) { log("Failed to compile\n"); return; }
 	if(!compileModule( find(target+".cc") )) { log("Failed to compile\n"); return; }
 
-	//if(arguments.contains("-tree")) { log(str(collect(modules.first(), 1))+'\n'); return; }
-
 	// Links
  binary = tmp+"/"+join(flags,"-"_)+"/"+target;
 	assert_(!existsFolder(binary));
@@ -222,7 +204,6 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
 					move(files) +
                     mref<String>{"-o"__, unsafeRef(binary), "-L/var/tmp/lib"__, "-Wl,-rpath,/var/tmp/lib"__,} +
 					apply(libraries, [this](const String& library)->String{ return "-l"+library; }) );
-        //if(flags.contains("m32"_)) args.append("-m32"__);
   if(execute(CXX, toRefs(args))) { ::log("Failed to link\n", CXX, args); return; }
 	}
 

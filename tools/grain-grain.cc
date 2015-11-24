@@ -1,6 +1,6 @@
 #include "simulation.h"
 
-void Simulation::grain_grain() {
+void Simulation::stepGrainGrain() {
  if(grainGrainGlobalMinD6 <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
   grainGrainLatticeTime.start();
   buffer<int2> grainGrainIndices {grainCount8 * grainGrain};
