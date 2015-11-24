@@ -82,3 +82,6 @@ tools/sweep.cc
 tools/system.h
 tools/simulation.h
 tools/view.h
+tools/list.h
+tools/lattice.h
+tools/grid.h
