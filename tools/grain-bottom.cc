@@ -56,7 +56,7 @@ bool Simulation::stepGrainBottom() {
  buffer<float> Fx(GBcc), Fy(GBcc), Fz(GBcc);
  buffer<float> TAx(GBcc), TAy(GBcc), TAz(GBcc);
  for(size_t index = 0; index < GBcc; index += 8) { // FIXME: parallel
-  v8ui A = *(v8ui*)(grainGrainA.data+index);
+  v8ui A = *(v8ui*)(grainBottomA.data+index);
   // FIXME: Recomputing from intersection (more efficient than storing?)
   v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
   v8sf depth = float8(Grain::radius) - gather(grain.Pz, A);
@@ -67,7 +67,7 @@ bool Simulation::stepGrainBottom() {
   v8sf localBx = *(v8sf*)(grainBottomLocalBx.data+index);
   v8sf localBy = *(v8sf*)(grainBottomLocalBy.data+index);
   v8sf localBz = *(v8sf*)(grainBottomLocalBz.data+index);
-  contact<Grain,Wire>(grain, A, depth,
+  contact<Grain, Obstacle>(grain, A, depth,
                       _0f, _0f, float8(-Grain::radius),
                       _0f, _0f, _1f,
                       Ax, Ay, Az,

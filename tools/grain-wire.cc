@@ -1,4 +1,4 @@
-// TODO: Verlet
+// TODO: Verlet, Cylinder contacts
 #include "simulation.h"
 
 bool Simulation::stepGrainWire() {

@@ -1,3 +1,4 @@
+// TODO: Factorize force evaluation, contact management
 #include "simulation.h"
 //#include "process.h"
 //#include "grain-bottom.h"
@@ -73,7 +74,7 @@ bool Simulation::step() {
 
  stepGrain();
  stepGrainBottom();
- stepGrainSide();
+ if(processState == ProcessState::Pour) stepGrainSide();
  if(!stepGrainGrain()) return false;
  if(!stepGrainWire()) return false;
 
@@ -98,45 +99,11 @@ bool Simulation::step() {
 }
 
 void Simulation::stepGrain() {
- // Grain
- buffer<int> grainBottom(grain.count, 0), grainSide(grain.count, 0);
  for(size_t a: range(grain.count)) {
-  // Initialization
   grain.Fx[a] = 0; grain.Fy[a] = 0; grain.Fz[a] = Grain::mass * Gz;
   grain.Tx[a] = 0; grain.Ty[a] = 0; grain.Tz[a] = 0;
-   if(processState == ProcessState::Pour &&
-     sq(grain.Px[a]) + sq(grain.Py[a]) > sq(radius - Grain::radius)) {
-   grainSide.append( a );
-  }
- }
-
- float sideForce = 0;
- if(processState <= ProcessState::Pour) { // Rigid Side
-  size_t gSC = grainRigidSideCount;
-  while(gSC%8) grainRigidSide[gSC++] = grain.count;
-  v8sf R = float8(radius-Grain::radius);
-  buffer<float> Fx(gSC), Fy(gSC), Fz(gSC);
-  for(size_t i = 0; i < gSC; i += 8) {
-   v8ui A = *(v8ui*)&grainRigidSide[i];
-   v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A);
-   v8sf length = sqrt8(Ax*Ax + Ay*Ay);
-   v8sf Nx = -Ax/length, Ny = -Ay/length;
-   v8sf depth = length - R;
-   contact<Grain, RigidSide>(grain, A, depth, Grain::radius8*(-Nx), Grain::radius8*(-Ny), _0f,
-                             Nx, Ny, _0f,
-                             *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i]);
-  }
-  for(size_t i = 0; i < grainRigidSideCount; i++) { // Scalar scatter add
-   size_t a = grainRigidSide[i];
-   assert(isNumber(Fx[i]) && isNumber(Fy[i]) && isNumber(Fz[i]));
-   grain.Fx[a] += Fx[i];
-   grain.Fy[a] += Fy[i];
-   grain.Fz[a] += Fz[i];
-   sideForce += (grain.Px[a]*Fx[i] + grain.Py[a]*Fy[i]) / sqrt(grain.Px[a]*grain.Px[a] + grain.Py[a]*grain.Py[a]); // dot(R^,F)
-  }
  }
 }
-
 
 void Simulation::stepWire() {
  buffer<int> wireBottom(wire.count, 0);
@@ -146,7 +113,7 @@ void Simulation::stepWire() {
   if(wire.Pz[i]-Wire::radius < 0) wireBottom.append( i );
  }
 
- {// Bottom
+ {// Bottom (TODO: friction)
   buffer<float> Fx(wireBottom.size), Fy(wireBottom.size), Fz(wireBottom.size);
   for(size_t i = 0; i < wireBottom.size; i += 8) {
    v8ui A = *(v8ui*)&wireBottom[i];
