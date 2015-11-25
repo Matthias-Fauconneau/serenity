@@ -25,7 +25,7 @@ bool Simulation::stepGrainGrain() {
   buffer<float> grainGrainLocalBx (grain.count * averageGrainGrainContactCount, 0);
   buffer<float> grainGrainLocalBy (grain.count * averageGrainGrainContactCount, 0);
   buffer<float> grainGrainLocalBz (grain.count * averageGrainGrainContactCount, 0);
-  size_t grainGrainIndex = 0; // Index of first contact with A in old grainGrain[Local]A|B list
+  size_t grainGrainI = 0; // Index of first contact with A in old grainGrain[Local]A|B list
   for(size_t a: range(grain.count)) {
    size_t offset = grainLattice->index(grain.Px[a], grain.Py[a], grain.Pz[a]);
 
@@ -45,8 +45,8 @@ bool Simulation::stepGrainGrain() {
     size_t b = D.elements[i].value;
     grainGrainA.append( a );
     grainGrainB.append( b );
-    for(size_t k = 0; this->grainGrainA[grainGrainIndex+k] == a; k++) {
-     size_t j = grainGrainIndex+k;
+    for(size_t k = 0; this->grainGrainA[grainGrainI+k] == a; k++) {
+     size_t j = grainGrainI+k;
      if(grainGrainB[j] == b) { // Repack existing friction
       grainGrainLocalAx.append( this->grainGrainLocalAx[j] );
       grainGrainLocalAy.append( this->grainGrainLocalAy[j] );
@@ -68,8 +68,8 @@ bool Simulation::stepGrainGrain() {
     }
     break_:;
    }
-   while(grainGrainIndex < this->grainGrainA.size-1 && this->grainGrainA[grainGrainIndex] == a)
-    grainGrainIndex++;
+   while(grainGrainI < this->grainGrainA.size-1 && this->grainGrainA[grainGrainI] == a)
+    grainGrainI++;
   }
 
   this->grainGrainA = move(grainGrainA);

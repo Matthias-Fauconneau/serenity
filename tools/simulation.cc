@@ -1,5 +1,7 @@
 #include "simulation.h"
 //#include "process.h"
+//#include "grain-bottom.h"
+//#include "grain-side.h"
 //#include "grain-grain.h"
 //#include "grain-wire.h"
 
@@ -70,6 +72,8 @@ bool Simulation::step() {
  stepProcess();
 
  stepGrain();
+ stepGrainBottom();
+ stepGrainSide();
  if(!stepGrainGrain()) return false;
  if(!stepGrainWire()) return false;
 
@@ -100,34 +104,12 @@ void Simulation::stepGrain() {
   // Initialization
   grain.Fx[a] = 0; grain.Fy[a] = 0; grain.Fz[a] = Grain::mass * Gz;
   grain.Tx[a] = 0; grain.Ty[a] = 0; grain.Tz[a] = 0;
-  // Contact with obstacles (floor, side)
-  if(grain.Pz[a]-Grain::radius < 0) grainBottom.append( a );
-  if(processState == ProcessState::Pour &&
+   if(processState == ProcessState::Pour &&
      sq(grain.Px[a]) + sq(grain.Py[a]) > sq(radius - Grain::radius)) {
    grainSide.append( a );
   }
  }
- {// Contact force with floor (SIMD)
-  buffer<float> Fx(grainBottom.size), Fy(grainBottom.size), Fz(grainBottom.size);
-  for(size_t i = 0; i < grainBottom.size; i += 8) {
-   v8ui A = *(v8ui*)&grainBottom[i];
-   v8sf depth = float8(Grain::radius) - gather(grain.Pz, A);
-   v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
-   contact<Grain, Obstacle>(grain, A, depth,
-                            _0f, _0f, float8(-Grain::radius),
-                            _0f, _0f, _1f,
-                            Ax, Ay, Az,
 
-                            *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i]);
-  }
-  for(size_t i = 0; i < grainBottom.size; i++) { // Scalar scatter add
-   size_t a = grainBottom[i];
-   assert(isNumber(Fx[i]) && isNumber(Fy[i]) && isNumber(Fz[i]));
-   grain.Fx[a] += Fx[i];
-   grain.Fy[a] += Fy[i];
-   grain.Fz[a] += Fz[i];
-  }
- }
  float sideForce = 0;
  if(processState <= ProcessState::Pour) { // Rigid Side
   size_t gSC = grainRigidSideCount;
