@@ -6,6 +6,13 @@
 //#include "grain-grain.h"
 //#include "grain-wire.h"
 
+constexpr float System::Grain::radius;
+constexpr float System::Wire::radius;
+constexpr float System::Wire::mass;
+constexpr float System::Wire::internodeLength;
+constexpr float System::Wire::tensionStiffness;
+constexpr float System::Wire::tensionDamping;
+
 Simulation::Simulation(const Dict& p) : System(p.at("TimeStep")), radius(p.at("Radius")),
   pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):None) {
  if(pattern) { // Initial wire node

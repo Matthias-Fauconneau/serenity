@@ -585,11 +585,3 @@ struct System {
   TBz = RBx*fTy - RBy*fTx;
  }
 };
-
-/*constexpr float System::Grain::radius;
-constexpr float System::Grain::mass;
-constexpr float System::Wire::radius;
-constexpr float System::Wire::mass;
-constexpr float System::Wire::elasticModulus;
-constexpr float System::Grain::elasticModulus;
-constexpr float System::Wire::tensionDamping;*/

@@ -6,7 +6,7 @@ struct element {
  element(float key, uint value) : key(key), value(value) {}
 };
 
-String str(element e) { return "("+str(e.key)+", "+str(e.value)+")"; }
+inline String str(element e) { return "("+str(e.key)+", "+str(e.value)+")"; }
 
 template<size_t N> struct list { // Small sorted list
  uint size = 0;

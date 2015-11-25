@@ -10,6 +10,7 @@ static string patterns[] {"none", "helix", "cross", "loop"};
 enum ProcessState { Running, Done, Error };
 static string processStates[] {"running", "done", "error"};
 
+// High level simulation and contact management
 struct Simulation : System {
  // Process parameters
  const float radius;
