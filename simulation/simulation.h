@@ -29,7 +29,7 @@ struct Simulation : System {
  float currentHeight = Grain::radius;
  float lastAngle = 0, winchAngle = 0, currentRadius = patternRadius;
 
- // Grain-Plate friction
+ // Grain-Bottom friction
  buffer<uint> grainBottomA;
  buffer<float> grainBottomLocalAx;
  buffer<float> grainBottomLocalAy;
@@ -37,6 +37,15 @@ struct Simulation : System {
  buffer<float> grainBottomLocalBx;
  buffer<float> grainBottomLocalBy;
  buffer<float> grainBottomLocalBz;
+
+ // Wire-Bottom friction
+ buffer<uint> wireBottomA;
+ buffer<float> wireBottomLocalAx;
+ buffer<float> wireBottomLocalAy;
+ buffer<float> wireBottomLocalAz;
+ buffer<float> wireBottomLocalBx;
+ buffer<float> wireBottomLocalBy;
+ buffer<float> wireBottomLocalBz;
 
  // Grain-Side friction
  buffer<uint> grainSideA;
@@ -94,5 +103,7 @@ struct Simulation : System {
  bool stepGrainGrain();
  bool stepGrainWire();
  void stepWire();
+ void stepWireTension();
+ bool stepWireBottom();
 };
 
