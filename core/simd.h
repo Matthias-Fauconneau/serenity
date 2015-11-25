@@ -65,12 +65,20 @@ inline v4sf qmul(v4sf a, v4sf b) {
                                       + shuffle4(a,a,1,2,0,2) * shuffle4(b,b,2,0,1,2)));
 }
 
-typedef int v8si __attribute((__vector_size__ (32)));
+/*typedef int v8si __attribute((__vector_size__ (32)));
 inline v8si constexpr v8i(int x) { return (v8si){x,x,x,x,x,x,x,x}; }
 static constexpr v8si unused _0i = v8i(0);
 static constexpr v8si unused _1i = v8i(1);
 static inline v8si gather(ref<int> P, v8si a) {
  return v8si{P[a[0]], P[a[1]], P[a[2]], P[a[3]], P[a[4]], P[a[5]], P[a[6]], P[a[7]]};
+}*/
+
+typedef uint v8ui __attribute((__vector_size__ (32)));
+//inline v8si constexpr v8i(int x) { return (v8si){x,x,x,x,x,x,x,x}; }
+//static constexpr v8si unused _0i = v8i(0);
+//static constexpr v8si unused _1i = v8i(1);
+static inline v8ui gather(ref<uint> P, v8ui a) {
+ return v8ui{P[a[0]], P[a[1]], P[a[2]], P[a[3]], P[a[4]], P[a[5]], P[a[6]], P[a[7]]};
 }
 
 #undef packed
@@ -92,13 +100,13 @@ static inline float reduce8(v8sf x) {
  return x32[0];
 }
 #endif
-static inline v8sf gather(const float* P, v8si a) {
+static inline v8sf gather(const float* P, v8ui a) {
  return (v8sf){P[a[0]], P[a[1]], P[a[2]], P[a[3]], P[a[4]], P[a[5]], P[a[6]], P[a[7]]};
 }
-static inline v8sf gather(ref<float> P, v8si a) {
+static inline v8sf gather(ref<float> P, v8ui a) {
  return (v8sf){P[a[0]], P[a[1]], P[a[2]], P[a[3]], P[a[4]], P[a[5]], P[a[6]], P[a[7]]};
 }
-static inline void scatter(mref<float> P, v8si a, v8sf x) {
+static inline void scatter(mref<float> P, v8ui a, v8sf x) {
  P[a[0]] = x[0];
  P[a[1]] = x[1];
  P[a[2]] = x[2];
@@ -114,7 +122,7 @@ inline v4sf mean(const ref<v4sf> x) { assert(x.size); return sum(x, float4(0)) /
 #include "string.h"
 template<> inline String str(const v4sf& v) { return "("+str(v[0], v[1], v[2], v[3])+")"; }
 inline bool isNumber(v4sf v){ for(uint i: range(4)) if(!isNumber(v[i])) return false; return true; }
-template<> inline String str(const v8si& v) {
+template<> inline String str(const v8ui& v) {
  return "("+str(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7])+")";
 }
 /*template<> inline String str(const v8sf& v) {

@@ -25,12 +25,19 @@ bool Simulation::stepGrainWire() {
  unique<Grid> wireGrid = generateGrid(wire, Grain::radius+Wire::radius);
  if(!wireGrid) return false;
 
- uint16* wireBase = wireGrid->base;
- const int gX = wireGrid->size.x, gY = wireGrid->size.y;
+ const int X = wireGrid->size.x, Y = wireGrid->size.y;
  const uint16* wireNeighbours[3*3] = {
-  wireBase+(-gX*gY-gX-1)*Grid::cellCapacity, wireBase+(-gX*gY-1)*Grid::cellCapacity, wireBase+(-gX*gY+gX-1)*Grid::cellCapacity,
-  wireBase+(-gX-1)*Grid::cellCapacity, wireBase+(-1)*Grid::cellCapacity, wireBase+(gX-1)*Grid::cellCapacity,
-  wireBase+(gX*gY-gX-1)*Grid::cellCapacity, wireBase+(gX*gY-1)*Grid::cellCapacity, wireBase+(gX*gY+gX-1)*Grid::cellCapacity
+  wireGrid->base+(-X*Y-X-1)*Grid::cellCapacity,
+  wireGrid->base+(-X*Y-1)*Grid::cellCapacity,
+  wireGrid->base+(-X*Y+X-1)*Grid::cellCapacity,
+
+  wireGrid->base+(-X-1)*Grid::cellCapacity,
+  wireGrid->base+(-1)*Grid::cellCapacity,
+  wireGrid->base+(X-1)*Grid::cellCapacity,
+
+  wireGrid->base+(X*Y-X-1)*Grid::cellCapacity,
+  wireGrid->base+(X*Y-1)*Grid::cellCapacity,
+  wireGrid->base+(X*Y+X-1)*Grid::cellCapacity
  };
 
  {

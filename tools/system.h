@@ -110,7 +110,7 @@ struct System {
 
  /// Evaluates contact force between a non-rotating object and an obstacle without friction
  // Wire - Floor/Side
- template<Type tA, Type tB> inline void contact(const tA& A, v8si a,
+ template<Type tA, Type tB> inline void contact(const tA& A, v8ui a,
                                          v8sf depth,
                                          v8sf Nx, v8sf Ny, v8sf Nz,
                                          v8sf& Fx, v8sf& Fy, v8sf& Fz
@@ -140,7 +140,7 @@ struct System {
 
  /*/// Evaluates contact force between two objects without friction (non rotating A, non rotating B)
  // Wire - Wire
- template<Type tA, Type tB> inline void contact(const tA& A, v8si a, tB& B, v8si b,
+ template<Type tA, Type tB> inline void contact(const tA& A, v8ui a, tB& B, v8ui b,
                                         v8sf depth,
                                         v8sf Nx, v8sf Ny, v8sf Nz,
                                         v8sf& Fx, v8sf& Fy, v8sf& Fz) {
@@ -169,7 +169,7 @@ struct System {
 
  /// Evaluates contact force between two objects without friction (rotating A, non rotating B)
  // Grain - Wire
- template<Type tA, Type tB> inline void contact(const tA& A, v8si a, tB& B, v8si b,
+ template<Type tA, Type tB> inline void contact(const tA& A, v8ui a, tB& B, v8ui b,
                                         v8sf depth,
                                         v8sf RAx, v8sf RAy, v8sf RAz,
                                         v8sf Nx, v8sf Ny, v8sf Nz,
@@ -201,7 +201,7 @@ struct System {
  /// Evaluates contact force between an object and an obstacle with friction (rotating A)
  // Grain - Floor/Side
  template<Type tA, Type tB> inline void contact(
-   const tA& A, v8si a,
+   const tA& A, v8ui a,
    v8sf depth,
    v8sf RAx, v8sf RAy, v8sf RAz,
    v8sf Nx, v8sf Ny, v8sf Nz,
@@ -325,8 +325,8 @@ struct System {
 
  /// Evaluates contact force between two objects with friction (rotating A, non rotating B)
  template<Type tA, Type tB> inline void contact(
-   const tA& A, v8si a,
-   tB& B, v8si b,
+   const tA& A, v8ui a,
+   tB& B, v8ui b,
    v8sf depth,
    v8sf RAx, v8sf RAy, v8sf RAz,
    v8sf Nx, v8sf Ny, v8sf Nz,
@@ -452,8 +452,8 @@ struct System {
 
  /// Evaluates contact force between two objects with friction (rotating A, rotating B)
  template<Type tA, Type tB> inline void contact(
-   const tA& A, v8si a,
-   tB& B, v8si b,
+   const tA& A, v8ui a,
+   tB& B, v8ui b,
    v8sf depth,
    v8sf RAx, v8sf RAy, v8sf RAz,
    v8sf RBx, v8sf RBy, v8sf RBz,
