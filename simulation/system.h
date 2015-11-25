@@ -110,8 +110,7 @@ struct System {
 
  /// Evaluates contact force between a non-rotating object and an obstacle without friction
  // Wire - Floor/Side
- template<Type tA, Type tB> inline void contact(const tA& A, v8ui a,
-                                         v8sf depth,
+ template<Type tA, Type tB> inline void contact(const tA& A, v8ui a, v8sf depth,
                                          v8sf Nx, v8sf Ny, v8sf Nz,
                                          v8sf& Fx, v8sf& Fy, v8sf& Fz
                                          ) {
@@ -139,7 +138,7 @@ struct System {
  }
 
  /*/// Evaluates contact force between two objects without friction (non rotating A, non rotating B)
- // Wire - Wire
+ // (TODO: Wire - Wire)
  template<Type tA, Type tB> inline void contact(const tA& A, v8ui a, tB& B, v8ui b,
                                         v8sf depth,
                                         v8sf Nx, v8sf Ny, v8sf Nz,

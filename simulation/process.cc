@@ -2,7 +2,7 @@
 
 void Simulation::stepProcess() {
  // Process
- if(currentHeight >= targetHeight || grain.count == grain.capacity) processState = Release;
+ if(currentHeight >= targetHeight || grain.count == grain.capacity) processState = Done;
  else {
   // Increases current height
   currentHeight += verticalSpeed * dt;

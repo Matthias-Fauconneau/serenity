@@ -7,8 +7,8 @@
 
 enum Pattern { None, Helix, Cross, Loop };
 static string patterns[] {"none", "helix", "cross", "loop"};
-enum ProcessState { Pour, Release, Error };
-static string processStates[] {"pour", "release", "error"};
+enum ProcessState { Running, Done, Error };
+static string processStates[] {"running", "done", "error"};
 
 struct Simulation : System {
  // Process parameters
@@ -21,7 +21,7 @@ struct Simulation : System {
  const float loopAngle = PI*(3-sqrt(5.));
 
  // Process variables
- ProcessState processState = Pour;
+ ProcessState processState = Running;
  Random random;
  float currentHeight = Grain::radius;
  float lastAngle = 0, winchAngle = 0, currentRadius = patternRadius;

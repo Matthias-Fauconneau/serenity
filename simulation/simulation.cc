@@ -74,7 +74,7 @@ bool Simulation::step() {
 
  stepGrain();
  stepGrainBottom();
- if(processState == ProcessState::Pour) stepGrainSide();
+ if(processState == ProcessState::Running) stepGrainSide();
  if(!stepGrainGrain()) return false;
  if(!stepGrainWire()) return false;
 
@@ -118,13 +118,11 @@ void Simulation::stepWire() {
   for(size_t i = 0; i < wireBottom.size; i += 8) {
    v8ui A = *(v8ui*)&wireBottom[i];
    v8sf depth = float8(Wire::radius) - gather(wire.Pz, A);
-   v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
-   contact(wire, A, depth,
-           _0f, _0f, _1f,
-           Ax, Ay, Az,
-           *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i]);
+   contact<Wire, Obstacle>(wire, A, depth,
+               _0f, _0f, _1f,
+               *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i]);
   }
-  for(size_t i = 0; i < wireBottomCount; i++) { // Scalar scatter add
+  for(size_t i = 0; i < wireBottom.size; i++) { // Scalar scatter add
    size_t a = wireBottom[i];
    wire.Fx[a] += Fx[i];
    wire.Fy[a] += Fy[i];
@@ -137,10 +135,10 @@ void Simulation::stepWire() {
   size_t a = i-1, b = i;
   vec3 relativePosition = wire.position(a) - wire.position(b);
   vec3 length = ::length(relativePosition);
-  vec3 x = length - wire.internodeLength;
+  vec3 x = length - vec3(wire.internodeLength);
   vec3 fS = - wire.tensionStiffness * x;
   vec3 direction = relativePosition/length;
-  vec3 relativeVelocity = wire.velocity(a) - A.velocity(b);
+  vec3 relativeVelocity = wire.velocity(a) - wire.velocity(b);
   vec3 fB = - wire.tensionDamping * dot(direction, relativeVelocity);
   vec3 fT = (fS + fB) * direction;
   wire.Fx[a] += fT.x;
