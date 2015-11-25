@@ -5,6 +5,8 @@
 #include "time.h"
 #include "variant.h"
 
+constexpr size_t simd = 8; // SIMD size
+
 enum Pattern { None, Helix, Cross, Loop };
 static string patterns[] {"none", "helix", "cross", "loop"};
 enum ProcessState { Running, Done, Error };

@@ -113,32 +113,32 @@ void Simulation::stepGrain() {
 }
 
 void Simulation::stepWire() {
- buffer<int> wireBottom(wire.count, 0);
-
+ // Bottom (TODO: friction)
+ buffer<uint> wireBottom(align(simd, wire.count), 0);
  for(size_t i: range(wire.count)) { // TODO: SIMD
   wire.Fx[i] = 0; wire.Fy[i] = 0; wire.Fz[i] = wire.mass * Gz;
   if(wire.Pz[i]-Wire::radius < 0) wireBottom.append( i );
  }
-
- {// Bottom (TODO: friction)
-  buffer<float> Fx(wireBottom.size), Fy(wireBottom.size), Fz(wireBottom.size);
-  for(size_t i = 0; i < wireBottom.size; i += 8) {
-   v8ui A = *(v8ui*)&wireBottom[i];
-   v8sf depth = float8(Wire::radius) - gather(wire.Pz, A);
-   contact<Wire, Obstacle>(wire, A, depth,
-               _0f, _0f, _1f,
-               *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i]);
-  }
-  for(size_t i = 0; i < wireBottom.size; i++) { // Scalar scatter add
-   size_t a = wireBottom[i];
-   wire.Fx[a] += Fx[i];
-   wire.Fy[a] += Fy[i];
-   wire.Fz[a] += Fz[i];
-  }
+ size_t WBcc = align(simd, wireBottom.size);
+ for(size_t i=wireBottom.size; i<WBcc; i++) wireBottom.begin()[i] = 0;
+ buffer<float> Fx(WBcc), Fy(WBcc), Fz(WBcc);
+ for(size_t i = 0; i<wireBottom.size; i+=8) {
+  v8ui A = *(v8ui*)&wireBottom[i];
+  v8sf depth = float8(Wire::radius) - gather(wire.Pz, A);
+  contact<Wire, Obstacle>(wire, A, depth,
+                          _0f, _0f, _1f,
+                          *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i]);
+ }
+ for(size_t i = 0; i<wireBottom.size; i++) { // Scalar scatter add
+  size_t a = wireBottom[i];
+  wire.Fx[a] += Fx[i];
+  wire.Fy[a] += Fy[i];
+  wire.Fz[a] += Fz[i];
  }
 
+
  // Tension
- for(size_t i: range(1, wire.count)) { // TODO: SIMD
+ if(wire.count) for(size_t i: range(1, wire.count)) { // TODO: SIMD
   size_t a = i-1, b = i;
   vec3 relativePosition = wire.position(a) - wire.position(b);
   vec3 length = ::length(relativePosition);
