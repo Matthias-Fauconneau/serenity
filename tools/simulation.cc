@@ -110,7 +110,7 @@ void Simulation::stepGrain() {
  {// Contact force with floor (SIMD)
   buffer<float> Fx(grainBottom.size), Fy(grainBottom.size), Fz(grainBottom.size);
   for(size_t i = 0; i < grainBottom.size; i += 8) {
-   v8si A = *(v8si*)&grainBottom[i];
+   v8ui A = *(v8ui*)&grainBottom[i];
    v8sf depth = float8(Grain::radius) - gather(grain.Pz, A);
    v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
    contact<Grain, Obstacle>(grain, A, depth,
@@ -135,7 +135,7 @@ void Simulation::stepGrain() {
   v8sf R = float8(radius-Grain::radius);
   buffer<float> Fx(gSC), Fy(gSC), Fz(gSC);
   for(size_t i = 0; i < gSC; i += 8) {
-   v8si A = *(v8si*)&grainRigidSide[i];
+   v8ui A = *(v8ui*)&grainRigidSide[i];
    v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A);
    v8sf length = sqrt8(Ax*Ax + Ay*Ay);
    v8sf Nx = -Ax/length, Ny = -Ay/length;
@@ -167,7 +167,7 @@ void Simulation::stepWire() {
  {// Bottom
   buffer<float> Fx(wireBottom.size), Fy(wireBottom.size), Fz(wireBottom.size);
   for(size_t i = 0; i < wireBottom.size; i += 8) {
-   v8si A = *(v8si*)&wireBottom[i];
+   v8ui A = *(v8ui*)&wireBottom[i];
    v8sf depth = float8(Wire::radius) - gather(wire.Pz, A);
    v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
    contact(wire, A, depth,

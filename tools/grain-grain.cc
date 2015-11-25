@@ -2,8 +2,6 @@
 #include "parallel.h"
 
 bool Simulation::stepGrainGrain() {
- static constexpr size_t averageGrainGrainContactCount = 8;
-
  if(grainGrainGlobalMinD12 <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
   unique<Lattice<uint16>> grainLattice = generateLattice(grain, Grain::radius);
   if(!grainLattice) return false;
@@ -18,6 +16,7 @@ bool Simulation::stepGrainGrain() {
   assert(i==62);
 
   // SoA (FIXME: single pointer/index)
+  static constexpr size_t averageGrainGrainContactCount = 8;
   buffer<uint> grainGrainA (grain.count * averageGrainGrainContactCount, 0);
   buffer<uint> grainGrainB (grain.count * averageGrainGrainContactCount, 0);
   buffer<float> grainGrainLocalAx (grain.count * averageGrainGrainContactCount, 0);
@@ -90,7 +89,7 @@ bool Simulation::stepGrainGrain() {
  } else grainSkipped++;
 
  // Evaluates (packed) intersections from (packed) verlet lists
- buffer<uint> grainGrainContact(grain.count * averageGrainGrainContactCount);
+ buffer<uint> grainGrainContact(grainGrainA.size);
  for(size_t index = 0; index < grainGrainA.size; index += 8) {
   v8ui A = *(v8ui*)(grainGrainA.data+index), B = *(v8ui*)(grainGrainB.data+index);
   v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
@@ -100,7 +99,8 @@ bool Simulation::stepGrainGrain() {
   v8sf depth = float8(Grain::radius+Grain::radius) - length;
   for(size_t k: range(8)) {
    size_t j = index+k;
-   if(j < grainGrainA.size && depth[k] > 0) {
+   if(j == grainGrainA.size) break /*2*/;
+   if(depth[k] > 0) {
     // Creates a map from packed contact to index into unpacked contact list (indirect reference)
     // Instead of packing (copying) the unpacked list to a packed contact list
     // To keep track of where to write back (unpacked) contact positions (for static friction)
@@ -115,12 +115,12 @@ bool Simulation::stepGrainGrain() {
  }
 
  // Evaluates forces from (packed) intersections (SoA)
- size_t gGCC = grainGrainA.size;
- buffer<float> Fx(gGCC), Fy(gGCC), Fz(gGCC);
- buffer<float> TAx(gGCC), TAy(gGCC), TAz(gGCC);
- buffer<float> TBx(gGCC), TBy(gGCC), TBz(gGCC);
+ size_t GGcc = grainGrainA.size; // Grain-Grain contact count
+ buffer<float> Fx(GGcc), Fy(GGcc), Fz(GGcc);
+ buffer<float> TAx(GGcc), TAy(GGcc), TAz(GGcc);
+ buffer<float> TBx(GGcc), TBy(GGcc), TBz(GGcc);
 
- parallel_chunk(align(8, gGCC), [&](uint, size_t start, size_t size) {
+ parallel_chunk(align(8, GGcc), [&](uint, size_t start, size_t size) {
   for(size_t i=start*8; i < start*8+size*8; i+=8) {
    v8ui contacts = *(v8ui*)&grainGrainContact[i];
    v8ui A = gather(grainGrainA, contacts), B = gather(grainGrainB, contacts);
@@ -162,7 +162,7 @@ bool Simulation::stepGrainGrain() {
    scatter(grainGrainLocalBz, contacts, localBz);
   }});
 
- for(size_t i = 0; i < grainGrainA.size; i++) { // Scalar scatter add
+ for(size_t i = 0; i < GGcc; i++) { // Scalar scatter add
   size_t index = grainGrainContact[i];
   size_t a = grainGrainA[index];
   size_t b = grainGrainB[index];
