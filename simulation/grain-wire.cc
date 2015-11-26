@@ -10,7 +10,11 @@ bool Simulation::stepGrainWire() {
   for(size_t i: range(wire.count))
    grid.cell(wire.Px[i], wire.Py[i], wire.Pz[i]).append(1+i);
 
-  const float verletDistance = Grain::radius+Grain::radius; // > Grain::radius + Wire::radius
+  const float verletDistance =
+    2*(2*Grain::radius/sqrt(3.)) -
+    (Grain::radius + Wire::radius);
+    //Grain::radius+Grain::radius; // > Grain::radius + Wire::radius
+  assert_(verletDistance > Grain::radius + Wire::radius);
   // Minimum distance over verlet distance parameter is the actual verlet distance which can be used
   float minD = inf;
 
@@ -30,7 +34,7 @@ bool Simulation::stepGrainWire() {
   };
 
   // SoA (FIXME: single pointer/index)
-  static constexpr size_t averageGrainWireContactCount = 3;
+  static constexpr size_t averageGrainWireContactCount = 1;
   const size_t GWcc = align(simd, grain.count * averageGrainWireContactCount + 1);
   buffer<uint> grainWireA (GWcc, 0);
   buffer<uint> grainWireB (GWcc, 0);

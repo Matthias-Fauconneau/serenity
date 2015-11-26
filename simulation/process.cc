@@ -87,7 +87,6 @@ void Simulation::stepProcess() {
        cos(t1)*sin(t2),
        cos(t2)};
      grain.count++;
-     log(timeStep, i);
      // Forces verlet lists reevaluation
      grainGrainGlobalMinD = 0;
      grainWireGlobalMinD = 0;

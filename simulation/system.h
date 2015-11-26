@@ -14,7 +14,7 @@ struct System {
  sconst float mm = 1e-3*m, g = 1e-3*kg, MPa = 1e6 * Pa;
 
  // Contact parameters
- sconst float normalDamping = 1e-4 * s;
+ sconst float normalDamping = 1e-3 * s;
  sconst float staticFrictionSpeed = inf;
  sconst float staticFrictionFactor = 1;
  sconst float staticFrictionLength = 10 * mm;

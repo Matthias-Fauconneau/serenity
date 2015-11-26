@@ -23,7 +23,6 @@ Simulation::Simulation(const Dict& p) : System(p.at("TimeStep")), radius(p.at("R
   wire.Vx[i] = 0; wire.Vy[i] = 0; wire.Vz[i] = 0;
   winchAngle += Wire::internodeLength / radius;
  }
- //log(Wire::mass, wire.dt_mass, Grain::mass, grain.dt_mass);
 }
 
 bool Simulation::domain(vec3& min, vec3& max) {
@@ -88,7 +87,7 @@ bool Simulation::step() {
  stepWire();
  wireTime.stop();
  wireTensionTime.start();
- stepWireTension();
+ //stepWireTension();
  wireTensionTime.stop();
  wireBottomTime.start();
  stepWireBottom();
@@ -113,7 +112,7 @@ bool Simulation::step() {
   maxWireV = ::max(maxWireV, length(wire.velocity(i)));
  }
  float maxGrainWireV = maxGrainV + maxWireV;
- grainWireGlobalMinD -= maxGrainWireV;
+ grainWireGlobalMinD -= maxGrainWireV * dt;
  wireTime.stop();
 
  timeStep++;

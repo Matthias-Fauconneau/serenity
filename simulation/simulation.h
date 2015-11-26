@@ -93,23 +93,23 @@ struct Simulation : System {
 
  bool step();
 
- Time processTime;
+ tsc processTime;
  void stepProcess();
- Time grainTime;
+ tsc grainTime;
  void stepGrain();
- Time grainBottomTime;
+ tsc grainBottomTime;
  bool stepGrainBottom();
- Time grainSideTime;
+ tsc grainSideTime;
  bool stepGrainSide();
- Time grainGrainTime;
+ tsc grainGrainTime;
  bool stepGrainGrain();
- Time grainWireTime;
+ tsc grainWireTime;
  bool stepGrainWire();
- Time wireTime;
+ tsc wireTime;
  void stepWire();
- Time wireTensionTime;
+ tsc wireTensionTime;
  void stepWireTension();
- Time wireBottomTime;
+ tsc wireBottomTime;
  bool stepWireBottom();
 };
 

@@ -10,7 +10,7 @@ bool Simulation::stepGrainGrain() {
   for(size_t i: range(grain.count))
    lattice.cell(grain.Px[i], grain.Py[i], grain.Pz[i]) = 1+i;
 
-  float verletDistance = 2*(2*Grain::radius/sqrt(3.)); // > Grain::radius + Grain::radius
+  const float verletDistance = 2*(2*Grain::radius/sqrt(3.)); // > Grain::radius + Grain::radius
   // Minimum distance over verlet distance parameter is the actual verlet distance which can be used
   float minD = inf;
 
