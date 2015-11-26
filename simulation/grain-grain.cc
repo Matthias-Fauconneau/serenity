@@ -49,7 +49,7 @@ bool Simulation::stepGrainGrain() {
     for(size_t k = 0;; k++) {
      size_t j = grainGrainI+k;
      if(j >= this->grainGrainA.size || this->grainGrainA[j] != a) break;
-     if(grainGrainB[j] == b) { // Repack existing friction
+     if(this->grainGrainB[j] == b) { // Repack existing friction
       grainGrainLocalAx.append( this->grainGrainLocalAx[j] );
       grainGrainLocalAy.append( this->grainGrainLocalAy[j] );
       grainGrainLocalAz.append( this->grainGrainLocalAz[j] );
@@ -76,6 +76,7 @@ bool Simulation::stepGrainGrain() {
 
   for(size_t i=grainGrainA.size; i<align(simd, grainGrainA.size); i++) grainGrainA.begin()[i] = 0;
   this->grainGrainA = move(grainGrainA);
+  for(size_t i=grainGrainB.size; i<align(simd, grainGrainB.size); i++) grainGrainB.begin()[i] = 0;
   this->grainGrainB = move(grainGrainB);
   this->grainGrainLocalAx = move(grainGrainLocalAx);
   this->grainGrainLocalAy = move(grainGrainLocalAy);
@@ -92,7 +93,7 @@ bool Simulation::stepGrainGrain() {
  } else grainSkipped++;
 
  // Evaluates (packed) intersections from (packed) verlet lists
- buffer<uint> grainGrainContact(grainGrainA.size);
+ buffer<uint> grainGrainContact(align(simd, grainGrainA.size), 0);
  for(size_t index = 0; index < grainGrainA.size; index += 8) {
   v8ui A = *(v8ui*)(grainGrainA.data+index), B = *(v8ui*)(grainGrainB.data+index);
   v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
@@ -116,16 +117,19 @@ bool Simulation::stepGrainGrain() {
    }
   }
  }
+ for(size_t i=grainGrainContact.size; i<align(simd, grainGrainContact.size); i++)
+  grainGrainContact.begin()[i] = 0;
 
  // Evaluates forces from (packed) intersections (SoA)
- size_t GGcc = align(simd, grainGrainA.size); // Grain-Grain contact count
+ size_t GGcc = align(simd, grainGrainContact.size); // Grain-Grain contact count
  buffer<float> Fx(GGcc), Fy(GGcc), Fz(GGcc);
  buffer<float> TAx(GGcc), TAy(GGcc), TAz(GGcc);
  buffer<float> TBx(GGcc), TBy(GGcc), TBz(GGcc);
 
- parallel_chunk(align(8, GGcc), [&](uint, size_t start, size_t size) {
-  for(size_t i=start*8; i < start*8+size*8; i+=8) {
-   v8ui contacts = *(v8ui*)&grainGrainContact[i];
+ //parallel_chunk(align(8, GGcc), [&](uint, size_t start, size_t size) {
+  for(size_t index = 0; index < GGcc; index += 8) {
+  //for(size_t index=start*8; index < start*8+size*8; index+=8) {
+   v8ui contacts = *(v8ui*)&grainGrainContact[index];
    v8ui A = gather(grainGrainA, contacts), B = gather(grainGrainB, contacts);
    // FIXME: Recomputing from intersection (more efficient than storing?)
    v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
@@ -152,9 +156,9 @@ bool Simulation::stepGrainGrain() {
                           Bx, By, Bz,
                           localAx, localAy, localAz,
                           localBx, localBy, localBz,
-                          *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i],
-                          *(v8sf*)&TAx[i], *(v8sf*)&TAy[i], *(v8sf*)&TAz[i],
-                          *(v8sf*)&TBx[i], *(v8sf*)&TBy[i], *(v8sf*)&TBz[i]
+                          *(v8sf*)&Fx[index], *(v8sf*)&Fy[index], *(v8sf*)&Fz[index],
+                          *(v8sf*)&TAx[index], *(v8sf*)&TAy[index], *(v8sf*)&TAz[index],
+                          *(v8sf*)&TBx[index], *(v8sf*)&TBy[index], *(v8sf*)&TBz[index]
                           );
    // Scatter static frictions
    scatter(grainGrainLocalAx, contacts, localAx);
@@ -163,9 +167,9 @@ bool Simulation::stepGrainGrain() {
    scatter(grainGrainLocalBx, contacts, localBx);
    scatter(grainGrainLocalBy, contacts, localBy);
    scatter(grainGrainLocalBz, contacts, localBz);
-  }});
+  }//});
 
- for(size_t i = 0; i < grainGrainA.size; i++) { // Scalar scatter add
+ for(size_t i = 0; i < grainGrainContact.size; i++) { // Scalar scatter add
   assert_(isNumber(Fx[i]));
   size_t index = grainGrainContact[i];
   size_t a = grainGrainA[index];

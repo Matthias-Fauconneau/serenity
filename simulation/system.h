@@ -12,7 +12,6 @@ struct System {
  const float dt;
  sconst float s = 1, m = 1, kg = 1, N = kg /m /(s*s), Pa = N / (m*m);
  sconst float mm = 1e-3*m, g = 1e-3*kg, MPa = 1e6 * Pa;
- sconst float Gz = -0/*10*/ * N/kg; // Gravity
 
  // Contact parameters
  sconst float normalDamping = 100e-6 * s; // ~dt
@@ -214,7 +213,7 @@ struct System {
     localAx[k] = 0;
     localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0; // DEBUG
    }
-   if(/*tangentRelativeSpeed[k]*/ 1) {
+   if(tangentRelativeSpeed[k]) {
     float scale = - fD[k] / tangentRelativeSpeed[k];
      fTx[k] += scale * TRVx[k];
      fTy[k] += scale * TRVy[k];
@@ -265,7 +264,7 @@ struct System {
   v8sf NFx = fN * Nx;
   v8sf NFy = fN * Ny;
   v8sf NFz = fN * Nz;
-  for(size_t k: range(simd)) assert_(isNumber(NFx[k]), k);
+  //for(size_t k: range(simd)) assert_(isNumber(NFx[k]), k);
   Fx = NFx;
   Fy = NFy;
   Fz = NFz;
@@ -337,14 +336,15 @@ struct System {
     localAx[k] = 0;
     localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0; // DEBUG
    }
-   if(/*tangentRelativeSpeed[k]*/ 1) {
+   if(tangentRelativeSpeed[k]) {
     float scale = - fD[k] / tangentRelativeSpeed[k];
      fTx[k] += scale * TRVx[k];
      fTy[k] += scale * TRVy[k];
      fTz[k] += scale * TRVz[k];
    }
   }
-  for(size_t k: range(simd)) assert_(isNumber(fTx[k]), k);
+  /*for(size_t k: range(simd))
+   assert_(isNumber(fTx[k]), k,tangentLength[k], tangentRelativeSpeed[k]);*/
   Fx += fTx;
   Fy += fTy;
   Fz += fTz;
@@ -465,7 +465,7 @@ struct System {
     localAx[k] = 0;
     localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0; // DEBUG
    }
-   if(/*tangentRelativeSpeed[k]*/ 1) {
+   if(tangentRelativeSpeed[k]) {
     float scale = - fD[k] / tangentRelativeSpeed[k];
      fTx[k] += scale * TRVx[k];
      fTy[k] += scale * TRVy[k];
@@ -523,7 +523,7 @@ struct System {
   v8sf NFx = fN * Nx;
   v8sf NFy = fN * Ny;
   v8sf NFz = fN * Nz;
-  for(size_t k: range(simd)) assert_(isNumber(NFx[k]), k);
+  //for(size_t k: range(simd)) assert_(isNumber(NFx[k]), k, a[k], b[k], fK[k], fB[k], depth[k]);
   Fx = NFx;
   Fy = NFy;
   Fz = NFz;
@@ -606,7 +606,7 @@ struct System {
      fTz[k] += scale * TRVz[k];
    }
   }
-  for(size_t k: range(simd)) assert_(isNumber(fTx[k]), k);
+  //for(size_t k: range(simd)) assert_(isNumber(fTx[k]), k);
   Fx += fTx;
   Fy += fTy;
   Fz += fTz;

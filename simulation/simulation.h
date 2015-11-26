@@ -13,6 +13,7 @@ static string processStates[] {"running", "done", "error"};
 // High level simulation and contact management
 struct Simulation : System {
  // Process parameters
+ sconst float Gz = -10 * N/kg; // Gravity
  const float radius;
  const float targetHeight = radius;
  const float patternRadius = radius - Grain::radius;

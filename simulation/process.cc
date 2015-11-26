@@ -91,7 +91,7 @@ void Simulation::stepProcess() {
      grain.count++;
      // Forces lattice reevaluation
      grainGrainGlobalMinD12 = 0;
-    } else log("newPosition.z > currentHeight", newPosition.z, currentHeight);
+    } //else log("newPosition.z > currentHeight", newPosition.z, currentHeight);
    }
   }
  }

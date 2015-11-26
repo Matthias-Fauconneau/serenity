@@ -49,7 +49,7 @@ bool Simulation::stepGrainWire() {
      for(size_t k = 0;; k++) {
       size_t j = grainWireIndex+k;
       if(j >= this->grainWireA.size || this->grainWireA[grainWireIndex+k] != a) break;
-      if(grainWireB[j] == b) { // Repack existing friction
+      if(this->grainWireB[j] == b) { // Repack existing friction
        grainWireLocalAx.append( this->grainWireLocalAx[j] );
        grainWireLocalAy.append( this->grainWireLocalAy[j] );
        grainWireLocalAz.append( this->grainWireLocalAz[j] );
@@ -77,6 +77,7 @@ bool Simulation::stepGrainWire() {
 
   for(size_t i=grainWireA.size; i<align(simd, grainWireA.size); i++) grainWireA.begin()[i] = 0;
   this->grainWireA = move(grainWireA);
+  for(size_t i=grainWireB.size; i<align(simd, grainWireB.size); i++) grainWireB.begin()[i] = 0;
   this->grainWireB = move(grainWireB);
   this->grainWireLocalAx = move(grainWireLocalAx);
   this->grainWireLocalAy = move(grainWireLocalAy);
@@ -87,7 +88,7 @@ bool Simulation::stepGrainWire() {
  }
 
  // Evaluates (packed) intersections from (packed) (TODO: verlet) lists
- buffer<uint> grainWireContact(grainWireA.size);
+ buffer<uint> grainWireContact(align(simd, grainWireA.size), 0);
  for(size_t index = 0; index < grainWireA.size; index += 8) {
   v8ui A = *(v8ui*)(grainWireA.data+index), B = *(v8ui*)(grainWireB.data+index);
   v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
@@ -111,9 +112,11 @@ bool Simulation::stepGrainWire() {
    }
   }
  }
+ for(size_t i=grainWireContact.size; i<align(simd, grainWireContact.size); i++)
+  grainWireContact.begin()[i] = 0;
 
  // Evaluates forces from (packed) intersections (SoA)
- size_t GWcc = align(simd, grainWireA.size); // Grain-Wire contact count
+ size_t GWcc = align(simd, grainWireContact.size); // Grain-Wire contact count
  buffer<float> Fx(GWcc), Fy(GWcc), Fz(GWcc);
  buffer<float> TAx(GWcc), TAy(GWcc), TAz(GWcc);
  for(size_t i = 0; i < GWcc; i += 8) { // FIXME: parallel
@@ -154,7 +157,7 @@ bool Simulation::stepGrainWire() {
   scatter(grainWireLocalBz, contacts, localBz);
  }
 
- for(size_t i = 0; i < GWcc; i++) { // Scalar scatter add
+ for(size_t i = 0; i < grainWireContact.size; i++) { // Scalar scatter add
   assert_(isNumber(Fx[i]));
   size_t index = grainWireContact[i];
   size_t a = grainWireA[index];
