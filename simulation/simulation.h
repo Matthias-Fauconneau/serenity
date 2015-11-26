@@ -5,8 +5,6 @@
 #include "time.h"
 #include "variant.h"
 
-constexpr size_t simd = 8; // SIMD size
-
 enum Pattern { None, Helix, Cross, Loop };
 static string patterns[] {"none", "helix", "cross", "loop"};
 enum ProcessState { Running, Done, Error };
@@ -19,8 +17,8 @@ struct Simulation : System {
  const float targetHeight = radius;
  const float patternRadius = radius - Grain::radius;
  const Pattern pattern;
- const float linearSpeed = 0.10 * m/s;
- const float verticalSpeed = 0.05 * m/s;
+ const float linearSpeed = 0.5 * m/s;
+ const float verticalSpeed = 0.025 * m/s;
  const float loopAngle = PI*(3-sqrt(5.));
 
  // Process variables

@@ -17,14 +17,15 @@ bool Simulation::stepGrainGrain() {
 
   // SoA (FIXME: single pointer/index)
   static constexpr size_t averageGrainGrainContactCount = 8;
-  buffer<uint> grainGrainA (grain.count * averageGrainGrainContactCount, 0);
-  buffer<uint> grainGrainB (grain.count * averageGrainGrainContactCount, 0);
-  buffer<float> grainGrainLocalAx (grain.count * averageGrainGrainContactCount, 0);
-  buffer<float> grainGrainLocalAy (grain.count * averageGrainGrainContactCount, 0);
-  buffer<float> grainGrainLocalAz (grain.count * averageGrainGrainContactCount, 0);
-  buffer<float> grainGrainLocalBx (grain.count * averageGrainGrainContactCount, 0);
-  buffer<float> grainGrainLocalBy (grain.count * averageGrainGrainContactCount, 0);
-  buffer<float> grainGrainLocalBz (grain.count * averageGrainGrainContactCount, 0);
+  size_t GGcc = align(simd, grain.count * averageGrainGrainContactCount);
+  buffer<uint> grainGrainA (GGcc, 0);
+  buffer<uint> grainGrainB (GGcc, 0);
+  buffer<float> grainGrainLocalAx (GGcc, 0);
+  buffer<float> grainGrainLocalAy (GGcc, 0);
+  buffer<float> grainGrainLocalAz (GGcc, 0);
+  buffer<float> grainGrainLocalBx (GGcc, 0);
+  buffer<float> grainGrainLocalBy (GGcc, 0);
+  buffer<float> grainGrainLocalBz (GGcc, 0);
   size_t grainGrainI = 0; // Index of first contact with A in old grainGrain[Local]A|B list
   for(size_t a: range(grain.count)) {
    size_t offset = grainLattice->index(grain.Px[a], grain.Py[a], grain.Pz[a]);
@@ -45,8 +46,9 @@ bool Simulation::stepGrainGrain() {
     size_t b = D.elements[i].value;
     grainGrainA.append( a );
     grainGrainB.append( b );
-    for(size_t k = 0; this->grainGrainA[grainGrainI+k] == a; k++) {
+    for(size_t k = 0;; k++) {
      size_t j = grainGrainI+k;
+     if(j >= this->grainGrainA.size || this->grainGrainA[j] != a) break;
      if(grainGrainB[j] == b) { // Repack existing friction
       grainGrainLocalAx.append( this->grainGrainLocalAx[j] );
       grainGrainLocalAy.append( this->grainGrainLocalAy[j] );
@@ -68,10 +70,11 @@ bool Simulation::stepGrainGrain() {
     }
     break_:;
    }
-   while(grainGrainI < this->grainGrainA.size-1 && this->grainGrainA[grainGrainI] == a)
+   while(grainGrainI < this->grainGrainA.size && this->grainGrainA[grainGrainI] == a)
     grainGrainI++;
   }
 
+  for(size_t i=grainGrainA.size; i<align(simd, grainGrainA.size); i++) grainGrainA.begin()[i] = 0;
   this->grainGrainA = move(grainGrainA);
   this->grainGrainB = move(grainGrainB);
   this->grainGrainLocalAx = move(grainGrainLocalAx);
@@ -115,7 +118,7 @@ bool Simulation::stepGrainGrain() {
  }
 
  // Evaluates forces from (packed) intersections (SoA)
- size_t GGcc = grainGrainA.size; // Grain-Grain contact count
+ size_t GGcc = align(simd, grainGrainA.size); // Grain-Grain contact count
  buffer<float> Fx(GGcc), Fy(GGcc), Fz(GGcc);
  buffer<float> TAx(GGcc), TAy(GGcc), TAz(GGcc);
  buffer<float> TBx(GGcc), TBy(GGcc), TBz(GGcc);
@@ -162,7 +165,8 @@ bool Simulation::stepGrainGrain() {
    scatter(grainGrainLocalBz, contacts, localBz);
   }});
 
- for(size_t i = 0; i < GGcc; i++) { // Scalar scatter add
+ for(size_t i = 0; i < grainGrainA.size; i++) { // Scalar scatter add
+  assert_(isNumber(Fx[i]));
   size_t index = grainGrainContact[i];
   size_t a = grainGrainA[index];
   size_t b = grainGrainB[index];

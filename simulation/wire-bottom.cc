@@ -5,14 +5,14 @@ bool Simulation::stepWireBottom() {
  {
   // SoA (FIXME: single pointer/index)
   static constexpr size_t averageWireBottomContactCount = 1;
-  size_t wC = align(simd, wire.count * averageWireBottomContactCount);
-  buffer<uint> wireBottomA           (wC, 0);
-  buffer<float> wireBottomLocalAx (wC, 0);
-  buffer<float> wireBottomLocalAy (wC, 0);
-  buffer<float> wireBottomLocalAz (wC, 0);
-  buffer<float> wireBottomLocalBx (wC, 0);
-  buffer<float> wireBottomLocalBy (wC, 0);
-  buffer<float> wireBottomLocalBz (wC, 0);
+  size_t WBcc = align(simd, wire.count * averageWireBottomContactCount);
+  buffer<uint> wireBottomA           (WBcc, 0);
+  buffer<float> wireBottomLocalAx (WBcc, 0);
+  buffer<float> wireBottomLocalAy (WBcc, 0);
+  buffer<float> wireBottomLocalAz (WBcc, 0);
+  buffer<float> wireBottomLocalBx (WBcc, 0);
+  buffer<float> wireBottomLocalBy (WBcc, 0);
+  buffer<float> wireBottomLocalBz (WBcc, 0);
 
   size_t wireBottomI = 0; // Index of first contact with A in old wireBottom[Local]A|B list
   for(size_t a: range(wire.count)) { // TODO: SIMD
@@ -41,6 +41,7 @@ bool Simulation::stepWireBottom() {
     wireBottomI++;
   }
 
+  for(size_t i=wireBottomA.size; i<WBcc; i++) wireBottomA.begin()[i] = 0;
   this->wireBottomA = move(wireBottomA);
   this->wireBottomLocalAx = move(wireBottomLocalAx);
   this->wireBottomLocalAy = move(wireBottomLocalAy);
@@ -54,8 +55,7 @@ bool Simulation::stepWireBottom() {
 
  // Evaluates forces from (packed) intersections (SoA)
 
- size_t WBcc = align(simd, wireBottomA.size); // Wire-Bottom contact count
- for(size_t i=wireBottomA.size; i<WBcc; i++) wireBottomA.begin()[i] = 0;
+ const size_t WBcc = align(simd, wireBottomA.size); // Wire-Bottom contact count
 
  buffer<float> Fx(WBcc), Fy(WBcc), Fz(WBcc);
  buffer<float> TAx(WBcc), TAy(WBcc), TAz(WBcc);

@@ -4,13 +4,15 @@
 #include "vector.h"
 #define sconst static constexpr
 
+constexpr size_t simd = 8; // SIMD size
+
 /// Evolving system of objects and obstacles interacting through contacts (SoA)
 struct System {
  // Units
  const float dt;
  sconst float s = 1, m = 1, kg = 1, N = kg /m /(s*s), Pa = N / (m*m);
  sconst float mm = 1e-3*m, g = 1e-3*kg, MPa = 1e6 * Pa;
- sconst float Gz = -10 * N/kg; // Gravity
+ sconst float Gz = -0/*10*/ * N/kg; // Gravity
 
  // Contact parameters
  sconst float normalDamping = 100e-6 * s; // ~dt
@@ -52,6 +54,7 @@ struct System {
  };
 
  void step(Mass& p, size_t i) { // TODO: SIMD
+  assert_(isNumber(p.Fx[i]));
   p.Vx[i] += p.dt_mass * p.Fx[i];
   p.Vy[i] += p.dt_mass * p.Fy[i];
   p.Vz[i] += p.dt_mass * p.Fz[i];
@@ -106,95 +109,6 @@ struct System {
 
  System(float dt) : dt(dt) {}
 
- // FIXME: factorize contacts
-
- /*/// Evaluates contact force between a non-rotating object and an obstacle without friction
- template<Type tA, Type tB> inline void contact(const tA& A, v8ui a, v8sf depth,
-                                         v8sf Nx, v8sf Ny, v8sf Nz,
-                                         v8sf& Fx, v8sf& Fy, v8sf& Fz
-                                         ) {
-  // Stiffness
-  constexpr float E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
-  constexpr float R = 1/(tA::curvature+tB::curvature);
-  static const float K = 4./3*E*sqrt(R);
-  static const v8sf K8 = float8(K);
-
-  const v8sf Ks = K8 * sqrt8(depth);
-  const v8sf fK = Ks * depth;
-
-  // Damping
-  static const v8sf KB = float8(K * normalDamping);
-  const v8sf Kb = KB * sqrt8(depth);
-  v8sf RVx = gather(A.Vx, a);
-  v8sf RVy = gather(A.Vy, a);
-  v8sf RVz = gather(A.Vz, a);
-  v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
-  v8sf fB = - Kb * normalSpeed ;
-  v8sf fN = fK + fB;
-  Fx = fN * Nx;
-  Fy = fN * Ny;
-  Fz = fN * Nz;
- }*/
-
- /*/// Evaluates contact force between two objects without friction (non rotating A, non rotating B)
- // (TODO: Wire - Wire)
- template<Type tA, Type tB> inline void contact(const tA& A, v8ui a, tB& B, v8ui b,
-                                        v8sf depth,
-                                        v8sf Nx, v8sf Ny, v8sf Nz,
-                                        v8sf& Fx, v8sf& Fy, v8sf& Fz) {
-  // Stiffness
-  constexpr float E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
-  constexpr float R = 1/(tA::curvature+tB::curvature);
-  static const float K = 4./3*E*sqrt(R); // FIXME: constexpr sqrt
-  static const v8sf K8 = float8(K);
-
-  const v8sf Ks = K8 * sqrt8(depth);
-  const v8sf fK = Ks * depth;
-
-  // Damping
-  static const v8sf KB = float8(K * normalDamping);
-  const v8sf Kb = KB * sqrt8(depth);
-  v8sf RVx = gather(A.Vx, a) - gather(B.Vx, b);
-  v8sf RVy = gather(A.Vy, a) - gather(B.Vy, b);
-  v8sf RVz = gather(A.Vz, a) - gather(B.Vz, b);
-  v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
-  v8sf fB = - Kb * normalSpeed ; // Damping
-  v8sf fN = fK + fB;
-  Fx = fN * Nx;
-  Fy = fN * Ny;
-  Fz = fN * Nz;
- }*/
-
- /*/// Evaluates contact force between two objects without friction (rotating A, non rotating B)
- template<Type tA, Type tB> inline void contact(const tA& A, v8ui a, tB& B, v8ui b,
-                                        v8sf depth,
-                                        v8sf RAx, v8sf RAy, v8sf RAz,
-                                        v8sf Nx, v8sf Ny, v8sf Nz,
-                                        v8sf& Fx, v8sf& Fy, v8sf& Fz) {
-  // Stiffness
-  constexpr float E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
-  constexpr float R = 1/(tA::curvature+tB::curvature);
-  static const float K = 4./3*E*sqrt(R); // FIXME: constexpr sqrt
-  static const v8sf K8 = float8(K);
-
-  const v8sf Ks = K8 * sqrt8(depth);
-  const v8sf fK = Ks * depth;
-
-  // Damping
-  static const v8sf KB = float8(K * normalDamping);
-  const v8sf Kb = KB * sqrt8(depth);
-  v8sf AVx = gather(A.AVx, a), AVy = gather(A.AVy, a), AVz = gather(A.AVz, a);
-  v8sf RVx = gather(A.Vx, a) + (AVy*RAz - AVz*RAy) - gather(B.Vx, b);
-  v8sf RVy = gather(A.Vy, a) + (AVz*RAx - AVx*RAz) - gather(B.Vy, b);
-  v8sf RVz = gather(A.Vz, a) + (AVx*RAy - AVy*RAx) - gather(B.Vz, b);
-  v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
-  v8sf fB = - Kb * normalSpeed ; // Damping
-  v8sf fN = fK + fB;
-  Fx = fN * Nx;
-  Fy = fN * Ny;
-  Fz = fN * Nz;
- }*/
-
  /// Evaluates contact force between an object and an obstacle with friction (non-rotating A)
  // Wire - Floor/Side
  template<Type tA, Type tB> inline void contact(
@@ -237,7 +151,7 @@ struct System {
 
   v8sf FRAx, FRAy, FRAz;
   v8sf FRBx, FRBy, FRBz;
-  for(size_t k: range(8)) { // FIXME
+  for(size_t k: range(simd)) { // FIXME
    if(!localAx[k]) {
     localAx[k] = RAx[k];
     localAy[k] = RAy[k];
@@ -279,7 +193,7 @@ struct System {
   sconst v8sf dynamicFrictionCoefficient8 = float8(dynamicFrictionCoefficient);
   v8sf fD = dynamicFrictionCoefficient8 * fN;
   v8sf fTx, fTy, fTz;
-  for(size_t k: range(8)) { // FIXME: mask
+  for(size_t k: range(simd)) { // FIXME: mask
    fTx[k] = 0;
    fTy[k] = 0;
    fTz[k] = 0;
@@ -351,13 +265,14 @@ struct System {
   v8sf NFx = fN * Nx;
   v8sf NFy = fN * Ny;
   v8sf NFz = fN * Nz;
+  for(size_t k: range(simd)) assert_(isNumber(NFx[k]), k);
   Fx = NFx;
   Fy = NFy;
   Fz = NFz;
 
   v8sf FRAx, FRAy, FRAz;
   v8sf FRBx, FRBy, FRBz;
-  for(size_t k: range(8)) { // FIXME
+  for(size_t k: range(simd)) { // FIXME
    if(!localAx[k]) {
     v4sf localA = qapply(conjugate(A.rotation[a[k]]), (v4sf){RAx[k], RAy[k], RAz[k], 0});
     localAx[k] = localA[0];
@@ -401,7 +316,7 @@ struct System {
   sconst v8sf dynamicFrictionCoefficient8 = float8(dynamicFrictionCoefficient);
   v8sf fD = dynamicFrictionCoefficient8 * fN;
   v8sf fTx, fTy, fTz;
-  for(size_t k: range(8)) { // FIXME: mask
+  for(size_t k: range(simd)) { // FIXME: mask
    fTx[k] = 0;
    fTy[k] = 0;
    fTz[k] = 0;
@@ -429,6 +344,7 @@ struct System {
      fTz[k] += scale * TRVz[k];
    }
   }
+  for(size_t k: range(simd)) assert_(isNumber(fTx[k]), k);
   Fx += fTx;
   Fy += fTy;
   Fz += fTz;
@@ -483,7 +399,7 @@ struct System {
 
   v8sf FRAx, FRAy, FRAz;
   v8sf FRBx, FRBy, FRBz;
-  for(size_t k: range(8)) { // FIXME
+  for(size_t k: range(simd)) { // FIXME
    if(!localAx[k]) {
     v4sf localA = qapply(conjugate(A.rotation[a[k]]), (v4sf){RAx[k], RAy[k], RAz[k], 0});
     localAx[k] = localA[0];
@@ -517,7 +433,7 @@ struct System {
   sconst v8sf staticFrictionStiffness = float8(staticFrictionFactor * staticFrictionCoefficient);
   v8sf kS = staticFrictionStiffness * fN;
   v8sf fS = kS * tangentLength; // 0.1~1 fN
-  //for(size_t k: range(8)) log(fS[k]);
+  //for(size_t k: range(simd)) log(fS[k]);
 
   // tangentRelativeVelocity
   v8sf RVn = Nx*RVx + Ny*RVy + Nz*RVz;
@@ -528,7 +444,7 @@ struct System {
   sconst v8sf dynamicFrictionCoefficient8 = float8(dynamicFrictionCoefficient);
   v8sf fD = dynamicFrictionCoefficient8 * fN;
   v8sf fTx, fTy, fTz;
-  for(size_t k: range(8)) { // FIXME: mask
+  for(size_t k: range(simd)) { // FIXME: mask
    fTx[k] = 0;
    fTy[k] = 0;
    fTz[k] = 0;
@@ -607,13 +523,14 @@ struct System {
   v8sf NFx = fN * Nx;
   v8sf NFy = fN * Ny;
   v8sf NFz = fN * Nz;
+  for(size_t k: range(simd)) assert_(isNumber(NFx[k]), k);
   Fx = NFx;
   Fy = NFy;
   Fz = NFz;
 
   v8sf FRAx, FRAy, FRAz;
   v8sf FRBx, FRBy, FRBz;
-  for(size_t k: range(8)) { // FIXME
+  for(size_t k: range(simd)) { // FIXME
    if(!localAx[k]) {
     v4sf localA = qapply(conjugate(A.rotation[a[k]]), (v4sf){RAx[k], RAy[k], RAz[k], 0});
     localAx[k] = localA[0];
@@ -662,7 +579,7 @@ struct System {
   sconst v8sf dynamicFrictionCoefficient8 = float8(dynamicFrictionCoefficient);
   v8sf fD = dynamicFrictionCoefficient8 * fN;
   v8sf fTx, fTy, fTz;
-  for(size_t k: range(8)) { // FIXME: mask
+  for(size_t k: range(simd)) { // FIXME: mask
    fTx[k] = 0;
    fTy[k] = 0;
    fTz[k] = 0;
@@ -689,6 +606,7 @@ struct System {
      fTz[k] += scale * TRVz[k];
    }
   }
+  for(size_t k: range(simd)) assert_(isNumber(fTx[k]), k);
   Fx += fTx;
   Fy += fTy;
   Fz += fTz;

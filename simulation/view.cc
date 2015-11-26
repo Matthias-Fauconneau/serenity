@@ -91,7 +91,7 @@ struct SimulationView : Simulation, Widget {
   array<v4sf> grainRotations (state.grain.count); // Rotated, Z-Sorted
   array<size_t> grainIndices (state.grain.count);
   {
-   vec3 min = inf, max = -inf;
+   vec3 min = -radius, max = radius;
    for(size_t i: range(state.grain.count)) {
     vec3 O = qapply(viewRotation, state.grain.position(i));
     min = ::min(min, O - vec3(grain.radius));

@@ -24,14 +24,15 @@ bool Simulation::stepGrainWire() {
 
   // SoA (FIXME: single pointer/index)
   static constexpr size_t averageGrainWireContactCount = 8;
-  buffer<uint> grainWireA (grain.count * averageGrainWireContactCount, 0);
-  buffer<uint> grainWireB (grain.count * averageGrainWireContactCount, 0);
-  buffer<float> grainWireLocalAx (grain.count * averageGrainWireContactCount, 0);
-  buffer<float> grainWireLocalAy (grain.count * averageGrainWireContactCount, 0);
-  buffer<float> grainWireLocalAz (grain.count * averageGrainWireContactCount, 0);
-  buffer<float> grainWireLocalBx (grain.count * averageGrainWireContactCount, 0);
-  buffer<float> grainWireLocalBy (grain.count * averageGrainWireContactCount, 0);
-  buffer<float> grainWireLocalBz (grain.count * averageGrainWireContactCount, 0);
+  const size_t GWcc = align(simd, grain.count * averageGrainWireContactCount);
+  buffer<uint> grainWireA (GWcc, 0);
+  buffer<uint> grainWireB (GWcc, 0);
+  buffer<float> grainWireLocalAx (GWcc, 0);
+  buffer<float> grainWireLocalAy (GWcc, 0);
+  buffer<float> grainWireLocalAz (GWcc, 0);
+  buffer<float> grainWireLocalBx (GWcc, 0);
+  buffer<float> grainWireLocalBy (GWcc, 0);
+  buffer<float> grainWireLocalBz (GWcc, 0);
 
   size_t grainWireIndex = 0; // Index of first contact with A in old grainWire[Local]A|B list
   for(size_t a: range(grain.count)) { // TODO: SIMD
@@ -45,8 +46,9 @@ bool Simulation::stepGrainWire() {
      size_t b = list[j]-1;
      grainWireA.append( a ); // Grain
      grainWireB.append( b ); // Wire
-     for(size_t k = 0; this->grainWireA[grainWireIndex+k] == a; k++) {
+     for(size_t k = 0;; k++) {
       size_t j = grainWireIndex+k;
+      if(j >= this->grainWireA.size || this->grainWireA[grainWireIndex+k] != a) break;
       if(grainWireB[j] == b) { // Repack existing friction
        grainWireLocalAx.append( this->grainWireLocalAx[j] );
        grainWireLocalAy.append( this->grainWireLocalAy[j] );
@@ -69,10 +71,11 @@ bool Simulation::stepGrainWire() {
      break_:;
     }
    }
-   while(grainWireIndex < this->grainWireA.size-1 && this->grainWireA[grainWireIndex] == a)
+   while(grainWireIndex < this->grainWireA.size && this->grainWireA[grainWireIndex] == a)
     grainWireIndex++;
   }
 
+  for(size_t i=grainWireA.size; i<align(simd, grainWireA.size); i++) grainWireA.begin()[i] = 0;
   this->grainWireA = move(grainWireA);
   this->grainWireB = move(grainWireB);
   this->grainWireLocalAx = move(grainWireLocalAx);
@@ -110,7 +113,7 @@ bool Simulation::stepGrainWire() {
  }
 
  // Evaluates forces from (packed) intersections (SoA)
- size_t GWcc = grainWireA.size; // Grain-Wire contact count
+ size_t GWcc = align(simd, grainWireA.size); // Grain-Wire contact count
  buffer<float> Fx(GWcc), Fy(GWcc), Fz(GWcc);
  buffer<float> TAx(GWcc), TAy(GWcc), TAz(GWcc);
  for(size_t i = 0; i < GWcc; i += 8) { // FIXME: parallel
@@ -152,6 +155,7 @@ bool Simulation::stepGrainWire() {
  }
 
  for(size_t i = 0; i < GWcc; i++) { // Scalar scatter add
+  assert_(isNumber(Fx[i]));
   size_t index = grainWireContact[i];
   size_t a = grainWireA[index];
   size_t b = grainWireB[index];

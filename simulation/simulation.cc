@@ -18,7 +18,7 @@ Simulation::Simulation(const Dict& p) : System(p.at("TimeStep")), radius(p.at("R
   pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):None) {
  if(pattern) { // Initial wire node
   size_t i = wire.count++;
-  wire.Px[i] = patternRadius; wire.Py[i] = 0; wire.Pz[i] = currentHeight;
+  wire.Px[i] = patternRadius; wire.Py[i] = 0; wire.Pz[i] = currentHeight+Grain::radius+Wire::radius;
   wire.Vx[i] = 0; wire.Vy[i] = 0; wire.Vz[i] = 0;
  }
 }

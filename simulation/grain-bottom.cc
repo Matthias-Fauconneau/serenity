@@ -5,20 +5,21 @@ bool Simulation::stepGrainBottom() {
  {
   // SoA (FIXME: single pointer/index)
   static constexpr size_t averageGrainBottomContactCount = 1;
-  buffer<uint> grainBottomA (grain.count * averageGrainBottomContactCount, 0);
-  buffer<float> grainBottomLocalAx (grain.count * averageGrainBottomContactCount, 0);
-  buffer<float> grainBottomLocalAy (grain.count * averageGrainBottomContactCount, 0);
-  buffer<float> grainBottomLocalAz (grain.count * averageGrainBottomContactCount, 0);
-  buffer<float> grainBottomLocalBx (grain.count * averageGrainBottomContactCount, 0);
-  buffer<float> grainBottomLocalBy (grain.count * averageGrainBottomContactCount, 0);
-  buffer<float> grainBottomLocalBz (grain.count * averageGrainBottomContactCount, 0);
+  const size_t GBcc = align(simd, grain.count * averageGrainBottomContactCount);
+  buffer<uint> grainBottomA           (GBcc, 0);
+  buffer<float> grainBottomLocalAx (GBcc, 0);
+  buffer<float> grainBottomLocalAy (GBcc, 0);
+  buffer<float> grainBottomLocalAz (GBcc, 0);
+  buffer<float> grainBottomLocalBx (GBcc, 0);
+  buffer<float> grainBottomLocalBy (GBcc, 0);
+  buffer<float> grainBottomLocalBz (GBcc, 0);
 
   size_t grainBottomI = 0; // Index of first contact with A in old grainBottom[Local]A|B list
   for(size_t a: range(grain.count)) { // TODO: SIMD
    if(grain.Pz[a] > Grain::radius) continue;
    grainBottomA.append( a ); // Grain
    size_t j = grainBottomI;
-   if(this->grainBottomA[grainBottomI] == a) {
+   if(grainBottomI < this->grainBottomA.size && this->grainBottomA[grainBottomI] == a) {
     // Repack existing friction
     grainBottomLocalAx.append( this->grainBottomLocalAx[j] );
     grainBottomLocalAy.append( this->grainBottomLocalAy[j] );
@@ -36,10 +37,12 @@ bool Simulation::stepGrainBottom() {
     grainBottomLocalBy.append( 0 );
     grainBottomLocalBz.append( 0 );
    }
-   while(grainBottomI < this->grainBottomA.size-1 && this->grainBottomA[grainBottomI] == a)
+   while(grainBottomI < this->grainBottomA.size && this->grainBottomA[grainBottomI] == a)
     grainBottomI++;
   }
 
+  for(size_t i=grainBottomA.size; i<align(simd, grainBottomA.size); i++)
+   grainBottomA.begin()[i] = 0;
   this->grainBottomA = move(grainBottomA);
   this->grainBottomLocalAx = move(grainBottomLocalAx);
   this->grainBottomLocalAy = move(grainBottomLocalAy);
@@ -52,7 +55,7 @@ bool Simulation::stepGrainBottom() {
  // TODO: verlet
 
  // Evaluates forces from (packed) intersections (SoA)
- size_t GBcc = grainBottomA.size; // Grain-Wire contact count
+ size_t GBcc = align(simd, grainBottomA.size); // Grain-Wire contact count
  buffer<float> Fx(GBcc), Fy(GBcc), Fz(GBcc);
  buffer<float> TAx(GBcc), TAy(GBcc), TAz(GBcc);
  for(size_t index = 0; index < GBcc; index += 8) { // FIXME: parallel
@@ -76,6 +79,7 @@ bool Simulation::stepGrainBottom() {
                       *(v8sf*)&Fx[index], *(v8sf*)&Fy[index], *(v8sf*)&Fz[index],
                       *(v8sf*)&TAx[index], *(v8sf*)&TAy[index], *(v8sf*)&TAz[index]
                       );
+  assert_(isNumber(Fx[index]), index, grainBottomA);
   // Scatter static frictions
   *(v8sf*)(grainBottomLocalAx.data+index) = localAx;
   *(v8sf*)(grainBottomLocalAy.data+index) = localAy;
@@ -85,7 +89,8 @@ bool Simulation::stepGrainBottom() {
   *(v8sf*)(grainBottomLocalBz.data+index) = localBz;
  }
 
- for(size_t index = 0; index < GBcc; index++) { // Scalar scatter add
+ for(size_t index = 0; index < grainBottomA.size; index++) { // Scalar scatter add
+  assert_(isNumber(Fx[index]), index, grainBottomA, GBcc);
   size_t a = grainBottomA[index];
   grain.Fx[a] += Fx[index];
   grain.Fy[a] += Fy[index];
