@@ -18,8 +18,8 @@ struct Simulation : System {
  const float targetHeight = radius;
  const float patternRadius = radius - Grain::radius;
  const Pattern pattern;
- const float linearSpeed = 0.5 * m/s;
- const float verticalSpeed = 0.025 * m/s;
+ const float linearSpeed = 1 * m/s;
+ const float verticalSpeed = 0.1 * m/s;
  const float loopAngle = PI*(3-sqrt(5.));
 
  // Process variables

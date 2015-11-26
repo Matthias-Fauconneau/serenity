@@ -8,6 +8,7 @@
 //#include "wire-bottom.h"
 
 constexpr float System::Grain::radius;
+constexpr float System::Grain::mass;
 constexpr float System::Wire::radius;
 constexpr float System::Wire::mass;
 constexpr float System::Wire::internodeLength;
@@ -20,7 +21,9 @@ Simulation::Simulation(const Dict& p) : System(p.at("TimeStep")), radius(p.at("R
   size_t i = wire.count++;
   wire.Px[i] = patternRadius; wire.Py[i] = 0; wire.Pz[i] = currentHeight+Grain::radius+Wire::radius;
   wire.Vx[i] = 0; wire.Vy[i] = 0; wire.Vz[i] = 0;
+  winchAngle += Wire::internodeLength / radius;
  }
+ //log(Wire::mass, wire.dt_mass, Grain::mass, grain.dt_mass);
 }
 
 bool Simulation::domain(vec3& min, vec3& max) {

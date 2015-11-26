@@ -1,11 +1,7 @@
 #include "simulation.h"
 #include "matrix.h"
 #include "window.h"
-#include "render.h"
-#include "png.h"
-#include "layout.h"
-#include "plot.h"
-#include "encoder.h"
+#include "time.h"
 #include "gl.h"
 FILE(shader_glsl)
 
@@ -49,16 +45,24 @@ struct SimulationView : Simulation, Widget {
  vec2 scale = 0;
  vec2 translation = 0;
 
+ Time totalTime {true}, stepTime;
+
  SimulationView(const Dict& parameters) : Simulation(parameters) {
   window = ::window(this, -1, mainThread, true, false);
   states.append(); viewT=states.size-1;
   window->presentComplete = [this]{
    if(!running) return;
-   for(int unused t: range(256)) if(!step()) { running = false;  break; }
-   record();
+   window->setTitle(str(timeStep*dt, timeStep*dt/totalTime.elapsed(), strD(stepTime,totalTime)));
+   for(int unused T: range(256)) {
+    stepTime.start();
+    for(int unused t: range(1)) if(!step()) { window->setTitle("Error"); running = false; goto break_2; }
+    stepTime.stop();
+    record();
+   }
+   break_2:;
    viewT=states.size-1;
    window->render();
-   if(states.size == 8192) running = false;
+   if(states.size == 8192) { log(states.size); window->setTitle("OK"); running = false; }
   };
  }
 

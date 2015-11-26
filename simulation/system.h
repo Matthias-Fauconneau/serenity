@@ -14,13 +14,13 @@ struct System {
  sconst float mm = 1e-3*m, g = 1e-3*kg, MPa = 1e6 * Pa;
 
  // Contact parameters
- sconst float normalDamping = 100e-6 * s; // ~dt
+ sconst float normalDamping = 1e-4 * s;
  sconst float staticFrictionSpeed = inf;
  sconst float staticFrictionFactor = 1;
  sconst float staticFrictionLength = 10 * mm;
  sconst float staticFrictionDamping = 0/*2.7*/ * g/s; // TODO: relative to k ?
- sconst float staticFrictionCoefficient = 0.3;
- sconst float dynamicFrictionCoefficient = 0.3;
+ sconst float staticFrictionCoefficient = 0;
+ sconst float dynamicFrictionCoefficient = 0/*.1*/;
 
  // Obstacles: floor plane, cast cylinder
  struct Obstacle {
@@ -64,7 +64,7 @@ struct System {
 
  // Sphere particles
  struct Grain : Mass {
-  sconst float mass = 2.7 * g;
+  sconst float mass = 2.7 * g * 10/*FIXME*/;
   sconst float radius = 40 *mm;
   sconst float curvature = 1./radius;
   sconst float elasticModulus = 1 * MPa;
@@ -80,22 +80,22 @@ struct System {
 
  void step(Grain& p, size_t i) { // TODO: SIMD
   step((Mass&)p, i);
-  p.rotation[i] += float4(dt/2) * qmul((v4sf){p.AVx[i],p.AVy[i],p.AVz[i],0}, p.rotation[i]);
+  /*p.rotation[i] += float4(dt/2) * qmul((v4sf){p.AVx[i],p.AVy[i],p.AVz[i],0}, p.rotation[i]);
   p.AVx[i] += p.dt_angularMass * p.Tx[i];
   p.AVy[i] += p.dt_angularMass * p.Ty[i];
   p.AVz[i] += p.dt_angularMass * p.Tz[i];
-  p.rotation[i] *= rsqrt(sq4(p.rotation[i]));
+  p.rotation[i] *= rsqrt(sq4(p.rotation[i]));*/
  }
 
  struct Wire : Mass {
   sconst float radius = 3*mm;
-  sconst float internodeLength = Grain::radius;
+  sconst float internodeLength = Grain::radius/2;
   sconst float section = PI * sq(radius);
   sconst float volume = section * internodeLength;
-  sconst float density = 1e3 * kg / cb(m);
+  sconst float density = 100 * kg / cb(m);
   sconst float mass = Wire::density * Wire::volume;
   sconst float curvature = 1./radius;
-  sconst float elasticModulus = 2e6;
+  sconst float elasticModulus = 1 * MPa;
   sconst float tensionStiffness = elasticModulus * PI * sq(radius);
   sconst float tensionDamping = mass / s;
   sconst float areaMomentOfInertia = PI/4*pow4(radius);
@@ -354,6 +354,7 @@ struct System {
  }
 
  /// Evaluates contact force between two objects with friction (rotating A, non rotating B)
+ // Grain-Wire
  template<Type tA, Type tB> inline void contact(
    const tA& A, v8ui a,
    tB& B, v8ui b,
@@ -372,10 +373,7 @@ struct System {
   constexpr float E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
   constexpr float R = 1/(tA::curvature+tB::curvature);
   static const float K = 4./3*E*sqrt(R);
-  static const v8sf K8 = float8(K);
-
-  const v8sf Ks = K8 * sqrt8(depth);
-  const v8sf fK = Ks * depth;
+  const v8sf fK =  float8(K) * sqrt8(depth) * depth;
 
   // Relative velocity
   v8sf AVx = gather(A.AVx, a), AVy = gather(A.AVy, a), AVz = gather(A.AVz, a);
@@ -384,12 +382,12 @@ struct System {
   v8sf RVz = gather(A.Vz, a) + (AVx*RAy - AVy*RAx) - gather(B.Vz, b);
 
   // Damping
-  static const v8sf KB = float8(K * normalDamping);
-  const v8sf Kb = KB * sqrt8(depth);
+  const v8sf Kb = float8(K * normalDamping) * sqrt8(depth);
   v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
+  for(size_t k: range(simd)) if(normalSpeed[k] > 0) normalSpeed[k] = 0; // Only damps penetration
   v8sf fB = - Kb * normalSpeed ; // Damping
 
-  v8sf fN = fK + fB;
+  v8sf fN = fK;// + fB;
   v8sf NFx = fN * Nx;
   v8sf NFy = fN * Ny;
   v8sf NFz = fN * Nz;
@@ -449,7 +447,7 @@ struct System {
    fTy[k] = 0;
    fTz[k] = 0;
    // Wire - Grain
-   if( 1/*tangentLength[k] < staticFrictionLength
+   if( 0/*tangentLength[k] < staticFrictionLength
        && tangentRelativeSpeed[0] < staticFrictionSpeed
        && fS[k] < fD[k]*/
        ) {
@@ -462,14 +460,13 @@ struct System {
      fTz[k] = - (fS[k]+fB) * springDirection[2];
     }
    } else { // 0
-    localAx[k] = 0;
-    localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0; // DEBUG
+    //localAx[k] = 0; localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0;
    }
    if(tangentRelativeSpeed[k]) {
     float scale = - fD[k] / tangentRelativeSpeed[k];
-     fTx[k] += scale * TRVx[k];
-     fTy[k] += scale * TRVy[k];
-     fTz[k] += scale * TRVz[k];
+    fTx[k] += scale * TRVx[k];
+    fTy[k] += scale * TRVy[k];
+    fTz[k] += scale * TRVz[k];
    }
   }
   Fx += fTx;
@@ -481,6 +478,7 @@ struct System {
  }
 
  /// Evaluates contact force between two objects with friction (rotating A, rotating B)
+ // Grain-Grain
  template<Type tA, Type tB> inline void contact(
    const tA& A, v8ui a,
    tB& B, v8ui b,
