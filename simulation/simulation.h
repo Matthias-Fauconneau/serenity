@@ -56,10 +56,8 @@ struct Simulation : System {
  buffer<float> grainSideLocalBz;
 
  // Grain - Grain
- float grainGrainGlobalMinD12 = 0;
- uint grainSkipped = 0;
-
- //size_t grainGrainCount = 0;
+ float grainGrainGlobalMinD = 0;
+ uint grainGrainSkipped = 0;
  buffer<uint> grainGrainA ;
  buffer<uint> grainGrainB;
  // Grain-Grain Friction
@@ -71,7 +69,8 @@ struct Simulation : System {
  buffer<float> grainGrainLocalBz;
 
  // Grain - Wire
- // TODO: Verlet
+ float grainWireGlobalMinD = 0;
+ uint grainWireSkipped = 0;
  buffer<uint> grainWireA;
  buffer<uint> grainWireB;
  // Grain-Wire Friction
@@ -95,14 +94,23 @@ struct Simulation : System {
 
  bool step();
 
+ Time processTime;
  void stepProcess();
+ Time grainTime;
  void stepGrain();
+ Time grainBottomTime;
  bool stepGrainBottom();
+ Time grainSideTime;
  bool stepGrainSide();
+ Time grainGrainTime;
  bool stepGrainGrain();
+ Time grainWireTime;
  bool stepGrainWire();
+ Time wireTime;
  void stepWire();
+ Time wireTensionTime;
  void stepWireTension();
+ Time wireBottomTime;
  bool stepWireBottom();
 };
 

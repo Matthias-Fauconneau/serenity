@@ -60,6 +60,18 @@ struct SimulationView : Simulation, Widget {
     record();
    }
    break_2:;
+   if(timeStep%256 == 0) {
+    log("-----------------------------------------------------------------");
+    log("process", strD(processTime, stepTime));
+    log("grain", strD(grainTime, stepTime));
+    log("grain-bottom", strD(grainBottomTime, stepTime));
+    log("grain-side", strD(grainSideTime, stepTime));
+    log("grain-grain", strD(grainGrainTime, stepTime));
+    log("grain-wire", strD(grainWireTime, stepTime));
+    log("wire", strD(wireTime, stepTime));
+    log("wire-tension", strD(wireTensionTime, stepTime));
+    log("wire-bottom", strD(wireBottomTime, stepTime));
+   }
    viewT=states.size-1;
    window->render();
    if(states.size == 8192) { log(states.size); window->setTitle("OK"); running = false; }

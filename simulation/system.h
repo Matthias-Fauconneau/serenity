@@ -387,7 +387,7 @@ struct System {
   for(size_t k: range(simd)) if(normalSpeed[k] > 0) normalSpeed[k] = 0; // Only damps penetration
   v8sf fB = - Kb * normalSpeed ; // Damping
 
-  v8sf fN = fK;// + fB;
+  v8sf fN = fK+ fB;
   v8sf NFx = fN * Nx;
   v8sf NFy = fN * Ny;
   v8sf NFz = fN * Nz;

@@ -61,51 +61,60 @@ bool Simulation::domain(vec3& min, vec3& max) {
  return true;
 }
 
-unique<Lattice<uint16> > Simulation::generateLattice(const Mass& vertices, float radius) {
- vec3 min, max;
- if(!domain(min, max)) return nullptr;
- unique<Lattice<uint16>> lattice(sqrt(3.)/(2*radius), min, max);
- for(size_t i: range(vertices.count))
-  lattice->cell(vertices.Px[i], vertices.Py[i], vertices.Pz[i]) = 1+i;
- return move(lattice);
-}
-
-unique<Grid> Simulation::generateGrid(const Mass& vertices, float length) {
- vec3 min, max;
- if(!domain(min, max)) return nullptr;
- unique<Grid> grid(1/length, min, max);
- for(size_t i: range(vertices.count))
-  grid->cell(vertices.Px[i], vertices.Py[i], vertices.Pz[i]).append(1+i);
- return move(grid);
-}
-
 bool Simulation::step() {
-
+ processTime.start();
  stepProcess();
+ processTime.stop();
 
+ grainTime.start();
  stepGrain();
+ grainTime.stop();
+ grainBottomTime.start();
  stepGrainBottom();
- if(processState == ProcessState::Running) stepGrainSide();
+ grainBottomTime.stop();
+ if(processState == ProcessState::Running) {
+  grainSideTime.start();
+  stepGrainSide();
+  grainSideTime.stop();
+ }
+ grainGrainTime.start();
  if(!stepGrainGrain()) return false;
+ grainGrainTime.stop();
+ grainWireTime.start();
  if(!stepGrainWire()) return false;
+ grainWireTime.stop();
 
+ wireTime.start();
  stepWire();
+ wireTime.stop();
+ wireTensionTime.start();
  stepWireTension();
+ wireTensionTime.stop();
+ wireBottomTime.start();
  stepWireBottom();
+ wireBottomTime.stop();
 
  // Grain
+ grainTime.start();
  float maxGrainV = 0;
  for(size_t i: range(grain.count)) { // TODO: SIMD
   System::step(grain, i);
   maxGrainV = ::max(maxGrainV, length(grain.velocity(i)));
  }
  float maxGrainGrainV = maxGrainV + maxGrainV;
- grainGrainGlobalMinD12 -= maxGrainGrainV * dt;
+ grainGrainGlobalMinD -= maxGrainGrainV * dt;
+ grainTime.stop();
 
  // Wire
+ wireTime.start();
+ float maxWireV = 0;
  for(size_t i: range(wire.count)) { // TODO: SIMD
   System::step(wire, i);
+  maxWireV = ::max(maxWireV, length(wire.velocity(i)));
  }
+ float maxGrainWireV = maxGrainV + maxWireV;
+ grainWireGlobalMinD -= maxGrainWireV;
+ wireTime.stop();
 
  timeStep++;
  return true;

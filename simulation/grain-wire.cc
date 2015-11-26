@@ -1,30 +1,35 @@
-// TODO: Verlet, Cylinder contacts
+// TODO: Cylinder contacts
 #include "simulation.h"
 
 bool Simulation::stepGrainWire() {
- if(!wire.count) return true;
- {
-  unique<Grid> wireGrid = generateGrid(wire, Grain::radius+Wire::radius);
-  if(!wireGrid) return false;
+ if(!grain.count || !wire.count) return true;
+ if(grainWireGlobalMinD <= 0)  {
+  vec3 min, max;
+  if(!domain(min, max)) return false;
+  Grid grid(1/(Grain::radius+Grain::radius), min, max);
+  for(size_t i: range(wire.count))
+   grid.cell(wire.Px[i], wire.Py[i], wire.Pz[i]).append(1+i);
 
-  const int X = wireGrid->size.x, Y = wireGrid->size.y;
+  float minD = Grain::radius+Grain::radius; // > Grain::radius+Wire::radius
+
+  const int X = grid.size.x, Y = grid.size.y;
   const uint16* wireNeighbours[3*3] = {
-   wireGrid->base+(-X*Y-X-1)*Grid::cellCapacity,
-   wireGrid->base+(-X*Y-1)*Grid::cellCapacity,
-   wireGrid->base+(-X*Y+X-1)*Grid::cellCapacity,
+   grid.base+(-X*Y-X-1)*Grid::cellCapacity,
+   grid.base+(-X*Y-1)*Grid::cellCapacity,
+   grid.base+(-X*Y+X-1)*Grid::cellCapacity,
 
-   wireGrid->base+(-X-1)*Grid::cellCapacity,
-   wireGrid->base+(-1)*Grid::cellCapacity,
-   wireGrid->base+(X-1)*Grid::cellCapacity,
+   grid.base+(-X-1)*Grid::cellCapacity,
+   grid.base+(-1)*Grid::cellCapacity,
+   grid.base+(X-1)*Grid::cellCapacity,
 
-   wireGrid->base+(X*Y-X-1)*Grid::cellCapacity,
-   wireGrid->base+(X*Y-1)*Grid::cellCapacity,
-   wireGrid->base+(X*Y+X-1)*Grid::cellCapacity
+   grid.base+(X*Y-X-1)*Grid::cellCapacity,
+   grid.base+(X*Y-1)*Grid::cellCapacity,
+   grid.base+(X*Y+X-1)*Grid::cellCapacity
   };
 
   // SoA (FIXME: single pointer/index)
-  static constexpr size_t averageGrainWireContactCount = 8;
-  const size_t GWcc = align(simd, grain.count * averageGrainWireContactCount);
+  static constexpr size_t averageGrainWireContactCount = 3;
+  const size_t GWcc = align(simd, grain.count * averageGrainWireContactCount + 1);
   buffer<uint> grainWireA (GWcc, 0);
   buffer<uint> grainWireB (GWcc, 0);
   buffer<float> grainWireLocalAx (GWcc, 0);
@@ -37,44 +42,64 @@ bool Simulation::stepGrainWire() {
   size_t grainWireIndex = 0; // Index of first contact with A in old grainWire[Local]A|B list
   for(size_t a: range(grain.count)) { // TODO: SIMD
 #if 1
-   size_t offset = wireGrid->index(grain.Px[a], grain.Py[a], grain.Pz[a]);
+   size_t offset = grid.index(grain.Px[a], grain.Py[a], grain.Pz[a]);
    // Neighbours
+   static constexpr size_t maximumGrainWireContactCount = 12;
+   list<maximumGrainWireContactCount> D;
+   //size_t grainWireContactCount = 0;
    for(size_t n: range(3*3)) for(size_t i: range(3)) {
     ref<uint16> list(wireNeighbours[n] + offset + i * Grid::cellCapacity, Grid::cellCapacity);
 
-    for(size_t j=0; list[j] && j<Grid::cellCapacity; j++) {
-     size_t b = list[j]-1;
+    for(size_t j: range(Grid::cellCapacity)) {
+     size_t b = list[j];
+     if(!b) break;
+     b--;
 #else
    for(size_t b: range(wire.count)) {
     {
 #endif
-     grainWireA.append( a ); // Grain
-     grainWireB.append( b ); // Wire
-     for(size_t k = 0;; k++) {
-      size_t j = grainWireIndex+k;
-      if(j >= this->grainWireA.size || this->grainWireA[grainWireIndex+k] != a) break;
-      if(this->grainWireB[j] == b) { // Repack existing friction
-       grainWireLocalAx.append( this->grainWireLocalAx[j] );
-       grainWireLocalAy.append( this->grainWireLocalAy[j] );
-       grainWireLocalAz.append( this->grainWireLocalAz[j] );
-       grainWireLocalBx.append( this->grainWireLocalBx[j] );
-       grainWireLocalBy.append( this->grainWireLocalBy[j] );
-       grainWireLocalBz.append( this->grainWireLocalBz[j] );
-       goto break_;
-      }
-     } /*else*/ { // New contact
-      // Appends zero to reserve slot. Zero flags contacts for evaluation.
-      // Contact points (for static friction) will be computed during force evaluation (if fine test passes)
-      grainWireLocalAx.append( 0 );
-      grainWireLocalAy.append( 0 );
-      grainWireLocalAz.append( 0 );
-      grainWireLocalBx.append( 0 );
-      grainWireLocalBy.append( 0 );
-      grainWireLocalBz.append( 0 );
-     }
-     break_:;
+     float d = sqrt(sq(grain.Px[a]-grain.Px[b])
+                       + sq(grain.Py[a]-grain.Py[b])
+                       + sq(grain.Pz[a]-grain.Pz[b])); // TODO: SIMD
+     if(!D.insert(d, b)) minD = ::min(minD, d);
     }
    }
+   for(size_t i: range(D.size)) {
+    float d = D.elements[i].key;
+    // Limits verlet lists size
+    if(/*i >= averageGrainWireContactCount &&*/ d > Grain::radius+Grain/*Wire*/::radius) {
+     minD = ::min(minD, d);
+     break;
+    }
+    size_t b = D.elements[i].value;
+    grainWireA.append( a ); // Grain
+    grainWireB.append( b ); // Wire
+    for(size_t k = 0;; k++) {
+     size_t j = grainWireIndex+k;
+     if(j >= this->grainWireA.size || this->grainWireA[grainWireIndex+k] != a) break;
+     if(this->grainWireB[j] == b) { // Repack existing friction
+      grainWireLocalAx.append( this->grainWireLocalAx[j] );
+      grainWireLocalAy.append( this->grainWireLocalAy[j] );
+      grainWireLocalAz.append( this->grainWireLocalAz[j] );
+      grainWireLocalBx.append( this->grainWireLocalBx[j] );
+      grainWireLocalBy.append( this->grainWireLocalBy[j] );
+      grainWireLocalBz.append( this->grainWireLocalBz[j] );
+      goto break_;
+     }
+    } /*else*/ { // New contact
+     // Appends zero to reserve slot. Zero flags contacts for evaluation.
+     // Contact points (for static friction) will be computed during force evaluation (if fine test passes)
+     grainWireLocalAx.append( 0 );
+     grainWireLocalAy.append( 0 );
+     grainWireLocalAz.append( 0 );
+     grainWireLocalBx.append( 0 );
+     grainWireLocalBy.append( 0 );
+     grainWireLocalBz.append( 0 );
+    }
+    break_:;
+   }
+
+   assert_(minD > Grain::radius+Wire::radius);
    while(grainWireIndex < this->grainWireA.size && this->grainWireA[grainWireIndex] == a)
     grainWireIndex++;
   }
@@ -91,7 +116,13 @@ bool Simulation::stepGrainWire() {
   this->grainWireLocalBx = move(grainWireLocalBx);
   this->grainWireLocalBy = move(grainWireLocalBy);
   this->grainWireLocalBz = move(grainWireLocalBz);
- }
+
+  grainWireGlobalMinD = minD - (Grain::radius+Wire::radius);
+  if(grainWireGlobalMinD < 0) log("grainWireGlobalMinD", grainWireGlobalMinD);
+
+  log("grain-wire", grainWireSkipped);
+  grainWireSkipped=0;
+ } else grainWireSkipped++;
 
  // Evaluates (packed) intersections from (packed) (TODO: verlet) lists
  buffer<uint> grainWireContact(align(simd, grainWireA.size), 0);

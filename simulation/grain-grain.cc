@@ -2,16 +2,21 @@
 #include "parallel.h"
 
 bool Simulation::stepGrainGrain() {
- if(grainGrainGlobalMinD12 <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
-  unique<Lattice<uint16>> grainLattice = generateLattice(grain, Grain::radius);
-  if(!grainLattice) return false;
-  float minD12= 2*(2*Grain::radius/sqrt(3.));
+ if(!grain.count) return true;
+ if(grainGrainGlobalMinD <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
+  vec3 min, max;
+  if(!domain(min, max)) return false;
+  Lattice<uint16> lattice(sqrt(3.)/(2*Grain::radius), min, max);
+  for(size_t i: range(grain.count))
+   lattice.cell(grain.Px[i], grain.Py[i], grain.Pz[i]) = 1+i;
 
-  const int Y = grainLattice->size.y, X = grainLattice->size.x;
+  float minD= 2*(2*Grain::radius/sqrt(3.));
+
+  const int Y = lattice.size.y, X = lattice.size.x;
   const uint16* latticeNeighbours[62];
   size_t i = 0;
   for(int z: range(0, 2 +1)) for(int y: range((z?-2:0), 2 +1)) for(int x: range(((z||y)?-2:1), 2 +1)) {
-   latticeNeighbours[i++] = grainLattice->base + z*Y*X + y*X + x;
+   latticeNeighbours[i++] = lattice.base + z*Y*X + y*X + x;
   }
   assert(i==62);
 
@@ -28,7 +33,7 @@ bool Simulation::stepGrainGrain() {
   buffer<float> grainGrainLocalBz (GGcc, 0);
   size_t grainGrainI = 0; // Index of first contact with A in old grainGrain[Local]A|B list
   for(size_t a: range(grain.count)) {
-   size_t offset = grainLattice->index(grain.Px[a], grain.Py[a], grain.Pz[a]);
+   size_t offset = lattice.index(grain.Px[a], grain.Py[a], grain.Pz[a]);
 
    // Neighbours
    static constexpr size_t maximumGrainGrainContactCount = 12;
@@ -39,8 +44,8 @@ bool Simulation::stepGrainGrain() {
     b--;
     float d = sqrt(sq(grain.Px[a]-grain.Px[b])
                       + sq(grain.Py[a]-grain.Py[b])
-                      + sq(grain.Pz[a]-grain.Pz[b]));
-    if(!D.insert(d, b)) minD12 = ::min(minD12, d);
+                      + sq(grain.Pz[a]-grain.Pz[b])); //TODO: SIMD
+    if(!D.insert(d, b)) minD = ::min(minD, d);
    }
    for(size_t i: range(D.size)) {
     size_t b = D.elements[i].value;
@@ -70,13 +75,15 @@ bool Simulation::stepGrainGrain() {
     }
     break_:;
    }
+   assert_(minD > Grain::radius+Grain::radius);
    while(grainGrainI < this->grainGrainA.size && this->grainGrainA[grainGrainI] == a)
     grainGrainI++;
   }
 
-  for(size_t i=grainGrainA.size; i<align(simd, grainGrainA.size); i++) grainGrainA.begin()[i] = 0;
+  assert_(align(simd, grainWireA.size+1) <= grainGrainA.capacity);
+  for(size_t i=grainGrainA.size; i<align(simd, grainGrainA.size+1); i++) grainGrainA.begin()[i] = 0;
   this->grainGrainA = move(grainGrainA);
-  for(size_t i=grainGrainB.size; i<align(simd, grainGrainB.size); i++) grainGrainB.begin()[i] = 0;
+  for(size_t i=grainGrainB.size; i<align(simd, grainGrainB.size+1); i++) grainGrainB.begin()[i] = 0;
   this->grainGrainB = move(grainGrainB);
   this->grainGrainLocalAx = move(grainGrainLocalAx);
   this->grainGrainLocalAy = move(grainGrainLocalAy);
@@ -85,12 +92,12 @@ bool Simulation::stepGrainGrain() {
   this->grainGrainLocalBy = move(grainGrainLocalBy);
   this->grainGrainLocalBz = move(grainGrainLocalBz);
 
-  grainGrainGlobalMinD12 = minD12 - 2*Grain::radius;
-  if(grainGrainGlobalMinD12 < 0) log("grainGrainGlobalMinD12", grainGrainGlobalMinD12);
+  grainGrainGlobalMinD = minD - 2*Grain::radius;
+  if(grainGrainGlobalMinD < 0) log("grainGrainGlobalMinD12", grainGrainGlobalMinD);
 
-  //log("grain", grainSkipped);
-  grainSkipped=0;
- } else grainSkipped++;
+  //log("grain-grain", grainGrainSkipped);
+  grainGrainSkipped=0;
+ } else grainGrainSkipped++;
 
  // Evaluates (packed) intersections from (packed) verlet lists
  buffer<uint> grainGrainContact(align(simd, grainGrainA.size), 0);

@@ -50,6 +50,8 @@ void Simulation::stepProcess() {
     size_t i = wire.count++;
     wire.Px[i] = p[0]; wire.Py[i] = p[1]; wire.Pz[i] = p[2];
     wire.Vx[i] = 0; wire.Vy[i] = 0; wire.Vz[i] = 0;
+    // Forces verlet lists reevaluation
+    grainWireGlobalMinD = 0;
    }
   }
 
@@ -86,8 +88,9 @@ void Simulation::stepProcess() {
        cos(t2)};
      grain.count++;
      log(timeStep, i);
-     // Forces lattice reevaluation
-     grainGrainGlobalMinD12 = 0;
+     // Forces verlet lists reevaluation
+     grainGrainGlobalMinD = 0;
+     grainWireGlobalMinD = 0;
     }
    }
   }
