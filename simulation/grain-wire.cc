@@ -10,7 +10,9 @@ bool Simulation::stepGrainWire() {
   for(size_t i: range(wire.count))
    grid.cell(wire.Px[i], wire.Py[i], wire.Pz[i]).append(1+i);
 
-  float minD = Grain::radius+Grain::radius; // > Grain::radius+Wire::radius
+  const float verletDistance = Grain::radius+Grain::radius; // > Grain::radius + Wire::radius
+  // Minimum distance over verlet distance parameter is the actual verlet distance which can be used
+  float minD = inf;
 
   const int X = grid.size.x, Y = grid.size.y;
   const uint16* wireNeighbours[3*3] = {
@@ -44,9 +46,6 @@ bool Simulation::stepGrainWire() {
 #if 1
    size_t offset = grid.index(grain.Px[a], grain.Py[a], grain.Pz[a]);
    // Neighbours
-   static constexpr size_t maximumGrainWireContactCount = 12;
-   list<maximumGrainWireContactCount> D;
-   //size_t grainWireContactCount = 0;
    for(size_t n: range(3*3)) for(size_t i: range(3)) {
     ref<uint16> list(wireNeighbours[n] + offset + i * Grid::cellCapacity, Grid::cellCapacity);
 
@@ -58,50 +57,39 @@ bool Simulation::stepGrainWire() {
    for(size_t b: range(wire.count)) {
     {
 #endif
-     float d = sqrt(sq(grain.Px[a]-grain.Px[b])
-                       + sq(grain.Py[a]-grain.Py[b])
-                       + sq(grain.Pz[a]-grain.Pz[b])); // TODO: SIMD
-     if(!D.insert(d, b)) minD = ::min(minD, d);
-    }
-   }
-   for(size_t i: range(D.size)) {
-    float d = D.elements[i].key;
-    // Limits verlet lists size
-    if(/*i >= averageGrainWireContactCount &&*/ d > Grain::radius+Grain/*Wire*/::radius) {
-     minD = ::min(minD, d);
-     break;
-    }
-    size_t b = D.elements[i].value;
-    grainWireA.append( a ); // Grain
-    grainWireB.append( b ); // Wire
-    for(size_t k = 0;; k++) {
-     size_t j = grainWireIndex+k;
-     if(j >= this->grainWireA.size || this->grainWireA[grainWireIndex+k] != a) break;
-     if(this->grainWireB[j] == b) { // Repack existing friction
-      grainWireLocalAx.append( this->grainWireLocalAx[j] );
-      grainWireLocalAy.append( this->grainWireLocalAy[j] );
-      grainWireLocalAz.append( this->grainWireLocalAz[j] );
-      grainWireLocalBx.append( this->grainWireLocalBx[j] );
-      grainWireLocalBy.append( this->grainWireLocalBy[j] );
-      grainWireLocalBz.append( this->grainWireLocalBz[j] );
-      goto break_;
+     float d = sqrt(sq(grain.Px[a]-wire.Px[b])
+                    + sq(grain.Py[a]-wire.Py[b])
+                    + sq(grain.Pz[a]-wire.Pz[b])); // TODO: SIMD
+     if(d > verletDistance) { minD=::min(minD, d); continue; }
+     grainWireA.append( a ); // Grain
+     grainWireB.append( b ); // Wire
+     for(size_t k = 0;; k++) {
+      size_t j = grainWireIndex+k;
+      if(j >= this->grainWireA.size || this->grainWireA[grainWireIndex+k] != a) break;
+      if(this->grainWireB[j] == b) { // Repack existing friction
+       grainWireLocalAx.append( this->grainWireLocalAx[j] );
+       grainWireLocalAy.append( this->grainWireLocalAy[j] );
+       grainWireLocalAz.append( this->grainWireLocalAz[j] );
+       grainWireLocalBx.append( this->grainWireLocalBx[j] );
+       grainWireLocalBy.append( this->grainWireLocalBy[j] );
+       grainWireLocalBz.append( this->grainWireLocalBz[j] );
+       goto break_;
+      }
+     } /*else*/ { // New contact
+      // Appends zero to reserve slot. Zero flags contacts for evaluation.
+      // Contact points (for static friction) will be computed during force evaluation (if fine test passes)
+      grainWireLocalAx.append( 0 );
+      grainWireLocalAy.append( 0 );
+      grainWireLocalAz.append( 0 );
+      grainWireLocalBx.append( 0 );
+      grainWireLocalBy.append( 0 );
+      grainWireLocalBz.append( 0 );
      }
-    } /*else*/ { // New contact
-     // Appends zero to reserve slot. Zero flags contacts for evaluation.
-     // Contact points (for static friction) will be computed during force evaluation (if fine test passes)
-     grainWireLocalAx.append( 0 );
-     grainWireLocalAy.append( 0 );
-     grainWireLocalAz.append( 0 );
-     grainWireLocalBx.append( 0 );
-     grainWireLocalBy.append( 0 );
-     grainWireLocalBz.append( 0 );
+     break_:;
     }
-    break_:;
+    while(grainWireIndex < this->grainWireA.size && this->grainWireA[grainWireIndex] == a)
+     grainWireIndex++;
    }
-
-   assert_(minD > Grain::radius+Wire::radius);
-   while(grainWireIndex < this->grainWireA.size && this->grainWireA[grainWireIndex] == a)
-    grainWireIndex++;
   }
 
   assert_(align(simd, grainWireA.size+1) <= grainWireA.capacity);

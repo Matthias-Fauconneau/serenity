@@ -10,7 +10,9 @@ bool Simulation::stepGrainGrain() {
   for(size_t i: range(grain.count))
    lattice.cell(grain.Px[i], grain.Py[i], grain.Pz[i]) = 1+i;
 
-  float minD= 2*(2*Grain::radius/sqrt(3.));
+  float verletDistance = 2*(2*Grain::radius/sqrt(3.)); // > Grain::radius + Grain::radius
+  // Minimum distance over verlet distance parameter is the actual verlet distance which can be used
+  float minD = inf;
 
   const int Y = lattice.size.y, X = lattice.size.x;
   const uint16* latticeNeighbours[62];
@@ -21,7 +23,7 @@ bool Simulation::stepGrainGrain() {
   assert(i==62);
 
   // SoA (FIXME: single pointer/index)
-  static constexpr size_t averageGrainGrainContactCount = 8;
+  static constexpr size_t averageGrainGrainContactCount = 4;
   size_t GGcc = align(simd, grain.count * averageGrainGrainContactCount);
   buffer<uint> grainGrainA (GGcc, 0);
   buffer<uint> grainGrainB (GGcc, 0);
@@ -36,8 +38,6 @@ bool Simulation::stepGrainGrain() {
    size_t offset = lattice.index(grain.Px[a], grain.Py[a], grain.Pz[a]);
 
    // Neighbours
-   static constexpr size_t maximumGrainGrainContactCount = 12;
-   list<maximumGrainGrainContactCount> D;
    for(size_t n: range(62)) {
     size_t b = *(latticeNeighbours[n] + offset);
     if(!b) continue;
@@ -45,10 +45,7 @@ bool Simulation::stepGrainGrain() {
     float d = sqrt(sq(grain.Px[a]-grain.Px[b])
                       + sq(grain.Py[a]-grain.Py[b])
                       + sq(grain.Pz[a]-grain.Pz[b])); //TODO: SIMD
-    if(!D.insert(d, b)) minD = ::min(minD, d);
-   }
-   for(size_t i: range(D.size)) {
-    size_t b = D.elements[i].value;
+    if(d > verletDistance) { minD=::min(minD, d); continue; }
     grainGrainA.append( a );
     grainGrainB.append( b );
     for(size_t k = 0;; k++) {
@@ -75,7 +72,6 @@ bool Simulation::stepGrainGrain() {
     }
     break_:;
    }
-   assert_(minD > Grain::radius+Grain::radius);
    while(grainGrainI < this->grainGrainA.size && this->grainGrainA[grainGrainI] == a)
     grainGrainI++;
   }

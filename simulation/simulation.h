@@ -1,5 +1,4 @@
 #include "system.h"
-#include "list.h"
 #include "lattice.h"
 #include "grid.h"
 #include "time.h"
