@@ -61,6 +61,8 @@ bool Simulation::domain(vec3& min, vec3& max) {
 }
 
 bool Simulation::step() {
+ forces.clear();
+
  processTime.start();
  stepProcess();
  processTime.stop();

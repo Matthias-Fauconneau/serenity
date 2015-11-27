@@ -5,8 +5,6 @@
 #include "gl.h"
 FILE(shader_glsl)
 
-inline vec3 qapply(v4sf q, vec3 v) { return toVec3(qapply(q, (v4sf)v)); }
-
 Dict parameters() {
  Dict parameters;
  for(string argument: arguments()) parameters.append(parseDict(argument));
@@ -241,7 +239,7 @@ struct SimulationView : Simulation, Widget {
 
    array<vec3> positions;
    float maxF = 0; for(const Force& force: state.forces) maxF = ::max(maxF, length(force.force));
-   maxF /= 0.01; // 1cm
+   maxF /= 0.1; // 10cm
    for(const Force& force: state.forces) {
     positions.append(force.origin);
     positions.append(force.origin + force.force/maxF);
@@ -252,8 +250,8 @@ struct SimulationView : Simulation, Widget {
     GLBuffer positionBuffer (positions);
     vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
     shader["transform"] = rotatedViewProjection;
-    shader["uColor"] = vec4(0,0,1, 1./2);
-    extern float lineWidth; lineWidth = 1./2;
+    shader["uColor"] = vec4(0,0,1, 1/*./2*/);
+    extern float lineWidth; lineWidth = 1/*./2*/;
     glBlendAlpha();
     vertexArray.draw(Lines, positions.size);
    }

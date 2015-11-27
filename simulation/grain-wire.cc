@@ -34,7 +34,7 @@ bool Simulation::stepGrainWire() {
   };
 
   // SoA (FIXME: single pointer/index)
-  static constexpr size_t averageGrainWireContactCount = 1;
+  static constexpr size_t averageGrainWireContactCount = 2;
   const size_t GWcc = align(simd, grain.count * averageGrainWireContactCount + 1);
   buffer<uint> grainWireA (GWcc, 0);
   buffer<uint> grainWireB (GWcc, 0);
@@ -197,9 +197,9 @@ bool Simulation::stepGrainWire() {
   wire .Fy[b] -= Fy[i];
   grain.Fz[a] += Fz[i];
   wire .Fz[b] -= Fz[i];
-  forces.append(grain.position(a)
-                 + vec3(grainWireLocalAx[a], grainWireLocalAy[a], grainWireLocalAz[a]),
-                     vec3(Fx[i],Fy[i],Fz[i]));
+  vec3 relativeA = qapply(grain.rotation[a],
+                          vec3(grainWireLocalAx[index], grainWireLocalAy[index], grainWireLocalAz[index]));
+  forces.append(grain.position(a) + relativeA, vec3(Fx[i],Fy[i],Fz[i]));
 
   /*grain.Tx[a] += TAx[i];
   grain.Ty[a] += TAy[i];

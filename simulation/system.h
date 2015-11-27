@@ -20,7 +20,7 @@ struct System {
  sconst float staticFrictionLength = 10 * mm;
  sconst float staticFrictionDamping = 0/*2.7*/ * g/s; // TODO: relative to k ?
  sconst float staticFrictionCoefficient = 0;
- sconst float dynamicFrictionCoefficient = 0/*.1*/;
+ sconst float dynamicFrictionCoefficient = 0.1;
 
  // Obstacles: floor plane, cast cylinder
  struct Obstacle {
@@ -67,7 +67,7 @@ struct System {
   sconst float mass = 2.7 * g * 10/*FIXME*/;
   sconst float radius = 40 *mm;
   sconst float curvature = 1./radius;
-  sconst float elasticModulus = 1 * MPa;
+  sconst float elasticModulus = 20 * MPa;
   sconst float angularMass = 2./3*mass*sq(radius);
   const float dt_angularMass;
 
@@ -95,7 +95,7 @@ struct System {
   sconst float density = 100 * kg / cb(m);
   sconst float mass = Wire::density * Wire::volume;
   sconst float curvature = 1./radius;
-  sconst float elasticModulus = 1 * MPa;
+  sconst float elasticModulus = 20 * MPa;
   sconst float tensionStiffness = elasticModulus * PI * sq(radius);
   sconst float tensionDamping = mass / s;
   sconst float areaMomentOfInertia = PI/4*pow4(radius);
@@ -197,7 +197,7 @@ struct System {
    fTy[k] = 0;
    fTz[k] = 0;
    // Wire - Grain
-   if( 1/*tangentLength[k] < staticFrictionLength
+   if( 0/*tangentLength[k] < staticFrictionLength
        && tangentRelativeSpeed[0] < staticFrictionSpeed
        && fS[k] < fD[k]*/
        ) {
@@ -210,8 +210,7 @@ struct System {
      fTz[k] = - (fS[k]+fB) * springDirection[2];
     }
    } else { // 0
-    localAx[k] = 0;
-    localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0; // DEBUG
+    localAx[k] = 0; localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0;
    }
    if(tangentRelativeSpeed[k]) {
     float scale = - fD[k] / tangentRelativeSpeed[k];
@@ -226,7 +225,7 @@ struct System {
  }
 
  /// Evaluates contact force between an object and an obstacle with friction (rotating A)
- // Grain - Floor/Side
+ // Grain - Bottom/Side
  template<Type tA, Type tB> inline void contact(
    const tA& A, v8ui a,
    v8sf depth,
@@ -333,15 +332,14 @@ struct System {
      fTz[k] = - (fS[k]+fB) * springDirection[2];
     }
    } else { // 0
-    localAx[k] = 0;
-    localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0; // DEBUG
+    localAx[k] = 0; localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0;
    }
-   if(tangentRelativeSpeed[k]) {
+   /*if(tangentRelativeSpeed[k]) {
     float scale = - fD[k] / tangentRelativeSpeed[k];
      fTx[k] += scale * TRVx[k];
      fTy[k] += scale * TRVy[k];
      fTz[k] += scale * TRVz[k];
-   }
+   }*/
   }
   /*for(size_t k: range(simd))
    assert_(isNumber(fTx[k]), k,tangentLength[k], tangentRelativeSpeed[k]);*/
@@ -354,7 +352,7 @@ struct System {
  }
 
  /// Evaluates contact force between two objects with friction (rotating A, non rotating B)
- // Grain-Wire
+ // Grain - Wire
  template<Type tA, Type tB> inline void contact(
    const tA& A, v8ui a,
    tB& B, v8ui b,
@@ -460,7 +458,7 @@ struct System {
      fTz[k] = - (fS[k]+fB) * springDirection[2];
     }
    } else { // 0
-    //localAx[k] = 0; localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0;
+    localAx[k] = 0; localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0;
    }
    if(tangentRelativeSpeed[k]) {
     float scale = - fD[k] / tangentRelativeSpeed[k];
@@ -478,7 +476,7 @@ struct System {
  }
 
  /// Evaluates contact force between two objects with friction (rotating A, rotating B)
- // Grain-Grain
+ // Grain - Grain
  template<Type tA, Type tB> inline void contact(
    const tA& A, v8ui a,
    tB& B, v8ui b,
@@ -581,7 +579,7 @@ struct System {
    fTx[k] = 0;
    fTy[k] = 0;
    fTz[k] = 0;
-   if( tangentLength[k] < staticFrictionLength
+   if( 0/*tangentLength[k] < staticFrictionLength*/
        //&& tangentRelativeSpeed[0] < staticFrictionSpeed
        //&& fS[k] < fD[k]
        ) {
@@ -594,8 +592,7 @@ struct System {
      fTz[k] = - (fS[k]+fB) * springDirection[2];
     }
    } else {
-    localAx[k] = 0;
-    localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0; // DEBUG
+    localAx[k] = 0; localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0;
    }
    if(tangentRelativeSpeed[k]) {
     float scale = - fD[k] / tangentRelativeSpeed[k];

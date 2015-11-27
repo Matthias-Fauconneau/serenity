@@ -215,6 +215,7 @@ inline v4sf qapply(v4sf q, v4sf v) {
  assert(abs(v[3]) <= 0x1p-23, v, log2(abs(v[3])));
  return qmul(q, qmul(v, conjugate(q)));
 }
+inline vec3 qapply(v4sf q, vec3 v) { return toVec3(qapply(q, (v4sf)v)); }
 
 //template<Type A, Type B> struct pair { A a; B b; };/*pair<v4sf, v4sf>*/
 inline void closest(v4sf a1, v4sf a2, v4sf b1, v4sf b2, v4sf& A, v4sf& B) {

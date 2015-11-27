@@ -89,16 +89,19 @@ bool Simulation::stepGrainBottom() {
   *(v8sf*)(grainBottomLocalBz.data+index) = localBz;
  }
 
- for(size_t index = 0; index < grainBottomA.size; index++) { // Scalar scatter add
-  assert_(isNumber(Fx[index]), index, grainBottomA, GBcc);
-  size_t a = grainBottomA[index];
-  grain.Fx[a] += Fx[index];
-  grain.Fy[a] += Fy[index];
-  grain.Fz[a] += Fz[index];
+ for(size_t i = 0; i < grainBottomA.size; i++) { // Scalar scatter add
+  assert_(isNumber(Fx[i]), i, grainBottomA, GBcc);
+  size_t a = grainBottomA[i];
+  grain.Fx[a] += Fx[i];
+  grain.Fy[a] += Fy[i];
+  grain.Fz[a] += Fz[i];
+  vec3 relativeA = qapply(grain.rotation[a],
+                                    vec3(grainBottomLocalAx[i], grainBottomLocalAy[i], grainBottomLocalAz[i]));
+  forces.append(grain.position(a) + relativeA, vec3(Fx[i], Fy[i], Fz[i]));
 
-  grain.Tx[a] += TAx[index];
-  grain.Ty[a] += TAy[index];
-  grain.Tz[a] += TAz[index];
+  grain.Tx[a] += TAx[i];
+  grain.Ty[a] += TAy[i];
+  grain.Tz[a] += TAz[i];
  }
 
  return true;
