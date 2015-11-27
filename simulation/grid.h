@@ -15,7 +15,7 @@ struct Grid {
     = int(scale.z*(z-min.z)) * (size.y*size.x)
     + int(scale.y*(y-min.y)) * size.x
     + int(scale.x*(x-min.x));
-  assert_(index >= 0 && index < size.z*size.y*size.x, index, min, x,y,z, max, scale);
+  assert(index >= 0 && index < size.z*size.y*size.x, index, min, x,y,z, max, scale);
   return index * cellCapacity;
  }
  inline List<cellCapacity> cell(float x, float y, float z) {

@@ -16,7 +16,7 @@ generic struct Lattice {
     = int(scale.z*(z-min.z)) * (size.y*size.x)
     + int(scale.y*(y-min.y)) * size.x
     + int(scale.x*(x-min.x));
-  assert_(index >= 0 && index < size.z*size.y*size.x, index, min, x,y,z, max);
+  assert(index >= 0 && index < size.z*size.y*size.x, index, min, x,y,z, max);
   return index;
  }
  inline T& cell(float x, float y, float z) { return base[index(x, y, z)]; }
@@ -27,9 +27,9 @@ template<size_t cellCapacity> struct List : mref<uint16> {
  bool append(uint16 index) {
   assert(index != 0);
   size_t i = 0;
-  while(at(i)) { i++; assert_(i<cellCapacity, (mref<uint16>)*this); }
+  while(at(i)) { i++; assert(i<cellCapacity, (mref<uint16>)*this); }
   at(i) = index; i++;
-  assert_(i < cellCapacity, index, i, cellCapacity, (mref<uint16>)*this);
+  assert(i < cellCapacity, index, i, cellCapacity, (mref<uint16>)*this);
   at(i) = 0;
   return true;
  }

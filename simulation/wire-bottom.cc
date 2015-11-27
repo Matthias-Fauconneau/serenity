@@ -1,7 +1,7 @@
 // TODO: Verlet
 #include "simulation.h"
 
-bool Simulation::stepWireBottom() {
+void Simulation::stepWireBottom() {
  {
   // SoA (FIXME: single pointer/index)
   static constexpr size_t averageWireBottomContactCount = 1;
@@ -92,6 +92,4 @@ bool Simulation::stepWireBottom() {
   wire.Fy[a] += Fy[index];
   wire.Fz[a] += Fz[index];
  }
-
- return true;
 }

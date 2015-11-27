@@ -1,21 +1,18 @@
 // TODO: Cylinder contacts
 #include "simulation.h"
 
-bool Simulation::stepGrainWire() {
- if(!grain.count || !wire.count) return true;
+void Simulation::stepGrainWire() {
+ if(!grain.count || !wire.count) return;
  if(grainWireGlobalMinD <= 0)  {
-  vec3 min, max;
-  if(!domain(min, max)) return false;
+  vec3 min, max; domain(min, max);
   Grid grid(1/(Grain::radius+Grain::radius), min, max);
   for(size_t i: range(wire.count))
    grid.cell(wire.Px[i], wire.Py[i], wire.Pz[i]).append(1+i);
 
-  const float verletDistance =
-    2*(2*Grain::radius/sqrt(3.)) -
-    (Grain::radius + Wire::radius);
-    //Grain::radius+Grain::radius; // > Grain::radius + Wire::radius
+  const float verletDistance = 2*(2*Grain::radius/sqrt(3.)) - (Grain::radius + Wire::radius);
+  //const float verletDistance = Grain::radius + Grain::radius;
   assert_(verletDistance > Grain::radius + Wire::radius);
-  assert_(verletDistance < Grain::radius + Grain::radius);
+  assert_(verletDistance <= Grain::radius + Grain::radius);
   // Minimum distance over verlet distance parameter is the actual verlet distance which can be used
   float minD = inf;
 
@@ -35,7 +32,7 @@ bool Simulation::stepGrainWire() {
   };
 
   // SoA (FIXME: single pointer/index)
-  static constexpr size_t averageGrainWireContactCount = 8;
+  static constexpr size_t averageGrainWireContactCount = 9;
   const size_t GWcc = align(simd, grain.count * averageGrainWireContactCount + 1);
   buffer<uint> grainWireA (GWcc, 0);
   buffer<uint> grainWireB (GWcc, 0);
@@ -131,7 +128,6 @@ bool Simulation::stepGrainWire() {
    size_t j = index+k;
    if(j == grainWireA.size) break /*2*/;
    if(depth[k] > 0) {
-    //if(depth[k] > 0.005) { log(timeStep, j, A, B, depth[k]); return false; }
     // Creates a map from packed contact to index into unpacked contact list (indirect reference)
     // Instead of packing (copying) the unpacked list to a packed contact list
     // To keep track of where to write back (unpacked) contact positions (for static friction)
@@ -199,14 +195,8 @@ bool Simulation::stepGrainWire() {
   wire .Fy[b] -= Fy[i];
   grain.Fz[a] += Fz[i];
   wire .Fz[b] -= Fz[i];
-  /*vec3 relativeA = qapply(grain.rotation[a],
-                          vec3(grainWireLocalAx[index], grainWireLocalAy[index], grainWireLocalAz[index]));
-  forces.append(grain.position(a) + relativeA, vec3(Fx[i],Fy[i],Fz[i]));*/
-
   grain.Tx[a] += TAx[i];
   grain.Ty[a] += TAy[i];
   grain.Tz[a] += TAz[i];
  }
-
- return true;
 }

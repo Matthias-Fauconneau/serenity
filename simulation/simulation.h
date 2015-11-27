@@ -4,25 +4,24 @@
 #include "time.h"
 #include "variant.h"
 
-enum Pattern { None, Helix, Cross, Loop };
-static string patterns[] {"none", "helix", "cross", "loop"};
-enum ProcessState { Running, Done, Error };
-static string processStates[] {"running", "done", "error"};
-
 // High level simulation and contact management
 struct Simulation : System {
  // Process parameters
  sconst float Gz = -10 * N/kg; // Gravity
- const float radius;
+ float radius;
  const float targetHeight = radius;
  const float patternRadius = radius - Grain::radius;
+ enum Pattern { None, Helix, Cross, Loop };
+ sconst string patterns[] {"none", "helix", "radial", "spiral"};
  const Pattern pattern;
  const float linearSpeed = 5 * m/s;
  const float verticalSpeed = 0.1 * m/s;
  const float loopAngle = PI*(3-sqrt(5.));
 
  // Process variables
- ProcessState processState = Running;
+ enum ProcessState { Pour, Release, Done, Error };
+ //sconst string processStates[] {"pour", "release", "done", "error"};
+ ProcessState processState = Pour;
  Random random;
  float currentHeight = Grain::radius;
  float lastAngle = 0, winchAngle = 0, currentRadius = patternRadius;
@@ -80,19 +79,9 @@ struct Simulation : System {
  buffer<float> grainWireLocalBy;
  buffer<float> grainWireLocalBz;
 
- struct Force { vec3 origin, force; };
- array<Force> forces;
-
  Simulation(const Dict& p);
-
- bool domain(vec3& min, vec3& max);
-
- unique<Lattice<uint16> > generateLattice(const Mass& vertices, float radius);
-
- unique<Grid> generateGrid(const Mass& vertices, float length);
-
+ void domain(vec3& min, vec3& max);
  bool step();
-
  tsc processTime;
  void stepProcess();
  tsc grainTime;
@@ -102,14 +91,14 @@ struct Simulation : System {
  tsc grainSideTime;
  bool stepGrainSide();
  tsc grainGrainTime;
- bool stepGrainGrain();
+ void stepGrainGrain();
  tsc grainWireTime;
- bool stepGrainWire();
+ void stepGrainWire();
  tsc wireTime;
  void stepWire();
  tsc wireTensionTime;
  void stepWireTension();
  tsc wireBottomTime;
- bool stepWireBottom();
+ void stepWireBottom();
 };
 

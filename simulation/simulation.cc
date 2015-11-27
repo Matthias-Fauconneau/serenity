@@ -7,6 +7,7 @@
 //#include "grain-wire.h"
 //#include "wire-bottom.h"
 
+constexpr float System::staticFrictionLength;
 constexpr float System::Grain::radius;
 constexpr float System::Grain::mass;
 constexpr float System::Wire::radius;
@@ -14,6 +15,7 @@ constexpr float System::Wire::mass;
 constexpr float System::Wire::internodeLength;
 constexpr float System::Wire::tensionStiffness;
 constexpr float System::Wire::tensionDamping;
+constexpr string Simulation::patterns[];
 
 Simulation::Simulation(const Dict& p) : System(p.at("TimeStep")), radius(p.at("Radius")),
   pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):None) {
@@ -25,10 +27,8 @@ Simulation::Simulation(const Dict& p) : System(p.at("TimeStep")), radius(p.at("R
  }
 }
 
-bool Simulation::domain(vec3& min, vec3& max) {
+void Simulation::domain(vec3& min, vec3& max) {
  min = inf, max = -inf;
- // Grain
- // Avoids bound checks on grain-wire
  for(size_t i: range(grain.count)) {
   min.x = ::min(min.x, grain.Px[i]);
   max.x = ::max(max.x, grain.Px[i]);
@@ -37,13 +37,6 @@ bool Simulation::domain(vec3& min, vec3& max) {
   min.z = ::min(min.z, grain.Pz[i]);
   max.z = ::max(max.z, grain.Pz[i]);
  }
- if(!(min > vec3(-1) && max < vec3(1))) {
-  log("Domain grain", min, max);
-  processState = ProcessState::Error;
-  return false;
- }
- // Wire
- // Avoids bound checks on grain-wire
  for(size_t i: range(wire.count)) {
   min.x = ::min(min.x, wire.Px[i]);
   max.x = ::max(max.x, wire.Px[i]);
@@ -52,17 +45,9 @@ bool Simulation::domain(vec3& min, vec3& max) {
   min.z = ::min(min.z, wire.Pz[i]);
   max.z = ::max(max.z, wire.Pz[i]);
  }
- if(!(min > vec3(-1) && max < vec3(1))) {
-  log("Domain wire", min, max);
-  processState = ProcessState::Error;
-  return false;
- }
- return true;
 }
 
 bool Simulation::step() {
- //forces.clear();
-
  processTime.start();
  stepProcess();
  processTime.stop();
@@ -78,16 +63,16 @@ bool Simulation::step() {
  grainBottomTime.start();
  stepGrainBottom();
  grainBottomTime.stop();
- if(processState == ProcessState::Running) {
+ if(processState < ProcessState::Done) {
   grainSideTime.start();
   stepGrainSide();
   grainSideTime.stop();
  }
  grainGrainTime.start();
- if(!stepGrainGrain()) return false;
+ stepGrainGrain();
  grainGrainTime.stop();
  grainWireTime.start();
- if(!stepGrainWire()) return false;
+ stepGrainWire();
  grainWireTime.stop();
 
  wireTensionTime.start();

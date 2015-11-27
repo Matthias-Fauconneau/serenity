@@ -30,7 +30,7 @@ struct SimulationView : Simulation, Widget {
    buffer<float> Pz;
    vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]); }
   } wire;
-  buffer<Force> forces;
+  float radius;
  };
  array<State> states;
  size_t viewT;
@@ -53,11 +53,13 @@ struct SimulationView : Simulation, Widget {
    if(!running) return;
    if(!totalTime) totalTime.start();
    recordTime.start();
-   window->setTitle(str(timeStep*dt, timeStep*dt/totalTime.elapsed(), strD(stepTime,totalTime)));
+   window->setTitle(str( str(timeStep*dt, 1u)+"s"_,
+                                      str(timeStep*dt/totalTime.elapsed(), 1u)+"x"_,
+                                      strD(stepTime,totalTime)));
    for(int unused T: range(1)) {
     stepTime.start();
     stepTimeTSC.start();
-    for(int unused t: range(2048)) if(!step()) {
+    for(int unused t: range(1/(dt*60))) if(!step()) {
      window->setTitle("Error");
      running = false;
      goto break_2;
@@ -67,7 +69,7 @@ struct SimulationView : Simulation, Widget {
     record();
    }
    break_2:;
-   if(timeStep%2048 == 0) {
+   if(timeStep%size_t(1/(dt*60)) == 0) {
     log("-----------------------------------------------------------------");
     log("step", strD(stepTime, totalTime));
     log(" process", strD(processTime, stepTimeTSC));
@@ -101,7 +103,7 @@ struct SimulationView : Simulation, Widget {
   state.wire.Py = copy(wire.Py);
   state.wire.Pz = copy(wire.Pz);
 
-  state.forces = move(forces);
+  state.radius = radius;
   states.append(::move(state));
  }
 
@@ -230,31 +232,26 @@ struct SimulationView : Simulation, Widget {
    }
   }
 
-  // Forces
+  // Radius
   {
    static GLShader shader {::shader_glsl(), {"flat"}};
    shader.bind();
    shader.bindFragments({"color"});
    shader["transform"] = mat4(1);
 
-   array<vec3> positions;
-   float maxF = 0; for(const Force& force: state.forces) maxF = ::max(maxF, length(force.force));
-   maxF /= 0.1; // 10cm
-   for(const Force& force: state.forces) {
-    positions.append(force.origin);
-    positions.append(force.origin + force.force/maxF);
+   size_t N = 16;
+   buffer<vec3> positions {N*2};
+   for(size_t i: range(N)) {
+    float a1 = 2*PI*(i+0)/N; vec3 a (state.radius*cos(a1), state.radius*sin(a1), 0);
+    float a2 = 2*PI*(i+1)/N; vec3 b (state.radius*cos(a2), state.radius*sin(a2), 0);
+    vec3 A = rotatedViewProjection * a, B= rotatedViewProjection * b;
+    positions[i*2+0] = A; positions[i*2+1] = B;
    }
-   if(positions) {
-    glDepthTest(false);
-    static GLVertexArray vertexArray;
-    GLBuffer positionBuffer (positions);
-    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
-    shader["transform"] = rotatedViewProjection;
-    shader["uColor"] = vec4(0,0,1, 1/*./2*/);
-    extern float lineWidth; lineWidth = 1/*./2*/;
-    glBlendAlpha();
-    vertexArray.draw(Lines, positions.size);
-   }
+   shader["uColor"] = vec4(black, 1);
+   static GLVertexArray vertexArray;
+   GLBuffer positionBuffer (positions);
+   vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
+   vertexArray.draw(Lines, positions.size);
   }
 
   int offset = (target.size.x-window->size.x)/2;

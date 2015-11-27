@@ -90,7 +90,6 @@ bool Simulation::stepGrainSide() {
  }
 
  for(size_t index = 0; index < grainSideA.size; index++) { // Scalar scatter add
-  assert_(isNumber(Fx[index]));
   size_t a = grainSideA[index];
   grain.Fx[a] += Fx[index];
   grain.Fy[a] += Fy[index];

@@ -14,12 +14,12 @@ struct System {
  sconst float mm = 1e-3*m, g = 1e-3*kg, MPa = 1e6 * Pa;
 
  // Contact parameters
- sconst float normalDamping = 1e-2 * s; // ~dt
+ sconst float normalDamping = 1e-2 * s;
  sconst float dynamicFrictionCoefficient = 1./3;
  sconst float staticFrictionSpeed = inf;
- sconst float staticFrictionLength = 40 * mm; // ~ Grain::radius
- sconst float staticFrictionStiffness = 1 * 1*g*10/(1*mm); //k/F = F/L ~ Wire::mass*G/Wire::radius
- sconst float staticFrictionDamping = 0/*2.7*/ * g/s; // TODO: relative to k ?
+ sconst float staticFrictionLength = 3 * mm; // ~ Wire::radius
+ sconst float staticFrictionStiffness = 100 * 1*g*10/(1*mm); //k/F = F/L ~ Wire::mass*G/Wire::radius
+ sconst float staticFrictionDamping = 1 * kg/s; // TODO: relative to k ?
 
  // Obstacles: floor plane, cast cylinder
  struct Obstacle {
@@ -52,7 +52,6 @@ struct System {
  };
 
  void step(Mass& p, size_t i) { // TODO: SIMD
-  assert_(isNumber(p.Fx[i]));
   p.Vx[i] += p.dt_mass * p.Fx[i];
   p.Vy[i] += p.dt_mass * p.Fy[i];
   p.Vz[i] += p.dt_mass * p.Fz[i];
@@ -259,7 +258,6 @@ struct System {
   v8sf NFx = fN * Nx;
   v8sf NFy = fN * Ny;
   v8sf NFz = fN * Nz;
-  //for(size_t k: range(simd)) assert_(isNumber(NFx[k]), k);
   Fx = NFx;
   Fy = NFy;
   Fz = NFz;
@@ -334,8 +332,6 @@ struct System {
      fTz[k] += fDN * TRVz[k];
    }
   }
-  /*for(size_t k: range(simd))
-   assert_(isNumber(fTx[k]), k,tangentLength[k], tangentRelativeSpeed[k]);*/
   Fx += fTx;
   Fy += fTy;
   Fz += fTz;
@@ -410,9 +406,9 @@ struct System {
   v8sf gBx = Bx + FRBx;
   v8sf gBy = By + FRBy;
   v8sf gBz = Bz + FRBz;
-  v8sf Dx = gAx - gBx;
-  v8sf Dy = gAy - gBy;
-  v8sf Dz = gAz - gBz;
+  v8sf Dx = gBx - gAx;
+  v8sf Dy = gBy - gAy;
+  v8sf Dz = gBz - gAz;
   v8sf Dn = Nx*Dx + Ny*Dy + Nz*Dz;
   // tangentOffset
   v8sf TOx = Dx - Dn * Nx;
@@ -434,6 +430,8 @@ struct System {
    fTx[k] = 0;
    fTy[k] = 0;
    fTz[k] = 0;
+   /*assert_(tangentLength[k] < staticFrictionLength || !isNumber(tangentLength[k]),
+           tangentLength[k], staticFrictionLength);*/
    if(      tangentLength[k] < staticFrictionLength
        && tangentRelativeSpeed[0] < staticFrictionSpeed
        //&& fS[k] < fD[k]
@@ -442,9 +440,9 @@ struct System {
     if(tangentLength[k]) {
      v4sf springDirection = v4sf{TOx[k], TOy[k], TOz[k], 0} / float4(tangentLength[k]);
      float fB = staticFrictionDamping * dot3(springDirection, v4sf{RVx[k], RVy[k], RVz[k], 0})[0];
-     fTx[k] = - (fS[k]+fB) * springDirection[0];
-     fTy[k] = - (fS[k]+fB) * springDirection[1];
-     fTz[k] = - (fS[k]+fB) * springDirection[2];
+     fTx[k] = (fS[k]-fB) * springDirection[0];
+     fTy[k] = (fS[k]-fB) * springDirection[1];
+     fTz[k] = (fS[k]-fB) * springDirection[2];
     }
    } else { // 0
     localAx[k] = 0; localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0;
@@ -508,7 +506,6 @@ struct System {
   v8sf NFx = fN * Nx;
   v8sf NFy = fN * Ny;
   v8sf NFz = fN * Nz;
-  //for(size_t k: range(simd)) assert_(isNumber(NFx[k]), k, a[k], b[k], fK[k], fB[k], depth[k]);
   Fx = NFx;
   Fy = NFy;
   Fz = NFz;

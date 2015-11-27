@@ -1,11 +1,10 @@
 #include "simulation.h"
 #include "parallel.h"
 
-bool Simulation::stepGrainGrain() {
- if(!grain.count) return true;
+void Simulation::stepGrainGrain() {
+ if(!grain.count) return;
  if(grainGrainGlobalMinD <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
-  vec3 min, max;
-  if(!domain(min, max)) return false;
+  vec3 min, max; domain(min, max);
   Lattice<uint16> lattice(sqrt(3.)/(2*Grain::radius), min, max);
   for(size_t i: range(grain.count))
    lattice.cell(grain.Px[i], grain.Py[i], grain.Pz[i]) = 1+i;
@@ -173,7 +172,6 @@ bool Simulation::stepGrainGrain() {
   }//});
 
  for(size_t i = 0; i < grainGrainContact.size; i++) { // Scalar scatter add
-  assert_(isNumber(Fx[i]));
   size_t index = grainGrainContact[i];
   size_t a = grainGrainA[index];
   size_t b = grainGrainB[index];
@@ -191,6 +189,4 @@ bool Simulation::stepGrainGrain() {
   grain.Ty[b] += TBy[i];
   grain.Tz[b] += TBz[i];
  }
-
- return true;
 }
