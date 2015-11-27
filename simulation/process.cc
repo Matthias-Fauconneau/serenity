@@ -45,7 +45,7 @@ void Simulation::stepProcess() {
    vec3 relativePosition = vec3(end.x, end.y, z) - wire.position(wire.count-1);
    float length = ::length(relativePosition);
    if(length >= Wire::internodeLength) {
-    assert(wire.count < wire.capacity);
+    assert_(wire.count < wire.capacity);
     vec3 p = wire.position(wire.count-1) + Wire::internodeLength * relativePosition/length;
     size_t i = wire.count++;
     wire.Px[i] = p[0]; wire.Py[i] = p[1]; wire.Pz[i] = p[2];

@@ -23,7 +23,7 @@ bool Simulation::stepGrainGrain() {
   assert(i==62);
 
   // SoA (FIXME: single pointer/index)
-  static constexpr size_t averageGrainGrainContactCount = 4;
+  static constexpr size_t averageGrainGrainContactCount = 7;
   size_t GGcc = align(simd, grain.count * averageGrainGrainContactCount);
   buffer<uint> grainGrainA (GGcc, 0);
   buffer<uint> grainGrainB (GGcc, 0);
@@ -76,7 +76,7 @@ bool Simulation::stepGrainGrain() {
     grainGrainI++;
   }
 
-  assert_(align(simd, grainWireA.size+1) <= grainGrainA.capacity);
+  assert_(align(simd, grainGrainA.size+1) <= grainGrainA.capacity);
   for(size_t i=grainGrainA.size; i<align(simd, grainGrainA.size+1); i++) grainGrainA.begin()[i] = 0;
   this->grainGrainA = move(grainGrainA);
   for(size_t i=grainGrainB.size; i<align(simd, grainGrainB.size+1); i++) grainGrainB.begin()[i] = 0;

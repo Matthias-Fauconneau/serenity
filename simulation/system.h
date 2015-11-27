@@ -14,17 +14,17 @@ struct System {
  sconst float mm = 1e-3*m, g = 1e-3*kg, MPa = 1e6 * Pa;
 
  // Contact parameters
- sconst float normalDamping = 1e-3 * s;
- sconst float dynamicFrictionCoefficient = 1./4;
+ sconst float normalDamping = 1e-2 * s; // ~dt
+ sconst float dynamicFrictionCoefficient = 1./3;
  sconst float staticFrictionSpeed = inf;
- sconst float staticFrictionLength = 10 * mm;
- sconst float staticFrictionStiffness = 0;
+ sconst float staticFrictionLength = 40 * mm; // ~ Grain::radius
+ sconst float staticFrictionStiffness = 1 * 1*g*10/(1*mm); //k/F = F/L ~ Wire::mass*G/Wire::radius
  sconst float staticFrictionDamping = 0/*2.7*/ * g/s; // TODO: relative to k ?
 
  // Obstacles: floor plane, cast cylinder
  struct Obstacle {
   sconst float curvature = 0;
-  sconst float elasticModulus = 1e0 * MPa;
+  sconst float elasticModulus = 1e-1 * MPa;
  };
  float radius; // Cylinder radius
 
@@ -74,7 +74,7 @@ struct System {
   buffer<float> AVx { capacity }, AVy { capacity }, AVz { capacity }; // Angular velocity
   buffer<float> Tx { capacity }, Ty { capacity }, Tz { capacity }; // Torque
 
-  Grain(float dt) : Mass(256, dt, mass), dt_angularMass(dt/angularMass) {}
+  Grain(float dt) : Mass(65536, dt, mass), dt_angularMass(dt/angularMass) {}
  } grain {dt};
 
  void step(Grain& p, size_t i) { // TODO: SIMD
@@ -100,7 +100,7 @@ struct System {
   sconst float areaMomentOfInertia = PI/4*pow4(radius);
   sconst float bendStiffness = elasticModulus * areaMomentOfInertia / internodeLength;
   sconst float bendDamping = mass / s;
-  Wire(float dt) : Mass(256, dt, mass) {}
+  Wire(float dt) : Mass(65536, dt, mass) {}
  } wire {dt};
 
  size_t timeStep = 0;
@@ -193,9 +193,9 @@ struct System {
    fTx[k] = 0;
    fTy[k] = 0;
    fTz[k] = 0;
-   if( 0/*tangentLength[k] < staticFrictionLength
+   if(       tangentLength[k] < staticFrictionLength
        && tangentRelativeSpeed[0] < staticFrictionSpeed
-       && fS[k] < fD[k]*/
+       //&& fS[k] < fD[k]
        ) {
     // Static
     if(tangentLength[k]) {
@@ -312,9 +312,9 @@ struct System {
    fTx[k] = 0;
    fTy[k] = 0;
    fTz[k] = 0;
-   if( tangentLength[k] < staticFrictionLength
+   if(      tangentLength[k] < staticFrictionLength
        && tangentRelativeSpeed[0] < staticFrictionSpeed
-       && fS[k] < fD[k]
+       //&& fS[k] < fD[k]
        ) {
     // Static
     if(tangentLength[k]) {
@@ -434,9 +434,9 @@ struct System {
    fTx[k] = 0;
    fTy[k] = 0;
    fTz[k] = 0;
-   if( tangentLength[k] < staticFrictionLength
+   if(      tangentLength[k] < staticFrictionLength
        && tangentRelativeSpeed[0] < staticFrictionSpeed
-       && fS[k] < fD[k]
+       //&& fS[k] < fD[k]
        ) {
     // Static
     if(tangentLength[k]) {
@@ -568,7 +568,7 @@ struct System {
    fTz[k] = 0;
    if( tangentLength[k] < staticFrictionLength
        && tangentRelativeSpeed[0] < staticFrictionSpeed
-       && fS[k] < fD[k]
+       //&& fS[k] < fD[k]
        ) {
     // Static
     if(tangentLength[k]) {

@@ -2,7 +2,7 @@
 #include "memory.h"
 
 struct Grid {
- static constexpr size_t cellCapacity = 32;
+ static constexpr size_t cellCapacity = 64;
  const vec3 scale;
  const vec3 min, max;
  const int3 size = ::max(int3(5,5,1), int3(::floor(toVec3(scale*(max-min))))+int3(2));
