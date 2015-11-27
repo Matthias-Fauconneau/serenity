@@ -23,6 +23,7 @@ Simulation::Simulation(const Dict& p) : System(p.at("TimeStep")), radius(p.at("R
   wire.Vx[i] = 0; wire.Vy[i] = 0; wire.Vz[i] = 0;
   winchAngle += Wire::internodeLength / radius;
  }
+ log(Wire::mass, wire.dt_mass, Grain::mass, grain.dt_mass);
 }
 
 bool Simulation::domain(vec3& min, vec3& max) {
@@ -70,6 +71,11 @@ bool Simulation::step() {
  grainTime.start();
  stepGrain();
  grainTime.stop();
+
+ wireTime.start();
+ stepWire(); // WARNING: Before Grain-Wire force evaluation !!!!!!
+ wireTime.stop();
+
  grainBottomTime.start();
  stepGrainBottom();
  grainBottomTime.stop();
@@ -85,9 +91,6 @@ bool Simulation::step() {
  if(!stepGrainWire()) return false;
  grainWireTime.stop();
 
- wireTime.start();
- stepWire();
- wireTime.stop();
  wireTensionTime.start();
  //stepWireTension();
  wireTensionTime.stop();
@@ -130,7 +133,7 @@ void Simulation::stepGrain() {
 
 void Simulation::stepWire() {
  for(size_t i: range(wire.count)) { // TODO: SIMD
-  wire.Fx[i] = 0; wire.Fy[i] = 0; wire.Fz[i] = wire.mass * Gz;
+  wire.Fx[i] = 0; wire.Fy[i] = 0; wire.Fz[i] = Wire::mass * Gz;
  }
 }
 

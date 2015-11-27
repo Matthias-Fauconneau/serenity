@@ -15,17 +15,16 @@ struct System {
 
  // Contact parameters
  sconst float normalDamping = 1e-3 * s;
+ sconst float dynamicFrictionCoefficient = 1./2;
  sconst float staticFrictionSpeed = inf;
- sconst float staticFrictionFactor = 1;
  sconst float staticFrictionLength = 10 * mm;
+ sconst float staticFrictionStiffness = 0;
  sconst float staticFrictionDamping = 0/*2.7*/ * g/s; // TODO: relative to k ?
- sconst float staticFrictionCoefficient = 0;
- sconst float dynamicFrictionCoefficient = 0.1;
 
  // Obstacles: floor plane, cast cylinder
  struct Obstacle {
   sconst float curvature = 0;
-  sconst float elasticModulus = 1 *MPa;
+  sconst float elasticModulus = 1e3 * MPa;
  };
  float radius; // Cylinder radius
 
@@ -67,7 +66,7 @@ struct System {
   sconst float mass = 2.7 * g * 10/*FIXME*/;
   sconst float radius = 40 *mm;
   sconst float curvature = 1./radius;
-  sconst float elasticModulus = 20 * MPa;
+  sconst float elasticModulus = Obstacle::elasticModulus/*1e3 * MPa*/;
   sconst float angularMass = 2./3*mass*sq(radius);
   const float dt_angularMass;
 
@@ -95,7 +94,7 @@ struct System {
   sconst float density = 100 * kg / cb(m);
   sconst float mass = Wire::density * Wire::volume;
   sconst float curvature = 1./radius;
-  sconst float elasticModulus = 20 * MPa;
+  sconst float elasticModulus = Obstacle::elasticModulus/*1e3 * MPa*/;
   sconst float tensionStiffness = elasticModulus * PI * sq(radius);
   sconst float tensionDamping = mass / s;
   sconst float areaMomentOfInertia = PI/4*pow4(radius);
@@ -179,8 +178,7 @@ struct System {
   v8sf TOy = Dy - Dn * Ny;
   v8sf TOz = Dz - Dn * Nz;
   v8sf tangentLength = sqrt8(TOx*TOx+TOy*TOy+TOz*TOz);
-  sconst v8sf staticFrictionStiffness = float8(staticFrictionFactor * staticFrictionCoefficient);
-  v8sf kS = staticFrictionStiffness * fN;
+  v8sf kS = float8(staticFrictionStiffness) * fN;
   v8sf fS = kS * tangentLength; // 0.1~1 fN
 
   // tangentRelativeVelocity
@@ -189,14 +187,12 @@ struct System {
   v8sf TRVy = RVy - RVn * Ny;
   v8sf TRVz = RVz - RVn * Nz;
   v8sf tangentRelativeSpeed = sqrt8(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
-  sconst v8sf dynamicFrictionCoefficient8 = float8(dynamicFrictionCoefficient);
-  v8sf fD = dynamicFrictionCoefficient8 * fN;
+  v8sf fD = float8(dynamicFrictionCoefficient) * fN;
   v8sf fTx, fTy, fTz;
   for(size_t k: range(simd)) { // FIXME: mask
    fTx[k] = 0;
    fTy[k] = 0;
    fTz[k] = 0;
-   // Wire - Grain
    if( 0/*tangentLength[k] < staticFrictionLength
        && tangentRelativeSpeed[0] < staticFrictionSpeed
        && fS[k] < fD[k]*/
@@ -213,10 +209,10 @@ struct System {
     localAx[k] = 0; localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0;
    }
    if(tangentRelativeSpeed[k]) {
-    float scale = - fD[k] / tangentRelativeSpeed[k];
-     fTx[k] += scale * TRVx[k];
-     fTy[k] += scale * TRVy[k];
-     fTz[k] += scale * TRVz[k];
+    float fDN = - fD[k] / tangentRelativeSpeed[k];
+     fTx[k] += fDN * TRVx[k];
+     fTy[k] += fDN * TRVy[k];
+     fTz[k] += fDN * TRVz[k];
    }
   }
   Fx += fTx;
@@ -301,8 +297,7 @@ struct System {
   v8sf TOy = Dy - Dn * Ny;
   v8sf TOz = Dz - Dn * Nz;
   v8sf tangentLength = sqrt8(TOx*TOx+TOy*TOy+TOz*TOz);
-  sconst v8sf staticFrictionStiffness = float8(staticFrictionFactor * staticFrictionCoefficient);
-  v8sf kS = staticFrictionStiffness * fN;
+  v8sf kS = float8(staticFrictionStiffness) * fN;
   v8sf fS = kS * tangentLength; // 0.1~1 fN
 
   // tangentRelativeVelocity
@@ -311,14 +306,12 @@ struct System {
   v8sf TRVy = RVy - RVn * Ny;
   v8sf TRVz = RVz - RVn * Nz;
   v8sf tangentRelativeSpeed = sqrt8(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
-  sconst v8sf dynamicFrictionCoefficient8 = float8(dynamicFrictionCoefficient);
-  v8sf fD = dynamicFrictionCoefficient8 * fN;
+  v8sf fD = float8(dynamicFrictionCoefficient) * fK;
   v8sf fTx, fTy, fTz;
   for(size_t k: range(simd)) { // FIXME: mask
    fTx[k] = 0;
    fTy[k] = 0;
    fTz[k] = 0;
-   // Wire - Grain
    if( 1/*tangentLength[k] < staticFrictionLength
        && tangentRelativeSpeed[0] < staticFrictionSpeed
        && fS[k] < fD[k]*/
@@ -334,12 +327,12 @@ struct System {
    } else { // 0
     localAx[k] = 0; localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0;
    }
-   /*if(tangentRelativeSpeed[k]) {
-    float scale = - fD[k] / tangentRelativeSpeed[k];
-     fTx[k] += scale * TRVx[k];
-     fTy[k] += scale * TRVy[k];
-     fTz[k] += scale * TRVz[k];
-   }*/
+   if(tangentRelativeSpeed[k]) {
+    float fDN = - fD[k] / tangentRelativeSpeed[k];
+     fTx[k] += fDN * TRVx[k];
+     fTy[k] += fDN * TRVy[k];
+     fTz[k] += fDN * TRVz[k];
+   }
   }
   /*for(size_t k: range(simd))
    assert_(isNumber(fTx[k]), k,tangentLength[k], tangentRelativeSpeed[k]);*/
@@ -426,8 +419,7 @@ struct System {
   v8sf TOy = Dy - Dn * Ny;
   v8sf TOz = Dz - Dn * Nz;
   v8sf tangentLength = sqrt8(TOx*TOx+TOy*TOy+TOz*TOz);
-  sconst v8sf staticFrictionStiffness = float8(staticFrictionFactor * staticFrictionCoefficient);
-  v8sf kS = staticFrictionStiffness * fN;
+  v8sf kS = float8(staticFrictionStiffness) * fN;
   v8sf fS = kS * tangentLength; // 0.1~1 fN
   //for(size_t k: range(simd)) log(fS[k]);
 
@@ -437,14 +429,12 @@ struct System {
   v8sf TRVy = RVy - RVn * Ny;
   v8sf TRVz = RVz - RVn * Nz;
   v8sf tangentRelativeSpeed = sqrt8(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
-  sconst v8sf dynamicFrictionCoefficient8 = float8(dynamicFrictionCoefficient);
-  v8sf fD = dynamicFrictionCoefficient8 * fN;
+  v8sf fD = float8(dynamicFrictionCoefficient) * fN;
   v8sf fTx, fTy, fTz;
   for(size_t k: range(simd)) { // FIXME: mask
    fTx[k] = 0;
    fTy[k] = 0;
    fTz[k] = 0;
-   // Wire - Grain
    if( 0/*tangentLength[k] < staticFrictionLength
        && tangentRelativeSpeed[0] < staticFrictionSpeed
        && fS[k] < fD[k]*/
@@ -460,12 +450,12 @@ struct System {
    } else { // 0
     localAx[k] = 0; localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0;
    }
-   if(tangentRelativeSpeed[k]) {
-    float scale = - fD[k] / tangentRelativeSpeed[k];
-    fTx[k] += scale * TRVx[k];
-    fTy[k] += scale * TRVy[k];
-    fTz[k] += scale * TRVz[k];
-   }
+   /*if(tangentRelativeSpeed[k]) {
+    float fDN = - fD[k] / tangentRelativeSpeed[k];
+    fTx[k] += fDN * TRVx[k];
+    fTy[k] += fDN * TRVy[k];
+    fTz[k] += fDN * TRVz[k];
+   }*/
   }
   Fx += fTx;
   Fy += fTy;
@@ -562,8 +552,7 @@ struct System {
   v8sf TOy = Dy - Dn * Ny;
   v8sf TOz = Dz - Dn * Nz;
   v8sf tangentLength = sqrt8(TOx*TOx+TOy*TOy+TOz*TOz);
-  sconst v8sf staticFrictionStiffness = float8(staticFrictionFactor * staticFrictionCoefficient);
-  v8sf kS = staticFrictionStiffness * fN;
+  v8sf kS = float8(staticFrictionStiffness) * fN;
   v8sf fS = kS * tangentLength; // 0.1~1 fN
 
   // tangentRelativeVelocity
@@ -572,8 +561,7 @@ struct System {
   v8sf TRVy = RVy - RVn * Ny;
   v8sf TRVz = RVz - RVn * Nz;
   v8sf tangentRelativeSpeed = sqrt8(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
-  sconst v8sf dynamicFrictionCoefficient8 = float8(dynamicFrictionCoefficient);
-  v8sf fD = dynamicFrictionCoefficient8 * fN;
+  v8sf fD = float8(dynamicFrictionCoefficient) * fN;
   v8sf fTx, fTy, fTz;
   for(size_t k: range(simd)) { // FIXME: mask
    fTx[k] = 0;
@@ -595,10 +583,10 @@ struct System {
     localAx[k] = 0; localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0;
    }
    if(tangentRelativeSpeed[k]) {
-    float scale = - fD[k] / tangentRelativeSpeed[k];
-     fTx[k] += scale * TRVx[k];
-     fTy[k] += scale * TRVy[k];
-     fTz[k] += scale * TRVz[k];
+    float fDN = - fD[k] / tangentRelativeSpeed[k];
+    fTx[k] += fDN * TRVx[k];
+    fTy[k] += fDN * TRVy[k];
+    fTz[k] += fDN * TRVz[k];
    }
   }
   //for(size_t k: range(simd)) assert_(isNumber(fTx[k]), k);
