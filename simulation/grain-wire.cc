@@ -197,13 +197,13 @@ bool Simulation::stepGrainWire() {
   wire .Fy[b] -= Fy[i];
   grain.Fz[a] += Fz[i];
   wire .Fz[b] -= Fz[i];
-  vec3 relativeA = qapply(grain.rotation[a],
+  /*vec3 relativeA = qapply(grain.rotation[a],
                           vec3(grainWireLocalAx[index], grainWireLocalAy[index], grainWireLocalAz[index]));
-  forces.append(grain.position(a) + relativeA, vec3(Fx[i],Fy[i],Fz[i]));
+  forces.append(grain.position(a) + relativeA, vec3(Fx[i],Fy[i],Fz[i]));*/
 
-  /*grain.Tx[a] += TAx[i];
+  grain.Tx[a] += TAx[i];
   grain.Ty[a] += TAy[i];
-  grain.Tz[a] += TAz[i];*/
+  grain.Tz[a] += TAz[i];
  }
 
  return true;

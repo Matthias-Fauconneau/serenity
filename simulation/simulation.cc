@@ -62,7 +62,7 @@ bool Simulation::domain(vec3& min, vec3& max) {
 }
 
 bool Simulation::step() {
- forces.clear();
+ //forces.clear();
 
  processTime.start();
  stepProcess();
@@ -92,7 +92,7 @@ bool Simulation::step() {
  grainWireTime.stop();
 
  wireTensionTime.start();
- //stepWireTension();
+ stepWireTension();
  wireTensionTime.stop();
  wireBottomTime.start();
  stepWireBottom();

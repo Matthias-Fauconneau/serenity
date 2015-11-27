@@ -15,7 +15,7 @@ struct System {
 
  // Contact parameters
  sconst float normalDamping = 1e-3 * s;
- sconst float dynamicFrictionCoefficient = 1./2;
+ sconst float dynamicFrictionCoefficient = 1./4;
  sconst float staticFrictionSpeed = inf;
  sconst float staticFrictionLength = 10 * mm;
  sconst float staticFrictionStiffness = 0;
@@ -24,7 +24,7 @@ struct System {
  // Obstacles: floor plane, cast cylinder
  struct Obstacle {
   sconst float curvature = 0;
-  sconst float elasticModulus = 1e3 * MPa;
+  sconst float elasticModulus = 1e0 * MPa;
  };
  float radius; // Cylinder radius
 
@@ -63,7 +63,7 @@ struct System {
 
  // Sphere particles
  struct Grain : Mass {
-  sconst float mass = 2.7 * g * 10/*FIXME*/;
+  sconst float mass = 2.7 * g;
   sconst float radius = 40 *mm;
   sconst float curvature = 1./radius;
   sconst float elasticModulus = Obstacle::elasticModulus/*1e3 * MPa*/;
@@ -79,11 +79,11 @@ struct System {
 
  void step(Grain& p, size_t i) { // TODO: SIMD
   step((Mass&)p, i);
-  /*p.rotation[i] += float4(dt/2) * qmul((v4sf){p.AVx[i],p.AVy[i],p.AVz[i],0}, p.rotation[i]);
+  p.rotation[i] += float4(dt/2) * qmul((v4sf){p.AVx[i],p.AVy[i],p.AVz[i],0}, p.rotation[i]);
   p.AVx[i] += p.dt_angularMass * p.Tx[i];
   p.AVy[i] += p.dt_angularMass * p.Ty[i];
   p.AVz[i] += p.dt_angularMass * p.Tz[i];
-  p.rotation[i] *= rsqrt(sq4(p.rotation[i]));*/
+  p.rotation[i] *= rsqrt(sq4(p.rotation[i]));
  }
 
  struct Wire : Mass {
@@ -91,7 +91,7 @@ struct System {
   sconst float internodeLength = Grain::radius/2;
   sconst float section = PI * sq(radius);
   sconst float volume = section * internodeLength;
-  sconst float density = 100 * kg / cb(m);
+  sconst float density = 1000 * kg / cb(m);
   sconst float mass = Wire::density * Wire::volume;
   sconst float curvature = 1./radius;
   sconst float elasticModulus = Obstacle::elasticModulus/*1e3 * MPa*/;
@@ -306,15 +306,15 @@ struct System {
   v8sf TRVy = RVy - RVn * Ny;
   v8sf TRVz = RVz - RVn * Nz;
   v8sf tangentRelativeSpeed = sqrt8(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
-  v8sf fD = float8(dynamicFrictionCoefficient) * fK;
+  v8sf fD = float8(dynamicFrictionCoefficient) * fN;
   v8sf fTx, fTy, fTz;
   for(size_t k: range(simd)) { // FIXME: mask
    fTx[k] = 0;
    fTy[k] = 0;
    fTz[k] = 0;
-   if( 1/*tangentLength[k] < staticFrictionLength
+   if( tangentLength[k] < staticFrictionLength
        && tangentRelativeSpeed[0] < staticFrictionSpeed
-       && fS[k] < fD[k]*/
+       && fS[k] < fD[k]
        ) {
     // Static
     if(tangentLength[k]) {
@@ -421,7 +421,6 @@ struct System {
   v8sf tangentLength = sqrt8(TOx*TOx+TOy*TOy+TOz*TOz);
   v8sf kS = float8(staticFrictionStiffness) * fN;
   v8sf fS = kS * tangentLength; // 0.1~1 fN
-  //for(size_t k: range(simd)) log(fS[k]);
 
   // tangentRelativeVelocity
   v8sf RVn = Nx*RVx + Ny*RVy + Nz*RVz;
@@ -435,9 +434,9 @@ struct System {
    fTx[k] = 0;
    fTy[k] = 0;
    fTz[k] = 0;
-   if( 0/*tangentLength[k] < staticFrictionLength
+   if( tangentLength[k] < staticFrictionLength
        && tangentRelativeSpeed[0] < staticFrictionSpeed
-       && fS[k] < fD[k]*/
+       && fS[k] < fD[k]
        ) {
     // Static
     if(tangentLength[k]) {
@@ -450,12 +449,12 @@ struct System {
    } else { // 0
     localAx[k] = 0; localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0;
    }
-   /*if(tangentRelativeSpeed[k]) {
+   if(tangentRelativeSpeed[k]) {
     float fDN = - fD[k] / tangentRelativeSpeed[k];
     fTx[k] += fDN * TRVx[k];
     fTy[k] += fDN * TRVy[k];
     fTz[k] += fDN * TRVz[k];
-   }*/
+   }
   }
   Fx += fTx;
   Fy += fTy;
@@ -567,9 +566,9 @@ struct System {
    fTx[k] = 0;
    fTy[k] = 0;
    fTz[k] = 0;
-   if( 0/*tangentLength[k] < staticFrictionLength*/
-       //&& tangentRelativeSpeed[0] < staticFrictionSpeed
-       //&& fS[k] < fD[k]
+   if( tangentLength[k] < staticFrictionLength
+       && tangentRelativeSpeed[0] < staticFrictionSpeed
+       && fS[k] < fD[k]
        ) {
     // Static
     if(tangentLength[k]) {
@@ -589,15 +588,14 @@ struct System {
     fTz[k] += fDN * TRVz[k];
    }
   }
-  //for(size_t k: range(simd)) assert_(isNumber(fTx[k]), k);
   Fx += fTx;
   Fy += fTy;
   Fz += fTz;
   TAx = RAy*fTz - RAz*fTy;
   TAy = RAz*fTx - RAx*fTz;
   TAz = RAx*fTy - RAy*fTx;
-  TBx = RBy*fTz - RBz*fTy;
-  TBy = RBz*fTx - RBx*fTz;
-  TBz = RBx*fTy - RBy*fTx;
+  TBx = RBy*(-fTz) - RBz*(-fTy);
+  TBy = RBz*(-fTx) - RBx*(-fTz);
+  TBz = RBx*(-fTy) - RBy*(-fTx);
  }
 };

@@ -95,9 +95,9 @@ bool Simulation::stepGrainBottom() {
   grain.Fx[a] += Fx[i];
   grain.Fy[a] += Fy[i];
   grain.Fz[a] += Fz[i];
-  vec3 relativeA = qapply(grain.rotation[a],
+  /*vec3 relativeA = qapply(grain.rotation[a],
                                     vec3(grainBottomLocalAx[i], grainBottomLocalAy[i], grainBottomLocalAz[i]));
-  forces.append(grain.position(a) + relativeA, vec3(Fx[i], Fy[i], Fz[i]));
+  forces.append(grain.position(a) + relativeA, vec3(Fx[i], Fy[i], Fz[i]));*/
 
   grain.Tx[a] += TAx[i];
   grain.Ty[a] += TAy[i];
