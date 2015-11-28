@@ -5,6 +5,7 @@
 #define sconst static constexpr
 
 constexpr size_t simd = 8; // SIMD size
+inline v8sf load(ref<float> a, size_t index) { return *(v8sf*)(a.data+index); }
 
 /// Evolving system of objects and obstacles interacting through contacts (SoA)
 struct System {
@@ -15,7 +16,7 @@ struct System {
 
  // Contact parameters
  sconst float normalDamping = 1e-2 * s;
- sconst float dynamicFrictionCoefficient = 1./3;
+ sconst float dynamicFrictionCoefficient = 1;
  sconst float staticFrictionSpeed = inf;
  sconst float staticFrictionLength = 3 * mm; // ~ Wire::radius
  sconst float staticFrictionStiffness = 100 * 1*g*10/(1*mm); //k/F = F/L ~ Wire::mass*G/Wire::radius
@@ -69,7 +70,7 @@ struct System {
   sconst float angularMass = 2./3*mass*sq(radius);
   const float dt_angularMass;
 
-  buffer<v4sf> rotation { capacity }; // TODO: Rodrigues vector
+  buffer<vec4> rotation { capacity }; // TODO: Rodrigues vector
   buffer<float> AVx { capacity }, AVy { capacity }, AVz { capacity }; // Angular velocity
   buffer<float> Tx { capacity }, Ty { capacity }, Tz { capacity }; // Torque
 
@@ -78,11 +79,11 @@ struct System {
 
  void step(Grain& p, size_t i) { // TODO: SIMD
   step((Mass&)p, i);
-  p.rotation[i] += float4(dt/2) * qmul((v4sf){p.AVx[i],p.AVy[i],p.AVz[i],0}, p.rotation[i]);
+  p.rotation[i] += dt/2 * qmul(vec4(p.AVx[i],p.AVy[i],p.AVz[i], 0), p.rotation[i]);
   p.AVx[i] += p.dt_angularMass * p.Tx[i];
   p.AVy[i] += p.dt_angularMass * p.Ty[i];
   p.AVz[i] += p.dt_angularMass * p.Tz[i];
-  p.rotation[i] *= rsqrt(sq4(p.rotation[i]));
+  p.rotation[i] *= 1./length(p.rotation[i]);
  }
 
  struct Wire : Mass {
@@ -93,12 +94,12 @@ struct System {
   sconst float density = 1000 * kg / cb(m);
   sconst float mass = Wire::density * Wire::volume;
   sconst float curvature = 1./radius;
-  sconst float elasticModulus = Obstacle::elasticModulus/*1e3 * MPa*/;
+  sconst float elasticModulus = 1e0 * MPa;
   sconst float tensionStiffness = elasticModulus * PI * sq(radius);
   sconst float tensionDamping = mass / s;
   sconst float areaMomentOfInertia = PI/4*pow4(radius);
-  sconst float bendStiffness = elasticModulus * areaMomentOfInertia / internodeLength;
-  sconst float bendDamping = mass / s;
+  sconst float bendStiffness = 0; //elasticModulus * areaMomentOfInertia / internodeLength;
+  sconst float bendDamping = 0*g /*mass*/ / s;
   Wire(float dt) : Mass(65536, dt, mass) {}
  } wire {dt};
 
@@ -198,8 +199,8 @@ struct System {
        ) {
     // Static
     if(tangentLength[k]) {
-     v4sf springDirection = v4sf{TOx[k], TOy[k], TOz[k], 0} / float4(tangentLength[k]);
-     float fB = staticFrictionDamping * dot3(springDirection, v4sf{RVx[k], RVy[k], RVz[k], 0})[0];
+     vec3 springDirection = vec3(TOx[k], TOy[k], TOz[k]) / tangentLength[k];
+     float fB = staticFrictionDamping * dot(springDirection, vec3(RVx[k], RVy[k], RVz[k]));
      fTx[k] = - (fS[k]+fB) * springDirection[0];
      fTy[k] = - (fS[k]+fB) * springDirection[1];
      fTz[k] = - (fS[k]+fB) * springDirection[2];
@@ -266,12 +267,12 @@ struct System {
   v8sf FRBx, FRBy, FRBz;
   for(size_t k: range(simd)) { // FIXME
    if(!localAx[k]) {
-    v4sf localA = qapply(conjugate(A.rotation[a[k]]), (v4sf){RAx[k], RAy[k], RAz[k], 0});
+    vec3 localA = qapply(conjugate(A.rotation[a[k]]), vec3(RAx[k], RAy[k], RAz[k]));
     localAx[k] = localA[0];
     localAy[k] = localA[1];
     localAz[k] = localA[2];
    }
-   v4sf relativeA = qapply(A.rotation[a[k]], (v4sf){localAx[k], localAy[k], localAz[k], 0});
+   vec3 relativeA = qapply(A.rotation[a[k]], vec3(localAx[k], localAy[k], localAz[k]));
    FRAx[k] = relativeA[0];
    FRAy[k] = relativeA[1];
    FRAz[k] = relativeA[2];
@@ -316,8 +317,8 @@ struct System {
        ) {
     // Static
     if(tangentLength[k]) {
-     v4sf springDirection = v4sf{TOx[k], TOy[k], TOz[k], 0} / float4(tangentLength[k]);
-     float fB = staticFrictionDamping * dot3(springDirection, v4sf{RVx[k], RVy[k], RVz[k], 0})[0];
+     vec3 springDirection = vec3(TOx[k], TOy[k], TOz[k]) / tangentLength[k];
+     float fB = staticFrictionDamping * dot(springDirection, vec3(RVx[k], RVy[k], RVz[k]));
      fTx[k] = - (fS[k]+fB) * springDirection[0];
      fTy[k] = - (fS[k]+fB) * springDirection[1];
      fTz[k] = - (fS[k]+fB) * springDirection[2];
@@ -386,12 +387,12 @@ struct System {
   v8sf FRBx, FRBy, FRBz;
   for(size_t k: range(simd)) { // FIXME
    if(!localAx[k]) {
-    v4sf localA = qapply(conjugate(A.rotation[a[k]]), (v4sf){RAx[k], RAy[k], RAz[k], 0});
+    vec3 localA = qapply(conjugate(A.rotation[a[k]]), vec3(RAx[k], RAy[k], RAz[k]));
     localAx[k] = localA[0];
     localAy[k] = localA[1];
     localAz[k] = localA[2];
    }
-   v4sf relativeA = qapply(A.rotation[a[k]], (v4sf){localAx[k], localAy[k], localAz[k], 0});
+   vec3 relativeA = qapply(A.rotation[a[k]], vec3(localAx[k], localAy[k], localAz[k]));
    FRAx[k] = relativeA[0];
    FRAy[k] = relativeA[1];
    FRAz[k] = relativeA[2];
@@ -438,8 +439,8 @@ struct System {
        ) {
     // Static
     if(tangentLength[k]) {
-     v4sf springDirection = v4sf{TOx[k], TOy[k], TOz[k], 0} / float4(tangentLength[k]);
-     float fB = staticFrictionDamping * dot3(springDirection, v4sf{RVx[k], RVy[k], RVz[k], 0})[0];
+     vec3 springDirection = vec3(TOx[k], TOy[k], TOz[k]) / tangentLength[k];
+     float fB = staticFrictionDamping * dot(springDirection, vec3(RVx[k], RVy[k], RVz[k]));
      fTx[k] = (fS[k]-fB) * springDirection[0];
      fTy[k] = (fS[k]-fB) * springDirection[1];
      fTz[k] = (fS[k]-fB) * springDirection[2];
@@ -514,20 +515,20 @@ struct System {
   v8sf FRBx, FRBy, FRBz;
   for(size_t k: range(simd)) { // FIXME
    if(!localAx[k]) {
-    v4sf localA = qapply(conjugate(A.rotation[a[k]]), (v4sf){RAx[k], RAy[k], RAz[k], 0});
+    vec3 localA = qapply(conjugate(A.rotation[a[k]]), vec3(RAx[k], RAy[k], RAz[k]));
     localAx[k] = localA[0];
     localAy[k] = localA[1];
     localAz[k] = localA[2];
-    v4sf localB = qapply(conjugate(B.rotation[b[k]]), (v4sf){RBx[k], RBy[k], RBz[k], 0});
+    vec3 localB = qapply(conjugate(B.rotation[b[k]]), vec3(RBx[k], RBy[k], RBz[k]));
     localBx[k] = localB[0];
     localBy[k] = localB[1];
     localBz[k] = localB[2];
    }
-   v4sf relativeA = qapply(A.rotation[a[k]], (v4sf){localAx[k], localAy[k], localAz[k], 0});
+   vec3 relativeA = qapply(A.rotation[a[k]], vec3(localAx[k], localAy[k], localAz[k]));
    FRAx[k] = relativeA[0];
    FRAy[k] = relativeA[1];
    FRAz[k] = relativeA[2];
-   v4sf relativeB = qapply(B.rotation[b[k]], (v4sf){localBx[k], localBy[k], localBz[k], 0});
+   vec3 relativeB = qapply(B.rotation[b[k]], vec3(localBx[k], localBy[k], localBz[k]));
    FRBx[k] = relativeB[0];
    FRBy[k] = relativeB[1];
    FRBz[k] = relativeB[2];
@@ -569,8 +570,8 @@ struct System {
        ) {
     // Static
     if(tangentLength[k]) {
-     v4sf springDirection = v4sf{TOx[k], TOy[k], TOz[k], 0} / float4(tangentLength[k]);
-     float fB = staticFrictionDamping * dot3(springDirection, v4sf{RVx[k], RVy[k], RVz[k], 0})[0];
+     vec3 springDirection = vec3(TOx[k], TOy[k], TOz[k]) / tangentLength[k];
+     float fB = staticFrictionDamping * dot(springDirection, vec3(RVx[k], RVy[k], RVz[k]));
      fTx[k] = - (fS[k]+fB) * springDirection[0];
      fTy[k] = - (fS[k]+fB) * springDirection[1];
      fTz[k] = - (fS[k]+fB) * springDirection[2];

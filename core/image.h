@@ -78,13 +78,5 @@ void resize(const Image& target, const Image& source);
 inline Image resize(Image&& target, const Image& source) { resize(target, source); return move(target); }
 inline Image resize(int2 size, const Image& source) { return resize(Image(size, source.alpha), source); }
 
-/// 2D array of 16bit integer pixels
-typedef ImageT<uint16> Image16;
 /// 2D array of 32bit floating-point pixels
 typedef ImageT<float> ImageF;
-/// 2D array of 32bit floating-point 4 component vector pixels
-typedef ImageT<v4sf> Image4f;
-
-Image4f convert(const Image& source);
-Image convert(const Image4f& source);
-void box(const Image4f& target, const Image4f& source, const int width);

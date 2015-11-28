@@ -2,7 +2,7 @@
 /// \file simd.h SIMD intrinsics (SSE, AVX, ...)
 #include "core.h"
 
-typedef uint16 v4hi __attribute((__vector_size__ (8)));
+/*typedef uint16 v4hi __attribute((__vector_size__ (8)));
 inline v4hi loada(const uint16* const ptr) { return *(v4hi*)ptr; }
 
 // v4si
@@ -62,7 +62,7 @@ inline v4sf qmul(v4sf a, v4sf b) {
  return shuffle4(a,a,3,3,3,3) * b - shuffle4(a,a,2,0,1,0) * shuffle4(b,b,1,2,0,0)
    + (v4sf)(_0001 ^ (v4si)(shuffle4(a,a,0,1,2,1) * shuffle4(b,b,3,3,3,1)
                                       + shuffle4(a,a,1,2,0,2) * shuffle4(b,b,2,0,1,2)));
-}
+}*/
 
 typedef uint v8ui __attribute((__vector_size__ (32)));
 /*static inline v8ui gather(ref<uint> P, v8ui a) {
@@ -80,11 +80,10 @@ typedef float v8sf __attribute((__vector_size__ (32)));
 inline v8sf constexpr float8(float f) { return (v8sf){f,f,f,f,f,f,f,f}; }
 static constexpr v8sf unused _0f = float8(0);
 static constexpr v8sf unused _1f = float8(1);
-#if __AVX__
 static inline v8sf loadu8(const float* P) { return _mm256_loadu_ps(P); }
 static inline void store(float* P, v8sf A) { _mm256_storeu_ps(P, A); }
-
 inline v8sf sqrt8(v8sf x) { return __builtin_ia32_sqrtps256(x); }
+#if 0
 static inline float reduce8(v8sf x) {
  const v4sf x128 = __builtin_ia32_vextractf128_ps256(x, 1) + _mm256_castps256_ps128(x);
  const __m128 x64 = x128 + _mm_movehl_ps/*__builtin_ia32_movhlps*/(x128, x128);
@@ -126,11 +125,11 @@ static inline void scatter(const buffer<float>& B, v8ui a, v8sf x) {
  P[a[7]] = x[7];
 }
 
-#include "math.h"
+/*#include "math.h"
 inline v4sf mean(const ref<v4sf> x) { assert(x.size); return sum(x, float4(0)) / float4(x.size); }
 #include "string.h"
 template<> inline String str(const v4sf& v) { return "("+str(v[0], v[1], v[2], v[3])+")"; }
 inline bool isNumber(v4sf v){ for(uint i: range(4)) if(!isNumber(v[i])) return false; return true; }
 template<> inline String str(const v8ui& v) {
  return "("+str(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7])+")";
-}
+}*/

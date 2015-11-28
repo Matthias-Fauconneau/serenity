@@ -118,7 +118,7 @@ typedef vec<xy,float,2> vec2;
 generic struct xyz {
     T x,y,z;
     vec<xy,T,2>& xy() const { return (vec< ::xy,T,2>&)*this; }
-    inline operator v4sf() const { return (v4sf){x,y,z,0}; }
+    //inline operator v4sf() const { return (v4sf){x,y,z,0}; }
 };
 /// Integer x,y,z vector
 typedef vec<xyz,int,3> int3;
@@ -126,7 +126,7 @@ typedef vec<xyz,int,3> int3;
 typedef vec<xyz,uint16,3> short3;
 /// Floating-point x,y,z vector
 typedef vec<xyz,float,3> vec3;
-inline vec3 toVec3(v4sf v) { return vec3(v[0],v[1],v[2]); }
+//inline vec3 toVec3(v4sf v) { return vec3(v[0],v[1],v[2]); }
 
 generic struct xyzw {
     T x,y,z,w;
@@ -201,25 +201,21 @@ template<template<Type> /*Type*/class V, Type T> inline
  return vec<V,T,3>(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y);
 }
 
-static constexpr unused v4si _1110
- = {int(0x80000000),int(0x80000000),int(0x80000000),0};
-inline v4sf conjugate(v4sf q) { return (v4sf)(_1110 ^ (v4si)q); }
+inline vec4 conjugate(vec4 q) { return vec4(-q.xyz(), q.w); }
+inline vec4 qmul(vec4 a, vec4 b) { return vec4( a[3] * b.xyz() + b[3] * a.xyz() + cross(a.xyz(), b.xyz()), a[3]*b[3] - dot(a.xyz(), b.xyz())); }
+inline vec3 qapply(vec4 q, vec3 v) { return qmul(q, qmul(vec4(v, 0), conjugate(q))).xyz(); }
 
-inline v4sf angleVector(float a, vec3 v) {
+inline vec4 angleVector(float a, vec3 v) {
  float l = length(v);
- if(!l) return _0001f;
+ if(!l) return vec4(vec3(0), 1);
  vec3 b = sin(a/2*l)/l*v;
- return (v4sf){b.x, b.y, b.z, cos(a/2*l)};
+ return vec4(b, cos(a/2*l));
 }
-inline v4sf qapply(v4sf q, v4sf v) {
- assert(abs(v[3]) <= 0x1p-23, v, log2(abs(v[3])));
- return qmul(q, qmul(v, conjugate(q)));
-}
-inline vec3 qapply(v4sf q, vec3 v) { return toVec3(qapply(q, (v4sf)v)); }
 
 //template<Type A, Type B> struct pair { A a; B b; };/*pair<v4sf, v4sf>*/
-inline void closest(v4sf a1, v4sf a2, v4sf b1, v4sf b2, v4sf& A, v4sf& B) {
- const v4sf u = a2 - a1, v = b2 - b1, w = a1 - b1;
+#if 0
+inline void closest(vec3 a1, vec3 a2, vec3 b1, vec3 b2, vec3& A, vec3& B) {
+ const vec3 u = a2 - a1, v = b2 - b1, w = a1 - b1;
  const float a = dot3(u,u)[0];
  const float b = dot3(u,v)[0];
  const float c = dot3(v,v)[0];
@@ -250,3 +246,4 @@ inline void closest(v4sf a1, v4sf a2, v4sf b1, v4sf b2, v4sf& A, v4sf& B) {
  float tc = abs(tD) < __FLT_EPSILON__ ? 0 : tN / tD;
  A = a1 + (float4(sc) * u); B = b1 + (float4(tc) * v);
 }
+#endif

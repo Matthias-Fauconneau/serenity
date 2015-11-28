@@ -4,7 +4,7 @@ void Simulation::stepProcess() {
  // Process
  if(currentHeight >= targetHeight || grain.count == grain.capacity) {
   processState = Release;
-  radius += Grain::radius / s * dt;
+  radius += 2 * Grain::radius / s * dt;
  } else {
   // Increases current height
   currentHeight += verticalSpeed * dt;
@@ -84,10 +84,10 @@ void Simulation::stepProcess() {
      float t0 = 2*PI*random();
      float t1 = acos(1-2*random());
      float t2 = (PI*random()+acos(random()))/2;
-     grain.rotation[i] = (v4sf){sin(t0)*sin(t1)*sin(t2),
-       cos(t0)*sin(t1)*sin(t2),
-       cos(t1)*sin(t2),
-       cos(t2)};
+     grain.rotation[i] = vec4(sin(t0)*sin(t1)*sin(t2),
+                                          cos(t0)*sin(t1)*sin(t2),
+                                          cos(t1)*sin(t2),
+                                          cos(t2));
      grain.count++;
      // Forces verlet lists reevaluation
      grainGrainGlobalMinD = 0;

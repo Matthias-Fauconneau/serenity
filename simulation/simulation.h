@@ -9,12 +9,12 @@ struct Simulation : System {
  // Process parameters
  sconst float Gz = -10 * N/kg; // Gravity
  float radius;
- const float targetHeight = radius;
+ const float targetHeight = radius * 2;
  const float patternRadius = radius - Grain::radius;
  enum Pattern { None, Helix, Cross, Loop };
  sconst string patterns[] {"none", "helix", "radial", "spiral"};
  const Pattern pattern;
- const float linearSpeed = 5 * m/s;
+ const float linearSpeed = 8 * m/s;
  const float verticalSpeed = 0.1 * m/s;
  const float loopAngle = PI*(3-sqrt(5.));
 
@@ -82,23 +82,26 @@ struct Simulation : System {
  Simulation(const Dict& p);
  void domain(vec3& min, vec3& max);
  bool step();
- tsc processTime;
  void stepProcess();
- tsc grainTime;
+  tsc processTime;
  void stepGrain();
- tsc grainBottomTime;
+  tsc grainTime;
  bool stepGrainBottom();
- tsc grainSideTime;
+  tsc grainBottomTime;
  bool stepGrainSide();
- tsc grainGrainTime;
+  tsc grainSideTime;
  void stepGrainGrain();
- tsc grainWireTime;
+  tsc grainGrainTime;
  void stepGrainWire();
- tsc wireTime;
+  tsc grainWireSearchTime;
+  tsc grainWireFilterTime;
+  tsc grainWireEvaluateTime;
+  tsc grainWireSumTime;
  void stepWire();
- tsc wireTensionTime;
+  tsc wireTime;
  void stepWireTension();
- tsc wireBottomTime;
+  tsc wireTensionTime;
  void stepWireBottom();
+  tsc wireBottomTime;
 };
 

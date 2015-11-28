@@ -15,6 +15,7 @@ constexpr float System::Wire::mass;
 constexpr float System::Wire::internodeLength;
 constexpr float System::Wire::tensionStiffness;
 constexpr float System::Wire::tensionDamping;
+constexpr float System::Wire::bendStiffness;
 constexpr string Simulation::patterns[];
 
 Simulation::Simulation(const Dict& p) : System(p.at("TimeStep")), radius(p.at("Radius")),
@@ -45,6 +46,7 @@ void Simulation::domain(vec3& min, vec3& max) {
   min.z = ::min(min.z, wire.Pz[i]);
   max.z = ::max(max.z, wire.Pz[i]);
  }
+ assert_(::max(::max((max-min).x, (max-min).y), (max-min).z) < 64);
 }
 
 bool Simulation::step() {
@@ -71,10 +73,8 @@ bool Simulation::step() {
  grainGrainTime.start();
  stepGrainGrain();
  grainGrainTime.stop();
- grainWireTime.start();
  stepGrainWire();
- grainWireTime.stop();
-
+  
  wireTensionTime.start();
  stepWireTension();
  wireTensionTime.stop();
@@ -119,26 +119,67 @@ void Simulation::stepWire() {
  for(size_t i: range(wire.count)) { // TODO: SIMD
   wire.Fx[i] = 0; wire.Fy[i] = 0; wire.Fz[i] = Wire::mass * Gz;
  }
+ // Bend stiffness
+ if(Wire::bendStiffness) for(size_t i: range(1, wire.count-1)) { // TODO: SIMD
+  // Bending resistance springs
+  vec3 A = wire.position(i-1), B = wire.position(i), C = wire.position(i+1);
+  vec3 a = C-B, b = B-A;
+  vec3 c = cross(a, b);
+  float length = ::length(c);
+  if(length) {
+   float angle = atan(length, dot(a, b));
+   float p = wire.bendStiffness * angle;
+   vec3 dap = cross(a, c) / (::length(a) * length);
+   vec3 dbp = cross(b, c) / (::length(b) * length);
+   wire.Fx[i+1] += p * (-dap).x;
+   wire.Fy[i+1] += p * (-dap).y;
+   wire.Fz[i+1] += p * (-dap).z;
+   wire.Fx[i] += p * (dap + dbp).x;
+   wire.Fy[i] += p * (dap + dbp).y;
+   wire.Fz[i] += p * (dap + dbp).z;
+   wire.Fx[i-1] += p * (-dbp).x;
+   wire.Fy[i-1] += p * (-dbp).y;
+   wire.Fz[i-1] += p * (-dbp).z;
+   if(Wire::bendDamping) {
+    vec3 A = wire.velocity(i-1), B = wire.velocity(i), C = wire.velocity(i+1);
+    vec3 axis = cross(C-B, B-A);
+    float length = ::length(axis);
+    if(length) {
+     float angularVelocity = atan(length, dot(C-B, B-A));
+     vec3 f = (Wire::bendDamping * angularVelocity / 2 / length) * cross(axis, C-A);
+     wire.Fx[i] += f.x;
+     wire.Fy[i] += f.y;
+     wire.Fz[i] += f.z;
+    }
+   }
+  }
+ }
 }
 
 void Simulation::stepWireTension() {
- // Tension
- if(wire.count) for(size_t i: range(1, wire.count)) { // TODO: SIMD
-  size_t a = i-1, b = i;
-  vec3 relativePosition = wire.position(a) - wire.position(b);
-  vec3 length = ::length(relativePosition);
-  vec3 x = length - vec3(wire.internodeLength);
-  vec3 fS = - wire.tensionStiffness * x;
-  vec3 direction = relativePosition/length;
-  vec3 relativeVelocity = wire.velocity(a) - wire.velocity(b);
-  vec3 fB = - wire.tensionDamping * dot(direction, relativeVelocity);
-  vec3 fT = (fS + fB) * direction;
-  wire.Fx[a] += fT.x;
-  wire.Fy[a] += fT.y;
-  wire.Fz[a] += fT.z;
-  wire.Fx[b] -= fT.x;
-  wire.Fy[b] -= fT.y;
-  wire.Fz[b] -= fT.z;
+ if(wire.count == 0) return;
+ for(size_t i=0; i<wire.count-1; i+=simd) {
+  v8sf Ax = load(wire.Px, i), Ay = load(wire.Py, i), Az = load(wire.Pz, i);
+  v8sf Bx = load(wire.Px, i+1), By = load(wire.Py, i+1), Bz = load(wire.Pz, i+1);
+  v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
+  v8sf L = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
+  v8sf x = L - float8(wire.internodeLength);
+  v8sf fS = - float8(wire.tensionStiffness) * x;
+  v8sf Nx = Rx/L, Ny = Ry/L, Nz = Rz/L;
+  v8sf AVx = load(wire.Vx, i), AVy = load(wire.Vy, i), AVz = load(wire.Pz, i);
+  v8sf BVx = load(wire.Vx, i+1), BVy = load(wire.Vy, i+1), BVz = load(wire.Pz, i+1);
+  v8sf RVx = AVx - BVx, RVy = AVy - BVy, RVz = AVz - BVz;
+  v8sf fB = - float8(wire.tensionDamping) * (Nx * RVx + Ny * RVy + Nz * RVz);
+  v8sf FTx = (fS + fB) * Nx;
+  v8sf FTy = (fS + fB) * Ny;
+  v8sf FTz = (fS + fB) * Nz;
+  store(wire.Fx.begin()+i, load(wire.Fx, i)+FTx);
+  store(wire.Fy.begin()+i, load(wire.Fy, i)+FTy);
+  store(wire.Fz.begin()+i, load(wire.Fz, i)+FTz);
+  // FIXME: parallel
+  store(wire.Fx.begin()+i+1, load(wire.Fx, i+1)-FTx);
+  store(wire.Fy.begin()+i+1, load(wire.Fy, i+1)-FTy);
+  store(wire.Fz.begin()+i+1, load(wire.Fz, i+1)-FTz);
  }
 }
 

@@ -20,7 +20,7 @@ struct SimulationView : Simulation, Widget {
    buffer<float> Px;
    buffer<float> Py;
    buffer<float> Pz;
-   buffer<v4sf> rotation;
+   buffer<vec4> rotation;
    vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]); }
   } grain;
   struct Wire {
@@ -77,7 +77,10 @@ struct SimulationView : Simulation, Widget {
     log(" grain-bottom", strD(grainBottomTime, stepTimeTSC));
     log(" grain-side", strD(grainSideTime, stepTimeTSC));
     log(" grain-grain", strD(grainGrainTime, stepTimeTSC));
-    log(" grain-wire", strD(grainWireTime, stepTimeTSC));
+    log(" grain-wire search", strD(grainWireSearchTime, stepTimeTSC));
+    log(" grain-wire filter", strD(grainWireFilterTime, stepTimeTSC));
+    log(" grain-wire evaluate", strD(grainWireEvaluateTime, stepTimeTSC));
+    log(" grain-wire sum", strD(grainWireSumTime, stepTimeTSC));
     log(" wire", strD(wireTime, stepTimeTSC));
     log(" wire-tension", strD(wireTensionTime, stepTimeTSC));
     log(" wire-bottom", strD(wireBottomTime, stepTimeTSC));
@@ -109,14 +112,14 @@ struct SimulationView : Simulation, Widget {
 
  vec2 sizeHint(vec2) override { return vec2(768); }
  shared<Graphics> graphics(vec2 size) override {
-  v4sf viewRotation = qmul(angleVector(viewYawPitch.y, vec3(1,0,0)),
+  vec4 viewRotation = qmul(angleVector(viewYawPitch.y, vec3(1,0,0)),
                                              angleVector(viewYawPitch.x, vec3(0,0,1)));
 
   vec3 scale, translation; // Fit view
 
   const State& state = states[viewT];
   array<vec3> grainPositions (state.grain.count); // Rotated, Z-Sorted
-  array<v4sf> grainRotations (state.grain.count); // Rotated, Z-Sorted
+  array<vec4> grainRotations (state.grain.count); // Rotated, Z-Sorted
   array<size_t> grainIndices (state.grain.count);
   {
    vec3 min = -radius, max = vec3(vec2(radius), 2*radius);
@@ -239,7 +242,7 @@ struct SimulationView : Simulation, Widget {
    shader.bindFragments({"color"});
    shader["transform"] = mat4(1);
 
-   size_t N = 16;
+   size_t N = 64;
    buffer<vec3> positions {N*2};
    for(size_t i: range(N)) {
     float a1 = 2*PI*(i+0)/N; vec3 a (state.radius*cos(a1), state.radius*sin(a1), 0);
