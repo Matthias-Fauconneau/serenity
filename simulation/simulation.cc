@@ -177,9 +177,9 @@ void Simulation::stepWireTension() {
   store(wire.Fy.begin()+i, load(wire.Fy, i)+FTy);
   store(wire.Fz.begin()+i, load(wire.Fz, i)+FTz);
   // FIXME: parallel
-  store(wire.Fx.begin()+i+1, load(wire.Fx, i+1)-FTx);
-  store(wire.Fy.begin()+i+1, load(wire.Fy, i+1)-FTy);
-  store(wire.Fz.begin()+i+1, load(wire.Fz, i+1)-FTz);
+  storeu(wire.Fx.begin()+i+1, loadu(wire.Fx, i+1)-FTx);
+  storeu(wire.Fy.begin()+i+1, loadu(wire.Fy, i+1)-FTy);
+  storeu(wire.Fz.begin()+i+1, loadu(wire.Fz, i+1)-FTz);
  }
 }
 

@@ -5,7 +5,6 @@
 #define sconst static constexpr
 
 constexpr size_t simd = 8; // SIMD size
-inline v8sf load(ref<float> a, size_t index) { return *(v8sf*)(a.data+index); }
 
 /// Evolving system of objects and obstacles interacting through contacts (SoA)
 struct System {
