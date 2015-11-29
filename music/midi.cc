@@ -45,6 +45,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 
  KeySignature keySignature = 0;
  TimeSignature timeSignature = {4,4};
+ uint tempo = 60000000 / 120; // 500000
  Metronome metronome = {Quarter, 120};
  uint lastTempoChange = 0, lastTempoChange120 = 0; // Last tempo changes in file ticks and in 120bpm ticks
  uint measureIndex = 0;
@@ -150,11 +151,11 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
     signs.insertSorted({Sign::TimeSignature, track.time, .timeSignature=timeSignature});
    }
    else if(MIDI(key)==MIDI::Tempo) {
-    int tempo = ((data[0]<<16)|(data[1]<<8)|data[2]); // Microseconds per beat (quarter)
+    tempo = ((data[0]<<16)|(data[1]<<8)|data[2]); // Microseconds per beat (quarter)
     metronome.perMinute = 60000000 / tempo; // Beats per minute
     //if(perMinute) signs.insertSorted({track.time, 0, uint(-1), Sign::Metronome, .metronome={Quarter, perMinute}});
     log("Tempo", track.startTime, track.time, tempo, metronome.perMinute, notes.ticksPerSeconds);
-    lastTempoChange120 += (track.time - lastTempoChange) * 120 / metronome.perMinute; // FIXME: use microseconds per beat
+    lastTempoChange120 += (uint64)(track.time - lastTempoChange) * tempo / 500000; // FIXME: use microseconds per beat
     lastTempoChange = track.time;
    }
    else if(MIDI(key)==MIDI::KeySignature) {
@@ -174,7 +175,17 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
   if(type==NoteOff) type=NoteOn, vel=0;
   if(type==NoteOn) {
    //log("Note", track.startTime, lastTempoChange120, track.time, lastTempoChange, lastTempoChange120 + (track.time-lastTempoChange)*120/metronome.perMinute);
-   MidiNote note{lastTempoChange120 + (track.time-lastTempoChange)*120/metronome.perMinute, key, vel};
+   assert_(track.time >= lastTempoChange);
+   MidiNote note{lastTempoChange120 + uint((uint64)(track.time-lastTempoChange)*tempo/500000), key, vel};
+   log(lastTempoChange120, track.time, lastTempoChange, note.time);
+   if(note.velocity) {
+    if(notes && notes.last().velocity && notes.last().time <= note.time)
+     assert_(notes.last().key != key, notes.last(), note, notes.last().velocity, note.velocity, notes.last().time, note.time);
+    for(MidiNote o: notes) if(o.velocity) {
+     if(o.key == key && note.time == o.time) goto continue2_;
+     assert_(o.key != key || abs(o.time-note.time), o, note, int(note.time-o.time), o.velocity, note.velocity);
+    }
+   }
    notes.insertSorted( note );
    for(uint staff: range(2)) actives[staff].filter([key](MidiNote o){return o.key == key;}); // Releases active note
    // Commits before any repeated note on (auto release on note on without matching note off)
@@ -286,6 +297,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
     actives[staff].insertSorted( note );
    }
   }
+  continue2_:;
 
   if(s) {
    uint8 c=s.read(); uint t=c&0x7f;

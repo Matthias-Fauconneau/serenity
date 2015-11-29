@@ -220,9 +220,10 @@ struct Synchronizer : Widget {
 
         { // Sets measure times to MIDI times
 			buffer<MidiNote> onsets = filter(notes, [](MidiNote o){return o.velocity==0;});
-			//assert_(onsets.size == signs.size || !signs.size, onsets.size, signs.size); FIXME
-			assert_(onsets.size >= signs.size, onsets.size, signs.size);
-			size_t index = 0;
+            //assert_(onsets.size == signs.size || !signs.size, onsets.size, signs.size); FIXME
+            assert_(onsets.size >= signs.size, onsets.size, signs.size);
+            //assert_(onsets.size*2 == signs.size || !signs.size, onsets.size, signs.size);
+            size_t index = 0;
 			for(size_t measureIndex: range(measureBars.size())) {
 				while(index < signs.size) {
 					if(signs[index].note.measureIndex != invalid) { // FIXME
@@ -234,14 +235,14 @@ struct Synchronizer : Widget {
 				if(index == signs.size) {
 					if(measureIndex < measureBars.size()-1) break; // FIXME
 					assert_(measureIndex == measureBars.size()-1, measureIndex, measureBars.size()-1);
-					measureBars.keys[measureIndex] =  onsets.last().time; // Last measure (FIXME: last release time)
+                    measureBars.keys[measureIndex] = onsets.last().time; // Last measure (FIXME: last release time)
 				} else {
                     if(signs[index].note.measureIndex != measureIndex) { // Empty measure
 						log("Empty measure", signs[index].note.measureIndex, measureIndex);
                         assert_(index>0, index, measureIndex, signs[index].note.measureIndex);
-						measureBars.keys[measureIndex] = onsets[index-1].time; // FIXME: should be onsets[index].time - measureTime[index]
+                        measureBars.keys[measureIndex] = onsets[index/2-1].time; // FIXME: should be onsets[index].time - measureTime[index]
 					} else {
-						measureBars.keys[measureIndex] = onsets[index].time;
+                        measureBars.keys[measureIndex] = onsets[index/2].time;
 					}
 				}
 			}
@@ -360,10 +361,10 @@ struct Music : Widget {
 					 gains[xml.staves.indexOf(selection)] = float2(1, 2);
 					 return gains;
 				 }*/
-    MidiNotes notes = ::scale(midi ? copy(midi.notes) : ::notes(xml.signs, xml.divisions/*, panAmplify(xml.staves, "Bass"_)*/), audioFile ? audioFile->audioFrameRate : /*sampler.rate*/0);
+    MidiNotes notes = ::scale(/*midi ?*/ copy(midi.notes) /*: ::notes(xml.signs, xml.divisions)*/, audioFile ? audioFile->audioFrameRate : /*sampler.rate*/0);
 	// Sheet
-    Sheet sheet {xml ? xml.signs : midi.signs, xml ? xml.divisions : midi.divisions, 0, 4,
-				apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
+    Sheet sheet {/*xml ?*/ xml.signs /*: midi.signs*/, /*xml ?*/ xml.divisions /*: midi.divisions*/, 0, 4,
+                /*notes*/apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
     Synchronizer synchronizer {audioFileName&&!midi?decodeAudio(audioFileName):Audio(), notes, sheet.midiToSign, sheet.measureBars};
 
 	// Video
@@ -371,7 +372,7 @@ struct Music : Widget {
 
 	// State
 	bool failed = sheet.firstSynchronizationFailureChordIndex != invalid;
-	bool running = !arguments().contains("pause"); //!failed;
+    bool running = !arguments().contains("pause") && !failed;
     bool keyboardView = false; //videoFile ? endsWith(videoFile, ".mkv") : false;
 	bool rotate = keyboardView;
 	bool crop = keyboardView;
@@ -435,7 +436,8 @@ struct Music : Widget {
 		bool contentChanged = false;
 		for(;midiIndex < notes.size && (int64)notes[midiIndex].time*timeDen <= (int64)timeNum*notes.ticksPerSeconds; midiIndex++) {
 			MidiNote note = notes[midiIndex];
-			if(note.velocity) {
+            //noteIndex = midiIndex;
+            if(note.velocity) {
                 assert_(noteIndex < sheet.midiToSign.size, noteIndex, sheet.midiToSign.size);
 				Sign sign = sheet.midiToSign[noteIndex];
 				if(sign.type == Sign::Note) {
@@ -447,7 +449,7 @@ struct Music : Widget {
 						contentChanged = true;
 					}
 				}
-				noteIndex++;
+                noteIndex++;
 			}
 			else if(!note.velocity && active.contains(note.key)) {
 				while(active.contains(note.key)) {
@@ -458,7 +460,7 @@ struct Music : Widget {
 						system.glyphs[sign.note.glyphIndex].color = black;
 					}
 					contentChanged = true;
-				}
+                }
 			}
 		}
 
@@ -481,7 +483,7 @@ struct Music : Widget {
 			}
 		}
 		if(previousOffset != scroll.offset.x) contentChanged = true;
-		synchronizer.currentTime = (int64)timeNum*notes.ticksPerSeconds/timeDen;
+        synchronizer.currentTime = (int64)timeNum*notes.ticksPerSeconds/timeDen;
         if(video) {
 			while((int64)video.videoTime*timeDen < (int64)timeNum*video.timeDen) {
 				Image image = video.read();

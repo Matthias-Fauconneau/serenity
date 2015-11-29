@@ -114,7 +114,7 @@ MusicXML::MusicXML(string document, string) {
             };
 
             for(const Element& e: m.children) {
-                if(e.name=="note"_ && e.contains("grace"_)) continue; // FIXME: graces
+                //if(e.name=="note"_ && e.contains("grace"_)) continue; // FIXME: graces // FIXME: sync
                 if(e.name!="note"_ || (!e.contains("chord"_) && !e.contains("grace"_))) time = nextTime; // Advances time (except chords and graces)
                 maxTime = max(maxTime, time);
 

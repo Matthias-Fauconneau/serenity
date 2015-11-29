@@ -3,6 +3,7 @@
 #include "notation.h"
 #include "widget.h"
 #include "font.h"
+#include "midi.h" // FIXME
 
 struct GraphicsWidget : Graphics, Widget {
     GraphicsWidget() {}
@@ -35,5 +36,5 @@ struct Sheet {
     int2 pageSize;
 
     /// Layouts musical notations to graphic primitives
-    Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize=0, float halfLineInterval = 4, ref<uint> midiNotes={}, string title="", bool pageNumbers=false);
+    Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize=0, float halfLineInterval = 4, ref</*MidiNote*/uint> midiNotes={}, string title="", bool pageNumbers=false);
 };
