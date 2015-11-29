@@ -4,9 +4,9 @@
 
 /// Generic audio file
 struct AudioFile {
-	uint channels = 0;
-	uint audioFrameRate = 0;
-	int64 audioTime = 0;
+    uint channels = 0;
+    uint audioFrameRate = 0;
+    int64 audioTime = 0;
     uint duration = 0;
 
     virtual ~AudioFile() {}

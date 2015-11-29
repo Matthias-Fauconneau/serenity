@@ -199,8 +199,8 @@ struct Synchronizer : Widget {
 			size_t midiIndex = 0;
 			while(i<m && j<n) {
 				int localOffset = (int(P[j][0].time) - int(notes[midiIndex].time)) - globalOffset; // >0: late, <0: early
-				const int limitDelay = notes.ticksPerSeconds/8, limitAdvance = notes.ticksPerSeconds/4;
-				if(j+1<n && ((D(i,j) == D(i,j+1) && (i==0 || localOffset < limitDelay)) || (i && localOffset < -limitAdvance))) {
+                const int limitDelay = 0/*notes.ticksPerSeconds/8*/, limitAdvance = notes.ticksPerSeconds/4;
+                if(j+1<n && ((D(i,j) == D(i,j+1) && (i==0 || localOffset < limitDelay)) || (i && localOffset < -limitAdvance))) {
 					j++;
 				} else {
 					globalOffset = int(P[j][0].time) - int(notes[midiIndex].time);
@@ -338,7 +338,7 @@ struct Music : Widget {
 	// Name
 	string name = arguments() ? arguments()[0] : (error("Expected name"), string());
 	// Files
-    String audioFileName = arguments().contains("noaudio") ? ""__ : name+".mp4";
+    String audioFileName = arguments().contains("noaudio") ? ""__ : arguments().contains("novideo") ? name+".mp3" : name+".mp4";
     String videoFile = arguments().contains("novideo") ? ""__ : name+".mp4";
 
 	// Audio
@@ -364,7 +364,7 @@ struct Music : Widget {
 	// Sheet
     Sheet sheet {xml ? xml.signs : midi.signs, xml ? xml.divisions : midi.divisions, 0, 4,
 				apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
-    Synchronizer synchronizer {/*audioFileName&&!midi?decodeAudio(audioFileName):*/Audio(), notes, sheet.midiToSign, sheet.measureBars};
+    Synchronizer synchronizer {audioFileName&&!midi?decodeAudio(audioFileName):Audio(), notes, sheet.midiToSign, sheet.measureBars};
 
 	// Video
     Decoder video = videoFile ? Decoder(videoFile) : Decoder();
@@ -519,8 +519,13 @@ struct Music : Widget {
 	}*/
 
 	Music() {
-        assert_(midi);
-		//TODO: measureBars.t *= 60 when using MusicXML (no MIDI)
+        //assert_(midi);
+        /*log(notes.last().time / (float)notes.ticksPerSeconds, audioFile->duration/(float)audioFile->audioFrameRate);
+        log(notes.ticksPerSeconds, notes.last().time, audioFile->audioFrameRate, audioFile->duration);
+        notes.ticksPerSeconds = (uint64) notes.last().time * audioFile->audioFrameRate / audioFile->duration;
+        log(notes.ticksPerSeconds);
+        log(notes.last().time / (float)notes.ticksPerSeconds, audioFile->duration/(float)audioFile->audioFrameRate);*/
+          //TODO: measureBars.t *= 60 when using MusicXML (no MIDI)
 
 		scroll.horizontal=true, scroll.vertical=false, scroll.scrollbar = true;
         if(failed) { // Seeks to first synchronization failure

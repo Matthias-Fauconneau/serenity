@@ -646,6 +646,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
                 if(sign.type == Sign::Note) {
                     Note& note = sign.note;
                     note.clef = staves[staff].clef;
+                    for(const auto& sign: staves[staff].chord) if(sign.note.key() == note.key()) goto continue2_;
 
                     if(note.tremolo /*== Note::Start*/) { tremolo.append(Chord{{sign}}); } // FIXME: tremolo chord
                     if(note.tremolo == Note::Stop) {
@@ -1040,6 +1041,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
                 }
             }
         }
+        continue2_:;
     }
     if(!pageWidth) pageWidth = measureBars->values.last();
     if(pedalStart) { // Draw pressed pedal line until end of line
@@ -1187,12 +1189,12 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
     // chordToNote: First MIDI note index of chord
     midiToSign = buffer<Sign>(midiNotes.size, 0);
     float space = 2;
-    constexpr bool logErrors = true;
+    constexpr bool logErrors = false;
     //midiNotes = midiNotes.slice(11);
 
-#if 1
+#if 0
     if(midiNotes) {
-        firstSynchronizationFailureChordIndex = 0;
+        //firstSynchronizationFailureChordIndex = 0;
         array<uint> scoreNotes;
         for(ref<Sign> chord: notes.values) for(Sign note: chord) scoreNotes.append(note.note.key());
         log(scoreNotes.slice(0,60), scoreNotes.size);

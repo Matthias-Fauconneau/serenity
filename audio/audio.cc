@@ -85,7 +85,7 @@ size_t FFmpeg::read16(mref<int16> output) {
 		output.slice(readSize*channels, size*channels).copy(int16Buffer.slice(bufferIndex*channels, size*channels));
 		bufferSize -= size; bufferIndex += size; readSize += size;
 	}
-	assert_(readSize*channels == output.size);
+    //assert(readSize*channels == output.size, readSize, channels, readSize*channels, output.size);
 	return readSize;
 }
 
@@ -127,7 +127,7 @@ size_t FFmpeg::read32(mref<int32> output) {
 		output.slice(readSize*channels, size*channels).copy(int32Buffer.slice(bufferIndex*channels, size*channels));
         bufferSize -= size; bufferIndex += size; readSize += size;
     }
-	assert(readSize*channels == output.size);
+    //assert(readSize*channels == output.size, readSize, channels, readSize*channels, output.size);
     return readSize;
 }
 
@@ -163,7 +163,7 @@ size_t FFmpeg::read(mref<float> output) {
 		output.slice(readSize*channels, size*channels).copy(floatBuffer.slice(bufferIndex*channels, size*channels));
 		bufferSize -= size; bufferIndex += size; readSize += size;
 	}
-	assert_(readSize*channels == output.size);
+    //assert(readSize*channels == output.size, readSize, channels, readSize*channels, output.size);
 	return readSize;
 }
 
