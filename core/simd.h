@@ -17,8 +17,10 @@ static inline v8sf loadu(ref<float> a, size_t index) {
  struct v8sfu { v8sf v; } __attribute((__packed__, may_alias));
  return ((v8sfu*)(a.data+index))->v;
 }
-static inline void store(float* P, v8sf A) {   *(v8sf*)P = A; }
-static inline void storeu(float* P, v8sf A) { __builtin_ia32_storeups256(P, A); }
+static inline void store(mref<float> a, size_t index, v8sf v) { *(v8sf*)(a.begin()+index) = v; }
+static inline void storeu(mref<float> a, size_t index, v8sf v) {
+ __builtin_ia32_storeups256(a.begin()+index, v);
+}
 
 inline v8sf sqrt8(v8sf x) { return __builtin_ia32_sqrtps256(x); }
 static inline v8sf gather(const buffer<float>& B, v8ui a) {

@@ -159,27 +159,32 @@ void Simulation::stepWire() {
 void Simulation::stepWireTension() {
  if(wire.count == 0) return;
  for(size_t i=0; i<wire.count-1; i+=simd) {
-  v8sf Ax = load(wire.Px, i), Ay = load(wire.Py, i), Az = load(wire.Pz, i);
+  v8sf Ax = load(wire.Px, i     ), Ay = load(wire.Py, i     ), Az = load(wire.Pz, i    );
   v8sf Bx = load(wire.Px, i+1), By = load(wire.Py, i+1), Bz = load(wire.Pz, i+1);
   v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
   v8sf L = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
   v8sf x = L - float8(wire.internodeLength);
   v8sf fS = - float8(wire.tensionStiffness) * x;
   v8sf Nx = Rx/L, Ny = Ry/L, Nz = Rz/L;
-  v8sf AVx = load(wire.Vx, i), AVy = load(wire.Vy, i), AVz = load(wire.Pz, i);
-  v8sf BVx = load(wire.Vx, i+1), BVy = load(wire.Vy, i+1), BVz = load(wire.Pz, i+1);
+  v8sf AVx = load(wire.Vx, i     ), AVy = load(wire.Vy, i     ), AVz = load(wire.Vz, i    );
+  v8sf BVx = load(wire.Vx, i+1), BVy = load(wire.Vy, i+1), BVz = load(wire.Vz, i+1);
   v8sf RVx = AVx - BVx, RVy = AVy - BVy, RVz = AVz - BVz;
   v8sf fB = - float8(wire.tensionDamping) * (Nx * RVx + Ny * RVy + Nz * RVz);
-  v8sf FTx = (fS + fB) * Nx;
-  v8sf FTy = (fS + fB) * Ny;
-  v8sf FTz = (fS + fB) * Nz;
-  store(wire.Fx.begin()+i, load(wire.Fx, i)+FTx);
-  store(wire.Fy.begin()+i, load(wire.Fy, i)+FTy);
-  store(wire.Fz.begin()+i, load(wire.Fz, i)+FTz);
+  v8sf f = fS + fB;
+  if(i+simd >= wire.count-1) { // Masks invalid force updates
+   for(size_t k=wire.count-1-i; k<simd; k++) f[k] = 0; // FIXME
+  }
+  v8sf FTx = f * Nx;
+  v8sf FTy = f * Ny;
+  v8sf FTz = f * Nz;
+
+  store(wire.Fx, i, load(wire.Fx, i) + FTx);
+  store(wire.Fy, i, load(wire.Fy, i) + FTy);
+  store(wire.Fz, i, load(wire.Fz, i) + FTz);
   // FIXME: parallel
-  storeu(wire.Fx.begin()+i+1, loadu(wire.Fx, i+1)-FTx);
-  storeu(wire.Fy.begin()+i+1, loadu(wire.Fy, i+1)-FTy);
-  storeu(wire.Fz.begin()+i+1, loadu(wire.Fz, i+1)-FTz);
+  storeu(wire.Fx, i+1, loadu(wire.Fx, i+1) - FTx);
+  storeu(wire.Fy, i+1, loadu(wire.Fy, i+1) - FTy);
+  storeu(wire.Fz, i+1, loadu(wire.Fz, i+1) - FTz);
  }
 }
 
