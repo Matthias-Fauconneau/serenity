@@ -177,7 +177,6 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
    //log("Note", track.startTime, lastTempoChange120, track.time, lastTempoChange, lastTempoChange120 + (track.time-lastTempoChange)*120/metronome.perMinute);
    assert_(track.time >= lastTempoChange);
    MidiNote note{lastTempoChange120 + uint((uint64)(track.time-lastTempoChange)*tempo/500000), key, vel};
-   log(lastTempoChange120, track.time, lastTempoChange, note.time);
    if(note.velocity) {
     if(notes && notes.last().velocity && notes.last().time <= note.time)
      assert_(notes.last().key != key, notes.last(), note, notes.last().velocity, note.velocity, notes.last().time, note.time);
@@ -307,7 +306,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
    //if(t>=1680) { log(track.time, t, notes.size); t=0; }
    //else if(t>=1573 && t<7000) { log(track.time, t, notes.size); notes.clear(); track.startTime=track.time=lastTime=t=0; } // FIXME
    if(t==3944) { log(trackIndex, track.time, t, notes.size, type); notes.clear(); track.startTime=track.time=lastTime=t=0; } //FIXME
-   if(t>=1090) log(track.time, t, notes.size);
+   //if(t>=1090) log(track.time, t, notes.size);
    track.time += t;
   }
  }

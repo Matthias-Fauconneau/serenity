@@ -1066,7 +1066,7 @@ inline bool operator ==(const Sign& sign, const uint& key) {
 }
 
 // Layouts notations to graphic primitives (and parses notes to MIDI keys)
-Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLineInterval, ref</*MidiNote*/uint> midiNotes, string title, bool pageNumbers)
+Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLineInterval, ref<MidiNote> midiNotes, string title, bool pageNumbers)
  : pageSize(pageSize) {
  SheetContext context (ticksPerQuarter, halfLineInterval);
  uint staffCount = 0; for(const Sign& sign: signs) if(sign.type == Sign::Note) staffCount = max(staffCount, sign.staff+1);
@@ -1188,19 +1188,99 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
  // Associates MIDI notes with score notes
  // chordToNote: First MIDI note index of chord
  midiToSign = buffer<Sign>(midiNotes.size, 0);
- float space = 2;
  constexpr bool logErrors = false;
- //midiNotes = midiNotes.slice(11);
 
-#if 0
+#if 1
  if(midiNotes) {
   //firstSynchronizationFailureChordIndex = 0;
-  array<uint> scoreNotes;
-  for(ref<Sign> chord: notes.values) for(Sign note: chord) scoreNotes.append(note.note.key());
-  log(scoreNotes.slice(0,60), scoreNotes.size);
-  log(midiNotes.slice(0,60), midiNotes.size);
-  //error("SYNC");
+  array<array<uint>> S;
+  array<array<uint>> Si; // Maps sorted index to original
+  for(ref<Sign> chord: notes.values) {
+   array<uint> bin;
+   array<uint> binI;
+   for(Sign note: chord) bin.append(note.note.key());
+   //S.append(move(bin));
+   array<uint> binS = copyRef(bin);
+   sort(binS);
+   for(size_t key: binS) binI.append(bin.indexOf(key));
+   //log(S[min(M.size, S.size-1)], bin, binS, binI);
+   S.append(move(binS));
+   Si.append(move(binI));
+  }
+  /// Bins MIDI notes (TODO: cluster)
+  array<array<uint>> M;
+  array<array<uint>> Mi; // Maps original index to sorted
+  for(size_t index = 0; index < midiNotes.size;) {
+   array<uint> bin;
+   array<uint> binI;
+   int64 time = midiNotes[index].time;
+   while(index < midiNotes.size && midiNotes[index].time < time+int(2048)) { // TODO: cluster size with most similar bin count/size
+    bin.append(midiNotes[index].key);
+    index++;
+   }
+   array<uint> binS = copyRef(bin);
+   sort(binS);
+   for(size_t key: bin) binI.append(binS.indexOf(key));
+   //log(S[min(M.size, S.size-1)], bin, binS, binI);
+   M.append(move(binS));
+   Mi.append(move(binI));
+  }
+  //log(S.size, sum(apply(S,[](ref<uint> b){return b.size;})), apply(S.slice(0,80),[](ref<uint> b){return b.size;}));
+  //log(M.size, sum(apply(M,[](ref<uint> b){return b.size;})), apply(M.slice(0,80),[](ref<uint> b){return b.size;}));
+  //log(Mi.slice(0,80));
 
+  /// Synchronizes MIDI and score using dynamic time warping
+  size_t m = S.size, n = M.size;
+  assert_(m < n, m, n);
+
+  // Evaluates cumulative score matrix at each alignment point (i, j)
+  struct Matrix {
+   size_t m, n;
+   buffer<float> elements;
+   Matrix(size_t m, size_t n) : m(m), n(n), elements(m*n) { elements.clear(0); }
+   float& operator()(size_t i, size_t j) { return elements[i*n+j]; }
+  } D(m,n);
+  // Reversed scan here to have the forward scan when walking back the best path
+  for(size_t i: reverse_range(m)) for(size_t j: reverse_range(n)) { // Evaluates match (i,j)
+   float d = 0;
+   for(uint s: S[i]) for(uint m: M[j]) d += s==m;
+   // Evaluates best cumulative score to an alignment point (i,j)
+   D(i,j) = max(max(
+                 j+1==n?0:D(i,j+1), // Ignores peak j
+                 i+1==m?0:D(i+1, j) ), // Ignores chord i
+                ((i+1==m||j+1==n)?0:D(i+1,j+1)) + d ); // Matches chord i with peak j
+  };
+
+  // Evaluates _strictly_ monotonous map by walking back the best path on the cumulative score matrix
+  // Forward scan (chronologic)
+  size_t i = 0, j = 0; // Score and MIDI bins indices
+  while(i<m && j<n) {
+   /**/ if(i+1<m && D(i,j) == D(i+1,j)) {
+    i++;
+   }
+   else if(j+1<n && D(i,j) == D(i,j+1)) {
+    for(size_t unused k: range(M[j].size)) midiToSign.append(Sign{});
+    j++;
+   } else {
+    for(size_t k: range(M[j].size)) {
+     //assert_(i < notes.values.size && k < notes.values[i].size, i, k, notes.values.size);
+     Sign sign{};
+     if(Mi[j][k]<notes.values[i].size) sign = notes.values[i][Si[i][Mi[j][k]]]; // Map original MIDI index to sorted to original note index
+     midiToSign.append( sign );
+     Note note = sign.note;
+     if(note.pageIndex != invalid && note.glyphIndex != invalid) {
+      vec2 p = pages[note.pageIndex].glyphs[note.glyphIndex].origin;
+      text(p+vec2(2), str(note.key(), M[j][k]), 12, debug->glyphs);
+     }
+    }
+    //for(size_t unused k: range(S[i].size, M[j].size)) midiToSign.append(Sign{});
+    i++; j++;
+   }
+  }
+  for(;j<n;j++) for(size_t unused k: range(M[j].size)) midiToSign.append(Sign{});
+
+  assert_(midiToSign.size == midiNotes.size, midiNotes.size, midiToSign.size);
+#if 0
   while(chordToNote.size < notes.size()) { // While map is not complete (iterates over notes)
    if(!notes.values[chordToNote.size]) { // Current chord depleted (all notes have been matched)
     chordToNote.append( midiToSign.size ); // Maps next chord to next index
@@ -1215,11 +1295,11 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
    array<Sign>& chord = notes.values[chordToNote.size]; // Current chord
    assert_(chord);
 
-   while(midiNotes[midiToSign.size].velocity == 0) midiToSign.append(Sign{}); // Not used
+   //while(midiNotes[midiToSign.size].velocity == 0) midiToSign.append(Sign{}); // Not used
    uint midiIndex = midiToSign.size;
    if(midiIndex == midiNotes.size) { log("midiIndex == midiNotes.size"); break; } // FIXME
    assert_(midiIndex < midiNotes.size, midiIndex, midiNotes.size);
-   uint midiKey = midiNotes[midiIndex] .key ; // Current key
+   uint midiKey = midiNotes[midiIndex];// .key ; // Current key
 
    // Finds current key in current chord
    int match = chord.indexOf(midiKey);
@@ -1236,6 +1316,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
     //log("match", midiKey);
    } else error(chord, strKey(0, midiKey));
   }
+#endif
  }
 #else
  array<uint> chordExtra;
@@ -1399,5 +1480,5 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
   log(extraErrors, wrongErrors, missingErrors, orderErrors);
   pages[0].graphics.insertMulti(vec2(0), share(debug));
  }
- pages[0].graphics.insertMulti(vec2(0), share(debug));
+ //pages[0].graphics.insertMulti(vec2(0), share(debug));
 }

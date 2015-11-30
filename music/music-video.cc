@@ -161,7 +161,7 @@ struct Synchronizer : Widget {
 			for(size_t index = 0; index < onsets.size;) {
 				array<Peak> chord;
 				int64 time = onsets[index].time;
-				while(index < onsets.size && onsets[index].time < time+int(h)) {
+                while(index < onsets.size && onsets[index].time < time+int(h)) {
 					if(chord) assert_(int(time)/*-scoreTimeOrigin*/-chord[0].time < 24000, onsets[index].time, chord[0].time);
 					chord.append(Peak{int(onsets[index].time)/*-scoreTimeOrigin*/, onsets[index].key, (float)onsets[index].velocity});
 					index++;
@@ -238,11 +238,11 @@ struct Synchronizer : Widget {
                     measureBars.keys[measureIndex] = onsets.last().time; // Last measure (FIXME: last release time)
 				} else {
                     if(signs[index].note.measureIndex != measureIndex) { // Empty measure
-						log("Empty measure", signs[index].note.measureIndex, measureIndex);
+                        //log("Empty measure", signs[index].note.measureIndex, measureIndex);
                         assert_(index>0, index, measureIndex, signs[index].note.measureIndex);
-                        measureBars.keys[measureIndex] = onsets[index/2-1].time; // FIXME: should be onsets[index].time - measureTime[index]
+                        measureBars.keys[measureIndex] = onsets[index-1].time; // FIXME: should be onsets[index].time - measureTime[index]
 					} else {
-                        measureBars.keys[measureIndex] = onsets[index/2].time;
+                        measureBars.keys[measureIndex] = onsets[index].time;
 					}
 				}
 			}
@@ -364,7 +364,7 @@ struct Music : Widget {
     MidiNotes notes = ::scale(/*midi ?*/ copy(midi.notes) /*: ::notes(xml.signs, xml.divisions)*/, audioFile ? audioFile->audioFrameRate : /*sampler.rate*/0);
 	// Sheet
     Sheet sheet {/*xml ?*/ xml.signs /*: midi.signs*/, /*xml ?*/ xml.divisions /*: midi.divisions*/, 0, 4,
-                /*notes*/apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.key;})};
+                /*apply(*/filter(notes, [](MidiNote o){return o.velocity==0;})/*, [](MidiNote o){return o.key;})*/};
     Synchronizer synchronizer {audioFileName&&!midi?decodeAudio(audioFileName):Audio(), notes, sheet.midiToSign, sheet.measureBars};
 
 	// Video
