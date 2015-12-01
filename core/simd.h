@@ -3,6 +3,9 @@
 #include "core.h"
 
 typedef uint v8ui __attribute((__vector_size__ (32)));
+static constexpr v8ui unused FF = (v8ui){
+  uint(~0),uint(~0),uint(~0),uint(~0),
+  uint(~0),uint(~0),uint(~0),uint(~0)};
 static inline v8ui gather(const buffer<uint>& B, v8ui a) {
  ref<uint> P (B.data, B.capacity); // Bounds check with aligned capacity
  return (v8ui){P[a[0]], P[a[1]], P[a[2]], P[a[3]], P[a[4]], P[a[5]], P[a[6]], P[a[7]]};
@@ -23,9 +26,13 @@ static inline void storeu(mref<float> a, size_t index, v8sf v) {
 }
 
 inline v8sf sqrt8(v8sf x) { return __builtin_ia32_sqrtps256(x); }
-static inline v8sf gather(const buffer<float>& B, v8ui a) {
+static inline v8sf gather(const buffer<float>& B, v8ui i) {
  ref<float> P (B.data, B.capacity); // Bounds check with aligned capacity
- return (v8sf){P[a[0]], P[a[1]], P[a[2]], P[a[3]], P[a[4]], P[a[5]], P[a[6]], P[a[7]]};
+#if __AVX2__
+  return __builtin_ia32_gatherd_ps256(_0f, (const v8sf*)P.data, i, FF, sizeof(float));
+#else
+ return (v8sf){P[i[0]], P[i[1]], P[i[2]], P[i[3]], P[i[4]], P[i[5]], P[i[6]], P[i[7]]};
+#endif
 }
 
 static inline void scatter(const buffer<float>& B, v8ui a, v8sf x) {

@@ -14,8 +14,8 @@ struct Simulation : System {
  enum Pattern { None, Helix, Cross, Loop };
  sconst string patterns[] {"none", "helix", "radial", "spiral"};
  const Pattern pattern;
- const float linearSpeed = 8 * m/s;
- const float verticalSpeed = 0.1 * m/s;
+ const float linearSpeed = 4 * m/s;
+ const float verticalSpeed = 0.2 * m/s;
  const float loopAngle = PI*(3-sqrt(5.));
 
  // Process variables
@@ -95,7 +95,9 @@ struct Simulation : System {
  void stepGrainWire();
   tsc grainWireSearchTime;
   tsc grainWireFilterTime;
-  tsc grainWireEvaluateTime;
+  //tsc grainWireEvaluateTime;
+  uint64 grainWireEvaluateTime = 0;
+  size_t grainWireContactSizeSum;
   tsc grainWireSumTime;
  void stepWire();
   tsc wireTime;
@@ -103,5 +105,10 @@ struct Simulation : System {
   tsc wireTensionTime;
  void stepWireBottom();
   tsc wireBottomTime;
+
+  void profile(const Time& totalTime);
+  bool stepProfile(const Time& totalTime);
+   Time stepTime;
+   tsc stepTimeTSC;
 };
 

@@ -77,3 +77,4 @@ simulation/grain-wire.cc
 simulation/grain-bottom.cc
 simulation/grain-side.cc
 simulation/wire-bottom.cc
+simulation/run.cc

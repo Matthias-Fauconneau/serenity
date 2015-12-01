@@ -28,12 +28,12 @@ struct tsc {
  void reset() { total=0;tsc=0;}
  void start() { if(!tsc) tsc=readCycleCounter(); }
  void stop() { if(tsc) total+=readCycleCounter()-tsc; tsc=0; }
- operator uint64() const {return total + (tsc?readCycleCounter()-tsc:0); }
+ uint64 cycleCount() const {return total + (tsc?readCycleCounter()-tsc:0); }
 };
 inline String strD(const uint64 num, const uint64 div) {
  return div ? str(int(round(100*double(num)/double(div))))+'%' : ""__;
 }
-inline String str(const tsc& num, const tsc& div) { return strD(num, div); }
+inline String strD(const tsc& num, const tsc& div) { return strD(num.cycleCount(), div.cycleCount()); }
 
 struct Time {
     uint64 startTime=realTime(), stopTime=0;
@@ -41,16 +41,21 @@ struct Time {
     void start() { if(stopTime) startTime=realTime()-(stopTime-startTime); stopTime=0; }
     void stop() { if(!stopTime) stopTime=realTime(); }
     String reset() { stop(); String s=str((stopTime-startTime)/1000000000., 1u)+'s'; startTime=stopTime; stopTime=0; return s; }
-    operator uint64() const { return ((stopTime?:realTime()) - startTime)/1000000; }
-    double elapsed() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
-    operator float() const { return elapsed(); }
-    operator double() const { return elapsed(); }
+    //operator uint64() const { return ((stopTime?:realTime()) - startTime)/1000000; }
+    uint64 nanoseconds() const { return ((stopTime?:realTime()) - startTime); }
+    uint64 microseconds() const { return ((stopTime?:realTime()) - startTime)/1000; }
+    uint64 milliseconds() const { return ((stopTime?:realTime()) - startTime)/1000000; }
+    double seconds() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
+    /*operator float() const { return elapsed(); }
+    operator double() const { return elapsed(); }*/
     explicit operator bool() const { return startTime != stopTime; }
 };
-inline String str(const Time& t) { return str(t.elapsed(), 1u)+'s'; }
-inline bool operator<(float a, const Time& b) { return a < b.elapsed(); }
-inline bool operator<(double a, const Time& b) { return a < b.elapsed(); }
-inline String str(const Time& num, const Time& div) { return strD(num, div); }
+inline String str(const Time& t) { return str(t.seconds(), 1u)+'s'; }
+inline bool operator<(float a, const Time& b) { return a < b.seconds(); }
+inline bool operator<(double a, const Time& b) { return a < b.seconds(); }
+inline String strD(const Time& num, const Time& div) {
+ return strD(num.nanoseconds(), div.nanoseconds());
+}
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;

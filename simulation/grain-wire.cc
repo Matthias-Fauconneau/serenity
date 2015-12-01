@@ -48,23 +48,20 @@ void Simulation::stepGrainWire() {
 
   size_t grainWireIndex = 0; // Index of first contact with A in old grainWire[Local]A|B list
   for(size_t a: range(grain.count)) { // TODO: SIMD
-#if 1
    size_t offset = grid.index(grain.Px[a], grain.Py[a], grain.Pz[a]);
    // Neighbours
    for(size_t n: range(3*3)) for(size_t i: range(3)) {
     ref<uint16> list(wireNeighbours[n] + offset + i * Grid::cellCapacity, Grid::cellCapacity);
 
     for(size_t j: range(Grid::cellCapacity)) {
+     assert_(list.begin() >= grid.cells.begin() && list.end()<=grid.cells.end(), offset, n, i);
      size_t b = list[j];
      if(!b) break;
      b--;
-#else
-   for(size_t b: range(wire.count)) {
-    {
-#endif
+     assert_(a < grain.count && b < wire.count, a, grain.count, b, wire.count, offset, n, i);
      float d = sqrt(sq(grain.Px[a]-wire.Px[b])
                     + sq(grain.Py[a]-wire.Py[b])
-                    + sq(grain.Pz[a]-wire.Pz[b])); // TODO: SIMD
+                    + sq(grain.Pz[a]-wire.Pz[b])); // TODO: SIMD //FIXME: fails with Ofast?
      if(d > verletDistance) { minD=::min(minD, d); continue; }
      assert_(grainWireA.size < grainWireA.capacity);
      grainWireA.append( a ); // Grain
@@ -151,11 +148,11 @@ void Simulation::stepGrainWire() {
  grainWireFilterTime.stop();
 
  // Evaluates forces from (packed) intersections (SoA)
- grainWireEvaluateTime.start();
+ //grainWireEvaluateTime.start();
  size_t GWcc = align(simd, grainWireContact.size); // Grain-Wire contact count
  buffer<float> Fx(GWcc), Fy(GWcc), Fz(GWcc);
  buffer<float> TAx(GWcc), TAy(GWcc), TAz(GWcc);
- parallel_chunk(GWcc/simd, [&](uint, size_t start, size_t size) {
+ grainWireEvaluateTime += parallel_chunk(GWcc/simd, [&](uint, size_t start, size_t size) {
   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
    v8ui contacts = *(v8ui*)(grainWireContact.data+i);
    v8ui A = gather(grainWireA, contacts), B = gather(grainWireB, contacts);
@@ -194,7 +191,8 @@ void Simulation::stepGrainWire() {
    scatter(grainWireLocalBz, contacts, localBz);
   }
  });
- grainWireEvaluateTime.stop();
+ grainWireContactSizeSum += grainWireContact.size;
+ //grainWireEvaluateTime.stop();
 
  grainWireSumTime.start();
  for(size_t i = 0; i < grainWireContact.size; i++) { // Scalar scatter add

@@ -160,14 +160,22 @@ void Simulation::stepWireTension() {
  if(wire.count == 0) return;
  for(size_t i=0; i<wire.count-1; i+=simd) {
   v8sf Ax = load(wire.Px, i     ), Ay = load(wire.Py, i     ), Az = load(wire.Pz, i    );
+#if DEBUG
+  v8sf Bx = loadu(wire.Px, i+1), By = loadu(wire.Py, i+1), Bz = loadu(wire.Pz, i+1);
+#else // CHECKME: How is the unaligned load optimized ?
   v8sf Bx = load(wire.Px, i+1), By = load(wire.Py, i+1), Bz = load(wire.Pz, i+1);
+#endif
   v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
   v8sf L = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
   v8sf x = L - float8(wire.internodeLength);
   v8sf fS = - float8(wire.tensionStiffness) * x;
   v8sf Nx = Rx/L, Ny = Ry/L, Nz = Rz/L;
   v8sf AVx = load(wire.Vx, i     ), AVy = load(wire.Vy, i     ), AVz = load(wire.Vz, i    );
+#if DEBUG
+  v8sf BVx = loadu(wire.Vx, i+1), BVy = loadu(wire.Vy, i+1), BVz = loadu(wire.Vz, i+1);
+#else // CHECKME: How is the unaligned load optimized ?
   v8sf BVx = load(wire.Vx, i+1), BVy = load(wire.Vy, i+1), BVz = load(wire.Vz, i+1);
+#endif
   v8sf RVx = AVx - BVx, RVy = AVy - BVy, RVz = AVz - BVz;
   v8sf fB = - float8(wire.tensionDamping) * (Nx * RVx + Ny * RVy + Nz * RVz);
   v8sf f = fS + fB;
@@ -188,3 +196,49 @@ void Simulation::stepWireTension() {
  }
 }
 
+void Simulation::profile(const Time& totalTime) {
+ log("----",timeStep/size_t(64*1/(dt*60)),"----");
+ log(totalTime.microseconds()/timeStep, "us/step", totalTime, timeStep);
+ if(stepTime.nanoseconds()*100<totalTime.nanoseconds()*99)
+  log("step", strD(stepTime, totalTime));
+ //log(" process", strD(processTime, stepTimeTSC));
+ //log(" grain", strD(grainTime, stepTimeTSC));
+ log(" grain-bottom", strD(grainBottomTime, stepTimeTSC));
+ //log(" grain-side", strD(grainSideTime, stepTimeTSC));
+ log(" grain-grain", strD(grainGrainTime, stepTimeTSC));
+ //log(" grain-wire search", strD(grainWireSearchTime, stepTimeTSC));
+ //log(" grain-wire filter", strD(grainWireFilterTime, stepTimeTSC));
+ log(" grain-wire evaluate", strD(grainWireEvaluateTime, stepTimeTSC.cycleCount()));
+ log("grain wire contact count average", grainWireContactSizeSum/timeStep);
+ log(" grain-wire evaluate cycle/grain", (float)grainWireEvaluateTime/grainWireContactSizeSum);
+ error(" grain-wire evaluate b/cycle", (float)(grainWireContactSizeSum*128*8)/grainWireEvaluateTime);
+ //log(" grain-wire sum", strD(grainWireSumTime, stepTimeTSC));
+ //log(" wire", strD(wireTime, stepTimeTSC));
+ //log(" wire-tension", strD(wireTensionTime, stepTimeTSC));
+ //log(" wire-bottom", strD(wireBottomTime, stepTimeTSC));
+}
+
+static inline buffer<int> coreFrequencies() {
+ TextData s(File("/proc/cpuinfo").readUpToLoop(1<<16));
+ assert_(s.data.size<s.buffer.capacity);
+ buffer<int> coreFrequencies (12, 0);
+ while(s) {
+  if(s.match("cpu MHz"_)) {
+   s.until(':'); s.whileAny(' ');
+   coreFrequencies.append( s.decimal() );
+  }
+  s.line();
+ }
+ return coreFrequencies;
+}
+
+bool Simulation::stepProfile(const Time& totalTime) {
+ stepTime.start();
+ stepTimeTSC.start();
+ for(int unused t: range(1/(dt*60))) if(!step()) return false;
+ stepTimeTSC.stop();
+ stepTime.stop();
+ log(coreFrequencies());
+ if(timeStep%(60*size_t(1/(dt*60))) == 0) profile(totalTime);
+ return true;
+}

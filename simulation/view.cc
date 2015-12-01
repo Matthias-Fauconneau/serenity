@@ -43,8 +43,7 @@ struct SimulationView : Simulation, Widget {
  vec2 scale = 0;
  vec2 translation = 0;
 
- Time totalTime, recordTime, stepTime;
- tsc stepTimeTSC;
+ Time totalTime, recordTime;
 
  SimulationView(const Dict& parameters) : Simulation(parameters) {
   window = ::window(this, -1, mainThread, true, false);
@@ -54,42 +53,17 @@ struct SimulationView : Simulation, Widget {
    if(!totalTime) totalTime.start();
    recordTime.start();
    window->setTitle(str( str(timeStep*dt, 1u)+"s"_,
-                                      str(timeStep*dt/totalTime.elapsed(), 1u)+"x"_,
-                                      strD(stepTime,totalTime)));
-   for(int unused T: range(1)) {
-    stepTime.start();
-    stepTimeTSC.start();
-    for(int unused t: range(1/(dt*60))) if(!step()) {
-     window->setTitle("Error");
-     running = false;
-     goto break_2;
-    }
-    stepTimeTSC.stop();
-    stepTime.stop();
-    record();
+                         str(timeStep*dt/totalTime.seconds(), 1u)+"x"_,
+                         strD(stepTime, totalTime)));
+   if(!stepProfile(totalTime)) {
+    window->setTitle("Error");
+    running = false;
    }
-   break_2:;
-   if(timeStep%size_t(1/(dt*60)) == 0) {
-    log("-----------------------------------------------------------------");
-    log("step", strD(stepTime, totalTime));
-    log(" process", strD(processTime, stepTimeTSC));
-    log(" grain", strD(grainTime, stepTimeTSC));
-    log(" grain-bottom", strD(grainBottomTime, stepTimeTSC));
-    log(" grain-side", strD(grainSideTime, stepTimeTSC));
-    log(" grain-grain", strD(grainGrainTime, stepTimeTSC));
-    log(" grain-wire search", strD(grainWireSearchTime, stepTimeTSC));
-    log(" grain-wire filter", strD(grainWireFilterTime, stepTimeTSC));
-    log(" grain-wire evaluate", strD(grainWireEvaluateTime, stepTimeTSC));
-    log(" grain-wire sum", strD(grainWireSumTime, stepTimeTSC));
-    log(" wire", strD(wireTime, stepTimeTSC));
-    log(" wire-tension", strD(wireTensionTime, stepTimeTSC));
-    log(" wire-bottom", strD(wireBottomTime, stepTimeTSC));
-    log("record+step", strD(recordTime, totalTime));
-   }
-   viewT=states.size-1;
+   record(); viewT=states.size-1;
+   recordTime.stop();
    window->render();
    if(states.size == 8192) { log(states.size); window->setTitle("OK"); running = false; }
-   recordTime.stop();
+
   };
  }
 

@@ -43,7 +43,7 @@ void Simulation::stepGrainGrain() {
     b--;
     float d = sqrt(sq(grain.Px[a]-grain.Px[b])
                       + sq(grain.Py[a]-grain.Py[b])
-                      + sq(grain.Pz[a]-grain.Pz[b])); //TODO: SIMD
+                      + sq(grain.Pz[a]-grain.Pz[b])); //TODO: SIMD //FIXME: fails with Ofast?
     if(d > verletDistance) { minD=::min(minD, d); continue; }
     grainGrainA.append( a );
     grainGrainB.append( b );
