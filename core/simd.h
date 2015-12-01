@@ -20,7 +20,7 @@ static inline v8ui gather(const uint* P, v8ui i) {
  return (v8ui){P[i[0]], P[i[1]], P[i[2]], P[i[3]], P[i[4]], P[i[5]], P[i[6]], P[i[7]]};
 #endif
 }
-static inline v8ui gather(const buffer<uint>& P, v8ui i) { return gather(P.data, i); }
+static inline v8ui gather(ref<uint> P, v8ui i) { return gather(P.data, i); }
 
 typedef float v8sf __attribute((__vector_size__ (32)));
 inline v8sf constexpr float8(float f) { return (v8sf){f,f,f,f,f,f,f,f}; }
@@ -49,10 +49,12 @@ static inline v8sf gather(const float* P, v8ui i) {
  return (v8sf){P[i[0]], P[i[1]], P[i[2]], P[i[3]], P[i[4]], P[i[5]], P[i[6]], P[i[7]]};
 #endif
 }
-static inline v8sf gather(const ref<float>& P, v8ui i) { return gather(P.data, i); }
+static inline v8sf gather(ref<float> P, v8ui i) { return gather(P.data, i); }
 
-static inline void scatter(float* const P, const v8ui a, const v8sf x) {
- P[a[0]] = x[0]; P[a[1]] = x[1]; P[a[2]] = x[2]; P[a[3]] = x[3];
- P[a[4]] = x[4]; P[a[5]] = x[5]; P[a[6]] = x[6]; P[a[7]] = x[7];
+static inline void scatter(float* const P, const v8ui i, const v8sf x) {
+ P[i[0]] = x[0]; P[i[1]] = x[1]; P[i[2]] = x[2]; P[i[3]] = x[3];
+ P[i[4]] = x[4]; P[i[5]] = x[5]; P[i[6]] = x[6]; P[i[7]] = x[7];
 }
-static inline void scatter(const mref<float>& P, const v8ui a, const v8sf x) { scatter(P.begin(), a, x); }
+static inline void scatter(mref<float> P, const v8ui a, const v8sf x) {
+ scatter(P.begin(), a, x);
+}

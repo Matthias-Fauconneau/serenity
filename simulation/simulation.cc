@@ -31,13 +31,17 @@ Simulation::Simulation(const Dict& p) : System(p.at("TimeStep")), radius(p.at("R
 void Simulation::domain(vec3& min, vec3& max) {
  min = inf, max = -inf;
  for(size_t i: range(grain.count)) {
+  assert(isNumber(grain.Px[i]));
   min.x = ::min(min.x, grain.Px[i]);
   max.x = ::max(max.x, grain.Px[i]);
+  assert(isNumber(grain.Py[i]));
   min.y = ::min(min.y, grain.Py[i]);
   max.y = ::max(max.y, grain.Py[i]);
+  assert(isNumber(grain.Pz[i]));
   min.z = ::min(min.z, grain.Pz[i]);
   max.z = ::max(max.z, grain.Pz[i]);
  }
+ assert_(::max(::max((max-min).x, (max-min).y), (max-min).z) < 32, "grain", min, max);
  for(size_t i: range(wire.count)) {
   min.x = ::min(min.x, wire.Px[i]);
   max.x = ::max(max.x, wire.Px[i]);
@@ -46,7 +50,7 @@ void Simulation::domain(vec3& min, vec3& max) {
   min.z = ::min(min.z, wire.Pz[i]);
   max.z = ::max(max.z, wire.Pz[i]);
  }
- assert_(::max(::max((max-min).x, (max-min).y), (max-min).z) < 64);
+ assert_(::max(::max((max-min).x, (max-min).y), (max-min).z) < 32, "wire", min, max);
 }
 
 bool Simulation::step() {
@@ -211,7 +215,7 @@ void Simulation::profile(const Time& totalTime) {
  log(" grain-wire evaluate", strD(grainWireEvaluateTime, stepTimeTSC.cycleCount()));
  log("grain wire contact count average", grainWireContactSizeSum/timeStep);
  log(" grain-wire evaluate cycle/grain", (float)grainWireEvaluateTime/grainWireContactSizeSum);
- error(" grain-wire evaluate b/cycle", (float)(grainWireContactSizeSum*128*8)/grainWireEvaluateTime);
+ error(" grain-wire evaluate b/cycle", (float)(grainWireContactSizeSum*35*4*8)/grainWireEvaluateTime);
  //log(" grain-wire sum", strD(grainWireSumTime, stepTimeTSC));
  //log(" wire", strD(wireTime, stepTimeTSC));
  //log(" wire-tension", strD(wireTensionTime, stepTimeTSC));

@@ -198,11 +198,12 @@ break_:;
    if(status) { binary={}; return; }
    else log(job.target+'\n');
   }
-  libraries.append("stdc++"__);
-  libraries.append("m"__);
+  //libraries.append("stdc++"__);
+  //libraries.append("m"__);
   array<String> args = (buffer<String>)(
      move(files) +
-     mref<String>{"-o"__, unsafeRef(binary), "-L/var/tmp/lib"__, "-Wl,-rpath,/var/tmp/lib"__,} +
+     mref<String>{"-o"__, unsafeRef(binary), /*"-L/var/tmp/lib"__, "-Wl,-rpath,/var/tmp/lib"__*/
+     "-static-libstdc++"__} +
      apply(libraries, [this](const String& library)->String{ return "-l"+library; }) );
   if(execute(CXX, toRefs(args))) { ::log("Failed to link\n", CXX, args); return; }
  }

@@ -45,7 +45,9 @@ inline void* start_routine(thread* t) {
 /// Runs a loop in parallel
 template<Type F> uint64 parallel_for(int64 start, int64 stop, F f, const int unused threadCount = ::threadCount) {
 #if DEBUG || PROFILE
+ tsc time; time.start();
  for(int64 i : range(start, stop)) f(0, i);
+ return time.cycleCount();
 #else
  if(threadCount == 1) {
   tsc time; time.start();

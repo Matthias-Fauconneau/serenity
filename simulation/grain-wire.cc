@@ -4,7 +4,7 @@
 #include "disasm.h"
 
 static inline void evaluateGrainWire(const size_t start, const size_t size,
-                                     const uint* grainWireContact,
+                                     const uint* grainWireContact, const size_t unused grainWireContactSize,
                                      const uint* grainWireA, const uint* grainWireB,
                                      const float* grainPx, const float* grainPy, const float* grainPz,
                                      const float* wirePx, const float* wirePy, const float* wirePz,
@@ -36,26 +36,20 @@ static inline void evaluateGrainWire(const size_t start, const size_t size,
   // Grain - Wire
 
   // Tension
-
   const v8sf fK = K * sqrt8(depth) * depth;
-
   // Relative velocity
-  v8sf AAVx = gather(pAAVx, A), AAVy = gather(pAAVy, A), AAVz = gather(pAAVz, A);
-  v8sf RVx = gather(AVx, A) + (AAVy*RAz - AAVz*RAy) - gather(BVx, B);
-  v8sf RVy = gather(AVy, A) + (AAVz*RAx - AAVx*RAz) - gather(BVy, B);
-  v8sf RVz = gather(AVz, A) + (AAVx*RAy - AAVy*RAx) - gather(BVz, B);
-
+  const v8sf AAVx = gather(pAAVx, A), AAVy = gather(pAAVy, A), AAVz = gather(pAAVz, A);
+  const v8sf RVx = gather(AVx, A) + (AAVy*RAz - AAVz*RAy) - gather(BVx, B);
+  const v8sf RVy = gather(AVy, A) + (AAVz*RAx - AAVx*RAz) - gather(BVy, B);
+  const v8sf RVz = gather(AVz, A) + (AAVx*RAy - AAVy*RAx) - gather(BVz, B);
   // Damping
-  v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
-  v8sf fB = - Kb * sqrt8(depth) * normalSpeed ; // Damping
-
-  v8sf fN = fK+ fB;
-  v8sf NFx = fN * Nx;
-  v8sf NFy = fN * Ny;
-  v8sf NFz = fN * Nz;
-  v8sf Fx = NFx;
-  v8sf Fy = NFy;
-  v8sf Fz = NFz;
+  const v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
+  const v8sf fB = - Kb * sqrt8(depth) * normalSpeed ; // Damping
+  // Normal force
+  const v8sf fN = fK + fB;
+  const v8sf NFx = fN * Nx;
+  const v8sf NFy = fN * Ny;
+  const v8sf NFz = fN * Nz;
 
   // Gather static frictions
   v8sf localAx = gather(grainWireLocalAx, contacts);
@@ -83,41 +77,38 @@ static inline void evaluateGrainWire(const size_t start, const size_t size,
    FRBz[k] = localBz[k];
   }
 
-  v8sf gAx = Ax + FRAx;
-  v8sf gAy = Ay + FRAy;
-  v8sf gAz = Az + FRAz;
-  v8sf gBx = Bx + FRBx;
-  v8sf gBy = By + FRBy;
-  v8sf gBz = Bz + FRBz;
-  v8sf Dx = gBx - gAx;
-  v8sf Dy = gBy - gAy;
-  v8sf Dz = gBz - gAz;
-  v8sf Dn = Nx*Dx + Ny*Dy + Nz*Dz;
+  const v8sf gAx = Ax + FRAx;
+  const v8sf gAy = Ay + FRAy;
+  const v8sf gAz = Az + FRAz;
+  const v8sf gBx = Bx + FRBx;
+  const v8sf gBy = By + FRBy;
+  const v8sf gBz = Bz + FRBz;
+  const v8sf Dx = gBx - gAx;
+  const v8sf Dy = gBy - gAy;
+  const v8sf Dz = gBz - gAz;
+  const v8sf Dn = Nx*Dx + Ny*Dy + Nz*Dz;
   // tangentOffset
-  v8sf TOx = Dx - Dn * Nx;
-  v8sf TOy = Dy - Dn * Ny;
-  v8sf TOz = Dz - Dn * Nz;
-  v8sf tangentLength = sqrt8(TOx*TOx+TOy*TOy+TOz*TOz);
-  v8sf kS = staticFrictionStiffness * fN;
-  v8sf fS = kS * tangentLength; // 0.1~1 fN
+  const v8sf TOx = Dx - Dn * Nx;
+  const v8sf TOy = Dy - Dn * Ny;
+  const v8sf TOz = Dz - Dn * Nz;
+  const v8sf tangentLength = sqrt8(TOx*TOx+TOy*TOy+TOz*TOz);
+  const v8sf kS = staticFrictionStiffness * fN;
+  const v8sf fS = kS * tangentLength; // 0.1~1 fN
 
   // tangentRelativeVelocity
-  v8sf RVn = Nx*RVx + Ny*RVy + Nz*RVz;
-  v8sf TRVx = RVx - RVn * Nx;
-  v8sf TRVy = RVy - RVn * Ny;
-  v8sf TRVz = RVz - RVn * Nz;
-  v8sf tangentRelativeSpeed = sqrt8(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
-  v8sf fD = dynamicFrictionCoefficient * fN;
+  const v8sf RVn = Nx*RVx + Ny*RVy + Nz*RVz;
+  const v8sf TRVx = RVx - RVn * Nx;
+  const v8sf TRVy = RVy - RVn * Ny;
+  const v8sf TRVz = RVz - RVn * Nz;
+  const v8sf tangentRelativeSpeed = sqrt8(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
+  const v8sf fD = dynamicFrictionCoefficient * fN;
   v8sf fTx, fTy, fTz;
   for(size_t k: range(simd)) { // FIXME: mask
    fTx[k] = 0;
    fTy[k] = 0;
    fTz[k] = 0;
-   /*assert_(tangentLength[k] < staticFrictionLength || !isNumber(tangentLength[k]),
-             tangentLength[k], staticFrictionLength);*/
    if(      tangentLength[k] < staticFrictionLength
             && tangentRelativeSpeed[0] < staticFrictionSpeed
-            //&& fS[k] < fD[k]
             ) {
     // Static
     if(tangentLength[k]) {
@@ -137,12 +128,12 @@ static inline void evaluateGrainWire(const size_t start, const size_t size,
     fTz[k] += fDN * TRVz[k];
    }
   }
-  *(v8sf*)&pFx[i] = Fx + fTx;
-  *(v8sf*)&pFy[i] = Fy + fTy;
-  *(v8sf*)&pFz[i] = Fz + fTz;
-  *(v8sf*)&pTAx[i] = RAy*fTz - RAz*fTy;
-  *(v8sf*)&pTAy[i] = RAz*fTx - RAx*fTz;
-  *(v8sf*)&pTAz[i] = RAx*fTy - RAy*fTx;
+  *(v8sf*)(pFx+i) = NFx + fTx;
+  *(v8sf*)(pFy+i) = NFy + fTy;
+  *(v8sf*)(pFz+i) = NFz + fTz;
+  *(v8sf*)(pTAx+i) = RAy*fTz - RAz*fTy;
+  *(v8sf*)(pTAy+i) = RAz*fTx - RAx*fTz;
+  *(v8sf*)(pTAz+i) = RAx*fTy - RAy*fTx;
   // Scatter static frictions
   scatter(grainWireLocalAx, contacts, localAx);
   scatter(grainWireLocalAy, contacts, localAy);
@@ -306,13 +297,13 @@ break_:;
  static constexpr float E = 1/(1/Grain::elasticModulus+1/Wire::elasticModulus);
  static constexpr float R = 1/(Grain::curvature+Wire::curvature);
  const float K = 4./3*E*sqrt(R);
- if(0) grainWireEvaluateTime += parallel_chunk(GWcc/simd, [&](uint, size_t start, size_t size) {
+ grainWireEvaluateTime += parallel_chunk(GWcc/simd, [&](uint, size_t start, size_t size) {
    (//disasm(evaluateGrainWire,
     evaluateGrainWire(start, size,
-                      grainWireContact.data,
+                      grainWireContact.data, grainWireContact.size,
                       grainWireA.data, grainWireB.data,
                       grain.Px.data, grain.Py.data, grain.Pz.data,
-                      wire.Px.data, wire.Py.data, grain.Pz.data,
+                      wire.Px.data, wire.Py.data, wire.Pz.data,
                       float8(Grain::radius+Wire::radius), float8(Grain::radius),
                       grainWireLocalAx.begin(), grainWireLocalAy.begin(), grainWireLocalAz.begin(),
                       grainWireLocalBx.begin(), grainWireLocalBy.begin(), grainWireLocalBz.begin(),

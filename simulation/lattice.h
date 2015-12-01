@@ -7,7 +7,7 @@ generic struct Lattice {
  const int3 size = ::max(int3(5,5,1), int3(::floor(scale*(max-min)))+int3(2));
  int YX = size.y * size.x;
  buffer<T> cells {size_t(size.z*size.y*size.x + 3*size.y*size.x+3*size.x+4)}; // -1 .. 2 OOB margins
- T* const base = cells.begin()+size.y*size.x+size.x+1;
+ const mref<T> base = cells.slice(size.y*size.x+size.x+1);
  Lattice(float scale, vec3 min, vec3 max) : scale(scale), min(min), max(max) {
   cells.clear(0);
  }

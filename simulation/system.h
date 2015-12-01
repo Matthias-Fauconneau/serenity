@@ -14,7 +14,7 @@ struct System {
  sconst float mm = 1e-3*m, g = 1e-3*kg, MPa = 1e6 * Pa;
 
  // Contact parameters
- sconst float normalDamping = 1e-2 * s;
+ sconst float normalDamping = 1e-2 * s; // K~6000 => Kb~60
  sconst float dynamicFrictionCoefficient = 1;
  sconst float staticFrictionSpeed = inf;
  sconst float staticFrictionLength = 3 * mm; // ~ Wire::radius
@@ -52,6 +52,9 @@ struct System {
  };
 
  void step(Mass& p, size_t i) { // TODO: SIMD
+  assert(isNumber(p.Fx[i]));
+  assert(isNumber(p.Fy[i]));
+  assert(isNumber(p.Fz[i]));
   p.Vx[i] += p.dt_mass * p.Fx[i];
   p.Vy[i] += p.dt_mass * p.Fy[i];
   p.Vz[i] += p.dt_mass * p.Fz[i];
