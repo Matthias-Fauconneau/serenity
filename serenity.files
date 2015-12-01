@@ -78,3 +78,5 @@ simulation/grain-bottom.cc
 simulation/grain-side.cc
 simulation/wire-bottom.cc
 simulation/run.cc
+disasm.h
+disasm.cc

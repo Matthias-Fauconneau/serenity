@@ -340,7 +340,7 @@ struct System {
   TAz = RAx*fTy - RAy*fTx;
  }
 
- /// Evaluates contact force between two objects with friction (rotating A, non rotating B)
+ /*/// Evaluates contact force between two objects with friction (rotating A, non rotating B)
  // Grain - Wire
  template<Type tA, Type tB> inline void contact(
    const tA& A, v8ui a,
@@ -430,8 +430,7 @@ struct System {
    fTx[k] = 0;
    fTy[k] = 0;
    fTz[k] = 0;
-   /*assert_(tangentLength[k] < staticFrictionLength || !isNumber(tangentLength[k]),
-           tangentLength[k], staticFrictionLength);*/
+
    if(      tangentLength[k] < staticFrictionLength
        && tangentRelativeSpeed[0] < staticFrictionSpeed
        //&& fS[k] < fD[k]
@@ -460,7 +459,7 @@ struct System {
   TAx = RAy*fTz - RAz*fTy;
   TAy = RAz*fTx - RAx*fTz;
   TAz = RAx*fTy - RAy*fTx;
- }
+ }*/
 
  /// Evaluates contact force between two objects with friction (rotating A, rotating B)
  // Grain - Grain

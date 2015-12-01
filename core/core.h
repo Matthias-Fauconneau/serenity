@@ -38,17 +38,17 @@ generic __attribute((warn_unused_result)) T copy(const T& o) { return o; }
 
 /// Reference type with move semantics
 generic struct handle {
-	T pointer;
+ T pointer;
 
-	handle(T pointer=T()) : pointer(pointer){}
-    handle& operator=(handle&& o) { pointer=o.pointer; o.pointer={}; return *this; }
-	handle(handle&& o) : pointer(o.pointer){ o.pointer=T(); }
+ handle(T pointer=T()) : pointer(pointer){}
+ handle& operator=(handle&& o) { pointer=o.pointer; o.pointer={}; return *this; }
+ handle(handle&& o) : pointer(o.pointer){ o.pointer=T(); }
 
-	operator T() const { return pointer; }
-	operator T&() { return pointer; }
-	T* operator &() { return &pointer; }
-	T operator ->() { return pointer; }
-	const T operator ->() const { return pointer; }
+ operator T() const { return pointer; }
+ operator T&() { return pointer; }
+ T* operator &() { return &pointer; }
+ T operator ->() { return pointer; }
+ const T operator ->() const { return pointer; }
 };
 
 template<Type A, Type B> constexpr bool operator !=(const A& a, const B& b) { return !(a==b); }
@@ -80,48 +80,48 @@ inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
 
 /// Numeric range
 struct range {
-	inline range(int start, int stop) : start(start), stop(stop){}
-	inline range(int size) : range(0, size) {}
-    struct iterator {
-		int i;
-		inline int operator*() { return i; }
-		inline iterator& operator++() { i++; return *this; }
-		inline bool operator !=(const iterator& o) const { return i<o.i; }
-    };
-	inline iterator begin() const { return {start}; }
-	inline iterator end() const { return {stop}; }
-    explicit operator bool() const { return start < stop; }
-	int size() { return stop-start; }
-	int start, stop;
+ inline range(int start, int stop) : start(start), stop(stop){}
+ inline range(int size) : range(0, size) {}
+ struct iterator {
+  int i;
+  inline int operator*() { return i; }
+  inline iterator& operator++() { i++; return *this; }
+  inline bool operator !=(const iterator& o) const { return i<o.i; }
+ };
+ inline iterator begin() const { return {start}; }
+ inline iterator end() const { return {stop}; }
+ explicit operator bool() const { return start < stop; }
+ int size() { return stop-start; }
+ int start, stop;
 };
 
 /// Numeric range
 struct reverse_range {
-	inline reverse_range(int start, int stop) : start(start), stop(stop){}
-	inline reverse_range(int size) : reverse_range(size-1, -1){}
-	struct iterator {
-		int i;
-		inline int operator*() { return i; }
-		inline iterator& operator++() { i--; return *this; }
-		inline bool operator !=(const iterator& o) const { return i>o.i; }
-	};
-	inline iterator begin() const { return {start}; }
-	inline iterator end() const { return {stop}; }
-	explicit operator bool() const { return start > stop; }
-	int size() { return start-stop; }
-	int start, stop;
+ inline reverse_range(int start, int stop) : start(start), stop(stop){}
+ inline reverse_range(int size) : reverse_range(size-1, -1){}
+ struct iterator {
+  int i;
+  inline int operator*() { return i; }
+  inline iterator& operator++() { i--; return *this; }
+  inline bool operator !=(const iterator& o) const { return i>o.i; }
+ };
+ inline iterator begin() const { return {start}; }
+ inline iterator end() const { return {stop}; }
+ explicit operator bool() const { return start > stop; }
+ int size() { return start-stop; }
+ int start, stop;
 };
 
 // -- initializer_list
 
 namespace std {
 generic struct initializer_list {
-    const T* data;
-    size_t length;
-    constexpr initializer_list(const T* data, size_t size) : data(data), length(size) {}
-    constexpr size_t size() const noexcept { return length; }
-    constexpr const T* begin() const noexcept { return data; }
-    constexpr const T* end() const { return (T*)data+length; }
+ const T* data;
+ size_t length;
+ constexpr initializer_list(const T* data, size_t size) : data(data), length(size) {}
+ constexpr size_t size() const noexcept { return length; }
+ constexpr const T* begin() const noexcept { return data; }
+ constexpr const T* end() const { return (T*)data+length; }
 };
 }
 
@@ -133,58 +133,58 @@ generic struct ref : Ref<T> { using Ref<T>::Ref; };
 
 /// Unmanaged fixed-size const reference to an array of elements
 generic struct Ref {
-    typedef T type;
-    const T* data = 0;
-    size_t size = 0;
+ typedef T type;
+ const T* data = 0;
+ size_t size = 0;
 
-    /// Default constructs an empty reference
-	inline constexpr Ref() {}
-    /// References \a size elements from const \a data pointer
-	inline constexpr Ref(const T* data, size_t size) : data(data), size(size) {}
-    /// Converts a real std::initializer_list to ref
-	constexpr Ref(const std::initializer_list<T>& list) : data(list.begin()), size(list.size()) {}
-    /// Explicitly references a static array
-	template<size_t N> explicit constexpr Ref(const T (&a)[N]) : Ref(a,N) {}
+ /// Default constructs an empty reference
+ inline constexpr Ref() {}
+ /// References \a size elements from const \a data pointer
+ inline constexpr Ref(const T* data, size_t size) : data(data), size(size) {}
+ /// Converts a real std::initializer_list to ref
+ constexpr Ref(const std::initializer_list<T>& list) : data(list.begin()), size(list.size()) {}
+ /// Explicitly references a static array
+ template<size_t N> explicit constexpr Ref(const T (&a)[N]) : Ref(a,N) {}
 
-    explicit operator bool() const { return size; }
-    explicit operator const T*() const { return data; }
+ explicit operator bool() const { return size; }
+ explicit operator const T*() const { return data; }
 
-    const T* begin() const { return data; }
-    const T* end() const { return data+size; }
-	inline const T& at(size_t i) const;
-	inline const T& operator [](size_t i) const { return at(i); }
-    const T& last() const { return at(size-1); }
+ const T* begin() const { return data; }
+ const T* end() const { return data+size; }
+ inline const T& at(size_t i) const;
+ inline const T& operator [](size_t i) const { return at(i); }
+ const T& last() const { return at(size-1); }
 
-    /// Slices a reference to elements from \a pos to \a pos + \a size
-	inline ref<T> slice(size_t pos, size_t size) const;
-	inline ref<T> sliceRange(size_t begin, size_t end) const;
-    /// Slices a reference to elements from \a pos to the end of the reference
-	inline ref<T> slice(size_t pos) const;
+ /// Slices a reference to elements from \a pos to \a pos + \a size
+ inline ref<T> slice(size_t pos, size_t size) const;
+ inline ref<T> sliceRange(size_t begin, size_t end) const;
+ /// Slices a reference to elements from \a pos to the end of the reference
+ inline ref<T> slice(size_t pos) const;
 
-	struct reverse_ref {
-		const T* start; const T* stop;
-		struct iterator {
-			const T* pointer;
-			const T& operator*() { return *pointer; }
-			iterator& operator++() { pointer--; return *this; }
-			typedef __INTPTR_TYPE__ intptr_t;
-			bool operator !=(const iterator& o) const { return intptr_t(pointer)>=intptr_t(o.pointer); }
-		};
-		iterator begin() const { return {start}; }
-		iterator end() const { return {stop}; }
-	};
-	reverse_ref reverse() { return {end()-1, begin()}; }
+ struct reverse_ref {
+  const T* start; const T* stop;
+  struct iterator {
+   const T* pointer;
+   const T& operator*() { return *pointer; }
+   iterator& operator++() { pointer--; return *this; }
+   typedef __INTPTR_TYPE__ intptr_t;
+   bool operator !=(const iterator& o) const { return intptr_t(pointer)>=intptr_t(o.pointer); }
+  };
+  iterator begin() const { return {start}; }
+  iterator end() const { return {stop}; }
+ };
+ reverse_ref reverse() { return {end()-1, begin()}; }
 
-	/// Returns the index of the first occurence of \a value. Returns invalid if \a value could not be found.
-	template<Type K> size_t indexOf(const K& key) const { for(size_t index: range(size)) { if(data[index]==key) return index; } return invalid; }
-	/// Returns whether the array contains an occurrence of \a value
-	template<Type K> bool contains(const K& key) const { return indexOf(key) != invalid; }
-    /// Compares all elements
-	bool operator ==(const ref<T> o) const {
-        if(size != o.size) return false;
-        for(size_t i: range(size)) if(data[i]!=o.data[i]) return false;
-        return true;
-    }
+ /// Returns the index of the first occurence of \a value. Returns invalid if \a value could not be found.
+ template<Type K> size_t indexOf(const K& key) const { for(size_t index: range(size)) { if(data[index]==key) return index; } return invalid; }
+ /// Returns whether the array contains an occurrence of \a value
+ template<Type K> bool contains(const K& key) const { return indexOf(key) != invalid; }
+ /// Compares all elements
+ bool operator ==(const ref<T> o) const {
+  if(size != o.size) return false;
+  for(size_t i: range(size)) if(data[i]!=o.data[i]) return false;
+  return true;
+ }
 };
 
 // -- string
@@ -192,11 +192,11 @@ generic struct Ref {
 /// ref discarding trailing zero byte in ref(char[N])
 // Needs to be a template specialization as a direct derived class specialization prevents implicit use of ref(char[N]) to bind ref<char>
 template<> struct ref<char> : Ref<char> {
-	using Ref::Ref;
-	constexpr ref() {}
-	inline constexpr ref(const char* data, size_t size) : Ref<char>(data, size) {}
-	/// Implicitly references a string literal
-	template<size_t N> constexpr ref(char const (&a)[N]) : ref(a, N-1 /*Does not include trailling zero byte*/) {}
+ using Ref::Ref;
+ constexpr ref() {}
+ inline constexpr ref(const char* data, size_t size) : Ref<char>(data, size) {}
+ /// Implicitly references a string literal
+ template<size_t N> constexpr ref(char const (&a)[N]) : ref(a, N-1 /*Does not include trailling zero byte*/) {}
 };
 
 /// Returns const reference to memory used by \a t
@@ -244,9 +244,9 @@ generic inline ref<T> Ref<T>::slice(size_t pos) const { assert(pos<=size); retur
 
 /// Declares a file to be embedded in the binary
 #define FILE(name) static ref<byte> name() { \
-    extern char _binary_ ## name ##_start[], _binary_ ## name ##_end[]; \
-	return ref<byte>(_binary_ ## name ##_start,_binary_ ## name ##_end - _binary_ ## name ##_start); \
-}
+ extern char _binary_ ## name ##_start[], _binary_ ## name ##_end[]; \
+ return ref<byte>(_binary_ ## name ##_start,_binary_ ## name ##_end - _binary_ ## name ##_start); \
+ }
 
 // -- mref
 
@@ -255,59 +255,59 @@ inline void* operator new(size_t, void* p) noexcept { return p; }
 
 /// Unmanaged fixed-size mutable reference to an array of elements
 generic struct mref : ref<T> {
-	using ref<T>::data;
-	using ref<T>::size;
+ using ref<T>::data;
+ using ref<T>::size;
 
-	/// Default constructs an empty reference
+ /// Default constructs an empty reference
  constexpr mref(){}
-	/// References \a size elements from \a data pointer
-	inline mref(T* data, size_t size) : ref<T>(data,size) {}
-	/// Converts an std::initializer_list to mref
-	constexpr mref(std::initializer_list<T>&& list) : ref<T>(list.begin(), list.size()) {}
-	/// Converts a static array to ref
-	template<size_t N> mref(T (&a)[N]): mref(a,N) {}
+ /// References \a size elements from \a data pointer
+ inline mref(T* data, size_t size) : ref<T>(data,size) {}
+ /// Converts an std::initializer_list to mref
+ constexpr mref(std::initializer_list<T>&& list) : ref<T>(list.begin(), list.size()) {}
+ /// Converts a static array to ref
+ template<size_t N> mref(T (&a)[N]): mref(a,N) {}
 
-	explicit operator bool() const { assert(!size || data, size); return size; }
-	explicit operator T*() const { return (T*)data; }
-	T* begin() const { return (T*)data; }
-	T* end() const { return (T*)data+size; }
-	inline T& at(size_t i) const { return (T&)ref<T>::at(i); }
-	inline T& operator [](size_t i) const { return at(i); }
-	T& first() const { return at(0); }
-	T& last() const { return at(size-1); }
+ explicit operator bool() const { assert(!size || data, size); return size; }
+ explicit operator T*() const { return (T*)data; }
+ T* begin() const { return (T*)data; }
+ T* end() const { return (T*)data+size; }
+ inline T& at(size_t i) const { return (T&)ref<T>::at(i); }
+ inline T& operator [](size_t i) const { return at(i); }
+ T& first() const { return at(0); }
+ T& last() const { return at(size-1); }
 
-	/// Slices a reference to elements from \a pos to \a pos + \a size
-	inline mref<T> slice(size_t pos, size_t size) const { assert(pos+size <= this->size, pos, size, this->size); return mref<T>((T*)data+pos, size); }
-	/// Slices a reference to elements from to the end of the reference
-	mref<T> slice(size_t pos) const { assert(pos<=size); return mref<T>((T*)data+pos,size-pos); }
-	/// Slices a reference to elements from \a start to \a stop
-	mref<T> sliceRange(size_t start, size_t stop) const { return slice(start, stop-start); }
+ /// Slices a reference to elements from \a pos to \a pos + \a size
+ inline mref<T> slice(size_t pos, size_t size) const { assert(pos+size <= this->size, pos, size, this->size); return mref<T>((T*)data+pos, size); }
+ /// Slices a reference to elements from to the end of the reference
+ mref<T> slice(size_t pos) const { assert(pos<=size); return mref<T>((T*)data+pos,size-pos); }
+ /// Slices a reference to elements from \a start to \a stop
+ mref<T> sliceRange(size_t start, size_t stop) const { return slice(start, stop-start); }
 
-	/// Initializes the element at index
-	T& set(size_t index, const T& value) const { return *(new (&at(index)) T(value)); } /// Initializes the element at index
-	T& set(size_t index, T&& value) const { return *(new (&at(index)) T(::move(value))); }
-	/// Initializes the element at index
-	template<Type... Args> T& set(size_t index, Args&&... args) const { return *(new (&at(index)) T{forward<Args>(args)...}); }
-	/// Initializes reference using the same constructor for all elements
-	template<Type... Args> void clear(Args&&... args) const { for(T& e: *this) new (&e) T(forward<Args>(args)...); }
-	/// Initializes reference from \a source using move constructor
-	void move(const mref<T>& source) { assert(size==source.size); for(size_t index: range(size)) set(index, ::move(source[index])); }
-	/// Initializes reference from \a source using copy constructor
+ /// Initializes the element at index
+ T& set(size_t index, const T& value) const { return *(new (&at(index)) T(value)); } /// Initializes the element at index
+ T& set(size_t index, T&& value) const { return *(new (&at(index)) T(::move(value))); }
+ /// Initializes the element at index
+ template<Type... Args> T& set(size_t index, Args&&... args) const { return *(new (&at(index)) T{forward<Args>(args)...}); }
+ /// Initializes reference using the same constructor for all elements
+ template<Type... Args> void clear(Args&&... args) const { for(T& e: *this) new (&e) T(forward<Args>(args)...); }
+ /// Initializes reference from \a source using move constructor
+ void move(const mref<T>& source) { assert(size==source.size); for(size_t index: range(size)) set(index, ::move(source[index])); }
+ /// Initializes reference from \a source using copy constructor
  void copy(const ref<T> source) const { assert(size==source.size); for(size_t index: range(size)) set(index, ::copy(source[index])); }
 
-	/// Stores the application of a function to every index up to a size in a mref
-	template<Type Function> void apply(Function function) const { for(size_t index: range(size)) set(index, function(index)); }
-	/// Stores the application of a function to every elements of a ref in a mref
-	template<Type Function, Type... S> void apply(Function function, ref<S>... sources) const {
-		for(size_t index: range(size)) new (&at(index)) T(function(sources[index]...));
-	}
-	/// Stores the application of a function to every elements of a ref in a mref
-	template<Type Function, Type... S> void apply(Function function, mref<S>... sources) const {
-		for(size_t index: range(size)) new (&at(index)) T(function(sources[index]...));
-	}
+ /// Stores the application of a function to every index up to a size in a mref
+ template<Type Function> void apply(Function function) const { for(size_t index: range(size)) set(index, function(index)); }
+ /// Stores the application of a function to every elements of a ref in a mref
+ template<Type Function, Type... S> void apply(Function function, ref<S>... sources) const {
+  for(size_t index: range(size)) new (&at(index)) T(function(sources[index]...));
+ }
+ /// Stores the application of a function to every elements of a ref in a mref
+ template<Type Function, Type... S> void apply(Function function, mref<S>... sources) const {
+  for(size_t index: range(size)) new (&at(index)) T(function(sources[index]...));
+ }
 
-	/// Replaces in \a array every occurence of \a before with \a after
-	template<Type K> mref& replace(const K& before, const T& after) { for(T& e : *this) if(e==before) e=::copy(after); return *this; }
+ /// Replaces in \a array every occurence of \a before with \a after
+ template<Type K> mref& replace(const K& before, const T& after) { for(T& e : *this) if(e==before) e=::copy(after); return *this; }
 };
 /// Returns mutable reference to memory used by \a t
 generic mref<byte> raw(T& t) { return mref<byte>((byte*)&t,sizeof(T)); }

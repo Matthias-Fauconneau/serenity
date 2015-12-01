@@ -1,6 +1,157 @@
 // TODO: Cylinder contacts
 #include "simulation.h"
 #include "parallel.h"
+#include "disasm.h"
+
+static inline void evaluateGrainWire(const size_t start, const size_t size,
+                                     const uint* grainWireContact,
+                                     const uint* grainWireA, const uint* grainWireB,
+                                     const float* grainPx, const float* grainPy, const float* grainPz,
+                                     const float* wirePx, const float* wirePy, const float* wirePz,
+                                     const v8sf Gr_Wr, const v8sf Gr,
+                                     float* const grainWireLocalAx, float* const grainWireLocalAy, float* const grainWireLocalAz,
+                                     float* const grainWireLocalBx, float* const grainWireLocalBy, float* const grainWireLocalBz,
+                                     const v8sf K, const v8sf Kb,
+                                     const v8sf staticFrictionStiffness, const v8sf dynamicFrictionCoefficient,
+                                     const float staticFrictionLength, const float staticFrictionSpeed,
+                                     const float staticFrictionDamping,
+                                     const float* AVx, const float* AVy, const float* AVz,
+                                     const float* BVx, const float* BVy, const float* BVz,
+                                     const float* pAAVx, const float* pAAVy, const float* pAAVz,
+                                     const vec4* Arotation,
+                                     float* const pFx, float* const pFy, float* const pFz,
+                                     float* const pTAx, float* const pTAy, float* const pTAz) {
+ for(size_t i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
+  const v8ui contacts = *(v8ui*)(grainWireContact+i);
+  const v8ui A = gather(grainWireA, contacts), B = gather(grainWireB, contacts);
+  // FIXME: Recomputing from intersection (more efficient than storing?)
+  const v8sf Ax = gather(grainPx, A), Ay = gather(grainPy, A), Az = gather(grainPz, A);
+  const v8sf Bx = gather(wirePx, B), By = gather(wirePy, B), Bz = gather(wirePz, B);
+  const v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
+  const v8sf length = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
+  const v8sf depth = Gr_Wr - length;
+  const v8sf Nx = Rx/length, Ny = Ry/length, Nz = Rz/length;
+  const v8sf RAx = - Gr  * Nx, RAy = - Gr * Ny, RAz = - Gr * Nz;
+  /// Evaluates contact force between two objects with friction (rotating A, non rotating B)
+  // Grain - Wire
+
+  // Tension
+
+  const v8sf fK = K * sqrt8(depth) * depth;
+
+  // Relative velocity
+  v8sf AAVx = gather(pAAVx, A), AAVy = gather(pAAVy, A), AAVz = gather(pAAVz, A);
+  v8sf RVx = gather(AVx, A) + (AAVy*RAz - AAVz*RAy) - gather(BVx, B);
+  v8sf RVy = gather(AVy, A) + (AAVz*RAx - AAVx*RAz) - gather(BVy, B);
+  v8sf RVz = gather(AVz, A) + (AAVx*RAy - AAVy*RAx) - gather(BVz, B);
+
+  // Damping
+  v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
+  v8sf fB = - Kb * sqrt8(depth) * normalSpeed ; // Damping
+
+  v8sf fN = fK+ fB;
+  v8sf NFx = fN * Nx;
+  v8sf NFy = fN * Ny;
+  v8sf NFz = fN * Nz;
+  v8sf Fx = NFx;
+  v8sf Fy = NFy;
+  v8sf Fz = NFz;
+
+  // Gather static frictions
+  v8sf localAx = gather(grainWireLocalAx, contacts);
+  v8sf localAy = gather(grainWireLocalAy, contacts);
+  v8sf localAz = gather(grainWireLocalAz, contacts);
+  v8sf localBx = gather(grainWireLocalBx, contacts);
+  v8sf localBy = gather(grainWireLocalBy, contacts);
+  v8sf localBz = gather(grainWireLocalBz, contacts);
+
+  v8sf FRAx, FRAy, FRAz;
+  v8sf FRBx, FRBy, FRBz;
+  for(size_t k: range(simd)) { // FIXME
+   if(!localAx[k]) {
+    vec3 localA = qapply(conjugate(Arotation[A[k]]), vec3(RAx[k], RAy[k], RAz[k]));
+    localAx[k] = localA[0];
+    localAy[k] = localA[1];
+    localAz[k] = localA[2];
+   }
+   vec3 relativeA = qapply(Arotation[A[k]], vec3(localAx[k], localAy[k], localAz[k]));
+   FRAx[k] = relativeA[0];
+   FRAy[k] = relativeA[1];
+   FRAz[k] = relativeA[2];
+   FRBx[k] = localBx[k];
+   FRBy[k] = localBy[k];
+   FRBz[k] = localBz[k];
+  }
+
+  v8sf gAx = Ax + FRAx;
+  v8sf gAy = Ay + FRAy;
+  v8sf gAz = Az + FRAz;
+  v8sf gBx = Bx + FRBx;
+  v8sf gBy = By + FRBy;
+  v8sf gBz = Bz + FRBz;
+  v8sf Dx = gBx - gAx;
+  v8sf Dy = gBy - gAy;
+  v8sf Dz = gBz - gAz;
+  v8sf Dn = Nx*Dx + Ny*Dy + Nz*Dz;
+  // tangentOffset
+  v8sf TOx = Dx - Dn * Nx;
+  v8sf TOy = Dy - Dn * Ny;
+  v8sf TOz = Dz - Dn * Nz;
+  v8sf tangentLength = sqrt8(TOx*TOx+TOy*TOy+TOz*TOz);
+  v8sf kS = staticFrictionStiffness * fN;
+  v8sf fS = kS * tangentLength; // 0.1~1 fN
+
+  // tangentRelativeVelocity
+  v8sf RVn = Nx*RVx + Ny*RVy + Nz*RVz;
+  v8sf TRVx = RVx - RVn * Nx;
+  v8sf TRVy = RVy - RVn * Ny;
+  v8sf TRVz = RVz - RVn * Nz;
+  v8sf tangentRelativeSpeed = sqrt8(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
+  v8sf fD = dynamicFrictionCoefficient * fN;
+  v8sf fTx, fTy, fTz;
+  for(size_t k: range(simd)) { // FIXME: mask
+   fTx[k] = 0;
+   fTy[k] = 0;
+   fTz[k] = 0;
+   /*assert_(tangentLength[k] < staticFrictionLength || !isNumber(tangentLength[k]),
+             tangentLength[k], staticFrictionLength);*/
+   if(      tangentLength[k] < staticFrictionLength
+            && tangentRelativeSpeed[0] < staticFrictionSpeed
+            //&& fS[k] < fD[k]
+            ) {
+    // Static
+    if(tangentLength[k]) {
+     vec3 springDirection = vec3(TOx[k], TOy[k], TOz[k]) / tangentLength[k];
+     float fB = staticFrictionDamping * dot(springDirection, vec3(RVx[k], RVy[k], RVz[k]));
+     fTx[k] = (fS[k]-fB) * springDirection[0];
+     fTy[k] = (fS[k]-fB) * springDirection[1];
+     fTz[k] = (fS[k]-fB) * springDirection[2];
+    }
+   } else { // 0
+    localAx[k] = 0; localAy[k] = 0, localAz[k] = 0; localBx[k] = 0, localBy[k] = 0, localBz[k] = 0;
+   }
+   if(tangentRelativeSpeed[k]) {
+    float fDN = - fD[k] / tangentRelativeSpeed[k];
+    fTx[k] += fDN * TRVx[k];
+    fTy[k] += fDN * TRVy[k];
+    fTz[k] += fDN * TRVz[k];
+   }
+  }
+  *(v8sf*)&pFx[i] = Fx + fTx;
+  *(v8sf*)&pFy[i] = Fy + fTy;
+  *(v8sf*)&pFz[i] = Fz + fTz;
+  *(v8sf*)&pTAx[i] = RAy*fTz - RAz*fTy;
+  *(v8sf*)&pTAy[i] = RAz*fTx - RAx*fTz;
+  *(v8sf*)&pTAz[i] = RAx*fTy - RAy*fTx;
+  // Scatter static frictions
+  scatter(grainWireLocalAx, contacts, localAx);
+  scatter(grainWireLocalAy, contacts, localAy);
+  scatter(grainWireLocalAz, contacts, localAz);
+  scatter(grainWireLocalBx, contacts, localBx);
+  scatter(grainWireLocalBy, contacts, localBy);
+  scatter(grainWireLocalBz, contacts, localBz);
+ }
+}
 
 void Simulation::stepGrainWire() {
  if(!grain.count || !wire.count) return;
@@ -88,7 +239,7 @@ void Simulation::stepGrainWire() {
       grainWireLocalBy.append( 0 );
       grainWireLocalBz.append( 0 );
      }
-     break_:;
+break_:;
     }
     while(grainWireIndex < this->grainWireA.size && this->grainWireA[grainWireIndex] == a)
      grainWireIndex++;
@@ -113,7 +264,7 @@ void Simulation::stepGrainWire() {
 
   grainWireSearchTime.stop();
   if(processState > ProcessState::Pour) // Element creation resets verlet lists
-    log("grain-wire", grainWireSkipped);
+   log("grain-wire", grainWireSkipped);
   grainWireSkipped=0;
  } else grainWireSkipped++;
 
@@ -152,44 +303,27 @@ void Simulation::stepGrainWire() {
  size_t GWcc = align(simd, grainWireContact.size); // Grain-Wire contact count
  buffer<float> Fx(GWcc), Fy(GWcc), Fz(GWcc);
  buffer<float> TAx(GWcc), TAy(GWcc), TAz(GWcc);
- grainWireEvaluateTime += parallel_chunk(GWcc/simd, [&](uint, size_t start, size_t size) {
-  for(size_t i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
-   v8ui contacts = *(v8ui*)(grainWireContact.data+i);
-   v8ui A = gather(grainWireA, contacts), B = gather(grainWireB, contacts);
-   // FIXME: Recomputing from intersection (more efficient than storing?)
-   v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
-   v8sf Bx = gather(wire.Px, B), By = gather(wire.Py, B), Bz = gather(wire.Pz, B);
-   v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-   v8sf length = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
-   v8sf depth = float8(Grain::radius+Wire::radius) - length;
-   v8sf Nx = Rx/length, Ny = Ry/length, Nz = Rz/length;
-   sconst v8sf R = float8(Grain::radius);
-   v8sf RAx = - R  * Nx, RAy = - R * Ny, RAz = - R * Nz;
-   // Gather static frictions
-   v8sf localAx = gather(grainWireLocalAx, contacts);
-   v8sf localAy = gather(grainWireLocalAy, contacts);
-   v8sf localAz = gather(grainWireLocalAz, contacts);
-   v8sf localBx = gather(grainWireLocalBx, contacts);
-   v8sf localBy = gather(grainWireLocalBy, contacts);
-   v8sf localBz = gather(grainWireLocalBz, contacts);
-   contact<Grain,Wire>(grain, A, wire, B, depth,
-                       RAx, RAy, RAz,
-                       Nx, Ny, Nz,
-                       Ax, Ay, Az,
-                       Bx, By, Bz,
-                       localAx, localAy, localAz,
-                       localBx, localBy, localBz,
-                       *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i],
-                       *(v8sf*)&TAx[i], *(v8sf*)&TAy[i], *(v8sf*)&TAz[i]
-                       );
-   // Scatter static frictions
-   scatter(grainWireLocalAx, contacts, localAx);
-   scatter(grainWireLocalAy, contacts, localAy);
-   scatter(grainWireLocalAz, contacts, localAz);
-   scatter(grainWireLocalBx, contacts, localBx);
-   scatter(grainWireLocalBy, contacts, localBy);
-   scatter(grainWireLocalBz, contacts, localBz);
-  }
+ static constexpr float E = 1/(1/Grain::elasticModulus+1/Wire::elasticModulus);
+ static constexpr float R = 1/(Grain::curvature+Wire::curvature);
+ const float K = 4./3*E*sqrt(R);
+ if(0) grainWireEvaluateTime += parallel_chunk(GWcc/simd, [&](uint, size_t start, size_t size) {
+   (//disasm(evaluateGrainWire,
+    evaluateGrainWire(start, size,
+                      grainWireContact.data,
+                      grainWireA.data, grainWireB.data,
+                      grain.Px.data, grain.Py.data, grain.Pz.data,
+                      wire.Px.data, wire.Py.data, grain.Pz.data,
+                      float8(Grain::radius+Wire::radius), float8(Grain::radius),
+                      grainWireLocalAx.begin(), grainWireLocalAy.begin(), grainWireLocalAz.begin(),
+                      grainWireLocalBx.begin(), grainWireLocalBy.begin(), grainWireLocalBz.begin(),
+                      float8(K), float8(K * normalDamping),
+                      float8(staticFrictionStiffness), float8(dynamicFrictionCoefficient),
+                      staticFrictionLength, staticFrictionSpeed, staticFrictionDamping,
+                      grain.Vx.data, grain.Vy.data, grain.Vz.data,
+                      wire.Vx.data, wire.Vy.data, wire.Vz.data,
+                      grain.AVx.data, grain.AVy.data, grain.AVz.data, grain.rotation.data,
+                      Fx.begin(), Fy.begin(), Fz.begin(),
+                      TAx.begin(), TAy.begin(), TAz.begin()) );
  });
  grainWireContactSizeSum += grainWireContact.size;
  //grainWireEvaluateTime.stop();

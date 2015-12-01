@@ -105,7 +105,7 @@ int64 Build::parse(string fileName, Node& parent) {
  for(TextData s = file.read(file.size()); s; s.line()) {
   {String name = tryParseIncludes(s, fileName);
    if(name) {
-    String module = find(name+".h") ?: find(name+".cc");
+    String module = find(name+".h") ? find(name+".h") : find(name+".cc");
     assert_(module, "No such module", name, "imported from", fileName);
     if(existsFile(module+".h")) lastEdit = max(lastEdit, parse(module+".h", parent));
     if(!parent.edges.contains(module) && existsFile(module+".cc", folder) && module != parent.name) {
