@@ -110,7 +110,10 @@ void Simulation::stepGrainGrain() {
  } else grainGrainSkipped++;
 
  // Filters verlet lists, packing contacts to evaluate
- buffer<uint> grainGrainContact(align(simd, grainGrainA.size), 0);
+ if(align(simd, grainGrainA.size) > grainGrainContact.capacity) {
+  grainGrainContact = buffer<uint>(align(simd, grainGrainA.size));
+ }
+ grainGrainContact.size = 0;
  grainGrainFilterTime += parallel_chunk(grainGrainA.size/simd, [&](uint, size_t start, size_t size) {
   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
     v8ui A = *(v8ui*)(grainGrainA.data+i), B = *(v8ui*)(grainGrainB.data+i);
@@ -141,9 +144,26 @@ void Simulation::stepGrainGrain() {
 
  // Evaluates forces from (packed) intersections (SoA)
  size_t GGcc = align(simd, grainGrainContact.size); // Grain-Grain contact count
- buffer<float> Fx(GGcc), Fy(GGcc), Fz(GGcc);
- buffer<float> TAx(GGcc), TAy(GGcc), TAz(GGcc);
- buffer<float> TBx(GGcc), TBy(GGcc), TBz(GGcc);
+ if(GGcc > grainGrainFx.capacity) {
+  grainGrainFx = buffer<float>(GGcc);
+  grainGrainFy = buffer<float>(GGcc);
+  grainGrainFz = buffer<float>(GGcc);
+  grainGrainTAx = buffer<float>(GGcc);
+  grainGrainTAy = buffer<float>(GGcc);
+  grainGrainTAz = buffer<float>(GGcc);
+  grainGrainTBx = buffer<float>(GGcc);
+  grainGrainTBy = buffer<float>(GGcc);
+  grainGrainTBz = buffer<float>(GGcc);
+ }
+ grainGrainFx.size = GGcc;
+ grainGrainFy.size = GGcc;
+ grainGrainFz.size = GGcc;
+ grainGrainTAx.size = GGcc;
+ grainGrainTAy.size = GGcc;
+ grainGrainTAz.size = GGcc;
+ grainGrainTBx.size = GGcc;
+ grainGrainTBy.size = GGcc;
+ grainGrainTBz.size = GGcc;
 
  grainGrainEvaluateTime += parallel_chunk(GGcc/simd, [&](uint, size_t start, size_t size) {
   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
@@ -175,9 +195,9 @@ void Simulation::stepGrainGrain() {
                           Bx, By, Bz,
                           localAx, localAy, localAz,
                           localBx, localBy, localBz,
-                          *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i],
-                          *(v8sf*)&TAx[i], *(v8sf*)&TAy[i], *(v8sf*)&TAz[i],
-                          *(v8sf*)&TBx[i], *(v8sf*)&TBy[i], *(v8sf*)&TBz[i]
+                          *(v8sf*)&grainGrainFx[i], *(v8sf*)&grainGrainFy[i], *(v8sf*)&grainGrainFz[i],
+                          *(v8sf*)&grainGrainTAx[i], *(v8sf*)&grainGrainTAy[i], *(v8sf*)&grainGrainTAz[i],
+                          *(v8sf*)&grainGrainTBx[i], *(v8sf*)&grainGrainTBy[i], *(v8sf*)&grainGrainTBz[i]
                           );
    // Scatter static frictions
    scatter(grainGrainLocalAx, contacts, localAx);
@@ -194,19 +214,19 @@ void Simulation::stepGrainGrain() {
    size_t index = grainGrainContact[i];
    size_t a = grainGrainA[index];
    size_t b = grainGrainB[index];
-   grain.Fx[a] += Fx[i];
-   grain.Fx[b] -= Fx[i];
-   grain.Fy[a] += Fy[i];
-   grain.Fy[b] -= Fy[i];
-   grain.Fz[a] += Fz[i];
-   grain.Fz[b] -= Fz[i];
+   grain.Fx[a] += grainGrainFx[i];
+   grain.Fx[b] -= grainGrainFx[i];
+   grain.Fy[a] += grainGrainFy[i];
+   grain.Fy[b] -= grainGrainFy[i];
+   grain.Fz[a] += grainGrainFz[i];
+   grain.Fz[b] -= grainGrainFz[i];
 
-   grain.Tx[a] += TAx[i];
-   grain.Ty[a] += TAy[i];
-   grain.Tz[a] += TAz[i];
-   grain.Tx[b] += TBx[i];
-   grain.Ty[b] += TBy[i];
-   grain.Tz[b] += TBz[i];
+   grain.Tx[a] += grainGrainTAx[i];
+   grain.Ty[a] += grainGrainTAy[i];
+   grain.Tz[a] += grainGrainTAz[i];
+   grain.Tx[b] += grainGrainTBx[i];
+   grain.Ty[b] += grainGrainTBy[i];
+   grain.Tz[b] += grainGrainTBz[i];
   }
   grainGrainSumTime.stop();
 }

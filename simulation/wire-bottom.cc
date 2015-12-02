@@ -67,8 +67,14 @@ void Simulation::stepWireBottom() {
 
  // Evaluates forces from (packed) intersections (SoA)
  const size_t WBcc = align(simd, wireBottomA.size); // Wire-Bottom contact count
- buffer<float> Fx(WBcc), Fy(WBcc), Fz(WBcc);
- buffer<float> TAx(WBcc), TAy(WBcc), TAz(WBcc);
+ if(WBcc > wireBottomFx.capacity) {
+  wireBottomFx = buffer<float>(WBcc);
+  wireBottomFy = buffer<float>(WBcc);
+  wireBottomFz = buffer<float>(WBcc);
+ }
+ wireBottomFx.size = WBcc;
+ wireBottomFy.size = WBcc;
+ wireBottomFz.size = WBcc;
  wireBottomEvaluateTime.start();
  for(size_t index = 0; index < WBcc; index += 8) { // FIXME: parallel
   v8ui A = *(v8ui*)(wireBottomA.data+index);
@@ -87,7 +93,7 @@ void Simulation::stepWireBottom() {
                       Ax, Ay, Az,
                       localAx, localAy, localAz,
                       localBx, localBy, localBz,
-                      *(v8sf*)&Fx[index], *(v8sf*)&Fy[index], *(v8sf*)&Fz[index]);
+                      *(v8sf*)&wireBottomFx[index], *(v8sf*)&wireBottomFy[index], *(v8sf*)&wireBottomFz[index]);
   // Scatter static frictions
   *(v8sf*)(wireBottomLocalAx.data+index) = localAx;
   *(v8sf*)(wireBottomLocalAy.data+index) = localAy;
@@ -101,9 +107,9 @@ void Simulation::stepWireBottom() {
  wireBottomSumTime.start();
  for(size_t index = 0; index < wireBottomA.size; index++) { // Scalar scatter add
   size_t a = wireBottomA[index];
-  wire.Fx[a] += Fx[index];
-  wire.Fy[a] += Fy[index];
-  wire.Fz[a] += Fz[index];
+  wire.Fx[a] += wireBottomFx[index];
+  wire.Fy[a] += wireBottomFy[index];
+  wire.Fz[a] += wireBottomFz[index];
  }
  wireBottomSumTime.stop();
 }

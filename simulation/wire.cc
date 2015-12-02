@@ -100,7 +100,7 @@ void Simulation::stepWireBendingResistance() {
 
 void Simulation::stepWireIntegration() {
  if(!wire.count) return;
- float maxWireV_[threadCount] = {};
+ float maxWireV_[maxThreadCount] = {};
  wireIntegrationTime +=
  parallel_chunk(wire.count/simd, [this,&maxWireV_](uint id, size_t start, size_t size) {
    const v8sf dt_mass = float8(wire.dt_mass), dt = float8(this->dt);

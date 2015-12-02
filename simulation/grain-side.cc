@@ -67,8 +67,20 @@ void Simulation::stepGrainSide() {
 
  // Evaluates forces from (packed) intersections (SoA)
  size_t GScc = align(simd, grainSideA.size); // Grain-Grain contact count
- buffer<float> Fx(GScc), Fy(GScc), Fz(GScc);
- buffer<float> TAx(GScc), TAy(GScc), TAz(GScc);
+ if(GScc > grainSideFx.capacity) {
+  grainSideFx = buffer<float>(GScc);
+  grainSideFy = buffer<float>(GScc);
+  grainSideFz = buffer<float>(GScc);
+  grainSideTAx = buffer<float>(GScc);
+  grainSideTAy = buffer<float>(GScc);
+  grainSideTAz = buffer<float>(GScc);
+ }
+ grainSideFx.size = GScc;
+ grainSideFy.size = GScc;
+ grainSideFz.size = GScc;
+ grainSideTAx.size = GScc;
+ grainSideTAy.size = GScc;
+ grainSideTAz.size = GScc;
  grainSideEvaluateTime.start();
  for(size_t index = 0; index < GScc; index += 8) { // FIXME: parallel
   v8ui A = *(v8ui*)(grainSideA.data+index);
@@ -91,8 +103,8 @@ void Simulation::stepGrainSide() {
                            Ax, Ay, Az,
                            localAx, localAy, localAz,
                            localBx, localBy, localBz,
-                           *(v8sf*)&Fx[index], *(v8sf*)&Fy[index], *(v8sf*)&Fz[index],
-                           *(v8sf*)&TAx[index], *(v8sf*)&TAy[index], *(v8sf*)&TAz[index]);
+                           *(v8sf*)&grainSideFx[index], *(v8sf*)&grainSideFy[index], *(v8sf*)&grainSideFz[index],
+                           *(v8sf*)&grainSideTAx[index], *(v8sf*)&grainSideTAy[index], *(v8sf*)&grainSideTAz[index]);
   // Scatter static frictions
   *(v8sf*)(grainSideLocalAx.data+index) = localAx;
   *(v8sf*)(grainSideLocalAy.data+index) = localAy;
@@ -104,15 +116,14 @@ void Simulation::stepGrainSide() {
  grainSideEvaluateTime.stop();
 
  grainSideSumTime.start();
- for(size_t index = 0; index < grainSideA.size; index++) { // Scalar scatter add
-  size_t a = grainSideA[index];
-  grain.Fx[a] += Fx[index];
-  grain.Fy[a] += Fy[index];
-  grain.Fz[a] += Fz[index];
-
-  grain.Tx[a] += TAx[index];
-  grain.Ty[a] += TAy[index];
-  grain.Tz[a] += TAz[index];
+ for(size_t i=0; i<grainSideA.size; i++) { // Scalar scatter add
+  size_t a = grainSideA[i];
+  grain.Fx[a] += grainSideFx[i];
+  grain.Fy[a] += grainSideFy[i];
+  grain.Fz[a] += grainSideFz[i];
+  grain.Tx[a] += grainSideTAx[i];
+  grain.Ty[a] += grainSideTAy[i];
+  grain.Tz[a] += grainSideTAz[i];
  }
  grainSideSumTime.stop();
 }

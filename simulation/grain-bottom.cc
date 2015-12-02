@@ -68,8 +68,20 @@ void Simulation::stepGrainBottom() {
 
  // Evaluates forces from (packed) intersections (SoA)
  size_t GBcc = align(simd, grainBottomA.size); // Grain-Wire contact count
- buffer<float> Fx(GBcc), Fy(GBcc), Fz(GBcc);
- buffer<float> TAx(GBcc), TAy(GBcc), TAz(GBcc);
+ if(GBcc > grainBottomFx.capacity) {
+  grainBottomFx = buffer<float>(GBcc);
+  grainBottomFy = buffer<float>(GBcc);
+  grainBottomFz = buffer<float>(GBcc);
+  grainBottomTAx = buffer<float>(GBcc);
+  grainBottomTAy = buffer<float>(GBcc);
+  grainBottomTAz = buffer<float>(GBcc);
+ }
+ grainBottomFx.size = GBcc;
+ grainBottomFy.size = GBcc;
+ grainBottomFz.size = GBcc;
+ grainBottomTAx.size = GBcc;
+ grainBottomTAy.size = GBcc;
+ grainBottomTAz.size = GBcc;
  grainBottomEvaluateTime += parallel_chunk(GBcc/simd, [&](uint, size_t start, size_t size) {
   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
     v8ui A = *(v8ui*)(grainBottomA.data+i);
@@ -90,8 +102,8 @@ void Simulation::stepGrainBottom() {
                              Ax, Ay, Az,
                              localAx, localAy, localAz,
                              localBx, localBy, localBz,
-                             *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i],
-                             *(v8sf*)&TAx[i], *(v8sf*)&TAy[i], *(v8sf*)&TAz[i]
+                             *(v8sf*)&grainBottomFx[i], *(v8sf*)&grainBottomFy[i], *(v8sf*)&grainBottomFz[i],
+                             *(v8sf*)&grainBottomTAx[i], *(v8sf*)&grainBottomTAy[i], *(v8sf*)&grainBottomTAz[i]
                              );
     // Store static frictions
     *(v8sf*)(grainBottomLocalAx.data+i) = localAx;
@@ -104,14 +116,14 @@ void Simulation::stepGrainBottom() {
  }, 1);
 
  grainBottomSumTime.start();
- for(size_t i = 0; i < grainBottomA.size; i++) { // Scalar scatter add
+ for(size_t i=0; i<grainBottomA.size; i++) { // Scalar scatter add
   size_t a = grainBottomA[i];
-  grain.Fx[a] += Fx[i];
-  grain.Fy[a] += Fy[i];
-  grain.Fz[a] += Fz[i];
-  grain.Tx[a] += TAx[i];
-  grain.Ty[a] += TAy[i];
-  grain.Tz[a] += TAz[i];
+  grain.Fx[a] += grainBottomFx[i];
+  grain.Fy[a] += grainBottomFy[i];
+  grain.Fz[a] += grainBottomFz[i];
+  grain.Tx[a] += grainBottomTAx[i];
+  grain.Ty[a] += grainBottomTAy[i];
+  grain.Tz[a] += grainBottomTAz[i];
  }
  grainBottomSumTime.stop();
 }

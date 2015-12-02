@@ -43,6 +43,13 @@ struct Simulation : System {
  buffer<float> grainBottomLocalBy;
  buffer<float> grainBottomLocalBz;
 
+ buffer<float> grainBottomFx;
+ buffer<float> grainBottomFy;
+ buffer<float> grainBottomFz;
+ buffer<float> grainBottomTAx;
+ buffer<float> grainBottomTAy;
+ buffer<float> grainBottomTAz;
+
  // Grain-Side
  buffer<uint> oldGrainSideA;
  buffer<float> oldGrainSideLocalAx;
@@ -60,6 +67,13 @@ struct Simulation : System {
  buffer<float> grainSideLocalBy;
  buffer<float> grainSideLocalBz;
 
+ buffer<float> grainSideFx;
+ buffer<float> grainSideFy;
+ buffer<float> grainSideFz;
+ buffer<float> grainSideTAx;
+ buffer<float> grainSideTAy;
+ buffer<float> grainSideTAz;
+
  // Wire-Bottom
  buffer<uint> oldWireBottomA;
  buffer<float> oldWireBottomLocalAx;
@@ -76,6 +90,10 @@ struct Simulation : System {
  buffer<float> wireBottomLocalBx;
  buffer<float> wireBottomLocalBy;
  buffer<float> wireBottomLocalBz;
+
+ buffer<float> wireBottomFx;
+ buffer<float> wireBottomFy;
+ buffer<float> wireBottomFz;
 
  // Grain - Grain
  float maxGrainV = 0;
@@ -100,6 +118,18 @@ struct Simulation : System {
  buffer<float> grainGrainLocalBy;
  buffer<float> grainGrainLocalBz;
 
+ buffer<uint> grainGrainContact;
+
+ buffer<float> grainGrainFx;
+ buffer<float> grainGrainFy;
+ buffer<float> grainGrainFz;
+ buffer<float> grainGrainTAx;
+ buffer<float> grainGrainTAy;
+ buffer<float> grainGrainTAz;
+ buffer<float> grainGrainTBx;
+ buffer<float> grainGrainTBy;
+ buffer<float> grainGrainTBz;
+
  // Grain - Wire
  float grainWireGlobalMinD = 0;
  uint grainWireSkipped = 0;
@@ -121,6 +151,15 @@ struct Simulation : System {
  buffer<float> grainWireLocalBx;
  buffer<float> grainWireLocalBy;
  buffer<float> grainWireLocalBz;
+
+ buffer<uint> grainWireContact;
+
+ buffer<float> grainWireFx;
+ buffer<float> grainWireFy;
+ buffer<float> grainWireFz;
+ buffer<float> grainWireTAx;
+ buffer<float> grainWireTAy;
+ buffer<float> grainWireTAz;
 
  Simulation(const Dict& p);
  void domain(vec3& min, vec3& max);

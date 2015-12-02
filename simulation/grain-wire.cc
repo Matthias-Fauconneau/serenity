@@ -287,7 +287,10 @@ break_:;
  } else grainWireSkipped++;
 
  // Filters verlet lists, packing contacts to evaluate
- buffer<uint> grainWireContact(align(simd, grainWireA.size), 0);
+ if(align(simd, grainWireA.size) > grainWireContact.capacity) {
+  grainWireContact = buffer<uint>(align(simd, grainWireA.size));
+ }
+ grainWireContact.size = 0;
  grainWireFilterTime += parallel_chunk(grainWireA.size/simd, [&](uint, size_t start, size_t size) {
    for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
     v8ui A = *(v8ui*)(grainWireA.data+i), B = *(v8ui*)(grainWireB.data+i);
@@ -318,8 +321,20 @@ break_:;
 
  // Evaluates forces from (packed) intersections (SoA)
  size_t GWcc = align(simd, grainWireContact.size); // Grain-Wire contact count
- buffer<float> Fx(GWcc), Fy(GWcc), Fz(GWcc);
- buffer<float> TAx(GWcc), TAy(GWcc), TAz(GWcc);
+ if(GWcc > grainWireFx.capacity) {
+  grainWireFx = buffer<float>(GWcc);
+  grainWireFy = buffer<float>(GWcc);
+  grainWireFz = buffer<float>(GWcc);
+  grainWireTAx = buffer<float>(GWcc);
+  grainWireTAy = buffer<float>(GWcc);
+  grainWireTAz = buffer<float>(GWcc);
+ }
+ grainWireFx.size = GWcc;
+ grainWireFy.size = GWcc;
+ grainWireFz.size = GWcc;
+ grainWireTAx.size = GWcc;
+ grainWireTAy.size = GWcc;
+ grainWireTAz.size = GWcc;
  static constexpr float E = 1/(1/Grain::elasticModulus+1/Wire::elasticModulus);
  static constexpr float R = 1/(Grain::curvature+Wire::curvature);
  const float K = 4./3*E*sqrt(R);
@@ -340,8 +355,8 @@ break_:;
                       wire.Vx.data, wire.Vy.data, wire.Vz.data,
                       grain.AVx.data, grain.AVy.data, grain.AVz.data,
                       grain.Rx.data, grain.Ry.data, grain.Rz.data, grain.Rw.data,
-                      Fx.begin(), Fy.begin(), Fz.begin(),
-                      TAx.begin(), TAy.begin(), TAz.begin() ) );
+                      grainWireFx.begin(), grainWireFy.begin(), grainWireFz.begin(),
+                      grainWireTAx.begin(), grainWireTAy.begin(), grainWireTAz.begin() ) );
  });
  grainWireContactSizeSum += grainWireContact.size;
 
@@ -350,15 +365,15 @@ break_:;
   size_t index = grainWireContact[i];
   size_t a = grainWireA[index];
   size_t b = grainWireB[index];
-  grain.Fx[a] += Fx[i];
-  wire .Fx[b] -= Fx[i];
-  grain.Fy[a] += Fy[i];
-  wire .Fy[b] -= Fy[i];
-  grain.Fz[a] += Fz[i];
-  wire .Fz[b] -= Fz[i];
-  grain.Tx[a] += TAx[i];
-  grain.Ty[a] += TAy[i];
-  grain.Tz[a] += TAz[i];
+  grain.Fx[a] += grainWireFx[i];
+  wire .Fx[b] -= grainWireFx[i];
+  grain.Fy[a] += grainWireFy[i];
+  wire .Fy[b] -= grainWireFy[i];
+  grain.Fz[a] += grainWireFz[i];
+  wire .Fz[b] -= grainWireFz[i];
+  grain.Tx[a] += grainWireTAx[i];
+  grain.Ty[a] += grainWireTAy[i];
+  grain.Tz[a] += grainWireTAz[i];
  }
  grainWireSumTime.stop();
 }
