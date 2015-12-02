@@ -88,18 +88,24 @@ struct Simulation : System {
  void stepGrain();
   tsc grainTime;
  bool stepGrainBottom();
-  tsc grainBottomTime;
+  //tsc grainBottomSearchTime; // TODO: verlet
+  tsc grainBottomFilterTime;
+  tsc grainBottomEvaluateTime;
+  tsc grainBottomSumTime;
  bool stepGrainSide();
   tsc grainSideTime;
  void stepGrainGrain();
-  tsc grainGrainTime;
+  tsc grainGrainSearchTime;
+  tsc grainGrainFilterTime;
+  tsc grainGrainEvaluateTime;
+  tsc grainGrainSumTime;
  void stepGrainWire();
   tsc grainWireSearchTime;
   tsc grainWireFilterTime;
   //tsc grainWireEvaluateTime;
   uint64 grainWireEvaluateTime = 0;
-  size_t grainWireContactSizeSum;
   tsc grainWireSumTime;
+  size_t grainWireContactSizeSum;
  void stepGrainIntegration();
   tsc grainIntegrationTime;
  void stepWire();
@@ -113,7 +119,12 @@ struct Simulation : System {
  void stepWireIntegration();
   tsc wireIntegrationTime;
 
+#if DEBUG
   void invariant();
+#define invariant invariant();
+#else
+#define invariant
+#endif
   void profile(const Time& totalTime);
   bool stepProfile(const Time& totalTime);
    Time stepTimeRT;

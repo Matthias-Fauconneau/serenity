@@ -2,6 +2,7 @@
 #include "simulation.h"
 
 bool Simulation::stepGrainBottom() {
+ grainGrainFilterTime.start();
  {
   // SoA (FIXME: single pointer/index)
   static constexpr size_t averageGrainBottomContactCount = 1;
@@ -51,10 +52,12 @@ bool Simulation::stepGrainBottom() {
   this->grainBottomLocalBy = move(grainBottomLocalBy);
   this->grainBottomLocalBz = move(grainBottomLocalBz);
  }
+ grainGrainFilterTime.stop();
 
  // TODO: verlet
 
  // Evaluates forces from (packed) intersections (SoA)
+ grainBottomEvaluateTime.start();
  size_t GBcc = align(simd, grainBottomA.size); // Grain-Wire contact count
  buffer<float> Fx(GBcc), Fy(GBcc), Fz(GBcc);
  buffer<float> TAx(GBcc), TAy(GBcc), TAz(GBcc);
@@ -79,7 +82,7 @@ bool Simulation::stepGrainBottom() {
                       *(v8sf*)&Fx[index], *(v8sf*)&Fy[index], *(v8sf*)&Fz[index],
                       *(v8sf*)&TAx[index], *(v8sf*)&TAy[index], *(v8sf*)&TAz[index]
                       );
-  // Scatter static frictions
+  // Store static frictions
   *(v8sf*)(grainBottomLocalAx.data+index) = localAx;
   *(v8sf*)(grainBottomLocalAy.data+index) = localAy;
   *(v8sf*)(grainBottomLocalAz.data+index) = localAz;
@@ -87,7 +90,9 @@ bool Simulation::stepGrainBottom() {
   *(v8sf*)(grainBottomLocalBy.data+index) = localBy;
   *(v8sf*)(grainBottomLocalBz.data+index) = localBz;
  }
+ grainBottomEvaluateTime.stop();
 
+ grainBottomSumTime.start();
  for(size_t i = 0; i < grainBottomA.size; i++) { // Scalar scatter add
   size_t a = grainBottomA[i];
   grain.Fx[a] += Fx[i];
@@ -97,6 +102,7 @@ bool Simulation::stepGrainBottom() {
   grain.Ty[a] += TAy[i];
   grain.Tz[a] += TAz[i];
  }
+ grainBottomSumTime.stop();
 
  return true;
 }

@@ -8,7 +8,6 @@ void Simulation::stepWire() {
 
 void Simulation::stepWireTension() {
  if(wire.count == 0) return;
- invariant();
  for(size_t i=0; i<wire.count-1; i+=simd) {
   v8sf Ax = load(wire.Px, i     ), Ay = load(wire.Py, i     ), Az = load(wire.Pz, i    );
 #if DEBUG
@@ -50,7 +49,6 @@ void Simulation::stepWireTension() {
   storeu(wire.Fy, i+1, loadu(wire.Fy, i+1) - FTy);
   storeu(wire.Fz, i+1, loadu(wire.Fz, i+1) - FTz);
  }
- invariant();
 }
 
 void Simulation::stepWireBendingResistance() {
@@ -96,7 +94,6 @@ void Simulation::stepWireIntegration() {
  const float* Fx = wire.Fx.data, *Fy = wire.Fy.data, *Fz = wire.Fz.data;
  float* const pVx = wire.Vx.begin(), *pVy = wire.Vy.begin(), *pVz = wire.Vz.begin();
  float* const Px = wire.Px.begin(), *Py = wire.Py.begin(), *Pz = wire.Pz.begin();
- invariant();
  for(size_t i=0; i<wire.count; i+=simd) {
   // Symplectic Euler
   v8sf Vx = load(pVx, i), Vy = load(pVy, i), Vz = load(pVz, i);
@@ -109,19 +106,10 @@ void Simulation::stepWireIntegration() {
   store(Px, i, load(Px, i) + dt * Vx);
   store(Py, i, load(Py, i) + dt * Vy);
   store(Pz, i, load(Pz, i) + dt * Vz);
-#if 1
-  v8sf speed = sqrt(Vx*Vx + Vy*Vy + Vz*Vz);
-  // FIXME: assert peeled // FIXME: should be unnecessary since max(x, NaN) = x for any valid x
-  if(i+simd > wire.count) for(size_t k: range((i+simd)-wire.count, simd)) speed[k] = 0;
-  maxWireV8 = max(maxWireV8, speed);
-#else
   maxWireV8 = max(maxWireV8, sqrt(Vx*Vx + Vy*Vy + Vz*Vz));
-#endif
  }
- invariant();
  float maxWireV = 0;
  for(size_t k: range(simd)) maxWireV = ::max(maxWireV, maxWireV8[k]);
- assert(isNumber(maxWireV));
  float maxGrainWireV = maxGrainV + maxWireV;
  grainWireGlobalMinD -= maxGrainWireV * this->dt;
 }

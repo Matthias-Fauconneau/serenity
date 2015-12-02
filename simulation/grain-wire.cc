@@ -271,8 +271,8 @@ break_:;
   if(grainWireGlobalMinD < 0) log("grainWireGlobalMinD", grainWireGlobalMinD);
 
   grainWireSearchTime.stop();
-  if(processState > ProcessState::Pour) // Element creation resets verlet lists
-   log("grain-wire", grainWireSkipped);
+  /*if(processState > ProcessState::Pour) // Element creation resets verlet lists
+   log("grain-wire", grainWireSkipped);*/
   grainWireSkipped=0;
  } else grainWireSkipped++;
 

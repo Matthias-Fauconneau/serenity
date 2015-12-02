@@ -63,9 +63,7 @@ bool Simulation::step() {
  stepGrain();
  grainTime.stop();
 
- grainBottomTime.start();
  stepGrainBottom();
- grainBottomTime.stop();
 
  if(processState < ProcessState::Done) {
   grainSideTime.start();
@@ -73,28 +71,26 @@ bool Simulation::step() {
   grainSideTime.stop();
  }
 
- grainGrainTime.start();
  stepGrainGrain();
- grainGrainTime.stop();
 
  wireTime.start();
  stepWire();
  wireTime.stop();
- invariant();
+
  stepGrainWire();
- invariant();
+
  wireTensionTime.start();
  stepWireTension();
  wireTensionTime.stop();
- invariant();
+
  wireBendingResistanceTime.start();
  stepWireBendingResistance();
  wireBendingResistanceTime.stop();
- invariant();
+
  wireBottomTime.start();
  stepWireBottom();
  wireBottomTime.stop();
- invariant();
+
  grainIntegrationTime.start();
  stepGrainIntegration();
  grainIntegrationTime.stop();
@@ -125,12 +121,13 @@ void Simulation::stepGrainIntegration() {
  grainGrainGlobalMinD -= maxGrainGrainV * dt;
 }
 
+#if DEBUG
 void Simulation::invariant() {
  for(size_t i: range(wire.count)) {
-  assert(isNumber(wire.force(i)) && isNumber(wire.velocity(i)) && isNumber(wire.position(i)),
-         i, wire.count, wire.position(i), wire.velocity(i), wire.force(i));
+  assert(isNumber(wire.force(i)) && isNumber(wire.velocity(i)) && isNumber(wire.position(i)));
  }
 }
+#endif
 
 void Simulation::profile(const Time& totalTime) {
  log("----",timeStep/size_t(64*1/(dt*60)),"----");
@@ -143,15 +140,19 @@ void Simulation::profile(const Time& totalTime) {
  size_t accounted = 0, shown = 0;
 #define logTime(name) \
  accounted += name##Time; \
- if(name##Time > stepTime/10) { \
+ if(name##Time > stepTime/16) { \
   log(#name, strD(name ## Time, stepTime)); \
   shown += name##Time; \
  }
  logTime(process);
  logTime(grain);
- logTime(grainBottom);
+ logTime(grainBottomFilter);
+ logTime(grainBottomEvaluate);
  logTime(grainSide);
- logTime(grainGrain);
+ logTime(grainGrainSearch);
+ logTime(grainGrainFilter);
+ logTime(grainGrainEvaluate);
+ logTime(grainGrainSum);
  logTime(grainWireSearch);
  logTime(grainWireFilter);
  logTime(grainWireEvaluate);

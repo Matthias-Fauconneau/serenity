@@ -4,6 +4,8 @@
 void Simulation::stepGrainGrain() {
  if(!grain.count) return;
  if(grainGrainGlobalMinD <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
+  grainGrainSearchTime.start();
+
   vec3 min, max; domain(min, max);
   Lattice<uint16> lattice(sqrt(3.)/(2*Grain::radius), min, max);
   for(size_t i: range(grain.count)) {
@@ -91,11 +93,13 @@ void Simulation::stepGrainGrain() {
   grainGrainGlobalMinD = minD - 2*Grain::radius;
   if(grainGrainGlobalMinD < 0) log("grainGrainGlobalMinD12", grainGrainGlobalMinD);
 
+  grainGrainSearchTime.stop();
   //log("grain-grain", grainGrainSkipped);
   grainGrainSkipped=0;
  } else grainGrainSkipped++;
 
- // Evaluates (packed) intersections from (packed) verlet lists
+ // Filters verlet lists, packing contacts to evaluate
+ grainGrainFilterTime.start();
  buffer<uint> grainGrainContact(align(simd, grainGrainA.size), 0);
  for(size_t index = 0; index < grainGrainA.size; index += 8) {
   v8ui A = *(v8ui*)(grainGrainA.data+index), B = *(v8ui*)(grainGrainB.data+index);
@@ -122,8 +126,10 @@ void Simulation::stepGrainGrain() {
  }
  for(size_t i=grainGrainContact.size; i<align(simd, grainGrainContact.size); i++)
   grainGrainContact.begin()[i] = 0;
+ grainGrainFilterTime.stop();
 
  // Evaluates forces from (packed) intersections (SoA)
+ grainGrainEvaluateTime.start();
  size_t GGcc = align(simd, grainGrainContact.size); // Grain-Grain contact count
  buffer<float> Fx(GGcc), Fy(GGcc), Fz(GGcc);
  buffer<float> TAx(GGcc), TAy(GGcc), TAz(GGcc);
@@ -171,23 +177,26 @@ void Simulation::stepGrainGrain() {
    scatter(grainGrainLocalBy, contacts, localBy);
    scatter(grainGrainLocalBz, contacts, localBz);
   }//});
+  grainGrainEvaluateTime.stop();
 
- for(size_t i = 0; i < grainGrainContact.size; i++) { // Scalar scatter add
-  size_t index = grainGrainContact[i];
-  size_t a = grainGrainA[index];
-  size_t b = grainGrainB[index];
-  grain.Fx[a] += Fx[i];
-  grain.Fx[b] -= Fx[i];
-  grain.Fy[a] += Fy[i];
-  grain.Fy[b] -= Fy[i];
-  grain.Fz[a] += Fz[i];
-  grain.Fz[b] -= Fz[i];
+  grainGrainSumTime.start();
+  for(size_t i = 0; i < grainGrainContact.size; i++) { // Scalar scatter add
+   size_t index = grainGrainContact[i];
+   size_t a = grainGrainA[index];
+   size_t b = grainGrainB[index];
+   grain.Fx[a] += Fx[i];
+   grain.Fx[b] -= Fx[i];
+   grain.Fy[a] += Fy[i];
+   grain.Fy[b] -= Fy[i];
+   grain.Fz[a] += Fz[i];
+   grain.Fz[b] -= Fz[i];
 
-  grain.Tx[a] += TAx[i];
-  grain.Ty[a] += TAy[i];
-  grain.Tz[a] += TAz[i];
-  grain.Tx[b] += TBx[i];
-  grain.Ty[b] += TBy[i];
-  grain.Tz[b] += TBz[i];
- }
+   grain.Tx[a] += TAx[i];
+   grain.Ty[a] += TAy[i];
+   grain.Tz[a] += TAz[i];
+   grain.Tx[b] += TBx[i];
+   grain.Ty[b] += TBy[i];
+   grain.Tz[b] += TBz[i];
+  }
+  grainGrainSumTime.stop();
 }
