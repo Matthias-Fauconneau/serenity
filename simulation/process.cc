@@ -4,7 +4,7 @@ void Simulation::stepProcess() {
  // Process
  if(currentHeight >= targetHeight || grain.count == grain.capacity) {
   processState = Release;
-  radius += 2 * Grain::radius / s * dt;
+  currentSideRadius += 2 * Grain::radius / s * dt;
  } else {
   // Increases current height
   currentHeight += verticalSpeed * dt;
@@ -19,8 +19,8 @@ void Simulation::stepProcess() {
     winchAngle += linearSpeed/patternRadius * dt;
    }
    else if(pattern == Cross) { // Cross reinforced helix
-    if(currentRadius < -patternRadius) { // Radial -> Tangential (Phase reset)
-     currentRadius = patternRadius;
+    if(currentWinchRadius < -patternRadius) { // Radial -> Tangential (Phase reset)
+     currentWinchRadius = patternRadius;
      lastAngle = winchAngle+PI;
      winchAngle = lastAngle;
     }
@@ -31,9 +31,9 @@ void Simulation::stepProcess() {
      winchAngle += linearSpeed/patternRadius * dt;
     } else { // Radial phase
      float a = winchAngle;
-     float r = currentRadius;
+     float r = currentWinchRadius;
      end = vec2(r*cos(a), r*sin(a));
-     currentRadius -= linearSpeed * dt; // Constant velocity
+     currentWinchRadius -= linearSpeed * dt; // Constant velocity
     }
    }
    else if (pattern == Loop) { // Loops

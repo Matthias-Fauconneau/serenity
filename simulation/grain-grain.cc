@@ -114,7 +114,7 @@ void Simulation::stepGrainGrain() {
   grainGrainContact = buffer<uint>(align(simd, grainGrainA.size));
  }
  grainGrainContact.size = 0;
- grainGrainFilterTime += parallel_chunk(grainGrainA.size/simd, [&](uint, size_t start, size_t size) {
+ grainGrainFilterTime += parallel_chunk(align(simd, grainGrainA.size)/simd, [&](uint, size_t start, size_t size) {
   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
     v8ui A = *(v8ui*)(grainGrainA.data+i), B = *(v8ui*)(grainGrainB.data+i);
     v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);

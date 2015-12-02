@@ -291,7 +291,7 @@ break_:;
   grainWireContact = buffer<uint>(align(simd, grainWireA.size));
  }
  grainWireContact.size = 0;
- grainWireFilterTime += parallel_chunk(grainWireA.size/simd, [&](uint, size_t start, size_t size) {
+ grainWireFilterTime += parallel_chunk(align(simd, grainWireA.size)/simd, [&](uint, size_t start, size_t size) {
    for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
     v8ui A = *(v8ui*)(grainWireA.data+i), B = *(v8ui*)(grainWireB.data+i);
     v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);

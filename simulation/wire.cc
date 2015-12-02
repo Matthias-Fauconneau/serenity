@@ -3,7 +3,7 @@
 
 void Simulation::stepWire() {
  const v8sf m_Gz = float8(Wire::mass * Gz);
- wireInitializationTime += parallel_chunk(wire.count/simd, [&](uint, size_t start, size_t size) {
+ wireInitializationTime += parallel_chunk(align(simd, wire.count)/simd, [&](uint, size_t start, size_t size) {
   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
     store(wire.Fx, i, _0f);
     store(wire.Fy, i, _0f);
@@ -102,8 +102,8 @@ void Simulation::stepWireIntegration() {
  if(!wire.count) return;
  float maxWireV_[maxThreadCount] = {};
  wireIntegrationTime +=
- parallel_chunk(wire.count/simd, [this,&maxWireV_](uint id, size_t start, size_t size) {
-   const v8sf dt_mass = float8(wire.dt_mass), dt = float8(this->dt);
+ parallel_chunk(align(simd, wire.count)/simd, [this,&maxWireV_](uint id, size_t start, size_t size) {
+   const v8sf dt_mass = float8(dt / wire.mass), dt = float8(this->dt);
    v8sf maxWireV8 = _0f;
    const float* Fx = wire.Fx.data, *Fy = wire.Fy.data, *Fz = wire.Fz.data;
    float* const pVx = wire.Vx.begin(), *pVy = wire.Vy.begin(), *pVz = wire.Vz.begin();

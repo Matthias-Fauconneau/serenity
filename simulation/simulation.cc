@@ -20,13 +20,13 @@ constexpr float System::Wire::tensionDamping;
 constexpr float System::Wire::bendStiffness;
 constexpr string Simulation::patterns[];
 
-Simulation::Simulation(const Dict& p) : System(p.at("TimeStep")), radius(p.at("Radius")),
+Simulation::Simulation(const Dict& p) : System(p.at("TimeStep")), initialRadius(p.at("Radius")),
   pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):None) {
  if(pattern) { // Initial wire node
   size_t i = wire.count++;
   wire.Px[i] = patternRadius; wire.Py[i] = 0; wire.Pz[i] = currentHeight+Grain::radius+Wire::radius;
   wire.Vx[i] = 0; wire.Vy[i] = 0; wire.Vz[i] = 0;
-  winchAngle += Wire::internodeLength / radius;
+  winchAngle += Wire::internodeLength / currentWinchRadius;
  }
 }
 
@@ -68,33 +68,35 @@ void Simulation::step() {
  stepWireTension();
  stepWireBendingResistance();
  stepWireBottom();
- stepGrainIntegration();
  stepWireIntegration();
+ stepGrainIntegration();
 
  timeStep++;
 }
 
 void Simulation::stepGrain() {
  grainTime.start();
- for(size_t a: range(grain.count)) {
-  grain.Fx[a] = 0; grain.Fy[a] = 0; grain.Fz[a] = Grain::mass * Gz;
-  grain.Tx[a] = 0; grain.Ty[a] = 0; grain.Tz[a] = 0;
+ for(size_t i: range(grain.count)) {
+  grain.Fx[i] = 0; grain.Fy[i] = 0; grain.Fz[i] = Grain::mass * Gz;
+  grain.Tx[i] = 0; grain.Ty[i] = 0; grain.Tz[i] = 0;
  }
  grainTime.stop();
 }
 
 void Simulation::stepGrainIntegration() {
- const v8sf dt_mass = float8(grain.dt_mass), dt = float8(this->dt);
- const float dt_angularMass = grain.angularMass;
- v8sf maxGrainV8 = _0f;
- const float* Fx = grain.Fx.data, *Fy = grain.Fy.data, *Fz = grain.Fz.data;
- const float* Tx = grain.Tx.begin(), *Ty = grain.Ty.begin(), *Tz = grain.Tz.begin();
- float* const pVx = grain.Vx.begin(), *pVy = grain.Vy.begin(), *pVz = grain.Vz.begin();
- float* const Px = grain.Px.begin(), *Py = grain.Py.begin(), *Pz = grain.Pz.begin();
- float* const AVx = grain.AVx.begin(), *AVy = grain.AVy.begin(), *AVz = grain.AVz.begin();
- float* const Rx = grain.Rx.begin(), *Ry = grain.Ry.begin(), *Rz = grain.Rz.begin(),
-                  *Rw = grain.Rw.begin();
- grainIntegrationTime += parallel_chunk(grain.count/simd, [&](uint, size_t start, size_t size) {
+ if(!grain.count) return;
+ float maxGrainV_[maxThreadCount] = {};
+ grainIntegrationTime += parallel_chunk(align(simd, grain.count)/simd, [this, &maxGrainV_](uint id, size_t start, size_t size) {
+   const v8sf dt_mass = float8(dt / grain.mass), dt = float8(this->dt);
+   const float dt_angularMass = this->dt / grain.angularMass;
+   v8sf maxGrainV8 = _0f;
+   const float* Fx = grain.Fx.data, *Fy = grain.Fy.data, *Fz = grain.Fz.data;
+   const float* Tx = grain.Tx.begin(), *Ty = grain.Ty.begin(), *Tz = grain.Tz.begin();
+   float* const pVx = grain.Vx.begin(), *pVy = grain.Vy.begin(), *pVz = grain.Vz.begin();
+   float* const Px = grain.Px.begin(), *Py = grain.Py.begin(), *Pz = grain.Pz.begin();
+   float* const AVx = grain.AVx.begin(), *AVy = grain.AVy.begin(), *AVz = grain.AVz.begin();
+   float* const Rx = grain.Rx.begin(), *Ry = grain.Ry.begin(), *Rz = grain.Rz.begin(),
+                    *Rw = grain.Rw.begin();
   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
     // Symplectic Euler
     v8sf Vx = load(pVx, i), Vy = load(pVy, i), Vz = load(pVz, i);
@@ -126,9 +128,12 @@ void Simulation::stepGrainIntegration() {
      Rw[j] *= scale;
     }
   }
+  float maxGrainV = 0;
+  for(size_t k: range(simd)) maxGrainV = ::max(maxGrainV, maxGrainV8[k]);
+  maxGrainV_[id] = maxGrainV;
  }, 1);
  float maxGrainV = 0;
- for(size_t k: range(simd)) maxGrainV = ::max(maxGrainV, maxGrainV8[k]);
+ for(size_t k: range(threadCount)) maxGrainV = ::max(maxGrainV, maxGrainV_[k]);
  this->maxGrainV = maxGrainV;
  float maxGrainGrainV = maxGrainV + maxGrainV;
  grainGrainGlobalMinD -= maxGrainGrainV * this->dt;
@@ -147,9 +152,11 @@ void Simulation::profile(const Time& totalTime) {
  log(totalTime.microseconds()/timeStep, "us/step", totalTime, timeStep);
  if(stepTimeRT.nanoseconds()*100<totalTime.nanoseconds()*99)
   log("step", strD(stepTimeRT, totalTime));
- log("grain-wire contact count mean", grainWireContactSizeSum/timeStep);
- log("grain-wire cycle/grain", (float)grainWireEvaluateTime/grainWireContactSizeSum);
- log("grain-wire B/cycle", (float)(grainWireContactSizeSum*41*4)/grainWireEvaluateTime);
+ if(grainWireContactSizeSum) {
+  log("grain-wire contact count mean", grainWireContactSizeSum/timeStep);
+  log("grain-wire cycle/grain", (float)grainWireEvaluateTime/grainWireContactSizeSum);
+  log("grain-wire B/cycle", (float)(grainWireContactSizeSum*41*4)/grainWireEvaluateTime);
+ }
  size_t accounted = 0, shown = 0;
  map<uint64, string> profile;
 #define logTime(name) \

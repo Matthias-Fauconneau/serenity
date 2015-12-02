@@ -87,7 +87,7 @@ struct SimulationView : Simulation, Widget {
   state.wire.Py = copy(wire.Py);
   state.wire.Pz = copy(wire.Pz);
 
-  state.radius = radius;
+  state.radius = currentSideRadius;
   states.append(::move(state));
  }
 
@@ -103,7 +103,7 @@ struct SimulationView : Simulation, Widget {
   array<vec4> grainRotations (state.grain.count); // Rotated, Z-Sorted
   array<size_t> grainIndices (state.grain.count);
   {
-   vec3 min = -radius/2, max = vec3(vec2(radius/2), radius);
+   vec3 min = -initialRadius, max = vec3(initialRadius);
    for(size_t i: range(state.grain.count)) {
     vec3 O = qapply(viewRotation, state.grain.position(i));
     min = ::min(min, O - vec3(grain.radius));

@@ -27,10 +27,15 @@ struct System {
   sconst float curvature = 0;
   sconst float elasticModulus = 1e-1 * MPa;
  };
- float radius; // Cylinder radius
 
- // Mass points/vertices/nodes (SoA)
- struct Mass {
+ // Sphere particles
+ struct Grain {
+  sconst float mass = 2.7 * g;
+  sconst float radius = 40 *mm;
+  sconst float curvature = 1./radius;
+  sconst float elasticModulus = Obstacle::elasticModulus/*1e3 * MPa*/;
+  sconst float angularMass = 2./3*mass*sq(radius);
+
   const size_t capacity;
   size_t count = 0;
   buffer<float> Px { capacity };
@@ -42,62 +47,21 @@ struct System {
   buffer<float> Fx { capacity };
   buffer<float> Fy { capacity };
   buffer<float> Fz { capacity };
-  const float dt_mass;
-
-  Mass(size_t capacity, float dt, float mass)
-   : capacity(capacity), dt_mass(dt / mass) {}
-
-  const vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]);  }
-  const vec3 velocity(size_t i) const { return vec3(Vx[i], Vy[i], Vz[i]);  }
-  const vec3 force(size_t i) const { return vec3(Fx[i], Fy[i], Fz[i]);  }
- };
-
- void step(Mass& p, size_t i) { // TODO: SIMD
-  p.Vx[i] += p.dt_mass * p.Fx[i];
-  p.Vy[i] += p.dt_mass * p.Fy[i];
-  p.Vz[i] += p.dt_mass * p.Fz[i];
-  p.Px[i] += dt * p.Vx[i];
-  p.Py[i] += dt * p.Vy[i];
-  p.Pz[i] += dt * p.Vz[i];
- }
-
- // Sphere particles
- struct Grain : Mass {
-  sconst float mass = 2.7 * g;
-  sconst float radius = 40 *mm;
-  sconst float curvature = 1./radius;
-  sconst float elasticModulus = Obstacle::elasticModulus/*1e3 * MPa*/;
-  sconst float angularMass = 2./3*mass*sq(radius);
-  const float dt_angularMass;
 
    // TODO: Rodrigues vector
   buffer<float> Rx { capacity }, Ry { capacity }, Rz { capacity }, Rw { capacity };
   buffer<float> AVx { capacity }, AVy { capacity }, AVz { capacity }; // Angular velocity
   buffer<float> Tx { capacity }, Ty { capacity }, Tz { capacity }; // Torque
 
-  Grain(float dt) : Mass(65536, dt, mass), dt_angularMass(dt/angularMass) {}
+  Grain() : capacity(65536) {}
 
+  const vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]);  }
+  const vec3 velocity(size_t i) const { return vec3(Vx[i], Vy[i], Vz[i]);  }
+  const vec3 force(size_t i) const { return vec3(Fx[i], Fy[i], Fz[i]);  }
   const vec4 rotation(size_t i) const { return vec4(Rx[i], Ry[i], Rz[i], Rw[i]);  }
- } grain {dt};
+ } grain;
 
- void step(Grain& p, size_t i) { // TODO: SIMD
-  step((Mass&)p, i);
-  vec4 dr = dt/2 * qmul(vec4(p.AVx[i],p.AVy[i],p.AVz[i], 0), vec4(p.Rx[i],p.Ry[i],p.Rz[i],p.Rw[i]));
-  p.Rx[i] += dr.x;
-  p.Ry[i] += dr.y;
-  p.Rz[i] += dr.z;
-  p.Rw[i] += dr.w;
-  p.AVx[i] += p.dt_angularMass * p.Tx[i];
-  p.AVy[i] += p.dt_angularMass * p.Ty[i];
-  p.AVz[i] += p.dt_angularMass * p.Tz[i];
-  float scale = 1./length(vec4(p.Rx[i],p.Ry[i],p.Rz[i],p.Rw[i]));
-  p.Rx[i] *= scale;
-  p.Ry[i] *= scale;
-  p.Rz[i] *= scale;
-  p.Rw[i] *= scale;
- }
-
- struct Wire : Mass {
+ struct Wire {
   sconst float radius = 3*mm;
   sconst float internodeLength = Grain::radius/2;
   sconst float section = PI * sq(radius);
@@ -111,8 +75,25 @@ struct System {
   sconst float areaMomentOfInertia = PI/4*pow4(radius);
   sconst float bendStiffness = 0; //elasticModulus * areaMomentOfInertia / internodeLength;
   sconst float bendDamping = 0*g /*mass*/ / s;
-  Wire(float dt) : Mass(65536, dt, mass) {}
- } wire {dt};
+
+  const size_t capacity;
+  size_t count = 0;
+  buffer<float> Px { capacity };
+  buffer<float> Py { capacity };
+  buffer<float> Pz { capacity };
+  buffer<float> Vx { capacity };
+  buffer<float> Vy { capacity };
+  buffer<float> Vz { capacity };
+  buffer<float> Fx { capacity };
+  buffer<float> Fy { capacity };
+  buffer<float> Fz { capacity };
+
+  Wire() : capacity(65536) {}
+
+  const vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]);  }
+  const vec3 velocity(size_t i) const { return vec3(Vx[i], Vy[i], Vz[i]);  }
+  const vec3 force(size_t i) const { return vec3(Fx[i], Fy[i], Fz[i]);  }
+ } wire;
 
  size_t timeStep = 0;
 

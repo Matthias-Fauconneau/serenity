@@ -8,9 +8,9 @@
 struct Simulation : System {
  // Process parameters
  sconst float Gz = -10 * N/kg; // Gravity
- float radius;
- const float targetHeight = radius * 2;
- const float patternRadius = radius - Grain::radius;
+ const float initialRadius;
+ const float targetHeight = initialRadius * 2;
+ const float patternRadius = initialRadius - Grain::radius;
  enum Pattern { None, Helix, Cross, Loop };
  sconst string patterns[] {"none", "helix", "radial", "spiral"};
  const Pattern pattern;
@@ -24,7 +24,8 @@ struct Simulation : System {
  ProcessState processState = Pour;
  Random random;
  float currentHeight = Grain::radius;
- float lastAngle = 0, winchAngle = 0, currentRadius = patternRadius;
+ float lastAngle = 0, winchAngle = 0, currentWinchRadius = patternRadius;
+ float currentSideRadius = initialRadius;
 
  // Grain-Bottom
  buffer<uint> oldGrainBottomA;
