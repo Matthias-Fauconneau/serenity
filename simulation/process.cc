@@ -84,10 +84,10 @@ void Simulation::stepProcess() {
      float t0 = 2*PI*random();
      float t1 = acos(1-2*random());
      float t2 = (PI*random()+acos(random()))/2;
-     grain.rotation[i] = vec4(sin(t0)*sin(t1)*sin(t2),
-                                          cos(t0)*sin(t1)*sin(t2),
-                                          cos(t1)*sin(t2),
-                                          cos(t2));
+     grain.Rx[i] = sin(t0)*sin(t1)*sin(t2);
+     grain.Ry[i] = cos(t0)*sin(t1)*sin(t2);
+     grain.Rz[i] = cos(t1)*sin(t2);
+     grain.Rw[i] = cos(t2);
      grain.count++;
      // Forces verlet lists reevaluation
      grainGrainGlobalMinD = 0;

@@ -20,8 +20,12 @@ struct SimulationView : Simulation, Widget {
    buffer<float> Px;
    buffer<float> Py;
    buffer<float> Pz;
-   buffer<vec4> rotation;
+   buffer<float> Rx;
+   buffer<float> Ry;
+   buffer<float> Rz;
+   buffer<float> Rw;
    vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]); }
+   vec4 rotation(size_t i) const { return vec4(Rx[i], Ry[i], Rz[i], Rw[i]); }
   } grain;
   struct Wire {
    size_t count = 0;
@@ -73,7 +77,10 @@ struct SimulationView : Simulation, Widget {
   state.grain.Px = copy(grain.Px);
   state.grain.Py = copy(grain.Py);
   state.grain.Pz = copy(grain.Pz);
-  state.grain.rotation = copy(grain.rotation);
+  state.grain.Rx = copy(grain.Rx);
+  state.grain.Ry = copy(grain.Ry);
+  state.grain.Rz = copy(grain.Rz);
+  state.grain.Rw = copy(grain.Rw);
 
   state.wire.count = wire.count;
   state.wire.Px = copy(wire.Px);
@@ -104,7 +111,7 @@ struct SimulationView : Simulation, Widget {
     size_t j = 0;
     while(j < grainPositions.size && grainPositions[j].z < O.z) j++;
     grainPositions.insertAt(j, O);
-    grainRotations.insertAt(j, conjugate(qmul(viewRotation, state.grain.rotation[i])));
+    grainRotations.insertAt(j, conjugate(qmul(viewRotation, state.grain.rotation(i))));
     grainIndices.insertAt(j, i);
    }
    for(size_t i: range(state.wire.count)) {

@@ -36,7 +36,10 @@ static inline void storeu(mref<float> a, size_t index, v8sf v) {
  __builtin_ia32_storeups256(a.begin()+index, v);
 }
 
-inline v8sf sqrt8(v8sf x) { return __builtin_ia32_sqrtps256(x); }
+static inline v8sf /*operator&*/mask(v8si a, v8sf b) { return (v8sf)(a & (v8si)b); }
+static inline v8sf /*operator|*/merge(v8sf a, v8sf b) { return (v8sf)((v8si)a | (v8si)b); }
+
+static inline v8sf sqrt8(v8sf x) { return __builtin_ia32_sqrtps256(x); }
 
 static inline v8sf gather(const float* P, v8ui i) {
 #if __AVX2__

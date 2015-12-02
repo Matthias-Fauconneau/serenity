@@ -72,20 +72,31 @@ struct System {
   sconst float angularMass = 2./3*mass*sq(radius);
   const float dt_angularMass;
 
-  buffer<vec4> rotation { capacity }; // TODO: Rodrigues vector
+   // TODO: Rodrigues vector
+  buffer<float> Rx { capacity }, Ry { capacity }, Rz { capacity }, Rw { capacity };
   buffer<float> AVx { capacity }, AVy { capacity }, AVz { capacity }; // Angular velocity
   buffer<float> Tx { capacity }, Ty { capacity }, Tz { capacity }; // Torque
 
   Grain(float dt) : Mass(65536, dt, mass), dt_angularMass(dt/angularMass) {}
+
+  const vec4 rotation(size_t i) const { return vec4(Rx[i], Ry[i], Rz[i], Rw[i]);  }
  } grain {dt};
 
  void step(Grain& p, size_t i) { // TODO: SIMD
   step((Mass&)p, i);
-  p.rotation[i] += dt/2 * qmul(vec4(p.AVx[i],p.AVy[i],p.AVz[i], 0), p.rotation[i]);
+  vec4 dr = dt/2 * qmul(vec4(p.AVx[i],p.AVy[i],p.AVz[i], 0), vec4(p.Rx[i],p.Ry[i],p.Rz[i],p.Rw[i]));
+  p.Rx[i] += dr.x;
+  p.Ry[i] += dr.y;
+  p.Rz[i] += dr.z;
+  p.Rw[i] += dr.w;
   p.AVx[i] += p.dt_angularMass * p.Tx[i];
   p.AVy[i] += p.dt_angularMass * p.Ty[i];
   p.AVz[i] += p.dt_angularMass * p.Tz[i];
-  p.rotation[i] *= 1./length(p.rotation[i]);
+  float scale = 1./length(vec4(p.Rx[i],p.Ry[i],p.Rz[i],p.Rw[i]));
+  p.Rx[i] *= scale;
+  p.Ry[i] *= scale;
+  p.Rz[i] *= scale;
+  p.Rw[i] *= scale;
  }
 
  struct Wire : Mass {
@@ -269,12 +280,12 @@ struct System {
   v8sf FRBx, FRBy, FRBz;
   for(size_t k: range(simd)) { // FIXME
    if(!localAx[k]) {
-    vec3 localA = qapply(conjugate(A.rotation[a[k]]), vec3(RAx[k], RAy[k], RAz[k]));
+    vec3 localA = qapply(conjugate(A.rotation(a[k])), vec3(RAx[k], RAy[k], RAz[k]));
     localAx[k] = localA[0];
     localAy[k] = localA[1];
     localAz[k] = localA[2];
    }
-   vec3 relativeA = qapply(A.rotation[a[k]], vec3(localAx[k], localAy[k], localAz[k]));
+   vec3 relativeA = qapply(A.rotation(a[k]), vec3(localAx[k], localAy[k], localAz[k]));
    FRAx[k] = relativeA[0];
    FRAy[k] = relativeA[1];
    FRAz[k] = relativeA[2];
@@ -516,20 +527,20 @@ struct System {
   v8sf FRBx, FRBy, FRBz;
   for(size_t k: range(simd)) { // FIXME
    if(!localAx[k]) {
-    vec3 localA = qapply(conjugate(A.rotation[a[k]]), vec3(RAx[k], RAy[k], RAz[k]));
+    vec3 localA = qapply(conjugate(A.rotation(a[k])), vec3(RAx[k], RAy[k], RAz[k]));
     localAx[k] = localA[0];
     localAy[k] = localA[1];
     localAz[k] = localA[2];
-    vec3 localB = qapply(conjugate(B.rotation[b[k]]), vec3(RBx[k], RBy[k], RBz[k]));
+    vec3 localB = qapply(conjugate(B.rotation(b[k])), vec3(RBx[k], RBy[k], RBz[k]));
     localBx[k] = localB[0];
     localBy[k] = localB[1];
     localBz[k] = localB[2];
    }
-   vec3 relativeA = qapply(A.rotation[a[k]], vec3(localAx[k], localAy[k], localAz[k]));
+   vec3 relativeA = qapply(A.rotation(a[k]), vec3(localAx[k], localAy[k], localAz[k]));
    FRAx[k] = relativeA[0];
    FRAy[k] = relativeA[1];
    FRAz[k] = relativeA[2];
-   vec3 relativeB = qapply(B.rotation[b[k]], vec3(localBx[k], localBy[k], localBz[k]));
+   vec3 relativeB = qapply(B.rotation(b[k]), vec3(localBx[k], localBy[k], localBz[k]));
    FRBx[k] = relativeB[0];
    FRBy[k] = relativeB[1];
    FRBz[k] = relativeB[2];
