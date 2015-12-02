@@ -2,6 +2,7 @@
 #include "simulation.h"
 
 void Simulation::stepWireBottom() {
+ wireBottomFilterTime.start();
  {
   // SoA (FIXME: single pointer/index)
   static constexpr size_t averageWireBottomContactCount = 1;
@@ -50,13 +51,13 @@ void Simulation::stepWireBottom() {
   this->wireBottomLocalBy = move(wireBottomLocalBy);
   this->wireBottomLocalBz = move(wireBottomLocalBz);
  }
+ wireBottomFilterTime.stop();
 
  // TODO: verlet
 
  // Evaluates forces from (packed) intersections (SoA)
-
+ wireBottomEvaluateTime.start();
  const size_t WBcc = align(simd, wireBottomA.size); // Wire-Bottom contact count
-
  buffer<float> Fx(WBcc), Fy(WBcc), Fz(WBcc);
  buffer<float> TAx(WBcc), TAy(WBcc), TAz(WBcc);
  for(size_t index = 0; index < WBcc; index += 8) { // FIXME: parallel
@@ -85,11 +86,14 @@ void Simulation::stepWireBottom() {
   *(v8sf*)(wireBottomLocalBy.data+index) = localBy;
   *(v8sf*)(wireBottomLocalBz.data+index) = localBz;
  }
+ wireBottomEvaluateTime.stop();
 
+ wireBottomSumTime.start();
  for(size_t index = 0; index < wireBottomA.size; index++) { // Scalar scatter add
   size_t a = wireBottomA[index];
   wire.Fx[a] += Fx[index];
   wire.Fy[a] += Fy[index];
   wire.Fz[a] += Fz[index];
  }
+ wireBottomSumTime.stop();
 }

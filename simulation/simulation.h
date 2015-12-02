@@ -115,7 +115,10 @@ struct Simulation : System {
  void stepWireBendingResistance();
   tsc wireBendingResistanceTime;
  void stepWireBottom();
-  tsc wireBottomTime;
+ //tsc wireBottomSearchTime; // TODO: verlet
+  tsc wireBottomFilterTime;
+  tsc wireBottomEvaluateTime;
+  tsc wireBottomSumTime;
  void stepWireIntegration();
   tsc wireIntegrationTime;
 

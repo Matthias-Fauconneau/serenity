@@ -2,7 +2,7 @@
 #include "simulation.h"
 
 bool Simulation::stepGrainBottom() {
- grainGrainFilterTime.start();
+ grainBottomFilterTime.start();
  {
   // SoA (FIXME: single pointer/index)
   static constexpr size_t averageGrainBottomContactCount = 1;
@@ -52,7 +52,7 @@ bool Simulation::stepGrainBottom() {
   this->grainBottomLocalBy = move(grainBottomLocalBy);
   this->grainBottomLocalBz = move(grainBottomLocalBz);
  }
- grainGrainFilterTime.stop();
+ grainBottomFilterTime.stop();
 
  // TODO: verlet
 

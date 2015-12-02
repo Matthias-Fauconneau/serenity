@@ -87,13 +87,9 @@ bool Simulation::step() {
  stepWireBendingResistance();
  wireBendingResistanceTime.stop();
 
- wireBottomTime.start();
  stepWireBottom();
- wireBottomTime.stop();
 
- grainIntegrationTime.start();
  stepGrainIntegration();
- grainIntegrationTime.stop();
 
  wireIntegrationTime.start();
  stepWireIntegration();
@@ -111,6 +107,7 @@ void Simulation::stepGrain() {
 }
 
 void Simulation::stepGrainIntegration() {
+ grainIntegrationTime.start();
  float maxGrainV = 0;
  for(size_t i: range(grain.count)) { // TODO: SIMD
   System::step(grain, i);
@@ -119,6 +116,7 @@ void Simulation::stepGrainIntegration() {
  this->maxGrainV = maxGrainV;
  float maxGrainGrainV = maxGrainV + maxGrainV;
  grainGrainGlobalMinD -= maxGrainGrainV * dt;
+ grainIntegrationTime.stop();
 }
 
 #if DEBUG
@@ -138,16 +136,18 @@ void Simulation::profile(const Time& totalTime) {
  log("grain-wire cycle/grain", (float)grainWireEvaluateTime/grainWireContactSizeSum);
  log("grain-wire B/cycle", (float)(grainWireContactSizeSum*41*4)/grainWireEvaluateTime);
  size_t accounted = 0, shown = 0;
+ map<uint64, string> profile;
 #define logTime(name) \
  accounted += name##Time; \
  if(name##Time > stepTime/16) { \
-  log(#name, strD(name ## Time, stepTime)); \
+  profile.insertSortedMulti(name ## Time, #name); \
   shown += name##Time; \
  }
  logTime(process);
  logTime(grain);
  logTime(grainBottomFilter);
  logTime(grainBottomEvaluate);
+ logTime(grainBottomSum);
  logTime(grainSide);
  logTime(grainGrainSearch);
  logTime(grainGrainFilter);
@@ -161,8 +161,11 @@ void Simulation::profile(const Time& totalTime) {
  logTime(wire);
  logTime(wireTension);
  logTime(wireBendingResistance);
- logTime(wireBottom);
+ logTime(wireBottomFilter);
+ logTime(wireBottomEvaluate);
+ logTime(wireBottomSum);
  logTime(wireIntegration);
+ for(const auto entry: profile) log(strD(entry.key, stepTime), entry.value);
  log(strD(shown, stepTime), "/", strD(accounted, stepTime));
 #undef log
 }

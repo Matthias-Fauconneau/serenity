@@ -277,8 +277,8 @@ break_:;
  } else grainWireSkipped++;
 
  // Filters verlet lists, packing contacts to evaluate
- grainWireFilterTime.start();
  buffer<uint> grainWireContact(align(simd, grainWireA.size), 0);
+ grainWireFilterTime.start();
  for(size_t index = 0; index < grainWireA.size; index += 8) {
   v8ui A = *(v8ui*)(grainWireA.data+index), B = *(v8ui*)(grainWireB.data+index);
   v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
@@ -302,9 +302,9 @@ break_:;
    }
   }
  }
+ grainWireFilterTime.stop();
  for(size_t i=grainWireContact.size; i<align(simd, grainWireContact.size); i++)
   grainWireContact.begin()[i] = grainWireA.size;
- grainWireFilterTime.stop();
 
  // Evaluates forces from (packed) intersections (SoA)
  //grainWireEvaluateTime.start();
