@@ -108,7 +108,7 @@ struct Simulation : System {
 
   void profile(const Time& totalTime);
   bool stepProfile(const Time& totalTime);
-   Time stepTime;
-   tsc stepTimeTSC;
+   Time stepTimeRT;
+   tsc stepTime;
 };
 

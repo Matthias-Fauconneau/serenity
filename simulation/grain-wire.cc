@@ -145,14 +145,6 @@ static inline void evaluateGrainWire(const size_t start, const size_t size,
   // Resets contacts without static friction
   localAx = mask(hasStaticFriction, localAx); // FIXME use 1s (NaN) not 0s to flag resets
 
-  /*for(size_t k: range(simd)) if(i+k < grainWireContactSize) {
-   assert_(isNumber(NFx[k]));
-   assert_(isNumber(FDx[k]));
-   assert_(isNumber(sfFt[k]));
-   if(hasTangentLength[k]) assert_(isNumber(SDx[k]));
-   assert_(isNumber(FSx[k]));
-   assert_(isNumber(FTx[k]));
-  }*/
   *(v8sf*)(pFx+i) = NFx + FTx;
   *(v8sf*)(pFy+i) = NFy + FTy;
   *(v8sf*)(pFz+i) = NFz + FTz;
@@ -202,7 +194,7 @@ void Simulation::stepGrainWire() {
   };
 
   // SoA (FIXME: single pointer/index)
-  static constexpr size_t averageGrainWireContactCount = 16;
+  static constexpr size_t averageGrainWireContactCount = 32;
   const size_t GWcc = align(simd, grain.count * averageGrainWireContactCount + 1);
   buffer<uint> grainWireA (GWcc, 0);
   buffer<uint> grainWireB (GWcc, 0);

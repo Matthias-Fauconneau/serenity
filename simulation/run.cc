@@ -7,11 +7,12 @@ Dict parameters() {
 }
 
 struct SimulationView : Simulation {
- Time totalTime, stepTime;
- tsc stepTimeTSC;
-
+ Time totalTime;
  SimulationView(const Dict& parameters) : Simulation(parameters) {
   totalTime.start();
-  for(;;) if(!stepProfile(totalTime)) return;
+  for(;;) {
+   if(!stepProfile(totalTime)) return;
+   if(timeStep%(60*size_t(1/(dt*60))) == 0) return;
+  }
  }
 } app (parameters());

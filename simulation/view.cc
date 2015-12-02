@@ -58,7 +58,7 @@ struct SimulationView : Simulation, Widget {
    recordTime.start();
    window->setTitle(str( str(timeStep*dt, 1u)+"s"_,
                          str(timeStep*dt/totalTime.seconds(), 1u)+"x"_,
-                         strD(stepTime, totalTime)));
+                         strD(stepTimeRT, totalTime)));
    if(!stepProfile(totalTime)) {
     window->setTitle("Error");
     running = false;

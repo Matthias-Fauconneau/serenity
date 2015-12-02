@@ -19,7 +19,6 @@ Entry entries[capacity];
 static size_t size = 0;
 static bool tracePaused = false;
 bool operator <(const Entry& a, const Entry& b) { return a.time < b.time; }
-//bool operator <(const Entry& a, const Entry& b) { return a.count < b.count; }
 
 void profile_reset() { mref<Entry>(entries, capacity).clear(); }
 __attribute((destructor(101))) notrace void logProfile() {

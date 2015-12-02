@@ -203,23 +203,32 @@ void Simulation::stepWireTension() {
 void Simulation::profile(const Time& totalTime) {
  log("----",timeStep/size_t(64*1/(dt*60)),"----");
  log(totalTime.microseconds()/timeStep, "us/step", totalTime, timeStep);
- if(stepTime.nanoseconds()*100<totalTime.nanoseconds()*99)
-  log("step", strD(stepTime, totalTime));
- //log(" process", strD(processTime, stepTimeTSC));
- //log(" grain", strD(grainTime, stepTimeTSC));
- log(" grain-bottom", strD(grainBottomTime, stepTimeTSC));
- //log(" grain-side", strD(grainSideTime, stepTimeTSC));
- log(" grain-grain", strD(grainGrainTime, stepTimeTSC));
- //log(" grain-wire search", strD(grainWireSearchTime, stepTimeTSC));
- //log(" grain-wire filter", strD(grainWireFilterTime, stepTimeTSC));
- log(" grain-wire evaluate", strD(grainWireEvaluateTime, stepTimeTSC.cycleCount()));
- log("grain wire contact count average", grainWireContactSizeSum/timeStep);
- log(" grain-wire evaluate cycle/grain", (float)grainWireEvaluateTime/grainWireContactSizeSum);
- error(" grain-wire evaluate b/cycle", (float)(grainWireContactSizeSum*35*4*8)/grainWireEvaluateTime);
- //log(" grain-wire sum", strD(grainWireSumTime, stepTimeTSC));
- //log(" wire", strD(wireTime, stepTimeTSC));
- //log(" wire-tension", strD(wireTensionTime, stepTimeTSC));
- //log(" wire-bottom", strD(wireBottomTime, stepTimeTSC));
+ if(stepTimeRT.nanoseconds()*100<totalTime.nanoseconds()*99)
+  log("step", strD(stepTimeRT, totalTime));
+ log("grain-wire contact count mean", grainWireContactSizeSum/timeStep);
+ log("grain-wire cycle/grain", (float)grainWireEvaluateTime/grainWireContactSizeSum);
+ log("grain-wire B/cycle", (float)(grainWireContactSizeSum*41*4)/grainWireEvaluateTime);
+ size_t accounted = 0, shown = 0;
+#define logTime(name) \
+ accounted += name##Time; \
+ if(name##Time > stepTime/10) { \
+  log(#name, strD(name ## Time, stepTime)); \
+  shown += name##Time; \
+ }
+ logTime(process);
+ logTime(grain);
+ logTime(grainBottom);
+ logTime(grainSide);
+ logTime(grainGrain);
+ logTime(grainWireSearch);
+ logTime(grainWireFilter);
+ logTime(grainWireEvaluate);
+ logTime(grainWireSum);
+ logTime(wire);
+ logTime(wireTension);
+ logTime(wireBottom);
+ log(strD(shown, stepTime), "/", strD(accounted, stepTime));
+#undef log
 }
 
 static inline buffer<int> coreFrequencies() {
@@ -237,12 +246,14 @@ static inline buffer<int> coreFrequencies() {
 }
 
 bool Simulation::stepProfile(const Time& totalTime) {
+ stepTimeRT.start();
  stepTime.start();
- stepTimeTSC.start();
  for(int unused t: range(1/(dt*60))) if(!step()) return false;
- stepTimeTSC.stop();
  stepTime.stop();
- log(coreFrequencies());
- if(timeStep%(60*size_t(1/(dt*60))) == 0) profile(totalTime);
+ stepTimeRT.stop();
+ if(timeStep%(60*size_t(1/(dt*60))) == 0) {
+  log(coreFrequencies());
+  profile(totalTime);
+ }
  return true;
 }
