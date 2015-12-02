@@ -114,7 +114,6 @@ inline String strx(int2 N) { return str(N.x)+'x'+str(N.y); }
 typedef vec<xy,float,2> vec2;
 //inline String strx(vec2 N) { return str(N.x)+'x'+str(N.y); }
 
-#include "simd.h"
 generic struct xyz {
     T x,y,z;
     vec<xy,T,2>& xy() const { return (vec< ::xy,T,2>&)*this; }

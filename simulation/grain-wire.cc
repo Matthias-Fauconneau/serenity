@@ -29,7 +29,7 @@ static inline void evaluateGrainWire(const size_t start, const size_t size,
   const v8sf Ax = gather(grainPx, A), Ay = gather(grainPy, A), Az = gather(grainPz, A);
   const v8sf Bx = gather(wirePx, B), By = gather(wirePy, B), Bz = gather(wirePz, B);
   const v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-  const v8sf length = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
+  const v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
   const v8sf depth = Gr_Wr - length;
   const v8sf Nx = Rx/length, Ny = Ry/length, Nz = Rz/length;
   const v8sf RAx = - Gr  * Nx, RAy = - Gr * Ny, RAz = - Gr * Nz;
@@ -38,7 +38,7 @@ static inline void evaluateGrainWire(const size_t start, const size_t size,
   // Grain - Wire
 
   // Tension
-  const v8sf Fk = K * sqrt8(depth) * depth;
+  const v8sf Fk = K * sqrt(depth) * depth;
   // Relative velocity
   const v8sf AAVx = gather(pAAVx, A), AAVy = gather(pAAVy, A), AAVz = gather(pAAVz, A);
   const v8sf RVx = gather(AVx, A) + (AAVy*RAz - AAVz*RAy) - gather(BVx, B);
@@ -46,7 +46,7 @@ static inline void evaluateGrainWire(const size_t start, const size_t size,
   const v8sf RVz = gather(AVz, A) + (AAVx*RAy - AAVy*RAx) - gather(BVz, B);
   // Damping
   const v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
-  const v8sf Fb = - Kb * sqrt8(depth) * normalSpeed ; // Damping
+  const v8sf Fb = - Kb * sqrt(depth) * normalSpeed ; // Damping
   // Normal force
   const v8sf Fn = Fk + Fb;
   const v8sf NFx = Fn * Nx;
@@ -59,7 +59,7 @@ static inline void evaluateGrainWire(const size_t start, const size_t size,
   const v8sf TRVx = RVx - RVn * Nx;
   const v8sf TRVy = RVy - RVn * Ny;
   const v8sf TRVz = RVz - RVn * Nz;
-  const v8sf tangentRelativeSpeed = sqrt8(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
+  const v8sf tangentRelativeSpeed = sqrt(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
   const v8sf Fd = mask(tangentRelativeSpeed > 0,
                        - dynamicFrictionCoefficient * Fn / tangentRelativeSpeed);
   const v8sf FDx = Fd * TRVx;
@@ -90,7 +90,7 @@ static inline void evaluateGrainWire(const size_t start, const size_t size,
   const v8sf newLocalBy = RBy;
   const v8sf newLocalBz = RBz;
 
-  const v8si keep = oldLocalAx != 0, reset = ~keep;
+  const v8ui keep = oldLocalAx != 0, reset = ~keep;
   v8sf localAx = merge(mask(keep, oldLocalAx), mask(reset, newLocalAx));
   const v8sf localAy = merge(mask(keep, oldLocalAy), mask(reset, newLocalAy));
   const v8sf localAz = merge(mask(keep, oldLocalAz), mask(reset, newLocalAz));
@@ -123,17 +123,17 @@ static inline void evaluateGrainWire(const size_t start, const size_t size,
   const v8sf TOx = Dx - Dn * Nx;
   const v8sf TOy = Dy - Dn * Ny;
   const v8sf TOz = Dz - Dn * Nz;
-  const v8sf tangentLength = sqrt8(TOx*TOx+TOy*TOy+TOz*TOz);
+  const v8sf tangentLength = sqrt(TOx*TOx+TOy*TOy+TOz*TOz);
   const v8sf Ks = staticFrictionStiffness * Fn;
   const v8sf Fs = Ks * tangentLength; // 0.1~1 fN
   // Spring direction
   const v8sf SDx = TOx / tangentLength;
   const v8sf SDy = TOy / tangentLength;
   const v8sf SDz = TOz / tangentLength;
-  const v8si hasTangentLength = tangentLength > 0;
+  const v8ui hasTangentLength = tangentLength > 0;
   const v8sf sfFb = mask(hasTangentLength,
                          staticFrictionDamping * (SDx * RVx + SDy * RVy + SDz * RVz));
-  const v8si hasStaticFriction = (tangentLength < staticFrictionLength)
+  const v8ui hasStaticFriction = (tangentLength < staticFrictionLength)
                                               & (tangentRelativeSpeed < staticFrictionSpeed);
   const v8sf sfFt = mask(hasStaticFriction, Fs - sfFb);
   const v8sf FSx = mask(hasTangentLength, sfFt * SDx);
@@ -284,7 +284,7 @@ break_:;
   v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
   v8sf Bx = gather(wire.Px, B), By = gather(wire.Py, B), Bz = gather(wire.Pz, B);
   v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-  v8sf length = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
+  v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
   v8sf depth = float8(Grain::radius+Wire::radius) - length;
   for(size_t k: range(simd)) {
    size_t j = index+k;

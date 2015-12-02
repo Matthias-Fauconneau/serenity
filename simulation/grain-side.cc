@@ -61,7 +61,7 @@ bool Simulation::stepGrainSide() {
   v8ui A = *(v8ui*)(grainSideA.data+index);
   // FIXME: Recomputing from intersection (more efficient than storing?)
   v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
-  v8sf length = sqrt8(Ax*Ax + Ay*Ay);
+  v8sf length = sqrt(Ax*Ax + Ay*Ay);
   v8sf Nx = -Ax/length, Ny = -Ay/length;
   v8sf depth = length - float8(radius-Grain::radius);
   // Gather static frictions

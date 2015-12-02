@@ -2,6 +2,7 @@
 #include "math.h"
 #include "memory.h"
 #include "vector.h"
+#include "simd.h"
 #define sconst static constexpr
 
 constexpr size_t simd = 8; // SIMD size
@@ -52,9 +53,6 @@ struct System {
  };
 
  void step(Mass& p, size_t i) { // TODO: SIMD
-  assert(isNumber(p.Fx[i]));
-  assert(isNumber(p.Fy[i]));
-  assert(isNumber(p.Fz[i]));
   p.Vx[i] += p.dt_mass * p.Fx[i];
   p.Vy[i] += p.dt_mass * p.Fy[i];
   p.Vz[i] += p.dt_mass * p.Fz[i];
@@ -138,7 +136,7 @@ struct System {
   static const float K = 4./3*E*sqrt(R);
   static const v8sf K8 = float8(K);
 
-  const v8sf Ks = K8 * sqrt8(depth);
+  const v8sf Ks = K8 * sqrt(depth);
   const v8sf fK = Ks * depth;
 
   // Relative velocity
@@ -148,7 +146,7 @@ struct System {
 
   // Damping
   static const v8sf KB = float8(K * normalDamping);
-  const v8sf Kb = KB * sqrt8(depth);
+  const v8sf Kb = KB * sqrt(depth);
   v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
   v8sf fB = - Kb * normalSpeed ; // Damping
 
@@ -190,7 +188,7 @@ struct System {
   v8sf TOx = Dx - Dn * Nx;
   v8sf TOy = Dy - Dn * Ny;
   v8sf TOz = Dz - Dn * Nz;
-  v8sf tangentLength = sqrt8(TOx*TOx+TOy*TOy+TOz*TOz);
+  v8sf tangentLength = sqrt(TOx*TOx+TOy*TOy+TOz*TOz);
   v8sf kS = float8(staticFrictionStiffness) * fN;
   v8sf fS = kS * tangentLength; // 0.1~1 fN
 
@@ -199,7 +197,7 @@ struct System {
   v8sf TRVx = RVx - RVn * Nx;
   v8sf TRVy = RVy - RVn * Ny;
   v8sf TRVz = RVz - RVn * Nz;
-  v8sf tangentRelativeSpeed = sqrt8(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
+  v8sf tangentRelativeSpeed = sqrt(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
   v8sf fD = float8(dynamicFrictionCoefficient) * fN;
   v8sf fTx, fTy, fTz;
   for(size_t k: range(simd)) { // FIXME: mask
@@ -253,7 +251,7 @@ struct System {
   static const float K = 4./3*E*sqrt(R);
   static const v8sf K8 = float8(K);
 
-  const v8sf Ks = K8 * sqrt8(depth);
+  const v8sf Ks = K8 * sqrt(depth);
   const v8sf fK = Ks * depth;
 
   // Relative velocity
@@ -264,7 +262,7 @@ struct System {
 
   // Damping
   static const v8sf KB = float8(K * normalDamping);
-  const v8sf Kb = KB * sqrt8(depth);
+  const v8sf Kb = KB * sqrt(depth);
   v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
   v8sf fB = - Kb * normalSpeed ; // Damping
 
@@ -308,7 +306,7 @@ struct System {
   v8sf TOx = Dx - Dn * Nx;
   v8sf TOy = Dy - Dn * Ny;
   v8sf TOz = Dz - Dn * Nz;
-  v8sf tangentLength = sqrt8(TOx*TOx+TOy*TOy+TOz*TOz);
+  v8sf tangentLength = sqrt(TOx*TOx+TOy*TOy+TOz*TOz);
   v8sf kS = float8(staticFrictionStiffness) * fN;
   v8sf fS = kS * tangentLength; // 0.1~1 fN
 
@@ -317,7 +315,7 @@ struct System {
   v8sf TRVx = RVx - RVn * Nx;
   v8sf TRVy = RVy - RVn * Ny;
   v8sf TRVz = RVz - RVn * Nz;
-  v8sf tangentRelativeSpeed = sqrt8(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
+  v8sf tangentRelativeSpeed = sqrt(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
   v8sf fD = float8(dynamicFrictionCoefficient) * fN;
   v8sf fTx, fTy, fTz;
   for(size_t k: range(simd)) { // FIXME: mask
@@ -374,7 +372,7 @@ struct System {
   constexpr float E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
   constexpr float R = 1/(tA::curvature+tB::curvature);
   static const float K = 4./3*E*sqrt(R);
-  const v8sf fK =  float8(K) * sqrt8(depth) * depth;
+  const v8sf fK =  float8(K) * sqrt(depth) * depth;
 
   // Relative velocity
   v8sf AVx = gather(A.AVx, a), AVy = gather(A.AVy, a), AVz = gather(A.AVz, a);
@@ -383,7 +381,7 @@ struct System {
   v8sf RVz = gather(A.Vz, a) + (AVx*RAy - AVy*RAx) - gather(B.Vz, b);
 
   // Damping
-  const v8sf Kb = float8(K * normalDamping) * sqrt8(depth);
+  const v8sf Kb = float8(K * normalDamping) * sqrt(depth);
   v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
   for(size_t k: range(simd)) if(normalSpeed[k] > 0) normalSpeed[k] = 0; // Only damps penetration
   v8sf fB = - Kb * normalSpeed ; // Damping
@@ -428,7 +426,7 @@ struct System {
   v8sf TOx = Dx - Dn * Nx;
   v8sf TOy = Dy - Dn * Ny;
   v8sf TOz = Dz - Dn * Nz;
-  v8sf tangentLength = sqrt8(TOx*TOx+TOy*TOy+TOz*TOz);
+  v8sf tangentLength = sqrt(TOx*TOx+TOy*TOy+TOz*TOz);
   v8sf kS = float8(staticFrictionStiffness) * fN;
   v8sf fS = kS * tangentLength; // 0.1~1 fN
 
@@ -437,7 +435,7 @@ struct System {
   v8sf TRVx = RVx - RVn * Nx;
   v8sf TRVy = RVy - RVn * Ny;
   v8sf TRVz = RVz - RVn * Nz;
-  v8sf tangentRelativeSpeed = sqrt8(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
+  v8sf tangentRelativeSpeed = sqrt(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
   v8sf fD = float8(dynamicFrictionCoefficient) * fN;
   v8sf fTx, fTy, fTz;
   for(size_t k: range(simd)) { // FIXME: mask
@@ -499,7 +497,7 @@ struct System {
   static const float K = 4./3*E*sqrt(R);
   static const v8sf K8 = float8(K);
 
-  const v8sf Ks = K8 * sqrt8(depth);
+  const v8sf Ks = K8 * sqrt(depth);
   const v8sf fK = Ks * depth;
 
   // Relative velocity
@@ -511,7 +509,7 @@ struct System {
 
   // Damping
   static const v8sf KB = float8(K * normalDamping);
-  const v8sf Kb = KB * sqrt8(depth);
+  const v8sf Kb = KB * sqrt(depth);
   v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
   v8sf fB = - Kb * normalSpeed ; // Damping
 
@@ -560,7 +558,7 @@ struct System {
   v8sf TOx = Dx - Dn * Nx;
   v8sf TOy = Dy - Dn * Ny;
   v8sf TOz = Dz - Dn * Nz;
-  v8sf tangentLength = sqrt8(TOx*TOx+TOy*TOy+TOz*TOz);
+  v8sf tangentLength = sqrt(TOx*TOx+TOy*TOy+TOz*TOz);
   v8sf kS = float8(staticFrictionStiffness) * fN;
   v8sf fS = kS * tangentLength; // 0.1~1 fN
 
@@ -569,7 +567,7 @@ struct System {
   v8sf TRVx = RVx - RVn * Nx;
   v8sf TRVy = RVy - RVn * Ny;
   v8sf TRVz = RVz - RVn * Nz;
-  v8sf tangentRelativeSpeed = sqrt8(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
+  v8sf tangentRelativeSpeed = sqrt(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
   v8sf fD = float8(dynamicFrictionCoefficient) * fN;
   v8sf fTx, fTy, fTz;
   for(size_t k: range(simd)) { // FIXME: mask

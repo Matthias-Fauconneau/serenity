@@ -54,6 +54,7 @@ struct Simulation : System {
  buffer<float> grainSideLocalBz;
 
  // Grain - Grain
+ float maxGrainV = 0;
  float grainGrainGlobalMinD = 0;
  uint grainGrainSkipped = 0;
  buffer<uint> grainGrainA ;
@@ -99,13 +100,20 @@ struct Simulation : System {
   uint64 grainWireEvaluateTime = 0;
   size_t grainWireContactSizeSum;
   tsc grainWireSumTime;
+ void stepGrainIntegration();
+  tsc grainIntegrationTime;
  void stepWire();
   tsc wireTime;
  void stepWireTension();
   tsc wireTensionTime;
+ void stepWireBendingResistance();
+  tsc wireBendingResistanceTime;
  void stepWireBottom();
   tsc wireBottomTime;
+ void stepWireIntegration();
+  tsc wireIntegrationTime;
 
+  void invariant();
   void profile(const Time& totalTime);
   bool stepProfile(const Time& totalTime);
    Time stepTimeRT;

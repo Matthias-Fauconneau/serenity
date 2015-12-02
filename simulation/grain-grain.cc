@@ -102,7 +102,7 @@ void Simulation::stepGrainGrain() {
   v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
   v8sf Bx = gather(grain.Px, B), By = gather(grain.Py, B), Bz = gather(grain.Pz, B);
   v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-  v8sf length = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
+  v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
   v8sf depth = float8(Grain::radius+Grain::radius) - length;
   for(size_t k: range(8)) {
    size_t j = index+k;
@@ -138,7 +138,7 @@ void Simulation::stepGrainGrain() {
    v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
    v8sf Bx = gather(grain.Px, B), By = gather(grain.Py, B), Bz = gather(grain.Pz, B);
    v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-   v8sf length = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
+   v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
    v8sf depth = float8(Grain::radius+Grain::radius) - length;
    v8sf Nx = Rx/length, Ny = Ry/length, Nz = Rz/length;
    sconst v8sf R = float8(Grain::radius);

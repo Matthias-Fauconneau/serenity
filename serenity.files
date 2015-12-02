@@ -80,3 +80,4 @@ simulation/wire-bottom.cc
 simulation/run.cc
 disasm.h
 disasm.cc
+simulation/wire.cc

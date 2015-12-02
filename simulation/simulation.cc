@@ -4,6 +4,7 @@
 //#include "grain-bottom.h"
 //#include "grain-side.h"
 //#include "grain-grain.h"
+//#include "wire.h"
 //#include "grain-wire.h"
 //#include "wire-bottom.h"
 
@@ -62,51 +63,45 @@ bool Simulation::step() {
  stepGrain();
  grainTime.stop();
 
- wireTime.start();
- stepWire(); // WARNING: Before Grain-Wire force evaluation !!!!!!
- wireTime.stop();
-
  grainBottomTime.start();
  stepGrainBottom();
  grainBottomTime.stop();
+
  if(processState < ProcessState::Done) {
   grainSideTime.start();
   stepGrainSide();
   grainSideTime.stop();
  }
+
  grainGrainTime.start();
  stepGrainGrain();
  grainGrainTime.stop();
+
+ wireTime.start();
+ stepWire();
+ wireTime.stop();
+ invariant();
  stepGrainWire();
-  
+ invariant();
  wireTensionTime.start();
  stepWireTension();
  wireTensionTime.stop();
+ invariant();
+ wireBendingResistanceTime.start();
+ stepWireBendingResistance();
+ wireBendingResistanceTime.stop();
+ invariant();
  wireBottomTime.start();
  stepWireBottom();
  wireBottomTime.stop();
+ invariant();
+ grainIntegrationTime.start();
+ stepGrainIntegration();
+ grainIntegrationTime.stop();
 
- // Grain
- grainTime.start();
- float maxGrainV = 0;
- for(size_t i: range(grain.count)) { // TODO: SIMD
-  System::step(grain, i);
-  maxGrainV = ::max(maxGrainV, length(grain.velocity(i)));
- }
- float maxGrainGrainV = maxGrainV + maxGrainV;
- grainGrainGlobalMinD -= maxGrainGrainV * dt;
- grainTime.stop();
-
- // Wire
- wireTime.start();
- float maxWireV = 0;
- for(size_t i: range(wire.count)) { // TODO: SIMD
-  System::step(wire, i);
-  maxWireV = ::max(maxWireV, length(wire.velocity(i)));
- }
- float maxGrainWireV = maxGrainV + maxWireV;
- grainWireGlobalMinD -= maxGrainWireV * dt;
- wireTime.stop();
+ wireIntegrationTime.start();
+ stepWireIntegration();
+ wireIntegrationTime.stop();
 
  timeStep++;
  return true;
@@ -119,84 +114,21 @@ void Simulation::stepGrain() {
  }
 }
 
-void Simulation::stepWire() {
- for(size_t i: range(wire.count)) { // TODO: SIMD
-  wire.Fx[i] = 0; wire.Fy[i] = 0; wire.Fz[i] = Wire::mass * Gz;
+void Simulation::stepGrainIntegration() {
+ float maxGrainV = 0;
+ for(size_t i: range(grain.count)) { // TODO: SIMD
+  System::step(grain, i);
+  maxGrainV = ::max(maxGrainV, length(grain.velocity(i)));
  }
- // Bend stiffness
- if(Wire::bendStiffness) for(size_t i: range(1, wire.count-1)) { // TODO: SIMD
-  // Bending resistance springs
-  vec3 A = wire.position(i-1), B = wire.position(i), C = wire.position(i+1);
-  vec3 a = C-B, b = B-A;
-  vec3 c = cross(a, b);
-  float length = ::length(c);
-  if(length) {
-   float angle = atan(length, dot(a, b));
-   float p = wire.bendStiffness * angle;
-   vec3 dap = cross(a, c) / (::length(a) * length);
-   vec3 dbp = cross(b, c) / (::length(b) * length);
-   wire.Fx[i+1] += p * (-dap).x;
-   wire.Fy[i+1] += p * (-dap).y;
-   wire.Fz[i+1] += p * (-dap).z;
-   wire.Fx[i] += p * (dap + dbp).x;
-   wire.Fy[i] += p * (dap + dbp).y;
-   wire.Fz[i] += p * (dap + dbp).z;
-   wire.Fx[i-1] += p * (-dbp).x;
-   wire.Fy[i-1] += p * (-dbp).y;
-   wire.Fz[i-1] += p * (-dbp).z;
-   if(Wire::bendDamping) {
-    vec3 A = wire.velocity(i-1), B = wire.velocity(i), C = wire.velocity(i+1);
-    vec3 axis = cross(C-B, B-A);
-    float length = ::length(axis);
-    if(length) {
-     float angularVelocity = atan(length, dot(C-B, B-A));
-     vec3 f = (Wire::bendDamping * angularVelocity / 2 / length) * cross(axis, C-A);
-     wire.Fx[i] += f.x;
-     wire.Fy[i] += f.y;
-     wire.Fz[i] += f.z;
-    }
-   }
-  }
- }
+ this->maxGrainV = maxGrainV;
+ float maxGrainGrainV = maxGrainV + maxGrainV;
+ grainGrainGlobalMinD -= maxGrainGrainV * dt;
 }
 
-void Simulation::stepWireTension() {
- if(wire.count == 0) return;
- for(size_t i=0; i<wire.count-1; i+=simd) {
-  v8sf Ax = load(wire.Px, i     ), Ay = load(wire.Py, i     ), Az = load(wire.Pz, i    );
-#if DEBUG
-  v8sf Bx = loadu(wire.Px, i+1), By = loadu(wire.Py, i+1), Bz = loadu(wire.Pz, i+1);
-#else // CHECKME: How is the unaligned load optimized ?
-  v8sf Bx = load(wire.Px, i+1), By = load(wire.Py, i+1), Bz = load(wire.Pz, i+1);
-#endif
-  v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-  v8sf L = sqrt8(Rx*Rx + Ry*Ry + Rz*Rz);
-  v8sf x = L - float8(wire.internodeLength);
-  v8sf fS = - float8(wire.tensionStiffness) * x;
-  v8sf Nx = Rx/L, Ny = Ry/L, Nz = Rz/L;
-  v8sf AVx = load(wire.Vx, i     ), AVy = load(wire.Vy, i     ), AVz = load(wire.Vz, i    );
-#if DEBUG
-  v8sf BVx = loadu(wire.Vx, i+1), BVy = loadu(wire.Vy, i+1), BVz = loadu(wire.Vz, i+1);
-#else // CHECKME: How is the unaligned load optimized ?
-  v8sf BVx = load(wire.Vx, i+1), BVy = load(wire.Vy, i+1), BVz = load(wire.Vz, i+1);
-#endif
-  v8sf RVx = AVx - BVx, RVy = AVy - BVy, RVz = AVz - BVz;
-  v8sf fB = - float8(wire.tensionDamping) * (Nx * RVx + Ny * RVy + Nz * RVz);
-  v8sf f = fS + fB;
-  if(i+simd >= wire.count-1) { // Masks invalid force updates
-   for(size_t k=wire.count-1-i; k<simd; k++) f[k] = 0; // FIXME
-  }
-  v8sf FTx = f * Nx;
-  v8sf FTy = f * Ny;
-  v8sf FTz = f * Nz;
-
-  store(wire.Fx, i, load(wire.Fx, i) + FTx);
-  store(wire.Fy, i, load(wire.Fy, i) + FTy);
-  store(wire.Fz, i, load(wire.Fz, i) + FTz);
-  // FIXME: parallel
-  storeu(wire.Fx, i+1, loadu(wire.Fx, i+1) - FTx);
-  storeu(wire.Fy, i+1, loadu(wire.Fy, i+1) - FTy);
-  storeu(wire.Fz, i+1, loadu(wire.Fz, i+1) - FTz);
+void Simulation::invariant() {
+ for(size_t i: range(wire.count)) {
+  assert(isNumber(wire.force(i)) && isNumber(wire.velocity(i)) && isNumber(wire.position(i)),
+         i, wire.count, wire.position(i), wire.velocity(i), wire.force(i));
  }
 }
 
@@ -224,9 +156,12 @@ void Simulation::profile(const Time& totalTime) {
  logTime(grainWireFilter);
  logTime(grainWireEvaluate);
  logTime(grainWireSum);
+ logTime(grainIntegration);
  logTime(wire);
  logTime(wireTension);
+ logTime(wireBendingResistance);
  logTime(wireBottom);
+ logTime(wireIntegration);
  log(strD(shown, stepTime), "/", strD(accounted, stepTime));
 #undef log
 }
