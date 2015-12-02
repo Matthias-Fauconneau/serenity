@@ -15,7 +15,7 @@ struct System {
  sconst float mm = 1e-3*m, g = 1e-3*kg, MPa = 1e6 * Pa;
 
  // Contact parameters
- sconst float normalDamping = 1e-2 * s; // K~6000 => Kb~60
+ sconst float normalDampingRate = 1e0 / s;
  sconst float dynamicFrictionCoefficient = 1;
  sconst float staticFrictionSpeed = inf;
  sconst float staticFrictionLength = 3 * mm; // ~ Wire::radius
@@ -24,8 +24,10 @@ struct System {
 
  // Obstacles: floor plane, cast cylinder
  struct Obstacle {
+  sconst float mass = 1 * kg;
   sconst float curvature = 0;
   sconst float elasticModulus = 1e-1 * MPa;
+  sconst float poissonRatio = 0;
  };
 
  // Sphere particles
@@ -34,6 +36,7 @@ struct System {
   sconst float radius = 40 *mm;
   sconst float curvature = 1./radius;
   sconst float elasticModulus = Obstacle::elasticModulus/*1e3 * MPa*/;
+  sconst float poissonRatio = 0.35;
   sconst float angularMass = 2./3*mass*sq(radius);
 
   const size_t capacity;
@@ -70,6 +73,7 @@ struct System {
   sconst float mass = Wire::density * Wire::volume;
   sconst float curvature = 1./radius;
   sconst float elasticModulus = 1e0 * MPa;
+  sconst float poissonRatio = 0.48;
   sconst float tensionStiffness = elasticModulus * PI * sq(radius);
   sconst float tensionDamping = mass / s;
   sconst float areaMomentOfInertia = PI/4*pow4(radius);
@@ -112,7 +116,7 @@ struct System {
    v8sf& Fx, v8sf& Fy, v8sf& Fz) {
 
   // Tension
-  constexpr float E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
+  constexpr float E = 1/((1-sq(tA::poissonRatio))/tA::elasticModulus+(1-sq(tB::poissonRatio))/tB::elasticModulus);
   constexpr float R = 1/(tA::curvature+tB::curvature);
   static const float K = 4./3*E*sqrt(R);
   static const v8sf K8 = float8(K);
@@ -126,8 +130,9 @@ struct System {
   v8sf RVz = gather(A.Vz, a);
 
   // Damping
-  static const v8sf KB = float8(K * normalDamping);
-  const v8sf Kb = KB * sqrt(depth);
+  constexpr float mass = 1/(1/tA::mass+1/tB::mass);
+  static const v8sf KB = float8(2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass));
+  const v8sf Kb = KB * sqrt(sqrt(depth));
   v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
   v8sf fB = - Kb * normalSpeed ; // Damping
 
@@ -227,7 +232,7 @@ struct System {
    ) {
 
   // Tension
-  constexpr float E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
+  constexpr float E = 1/((1-sq(tA::poissonRatio))/tA::elasticModulus+(1-sq(tB::poissonRatio))/tB::elasticModulus);
   constexpr float R = 1/(tA::curvature+tB::curvature);
   static const float K = 4./3*E*sqrt(R);
   static const v8sf K8 = float8(K);
@@ -242,8 +247,9 @@ struct System {
   v8sf RVz = gather(A.Vz, a) + (AVx*RAy - AVy*RAx);
 
   // Damping
-  static const v8sf KB = float8(K * normalDamping);
-  const v8sf Kb = KB * sqrt(depth);
+  constexpr float mass = 1/(1/tA::mass+1/tB::mass);
+  static const v8sf KB = float8(2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass));
+  const v8sf Kb = KB * sqrt(sqrt(depth));
   v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
   v8sf fB = - Kb * normalSpeed ; // Damping
 
@@ -350,7 +356,7 @@ struct System {
    ) {
 
   // Tension
-  constexpr float E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
+  constexpr float E = 1/((1-sq(tA::poissonRatio))/tA::elasticModulus+(1-sq(tB::poissonRatio))/tB::elasticModulus);
   constexpr float R = 1/(tA::curvature+tB::curvature);
   static const float K = 4./3*E*sqrt(R);
   const v8sf fK =  float8(K) * sqrt(depth) * depth;
@@ -473,7 +479,7 @@ struct System {
    ) {
 
   // Tension
-  constexpr float E = 1/(1/tA::elasticModulus+1/tB::elasticModulus);
+  constexpr float E = 1/((1-sq(tA::poissonRatio))/tA::elasticModulus+(1-sq(tB::poissonRatio))/tB::elasticModulus);
   constexpr float R = 1/(tA::curvature+tB::curvature);
   static const float K = 4./3*E*sqrt(R);
   static const v8sf K8 = float8(K);
@@ -489,8 +495,9 @@ struct System {
   v8sf RVz = gather(A.Vz, a) + (AVx*RAy - AVy*RAx) - gather(B.Vz, b) - (BVx*RBy - BVy*RBx);
 
   // Damping
-  static const v8sf KB = float8(K * normalDamping);
-  const v8sf Kb = KB * sqrt(depth);
+  constexpr float mass = 1/(1/tA::mass+1/tB::mass);
+  static const v8sf KB = float8(2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass));
+  const v8sf Kb = KB * sqrt(sqrt(depth));
   v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
   v8sf fB = - Kb * normalSpeed ; // Damping
 

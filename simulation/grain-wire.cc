@@ -46,7 +46,7 @@ static inline void evaluateGrainWire(const size_t start, const size_t size,
   const v8sf RVz = gather(AVz, A) + (AAVx*RAy - AAVy*RAx) - gather(BVz, B);
   // Damping
   const v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
-  const v8sf Fb = - Kb * sqrt(depth) * normalSpeed ; // Damping
+  const v8sf Fb = - Kb * sqrt(sqrt(depth)) * normalSpeed ; // Damping
   // Normal force
   const v8sf Fn = Fk + Fb;
   const v8sf NFx = Fn * Nx;
@@ -335,9 +335,11 @@ break_:;
  grainWireTAx.size = GWcc;
  grainWireTAy.size = GWcc;
  grainWireTAz.size = GWcc;
- static constexpr float E = 1/(1/Grain::elasticModulus+1/Wire::elasticModulus);
- static constexpr float R = 1/(Grain::curvature+Wire::curvature);
+ constexpr float E = 1/((1-sq(Grain::poissonRatio))/Grain::elasticModulus+(1-sq(Grain::poissonRatio))/Grain::elasticModulus);
+ constexpr float R = 1/(Grain::curvature+Wire::curvature);
  const float K = 4./3*E*sqrt(R);
+ constexpr float mass = 1/(1/Grain::mass+1/Wire::mass);
+ const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
  grainWireEvaluateTime += parallel_chunk(GWcc/simd, [&](uint, size_t start, size_t size) {
    (//disasm(evaluateGrainWire,
     evaluateGrainWire(start, size,
@@ -348,7 +350,7 @@ break_:;
                       float8(Grain::radius+Wire::radius), float8(Grain::radius), float8(Wire::radius),
                       grainWireLocalAx.begin(), grainWireLocalAy.begin(), grainWireLocalAz.begin(),
                       grainWireLocalBx.begin(), grainWireLocalBy.begin(), grainWireLocalBz.begin(),
-                      float8(K), float8(K * normalDamping),
+                      float8(K), float8(Kb),
                       float8(staticFrictionStiffness), float8(dynamicFrictionCoefficient),
                       float8(staticFrictionLength), float8(staticFrictionSpeed), float8(staticFrictionDamping),
                       grain.Vx.data, grain.Vy.data, grain.Vz.data,
