@@ -126,7 +126,7 @@ void Simulation::stepGrainIntegration() {
      Rw[j] *= scale;
     }
   }
- });
+ }, 1);
  float maxGrainV = 0;
  for(size_t k: range(simd)) maxGrainV = ::max(maxGrainV, maxGrainV8[k]);
  this->maxGrainV = maxGrainV;
@@ -154,7 +154,7 @@ void Simulation::profile(const Time& totalTime) {
  map<uint64, string> profile;
 #define logTime(name) \
  accounted += name##Time; \
- if(name##Time > stepTime/128) { \
+ if(name##Time > stepTime/64) { \
   profile.insertSortedMulti(name ## Time, #name); \
   shown += name##Time; \
  }
@@ -175,7 +175,7 @@ void Simulation::profile(const Time& totalTime) {
  logTime(grainWireEvaluate);
  logTime(grainWireSum);
  logTime(grainIntegration);
- logTime(wire);
+ logTime(wireInitialization);
  logTime(wireTension);
  logTime(wireBendingResistance);
  logTime(wireBottomFilter);
@@ -207,7 +207,7 @@ bool Simulation::stepProfile(const Time& totalTime) {
  for(int unused t: range(1/(dt*60))) step();
  stepTime.stop();
  stepTimeRT.stop();
- if(timeStep%(60*size_t(1/(dt*60))) == 0) {
+ if(timeStep%(2*60*size_t(1/(dt*60))) == 0) {
   log(coreFrequencies());
   profile(totalTime);
  }

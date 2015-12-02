@@ -24,17 +24,36 @@ void Simulation::stepGrainGrain() {
   }
   assert(i==62);
 
-  // SoA (FIXME: single pointer/index)
+  swap(oldGrainGrainA, grainGrainA);
+  swap(oldGrainGrainB, grainGrainB);
+  swap(oldGrainGrainLocalAx, grainGrainLocalAx);
+  swap(oldGrainGrainLocalAy, grainGrainLocalAy);
+  swap(oldGrainGrainLocalAz, grainGrainLocalAz);
+  swap(oldGrainGrainLocalBx, grainGrainLocalBx);
+  swap(oldGrainGrainLocalBy, grainGrainLocalBy);
+  swap(oldGrainGrainLocalBz, grainGrainLocalBz);
+
   static constexpr size_t averageGrainGrainContactCount = 7;
   size_t GGcc = align(simd, grain.count * averageGrainGrainContactCount);
-  buffer<uint> grainGrainA (GGcc, 0);
-  buffer<uint> grainGrainB (GGcc, 0);
-  buffer<float> grainGrainLocalAx (GGcc, 0);
-  buffer<float> grainGrainLocalAy (GGcc, 0);
-  buffer<float> grainGrainLocalAz (GGcc, 0);
-  buffer<float> grainGrainLocalBx (GGcc, 0);
-  buffer<float> grainGrainLocalBy (GGcc, 0);
-  buffer<float> grainGrainLocalBz (GGcc, 0);
+  if(GGcc > grainGrainA.capacity) {
+   grainGrainA = buffer<uint>(GGcc, 0);
+   grainGrainB = buffer<uint>(GGcc, 0);
+   grainGrainLocalAx = buffer<float>(GGcc, 0);
+   grainGrainLocalAy = buffer<float>(GGcc, 0);
+   grainGrainLocalAz = buffer<float>(GGcc, 0);
+   grainGrainLocalBx = buffer<float>(GGcc, 0);
+   grainGrainLocalBy = buffer<float>(GGcc, 0);
+   grainGrainLocalBz = buffer<float>(GGcc, 0);
+  }
+  grainGrainA.size = 0;
+  grainGrainB.size = 0;
+  grainGrainLocalAx.size = 0;
+  grainGrainLocalAy.size = 0;
+  grainGrainLocalAz.size = 0;
+  grainGrainLocalBx.size = 0;
+  grainGrainLocalBy.size = 0;
+  grainGrainLocalBz.size = 0;
+
   size_t grainGrainI = 0; // Index of first contact with A in old grainGrain[Local]A|B list
   for(size_t a: range(grain.count)) {
    size_t offset = lattice.index(grain.Px[a], grain.Py[a], grain.Pz[a]);
@@ -52,14 +71,14 @@ void Simulation::stepGrainGrain() {
     grainGrainB.append( b );
     for(size_t k = 0;; k++) {
      size_t j = grainGrainI+k;
-     if(j >= this->grainGrainA.size || this->grainGrainA[j] != a) break;
-     if(this->grainGrainB[j] == b) { // Repack existing friction
-      grainGrainLocalAx.append( this->grainGrainLocalAx[j] );
-      grainGrainLocalAy.append( this->grainGrainLocalAy[j] );
-      grainGrainLocalAz.append( this->grainGrainLocalAz[j] );
-      grainGrainLocalBx.append( this->grainGrainLocalBx[j] );
-      grainGrainLocalBy.append( this->grainGrainLocalBy[j] );
-      grainGrainLocalBz.append( this->grainGrainLocalBz[j] );
+     if(j >= oldGrainGrainA.size || oldGrainGrainA[j] != a) break;
+     if(oldGrainGrainB[j] == b) { // Repack existing friction
+      grainGrainLocalAx.append( oldGrainGrainLocalAx[j] );
+      grainGrainLocalAy.append( oldGrainGrainLocalAy[j] );
+      grainGrainLocalAz.append( oldGrainGrainLocalAz[j] );
+      grainGrainLocalBx.append( oldGrainGrainLocalBx[j] );
+      grainGrainLocalBy.append( oldGrainGrainLocalBy[j] );
+      grainGrainLocalBz.append( oldGrainGrainLocalBz[j] );
       goto break_;
      }
     } /*else*/ { // New contact
@@ -74,21 +93,13 @@ void Simulation::stepGrainGrain() {
     }
     break_:;
    }
-   while(grainGrainI < this->grainGrainA.size && this->grainGrainA[grainGrainI] == a)
+   while(grainGrainI < oldGrainGrainA.size && oldGrainGrainA[grainGrainI] == a)
     grainGrainI++;
   }
 
   assert_(align(simd, grainGrainA.size+1) <= grainGrainA.capacity);
   for(size_t i=grainGrainA.size; i<align(simd, grainGrainA.size+1); i++) grainGrainA.begin()[i] = 0;
-  this->grainGrainA = move(grainGrainA);
   for(size_t i=grainGrainB.size; i<align(simd, grainGrainB.size+1); i++) grainGrainB.begin()[i] = 0;
-  this->grainGrainB = move(grainGrainB);
-  this->grainGrainLocalAx = move(grainGrainLocalAx);
-  this->grainGrainLocalAy = move(grainGrainLocalAy);
-  this->grainGrainLocalAz = move(grainGrainLocalAz);
-  this->grainGrainLocalBx = move(grainGrainLocalBx);
-  this->grainGrainLocalBy = move(grainGrainLocalBy);
-  this->grainGrainLocalBz = move(grainGrainLocalBz);
 
   grainGrainGlobalMinD = minD - 2*Grain::radius;
   if(grainGrainGlobalMinD < 0) log("grainGrainGlobalMinD12", grainGrainGlobalMinD);
@@ -100,31 +111,31 @@ void Simulation::stepGrainGrain() {
 
  // Filters verlet lists, packing contacts to evaluate
  buffer<uint> grainGrainContact(align(simd, grainGrainA.size), 0);
- grainGrainFilterTime.start();
- for(size_t index = 0; index < grainGrainA.size; index += 8) {
-  v8ui A = *(v8ui*)(grainGrainA.data+index), B = *(v8ui*)(grainGrainB.data+index);
-  v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
-  v8sf Bx = gather(grain.Px, B), By = gather(grain.Py, B), Bz = gather(grain.Pz, B);
-  v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-  v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
-  v8sf depth = float8(Grain::radius+Grain::radius) - length;
-  for(size_t k: range(8)) {
-   size_t j = index+k;
-   if(j == grainGrainA.size) break /*2*/;
-   if(depth[k] > 0) {
-    // Creates a map from packed contact to index into unpacked contact list (indirect reference)
-    // Instead of packing (copying) the unpacked list to a packed contact list
-    // To keep track of where to write back (unpacked) contact positions (for static friction)
-    // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
-    grainGrainContact.append( j ); // FIXME: parallel
-   } else {
-    // Resets contact (static friction spring)
-    grainGrainLocalAx[j] = 0; grainGrainLocalAy[j] = 0; grainGrainLocalAz[j] = 0;
-    grainGrainLocalBx[j] = 0; grainGrainLocalBy[j] = 0; grainGrainLocalBz[j] = 0;
+ grainGrainFilterTime += parallel_chunk(grainGrainA.size/simd, [&](uint, size_t start, size_t size) {
+  for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
+    v8ui A = *(v8ui*)(grainGrainA.data+i), B = *(v8ui*)(grainGrainB.data+i);
+    v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
+    v8sf Bx = gather(grain.Px, B), By = gather(grain.Py, B), Bz = gather(grain.Pz, B);
+    v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
+    v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
+    v8sf depth = float8(Grain::radius+Grain::radius) - length;
+    for(size_t k: range(8)) {
+     size_t j = i+k;
+     if(j == grainGrainA.size) break /*2*/;
+     if(depth[k] > 0) {
+      // Creates a map from packed contact to index into unpacked contact list (indirect reference)
+      // Instead of packing (copying) the unpacked list to a packed contact list
+      // To keep track of where to write back (unpacked) contact positions (for static friction)
+      // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
+      grainGrainContact.append( j );
+     } else {
+      // Resets contact (static friction spring)
+      grainGrainLocalAx[j] = 0; /*grainGrainLocalAy[j] = 0; grainGrainLocalAz[j] = 0;
+      grainGrainLocalBx[j] = 0; grainGrainLocalBy[j] = 0; grainGrainLocalBz[j] = 0;*/
+     }
+    }
    }
-  }
- }
- grainGrainFilterTime.stop();
+ }, 1);
  for(size_t i=grainGrainContact.size; i<align(simd, grainGrainContact.size); i++)
   grainGrainContact.begin()[i] = 0;
 
@@ -175,9 +186,10 @@ void Simulation::stepGrainGrain() {
    scatter(grainGrainLocalBx, contacts, localBx);
    scatter(grainGrainLocalBy, contacts, localBy);
    scatter(grainGrainLocalBz, contacts, localBz);
-  }});
+  }
+ }, 1);
 
-  grainGrainSumTime.start();
+ grainGrainSumTime.start();
   for(size_t i = 0; i < grainGrainContact.size; i++) { // Scalar scatter add
    size_t index = grainGrainContact[i];
    size_t a = grainGrainA[index];

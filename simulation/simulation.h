@@ -26,7 +26,15 @@ struct Simulation : System {
  float currentHeight = Grain::radius;
  float lastAngle = 0, winchAngle = 0, currentRadius = patternRadius;
 
- // Grain-Bottom friction
+ // Grain-Bottom
+ buffer<uint> oldGrainBottomA;
+ buffer<float> oldGrainBottomLocalAx;
+ buffer<float> oldGrainBottomLocalAy;
+ buffer<float> oldGrainBottomLocalAz;
+ buffer<float> oldGrainBottomLocalBx;
+ buffer<float> oldGrainBottomLocalBy;
+ buffer<float> oldGrainBottomLocalBz;
+
  buffer<uint> grainBottomA;
  buffer<float> grainBottomLocalAx;
  buffer<float> grainBottomLocalAy;
@@ -35,16 +43,15 @@ struct Simulation : System {
  buffer<float> grainBottomLocalBy;
  buffer<float> grainBottomLocalBz;
 
- // Wire-Bottom friction
- buffer<uint> wireBottomA;
- buffer<float> wireBottomLocalAx;
- buffer<float> wireBottomLocalAy;
- buffer<float> wireBottomLocalAz;
- buffer<float> wireBottomLocalBx;
- buffer<float> wireBottomLocalBy;
- buffer<float> wireBottomLocalBz;
+ // Grain-Side
+ buffer<uint> oldGrainSideA;
+ buffer<float> oldGrainSideLocalAx;
+ buffer<float> oldGrainSideLocalAy;
+ buffer<float> oldGrainSideLocalAz;
+ buffer<float> oldGrainSideLocalBx;
+ buffer<float> oldGrainSideLocalBy;
+ buffer<float> oldGrainSideLocalBz;
 
- // Grain-Side friction
  buffer<uint> grainSideA;
  buffer<float> grainSideLocalAx;
  buffer<float> grainSideLocalAy;
@@ -53,13 +60,39 @@ struct Simulation : System {
  buffer<float> grainSideLocalBy;
  buffer<float> grainSideLocalBz;
 
+ // Wire-Bottom
+ buffer<uint> oldWireBottomA;
+ buffer<float> oldWireBottomLocalAx;
+ buffer<float> oldWireBottomLocalAy;
+ buffer<float> oldWireBottomLocalAz;
+ buffer<float> oldWireBottomLocalBx;
+ buffer<float> oldWireBottomLocalBy;
+ buffer<float> oldWireBottomLocalBz;
+
+ buffer<uint> wireBottomA;
+ buffer<float> wireBottomLocalAx;
+ buffer<float> wireBottomLocalAy;
+ buffer<float> wireBottomLocalAz;
+ buffer<float> wireBottomLocalBx;
+ buffer<float> wireBottomLocalBy;
+ buffer<float> wireBottomLocalBz;
+
  // Grain - Grain
  float maxGrainV = 0;
  float grainGrainGlobalMinD = 0;
  uint grainGrainSkipped = 0;
+
+ buffer<uint> oldGrainGrainA ;
+ buffer<uint> oldGrainGrainB;
+ buffer<float> oldGrainGrainLocalAx;
+ buffer<float> oldGrainGrainLocalAy;
+ buffer<float> oldGrainGrainLocalAz;
+ buffer<float> oldGrainGrainLocalBx;
+ buffer<float> oldGrainGrainLocalBy;
+ buffer<float> oldGrainGrainLocalBz;
+
  buffer<uint> grainGrainA ;
  buffer<uint> grainGrainB;
- // Grain-Grain Friction
  buffer<float> grainGrainLocalAx;
  buffer<float> grainGrainLocalAy;
  buffer<float> grainGrainLocalAz;
@@ -70,9 +103,18 @@ struct Simulation : System {
  // Grain - Wire
  float grainWireGlobalMinD = 0;
  uint grainWireSkipped = 0;
+
+ buffer<uint> oldGrainWireA;
+ buffer<uint> oldGrainWireB;
+ buffer<float> oldGrainWireLocalAx;
+ buffer<float> oldGrainWireLocalAy;
+ buffer<float> oldGrainWireLocalAz;
+ buffer<float> oldGrainWireLocalBx;
+ buffer<float> oldGrainWireLocalBy;
+ buffer<float> oldGrainWireLocalBz;
+
  buffer<uint> grainWireA;
  buffer<uint> grainWireB;
- // Grain-Wire Friction
  buffer<float> grainWireLocalAx;
  buffer<float> grainWireLocalAy;
  buffer<float> grainWireLocalAz;
@@ -89,8 +131,8 @@ struct Simulation : System {
   tsc grainTime;
  void stepGrainBottom();
   //tsc grainBottomSearchTime; // TODO: verlet
-  tsc grainBottomFilterTime;
-  tsc grainBottomEvaluateTime;
+  uint64 grainBottomFilterTime = 0;
+  uint64 grainBottomEvaluateTime = 0;
   tsc grainBottomSumTime;
  void stepGrainSide();
   //tsc grainSideSearchTime; // TODO: verlet
@@ -99,11 +141,11 @@ struct Simulation : System {
   tsc grainSideSumTime;
  void stepGrainGrain();
   tsc grainGrainSearchTime;
-  tsc grainGrainFilterTime;
+  uint64 grainGrainFilterTime = 0;
   uint64 grainGrainEvaluateTime = 0;
   tsc grainGrainSumTime;
  void stepGrainWire();
-  tsc grainWireSearchTime;
+  uint64 grainWireSearchTime = 0;
   uint64 grainWireFilterTime = 0;
   //tsc grainWireEvaluateTime;
   uint64 grainWireEvaluateTime = 0;
@@ -112,14 +154,14 @@ struct Simulation : System {
  void stepGrainIntegration();
   uint64 grainIntegrationTime = 0;
  void stepWire();
-  tsc wireTime;
+  uint64 wireInitializationTime = 0;
  void stepWireTension();
   tsc wireTensionTime;
  void stepWireBendingResistance();
   tsc wireBendingResistanceTime;
  void stepWireBottom();
  //tsc wireBottomSearchTime; // TODO: verlet
-  tsc wireBottomFilterTime;
+  uint64 wireBottomFilterTime = 0;
   tsc wireBottomEvaluateTime;
   tsc wireBottomSumTime;
  void stepWireIntegration();

@@ -7,29 +7,20 @@
 #include "thread.h"
 #include "time.h"
 
-static constexpr size_t maxThreadCount = 12; // 4..32
-
-static size_t coreCount() {
- TextData s(File("/proc/cpuinfo").readUpToLoop(1<<16));
- assert_(s.data.size<s.buffer.capacity);
- size_t coreCount = 0;
- while(s) { if(s.match("processor")) coreCount++; s.line(); }
- //assert_(coreCount <= maxThreadCount, coreCount, maxThreadCount);
- if(environmentVariable("THREADS"_))
-  coreCount = min(coreCount, (size_t)parseInteger(environmentVariable("THREADS"_)));
- return min(coreCount, maxThreadCount);
-}
-static const int threadCount = coreCount();
-
 struct thread {
  pthread_t pthread = 0;
  int64 id; int64* counter; int64 stop;
  function<void(uint, uint)>* delegate;
  uint64 time = 0;
 };
+
+static constexpr size_t maxThreadCount = 12; // 4..32
+
+extern thread threads[::maxThreadCount];
+
 extern Semaphore jobs;
 extern Semaphore results;
-extern thread threads[::maxThreadCount];
+
 inline void* start_routine(thread* t) {
  for(;;) {
   jobs.acquire(1);
@@ -44,6 +35,10 @@ inline void* start_routine(thread* t) {
  }
  return 0;
 }
+
+extern const int threadCount;
+
+
 
 /// Runs a loop in parallel
 template<Type F> uint64 parallel_for(int64 start, int64 stop, F f, const int unused threadCount = ::threadCount) {
@@ -60,13 +55,10 @@ template<Type F> uint64 parallel_for(int64 start, int64 stop, F f, const int unu
   function<void(uint, uint)> delegate = f;
   assert_(threadCount == ::threadCount);
   for(uint index: range(threadCount)) {
-   threads[index].id = index;
    threads[index].counter = &start;
    threads[index].stop = stop;
    threads[index].delegate = &delegate;
    threads[index].time = 0;
-   if(!threads[index].pthread)
-    pthread_create(&threads[index].pthread, 0, (void*(*)(void*))start_routine, &threads[index]);
   }
   jobs.release(threadCount);
   results.acquire(threadCount);

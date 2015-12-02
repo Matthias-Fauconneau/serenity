@@ -40,19 +40,24 @@ generic struct buffer : mref<T> {
   data=0; capacity=0; size=0;
  }
 
- void setSize(size_t size) { assert_(size<=capacity, size, capacity); this->size=size; }
  /// Appends a default element
- T& append() { setSize(size+1); return set(size-1, T()); }
+ T& append() { return set(__atomic_fetch_add(&size, 1, 5/*SeqCst*/), T()); }
+
  /// Appends an implicitly copiable value
- T& append(const T& e) { setSize(size+1); return set(size-1, e); }
+ T& append(const T& e) { return set(__atomic_fetch_add(&size, 1, 5/*SeqCst*/), e); }
+
  /// Appends a movable value
- T& append(T&& e) { setSize(size+1); return set(size-1, ::move(e)); }
- template<Type A0, Type A1, Type... Args> void append(A0&& a0, A1&& a1, Args&&... args) const {
-  set(size-1, forward<A0>(a0), forward<A1>(a1), forward<Args>(args)...); }
+ T& append(T&& e) { return set(__atomic_fetch_add(&size, 1, 5/*SeqCst*/), ::move(e)); }
+
  /// Appends another list of elements to this array by moving
- void append(const mref<T> source) { setSize(size+source.size); slice(size-source.size).move(source); }
+ void append(const mref<T> source) {
+  slice(__atomic_fetch_add(&size, source.size, 5/*SeqCst*/), source.size).move(source);
+ }
+
  /// Appends another list of elements to this array by copying
- void append(const ref<T> source) { setSize(size+source.size); slice(size-source.size).copy(source); }
+ void append(const ref<T> source) {
+  slice(__atomic_fetch_add(&size, source.size, 5/*SeqCst*/), source.size).copy(source);
+ }
 };
 /// Initializes a new buffer with the content of \a o
 generic buffer<T> copy(const buffer<T>& o) { buffer<T> t(o.capacity?:o.size, o.size); t.copy(o); return t; }

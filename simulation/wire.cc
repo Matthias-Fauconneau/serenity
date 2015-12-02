@@ -2,11 +2,14 @@
 #include "parallel.h"
 
 void Simulation::stepWire() {
- wireTime.start();
- for(size_t i: range(wire.count)) { // TODO: SIMD
-  wire.Fx[i] = 0; wire.Fy[i] = 0; wire.Fz[i] = Wire::mass * Gz;
- }
- wireTime.stop();
+ const v8sf m_Gz = float8(Wire::mass * Gz);
+ wireInitializationTime += parallel_chunk(wire.count/simd, [&](uint, size_t start, size_t size) {
+  for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
+    store(wire.Fx, i, _0f);
+    store(wire.Fy, i, _0f);
+    store(wire.Fz, i, m_Gz);
+   }
+ }, 1);
 }
 
 void Simulation::stepWireTension() {
@@ -122,7 +125,7 @@ void Simulation::stepWireIntegration() {
    float maxWireV = 0;
    for(size_t k: range(simd)) maxWireV = ::max(maxWireV, maxWireV8[k]);
    maxWireV_[id] = maxWireV;
- });
+ }, 1);
  float maxWireV = 0;
  for(size_t k: range(threadCount)) maxWireV = ::max(maxWireV, maxWireV_[k]);
  float maxGrainWireV = maxGrainV + maxWireV;

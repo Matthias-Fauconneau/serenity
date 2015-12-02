@@ -3,16 +3,32 @@
 
 void Simulation::stepGrainSide() {
  {
-  // SoA (FIXME: single pointer/index)
+  swap(oldGrainSideA, grainSideA);
+  swap(oldGrainSideLocalAx, grainSideLocalAx);
+  swap(oldGrainSideLocalAy, grainSideLocalAy);
+  swap(oldGrainSideLocalAz, grainSideLocalAz);
+  swap(oldGrainSideLocalBx, grainSideLocalBx);
+  swap(oldGrainSideLocalBy, grainSideLocalBy);
+  swap(oldGrainSideLocalBz, grainSideLocalBz);
+
   static constexpr size_t averageGrainSideContactCount = 1;
   const size_t GScc = align(simd, grain.count * averageGrainSideContactCount);
-  buffer<uint> grainSideA (GScc, 0);
-  buffer<float> grainSideLocalAx (GScc, 0);
-  buffer<float> grainSideLocalAy (GScc, 0);
-  buffer<float> grainSideLocalAz (GScc, 0);
-  buffer<float> grainSideLocalBx (GScc, 0);
-  buffer<float> grainSideLocalBy (GScc, 0);
-  buffer<float> grainSideLocalBz (GScc, 0);
+  if(GScc > grainSideA.capacity) {
+   grainSideA = buffer<uint>(GScc, 0);
+   grainSideLocalAx = buffer<float>(GScc, 0);
+   grainSideLocalAy = buffer<float>(GScc, 0);
+   grainSideLocalAz = buffer<float>(GScc, 0);
+   grainSideLocalBx = buffer<float>(GScc, 0);
+   grainSideLocalBy = buffer<float>(GScc, 0);
+   grainSideLocalBz = buffer<float>(GScc, 0);
+  }
+  grainSideA.size = 0;
+  grainSideLocalAx.size = 0;
+  grainSideLocalAy.size = 0;
+  grainSideLocalAz.size = 0;
+  grainSideLocalBx.size = 0;
+  grainSideLocalBy.size = 0;
+  grainSideLocalBz.size = 0;
 
   size_t grainSideI = 0; // Index of first contact with A in old grainSide[Local]A|B list
   grainSideFilterTime.start();
@@ -20,14 +36,14 @@ void Simulation::stepGrainSide() {
    if(sq(grain.Px[a]) + sq(grain.Py[a]) < sq(radius - Grain::radius)) continue;
    grainSideA.append( a ); // Grain
    size_t j = grainSideI;
-   if(grainSideI < this->grainSideA.size && this->grainSideA[grainSideI] == a) {
+   if(grainSideI < oldGrainSideA.size && oldGrainSideA[grainSideI] == a) {
     // Repack existing friction
-    grainSideLocalAx.append( this->grainSideLocalAx[j] );
-    grainSideLocalAy.append( this->grainSideLocalAy[j] );
-    grainSideLocalAz.append( this->grainSideLocalAz[j] );
-    grainSideLocalBx.append( this->grainSideLocalBx[j] );
-    grainSideLocalBy.append( this->grainSideLocalBy[j] );
-    grainSideLocalBz.append( this->grainSideLocalBz[j] );
+    grainSideLocalAx.append( oldGrainSideLocalAx[j] );
+    grainSideLocalAy.append( oldGrainSideLocalAy[j] );
+    grainSideLocalAz.append( oldGrainSideLocalAz[j] );
+    grainSideLocalBx.append( oldGrainSideLocalBx[j] );
+    grainSideLocalBy.append( oldGrainSideLocalBy[j] );
+    grainSideLocalBz.append( oldGrainSideLocalBz[j] );
    } else { // New contact
     // Appends zero to reserve slot. Zero flags contacts for evaluation.
     // Contact points (for static friction) will be computed during force evaluation (if fine test passes)
@@ -38,19 +54,13 @@ void Simulation::stepGrainSide() {
     grainSideLocalBy.append( 0 );
     grainSideLocalBz.append( 0 );
    }
-   while(grainSideI < this->grainSideA.size && this->grainSideA[grainSideI] == a)
+   while(grainSideI < oldGrainSideA.size && oldGrainSideA[grainSideI] == a)
     grainSideI++;
   }
   grainSideFilterTime.stop();
 
   for(size_t i=grainSideA.size; i<align(simd, grainSideA.size); i++) grainSideA.begin()[i] = 0;
-  this->grainSideA = move(grainSideA);
-  this->grainSideLocalAx = move(grainSideLocalAx);
-  this->grainSideLocalAy = move(grainSideLocalAy);
-  this->grainSideLocalAz = move(grainSideLocalAz);
-  this->grainSideLocalBx = move(grainSideLocalBx);
-  this->grainSideLocalBy = move(grainSideLocalBy);
-  this->grainSideLocalBz = move(grainSideLocalBz);
+
  }
 
  // TODO: verlet
