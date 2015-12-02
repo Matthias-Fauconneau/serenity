@@ -62,6 +62,7 @@ void Simulation::stepProcess() {
    vec2 p(random()*2-1,random()*2-1);
    if(length(p)<1) { // Within cylinder
     vec3 newPosition (patternRadius*p.x, patternRadius*p.y, Grain::radius);
+    processTime.start();
     // Deposits grain without grain overlap
     for(size_t index: range(grain.count)) {
      vec3 other = grain.position(index);
@@ -71,12 +72,15 @@ void Simulation::stepProcess() {
       newPosition.z = ::max(newPosition.z, other.z+dz);
      }
     }
+    processTime.stop();
     // Under current wire drop height
     if(newPosition.z < currentHeight) {
      // Without wire overlap
+     processTime.start();
      for(size_t index: range(wire.count))
       if(length(wire.position(index) - newPosition) < Grain::radius+Wire::radius)
-       return;
+      { processTime.stop(); return; }
+     processTime.stop();
      size_t i = grain.count;
      grain.Px[i] = newPosition.x; grain.Py[i] = newPosition.y; grain.Pz[i] = newPosition.z;
      grain.Vx[i] = 0; grain.Vy[i] = 0; grain.Vz[i] = 0;
@@ -97,4 +101,3 @@ void Simulation::stepProcess() {
   }
  }
 }
-

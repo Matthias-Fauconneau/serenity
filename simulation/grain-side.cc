@@ -1,7 +1,7 @@
 // TODO: Verlet, reintegrate soft membrane, face contacts
 #include "simulation.h"
 
-bool Simulation::stepGrainSide() {
+void Simulation::stepGrainSide() {
  {
   // SoA (FIXME: single pointer/index)
   static constexpr size_t averageGrainSideContactCount = 1;
@@ -15,6 +15,7 @@ bool Simulation::stepGrainSide() {
   buffer<float> grainSideLocalBz (GScc, 0);
 
   size_t grainSideI = 0; // Index of first contact with A in old grainSide[Local]A|B list
+  grainSideFilterTime.start();
   for(size_t a: range(grain.count)) { // TODO: SIMD
    if(sq(grain.Px[a]) + sq(grain.Py[a]) < sq(radius - Grain::radius)) continue;
    grainSideA.append( a ); // Grain
@@ -40,6 +41,7 @@ bool Simulation::stepGrainSide() {
    while(grainSideI < this->grainSideA.size && this->grainSideA[grainSideI] == a)
     grainSideI++;
   }
+  grainSideFilterTime.stop();
 
   for(size_t i=grainSideA.size; i<align(simd, grainSideA.size); i++) grainSideA.begin()[i] = 0;
   this->grainSideA = move(grainSideA);
@@ -57,6 +59,7 @@ bool Simulation::stepGrainSide() {
  size_t GScc = align(simd, grainSideA.size); // Grain-Grain contact count
  buffer<float> Fx(GScc), Fy(GScc), Fz(GScc);
  buffer<float> TAx(GScc), TAy(GScc), TAz(GScc);
+ grainSideEvaluateTime.start();
  for(size_t index = 0; index < GScc; index += 8) { // FIXME: parallel
   v8ui A = *(v8ui*)(grainSideA.data+index);
   // FIXME: Recomputing from intersection (more efficient than storing?)
@@ -88,7 +91,9 @@ bool Simulation::stepGrainSide() {
   *(v8sf*)(grainSideLocalBy.data+index) = localBy;
   *(v8sf*)(grainSideLocalBz.data+index) = localBz;
  }
+ grainSideEvaluateTime.stop();
 
+ grainSideSumTime.start();
  for(size_t index = 0; index < grainSideA.size; index++) { // Scalar scatter add
   size_t a = grainSideA[index];
   grain.Fx[a] += Fx[index];
@@ -99,6 +104,5 @@ bool Simulation::stepGrainSide() {
   grain.Ty[a] += TAy[index];
   grain.Tz[a] += TAz[index];
  }
-
- return true;
+ grainSideSumTime.stop();
 }

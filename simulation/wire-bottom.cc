@@ -2,7 +2,6 @@
 #include "simulation.h"
 
 void Simulation::stepWireBottom() {
- wireBottomFilterTime.start();
  {
   // SoA (FIXME: single pointer/index)
   static constexpr size_t averageWireBottomContactCount = 1;
@@ -16,6 +15,7 @@ void Simulation::stepWireBottom() {
   buffer<float> wireBottomLocalBz (WBcc, 0);
 
   size_t wireBottomI = 0; // Index of first contact with A in old wireBottom[Local]A|B list
+  wireBottomFilterTime.start();
   for(size_t a: range(wire.count)) { // TODO: SIMD
    if(wire.Pz[a] > Wire::radius) continue;
    wireBottomA.append( a ); // Wire
@@ -41,6 +41,7 @@ void Simulation::stepWireBottom() {
    while(wireBottomI < this->wireBottomA.size && this->wireBottomA[wireBottomI] == a)
     wireBottomI++;
   }
+  wireBottomFilterTime.stop();
 
   for(size_t i=wireBottomA.size; i<WBcc; i++) wireBottomA.begin()[i] = 0;
   this->wireBottomA = move(wireBottomA);
@@ -51,7 +52,6 @@ void Simulation::stepWireBottom() {
   this->wireBottomLocalBy = move(wireBottomLocalBy);
   this->wireBottomLocalBz = move(wireBottomLocalBz);
  }
- wireBottomFilterTime.stop();
 
  // TODO: verlet
 

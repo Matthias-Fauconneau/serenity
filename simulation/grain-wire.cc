@@ -278,31 +278,31 @@ break_:;
 
  // Filters verlet lists, packing contacts to evaluate
  buffer<uint> grainWireContact(align(simd, grainWireA.size), 0);
- grainWireFilterTime.start();
- for(size_t index = 0; index < grainWireA.size; index += 8) {
-  v8ui A = *(v8ui*)(grainWireA.data+index), B = *(v8ui*)(grainWireB.data+index);
-  v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
-  v8sf Bx = gather(wire.Px, B), By = gather(wire.Py, B), Bz = gather(wire.Pz, B);
-  v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-  v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
-  v8sf depth = float8(Grain::radius+Wire::radius) - length;
-  for(size_t k: range(simd)) {
-   size_t j = index+k;
-   if(j == grainWireA.size) break /*2*/;
-   if(depth[k] > 0) {
-    // Creates a map from packed contact to index into unpacked contact list (indirect reference)
-    // Instead of packing (copying) the unpacked list to a packed contact list
-    // To keep track of where to write back (unpacked) contact positions (for static friction)
-    // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
-    grainWireContact.append( j );
-   } else {
-    // Resets contact (static friction spring)
-    grainWireLocalAx[j] = 0; grainWireLocalAy[j] = 0; grainWireLocalAz[j] = 0;
-    grainWireLocalBx[j] = 0; grainWireLocalBy[j] = 0; grainWireLocalBz[j] = 0;
+ grainWireFilterTime += parallel_chunk(grainWireA.size/simd, [&](uint, size_t start, size_t size) {
+   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
+    v8ui A = *(v8ui*)(grainWireA.data+i), B = *(v8ui*)(grainWireB.data+i);
+    v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
+    v8sf Bx = gather(wire.Px, B), By = gather(wire.Py, B), Bz = gather(wire.Pz, B);
+    v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
+    v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
+    v8sf depth = float8(Grain::radius+Wire::radius) - length;
+    for(size_t k: range(simd)) {
+     size_t j = i+k;
+     if(j == grainWireA.size) break /*2*/;
+     if(depth[k] > 0) {
+      // Creates a map from packed contact to index into unpacked contact list (indirect reference)
+      // Instead of packing (copying) the unpacked list to a packed contact list
+      // To keep track of where to write back (unpacked) contact positions (for static friction)
+      // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
+      grainWireContact.append( j );
+     } else {
+      // Resets contact (static friction spring)
+      grainWireLocalAx[j] = 0; grainWireLocalAy[j] = 0; grainWireLocalAz[j] = 0;
+      grainWireLocalBx[j] = 0; grainWireLocalBy[j] = 0; grainWireLocalBz[j] = 0;
+     }
+    }
    }
-  }
- }
- grainWireFilterTime.stop();
+ });
  for(size_t i=grainWireContact.size; i<align(simd, grainWireContact.size); i++)
   grainWireContact.begin()[i] = grainWireA.size;
 

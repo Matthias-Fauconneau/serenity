@@ -1,13 +1,17 @@
 #include "simulation.h"
+#include "parallel.h"
 
 void Simulation::stepWire() {
+ wireTime.start();
  for(size_t i: range(wire.count)) { // TODO: SIMD
   wire.Fx[i] = 0; wire.Fy[i] = 0; wire.Fz[i] = Wire::mass * Gz;
  }
+ wireTime.stop();
 }
 
 void Simulation::stepWireTension() {
  if(wire.count == 0) return;
+ wireTensionTime.start();
  for(size_t i=0; i<wire.count-1; i+=simd) {
   v8sf Ax = load(wire.Px, i     ), Ay = load(wire.Py, i     ), Az = load(wire.Pz, i    );
 #if DEBUG
@@ -49,10 +53,12 @@ void Simulation::stepWireTension() {
   storeu(wire.Fy, i+1, loadu(wire.Fy, i+1) - FTy);
   storeu(wire.Fz, i+1, loadu(wire.Fz, i+1) - FTz);
  }
+ wireTensionTime.stop();
 }
 
 void Simulation::stepWireBendingResistance() {
  if(!Wire::bendStiffness || wire.count < 2) return;
+ wireBendingResistanceTime.start();
  for(size_t i: range(1, wire.count-1)) { // TODO: SIMD
   vec3 A = wire.position(i-1), B = wire.position(i), C = wire.position(i+1);
   vec3 a = C-B, b = B-A;
@@ -86,30 +92,39 @@ void Simulation::stepWireBendingResistance() {
    }
   }
  }
+ wireBendingResistanceTime.stop();
 }
 
 void Simulation::stepWireIntegration() {
- const v8sf dt_mass = float8(wire.dt_mass), dt = float8(this->dt);
- v8sf maxWireV8 = _0f;
- const float* Fx = wire.Fx.data, *Fy = wire.Fy.data, *Fz = wire.Fz.data;
- float* const pVx = wire.Vx.begin(), *pVy = wire.Vy.begin(), *pVz = wire.Vz.begin();
- float* const Px = wire.Px.begin(), *Py = wire.Py.begin(), *Pz = wire.Pz.begin();
- for(size_t i=0; i<wire.count; i+=simd) {
-  // Symplectic Euler
-  v8sf Vx = load(pVx, i), Vy = load(pVy, i), Vz = load(pVz, i);
-  Vx += dt_mass * load(Fx, i);
-  Vy += dt_mass * load(Fy, i);
-  Vz += dt_mass * load(Fz, i);
-  store(pVx, i, Vx);
-  store(pVy, i, Vy);
-  store(pVz, i, Vz);
-  store(Px, i, load(Px, i) + dt * Vx);
-  store(Py, i, load(Py, i) + dt * Vy);
-  store(Pz, i, load(Pz, i) + dt * Vz);
-  maxWireV8 = max(maxWireV8, sqrt(Vx*Vx + Vy*Vy + Vz*Vz));
- }
+ if(!wire.count) return;
+ float maxWireV_[threadCount] = {};
+ wireIntegrationTime +=
+ parallel_chunk(wire.count/simd, [this,&maxWireV_](uint id, size_t start, size_t size) {
+   const v8sf dt_mass = float8(wire.dt_mass), dt = float8(this->dt);
+   v8sf maxWireV8 = _0f;
+   const float* Fx = wire.Fx.data, *Fy = wire.Fy.data, *Fz = wire.Fz.data;
+   float* const pVx = wire.Vx.begin(), *pVy = wire.Vy.begin(), *pVz = wire.Vz.begin();
+   float* const Px = wire.Px.begin(), *Py = wire.Py.begin(), *Pz = wire.Pz.begin();
+   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
+    // Symplectic Euler
+    v8sf Vx = load(pVx, i), Vy = load(pVy, i), Vz = load(pVz, i);
+    Vx += dt_mass * load(Fx, i);
+    Vy += dt_mass * load(Fy, i);
+    Vz += dt_mass * load(Fz, i);
+    store(pVx, i, Vx);
+    store(pVy, i, Vy);
+    store(pVz, i, Vz);
+    store(Px, i, load(Px, i) + dt * Vx);
+    store(Py, i, load(Py, i) + dt * Vy);
+    store(Pz, i, load(Pz, i) + dt * Vz);
+    maxWireV8 = max(maxWireV8, sqrt(Vx*Vx + Vy*Vy + Vz*Vz));
+   }
+   float maxWireV = 0;
+   for(size_t k: range(simd)) maxWireV = ::max(maxWireV, maxWireV8[k]);
+   maxWireV_[id] = maxWireV;
+ });
  float maxWireV = 0;
- for(size_t k: range(simd)) maxWireV = ::max(maxWireV, maxWireV8[k]);
+ for(size_t k: range(threadCount)) maxWireV = ::max(maxWireV, maxWireV_[k]);
  float maxGrainWireV = maxGrainV + maxWireV;
  grainWireGlobalMinD -= maxGrainWireV * this->dt;
 }

@@ -7,8 +7,6 @@
 #include <pthread.h> //pthread
 #include <sys/inotify.h>
 
-//extern Stream stdout;
-
 /// Abstract factory pattern (allows construction of class by names)
 template<Type I> struct Interface {
     struct AbstractFactory {
@@ -196,21 +194,3 @@ struct FileWatcher : File, Poll {
 		}
 	}
 };
-/*struct FileWatcher : File, Poll {
-    FileWatcher(string path, function<void(string)> fileCreated, function<void(string)> fileDeleted={})
-        : File(inotify_init1(IN_CLOEXEC)), Poll(File::fd), watch(check(inotify_add_watch(File::fd, strz(path), IN_CREATE|IN_DELETE))),
-          fileCreated(fileCreated), fileDeleted(fileDeleted) {}
-    void event() override {
-        while(poll()) {
-            //::buffer<byte> buffer = readUpTo(2*sizeof(inotify_event)+4); // Maximum size fitting only a single event (FIXME)
-            ::buffer<byte> buffer = readUpTo(sizeof(struct inotify_event) + 256);
-            inotify_event e = *(inotify_event*)buffer.data;
-            string name = str((const char*)buffer.slice(__builtin_offsetof(inotify_event, name), e.len-1).data);
-            if((e.mask&IN_CREATE) && fileCreated) fileCreated(name);
-            if((e.mask&IN_DELETE) && fileDeleted) fileDeleted(name);
-        }
-    }
-    const uint watch;
-    function<void(string)> fileCreated;
-    function<void(string)> fileDeleted;
-};*/

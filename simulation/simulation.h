@@ -82,32 +82,35 @@ struct Simulation : System {
 
  Simulation(const Dict& p);
  void domain(vec3& min, vec3& max);
- bool step();
+ void step();
  void stepProcess();
   tsc processTime;
  void stepGrain();
   tsc grainTime;
- bool stepGrainBottom();
+ void stepGrainBottom();
   //tsc grainBottomSearchTime; // TODO: verlet
   tsc grainBottomFilterTime;
   tsc grainBottomEvaluateTime;
   tsc grainBottomSumTime;
- bool stepGrainSide();
-  tsc grainSideTime;
+ void stepGrainSide();
+  //tsc grainSideSearchTime; // TODO: verlet
+  tsc grainSideFilterTime;
+  tsc grainSideEvaluateTime;
+  tsc grainSideSumTime;
  void stepGrainGrain();
   tsc grainGrainSearchTime;
   tsc grainGrainFilterTime;
-  tsc grainGrainEvaluateTime;
+  uint64 grainGrainEvaluateTime = 0;
   tsc grainGrainSumTime;
  void stepGrainWire();
   tsc grainWireSearchTime;
-  tsc grainWireFilterTime;
+  uint64 grainWireFilterTime = 0;
   //tsc grainWireEvaluateTime;
   uint64 grainWireEvaluateTime = 0;
   tsc grainWireSumTime;
   size_t grainWireContactSizeSum;
  void stepGrainIntegration();
-  tsc grainIntegrationTime;
+  uint64 grainIntegrationTime = 0;
  void stepWire();
   tsc wireTime;
  void stepWireTension();
@@ -120,11 +123,11 @@ struct Simulation : System {
   tsc wireBottomEvaluateTime;
   tsc wireBottomSumTime;
  void stepWireIntegration();
-  tsc wireIntegrationTime;
+  uint64 wireIntegrationTime = 0;
 
 #if DEBUG
-  void invariant();
-#define invariant invariant();
+  void invariant_();
+#define invariant invariant_();
 #else
 #define invariant
 #endif

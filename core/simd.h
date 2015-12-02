@@ -3,6 +3,7 @@
 #include "core.h"
 
 typedef uint v8ui __attribute((__vector_size__ (32)));
+typedef int v8si __attribute((__vector_size__ (32)));
 static constexpr v8ui unused _0i = (v8ui){0,0,0,0,0,0,0,0};
 static constexpr v8ui unused _1i = (v8ui){
   uint(~0),uint(~0),uint(~0),uint(~0),
@@ -13,7 +14,7 @@ static inline v8ui gather(const uint* P, v8ui i) {
 #if __clang__
  return __builtin_ia32_gatherd_epi256(_0i, (const v8sf*)P, i, _1i, sizeof(float));
 #else
- return (v8ui)__builtin_ia32_gathersiv8si((v8ui)_0i, (const int*)P, (v8ui)i, (v8ui)_1i, sizeof(int));
+ return (v8ui)__builtin_ia32_gathersiv8si((v8si)_0i, (const int*)P, (v8si)i, (v8si)_1i, sizeof(int));
 #endif
 #else
  return (v8ui){P[i[0]], P[i[1]], P[i[2]], P[i[3]], P[i[4]], P[i[5]], P[i[6]], P[i[7]]};
@@ -52,7 +53,7 @@ static inline v8sf gather(const float* P, v8ui i) {
 #if __clang__
  return __builtin_ia32_gatherd_ps256(_0f, (const v8sf*)P, i, _1i, sizeof(float));
 #else
- return __builtin_ia32_gathersiv8sf(_0f, P, (v8ui)i, (v8sf)_1i, sizeof(float));
+ return __builtin_ia32_gathersiv8sf(_0f, P, (v8si)i, (v8sf)_1i, sizeof(float));
 #endif
 #else
  return (v8sf){P[i[0]], P[i[1]], P[i[2]], P[i[3]], P[i[4]], P[i[5]], P[i[6]], P[i[7]]};

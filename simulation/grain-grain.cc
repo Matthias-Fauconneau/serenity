@@ -99,8 +99,8 @@ void Simulation::stepGrainGrain() {
  } else grainGrainSkipped++;
 
  // Filters verlet lists, packing contacts to evaluate
- grainGrainFilterTime.start();
  buffer<uint> grainGrainContact(align(simd, grainGrainA.size), 0);
+ grainGrainFilterTime.start();
  for(size_t index = 0; index < grainGrainA.size; index += 8) {
   v8ui A = *(v8ui*)(grainGrainA.data+index), B = *(v8ui*)(grainGrainB.data+index);
   v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
@@ -116,7 +116,7 @@ void Simulation::stepGrainGrain() {
     // Instead of packing (copying) the unpacked list to a packed contact list
     // To keep track of where to write back (unpacked) contact positions (for static friction)
     // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
-    grainGrainContact.append( j );
+    grainGrainContact.append( j ); // FIXME: parallel
    } else {
     // Resets contact (static friction spring)
     grainGrainLocalAx[j] = 0; grainGrainLocalAy[j] = 0; grainGrainLocalAz[j] = 0;
@@ -124,21 +124,19 @@ void Simulation::stepGrainGrain() {
    }
   }
  }
+ grainGrainFilterTime.stop();
  for(size_t i=grainGrainContact.size; i<align(simd, grainGrainContact.size); i++)
   grainGrainContact.begin()[i] = 0;
- grainGrainFilterTime.stop();
 
  // Evaluates forces from (packed) intersections (SoA)
- grainGrainEvaluateTime.start();
  size_t GGcc = align(simd, grainGrainContact.size); // Grain-Grain contact count
  buffer<float> Fx(GGcc), Fy(GGcc), Fz(GGcc);
  buffer<float> TAx(GGcc), TAy(GGcc), TAz(GGcc);
  buffer<float> TBx(GGcc), TBy(GGcc), TBz(GGcc);
 
- //parallel_chunk(align(8, GGcc), [&](uint, size_t start, size_t size) {
-  for(size_t index = 0; index < GGcc; index += 8) {
-  //for(size_t index=start*8; index < start*8+size*8; index+=8) {
-   v8ui contacts = *(v8ui*)&grainGrainContact[index];
+ grainGrainEvaluateTime += parallel_chunk(GGcc/simd, [&](uint, size_t start, size_t size) {
+  for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
+   v8ui contacts = *(v8ui*)&grainGrainContact[i];
    v8ui A = gather(grainGrainA, contacts), B = gather(grainGrainB, contacts);
    // FIXME: Recomputing from intersection (more efficient than storing?)
    v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
@@ -157,6 +155,7 @@ void Simulation::stepGrainGrain() {
    v8sf localBx = gather(grainGrainLocalBx, contacts);
    v8sf localBy = gather(grainGrainLocalBy, contacts);
    v8sf localBz = gather(grainGrainLocalBz, contacts);
+   // FIXME: inline full SIMD
    contact<Grain, Grain>( grain, A, grain, B, depth,
                           RAx, RAy, RAz,
                           RBx, RBy, RBz,
@@ -165,9 +164,9 @@ void Simulation::stepGrainGrain() {
                           Bx, By, Bz,
                           localAx, localAy, localAz,
                           localBx, localBy, localBz,
-                          *(v8sf*)&Fx[index], *(v8sf*)&Fy[index], *(v8sf*)&Fz[index],
-                          *(v8sf*)&TAx[index], *(v8sf*)&TAy[index], *(v8sf*)&TAz[index],
-                          *(v8sf*)&TBx[index], *(v8sf*)&TBy[index], *(v8sf*)&TBz[index]
+                          *(v8sf*)&Fx[i], *(v8sf*)&Fy[i], *(v8sf*)&Fz[i],
+                          *(v8sf*)&TAx[i], *(v8sf*)&TAy[i], *(v8sf*)&TAz[i],
+                          *(v8sf*)&TBx[i], *(v8sf*)&TBy[i], *(v8sf*)&TBz[i]
                           );
    // Scatter static frictions
    scatter(grainGrainLocalAx, contacts, localAx);
@@ -176,8 +175,7 @@ void Simulation::stepGrainGrain() {
    scatter(grainGrainLocalBx, contacts, localBx);
    scatter(grainGrainLocalBy, contacts, localBy);
    scatter(grainGrainLocalBz, contacts, localBz);
-  }//});
-  grainGrainEvaluateTime.stop();
+  }});
 
   grainGrainSumTime.start();
   for(size_t i = 0; i < grainGrainContact.size; i++) { // Scalar scatter add
