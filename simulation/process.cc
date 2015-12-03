@@ -96,6 +96,7 @@ void Simulation::stepProcess() {
      // Forces verlet lists reevaluation
      grainGrainGlobalMinD = 0;
      grainWireGlobalMinD = 0;
+     grainMembraneGlobalMinD = 0;
     }
    }
   }

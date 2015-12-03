@@ -25,12 +25,11 @@ generic struct Lattice {
 template<size_t cellCapacity> struct List : mref<uint16> {
  List(mref<uint16> o) : mref(o) {}
  bool append(uint16 index) {
-  assert(index != 0);
   size_t i = 0;
-  while(at(i)) { i++; assert(i<cellCapacity, (mref<uint16>)*this); }
+  while(at(i)) { i++; }
+  assert_(i < cellCapacity);
   at(i) = index; i++;
-  assert(i < cellCapacity, index, i, cellCapacity, (mref<uint16>)*this);
-  at(i) = 0;
+  if(i < cellCapacity) at(i) = 0;
   return true;
  }
 };

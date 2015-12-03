@@ -166,7 +166,7 @@ void Simulation::stepGrainMembrane() {
 
   vec3 min, max; domain(min, max);
   Grid grid(1/(Grain::radius+Grain::radius), min, max);
-  for(size_t i: range(1, membrane.H-1)) {
+  for(size_t i: range(1, membrane.H)) {
    for(size_t j: range(membrane.W)) {
     size_t stride = membrane.stride;
     size_t k = i*stride+simd+j;
@@ -182,7 +182,7 @@ void Simulation::stepGrainMembrane() {
   float minD = __builtin_inff();
 
   const int X = grid.size.x, Y = grid.size.y;
-  const uint16* membraneNeighbours[3*3] = {
+  const unused uint16* membraneNeighbours[3*3] = {
    grid.base+(-X*Y-X-1)*Grid::cellCapacity,
    grid.base+(-X*Y-1)*Grid::cellCapacity,
    grid.base+(-X*Y+X-1)*Grid::cellCapacity,
@@ -205,7 +205,7 @@ void Simulation::stepGrainMembrane() {
   swap(oldGrainMembraneLocalBy, grainMembraneLocalBy);
   swap(oldGrainMembraneLocalBz, grainMembraneLocalBz);
 
-  static constexpr size_t averageGrainMembraneContactCount = 32;
+  static constexpr size_t averageGrainMembraneContactCount = 8;
   const size_t GWcc = align(simd, grain.count * averageGrainMembraneContactCount + 1);
   if(GWcc > grainMembraneA.capacity) {
    grainMembraneA = buffer<uint>(GWcc, 0);
@@ -230,7 +230,6 @@ void Simulation::stepGrainMembrane() {
   grainMembraneSearchTime += parallel_chunk(grain.count, [&](uint, size_t start, size_t size) {
    for(size_t a=start; a<(start+size); a+=1) { // TODO: SIMD
      size_t offset = grid.index(grain.Px[a], grain.Py[a], grain.Pz[a]);
-     // Neighbours
      for(size_t n: range(3*3)) for(size_t i: range(3)) {
       ref<uint16> list(membraneNeighbours[n] + offset + i * Grid::cellCapacity, Grid::cellCapacity);
 
@@ -239,7 +238,6 @@ void Simulation::stepGrainMembrane() {
        size_t b = list[j];
        if(!b) break;
        b--;
-       assert_(a < grain.count && b < membrane.count, a, grain.count, b, membrane.count, offset, n, i);
        float d = sqrt(sq(grain.Px[a]-membrane.Px[b])
                       + sq(grain.Py[a]-membrane.Py[b])
                       + sq(grain.Pz[a]-membrane.Pz[b])); // TODO: SIMD //FIXME: fails with Ofast?

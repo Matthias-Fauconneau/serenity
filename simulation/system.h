@@ -58,7 +58,7 @@ struct System {
   buffer<float> AVx { capacity }, AVy { capacity }, AVz { capacity }; // Angular velocity
   buffer<float> Tx { capacity }, Ty { capacity }, Tz { capacity }; // Torque
 
-  Grain() : capacity(65536) {}
+  Grain() : capacity(65536) { Rw.clear(1); }
 
   const vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]);  }
   const vec3 velocity(size_t i) const { return vec3(Vx[i], Vy[i], Vz[i]);  }
@@ -104,7 +104,7 @@ struct System {
  struct Membrane {
   sconst float density = 1000 * kg / cb(m);
   sconst float curvature = 0;
-  sconst float elasticModulus = 1e-1 * MPa; // 0
+  sconst float elasticModulus = 1 * MPa;
   sconst float poissonRatio = 0.48;
 
   sconst float resolution = Grain::radius;
@@ -117,7 +117,7 @@ struct System {
   const size_t H = ceil(exactHeight/cellHeight)+1;
   const float height = (H-1) * cellHeight;
   sconst float thickness = 1 * mm;
-  const float tensionElasticModulus = elasticModulus;
+  const float tensionElasticModulus = 1 * MPa;
   const float mass = sqrt(3.)/2 * sq(internodeLength) * thickness * density;
   const float tensionStiffness = sqrt(3.)/2 * internodeLength * thickness * tensionElasticModulus;
   const float tensionDamping = 2 * sqrt(mass * tensionStiffness);
@@ -138,8 +138,6 @@ struct System {
 
   Membrane(float radius) : radius(radius), capacity(H*stride) {
    Vx.clear(); Vy.clear(); Vz.clear(); // TODO: Gear
-   assert_(W>=2 && H>=2);
-   //log(radius, W, internodeLength, exactHeight, cellHeight, H, height);
    for(size_t i: range(H)) {
     for(size_t j: range(W)) {
      float z = i*height/(H-1);

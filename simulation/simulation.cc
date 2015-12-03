@@ -69,16 +69,16 @@ void Simulation::domain(vec3& min, vec3& max) {
 }
 
 void Simulation::step() {
- /*stepProcess();
+ stepProcess();
 
  stepGrain();
  stepGrainBottom();
  //if(processState == ProcessState::Pour) stepGrainSide();
- stepGrainGrain();*/
+ stepGrainGrain();
 
  //if(processState > ProcessState::Pour) {
   stepMembrane();
-  //stepGrainMembrane();
+  stepGrainMembrane();
  //}
 
  stepWire();
