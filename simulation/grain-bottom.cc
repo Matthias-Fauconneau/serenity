@@ -34,7 +34,7 @@ void Simulation::stepGrainBottom() {
   size_t grainBottomI = 0; // Index of first contact with A in old grainBottom[Local]A|B list
   grainBottomFilterTime += parallel_chunk(grain.count, [&](uint, size_t start, size_t size) {
    for(size_t i=start; i<(start+size); i+=1) { // TODO: SIMD
-     if(grain.Pz[i] > Grain::radius) continue;
+     if(grain.Pz[i] > bottomZ+Grain::radius) continue;
      grainBottomA.append( i ); // Grain
      size_t j = grainBottomI;
      if(grainBottomI < oldGrainBottomA.size && oldGrainBottomA[grainBottomI] == i) {
@@ -87,7 +87,7 @@ void Simulation::stepGrainBottom() {
     v8ui A = *(v8ui*)(grainBottomA.data+i);
     // FIXME: Recomputing from intersection (more efficient than storing?)
     v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
-    v8sf depth = float8(Grain::radius) - gather(grain.Pz, A);
+    v8sf depth = float8(bottomZ + Grain::radius) - gather(grain.Pz, A);
     // Gather static frictions
     v8sf localAx = *(v8sf*)(grainBottomLocalAx.data+i);
     v8sf localAy = *(v8sf*)(grainBottomLocalAy.data+i);

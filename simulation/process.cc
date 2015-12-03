@@ -1,10 +1,13 @@
 #include "simulation.h"
 
 void Simulation::stepProcess() {
+
  // Process
- if(currentHeight >= membrane.height || grain.count == grain.capacity) {
+ if(currentHeight >= topZ-Grain::radius || grain.count == grain.capacity) {
   processState = Load;
   //currentSideRadius += 2 * Grain::radius / s * dt;
+  topZ -= dt * plateSpeed;
+  bottomZ += dt * plateSpeed;
  } else {
   // Increases current height
   currentHeight += verticalSpeed * dt;

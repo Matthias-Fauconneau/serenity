@@ -15,6 +15,7 @@ struct Simulation : System {
  const float linearSpeed = 4 * m/s;
  const float verticalSpeed = 0.2 * m/s;
  const float loopAngle = PI*(3-sqrt(5.));
+ const float plateSpeed = 0.01 * m/s;
 
  // Process variables
  enum ProcessState { Pour, Load, Error };
@@ -24,6 +25,7 @@ struct Simulation : System {
  float currentHeight = Grain::radius;
  float lastAngle = 0, winchAngle = 0, currentWinchRadius = patternRadius;
  float pressure = 0;
+ float bottomZ = 0, topZ = membrane.height;
 
  // Grain-Bottom
  buffer<uint> oldGrainBottomA;
@@ -48,6 +50,30 @@ struct Simulation : System {
  buffer<float> grainBottomTAx;
  buffer<float> grainBottomTAy;
  buffer<float> grainBottomTAz;
+
+ // Grain-Top
+ buffer<uint> oldGrainTopA;
+ buffer<float> oldGrainTopLocalAx;
+ buffer<float> oldGrainTopLocalAy;
+ buffer<float> oldGrainTopLocalAz;
+ buffer<float> oldGrainTopLocalBx;
+ buffer<float> oldGrainTopLocalBy;
+ buffer<float> oldGrainTopLocalBz;
+
+ buffer<uint> grainTopA;
+ buffer<float> grainTopLocalAx;
+ buffer<float> grainTopLocalAy;
+ buffer<float> grainTopLocalAz;
+ buffer<float> grainTopLocalBx;
+ buffer<float> grainTopLocalBy;
+ buffer<float> grainTopLocalBz;
+
+ buffer<float> grainTopFx;
+ buffer<float> grainTopFy;
+ buffer<float> grainTopFz;
+ buffer<float> grainTopTAx;
+ buffer<float> grainTopTAy;
+ buffer<float> grainTopTAz;
 
  // Grain-Side
  buffer<uint> oldGrainSideA;
@@ -203,6 +229,11 @@ struct Simulation : System {
   uint64 grainBottomFilterTime = 0;
   uint64 grainBottomEvaluateTime = 0;
   tsc grainBottomSumTime;
+ void stepGrainTop();
+  //tsc grainTopSearchTime; // TODO: verlet
+  uint64 grainTopFilterTime = 0;
+  uint64 grainTopEvaluateTime = 0;
+  tsc grainTopSumTime;
  void stepGrainSide();
   //tsc grainSideSearchTime; // TODO: verlet
   tsc grainSideFilterTime;

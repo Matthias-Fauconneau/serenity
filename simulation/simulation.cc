@@ -2,6 +2,7 @@
 #include "simulation.h"
 //#include "process.h"
 //#include "grain-bottom.h"
+//#include "grain-top.h"
 //#include "grain-side.h"
 //#include "grain-grain.h"
 //#include "membrane.h"
@@ -73,13 +74,11 @@ void Simulation::step() {
 
  stepGrain();
  stepGrainBottom();
- //if(processState == ProcessState::Pour) stepGrainSide();
+ stepGrainTop();
  stepGrainGrain();
 
- //if(processState > ProcessState::Pour) {
-  stepMembrane();
-  stepGrainMembrane();
- //}
+ stepMembrane();
+ stepGrainMembrane();
 
  stepWire();
  stepGrainWire();

@@ -41,7 +41,7 @@ struct SimulationView : Simulation, Widget {
    buffer<float> Pz;
    vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]); }
   } membrane;
-  float radius;
+  float radius, bottomZ, topZ;
  };
  array<State> states;
  size_t viewT;
@@ -100,6 +100,8 @@ struct SimulationView : Simulation, Widget {
   state.membrane.Pz = copy(membrane.Pz);
 
   state.radius = membrane.radius;
+  state.bottomZ = bottomZ;
+  state.topZ = topZ;
   states.append(::move(state));
  }
 
@@ -263,7 +265,7 @@ struct SimulationView : Simulation, Widget {
   }
 
 
-  // Radius
+  // Bottom
   {
    static GLShader shader {::shader_glsl(), {"flat"}};
    shader.bind();
@@ -271,12 +273,18 @@ struct SimulationView : Simulation, Widget {
    shader["transform"] = mat4(1);
 
    size_t N = 64;
-   buffer<vec3> positions {N*2};
+   buffer<vec3> positions {N*2*2, 0};
    for(size_t i: range(N)) {
-    float a1 = 2*PI*(i+0)/N; vec3 a (state.radius*cos(a1), state.radius*sin(a1), 0);
-    float a2 = 2*PI*(i+1)/N; vec3 b (state.radius*cos(a2), state.radius*sin(a2), 0);
+    float a1 = 2*PI*(i+0)/N; vec3 a (state.radius*cos(a1), state.radius*sin(a1), state.bottomZ);
+    float a2 = 2*PI*(i+1)/N; vec3 b (state.radius*cos(a2), state.radius*sin(a2), state.bottomZ);
     vec3 A = rotatedViewProjection * a, B= rotatedViewProjection * b;
-    positions[i*2+0] = A; positions[i*2+1] = B;
+    positions.append(A); positions.append(B);
+   }
+   for(size_t i: range(N)) {
+    float a1 = 2*PI*(i+0)/N; vec3 a (state.radius*cos(a1), state.radius*sin(a1), state.topZ);
+    float a2 = 2*PI*(i+1)/N; vec3 b (state.radius*cos(a2), state.radius*sin(a2), state.topZ);
+    vec3 A = rotatedViewProjection * a, B= rotatedViewProjection * b;
+    positions.append(A); positions.append(B);
    }
    shader["uColor"] = vec4(black, 1);
    static GLVertexArray vertexArray;
