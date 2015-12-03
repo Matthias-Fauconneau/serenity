@@ -5,6 +5,8 @@
 #include "math.h"
 #include "map.h"
 
+static inline double pow(double x, double y) { return __builtin_pow(x,y); }
+
 // -- sRGB --
 
 uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)

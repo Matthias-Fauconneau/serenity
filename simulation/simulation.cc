@@ -33,7 +33,7 @@ Simulation::Simulation(const Dict& p) : System(p.at("TimeStep"), p.at("Radius"))
 }
 
 void Simulation::domain(vec3& min, vec3& max) {
- min = inf, max = -inf;
+ min = __builtin_inff(), max = -__builtin_inff();
  for(size_t i: range(1, membrane.H-1)) {
   for(size_t j: range(membrane.W)) {
    size_t stride = membrane.stride;

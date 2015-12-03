@@ -1,6 +1,6 @@
 #include "string.h"
-#include "math.h"
 #include "data.h"
+//#include "math.h"
 
 // -- string
 
@@ -147,11 +147,19 @@ String str(int64 number, uint pad, char padChar, uint base) {
 	return copyRef(string(buf+i,64-i));
 }
 
+#if 0
+static inline double log10(double x) { return __builtin_log10(x); }
+static inline double exp10(double x) { return __builtin_exp2(__builtin_log2(10)*x); }
+static inline double floor(double x) { return __builtin_floor(x); }
+static inline double round(double x) { return __builtin_round(x); }
+static inline bool isNaN(double x) { return x!=x; }
+static inline bool isNumber(double x) { return !isNaN(x) && x != __builtin_inf() && x != -__builtin_inf(); }
+
 String str(double n, uint precision, uint exponent, uint pad) {
     bool sign = n<0; n=abs(n);
     if(__builtin_isnan(n)) return ::right("NaN", pad);
-    if(n==::inf) return ::right("∞", pad+2);
-    if(n==-::inf) return ::right("-∞", pad+2);
+    if(n==__builtin_inf() || n==__builtin_inff()) return ::right("∞", pad+2);
+    if(n==-__builtin_inf() || n==-__builtin_inff()) return ::right("-∞", pad+2);
     int e=0;
     if(n && exponent && (n<1 || log10(n)>=precision+3/*4*/)) {
      e = floor(log10(n) / exponent) * exponent;
@@ -164,7 +172,7 @@ String str(double n, uint precision, uint exponent, uint pad) {
         uint64 decimal = round(fract*exp10(precision));
         uint exp10=1; for(uint i unused: range(precision)) exp10*=10; // Integer exp10(precision)
         if(decimal==exp10) integer++, decimal=0; // Rounds to ceiling integer
-        assert_(isNumber(integer)/*, integer, n*/);
+        assert_(isNumber(integer));
         s.append( str(uint64(integer)) );
         s.append('.');
         s.append( str(decimal, precision) );
@@ -178,6 +186,47 @@ String str(double n, uint precision, uint exponent, uint pad) {
 	if(pad > s.size) return right(s, pad);
 	return move(s);
 }
+#else
+static inline float log10(float x) { return __builtin_log10(x); }
+static inline float exp10(float x) { return __builtin_exp2(__builtin_log2(10)*x); }
+static inline float floor(float x) { return __builtin_floor(x); }
+static inline float round(float x) { return __builtin_round(x); }
+static inline bool isNaN(float x) { return x!=x; }
+static inline bool isNumber(float x) { return !isNaN(x) && x != __builtin_inff() && x != -__builtin_inff(); }
+
+String str(float n, uint precision, uint exponent, uint pad) {
+    bool sign = n<0; n=abs(n);
+    if(__builtin_isnan(n)) return ::right("NaN", pad);
+    if(n==__builtin_inff()) return ::right("∞", pad+2);
+    if(n==-__builtin_inff()) return ::right("-∞", pad+2);
+    int e=0;
+    if(n && exponent && (n<1 || log10(n)>=precision+3/*4*/)) {
+     e = floor(log10(n) / exponent) * exponent;
+     n /= exp10(e);
+    }
+    assert_(isNumber(n));
+    array<char> s;
+    if(sign) s.append('-');
+    if(precision && 0/*&& n!=round(n)*/) {
+        float integer=1, fract=__builtin_modff(n, &integer);
+        uint64 decimal = round(fract*exp10(precision));
+        uint exp10=1; for(uint i unused: range(precision)) exp10*=10; // Integer exp10(precision)
+        if(decimal==exp10) integer++, decimal=0; // Rounds to ceiling integer
+        assert_(isNumber(integer));
+        s.append( str(uint64(integer)) );
+        s.append('.');
+        s.append( str(decimal, precision) );
+        while(s.last()=='0') s.pop(); // Trim trailing zeroes
+        if(s.last()=='.') s.pop(); // Trim trailing dot
+    } else s.append( str(uint64(round(n))) );
+    if(exponent==3 && e==3) s.append('K');
+    else if(exponent==3 && e==6) s.append('M');
+    else if(exponent==3 && e==9) s.append('G');
+    else if(e) { s.append('e'); s.append(str(e)); }
+ if(pad > s.size) return right(s, pad);
+ return move(s);
+}
+#endif
 
 String binaryPrefix(uint64 value, string unit, string unitSuffix) {
     if(value < 1u<<10) return str(value, unit);

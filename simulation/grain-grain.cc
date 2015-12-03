@@ -14,7 +14,7 @@ void Simulation::stepGrainGrain() {
 
   const float verletDistance = 2*(2*Grain::radius/sqrt(3.)); // > Grain::radius + Grain::radius
   // Minimum distance over verlet distance parameter is the actual verlet distance which can be used
-  float minD = inf;
+  float minD = __builtin_inff();
 
   const int Y = lattice.size.y, X = lattice.size.x;
   const uint16* latticeNeighbours[62];

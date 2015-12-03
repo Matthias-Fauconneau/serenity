@@ -1,6 +1,6 @@
 #include "data.h"
 #include "string.h"
-#include "math.h"
+//#include "math.h"
 
 bool Data::wouldMatch(uint8 key) {
  if(available(1) && (uint8)peek() == key) return true;
@@ -252,13 +252,15 @@ string TextData::whileDecimal() {
  return slice(start,index-start);
 }
 
+static inline double exp10(double x) { return __builtin_exp2(__builtin_log2(10)*x); }
+
 double TextData::decimal() {
  if(!available(1)) return __builtin_nan("");
  double sign=1;
  if(match('-')) sign=-1; else match('+');
  double significand=0, decimal=0, eSign=1, exponent=0;
  if(match("∞")) return sign*__builtin_inf();
- if(match("NaN")) return nan;
+ if(match("NaN")) return __builtin_nan("");
  assert_(isInteger(), peek(16));
  //if(!isInteger()) return nan;
  for(bool gotDot=false, gotE=false; available(1);) {

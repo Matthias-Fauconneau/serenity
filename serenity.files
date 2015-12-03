@@ -7,6 +7,7 @@ build.h
 build.cc
 
 core/core.h
+core/data.cc
 core/memory.h
 core/array.h
 core/math.h

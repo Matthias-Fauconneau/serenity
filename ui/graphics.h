@@ -91,7 +91,7 @@ inline Rect operator +(vec2 offset, Rect rect) { return Rect(offset+rect.min,off
 /// Set of graphic elements
 struct Graphics : shareable {
  vec2 offset = 0;
- Rect bounds = Rect(inf, -inf); // bounding box of untransformed primitives
+ Rect bounds = Rect(__builtin_inff(), -__builtin_inff()); // bounding box of untransformed primitives
  array<Fill> fills;
  array<Blit> blits;
  array<Glyph> glyphs;

@@ -1,11 +1,11 @@
 #pragma once
-#include "math.h"
+//#include "math.h"
 #include "memory.h"
 #include "vector.h"
 #include "simd.h"
 #define sconst static constexpr
-
 constexpr size_t simd = 8; // SIMD size
+static inline constexpr float pow4(float x) { return x*x*x*x; }
 
 /// Evolving system of objects and obstacles interacting through contacts (SoA)
 struct System {
@@ -19,7 +19,7 @@ struct System {
  //const float normalDampingRate = ln(e) / sqrt(sq(PI)+ln(ln(e)));
  sconst float normalDampingRate = 1; // ~ ln e / √(π²+ln²e) [restitution coefficient e]
  sconst float dynamicFrictionCoefficient = 1;
- sconst float staticFrictionSpeed = inf;
+ sconst float staticFrictionSpeed = __builtin_inff();
  sconst float staticFrictionLength = 3 * mm; // ~ Wire::radius
  sconst float staticFrictionStiffness = 100 * 1*g*10/(1*mm); //k/F = F/L ~ Wire::mass*G/Wire::radius
  sconst float staticFrictionDamping = 1 * kg/s; // TODO: relative to k ?
@@ -134,23 +134,24 @@ struct System {
   buffer<float> Fy { capacity };
   buffer<float> Fz { capacity };
 
-  Membrane(float radius) : radius(radius), capacity(stride*H) {
+  Membrane(float radius) : radius(radius), capacity(H*stride) {
+   Vx.clear(); Vy.clear(); Vz.clear(); // TODO: Gear
    for(size_t i: range(H)) {
     for(size_t j: range(W)) {
      float z = i*height/(H-1);
      float a = 2*PI*(j+(i%2)*1./2)/(W);
      float x = radius*cos(a), y = radius*sin(a);
-     Px[simd+i*stride+j] = x;
-     Py[simd+i*stride+j] = y;
-     Pz[simd+i*stride+j] = z;
+     Px[i*stride+simd+j] = x;
+     Py[i*stride+simd+j] = y;
+     Pz[i*stride+simd+j] = z;
     }
     // Copies position back to repeated nodes
-    Px[simd+i*stride-1] = Px[simd+i*stride+W-1];
-    Py[simd+i*stride-1] = Py[simd+i*stride+W-1];
-    Pz[simd+i*stride-1] = Pz[simd+i*stride+W-1];
-    Px[simd+i*stride+W] = Px[simd+i*stride];
-    Py[simd+i*stride+W] = Py[simd+i*stride];
-    Pz[simd+i*stride+W] = Pz[simd+i*stride];
+    Px[i*stride+simd-1] = Px[i*stride+simd+W-1];
+    Py[i*stride+simd-1] = Py[i*stride+simd+W-1];
+    Pz[i*stride+simd-1] = Pz[i*stride+simd+W-1];
+    Px[i*stride+simd+W] = Px[i*stride+simd+0];
+    Py[i*stride+simd+W] = Py[i*stride+simd+0];
+    Pz[i*stride+simd+W] = Pz[i*stride+simd+0];
    }
   }
 

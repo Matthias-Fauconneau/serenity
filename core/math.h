@@ -10,41 +10,42 @@ generic inline constexpr T sq(const T x) { return x*x; }
 generic inline constexpr T cb(const T x) { return x*x*x; }
 
 inline float abs(float x) { return __builtin_fabsf(x); }
-inline double abs(double x) { return __builtin_fabs(x); }
+//inline double abs(double x) { return __builtin_fabs(x); }
 
-constexpr float nanf = __builtin_nanf("");
-constexpr double nan = __builtin_nan("");
+//constexpr float nanf = __builtin_nanf("");
+//constexpr double nan = __builtin_nan("");
 inline bool isNaN(float x) { return x!=x; }
-inline bool isNaN(double x) { return x!=x; }
-static constexpr float inf = __builtin_inff();
-inline bool isNumber(float x) { return !isNaN(x) && x !=inf && x !=-inf; }
+//inline bool isNaN(double x) { return x!=x; }
+//static constexpr float inf = __builtin_inff();
+inline bool isNumber(float x) { return !isNaN(x) && x != __builtin_inff() && x != -__builtin_inff(); }
 
 inline float floor(float x) { return __builtin_floorf(x); }
-inline double floor(double x) { return __builtin_floor(x); }
+//inline double floor(double x) { return __builtin_floor(x); }
 inline float fract(float x) { return x - floor(x); }
 inline float round(float x) { return __builtin_roundf(x); }
-inline double round(double x) { return __builtin_round(x); }
+//inline double round(double x) { return __builtin_round(x); }
 inline float ceil(float x) { return __builtin_ceilf(x); }
-inline double ceil(double x) { return __builtin_ceil(x); }
-inline double mod(double q, double d) { return __builtin_fmod(q, d); }
+//inline double ceil(double x) { return __builtin_ceil(x); }
+//inline double mod(double q, double d) { return __builtin_fmod(q, d); }
 inline float sqrt(float f) { return __builtin_sqrtf(f); }
-inline double sqrt(double f) { return __builtin_sqrt(f); }
-inline double pow(double x, double y) { return __builtin_pow(x,y); }
+//inline double sqrt(double f) { return __builtin_sqrt(f); }
+//inline double pow(double x, double y) { return __builtin_pow(x,y); }
 
-const double expUnderflow = -7.45133219101941108420e+02;
-const double expOverflow = 7.09782712893383973096e+02;
-inline double exp(double x) { assert(x>expUnderflow && x<expOverflow); return __builtin_exp(x); }
-inline double ln(double x) { return __builtin_log(x); }
+//const double expUnderflow = -7.45133219101941108420e+02;
+//const double expOverflow = 7.09782712893383973096e+02;
+//inline double exp(double x) { assert(x>expUnderflow && x<expOverflow); return __builtin_exp(x); }
+//inline double ln(double x) { return __builtin_log(x); }
 
-constexpr double PI = 3.14159265358979323846;
-inline double cos(double t) { return __builtin_cos(t); }
+constexpr float/*double*/ PI = 3.14159265358979323846;
+//inline double cos(double t) { return __builtin_cos(t); }
 inline float cos(float t) { return __builtin_cos(t); }
-inline double acos(double t) { return __builtin_acos(t); }
-inline double sin(double t) { return __builtin_sin(t); }
+inline float acos(float t) { return __builtin_acos(t); }
+//inline double acos(double t) { return __builtin_acos(t); }
+//inline double sin(double t) { return __builtin_sin(t); }
 inline float sin(float t) { return __builtin_sin(t); }
-inline double asin(double t) { return __builtin_asin(t); }
-inline double tan(double t) { return __builtin_tan(t); }
-inline double atan(double y, double x) { return __builtin_atan2(y, x); }
+//inline double asin(double t) { return __builtin_asin(t); }
+//inline double tan(double t) { return __builtin_tan(t); }
+//inline double atan(double y, double x) { return __builtin_atan2(y, x); }
 inline float atan(float y, float x) { return __builtin_atan2f(y, x); }
 /*inline float atan(float y, float x) {
    static constexpr float c1 = PI/4, c2 = 3*c1;
@@ -55,19 +56,19 @@ inline float atan(float y, float x) { return __builtin_atan2f(y, x); }
    if(y < 0) return -angle; else return angle;
 }*/
 
-inline float gaussian(float sigma, float x) { return exp(-sq(x/sigma)/2); }
+//inline float gaussian(float sigma, float x) { return exp(-sq(x/sigma)/2); }
 
-inline double exp2(double x) { return __builtin_exp2(x); }
-inline double log2(double x) { return __builtin_log2(x); }
-inline double exp10(double x) { return __builtin_exp2(__builtin_log2(10)*x); }
-inline double log10(double x) { return __builtin_log10(x); }
+//inline double exp2(double x) { return __builtin_exp2(x); }
+//inline double log2(double x) { return __builtin_log2(x); }
+//inline double exp10(double x) { return __builtin_exp2(__builtin_log2(10)*x); }
+//inline double log10(double x) { return __builtin_log10(x); }
 
-constexpr float pow4(float x) { return x*x*x*x; }
-constexpr float pow5(float x) { return x*x*x*x*x; }
+//constexpr float pow4(float x) { return x*x*x*x; }
+//constexpr float pow5(float x) { return x*x*x*x*x; }
 
 // -> \file algorithm.h
 
-template<Type A, Type F> A reduce(range range, F fold, A accumulator) {
+/*template<Type A, Type F> A reduce(range range, F fold, A accumulator) {
 	for(size_t index: range) accumulator = fold(accumulator, index);
 	return accumulator;
 }
@@ -94,5 +95,5 @@ template<Type T, size_t N> T max(const T (&a)[N]) { return max(ref<T>(a)); }
 
 generic size_t argmax(const ref<T>& a) { size_t argmax=0; for(size_t i: range(a.size)) if(a[i] > a[argmax]) argmax=i; return argmax; }
 
-generic T mean(const ref<T> values) { return sum(values) / float(values.size); }
+generic T mean(const ref<T> values) { return sum(values) / float(values.size); }*/
 //inline double mean(const ref<float> v) { return sum(v, 0.)/v.size; }

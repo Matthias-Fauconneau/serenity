@@ -174,7 +174,7 @@ void Simulation::stepGrainWire() {
   assert_(verletDistance > Grain::radius + Wire::radius);
   assert_(verletDistance <= Grain::radius + Grain::radius);
   // Minimum distance over verlet distance parameter is the actual verlet distance which can be used
-  float minD = inf;
+  float minD = __builtin_inff();
 
   const int X = grid.size.x, Y = grid.size.y;
   const uint16* wireNeighbours[3*3] = {
