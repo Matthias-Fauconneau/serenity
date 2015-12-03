@@ -104,7 +104,7 @@ struct System {
  struct Membrane {
   sconst float density = 1000 * kg / cb(m);
   sconst float curvature = 0;
-  sconst float elasticModulus = 1e0 * MPa;
+  sconst float elasticModulus = 1e-1 * MPa; // 0
   sconst float poissonRatio = 0.48;
 
   sconst float resolution = Grain::radius;

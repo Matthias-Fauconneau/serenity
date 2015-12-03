@@ -83,3 +83,4 @@ disasm.cc
 simulation/wire.cc
 core/parallel.cc
 simulation/grain-membrane.cc
+simulation/membrane.cc

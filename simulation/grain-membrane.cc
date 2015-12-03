@@ -166,8 +166,13 @@ void Simulation::stepGrainMembrane() {
 
   vec3 min, max; domain(min, max);
   Grid grid(1/(Grain::radius+Grain::radius), min, max);
-  for(size_t i: range(membrane.count))
-   grid.cell(membrane.Px[i], membrane.Py[i], membrane.Pz[i]).append(1+i);
+  for(size_t i: range(1, membrane.H-1)) {
+   for(size_t j: range(membrane.W)) {
+    size_t stride = membrane.stride;
+    size_t k = i*stride+simd+j;
+    grid.cell(membrane.Px[k], membrane.Py[k], membrane.Pz[k]).append(1+k);
+   }
+  }
 
   const float verletDistance = 2*(2*Grain::radius/sqrt(3.)) - (Grain::radius+0);
   //const float verletDistance = Grain::radius + Grain::radius;

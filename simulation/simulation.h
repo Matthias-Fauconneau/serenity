@@ -23,6 +23,7 @@ struct Simulation : System {
  Random random;
  float currentHeight = Grain::radius;
  float lastAngle = 0, winchAngle = 0, currentWinchRadius = patternRadius;
+ float pressure = 0;
 
  // Grain-Bottom
  buffer<uint> oldGrainBottomA;
@@ -219,6 +220,10 @@ struct Simulation : System {
   uint64 grainWireEvaluateTime = 0;
   tsc grainWireSumTime;
   size_t grainWireContactSizeSum;
+ void stepGrainIntegration();
+  uint64 grainIntegrationTime = 0;
+
+ void stepMembrane();
  void stepGrainMembrane();
    uint64 grainMembraneSearchTime = 0;
    uint64 grainMembraneFilterTime = 0;
@@ -226,8 +231,8 @@ struct Simulation : System {
    uint64 grainMembraneEvaluateTime = 0;
    tsc grainMembraneSumTime;
    size_t grainMembraneContactSizeSum;
- void stepGrainIntegration();
-  uint64 grainIntegrationTime = 0;
+ void stepMembraneIntegration();
+
  void stepWire();
   uint64 wireInitializationTime = 0;
  void stepWireTension();

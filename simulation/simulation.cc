@@ -4,10 +4,11 @@
 //#include "grain-bottom.h"
 //#include "grain-side.h"
 //#include "grain-grain.h"
-//#include "wire.h"
-//#include "grain-wire.h"
+//#include "membrane.h"
 //#include "grain-membrane.h"
+//#include "wire.h"
 //#include "wire-bottom.h"
+//#include "grain-wire.h"
 #include "parallel.h"
 
 constexpr float System::staticFrictionLength;
@@ -33,6 +34,18 @@ Simulation::Simulation(const Dict& p) : System(p.at("TimeStep"), p.at("Radius"))
 
 void Simulation::domain(vec3& min, vec3& max) {
  min = inf, max = -inf;
+ for(size_t i: range(1, membrane.H-1)) {
+  for(size_t j: range(membrane.W)) {
+   size_t stride = membrane.stride;
+   min.x = ::min(min.x, membrane.Px[i*stride+simd+j]);
+   max.x = ::max(max.x, membrane.Px[i*stride+simd+j]);
+   min.y = ::min(min.y, membrane.Py[i*stride+simd+j]);
+   max.y = ::max(max.y, membrane.Py[i*stride+simd+j]);
+   min.z = ::min(min.z, membrane.Pz[i*stride+simd+j]);
+   max.z = ::max(max.z, membrane.Pz[i*stride+simd+j]);
+  }
+ }
+ assert_(::max(::max((max-min).x, (max-min).y), (max-min).z) < 32, "membrane", min, max, ::max(::max((max-min).x, (max-min).y), (max-min).z));
  for(size_t i: range(grain.count)) {
   assert(isNumber(grain.Px[i]));
   min.x = ::min(min.x, grain.Px[i]);
@@ -57,21 +70,27 @@ void Simulation::domain(vec3& min, vec3& max) {
 }
 
 void Simulation::step() {
- stepProcess();
+ /*stepProcess();
 
  stepGrain();
  stepGrainBottom();
- if(processState == ProcessState::Pour) stepGrainSide();
- else stepGrainMembrane();
- stepGrainGrain();
+ //if(processState == ProcessState::Pour) stepGrainSide();
+ stepGrainGrain();*/
+
+ //if(processState > ProcessState::Pour) {
+  stepMembrane();
+  //stepGrainMembrane();
+ //}
 
  stepWire();
  stepGrainWire();
  stepWireTension();
  stepWireBendingResistance();
  stepWireBottom();
- stepWireIntegration();
+
  stepGrainIntegration();
+ stepMembraneIntegration();
+ stepWireIntegration();
 
  timeStep++;
 }
