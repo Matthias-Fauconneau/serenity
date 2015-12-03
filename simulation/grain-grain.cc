@@ -187,7 +187,7 @@ void Simulation::stepGrainGrain() {
    v8sf localBy = gather(grainGrainLocalBy, contacts);
    v8sf localBz = gather(grainGrainLocalBz, contacts);
    // FIXME: inline full SIMD
-   contact<Grain, Grain>( grain, A, grain, B, depth,
+   contact<Grain, Grain>(grain, A, grain, B, depth,
                           RAx, RAy, RAz,
                           RBx, RBy, RBz,
                           Nx, Ny, Nz,

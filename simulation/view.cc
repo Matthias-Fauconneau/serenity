@@ -66,8 +66,8 @@ struct SimulationView : Simulation, Widget {
    window->setTitle(str( str(timeStep*dt, 1u)+"s"_,
                          str(timeStep*dt/totalTime.seconds(), 1u)+"x"_,
                          strD(stepTimeRT, totalTime)));
-   if(!stepProfile(totalTime)) {
-    window->setTitle("Error");
+   if(!run(totalTime)) {
+    window->setTitle("Done");
     running = false;
    }
    record(); viewT=states.size-1;

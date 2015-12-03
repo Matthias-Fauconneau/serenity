@@ -45,7 +45,7 @@ void Simulation::domain(vec3& min, vec3& max) {
    max.z = ::max(max.z, membrane.Pz[i*stride+simd+j]);
   }
  }
- assert_(::max(::max((max-min).x, (max-min).y), (max-min).z) < 32, "membrane", min, max, ::max(::max((max-min).x, (max-min).y), (max-min).z));
+ assert_(::max(::max((max-min).x, (max-min).y), (max-min).z) < 16, "membrane", min, max, ::max(::max((max-min).x, (max-min).y), (max-min).z));
  for(size_t i: range(grain.count)) {
   assert(isNumber(grain.Px[i]));
   min.x = ::min(min.x, grain.Px[i]);
@@ -57,7 +57,7 @@ void Simulation::domain(vec3& min, vec3& max) {
   min.z = ::min(min.z, grain.Pz[i]);
   max.z = ::max(max.z, grain.Pz[i]);
  }
- assert_(::max(::max((max-min).x, (max-min).y), (max-min).z) < 32, "grain", min, max);
+ assert_(::max(::max((max-min).x, (max-min).y), (max-min).z) < 16, "grain", min, max);
  for(size_t i: range(wire.count)) {
   min.x = ::min(min.x, wire.Px[i]);
   max.x = ::max(max.x, wire.Px[i]);
@@ -66,7 +66,7 @@ void Simulation::domain(vec3& min, vec3& max) {
   min.z = ::min(min.z, wire.Pz[i]);
   max.z = ::max(max.z, wire.Pz[i]);
  }
- assert_(::max(::max((max-min).x, (max-min).y), (max-min).z) < 32, "wire", min, max);
+ assert_(::max(::max((max-min).x, (max-min).y), (max-min).z) < 16, "wire", min, max);
 }
 
 void Simulation::step() {
@@ -227,7 +227,7 @@ static inline buffer<int> coreFrequencies() {
  return coreFrequencies;
 }
 
-bool Simulation::stepProfile(const Time& totalTime) {
+bool Simulation::run(const Time& totalTime) {
  stepTimeRT.start();
  stepTime.start();
  for(int unused t: range(1/(dt*60))) step();
@@ -236,6 +236,16 @@ bool Simulation::stepProfile(const Time& totalTime) {
  if(timeStep%(2*60*size_t(1/(dt*60))) == 0) {
   log(coreFrequencies());
   profile(totalTime);
+ }
+ if(processState == Pressure) log("Pressure", int(round(pressure)), "Pa");
+ if(processState == Load) {
+  float height = topZ-bottomZ;
+  float strain = 1-height/topZ0;
+  float area = PI*sq(membrane.radius);
+  float force = topForceZ + bottomForceZ;
+  float stress = force / area;
+  log(str(int(round(strain*100)))+"%"_, int(round(stress)), "Pa");
+  if(strain > 1./8) return false;
  }
  return true;
 }

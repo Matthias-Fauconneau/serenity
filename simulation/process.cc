@@ -4,10 +4,21 @@ void Simulation::stepProcess() {
 
  // Process
  if(currentHeight >= topZ-Grain::radius || grain.count == grain.capacity) {
-  processState = Load;
-  //currentSideRadius += 2 * Grain::radius / s * dt;
-  topZ -= dt * plateSpeed;
-  bottomZ += dt * plateSpeed;
+  const float targetPressure = 1000;
+  if(pressure < targetPressure) {
+   processState = Pressure;
+   pressure += dt*targetPressure;
+  } else {
+   if(processState  < Load) { // Fits plate (Prevents initial decompression)
+    float topZ = 0;
+    for(float z: grain.Pz.slice(0, grain.count)) topZ = ::max(topZ, z+Grain::radius);
+    this->topZ = ::min(this->topZ, topZ);
+    topZ0 = this->topZ;
+    processState = Load;
+   }
+   topZ -= dt * plateSpeed;
+   bottomZ += dt * plateSpeed;
+  }
  } else {
   // Increases current height
   currentHeight += verticalSpeed * dt;

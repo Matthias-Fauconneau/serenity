@@ -17,10 +17,9 @@ void Simulation::stepMembrane() {
  int dx[2][6] {{0, -1, -1, -1, 0, 1},{1, 0, -1, 0, 1, 1}};
  int stride = membrane.stride, W = membrane.W;
  for(int i=0; i<2; i++) for(int e=0; e<6; e++) D[i][e] = dy[e]*stride+dx[i][e];
- //v8sf P = float8(pressure/(2*3)); // area = length(cross)/2 / 3 vertices
+ v8sf P = float8(pressure/(2*3)); // area = length(cross)/2 / 3 vertices
  v8sf internodeLength = float8(membrane.internodeLength);
  v8sf tensionStiffness = float8(membrane.tensionStiffness);
- //v8sf tensionStiffness_internodeLength = float8(membrane.tensionStiffness*membrane.internodeLength);
 
  // Tension from first row
  {
@@ -104,7 +103,7 @@ void Simulation::stepMembrane() {
     FY[3] += ty;
     FZ[3] += tz;
    }
-   /*for(size_t a: range(2)) {
+   for(size_t a: range(2)) {
     int b = a+1; // TODO: Assert peeled
     v8sf px = (Y[a]*Z[b] - Y[b]*Z[a]);
     v8sf py = (Z[a]*X[b] - Z[b]*X[a]);
@@ -121,7 +120,7 @@ void Simulation::stepMembrane() {
     FX[3] += ppx;
     FY[3] += ppy;
     FZ[3] += ppz;
-   }*/
+   }
    for(int a=0; a<3; a++) {
     int e = E[a];
     storeu(Fx, e, loadu(Fx, e) + FX[a]);
@@ -178,7 +177,7 @@ void Simulation::stepMembraneIntegration() {
  v8sf maxMembraneV8 = _0f;
  float* const Fx = membrane.Fx.begin(), *Fy = membrane.Fy.begin(), *Fz = membrane.Fz.begin();
  float* const pVx = membrane.Vx.begin(), *pVy = membrane.Vy.begin(), *pVz = membrane.Vz.begin();
- float* const Px = membrane.Px.begin(), *Py = membrane.Py.begin(), *Pz = membrane.Pz.begin();
+ float* const pPx = membrane.Px.begin(), *pPy = membrane.Py.begin(), *pPz = membrane.Pz.begin();
  for(size_t i=1; i<membrane.H-1; i+=1) {
   size_t W = membrane.W, stride = membrane.stride;
   // Adds force from repeated nodes
@@ -198,18 +197,22 @@ void Simulation::stepMembraneIntegration() {
    store(pVx, k, Vx);
    store(pVy, k, Vy);
    store(pVz, k, Vz);
-   store(Px, k, load(Px, k) + dt * Vx);
-   store(Py, k, load(Py, k) + dt * Vy);
-   store(Pz, k, load(Pz, k) + dt * Vz);
+   const v8sf Px = load(pPx, k) + dt * Vx;
+   const v8sf Py = load(pPy, k) + dt * Vy;
+   v8sf Pz = load(pPz, k) + dt * Vz;
+   Pz = min(float8(topZ), Pz);
+   store(pPx, k, Px);
+   store(pPy, k, Py);
+   store(pPz, k, Pz);
    maxMembraneV8 = max(maxMembraneV8, sqrt(Vx*Vx + Vy*Vy + Vz*Vz));
   }
   // Copies position back to repeated nodes
-  Px[i*stride+simd-1] = Px[i*stride+simd+W-1];
-  Py[i*stride+simd-1] = Py[i*stride+simd+W-1];
-  Pz[i*stride+simd-1] = Pz[i*stride+simd+W-1];
-  Px[i*stride+simd+W] = Px[i*stride+simd+0];
-  Py[i*stride+simd+W] = Py[i*stride+simd+0];
-  Pz[i*stride+simd+W] = Pz[i*stride+simd+0];
+  pPx[i*stride+simd-1] = pPx[i*stride+simd+W-1];
+  pPy[i*stride+simd-1] = pPy[i*stride+simd+W-1];
+  pPz[i*stride+simd-1] = pPz[i*stride+simd+W-1];
+  pPx[i*stride+simd+W] = pPx[i*stride+simd+0];
+  pPy[i*stride+simd+W] = pPy[i*stride+simd+0];
+  pPz[i*stride+simd+W] = pPz[i*stride+simd+0];
  }
  float maxMembraneV = 0;
  for(size_t k: range(simd)) maxMembraneV = ::max(maxMembraneV, maxMembraneV8[k]);

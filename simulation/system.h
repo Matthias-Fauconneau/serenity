@@ -107,7 +107,7 @@ struct System {
   sconst float elasticModulus = 1 * MPa;
   sconst float poissonRatio = 0.48;
 
-  sconst float resolution = Grain::radius;
+  sconst float resolution = Grain::radius/2;
   const float radius;
   const int W = int(2*PI*radius/resolution)/simd*simd;
   const int stride = simd+W+simd;

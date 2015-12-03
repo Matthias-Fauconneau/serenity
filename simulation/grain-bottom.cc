@@ -116,6 +116,7 @@ void Simulation::stepGrainBottom() {
  }, 1);
 
  grainBottomSumTime.start();
+ float bottomForceZ = 0;
  for(size_t i=0; i<grainBottomA.size; i++) { // Scalar scatter add
   size_t a = grainBottomA[i];
   grain.Fx[a] += grainBottomFx[i];
@@ -124,6 +125,8 @@ void Simulation::stepGrainBottom() {
   grain.Tx[a] += grainBottomTAx[i];
   grain.Ty[a] += grainBottomTAy[i];
   grain.Tz[a] += grainBottomTAz[i];
+  bottomForceZ += grainBottomFz[i];
  }
+ this->bottomForceZ = bottomForceZ;
  grainBottomSumTime.stop();
 }

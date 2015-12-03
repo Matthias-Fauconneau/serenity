@@ -18,14 +18,17 @@ struct Simulation : System {
  const float plateSpeed = 0.01 * m/s;
 
  // Process variables
- enum ProcessState { Pour, Load, Error };
+ enum ProcessState { Pour, Pressure, Load, Error };
  //sconst string processStates[] {"pour", "load", "error"};
  ProcessState processState = Pour;
  Random random;
  float currentHeight = Grain::radius;
  float lastAngle = 0, winchAngle = 0, currentWinchRadius = patternRadius;
  float pressure = 0;
- float bottomZ = 0, topZ = membrane.height;
+ float bottomZ = 0, topZ = membrane.height, topZ0;
+
+ // Results
+ float bottomForceZ = 0, topForceZ = 0;
 
  // Grain-Bottom
  buffer<uint> oldGrainBottomA;
@@ -285,7 +288,7 @@ struct Simulation : System {
 #define invariant
 #endif
   void profile(const Time& totalTime);
-  bool stepProfile(const Time& totalTime);
+  bool run(const Time& totalTime);
    Time stepTimeRT;
    tsc stepTime;
 };

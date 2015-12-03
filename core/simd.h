@@ -45,6 +45,7 @@ static inline void storeu(mref<float> a, size_t index, v8sf v) {
 static inline v8sf /*operator&*/mask(v8ui a, v8sf b) { return (v8sf)(a & (v8ui)b); }
 static inline v8sf /*operator|*/merge(v8sf a, v8sf b) { return (v8sf)((v8ui)a | (v8ui)b); }
 
+static inline v8sf min(v8sf a, v8sf b) { return __builtin_ia32_minps256(a, b); }
 static inline v8sf max(v8sf a, v8sf b) { return __builtin_ia32_maxps256(a, b); }
 static inline v8sf sqrt(v8sf x) { return __builtin_ia32_sqrtps256(x); }
 

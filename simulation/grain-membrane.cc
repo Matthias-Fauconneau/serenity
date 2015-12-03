@@ -205,7 +205,7 @@ void Simulation::stepGrainMembrane() {
   swap(oldGrainMembraneLocalBy, grainMembraneLocalBy);
   swap(oldGrainMembraneLocalBz, grainMembraneLocalBz);
 
-  static constexpr size_t averageGrainMembraneContactCount = 8;
+  static constexpr size_t averageGrainMembraneContactCount = 16;
   const size_t GWcc = align(simd, grain.count * averageGrainMembraneContactCount + 1);
   if(GWcc > grainMembraneA.capacity) {
    grainMembraneA = buffer<uint>(GWcc, 0);
