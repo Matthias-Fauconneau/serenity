@@ -2,9 +2,9 @@
 
 void Simulation::stepProcess() {
  // Process
- if(currentHeight >= targetHeight || grain.count == grain.capacity) {
-  processState = Release;
-  currentSideRadius += 2 * Grain::radius / s * dt;
+ if(currentHeight >= membrane.height || grain.count == grain.capacity) {
+  processState = Load;
+  //currentSideRadius += 2 * Grain::radius / s * dt;
  } else {
   // Increases current height
   currentHeight += verticalSpeed * dt;

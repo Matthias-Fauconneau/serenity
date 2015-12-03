@@ -8,9 +8,7 @@
 struct Simulation : System {
  // Process parameters
  sconst float Gz = -10 * N/kg; // Gravity
- const float initialRadius;
- const float targetHeight = initialRadius * 2;
- const float patternRadius = initialRadius - Grain::radius;
+ const float patternRadius = membrane.radius - Grain::radius;
  enum Pattern { None, Helix, Cross, Loop };
  sconst string patterns[] {"none", "helix", "radial", "spiral"};
  const Pattern pattern;
@@ -19,13 +17,12 @@ struct Simulation : System {
  const float loopAngle = PI*(3-sqrt(5.));
 
  // Process variables
- enum ProcessState { Pour, Release, Done, Error };
- //sconst string processStates[] {"pour", "release", "done", "error"};
+ enum ProcessState { Pour, Load, Error };
+ //sconst string processStates[] {"pour", "load", "error"};
  ProcessState processState = Pour;
  Random random;
  float currentHeight = Grain::radius;
  float lastAngle = 0, winchAngle = 0, currentWinchRadius = patternRadius;
- float currentSideRadius = initialRadius;
 
  // Grain-Bottom
  buffer<uint> oldGrainBottomA;
@@ -162,6 +159,37 @@ struct Simulation : System {
  buffer<float> grainWireTAy;
  buffer<float> grainWireTAz;
 
+ // Grain - Membrane
+ float grainMembraneGlobalMinD = 0;
+ uint grainMembraneSkipped = 0;
+
+ buffer<uint> oldGrainMembraneA;
+ buffer<uint> oldGrainMembraneB;
+ buffer<float> oldGrainMembraneLocalAx;
+ buffer<float> oldGrainMembraneLocalAy;
+ buffer<float> oldGrainMembraneLocalAz;
+ buffer<float> oldGrainMembraneLocalBx;
+ buffer<float> oldGrainMembraneLocalBy;
+ buffer<float> oldGrainMembraneLocalBz;
+
+ buffer<uint> grainMembraneA;
+ buffer<uint> grainMembraneB;
+ buffer<float> grainMembraneLocalAx;
+ buffer<float> grainMembraneLocalAy;
+ buffer<float> grainMembraneLocalAz;
+ buffer<float> grainMembraneLocalBx;
+ buffer<float> grainMembraneLocalBy;
+ buffer<float> grainMembraneLocalBz;
+
+ buffer<uint> grainMembraneContact;
+
+ buffer<float> grainMembraneFx;
+ buffer<float> grainMembraneFy;
+ buffer<float> grainMembraneFz;
+ buffer<float> grainMembraneTAx;
+ buffer<float> grainMembraneTAy;
+ buffer<float> grainMembraneTAz;
+
  Simulation(const Dict& p);
  void domain(vec3& min, vec3& max);
  void step();
@@ -191,6 +219,13 @@ struct Simulation : System {
   uint64 grainWireEvaluateTime = 0;
   tsc grainWireSumTime;
   size_t grainWireContactSizeSum;
+ void stepGrainMembrane();
+   uint64 grainMembraneSearchTime = 0;
+   uint64 grainMembraneFilterTime = 0;
+   //tsc grainMembraneEvaluateTime;
+   uint64 grainMembraneEvaluateTime = 0;
+   tsc grainMembraneSumTime;
+   size_t grainMembraneContactSizeSum;
  void stepGrainIntegration();
   uint64 grainIntegrationTime = 0;
  void stepWire();

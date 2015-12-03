@@ -6,6 +6,7 @@
 //#include "grain-grain.h"
 //#include "wire.h"
 //#include "grain-wire.h"
+//#include "grain-membrane.h"
 //#include "wire-bottom.h"
 #include "parallel.h"
 
@@ -20,7 +21,7 @@ constexpr float System::Wire::tensionDamping;
 constexpr float System::Wire::bendStiffness;
 constexpr string Simulation::patterns[];
 
-Simulation::Simulation(const Dict& p) : System(p.at("TimeStep")), initialRadius(p.at("Radius")),
+Simulation::Simulation(const Dict& p) : System(p.at("TimeStep"), p.at("Radius")),
   pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):None) {
  if(pattern) { // Initial wire node
   size_t i = wire.count++;
@@ -60,7 +61,8 @@ void Simulation::step() {
 
  stepGrain();
  stepGrainBottom();
- if(processState < ProcessState::Done) stepGrainSide();
+ if(processState == ProcessState::Pour) stepGrainSide();
+ else stepGrainMembrane();
  stepGrainGrain();
 
  stepWire();

@@ -15,7 +15,9 @@ struct System {
  sconst float mm = 1e-3*m, g = 1e-3*kg, MPa = 1e6 * Pa;
 
  // Contact parameters
- sconst float normalDampingRate = 1e0 / s;
+ //sconst float e = 1./2; // Restitution coefficient
+ //const float normalDampingRate = ln(e) / sqrt(sq(PI)+ln(ln(e)));
+ sconst float normalDampingRate = 1; // ~ ln e / √(π²+ln²e) [restitution coefficient e]
  sconst float dynamicFrictionCoefficient = 1;
  sconst float staticFrictionSpeed = inf;
  sconst float staticFrictionLength = 3 * mm; // ~ Wire::radius
@@ -99,9 +101,67 @@ struct System {
   const vec3 force(size_t i) const { return vec3(Fx[i], Fy[i], Fz[i]);  }
  } wire;
 
+ struct Membrane {
+  sconst float density = 1000 * kg / cb(m);
+  sconst float curvature = 0;
+  sconst float elasticModulus = 1e0 * MPa;
+  sconst float poissonRatio = 0.48;
+
+  sconst float resolution = Grain::radius;
+  const float radius;
+  const float height = radius * 2;
+  const size_t W = int(2*PI*radius/resolution)/simd*simd;
+  const size_t stride = simd+W+simd;
+  const size_t H = int(height/resolution*2/sqrt(3.))+1;
+  const float internodeLength = 2*PI*radius/W;
+  sconst float thickness = 1 * mm;
+  const float tensionElasticModulus = elasticModulus;
+  const float mass = sqrt(3.)/2 * sq(internodeLength) * thickness * density;
+  const float tensionStiffness = sqrt(3.)/2 * internodeLength * thickness * tensionElasticModulus;
+  //float tensionDamping = mass / s;
+  //sconst float areaMomentOfInertia = pow4(1*mm); // FIXME
+  //const float bendStiffness = 0;//elasticModulus * areaMomentOfInertia / internodeLength; // FIXME
+
+  const size_t capacity;
+  const size_t count = capacity;
+  buffer<float> Px { capacity };
+  buffer<float> Py { capacity };
+  buffer<float> Pz { capacity };
+  buffer<float> Vx { capacity };
+  buffer<float> Vy { capacity };
+  buffer<float> Vz { capacity };
+  buffer<float> Fx { capacity };
+  buffer<float> Fy { capacity };
+  buffer<float> Fz { capacity };
+
+  Membrane(float radius) : radius(radius), capacity(stride*H) {
+   for(size_t i: range(H)) {
+    for(size_t j: range(W)) {
+     float z = i*height/(H-1);
+     float a = 2*PI*(j+(i%2)*1./2)/(W);
+     float x = radius*cos(a), y = radius*sin(a);
+     Px[simd+i*stride+j] = x;
+     Py[simd+i*stride+j] = y;
+     Pz[simd+i*stride+j] = z;
+    }
+    // Copies position back to repeated nodes
+    Px[simd+i*stride-1] = Px[simd+i*stride+W-1];
+    Py[simd+i*stride-1] = Py[simd+i*stride+W-1];
+    Pz[simd+i*stride-1] = Pz[simd+i*stride+W-1];
+    Px[simd+i*stride+W] = Px[simd+i*stride];
+    Py[simd+i*stride+W] = Py[simd+i*stride];
+    Pz[simd+i*stride+W] = Pz[simd+i*stride];
+   }
+  }
+
+  const vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]);  }
+  const vec3 velocity(size_t i) const { return vec3(Vx[i], Vy[i], Vz[i]);  }
+  const vec3 force(size_t i) const { return vec3(Fx[i], Fy[i], Fz[i]);  }
+ } membrane;
+
  size_t timeStep = 0;
 
- System(float dt) : dt(dt) {}
+ System(float dt, float radius) : dt(dt), membrane(radius) {}
 
  /// Evaluates contact force between an object and an obstacle with friction (non-rotating A)
  // Wire - Floor/Side

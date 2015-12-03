@@ -34,6 +34,13 @@ struct SimulationView : Simulation, Widget {
    buffer<float> Pz;
    vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]); }
   } wire;
+  struct Membrane {
+   size_t count = 0;
+   buffer<float> Px;
+   buffer<float> Py;
+   buffer<float> Pz;
+   vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]); }
+  } membrane;
   float radius;
  };
  array<State> states;
@@ -87,7 +94,12 @@ struct SimulationView : Simulation, Widget {
   state.wire.Py = copy(wire.Py);
   state.wire.Pz = copy(wire.Pz);
 
-  state.radius = currentSideRadius;
+  state.membrane.count = membrane.count;
+  state.membrane.Px = copy(membrane.Px);
+  state.membrane.Py = copy(membrane.Py);
+  state.membrane.Pz = copy(membrane.Pz);
+
+  state.radius = membrane.radius;
   states.append(::move(state));
  }
 
@@ -103,7 +115,7 @@ struct SimulationView : Simulation, Widget {
   array<vec4> grainRotations (state.grain.count); // Rotated, Z-Sorted
   array<size_t> grainIndices (state.grain.count);
   {
-   vec3 min = -initialRadius, max = vec3(initialRadius);
+   vec3 min = -membrane.radius, max = vec3(membrane.radius);
    for(size_t i: range(state.grain.count)) {
     vec3 O = qapply(viewRotation, state.grain.position(i));
     min = ::min(min, O - vec3(grain.radius));
@@ -215,6 +227,35 @@ struct SimulationView : Simulation, Widget {
     vertexArray.draw(Triangles, positions.size);
    }
   }
+
+  if(state.membrane.count) {
+   static GLShader shader {::shader_glsl(), {"color"}};
+   shader.bind();
+   shader.bindFragments({"color"});
+   shader["transform"] = rotatedViewProjection;
+
+   const size_t W = membrane.W, stride=membrane.stride;
+   buffer<vec3> positions {W*(membrane.H-1)*6-W*2};
+   size_t s = 0;
+   for(size_t i: range(membrane.H-1)) for(size_t j: range(W)) {
+    vec3 a (state.membrane.position(simd+i*stride+j));
+    vec3 b (state.membrane.position(simd+i*stride+(j+1)%W));
+    vec3 c (state.membrane.position(simd+(i+1)*stride+(j+i%2)%W));
+    // FIXME: GPU projection
+    vec3 A = a, B = b, C = c;
+    positions[s+0] = C; positions[s+1] = A;
+    positions[s+2] = B; positions[s+3] = C;
+    if(i) { positions[s+4] = A; positions[s+5] = B; s += 6; }
+    else s += 4;
+   }
+   assert_(s <= positions.size && s, membrane.W, membrane.H);
+   positions.size = s;
+   static GLVertexArray vertexArray;
+   GLBuffer positionBuffer (positions);
+   vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
+   vertexArray.draw(Lines, positions.size);
+  }
+
 
   // Radius
   {

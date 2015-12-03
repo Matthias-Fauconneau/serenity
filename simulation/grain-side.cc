@@ -33,7 +33,7 @@ void Simulation::stepGrainSide() {
   size_t grainSideI = 0; // Index of first contact with A in old grainSide[Local]A|B list
   grainSideFilterTime.start();
   for(size_t a: range(grain.count)) { // TODO: SIMD
-   if(sq(grain.Px[a]) + sq(grain.Py[a]) < sq(currentSideRadius - Grain::radius)) continue;
+   if(sq(grain.Px[a]) + sq(grain.Py[a]) < sq(membrane.radius - Grain::radius)) continue;
    grainSideA.append( a ); // Grain
    size_t j = grainSideI;
    if(grainSideI < oldGrainSideA.size && oldGrainSideA[grainSideI] == a) {
@@ -88,7 +88,7 @@ void Simulation::stepGrainSide() {
   v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
   v8sf length = sqrt(Ax*Ax + Ay*Ay);
   v8sf Nx = -Ax/length, Ny = -Ay/length;
-  v8sf depth = length - float8(currentSideRadius-Grain::radius);
+  v8sf depth = length - float8(membrane.radius-Grain::radius);
   // Gather static frictions
   v8sf localAx = *(v8sf*)(grainSideLocalAx.data+index);
   v8sf localAy = *(v8sf*)(grainSideLocalAy.data+index);

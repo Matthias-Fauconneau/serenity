@@ -1,15 +1,15 @@
-// TODO: Cylinder contacts
+// TODO: Face contacts
 #include "simulation.h"
 #include "parallel.h"
 
-static inline void evaluateGrainWire(const size_t start, const size_t size,
-                                     const uint* grainWireContact, const size_t unused grainWireContactSize,
-                                     const uint* grainWireA, const uint* grainWireB,
+static inline void evaluateGrainMembrane(const size_t start, const size_t size,
+                                     const uint* grainMembraneContact, const size_t unused grainMembraneContactSize,
+                                     const uint* grainMembraneA, const uint* grainMembraneB,
                                      const float* grainPx, const float* grainPy, const float* grainPz,
-                                     const float* wirePx, const float* wirePy, const float* wirePz,
+                                     const float* membranePx, const float* membranePy, const float* membranePz,
                                      const v8sf Gr_Wr, const v8sf Gr, const v8sf Wr,
-                                     float* const grainWireLocalAx, float* const grainWireLocalAy, float* const grainWireLocalAz,
-                                     float* const grainWireLocalBx, float* const grainWireLocalBy, float* const grainWireLocalBz,
+                                     float* const grainMembraneLocalAx, float* const grainMembraneLocalAy, float* const grainMembraneLocalAz,
+                                     float* const grainMembraneLocalBx, float* const grainMembraneLocalBy, float* const grainMembraneLocalBz,
                                      const v8sf K, const v8sf Kb,
                                      const v8sf staticFrictionStiffness, const v8sf dynamicFrictionCoefficient,
                                      const v8sf staticFrictionLength, const v8sf staticFrictionSpeed,
@@ -22,11 +22,11 @@ static inline void evaluateGrainWire(const size_t start, const size_t size,
                                      float* const pFx, float* const pFy, float* const pFz,
                                      float* const pTAx, float* const pTAy, float* const pTAz) {
  for(size_t i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
-  const v8ui contacts = *(v8ui*)(grainWireContact+i);
-  const v8ui A = gather(grainWireA, contacts), B = gather(grainWireB, contacts);
+  const v8ui contacts = *(v8ui*)(grainMembraneContact+i);
+  const v8ui A = gather(grainMembraneA, contacts), B = gather(grainMembraneB, contacts);
   // FIXME: Recomputing from intersection (more efficient than storing?)
   const v8sf Ax = gather(grainPx, A), Ay = gather(grainPy, A), Az = gather(grainPz, A);
-  const v8sf Bx = gather(wirePx, B), By = gather(wirePy, B), Bz = gather(wirePz, B);
+  const v8sf Bx = gather(membranePx, B), By = gather(membranePy, B), Bz = gather(membranePz, B);
   const v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
   const v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
   const v8sf depth = Gr_Wr - length;
@@ -34,7 +34,7 @@ static inline void evaluateGrainWire(const size_t start, const size_t size,
   const v8sf RAx = - Gr  * Nx, RAy = - Gr * Ny, RAz = - Gr * Nz;
   const v8sf RBx = + Wr  * Nx, RBy = + Wr * Ny, RBz = + Wr * Nz;
   /// Evaluates contact force between two objects with friction (rotating A, non rotating B)
-  // Grain - Wire
+  // Grain - Membrane
 
   // Tension
   const v8sf Fk = K * sqrt(depth) * depth;
@@ -66,12 +66,12 @@ static inline void evaluateGrainWire(const size_t start, const size_t size,
   const v8sf FDz = Fd * TRVz;
 
   // Gather static frictions
-  const v8sf oldLocalAx = gather(grainWireLocalAx, contacts);
-  const v8sf oldLocalAy = gather(grainWireLocalAy, contacts);
-  const v8sf oldLocalAz = gather(grainWireLocalAz, contacts);
-  const v8sf oldLocalBx = gather(grainWireLocalBx, contacts);
-  const v8sf oldLocalBy = gather(grainWireLocalBy, contacts);
-  const v8sf oldLocalBz = gather(grainWireLocalBz, contacts);
+  const v8sf oldLocalAx = gather(grainMembraneLocalAx, contacts);
+  const v8sf oldLocalAy = gather(grainMembraneLocalAy, contacts);
+  const v8sf oldLocalAz = gather(grainMembraneLocalAz, contacts);
+  const v8sf oldLocalBx = gather(grainMembraneLocalBx, contacts);
+  const v8sf oldLocalBy = gather(grainMembraneLocalBy, contacts);
+  const v8sf oldLocalBz = gather(grainMembraneLocalBz, contacts);
 
   const v8sf QAx = gather(ArotationX, A);
   const v8sf QAy = gather(ArotationY, A);
@@ -151,33 +151,33 @@ static inline void evaluateGrainWire(const size_t start, const size_t size,
   *(v8sf*)(pTAy+i) = RAz*FTx - RAx*FTz;
   *(v8sf*)(pTAz+i) = RAx*FTy - RAy*FTx;
   // Scatter static frictions
-  scatter(grainWireLocalAx, contacts, localAx);
-  scatter(grainWireLocalAy, contacts, localAy);
-  scatter(grainWireLocalAz, contacts, localAz);
-  scatter(grainWireLocalBx, contacts, localBx);
-  scatter(grainWireLocalBy, contacts, localBy);
-  scatter(grainWireLocalBz, contacts, localBz);
+  scatter(grainMembraneLocalAx, contacts, localAx);
+  scatter(grainMembraneLocalAy, contacts, localAy);
+  scatter(grainMembraneLocalAz, contacts, localAz);
+  scatter(grainMembraneLocalBx, contacts, localBx);
+  scatter(grainMembraneLocalBy, contacts, localBy);
+  scatter(grainMembraneLocalBz, contacts, localBz);
  }
 }
 
-void Simulation::stepGrainWire() {
- if(!grain.count || !wire.count) return;
- if(grainWireGlobalMinD <= 0)  {
+void Simulation::stepGrainMembrane() {
+ if(!grain.count || !membrane.count) return;
+ if(grainMembraneGlobalMinD <= 0)  {
 
   vec3 min, max; domain(min, max);
   Grid grid(1/(Grain::radius+Grain::radius), min, max);
-  for(size_t i: range(wire.count))
-   grid.cell(wire.Px[i], wire.Py[i], wire.Pz[i]).append(1+i);
+  for(size_t i: range(membrane.count))
+   grid.cell(membrane.Px[i], membrane.Py[i], membrane.Pz[i]).append(1+i);
 
-  const float verletDistance = 2*(2*Grain::radius/sqrt(3.)) - (Grain::radius + Wire::radius);
+  const float verletDistance = 2*(2*Grain::radius/sqrt(3.)) - (Grain::radius+0);
   //const float verletDistance = Grain::radius + Grain::radius;
-  assert_(verletDistance > Grain::radius + Wire::radius);
+  assert_(verletDistance > Grain::radius + 0);
   assert_(verletDistance <= Grain::radius + Grain::radius);
   // Minimum distance over verlet distance parameter is the actual verlet distance which can be used
   float minD = inf;
 
   const int X = grid.size.x, Y = grid.size.y;
-  const uint16* wireNeighbours[3*3] = {
+  const uint16* membraneNeighbours[3*3] = {
    grid.base+(-X*Y-X-1)*Grid::cellCapacity,
    grid.base+(-X*Y-1)*Grid::cellCapacity,
    grid.base+(-X*Y+X-1)*Grid::cellCapacity,
@@ -191,189 +191,189 @@ void Simulation::stepGrainWire() {
    grid.base+(X*Y+X-1)*Grid::cellCapacity
   };
 
-  swap(oldGrainWireA, grainWireA);
-  swap(oldGrainWireB, grainWireB);
-  swap(oldGrainWireLocalAx, grainWireLocalAx);
-  swap(oldGrainWireLocalAy, grainWireLocalAy);
-  swap(oldGrainWireLocalAz, grainWireLocalAz);
-  swap(oldGrainWireLocalBx, grainWireLocalBx);
-  swap(oldGrainWireLocalBy, grainWireLocalBy);
-  swap(oldGrainWireLocalBz, grainWireLocalBz);
+  swap(oldGrainMembraneA, grainMembraneA);
+  swap(oldGrainMembraneB, grainMembraneB);
+  swap(oldGrainMembraneLocalAx, grainMembraneLocalAx);
+  swap(oldGrainMembraneLocalAy, grainMembraneLocalAy);
+  swap(oldGrainMembraneLocalAz, grainMembraneLocalAz);
+  swap(oldGrainMembraneLocalBx, grainMembraneLocalBx);
+  swap(oldGrainMembraneLocalBy, grainMembraneLocalBy);
+  swap(oldGrainMembraneLocalBz, grainMembraneLocalBz);
 
-  static constexpr size_t averageGrainWireContactCount = 32;
-  const size_t GWcc = align(simd, grain.count * averageGrainWireContactCount + 1);
-  if(GWcc > grainWireA.capacity) {
-   grainWireA = buffer<uint>(GWcc, 0);
-   grainWireB = buffer<uint>(GWcc, 0);
-   grainWireLocalAx = buffer<float>(GWcc, 0);
-   grainWireLocalAy = buffer<float>(GWcc, 0);
-   grainWireLocalAz = buffer<float>(GWcc, 0);
-   grainWireLocalBx = buffer<float>(GWcc, 0);
-   grainWireLocalBy = buffer<float>(GWcc, 0);
-   grainWireLocalBz = buffer<float>(GWcc, 0);
+  static constexpr size_t averageGrainMembraneContactCount = 32;
+  const size_t GWcc = align(simd, grain.count * averageGrainMembraneContactCount + 1);
+  if(GWcc > grainMembraneA.capacity) {
+   grainMembraneA = buffer<uint>(GWcc, 0);
+   grainMembraneB = buffer<uint>(GWcc, 0);
+   grainMembraneLocalAx = buffer<float>(GWcc, 0);
+   grainMembraneLocalAy = buffer<float>(GWcc, 0);
+   grainMembraneLocalAz = buffer<float>(GWcc, 0);
+   grainMembraneLocalBx = buffer<float>(GWcc, 0);
+   grainMembraneLocalBy = buffer<float>(GWcc, 0);
+   grainMembraneLocalBz = buffer<float>(GWcc, 0);
   }
-  grainWireA.size = 0;
-  grainWireB.size = 0;
-  grainWireLocalAx.size = 0;
-  grainWireLocalAy.size = 0;
-  grainWireLocalAz.size = 0;
-  grainWireLocalBx.size = 0;
-  grainWireLocalBy.size = 0;
-  grainWireLocalBz.size = 0;
+  grainMembraneA.size = 0;
+  grainMembraneB.size = 0;
+  grainMembraneLocalAx.size = 0;
+  grainMembraneLocalAy.size = 0;
+  grainMembraneLocalAz.size = 0;
+  grainMembraneLocalBx.size = 0;
+  grainMembraneLocalBy.size = 0;
+  grainMembraneLocalBz.size = 0;
 
-  size_t grainWireIndex = 0; // Index of first contact with A in old grainWire[Local]A|B list
-  grainWireSearchTime += parallel_chunk(grain.count, [&](uint, size_t start, size_t size) {
+  size_t grainMembraneIndex = 0; // Index of first contact with A in old grainMembrane[Local]A|B list
+  grainMembraneSearchTime += parallel_chunk(grain.count, [&](uint, size_t start, size_t size) {
    for(size_t a=start; a<(start+size); a+=1) { // TODO: SIMD
      size_t offset = grid.index(grain.Px[a], grain.Py[a], grain.Pz[a]);
      // Neighbours
      for(size_t n: range(3*3)) for(size_t i: range(3)) {
-      ref<uint16> list(wireNeighbours[n] + offset + i * Grid::cellCapacity, Grid::cellCapacity);
+      ref<uint16> list(membraneNeighbours[n] + offset + i * Grid::cellCapacity, Grid::cellCapacity);
 
       for(size_t j: range(Grid::cellCapacity)) {
        assert_(list.begin() >= grid.cells.begin() && list.end()<=grid.cells.end(), offset, n, i);
        size_t b = list[j];
        if(!b) break;
        b--;
-       assert_(a < grain.count && b < wire.count, a, grain.count, b, wire.count, offset, n, i);
-       float d = sqrt(sq(grain.Px[a]-wire.Px[b])
-                      + sq(grain.Py[a]-wire.Py[b])
-                      + sq(grain.Pz[a]-wire.Pz[b])); // TODO: SIMD //FIXME: fails with Ofast?
+       assert_(a < grain.count && b < membrane.count, a, grain.count, b, membrane.count, offset, n, i);
+       float d = sqrt(sq(grain.Px[a]-membrane.Px[b])
+                      + sq(grain.Py[a]-membrane.Py[b])
+                      + sq(grain.Pz[a]-membrane.Pz[b])); // TODO: SIMD //FIXME: fails with Ofast?
        if(d > verletDistance) { minD=::min(minD, d); continue; }
-       assert_(grainWireA.size < grainWireA.capacity);
-       grainWireA.append( a ); // Grain
-       grainWireB.append( b ); // Wire
+       assert_(grainMembraneA.size < grainMembraneA.capacity);
+       grainMembraneA.append( a ); // Grain
+       grainMembraneB.append( b ); // Membrane
        for(size_t k = 0;; k++) {
-        size_t j = grainWireIndex+k;
-        if(j >= oldGrainWireA.size || oldGrainWireA[grainWireIndex+k] != a) break;
-        if(oldGrainWireB[j] == b) { // Repack existing friction
-         grainWireLocalAx.append( oldGrainWireLocalAx[j] );
-         grainWireLocalAy.append( oldGrainWireLocalAy[j] );
-         grainWireLocalAz.append( oldGrainWireLocalAz[j] );
-         grainWireLocalBx.append( oldGrainWireLocalBx[j] );
-         grainWireLocalBy.append( oldGrainWireLocalBy[j] );
-         grainWireLocalBz.append( oldGrainWireLocalBz[j] );
+        size_t j = grainMembraneIndex+k;
+        if(j >= oldGrainMembraneA.size || oldGrainMembraneA[grainMembraneIndex+k] != a) break;
+        if(oldGrainMembraneB[j] == b) { // Repack existing friction
+         grainMembraneLocalAx.append( oldGrainMembraneLocalAx[j] );
+         grainMembraneLocalAy.append( oldGrainMembraneLocalAy[j] );
+         grainMembraneLocalAz.append( oldGrainMembraneLocalAz[j] );
+         grainMembraneLocalBx.append( oldGrainMembraneLocalBx[j] );
+         grainMembraneLocalBy.append( oldGrainMembraneLocalBy[j] );
+         grainMembraneLocalBz.append( oldGrainMembraneLocalBz[j] );
          goto break_;
         }
        } /*else*/ { // New contact
         // Appends zero to reserve slot. Zero flags contacts for evaluation.
         // Contact points (for static friction) will be computed during force evaluation (if fine test passes)
-        grainWireLocalAx.append( 0 );
-        grainWireLocalAy.append( 0 );
-        grainWireLocalAz.append( 0 );
-        grainWireLocalBx.append( 0 );
-        grainWireLocalBy.append( 0 );
-        grainWireLocalBz.append( 0 );
+        grainMembraneLocalAx.append( 0 );
+        grainMembraneLocalAy.append( 0 );
+        grainMembraneLocalAz.append( 0 );
+        grainMembraneLocalBx.append( 0 );
+        grainMembraneLocalBy.append( 0 );
+        grainMembraneLocalBz.append( 0 );
        }
 break_:;
       }
-      while(grainWireIndex < oldGrainWireA.size && oldGrainWireA[grainWireIndex] == a)
-       grainWireIndex++;
+      while(grainMembraneIndex < oldGrainMembraneA.size && oldGrainMembraneA[grainMembraneIndex] == a)
+       grainMembraneIndex++;
      }
     }
   }, 1);
 
-  assert_(align(simd, grainWireA.size+1) <= grainWireA.capacity);
-  for(size_t i=grainWireA.size; i<align(simd, grainWireA.size+1); i++) grainWireA.begin()[i] = 0;
-  assert_(align(simd, grainWireB.size+1) <= grainWireB.capacity);
-  for(size_t i=grainWireB.size; i<align(simd, grainWireB.size+1); i++) grainWireB.begin()[i] = 0;
+  assert_(align(simd, grainMembraneA.size+1) <= grainMembraneA.capacity);
+  for(size_t i=grainMembraneA.size; i<align(simd, grainMembraneA.size+1); i++) grainMembraneA.begin()[i] = 0;
+  assert_(align(simd, grainMembraneB.size+1) <= grainMembraneB.capacity);
+  for(size_t i=grainMembraneB.size; i<align(simd, grainMembraneB.size+1); i++) grainMembraneB.begin()[i] = 0;
 
-  grainWireGlobalMinD = minD - (Grain::radius+Wire::radius);
-  if(grainWireGlobalMinD < 0) log("grainWireGlobalMinD", grainWireGlobalMinD);
+  grainMembraneGlobalMinD = minD - (Grain::radius+0);
+  if(grainMembraneGlobalMinD < 0) log("grainMembraneGlobalMinD", grainMembraneGlobalMinD);
 
   /*if(processState > ProcessState::Pour) // Element creation resets verlet lists
-   log("grain-wire", grainWireSkipped);*/
-  grainWireSkipped=0;
- } else grainWireSkipped++;
+   log("grain-membrane", grainMembraneSkipped);*/
+  grainMembraneSkipped=0;
+ } else grainMembraneSkipped++;
 
  // Filters verlet lists, packing contacts to evaluate
- if(align(simd, grainWireA.size) > grainWireContact.capacity) {
-  grainWireContact = buffer<uint>(align(simd, grainWireA.size));
+ if(align(simd, grainMembraneA.size) > grainMembraneContact.capacity) {
+  grainMembraneContact = buffer<uint>(align(simd, grainMembraneA.size));
  }
- grainWireContact.size = 0;
- grainWireFilterTime += parallel_chunk(align(simd, grainWireA.size)/simd, [&](uint, size_t start, size_t size) {
+ grainMembraneContact.size = 0;
+ grainMembraneFilterTime += parallel_chunk(align(simd, grainMembraneA.size)/simd, [&](uint, size_t start, size_t size) {
    for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
-    v8ui A = *(v8ui*)(grainWireA.data+i), B = *(v8ui*)(grainWireB.data+i);
+    v8ui A = *(v8ui*)(grainMembraneA.data+i), B = *(v8ui*)(grainMembraneB.data+i);
     v8sf Ax = gather(grain.Px, A), Ay = gather(grain.Py, A), Az = gather(grain.Pz, A);
-    v8sf Bx = gather(wire.Px, B), By = gather(wire.Py, B), Bz = gather(wire.Pz, B);
+    v8sf Bx = gather(membrane.Px, B), By = gather(membrane.Py, B), Bz = gather(membrane.Pz, B);
     v8sf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
     v8sf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
-    v8sf depth = float8(Grain::radius+Wire::radius) - length;
+    v8sf depth = float8(Grain::radius+0) - length;
     for(size_t k: range(simd)) {
      size_t j = i+k;
-     if(j == grainWireA.size) break /*2*/;
+     if(j == grainMembraneA.size) break /*2*/;
      if(depth[k] > 0) {
       // Creates a map from packed contact to index into unpacked contact list (indirect reference)
       // Instead of packing (copying) the unpacked list to a packed contact list
       // To keep track of where to write back (unpacked) contact positions (for static friction)
       // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
-      grainWireContact.append( j );
+      grainMembraneContact.append( j );
      } else {
       // Resets contact (static friction spring)
-      grainWireLocalAx[j] = 0; /*grainWireLocalAy[j] = 0; grainWireLocalAz[j] = 0;
-      grainWireLocalBx[j] = 0; grainWireLocalBy[j] = 0; grainWireLocalBz[j] = 0;*/
+      grainMembraneLocalAx[j] = 0; /*grainMembraneLocalAy[j] = 0; grainMembraneLocalAz[j] = 0;
+      grainMembraneLocalBx[j] = 0; grainMembraneLocalBy[j] = 0; grainMembraneLocalBz[j] = 0;*/
      }
     }
    }
  }, 1);
- for(size_t i=grainWireContact.size; i<align(simd, grainWireContact.size); i++)
-  grainWireContact.begin()[i] = grainWireA.size;
+ for(size_t i=grainMembraneContact.size; i<align(simd, grainMembraneContact.size); i++)
+  grainMembraneContact.begin()[i] = grainMembraneA.size;
 
  // Evaluates forces from (packed) intersections (SoA)
- size_t GWcc = align(simd, grainWireContact.size); // Grain-Wire contact count
- if(GWcc > grainWireFx.capacity) {
-  grainWireFx = buffer<float>(GWcc);
-  grainWireFy = buffer<float>(GWcc);
-  grainWireFz = buffer<float>(GWcc);
-  grainWireTAx = buffer<float>(GWcc);
-  grainWireTAy = buffer<float>(GWcc);
-  grainWireTAz = buffer<float>(GWcc);
+ size_t GWcc = align(simd, grainMembraneContact.size); // Grain-Membrane contact count
+ if(GWcc > grainMembraneFx.capacity) {
+  grainMembraneFx = buffer<float>(GWcc);
+  grainMembraneFy = buffer<float>(GWcc);
+  grainMembraneFz = buffer<float>(GWcc);
+  grainMembraneTAx = buffer<float>(GWcc);
+  grainMembraneTAy = buffer<float>(GWcc);
+  grainMembraneTAz = buffer<float>(GWcc);
  }
- grainWireFx.size = GWcc;
- grainWireFy.size = GWcc;
- grainWireFz.size = GWcc;
- grainWireTAx.size = GWcc;
- grainWireTAy.size = GWcc;
- grainWireTAz.size = GWcc;
+ grainMembraneFx.size = GWcc;
+ grainMembraneFy.size = GWcc;
+ grainMembraneFz.size = GWcc;
+ grainMembraneTAx.size = GWcc;
+ grainMembraneTAy.size = GWcc;
+ grainMembraneTAz.size = GWcc;
  constexpr float E = 1/((1-sq(Grain::poissonRatio))/Grain::elasticModulus+(1-sq(Grain::poissonRatio))/Grain::elasticModulus);
- constexpr float R = 1/(Grain::curvature+Wire::curvature);
+ constexpr float R = 1/(Grain::curvature+Membrane::curvature);
  const float K = 4./3*E*sqrt(R);
- constexpr float mass = 1/(1/Grain::mass+1/Wire::mass);
+ const float mass = 1/(1/Grain::mass+1/membrane.mass);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
- grainWireEvaluateTime += parallel_chunk(GWcc/simd, [&](uint, size_t start, size_t size) {
-    evaluateGrainWire(start, size,
-                      grainWireContact.data, grainWireContact.size,
-                      grainWireA.data, grainWireB.data,
+ grainMembraneEvaluateTime += parallel_chunk(GWcc/simd, [&](uint, size_t start, size_t size) {
+    evaluateGrainMembrane(start, size,
+                      grainMembraneContact.data, grainMembraneContact.size,
+                      grainMembraneA.data, grainMembraneB.data,
                       grain.Px.data, grain.Py.data, grain.Pz.data,
-                      wire.Px.data, wire.Py.data, wire.Pz.data,
-                      float8(Grain::radius+Wire::radius), float8(Grain::radius), float8(Wire::radius),
-                      grainWireLocalAx.begin(), grainWireLocalAy.begin(), grainWireLocalAz.begin(),
-                      grainWireLocalBx.begin(), grainWireLocalBy.begin(), grainWireLocalBz.begin(),
+                      membrane.Px.data, membrane.Py.data, membrane.Pz.data,
+                      float8(Grain::radius+0), float8(Grain::radius), float8(0),
+                      grainMembraneLocalAx.begin(), grainMembraneLocalAy.begin(), grainMembraneLocalAz.begin(),
+                      grainMembraneLocalBx.begin(), grainMembraneLocalBy.begin(), grainMembraneLocalBz.begin(),
                       float8(K), float8(Kb),
                       float8(staticFrictionStiffness), float8(dynamicFrictionCoefficient),
                       float8(staticFrictionLength), float8(staticFrictionSpeed), float8(staticFrictionDamping),
                       grain.Vx.data, grain.Vy.data, grain.Vz.data,
-                      wire.Vx.data, wire.Vy.data, wire.Vz.data,
+                      membrane.Vx.data, membrane.Vy.data, membrane.Vz.data,
                       grain.AVx.data, grain.AVy.data, grain.AVz.data,
                       grain.Rx.data, grain.Ry.data, grain.Rz.data, grain.Rw.data,
-                      grainWireFx.begin(), grainWireFy.begin(), grainWireFz.begin(),
-                      grainWireTAx.begin(), grainWireTAy.begin(), grainWireTAz.begin() );
+                      grainMembraneFx.begin(), grainMembraneFy.begin(), grainMembraneFz.begin(),
+                      grainMembraneTAx.begin(), grainMembraneTAy.begin(), grainMembraneTAz.begin() );
  });
- grainWireContactSizeSum += grainWireContact.size;
+ grainMembraneContactSizeSum += grainMembraneContact.size;
 
- grainWireSumTime.start();
- for(size_t i = 0; i < grainWireContact.size; i++) { // Scalar scatter add
-  size_t index = grainWireContact[i];
-  size_t a = grainWireA[index];
-  size_t b = grainWireB[index];
-  grain.Fx[a] += grainWireFx[i];
-  wire .Fx[b] -= grainWireFx[i];
-  grain.Fy[a] += grainWireFy[i];
-  wire .Fy[b] -= grainWireFy[i];
-  grain.Fz[a] += grainWireFz[i];
-  wire .Fz[b] -= grainWireFz[i];
-  grain.Tx[a] += grainWireTAx[i];
-  grain.Ty[a] += grainWireTAy[i];
-  grain.Tz[a] += grainWireTAz[i];
+ grainMembraneSumTime.start();
+ for(size_t i = 0; i < grainMembraneContact.size; i++) { // Scalar scatter add
+  size_t index = grainMembraneContact[i];
+  size_t a = grainMembraneA[index];
+  size_t b = grainMembraneB[index];
+  grain.Fx[a] += grainMembraneFx[i];
+  membrane .Fx[b] -= grainMembraneFx[i];
+  grain.Fy[a] += grainMembraneFy[i];
+  membrane .Fy[b] -= grainMembraneFy[i];
+  grain.Fz[a] += grainMembraneFz[i];
+  membrane .Fz[b] -= grainMembraneFz[i];
+  grain.Tx[a] += grainMembraneTAx[i];
+  grain.Ty[a] += grainMembraneTAy[i];
+  grain.Tz[a] += grainMembraneTAz[i];
  }
- grainWireSumTime.stop();
+ grainMembraneSumTime.stop();
 }
