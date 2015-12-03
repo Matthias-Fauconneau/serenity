@@ -77,7 +77,7 @@ struct System {
   sconst float elasticModulus = 1e0 * MPa;
   sconst float poissonRatio = 0.48;
   sconst float tensionStiffness = elasticModulus * PI * sq(radius);
-  sconst float tensionDamping = mass / s;
+  const float tensionDamping = 2 * sqrt(mass * tensionStiffness);
   sconst float areaMomentOfInertia = PI/4*pow4(radius);
   sconst float bendStiffness = 0; //elasticModulus * areaMomentOfInertia / internodeLength;
   sconst float bendDamping = 0*g /*mass*/ / s;
@@ -109,16 +109,18 @@ struct System {
 
   sconst float resolution = Grain::radius;
   const float radius;
-  const float height = radius * 2;
-  const size_t W = int(2*PI*radius/resolution)/simd*simd;
-  const size_t stride = simd+W+simd;
-  const size_t H = int(height/resolution*2/sqrt(3.))+1;
-  const float internodeLength = 2*PI*radius/W;
+  const int W = int(2*PI*radius/resolution)/simd*simd;
+  const int stride = simd+W+simd;
+  const float internodeLength = 2*sin(PI/W)*radius;
+  const float exactHeight = radius * 2;
+  const float cellHeight = sqrt(3.)/2*internodeLength;
+  const size_t H = ceil(exactHeight/cellHeight)+1;
+  const float height = (H-1) * cellHeight;
   sconst float thickness = 1 * mm;
   const float tensionElasticModulus = elasticModulus;
   const float mass = sqrt(3.)/2 * sq(internodeLength) * thickness * density;
   const float tensionStiffness = sqrt(3.)/2 * internodeLength * thickness * tensionElasticModulus;
-  //float tensionDamping = mass / s;
+  const float tensionDamping = 2 * sqrt(mass * tensionStiffness);
   //sconst float areaMomentOfInertia = pow4(1*mm); // FIXME
   //const float bendStiffness = 0;//elasticModulus * areaMomentOfInertia / internodeLength; // FIXME
 
@@ -136,10 +138,12 @@ struct System {
 
   Membrane(float radius) : radius(radius), capacity(H*stride) {
    Vx.clear(); Vy.clear(); Vz.clear(); // TODO: Gear
+   assert_(W>=2 && H>=2);
+   //log(radius, W, internodeLength, exactHeight, cellHeight, H, height);
    for(size_t i: range(H)) {
     for(size_t j: range(W)) {
      float z = i*height/(H-1);
-     float a = 2*PI*(j+(i%2)*1./2)/(W);
+     float a = 2*PI*(j+(i%2)*1./2)/W;
      float x = radius*cos(a), y = radius*sin(a);
      Px[i*stride+simd+j] = x;
      Py[i*stride+simd+j] = y;

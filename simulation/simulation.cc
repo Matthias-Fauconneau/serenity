@@ -18,7 +18,6 @@ constexpr float System::Wire::radius;
 constexpr float System::Wire::mass;
 constexpr float System::Wire::internodeLength;
 constexpr float System::Wire::tensionStiffness;
-constexpr float System::Wire::tensionDamping;
 constexpr float System::Wire::bendStiffness;
 constexpr string Simulation::patterns[];
 

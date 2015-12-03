@@ -58,9 +58,9 @@ struct SimulationView : Simulation, Widget {
 
  SimulationView(const Dict& parameters) : Simulation(parameters) {
   window = ::window(this, -1, mainThread, true, false);
-  states.append(); viewT=states.size-1;
+  record(); viewT=states.size-1;
   window->presentComplete = [this]{
-   if(!running) return;
+   if(!running || !dt) return;
    if(!totalTime) totalTime.start();
    recordTime.start();
    window->setTitle(str( str(timeStep*dt, 1u)+"s"_,
@@ -131,6 +131,12 @@ struct SimulationView : Simulation, Widget {
     if(O.z > 1) continue;
     min = ::min(min, O - vec3(wire.radius));
     max = ::max(max, O + vec3(wire.radius));
+   }
+   for(size_t i: range(state.membrane.count)) {
+    vec3 O = qapply(viewRotation, state.membrane.position(i));
+    if(O.z > 1) continue;
+    min = ::min(min, O);
+    max = ::max(max, O);
    }
    scale = vec3(vec2(2/::max(max.x-min.x, max.y-min.y)/1.2), 2/(max-min).z);
    translation = -vec3((min+max).xy()/2.f, min.z);

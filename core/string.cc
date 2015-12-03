@@ -207,7 +207,7 @@ String str(float n, uint precision, uint exponent, uint pad) {
     assert_(isNumber(n));
     array<char> s;
     if(sign) s.append('-');
-    if(precision && 0/*&& n!=round(n)*/) {
+    if(precision && n!=round(n)) {
         float integer=1, fract=__builtin_modff(n, &integer);
         uint64 decimal = round(fract*exp10(precision));
         uint exp10=1; for(uint i unused: range(precision)) exp10*=10; // Integer exp10(precision)
