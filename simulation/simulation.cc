@@ -185,6 +185,7 @@ void Simulation::profile(const Time& totalTime) {
   shown += name##Time; \
  }
  logTime(process);
+
  logTime(grain);
  logTime(grainBottomFilter);
  logTime(grainBottomEvaluate);
@@ -201,6 +202,14 @@ void Simulation::profile(const Time& totalTime) {
  logTime(grainWireEvaluate);
  logTime(grainWireSum);
  logTime(grainIntegration);
+
+ logTime(membrane);
+ logTime(grainMembraneSearch);
+ logTime(grainMembraneFilter);
+ logTime(grainMembraneEvaluate);
+ logTime(grainMembraneSum);
+ logTime(membraneIntegration);
+
  logTime(wireInitialization);
  logTime(wireTension);
  logTime(wireBendingResistance);

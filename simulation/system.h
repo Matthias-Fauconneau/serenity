@@ -104,7 +104,7 @@ struct System {
  struct Membrane {
   sconst float density = 1000 * kg / cb(m);
   sconst float curvature = 0;
-  sconst float elasticModulus = 1 * MPa;
+  sconst float elasticModulus = 10 * MPa;
   sconst float poissonRatio = 0.48;
 
   sconst float resolution = Grain::radius/2;
@@ -117,7 +117,7 @@ struct System {
   const size_t H = ceil(exactHeight/cellHeight)+1;
   const float height = (H-1) * cellHeight;
   sconst float thickness = 1 * mm;
-  const float tensionElasticModulus = 1 * MPa;
+  const float tensionElasticModulus = 10 * MPa;
   const float mass = sqrt(3.)/2 * sq(internodeLength) * thickness * density;
   const float tensionStiffness = sqrt(3.)/2 * internodeLength * thickness * tensionElasticModulus;
   const float tensionDamping = 2 * sqrt(mass * tensionStiffness);

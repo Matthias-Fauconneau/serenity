@@ -161,7 +161,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
    if(target) log(str("Multiple targets unsupported, building last target:", arg, ". Parsing arguments:", arguments)+'\n');
    target = arg;
   }
-  else if(startsWith(arg,"-"_) && arg.contains('=')) args.append(copyRef(arg));
+  else if(startsWith(arg,"-"_) /*&& arg.contains('=')*/) args.append(copyRef(arg));
   //else if(startsWith(arg,"-"_)) {} // Build command flag
   else flags.append( split(arg,"-") );
  }

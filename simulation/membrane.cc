@@ -2,6 +2,7 @@
 #include "parallel.h"
 
 void Simulation::stepMembrane() {
+ membraneTime.start();
  for(size_t i=membrane.stride; i<membrane.count-membrane.stride; i+=simd) {
   store(membrane.Fx, i, _0f);
   store(membrane.Fy, i, _0f);
@@ -169,10 +170,12 @@ void Simulation::stepMembrane() {
    }
   }
  }
+ membraneTime.stop();
 }
 
 void Simulation::stepMembraneIntegration() {
  if(!membrane.count) return;
+ membraneIntegrationTime.start();
  const v8sf dt_mass = float8(this->dt / membrane.mass), dt = float8(this->dt);
  v8sf maxMembraneV8 = _0f;
  float* const Fx = membrane.Fx.begin(), *Fy = membrane.Fy.begin(), *Fz = membrane.Fz.begin();
@@ -218,4 +221,5 @@ void Simulation::stepMembraneIntegration() {
  for(size_t k: range(simd)) maxMembraneV = ::max(maxMembraneV, maxMembraneV8[k]);
  float maxGrainMembraneV = maxGrainV + maxMembraneV;
  grainMembraneGlobalMinD -= maxGrainMembraneV * this->dt;
+ membraneIntegrationTime.stop();
 }

@@ -4,10 +4,10 @@ void Simulation::stepProcess() {
 
  // Process
  if(currentHeight >= topZ-Grain::radius || grain.count == grain.capacity) {
-  const float targetPressure = 1000;
+  const float targetPressure = 10000 * Pa;
   if(pressure < targetPressure) {
    processState = Pressure;
-   pressure += dt*targetPressure;
+   pressure += dt * 1000 * Pa/s;
   } else {
    if(processState  < Load) { // Fits plate (Prevents initial decompression)
     float topZ = 0;
