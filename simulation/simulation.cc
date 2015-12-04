@@ -80,11 +80,11 @@ void Simulation::step() {
  stepMembrane();
  stepGrainMembrane();
 
- stepWire();
+ /*stepWire();
  stepGrainWire();
  stepWireTension();
  stepWireBendingResistance();
- stepWireBottom();
+ stepWireBottom();*/
 
  stepGrainIntegration();
  stepMembraneIntegration();
@@ -203,7 +203,9 @@ void Simulation::profile(const Time& totalTime) {
  logTime(grainWireSum);
  logTime(grainIntegration);
 
- logTime(membrane);
+ logTime(membraneInitialization);
+ logTime(membraneForce);
+ logTime(grainMembraneGrid);
  logTime(grainMembraneSearch);
  logTime(grainMembraneFilter);
  logTime(grainMembraneEvaluate);
@@ -242,7 +244,7 @@ bool Simulation::run(const Time& totalTime) {
  for(int unused t: range(1/(dt*60))) step();
  stepTime.stop();
  stepTimeRT.stop();
- if(timeStep%(2*60*size_t(1/(dt*60))) == 0) {
+ if(timeStep%(60*size_t(1/(dt*60))) == 0) {
   log(coreFrequencies());
   profile(totalTime);
  }

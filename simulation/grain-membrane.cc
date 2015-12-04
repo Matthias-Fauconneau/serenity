@@ -162,10 +162,11 @@ static inline void evaluateGrainMembrane(const size_t start, const size_t size,
 
 void Simulation::stepGrainMembrane() {
  if(!grain.count || !membrane.count) return;
- if(grainMembraneGlobalMinD <= 0)  {
 
+ if(grainMembraneGlobalMinD <= 0)  {
   vec3 min, max; domain(min, max);
   Grid grid(1/(Grain::radius+Grain::radius), min, max);
+  grainMembraneGridTime.start();
   for(size_t i: range(1, membrane.H)) {
    for(size_t j: range(membrane.W)) {
     size_t stride = membrane.stride;
@@ -173,6 +174,7 @@ void Simulation::stepGrainMembrane() {
     grid.cell(membrane.Px[k], membrane.Py[k], membrane.Pz[k]).append(1+k);
    }
   }
+  grainMembraneGridTime.stop();
 
   const float verletDistance = 2*(2*Grain::radius/sqrt(3.)) - (Grain::radius+0);
   //const float verletDistance = Grain::radius + Grain::radius;

@@ -2,12 +2,13 @@
 #include "parallel.h"
 
 void Simulation::stepMembrane() {
- membraneTime.start();
+ membraneInitializationTime.start();
  for(size_t i=membrane.stride; i<membrane.count-membrane.stride; i+=simd) {
   store(membrane.Fx, i, _0f);
   store(membrane.Fy, i, _0f);
   store(membrane.Fz, i, _0f);
  }
+ membraneInitializationTime.stop();
 
  ref<float> Px = membrane.Px, Py = membrane.Py, Pz = membrane.Pz;
  ref<float> Vx = membrane.Vx, Vy = membrane.Vy, Vz = membrane.Vz;
@@ -64,6 +65,7 @@ void Simulation::stepMembrane() {
   }
  }
 
+ membraneForceTime.start();
  for(size_t i=1; i<membrane.H-1; i++) {
   int base = i*stride+simd;
   for(int j=0; j<W; j+=simd) {
@@ -133,6 +135,7 @@ void Simulation::stepMembrane() {
    store(Fz, index, load(Fz, index) + FZ[3]);
   }
  }
+ membraneForceTime.stop();
 
  { // Tension from last row (FIXME: reverse to align)
   size_t i = membrane.H-1;
@@ -170,7 +173,6 @@ void Simulation::stepMembrane() {
    }
   }
  }
- membraneTime.stop();
 }
 
 void Simulation::stepMembraneIntegration() {
