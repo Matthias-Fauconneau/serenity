@@ -32,7 +32,7 @@ struct tsc {
  operator uint64() const { return cycleCount(); }
 };
 inline String strD(const uint64 num, const uint64 div) {
- return div ? str(int(round(100*double(num)/double(div))))+'%' : ""__;
+ return div ? str(int(round(100*double(num)/double(div))))+'%' : String();
 }
 inline String strD(const tsc& num, const tsc& div) { return strD(num.cycleCount(), div.cycleCount()); }
 

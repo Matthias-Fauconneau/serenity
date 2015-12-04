@@ -42,7 +42,7 @@ struct Build {
  bool needLink = false;
  String binary;
 
- const buffer<String> sources {folder.list(Files|Recursive)};
+ const buffer<String> sources = folder.list(Files|Recursive);
 
  /// Returns the first path matching file
  String find(string file);

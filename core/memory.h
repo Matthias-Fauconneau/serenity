@@ -3,13 +3,18 @@
 #include "core.h"
 
 // C runtime memory allocation
-extern "C" void* malloc(size_t size) noexcept;
-extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size) noexcept;
-extern "C" void free(void* buffer) noexcept;
-#include <type_traits>
+extern "C" void* malloc(size_t size) /*noexcept*/;
+extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size) /*noexcept*/;
+extern "C" void free(void* buffer) /*noexcept*/;
+//#include <type_traits>
+
+#if __INTEL_COMPILER
+#define __atomic_fetch_add __atomic_fetch_add_explicit
+#endif
+
 /// Managed fixed capacity mutable reference to an array of elements
 /// \note Data is either an heap allocation managed by this object or a reference to memory managed by another object.
-generic struct buffer : mref<T> {
+generic struct Buffer : mref<T> {
  using mref<T>::data;
  using mref<T>::size;
  size_t capacity = 0; /// 0: reference, >0: size of the owned heap allocation
@@ -18,23 +23,25 @@ generic struct buffer : mref<T> {
  using mref<T>::set;
  using mref<T>::slice;
 
- buffer(){}
- buffer(buffer&& o) : mref<T>(o), capacity(o.capacity) { o.data=0; o.size=0; o.capacity=0; }
- buffer(T* data, size_t size, size_t capacity) : mref<T>(data, size), capacity(capacity) {}
+ no_copy(Buffer);
+ constexpr Buffer(){}
+ Buffer(Buffer&& o) : mref<T>(o), capacity(o.capacity) { o.data=0; o.size=0; o.capacity=0; }
+ constexpr Buffer(T* data, size_t size, size_t capacity) : mref<T>(data, size), capacity(capacity) {}
 
- /// Allocates an uninitialized buffer for \a capacity elements
- buffer(size_t capacity, size_t size) : mref<T>((T*)0, size), capacity(capacity) {
+ /// Allocates an uninitialized Buffer for \a capacity elements
+ Buffer(size_t capacity, size_t size) : mref<T>((T*)0, size), capacity(capacity) {
   assert(capacity>=size && size>=0);
   if(capacity && posix_memalign((void**)&data, 64, capacity*sizeof(T))) error("Out of memory", size, capacity, sizeof(T));
  }
- explicit buffer(size_t size) : buffer(size, size) {}
+ explicit Buffer(size_t size) : Buffer(size, size) {}
 
- buffer& operator=(buffer&& o) { this->~buffer(); new (this) buffer(::move(o)); return *this; }
+ Buffer& operator=(Buffer&& o) { this->~Buffer(); new (this) Buffer(::move(o)); return *this; }
 
- /// If the buffer owns the reference, returns the memory to the allocator
- ~buffer() {
+ /// If the Buffer owns the reference, returns the memory to the allocator
+ ~Buffer() {
   if(capacity) {
    if(!__has_trivial_destructor(T)) for(size_t i: range(size)) at(i).~T();
+   printf("- %p\n", data);
    free((void*)data);
   }
   data=0; capacity=0; size=0;
@@ -59,11 +66,34 @@ generic struct buffer : mref<T> {
   slice(__atomic_fetch_add(&size, source.size, 5/*SeqCst*/), source.size).copy(source);
  }
 };
+
+// Allows buffer<char> template specialization to be implemented by Buffer
+generic struct buffer : Buffer<T> {
+ using Buffer<T>::Buffer;
+ constexpr buffer() {}
+ buffer(buffer&& o) : Buffer<T>((Buffer<T>&&)o) {}
+};
+
+/// ref discarding trailing zero byte in buffer(char[N])
+// Needs to be a template specialization as a direct derived class specialization prevents implicit use of ref(char[N]) to bind ref<char>
+template<> struct buffer<char> : Buffer<char> {
+ using Buffer::Buffer;
+ constexpr buffer() {}
+ buffer(buffer&& o) : Buffer<char>((Buffer<char>&&)o) {}
+ constexpr buffer(const char* data, size_t size) : Buffer<char>((char*)data, size, 0) {}
+
+ /// Implicitly references a string literal
+ template<size_t N> constexpr buffer(char const (&a)[N]) : buffer((char*)a, N-1) {}
+};
+
+typedef buffer<char> String;
+inline String unsafeRef(const string o) { return String(o.data, o.size); }
+
 /// Initializes a new buffer with the content of \a o
 generic buffer<T> copy(const buffer<T>& o) { buffer<T> t(o.capacity?:o.size, o.size); t.copy(o); return t; }
 
 /// Converts a reference to a buffer (unsafe as no automatic memory management method keeps the original reference from being released)
-generic buffer<T> unsafeRef(const ref<T> o) { return buffer<T>((T*)o.data, o.size, 0); }
+//generic buffer<T> unsafeRef(const ref<T> o) { return buffer<T>((T*)o.data, o.size, 0); }
 
 /// Initializes a new buffer moving the content of \a o
 generic buffer<T> moveRef(mref<T> o) { buffer<T> copy(o.size); copy.mref<T>::move(o); return copy; }
@@ -75,17 +105,23 @@ generic buffer<T> copyRef(ref<T> o) { buffer<T> copy(o.size); copy.mref<T>::copy
 
 /// Returns an array of the application of a function to every index up to a size
 template<Type Function> auto apply(size_t size, Function function) -> buffer<decltype(function(0))> {
- buffer<decltype(function(0))> target(size); target.apply(function); return target;
+ buffer<decltype(function(0))> target(size);
+ target.apply(function);
+ return ::move(target);
 }
 
 /// Returns an array of the application of a function to every elements of a reference
 template<Type Function, Type T> auto apply(ref<T> source, Function function) -> buffer<decltype(function(source[0]))> {
- buffer<decltype(function(source[0]))> target(source.size); target.apply(function, source); return target;
+ buffer<decltype(function(source[0]))> target(source.size);
+ target.apply(function, source);
+ return ::move(target);
 }
 
 /// Returns an array of the application of a function to every elements of a reference
 template<Type Function, Type T> auto apply(mref<T> source, Function function) -> buffer<decltype(function(source[0]))> {
- buffer<decltype(function(source[0]))> target(source.size); target.apply(function, source); return target;
+ buffer<decltype(function(source[0]))> target(source.size);
+ target.apply(function, source);
+ return ::move(target);
 }
 
 /// Replaces in \a array every occurence of \a before with \a after
@@ -139,10 +175,6 @@ template<Type T, Type O> buffer<T> cast(buffer<O>&& o) {
  o.data=0; o.size=0; o.capacity = 0;
  return buffer;
 }
-
-// -- String
-
-typedef buffer<char> String;
 
 // -- unique
 

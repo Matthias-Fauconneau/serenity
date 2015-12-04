@@ -112,10 +112,10 @@ String join(ref<string> list, const string separator) {
 }
 
 buffer<string> split(const string source, string separator) {
-    array<string> list;
-    TextData s (source);
-    while(s) list.append( s.until(separator) );
-    return move(list);
+ array<string> list;
+ TextData s (source);
+ while(s) list.append( s.until(separator) );
+ return move(list);
 }
 
 // -- Number conversions

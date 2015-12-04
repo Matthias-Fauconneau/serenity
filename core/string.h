@@ -3,6 +3,15 @@
 #include "array.h"
 #include "cat.h"
 
+// -- String
+
+#if __INTEL_COMPILER
+#define __ // ICC doesn't parse custom literal operators (""_)
+#else
+/// Returns const reference to a static string literal
+inline String operator "" __(const char* data, size_t size) { return String((char*)data, size, 0); }
+#endif
+
 // -- str()
 
 // Enforces exact match for overload resolution
@@ -14,7 +23,7 @@ inline String str(string s) { return unsafeRef(s); }
 template<size_t N> string str(const char (&source)[N]) { return string(source); }
 
 /// Returns boolean as "true"/"false"
-inline string str(bool value) { return value ? "true"_ : "false"_; }
+inline string str(bool value) { return value ? string("true"_) : string("false"_); }
 /// Returns a reference to the character
 inline string str(const char& character) { return string((char*)&character,1); }
 
@@ -56,18 +65,13 @@ double parseDecimal(const string str);
 
 // -- String
 
-/// Converts a static reference to a buffer
-//template<size_t N> buffer<char> staticRef(char const(&a)[N]) { return buffer<char>((char*)a, N-1 /*Discards trailing zero byte*/, 0); }
-/// Returns const reference to a static string literal
-inline String operator "" __(const char* data, size_t size) { return String((char*)data, size, 0); }
-
 /// Forwards string
 inline string str(const String& s) { return s; }
 
 /// Null-terminated \a String with implicit conversion to const char*
 struct strz : buffer<char> {
     /// Copies a string reference, appends a null byte and allows implicit conversion to const char*
-    strz(const string s) : buffer(s.size+1) { slice(0, s.size).copy(s); last()='\0'; }
+    strz(const string s) : buffer<char>(s.size+1) { slice(0, s.size).copy(s); last()='\0'; }
     operator const char*() { return data; }
 };
 
@@ -90,14 +94,12 @@ String replace(string s, string before, string after);
 
 /// Removes duplicate whitespace
 String simplify(array<char>&& s);
-inline String simplify(string s) { return simplify((array<char>)copyRef(s)); }
+//inline String simplify(string s) { return simplify(array<char>(copyRef(s))); }
 
 // -- string[]
 
 /// Joins \a list into a single String with each element separated by \a separator
 //String join(ref<string> list, const string separator=""_);
-
-
 
 /// Returns an array of references splitting \a str wherever \a separator occurs
 buffer<string> split(const string str, string separator/*=", "_*/);
@@ -140,10 +142,10 @@ inline String str(long n, uint pad=0, char padChar=' ', uint base=10) { return s
 String str(float number, uint precision=6, uint exponent=0, uint pad=0);
 inline String str(double n, uint precision=6, uint exponent=0) { return str(float(n), precision, exponent); }
 
-/// Formats value using best binary prefix
+/*/// Formats value using best binary prefix
 String binaryPrefix(uint64 value, string unit="B"_, string unitSuffix=""_);
 /// Formats value using best decimal prefix
-String decimalPrefix(double value, string unit=""_, string unitSuffix=""_);
+String decimalPrefix(double value, string unit=""_, string unitSuffix=""_);*/
 
 /// Converts arrays
 generic String str(const ref<T> source, string separator=" "_, string bracket="[]"_) {
@@ -161,7 +163,7 @@ generic String str(const buffer<T>& source, string separator=" "_, string bracke
 generic String str(const array<T>& source, string separator=" "_, string bracket="[]"_) { return str((const ref<T>)source, separator, bracket); }
 inline String str(const array<char>& a) { return str((string)a); }
 inline String str(const ref<char>& a, string b) { return str(a)+" "+str(b); }
-inline String str(const ref<char>& a, string b, string c) { return str(a)+" "+str(b)+" "+str(c); }
+inline String str(const ref<char>& a, string b, string c) { return str(a)+" "+str(b)+" "+str(c); } //?
 inline String bin(const ref<uint8> source, string separator=" "_) { return str(apply(source, [](uint64 c) { return str(c, 8u, '0', 2u); }), separator); }
 inline String hex(const ref<int32> source, string separator=" "_) { return str(apply(source, [](const int32& c) { return hex(c, 8); }), separator); }
 inline String hex(const ref<uint8> source, string separator=" "_) { return str(apply(source, [](const uint8& c) { return hex(c, 2); }), separator); }
@@ -173,10 +175,10 @@ template<Type T, size_t N> String str(const T (&source)[N], string separator=" "
 /// Converts and concatenates all arguments separating with spaces
 /// \note Use join({str(args)...}) to convert and concatenate without spaces
 template<Type Arg0, Type Arg1, Type... Args>
-String str(const Arg0& arg0, const Arg1& arg1, const Args&... args) { return join(ref<string>{str(arg0), str(arg1), str(args)...}, " "_); }
+String str(const Arg0& arg0, const Arg1& arg1, const Args&... args) { return join(ref<string>{str(arg0), str(arg1), str(args)...}, string(" "_)); }
 
 /// Logs to standard output using str(...) serialization
-template<Type... Args> void log(const Args&... args) { log((string)join(ref<string>{str(args)...}, " "_)); }
+template<Type... Args> void log(const Args&... args) { log((string)join(ref<string>{str(args)...}, string(" "_))); }
 /// Logs to standard output using str(...) serialization and terminate all threads
 template<Type... Args> __attribute((noreturn)) void error(const Args&... args) { error<string>(str(args...)); }
 

@@ -128,7 +128,7 @@ bool Build::compileModule(string target) {
  String fileName = target+".cc";
  int64 lastEdit = parse(fileName, module);
  if(!lastEdit) return false;
- String object = tmp+"/"+join(flags,"-"_)+"/"+target+".o";
+ String object = tmp+"/"+join(flags,string("-"_))+"/"+target+".o";
  if(!existsFile(object, folder) || lastEdit >= File(object).modifiedTime()) {
   while(jobs.size>=2) { // Waits for a job to finish before launching a new unit
    int pid = wait(); // Waits for any child to terminate
@@ -138,9 +138,9 @@ bool Build::compileModule(string target) {
    if(status) { log("Failed to compile\n"); return false; }
    else log(job.target+'\n');
   }
-  Folder(tmp+"/"+join(flags,"-"_)+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
+  Folder(tmp+"/"+join(flags,string("-"_))+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
   Stream stdout;
-  int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1y",
+  int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++14",
                                      "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing",
                                      "-I/usr/include/freetype2","-I/var/tmp/include", "-iquote.",
                                      "-o", object, fileName} + toRefs(args),
@@ -148,7 +148,7 @@ bool Build::compileModule(string target) {
   jobs.append({copyRef(target), pid, move(stdout)});
   needLink = true;
  }
- files.append( tmp+"/"+join(flags,"-"_)+"/"+target+".o" );
+ files.append( tmp+"/"+join(flags,string("-"_))+"/"+target+".o" );
  return true;
 }
 
@@ -171,7 +171,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
 
  //args.append("-iquote."__);
  for(string flag: flags) args.append( "-D"+toUpper(flag)+"=1" );
- if(!flags.contains("release")) args.append("-g"__);
+ if(!flags.contains("release")) args.append(String("-g"__));
  if(!flags.contains("debug")) args.append("-O3"__); //O3|Ofast?
  else if(flags.contains("fast")) args.append("-O3"__); //O3|Ofast? // fast-debug
  if(flags.contains("profile")) args.append("-finstrument-functions"__);
@@ -181,14 +181,14 @@ break_:;
  if(!::find(CXX,"clang")) args.append("-fabi-version=0"__);
 
  Folder(tmp, currentWorkingDirectory(), true);
- Folder(tmp+"/"+join(flags,"-"_), currentWorkingDirectory(), true);
+ Folder(tmp + string("/"_) + join(flags, string("-"_)), currentWorkingDirectory(), true);
 
  // Compiles
  if(flags.contains("profile")) if(!compileModule(find("core/profile.cc"))) { log("Failed to compile\n"); return; }
  if(!compileModule( find(target+".cc") )) { log("Failed to compile\n"); return; }
 
  // Links
- binary = tmp+"/"+join(flags,"-"_)+"/"+target;
+ binary = tmp+string("/"_)+join(flags, string("-"_))+string("/"_)+target;
  assert_(!existsFolder(binary));
  if(!existsFile(binary) || needLink) {
   // Waits for all translation units to finish compilation before final link

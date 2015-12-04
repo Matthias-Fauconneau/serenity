@@ -7,7 +7,7 @@
 #include <pthread.h> //pthread
 #include <sys/inotify.h>
 
-/// Abstract factory pattern (allows construction of class by names)
+/*/// Abstract factory pattern (allows construction of class by names)
 template<Type I> struct Interface {
     struct AbstractFactory {
         virtual unique<I> constructNewInstance() abstract;
@@ -24,68 +24,68 @@ template<Type I> template<Type C> Type Interface<I>::template Factory<C> Interfa
 
 /// Class to inherit in order to register objects to be instanced depending on first command line argument
 struct Application { virtual ~Application() {} };
-#define registerApplication(T, name...) Interface<Application>::Factory<T> name ## ApplicationFactoryRegistration (#name)
+#define registerApplication(T, name...) Interface<Application>::Factory<T> name ## ApplicationFactoryRegistration (#name)*/
 
 /// Lock is an initially released binary semaphore which can only be released by the acquiring thread
 struct Lock : handle<pthread_mutex_t> {
-    default_move(Lock);
-    Lock() { pthread_mutex_init(&pointer,0); }
-    ~Lock() { pthread_mutex_destroy(&pointer); }
-    /// Locks the mutex.
-    void lock() { pthread_mutex_lock(&pointer); }
-    /// Atomically lock the mutex only if unlocked.
-    bool tryLock() { return !pthread_mutex_trylock(&pointer); }
-    /// Unlocks the mutex.
-    void unlock() { pthread_mutex_unlock(&pointer); }
+ default_move(Lock);
+ Lock() { pthread_mutex_init(&pointer,0); }
+ ~Lock() { pthread_mutex_destroy(&pointer); }
+ /// Locks the mutex.
+ void lock() { pthread_mutex_lock(&pointer); }
+ /// Atomically lock the mutex only if unlocked.
+ bool tryLock() { return !pthread_mutex_trylock(&pointer); }
+ /// Unlocks the mutex.
+ void unlock() { pthread_mutex_unlock(&pointer); }
 };
 
 /// Convenience class to automatically unlock a mutex
 struct Locker {
-    Lock& lock;
-    Locker(Lock& lock):lock(lock){lock.lock();}
-    ~Locker(){lock.unlock();}
+ Lock& lock;
+ Locker(Lock& lock):lock(lock){lock.lock();}
+ ~Locker(){lock.unlock();}
 };
 
 struct Condition : handle<pthread_cond_t> {
-    default_move(Condition);
-    Condition() { pthread_cond_init(&pointer,0); }
-    ~Condition(){ pthread_cond_destroy(&pointer); }
+ default_move(Condition);
+ Condition() { pthread_cond_init(&pointer,0); }
+ ~Condition(){ pthread_cond_destroy(&pointer); }
 };
 
 /// A semaphore implemented using POSIX mutex, POSIX condition variable, and a counter
 struct Semaphore {
-    default_move(Semaphore);
-    Lock mutex;
-    Condition condition;
-    int64 counter;
-    /// Creates a semaphore with \a count initial ressources
-    explicit Semaphore(int64 count=0) : counter(count) {}
-    /// Acquires \a count ressources
-    void acquire(int64 count) {
-        mutex.lock();
-        while(counter<count) pthread_cond_wait(&condition, &mutex);
-        __sync_sub_and_fetch(&counter,count);
-        assert(counter>=0);
-        mutex.unlock();
-    }
-    /// Atomically tries to acquires \a count ressources only if available
-    bool tryAcquire(int64 count) {
-        mutex.lock();
-        if(counter<count) { mutex.unlock(); return false; }
-        assert(count>0);
-        __sync_sub_and_fetch(&counter,count);
-        mutex.unlock();
-        return true;
-    }
-    /// Releases \a count ressources
-    void release(int64 count) {
-        mutex.lock();
-        __sync_add_and_fetch(&counter, count);
-        pthread_cond_broadcast(&condition);
-        mutex.unlock();
-    }
-    /// Returns available ressources \a count
-    operator uint64() const { return counter; }
+ default_move(Semaphore);
+ Lock mutex;
+ Condition condition;
+ int64 counter;
+ /// Creates a semaphore with \a count initial ressources
+ explicit Semaphore(int64 count=0) : counter(count) {}
+ /// Acquires \a count ressources
+ void acquire(int64 count) {
+  mutex.lock();
+  while(counter<count) pthread_cond_wait(&condition, &mutex);
+  __sync_sub_and_fetch(&counter,count);
+  assert(counter>=0);
+  mutex.unlock();
+ }
+ /// Atomically tries to acquires \a count ressources only if available
+ bool tryAcquire(int64 count) {
+  mutex.lock();
+  if(counter<count) { mutex.unlock(); return false; }
+  assert(count>0);
+  __sync_sub_and_fetch(&counter,count);
+  mutex.unlock();
+  return true;
+ }
+ /// Releases \a count ressources
+ void release(int64 count) {
+  mutex.lock();
+  __sync_add_and_fetch(&counter, count);
+  pthread_cond_broadcast(&condition);
+  mutex.unlock();
+ }
+ /// Returns available ressources \a count
+ operator uint64() const { return counter; }
 };
 inline String str(const Semaphore& o) { return str(o.counter); }
 
@@ -97,62 +97,62 @@ int __attribute((noreturn)) exit_group(int status);
 struct pollfd;
 /// Poll is a convenient interface to participate in the event loop
 struct Poll : pollfd {
-    enum { IDLE=64 };
-    Thread& thread; /// Thread monitoring this pollfd
+ enum { IDLE=64 };
+ Thread& thread; /// Thread monitoring this pollfd
 
-    /// Creates an handle to participate in an event loop, use \a registerPoll when ready
-    /// \note May be used without a file descriptor to queue jobs using \a wait, \a event will be called after all system events have been handled
-    Poll(int fd=0, int events=POLLIN, Thread& thread=mainThread) : pollfd{fd,(short)events,0}, thread(thread) { if(fd) registerPoll(); }
-    no_copy(Poll);
-    ~Poll(){ if(fd) unregisterPoll(); }
-    /// Registers \a fd to the event loop
-    void registerPoll();
-    /// Unregisters \a fd from the event loop
-    void unregisterPoll();
-    /// Schedules an \a event call from \a thread's next poll iteration
-    void queue();
-    /// Callback on new poll events (or when thread is idle when triggered by \a queue)
-    virtual void event() abstract;
+ /// Creates an handle to participate in an event loop, use \a registerPoll when ready
+ /// \note May be used without a file descriptor to queue jobs using \a wait, \a event will be called after all system events have been handled
+ Poll(int fd=0, int events=POLLIN, Thread& thread=mainThread) : pollfd{fd,(short)events,0}, thread(thread) { if(fd) registerPoll(); }
+ no_copy(Poll);
+ ~Poll(){ if(fd) unregisterPoll(); }
+ /// Registers \a fd to the event loop
+ void registerPoll();
+ /// Unregisters \a fd from the event loop
+ void unregisterPoll();
+ /// Schedules an \a event call from \a thread's next poll iteration
+ void queue();
+ /// Callback on new poll events (or when thread is idle when triggered by \a queue)
+ virtual void event() abstract;
 };
 
 /// Pollable semaphore
 struct EventFD : Stream {
-    EventFD();
-    void post(){Stream::write(raw<uint64>(1));}
-    void read(){Stream::read<uint64>();}
+ EventFD();
+ void post(){Stream::write(raw<uint64>(1));}
+ void read(){Stream::read<uint64>();}
 };
 
 typedef unsigned long pthread_t;
 /// Concurrently runs an event loop
 struct Thread : array<Poll*>, EventFD, Lock, Poll {
-    array<Poll*> queue; // Poll objects queued on this thread
-    array<Poll*> unregistered; // Poll objects removed while in event loop
-    int priority=0; // Thread system priority
-    pthread_t thread = 0;
-    int tid=0; // Thread system identifier
-    Lock runLock;
-    bool terminationRequested = false;
+ array<Poll*> queue; // Poll objects queued on this thread
+ array<Poll*> unregistered; // Poll objects removed while in event loop
+ int priority=0; // Thread system priority
+ pthread_t thread = 0;
+ int tid=0; // Thread system identifier
+ Lock runLock;
+ bool terminationRequested = false;
 
-    Thread(int priority=0, bool spawn=false);
-    ~Thread(){ Poll::fd=0;/*Avoid Thread::unregistered reference in ~Poll*/ }
-    explicit operator bool() const { return thread; }
+ Thread(int priority=0, bool spawn=false);
+ ~Thread(){ Poll::fd=0;/*Avoid Thread::unregistered reference in ~Poll*/ }
+ explicit operator bool() const { return thread; }
 
-    void setPriority(int priority);
-    /// Spawns a thread running an event loop with the given \a priority
-    void spawn();
-    /// Processes all events on \a polls and tasks on \a queue until terminate is set
-    void run();
-    /// Processes one queued task
-    void event();
-    /// Waits on this thread
-    void wait();
+ void setPriority(int priority);
+ /// Spawns a thread running an event loop with the given \a priority
+ void spawn();
+ /// Processes all events on \a polls and tasks on \a queue until terminate is set
+ void run();
+ /// Processes one queued task
+ void event();
+ /// Waits on this thread
+ void wait();
 };
 int32 gettid();
 
 struct Job : Poll {
-    function<void()> job;
-    Job(Thread& thread, function<void()> job, bool queue=true) : Poll(0,0,thread), job(job) { if(queue) this->queue(); }
-    void event() override { job(); }
+ function<void()> job;
+ Job(Thread& thread, function<void()> job, bool queue=true) : Poll(0,0,thread), job(job) { if(queue) this->queue(); }
+ void event() override { job(); }
 };
 
 /// Flags all threads to terminate as soon as they return to event loop, destroys all global objects and exits process.
@@ -175,22 +175,22 @@ bool isRunning(int pid);
 struct inotify_event;
 /// Watches a folder for new files
 struct FileWatcher : File, Poll {
-    String path;
-    function<void(string)> fileModified;
+ String path;
+ function<void(string)> fileModified;
 
-    FileWatcher(string path, function<void(string)> fileModified)
-        : File(inotify_init1(IN_CLOEXEC)), Poll(File::fd), path(copyRef(path)), fileModified(fileModified) {
-        addWatch(path);
-    }
-    virtual ~FileWatcher() {}
-    void addWatch(string path)  { check(inotify_add_watch(File::fd, strz(path), IN_MODIFY|IN_MOVED_TO), path); }
-    void event() override {
-        while(poll()) {
-            ::buffer<byte> buffer = readUpTo(sizeof(inotify_event) + 256);
-            inotify_event e = *(inotify_event*)buffer.data;
-            string name = e.len ? string(e.name, e.len-1) : path;
-            fileModified(name);
-            addWatch(name); // FIXME: should not be one shot
-        }
-    }
+ FileWatcher(string path, function<void(string)> fileModified)
+  : File(inotify_init1(IN_CLOEXEC)), Poll(File::fd), path(copyRef(path)), fileModified(fileModified) {
+  addWatch(path);
+ }
+ virtual ~FileWatcher() {}
+ void addWatch(string path)  { check(inotify_add_watch(File::fd, strz(path), IN_MODIFY|IN_MOVED_TO), path); }
+ void event() override {
+  while(poll()) {
+   ::buffer<byte> buffer = readUpTo(sizeof(inotify_event) + 256);
+   inotify_event e = *(inotify_event*)buffer.data;
+   string name = e.len ? string(e.name, e.len-1) : path;
+   fileModified(name);
+   addWatch(name); // FIXME: should not be one shot
+  }
+ }
 };

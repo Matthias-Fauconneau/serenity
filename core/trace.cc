@@ -66,7 +66,7 @@ String demangle(TextData& s, bool function=true) {
     else if(s.match('F')||s.match("Dp")) r.append(demangle(s));
     else if(s.match("Li")) r.append(str(s.integer()));
     else if(s.match("Lj")) r.append(str(s.integer()));
-    else if(s.match("Lb")) r.append(str((bool)s.integer()));
+    //else if(s.match("Lb")) r.append(str((bool)s.integer()));
     else if(s.match('L')) { r.append("extern "); r.append(demangle(s)); }
     else if(s.match('I')||s.match('J')) { //template | argument pack
         r.append('<');
@@ -146,7 +146,11 @@ Symbol findSymbol(void* find) {
                 opcode -= cu.opcode_base;
                 int delta = (opcode / cu.line_range) * cu.min_inst_len;
                 line += (opcode % cu.line_range) + cu.line_base;
-                if(find>=address && find<address+delta) { symbol.file=files[file_index-1]; symbol.line=line; return symbol; }
+                if(find>=address && find<address+delta) {
+                    symbol.file = files[file_index-1];
+                    symbol.line=line;
+                    return ::move(symbol);
+                }
                 address += delta;
             }
             else if(opcode == extended_op) {
@@ -195,7 +199,9 @@ void* return_address(void* fp) { return *((void**)fp+1); }
 #include <execinfo.h>
 
 String trace(int skip, void* ip) {
-	array<char> log;
+    array<char> log;
+#if __INTEL_COMPILER
+#else
     void* stack[32];
 #if 1
     int i = backtrace(stack, 32);
@@ -219,8 +225,9 @@ String trace(int skip, void* ip) {
         if(s.function||s.file||s.line) log.append(left(s.file+':'+str(s.line),16)+'\t'+s.function+'\n');
         else log.append("0x"+hex(ptr(ip))+'\n');
     }
-	log.pop(); // Pops last \n
-	return move(log);
+    log.pop(); // Pops last \n
+#endif
+    return move(log);
 }
 
 void logTrace() { log(trace()); }

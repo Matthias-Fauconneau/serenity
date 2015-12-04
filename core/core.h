@@ -13,8 +13,12 @@
 #define Type typename
 #define generic template<Type T>
 #define abstract =0
+#if __INTEL_COMPILER
+#define default_move(T)
+#else
 #define default_move(T) T(T&&)=default; T& operator=(T&&)=default
-#define no_copy(T) T(const T&)=delete; T& operator=(const T&)=delete; T(T&& o) = delete;
+#endif
+#define no_copy(T) T(const T&)=delete; T& operator=(const T&)=delete
 
 // Traits
 template<Type> struct is_lvalue_reference { static constexpr bool value = false; };
@@ -40,6 +44,7 @@ generic __attribute((warn_unused_result)) T copy(const T& o) { return o; }
 generic struct handle {
  T pointer;
 
+ no_copy(handle);
  handle(T pointer=T()) : pointer(pointer){}
  handle& operator=(handle&& o) { pointer=o.pointer; o.pointer={}; return *this; }
  handle(handle&& o) : pointer(o.pointer){ o.pointer=T(); }
@@ -119,8 +124,8 @@ generic struct initializer_list {
  const T* data;
  size_t length;
  constexpr initializer_list(const T* data, size_t size) : data(data), length(size) {}
- constexpr size_t size() const noexcept { return length; }
- constexpr const T* begin() const noexcept { return data; }
+ constexpr size_t size() const /*noexcept*/ { return length; }
+ constexpr const T* begin() const /*noexcept*/ { return data; }
  constexpr const T* end() const { return (T*)data+length; }
 };
 }
@@ -161,20 +166,6 @@ generic struct Ref {
  /// Slices a reference to elements from \a pos to the end of the reference
  inline ref<T> slice(size_t pos) const;
 
- struct reverse_ref {
-  const T* start; const T* stop;
-  struct iterator {
-   const T* pointer;
-   const T& operator*() { return *pointer; }
-   iterator& operator++() { pointer--; return *this; }
-   typedef __INTPTR_TYPE__ intptr_t;
-   bool operator !=(const iterator& o) const { return intptr_t(pointer)>=intptr_t(o.pointer); }
-  };
-  iterator begin() const { return {start}; }
-  iterator end() const { return {stop}; }
- };
- reverse_ref reverse() { return {end()-1, begin()}; }
-
  /// Returns the index of the first occurence of \a value. Returns invalid if \a value could not be found.
  template<Type K> size_t indexOf(const K& key) const { for(size_t index: range(size)) { if(data[index]==key) return index; } return invalid; }
  /// Returns whether the array contains an occurrence of \a value
@@ -192,7 +183,7 @@ generic struct Ref {
 /// ref discarding trailing zero byte in ref(char[N])
 // Needs to be a template specialization as a direct derived class specialization prevents implicit use of ref(char[N]) to bind ref<char>
 template<> struct ref<char> : Ref<char> {
- using Ref::Ref;
+ //using Ref::Ref;
  constexpr ref() {}
  inline constexpr ref(const char* data, size_t size) : Ref<char>(data, size) {}
  /// Implicitly references a string literal
@@ -205,8 +196,8 @@ generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 /// ref<char> holding a UTF8 text string
 typedef ref<char> string;
 
-#if !__GXX_EXPERIMENTAL_CXX0X__
-#define _ // QtCreator doesn't parse custom literal operators (""_)
+#if __INTEL_COMPILER
+#define _ // ICC doesn't parse custom literal operators (""_)
 #else
 /// Returns const reference to a static string literal
 inline constexpr string operator "" _(const char* data, size_t size) { return string(data,size); }
@@ -251,7 +242,8 @@ generic inline ref<T> Ref<T>::slice(size_t pos) const { assert(pos<=size); retur
 // -- mref
 
 /// Initializes memory using a constructor (placement new)
-inline void* operator new(size_t, void* p) noexcept { return p; }
+inline void* operator new(size_t, void* p) /*noexcept*/ { return p; }
+inline void operator delete(void*, void*) /*noexcept*/ {}
 
 /// Unmanaged fixed-size mutable reference to an array of elements
 generic struct mref : ref<T> {
@@ -261,7 +253,7 @@ generic struct mref : ref<T> {
  /// Default constructs an empty reference
  constexpr mref(){}
  /// References \a size elements from \a data pointer
- inline mref(T* data, size_t size) : ref<T>(data,size) {}
+ constexpr mref(T* data, size_t size) : ref<T>(data,size) {}
  /// Converts an std::initializer_list to mref
  constexpr mref(std::initializer_list<T>&& list) : ref<T>(list.begin(), list.size()) {}
  /// Converts a static array to ref

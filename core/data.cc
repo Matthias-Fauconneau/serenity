@@ -39,8 +39,8 @@ string Data::match(const string key) {
 }
 
 String escape(char c) {
- size_t index = "\t\r\n"_.indexOf(c);
- return index != invalid ? "\\"_+"trn"_[index] : ""_+c;
+ size_t index = string("\t\r\n"_).indexOf(c);
+ return index != invalid ? string("\\"_)+string("trn"_)[index] : string()+c;
 }
 String escape(string s) { array<char> target (s.size, 0); for(char c: s) target.append(escape(c)); return move(target); }
 
@@ -187,10 +187,10 @@ char TextData::character() {
  char c = next();
  if(c!='\\') return c;
  c = peek();
- int i="\'\"nrtbf()\\"_.indexOf(c);
+ int i = string("\'\"nrtbf()\\"_).indexOf(c);
  if(i<0) { /*error("Invalid escape sequence '\\"+str(c)+'\'');*/ return '/'; }
  advance(1);
- return "\'\"\n\r\t\b\f()\\"[i];
+ return string("\'\"\n\r\t\b\f()\\"_)[i];
 }
 
 bool TextData::isInteger(int base) {
