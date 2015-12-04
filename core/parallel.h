@@ -71,7 +71,7 @@ template<Type F> uint64 parallel_for(int64 start, int64 stop, F f, const int unu
 
 /// Runs a loop in parallel chunks with chunk-wise functor
 template<Type F> uint64 parallel_chunk(int64 totalSize, F f, const uint threadCount = ::threadCount) {
- if(totalSize <= threadCount*threadCount || threadCount==1) {
+ if(totalSize <= threadCount/**threadCount*/ || threadCount==1) {
   tsc time; time.start();
   f(0, 0, totalSize);
   return time.cycleCount();
@@ -79,8 +79,15 @@ template<Type F> uint64 parallel_chunk(int64 totalSize, F f, const uint threadCo
  const int64 chunkSize = (totalSize+threadCount-1)/threadCount;
  const int64 chunkCount = (totalSize+chunkSize-1)/chunkSize; // Last chunk might be smaller
  assert_((chunkCount-1)*chunkSize < totalSize && totalSize <= chunkCount*chunkSize, (chunkCount-1)*chunkSize, totalSize, chunkCount*chunkSize);
- assert_(chunkCount == threadCount, chunkCount, threadCount, chunkSize);
+ //assert_(chunkCount == threadCount, chunkCount, threadCount, chunkSize);
  return parallel_for(0, chunkCount, [&](uint id, int64 chunkIndex) {
   f(id, chunkIndex*chunkSize, min(chunkSize, totalSize-chunkIndex*chunkSize));
+ }, threadCount);
+}
+
+/// Runs a loop in parallel chunks with chunk-wise functor
+template<Type F> uint64 parallel_chunk(int64 start, int64 stop, F f, const uint threadCount = ::threadCount) {
+ return parallel_chunk(stop-start, [&](uint id, int64 I0, int64 DI) {
+  f(id, start+I0, DI);
  }, threadCount);
 }
