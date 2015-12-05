@@ -59,7 +59,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
  for(uint lastTime = 0;;) {
   size_t trackIndex = invalid;
   for(size_t index: range(tracks.size))
-   if(tracks[index].data && (trackIndex==invalid || tracks[index].time <= tracks[trackIndex].time))
+   if(tracks[index].data && (trackIndex==invalid || tracks[index].time < tracks[trackIndex].time))
     trackIndex = index;
   if(trackIndex == invalid) break;
   Track& track = tracks[trackIndex];
@@ -140,7 +140,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
   else if(/*type == Aftertouch ||*/ type == Controller/*TODO: pedal*/ /*|| type == PitchBend*/) s.advance(1);
   else if(type == ProgramChange /*|| type == ChannelAftertouch*/) {}
   else if(type == Meta) {
-   uint8 c=s.read(); uint len=c&0x7f; if(c&0x80){ c=s.read(); len=(len<<7)|(c&0x7f); }
+   uint8 c=s.read(); uint len=c&0x7f; if(c&0x80){ assert_(!(c&0x80)); c=s.read(); len=(len<<7)|c; }
    enum class MIDI { SequenceNumber, Text, Copyright, TrackName, InstrumentName, Lyrics, Marker, Cue, ChannelPrefix=0x20,
                      EndOfTrack=0x2F, Tempo=0x51, Offset=0x54, TimeSignature=0x58, KeySignature, SequencerSpecific=0x7F };
    ref<uint8> data = s.read<uint8>(len);
@@ -151,12 +151,11 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
     signs.insertSorted({Sign::TimeSignature, track.time, .timeSignature=timeSignature});
    }
    else if(MIDI(key)==MIDI::Tempo) {
-    tempo = ((data[0]<<16)|(data[1]<<8)|data[2]); // Microseconds per beat (quarter)
     metronome.perMinute = 60000000 / tempo; // Beats per minute
     //if(perMinute) signs.insertSorted({track.time, 0, uint(-1), Sign::Metronome, .metronome={Quarter, perMinute}});
-    log("Tempo", track.startTime, track.time, tempo, metronome.perMinute, notes.ticksPerSeconds);
     lastTempoChange120 += (uint64)(track.time - lastTempoChange) * tempo / 500000; // FIXME: use microseconds per beat
     lastTempoChange = track.time;
+    tempo = ((data[0]<<16)|(data[1]<<8)|data[2]); // Microseconds per beat (quarter)
    }
    else if(MIDI(key)==MIDI::KeySignature) {
     int newKeySignature = (int8)data[0];
@@ -174,7 +173,6 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 
   if(type==NoteOff) type=NoteOn, vel=0;
   if(type==NoteOn) {
-   //log("Note", track.startTime, lastTempoChange120, track.time, lastTempoChange, lastTempoChange120 + (track.time-lastTempoChange)*120/metronome.perMinute);
    assert_(track.time >= lastTempoChange);
    MidiNote note{lastTempoChange120 + uint((uint64)(track.time-lastTempoChange)*tempo/500000), key, vel};
    if(note.velocity) {
@@ -263,10 +261,10 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
       } else if(valueDuration>=142 && valueDuration <= 149) { // Double + Quarter
        // TODO: insert tied quarter before/after depending on beat
        valueDuration = 128;// FIXME: Only displays a double which is of an actual duration of a white and a quarter
-      } else if(valueDuration>=160 /*&& valueDuration <= 299*/) { // Long
+      } else if(valueDuration>=152 /*&& valueDuration <= 299*/) { // Long
        valueDuration = 256;
       }
-      else error("Unsupported duration",valueDuration, duration, quarterDuration, divisions, duration*quarterDuration/divisions, strKey(0, key), dot);
+      else error("Unsupported duration", valueDuration, duration, quarterDuration, divisions, duration*quarterDuration/divisions, strKey(0, key), dot);
       assert_(isPowerOfTwo(valueDuration), duration, quarterDuration, divisions, duration*quarterDuration/divisions, valueDuration, strKey(0, key), dot);
       Value value = Value(ref<uint>(valueDurations).size-1-log2(valueDuration));
       //assert_(int(value) >= 0, duration, valueDuration, note.time - noteOn.time);
@@ -299,13 +297,16 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
   continue2_:;
 
   if(s) {
-   uint8 c=s.read(); uint t=c&0x7f;
-   if(c&0x80){c=s.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=s.read();t=(t<<7)|(c&0x7f);if(c&0x80){c=s.read();t=(t<<7)|c;}}}
-   //if(t>=6730) { log(trackIndex, track.time, t, notes.size, type); t=0; } //FIXME
+   uint8 c = s.read(); uint t = c&0x7F;
+   if(c&0x80) { c = s.read(); t=(t<<7)|(c&0x7F);
+    if(c&0x80) { c=s.read(); t=(t<<7)|(c&0x7F);
+     if(c&0x80) { c=s.read();  t=(t<<7)|c;
+     assert_(!(c&0x80)); } } }
+   //if(t>=161280) { log(trackIndex, track.time, t, notes.size, type); t=0; } //FIXME
    //if(t>=3808 && t<7000) { log(trackIndex, track.time, t, notes.size, type); notes.clear(); track.startTime=track.time=lastTime=t=0; } //FIXME
    //if(t>=1680) { log(track.time, t, notes.size); t=0; }
    //else if(t>=1573 && t<7000) { log(track.time, t, notes.size); notes.clear(); track.startTime=track.time=lastTime=t=0; } // FIXME
-   if(t==3944) { log(trackIndex, track.time, t, notes.size, type); notes.clear(); track.startTime=track.time=lastTime=t=0; } //FIXME
+   //if(t==3944) { log(trackIndex, track.time, t, notes.size, type); notes.clear(); track.startTime=track.time=lastTime=t=0; } //FIXME
    //if(t>=1090) log(track.time, t, notes.size);
    track.time += t;
   }
@@ -320,4 +321,10 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
  assert_(measureLength);
  uint nextMeasureStart = lastMeasureStart+measureLength;
  signs.insertSorted({Sign::Measure, nextMeasureStart, .measure={Measure::NoBreak, measureIndex, 1, 1, measureIndex}}); // Last measure bar
+ /*{int64 t = 0;
+  for(auto note: notes) {
+   if(t+13*notes.ticksPerSeconds < note.time) error(note.time, t, note.time-t, notes.ticksPerSeconds);
+   t = note.time;
+  }
+ }*/
 }

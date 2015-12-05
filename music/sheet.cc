@@ -810,8 +810,10 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
       //if(measureBars) chord.append(str(measureBars->size())+" "_); // Measure index
       uint root = keys[0];
       chord.append( strKey(keySignature, root) );
-      uint third = keys[1];
-      if(third-root == 3) chord.append("m");
+      if(keys.size>1) {
+       uint third = keys[1];
+       if(third-root == 3) chord.append("m");
+      }
       float x = measureFirstNote;
       text(vec2(x, staffY(staves.size-1, max(10, line[1].top))), chord, textSize, system.glyphs, vec2(1./2,0/*1*/));
       //error(chord);
