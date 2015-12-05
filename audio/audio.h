@@ -23,7 +23,7 @@ struct FFmpeg : AudioFile {
     struct AVFormatContext* file=0;
     struct AVStream* audioStream=0;
     struct AVCodecContext* audio=0;
-    enum Codec { Invalid=-1, AAC, FLAC } codec;
+    enum Codec { Invalid=-1, AAC, FLAC, MP3 } codec;
     struct AVFrame* frame=0;
 
     buffer<int16> int16Buffer;

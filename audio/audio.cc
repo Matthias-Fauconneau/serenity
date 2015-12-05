@@ -26,7 +26,7 @@ FFmpeg::FFmpeg(string path) {
             audio->request_sample_fmt = AV_SAMPLE_FMT_S16;
             AVCodec* codec = avcodec_find_decoder(audio->codec_id);
             if(codec && avcodec_open2(audio, codec, 0) >= 0) {
-				this->codec = Codec(ref<AVCodecID>{AV_CODEC_ID_AAC, AV_CODEC_ID_FLAC}.indexOf(audio->codec_id));
+                this->codec = Codec(ref<AVCodecID>{AV_CODEC_ID_AAC, AV_CODEC_ID_FLAC, AV_CODEC_ID_MP3}.indexOf(audio->codec_id));
 				channels = audio->channels;
 				assert_(channels == 1 || channels == 2);
 				audioFrameRate = audio->sample_rate;

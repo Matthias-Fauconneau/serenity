@@ -74,6 +74,9 @@ void Encoder::setH264(int2 size, uint videoFrameRate) {
     check( avcodec_open2(videoCodec, codec, &options), size );
     frame = av_frame_alloc();
     avpicture_alloc((AVPicture*)frame, AV_PIX_FMT_YUV420P, width, height);
+    frame->format = AV_PIX_FMT_YUV420P;
+    frame->width = width;
+    frame->height = height;
 }
 
 void Encoder::setAudio(const FFmpeg& audio) {
@@ -135,7 +138,6 @@ void Encoder::open() {
     assert_(videoStream);
     av_dict_set(&options, "movflags", "faststart", 0);
     check( avformat_write_header(context, &options) );
-    //if(options) { char* s; av_dict_get_string(options, &s, '=', ','); log(str((const char*)s)); }
     lock.unlock();
 }
 
@@ -177,7 +179,7 @@ void Encoder::writeVideoFrame(const Image& image) {
 
 void Encoder::writeAudioFrame(ref<int16> audio) {
     assert_(audioStream && audioCodec->sample_fmt==AV_SAMPLE_FMT_S16);
-    AVFrame frame;
+    AVFrame frame = {};
     frame.nb_samples = audio.size/channels;
     avcodec_fill_audio_frame(&frame, channels, AV_SAMPLE_FMT_S16, (uint8*)audio.data, audio.size * channels * sizeof(int16), 1);
     assert_(audioCodec->time_base.num == audioStream->time_base.num);
@@ -187,6 +189,7 @@ void Encoder::writeAudioFrame(ref<int16> audio) {
 
     AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
     int gotAudioPacket;
+    assert_(frame.nb_samples == audioCodec->frame_size);
     avcodec_encode_audio2(audioCodec, &pkt, &frame, &gotAudioPacket);
     if(gotAudioPacket) {
         audioEncodeTime = pkt.pts;
