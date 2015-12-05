@@ -465,7 +465,8 @@ struct Music : Widget {
     double w[4] = { 1./6 * cb(1-f), 2./3 - 1./2 * sq(f)*(2-f), 2./3 - 1./2 * sq(1-f)*(2-(1-f)), 1./6 * cb(f) };
     auto X = [&](int index) { return clamp(0.f, sheet.measureBars.values[clamp<int>(0, index, sheet.measureBars.values.size)] - size.x/2,
        abs(system.sizeHint(size).x)-size.x); };
-    scroll.offset.x = -round( w[0]*X(index-1) + w[1]*X(index) + w[2]*X(index+1) + w[3]*X(index+2) );
+    float newOffset = round( w[0]*X(index-1) + w[1]*X(index) + w[2]*X(index+1) + w[3]*X(index+2) );
+    if(newOffset >= -scroll.offset.x) scroll.offset.x = -newOffset;
     break;
    }
   }
@@ -580,7 +581,7 @@ struct Music : Widget {
     int percent = round(100.*timeTicks/durationTicks);
     if(percent!=lastReport) {
      log(str(percent, 2u)+"%", "Render", str(renderTime, totalTime), "Encode", str(videoEncodeTime, totalTime),
-         (float)totalTime*((float)durationTicks/timeTicks-1), "/", (float)totalTime/timeTicks*durationTicks, "s");
+         int(round((float)totalTime*((float)durationTicks/timeTicks-1))), "/", int(round((float)totalTime/timeTicks*durationTicks)), "s");
      lastReport=percent;
     }
     if(timeTicks >= durationTicks) break;

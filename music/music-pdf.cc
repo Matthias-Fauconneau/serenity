@@ -17,7 +17,7 @@ struct MusicPDF {
     const int2 pageSize = int2(pageSizeMM.x*1024/pageSizeMM.y, 1024);
     const float inchPx = pageSize.y/pageSizeMM.y*inchMM;
     // Sheet
-    Sheet sheet {xml.signs, xml.divisions, 0, 7/*mm*/*(inchPx/inchMM) / 8/*half intervals / staff height*//*, {}, name, true*/};
+    Sheet sheet {xml.signs, xml.divisions, 0, 7/*mm*/*(inchPx/inchMM) / 8/*half intervals / staff height*/, {}, "", false, true};
 };
 
 struct MusicPDFPreview : MusicPDF, Application {

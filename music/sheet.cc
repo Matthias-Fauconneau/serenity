@@ -122,7 +122,7 @@ struct System : SheetContext {
  buffer<Range> evaluateStepRanges(ref<Sign> signs) const;
 
  System(SheetContext context, ref<Staff> staves, float pageWidth, size_t pageIndex, size_t systemIndex, Graphics* previousSystem, ref<Sign> signs,
-        map<uint, float>* measureBars = 0, array<TieStart>* activeTies = 0, map<uint, array<Sign>>* notes=0, float spaceWidth=0);
+        map<uint, float>* measureBars = 0, array<TieStart>* activeTies = 0, map<uint, array<Sign>>* notes=0, float spaceWidth=0, bool measureNumbers=false);
 };
 
 // -- Layout output
@@ -524,7 +524,7 @@ buffer<System::Range> System::evaluateStepRanges(ref<Sign> signs) const {
 
 // Layouts a system
 System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t pageIndex, size_t systemIndex, Graphics* previousSystem, ref<Sign> signs,
-               map<uint, float>* measureBars, array<TieStart>* activeTies, map<uint, array<Sign>>* notes, float _spaceWidth)
+               map<uint, float>* measureBars, array<TieStart>* activeTies, map<uint, array<Sign>>* notes, float _spaceWidth, bool measureNumbers)
  : SheetContext(context), staves(copyRef(_staves)), spaceWidth(_spaceWidth?:space), pageWidth(pageWidth), pageIndex(pageIndex), systemIndex(systemIndex), previousSystem(previousSystem),
    measureBars(measureBars), activeTies(activeTies), notes(notes), line(evaluateStepRanges(signs)) {
 
@@ -807,7 +807,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 
      { array<uint> keys = ::move(measureNoteKeys);
       array<char> chord;
-      //if(measureBars) chord.append(str(measureBars->size())+" "_); // Measure index
+      if(measureNumbers && measureBars) chord.append(str(measureBars->size())+" "_); // Measure index
       uint root = keys[0];
       chord.append( strKey(keySignature, root) );
       if(keys.size>1) {
@@ -1068,7 +1068,7 @@ inline bool operator ==(const Sign& sign, const uint& key) {
 }
 
 // Layouts notations to graphic primitives (and parses notes to MIDI keys)
-Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLineInterval, ref<MidiNote> midiNotes, string title, bool pageNumbers)
+Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLineInterval, ref<MidiNote> midiNotes, string title, bool pageNumbers, bool measureNumbers)
  : pageSize(pageSize) {
  SheetContext context (ticksPerQuarter, halfLineInterval);
  uint staffCount = 0; for(const Sign& sign: signs) if(sign.type == Sign::Note) staffCount = max(staffCount, sign.staff+1);
@@ -1150,7 +1150,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
 
    // -- Layouts justified system
    System system(context, staves, pageSize.x, pages.size, pageSystems.size, pageSystems ? &pageSystems.last() : nullptr, signs.slice(startIndex, breakIndex-startIndex),
-                 &measureBars, &activeTies, &notes, spaceWidth);
+                 &measureBars, &activeTies, &notes, spaceWidth, measureNumbers);
    context = system; staves = copy(system.staves); // Copies back context for next line
 
    requiredHeight += system.system.bounds.size().y;
