@@ -37,18 +37,22 @@ MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter, 	ref<float2> staffGains =
  return notes;
 }
 
+uint audioStart(string audioFileName) {
+ for(FFmpeg file(audioFileName);;) {
+  int32 buffer[1024  * file.channels];
+  size_t size = file.read32(mref<int32>(buffer, 1024 * file.channels));
+  assert_(size);
+  for(size_t i: range(size  * file.channels)) if(abs(buffer[i])>1<<23) return file.audioTime+i;
+}
+}
+
 /// Converts MIDI time base to audio sample rate
-MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds) {
- assert_(targetTicksPerSeconds > notes.ticksPerSeconds, targetTicksPerSeconds, notes.ticksPerSeconds);
- log(notes.size, notes.ticksPerSeconds, notes.last().time, notes.last().time / (float)notes.ticksPerSeconds);
+MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds, int start) {
+ int offset = start+notes.first().time*targetTicksPerSeconds/notes.ticksPerSeconds;
  for(MidiNote& note: notes) {
-  /*log(note.time, targetTicksPerSeconds, notes.ticksPerSeconds, (int64)note.time*targetTicksPerSeconds/notes.ticksPerSeconds,
-            (int64)note.time*targetTicksPerSeconds/notes.ticksPerSeconds / (float)targetTicksPerSeconds);*/
-  note.time = (int64)note.time*targetTicksPerSeconds/notes.ticksPerSeconds;
-  assert_(note.time < 1<<30);
-  assert(note.time >= 0);
+  note.time = offset + (int64)note.time*targetTicksPerSeconds/notes.ticksPerSeconds;
  }
- notes.ticksPerSeconds = targetTicksPerSeconds; //*5.25/4.58; //*9.6/6; // Skew
+ notes.ticksPerSeconds = targetTicksPerSeconds;
  return move(notes);
 }
 
@@ -361,7 +365,7 @@ struct Music : Widget {
                      gains[xml.staves.indexOf(selection)] = float2(1, 2);
                      return gains;
                  }*/
- MidiNotes notes = ::scale(/*midi ?*/ copy(midi.notes) /*: ::notes(xml.signs, xml.divisions)*/, audioFile ? audioFile->audioFrameRate : /*sampler.rate*/0);
+ MidiNotes notes = ::scale(/*midi ?*/ copy(midi.notes) /*: ::notes(xml.signs, xml.divisions)*/, audioFile ? audioFile->audioFrameRate : /*sampler.rate*/0, audioStart(audioFileName));
  // Sheet
  Sheet sheet {/*xml ?*/ xml.signs /*: midi.signs*/, /*xml ?*/ xml.divisions /*: midi.divisions*/, 0, 4,
     /*apply(*/filter(notes, [](MidiNote o){return o.velocity==0;})/*, [](MidiNote o){return o.key;})*/};
@@ -384,7 +388,7 @@ struct Music : Widget {
  Scroll<VBox> scroll {{&system/*, &synchronizer*/}}; // 1/3 ~ 240
  ImageView videoView; // 1/2 ~ 360
  Keyboard keyboard; // 1/6 ~ 120
- VBox widget {{&scroll, &videoView, &keyboard}};
+ VBox widget {{&scroll/*, &videoView, &keyboard*/}};
 
  // Highlighting
  map<uint, Sign> active; // Maps active keys to notes (indices)
@@ -533,7 +537,18 @@ struct Music : Widget {
         log(notes.ticksPerSeconds);
         log(notes.last().time / (float)notes.ticksPerSeconds, audioFile->duration/(float)audioFile->audioFrameRate);*/
   //TODO: measureBars.t *= 60 when using MusicXML (no MIDI)
-
+  for(FFmpeg file(audioFileName);;) {
+   int32 buffer[1024  * file.channels];
+   size_t size = file.read32(mref<int32>(buffer, 1024 * file.channels));
+   if(!size) break;
+   int firstAudio = 0;
+   for(size_t i: range(size  * file.channels)) if(abs(buffer[i])>1<<23) { firstAudio=file.audioTime+i; break; }
+   if(firstAudio) log(firstAudio, float(firstAudio)/file.audioFrameRate); //, log2((float)abs(buffer[i])));
+   int offset = firstAudio+notes.first().time;
+   assert_(notes.ticksPerSeconds == file.audioFrameRate);
+   for(MidiNote& note: notes) note.time += offset;
+   if(firstAudio) break;
+  }
   scroll.horizontal=true, scroll.vertical=false, scroll.scrollbar = true;
   if(failed) { // Seeks to first synchronization failure
    size_t measureIndex = 0;
@@ -631,7 +646,7 @@ struct Music : Widget {
    log("Done");
   } else { // Preview
    //if(!failed) seek(max(0ll, notes[0].time - notes.ticksPerSeconds));
-   window = ::window(this, int2(1280,720));
+   window = ::window(this, int2(1366/*1280*/,360));
    window->backgroundColor = white;
    window->show();
    if(running && playbackDeviceAvailable()) {
@@ -640,7 +655,7 @@ struct Music : Widget {
 #endif
     audio.start(audioFile ? audioFile->audioFrameRate : /*sampler.rate*/0, audioFile ? 1024 : /*sampler.periodSize*/0, 32, 2);
     assert_(audio.rate == (audioFile ? audioFile->audioFrameRate : /*sampler.rate*/0));
-    seek(audioFile->duration/4);
+    seek(audioFile->duration/3);
     audioThread.spawn();
    } else running = false;
   }

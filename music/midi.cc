@@ -256,12 +256,12 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
       } else if(valueDuration >= 82/*96*/ && valueDuration <= 101/*96*/) { // Dotted Whole
        dot = true;
        valueDuration = 64;
-      } else if(valueDuration>=102/*120*/ && valueDuration <= 138/*128*/) { // Double
+      } else if(valueDuration>=102/*120*/ && valueDuration <= 141/*128*/) { // Double
        valueDuration = 128;
       } else if(valueDuration>=142 && valueDuration <= 149) { // Double + Quarter
        // TODO: insert tied quarter before/after depending on beat
        valueDuration = 128;// FIXME: Only displays a double which is of an actual duration of a white and a quarter
-      } else if(valueDuration>=152 /*&& valueDuration <= 299*/) { // Long
+      } else if(valueDuration>=150 /*&& valueDuration <= 299*/) { // Long
        valueDuration = 256;
       }
       else error("Unsupported duration", valueDuration, duration, quarterDuration, divisions, duration*quarterDuration/divisions, strKey(0, key), dot);
@@ -301,13 +301,10 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
    if(c&0x80) { c = s.read(); t=(t<<7)|(c&0x7F);
     if(c&0x80) { c=s.read(); t=(t<<7)|(c&0x7F);
      if(c&0x80) { c=s.read();  t=(t<<7)|c;
-     assert_(!(c&0x80)); } } }
-   //if(t>=161280) { log(trackIndex, track.time, t, notes.size, type); t=0; } //FIXME
-   //if(t>=3808 && t<7000) { log(trackIndex, track.time, t, notes.size, type); notes.clear(); track.startTime=track.time=lastTime=t=0; } //FIXME
-   //if(t>=1680) { log(track.time, t, notes.size); t=0; }
-   //else if(t>=1573 && t<7000) { log(track.time, t, notes.size); notes.clear(); track.startTime=track.time=lastTime=t=0; } // FIXME
-   //if(t==3944) { log(trackIndex, track.time, t, notes.size, type); notes.clear(); track.startTime=track.time=lastTime=t=0; } //FIXME
-   //if(t>=1090) log(track.time, t, notes.size);
+     assert_(!(c&0x80));
+     }
+    }
+   }
    track.time += t;
   }
  }
@@ -321,10 +318,4 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
  assert_(measureLength);
  uint nextMeasureStart = lastMeasureStart+measureLength;
  signs.insertSorted({Sign::Measure, nextMeasureStart, .measure={Measure::NoBreak, measureIndex, 1, 1, measureIndex}}); // Last measure bar
- /*{int64 t = 0;
-  for(auto note: notes) {
-   if(t+13*notes.ticksPerSeconds < note.time) error(note.time, t, note.time-t, notes.ticksPerSeconds);
-   t = note.time;
-  }
- }*/
 }
