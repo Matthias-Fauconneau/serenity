@@ -1,5 +1,17 @@
 #include "simulation.h"
 
+__attribute((constructor)) void logCompiler() {
+#if __INTEL_COMPILER
+ log("ICC");
+#elif __clang__
+ log("Clang");
+#elif __GNUC__
+ log("gcc");
+#else
+#error
+#endif
+}
+
 Dict parameters() {
  Dict parameters;
  for(string argument: arguments()) parameters.append(parseDict(argument));

@@ -74,11 +74,11 @@ void Simulation::step() {
 
  stepGrain();
  stepGrainBottom();
- //stepGrainTop();
+ stepGrainTop();
  stepGrainGrain();
 
- /*stepMembrane();
- stepGrainMembrane();*/
+ stepMembrane();
+ stepGrainMembrane();
 
  /*stepWire();
  stepGrainWire();
@@ -87,7 +87,7 @@ void Simulation::step() {
  stepWireBottom();*/
 
  stepGrainIntegration();
- //stepMembraneIntegration();
+ stepMembraneIntegration();
  //stepWireIntegration();
 
  timeStep++;

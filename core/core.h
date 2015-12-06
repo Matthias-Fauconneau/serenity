@@ -67,7 +67,7 @@ typedef unsigned long ptr;
 typedef signed long long int64;
 typedef unsigned long long uint64;
 typedef __SIZE_TYPE__ size_t;
-constexpr size_t invalid = -1; // Invalid index
+constexpr size_t invalid = ~0; // Invalid index
 #define null nullptr
 
 // -- Number arithmetic

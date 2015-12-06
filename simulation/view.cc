@@ -4,29 +4,16 @@
 #include "gl.h"
 FILE(shader_glsl)
 
-__attribute((constructor)) void logCompiler() {
-#if __INTEL_COMPILER
- log("ICC");
-#endif
-#if __clang__
- log("CLang");
-#endif
-#if __gcc__
- log("gcc")
-#endif
-}
-
 Dict parameters() {
  Dict parameters;
  for(string argument: arguments()) parameters.append(parseDict(argument));
  return parameters;
 }
 
-struct SimulationView : Simulation, Widget {
- bool running = true;
-
+struct SimulationView : Widget {
  struct State {
   struct Grain {
+   float radius = 0;
    size_t count = 0;
    buffer<float> Px;
    buffer<float> Py;
@@ -39,6 +26,7 @@ struct SimulationView : Simulation, Widget {
    vec4 rotation(size_t i) const { return vec4(Rx[i], Ry[i], Rz[i], Rw[i]); }
   } grain;
   struct Wire {
+   float radius = 0;
    size_t count = 0;
    buffer<float> Px;
    buffer<float> Py;
@@ -46,6 +34,7 @@ struct SimulationView : Simulation, Widget {
    vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]); }
   } wire;
   struct Membrane {
+   size_t W, H, stride;
    size_t count = 0;
    buffer<float> Px;
    buffer<float> Py;
@@ -56,87 +45,34 @@ struct SimulationView : Simulation, Widget {
  };
  array<State> states;
 
- Time totalTime, recordTime;
-
- unique<Window> window = nullptr;
  GLFrameBuffer target;
 
- size_t viewT = 0;
- vec2 viewYawPitch = vec2(0, -PI/3); // Current view angles
- /*vec2 scale = 0;
- vec2 translation = 0;*/
+ size_t timeStep = 0;
+ vec2 yawPitch = vec2(0, -PI/3); // Current view angles
 
  struct {
   vec2 cursor;
-  vec2 viewYawPitch;
-  size_t viewT;
+  vec2 yawPitch;
+  size_t timeStep;
  } dragStart = {0,0,0};
-
- SimulationView(const Dict& parameters) : Simulation(parameters) {
-  window = ::window(this, -1, mainThread, true, false);
-  record(); viewT=states.size-1;
-  window->presentComplete = [this]{
-   if(!running || !dt) return;
-   if(!totalTime) totalTime.start();
-   recordTime.start();
-   window->setTitle(str( str(timeStep*dt, 1u)+"s"_,
-                         str(timeStep*dt/totalTime.seconds(), 1u)+"x"_,
-                         strD(stepTimeRT, totalTime)));
-   if(!run(totalTime)) {
-    window->setTitle("Done");
-    running = false;
-   }
-   record(); viewT=states.size-1;
-   recordTime.stop();
-   window->render();
-   if(states.size == 8192) { log(states.size); window->setTitle("OK"); running = false; }
-  };
- }
-
- void record() {
-  State state;
-  state.grain.count = grain.count;
-  state.grain.Px = copy(grain.Px);
-  state.grain.Py = copy(grain.Py);
-  state.grain.Pz = copy(grain.Pz);
-  state.grain.Rx = copy(grain.Rx);
-  state.grain.Ry = copy(grain.Ry);
-  state.grain.Rz = copy(grain.Rz);
-  state.grain.Rw = copy(grain.Rw);
-
-  state.wire.count = wire.count;
-  state.wire.Px = copy(wire.Px);
-  state.wire.Py = copy(wire.Py);
-  state.wire.Pz = copy(wire.Pz);
-
-  state.membrane.count = membrane.count;
-  state.membrane.Px = copy(membrane.Px);
-  state.membrane.Py = copy(membrane.Py);
-  state.membrane.Pz = copy(membrane.Pz);
-
-  state.radius = membrane.radius;
-  state.bottomZ = bottomZ;
-  state.topZ = topZ;
-  states.append(::move(state));
- }
 
  vec2 sizeHint(vec2) override { return vec2(768); }
  shared<Graphics> graphics(vec2 size) override {
-  vec4 viewRotation = qmul(angleVector(viewYawPitch.y, vec3(1,0,0)),
-                                             angleVector(viewYawPitch.x, vec3(0,0,1)));
+  vec4 viewRotation = qmul(angleVector(yawPitch.y, vec3(1,0,0)),
+                                             angleVector(yawPitch.x, vec3(0,0,1)));
 
   vec3 scale = 0, translation = 0; // Fit view
 
-  const State& state = states[viewT];
+  const State& state = states[timeStep];
   array<vec3> grainPositions (state.grain.count); // Rotated, Z-Sorted
   array<vec4> grainRotations (state.grain.count); // Rotated, Z-Sorted
   array<size_t> grainIndices (state.grain.count);
   {
-   vec3 min = -membrane.radius, max = vec3(membrane.radius);
+   vec3 min = 0, max = 0; //-state.membrane.radius, max = vec3(state.membrane.radius);
    for(size_t i: range(state.grain.count)) {
     vec3 O = qapply(viewRotation, state.grain.position(i));
-    min = ::min(min, O - vec3(grain.radius));
-    max = ::max(max, O + vec3(grain.radius));
+    min = ::min(min, O - vec3(state.grain.radius));
+    max = ::max(max, O + vec3(state.grain.radius));
     size_t j = 0;
     while(j < grainPositions.size && grainPositions[j].z < O.z) j++;
     grainPositions.insertAt(j, O);
@@ -146,11 +82,11 @@ struct SimulationView : Simulation, Widget {
    for(size_t i: range(state.wire.count)) {
     vec3 O = qapply(viewRotation, state.wire.position(i));
     if(O.z > 1) continue;
-    min = ::min(min, O - vec3(wire.radius));
-    max = ::max(max, O + vec3(wire.radius));
+    min = ::min(min, O - vec3(state.wire.radius));
+    max = ::max(max, O + vec3(state.wire.radius));
    }
-   for(size_t i: range(membrane.H-1)) for(size_t j: range(membrane.W)) {
-    vec3 O = qapply(viewRotation, state.membrane.position(simd+i*membrane.stride+j));
+   for(size_t i: range(state.membrane.H-1)) for(size_t j: range(state.membrane.W)) {
+    vec3 O = qapply(viewRotation, state.membrane.position(simd+i*state.membrane.stride+j));
     if(O.z > 1) continue;
     min = ::min(min, O);
     max = ::max(max, O);
@@ -170,7 +106,7 @@ struct SimulationView : Simulation, Widget {
     .translate(vec3(0,0,-1))
     .scale(scale)
     .translate(translation);
-  mat4 rotatedViewProjection = mat4(viewProjection).rotateX(viewYawPitch.y) .rotateZ(viewYawPitch.x);
+  mat4 rotatedViewProjection = mat4(viewProjection).rotateX(yawPitch.y) .rotateZ(yawPitch.x);
 
   if(!target) target = GLFrameBuffer(int2(size));
   target.bind(ClearColor|ClearDepth);
@@ -182,8 +118,8 @@ struct SimulationView : Simulation, Widget {
    for(size_t i: range(state.grain.count)) {
     // FIXME: GPU quad projection
     vec3 O = viewProjection * grainPositions[i];
-    vec2 min = O.xy() - vec2(scale.xy()) * vec2(Grain::radius) - vec2(2.f/size.x); // Parallel
-    vec2 max = O.xy() + vec2(scale.xy()) * vec2(Grain::radius) + vec2(2.f/size.x); // Parallel
+    vec2 min = O.xy() - vec2(scale.xy()) * vec2(state.grain.radius) - vec2(2.f/size.x); // Parallel
+    vec2 max = O.xy() + vec2(scale.xy()) * vec2(state.grain.radius) + vec2(2.f/size.x); // Parallel
     positions[i*6+0] = vec3(min, O.z);
     positions[i*6+1] = vec3(max.x, min.y, O.z);
     positions[i*6+2] = vec3(min.x, max.y, O.z);
@@ -204,8 +140,8 @@ struct SimulationView : Simulation, Widget {
    shader.bind("rotationBuffer"_, rotationBuffer, 0);
    GLBuffer colorBuffer (colors);
    shader.bind("colorBuffer"_, colorBuffer, 1);
-   shader["radius"] = float(scale.z/2 * Grain::radius*3/4); // reduce Z radius to see membrane mesh on/in grain
-   shader["hpxRadius"] = 1 / (size.x * scale.x * grain.radius);
+   shader["radius"] = float(scale.z/2 * state.grain.radius*3/4); // reduce Z radius to see membrane mesh on/in grain
+   shader["hpxRadius"] = 1 / (size.x * scale.x * state.grain.radius);
    vertexArray.draw(Triangles, positions.size);
   }
 
@@ -220,7 +156,7 @@ struct SimulationView : Simulation, Widget {
     vec2 r = B.xy()-A.xy();
     float l = length(r);
     vec2 t = r/l;
-    vec3 n = scale*float(Wire::radius)*vec3(t.y, -t.x, 0); // FIXME: hpx
+    vec3 n = scale*float(state.wire.radius)*vec3(t.y, -t.x, 0); // FIXME: hpx
     vec3 P[4] {A-n, A+n, B-n, B+n};
     positions[s*6+0] = P[0];
     positions[s*6+1] = P[1];
@@ -238,8 +174,8 @@ struct SimulationView : Simulation, Widget {
     shader.bind();
     shader.bindFragments({"color"});
     shader["transform"] = mat4(1);
-    shader["radius"] = float(scale.z/2 * Wire::radius);
-    shader["hpxRadius"] = 1 / (size.x * scale.x * wire.radius);
+    shader["radius"] = float(scale.z/2 * state.wire.radius);
+    shader["hpxRadius"] = 1 / (size.x * scale.x * state.wire.radius);
     static GLVertexArray vertexArray;
     GLBuffer positionBuffer (positions);
     vertexArray.bindAttribute(shader.attribLocation("position"_),
@@ -256,10 +192,10 @@ struct SimulationView : Simulation, Widget {
    shader.bindFragments({"color"});
    shader["transform"] = rotatedViewProjection;
 
-   const size_t W = membrane.W, stride=membrane.stride;
-   buffer<vec3> positions {W*(membrane.H-1)*6-W*2};
+   const size_t W = state.membrane.W, stride = state.membrane.stride;
+   buffer<vec3> positions {W*(state.membrane.H-1)*6-W*2};
    size_t s = 0;
-   for(size_t i: range(membrane.H-1)) for(size_t j: range(W)) {
+   for(size_t i: range(state.membrane.H-1)) for(size_t j: range(W)) {
     vec3 a (state.membrane.position(simd+i*stride+j));
     vec3 b (state.membrane.position(simd+i*stride+(j+1)%W));
     vec3 c (state.membrane.position(simd+(i+1)*stride+(j+i%2)%W));
@@ -270,7 +206,7 @@ struct SimulationView : Simulation, Widget {
     if(i) { positions[s+4] = A; positions[s+5] = B; s += 6; }
     else s += 4;
    }
-   assert_(s <= positions.size && s, membrane.W, membrane.H);
+   assert_(s <= positions.size && s, state.membrane.W, state.membrane.H);
    positions.size = s;
    static GLVertexArray vertexArray;
    GLBuffer positionBuffer (positions);
@@ -306,25 +242,87 @@ struct SimulationView : Simulation, Widget {
    vertexArray.draw(Lines, positions.size);
   }
 
-  int offset = (target.size.x-window->size.x)/2;
-  target.blit(0, window->size, int2(offset, 0), int2(target.size.x-offset, target.size.y));
+  int offset = 0; //(target.size.x-window->size.x)/2;
+  target.blit(0, /*window->size*/target.size, int2(offset, 0), int2(target.size.x-offset, target.size.y));
   return shared<Graphics>();
  }
 
  // Orbital ("turntable") view control
  bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button,
                                 Widget*&) override {
-   if(event == Press) dragStart = {cursor, viewYawPitch, viewT};
+   if(event == Press) dragStart = {cursor, yawPitch, timeStep};
    if(event==Motion && button==LeftButton) {
-    viewYawPitch = dragStart.viewYawPitch + float(2*PI) * (cursor - dragStart.cursor) / size;
-    viewYawPitch.y = clamp<float>(-PI, viewYawPitch.y, 0);
+    yawPitch = dragStart.yawPitch + float(2*PI) * (cursor - dragStart.cursor) / size;
+    yawPitch.y = clamp<float>(-PI, yawPitch.y, 0);
    }
    else if(event==Motion && button==RightButton) {
-    viewT = clamp<int>(0, int(dragStart.viewT) + (states.size-1) * (cursor.x - dragStart.cursor.x) / (size.x/2-1), states.size-1); // Relative
-    //scale = 0; translation = 0;
-    running = false;
+    timeStep = clamp<int>(0,
+                      int(dragStart.timeStep) + (states.size-1) * (cursor.x - dragStart.cursor.x) / (size.x/2-1),
+                       states.size-1);
    }
    else return false;
    return true;
+ }
+};
+
+struct SimulationApp {
+ Simulation simulation;
+ SimulationView view;
+
+ bool running = true;
+
+ Time totalTime, recordTime;
+
+ unique<Window> window = ::window(&view, -1, mainThread, true, false);
+ SimulationApp(const Dict& parameters) : simulation(parameters) {
+  record(); view.timeStep=view.states.size-1;
+  window->presentComplete = [this]{
+   if(!running || !simulation.dt) return;
+   if(!totalTime) totalTime.start();
+   recordTime.start();
+   window->setTitle(str( str(simulation.timeStep*simulation.dt, 1u)+"s"_,
+                         str(simulation.timeStep*simulation.dt/totalTime.seconds(), 1u)+"x"_,
+                         strD(simulation.stepTimeRT, totalTime)));
+   if(!simulation.run(totalTime)) {
+    window->setTitle("Done");
+    running = false;
+   }
+   record(); view.timeStep=view.states.size-1;
+   recordTime.stop();
+   window->render();
+   if(view.states.size == 8192) { log(view.states.size); window->setTitle("OK"); running = false; }
+  };
+ }
+
+ void record() {
+  SimulationView::State state;
+  state.grain.radius = simulation.grain.radius;
+  state.grain.count = simulation.grain.count;
+  state.grain.Px = copy(simulation.grain.Px);
+  state.grain.Py = copy(simulation.grain.Py);
+  state.grain.Pz = copy(simulation.grain.Pz);
+  state.grain.Rx = copy(simulation.grain.Rx);
+  state.grain.Ry = copy(simulation.grain.Ry);
+  state.grain.Rz = copy(simulation.grain.Rz);
+  state.grain.Rw = copy(simulation.grain.Rw);
+
+  state.wire.radius = simulation.wire.radius;
+  state.wire.count = simulation.wire.count;
+  state.wire.Px = copy(simulation.wire.Px);
+  state.wire.Py = copy(simulation.wire.Py);
+  state.wire.Pz = copy(simulation.wire.Pz);
+
+  state.membrane.W = simulation.membrane.W;
+  state.membrane.H = simulation.membrane.H;
+  state.membrane.stride = simulation.membrane.stride;
+  state.membrane.count = simulation.membrane.count;
+  state.membrane.Px = copy(simulation.membrane.Px);
+  state.membrane.Py = copy(simulation.membrane.Py);
+  state.membrane.Pz = copy(simulation.membrane.Pz);
+
+  state.radius = simulation.membrane.radius;
+  state.bottomZ = simulation.bottomZ;
+  state.topZ = simulation.topZ;
+  view.states.append(::move(state));
  }
 } app (parameters());

@@ -44,7 +44,7 @@ struct Data {
  ref<byte> read(size_t size) { ref<byte> t = peek(size); advance(size); return t; }
 
  /// Reads until the end of input
- ref<byte> untilEnd() { size_t size=available(-1); return read(size); }
+ ref<byte> untilEnd() { size_t size=available(~0); return read(size); }
 
  /// Returns whether input match \a key
  bool wouldMatch(uint8 key);

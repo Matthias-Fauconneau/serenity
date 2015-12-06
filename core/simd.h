@@ -2,6 +2,80 @@
 /// \file simd.h SIMD intrinsics (SSE, AVX, ...)
 #include "core.h"
 
+#if __INTEL_COMPILER
+typedef uint v16ui __attribute((__vector_size__ (64)));
+typedef int v16si __attribute((__vector_size__ (64)));
+static /*constexpr*/ v16ui unused _0i = (v16ui){0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+static /*constexpr*/ v16ui unused _1i = (v16ui){
+  uint(~0),uint(~0),uint(~0),uint(~0),
+  uint(~0),uint(~0),uint(~0),uint(~0),
+  uint(~0),uint(~0),uint(~0),uint(~0),
+  uint(~0),uint(~0),uint(~0),uint(~0)};
+
+//static inline float extract(v16ui x, int i) { union { uint e[16]; v16ui v; } X; X.v = x; return X.e[i]; }
+#include <immintrin.h>
+
+static inline v16ui gather(const uint* P, v16ui i) {
+ return _mm512_i32gather_epi32((v16si)i, (const int*)P, sizeof(int));
+}
+//static inline v16ui gather(ref<uint> P, v16ui i) { return gather(P.data, i); }
+
+typedef float v16sf __attribute((__vector_size__ (64)));
+inline v16sf /*constexpr*/ float16(float f) { return (v16sf){f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f}; }
+static /*constexpr*/ v16sf unused _0f = float16(0);
+static /*constexpr*/ v16sf unused _1f = float16(1);
+
+static inline v16sf load(const float* a, size_t index) { return *(v16sf*)(a+index); }
+static inline v16sf load(ref<float> a, size_t index) { return load(a.data, index); }
+
+static inline v16sf loadu(ref<float> a, size_t index) {
+ struct v16sfu { v16sf v; } __attribute((__packed__, may_alias));
+ return ((v16sfu*)(a.data+index))->v;
+}
+
+static inline void store(float* const a, size_t index, v16sf v) { *(v16sf*)(a+index) = v; }
+static inline void store(mref<float> a, size_t index, v16sf v) { store(a.begin(), index, v); }
+static inline void storeu(mref<float> a, size_t index, v16sf v) {
+ _mm512_storeu_ps(a.begin()+index, v);
+}
+
+//static inline v16sf /*operator&*/mask(v16ui a, v16sf b) { return __mm512_mask_and_ps(a & (v16ui)b); }
+#define fma _mm512_mask_fmadd_ps
+#define maskSub _mm512_mask_sub_ps
+static inline v16sf /*operator|*/merge(v16sf a, v16sf b) { return (v16sf)((v16ui)a | (v16ui)b); }
+
+static inline v16sf min(v16sf a, v16sf b) {  return _mm512_min_ps(a, b); }
+static inline v16sf max(v16sf a, v16sf b) {  return _mm512_max_ps(a, b); }
+static inline v16sf sqrt(v16sf x) { return _mm512_sqrt_ps(x); }
+
+static inline float extract(v16sf x, int i) { union { float e[16]; v16sf v; } X; X.v = x; return X.e[i]; }
+static inline void insert(v16ui& x, int i, uint e) {
+ union { uint e[16]; v16ui v; } X; X.v = x; X.e[i] = e; x = X.v;
+}
+
+static inline v16sf gather(const float* P, v16ui i) {
+ return _mm512_i32gather_ps((v16si)i, P, sizeof(float));
+}
+//static inline v16sf gather(ref<float> P, v16ui i) { return gather(P.data, i); }
+
+static inline void scatter(float* const P, const v16ui i, const v16sf x) {
+ _mm512_i32scatter_ps(P, (v16si)i, x, sizeof(float));
+}
+//static inline void scatter(mref<float> P, const v16ui a, const v16sf x) { scatter(P.begin(), a, x); }
+
+static inline uint16 greaterThan(v16sf a, v16sf b) { return _mm512_cmp_ps_mask(a, b, _CMP_GT_OS); }
+//static inline uint16 notEqual(v16sf a, v16sf b) { return _mm512_cmp_ps_mask(a, b, _CMP_NEQ_UQ); }
+static inline uint16 equal(v16sf a, v16sf b) { return _mm512_cmp_ps_mask(a, b, _CMP_EQ_UQ); }
+
+static inline v16sf blend(uint16 k, v16sf a, v16sf b) { return _mm512_mask_blend_ps(k, a, b); }
+
+static constexpr size_t simd = 16; // SIMD size
+typedef v16sf vXsf;
+typedef v16ui vXui;
+inline vXsf /*constexpr*/ floatX(float x) { return float16(x); }
+
+#else
+
 typedef uint v8ui __attribute((__vector_size__ (32)));
 typedef int v8si __attribute((__vector_size__ (32)));
 static /*constexpr*/ v8ui unused _0i = (v8ui){0,0,0,0,0,0,0,0};
@@ -11,6 +85,7 @@ static /*constexpr*/ v8ui unused _1i = (v8ui){
 
 #if __INTEL_COMPILER
 static inline float extract(v8ui x, int i) { union { uint e[8]; v8ui v; } X; X.v = x; return X.e[i]; }
+#include <immintrin.h>
 #else
 static inline float extract(v8ui x, int i) { return x[i]; }
 #endif
@@ -18,7 +93,9 @@ static inline float extract(v8ui x, int i) { return x[i]; }
 static inline v8ui gather(const uint* P, v8ui i) {
 #if __AVX2__
 #if __clang__
- return __builtin_ia32_gatherd_epi256(_0i, (const v8sf*)P, i, _1i, sizeof(float));
+ return __builtin_ia32_gatherd_d256(_0i, (const v8si*)P, i, _1i, sizeof(int));
+#elif __INTEL_COMPILER
+ return _mm256_i32gather_epi32((const int*)P, (v8si)i, sizeof(int));
 #else
  return (v8ui)__builtin_ia32_gathersiv8si((v8si)_0i, (const int*)P, (v8si)i, (v8si)_1i, sizeof(int));
 #endif
@@ -63,9 +140,23 @@ static inline void storeu(mref<float> a, size_t index, v8sf v) {
 static inline v8sf /*operator&*/mask(v8ui a, v8sf b) { return (v8sf)(a & (v8ui)b); }
 static inline v8sf /*operator|*/merge(v8sf a, v8sf b) { return (v8sf)((v8ui)a | (v8ui)b); }
 
+#if __INTEL_COMPILER //__AVX512ER__
+//#include <zmmintrin.h>
+extern __m512 __ICL_INTRINCC _mm512_castps256_ps512(__m256);
+extern __m256 __ICL_INTRINCC _mm512_castps512_ps256(__m512);
+static inline v8sf min(v8sf a, v8sf b) {  return
+   _mm512_castps512_ps256(_mm512_min_ps(_mm512_castps256_ps512(a),
+                                                                         _mm512_castps256_ps512(b))); }
+static inline v8sf max(v8sf a, v8sf b) {  return
+   _mm512_castps512_ps256(_mm512_max_ps(_mm512_castps256_ps512(a),
+                                                                         _mm512_castps256_ps512(b))); }
+static inline v8sf sqrt(v8sf x) { return
+   _mm512_castps512_ps256(_mm512_sqrt_ps(_mm512_castps256_ps512((x)))); }
+#else
 static inline v8sf min(v8sf a, v8sf b) { return __builtin_ia32_minps256(a, b); }
 static inline v8sf max(v8sf a, v8sf b) { return __builtin_ia32_maxps256(a, b); }
 static inline v8sf sqrt(v8sf x) { return __builtin_ia32_sqrtps256(x); }
+#endif
 
 #if __INTEL_COMPILER
 static inline float extract(v8sf x, int i) { union { float e[8]; v8sf v; } X; X.v = x; return X.e[i]; }
@@ -83,6 +174,8 @@ static inline v8sf gather(const float* P, v8ui i) {
 #if __AVX2__
 #if __clang__
  return __builtin_ia32_gatherd_ps256(_0f, (const v8sf*)P, i, _1i, sizeof(float));
+#elif __INTEL_COMPILER
+ return _mm256_i32gather_ps(P, (v8si)i, sizeof(float));
 #else
  return __builtin_ia32_gathersiv8sf(_0f, P, (v8si)i, (v8sf)_1i, sizeof(float));
 #endif
@@ -111,7 +204,6 @@ static inline void scatter(mref<float> P, const v8ui a, const v8sf x) {
 }
 
 #if __INTEL_COMPILER
-#include <immintrin.h>
 static inline v8ui greaterThan(v8sf a, v8sf b) { return (v8ui)(v8sf)_mm256_cmp_ps(a, b, _CMP_GT_OS); }
 static inline v8ui notEqual(v8sf a, v8sf b) { return (v8ui)(v8sf)_mm256_cmp_ps(a, b, _CMP_NEQ_UQ); }
 #else
@@ -120,3 +212,8 @@ static inline v8ui notEqual(v8sf a, v8sf b) { return a != b; }
 #endif
 
 static constexpr size_t simd = 8; // SIMD size
+typedef v8sf vXsf;
+typedef v8ui vXui;
+inline vXsf /*constexpr*/ floatX(float x) { return float8(x); }
+
+#endif

@@ -140,7 +140,7 @@ int64 writeFile(const string path, const ref<byte> content, const Folder& at=cur
 
 template<uint major, uint minor> struct IO { static constexpr uint io = major<<8 | minor; };
 template<uint major, uint minor, Type T> struct IOW { typedef T Args; static constexpr uint iow = 1<<30 | sizeof(T)<<16 | major<<8 | minor; };
-template<uint major, uint minor, Type T> struct IOR { typedef T Args; static constexpr uint ior = 2<<30 | sizeof(T)<<16 | major<<8 | minor; };
+template<uint major, uint minor, Type T> struct IOR { typedef T Args; static constexpr uint ior = 2u<<30 | sizeof(T)<<16 | major<<8 | minor; };
 template<uint major, uint minor, Type T> struct IOWR { typedef T Args; static constexpr uint iowr = 3u<<30|sizeof(T)<<16|major<<8|minor; };
 /// Handle to a device
 struct Device : File {
@@ -176,7 +176,7 @@ struct Map : mref<byte> {
  ~Map();
 
  /// Locks memory map in RAM
- int lock(size_t size=-1) const;
+ int lock(size_t size=~0) const;
 
  /// Unmaps memory map
  void unmap();
