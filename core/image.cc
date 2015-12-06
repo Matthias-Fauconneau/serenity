@@ -6,6 +6,7 @@
 #include "map.h"
 
 static inline double pow(double x, double y) { return __builtin_pow(x,y); }
+static inline double round(double x) { return __builtin_round(x); }
 
 // -- sRGB --
 
@@ -20,13 +21,14 @@ __attribute((constructor(1001))) void generate_sRGB_forward() {
 }
 
 float sRGB_reverse[0x100];
-__attribute((constructor(1001))) void generate_sRGB_reverse() {
+__attribute((constructor(1002))) void generate_sRGB_reverse() {
  for(uint index: range(0x100)) {
   double sRGB = (double) index / 0xFF;
   double linear = sRGB > 0.04045 ? pow((sRGB+0.055)/1.055, 2.4) : sRGB / 12.92;
   assert(abs(sRGB-(linear > 0.0031308 ? 1.055*pow(linear,1/2.4)-0.055 : 12.92*linear))< 0x1p-50);
   sRGB_reverse[index] = linear;
-  assert(sRGB_forward[int(round(0xFFF*sRGB_reverse[index]))]==index);
+  assert(sRGB_forward[int(round(0xFFF*sRGB_reverse[index]))]==index,
+    sRGB_forward[int(round(0xFFF*sRGB_reverse[index]))], index);
  }
 }
 
@@ -147,6 +149,6 @@ static void bilinear(const Image& target, const Image& source) {
 }
 
 void resize(const Image& target, const Image& source) {
- assert_(source && target && source.size != target.size, source, target);
- if(target.size > source.size/2) bilinear(target, source); // Bilinear resample
+ assert_(source && target && source.size != target.size);
+ if(target.size > source.size/2u) bilinear(target, source); // Bilinear resample
 }

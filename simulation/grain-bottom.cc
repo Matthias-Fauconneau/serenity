@@ -298,8 +298,9 @@ void Simulation::stepGrainBottom() {
 
  grainBottomSumTime.start();
  float bottomForceZ = 0;
- for(size_t i=0; i<grainBottomA.size; i++) { // Scalar scatter add
-  size_t a = grainBottomA[i];
+ for(size_t i=0; i<grainBottomContact.size; i++) { // Scalar scatter add
+  size_t index = grainBottomContact[i];
+  size_t a = grainBottomA[index];
   grain.Fx[a] += grainBottomFx[i];
   grain.Fy[a] += grainBottomFy[i];
   grain.Fz[a] += grainBottomFz[i];

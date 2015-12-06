@@ -32,7 +32,8 @@ generic struct Buffer : mref<T> {
  /// Allocates an uninitialized Buffer for \a capacity elements
  Buffer(size_t capacity, size_t size) : mref<T>((T*)0, size), capacity(capacity) {
   assert(capacity>=size && size>=0);
-  if(capacity && posix_memalign((void**)&data, 64, capacity*sizeof(T))) error("Out of memory", size, capacity, sizeof(T));
+  if(capacity && posix_memalign((void**)&data, 64, capacity*sizeof(T)))
+   error("Out of memory", size, capacity, sizeof(T));
   //printf("+ %p\n", data);
  }
  explicit Buffer(size_t size) : Buffer(size, size) {}
@@ -85,8 +86,8 @@ generic struct buffer : Buffer<T> {
 template<> struct buffer<char> : Buffer<char> {
  using Buffer::Buffer;
 
- constexpr buffer() {}
- constexpr buffer(const char* data, size_t size) : Buffer<char>((char*)data, size, 0) {}
+ /*constexpr*/ buffer() {}
+ /*constexpr*/ buffer(const char* data, size_t size) : Buffer<char>((char*)data, size, 0) {}
  buffer(buffer&& o) : Buffer<char>((Buffer<char>&&)o) {}
  buffer& operator=(buffer&& o) { Buffer<char>::operator=(::move(o)); return *this; }
  //Buffer& operator=(Buffer&& o) { Buffer<char>::operator=(::move(o)); return *this; }

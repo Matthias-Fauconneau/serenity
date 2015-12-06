@@ -23,7 +23,7 @@ void fill(const Image& target, int2 origin, int2 size, bgr3f color, float opacit
  assert_(bgr3f(0) <= color && color <= bgr3f(1));
 
  int2 min = ::max(int2(0), origin);
- int2 max = ::min(target.size, origin+size);
+ int2 max = ::min(int2(target.size), origin+size);
  if(max<=min) return;
 
  if(opacity==1) { // Solid fill
@@ -41,7 +41,7 @@ void blit(const Image& target, int2 origin, const Image& source, bgr3f color, fl
  assert_(source);
 
  int2 min = ::max(int2(0), origin);
- int2 max = ::min(target.size, origin+source.size);
+ int2 max = ::min(int2(target.size), origin+int2(source.size));
  /**/  if(color==bgr3f(1) && opacity==1 && !source.alpha) { // Copy
   for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
    byte4 s = source(x-origin.x, y-origin.y);
@@ -73,7 +73,7 @@ void blit(const Image& target, int2 origin, const Image& source, bgr3f color, fl
 
 static void blend(const Image& target, uint x, uint y, bgr3f color, float opacity, bool transpose) {
  if(transpose) swap(x,y);
- if(x>=target.size.x|| y>=target.size.y) return;
+ if(x >= uint(target.size.x) || y >= uint(target.size.y)) return;
  blend(target, x,y, color, opacity);
 }
 
@@ -114,7 +114,7 @@ void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity, boo
  }
  int x = i1+1;
  if(x < 0) { intery += (0-x) * gradient; x = 0; }
- for(;x<min(transpose ? target.size.y : target.size.x, i2); x++) {
+ for(;x<min(int(transpose ? target.size.y : target.size.x), i2); x++) {
   blend(target, x, intery, color, (1-fract(intery)) * opacity, transpose);
   blend(target, x, intery+1, color, fract(intery) * opacity, transpose);
   intery += gradient;
@@ -130,11 +130,11 @@ static void trapezoidX(const Image& target, TrapezoidX::Span s0, TrapezoidX::Spa
   float x1 = float(s0.max) + float((s1.max - s0.max) * int(y - s0.y)) / float(s1.y - s0.y); // FIXME: step
   float f1 = floor(x1);
   int i1 = int(f1);
-  if(uint(i0)<target.size.x) blend(target, i0, y, color, opacity*(1-(x0-f0)));
+  if(uint(i0) < uint(target.size.x)) blend(target, i0, y, color, opacity*(1-(x0-f0)));
   for(uint x: range(max(0,i0+1), min(int(target.size.x),i1))) { // FIXME: clip once
    blend(target, x,y, color, opacity); // FIXME: antialias first last column
   }
-  if(uint(i1)<target.size.x) blend(target, i1, y, color, opacity*(x1-f1));
+  if(uint(i1) < uint(target.size.x)) blend(target, i1, y, color, opacity*(x1-f1));
  }
 }
 
@@ -204,7 +204,7 @@ void cubic(const Image& target, ref<vec2> sourcePoints, bgr3f color, float opaci
  for(vec2 p: points) pMin = ::min(pMin, p), pMax = ::max(pMax, p);
  pMin = floor(pMin), pMax = ceil(pMax);
  const int2 iMin = int2(pMin), iMax = int2(pMax);
- const int2 cMin = max(int2(0),iMin), cMax = min(target.size, iMax);
+ const int2 cMin = max(int2(0),iMin), cMax = min(int2(target.size), iMax);
  if(!(cMin < cMax)) return;
  const int2 size = iMax-iMin;
  Image8 raster(oversample*size.x+1,oversample*size.y+1);
@@ -233,7 +233,7 @@ void cubic(const Image& target, ref<vec2> sourcePoints, bgr3f color, float opaci
 void render(const Image& target, const Graphics& graphics, vec2 offset) {
  offset += graphics.offset;
  for(const auto& e: graphics.blits) {
-  if(int2(e.size) == e.image.size)
+  if(int2(e.size) == int2(e.image.size))
    blit(target, int2(round(offset+e.origin)), e.image, e.color, e.opacity);
   //else blit(target, int2(round(offset+e.origin)), resize(int2(round(e.size)), e.image), e.color, e.opacity); // FIXME: subpixel blit
  }

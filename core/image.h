@@ -5,13 +5,13 @@
 
 /// 2D array of pixels
 generic struct ImageT : buffer<T> {
- int2 size = 0; //union { int2 size = 0; struct { uint width, height; }; };
+ uint2 size = 0; //union { int2 size = 0; struct { uint width, height; }; };
  uint stride = 0;
  bool alpha = false;
 
  ImageT() {}
  default_move(ImageT);
- ImageT(buffer<T>&& pixels, int2 size, uint stride=0, bool alpha=false) : buffer<T>(::move(pixels)), size(size), stride(stride?:size.x), alpha(alpha) {
+ ImageT(buffer<T>&& pixels, uint2 size, uint stride=0, bool alpha=false) : buffer<T>(::move(pixels)), size(size), stride(stride?:size.x), alpha(alpha) {
   //assert_(buffer::data && buffer::size == height*this->stride);
  }
  ImageT(uint width, uint height, bool alpha=false) : buffer<T>(height*width), size(width, height), stride(width), alpha(alpha) {
@@ -20,9 +20,11 @@ generic struct ImageT : buffer<T> {
  ImageT(int2 size, bool alpha=false) : ImageT(size.x, size.y, alpha) {}
 
  explicit operator bool() const { return buffer<T>::data && size.x && size.y; }
- inline T& operator()(uint x, uint y) const { assert(x<size.x && y<size.y); return buffer<T>::at(y*stride+x); }
+ inline T& operator()(uint x, uint y) const {
+  assert(x<uint(size.x) && y<uint(size.y));
+  return buffer<T>::at(y*stride+x);
+ }
 };
-generic String str(const ImageT<T>& o) { return strx(o.size); }
 generic ImageT<T> copy(const ImageT<T>& o) {
  if(o.width == o.stride) return ImageT<T>(copyRef(o), o.size, o.stride, o.alpha);
  ImageT<T> target(o.size, o.alpha);

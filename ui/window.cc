@@ -239,7 +239,7 @@ void XWindow::event() {
  setTitle(getTitle ? getTitle() : widget->title());
  if(state!=Idle || !mapped) return;
 
- if(target.size != Window::size) {
+ if(int2(target.size) != Window::size) {
   if(target) {
    {FreePixmap r; send(({r.pixmap=id+Pixmap, r;}));} target=Image();
    assert_(shm);
@@ -252,7 +252,7 @@ void XWindow::event() {
   uint stride = align(16, Window::size.x);
   shm = check( shmget(0, Window::size.y*stride*sizeof(byte4) , IPC_CREAT | 0777) );
   target = Image(buffer<byte4>((byte4*)check(shmat(shm, 0, 0)), Window::size.y*stride),
-                            Window::size, stride, true);
+                            uint2(Window::size), stride, true);
   target.clear(byte4(0xFF));
   {Shm::Attach r; send(({r.seg=id+Segment, r.shm=shm, r;}));}
   {CreatePixmap r; send(({r.pixmap=id+Pixmap, r.window=id+Window, r.w=uint16(Window::size.x), r.h=uint16(Window::size.y), r;}));}

@@ -109,10 +109,11 @@ typedef vec<xy,uint8,2> byte2;
 typedef vec<xy,int16,2> short2;
 /// Integer x,y vector (32bit)
 typedef vec<xy,int,2> int2;
-inline String strx(int2 N) { return str(N.x)+'x'+str(N.y); }
+/// Unsigned integer x,y vector (32bit)
+typedef vec<xy,uint,2> uint2;
 /// Single precision x,y vector
 typedef vec<xy,float,2> vec2;
-//inline String strx(vec2 N) { return str(N.x)+'x'+str(N.y); }
+
 
 generic struct xyz {
     T x,y,z;

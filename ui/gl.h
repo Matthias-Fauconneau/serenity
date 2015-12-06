@@ -86,7 +86,7 @@ enum Format { RGB8=0, R16I=1, Depth=2/*U32*/, RGBA8=3, R32F=4,
               Clamp=1<<8, Multisample=1<<9, Cube=1<<10 };
 struct GLTexture {
  handle<uint> id = 0;
- int2 size; //union { int2 size = 0; struct { uint width, height; }; };
+ uint2 size; //union { int2 size = 0; struct { uint width, height; }; };
  uint format, target;
 
  GLTexture(){}

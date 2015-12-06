@@ -14,6 +14,7 @@
 constexpr float System::staticFrictionLength;
 constexpr float System::Grain::radius;
 constexpr float System::Grain::mass;
+constexpr float System::Grain::angularMass;
 constexpr float System::Wire::radius;
 constexpr float System::Wire::mass;
 constexpr float System::Wire::internodeLength;
@@ -106,7 +107,7 @@ void Simulation::stepGrainIntegration() {
  float maxGrainV_[maxThreadCount] = {};
  grainIntegrationTime += parallel_chunk(align(simd, grain.count)/simd, [this, &maxGrainV_](uint id, size_t start, size_t size) {
    const v8sf dt_mass = float8(dt / grain.mass), dt = float8(this->dt);
-   const float dt_angularMass = this->dt / grain.angularMass;
+   const float dt_angularMass = this->dt / Grain::angularMass;
    v8sf maxGrainV8 = _0f;
    const float* Fx = grain.Fx.data, *Fy = grain.Fy.data, *Fz = grain.Fz.data;
    const float* Tx = grain.Tx.begin(), *Ty = grain.Ty.begin(), *Tz = grain.Tz.begin();

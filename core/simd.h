@@ -30,7 +30,7 @@ static inline v8ui gather(const uint* P, v8ui i) {
 #endif
 }
 static inline v8ui gather(ref<uint> P, v8ui i) {
-#if DEBUG
+#if DEBUG && 0
  for(int k: range(8)) assert(extract(i, k) < P.size, extract(i, k), P.size);
 #endif
  return gather(P.data, i);
@@ -77,6 +77,7 @@ static inline void insert(v8ui& x, int i, uint e) {
 }
 #else
 static inline float extract(v8sf x, int i) { return x[i]; }
+static inline void insert(v8ui& x, int i, uint e) { x[i] = e; }
 #endif
 static inline v8sf gather(const float* P, v8ui i) {
 #if __AVX2__
@@ -114,8 +115,8 @@ static inline void scatter(mref<float> P, const v8ui a, const v8sf x) {
 static inline v8ui greaterThan(v8sf a, v8sf b) { return (v8ui)(v8sf)_mm256_cmp_ps(a, b, _CMP_GT_OS); }
 static inline v8ui notEqual(v8sf a, v8sf b) { return (v8ui)(v8sf)_mm256_cmp_ps(a, b, _CMP_NEQ_UQ); }
 #else
-static inline v8sf greaterThan(v8sf a, v8sf b) { return a > b; }
-static inline v8sf notEqual(v8sf a, v8sf b) { return a != b; }
+static inline v8ui greaterThan(v8sf a, v8sf b) { return a > b; }
+static inline v8ui notEqual(v8sf a, v8sf b) { return a != b; }
 #endif
 
 static constexpr size_t simd = 8; // SIMD size
