@@ -134,10 +134,6 @@ GLUniform GLShader::operator[](string name) {
     }
     return GLUniform(id, location);
 }
-/*#if !__clang__
-extern "C" __attribute((weak)) GLuint glGetProgramResourceIndex (GLuint, GLenum, const GLchar*) { error("glGetProgramResourceIndex"); }
-extern "C" __attribute((weak)) void glShaderStorageBlockBinding (GLuint, GLuint, GLuint) { error("glShaderStorageBlockBinding"); }
-#endif*/
 void GLShader::bind(string name, const GLBuffer& ssbo, uint binding) {
     uint index = glGetProgramResourceIndex(id, GL_SHADER_STORAGE_BLOCK, strz(name));
     glShaderStorageBlockBinding(id, index, binding);

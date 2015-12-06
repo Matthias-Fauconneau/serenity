@@ -202,7 +202,7 @@ void Simulation::stepGrainWire() {
   swap(oldGrainWireLocalBz, grainWireLocalBz);
 
   static constexpr size_t averageGrainWireContactCount = 32;
-  const size_t GWcc = align(simd, grain.count * averageGrainWireContactCount + 1);
+  const size_t GWcc = align(simd, grain.count * averageGrainWireContactCount +1);
   if(GWcc > grainWireA.capacity) {
    grainWireA = buffer<uint>(GWcc, 0);
    grainWireB = buffer<uint>(GWcc, 0);

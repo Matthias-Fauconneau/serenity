@@ -171,7 +171,7 @@ void Simulation::stepGrainBottom() {
   swap(oldGrainBottomLocalBz, grainBottomLocalBz);
 
   static constexpr size_t averageGrainBottomContactCount = 1;
-  const size_t GBcc = align(simd, grain.count * averageGrainBottomContactCount);
+  const size_t GBcc = align(simd, grain.count * averageGrainBottomContactCount +1);
   if(GBcc > grainBottomA.capacity) {
    grainBottomA = buffer<uint>(GBcc, 0);
    grainBottomLocalAx = buffer<float>(GBcc, 0);

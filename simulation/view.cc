@@ -4,6 +4,18 @@
 #include "gl.h"
 FILE(shader_glsl)
 
+__attribute((constructor)) void logCompiler() {
+#if __INTEL_COMPILER
+ log("ICC");
+#endif
+#if __clang__
+ log("CLang");
+#endif
+#if __gcc__
+ log("gcc")
+#endif
+}
+
 Dict parameters() {
  Dict parameters;
  for(string argument: arguments()) parameters.append(parseDict(argument));

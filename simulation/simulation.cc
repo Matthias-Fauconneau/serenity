@@ -72,13 +72,13 @@ void Simulation::domain(vec3& min, vec3& max) {
 void Simulation::step() {
  stepProcess();
 
- /*stepGrain();
+ stepGrain();
  stepGrainBottom();
- stepGrainTop();
+ /*stepGrainTop();
  stepGrainGrain();*/
 
- //stepMembrane();
- //stepGrainMembrane();
+ /*stepMembrane();
+ stepGrainMembrane();*/
 
  /*stepWire();
  stepGrainWire();
@@ -86,9 +86,9 @@ void Simulation::step() {
  stepWireBendingResistance();
  stepWireBottom();*/
 
- /*stepGrainIntegration();
- stepMembraneIntegration();
- stepWireIntegration();*/
+ stepGrainIntegration();
+ //stepMembraneIntegration();
+ //stepWireIntegration();
 
  timeStep++;
 }

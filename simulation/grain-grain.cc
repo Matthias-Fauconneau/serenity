@@ -197,7 +197,7 @@ void Simulation::stepGrainGrain() {
   swap(oldGrainGrainLocalBz, grainGrainLocalBz);
 
   static constexpr size_t averageGrainGrainContactCount = 7;
-  size_t GGcc = align(simd, grain.count * averageGrainGrainContactCount);
+  size_t GGcc = align(simd, grain.count * averageGrainGrainContactCount +1);
   if(GGcc > grainGrainA.capacity) {
    grainGrainA = buffer<uint>(GGcc, 0);
    grainGrainB = buffer<uint>(GGcc, 0);
