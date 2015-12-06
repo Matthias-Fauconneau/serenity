@@ -171,7 +171,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
 
  //args.append("-iquote."__);
  for(string flag: flags) args.append( "-D"+toUpper(flag)+"=1" );
- if(!flags.contains("release")) args.append(String("-g"__));
+ if(!flags.contains("release")) args.append("-g"__);
  if(!flags.contains("debug")) args.append("-O3"__); //O3|Ofast?
  else if(flags.contains("fast")) args.append("-O3"__); //O3|Ofast? // fast-debug
  if(flags.contains("profile")) args.append("-finstrument-functions"__);
@@ -181,14 +181,14 @@ break_:;
  if(!::find(CXX,"clang")) args.append("-fabi-version=0"__);
 
  Folder(tmp, currentWorkingDirectory(), true);
- Folder(tmp + string("/"_) + join(flags, string("-"_)), currentWorkingDirectory(), true);
+ Folder(tmp + "/"_ + join(flags, "-"_), currentWorkingDirectory(), true);
 
  // Compiles
  if(flags.contains("profile")) if(!compileModule(find("core/profile.cc"))) { log("Failed to compile\n"); return; }
  if(!compileModule( find(target+".cc") )) { log("Failed to compile\n"); return; }
 
  // Links
- binary = tmp+string("/"_)+join(flags, string("-"_))+string("/"_)+target;
+ binary = tmp+"/"_+join(flags, "-"_)+"/"_+target;
  assert_(!existsFolder(binary));
  if(!existsFile(binary) || needLink) {
   // Waits for all translation units to finish compilation before final link

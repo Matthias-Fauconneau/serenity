@@ -51,8 +51,8 @@ struct SimulationView : Simulation, Widget {
 
  size_t viewT = 0;
  vec2 viewYawPitch = vec2(0, -PI/3); // Current view angles
- vec2 scale = 0;
- vec2 translation = 0;
+ /*vec2 scale = 0;
+ vec2 translation = 0;*/
 
  struct {
   vec2 cursor;
@@ -137,8 +137,8 @@ struct SimulationView : Simulation, Widget {
     min = ::min(min, O - vec3(wire.radius));
     max = ::max(max, O + vec3(wire.radius));
    }
-   for(size_t i: range(state.membrane.count)) {
-    vec3 O = qapply(viewRotation, state.membrane.position(i));
+   for(size_t i: range(membrane.H-1)) for(size_t j: range(membrane.W)) {
+    vec3 O = qapply(viewRotation, state.membrane.position(simd+i*membrane.stride+j));
     if(O.z > 1) continue;
     min = ::min(min, O);
     max = ::max(max, O);
@@ -309,7 +309,7 @@ struct SimulationView : Simulation, Widget {
    }
    else if(event==Motion && button==RightButton) {
     viewT = clamp<int>(0, int(dragStart.viewT) + (states.size-1) * (cursor.x - dragStart.cursor.x) / (size.x/2-1), states.size-1); // Relative
-    scale = 0; translation = 0;
+    //scale = 0; translation = 0;
     running = false;
    }
    else return false;

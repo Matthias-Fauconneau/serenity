@@ -5,12 +5,8 @@
 
 // -- String
 
-#if __INTEL_COMPILER
-#define __ // ICC doesn't parse custom literal operators (""_)
-#else
 /// Returns const reference to a static string literal
 inline String operator "" __(const char* data, size_t size) { return String((char*)data, size, 0); }
-#endif
 
 // -- str()
 

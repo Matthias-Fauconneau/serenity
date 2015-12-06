@@ -179,9 +179,9 @@ generic struct Ref {
 /// ref discarding trailing zero byte in ref(char[N])
 // Needs to be a template specialization as a direct derived class specialization prevents implicit use of ref(char[N]) to bind ref<char>
 template<> struct ref<char> : Ref<char> {
- using Ref::Ref;
+ //using Ref::Ref;
  constexpr ref() {}
- //inline constexpr ref(const char* data, size_t size) : Ref<char>(data, size) {}*/
+ inline constexpr ref(const char* data, size_t size) : Ref<char>(data, size) {}
  /// Implicitly references a string literal
  template<size_t N> constexpr ref(char const (&a)[N]) : ref(a, N-1 /*Does not include trailling zero byte*/) {}
 };
@@ -192,12 +192,8 @@ generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 /// ref<char> holding a UTF8 text string
 typedef ref<char> string;
 
-#if __INTEL_COMPILER && 0
-#define _ // ICC doesn't parse custom literal operators (""_)
-#else
 /// Returns const reference to a static string literal
 inline constexpr string operator "" _(const char* data, size_t size) { return string(data,size); }
-#endif
 
 // -- Log
 

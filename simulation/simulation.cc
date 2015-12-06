@@ -1,6 +1,7 @@
 // TODO: Factorize force evaluation, contact management
 #include "simulation.h"
 //#include "process.h"
+//#include "grain.h"
 //#include "grain-bottom.h"
 //#include "grain-top.h"
 //#include "grain-grain.h"
@@ -69,9 +70,9 @@ void Simulation::domain(vec3& min, vec3& max) {
 }
 
 void Simulation::step() {
- /*stepProcess();
+ stepProcess();
 
- stepGrain();
+ /*stepGrain();
  stepGrainBottom();
  stepGrainTop();
  stepGrainGrain();*/

@@ -10,12 +10,11 @@ extern "C" void free(void* buffer) /*noexcept*/;
 
 #if __INTEL_COMPILER
 #define __atomic_fetch_add __atomic_fetch_add_explicit
-extern "C" { int printf(const char*, ...); }
 #endif
 
 /// Managed fixed capacity mutable reference to an array of elements
 /// \note Data is either an heap allocation managed by this object or a reference to memory managed by another object.
-generic struct Buffer : mref<T> {
+generic struct buffer : mref<T> {
  using mref<T>::data;
  using mref<T>::size;
  size_t capacity = 0; /// 0: reference, >0: size of the owned heap allocation
@@ -24,27 +23,25 @@ generic struct Buffer : mref<T> {
  using mref<T>::set;
  using mref<T>::slice;
 
- no_copy(Buffer);
- constexpr Buffer(){}
- Buffer(Buffer&& o) : mref<T>(o), capacity(o.capacity) { o.data=0; o.size=0; o.capacity=0; }
- constexpr Buffer(T* data, size_t size, size_t capacity) : mref<T>(data, size), capacity(capacity) {}
+ no_copy(buffer);
+ constexpr buffer(){}
+ buffer(buffer&& o) : mref<T>(o), capacity(o.capacity) { o.data=0; o.size=0; o.capacity=0; }
+ constexpr buffer(T* data, size_t size, size_t capacity) : mref<T>(data, size), capacity(capacity) {}
 
- /// Allocates an uninitialized Buffer for \a capacity elements
- Buffer(size_t capacity, size_t size) : mref<T>((T*)0, size), capacity(capacity) {
+ /// Allocates an uninitialized buffer for \a capacity elements
+ buffer(size_t capacity, size_t size) : mref<T>((T*)0, size), capacity(capacity) {
   assert(capacity>=size && size>=0);
   if(capacity && posix_memalign((void**)&data, 64, capacity*sizeof(T)))
    error("Out of memory", size, capacity, sizeof(T));
-  //printf("+ %p\n", data);
  }
- explicit Buffer(size_t size) : Buffer(size, size) {}
+ explicit buffer(size_t size) : buffer(size, size) {}
 
- Buffer& operator=(Buffer&& o) { this->~Buffer(); new (this) Buffer(::move(o)); return *this; }
+ buffer& operator=(buffer&& o) { this->~buffer(); new (this) buffer(::move(o)); return *this; }
 
- /// If the Buffer owns the reference, returns the memory to the allocator
- ~Buffer() {
+ /// If the buffer owns the reference, returns the memory to the allocator
+ ~buffer() {
   if(capacity) {
    if(!__has_trivial_destructor(T)) for(size_t i: range(size)) at(i).~T();
-   //printf("- %p\n", data);
    free((void*)data);
   }
   data=0; capacity=0; size=0;
@@ -68,31 +65,6 @@ generic struct Buffer : mref<T> {
  void append(const ref<T> source) {
   slice(__atomic_fetch_add(&size, source.size, 5/*SeqCst*/), source.size).copy(source);
  }
-};
-
-// Allows buffer<char> template specialization to be implemented by Buffer
-generic struct buffer : Buffer<T> {
- using Buffer<T>::Buffer;
- /*constexpr buffer() {}
- buffer(buffer&& o) : Buffer<T>((Buffer<T>&&)o) {}
- buffer(size_t capacity, size_t size) : Buffer<T>(capacity, size) {}
- explicit buffer(size_t size) : Buffer<T>(size) {}
- constexpr buffer(T* data, size_t size) : Buffer<T>(data, size, 0) {}
- buffer<T>& operator=(buffer<T>&& o) { Buffer<T>::operator=(::move(o)); return *this; }*/
-};
-
-/// ref discarding trailing zero byte in buffer(char[N])
-// Needs to be a template specialization as a direct derived class specialization prevents implicit use of ref(char[N]) to bind ref<char>
-template<> struct buffer<char> : Buffer<char> {
- using Buffer::Buffer;
-
- buffer() {}
- /*buffer(const char* data, size_t size) : Buffer<char>((char*)data, size, 0) {}
- buffer(buffer&& o) : Buffer<char>((Buffer<char>&&)o) {}
- buffer& operator=(buffer&& o) { Buffer<char>::operator=(::move(o)); return *this; }*/
-
- /// Implicitly references a string literal
- template<size_t N> constexpr buffer(char const (&a)[N]) : Buffer((char*)a, N-1, 0) {}
 };
 
 typedef buffer<char> String;
