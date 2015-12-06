@@ -1,4 +1,5 @@
 #include "simulation.h"
+#include "thread.h"
 
 __attribute((constructor)) void logCompiler() {
 #if __INTEL_COMPILER

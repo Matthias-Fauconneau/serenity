@@ -35,9 +35,9 @@ static inline v16sf loadu(ref<float> a, size_t index) {
 
 static inline void store(float* const a, size_t index, v16sf v) { *(v16sf*)(a+index) = v; }
 static inline void store(mref<float> a, size_t index, v16sf v) { store(a.begin(), index, v); }
-static inline void storeu(mref<float> a, size_t index, v16sf v) {
+/*static inline void storeu(mref<float> a, size_t index, v16sf v) {
  _mm512_storeu_ps(a.begin()+index, v);
-}
+}*/
 
 //static inline v16sf /*operator&*/mask(v16ui a, v16sf b) { return __mm512_mask_and_ps(a & (v16ui)b); }
 #define fma _mm512_mask_fmadd_ps
@@ -65,7 +65,7 @@ static inline void scatter(float* const P, const v16ui i, const v16sf x) {
 
 static inline uint16 greaterThan(v16sf a, v16sf b) { return _mm512_cmp_ps_mask(a, b, _CMP_GT_OS); }
 //static inline uint16 notEqual(v16sf a, v16sf b) { return _mm512_cmp_ps_mask(a, b, _CMP_NEQ_UQ); }
-static inline uint16 equal(v16sf a, v16sf b) { return _mm512_cmp_ps_mask(a, b, _CMP_EQ_UQ); }
+static inline uint16 equal(v16sf a, v16sf b) { return _mm512_cmp_ps_mask(a, b, _CMP_EQ_OQ); }
 
 static inline v16sf blend(uint16 k, v16sf a, v16sf b) { return _mm512_mask_blend_ps(k, a, b); }
 

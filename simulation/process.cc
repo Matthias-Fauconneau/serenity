@@ -1,7 +1,6 @@
 #include "simulation.h"
 
 void Simulation::stepProcess() {
-
  // Process
  if(currentHeight >= topZ-Grain::radius || grain.count == grain.capacity) {
   const float targetPressure = 10000 * Pa;

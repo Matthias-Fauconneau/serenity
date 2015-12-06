@@ -20,9 +20,9 @@ void Simulation::stepMembrane() {
    int dx[2][6] {{0, -1, -1, -1, 0, 1},{1, 0, -1, 0, 1, 1}};
    int stride = membrane.stride, W = membrane.W;
    for(int i=0; i<2; i++) for(int e=0; e<6; e++) D[i][e] = dy[e]*stride+dx[i][e];
-   v8sf P = float8(pressure/(2*3)); // area = length(cross)/2 / 3 vertices
-   v8sf internodeLength = float8(membrane.internodeLength);
-   v8sf tensionStiffness = float8(membrane.tensionStiffness);
+   vXsf P = floatX(pressure/(2*3)); // area = length(cross)/2 / 3 vertices
+   vXsf internodeLength = floatX(membrane.internodeLength);
+   vXsf tensionStiffness = floatX(membrane.tensionStiffness);
 
    // Tension from previous row
    {
@@ -30,32 +30,32 @@ void Simulation::stepMembrane() {
     int base = i*stride+simd;
     for(int j=0; j<W; j+=simd) {
      int index = base+j;
-     v8sf Ox = load(Px, index);
-     v8sf Oy = load(Py, index);
-     v8sf Oz = load(Pz, index);
-     v8sf VOx = load(Vx, index);
-     v8sf VOy = load(Vy, index);
-     v8sf VOz = load(Vz, index);
+     vXsf Ox = load(Px, index);
+     vXsf Oy = load(Py, index);
+     vXsf Oz = load(Pz, index);
+     vXsf VOx = load(Vx, index);
+     vXsf VOy = load(Vy, index);
+     vXsf VOz = load(Vz, index);
 
      // Tension
-     v8sf fx = _0f, fy = _0f, fz = _0f; // Assumes accumulators stays in registers
+     vXsf fx = _0f, fy = _0f, fz = _0f; // Assumes accumulators stays in registers
      for(int a=0; a<2; a++) { // TODO: assert unrolled
       int e = index+D[i%2][a]; // Gather (TODO: assert reduced i%2)
-      v8sf Rx = loadu(Px, e) - Ox;
-      v8sf Ry = loadu(Py, e) - Oy;
-      v8sf Rz = loadu(Pz, e) - Oz;
-      v8sf L = sqrt(Rx*Rx+Ry*Ry+Rz*Rz);
-      v8sf Nx = Rx/L, Ny = Ry/L, Nz = Rz/L;
-      v8sf x = L - internodeLength;
-      v8sf fS = tensionStiffness * x;
-      v8sf RVx = loadu(Vx, e) - VOx;
-      v8sf RVy = loadu(Vy, e) - VOy;
-      v8sf RVz = loadu(Vz, e) - VOz;
-      v8sf fB = float8(membrane.tensionDamping) * (Nx * RVx + Ny * RVy + Nz * RVz);
-      v8sf f = fS + fB;
-      v8sf tx = f * Nx;
-      v8sf ty = f * Ny;
-      v8sf tz = f * Nz;
+      vXsf Rx = loadu(Px, e) - Ox;
+      vXsf Ry = loadu(Py, e) - Oy;
+      vXsf Rz = loadu(Pz, e) - Oz;
+      vXsf L = sqrt(Rx*Rx+Ry*Ry+Rz*Rz);
+      vXsf Nx = Rx/L, Ny = Ry/L, Nz = Rz/L;
+      vXsf x = L - internodeLength;
+      vXsf fS = tensionStiffness * x;
+      vXsf RVx = loadu(Vx, e) - VOx;
+      vXsf RVy = loadu(Vy, e) - VOy;
+      vXsf RVz = loadu(Vz, e) - VOz;
+      vXsf fB = floatX(membrane.tensionDamping) * (Nx * RVx + Ny * RVy + Nz * RVz);
+      vXsf f = fS + fB;
+      vXsf tx = f * Nx;
+      vXsf ty = f * Ny;
+      vXsf tz = f * Nz;
       fx += tx;
       fy += ty;
       fz += tz;
@@ -70,35 +70,35 @@ void Simulation::stepMembrane() {
     int base = i*stride+simd;
     for(int j=0; j<W; j+=simd) {
      int index = base+j;
-     v8sf Ox = load(Px, index);
-     v8sf Oy = load(Py, index);
-     v8sf Oz = load(Pz, index);
-     v8sf VOx = load(Vx, index);
-     v8sf VOy = load(Vy, index);
-     v8sf VOz = load(Vz, index);
+     vXsf Ox = load(Px, index);
+     vXsf Oy = load(Py, index);
+     vXsf Oz = load(Pz, index);
+     vXsf VOx = load(Vx, index);
+     vXsf VOy = load(Vy, index);
+     vXsf VOz = load(Vz, index);
 
      int E[3];
-     v8sf X[3], Y[3], Z[3];
-     v8sf FX[4], FY[4], FZ[4];
+     vXsf X[3], Y[3], Z[3];
+     vXsf FX[4], FY[4], FZ[4];
      for(size_t a: range(4)) { FX[a]=_0f, FY[a]=_0f, FZ[a]=_0f; } // TODO: assert unrolled
      // Tension
      for(size_t a: range(3)) { // TODO: assert unrolled
       int e = E[a] = index+D[i%2][a];
-      v8sf Rx = X[a] = loadu(Px, e) - Ox;
-      v8sf Ry = Y[a] = loadu(Py, e) - Oy;
-      v8sf Rz = Z[a] = loadu(Pz, e) - Oz;
-      v8sf L = sqrt(Rx*Rx+Ry*Ry+Rz*Rz);
-      v8sf Nx = Rx/L, Ny = Ry/L, Nz = Rz/L;
-      v8sf x = L - internodeLength;
-      v8sf fS = tensionStiffness * x;
-      v8sf RVx = loadu(Vx, e) - VOx;
-      v8sf RVy = loadu(Vy, e) - VOy;
-      v8sf RVz = loadu(Vz, e) - VOz;
-      v8sf fB = float8(membrane.tensionDamping) * (Nx * RVx + Ny * RVy + Nz * RVz);
-      v8sf f = fS + fB;
-      v8sf tx = f * Nx;
-      v8sf ty = f * Ny;
-      v8sf tz = f * Nz;
+      vXsf Rx = X[a] = loadu(Px, e) - Ox;
+      vXsf Ry = Y[a] = loadu(Py, e) - Oy;
+      vXsf Rz = Z[a] = loadu(Pz, e) - Oz;
+      vXsf L = sqrt(Rx*Rx+Ry*Ry+Rz*Rz);
+      vXsf Nx = Rx/L, Ny = Ry/L, Nz = Rz/L;
+      vXsf x = L - internodeLength;
+      vXsf fS = tensionStiffness * x;
+      vXsf RVx = loadu(Vx, e) - VOx;
+      vXsf RVy = loadu(Vy, e) - VOy;
+      vXsf RVz = loadu(Vz, e) - VOz;
+      vXsf fB = floatX(membrane.tensionDamping) * (Nx * RVx + Ny * RVy + Nz * RVz);
+      vXsf f = fS + fB;
+      vXsf tx = f * Nx;
+      vXsf ty = f * Ny;
+      vXsf tz = f * Nz;
       FX[a] -= tx;
       FY[a] -= ty;
       FZ[a] -= tz;
@@ -108,12 +108,12 @@ void Simulation::stepMembrane() {
      }
      for(size_t a: range(2)) {
       int b = a+1; // TODO: Assert peeled
-      v8sf px = (Y[a]*Z[b] - Y[b]*Z[a]);
-      v8sf py = (Z[a]*X[b] - Z[b]*X[a]);
-      v8sf pz = (X[a]*Y[b] - X[b]*Y[a]);
-      v8sf ppx = P * px;
-      v8sf ppy = P * py;
-      v8sf ppz = P * pz;
+      vXsf px = (Y[a]*Z[b] - Y[b]*Z[a]);
+      vXsf py = (Z[a]*X[b] - Z[b]*X[a]);
+      vXsf pz = (X[a]*Y[b] - X[b]*Y[a]);
+      vXsf ppx = P * px;
+      vXsf ppy = P * py;
+      vXsf ppz = P * pz;
       FX[a] += ppx;
       FY[a] += ppy;
       FZ[a] += ppz;
@@ -126,9 +126,9 @@ void Simulation::stepMembrane() {
      }
      for(int a=0; a<3; a++) {
       int e = E[a];
-      storeu(Fx, e, loadu(Fx, e) + FX[a]);
-      storeu(Fy, e, loadu(Fy, e) + FY[a]);
-      storeu(Fz, e, loadu(Fz, e) + FZ[a]);
+      store/*u*/(Fx, e, loadu(Fx, e) + FX[a]);
+      store/*u*/(Fy, e, loadu(Fy, e) + FY[a]);
+      store/*u*/(Fz, e, loadu(Fz, e) + FZ[a]);
      }
      store(Fx, index, load(Fx, index) + FX[3]);
      store(Fy, index, load(Fy, index) + FY[3]);
@@ -141,34 +141,34 @@ void Simulation::stepMembrane() {
     size_t base = i*stride+simd;
     for(int j=0; j<W; j+=simd) {
      size_t  index = base+j;
-     v8sf Ox = load(Px, index);
-     v8sf Oy = load(Py, index);
-     v8sf Oz = load(Pz, index);
-     v8sf VOx = load(Vx, index);
-     v8sf VOy = load(Vy, index);
-     v8sf VOz = load(Vz, index);
+     vXsf Ox = load(Px, index);
+     vXsf Oy = load(Py, index);
+     vXsf Oz = load(Pz, index);
+     vXsf VOx = load(Vx, index);
+     vXsf VOy = load(Vy, index);
+     vXsf VOz = load(Vz, index);
 
      // Tension
      for(int a=0; a<2; a++) { // TODO: assert unrolled
       int e = index+D[i%2][a]; // Gather (TODO: assert reduced i%2)
-      v8sf Rx = loadu(Px, e) - Ox;
-      v8sf Ry = loadu(Py, e) - Oy;
-      v8sf Rz = loadu(Pz, e) - Oz;
-      v8sf L = sqrt(Rx*Rx+Ry*Ry+Rz*Rz);
-      v8sf Nx = Rx/L, Ny = Ry/L, Nz = Rz/L;
-      v8sf x = L - internodeLength;
-      v8sf fS = tensionStiffness * x;
-      v8sf RVx = loadu(Vx, e) - VOx;
-      v8sf RVy = loadu(Vy, e) - VOy;
-      v8sf RVz = loadu(Vz, e) - VOz;
-      v8sf fB = float8(membrane.tensionDamping) * (Nx * RVx + Ny * RVy + Nz * RVz);
-      v8sf f = fS + fB;
-      v8sf tx = f * Nx;
-      v8sf ty = f * Ny;
-      v8sf tz = f * Nz;
-      storeu(Fx, e, loadu(Fx, e) - tx);
-      storeu(Fy, e, loadu(Fy, e) - ty);
-      storeu(Fz, e, loadu(Fz, e) - tz);
+      vXsf Rx = loadu(Px, e) - Ox;
+      vXsf Ry = loadu(Py, e) - Oy;
+      vXsf Rz = loadu(Pz, e) - Oz;
+      vXsf L = sqrt(Rx*Rx+Ry*Ry+Rz*Rz);
+      vXsf Nx = Rx/L, Ny = Ry/L, Nz = Rz/L;
+      vXsf x = L - internodeLength;
+      vXsf fS = tensionStiffness * x;
+      vXsf RVx = loadu(Vx, e) - VOx;
+      vXsf RVy = loadu(Vy, e) - VOy;
+      vXsf RVz = loadu(Vz, e) - VOz;
+      vXsf fB = floatX(membrane.tensionDamping) * (Nx * RVx + Ny * RVy + Nz * RVz);
+      vXsf f = fS + fB;
+      vXsf tx = f * Nx;
+      vXsf ty = f * Ny;
+      vXsf tz = f * Nz;
+      store/*u*/(Fx, e, loadu(Fx, e) - tx);
+      store/*u*/(Fy, e, loadu(Fy, e) - ty);
+      store/*u*/(Fz, e, loadu(Fz, e) - tz);
      }
     }
    }
@@ -178,8 +178,8 @@ void Simulation::stepMembrane() {
 void Simulation::stepMembraneIntegration() {
  if(!membrane.count) return;
  membraneIntegrationTime.start();
- const v8sf dt_mass = float8(this->dt / membrane.mass), dt = float8(this->dt);
- v8sf maxMembraneV8 = _0f;
+ const vXsf dt_mass = floatX(this->dt / membrane.mass), dt = floatX(this->dt);
+ vXsf maxMembraneVX = _0f;
  float* const Fx = membrane.Fx.begin(), *Fy = membrane.Fy.begin(), *Fz = membrane.Fz.begin();
  float* const pVx = membrane.Vx.begin(), *pVy = membrane.Vy.begin(), *pVz = membrane.Vz.begin();
  float* const pPx = membrane.Px.begin(), *pPy = membrane.Py.begin(), *pPz = membrane.Pz.begin();
@@ -195,21 +195,21 @@ void Simulation::stepMembraneIntegration() {
   for(size_t j=0; j<W; j+=simd) {
    size_t k = i*stride+simd+j;
    // Symplectic Euler
-   v8sf Vx = load(pVx, k), Vy = load(pVy, k), Vz = load(pVz, k);
+   vXsf Vx = load(pVx, k), Vy = load(pVy, k), Vz = load(pVz, k);
    Vx += dt_mass * load(Fx, k);
    Vy += dt_mass * load(Fy, k);
    Vz += dt_mass * load(Fz, k);
    store(pVx, k, Vx);
    store(pVy, k, Vy);
    store(pVz, k, Vz);
-   const v8sf Px = load(pPx, k) + dt * Vx;
-   const v8sf Py = load(pPy, k) + dt * Vy;
-   v8sf Pz = load(pPz, k) + dt * Vz;
-   Pz = min(float8(topZ), Pz);
+   const vXsf Px = load(pPx, k) + dt * Vx;
+   const vXsf Py = load(pPy, k) + dt * Vy;
+   vXsf Pz = load(pPz, k) + dt * Vz;
+   Pz = min(floatX(topZ), Pz);
    store(pPx, k, Px);
    store(pPy, k, Py);
    store(pPz, k, Pz);
-   maxMembraneV8 = max(maxMembraneV8, sqrt(Vx*Vx + Vy*Vy + Vz*Vz));
+   maxMembraneVX = max(maxMembraneVX, sqrt(Vx*Vx + Vy*Vy + Vz*Vz));
   }
   // Copies position back to repeated nodes
   pPx[i*stride+simd-1] = pPx[i*stride+simd+W-1];
@@ -220,7 +220,7 @@ void Simulation::stepMembraneIntegration() {
   pPz[i*stride+simd+W] = pPz[i*stride+simd+0];
  }
  float maxMembraneV = 0;
- for(size_t k: range(simd)) maxMembraneV = ::max(maxMembraneV, extract(maxMembraneV8,k));
+ for(size_t k: range(simd)) maxMembraneV = ::max(maxMembraneV, extract(maxMembraneVX,k));
  float maxGrainMembraneV = maxGrainV + maxMembraneV;
  grainMembraneGlobalMinD -= maxGrainMembraneV * this->dt;
  membraneIntegrationTime.stop();

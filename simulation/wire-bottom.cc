@@ -7,125 +7,121 @@ void evaluateWireObstacle(const size_t start, const size_t size,
                                      const uint* wireObstacleContact, const size_t unused wireObstacleContactSize,
                                      const uint* wireObstacleA,
                                      const float* wirePx, const float* wirePy, const float* wirePz,
-                                     const v8sf obstacleZ, const v8sf Wr,
+                                     const vXsf obstacleZ, const vXsf Wr,
                                      float* const wireObstacleLocalAx, float* const wireObstacleLocalAy, float* const wireObstacleLocalAz,
                                      float* const wireObstacleLocalBx, float* const wireObstacleLocalBy, float* const wireObstacleLocalBz,
-                                     const v8sf K, const v8sf Kb,
-                                     const v8sf staticFrictionStiffness, const v8sf dynamicFrictionCoefficient,
-                                     const v8sf staticFrictionLength, const v8sf staticFrictionSpeed,
-                                     const v8sf staticFrictionDamping,
+                                     const vXsf K, const vXsf Kb,
+                                     const vXsf staticFrictionStiffness, const vXsf dynamicFrictionCoefficient,
+                                     const vXsf staticFrictionLength, const vXsf staticFrictionSpeed,
+                                     const vXsf staticFrictionDamping,
                                      const float* AVx, const float* AVy, const float* AVz,
                                      float* const pFx, float* const pFy, float* const pFz) {
  for(size_t i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
-  const v8ui contacts = *(v8ui*)(wireObstacleContact+i);
-  const v8ui A = gather(wireObstacleA, contacts);
+  const vXui contacts = *(vXui*)(wireObstacleContact+i);
+  const vXui A = gather(wireObstacleA, contacts);
   // FIXME: Recomputing from intersection (more efficient than storing?)
-  const v8sf Ax = gather(wirePx, A), Ay = gather(wirePy, A), Az = gather(wirePz, A);
-  const v8sf depth = (obstacleZ+Wr) - Az; // Top: Az - (obstacleZ-Gr);
-  const v8sf Nx = _0f, Ny = _0f, Nz = _1f;
-  const v8sf RAx = - Wr  * Nx, RAy = - Wr * Ny, RAz = - Wr * Nz;
-  const v8sf RBx = Ax, RBy = Ay, RBz = Az;
+  const vXsf Ax = gather(wirePx, A), Ay = gather(wirePy, A), Az = gather(wirePz, A);
+  const vXsf depth = (obstacleZ+Wr) - Az; // Top: Az - (obstacleZ-Gr);
+  const vXsf Nx = _0f, Ny = _0f, Nz = _1f;
+  const vXsf RAx = - Wr  * Nx, RAy = - Wr * Ny, RAz = - Wr * Nz;
+  const vXsf RBx = Ax, RBy = Ay, RBz = Az;
   /// Evaluates contact force between two objects with friction (rotating A, non rotating B)
   // Wire - Obstacle
 
   // Tension
-  const v8sf Fk = K * sqrt(depth) * depth;
+  const vXsf Fk = K * sqrt(depth) * depth;
   // Relative velocity
-  const v8sf RVx = gather(AVx, A);
-  const v8sf RVy = gather(AVy, A);
-  const v8sf RVz = gather(AVz, A);
+  const vXsf RVx = gather(AVx, A);
+  const vXsf RVy = gather(AVy, A);
+  const vXsf RVz = gather(AVz, A);
   // Damping
-  const v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
-  const v8sf Fb = - Kb * sqrt(sqrt(depth)) * normalSpeed ; // Damping
+  const vXsf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
+  const vXsf Fb = - Kb * sqrt(sqrt(depth)) * normalSpeed ; // Damping
   // Normal force
-  const v8sf Fn = Fk + Fb;
-  const v8sf NFx = Fn * Nx;
-  const v8sf NFy = Fn * Ny;
-  const v8sf NFz = Fn * Nz;
+  const vXsf Fn = Fk + Fb;
+  const vXsf NFx = Fn * Nx;
+  const vXsf NFy = Fn * Ny;
+  const vXsf NFz = Fn * Nz;
 
   // Dynamic friction
   // Tangent relative velocity
-  const v8sf RVn = Nx*RVx + Ny*RVy + Nz*RVz;
-  const v8sf TRVx = RVx - RVn * Nx;
-  const v8sf TRVy = RVy - RVn * Ny;
-  const v8sf TRVz = RVz - RVn * Nz;
-  const v8sf tangentRelativeSpeed = sqrt(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
-  const v8sf Fd = mask(greaterThan(tangentRelativeSpeed, _0f),
-                       - dynamicFrictionCoefficient * Fn / tangentRelativeSpeed);
-  const v8sf FDx = Fd * TRVx;
-  const v8sf FDy = Fd * TRVy;
-  const v8sf FDz = Fd * TRVz;
+  const vXsf RVn = Nx*RVx + Ny*RVy + Nz*RVz;
+  const vXsf TRVx = RVx - RVn * Nx;
+  const vXsf TRVy = RVy - RVn * Ny;
+  const vXsf TRVz = RVz - RVn * Nz;
+  const vXsf tangentRelativeSpeed = sqrt(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
+  const uint16 div0 = greaterThan(tangentRelativeSpeed, _0f);
+  const vXsf Fd = - dynamicFrictionCoefficient * Fn / tangentRelativeSpeed;
+  const vXsf FDx = fma(Fd, div0, TRVx, _0f);
+  const vXsf FDy = fma(Fd, div0, TRVy, _0f);
+  const vXsf FDz = fma(Fd, div0, TRVz, _0f);
 
   // Gather static frictions
-  const v8sf oldLocalAx = gather(wireObstacleLocalAx, contacts);
-  const v8sf oldLocalAy = gather(wireObstacleLocalAy, contacts);
-  const v8sf oldLocalAz = gather(wireObstacleLocalAz, contacts);
-  const v8sf oldLocalBx = gather(wireObstacleLocalBx, contacts);
-  const v8sf oldLocalBy = gather(wireObstacleLocalBy, contacts);
-  const v8sf oldLocalBz = gather(wireObstacleLocalBz, contacts);
+  const vXsf oldLocalAx = gather(wireObstacleLocalAx, contacts);
+  const vXsf oldLocalAy = gather(wireObstacleLocalAy, contacts);
+  const vXsf oldLocalAz = gather(wireObstacleLocalAz, contacts);
+  const vXsf oldLocalBx = gather(wireObstacleLocalBx, contacts);
+  const vXsf oldLocalBy = gather(wireObstacleLocalBy, contacts);
+  const vXsf oldLocalBz = gather(wireObstacleLocalBz, contacts);
 
-  const v8sf newLocalAx = RAx;
-  const v8sf newLocalAy = RAy;
-  const v8sf newLocalAz = RAz;
+  const vXsf newLocalAx = RAx;
+  const vXsf newLocalAy = RAy;
+  const vXsf newLocalAz = RAz;
 
-  const v8sf newLocalBx = RBx;
-  const v8sf newLocalBy = RBy;
-  const v8sf newLocalBz = RBz;
+  const vXsf newLocalBx = RBx;
+  const vXsf newLocalBy = RBy;
+  const vXsf newLocalBz = RBz;
 
-  const v8ui keep = notEqual(oldLocalAx, _0f), reset = ~keep;
-  v8sf localAx = merge(mask(keep, oldLocalAx), mask(reset, newLocalAx));
-  const v8sf localAy = merge(mask(keep, oldLocalAy), mask(reset, newLocalAy));
-  const v8sf localAz = merge(mask(keep, oldLocalAz), mask(reset, newLocalAz));
-  const v8sf localBx = merge(mask(keep, oldLocalBx), mask(reset, newLocalBx));
-  const v8sf localBy = merge(mask(keep, oldLocalBy), mask(reset, newLocalBy));
-  const v8sf localBz = merge(mask(keep, oldLocalBz), mask(reset, newLocalBz));
+  const uint16 reset = equal(oldLocalAx, _0f);
+  vXsf localAx = blend(reset, oldLocalAx, newLocalAx);
+  const vXsf localAy = blend(reset, oldLocalAy, newLocalAy);
+  const vXsf localAz = blend(reset, oldLocalAz, newLocalAz);
+  const vXsf localBx = blend(reset, oldLocalBx, newLocalBx);
+  const vXsf localBy = blend(reset, oldLocalBy, newLocalBy);
+  const vXsf localBz = blend(reset, oldLocalBz, newLocalBz);
 
-  const v8sf FRAx = localAx;
-  const v8sf FRAy = localAy;
-  const v8sf FRAz = localAz;
-  const v8sf FRBx = localBx;
-  const v8sf FRBy = localBy;
-  const v8sf FRBz = localBz;
+  const vXsf FRAx = localAx;
+  const vXsf FRAy = localAy;
+  const vXsf FRAz = localAz;
+  const vXsf FRBx = localBx;
+  const vXsf FRBy = localBy;
+  const vXsf FRBz = localBz;
 
-  const v8sf gAx = Ax + FRAx;
-  const v8sf gAy = Ay + FRAy;
-  const v8sf gAz = Az + FRAz;
-  const v8sf gBx = FRBx;
-  const v8sf gBy = FRBy;
-  const v8sf gBz = FRBz;
-  const v8sf Dx = gBx - gAx;
-  const v8sf Dy = gBy - gAy;
-  const v8sf Dz = gBz - gAz;
-  const v8sf Dn = Nx*Dx + Ny*Dy + Nz*Dz;
+  const vXsf gAx = Ax + FRAx;
+  const vXsf gAy = Ay + FRAy;
+  const vXsf gAz = Az + FRAz;
+  const vXsf gBx = FRBx;
+  const vXsf gBy = FRBy;
+  const vXsf gBz = FRBz;
+  const vXsf Dx = gBx - gAx;
+  const vXsf Dy = gBy - gAy;
+  const vXsf Dz = gBz - gAz;
+  const vXsf Dn = Nx*Dx + Ny*Dy + Nz*Dz;
   // Tangent offset
-  const v8sf TOx = Dx - Dn * Nx;
-  const v8sf TOy = Dy - Dn * Ny;
-  const v8sf TOz = Dz - Dn * Nz;
-  const v8sf tangentLength = sqrt(TOx*TOx+TOy*TOy+TOz*TOz);
-  const v8sf Ks = staticFrictionStiffness * Fn;
-  const v8sf Fs = Ks * tangentLength; // 0.1~1 fN
+  const vXsf TOx = Dx - Dn * Nx;
+  const vXsf TOy = Dy - Dn * Ny;
+  const vXsf TOz = Dz - Dn * Nz;
+  const vXsf tangentLength = sqrt(TOx*TOx+TOy*TOy+TOz*TOz);
+  const vXsf Ks = staticFrictionStiffness * Fn;
+  const vXsf Fs = Ks * tangentLength; // 0.1~1 fN
   // Spring direction
-  const v8sf SDx = TOx / tangentLength;
-  const v8sf SDy = TOy / tangentLength;
-  const v8sf SDz = TOz / tangentLength;
-  const v8ui hasTangentLength = greaterThan(tangentLength, _0f);
-  const v8sf sfFb = mask(hasTangentLength,
-                         staticFrictionDamping * (SDx * RVx + SDy * RVy + SDz * RVz));
-  const v8ui hasStaticFriction = greaterThan(staticFrictionLength, tangentLength)
+  const vXsf SDx = TOx / tangentLength;
+  const vXsf SDy = TOy / tangentLength;
+  const vXsf SDz = TOz / tangentLength;
+  const uint16 hasTangentLength = greaterThan(tangentLength, _0f);
+  const vXsf sfFb = staticFrictionDamping * (SDx * RVx + SDy * RVy + SDz * RVz);
+  const uint16 hasStaticFriction = greaterThan(staticFrictionLength, tangentLength)
                                               & greaterThan(staticFrictionSpeed, tangentRelativeSpeed);
-  const v8sf sfFt = mask(hasStaticFriction, Fs - sfFb);
-  const v8sf FSx = mask(hasTangentLength, sfFt * SDx);
-  const v8sf FSy = mask(hasTangentLength, sfFt * SDy);
-  const v8sf FSz = mask(hasTangentLength, sfFt * SDz);
-  const v8sf FTx = FDx + FSx;
-  const v8sf FTy = FDy + FSy;
-  const v8sf FTz = FDz + FSz;
+  const vXsf sfFt = maskSub(Fs, hasTangentLength, Fs, sfFb);
+  const vXsf FTx = fma(sfFt, hasStaticFriction, SDx, FDx);
+  const vXsf FTy = fma(sfFt, hasStaticFriction, SDy, FDy);
+  const vXsf FTz = fma(sfFt, hasStaticFriction, SDz, FDz);
   // Resets contacts without static friction
-  localAx = mask(hasStaticFriction, localAx); // FIXME use 1s (NaN) not 0s to flag resets
+  localAx = blend(hasStaticFriction, _0f, localAx); // FIXME use 1s (NaN) not 0s to flag resets
 
-  *(v8sf*)(pFx+i) = NFx + FTx;
-  *(v8sf*)(pFy+i) = NFy + FTy;
-  *(v8sf*)(pFz+i) = NFz + FTz;
+  *(vXsf*)(pFx+i) = NFx + FTx;
+  *(vXsf*)(pFy+i) = NFy + FTy;
+  *(vXsf*)(pFz+i) = NFz + FTz;
   // Scatter static frictions
   scatter(wireObstacleLocalAx, contacts, localAx);
   scatter(wireObstacleLocalAy, contacts, localAy);
@@ -206,8 +202,8 @@ void Simulation::stepWireBottom() {
  wireBottomContact.size = 0;
  auto filter = [&](uint, size_t start, size_t size) {
   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
-   v8ui A = *(v8ui*)(wireBottomA.data+i);
-   v8sf Az = gather(wire.Pz, A);
+   vXui A = *(vXui*)(wireBottomA.data+i);
+   vXsf Az = gather(wire.Pz.data, A);
    for(size_t k: range(simd)) {
     size_t j = i+k;
     if(j == wireBottomA.size) break /*2*/;
@@ -248,12 +244,12 @@ void Simulation::stepWireBottom() {
                      wireBottomContact.data, wireBottomContact.size,
                      wireBottomA.data,
                      wire.Px.data, wire.Py.data, wire.Pz.data,
-                     float8(bottomZ), float8(Wire::radius),
+                     floatX(bottomZ), floatX(Wire::radius),
                      wireBottomLocalAx.begin(), wireBottomLocalAy.begin(), wireBottomLocalAz.begin(),
                      wireBottomLocalBx.begin(), wireBottomLocalBy.begin(), wireBottomLocalBz.begin(),
-                     float8(K), float8(Kb),
-                     float8(staticFrictionStiffness), float8(dynamicFrictionCoefficient),
-                     float8(staticFrictionLength), float8(staticFrictionSpeed), float8(staticFrictionDamping),
+                     floatX(K), floatX(Kb),
+                     floatX(staticFrictionStiffness), floatX(dynamicFrictionCoefficient),
+                     floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping),
                      wire.Vx.data, wire.Vy.data, wire.Vz.data,
                      wireBottomFx.begin(), wireBottomFy.begin(), wireBottomFz.begin() );
  }, 1);

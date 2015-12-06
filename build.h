@@ -13,7 +13,7 @@ struct Build {
  String CXX {
   which(environmentVariable("CC")) ? which(environmentVariable("CC")) :
      which("clang++") ? which("clang++") : which("g++")};
- String LD {which("ld")};
+ String LD {/*which("ld")*/copyRef(CXX)};
 
  const Folder folder {"."};
  const String base {copyRef(section(folder.name(),'/',-2,-1))};
@@ -24,6 +24,7 @@ struct Build {
  array<String> args {
   apply(folder.list(Folders), [this](string subfolder)->String{ return "-iquote"+subfolder; })
  };
+ array<String> linkArgs;
 
  function<void(string)> log;
 

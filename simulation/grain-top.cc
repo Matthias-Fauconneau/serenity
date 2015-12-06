@@ -7,13 +7,13 @@ static void evaluateGrainObstacle(const size_t start, const size_t size,
                                      const uint* grainObstacleContact, const size_t unused grainObstacleContactSize,
                                      const uint* grainObstacleA,
                                      const float* grainPx, const float* grainPy, const float* grainPz,
-                                     const v8sf obstacleZ, const v8sf Gr,
+                                     const vXsf obstacleZ, const vXsf Gr,
                                      float* const grainObstacleLocalAx, float* const grainObstacleLocalAy, float* const grainObstacleLocalAz,
                                      float* const grainObstacleLocalBx, float* const grainObstacleLocalBy, float* const grainObstacleLocalBz,
-                                     const v8sf K, const v8sf Kb,
-                                     const v8sf staticFrictionStiffness, const v8sf dynamicFrictionCoefficient,
-                                     const v8sf staticFrictionLength, const v8sf staticFrictionSpeed,
-                                     const v8sf staticFrictionDamping,
+                                     const vXsf K, const vXsf Kb,
+                                     const vXsf staticFrictionStiffness, const vXsf dynamicFrictionCoefficient,
+                                     const vXsf staticFrictionLength, const vXsf staticFrictionSpeed,
+                                     const vXsf staticFrictionDamping,
                                      const float* AVx, const float* AVy, const float* AVz,
                                      const float* pAAVx, const float* pAAVy, const float* pAAVz,
                                      const float* ArotationX, const float* ArotationY, const float* ArotationZ,
@@ -21,131 +21,127 @@ static void evaluateGrainObstacle(const size_t start, const size_t size,
                                      float* const pFx, float* const pFy, float* const pFz,
                                      float* const pTAx, float* const pTAy, float* const pTAz) {
  for(size_t i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
-  const v8ui contacts = *(v8ui*)(grainObstacleContact+i);
-  const v8ui A = gather(grainObstacleA, contacts);
+  const vXui contacts = *(vXui*)(grainObstacleContact+i);
+  const vXui A = gather(grainObstacleA, contacts);
   // FIXME: Recomputing from intersection (more efficient than storing?)
-  const v8sf Ax = gather(grainPx, A), Ay = gather(grainPy, A), Az = gather(grainPz, A);
-  const v8sf depth = Az - (obstacleZ-Gr); // Bottom: (obstacleZ+Gr) - Az
-  const v8sf Nx = _0f, Ny = _0f, Nz = -_1f;
-  const v8sf RAx = - Gr  * Nx, RAy = - Gr * Ny, RAz = - Gr * Nz;
-  const v8sf RBx = Ax, RBy = Ay, RBz = Az;
+  const vXsf Ax = gather(grainPx, A), Ay = gather(grainPy, A), Az = gather(grainPz, A);
+  const vXsf depth = Az - (obstacleZ-Gr); // Bottom: (obstacleZ+Gr) - Az
+  const vXsf Nx = _0f, Ny = _0f, Nz = -_1f;
+  const vXsf RAx = - Gr  * Nx, RAy = - Gr * Ny, RAz = - Gr * Nz;
+  const vXsf RBx = Ax, RBy = Ay, RBz = Az;
   /// Evaluates contact force between two objects with friction (rotating A, non rotating B)
   // Grain - Obstacle
 
   // Tension
-  const v8sf Fk = K * sqrt(depth) * depth;
+  const vXsf Fk = K * sqrt(depth) * depth;
   // Relative velocity
-  const v8sf AAVx = gather(pAAVx, A), AAVy = gather(pAAVy, A), AAVz = gather(pAAVz, A);
-  const v8sf RVx = gather(AVx, A) + (AAVy*RAz - AAVz*RAy);
-  const v8sf RVy = gather(AVy, A) + (AAVz*RAx - AAVx*RAz);
-  const v8sf RVz = gather(AVz, A) + (AAVx*RAy - AAVy*RAx);
+  const vXsf AAVx = gather(pAAVx, A), AAVy = gather(pAAVy, A), AAVz = gather(pAAVz, A);
+  const vXsf RVx = gather(AVx, A) + (AAVy*RAz - AAVz*RAy);
+  const vXsf RVy = gather(AVy, A) + (AAVz*RAx - AAVx*RAz);
+  const vXsf RVz = gather(AVz, A) + (AAVx*RAy - AAVy*RAx);
   // Damping
-  const v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
-  const v8sf Fb = - Kb * sqrt(sqrt(depth)) * normalSpeed ; // Damping
+  const vXsf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
+  const vXsf Fb = - Kb * sqrt(sqrt(depth)) * normalSpeed ; // Damping
   // Normal force
-  const v8sf Fn = Fk + Fb;
-  const v8sf NFx = Fn * Nx;
-  const v8sf NFy = Fn * Ny;
-  const v8sf NFz = Fn * Nz;
+  const vXsf Fn = Fk + Fb;
+  const vXsf NFx = Fn * Nx;
+  const vXsf NFy = Fn * Ny;
+  const vXsf NFz = Fn * Nz;
 
   // Dynamic friction
   // Tangent relative velocity
-  const v8sf RVn = Nx*RVx + Ny*RVy + Nz*RVz;
-  const v8sf TRVx = RVx - RVn * Nx;
-  const v8sf TRVy = RVy - RVn * Ny;
-  const v8sf TRVz = RVz - RVn * Nz;
-  const v8sf tangentRelativeSpeed = sqrt(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
-  const v8sf Fd = mask(greaterThan(tangentRelativeSpeed, _0f),
-                       - dynamicFrictionCoefficient * Fn / tangentRelativeSpeed);
-  const v8sf FDx = Fd * TRVx;
-  const v8sf FDy = Fd * TRVy;
-  const v8sf FDz = Fd * TRVz;
+  const vXsf RVn = Nx*RVx + Ny*RVy + Nz*RVz;
+  const vXsf TRVx = RVx - RVn * Nx;
+  const vXsf TRVy = RVy - RVn * Ny;
+  const vXsf TRVz = RVz - RVn * Nz;
+  const vXsf tangentRelativeSpeed = sqrt(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
+  const uint16 div0 = greaterThan(tangentRelativeSpeed, _0f);
+  const vXsf Fd = - dynamicFrictionCoefficient * Fn / tangentRelativeSpeed;
+  const vXsf FDx = fma(Fd, div0, TRVx, _0f);
+  const vXsf FDy = fma(Fd, div0, TRVy, _0f);
+  const vXsf FDz = fma(Fd, div0, TRVz, _0f);
 
   // Gather static frictions
-  const v8sf oldLocalAx = gather(grainObstacleLocalAx, contacts);
-  const v8sf oldLocalAy = gather(grainObstacleLocalAy, contacts);
-  const v8sf oldLocalAz = gather(grainObstacleLocalAz, contacts);
-  const v8sf oldLocalBx = gather(grainObstacleLocalBx, contacts);
-  const v8sf oldLocalBy = gather(grainObstacleLocalBy, contacts);
-  const v8sf oldLocalBz = gather(grainObstacleLocalBz, contacts);
+  const vXsf oldLocalAx = gather(grainObstacleLocalAx, contacts);
+  const vXsf oldLocalAy = gather(grainObstacleLocalAy, contacts);
+  const vXsf oldLocalAz = gather(grainObstacleLocalAz, contacts);
+  const vXsf oldLocalBx = gather(grainObstacleLocalBx, contacts);
+  const vXsf oldLocalBy = gather(grainObstacleLocalBy, contacts);
+  const vXsf oldLocalBz = gather(grainObstacleLocalBz, contacts);
 
-  const v8sf QAx = gather(ArotationX, A);
-  const v8sf QAy = gather(ArotationY, A);
-  const v8sf QAz = gather(ArotationZ, A);
-  const v8sf QAw = gather(ArotationW, A);
-  const v8sf X1 = QAw*RAx + RAy*QAz - QAy*RAz;
-  const v8sf Y1 = QAw*RAy + RAz*QAx - QAz*RAx;
-  const v8sf Z1 = QAw*RAz + RAx*QAy - QAx*RAy;
-  const v8sf W1 = - (RAx * QAx + RAy * QAy + RAz * QAz);
-  const v8sf newLocalAx = QAw*X1 - (W1*QAx + QAy*Z1 - Y1*QAz);
-  const v8sf newLocalAy = QAw*Y1 - (W1*QAy + QAz*X1 - Z1*QAx);
-  const v8sf newLocalAz = QAw*Z1 - (W1*QAz + QAx*Y1 - X1*QAy);
+  const vXsf QAx = gather(ArotationX, A);
+  const vXsf QAy = gather(ArotationY, A);
+  const vXsf QAz = gather(ArotationZ, A);
+  const vXsf QAw = gather(ArotationW, A);
+  const vXsf X1 = QAw*RAx + RAy*QAz - QAy*RAz;
+  const vXsf Y1 = QAw*RAy + RAz*QAx - QAz*RAx;
+  const vXsf Z1 = QAw*RAz + RAx*QAy - QAx*RAy;
+  const vXsf W1 = - (RAx * QAx + RAy * QAy + RAz * QAz);
+  const vXsf newLocalAx = QAw*X1 - (W1*QAx + QAy*Z1 - Y1*QAz);
+  const vXsf newLocalAy = QAw*Y1 - (W1*QAy + QAz*X1 - Z1*QAx);
+  const vXsf newLocalAz = QAw*Z1 - (W1*QAz + QAx*Y1 - X1*QAy);
 
-  const v8sf newLocalBx = RBx;
-  const v8sf newLocalBy = RBy;
-  const v8sf newLocalBz = RBz;
+  const vXsf newLocalBx = RBx;
+  const vXsf newLocalBy = RBy;
+  const vXsf newLocalBz = RBz;
 
-  const v8ui keep = notEqual(oldLocalAx, _0f), reset = ~keep;
-  v8sf localAx = merge(mask(keep, oldLocalAx), mask(reset, newLocalAx));
-  const v8sf localAy = merge(mask(keep, oldLocalAy), mask(reset, newLocalAy));
-  const v8sf localAz = merge(mask(keep, oldLocalAz), mask(reset, newLocalAz));
-  const v8sf localBx = merge(mask(keep, oldLocalBx), mask(reset, newLocalBx));
-  const v8sf localBy = merge(mask(keep, oldLocalBy), mask(reset, newLocalBy));
-  const v8sf localBz = merge(mask(keep, oldLocalBz), mask(reset, newLocalBz));
+  const uint16 reset = equal(oldLocalAx, _0f);
+  vXsf localAx = blend(reset, oldLocalAx, newLocalAx);
+  const vXsf localAy = blend(reset, oldLocalAy, newLocalAy);
+  const vXsf localAz = blend(reset, oldLocalAz, newLocalAz);
+  const vXsf localBx = blend(reset, oldLocalBx, newLocalBx);
+  const vXsf localBy = blend(reset, oldLocalBy, newLocalBy);
+  const vXsf localBz = blend(reset, oldLocalBz, newLocalBz);
 
-  const v8sf X = QAw*localAx - (localAy*QAz - QAy*localAz);
-  const v8sf Y = QAw*localAy - (localAz*QAx - QAz*localAx);
-  const v8sf Z = QAw*localAz - (localAx*QAy - QAx*localAy);
-  const v8sf W = localAx * QAx + localAy * QAy + localAz * QAz;
-  const v8sf FRAx = QAw*X + W*QAx + QAy*Z - Y*QAz;
-  const v8sf FRAy = QAw*Y + W*QAy + QAz*X - Z*QAx;
-  const v8sf FRAz = QAw*Z + W*QAz + QAx*Y - X*QAy;
-  const v8sf FRBx = localBx;
-  const v8sf FRBy = localBy;
-  const v8sf FRBz = localBz;
+  const vXsf X = QAw*localAx - (localAy*QAz - QAy*localAz);
+  const vXsf Y = QAw*localAy - (localAz*QAx - QAz*localAx);
+  const vXsf Z = QAw*localAz - (localAx*QAy - QAx*localAy);
+  const vXsf W = localAx * QAx + localAy * QAy + localAz * QAz;
+  const vXsf FRAx = QAw*X + W*QAx + QAy*Z - Y*QAz;
+  const vXsf FRAy = QAw*Y + W*QAy + QAz*X - Z*QAx;
+  const vXsf FRAz = QAw*Z + W*QAz + QAx*Y - X*QAy;
+  const vXsf FRBx = localBx;
+  const vXsf FRBy = localBy;
+  const vXsf FRBz = localBz;
 
-  const v8sf gAx = Ax + FRAx;
-  const v8sf gAy = Ay + FRAy;
-  const v8sf gAz = Az + FRAz;
-  const v8sf gBx = FRBx;
-  const v8sf gBy = FRBy;
-  const v8sf gBz = FRBz;
-  const v8sf Dx = gBx - gAx;
-  const v8sf Dy = gBy - gAy;
-  const v8sf Dz = gBz - gAz;
-  const v8sf Dn = Nx*Dx + Ny*Dy + Nz*Dz;
+  const vXsf gAx = Ax + FRAx;
+  const vXsf gAy = Ay + FRAy;
+  const vXsf gAz = Az + FRAz;
+  const vXsf gBx = FRBx;
+  const vXsf gBy = FRBy;
+  const vXsf gBz = FRBz;
+  const vXsf Dx = gBx - gAx;
+  const vXsf Dy = gBy - gAy;
+  const vXsf Dz = gBz - gAz;
+  const vXsf Dn = Nx*Dx + Ny*Dy + Nz*Dz;
   // Tangent offset
-  const v8sf TOx = Dx - Dn * Nx;
-  const v8sf TOy = Dy - Dn * Ny;
-  const v8sf TOz = Dz - Dn * Nz;
-  const v8sf tangentLength = sqrt(TOx*TOx+TOy*TOy+TOz*TOz);
-  const v8sf Ks = staticFrictionStiffness * Fn;
-  const v8sf Fs = Ks * tangentLength; // 0.1~1 fN
+  const vXsf TOx = Dx - Dn * Nx;
+  const vXsf TOy = Dy - Dn * Ny;
+  const vXsf TOz = Dz - Dn * Nz;
+  const vXsf tangentLength = sqrt(TOx*TOx+TOy*TOy+TOz*TOz);
+  const vXsf Ks = staticFrictionStiffness * Fn;
+  const vXsf Fs = Ks * tangentLength; // 0.1~1 fN
   // Spring direction
-  const v8sf SDx = TOx / tangentLength;
-  const v8sf SDy = TOy / tangentLength;
-  const v8sf SDz = TOz / tangentLength;
-  const v8ui hasTangentLength = greaterThan(tangentLength, _0f);
-  const v8sf sfFb = mask(hasTangentLength,
-                         staticFrictionDamping * (SDx * RVx + SDy * RVy + SDz * RVz));
-  const v8ui hasStaticFriction = greaterThan(staticFrictionLength, tangentLength)
+  const vXsf SDx = TOx / tangentLength;
+  const vXsf SDy = TOy / tangentLength;
+  const vXsf SDz = TOz / tangentLength;
+  const uint16 hasTangentLength = greaterThan(tangentLength, _0f);
+  const vXsf sfFb = staticFrictionDamping * (SDx * RVx + SDy * RVy + SDz * RVz);
+  const uint16 hasStaticFriction = greaterThan(staticFrictionLength, tangentLength)
                                               & greaterThan(staticFrictionSpeed, tangentRelativeSpeed);
-  const v8sf sfFt = mask(hasStaticFriction, Fs - sfFb);
-  const v8sf FSx = mask(hasTangentLength, sfFt * SDx);
-  const v8sf FSy = mask(hasTangentLength, sfFt * SDy);
-  const v8sf FSz = mask(hasTangentLength, sfFt * SDz);
-  const v8sf FTx = FDx + FSx;
-  const v8sf FTy = FDy + FSy;
-  const v8sf FTz = FDz + FSz;
+  const vXsf sfFt = maskSub(Fs, hasTangentLength, Fs, sfFb);
+  const vXsf FTx = fma(sfFt, hasStaticFriction, SDx, FDx);
+  const vXsf FTy = fma(sfFt, hasStaticFriction, SDy, FDy);
+  const vXsf FTz = fma(sfFt, hasStaticFriction, SDz, FDz);
   // Resets contacts without static friction
-  localAx = mask(hasStaticFriction, localAx); // FIXME use 1s (NaN) not 0s to flag resets
+  localAx = blend(hasStaticFriction, _0f, localAx); // FIXME use 1s (NaN) not 0s to flag resets
 
-  *(v8sf*)(pFx+i) = NFx + FTx;
-  *(v8sf*)(pFy+i) = NFy + FTy;
-  *(v8sf*)(pFz+i) = NFz + FTz;
-  *(v8sf*)(pTAx+i) = RAy*FTz - RAz*FTy;
-  *(v8sf*)(pTAy+i) = RAz*FTx - RAx*FTz;
-  *(v8sf*)(pTAz+i) = RAx*FTy - RAy*FTx;
+  *(vXsf*)(pFx+i) = NFx + FTx;
+  *(vXsf*)(pFy+i) = NFy + FTy;
+  *(vXsf*)(pFz+i) = NFz + FTz;
+  *(vXsf*)(pTAx+i) = RAy*FTz - RAz*FTy;
+  *(vXsf*)(pTAy+i) = RAz*FTx - RAx*FTz;
+  *(vXsf*)(pTAz+i) = RAx*FTy - RAy*FTx;
   // Scatter static frictions
   scatter(grainObstacleLocalAx, contacts, localAx);
   scatter(grainObstacleLocalAy, contacts, localAy);
@@ -229,8 +225,8 @@ void Simulation::stepGrainTop() {
  grainTopContact.size = 0;
  auto filter =  [&](uint, size_t start, size_t size) {
   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
-   v8ui A = *(v8ui*)(grainTopA.data+i);
-   v8sf Az = gather(grain.Pz, A);
+   vXui A = *(vXui*)(grainTopA.data+i);
+   vXsf Az = gather(grain.Pz.data, A);
    for(size_t k: range(simd)) {
     size_t j = i+k;
     if(j == grainTopA.size) break /*2*/;
@@ -278,12 +274,12 @@ void Simulation::stepGrainTop() {
                      grainTopContact.data, grainTopContact.size,
                      grainTopA.data,
                      grain.Px.data, grain.Py.data, grain.Pz.data,
-                     float8(bottomZ), float8(Grain::radius),
+                     floatX(bottomZ), floatX(Grain::radius),
                      grainTopLocalAx.begin(), grainTopLocalAy.begin(), grainTopLocalAz.begin(),
                      grainTopLocalBx.begin(), grainTopLocalBy.begin(), grainTopLocalBz.begin(),
-                     float8(K), float8(Kb),
-                     float8(staticFrictionStiffness), float8(dynamicFrictionCoefficient),
-                     float8(staticFrictionLength), float8(staticFrictionSpeed), float8(staticFrictionDamping),
+                     floatX(K), floatX(Kb),
+                     floatX(staticFrictionStiffness), floatX(dynamicFrictionCoefficient),
+                     floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping),
                      grain.Vx.data, grain.Vy.data, grain.Vz.data,
                      grain.AVx.data, grain.AVy.data, grain.AVz.data,
                      grain.Rx.data, grain.Ry.data, grain.Rz.data, grain.Rw.data,

@@ -119,7 +119,7 @@ static void evaluateGrainObstacle(const size_t start, const size_t size,
   const vXsf TOz = Dz - Dn * Nz;
   const vXsf tangentLength = sqrt(TOx*TOx+TOy*TOy+TOz*TOz);
   const vXsf Ks = staticFrictionStiffness * Fn;
-  vXsf Fs = Ks * tangentLength; // 0.1~1 fN
+  const vXsf Fs = Ks * tangentLength; // 0.1~1 fN
   // Spring direction
   const vXsf SDx = TOx / tangentLength;
   const vXsf SDy = TOy / tangentLength;

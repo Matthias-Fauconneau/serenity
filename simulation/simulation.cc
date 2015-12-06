@@ -1,5 +1,6 @@
 // TODO: Factorize force evaluation, contact management
 #include "simulation.h"
+#include "file.h"
 //#include "process.h"
 //#include "grain.h"
 //#include "grain-bottom.h"

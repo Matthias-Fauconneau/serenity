@@ -161,7 +161,10 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
    if(target) log(str("Multiple targets unsupported, building last target:", arg, ". Parsing arguments:", arguments)+'\n');
    target = arg;
   }
-  else if(startsWith(arg,"-"_) /*&& arg.contains('=')*/) args.append(copyRef(arg));
+  else if(startsWith(arg,"-"_) /*&& arg.contains('=')*/) {
+   args.append(copyRef(arg));
+   linkArgs.append(copyRef(arg));
+  }
   //else if(startsWith(arg,"-"_)) {} // Build command flag
   else flags.append( split(arg,"-") );
  }
@@ -205,7 +208,7 @@ break_:;
      mref<String>{"-o"__, unsafeRef(binary), /*"-L/var/tmp/lib"__, "-Wl,-rpath,/var/tmp/lib"__*/
      "-static-libstdc++"__} +
      apply(libraries, [this](const String& library)->String{ return "-l"+library; }) );
-  if(execute(CXX, toRefs(args))) { ::log("Failed to link\n", CXX, args); return; }
+  if(execute(CXX, toRefs(args)+toRefs(linkArgs))) { ::log("Failed to link\n", CXX, args); return; }
  }
 
  // Installs

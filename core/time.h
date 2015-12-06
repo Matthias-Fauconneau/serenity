@@ -1,7 +1,6 @@
 #pragma once
 /// \file time.h Time and date operations
 #include "data.h"
-#include "thread.h"
 #include "function.h"
 #include "string.h"
 #include "math.h"
@@ -15,7 +14,6 @@ long currentTime();
 int64 realTime();
 int64 threadCPUTime();
 
-//inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)::"memory"); return (((uint64)hi)<<32)|lo; }
 #if __clang__
 #define readCycleCounter  __builtin_readcyclecounter
 #elif __INTEL_COMPILER
@@ -44,22 +42,19 @@ struct Time {
     void start() { if(stopTime) startTime=realTime()-(stopTime-startTime); stopTime=0; }
     void stop() { if(!stopTime) stopTime=realTime(); }
     String reset() { stop(); String s=str((stopTime-startTime)/1000000000.f, 1u)+'s'; startTime=stopTime; stopTime=0; return s; }
-    //operator uint64() const { return ((stopTime?:realTime()) - startTime)/1000000; }
     uint64 nanoseconds() const { return ((stopTime?:realTime()) - startTime); }
     uint64 microseconds() const { return ((stopTime?:realTime()) - startTime)/1000; }
     uint64 milliseconds() const { return ((stopTime?:realTime()) - startTime)/1000000; }
     float seconds() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
-    /*operator float() const { return elapsed(); }
-    operator double() const { return elapsed(); }*/
     explicit operator bool() const { return startTime != stopTime; }
 };
 inline String str(const Time& t) { return str(t.seconds(), 1u)+'s'; }
 inline bool operator<(float a, const Time& b) { return a < b.seconds(); }
-//inline bool operator<(double a, const Time& b) { return a < b.seconds(); }
 inline String strD(const Time& num, const Time& div) {
  return strD(num.nanoseconds(), div.nanoseconds());
 }
 
+#if 0
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;
     int weekDay=-1;
@@ -96,15 +91,7 @@ String str(Date date, const string format="dddd, dd MMMM yyyy hh:mm:ss");
 /// Parses a date from s
 Date parseDate(TextData& s);
 inline Date parseDate(string s) { TextData t(s); Date date = parseDate(t); return t ? Date() : date; }
-
-struct Timer : Stream, Poll {
-    Timer(const function<void()>& timeout={}, long sec=0, Thread& thread=mainThread);
-    virtual ~Timer() {}
-    void setAbsolute(uint64 nsec);
-    void setRelative(long msec);
-    function<void()> timeout;
-    virtual void event();
-};
+#endif
 
 /// Generates a sequence of uniformly distributed pseudo-random 64bit integers
 struct Random {
