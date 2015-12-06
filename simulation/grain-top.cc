@@ -3,7 +3,7 @@
 #include "parallel.h"
 
 //FIXME: factorize Top and Bottom
-void evaluateGrainObstacle(const size_t start, const size_t size,
+static void evaluateGrainObstacle(const size_t start, const size_t size,
                                      const uint* grainObstacleContact, const size_t unused grainObstacleContactSize,
                                      const uint* grainObstacleA,
                                      const float* grainPx, const float* grainPy, const float* grainPz,
@@ -158,6 +158,7 @@ void evaluateGrainObstacle(const size_t start, const size_t size,
 }
 
 void Simulation::stepGrainTop() {
+ if(!grain.count) return;
  {
   swap(oldGrainTopA, grainTopA);
   swap(oldGrainTopLocalAx, grainTopLocalAx);
@@ -219,6 +220,7 @@ void Simulation::stepGrainTop() {
   for(size_t i=grainTopA.size; i<align(simd, grainTopA.size+1); i++)
    grainTopA.begin()[i] = 0;
  }
+ if(!grainTopA) return;
 
  // TODO: verlet
  // Filters verlet lists, packing contacts to evaluate
@@ -249,29 +251,30 @@ void Simulation::stepGrainTop() {
  grainTopFilterTime += parallel_chunk(align(simd, grainTopA.size)/simd, filter, 1);
  for(size_t i=grainTopContact.size; i<align(simd, grainTopContact.size); i++)
   grainTopContact.begin()[i] = grainTopA.size;
+ if(!grainTopContact) return;
 
  // Evaluates forces from (packed) intersections (SoA)
- size_t GBcc = align(simd, grainTopA.size); // Grain-Wire contact count
- if(GBcc > grainTopFx.capacity) {
-  grainTopFx = buffer<float>(GBcc);
-  grainTopFy = buffer<float>(GBcc);
-  grainTopFz = buffer<float>(GBcc);
-  grainTopTAx = buffer<float>(GBcc);
-  grainTopTAy = buffer<float>(GBcc);
-  grainTopTAz = buffer<float>(GBcc);
+ size_t GTcc = align(simd, grainTopContact.size); // Grain-Wire contact count
+ if(GTcc > grainTopFx.capacity) {
+  grainTopFx = buffer<float>(GTcc);
+  grainTopFy = buffer<float>(GTcc);
+  grainTopFz = buffer<float>(GTcc);
+  grainTopTAx = buffer<float>(GTcc);
+  grainTopTAy = buffer<float>(GTcc);
+  grainTopTAz = buffer<float>(GTcc);
  }
- grainTopFx.size = GBcc;
- grainTopFy.size = GBcc;
- grainTopFz.size = GBcc;
- grainTopTAx.size = GBcc;
- grainTopTAy.size = GBcc;
- grainTopTAz.size = GBcc;
+ grainTopFx.size = GTcc;
+ grainTopFy.size = GTcc;
+ grainTopFz.size = GTcc;
+ grainTopTAx.size = GTcc;
+ grainTopTAy.size = GTcc;
+ grainTopTAz.size = GTcc;
  constexpr float E = 1/((1-sq(Grain::poissonRatio))/Grain::elasticModulus+(1-sq(Obstacle::poissonRatio))/Obstacle::elasticModulus);
  constexpr float R = 1/(Grain::curvature/*+Obstacle::curvature*/);
  const float K = 4./3*E*sqrt(R);
  constexpr float mass = 1/(1/Grain::mass/*+1/Obstacle::mass*/);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
- grainTopEvaluateTime += parallel_chunk(GBcc/simd, [&](uint, size_t start, size_t size) {
+ grainTopEvaluateTime += parallel_chunk(GTcc/simd, [&](uint, size_t start, size_t size) {
    evaluateGrainObstacle(start, size,
                      grainTopContact.data, grainTopContact.size,
                      grainTopA.data,

@@ -7,7 +7,7 @@ template<> String str(const v8ui& v) {
                  extract(v, 4), extract(v, 5), extract(v, 6), extract(v, 7)); }
 
 //FIXME: factorize Bottom and Top
-void evaluateGrainObstacle(const size_t start, const size_t size,
+static void evaluateGrainObstacle(const size_t start, const size_t size,
                            const uint* grainObstacleContact, const size_t unused grainObstacleContactSize,
                            const ref<uint> grainObstacleA,
                            const float* grainPx, const float* grainPy, const float* grainPz,
@@ -25,7 +25,6 @@ void evaluateGrainObstacle(const size_t start, const size_t size,
                            float* const pTAx, float* const pTAy, float* const pTAz) {
  for(size_t i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
   const v8ui contacts = *(v8ui*)(grainObstacleContact+i);
-  log(i, contacts);
   const v8ui A = gather(grainObstacleA, contacts);
   // FIXME: Recomputing from intersection (more efficient than storing?)
   const v8sf Ax = gather(grainPx, A), Ay = gather(grainPy, A), Az = gather(grainPz, A);
@@ -161,6 +160,7 @@ void evaluateGrainObstacle(const size_t start, const size_t size,
 }
 
 void Simulation::stepGrainBottom() {
+ if(!grain.count) return;
  {
   swap(oldGrainBottomA, grainBottomA);
   swap(oldGrainBottomLocalAx, grainBottomLocalAx);
@@ -192,7 +192,8 @@ void Simulation::stepGrainBottom() {
   size_t grainBottomI = 0; // Index of first contact with A in old grainBottom[Local]A|B list
   auto search = [&](uint, size_t start, size_t size) {
    for(size_t i=start; i<(start+size); i+=1) { // TODO: SIMD
-    if(grain.Pz[i] > bottomZ+Grain::radius) continue;
+    float depth = (bottomZ+Grain::radius) - grain.Pz[i];
+    if(depth < 0) continue;
     grainBottomA.append( i ); // Grain
     size_t j = grainBottomI;
     if(grainBottomI < oldGrainBottomA.size && oldGrainBottomA[grainBottomI] == i) {
@@ -222,6 +223,7 @@ void Simulation::stepGrainBottom() {
   for(size_t i=grainBottomA.size; i<align(simd, grainBottomA.size+1); i++)
    grainBottomA.begin()[i] = 0;
  }
+ if(!grainBottomA) return;
 
  // TODO: verlet
  // Filters verlet lists, packing contacts to evaluate
@@ -233,10 +235,11 @@ void Simulation::stepGrainBottom() {
   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
    v8ui A = *(v8ui*)(grainBottomA.data+i);
    v8sf Az = gather(grain.Pz, A);
+   v8sf depth = float8(bottomZ+Grain::radius) - Az;
    for(size_t k: range(simd)) {
     size_t j = i+k;
     if(j == grainBottomA.size) break /*2*/;
-    if(extract(Az, k) < bottomZ+Grain::radius) {
+    if(extract(depth, k) > 0) {
      // Creates a map from packed contact to index into unpacked contact list (indirect reference)
      // Instead of packing (copying) the unpacked list to a packed contact list
      // To keep track of where to write back (unpacked) contact positions (for static friction)
@@ -252,9 +255,10 @@ void Simulation::stepGrainBottom() {
  grainBottomFilterTime += parallel_chunk(align(simd, grainBottomA.size)/simd, filter, 1);
  for(size_t i=grainBottomContact.size; i<align(simd, grainBottomContact.size); i++)
   grainBottomContact.begin()[i] = grainBottomA.size;
+ if(!grainBottomContact) return;
 
  // Evaluates forces from (packed) intersections (SoA)
- size_t GBcc = align(simd, grainBottomA.size); // Grain-Bottom contact count
+ size_t GBcc = align(simd, grainBottomContact.size); // Grain-Bottom contact count
  if(GBcc > grainBottomFx.capacity) {
   grainBottomFx = buffer<float>(GBcc);
   grainBottomFy = buffer<float>(GBcc);
