@@ -54,7 +54,7 @@ static void evaluateGrainObstacle(const size_t start, const size_t size,
   const vXsf TRVy = RVy - RVn * Ny;
   const vXsf TRVz = RVz - RVn * Nz;
   const vXsf tangentRelativeSpeed = sqrt(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
-  const uint16 div0 = greaterThan(tangentRelativeSpeed, _0f);
+  const maskX div0 = greaterThan(tangentRelativeSpeed, _0f);
   const vXsf Fd = - dynamicFrictionCoefficient * Fn / tangentRelativeSpeed;
   const vXsf FDx = fma(Fd, div0, TRVx, _0f);
   const vXsf FDy = fma(Fd, div0, TRVy, _0f);
@@ -84,7 +84,7 @@ static void evaluateGrainObstacle(const size_t start, const size_t size,
   const vXsf newLocalBy = RBy;
   const vXsf newLocalBz = RBz;
 
-  const uint16 reset = equal(oldLocalAx, _0f);
+  const maskX reset = equal(oldLocalAx, _0f);
   vXsf localAx = blend(reset, oldLocalAx, newLocalAx);
   const vXsf localAy = blend(reset, oldLocalAy, newLocalAy);
   const vXsf localAz = blend(reset, oldLocalAz, newLocalAz);
@@ -124,11 +124,11 @@ static void evaluateGrainObstacle(const size_t start, const size_t size,
   const vXsf SDx = TOx / tangentLength;
   const vXsf SDy = TOy / tangentLength;
   const vXsf SDz = TOz / tangentLength;
-  const uint16 hasTangentLength = greaterThan(tangentLength, _0f);
+  const maskX hasTangentLength = greaterThan(tangentLength, _0f);
   const vXsf sfFb = staticFrictionDamping * (SDx * RVx + SDy * RVy + SDz * RVz);
-  const uint16 hasStaticFriction = greaterThan(staticFrictionLength, tangentLength)
+  const maskX hasStaticFriction = greaterThan(staticFrictionLength, tangentLength)
                                               & greaterThan(staticFrictionSpeed, tangentRelativeSpeed);
-  const vXsf sfFt = maskSub(Fs, hasTangentLength, Fs, sfFb);
+  const vXsf sfFt = maskSub(Fs, hasTangentLength, sfFb);
   const vXsf FTx = fma(sfFt, hasStaticFriction, SDx, FDx);
   const vXsf FTy = fma(sfFt, hasStaticFriction, SDy, FDy);
   const vXsf FTz = fma(sfFt, hasStaticFriction, SDz, FDz);

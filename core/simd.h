@@ -41,7 +41,8 @@ static inline void store(mref<float> a, size_t index, v16sf v) { store(a.begin()
 
 //static inline v16sf /*operator&*/mask(v16ui a, v16sf b) { return __mm512_mask_and_ps(a & (v16ui)b); }
 #define fma _mm512_mask_fmadd_ps
-#define maskSub _mm512_mask_sub_ps
+#define maskSub
+static inline v16sf maskSub(v16sf a, uint16 k, v16sf b) { return _mm512_mask_sub_ps(a, k, a, b); }
 static inline v16sf /*operator|*/merge(v16sf a, v16sf b) { return (v16sf)((v16ui)a | (v16ui)b); }
 
 static inline v16sf min(v16sf a, v16sf b) {  return _mm512_min_ps(a, b); }
@@ -72,6 +73,7 @@ static inline v16sf blend(uint16 k, v16sf a, v16sf b) { return _mm512_mask_blend
 static constexpr size_t simd = 16; // SIMD size
 typedef v16sf vXsf;
 typedef v16ui vXui;
+typedef uint16 maskX;
 inline vXsf /*constexpr*/ floatX(float x) { return float16(x); }
 
 #else
@@ -205,15 +207,23 @@ static inline void scatter(mref<float> P, const v8ui a, const v8sf x) {
 
 #if __INTEL_COMPILER
 static inline v8ui greaterThan(v8sf a, v8sf b) { return (v8ui)(v8sf)_mm256_cmp_ps(a, b, _CMP_GT_OS); }
-static inline v8ui notEqual(v8sf a, v8sf b) { return (v8ui)(v8sf)_mm256_cmp_ps(a, b, _CMP_NEQ_UQ); }
+//static inline v8ui notEqual(v8sf a, v8sf b) { return (v8ui)(v8sf)_mm256_cmp_ps(a, b, _CMP_NEQ_UQ); }
+
 #else
 static inline v8ui greaterThan(v8sf a, v8sf b) { return a > b; }
-static inline v8ui notEqual(v8sf a, v8sf b) { return a != b; }
+//static inline v8ui notEqual(v8sf a, v8sf b) { return a != b; }
+static inline v8ui equal(v8sf a, v8sf b) { return a == b; }
 #endif
+
+static inline v8sf blend(v8ui k, v8sf a, v8sf b) { return __builtin_ia32_blendvps256(a, b, k); }
+
+static inline v8sf maskSub(v8sf a, v8ui k, v8sf b) { return a - mask(k, b); }
+static inline v8sf fma(v8sf a, v8ui k, v8sf b, v8sf c) { return __builtin_ia32_vfmaddps256(a, mask(k, b), c); }
 
 static constexpr size_t simd = 8; // SIMD size
 typedef v8sf vXsf;
 typedef v8ui vXui;
+typedef v8ui maskX;
 inline vXsf /*constexpr*/ floatX(float x) { return float8(x); }
 
 #endif
