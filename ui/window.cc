@@ -251,7 +251,8 @@ void XWindow::event() {
 
   uint stride = align(16, Window::size.x);
   shm = check( shmget(0, Window::size.y*stride*sizeof(byte4) , IPC_CREAT | 0777) );
-  target = Image(buffer<byte4>((byte4*)check(shmat(shm, 0, 0)), Window::size.y*stride, 0), Window::size, stride, true);
+  target = Image(buffer<byte4>((byte4*)check(shmat(shm, 0, 0)), Window::size.y*stride),
+                            Window::size, stride, true);
   target.clear(byte4(0xFF));
   {Shm::Attach r; send(({r.seg=id+Segment, r.shm=shm, r;}));}
   {CreatePixmap r; send(({r.pixmap=id+Pixmap, r.window=id+Window, r.w=uint16(Window::size.x), r.h=uint16(Window::size.y), r;}));}
@@ -270,9 +271,12 @@ void XWindow::event() {
    swapTime.stop();
    presentComplete();
   } else {
-   {Shm::PutImage r; send(({r.window=id+(Present::EXT?Pixmap:Window), r.context=id+GraphicContext, r.seg=id+Segment,
-                            r.totalW=uint16(target.stride), r.totalH=uint16(target.height), r.srcX=uint16(update.origin.x), r.srcY=uint16(update.origin.y),
-                            r.srcW=uint16(update.size.x), r.srcH=uint16(update.size.y), r.dstX=uint16(update.origin.x), r.dstY=uint16(update.origin.y), r;}));}
+   {Shm::PutImage r; send(({r.window=id+(Present::EXT?Pixmap:Window),
+                            r.context=id+GraphicContext, r.seg=id+Segment,
+                            r.totalW=uint16(target.stride), r.totalH=uint16(target.size.y),
+                            r.srcX=uint16(update.origin.x), r.srcY=uint16(update.origin.y),
+                            r.srcW=uint16(update.size.x), r.srcH=uint16(update.size.y),
+                            r.dstX=uint16(update.origin.x), r.dstY=uint16(update.origin.y), r;}));}
    state = Copy;
    if(Present::EXT) send(({Present::Pixmap r; r.window=id+Window, r.pixmap=id+Pixmap, r;})); //FIXME: update region*/
   }

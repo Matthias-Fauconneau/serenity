@@ -198,8 +198,10 @@ void GLIndexBuffer::draw(size_t start, size_t end) {
 }
 
 /// Texture
-GLTexture::GLTexture(uint width, uint height, uint format, const void* data, uint stride) : width(width), height(height), format(format),
-    target((format&Cube)?GL_TEXTURE_CUBE_MAP:(format&Multisample)?GL_TEXTURE_2D_MULTISAMPLE:GL_TEXTURE_2D) {
+GLTexture::GLTexture(uint width, uint height, uint format, const void* data, uint stride) :
+  size(width, height), format(format), target((format&Cube) ? GL_TEXTURE_CUBE_MAP :
+                                                                    (format&Multisample)?GL_TEXTURE_2D_MULTISAMPLE
+                                                                                       : GL_TEXTURE_2D) {
     glGenTextures(1, &id);
     glBindTexture(target, id);
     if(format&Multisample) {
@@ -248,9 +250,9 @@ GLTexture::GLTexture(uint width, uint height, uint format, const void* data, uin
     }
     if(format&Mipmap) glGenerateMipmap(target);
 }
-GLTexture::GLTexture(const Image& image, uint format)
-    : GLTexture(image.width, image.height, (image.alpha?RGBA8:RGB8)|format, image.data, image.stride!=image.width?image.stride:0) {
-    assert(width==image.stride);
+GLTexture::GLTexture(const Image& image, uint format) : GLTexture(image.size.x, image.size.y,
+        (image.alpha?RGBA8:RGB8)|format, image.data, image.stride!=image.size.x?image.stride:0) {
+    assert(size.x==image.stride);
 }
 /*GLTexture::GLTexture(const Image16& image, uint format)
     : GLTexture(image.width, image.height, Short|format, image.data) {
@@ -276,14 +278,15 @@ void GLTexture::bind(uint sampler) const {
 
 /// Framebuffer
 
-GLFrameBuffer::GLFrameBuffer(GLTexture&& depth):width(depth.width),height(depth.height),depthTexture(move(depth)) {
+GLFrameBuffer::GLFrameBuffer(GLTexture&& depth)
+ : width(depth.size.x), height(depth.size.y), depthTexture(::move(depth)) {
     glGenFramebuffers(1,&id);
     glBindFramebuffer(GL_FRAMEBUFFER,id);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture.id, 0);
     assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
 }
 GLFrameBuffer::GLFrameBuffer(GLTexture&& depth, GLTexture&& color)
-    : width(depth.width), height(depth.height), depthTexture(move(depth)), colorTexture(move(color)) {
+    : width(depth.size.x), height(depth.size.y), depthTexture(move(depth)), colorTexture(move(color)) {
     assert(depth.size==color.size && (depthTexture.format&Multisample)==(colorTexture.format&Multisample));
     glGenFramebuffers(1,&id);
     glBindFramebuffer(GL_FRAMEBUFFER,id);

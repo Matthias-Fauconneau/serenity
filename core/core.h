@@ -14,7 +14,7 @@
 #define generic template<Type T>
 #define abstract =0
 #if __INTEL_COMPILER
-#define default_move(T)
+#define default_move(T) T(T&&)=default; T& operator=(T&&)=default
 #else
 #define default_move(T) T(T&&)=default; T& operator=(T&&)=default
 #endif

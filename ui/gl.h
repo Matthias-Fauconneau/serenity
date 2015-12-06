@@ -82,10 +82,11 @@ struct GLIndexBuffer : GLBuffer {
 };
 
 enum Format { RGB8=0, R16I=1, Depth=2/*U32*/, RGBA8=3, R32F=4,
-              SRGB=1<<3, Mipmap=1<<4, Shadow=1<<5, Bilinear=1<<6, Anisotropic=1<<7, Clamp=1<<8, Multisample=1<<9, Cube=1<<10 };
+              SRGB=1<<3, Mipmap=1<<4, Shadow=1<<5, Bilinear=1<<6, Anisotropic=1<<7,
+              Clamp=1<<8, Multisample=1<<9, Cube=1<<10 };
 struct GLTexture {
  handle<uint> id = 0;
- union { int2 size = 0; struct { uint width, height; }; };
+ int2 size; //union { int2 size = 0; struct { uint width, height; }; };
  uint format, target;
 
  GLTexture(){}

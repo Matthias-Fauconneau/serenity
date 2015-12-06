@@ -5,9 +5,12 @@
 #include "map.h" // actions
 #include "vector.h" // int2
 
-inline string padding(size_t size, uint width=4){ return "\0\0\0\0"_.slice(0, align(width, size)-size); }
-//generic auto pad(T&& t, uint width=4) -> decltype(t+padding(t.size, width)) { return move(t)+padding(t.size, width); }
-String pad(string t, uint width=4) { return t+padding(t.size, width); }
+static inline string padding(size_t size, uint width=4){
+ return "\0\0\0\0"_.slice(0, align(width, size)-size);
+}
+static inline String pad(string t, uint width=4) {
+ return t+padding(t.size, width);
+}
 
 /// Connection to an X display server
 struct XDisplay : Socket, Poll {
@@ -51,7 +54,9 @@ struct XDisplay : Socket, Poll {
   assert_(sizeof(request)%4==0 && sizeof(request) + align(4, data.size) == request.size*4, sizeof(request), data.size, request.size*4);
   return send(ref<byte>(data?raw(request)+pad(data):raw(request)), fd);
  }
- template<Type Request> uint16 send(Request request, int fd=-1) { return send(request, {}, fd); }
+ template<Type Request> uint16 send(Request request, int fd=-1) {
+  return send(request, ref<byte>(), fd);
+ }
 
  /// Reads reply checking for errors and queueing events
  array<byte> readReply(uint16 sequence, uint elementSize, buffer<int>& fds);

@@ -80,7 +80,7 @@ bool Build::tryParseFiles(TextData& s) {
  if(!s.match("FILE(") && !s.match("ICON(")) return false;
  String name = copyRef(s.identifier("_-"));
  s.skip(')');
- //name = replace(name, '_', '.');
+ name = replace(name, '_', '.');
  String path = find(name);
  assert(path, "No such file to embed", name);
  String filesPath = tmp+"/files";
