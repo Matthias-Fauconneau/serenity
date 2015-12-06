@@ -139,8 +139,8 @@ inline String str(long n, uint pad=0, char padChar=' ', uint base=10) { return s
 //String str(double number, uint precision=6, uint exponent=0, uint pad=0);
 //inline String str(float n, uint precision=6, uint exponent=0) { return str(double(n), precision, exponent); }
 
-String str(float number, uint precision=6, uint exponent=0, uint pad=0);
-inline String str(double n, uint precision=6, uint exponent=0) { return str(float(n), precision, exponent); }
+String str(float number, uint precision=2, uint exponent=0, uint pad=0);
+//inline String str(double n, uint precision=1, uint exponent=0) { return str(float(n), precision, exponent); }
 
 /*/// Formats value using best binary prefix
 String binaryPrefix(uint64 value, string unit="B"_, string unitSuffix=""_);

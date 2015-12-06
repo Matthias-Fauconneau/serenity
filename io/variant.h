@@ -28,8 +28,11 @@ struct Variant {
  explicit operator bool() const { return type != Null; }
 
  int64 integer() const { /*assert_(type==Integer, (int)type, *this); return number;*/ return real(); } // FIXME
- double real() const {
-  if(type==Rational) { assert_((number/denominator)*denominator==number); return number/denominator; }
+ float real() const {
+  if(type==Rational) {
+   assert_((number/denominator)*denominator==number);
+   return number/denominator;
+  }
   if(type==Real||type==Integer) return number;
   if(type==Data) return parseDecimal(data);
   error(int(type));

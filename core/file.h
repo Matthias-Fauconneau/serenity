@@ -30,8 +30,8 @@ struct Handle {
 
  Handle() : fd(0){}
  explicit Handle(int fd):fd(fd){}
- //default_move(Handle);
- Handle(Handle&& o) : fd(::move(o.fd)) {}
+ default_move(Handle);
+ //Handle(Handle&& o) : fd(::move(o.fd)) {}
  ~Handle() { close(); }
  explicit operator bool() const { return fd; }
  /// Closes file descriptor

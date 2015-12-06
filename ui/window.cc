@@ -90,7 +90,9 @@ XWindow::XWindow(Widget* widget, Thread& thread, int2 sizeHint, bool useGL, bool
   const int fbAttribs[] = {GLX_DOUBLEBUFFER, 0,
                            GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8,  0};
   int fbCount=0;
-  fbConfig = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount)[0];
+  GLXFBConfig* fbConfigs = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount);
+  fbConfig = fbConfigs[0];
+  XFree(fbConfigs);
   assert(fbConfig && fbCount);
   initializeThreadGLContext();
  }
@@ -114,10 +116,12 @@ XWindow::XWindow(Widget* widget, Thread& thread, int2 sizeHint, bool useGL, bool
 }
 
 XWindow::~XWindow() {
+ if(glContext) glXDestroyContext(glDisplay, glContext);
  if(id) {
   {DestroyWindow r; send(({r.id=id+Window, r;}));}
   id = 0;
  }
+ if(glDisplay) XCloseDisplay(glDisplay);
 }
 
 // Events
@@ -135,7 +139,7 @@ void XWindow::onEvent(const ref<byte> ge) {
    state = Idle;
    currentFrameCounterValue = completeNotify.msc;
    if(!firstFrameCounterValue) firstFrameCounterValue = currentFrameCounterValue;
-   presentComplete();
+   if(presentComplete) presentComplete();
   }
   else error("Unhandled event", ref<string>(X11::events)[type]);
  }
@@ -251,7 +255,7 @@ void XWindow::event() {
 
   uint stride = align(16, Window::size.x);
   shm = check( shmget(0, Window::size.y*stride*sizeof(byte4) , IPC_CREAT | 0777) );
-  target = Image(buffer<byte4>((byte4*)check(shmat(shm, 0, 0)), Window::size.y*stride),
+  target = Image(buffer<byte4>((byte4*)check(shmat(shm, 0, 0)), Window::size.y*stride, 0),
                             uint2(Window::size), stride, true);
   target.clear(byte4(0xFF));
   {Shm::Attach r; send(({r.seg=id+Segment, r.shm=shm, r;}));}
@@ -269,7 +273,7 @@ void XWindow::event() {
    //GLFrameBuffer::blitWindow(target);
    glXSwapBuffers(glDisplay, id+Window);
    swapTime.stop();
-   presentComplete();
+   if(presentComplete) presentComplete();
   } else {
    {Shm::PutImage r; send(({r.window=id+(Present::EXT?Pixmap:Window),
                             r.context=id+GraphicContext, r.seg=id+Segment,

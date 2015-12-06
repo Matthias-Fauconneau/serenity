@@ -108,19 +108,22 @@ void XDisplay::event(const ref<byte> ge) {
 }
 
 uint16 XDisplay::send(ref<byte> data, int fd) {
- iovec iov {.iov_base = (byte*)data.data, .iov_len = data.size};
- union { cmsghdr header; char control[CMSG_SPACE(sizeof(int))]; } cmsgu;
- msghdr msg{.msg_name=0, .msg_namelen=0, .msg_iov=&iov, .msg_iovlen=1, .msg_control=&cmsgu, .msg_controllen = sizeof(cmsgu.control), .msg_flags=0};
- if(fd==-1) { msg.msg_control = NULL, msg.msg_controllen = 0; }
+ if(fd==-1) write(data);
  else {
-  cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
-  cmsg->cmsg_len = CMSG_LEN(sizeof (int));
-  cmsg->cmsg_level = SOL_SOCKET;
-  cmsg->cmsg_type = SCM_RIGHTS;
-  *((int *)CMSG_DATA(cmsg)) = fd;
+  iovec iov {.iov_base = (byte*)data.data, .iov_len = data.size};
+  union { cmsghdr header; char control[CMSG_SPACE(sizeof(int))]; } cmsgu;
+  msghdr msg{.msg_name=0, .msg_namelen=0, .msg_iov=&iov, .msg_iovlen=1, .msg_control=&cmsgu, .msg_controllen = sizeof(cmsgu.control), .msg_flags=0};
+  /*if(fd==-1) { msg.msg_control = NULL, msg.msg_controllen = 0; }
+ else*/ {
+   cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+   cmsg->cmsg_len = CMSG_LEN(sizeof (int));
+   cmsg->cmsg_level = SOL_SOCKET;
+   cmsg->cmsg_type = SCM_RIGHTS;
+   *((int *)CMSG_DATA(cmsg)) = fd;
+  }
+  ssize_t size = sendmsg(Socket::fd, &msg, 0);
+  assert_(size == ssize_t(data.size));
  }
- ssize_t size = sendmsg(Socket::fd, &msg, 0);
- assert_(size == ssize_t(data.size));
  sequence++;
  return sequence;
 }

@@ -70,7 +70,7 @@ struct GetWindowAttributes {
         int8 saveUnder, mapIsInstalled, mapState, overrideRedirect; uint colormap, allEventMask, yourEventMask; int16 nopropagate, pad;
     } packed;
 };
-struct DestroyWindow { int8 req=4; uint16 size=2; uint id; };
+struct DestroyWindow { int8 req=4, pad=0; uint16 size=2; uint id; };
 struct MapWindow { int8 req=8, pad=0; uint16 size=2; uint id;};
 struct UnmapWindow { int8 req=10, pad=0; uint16 size=2; uint id;};
 struct ConfigureWindow { int8 req=12, pad=0; uint16 size=8; uint id; int16 mask=X|Y|W|H|StackMode,pad2=0; uint x,y,w,h,stackMode; };
@@ -132,7 +132,7 @@ struct ListExtensions {
 	struct Reply { uint8 extensionCount; uint16 seq; uint size; byte pad[24]; } packed;
 };
 struct GetKeyboardMapping {
-    int8 req=101; uint16 size=2; uint8 keycode, count=1; int16 pad=0;
+    int8 req=101, pad=0; uint16 size=2; uint8 keycode, count=1; int16 pad2=0;
     struct Reply { uint8 numKeySymsPerKeyCode; uint16 seq; uint size; byte pad[24]; } packed;
 };
 

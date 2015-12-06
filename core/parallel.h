@@ -21,21 +21,6 @@ extern thread threads[::maxThreadCount];
 extern Semaphore jobs;
 extern Semaphore results;
 
-inline void* start_routine(thread* t) {
- for(;;) {
-  jobs.acquire(1);
-  tsc time; time.start();
-  for(;;) {
-   int64 index = __sync_fetch_and_add(t->counter,1);
-   if(index >= t->stop) break;
-   (*t->delegate)(t->id, index);
-  }
-  t->time += time.cycleCount();
-  results.release(1);
- }
- return 0;
-}
-
 extern const int threadCount;
 
 

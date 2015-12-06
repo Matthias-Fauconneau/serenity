@@ -16,6 +16,21 @@ static size_t coreCount() {
  return min(coreCount, maxThreadCount);
 }
 
+inline void* start_routine(thread* t) {
+ for(;;) {
+  jobs.acquire(1);
+  if(!t->counter) return 0;
+  tsc time; time.start();
+  for(;;) {
+   int64 index = __sync_fetch_and_add(t->counter,1);
+   if(index >= t->stop) break;
+   (*t->delegate)(t->id, index);
+  }
+  t->time += time.cycleCount();
+  results.release(1);
+ }
+}
+
 static size_t spawnWorkers() {
  size_t threadCount = coreCount();
  for(uint index: range(threadCount)) {
@@ -26,3 +41,9 @@ static size_t spawnWorkers() {
 }
 
 const int threadCount = spawnWorkers();
+
+__attribute((destructor)) void joinWorkers() {
+ for(uint index: range(threadCount)) threads[index].counter = 0;
+ jobs.release(threadCount);
+ for(uint index: range(threadCount)) pthread_join(threads[index].pthread, 0);
+}

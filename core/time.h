@@ -43,19 +43,19 @@ struct Time {
     Time(bool start=false) : stopTime(start?0:startTime) {}
     void start() { if(stopTime) startTime=realTime()-(stopTime-startTime); stopTime=0; }
     void stop() { if(!stopTime) stopTime=realTime(); }
-    String reset() { stop(); String s=str((stopTime-startTime)/1000000000., 1u)+'s'; startTime=stopTime; stopTime=0; return s; }
+    String reset() { stop(); String s=str((stopTime-startTime)/1000000000.f, 1u)+'s'; startTime=stopTime; stopTime=0; return s; }
     //operator uint64() const { return ((stopTime?:realTime()) - startTime)/1000000; }
     uint64 nanoseconds() const { return ((stopTime?:realTime()) - startTime); }
     uint64 microseconds() const { return ((stopTime?:realTime()) - startTime)/1000; }
     uint64 milliseconds() const { return ((stopTime?:realTime()) - startTime)/1000000; }
-    double seconds() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
+    float seconds() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
     /*operator float() const { return elapsed(); }
     operator double() const { return elapsed(); }*/
     explicit operator bool() const { return startTime != stopTime; }
 };
 inline String str(const Time& t) { return str(t.seconds(), 1u)+'s'; }
 inline bool operator<(float a, const Time& b) { return a < b.seconds(); }
-inline bool operator<(double a, const Time& b) { return a < b.seconds(); }
+//inline bool operator<(double a, const Time& b) { return a < b.seconds(); }
 inline String strD(const Time& num, const Time& div) {
  return strD(num.nanoseconds(), div.nanoseconds());
 }

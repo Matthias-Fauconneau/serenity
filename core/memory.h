@@ -72,13 +72,13 @@ generic struct Buffer : mref<T> {
 
 // Allows buffer<char> template specialization to be implemented by Buffer
 generic struct buffer : Buffer<T> {
- //using Buffer<T>::Buffer;
- constexpr buffer() {}
+ using Buffer<T>::Buffer;
+ /*constexpr buffer() {}
  buffer(buffer&& o) : Buffer<T>((Buffer<T>&&)o) {}
  buffer(size_t capacity, size_t size) : Buffer<T>(capacity, size) {}
  explicit buffer(size_t size) : Buffer<T>(size) {}
  constexpr buffer(T* data, size_t size) : Buffer<T>(data, size, 0) {}
- buffer<T>& operator=(buffer<T>&& o) { Buffer<T>::operator=(::move(o)); return *this; }
+ buffer<T>& operator=(buffer<T>&& o) { Buffer<T>::operator=(::move(o)); return *this; }*/
 };
 
 /// ref discarding trailing zero byte in buffer(char[N])
@@ -86,14 +86,13 @@ generic struct buffer : Buffer<T> {
 template<> struct buffer<char> : Buffer<char> {
  using Buffer::Buffer;
 
- /*constexpr*/ buffer() {}
- /*constexpr*/ buffer(const char* data, size_t size) : Buffer<char>((char*)data, size, 0) {}
+ buffer() {}
+ /*buffer(const char* data, size_t size) : Buffer<char>((char*)data, size, 0) {}
  buffer(buffer&& o) : Buffer<char>((Buffer<char>&&)o) {}
- buffer& operator=(buffer&& o) { Buffer<char>::operator=(::move(o)); return *this; }
- //Buffer& operator=(Buffer&& o) { Buffer<char>::operator=(::move(o)); return *this; }
+ buffer& operator=(buffer&& o) { Buffer<char>::operator=(::move(o)); return *this; }*/
 
  /// Implicitly references a string literal
- template<size_t N> constexpr buffer(char const (&a)[N]) : buffer((char*)a, N-1) {}
+ template<size_t N> constexpr buffer(char const (&a)[N]) : Buffer((char*)a, N-1, 0) {}
 };
 
 typedef buffer<char> String;
@@ -102,7 +101,7 @@ typedef buffer<char> String;
 generic buffer<T> copy(const buffer<T>& o) { buffer<T> t(o.capacity?:o.size, o.size); t.copy(o); return t; }
 
 /// Converts a reference to a buffer (unsafe as no automatic memory management method keeps the original reference from being released)
-generic buffer<T> unsafeRef(const ref<T> o) { return buffer<T>((T*)o.data, o.size); }
+generic buffer<T> unsafeRef(const ref<T> o) { return buffer<T>((T*)o.data, o.size, 0); }
 
 /// Initializes a new buffer moving the content of \a o
 generic buffer<T> moveRef(mref<T> o) { buffer<T> copy(o.size); copy.mref<T>::move(o); return copy; }

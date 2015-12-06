@@ -13,11 +13,7 @@
 #define Type typename
 #define generic template<Type T>
 #define abstract =0
-#if __INTEL_COMPILER
 #define default_move(T) T(T&&)=default; T& operator=(T&&)=default
-#else
-#define default_move(T) T(T&&)=default; T& operator=(T&&)=default
-#endif
 #define no_copy(T) T(const T&)=delete; T& operator=(const T&)=delete
 
 // Traits
@@ -183,9 +179,9 @@ generic struct Ref {
 /// ref discarding trailing zero byte in ref(char[N])
 // Needs to be a template specialization as a direct derived class specialization prevents implicit use of ref(char[N]) to bind ref<char>
 template<> struct ref<char> : Ref<char> {
- //using Ref::Ref;
+ using Ref::Ref;
  constexpr ref() {}
- inline constexpr ref(const char* data, size_t size) : Ref<char>(data, size) {}
+ //inline constexpr ref(const char* data, size_t size) : Ref<char>(data, size) {}*/
  /// Implicitly references a string literal
  template<size_t N> constexpr ref(char const (&a)[N]) : ref(a, N-1 /*Does not include trailling zero byte*/) {}
 };

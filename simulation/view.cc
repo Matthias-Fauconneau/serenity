@@ -43,17 +43,22 @@ struct SimulationView : Simulation, Widget {
   float radius, bottomZ, topZ;
  };
  array<State> states;
- size_t viewT;
+
+ Time totalTime, recordTime;
 
  unique<Window> window = nullptr;
  GLFrameBuffer target;
 
- vec2 lastPos; // For relative cursor movements
+ size_t viewT = 0;
  vec2 viewYawPitch = vec2(0, -PI/3); // Current view angles
  vec2 scale = 0;
  vec2 translation = 0;
 
- Time totalTime, recordTime;
+ struct {
+  vec2 cursor;
+  vec2 viewYawPitch;
+  size_t viewT;
+ } dragStart = {0,0,0};
 
  SimulationView(const Dict& parameters) : Simulation(parameters) {
   window = ::window(this, -1, mainThread, true, false);
@@ -73,7 +78,6 @@ struct SimulationView : Simulation, Widget {
    recordTime.stop();
    window->render();
    if(states.size == 8192) { log(states.size); window->setTitle("OK"); running = false; }
-
   };
  }
 
@@ -109,7 +113,7 @@ struct SimulationView : Simulation, Widget {
   vec4 viewRotation = qmul(angleVector(viewYawPitch.y, vec3(1,0,0)),
                                              angleVector(viewYawPitch.x, vec3(0,0,1)));
 
-  vec3 scale, translation; // Fit view
+  vec3 scale = 0, translation = 0; // Fit view
 
   const State& state = states[viewT];
   array<vec3> grainPositions (state.grain.count); // Rotated, Z-Sorted
@@ -141,13 +145,12 @@ struct SimulationView : Simulation, Widget {
    }
    scale = vec3(vec2(2/::max(max.x-min.x, max.y-min.y)/1.2), 2/(max-min).z);
    translation = -vec3((min+max).xy()/2.f, min.z);
-   if(!isNumber(translation.xy())) translation.xy() = this->translation;
-
+   /*if(!isNumber(translation.xy())) translation.xy() = this->translation;
    if(!this->scale && !this->translation) this->scale = scale.xy(), this->translation = translation.xy();
    const float Dt = 1./60;
    if(scale.xy() != this->scale || translation.xy() != this->translation) window->render();
    scale.xy() = this->scale = this->scale*float(1-Dt) + float(Dt)*scale.xy();
-   translation.xy() = this->translation = this->translation*float(1-Dt) + float(Dt)*translation.xy();
+   translation.xy() = this->translation = this->translation*float(1-Dt) + float(Dt)*translation.xy();*/
   }
 
   mat4 viewProjection = mat4()
@@ -263,7 +266,6 @@ struct SimulationView : Simulation, Widget {
    vertexArray.draw(Lines, positions.size);
   }
 
-
   // Bottom
   {
    static GLShader shader {::shader_glsl(), {"flat"}};
@@ -296,12 +298,6 @@ struct SimulationView : Simulation, Widget {
   target.blit(0, window->size, int2(offset, 0), int2(target.size.x-offset, target.size.y));
   return shared<Graphics>();
  }
-
- struct {
-  vec2 cursor;
-  vec2 viewYawPitch;
-  size_t viewT;
- } dragStart;
 
  // Orbital ("turntable") view control
  bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button,

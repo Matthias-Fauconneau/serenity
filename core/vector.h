@@ -6,44 +6,44 @@
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
 template<template<Type> /*Type*/class V, Type T, uint N> struct vec : V<T> {
-    //static_assert(sizeof(V<T>)==N*sizeof(T), ""/*req C++14*/);
+ //static_assert(sizeof(V<T>)==N*sizeof(T), ""/*req C++14*/);
 
-    /// Defaults initializes to zero
-	inline vec() : vec(0) {}
-    /// Initializes all components to the same value \a v
-    inline vec(T v){ for(uint i: range(N)) at(i)=v; }
-    /// Initializes components separately
-	template<Type... Args> inline explicit constexpr vec(T a, T b, Args... args) : V<T>{a,b,T(args)...} {
-		static_assert(sizeof...(args) == N-2, "Invalid number of arguments");
-    }
-    /// Initializes components from a fixed size array
-	template<Type... Args> inline explicit vec(const T o[N]){ for(uint i: range(N)) at(i)=(T)o[i]; }
+ /// Defaults initializes to zero
+ inline vec() : vec(0) {}
+ /// Initializes all components to the same value \a v
+ inline vec(T v){ for(uint i: range(N)) at(i)=v; }
+ /// Initializes components separately
+ template<Type... Args> inline explicit constexpr vec(T a, T b, Args... args) : V<T>{a,b,T(args)...} {
+  static_assert(sizeof...(args) == N-2, "Invalid number of arguments");
+ }
+ /// Initializes components from a fixed size array
+ template<Type... Args> inline explicit vec(const T o[N]){ for(uint i: range(N)) at(i)=(T)o[i]; }
 
-    /// Initializes components from another vec \a o casting from \a S to \a T
-	template<Type S> inline explicit vec(const vec<V,S,N>& o) { for(uint i: range(N)) at(i)=(T)o[i]; }
+ /// Initializes components from another vec \a o casting from \a S to \a T
+ template<Type S> inline explicit vec(const vec<V,S,N>& o) { for(uint i: range(N)) at(i)=(T)o[i]; }
 
-	/// Initializes first components from another vec \a o and initializes remaining components with args...
-    template<template<Type> /*Type*/class W, Type... Args> vec(const vec<W,T,N-sizeof...(Args)>& o, Args... args){
-		for(int i: range(N-sizeof...(Args))) at(i)=o[i];
-		T unpacked[]={T(args)...}; for(int i: range(sizeof...(Args))) at(N-sizeof...(Args)+i)=unpacked[i];
-	}
+ /// Initializes first components from another vec \a o and initializes remaining components with args...
+ template<template<Type> /*Type*/class W, Type... Args> vec(const vec<W,T,N-sizeof...(Args)>& o, Args... args){
+  for(int i: range(N-sizeof...(Args))) at(i)=o[i];
+  T unpacked[]={T(args)...}; for(int i: range(sizeof...(Args))) at(N-sizeof...(Args)+i)=unpacked[i];
+ }
 
-    operator ref<T>() const { return ref<T>((T*)this, N); }
+ operator ref<T>() const { return ref<T>((T*)this, N); }
 
-    /// \name Accessors
-	inline const T& at(uint i) const { return ((T*)this)[i]; }
-	inline T& at(uint i) { return ((T*)this)[i]; }
-	inline const T& operator[](uint i) const { return at(i); }
-	inline T& operator[](uint i) { return at(i); }
+ /// \name Accessors
+ inline const T& at(uint i) const { return ((T*)this)[i]; }
+ inline T& at(uint i) { return ((T*)this)[i]; }
+ inline const T& operator[](uint i) const { return at(i); }
+ inline T& operator[](uint i) { return at(i); }
 
-    /// \name Operators
-    explicit operator bool() const { for(uint i: range(N)) if(at(i)!=0) return true; return false; }
-	inline vec& operator +=(const vec& v) { for(uint i: range(N)) at(i)+=v[i]; return *this; }
-    vec& operator -=(const vec& v) { for(uint i: range(N)) at(i)-=v[i]; return *this; }
-    vec& operator *=(const vec& v) { for(uint i: range(N)) at(i)*=v[i]; return *this; }
-    vec& operator *=(const T& s) { for(uint i: range(N)) at(i)*=s; return *this; }
-    vec& operator /=(const T& s) { for(uint i: range(N)) at(i)/=s; return *this; }
-    /// \}
+ /// \name Operators
+ explicit operator bool() const { for(uint i: range(N)) if(at(i)!=0) return true; return false; }
+ inline vec& operator +=(const vec& v) { for(uint i: range(N)) at(i)+=v[i]; return *this; }
+ vec& operator -=(const vec& v) { for(uint i: range(N)) at(i)-=v[i]; return *this; }
+ vec& operator *=(const vec& v) { for(uint i: range(N)) at(i)*=v[i]; return *this; }
+ vec& operator *=(const T& s) { for(uint i: range(N)) at(i)*=s; return *this; }
+ vec& operator /=(const T& s) { for(uint i: range(N)) at(i)/=s; return *this; }
+ /// \}
 };
 
 #undef generic
@@ -82,122 +82,57 @@ generic T sum(const vec& a) { T sum=0; for(uint i: range(N)) sum+=a[i]; return s
 generic T product(const vec& a) { T product=1; for(uint i: range(N)) product *= a[i]; return product; }
 generic T dot(const vec& a, const vec& b) { T ssq=0; for(uint i: range(N)) ssq += a[i]*b[i]; return ssq; }
 generic T sq(const vec& a) { return dot(a,a); }
-//generic float length(const vec& a) { return sqrt(dot(a,a)); }
-//generic vec normalize(const vec& a){ return a/length(a); }
 generic bool isNaN(const vec& v){ for(uint i: range(N)) if(isNaN(v[i])) return true; return false; }
 generic bool isNumber(const vec& v){ for(uint i: range(N)) if(!isNumber(v[i])) return false; return true; }
 
 #undef generic
 #define generic template<Type T>
 
-/*template<template<Type> class V, Type T, uint N> inline String str(const vec& v) {
- buffer<char> s(6*N);
+template<template<Type> class V, Type T, uint N> inline String str(const vec& v) {
+ buffer<char> s(16*N, 0);
  s.append('(');
  for(uint i: range(N)) { s.append(str(v[i])); if(i<N-1) s.append(", "); } s.append(')');
  return move(s);
-}*/
+}
 
 #undef vec
 
-generic struct xy {
- T x,y;
- vec< ::xy, T, 2> yx() const { return vec< ::xy, T, 2>{y,x}; }
-};
-/// Integer x,y vector (8bit)
-typedef vec<xy,uint8,2> byte2;
-/// Integer x,y vector (16bit)
-typedef vec<xy,int16,2> short2;
-/// Integer x,y vector (32bit)
+generic struct xy { T x,y; };
 typedef vec<xy,int,2> int2;
-/// Unsigned integer x,y vector (32bit)
 typedef vec<xy,uint,2> uint2;
-/// Single precision x,y vector
 typedef vec<xy,float,2> vec2;
 
 
 generic struct xyz {
-    T x,y,z;
-    vec<xy,T,2>& xy() const { return (vec< ::xy,T,2>&)*this; }
-    //inline operator v4sf() const { return (v4sf){x,y,z,0}; }
+ T x,y,z;
+ vec<xy,T,2>& xy() const { return (vec< ::xy,T,2>&)*this; }
 };
 /// Integer x,y,z vector
 typedef vec<xyz,int,3> int3;
-/// Integer x,y,z vector (16bit)
-typedef vec<xyz,uint16,3> short3;
-/// Floating-point x,y,z vector
 typedef vec<xyz,float,3> vec3;
-//inline vec3 toVec3(v4sf v) { return vec3(v[0],v[1],v[2]); }
 
 generic struct xyzw {
-    T x,y,z,w;
-    vec< ::xyz,T,3> xyz() const { return *(vec< ::xyz,T,3>*)this; }
-    vec< ::xyz,T,3> xyw() const { return vec< ::xyz,T,3>{x,y,w}; }
-    vec< ::xy,T,2> xy()const{ return *(vec< ::xyz,T,2>*)this; }
+ T x,y,z,w;
+ vec< ::xyz,T,3> xyz() const { return *(vec< ::xyz,T,3>*)this; }
 };
-/// Floating-point x,y,z,w vector
 typedef vec<xyzw,float,4> vec4;
 
-generic struct bgr {
-    T b,g,r;
-};
-/// Integer b,g,r vector (8bit)
-typedef vec<bgr,uint8,3> byte3;
-/// Integer b,g,r vector (32bit)
+generic struct bgr { T b,g,r; };
 typedef vec<bgr,int,3> bgr3i;
-/// Floating-point b,g,r vector
 typedef vec<bgr,float,3> bgr3f;
-
-generic struct bgra;
-generic struct rgb {
-    T r,g,b;
-};
-/// Floating-point r,g,b vector
+generic struct rgb { T r,g,b; };
 typedef vec<rgb,float,3> rgb3f;
 
-generic struct rgba;
-generic struct bgra {
-    T b,g,r,a;
-    vec<bgr,T,3>& bgr() const { return *(vec< ::bgr,T,3>*)this; }
-    operator vec<rgb,T,3>() const { return vec<rgb,T,3>{r,g,b}; }
-    operator vec<rgba,T,4>() const { return vec<rgba,T,4>{r,g,b,a}; }
-};
-/// Floating-point b,g,r,a vector
+generic struct bgra { T b,g,r,a; };
 typedef vec<bgra,float,4> rgba4f;
-
-generic struct rgba {
-    T r,g,b,a;
-};
-/// Floating-point r,g,b,a vector
+generic struct rgba { T r,g,b,a; };
 typedef vec<rgba,float,4> bgra4f;
+typedef vec<bgra,uint8,4> byte4;
 
-/// Integer b,g,r,a vector (8bit)
-struct byte4 : vec<bgra,uint8,4> {
-	//using vec::vec;
-    byte4() : vec(0) {} // Defaults initalizes to zero
-	inline byte4(byte v) : vec(v) {}
-	inline byte4(byte b, byte g, byte r, byte a=0xFF) : vec(b,g,r,a) {}
-	// bgr
-	byte4(byte3 bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
-	//byte3 bgr() { return byte3(b, g, r); } // -> bgra
-	// bgr3f
-	byte4(bgr3f bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
-	bgr3f bgr() { return bgr3f(b, g, r); }
-	// rgba
-	byte4(vec<rgba,uint8,4> rgba) : vec(rgba.b, rgba.g, rgba.r, rgba.a) {}
-	byte4(vec<rgb,uint8,3> rgb) : vec(rgb.b, rgb.g, rgb.r, 0xFF) {}
-};
-/// Integer b,g,r,a vector (32bit)
-typedef vec<bgra,int,4> int4;
-/// Unsigned integer b,g,r,a vector (32bit)
-typedef vec<bgra,uint,4> uint4;
-
-/// Integer x,y vector (64bit)
-typedef vec<xy,int64,2> long2;
-
-template<template<Type> /*Type*/class V, Type T, uint N> inline
-         /*constexpr*/ T length(vec<V,T,N> a) { return sqrt(dot(a,a)); }
-template<template<Type> /*Type*/class V, Type T> inline
- vec<V,T,3> cross(vec<V,T,3> a, vec<V,T,3> b) {
+template<template<Type> class V, Type T, uint N>
+inline T length(vec<V,T,N> a) { return sqrt(dot(a,a)); }
+template<template<Type> class V, Type T> inline
+vec<V,T,3> cross(vec<V,T,3> a, vec<V,T,3> b) {
  return vec<V,T,3>(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y);
 }
 
@@ -211,39 +146,3 @@ inline vec4 angleVector(float a, vec3 v) {
  vec3 b = sin(a/2*l)/l*v;
  return vec4(b, cos(a/2*l));
 }
-
-//template<Type A, Type B> struct pair { A a; B b; };/*pair<v4sf, v4sf>*/
-#if 0
-inline void closest(vec3 a1, vec3 a2, vec3 b1, vec3 b2, vec3& A, vec3& B) {
- const vec3 u = a2 - a1, v = b2 - b1, w = a1 - b1;
- const float a = dot3(u,u)[0];
- const float b = dot3(u,v)[0];
- const float c = dot3(v,v)[0];
- const float d = dot3(u,w)[0];
- const float e = dot3(v,w)[0];
- const float D = a*c - b*b; float sD = D, tD = D;
- // Compute the line parameters of the two closest points
- float sN, tN;
- if(D < __FLT_EPSILON__) sN = 0, sD = 1, tN = e, tD = c;
- else {
-  sN = (b*e - c*d), tN = (a*e - b*d);
-  /**/ if(sN < 0) { sN = 0, tN = e, tD = c; }
-  else if (sN > sD) { sN = sD; tN = e + b; tD = c; }
- }
- /**/ if(tN < 0) {
-  tN = 0;
-  /**/ if(-d < 0) sN = 0;
-  else if(-d > a) sN = sD;
-  else { sN = -d; sD = a; }
- }
- else if(tN > tD) {
-  tN = tD;
-  /**/ if((-d + b) < 0) sN = 0;
-  else if((-d + b) > a) sN = sD;
-  else { sN = (-d + b); sD = a; }
- }
- float sc = abs(sD) < __FLT_EPSILON__ ? 0 : sN / sD;
- float tc = abs(tD) < __FLT_EPSILON__ ? 0 : tN / tD;
- A = a1 + (float4(sc) * u); B = b1 + (float4(tc) * v);
-}
-#endif
