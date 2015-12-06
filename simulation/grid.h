@@ -1,6 +1,18 @@
 #pragma once
 #include "memory.h"
 
+template<size_t cellCapacity> struct List : mref<uint16> {
+ List(mref<uint16> o) : mref(o) {}
+ bool append(uint16 index) {
+  size_t i = 0;
+  while(at(i)) { i++; }
+  assert_(i < cellCapacity);
+  at(i) = index; i++;
+  if(i < cellCapacity) at(i) = 0;
+  return true;
+ }
+};
+
 struct Grid {
  static constexpr size_t cellCapacity = 32;
  const vec3 scale;

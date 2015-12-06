@@ -1,5 +1,6 @@
 // TODO: Face contacts
 #include "simulation.h"
+#include "grid.h"
 #include "parallel.h"
 
 static inline void evaluateGrainMembrane(const size_t start, const size_t size,

@@ -1,6 +1,4 @@
 #include "system.h"
-#include "lattice.h"
-#include "grid.h"
 #include "time.h"
 #include "variant.h"
 
@@ -267,12 +265,6 @@ struct Simulation : System {
  void stepWireIntegration();
   uint64 wireIntegrationTime = 0;
 
-#if DEBUG
-  void invariant_();
-#define invariant invariant_();
-#else
-#define invariant
-#endif
   void profile(const Time& totalTime);
   bool run(const Time& totalTime);
    Time stepTimeRT;

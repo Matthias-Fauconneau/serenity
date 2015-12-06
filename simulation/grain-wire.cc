@@ -1,5 +1,6 @@
 // TODO: Cylinder contacts
 #include "simulation.h"
+#include "grid.h"
 #include "parallel.h"
 
 static inline void evaluateGrainWire(const size_t start, const size_t size,

@@ -1,4 +1,5 @@
 #include "simulation.h"
+#include "lattice.h"
 #include "parallel.h"
 
 static inline void qapply(v8sf Qx, v8sf Qy, v8sf Qz, v8sf Qw, v8sf Vx, v8sf Vy, v8sf Vz,
