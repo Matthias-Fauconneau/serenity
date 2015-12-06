@@ -5,7 +5,7 @@
 
 struct Ehdr { byte ident[16]; uint16 type,machine; uint version; ptr entry,phoff,shoff; uint flags; uint16 ehsize,phentsize,phnum,shentsize,shnum,shstrndx; };
 struct Shdr { uint name,type; long flags,addr,offset,size; uint link,info; long addralign,entsize; };
-struct Sym { uint	name; byte info,other; uint16 shndx; byte* value; long size; };
+struct Sym { uint name; byte info,other; uint16 shndx; byte* value; long size; };
 
 /// Reads a little endian variable size integer
 static int readLEV(BinaryData& s, bool sign=false) {
@@ -108,6 +108,7 @@ String demangle(TextData& s, bool function=true) {
 }
 String demangle(const string symbol) { TextData s(symbol); s.match('_'); return demangle(s); }
 
+#if !__INTEL_COMPILER
 Symbol findSymbol(void* find) {
     static Map exe("/proc/self/exe");
     const byte* elf = exe.data;
@@ -122,8 +123,12 @@ Symbol findSymbol(void* find) {
         else if(name==".symtab") symtab=ref<Sym>((Sym*)(elf+s.offset),s.size/sizeof(Sym));
     }
     Symbol symbol;
-    for(const Sym& sym: symtab)
-        if(find >= sym.value && find < sym.value+sym.size) { symbol.function = demangle(str(strtab+sym.name)); break; }
+    for(const Sym& sym: symtab) {
+        if(find >= sym.value && find < sym.value+sym.size) {
+         symbol.function = demangle(str(strtab+sym.name));
+         break;
+        }
+    }
     for(BinaryData& s = debug_line; s;) {
         uint begin = s.index;
         struct CU { uint size; uint16 version; uint prolog_size; uint8 min_inst_len, stmt; int8 line_base; uint8 line_range,opcode_base; } packed;
@@ -193,6 +198,7 @@ Symbol findSymbol(void* find) {
     }
     return symbol;
 }
+#endif
 
 void* caller_frame(void* fp) { return *(void**)fp; }
 void* return_address(void* fp) { return *((void**)fp+1); }

@@ -16,7 +16,7 @@ generic struct array : buffer<T> {
  using buffer<T>::slice;
  using buffer<T>::set;
 
- using buffer<T>::buffer;
+ //using buffer<T>::buffer;
  array() {}
  /// Converts a buffer to an array
  array(buffer<T>&& o) : buffer<T>(::move(o)) {}
@@ -72,9 +72,11 @@ generic struct array : buffer<T> {
   assert(int(index)>=0);
   grow(size+1);
   if(int(size)-2>=int(index)) {
-   set(size-1, ::move(at(size-2))); // Initializes last slot
-   for(int i=size-3;i>=int(index);i--) at(i+1)= ::move(at(i)); // Shifts elements
-   return at(index) = ::move(e);
+   //set(size-1, ::move(at(size-2))); // Initializes last slot
+   for(int i=size-2;i>=int(index);i--) set(i+1, ::move(at(i))); // Shifts elements
+   //for(int i=size-3;i>=int(index);i--) at(i+1)= ::move(at(i)); // Shifts elements
+   at(index) = ::move(e);
+   return at(index);
   } else return set(index, ::move(e)); // index==size-1
  }
  /// Inserts immediately before the first element greater than the argument

@@ -24,6 +24,7 @@ core/data.h
 core/function.h
 core/thread.h
 core/thread.cc
+core/trace.cc
 core/file.cc
 core/serialization.h
 core/parallel.h

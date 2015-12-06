@@ -4,8 +4,8 @@
 
 typedef uint v8ui __attribute((__vector_size__ (32)));
 typedef int v8si __attribute((__vector_size__ (32)));
-static constexpr v8ui unused _0i = (v8ui){0,0,0,0,0,0,0,0};
-static constexpr v8ui unused _1i = (v8ui){
+static /*constexpr*/ v8ui unused _0i = (v8ui){0,0,0,0,0,0,0,0};
+static /*constexpr*/ v8ui unused _1i = (v8ui){
   uint(~0),uint(~0),uint(~0),uint(~0),
   uint(~0),uint(~0),uint(~0),uint(~0)};
 
@@ -16,6 +16,9 @@ static inline v8ui gather(const uint* P, v8ui i) {
 #else
  return (v8ui)__builtin_ia32_gathersiv8si((v8si)_0i, (const int*)P, (v8si)i, (v8si)_1i, sizeof(int));
 #endif
+#elif __INTEL_COMPILER
+ union { uint e[8]; v8ui v; } I; I.v = i;
+ return (v8ui){P[I.e[0]], P[I.e[1]], P[I.e[2]], P[I.e[3]], P[I.e[4]], P[I.e[5]], P[I.e[6]], P[I.e[7]]};
 #else
  return (v8ui){P[i[0]], P[i[1]], P[i[2]], P[i[3]], P[i[4]], P[i[5]], P[i[6]], P[i[7]]};
 #endif
@@ -23,9 +26,9 @@ static inline v8ui gather(const uint* P, v8ui i) {
 static inline v8ui gather(ref<uint> P, v8ui i) { return gather(P.data, i); }
 
 typedef float v8sf __attribute((__vector_size__ (32)));
-inline v8sf constexpr float8(float f) { return (v8sf){f,f,f,f,f,f,f,f}; }
-static constexpr v8sf unused _0f = float8(0);
-static constexpr v8sf unused _1f = float8(1);
+inline v8sf /*constexpr*/ float8(float f) { return (v8sf){f,f,f,f,f,f,f,f}; }
+static /*constexpr*/ v8sf unused _0f = float8(0);
+static /*constexpr*/ v8sf unused _1f = float8(1);
 
 static inline v8sf load(const float* a, size_t index) { return *(v8sf*)(a+index); }
 static inline v8sf load(ref<float> a, size_t index) { return load(a.data, index); }
@@ -56,6 +59,9 @@ static inline v8sf gather(const float* P, v8ui i) {
 #else
  return __builtin_ia32_gathersiv8sf(_0f, P, (v8si)i, (v8sf)_1i, sizeof(float));
 #endif
+#elif __INTEL_COMPILER
+ union { uint e[8]; v8ui v; } I; I.v = i;
+ return (v8sf){P[I.e[0]], P[I.e[1]], P[I.e[2]], P[I.e[3]], P[I.e[4]], P[I.e[5]], P[I.e[6]], P[I.e[7]]};
 #else
  return (v8sf){P[i[0]], P[i[1]], P[i[2]], P[i[3]], P[i[4]], P[i[5]], P[i[6]], P[i[7]]};
 #endif
@@ -63,8 +69,15 @@ static inline v8sf gather(const float* P, v8ui i) {
 static inline v8sf gather(ref<float> P, v8ui i) { return gather(P.data, i); }
 
 static inline void scatter(float* const P, const v8ui i, const v8sf x) {
+#if __INTEL_COMPILER
+ union { uint e[8]; v8ui v; } I; I.v = i;
+ union { float e[8]; v8sf v; } X; X.v = x;
+ P[I.e[0]] = X.e[0]; P[I.e[1]] = X.e[1]; P[I.e[2]] = X.e[2]; P[I.e[3]] = X.e[3];
+ P[I.e[4]] = X.e[4]; P[I.e[5]] = X.e[5]; P[I.e[6]] = X.e[6]; P[I.e[7]] = X.e[7];
+#else
  P[i[0]] = x[0]; P[i[1]] = x[1]; P[i[2]] = x[2]; P[i[3]] = x[3];
  P[i[4]] = x[4]; P[i[5]] = x[5]; P[i[6]] = x[6]; P[i[7]] = x[7];
+#endif
 }
 static inline void scatter(mref<float> P, const v8ui a, const v8sf x) {
  scatter(P.begin(), a, x);

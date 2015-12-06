@@ -40,9 +40,15 @@ Folder::Folder(string folder, const Folder& at, bool create) {
 
 struct stat Folder::properties() const { struct stat s; check( fstat(fd, &s) ); return s; }
 
-int64 Folder::accessTime() const { struct stat s = Folder::properties(); return s.st_atim.tv_sec*1000000000ull + s.st_atim.tv_nsec; }
+int64 Folder::accessTime() const {
+ struct stat s = Folder::properties();
+ return s.st_atim.tv_sec*1000000000ull + s.st_atim.tv_nsec;
+}
 
-int64 Folder::modifiedTime() const { struct stat s = Folder::properties(); return s.st_mtim.tv_sec*1000000000ull + s.st_mtim.tv_nsec;  }
+int64 Folder::modifiedTime() const {
+ struct stat s = Folder::properties();
+ return s.st_mtim.tv_sec*1000000000ull + s.st_mtim.tv_nsec;
+}
 
 static int getdents(int fd, void* entry, long size) { return syscall(SYS_getdents, fd, entry, size); }
 struct dirent { long ino, off; short len; char name[]; };
@@ -56,15 +62,17 @@ buffer<String> Folder::list(uint flags) const {
    if(!(flags&Hidden) && name[0]=='.') continue;
    if(name=="." || name=="..") continue;
    int type = *((byte*)&entry + entry.len - 1);
-   if((flags&Files && (type==DT_REG||type==DT_LNK||type==DT_UNKNOWN/*NFS*/))
+   if((flags&Files && (type==DT_REG||type==DT_LNK||type==DT_UNKNOWN))
       || (flags&Folders && type==DT_DIR)
       || (flags&Devices && type==DT_CHR)
       || (flags&Drives && type==DT_BLK) ) {
-    if(flags&Sorted) list.insertSorted( copyRef(name) ); else list.append( copyRef(name) );
+    if(flags&Sorted) error("UNIMPL"); //list.insertSorted( copyRef(name) );
+    else list.append( copyRef(name) );
    }
    if(flags&Recursive && type==DT_DIR) {
     for(const String& file: Folder(name,*this).list(flags)) {
-     if(flags&Sorted) list.insertSorted( name+'/'+file ); else list.append( name+'/'+file );
+     if(flags&Sorted) error("UNIMPL"); //list.insertSorted( name+'/'+file );
+     else list.append( name+'/'+file );
     }
    }
   }

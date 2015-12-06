@@ -17,7 +17,7 @@ struct Data {
  /// Creates a Data interface to a \a ref
  explicit Data(ref<byte> data) : data(data) {}
  /// Creates a Data interface to a \a buffer
- Data(::buffer<byte>&& buffer) : Data(buffer) { this->buffer=move(buffer); }
+ Data(::buffer<byte>&& buffer) : data(buffer), buffer(::move(buffer)) {}
  /// Slices a reference to the buffer from \a index to \a index + \a size
  inline ref<byte> slice(size_t pos, size_t size) const { return data.slice(pos,size); }
  inline ref<byte> sliceRange(size_t begin, size_t end) const { return data.sliceRange(begin, end); }
@@ -137,12 +137,13 @@ struct TextData : Data {
  /// 1-based line/column index
  int lineIndex = 1, columnIndex = 1;
 
- /// Creates a TextData interface to a \a ref
+ using Data::Data;
+ /*/// Creates a TextData interface to a \a ref
  /// \note Matches any heading Unicode BOM
  explicit TextData(ref<byte> data);
  /// Creates a Data interface to a \a buffer
  /// \note Matches any heading Unicode BOM
- TextData(::buffer<byte>&& buffer) : TextData(buffer) { this->buffer=move(buffer); }
+ Data(::buffer<byte>&& buffer) : data(buffer), buffer(::move(buffer)) {}*/
 
  void advance(size_t step) override;
 

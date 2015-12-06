@@ -10,6 +10,7 @@ extern "C" void free(void* buffer) /*noexcept*/;
 
 #if __INTEL_COMPILER
 #define __atomic_fetch_add __atomic_fetch_add_explicit
+extern "C" { int printf(const char*, ...); }
 #endif
 
 /// Managed fixed capacity mutable reference to an array of elements
@@ -32,6 +33,7 @@ generic struct Buffer : mref<T> {
  Buffer(size_t capacity, size_t size) : mref<T>((T*)0, size), capacity(capacity) {
   assert(capacity>=size && size>=0);
   if(capacity && posix_memalign((void**)&data, 64, capacity*sizeof(T))) error("Out of memory", size, capacity, sizeof(T));
+  //printf("+ %p\n", data);
  }
  explicit Buffer(size_t size) : Buffer(size, size) {}
 
@@ -41,7 +43,7 @@ generic struct Buffer : mref<T> {
  ~Buffer() {
   if(capacity) {
    if(!__has_trivial_destructor(T)) for(size_t i: range(size)) at(i).~T();
-   printf("- %p\n", data);
+   //printf("- %p\n", data);
    free((void*)data);
   }
   data=0; capacity=0; size=0;
@@ -69,18 +71,24 @@ generic struct Buffer : mref<T> {
 
 // Allows buffer<char> template specialization to be implemented by Buffer
 generic struct buffer : Buffer<T> {
- using Buffer<T>::Buffer;
+ //using Buffer<T>::Buffer;
  constexpr buffer() {}
  buffer(buffer&& o) : Buffer<T>((Buffer<T>&&)o) {}
+ buffer(size_t capacity, size_t size) : Buffer<T>(capacity, size) {}
+ explicit buffer(size_t size) : Buffer<T>(size) {}
+ buffer<T>& operator=(buffer<T>&& o) { Buffer<T>::operator=(::move(o)); return *this; }
 };
 
 /// ref discarding trailing zero byte in buffer(char[N])
 // Needs to be a template specialization as a direct derived class specialization prevents implicit use of ref(char[N]) to bind ref<char>
 template<> struct buffer<char> : Buffer<char> {
  using Buffer::Buffer;
+
  constexpr buffer() {}
- buffer(buffer&& o) : Buffer<char>((Buffer<char>&&)o) {}
  constexpr buffer(const char* data, size_t size) : Buffer<char>((char*)data, size, 0) {}
+ buffer(buffer&& o) : Buffer<char>((Buffer<char>&&)o) {}
+ buffer& operator=(buffer&& o) { Buffer<char>::operator=(::move(o)); return *this; }
+ //Buffer& operator=(Buffer&& o) { Buffer<char>::operator=(::move(o)); return *this; }
 
  /// Implicitly references a string literal
  template<size_t N> constexpr buffer(char const (&a)[N]) : buffer((char*)a, N-1) {}

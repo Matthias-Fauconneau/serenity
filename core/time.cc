@@ -38,8 +38,8 @@ void Date::invariant() const {
 int Date::days() const {
     assert(year>=0 && month>=0, year, month, day, hours, minutes, seconds);
     int days=0; //days from Thursday, 1st January 1970
-    for(int year=1970;year<this->year;year++) days+= leap(year)?366:365;
-    for(int month=0;month<this->month;month++) days+=daysInMonth(month,year);
+    for(int year: range(1970, this->year)) days+= leap(year)?366:365;
+    for(int month: range(this->month)) days+=daysInMonth(month, year);
     return days+day;
 }
 Date::Date(int day, int month, int year, int weekDay) :year(year),month(month),day(day),weekDay(weekDay) {

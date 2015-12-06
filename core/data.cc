@@ -42,7 +42,11 @@ String escape(char c) {
  size_t index = string("\t\r\n"_).indexOf(c);
  return index != invalid ? string("\\"_)+string("trn"_)[index] : string()+c;
 }
-String escape(string s) { array<char> target (s.size, 0); for(char c: s) target.append(escape(c)); return move(target); }
+String escape(string s) {
+ String target (s.size, 0);
+ for(char c: s) target.append(escape(c));
+ return move(target);
+}
 
 void Data::skip(const uint8 key) {
  if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(peek())+'\'');
@@ -64,9 +68,10 @@ ref<uint8> BinaryData::whileNot(uint8 key) {
  return cast<uint8>(slice(start, index-start));
 }
 
-TextData::TextData(ref<byte> data) : Data(data) {
- if(data && uint8(data[0]) >= 0x80 && !match("\xEF\xBB\xBF")) error("Expected Unicode BOM, got", peek(3), hex(peek(3)));
-}
+/*TextData::Text(ref<byte> data) : Data(data) {
+ if(data && uint8(data[0]) >= 0x80 && !match("\xEF\xBB\xBF"))
+  error("Expected Unicode BOM, got", peek(3), hex(peek(3)));
+}*/
 
 void TextData::advance(size_t step) {
  assert(index+step<=data.size, index, data.size);

@@ -80,7 +80,7 @@ bool Build::tryParseFiles(TextData& s) {
  if(!s.match("FILE(") && !s.match("ICON(")) return false;
  String name = copyRef(s.identifier("_-"));
  s.skip(')');
- name = replace(name, '_', '.');
+ //name = replace(name, '_', '.');
  String path = find(name);
  assert(path, "No such file to embed", name);
  String filesPath = tmp+"/files";
@@ -140,15 +140,15 @@ bool Build::compileModule(string target) {
   }
   Folder(tmp+"/"+join(flags,string("-"_))+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
   Stream stdout;
-  int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++14",
+  int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++11",
                                      "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing",
                                      "-I/usr/include/freetype2","-I/var/tmp/include", "-iquote.",
                                      "-o", object, fileName} + toRefs(args),
                     false, currentWorkingDirectory(), 0, &stdout);
-  jobs.append({copyRef(target), pid, move(stdout)});
+  jobs.append(copyRef(target), pid, move(stdout));
   needLink = true;
  }
- files.append( tmp+"/"+join(flags,string("-"_))+"/"+target+".o" );
+ files.append(tmp+"/"+join(flags,string("-"_))+"/"+target+".o");
  return true;
 }
 

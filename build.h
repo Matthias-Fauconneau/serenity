@@ -3,6 +3,7 @@
 struct TextData;
 
 struct Node {
+ no_copy(Node);
 	String name;
 	array<Node*> edges;
 	explicit Node(String&& name) : name(move(name)){}
@@ -36,6 +37,11 @@ struct Build {
   String target;
   int pid;
   Stream stdout;
+  no_copy(Job);
+  Job() {}
+  Job(String&& target, int pid, Stream&& stdout)
+   : target(::move(target)), pid(pid), stdout(::move(stdout)) {}
+  Job(Job&& o) : target(::move(o.target)), pid(o.pid), stdout(::move(o.stdout)) {}
   bool operator==(int pid) const { return pid=this->pid; }
  };
  array<Job> jobs;

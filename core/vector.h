@@ -156,7 +156,7 @@ typedef vec<rgb,float,3> rgb3f;
 generic struct rgba;
 generic struct bgra {
     T b,g,r,a;
-    vec<bgr,T,3>& bgr() const { return *(vec<::bgr,T,3>*)this; }
+    vec<bgr,T,3>& bgr() const { return *(vec< ::bgr,T,3>*)this; }
     operator vec<rgb,T,3>() const { return vec<rgb,T,3>{r,g,b}; }
     operator vec<rgba,T,4>() const { return vec<rgba,T,4>{r,g,b,a}; }
 };

@@ -46,8 +46,8 @@ generic struct handle {
 
  no_copy(handle);
  handle(T pointer=T()) : pointer(pointer){}
- handle& operator=(handle&& o) { pointer=o.pointer; o.pointer={}; return *this; }
  handle(handle&& o) : pointer(o.pointer){ o.pointer=T(); }
+ handle& operator=(handle&& o) { pointer=o.pointer; o.pointer={}; return *this; }
 
  operator T() const { return pointer; }
  operator T&() { return pointer; }
@@ -196,7 +196,7 @@ generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
 /// ref<char> holding a UTF8 text string
 typedef ref<char> string;
 
-#if __INTEL_COMPILER
+#if __INTEL_COMPILER && 0
 #define _ // ICC doesn't parse custom literal operators (""_)
 #else
 /// Returns const reference to a static string literal
