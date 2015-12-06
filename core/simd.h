@@ -9,6 +9,12 @@ static /*constexpr*/ v8ui unused _1i = (v8ui){
   uint(~0),uint(~0),uint(~0),uint(~0),
   uint(~0),uint(~0),uint(~0),uint(~0)};
 
+#if __INTEL_COMPILER
+static inline float extract(v8ui x, int i) { union { uint e[8]; v8ui v; } X; X.v = x; return X.e[i]; }
+#else
+static inline float extract(v8ui x, int i) { return x[i]; }
+#endif
+
 static inline v8ui gather(const uint* P, v8ui i) {
 #if __AVX2__
 #if __clang__
@@ -23,7 +29,12 @@ static inline v8ui gather(const uint* P, v8ui i) {
  return (v8ui){P[i[0]], P[i[1]], P[i[2]], P[i[3]], P[i[4]], P[i[5]], P[i[6]], P[i[7]]};
 #endif
 }
-static inline v8ui gather(ref<uint> P, v8ui i) { return gather(P.data, i); }
+static inline v8ui gather(ref<uint> P, v8ui i) {
+#if DEBUG
+ for(int k: range(8)) assert(extract(i, k) < P.size, extract(i, k), P.size);
+#endif
+ return gather(P.data, i);
+}
 
 #if __INTEL_COMPILER && 0
 union  __declspec(align(32)) __declspec(intrin_type) v8sf { float e[8]; };

@@ -216,7 +216,7 @@ void Simulation::stepGrainTop() {
   };
   grainTopFilterTime += parallel_chunk(grain.count, search, 1);
 
-  for(size_t i=grainTopA.size; i<align(simd, grainTopA.size); i++)
+  for(size_t i=grainTopA.size; i<align(simd, grainTopA.size+1); i++)
    grainTopA.begin()[i] = 0;
  }
 

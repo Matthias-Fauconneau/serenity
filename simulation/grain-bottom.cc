@@ -2,10 +2,14 @@
 #include "simulation.h"
 #include "parallel.h"
 
+template<> String str(const v8ui& v) {
+ return str(extract(v, 0), extract(v, 1), extract(v, 2), extract(v, 3),
+                 extract(v, 4), extract(v, 5), extract(v, 6), extract(v, 7)); }
+
 //FIXME: factorize Bottom and Top
 void evaluateGrainObstacle(const size_t start, const size_t size,
                            const uint* grainObstacleContact, const size_t unused grainObstacleContactSize,
-                           const uint* grainObstacleA,
+                           const ref<uint> grainObstacleA,
                            const float* grainPx, const float* grainPy, const float* grainPz,
                            const v8sf obstacleZ, const v8sf Gr,
                            float* const grainObstacleLocalAx, float* const grainObstacleLocalAy, float* const grainObstacleLocalAz,
@@ -21,6 +25,7 @@ void evaluateGrainObstacle(const size_t start, const size_t size,
                            float* const pTAx, float* const pTAy, float* const pTAz) {
  for(size_t i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
   const v8ui contacts = *(v8ui*)(grainObstacleContact+i);
+  log(i, contacts);
   const v8ui A = gather(grainObstacleA, contacts);
   // FIXME: Recomputing from intersection (more efficient than storing?)
   const v8sf Ax = gather(grainPx, A), Ay = gather(grainPy, A), Az = gather(grainPz, A);
@@ -214,7 +219,7 @@ void Simulation::stepGrainBottom() {
   };
   grainBottomFilterTime += parallel_chunk(grain.count, search, 1);
 
-  for(size_t i=grainBottomA.size; i<align(simd, grainBottomA.size); i++)
+  for(size_t i=grainBottomA.size; i<align(simd, grainBottomA.size+1); i++)
    grainBottomA.begin()[i] = 0;
  }
 
@@ -224,7 +229,7 @@ void Simulation::stepGrainBottom() {
   grainBottomContact = buffer<uint>(align(simd, grainBottomA.size));
  }
  grainBottomContact.size = 0;
- auto filter =  [&](uint, size_t start, size_t size) {
+ auto filter = [&](uint, size_t start, size_t size) {
   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
    v8ui A = *(v8ui*)(grainBottomA.data+i);
    v8sf Az = gather(grain.Pz, A);
@@ -272,7 +277,7 @@ void Simulation::stepGrainBottom() {
  grainBottomEvaluateTime += parallel_chunk(GBcc/simd, [&](uint, size_t start, size_t size) {
    evaluateGrainObstacle(start, size,
                      grainBottomContact.data, grainBottomContact.size,
-                     grainBottomA.data,
+                     grainBottomA,
                      grain.Px.data, grain.Py.data, grain.Pz.data,
                      float8(bottomZ), float8(Grain::radius),
                      grainBottomLocalAx.begin(), grainBottomLocalAy.begin(), grainBottomLocalAz.begin(),
