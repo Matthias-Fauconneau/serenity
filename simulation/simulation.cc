@@ -74,8 +74,8 @@ void Simulation::step() {
 
  stepGrain();
  stepGrainBottom();
- /*stepGrainTop();
- stepGrainGrain();*/
+ //stepGrainTop();
+ stepGrainGrain();
 
  /*stepMembrane();
  stepGrainMembrane();*/

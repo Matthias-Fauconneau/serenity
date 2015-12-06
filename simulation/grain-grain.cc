@@ -27,6 +27,7 @@ static inline void evaluateGrainGrain(const size_t start, const size_t size,
                                      const float* AVx, const float* AVy, const float* AVz,
                                      const float* BVx, const float* BVy, const float* BVz,
                                      const float* pAAVx, const float* pAAVy, const float* pAAVz,
+                                      const float* pBAVx, const float* pBAVy, const float* pBAVz,
                                      const float* pAQX, const float* pAQY, const float* pAQZ, const float* pAQW,
                                      const float* pBQX, const float* pBQY, const float* pBQZ, const float* pBQW,
                                      float* const pFx, float* const pFy, float* const pFz,
@@ -51,9 +52,10 @@ static inline void evaluateGrainGrain(const size_t start, const size_t size,
   const v8sf Fk = K * sqrt(depth) * depth;
   // Relative velocity
   const v8sf AAVx = gather(pAAVx, A), AAVy = gather(pAAVy, A), AAVz = gather(pAAVz, A);
-  const v8sf RVx = gather(AVx, A) + (AAVy*ARz - AAVz*ARy) - gather(BVx, B);
-  const v8sf RVy = gather(AVy, A) + (AAVz*ARx - AAVx*ARz) - gather(BVy, B);
-  const v8sf RVz = gather(AVz, A) + (AAVx*ARy - AAVy*ARx) - gather(BVz, B);
+  const v8sf BAVx = gather(pBAVx, B), BAVy = gather(pBAVy, B), BAVz = gather(pBAVz, B);
+  const v8sf RVx = gather(AVx, A) + (AAVy*ARz - AAVz*ARy) - gather(BVx, B) - (BAVy*BRz - BAVz*BRy);
+  const v8sf RVy = gather(AVy, A) + (AAVz*ARx - AAVx*ARz) - gather(BVy, B) - (BAVz*BRx - BAVx*BRz);
+  const v8sf RVz = gather(AVz, A) + (AAVx*ARy - AAVy*ARx) - gather(BVz, B) - (BAVx*BRy - BAVy*BRx);
   // Damping
   const v8sf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
   const v8sf Fb = - Kb * sqrt(sqrt(depth)) * normalSpeed ; // Damping
@@ -346,6 +348,7 @@ void Simulation::stepGrainGrain() {
                       float8(staticFrictionLength), float8(staticFrictionSpeed), float8(staticFrictionDamping),
                       grain.Vx.data, grain.Vy.data, grain.Vz.data,
                       grain.Vx.data, grain.Vy.data, grain.Vz.data,
+                      grain.AVx.data, grain.AVy.data, grain.AVz.data,
                       grain.AVx.data, grain.AVy.data, grain.AVz.data,
                       grain.Rx.data, grain.Ry.data, grain.Rz.data, grain.Rw.data,
                       grain.Rx.data, grain.Ry.data, grain.Rz.data, grain.Rw.data,
