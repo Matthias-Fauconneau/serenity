@@ -4,7 +4,6 @@
 #include "vector.h"
 #include "simd.h"
 #define sconst static constexpr
-constexpr size_t simd = 8; // SIMD size
 static inline constexpr float pow4(float x) { return x*x*x*x; }
 
 /// Evolving system of objects and obstacles interacting through contacts (SoA)
@@ -165,7 +164,7 @@ struct System {
  size_t timeStep = 0;
 
  System(float dt, float radius) : dt(dt), membrane(radius) {}
-
+/*
  /// Evaluates contact force between an object and an obstacle with friction (non-rotating A)
  // Wire - Floor/Side
  template<Type tA, Type tB> inline void contact(
@@ -401,7 +400,7 @@ struct System {
   TAy = RAz*fTx - RAx*fTz;
   TAz = RAx*fTy - RAy*fTx;
  }
-
+*/
  /*/// Evaluates contact force between two objects with friction (rotating A, non rotating B)
  // Grain - Wire
  template<Type tA, Type tB> inline void contact(
@@ -522,7 +521,7 @@ struct System {
   TAy = RAz*fTx - RAx*fTz;
   TAz = RAx*fTy - RAy*fTx;
  }*/
-
+/*
  /// Evaluates contact force between two objects with friction (rotating A, rotating B)
  // Grain - Grain
  template<Type tA, Type tB> inline void contact(
@@ -656,5 +655,5 @@ struct System {
   TBx = RBy*(-fTz) - RBz*(-fTy);
   TBy = RBz*(-fTx) - RBx*(-fTz);
   TBz = RBx*(-fTy) - RBy*(-fTx);
- }
+ }*/
 };

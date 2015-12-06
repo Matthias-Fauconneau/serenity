@@ -88,3 +88,5 @@ core/parallel.cc
 simulation/grain-membrane.cc
 simulation/membrane.cc
 simulation/grain-top.cc
+simulation/grain-obstacle.h
+simulation/grain-obstacle.cc

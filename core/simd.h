@@ -25,7 +25,11 @@ static inline v8ui gather(const uint* P, v8ui i) {
 }
 static inline v8ui gather(ref<uint> P, v8ui i) { return gather(P.data, i); }
 
+#if __INTEL_COMPILER && 0
+union  __declspec(align(32)) __declspec(intrin_type) v8sf { float e[8]; };
+#else
 typedef float v8sf __attribute((__vector_size__ (32)));
+#endif
 inline v8sf /*constexpr*/ float8(float f) { return (v8sf){f,f,f,f,f,f,f,f}; }
 static /*constexpr*/ v8sf unused _0f = float8(0);
 static /*constexpr*/ v8sf unused _1f = float8(1);
@@ -52,6 +56,11 @@ static inline v8sf min(v8sf a, v8sf b) { return __builtin_ia32_minps256(a, b); }
 static inline v8sf max(v8sf a, v8sf b) { return __builtin_ia32_maxps256(a, b); }
 static inline v8sf sqrt(v8sf x) { return __builtin_ia32_sqrtps256(x); }
 
+#if __INTEL_COMPILER
+static inline float extract(v8sf x, int i) {  union { uint e[8]; v8sf v; } X; X.v = x; return X.e[i]; }
+#else
+static inline float extract(v8sf x, int i) { return x[i]; }
+#endif
 static inline v8sf gather(const float* P, v8ui i) {
 #if __AVX2__
 #if __clang__
@@ -82,3 +91,14 @@ static inline void scatter(float* const P, const v8ui i, const v8sf x) {
 static inline void scatter(mref<float> P, const v8ui a, const v8sf x) {
  scatter(P.begin(), a, x);
 }
+
+#if __INTEL_COMPILER
+#include <immintrin.h>
+static inline v8ui greaterThan(v8sf a, v8sf b) { return (v8ui)(v8sf)_mm256_cmp_ps(a, b, _CMP_GT_OS); }
+static inline v8ui notEqual(v8sf a, v8sf b) { return (v8ui)(v8sf)_mm256_cmp_ps(a, b, _CMP_NEQ_UQ); }
+#else
+static inline v8sf greaterThan(v8sf a, v8sf b) { return a > b; }
+static inline v8sf notEqual(v8sf a, v8sf b) { return a != b; }
+#endif
+
+static constexpr size_t simd = 8; // SIMD size

@@ -96,7 +96,7 @@ void Simulation::stepGrainSide() {
   v8sf localBx = *(v8sf*)(grainSideLocalBx.data+index);
   v8sf localBy = *(v8sf*)(grainSideLocalBy.data+index);
   v8sf localBz = *(v8sf*)(grainSideLocalBz.data+index);
-  sconst v8sf gR = float8(Grain::radius);
+  const v8sf gR = float8(Grain::radius);
   contact<Grain, Obstacle>(grain, A, depth,
                            -gR*Nx, -gR*Ny, _0f,
                            Nx, Ny, _0f,

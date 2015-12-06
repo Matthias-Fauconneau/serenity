@@ -39,6 +39,8 @@ struct Simulation : System {
  buffer<float> oldGrainBottomLocalBy;
  buffer<float> oldGrainBottomLocalBz;
 
+ buffer<uint> grainBottomContact;
+
  buffer<uint> grainBottomA;
  buffer<float> grainBottomLocalAx;
  buffer<float> grainBottomLocalAy;
@@ -62,6 +64,8 @@ struct Simulation : System {
  buffer<float> oldGrainTopLocalBx;
  buffer<float> oldGrainTopLocalBy;
  buffer<float> oldGrainTopLocalBz;
+
+ buffer<uint> grainTopContact;
 
  buffer<uint> grainTopA;
  buffer<float> grainTopLocalAx;
