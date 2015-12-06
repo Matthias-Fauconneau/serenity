@@ -85,7 +85,7 @@ struct Rect {
  void extend(vec2 p) { min=::min(min, p); max=::max(max, p); }
 };
 inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min), min(a.max,b.max)); }
-inline String str(const Rect& r) { return "["_+str(r.min)+" - "_+str(r.max)+"]"_; }
+//inline String str(const Rect& r) { return "["_+str(r.min)+" - "_+str(r.max)+"]"_; }
 inline Rect operator +(vec2 offset, Rect rect) { return Rect(offset+rect.min,offset+rect.max); }
 
 /// Set of graphic elements
@@ -133,6 +133,6 @@ struct Graphics : shareable {
  }
 };
 
-inline String str(const Graphics& o) {
+/*inline String str(const Graphics& o) {
  return str(o.bounds, o.fills.size, o.blits.size, o.glyphs.size, o.lines.size, o.trapezoidsX.size, o.trapezoidsY.size, o.cubics.size, o.graphics.size());
-}
+}*/

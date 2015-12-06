@@ -102,7 +102,7 @@ Image decodeImage(const ref<byte> file) {
 // -- Rotate --
 
 void flip(Image& image) {
- for(int y=0,h=image.height;y<h/2;y++) for(int x=0,w=image.width;x<w;x++)
+ for(int y=0,h=image.size.y;y<h/2;y++) for(int x=0,w=image.size.x;x<w;x++)
   swap(image(x,y),image(x,h-1-y));
 }
 Image flip(Image&& image) {
@@ -111,13 +111,13 @@ Image flip(Image&& image) {
 }
 
 void rotate(const Image& target, const Image& source) {
- assert_(target.size.x == source.size.y && target.size.y == source.size.x, source.size, target.size);
- for(int y: range(source.height)) for(int x: range(source.width)) target(source.height-1-y, x) = source(x,y);
+ assert_(target.size.x == source.size.y && target.size.y == source.size.x);
+ for(int y: range(source.size.y)) for(int x: range(source.size.x)) target(source.size.y-1-y, x) = source(x,y);
 }
 
 Image rotateHalfTurn(Image&& target) {
- for(size_t y: range(target.height)) for(size_t x: range(target.width/2)) swap(target(x,y), target(target.width-1-x, y)); // Reverse rows
- for(size_t y: range(target.height/2)) for(size_t x: range(target.width)) swap(target(x,y), target(x, target.height-1-y)); // Reverse columns
+ for(size_t y: range(target.size.y)) for(size_t x: range(target.size.x/2)) swap(target(x,y), target(target.size.x-1-x, y)); // Reverse rows
+ for(size_t y: range(target.size.y/2)) for(size_t x: range(target.size.x)) swap(target(x,y), target(x, target.size.y-1-y)); // Reverse columns
  return move(target);
 }
 
@@ -126,9 +126,9 @@ Image rotateHalfTurn(Image&& target) {
 static void bilinear(const Image& target, const Image& source) {
  //assert_(!source.alpha, source.size, target.size);
  const uint stride = source.stride;
- for(uint y: range(target.height)) {
-  for(uint x: range(target.width)) {
-   const uint fx = x*256*(source.width-1)/target.width, fy = y*256*(source.height-1)/target.height; //TODO: incremental
+ for(uint y: range(target.size.y)) {
+  for(uint x: range(target.size.x)) {
+   const uint fx = x*256*(source.size.x-1)/target.size.x, fy = y*256*(source.size.y-1)/target.size.y; //TODO: incremental
    uint ix = fx/256, iy = fy/256;
    uint u = fx%256, v = fy%256;
    const ref<byte4> span = source.slice(iy*stride+ix);

@@ -1,7 +1,6 @@
+#include "window.h"
 #include "simulation.h"
 #include "matrix.h"
-#include "window.h"
-#include "time.h"
 #include "gl.h"
 FILE(shader_glsl)
 
