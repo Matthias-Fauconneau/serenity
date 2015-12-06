@@ -41,7 +41,7 @@ void Simulation::stepWireTension() {
   v8sf FTz = f * Nz;
   if(i+simd >= wire.count-1) { // Masks invalid force updates (FIXME: assert peeled)
    v8ui mask = _1i;
-   for(size_t k=wire.count-1-i; k<simd; k++) mask[k] = 0; // FIXME
+   for(size_t k=wire.count-1-i; k<simd; k++) insert(mask, k, 0); // FIXME
    FTx = ::mask(mask, FTx);
    FTy = ::mask(mask, FTy);
    FTz = ::mask(mask, FTz);
@@ -123,7 +123,7 @@ void Simulation::stepWireIntegration() {
     maxWireV8 = max(maxWireV8, sqrt(Vx*Vx + Vy*Vy + Vz*Vz));
    }
    float maxWireV = 0;
-   for(size_t k: range(simd)) maxWireV = ::max(maxWireV, maxWireV8[k]);
+   for(size_t k: range(simd)) maxWireV = ::max(maxWireV, extract(maxWireV8, k));
    maxWireV_[id] = maxWireV;
  }, 1);
  float maxWireV = 0;

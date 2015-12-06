@@ -220,7 +220,7 @@ void Simulation::stepMembraneIntegration() {
   pPz[i*stride+simd+W] = pPz[i*stride+simd+0];
  }
  float maxMembraneV = 0;
- for(size_t k: range(simd)) maxMembraneV = ::max(maxMembraneV, maxMembraneV8[k]);
+ for(size_t k: range(simd)) maxMembraneV = ::max(maxMembraneV, extract(maxMembraneV8,k));
  float maxGrainMembraneV = maxGrainV + maxMembraneV;
  grainMembraneGlobalMinD -= maxGrainMembraneV * this->dt;
  membraneIntegrationTime.stop();

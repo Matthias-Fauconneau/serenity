@@ -2,7 +2,7 @@
 #include "simulation.h"
 #include "parallel.h"
 
-//FIXME: factorize Bottom and Top
+//FIXME: factorize Top and Bottom
 void evaluateGrainObstacle(const size_t start, const size_t size,
                                      const uint* grainObstacleContact, const size_t unused grainObstacleContactSize,
                                      const uint* grainObstacleA,
@@ -266,7 +266,7 @@ void Simulation::stepGrainTop() {
  grainTopTAx.size = GBcc;
  grainTopTAy.size = GBcc;
  grainTopTAz.size = GBcc;
- constexpr float E = 1/((1-sq(Grain::poissonRatio))/Grain::elasticModulus+(1-sq(Grain::poissonRatio))/Grain::elasticModulus);
+ constexpr float E = 1/((1-sq(Grain::poissonRatio))/Grain::elasticModulus+(1-sq(Obstacle::poissonRatio))/Obstacle::elasticModulus);
  constexpr float R = 1/(Grain::curvature/*+Obstacle::curvature*/);
  const float K = 4./3*E*sqrt(R);
  constexpr float mass = 1/(1/Grain::mass/*+1/Obstacle::mass*/);

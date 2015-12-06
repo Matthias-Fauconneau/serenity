@@ -59,7 +59,7 @@ static inline void evaluateGrainWire(const size_t start, const size_t size,
   const v8sf TRVy = RVy - RVn * Ny;
   const v8sf TRVz = RVz - RVn * Nz;
   const v8sf tangentRelativeSpeed = sqrt(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
-  const v8sf Fd = mask(tangentRelativeSpeed > 0,
+  const v8sf Fd = mask(greaterThan(tangentRelativeSpeed, _0f),
                        - dynamicFrictionCoefficient * Fn / tangentRelativeSpeed);
   const v8sf FDx = Fd * TRVx;
   const v8sf FDy = Fd * TRVy;
@@ -89,7 +89,7 @@ static inline void evaluateGrainWire(const size_t start, const size_t size,
   const v8sf newLocalBy = RBy;
   const v8sf newLocalBz = RBz;
 
-  const v8ui keep = oldLocalAx != 0, reset = ~keep;
+  const v8ui keep = notEqual(oldLocalAx, _0f), reset = ~keep;
   v8sf localAx = merge(mask(keep, oldLocalAx), mask(reset, newLocalAx));
   const v8sf localAy = merge(mask(keep, oldLocalAy), mask(reset, newLocalAy));
   const v8sf localAz = merge(mask(keep, oldLocalAz), mask(reset, newLocalAz));
@@ -129,11 +129,11 @@ static inline void evaluateGrainWire(const size_t start, const size_t size,
   const v8sf SDx = TOx / tangentLength;
   const v8sf SDy = TOy / tangentLength;
   const v8sf SDz = TOz / tangentLength;
-  const v8ui hasTangentLength = tangentLength > 0;
+  const v8ui hasTangentLength = greaterThan(tangentLength, _0f);
   const v8sf sfFb = mask(hasTangentLength,
                          staticFrictionDamping * (SDx * RVx + SDy * RVy + SDz * RVz));
-  const v8ui hasStaticFriction = (tangentLength < staticFrictionLength)
-                                              & (tangentRelativeSpeed < staticFrictionSpeed);
+  const v8ui hasStaticFriction = greaterThan(staticFrictionLength, tangentLength)
+                                              & greaterThan(staticFrictionSpeed, tangentRelativeSpeed);
   const v8sf sfFt = mask(hasStaticFriction, Fs - sfFb);
   const v8sf FSx = mask(hasTangentLength, sfFt * SDx);
   const v8sf FSy = mask(hasTangentLength, sfFt * SDy);
@@ -301,7 +301,7 @@ break_:;
     for(size_t k: range(simd)) {
      size_t j = i+k;
      if(j == grainWireA.size) break /*2*/;
-     if(depth[k] > 0) {
+     if(extract(depth, k) > 0) {
       // Creates a map from packed contact to index into unpacked contact list (indirect reference)
       // Instead of packing (copying) the unpacked list to a packed contact list
       // To keep track of where to write back (unpacked) contact positions (for static friction)

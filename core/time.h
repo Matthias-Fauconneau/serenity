@@ -18,6 +18,8 @@ int64 threadCPUTime();
 //inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)::"memory"); return (((uint64)hi)<<32)|lo; }
 #if __clang__
 #define readCycleCounter  __builtin_readcyclecounter
+#elif __INTEL_COMPILER
+#define readCycleCounter __rdtsc
 #else
 #define readCycleCounter __builtin_ia32_rdtsc
 #endif

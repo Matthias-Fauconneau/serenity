@@ -57,7 +57,13 @@ static inline v8sf max(v8sf a, v8sf b) { return __builtin_ia32_maxps256(a, b); }
 static inline v8sf sqrt(v8sf x) { return __builtin_ia32_sqrtps256(x); }
 
 #if __INTEL_COMPILER
-static inline float extract(v8sf x, int i) {  union { uint e[8]; v8sf v; } X; X.v = x; return X.e[i]; }
+static inline float extract(v8sf x, int i) { union { float e[8]; v8sf v; } X; X.v = x; return X.e[i]; }
+/*static inline void insert(v8sf& x, int i, float e) {
+ union { float e[8]; v8sf v; } X; X.v = x; X.e[i] = e; x = X.v;
+}*/
+static inline void insert(v8ui& x, int i, uint e) {
+ union { uint e[8]; v8ui v; } X; X.v = x; X.e[i] = e; x = X.v;
+}
 #else
 static inline float extract(v8sf x, int i) { return x[i]; }
 #endif

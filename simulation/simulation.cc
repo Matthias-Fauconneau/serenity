@@ -3,7 +3,6 @@
 //#include "process.h"
 //#include "grain-bottom.h"
 //#include "grain-top.h"
-//#include "grain-side.h"
 //#include "grain-grain.h"
 //#include "membrane.h"
 //#include "grain-membrane.h"
@@ -45,7 +44,7 @@ void Simulation::domain(vec3& min, vec3& max) {
    max.z = ::max(max.z, membrane.Pz[i*stride+simd+j]);
   }
  }
- assert_(::max(::max((max-min).x, (max-min).y), (max-min).z) < 16, "membrane", min, max, ::max(::max((max-min).x, (max-min).y), (max-min).z));
+ assert_(::max(::max((max-min).x, (max-min).y), (max-min).z) < 16, "membrane");
  for(size_t i: range(grain.count)) {
   assert(isNumber(grain.Px[i]));
   min.x = ::min(min.x, grain.Px[i]);
@@ -57,7 +56,7 @@ void Simulation::domain(vec3& min, vec3& max) {
   min.z = ::min(min.z, grain.Pz[i]);
   max.z = ::max(max.z, grain.Pz[i]);
  }
- assert_(::max(::max((max-min).x, (max-min).y), (max-min).z) < 16, "grain", min, max);
+ assert_(::max(::max((max-min).x, (max-min).y), (max-min).z) < 16, "grain");
  for(size_t i: range(wire.count)) {
   min.x = ::min(min.x, wire.Px[i]);
   max.x = ::max(max.x, wire.Px[i]);
@@ -66,7 +65,7 @@ void Simulation::domain(vec3& min, vec3& max) {
   min.z = ::min(min.z, wire.Pz[i]);
   max.z = ::max(max.z, wire.Pz[i]);
  }
- assert_(::max(::max((max-min).x, (max-min).y), (max-min).z) < 16, "wire", min, max);
+ assert_(::max(::max((max-min).x, (max-min).y), (max-min).z) < 16, "wire");
 }
 
 void Simulation::step() {
@@ -148,7 +147,7 @@ void Simulation::stepGrainIntegration() {
     }
   }
   float maxGrainV = 0;
-  for(size_t k: range(simd)) maxGrainV = ::max(maxGrainV, maxGrainV8[k]);
+  for(size_t k: range(simd)) maxGrainV = ::max(maxGrainV, extract(maxGrainV8, k));
   maxGrainV_[id] = maxGrainV;
  }, 1);
  float maxGrainV = 0;

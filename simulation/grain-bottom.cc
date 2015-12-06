@@ -4,23 +4,21 @@
 
 //FIXME: factorize Bottom and Top
 void evaluateGrainObstacle(const size_t start, const size_t size,
-                                     const uint* grainObstacleContact, const size_t unused grainObstacleContactSize,
-                                     const uint* grainObstacleA,
-                                     const float* grainPx, const float* grainPy, const float* grainPz,
-                                     const v8sf obstacleZ, const v8sf Gr,
-                                     float* const grainObstacleLocalAx, float* const grainObstacleLocalAy, float* const grainObstacleLocalAz,
-                                     float* const grainObstacleLocalBx, float* const grainObstacleLocalBy, float* const grainObstacleLocalBz,
-                                     const v8sf K, const v8sf Kb,
-                                     const v8sf staticFrictionStiffness, const v8sf dynamicFrictionCoefficient,
-                                     const v8sf staticFrictionLength, const v8sf staticFrictionSpeed,
-                                     const v8sf staticFrictionDamping,
-                                     const float* AVx, const float* AVy, const float* AVz,
-                                     const float* BVx, const float* BVy, const float* BVz,
-                                     const float* pAAVx, const float* pAAVy, const float* pAAVz,
-                                     const float* ArotationX, const float* ArotationY, const float* ArotationZ,
-                                     const float* ArotationW,
-                                     float* const pFx, float* const pFy, float* const pFz,
-                                     float* const pTAx, float* const pTAy, float* const pTAz) {
+                           const uint* grainObstacleContact, const size_t unused grainObstacleContactSize,
+                           const uint* grainObstacleA,
+                           const float* grainPx, const float* grainPy, const float* grainPz,
+                           const v8sf obstacleZ, const v8sf Gr,
+                           float* const grainObstacleLocalAx, float* const grainObstacleLocalAy, float* const grainObstacleLocalAz,
+                           float* const grainObstacleLocalBx, float* const grainObstacleLocalBy, float* const grainObstacleLocalBz,
+                           const v8sf K, const v8sf Kb,
+                           const v8sf staticFrictionStiffness, const v8sf dynamicFrictionCoefficient,
+                           const v8sf staticFrictionLength, const v8sf staticFrictionSpeed,
+                           const v8sf staticFrictionDamping,
+                           const float* AVx, const float* AVy, const float* AVz,
+                           const float* pAAVx, const float* pAAVy, const float* pAAVz,
+                           const float* AQX, const float* AQY, const float* AQZ, const float* AQW,
+                           float* const pFx, float* const pFy, float* const pFz,
+                           float* const pTAx, float* const pTAy, float* const pTAz) {
  for(size_t i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
   const v8ui contacts = *(v8ui*)(grainObstacleContact+i);
   const v8ui A = gather(grainObstacleA, contacts);
@@ -70,10 +68,10 @@ void evaluateGrainObstacle(const size_t start, const size_t size,
   const v8sf oldLocalBy = gather(grainObstacleLocalBy, contacts);
   const v8sf oldLocalBz = gather(grainObstacleLocalBz, contacts);
 
-  const v8sf QAx = gather(ArotationX, A);
-  const v8sf QAy = gather(ArotationY, A);
-  const v8sf QAz = gather(ArotationZ, A);
-  const v8sf QAw = gather(ArotationW, A);
+  const v8sf QAx = gather(AQX, A);
+  const v8sf QAy = gather(AQY, A);
+  const v8sf QAz = gather(AQZ, A);
+  const v8sf QAw = gather(AQW, A);
   const v8sf X1 = QAw*RAx + RAy*QAz - QAy*RAz;
   const v8sf Y1 = QAw*RAy + RAz*QAx - QAz*RAx;
   const v8sf Z1 = QAw*RAz + RAx*QAy - QAx*RAy;
@@ -266,7 +264,7 @@ void Simulation::stepGrainBottom() {
  grainBottomTAx.size = GBcc;
  grainBottomTAy.size = GBcc;
  grainBottomTAz.size = GBcc;
- constexpr float E = 1/((1-sq(Grain::poissonRatio))/Grain::elasticModulus+(1-sq(Grain::poissonRatio))/Grain::elasticModulus);
+ constexpr float E = 1/((1-sq(Grain::poissonRatio))/Grain::elasticModulus+(1-sq(Obstacle::poissonRatio))/Obstacle::elasticModulus);
  constexpr float R = 1/(Grain::curvature/*+Obstacle::curvature*/);
  const float K = 4./3*E*sqrt(R);
  constexpr float mass = 1/(1/Grain::mass/*+1/Obstacle::mass*/);
@@ -283,7 +281,6 @@ void Simulation::stepGrainBottom() {
                      float8(staticFrictionStiffness), float8(dynamicFrictionCoefficient),
                      float8(staticFrictionLength), float8(staticFrictionSpeed), float8(staticFrictionDamping),
                      grain.Vx.data, grain.Vy.data, grain.Vz.data,
-                     wire.Vx.data, wire.Vy.data, wire.Vz.data,
                      grain.AVx.data, grain.AVy.data, grain.AVz.data,
                      grain.Rx.data, grain.Ry.data, grain.Rz.data, grain.Rw.data,
                      grainBottomFx.begin(), grainBottomFy.begin(), grainBottomFz.begin(),
