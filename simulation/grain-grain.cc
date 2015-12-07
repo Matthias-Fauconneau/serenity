@@ -74,9 +74,9 @@ static inline void evaluateGrainGrain(const size_t start, const size_t size,
   const vXsf tangentRelativeSpeed = sqrt(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
   const maskX div0 = greaterThan(tangentRelativeSpeed, _0f);
   const vXsf Fd = - dynamicFrictionCoefficient * Fn / tangentRelativeSpeed;
-  const vXsf FDx = fma(TRVx, div0, Fd, _0f);
-  const vXsf FDy = fma(TRVy, div0, Fd, _0f);
-  const vXsf FDz = fma(TRVz, div0, Fd, _0f);
+  const vXsf FDx = mask3_fmadd(Fd, TRVx, _0f, div0);
+  const vXsf FDy = mask3_fmadd(Fd, TRVy, _0f, div0);
+  const vXsf FDz = mask3_fmadd(Fd, TRVz, _0f, div0);
 
   // Gather static frictions
   const vXsf oldLocalAx = gather(grainGrainLocalAx, contacts);
@@ -137,9 +137,9 @@ static inline void evaluateGrainGrain(const size_t start, const size_t size,
   const maskX hasStaticFriction = greaterThan(staticFrictionLength, tangentLength)
                                               & greaterThan(staticFrictionSpeed, tangentRelativeSpeed);
   const vXsf sfFt = maskSub(Fs, hasTangentLength, sfFb);
-  const vXsf FTx = fma(sfFt, hasStaticFriction, SDx, FDx);
-  const vXsf FTy = fma(sfFt, hasStaticFriction, SDy, FDy);
-  const vXsf FTz = fma(sfFt, hasStaticFriction, SDz, FDz);
+  const vXsf FTx = mask3_fmadd(sfFt, SDx, FDx, hasStaticFriction & hasTangentLength);
+  const vXsf FTy = mask3_fmadd(sfFt, SDy, FDy, hasStaticFriction & hasTangentLength);
+  const vXsf FTz = mask3_fmadd(sfFt, SDz, FDz, hasStaticFriction & hasTangentLength);
   // Resets contacts without static friction
   localAx = blend(hasStaticFriction, _0f, localAx); // FIXME use 1s (NaN) not 0s to flag resets
 
@@ -286,7 +286,7 @@ void Simulation::stepGrainGrain() {
     for(size_t k: range(simd)) {
      size_t j = i+k;
      if(j == grainGrainA.size) break /*2*/;
-     if(extract(depth, k) > 0) {
+     if(extract(depth, k) >= 0) {
       // Creates a map from packed contact to index into unpacked contact list (indirect reference)
       // Instead of packing (copying) the unpacked list to a packed contact list
       // To keep track of where to write back (unpacked) contact positions (for static friction)

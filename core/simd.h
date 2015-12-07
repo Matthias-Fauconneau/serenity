@@ -38,8 +38,9 @@ static inline void storeu(mref<float> a, size_t index, v16sf v) {
 }
 
 //static inline v16sf /*operator&*/mask(v16ui a, v16sf b) { return __mm512_mask_and_ps(a & (v16ui)b); }
-#define fma _mm512_mask_fmadd_ps
-#define maskSub
+static inline v8sf mask3_fmadd(v16sf a, v16sf b, v16sf c, uint16 k) {
+ return _mm_mask3_fmadd_ps(a, b, c, k);
+}
 static inline v16sf maskSub(v16sf a, uint16 k, v16sf b) { return _mm512_mask_sub_ps(a, k, a, b); }
 static inline v16sf /*operator|*/merge(v16sf a, v16sf b) { return (v16sf)((v16ui)a | (v16ui)b); }
 
@@ -223,13 +224,7 @@ static inline v8sf blend(v8ui k, v8sf a, v8sf b) { return __builtin_ia32_blendvp
 static inline v8sf blend(uint8 k, v8sf a, v8sf b) { return blend(expandMask(k), a, b); }
 
 static inline v8sf maskSub(v8sf a, v8ui k, v8sf b) { return a - mask(k, b); }
-#if __clang__ && __FMA__
-static inline v8sf fma(v8sf a, v8ui k, v8sf b, v8sf c) {
- return __builtin_ia32_vfmaddps256(a, mask(k, b), c);
-}
-#else
-static inline v8sf fma(v8sf a, v8ui k, v8sf b, v8sf c) { return a * mask(k, b) + c; }
-#endif
+static inline v8sf mask3_fmadd(v8sf a, v8sf b, v8sf c, v8ui k) { return mask(k, a * b) + c; }
 
 static constexpr size_t simd = 8; // SIMD size
 typedef v8sf vXsf;

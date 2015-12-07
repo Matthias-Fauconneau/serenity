@@ -75,10 +75,10 @@ void Simulation::step() {
 
  stepGrain();
  stepGrainBottom();
- /*stepGrainTop();
+ stepGrainTop();
  stepGrainGrain();
 
- stepMembrane();
+ /*stepMembrane();
  stepGrainMembrane();*/
 
  /*stepWire();

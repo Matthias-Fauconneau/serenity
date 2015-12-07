@@ -83,13 +83,14 @@ void Simulation::stepGrainBottom() {
    for(size_t k: range(simd)) {
     size_t j = i+k;
     if(j == grainBottomA.size) break /*2*/;
-    if(extract(depth, k) > 0) {
+    if(extract(depth, k) >= 0) {
      // Creates a map from packed contact to index into unpacked contact list (indirect reference)
      // Instead of packing (copying) the unpacked list to a packed contact list
      // To keep track of where to write back (unpacked) contact positions (for static friction)
      // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
      grainBottomContact.append( j );
     } else {
+     error(extract(depth, k));
      // Resets contact (static friction spring)
      grainBottomLocalAx[j] = 0;
     }
@@ -144,7 +145,7 @@ void Simulation::stepGrainBottom() {
  float bottomForceZ = 0;
  for(size_t i=0; i<grainBottomContact.size; i++) { // Scalar scatter add
   size_t index = grainBottomContact[i];
-  assert(index == i);
+  assert(index == i, i, index);
   size_t a = grainBottomA[index];
   grain.Fx[a] += grainBottomFx[i];
   grain.Fy[a] += grainBottomFy[i];

@@ -24,7 +24,7 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
   // FIXME: Recomputing from intersection (more efficient than storing?)
   const vXsf Ax = gather(grainPx, A), Ay = gather(grainPy, A), Az = gather(grainPz, A);
   const vXsf depth = top ? Az - obstacleZ_Gr : obstacleZ_Gr - Az;
-  const vXsf Nx = _0f, Ny = _0f, Nz = _1f;
+  const vXsf Nx = _0f, Ny = _0f, Nz = top ? -_1f : _1f;
   const vXsf RAx = - Gr  * Nx, RAy = - Gr * Ny, RAz = - Gr * Nz;
   const vXsf RBx = Ax + RAx, RBy = Ay + RAy, RBz = Az + RAz;
   /// Evaluates contact force between two objects with friction (rotating A, non rotating B)
@@ -55,9 +55,9 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
   const vXsf tangentRelativeSpeed = sqrt(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
   const maskX div0 = greaterThan(tangentRelativeSpeed, _0f);
   const vXsf Fd = - dynamicFrictionCoefficient * Fn / tangentRelativeSpeed;
-  const vXsf FDx = fma(TRVx, div0, Fd, _0f);
-  const vXsf FDy = fma(TRVy, div0, Fd, _0f);
-  const vXsf FDz = fma(TRVz, div0, Fd, _0f);
+  const vXsf FDx = mask3_fmadd(Fd, TRVx, _0f, div0);
+  const vXsf FDy = mask3_fmadd(Fd, TRVy, _0f, div0);
+  const vXsf FDz = mask3_fmadd(Fd, TRVz, _0f, div0);
 
   // Gather static frictions
   const vXsf oldLocalAx = gather(grainObstacleLocalAx, contacts);
@@ -128,9 +128,9 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
   const maskX hasStaticFriction = greaterThan(staticFrictionLength, tangentLength)
                                               & greaterThan(staticFrictionSpeed, tangentRelativeSpeed);
   const vXsf sfFt = maskSub(Fs, hasTangentLength, sfFb);
-  const vXsf FTx = fma(sfFt, hasStaticFriction, SDx, FDx);
-  const vXsf FTy = fma(sfFt, hasStaticFriction, SDy, FDy);
-  const vXsf FTz = fma(sfFt, hasStaticFriction, SDz, FDz);
+  const vXsf FTx = mask3_fmadd(sfFt, SDx, FDx, hasStaticFriction & hasTangentLength);
+  const vXsf FTy = mask3_fmadd(sfFt, SDy, FDy, hasStaticFriction & hasTangentLength);
+  const vXsf FTz = mask3_fmadd(sfFt, SDz, FDz, hasStaticFriction & hasTangentLength);
   // Resets contacts without static friction
   localAx = blend(hasStaticFriction, _0f, localAx); // FIXME use 1s (NaN) not 0s to flag resets
 
