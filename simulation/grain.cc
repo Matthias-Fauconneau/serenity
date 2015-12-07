@@ -40,7 +40,7 @@ void Simulation::stepGrainIntegration() {
     store(Pz, i, load(Pz, i) + dt * Vz);
     maxGrainVX = max(maxGrainVX, maxGrainVX/*sqrt(Vx*Vx + Vy*Vy + Vz*Vz)*/);
 
-    /*for(size_t k: range(simd)) { // FIXME: SIMD
+    for(size_t k: range(simd)) { // FIXME: SIMD
      size_t j = i+k;
      vec4 dr = this->dt/2 * qmul(vec4(AVx[j],AVy[j],AVz[j], 0), vec4(Rx[j],Ry[j],Rz[j],Rw[j]));
      Rx[j] += dr.x;
@@ -55,7 +55,7 @@ void Simulation::stepGrainIntegration() {
      Ry[j] *= scale;
      Rz[j] *= scale;
      Rw[j] *= scale;
-    }*/
+    }
   }
   float maxGrainV = 0;
   for(size_t k: range(simd)) maxGrainV = ::max(maxGrainV, extract(maxGrainVX, k));

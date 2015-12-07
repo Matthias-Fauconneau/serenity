@@ -126,9 +126,9 @@ void Simulation::stepMembrane() {
      }
      for(int a=0; a<3; a++) {
       int e = E[a];
-      store/*u*/(Fx, e, loadu(Fx, e) + FX[a]);
-      store/*u*/(Fy, e, loadu(Fy, e) + FY[a]);
-      store/*u*/(Fz, e, loadu(Fz, e) + FZ[a]);
+      storeu(Fx, e, loadu(Fx, e) + FX[a]);
+      storeu(Fy, e, loadu(Fy, e) + FY[a]);
+      storeu(Fz, e, loadu(Fz, e) + FZ[a]);
      }
      store(Fx, index, load(Fx, index) + FX[3]);
      store(Fy, index, load(Fy, index) + FY[3]);
@@ -166,9 +166,9 @@ void Simulation::stepMembrane() {
       vXsf tx = f * Nx;
       vXsf ty = f * Ny;
       vXsf tz = f * Nz;
-      store/*u*/(Fx, e, loadu(Fx, e) - tx);
-      store/*u*/(Fy, e, loadu(Fy, e) - ty);
-      store/*u*/(Fz, e, loadu(Fz, e) - tz);
+      storeu(Fx, e, loadu(Fx, e) - tx);
+      storeu(Fy, e, loadu(Fy, e) - ty);
+      storeu(Fz, e, loadu(Fz, e) - tz);
      }
     }
    }

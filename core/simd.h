@@ -5,12 +5,9 @@
 #if __INTEL_COMPILER
 typedef uint v16ui __attribute((__vector_size__ (64)));
 typedef int v16si __attribute((__vector_size__ (64)));
-static /*constexpr*/ v16ui unused _0i = (v16ui){0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-static /*constexpr*/ v16ui unused _1i = (v16ui){
-  uint(~0),uint(~0),uint(~0),uint(~0),
-  uint(~0),uint(~0),uint(~0),uint(~0),
-  uint(~0),uint(~0),uint(~0),uint(~0),
-  uint(~0),uint(~0),uint(~0),uint(~0)};
+inline v16ui /*constexpr*/ uintX(uint x) { return (v16ui){x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x}; }
+static /*constexpr*/ v16ui unused _0i = uintX(0);
+static /*constexpr*/ v16ui unused _1i = uintX(~0);
 
 //static inline float extract(v16ui x, int i) { union { uint e[16]; v16ui v; } X; X.v = x; return X.e[i]; }
 #include <immintrin.h>
@@ -35,9 +32,10 @@ static inline v16sf loadu(ref<float> a, size_t index) {
 
 static inline void store(float* const a, size_t index, v16sf v) { *(v16sf*)(a+index) = v; }
 static inline void store(mref<float> a, size_t index, v16sf v) { store(a.begin(), index, v); }
-/*static inline void storeu(mref<float> a, size_t index, v16sf v) {
- _mm512_storeu_ps(a.begin()+index, v);
-}*/
+static inline void storeu(mref<float> a, size_t index, v16sf v) {
+ //_mm512_storeu_ps(a.begin()+index, v);
+ store(a, index, v);
+}
 
 //static inline v16sf /*operator&*/mask(v16ui a, v16sf b) { return __mm512_mask_and_ps(a & (v16ui)b); }
 #define fma _mm512_mask_fmadd_ps
@@ -80,10 +78,9 @@ inline vXsf /*constexpr*/ floatX(float x) { return float16(x); }
 
 typedef uint v8ui __attribute((__vector_size__ (32)));
 typedef int v8si __attribute((__vector_size__ (32)));
-static /*constexpr*/ v8ui unused _0i = (v8ui){0,0,0,0,0,0,0,0};
-static /*constexpr*/ v8ui unused _1i = (v8ui){
-  uint(~0),uint(~0),uint(~0),uint(~0),
-  uint(~0),uint(~0),uint(~0),uint(~0)};
+inline v8ui /*constexpr*/ uintX(uint x) { return (v8ui){x,x,x,x,x,x,x,x}; }
+static /*constexpr*/ v8ui unused _0i = uintX(0);
+static /*constexpr*/ v8ui unused _1i = uintX(~0);
 
 #if __INTEL_COMPILER
 static inline float extract(v8ui x, int i) { union { uint e[8]; v8ui v; } X; X.v = x; return X.e[i]; }
@@ -215,10 +212,24 @@ static inline v8ui greaterThan(v8sf a, v8sf b) { return a > b; }
 static inline v8ui equal(v8sf a, v8sf b) { return a == b; }
 #endif
 
+static const unused v8ui select {1<<7, 1<<6,  1<<5, 1<<4,   1<<3, 1<<2,  1<<1, 1<<0};
+static inline v8ui expandMask(const uint8 mask) { return (uintX(mask) & select) != 0; }
+
+#if __clang__
 static inline v8sf blend(v8ui k, v8sf a, v8sf b) { return __builtin_ia32_blendvps256(a, b, k); }
+#else
+static inline v8sf blend(v8ui k, v8sf a, v8sf b) { return __builtin_ia32_blendvps256(a, b, (v8sf)k); }
+#endif
+static inline v8sf blend(uint8 k, v8sf a, v8sf b) { return blend(expandMask(k), a, b); }
 
 static inline v8sf maskSub(v8sf a, v8ui k, v8sf b) { return a - mask(k, b); }
-static inline v8sf fma(v8sf a, v8ui k, v8sf b, v8sf c) { return __builtin_ia32_vfmaddps256(a, mask(k, b), c); }
+#if __clang__
+static inline v8sf fma(v8sf a, v8ui k, v8sf b, v8sf c) {
+ return __builtin_ia32_vfmaddps256(a, mask(k, b), c);
+}
+#else
+static inline v8sf fma(v8sf a, v8ui k, v8sf b, v8sf c) { return a * mask(k, b) + c; }
+#endif
 
 static constexpr size_t simd = 8; // SIMD size
 typedef v8sf vXsf;
