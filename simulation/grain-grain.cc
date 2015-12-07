@@ -74,9 +74,9 @@ static inline void evaluateGrainGrain(const size_t start, const size_t size,
   const vXsf tangentRelativeSpeed = sqrt(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
   const maskX div0 = greaterThan(tangentRelativeSpeed, _0f);
   const vXsf Fd = - dynamicFrictionCoefficient * Fn / tangentRelativeSpeed;
-  const vXsf FDx = fma(Fd, div0, TRVx, _0f);
-  const vXsf FDy = fma(Fd, div0, TRVy, _0f);
-  const vXsf FDz = fma(Fd, div0, TRVz, _0f);
+  const vXsf FDx = fma(TRVx, div0, Fd, _0f);
+  const vXsf FDy = fma(TRVy, div0, Fd, _0f);
+  const vXsf FDz = fma(TRVz, div0, Fd, _0f);
 
   // Gather static frictions
   const vXsf oldLocalAx = gather(grainGrainLocalAx, contacts);

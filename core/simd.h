@@ -213,7 +213,7 @@ static inline v8ui equal(v8sf a, v8sf b) { return a == b; }
 #endif
 
 static const unused v8ui select {1<<7, 1<<6,  1<<5, 1<<4,   1<<3, 1<<2,  1<<1, 1<<0};
-static inline v8ui expandMask(const uint8 mask) { return (uintX(mask) & select) != 0; }
+static inline v8ui expandMask(const uint8 mask) { return (uintX(mask) & select) != _0i; }
 
 #if __clang__
 static inline v8sf blend(v8ui k, v8sf a, v8sf b) { return __builtin_ia32_blendvps256(a, b, k); }
@@ -223,7 +223,7 @@ static inline v8sf blend(v8ui k, v8sf a, v8sf b) { return __builtin_ia32_blendvp
 static inline v8sf blend(uint8 k, v8sf a, v8sf b) { return blend(expandMask(k), a, b); }
 
 static inline v8sf maskSub(v8sf a, v8ui k, v8sf b) { return a - mask(k, b); }
-#if __clang__
+#if __clang__ && __FMA__
 static inline v8sf fma(v8sf a, v8ui k, v8sf b, v8sf c) {
  return __builtin_ia32_vfmaddps256(a, mask(k, b), c);
 }
