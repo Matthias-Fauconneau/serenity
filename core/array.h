@@ -93,7 +93,7 @@ generic struct array : buffer<T> {
  /// Removes one matching element and returns an index to its successor, or invalid if none match
  template<Type K> size_t tryRemove(const K& key) { size_t i=ref<T>::indexOf(key); if(i!=invalid) removeAt(i); return i; }
  /// Removes one matching element and returns an index to its successor, aborts if none match
- template<Type K> size_t remove(const K& key) { size_t i=ref<T>::indexOf(key); assert(i>=0); removeAt(i); return i; }
+ template<Type K> size_t remove(const K& key) { size_t i=ref<T>::indexOf(key); removeAt(i); return i; }
  /// Filters elements matching predicate
  template<Type F> array& filter(F f) { for(size_t i=0; i<size;) if(f(at(i))) removeAt(i); else i++; return *this; }
 

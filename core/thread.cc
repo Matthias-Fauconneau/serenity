@@ -44,7 +44,6 @@ Thread mainThread __attribute((init_priority(102))) (0);
 static bool terminationRequested = false;
 // Exit status to return for process (group)
 int groupExitStatus = 0;
-function<void(int)> userSignal;
 
 //generic T* addressOf(T& arg)  { return reinterpret_cast<T*>(&const_cast<char&>(reinterpret_cast<const volatile char&>(arg))); }
 Thread::Thread(int priority, bool spawn) : Poll(0,POLLIN,*this), priority(priority) {
@@ -121,8 +120,9 @@ static void traceAllThreads() {
  for(Thread* thread: threads) if(thread->tid!=gettid()) tgkill(getpid(),thread->tid,SIGTRAP); // Logs stack trace of all threads
 }
 static void handler(int sig, siginfo_t* info, void* ctx) {
- if(sig==SIGUSR1 && userSignal) { userSignal(0); return; }
  if(sig==SIGSEGV) log_("Segmentation fault\n");
+ else if(sig==SIGABRT) log_("Aborted\n");
+ else log_("Unknown signal\n");
  if(threads.size>1) log("Thread #"+str(gettid())+':');
 #if __x86_64
  log(trace(1, (void*) ((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP]));
@@ -130,7 +130,6 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
  log(trace(1, (void*) ((ucontext_t*)ctx)->uc_mcontext.gregs[REG_EIP]));
 #endif
  if(sig!=SIGTRAP) traceAllThreads();
- if(sig==SIGABRT) log("Aborted");
  static constexpr string fpErrors[] = {"", "Integer division", "Integer overflow", "Division by zero", "Overflow",
                                        "Underflow", "Precision", "Invalid", "Denormal"};
  if(sig==SIGFPE) log("Floating-point exception (",fpErrors[info->si_code],")", *(float*)info->si_addr);

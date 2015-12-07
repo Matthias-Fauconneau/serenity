@@ -8,22 +8,20 @@
 #include "time.h"
 
 struct thread {
- pthread_t pthread = 0;
+ pthread_t pthread;
  int64 id; int64* counter; int64 stop;
  function<void(uint, uint)>* delegate;
  uint64 time = 0;
 };
 
-static constexpr size_t maxThreadCount = 12; // 4..32
+static constexpr size_t maxThreadCount = 244;
 
 extern thread threads[::maxThreadCount];
 
 extern Semaphore jobs;
 extern Semaphore results;
 
-extern const int threadCount;
-
-
+size_t threadCount();
 
 /// Runs a loop in parallel
 template<Type F> uint64 parallel_for(int64 start, int64 stop, F f, const int unused threadCount = ::threadCount) {
@@ -38,7 +36,7 @@ template<Type F> uint64 parallel_for(int64 start, int64 stop, F f, const int unu
   return time.cycleCount();
  } else {
   function<void(uint, uint)> delegate = f;
-  assert_(threadCount == ::threadCount);
+  assert_(threadCount == ::threadCount());
   for(uint index: range(threadCount)) {
    threads[index].counter = &start;
    threads[index].stop = stop;
@@ -55,7 +53,7 @@ template<Type F> uint64 parallel_for(int64 start, int64 stop, F f, const int unu
 }
 
 /// Runs a loop in parallel chunks with chunk-wise functor
-template<Type F> uint64 parallel_chunk(int64 totalSize, F f, const uint threadCount = ::threadCount) {
+template<Type F> uint64 parallel_chunk(int64 totalSize, F f, const uint threadCount = ::threadCount()) {
  if(totalSize <= threadCount/**threadCount*/ || threadCount==1) {
   tsc time; time.start();
   f(0, 0, totalSize);
@@ -71,7 +69,7 @@ template<Type F> uint64 parallel_chunk(int64 totalSize, F f, const uint threadCo
 }
 
 /// Runs a loop in parallel chunks with chunk-wise functor
-template<Type F> uint64 parallel_chunk(int64 start, int64 stop, F f, const uint threadCount = ::threadCount) {
+template<Type F> uint64 parallel_chunk(int64 start, int64 stop, F f, const uint threadCount = ::threadCount()) {
  return parallel_chunk(stop-start, [&](uint id, int64 I0, int64 DI) {
   f(id, start+I0, DI);
  }, threadCount);

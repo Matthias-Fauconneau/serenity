@@ -1,13 +1,14 @@
 #include "simulation.h"
 #include "thread.h"
+#include <unistd.h>
 
-__attribute((constructor)) void logCompiler() {
+__attribute((constructor(101))) void logCompiler() {
 #if __INTEL_COMPILER
- log("ICC");
+ log("ICC", simd, ARGS);
 #elif __clang__
- log("Clang");
+ log("Clang", simd);
 #elif __GNUC__
- log("gcc");
+ log("gcc", simd);
 #else
 #error
 #endif

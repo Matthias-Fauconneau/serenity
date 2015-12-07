@@ -331,7 +331,8 @@ void Simulation::stepGrainGrain() {
  const float K = 4./3*E*sqrt(R);
  constexpr float mass = 1/(1/Grain::mass+1/Grain::mass);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
- grainGrainEvaluateTime += parallel_chunk(GGcc/simd, [&](uint, size_t start, size_t size) {
+ //grainGrainEvaluateTime += parallel_chunk(GGcc/simd, [&](uint, size_t start, size_t size) {
+ {size_t start =0, size=GGcc/simd;
     evaluateGrainGrain(start, size,
                       grainGrainContact.data, grainGrainContact.size,
                       grainGrainA.data, grainGrainB.data,
@@ -351,7 +352,7 @@ void Simulation::stepGrainGrain() {
                       grainGrainFx.begin(), grainGrainFy.begin(), grainGrainFz.begin(),
                       grainGrainTAx.begin(), grainGrainTAy.begin(), grainGrainTAz.begin(),
                       grainGrainTBx.begin(), grainGrainTBy.begin(), grainGrainTBz.begin() );
- }, 1);
+ }//, 1);
 
  grainGrainSumTime.start();
   for(size_t i = 0; i < grainGrainContact.size; i++) { // Scalar scatter add

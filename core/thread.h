@@ -64,7 +64,7 @@ struct Semaphore {
  void acquire(int64 count) {
   mutex.lock();
   while(counter<count) pthread_cond_wait(&condition, &mutex);
-  __sync_sub_and_fetch(&counter,count);
+  __sync_sub_and_fetch(&counter, count);
   assert(counter>=0);
   mutex.unlock();
  }
@@ -73,16 +73,18 @@ struct Semaphore {
   mutex.lock();
   if(counter<count) { mutex.unlock(); return false; }
   assert(count>0);
-  __sync_sub_and_fetch(&counter,count);
+  __sync_sub_and_fetch(&counter, count);
   mutex.unlock();
   return true;
  }
  /// Releases \a count ressources
  void release(int64 count) {
-  mutex.lock();
+  //mutex.lock(); // FIXME: unecessary?
   __sync_add_and_fetch(&counter, count);
+  //log("pthread_cond_broadcast");
   pthread_cond_broadcast(&condition);
-  mutex.unlock();
+  //log("<<pthread_cond_broadcast");
+  //mutex.unlock(); // FIXME: unecessary?
  }
  /// Returns available ressources \a count
  operator uint64() const { return counter; }

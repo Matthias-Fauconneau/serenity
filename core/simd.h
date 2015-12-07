@@ -5,11 +5,10 @@
 #if __INTEL_COMPILER && __MIC__
 typedef uint v16ui __attribute((__vector_size__ (64)));
 typedef int v16si __attribute((__vector_size__ (64)));
-inline v16ui /*constexpr*/ uintX(uint x) { return (v16ui){x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x}; }
-static /*constexpr*/ v16ui unused _0i = uintX(0);
-static /*constexpr*/ v16ui unused _1i = uintX(~0);
+inline v16ui uintX(uint x) { return (v16ui){x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x}; }
+static v16ui unused _0i = uintX(0);
+static v16ui unused _1i = uintX(~0);
 
-//static inline float extract(v16ui x, int i) { union { uint e[16]; v16ui v; } X; X.v = x; return X.e[i]; }
 #include <immintrin.h>
 
 static inline v16ui gather(const uint* P, v16ui i) {
@@ -24,11 +23,11 @@ static /*constexpr*/ v16sf unused _1f = float16(1);
 
 static inline v16sf load(const float* a, size_t index) { return *(v16sf*)(a+index); }
 static inline v16sf load(ref<float> a, size_t index) { return load(a.data, index); }
-
-static inline v16sf loadu(ref<float> a, size_t index) {
+static inline v16sf loadu(ref<float> a, size_t index) { return load(a, index); }
+/*static inline v16sf loadu(ref<float> a, size_t index) {
  struct v16sfu { v16sf v; } __attribute((__packed__, may_alias));
  return ((v16sfu*)(a.data+index))->v;
-}
+}*/
 
 static inline void store(float* const a, size_t index, v16sf v) { *(v16sf*)(a+index) = v; }
 static inline void store(mref<float> a, size_t index, v16sf v) { store(a.begin(), index, v); }

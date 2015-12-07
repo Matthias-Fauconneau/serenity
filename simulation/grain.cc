@@ -62,7 +62,7 @@ void Simulation::stepGrainIntegration() {
   maxGrainV_[id] = maxGrainV;
  }//, 1);
  float maxGrainV = 0;
- for(size_t k: range(threadCount)) maxGrainV = ::max(maxGrainV, maxGrainV_[k]);
+ for(size_t k: range(threadCount())) maxGrainV = ::max(maxGrainV, maxGrainV_[k]);
  this->maxGrainV = maxGrainV;
  float maxGrainGrainV = maxGrainV + maxGrainV;
  grainGrainGlobalMinD -= maxGrainGrainV * this->dt;

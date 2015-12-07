@@ -21,9 +21,7 @@ struct Build {
 
  string target;
  array<string> flags;
- array<String> args {
-  apply(folder.list(Folders), [this](string subfolder)->String{ return "-iquote"+subfolder; })
- };
+ array<String> args;
  array<String> linkArgs;
 
  function<void(string)> log;

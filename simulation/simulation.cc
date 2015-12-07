@@ -153,12 +153,13 @@ void Simulation::profile(const Time& totalTime) {
 }
 
 static inline buffer<int> coreFrequencies() {
- TextData s(File("/proc/cpuinfo").readUpToLoop(1<<16));
- assert_(s.data.size<s.buffer.capacity);
- buffer<int> coreFrequencies (12, 0);
+ TextData s(File("/proc/cpuinfo"_).readUpToLoop(1<<17));
+ assert_(s.data.size<s.buffer.capacity, s.data.size, s.buffer.capacity, "/proc/cpuinfo", "coreFrequencies");
+ buffer<int> coreFrequencies (256, 0);
  while(s) {
   if(s.match("cpu MHz"_)) {
    s.until(':'); s.whileAny(' ');
+   assert(coreFrequencies.size<coreFrequencies.capacity, s.data);
    coreFrequencies.append( s.decimal() );
   }
   s.line();
@@ -173,7 +174,8 @@ bool Simulation::run(const Time& totalTime) {
  stepTime.stop();
  stepTimeRT.stop();
  if(timeStep%(60*size_t(1/(dt*60))) == 0) {
-  log(coreFrequencies());
+  extern size_t threadCount();
+  if(threadCount()<244) log(threadCount(), coreFrequencies()); else log("//", threadCount());
   profile(totalTime);
  }
  if(processState == Pressure) log("Pressure", int(round(pressure)), "Pa");

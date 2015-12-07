@@ -108,7 +108,6 @@ String demangle(TextData& s, bool function=true) {
 }
 String demangle(const string symbol) { TextData s(symbol); s.match('_'); return demangle(s); }
 
-#if !__INTEL_COMPILER
 Symbol findSymbol(void* find) {
     static Map exe("/proc/self/exe");
     const byte* elf = exe.data;
@@ -198,7 +197,6 @@ Symbol findSymbol(void* find) {
     }
     return symbol;
 }
-#endif
 
 void* caller_frame(void* fp) { return *(void**)fp; }
 void* return_address(void* fp) { return *((void**)fp+1); }
@@ -206,8 +204,6 @@ void* return_address(void* fp) { return *((void**)fp+1); }
 
 String trace(int skip, void* ip) {
     array<char> log;
-#if __INTEL_COMPILER
-#else
     void* stack[32];
 #if 1
     int i = backtrace(stack, 32);
@@ -232,7 +228,6 @@ String trace(int skip, void* ip) {
         else log.append("0x"+hex(ptr(ip))+'\n');
     }
     log.pop(); // Pops last \n
-#endif
     return move(log);
 }
 
