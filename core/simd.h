@@ -2,7 +2,7 @@
 /// \file simd.h SIMD intrinsics (SSE, AVX, ...)
 #include "core.h"
 
-#if __INTEL_COMPILER
+#if __INTEL_COMPILER && __MIC__
 typedef uint v16ui __attribute((__vector_size__ (64)));
 typedef int v16si __attribute((__vector_size__ (64)));
 inline v16ui /*constexpr*/ uintX(uint x) { return (v16ui){x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x}; }
@@ -38,8 +38,8 @@ static inline void storeu(mref<float> a, size_t index, v16sf v) {
 }
 
 //static inline v16sf /*operator&*/mask(v16ui a, v16sf b) { return __mm512_mask_and_ps(a & (v16ui)b); }
-static inline v8sf mask3_fmadd(v16sf a, v16sf b, v16sf c, uint16 k) {
- return _mm_mask3_fmadd_ps(a, b, c, k);
+static inline v16sf mask3_fmadd(v16sf a, v16sf b, v16sf c, uint16 k) {
+ return _mm512_mask3_fmadd_ps(a, b, c, k);
 }
 static inline v16sf maskSub(v16sf a, uint16 k, v16sf b) { return _mm512_mask_sub_ps(a, k, a, b); }
 static inline v16sf /*operator|*/merge(v16sf a, v16sf b) { return (v16sf)((v16ui)a | (v16ui)b); }
@@ -140,29 +140,12 @@ static inline void storeu(mref<float> a, size_t index, v8sf v) {
 static inline v8sf /*operator&*/mask(v8ui a, v8sf b) { return (v8sf)(a & (v8ui)b); }
 static inline v8sf /*operator|*/merge(v8sf a, v8sf b) { return (v8sf)((v8ui)a | (v8ui)b); }
 
-#if __INTEL_COMPILER //__AVX512ER__
-//#include <zmmintrin.h>
-extern __m512 __ICL_INTRINCC _mm512_castps256_ps512(__m256);
-extern __m256 __ICL_INTRINCC _mm512_castps512_ps256(__m512);
-static inline v8sf min(v8sf a, v8sf b) {  return
-   _mm512_castps512_ps256(_mm512_min_ps(_mm512_castps256_ps512(a),
-                                                                         _mm512_castps256_ps512(b))); }
-static inline v8sf max(v8sf a, v8sf b) {  return
-   _mm512_castps512_ps256(_mm512_max_ps(_mm512_castps256_ps512(a),
-                                                                         _mm512_castps256_ps512(b))); }
-static inline v8sf sqrt(v8sf x) { return
-   _mm512_castps512_ps256(_mm512_sqrt_ps(_mm512_castps256_ps512((x)))); }
-#else
 static inline v8sf min(v8sf a, v8sf b) { return __builtin_ia32_minps256(a, b); }
 static inline v8sf max(v8sf a, v8sf b) { return __builtin_ia32_maxps256(a, b); }
 static inline v8sf sqrt(v8sf x) { return __builtin_ia32_sqrtps256(x); }
-#endif
 
 #if __INTEL_COMPILER
 static inline float extract(v8sf x, int i) { union { float e[8]; v8sf v; } X; X.v = x; return X.e[i]; }
-/*static inline void insert(v8sf& x, int i, float e) {
- union { float e[8]; v8sf v; } X; X.v = x; X.e[i] = e; x = X.v;
-}*/
 static inline void insert(v8ui& x, int i, uint e) {
  union { uint e[8]; v8ui v; } X; X.v = x; X.e[i] = e; x = X.v;
 }
@@ -206,15 +189,17 @@ static inline void scatter(mref<float> P, const v8ui a, const v8sf x) {
 #if __INTEL_COMPILER
 static inline v8ui greaterThan(v8sf a, v8sf b) { return (v8ui)(v8sf)_mm256_cmp_ps(a, b, _CMP_GT_OS); }
 //static inline v8ui notEqual(v8sf a, v8sf b) { return (v8ui)(v8sf)_mm256_cmp_ps(a, b, _CMP_NEQ_UQ); }
-
+static inline v8ui notEqual(v8ui a, v8ui b) { return (v8ui)(v8sf)_mm256_cmp_ps((v8sf)a, (v8sf)b, _CMP_NEQ_UQ); }
+static inline v8ui equal(v8sf a, v8sf b) { return (v8ui)(v8sf)_mm256_cmp_ps(a, b, _CMP_EQ_OQ); }
 #else
 static inline v8ui greaterThan(v8sf a, v8sf b) { return a > b; }
 //static inline v8ui notEqual(v8sf a, v8sf b) { return a != b; }
+static inline v8ui notEqual(v8ui a, v8ui b) { return a != b; }
 static inline v8ui equal(v8sf a, v8sf b) { return a == b; }
 #endif
 
 static const unused v8ui select {1<<7, 1<<6,  1<<5, 1<<4,   1<<3, 1<<2,  1<<1, 1<<0};
-static inline v8ui expandMask(const uint8 mask) { return (uintX(mask) & select) != _0i; }
+static inline v8ui expandMask(const uint8 mask) { return notEqual(uintX(mask) & select, _0i); }
 
 #if __clang__
 static inline v8sf blend(v8ui k, v8sf a, v8sf b) { return __builtin_ia32_blendvps256(a, b, k); }

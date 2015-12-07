@@ -13,7 +13,7 @@ struct Build {
  String CXX {
   which(environmentVariable("CC")) ? which(environmentVariable("CC")) :
      which("clang++") ? which("clang++") : which("g++")};
- String LD {/*which("ld")*/copyRef(CXX)};
+ String LD {which("ld")};
 
  const Folder folder {"."};
  const String base {copyRef(section(folder.name(),'/',-2,-1))};
