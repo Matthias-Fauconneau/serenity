@@ -41,16 +41,16 @@ void Simulation::stepMembrane() {
      vXsf fx = _0f, fy = _0f, fz = _0f; // Assumes accumulators stays in registers
      for(int a=0; a<2; a++) { // TODO: assert unrolled
       int e = index+D[i%2][a]; // Gather (TODO: assert reduced i%2)
-      vXsf Rx = load/*u*/(Px, e) - Ox;
-      vXsf Ry = load/*u*/(Py, e) - Oy;
-      vXsf Rz = load/*u*/(Pz, e) - Oz;
+      vXsf Rx = loadu(Px, e) - Ox;
+      vXsf Ry = loadu(Py, e) - Oy;
+      vXsf Rz = loadu(Pz, e) - Oz;
       vXsf L = sqrt(Rx*Rx+Ry*Ry+Rz*Rz);
       vXsf Nx = Rx/L, Ny = Ry/L, Nz = Rz/L;
       vXsf x = L - internodeLength;
       vXsf fS = tensionStiffness * x;
-      vXsf RVx = load/*u*/(Vx, e) - VOx;
-      vXsf RVy = load/*u*/(Vy, e) - VOy;
-      vXsf RVz = load/*u*/(Vz, e) - VOz;
+      vXsf RVx = loadu(Vx, e) - VOx;
+      vXsf RVy = loadu(Vy, e) - VOy;
+      vXsf RVz = loadu(Vz, e) - VOz;
       vXsf fB = floatX(membrane.tensionDamping) * (Nx * RVx + Ny * RVy + Nz * RVz);
       vXsf f = fS + fB;
       vXsf tx = f * Nx;
@@ -84,16 +84,16 @@ void Simulation::stepMembrane() {
      // Tension
      for(size_t a: range(3)) { // TODO: assert unrolled
       int e = E[a] = index+D[i%2][a];
-      vXsf Rx = X[a] = load/*u*/(Px, e) - Ox;
-      vXsf Ry = Y[a] = load/*u*/(Py, e) - Oy;
-      vXsf Rz = Z[a] = load/*u*/(Pz, e) - Oz;
+      vXsf Rx = X[a] = loadu(Px, e) - Ox;
+      vXsf Ry = Y[a] = loadu(Py, e) - Oy;
+      vXsf Rz = Z[a] = loadu(Pz, e) - Oz;
       vXsf L = sqrt(Rx*Rx+Ry*Ry+Rz*Rz);
       vXsf Nx = Rx/L, Ny = Ry/L, Nz = Rz/L;
       vXsf x = L - internodeLength;
       vXsf fS = tensionStiffness * x;
-      vXsf RVx = load/*u*/(Vx, e) - VOx;
-      vXsf RVy = load/*u*/(Vy, e) - VOy;
-      vXsf RVz = load/*u*/(Vz, e) - VOz;
+      vXsf RVx = loadu(Vx, e) - VOx;
+      vXsf RVy = loadu(Vy, e) - VOy;
+      vXsf RVz = loadu(Vz, e) - VOz;
       vXsf fB = floatX(membrane.tensionDamping) * (Nx * RVx + Ny * RVy + Nz * RVz);
       vXsf f = fS + fB;
       vXsf tx = f * Nx;
@@ -126,9 +126,9 @@ void Simulation::stepMembrane() {
      }
      for(int a=0; a<3; a++) {
       int e = E[a];
-      storeu(Fx, e, load/*u*/(Fx, e) + FX[a]);
-      storeu(Fy, e, load/*u*/(Fy, e) + FY[a]);
-      storeu(Fz, e, load/*u*/(Fz, e) + FZ[a]);
+      storeu(Fx, e, loadu(Fx, e) + FX[a]);
+      storeu(Fy, e, loadu(Fy, e) + FY[a]);
+      storeu(Fz, e, loadu(Fz, e) + FZ[a]);
      }
      store(Fx, index, load(Fx, index) + FX[3]);
      store(Fy, index, load(Fy, index) + FY[3]);
@@ -151,24 +151,24 @@ void Simulation::stepMembrane() {
      // Tension
      for(int a=0; a<2; a++) { // TODO: assert unrolled
       int e = index+D[i%2][a]; // Gather (TODO: assert reduced i%2)
-      vXsf Rx = load/*u*/(Px, e) - Ox;
-      vXsf Ry = load/*u*/(Py, e) - Oy;
-      vXsf Rz = load/*u*/(Pz, e) - Oz;
+      vXsf Rx = loadu(Px, e) - Ox;
+      vXsf Ry = loadu(Py, e) - Oy;
+      vXsf Rz = loadu(Pz, e) - Oz;
       vXsf L = sqrt(Rx*Rx+Ry*Ry+Rz*Rz);
       vXsf Nx = Rx/L, Ny = Ry/L, Nz = Rz/L;
       vXsf x = L - internodeLength;
       vXsf fS = tensionStiffness * x;
-      vXsf RVx = load/*u*/(Vx, e) - VOx;
-      vXsf RVy = load/*u*/(Vy, e) - VOy;
-      vXsf RVz = load/*u*/(Vz, e) - VOz;
+      vXsf RVx = loadu(Vx, e) - VOx;
+      vXsf RVy = loadu(Vy, e) - VOy;
+      vXsf RVz = loadu(Vz, e) - VOz;
       vXsf fB = floatX(membrane.tensionDamping) * (Nx * RVx + Ny * RVy + Nz * RVz);
       vXsf f = fS + fB;
       vXsf tx = f * Nx;
       vXsf ty = f * Ny;
       vXsf tz = f * Nz;
-      storeu(Fx, e, load/*u*/(Fx, e) - tx);
-      storeu(Fy, e, load/*u*/(Fy, e) - ty);
-      storeu(Fz, e, load/*u*/(Fz, e) - tz);
+      storeu(Fx, e, loadu(Fx, e) - tx);
+      storeu(Fy, e, loadu(Fy, e) - ty);
+      storeu(Fz, e, loadu(Fz, e) - tz);
      }
     }
    }

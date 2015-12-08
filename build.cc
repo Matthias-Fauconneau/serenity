@@ -173,23 +173,14 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
  assert_(find(target+".cc"), "Invalid target"_, target, sources);
 
  //args.append("-iquote."__);
- if(!flags.contains("release")) args.append("-g"__);
- /*if(!flags.contains("debug")) args.append("-O3"__); //O3|Ofast?
- else*/ if(flags.contains("fast")) args.append("-O3"__); //O3|Ofast? // fast-debug
- //else args.append("-O0"__);
+ args.append("-g"__);
  if(flags.contains("profile")) args.append("-finstrument-functions"__);
- for(string arg: args) if(startsWith(arg,"-march=")) { flags.append(section(arg,'=',1,2)); }
- for(string arg: args) if(startsWith(arg,"-O")) {
-  /*flags.append(arg.slice(1));*/
-  assert_(flags.contains(arg.slice(1)));
- }
+ for(string flag: flags) if(flag=="native"_||flag=="haswell"_||flag=="sandybridge"_)
+  args.append("-march="+flag);
+ for(string flag: flags) if(startsWith(flag,"O")) args.append("-"+flag);
  args.append( "-DARGS=\""+str(args)+"\"");
  args.append(apply(folder.list(Folders), [this](string subfolder)->String{ return "-iquote"+subfolder; }));
  for(string flag: flags) args.append( "-D"+toUpper(flag)+"=1" );
- //for(string arg: args) if(startsWith(arg,"-march=")) { flags.append(section(arg,'=',1,2)); goto break_; }
- /*else*/// args.append("-march=native"__);
- //break_:;
- //if(!::find(CXX,"clang")) args.append("-fabi-version=0"__);
 
  Folder(tmp, currentWorkingDirectory(), true);
  Folder(tmp + "/"_ + join(flags, "-"_), currentWorkingDirectory(), true);

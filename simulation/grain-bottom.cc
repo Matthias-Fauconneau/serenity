@@ -125,7 +125,7 @@ void Simulation::stepGrainBottom() {
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
  //grainBottomEvaluateTime += parallel_chunk(GBcc/simd, [&](uint, size_t start, size_t size) {
  {size_t start = 0, size = GBcc/simd;
-   if(0) evaluateGrainObstacle<false>(start, size,
+   evaluateGrainObstacle<false>(start, size,
                      grainBottomContact.data, grainBottomContact.size,
                      grainBottomA.data,
                      grain.Px.data, grain.Py.data, grain.Pz.data,

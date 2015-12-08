@@ -24,7 +24,7 @@ extern Semaphore results;
 size_t threadCount();
 
 /// Runs a loop in parallel
-template<Type F> uint64 parallel_for(int64 start, int64 stop, F f, const int unused threadCount = ::threadCount) {
+template<Type F> uint64 parallel_for(int64 start, int64 stop, F f, const size_t unused threadCount = ::threadCount()) {
 #if DEBUG || PROFILE
  tsc time; time.start();
  for(int64 i : range(start, stop)) f(0, i);

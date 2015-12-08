@@ -304,7 +304,6 @@ break_:;
      size_t j = i+k;
      if(j == grainMembraneA.size) break /*2*/;
      if(extract(depth, k) >= 0) {
-      error("test");
       // Creates a map from packed contact to index into unpacked contact list (indirect reference)
       // Instead of packing (copying) the unpacked list to a packed contact list
       // To keep track of where to write back (unpacked) contact positions (for static friction)
@@ -312,8 +311,7 @@ break_:;
       grainMembraneContact.append( j );
      } else {
       // Resets contact (static friction spring)
-      grainMembraneLocalAx[j] = 0; /*grainMembraneLocalAy[j] = 0; grainMembraneLocalAz[j] = 0;
-      grainMembraneLocalBx[j] = 0; grainMembraneLocalBy[j] = 0; grainMembraneLocalBz[j] = 0;*/
+      grainMembraneLocalAx[j] = 0;
      }
     }
    }

@@ -6,9 +6,9 @@ __attribute((constructor(101))) void logCompiler() {
 #if __INTEL_COMPILER
  log("ICC", simd, ARGS);
 #elif __clang__
- log("Clang", simd);
+ log("Clang", simd, ARGS);
 #elif __GNUC__
- log("gcc", simd);
+ log("gcc", simd, ARGS);
 #else
 #error
 #endif
