@@ -12,7 +12,7 @@ void Simulation::stepGrain() {
 
 void Simulation::stepGrainIntegration() {
  if(!grain.count) return;
- float maxGrainV_[maxThreadCount] = {};
+ float maxGrainV_[maxThreadCount]; mref<float>(maxGrainV_, maxThreadCount).clear(0);
  //grainIntegrationTime += //parallel_chunk(align(simd, grain.count)/simd, [this, &maxGrainV_](uint id, size_t start, size_t size) {
  {
   size_t id = 0, start = 0, size = align(simd, grain.count)/simd;

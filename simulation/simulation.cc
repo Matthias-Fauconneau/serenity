@@ -79,7 +79,7 @@ void Simulation::step() {
  stepGrainGrain();
 
  stepMembrane();
- stepGrainMembrane();
+ //stepGrainMembrane();
 
  /*stepWire();
  stepGrainWire();
@@ -121,6 +121,7 @@ void Simulation::profile(const Time& totalTime) {
  logTime(grainSideFilter);
  logTime(grainSideEvaluate);
  logTime(grainSideSum);
+ logTime(grainGrainLattice);
  logTime(grainGrainSearch);
  logTime(grainGrainFilter);
  logTime(grainGrainEvaluate);

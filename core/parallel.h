@@ -14,10 +14,7 @@ struct thread {
  uint64 time = 0;
 };
 
-static constexpr size_t maxThreadCount = 2;//17/*60*//*244*/;
-
-extern thread threads[::maxThreadCount];
-
+extern const size_t maxThreadCount;
 extern Semaphore jobs;
 extern Semaphore results;
 

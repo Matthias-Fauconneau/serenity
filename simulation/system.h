@@ -57,7 +57,7 @@ struct System {
   buffer<float> AVx { capacity }, AVy { capacity }, AVz { capacity }; // Angular velocity
   buffer<float> Tx { capacity }, Ty { capacity }, Tz { capacity }; // Torque
 
-  Grain() : capacity(65536) { Rw.clear(1); }
+  Grain() : capacity(16384) { Rw.clear(1); }
 
   const vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]);  }
   const vec3 velocity(size_t i) const { return vec3(Vx[i], Vy[i], Vz[i]);  }
@@ -93,7 +93,7 @@ struct System {
   buffer<float> Fy { capacity };
   buffer<float> Fz { capacity };
 
-  Wire() : capacity(65536) {}
+  Wire() : capacity(1) {}
 
   const vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]);  }
   const vec3 velocity(size_t i) const { return vec3(Vx[i], Vy[i], Vz[i]);  }

@@ -1,5 +1,7 @@
 #include "parallel.h"
 
+const size_t maxThreadCount = 240;
+extern thread threads[::maxThreadCount];
 thread threads[::maxThreadCount];
 
 Semaphore jobs __attribute((init_priority(101)));
@@ -47,7 +49,13 @@ uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate
   for(int64 i : range(start, stop)) delegate(0, i);
   return time.cycleCount();
  } else {
-  /*for(size_t index: range(::threadCount())) {
+#if OPENMP
+  tsc time; time.start();
+  #pragma omp parallel for
+  for(int i=start; i<stop; i++) delegate(0, i);
+  return time.cycleCount();
+#else
+  for(size_t index: range(::threadCount())) {
    threads[index].counter = &start;
    threads[index].stop = stop;
    threads[index].delegate = &delegate;
@@ -55,13 +63,10 @@ uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate
   }
   size_t jobCount = ::min(threadCount, size_t(stop-start));
   jobs.release(jobCount);
-  results.acquire(jobCount);
-  uint64 time = 0;
-  for(size_t index: range(::threadCount())) time += threads[index].time;
-  return time;*/
   tsc time; time.start();
-  #pragma omp parallel for
-  for(int i=start; i<stop; i++) delegate(0, i);
+  results.acquire(jobCount);
   return time.cycleCount();
+  //uint64 time = 0; for(size_t index: range(::threadCount())) time += threads[index].time; return time;
+#endif
  }
 }

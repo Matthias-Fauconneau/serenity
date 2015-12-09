@@ -178,7 +178,11 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
  for(string flag: flags) if(flag=="native"_||flag=="haswell"_||flag=="core_avx2"_||flag=="sandybridge"_)
   args.append("-march="+replace(flag,'_','-'));
  for(string flag: flags) if(flag=="mic"_) {
+  //args.append("-xMIC-AVX512"__);
   args.append("-mmic"__);
+  //args.append(ref<String>{"-opt"__, "-report-phase"__, "hlo"__,  "-opt-report"__, "3"__});
+  args.append("-ansi-alias"__);
+  //args.append("-no-opt-prefetch"__);
   linkArgs.append("-mmic"__);
  }
  for(string flag: flags) if(flag=="openmp"_) { args.append("-fopenmp"__); linkArgs.append("-fopenmp"__); }
