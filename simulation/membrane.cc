@@ -270,7 +270,7 @@ void Simulation::stepMembrane() {
 void Simulation::stepMembraneIntegration() {
  if(!membrane.count) return;
  //float maxMembraneV_[maxThreadCount]; mref<float>(maxMembraneV_, maxThreadCount).clear(0);
- //membraneIntegrationTime.start();
+ tsc membraneIntegrationTime; membraneIntegrationTime.start();
  //membraneIntegrationTime += /*parallel_chunk*/parallel_for(1, membrane.H-1, [this, &maxMembraneV_](uint id, uint i/*start, uint size*/) {
   const vXsf dt_mass = floatX(this->dt / membrane.mass), dt = floatX(this->dt);//, topZ = floatX(this->topZ);
   //vXsf maxMembraneVX = _0f;
@@ -321,7 +321,8 @@ for(int i=1; i<H-1; i++) {
  for(size_t k: range(simd)) maxMembraneV = ::max(maxMembraneV, extract(maxMembraneVX, k));
  maxMembraneV_[id] = maxMembraneV;*/
 }//);
- //membraneIntegrationTime.stop();
+ membraneIntegrationTime.stop();
+ this->membraneIntegrationTime += membraneIntegrationTime.cycleCount();
  float maxMembraneV = 0;
  //for(int k: range(threadCount())) maxMembraneV = ::max(maxMembraneV, maxMembraneV_[k]);
  float maxGrainMembraneV = maxGrainV + maxMembraneV;

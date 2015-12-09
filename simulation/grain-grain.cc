@@ -167,13 +167,14 @@ void Simulation::stepGrainGrain() {
  if(grainGrainGlobalMinD <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
 
   vec3 min, max; domain(min, max);
+  memoryTime.start();
   Lattice<uint16> lattice(sqrt(3.)/(2*Grain::radius), min, max);
+  memoryTime.stop();
   grainGrainLatticeTime.start();
   //#pragma omp parallel for
   for(size_t i: range(grain.count)) {
    lattice.cell(grain.Px[i], grain.Py[i], grain.Pz[i]) = 1+i;
   }
-  grainGrainLatticeTime.stop();
 
   const float verletDistance = 2*(2*Grain::radius/sqrt(3.)); // > Grain::radius + Grain::radius
   // Minimum distance over verlet distance parameter is the actual verlet distance which can be used
@@ -186,7 +187,8 @@ void Simulation::stepGrainGrain() {
    latticeNeighbours[i++] = lattice.base.data + z*Y*X + y*X + x;
   }
   assert(i==62);
-
+  grainGrainLatticeTime.stop();
+  grainGrainSearchTime.start();
   swap(oldGrainGrainA, grainGrainA);
   swap(oldGrainGrainB, grainGrainB);
   swap(oldGrainGrainLocalAx, grainGrainLocalAx);
@@ -218,7 +220,7 @@ void Simulation::stepGrainGrain() {
   grainGrainLocalBz.size = 0;
 
   size_t grainGrainI = 0; // Index of first contact with A in old grainGrain[Local]A|B list
-  grainGrainSearchTime.start();
+
   for(size_t a: range(grain.count)) {
    size_t offset = lattice.index(grain.Px[a], grain.Py[a], grain.Pz[a]);
 
@@ -260,7 +262,6 @@ void Simulation::stepGrainGrain() {
    while(grainGrainI < oldGrainGrainA.size && oldGrainGrainA[grainGrainI] == a)
     grainGrainI++;
   }
-  grainGrainSearchTime.stop();
 
   assert_(align(simd, grainGrainA.size+1) <= grainGrainA.capacity);
   for(size_t i=grainGrainA.size; i<align(simd, grainGrainA.size+1); i++) grainGrainA.begin()[i] = 0;
@@ -271,6 +272,7 @@ void Simulation::stepGrainGrain() {
 
   //log("grain-grain", grainGrainSkipped);
   grainGrainSkipped=0;
+  grainGrainSearchTime.stop();
  } else grainGrainSkipped++;
 
  // Filters verlet lists, packing contacts to evaluate

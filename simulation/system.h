@@ -1,5 +1,4 @@
 #pragma once
-//#include "math.h"
 #include "memory.h"
 #include "vector.h"
 #include "simd.h"
@@ -93,7 +92,7 @@ struct System {
   buffer<float> Fy { capacity };
   buffer<float> Fz { capacity };
 
-  Wire() : capacity(1) {}
+  Wire() : capacity(0) {}
 
   const vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]);  }
   const vec3 velocity(size_t i) const { return vec3(Vx[i], Vy[i], Vz[i]);  }

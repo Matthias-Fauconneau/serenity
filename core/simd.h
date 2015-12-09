@@ -46,6 +46,9 @@ static inline uint16 equal(v16sf a, v16sf b) { return _mm512_cmp_ps_mask(a, b, _
 
 static inline v16sf blend(uint16 k, v16sf a, v16sf b) { return _mm512_mask_blend_ps(k, a, b); }
 
+static inline float min(v16sf x) { return _mm512_reduce_min_ps(x); }
+static inline float max(v16sf x) { return _mm512_reduce_max_ps(x); }
+
 static constexpr size_t simd = 16; // SIMD size
 typedef v16sf vXsf;
 typedef v16ui vXui;

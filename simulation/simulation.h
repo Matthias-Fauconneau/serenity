@@ -205,6 +205,7 @@ struct Simulation : System {
  void step();
  void stepProcess();
   tsc processTime;
+ tsc grainTotalTime;
  void stepGrain();
   tsc grainTime;
  void stepGrainBottom();
@@ -223,7 +224,9 @@ struct Simulation : System {
   tsc grainSideEvaluateTime;
   tsc grainSideSumTime;
  void stepGrainGrain();
- tsc grainGrainLatticeTime;
+  tsc domainTime;
+  tsc memoryTime;
+  tsc grainGrainLatticeTime;
   tsc grainGrainSearchTime;
   uint64 grainGrainFilterTime = 0;
   uint64 grainGrainEvaluateTime = 0;
@@ -238,6 +241,7 @@ struct Simulation : System {
  void stepGrainIntegration();
   uint64 grainIntegrationTime = 0;
 
+ tsc membraneTotalTime;
  void stepMembrane();
   tsc membraneInitializationTime;
   uint64 membraneForceTime = 0;
