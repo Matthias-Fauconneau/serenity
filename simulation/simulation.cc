@@ -37,13 +37,13 @@ void Simulation::domain(vec3& min, vec3& max) {
  min = __builtin_inff(), max = -__builtin_inff();
  for(size_t i: range(1, membrane.H-1)) {
   for(size_t j: range(membrane.W)) {
-   size_t stride = membrane.stride;
-   min.x = ::min(min.x, membrane.Px[i*stride+simd+j]);
-   max.x = ::max(max.x, membrane.Px[i*stride+simd+j]);
-   min.y = ::min(min.y, membrane.Py[i*stride+simd+j]);
-   max.y = ::max(max.y, membrane.Py[i*stride+simd+j]);
-   min.z = ::min(min.z, membrane.Pz[i*stride+simd+j]);
-   max.z = ::max(max.z, membrane.Pz[i*stride+simd+j]);
+   size_t stride = membrane.stride, margin=membrane.margin;
+   min.x = ::min(min.x, membrane.Px[i*stride+margin+j]);
+   max.x = ::max(max.x, membrane.Px[i*stride+margin+j]);
+   min.y = ::min(min.y, membrane.Py[i*stride+margin+j]);
+   max.y = ::max(max.y, membrane.Py[i*stride+margin+j]);
+   min.z = ::min(min.z, membrane.Pz[i*stride+margin+j]);
+   max.z = ::max(max.z, membrane.Pz[i*stride+margin+j]);
   }
  }
  assert_(::max(::max((max-min).x, (max-min).y), (max-min).z) < 16, "membrane");
@@ -95,7 +95,7 @@ void Simulation::step() {
 }
 
 void Simulation::profile(const Time& totalTime) {
- log("----",timeStep/size_t(64*1/(dt*60)),"----");
+ log("----",timeStep/size_t(1*1/(dt*60)),"----");
  log(totalTime.microseconds()/timeStep, "us/step", totalTime, timeStep);
  if(stepTimeRT.nanoseconds()*100<totalTime.nanoseconds()*99)
   log("step", strD(stepTimeRT, totalTime));
@@ -152,7 +152,7 @@ void Simulation::profile(const Time& totalTime) {
 #undef log
 }
 
-static inline buffer<int> coreFrequencies() {
+/*static inline buffer<int> coreFrequencies() {
  TextData s(File("/proc/cpuinfo"_).readUpToLoop(1<<17));
  assert_(s.data.size<s.buffer.capacity, s.data.size, s.buffer.capacity, "/proc/cpuinfo", "coreFrequencies");
  buffer<int> coreFrequencies (256, 0);
@@ -165,7 +165,7 @@ static inline buffer<int> coreFrequencies() {
   s.line();
  }
  return coreFrequencies;
-}
+}*/
 
 bool Simulation::run(const Time& totalTime) {
  stepTimeRT.start();
@@ -173,9 +173,9 @@ bool Simulation::run(const Time& totalTime) {
  for(int unused t: range(1/(dt*60))) step();
  stepTime.stop();
  stepTimeRT.stop();
- if(timeStep%(60*size_t(1/(dt*60))) == 0) {
-  extern size_t threadCount();
-  if(threadCount()<244) log(threadCount(), coreFrequencies()); else log("//", threadCount());
+ if(timeStep%(1*size_t(1/(dt*60))) == 0) {
+  //extern size_t threadCount();
+  //if(threadCount()<17) log(threadCount(), coreFrequencies()); else log("//", threadCount());
   profile(totalTime);
  }
  if(processState == Pressure) log("Pressure", int(round(pressure)), "Pa");

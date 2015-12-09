@@ -20,10 +20,12 @@ static v16sf unused _1f = float16(1);
 
 static inline v16sf load(const float* a, size_t index) { return *(v16sf*)(a+index); }
 static inline v16sf load(ref<float> a, size_t index) { return load(a.data, index); }
+static inline v16sf loadu(const float* a, size_t index) { return load(a, index); }
 static inline v16sf loadu(ref<float> a, size_t index) { return load(a, index); }
 
 static inline void store(float* const a, size_t index, v16sf v) { *(v16sf*)(a+index) = v; }
 static inline void store(mref<float> a, size_t index, v16sf v) { store(a.begin(), index, v); }
+static inline void storeu(float* const a, size_t index, v16sf v) { store(a, index, v); }
 static inline void storeu(mref<float> a, size_t index, v16sf v) { store(a, index, v); }
 
 static inline v16sf mask3_fmadd(v16sf a, v16sf b, v16sf c, uint16 k) { return _mm512_mask3_fmadd_ps(a, b, c, k); }
@@ -89,14 +91,16 @@ static v8sf unused _1f = float8(1);
 
 static inline v8sf load(const float* a, size_t index) { return *(v8sf*)(a+index); }
 static inline v8sf load(ref<float> a, size_t index) { return load(a.data, index); }
-static inline v8sf loadu(ref<float> a, size_t index) {
+static inline v8sf loadu(const float* a, size_t index) {
  struct v8sfu { v8sf v; } __attribute((__packed__, may_alias));
- return ((v8sfu*)(a.data+index))->v;
+ return ((v8sfu*)(a+index))->v;
 }
+static inline v8sf loadu(ref<float> a, size_t index) { return loadu(a.data, index); }
 
 static inline void store(float* const a, size_t index, v8sf v) { *(v8sf*)(a+index) = v; }
 static inline void store(mref<float> a, size_t index, v8sf v) { store(a.begin(), index, v); }
-static inline void storeu(mref<float> a, size_t index, v8sf v) { __builtin_ia32_storeups256(a.begin()+index, v); }
+static inline void storeu(float* const a, size_t index, v8sf v) { __builtin_ia32_storeups256(a+index, v); }
+//static inline void storeu(mref<float> a, size_t index, v8sf v) { storeu(a.begin(), index, v); }
 
 static inline v8sf min(v8sf a, v8sf b) { return __builtin_ia32_minps256(a, b); }
 static inline v8sf max(v8sf a, v8sf b) { return __builtin_ia32_maxps256(a, b); }

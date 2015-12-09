@@ -79,12 +79,11 @@ struct Semaphore {
  }
  /// Releases \a count ressources
  void release(int64 count) {
-  //mutex.lock(); // FIXME: unecessary?
-  __sync_add_and_fetch(&counter, count);
-  //log("pthread_cond_broadcast");
+  mutex.lock();
+  __sync_add_and_fetch(&counter, count); // Not atomic already ?
+  mutex.unlock(); // here ?
   pthread_cond_broadcast(&condition);
-  //log("<<pthread_cond_broadcast");
-  //mutex.unlock(); // FIXME: unecessary?
+  //mutex.unlock(); // or here ?
  }
  /// Returns available ressources \a count
  operator uint64() const { return counter; }

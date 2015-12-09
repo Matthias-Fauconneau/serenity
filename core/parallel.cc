@@ -41,13 +41,27 @@ __attribute((constructor(102))) void spawnWorkers() {
  }
 }
 
-/*__attribute((destructor)) void joinWorkers() {
- for(uint index: range(threadCount())) threads[index].counter = 0;
- log("release", threadCount());
- jobs.release(threadCount());
- log("released");
- for(uint index: range(threadCount())) {
-  log(index);
-  pthread_join(threads[index].pthread, 0);
+uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate, const size_t unused threadCount) {
+ if(threadCount == 1) {
+  tsc time; time.start();
+  for(int64 i : range(start, stop)) delegate(0, i);
+  return time.cycleCount();
+ } else {
+  /*for(size_t index: range(::threadCount())) {
+   threads[index].counter = &start;
+   threads[index].stop = stop;
+   threads[index].delegate = &delegate;
+   threads[index].time = 0;
+  }
+  size_t jobCount = ::min(threadCount, size_t(stop-start));
+  jobs.release(jobCount);
+  results.acquire(jobCount);
+  uint64 time = 0;
+  for(size_t index: range(::threadCount())) time += threads[index].time;
+  return time;*/
+  tsc time; time.start();
+  #pragma omp parallel for
+  for(int i=start; i<stop; i++) delegate(0, i);
+  return time.cycleCount();
  }
-}*/
+}

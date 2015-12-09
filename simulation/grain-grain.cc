@@ -294,14 +294,13 @@ void Simulation::stepGrainGrain() {
       grainGrainContact.append( j );
      } else {
       // Resets contact (static friction spring)
-      grainGrainLocalAx[j] = 0; /*grainGrainLocalAy[j] = 0; grainGrainLocalAz[j] = 0;
-      grainGrainLocalBx[j] = 0; grainGrainLocalBy[j] = 0; grainGrainLocalBz[j] = 0;*/
+      grainGrainLocalAx[j] = 0;
      }
     }
    }
  }, 1);
  for(size_t i=grainGrainContact.size; i<align(simd, grainGrainContact.size); i++)
-  grainGrainContact.begin()[i] = 0;
+  grainGrainContact.begin()[i] = grainGrainA.size;;
 
  // Evaluates forces from (packed) intersections (SoA)
  size_t GGcc = align(simd, grainGrainContact.size); // Grain-Grain contact count

@@ -86,7 +86,7 @@ struct SimulationView : Widget {
     max = ::max(max, O + vec3(state.wire.radius));
    }
    for(size_t i: range(state.membrane.H-1)) for(size_t j: range(state.membrane.W)) {
-    vec3 O = qapply(viewRotation, state.membrane.position(simd+i*state.membrane.stride+j));
+    vec3 O = qapply(viewRotation, state.membrane.position(margin+i*state.membrane.stride+j));
     if(O.z > 1) continue;
     min = ::min(min, O);
     max = ::max(max, O);
@@ -192,13 +192,13 @@ struct SimulationView : Widget {
    shader.bindFragments({"color"});
    shader["transform"] = rotatedViewProjection;
 
-   const size_t W = state.membrane.W, stride = state.membrane.stride;
+   const size_t W = state.membrane.W, stride = state.membrane.stride, margin=state.membrane.margin;
    buffer<vec3> positions {W*(state.membrane.H-1)*6-W*2};
    size_t s = 0;
    for(size_t i: range(state.membrane.H-1)) for(size_t j: range(W)) {
-    vec3 a (state.membrane.position(simd+i*stride+j));
-    vec3 b (state.membrane.position(simd+i*stride+(j+1)%W));
-    vec3 c (state.membrane.position(simd+(i+1)*stride+(j+i%2)%W));
+    vec3 a (state.membrane.position(margin+i*stride+j));
+    vec3 b (state.membrane.position(margin+i*stride+(j+1)%W));
+    vec3 c (state.membrane.position(margin+(i+1)*stride+(j+i%2)%W));
     // FIXME: GPU projection
     vec3 A = a, B = b, C = c;
     positions[s+0] = C; positions[s+1] = A;

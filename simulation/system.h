@@ -34,7 +34,7 @@ struct System {
  // Sphere particles
  struct Grain {
   sconst float mass = 2.7 * g;
-  sconst float radius = 40 *mm;
+  sconst float radius = 2.47 * mm; //40 *mm;
   sconst float curvature = 1./radius;
   sconst float elasticModulus = Obstacle::elasticModulus/*1e3 * MPa*/;
   sconst float poissonRatio = 0.35;
@@ -109,9 +109,10 @@ struct System {
   sconst float resolution = Grain::radius/2;
   const float radius;
   const int W = int(2*PI*radius/resolution)/simd*simd;
-  const int stride = simd+W+simd;
+  const int margin = 16; // Ensures no false sharing
+  const int stride = margin+W+margin;
   const float internodeLength = 2*sin(PI/W)*radius;
-  const float exactHeight = radius * 2;
+  const float exactHeight = radius * 4;
   const float cellHeight = sqrt(3.)/2*internodeLength;
   const size_t H = ceil(exactHeight/cellHeight)+1;
   const float height = (H-1) * cellHeight;
@@ -142,17 +143,17 @@ struct System {
      float z = i*height/(H-1);
      float a = 2*PI*(j+(i%2)*1./2)/W;
      float x = radius*cos(a), y = radius*sin(a);
-     Px[i*stride+simd+j] = x;
-     Py[i*stride+simd+j] = y;
-     Pz[i*stride+simd+j] = z;
+     Px[i*stride+margin+j] = x;
+     Py[i*stride+margin+j] = y;
+     Pz[i*stride+margin+j] = z;
     }
     // Copies position back to repeated nodes
-    Px[i*stride+simd-1] = Px[i*stride+simd+W-1];
-    Py[i*stride+simd-1] = Py[i*stride+simd+W-1];
-    Pz[i*stride+simd-1] = Pz[i*stride+simd+W-1];
-    Px[i*stride+simd+W] = Px[i*stride+simd+0];
-    Py[i*stride+simd+W] = Py[i*stride+simd+0];
-    Pz[i*stride+simd+W] = Pz[i*stride+simd+0];
+    Px[i*stride+margin-1] = Px[i*stride+margin+W-1];
+    Py[i*stride+margin-1] = Py[i*stride+margin+W-1];
+    Pz[i*stride+margin-1] = Pz[i*stride+margin+W-1];
+    Px[i*stride+margin+W] = Px[i*stride+margin+0];
+    Py[i*stride+margin+W] = Py[i*stride+margin+0];
+    Pz[i*stride+margin+W] = Pz[i*stride+margin+0];
    }
   }
 

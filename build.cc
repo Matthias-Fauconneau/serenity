@@ -130,7 +130,7 @@ bool Build::compileModule(string target) {
  if(!lastEdit) return false;
  String object = tmp+"/"+join(flags,string("-"_))+"/"+target+".o";
  if(!existsFile(object, folder) || lastEdit >= File(object).modifiedTime()) {
-  while(jobs.size>=2) { // Waits for a job to finish before launching a new unit
+  while(jobs.size>=1) { // Waits for a job to finish before launching a new unit
    int pid = wait(); // Waits for any child to terminate
    int status = wait(pid);
    Job job = jobs.take(jobs.indexOf(pid));
@@ -175,8 +175,13 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
  //args.append("-iquote."__);
  args.append("-g"__);
  if(flags.contains("profile")) args.append("-finstrument-functions"__);
- for(string flag: flags) if(flag=="native"_||flag=="haswell"_||flag=="sandybridge"_)
-  args.append("-march="+flag);
+ for(string flag: flags) if(flag=="native"_||flag=="haswell"_||flag=="core_avx2"_||flag=="sandybridge"_)
+  args.append("-march="+replace(flag,'_','-'));
+ for(string flag: flags) if(flag=="mic"_) {
+  args.append("-mmic"__);
+  linkArgs.append("-mmic"__);
+ }
+ for(string flag: flags) if(flag=="openmp"_) { args.append("-fopenmp"__); linkArgs.append("-fopenmp"__); }
  for(string flag: flags) if(startsWith(flag,"O")) args.append("-"+flag);
  args.append( "-DARGS=\""+str(args)+"\"");
  args.append(apply(folder.list(Folders), [this](string subfolder)->String{ return "-iquote"+subfolder; }));

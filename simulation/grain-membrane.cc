@@ -166,8 +166,8 @@ void Simulation::stepGrainMembrane() {
   grainMembraneGridTime.start();
   for(size_t i: range(1, membrane.H)) {
    for(size_t j: range(membrane.W)) {
-    size_t stride = membrane.stride;
-    size_t k = i*stride+simd+j;
+    size_t stride = membrane.stride, margin=membrane.margin;
+    size_t k = i*stride+margin+j;
     grid.cell(membrane.Px[k], membrane.Py[k], membrane.Pz[k]).append(1+k);
    }
   }
@@ -275,9 +275,9 @@ break_:;
   }, 1);
 
   assert_(align(simd, grainMembraneA.size+1) <= grainMembraneA.capacity);
-  for(size_t i=grainMembraneA.size; i<align(simd, grainMembraneA.size+1); i++) grainMembraneA.begin()[i] = 0;
+  for(size_t i=grainMembraneA.size; i<align(simd, grainMembraneA.size +1); i++) grainMembraneA.begin()[i] = 0;
   assert_(align(simd, grainMembraneB.size+1) <= grainMembraneB.capacity);
-  for(size_t i=grainMembraneB.size; i<align(simd, grainMembraneB.size+1); i++) grainMembraneB.begin()[i] = 0;
+  for(size_t i=grainMembraneB.size; i<align(simd, grainMembraneB.size +1); i++) grainMembraneB.begin()[i] = 0;
 
   grainMembraneGlobalMinD = minD - (Grain::radius+0);
   if(grainMembraneGlobalMinD < 0) log("grainMembraneGlobalMinD", grainMembraneGlobalMinD);
@@ -358,7 +358,7 @@ break_:;
                       grain.Rx.data, grain.Ry.data, grain.Rz.data, grain.Rw.data,
                       grainMembraneFx.begin(), grainMembraneFy.begin(), grainMembraneFz.begin(),
                       grainMembraneTAx.begin(), grainMembraneTAy.begin(), grainMembraneTAz.begin() );
- });
+ }, 1);
  grainMembraneContactSizeSum += grainMembraneContact.size;
 
  grainMembraneSumTime.start();

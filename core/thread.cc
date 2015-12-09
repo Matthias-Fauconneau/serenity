@@ -122,7 +122,7 @@ static void traceAllThreads() {
 static void handler(int sig, siginfo_t* info, void* ctx) {
  if(sig==SIGSEGV) log_("Segmentation fault\n");
  else if(sig==SIGABRT) log_("Aborted\n");
- else log_("Unknown signal\n");
+ else { log_("Unknown signal"); log_(str(sig)); log_("\n"); }
  if(threads.size>1) log("Thread #"+str(gettid())+':');
 #if __x86_64
  log(trace(1, (void*) ((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP]));

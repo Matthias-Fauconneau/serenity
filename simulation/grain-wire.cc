@@ -270,9 +270,9 @@ break_:;
   }, 1);
 
   assert_(align(simd, grainWireA.size+1) <= grainWireA.capacity);
-  for(size_t i=grainWireA.size; i<align(simd, grainWireA.size+1); i++) grainWireA.begin()[i] = 0;
+  for(size_t i=grainWireA.size; i<align(simd, grainWireA.size +1); i++) grainWireA.begin()[i] = 0;
   assert_(align(simd, grainWireB.size+1) <= grainWireB.capacity);
-  for(size_t i=grainWireB.size; i<align(simd, grainWireB.size+1); i++) grainWireB.begin()[i] = 0;
+  for(size_t i=grainWireB.size; i<align(simd, grainWireB.size +1); i++) grainWireB.begin()[i] = 0;
 
   grainWireGlobalMinD = minD - (Grain::radius+Wire::radius);
   if(grainWireGlobalMinD < 0) log("grainWireGlobalMinD", grainWireGlobalMinD);
@@ -306,8 +306,7 @@ break_:;
       grainWireContact.append( j );
      } else {
       // Resets contact (static friction spring)
-      grainWireLocalAx[j] = 0; /*grainWireLocalAy[j] = 0; grainWireLocalAz[j] = 0;
-      grainWireLocalBx[j] = 0; grainWireLocalBy[j] = 0; grainWireLocalBz[j] = 0;*/
+      grainWireLocalAx[j] = 0;
      }
     }
    }

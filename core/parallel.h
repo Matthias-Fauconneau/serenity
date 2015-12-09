@@ -14,7 +14,7 @@ struct thread {
  uint64 time = 0;
 };
 
-static constexpr size_t maxThreadCount = 244;
+static constexpr size_t maxThreadCount = 2;//17/*60*//*244*/;
 
 extern thread threads[::maxThreadCount];
 
@@ -24,47 +24,19 @@ extern Semaphore results;
 size_t threadCount();
 
 /// Runs a loop in parallel
-template<Type F> uint64 parallel_for(int64 start, int64 stop, F f, const size_t unused threadCount = ::threadCount()) {
-#if DEBUG || PROFILE
- tsc time; time.start();
- for(int64 i : range(start, stop)) f(0, i);
- return time.cycleCount();
-#else
- if(threadCount == 1) {
-  tsc time; time.start();
-  for(int64 i : range(start, stop)) f(0, i);
-  return time.cycleCount();
- } else {
-  function<void(uint, uint)> delegate = f;
-  assert_(threadCount == ::threadCount());
-  for(uint index: range(threadCount)) {
-   threads[index].counter = &start;
-   threads[index].stop = stop;
-   threads[index].delegate = &delegate;
-   threads[index].time = 0;
-  }
-  jobs.release(threadCount);
-  results.acquire(threadCount);
-  uint64 time = 0;
-  for(uint index: range(threadCount)) time += threads[index].time;
-  return time;
- }
-#endif
-}
+uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate, const size_t unused threadCount = ::threadCount());
 
 /// Runs a loop in parallel chunks with chunk-wise functor
-template<Type F> uint64 parallel_chunk(int64 totalSize, F f, const uint threadCount = ::threadCount()) {
- if(totalSize <= threadCount/**threadCount*/ || threadCount==1) {
+template<Type F> uint64 parallel_chunk(size_t jobCount, F f, const uint threadCount = ::threadCount()) {
+ if(threadCount==1) {
   tsc time; time.start();
-  f(0, 0, totalSize);
+  f(0, 0, jobCount);
   return time.cycleCount();
  }
- const int64 chunkSize = (totalSize+threadCount-1)/threadCount;
- const int64 chunkCount = (totalSize+chunkSize-1)/chunkSize; // Last chunk might be smaller
- assert_((chunkCount-1)*chunkSize < totalSize && totalSize <= chunkCount*chunkSize, (chunkCount-1)*chunkSize, totalSize, chunkCount*chunkSize);
- //assert_(chunkCount == threadCount, chunkCount, threadCount, chunkSize);
+ const size_t chunkSize = max(1ul, jobCount/threadCount);
+ const size_t chunkCount = jobCount/chunkSize; // Last chunk might be smaller
  return parallel_for(0, chunkCount, [&](uint id, int64 chunkIndex) {
-  f(id, chunkIndex*chunkSize, min(chunkSize, totalSize-chunkIndex*chunkSize));
+  f(id, chunkIndex*chunkSize, min<size_t>(chunkSize, jobCount-chunkIndex*chunkSize));
  }, threadCount);
 }
 
