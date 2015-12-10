@@ -1,6 +1,10 @@
 #include "parallel.h"
 
-const size_t maxThreadCount = 240;
+#if __MIC__
+const size_t maxThreadCount = 60; //240;
+#else
+const size_t maxThreadCount = 8;
+#endif
 extern thread threads[::maxThreadCount];
 thread threads[::maxThreadCount];
 
@@ -18,6 +22,7 @@ size_t threadCount() {
    threadCount = min(threadCount, (size_t)parseInteger(environmentVariable("THREADS"_)));
   min(threadCount, maxThreadCount);
  });
+ assert_(threadCount == maxThreadCount, threadCount, maxThreadCount);
  return threadCount;
 }
 
@@ -43,6 +48,8 @@ __attribute((constructor(102))) void spawnWorkers() {
  }
 }
 
+extern "C" int omp_get_thread_num();
+extern "C" void omp_set_num_threads(int threadCount);
 uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate, const size_t unused threadCount) {
  if(threadCount == 1) {
   tsc time; time.start();
@@ -51,8 +58,9 @@ uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate
  } else {
 #if OPENMP
   tsc time; time.start();
+  omp_set_num_threads(threadCount);
   #pragma omp parallel for
-  for(int i=start; i<stop; i++) delegate(0, i);
+  for(int i=start; i<stop; i++) delegate(omp_get_thread_num(), i);
   return time.cycleCount();
 #else
   for(size_t index: range(::threadCount())) {

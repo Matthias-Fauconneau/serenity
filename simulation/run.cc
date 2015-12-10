@@ -1,5 +1,6 @@
 #include "simulation.h"
 #include "thread.h"
+#include "parallel.h"
 #include <unistd.h>
 
 __attribute((constructor(101))) void logCompiler() {
@@ -11,6 +12,9 @@ __attribute((constructor(101))) void logCompiler() {
  log("gcc", simd, ARGS);
 #else
 #error
+#endif
+#if OPENMP
+ log("OpenMP", ::threadCount());
 #endif
 }
 

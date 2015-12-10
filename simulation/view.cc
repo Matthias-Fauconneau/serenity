@@ -34,7 +34,7 @@ struct SimulationView : Widget {
    vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]); }
   } wire;
   struct Membrane {
-   size_t W, H, stride;
+   size_t W, H, stride, margin;
    size_t count = 0;
    buffer<float> Px;
    buffer<float> Py;
@@ -86,7 +86,7 @@ struct SimulationView : Widget {
     max = ::max(max, O + vec3(state.wire.radius));
    }
    for(size_t i: range(state.membrane.H-1)) for(size_t j: range(state.membrane.W)) {
-    vec3 O = qapply(viewRotation, state.membrane.position(margin+i*state.membrane.stride+j));
+    vec3 O = qapply(viewRotation, state.membrane.position(state.membrane.margin+i*state.membrane.stride+j));
     if(O.z > 1) continue;
     min = ::min(min, O);
     max = ::max(max, O);
@@ -315,6 +315,7 @@ struct SimulationApp {
   state.membrane.W = simulation.membrane.W;
   state.membrane.H = simulation.membrane.H;
   state.membrane.stride = simulation.membrane.stride;
+  state.membrane.margin = simulation.membrane.margin;
   state.membrane.count = simulation.membrane.count;
   state.membrane.Px = copy(simulation.membrane.Px);
   state.membrane.Py = copy(simulation.membrane.Py);

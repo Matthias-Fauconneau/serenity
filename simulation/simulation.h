@@ -224,7 +224,7 @@ struct Simulation : System {
   tsc grainSideEvaluateTime;
   tsc grainSideSumTime;
  void stepGrainGrain();
-  tsc domainTime;
+  uint64 domainTime = 0;
   tsc memoryTime;
   tsc grainGrainLatticeTime;
   tsc grainGrainSearchTime;

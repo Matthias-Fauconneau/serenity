@@ -12,7 +12,8 @@ void Simulation::stepGrain() {
 
 void Simulation::stepGrainIntegration() {
  if(!grain.count) return;
- float maxGrainV_[maxThreadCount]; mref<float>(maxGrainV_, maxThreadCount).clear(0);
+ const/*expr*/ size_t threadCount = /*60*/maxThreadCount;
+ float maxGrainV_[threadCount]; mref<float>(maxGrainV_, threadCount).clear(0);
  grainIntegrationTime += parallel_chunk(align(simd, grain.count)/simd, [this, &maxGrainV_](uint id, size_t start, size_t size) {
    const vXsf dt_mass = floatX(dt / grain.mass), dt = floatX(this->dt);
    const float dt_angularMass = this->dt / Grain::angularMass;
@@ -56,9 +57,9 @@ void Simulation::stepGrainIntegration() {
     }
   }
   maxGrainV_[id] = max(maxGrainVX);
- });
+ }, threadCount);
  float maxGrainV = 0;
- for(size_t k: range(threadCount())) maxGrainV = ::max(maxGrainV, maxGrainV_[k]);
+ for(size_t k: range(threadCount)) maxGrainV = ::max(maxGrainV, maxGrainV_[k]);
  this->maxGrainV = maxGrainV;
  float maxGrainGrainV = maxGrainV + maxGrainV;
  grainGrainGlobalMinD -= maxGrainGrainV * this->dt;

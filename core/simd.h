@@ -168,6 +168,33 @@ static inline v8sf mask(v8ui a, v8sf b) { return (v8sf)(a & (v8ui)b); }
 static inline v8sf maskSub(v8sf a, v8ui k, v8sf b) { return a - mask(k, b); }
 static inline v8sf mask3_fmadd(v8sf a, v8sf b, v8sf c, v8ui k) { return mask(k, a * b) + c; }
 
+typedef float v4sf __attribute((__vector_size__ (16)));
+#if __INTEL_COMPILER
+#define reduce(op) \
+static inline float op(v8sf x) { \
+    /* ( x3+x7, x2+x6, x1+x5, x0+x4 ) */ \
+    const v4sf x128 = _mm_##op##_ps(_mm256_extractf128_ps(x, 1), _mm256_castps256_ps128(x)); \
+    /* ( -, -, x1+x3+x5+x7, x0+x2+x4+x6 ) */ \
+    const v4sf x64 = _mm_##op##_ps(x128, _mm_movehl_ps(x128, x128)); \
+    /* ( -, -, -, x0+x1+x2+x3+x4+x5+x6+x7 ) */ \
+    const v4sf x32 = _mm_##op##_ss(x64, _mm_shuffle_ps(x64, x64, 0x55)); \
+    return _mm_cvtss_f32(x32); \
+}
+#else
+#define reduce(op) \
+static inline float op(v8sf x) { \
+    /* ( x3+x7, x2+x6, x1+x5, x0+x4 ) */ \
+    const v4sf x128 = __builtin_ia32_##op##ps(__builtin_ia32_vextractf128_ps256(x, 1), __builtin_shufflevector(x, x, 0, 1, 2, 3)); \
+    /* ( -, -, x1+x3+x5+x7, x0+x2+x4+x6 ) */ \
+    const v4sf x64 = __builtin_ia32_##op##ps(x128, __builtin_shufflevector(x128, x128, 6, 7, 2, 3)); \
+    /* ( -, -, -, x0+x1+x2+x3+x4+x5+x6+x7 ) */ \
+    const v4sf x32 = __builtin_ia32_##op##ps(x64, __builtin_shufflevector(x64, x64, 1,1,1,1)); \
+    return x32[0]; \
+}
+#endif
+reduce(min)
+reduce(max)
+
 static constexpr size_t simd = 8; // SIMD size
 typedef v8sf vXsf;
 typedef v8ui vXui;
