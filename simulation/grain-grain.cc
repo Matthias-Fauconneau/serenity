@@ -166,7 +166,7 @@ void Simulation::stepGrainGrain() {
  if(!grain.count) return;
  if(grainGrainGlobalMinD <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
 
-  vec3 min, max; domain(min, max);
+  vec3 min, max; domainGrain(min, max);
   memoryTime.start();
   Lattice<uint16> lattice(sqrt(3.)/(2*Grain::radius), min, max);
   memoryTime.stop();
@@ -175,7 +175,7 @@ void Simulation::stepGrainGrain() {
    lattice.cell(grain.Px[i], grain.Py[i], grain.Pz[i]) = 1+i;
   }
 
-  const float verletDistance = 2*(2*Grain::radius/sqrt(3.)); // > Grain::radius + Grain::radius
+  const float verletDistance = 2*2*Grain::radius/sqrt(3.); // > Grain::radius + Grain::radius
   // Minimum distance over verlet distance parameter is the actual verlet distance which can be used
   float minD = __builtin_inff();
 

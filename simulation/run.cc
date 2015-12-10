@@ -30,7 +30,7 @@ struct SimulationView : Simulation {
   totalTime.start();
   for(;;) {
    if(!run(totalTime)) return;
-   if(timeStep%(1*size_t(1/(dt*60))) == 0) return;
+   if(timeStep%(2*size_t(1/(dt*60))) == 0) return;
   }
  }
 } app (parameters());

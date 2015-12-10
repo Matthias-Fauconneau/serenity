@@ -33,7 +33,7 @@ struct System {
  // Sphere particles
  struct Grain {
   sconst float mass = 2.7 * g;
-  sconst bool validation = false;
+  sconst bool validation = true;
   sconst float radius = (validation ? 2.47 : 40) * mm;
   sconst float curvature = 1./radius;
   sconst float elasticModulus = Obstacle::elasticModulus/*1e3 * MPa*/;
@@ -114,7 +114,7 @@ struct System {
   const float internodeLength = 2*sin(PI/W)*radius;
   const float exactHeight = radius * 2;// 4;
   const float cellHeight = sqrt(3.)/2*internodeLength;
-  const size_t H = ceil(exactHeight/cellHeight)+1;
+  const int H = ceil(exactHeight/cellHeight)+1;
   const float height = (H-1) * cellHeight;
   sconst float thickness = 1 * mm;
   const float tensionElasticModulus = 10 * MPa;

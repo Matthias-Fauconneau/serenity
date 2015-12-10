@@ -1,11 +1,11 @@
 #include "parallel.h"
 
 #if __MIC__
-const size_t maxThreadCount = 60; //240;
-#elif 0
-const size_t maxThreadCount = 8;
+const int maxThreadCount = 60; //240;
+#elif !DEBUG
+const int maxThreadCount = 8;
 #else
-const size_t maxThreadCount = 1;
+const int maxThreadCount = 1;
 #endif
 extern thread threads[::maxThreadCount];
 thread threads[::maxThreadCount];
@@ -13,15 +13,15 @@ thread threads[::maxThreadCount];
 Semaphore jobs __attribute((init_priority(101)));
 Semaphore results __attribute((init_priority(101)));
 
-size_t threadCount() {
- static size_t threadCount = ({
+int threadCount() {
+ static int threadCount = ({
   TextData s(File("/proc/cpuinfo").readUpToLoop(1<<17));
   assert_(s.data.size<s.buffer.capacity, s.data.size, s.buffer.capacity, "/proc/cpuinfo", "threadCount");
-  size_t threadCount = 0;
+  int threadCount = 0;
   while(s) { if(s.match("processor")) threadCount++; s.line(); }
   //assert_(threadCount <= maxThreadCount, threadCount, maxThreadCount);
   if(environmentVariable("THREADS"_))
-   threadCount = min(threadCount, (size_t)parseInteger(environmentVariable("THREADS"_)));
+   threadCount = min(threadCount, (int)parseInteger(environmentVariable("THREADS"_)));
   min(threadCount, maxThreadCount);
  });
  assert_(threadCount == maxThreadCount, threadCount, maxThreadCount);
@@ -52,7 +52,7 @@ __attribute((constructor(102))) void spawnWorkers() {
 
 extern "C" int omp_get_thread_num();
 extern "C" void omp_set_num_threads(int threadCount);
-uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate, const size_t unused threadCount) {
+uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate, const int unused threadCount) {
  if(threadCount == 1) {
   tsc time; time.start();
   for(int64 i : range(start, stop)) delegate(0, i);
@@ -66,18 +66,18 @@ uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate
   return time.cycleCount();
 #else
   assert_(threadCount == ::threadCount());
-  for(size_t index: range(::threadCount())) {
+  for(int index: range(::threadCount())) {
    threads[index].counter = &start;
    threads[index].stop = stop;
    threads[index].delegate = &delegate;
    threads[index].time = 0;
   }
-  size_t jobCount = ::min(threadCount, size_t(stop-start));
+  int jobCount = ::min(threadCount, int(stop-start));
   jobs.release(jobCount);
   tsc time; time.start();
   results.acquire(jobCount);
   return time.cycleCount();
-  //uint64 time = 0; for(size_t index: range(::threadCount())) time += threads[index].time; return time;
+  //uint64 time = 0; for(int index: range(::threadCount())) time += threads[index].time; return time;
 #endif
  }
 }

@@ -201,8 +201,13 @@ struct Simulation : System {
  buffer<float> grainMembraneTAz;
 
  Simulation(const Dict& p);
- void domain(vec3& min, vec3& max);
+
+ void domainMembrane(vec3& min, vec3& max);
+ void domainGrain(vec3& min, vec3& max);
+ void domainWire(vec3& min, vec3& max);
+
  void step();
+
  void stepProcess();
   tsc processTime;
  tsc grainTotalTime;

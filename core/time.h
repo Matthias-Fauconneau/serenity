@@ -30,6 +30,7 @@ struct tsc {
  void stop() { if(tsc) total+=readCycleCounter()-tsc; tsc=0; }
  uint64 cycleCount() const {return total + (tsc?readCycleCounter()-tsc:0); }
  operator uint64() const { return cycleCount(); }
+ void operator =(int unused v) { assert(v == 0); reset(); }
 };
 inline String strD(const uint64 num, const uint64 div) {
  return div ? str(int(round(100*double(num)/double(div))))+'%' : String();

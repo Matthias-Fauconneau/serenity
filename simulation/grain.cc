@@ -56,7 +56,7 @@ void Simulation::stepGrainIntegration() {
      Rw[j] *= scale;
     }
   }
-  maxGrainV_[id] = max(maxGrainVX);
+  maxGrainV_[id] = max(maxGrainV_[id], max(maxGrainVX));
  }, threadCount);
  float maxGrainV = 0;
  for(size_t k: range(threadCount)) maxGrainV = ::max(maxGrainV, maxGrainV_[k]);

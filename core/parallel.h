@@ -14,14 +14,14 @@ struct thread {
  uint64 time = 0;
 };
 
-extern const size_t maxThreadCount;
+extern const int maxThreadCount;
 extern Semaphore jobs;
 extern Semaphore results;
 
-size_t threadCount();
+int threadCount();
 
 /// Runs a loop in parallel
-uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate, const size_t unused threadCount = ::threadCount());
+uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate, const int unused threadCount = ::threadCount());
 
 /// Runs a loop in parallel chunks with chunk-wise functor
 template<Type F> uint64 parallel_chunk(size_t jobCount, F f, const uint threadCount = ::threadCount()) {

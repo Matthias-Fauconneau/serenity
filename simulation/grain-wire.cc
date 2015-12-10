@@ -161,7 +161,7 @@ void Simulation::stepGrainWire() {
  if(!grain.count || !wire.count) return;
  if(grainWireGlobalMinD <= 0)  {
 
-  vec3 min, max; domain(min, max);
+  vec3 min, max; domainWire(min, max);
   Grid grid(1/(Grain::radius+Grain::radius), min, max);
   for(size_t i: range(wire.count))
    grid.cell(wire.Px[i], wire.Py[i], wire.Pz[i]).append(1+i);

@@ -1,6 +1,7 @@
 // TODO: Face contacts
 #include "simulation.h"
-#include "grid.h"
+//#include "grid.h"
+#include "lattice.h"
 #include "parallel.h"
 
 static inline void evaluateGrainMembrane(const size_t start, const size_t size,
@@ -161,7 +162,8 @@ void Simulation::stepGrainMembrane() {
  if(!grain.count || !membrane.count) return;
 
  if(grainMembraneGlobalMinD <= 0)  {
-  vec3 min, max; domain(min, max);
+  /*vec3 min, max; domainMembrane(min, max);
+  //vec3 min = -membrane.radius, max = membrane.radius;
   Grid grid(1/(Grain::radius+Grain::radius), min, max);
   grainMembraneGridTime.start();
   for(size_t i: range(1, membrane.H)) {
@@ -171,28 +173,38 @@ void Simulation::stepGrainMembrane() {
     grid.cell(membrane.Px[k], membrane.Py[k], membrane.Pz[k]).append(1+k);
    }
   }
-  grainMembraneGridTime.stop();
+  grainMembraneGridTime.stop();*/
 
-  const float verletDistance = 2*(2*Grain::radius/sqrt(3.)) - (Grain::radius+0);
-  //const float verletDistance = Grain::radius + Grain::radius;
+  vec3 min =  0, max = 0; domainGrain(min, max); //domainMembrane(min, max);
+  min = ::min(min, vec3(vec2(-membrane.radius), 0));
+  max = ::max(max, vec3(vec2(membrane.radius), membrane.height));
+  memoryTime.start();
+  Lattice<uint16> lattice(sqrt(3.)/(2*Grain::radius), min, max);
+  memoryTime.stop();
+  grainGrainLatticeTime.start();
+  for(size_t i: range(grain.count)) {
+   lattice.cell(grain.Px[i], grain.Py[i], grain.Pz[i]) = 1+i;
+  }
+  grainGrainLatticeTime.stop();
+
+  const float verletDistance = 2*Grain::radius/sqrt(3.); // > Grain::radius
   assert_(verletDistance > Grain::radius + 0);
-  assert_(verletDistance <= Grain::radius + Grain::radius);
   // Minimum distance over verlet distance parameter is the actual verlet distance which can be used
   float minD = __builtin_inff();
 
-  const int X = grid.size.x, Y = grid.size.y;
-  const unused uint16* membraneNeighbours[3*3] = {
-   grid.base+(-X*Y-X-1)*Grid::cellCapacity,
-   grid.base+(-X*Y-1)*Grid::cellCapacity,
-   grid.base+(-X*Y+X-1)*Grid::cellCapacity,
+  const int X = lattice.size.x, Y = lattice.size.y;
+  const unused uint16* latticeNeighbours[3*3] = {
+   lattice.base.data+(-X*Y-X-1),
+   lattice.base.data+(-X*Y-1),
+   lattice.base.data+(-X*Y+X-1),
 
-   grid.base+(-X-1)*Grid::cellCapacity,
-   grid.base+(-1)*Grid::cellCapacity,
-   grid.base+(X-1)*Grid::cellCapacity,
+   lattice.base.data+(-X-1),
+   lattice.base.data+(-1),
+   lattice.base.data+(X-1),
 
-   grid.base+(X*Y-X-1)*Grid::cellCapacity,
-   grid.base+(X*Y-1)*Grid::cellCapacity,
-   grid.base+(X*Y+X-1)*Grid::cellCapacity
+   lattice.base.data+(X*Y-X-1),
+   lattice.base.data+(X*Y-1),
+   lattice.base.data+(X*Y+X-1)
   };
 
   swap(oldGrainMembraneA, grainMembraneA);
@@ -226,53 +238,59 @@ void Simulation::stepGrainMembrane() {
   grainMembraneLocalBz.size = 0;
 
   size_t grainMembraneIndex = 0; // Index of first contact with A in old grainMembrane[Local]A|B list
-  grainMembraneSearchTime += parallel_chunk(grain.count, [&](uint, size_t start, size_t size) {
-   for(size_t a=start; a<(start+size); a+=1) { // TODO: SIMD
-     size_t offset = grid.index(grain.Px[a], grain.Py[a], grain.Pz[a]);
-     for(size_t n: range(3*3)) for(size_t i: range(3)) {
-      ref<uint16> list(membraneNeighbours[n] + offset + i * Grid::cellCapacity, Grid::cellCapacity);
-
-      for(size_t j: range(Grid::cellCapacity)) {
-       assert_(list.begin() >= grid.cells.begin() && list.end()<=grid.cells.end(), offset, n, i);
-       size_t b = list[j];
-       if(!b) break;
-       b--;
-       float d = sqrt(sq(grain.Px[a]-membrane.Px[b])
-                      + sq(grain.Py[a]-membrane.Py[b])
-                      + sq(grain.Pz[a]-membrane.Pz[b])); // TODO: SIMD //FIXME: fails with Ofast?
-       if(d > verletDistance) { minD=::min(minD, d); continue; }
-       assert_(grainMembraneA.size < grainMembraneA.capacity);
-       grainMembraneA.append( a ); // Grain
-       grainMembraneB.append( b ); // Membrane
-       for(size_t k = 0;; k++) {
-        size_t j = grainMembraneIndex+k;
-        if(j >= oldGrainMembraneA.size || oldGrainMembraneA[grainMembraneIndex+k] != a) break;
-        if(oldGrainMembraneB[j] == b) { // Repack existing friction
-         grainMembraneLocalAx.append( oldGrainMembraneLocalAx[j] );
-         grainMembraneLocalAy.append( oldGrainMembraneLocalAy[j] );
-         grainMembraneLocalAz.append( oldGrainMembraneLocalAz[j] );
-         grainMembraneLocalBx.append( oldGrainMembraneLocalBx[j] );
-         grainMembraneLocalBy.append( oldGrainMembraneLocalBy[j] );
-         grainMembraneLocalBz.append( oldGrainMembraneLocalBz[j] );
-         goto break_;
-        }
-       } /*else*/ { // New contact
-        // Appends zero to reserve slot. Zero flags contacts for evaluation.
-        // Contact points (for static friction) will be computed during force evaluation (if fine test passes)
-        grainMembraneLocalAx.append( 0 );
-        grainMembraneLocalAy.append( 0 );
-        grainMembraneLocalAz.append( 0 );
-        grainMembraneLocalBx.append( 0 );
-        grainMembraneLocalBy.append( 0 );
-        grainMembraneLocalBz.append( 0 );
+  //grainMembraneSearchTime += parallel_chunk(grain.count, [&](uint, size_t start, size_t size) {
+  //grainMembraneSearchTime += parallel_chunk(grain.count, [&](uint, size_t start, size_t size) {
+  const size_t threadCount = ::min(membrane.H, maxThreadCount);
+  float minD_[threadCount]; mref<float>(minD_, threadCount).clear(0);
+  grainMembraneSearchTime += parallel_for(0, membrane.H,
+                                          [this,&lattice,&latticeNeighbours,verletDistance,&grainMembraneIndex,&minD_](uint id, uint i) {
+   //for(size_t a=start; a<(start+size); a+=1) { // TODO: SIMD
+    int W = membrane.W;
+    int base = membrane.margin+i*membrane.stride;
+    float minD = __builtin_inff();
+    for(int j=0; j<W; j+=simd) {
+     uint b = base+j;
+     int offset = lattice.index(membrane.Px[b], membrane.Py[b], membrane.Pz[b]);
+     for(int n: range(3*3)) for(int i: range(3)) {
+      int a = *(latticeNeighbours[n] + offset + i);
+      if(!a) continue;
+      a--;
+      float d = sqrt(sq(grain.Px[a]-membrane.Px[b])
+                     + sq(grain.Py[a]-membrane.Py[b])
+                     + sq(grain.Pz[a]-membrane.Pz[b])); // TODO: SIMD //FIXME: fails with Ofast?
+      if(d > verletDistance) { minD=::min(minD, d); continue; }
+      assert_(grainMembraneA.size < grainMembraneA.capacity);
+      grainMembraneA.append( a ); // Grain
+      grainMembraneB.append( b ); // Membrane
+      for(int k = 0;; k++) {
+       size_t j = grainMembraneIndex+k;
+       if(j >= oldGrainMembraneB.size || oldGrainMembraneB[grainMembraneIndex+k] != b) break;
+       if(oldGrainMembraneB[j] == b) { // Repack existing friction
+        grainMembraneLocalAx.append( oldGrainMembraneLocalAx[j] );
+        grainMembraneLocalAy.append( oldGrainMembraneLocalAy[j] );
+        grainMembraneLocalAz.append( oldGrainMembraneLocalAz[j] );
+        grainMembraneLocalBx.append( oldGrainMembraneLocalBx[j] );
+        grainMembraneLocalBy.append( oldGrainMembraneLocalBy[j] );
+        grainMembraneLocalBz.append( oldGrainMembraneLocalBz[j] );
+        goto break_;
        }
-break_:;
+      } /*else*/ { // New contact
+       // Appends zero to reserve slot. Zero flags contacts for evaluation.
+       // Contact points (for static friction) will be computed during force evaluation (if fine test passes)
+       grainMembraneLocalAx.append( 0 );
+       grainMembraneLocalAy.append( 0 );
+       grainMembraneLocalAz.append( 0 );
+       grainMembraneLocalBx.append( 0 );
+       grainMembraneLocalBy.append( 0 );
+       grainMembraneLocalBz.append( 0 );
       }
-      while(grainMembraneIndex < oldGrainMembraneA.size && oldGrainMembraneA[grainMembraneIndex] == a)
-       grainMembraneIndex++;
+break_:;
      }
+     while(grainMembraneIndex < oldGrainMembraneB.size && oldGrainMembraneB[grainMembraneIndex] == b)
+      grainMembraneIndex++;
     }
-  }, 1);
+    minD_[id] = ::min(minD_[id], minD);
+  }, 1 /*FIXME*/);
 
   assert_(align(simd, grainMembraneA.size+1) <= grainMembraneA.capacity);
   for(size_t i=grainMembraneA.size; i<align(simd, grainMembraneA.size +1); i++) grainMembraneA.begin()[i] = 0;

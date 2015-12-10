@@ -11,7 +11,7 @@ generic struct Lattice {
  Lattice(float scale, vec3 min, vec3 max) : scale(scale), min(min), max(max) {
   cells.clear(0);
  }
- inline size_t index(float x, float y, float z) {
+ inline int index(float x, float y, float z) {
   int index
     = int(scale.z*(z-min.z)) * (size.y*size.x)
     + int(scale.y*(y-min.y)) * size.x
