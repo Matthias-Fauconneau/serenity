@@ -171,7 +171,6 @@ void Simulation::stepGrainGrain() {
   Lattice<uint16> lattice(sqrt(3.)/(2*Grain::radius), min, max);
   memoryTime.stop();
   grainGrainLatticeTime.start();
-  //#pragma omp parallel for
   for(size_t i: range(grain.count)) {
    lattice.cell(grain.Px[i], grain.Py[i], grain.Pz[i]) = 1+i;
   }
@@ -268,7 +267,7 @@ void Simulation::stepGrainGrain() {
   for(size_t i=grainGrainB.size; i<align(simd, grainGrainB.size+1); i++) grainGrainB.begin()[i] = 0;
 
   grainGrainGlobalMinD = minD - 2*Grain::radius;
-  if(grainGrainGlobalMinD < 0) log("grainGrainGlobalMinD12", grainGrainGlobalMinD);
+  if(grainGrainGlobalMinD <= 0) log("grainGrainGlobalMinD12", grainGrainGlobalMinD);
 
   //log("grain-grain", grainGrainSkipped);
   grainGrainSkipped=0;

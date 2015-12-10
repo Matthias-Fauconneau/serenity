@@ -36,7 +36,6 @@ Simulation::Simulation(const Dict& p) : System(p.at("TimeStep"), p.at("Radius"))
 void Simulation::domain(vec3& min, vec3& max) {
  //min = __builtin_inff(), max = -__builtin_inff();
  float minX = 0, minY = 0, minZ = 0, maxX = 0, maxY = 0, maxZ = 0;
- domainTime.start();
  {
   float minX_[maxThreadCount]; mref<float>(minX_, maxThreadCount).clear(0);
   float minY_[maxThreadCount]; mref<float>(minY_, maxThreadCount).clear(0);
@@ -44,29 +43,35 @@ void Simulation::domain(vec3& min, vec3& max) {
   float maxX_[maxThreadCount]; mref<float>(maxX_, maxThreadCount).clear(0);
   float maxY_[maxThreadCount]; mref<float>(maxY_, maxThreadCount).clear(0);
   float maxZ_[maxThreadCount]; mref<float>(maxZ_, maxThreadCount).clear(0);
-//#pragma omp parallel for
-//  for(int i=1; i<membrane.H-1; i++) {
-  parallel_for(1, membrane.H-1, [this, &minX_, &minY_, &minZ_, &maxX_, &maxY_, &maxZ_](uint id, uint i) {
+  domainTime.start();
+  /*parallel_for(1, membrane.H-1, [this, &minX_, &minY_, &minZ_, &maxX_, &maxY_, &maxZ_](uint id, uint i) {
    float* const Px = membrane.Px.begin(), *Py = membrane.Py.begin(), *Pz = membrane.Pz.begin();
    vXsf minX = _0f, minY = _0f, minZ = _0f, maxX = _0f, maxY = _0f, maxZ = _0f;
    int stride = membrane.stride, margin=membrane.margin;
    int base = margin+i*stride;
-   for(int j=0; j<membrane.W; j+=simd) {
-    vXsf X = load(Px, base+j), Y = load(Py, base+j), Z = load(Pz, base+j);
-    minX = ::min(minX, X);
-    maxX = ::max(maxX, X);
-    minY = ::min(minY, Y);
-    maxY = ::max(maxY, Y);
-    minZ = ::min(minZ, Z);
-    maxZ = ::max(maxZ, Z);
-   }
-   minX_[id] = ::min(minX);
-   minY_[id] = ::min(minY);
-   minZ_[id] = ::min(minZ);
-   maxX_[id] = ::max(maxX);
-   maxY_[id] = ::max(maxY);
-   maxZ_[id] = ::max(maxZ);
-  });
+   for(int j=0; j<membrane.W; j+=simd) {*/
+  //domainTime +=
+    parallel_chunk(membrane.stride/simd, (membrane.count-membrane.stride)/simd,
+                   [this, &minX_, &minY_, &minZ_, &maxX_, &maxY_, &maxZ_](uint id, uint start, uint size) {
+     const float* const Px = membrane.Px.begin(), *Py = membrane.Py.begin(), *Pz = membrane.Pz.begin();
+     vXsf minX = _0f, minY = _0f, minZ = _0f, maxX = _0f, maxY = _0f, maxZ = _0f;
+     for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
+       vXsf X = load(Px, i), Y = load(Py, i), Z = load(Pz, i);
+       minX = ::min(minX, X);
+       minY = ::min(minY, Y);
+       minZ = ::min(minZ, Z);
+       maxX = ::max(maxX, X);
+       maxY = ::max(maxY, Y);
+       maxZ = ::max(maxZ, Z);
+     }
+     minX_[id] = ::min(minX);
+     minY_[id] = ::min(minY);
+     minZ_[id] = ::min(minZ);
+     maxX_[id] = ::max(maxX);
+     maxY_[id] = ::max(maxY);
+     maxZ_[id] = ::max(maxZ);
+  }, 60);
+  domainTime.stop();
  //}
   for(size_t k: range(threadCount())) {
    minX = ::min(minX, minX_[k]);
@@ -121,7 +126,6 @@ void Simulation::domain(vec3& min, vec3& max) {
  min = vec3(minX, minY, minZ);
  max = vec3(maxX, maxY, maxZ);
  assert_(::max(::max((max-min).x, (max-min).y), (max-min).z) < 16, "wire");
- domainTime.stop();
 }
 
 void Simulation::step() {
@@ -166,6 +170,7 @@ void Simulation::profile(const Time& totalTime) {
   log("grain-wire cycle/grain", (float)grainWireEvaluateTime/grainWireContactSizeSum);
   log("grain-wire B/cycle", (float)(grainWireContactSizeSum*41*4)/grainWireEvaluateTime);
  }
+ log(membrane.W*membrane.H, grain.count, wire.count);
  size_t accounted = 0, shown = 0;
  map<uint64, string> profile;
 #define logTime(name) \

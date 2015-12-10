@@ -243,7 +243,7 @@ struct Simulation : System {
 
  tsc membraneTotalTime;
  void stepMembrane();
-  tsc membraneInitializationTime;
+  uint64 membraneInitializationTime = 0;
   uint64 membraneForceTime = 0;
  void stepGrainMembrane();
    tsc grainMembraneGridTime;

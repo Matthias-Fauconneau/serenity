@@ -13,9 +13,7 @@ void Simulation::stepGrain() {
 void Simulation::stepGrainIntegration() {
  if(!grain.count) return;
  float maxGrainV_[maxThreadCount]; mref<float>(maxGrainV_, maxThreadCount).clear(0);
- //grainIntegrationTime += //parallel_chunk(align(simd, grain.count)/simd, [this, &maxGrainV_](uint id, size_t start, size_t size) {
- {
-  size_t id = 0, start = 0, size = align(simd, grain.count)/simd;
+ grainIntegrationTime += parallel_chunk(align(simd, grain.count)/simd, [this, &maxGrainV_](uint id, size_t start, size_t size) {
    const vXsf dt_mass = floatX(dt / grain.mass), dt = floatX(this->dt);
    const float dt_angularMass = this->dt / Grain::angularMass;
    vXsf maxGrainVX = _0f;
@@ -38,7 +36,7 @@ void Simulation::stepGrainIntegration() {
     store(Px, i, load(Px, i) + dt * Vx);
     store(Py, i, load(Py, i) + dt * Vy);
     store(Pz, i, load(Pz, i) + dt * Vz);
-    maxGrainVX = max(maxGrainVX, maxGrainVX/*sqrt(Vx*Vx + Vy*Vy + Vz*Vz)*/);
+    maxGrainVX = max(maxGrainVX, sqrt(Vx*Vx + Vy*Vy + Vz*Vz));
 
     for(size_t k: range(simd)) { // FIXME: SIMD
      size_t j = i+k;
@@ -57,10 +55,8 @@ void Simulation::stepGrainIntegration() {
      Rw[j] *= scale;
     }
   }
-  float maxGrainV = 0;
-  for(size_t k: range(simd)) maxGrainV = ::max(maxGrainV, extract(maxGrainVX, k));
-  maxGrainV_[id] = maxGrainV;
- }//, 1);
+  maxGrainV_[id] = max(maxGrainVX);
+ });
  float maxGrainV = 0;
  for(size_t k: range(threadCount())) maxGrainV = ::max(maxGrainV, maxGrainV_[k]);
  this->maxGrainV = maxGrainV;
