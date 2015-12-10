@@ -116,7 +116,7 @@ struct System {
   sconst float resolution = Grain::radius; ///2;
   const float radius;
   const int W = int(2*PI*radius/resolution)/simd*simd;
-  const int margin = simd; //16; // Ensures no false sharing
+  const int margin = simd; // 16 to ensure no false sharing ?
   const int stride = margin+W+margin;
   const float internodeLength = 2*sin(PI/W)*radius;
   const float exactHeight = radius * 2;// 4;
@@ -144,7 +144,9 @@ struct System {
   buffer<float> Fz { capacity };
 
   Membrane(float radius) : radius(radius) {
-   Vx.clear(); Vy.clear(); Vz.clear(); // TODO: Gear
+   Px.clear(0); Py.clear(0); Pz.clear(0); // TODO: Gear?
+   Vx.clear(0); Vy.clear(0); Vz.clear(0); // TODO: Gear?
+   Fx.clear(0); Fy.clear(0); Fz.clear(0); // TODO: Gear?
    for(size_t i: range(H)) {
     for(size_t j: range(W)) {
      float z = i*height/(H-1);

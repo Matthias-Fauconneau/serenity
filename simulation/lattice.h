@@ -16,7 +16,7 @@ generic struct Lattice {
     = int(scale.z*(z-min.z)) * (size.y*size.x)
     + int(scale.y*(y-min.y)) * size.x
     + int(scale.x*(x-min.x));
-  assert_(index >= 0 && index < size.z*size.y*size.x, index);
+  assert(index >= 0 && index < size.z*size.y*size.x, index);
   return index;
  }
  inline T& cell(float x, float y, float z) { return base[index(x, y, z)]; }

@@ -11,10 +11,10 @@ void Simulation::stepMembrane() {
      *(vXsf*)(Fy+i) = _0f;
      *(vXsf*)(Fz+i) = _0f;
     }
-  }, maxThreadCount);
+  }, 1/*maxThreadCount FIXME*/);
 
- //membraneForceTime += parallel_for(1, membrane.H-1, [this](uint, int index) { const int start = index, size = 1;
- membraneForceTime += parallel_chunk(1, membrane.H-1, [this](uint, int start, int size) {
+ membraneForceTime += parallel_for(1, membrane.H-1, [this](uint, int index) { const int start = index, size = 1;
+ //membraneForceTime += parallel_chunk(1, membrane.H-1, [this](uint, int start, int size) {
  const float* const Px = membrane.Px.data, *Py = membrane.Py.data, *Pz = membrane.Pz.data;
  const float* const Vx = membrane.Vx.data, *Vy = membrane.Vy.data, *Vz = membrane.Vz.data;
  float* const Fx = membrane.Fx.begin(), *Fy = membrane.Fy.begin(), *Fz = membrane.Fz.begin();
@@ -160,7 +160,7 @@ void Simulation::stepMembrane() {
     const vXsf dFz = load(Fz, index) + fz; store(Fz, index, dFz);
    }
   }
- }, maxThreadCount);
+ }, 1/*maxThreadCount*/);
 }
 
 void Simulation::stepMembraneIntegration() {
@@ -207,18 +207,24 @@ void Simulation::stepMembraneIntegration() {
   pPx[i*stride+margin+W] = pPx[i*stride+margin+0];
   pPy[i*stride+margin+W] = pPy[i*stride+margin+0];
   pPz[i*stride+margin+W] = pPz[i*stride+margin+0];
+  // Copies velocities back to repeated nodes
+  pVx[i*stride+margin-1] = pVx[i*stride+margin+W-1];
+  pVy[i*stride+margin-1] = pVy[i*stride+margin+W-1];
+  pVz[i*stride+margin-1] = pVz[i*stride+margin+W-1];
+  pVx[i*stride+margin+W] = pVx[i*stride+margin+0];
+  pVy[i*stride+margin+W] = pVy[i*stride+margin+0];
+  pVz[i*stride+margin+W] = pVz[i*stride+margin+0];
   maxMembraneV_[id] = max(maxMembraneV_[id], max(maxMembraneVX));
- }, threadCount);
+ }, 1/*threadCount*/);
  float maxMembraneV = 0;
  for(int k: range(threadCount)) maxMembraneV = ::max(maxMembraneV, maxMembraneV_[k]);
  float maxGrainMembraneV = maxGrainV + maxMembraneV;
  grainMembraneGlobalMinD -= maxGrainMembraneV * this->dt;
 }
 
-#if 0
+#if 1
 void Simulation::domainMembrane(vec3& min, vec3& max) {
- float minX = 0, minY = 0, minZ = 0, maxX = 0, maxY = 0, maxZ = 0;
- {
+#if 0
   const/*expr*/ size_t threadCount = ::min(membrane.H-2, maxThreadCount); // 60*60*16 ~ 57600
   float minX_[threadCount]; mref<float>(minX_, threadCount).clear(0);
   float minY_[threadCount]; mref<float>(minY_, threadCount).clear(0);
@@ -252,6 +258,7 @@ void Simulation::domainMembrane(vec3& min, vec3& max) {
      maxY_[id] = ::max(maxY);
      maxZ_[id] = ::max(maxZ);
   }, threadCount);
+  float minX = 0, minY = 0, minZ = 0, maxX = 0, maxY = 0, maxZ = 0;
   for(size_t k: range(threadCount)) {
    minX = ::min(minX, minX_[k]);
    maxX = ::max(maxX, maxX_[k]);
@@ -261,7 +268,30 @@ void Simulation::domainMembrane(vec3& min, vec3& max) {
    maxZ = ::max(maxZ, maxZ_[k]);
   }
  }
- assert_(maxX-minX < 16 && maxY-minY < 16 && maxZ-minZ < 16, "membrane",
+#else
+ vXsf minX_ = _0f, minY_ = _0f, minZ_ = _0f, maxX_ = _0f, maxY_ = _0f, maxZ_ = _0f;
+ int stride = membrane.stride, W = membrane.W, margin = membrane.margin;
+ const float* const Px = membrane.Px.begin(), *Py = membrane.Py.begin(), *Pz = membrane.Pz.begin();
+ for(int i=1; i<membrane.H-1; i++) {
+  for(int j=0; j<W; j+=simd) {
+   uint k = margin+i*stride+j;
+   vXsf X = load(Px, k), Y = load(Py, k), Z = load(Pz, k);
+   minX_ = ::min(minX_, X);
+   maxX_ = ::max(maxX_, X);
+   minY_ = ::min(minY_, Y);
+   maxY_ = ::max(maxY_, Y);
+   minZ_ = ::min(minZ_, Z);
+   maxZ_ = ::max(maxZ_, Z);
+  }
+ }
+ const float minX = ::min(minX_);
+ const float minY = ::min(minY_);
+ const float minZ = ::min(minZ_);
+ const float maxX = ::max(maxX_);
+ const float maxY = ::max(maxY_);
+ const float maxZ = ::max(maxZ_);
+#endif
+ assert_(maxX-minX < 4 && maxY-minY < 4 && maxZ-minZ < 4, "membrane",
          minX, maxX, minY, maxY, minZ, maxZ, "\n",
          maxX-minX, maxY-minY, maxZ-minZ, "\n",
          membrane.margin, membrane.W, membrane.H, membrane.stride);

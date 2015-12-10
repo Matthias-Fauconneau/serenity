@@ -176,8 +176,14 @@ void Simulation::stepGrainMembrane() {
   grainMembraneGridTime.stop();*/
 
   vec3 min =  0, max = 0; domainGrain(min, max); //domainMembrane(min, max);
-  min = ::min(min, vec3(vec2(-membrane.radius), 0));
-  max = ::max(max, vec3(vec2(membrane.radius), membrane.height));
+  /*min = ::min(min, vec3(vec2(-membrane.radius), 0));
+  max = ::max(max, vec3(vec2(membrane.radius), membrane.height));*/
+  {vec3 mmin, mmax; domainMembrane(mmin, mmax);
+   min = ::min(min, mmin);
+   max = ::max(max, mmax);
+  }
+  assert_(min<max);
+
   memoryTime.start();
   Lattice<uint16> lattice(sqrt(3.)/(2*Grain::radius), min, max);
   memoryTime.stop();
