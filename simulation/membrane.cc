@@ -42,7 +42,7 @@ void Simulation::stepMembrane() {
     const vXsf VOz = *(vXsf*)(Vz+index);
 
     // Tension
-#define edge(i) \
+#define tension(i) \
  const int e = e##i+j; \
  const vXsf Rx = loadu(Px, e) - Ox; \
  const vXsf Ry = loadu(Py, e) - Oy; \
@@ -61,9 +61,9 @@ void Simulation::stepMembrane() {
  const vXsf ty = f * Ny; \
  const vXsf tz = f * Nz;
     vXsf fx, fy, fz;
-    {edge(0) fx = tx; fy = ty; fz = tz;}
-    {edge(1) fx += tx; fy += ty; fz += tz;}
-    {edge(2)
+    {tension(0) fx = tx; fy = ty; fz = tz;}
+    {tension(1) fx += tx; fy += ty; fz += tz;}
+    {tension(2)
        const vXsf dFx = loadu(Fx, e) - tx; storeu(Fx, e, dFx);
        const vXsf dFy = loadu(Fy, e) - ty; storeu(Fy, e, dFy);
        const vXsf dFz = loadu(Fz, e) - tz; storeu(Fz, e, dFz);
@@ -91,43 +91,66 @@ void Simulation::stepMembrane() {
      const vXsf VOz = load(Vz, index);
 
      vXsf fx, fy, fz;
-     {edge(0)
+     {tension(0)
         const vXsf dFx = loadu(Fx, e) - tx; storeu(Fx, e, dFx);
         const vXsf dFy = loadu(Fy, e) - ty; storeu(Fy, e, dFy);
         const vXsf dFz = loadu(Fz, e) - tz; storeu(Fz, e, dFz);
         fx = tx; fy = ty; fz = tz;
      }
-     {edge(1)
+     {tension(1)
         const vXsf dFx = loadu(Fx, e) - tx; storeu(Fx, e, dFx);
         const vXsf dFy = loadu(Fy, e) - ty; storeu(Fy, e, dFy);
         const vXsf dFz = loadu(Fz, e) - tz; storeu(Fz, e, dFz);
         fx += tx; fy += ty; fz += tz;
      }
-     {edge(2)
+     {tension(2)
         const vXsf dFx = loadu(Fx, e) - tx; storeu(Fx, e, dFx);
         const vXsf dFy = loadu(Fy, e) - ty; storeu(Fy, e, dFy);
         const vXsf dFz = loadu(Fz, e) - tz; storeu(Fz, e, dFz);
         fx += tx; fy += ty; fz += tz;
      }
-     #if 0
-     for(int a: range(2)) { // TODO: merge pressure with tension evaluation above
-      int b = a+1; // TODO: Assert peeled
-      const vXsf px = (Y[a]*Z[b] - Y[b]*Z[a]);
-      const vXsf py = (Z[a]*X[b] - Z[b]*X[a]);
-      const vXsf pz = (X[a]*Y[b] - X[b]*Y[a]);
-      const vXsf ppx = P * px;
-      const vXsf ppy = P * py;
+     #if 1
+     // FIXME: merge loads with tension
+#define pressure(a, b) \
+      const int ea = e##a+j; \
+      const vXsf Xa = loadu(Px, ea) - Ox; \
+      const vXsf Ya = loadu(Py, ea) - Oy; \
+      const vXsf Za = loadu(Pz, ea) - Oz; \
+      const int eb = e##b+j; \
+      const vXsf Xb = loadu(Px, eb) - Ox; \
+      const vXsf Yb = loadu(Py, eb) - Oy; \
+      const vXsf Zb = loadu(Pz, eb) - Oz; \
+      const vXsf px = (Ya*Zb - Yb*Za); \
+      const vXsf py = (Za*Xb - Zb*Xa); \
+      const vXsf pz = (Xa*Yb - Xb*Ya); \
+      const vXsf ppx = P * px; \
+      const vXsf ppy = P * py; \
       const vXsf ppz = P * pz;
-      FX[a] += ppx;
-      FY[a] += ppy;
-      FZ[a] += ppz;
-      FX[b] += ppx;
-      FY[b] += ppy;
-      FZ[b] += ppz;
-      FX[3] += ppx;
-      FY[3] += ppy;
-      FZ[3] += ppz;
-     }
+      {
+       pressure(0, 1)
+       {const vXsf dFx = loadu(Fx, ea) + ppx; storeu(Fx, ea, dFx);
+       const vXsf dFy = loadu(Fy, ea) + ppy; storeu(Fy, ea, dFy);
+       const vXsf dFz = loadu(Fz, ea) + ppz; storeu(Fz, ea, dFz);}
+       {const vXsf dFx = loadu(Fx, eb) + ppx; storeu(Fx, eb, dFx);
+       const vXsf dFy = loadu(Fy, eb) + ppy; storeu(Fy, eb, dFy);
+       const vXsf dFz = loadu(Fz, eb) + ppz; storeu(Fz, eb, dFz);}
+       fx += ppx;
+       fy += ppy;
+       fz += ppz;
+      }
+      {
+       pressure(1, 2)
+       {const vXsf dFx = loadu(Fx, ea) + ppx; storeu(Fx, ea, dFx);
+       const vXsf dFy = loadu(Fy, ea) + ppy; storeu(Fy, ea, dFy);
+       const vXsf dFz = loadu(Fz, ea) + ppz; storeu(Fz, ea, dFz);}
+       {const vXsf dFx = loadu(Fx, eb) + ppx; storeu(Fx, eb, dFx);
+       const vXsf dFy = loadu(Fy, eb) + ppy; storeu(Fy, eb, dFy);
+       const vXsf dFz = loadu(Fz, eb) + ppz; storeu(Fz, eb, dFz);}
+       fx += ppx;
+       fy += ppy;
+       fz += ppz;
+      }
+#undef pressure
      #endif
      const vXsf dFx = load(Fx, index) + fx; store(Fx, index, dFx);
      const vXsf dFy = load(Fy, index) + fy; store(Fy, index, dFy);
@@ -152,15 +175,16 @@ void Simulation::stepMembrane() {
 
     // Tension
     vXsf fx, fy, fz;
-    {edge(3) fx = tx; fy = ty; fz = tz;}
-    {edge(4) fx += tx; fy += ty; fz += tz;}
+    {tension(3) fx = tx; fy = ty; fz = tz;}
+    {tension(4) fx += tx; fy += ty; fz += tz;}
     // TODO: pression
     const vXsf dFx = load(Fx, index) + fx; store(Fx, index, dFx);
     const vXsf dFy = load(Fy, index) + fy; store(Fy, index, dFy);
     const vXsf dFz = load(Fz, index) + fz; store(Fz, index, dFz);
    }
   }
- }, 1/*maxThreadCount*/);
+#undef tension
+ }, 1/*maxThreadCount FIXME: pressure*/);
 }
 
 void Simulation::stepMembraneIntegration() {
