@@ -43,12 +43,18 @@ void Simulation::domain(vec3& min, vec3& max) {
   float maxX_[threadCount]; mref<float>(maxX_, threadCount).clear(0);
   float maxY_[threadCount]; mref<float>(maxY_, threadCount).clear(0);
   float maxZ_[threadCount]; mref<float>(maxZ_, threadCount).clear(0);
-  domainTime += parallel_chunk(membrane.stride/simd, (membrane.count-membrane.stride)/simd,
-                   [this, &minX_, &minY_, &minZ_, &maxX_, &maxY_, &maxZ_](uint id, uint start, uint size) {
+  //size_t stride = membrane.stride, margin = membrane.margin;
+  /*domainTime += parallel_chunk((stride+margin)/simd, (membrane.count-stride-margin)/simd,
+                   [this, &minX_, &minY_, &minZ_, &maxX_, &maxY_, &maxZ_](uint id, uint start, uint size) {*/
+  domainTime += parallel_for(1, membrane.H-1,
+                   [this, &minX_, &minY_, &minZ_, &maxX_, &maxY_, &maxZ_](uint id, uint i) {
+   int stride = membrane.stride, W = membrane.W, margin = membrane.margin;
      const float* const Px = membrane.Px.begin(), *Py = membrane.Py.begin(), *Pz = membrane.Pz.begin();
      vXsf minX = _0f, minY = _0f, minZ = _0f, maxX = _0f, maxY = _0f, maxZ = _0f;
-     for(uint i=start*simd; i<(start+size)*simd; i+=simd) { // 49
-       vXsf X = load(Px, i), Y = load(Py, i), Z = load(Pz, i);
+     for(int j=0; j<W; j+=simd) { // 49
+     //for(uint i=start*simd; i<(start+size)*simd; i+=simd) { // 49
+      uint k = margin+i*stride+j;
+       vXsf X = load(Px, k), Y = load(Py, k), Z = load(Pz, k);
        minX = ::min(minX, X);
        minY = ::min(minY, Y);
        minZ = ::min(minZ, Z);
@@ -73,7 +79,9 @@ void Simulation::domain(vec3& min, vec3& max) {
   }
  }
  assert_(maxX-minX < 16 && maxY-minY < 16 && maxZ-minZ < 16, "membrane",
-         minX, maxX, minY, maxY, minZ, maxZ, membrane.margin, membrane.W, membrane.H, membrane.stride);
+         minX, maxX, minY, maxY, minZ, maxZ, "\n",
+         maxX-minX, maxY-minY, maxZ-minZ, "\n",
+         membrane.margin, membrane.W, membrane.H, membrane.stride);
  {
   float* const Px = grain.Px.begin(), *Py = grain.Py.begin(), *Pz = grain.Pz.begin();
   vXsf minX_ = _0f, minY_ = _0f, minZ_ = _0f, maxX_ = _0f, maxY_ = _0f, maxZ_ = _0f;
@@ -132,7 +140,7 @@ void Simulation::step() {
  membraneTotalTime.start();
  stepMembrane();
  membraneTotalTime.stop();
- //stepGrainMembrane();
+ stepGrainMembrane();
 
  /*stepWire();
  stepGrainWire();
@@ -233,7 +241,7 @@ void Simulation::profile(const Time& totalTime) {
 bool Simulation::run(const Time& totalTime) {
  stepTimeRT.start();
  stepTime.start();
- for(int unused t: range(1/(dt*60))) step();
+ for(int unused t: range(1/(dt*60*4))) step();
  stepTime.stop();
  stepTimeRT.stop();
  if(timeStep%(1*size_t(1/(dt*60))) == 0) {

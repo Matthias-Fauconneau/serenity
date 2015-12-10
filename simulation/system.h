@@ -33,7 +33,8 @@ struct System {
  // Sphere particles
  struct Grain {
   sconst float mass = 2.7 * g;
-  sconst float radius = 2.47 * mm; //40 *mm;
+  sconst bool validation = false;
+  sconst float radius = (validation ? 2.47 : 40) * mm;
   sconst float curvature = 1./radius;
   sconst float elasticModulus = Obstacle::elasticModulus/*1e3 * MPa*/;
   sconst float poissonRatio = 0.35;
@@ -108,10 +109,10 @@ struct System {
   sconst float resolution = Grain::radius/2;
   const float radius;
   const int W = int(2*PI*radius/resolution)/simd*simd;
-  const int margin = 16; // Ensures no false sharing
+  const int margin = simd; //16; // Ensures no false sharing
   const int stride = margin+W+margin;
   const float internodeLength = 2*sin(PI/W)*radius;
-  const float exactHeight = radius * 4;
+  const float exactHeight = radius * 2;// 4;
   const float cellHeight = sqrt(3.)/2*internodeLength;
   const size_t H = ceil(exactHeight/cellHeight)+1;
   const float height = (H-1) * cellHeight;
@@ -123,7 +124,7 @@ struct System {
   //sconst float areaMomentOfInertia = pow4(1*mm); // FIXME
   //const float bendStiffness = 0;//elasticModulus * areaMomentOfInertia / internodeLength; // FIXME
 
-  const size_t capacity;
+  const size_t capacity = H*stride;
   const size_t count = capacity;
   buffer<float> Px { capacity };
   buffer<float> Py { capacity };
@@ -135,7 +136,7 @@ struct System {
   buffer<float> Fy { capacity };
   buffer<float> Fz { capacity };
 
-  Membrane(float radius) : radius(radius), capacity(H*stride) {
+  Membrane(float radius) : radius(radius) {
    Vx.clear(); Vy.clear(); Vz.clear(); // TODO: Gear
    for(size_t i: range(H)) {
     for(size_t j: range(W)) {

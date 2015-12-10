@@ -1,10 +1,9 @@
 #include "simulation.h"
 #include "parallel.h"
-extern "C" int omp_get_num_threads();
 
 void Simulation::stepMembrane() {
- membraneInitializationTime +=
-   parallel_chunk(membrane.stride/simd, (membrane.count-membrane.stride)/simd,
+ size_t stride = membrane.stride;
+ membraneInitializationTime += parallel_chunk(stride/simd, (membrane.count-stride)/simd,
                   [this](uint, uint start, uint size) {
     float* const Fx = membrane.Fx.begin(), *Fy = membrane.Fy.begin(), *Fz = membrane.Fz.begin();
     for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
@@ -15,7 +14,7 @@ void Simulation::stepMembrane() {
   }, maxThreadCount);
 
  membraneForceTime += parallel_for(1, membrane.H-1, [this](uint, int index) { const int start = index, size = 1;
-//membraneForceTime += parallel_chunk(1, membrane.H-1, [this](uint, size_t start, size_t size) {
+ //membraneForceTime += parallel_chunk(1, membrane.H-1, [this](uint, int start, int size) {
  const float* const Px = membrane.Px.data, *Py = membrane.Py.data, *Pz = membrane.Pz.data;
  const float* const Vx = membrane.Vx.data, *Vy = membrane.Vy.data, *Vz = membrane.Vz.data;
  float* const Fx = membrane.Fx.begin(), *Fy = membrane.Fy.begin(), *Fz = membrane.Fz.begin();
@@ -33,7 +32,6 @@ void Simulation::stepMembrane() {
    const int e0 = base-stride+i%2;
    const int e1 = base-stride-!(i%2);
    const int e2 = base-1;
-   //#pragma loop count (15)
    for(int j=0; j<W; j+=simd) {
     int index = base+j;
     const vXsf Ox = *(vXsf*)(Px+index);
@@ -44,8 +42,8 @@ void Simulation::stepMembrane() {
     const vXsf VOz = *(vXsf*)(Vz+index);
 
     // Tension
-#define loop(i) \
- int e = e##i+j; \
+#define edge(i) \
+ const int e = e##i+j; \
  const vXsf Rx = loadu(Px, e) - Ox; \
  const vXsf Ry = loadu(Py, e) - Oy; \
  const vXsf Rz = loadu(Pz, e) - Oz; \
@@ -63,13 +61,13 @@ void Simulation::stepMembrane() {
  const vXsf ty = f * Ny; \
  const vXsf tz = f * Nz;
     vXsf fx, fy, fz;
-    {loop(0) fx = tx; fy = ty; fz = tz;}
-    {loop(1) fx += tx; fy += ty; fz += tz;}
-    {loop(2)
+    {edge(0) fx = tx; fy = ty; fz = tz;}
+    {edge(1) fx += tx; fy += ty; fz += tz;}
+    {edge(2)
        const vXsf dFx = loadu(Fx, e) - tx; storeu(Fx, e, dFx);
-     const vXsf dFy = loadu(Fy, e) - ty; storeu(Fy, e, dFy);
-     const vXsf dFz = loadu(Fz, e) - tz; storeu(Fz, e, dFz);
-     fx += tx; fy += ty; fz += tz;
+       const vXsf dFy = loadu(Fy, e) - ty; storeu(Fy, e, dFy);
+       const vXsf dFz = loadu(Fz, e) - tz; storeu(Fz, e, dFz);
+       fx += tx; fy += ty; fz += tz;
     }
     // TODO: pression
     const vXsf dFx = load(Fx, index) + fx; store(Fx, index, dFx);
@@ -79,7 +77,6 @@ void Simulation::stepMembrane() {
   }
 
    for(int i=start+1; i<start+size; i++) {
-    error("for");
     const int base = margin+i*stride;
     const int e0 = base-stride+i%2;
     const int e1 = base-stride-!(i%2);
@@ -94,19 +91,19 @@ void Simulation::stepMembrane() {
      const vXsf VOz = load(Vz, index);
 
      vXsf fx, fy, fz;
-     {loop(0)
+     {edge(0)
         const vXsf dFx = loadu(Fx, e) - tx; storeu(Fx, e, dFx);
         const vXsf dFy = loadu(Fy, e) - ty; storeu(Fy, e, dFy);
         const vXsf dFz = loadu(Fz, e) - tz; storeu(Fz, e, dFz);
         fx = tx; fy = ty; fz = tz;
      }
-     {loop(1)
+     {edge(1)
         const vXsf dFx = loadu(Fx, e) - tx; storeu(Fx, e, dFx);
         const vXsf dFy = loadu(Fy, e) - ty; storeu(Fy, e, dFy);
         const vXsf dFz = loadu(Fz, e) - tz; storeu(Fz, e, dFz);
         fx += tx; fy += ty; fz += tz;
      }
-     {loop(2)
+     {edge(2)
         const vXsf dFx = loadu(Fx, e) - tx; storeu(Fx, e, dFx);
         const vXsf dFy = loadu(Fy, e) - ty; storeu(Fy, e, dFy);
         const vXsf dFz = loadu(Fz, e) - tz; storeu(Fz, e, dFz);
@@ -142,11 +139,8 @@ void Simulation::stepMembrane() {
   {
    const int i = start+size-1;
    const int base = margin+i*stride;
-   //int dy[6] {-1, -1,            0,       1,         1,     0};
-   //int dx[2][6] {{0, -1, -1, -1, 0, 1},{1, 0, -1, 0, 1, 1}};
    const int e3 = base+stride-!(i%2);
    const int e4 = base+stride+(i%2);
-   //#pragma loop count (15)
    for(int j=0; j<W; j+=simd) {
     int index = base+j;
     const vXsf Ox = *(vXsf*)(Px+index);
@@ -157,27 +151,9 @@ void Simulation::stepMembrane() {
     const vXsf VOz = *(vXsf*)(Vz+index);
 
     // Tension
-#define loop(i) \
- int e = e##i+j; \
- const vXsf Rx = loadu(Px, e) - Ox; \
- const vXsf Ry = loadu(Py, e) - Oy; \
- const vXsf Rz = loadu(Pz, e) - Oz; \
- const vXsf sqL = Rx*Rx+Ry*Ry+Rz*Rz; \
- const vXsf L = sqrt(sqL); \
- const vXsf Nx = Rx/L, Ny = Ry/L, Nz = Rz/L; \
- const vXsf x = L - internodeLength; \
- const vXsf fS = tensionStiffness * x; \
- const vXsf RVx = loadu(Vx, e) - VOx; \
- const vXsf RVy = loadu(Vy, e) - VOy; \
- const vXsf RVz = loadu(Vz, e) - VOz; \
- const vXsf fB = tensionDamping * (Nx * RVx + Ny * RVy + Nz * RVz); \
- const vXsf f = fS + fB; \
- const vXsf tx = f * Nx; \
- const vXsf ty = f * Ny; \
- const vXsf tz = f * Nz;
     vXsf fx, fy, fz;
-    {loop(3) fx = tx; fy = ty; fz = tz;}
-    {loop(4) fx += tx; fy += ty; fz += tz;}
+    {edge(3) fx = tx; fy = ty; fz = tz;}
+    {edge(4) fx += tx; fy += ty; fz += tz;}
     // TODO: pression
     const vXsf dFx = load(Fx, index) + fx; store(Fx, index, dFx);
     const vXsf dFy = load(Fy, index) + fy; store(Fy, index, dFy);
@@ -189,7 +165,7 @@ void Simulation::stepMembrane() {
 
 void Simulation::stepMembraneIntegration() {
  if(!membrane.count) return;
- const/*expr*/ size_t threadCount = /*60*/maxThreadCount;
+ const size_t threadCount = maxThreadCount;
  float maxMembraneV_[threadCount]; mref<float>(maxMembraneV_, threadCount).clear(0);
  membraneIntegrationTime += parallel_for(1, membrane.H-1, [this, &maxMembraneV_](uint id, uint i) {
   const vXsf dt_mass = floatX(this->dt / membrane.mass), dt = floatX(this->dt);//, topZ = floatX(this->topZ);
@@ -206,13 +182,12 @@ void Simulation::stepMembraneIntegration() {
   Fy[i*stride+margin+W-1] += Fy[i*stride+margin-1];
   Fz[i*stride+margin+W-1] += Fz[i*stride+margin-1];
   int base = margin+i*stride;
-  //#pragma loop count (15)
   for(int j=0; j<W; j+=simd) {
    int k = base+j;
    // Symplectic Euler
    const vXsf Vx = load(pVx, k) + dt_mass * load(Fx, k);
-   const vXsf Vy = load(pVx, k) + dt_mass * load(Fy, k);
-   const vXsf Vz = load(pVx, k) + dt_mass * load(Fz, k);
+   const vXsf Vy = load(pVy, k) + dt_mass * load(Fy, k);
+   const vXsf Vz = load(pVz, k) + dt_mass * load(Fz, k);
    store(pVx, k, Vx);
    store(pVy, k, Vy);
    store(pVz, k, Vz);

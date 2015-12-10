@@ -2,8 +2,10 @@
 
 #if __MIC__
 const size_t maxThreadCount = 60; //240;
-#else
+#elif 0
 const size_t maxThreadCount = 8;
+#else
+const size_t maxThreadCount = 1;
 #endif
 extern thread threads[::maxThreadCount];
 thread threads[::maxThreadCount];
@@ -63,6 +65,7 @@ uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate
   for(int i=start; i<stop; i++) delegate(omp_get_thread_num(), i);
   return time.cycleCount();
 #else
+  assert_(threadCount == ::threadCount());
   for(size_t index: range(::threadCount())) {
    threads[index].counter = &start;
    threads[index].stop = stop;

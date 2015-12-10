@@ -103,7 +103,7 @@ static inline v8sf loadu(ref<float> a, size_t index) { return loadu(a.data, inde
 static inline void store(float* const a, size_t index, v8sf v) { *(v8sf*)(a+index) = v; }
 static inline void store(mref<float> a, size_t index, v8sf v) { store(a.begin(), index, v); }
 static inline void storeu(float* const a, size_t index, v8sf v) { __builtin_ia32_storeups256(a+index, v); }
-//static inline void storeu(mref<float> a, size_t index, v8sf v) { storeu(a.begin(), index, v); }
+static inline void storeu(mref<float> a, size_t index, v8sf v) { storeu(a.begin(), index, v); }
 
 static inline v8sf min(v8sf a, v8sf b) { return __builtin_ia32_minps256(a, b); }
 static inline v8sf max(v8sf a, v8sf b) { return __builtin_ia32_maxps256(a, b); }
