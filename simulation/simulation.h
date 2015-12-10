@@ -212,7 +212,7 @@ struct Simulation : System {
   tsc processTime;
  tsc grainTotalTime;
  void stepGrain();
-  tsc grainTime;
+  uint64 grainTime = 0;
  void stepGrainBottom();
   //tsc grainBottomSearchTime; // TODO: verlet
   uint64 grainBottomFilterTime = 0;

@@ -177,7 +177,7 @@ void Simulation::stepGrainGrain() {
 
   const float verletDistance = 2*2*Grain::radius/sqrt(3.); // > Grain::radius + Grain::radius
   // Minimum distance over verlet distance parameter is the actual verlet distance which can be used
-  float minD = __builtin_inff();
+  //float minD = verletDistance; //__builtin_inff(); // With lattice, a nearest > verletDistance might be skipped
 
   const int Y = lattice.size.y, X = lattice.size.x;
   const uint16* latticeNeighbours[62];
@@ -187,7 +187,7 @@ void Simulation::stepGrainGrain() {
   }
   assert(i==62);
   grainGrainLatticeTime.stop();
-  grainGrainSearchTime.start();
+
   swap(oldGrainGrainA, grainGrainA);
   swap(oldGrainGrainB, grainGrainB);
   swap(oldGrainGrainLocalAx, grainGrainLocalAx);
@@ -220,6 +220,7 @@ void Simulation::stepGrainGrain() {
 
   size_t grainGrainI = 0; // Index of first contact with A in old grainGrain[Local]A|B list
 
+  grainGrainSearchTime.start();
   for(size_t a: range(grain.count)) {
    size_t offset = lattice.index(grain.Px[a], grain.Py[a], grain.Pz[a]);
 
@@ -231,7 +232,7 @@ void Simulation::stepGrainGrain() {
     float d = sqrt(sq(grain.Px[a]-grain.Px[b])
                       + sq(grain.Py[a]-grain.Py[b])
                       + sq(grain.Pz[a]-grain.Pz[b])); //TODO: SIMD //FIXME: fails with Ofast?
-    if(d > verletDistance) { minD=::min(minD, d); continue; }
+    if(d > verletDistance) { /*minD=::min(minD, d);*/ continue; }
     grainGrainA.append( a );
     grainGrainB.append( b );
     for(size_t k = 0;; k++) {
@@ -258,6 +259,7 @@ void Simulation::stepGrainGrain() {
     }
     break_:;
    }
+   grainGrainSearchTime.stop();
    while(grainGrainI < oldGrainGrainA.size && oldGrainGrainA[grainGrainI] == a)
     grainGrainI++;
   }
@@ -266,12 +268,11 @@ void Simulation::stepGrainGrain() {
   for(size_t i=grainGrainA.size; i<align(simd, grainGrainA.size+1); i++) grainGrainA.begin()[i] = 0;
   for(size_t i=grainGrainB.size; i<align(simd, grainGrainB.size+1); i++) grainGrainB.begin()[i] = 0;
 
-  grainGrainGlobalMinD = minD - 2*Grain::radius;
+  grainGrainGlobalMinD = verletDistance/*minD*/ - 2*Grain::radius;
   if(grainGrainGlobalMinD <= 0) log("grainGrainGlobalMinD12", grainGrainGlobalMinD);
 
   //log("grain-grain", grainGrainSkipped);
   grainGrainSkipped=0;
-  grainGrainSearchTime.stop();
  } else grainGrainSkipped++;
 
  // Filters verlet lists, packing contacts to evaluate

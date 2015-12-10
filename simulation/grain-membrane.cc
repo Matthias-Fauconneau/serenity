@@ -190,7 +190,7 @@ void Simulation::stepGrainMembrane() {
   const float verletDistance = 2*Grain::radius/sqrt(3.); // > Grain::radius
   assert_(verletDistance > Grain::radius + 0);
   // Minimum distance over verlet distance parameter is the actual verlet distance which can be used
-  float minD = __builtin_inff();
+  //float minD = __builtin_inff();
 
   const int X = lattice.size.x, Y = lattice.size.y;
   const unused uint16* latticeNeighbours[3*3] = {
@@ -240,15 +240,18 @@ void Simulation::stepGrainMembrane() {
   size_t grainMembraneIndex = 0; // Index of first contact with A in old grainMembrane[Local]A|B list
   //grainMembraneSearchTime += parallel_chunk(grain.count, [&](uint, size_t start, size_t size) {
   //grainMembraneSearchTime += parallel_chunk(grain.count, [&](uint, size_t start, size_t size) {
-  const size_t threadCount = ::min(membrane.H, maxThreadCount);
-  float minD_[threadCount]; mref<float>(minD_, threadCount).clear(0);
-  grainMembraneSearchTime += parallel_for(0, membrane.H,
-                                          [this,&lattice,&latticeNeighbours,verletDistance,&grainMembraneIndex,&minD_](uint id, uint i) {
-   //for(size_t a=start; a<(start+size); a+=1) { // TODO: SIMD
+  //const size_t threadCount = ::min(membrane.H, maxThreadCount);
+  //float minD_[threadCount]; mref<float>(minD_, threadCount).clear(__builtin_inff());
+  /*grainMembraneSearchTime += parallel_for(0, membrane.H,
+                                          [this,&lattice,&latticeNeighbours,verletDistance,&grainMembraneIndex,&minD_](uint id, uint i) {*/
+  //float minD = verletDistance; //__builtin_inff();
+  tsc grainMembraneSearchTime; grainMembraneSearchTime.start();
+  for(int i=0; i<membrane.H; i++) {
+   //for(size_t a=start; a<(start+size); a+=1) { // TODO: SIMD ?
     int W = membrane.W;
     int base = membrane.margin+i*membrane.stride;
-    float minD = __builtin_inff();
-    for(int j=0; j<W; j+=simd) {
+    //float minD = __builtin_inff();
+    for(int j=0; j<W; j++) { // TODO: SIMD ?
      uint b = base+j;
      int offset = lattice.index(membrane.Px[b], membrane.Py[b], membrane.Pz[b]);
      for(int n: range(3*3)) for(int i: range(3)) {
@@ -258,7 +261,7 @@ void Simulation::stepGrainMembrane() {
       float d = sqrt(sq(grain.Px[a]-membrane.Px[b])
                      + sq(grain.Py[a]-membrane.Py[b])
                      + sq(grain.Pz[a]-membrane.Pz[b])); // TODO: SIMD //FIXME: fails with Ofast?
-      if(d > verletDistance) { minD=::min(minD, d); continue; }
+      if(d > verletDistance) { /*minD=::min(minD, d);*/ continue; }
       assert_(grainMembraneA.size < grainMembraneA.capacity);
       grainMembraneA.append( a ); // Grain
       grainMembraneB.append( b ); // Membrane
@@ -289,15 +292,16 @@ break_:;
      while(grainMembraneIndex < oldGrainMembraneB.size && oldGrainMembraneB[grainMembraneIndex] == b)
       grainMembraneIndex++;
     }
-    minD_[id] = ::min(minD_[id], minD);
-  }, 1 /*FIXME*/);
+    //minD_[id] = ::min(minD_[id], minD);
+  }//, 1 /*FIXME: grainMembraneIndex*/);
+  this->grainMembraneSearchTime += grainMembraneSearchTime.cycleCount();
 
   assert_(align(simd, grainMembraneA.size+1) <= grainMembraneA.capacity);
   for(size_t i=grainMembraneA.size; i<align(simd, grainMembraneA.size +1); i++) grainMembraneA.begin()[i] = 0;
   assert_(align(simd, grainMembraneB.size+1) <= grainMembraneB.capacity);
   for(size_t i=grainMembraneB.size; i<align(simd, grainMembraneB.size +1); i++) grainMembraneB.begin()[i] = 0;
 
-  grainMembraneGlobalMinD = minD - (Grain::radius+0);
+  grainMembraneGlobalMinD = /*minD*/verletDistance - (Grain::radius+0);
   if(grainMembraneGlobalMinD < 0) log("grainMembraneGlobalMinD", grainMembraneGlobalMinD);
 
   /*if(processState > ProcessState::Pour) // Element creation resets verlet lists

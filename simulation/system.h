@@ -32,9 +32,10 @@ struct System {
 
  // Sphere particles
  struct Grain {
-  sconst float mass = 2.7 * g;
   sconst bool validation = true;
-  sconst float radius = (validation ? 2.47 : 40) * mm;
+  sconst float radius = validation ? 2.47 * mm: 40 * mm;
+  sconst float density = 7.6e3 * kg/cb(m);
+  sconst float mass = validation ? 4./3*PI*cb(radius) * density /*~5g*/ : 2.7 * g;
   sconst float curvature = 1./radius;
   sconst float elasticModulus = Obstacle::elasticModulus/*1e3 * MPa*/;
   sconst float poissonRatio = 0.35;
@@ -57,7 +58,13 @@ struct System {
   buffer<float> AVx { capacity }, AVy { capacity }, AVz { capacity }; // Angular velocity
   buffer<float> Tx { capacity }, Ty { capacity }, Tz { capacity }; // Torque
 
-  Grain() : capacity(16384) { Px.clear(0); Py.clear(0); Pz.clear(0); Rw.clear(1); }
+  Grain() : capacity(16384) {
+   Px.clear(0); Py.clear(0); Pz.clear(0);
+   Vx.clear(0); Vy.clear(0); Vz.clear(0);
+   Fx.clear(0); Fy.clear(0); Fz.clear(0);
+   Tx.clear(0); Ty.clear(0); Tz.clear(0);
+   Rx.clear(0); Ry.clear(0); Rz.clear(0); Rw.clear(1);
+  }
 
   const vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]);  }
   const vec3 velocity(size_t i) const { return vec3(Vx[i], Vy[i], Vz[i]);  }
@@ -106,7 +113,7 @@ struct System {
   sconst float elasticModulus = 10 * MPa;
   sconst float poissonRatio = 0.48;
 
-  sconst float resolution = Grain::radius/2;
+  sconst float resolution = Grain::radius; ///2;
   const float radius;
   const int W = int(2*PI*radius/resolution)/simd*simd;
   const int margin = simd; //16; // Ensures no false sharing

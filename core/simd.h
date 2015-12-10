@@ -180,7 +180,7 @@ static inline float op(v8sf x) { \
     const v4sf x32 = _mm_##op##_ss(x64, _mm_shuffle_ps(x64, x64, 0x55)); \
     return _mm_cvtss_f32(x32); \
 }
-#else
+#elif __clang__
 #define reduce(op) \
 static inline float op(v8sf x) { \
     /* ( x3+x7, x2+x6, x1+x5, x0+x4 ) */ \

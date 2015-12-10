@@ -2,12 +2,17 @@
 #include "parallel.h"
 
 void Simulation::stepGrain() {
- grainTime.start();
- for(size_t i: range(grain.count)) {
-  grain.Fx[i] = 0; grain.Fy[i] = 0; grain.Fz[i] = Grain::mass * Gz;
-  grain.Tx[i] = 0; grain.Ty[i] = 0; grain.Tz[i] = 0;
- }
- grainTime.stop();
+ const vXsf m_Gz = floatX(Grain::mass * Gz);
+ grainTime += parallel_chunk(align(simd, grain.count)/simd, [&](uint, size_t start, size_t size) {
+  for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
+    store(grain.Fx, i, _0f);
+    store(grain.Fy, i, _0f);
+    store(grain.Fz, i, m_Gz);
+    store(grain.Tx, i, _0f);
+    store(grain.Ty, i, _0f);
+    store(grain.Tz, i, _0f);
+   }
+ }, 1);
 }
 
 void Simulation::stepGrainIntegration() {

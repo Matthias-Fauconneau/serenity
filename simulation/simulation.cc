@@ -8,9 +8,9 @@
 //#include "grain-grain.h"
 //#include "membrane.h"
 //#include "grain-membrane.h"
-//#include "wire.h"
-//#include "wire-bottom.h"
-//#include "grain-wire.h"
+//include "wire.h"
+//include "wire-bottom.h"
+//include "grain-wire.h"
 
 constexpr float System::staticFrictionLength;
 constexpr float System::Grain::radius;
@@ -51,7 +51,9 @@ void Simulation::domainGrain(vec3& min, vec3& max) {
  const float maxX = ::max(maxX_);
  const float maxY = ::max(maxY_);
  const float maxZ = ::max(maxZ_);
- assert_(maxX-minX < 16 && maxY-minY < 16 && maxZ-minZ < 16, "grain");
+ assert_(maxX-minX < 16 && maxY-minY < 16 && maxZ-minZ < 16, "grain",
+         maxX-minX, maxY-minY, maxZ-minZ, "\n",
+         minX, maxX, minY, maxY, minZ, maxZ, grain.count);
  min = vec3(minX, minY, minZ);
  max = vec3(maxX, maxY, maxZ);
 }
@@ -198,7 +200,7 @@ void Simulation::profile(const Time& totalTime) {
 bool Simulation::run(const Time& totalTime) {
  stepTimeRT.start();
  stepTime.start();
- for(int unused t: range(1/(dt*60))) step();
+ for(int unused t: range(1/(dt*60*32))) step();
  stepTime.stop();
  stepTimeRT.stop();
  if(timeStep%(1*size_t(1/(dt*60))) == 0) {
