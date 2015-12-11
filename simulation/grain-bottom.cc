@@ -90,7 +90,7 @@ void Simulation::stepGrainBottom() {
      // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
      grainBottomContact.append( j );
     } else {
-     error(extract(depth, k), j, grainBottomA.size, A[k], Az[k]);
+     error(extract(depth, k), j, grainBottomA.size/*, extract(A, k), extract(Az, k)*/);
      // Resets contact (static friction spring)
      grainBottomLocalAx[j] = 0;
     }

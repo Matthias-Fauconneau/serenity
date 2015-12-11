@@ -37,7 +37,7 @@ struct System {
   sconst float density = 7.6e3 * kg/cb(m);
   sconst float mass = validation ? 4./3*PI*cb(radius) * density /*~5g*/ : 2.7 * g;
   sconst float curvature = 1./radius;
-  sconst float elasticModulus = Obstacle::elasticModulus/*1e3 * MPa*/;
+  sconst float elasticModulus = 1e3 * MPa;
   sconst float poissonRatio = 0.35;
   sconst float angularMass = 2./3*mass*sq(radius);
 
@@ -58,7 +58,7 @@ struct System {
   buffer<float> AVx { capacity }, AVy { capacity }, AVz { capacity }; // Angular velocity
   buffer<float> Tx { capacity }, Ty { capacity }, Tz { capacity }; // Torque
 
-  Grain() : capacity(16384) {
+  Grain() : capacity(4*2048) {
    Px.clear(0); Py.clear(0); Pz.clear(0);
    Vx.clear(0); Vy.clear(0); Vz.clear(0);
    Fx.clear(0); Fy.clear(0); Fz.clear(0);
@@ -119,12 +119,12 @@ struct System {
   const int margin = simd; // 16 to ensure no false sharing ?
   const int stride = margin+W+margin;
   const float internodeLength = 2*sin(PI/W)*radius;
-  const float exactHeight = radius * 2;// 4;
+  const float exactHeight = radius * 4;
   const float cellHeight = sqrt(3.)/2*internodeLength;
   const int H = ceil(exactHeight/cellHeight)+1;
   const float height = (H-1) * cellHeight;
   sconst float thickness = 1 * mm;
-  const float tensionElasticModulus = 10 * MPa;
+  const float tensionElasticModulus = 100 * MPa;
   const float mass = sqrt(3.)/2 * sq(internodeLength) * thickness * density;
   const float tensionStiffness = sqrt(3.)/2 * internodeLength * thickness * tensionElasticModulus;
   const float tensionDamping = 2 * sqrt(mass * tensionStiffness);

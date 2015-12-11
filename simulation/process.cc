@@ -2,11 +2,11 @@
 
 void Simulation::stepProcess() {
  // Process
- if(currentHeight >= topZ-Grain::radius || grain.count == grain.capacity) {
+ if(/*currentHeight >= topZ-Grain::radius ||*/ grain.count == grain.capacity) {
   const float targetPressure = 10000 * Pa;
   if(pressure < targetPressure) {
    processState = Pressure;
-   pressure += dt * 1000 * Pa/s;
+   pressure += dt * targetPressure * Pa/s;
   } else {
    if(processState  < Load) { // Fits plate (Prevents initial decompression)
     float topZ = 0;
@@ -20,7 +20,7 @@ void Simulation::stepProcess() {
   }
  } else {
   // Increases current height
-  currentHeight += verticalSpeed * dt;
+  if(currentHeight < topZ-Grain::radius) currentHeight += verticalSpeed * dt;
 
   // Generates wire
   if(pattern) {
@@ -96,7 +96,7 @@ void Simulation::stepProcess() {
      processTime.stop();
      size_t i = grain.count;
      grain.Px[i] = newPosition.x; grain.Py[i] = newPosition.y; grain.Pz[i] = newPosition.z;
-     grain.Vx[i] = 0; grain.Vy[i] = 0; grain.Vz[i] = 0;
+     grain.Vx[i] = 0; grain.Vy[i] = 0; grain.Vz[i] = - 1 * m/s;
      grain.AVx[i] = 0; grain.AVy[i] = 0; grain.AVz[i] = 0;
      float t0 = 2*PI*random();
      float t1 = acos(1-2*random());

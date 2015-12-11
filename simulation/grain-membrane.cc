@@ -178,9 +178,9 @@ void Simulation::stepGrainMembrane() {
   grainMembraneGridTime.stop();*/
 
 #if 1
-  const float R = membrane.radius*(1+1./8);
-  vec3 min = vec3(vec2(-R), -membrane.height/8), max = vec3(vec2(R), membrane.height);
-#if 1
+  const float R = membrane.radius*(1+1./2);
+  vec3 min = vec3(vec2(-R), -membrane.height/64), max = vec3(vec2(R), membrane.height);
+#if 0
   int stride = membrane.stride, W = membrane.W, margin = membrane.margin;
   const float* const Px = membrane.Px.begin(), *Py = membrane.Py.begin(), *Pz = membrane.Pz.begin();
   for(int i=1; i<membrane.H-1; i++) {

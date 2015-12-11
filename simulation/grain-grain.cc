@@ -170,9 +170,9 @@ void Simulation::stepGrainGrain() {
   //vec3 min, max; domainGrain(min, max);
   //vec3 min = vec3(vec2(-membrane.radius), 0), max = vec3(vec2(membrane.radius), membrane.height);
 #if 1
-  const float R = membrane.radius*(1+0x1p-4);
+  const float R = membrane.radius*(1+1./2);
   vec3 min = vec3(vec2(-R), 0), max = vec3(vec2(R), membrane.height);
-#if 1
+#if 0
   {const float* const Px = grain.Px.begin(), *Py = grain.Py.begin(), *Pz = grain.Pz.begin();
    for(size_t i=0; i<grain.count; i++) {
     assert_(min.x <= Px[i], min.x, Px[i], log2(Px[i]/min.x-1));
@@ -395,6 +395,40 @@ void Simulation::stepGrainGrain() {
    grain.Ty[b] += grainGrainTBy[i];
    grain.Tz[b] += grainGrainTBz[i];
   }
+#if 1
+{ // Coherence profile
+ const size_t N = 30;
+ const size_t jobCount = grainGrainContact.size;
+ if(jobCount) {
+  const size_t chunkSize = ::max(1ul, jobCount/N);
+  const size_t chunkCount = (jobCount+chunkSize-1)/chunkSize;
+  const size_t elementCount = grain.count;
+  /*const size_t domainSize = ::max(1, elementCount/N);
+ const size_t domainCount = (elementCount+chunkSize-1)/chunkSize;*/
+  const size_t domainCount = chunkCount;
+  const size_t domainSize = (elementCount+domainCount-1)/domainCount;
+  size_t inDomainA = 0, outOfDomainA = 0, inDomainB = 0, outOfDomainB = 0, inDomainBoth = 0, outOfDomainAny = 0, outOfDomainBoth = 0;
+  for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
+   const size_t domainIndex = chunkIndex;
+   const size_t domainStart = domainIndex * domainSize;
+   const size_t domainEnd = (domainIndex+1) * domainSize;
+   //domainEnd = ::min(domainEnd, elementCount);
+   for(size_t i = chunkIndex*chunkSize; i < min(jobCount, (chunkIndex+1)*chunkSize); i++) {
+    size_t index = grainGrainContact[i];
+    size_t a = grainGrainA[index];
+    size_t b = grainGrainB[index];
+    if(a >= domainStart && a<domainEnd) inDomainA++; else outOfDomainA++;
+    if(b >= domainStart && b<domainEnd) inDomainB++; else  outOfDomainB++;
+    if((a >= domainStart && a<domainEnd) && (b >= domainStart && b<domainEnd)) inDomainBoth++; else outOfDomainAny++;
+    if(!(a >= domainStart && a<domainEnd) && !(b >= domainStart && b<domainEnd)) outOfDomainBoth++;
+   }
+  }
+  log(strD(outOfDomainA, outOfDomainA+inDomainA),
+        strD(outOfDomainB, outOfDomainB+inDomainB),
+        strD(outOfDomainAny, outOfDomainAny+inDomainBoth));
+ }
+ }
+#endif
   grainGrainSumTime.stop();
   grainGrainTotalTime.stop();
 }

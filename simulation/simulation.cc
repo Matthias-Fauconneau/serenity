@@ -43,9 +43,11 @@ void Simulation::step() {
  stepGrainGrain();
  grainTotalTime.stop();
 
- membraneTotalTime.start();
- stepMembrane();
- membraneTotalTime.stop();
+ if(processState >= ProcessState::Pressure) {
+  membraneTotalTime.start();
+  stepMembrane();
+  membraneTotalTime.stop();
+ }
  stepGrainMembrane();
 
  /*stepWire();
@@ -57,9 +59,11 @@ void Simulation::step() {
  grainTotalTime.start();
  stepGrainIntegration();
  grainTotalTime.stop();
- membraneTotalTime.start();
- stepMembraneIntegration();
- membraneTotalTime.stop();
+ if(processState >= ProcessState::Pressure) {
+  membraneTotalTime.start();
+  stepMembraneIntegration();
+  membraneTotalTime.stop();
+ }
  //stepWireIntegration();
 
  timeStep++;
@@ -163,7 +167,7 @@ bool Simulation::run(const Time& totalTime) {
  for(int unused t: range(1/(dt*60*32))) step();
  stepTime.stop();
  stepTimeRT.stop();
- if(timeStep%(1*size_t(1/(dt*60))) == 0) {
+ if(timeStep%(1*size_t(1/(dt*60*32))) == 0) {
   //extern size_t threadCount();
   //if(threadCount()<17) log(threadCount(), coreFrequencies()); else log("//", threadCount());
   profile(totalTime);
