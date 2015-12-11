@@ -396,16 +396,46 @@ void Simulation::stepGrainGrain() {
    grain.Tz[b] += grainGrainTBz[i];
   }
 #if 1
-{ // Coherence profile
- const size_t N = 30;
+{ // Domain coherence profile
+ const size_t threadCount = 60;
  const size_t jobCount = grainGrainContact.size;
  if(jobCount) {
-  const size_t chunkSize = ::max(1ul, jobCount/N);
+  const size_t chunkSize = ::max(1ul, jobCount/threadCount);
   const size_t chunkCount = (jobCount+chunkSize-1)/chunkSize;
-  const size_t elementCount = grain.count;
+  int domainsAStart[chunkCount], domainsAStop[chunkCount];
+  int domainsBStart[chunkCount], domainsBStop[chunkCount];
+  // //
+  for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
+   domainsAStart[chunkIndex] = grain.count;
+   domainsAStop[chunkIndex] = 0;
+   domainsBStart[chunkIndex] = grain.count;
+   domainsBStop[chunkIndex] = 0;
+   for(size_t i = chunkIndex*chunkSize; i < min(jobCount, (chunkIndex+1)*chunkSize); i++) {
+    size_t index = grainGrainContact[i];
+    int a = grainGrainA[index];
+    int b = grainGrainB[index];
+    domainsAStart[chunkIndex] = min(domainsAStart[chunkIndex], a);
+    domainsAStop[chunkIndex]= max(domainsAStop[chunkIndex], a);
+    domainsBStart[chunkIndex]= min(domainsBStart[chunkIndex], b);
+    domainsBStop[chunkIndex]= max(domainsBStop[chunkIndex], b);
+   }
+  }
+  // --
+  for(size_t index =0;;) {
+   for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
+    if(chunkIndex>0) {
+     assert_(domainsAStop[chunkIndex-1] <= domainsAStart[chunkIndex], // Single element overlap
+       domainsAStop[chunkIndex-1], domainsAStart[chunkIndex]);
+     /*assert_(domainsBStart[chunkIndex-1] <= domainsBStart[chunkIndex], // Only neighbour overlap
+      domainsBStart[chunkIndex-1], domainsBStart[chunkIndex] );
+    assert_(domainsBStop[chunkIndex-1] <= domainsBStop[chunkIndex]); // Only neighbour overlap*/
+    }
+   }
+  }
+  //const size_t elementCount = grain.count;
   /*const size_t domainSize = ::max(1, elementCount/N);
  const size_t domainCount = (elementCount+chunkSize-1)/chunkSize;*/
-  const size_t domainCount = chunkCount;
+/*  const size_t domainCount = chunkCount;
   const size_t domainSize = (elementCount+domainCount-1)/domainCount;
   size_t inDomainA = 0, outOfDomainA = 0, inDomainB = 0, outOfDomainB = 0, inDomainBoth = 0, outOfDomainAny = 0, outOfDomainBoth = 0;
   for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
@@ -425,7 +455,7 @@ void Simulation::stepGrainGrain() {
   }
   log(strD(outOfDomainA, outOfDomainA+inDomainA),
         strD(outOfDomainB, outOfDomainB+inDomainB),
-        strD(outOfDomainAny, outOfDomainAny+inDomainBoth));
+        strD(outOfDomainAny, outOfDomainAny+inDomainBoth));*/
  }
  }
 #endif
