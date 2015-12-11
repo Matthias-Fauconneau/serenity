@@ -1,47 +1,14 @@
 #include "simulation.h"
 #include "parallel.h"
 
-void Simulation::stepMembrane() {
- size_t stride = membrane.stride;
- membraneInitializationTime += parallel_chunk(stride/simd, (membrane.count-stride)/simd,
-                  [this](uint, uint start, uint size) {
-    float* const Fx = membrane.Fx.begin(), *Fy = membrane.Fy.begin(), *Fz = membrane.Fz.begin();
-    for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
-     *(vXsf*)(Fx+i) = _0f;
-     *(vXsf*)(Fy+i) = _0f;
-     *(vXsf*)(Fz+i) = _0f;
-    }
-  }, 1/*maxThreadCount FIXME*/);
-
- membraneForceTime += parallel_for(1, membrane.H-1, [this](uint, int index) { const int start = index, size = 1;
- //membraneForceTime += parallel_chunk(1, membrane.H-1, [this](uint, int start, int size) {
- const float* const Px = membrane.Px.data, *Py = membrane.Py.data, *Pz = membrane.Pz.data;
- const float* const Vx = membrane.Vx.data, *Vy = membrane.Vy.data, *Vz = membrane.Vz.data;
- float* const Fx = membrane.Fx.begin(), *Fy = membrane.Fy.begin(), *Fz = membrane.Fz.begin();
-
- int stride = membrane.stride, W = membrane.W, margin=membrane.margin;
- const vXsf unused P = floatX(pressure/(2*3)); // area = length(cross)/2 / 3 vertices
- const vXsf internodeLength = floatX(membrane.internodeLength);
- const vXsf tensionStiffness = floatX(membrane.tensionStiffness);
- const vXsf tensionDamping = floatX(membrane.tensionDamping);
-
-  // Tension from previous row (same as loop on inner domain but without writing to previous row)
-  {
-   const int i = start;
-   const int base = margin+i*stride;
-   const int e0 = base-stride+i%2;
-   const int e1 = base-stride-!(i%2);
-   const int e2 = base-1;
-   for(int j=0; j<W; j+=simd) {
-    int index = base+j;
-    const vXsf Ox = *(vXsf*)(Px+index);
-    const vXsf Oy = *(vXsf*)(Py+index);
-    const vXsf Oz = *(vXsf*)(Pz+index);
-    const vXsf VOx = *(vXsf*)(Vx+index);
-    const vXsf VOy = *(vXsf*)(Vy+index);
-    const vXsf VOz = *(vXsf*)(Vz+index);
-
-    // Tension
+static inline void membraneTensionPressure(const float* const Px, const float* const Py, const float* const Pz,
+                                           const float* const Vx, const float* const Vy, const float* const Vz,
+                                           float* const Fx, float* const Fy, float* const Fz,
+                                           const int W, const int margin, const int stride,
+                                           const vXsf pressureCoefficient, // [area = length(cross)/2] / 3 vertices
+                                           const vXsf internodeLength, const vXsf tensionStiffness, const vXsf tensionDamping,
+                                           const int start, const int size
+                                           ) {
 #define tension(i) \
  const int e##i##j = e##i+j; \
  const vXsf Rx##i = loadu(Px, e##i##j) - Ox; \
@@ -64,67 +31,114 @@ void Simulation::stepMembrane() {
  const vXsf px##a##b = (Ry##a*Rz##b - Ry##b*Rz##a); \
  const vXsf py##a##b = (Rz##a*Rx##b - Rz##b*Rx##a); \
  const vXsf pz##a##b = (Rx##a*Ry##b - Rx##b*Ry##a); \
- const vXsf ppx##a##b = P * px##a##b; \
- const vXsf ppy##a##b = P * py##a##b; \
- const vXsf ppz##a##b = P * pz##a##b;
-    tension(0) tension(1) pressure(0, 1)
-    tension(2) pressure(1, 2)
-    const vXsf fx = load(Fx, index) + tx0 + tx1 + tx2 + ppx01 + ppx12; store(Fx, index, fx);
-    const vXsf fy = load(Fy, index) + ty0 + ty1 + ty2 + ppy01 + ppy12; store(Fy, index, fy);
-    const vXsf fz = load(Fz, index) + tz0 + tz1 + tz2 + ppz01 + ppz12; store(Fz, index, fz);
-   }
+ const vXsf ppx##a##b = pressureCoefficient * px##a##b; \
+ const vXsf ppy##a##b = pressureCoefficient * py##a##b; \
+ const vXsf ppz##a##b = pressureCoefficient * pz##a##b;
+
+ // Previous row (same as loop on inner domain but without writing to previous row (done by next row ending)
+ {
+  const int i = start;
+  const int base = margin+i*stride;
+  const int e0 = base-stride+i%2;
+  const int e1 = base-stride-!(i%2);
+  const int e2 = base-1;
+  for(int j=0; j<W; j+=simd) {
+   int index = base+j;
+   const vXsf Ox = *(vXsf*)(Px+index);
+   const vXsf Oy = *(vXsf*)(Py+index);
+   const vXsf Oz = *(vXsf*)(Pz+index);
+   const vXsf VOx = *(vXsf*)(Vx+index);
+   const vXsf VOy = *(vXsf*)(Vy+index);
+   const vXsf VOz = *(vXsf*)(Vz+index);
+
+   tension(0) tension(1) pressure(0, 1) tension(2) pressure(1, 2);
+   const vXsf fx2 = loadu(Fx, e2j) - tx2 + ppx12; storeu(Fx, e2j, fx2);
+   const vXsf fy2 = loadu(Fy, e2j) - ty2 + ppy12; storeu(Fy, e2j, fy2);
+   const vXsf fz2 = loadu(Fz, e2j)  - tz2 + ppz12; storeu(Fz, e2j, fz2);
+   const vXsf fx = load(Fx, index) + tx0 + tx1 + tx2 + ppx01 + ppx12; store(Fx, index, fx);
+   const vXsf fy = load(Fy, index) + ty0 + ty1 + ty2 + ppy01 + ppy12; store(Fy, index, fy);
+   const vXsf fz = load(Fz, index)  + tz0 + tz1 + tz2  + ppz01 + ppz12; store(Fz, index, fz);
   }
+ }
 
-   for(int i=start+1; i<start+size; i++) {
-    const int base = margin+i*stride;
-    const int e0 = base-stride+i%2;
-    const int e1 = base-stride-!(i%2);
-    const int e2 = base-1;
-    for(int j=0; j<W; j+=simd) {
-     int index = base+j;
-     const vXsf Ox = load(Px, index);
-     const vXsf Oy = load(Py, index);
-     const vXsf Oz = load(Pz, index);
-     const vXsf VOx = load(Vx, index);
-     const vXsf VOy = load(Vy, index);
-     const vXsf VOz = load(Vz, index);
+ for(int i=start+1; i<start+size; i++) {
+  const int base = margin+i*stride;
+  const int e0 = base-stride+i%2;
+  const int e1 = base-stride-!(i%2);
+  const int e2 = base-1;
+  for(int j=0; j<W; j+=simd) {
+   int index = base+j;
+   const vXsf Ox = load(Px, index);
+   const vXsf Oy = load(Py, index);
+   const vXsf Oz = load(Pz, index);
+   const vXsf VOx = load(Vx, index);
+   const vXsf VOy = load(Vy, index);
+   const vXsf VOz = load(Vz, index);
 
-     tension(0) tension(1) pressure(0, 1) tension(2) pressure(1, 2)
-     const vXsf fx0 = loadu(Fx, e0j) - tx0 + ppx01; storeu(Fx, e0j, fx0);
-     const vXsf fy0 = loadu(Fy, e0j) - ty0 + ppy01; storeu(Fy, e0j, fy0);
-     const vXsf fz0 = loadu(Fz, e0j) - tz0 + ppz01; storeu(Fz, e0j, fz0);
-     const vXsf fx1 = loadu(Fx, e1j) - tx1 + ppx01 + ppy12; storeu(Fx, e1j, fx1);
-     const vXsf fy1 = loadu(Fy, e1j) - ty1 + ppy01 + ppy12; storeu(Fy, e1j, fy1);
-     const vXsf fz1 = loadu(Fz, e1j) - tz1 + ppz01 + ppz12; storeu(Fz, e1j, fz1);
-     const vXsf fx = load(Fx, index) + tx0 + tx1 + tx2 + ppx01 + ppx12; store(Fx, index, fx);
-     const vXsf fy = load(Fy, index) + ty0 + ty1 + ty2 + ppy01 + ppy12; store(Fy, index, fy);
-     const vXsf fz = load(Fz, index) + tz0 + tz1 + tz2 + ppz01 + ppz12; store(Fz, index, fz);
-    }
-   }
-
-  // Tension from next row
-  {
-   const int i = start+size-1;
-   const int base = margin+i*stride;
-   const int e3 = base+stride-!(i%2);
-   const int e4 = base+stride+(i%2);
-   for(int j=0; j<W; j+=simd) {
-    int index = base+j;
-    const vXsf Ox = *(vXsf*)(Px+index);
-    const vXsf Oy = *(vXsf*)(Py+index);
-    const vXsf Oz = *(vXsf*)(Pz+index);
-    const vXsf VOx = *(vXsf*)(Vx+index);
-    const vXsf VOy = *(vXsf*)(Vy+index);
-    const vXsf VOz = *(vXsf*)(Vz+index);
-
-    // Tension
-    tension(3) tension(4)
-      const vXsf fx = load(Fx, index) + tx3 + tx4; store(Fx, index, fx);
-      const vXsf fy = load(Fy, index) + ty3 + ty4; store(Fy, index, fy);
-      const vXsf fz = load(Fz, index) + tz3 + tz4; store(Fz, index, fz);
-   }
+   tension(0) tension(1) pressure(0, 1) tension(2) pressure(1, 2);
+   const vXsf fx0 = loadu(Fx, e0j) - tx0 + ppx01; storeu(Fx, e0j, fx0);
+   const vXsf fy0 = loadu(Fy, e0j) - ty0 + ppy01; storeu(Fy, e0j, fy0);
+   const vXsf fz0 = loadu(Fz, e0j)  - tz0 + ppz01; storeu(Fz, e0j, fz0);
+   const vXsf fx1 = loadu(Fx, e1j) - tx1 + ppx01 + ppx12; storeu(Fx, e1j, fx1);
+   const vXsf fy1 = loadu(Fy, e1j) - ty1 + ppy01 + ppy12; storeu(Fy, e1j, fy1);
+   const vXsf fz1 = loadu(Fz, e1j)  - tz1 + ppz01 + ppz12; storeu(Fz, e1j, fz1);
+   const vXsf fx2 = loadu(Fx, e2j) - tx2 + ppx12; storeu(Fx, e2j, fx2);
+   const vXsf fy2 = loadu(Fy, e2j) - ty2 + ppy12; storeu(Fy, e2j, fy2);
+   const vXsf fz2 = loadu(Fz, e2j)  - tz2 + ppz12; storeu(Fz, e2j, fz2);
+   const vXsf fx = load(Fx, index) + tx0 + tx1 + tx2 + ppx01 + ppx12; store(Fx, index, fx);
+   const vXsf fy = load(Fy, index) + ty0 + ty1 + ty2 + ppy01 + ppy12; store(Fy, index, fy);
+   const vXsf fz = load(Fz, index)  + tz0 + tz1 + tz2  + ppz01 + ppz12; store(Fz, index, fz);
   }
+ }
+
+ // Tension from next row
+ {
+  const int i = start+size-1;
+  const int base = margin+i*stride;
+  const int e3 = base+stride-!(i%2);
+  const int e4 = base+stride+(i%2);
+  for(int j=0; j<W; j+=simd) {
+   int index = base+j;
+   const vXsf Ox = *(vXsf*)(Px+index);
+   const vXsf Oy = *(vXsf*)(Py+index);
+   const vXsf Oz = *(vXsf*)(Pz+index);
+   const vXsf VOx = *(vXsf*)(Vx+index);
+   const vXsf VOy = *(vXsf*)(Vy+index);
+   const vXsf VOz = *(vXsf*)(Vz+index);
+
+   // Tension
+   tension(3) tension(4);
+   const vXsf fx = load(Fx, index) + tx3 + tx4; store(Fx, index, fx);
+   const vXsf fy = load(Fy, index) + ty3 + ty4; store(Fy, index, fy);
+   const vXsf fz = load(Fz, index)  + tz3 + tz4; store(Fz, index, fz);
+  }
+ }
 #undef tension
+#undef pressure
+}
+
+void Simulation::stepMembrane() {
+ size_t stride = membrane.stride;
+ membraneInitializationTime += parallel_chunk(stride/simd, (membrane.count-stride)/simd,
+                  [this](uint, uint start, uint size) {
+    float* const Fx = membrane.Fx.begin(), *Fy = membrane.Fy.begin(), *Fz = membrane.Fz.begin();
+    for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
+     *(vXsf*)(Fx+i) = _0f;
+     *(vXsf*)(Fy+i) = _0f;
+     *(vXsf*)(Fz+i) = _0f;
+    }
+  }, 1/*maxThreadCount FIXME*/);
+
+ //membraneForceTime += parallel_chunk(1, membrane.H-1, [this](uint, int start, int size) {
+ membraneForceTime += parallel_for(1, membrane.H-1, [this](uint, int index) {
+   membraneTensionPressure(
+    membrane.Px.data, membrane.Py.data, membrane.Pz.data,
+    membrane.Vx.data, membrane.Vy.data, membrane.Vz.data,
+    membrane.Fx.begin(), membrane.Fy.begin(), membrane.Fz.begin(),
+    membrane.W, membrane.margin, membrane.stride,
+    floatX(pressure/(2*3)) /*[area = length(cross)/2] / 3 vertices*/, floatX(membrane.internodeLength),
+    floatX(membrane.tensionStiffness), floatX(membrane.tensionDamping),
+    index, 1);
  }, 1/*maxThreadCount FIXME: pressure*/);
 }
 
