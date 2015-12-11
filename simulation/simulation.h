@@ -202,9 +202,9 @@ struct Simulation : System {
 
  Simulation(const Dict& p);
 
- void domainMembrane(vec3& min, vec3& max);
- void domainGrain(vec3& min, vec3& max);
- void domainWire(vec3& min, vec3& max);
+ //void domainMembrane(vec3& min, vec3& max);
+ //void domainGrain(vec3& min, vec3& max);
+ //void c(vec3& min, vec3& max);
 
  void step();
 
@@ -229,6 +229,7 @@ struct Simulation : System {
   tsc grainSideEvaluateTime;
   tsc grainSideSumTime;
  void stepGrainGrain();
+  tsc grainGrainTotalTime;
   uint64 domainTime = 0;
   tsc memoryTime;
   tsc grainGrainLatticeTime;
@@ -236,13 +237,6 @@ struct Simulation : System {
   uint64 grainGrainFilterTime = 0;
   uint64 grainGrainEvaluateTime = 0;
   tsc grainGrainSumTime;
- void stepGrainWire();
-  uint64 grainWireSearchTime = 0;
-  uint64 grainWireFilterTime = 0;
-  //tsc grainWireEvaluateTime;
-  uint64 grainWireEvaluateTime = 0;
-  tsc grainWireSumTime;
-  size_t grainWireContactSizeSum;
  void stepGrainIntegration();
   uint64 grainIntegrationTime = 0;
 
@@ -261,6 +255,7 @@ struct Simulation : System {
  void stepMembraneIntegration();
   uint64 membraneIntegrationTime = 0;
 
+#if WIRE
  void stepWire();
   uint64 wireInitializationTime = 0;
  void stepWireTension();
@@ -272,8 +267,17 @@ struct Simulation : System {
   uint64 wireBottomFilterTime = 0;
   uint64 wireBottomEvaluateTime = 0;
   tsc wireBottomSumTime;
+  void stepGrainWire();
+   tsc grainWireLatticeTime = 0;
+   uint64 grainWireSearchTime = 0;
+   uint64 grainWireFilterTime = 0;
+   //tsc grainWireEvaluateTime;
+   uint64 grainWireEvaluateTime = 0;
+   tsc grainWireSumTime;
+   size_t grainWireContactSizeSum;
  void stepWireIntegration();
   uint64 wireIntegrationTime = 0;
+#endif
 
   void profile(const Time& totalTime);
   bool run(const Time& totalTime);

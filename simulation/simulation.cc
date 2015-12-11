@@ -33,54 +33,6 @@ Simulation::Simulation(const Dict& p) : System(p.at("TimeStep"), p.at("Radius"))
  }
 }
 
-void Simulation::domainGrain(vec3& min, vec3& max) {
- float* const Px = grain.Px.begin(), *Py = grain.Py.begin(), *Pz = grain.Pz.begin();
- vXsf minX_ = _0f, minY_ = _0f, minZ_ = _0f, maxX_ = _0f, maxY_ = _0f, maxZ_ = _0f;
- for(size_t i=0; i<grain.count; i+=simd) {
-  vXsf X = load(Px, i), Y = load(Py, i), Z = load(Pz, i);
-  minX_ = ::min(minX_, X);
-  maxX_ = ::max(maxX_, X);
-  minY_ = ::min(minY_, Y);
-  maxY_ = ::max(maxY_, Y);
-  minZ_ = ::min(minZ_, Z);
-  maxZ_ = ::max(maxZ_, Z);
- }
- const float minX = ::min(minX_);
- const float minY = ::min(minY_);
- const float minZ = ::min(minZ_);
- const float maxX = ::max(maxX_);
- const float maxY = ::max(maxY_);
- const float maxZ = ::max(maxZ_);
- assert_(maxX-minX < 16 && maxY-minY < 16 && maxZ-minZ < 16, "grain",
-         maxX-minX, maxY-minY, maxZ-minZ, "\n",
-         minX, maxX, minY, maxY, minZ, maxZ, grain.count);
- min = vec3(minX, minY, minZ);
- max = vec3(maxX, maxY, maxZ);
-}
-
-void Simulation::domainWire(vec3& min, vec3& max) {
- float* const Px = wire.Px.begin(), *Py = wire.Py.begin(), *Pz = wire.Pz.begin();
- vXsf minX_ = _0f, minY_ = _0f, minZ_ = _0f, maxX_ = _0f, maxY_ = _0f, maxZ_ = _0f;
- for(size_t i=0; i<wire.count; i+=simd) {
-  vXsf X = load(Px, i), Y = load(Py, i), Z = load(Pz, i);
-  minX_ = ::min(minX_, X);
-  maxX_ = ::max(maxX_, X);
-  minY_ = ::min(minY_, Y);
-  maxY_ = ::max(maxY_, Y);
-  minZ_ = ::min(minZ_, Z);
-  maxZ_ = ::max(maxZ_, Z);
- }
- const float minX = ::min(minX_);
- const float minY = ::min(minY_);
- const float minZ = ::min(minZ_);
- const float maxX = ::max(maxX_);
- const float maxY = ::max(maxY_);
- const float maxZ = ::max(maxZ_);
- assert_(maxX-minX < 16 && maxY-minY < 16 && maxZ-minZ < 16, "wire");
- min = vec3(minX, minY, minZ);
- max = vec3(maxX, maxY, maxZ);
-}
-
 void Simulation::step() {
  stepProcess();
 
@@ -118,11 +70,13 @@ void Simulation::profile(const Time& totalTime) {
  log(totalTime.microseconds()/timeStep, "us/step", totalTime, timeStep);
  if(stepTimeRT.nanoseconds()*100<totalTime.nanoseconds()*99)
   log("step", strD(stepTimeRT, totalTime));
+#if WIRE
  if(grainWireContactSizeSum) {
   log("grain-wire contact count mean", grainWireContactSizeSum/timeStep);
   log("grain-wire cycle/grain", (float)grainWireEvaluateTime/grainWireContactSizeSum);
   log("grain-wire B/cycle", (float)(grainWireContactSizeSum*41*4)/grainWireEvaluateTime);
  }
+#endif
  log("W", membrane.W, "H", membrane.H, "W*H", membrane.W*membrane.H, grain.count, wire.count);
  const bool reset = true;
  size_t accounted = 0, shown = 0;
@@ -145,6 +99,8 @@ void Simulation::profile(const Time& totalTime) {
  logTime(grainSideFilter);
  logTime(grainSideEvaluate);
  logTime(grainSideSum);
+ profile.insertSortedMulti(grainGrainTotalTime, "grainGrainTotal");
+ if(reset) grainGrainTotalTime.reset();
  logTime(domain);
  logTime(memory);
  logTime(grainGrainLattice);
@@ -152,10 +108,7 @@ void Simulation::profile(const Time& totalTime) {
  logTime(grainGrainFilter);
  logTime(grainGrainEvaluate);
  logTime(grainGrainSum);
- logTime(grainWireSearch);
- logTime(grainWireFilter);
- logTime(grainWireEvaluate);
- logTime(grainWireSum);
+
  logTime(grainIntegration);
 
  profile.insertSortedMulti(membraneTotalTime, "=sum{membrane}");
@@ -169,13 +122,20 @@ void Simulation::profile(const Time& totalTime) {
  logTime(grainMembraneSum);
  logTime(membraneIntegration);
 
+#if WIRE
  logTime(wireInitialization);
  logTime(wireTension);
  logTime(wireBendingResistance);
  logTime(wireBottomFilter);
  logTime(wireBottomEvaluate);
  logTime(wireBottomSum);
+ logTime(grainWireSearch);
+ logTime(grainWireFilter);
+ logTime(grainWireEvaluate);
+ logTime(grainWireSum);
  logTime(wireIntegration);
+#endif
+
 #undef logTime
  for(const auto entry: profile) log(strD(entry.key, stepTime), entry.value);
  log(strD(shown, stepTime), "/", strD(accounted, stepTime));

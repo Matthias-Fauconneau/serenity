@@ -18,15 +18,15 @@ inline v16sf float16(float f) { return (v16sf){f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f};
 static v16sf unused _0f = float16(0);
 static v16sf unused _1f = float16(1);
 
-static inline v16sf load(const float* a, size_t index) { return *(v16sf*)(a+index); }
-static inline v16sf load(ref<float> a, size_t index) { return load(a.data, index); }
-static inline v16sf loadu(const float* a, size_t index) { return load(a, index); }
-static inline v16sf loadu(ref<float> a, size_t index) { return load(a, index); }
+static inline v16sf load(const float* a, int index) { return *(v16sf*)(a+index); }
+static inline v16sf load(ref<float> a, int index) { return load(a.data, index); }
+static inline v16sf loadu(const float* a, int index) { return load(a, index); }
+static inline v16sf loadu(ref<float> a, int index) { return load(a, index); }
 
-static inline void store(float* const a, size_t index, v16sf v) { *(v16sf*)(a+index) = v; }
-static inline void store(mref<float> a, size_t index, v16sf v) { store(a.begin(), index, v); }
-static inline void storeu(float* const a, size_t index, v16sf v) { store(a, index, v); }
-static inline void storeu(mref<float> a, size_t index, v16sf v) { store(a, index, v); }
+static inline void store(float* const a, int index, v16sf v) { *(v16sf*)(a+index) = v; }
+static inline void store(mref<float> a, int index, v16sf v) { store(a.begin(), index, v); }
+static inline void storeu(float* const a, int index, v16sf v) { store(a, index, v); }
+static inline void storeu(mref<float> a, int index, v16sf v) { store(a, index, v); }
 
 static inline v16sf mask3_fmadd(v16sf a, v16sf b, v16sf c, uint16 k) { return _mm512_mask3_fmadd_ps(a, b, c, k); }
 static inline v16sf maskSub(v16sf a, uint16 k, v16sf b) { return _mm512_mask_sub_ps(a, k, a, b); }
@@ -49,7 +49,7 @@ static inline v16sf blend(uint16 k, v16sf a, v16sf b) { return _mm512_mask_blend
 static inline float min(v16sf x) { return _mm512_reduce_min_ps(x); }
 static inline float max(v16sf x) { return _mm512_reduce_max_ps(x); }
 
-static constexpr size_t simd = 16; // SIMD size
+static constexpr int simd = 16; // SIMD size
 typedef v16sf vXsf;
 typedef v16ui vXui;
 typedef uint16 maskX;
@@ -92,18 +92,18 @@ inline v8sf float8(float f) { return (v8sf){f,f,f,f,f,f,f,f}; }
 static v8sf unused _0f = float8(0);
 static v8sf unused _1f = float8(1);
 
-static inline v8sf load(const float* a, size_t index) { return *(v8sf*)(a+index); }
-static inline v8sf load(ref<float> a, size_t index) { return load(a.data, index); }
-static inline v8sf loadu(const float* a, size_t index) {
+static inline v8sf load(const float* a, int index) { return *(v8sf*)(a+index); }
+static inline v8sf load(ref<float> a, int index) { return load(a.data, index); }
+static inline v8sf loadu(const float* a, int index) {
  struct v8sfu { v8sf v; } __attribute((__packed__, may_alias));
  return ((v8sfu*)(a+index))->v;
 }
-static inline v8sf loadu(ref<float> a, size_t index) { return loadu(a.data, index); }
+static inline v8sf loadu(ref<float> a, int index) { return loadu(a.data, index); }
 
-static inline void store(float* const a, size_t index, v8sf v) { *(v8sf*)(a+index) = v; }
-static inline void store(mref<float> a, size_t index, v8sf v) { store(a.begin(), index, v); }
-static inline void storeu(float* const a, size_t index, v8sf v) { __builtin_ia32_storeups256(a+index, v); }
-static inline void storeu(mref<float> a, size_t index, v8sf v) { storeu(a.begin(), index, v); }
+static inline void store(float* const a, int index, v8sf v) { *(v8sf*)(a+index) = v; }
+static inline void store(mref<float> a, int index, v8sf v) { store(a.begin(), index, v); }
+static inline void storeu(float* const a, int index, v8sf v) { __builtin_ia32_storeups256(a+index, v); }
+static inline void storeu(mref<float> a, int index, v8sf v) { storeu(a.begin(), index, v); }
 
 static inline v8sf min(v8sf a, v8sf b) { return __builtin_ia32_minps256(a, b); }
 static inline v8sf max(v8sf a, v8sf b) { return __builtin_ia32_maxps256(a, b); }
@@ -195,7 +195,7 @@ static inline float op(v8sf x) { \
 reduce(min)
 reduce(max)
 
-static constexpr size_t simd = 8; // SIMD size
+static constexpr int simd = 8; // SIMD size
 typedef v8sf vXsf;
 typedef v8ui vXui;
 typedef v8ui maskX;

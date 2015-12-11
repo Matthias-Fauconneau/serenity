@@ -130,3 +130,27 @@ void Simulation::stepWireIntegration() {
  float maxGrainWireV = maxGrainV + maxWireV;
  grainWireGlobalMinD -= maxGrainWireV * this->dt;
 }
+
+
+void Simulation::domainWire(vec3& min, vec3& max) {
+ float* const Px = wire.Px.begin(), *Py = wire.Py.begin(), *Pz = wire.Pz.begin();
+ vXsf minX_ = _0f, minY_ = _0f, minZ_ = _0f, maxX_ = _0f, maxY_ = _0f, maxZ_ = _0f;
+ for(size_t i=0; i<wire.count; i+=simd) {
+  vXsf X = load(Px, i), Y = load(Py, i), Z = load(Pz, i);
+  minX_ = ::min(minX_, X);
+  maxX_ = ::max(maxX_, X);
+  minY_ = ::min(minY_, Y);
+  maxY_ = ::max(maxY_, Y);
+  minZ_ = ::min(minZ_, Z);
+  maxZ_ = ::max(maxZ_, Z);
+ }
+ const float minX = ::min(minX_);
+ const float minY = ::min(minY_);
+ const float minZ = ::min(minZ_);
+ const float maxX = ::max(maxX_);
+ const float maxY = ::max(maxY_);
+ const float maxZ = ::max(maxZ_);
+ assert_(maxX-minX < 16 && maxY-minY < 16 && maxZ-minZ < 16, "wire");
+ min = vec3(minX, minY, minZ);
+ max = vec3(maxX, maxY, maxZ);
+}

@@ -161,10 +161,15 @@ void Simulation::stepGrainWire() {
  if(!grain.count || !wire.count) return;
  if(grainWireGlobalMinD <= 0)  {
 
-  vec3 min, max; domainWire(min, max);
+  //vec3 min, max; domainWire(min, max);
+  vec3 min = vec3(vec2(-membrane.radius), 0), max = vec3(vec2(membrane.radius), membrane.height);
+  memoryTime.start();
   Grid grid(1/(Grain::radius+Grain::radius), min, max);
+  memoryTime.stop();
+  grainWireLatticeTime.start();
   for(size_t i: range(wire.count))
    grid.cell(wire.Px[i], wire.Py[i], wire.Pz[i]).append(1+i);
+  grainWireLatticeTime.stop();
 
   const float verletDistance = 2*(2*Grain::radius/sqrt(3.)) - (Grain::radius + Wire::radius); // FIXME: ?
   //const float verletDistance = Grain::radius + Grain::radius;

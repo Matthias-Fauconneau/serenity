@@ -4,6 +4,8 @@
 #include "lattice.h"
 #include "parallel.h"
 
+inline float log2(float x) { return __builtin_log2f(x); }
+
 static inline void evaluateGrainMembrane(const size_t start, const size_t size,
                                      const uint* grainMembraneContact, const size_t unused grainMembraneContactSize,
                                      const uint* grainMembraneA, const uint* grainMembraneB,
@@ -175,14 +177,34 @@ void Simulation::stepGrainMembrane() {
   }
   grainMembraneGridTime.stop();*/
 
-  vec3 min =  0, max = 0; domainGrain(min, max); //domainMembrane(min, max);
-  /*min = ::min(min, vec3(vec2(-membrane.radius), 0));
-  max = ::max(max, vec3(vec2(membrane.radius), membrane.height));*/
+#if 1
+  const float R = membrane.radius*(1+1./8);
+  vec3 min = vec3(vec2(-R), -membrane.height/8), max = vec3(vec2(R), membrane.height);
+#if 1
+  int stride = membrane.stride, W = membrane.W, margin = membrane.margin;
+  const float* const Px = membrane.Px.begin(), *Py = membrane.Py.begin(), *Pz = membrane.Pz.begin();
+  for(int i=1; i<membrane.H-1; i++) {
+   for(int j=0; j<W; j++) {
+    uint k = margin+i*stride+j;
+    assert_(min.x <= Px[k], min.x, Px[k], log2(Px[k]/min.x-1));
+    assert_(min.y <= Py[k], min.y, Py[k], log2(Py[k]/min.y-1));
+    assert_(min.z <= Pz[k], min.z, Pz[k]);
+    assert_(Px[k] <= max.x, Px[k], max.x, log2(Px[k]/max.x-1));
+    assert_(Py[k] <= max.y, Py[k], max.y, log2(Py[k]/max.y-1));
+    assert_(Pz[k] <= max.z, Pz[k], max.z);
+   }
+  }
+#endif
+#else
+  vec3 min =  0, max = 0; domainGrain(min, max);
+  min = ::min(min, vec3(vec2(-membrane.radius), 0));
+  max = ::max(max, vec3(vec2(membrane.radius), membrane.height));
   {vec3 mmin, mmax; domainMembrane(mmin, mmax);
    min = ::min(min, mmin);
    max = ::max(max, mmax);
   }
   assert_(min<max);
+#endif
 
   memoryTime.start();
   Lattice<uint16> lattice(sqrt(3.)/(2*Grain::radius), min, max);

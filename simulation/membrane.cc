@@ -201,7 +201,7 @@ void Simulation::stepMembraneIntegration() {
  grainMembraneGlobalMinD -= maxGrainMembraneV * this->dt;
 }
 
-#if 1
+#if 0
 void Simulation::domainMembrane(vec3& min, vec3& max) {
 #if 0
   const/*expr*/ size_t threadCount = ::min(membrane.H-2, maxThreadCount); // 60*60*16 ~ 57600

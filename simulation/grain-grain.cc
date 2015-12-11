@@ -13,8 +13,8 @@ static inline void qapply(vXsf Qx, vXsf Qy, vXsf Qz, vXsf Qw, vXsf Vx, vXsf Vy, 
  QVz = Qw*Z + W*Qz + Qx*Y - X*Qy;
 }
 
-static inline void evaluateGrainGrain(const size_t start, const size_t size,
-                                     const uint* grainGrainContact, const size_t unused grainGrainContactSize,
+static inline void evaluateGrainGrain(const int start, const int size,
+                                     const uint* grainGrainContact,
                                      const uint* grainGrainA, const uint* grainGrainB,
                                      const float* grainPx, const float* grainPy, const float* grainPz,
                                      const vXsf Gr_Wr, const vXsf Gr, const vXsf Wr,
@@ -33,7 +33,7 @@ static inline void evaluateGrainGrain(const size_t start, const size_t size,
                                      float* const pFx, float* const pFy, float* const pFz,
                                      float* const pTAx, float* const pTAy, float* const pTAz,
                                      float* const pTBx, float* const pTBy, float* const pTBz) {
- for(size_t i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
+ for(int i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
   const vXui contacts = *(vXui*)(grainGrainContact+i);
   const vXui A = gather(grainGrainA, contacts), B = gather(grainGrainB, contacts);
   // FIXME: Recomputing from intersection (more efficient than storing?)
@@ -164,9 +164,28 @@ static inline void evaluateGrainGrain(const size_t start, const size_t size,
 
 void Simulation::stepGrainGrain() {
  if(!grain.count) return;
+ grainGrainTotalTime.start();
  if(grainGrainGlobalMinD <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
 
-  vec3 min, max; domainGrain(min, max);
+  //vec3 min, max; domainGrain(min, max);
+  //vec3 min = vec3(vec2(-membrane.radius), 0), max = vec3(vec2(membrane.radius), membrane.height);
+#if 1
+  const float R = membrane.radius*(1+0x1p-4);
+  vec3 min = vec3(vec2(-R), 0), max = vec3(vec2(R), membrane.height);
+#if 1
+  {const float* const Px = grain.Px.begin(), *Py = grain.Py.begin(), *Pz = grain.Pz.begin();
+   for(size_t i=0; i<grain.count; i++) {
+    assert_(min.x <= Px[i], min.x, Px[i], log2(Px[i]/min.x-1));
+    assert_(min.y <= Py[i], min.y, Py[i], log2(Py[i]/min.y-1));
+    assert_(min.z <= Pz[i], min.z, Pz[i], log2(Pz[i]/min.z-1));
+    assert_(Px[i] <= max.x, Px[i], max.x, log2(Px[i]/max.x-1));
+    assert_(Py[i] <= max.y, Py[i], max.y, log2(Py[i]/max.y-1));
+    assert_(Pz[i] <= max.z, Pz[i], max.z, log2(Pz[i]/min.z-1));
+   }
+  }
+#endif
+#endif
+
   memoryTime.start();
   Lattice<uint16> lattice(sqrt(3.)/(2*Grain::radius), min, max);
   memoryTime.stop();
@@ -187,6 +206,7 @@ void Simulation::stepGrainGrain() {
   }
   assert(i==62);
   grainGrainLatticeTime.stop();
+  grainGrainSearchTime.start();
 
   swap(oldGrainGrainA, grainGrainA);
   swap(oldGrainGrainB, grainGrainB);
@@ -220,7 +240,6 @@ void Simulation::stepGrainGrain() {
 
   size_t grainGrainI = 0; // Index of first contact with A in old grainGrain[Local]A|B list
 
-  grainGrainSearchTime.start();
   for(size_t a: range(grain.count)) {
    size_t offset = lattice.index(grain.Px[a], grain.Py[a], grain.Pz[a]);
 
@@ -259,7 +278,6 @@ void Simulation::stepGrainGrain() {
     }
     break_:;
    }
-   grainGrainSearchTime.stop();
    while(grainGrainI < oldGrainGrainA.size && oldGrainGrainA[grainGrainI] == a)
     grainGrainI++;
   }
@@ -273,6 +291,7 @@ void Simulation::stepGrainGrain() {
 
   //log("grain-grain", grainGrainSkipped);
   grainGrainSkipped=0;
+  grainGrainSearchTime.stop();
  } else grainGrainSkipped++;
 
  // Filters verlet lists, packing contacts to evaluate
@@ -335,10 +354,9 @@ void Simulation::stepGrainGrain() {
  const float K = 4./3*E*sqrt(R);
  constexpr float mass = 1/(1/Grain::mass+1/Grain::mass);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
- //grainGrainEvaluateTime += parallel_chunk(GGcc/simd, [&](uint, size_t start, size_t size) {
- {size_t start =0, size=GGcc/simd;
+ grainGrainEvaluateTime += parallel_chunk(GGcc/simd, [this, K, Kb](uint, int start, int size) {
     evaluateGrainGrain(start, size,
-                      grainGrainContact.data, grainGrainContact.size,
+                      grainGrainContact.data,
                       grainGrainA.data, grainGrainB.data,
                       grain.Px.data, grain.Py.data, grain.Pz.data,
                       floatX(Grain::radius+Grain::radius), floatX(Grain::radius), floatX(Grain::radius),
@@ -356,7 +374,7 @@ void Simulation::stepGrainGrain() {
                       grainGrainFx.begin(), grainGrainFy.begin(), grainGrainFz.begin(),
                       grainGrainTAx.begin(), grainGrainTAy.begin(), grainGrainTAz.begin(),
                       grainGrainTBx.begin(), grainGrainTBy.begin(), grainGrainTBz.begin() );
- }//, 1);
+ });
 
  grainGrainSumTime.start();
   for(size_t i = 0; i < grainGrainContact.size; i++) { // Scalar scatter add
@@ -378,4 +396,5 @@ void Simulation::stepGrainGrain() {
    grain.Tz[b] += grainGrainTBz[i];
   }
   grainGrainSumTime.stop();
+  grainGrainTotalTime.stop();
 }
