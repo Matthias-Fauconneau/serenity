@@ -236,7 +236,10 @@ struct Simulation : System {
   tsc grainGrainSearchTime;
   uint64 grainGrainFilterTime = 0;
   uint64 grainGrainEvaluateTime = 0;
-  tsc grainGrainSumTime;
+  uint64 grainGrainSumDomainTime = 0;
+  uint64 grainGrainSumZeroTime = 0;
+  uint64 grainGrainSumSumTime = 0;
+  uint64 grainGrainSumMergeTime = 0;
  void stepGrainIntegration();
   uint64 grainIntegrationTime = 0;
 

@@ -206,7 +206,6 @@ void Simulation::stepGrainGrain() {
   }
   assert(i==62);
   grainGrainLatticeTime.stop();
-  grainGrainSearchTime.start();
 
   swap(oldGrainGrainA, grainGrainA);
   swap(oldGrainGrainB, grainGrainB);
@@ -240,6 +239,7 @@ void Simulation::stepGrainGrain() {
 
   size_t grainGrainI = 0; // Index of first contact with A in old grainGrain[Local]A|B list
 
+  grainGrainSearchTime.start();
   for(size_t a: range(grain.count)) {
    size_t offset = lattice.index(grain.Px[a], grain.Py[a], grain.Pz[a]);
 
@@ -281,6 +281,7 @@ void Simulation::stepGrainGrain() {
    while(grainGrainI < oldGrainGrainA.size && oldGrainGrainA[grainGrainI] == a)
     grainGrainI++;
   }
+  grainGrainSearchTime.stop();
 
   assert_(align(simd, grainGrainA.size+1) <= grainGrainA.capacity);
   for(size_t i=grainGrainA.size; i<align(simd, grainGrainA.size+1); i++) grainGrainA.begin()[i] = 0;
@@ -291,7 +292,6 @@ void Simulation::stepGrainGrain() {
 
   //log("grain-grain", grainGrainSkipped);
   grainGrainSkipped=0;
-  grainGrainSearchTime.stop();
  } else grainGrainSkipped++;
 
  // Filters verlet lists, packing contacts to evaluate
@@ -377,15 +377,14 @@ void Simulation::stepGrainGrain() {
                       grainGrainTBx.begin(), grainGrainTBy.begin(), grainGrainTBz.begin() );
  });
 
- grainGrainSumTime.start();
  const size_t threadCount = 60;
  const size_t jobCount = grainGrainContact.size;
  const size_t chunkSize = (jobCount+threadCount-1)/threadCount;
  const size_t chunkCount = (jobCount+chunkSize-1)/chunkSize;
  assert_(chunkCount <= threadCount);
  uint chunkDomainStarts[chunkCount], chunkDomainStops[chunkCount];
- // Evaluates domain (range) for each chunk (//)
- for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
+ // Evaluates domain (range) for each chunk
+ grainGrainSumDomainTime += parallel_for(0, chunkCount, [&](uint, uint chunkIndex) {
   chunkDomainStarts[chunkIndex] = grain.count;
   chunkDomainStops[chunkIndex] = 0;
   for(size_t i = chunkIndex*chunkSize; i < min(jobCount, (chunkIndex+1)*chunkSize); i++) {
@@ -395,14 +394,13 @@ void Simulation::stepGrainGrain() {
    chunkDomainStarts[chunkIndex] = min(chunkDomainStarts[chunkIndex], min(a, b));
    chunkDomainStops[chunkIndex]= max(chunkDomainStops[chunkIndex], max(a, b));
   }
- }
+ });
  // Distributes chunks across copies
  size_t maxCopyCount = chunkCount, maxDomainCount = chunkCount;
  uint copyStart[maxCopyCount*maxDomainCount], copyStop[maxCopyCount*maxDomainCount];
  mref<uint>(copyStart, maxCopyCount*maxDomainCount).clear(0);
  mref<uint>(copyStop, maxCopyCount*maxDomainCount).clear(0);
  uint copy[maxCopyCount]; // Allocates buffer copies to chunks without range overlap
- mref<uint>(copy, chunkCount).clear(~0); // DEBUG
  size_t copyCount = 0;
  for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
   uint chunkDomainStart = chunkDomainStarts[chunkIndex];
@@ -438,12 +436,13 @@ continue_2:;
   assert_(copy[chunkIndex] != ~0u);
  }
  //for(size_t copyIndex = 1 /*0 is target buffer*/; copyIndex < copyCount; copyIndex++) { //
- parallel_for(1, copyCount, [this](uint, uint copyIndex) {
-  const size_t stride = align(simd, grain.count);
+ grainGrainSumZeroTime += parallel_for(1, copyCount, [this](uint, uint copyIndex) {
+  int count = grain.count;
+  const size_t stride = align(simd, count);
   const size_t base = copyIndex * stride;
   float* const Fx = grain.Fx.begin()+base, *Fy = grain.Fy.begin()+base, *Fz = grain.Fz.begin()+base;
   float* const Tx = grain.Tx.begin()+base, *Ty = grain.Ty.begin()+base, *Tz = grain.Tz.begin()+base;
-  for(size_t i=0; i<grain.count; i+=simd) {
+  for(int i=0; i<count; i+=simd) {
    store(Fx, i, _0f);
    store(Fy, i, _0f);
    store(Fz, i, _0f);
@@ -452,9 +451,7 @@ continue_2:;
    store(Tz, i, _0f);
   }
  });
- for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) { //
-  assert_(0 <= copy[chunkIndex] && copy[chunkIndex] < copyCount,
-          chunkIndex, copy[chunkIndex], copyCount);
+ grainGrainSumSumTime += parallel_for(0, chunkCount, [&](uint, uint chunkIndex) {
   const size_t stride = align(simd, grain.count);
   const size_t base  = copy[chunkIndex]*stride;
   float* const Fx = grain.Fx.begin()+base, *Fy = grain.Fy.begin()+base, *Fz = grain.Fz.begin()+base;
@@ -478,30 +475,30 @@ continue_2:;
    Ty[b] += grainGrainTBy[i];
    Tz[b] += grainGrainTBz[i];
   }
- }
-{
- float* const pFx = grain.Fx.begin(), *pFy = grain.Fy.begin(), *pFz = grain.Fz.begin();
- float* const pTx = grain.Tx.begin(), *pTy = grain.Ty.begin(), *pTz = grain.Tz.begin();
- for(size_t i = 0; i<grain.count; i+=simd) { //
-  vXsf Fx = _0f, Fy = _0f, Fz = _0f, Tx = _0f, Ty = _0f, Tz = _0f;
-  for(size_t copyIndex = 1; copyIndex < copyCount; copyIndex++) {
-   const size_t stride = align(simd, grain.count);
-   const size_t base = copyIndex*stride;
-   Fx += load(pFx, base+i);
-   Fy += load(pFy, base+i);
-   Fz += load(pFz, base+i);
-   Tx += load(pTx, base+i);
-   Ty += load(pTy, base+i);
-   Tz += load(pTz, base+i);
+ });
+ grainGrainSumMergeTime += parallel_chunk(align(simd, grain.count)/simd,
+                                          [this, copyCount](uint, size_t start, size_t size) {
+  float* const pFx = grain.Fx.begin(), *pFy = grain.Fy.begin(), *pFz = grain.Fz.begin();
+  float* const pTx = grain.Tx.begin(), *pTy = grain.Ty.begin(), *pTz = grain.Tz.begin();
+  for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
+   vXsf Fx = _0f, Fy = _0f, Fz = _0f, Tx = _0f, Ty = _0f, Tz = _0f;
+   for(size_t copyIndex = 1; copyIndex < copyCount; copyIndex++) {
+    const size_t stride = align(simd, grain.count);
+    const size_t base = copyIndex*stride;
+    Fx += load(pFx, base+i);
+    Fy += load(pFy, base+i);
+    Fz += load(pFz, base+i);
+    Tx += load(pTx, base+i);
+    Ty += load(pTy, base+i);
+    Tz += load(pTz, base+i);
+   }
+   store(pFx, i, load(pFx, i) + Fx);
+   store(pFy, i, load(pFy, i) + Fy);
+   store(pFz, i, load(pFz, i) + Fz);
+   store(pTx, i, load(pTx, i) + Tx);
+   store(pTy, i, load(pTy, i) + Ty);
+   store(pTz, i, load(pTz, i) + Tz);
   }
-  store(pFx, i, load(pFx, i) + Fx);
-  store(pFy, i, load(pFy, i) + Fy);
-  store(pFz, i, load(pFz, i) + Fz);
-  store(pTx, i, load(pTx, i) + Tx);
-  store(pTy, i, load(pTy, i) + Ty);
-  store(pTz, i, load(pTz, i) + Tz);
- }
- }
- grainGrainSumTime.stop();
+ });
  grainGrainTotalTime.stop();
  }
