@@ -402,92 +402,60 @@ void Simulation::stepGrainGrain() {
  if(jobCount) {
   const size_t chunkSize = ::max(1ul, jobCount/threadCount);
   const size_t chunkCount = (jobCount+chunkSize-1)/chunkSize;
-  //uint domainAStart[chunkCount], domainAStop[chunkCount];
-  //uint domainBStart[chunkCount], domainBStop[chunkCount];
-  uint domainStart[chunkCount], domainStop[chunkCount];
+  uint chunkDomainStarts[chunkCount], chunkDomainStops[chunkCount];
   // //
   for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
-   /*domainAStart[chunkIndex] = grain.count;
-   domainAStop[chunkIndex] = 0;
-   domainBStart[chunkIndex] = grain.count;
-   domainBStop[chunkIndex] = 0;*/
-   domainStart[chunkIndex] = grain.count;
-   domainStop[chunkIndex] = 0;
+   chunkDomainStarts[chunkIndex] = grain.count;
+   chunkDomainStops[chunkIndex] = 0;
    for(size_t i = chunkIndex*chunkSize; i < min(jobCount, (chunkIndex+1)*chunkSize); i++) {
     size_t index = grainGrainContact[i];
     uint a = grainGrainA[index];
     uint b = grainGrainB[index];
-    /*domainAStart[chunkIndex] = min(domainAStart[chunkIndex], a);
-    domainAStop[chunkIndex]= max(domainAStop[chunkIndex], a);
-    domainBStart[chunkIndex]= min(domainBStart[chunkIndex], b);
-    domainBStop[chunkIndex]= max(domainBStop[chunkIndex], b);*/
-    domainStart[chunkIndex] = min(domainStart[chunkIndex], min(a, b));
-    domainStop[chunkIndex]= max(domainStop[chunkIndex], max(a, b));
+    chunkDomainStarts[chunkIndex] = min(chunkDomainStarts[chunkIndex], min(a, b));
+    chunkDomainStops[chunkIndex]= max(chunkDomainStops[chunkIndex], max(a, b));
    }
   }
   // --
-  size_t lastIndex = 0;
+  // Domain start/stop distributed across copies
+  size_t maxCopyCount = chunkCount, maxDomainCount = chunkCount;
+  uint copyStart[maxCopyCount*maxDomainCount], copyStop[maxCopyCount*maxDomainCount];
+  mref<uint>(copyStart, maxCopyCount*maxDomainCount).clear(0);
+  mref<uint>(copyStop, maxCopyCount*maxDomainCount).clear(0);
+  uint copy[maxCopyCount]; // Allocates buffer copies to chunks without range overlap
+  size_t copyCount = 0;
   for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
-   /*if(domainAStart[chunkIndex] > lastIndex) lastIndex = domainAStart[chunkIndex];
-   if(domainAStop[chunkIndex] > lastIndex) lastIndex = domainAStop[chunkIndex];
-   if(domainBStart[chunkIndex] > lastIndex) lastIndex = domainBStart[chunkIndex];
-   if(domainBStop[chunkIndex] > lastIndex) lastIndex = domainBStop[chunkIndex];*/
-   if(domainStart[chunkIndex] > lastIndex) lastIndex = domainStart[chunkIndex];
-   if(domainStop[chunkIndex] > lastIndex) lastIndex = domainStop[chunkIndex];
-  }
-  size_t copyCount = 0, copyCountSum = 0, domainCount = 0, maxCopyCount = 0;
-  size_t minDomainSize = -1, maxDomainSize = 0, sumDomainSize = 0;
-  for(int index = -1; index<(int)lastIndex;) {
-   size_t nextIndex = -1;
-   for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
-    /*if((int)domainAStart[chunkIndex] > index && domainAStart[chunkIndex] < nextIndex)
-     nextIndex = domainAStart[chunkIndex];
-    if((int)domainAStop[chunkIndex] > index && domainAStop[chunkIndex] < nextIndex)
-     nextIndex = domainAStop[chunkIndex];
-    if((int)domainBStart[chunkIndex] > index && domainBStart[chunkIndex] < nextIndex)
-     nextIndex = domainBStart[chunkIndex];
-    if((int)domainBStop[chunkIndex] > index && domainBStop[chunkIndex] < nextIndex)
-     nextIndex = domainBStop[chunkIndex];*/
-    if((int)domainStart[chunkIndex] > index && domainStart[chunkIndex] < nextIndex)
-     nextIndex = domainStart[chunkIndex];
-    if((int)domainStop[chunkIndex] > index && domainStop[chunkIndex] < nextIndex)
-     nextIndex = domainStop[chunkIndex];
+   uint chunkDomainStart = chunkDomainStarts[chunkIndex];
+   uint chunkDomainStop = chunkDomainStops[chunkIndex];
+   size_t copyIndex = 0;
+   for(;; copyIndex++) {
+    assert_(copyIndex < maxCopyCount, copyIndex, maxCopyCount, chunkIndex);
+    for(size_t domainIndex = 0;; domainIndex++) {
+     assert_(domainIndex < maxDomainCount);
+     uint domainStart = copyStart[copyIndex*maxDomainCount+domainIndex];
+     uint domainStop = copyStop[copyIndex*maxDomainCount+domainIndex];
+     if(domainStart == domainStop) break;
+     if(chunkDomainStart < domainStop && chunkDomainStop > domainStart) {
+      goto continue_2;
+     }
+    } /*else*/ {
+     copyCount = max(copyCount, copyIndex+1);
+     copy[chunkCount] = copyIndex;
+     for(size_t domainIndex = 0;; domainIndex++) {
+      assert_(domainIndex < maxDomainCount, domainIndex, maxDomainCount);
+      uint& domainStart = copyStart[copyIndex*maxDomainCount+domainIndex];
+      uint& domainStop = copyStop[copyIndex*maxDomainCount+domainIndex];
+      if(domainStart == domainStop) {
+       domainStart = chunkDomainStart;
+       domainStop = chunkDomainStop;
+       break;
+      }
+     }
+     break; // next chunk
+    }
+    continue_2:;
    }
-   for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
-    /*if(domainAStart[chunkIndex] == nextIndex) {
-     copyCount++;
-     if(copyCount > maxCopyCount) maxCopyCount = copyCount;
-    }
-    if(domainAStop[chunkIndex] == nextIndex) {
-     copyCount--;
-    }
-    if(domainBStart[chunkIndex] == nextIndex) {
-     copyCount++;
-     if(copyCount > maxCopyCount) maxCopyCount = copyCount;
-    }
-    if(domainBStop[chunkIndex] == nextIndex) {
-     copyCount--;
-    }*/
-    if(domainStart[chunkIndex] == nextIndex) {
-     copyCount++;
-     if(copyCount > maxCopyCount) maxCopyCount = copyCount;
-    }
-    if(domainStop[chunkIndex] == nextIndex) {
-     copyCount--;
-    }
-   }
-   copyCountSum += copyCount;
-   domainCount++;
-   size_t domainSize = nextIndex - index;
-   minDomainSize = ::min(minDomainSize, domainSize);
-   maxDomainSize = ::max(maxDomainSize, domainSize);
-   sumDomainSize += domainSize;
-   index = nextIndex;
   }
-  log("max", maxCopyCount, "avg", domainCount?copyCountSum/domainCount:0, "#", domainCount,
-      "minSize", minDomainSize, "maxSize", maxDomainSize, "total", sumDomainSize,
-      "avgSize", domainCount?sumDomainSize/domainCount:0, "=Size", sumDomainSize/chunkCount);
-  assert_(copyCount == 0, copyCount);
+  log(chunkCount, copyCount);
   //const size_t elementCount = grain.count;
   /*const size_t domainSize = ::max(1, elementCount/N);
  const size_t domainCount = (elementCount+chunkSize-1)/chunkSize;*/
