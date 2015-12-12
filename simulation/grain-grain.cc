@@ -402,8 +402,8 @@ void Simulation::stepGrainGrain() {
  if(jobCount) {
   const size_t chunkSize = ::max(1ul, jobCount/threadCount);
   const size_t chunkCount = (jobCount+chunkSize-1)/chunkSize;
-  int domainsAStart[chunkCount], domainsAStop[chunkCount];
-  int domainsBStart[chunkCount], domainsBStop[chunkCount];
+  uint domainsAStart[chunkCount], domainsAStop[chunkCount];
+  uint domainsBStart[chunkCount], domainsBStop[chunkCount];
   // //
   for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
    domainsAStart[chunkIndex] = grain.count;
@@ -412,8 +412,8 @@ void Simulation::stepGrainGrain() {
    domainsBStop[chunkIndex] = 0;
    for(size_t i = chunkIndex*chunkSize; i < min(jobCount, (chunkIndex+1)*chunkSize); i++) {
     size_t index = grainGrainContact[i];
-    int a = grainGrainA[index];
-    int b = grainGrainB[index];
+    uint a = grainGrainA[index];
+    uint b = grainGrainB[index];
     domainsAStart[chunkIndex] = min(domainsAStart[chunkIndex], a);
     domainsAStop[chunkIndex]= max(domainsAStop[chunkIndex], a);
     domainsBStart[chunkIndex]= min(domainsBStart[chunkIndex], b);
@@ -421,17 +421,55 @@ void Simulation::stepGrainGrain() {
    }
   }
   // --
-  for(size_t index =0;;) {
+  size_t lastIndex = 0;
+  for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
+   if(domainsAStart[chunkIndex] > lastIndex) lastIndex = domainsAStart[chunkIndex];
+   if(domainsAStop[chunkIndex] > lastIndex) lastIndex = domainsAStop[chunkIndex];
+   if(domainsBStart[chunkIndex] > lastIndex) lastIndex = domainsBStart[chunkIndex];
+   if(domainsBStop[chunkIndex] > lastIndex) lastIndex = domainsBStop[chunkIndex];
+  }
+  size_t copyCount = 0, copyCountSum = 0, domainCount = 0, maxCopyCount = 0;
+  size_t minDomainSize = -1, maxDomainSize = 0, sumDomainSize = 0;
+  for(int index = -1; index<(int)lastIndex;) {
+   size_t nextIndex = -1;
    for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
-    if(chunkIndex>0) {
-     assert_(domainsAStop[chunkIndex-1] <= domainsAStart[chunkIndex], // Single element overlap
-       domainsAStop[chunkIndex-1], domainsAStart[chunkIndex]);
-     /*assert_(domainsBStart[chunkIndex-1] <= domainsBStart[chunkIndex], // Only neighbour overlap
-      domainsBStart[chunkIndex-1], domainsBStart[chunkIndex] );
-    assert_(domainsBStop[chunkIndex-1] <= domainsBStop[chunkIndex]); // Only neighbour overlap*/
+    if((int)domainsAStart[chunkIndex] > index && domainsAStart[chunkIndex] < nextIndex)
+     nextIndex = domainsAStart[chunkIndex];
+    if((int)domainsAStop[chunkIndex] > index && domainsAStop[chunkIndex] < nextIndex)
+     nextIndex = domainsAStop[chunkIndex];
+    if((int)domainsBStart[chunkIndex] > index && domainsBStart[chunkIndex] < nextIndex)
+     nextIndex = domainsBStart[chunkIndex];
+    if((int)domainsBStop[chunkIndex] > index && domainsBStop[chunkIndex] < nextIndex)
+     nextIndex = domainsBStop[chunkIndex];
+   }
+   for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
+    if(domainsAStart[chunkIndex] == nextIndex) {
+     copyCount++;
+     if(copyCount > maxCopyCount) maxCopyCount = copyCount;
+    }
+    if(domainsAStop[chunkIndex] == nextIndex) {
+     copyCount--;
+    }
+    if(domainsBStart[chunkIndex] == nextIndex) {
+     copyCount++;
+     if(copyCount > maxCopyCount) maxCopyCount = copyCount;
+    }
+    if(domainsBStop[chunkIndex] == nextIndex) {
+     copyCount--;
     }
    }
+   copyCountSum += copyCount;
+   domainCount++;
+   size_t domainSize = nextIndex - index;
+   minDomainSize = ::min(minDomainSize, domainSize);
+   maxDomainSize = ::max(maxDomainSize, domainSize);
+   sumDomainSize += domainSize;
+   index = nextIndex;
   }
+  log("max", maxCopyCount, "avg", domainCount?copyCountSum/domainCount:0, "#", domainCount,
+      "minSize", minDomainSize, "maxSize", maxDomainSize, "total", sumDomainSize,
+      "avgSize", domainCount?sumDomainSize/domainCount:0, "=Size", sumDomainSize/chunkCount);
+  assert_(copyCount == 0, copyCount);
   //const size_t elementCount = grain.count;
   /*const size_t domainSize = ::max(1, elementCount/N);
  const size_t domainCount = (elementCount+chunkSize-1)/chunkSize;*/
