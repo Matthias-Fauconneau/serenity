@@ -402,59 +402,77 @@ void Simulation::stepGrainGrain() {
  if(jobCount) {
   const size_t chunkSize = ::max(1ul, jobCount/threadCount);
   const size_t chunkCount = (jobCount+chunkSize-1)/chunkSize;
-  uint domainsAStart[chunkCount], domainsAStop[chunkCount];
-  uint domainsBStart[chunkCount], domainsBStop[chunkCount];
+  //uint domainAStart[chunkCount], domainAStop[chunkCount];
+  //uint domainBStart[chunkCount], domainBStop[chunkCount];
+  uint domainStart[chunkCount], domainStop[chunkCount];
   // //
   for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
-   domainsAStart[chunkIndex] = grain.count;
-   domainsAStop[chunkIndex] = 0;
-   domainsBStart[chunkIndex] = grain.count;
-   domainsBStop[chunkIndex] = 0;
+   /*domainAStart[chunkIndex] = grain.count;
+   domainAStop[chunkIndex] = 0;
+   domainBStart[chunkIndex] = grain.count;
+   domainBStop[chunkIndex] = 0;*/
+   domainStart[chunkIndex] = grain.count;
+   domainStop[chunkIndex] = 0;
    for(size_t i = chunkIndex*chunkSize; i < min(jobCount, (chunkIndex+1)*chunkSize); i++) {
     size_t index = grainGrainContact[i];
     uint a = grainGrainA[index];
     uint b = grainGrainB[index];
-    domainsAStart[chunkIndex] = min(domainsAStart[chunkIndex], a);
-    domainsAStop[chunkIndex]= max(domainsAStop[chunkIndex], a);
-    domainsBStart[chunkIndex]= min(domainsBStart[chunkIndex], b);
-    domainsBStop[chunkIndex]= max(domainsBStop[chunkIndex], b);
+    /*domainAStart[chunkIndex] = min(domainAStart[chunkIndex], a);
+    domainAStop[chunkIndex]= max(domainAStop[chunkIndex], a);
+    domainBStart[chunkIndex]= min(domainBStart[chunkIndex], b);
+    domainBStop[chunkIndex]= max(domainBStop[chunkIndex], b);*/
+    domainStart[chunkIndex] = min(domainStart[chunkIndex], min(a, b));
+    domainStop[chunkIndex]= max(domainStop[chunkIndex], max(a, b));
    }
   }
   // --
   size_t lastIndex = 0;
   for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
-   if(domainsAStart[chunkIndex] > lastIndex) lastIndex = domainsAStart[chunkIndex];
-   if(domainsAStop[chunkIndex] > lastIndex) lastIndex = domainsAStop[chunkIndex];
-   if(domainsBStart[chunkIndex] > lastIndex) lastIndex = domainsBStart[chunkIndex];
-   if(domainsBStop[chunkIndex] > lastIndex) lastIndex = domainsBStop[chunkIndex];
+   /*if(domainAStart[chunkIndex] > lastIndex) lastIndex = domainAStart[chunkIndex];
+   if(domainAStop[chunkIndex] > lastIndex) lastIndex = domainAStop[chunkIndex];
+   if(domainBStart[chunkIndex] > lastIndex) lastIndex = domainBStart[chunkIndex];
+   if(domainBStop[chunkIndex] > lastIndex) lastIndex = domainBStop[chunkIndex];*/
+   if(domainStart[chunkIndex] > lastIndex) lastIndex = domainStart[chunkIndex];
+   if(domainStop[chunkIndex] > lastIndex) lastIndex = domainStop[chunkIndex];
   }
   size_t copyCount = 0, copyCountSum = 0, domainCount = 0, maxCopyCount = 0;
   size_t minDomainSize = -1, maxDomainSize = 0, sumDomainSize = 0;
   for(int index = -1; index<(int)lastIndex;) {
    size_t nextIndex = -1;
    for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
-    if((int)domainsAStart[chunkIndex] > index && domainsAStart[chunkIndex] < nextIndex)
-     nextIndex = domainsAStart[chunkIndex];
-    if((int)domainsAStop[chunkIndex] > index && domainsAStop[chunkIndex] < nextIndex)
-     nextIndex = domainsAStop[chunkIndex];
-    if((int)domainsBStart[chunkIndex] > index && domainsBStart[chunkIndex] < nextIndex)
-     nextIndex = domainsBStart[chunkIndex];
-    if((int)domainsBStop[chunkIndex] > index && domainsBStop[chunkIndex] < nextIndex)
-     nextIndex = domainsBStop[chunkIndex];
+    /*if((int)domainAStart[chunkIndex] > index && domainAStart[chunkIndex] < nextIndex)
+     nextIndex = domainAStart[chunkIndex];
+    if((int)domainAStop[chunkIndex] > index && domainAStop[chunkIndex] < nextIndex)
+     nextIndex = domainAStop[chunkIndex];
+    if((int)domainBStart[chunkIndex] > index && domainBStart[chunkIndex] < nextIndex)
+     nextIndex = domainBStart[chunkIndex];
+    if((int)domainBStop[chunkIndex] > index && domainBStop[chunkIndex] < nextIndex)
+     nextIndex = domainBStop[chunkIndex];*/
+    if((int)domainStart[chunkIndex] > index && domainStart[chunkIndex] < nextIndex)
+     nextIndex = domainStart[chunkIndex];
+    if((int)domainStop[chunkIndex] > index && domainStop[chunkIndex] < nextIndex)
+     nextIndex = domainStop[chunkIndex];
    }
    for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
-    if(domainsAStart[chunkIndex] == nextIndex) {
+    /*if(domainAStart[chunkIndex] == nextIndex) {
      copyCount++;
      if(copyCount > maxCopyCount) maxCopyCount = copyCount;
     }
-    if(domainsAStop[chunkIndex] == nextIndex) {
+    if(domainAStop[chunkIndex] == nextIndex) {
      copyCount--;
     }
-    if(domainsBStart[chunkIndex] == nextIndex) {
+    if(domainBStart[chunkIndex] == nextIndex) {
      copyCount++;
      if(copyCount > maxCopyCount) maxCopyCount = copyCount;
     }
-    if(domainsBStop[chunkIndex] == nextIndex) {
+    if(domainBStop[chunkIndex] == nextIndex) {
+     copyCount--;
+    }*/
+    if(domainStart[chunkIndex] == nextIndex) {
+     copyCount++;
+     if(copyCount > maxCopyCount) maxCopyCount = copyCount;
+    }
+    if(domainStop[chunkIndex] == nextIndex) {
      copyCount--;
     }
    }
