@@ -3,7 +3,7 @@
 #include "parallel.h"
 
 static inline void qapply(vXsf Qx, vXsf Qy, vXsf Qz, vXsf Qw, vXsf Vx, vXsf Vy, vXsf Vz,
-                     vXsf& QVx, vXsf& QVy, vXsf& QVz) {
+                          vXsf& QVx, vXsf& QVy, vXsf& QVz) {
  const vXsf X = Qw*Vx - Vy*Qz + Qy*Vz;
  const vXsf Y = Qw*Vy - Vz*Qx + Qz*Vx;
  const vXsf Z = Qw*Vz - Vx*Qy + Qx*Vy;
@@ -323,6 +323,7 @@ void Simulation::stepGrainGrain() {
     }
    }
  }, 1);
+ if(!grainGrainContact.size) return;
  for(size_t i=grainGrainContact.size; i<align(simd, grainGrainContact.size); i++)
   grainGrainContact.begin()[i] = grainGrainA.size;;
 
@@ -377,112 +378,130 @@ void Simulation::stepGrainGrain() {
  });
 
  grainGrainSumTime.start();
-  for(size_t i = 0; i < grainGrainContact.size; i++) { // Scalar scatter add
-   size_t index = grainGrainContact[i];
-   size_t a = grainGrainA[index];
-   size_t b = grainGrainB[index];
-   grain.Fx[a] += grainGrainFx[i];
-   grain.Fx[b] -= grainGrainFx[i];
-   grain.Fy[a] += grainGrainFy[i];
-   grain.Fy[b] -= grainGrainFy[i];
-   grain.Fz[a] += grainGrainFz[i];
-   grain.Fz[b] -= grainGrainFz[i];
-
-   grain.Tx[a] += grainGrainTAx[i];
-   grain.Ty[a] += grainGrainTAy[i];
-   grain.Tz[a] += grainGrainTAz[i];
-   grain.Tx[b] += grainGrainTBx[i];
-   grain.Ty[b] += grainGrainTBy[i];
-   grain.Tz[b] += grainGrainTBz[i];
-  }
-#if 1
-{ // Domain coherence profile
  const size_t threadCount = 60;
  const size_t jobCount = grainGrainContact.size;
- if(jobCount) {
-  const size_t chunkSize = ::max(1ul, jobCount/threadCount);
-  const size_t chunkCount = (jobCount+chunkSize-1)/chunkSize;
-  uint chunkDomainStarts[chunkCount], chunkDomainStops[chunkCount];
-  // //
-  for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
-   chunkDomainStarts[chunkIndex] = grain.count;
-   chunkDomainStops[chunkIndex] = 0;
-   for(size_t i = chunkIndex*chunkSize; i < min(jobCount, (chunkIndex+1)*chunkSize); i++) {
-    size_t index = grainGrainContact[i];
-    uint a = grainGrainA[index];
-    uint b = grainGrainB[index];
-    chunkDomainStarts[chunkIndex] = min(chunkDomainStarts[chunkIndex], min(a, b));
-    chunkDomainStops[chunkIndex]= max(chunkDomainStops[chunkIndex], max(a, b));
-   }
+ const size_t chunkSize = (jobCount+threadCount-1)/threadCount;
+ const size_t chunkCount = (jobCount+chunkSize-1)/chunkSize;
+ assert_(chunkCount <= threadCount);
+ uint chunkDomainStarts[chunkCount], chunkDomainStops[chunkCount];
+ // Evaluates domain (range) for each chunk (//)
+ for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
+  chunkDomainStarts[chunkIndex] = grain.count;
+  chunkDomainStops[chunkIndex] = 0;
+  for(size_t i = chunkIndex*chunkSize; i < min(jobCount, (chunkIndex+1)*chunkSize); i++) {
+   size_t index = grainGrainContact[i];
+   uint a = grainGrainA[index];
+   uint b = grainGrainB[index];
+   chunkDomainStarts[chunkIndex] = min(chunkDomainStarts[chunkIndex], min(a, b));
+   chunkDomainStops[chunkIndex]= max(chunkDomainStops[chunkIndex], max(a, b));
   }
-  // --
-  // Domain start/stop distributed across copies
-  size_t maxCopyCount = chunkCount, maxDomainCount = chunkCount;
-  uint copyStart[maxCopyCount*maxDomainCount], copyStop[maxCopyCount*maxDomainCount];
-  mref<uint>(copyStart, maxCopyCount*maxDomainCount).clear(0);
-  mref<uint>(copyStop, maxCopyCount*maxDomainCount).clear(0);
-  uint copy[maxCopyCount]; // Allocates buffer copies to chunks without range overlap
-  size_t copyCount = 0;
-  for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
-   uint chunkDomainStart = chunkDomainStarts[chunkIndex];
-   uint chunkDomainStop = chunkDomainStops[chunkIndex];
-   size_t copyIndex = 0;
-   for(;; copyIndex++) {
-    assert_(copyIndex < maxCopyCount, copyIndex, maxCopyCount, chunkIndex);
-    for(size_t domainIndex = 0;; domainIndex++) {
-     assert_(domainIndex < maxDomainCount);
-     uint domainStart = copyStart[copyIndex*maxDomainCount+domainIndex];
-     uint domainStop = copyStop[copyIndex*maxDomainCount+domainIndex];
-     if(domainStart == domainStop) break;
-     if(chunkDomainStart < domainStop && chunkDomainStop > domainStart) {
-      goto continue_2;
-     }
-    } /*else*/ {
-     copyCount = max(copyCount, copyIndex+1);
-     copy[chunkCount] = copyIndex;
-     for(size_t domainIndex = 0;; domainIndex++) {
-      assert_(domainIndex < maxDomainCount, domainIndex, maxDomainCount);
-      uint& domainStart = copyStart[copyIndex*maxDomainCount+domainIndex];
-      uint& domainStop = copyStop[copyIndex*maxDomainCount+domainIndex];
-      if(domainStart == domainStop) {
-       domainStart = chunkDomainStart;
-       domainStop = chunkDomainStop;
-       break;
-      }
-     }
-     break; // next chunk
+ }
+ // Distributes chunks across copies
+ size_t maxCopyCount = chunkCount, maxDomainCount = chunkCount;
+ uint copyStart[maxCopyCount*maxDomainCount], copyStop[maxCopyCount*maxDomainCount];
+ mref<uint>(copyStart, maxCopyCount*maxDomainCount).clear(0);
+ mref<uint>(copyStop, maxCopyCount*maxDomainCount).clear(0);
+ uint copy[maxCopyCount]; // Allocates buffer copies to chunks without range overlap
+ mref<uint>(copy, chunkCount).clear(~0); // DEBUG
+ size_t copyCount = 0;
+ for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
+  uint chunkDomainStart = chunkDomainStarts[chunkIndex];
+  uint chunkDomainStop = chunkDomainStops[chunkIndex];
+  size_t copyIndex = 0;
+  for(;; copyIndex++) {
+   assert_(copyIndex < maxCopyCount, copyIndex, maxCopyCount, chunkIndex);
+   for(size_t domainIndex = 0;; domainIndex++) {
+    assert_(domainIndex < maxDomainCount);
+    uint domainStart = copyStart[copyIndex*maxDomainCount+domainIndex];
+    uint domainStop = copyStop[copyIndex*maxDomainCount+domainIndex];
+    if(domainStart == domainStop) break;
+    if(chunkDomainStart < domainStop && chunkDomainStop > domainStart) {
+     goto continue_2;
     }
-    continue_2:;
+   } /*else*/ {
+    copyCount = max(copyCount, copyIndex+1);
+    copy[chunkIndex] = copyIndex;
+    for(size_t domainIndex = 0;; domainIndex++) {
+     assert_(domainIndex < maxDomainCount, domainIndex, maxDomainCount);
+     uint& domainStart = copyStart[copyIndex*maxDomainCount+domainIndex];
+     uint& domainStop = copyStop[copyIndex*maxDomainCount+domainIndex];
+     if(domainStart == domainStop) {
+      domainStart = chunkDomainStart;
+      domainStop = chunkDomainStop;
+      break;
+     }
+    }
+    break; // next chunk
    }
+continue_2:;
   }
-  log(chunkCount, copyCount);
-  //const size_t elementCount = grain.count;
-  /*const size_t domainSize = ::max(1, elementCount/N);
- const size_t domainCount = (elementCount+chunkSize-1)/chunkSize;*/
-/*  const size_t domainCount = chunkCount;
-  const size_t domainSize = (elementCount+domainCount-1)/domainCount;
-  size_t inDomainA = 0, outOfDomainA = 0, inDomainB = 0, outOfDomainB = 0, inDomainBoth = 0, outOfDomainAny = 0, outOfDomainBoth = 0;
-  for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
-   const size_t domainIndex = chunkIndex;
-   const size_t domainStart = domainIndex * domainSize;
-   const size_t domainEnd = (domainIndex+1) * domainSize;
-   //domainEnd = ::min(domainEnd, elementCount);
-   for(size_t i = chunkIndex*chunkSize; i < min(jobCount, (chunkIndex+1)*chunkSize); i++) {
-    size_t index = grainGrainContact[i];
-    size_t a = grainGrainA[index];
-    size_t b = grainGrainB[index];
-    if(a >= domainStart && a<domainEnd) inDomainA++; else outOfDomainA++;
-    if(b >= domainStart && b<domainEnd) inDomainB++; else  outOfDomainB++;
-    if((a >= domainStart && a<domainEnd) && (b >= domainStart && b<domainEnd)) inDomainBoth++; else outOfDomainAny++;
-    if(!(a >= domainStart && a<domainEnd) && !(b >= domainStart && b<domainEnd)) outOfDomainBoth++;
-   }
+  assert_(copy[chunkIndex] != ~0u);
+ }
+ //for(size_t copyIndex = 1 /*0 is target buffer*/; copyIndex < copyCount; copyIndex++) { //
+ parallel_for(1, copyCount, [this](uint, uint copyIndex) {
+  const size_t stride = align(simd, grain.count);
+  const size_t base = copyIndex * stride;
+  float* const Fx = grain.Fx.begin()+base, *Fy = grain.Fy.begin()+base, *Fz = grain.Fz.begin()+base;
+  float* const Tx = grain.Tx.begin()+base, *Ty = grain.Ty.begin()+base, *Tz = grain.Tz.begin()+base;
+  for(size_t i=0; i<grain.count; i+=simd) {
+   store(Fx, i, _0f);
+   store(Fy, i, _0f);
+   store(Fz, i, _0f);
+   store(Tx, i, _0f);
+   store(Ty, i, _0f);
+   store(Tz, i, _0f);
   }
-  log(strD(outOfDomainA, outOfDomainA+inDomainA),
-        strD(outOfDomainB, outOfDomainB+inDomainB),
-        strD(outOfDomainAny, outOfDomainAny+inDomainBoth));*/
+ });
+ for(size_t chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) { //
+  assert_(0 <= copy[chunkIndex] && copy[chunkIndex] < copyCount,
+          chunkIndex, copy[chunkIndex], copyCount);
+  const size_t stride = align(simd, grain.count);
+  const size_t base  = copy[chunkIndex]*stride;
+  float* const Fx = grain.Fx.begin()+base, *Fy = grain.Fy.begin()+base, *Fz = grain.Fz.begin()+base;
+  float* const Tx = grain.Tx.begin()+base, *Ty = grain.Ty.begin()+base, *Tz = grain.Tz.begin()+base;
+  // Scalar scatter add
+  for(size_t i = chunkIndex*chunkSize; i < min(jobCount, (chunkIndex+1)*chunkSize); i++) {
+   const size_t index = grainGrainContact[i];
+   const size_t a = grainGrainA[index];
+   const size_t b = grainGrainB[index];
+   Fx[a] += grainGrainFx[i];
+   Fx[b] -= grainGrainFx[i];
+   Fy[a] += grainGrainFy[i];
+   Fy[b] -= grainGrainFy[i];
+   Fz[a] += grainGrainFz[i];
+   Fz[b] -= grainGrainFz[i];
+
+   Tx[a] += grainGrainTAx[i];
+   Ty[a] += grainGrainTAy[i];
+   Tz[a] += grainGrainTAz[i];
+   Tx[b] += grainGrainTBx[i];
+   Ty[b] += grainGrainTBy[i];
+   Tz[b] += grainGrainTBz[i];
+  }
+ }
+{
+ float* const pFx = grain.Fx.begin(), *pFy = grain.Fy.begin(), *pFz = grain.Fz.begin();
+ float* const pTx = grain.Tx.begin(), *pTy = grain.Ty.begin(), *pTz = grain.Tz.begin();
+ for(size_t i = 0; i<grain.count; i+=simd) { //
+  vXsf Fx = _0f, Fy = _0f, Fz = _0f, Tx = _0f, Ty = _0f, Tz = _0f;
+  for(size_t copyIndex = 1; copyIndex < copyCount; copyIndex++) {
+   const size_t stride = align(simd, grain.count);
+   const size_t base = copyIndex*stride;
+   Fx += load(pFx, base+i);
+   Fy += load(pFy, base+i);
+   Fz += load(pFz, base+i);
+   Tx += load(pTx, base+i);
+   Ty += load(pTy, base+i);
+   Tz += load(pTz, base+i);
+  }
+  store(pFx, i, load(pFx, i) + Fx);
+  store(pFy, i, load(pFy, i) + Fy);
+  store(pFz, i, load(pFz, i) + Fz);
+  store(pTx, i, load(pTx, i) + Tx);
+  store(pTy, i, load(pTy, i) + Ty);
+  store(pTz, i, load(pTz, i) + Tz);
  }
  }
-#endif
-  grainGrainSumTime.stop();
-  grainGrainTotalTime.stop();
-}
+ grainGrainSumTime.stop();
+ grainGrainTotalTime.stop();
+ }

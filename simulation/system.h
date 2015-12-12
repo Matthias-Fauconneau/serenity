@@ -2,6 +2,7 @@
 #include "memory.h"
 #include "vector.h"
 #include "simd.h"
+#include "parallel.h"
 #define sconst static constexpr
 static inline constexpr float pow4(float x) { return x*x*x*x; }
 
@@ -49,14 +50,16 @@ struct System {
   buffer<float> Vx { capacity };
   buffer<float> Vy { capacity };
   buffer<float> Vz { capacity };
-  buffer<float> Fx { capacity };
-  buffer<float> Fy { capacity };
-  buffer<float> Fz { capacity };
+  buffer<float> Fx { maxThreadCount * capacity };
+  buffer<float> Fy { maxThreadCount * capacity };
+  buffer<float> Fz { maxThreadCount * capacity };
 
    // TODO: Rodrigues vector
   buffer<float> Rx { capacity }, Ry { capacity }, Rz { capacity }, Rw { capacity };
   buffer<float> AVx { capacity }, AVy { capacity }, AVz { capacity }; // Angular velocity
-  buffer<float> Tx { capacity }, Ty { capacity }, Tz { capacity }; // Torque
+  buffer<float> Tx { maxThreadCount * capacity };
+  buffer<float> Ty { maxThreadCount * capacity };
+  buffer<float> Tz { maxThreadCount * capacity }; // Torque
 
   Grain() : capacity(4*2048) {
    Px.clear(0); Py.clear(0); Pz.clear(0);
