@@ -164,6 +164,7 @@ void __attribute((constructor(102))) setup_signals() {
 int __attribute((noreturn)) exit_group(int status) { syscall(SYS_exit_group, status); __builtin_unreachable(); }
 
 template<> void __attribute((noreturn)) error(const string& message) {
+ log(message);
  static bool reentrant = false;
  if(!reentrant) { // Avoid hangs if tracing errors
   reentrant = true;

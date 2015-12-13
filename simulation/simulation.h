@@ -233,7 +233,7 @@ struct Simulation : System {
   uint64 domainTime = 0;
   tsc memoryTime;
   tsc grainGrainLatticeTime;
-  tsc grainGrainSearchTime;
+  uint64 grainGrainSearchTime = 0;
   uint64 grainGrainFilterTime = 0;
   uint64 grainGrainEvaluateTime = 0;
   uint64 grainGrainSumDomainTime = 0;
@@ -248,13 +248,14 @@ struct Simulation : System {
   uint64 membraneInitializationTime = 0;
   uint64 membraneForceTime = 0;
  void stepGrainMembrane();
+   tsc grainMembraneLatticeTime;
    tsc grainMembraneGridTime;
    uint64 grainMembraneSearchTime = 0;
    uint64 grainMembraneFilterTime = 0;
    //tsc grainMembraneEvaluateTime;
    uint64 grainMembraneEvaluateTime = 0;
    tsc grainMembraneSumTime;
-   size_t grainMembraneContactSizeSum;
+   size_t grainMembraneContactSizeSum = 0;
  void stepMembraneIntegration();
   uint64 membraneIntegrationTime = 0;
 

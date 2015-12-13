@@ -14,6 +14,10 @@ long currentTime();
 int64 realTime();
 int64 threadCPUTime();
 
+#if 0
+ // FIXME: thread might switch core between cycle counter reads
+ #define readCycleCounter threadCPUTime
+#else
 #if __clang__
 #define readCycleCounter  __builtin_readcyclecounter
 #elif __INTEL_COMPILER
@@ -21,11 +25,12 @@ int64 threadCPUTime();
 #else
 #define readCycleCounter __builtin_ia32_rdtsc
 #endif
+#endif
 /// Returns the number of cycles used to execute \a statements (low overhead)
 #define cycles( statements ) ({ uint64 start=rdtsc(); statements; rdtsc()-start; })
 struct tsc {
  uint64 total=0, tsc=0;
- void reset() { total=0;tsc=0;}
+ void reset() { total=0; tsc=0;}
  void start() { if(!tsc) tsc=readCycleCounter(); }
  void stop() { if(tsc) total+=readCycleCounter()-tsc; tsc=0; }
  uint64 cycleCount() const {return total + (tsc?readCycleCounter()-tsc:0); }
@@ -33,9 +38,17 @@ struct tsc {
  void operator =(int unused v) { assert(v == 0); reset(); }
 };
 inline String strD(const uint64 num, const uint64 div) {
- return div ? str(int(round(100*double(num)/double(div))))+'%' : String();
+ assert_(num <= div, num, div);
+ return div ? str(uint(round(100*float(num)/float(div))))+'%' : String();
 }
 inline String strD(const tsc& num, const tsc& div) { return strD(num.cycleCount(), div.cycleCount()); }
+
+struct scope {
+ tsc& tsc;
+ scope(struct tsc& tsc) : tsc(tsc) { tsc.start(); }
+ ~scope() { tsc.stop(); }
+};
+#define scope scope unused _time_
 
 struct Time {
     uint64 startTime=realTime(), stopTime=0;

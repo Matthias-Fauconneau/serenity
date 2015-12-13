@@ -113,6 +113,14 @@ struct reverse_range {
  int start, stop;
 };
 
+// -- atomic
+
+struct atomic {
+ size_t count = 0;
+ operator size_t() { return count; }
+ size_t operator++(int/*postfix*/) { return __atomic_fetch_add(&count, 1, 5/*SeqCst*/); }
+};
+
 // -- initializer_list
 
 namespace std {

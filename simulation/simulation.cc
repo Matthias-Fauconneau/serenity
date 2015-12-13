@@ -72,8 +72,7 @@ void Simulation::step() {
 void Simulation::profile(const Time& totalTime) {
  log("----",timeStep/size_t(1*1/(dt*60)),"----");
  log(totalTime.microseconds()/timeStep, "us/step", totalTime, timeStep);
- if(stepTimeRT.nanoseconds()*100<totalTime.nanoseconds()*99)
-  //log("step", strD(stepTimeRT, totalTime));
+ //if(stepTimeRT.nanoseconds()*100<totalTime.nanoseconds()*99) log("step", strD(stepTimeRT, totalTime));
 #if WIRE
  if(grainWireContactSizeSum) {
   log("grain-wire contact count mean", grainWireContactSizeSum/timeStep);
@@ -82,7 +81,7 @@ void Simulation::profile(const Time& totalTime) {
  }
 #endif
  log("W", membrane.W, "H", membrane.H, "W*H", membrane.W*membrane.H, grain.count, wire.count);
- const bool reset = true;
+ const bool reset = false;
  size_t accounted = 0, shown = 0;
  map<uint64, string> profile;
 #define logTime(name) \
@@ -144,7 +143,10 @@ void Simulation::profile(const Time& totalTime) {
 #endif
 
 #undef logTime
- for(const auto entry: profile) log(strD(entry.key, stepTime), entry.value);
+ for(const auto entry: profile) {
+  assert_(entry.key <= stepTime, entry.value, entry.key/1000000.f, stepTime.cycleCount()/1000000.f);
+  log(strD(entry.key, stepTime), entry.value);
+ }
  log(strD(shown, stepTime), "/", strD(accounted, stepTime), "/", strD(stepTimeRT, totalTime));
  if(reset) stepTime.reset();
 }
@@ -167,10 +169,10 @@ void Simulation::profile(const Time& totalTime) {
 bool Simulation::run(const Time& totalTime) {
  stepTimeRT.start();
  stepTime.start();
- for(int unused t: range(1/(dt*60*32))) step();
+ for(int unused t: range(1/(dt*60*16))) step();
  stepTime.stop();
  stepTimeRT.stop();
- if(timeStep%(1*size_t(1/(dt*60*32))) == 0) {
+ if(timeStep%(1*size_t(1/(dt*60*16))) == 0) {
   //extern size_t threadCount();
   //if(threadCount()<17) log(threadCount(), coreFrequencies()); else log("//", threadCount());
   profile(totalTime);

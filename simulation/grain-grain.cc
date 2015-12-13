@@ -2,12 +2,6 @@
 #include "lattice.h"
 #include "parallel.h"
 
-struct atomic {
- size_t count = 0;
- operator size_t() { return count; }
- size_t operator++(int/*postfix*/) { return __atomic_fetch_add(&count, 1, 5/*SeqCst*/); }
-};
-
 static inline void qapply(vXsf Qx, vXsf Qy, vXsf Qz, vXsf Qw, vXsf Vx, vXsf Vy, vXsf Vz,
                           vXsf& QVx, vXsf& QVy, vXsf& QVz) {
  const vXsf X = Qw*Vx - Vy*Qz + Qy*Vz;
@@ -169,8 +163,9 @@ static inline void evaluateGrainGrain(const int start, const int size,
 }
 
 void Simulation::stepGrainGrain() {
+ return; // DEBUG
  if(!grain.count) return;
- grainGrainTotalTime.start();
+ scope(grainGrainTotalTime);
  if(grainGrainGlobalMinD <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
 
   //vec3 min, max; domainGrain(min, max);
@@ -243,9 +238,10 @@ void Simulation::stepGrainGrain() {
   grainGrainLocalBy.size = 0;
   grainGrainLocalBz.size = 0;
 
-  grainGrainSearchTime.start();
   atomic contactCount;
-  parallel_chunk(grain.count, [&](uint, uint start, uint size) {
+  return; // DEBUG
+  grainGrainSearchTime += parallel_chunk(grain.count,
+  [this, &lattice, &latticeNeighbours, verletDistance, &contactCount](uint, uint start, uint size) {
    for(uint a=start; a<(start+size); a+=1) { // TODO: SIMD ?
     uint offset = lattice.index(grain.Px[a], grain.Py[a], grain.Pz[a]);
     // Neighbours
@@ -258,22 +254,24 @@ void Simulation::stepGrainGrain() {
                     + sq(grain.Pz[a]-grain.Pz[b])); //TODO: SIMD //FIXME: fails with Ofast?
      if(d <= verletDistance) {
       size_t index = contactCount++;
+      assert_(index< grainGrainA.capacity);
       grainGrainA[index] = a;
       grainGrainB[index] = b;
      }
     }
    }
-  });
+  }, 1);
+  return; // DEBUG
   if(!contactCount) return;
   grainGrainA.size = contactCount;
   grainGrainB.size = contactCount;
 
-  uint grainGrainI = 0; // Index of first contact with A in old grainGrain[Local]A|B list
+  uint grainGrainIndex = 0; // Index of first contact with A in old grainGrain[Local]A|B list
   for(uint i=0; i<grainGrainA.size; i++) { // seq
    uint a = grainGrainA[i];
    uint b = grainGrainB[i];
    for(uint k = 0;; k++) {
-    uint j = grainGrainI+k;
+    uint j = grainGrainIndex+k;
     if(j >= oldGrainGrainA.size || oldGrainGrainA[j] != a) break;
     if(oldGrainGrainB[j] == b) { // Repack existing friction
      grainGrainLocalAx.append( oldGrainGrainLocalAx[j] );
@@ -294,11 +292,10 @@ void Simulation::stepGrainGrain() {
     grainGrainLocalBy.append( 0 );
     grainGrainLocalBz.append( 0 );
    }
-    break_:;
-   while(grainGrainI < oldGrainGrainA.size && oldGrainGrainA[grainGrainI] == a)
-    grainGrainI++;
+   break_:;
+   while(grainGrainIndex < oldGrainGrainA.size && oldGrainGrainA[grainGrainIndex] == a)
+    grainGrainIndex++;
   }
-  grainGrainSearchTime.stop();
 
   assert_(align(simd, grainGrainA.size+1) <= grainGrainA.capacity);
   for(uint i=grainGrainA.size; i<align(simd, grainGrainA.size+1); i++) grainGrainA.begin()[i] = 0;
@@ -394,7 +391,7 @@ void Simulation::stepGrainGrain() {
                       grainGrainTBx.begin(), grainGrainTBy.begin(), grainGrainTBz.begin() );
  });
 
- const uint threadCount = maxThreadCount;
+ const uint threadCount = ::threadCount();
  const uint jobCount = grainGrainContact.size;
  const uint chunkSize = (jobCount+threadCount-1)/threadCount;
  const uint chunkCount = (jobCount+chunkSize-1)/chunkSize;
@@ -525,5 +522,4 @@ continue_2:;
   }
  });
 #endif
- grainGrainTotalTime.stop();
  }

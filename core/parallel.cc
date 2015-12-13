@@ -2,8 +2,8 @@
 
 #if __MIC__
 const int maxThreadCount = 60; //240;
-#elif !DEBUG
-const int maxThreadCount = 8;
+#elif !DEBUG && 1
+const int maxThreadCount = 12;
 #else
 const int maxThreadCount = 1;
 #endif
@@ -19,12 +19,14 @@ int threadCount() {
   assert_(s.data.size<s.buffer.capacity, s.data.size, s.buffer.capacity, "/proc/cpuinfo", "threadCount");
   int threadCount = 0;
   while(s) { if(s.match("processor")) threadCount++; s.line(); }
-  //assert_(threadCount <= maxThreadCount, threadCount, maxThreadCount);
+#if !DEBUG && 1
+  assert_(threadCount <= maxThreadCount, threadCount, maxThreadCount);
+#endif
   if(environmentVariable("THREADS"_))
    threadCount = min(threadCount, (int)parseInteger(environmentVariable("THREADS"_)));
   min(threadCount, maxThreadCount);
  });
- assert_(threadCount == maxThreadCount, threadCount, maxThreadCount);
+ //assert_(threadCount == maxThreadCount, threadCount, maxThreadCount);
  return threadCount;
 }
 
@@ -74,9 +76,11 @@ uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate
   }
   int jobCount = ::min(threadCount, int(stop-start));
   jobs.release(jobCount);
-  tsc time; time.start();
+  //tsc time; time.start();
+  Time time; time.start();
   results.acquire(jobCount);
-  return time.cycleCount();
+  return time.nanoseconds();
+  //return time.cycleCount();
   //uint64 time = 0; for(int index: range(::threadCount())) time += threads[index].time; return time;
 #endif
  }

@@ -129,7 +129,6 @@ void Simulation::stepMembrane() {
     }
   }, 1/*maxThreadCount FIXME*/);
 
- //membraneForceTime += parallel_chunk(1, membrane.H-1, [this](uint, int start, int size) {
  membraneForceTime += parallel_for(1, membrane.H-1, [this](uint, int index) {
    membraneTensionPressure(
     membrane.Px.data, membrane.Py.data, membrane.Pz.data,
@@ -144,7 +143,7 @@ void Simulation::stepMembrane() {
 
 void Simulation::stepMembraneIntegration() {
  if(!membrane.count) return;
- const size_t threadCount = maxThreadCount;
+ const size_t threadCount = ::threadCount();
  float maxMembraneV_[threadCount]; mref<float>(maxMembraneV_, threadCount).clear(0);
  membraneIntegrationTime += parallel_for(1, membrane.H-1, [this, &maxMembraneV_](uint id, uint i) {
   const vXsf dt_mass = floatX(this->dt / membrane.mass), dt = floatX(this->dt);//, topZ = floatX(this->topZ);
@@ -204,7 +203,7 @@ void Simulation::stepMembraneIntegration() {
 #if 0
 void Simulation::domainMembrane(vec3& min, vec3& max) {
 #if 0
-  const/*expr*/ size_t threadCount = ::min(membrane.H-2, maxThreadCount); // 60*60*16 ~ 57600
+  const/*expr*/ size_t threadCount = ::min(membrane.H-2, ::threadCount()); // 60*60*16 ~ 57600
   float minX_[threadCount]; mref<float>(minX_, threadCount).clear(0);
   float minY_[threadCount]; mref<float>(minY_, threadCount).clear(0);
   float minZ_[threadCount]; mref<float>(minZ_, threadCount).clear(0);

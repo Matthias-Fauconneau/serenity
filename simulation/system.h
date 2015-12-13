@@ -50,16 +50,16 @@ struct System {
   buffer<float> Vx { capacity };
   buffer<float> Vy { capacity };
   buffer<float> Vz { capacity };
-  buffer<float> Fx { maxThreadCount * capacity };
-  buffer<float> Fy { maxThreadCount * capacity };
-  buffer<float> Fz { maxThreadCount * capacity };
+  buffer<float> Fx { ::threadCount() * capacity };
+  buffer<float> Fy { ::threadCount() * capacity };
+  buffer<float> Fz { ::threadCount() * capacity };
 
    // TODO: Rodrigues vector
   buffer<float> Rx { capacity }, Ry { capacity }, Rz { capacity }, Rw { capacity };
   buffer<float> AVx { capacity }, AVy { capacity }, AVz { capacity }; // Angular velocity
-  buffer<float> Tx { maxThreadCount * capacity };
-  buffer<float> Ty { maxThreadCount * capacity };
-  buffer<float> Tz { maxThreadCount * capacity }; // Torque
+  buffer<float> Tx { ::threadCount() * capacity };
+  buffer<float> Ty { ::threadCount() * capacity };
+  buffer<float> Tz { ::threadCount() * capacity }; // Torque
 
   Grain() : capacity(4*2048) {
    Px.clear(0); Py.clear(0); Pz.clear(0);
