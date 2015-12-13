@@ -35,6 +35,7 @@ static inline v16sf min(v16sf a, v16sf b) { return _mm512_min_ps(a, b); }
 static inline v16sf max(v16sf a, v16sf b) { return _mm512_max_ps(a, b); }
 static inline v16sf sqrt(v16sf x) { return _mm512_sqrt_ps(x); }
 
+static inline uint extract(v16ui x, int i) { union { uint e[16]; v16ui v; } X; X.v = x; return X.e[i]; }
 static inline float extract(v16sf x, int i) { union { float e[16]; v16sf v; } X; X.v = x; return X.e[i]; }
 
 static inline v16sf gather(const float* P, v16ui i) { return _mm512_i32gather_ps((v16si)i, P, sizeof(float)); }

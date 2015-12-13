@@ -62,7 +62,7 @@ void Simulation::stepGrainBottom() {
      grainBottomI++;
    }
   };
-  grainBottomFilterTime += parallel_chunk(grain.count, search, 1);
+  grainBottomFilterTime += parallel_chunk(grain.count, search, 1 /*FIXME: grainBottomI*/);
 
   for(size_t i=grainBottomA.size; i<align(simd, grainBottomA.size+1); i++)
    grainBottomA.begin()[i] = 0;
@@ -90,7 +90,7 @@ void Simulation::stepGrainBottom() {
      // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
      grainBottomContact.append( j );
     } else {
-     error(extract(depth, k), j, grainBottomA.size/*, extract(A, k), extract(Az, k)*/);
+     error(extract(depth, k), j, grainBottomA.size, extract(A, k), grain.count, extract(Az, k));
      // Resets contact (static friction spring)
      grainBottomLocalAx[j] = 0;
     }

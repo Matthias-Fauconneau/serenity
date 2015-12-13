@@ -266,19 +266,10 @@ void Simulation::stepGrainMembrane() {
   grainMembraneLocalBz.size = 0;
 
   size_t grainMembraneIndex = 0; // Index of first contact with A in old grainMembrane[Local]A|B list
-  //grainMembraneSearchTime += parallel_chunk(grain.count, [&](uint, size_t start, size_t size) {
-  //grainMembraneSearchTime += parallel_chunk(grain.count, [&](uint, size_t start, size_t size) {
-  //const size_t threadCount = ::min(membrane.H, maxThreadCount);
-  //float minD_[threadCount]; mref<float>(minD_, threadCount).clear(__builtin_inff());
-  /*grainMembraneSearchTime += parallel_for(0, membrane.H,
-                                          [this,&lattice,&latticeNeighbours,verletDistance,&grainMembraneIndex,&minD_](uint id, uint i) {*/
-  //float minD = verletDistance; //__builtin_inff();
   tsc grainMembraneSearchTime; grainMembraneSearchTime.start();
   for(int i=0; i<membrane.H; i++) {
-   //for(size_t a=start; a<(start+size); a+=1) { // TODO: SIMD ?
     int W = membrane.W;
     int base = membrane.margin+i*membrane.stride;
-    //float minD = __builtin_inff();
     for(int j=0; j<W; j++) { // TODO: SIMD ?
      uint b = base+j;
      int offset = lattice.index(membrane.Px[b], membrane.Py[b], membrane.Pz[b]);
@@ -320,7 +311,6 @@ break_:;
      while(grainMembraneIndex < oldGrainMembraneB.size && oldGrainMembraneB[grainMembraneIndex] == b)
       grainMembraneIndex++;
     }
-    //minD_[id] = ::min(minD_[id], minD);
   }//, 1 /*FIXME: grainMembraneIndex*/);
   this->grainMembraneSearchTime += grainMembraneSearchTime.cycleCount();
 

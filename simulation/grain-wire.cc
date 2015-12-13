@@ -272,7 +272,7 @@ break_:;
        grainWireIndex++;
      }
     }
-  }, 1);
+  }, 1 /*FIXME: grainWireIndex*/);
 
   assert_(align(simd, grainWireA.size+1) <= grainWireA.capacity);
   for(size_t i=grainWireA.size; i<align(simd, grainWireA.size +1); i++) grainWireA.begin()[i] = 0;

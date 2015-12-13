@@ -121,6 +121,7 @@ static void traceAllThreads() {
 }
 static void handler(int sig, siginfo_t* info, void* ctx) {
  if(sig==SIGSEGV) log_("Segmentation fault\n");
+ else if(sig==SIGFPE) log("Floating-point exception\n"_);
  else if(sig==SIGABRT) log_("Aborted\n");
  else { log_("Unknown signal"); log_(str(sig)); log_("\n"); }
  if(threads.size>1) log("Thread #"+str(gettid())+':');

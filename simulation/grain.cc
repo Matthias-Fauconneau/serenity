@@ -17,7 +17,7 @@ void Simulation::stepGrain() {
 
 void Simulation::stepGrainIntegration() {
  if(!grain.count) return;
- const/*expr*/ size_t threadCount = /*60*/maxThreadCount;
+ const/*expr*/ size_t threadCount = maxThreadCount;
  float maxGrainV_[threadCount]; mref<float>(maxGrainV_, threadCount).clear(0);
  grainIntegrationTime += parallel_chunk(align(simd, grain.count)/simd, [this, &maxGrainV_](uint id, size_t start, size_t size) {
    const vXsf dt_mass = floatX(dt / grain.mass), dt = floatX(this->dt);

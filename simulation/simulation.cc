@@ -73,7 +73,7 @@ void Simulation::profile(const Time& totalTime) {
  log("----",timeStep/size_t(1*1/(dt*60)),"----");
  log(totalTime.microseconds()/timeStep, "us/step", totalTime, timeStep);
  if(stepTimeRT.nanoseconds()*100<totalTime.nanoseconds()*99)
-  log("step", strD(stepTimeRT, totalTime));
+  //log("step", strD(stepTimeRT, totalTime));
 #if WIRE
  if(grainWireContactSizeSum) {
   log("grain-wire contact count mean", grainWireContactSizeSum/timeStep);
@@ -145,7 +145,7 @@ void Simulation::profile(const Time& totalTime) {
 
 #undef logTime
  for(const auto entry: profile) log(strD(entry.key, stepTime), entry.value);
- log(strD(shown, stepTime), "/", strD(accounted, stepTime));
+ log(strD(shown, stepTime), "/", strD(accounted, stepTime), "/", strD(stepTimeRT, totalTime));
  if(reset) stepTime.reset();
 }
 
