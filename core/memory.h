@@ -65,6 +65,7 @@ generic struct buffer : mref<T> {
  void append(const ref<T> source) {
   slice(__atomic_fetch_add(&size, source.size, 5/*SeqCst*/), source.size).copy(source);
  }
+#define appendAtomic append // atomic by default
 };
 
 typedef buffer<char> String;

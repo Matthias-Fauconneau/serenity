@@ -246,7 +246,8 @@ void Simulation::stepGrainMembrane() {
 
   static constexpr size_t averageGrainMembraneContactCount = 16;
   const size_t GWcc = align(simd, grain.count * averageGrainMembraneContactCount +1);
-  if(GWcc > grainMembraneA.capacity) {
+  if(GWcc > grainMembraneA.capacity) {\
+   memoryTime.start();
    grainMembraneA = buffer<uint>(GWcc, 0);
    grainMembraneB = buffer<uint>(GWcc, 0);
    grainMembraneLocalAx = buffer<float>(GWcc, 0);
@@ -255,6 +256,7 @@ void Simulation::stepGrainMembrane() {
    grainMembraneLocalBx = buffer<float>(GWcc, 0);
    grainMembraneLocalBy = buffer<float>(GWcc, 0);
    grainMembraneLocalBz = buffer<float>(GWcc, 0);
+   memoryTime.stop();
   }
   grainMembraneA.size = grainMembraneA.capacity;
   grainMembraneB.size = grainMembraneB.capacity;
@@ -293,6 +295,7 @@ void Simulation::stepGrainMembrane() {
   grainMembraneA.size = contactCount;
   grainMembraneB.size = contactCount;
 
+  grainMembraneRepackFrictionTime.start();
   size_t grainMembraneIndex = 0; // Index of first contact with A in old grainMembrane[Local]A|B list
   for(uint i=0; i<grainMembraneA.size; i++) { // seq
    uint a = grainMembraneA[i];
@@ -323,6 +326,7 @@ void Simulation::stepGrainMembrane() {
    while(grainMembraneIndex < oldGrainMembraneA.size && oldGrainMembraneA[grainMembraneIndex] == a)
     grainMembraneIndex++;
   }
+  grainMembraneRepackFrictionTime.stop();
 
   assert_(align(simd, grainMembraneA.size+1) <= grainMembraneA.capacity);
   for(size_t i=grainMembraneA.size; i<align(simd, grainMembraneA.size +1); i++) grainMembraneA.begin()[i] = 0;
@@ -358,26 +362,28 @@ void Simulation::stepGrainMembrane() {
       // Instead of packing (copying) the unpacked list to a packed contact list
       // To keep track of where to write back (unpacked) contact positions (for static friction)
       // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
-      grainMembraneContact.append( j );
+      grainMembraneContact.appendAtomic( j );
      } else {
       // Resets contact (static friction spring)
       grainMembraneLocalAx[j] = 0;
      }
     }
    }
- }, 1);
+ });
  for(size_t i=grainMembraneContact.size; i<align(simd, grainMembraneContact.size); i++)
   grainMembraneContact.begin()[i] = grainMembraneA.size;
 
  // Evaluates forces from (packed) intersections (SoA)
  size_t GWcc = align(simd, grainMembraneContact.size); // Grain-Membrane contact count
  if(GWcc > grainMembraneFx.capacity) {
+  memoryTime.start();
   grainMembraneFx = buffer<float>(GWcc);
   grainMembraneFy = buffer<float>(GWcc);
   grainMembraneFz = buffer<float>(GWcc);
   grainMembraneTAx = buffer<float>(GWcc);
   grainMembraneTAy = buffer<float>(GWcc);
   grainMembraneTAz = buffer<float>(GWcc);
+  memoryTime.stop();
  }
  grainMembraneFx.size = GWcc;
  grainMembraneFy.size = GWcc;

@@ -214,20 +214,19 @@ struct Simulation : System {
  void stepGrain();
   uint64 grainTime = 0;
  void stepGrainBottom();
+  tsc grainBottomTotalTime;
   //tsc grainBottomSearchTime; // TODO: verlet
   uint64 grainBottomFilterTime = 0;
+  tsc grainBottomRepackFrictionTime;
   uint64 grainBottomEvaluateTime = 0;
   tsc grainBottomSumTime;
  void stepGrainTop();
+  tsc grainTopTotalTime;
   //tsc grainTopSearchTime; // TODO: verlet
   uint64 grainTopFilterTime = 0;
+  uint64 grainTopRepackFrictionTime = 0;
   uint64 grainTopEvaluateTime = 0;
   tsc grainTopSumTime;
- void stepGrainSide();
-  //tsc grainSideSearchTime; // TODO: verlet
-  tsc grainSideFilterTime;
-  tsc grainSideEvaluateTime;
-  tsc grainSideSumTime;
  void stepGrainGrain();
   tsc grainGrainTotalTime;
   uint64 domainTime = 0;
@@ -235,9 +234,11 @@ struct Simulation : System {
   tsc grainGrainLatticeTime;
   uint64 grainGrainSearchTime = 0;
   uint64 grainGrainFilterTime = 0;
+  tsc grainGrainRepackFrictionTime;
   uint64 grainGrainEvaluateTime = 0;
   uint64 grainGrainSumDomainTime = 0;
-  uint64 grainGrainSumZeroTime = 0;
+  //uint64 grainGrainSumZeroTime = 0;
+  tsc grainGrainSumAllocateTime;
   uint64 grainGrainSumSumTime = 0;
   uint64 grainGrainSumMergeTime = 0;
  void stepGrainIntegration();
@@ -248,11 +249,12 @@ struct Simulation : System {
   uint64 membraneInitializationTime = 0;
   uint64 membraneForceTime = 0;
  void stepGrainMembrane();
+   tsc grainMembraneTotalTime;
    tsc grainMembraneLatticeTime;
-   tsc grainMembraneGridTime;
+   //tsc grainMembraneGridTime;
    uint64 grainMembraneSearchTime = 0;
    uint64 grainMembraneFilterTime = 0;
-   //tsc grainMembraneEvaluateTime;
+   tsc grainMembraneRepackFrictionTime;
    uint64 grainMembraneEvaluateTime = 0;
    tsc grainMembraneSumTime;
    size_t grainMembraneContactSizeSum = 0;

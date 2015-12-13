@@ -83,6 +83,8 @@ template<Type K, Type V> struct map {
   assertNo(key);
   return values.insertAt(keys.insertSorted(key),move(value));
  }
+ V& insertSortedMulti(K&& key, V&& value) { return values.insertAt(keys.insertSorted(::move(key)),::move(value)); }
+ V& insertSortedMulti(const K& key, V&& value) { return values.insertAt(keys.insertSorted(key),::move(value)); }
  V& insertSortedMulti(K&& key, const V& value) { return values.insertAt(keys.insertSorted(::move(key)),value); }
  V& insertSortedMulti(const K& key, const V& value) { return values.insertAt(keys.insertSorted(key),value); }
 

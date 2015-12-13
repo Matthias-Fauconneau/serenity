@@ -75,9 +75,9 @@ uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate
    threads[index].time = 0;
   }
   int jobCount = ::min(threadCount, int(stop-start));
+  Time time; time.start();
   jobs.release(jobCount);
   //tsc time; time.start();
-  Time time; time.start();
   results.acquire(jobCount);
   return time.nanoseconds();
   //return time.cycleCount();

@@ -14,9 +14,9 @@ long currentTime();
 int64 realTime();
 int64 threadCPUTime();
 
-#if 0
+#if 1
  // FIXME: thread might switch core between cycle counter reads
- #define readCycleCounter threadCPUTime
+ #define readCycleCounter realTime
 #else
 #if __clang__
 #define readCycleCounter  __builtin_readcyclecounter
@@ -38,7 +38,7 @@ struct tsc {
  void operator =(int unused v) { assert(v == 0); reset(); }
 };
 inline String strD(const uint64 num, const uint64 div) {
- assert_(num <= div, num, div);
+ //assert_(num <= div, num, div);
  return div ? str(uint(round(100*float(num)/float(div))))+'%' : String();
 }
 inline String strD(const tsc& num, const tsc& div) { return strD(num.cycleCount(), div.cycleCount()); }

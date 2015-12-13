@@ -5,7 +5,7 @@
 
 void Simulation::stepGrainBottom() {
  if(!grain.count) return;
- {
+ { // TODO: verlet
   swap(oldGrainBottomA, grainBottomA);
   swap(oldGrainBottomLocalAx, grainBottomLocalAx);
   swap(oldGrainBottomLocalAy, grainBottomLocalAy);
@@ -33,43 +33,48 @@ void Simulation::stepGrainBottom() {
   grainBottomLocalBy.size = 0;
   grainBottomLocalBz.size = 0;
 
-  size_t grainBottomI = 0; // Index of first contact with A in old grainBottom[Local]A|B list
+  //atomic contactCount;
   auto search = [&](uint, size_t start, size_t size) {
    for(size_t i=start; i<(start+size); i+=1) { // TODO: SIMD
     float depth = (bottomZ+Grain::radius) - grain.Pz[i];
-    if(depth < 0) continue;
-    grainBottomA.append( i ); // Grain
-    size_t j = grainBottomI;
-    if(grainBottomI < oldGrainBottomA.size && oldGrainBottomA[grainBottomI] == i) {
-     // Repack existing friction
-     grainBottomLocalAx.append( oldGrainBottomLocalAx[j] );
-     grainBottomLocalAy.append( oldGrainBottomLocalAy[j] );
-     grainBottomLocalAz.append( oldGrainBottomLocalAz[j] );
-     grainBottomLocalBx.append( oldGrainBottomLocalBx[j] );
-     grainBottomLocalBy.append( oldGrainBottomLocalBy[j] );
-     grainBottomLocalBz.append( oldGrainBottomLocalBz[j] );
-    } else { // New contact
-     // Appends zero to reserve slot. Zero flags contacts for evaluation.
-     // Contact points (for static friction) will be computed during force evaluation (if fine test passes)
-     grainBottomLocalAx.append( 0 );
-     grainBottomLocalAy.append( 0 );
-     grainBottomLocalAz.append( 0 );
-     grainBottomLocalBx.append( 0 );
-     grainBottomLocalBy.append( 0 );
-     grainBottomLocalBz.append( 0 );
-    }
-    while(grainBottomI < oldGrainBottomA.size && oldGrainBottomA[grainBottomI] == i)
-     grainBottomI++;
+    if(depth >= 0) grainBottomA.appendAtomic(i); // Grain
    }
   };
-  grainBottomFilterTime += parallel_chunk(grain.count, search, 1 /*FIXME: grainBottomI*/);
+  grainBottomFilterTime += parallel_chunk(grain.count, search);
+  if(!grainBottomA.size) return;
+  //if(!contactCount) return;
+
+  grainBottomRepackFrictionTime.start();
+  size_t grainBottomI = 0; // Index of first contact with A in old grainBottom[Local]A|B list
+  for(uint i=0; i<grainBottomA.size; i++) { // seq
+   size_t j = grainBottomI;
+   if(grainBottomI < oldGrainBottomA.size && oldGrainBottomA[grainBottomI] == i) {
+    // Repack existing friction
+    grainBottomLocalAx.append( oldGrainBottomLocalAx[j] );
+    grainBottomLocalAy.append( oldGrainBottomLocalAy[j] );
+    grainBottomLocalAz.append( oldGrainBottomLocalAz[j] );
+    grainBottomLocalBx.append( oldGrainBottomLocalBx[j] );
+    grainBottomLocalBy.append( oldGrainBottomLocalBy[j] );
+    grainBottomLocalBz.append( oldGrainBottomLocalBz[j] );
+   } else { // New contact
+    // Appends zero to reserve slot. Zero flags contacts for evaluation.
+    // Contact points (for static friction) will be computed during force evaluation (if fine test passes)
+    grainBottomLocalAx.append( 0 );
+    grainBottomLocalAy.append( 0 );
+    grainBottomLocalAz.append( 0 );
+    grainBottomLocalBx.append( 0 );
+    grainBottomLocalBy.append( 0 );
+    grainBottomLocalBz.append( 0 );
+   }
+   while(grainBottomI < oldGrainBottomA.size && oldGrainBottomA[grainBottomI] == i)
+    grainBottomI++;
+  }
+  grainBottomRepackFrictionTime.stop();
 
   for(size_t i=grainBottomA.size; i<align(simd, grainBottomA.size+1); i++)
    grainBottomA.begin()[i] = 0;
  }
- if(!grainBottomA) return;
 
- // TODO: verlet
  // Filters verlet lists, packing contacts to evaluate
  if(align(simd, grainBottomA.size) > grainBottomContact.capacity) {
   grainBottomContact = buffer<uint>(align(simd, grainBottomA.size));
