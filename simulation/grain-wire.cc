@@ -315,7 +315,7 @@ break_:;
      }
     }
    }
- }, 1);
+ });
  for(size_t i=grainWireContact.size; i<align(simd, grainWireContact.size); i++)
   grainWireContact.begin()[i] = grainWireA.size;
 

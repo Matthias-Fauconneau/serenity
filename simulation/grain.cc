@@ -12,7 +12,7 @@ void Simulation::stepGrain() {
     store(grain.Ty, i, _0f);
     store(grain.Tz, i, _0f);
    }
- }, 1);
+ });
 }
 
 void Simulation::stepGrainIntegration() {

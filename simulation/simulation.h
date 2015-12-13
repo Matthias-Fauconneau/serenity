@@ -215,14 +215,14 @@ struct Simulation : System {
   uint64 grainTime = 0;
  void stepGrainBottom();
   tsc grainBottomTotalTime;
-  //tsc grainBottomSearchTime; // TODO: verlet
+  uint64 grainBottomSearchTime = 0;
   uint64 grainBottomFilterTime = 0;
   tsc grainBottomRepackFrictionTime;
   uint64 grainBottomEvaluateTime = 0;
   tsc grainBottomSumTime;
  void stepGrainTop();
   tsc grainTopTotalTime;
-  //tsc grainTopSearchTime; // TODO: verlet
+  uint64 grainTopSearchTime = 0;
   uint64 grainTopFilterTime = 0;
   uint64 grainTopRepackFrictionTime = 0;
   uint64 grainTopEvaluateTime = 0;
@@ -237,7 +237,6 @@ struct Simulation : System {
   tsc grainGrainRepackFrictionTime;
   uint64 grainGrainEvaluateTime = 0;
   uint64 grainGrainSumDomainTime = 0;
-  //uint64 grainGrainSumZeroTime = 0;
   tsc grainGrainSumAllocateTime;
   uint64 grainGrainSumSumTime = 0;
   uint64 grainGrainSumMergeTime = 0;
@@ -251,7 +250,6 @@ struct Simulation : System {
  void stepGrainMembrane();
    tsc grainMembraneTotalTime;
    tsc grainMembraneLatticeTime;
-   //tsc grainMembraneGridTime;
    uint64 grainMembraneSearchTime = 0;
    uint64 grainMembraneFilterTime = 0;
    tsc grainMembraneRepackFrictionTime;
@@ -269,7 +267,7 @@ struct Simulation : System {
  void stepWireBendingResistance();
   tsc wireBendingResistanceTime;
  void stepWireBottom();
- //tsc wireBottomSearchTime; // TODO: verlet
+  uint64 wireBottomSearchTime = 0;
   uint64 wireBottomFilterTime = 0;
   uint64 wireBottomEvaluateTime = 0;
   tsc wireBottomSumTime;
@@ -277,7 +275,6 @@ struct Simulation : System {
    tsc grainWireLatticeTime = 0;
    uint64 grainWireSearchTime = 0;
    uint64 grainWireFilterTime = 0;
-   //tsc grainWireEvaluateTime;
    uint64 grainWireEvaluateTime = 0;
    tsc grainWireSumTime;
    size_t grainWireContactSizeSum;

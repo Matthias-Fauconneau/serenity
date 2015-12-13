@@ -26,17 +26,11 @@ void Simulation::stepGrainTop() {
    grainTopLocalBz = buffer<float>(GBcc, 0);
   }
   grainTopA.size = 0;
-  grainTopLocalAx.size = 0;
-  grainTopLocalAy.size = 0;
-  grainTopLocalAz.size = 0;
-  grainTopLocalBx.size = 0;
-  grainTopLocalBy.size = 0;
-  grainTopLocalBz.size = 0;
-
+/*
   size_t grainTopI = 0; // Index of first contact with A in old grainTop[Local]A|B list
   auto search = [&](uint, size_t start, size_t size) {
    for(size_t i=start; i<(start+size); i+=1) { // TODO: SIMD
-    if(grain.Pz[i] < topZ-Grain::radius) continue;
+    if(grain.Pz[i] < topZ-Grain::radius) continue; // Ref
     grainTopA.append( i ); // Grain
     size_t j = grainTopI;
     if(grainTopI < oldGrainTopA.size && oldGrainTopA[grainTopI] == i) {
@@ -61,7 +55,46 @@ void Simulation::stepGrainTop() {
      grainTopI++;
    }
   };
-  grainTopFilterTime += parallel_chunk(grain.count, search, 1);
+  grainTopFilterTime += parallel_chunk(grain.count, search, 1 /*FIXME*/);
+
+  //atomic contactCount;
+  auto search = [&](uint, size_t start, size_t size) {
+   for(size_t i=start; i<(start+size); i+=1) { // TODO: SIMD
+    float depth = (topZ+Grain::radius) - grain.Pz[i]; // FIXME
+    if(depth >= 0) grainTopA.appendAtomic(i); // Grain
+   }
+  };
+  grainTopSearchTime += parallel_chunk(grain.count, search);
+  grainTopLocalAx.size = grainTopA.size;
+  grainTopLocalAy.size = grainTopA.size;
+  grainTopLocalAz.size = grainTopA.size;
+  grainTopLocalBx.size = grainTopA.size;
+  grainTopLocalBy.size = grainTopA.size;
+  grainTopLocalBz.size = grainTopA.size;
+  if(!grainTopA.size) return;
+  //if(!contactCount) return;
+
+  grainTopRepackFrictionTime.start();
+  size_t grainTopI = 0; // Index of first contact with A in old grainTop[Local]A|B list
+  for(uint i=0; i<grainTopA.size; i++) { // seq
+   size_t j = grainTopI;
+   if(grainTopI < oldGrainTopA.size && oldGrainTopA[grainTopI] == i) {
+    // Repack existing friction
+    grainTopLocalAx[i] = oldGrainTopLocalAx[j];
+    grainTopLocalAy[i] = oldGrainTopLocalAy[j];
+    grainTopLocalAz[i] = oldGrainTopLocalAz[j];
+    grainTopLocalBx[i] = oldGrainTopLocalBx[j];
+    grainTopLocalBy[i] = oldGrainTopLocalBy[j];
+    grainTopLocalBz[i] = oldGrainTopLocalBz[j];
+   } else { // New contact
+    // Appends zero to reserve slot. Zero flags contacts for evaluation.
+    // Contact points (for static friction) will be computed during force evaluation (if fine test passes)
+    grainTopLocalAx[i] = 0;
+   }
+   while(grainTopI < oldGrainTopA.size && oldGrainTopA[grainTopI] == i)
+    grainTopI++;
+  }
+  grainTopRepackFrictionTime.stop();
 
   for(size_t i=grainTopA.size; i<align(simd, grainTopA.size+1); i++)
    grainTopA.begin()[i] = 0;
@@ -81,7 +114,7 @@ void Simulation::stepGrainTop() {
    for(size_t k: range(simd)) {
     size_t j = i+k;
     if(j == grainTopA.size) break /*2*/;
-    if(extract(Az, k) < bottomZ+Grain::radius) {
+    if(extract(Az, k) < topZ+Grain::radius) { // FIXME
      // Creates a map from packed contact to index into unpacked contact list (indirect reference)
      // Instead of packing (copying) the unpacked list to a packed contact list
      // To keep track of where to write back (unpacked) contact positions (for static friction)
@@ -94,7 +127,7 @@ void Simulation::stepGrainTop() {
    }
   }
  };
- grainTopFilterTime += parallel_chunk(align(simd, grainTopA.size)/simd, filter, 1);
+ grainTopFilterTime += parallel_chunk(align(simd, grainTopA.size)/simd, filter);
  for(size_t i=grainTopContact.size; i<align(simd, grainTopContact.size); i++)
   grainTopContact.begin()[i] = grainTopA.size;
  if(!grainTopContact) return;
@@ -125,7 +158,7 @@ void Simulation::stepGrainTop() {
                      grainTopContact.data, grainTopContact.size,
                      grainTopA.data,
                      grain.Px.data, grain.Py.data, grain.Pz.data,
-                     floatX(bottomZ-Grain::radius), floatX(Grain::radius),
+                     floatX(topZ-Grain::radius), floatX(Grain::radius), // FIXME
                      grainTopLocalAx.begin(), grainTopLocalAy.begin(), grainTopLocalAz.begin(),
                      grainTopLocalBx.begin(), grainTopLocalBy.begin(), grainTopLocalBz.begin(),
                      floatX(K), floatX(Kb),
@@ -136,7 +169,7 @@ void Simulation::stepGrainTop() {
                      grain.Rx.data, grain.Ry.data, grain.Rz.data, grain.Rw.data,
                      grainTopFx.begin(), grainTopFy.begin(), grainTopFz.begin(),
                      grainTopTAx.begin(), grainTopTAy.begin(), grainTopTAz.begin() );
- }, 1);
+ });
 
  grainTopSumTime.start();
  float topForceZ = 0;

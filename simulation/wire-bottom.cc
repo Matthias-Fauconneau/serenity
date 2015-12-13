@@ -189,7 +189,7 @@ void Simulation::stepWireBottom() {
       wireBottomI++;
     }
   };
-  wireBottomFilterTime += parallel_chunk(wire.count, search, 1);
+  wireBottomFilterTime += parallel_chunk(wire.count, search, 1 /*FIXME*/);
 
   for(size_t i=wireBottomA.size; i<align(simd, wireBottomA.size); i++) wireBottomA.begin()[i] = 0;
  }
@@ -220,7 +220,7 @@ void Simulation::stepWireBottom() {
    }
   }
  };
- wireBottomFilterTime += parallel_chunk(align(simd, wireBottomA.size)/simd, filter, 1);
+ wireBottomFilterTime += parallel_chunk(align(simd, wireBottomA.size)/simd, filter);
  for(size_t i=wireBottomContact.size; i<align(simd, wireBottomContact.size); i++)
   wireBottomContact.begin()[i] = wireBottomA.size;
 
@@ -252,7 +252,7 @@ void Simulation::stepWireBottom() {
                      floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping),
                      wire.Vx.data, wire.Vy.data, wire.Vz.data,
                      wireBottomFx.begin(), wireBottomFy.begin(), wireBottomFz.begin() );
- }, 1);
+ });
 
  wireBottomSumTime.start();
  for(size_t index = 0; index < wireBottomA.size; index++) { // Scalar scatter add

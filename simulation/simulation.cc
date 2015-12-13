@@ -115,6 +115,7 @@ void Simulation::profile(const Time& totalTime) {
                            strD(grainBottomFilterTime+grainBottomRepackFrictionTime+grainBottomEvaluateTime
                                 +grainBottomSumTime, grainBottomTotalTime));
  if(reset) grainBottomTotalTime.reset();
+ logTime(grainBottomSearch);
  logTime(grainBottomFilter);
  logTime(grainBottomRepackFriction);
  logTime(grainBottomEvaluate);
@@ -123,6 +124,7 @@ void Simulation::profile(const Time& totalTime) {
                                                  strD(grainTopFilterTime+grainTopRepackFrictionTime+grainTopEvaluateTime
                                                       +grainTopSumTime, grainTopTotalTime));
  if(reset) grainTopTotalTime.reset();
+ logTime(grainTopSearch);
  logTime(grainTopFilter);
  logTime(grainTopRepackFriction);
  logTime(grainTopEvaluate);

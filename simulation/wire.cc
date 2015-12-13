@@ -9,7 +9,7 @@ void Simulation::stepWire() {
     store(wire.Fy, i, _0f);
     store(wire.Fz, i, m_Gz);
    }
- }, 1);
+ });
 }
 
 void Simulation::stepWireTension() {
@@ -124,7 +124,7 @@ void Simulation::stepWireIntegration() {
    float maxWireV = 0;
    for(size_t k: range(simd)) maxWireV = ::max(maxWireV, extract(maxWireVX, k));
    maxWireV_[id] = maxWireV;
- }, 1);
+ });
  float maxWireV = 0;
  for(size_t k: range(threadCount())) maxWireV = ::max(maxWireV, maxWireV_[k]);
  float maxGrainWireV = maxGrainV + maxWireV;

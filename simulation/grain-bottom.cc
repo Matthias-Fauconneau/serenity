@@ -17,6 +17,7 @@ void Simulation::stepGrainBottom() {
   static constexpr size_t averageGrainBottomContactCount = 1;
   const size_t GBcc = align(simd, grain.count * averageGrainBottomContactCount +1);
   if(GBcc > grainBottomA.capacity) {
+   memoryTime.start();
    grainBottomA = buffer<uint>(GBcc, 0);
    grainBottomLocalAx = buffer<float>(GBcc, 0);
    grainBottomLocalAy = buffer<float>(GBcc, 0);
@@ -24,14 +25,9 @@ void Simulation::stepGrainBottom() {
    grainBottomLocalBx = buffer<float>(GBcc, 0);
    grainBottomLocalBy = buffer<float>(GBcc, 0);
    grainBottomLocalBz = buffer<float>(GBcc, 0);
+   memoryTime.stop();
   }
   grainBottomA.size = 0;
-  grainBottomLocalAx.size = 0;
-  grainBottomLocalAy.size = 0;
-  grainBottomLocalAz.size = 0;
-  grainBottomLocalBx.size = 0;
-  grainBottomLocalBy.size = 0;
-  grainBottomLocalBz.size = 0;
 
   //atomic contactCount;
   auto search = [&](uint, size_t start, size_t size) {
@@ -40,7 +36,13 @@ void Simulation::stepGrainBottom() {
     if(depth >= 0) grainBottomA.appendAtomic(i); // Grain
    }
   };
-  grainBottomFilterTime += parallel_chunk(grain.count, search);
+  grainBottomSearchTime += parallel_chunk(grain.count, search);
+  grainBottomLocalAx.size = grainBottomA.size;
+  grainBottomLocalAy.size = grainBottomA.size;
+  grainBottomLocalAz.size = grainBottomA.size;
+  grainBottomLocalBx.size = grainBottomA.size;
+  grainBottomLocalBy.size = grainBottomA.size;
+  grainBottomLocalBz.size = grainBottomA.size;
   if(!grainBottomA.size) return;
   //if(!contactCount) return;
 
@@ -50,21 +52,16 @@ void Simulation::stepGrainBottom() {
    size_t j = grainBottomI;
    if(grainBottomI < oldGrainBottomA.size && oldGrainBottomA[grainBottomI] == i) {
     // Repack existing friction
-    grainBottomLocalAx.append( oldGrainBottomLocalAx[j] );
-    grainBottomLocalAy.append( oldGrainBottomLocalAy[j] );
-    grainBottomLocalAz.append( oldGrainBottomLocalAz[j] );
-    grainBottomLocalBx.append( oldGrainBottomLocalBx[j] );
-    grainBottomLocalBy.append( oldGrainBottomLocalBy[j] );
-    grainBottomLocalBz.append( oldGrainBottomLocalBz[j] );
+    grainBottomLocalAx[i] = oldGrainBottomLocalAx[j];
+    grainBottomLocalAy[i] = oldGrainBottomLocalAy[j];
+    grainBottomLocalAz[i] = oldGrainBottomLocalAz[j];
+    grainBottomLocalBx[i] = oldGrainBottomLocalBx[j];
+    grainBottomLocalBy[i] = oldGrainBottomLocalBy[j];
+    grainBottomLocalBz[i] = oldGrainBottomLocalBz[j];
    } else { // New contact
     // Appends zero to reserve slot. Zero flags contacts for evaluation.
     // Contact points (for static friction) will be computed during force evaluation (if fine test passes)
-    grainBottomLocalAx.append( 0 );
-    grainBottomLocalAy.append( 0 );
-    grainBottomLocalAz.append( 0 );
-    grainBottomLocalBx.append( 0 );
-    grainBottomLocalBy.append( 0 );
-    grainBottomLocalBz.append( 0 );
+    grainBottomLocalAx[i] = 0;
    }
    while(grainBottomI < oldGrainBottomA.size && oldGrainBottomA[grainBottomI] == i)
     grainBottomI++;
@@ -93,7 +90,7 @@ void Simulation::stepGrainBottom() {
      // Instead of packing (copying) the unpacked list to a packed contact list
      // To keep track of where to write back (unpacked) contact positions (for static friction)
      // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
-     grainBottomContact.append( j );
+     grainBottomContact.appendAtomic( j );
     } else {
      error(extract(depth, k), j, grainBottomA.size, extract(A, k), grain.count, extract(Az, k));
      // Resets contact (static friction spring)
@@ -102,7 +99,7 @@ void Simulation::stepGrainBottom() {
    }
   }
  };
- grainBottomFilterTime += parallel_chunk(align(simd, grainBottomA.size)/simd, filter, 1);
+ grainBottomFilterTime += parallel_chunk(align(simd, grainBottomA.size)/simd, filter);
  for(size_t i=grainBottomContact.size; i<align(simd, grainBottomContact.size); i++)
   grainBottomContact.begin()[i] = grainBottomA.size;
  if(!grainBottomContact) return;
@@ -110,12 +107,14 @@ void Simulation::stepGrainBottom() {
  // Evaluates forces from (packed) intersections (SoA)
  size_t GBcc = align(simd, grainBottomContact.size); // Grain-Bottom contact count
  if(GBcc > grainBottomFx.capacity) {
+  memoryTime.start();
   grainBottomFx = buffer<float>(GBcc);
   grainBottomFy = buffer<float>(GBcc);
   grainBottomFz = buffer<float>(GBcc);
   grainBottomTAx = buffer<float>(GBcc);
   grainBottomTAy = buffer<float>(GBcc);
   grainBottomTAz = buffer<float>(GBcc);
+  memoryTime.stop();
  }
  grainBottomFx.size = GBcc;
  grainBottomFy.size = GBcc;
@@ -128,8 +127,7 @@ void Simulation::stepGrainBottom() {
  const float K = 4./3*E*sqrt(R);
  constexpr float mass = 1/(1/Grain::mass/*+1/Obstacle::mass*/);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
- //grainBottomEvaluateTime += parallel_chunk(GBcc/simd, [&](uint, size_t start, size_t size) {
- {size_t start = 0, size = GBcc/simd;
+ grainBottomEvaluateTime += parallel_chunk(GBcc/simd, [&](uint, size_t start, size_t size) {
    evaluateGrainObstacle<false>(start, size,
                      grainBottomContact.data, grainBottomContact.size,
                      grainBottomA.data,
@@ -145,7 +143,7 @@ void Simulation::stepGrainBottom() {
                      grain.Rx.data, grain.Ry.data, grain.Rz.data, grain.Rw.data,
                      grainBottomFx.begin(), grainBottomFy.begin(), grainBottomFz.begin(),
                      grainBottomTAx.begin(), grainBottomTAy.begin(), grainBottomTAz.begin() );
- }//, 1);
+ });
 
  grainBottomSumTime.start();
  float bottomForceZ = 0;
