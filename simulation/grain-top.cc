@@ -26,41 +26,11 @@ void Simulation::stepGrainTop() {
    grainTopLocalBz = buffer<float>(GBcc, 0);
   }
   grainTopA.size = 0;
-/*
-  size_t grainTopI = 0; // Index of first contact with A in old grainTop[Local]A|B list
-  auto search = [&](uint, size_t start, size_t size) {
-   for(size_t i=start; i<(start+size); i+=1) { // TODO: SIMD
-    if(grain.Pz[i] < topZ-Grain::radius) continue; // Ref
-    grainTopA.append( i ); // Grain
-    size_t j = grainTopI;
-    if(grainTopI < oldGrainTopA.size && oldGrainTopA[grainTopI] == i) {
-     // Repack existing friction
-     grainTopLocalAx.append( oldGrainTopLocalAx[j] );
-     grainTopLocalAy.append( oldGrainTopLocalAy[j] );
-     grainTopLocalAz.append( oldGrainTopLocalAz[j] );
-     grainTopLocalBx.append( oldGrainTopLocalBx[j] );
-     grainTopLocalBy.append( oldGrainTopLocalBy[j] );
-     grainTopLocalBz.append( oldGrainTopLocalBz[j] );
-    } else { // New contact
-     // Appends zero to reserve slot. Zero flags contacts for evaluation.
-     // Contact points (for static friction) will be computed during force evaluation (if fine test passes)
-     grainTopLocalAx.append( 0 );
-     grainTopLocalAy.append( 0 );
-     grainTopLocalAz.append( 0 );
-     grainTopLocalBx.append( 0 );
-     grainTopLocalBy.append( 0 );
-     grainTopLocalBz.append( 0 );
-    }
-    while(grainTopI < oldGrainTopA.size && oldGrainTopA[grainTopI] == i)
-     grainTopI++;
-   }
-  };
-  grainTopFilterTime += parallel_chunk(grain.count, search, 1 /*FIXME*/);
 
   //atomic contactCount;
   auto search = [&](uint, size_t start, size_t size) {
    for(size_t i=start; i<(start+size); i+=1) { // TODO: SIMD
-    float depth = (topZ+Grain::radius) - grain.Pz[i]; // FIXME
+    float depth = grain.Pz[i] - (topZ-Grain::radius);
     if(depth >= 0) grainTopA.appendAtomic(i); // Grain
    }
   };
@@ -101,7 +71,6 @@ void Simulation::stepGrainTop() {
  }
  if(!grainTopA) return;
 
- // TODO: verlet
  // Filters verlet lists, packing contacts to evaluate
  if(align(simd, grainTopA.size) > grainTopContact.capacity) {
   grainTopContact = buffer<uint>(align(simd, grainTopA.size));
@@ -111,16 +80,18 @@ void Simulation::stepGrainTop() {
   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
    vXui A = *(vXui*)(grainTopA.data+i);
    vXsf Az = gather(grain.Pz.data, A);
-   for(size_t k: range(simd)) {
+   vXsf depth = Az - floatX(topZ-Grain::radius);
+   for(size_t k: range(simd)) { // TODO: SIMD
     size_t j = i+k;
     if(j == grainTopA.size) break /*2*/;
-    if(extract(Az, k) < topZ+Grain::radius) { // FIXME
+    if(extract(depth, k) >= 0) {
      // Creates a map from packed contact to index into unpacked contact list (indirect reference)
      // Instead of packing (copying) the unpacked list to a packed contact list
      // To keep track of where to write back (unpacked) contact positions (for static friction)
      // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
-     grainTopContact.append( j );
+     grainTopContact.appendAtomic( j );
     } else {
+     error(extract(depth, k));
      // Resets contact (static friction spring)
      grainTopLocalAx[j] = 0;
     }
@@ -158,7 +129,7 @@ void Simulation::stepGrainTop() {
                      grainTopContact.data, grainTopContact.size,
                      grainTopA.data,
                      grain.Px.data, grain.Py.data, grain.Pz.data,
-                     floatX(topZ-Grain::radius), floatX(Grain::radius), // FIXME
+                     floatX(topZ-Grain::radius), floatX(Grain::radius),
                      grainTopLocalAx.begin(), grainTopLocalAy.begin(), grainTopLocalAz.begin(),
                      grainTopLocalBx.begin(), grainTopLocalBy.begin(), grainTopLocalBz.begin(),
                      floatX(K), floatX(Kb),

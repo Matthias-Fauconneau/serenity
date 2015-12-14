@@ -224,7 +224,7 @@ struct Simulation : System {
   tsc grainTopTotalTime;
   uint64 grainTopSearchTime = 0;
   uint64 grainTopFilterTime = 0;
-  uint64 grainTopRepackFrictionTime = 0;
+  tsc grainTopRepackFrictionTime;
   uint64 grainTopEvaluateTime = 0;
   tsc grainTopSumTime;
  void stepGrainGrain();

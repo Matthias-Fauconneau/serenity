@@ -71,6 +71,7 @@ void Simulation::stepGrainBottom() {
   for(size_t i=grainBottomA.size; i<align(simd, grainBottomA.size+1); i++)
    grainBottomA.begin()[i] = 0;
  }
+ if(!grainBottomA) return;
 
  // Filters verlet lists, packing contacts to evaluate
  if(align(simd, grainBottomA.size) > grainBottomContact.capacity) {
@@ -82,7 +83,7 @@ void Simulation::stepGrainBottom() {
    vXui A = *(vXui*)(grainBottomA.data+i);
    vXsf Az = gather(grain.Pz.data, A);
    vXsf depth = floatX(bottomZ+Grain::radius) - Az;
-   for(size_t k: range(simd)) {
+   for(size_t k: range(simd)) { // TODO: SIMD
     size_t j = i+k;
     if(j == grainBottomA.size) break /*2*/;
     if(extract(depth, k) >= 0) {
@@ -92,7 +93,7 @@ void Simulation::stepGrainBottom() {
      // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
      grainBottomContact.appendAtomic( j );
     } else {
-     error(extract(depth, k), j, grainBottomA.size, extract(A, k), grain.count, extract(Az, k));
+     error(extract(depth, k));
      // Resets contact (static friction spring)
      grainBottomLocalAx[j] = 0;
     }
