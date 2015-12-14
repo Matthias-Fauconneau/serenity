@@ -58,6 +58,8 @@ static inline v16sf blend(uint16 k, v16sf a, v16sf b) { return _mm512_mask_blend
 static inline float min(v16sf x) { return _mm512_reduce_min_ps(x); }
 static inline float max(v16sf x) { return _mm512_reduce_max_ps(x); }
 
+static inline v16ui convert(v16sf x) { return _mm512_cvtps_epi32(x); }
+
 static inline void maskStore(float* p, uint16 k, v16sf a) { _mm512_mask_store_ps(p, k, a); }
 static inline uint countBits(uint16 k) { return _mm_countbits_32(k); }
 #if KNIGHTS_LANDING
@@ -216,6 +218,12 @@ static inline v8sf blend(uint8 k, v8sf a, v8sf b) { return blend(expandMask(k), 
 static inline v8sf mask(v8ui a, v8sf b) { return (v8sf)(a & (v8ui)b); }
 static inline v8sf maskSub(v8sf a, v8ui k, v8sf b) { return a - mask(k, b); }
 static inline v8sf mask3_fmadd(v8sf a, v8sf b, v8sf c, v8ui k) { return mask(k, a * b) + c; }
+
+#if __INTEL_COMPILER
+static inline v8ui convert(v8sf x) { return _mm256_cvtps_epi32(x); }
+#else
+static inline v8ui convert(v8sf x) { return __builtin_ia32_cvtps2dq256(x); }
+#endif
 
 #if __INTEL_COMPILER
 static inline void maskStore(float* p, v8ui k, v8sf a) { _mm256_maskstore_ps(p, k, a); }

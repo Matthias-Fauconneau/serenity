@@ -186,7 +186,7 @@ void Simulation::stepGrainGrain() {
 #endif
 
   memoryTime.start();
-  Lattice<uint16> lattice(sqrt(3.)/(2*Grain::radius), min, max);
+  Lattice<uint32/*16*/> lattice(sqrt(3.)/(2*Grain::radius), min, max);
   memoryTime.stop();
   grainGrainLatticeTime.start();
   for(uint i: range(grain.count)) {
@@ -198,7 +198,7 @@ void Simulation::stepGrainGrain() {
   //float minD = verletDistance; //__builtin_inff(); // With lattice, a nearest > verletDistance might be skipped
 
   const int Y = lattice.size.y, X = lattice.size.x;
-  const uint16* latticeNeighbours[62];
+  const uint32/*16*/* latticeNeighbours[62];
   uint i = 0;
   for(int z: range(0, 2 +1)) for(int y: range((z?-2:0), 2 +1)) for(int x: range(((z||y)?-2:1), 2 +1)) {
    latticeNeighbours[i++] = lattice.base.data + z*Y*X + y*X + x;
@@ -234,22 +234,31 @@ void Simulation::stepGrainGrain() {
 
   atomic contactCount;
   auto search = [this, &lattice, &latticeNeighbours, verletDistance, &contactCount](uint, uint start, uint size) {
-   for(uint a=start; a<(start+size); a+=1) { // TODO: SIMD
-    uint offset = lattice.index(grain.Px[a], grain.Py[a], grain.Pz[a]);
+   const float* const gPx = grain.Px.data, *gPy = grain.Py.data, *gPz = grain.Pz.data;
+   uint* const ggA = grainGrainA.begin(), *ggB = grainGrainB.begin();
+   const vXsf scaleX = floatX(lattice.scale.x), scaleY = floatX(lattice.scale.y), scaleZ = floatX(lattice.scale.z);
+   const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
+   const vXui sizeX = uintX(lattice.size.x), sizeYX = uintX(lattice.size.y * lattice.size.x);
+   const vXui _1i = uintX(1);
+   const vXsf verletDistanceX = floatX(verletDistance);
+   for(uint a=start; a<(start+size); a+=simd) {
+    const vXsf Ax = load(gPx, a), Ay = load(gPy, a), Az = load(gPz, a);
+    vXui index = convert(scaleZ*(Az-minZ)) * sizeYX
+                       + convert(scaleY*(Ay-minY)) * sizeX
+                       + convert(scaleX*(Ax-minX));
     // Neighbours
     for(uint n: range(62)) {
-     uint b = *(latticeNeighbours[n] + offset);
-     if(!b) continue;
-     b--;
-     float d = sqrt(sq(grain.Px[a]-grain.Px[b])
-                    + sq(grain.Py[a]-grain.Py[b])
-                    + sq(grain.Pz[a]-grain.Pz[b]));
-     if(d <= verletDistance) {
-      size_t index = contactCount++;
-      assert_(index< grainGrainA.capacity);
-      grainGrainA[index] = a;
-      grainGrainB[index] = b;
-     }
+     vXui b = gather(latticeNeighbours[n], index);
+     maskX empty = equal(b, _0i);
+     b -= _1i;
+     const vXsf Bx = gather(gPx, b), By = gather(gPy, b), Bz = gather(gPz, b);
+     const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
+     v8sf distance = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
+     maskX close = lessThan(distance, verletDistanceX);
+     maskX add = ~empty & close;
+     uint index = (contactCount+=countBits(add));
+     compressStore(ggA+index, add, uintX(a)+_seqi);
+     compressStore(ggB+index, add, b);
     }
    }
   };
