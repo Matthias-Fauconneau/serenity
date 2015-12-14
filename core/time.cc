@@ -149,7 +149,7 @@ Date parseDate(TextData& s) {
             //else if(date.year==-1) date.year=number;
             else error("Invalid date", s);
         } else break;
-        continue2_:;
+        /**/continue2_:;
     }
     if(date.year<0 && (date.month>=0 || date.day>=0)) {
         Date now(currentTime());

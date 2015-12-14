@@ -119,6 +119,7 @@ struct atomic {
  size_t count = 0;
  operator size_t() { return count; }
  size_t operator++(int/*postfix*/) { return __atomic_fetch_add(&count, 1, 5/*SeqCst*/); }
+ size_t operator+=(int increment) { return __atomic_fetch_add(&count, increment, 5/*SeqCst*/); }
 };
 
 // -- initializer_list

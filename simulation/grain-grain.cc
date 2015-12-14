@@ -233,9 +233,8 @@ void Simulation::stepGrainGrain() {
   grainGrainB.size = grainGrainB.capacity;
 
   atomic contactCount;
-  grainGrainSearchTime += parallel_chunk(grain.count,
-  [this, &lattice, &latticeNeighbours, verletDistance, &contactCount](uint, uint start, uint size) {
-   for(uint a=start; a<(start+size); a+=1) { // TODO: SIMD ?
+  auto search = [this, &lattice, &latticeNeighbours, verletDistance, &contactCount](uint, uint start, uint size) {
+   for(uint a=start; a<(start+size); a+=1) { // TODO: SIMD
     uint offset = lattice.index(grain.Px[a], grain.Py[a], grain.Pz[a]);
     // Neighbours
     for(uint n: range(62)) {
@@ -244,7 +243,7 @@ void Simulation::stepGrainGrain() {
      b--;
      float d = sqrt(sq(grain.Px[a]-grain.Px[b])
                     + sq(grain.Py[a]-grain.Py[b])
-                    + sq(grain.Pz[a]-grain.Pz[b])); //TODO: SIMD //FIXME: fails with Ofast?
+                    + sq(grain.Pz[a]-grain.Pz[b]));
      if(d <= verletDistance) {
       size_t index = contactCount++;
       assert_(index< grainGrainA.capacity);
@@ -253,8 +252,8 @@ void Simulation::stepGrainGrain() {
      }
     }
    }
-  });
-
+  };
+  grainGrainSearchTime += parallel_chunk(grain.count, search);
   if(!contactCount) return;
   grainGrainA.size = contactCount;
   grainGrainB.size = contactCount;
@@ -287,15 +286,15 @@ void Simulation::stepGrainGrain() {
     // Contact points (for static friction) will be computed during force evaluation (if fine test passes)
     grainGrainLocalAx[i] = 0;
    }
-   break_:;
+   /**/break_:;
    while(grainGrainIndex < oldGrainGrainA.size && oldGrainGrainA[grainGrainIndex] == a)
     grainGrainIndex++;
   }
   grainGrainRepackFrictionTime.stop();
 
   assert_(align(simd, grainGrainA.size+1) <= grainGrainA.capacity);
-  for(uint i=grainGrainA.size; i<align(simd, grainGrainA.size+1); i++) grainGrainA.begin()[i] = 0;
-  for(uint i=grainGrainB.size; i<align(simd, grainGrainB.size+1); i++) grainGrainB.begin()[i] = 0;
+  for(uint i=grainGrainA.size; i<align(simd, grainGrainA.size+1); i++) grainGrainA.begin()[i] = grain.count;
+  for(uint i=grainGrainB.size; i<align(simd, grainGrainB.size+1); i++) grainGrainB.begin()[i] = grain.count;
 
   grainGrainGlobalMinD = verletDistance/*minD*/ - 2*Grain::radius;
   if(grainGrainGlobalMinD <= 0) log("grainGrainGlobalMinD12", grainGrainGlobalMinD);
@@ -311,30 +310,32 @@ void Simulation::stepGrainGrain() {
   memoryTime.stop();
  }
  grainGrainContact.size = 0;
- grainGrainFilterTime += parallel_chunk(align(simd, grainGrainA.size)/simd, [&](uint, uint start, uint size) {
+ // Creates a map from packed contact to index into unpacked contact list (indirect reference)
+ // Instead of packing (copying) the unpacked list to a packed contact list
+ // To keep track of where to write back (unpacked) contact positions (for static friction)
+ // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
+ atomic contactCount;
+ auto filter = [&](uint, uint start, uint size) {
+  const uint* const ggA = grainGrainA.data, *ggB = grainGrainB.data;
+  const float* const gPx = grain.Px.data, *gPy = grain.Py.data, *gPz = grain.Pz.data;
+  float* const ggL = grainGrainLocalAx.begin();
+  uint* const ggContact = grainGrainContact.begin();
+  const vXsf _2Gr = floatX(Grain::radius+Grain::radius);
   for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
-    vXui A = *(vXui*)(grainGrainA.data+i), B = *(vXui*)(grainGrainB.data+i);
-    vXsf Ax = gather(grain.Px.data, A), Ay = gather(grain.Py.data, A), Az = gather(grain.Pz.data, A);
-    vXsf Bx = gather(grain.Px.data, B), By = gather(grain.Py.data, B), Bz = gather(grain.Pz.data, B);
+    vXui A = *(vXui*)(ggA+i), B = *(vXui*)(ggB+i);
+    vXsf Ax = gather(gPx, A), Ay = gather(gPy, A), Az = gather(gPz, A);
+    vXsf Bx = gather(gPx, B), By = gather(gPy, B), Bz = gather(gPz, B);
     vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
     vXsf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
-    vXsf depth = floatX(Grain::radius+Grain::radius) - length;
-    for(uint k: range(simd)) {
-     uint j = i+k;
-     if(j == grainGrainA.size) break /*2*/;
-     if(extract(depth, k) >= 0) {
-      // Creates a map from packed contact to index into unpacked contact list (indirect reference)
-      // Instead of packing (copying) the unpacked list to a packed contact list
-      // To keep track of where to write back (unpacked) contact positions (for static friction)
-      // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
-      grainGrainContact.appendAtomic( j );
-     } else {
-      // Resets contact (static friction spring)
-      grainGrainLocalAx[j] = 0;
-     }
-    }
-   }
- });
+    vXsf depth = _2Gr - length;
+    maskX contact = greaterThanOrEqual(depth, _0f);
+    maskStore(ggL+i, ~contact, _0f);
+    uint index = (contactCount+=populationCount(contact));
+    compressStore(ggContact+index, contact, uintX(i)+_seqi);
+  }
+ };
+ grainGrainFilterTime += parallel_chunk(align(simd, grainGrainA.size)/simd, filter);
+ grainGrainContact.size = contactCount;
  if(!grainGrainContact.size) return;
  for(uint i=grainGrainContact.size; i<align(simd, grainGrainContact.size); i++)
   grainGrainContact.begin()[i] = grainGrainA.size;;
@@ -369,136 +370,173 @@ void Simulation::stepGrainGrain() {
  const float K = 4./3*E*sqrt(R);
  constexpr float mass = 1/(1/Grain::mass+1/Grain::mass);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
- grainGrainEvaluateTime += parallel_chunk(GGcc/simd, [this, K, Kb](uint, int start, int size) {
-    evaluateGrainGrain(start, size,
-                      grainGrainContact.data,
-                      grainGrainA.data, grainGrainB.data,
-                      grain.Px.data, grain.Py.data, grain.Pz.data,
-                      floatX(Grain::radius+Grain::radius), floatX(Grain::radius), floatX(Grain::radius),
-                      grainGrainLocalAx.begin(), grainGrainLocalAy.begin(), grainGrainLocalAz.begin(),
-                      grainGrainLocalBx.begin(), grainGrainLocalBy.begin(), grainGrainLocalBz.begin(),
-                      floatX(K), floatX(Kb),
-                      floatX(staticFrictionStiffness), floatX(dynamicFrictionCoefficient),
-                      floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping),
-                      grain.Vx.data, grain.Vy.data, grain.Vz.data,
-                      grain.Vx.data, grain.Vy.data, grain.Vz.data,
-                      grain.AVx.data, grain.AVy.data, grain.AVz.data,
-                      grain.AVx.data, grain.AVy.data, grain.AVz.data,
-                      grain.Rx.data, grain.Ry.data, grain.Rz.data, grain.Rw.data,
-                      grain.Rx.data, grain.Ry.data, grain.Rz.data, grain.Rw.data,
-                      grainGrainFx.begin(), grainGrainFy.begin(), grainGrainFz.begin(),
-                      grainGrainTAx.begin(), grainGrainTAy.begin(), grainGrainTAz.begin(),
-                      grainGrainTBx.begin(), grainGrainTBy.begin(), grainGrainTBz.begin() );
- });
+ auto evaluate = [this, K, Kb](uint, int start, int size) {
+  evaluateGrainGrain(start, size,
+                     grainGrainContact.data,
+                     grainGrainA.data, grainGrainB.data,
+                     grain.Px.data, grain.Py.data, grain.Pz.data,
+                     floatX(Grain::radius+Grain::radius), floatX(Grain::radius), floatX(Grain::radius),
+                     grainGrainLocalAx.begin(), grainGrainLocalAy.begin(), grainGrainLocalAz.begin(),
+                     grainGrainLocalBx.begin(), grainGrainLocalBy.begin(), grainGrainLocalBz.begin(),
+                     floatX(K), floatX(Kb),
+                     floatX(staticFrictionStiffness), floatX(dynamicFrictionCoefficient),
+                     floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping),
+                     grain.Vx.data, grain.Vy.data, grain.Vz.data,
+                     grain.Vx.data, grain.Vy.data, grain.Vz.data,
+                     grain.AVx.data, grain.AVy.data, grain.AVz.data,
+                     grain.AVx.data, grain.AVy.data, grain.AVz.data,
+                     grain.Rx.data, grain.Ry.data, grain.Rz.data, grain.Rw.data,
+                     grain.Rx.data, grain.Ry.data, grain.Rz.data, grain.Rw.data,
+                     grainGrainFx.begin(), grainGrainFy.begin(), grainGrainFz.begin(),
+                     grainGrainTAx.begin(), grainGrainTAy.begin(), grainGrainTAz.begin(),
+                     grainGrainTBx.begin(), grainGrainTBy.begin(), grainGrainTBz.begin() );
+ };
+ grainGrainEvaluateTime += parallel_chunk(GGcc/simd, evaluate);
 
- const uint threadCount = ::threadCount();
- const uint jobCount = grainGrainContact.size;
- const uint chunkSize = (jobCount+threadCount-1)/threadCount;
- const uint chunkCount = (jobCount+chunkSize-1)/chunkSize;
- assert_(chunkCount <= threadCount);
- uint chunkDomainStarts[chunkCount], chunkDomainStops[chunkCount];
- // Evaluates domain (range) for each chunk
- grainGrainSumDomainTime += parallel_for(0, chunkCount, [&](uint, uint chunkIndex) {
-  chunkDomainStarts[chunkIndex] = grain.count;
-  chunkDomainStops[chunkIndex] = 0;
-  for(uint i = chunkIndex*chunkSize; i < min(jobCount, (chunkIndex+1)*chunkSize); i++) {
-   uint index = grainGrainContact[i];
-   uint a = grainGrainA[index];
-   uint b = grainGrainB[index];
-   chunkDomainStarts[chunkIndex] = min(chunkDomainStarts[chunkIndex], min(a, b));
-   chunkDomainStops[chunkIndex]= max(chunkDomainStops[chunkIndex], max(a, b));
+ const uint threadCount = ::min( ::threadCount(), int(sqrt(grainGrainContact.size/16)));
+ if(threadCount <= 12) { // Sequential scalar scatter add
+  grainGrainSumTime.start();
+  for(size_t i = 0; i < grainGrainContact.size; i++) {
+   size_t index = grainGrainContact[i];
+   size_t a = grainGrainA[index];
+   size_t b = grainGrainB[index];
+   grain.Fx[a] += grainGrainFx[i];
+   grain.Fx[b] -= grainGrainFx[i];
+   grain.Fy[a] += grainGrainFy[i];
+   grain.Fy[b] -= grainGrainFy[i];
+   grain.Fz[a] += grainGrainFz[i];
+   grain.Fz[b] -= grainGrainFz[i];
+
+   grain.Tx[a] += grainGrainTAx[i];
+   grain.Ty[a] += grainGrainTAy[i];
+   grain.Tz[a] += grainGrainTAz[i];
+   grain.Tx[b] += grainGrainTBx[i];
+   grain.Ty[b] += grainGrainTBy[i];
+   grain.Tz[b] += grainGrainTBz[i];
   }
- });
- grainGrainSumAllocateTime.start();
- // Distributes chunks across copies
- uint maxCopyCount = chunkCount, maxDomainCount = chunkCount;
- uint copyStart[maxCopyCount*maxDomainCount], copyStop[maxCopyCount*maxDomainCount];
- mref<uint>(copyStart, maxCopyCount*maxDomainCount).clear(0);
- mref<uint>(copyStop, maxCopyCount*maxDomainCount).clear(0);
- uint copy[maxCopyCount]; // Allocates buffer copies to chunks without range overlap
- uint copyCount = 0;
- for(uint chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
-  uint chunkDomainStart = chunkDomainStarts[chunkIndex];
-  uint chunkDomainStop = chunkDomainStops[chunkIndex];
-  uint copyIndex = 0;
-  for(;; copyIndex++) {
-   assert_(copyIndex < maxCopyCount, copyIndex, maxCopyCount, chunkIndex);
-   for(uint domainIndex = 0;; domainIndex++) {
-    assert_(domainIndex < maxDomainCount);
-    uint domainStart = copyStart[copyIndex*maxDomainCount+domainIndex];
-    uint domainStop = copyStop[copyIndex*maxDomainCount+domainIndex];
-    if(domainStart == domainStop) break;
-    if(chunkDomainStart < domainStop && chunkDomainStop > domainStart) {
-     goto continue_2;
-    }
-   } /*else*/ {
-    copyCount = max(copyCount, copyIndex+1);
-    copy[chunkIndex] = copyIndex;
+  grainGrainSumTime.stop();
+ } else {
+  const uint jobCount = grainGrainContact.size/simd;
+  const uint chunkSize = (jobCount+threadCount-1)/threadCount;
+  const uint chunkCount = (jobCount+chunkSize-1)/chunkSize;
+  assert_(chunkCount <= threadCount);
+  uint chunkDomainStarts[chunkCount], chunkDomainStops[chunkCount];
+  // Evaluates domain (range) for each chunk
+  auto domainMinMax = [&](uint, uint chunkIndex) {
+   const uint* const grainGrainContact = this->grainGrainContact.data;
+   const uint* const grainGrainA = this->grainGrainA.data;
+   const uint* const grainGrainB = this->grainGrainB.data;
+   vXui start = uintX(grain.count);
+   vXui stop = _0i;
+   for(uint i = chunkIndex*chunkSize*simd; i < min(jobCount, (chunkIndex+1)*chunkSize)*simd; i+=simd) {
+    const vXui contacts = *(vXui*)(grainGrainContact+i);
+    const vXui A = gather(grainGrainA, contacts);
+    const vXui B = gather(grainGrainB, contacts);
+    start = min(start, min(A, B));
+    stop = max(stop, max(A, B));
+   }
+   chunkDomainStarts[chunkIndex] = min(start);
+   chunkDomainStops[chunkIndex] = max(stop);
+  };
+  grainGrainSumDomainTime += parallel_for(0, chunkCount, domainMinMax);
+  grainGrainSumAllocateTime.start();
+  // Distributes chunks across copies
+  uint maxCopyCount = chunkCount, maxDomainCount = chunkCount;
+  uint copyStart[maxCopyCount*maxDomainCount], copyStop[maxCopyCount*maxDomainCount];
+  mref<uint>(copyStart, maxCopyCount*maxDomainCount).clear(0);
+  mref<uint>(copyStop, maxCopyCount*maxDomainCount).clear(0);
+  uint copy[maxCopyCount]; // Allocates buffer copies to chunks without range overlap
+  uint copyCount = 0;
+  for(uint chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
+   uint chunkDomainStart = chunkDomainStarts[chunkIndex];
+   uint chunkDomainStop = chunkDomainStops[chunkIndex];
+   uint copyIndex = 0;
+   for(;; copyIndex++) {
+    assert_(copyIndex < maxCopyCount, copyIndex, maxCopyCount, chunkIndex);
     for(uint domainIndex = 0;; domainIndex++) {
-     assert_(domainIndex < maxDomainCount, domainIndex, maxDomainCount);
-     uint& domainStart = copyStart[copyIndex*maxDomainCount+domainIndex];
-     uint& domainStop = copyStop[copyIndex*maxDomainCount+domainIndex];
-     if(domainStart == domainStop) {
-      domainStart = chunkDomainStart;
-      domainStop = chunkDomainStop;
-      break;
+     assert_(domainIndex < maxDomainCount);
+     uint domainStart = copyStart[copyIndex*maxDomainCount+domainIndex];
+     uint domainStop = copyStop[copyIndex*maxDomainCount+domainIndex];
+     if(domainStart == domainStop) break;
+     if(chunkDomainStart < domainStop && chunkDomainStop > domainStart) {
+      goto continue_2;
      }
+    } /*else*/ {
+     copyCount = max(copyCount, copyIndex+1);
+     copy[chunkIndex] = copyIndex;
+     for(uint domainIndex = 0;; domainIndex++) {
+      assert_(domainIndex < maxDomainCount, domainIndex, maxDomainCount);
+      uint& domainStart = copyStart[copyIndex*maxDomainCount+domainIndex];
+      uint& domainStop = copyStop[copyIndex*maxDomainCount+domainIndex];
+      if(domainStart == domainStop) {
+       domainStart = chunkDomainStart;
+       domainStop = chunkDomainStop;
+       break;
+      }
+     }
+     break; // next chunk
     }
-    break; // next chunk
+    /**/continue_2:;
    }
-continue_2:;
+   assert_(copy[chunkIndex] != ~0u);
   }
-  assert_(copy[chunkIndex] != ~0u);
- }
- grainGrainSumAllocateTime.stop();
- grainGrainSumSumTime += parallel_for(0, chunkCount, [&](uint, uint chunkIndex) {
-  const uint stride = align(simd, grain.count);
-  const uint base  = copy[chunkIndex]*stride;
-  float* const Fx = grain.Fx.begin()+base, *Fy = grain.Fy.begin()+base, *Fz = grain.Fz.begin()+base;
-  float* const Tx = grain.Tx.begin()+base, *Ty = grain.Ty.begin()+base, *Tz = grain.Tz.begin()+base;
-  // Scalar scatter add
-  for(uint i = chunkIndex*chunkSize; i < min(jobCount, (chunkIndex+1)*chunkSize); i++) {
-   const uint index = grainGrainContact[i];
-   const uint a = grainGrainA[index];
-   const uint b = grainGrainB[index];
-   Fx[a] += grainGrainFx[i];
-   Fx[b] -= grainGrainFx[i];
-   Fy[a] += grainGrainFy[i];
-   Fy[b] -= grainGrainFy[i];
-   Fz[a] += grainGrainFz[i];
-   Fz[b] -= grainGrainFz[i];
+  grainGrainSumAllocateTime.stop();
+  auto sum = [&](uint, uint chunkIndex) {
+   const uint* const grainGrainContact = this->grainGrainContact.data;
+   const uint* const grainGrainA = this->grainGrainA.data;
+   const uint* const grainGrainB = this->grainGrainB.data;
+   const uint stride = align(simd, grain.count);
+   const uint base  = copy[chunkIndex]*stride;
+   const float* const pGGFx = grainGrainFx.data, *pGGFy = grainGrainFy.data, *pGGFz = grainGrainFz.data;
+   const float* const pGGTAx = grainGrainTAx.data, *pGGTAy = grainGrainTAy.data, *pGGTAz = grainGrainTAz.data;
+   const float* const pGGTBx = grainGrainTBx.data, *pGGTBy = grainGrainTBy.data, *pGGTBz = grainGrainTBz.data;
+   float* const pFx = grain.Fx.begin()+base, *pFy = grain.Fy.begin()+base, *pFz = grain.Fz.begin()+base;
+   float* const pTx = grain.Tx.begin()+base, *pTy = grain.Ty.begin()+base, *pTz = grain.Tz.begin()+base;
+   // Scalar scatter add
+   for(uint i=chunkIndex*chunkSize*simd; i<min(jobCount, (chunkIndex+1)*chunkSize)*simd; i++) {
+    uint index = grainGrainContact[i];
+    uint a = grainGrainA[index];
+    uint b = grainGrainB[index];
+    pFx[a] += pGGFx[i];
+    pFx[b] -= pGGFx[i];
+    pFy[a] += pGGFy[i];
+    pFy[b] -= pGGFy[i];
+    pFz[a] += pGGFz[i];
+    pFz[b] -= pGGFz[i];
 
-   Tx[a] += grainGrainTAx[i];
-   Ty[a] += grainGrainTAy[i];
-   Tz[a] += grainGrainTAz[i];
-   Tx[b] += grainGrainTBx[i];
-   Ty[b] += grainGrainTBy[i];
-   Tz[b] += grainGrainTBz[i];
-  }
- });
- // TODO: range optimized zero/copy
- grainGrainSumMergeTime += parallel_chunk(align(simd, grain.count)/simd,
-                                          [this, copyCount](uint, uint start, uint size) {
-  float* const pFx = grain.Fx.begin(), *pFy = grain.Fy.begin(), *pFz = grain.Fz.begin();
-  float* const pTx = grain.Tx.begin(), *pTy = grain.Ty.begin(), *pTz = grain.Tz.begin();
-  for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
-   vXsf Fx = _0f, Fy = _0f, Fz = _0f, Tx = _0f, Ty = _0f, Tz = _0f;
-   for(uint copyIndex = 1; copyIndex < copyCount; copyIndex++) {
-    const uint stride = align(simd, grain.count);
-    const uint base = copyIndex*stride;
-    Fx += load(pFx, base+i); store(pFx, base+i, _0f); // Zeroes for next time
-    Fy += load(pFy, base+i); store(pFy, base+i, _0f);
-    Fz += load(pFz, base+i); store(pFz, base+i, _0f);
-    Tx += load(pTx, base+i); store(pTx, base+i, _0f);
-    Ty += load(pTy, base+i); store(pTy, base+i, _0f);
-    Tz += load(pTz, base+i); store(pTz, base+i, _0f);
+    pTx[a] += pGGTAx[i];
+    pTy[a] += pGGTAy[i];
+    pTz[a] += pGGTAz[i];
+    pTx[b] += pGGTBx[i];
+    pTy[b] += pGGTBy[i];
+    pTz[b] += pGGTBz[i];
    }
-   store(pFx, i, load(pFx, i) + Fx);
-   store(pFy, i, load(pFy, i) + Fy);
-   store(pFz, i, load(pFz, i) + Fz);
-   store(pTx, i, load(pTx, i) + Tx);
-   store(pTy, i, load(pTy, i) + Ty);
-   store(pTz, i, load(pTz, i) + Tz);
-  }
- });
+  };
+  grainGrainSumSumTime += parallel_for(0, chunkCount, sum);
+  // TODO: range optimized zero/copy
+  auto merge = [this, copyCount](uint, uint start, uint size) {
+   float* const pFx = grain.Fx.begin(), *pFy = grain.Fy.begin(), *pFz = grain.Fz.begin();
+   float* const pTx = grain.Tx.begin(), *pTy = grain.Ty.begin(), *pTz = grain.Tz.begin();
+   const uint stride = align(simd, grain.count);
+   for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
+    vXsf Fx = _0f, Fy = _0f, Fz = _0f, Tx = _0f, Ty = _0f, Tz = _0f;
+    for(uint copyIndex = 1; copyIndex < copyCount; copyIndex++) {
+     const uint base = copyIndex*stride;
+     Fx += load(pFx, base+i); store(pFx, base+i, _0f); // Zeroes for next time
+     Fy += load(pFy, base+i); store(pFy, base+i, _0f);
+     Fz += load(pFz, base+i); store(pFz, base+i, _0f);
+     Tx += load(pTx, base+i); store(pTx, base+i, _0f);
+     Ty += load(pTy, base+i); store(pTy, base+i, _0f);
+     Tz += load(pTz, base+i); store(pTz, base+i, _0f);
+    }
+    store(pFx, i, load(pFx, i) + Fx);
+    store(pFy, i, load(pFy, i) + Fy);
+    store(pFz, i, load(pFz, i) + Fz);
+    store(pTx, i, load(pTx, i) + Tx);
+    store(pTy, i, load(pTy, i) + Ty);
+    store(pTz, i, load(pTz, i) + Tz);
+   }
+  };
+  grainGrainSumMergeTime += parallel_chunk(align(simd, grain.count)/simd, merge);
  }
+}

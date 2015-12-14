@@ -266,7 +266,7 @@ void Simulation::stepGrainWire() {
         grainWireLocalBy.append( 0 );
         grainWireLocalBz.append( 0 );
        }
-break_:;
+       /**/break_:;
       }
       while(grainWireIndex < oldGrainWireA.size && oldGrainWireA[grainWireIndex] == a)
        grainWireIndex++;

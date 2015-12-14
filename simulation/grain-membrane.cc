@@ -276,7 +276,7 @@ void Simulation::stepGrainMembrane() {
     // Contact points (for static friction) will be computed during force evaluation (if fine test passes)
     grainMembraneLocalAx[i] = 0;
    }
-   break_:;
+   /**/break_:;
    while(grainMembraneIndex < oldGrainMembraneA.size && oldGrainMembraneA[grainMembraneIndex] == a)
     grainMembraneIndex++;
   }

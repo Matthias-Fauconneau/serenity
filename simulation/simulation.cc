@@ -139,9 +139,9 @@ void Simulation::profile(const Time& totalTime) {
  logTime(grainGrainFilter);
  logTime(grainGrainRepackFriction);
  logTime(grainGrainEvaluate);
+ logTime(grainGrainSum);
  logTime(grainGrainSumDomain);
  logTime(grainGrainSumAllocate);
- //logTime(grainGrainSumZero);
  logTime(grainGrainSumSum);
  logTime(grainGrainSumMerge);
 

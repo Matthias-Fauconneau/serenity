@@ -20,7 +20,7 @@ int threadCount() {
   int threadCount = 0;
   while(s) { if(s.match("processor")) threadCount++; s.line(); }
 #if !DEBUG && 1
-  assert_(threadCount >= 60 || threadCount <= maxThreadCount, threadCount, maxThreadCount);
+  assert_(threadCount >= 8 || threadCount <= maxThreadCount, threadCount, maxThreadCount);
 #endif
   if(environmentVariable("THREADS"_))
    threadCount = min(threadCount, (int)parseInteger(environmentVariable("THREADS"_)));

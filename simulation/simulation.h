@@ -236,6 +236,7 @@ struct Simulation : System {
   uint64 grainGrainFilterTime = 0;
   tsc grainGrainRepackFrictionTime;
   uint64 grainGrainEvaluateTime = 0;
+  tsc grainGrainSumTime;
   uint64 grainGrainSumDomainTime = 0;
   tsc grainGrainSumAllocateTime;
   uint64 grainGrainSumSumTime = 0;
