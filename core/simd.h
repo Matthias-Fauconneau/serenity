@@ -50,6 +50,7 @@ static inline void scatter(float* const P, const v16ui i, const v16sf x) { _mm51
 
 static inline uint16 lessThan(v16sf a, v16sf b) { return _mm512_cmp_ps_mask(a, b, _CMP_LT_OS); }
 static inline uint16 greaterThan(v16sf a, v16sf b) { return _mm512_cmp_ps_mask(a, b, _CMP_GT_OS); }
+static inline uint16 greaterThanOrEqual(v16sf a, v16sf b) { return _mm512_cmp_ps_mask(a, b, _CMP_GE_OS); }
 static inline uint16 equal(v16sf a, v16sf b) { return _mm512_cmp_ps_mask(a, b, _CMP_EQ_OQ); }
 
 static inline v16sf blend(uint16 k, v16sf a, v16sf b) { return _mm512_mask_blend_ps(k, a, b); }
@@ -58,7 +59,14 @@ static inline float min(v16sf x) { return _mm512_reduce_min_ps(x); }
 static inline float max(v16sf x) { return _mm512_reduce_max_ps(x); }
 
 static inline void maskStore(float* p, uint16 k, v16sf a) { _mm512_mask_store_ps(p, k, a); }
+static inline uint countBits(uint16 k) { return _mm_countbits_32(k); }
+#if KNIGHTS_LANDING
 static inline void compressStore(uint* p, uint16 k, v16ui a) { _mm512_mask_compressstoreu_epi32(p, k, a); }
+#else
+static inline void compressStore(uint* p, uint16 mask, v16ui a) {
+  for(uint i=0; i<16; i++) if(mask&(1<<i)) { *p = extract(a, i); p++; }
+}
+#endif
 
 static constexpr int simd = 16; // SIMD size
 typedef v16sf vXsf;
@@ -212,11 +220,11 @@ static inline v8sf mask3_fmadd(v8sf a, v8sf b, v8sf c, v8ui k) { return mask(k, 
 #if __INTEL_COMPILER
 static inline void maskStore(float* p, v8ui k, v8sf a) { _mm256_maskstore_ps(p, k, a); }
 static inline uint moveMask(v8ui k) { return _mm256_movemask_ps(k); }
-static inline uint populationCount(v8ui k) { return _mm_popcnt_u32(k); }
+static inline uint countBits(v8ui k) { return _mm_countbits_32(k); }
 #else
 static inline void maskStore(float* p, v8ui k, v8sf a) { __builtin_ia32_maskstoreps256((v8sf*)p, k, a); }
 static inline uint moveMask(v8ui k) { return __builtin_ia32_movmskps256(k); }
-static inline uint populationCount(v8ui k) { return __builtin_popcount(moveMask(k)); }
+static inline uint countBits(v8ui k) { return __builtin_popcount(moveMask(k)); }
 #endif
 static inline void compressStore(uint* p, v8ui k, v8ui a) {\
  uint mask = moveMask(k);

@@ -330,7 +330,7 @@ void Simulation::stepGrainGrain() {
     vXsf depth = _2Gr - length;
     maskX contact = greaterThanOrEqual(depth, _0f);
     maskStore(ggL+i, ~contact, _0f);
-    uint index = (contactCount+=populationCount(contact));
+    uint index = (contactCount+=countBits(contact));
     compressStore(ggContact+index, contact, uintX(i)+_seqi);
   }
  };
