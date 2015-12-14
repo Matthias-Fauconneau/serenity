@@ -192,6 +192,17 @@ static inline float op(v8sf x) { \
     const v4sf x32 = __builtin_ia32_##op##ps(x64, __builtin_shufflevector(x64, x64, 1,1,1,1)); \
     return x32[0]; \
 }
+#else
+#define reduce(op) \
+static inline float op(v8sf x) { \
+    /* ( x3+x7, x2+x6, x1+x5, x0+x4 ) */ \
+    const v4sf x128 = __builtin_ia32_##op##ps(__builtin_ia32_vextractf128_ps256(x, 1), __builtin_ia32_ps_ps256(x)); \
+    /* ( -, -, x1+x3+x5+x7, x0+x2+x4+x6 ) */ \
+    const v4sf x64 = __builtin_ia32_##op##ps(x128, __builtin_ia32_movhlps(x128, x128)); \
+    /* ( -, -, -, x0+x1+x2+x3+x4+x5+x6+x7 ) */ \
+    const v4sf x32 = __builtin_ia32_##op##ps(x64, __builtin_ia32_shufps(x64, x64, 0x55)); \
+    return x32[0]; \
+}
 #endif
 reduce(min)
 reduce(max)

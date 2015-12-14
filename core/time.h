@@ -38,17 +38,9 @@ struct tsc {
  void operator =(int unused v) { assert(v == 0); reset(); }
 };
 inline String strD(const uint64 num, const uint64 div) {
- //assert_(num <= div, num, div);
  return div ? str(uint(round(100*float(num)/float(div))))+'%' : String();
 }
 inline String strD(const tsc& num, const tsc& div) { return strD(num.cycleCount(), div.cycleCount()); }
-
-struct scope {
- tsc& tsc;
- scope(struct tsc& tsc) : tsc(tsc) { tsc.start(); }
- ~scope() { tsc.stop(); }
-};
-#define scope scope unused _time_
 
 struct Time {
     uint64 startTime=realTime(), stopTime=0;

@@ -112,8 +112,8 @@ void Simulation::profile(const Time& totalTime) {
  if(reset) grainTotalTime.reset();
  logTime(grain);
  profile.insertSortedMulti(grainBottomTotalTime, "=sum{grain-bottom}"_+
-                           strD(grainBottomFilterTime+grainBottomRepackFrictionTime+grainBottomEvaluateTime
-                                +grainBottomSumTime, grainBottomTotalTime));
+                           strD(grainBottomSearchTime+grainBottomRepackFrictionTime+grainBottomFilterTime
+                                +grainBottomEvaluateTime+grainBottomSumTime, grainBottomTotalTime));
  if(reset) grainBottomTotalTime.reset();
  logTime(grainBottomSearch);
  logTime(grainBottomFilter);
@@ -121,7 +121,7 @@ void Simulation::profile(const Time& totalTime) {
  logTime(grainBottomEvaluate);
  logTime(grainBottomSum);
  if(grainTopTotalTime) profile.insertSortedMulti(grainTopTotalTime, "=sum{grain-top}"_+
-                                                 strD(grainTopFilterTime+grainTopRepackFrictionTime+grainTopEvaluateTime
+                                                 strD(grainTopSearchTime+grainTopFilterTime+grainTopRepackFrictionTime+grainTopEvaluateTime
                                                       +grainTopSumTime, grainTopTotalTime));
  if(reset) grainTopTotalTime.reset();
  logTime(grainTopSearch);
