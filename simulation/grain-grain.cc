@@ -186,12 +186,22 @@ void Simulation::stepGrainGrain() {
 #endif
 
   memoryTime.start();
+  {const vec3 size = sqrt(3.)/(2*Grain::radius)*(max-min);
+   assert_(size.x < 0x1p10 && size.y < 0x1p10 && size.z < 0x1p10);}
   Lattice<int32/*16*/> lattice(sqrt(3.)/(2*Grain::radius), min, max);
   memoryTime.stop();
   grainGrainLatticeTime.start();
   for(uint i: range(grain.count)) {
    lattice.cell(grain.Px[i], grain.Py[i], grain.Pz[i]) = /*1+*/i;
   }
+  /*if(lattice.base[-1658] >= 0 || lattice.base[1257] >= 0) log(lattice.base[1257]);
+  if(lattice.base[1257] >= 0) log(lattice.base[1257]);*/
+  /*for(uint a: range(grain.count)) {
+   bool found = false;
+   for(uint b: lattice.cells) {
+    if(a == b) { assert_(!found); found = true; }
+   }
+  }*/
 
   const float verletDistance = 2*2*Grain::radius/sqrt(3.); // > Grain::radius + Grain::radius
   // Minimum distance over verlet distance parameter is the actual verlet distance which can be used
@@ -249,26 +259,39 @@ void Simulation::stepGrainGrain() {
     vXsi index = convert(scaleZ*(Az-minZ)) * sizeYX
                        + convert(scaleY*(Ay-minY)) * sizeX
                        + convert(scaleX*(Ax-minX));
-    for(uint k: range(simd)) assert_(0 <= index[k] && index[k] < (int)lattice.cells.capacity, index[k], lattice.cells.capacity,
+    /*for(uint k: range(simd)) assert_(-(1+lattice.size.y*lattice.size.x+lattice.size.x+1) <= index[k] && index[k] < (int)lattice.cells.capacity, index[k], lattice.cells.capacity,
                                      minX[k], Ax[k],
                                      minY[k], Ay[k],
-                                     minZ[k], Az[k]);
+                                     minZ[k], Az[k]);*/
     // Neighbours
+    if(lattice.base[1257] >= 0) log(i, lattice.base[1257]);
     for(uint n: range(62)) { // A is not monotonous
-     for(uint k: range(simd)) assert_(0 <= index[k] && index[k] < (int)lattice.cells.capacity, index[k], lattice.cells.capacity);
+     //for(uint k: range(simd)) assert_(0 <= index[k] && index[k] < (int)lattice.cells.capacity, index[k], lattice.cells.capacity);
      vXsi b = gather(latticeNeighbours[n], index);
-     for(uint k: range(simd)) assert_(b[k] >= -1 && b[k] < (int)grain.capacity, b[k], grain.count, grain.capacity);
+     for(uint k: range(simd)) assert_(a[k] != b[k],
+                                      a[k], b[k],
+                                      grain.count, /*mask[k],*/ index[k], n,
+                                      //lattice.base.data - lattice.cells.data,
+                                      latticeNeighbours[n] + index[k] - lattice.base.data,
+                                      latticeNeighbours[n] - lattice.base.data,
+                                      lattice.size.x, lattice.size.y, lattice.size.z,
+                                      convert(scaleX*(Ax-minX))[k],
+                                       convert(scaleY*(Ay-minY))[k],
+                                      convert(scaleZ*(Az-minZ))[k]);
+     //for(uint k: range(simd)) assert_(b[k] >= -1 && b[k] < (int)grain.capacity, b[k], grain.count, grain.capacity);
      const vXsf Bx = gather(gPx, b), By = gather(gPy, b), Bz = gather(gPz, b);
      const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
      v8sf distance = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
      maskX mask = valid & notEqual(b, _1i) & lessThan(distance, verletDistanceX);
      uint targetIndex = contactCount.fetchAdd(countBits(mask));
+     assert_(targetIndex+countBits(mask) < grainGrainA.capacity);
      compressStore(ggA+targetIndex, mask, a);
      compressStore(ggB+targetIndex, mask, b);
     }
    }
   };
   grainGrainSearchTime += parallel_chunk(align(simd, grain.count)/simd, search, 1);
+  //return;
   if(!contactCount) return;
   grainGrainA.size = contactCount;
   grainGrainB.size = contactCount;
@@ -286,6 +309,7 @@ void Simulation::stepGrainGrain() {
   for(uint i=0; i<grainGrainA.size; i++) { // seq
    int a = grainGrainA[i];
    int b = grainGrainB[i];
+   assert_(a != b);
    for(uint k = 0;; k++) {
     uint j = grainGrainIndex+k;
     if(j >= oldGrainGrainA.size || oldGrainGrainA[j] != a) break;
@@ -339,7 +363,8 @@ void Simulation::stepGrainGrain() {
   int* const ggContact = grainGrainContact.begin();
   const vXsf _2Gr = floatX(Grain::radius+Grain::radius);
   for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
-    vXsi A = *(vXsi*)(ggA+i), B = *(vXsi*)(ggB+i);
+    vXsi A = load(ggA, i), B = load(ggB, i);
+    for(uint k: range(simd)) assert_(A[k] != B[k] || A[k] == (int)grain.count, A[k], B[k], grain.count);
     vXsf Ax = gather(gPx, A), Ay = gather(gPy, A), Az = gather(gPz, A);
     vXsf Bx = gather(gPx, B), By = gather(gPy, B), Bz = gather(gPz, B);
     vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
@@ -351,7 +376,9 @@ void Simulation::stepGrainGrain() {
     compressStore(ggContact+index, contact, intX(i)+_seqi);
   }
  };
- grainGrainFilterTime += parallel_chunk(align(simd, grainGrainA.size)/simd, filter);
+ grainGrainFilterTime += parallel_chunk(align(simd, grainGrainA.size)/simd, filter, 1);
+ while(contactCount.count > 0 && grainGrainContact[contactCount-1] >= (int)grainGrainA.size)
+  contactCount.count--; // Trims trailing invalid contacts
  grainGrainContact.size = contactCount;
  if(!grainGrainContact.size) return;
  for(uint i=grainGrainContact.size; i<align(simd, grainGrainContact.size); i++)
@@ -417,6 +444,8 @@ void Simulation::stepGrainGrain() {
    size_t index = grainGrainContact[i];
    size_t a = grainGrainA[index];
    size_t b = grainGrainB[index];
+   assert_(a!=b, a, b, grain.count, index, grainGrainA.size);
+   assert_(isNumber(grainGrainFx[i]), a, b);
    grain.Fx[a] += grainGrainFx[i];
    grain.Fx[b] -= grainGrainFx[i];
    grain.Fy[a] += grainGrainFy[i];
