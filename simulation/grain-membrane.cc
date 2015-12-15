@@ -7,8 +7,8 @@
 inline float log2(float x) { return __builtin_log2f(x); }
 
 static inline void evaluateGrainMembrane(const size_t start, const size_t size,
-                                     const uint* grainMembraneContact, const size_t unused grainMembraneContactSize,
-                                     const uint* grainMembraneA, const uint* grainMembraneB,
+                                     const int* grainMembraneContact, const size_t unused grainMembraneContactSize,
+                                     const int* grainMembraneA, const int* grainMembraneB,
                                      const float* grainPx, const float* grainPy, const float* grainPz,
                                      const float* membranePx, const float* membranePy, const float* membranePz,
                                      const vXsf Gr_Wr, const vXsf Gr, const vXsf Wr,
@@ -26,8 +26,8 @@ static inline void evaluateGrainMembrane(const size_t start, const size_t size,
                                      float* const pFx, float* const pFy, float* const pFz,
                                      float* const pTAx, float* const pTAy, float* const pTAz) {
  for(size_t i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
-  const vXui contacts = *(vXui*)(grainMembraneContact+i);
-  const vXui A = gather(grainMembraneA, contacts), B = gather(grainMembraneB, contacts);
+  const vXsi contacts = load(grainMembraneContact, i);
+  const vXsi A = gather(grainMembraneA, contacts), B = gather(grainMembraneB, contacts);
   // FIXME: Recomputing from intersection (more efficient than storing?)
   const vXsf Ax = gather(grainPx, A), Ay = gather(grainPy, A), Az = gather(grainPz, A);
   const vXsf Bx = gather(membranePx, B), By = gather(membranePy, B), Bz = gather(membranePz, B);
@@ -207,8 +207,8 @@ void Simulation::stepGrainMembrane() {
   const size_t GWcc = align(simd, grain.count * averageGrainMembraneContactCount +1);
   if(GWcc > grainMembraneA.capacity) {\
    memoryTime.start();
-   grainMembraneA = buffer<uint>(GWcc, 0);
-   grainMembraneB = buffer<uint>(GWcc, 0);
+   grainMembraneA = buffer<int>(GWcc, 0);
+   grainMembraneB = buffer<int>(GWcc, 0);
    grainMembraneLocalAx = buffer<float>(GWcc, 0);
    grainMembraneLocalAy = buffer<float>(GWcc, 0);
    grainMembraneLocalAz = buffer<float>(GWcc, 0);
@@ -236,7 +236,7 @@ void Simulation::stepGrainMembrane() {
                      + sq(grain.Py[a]-membrane.Py[b])
                      + sq(grain.Pz[a]-membrane.Pz[b])); // TODO: SIMD //FIXME: fails with Ofast?
       if(d <= verletDistance) {
-       size_t index = contactCount++;
+       size_t index = contactCount.fetchAdd(1);
        assert_(index < grainMembraneA.capacity);
        grainMembraneA[index] = a; // Grain
        grainMembraneB[index] = b; // Membrane
@@ -257,8 +257,8 @@ void Simulation::stepGrainMembrane() {
   grainMembraneRepackFrictionTime.start();
   size_t grainMembraneIndex = 0; // Index of first contact with A in old grainMembrane[Local]A|B list
   for(uint i=0; i<grainMembraneA.size; i++) { // seq
-   uint a = grainMembraneA[i];
-   uint b = grainMembraneB[i];
+   int a = grainMembraneA[i];
+   int b = grainMembraneB[i];
    for(uint k = 0;; k++) {
     size_t j = grainMembraneIndex+k;
     if(j >= oldGrainMembraneA.size || oldGrainMembraneA[grainMembraneIndex+k] != a) break;
@@ -297,12 +297,12 @@ void Simulation::stepGrainMembrane() {
 
  // Filters verlet lists, packing contacts to evaluate
  if(align(simd, grainMembraneA.size) > grainMembraneContact.capacity) {
-  grainMembraneContact = buffer<uint>(align(simd, grainMembraneA.size));
+  grainMembraneContact = buffer<int>(align(simd, grainMembraneA.size));
  }
  grainMembraneContact.size = 0;
  grainMembraneFilterTime += parallel_chunk(align(simd, grainMembraneA.size)/simd, [&](uint, size_t start, size_t size) {
    for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
-    vXui A = *(vXui*)(grainMembraneA.data+i), B = *(vXui*)(grainMembraneB.data+i);
+    vXsi A = load(grainMembraneA.data, i), B = load(grainMembraneB.data, i);
     vXsf Ax = gather(grain.Px.data, A), Ay = gather(grain.Py.data, A), Az = gather(grain.Pz.data, A);
     vXsf Bx = gather(membrane.Px.data, B), By = gather(membrane.Py.data, B), Bz = gather(membrane.Pz.data, B);
     vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;

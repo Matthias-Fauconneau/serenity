@@ -17,7 +17,7 @@ void Simulation::stepGrainTop() {
   static constexpr size_t averageGrainTopContactCount = 1;
   const size_t GBcc = align(simd, grain.count * averageGrainTopContactCount +1);
   if(GBcc > grainTopA.capacity) {
-   grainTopA = buffer<uint>(GBcc, 0);
+   grainTopA = buffer<int>(GBcc, 0);
    grainTopLocalAx = buffer<float>(GBcc, 0);
    grainTopLocalAy = buffer<float>(GBcc, 0);
    grainTopLocalAz = buffer<float>(GBcc, 0);
@@ -48,7 +48,7 @@ void Simulation::stepGrainTop() {
   size_t grainTopI = 0; // Index of first contact with A in old grainTop[Local]A|B list
   for(uint i=0; i<grainTopA.size; i++) { // seq
    size_t j = grainTopI;
-   if(grainTopI < oldGrainTopA.size && oldGrainTopA[grainTopI] == i) {
+   if(grainTopI < oldGrainTopA.size && (uint)oldGrainTopA[grainTopI] == i) {
     // Repack existing friction
     grainTopLocalAx[i] = oldGrainTopLocalAx[j];
     grainTopLocalAy[i] = oldGrainTopLocalAy[j];
@@ -61,7 +61,7 @@ void Simulation::stepGrainTop() {
     // Contact points (for static friction) will be computed during force evaluation (if fine test passes)
     grainTopLocalAx[i] = 0;
    }
-   while(grainTopI < oldGrainTopA.size && oldGrainTopA[grainTopI] == i)
+   while(grainTopI < oldGrainTopA.size && (uint)oldGrainTopA[grainTopI] == i)
     grainTopI++;
   }
   grainTopRepackFrictionTime.stop();
@@ -73,12 +73,12 @@ void Simulation::stepGrainTop() {
 
  // Filters verlet lists, packing contacts to evaluate
  if(align(simd, grainTopA.size) > grainTopContact.capacity) {
-  grainTopContact = buffer<uint>(align(simd, grainTopA.size));
+  grainTopContact = buffer<int>(align(simd, grainTopA.size));
  }
  grainTopContact.size = 0;
  auto filter =  [&](uint, size_t start, size_t size) {
   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
-   vXui A = *(vXui*)(grainTopA.data+i);
+   vXsi A = load(grainTopA.data, i);
    vXsf Az = gather(grain.Pz.data, A);
    vXsf depth = Az - floatX(topZ-Grain::radius);
    for(size_t k: range(simd)) { // TODO: SIMD

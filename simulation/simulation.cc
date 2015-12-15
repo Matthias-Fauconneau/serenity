@@ -56,7 +56,7 @@ void Simulation::step() {
   stepMembrane();
  }
  grainMembraneTotalTime.start();
- stepGrainMembrane();
+ //stepGrainMembrane(); TODO: lattice
  grainMembraneTotalTime.stop();
  membraneTotalTime.stop();
 

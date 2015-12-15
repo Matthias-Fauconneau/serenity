@@ -18,7 +18,7 @@ void Simulation::stepGrainBottom() {
   const size_t GBcc = align(simd, grain.count * averageGrainBottomContactCount +1);
   if(GBcc > grainBottomA.capacity) {
    memoryTime.start();
-   grainBottomA = buffer<uint>(GBcc, 0);
+   grainBottomA = buffer<int>(GBcc, 0);
    grainBottomLocalAx = buffer<float>(GBcc, 0);
    grainBottomLocalAy = buffer<float>(GBcc, 0);
    grainBottomLocalAz = buffer<float>(GBcc, 0);
@@ -50,7 +50,7 @@ void Simulation::stepGrainBottom() {
   size_t grainBottomI = 0; // Index of first contact with A in old grainBottom[Local]A|B list
   for(uint i=0; i<grainBottomA.size; i++) { // seq
    size_t j = grainBottomI;
-   if(grainBottomI < oldGrainBottomA.size && oldGrainBottomA[grainBottomI] == i) {
+   if(grainBottomI < oldGrainBottomA.size && (uint)oldGrainBottomA[grainBottomI] == i) {
     // Repack existing friction
     grainBottomLocalAx[i] = oldGrainBottomLocalAx[j];
     grainBottomLocalAy[i] = oldGrainBottomLocalAy[j];
@@ -63,7 +63,7 @@ void Simulation::stepGrainBottom() {
     // Contact points (for static friction) will be computed during force evaluation (if fine test passes)
     grainBottomLocalAx[i] = 0;
    }
-   while(grainBottomI < oldGrainBottomA.size && oldGrainBottomA[grainBottomI] == i)
+   while(grainBottomI < oldGrainBottomA.size && (uint)oldGrainBottomA[grainBottomI] == i)
     grainBottomI++;
   }
   grainBottomRepackFrictionTime.stop();
@@ -75,12 +75,12 @@ void Simulation::stepGrainBottom() {
 
  // Filters verlet lists, packing contacts to evaluate
  if(align(simd, grainBottomA.size) > grainBottomContact.capacity) {
-  grainBottomContact = buffer<uint>(align(simd, grainBottomA.size));
+  grainBottomContact = buffer<int>(align(simd, grainBottomA.size));
  }
  grainBottomContact.size = 0;
  auto filter = [&](uint, size_t start, size_t size) {
   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
-   vXui A = *(vXui*)(grainBottomA.data+i);
+   vXsi A = *(vXsi*)(grainBottomA.data+i);
    vXsf Az = gather(grain.Pz.data, A);
    vXsf depth = floatX(bottomZ+Grain::radius) - Az;
    for(size_t k: range(simd)) { // TODO: SIMD

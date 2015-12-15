@@ -29,7 +29,7 @@ struct Simulation : System {
  float bottomForceZ = 0, topForceZ = 0;
 
  // Grain-Bottom
- buffer<uint> oldGrainBottomA;
+ buffer<int> oldGrainBottomA;
  buffer<float> oldGrainBottomLocalAx;
  buffer<float> oldGrainBottomLocalAy;
  buffer<float> oldGrainBottomLocalAz;
@@ -37,9 +37,9 @@ struct Simulation : System {
  buffer<float> oldGrainBottomLocalBy;
  buffer<float> oldGrainBottomLocalBz;
 
- buffer<uint> grainBottomContact;
+ buffer<int> grainBottomContact;
 
- buffer<uint> grainBottomA;
+ buffer<int> grainBottomA;
  buffer<float> grainBottomLocalAx;
  buffer<float> grainBottomLocalAy;
  buffer<float> grainBottomLocalAz;
@@ -55,7 +55,7 @@ struct Simulation : System {
  buffer<float> grainBottomTAz;
 
  // Grain-Top
- buffer<uint> oldGrainTopA;
+ buffer<int> oldGrainTopA;
  buffer<float> oldGrainTopLocalAx;
  buffer<float> oldGrainTopLocalAy;
  buffer<float> oldGrainTopLocalAz;
@@ -63,9 +63,9 @@ struct Simulation : System {
  buffer<float> oldGrainTopLocalBy;
  buffer<float> oldGrainTopLocalBz;
 
- buffer<uint> grainTopContact;
+ buffer<int> grainTopContact;
 
- buffer<uint> grainTopA;
+ buffer<int> grainTopA;
  buffer<float> grainTopLocalAx;
  buffer<float> grainTopLocalAy;
  buffer<float> grainTopLocalAz;
@@ -81,7 +81,7 @@ struct Simulation : System {
  buffer<float> grainTopTAz;
 
  // Wire-Bottom
- buffer<uint> oldWireBottomA;
+ buffer<int> oldWireBottomA;
  buffer<float> oldWireBottomLocalAx;
  buffer<float> oldWireBottomLocalAy;
  buffer<float> oldWireBottomLocalAz;
@@ -89,9 +89,9 @@ struct Simulation : System {
  buffer<float> oldWireBottomLocalBy;
  buffer<float> oldWireBottomLocalBz;
 
-  buffer<uint> wireBottomContact;
+  buffer<int> wireBottomContact;
 
- buffer<uint> wireBottomA;
+ buffer<int> wireBottomA;
  buffer<float> wireBottomLocalAx;
  buffer<float> wireBottomLocalAy;
  buffer<float> wireBottomLocalAz;
@@ -108,8 +108,8 @@ struct Simulation : System {
  float grainGrainGlobalMinD = 0;
  uint grainGrainSkipped = 0;
 
- buffer<uint> oldGrainGrainA ;
- buffer<uint> oldGrainGrainB;
+ buffer<int> oldGrainGrainA ;
+ buffer<int> oldGrainGrainB;
  buffer<float> oldGrainGrainLocalAx;
  buffer<float> oldGrainGrainLocalAy;
  buffer<float> oldGrainGrainLocalAz;
@@ -117,8 +117,8 @@ struct Simulation : System {
  buffer<float> oldGrainGrainLocalBy;
  buffer<float> oldGrainGrainLocalBz;
 
- buffer<uint> grainGrainA ;
- buffer<uint> grainGrainB;
+ buffer<int> grainGrainA ;
+ buffer<int> grainGrainB;
  buffer<float> grainGrainLocalAx;
  buffer<float> grainGrainLocalAy;
  buffer<float> grainGrainLocalAz;
@@ -126,7 +126,7 @@ struct Simulation : System {
  buffer<float> grainGrainLocalBy;
  buffer<float> grainGrainLocalBz;
 
- buffer<uint> grainGrainContact;
+ buffer<int> grainGrainContact;
 
  buffer<float> grainGrainFx;
  buffer<float> grainGrainFy;
@@ -142,8 +142,8 @@ struct Simulation : System {
  float grainWireGlobalMinD = 0;
  uint grainWireSkipped = 0;
 
- buffer<uint> oldGrainWireA;
- buffer<uint> oldGrainWireB;
+ buffer<int> oldGrainWireA;
+ buffer<int> oldGrainWireB;
  buffer<float> oldGrainWireLocalAx;
  buffer<float> oldGrainWireLocalAy;
  buffer<float> oldGrainWireLocalAz;
@@ -151,8 +151,8 @@ struct Simulation : System {
  buffer<float> oldGrainWireLocalBy;
  buffer<float> oldGrainWireLocalBz;
 
- buffer<uint> grainWireA;
- buffer<uint> grainWireB;
+ buffer<int> grainWireA;
+ buffer<int> grainWireB;
  buffer<float> grainWireLocalAx;
  buffer<float> grainWireLocalAy;
  buffer<float> grainWireLocalAz;
@@ -160,7 +160,7 @@ struct Simulation : System {
  buffer<float> grainWireLocalBy;
  buffer<float> grainWireLocalBz;
 
- buffer<uint> grainWireContact;
+ buffer<int> grainWireContact;
 
  buffer<float> grainWireFx;
  buffer<float> grainWireFy;
@@ -173,8 +173,8 @@ struct Simulation : System {
  float grainMembraneGlobalMinD = 0;
  uint grainMembraneSkipped = 0;
 
- buffer<uint> oldGrainMembraneA;
- buffer<uint> oldGrainMembraneB;
+ buffer<int> oldGrainMembraneA;
+ buffer<int> oldGrainMembraneB;
  buffer<float> oldGrainMembraneLocalAx;
  buffer<float> oldGrainMembraneLocalAy;
  buffer<float> oldGrainMembraneLocalAz;
@@ -182,8 +182,8 @@ struct Simulation : System {
  buffer<float> oldGrainMembraneLocalBy;
  buffer<float> oldGrainMembraneLocalBz;
 
- buffer<uint> grainMembraneA;
- buffer<uint> grainMembraneB;
+ buffer<int> grainMembraneA;
+ buffer<int> grainMembraneB;
  buffer<float> grainMembraneLocalAx;
  buffer<float> grainMembraneLocalAy;
  buffer<float> grainMembraneLocalAz;
@@ -191,7 +191,7 @@ struct Simulation : System {
  buffer<float> grainMembraneLocalBy;
  buffer<float> grainMembraneLocalBz;
 
- buffer<uint> grainMembraneContact;
+ buffer<int> grainMembraneContact;
 
  buffer<float> grainMembraneFx;
  buffer<float> grainMembraneFy;
