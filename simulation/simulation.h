@@ -12,7 +12,7 @@ struct Simulation : System {
  sconst string patterns[] {"none", "helix", "radial", "spiral"};
  const Pattern pattern;
  const float linearSpeed = 4 * m/s;
- const float verticalSpeed = 0.2 * m/s;
+ const float verticalSpeed = 1 * m/s;
  const float loopAngle = PI*(3-sqrt(5.));
  const float plateSpeed = 0.01 * m/s;
 

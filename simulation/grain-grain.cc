@@ -227,7 +227,6 @@ void Simulation::stepGrainGrain() {
     }
    }
   };
-  assert(contactCount <= grainGrainA.size);
   if(grain.count/simd) grainGrainSearchTime += parallel_chunk(grain.count/simd, search);
   if(grain.count%simd) {
    const float* const gPx = grain.Px.data+simd, *gPy = grain.Py.data+simd, *gPz = grain.Pz.data+simd;
@@ -257,6 +256,7 @@ void Simulation::stepGrainGrain() {
    }
   }
   if(!contactCount) return;
+  assert(contactCount <= grainGrainA.capacity);
   grainGrainA.size = contactCount;
   grainGrainB.size = contactCount;
   grainGrainLocalAx.size = contactCount;

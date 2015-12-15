@@ -143,59 +143,61 @@ void Simulation::stepMembrane() {
 
 void Simulation::stepMembraneIntegration() {
  if(!membrane.count) return;
- const size_t threadCount = ::threadCount();
- float maxMembraneV_[threadCount]; mref<float>(maxMembraneV_, threadCount).clear(0);
- membraneIntegrationTime += parallel_for(1, membrane.H-1, [this, &maxMembraneV_](uint id, uint i) {
-  const vXsf dt_mass = floatX(this->dt / membrane.mass), dt = floatX(this->dt);//, topZ = floatX(this->topZ);
-  vXsf maxMembraneVX = _0f;
-  float* const Fx = membrane.Fx.begin(), *Fy = membrane.Fy.begin(), *Fz = membrane.Fz.begin();
-  float* const pVx = membrane.Vx.begin(), *pVy = membrane.Vy.begin(), *pVz = membrane.Vz.begin();
-  float* const pPx = membrane.Px.begin(), *pPy = membrane.Py.begin(), *pPz = membrane.Pz.begin();
-  const int W = membrane.W, stride = membrane.stride, margin=membrane.margin;
-  // Adds force from repeated nodes
-  Fx[i*stride+margin+0] += Fx[i*stride+margin+W];
-  Fy[i*stride+margin+0] += Fy[i*stride+margin+W];
-  Fz[i*stride+margin+0] += Fz[i*stride+margin+W];
-  Fx[i*stride+margin+W-1] += Fx[i*stride+margin-1];
-  Fy[i*stride+margin+W-1] += Fy[i*stride+margin-1];
-  Fz[i*stride+margin+W-1] += Fz[i*stride+margin-1];
-  int base = margin+i*stride;
-  for(int j=0; j<W; j+=simd) {
-   int k = base+j;
-   // Symplectic Euler
-   const vXsf Vx = load(pVx, k) + dt_mass * load(Fx, k);
-   const vXsf Vy = load(pVy, k) + dt_mass * load(Fy, k);
-   const vXsf Vz = load(pVz, k) + dt_mass * load(Fz, k);
-   store(pVx, k, Vx);
-   store(pVy, k, Vy);
-   store(pVz, k, Vz);
-   const vXsf Px = load(pPx, k) + dt * Vx;
-   const vXsf Py = load(pPy, k) + dt * Vy;
-   const vXsf Pz = load(pPz, k) + dt * Vz;
-   //Pz = min(topZ, Pz);
-   store(pPx, k, Px);
-   store(pPy, k, Py);
-   store(pPz, k, Pz);
-   maxMembraneVX = max(maxMembraneVX, sqrt(Vx*Vx + Vy*Vy + Vz*Vz));
-  }
-  // Copies position back to repeated nodes
-  pPx[i*stride+margin-1] = pPx[i*stride+margin+W-1];
-  pPy[i*stride+margin-1] = pPy[i*stride+margin+W-1];
-  pPz[i*stride+margin-1] = pPz[i*stride+margin+W-1];
-  pPx[i*stride+margin+W] = pPx[i*stride+margin+0];
-  pPy[i*stride+margin+W] = pPy[i*stride+margin+0];
-  pPz[i*stride+margin+W] = pPz[i*stride+margin+0];
-  // Copies velocities back to repeated nodes
-  pVx[i*stride+margin-1] = pVx[i*stride+margin+W-1];
-  pVy[i*stride+margin-1] = pVy[i*stride+margin+W-1];
-  pVz[i*stride+margin-1] = pVz[i*stride+margin+W-1];
-  pVx[i*stride+margin+W] = pVx[i*stride+margin+0];
-  pVy[i*stride+margin+W] = pVy[i*stride+margin+0];
-  pVz[i*stride+margin+W] = pVz[i*stride+margin+0];
-  maxMembraneV_[id] = max(maxMembraneV_[id], max(maxMembraneVX));
- }, 1/*threadCount*/);
  float maxMembraneV = 0;
- for(int k: range(threadCount)) maxMembraneV = ::max(maxMembraneV, maxMembraneV_[k]);
+ if(processState >= ProcessState::Pressure) {
+  const size_t threadCount = ::threadCount();
+  float maxMembraneV_[threadCount]; mref<float>(maxMembraneV_, threadCount).clear(0);
+  membraneIntegrationTime += parallel_for(1, membrane.H-1, [this, &maxMembraneV_](uint id, uint i) {
+   const vXsf dt_mass = floatX(this->dt / membrane.mass), dt = floatX(this->dt);//, topZ = floatX(this->topZ);
+   vXsf maxMembraneVX = _0f;
+   float* const Fx = membrane.Fx.begin(), *Fy = membrane.Fy.begin(), *Fz = membrane.Fz.begin();
+   float* const pVx = membrane.Vx.begin(), *pVy = membrane.Vy.begin(), *pVz = membrane.Vz.begin();
+   float* const pPx = membrane.Px.begin(), *pPy = membrane.Py.begin(), *pPz = membrane.Pz.begin();
+   const int W = membrane.W, stride = membrane.stride, margin=membrane.margin;
+   // Adds force from repeated nodes
+   Fx[i*stride+margin+0] += Fx[i*stride+margin+W];
+   Fy[i*stride+margin+0] += Fy[i*stride+margin+W];
+   Fz[i*stride+margin+0] += Fz[i*stride+margin+W];
+   Fx[i*stride+margin+W-1] += Fx[i*stride+margin-1];
+   Fy[i*stride+margin+W-1] += Fy[i*stride+margin-1];
+   Fz[i*stride+margin+W-1] += Fz[i*stride+margin-1];
+   int base = margin+i*stride;
+   for(int j=0; j<W; j+=simd) {
+    int k = base+j;
+    // Symplectic Euler
+    const vXsf Vx = load(pVx, k) + dt_mass * load(Fx, k);
+    const vXsf Vy = load(pVy, k) + dt_mass * load(Fy, k);
+    const vXsf Vz = load(pVz, k) + dt_mass * load(Fz, k);
+    store(pVx, k, Vx);
+    store(pVy, k, Vy);
+    store(pVz, k, Vz);
+    const vXsf Px = load(pPx, k) + dt * Vx;
+    const vXsf Py = load(pPy, k) + dt * Vy;
+    const vXsf Pz = load(pPz, k) + dt * Vz;
+    //Pz = min(topZ, Pz);
+    store(pPx, k, Px);
+    store(pPy, k, Py);
+    store(pPz, k, Pz);
+    maxMembraneVX = max(maxMembraneVX, sqrt(Vx*Vx + Vy*Vy + Vz*Vz));
+   }
+   // Copies position back to repeated nodes
+   pPx[i*stride+margin-1] = pPx[i*stride+margin+W-1];
+   pPy[i*stride+margin-1] = pPy[i*stride+margin+W-1];
+   pPz[i*stride+margin-1] = pPz[i*stride+margin+W-1];
+   pPx[i*stride+margin+W] = pPx[i*stride+margin+0];
+   pPy[i*stride+margin+W] = pPy[i*stride+margin+0];
+   pPz[i*stride+margin+W] = pPz[i*stride+margin+0];
+   // Copies velocities back to repeated nodes
+   pVx[i*stride+margin-1] = pVx[i*stride+margin+W-1];
+   pVy[i*stride+margin-1] = pVy[i*stride+margin+W-1];
+   pVz[i*stride+margin-1] = pVz[i*stride+margin+W-1];
+   pVx[i*stride+margin+W] = pVx[i*stride+margin+0];
+   pVy[i*stride+margin+W] = pVy[i*stride+margin+0];
+   pVz[i*stride+margin+W] = pVz[i*stride+margin+0];
+   maxMembraneV_[id] = max(maxMembraneV_[id], max(maxMembraneVX));
+  }, 1/*threadCount*/);
+  for(int k: range(threadCount)) maxMembraneV = ::max(maxMembraneV, maxMembraneV_[k]);
+ }
  float maxGrainMembraneV = maxGrainV + maxMembraneV;
  grainMembraneGlobalMinD -= maxGrainMembraneV * this->dt;
 }

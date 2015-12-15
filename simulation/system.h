@@ -19,17 +19,17 @@ struct System {
  //sconst float e = 1./2; // Restitution coefficient
  //const float normalDampingRate = ln(e) / sqrt(sq(PI)+ln(ln(e)));
  sconst float normalDampingRate = 1; // ~ ln e / √(π²+ln²e) [restitution coefficient e]
- sconst float dynamicFrictionCoefficient = 1;
- sconst float staticFrictionSpeed = __builtin_inff();
- sconst float staticFrictionLength = 3 * mm; // ~ Wire::radius
- sconst float staticFrictionStiffness = 100 * 1*g*10/(1*mm); //k/F = F/L ~ Wire::mass*G/Wire::radius
- sconst float staticFrictionDamping = 1 * kg/s; // TODO: relative to k ?
+ sconst float dynamicFrictionCoefficient = 0/*1*/;
+ sconst float staticFrictionSpeed = 0/*__builtin_inff()*/;
+ sconst float staticFrictionLength = 0/*3*/ * mm; // ~ Wire::radius
+ sconst float staticFrictionStiffness = 0/*100*/ * 1*g*10/(1*mm); //k/F = F/L ~ Wire::mass*G/Wire::radius
+ sconst float staticFrictionDamping = 0/*1*/ * kg/s; // TODO: relative to k ?
 
  // Obstacles: floor plane, cast cylinder
  struct Obstacle {
   sconst float mass = 1 * kg;
   sconst float curvature = 0;
-  sconst float elasticModulus = 1e-1 * MPa;
+  sconst float elasticModulus = 1 * MPa; // 0.1
   sconst float poissonRatio = 0;
  };
 
@@ -40,7 +40,7 @@ struct System {
   sconst float density = 7.6e3 * kg/cb(m);
   sconst float mass = validation ? 4./3*PI*cb(radius) * density /*~5g*/ : 2.7 * g;
   sconst float curvature = 1./radius;
-  sconst float elasticModulus = 1e3 * MPa;
+  sconst float elasticModulus = 1 * MPa; // 1e3
   sconst float poissonRatio = 0.35;
   sconst float angularMass = 2./3*mass*sq(radius);
 
@@ -115,7 +115,7 @@ struct System {
  struct Membrane {
   sconst float density = 1000 * kg / cb(m);
   sconst float curvature = 0;
-  sconst float elasticModulus = 10 * MPa;
+  sconst float elasticModulus = Obstacle::elasticModulus * MPa; // 10
   sconst float poissonRatio = 0.48;
 
   sconst float resolution = Grain::radius; ///2;
@@ -124,7 +124,7 @@ struct System {
   const int margin = simd; // 16 to ensure no false sharing ?
   const int stride = margin+W+margin;
   const float internodeLength = 2*sin(PI/W)*radius;
-  const float exactHeight = radius * 4;
+  const float exactHeight = radius * 2;
   const float cellHeight = sqrt(3.)/2*internodeLength;
   const int H = ceil(exactHeight/cellHeight)+1;
   const float height = (H-1) * cellHeight;

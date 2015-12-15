@@ -4,8 +4,6 @@
 #include "lattice.h"
 #include "parallel.h"
 
-inline float log2(float x) { return __builtin_log2f(x); }
-
 static inline void evaluateGrainMembrane(const size_t start, const size_t size,
                                      const int* grainMembraneContact, const size_t unused grainMembraneContactSize,
                                      const int* grainMembraneA, const int* grainMembraneB,
@@ -231,6 +229,7 @@ void Simulation::stepGrainMembrane() {
     // Neighbours
     for(int n: range(3*3)) for(int i: range(3)) {
      vXsi a = gather(latticeNeighbours[n]+i, index);
+     //for(int k: range(simd)) assert_(a[k] >= -1 && a[k] < (int)grain.count, a[k], index[k]);
      const vXsf Ax = gather(gPx, a), Ay = gather(gPy, a), Az = gather(gPz, a);
      const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
      vXsf distance = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);

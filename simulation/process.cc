@@ -3,7 +3,7 @@
 void Simulation::stepProcess() {
  // Process
  if(/*currentHeight >= topZ-Grain::radius ||*/ grain.count == grain.capacity-simd) {
-  const float targetPressure = 10000 * Pa;
+  /*const float targetPressure = 10000 * Pa;
   if(pressure < targetPressure) {
    processState = Pressure;
    pressure += dt * targetPressure * Pa/s;
@@ -17,7 +17,7 @@ void Simulation::stepProcess() {
    }
    topZ -= dt * plateSpeed;
    bottomZ += dt * plateSpeed;
-  }
+  }*/
  } else {
   // Increases current height
   if(currentHeight < topZ-Grain::radius) currentHeight += verticalSpeed * dt;
@@ -72,44 +72,48 @@ void Simulation::stepProcess() {
 
   // Generates grain
   if(currentHeight >= Grain::radius) {
-   vec2 p(random()*2-1,random()*2-1);
-   if(length(p)<1) { // Within cylinder
-    vec3 newPosition (patternRadius*p.x, patternRadius*p.y, Grain::radius);
-    processTime.start();
-    // Deposits grain without grain overlap
-    for(size_t index: range(grain.count)) {
-     vec3 other = grain.position(index);
-     float Dxy = length((other - newPosition).xy());
-     if(Dxy < 2*Grain::radius) {
-      float dz = sqrt(sq(2*Grain::radius) - sq(Dxy));
-      newPosition.z = ::max(newPosition.z, other.z+dz);
-     }
-    }
-    processTime.stop();
-    // Under current wire drop height
-    if(newPosition.z < currentHeight) {
-     // Without wire overlap
+   for(int unused i: range(8)) {
+    if(grain.count == grain.capacity-simd) break;
+    vec2 p(random()*2-1,random()*2-1);
+    if(length(p)<1) { // Within cylinder
+     vec3 newPosition (patternRadius*p.x, patternRadius*p.y, Grain::radius);
      processTime.start();
-     for(size_t index: range(wire.count))
-      if(length(wire.position(index) - newPosition) < Grain::radius+Wire::radius)
-      { processTime.stop(); return; }
+     // Deposits grain without grain overlap
+     for(size_t index: range(grain.count)) {
+      vec3 other = grain.position(index);
+      float Dxy = length((other - newPosition).xy());
+      if(Dxy < 2*Grain::radius) {
+       float dz = sqrt(sq(2*Grain::radius) - sq(Dxy));
+       newPosition.z = ::max(newPosition.z, other.z+dz);
+      }
+     }
      processTime.stop();
-     size_t i = grain.count;
-     grain.Px[simd+i] = newPosition.x; grain.Py[i+simd] = newPosition.y; grain.Pz[simd+i] = newPosition.z;
-     grain.Vx[i] = 0; grain.Vy[i] = 0; grain.Vz[i] = - 1 * m/s;
-     grain.AVx[i] = 0; grain.AVy[i] = 0; grain.AVz[i] = 0;
-     float t0 = 2*PI*random();
-     float t1 = acos(1-2*random());
-     float t2 = (PI*random()+acos(random()))/2;
-     grain.Rx[i] = sin(t0)*sin(t1)*sin(t2);
-     grain.Ry[i] = cos(t0)*sin(t1)*sin(t2);
-     grain.Rz[i] = cos(t1)*sin(t2);
-     grain.Rw[i] = cos(t2);
-     grain.count++;
-     // Forces verlet lists reevaluation
-     grainGrainGlobalMinD = 0;
-     grainWireGlobalMinD = 0;
-     grainMembraneGlobalMinD = 0;
+     // Under current wire drop height
+     if(newPosition.z < currentHeight) {
+      // Without wire overlap
+      processTime.start();
+      for(size_t index: range(wire.count))
+       if(length(wire.position(index) - newPosition) < Grain::radius+Wire::radius) { processTime.stop(); return; }
+      processTime.stop();
+      size_t i = grain.count;
+      grain.Px[simd+i] = newPosition.x; grain.Py[i+simd] = newPosition.y; grain.Pz[simd+i] = newPosition.z;
+      grain.Vx[i] = 0; grain.Vy[i] = 0; grain.Vz[i] = 0; //- 1 * m/s;
+      grain.AVx[i] = 0; grain.AVy[i] = 0; grain.AVz[i] = 0;
+      float t0 = 2*PI*random();
+      float t1 = acos(1-2*random());
+      float t2 = (PI*random()+acos(random()))/2;
+      grain.Rx[i] = sin(t0)*sin(t1)*sin(t2);
+      grain.Ry[i] = cos(t0)*sin(t1)*sin(t2);
+      grain.Rz[i] = cos(t1)*sin(t2);
+      grain.Rw[i] = cos(t2);
+      grain.count++;
+      // Forces verlet lists reevaluation
+      if(grain.count && timeStep%grain.count == 0) {
+       grainGrainGlobalMinD = 0;
+       grainMembraneGlobalMinD = 0;
+      }
+      grainWireGlobalMinD = 0;
+     }
     }
    }
   }

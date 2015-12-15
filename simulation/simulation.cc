@@ -70,11 +70,9 @@ void Simulation::step() {
  stepGrainIntegration();
  validGrainLattice = false;
  grainTotalTime.stop();
- /*if(processState >= ProcessState::Pressure) {
-  membraneTotalTime.start();
-  stepMembraneIntegration();
-  membraneTotalTime.stop();
- }*/
+ membraneTotalTime.start();
+ stepMembraneIntegration();
+ membraneTotalTime.stop();
  //stepWireIntegration();
 
  timeStep++;
@@ -207,10 +205,10 @@ void Simulation::profile(const Time& totalTime) {
 bool Simulation::run(const Time& totalTime) {
  stepTimeRT.start();
  stepTime.start();
- for(int unused t: range(1/(dt*60*16))) step();
+ for(int unused t: range(1/(dt*60*2))) step();
  stepTime.stop();
  stepTimeRT.stop();
- if(timeStep%(1*size_t(1/(dt*60*16))) == 0) {
+ if(timeStep%(1*size_t(1/(dt*60*2))) == 0) {
   //extern size_t threadCount();
   //if(threadCount()<17) log(threadCount(), coreFrequencies()); else log("//", threadCount());
   profile(totalTime);
