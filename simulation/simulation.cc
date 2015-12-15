@@ -182,7 +182,7 @@ void Simulation::profile(const Time& totalTime) {
 
 #undef logTime
  for(const auto entry: profile) {
-  assert_(entry.key <= stepTime, entry.value, entry.key/1000000.f, stepTime.cycleCount()/1000000.f);
+  assert(entry.key <= stepTime, entry.value, entry.key/1000000.f, stepTime.cycleCount()/1000000.f);
   log(strD(entry.key, stepTime), entry.value);
  }
  log(strD(shown, stepTime), "/", strD(accounted, stepTime), "/", strD(stepTimeRT, totalTime));
@@ -191,7 +191,7 @@ void Simulation::profile(const Time& totalTime) {
 
 /*static inline buffer<int> coreFrequencies() {
  TextData s(File("/proc/cpuinfo"_).readUpToLoop(1<<17));
- assert_(s.data.size<s.buffer.capacity, s.data.size, s.buffer.capacity, "/proc/cpuinfo", "coreFrequencies");
+ assert(s.data.size<s.buffer.capacity, s.data.size, s.buffer.capacity, "/proc/cpuinfo", "coreFrequencies");
  buffer<int> coreFrequencies (256, 0);
  while(s) {
   if(s.match("cpu MHz"_)) {

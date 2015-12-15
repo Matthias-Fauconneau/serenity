@@ -167,7 +167,7 @@ void Simulation::stepGrainMembrane() {
   grainLattice();
 
   const float verletDistance = 2*Grain::radius/sqrt(3.);
-  assert_(verletDistance > Grain::radius + 0);
+  assert(verletDistance > Grain::radius + 0);
 
   const int X = lattice.size.x, Y = lattice.size.y;
   const int* latticeNeighbours[3*3] = {
@@ -281,9 +281,9 @@ void Simulation::stepGrainMembrane() {
   }
   grainMembraneRepackFrictionTime.stop();
 
-  assert_(align(simd, grainMembraneA.size+1) <= grainMembraneA.capacity);
+  assert(align(simd, grainMembraneA.size+1) <= grainMembraneA.capacity);
   for(size_t i=grainMembraneA.size; i<align(simd, grainMembraneA.size +1); i++) grainMembraneA.begin()[i] = 0;
-  assert_(align(simd, grainMembraneB.size+1) <= grainMembraneB.capacity);
+  assert(align(simd, grainMembraneB.size+1) <= grainMembraneB.capacity);
   for(size_t i=grainMembraneB.size; i<align(simd, grainMembraneB.size +1); i++) grainMembraneB.begin()[i] = 0;
 
   grainMembraneGlobalMinD = /*minD*/verletDistance - (Grain::radius+0);

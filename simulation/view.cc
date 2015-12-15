@@ -167,7 +167,7 @@ struct SimulationView : Widget {
     colors[s] = vec4(1, 1, 1, 1);
     s++;
    }
-   assert_(s*6 <= positions.size);
+   assert(s*6 <= positions.size);
    positions.size = s*6;
    if(positions.size) {
     static GLShader shader {::shader_glsl(), {"cylinder"}};
@@ -206,7 +206,7 @@ struct SimulationView : Widget {
     if(i) { positions[s+4] = A; positions[s+5] = B; s += 6; }
     else s += 4;
    }
-   assert_(s <= positions.size && s, state.membrane.W, state.membrane.H);
+   assert(s <= positions.size && s, state.membrane.W, state.membrane.H);
    positions.size = s;
    static GLVertexArray vertexArray;
    GLBuffer positionBuffer (positions);

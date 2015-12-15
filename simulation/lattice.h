@@ -9,7 +9,7 @@ generic struct Lattice {
  buffer<T> cells {size_t(size.y*size.x+size.x+1+ size.z*size.y*size.x + 2*size.y*size.x+2*size.x+2)}; // -1 .. 2 OOB margins
  const mref<T> base = cells.slice(size.y*size.x+size.x+1);
  Lattice(float scale, vec3 min, vec3 max) : scale(scale), min(min), max(max) {
-  assert_(size.x < (1<<10) && size.y < (1<<10) && size.z < (1<<10));
-  assert_(cells.size < (1<<30));
+  assert(size.x < (1<<10) && size.y < (1<<10) && size.z < (1<<10));
+  assert(cells.size < (1<<30));
  }
 };

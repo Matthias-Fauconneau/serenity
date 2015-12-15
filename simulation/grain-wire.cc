@@ -173,8 +173,8 @@ void Simulation::stepGrainWire() {
 
   const float verletDistance = 2*(2*Grain::radius/sqrt(3.)) - (Grain::radius + Wire::radius); // FIXME: ?
   //const float verletDistance = Grain::radius + Grain::radius;
-  assert_(verletDistance > Grain::radius + Wire::radius);
-  assert_(verletDistance <= Grain::radius + Grain::radius);
+  assert(verletDistance > Grain::radius + Wire::radius);
+  assert(verletDistance <= Grain::radius + Grain::radius);
   // Minimum distance over verlet distance parameter is the actual verlet distance which can be used
   //float minD = __builtin_inff();
 
@@ -232,16 +232,16 @@ void Simulation::stepGrainWire() {
       ref<uint16> list(wireNeighbours[n] + offset + i * Grid::cellCapacity, Grid::cellCapacity);
 
       for(size_t j: range(Grid::cellCapacity)) {
-       assert_(list.begin() >= grid.cells.begin() && list.end()<=grid.cells.end(), offset, n, i);
+       assert(list.begin() >= grid.cells.begin() && list.end()<=grid.cells.end(), offset, n, i);
        size_t b = list[j];
        if(!b) break;
        b--;
-       assert_(a < grain.count && b < wire.count, a, grain.count, b, wire.count, offset, n, i);
+       assert(a < grain.count && b < wire.count, a, grain.count, b, wire.count, offset, n, i);
        float d = sqrt(sq(grain.Px[simd+a]-wire.Px[b])
                       + sq(grain.Py[simd+a]-wire.Py[b])
                       + sq(grain.Pz[simd+a]-wire.Pz[b])); // TODO: SIMD //FIXME: fails with Ofast?
        if(d > verletDistance) { /*minD=::min(minD, d);*/ continue; }
-       assert_(grainWireA.size < grainWireA.capacity);
+       assert(grainWireA.size < grainWireA.capacity);
        grainWireA.append( a ); // Grain
        grainWireB.append( b ); // Wire
        for(size_t k = 0;; k++) {
@@ -274,9 +274,9 @@ void Simulation::stepGrainWire() {
     }
   }, 1 /*FIXME: grainWireIndex*/);
 
-  assert_(align(simd, grainWireA.size+1) <= grainWireA.capacity);
+  assert(align(simd, grainWireA.size+1) <= grainWireA.capacity);
   for(size_t i=grainWireA.size; i<align(simd, grainWireA.size +1); i++) grainWireA.begin()[i] = 0;
-  assert_(align(simd, grainWireB.size+1) <= grainWireB.capacity);
+  assert(align(simd, grainWireB.size+1) <= grainWireB.capacity);
   for(size_t i=grainWireB.size; i<align(simd, grainWireB.size +1); i++) grainWireB.begin()[i] = 0;
 
   grainWireGlobalMinD = /*minD*/verletDistance - (Grain::radius+Wire::radius);

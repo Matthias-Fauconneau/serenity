@@ -150,7 +150,7 @@ void Simulation::domainWire(vec3& min, vec3& max) {
  const float maxX = ::max(maxX_);
  const float maxY = ::max(maxY_);
  const float maxZ = ::max(maxZ_);
- assert_(maxX-minX < 16 && maxY-minY < 16 && maxZ-minZ < 16, "wire");
+ assert(maxX-minX < 16 && maxY-minY < 16 && maxZ-minZ < 16, "wire");
  min = vec3(minX, minY, minZ);
  max = vec3(maxX, maxY, maxZ);
 }

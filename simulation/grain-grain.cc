@@ -214,14 +214,6 @@ void Simulation::stepGrainGrain() {
     vXsi index = convert(scale*(Az-minZ)) * sizeYX
                        + convert(scale*(Ay-minY)) * sizeX
                        + convert(scale*(Ax-minX));
-    for(int k: range(simd)) assert_(index[k] >= -(sizeYX[k]+sizeX[k]+1),
-                                    index[k], sizeYX[k]+sizeX[k]+1,
-                                    convert(scale*(Ax-minX))[k],
-                                    convert(scale*(Ay-minY))[k],
-                                    convert(scale*(Az-minZ))[k],
-                                    (Ax-minX)[k], (Ay-minY)[k], (Az-minZ)[k], log2(-(Az-minZ)[k]),
-                                    Ax[k], Ay[k], Az[k],
-                                    minX[k], minY[k], minZ[k]);
     // Neighbours
     for(uint n: range(62)) { // A is not monotonous
      vXsi b = gather(latticeNeighbours[n], index);
@@ -278,7 +270,7 @@ void Simulation::stepGrainGrain() {
   for(uint i=0; i<grainGrainA.size; i++) { // seq
    int a = grainGrainA[i];
    int b = grainGrainB[i];
-   assert_(a != b, a, b, grain.count);
+   assert(a != b);
    for(uint k = 0;; k++) {
     uint j = grainGrainIndex+k;
     if(j >= oldGrainGrainA.size || oldGrainGrainA[j] != a) break;
@@ -302,7 +294,7 @@ void Simulation::stepGrainGrain() {
   }
   grainGrainRepackFrictionTime.stop();
 
-  assert_(align(simd, grainGrainA.size+1) <= grainGrainA.capacity);
+  assert(align(simd, grainGrainA.size+1) <= grainGrainA.capacity);
   for(uint i=grainGrainA.size; i<align(simd, grainGrainA.size+1); i++) grainGrainA.begin()[i] = grain.count;
   for(uint i=grainGrainB.size; i<align(simd, grainGrainB.size+1); i++) grainGrainB.begin()[i] = grain.count;
 
@@ -431,7 +423,7 @@ void Simulation::stepGrainGrain() {
   const uint jobCount = grainGrainContact.size/simd;
   const uint chunkSize = (jobCount+threadCount-1)/threadCount;
   const uint chunkCount = (jobCount+chunkSize-1)/chunkSize;
-  assert_(chunkCount <= threadCount);
+  assert(chunkCount <= threadCount);
   uint chunkDomainStarts[chunkCount], chunkDomainStops[chunkCount];
   // Evaluates domain (range) for each chunk
   auto domainMinMax = [&](uint, uint chunkIndex) {
@@ -464,9 +456,9 @@ void Simulation::stepGrainGrain() {
    uint chunkDomainStop = chunkDomainStops[chunkIndex];
    uint copyIndex = 0;
    for(;; copyIndex++) {
-    assert_(copyIndex < maxCopyCount, copyIndex, maxCopyCount, chunkIndex);
+    assert(copyIndex < maxCopyCount, copyIndex, maxCopyCount, chunkIndex);
     for(uint domainIndex = 0;; domainIndex++) {
-     assert_(domainIndex < maxDomainCount);
+     assert(domainIndex < maxDomainCount);
      uint domainStart = copyStart[copyIndex*maxDomainCount+domainIndex];
      uint domainStop = copyStop[copyIndex*maxDomainCount+domainIndex];
      if(domainStart == domainStop) break;
@@ -477,7 +469,7 @@ void Simulation::stepGrainGrain() {
      copyCount = max(copyCount, copyIndex+1);
      copy[chunkIndex] = copyIndex;
      for(uint domainIndex = 0;; domainIndex++) {
-      assert_(domainIndex < maxDomainCount, domainIndex, maxDomainCount);
+      assert(domainIndex < maxDomainCount, domainIndex, maxDomainCount);
       uint& domainStart = copyStart[copyIndex*maxDomainCount+domainIndex];
       uint& domainStop = copyStop[copyIndex*maxDomainCount+domainIndex];
       if(domainStart == domainStop) {
@@ -490,7 +482,7 @@ void Simulation::stepGrainGrain() {
     }
     /**/continue_2:;
    }
-   assert_(copy[chunkIndex] != ~0u);
+   assert(copy[chunkIndex] != ~0u);
   }
   grainGrainSumAllocateTime.stop();
   auto sum = [&](uint, uint chunkIndex) {

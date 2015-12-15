@@ -269,7 +269,7 @@ void Simulation::domainMembrane(vec3& min, vec3& max) {
  const float maxY = ::max(maxY_);
  const float maxZ = ::max(maxZ_);
 #endif
- assert_(maxX-minX < 4 && maxY-minY < 4 && maxZ-minZ < 4, "membrane",
+ assert(maxX-minX < 4 && maxY-minY < 4 && maxZ-minZ < 4, "membrane",
          minX, maxX, minY, maxY, minZ, maxZ, "\n",
          maxX-minX, maxY-minY, maxZ-minZ, "\n",
          membrane.margin, membrane.W, membrane.H, membrane.stride);

@@ -6,7 +6,7 @@ template<size_t cellCapacity> struct List : mref<uint16> {
  bool append(uint16 index) {
   size_t i = 0;
   while(at(i)) { i++; }
-  assert_(i < cellCapacity);
+  assert(i < cellCapacity);
   at(i) = index; i++;
   if(i < cellCapacity) at(i) = 0;
   return true;

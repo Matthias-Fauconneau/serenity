@@ -129,7 +129,7 @@ const float minZ = ::min(minZ_);
 const float maxX = ::max(maxX_);
 const float maxY = ::max(maxY_);
 const float maxZ = ::max(maxZ_);
-assert_(maxX-minX < 16 && maxY-minY < 16 && maxZ-minZ < 16, "grain",
+assert(maxX-minX < 16 && maxY-minY < 16 && maxZ-minZ < 16, "grain",
        maxX-minX, maxY-minY, maxZ-minZ, "\n",
        minX, maxX, minY, maxY, minZ, maxZ, grain.count);
 min = vec3(minX, minY, minZ);
