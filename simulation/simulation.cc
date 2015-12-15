@@ -41,24 +41,24 @@ void Simulation::step() {
  grainBottomTotalTime.start();
  stepGrainBottom();
  grainBottomTotalTime.stop();
- if(processState >= ProcessState::Pressure) {
+ /*if(processState >= ProcessState::Pressure) {
   grainTopTotalTime.start();
   stepGrainTop();
   grainTopTotalTime.start();
- }
+ }*/
  grainGrainTotalTime.start();
  stepGrainGrain();
  grainGrainTotalTime.stop();
  grainTotalTime.stop();
 
- membraneTotalTime.start();
+ /*membraneTotalTime.start();
  if(processState >= ProcessState::Pressure) {
   stepMembrane();
- }
+ }*/
  grainMembraneTotalTime.start();
  stepGrainMembrane();
  grainMembraneTotalTime.stop();
- membraneTotalTime.stop();
+ //membraneTotalTime.stop();
 
  /*stepWire();
  stepGrainWire();
@@ -70,11 +70,11 @@ void Simulation::step() {
  stepGrainIntegration();
  validGrainLattice = false;
  grainTotalTime.stop();
- if(processState >= ProcessState::Pressure) {
+ /*if(processState >= ProcessState::Pressure) {
   membraneTotalTime.start();
   stepMembraneIntegration();
   membraneTotalTime.stop();
- }
+ }*/
  //stepWireIntegration();
 
  timeStep++;
@@ -131,11 +131,11 @@ void Simulation::profile(const Time& totalTime) {
  logTime(grainTopEvaluate);
  logTime(grainTopSum);
  profile.insertSortedMulti(grainGrainTotalTime, "=sum{grain-grain}"_+
-   strD(grainGrainLatticeTime+grainGrainSearchTime+grainGrainFilterTime+grainGrainRepackFrictionTime
+   strD(grainLatticeTime+grainGrainSearchTime+grainGrainFilterTime+grainGrainRepackFrictionTime
         +grainGrainEvaluateTime+grainGrainSumDomainTime+grainGrainSumAllocateTime+
         grainGrainSumSumTime+grainGrainSumMergeTime, grainGrainTotalTime));
  if(reset) grainGrainTotalTime.reset();
- logTime(grainGrainLattice);
+ logTime(grainLattice);
  logTime(grainGrainSearch);
  logTime(grainGrainFilter);
  logTime(grainGrainRepackFriction);
@@ -149,7 +149,7 @@ void Simulation::profile(const Time& totalTime) {
  logTime(grainIntegration);
 
  profile.insertSortedMulti(grainMembraneTotalTime, "=sum{grain-membrane}"_+
-                           strD(grainMembraneLatticeTime+grainMembraneSearchTime+grainMembraneFilterTime
+                           strD(grainLatticeTime+grainMembraneSearchTime+grainMembraneFilterTime
                                 +grainMembraneRepackFrictionTime+grainMembraneEvaluateTime
                                 +grainMembraneSumTime, grainMembraneTotalTime));
  if(reset) membraneTotalTime.reset();
@@ -158,7 +158,7 @@ void Simulation::profile(const Time& totalTime) {
  profile.insertSortedMulti(membraneTotalTime, "=sum{membrane}"_+
                            strD(membraneInitializationTime+membraneForceTime
                                 +grainMembraneTotalTime+membraneIntegrationTime, membraneTotalTime));
- logTime(grainMembraneLattice);
+ logTime(grainLattice);
  logTime(grainMembraneSearch);
  logTime(grainMembraneFilter);
  logTime(grainMembraneRepackFriction);

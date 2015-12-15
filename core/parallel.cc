@@ -1,7 +1,11 @@
 #include "parallel.h"
 
 #if __MIC__
+#if !DEBUG && 1
 const int maxThreadCount = 60; //240;
+#else
+const int maxThreadCount = 1; //240;
+#endif
 #elif !DEBUG && 1
 const int maxThreadCount = 12;
 #else

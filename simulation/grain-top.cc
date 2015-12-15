@@ -126,7 +126,7 @@ void Simulation::stepGrainTop() {
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
  grainTopEvaluateTime += parallel_chunk(GTcc/simd, [&](uint, size_t start, size_t size) {
    evaluateGrainObstacle<true>(start, size,
-                     grainTopContact.data, grainTopContact.size,
+                     grainTopContact.data,
                      grainTopA.data,
                      grain.Px.data+simd, grain.Py.data+simd, grain.Pz.data+simd,
                      floatX(topZ-Grain::radius), floatX(Grain::radius),

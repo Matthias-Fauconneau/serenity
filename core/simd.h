@@ -46,6 +46,7 @@ static inline float extract(v16sf x, int i) { union { float e[16]; v16sf v; } X;
 
 static inline v16sf gather(const float* P, v16si i) { return _mm512_i32gather_ps(i, P, sizeof(float)); }
 
+static inline void scatter(int* const P, const v16si i, const v16si x) { _mm512_i32scatter_epi32(P, i, x, sizeof(float)); }
 static inline void scatter(float* const P, const v16si i, const v16sf x) { _mm512_i32scatter_ps(P, i, x, sizeof(float)); }
 
 static inline uint16 lessThan(v16si a, v16si b) { return _mm512_cmp_epi32_mask(a, b, _CMP_LT_OS); }
@@ -53,13 +54,16 @@ static inline uint16 lessThan(v16sf a, v16sf b) { return _mm512_cmp_ps_mask(a, b
 static inline uint16 greaterThan(v16sf a, v16sf b) { return _mm512_cmp_ps_mask(a, b, _CMP_GT_OS); }
 static inline uint16 greaterThanOrEqual(v16sf a, v16sf b) { return _mm512_cmp_ps_mask(a, b, _CMP_GE_OS); }
 static inline uint16 equal(v16sf a, v16sf b) { return _mm512_cmp_ps_mask(a, b, _CMP_EQ_OQ); }
+static inline uint16 notEqual(v16si a, v16si b) { return _mm512_cmp_epi32_mask(a, b, _CMP_NEQ_UQ); }
 
 static inline v16sf blend(uint16 k, v16sf a, v16sf b) { return _mm512_mask_blend_ps(k, a, b); }
 
 static inline float min(v16sf x) { return _mm512_reduce_min_ps(x); }
 static inline float max(v16sf x) { return _mm512_reduce_max_ps(x); }
 
-static inline v16si convert(v16sf x) { return _mm512_cvtps_epi32(x); }
+static inline v16si convert(v16sf x) {
+ return _mm512_cvtfxpnt_round_adjustps_epi32(x, _MM_FROUND_TO_NEG_INF, _MM_EXPADJ_NONE);
+}
 
 static inline void maskStore(float* p, uint16 k, v16sf a) { _mm512_mask_store_ps(p, k, a); }
 static inline uint countBits(uint16 k) { return _mm_countbits_32(k); }
@@ -241,7 +245,7 @@ static inline v8sf maskSub(v8sf a, v8si k, v8sf b) { return a - mask(k, b); }
 static inline v8sf mask3_fmadd(v8sf a, v8sf b, v8sf c, v8si k) { return mask(k, a * b) + c; }
 
 #if __INTEL_COMPILER
-static inline v8si convert(v8sf x) { return _mm256_cvtps_epi32(x); }
+static inline v8si convert(v8sf x) { return _mm256_cvt_roundps_epi32(x); }
 #else
 static inline v8si convert(v8sf x) { return __builtin_ia32_cvtps2dq256(x); }
 #endif

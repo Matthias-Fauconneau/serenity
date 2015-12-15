@@ -236,7 +236,7 @@ struct Simulation : System {
   tsc grainGrainTotalTime;
   uint64 domainTime = 0;
   tsc memoryTime;
-  uint64 grainGrainLatticeTime = 0;
+  uint64 grainLatticeTime = 0;
   uint64 grainGrainSearchTime = 0;
   uint64 grainGrainFilterTime = 0;
   tsc grainGrainRepackFrictionTime;
@@ -255,7 +255,6 @@ struct Simulation : System {
   uint64 membraneForceTime = 0;
  void stepGrainMembrane();
    tsc grainMembraneTotalTime;
-   tsc grainMembraneLatticeTime;
    uint64 grainMembraneSearchTime = 0;
    uint64 grainMembraneFilterTime = 0;
    tsc grainMembraneRepackFrictionTime;

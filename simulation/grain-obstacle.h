@@ -3,7 +3,7 @@
 
 //TODO: factorize Grain - Plate|Membrane
 template<bool top> static inline void evaluateGrainObstacle(const size_t start, const size_t size,
-                           const int* grainObstacleContact, const size_t unused grainObstacleContactSize,
+                           const int* grainObstacleContact,
                            const int* grainObstacleA,
                            const float* grainPx, const float* grainPy, const float* grainPz,
                            const vXsf obstacleZ_Gr, const vXsf Gr,
@@ -19,7 +19,7 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
                            float* const pFx, float* const pFy, float* const pFz,
                            float* const pTAx, float* const pTAy, float* const pTAz) {
  for(size_t i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
-  const vXsi contacts = *(vXsi*)(grainObstacleContact+i);
+  const vXsi contacts = load(grainObstacleContact, i);
   const vXsi A = gather(grainObstacleA, contacts);
   // FIXME: Recomputing from intersection (more efficient than storing?)
   const vXsf Ax = gather(grainPx, A), Ay = gather(grainPy, A), Az = gather(grainPz, A);

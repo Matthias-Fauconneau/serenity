@@ -68,8 +68,9 @@ void Simulation::stepGrainBottom() {
   }
   grainBottomRepackFrictionTime.stop();
 
+  assert_(align(simd, grainBottomA.size+1) <= grainBottomA.capacity);
   for(size_t i=grainBottomA.size; i<align(simd, grainBottomA.size+1); i++)
-   grainBottomA.begin()[i] = 0;
+   grainBottomA.begin()[i] = grain.count;
  }
  if(!grainBottomA) return;
 
@@ -128,9 +129,9 @@ void Simulation::stepGrainBottom() {
  const float K = 4./3*E*sqrt(R);
  constexpr float mass = 1/(1/Grain::mass/*+1/Obstacle::mass*/);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
- grainBottomEvaluateTime += parallel_chunk(GBcc/simd, [&](uint, size_t start, size_t size) {
+ grainBottomEvaluateTime += parallel_chunk(GBcc/simd, [&](uint, int start, int size) {
    evaluateGrainObstacle<false>(start, size,
-                     grainBottomContact.data, grainBottomContact.size,
+                     grainBottomContact.data,
                      grainBottomA.data,
                      grain.Px.data+simd, grain.Py.data+simd, grain.Pz.data+simd,
                      floatX(bottomZ+Grain::radius), floatX(Grain::radius),

@@ -5,6 +5,8 @@
 #include "parallel.h"
 #define sconst static constexpr
 static inline constexpr float pow4(float x) { return x*x*x*x; }
+template<> inline String str(const vXsf& a) { return str(ref<float>((float*)&a, simd)); }
+template<> inline String str(const vXsi& a) { return str(ref<int>((int*)&a, simd)); }
 
 /// Evolving system of objects and obstacles interacting through contacts (SoA)
 struct System {

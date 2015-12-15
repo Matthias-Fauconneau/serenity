@@ -219,7 +219,7 @@ void Simulation::stepGrainGrain() {
      vXsi b = gather(latticeNeighbours[n], index);
      const vXsf Bx = gather(gPx, b), By = gather(gPy, b), Bz = gather(gPz, b);
      const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-     v8sf distance = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
+     vXsf distance = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
      maskX mask = notEqual(b, _1i) & lessThan(distance, verletDistanceX);
      uint targetIndex = contactCount.fetchAdd(countBits(mask));
      compressStore(ggA+targetIndex, mask, a);
@@ -227,6 +227,7 @@ void Simulation::stepGrainGrain() {
     }
    }
   };
+  assert_(contactCount <= grainGrainA.size);
   if(grain.count/simd) grainGrainSearchTime += parallel_chunk(grain.count/simd, search);
   if(grain.count%simd) {
    const float* const gPx = grain.Px.data+simd, *gPy = grain.Py.data+simd, *gPz = grain.Pz.data+simd;
@@ -242,19 +243,19 @@ void Simulation::stepGrainGrain() {
    vXsi index = convert(scale*(Az-minZ)) * sizeYX
      + convert(scale*(Ay-minY)) * sizeX
      + convert(scale*(Ax-minX));
+   for(int k: range(grain.count-i, simd)) index[k] = 0;
    // Neighbours
    for(uint n: range(62)) { // A is not monotonous
     vXsi b = gather(latticeNeighbours[n], index);
     const vXsf Bx = gather(gPx, b), By = gather(gPy, b), Bz = gather(gPz, b);
     const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-    v8sf distance = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
+    vXsf distance = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
     maskX mask = valid & notEqual(b, _1i) & lessThan(distance, verletDistanceX);
     uint targetIndex = contactCount.fetchAdd(countBits(mask));
     compressStore(ggA+targetIndex, mask, a);
     compressStore(ggB+targetIndex, mask, b);
    }
   }
-
   if(!contactCount) return;
   grainGrainA.size = contactCount;
   grainGrainB.size = contactCount;
@@ -312,6 +313,7 @@ void Simulation::stepGrainGrain() {
   memoryTime.stop();
  }
  grainGrainContact.size = 0;
+
  // Creates a map from packed contact to index into unpacked contact list (indirect reference)
  // Instead of packing (copying) the unpacked list to a packed contact list
  // To keep track of where to write back (unpacked) contact positions (for static friction)
@@ -337,7 +339,8 @@ void Simulation::stepGrainGrain() {
   }
  };
  grainGrainFilterTime += parallel_chunk(align(simd, grainGrainA.size)/simd, filter);
- while(contactCount.count > 0 && grainGrainContact[contactCount-1] >= (int)grainGrainA.size)
+ grainGrainContact.size = contactCount;
+ while(contactCount.count > 0 && grainGrainContact[contactCount.count-1] >= (int)grainGrainA.size)
   contactCount.count--; // Trims trailing invalid contacts
  grainGrainContact.size = contactCount;
  if(!grainGrainContact.size) return;
@@ -400,10 +403,10 @@ void Simulation::stepGrainGrain() {
  const uint threadCount = ::min( ::threadCount(), int(sqrt(grainGrainContact.size/16)));
  if(threadCount <= 12) { // Sequential scalar scatter add
   grainGrainSumTime.start();
-  for(size_t i = 0; i < grainGrainContact.size; i++) {
-   size_t index = grainGrainContact[i];
-   size_t a = grainGrainA[index];
-   size_t b = grainGrainB[index];
+  for(int i = 0; i < (int)grainGrainContact.size; i++) {
+   int index = grainGrainContact[i];
+   int a = grainGrainA[index];
+   int b = grainGrainB[index];
    grain.Fx[a] += grainGrainFx[i];
    grain.Fx[b] -= grainGrainFx[i];
    grain.Fy[a] += grainGrainFy[i];

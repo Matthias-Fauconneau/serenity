@@ -233,7 +233,7 @@ void Simulation::stepGrainMembrane() {
      vXsi a = gather(latticeNeighbours[n]+i, index);
      const vXsf Ax = gather(gPx, a), Ay = gather(gPy, a), Az = gather(gPz, a);
      const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-     v8sf distance = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
+     vXsf distance = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
      maskX mask = notEqual(a, _1i) & lessThan(distance, verletDistanceX);
      uint targetIndex = contactCount.fetchAdd(countBits(mask));
      compressStore(gmA+targetIndex, mask, a);
@@ -322,6 +322,7 @@ void Simulation::stepGrainMembrane() {
   }
  };
  grainMembraneFilterTime += parallel_chunk(align(simd, grainMembraneA.size)/simd, filter);
+ grainMembraneContact.size = contactCount;
  while(contactCount.count > 0 && grainMembraneContact[contactCount-1] >= (int)grainMembraneA.size)
   contactCount.count--; // Trims trailing invalid contacts
  grainMembraneContact.size = contactCount;
