@@ -164,21 +164,13 @@ void Simulation::stepGrainMembrane() {
  if(!grain.count || !membrane.count) return;
 
  if(grainMembraneGlobalMinD <= 0)  {
-  const float R = membrane.radius*(1+1./2);
-  vec3 min = vec3(vec2(-R), -membrane.height/64), max = vec3(vec2(R), membrane.height);
-
-  memoryTime.start();
-  Lattice<uint16> lattice(sqrt(3.)/(2*Grain::radius), min, max);
-  memoryTime.stop();
-  grainMembraneLatticeTime.start();
-  //for(size_t i: range(grain.count)) lattice.cell(grain.Px[i], grain.Py[i], grain.Pz[i]) = 1+i; FIXME
-  grainMembraneLatticeTime.stop();
+  grainLattice();
 
   const float verletDistance = 2*Grain::radius/sqrt(3.);
   assert_(verletDistance > Grain::radius + 0);
 
   const int X = lattice.size.x, Y = lattice.size.y;
-  const unused uint16* latticeNeighbours[3*3] = {
+  const int* latticeNeighbours[3*3] = {
    lattice.base.data+(-X*Y-X-1),
    lattice.base.data+(-X*Y-1),
    lattice.base.data+(-X*Y+X-1),
@@ -218,8 +210,8 @@ void Simulation::stepGrainMembrane() {
   grainMembraneA.size = grainMembraneA.capacity;
   grainMembraneB.size = grainMembraneB.capacity;
 
-  atomic contactCount;
- /* grainMembraneSearchTime += parallel_for(0, membrane.H,
+  /*atomic contactCount;
+  grainMembraneSearchTime += parallel_for(0, membrane.H,
   [this, &lattice, &latticeNeighbours, verletDistance, &contactCount](uint, uint rowIndex) {
     int W = membrane.W;
     int base = membrane.margin+rowIndex*membrane.stride;
@@ -242,6 +234,41 @@ void Simulation::stepGrainMembrane() {
      }
     }
   }); FIXME*/
+
+  atomic contactCount;
+  assert_(contactCount.count == 0);
+  auto search = [this, &latticeNeighbours, verletDistance, &contactCount](uint, uint rowIndex) {
+   const float* const mPx = membrane.Px.data, *mPy = membrane.Py.data, *mPz = membrane.Pz.data;
+   const float* const gPx = grain.Px.data, *gPy = grain.Py.data, *gPz = grain.Pz.data;
+   int* const ggA = grainGrainA.begin(), *ggB = grainGrainB.begin();
+   const vXsf scaleX = floatX(lattice.scale.x), scaleY = floatX(lattice.scale.y), scaleZ = floatX(lattice.scale.z);
+   const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
+   const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
+   const vXsf verletDistanceX = floatX(verletDistance);
+   int W = membrane.W;
+   int base = membrane.margin+rowIndex*membrane.stride;
+   for(int j=0; j<W; j+=simd) {
+    int i = base+j;
+    vXsi b = intX(i)+_seqi;
+    const vXsf Bx = load(mPx, i), By = load(mPy, i), Bz = load(mPz, i);
+    vXsi index = convert(scaleZ*(Bz-minZ)) * sizeYX
+                       + convert(scaleY*(By-minY)) * sizeX
+                       + convert(scaleX*(Bx-minX));
+    // Neighbours
+    for(int n: range(3*3)) for(int i: range(3)) {
+     vXsi a = gather(latticeNeighbours[n]+i, index);
+     const vXsf Ax = gather(gPx, a), Ay = gather(gPy, a), Az = gather(gPz, a);
+     const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
+     v8sf distance = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
+     maskX mask = notEqual(a, _1i) & lessThan(distance, verletDistanceX);
+     uint targetIndex = contactCount.fetchAdd(countBits(mask));
+     compressStore(ggA+targetIndex, mask, a);
+     compressStore(ggB+targetIndex, mask, b);
+    }
+   }
+  };
+  grainMembraneSearchTime += parallel_for(0, membrane.H, search);
+
   if(!contactCount) return;
   grainMembraneA.size = contactCount;
   grainMembraneB.size = contactCount;

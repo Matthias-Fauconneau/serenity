@@ -15,6 +15,46 @@ void Simulation::stepGrain() {
  });
 }
 
+void Simulation::grainLattice() {
+ if(validGrainLattice) return;
+ int* const cells = lattice.cells.begin();
+ int size = lattice.cells.size;
+ for(int i=0; i<size; i++) cells[i] = -1;
+
+ auto scatter = [this](uint, uint start, uint size) {
+  const float* const gPx = grain.Px.data, *gPy = grain.Py.data, *gPz = grain.Pz.data;
+  int* const base = lattice.base.begin();
+  const vXsf scaleX = floatX(lattice.scale.x), scaleY = floatX(lattice.scale.y), scaleZ = floatX(lattice.scale.z);
+  const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
+  const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
+  for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
+   vXsi a = intX(i)+_seqi;
+   const vXsf Ax = load(gPx, i), Ay = load(gPy, i), Az = load(gPz, i);
+   vXsi index = convert(scaleZ*(Az-minZ)) * sizeYX
+     + convert(scaleY*(Ay-minY)) * sizeX
+     + convert(scaleX*(Ax-minX));
+   ::scatter(base, index, a);
+  }
+ };
+ if(grain.count/simd) grainGrainLatticeTime += parallel_chunk(grain.count/simd, scatter, 1);
+ if(grain.count%simd) {
+  const float* const gPx = grain.Px.data, *gPy = grain.Py.data, *gPz = grain.Pz.data;
+  int* const base = lattice.base.begin();
+  const vXsf scaleX = floatX(lattice.scale.x), scaleY = floatX(lattice.scale.y), scaleZ = floatX(lattice.scale.z);
+  const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
+  const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
+  uint i=grain.count/simd*simd;
+  vXsi a = intX(i)+_seqi;
+  const vXsf Ax = load(gPx, i), Ay = load(gPy, i), Az = load(gPz, i);
+  vXsi index = convert(scaleZ*(Az-minZ)) * sizeYX
+    + convert(scaleY*(Ay-minY)) * sizeX
+    + convert(scaleX*(Ax-minX));
+  for(int k: range(grain.count-i)) base[index[k]] = a[k];
+ }
+
+ validGrainLattice = true;
+}
+
 void Simulation::stepGrainIntegration() {
  if(!grain.count) return;
  const/*expr*/ size_t threadCount = ::threadCount();

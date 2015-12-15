@@ -1,6 +1,7 @@
 #include "system.h"
 #include "time.h"
 #include "variant.h"
+#include "lattice.h"
 
 // High level simulation and contact management
 struct Simulation : System {
@@ -103,6 +104,12 @@ struct Simulation : System {
  buffer<float> wireBottomFy;
  buffer<float> wireBottomFz;
 
+ // Grain Lattice
+ const float grainLatticeR = membrane.radius*(1+1./2);
+ Lattice<int32> lattice {sqrt(3.)/(2*Grain::radius), vec3(vec2(-grainLatticeR), 0),
+                                                                                    vec3(vec2(grainLatticeR), membrane.height)};
+ bool validGrainLattice = false;
+
  // Grain - Grain
  float maxGrainV = 0;
  float grainGrainGlobalMinD = 0;
@@ -202,9 +209,7 @@ struct Simulation : System {
 
  Simulation(const Dict& p);
 
- //void domainMembrane(vec3& min, vec3& max);
- //void domainGrain(vec3& min, vec3& max);
- //void c(vec3& min, vec3& max);
+ void grainLattice();
 
  void step();
 

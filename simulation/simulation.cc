@@ -56,7 +56,7 @@ void Simulation::step() {
   stepMembrane();
  }
  grainMembraneTotalTime.start();
- //stepGrainMembrane(); TODO: lattice
+ stepGrainMembrane();
  grainMembraneTotalTime.stop();
  membraneTotalTime.stop();
 
@@ -68,6 +68,7 @@ void Simulation::step() {
 
  grainTotalTime.start();
  stepGrainIntegration();
+ validGrainLattice = false;
  grainTotalTime.stop();
  if(processState >= ProcessState::Pressure) {
   membraneTotalTime.start();
