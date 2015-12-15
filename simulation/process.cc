@@ -2,7 +2,7 @@
 
 void Simulation::stepProcess() {
  // Process
- if(/*currentHeight >= topZ-Grain::radius ||*/ grain.count == grain.capacity) {
+ if(/*currentHeight >= topZ-Grain::radius ||*/ grain.count == grain.capacity-simd) {
   const float targetPressure = 10000 * Pa;
   if(pressure < targetPressure) {
    processState = Pressure;
@@ -10,7 +10,7 @@ void Simulation::stepProcess() {
   } else {
    if(processState  < Load) { // Fits plate (Prevents initial decompression)
     float topZ = 0;
-    for(float z: grain.Pz.slice(0, grain.count)) topZ = ::max(topZ, z+Grain::radius);
+    for(float z: grain.Pz.slice(simd, grain.count)) topZ = ::max(topZ, z+Grain::radius);
     this->topZ = ::min(this->topZ, topZ);
     topZ0 = this->topZ;
     processState = Load;
@@ -95,7 +95,7 @@ void Simulation::stepProcess() {
       { processTime.stop(); return; }
      processTime.stop();
      size_t i = grain.count;
-     grain.Px[i] = newPosition.x; grain.Py[i] = newPosition.y; grain.Pz[i] = newPosition.z;
+     grain.Px[simd+i] = newPosition.x; grain.Py[i+simd] = newPosition.y; grain.Pz[simd+i] = newPosition.z;
      grain.Vx[i] = 0; grain.Vy[i] = 0; grain.Vz[i] = - 1 * m/s;
      grain.AVx[i] = 0; grain.AVy[i] = 0; grain.AVz[i] = 0;
      float t0 = 2*PI*random();

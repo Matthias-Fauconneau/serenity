@@ -226,7 +226,7 @@ void Simulation::stepGrainWire() {
   size_t grainWireIndex = 0; // Index of first contact with A in old grainWire[Local]A|B list
   grainWireSearchTime += parallel_chunk(grain.count, [&](uint, size_t start, size_t size) {
    for(size_t a=start; a<(start+size); a+=1) { // TODO: SIMD
-     size_t offset = grid.index(grain.Px[a], grain.Py[a], grain.Pz[a]);
+     size_t offset = grid.index(grain.Px[simd+a], grain.Py[simd+a], grain.Pz[simd+a]);
      // Neighbours
      for(size_t n: range(3*3)) for(size_t i: range(3)) {
       ref<uint16> list(wireNeighbours[n] + offset + i * Grid::cellCapacity, Grid::cellCapacity);
@@ -237,9 +237,9 @@ void Simulation::stepGrainWire() {
        if(!b) break;
        b--;
        assert_(a < grain.count && b < wire.count, a, grain.count, b, wire.count, offset, n, i);
-       float d = sqrt(sq(grain.Px[a]-wire.Px[b])
-                      + sq(grain.Py[a]-wire.Py[b])
-                      + sq(grain.Pz[a]-wire.Pz[b])); // TODO: SIMD //FIXME: fails with Ofast?
+       float d = sqrt(sq(grain.Px[simd+a]-wire.Px[b])
+                      + sq(grain.Py[simd+a]-wire.Py[b])
+                      + sq(grain.Pz[simd+a]-wire.Pz[b])); // TODO: SIMD //FIXME: fails with Ofast?
        if(d > verletDistance) { /*minD=::min(minD, d);*/ continue; }
        assert_(grainWireA.size < grainWireA.capacity);
        grainWireA.append( a ); // Grain
@@ -295,7 +295,7 @@ void Simulation::stepGrainWire() {
  grainWireFilterTime += parallel_chunk(align(simd, grainWireA.size)/simd, [&](uint, size_t start, size_t size) {
    for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
     vXui A = *(vXui*)(grainWireA.data+i), B = *(vXui*)(grainWireB.data+i);
-    vXsf Ax = gather(grain.Px.data, A), Ay = gather(grain.Py.data, A), Az = gather(grain.Pz.data, A);
+    vXsf Ax = gather(grain.Px.data+simd, A), Ay = gather(grain.Py.data+simd, A), Az = gather(grain.Pz.data+simd, A);
     vXsf Bx = gather(wire.Px.data, B), By = gather(wire.Py.data, B), Bz = gather(wire.Pz.data, B);
     vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
     vXsf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
@@ -344,7 +344,7 @@ void Simulation::stepGrainWire() {
     evaluateGrainWire(start, size,
                       grainWireContact.data, grainWireContact.size,
                       grainWireA.data, grainWireB.data,
-                      grain.Px.data, grain.Py.data, grain.Pz.data,
+                      grain.Px.data+simd, grain.Py.data+simd, grain.Pz.data+simd,
                       wire.Px.data, wire.Py.data, wire.Pz.data,
                       floatX(Grain::radius+Wire::radius), floatX(Grain::radius), floatX(Wire::radius),
                       grainWireLocalAx.begin(), grainWireLocalAy.begin(), grainWireLocalAz.begin(),

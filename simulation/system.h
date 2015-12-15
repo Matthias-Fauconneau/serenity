@@ -61,7 +61,7 @@ struct System {
   buffer<float> Ty { ::threadCount() * capacity };
   buffer<float> Tz { ::threadCount() * capacity }; // Torque
 
-  Grain() : capacity(4*2048) {
+  Grain() : capacity(4*2048+simd) {
    Px.clear(0); Py.clear(0); Pz.clear(0);
    Vx.clear(0); Vy.clear(0); Vz.clear(0);
    Fx.clear(0); Fy.clear(0); Fz.clear(0);
@@ -69,7 +69,7 @@ struct System {
    Rx.clear(0); Ry.clear(0); Rz.clear(0); Rw.clear(1);
   }
 
-  const vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]);  }
+  const vec3 position(size_t i) const { return vec3(Px[simd+i], Py[simd+i], Pz[simd+i]);  }
   const vec3 velocity(size_t i) const { return vec3(Vx[i], Vy[i], Vz[i]);  }
   const vec3 force(size_t i) const { return vec3(Fx[i], Fy[i], Fz[i]);  }
   const vec4 rotation(size_t i) const { return vec4(Rx[i], Ry[i], Rz[i], Rw[i]);  }

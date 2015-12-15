@@ -213,9 +213,9 @@ void Simulation::stepGrainMembrane() {
   atomic contactCount;
   auto search = [this, &latticeNeighbours, verletDistance, &contactCount](uint, uint rowIndex) {
    const float* const mPx = membrane.Px.data, *mPy = membrane.Py.data, *mPz = membrane.Pz.data;
-   const float* const gPx = grain.Px.data, *gPy = grain.Py.data, *gPz = grain.Pz.data;
+   const float* const gPx = grain.Px.data+simd, *gPy = grain.Py.data+simd, *gPz = grain.Pz.data+simd;
    int* const gmA = grainMembraneA.begin(), *gmB = grainMembraneB.begin();
-   const vXsf scaleX = floatX(lattice.scale.x), scaleY = floatX(lattice.scale.y), scaleZ = floatX(lattice.scale.z);
+   const vXsf scale = floatX(lattice.scale);
    const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
    const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
    const vXsf verletDistanceX = floatX(verletDistance);
@@ -225,9 +225,9 @@ void Simulation::stepGrainMembrane() {
     int i = base+j;
     vXsi b = intX(i)+_seqi;
     const vXsf Bx = load(mPx, i), By = load(mPy, i), Bz = load(mPz, i);
-    vXsi index = convert(scaleZ*(Bz-minZ)) * sizeYX
-                       + convert(scaleY*(By-minY)) * sizeX
-                       + convert(scaleX*(Bx-minX));
+    vXsi index = convert(scale*(Bz-minZ)) * sizeYX
+                       + convert(scale*(By-minY)) * sizeX
+                       + convert(scale*(Bx-minX));
     // Neighbours
     for(int n: range(3*3)) for(int i: range(3)) {
      vXsi a = gather(latticeNeighbours[n]+i, index);
@@ -303,7 +303,7 @@ void Simulation::stepGrainMembrane() {
  atomic contactCount;
  auto filter = [&](uint, uint start, uint size) {
   const int* const gmA = grainMembraneA.data, *gmB = grainMembraneB.data;
-  const float* const gPx = grain.Px.data, *gPy = grain.Py.data, *gPz = grain.Pz.data;
+  const float* const gPx = grain.Px.data+simd, *gPy = grain.Py.data+simd, *gPz = grain.Pz.data+simd;
   const float* const mPx = membrane.Px.data, *mPy = membrane.Py.data, *mPz = membrane.Pz.data;
   float* const gmL = grainMembraneLocalAx.begin();
   int* const gmContact = grainMembraneContact.begin();
@@ -356,7 +356,7 @@ void Simulation::stepGrainMembrane() {
     evaluateGrainMembrane(start, size,
                       grainMembraneContact.data, grainMembraneContact.size,
                       grainMembraneA.data, grainMembraneB.data,
-                      grain.Px.data, grain.Py.data, grain.Pz.data,
+                      grain.Px.data+simd, grain.Py.data+simd, grain.Pz.data+simd,
                       membrane.Px.data, membrane.Py.data, membrane.Pz.data,
                       floatX(Grain::radius+0), floatX(Grain::radius), floatX(0),
                       grainMembraneLocalAx.begin(), grainMembraneLocalAy.begin(), grainMembraneLocalAz.begin(),

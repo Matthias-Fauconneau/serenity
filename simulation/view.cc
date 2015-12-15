@@ -298,9 +298,9 @@ struct SimulationApp {
   SimulationView::State state;
   state.grain.radius = simulation.grain.radius;
   state.grain.count = simulation.grain.count;
-  state.grain.Px = copy(simulation.grain.Px);
-  state.grain.Py = copy(simulation.grain.Py);
-  state.grain.Pz = copy(simulation.grain.Pz);
+  state.grain.Px = copyRef(simulation.grain.Px.slice(simd));
+  state.grain.Py = copyRef(simulation.grain.Py.slice(simd));
+  state.grain.Pz = copyRef(simulation.grain.Pz.slice(simd));
   state.grain.Rx = copy(simulation.grain.Rx);
   state.grain.Ry = copy(simulation.grain.Ry);
   state.grain.Rz = copy(simulation.grain.Rz);

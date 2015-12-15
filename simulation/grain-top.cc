@@ -30,7 +30,7 @@ void Simulation::stepGrainTop() {
   //atomic contactCount;
   auto search = [&](uint, size_t start, size_t size) {
    for(size_t i=start; i<(start+size); i+=1) { // TODO: SIMD
-    float depth = grain.Pz[i] - (topZ-Grain::radius);
+    float depth = grain.Pz[simd+i] - (topZ-Grain::radius);
     if(depth >= 0) grainTopA.appendAtomic(i); // Grain
    }
   };
@@ -79,7 +79,7 @@ void Simulation::stepGrainTop() {
  auto filter =  [&](uint, size_t start, size_t size) {
   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
    vXsi A = load(grainTopA.data, i);
-   vXsf Az = gather(grain.Pz.data, A);
+   vXsf Az = gather(grain.Pz.data+simd, A);
    vXsf depth = Az - floatX(topZ-Grain::radius);
    for(size_t k: range(simd)) { // TODO: SIMD
     size_t j = i+k;
@@ -128,7 +128,7 @@ void Simulation::stepGrainTop() {
    evaluateGrainObstacle<true>(start, size,
                      grainTopContact.data, grainTopContact.size,
                      grainTopA.data,
-                     grain.Px.data, grain.Py.data, grain.Pz.data,
+                     grain.Px.data+simd, grain.Py.data+simd, grain.Pz.data+simd,
                      floatX(topZ-Grain::radius), floatX(Grain::radius),
                      grainTopLocalAx.begin(), grainTopLocalAy.begin(), grainTopLocalAz.begin(),
                      grainTopLocalBx.begin(), grainTopLocalBy.begin(), grainTopLocalBz.begin(),

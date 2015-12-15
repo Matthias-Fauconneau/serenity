@@ -22,33 +22,33 @@ void Simulation::grainLattice() {
  for(int i=0; i<size; i++) cells[i] = -1;
 
  auto scatter = [this](uint, uint start, uint size) {
-  const float* const gPx = grain.Px.data, *gPy = grain.Py.data, *gPz = grain.Pz.data;
+  const float* const gPx = grain.Px.data+simd, *gPy = grain.Py.data+simd, *gPz = grain.Pz.data+simd;
   int* const base = lattice.base.begin();
-  const vXsf scaleX = floatX(lattice.scale.x), scaleY = floatX(lattice.scale.y), scaleZ = floatX(lattice.scale.z);
+  const vXsf scale = floatX(lattice.scale);
   const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
   const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
   for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
    vXsi a = intX(i)+_seqi;
    const vXsf Ax = load(gPx, i), Ay = load(gPy, i), Az = load(gPz, i);
-   vXsi index = convert(scaleZ*(Az-minZ)) * sizeYX
-     + convert(scaleY*(Ay-minY)) * sizeX
-     + convert(scaleX*(Ax-minX));
+   vXsi index = convert(scale*(Az-minZ)) * sizeYX
+     + convert(scale*(Ay-minY)) * sizeX
+     + convert(scale*(Ax-minX));
    ::scatter(base, index, a);
   }
  };
  if(grain.count/simd) grainGrainLatticeTime += parallel_chunk(grain.count/simd, scatter);
  if(grain.count%simd) {
-  const float* const gPx = grain.Px.data, *gPy = grain.Py.data, *gPz = grain.Pz.data;
+  const float* const gPx = grain.Px.data+simd, *gPy = grain.Py.data+simd, *gPz = grain.Pz.data+simd;
   int* const base = lattice.base.begin();
-  const vXsf scaleX = floatX(lattice.scale.x), scaleY = floatX(lattice.scale.y), scaleZ = floatX(lattice.scale.z);
+  const vXsf scale = floatX(lattice.scale);
   const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
   const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
   uint i=grain.count/simd*simd;
   vXsi a = intX(i)+_seqi;
   const vXsf Ax = load(gPx, i), Ay = load(gPy, i), Az = load(gPz, i);
-  vXsi index = convert(scaleZ*(Az-minZ)) * sizeYX
-    + convert(scaleY*(Ay-minY)) * sizeX
-    + convert(scaleX*(Ax-minX));
+  vXsi index = convert(scale*(Az-minZ)) * sizeYX
+    + convert(scale*(Ay-minY)) * sizeX
+    + convert(scale*(Ax-minX));
   for(int k: range(grain.count-i)) base[index[k]] = a[k];
  }
 
@@ -66,7 +66,7 @@ void Simulation::stepGrainIntegration() {
    const float* Fx = grain.Fx.data, *Fy = grain.Fy.data, *Fz = grain.Fz.data;
    const float* Tx = grain.Tx.begin(), *Ty = grain.Ty.begin(), *Tz = grain.Tz.begin();
    float* const pVx = grain.Vx.begin(), *pVy = grain.Vy.begin(), *pVz = grain.Vz.begin();
-   float* const Px = grain.Px.begin(), *Py = grain.Py.begin(), *Pz = grain.Pz.begin();
+   float* const Px = grain.Px.begin()+simd, *Py = grain.Py.begin()+simd, *Pz = grain.Pz.begin()+simd;
    float* const AVx = grain.AVx.begin(), *AVy = grain.AVy.begin(), *AVz = grain.AVz.begin();
    float* const Rx = grain.Rx.begin(), *Ry = grain.Ry.begin(), *Rz = grain.Rz.begin(),
                     *Rw = grain.Rw.begin();
@@ -112,7 +112,7 @@ void Simulation::stepGrainIntegration() {
 
 #if 0
 void Simulation::domainGrain(vec3& min, vec3& max) {
-float* const Px = grain.Px.begin(), *Py = grain.Py.begin(), *Pz = grain.Pz.begin();
+float* const Px = grain.Px.begin()+simd, *Py = grain.Py.begin()+simd, *Pz = grain.Pz.begin()+simd;
 vXsf minX_ = _0f, minY_ = _0f, minZ_ = _0f, maxX_ = _0f, maxY_ = _0f, maxZ_ = _0f;
 for(size_t i=0; i<grain.count; i+=simd) {
 vXsf X = load(Px, i), Y = load(Py, i), Z = load(Pz, i);
