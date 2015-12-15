@@ -13,22 +13,4 @@ generic struct Lattice {
   assert_(cells.size < (1<<30));
   cells.clear(-1);
  }
- inline int index(float x, float y, float z) {
-  /*int index
-    = int(scale.z*(z-min.z)) * (size.y*size.x)
-    + int(scale.y*(y-min.y)) * size.x
-    + int(scale.x*(x-min.x));*/
-  const vXsf Ax = floatX(x), Ay = floatX(y), Az = floatX(z);
-  const vXsf scaleX = floatX(scale.x), scaleY = floatX(scale.y), scaleZ = floatX(scale.z);
-  const vXsf minX = floatX(min.x), minY = floatX(min.y), minZ = floatX(min.z);
-  const vXsi sizeX = intX(size.x), sizeYX = intX(size.y * size.x);
-  vXsi indexX = convert(scaleZ*(Az-minZ)) * sizeYX
-                     + convert(scaleY*(Ay-minY)) * sizeX
-                     + convert(scaleX*(Ax-minX));
-  //assert_(indexX[0] == index, indexX[0], index);
-  int index = indexX[0];
-  assert(index >= 0 && index < size.z*size.y*size.x, index);
-  return index;
- }
- inline T& cell(float x, float y, float z) { return base[index(x, y, z)]; }
 };

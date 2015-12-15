@@ -190,31 +190,46 @@ void Simulation::stepGrainGrain() {
    assert_(size.x < 0x1p10 && size.y < 0x1p10 && size.z < 0x1p10);}
   Lattice<int32/*16*/> lattice(sqrt(3.)/(2*Grain::radius), min, max);
   memoryTime.stop();
-  grainGrainLatticeTime.start();
-  for(uint i: range(grain.count)) {
-   lattice.cell(grain.Px[i], grain.Py[i], grain.Pz[i]) = /*1+*/i;
-  }
-  /*if(lattice.base[-1658] >= 0 || lattice.base[1257] >= 0) log(lattice.base[1257]);
-  if(lattice.base[1257] >= 0) log(lattice.base[1257]);*/
-  /*for(uint a: range(grain.count)) {
-   bool found = false;
-   for(uint b: lattice.cells) {
-    if(a == b) { assert_(!found); found = true; }
+  auto latticeScatter = [this, &lattice](uint, uint start, uint size) {
+   const float* const gPx = grain.Px.data, *gPy = grain.Py.data, *gPz = grain.Pz.data;
+   int* const base = lattice.base.begin();
+   const vXsf scaleX = floatX(lattice.scale.x), scaleY = floatX(lattice.scale.y), scaleZ = floatX(lattice.scale.z);
+   const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
+   const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
+   for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
+    vXsi a = intX(i)+_seqi;
+    const vXsf Ax = load(gPx, i), Ay = load(gPy, i), Az = load(gPz, i);
+    vXsi index = convert(scaleZ*(Az-minZ)) * sizeYX
+                       + convert(scaleY*(Ay-minY)) * sizeX
+                       + convert(scaleX*(Ax-minX));
+    scatter(base, index, a);
    }
-  }*/
+  };
+  if(grain.count/simd) grainGrainLatticeTime += parallel_chunk(grain.count/simd, latticeScatter);
+  if(grain.count%simd) {
+   const float* const gPx = grain.Px.data, *gPy = grain.Py.data, *gPz = grain.Pz.data;
+   int* const base = lattice.base.begin();
+   const vXsf scaleX = floatX(lattice.scale.x), scaleY = floatX(lattice.scale.y), scaleZ = floatX(lattice.scale.z);
+   const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
+   const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
+   uint i=grain.count/simd*simd;
+   vXsi a = intX(i)+_seqi;
+   const vXsf Ax = load(gPx, i), Ay = load(gPy, i), Az = load(gPz, i);
+   vXsi index = convert(scaleZ*(Az-minZ)) * sizeYX
+                       + convert(scaleY*(Ay-minY)) * sizeX
+                       + convert(scaleX*(Ax-minX));
+   for(int k: range(grain.count-i)) base[index[k]] = a[k];
+  }
 
   const float verletDistance = 2*2*Grain::radius/sqrt(3.); // > Grain::radius + Grain::radius
-  // Minimum distance over verlet distance parameter is the actual verlet distance which can be used
-  //float minD = verletDistance; //__builtin_inff(); // With lattice, a nearest > verletDistance might be skipped
-
-  const int Y = lattice.size.y, X = lattice.size.x;
   const int32/*16*/* latticeNeighbours[62];
-  uint i = 0;
-  for(int z: range(0, 2 +1)) for(int y: range((z?-2:0), 2 +1)) for(int x: range(((z||y)?-2:1), 2 +1)) {
-   latticeNeighbours[i++] = lattice.base.data + z*Y*X + y*X + x;
+  {const int Y = lattice.size.y, X = lattice.size.x;
+   uint i = 0;
+   for(int z: range(0, 2 +1)) for(int y: range((z?-2:0), 2 +1)) for(int x: range(((z||y)?-2:1), 2 +1)) {
+    latticeNeighbours[i++] = lattice.base.data + z*Y*X + y*X + x;
+   }
+   assert(i==62);
   }
-  assert(i==62);
-  grainGrainLatticeTime.stop();
 
   swap(oldGrainGrainA, grainGrainA);
   swap(oldGrainGrainB, grainGrainB);
@@ -250,48 +265,54 @@ void Simulation::stepGrainGrain() {
    const vXsf scaleX = floatX(lattice.scale.x), scaleY = floatX(lattice.scale.y), scaleZ = floatX(lattice.scale.z);
    const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
    const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
-   const vXsi grainCount = intX(grain.count);
    const vXsf verletDistanceX = floatX(verletDistance);
    for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
     vXsi a = intX(i)+_seqi;
-    maskX valid = lessThan(a, grainCount);
     const vXsf Ax = load(gPx, i), Ay = load(gPy, i), Az = load(gPz, i);
     vXsi index = convert(scaleZ*(Az-minZ)) * sizeYX
                        + convert(scaleY*(Ay-minY)) * sizeX
                        + convert(scaleX*(Ax-minX));
-    /*for(uint k: range(simd)) assert_(-(1+lattice.size.y*lattice.size.x+lattice.size.x+1) <= index[k] && index[k] < (int)lattice.cells.capacity, index[k], lattice.cells.capacity,
-                                     minX[k], Ax[k],
-                                     minY[k], Ay[k],
-                                     minZ[k], Az[k]);*/
     // Neighbours
-    if(lattice.base[1257] >= 0) log(i, lattice.base[1257]);
     for(uint n: range(62)) { // A is not monotonous
-     //for(uint k: range(simd)) assert_(0 <= index[k] && index[k] < (int)lattice.cells.capacity, index[k], lattice.cells.capacity);
      vXsi b = gather(latticeNeighbours[n], index);
-     for(uint k: range(simd)) assert_(a[k] != b[k],
-                                      a[k], b[k],
-                                      grain.count, /*mask[k],*/ index[k], n,
-                                      //lattice.base.data - lattice.cells.data,
-                                      latticeNeighbours[n] + index[k] - lattice.base.data,
-                                      latticeNeighbours[n] - lattice.base.data,
-                                      lattice.size.x, lattice.size.y, lattice.size.z,
-                                      convert(scaleX*(Ax-minX))[k],
-                                       convert(scaleY*(Ay-minY))[k],
-                                      convert(scaleZ*(Az-minZ))[k]);
-     //for(uint k: range(simd)) assert_(b[k] >= -1 && b[k] < (int)grain.capacity, b[k], grain.count, grain.capacity);
      const vXsf Bx = gather(gPx, b), By = gather(gPy, b), Bz = gather(gPz, b);
      const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
      v8sf distance = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
-     maskX mask = valid & notEqual(b, _1i) & lessThan(distance, verletDistanceX);
+     maskX mask = notEqual(b, _1i) & lessThan(distance, verletDistanceX);
      uint targetIndex = contactCount.fetchAdd(countBits(mask));
-     assert_(targetIndex+countBits(mask) < grainGrainA.capacity);
      compressStore(ggA+targetIndex, mask, a);
      compressStore(ggB+targetIndex, mask, b);
     }
    }
   };
-  grainGrainSearchTime += parallel_chunk(align(simd, grain.count)/simd, search, 1);
-  //return;
+  if(grain.count/simd) grainGrainSearchTime += parallel_chunk(grain.count/simd, search, 1);
+  if(grain.count%simd) {
+   const float* const gPx = grain.Px.data, *gPy = grain.Py.data, *gPz = grain.Pz.data;
+   int* const ggA = grainGrainA.begin(), *ggB = grainGrainB.begin();
+   const vXsf scaleX = floatX(lattice.scale.x), scaleY = floatX(lattice.scale.y), scaleZ = floatX(lattice.scale.z);
+   const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
+   const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
+   const vXsf verletDistanceX = floatX(verletDistance);
+   uint i=grain.count/simd*simd;
+   vXsi a = intX(i)+_seqi;
+   maskX valid = lessThan(a, intX(grain.count));
+   const vXsf Ax = load(gPx, i), Ay = load(gPy, i), Az = load(gPz, i);
+   vXsi index = convert(scaleZ*(Az-minZ)) * sizeYX
+     + convert(scaleY*(Ay-minY)) * sizeX
+     + convert(scaleX*(Ax-minX));
+   // Neighbours
+   for(uint n: range(62)) { // A is not monotonous
+    vXsi b = gather(latticeNeighbours[n], index);
+    const vXsf Bx = gather(gPx, b), By = gather(gPy, b), Bz = gather(gPz, b);
+    const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
+    v8sf distance = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
+    maskX mask = valid & notEqual(b, _1i) & lessThan(distance, verletDistanceX);
+    uint targetIndex = contactCount.fetchAdd(countBits(mask));
+    compressStore(ggA+targetIndex, mask, a);
+    compressStore(ggB+targetIndex, mask, b);
+   }
+  }
+
   if(!contactCount) return;
   grainGrainA.size = contactCount;
   grainGrainB.size = contactCount;

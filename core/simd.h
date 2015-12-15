@@ -117,6 +117,19 @@ static inline v8si gather(const int* P, v8si i) {
 #endif
 }
 
+static inline void scatter(int* const P, const v8si i, const v8si x) {
+#if __INTEL_COMPILER
+ union { int e[8]; v8si v; } I; I.v = i;
+ union { int e[8]; v8sf v; } X; X.v = x;
+ P[I.e[0]] = X.e[0]; P[I.e[1]] = X.e[1]; P[I.e[2]] = X.e[2]; P[I.e[3]] = X.e[3];
+ P[I.e[4]] = X.e[4]; P[I.e[5]] = X.e[5]; P[I.e[6]] = X.e[6]; P[I.e[7]] = X.e[7];
+#else
+ P[i[0]] = x[0]; P[i[1]] = x[1]; P[i[2]] = x[2]; P[i[3]] = x[3];
+ P[i[4]] = x[4]; P[i[5]] = x[5]; P[i[6]] = x[6]; P[i[7]] = x[7];
+#endif
+}
+
+
 typedef int v4si __attribute((__vector_size__ (16)));
 #if AVX2
 static inline v8si min(v8si a, v8si b) { return __builtin_ia32_pminud256(a, b); }

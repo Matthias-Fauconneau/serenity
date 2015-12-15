@@ -171,9 +171,7 @@ void Simulation::stepGrainMembrane() {
   Lattice<uint16> lattice(sqrt(3.)/(2*Grain::radius), min, max);
   memoryTime.stop();
   grainMembraneLatticeTime.start();
-  for(size_t i: range(grain.count)) {
-   lattice.cell(grain.Px[i], grain.Py[i], grain.Pz[i]) = 1+i;
-  }
+  //for(size_t i: range(grain.count)) lattice.cell(grain.Px[i], grain.Py[i], grain.Pz[i]) = 1+i; FIXME
   grainMembraneLatticeTime.stop();
 
   const float verletDistance = 2*Grain::radius/sqrt(3.);
@@ -221,7 +219,7 @@ void Simulation::stepGrainMembrane() {
   grainMembraneB.size = grainMembraneB.capacity;
 
   atomic contactCount;
-  grainMembraneSearchTime += parallel_for(0, membrane.H,
+ /* grainMembraneSearchTime += parallel_for(0, membrane.H,
   [this, &lattice, &latticeNeighbours, verletDistance, &contactCount](uint, uint rowIndex) {
     int W = membrane.W;
     int base = membrane.margin+rowIndex*membrane.stride;
@@ -243,7 +241,7 @@ void Simulation::stepGrainMembrane() {
       }
      }
     }
-  });
+  }); FIXME*/
   if(!contactCount) return;
   grainMembraneA.size = contactCount;
   grainMembraneB.size = contactCount;
