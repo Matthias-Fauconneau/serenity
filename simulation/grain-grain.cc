@@ -202,7 +202,6 @@ void Simulation::stepGrainGrain() {
   }
 
   atomic contactCount;
-  assert_(contactCount.count == 0);
   auto search = [this, &latticeNeighbours, verletDistance, &contactCount](uint, uint start, uint size) {
    const float* const gPx = grain.Px.data, *gPy = grain.Py.data, *gPz = grain.Pz.data;
    int* const ggA = grainGrainA.begin(), *ggB = grainGrainB.begin();
@@ -229,8 +228,8 @@ void Simulation::stepGrainGrain() {
     }
    }
   };
-  if(grain.count/simd) grainGrainSearchTime += parallel_chunk(grain.count/simd, search, 1);
-  /*if(grain.count%simd) {
+  if(grain.count/simd) grainGrainSearchTime += parallel_chunk(grain.count/simd, search);
+  if(grain.count%simd) {
    const float* const gPx = grain.Px.data, *gPy = grain.Py.data, *gPz = grain.Pz.data;
    int* const ggA = grainGrainA.begin(), *ggB = grainGrainB.begin();
    const vXsf scaleX = floatX(lattice.scale.x), scaleY = floatX(lattice.scale.y), scaleZ = floatX(lattice.scale.z);
@@ -255,13 +254,11 @@ void Simulation::stepGrainGrain() {
     compressStore(ggA+targetIndex, mask, a);
     compressStore(ggB+targetIndex, mask, b);
    }
-  }*/
+  }
 
   if(!contactCount) return;
   grainGrainA.size = contactCount;
   grainGrainB.size = contactCount;
-  for(uint a: grainGrainA) assert_(a < grain.count, a, grain.count, contactCount.count, grainGrainA, grainGrainB);
-  for(uint b: grainGrainB) assert_(b < grain.count, b, grain.count, contactCount.count, grainGrainB);
   grainGrainLocalAx.size = contactCount;
   grainGrainLocalAy.size = contactCount;
   grainGrainLocalAz.size = contactCount;
@@ -274,7 +271,7 @@ void Simulation::stepGrainGrain() {
   for(uint i=0; i<grainGrainA.size; i++) { // seq
    int a = grainGrainA[i];
    int b = grainGrainB[i];
-   assert_(a != b, a, b, grain.count);
+   assert_(a != b);
    for(uint k = 0;; k++) {
     uint j = grainGrainIndex+k;
     if(j >= oldGrainGrainA.size || oldGrainGrainA[j] != a) break;
@@ -329,7 +326,6 @@ void Simulation::stepGrainGrain() {
   const vXsf _2Gr = floatX(Grain::radius+Grain::radius);
   for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
     vXsi A = load(ggA, i), B = load(ggB, i);
-    for(uint k: range(simd)) assert_(A[k] != B[k] || A[k] == (int)grain.count, A[k], B[k], grain.count);
     vXsf Ax = gather(gPx, A), Ay = gather(gPy, A), Az = gather(gPz, A);
     vXsf Bx = gather(gPx, B), By = gather(gPy, B), Bz = gather(gPz, B);
     vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
@@ -409,8 +405,6 @@ void Simulation::stepGrainGrain() {
    size_t index = grainGrainContact[i];
    size_t a = grainGrainA[index];
    size_t b = grainGrainB[index];
-   assert_(a!=b, a, b, grain.count, index, grainGrainA.size);
-   assert_(isNumber(grainGrainFx[i]), a, b);
    grain.Fx[a] += grainGrainFx[i];
    grain.Fx[b] -= grainGrainFx[i];
    grain.Fy[a] += grainGrainFy[i];

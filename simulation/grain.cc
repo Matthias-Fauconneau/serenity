@@ -36,7 +36,7 @@ void Simulation::grainLattice() {
    ::scatter(base, index, a);
   }
  };
- if(grain.count/simd) grainGrainLatticeTime += parallel_chunk(grain.count/simd, scatter, 1);
+ if(grain.count/simd) grainGrainLatticeTime += parallel_chunk(grain.count/simd, scatter);
  if(grain.count%simd) {
   const float* const gPx = grain.Px.data, *gPy = grain.Py.data, *gPz = grain.Pz.data;
   int* const base = lattice.base.begin();

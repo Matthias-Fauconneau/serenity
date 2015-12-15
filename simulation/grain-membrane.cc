@@ -210,37 +210,11 @@ void Simulation::stepGrainMembrane() {
   grainMembraneA.size = grainMembraneA.capacity;
   grainMembraneB.size = grainMembraneB.capacity;
 
-  /*atomic contactCount;
-  grainMembraneSearchTime += parallel_for(0, membrane.H,
-  [this, &lattice, &latticeNeighbours, verletDistance, &contactCount](uint, uint rowIndex) {
-    int W = membrane.W;
-    int base = membrane.margin+rowIndex*membrane.stride;
-    for(int j=0; j<W; j++) {
-     uint b = base+j;
-     int offset = lattice.index(membrane.Px[b], membrane.Py[b], membrane.Pz[b]);
-     for(int n: range(3*3)) for(int i: range(3)) {
-      int a = *(latticeNeighbours[n] + offset + i);
-      if(!a) continue;
-      a--;
-      float d = sqrt(sq(grain.Px[a]-membrane.Px[b])
-                     + sq(grain.Py[a]-membrane.Py[b])
-                     + sq(grain.Pz[a]-membrane.Pz[b])); // TODO: SIMD //FIXME: fails with Ofast?
-      if(d <= verletDistance) {
-       size_t index = contactCount.fetchAdd(1);
-       assert_(index < grainMembraneA.capacity);
-       grainMembraneA[index] = a; // Grain
-       grainMembraneB[index] = b; // Membrane
-      }
-     }
-    }
-  }); FIXME*/
-
   atomic contactCount;
-  assert_(contactCount.count == 0);
   auto search = [this, &latticeNeighbours, verletDistance, &contactCount](uint, uint rowIndex) {
    const float* const mPx = membrane.Px.data, *mPy = membrane.Py.data, *mPz = membrane.Pz.data;
    const float* const gPx = grain.Px.data, *gPy = grain.Py.data, *gPz = grain.Pz.data;
-   int* const ggA = grainGrainA.begin(), *ggB = grainGrainB.begin();
+   int* const gmA = grainMembraneA.begin(), *gmB = grainMembraneB.begin();
    const vXsf scaleX = floatX(lattice.scale.x), scaleY = floatX(lattice.scale.y), scaleZ = floatX(lattice.scale.z);
    const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
    const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
@@ -262,8 +236,8 @@ void Simulation::stepGrainMembrane() {
      v8sf distance = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
      maskX mask = notEqual(a, _1i) & lessThan(distance, verletDistanceX);
      uint targetIndex = contactCount.fetchAdd(countBits(mask));
-     compressStore(ggA+targetIndex, mask, a);
-     compressStore(ggB+targetIndex, mask, b);
+     compressStore(gmA+targetIndex, mask, a);
+     compressStore(gmB+targetIndex, mask, b);
     }
    }
   };
@@ -325,30 +299,32 @@ void Simulation::stepGrainMembrane() {
   grainMembraneContact = buffer<int>(align(simd, grainMembraneA.size));
  }
  grainMembraneContact.size = 0;
- grainMembraneFilterTime += parallel_chunk(align(simd, grainMembraneA.size)/simd, [&](uint, size_t start, size_t size) {
-   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
-    vXsi A = load(grainMembraneA.data, i), B = load(grainMembraneB.data, i);
-    vXsf Ax = gather(grain.Px.data, A), Ay = gather(grain.Py.data, A), Az = gather(grain.Pz.data, A);
-    vXsf Bx = gather(membrane.Px.data, B), By = gather(membrane.Py.data, B), Bz = gather(membrane.Pz.data, B);
-    vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-    vXsf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
-    vXsf depth = floatX(Grain::radius+0) - length;
-    for(size_t k: range(simd)) {
-     size_t j = i+k;
-     if(j == grainMembraneA.size) break /*2*/;
-     if(extract(depth, k) >= 0) {
-      // Creates a map from packed contact to index into unpacked contact list (indirect reference)
-      // Instead of packing (copying) the unpacked list to a packed contact list
-      // To keep track of where to write back (unpacked) contact positions (for static friction)
-      // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
-      grainMembraneContact.appendAtomic( j );
-     } else {
-      // Resets contact (static friction spring)
-      grainMembraneLocalAx[j] = 0;
-     }
-    }
-   }
- });
+
+ atomic contactCount;
+ auto filter = [&](uint, uint start, uint size) {
+  const int* const gmA = grainMembraneA.data, *gmB = grainMembraneB.data;
+  const float* const gPx = grain.Px.data, *gPy = grain.Py.data, *gPz = grain.Pz.data;
+  const float* const mPx = membrane.Px.data, *mPy = membrane.Py.data, *mPz = membrane.Pz.data;
+  float* const gmL = grainMembraneLocalAx.begin();
+  int* const gmContact = grainMembraneContact.begin();
+  const vXsf Gr = floatX(Grain::radius);
+  for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
+   vXsi A = load(gmA, i), B = load(gmB, i);
+   vXsf Ax = gather(gPx, A), Ay = gather(gPy, A), Az = gather(gPz, A);
+   vXsf Bx = gather(mPx, B), By = gather(mPy, B), Bz = gather(mPz, B);
+   vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
+   vXsf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
+   vXsf depth = Gr - length;
+   maskX contact = greaterThanOrEqual(depth, _0f);
+   maskStore(gmL+i, ~contact, _0f);
+   uint index = contactCount.fetchAdd(countBits(contact));
+   compressStore(gmContact+index, contact, intX(i)+_seqi);
+  }
+ };
+ grainMembraneFilterTime += parallel_chunk(align(simd, grainMembraneA.size)/simd, filter);
+ while(contactCount.count > 0 && grainMembraneContact[contactCount-1] >= (int)grainMembraneA.size)
+  contactCount.count--; // Trims trailing invalid contacts
+ grainMembraneContact.size = contactCount;
  if(!grainMembraneContact.size) return;
  for(size_t i=grainMembraneContact.size; i<align(simd, grainMembraneContact.size); i++)
   grainMembraneContact.begin()[i] = grainMembraneA.size;
