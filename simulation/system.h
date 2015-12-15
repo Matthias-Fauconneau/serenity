@@ -19,11 +19,11 @@ struct System {
  //sconst float e = 1./2; // Restitution coefficient
  //const float normalDampingRate = ln(e) / sqrt(sq(PI)+ln(ln(e)));
  sconst float normalDampingRate = 1; // ~ ln e / √(π²+ln²e) [restitution coefficient e]
- sconst float dynamicFrictionCoefficient = 0/*1*/;
- sconst float staticFrictionSpeed = 0/*__builtin_inff()*/;
- sconst float staticFrictionLength = 0/*3*/ * mm; // ~ Wire::radius
- sconst float staticFrictionStiffness = 0/*100*/ * 1*g*10/(1*mm); //k/F = F/L ~ Wire::mass*G/Wire::radius
- sconst float staticFrictionDamping = 0/*1*/ * kg/s; // TODO: relative to k ?
+ sconst float dynamicFrictionCoefficient = 0.1; // 1
+ sconst float staticFrictionSpeed = __builtin_inff();
+ sconst float staticFrictionLength = 3 * mm; // ~ Wire::radius
+ sconst float staticFrictionStiffness = 100 * 1*g*10/(1*mm); //k/F = F/L ~ Wire::mass*G/Wire::radius
+ sconst float staticFrictionDamping = 0.01 * kg/s; // TODO: relative to k ?
 
  // Obstacles: floor plane, cast cylinder
  struct Obstacle {
