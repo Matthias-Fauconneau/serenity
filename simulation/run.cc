@@ -15,6 +15,8 @@ __attribute((constructor(101))) void logCompiler() {
 #endif
 #if OPENMP
  log("OpenMP", ::threadCount());
+#else
+ log("Pthread", ::threadCount());
 #endif
 }
 

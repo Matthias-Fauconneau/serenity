@@ -97,7 +97,7 @@ void Simulation::profile(const Time& totalTime) {
  map<uint64, String> profile;
 #define logTime(name) \
  accounted += name##Time; \
- if(name##Time > stepTime/64) { \
+ if(name##Time > stepTime/32) { \
   profile.insertSortedMulti(name ## Time, #name##__); \
   shown += name##Time; \
  } \

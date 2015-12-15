@@ -227,7 +227,7 @@ void Simulation::stepGrainGrain() {
     }
    }
   };
-  assert_(contactCount <= grainGrainA.size);
+  assert(contactCount <= grainGrainA.size);
   if(grain.count/simd) grainGrainSearchTime += parallel_chunk(grain.count/simd, search);
   if(grain.count%simd) {
    const float* const gPx = grain.Px.data+simd, *gPy = grain.Py.data+simd, *gPz = grain.Pz.data+simd;
@@ -400,7 +400,7 @@ void Simulation::stepGrainGrain() {
  };
  grainGrainEvaluateTime += parallel_chunk(GGcc/simd, evaluate);
 
- const uint threadCount = ::min( ::threadCount(), int(sqrt(grainGrainContact.size/16)));
+ const uint threadCount = ::min(::threadCount(), int(sqrt(grainGrainContact.size/16)));
  if(threadCount <= 12) { // Sequential scalar scatter add
   grainGrainSumTime.start();
   for(int i = 0; i < (int)grainGrainContact.size; i++) {

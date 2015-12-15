@@ -14,7 +14,7 @@ long currentTime();
 int64 realTime();
 int64 threadCPUTime();
 
-#if 1
+#if 0
  // FIXME: thread might switch core between cycle counter reads
  #define readCycleCounter realTime
 #else

@@ -145,14 +145,19 @@ static inline v4si high(v8si x) { return _mm256_extractf128_epi32(x, 1); }
 #elif __clang__
 static inline v4si low(v8si x) { return __builtin_shufflevector(x, x, 0, 1, 2, 3); }
 static inline v4si high(v8si x) { return __builtin_ia32_vextractf128_si256(x, 1); }
-#else
-static inline v4si low(v8si x) { return __builtin_ia32_epi32_si256(x); }
-static inline v4si high(v8si x) { return __builtin_ia32_vextractf128_si256(x, 1); }
-#endif
-
 typedef long long m128i __attribute__((__vector_size__(16)));
 typedef long long m256i __attribute__((__vector_size__(32)));
-static inline v8si int2x4(v4si a, v4si b) { return __builtin_ia32_vinsertf128_si256((m256i)__builtin_shufflevector((m128i)a ,(m128i)a, 0, 1, -1, -1), b, 1); }
+static inline v8si int2x4(v4si a, v4si b) {
+ return __builtin_ia32_vinsertf128_si256((m256i)__builtin_shufflevector((m128i)a ,(m128i)a, 0, 1, -1, -1),
+                                                                     b, 1);
+}
+#else
+static inline v4si low(v8si x) { return __builtin_ia32_si_si256(x); }
+static inline v4si high(v8si x) { return __builtin_ia32_vextractf128_si256(x, 1); }
+static inline v8si int2x4(v4si a, v4si b) {
+ return __builtin_ia32_vinsertf128_si256(__builtin_ia32_si256_si(a), b, 1); }
+#endif
+
 static inline v4si min(v4si a, v4si b) { return __builtin_ia32_pminsd128(a, b); }
 static inline v4si max(v4si a, v4si b) { return __builtin_ia32_pmaxsd128(a, b); }
 static inline v8si min(v8si a, v8si b) { return int2x4(min(low(a), high(b)), min(low(a), high(b))); }
@@ -256,7 +261,7 @@ static inline uint moveMask(v8si k) { return _mm256_movemask_ps(k); }
 static inline uint countBits(v8si k) { return _mm_countbits_32(k); }
 #else
 static inline void maskStore(float* p, v8si k, v8sf a) { __builtin_ia32_maskstoreps256((v8sf*)p, k, a); }
-static inline uint moveMask(v8si k) { return __builtin_ia32_movmskps256(k); }
+static inline uint moveMask(v8si k) { return __builtin_ia32_movmskps256((v8sf)k); }
 static inline uint countBits(v8si k) { return __builtin_popcount(moveMask(k)); }
 #endif
 static inline void compressStore(int* p, v8si k, v8si a) {\
@@ -329,11 +334,11 @@ static inline int op(v8si x) { \
 #define reduce(op) \
 static inline int op(v8si x) { \
     /* ( x3+x7, x2+x6, x1+x5, x0+x4 ) */ \
-    const v4sf x128 = __builtin_ia32_p##op##sd128(high(x), low(x)); \
+    const v4si x128 = __builtin_ia32_p##op##sd128(high(x), low(x)); \
     /* ( -, -, x1+x3+x5+x7, x0+x2+x4+x6 ) */ \
-    const v4sf x64 = __builtin_ia32_p##op##sd128(x128, __builtin_ia32_movhlepi32(x128, x128)); \
+    const v4si x64 = __builtin_ia32_p##op##sd128(x128, (v4si)__builtin_ia32_movhlps((v4sf)x128, (v4sf)x128)); \
     /* ( -, -, -, x0+x1+x2+x3+x4+x5+x6+x7 ) */ \
-    const v4sf x32 = __builtin_ia32_p##op##sd128(x64, __builtin_ia32_shufepi32(x64, x64, 0x55)); \
+    const v4si x32 = __builtin_ia32_p##op##sd128(x64, (v4si)__builtin_ia32_shufps((v4sf)x64, (v4sf)x64, 0x55)); \
     return x32[0]; \
 }
 #endif

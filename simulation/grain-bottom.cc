@@ -68,7 +68,7 @@ void Simulation::stepGrainBottom() {
   }
   grainBottomRepackFrictionTime.stop();
 
-  assert_(align(simd, grainBottomA.size+1) <= grainBottomA.capacity);
+  assert(align(simd, grainBottomA.size+1) <= grainBottomA.capacity);
   for(size_t i=grainBottomA.size; i<align(simd, grainBottomA.size+1); i++)
    grainBottomA.begin()[i] = grain.count;
  }
