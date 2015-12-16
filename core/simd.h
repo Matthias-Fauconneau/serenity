@@ -40,6 +40,7 @@ static inline v16sf maskSub(v16sf a, uint16 k, v16sf b) { return _mm512_mask_sub
 static inline v16sf min(v16sf a, v16sf b) { return _mm512_min_ps(a, b); }
 static inline v16sf max(v16sf a, v16sf b) { return _mm512_max_ps(a, b); }
 static inline v16sf sqrt(v16sf x) { return _mm512_sqrt_ps(x); }
+static inline v16sf rsqrt(v16sf x) { return _mm512_rsqrt23_ps(x); }
 
 static inline int extract(v16si x, int i) { union { int e[16]; v16si v; } X; X.v = x; return X.e[i]; }
 static inline float extract(v16sf x, int i) { union { float e[16]; v16sf v; } X; X.v = x; return X.e[i]; }
@@ -185,7 +186,7 @@ static inline void storeu(mref<float> a, int index, v8sf v) { storeu(a.begin(), 
 static inline v8sf min(v8sf a, v8sf b) { return __builtin_ia32_minps256(a, b); }
 static inline v8sf max(v8sf a, v8sf b) { return __builtin_ia32_maxps256(a, b); }
 static inline v8sf sqrt(v8sf x) { return __builtin_ia32_sqrtps256(x); }
-static inline v8sf rcp(v8sf x) { return __builtin_ia32_rcpps256(x); }
+static inline v8sf rsqrt(v8sf x) { return __builtin_ia32_rsqrtps256(x); }
 
 #if __INTEL_COMPILER
 static inline float extract(v8sf x, int i) { union { float e[8]; v8sf v; } X; X.v = x; return X.e[i]; }

@@ -75,7 +75,6 @@ void Simulation::stepGrainIntegration() {
     // Symplectic Euler
     vXsf Vx = load(pVx, i), Vy = load(pVy, i), Vz = load(pVz, i);
     vXsf Fx = load(pFx, i), Fy = load(pFy, i), Fz = load(pFz, i);
-    for(int k: range(simd)) assert_(isNumber(Fx[k]) && isNumber(Fy[k]) && isNumber(Fz[k]), i+k, grain.count);
     Vx += dt_mass * Fx;
     Vy += dt_mass * Fy;
     Vz += dt_mass * Fz;
@@ -87,6 +86,9 @@ void Simulation::stepGrainIntegration() {
     store(Pz, i, load(Pz, i) + dt * Vz);
     maxGrainVX = max(maxGrainVX, sqrt(Vx*Vx + Vy*Vy + Vz*Vz));
 
+    //vec4( a[3] * b.xyz() + b[3] * a.xyz() + cross(a.xyz(), b.xyz()), a[3]*b[3] - dot(a.xyz(), b.xyz()));
+    // a = AVx[j], AVy[j], AVz[j], 0
+    // b = Rx[j], Ry[j], Rz[j], Rw[j]
     const vXsf AVx = load(pAVx, i), AVy = load(pAVy, i), AVz = load(pAVz, i);
     vXsf Rx = load(pRx, i), Ry = load(pRy, i), Rz = load(pRz, i), Rw = load(pRw, i);
     const vXsf dRx = dt_2 * (Rw * Rx + AVy*Rz - Ry*AVz);
@@ -100,10 +102,10 @@ void Simulation::stepGrainIntegration() {
     store(pAVx, i, AVx + dt_angularMass * load(pTx, i));
     store(pAVy, i, AVy + dt_angularMass * load(pTy, i));
     store(pAVz, i, AVz + dt_angularMass * load(pTz, i));
-    vXsf normalize = rcp(Rx*Rx+Ry*Ry+Rz*Rz+Rw*Rw);
+    vXsf normalize = rsqrt(Rx*Rx+Ry*Ry+Rz*Rz+Rw*Rw);
     store(pRx, i, normalize*Rx);
     store(pRy, i, normalize*Ry);
-    store(pRz, i, normalize*Rx);
+    store(pRz, i, normalize*Rz);
     store(pRw, i, normalize*Rw);
   }
   maxGrainV_[id] = max(maxGrainV_[id], max(maxGrainVX));
@@ -114,30 +116,3 @@ void Simulation::stepGrainIntegration() {
  float maxGrainGrainV = maxGrainV + maxGrainV;
  grainGrainGlobalMinD -= maxGrainGrainV * this->dt;
 }
-
-#if 0
-void Simulation::domainGrain(vec3& min, vec3& max) {
-float* const Px = grain.Px.begin()+simd, *Py = grain.Py.begin()+simd, *Pz = grain.Pz.begin()+simd;
-vXsf minX_ = _0f, minY_ = _0f, minZ_ = _0f, maxX_ = _0f, maxY_ = _0f, maxZ_ = _0f;
-for(size_t i=0; i<grain.count; i+=simd) {
-vXsf X = load(Px, i), Y = load(Py, i), Z = load(Pz, i);
-minX_ = ::min(minX_, X);
-maxX_ = ::max(maxX_, X);
-minY_ = ::min(minY_, Y);
-maxY_ = ::max(maxY_, Y);
-minZ_ = ::min(minZ_, Z);
-maxZ_ = ::max(maxZ_, Z);
-}
-const float minX = ::min(minX_);
-const float minY = ::min(minY_);
-const float minZ = ::min(minZ_);
-const float maxX = ::max(maxX_);
-const float maxY = ::max(maxY_);
-const float maxZ = ::max(maxZ_);
-assert(maxX-minX < 16 && maxY-minY < 16 && maxZ-minZ < 16, "grain",
-       maxX-minX, maxY-minY, maxZ-minZ, "\n",
-       minX, maxX, minY, maxY, minZ, maxZ, grain.count);
-min = vec3(minX, minY, minZ);
-max = vec3(maxX, maxY, maxZ);
-}
-#endif
