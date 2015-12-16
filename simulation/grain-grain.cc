@@ -338,7 +338,10 @@ void Simulation::stepGrainGrain() {
     compressStore(ggContact+index, contact, intX(i)+_seqi);
   }
  };
- grainGrainFilterTime += parallel_chunk(align(simd, grainGrainA.size)/simd, filter);
+ if(grainGrainA.size/simd) grainGrainFilterTime += parallel_chunk(grainGrainA.size/simd, filter);
+ // The partial iteration has to be executed last so that invalid contacts are trailing
+ // and can be easily trimmed
+ if(grainGrainA.size%simd != 0) filter(0, grainGrainA.size/simd, 1);
  grainGrainContact.size = contactCount;
  while(contactCount.count > 0 && grainGrainContact[contactCount.count-1] >= (int)grainGrainA.size)
   contactCount.count--; // Trims trailing invalid contacts
@@ -407,6 +410,8 @@ void Simulation::stepGrainGrain() {
    int index = grainGrainContact[i];
    int a = grainGrainA[index];
    int b = grainGrainB[index];
+    assert_(isNumber(grainGrainFx[i]) && isNumber(grainGrainFy[i])
+                 && isNumber(grainGrainFz[i]), i, grainGrainContact.size, a, b, grain.count);
    grain.Fx[a] += grainGrainFx[i];
    grain.Fx[b] -= grainGrainFx[i];
    grain.Fy[a] += grainGrainFy[i];

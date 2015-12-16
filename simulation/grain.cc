@@ -64,7 +64,7 @@ void Simulation::stepGrainIntegration() {
    const vXsf dt_mass = floatX(dt / grain.mass), dt = floatX(this->dt), dt_2 = floatX(this->dt / 2);
    const vXsf dt_angularMass = floatX(this->dt / Grain::angularMass);
    vXsf maxGrainVX = _0f;
-   const float* Fx = grain.Fx.data, *Fy = grain.Fy.data, *Fz = grain.Fz.data;
+   const float* pFx = grain.Fx.data, *pFy = grain.Fy.data, *pFz = grain.Fz.data;
    const float* pTx = grain.Tx.begin(), *pTy = grain.Ty.begin(), *pTz = grain.Tz.begin();
    float* const pVx = grain.Vx.begin(), *pVy = grain.Vy.begin(), *pVz = grain.Vz.begin();
    float* const Px = grain.Px.begin()+simd, *Py = grain.Py.begin()+simd, *Pz = grain.Pz.begin()+simd;
@@ -74,9 +74,11 @@ void Simulation::stepGrainIntegration() {
   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
     // Symplectic Euler
     vXsf Vx = load(pVx, i), Vy = load(pVy, i), Vz = load(pVz, i);
-    Vx += dt_mass * load(Fx, i);
-    Vy += dt_mass * load(Fy, i);
-    Vz += dt_mass * load(Fz, i);
+    vXsf Fx = load(pFx, i), Fy = load(pFy, i), Fz = load(pFz, i);
+    for(int k: range(simd)) assert_(isNumber(Fx[k]) && isNumber(Fy[k]) && isNumber(Fz[k]), i+k, grain.count);
+    Vx += dt_mass * Fx;
+    Vy += dt_mass * Fy;
+    Vz += dt_mass * Fz;
     store(pVx, i, Vx);
     store(pVy, i, Vy);
     store(pVz, i, Vz);
@@ -85,9 +87,6 @@ void Simulation::stepGrainIntegration() {
     store(Pz, i, load(Pz, i) + dt * Vz);
     maxGrainVX = max(maxGrainVX, sqrt(Vx*Vx + Vy*Vy + Vz*Vz));
 
-    //vec4( a[3] * b.xyz() + b[3] * a.xyz() + cross(a.xyz(), b.xyz()), a[3]*b[3] - dot(a.xyz(), b.xyz()));
-    // a = AVx[j], AVy[j], AVz[j], 0
-    // b = Rx[j], Ry[j], Rz[j], Rw[j]
     const vXsf AVx = load(pAVx, i), AVy = load(pAVy, i), AVz = load(pAVz, i);
     vXsf Rx = load(pRx, i), Ry = load(pRy, i), Rz = load(pRz, i), Rw = load(pRw, i);
     const vXsf dRx = dt_2 * (Rw * Rx + AVy*Rz - Ry*AVz);
