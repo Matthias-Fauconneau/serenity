@@ -185,6 +185,7 @@ static inline void storeu(mref<float> a, int index, v8sf v) { storeu(a.begin(), 
 static inline v8sf min(v8sf a, v8sf b) { return __builtin_ia32_minps256(a, b); }
 static inline v8sf max(v8sf a, v8sf b) { return __builtin_ia32_maxps256(a, b); }
 static inline v8sf sqrt(v8sf x) { return __builtin_ia32_sqrtps256(x); }
+static inline v8sf rcp(v8sf x) { return __builtin_ia32_rcpps256(x); }
 
 #if __INTEL_COMPILER
 static inline float extract(v8sf x, int i) { union { float e[8]; v8sf v; } X; X.v = x; return X.e[i]; }

@@ -16,7 +16,7 @@ __attribute((constructor(101))) void logCompiler() {
 #if OPENMP
  log("OpenMP", ::threadCount());
 #else
- log("Pthread", ::threadCount());
+ log("PThread", ::threadCount());
 #endif
 }
 
@@ -32,7 +32,7 @@ struct SimulationView : Simulation {
   totalTime.start();
   for(;;) {
    if(!run(totalTime)) return;
-   if(timeStep%(2*size_t(1/(dt*60))) == 0) return;
+   if(timeStep%(int(1/(dt*60))/4*32*1) == 0) return;
   }
  }
 } app (parameters());

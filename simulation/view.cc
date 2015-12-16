@@ -70,7 +70,10 @@ struct SimulationView : Widget {
   array<size_t> grainIndices (state.grain.count);
   {
    //vec3 min = 0, max = 0; //-state.membrane.radius, max = vec3(state.membrane.radius);
-   const vec3 min = state.min, max = state.max;
+   //const vec3 minW = qapply(viewRotation, state.min), maxW = qapply(viewRotation, state.max);
+   //const vec3 min = ::min(minW, maxW), max = ::max(minW, maxW);
+   const vec3 min = vec3(-state.radius, qapply(viewRotation, vec3(0,0,0)).y, -state.topZ/2);
+   const vec3 max = vec3(state.radius, qapply(viewRotation, vec3(0,0,state.topZ)).y, state.topZ/2);
    for(size_t i: range(state.grain.count)) {
     vec3 O = qapply(viewRotation, state.grain.position(i));
     //min = ::min(min, O - vec3(state.grain.radius));

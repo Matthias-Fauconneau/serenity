@@ -61,16 +61,16 @@ void Simulation::stepGrainIntegration() {
  const/*expr*/ size_t threadCount = ::threadCount();
  float maxGrainV_[threadCount]; mref<float>(maxGrainV_, threadCount).clear(0);
  grainIntegrationTime += parallel_chunk(align(simd, grain.count)/simd, [this, &maxGrainV_](uint id, size_t start, size_t size) {
-   const vXsf dt_mass = floatX(dt / grain.mass), dt = floatX(this->dt);
-   const float dt_angularMass = this->dt / Grain::angularMass;
+   const vXsf dt_mass = floatX(dt / grain.mass), dt = floatX(this->dt), dt_2 = floatX(this->dt / 2);
+   const vXsf dt_angularMass = floatX(this->dt / Grain::angularMass);
    vXsf maxGrainVX = _0f;
    const float* Fx = grain.Fx.data, *Fy = grain.Fy.data, *Fz = grain.Fz.data;
-   const float* Tx = grain.Tx.begin(), *Ty = grain.Ty.begin(), *Tz = grain.Tz.begin();
+   const float* pTx = grain.Tx.begin(), *pTy = grain.Ty.begin(), *pTz = grain.Tz.begin();
    float* const pVx = grain.Vx.begin(), *pVy = grain.Vy.begin(), *pVz = grain.Vz.begin();
    float* const Px = grain.Px.begin()+simd, *Py = grain.Py.begin()+simd, *Pz = grain.Pz.begin()+simd;
-   float* const AVx = grain.AVx.begin(), *AVy = grain.AVy.begin(), *AVz = grain.AVz.begin();
-   float* const Rx = grain.Rx.begin(), *Ry = grain.Ry.begin(), *Rz = grain.Rz.begin(),
-                    *Rw = grain.Rw.begin();
+   float* const pAVx = grain.AVx.begin(), *pAVy = grain.AVy.begin(), *pAVz = grain.AVz.begin();
+   float* const pRx = grain.Rx.begin(), *pRy = grain.Ry.begin(), *pRz = grain.Rz.begin(),
+                    *pRw = grain.Rw.begin();
   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
     // Symplectic Euler
     vXsf Vx = load(pVx, i), Vy = load(pVy, i), Vz = load(pVz, i);
@@ -85,22 +85,27 @@ void Simulation::stepGrainIntegration() {
     store(Pz, i, load(Pz, i) + dt * Vz);
     maxGrainVX = max(maxGrainVX, sqrt(Vx*Vx + Vy*Vy + Vz*Vz));
 
-    for(size_t k: range(simd)) { // FIXME: SIMD
-     size_t j = i+k;
-     vec4 dr = this->dt/2 * qmul(vec4(AVx[j],AVy[j],AVz[j], 0), vec4(Rx[j],Ry[j],Rz[j],Rw[j]));
-     Rx[j] += dr.x;
-     Ry[j] += dr.y;
-     Rz[j] += dr.z;
-     Rw[j] += dr.w;
-     AVx[j] += dt_angularMass * Tx[j];
-     AVy[j] += dt_angularMass * Ty[j];
-     AVz[j] += dt_angularMass * Tz[j];
-     float scale = 1./length(vec4(Rx[j],Ry[j],Rz[j],Rw[j]));
-     Rx[j] *= scale;
-     Ry[j] *= scale;
-     Rz[j] *= scale;
-     Rw[j] *= scale;
-    }
+    //vec4( a[3] * b.xyz() + b[3] * a.xyz() + cross(a.xyz(), b.xyz()), a[3]*b[3] - dot(a.xyz(), b.xyz()));
+    // a = AVx[j], AVy[j], AVz[j], 0
+    // b = Rx[j], Ry[j], Rz[j], Rw[j]
+    const vXsf AVx = load(pAVx, i), AVy = load(pAVy, i), AVz = load(pAVz, i);
+    vXsf Rx = load(pRx, i), Ry = load(pRy, i), Rz = load(pRz, i), Rw = load(pRw, i);
+    const vXsf dRx = dt_2 * (Rw * Rx + AVy*Rz - Ry*AVz);
+    const vXsf dRy = dt_2 * (Rw * Ry + AVz*Rx - Rz*AVx);
+    const vXsf dRz = dt_2 * (Rw * Rz + AVx*Ry - Rx*AVy);
+    const vXsf dRw = dt_2 * -(AVx*Rx + AVy*Ry + AVz*Rz);
+    Rx += dRx;
+    Ry += dRy;
+    Rz += dRz;
+    Rw += dRw;
+    store(pAVx, i, AVx + dt_angularMass * load(pTx, i));
+    store(pAVy, i, AVy + dt_angularMass * load(pTy, i));
+    store(pAVz, i, AVz + dt_angularMass * load(pTz, i));
+    vXsf normalize = rcp(Rx*Rx+Ry*Ry+Rz*Rz+Rw*Rw);
+    store(pRx, i, normalize*Rx);
+    store(pRy, i, normalize*Ry);
+    store(pRz, i, normalize*Rx);
+    store(pRw, i, normalize*Rw);
   }
   maxGrainV_[id] = max(maxGrainV_[id], max(maxGrainVX));
  }, threadCount);

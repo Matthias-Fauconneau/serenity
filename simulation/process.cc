@@ -14,7 +14,7 @@ void Simulation::stepProcess() {
    //processState = Load;
   }
   if(processState < Pressure) {
-   if(timeStep%60==0) log(maxGrainV*1e3f);
+   if(timeStep%(int(1/(dt*60))) == 0) log(maxGrainV*1e3f, "mm/s");
    if(maxGrainV > 10 * mm/s) return;
   }
   if(pressure < targetPressure) { // Increases pressure toward target pressure

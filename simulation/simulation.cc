@@ -205,10 +205,10 @@ void Simulation::profile(const Time& totalTime) {
 bool Simulation::run(const Time& totalTime) {
  stepTimeRT.start();
  stepTime.start();
- for(int unused t: range(1/(dt*60*4))) step();
+ for(int unused t: range(int(1/(dt*60))/4)) step();
  stepTime.stop();
  stepTimeRT.stop();
- if(timeStep%(1*size_t(1/(dt*60*4))) == 0) {
+ if(timeStep%(int(1/(dt*60))/4*32) == 0) {
   //extern size_t threadCount();
   //if(threadCount()<17) log(threadCount(), coreFrequencies()); else log("//", threadCount());
   profile(totalTime);
