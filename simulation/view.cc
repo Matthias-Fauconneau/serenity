@@ -42,6 +42,7 @@ struct SimulationView : Widget {
    vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]); }
   } membrane;
   float radius, bottomZ, topZ;
+  vec3 min, max;
  };
  array<State> states;
 
@@ -68,18 +69,19 @@ struct SimulationView : Widget {
   array<vec4> grainRotations (state.grain.count); // Rotated, Z-Sorted
   array<size_t> grainIndices (state.grain.count);
   {
-   vec3 min = 0, max = 0; //-state.membrane.radius, max = vec3(state.membrane.radius);
+   //vec3 min = 0, max = 0; //-state.membrane.radius, max = vec3(state.membrane.radius);
+   const vec3 min = state.min, max = state.max;
    for(size_t i: range(state.grain.count)) {
     vec3 O = qapply(viewRotation, state.grain.position(i));
-    min = ::min(min, O - vec3(state.grain.radius));
-    max = ::max(max, O + vec3(state.grain.radius));
+    //min = ::min(min, O - vec3(state.grain.radius));
+    //max = ::max(max, O + vec3(state.grain.radius));
     size_t j = 0;
     while(j < grainPositions.size && grainPositions[j].z < O.z) j++;
     grainPositions.insertAt(j, O);
     grainRotations.insertAt(j, conjugate(qmul(viewRotation, state.grain.rotation(i))));
     grainIndices.insertAt(j, i);
    }
-   for(size_t i: range(state.wire.count)) {
+   /*for(size_t i: range(state.wire.count)) {
     vec3 O = qapply(viewRotation, state.wire.position(i));
     if(O.z > 1) continue;
     min = ::min(min, O - vec3(state.wire.radius));
@@ -90,7 +92,7 @@ struct SimulationView : Widget {
     if(O.z > 1) continue;
     min = ::min(min, O);
     max = ::max(max, O);
-   }
+   }*/
    scale = vec3(vec2(2/::max(max.x-min.x, max.y-min.y)/1.2), 2/(max-min).z);
    translation = -vec3((min+max).xy()/2.f, min.z);
    /*if(!isNumber(translation.xy())) translation.xy() = this->translation;
@@ -324,6 +326,8 @@ struct SimulationApp {
   state.radius = simulation.membrane.radius;
   state.bottomZ = simulation.bottomZ;
   state.topZ = simulation.topZ;
+  state.min = simulation.lattice.min;
+  state.max = simulation.lattice.max;
   view.states.append(::move(state));
  }
 } app (parameters());

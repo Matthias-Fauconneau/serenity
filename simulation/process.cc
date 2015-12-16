@@ -2,25 +2,32 @@
 
 void Simulation::stepProcess() {
  // Process
- if(/*currentHeight >= topZ-Grain::radius ||*/ grain.count == grain.capacity-simd) {
-  /*const float targetPressure = 10000 * Pa;
-  if(pressure < targetPressure) {
+ if(grain.count == grain.capacity-simd) {
+  if(processState  < Pressure) { // Fits top plate while disabling gravity
+   float topZ = 0;
+   for(float z: grain.Pz.slice(simd, grain.count)) topZ = ::max(topZ, z+Grain::radius);
+   if(topZ < this->topZ) this->topZ = this->topZ + dt * (topZ-this->topZ) / s;
+   //this->topZ = ::max(this->topZ, topZ);
+   topZ0 = this->topZ;
+   if(Gz < 0) Gz += 4 * dt * (0-Gz) / s;
+   if(Gz > 0) Gz = 0;
+   //processState = Load;
+  }
+  if(processState < Pressure) {
+   if(timeStep%60==0) log(maxGrainV*1e3f);
+   if(maxGrainV > 10 * mm/s) return;
+  }
+  if(pressure < targetPressure) { // Increases pressure toward target pressure
    processState = Pressure;
    pressure += dt * targetPressure * Pa/s;
-  } else {
-   if(processState  < Load) { // Fits plate (Prevents initial decompression)
-    float topZ = 0;
-    for(float z: grain.Pz.slice(simd, grain.count)) topZ = ::max(topZ, z+Grain::radius);
-    this->topZ = ::min(this->topZ, topZ);
-    topZ0 = this->topZ;
-    processState = Load;
-   }
+  } else { // Displace plates with constant velocity
+   processState = Load;
    topZ -= dt * plateSpeed;
    bottomZ += dt * plateSpeed;
-  }*/
+  }
  } else {
   // Increases current height
-  if(currentHeight < topZ-Grain::radius) currentHeight += verticalSpeed * dt;
+  if(currentHeight < topZ+Grain::radius/2) currentHeight += verticalSpeed * dt;
 
   // Generates wire
   if(pattern) {
@@ -72,7 +79,7 @@ void Simulation::stepProcess() {
 
   // Generates grain
   if(currentHeight >= Grain::radius) {
-   for(int unused i: range(8)) {
+   for(;;) {
     if(grain.count == grain.capacity-simd) break;
     vec2 p(random()*2-1,random()*2-1);
     if(length(p)<1) { // Within cylinder
@@ -97,7 +104,7 @@ void Simulation::stepProcess() {
       processTime.stop();
       size_t i = grain.count;
       grain.Px[simd+i] = newPosition.x; grain.Py[i+simd] = newPosition.y; grain.Pz[simd+i] = newPosition.z;
-      grain.Vx[i] = 0; grain.Vy[i] = 0; grain.Vz[i] = 0; //- 1 * m/s;
+      grain.Vx[i] = 0; grain.Vy[i] = 0; grain.Vz[i] = - 1 * m/s;
       grain.AVx[i] = 0; grain.AVy[i] = 0; grain.AVz[i] = 0;
       float t0 = 2*PI*random();
       float t1 = acos(1-2*random());
@@ -113,7 +120,7 @@ void Simulation::stepProcess() {
        grainMembraneGlobalMinD = 0;
       }
       grainWireGlobalMinD = 0;
-     }
+     } else break;
     }
    }
   }

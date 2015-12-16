@@ -41,24 +41,24 @@ void Simulation::step() {
  grainBottomTotalTime.start();
  stepGrainBottom();
  grainBottomTotalTime.stop();
- /*if(processState >= ProcessState::Pressure) {
+ if(currentHeight >= topZ) { //processState >= ProcessState::Pressure) {
   grainTopTotalTime.start();
   stepGrainTop();
   grainTopTotalTime.start();
- }*/
+ }
  grainGrainTotalTime.start();
  stepGrainGrain();
  grainGrainTotalTime.stop();
  grainTotalTime.stop();
 
- /*membraneTotalTime.start();
+ membraneTotalTime.start();
  if(processState >= ProcessState::Pressure) {
   stepMembrane();
- }*/
+ }
  grainMembraneTotalTime.start();
  stepGrainMembrane();
  grainMembraneTotalTime.stop();
- //membraneTotalTime.stop();
+ membraneTotalTime.stop();
 
  /*stepWire();
  stepGrainWire();
@@ -205,10 +205,10 @@ void Simulation::profile(const Time& totalTime) {
 bool Simulation::run(const Time& totalTime) {
  stepTimeRT.start();
  stepTime.start();
- for(int unused t: range(1/(dt*60*2))) step();
+ for(int unused t: range(1/(dt*60*4))) step();
  stepTime.stop();
  stepTimeRT.stop();
- if(timeStep%(1*size_t(1/(dt*60*2))) == 0) {
+ if(timeStep%(1*size_t(1/(dt*60*4))) == 0) {
   //extern size_t threadCount();
   //if(threadCount()<17) log(threadCount(), coreFrequencies()); else log("//", threadCount());
   profile(totalTime);

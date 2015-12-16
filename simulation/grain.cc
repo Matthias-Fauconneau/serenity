@@ -57,6 +57,7 @@ void Simulation::grainLattice() {
 
 void Simulation::stepGrainIntegration() {
  if(!grain.count) return;
+ for(size_t i: range(grain.count, align(simd, grain.count))) { grain.Fx[i] = 0; grain.Fy[i] = 0; grain.Fz[i] = 0; }
  const/*expr*/ size_t threadCount = ::threadCount();
  float maxGrainV_[threadCount]; mref<float>(maxGrainV_, threadCount).clear(0);
  grainIntegrationTime += parallel_chunk(align(simd, grain.count)/simd, [this, &maxGrainV_](uint id, size_t start, size_t size) {

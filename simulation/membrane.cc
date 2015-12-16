@@ -148,7 +148,8 @@ void Simulation::stepMembraneIntegration() {
   const size_t threadCount = ::threadCount();
   float maxMembraneV_[threadCount]; mref<float>(maxMembraneV_, threadCount).clear(0);
   membraneIntegrationTime += parallel_for(1, membrane.H-1, [this, &maxMembraneV_](uint id, uint i) {
-   const vXsf dt_mass = floatX(this->dt / membrane.mass), dt = floatX(this->dt);//, topZ = floatX(this->topZ);
+   const vXsf dt_mass = floatX(this->dt / membrane.mass), dt = floatX(this->dt);
+   const vXsf topZ = floatX(this->topZ);
    vXsf maxMembraneVX = _0f;
    float* const Fx = membrane.Fx.begin(), *Fy = membrane.Fy.begin(), *Fz = membrane.Fz.begin();
    float* const pVx = membrane.Vx.begin(), *pVy = membrane.Vy.begin(), *pVz = membrane.Vz.begin();
@@ -173,8 +174,7 @@ void Simulation::stepMembraneIntegration() {
     store(pVz, k, Vz);
     const vXsf Px = load(pPx, k) + dt * Vx;
     const vXsf Py = load(pPy, k) + dt * Vy;
-    const vXsf Pz = load(pPz, k) + dt * Vz;
-    //Pz = min(topZ, Pz);
+    const vXsf Pz = min(topZ, load(pPz, k) + dt * Vz);
     store(pPx, k, Px);
     store(pPy, k, Py);
     store(pPz, k, Pz);
@@ -201,81 +201,3 @@ void Simulation::stepMembraneIntegration() {
  float maxGrainMembraneV = maxGrainV + maxMembraneV;
  grainMembraneGlobalMinD -= maxGrainMembraneV * this->dt;
 }
-
-#if 0
-void Simulation::domainMembrane(vec3& min, vec3& max) {
-#if 0
-  const/*expr*/ size_t threadCount = ::min(membrane.H-2, ::threadCount()); // 60*60*16 ~ 57600
-  float minX_[threadCount]; mref<float>(minX_, threadCount).clear(0);
-  float minY_[threadCount]; mref<float>(minY_, threadCount).clear(0);
-  float minZ_[threadCount]; mref<float>(minZ_, threadCount).clear(0);
-  float maxX_[threadCount]; mref<float>(maxX_, threadCount).clear(0);
-  float maxY_[threadCount]; mref<float>(maxY_, threadCount).clear(0);
-  float maxZ_[threadCount]; mref<float>(maxZ_, threadCount).clear(0);
-  //size_t stride = membrane.stride, margin = membrane.margin;
-  /*domainTime += parallel_chunk((stride+margin)/simd, (membrane.count-stride-margin)/simd,
-                   [this, &minX_, &minY_, &minZ_, &maxX_, &maxY_, &maxZ_](uint id, uint start, uint size) {*/
-  domainTime += parallel_for(1, membrane.H-1,
-                   [this, &minX_, &minY_, &minZ_, &maxX_, &maxY_, &maxZ_](uint id, uint i) {
-   int stride = membrane.stride, W = membrane.W, margin = membrane.margin;
-     const float* const Px = membrane.Px.begin(), *Py = membrane.Py.begin(), *Pz = membrane.Pz.begin();
-     vXsf minX = _0f, minY = _0f, minZ = _0f, maxX = _0f, maxY = _0f, maxZ = _0f;
-     for(int j=0; j<W; j+=simd) { // 49
-     //for(uint i=start*simd; i<(start+size)*simd; i+=simd) { // 49
-      uint k = margin+i*stride+j;
-       vXsf X = load(Px, k), Y = load(Py, k), Z = load(Pz, k);
-       minX = ::min(minX, X);
-       minY = ::min(minY, Y);
-       minZ = ::min(minZ, Z);
-       maxX = ::max(maxX, X);
-       maxY = ::max(maxY, Y);
-       maxZ = ::max(maxZ, Z);
-     }
-     minX_[id] = ::min(minX);
-     minY_[id] = ::min(minY);
-     minZ_[id] = ::min(minZ);
-     maxX_[id] = ::max(maxX);
-     maxY_[id] = ::max(maxY);
-     maxZ_[id] = ::max(maxZ);
-  }, threadCount);
-  float minX = 0, minY = 0, minZ = 0, maxX = 0, maxY = 0, maxZ = 0;
-  for(size_t k: range(threadCount)) {
-   minX = ::min(minX, minX_[k]);
-   maxX = ::max(maxX, maxX_[k]);
-   minY = ::min(minY, minY_[k]);
-   maxY = ::max(maxY, maxY_[k]);
-   minZ = ::min(minZ, minZ_[k]);
-   maxZ = ::max(maxZ, maxZ_[k]);
-  }
- }
-#else
- vXsf minX_ = _0f, minY_ = _0f, minZ_ = _0f, maxX_ = _0f, maxY_ = _0f, maxZ_ = _0f;
- int stride = membrane.stride, W = membrane.W, margin = membrane.margin;
- const float* const Px = membrane.Px.begin(), *Py = membrane.Py.begin(), *Pz = membrane.Pz.begin();
- for(int i=1; i<membrane.H-1; i++) {
-  for(int j=0; j<W; j+=simd) {
-   uint k = margin+i*stride+j;
-   vXsf X = load(Px, k), Y = load(Py, k), Z = load(Pz, k);
-   minX_ = ::min(minX_, X);
-   maxX_ = ::max(maxX_, X);
-   minY_ = ::min(minY_, Y);
-   maxY_ = ::max(maxY_, Y);
-   minZ_ = ::min(minZ_, Z);
-   maxZ_ = ::max(maxZ_, Z);
-  }
- }
- const float minX = ::min(minX_);
- const float minY = ::min(minY_);
- const float minZ = ::min(minZ_);
- const float maxX = ::max(maxX_);
- const float maxY = ::max(maxY_);
- const float maxZ = ::max(maxZ_);
-#endif
- assert(maxX-minX < 4 && maxY-minY < 4 && maxZ-minZ < 4, "membrane",
-         minX, maxX, minY, maxY, minZ, maxZ, "\n",
-         maxX-minX, maxY-minY, maxZ-minZ, "\n",
-         membrane.margin, membrane.W, membrane.H, membrane.stride);
- min = vec3(minX, minY, minZ);
- max = vec3(maxX, maxY, maxZ);
-}
-#endif

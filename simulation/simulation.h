@@ -6,7 +6,7 @@
 // High level simulation and contact management
 struct Simulation : System {
  // Process parameters
- sconst float Gz = -10 * N/kg; // Gravity
+ float Gz = -10 * N/kg; // Gravity
  const float patternRadius = membrane.radius - Grain::radius;
  enum Pattern { None, Helix, Cross, Loop };
  sconst string patterns[] {"none", "helix", "radial", "spiral"};
@@ -23,7 +23,8 @@ struct Simulation : System {
  Random random;
  float currentHeight = Grain::radius;
  float lastAngle = 0, winchAngle = 0, currentWinchRadius = patternRadius;
- float pressure = 0;
+ const float targetPressure = 80 * KPa;
+ float pressure = targetPressure/128;
  float bottomZ = 0, topZ = membrane.height, topZ0;
 
  // Results
@@ -106,8 +107,8 @@ struct Simulation : System {
 
  // Grain Lattice
  const float grainLatticeR = membrane.radius*(1+1./2);
- Lattice<int32> lattice {sqrt(3.)/(2*Grain::radius), vec3(vec2(-grainLatticeR), 0),
-                                                                                    vec3(vec2(grainLatticeR), membrane.height)};
+ Lattice<int32> lattice {sqrt(3.)/(2*Grain::radius), vec3(vec2(-grainLatticeR), -Grain::radius),
+                                                                                    vec3(vec2(grainLatticeR), membrane.height+Grain::radius)};
  bool validGrainLattice = false;
 
  // Grain - Grain

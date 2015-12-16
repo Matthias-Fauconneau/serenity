@@ -13,23 +13,23 @@ struct System {
  // Units
  const float dt;
  sconst float s = 1, m = 1, kg = 1, N = kg /m /(s*s), Pa = N / (m*m);
- sconst float mm = 1e-3*m, g = 1e-3*kg, MPa = 1e6 * Pa;
+ sconst float mm = 1e-3*m, g = 1e-3*kg, KPa = 1e3 * Pa, MPa = 1e6 * Pa;
 
  // Contact parameters
  //sconst float e = 1./2; // Restitution coefficient
  //const float normalDampingRate = ln(e) / sqrt(sq(PI)+ln(ln(e)));
  sconst float normalDampingRate = 1; // ~ ln e / √(π²+ln²e) [restitution coefficient e]
- sconst float dynamicFrictionCoefficient = 0.1; // 1
- sconst float staticFrictionSpeed = __builtin_inff();
- sconst float staticFrictionLength = 3 * mm; // ~ Wire::radius
- sconst float staticFrictionStiffness = 100 * 1*g*10/(1*mm); //k/F = F/L ~ Wire::mass*G/Wire::radius
- sconst float staticFrictionDamping = 0.01 * kg/s; // TODO: relative to k ?
+ sconst float dynamicFrictionCoefficient = 0;//0.1; // 1
+ sconst float staticFrictionSpeed = 0;//__builtin_inff();
+ sconst float staticFrictionLength = 0;//3 * mm; // ~ Wire::radius
+ sconst float staticFrictionStiffness = 0;//100 * 1*g*10/(1*mm); //k/F = F/L ~ Wire::mass*G/Wire::radius
+ sconst float staticFrictionDamping = 0;//0.01 * kg/s; // TODO: relative to k ?
 
  // Obstacles: floor plane, cast cylinder
  struct Obstacle {
   sconst float mass = 1 * kg;
   sconst float curvature = 0;
-  sconst float elasticModulus = 1 * MPa; // 0.1
+  sconst float elasticModulus = 100 * MPa;
   sconst float poissonRatio = 0;
  };
 
@@ -40,7 +40,7 @@ struct System {
   sconst float density = 7.6e3 * kg/cb(m);
   sconst float mass = validation ? 4./3*PI*cb(radius) * density /*~5g*/ : 2.7 * g;
   sconst float curvature = 1./radius;
-  sconst float elasticModulus = 1 * MPa; // 1e3
+  sconst float elasticModulus = 100 * MPa; // 1e3
   sconst float poissonRatio = 0.35;
   sconst float angularMass = 2./3*mass*sq(radius);
 
@@ -63,7 +63,7 @@ struct System {
   buffer<float> Ty { ::threadCount() * capacity };
   buffer<float> Tz { ::threadCount() * capacity }; // Torque
 
-  Grain() : capacity(4*2048+simd) {
+  Grain() : capacity(4*3840/8+simd) {
    Px.clear(0); Py.clear(0); Pz.clear(0);
    Vx.clear(0); Vy.clear(0); Vz.clear(0);
    Fx.clear(0); Fy.clear(0); Fz.clear(0);
@@ -115,21 +115,21 @@ struct System {
  struct Membrane {
   sconst float density = 1000 * kg / cb(m);
   sconst float curvature = 0;
-  sconst float elasticModulus = Obstacle::elasticModulus * MPa; // 10
+  sconst float elasticModulus = 100 * MPa;
   sconst float poissonRatio = 0.48;
 
-  sconst float resolution = Grain::radius; ///2;
+  sconst float resolution = Grain::radius / 2;
   const float radius;
   const int W = int(2*PI*radius/resolution)/simd*simd;
   const int margin = simd; // 16 to ensure no false sharing ?
   const int stride = margin+W+margin;
   const float internodeLength = 2*sin(PI/W)*radius;
-  const float exactHeight = radius * 2;
+  const float exactHeight = radius * 4;
   const float cellHeight = sqrt(3.)/2*internodeLength;
   const int H = ceil(exactHeight/cellHeight)+1;
   const float height = (H-1) * cellHeight;
   sconst float thickness = 1 * mm;
-  const float tensionElasticModulus = 100 * MPa;
+  const float tensionElasticModulus = 100 * MPa; // 22-100
   const float mass = sqrt(3.)/2 * sq(internodeLength) * thickness * density;
   const float tensionStiffness = sqrt(3.)/2 * internodeLength * thickness * tensionElasticModulus;
   const float tensionDamping = 2 * sqrt(mass * tensionStiffness);
