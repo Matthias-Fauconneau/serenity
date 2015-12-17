@@ -20,11 +20,11 @@ struct System {
  //sconst float e = 1./2; // Restitution coefficient
  //const float normalDampingRate = ln(e) / sqrt(sq(PI)+ln(ln(e)));
  sconst float normalDampingRate = 1; // ~ ln e / √(π²+ln²e) [restitution coefficient e]
- sconst float dynamicFrictionCoefficient = 1; // 1
- sconst float staticFrictionSpeed = 0;//__builtin_inff();
- sconst float staticFrictionLength = 0;//3 * mm; // ~ Wire::radius
- sconst float staticFrictionStiffness = 0;//100 * 1*g*10/(1*mm); //k/F = F/L ~ Wire::mass*G/Wire::radius
- sconst float staticFrictionDamping = 0;//0.01 * kg/s; // TODO: relative to k ?
+ sconst float dynamicFrictionCoefficient = 1./2; // 1
+ sconst float staticFrictionSpeed = __builtin_inff();
+ sconst float staticFrictionLength = 3 * mm; // ~ Wire::radius
+ sconst float staticFrictionStiffness = 100 * 1*g*10/(1*mm); //k/F = F/L ~ Wire::mass*G/Wire::radius
+ sconst float staticFrictionDamping = 0.01 * kg/s; // TODO: relative to k ?
 
  // Obstacles: floor plane, cast cylinder
  struct Obstacle {
@@ -50,12 +50,6 @@ struct System {
   buffer<float> Px { capacity };
   buffer<float> Py { capacity };
   buffer<float> Pz { capacity };
-#define GEAR 0
-#if GEAR
-  buffer<float> PDx[2] {capacity, capacity};
-  buffer<float> PDy[2] {capacity, capacity};
-  buffer<float> PDz[2] {capacity, capacity};
-#endif
   buffer<float> Vx { capacity };
   buffer<float> Vy { capacity };
   buffer<float> Vz { capacity };
@@ -71,9 +65,6 @@ struct System {
 
   Grain() : capacity(4*3840/8+simd) {
    Px.clear(0); Py.clear(0); Pz.clear(0);
-#if GEAR
-   for(int i: range(2)) { PDx[i].clear(0); PDy[i].clear(0); PDz[i].clear(0); }
-#endif
    Vx.clear(0); Vy.clear(0); Vz.clear(0);
    Fx.clear(0); Fy.clear(0); Fz.clear(0);
    Tx.clear(0); Ty.clear(0); Tz.clear(0);
@@ -152,11 +143,6 @@ struct System {
   buffer<float> Px { capacity };
   buffer<float> Py { capacity };
   buffer<float> Pz { capacity };
-#if GEAR
-  buffer<float> PDx[2] {capacity, capacity};
-  buffer<float> PDy[2] {capacity, capacity};
-  buffer<float> PDz[2] {capacity, capacity};
-#endif
   buffer<float> Vx { capacity };
   buffer<float> Vy { capacity };
   buffer<float> Vz { capacity };
@@ -166,9 +152,6 @@ struct System {
 
   Membrane(float radius) : radius(radius) {
    Px.clear(0); Py.clear(0); Pz.clear(0);
-#if GEAR
-   for(int i: range(2)) { PDx[i].clear(0); PDy[i].clear(0); PDz[i].clear(0); }
-#endif
    Vx.clear(0); Vy.clear(0); Vz.clear(0);
    Fx.clear(0); Fy.clear(0); Fz.clear(0);
    for(size_t i: range(H)) {

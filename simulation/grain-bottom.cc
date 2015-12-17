@@ -121,7 +121,7 @@ void Simulation::stepGrainBottom() {
  grainBottomContact.size = contactCount;
  if(!grainBottomContact.size) return;
  for(uint i=grainBottomContact.size; i<align(simd, grainBottomContact.size); i++)
-  grainBottomContact.begin()[i] = grainBottomA.size;;
+  grainBottomContact.begin()[i] = grainBottomA.size;
 
  // Evaluates forces from (packed) intersections (SoA)
  size_t GBcc = align(simd, grainBottomContact.size); // Grain-Bottom contact count
@@ -168,7 +168,6 @@ void Simulation::stepGrainBottom() {
  float bottomForceZ = 0;
  for(size_t i=0; i<grainBottomContact.size; i++) { // Scalar scatter add
   size_t index = grainBottomContact[i];
-  assert(index == i, i, index);
   size_t a = grainBottomA[index];
   grain.Fx[a] += grainBottomFx[i];
   grain.Fy[a] += grainBottomFy[i];

@@ -7,15 +7,12 @@ void Simulation::stepProcess() {
    float topZ = 0;
    for(float z: grain.Pz.slice(simd, grain.count)) topZ = ::max(topZ, z+Grain::radius);
    if(topZ < this->topZ) this->topZ = this->topZ + dt * (topZ-this->topZ) / s;
-   //this->topZ = ::max(this->topZ, topZ);
    topZ0 = this->topZ;
-   if(Gz < 0) Gz += 4 * dt * (0-Gz) / s;
-   if(Gz > 0) Gz = 0;
-   //processState = Load;
+   Gz = 0;
   }
   if(processState < Pressure) {
    if(timeStep%(int(1/(dt*60))) == 0) log(maxGrainV*1e3f, "mm/s");
-   if(maxGrainV > 100 * mm/s) return;
+   if(maxGrainV > 50 * mm/s) return;
   }
   if(pressure < targetPressure) { // Increases pressure toward target pressure
    processState = Pressure;
