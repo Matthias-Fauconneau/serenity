@@ -242,7 +242,7 @@ void Simulation::stepGrainGrain() {
    vXsi index = convert(scale*(Az-minZ)) * sizeYX
      + convert(scale*(Ay-minY)) * sizeX
      + convert(scale*(Ax-minX));
-   for(int k: range(grain.count-i, simd)) index[k] = 0;
+   for(int k: range(grain.count-i, simd)) insert(index, k, 0);
    // Neighbours
    for(uint n: range(62)) { // A is not monotonous
     vXsi b = gather(latticeNeighbours[n], index);
@@ -410,6 +410,7 @@ void Simulation::stepGrainGrain() {
    int index = grainGrainContact[i];
    int a = grainGrainA[index];
    int b = grainGrainB[index];
+   assert_(a >= 0 && b>= 0, a, b, grain.count, index, grainGrainA.size, i, grainGrainContact.size);
    grain.Fx[a] += grainGrainFx[i];
    grain.Fx[b] -= grainGrainFx[i];
    grain.Fy[a] += grainGrainFy[i];
@@ -426,6 +427,7 @@ void Simulation::stepGrainGrain() {
   }
   grainGrainSumTime.stop();
  } else {
+#if __MIC__ || !__INTEL_COMPILER
   const uint jobCount = grainGrainContact.size/simd;
   const uint chunkSize = (jobCount+threadCount-1)/threadCount;
   const uint chunkCount = (jobCount+chunkSize-1)/chunkSize;
@@ -452,9 +454,10 @@ void Simulation::stepGrainGrain() {
   grainGrainSumAllocateTime.start();
   // Distributes chunks across copies
   uint maxCopyCount = chunkCount, maxDomainCount = chunkCount;
-  uint copyStart[maxCopyCount*maxDomainCount], copyStop[maxCopyCount*maxDomainCount];
-  mref<uint>(copyStart, maxCopyCount*maxDomainCount).clear(0);
-  mref<uint>(copyStop, maxCopyCount*maxDomainCount).clear(0);
+  buffer<uint> copyStart(maxCopyCount*maxDomainCount), copyStop(maxCopyCount*maxDomainCount);
+  /*mref<uint>(copyStart, maxCopyCount*maxDomainCount).clear(0);
+  mref<uint>(copyStop, maxCopyCount*maxDomainCount).clear(0);*/
+  copyStart.clear(0); copyStop.clear(0);
   uint copy[maxCopyCount]; // Allocates buffer copies to chunks without range overlap
   uint copyCount = 0;
   for(uint chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
@@ -548,5 +551,8 @@ void Simulation::stepGrainGrain() {
    }
   };
   grainGrainSumMergeTime += parallel_chunk(align(simd, grain.count)/simd, merge);
+#else
+  error("Unsupported");
+#endif
  }
 }

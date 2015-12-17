@@ -44,7 +44,7 @@ void Simulation::step() {
  if(currentHeight >= topZ) { //processState >= ProcessState::Pressure) {
   grainTopTotalTime.start();
   stepGrainTop();
-  grainTopTotalTime.start();
+  grainTopTotalTime.stop();
  }
  grainGrainTotalTime.start();
  stepGrainGrain();

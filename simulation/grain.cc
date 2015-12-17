@@ -49,7 +49,7 @@ void Simulation::grainLattice() {
   vXsi index = convert(scale*(Az-minZ)) * sizeYX
     + convert(scale*(Ay-minY)) * sizeX
     + convert(scale*(Ax-minX));
-  for(int k: range(grain.count-i)) base[index[k]] = a[k];
+  for(int k: range(grain.count-i)) base[extract(index, k)] = extract(a, k);
  }
 
  validGrainLattice = true;

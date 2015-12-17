@@ -43,6 +43,7 @@ static inline v16sf sqrt(v16sf x) { return _mm512_sqrt_ps(x); }
 static inline v16sf rsqrt(v16sf x) { return _mm512_rsqrt23_ps(x); }
 
 static inline int extract(v16si x, int i) { union { int e[16]; v16si v; } X; X.v = x; return X.e[i]; }
+static inline void insert(v16si& x, int i, int v) { union { int e[16]; v16si v; } X; X.v = x; X.e[i] = v; x=X.v; }
 static inline float extract(v16sf x, int i) { union { float e[16]; v16sf v; } X; X.v = x; return X.e[i]; }
 
 static inline v16sf gather(const float* P, v16si i) { return _mm512_i32gather_ps(i, P, sizeof(float)); }
@@ -93,16 +94,18 @@ static v8si unused _seqi = (v8si){0,1,2,3,4,5,6,7};
 static inline v8si load(const int* a, int index) { return *(v8si*)(a+index); }
 
 #if __INTEL_COMPILER
-static inline v8si lessThan(v8si a, v8si b) { return _mm256_cmp_epi32(a, b, _CMP_LT_OS); }
-#else
-static inline v8si lessThan(v8si a, v8si b) { return a < b; }
+#include <immintrin.h>
 #endif
 
+typedef int v4si __attribute((__vector_size__ (16)));
 #if __INTEL_COMPILER
-static inline float extract(v8si x, int i) { union { int e[8]; v8si v; } X; X.v = x; return X.e[i]; }
-#include <immintrin.h>
+static inline int extract(v4si x, int i) { return _mm_extract_epi32(x, i); }
+static inline int extract(v8si x, int i) { union { int e[8]; v8si v; } X; X.v = x; return X.e[i]; }
+//static inline float extract(v8si x, int i) { return _mm256_extract_epi32(x, i); }
+static inline void insert(v8si& x, int i, int v) { union { int e[8]; v8si v; } X; X.v = x; X.e[i] = v; x=X.v; }
 #else
-static inline float extract(v8si x, int i) { return x[i]; }
+static inline int extract(v8si x, int i) { return x[i]; }
+static inline void insert(v8si& x, int i, int v) { x[i] = v; }
 #endif
 
 static inline v8si gather(const int* P, v8si i) {
@@ -125,7 +128,7 @@ static inline v8si gather(const int* P, v8si i) {
 static inline void scatter(int* const P, const v8si i, const v8si x) {
 #if __INTEL_COMPILER
  union { int e[8]; v8si v; } I; I.v = i;
- union { int e[8]; v8sf v; } X; X.v = x;
+ union { int e[8]; v8si v; } X; X.v = x;
  P[I.e[0]] = X.e[0]; P[I.e[1]] = X.e[1]; P[I.e[2]] = X.e[2]; P[I.e[3]] = X.e[3];
  P[I.e[4]] = X.e[4]; P[I.e[5]] = X.e[5]; P[I.e[6]] = X.e[6]; P[I.e[7]] = X.e[7];
 #else
@@ -134,20 +137,21 @@ static inline void scatter(int* const P, const v8si i, const v8si x) {
 #endif
 }
 
-
-typedef int v4si __attribute((__vector_size__ (16)));
+typedef long long m128i __attribute__((__vector_size__(16)));
+typedef long long m256i __attribute__((__vector_size__(32)));
 #if AVX2
 static inline v8si min(v8si a, v8si b) { return __builtin_ia32_pminud256(a, b); }
 static inline v8si max(v8si a, v8si b) { return __builtin_ia32_pmaxud256(a, b); }
 #else
 #if __INTEL_COMPILER
 static inline v4si low(v8si x) { return _mm256_castsi256_si128(x); }
-static inline v4si high(v8si x) { return _mm256_extractf128_epi32(x, 1); }
+static inline v4si high(v8si x) { return _mm256_extractf128_si256(x, 1); }
+static inline v8si int2x4(v4si a, v4si b) {
+ return _mm256_insertf128_si256(_mm256_castsi128_si256((m128i)a), (m128i)b, 1);
+}
 #elif __clang__
 static inline v4si low(v8si x) { return __builtin_shufflevector(x, x, 0, 1, 2, 3); }
 static inline v4si high(v8si x) { return __builtin_ia32_vextractf128_si256(x, 1); }
-typedef long long m128i __attribute__((__vector_size__(16)));
-typedef long long m256i __attribute__((__vector_size__(32)));
 static inline v8si int2x4(v4si a, v4si b) {
  return __builtin_ia32_vinsertf128_si256((m256i)__builtin_shufflevector((m128i)a ,(m128i)a, 0, 1, -1, -1),
                                                                      b, 1);
@@ -161,8 +165,15 @@ static inline v8si int2x4(v4si a, v4si b) {
 
 static inline v4si min(v4si a, v4si b) { return __builtin_ia32_pminsd128(a, b); }
 static inline v4si max(v4si a, v4si b) { return __builtin_ia32_pmaxsd128(a, b); }
-static inline v8si min(v8si a, v8si b) { return int2x4(min(low(a), high(b)), min(low(a), high(b))); }
-static inline v8si max(v8si a, v8si b) { return int2x4(max(low(a), high(b)), max(low(a), high(b))); }
+static inline v8si min(v8si a, v8si b) { return int2x4(min(low(a), low(b)), min(high(a), high(b))); }
+static inline v8si max(v8si a, v8si b) { return int2x4(max(low(a), low(b)), max(high(a), high(b))); }
+#endif
+
+#if __INTEL_COMPILER
+static inline v4si lessThan(v4si a, v4si b) { return _mm_cmplt_epi32(a, b); }
+static inline v8si lessThan(v8si a, v8si b) { return int2x4(lessThan(low(a), low(b)), lessThan(high(a), high(b))); }
+#else
+static inline v8si lessThan(v8si a, v8si b) { return a < b; }
 #endif
 
 typedef float v8sf __attribute((__vector_size__ (32)));
@@ -226,9 +237,10 @@ static inline void scatter(float* const P, const v8si i, const v8sf x) {
 #if __INTEL_COMPILER
 static inline v8si lessThan(v8sf a, v8sf b) { return (v8si)(v8sf)_mm256_cmp_ps(a, b, _CMP_LT_OS); }
 static inline v8si greaterThan(v8sf a, v8sf b) { return (v8si)(v8sf)_mm256_cmp_ps(a, b, _CMP_GT_OS); }
-static inline v8si greaterThanOrEqual(v8sf a, v8sf b) { return (v8si)(v8sf)_mm256_cmp_ps(a, b, _CMP_GTE_OS); }
-static inline v8si notEqual(v8si a, v8si b) { return (v8si)(v8sf)_mm256_cmp_ps((v8sf)a, (v8sf)b, _CMP_NEQ_UQ); }
+static inline v8si greaterThanOrEqual(v8sf a, v8sf b) { return (v8si)(v8sf)_mm256_cmp_ps(a, b, _CMP_GE_OS); }
 static inline v8si equal(v8sf a, v8sf b) { return (v8si)(v8sf)_mm256_cmp_ps(a, b, _CMP_EQ_OQ); }
+static inline v8si notEqual(v8si a, v8si b) {
+ return (__m256i)_mm256_andnot_ps((__m256)(__m256i)_mm256_cmpeq_epi32(a, b), (__m256)(__m256i)_1i); }
 #else
 static inline v8si lessThan(v8sf a, v8sf b) { return a < b; }
 static inline v8si greaterThan(v8sf a, v8sf b) { return a > b; }
@@ -252,15 +264,15 @@ static inline v8sf maskSub(v8sf a, v8si k, v8sf b) { return a - mask(k, b); }
 static inline v8sf mask3_fmadd(v8sf a, v8sf b, v8sf c, v8si k) { return mask(k, a * b) + c; }
 
 #if __INTEL_COMPILER
-static inline v8si convert(v8sf x) { return _mm256_cvt_roundps_epi32(x); }
+static inline v8si convert(v8sf x) { return _mm256_cvttps_epi32(x); }
 #else
 static inline v8si convert(v8sf x) { return __builtin_ia32_cvtps2dq256(x); }
 #endif
 
 #if __INTEL_COMPILER
 static inline void maskStore(float* p, v8si k, v8sf a) { _mm256_maskstore_ps(p, k, a); }
-static inline uint moveMask(v8si k) { return _mm256_movemask_ps(k); }
-static inline uint countBits(v8si k) { return _mm_countbits_32(k); }
+static inline int moveMask(v8si k) { return _mm256_movemask_ps((v8sf)k); }
+static inline uint countBits(v8si k) { return _mm_countbits_32(moveMask(k)); }
 #else
 static inline void maskStore(float* p, v8si k, v8sf a) { __builtin_ia32_maskstoreps256((v8sf*)p, k, a); }
 static inline uint moveMask(v8si k) { return __builtin_ia32_movmskps256((v8sf)k); }
@@ -314,22 +326,22 @@ reduce(max)
 #define reduce(op) \
 static inline int op(v8si x) { \
     /* ( x3+x7, x2+x6, x1+x5, x0+x4 ) */ \
-    const v4sf x128 = _mm_##op##_epi32(high(x),  low(x)); \
+    const v4si x128 = _mm_##op##_epi32(high(x),  low(x)); \
     /* ( -, -, x1+x3+x5+x7, x0+x2+x4+x6 ) */ \
-    const v4sf x64 = _mm_##op##_epi32(x128, _mm_movehl_epi32(x128, x128)); \
+    const v4si x64 = _mm_##op##_epi32(x128, (__m128i)_mm_movehl_ps((v4sf)x128, (v4sf)x128)); \
     /* ( -, -, -, x0+x1+x2+x3+x4+x5+x6+x7 ) */ \
-    const v4sf x32 = _mm_##op##_ss(x64, _mm_shuffle_epi32(x64, x64, 0x55)); \
-    return _mm_cvtss_f32(x32); \
+    const v4si x32 = _mm_##op##_epi32(x64, _mm_shuffle_epi32(x64, 0x55)); \
+    return extract(x32, 0); \
 }
 #elif __clang__
 #define reduce(op) \
 static inline int op(v8si x) { \
     /* ( x3+x7, x2+x6, x1+x5, x0+x4 ) */ \
-    const v4sf x128 = __builtin_ia32_p##op##sd128(high(x), low(x)); \
+    const v4si x128 = __builtin_ia32_p##op##sd128(high(x), low(x)); \
     /* ( -, -, x1+x3+x5+x7, x0+x2+x4+x6 ) */ \
-    const v4sf x64 = __builtin_ia32_p##op##sd128(x128, __builtin_shufflevector(x128, x128, 6, 7, 2, 3)); \
+    const v4si x64 = __builtin_ia32_p##op##sd128(x128, __builtin_shufflevector(x128, x128, 6, 7, 2, 3)); \
     /* ( -, -, -, x0+x1+x2+x3+x4+x5+x6+x7 ) */ \
-    const v4sf x32 = __builtin_ia32_p##op##sd128(x64, __builtin_shufflevector(x64, x64, 1,1,1,1)); \
+    const v4si x32 = __builtin_ia32_p##op##sd128(x64, __builtin_shufflevector(x64, x64, 1,1,1,1)); \
     return x32[0]; \
 }
 #else
