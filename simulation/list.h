@@ -1,7 +1,7 @@
 #pragma once
 
 struct element {
- float key=inf; uint value=0;
+ float key=inff; uint value=0;
  element() {}
  element(float key, uint value) : key(key), value(value) {}
 };

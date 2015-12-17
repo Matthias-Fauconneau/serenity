@@ -92,4 +92,5 @@ simulation/grain-obstacle.h
 simulation/grain-obstacle.cc
 simulation/grain.cc
 simulation/grain-obstacle.h
-test.cc
+tools/plot-app.cc
+ui/utf8.cc

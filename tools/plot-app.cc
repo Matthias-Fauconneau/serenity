@@ -35,7 +35,8 @@ struct PlotView : HList<Plot> {
  }
  bool mouseEvent(vec2, vec2, Event, Button button, Widget*&) override {
   if(button == WheelUp || button == WheelDown) {
-   index = (++index)%2;
+   index++;
+   index = index%2;
    load();
    return true;
   }

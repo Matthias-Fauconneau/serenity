@@ -36,7 +36,7 @@ String utf8(uint c) {
 }
 
 generic array<T> toUCS(string utf8) {
-	array<T> ucs(utf8.size, 0);
+ array<T> ucs(utf8.size);
 	for(utf8_iterator it=utf8.begin(); it!=utf8_iterator(utf8.end());++it) ucs.append( *it );
     return ucs;
 }
@@ -44,7 +44,7 @@ array<uint16> toUCS2(string utf8) { return toUCS<uint16>(utf8); }
 array<uint32> toUCS4(string utf8) { return toUCS<uint32>(utf8); }
 
 generic String toUTF8(ref<T> ucs) {
-	array<char> utf8(ucs.size, 0);
+ array<char> utf8(ucs.size);
 	for(uint c: ucs) utf8.append( ::utf8(c) );
 	return move(utf8);
 }

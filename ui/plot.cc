@@ -3,6 +3,11 @@
 #include "text.h"
 #include "color.h"
 
+static inline double exp2(double x) { return __builtin_exp2(x); }
+static inline double log2(double x) { return __builtin_log2(x); }
+static inline double log10(double x) { return __builtin_log10(x); }
+static inline double exp10(double x) { return __builtin_exp2(__builtin_log2(10)*x); }
+
 struct Ticks { float max; uint tickCount; };
 uint subExponent(float& value) {
  float subExponent = exp10(log10(abs(value)) - floor(log10(abs(value))));
@@ -76,7 +81,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
  struct Tick : Text { float value; Tick(float value, string label, float textSize, string fontName) : Text(label, textSize, 0,1,0, fontName), value(value) {} };
  array<Tick> ticks[2]; vec2 tickLabelSize = 0;
  for(size_t axis: range(2)) {
-  uint precision = ::max(1., ceil(-log10(::max(-min[axis],max[axis])/tickCount[axis])));
+  uint precision = ::max(1.f, ceil(-log10(::max(-min[axis],max[axis])/tickCount[axis])));
   for(size_t i: range(tickCount[axis]+1)) {
    float lmin = log[axis] ? log2(min[axis]) : min[axis];
    float lmax = log[axis] ? log2(max[axis]) : max[axis];
@@ -291,7 +296,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
  {
   float x = max.x;
   map<int, int> done;
-  float minY = inf;
+  float minY = inff;
   //extern bool hack;
   for(size_t i: range(/*hack*/0, fits.size())) for(auto f: fits.values[i]) {
    float y = f.a*x+f.b;

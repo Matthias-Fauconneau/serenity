@@ -127,7 +127,22 @@ generic struct bgra { T b,g,r,a; };
 typedef vec<bgra,float,4> rgba4f;
 generic struct rgba { T r,g,b,a; };
 typedef vec<rgba,float,4> bgra4f;
-typedef vec<bgra,uint8,4> byte4;
+//typedef vec<bgra,uint8,4> byte4;
+struct byte4 : vec<bgra,uint8,4> {
+ using vec::vec;
+ byte4() : vec() {}
+ /*inline byte4(byte v) : vec(v) {}
+ inline byte4(byte b, byte g, byte r, byte a=0xFF) : vec(b,g,r,a) {}
+ // bgr
+ byte4(byte3 bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
+ //byte3 bgr() { return byte3(b, g, r); } // -> bgra
+ // bgr3f
+ byte4(bgr3f bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
+ bgr3f bgr() { return bgr3f(b, g, r); }
+ // rgba
+ byte4(vec<rgba,uint8,4> rgba) : vec(rgba.b, rgba.g, rgba.r, rgba.a) {}*/
+ byte4(vec<rgb,uint8,3> rgb) : vec(rgb.b, rgb.g, rgb.r, 0xFF) {}
+};
 
 template<template<Type> class V, Type T, uint N>
 inline T length(vec<V,T,N> a) { return sqrt(dot(a,a)); }

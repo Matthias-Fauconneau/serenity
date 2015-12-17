@@ -227,8 +227,11 @@ bool Simulation::run(const Time& totalTime) {
   float area = PI*sq(membrane.radius);
   float force = topForceZ + bottomForceZ;
   float stress = force / area;
-  if(!pressureStrain) pressureStrain = File("pressureStrain");
-  String line = str(strain*100)+" %"_+str(int(round(stress))+" Pa"+"\n";
+  if(!pressureStrain) {
+   assert_(!existsFile("pressureStrain", home()));
+   pressureStrain = File("pressureStrain"_, home(), Flags(WriteOnly|Create));
+  }
+  String line = str(strain*100)+" % "_+str(int(round(stress)))+" Pa\n"_;
   log_(line);
   pressureStrain.write(line);
   if(strain > 1./8) return false;
