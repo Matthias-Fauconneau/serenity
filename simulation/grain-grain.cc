@@ -405,8 +405,8 @@ void Simulation::stepGrainGrain() {
  };
  grainGrainEvaluateTime += parallel_chunk(GGcc/simd, evaluate);
 
- const uint threadCount = ::min(::threadCount()/12, int(sqrt(grainGrainContact.size/simd)));
- if(threadCount < 12) { // Sequential scalar scatter add
+ const uint threadCount = ::min(::threadCount()/2, int(sqrt(grainGrainContact.size/simd)));
+ if(threadCount < 4) { // Sequential scalar scatter add
   grainGrainSumTime.start();
   for(int i = 0; i < (int)grainGrainContact.size; i++) {
    int index = grainGrainContact[i];

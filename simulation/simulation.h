@@ -8,7 +8,7 @@ struct Simulation : System {
  // Process parameters
  float Gz = -10 * N/kg; // Gravity
  const float verticalSpeed = 1 * m/s;
- const float plateSpeed = 0.01 * m/s;
+ const float plateSpeed = 0.1 * m/s;
 #if WIRE
  const float patternRadius = membrane.radius - Grain::radius;
  enum Pattern { None, Helix, Cross, Loop };
@@ -25,7 +25,7 @@ struct Simulation : System {
  Random random;
  float currentHeight = Grain::radius;
  const float targetPressure = 80 * KPa;
- float pressure = targetPressure/128;
+ float pressure = targetPressure/2;
  float bottomZ = 0, topZ = membrane.height, topZ0;
 #if WIRE
  float lastAngle = 0, winchAngle = 0, currentWinchRadius = patternRadius;
@@ -211,6 +211,8 @@ struct Simulation : System {
  buffer<float> grainMembraneTAx;
  buffer<float> grainMembraneTAy;
  buffer<float> grainMembraneTAz;
+
+ File pressureStrain;
 
  Simulation(const Dict& p);
 

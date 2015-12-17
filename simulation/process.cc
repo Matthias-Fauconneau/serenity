@@ -12,12 +12,14 @@ void Simulation::stepProcess() {
   }
   if(processState < Pressure) {
    if(timeStep%(int(1/(dt*60))) == 0) log(maxGrainV*1e3f, "mm/s");
-   if(maxGrainV > 50 * mm/s) return;
+   if(maxGrainV > 100 * mm/s) return;
+   pressure = targetPressure;
   }
   if(pressure < targetPressure) { // Increases pressure toward target pressure
    processState = Pressure;
    pressure += dt * targetPressure * Pa/s;
   } else { // Displace plates with constant velocity
+   pressure = targetPressure;
    processState = Load;
    topZ -= dt * plateSpeed;
    bottomZ += dt * plateSpeed;

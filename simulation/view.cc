@@ -59,7 +59,7 @@ struct SimulationView : Widget {
   size_t timeStep;
  } dragStart = {0,0,0};
 
- vec2 sizeHint(vec2) override { return vec2(768); }
+ vec2 sizeHint(vec2) override { return vec2(1024); }
  shared<Graphics> graphics(vec2 size) override {
   vec4 viewRotation = qmul(angleVector(yawPitch.y, vec3(1,0,0)),
                                              angleVector(yawPitch.x, vec3(0,0,1)));
