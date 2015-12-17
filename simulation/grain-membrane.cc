@@ -217,6 +217,7 @@ void Simulation::stepGrainMembrane() {
    const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
    const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
    const vXsf verletDistanceX = floatX(verletDistance);
+   const vXsi _1i = intX(-1);
    int W = membrane.W;
    int base = membrane.margin+rowIndex*membrane.stride;
    for(int j=0; j<W; j+=simd) {

@@ -6,7 +6,7 @@
 typedef int v16si __attribute((__vector_size__ (64)));
 inline v16si intX(int x) { return (v16si){x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x}; }
 static v16si unused _0i = intX(0);
-static v16si unused _1i = intX(-1);
+//static v16si unused _1i = intX(-1);
 static v16si unused _seqi {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
 
 #include <immintrin.h>

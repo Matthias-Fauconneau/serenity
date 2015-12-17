@@ -208,6 +208,7 @@ void Simulation::stepGrainGrain() {
    const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
    const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
    const vXsf verletDistanceX = floatX(verletDistance);
+   const vXsi _1i = intX(-1);
    for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
     vXsi a = intX(i)+_seqi;
     const vXsf Ax = load(gPx, i), Ay = load(gPy, i), Az = load(gPz, i);
@@ -235,6 +236,7 @@ void Simulation::stepGrainGrain() {
    const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
    const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
    const vXsf verletDistanceX = floatX(verletDistance);
+   const vXsi _1i = intX(-1);
    uint i=grain.count/simd*simd;
    vXsi a = intX(i)+_seqi;
    maskX valid = lessThan(a, intX(grain.count));
@@ -341,7 +343,7 @@ void Simulation::stepGrainGrain() {
  if(grainGrainA.size/simd) grainGrainFilterTime += parallel_chunk(grainGrainA.size/simd, filter);
  // The partial iteration has to be executed last so that invalid contacts are trailing
  // and can be easily trimmed
- if(grainGrainA.size%simd != 0) filter(0, grainGrainA.size/simd, 1);
+ if(grainGrainA.size%simd != 0) filter(0, grainGrainA.size/simd, 1u);
  grainGrainContact.size = contactCount;
  while(contactCount.count > 0 && grainGrainContact[contactCount.count-1] >= (int)grainGrainA.size)
   contactCount.count--; // Trims trailing invalid contacts
@@ -410,7 +412,6 @@ void Simulation::stepGrainGrain() {
    int index = grainGrainContact[i];
    int a = grainGrainA[index];
    int b = grainGrainB[index];
-   assert_(a >= 0 && b>= 0, a, b, grain.count, index, grainGrainA.size, i, grainGrainContact.size);
    grain.Fx[a] += grainGrainFx[i];
    grain.Fx[b] -= grainGrainFx[i];
    grain.Fy[a] += grainGrainFy[i];
