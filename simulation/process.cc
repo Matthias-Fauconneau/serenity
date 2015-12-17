@@ -15,7 +15,7 @@ void Simulation::stepProcess() {
   }
   if(processState < Pressure) {
    if(timeStep%(int(1/(dt*60))) == 0) log(maxGrainV*1e3f, "mm/s");
-   if(maxGrainV > 10 * mm/s) return;
+   if(maxGrainV > 100 * mm/s) return;
   }
   if(pressure < targetPressure) { // Increases pressure toward target pressure
    processState = Pressure;
@@ -105,7 +105,6 @@ void Simulation::stepProcess() {
        maxZ_[id] = max(maxZ_[id], max(maxZ));
       });
       for(size_t k: range(threadCount)) newPosition.z = ::max(newPosition.z, maxZ_[k]);
-      assert_(isNumber(newPosition.z));
      }
      // Under current wire drop height
      if(newPosition.z < currentHeight) {

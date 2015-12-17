@@ -119,9 +119,9 @@ void evaluateWireObstacle(const size_t start, const size_t size,
   // Resets contacts without static friction
   localAx = blend(hasStaticFriction, _0f, localAx); // FIXME use 1s (NaN) not 0s to flag resets
 
-  *(vXsf*)(pFx+i) = NFx + FTx;
-  *(vXsf*)(pFy+i) = NFy + FTy;
-  *(vXsf*)(pFz+i) = NFz + FTz;
+  store(pFx, i, NFx + FTx);
+  store(pFy, i, NFy + FTy);
+  store(pFz, i, NFz + FTz);
   // Scatter static frictions
   scatter(wireObstacleLocalAx, contacts, localAx);
   scatter(wireObstacleLocalAy, contacts, localAy);

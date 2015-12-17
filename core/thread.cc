@@ -124,7 +124,8 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
  else if(sig==SIGFPE) log("Floating-point exception\n"_);
  else if(sig==SIGABRT) log_("Aborted\n");
  else if(sig==SIGTERM) log_("Terminated\n");
- else { log_("Unknown signal "); log_(str(sig)); log_("\n"); }
+ else if(sig==SIGTRAP) { log_("Trapped\n"); exit_group(-1); }
+ else { log_("Unknown signal "); log_(/*str(sig)*/string(&"0123456789"[sig], 1)); log_("\n"); }
  if(threads.size>1) log("Thread #"+str(gettid())+':');
 #if __x86_64
  log(trace(1, (void*) ((ucontext_t*)ctx)->uc_mcontext.gregs[REG_RIP]));

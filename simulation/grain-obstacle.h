@@ -134,12 +134,12 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
   // Resets contacts without static friction
   localAx = blend(hasStaticFriction, _0f, localAx); // FIXME use 1s (NaN) not 0s to flag resets
 
-  *(vXsf*)(pFx+i) = NFx + FTx;
-  *(vXsf*)(pFy+i) = NFy + FTy;
-  *(vXsf*)(pFz+i) = NFz + FTz;
-  *(vXsf*)(pTAx+i) = RAy*FTz - RAz*FTy;
-  *(vXsf*)(pTAy+i) = RAz*FTx - RAx*FTz;
-  *(vXsf*)(pTAz+i) = RAx*FTy - RAy*FTx;
+  store(pFx, i, NFx + FTx);
+  store(pFy, i, NFy + FTy);
+  store(pFz, i, NFz + FTz);
+  store(pTAx, i, RAy*FTz - RAz*FTy);
+  store(pTAy, i, RAz*FTx - RAx*FTz);
+  store(pTAz, i, RAx*FTy - RAy*FTx);
   // Scatter static frictions
   scatter(grainObstacleLocalAx, contacts, localAx);
   scatter(grainObstacleLocalAy, contacts, localAy);

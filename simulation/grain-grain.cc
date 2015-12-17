@@ -142,15 +142,15 @@ static inline void evaluateGrainGrain(const int start, const int size,
   // Resets contacts without static friction
   localAx = blend(hasStaticFriction, _0f, localAx); // FIXME use 1s (NaN) not 0s to flag resets
 
-  *(vXsf*)(pFx+i) = NFx + FTx;
-  *(vXsf*)(pFy+i) = NFy + FTy;
-  *(vXsf*)(pFz+i) = NFz + FTz;
-  *(vXsf*)(pTAx+i) = ARy*FTz - ARz*FTy;
-  *(vXsf*)(pTAy+i) = ARz*FTx - ARx*FTz;
-  *(vXsf*)(pTAz+i) = ARx*FTy - ARy*FTx;
-  *(vXsf*)(pTBx+i) = BRz*FTy - BRy*FTz;
-  *(vXsf*)(pTBy+i) = BRx*FTz - BRz*FTx;
-  *(vXsf*)(pTBz+i) = BRy*FTx - BRx*FTy;
+  store(pFx, i, NFx + FTx);
+  store(pFy, i, NFy + FTy);
+  store(pFz, i, NFz + FTz);
+  store(pTAx, i, ARy*FTz - ARz*FTy);
+  store(pTAy, i, ARz*FTx - ARx*FTz);
+  store(pTAz, i, ARx*FTy - ARy*FTx);
+  store(pTBx, i, BRz*FTy - BRy*FTz);
+  store(pTBy, i, BRx*FTz - BRz*FTx);
+  store(pTBz, i, BRy*FTx - BRx*FTy);
   // Scatter static frictions
   scatter(grainGrainLocalAx, contacts, localAx);
   scatter(grainGrainLocalAy, contacts, localAy);

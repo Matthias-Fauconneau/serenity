@@ -61,28 +61,22 @@ void Simulation::stepGrainIntegration() {
  const/*expr*/ size_t threadCount = ::threadCount();
  float maxGrainV_[threadCount]; mref<float>(maxGrainV_, threadCount).clear(0);
  grainIntegrationTime += parallel_chunk(align(simd, grain.count)/simd, [this, &maxGrainV_](uint id, size_t start, size_t size) {
-#if EULER
+#if !GEAR
   const vXsf dt_mass = floatX(dt / grain.mass), dt = floatX(this->dt);
 #endif
   const vXsf dt_2 = floatX(this->dt / 2);
   const vXsf dt_angularMass = floatX(this->dt / Grain::angularMass);
   vXsf maxGrainVX = _0f;
   const float* pFx = grain.Fx.data, *pFy = grain.Fy.data, *pFz = grain.Fz.data;
-#if NEWMARK
-  const float* pFx0 = grain.Fx.data, *pFy0 = grain.Fy.data, *pFz0 = grain.Fz.data;
-  const vXsf dt = floatX(this->dt), dt_2mass = floatX(this->dt / (2*grain.mass));
-  const vXsf dt2_4m = floatX(sq(this->dt) / (4*grain.mass));
-#endif
   const float* pTx = grain.Tx.begin(), *pTy = grain.Ty.begin(), *pTz = grain.Tz.begin();
   float* const pVx = grain.Vx.begin(), *pVy = grain.Vy.begin(), *pVz = grain.Vz.begin();
   float* const pPx = grain.Px.begin()+simd, *pPy = grain.Py.begin()+simd, *pPz = grain.Pz.begin()+simd;
 #if GEAR
   const vXsf _1_mass = floatX(1 / grain.mass);
-  const vXsf p[4] = {floatX(dt), floatX(dt*dt/2), floatX(dt*dt*dt/6), floatX(dt*dt*dt*dt/24)};
-  const vXsf c[5] = {floatX(19./90), floatX(3/(4*dt)), floatX(2/(dt*dt)), floatX(6/(2*dt*dt*dt)), floatX(24/(12*dt*dt*dt*dt))};
+  const vXsf p[3] = {floatX(dt), floatX(dt*dt/2), floatX(dt*dt*dt/6)};
+  const vXsf c[4] = {floatX(1./6), floatX(5/(6*dt)), floatX(1/(dt*dt)), floatX(1/(3*dt*dt*dt))};
   float* const pPDx0 = grain.PDx[0].begin(), *pPDy0 = grain.PDy[0].begin(), *pPDz0 = grain.PDz[0].begin();
   float* const pPDx1 = grain.PDx[1].begin(), *pPDy1 = grain.PDy[1].begin(), *pPDz1 = grain.PDz[1].begin();
-  float* const pPDx2 = grain.PDx[2].begin(), *pPDy2 = grain.PDy[2].begin(), *pPDz2 = grain.PDz[2].begin();
 #endif
   float* const pAVx = grain.AVx.begin(), *pAVy = grain.AVy.begin(), *pAVz = grain.AVz.begin();
   float* const pRx = grain.Rx.begin(), *pRy = grain.Ry.begin(), *pRz = grain.Rz.begin(),
@@ -91,7 +85,7 @@ void Simulation::stepGrainIntegration() {
    const vXsf Fx = load(pFx, i), Fy = load(pFy, i), Fz = load(pFz, i);
    vXsf Vx = load(pVx, i), Vy = load(pVy, i), Vz = load(pVz, i);
    vXsf Px = load(pPx, i), Py = load(pPy, i), Pz = load(pPz, i);
-#if EULER
+#if !GEAR
    // Symplectic Euler
    Vx += dt_mass * Fx;
    Vy += dt_mass * Fy;
@@ -99,19 +93,10 @@ void Simulation::stepGrainIntegration() {
    Px += dt * Vx;
    Py += dt * Vy;
    Pz += dt * Vz;
-#elif NEWMARK
-   const vXsf Fx0 = load(pFx0, i), Fy0 = load(pFy0, i), Fz0 = load(pFz0, i);
-   Px += dt * Vx + dt2_4m * (Fx0 + Fx);
-   Py += dt * Vy + dt2_4m * (Fy0 + Fy);
-   Pz += dt * Vz + dt2_4m * (Fz0 + Fz);
-   Vx += dt_2mass * (Fx0 + Fx);
-   Vy += dt_2mass * (Fy0 + Fy);
-   Vz += dt_2mass * (Fz0 + Fz);
 #else
-   // 5th order "Gear" explicit backward differentiation formula predictor corrector linear multistep method
+   // 4th order "Gear"
    vXsf PDx0 = load(pPDx0, i), PDy0 = load(pPDy0, i), PDz0 = load(pPDz0, i);
    vXsf PDx1 = load(pPDx1, i), PDy1 = load(pPDy1, i), PDz1 = load(pPDz1, i);
-   vXsf PDx2 = load(pPDx2, i), PDy2 = load(pPDy2, i), PDz2 = load(pPDz2, i);
 
    const vXsf Rx = p[1] * (Fx * _1_mass - PDx0);
    const vXsf Ry = p[1] * (Fy * _1_mass - PDy0);
@@ -133,10 +118,6 @@ void Simulation::stepGrainIntegration() {
    PDy1 += c[3]*Ry;
    PDz1 += c[3]*Rz;
 
-   PDx2 += c[4]*Rx;
-   PDy2 += c[4]*Ry;
-   PDz2 += c[4]*Rz;
-
    // "Prediction"
    Px += p[0]*Vx;
    Py += p[0]*Vy;
@@ -150,10 +131,6 @@ void Simulation::stepGrainIntegration() {
    Py += p[2]*PDy1;
    Pz += p[2]*PDz1;
 
-   Px += p[3]*PDx2;
-   Py += p[3]*PDy2;
-   Pz += p[3]*PDz2;
-
    Vx += p[0]*PDx0;
    Vy += p[0]*PDy0;
    Vz += p[0]*PDz0;
@@ -162,25 +139,12 @@ void Simulation::stepGrainIntegration() {
    Vy += p[1]*PDy1;
    Vz += p[1]*PDz1;
 
-   Vx += p[2]*PDx2;
-   Vy += p[2]*PDy2;
-   Vz += p[2]*PDz2;
-
    PDx0 += p[0]*PDx1;
    PDy0 += p[0]*PDy1;
    PDz0 += p[0]*PDz1;
 
-   PDx0 += p[1]*PDx2;
-   PDy0 += p[1]*PDy2;
-   PDz0 += p[1]*PDz2;
-
-   PDx1 += p[0]*PDx2;
-   PDy1 += p[0]*PDy2;
-   PDz1 += p[0]*PDz2;
-
    store(pPDx0, i, PDx0); store(pPDy0, i, PDy0); store(pPDz0, i, PDz0);
    store(pPDx1, i, PDx1); store(pPDy1, i, PDy1); store(pPDz1, i, PDz1);
-   store(pPDx2, i, PDx2); store(pPDy2, i, PDy2); store(pPDz2, i, PDz2);
 #endif
    //Pz = min(topZ, Pz);
    store(pVx, i, Vx); store(pVy, i, Vy); store(pVz, i, Vz);

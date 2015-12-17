@@ -44,12 +44,12 @@ static inline void membraneTensionPressure(const float* const Px, const float* c
   const int e2 = base-1;
   for(int j=0; j<W; j+=simd) {
    int index = base+j;
-   const vXsf Ox = *(vXsf*)(Px+index);
-   const vXsf Oy = *(vXsf*)(Py+index);
-   const vXsf Oz = *(vXsf*)(Pz+index);
-   const vXsf VOx = *(vXsf*)(Vx+index);
-   const vXsf VOy = *(vXsf*)(Vy+index);
-   const vXsf VOz = *(vXsf*)(Vz+index);
+   const vXsf Ox = load(Px, index);
+   const vXsf Oy = load(Py, index);
+   const vXsf Oz = load(Pz, index);
+   const vXsf VOx = load(Vx, index);
+   const vXsf VOy = load(Vy, index);
+   const vXsf VOz = load(Vz, index);
 
    tension(0) tension(1) pressure(0, 1) tension(2) pressure(1, 2);
    const vXsf fx2 = loadu(Fx, e2j) - tx2 + ppx12; storeu(Fx, e2j, fx2);
@@ -99,12 +99,12 @@ static inline void membraneTensionPressure(const float* const Px, const float* c
   const int e4 = base+stride+(i%2);
   for(int j=0; j<W; j+=simd) {
    int index = base+j;
-   const vXsf Ox = *(vXsf*)(Px+index);
-   const vXsf Oy = *(vXsf*)(Py+index);
-   const vXsf Oz = *(vXsf*)(Pz+index);
-   const vXsf VOx = *(vXsf*)(Vx+index);
-   const vXsf VOy = *(vXsf*)(Vy+index);
-   const vXsf VOz = *(vXsf*)(Vz+index);
+   const vXsf Ox = load(Px, index);
+   const vXsf Oy = load(Py, index);
+   const vXsf Oz = load(Pz, index);
+   const vXsf VOx = load(Vx, index);
+   const vXsf VOy = load(Vy, index);
+   const vXsf VOz = load(Vz, index);
 
    // Tension
    tension(3) tension(4);
@@ -123,11 +123,11 @@ void Simulation::stepMembrane() {
                   [this](uint, uint start, uint size) {
     float* const Fx = membrane.Fx.begin(), *Fy = membrane.Fy.begin(), *Fz = membrane.Fz.begin();
     for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
-     *(vXsf*)(Fx+i) = _0f;
-     *(vXsf*)(Fy+i) = _0f;
-     *(vXsf*)(Fz+i) = _0f;
+     store(Fx, i, _0f);
+     store(Fy, i, _0f);
+     store(Fz, i, _0f);
     }
-  }, 1/*maxThreadCount FIXME*/);
+  });
 
  membraneForceTime += parallel_for(1, membrane.H-1, [this](uint, int index) {
    membraneTensionPressure(
@@ -138,7 +138,7 @@ void Simulation::stepMembrane() {
     floatX(pressure/(2*3)) /*[area = length(cross)/2] / 3 vertices*/, floatX(membrane.internodeLength),
     floatX(membrane.tensionStiffness), floatX(membrane.tensionDamping),
     index, 1);
- }, 1/*maxThreadCount FIXME: pressure*/);
+ });
 }
 
 void Simulation::stepMembraneIntegration() {
@@ -148,18 +148,21 @@ void Simulation::stepMembraneIntegration() {
   const size_t threadCount = ::threadCount();
   float maxMembraneV_[threadCount]; mref<float>(maxMembraneV_, threadCount).clear(0);
   membraneIntegrationTime += parallel_for(1, membrane.H-1, [this, &maxMembraneV_](uint id, uint i) {
-   //const vXsf dt_mass = floatX(this->dt / membrane.mass), dt = floatX(this->dt);
-   const vXsf _1_mass = floatX(1 / membrane.mass);
+#if !GEAR
+  const vXsf dt_mass = floatX(this->dt / membrane.mass), dt = floatX(this->dt);
+#endif
    //const vXsf unused topZ = floatX(this->topZ);
    vXsf maxMembraneVX = _0f;
    float* const pFx = membrane.Fx.begin(), *pFy = membrane.Fy.begin(), *pFz = membrane.Fz.begin();
    float* const pVx = membrane.Vx.begin(), *pVy = membrane.Vy.begin(), *pVz = membrane.Vz.begin();
    float* const pPx = membrane.Px.begin(), *pPy = membrane.Py.begin(), *pPz = membrane.Pz.begin();
-   float* const pPDx0 = membrane.PDx[0].begin(), *pPDy0 = membrane.PDy[0].begin(), *pPDz0 = membrane.PDz[0].begin();
-   float* const pPDx1 = membrane.PDx[1].begin(), *pPDy1 = membrane.PDy[1].begin(), *pPDz1 = membrane.PDz[1].begin();
-   float* const pPDx2 = membrane.PDx[2].begin(), *pPDy2 = membrane.PDy[2].begin(), *pPDz2 = membrane.PDz[2].begin();
-   const vXsf b[4] = {floatX(dt), floatX(dt*dt/2), floatX(dt*dt*dt/6), floatX(dt*dt*dt*dt/24)};
-   const vXsf c[5] = {floatX(19./90), floatX(3/(4*dt)), floatX(2/(dt*dt)), floatX(6/(2*dt*dt*dt)), floatX(24/(12*dt*dt*dt*dt))};
+#if GEAR
+  const vXsf _1_mass = floatX(1 / membrane.mass);
+  const vXsf p[3] = {floatX(dt), floatX(dt*dt/2), floatX(dt*dt*dt/6)};
+  const vXsf c[4] = {floatX(1./6), floatX(5/(6*dt)), floatX(1/(dt*dt)), floatX(1/(3*dt*dt*dt))};
+  float* const pPDx0 = membrane.PDx[0].begin(), *pPDy0 = membrane.PDy[0].begin(), *pPDz0 = membrane.PDz[0].begin();
+  float* const pPDx1 = membrane.PDx[1].begin(), *pPDy1 = membrane.PDy[1].begin(), *pPDz1 = membrane.PDz[1].begin();
+#endif
    const int W = membrane.W, stride = membrane.stride, margin=membrane.margin;
    // Adds force from repeated nodes
    pFx[i*stride+margin+0] += pFx[i*stride+margin+W];
@@ -174,10 +177,7 @@ void Simulation::stepMembraneIntegration() {
     const vXsf Fx = load(pFx, k), Fy = load(pFy, k), Fz = load(pFz, k);
     vXsf Vx = load(pVx, k), Vy = load(pVy, k), Vz = load(pVz, k);
     vXsf Px = load(pPx, k), Py = load(pPy, k), Pz = load(pPz, k);
-    vXsf PDx0 = load(pPDx0, k), PDy0 = load(pPDy0, k), PDz0 = load(pPDz0, k);
-    vXsf PDx1 = load(pPDx1, k), PDy1 = load(pPDy1, k), PDz1 = load(pPDz1, k);
-    vXsf PDx2 = load(pPDx2, k), PDy2 = load(pPDy2, k), PDz2 = load(pPDz2, k);
-#if 0
+#if !GEAR
     // Symplectic Euler
     Vx += dt_mass * Fx;
     Vy += dt_mass * Fy;
@@ -186,65 +186,61 @@ void Simulation::stepMembraneIntegration() {
     Py += dt * Vy;
     Pz += dt * Vz;
 #else
-    // 5th "Gear" linear backward multistep
-    vXsf Rx = b[1] * (Fx * _1_mass - PDx0);
-    vXsf Ry = b[1] * (Fy * _1_mass - PDy0);
-    vXsf Rz = b[1] * (Fz * _1_mass - PDz0);
+    // 4th order "Gear"
+    vXsf PDx0 = load(pPDx0, k), PDy0 = load(pPDy0, k), PDz0 = load(pPDz0, k);
+    vXsf PDx1 = load(pPDx1, k), PDy1 = load(pPDy1, k), PDz1 = load(pPDz1, k);
+
+    const vXsf Rx = p[1] * (Fx * _1_mass - PDx0);
+    const vXsf Ry = p[1] * (Fy * _1_mass - PDy0);
+    const vXsf Rz = p[1] * (Fz * _1_mass - PDz0);
     // "Correction"
     Px += c[0]*Rx;
     Py += c[0]*Ry;
     Pz += c[0]*Rz;
+
     Vx += c[1]*Rx;
     Vy+= c[1]*Ry;
     Vz += c[1]*Rz;
+
     PDx0 += c[2]*Rx;
     PDy0 += c[2]*Ry;
     PDz0 += c[2]*Rz;
+
     PDx1 += c[3]*Rx;
     PDy1 += c[3]*Ry;
     PDz1 += c[3]*Rz;
-    PDx2 += c[4]*Rx;
-    PDy2 += c[4]*Ry;
-    PDz2 += c[4]*Rz;
 
     // "Prediction"
-    Px += b[0]*Vx;
-    Py += b[0]*Vy;
-    Pz += b[0]*Vz;
-    Px += b[1]*PDx0;
-    Py += b[1]*PDy0;
-    Pz += b[1]*PDz0;
-    Px += b[2]*PDx1;
-    Py += b[2]*PDy1;
-    Pz += b[2]*PDz1;
-    Px += b[3]*PDx2;
-    Py += b[3]*PDy2;
-    Pz += b[3]*PDz2;
-    Vx += b[0]*PDx0;
-    Vy += b[0]*PDy0;
-    Vz += b[0]*PDz0;
-    Vx += b[1]*PDx1;
-    Vy += b[1]*PDy1;
-    Vz += b[1]*PDz1;
-    Vx += b[2]*PDx2;
-    Vy += b[2]*PDy2;
-    Vz += b[2]*PDz2;
-    PDx0 += b[0]*PDx1;
-    PDy0 += b[0]*PDy1;
-    PDz0 += b[0]*PDz1;
-    PDx0 += b[1]*PDx2;
-    PDy0 += b[1]*PDy2;
-    PDz0 += b[1]*PDz2;
-    PDx1 += b[0]*PDx2;
-    PDy1 += b[0]*PDy2;
-    PDz1 += b[0]*PDz2;
+    Px += p[0]*Vx;
+    Py += p[0]*Vy;
+    Pz += p[0]*Vz;
+
+    Px += p[1]*PDx0;
+    Py += p[1]*PDy0;
+    Pz += p[1]*PDz0;
+
+    Px += p[2]*PDx1;
+    Py += p[2]*PDy1;
+    Pz += p[2]*PDz1;
+
+    Vx += p[0]*PDx0;
+    Vy += p[0]*PDy0;
+    Vz += p[0]*PDz0;
+
+    Vx += p[1]*PDx1;
+    Vy += p[1]*PDy1;
+    Vz += p[1]*PDz1;
+
+    PDx0 += p[0]*PDx1;
+    PDy0 += p[0]*PDy1;
+    PDz0 += p[0]*PDz1;
+
+    store(pPDx0, k, PDx0); store(pPDy0, k, PDy0); store(pPDz0, k, PDz0);
+    store(pPDx1, k, PDx1); store(pPDy1, k, PDy1); store(pPDz1, k, PDz1);
 #endif
     //Pz = min(topZ, Pz);
     store(pVx, k, Vx); store(pVy, k, Vy); store(pVz, k, Vz);
     store(pPx, k, Px); store(pPy, k, Py); store(pPz, k, Pz);
-    store(pPDx0, k, PDx0); store(pPDy0, k, PDy0); store(pPDz0, k, PDz0);
-    store(pPDx1, k, PDx1); store(pPDy1, k, PDy1); store(pPDz1, k, PDz1);
-    store(pPDx2, k, PDx2); store(pPDy2, k, PDy2); store(pPDz2, k, PDz2);
     maxMembraneVX = max(maxMembraneVX, sqrt(Vx*Vx + Vy*Vy + Vz*Vz));
    }
    // Copies position back to repeated nodes
@@ -262,7 +258,7 @@ void Simulation::stepMembraneIntegration() {
    pVy[i*stride+margin+W] = pVy[i*stride+margin+0];
    pVz[i*stride+margin+W] = pVz[i*stride+margin+0];
    maxMembraneV_[id] = max(maxMembraneV_[id], max(maxMembraneVX));
-  }, 1/*threadCount*/);
+  });
   for(int k: range(threadCount)) maxMembraneV = ::max(maxMembraneV, maxMembraneV_[k]);
  }
  float maxGrainMembraneV = maxGrainV + maxMembraneV;
