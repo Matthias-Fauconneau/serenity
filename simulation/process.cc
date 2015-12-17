@@ -29,6 +29,7 @@ void Simulation::stepProcess() {
   // Increases current height
   if(currentHeight < topZ+Grain::radius/2) currentHeight += verticalSpeed * dt;
 
+#if WIRE
   // Generates wire
   if(pattern) {
    vec2 end;
@@ -76,6 +77,7 @@ void Simulation::stepProcess() {
     grainWireGlobalMinD = 0;
    }
   }
+#endif
 
   // Generates grain
   if(currentHeight >= Grain::radius) {
@@ -83,25 +85,35 @@ void Simulation::stepProcess() {
     if(grain.count == grain.capacity-simd) break;
     vec2 p(random()*2-1,random()*2-1);
     if(length(p)<1) { // Within cylinder
-     vec3 newPosition (patternRadius*p.x, patternRadius*p.y, Grain::radius);
-     processTime.start();
-     // Deposits grain without grain overlap
-     for(size_t index: range(grain.count)) {
-      vec3 other = grain.position(index);
-      float Dxy = length((other - newPosition).xy());
-      if(Dxy < 2*Grain::radius) {
-       float dz = sqrt(sq(2*Grain::radius) - sq(Dxy));
-       newPosition.z = ::max(newPosition.z, other.z+dz);
-      }
+     vec3 newPosition ((membrane.radius-Grain::radius)*p.x, (membrane.radius-Grain::radius)*p.y, Grain::radius);
+     if(grain.count) {// Deposits grain without grain overlap
+      const/*expr*/ size_t threadCount = ::threadCount();
+      float maxZ_[threadCount]; mref<float>(maxZ_, threadCount).clear(0);
+      processTime += parallel_chunk(align(simd, grain.count)/simd,
+                                    [this, newPosition, &maxZ_](uint id, size_t start, size_t size) {
+       float* const pPx = grain.Px.begin()+simd, *pPy = grain.Py.begin()+simd, *pPz = grain.Pz.begin()+simd;
+       const vXsf nPx = floatX(newPosition.x), nPy = floatX(newPosition.y);
+       const vXsf _2_Gr2 = floatX(sq(2*Grain::radius));
+       vXsf maxZ = _0f;
+       for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
+        vXsf Px = load(pPx, i), Py = load(pPy, i), Pz = load(pPz, i);
+        vXsf Rx = Px-nPx, Ry = Py-nPy;
+        vXsf Dxy2 = Rx*Rx + Ry*Ry;
+        vXsf Dz = sqrt(_2_Gr2 - Dxy2);
+        maxZ = max(Pz+Dz, maxZ); // Dxy2>_2Gr2: max(NaN, z) = z
+       }
+       maxZ_[id] = max(maxZ_[id], max(maxZ));
+      });
+      for(size_t k: range(threadCount)) newPosition.z = ::max(newPosition.z, maxZ_[k]);
+      assert_(isNumber(newPosition.z));
      }
-     processTime.stop();
      // Under current wire drop height
      if(newPosition.z < currentHeight) {
+#if WIRE
       // Without wire overlap
-      processTime.start();
       for(size_t index: range(wire.count))
        if(length(wire.position(index) - newPosition) < Grain::radius+Wire::radius) { processTime.stop(); return; }
-      processTime.stop();
+#endif
       size_t i = grain.count;
       grain.Px[simd+i] = newPosition.x; grain.Py[i+simd] = newPosition.y; grain.Pz[simd+i] = newPosition.z;
       grain.Vx[i] = 0; grain.Vy[i] = 0; grain.Vz[i] = - 1 * m/s;
@@ -122,6 +134,7 @@ void Simulation::stepProcess() {
       grainWireGlobalMinD = 0;
      } else break;
     }
+    break;
    }
   }
  }

@@ -86,9 +86,6 @@ void Simulation::stepGrainIntegration() {
     store(Pz, i, load(Pz, i) + dt * Vz);
     maxGrainVX = max(maxGrainVX, sqrt(Vx*Vx + Vy*Vy + Vz*Vz));
 
-    //vec4( a[3] * b.xyz() + b[3] * a.xyz() + cross(a.xyz(), b.xyz()), a[3]*b[3] - dot(a.xyz(), b.xyz()));
-    // a = AVx[j], AVy[j], AVz[j], 0
-    // b = Rx[j], Ry[j], Rz[j], Rw[j]
     const vXsf AVx = load(pAVx, i), AVy = load(pAVy, i), AVz = load(pAVz, i);
     vXsf Rx = load(pRx, i), Ry = load(pRy, i), Rz = load(pRz, i), Rw = load(pRw, i);
     const vXsf dRx = dt_2 * (Rw * Rx + AVy*Rz - Ry*AVz);

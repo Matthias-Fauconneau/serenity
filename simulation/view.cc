@@ -25,6 +25,7 @@ struct SimulationView : Widget {
    vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]); }
    vec4 rotation(size_t i) const { return vec4(Rx[i], Ry[i], Rz[i], Rw[i]); }
   } grain;
+#if WIRE
   struct Wire {
    float radius = 0;
    size_t count = 0;
@@ -33,6 +34,7 @@ struct SimulationView : Widget {
    buffer<float> Pz;
    vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]); }
   } wire;
+#endif
   struct Membrane {
    size_t W, H, stride, margin;
    size_t count = 0;
@@ -150,6 +152,7 @@ struct SimulationView : Widget {
    vertexArray.draw(Triangles, positions.size);
   }
 
+#if WIRE
   if(state.wire.count>1) {
    buffer<vec3> positions {(state.wire.count-1)*6};
    buffer<vec4> colors {(state.wire.count-1)};
@@ -190,6 +193,7 @@ struct SimulationView : Widget {
     vertexArray.draw(Triangles, positions.size);
    }
   }
+#endif
 
   if(state.membrane.count) {
    static GLShader shader {::shader_glsl(), {"color"}};
@@ -311,11 +315,13 @@ struct SimulationApp {
   state.grain.Rz = copy(simulation.grain.Rz);
   state.grain.Rw = copy(simulation.grain.Rw);
 
+#if WIRE
   state.wire.radius = simulation.wire.radius;
   state.wire.count = simulation.wire.count;
   state.wire.Px = copy(simulation.wire.Px);
   state.wire.Py = copy(simulation.wire.Py);
   state.wire.Pz = copy(simulation.wire.Pz);
+#endif
 
   state.membrane.W = simulation.membrane.W;
   state.membrane.H = simulation.membrane.H;

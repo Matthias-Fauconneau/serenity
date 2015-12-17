@@ -77,6 +77,7 @@ struct System {
   const vec4 rotation(size_t i) const { return vec4(Rx[i], Ry[i], Rz[i], Rw[i]);  }
  } grain;
 
+#if WIRE
  struct Wire {
   sconst float radius = 3*mm;
   sconst float internodeLength = Grain::radius/2;
@@ -111,6 +112,7 @@ struct System {
   const vec3 velocity(size_t i) const { return vec3(Vx[i], Vy[i], Vz[i]);  }
   const vec3 force(size_t i) const { return vec3(Fx[i], Fy[i], Fz[i]);  }
  } wire;
+#endif
 
  struct Membrane {
   sconst float density = 1000 * kg / cb(m);

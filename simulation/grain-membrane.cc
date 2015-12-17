@@ -320,7 +320,10 @@ void Simulation::stepGrainMembrane() {
    compressStore(gmContact+index, contact, intX(i)+_seqi);
   }
  };
- grainMembraneFilterTime += parallel_chunk(align(simd, grainMembraneA.size)/simd, filter);
+ if(grainMembraneA.size/simd) grainMembraneFilterTime += parallel_chunk(grainMembraneA.size/simd, filter);
+ // The partial iteration has to be executed last so that invalid contacts are trailing
+ // and can be easily trimmed
+ if(grainMembraneA.size%simd != 0) filter(0, grainMembraneA.size/simd, 1u);
  grainMembraneContact.size = contactCount;
  while(contactCount.count > 0 && grainMembraneContact[contactCount-1] >= (int)grainMembraneA.size)
   contactCount.count--; // Trims trailing invalid contacts

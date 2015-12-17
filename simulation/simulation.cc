@@ -16,21 +16,28 @@ constexpr float System::staticFrictionLength;
 constexpr float System::Grain::radius;
 constexpr float System::Grain::mass;
 constexpr float System::Grain::angularMass;
+#if WIRE
 constexpr float System::Wire::radius;
 constexpr float System::Wire::mass;
 constexpr float System::Wire::internodeLength;
 constexpr float System::Wire::tensionStiffness;
 constexpr float System::Wire::bendStiffness;
 constexpr string Simulation::patterns[];
+#endif
 
-Simulation::Simulation(const Dict& p) : System(p.at("TimeStep"), p.at("Radius")),
-  pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):None) {
+Simulation::Simulation(const Dict& p) : System(p.at("TimeStep"), p.at("Radius"))
+#if WIRE
+  , pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):None)
+#endif
+{
+#if WIRE
  if(pattern) { // Initial wire node
   size_t i = wire.count++;
   wire.Px[i] = patternRadius; wire.Py[i] = 0; wire.Pz[i] = currentHeight+Grain::radius+Wire::radius;
   wire.Vx[i] = 0; wire.Vy[i] = 0; wire.Vz[i] = 0;
   winchAngle += Wire::internodeLength / currentWinchRadius;
  }
+#endif
 }
 
 void Simulation::step() {
@@ -89,7 +96,7 @@ void Simulation::profile(const Time& totalTime) {
   log("grain-wire B/cycle", (float)(grainWireContactSizeSum*41*4)/grainWireEvaluateTime);
  }
 #endif
- log("W", membrane.W, "H", membrane.H, "W*H", membrane.W*membrane.H, grain.count, wire.count);
+ log("W", membrane.W, "H", membrane.H, "W*H", membrane.W*membrane.H, grain.count);
  const bool reset = false;
  size_t accounted = 0, shown = 0;
  map<uint64, String> profile;

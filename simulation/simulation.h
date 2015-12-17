@@ -7,14 +7,16 @@
 struct Simulation : System {
  // Process parameters
  float Gz = -10 * N/kg; // Gravity
+ const float verticalSpeed = 1 * m/s;
+ const float plateSpeed = 0.01 * m/s;
+#if WIRE
  const float patternRadius = membrane.radius - Grain::radius;
  enum Pattern { None, Helix, Cross, Loop };
  sconst string patterns[] {"none", "helix", "radial", "spiral"};
  const Pattern pattern;
  const float linearSpeed = 4 * m/s;
- const float verticalSpeed = 1 * m/s;
  const float loopAngle = PI*(3-sqrt(5.));
- const float plateSpeed = 0.01 * m/s;
+#endif
 
  // Process variables
  enum ProcessState { Pour, Pressure, Load, Error };
@@ -22,10 +24,12 @@ struct Simulation : System {
  ProcessState processState = Pour;
  Random random;
  float currentHeight = Grain::radius;
- float lastAngle = 0, winchAngle = 0, currentWinchRadius = patternRadius;
  const float targetPressure = 80 * KPa;
  float pressure = targetPressure/128;
  float bottomZ = 0, topZ = membrane.height, topZ0;
+#if WIRE
+ float lastAngle = 0, winchAngle = 0, currentWinchRadius = patternRadius;
+#endif
 
  // Results
  float bottomForceZ = 0, topForceZ = 0;
@@ -215,7 +219,7 @@ struct Simulation : System {
  void step();
 
  void stepProcess();
-  tsc processTime;
+  uint64 processTime = 0;
  tsc grainTotalTime;
  void stepGrain();
   uint64 grainTime = 0;
