@@ -34,7 +34,7 @@ generic struct buffer : mref<T> {
   if(capacity && posix_memalign((void**)&data, 64, capacity*sizeof(T)))
    error("Out of memory", size, capacity, sizeof(T));
  }
- explicit buffer(size_t size) : buffer(size, size) {}
+ /*explicit*/ buffer(size_t size) : buffer(size, size) {}
 
  buffer& operator=(buffer&& o) { this->~buffer(); new (this) buffer(::move(o)); return *this; }
 

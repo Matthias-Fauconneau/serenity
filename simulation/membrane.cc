@@ -148,36 +148,103 @@ void Simulation::stepMembraneIntegration() {
   const size_t threadCount = ::threadCount();
   float maxMembraneV_[threadCount]; mref<float>(maxMembraneV_, threadCount).clear(0);
   membraneIntegrationTime += parallel_for(1, membrane.H-1, [this, &maxMembraneV_](uint id, uint i) {
-   const vXsf dt_mass = floatX(this->dt / membrane.mass), dt = floatX(this->dt);
-   const vXsf topZ = floatX(this->topZ);
+   //const vXsf dt_mass = floatX(this->dt / membrane.mass), dt = floatX(this->dt);
+   const vXsf _1_mass = floatX(1 / membrane.mass);
+   //const vXsf unused topZ = floatX(this->topZ);
    vXsf maxMembraneVX = _0f;
-   float* const Fx = membrane.Fx.begin(), *Fy = membrane.Fy.begin(), *Fz = membrane.Fz.begin();
+   float* const pFx = membrane.Fx.begin(), *pFy = membrane.Fy.begin(), *pFz = membrane.Fz.begin();
    float* const pVx = membrane.Vx.begin(), *pVy = membrane.Vy.begin(), *pVz = membrane.Vz.begin();
    float* const pPx = membrane.Px.begin(), *pPy = membrane.Py.begin(), *pPz = membrane.Pz.begin();
+   float* const pPDx0 = membrane.PDx[0].begin(), *pPDy0 = membrane.PDy[0].begin(), *pPDz0 = membrane.PDz[0].begin();
+   float* const pPDx1 = membrane.PDx[1].begin(), *pPDy1 = membrane.PDy[1].begin(), *pPDz1 = membrane.PDz[1].begin();
+   float* const pPDx2 = membrane.PDx[2].begin(), *pPDy2 = membrane.PDy[2].begin(), *pPDz2 = membrane.PDz[2].begin();
+   const vXsf b[4] = {floatX(dt), floatX(dt*dt/2), floatX(dt*dt*dt/6), floatX(dt*dt*dt*dt/24)};
+   const vXsf c[5] = {floatX(19./90), floatX(3/(4*dt)), floatX(2/(dt*dt)), floatX(6/(2*dt*dt*dt)), floatX(24/(12*dt*dt*dt*dt))};
    const int W = membrane.W, stride = membrane.stride, margin=membrane.margin;
    // Adds force from repeated nodes
-   Fx[i*stride+margin+0] += Fx[i*stride+margin+W];
-   Fy[i*stride+margin+0] += Fy[i*stride+margin+W];
-   Fz[i*stride+margin+0] += Fz[i*stride+margin+W];
-   Fx[i*stride+margin+W-1] += Fx[i*stride+margin-1];
-   Fy[i*stride+margin+W-1] += Fy[i*stride+margin-1];
-   Fz[i*stride+margin+W-1] += Fz[i*stride+margin-1];
+   pFx[i*stride+margin+0] += pFx[i*stride+margin+W];
+   pFy[i*stride+margin+0] += pFy[i*stride+margin+W];
+   pFz[i*stride+margin+0] += pFz[i*stride+margin+W];
+   pFx[i*stride+margin+W-1] += pFx[i*stride+margin-1];
+   pFy[i*stride+margin+W-1] += pFy[i*stride+margin-1];
+   pFz[i*stride+margin+W-1] += pFz[i*stride+margin-1];
    int base = margin+i*stride;
    for(int j=0; j<W; j+=simd) {
     int k = base+j;
+    const vXsf Fx = load(pFx, k), Fy = load(pFy, k), Fz = load(pFz, k);
+    vXsf Vx = load(pVx, k), Vy = load(pVy, k), Vz = load(pVz, k);
+    vXsf Px = load(pPx, k), Py = load(pPy, k), Pz = load(pPz, k);
+    vXsf PDx0 = load(pPDx0, k), PDy0 = load(pPDy0, k), PDz0 = load(pPDz0, k);
+    vXsf PDx1 = load(pPDx1, k), PDy1 = load(pPDy1, k), PDz1 = load(pPDz1, k);
+    vXsf PDx2 = load(pPDx2, k), PDy2 = load(pPDy2, k), PDz2 = load(pPDz2, k);
+#if 0
     // Symplectic Euler
-    const vXsf Vx = load(pVx, k) + dt_mass * load(Fx, k);
-    const vXsf Vy = load(pVy, k) + dt_mass * load(Fy, k);
-    const vXsf Vz = load(pVz, k) + dt_mass * load(Fz, k);
-    store(pVx, k, Vx);
-    store(pVy, k, Vy);
-    store(pVz, k, Vz);
-    const vXsf Px = load(pPx, k) + dt * Vx;
-    const vXsf Py = load(pPy, k) + dt * Vy;
-    const vXsf Pz = min(topZ, load(pPz, k) + dt * Vz);
-    store(pPx, k, Px);
-    store(pPy, k, Py);
-    store(pPz, k, Pz);
+    Vx += dt_mass * Fx;
+    Vy += dt_mass * Fy;
+    Vz += dt_mass * Fz;
+    Px += dt * Vx;
+    Py += dt * Vy;
+    Pz += dt * Vz;
+#else
+    // 5th "Gear" linear backward multistep
+    vXsf Rx = b[1] * (Fx * _1_mass - PDx0);
+    vXsf Ry = b[1] * (Fy * _1_mass - PDy0);
+    vXsf Rz = b[1] * (Fz * _1_mass - PDz0);
+    // "Correction"
+    Px += c[0]*Rx;
+    Py += c[0]*Ry;
+    Pz += c[0]*Rz;
+    Vx += c[1]*Rx;
+    Vy+= c[1]*Ry;
+    Vz += c[1]*Rz;
+    PDx0 += c[2]*Rx;
+    PDy0 += c[2]*Ry;
+    PDz0 += c[2]*Rz;
+    PDx1 += c[3]*Rx;
+    PDy1 += c[3]*Ry;
+    PDz1 += c[3]*Rz;
+    PDx2 += c[4]*Rx;
+    PDy2 += c[4]*Ry;
+    PDz2 += c[4]*Rz;
+
+    // "Prediction"
+    Px += b[0]*Vx;
+    Py += b[0]*Vy;
+    Pz += b[0]*Vz;
+    Px += b[1]*PDx0;
+    Py += b[1]*PDy0;
+    Pz += b[1]*PDz0;
+    Px += b[2]*PDx1;
+    Py += b[2]*PDy1;
+    Pz += b[2]*PDz1;
+    Px += b[3]*PDx2;
+    Py += b[3]*PDy2;
+    Pz += b[3]*PDz2;
+    Vx += b[0]*PDx0;
+    Vy += b[0]*PDy0;
+    Vz += b[0]*PDz0;
+    Vx += b[1]*PDx1;
+    Vy += b[1]*PDy1;
+    Vz += b[1]*PDz1;
+    Vx += b[2]*PDx2;
+    Vy += b[2]*PDy2;
+    Vz += b[2]*PDz2;
+    PDx0 += b[0]*PDx1;
+    PDy0 += b[0]*PDy1;
+    PDz0 += b[0]*PDz1;
+    PDx0 += b[1]*PDx2;
+    PDy0 += b[1]*PDy2;
+    PDz0 += b[1]*PDz2;
+    PDx1 += b[0]*PDx2;
+    PDy1 += b[0]*PDy2;
+    PDz1 += b[0]*PDz2;
+#endif
+    //Pz = min(topZ, Pz);
+    store(pVx, k, Vx); store(pVy, k, Vy); store(pVz, k, Vz);
+    store(pPx, k, Px); store(pPy, k, Py); store(pPz, k, Pz);
+    store(pPDx0, k, PDx0); store(pPDy0, k, PDy0); store(pPDz0, k, PDz0);
+    store(pPDx1, k, PDx1); store(pPDy1, k, PDy1); store(pPDz1, k, PDz1);
+    store(pPDx2, k, PDx2); store(pPDy2, k, PDy2); store(pPDz2, k, PDz2);
     maxMembraneVX = max(maxMembraneVX, sqrt(Vx*Vx + Vy*Vy + Vz*Vz));
    }
    // Copies position back to repeated nodes

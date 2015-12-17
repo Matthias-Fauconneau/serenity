@@ -12,6 +12,7 @@ template<> inline String str(const vXsi& a) { return str(ref<int>((int*)&a, simd
 struct System {
  // Units
  const float dt;
+
  sconst float s = 1, m = 1, kg = 1, N = kg /m /(s*s), Pa = N / (m*m);
  sconst float mm = 1e-3*m, g = 1e-3*kg, KPa = 1e3 * Pa, MPa = 1e6 * Pa;
 
@@ -49,13 +50,23 @@ struct System {
   buffer<float> Px { capacity };
   buffer<float> Py { capacity };
   buffer<float> Pz { capacity };
+#define NEWMARK 1
+#if GEAR
+  buffer<float> PDx[3] {capacity, capacity, capacity};
+  buffer<float> PDy[3] {capacity, capacity, capacity};
+  buffer<float> PDz[3] {capacity, capacity, capacity};
+#endif
   buffer<float> Vx { capacity };
   buffer<float> Vy { capacity };
   buffer<float> Vz { capacity };
+#if NEWMARK
+  buffer<float> Fx0 { capacity };
+  buffer<float> Fy0 { capacity };
+  buffer<float> Fz0 { capacity };
+#endif
   buffer<float> Fx { ::threadCount() * capacity };
   buffer<float> Fy { ::threadCount() * capacity };
   buffer<float> Fz { ::threadCount() * capacity };
-
    // TODO: Rodrigues vector
   buffer<float> Rx { capacity }, Ry { capacity }, Rz { capacity }, Rw { capacity };
   buffer<float> AVx { capacity }, AVy { capacity }, AVz { capacity }; // Angular velocity
@@ -65,7 +76,13 @@ struct System {
 
   Grain() : capacity(4*3840/8+simd) {
    Px.clear(0); Py.clear(0); Pz.clear(0);
+#if GEAR
+   for(int i: range(3)) { PDx[i].clear(0); PDy[i].clear(0); PDz[i].clear(0); }
+#endif
    Vx.clear(0); Vy.clear(0); Vz.clear(0);
+#if NEWMARK
+   Fx0.clear(0); Fy0.clear(0); Fz0.clear(0);
+#endif
    Fx.clear(0); Fy.clear(0); Fz.clear(0);
    Tx.clear(0); Ty.clear(0); Tz.clear(0);
    Rx.clear(0); Ry.clear(0); Rz.clear(0); Rw.clear(1);
@@ -143,6 +160,9 @@ struct System {
   buffer<float> Px { capacity };
   buffer<float> Py { capacity };
   buffer<float> Pz { capacity };
+  buffer<float> PDx[3] {capacity, capacity, capacity};
+  buffer<float> PDy[3] {capacity, capacity, capacity};
+  buffer<float> PDz[3] {capacity, capacity, capacity};
   buffer<float> Vx { capacity };
   buffer<float> Vy { capacity };
   buffer<float> Vz { capacity };
@@ -151,9 +171,10 @@ struct System {
   buffer<float> Fz { capacity };
 
   Membrane(float radius) : radius(radius) {
-   Px.clear(0); Py.clear(0); Pz.clear(0); // TODO: Gear?
-   Vx.clear(0); Vy.clear(0); Vz.clear(0); // TODO: Gear?
-   Fx.clear(0); Fy.clear(0); Fz.clear(0); // TODO: Gear?
+   Px.clear(0); Py.clear(0); Pz.clear(0);
+   for(int i: range(3)) { PDx[i].clear(0); PDy[i].clear(0); PDz[i].clear(0); }
+   Vx.clear(0); Vy.clear(0); Vz.clear(0);
+   Fx.clear(0); Fy.clear(0); Fz.clear(0);
    for(size_t i: range(H)) {
     for(size_t j: range(W)) {
      float z = i*height/(H-1);
