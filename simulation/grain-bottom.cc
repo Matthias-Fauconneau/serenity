@@ -29,14 +29,24 @@ void Simulation::stepGrainBottom() {
   }
   grainBottomA.size = 0;
 
-  //atomic contactCount;
+  atomic contactCount;
   auto search = [&](uint, size_t start, size_t size) {
-   for(size_t i=start; i<(start+size); i+=1) { // TODO: SIMD
-    float depth = (bottomZ+Grain::radius) - grain.Pz[simd+i];
-    if(depth >= 0) grainBottomA.appendAtomic(i); // Grain
+   const float* const gPz = grain.Pz.data+simd;
+   const vXsf _bZ_Gr = floatX(bottomZ+Grain::radius);
+   int* const gbA = grainBottomA.begin();
+   for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
+     vXsf Az = load(gPz, i);
+     vXsf depth = _bZ_Gr - Az;
+     maskX contact = greaterThanOrEqual(depth, _0f);
+     uint index = contactCount.fetchAdd(countBits(contact));
+     compressStore(gbA+index, contact, intX(i)+_seqi);
    }
   };
-  grainBottomSearchTime += parallel_chunk(grain.count, search);
+  if(grain.count/simd) grainBottomSearchTime += parallel_chunk(grain.count/simd, search);
+  if(grain.count%simd) search(0, grain.count/simd, 1u);
+  grainBottomA.size = contactCount;
+  while(contactCount.count > 0 && grainBottomA[contactCount-1] >= (int)grain.count) contactCount.count--;
+  grainBottomA.size = contactCount;
   grainBottomLocalAx.size = grainBottomA.size;
   grainBottomLocalAy.size = grainBottomA.size;
   grainBottomLocalAz.size = grainBottomA.size;
@@ -79,32 +89,39 @@ void Simulation::stepGrainBottom() {
   grainBottomContact = buffer<int>(align(simd, grainBottomA.size));
  }
  grainBottomContact.size = 0;
- auto filter = [&](uint, size_t start, size_t size) {
-  for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
-   vXsi A = *(vXsi*)(grainBottomA.data+i);
-   vXsf Az = gather(grain.Pz.data+simd, A);
-   vXsf depth = floatX(bottomZ+Grain::radius) - Az;
-   for(size_t k: range(simd)) { // TODO: SIMD
-    size_t j = i+k;
-    if(j == grainBottomA.size) break /*2*/;
-    if(extract(depth, k) >= 0) {
-     // Creates a map from packed contact to index into unpacked contact list (indirect reference)
-     // Instead of packing (copying) the unpacked list to a packed contact list
-     // To keep track of where to write back (unpacked) contact positions (for static friction)
-     // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
-     grainBottomContact.appendAtomic( j );
-    } else {
-     error(extract(depth, k));
-     // Resets contact (static friction spring)
-     grainBottomLocalAx[j] = 0;
-    }
-   }
+
+ // Creates a map from packed contact to index into unpacked contact list (indirect reference)
+ // Instead of packing (copying) the unpacked list to a packed contact list
+ // To keep track of where to write back (unpacked) contact positions (for static friction)
+ // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
+ atomic contactCount;
+ auto filter = [&](uint, uint start, uint size) {
+  const int* const gbA = grainBottomA.data;
+  const float* const gPz = grain.Pz.data+simd;
+  float* const gbL = grainBottomLocalAx.begin();
+  int* const gbContact = grainBottomContact.begin();
+  const vXsf _bZ_Gr = floatX(bottomZ+Grain::radius);
+  for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
+    vXsi A = load(gbA, i);
+    vXsf Az = gather(gPz, A);
+    vXsf depth = _bZ_Gr - Az;
+    maskX contact = greaterThanOrEqual(depth, _0f);
+    maskStore(gbL+i, ~contact, _0f);
+    uint index = contactCount.fetchAdd(countBits(contact));
+    compressStore(gbContact+index, contact, intX(i)+_seqi);
   }
  };
- grainBottomFilterTime += parallel_chunk(align(simd, grainBottomA.size)/simd, filter);
- for(size_t i=grainBottomContact.size; i<align(simd, grainBottomContact.size); i++)
-  grainBottomContact.begin()[i] = grainBottomA.size;
- if(!grainBottomContact) return;
+ if(grainBottomA.size/simd) grainBottomFilterTime += parallel_chunk(grainBottomA.size/simd, filter);
+ // The partial iteration has to be executed last so that invalid contacts are trailing
+ // and can be easily trimmed
+ if(grainBottomA.size%simd != 0) filter(0, grainBottomA.size/simd, 1u);
+ grainBottomContact.size = contactCount;
+ while(contactCount.count > 0 && grainBottomContact[contactCount.count-1] >= (int)grainBottomA.size)
+  contactCount.count--; // Trims trailing invalid contacts
+ grainBottomContact.size = contactCount;
+ if(!grainBottomContact.size) return;
+ for(uint i=grainBottomContact.size; i<align(simd, grainBottomContact.size); i++)
+  grainBottomContact.begin()[i] = grainBottomA.size;;
 
  // Evaluates forces from (packed) intersections (SoA)
  size_t GBcc = align(simd, grainBottomContact.size); // Grain-Bottom contact count
