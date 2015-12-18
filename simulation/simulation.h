@@ -3,6 +3,17 @@
 #include "variant.h"
 #include "lattice.h"
 
+static inline void qapply(vXsf Qx, vXsf Qy, vXsf Qz, vXsf Qw, vXsf Vx, vXsf Vy, vXsf Vz,
+                          vXsf& QVx, vXsf& QVy, vXsf& QVz) {
+ const vXsf X = Qw*Vx - Vy*Qz + Qy*Vz;
+ const vXsf Y = Qw*Vy - Vz*Qx + Qz*Vx;
+ const vXsf Z = Qw*Vz - Vx*Qy + Qx*Vy;
+ const vXsf W = Vx * Qx + Vy * Qy + Vz * Qz;
+ QVx = Qw*X + W*Qx + Qy*Z - Y*Qz;
+ QVy = Qw*Y + W*Qy + Qz*X - Z*Qx;
+ QVz = Qw*Z + W*Qz + Qx*Y - X*Qy;
+}
+
 // High level simulation and contact management
 struct Simulation : System {
  // Process parameters

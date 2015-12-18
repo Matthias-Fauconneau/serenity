@@ -62,11 +62,14 @@ struct SimulationView : Widget {
 
  Time totalTime;
  Time renderTime;
+ Time grainTransformTime;
+ Time grainTransform2Time;
  Time grainSortTime;
  Time grainTime;
  Time membraneTime;
  Time plateTime;
 
+ array<int> grainIndices;
  GLIndexBuffer indexBuffer;
 
  vec2 sizeHint(vec2) override { return vec2(1024); }
@@ -86,25 +89,70 @@ struct SimulationView : Widget {
   {
    const vec3 min = vec3(-state.radius, qapply(viewRotation, vec3(0,0,0)).y, -sqrt(sq(state.topZ/2)+sq(state.radius)));
    const vec3 max = vec3(state.radius, qapply(viewRotation, vec3(0,0,state.topZ)).y, sqrt(sq(state.topZ/2)+sq(state.radius)));
-   struct key_value { float z; int index; bool operator<(const key_value& b) const { return z > b.z; }};
-   array<key_value> grainIndices (state.grain.count);
+   //struct key_value { float z; int index; bool operator<(const key_value& b) const { return z > b.z; }};
+   for(int i: range(grainIndices.size, state.grain.count)) grainIndices.append(i);
+   buffer<float> grainZ (align(simd, grainIndices.size));
+   grainTransformTime.start();
+   const vXsf Qx = floatX(viewRotation.x);
+   const vXsf Qy = floatX(viewRotation.y);
+   const vXsf Qz = floatX(viewRotation.z);
+   const vXsf Qw = floatX(viewRotation.w);
+   const float* pPx = state.grain.Px.data, *pPy = state.grain.Py.data, *pPz = state.grain.Pz.data;
+   float* const pQPz = grainZ.begin();
+   int size = state.grain.count;
+   for(int i=0; i<size; i+=simd) {
+    const vXsf Px = load(pPx, i), Py = load(pPy, i), Pz = load(pPz, i);
+    //vXsf QPx, QPy, QPz;
+    //qapply(Qx, Qy, Qz, Qw, Px, Py, Pz, QPx, QPy, QPz);
+    const vXsf X = Qw*Px - Py*Qz + Qy*Pz;
+    const vXsf Y = Qw*Py - Pz*Qx + Qz*Px;
+    const vXsf Z = Qw*Pz - Px*Qy + Qx*Py;
+    const vXsf W = Px * Qx + Py * Qy + Pz * Qz;
+    const vXsf QPz = Qw*Z + W*Qz + Qx*Y - X*Qy;
+    store(pQPz, i, QPz);
+   }
+   grainTransformTime.stop();
    grainSortTime.start();
-   /*for(int i: range(state.grain.count)) {
+   // Checks elements are sorted
+   /*if(grainIndices)
+    for(int i: range(1, grainIndices.size))
+     if(grainZ[grainIndices[i-1]] > grainZ[grainIndices[i]]) { swap(grainIndices[i-1], grainIndices[i]);}*/
+   // Sinks elements whose order changed
+   for(int i: range(1, grainIndices.size)) {
+    int j = i;
+    while(j > 0 && grainZ[grainIndices[j-1]] > grainZ[grainIndices[j]]) {
+     swap(grainIndices[j-1], grainIndices[j]);
+     j--;
+    }
+   }
+   grainSortTime.stop();
+   /*for(int i: grainIndices) {
     vec3 O = qapply(viewRotation, state.grain.position(i));
-    size_t j = 0;
-    while(j < grainIndices.size && grainIndices[j].z < O.z) j++;
-    grainIndices.insertAt(j, key_value{O.z, i}); // FIXME: insertion sort from previous state
+    int j = grainZ.size;
+    grainZ.append(O.z);
+    while(j > 0 && grainZ[j-1] > O.z) {
+     swap(grainZ[j-1], grainZ[j]);
+     swap(grainIndices[j-1], grainIndices[j]);
+     j--; // Sinks elements whose order changed
+    }
    }*/
+   //grainTransformTime.stop();
+   /*grainTransformTime.start();
    for(int i: range(state.grain.count)) {
     vec3 O = qapply(viewRotation, state.grain.position(i));
     grainIndices.append(key_value{O.z, i});
    }
+   grainTransformTime.stop();
+   grainSortTime.start();
    sort(grainIndices);
-   grainSortTime.stop();
-   for(key_value kv: grainIndices) {
-    grainPositions.append(qapply(viewRotation, state.grain.position(kv.index)));
-    grainRotations.append(conjugate(qmul(viewRotation, state.grain.rotation(kv.index))));
+   grainSortTime.stop();*/
+   //for(key_value kv: grainIndices) { int index = kv.index;
+   grainTransform2Time.start();
+   for(int index: grainIndices) { // FIXME: GPU
+    grainPositions.append(qapply(viewRotation, state.grain.position(index)));
+    grainRotations.append(conjugate(qmul(viewRotation, state.grain.rotation(index))));
    }
+   grainTransform2Time.stop();
    scale = vec3(vec2(2/::max(max.x-min.x, max.y-min.y)/1.2), 2/(max-min).z);
    translation = -vec3((min+max).xy()/2.f, min.z);
   }
@@ -135,7 +183,6 @@ struct SimulationView : Widget {
     positions[i*6+3] = vec3(min.x, max.y, O.z);
     positions[i*6+4] = vec3(max.x, min.y, O.z);
     positions[i*6+5] = vec3(max, O.z);
-    //colors[i] = vec4(1,1,1,1);
    }
    grainTime.stop();
 
@@ -199,62 +246,40 @@ struct SimulationView : Widget {
 #endif
 
   if(state.membrane.count) {
+   if(!indexBuffer) {
+    const int W = state.membrane.W, stride = state.membrane.stride, margin=state.membrane.margin;
+    buffer<uint16> indices(W*(state.membrane.H-1)*6-W*2);
+    int s = 0;
+    for(int i: range(1, state.membrane.H-1)) {
+     int base = margin+i*stride;
+     for(int j: range(W)) {
+      int a = base+j;
+      int b = base+(j+1)%W;
+      int c = base+stride+(j+i%2)%W;
+      indices[s+0] = c; indices[s+1] = a;
+      indices[s+2] = b; indices[s+3] = c;
+      if(i) { indices[s+4] = a; indices[s+5] = b; s += 6;}
+      else s += 4;
+     }
+    }
+    indices.size = s;
+    indexBuffer = indices;
+    indexBuffer.primitiveType = Lines;
+   }
    static GLShader shader {::shader_glsl(), {"packed flat"}};
    shader.bind();
    shader.bindFragments({"color"});
    shader["transform"] = rotatedViewProjection;
    shader["uColor"] = vec4(black, 1);
-
-   //buffer<vec3> positions {W*(state.membrane.H-1)*6-W*2};
-   if(!indexBuffer) {
-    const int W = state.membrane.W, stride = state.membrane.stride, margin=state.membrane.margin;
-    buffer<uint16> indices(W*(state.membrane.H-1)*6-W*2);
-    int s = 0;
-    {int base = margin;
-     for(size_t j: range(W)) {
-      int a = base+j;
-      int b = base+(j+1)%W;
-      int c = base+stride+(j+0)%W;
-      indices[s+0] = c; indices[s+1] = a;
-      indices[s+2] = b; indices[s+3] = c;
-      s += 4;
-     }
-    }
-    for(int i: range(1, state.membrane.H-1)) {
-     int base = margin+i*stride;
-     if(i%2) for(int j: range(W)) {
-      int a = base+j;
-      int b = base+(j+1)%W;
-      int c = base+stride+(j+1)%W;
-      indices[s+0] = c; indices[s+1] = a;
-      indices[s+2] = b; indices[s+3] = c;
-      indices[s+4] = a; indices[s+5] = b;
-      s += 6;
-     } else {
-      for(int j: range(W)) {
-       int a = base+j;
-       int b = base+(j+1)%W;
-       int c = base+stride+(j+0)%W;
-       indices[s+0] = c; indices[s+1] = a;
-       indices[s+2] = b; indices[s+3] = c;
-       indices[s+4] = a; indices[s+5] = b;
-       s += 6;
-      }
-     }
-    }
-    log(margin+W*stride);
-    indices.size = s;
-    indexBuffer = indices;
-    indexBuffer.primitiveType = Lines;
-   }
-   assert(s <= indices.size && s, state.membrane.W, state.membrane.H);
    static GLVertexArray vertexArray;
+   membraneTime.start();
    GLBuffer xBuffer (state.membrane.Px);
    vertexArray.bindAttribute(shader.attribLocation("x"_), 1, Float, xBuffer);
    GLBuffer yBuffer (state.membrane.Py);
    vertexArray.bindAttribute(shader.attribLocation("y"_), 1, Float, yBuffer);
    GLBuffer zBuffer (state.membrane.Pz);
    vertexArray.bindAttribute(shader.attribLocation("z"_), 1, Float, zBuffer);
+   membraneTime.stop();
    vertexArray.bind();
    indexBuffer.draw();
   }
@@ -289,9 +314,11 @@ struct SimulationView : Widget {
    plateTime.stop();
   }
   renderTime.stop();
-  if(totalTime.seconds()>1 && renderTime.seconds()*8>totalTime.seconds()) {
+  if(totalTime.seconds()>1 && renderTime.seconds()*32>totalTime.seconds()) {
    //static bool unused once = ({ log("!Render!:", strD(renderTime, totalTime), "!"); true; });
    log(strD(renderTime, totalTime));
+   log("transform", strD(grainTransformTime, renderTime));
+   log("transform2", strD(grainTransform2Time, renderTime));
    log("sort", strD(grainSortTime, renderTime));
    log("grain", strD(grainTime, renderTime));
    log("membrane", strD(membraneTime, renderTime));
@@ -340,10 +367,6 @@ struct SimulationApp : Poll {
    window->setTitle(str( str(simulation.timeStep*simulation.dt, 1u)+"s"_,
                          str(simulation.timeStep*simulation.dt/totalTime.seconds(), 1u)+"x"_,
                          strD(simulation.stepTimeRT, totalTime)));
-   /*if(!simulation.run(totalTime)) {
-    window->setTitle("Done");
-    running = false;
-   }*/
    record(); view.timeStep=view.states.size-1;
    recordTime.stop();
    window->render();
@@ -363,13 +386,13 @@ struct SimulationApp : Poll {
   SimulationView::State state;
   state.grain.radius = simulation.grain.radius;
   state.grain.count = simulation.grain.count;
-  state.grain.Px = copyRef(simulation.grain.Px.slice(simd));
-  state.grain.Py = copyRef(simulation.grain.Py.slice(simd));
-  state.grain.Pz = copyRef(simulation.grain.Pz.slice(simd));
-  state.grain.Rx = copy(simulation.grain.Rx);
-  state.grain.Ry = copy(simulation.grain.Ry);
-  state.grain.Rz = copy(simulation.grain.Rz);
-  state.grain.Rw = copy(simulation.grain.Rw);
+  state.grain.Px = copyRef(simulation.grain.Px.slice(simd, align(simd, state.grain.count)));
+  state.grain.Py = copyRef(simulation.grain.Py.slice(simd, align(simd, state.grain.count)));
+  state.grain.Pz = copyRef(simulation.grain.Pz.slice(simd, align(simd, state.grain.count)));
+  state.grain.Rx = copyRef(simulation.grain.Rx.slice(0, align(simd, state.grain.count)));
+  state.grain.Ry = copyRef(simulation.grain.Ry.slice(0, align(simd, state.grain.count)));
+  state.grain.Rz = copyRef(simulation.grain.Rz.slice(0, align(simd, state.grain.count)));
+  state.grain.Rw = copyRef(simulation.grain.Rw.slice(0, align(simd, state.grain.count)));
 
 #if WIRE
   state.wire.radius = simulation.wire.radius;

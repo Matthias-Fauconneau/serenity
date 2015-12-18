@@ -27,13 +27,14 @@ struct System {
  sconst float staticFrictionDamping = 1; // * g/s; // TODO: relative to k ?
 
  sconst bool validation = true;
+ sconst bool fast = true;
 
  // Plates
  struct Plate {
   sconst float mass = 1 * kg;
   sconst float curvature = 0;
   sconst float poissonRatio = 0.28;
-  sconst float shearModulus = 77000/8 * MPa;
+  sconst float shearModulus = 77000/8/(fast?4:1) * MPa;
   sconst float elasticModulus = validation ? 2*shearModulus*(1+poissonRatio) : 180 * GPa;
  };
 
@@ -44,7 +45,7 @@ struct System {
   sconst float mass = validation ? 4./3*PI*cb(radius) * density /*~5g*/ : 2.7 * g;
   sconst float curvature = 1./radius;
   sconst float poissonRatio = validation ? 0.28 : 0.35;
-  sconst float shearModulus = 77000/8 * MPa;
+  sconst float shearModulus = 77000/8/(fast?4:1) * MPa;
   sconst float elasticModulus = validation ? 2*shearModulus*(1+poissonRatio) : 250 * MPa;
   sconst float angularMass = 2./3*mass*sq(radius);
 

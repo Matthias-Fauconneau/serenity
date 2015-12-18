@@ -146,7 +146,7 @@ GLBuffer::GLBuffer(uint elementSize, ref<byte> data) : elementSize(elementSize),
  glGenBuffers(1, &id);
  glBindBuffer(GL_ARRAY_BUFFER, id);
  assert_(int(data.size) > 0, data.size);
- glBufferData(GL_ARRAY_BUFFER, data.size, data.data, GL_STATIC_DRAW);
+ glBufferData(GL_ARRAY_BUFFER, data.size, data.data, GL_DYNAMIC_DRAW);
  glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 GLBuffer::~GLBuffer() { if(id) glDeleteBuffers(1, &id); }
@@ -188,8 +188,8 @@ void GLIndexBuffer::draw(size_t start, size_t end) {
  glEnable(GL_LINE_SMOOTH);
  glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
  glLineWidth(lineWidth);
- glEnable(GL_PRIMITIVE_RESTART);
- glPrimitiveRestartIndex((1u<<(elementSize*8))-1);
+ //glEnable(GL_PRIMITIVE_RESTART);
+ //glPrimitiveRestartIndex((1u<<(elementSize*8))-1);
  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
  GLenum type = 0;
  if(elementSize==2) type = GL_UNSIGNED_SHORT;
