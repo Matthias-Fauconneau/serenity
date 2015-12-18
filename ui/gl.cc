@@ -142,8 +142,10 @@ void GLShader::bind(string name, const GLBuffer& ssbo, uint binding) {
 
 /// Buffer
 
-GLBuffer::GLBuffer(uint elementSize, ref<byte> data) : elementSize(elementSize), elementCount(data.size/elementSize) {
- glGenBuffers(1, &id);
+void GLBuffer::upload(uint elementSize, ref<byte> data) {
+ this->elementSize = elementSize;
+ this->elementCount = data.size/elementSize;
+ if(!id) glGenBuffers(1, &id);
  glBindBuffer(GL_ARRAY_BUFFER, id);
  assert_(int(data.size) > 0, data.size);
  glBufferData(GL_ARRAY_BUFFER, data.size, data.data, GL_STREAM_DRAW);
@@ -372,24 +374,4 @@ Image GLFrameBuffer::readback() {
  Image target(size);
  glReadPixels(0, 0, target.size.x, target.size.y, GL_BGRA, GL_UNSIGNED_BYTE, (void*)target.data);
  return flip(move(target));
-}
-
-void glDrawRectangle(GLShader& shader, vec2 min, vec2 max, bool texCoord) {
- shader.bind();
- static GLVertexArray vertexArray;
- int positionIndex = shader.attribLocation("position"_);
- assert_(positionIndex>=0);
- GLBuffer positions {ref<vec2>{vec2(min.x,min.y), vec2(max.x,min.y), vec2(min.x,max.y), vec2(max.x,max.y)}};
- vertexArray.bindAttribute(positionIndex, 2, Float, positions);
- int texCoordsIndex;
- GLBuffer texCoordsBuffer;
- if(texCoord) {
-  texCoordsIndex = shader.attribLocation("texCoords"_);
-  assert_(texCoordsIndex>=0);
-  texCoordsBuffer = GLBuffer(ref<vec2>{vec2(0,1), vec2(1,1), vec2(0,0), vec2(1,0)}); //flip Y
-  vertexArray.bindAttribute(texCoordsIndex, 2, Float, texCoordsBuffer);
- }
- vertexArray.draw(TriangleStrip, 4);
- /*glDisableVertexAttribArray(positionIndex);
-    if(texCoord) glDisableVertexAttribArray(texCoordsIndex);*/
 }

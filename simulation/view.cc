@@ -24,20 +24,17 @@ struct SimulationView : Widget {
 
  Time totalTime;
  Time renderTime;
- Time grainTransformTime;
- Time grainSortTime;
- Time grainTime;
- Time membraneTime;
- Time plateTime;
 
  array<int> grainIndices;
  GLIndexBuffer indexBuffer;
+ GLBuffer xBuffer, yBuffer, zBuffer;
 
  SimulationView(const Simulation& simulation) : simulation(simulation) {}
 
  vec2 sizeHint(vec2) override { return vec2(1024); }
  shared<Graphics> graphics(vec2 size) override {
   if(!totalTime) totalTime.start();
+  renderTime.start();
 
   vec4 viewRotation = qmul(angleVector(yawPitch.y, vec3(1,0,0)), angleVector(yawPitch.x, vec3(0,0,1)));
   const vec3 scale = vec3(2/(simulation.topZ-simulation.bottomZ));
@@ -48,12 +45,11 @@ struct SimulationView : Widget {
     .translate(vec3(0,0,-(simulation.bottomZ+simulation.topZ)/2));
 
   glDepthTest(true);
-  renderTime.start();
 
   if(simulation.grain.count) {
    for(int i: range(grainIndices.size, simulation.grain.count)) grainIndices.append(i);
    buffer<float> grainZ (align(simd, grainIndices.size));
-   {grainTransformTime.start();
+   {
     const vXsf Qx = floatX(viewRotation.x);
     const vXsf Qy = floatX(viewRotation.y);
     const vXsf Qz = floatX(viewRotation.z);
@@ -70,8 +66,7 @@ struct SimulationView : Widget {
      const vXsf QPz = Qw*Z + W*Qz + Qx*Y - X*Qy;
      store(pQPz, i, QPz);
     }
-    grainTransformTime.stop(); }
-   grainSortTime.start();
+   }
    for(int i: range(1, grainIndices.size)) {
     int j = i;
     while(j > 0 && grainZ[grainIndices[j-1]] > grainZ[grainIndices[j]]) {
@@ -79,10 +74,8 @@ struct SimulationView : Widget {
      j--;
     }
    }
-   grainSortTime.stop();
 
    buffer<vec3> positions {grainIndices.size*6};
-   grainTime.start();
    for(size_t i: range(grainIndices.size)) {
     // FIXME: GPU quad projection
     vec3 O = viewProjection * simulation.grain.position(grainIndices[i]);
@@ -95,7 +88,6 @@ struct SimulationView : Widget {
     positions[i*6+4] = vec3(max.x, min.y, O.z);
     positions[i*6+5] = vec3(max, O.z);
    }
-   grainTime.stop();
 
    static GLShader shader {::shader_glsl(), {"interleaved sphere"}};
    shader.bind();
@@ -190,22 +182,20 @@ struct SimulationView : Widget {
    shader["transform"] = viewProjection;
    shader["uColor"] = vec4(black, 1);
    static GLVertexArray vertexArray;
-   membraneTime.start();
    // FIXME: reuse buffers / no update before pressure
-   GLBuffer xBuffer (simulation.membrane.Px);
+   if(!xBuffer) xBuffer = GLBuffer(simulation.membrane.Px);
+   else if(simulation.processState >= Simulation::Pressure) xBuffer.unmap();
    vertexArray.bindAttribute(shader.attribLocation("x"_), 1, Float, xBuffer);
-   GLBuffer yBuffer (simulation.membrane.Py);
+   if(!yBuffer) yBuffer = GLBuffer(simulation.membrane.Py);
    vertexArray.bindAttribute(shader.attribLocation("y"_), 1, Float, yBuffer);
-   GLBuffer zBuffer (simulation.membrane.Pz);
+   if(!zBuffer) zBuffer = GLBuffer(simulation.membrane.Pz);
    vertexArray.bindAttribute(shader.attribLocation("z"_), 1, Float, zBuffer);
-   membraneTime.stop();
    vertexArray.bind();
    indexBuffer.draw();
   }
 
   // Plates
   {
-   plateTime.start();
    static GLShader shader {::shader_glsl(), {"interleaved flat"}};
    shader.bind();
    shader.bindFragments({"color"});
@@ -231,20 +221,8 @@ struct SimulationView : Widget {
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
    vertexArray.draw(Lines, positions.size);
-   plateTime.stop();
   }
   renderTime.stop();
-  if(totalTime.seconds()>1 && renderTime.seconds()*32>totalTime.seconds()) {
-   //static bool unused once = ({ log("!Render!:", strD(renderTime, totalTime), "!"); true; });
-   log(strD(renderTime, totalTime));
-   log("transform", strD(grainTransformTime, renderTime));
-   log("transform2", strD(grainTransform2Time, renderTime));
-   log("sort", strD(grainSortTime, renderTime));
-   log("grain", strD(grainTime, renderTime));
-   log("membrane", strD(membraneTime, renderTime));
-   log("plate", strD(plateTime, renderTime));
-  }
-
   return shared<Graphics>();
  }
 

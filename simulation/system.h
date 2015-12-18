@@ -27,7 +27,7 @@ struct System {
  sconst float staticFrictionDamping = 1; // * g/s; // TODO: relative to k ?
 
  sconst bool validation = true;
- sconst bool fast = true;
+ sconst bool fast = false;
 
  // Plates
  struct Plate {
