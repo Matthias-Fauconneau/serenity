@@ -32,7 +32,8 @@ struct Simulation : System {
 #endif
 
  // Results
- float bottomForceZ = 0, topForceZ = 0;
+ int bottomSumStepCount = 0, topSumStepCount = 0;
+ float bottomForceZ = 0, topForceZ = 0;//, radialForce;
 
  // Grain-Bottom
  buffer<int> oldGrainBottomA;

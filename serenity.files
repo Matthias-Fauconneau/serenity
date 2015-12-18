@@ -94,3 +94,4 @@ simulation/grain.cc
 simulation/grain-obstacle.h
 tools/plot-app.cc
 ui/utf8.cc
+tools/shader.glsl

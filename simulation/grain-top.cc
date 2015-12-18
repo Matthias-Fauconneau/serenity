@@ -198,6 +198,7 @@ void Simulation::stepGrainTop() {
   grain.Tz[a] += grainTopTAz[i];
   topForceZ -= grainTopFz[i];
  }
- this->topForceZ = topForceZ;
+ this->topForceZ = topForceZ; // FIXME: average
+ topSumStepCount++;
  grainTopSumTime.stop();
 }

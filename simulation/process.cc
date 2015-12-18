@@ -26,7 +26,7 @@ void Simulation::stepProcess() {
   }
  } else {
   // Increases current height
-  if(currentHeight < topZ-Grain::radius) currentHeight += verticalSpeed * dt;
+  if(currentHeight < topZ-Grain::radius+1e-4) currentHeight += verticalSpeed * dt;
 
 #if WIRE
   // Generates wire
@@ -115,7 +115,7 @@ void Simulation::stepProcess() {
       size_t i = grain.count;
       assert_(newPosition.z >= Grain::radius);
       grain.Px[simd+i] = newPosition.x; grain.Py[i+simd] = newPosition.y; grain.Pz[simd+i] = newPosition.z;
-      grain.Vx[i] = 0; grain.Vy[i] = 0; grain.Vz[i] = 0; //- 1 * m/s;
+      grain.Vx[i] = 0; grain.Vy[i] = 0; grain.Vz[i] = - 1 * m/s;
       grain.AVx[i] = 0; grain.AVy[i] = 0; grain.AVz[i] = 0;
       float t0 = 2*PI*random();
       float t1 = acos(1-2*random());
@@ -126,7 +126,7 @@ void Simulation::stepProcess() {
       grain.Rw[i] = cos(t2);
       grain.count++;
       // Forces verlet lists reevaluation
-      if(grain.count && timeStep%grain.count == 0) grainMembraneGlobalMinD = 0;
+      /*if(timeStep%grain.count == 0)*/ grainMembraneGlobalMinD = 0;
       grainGrainGlobalMinD = 0;
       grainWireGlobalMinD = 0;
      } else break;

@@ -32,9 +32,10 @@ vec2 Plot::sizeHint(vec2 size) {
 shared<Graphics> Plot::graphics(vec2 size) {
  vec2 min=vec2(+__builtin_inf()), max=vec2(-__builtin_inf());
  // Computes axis scales
- for(const auto& data: dataSets.values) {
+ for(const map<float,float>& data: dataSets.values) {
+  if(!data.values) continue; // FIXME
   for(auto point: data) {
-   vec2 p(point.key,point.value);
+   vec2 p(point.key, point.value);
    if(!isNumber(p)) continue;
    //assert_(isNumber(p.x) && isNumber(p.y), p);
    min=::min(min,p);

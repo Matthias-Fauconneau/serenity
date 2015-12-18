@@ -47,7 +47,7 @@ struct PlotView : HList<Plot> {
   for(size_t index: range(2)) {
    Plot& plot = append();
    plot.xlabel = "Strain (%)"__;
-   plot.ylabel = unsafeRef(ref<string>{"Stress (Pa)","Normalized deviator stress"}[index]);
+   plot.ylabel = copyRef(ref<string>{"Stress (Pa)","Normalized deviator stress"}[index]);
    map<String, array<Variant>> allCoordinates;
    for(Folder folder: {"Results"_}/*arguments()*/) {
     for(string name: folder.list(Files)) {
@@ -71,7 +71,7 @@ struct PlotView : HList<Plot> {
        s.whileAny(' ');
       }
      }
-     for(mref<float> data: dataSets.values) data[0]=0; // Filters invalid first point (inertia)
+     //for(mref<float> data: dataSets.values) if(data) data[0]=0; // Filters invalid first point (inertia)
      auto parameters = parseDict(name);
      if(plot.ylabel == "Normalized deviator stress") {
       float pressure = parameters.at("Pressure");

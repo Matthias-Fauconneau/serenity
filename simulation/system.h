@@ -21,9 +21,9 @@ struct System {
  //const float normalDampingRate = ln(e) / sqrt(sq(PI)+ln(ln(e)));
  sconst float normalDampingRate = 1; // ~ ln e / √(π²+ln²e) [restitution coefficient e]
  sconst float dynamicFrictionCoefficient = 0.1; // Interparticle 0.1 (FIXME: boundary: 0.23)
- sconst float staticFrictionSpeed = 1 * m/s;
- sconst float staticFrictionLength = 0.5 * mm; // ~ Grain::radius/4 //~ Wire::radius
- sconst float staticFrictionStiffness = 1; //00* 1*g*10/(1.25*mm); //k/F = F/L ~ Grain::mass*G/L //~ Wire::mass*G/Wire::radius
+ sconst float staticFrictionSpeed = 1 * mm/s;
+ sconst float staticFrictionLength = 1e-3 * m; // ~ Grain::radius/4 //~ Wire::radius
+ sconst float staticFrictionStiffness = 100; //00* 1*g*10/(1.25*mm); //k/F = F/L ~ Grain::mass*G/L //~ Wire::mass*G/Wire::radius
  sconst float staticFrictionDamping = 1; // * g/s; // TODO: relative to k ?
 
  sconst bool validation = true;

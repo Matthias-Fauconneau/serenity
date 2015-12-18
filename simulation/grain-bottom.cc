@@ -177,6 +177,7 @@ void Simulation::stepGrainBottom() {
   grain.Tz[a] += grainBottomTAz[i];
   bottomForceZ += grainBottomFz[i];
  }
- this->bottomForceZ = bottomForceZ;
+ this->bottomForceZ += bottomForceZ;
+ bottomSumStepCount++;
  grainBottomSumTime.stop();
 }

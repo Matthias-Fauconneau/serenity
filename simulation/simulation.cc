@@ -50,11 +50,11 @@ void Simulation::step() {
  grainBottomTotalTime.start();
  stepGrainBottom();
  grainBottomTotalTime.stop();
- if(currentHeight >= topZ-Grain::radius) {
+ //if(currentHeight >= topZ-Grain::radius) {
   grainTopTotalTime.start();
   stepGrainTop();
   grainTopTotalTime.stop();
- }
+ //}
  grainGrainTotalTime.start();
  stepGrainGrain();
  grainGrainTotalTime.stop();
@@ -220,7 +220,7 @@ bool Simulation::run(const Time& totalTime) {
  stepTimeRT.stop();
  //viewStep++;
  //if(viewStep%60 == 0) {
- if(timeStep%(int(1/(dt*60))/8*64) == 0) {
+ if(timeStep%(int(1/(dt*60))/8*60) == 0) {
   //extern size_t threadCount();
   //if(threadCount()<17) log(threadCount(), coreFrequencies()); else log("//", threadCount());
   profile(totalTime);
@@ -229,16 +229,18 @@ bool Simulation::run(const Time& totalTime) {
  if(processState == Load) {
   float height = topZ-bottomZ;
   float strain = 1-height/topZ0;
-  float area = PI*sq(membrane.radius);
-  float force = topForceZ + bottomForceZ;
+  float area = PI*sq(membrane.radius) * 2 /*2 plates*/;
+  float force = topForceZ/topSumStepCount + bottomForceZ/bottomSumStepCount;
   float stress = force / area;
+  //float side = 2*PI*membrane.radius*height;
+  //float radial = radialForce / side;
   if(!pressureStrain) {
    //assert_(!existsFile(arguments()[0], "Results"_));
    if(existsFile(arguments()[0], "Results"_)) log("Overwrote", arguments()[0]);
    pressureStrain = File(arguments()[0], "Results"_, Flags(WriteOnly|Create|Truncate));
-   pressureStrain.write("Strain (%), Stress (Pa)\n");
+   pressureStrain.write("Strain (%), "/*Radial (Pa), */"Stress (Pa)""\n");
   }
-  String line = str(strain*100, 4u)+' '+str(int(round(stress)))+'\n';
+  String line = str(strain*100, 4u)+' '/*+str(int(round(radial)))+' '*/+str(int(round(stress)))+'\n';
   log_(line);
   pressureStrain.write(line);
   if(strain > 1./8) return false;
