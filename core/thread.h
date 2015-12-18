@@ -191,7 +191,7 @@ struct FileWatcher : File, Poll {
    inotify_event e = *(inotify_event*)buffer.data;
    string name = e.len ? string(e.name, e.len-1) : path;
    fileModified(name);
-   addWatch(name); // FIXME: should not be one shot
+   //addWatch(name); // FIXME: should not be one shot
   }
  }
 };

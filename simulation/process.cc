@@ -13,7 +13,7 @@ void Simulation::stepProcess() {
   if(processState < Pressure) {
    if(timeStep%(int(1/(dt*60))) == 0) log(maxGrainV*1e3f, "mm/s");
    if(maxGrainV > 100 * mm/s) return;
-   pressure = targetPressure;
+   //pressure = targetPressure;
   }
   if(pressure < targetPressure) { // Increases pressure toward target pressure
    processState = Pressure;
@@ -26,7 +26,7 @@ void Simulation::stepProcess() {
   }
  } else {
   // Increases current height
-  if(currentHeight < topZ-Grain::radius/2) currentHeight += verticalSpeed * dt;
+  if(currentHeight < topZ-Grain::radius) currentHeight += verticalSpeed * dt;
 
 #if WIRE
   // Generates wire

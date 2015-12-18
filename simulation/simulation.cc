@@ -26,7 +26,8 @@ constexpr string Simulation::patterns[];
 #endif
 
 Simulation::Simulation(const Dict& p) : System(p.at("TimeStep"), p.at("Radius")),
-  targetPressure(p.at("Pressure"))
+  targetPressure((float)p.at("Pressure")*Pa),
+  plateSpeed((float)p.at("Speed")*mm/s)
 #if WIRE
   , pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):None)
 #endif
@@ -49,7 +50,7 @@ void Simulation::step() {
  grainBottomTotalTime.start();
  stepGrainBottom();
  grainBottomTotalTime.stop();
- if(currentHeight >= topZ) {
+ if(currentHeight >= topZ-Grain::radius) {
   grainTopTotalTime.start();
   stepGrainTop();
   grainTopTotalTime.stop();
@@ -229,11 +230,12 @@ bool Simulation::run(const Time& totalTime) {
   float force = topForceZ + bottomForceZ;
   float stress = force / area;
   if(!pressureStrain) {
-   assert_(!existsFile(arguments()[0], "Results"_));
-   pressureStrain = File(arguments()[0], "Results"_, Flags(WriteOnly|Create));
+   //assert_(!existsFile(arguments()[0], "Results"_));
+   if(existsFile(arguments()[0], "Results"_)) log("Overwrote", arguments()[0]);
+   pressureStrain = File(arguments()[0], "Results"_, Flags(WriteOnly|Create|Truncate));
    pressureStrain.write("Strain (%), Stress (Pa)\n");
   }
-  String line = str(strain*100, 3u)+' '+str(int(round(stress)))+'\n';
+  String line = str(strain*100, 4u)+' '+str(int(round(stress)))+'\n';
   log_(line);
   pressureStrain.write(line);
   if(strain > 1./8) return false;
