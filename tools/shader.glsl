@@ -22,10 +22,14 @@ fragment {
     float l = length(vLocalCoords);
     if(l > 1+hpxRadius) discard;
     float dz = sqrt(max(0, 1-dot(vLocalCoords,vLocalCoords)));
-    vec3 v = vec3(vLocalCoords, dz);
-    buffer rotationBuffer { vec4[] rotation; };
-    //buffer colorBuffer { vec4[] aColor; };
-    vec4 q = rotation[gl_PrimitiveID/2];
+    float a = ((1+hpxRadius)-l)/(2*hpxRadius);
+    /*buffer pRx { float[] Rx; };
+    buffer pRy { float[] Ry; };
+    buffer pRz { float[] Rz; };
+    buffer pRw { float[] Rw; };
+    //uniform vec4 viewRotation;
+    vec4 q = vec4(Rx[gl_PrimitiveID/2], Ry[gl_PrimitiveID/2], Rz[gl_PrimitiveID/2], Rw[gl_PrimitiveID/2]);
+    vec4 conjugate(vec4 q) { return vec4(-q.xyz, q.w); }
     vec4 qmul(vec4 p, vec4 q) {
       return vec4(p.w*q.xyz + q.w*p.xyz + cross(p.xyz, q.xyz),
                   p.w*q.w - dot(p.xyz, q.xyz));
@@ -33,11 +37,9 @@ fragment {
     vec3 mul(vec4 p, vec3 v) {
       return qmul(p, qmul(vec4(v, 0), vec4(-p.xyz, p.w))).xyz;
     }
-    float a = ((1+hpxRadius)-l)/(2*hpxRadius);
-    //color = vec4(vec3(dz), a);
-    color = vec4(dz*(1+mul(q, v))/2, a);
-    //color = aColor[gl_PrimitiveID/2] * vec4(dz*(1+mul(q, v))/2, a);
-    //color = q;
+    vec3 v = vec3(vLocalCoords, dz);
+    color = vec4(dz*(1+mul(conjugate(qmul(viewRotation, q)), v))/2, a);*/
+    color = vec4(vec3(dz), a);
     uniform float radius;
     gl_FragDepth = gl_FragCoord.z + dz * radius;
   }

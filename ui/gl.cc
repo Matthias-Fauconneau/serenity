@@ -146,7 +146,7 @@ GLBuffer::GLBuffer(uint elementSize, ref<byte> data) : elementSize(elementSize),
  glGenBuffers(1, &id);
  glBindBuffer(GL_ARRAY_BUFFER, id);
  assert_(int(data.size) > 0, data.size);
- glBufferData(GL_ARRAY_BUFFER, data.size, data.data, GL_DYNAMIC_DRAW);
+ glBufferData(GL_ARRAY_BUFFER, data.size, data.data, GL_STREAM_DRAW);
  glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 GLBuffer::~GLBuffer() { if(id) glDeleteBuffers(1, &id); }

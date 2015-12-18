@@ -263,7 +263,7 @@ void XWindow::event() {
  }
 
  if(glContext && !useSW) // if useSW: GL image should be composited in CPU target
-  GLFrameBuffer::bindWindow(0, Window::size, ClearColor/*|ClearDepth*/,
+  GLFrameBuffer::bindWindow(0, Window::size, ClearColor|ClearDepth,
                             rgba4f(backgroundColor, 1));
  Update update = render(Window::size, target);
  if(update) {
