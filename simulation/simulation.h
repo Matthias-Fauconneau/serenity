@@ -8,7 +8,7 @@ struct Simulation : System {
  // Process parameters
  float Gz = -10 * N/kg; // Gravity
  const float verticalSpeed = 1 * m/s;
- const float plateSpeed = 0.1 * m/s;
+ const float plateSpeed = 1 * mm/s;
 #if WIRE
  const float patternRadius = membrane.radius - Grain::radius;
  enum Pattern { None, Helix, Cross, Loop };

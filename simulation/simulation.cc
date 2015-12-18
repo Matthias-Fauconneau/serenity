@@ -229,8 +229,8 @@ bool Simulation::run(const Time& totalTime) {
   float force = topForceZ + bottomForceZ;
   float stress = force / area;
   if(!pressureStrain) {
-   assert_(!existsFile(arguments()[0], "Results"));
-   pressureStrain = File(arguments()[0], "Results", Flags(WriteOnly|Create));
+   assert_(!existsFile(arguments()[0], "Results"_));
+   pressureStrain = File(arguments()[0], "Results"_, Flags(WriteOnly|Create));
    pressureStrain.write("Strain (%), Stress (Pa)\n");
   }
   String line = str(strain*100, 3u)+' '+str(int(round(stress)))+'\n';

@@ -61,7 +61,15 @@ void Simulation::stepGrainIntegration() {
  const/*expr*/ size_t threadCount = ::threadCount();
  float maxGrainV_[threadCount]; mref<float>(maxGrainV_, threadCount).clear(0);
  grainIntegrationTime += parallel_chunk(align(simd, grain.count)/simd, [this, &maxGrainV_](uint id, size_t start, size_t size) {
+#if !GEAR
   const vXsf dt_mass = floatX(dt / grain.mass), dt = floatX(this->dt);
+#else
+  const vXsf _1_mass = floatX(1 / grain.mass);
+  const vXsf p[3] = {floatX(dt), floatX(dt*dt/2), floatX(dt*dt*dt/6)};
+  const vXsf c[4] = {floatX(1./6), floatX(5/(6*dt)), floatX(1/(dt*dt)), floatX(1/(3*dt*dt*dt))};
+  float* const pPDx0 = grain.PDx[0].begin(), *pPDy0 = grain.PDy[0].begin(), *pPDz0 = grain.PDz[0].begin();
+  float* const pPDx1 = grain.PDx[1].begin(), *pPDy1 = grain.PDy[1].begin(), *pPDz1 = grain.PDz[1].begin();
+#endif
   const vXsf dt_2 = floatX(this->dt / 2);
   const vXsf dt_angularMass = floatX(this->dt / Grain::angularMass);
   vXsf maxGrainVX = _0f;
@@ -76,6 +84,7 @@ void Simulation::stepGrainIntegration() {
    const vXsf Fx = load(pFx, i), Fy = load(pFy, i), Fz = load(pFz, i);
    vXsf Vx = load(pVx, i), Vy = load(pVy, i), Vz = load(pVz, i);
    vXsf Px = load(pPx, i), Py = load(pPy, i), Pz = load(pPz, i);
+#if !GEAR
    // Symplectic Euler
    Vx += dt_mass * Fx;
    Vy += dt_mass * Fy;
@@ -83,7 +92,59 @@ void Simulation::stepGrainIntegration() {
    Px += dt * Vx;
    Py += dt * Vy;
    Pz += dt * Vz;
-   //Pz = min(topZ, Pz);
+#else
+   // 4th order "Gear"
+   vXsf PDx0 = load(pPDx0, i), PDy0 = load(pPDy0, i), PDz0 = load(pPDz0, i);
+   vXsf PDx1 = load(pPDx1, i), PDy1 = load(pPDy1, i), PDz1 = load(pPDz1, i);
+
+   const vXsf Rx = p[1] * (Fx * _1_mass - PDx0);
+   const vXsf Ry = p[1] * (Fy * _1_mass - PDy0);
+   const vXsf Rz = p[1] * (Fz * _1_mass - PDz0);
+   // "Correction"
+   Px += c[0]*Rx;
+   Py += c[0]*Ry;
+   Pz += c[0]*Rz;
+
+   Vx += c[1]*Rx;
+   Vy+= c[1]*Ry;
+   Vz += c[1]*Rz;
+
+   PDx0 += c[2]*Rx;
+   PDy0 += c[2]*Ry;
+   PDz0 += c[2]*Rz;
+
+   PDx1 += c[3]*Rx;
+   PDy1 += c[3]*Ry;
+   PDz1 += c[3]*Rz;
+
+   // "Prediction"
+   Px += p[0]*Vx;
+   Py += p[0]*Vy;
+   Pz += p[0]*Vz;
+
+   Px += p[1]*PDx0;
+   Py += p[1]*PDy0;
+   Pz += p[1]*PDz0;
+
+   Px += p[2]*PDx1;
+   Py += p[2]*PDy1;
+   Pz += p[2]*PDz1;
+
+   Vx += p[0]*PDx0;
+   Vy += p[0]*PDy0;
+   Vz += p[0]*PDz0;
+
+   Vx += p[1]*PDx1;
+   Vy += p[1]*PDy1;
+   Vz += p[1]*PDz1;
+
+   PDx0 += p[0]*PDx1;
+   PDy0 += p[0]*PDy1;
+   PDz0 += p[0]*PDz1;
+
+   store(pPDx0, i, PDx0); store(pPDy0, i, PDy0); store(pPDz0, i, PDz0);
+   store(pPDx1, i, PDx1); store(pPDy1, i, PDy1); store(pPDz1, i, PDz1);
+#endif
    store(pVx, i, Vx); store(pVy, i, Vy); store(pVz, i, Vz);
    store(pPx, i, Px); store(pPy, i, Py); store(pPz, i, Pz);
 
