@@ -20,33 +20,32 @@ struct System {
  //sconst float e = 1./2; // Restitution coefficient
  //const float normalDampingRate = ln(e) / sqrt(sq(PI)+ln(ln(e)));
  sconst float normalDampingRate = 1; // ~ ln e / √(π²+ln²e) [restitution coefficient e]
- sconst float dynamicFrictionCoefficient = 0.1; // Interparticle (FIXME: boundary: 0.23)
- sconst float staticFrictionSpeed = __builtin_inff();
- sconst float staticFrictionLength = 3 * mm; // ~ Wire::radius
- sconst float staticFrictionStiffness = 100* 1*g*10/(3*mm); //k/F = F/L ~ Wire::mass*G/Wire::radius
- sconst float staticFrictionDamping = 1 * g/s; // TODO: relative to k ?
+ sconst float dynamicFrictionCoefficient = 0.1; // Interparticle 0.1 (FIXME: boundary: 0.23)
+ sconst float staticFrictionSpeed = 1 * m/s;
+ sconst float staticFrictionLength = 0.5 * mm; // ~ Grain::radius/4 //~ Wire::radius
+ sconst float staticFrictionStiffness = 1; //00* 1*g*10/(1.25*mm); //k/F = F/L ~ Grain::mass*G/L //~ Wire::mass*G/Wire::radius
+ sconst float staticFrictionDamping = 1; // * g/s; // TODO: relative to k ?
 
- // Obstacles: floor plane, cast cylinder
- struct Obstacle {
+ sconst bool validation = true;
+
+ // Plates
+ struct Plate {
   sconst float mass = 1 * kg;
   sconst float curvature = 0;
   sconst float poissonRatio = 0.28;
-  //sconst float shearModulus = 77000/8 * MPa;
-  //sconst float elasticModulus = validation ? 2*shearModulus*(1+poissonRatio) : 250 * MPa;
-  sconst float elasticModulus = 180 * GPa;
+  sconst float shearModulus = 77000/8 * MPa;
+  sconst float elasticModulus = validation ? 2*shearModulus*(1+poissonRatio) : 180 * GPa;
  };
 
  // Sphere particles
  struct Grain {
-  sconst bool validation = true;
   sconst float radius = validation ? 2.5 * mm: 40 * mm;
   sconst float density = 7.8e3 * kg/cb(m);
   sconst float mass = validation ? 4./3*PI*cb(radius) * density /*~5g*/ : 2.7 * g;
   sconst float curvature = 1./radius;
   sconst float poissonRatio = validation ? 0.28 : 0.35;
-  //sconst float shearModulus = 77000/8 * MPa;
-  //sconst float elasticModulus = validation ? 2*shearModulus*(1+poissonRatio) : 250 * MPa; // 200 GPa
-  sconst float elasticModulus = 180/8 * GPa;
+  sconst float shearModulus = 77000/8 * MPa;
+  sconst float elasticModulus = validation ? 2*shearModulus*(1+poissonRatio) : 250 * MPa;
   sconst float angularMass = 2./3*mass*sq(radius);
 
   const size_t capacity;
@@ -54,12 +53,6 @@ struct System {
   buffer<float> Px { capacity };
   buffer<float> Py { capacity };
   buffer<float> Pz { capacity };
-#define GEAR 0
-#if GEAR
-  buffer<float> PDx[2] {capacity, capacity};
-  buffer<float> PDy[2] {capacity, capacity};
-  buffer<float> PDz[2] {capacity, capacity};
-#endif
   buffer<float> Vx { capacity };
   buffer<float> Vy { capacity };
   buffer<float> Vz { capacity };
@@ -73,11 +66,8 @@ struct System {
   buffer<float> Ty { ::threadCount() * capacity };
   buffer<float> Tz { ::threadCount() * capacity }; // Torque
 
-  Grain() : capacity(4*194*16/*(3120)<3840=1920*2*//8/8+simd) {
+  Grain(size_t capacity) : capacity(capacity+simd) {
    Px.clear(0); Py.clear(0); Pz.clear(0);
-#if GEAR
-   for(int i: range(2)) { PDx[i].clear(0); PDy[i].clear(0); PDz[i].clear(0); }
-#endif
    Vx.clear(0); Vy.clear(0); Vz.clear(0);
    Fx.clear(0); Fy.clear(0); Fz.clear(0);
    Tx.clear(0); Ty.clear(0); Tz.clear(0);
@@ -191,7 +181,7 @@ struct System {
   const vec3 force(size_t i) const { return vec3(Fx[i], Fy[i], Fz[i]);  }
  } membrane;
 
- size_t timeStep = 0;
+ size_t timeStep = 0, viewStep = 0;
 
- System(float dt, float radius) : dt(dt), membrane(radius) {}
+ System(float dt, size_t grainCount, float radius) : dt(dt), grain(grainCount), membrane(radius) {}
 };

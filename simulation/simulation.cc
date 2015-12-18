@@ -25,7 +25,7 @@ constexpr float System::Wire::bendStiffness;
 constexpr string Simulation::patterns[];
 #endif
 
-Simulation::Simulation(const Dict& p) : System(p.at("TimeStep"), p.at("Radius")),
+Simulation::Simulation(const Dict& p) : System(p.at("TimeStep"), (int)p.at("Count"), p.at("Radius")),
   targetPressure((float)p.at("Pressure")*Pa),
   plateSpeed((float)p.at("Speed")*mm/s)
 #if WIRE
@@ -214,9 +214,12 @@ void Simulation::profile(const Time& totalTime) {
 bool Simulation::run(const Time& totalTime) {
  stepTimeRT.start();
  stepTime.start();
+ //for(Time time{true}; time.nanoseconds() < second/60;) step();
  for(int unused t: range(int(1/(dt*60))/8)) step();
  stepTime.stop();
  stepTimeRT.stop();
+ //viewStep++;
+ //if(viewStep%60 == 0) {
  if(timeStep%(int(1/(dt*60))/8*64) == 0) {
   //extern size_t threadCount();
   //if(threadCount()<17) log(threadCount(), coreFrequencies()); else log("//", threadCount());

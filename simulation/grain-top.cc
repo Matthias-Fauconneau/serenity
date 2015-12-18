@@ -162,7 +162,7 @@ void Simulation::stepGrainTop() {
  grainTopTAx.size = GTcc;
  grainTopTAy.size = GTcc;
  grainTopTAz.size = GTcc;
- constexpr float E = 1/((1-sq(Grain::poissonRatio))/Grain::elasticModulus+(1-sq(Obstacle::poissonRatio))/Obstacle::elasticModulus);
+ constexpr float E = 1/((1-sq(Grain::poissonRatio))/Grain::elasticModulus+(1-sq(Plate::poissonRatio))/Plate::elasticModulus);
  constexpr float R = 1/(Grain::curvature/*+Obstacle::curvature*/);
  const float K = 4./3*E*sqrt(R);
  constexpr float mass = 1/(1/Grain::mass/*+1/Obstacle::mass*/);

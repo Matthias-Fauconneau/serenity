@@ -113,6 +113,7 @@ void Simulation::stepProcess() {
        if(length(wire.position(index) - newPosition) < Grain::radius+Wire::radius) { processTime.stop(); return; }
 #endif
       size_t i = grain.count;
+      assert_(newPosition.z >= Grain::radius);
       grain.Px[simd+i] = newPosition.x; grain.Py[i+simd] = newPosition.y; grain.Pz[simd+i] = newPosition.z;
       grain.Vx[i] = 0; grain.Vy[i] = 0; grain.Vz[i] = 0; //- 1 * m/s;
       grain.AVx[i] = 0; grain.AVy[i] = 0; grain.AVz[i] = 0;
@@ -125,10 +126,8 @@ void Simulation::stepProcess() {
       grain.Rw[i] = cos(t2);
       grain.count++;
       // Forces verlet lists reevaluation
-      if(grain.count && timeStep%grain.count == 0) {
-       grainGrainGlobalMinD = 0;
-       grainMembraneGlobalMinD = 0;
-      }
+      if(grain.count && timeStep%grain.count == 0) grainMembraneGlobalMinD = 0;
+      grainGrainGlobalMinD = 0;
       grainWireGlobalMinD = 0;
      } else break;
     }

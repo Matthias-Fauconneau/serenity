@@ -129,7 +129,8 @@ void Simulation::stepMembrane() {
     }
   });
 
- membraneForceTime += parallel_for(1, membrane.H-1, [this](uint, int index) {
+ //membraneForceTime += parallel_for(1, membrane.H-1, [this](uint, int index) {
+ membraneForceTime += parallel_chunk(1, membrane.H-1, [this](uint, int start, int size) {
    membraneTensionPressure(
     membrane.Px.data, membrane.Py.data, membrane.Pz.data,
     membrane.Vx.data, membrane.Vy.data, membrane.Vz.data,
@@ -137,7 +138,8 @@ void Simulation::stepMembrane() {
     membrane.W, membrane.margin, membrane.stride,
     floatX(pressure/(2*3)) /*[area = length(cross)/2] / 3 vertices*/, floatX(membrane.internodeLength),
     floatX(membrane.tensionStiffness), floatX(membrane.tensionDamping),
-    index, 1);
+    //index, 1);
+    start, size);
  });
 }
 
@@ -149,7 +151,7 @@ void Simulation::stepMembraneIntegration() {
   float maxMembraneV_[threadCount]; mref<float>(maxMembraneV_, threadCount).clear(0);
   membraneIntegrationTime += parallel_for(1, membrane.H-1, [this, &maxMembraneV_](uint id, uint i) {
   const vXsf dt_mass = floatX(this->dt / membrane.mass), dt = floatX(this->dt);
-   const vXsf bottomZ = floatX(this->bottomZ), topZ = floatX(this->topZ);
+   const vXsf unused bottomZ = floatX(this->bottomZ), topZ = floatX(this->topZ);
    vXsf maxMembraneVX = _0f;
    float* const pFx = membrane.Fx.begin(), *pFy = membrane.Fy.begin(), *pFz = membrane.Fz.begin();
    float* const pVx = membrane.Vx.begin(), *pVy = membrane.Vy.begin(), *pVz = membrane.Vz.begin();
@@ -175,7 +177,7 @@ void Simulation::stepMembraneIntegration() {
     Px += dt * Vx;
     Py += dt * Vy;
     Pz += dt * Vz;
-    Pz = max(bottomZ, min(topZ, Pz));
+    //Pz = max(bottomZ, min(topZ, Pz));
     store(pVx, k, Vx); store(pVy, k, Vy); store(pVz, k, Vz);
     store(pPx, k, Px); store(pPy, k, Py); store(pPz, k, Pz);
     maxMembraneVX = max(maxMembraneVX, sqrt(Vx*Vx + Vy*Vy + Vz*Vz));

@@ -47,6 +47,7 @@ struct SimulationView : Widget {
   vec3 min, max;
  };
  array<State> states;
+ Lock lock;
 
  GLFrameBuffer target;
 
@@ -59,54 +60,47 @@ struct SimulationView : Widget {
   size_t timeStep;
  } dragStart = {0,0,0};
 
+ Time totalTime;
+ Time renderTime;
+ Time grainSortTime;
+ Time grainTime;
+ Time membraneTime;
+ Time plateTime;
+
  vec2 sizeHint(vec2) override { return vec2(1024); }
  shared<Graphics> graphics(vec2 size) override {
+  if(!totalTime) totalTime.start();
+
   vec4 viewRotation = qmul(angleVector(yawPitch.y, vec3(1,0,0)),
                                              angleVector(yawPitch.x, vec3(0,0,1)));
 
   vec3 scale = 0, translation = 0; // Fit view
 
+  Locker lock(this->lock);
+  renderTime.start();
+  grainSortTime.start();
   const State& state = states[timeStep];
   array<vec3> grainPositions (state.grain.count); // Rotated, Z-Sorted
   array<vec4> grainRotations (state.grain.count); // Rotated, Z-Sorted
-  array<size_t> grainIndices (state.grain.count);
   {
-   //vec3 min = 0, max = 0; //-state.membrane.radius, max = vec3(state.membrane.radius);
-   //const vec3 minW = qapply(viewRotation, state.min), maxW = qapply(viewRotation, state.max);
-   //const vec3 min = ::min(minW, maxW), max = ::max(minW, maxW);
    const vec3 min = vec3(-state.radius, qapply(viewRotation, vec3(0,0,0)).y, -sqrt(sq(state.topZ/2)+sq(state.radius)));
    const vec3 max = vec3(state.radius, qapply(viewRotation, vec3(0,0,state.topZ)).y, sqrt(sq(state.topZ/2)+sq(state.radius)));
-   for(size_t i: range(state.grain.count)) {
+   struct key_value { float z; int index; };
+   array<key_value> grainIndices (state.grain.count);
+   for(int i: range(state.grain.count)) {
     vec3 O = qapply(viewRotation, state.grain.position(i));
-    //min = ::min(min, O - vec3(state.grain.radius));
-    //max = ::max(max, O + vec3(state.grain.radius));
     size_t j = 0;
-    while(j < grainPositions.size && grainPositions[j].z < O.z) j++;
-    grainPositions.insertAt(j, O);
-    grainRotations.insertAt(j, conjugate(qmul(viewRotation, state.grain.rotation(i))));
-    grainIndices.insertAt(j, i);
+    while(j < grainIndices.size && grainIndices[j].z < O.z) j++;
+    grainIndices.insertAt(j, key_value{O.z, i}); // FIXME: quicksort || start from previous state
    }
-   /*for(size_t i: range(state.wire.count)) {
-    vec3 O = qapply(viewRotation, state.wire.position(i));
-    if(O.z > 1) continue;
-    min = ::min(min, O - vec3(state.wire.radius));
-    max = ::max(max, O + vec3(state.wire.radius));
+   for(key_value kv: grainIndices) {
+    grainPositions.append(qapply(viewRotation, state.grain.position(kv.index)));
+    grainRotations.append(conjugate(qmul(viewRotation, state.grain.rotation(kv.index))));
    }
-   for(size_t i: range(state.membrane.H-1)) for(size_t j: range(state.membrane.W)) {
-    vec3 O = qapply(viewRotation, state.membrane.position(state.membrane.margin+i*state.membrane.stride+j));
-    if(O.z > 1) continue;
-    min = ::min(min, O);
-    max = ::max(max, O);
-   }*/
    scale = vec3(vec2(2/::max(max.x-min.x, max.y-min.y)/1.2), 2/(max-min).z);
    translation = -vec3((min+max).xy()/2.f, min.z);
-   /*if(!isNumber(translation.xy())) translation.xy() = this->translation;
-   if(!this->scale && !this->translation) this->scale = scale.xy(), this->translation = translation.xy();
-   const float Dt = 1./60;
-   if(scale.xy() != this->scale || translation.xy() != this->translation) window->render();
-   scale.xy() = this->scale = this->scale*float(1-Dt) + float(Dt)*scale.xy();
-   translation.xy() = this->translation = this->translation*float(1-Dt) + float(Dt)*translation.xy();*/
   }
+  grainSortTime.stop();
 
   mat4 viewProjection = mat4()
     .scale(vec3(1,1,-1))
@@ -120,6 +114,7 @@ struct SimulationView : Widget {
   glDepthTest(true);
 
   if(state.grain.count) {
+   grainTime.start();
    buffer<vec3> positions {state.grain.count*6};
    buffer<vec4> colors {state.grain.count};
    for(size_t i: range(state.grain.count)) {
@@ -150,6 +145,8 @@ struct SimulationView : Widget {
    shader["radius"] = float(scale.z/2 * state.grain.radius*3/4); // reduce Z radius to see membrane mesh on/in grain
    shader["hpxRadius"] = 1 / (size.x * scale.x * state.grain.radius);
    vertexArray.draw(Triangles, positions.size);
+
+   grainTime.stop();
   }
 
 #if WIRE
@@ -196,6 +193,8 @@ struct SimulationView : Widget {
 #endif
 
   if(state.membrane.count) {
+   membraneTime.start();
+
    static GLShader shader {::shader_glsl(), {"color"}};
    shader.bind();
    shader.bindFragments({"color"});
@@ -221,10 +220,13 @@ struct SimulationView : Widget {
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
    vertexArray.draw(Lines, positions.size);
+
+   membraneTime.stop();
   }
 
-  // Bottom
+  // Plates
   {
+   plateTime.start();
    static GLShader shader {::shader_glsl(), {"flat"}};
    shader.bind();
    shader.bindFragments({"color"});
@@ -249,6 +251,16 @@ struct SimulationView : Widget {
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
    vertexArray.draw(Lines, positions.size);
+   plateTime.stop();
+  }
+  renderTime.stop();
+  if(totalTime.seconds()>1 && renderTime.seconds()*16>totalTime.seconds()) {
+   //static bool unused once = ({ log("!Render!:", strD(renderTime, totalTime), "!"); true; });
+   log(strD(renderTime, totalTime));
+   log("sort", strD(grainSortTime, renderTime));
+   log("grain", strD(grainTime, renderTime));
+   log("membrane", strD(membraneTime, renderTime));
+   log("plate", strD(plateTime, renderTime));
   }
 
   int offset = 0; //(target.size.x-window->size.x)/2;
@@ -274,7 +286,7 @@ struct SimulationView : Widget {
  }
 };
 
-struct SimulationApp {
+struct SimulationApp : Poll {
  Simulation simulation;
  SimulationView view;
 
@@ -283,8 +295,8 @@ struct SimulationApp {
  Time totalTime, recordTime;
 
  unique<Window> window = ::window(&view, -1, mainThread, true, false);
- SimulationApp(const Dict& parameters) : simulation(parameters) {
-  record(); view.timeStep=view.states.size-1;
+ Thread simulationMasterThread;
+ SimulationApp(const Dict& parameters) : Poll(0, 0, simulationMasterThread), simulation(parameters) {
   window->presentComplete = [this]{
    if(!running || !simulation.dt) return;
    if(!totalTime) totalTime.start();
@@ -292,15 +304,23 @@ struct SimulationApp {
    window->setTitle(str( str(simulation.timeStep*simulation.dt, 1u)+"s"_,
                          str(simulation.timeStep*simulation.dt/totalTime.seconds(), 1u)+"x"_,
                          strD(simulation.stepTimeRT, totalTime)));
-   if(!simulation.run(totalTime)) {
+   /*if(!simulation.run(totalTime)) {
     window->setTitle("Done");
     running = false;
-   }
+   }*/
    record(); view.timeStep=view.states.size-1;
    recordTime.stop();
    window->render();
    if(view.states.size == 8192) { log(view.states.size); window->setTitle("OK"); running = false; }
   };
+  view.states.append();
+  queue(); simulationMasterThread.spawn();
+ }
+ void event() {
+  if(!simulation.run(totalTime)) {
+   window->setTitle("Done");
+   running = false;
+  } else queue();
  }
 
  void record() {
@@ -337,6 +357,7 @@ struct SimulationApp {
   state.topZ = simulation.topZ;
   state.min = simulation.lattice.min;
   state.max = simulation.lattice.max;
-  view.states.append(::move(state));
+  Locker lock(view.lock);
+  view.states.last() = ::move(state);
  }
 } app (parameters());

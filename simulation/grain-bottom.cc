@@ -141,10 +141,10 @@ void Simulation::stepGrainBottom() {
  grainBottomTAx.size = GBcc;
  grainBottomTAy.size = GBcc;
  grainBottomTAz.size = GBcc;
- constexpr float E = 1/((1-sq(Grain::poissonRatio))/Grain::elasticModulus+(1-sq(Obstacle::poissonRatio))/Obstacle::elasticModulus);
- constexpr float R = 1/(Grain::curvature/*+Obstacle::curvature*/);
+ constexpr float E = 1/((1-sq(Grain::poissonRatio))/Grain::elasticModulus+(1-sq(Plate::poissonRatio))/Plate::elasticModulus);
+ constexpr float R = 1/(Grain::curvature/*+Plate::curvature*/);
  const float K = 4./3*E*sqrt(R);
- constexpr float mass = 1/(1/Grain::mass/*+1/Obstacle::mass*/);
+ constexpr float mass = 1/(1/Grain::mass/*+1/Plate::mass*/);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
  grainBottomEvaluateTime += parallel_chunk(GBcc/simd, [&](uint, int start, int size) {
    evaluateGrainObstacle<false>(start, size,
