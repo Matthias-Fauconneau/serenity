@@ -25,7 +25,8 @@ constexpr float System::Wire::bendStiffness;
 constexpr string Simulation::patterns[];
 #endif
 
-Simulation::Simulation(const Dict& p) : System(p.at("TimeStep"), p.at("Radius"))
+Simulation::Simulation(const Dict& p) : System(p.at("TimeStep"), p.at("Radius")),
+  targetPressure(p.at("Pressure"))
 #if WIRE
   , pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):None)
 #endif
@@ -228,10 +229,11 @@ bool Simulation::run(const Time& totalTime) {
   float force = topForceZ + bottomForceZ;
   float stress = force / area;
   if(!pressureStrain) {
-   assert_(!existsFile("pressureStrain", home()));
-   pressureStrain = File("pressureStrain"_, home(), Flags(WriteOnly|Create));
+   assert_(!existsFile(arguments()[0], "Results"));
+   pressureStrain = File(arguments()[0], "Results", Flags(WriteOnly|Create));
+   pressureStrain.write("Strain (%), Stress (Pa)\n");
   }
-  String line = str(strain*100)+" % "_+str(int(round(stress)))+" Pa\n"_;
+  String line = str(strain*100, 3u)+' '+str(int(round(stress)))+'\n';
   log_(line);
   pressureStrain.write(line);
   if(strain > 1./8) return false;

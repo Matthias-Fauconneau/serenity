@@ -123,24 +123,19 @@ typedef vec<bgr,float,3> bgr3f;
 generic struct rgb { T r,g,b; };
 typedef vec<rgb,float,3> rgb3f;
 
-generic struct bgra { T b,g,r,a; };
+generic struct rgba;
+generic struct bgra {
+    T b,g,r,a;
+    vec<bgr,T,3>& bgr() const { return *(vec< ::bgr,T,3>*)this; }
+    operator vec<rgb,T,3>() const { return vec<rgb,T,3>{r,g,b}; }
+    operator vec<rgba,T,4>() const { return vec<rgba,T,4>{r,g,b,a}; }
+};
 typedef vec<bgra,float,4> rgba4f;
 generic struct rgba { T r,g,b,a; };
 typedef vec<rgba,float,4> bgra4f;
-//typedef vec<bgra,uint8,4> byte4;
 struct byte4 : vec<bgra,uint8,4> {
  using vec::vec;
  byte4() : vec() {}
- /*inline byte4(byte v) : vec(v) {}
- inline byte4(byte b, byte g, byte r, byte a=0xFF) : vec(b,g,r,a) {}
- // bgr
- byte4(byte3 bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
- //byte3 bgr() { return byte3(b, g, r); } // -> bgra
- // bgr3f
- byte4(bgr3f bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
- bgr3f bgr() { return bgr3f(b, g, r); }
- // rgba
- byte4(vec<rgba,uint8,4> rgba) : vec(rgba.b, rgba.g, rgba.r, rgba.a) {}*/
  byte4(vec<rgb,uint8,3> rgb) : vec(rgb.b, rgb.g, rgb.r, 0xFF) {}
 };
 

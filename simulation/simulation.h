@@ -24,8 +24,8 @@ struct Simulation : System {
  ProcessState processState = Pour;
  Random random;
  float currentHeight = Grain::radius;
- const float targetPressure = 80 * KPa;
- float pressure = targetPressure/2;
+ const float targetPressure;
+ float pressure = targetPressure;
  float bottomZ = 0, topZ = membrane.height, topZ0;
 #if WIRE
  float lastAngle = 0, winchAngle = 0, currentWinchRadius = patternRadius;
