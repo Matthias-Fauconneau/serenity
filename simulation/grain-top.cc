@@ -2,9 +2,11 @@
 #include "simulation.h"
 #include "parallel.h"
 #include "grain-obstacle.h"
+#include "grain.h"
+#include "plate.h"
 
 void Simulation::stepGrainTop() {
- if(!grain.count) return;
+ if(!grain->count) return;
  {
   swap(oldGrainTopA, grainTopA);
   swap(oldGrainTopLocalAx, grainTopLocalAx);
@@ -15,7 +17,7 @@ void Simulation::stepGrainTop() {
   swap(oldGrainTopLocalBz, grainTopLocalBz);
 
   static constexpr size_t averageGrainTopContactCount = 1;
-  const size_t GTcc = align(simd, grain.count * averageGrainTopContactCount +1);
+  const size_t GTcc = align(simd, grain->count * averageGrainTopContactCount +1);
   if(GTcc > grainTopA.capacity) {
    grainTopA = buffer<int>(GTcc, 0);
    grainTopLocalAx = buffer<float>(GTcc, 0);
@@ -29,7 +31,7 @@ void Simulation::stepGrainTop() {
 
   atomic contactCount;
   auto search = [&](uint, size_t start, size_t size) {
-   const float* const gPz = grain.Pz.data+simd;
+   const float* const gPz = grain->Pz.data+simd;
    const vXsf _tZ_Gr = floatX(topZ-Grain::radius);
    int* const gtA = grainTopA.begin();
    for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
@@ -40,10 +42,10 @@ void Simulation::stepGrainTop() {
      compressStore(gtA+index, contact, intX(i)+_seqi);
    }
   };
-  if(grain.count/simd) grainTopSearchTime += parallel_chunk(grain.count/simd, search);
-  if(grain.count%simd) search(0, grain.count/simd, 1u);
+  if(grain->count/simd) grainTopSearchTime += parallel_chunk(grain->count/simd, search);
+  if(grain->count%simd) search(0, grain->count/simd, 1u);
   grainTopA.size = contactCount;
-  while(contactCount.count > 0 && grainTopA[contactCount-1] >= (int)grain.count) contactCount.count--;
+  while(contactCount.count > 0 && grainTopA[contactCount-1] >= (int)grain->count) contactCount.count--;
   grainTopA.size = contactCount;
   grainTopLocalAx.size = grainTopA.size;
   grainTopLocalAy.size = grainTopA.size;
@@ -76,7 +78,7 @@ void Simulation::stepGrainTop() {
   grainTopRepackFrictionTime.stop();
 
   for(size_t i=grainTopA.size; i<align(simd, grainTopA.size+1); i++)
-   grainTopA.begin()[i] = 0;
+   grainTopA.begin()[i] = -1;
  }
  if(!grainTopA) return;
 
@@ -89,7 +91,7 @@ void Simulation::stepGrainTop() {
  auto filter =  [&](uint, size_t start, size_t size) {
   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
    vXsi A = load(grainTopA.data, i);
-   vXsf Az = gather(grain.Pz.data+simd, A);
+   vXsf Az = gather(grain->Pz.data+simd, A);
    vXsf depth = Az - floatX(topZ-Grain::radius);
    for(size_t k: range(simd)) { // TODO: SIMD
     size_t j = i+k;
@@ -120,7 +122,7 @@ void Simulation::stepGrainTop() {
  atomic contactCount;
  auto filter = [&](uint, uint start, uint size) {
   const int* const gtA = grainTopA.data;
-  const float* const gPz = grain.Pz.data+simd;
+  const float* const gPz = grain->Pz.data+simd;
   float* const gtL = grainTopLocalAx.begin();
   int* const gtContact = grainTopContact.begin();
   const vXsf _tZ_Gr = floatX(topZ-Grain::radius);
@@ -171,16 +173,16 @@ void Simulation::stepGrainTop() {
    evaluateGrainObstacle<true>(start, size,
                      grainTopContact.data,
                      grainTopA.data,
-                     grain.Px.data+simd, grain.Py.data+simd, grain.Pz.data+simd,
+                     grain->Px.data+simd, grain->Py.data+simd, grain->Pz.data+simd,
                      floatX(topZ-Grain::radius), floatX(Grain::radius),
                      grainTopLocalAx.begin(), grainTopLocalAy.begin(), grainTopLocalAz.begin(),
                      grainTopLocalBx.begin(), grainTopLocalBy.begin(), grainTopLocalBz.begin(),
                      floatX(K), floatX(Kb),
                      floatX(staticFrictionStiffness), floatX(dynamicFrictionCoefficient),
                      floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping),
-                     grain.Vx.data, grain.Vy.data, grain.Vz.data,
-                     grain.AVx.data, grain.AVy.data, grain.AVz.data,
-                     grain.Rx.data, grain.Ry.data, grain.Rz.data, grain.Rw.data,
+                     grain->Vx.data+simd, grain->Vy.data+simd, grain->Vz.data+simd,
+                     grain->AVx.data+simd, grain->AVy.data+simd, grain->AVz.data+simd,
+                     grain->Rx.data+simd, grain->Ry.data+simd, grain->Rz.data+simd, grain->Rw.data+simd,
                      grainTopFx.begin(), grainTopFy.begin(), grainTopFz.begin(),
                      grainTopTAx.begin(), grainTopTAy.begin(), grainTopTAz.begin() );
  });
@@ -190,12 +192,12 @@ void Simulation::stepGrainTop() {
  for(size_t i=0; i<grainTopContact.size; i++) { // Scalar scatter add
   size_t index = grainTopContact[i];
   size_t a = grainTopA[index];
-  grain.Fx[a] += grainTopFx[i];
-  grain.Fy[a] += grainTopFy[i];
-  grain.Fz[a] += grainTopFz[i];
-  grain.Tx[a] += grainTopTAx[i];
-  grain.Ty[a] += grainTopTAy[i];
-  grain.Tz[a] += grainTopTAz[i];
+  grain->Fx[simd+a] += grainTopFx[i];
+  grain->Fy[simd+a] += grainTopFy[i];
+  grain->Fz[simd+a] += grainTopFz[i];
+  grain->Tx[simd+a] += grainTopTAx[i];
+  grain->Ty[simd+a] += grainTopTAy[i];
+  grain->Tz[simd+a] += grainTopTAz[i];
   topForceZ -= grainTopFz[i];
  }
  this->topForceZ = topForceZ; // FIXME: average

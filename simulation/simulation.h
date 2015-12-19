@@ -2,20 +2,17 @@
 #include "time.h"
 #include "variant.h"
 #include "lattice.h"
+#include "file.h"
 
-static inline void qapply(vXsf Qx, vXsf Qy, vXsf Qz, vXsf Qw, vXsf Vx, vXsf Vy, vXsf Vz,
-                          vXsf& QVx, vXsf& QVy, vXsf& QVz) {
- const vXsf X = Qw*Vx - Vy*Qz + Qy*Vz;
- const vXsf Y = Qw*Vy - Vz*Qx + Qz*Vx;
- const vXsf Z = Qw*Vz - Vx*Qy + Qx*Vy;
- const vXsf W = Vx * Qx + Vy * Qy + Vz * Qz;
- QVx = Qw*X + W*Qx + Qy*Z - Y*Qz;
- QVy = Qw*Y + W*Qy + Qz*X - Z*Qx;
- QVz = Qw*Z + W*Qz + Qx*Y - X*Qy;
-}
+struct Grain;
+struct Membrane;
+struct Plate;
 
 // High level simulation and contact management
-struct Simulation : System {
+struct Simulation {
+ const float dt;
+ size_t timeStep = 0;
+
  // Contact parameters
  sconst float normalDampingRate = 1;
  const float targetDynamicFrictionCoefficient;// = 0.23; //.23; // Interparticle 0.1 (FIXME: boundary: 0.23)
@@ -25,8 +22,12 @@ struct Simulation : System {
  const float staticFrictionStiffness;// = 1000000; //00* 1*g*10/(1.25*mm); //k/F = F/L ~ Grain::mass*G/L //~ Wire::mass*G/Wire::radius
  const float staticFrictionDamping;// = 10; //100; // * F/V; // TODO: relative to k ?
 
+ unique<Grain> grain;
+ unique<Membrane> membrane;
+ unique<Plate> plate;
+
  // Process parameters
- float Gz = 10000 * -10 * N/kg; // Gravity
+ float Gz = 5000 * -10 * N/kg; // Gravity
  const float verticalSpeed = 1 * m/s;
  const float targetPressure;
  const float plateSpeed;// = 10 * mm/s;
@@ -44,10 +45,10 @@ struct Simulation : System {
  //sconst string processStates[] {"pour", "load", "error"};
  ProcessState processState = Pour;
  Random random;
- float currentHeight = Grain::radius;
+ float currentHeight;
  float pressure = targetPressure;
  float membraneViscosity = 0;
- float bottomZ = 0, topZ = membrane.height, topZ0;
+ float bottomZ = 0, topZ, topZ0;
 #if WIRE
  float lastAngle = 0, winchAngle = 0, currentWinchRadius = patternRadius;
 #endif
@@ -136,9 +137,7 @@ struct Simulation : System {
  buffer<float> wireBottomFz;
 
  // Grain Lattice
- const float grainLatticeR = membrane.radius*(1+1./2);
- Lattice<int32> lattice {sqrt(3.)/(2*Grain::radius), vec3(vec2(-grainLatticeR), -Grain::radius),
-                                                                                    vec3(vec2(grainLatticeR), membrane.height+Grain::radius)};
+ Lattice<int32> lattice;
  bool validGrainLattice = false;
 
  // Grain - Grain
@@ -146,7 +145,7 @@ struct Simulation : System {
  float grainGrainGlobalMinD = 0;
  uint grainGrainSkipped = 0;
 
- buffer<int> oldGrainGrainA ;
+ buffer<int> oldGrainGrainA;
  buffer<int> oldGrainGrainB;
  buffer<float> oldGrainGrainLocalAx;
  buffer<float> oldGrainGrainLocalAy;
@@ -238,15 +237,18 @@ struct Simulation : System {
  buffer<float> grainMembraneTAy;
  buffer<float> grainMembraneTAz;
 
+ bool primed = false;
  File pressureStrain;
  float voidRatio = 0;
 
  Simulation(const Dict& p);
+ virtual ~Simulation();
 
  void grainLattice();
 
+ Time totalTime;
  void step();
-
+  tsc stepTime;
  void stepProcess();
   uint64 processTime = 0;
  tsc grainTotalTime;
@@ -321,9 +323,7 @@ struct Simulation : System {
   uint64 wireIntegrationTime = 0;
 #endif
 
-  void profile(const Time& totalTime);
-  bool run(const Time& totalTime);
-   Time stepTimeRT;
-   tsc stepTime;
+  void profile();
+  void run();
 };
 

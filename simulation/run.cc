@@ -18,6 +18,8 @@ __attribute((constructor(101))) void logCompiler() {
 #else
  log("PThread", ::threadCount());
 #endif
+ //log_(File("/proc/sys/kernel/hostname").readUpTo(256));
+ log(arguments());
 }
 
 Dict parameters() {
@@ -27,12 +29,5 @@ Dict parameters() {
 }
 
 struct SimulationView : Simulation {
- Time totalTime;
- SimulationView(const Dict& parameters) : Simulation(parameters) {
-  totalTime.start();
-  for(;;) {
-   if(!run(totalTime)) return;
-   if(timeStep%(int(1/(dt*60))/4*32*1) == 0) return;
-  }
- }
+ SimulationView(const Dict& parameters) : Simulation(parameters) { run(); }
 } app (parameters());

@@ -19,7 +19,7 @@ inline String str(string s) { return unsafeRef(s); }
 template<size_t N> string str(const char (&source)[N]) { return string(source); }
 
 /// Returns boolean as "true"/"false"
-inline string str(bool value) { return value ? string("true"_) : string("false"_); }
+inline string str(bool value) { return value ? "true"_ : "false"_; }
 /// Returns a reference to the character
 inline string str(const char& character) { return string((char*)&character,1); }
 
@@ -171,10 +171,10 @@ template<Type T, size_t N> String str(const T (&source)[N], string separator=" "
 /// Converts and concatenates all arguments separating with spaces
 /// \note Use join({str(args)...}) to convert and concatenate without spaces
 template<Type Arg0, Type Arg1, Type... Args>
-String str(const Arg0& arg0, const Arg1& arg1, const Args&... args) { return join(ref<string>{str(arg0), str(arg1), str(args)...}, string(" "_)); }
+String str(const Arg0& arg0, const Arg1& arg1, const Args&... args) { return join(ref<string>{str(arg0), str(arg1), str(args)...}, " "_); }
 
 /// Logs to standard output using str(...) serialization
-template<Type... Args> void log(const Args&... args) { log((string)join(ref<string>{str(args)...}, string(" "_))); }
+template<Type... Args> void log(const Args&... args) { log((string)join(ref<string>{str(args)...}, " "_)); }
 /// Logs to standard output using str(...) serialization and terminate all threads
 template<Type... Args> __attribute((noreturn)) void error(const Args&... args) { error<string>(str(args...)); }
 

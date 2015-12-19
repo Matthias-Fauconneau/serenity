@@ -275,9 +275,9 @@ void Simulation::stepGrainWire() {
   }, 1 /*FIXME: grainWireIndex*/);
 
   assert(align(simd, grainWireA.size+1) <= grainWireA.capacity);
-  for(size_t i=grainWireA.size; i<align(simd, grainWireA.size +1); i++) grainWireA.begin()[i] = 0;
+  for(size_t i=grainWireA.size; i<align(simd, grainWireA.size +1); i++) grainWireA.begin()[i] = -1;
   assert(align(simd, grainWireB.size+1) <= grainWireB.capacity);
-  for(size_t i=grainWireB.size; i<align(simd, grainWireB.size +1); i++) grainWireB.begin()[i] = 0;
+  for(size_t i=grainWireB.size; i<align(simd, grainWireB.size +1); i++) grainWireB.begin()[i] = -1;
 
   grainWireGlobalMinD = /*minD*/verletDistance - (Grain::radius+Wire::radius);
   if(grainWireGlobalMinD < 0) log("grainWireGlobalMinD", grainWireGlobalMinD);
@@ -352,10 +352,10 @@ void Simulation::stepGrainWire() {
                       floatX(K), floatX(Kb),
                       floatX(staticFrictionStiffness), floatX(dynamicFrictionCoefficient),
                       floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping),
-                      grain.Vx.data, grain.Vy.data, grain.Vz.data,
+                      grain.Vx.data+simd, grain.Vy.data+simd, grain.Vz.data+simd,
                       wire.Vx.data, wire.Vy.data, wire.Vz.data,
-                      grain.AVx.data, grain.AVy.data, grain.AVz.data,
-                      grain.Rx.data, grain.Ry.data, grain.Rz.data, grain.Rw.data,
+                      grain.AVx.data+simd, grain.AVy.data+simd, grain.AVz.data+simd,
+                      grain.Rx.data+simd, grain.Ry.data+simd, grain.Rz.data+simd, grain.Rw.data+simd,
                       grainWireFx.begin(), grainWireFy.begin(), grainWireFz.begin(),
                       grainWireTAx.begin(), grainWireTAy.begin(), grainWireTAz.begin() );
  });
@@ -366,15 +366,15 @@ void Simulation::stepGrainWire() {
   size_t index = grainWireContact[i];
   size_t a = grainWireA[index];
   size_t b = grainWireB[index];
-  grain.Fx[a] += grainWireFx[i];
+  grain.Fx[simd+a] += grainWireFx[i];
   wire .Fx[b] -= grainWireFx[i];
-  grain.Fy[a] += grainWireFy[i];
+  grain.Fy[simd+a] += grainWireFy[i];
   wire .Fy[b] -= grainWireFy[i];
-  grain.Fz[a] += grainWireFz[i];
+  grain.Fz[simd+a] += grainWireFz[i];
   wire .Fz[b] -= grainWireFz[i];
-  grain.Tx[a] += grainWireTAx[i];
-  grain.Ty[a] += grainWireTAy[i];
-  grain.Tz[a] += grainWireTAz[i];
+  grain.Tx[simd+a] += grainWireTAx[i];
+  grain.Ty[simd+a] += grainWireTAy[i];
+  grain.Tz[simd+a] += grainWireTAz[i];
  }
  grainWireSumTime.stop();
 }

@@ -191,7 +191,7 @@ void Simulation::stepWireBottom() {
   };
   wireBottomFilterTime += parallel_chunk(wire.count, search, 1 /*FIXME*/);
 
-  for(size_t i=wireBottomA.size; i<align(simd, wireBottomA.size); i++) wireBottomA.begin()[i] = 0;
+  for(size_t i=wireBottomA.size; i<align(simd, wireBottomA.size); i++) wireBottomA.begin()[i] = -1;
  }
 
  // TODO: verlet

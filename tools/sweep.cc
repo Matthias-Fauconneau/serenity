@@ -6,8 +6,11 @@ struct ParameterSweep {
   Dict parameters;
   array<String> existing;
   auto list = currentWorkingDirectory().list(Files);
-  for(string name: list) existing.append(copyRef(name));
-  array<SGEJob> jobs = qstat(0);
+  for(string name: list) {
+   existing.append(copyRef(name));
+   if(startsWith(name, "Count=")) remove(name);
+  }
+  array<SGEJob> jobs ;// = qstat(0);
   {
    array<char> running, queued;
    size_t runningCount = 0, queuedCount = 0;
@@ -30,9 +33,9 @@ struct ParameterSweep {
        parameters["Pattern"__] = pattern;
        for(int pressure: {80}) {
         parameters["Pressure"__] = String(str(pressure)+"K"_);
-        for(float radius: {0.25/*, 0.50*/}) {
+        for(float radius: {0.025/*, 0.050*/}) {
          parameters["Radius"__] = radius;
-         parameters["Count"__] = 3852*4;
+         parameters["Count"__] = 187; //1909; //3852*4;
          for(float staticFrictionSpeed: {/*0.01,*/ 0.1/*, 1.*/}) {
           parameters["sfSpeed"__] = staticFrictionSpeed;
           for(float staticFrictionLength: {/*0.01e-3,*/ 0.1e-3/*, 1e-3*/}) {
@@ -55,7 +58,10 @@ struct ParameterSweep {
                jobs.take(jobs.indexOf(parseDict(id)));
                return;
               }
-              if(existing.contains(id)) { done++; return; }
+              if(existing.contains(id)) {
+               if(existsFile(id)) { log("Remove", id); remove(id); }
+               //done++; return;
+              }
               missing.append(move(id));
              };
              add();
@@ -91,23 +97,17 @@ struct ParameterSweep {
    else {
     String parameters = missing.take(random%missing.size);
     String name = replace(parameters,':','=');
-    log("-q", "fast.q@@blade04,fast.q@@blade05",
-         "-l", "fq=true",
-         //-hard -l h_vmem=4G,vf=4G
-         "-N", name,
-         "-j", "y",
-         "-o", name, //"$JOB_NAME.o$JOB_ID",
-         //" -pe", "omp",
-         "-b","y", "run", parameters);
-    if(execute(which("qsub.orig"), {
+    //-hard -l h_vmem=4G,vf=4G
+    //"-pe", "omp",
+    if(execute("/opt/ge2011.pleiades/bin/linux-x64/qsub.orig", {
                "-q", "fast.q@@blade04,fast.q@@blade05",
                "-l", "fq=true",
-               //-hard -l h_vmem=4G,vf=4G
                "-N", name,
                "-j", "y",
-               "-o", "$JOB_NAME", //.$JOB_ID",
-               //" -pe", "omp",
-               "-b","y", "~/run", parameters})) { log("Error"); break; }
+               "-o", "$JOB_NAME",
+               "-b","y",
+               //"-pe", "omp",
+               "~/run", parameters})) { log("Error"); break; }
     count++;
    }
   }

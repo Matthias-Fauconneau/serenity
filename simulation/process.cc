@@ -1,12 +1,14 @@
 #include "simulation.h"
+#include "grain.h"
+#include "membrane.h"
 
 void Simulation::stepProcess() {
  // Process
- if(grain.count == grain.capacity-simd) {
+ if(grain->count == grain->capacity-simd) {
   dynamicFrictionCoefficient = targetDynamicFrictionCoefficient;
   if(processState  < Pressure) { // Fits top plate while disabling gravity
    float topZ = 0;
-   for(float z: grain.Pz.slice(simd, grain.count)) topZ = ::max(topZ, z+Grain::radius);
+   for(float z: grain->Pz.slice(simd, grain->count)) topZ = ::max(topZ, z+Grain::radius);
    if(topZ < this->topZ) this->topZ = topZ;
    topZ0 = this->topZ;
    Gz = 0;
@@ -88,16 +90,16 @@ void Simulation::stepProcess() {
   // Generates grain
   if(currentHeight >= Grain::radius) {
    for(;;) {
-    if(grain.count == grain.capacity-simd) break;
+    if(grain->count == grain->capacity-simd) break;
     vec2 p(random()*2-1,random()*2-1);
     if(length(p)<1) { // Within cylinder
-     vec3 newPosition ((membrane.radius-Grain::radius)*p.x, (membrane.radius-Grain::radius)*p.y, Grain::radius);
-     if(grain.count) {// Deposits grain without grain overlap
+     vec3 newPosition ((membrane->radius-Grain::radius)*p.x, (membrane->radius-Grain::radius)*p.y, Grain::radius);
+     if(grain->count) {// Deposits grain without grain overlap
       const/*expr*/ size_t threadCount = ::threadCount();
       float maxZ_[threadCount]; mref<float>(maxZ_, threadCount).clear(0);
-      processTime += parallel_chunk(align(simd, grain.count)/simd,
+      processTime += parallel_chunk(align(simd, grain->count)/simd,
                                     [this, newPosition, &maxZ_](uint id, size_t start, size_t size) {
-       float* const pPx = grain.Px.begin()+simd, *pPy = grain.Py.begin()+simd, *pPz = grain.Pz.begin()+simd;
+       float* const pPx = grain->Px.begin()+simd, *pPy = grain->Py.begin()+simd, *pPz = grain->Pz.begin()+simd;
        const vXsf nPx = floatX(newPosition.x), nPy = floatX(newPosition.y);
        const vXsf _2_Gr2 = floatX(sq(2*Grain::radius));
        vXsf maxZ = _0f;
@@ -111,6 +113,8 @@ void Simulation::stepProcess() {
        maxZ_[id] = max(maxZ_[id], max(maxZ));
       });
       for(size_t k: range(threadCount)) newPosition.z = ::max(newPosition.z, maxZ_[k]);
+      // for(size_t k: range(threadCount)) log(k, maxZ_[k]);
+      //log(newPosition.z);
      }
      // Under current wire drop height
      if(newPosition.z < currentHeight) {
@@ -119,27 +123,28 @@ void Simulation::stepProcess() {
       for(size_t index: range(wire.count))
        if(length(wire.position(index) - newPosition) < Grain::radius+Wire::radius) { processTime.stop(); return; }
 #endif
-      size_t i = grain.count;
+      size_t i = grain->count;
       assert_(newPosition.z >= Grain::radius);
-      grain.Px[simd+i] = newPosition.x; grain.Py[i+simd] = newPosition.y; grain.Pz[simd+i] = newPosition.z;
-      grain.Vx[i] = 0; grain.Vy[i] = 0; grain.Vz[i] = - 1 * m/s;
-      grain.AVx[i] = 0; grain.AVy[i] = 0; grain.AVz[i] = 0;
+      grain->Px[simd+i] = newPosition.x; grain->Py[i+simd] = newPosition.y; grain->Pz[simd+i] = newPosition.z;
+      grain->Vx[simd+i] = 0; grain->Vy[simd+i] = 0; grain->Vz[simd+i] = 0; //- 1 * m/s;
+      grain->AVx[simd+i] = 0; grain->AVy[simd+i] = 0; grain->AVz[simd+i] = 0;
       float t0 = 2*PI*random();
       float t1 = acos(1-2*random());
       float t2 = (PI*random()+acos(random()))/2;
-      grain.Rx[i] = sin(t0)*sin(t1)*sin(t2);
-      grain.Ry[i] = cos(t0)*sin(t1)*sin(t2);
-      grain.Rz[i] = cos(t1)*sin(t2);
-      grain.Rw[i] = cos(t2);
-      grain.count++;
+      grain->Rx[simd+i] = sin(t0)*sin(t1)*sin(t2);
+      grain->Ry[simd+i] = cos(t0)*sin(t1)*sin(t2);
+      grain->Rz[simd+i] = cos(t1)*sin(t2);
+      grain->Rw[simd+i] = cos(t2);
+      //log(i, grain->Pz[simd+i]);
+      grain->count++;
       {
        float height = topZ-bottomZ;
-       float totalVolume = PI*sq(membrane.radius)*height;
-       float grainVolume = grain.count * Grain::volume;
+       float totalVolume = PI*sq(membrane->radius)*height;
+       float grainVolume = grain->count * Grain::volume;
        voidRatio = (totalVolume-grainVolume)/grainVolume;
       }
       // Forces verlet lists reevaluation
-      /*if(timeStep%grain.count == 0)*/ grainMembraneGlobalMinD = 0;
+      /*if(timeStep%grain->count == 0)*/ grainMembraneGlobalMinD = 0;
       grainGrainGlobalMinD = 0;
       grainWireGlobalMinD = 0;
      } else break;

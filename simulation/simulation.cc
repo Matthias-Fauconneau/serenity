@@ -1,21 +1,23 @@
 // TODO: Factorize force evaluation, contact management
 #include "simulation.h"
 #include "parallel.h"
+#include "grain.h"
+#include "membrane.h"
+#include "plate.h"
 //#include "process.h"
-//#include "grain.h"
 //#include "grain-bottom.h"
 //#include "grain-top.h"
 //#include "grain-grain.h"
-//#include "membrane.h"
 //#include "grain-membrane.h"
 //include "wire.h"
 //include "wire-bottom.h"
 //include "grain-wire.h"
 
-//constexpr float System::staticFrictionLength;
-constexpr float System::Grain::radius;
-constexpr float System::Grain::mass;
-constexpr float System::Grain::angularMass;
+#if GRAIN
+constexpr float Grain::radius;
+constexpr float Grain::mass;
+constexpr float Grain::angularMass;
+#endif
 #if WIRE
 constexpr float System::Wire::radius;
 constexpr float System::Wire::mass;
@@ -25,16 +27,23 @@ constexpr float System::Wire::bendStiffness;
 constexpr string Simulation::patterns[];
 #endif
 
-Simulation::Simulation(const Dict& p) : System(p.at("TimeStep"), (int)p.at("Count"), p.at("Radius")),
+Simulation::Simulation(const Dict& p) :
+  dt(p.at("TimeStep")),
   targetDynamicFrictionCoefficient((float)p.at("Friction")*1),
   staticFrictionSpeed((float)p.at("sfSpeed")*m/s),
   staticFrictionLength((float)p.at("sfLength")*m),
   staticFrictionStiffness((float)p.at("sfStiffness")*N/m),
   staticFrictionDamping((float)p.at("sfDamping")*N/(m/s)),
+  grain((int)p.at("Count")),
+  membrane(p.at("Radius")),
   targetPressure((float)p.at("Pressure")*Pa),
-  plateSpeed((float)p.at("Speed")*mm/s)
+  plateSpeed((float)p.at("Speed")*mm/s),
+  currentHeight(Grain::radius),
+  topZ(membrane->height),
+  lattice {sqrt(3.)/(2*Grain::radius), vec3(vec2(-membrane->radius), -Grain::radius*2),
+                                           vec3(vec2(membrane->radius), membrane->height)}
 #if WIRE
-  , pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):None)
+, pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):None)
 #endif
 {
 #if WIRE
@@ -46,8 +55,11 @@ Simulation::Simulation(const Dict& p) : System(p.at("TimeStep"), (int)p.at("Coun
  }
 #endif
 }
+Simulation::~Simulation() {}
 
 void Simulation::step() {
+ stepTime.start();
+
  stepProcess();
 
  grainTotalTime.start();
@@ -55,11 +67,9 @@ void Simulation::step() {
  grainBottomTotalTime.start();
  stepGrainBottom();
  grainBottomTotalTime.stop();
- //if(currentHeight >= topZ-Grain::radius) {
-  grainTopTotalTime.start();
-  stepGrainTop();
-  grainTopTotalTime.stop();
- //}
+ grainTopTotalTime.start();
+ stepGrainTop();
+ grainTopTotalTime.stop();
  grainGrainTotalTime.start();
  stepGrainGrain();
  grainGrainTotalTime.stop();
@@ -74,11 +84,14 @@ void Simulation::step() {
  grainMembraneTotalTime.stop();
  membraneTotalTime.stop();
 
- /*stepWire();
+#if WIRE
+ stepWire();
  stepGrainWire();
  stepWireTension();
  stepWireBendingResistance();
- stepWireBottom();*/
+ stepWireBottom();
+ stepWireIntegration();
+#endif
 
  grainTotalTime.start();
  stepGrainIntegration();
@@ -87,12 +100,13 @@ void Simulation::step() {
  membraneTotalTime.start();
  stepMembraneIntegration();
  membraneTotalTime.stop();
- //stepWireIntegration();
+
+ stepTime.stop();
 
  timeStep++;
 }
 
-void Simulation::profile(const Time& totalTime) {
+void Simulation::profile() {
  log("----",timeStep/size_t(1*1/(dt*60)),"----");
  log(totalTime.microseconds()/timeStep, "us/step", totalTime, timeStep);
  //if(stepTimeRT.nanoseconds()*100<totalTime.nanoseconds()*99) log("step", strD(stepTimeRT, totalTime));
@@ -103,16 +117,16 @@ void Simulation::profile(const Time& totalTime) {
   log("grain-wire B/cycle", (float)(grainWireContactSizeSum*41*4)/grainWireEvaluateTime);
  }
 #endif
- log("W", membrane.W, "H", membrane.H, "W*H", membrane.W*membrane.H, grain.count);
+ log("W", membrane->W, "H", membrane->H, "W*H", membrane->W*membrane->H, grain->count);
  const bool reset = false;
  size_t accounted = 0, shown = 0;
  map<uint64, String> profile;
 #define logTime(name) \
  accounted += name##Time; \
  if(name##Time > stepTime/32) { \
-  profile.insertSortedMulti(name ## Time, #name##__); \
-  shown += name##Time; \
- } \
+ profile.insertSortedMulti(name ## Time, #name##__); \
+ shown += name##Time; \
+} \
  if(reset) name##Time = 0;
 
  logTime(process);
@@ -143,9 +157,9 @@ void Simulation::profile(const Time& totalTime) {
  logTime(grainTopEvaluate);
  logTime(grainTopSum);
  profile.insertSortedMulti(grainGrainTotalTime, "=sum{grain-grain}"_+
-   strD(grainLatticeTime+grainGrainSearchTime+grainGrainFilterTime+grainGrainRepackFrictionTime
-        +grainGrainEvaluateTime+grainGrainSumDomainTime+grainGrainSumAllocateTime+
-        grainGrainSumSumTime+grainGrainSumMergeTime, grainGrainTotalTime));
+                           strD(grainLatticeTime+grainGrainSearchTime+grainGrainFilterTime+grainGrainRepackFrictionTime
+                                +grainGrainEvaluateTime+grainGrainSumDomainTime+grainGrainSumAllocateTime+
+                                grainGrainSumSumTime+grainGrainSumMergeTime, grainGrainTotalTime));
  if(reset) grainGrainTotalTime.reset();
  logTime(grainLattice);
  logTime(grainGrainSearch);
@@ -197,66 +211,57 @@ void Simulation::profile(const Time& totalTime) {
   assert(entry.key <= stepTime, entry.value, entry.key/1000000.f, stepTime.cycleCount()/1000000.f);
   log(strD(entry.key, stepTime), entry.value);
  }
- log(strD(shown, stepTime), "/", strD(accounted, stepTime), "/", strD(stepTimeRT, totalTime));
+ log(strD(shown, stepTime), "/", strD(accounted, stepTime));
  if(reset) stepTime.reset();
 }
 
-/*static inline buffer<int> coreFrequencies() {
- TextData s(File("/proc/cpuinfo"_).readUpToLoop(1<<17));
- assert(s.data.size<s.buffer.capacity, s.data.size, s.buffer.capacity, "/proc/cpuinfo", "coreFrequencies");
- buffer<int> coreFrequencies (256, 0);
- while(s) {
-  if(s.match("cpu MHz"_)) {
-   s.until(':'); s.whileAny(' ');
-   assert(coreFrequencies.size<coreFrequencies.capacity, s.data);
-   coreFrequencies.append( s.decimal() );
+void Simulation::run() {
+ totalTime.start();
+ for(;;) {
+  for(int unused t: range(256)) step();
+  if(timeStep%4096 == 0) {
+   profile();
+   if(processState == Pour) log(grain->count, (int)processState);
+   if(processState == Pressure) log(
+      "Pressure", int(round(pressure)), "Pa",
+      "Membrane viscosity", membraneViscosity );
   }
-  s.line();
- }
- return coreFrequencies;
-}*/
-
-bool Simulation::run(const Time& totalTime) {
- stepTimeRT.start();
- stepTime.start();
- //for(Time time{true}; time.nanoseconds() < second/60;) step();
- for(int unused t: range(int(1/(dt*10000)))) step();
- stepTime.stop();
- stepTimeRT.stop();
- //viewStep++;
- //if(viewStep%60 == 0) {
- if(timeStep%(int(1/(dt*60))/8*60) == 0) {
-  //extern size_t threadCount();
-  //if(threadCount()<17) log(threadCount(), coreFrequencies()); else log("//", threadCount());
-  profile(totalTime);
- }
- if(processState == Pressure) log(
-    "Pressure", int(round(pressure)), "Pa",
-    "Membrane viscosity", membraneViscosity
-    );
- if(processState == Load) {
-  float height = topZ-bottomZ;
-  float strain = 1-height/topZ0;
-  float area = PI*sq(membrane.radius) * 2 /*2 plates*/;
-  float force = topForceZ/topSumStepCount + bottomForceZ/bottomSumStepCount;
-  topForceZ = 0; topSumStepCount = 0;
-  bottomForceZ = 0; bottomSumStepCount = 0;
-  float stress = force / area;
+  if(processState == Load) {
+   float height = topZ-bottomZ;
+   float strain = 1-height/topZ0;
+   float area = PI*sq(membrane->radius) * 2 /*2 plates*/;
+   float force = topForceZ/topSumStepCount + bottomForceZ/bottomSumStepCount;
+   topForceZ = 0; topSumStepCount = 0;
+   bottomForceZ = 0; bottomSumStepCount = 0;
+   float stress = force / area;
 #if RADIAL
-  float side = 2*PI*membrane.radius*height;
-  float radial = (radialForce/radialSumStepCount) / side;
-  radialForce = 0; radialSumStepCount = 0;
+   float side = 2*PI*membrane->radius*height;
+   float radial = (radialSumStepCount?radialForce/radialSumStepCount:0) / side;
+   radialForce = 0; radialSumStepCount = 0;
 #endif
-  if(!pressureStrain) {
-   if(existsFile(arguments()[0])) log("Overwrote", arguments()[0]);
-   pressureStrain = File(arguments()[0], currentWorkingDirectory(), Flags(WriteOnly|Create|Truncate));
-   pressureStrain.write("voidRatio:"+str(voidRatio)+"\n");
-   pressureStrain.write("Strain (%), ""Radial (Pa), ""Axial (Pa)""\n");
+   if(!primed) {
+    primed = true;
+    //if(existsFile(arguments()[0])) log("Overwrote", arguments()[0]);
+    if(!existsFile(arguments()[0]))
+     pressureStrain = File(arguments()[0], currentWorkingDirectory(), Flags(WriteOnly|Create|Truncate));
+    {
+     String line = "voidRatio:"+str(voidRatio)+"\n";
+     log_(line);
+     if(pressureStrain) pressureStrain.write(line);
+    }
+    {
+     String line = "Strain (%), ""Radial (Pa), ""Axial (Pa)""\n"__;
+     log_(line);
+     if(pressureStrain) pressureStrain.write(line);
+    }
+   }
+   {String line = str(strain*100, 4u)+' '+str(int(round(radial)))+' '+str(int(round(stress)))+'\n';
+    log_(line);
+    if(pressureStrain) pressureStrain.write(line);
+   }
+   if(strain > 1./8) break;
   }
-  String line = str(strain*100, 4u)+' '+str(int(round(radial)))+' '+str(int(round(stress)))+'\n';
-  log_(line);
-  pressureStrain.write(line);
-  if(strain > 1./8) return false;
+  if(grain->count == grain->capacity-simd) break; // DEBUG
  }
- return true;
+ totalTime.stop();
 }

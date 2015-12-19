@@ -142,6 +142,7 @@ String str(int64 number, uint pad, char padChar, uint base) {
  byte buf[64]; uint i=64;
  uint64 n=abs(number);
  do {
+  assert_(i>0);
   buf[--i] = "0123456789abcdef"[n%base];
   n /= base;
  } while( n!=0 );
@@ -149,7 +150,11 @@ String str(int64 number, uint pad, char padChar, uint base) {
 #if __GNUC__
  assert_(i<64); // Fixes wrong 'array subscript is above array bounds' warning given by GCC
 #endif
- while(64<pad+i) buf[--i] = padChar;
+ while(64<pad+i) {
+  assert_(i>0);
+  buf[--i] = padChar;
+ }
+ assert_(i>0 && i<64);
  return copyRef(string(buf+i,64-i));
 }
 
@@ -200,11 +205,11 @@ static inline float round(float x) { return __builtin_round(x); }
 static inline bool isNaN(float x) { return x!=x; }
 static inline bool isNumber(float x) { return !isNaN(x) && x != __builtin_inff() && x != -__builtin_inff(); }
 
-String str(float n, uint precision, uint exponent, uint pad) {
+String str(float n, uint precision, uint exponent, uint unused pad) {
  bool sign = n<0; n=abs(n);
- if(__builtin_isnan(n)) return ::right("NaN", pad);
- if(n==__builtin_inff()) return ::right("∞", pad+2);
- if(n==-__builtin_inff()) return ::right("-∞", pad+2);
+ if(__builtin_isnan(n)) return "NaN"__; //::right("NaN", pad);
+ if(n==__builtin_inff()) return "∞"__; //::right("∞", pad+2);
+ if(n==-__builtin_inff()) return "-∞"__; //::right("-∞", pad+2);
  int e=0;
  if(n && exponent && (n<1 || log10(n)>=precision+3/*4*/)) {
   e = floor(log10(n) / exponent) * exponent;
@@ -229,7 +234,7 @@ String str(float n, uint precision, uint exponent, uint pad) {
  else if(exponent==3 && e==6) s.append('M');
  else if(exponent==3 && e==9) s.append('G');
  else if(e) { s.append('e'); s.append(str(e)); }
- if(pad > s.size) return right(s, pad);
+ //if(pad > s.size) return right(s, pad);
  return move(s);
 }
 #endif

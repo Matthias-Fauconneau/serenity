@@ -1,5 +1,7 @@
 #include "window.h"
 #include "simulation.h"
+#include "grain.h"
+#include "membrane.h"
 #include "matrix.h"
 #include "gl.h"
 FILE(shader_glsl)
@@ -46,15 +48,15 @@ struct SimulationView : Widget {
 
   glDepthTest(true);
 
-  if(simulation.grain.count) {
-   for(int i: range(grainIndices.size, simulation.grain.count)) grainIndices.append(i);
+  if(simulation.grain->count) {
+   for(int i: range(grainIndices.size, simulation.grain->count)) grainIndices.append(i);
    buffer<float> grainZ (align(simd, grainIndices.size));
    {
     const vXsf Qx = floatX(viewRotation.x);
     const vXsf Qy = floatX(viewRotation.y);
     const vXsf Qz = floatX(viewRotation.z);
     const vXsf Qw = floatX(viewRotation.w);
-    const float* pPx = simulation.grain.Px.data, *pPy = simulation.grain.Py.data, *pPz = simulation.grain.Pz.data;
+    const float* pPx = simulation.grain->Px.data, *pPy = simulation.grain->Py.data, *pPz = simulation.grain->Pz.data;
     float* const pQPz = grainZ.begin();
     int size = grainIndices.size;
     for(int i=0; i<size; i+=simd) {
@@ -78,9 +80,9 @@ struct SimulationView : Widget {
    buffer<vec3> positions {grainIndices.size*6};
    for(size_t i: range(grainIndices.size)) {
     // FIXME: GPU quad projection
-    vec3 O = viewProjection * simulation.grain.position(grainIndices[i]);
-    vec2 min = O.xy() - vec2(scale.xy()) * vec2(simulation.grain.radius) - vec2(2.f/size.x); // Parallel
-    vec2 max = O.xy() + vec2(scale.xy()) * vec2(simulation.grain.radius) + vec2(2.f/size.x); // Parallel
+    vec3 O = viewProjection * simulation.grain->position(grainIndices[i]);
+    vec2 min = O.xy() - vec2(scale.xy()) * vec2(simulation.grain->radius) - vec2(2.f/size.x); // Parallel
+    vec2 max = O.xy() + vec2(scale.xy()) * vec2(simulation.grain->radius) + vec2(2.f/size.x); // Parallel
     positions[i*6+0] = vec3(min, O.z);
     positions[i*6+1] = vec3(max.x, min.y, O.z);
     positions[i*6+2] = vec3(min.x, max.y, O.z);
@@ -96,17 +98,17 @@ struct SimulationView : Widget {
    static GLVertexArray vertexArray;
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
-   /*GLBuffer Rx (simulation.grain.Rx);
+   /*GLBuffer Rx (simulation.grain->Rx+simd);
    shader.bind("Rx"_, Rx, 0);
-   GLBuffer Ry (simulation.grain.Ry);
+   GLBuffer Ry (simulation.grain->Ry+simd);
    shader.bind("Ry"_, Ry, 0);
-   GLBuffer Rz (simulation.grain.Rz);
+   GLBuffer Rz (simulation.grain->Rz+simd);
    shader.bind("Rz"_, Rz, 0);
-   GLBuffer Rw (simulation.grain.Rw);
+   GLBuffer Rw (simulation.grain->Rw+simd);
    shader.bind("Rw"_, Rw, 0);*/
    // Reduces Z radius to see membrane mesh on/in grain
-   shader["radius"] = float(scale.z/2 * simulation.grain.radius * 7/8);
-   shader["hpxRadius"] = 1 / (size.x * scale.x * simulation.grain.radius);
+   shader["radius"] = float(scale.z/2 * simulation.grain->radius * 7/8);
+   shader["hpxRadius"] = 1 / (size.x * scale.x * simulation.grain->radius);
    //shader["viewRotation"] = viewRotation;
    vertexArray.draw(Triangles, positions.size);
   }
@@ -154,13 +156,13 @@ struct SimulationView : Widget {
   }
 #endif
 
-  if(simulation.membrane.count) {
+  if(simulation.membrane->count) {
    if(!indexBuffer) {
-    const int W = simulation.membrane.W, stride = simulation.membrane.stride,
-      margin = simulation.membrane.margin;
-    buffer<uint16> indices(W*(simulation.membrane.H-1)*6-W*2);
+    const int W = simulation.membrane->W, stride = simulation.membrane->stride,
+      margin = simulation.membrane->margin;
+    buffer<uint16> indices(W*(simulation.membrane->H-1)*6-W*2);
     int s = 0;
-    for(int i: range(1, simulation.membrane.H-1)) {
+    for(int i: range(1, simulation.membrane->H-1)) {
      int base = margin+i*stride;
      for(int j: range(W)) {
       int a = base+j;
@@ -183,14 +185,14 @@ struct SimulationView : Widget {
    shader["uColor"] = vec4(black, 1);
    static GLVertexArray vertexArray;
    // FIXME: reuse buffers / no update before pressure
-   if(!xBuffer) xBuffer = GLBuffer(simulation.membrane.Px);
-   else if(simulation.processState >= Simulation::Pressure) xBuffer.upload(simulation.membrane.Px);
+   if(!xBuffer) xBuffer = GLBuffer(simulation.membrane->Px);
+   else if(simulation.processState >= Simulation::Pressure) xBuffer.upload(simulation.membrane->Px);
    vertexArray.bindAttribute(shader.attribLocation("x"_), 1, Float, xBuffer);
-   if(!yBuffer) yBuffer = GLBuffer(simulation.membrane.Py);
-   else if(simulation.processState >= Simulation::Pressure) yBuffer.upload(simulation.membrane.Py);
+   if(!yBuffer) yBuffer = GLBuffer(simulation.membrane->Py);
+   else if(simulation.processState >= Simulation::Pressure) yBuffer.upload(simulation.membrane->Py);
    vertexArray.bindAttribute(shader.attribLocation("y"_), 1, Float, yBuffer);
-   if(!zBuffer) zBuffer = GLBuffer(simulation.membrane.Pz);
-   else if(simulation.processState >= Simulation::Pressure) zBuffer.upload(simulation.membrane.Pz);
+   if(!zBuffer) zBuffer = GLBuffer(simulation.membrane->Pz);
+   else if(simulation.processState >= Simulation::Pressure) zBuffer.upload(simulation.membrane->Pz);
    vertexArray.bindAttribute(shader.attribLocation("z"_), 1, Float, zBuffer);
    vertexArray.bind();
    indexBuffer.draw();
@@ -206,7 +208,7 @@ struct SimulationView : Widget {
 
    size_t N = 64;
    buffer<vec3> positions {N*2*2, 0};
-   const int radius = simulation.membrane.radius;
+   const int radius = simulation.membrane->radius;
    for(size_t i: range(N)) {
     float a1 = 2*PI*(i+0)/N; vec3 a (radius*cos(a1), radius*sin(a1), simulation.bottomZ);
     float a2 = 2*PI*(i+1)/N; vec3 b (radius*cos(a2), radius*sin(a2), simulation.bottomZ);
@@ -245,25 +247,19 @@ struct SimulationApp : Poll {
  Simulation simulation;
  SimulationView view;
 
- bool running = true;
-
- Time totalTime, recordTime;
-
  unique<Window> window = ::window(&view, -1, mainThread, true, false);
  Thread simulationMasterThread;
- SimulationApp(const Dict& parameters) : Poll(0, 0, simulationMasterThread), simulation(parameters),
-   view(simulation) {
-  window->actions[Escape] = [this]{ running=false; window=nullptr; exit_group(0); /*FIXME*/ };
+ SimulationApp(const Dict& parameters)
+  : Poll(0, 0, simulationMasterThread), simulation(parameters), view(simulation) {
+  window->actions[Escape] = [this]{ exit_group(0); /*FIXME*/ };
   window->presentComplete = [this]{
    window->render();
-   window->setTitle(str(simulation.timeStep*simulation.dt, simulation.grain.count, simulation.voidRatio, simulation.maxGrainV));
+   window->setTitle(str(simulation.timeStep*simulation.dt, simulation.grain->count, simulation.voidRatio, simulation.maxGrainV));
   };
   queue(); simulationMasterThread.spawn();
  }
  void event() {
-  if(!simulation.run(totalTime)) {
-   window->setTitle("Done");
-   running = false;
-  } else queue();
+  simulation.run();
+  window->setTitle("Done");
  }
 } app (parameters());

@@ -1,5 +1,5 @@
 #include "simulation.h"
-#include "parallel.h"
+#include "membrane.h"
 
 static inline void membraneTensionPressure(const float* const Px, const float* const Py, const float* const Pz,
                                            const float* const Vx, const float* const Vy, const float* const Vz,
@@ -118,10 +118,10 @@ static inline void membraneTensionPressure(const float* const Px, const float* c
 }
 
 void Simulation::stepMembrane() {
- size_t stride = membrane.stride;
- membraneInitializationTime += parallel_chunk(stride/simd, (membrane.count-stride)/simd,
+ size_t stride = membrane->stride;
+ membraneInitializationTime += parallel_chunk(stride/simd, (membrane->count-stride)/simd,
                   [this](uint, uint start, uint size) {
-    float* const Fx = membrane.Fx.begin(), *Fy = membrane.Fy.begin(), *Fz = membrane.Fz.begin();
+    float* const Fx = membrane->Fx.begin(), *Fy = membrane->Fy.begin(), *Fz = membrane->Fz.begin();
     for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
      store(Fx, i, _0f);
      store(Fy, i, _0f);
@@ -129,34 +129,34 @@ void Simulation::stepMembrane() {
     }
   });
 
- //membraneForceTime += parallel_for(1, membrane.H-1, [this](uint, int index) {
- membraneForceTime += parallel_chunk(1, membrane.H-1, [this](uint, int start, int size) {
+ //membraneForceTime += parallel_for(1, membrane->H-1, [this](uint, int index) {
+ membraneForceTime += parallel_chunk(1, membrane->H-1, [this](uint, int start, int size) {
    membraneTensionPressure(
-    membrane.Px.data, membrane.Py.data, membrane.Pz.data,
-    membrane.Vx.data, membrane.Vy.data, membrane.Vz.data,
-    membrane.Fx.begin(), membrane.Fy.begin(), membrane.Fz.begin(),
-    membrane.W, membrane.margin, membrane.stride,
-    floatX(pressure/(2*3)) /*[area = length(cross)/2] / 3 vertices*/, floatX(membrane.internodeLength),
-    floatX(membrane.tensionStiffness), floatX(membrane.tensionDamping),
+    membrane->Px.data, membrane->Py.data, membrane->Pz.data,
+    membrane->Vx.data, membrane->Vy.data, membrane->Vz.data,
+    membrane->Fx.begin(), membrane->Fy.begin(), membrane->Fz.begin(),
+    membrane->W, membrane->margin, membrane->stride,
+    floatX(pressure/(2*3)) /*[area = length(cross)/2] / 3 vertices*/, floatX(membrane->internodeLength),
+    floatX(membrane->tensionStiffness), floatX(membrane->tensionDamping),
     //index, 1);
     start, size);
  });
 }
 
 void Simulation::stepMembraneIntegration() {
- if(!membrane.count) return;
+ if(!membrane->count) return;
  float maxMembraneV = 0;
  if(processState >= ProcessState::Pressure) {
   const size_t threadCount = ::threadCount();
   float maxMembraneV_[threadCount]; mref<float>(maxMembraneV_, threadCount).clear(0);
-  membraneIntegrationTime += parallel_for(1, membrane.H-1, [this, &maxMembraneV_](uint id, uint i) {
-  const vXsf dt_mass = floatX(this->dt / membrane.mass), dt = floatX(this->dt);
+  membraneIntegrationTime += parallel_for(1, membrane->H-1, [this, &maxMembraneV_](uint id, uint i) {
+  const vXsf dt_mass = floatX(this->dt / membrane->mass), dt = floatX(this->dt);
    const vXsf membraneViscosity = floatX(this->membraneViscosity);
    vXsf maxMembraneVX = _0f;
-   float* const pFx = membrane.Fx.begin(), *pFy = membrane.Fy.begin(), *pFz = membrane.Fz.begin();
-   float* const pVx = membrane.Vx.begin(), *pVy = membrane.Vy.begin(), *pVz = membrane.Vz.begin();
-   float* const pPx = membrane.Px.begin(), *pPy = membrane.Py.begin(), *pPz = membrane.Pz.begin();
-   const int W = membrane.W, stride = membrane.stride, margin=membrane.margin;
+   float* const pFx = membrane->Fx.begin(), *pFy = membrane->Fy.begin(), *pFz = membrane->Fz.begin();
+   float* const pVx = membrane->Vx.begin(), *pVy = membrane->Vy.begin(), *pVz = membrane->Vz.begin();
+   float* const pPx = membrane->Px.begin(), *pPy = membrane->Py.begin(), *pPz = membrane->Pz.begin();
+   const int W = membrane->W, stride = membrane->stride, margin=membrane->margin;
    // Adds force from repeated nodes
    pFx[i*stride+margin+0] += pFx[i*stride+margin+W];
    pFy[i*stride+margin+0] += pFy[i*stride+margin+W];

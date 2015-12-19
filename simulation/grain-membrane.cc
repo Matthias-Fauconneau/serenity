@@ -1,8 +1,8 @@
 // TODO: Face contacts
 #include "simulation.h"
-//#include "grid.h"
-#include "lattice.h"
 #include "parallel.h"
+#include "grain.h"
+#include "membrane.h"
 
 static inline void evaluateGrainMembrane(const size_t start, const size_t size,
                                      const int* grainMembraneContact, const size_t unused grainMembraneContactSize,
@@ -159,7 +159,7 @@ static inline void evaluateGrainMembrane(const size_t start, const size_t size,
 }
 
 void Simulation::stepGrainMembrane() {
- if(!grain.count || !membrane.count) return;
+ if(!grain->count || !membrane->count) return;
 
  if(grainMembraneGlobalMinD <= 0)  {
   grainLattice();
@@ -192,7 +192,7 @@ void Simulation::stepGrainMembrane() {
   swap(oldGrainMembraneLocalBz, grainMembraneLocalBz);
 
   static constexpr size_t averageGrainMembraneContactCount = 16;
-  const size_t GWcc = align(simd, grain.count * averageGrainMembraneContactCount +1);
+  const size_t GWcc = align(simd, grain->count * averageGrainMembraneContactCount +1);
   if(GWcc > grainMembraneA.capacity) {\
    memoryTime.start();
    grainMembraneA = buffer<int>(GWcc, 0);
@@ -210,16 +210,16 @@ void Simulation::stepGrainMembrane() {
 
   atomic contactCount;
   auto search = [this, &latticeNeighbours, verletDistance, &contactCount](uint, uint rowIndex) {
-   const float* const mPx = membrane.Px.data, *mPy = membrane.Py.data, *mPz = membrane.Pz.data;
-   const float* const gPx = grain.Px.data+simd, *gPy = grain.Py.data+simd, *gPz = grain.Pz.data+simd;
+   const float* const mPx = membrane->Px.data, *mPy = membrane->Py.data, *mPz = membrane->Pz.data;
+   const float* const gPx = grain->Px.data+simd, *gPy = grain->Py.data+simd, *gPz = grain->Pz.data+simd;
    int* const gmA = grainMembraneA.begin(), *gmB = grainMembraneB.begin();
    const vXsf scale = floatX(lattice.scale);
    const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
    const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
    const vXsf verletDistanceX = floatX(verletDistance);
    const vXsi _1i = intX(-1);
-   int W = membrane.W;
-   int base = membrane.margin+rowIndex*membrane.stride;
+   int W = membrane->W;
+   int base = membrane->margin+rowIndex*membrane->stride;
    for(int j=0; j<W; j+=simd) {
     int i = base+j;
     vXsi b = intX(i)+_seqi;
@@ -240,7 +240,7 @@ void Simulation::stepGrainMembrane() {
     }
    }
   };
-  grainMembraneSearchTime += parallel_for(0, membrane.H, search);
+  grainMembraneSearchTime += parallel_for(0, membrane->H, search);
 
   if(!contactCount) return;
   grainMembraneA.size = contactCount;
@@ -259,7 +259,7 @@ void Simulation::stepGrainMembrane() {
    int b = grainMembraneB[i];
    for(uint k = 0;; k++) {
     size_t j = grainMembraneIndex+k;
-    if(j >= oldGrainMembraneA.size || oldGrainMembraneA[grainMembraneIndex+k] != a) break;
+    if(j >= oldGrainMembraneA.size || oldGrainMembraneA[j] != a) break;
     if(oldGrainMembraneB[j] == b) { // Repack existing friction
      grainMembraneLocalAx[i] = oldGrainMembraneLocalAx[j];
      grainMembraneLocalAy[i] = oldGrainMembraneLocalAy[j];
@@ -281,7 +281,7 @@ void Simulation::stepGrainMembrane() {
   grainMembraneRepackFrictionTime.stop();
 
   assert(align(simd, grainMembraneA.size+1) <= grainMembraneA.capacity);
-  for(size_t i=grainMembraneA.size; i<align(simd, grainMembraneA.size +1); i++) grainMembraneA.begin()[i] = 0;
+  for(size_t i=grainMembraneA.size; i<align(simd, grainMembraneA.size +1); i++) grainMembraneA.begin()[i] = -1;
   assert(align(simd, grainMembraneB.size+1) <= grainMembraneB.capacity);
   for(size_t i=grainMembraneB.size; i<align(simd, grainMembraneB.size +1); i++) grainMembraneB.begin()[i] = 0;
 
@@ -302,8 +302,8 @@ void Simulation::stepGrainMembrane() {
  atomic contactCount;
  auto filter = [&](uint, uint start, uint size) {
   const int* const gmA = grainMembraneA.data, *gmB = grainMembraneB.data;
-  const float* const gPx = grain.Px.data+simd, *gPy = grain.Py.data+simd, *gPz = grain.Pz.data+simd;
-  const float* const mPx = membrane.Px.data, *mPy = membrane.Py.data, *mPz = membrane.Pz.data;
+  const float* const gPx = grain->Px.data+simd, *gPy = grain->Py.data+simd, *gPz = grain->Pz.data+simd;
+  const float* const mPx = membrane->Px.data, *mPy = membrane->Py.data, *mPz = membrane->Pz.data;
   float* const gmL = grainMembraneLocalAx.begin();
   int* const gmContact = grainMembraneContact.begin();
   const vXsf Gr = floatX(Grain::radius);
@@ -353,24 +353,24 @@ void Simulation::stepGrainMembrane() {
  constexpr float E = 1/((1-sq(Grain::poissonRatio))/Grain::elasticModulus+(1-sq(Grain::poissonRatio))/Grain::elasticModulus);
  constexpr float R = 1/(Grain::curvature+Membrane::curvature);
  const float K = 4./3*E*sqrt(R);
- const float mass = 1/(1/Grain::mass+1/membrane.mass);
+ const float mass = 1/(1/Grain::mass+1/membrane->mass);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
  grainMembraneEvaluateTime += parallel_chunk(GWcc/simd, [&](uint, size_t start, size_t size) {
     evaluateGrainMembrane(start, size,
                       grainMembraneContact.data, grainMembraneContact.size,
                       grainMembraneA.data, grainMembraneB.data,
-                      grain.Px.data+simd, grain.Py.data+simd, grain.Pz.data+simd,
-                      membrane.Px.data, membrane.Py.data, membrane.Pz.data,
+                      grain->Px.data+simd, grain->Py.data+simd, grain->Pz.data+simd,
+                      membrane->Px.data, membrane->Py.data, membrane->Pz.data,
                       floatX(Grain::radius+0), floatX(Grain::radius), floatX(0),
                       grainMembraneLocalAx.begin(), grainMembraneLocalAy.begin(), grainMembraneLocalAz.begin(),
                       grainMembraneLocalBx.begin(), grainMembraneLocalBy.begin(), grainMembraneLocalBz.begin(),
                       floatX(K), floatX(Kb),
                       floatX(staticFrictionStiffness), floatX(dynamicFrictionCoefficient),
                       floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping),
-                      grain.Vx.data, grain.Vy.data, grain.Vz.data,
-                      membrane.Vx.data, membrane.Vy.data, membrane.Vz.data,
-                      grain.AVx.data, grain.AVy.data, grain.AVz.data,
-                      grain.Rx.data, grain.Ry.data, grain.Rz.data, grain.Rw.data,
+                      grain->Vx.data+simd, grain->Vy.data+simd, grain->Vz.data+simd,
+                      membrane->Vx.data, membrane->Vy.data, membrane->Vz.data,
+                      grain->AVx.data+simd, grain->AVy.data+simd, grain->AVz.data+simd,
+                      grain->Rx.data+simd, grain->Ry.data+simd, grain->Rz.data+simd, grain->Rw.data+simd,
                       grainMembraneFx.begin(), grainMembraneFy.begin(), grainMembraneFz.begin(),
                       grainMembraneTAx.begin(), grainMembraneTAy.begin(), grainMembraneTAz.begin() );
  });
@@ -384,17 +384,17 @@ void Simulation::stepGrainMembrane() {
   size_t index = grainMembraneContact[i];
   size_t a = grainMembraneA[index];
   size_t b = grainMembraneB[index];
-  grain.Fx[a] += grainMembraneFx[i];
-  membrane .Fx[b] -= grainMembraneFx[i];
-  grain.Fy[a] += grainMembraneFy[i];
-  membrane .Fy[b] -= grainMembraneFy[i];
-  grain.Fz[a] += grainMembraneFz[i];
-  membrane .Fz[b] -= grainMembraneFz[i];
-  grain.Tx[a] += grainMembraneTAx[i];
-  grain.Ty[a] += grainMembraneTAy[i];
-  grain.Tz[a] += grainMembraneTAz[i];
+  grain->Fx[simd+a] += grainMembraneFx[i];
+  membrane->Fx[b] -= grainMembraneFx[i];
+  grain->Fy[simd+a] += grainMembraneFy[i];
+  membrane->Fy[b] -= grainMembraneFy[i];
+  grain->Fz[simd+a] += grainMembraneFz[i];
+  membrane->Fz[b] -= grainMembraneFz[i];
+  grain->Tx[simd+a] += grainMembraneTAx[i];
+  grain->Ty[simd+a] += grainMembraneTAy[i];
+  grain->Tz[simd+a] += grainMembraneTAz[i];
 #if RADIAL
-  vec2 N = grain.position(a).xy();
+  vec2 N = grain->position(a).xy();
   N /= length(N);
   radialForce += dot(N, vec2(grainMembraneFx[i], grainMembraneFy[i]));
 #endif

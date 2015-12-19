@@ -1,5 +1,6 @@
 #include "simulation.h"
 #include "parallel.h"
+#include "grain.h"
 
 static inline void evaluateGrainGrain(const int start, const int size,
                                      const int* grainGrainContact,
@@ -151,10 +152,9 @@ static inline void evaluateGrainGrain(const int start, const int size,
 }
 
 void Simulation::stepGrainGrain() {
- if(!grain.count) return;
+ if(!grain->count) return;
  if(grainGrainGlobalMinD <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
   grainLattice();
-
   swap(oldGrainGrainA, grainGrainA);
   swap(oldGrainGrainB, grainGrainB);
   swap(oldGrainGrainLocalAx, grainGrainLocalAx);
@@ -165,7 +165,7 @@ void Simulation::stepGrainGrain() {
   swap(oldGrainGrainLocalBz, grainGrainLocalBz);
 
   static constexpr uint averageGrainGrainContactCount = 7;
-  uint GGcc = align(simd, grain.count * averageGrainGrainContactCount +1);
+  uint GGcc = align(simd, grain->count * averageGrainGrainContactCount +1);
   if(GGcc > grainGrainA.capacity) {
    memoryTime.start();
    grainGrainA = buffer<int>(GGcc, 0);
@@ -191,7 +191,7 @@ void Simulation::stepGrainGrain() {
 
   atomic contactCount;
   auto search = [this, &latticeNeighbours, verletDistance, &contactCount](uint, uint start, uint size) {
-   const float* const gPx = grain.Px.data+simd, *gPy = grain.Py.data+simd, *gPz = grain.Pz.data+simd;
+   const float* const gPx = grain->Px.data+simd, *gPy = grain->Py.data+simd, *gPz = grain->Pz.data+simd;
    int* const ggA = grainGrainA.begin(), *ggB = grainGrainB.begin();
    const vXsf scale = floatX(lattice.scale);
    const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
@@ -217,23 +217,23 @@ void Simulation::stepGrainGrain() {
     }
    }
   };
-  if(grain.count/simd) grainGrainSearchTime += parallel_chunk(grain.count/simd, search);
-  if(grain.count%simd) {
-   const float* const gPx = grain.Px.data+simd, *gPy = grain.Py.data+simd, *gPz = grain.Pz.data+simd;
+  if(grain->count/simd) grainGrainSearchTime += parallel_chunk(grain->count/simd, search);
+  if(grain->count%simd) {
+   const float* const gPx = grain->Px.data+simd, *gPy = grain->Py.data+simd, *gPz = grain->Pz.data+simd;
    int* const ggA = grainGrainA.begin(), *ggB = grainGrainB.begin();
    const vXsf scale = floatX(lattice.scale);
    const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
    const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
    const vXsf verletDistanceX = floatX(verletDistance);
    const vXsi _1i = intX(-1);
-   uint i=grain.count/simd*simd;
+   uint i=grain->count/simd*simd;
    vXsi a = intX(i)+_seqi;
-   maskX valid = lessThan(a, intX(grain.count));
+   maskX valid = lessThan(a, intX(grain->count));
    const vXsf Ax = load(gPx, i), Ay = load(gPy, i), Az = load(gPz, i);
    vXsi index = convert(scale*(Az-minZ)) * sizeYX
      + convert(scale*(Ay-minY)) * sizeX
      + convert(scale*(Ax-minX));
-   for(int k: range(grain.count-i, simd)) insert(index, k, 0);
+   for(int k: range(grain->count-i, simd)) insert(index, k, 0);
    // Neighbours
    for(uint n: range(62)) { // A is not monotonous
     vXsi b = gather(latticeNeighbours[n], index);
@@ -287,8 +287,8 @@ void Simulation::stepGrainGrain() {
   grainGrainRepackFrictionTime.stop();
 
   assert(align(simd, grainGrainA.size+1) <= grainGrainA.capacity);
-  for(uint i=grainGrainA.size; i<align(simd, grainGrainA.size+1); i++) grainGrainA.begin()[i] = grain.count;
-  for(uint i=grainGrainB.size; i<align(simd, grainGrainB.size+1); i++) grainGrainB.begin()[i] = grain.count;
+  for(uint i=grainGrainA.size; i<align(simd, grainGrainA.size+1); i++) grainGrainA.begin()[i] = -1;
+  for(uint i=grainGrainB.size; i<align(simd, grainGrainB.size+1); i++) grainGrainB.begin()[i] = -1;
 
   grainGrainGlobalMinD = verletDistance/*minD*/ - 2*Grain::radius;
   if(grainGrainGlobalMinD <= 0) log("grainGrainGlobalMinD12", grainGrainGlobalMinD);
@@ -312,7 +312,7 @@ void Simulation::stepGrainGrain() {
  atomic contactCount;
  auto filter = [&](uint, uint start, uint size) {
   const int* const ggA = grainGrainA.data, *ggB = grainGrainB.data;
-  const float* const gPx = grain.Px.data+simd, *gPy = grain.Py.data+simd, *gPz = grain.Pz.data+simd;
+  const float* const gPx = grain->Px.data+simd, *gPy = grain->Py.data+simd, *gPz = grain->Pz.data+simd;
   float* const ggL = grainGrainLocalAx.begin();
   int* const ggContact = grainGrainContact.begin();
   const vXsf _2Gr = floatX(Grain::radius+Grain::radius);
@@ -375,19 +375,19 @@ void Simulation::stepGrainGrain() {
   evaluateGrainGrain(start, size,
                      grainGrainContact.data,
                      grainGrainA.data, grainGrainB.data,
-                     grain.Px.data+simd, grain.Py.data+simd, grain.Pz.data+simd,
+                     grain->Px.data+simd, grain->Py.data+simd, grain->Pz.data+simd,
                      floatX(Grain::radius+Grain::radius), floatX(Grain::radius), floatX(Grain::radius),
                      grainGrainLocalAx.begin(), grainGrainLocalAy.begin(), grainGrainLocalAz.begin(),
                      grainGrainLocalBx.begin(), grainGrainLocalBy.begin(), grainGrainLocalBz.begin(),
                      floatX(K), floatX(Kb),
                      floatX(staticFrictionStiffness), floatX(dynamicFrictionCoefficient),
                      floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping),
-                     grain.Vx.data, grain.Vy.data, grain.Vz.data,
-                     grain.Vx.data, grain.Vy.data, grain.Vz.data,
-                     grain.AVx.data, grain.AVy.data, grain.AVz.data,
-                     grain.AVx.data, grain.AVy.data, grain.AVz.data,
-                     grain.Rx.data, grain.Ry.data, grain.Rz.data, grain.Rw.data,
-                     grain.Rx.data, grain.Ry.data, grain.Rz.data, grain.Rw.data,
+                     grain->Vx.data+simd, grain->Vy.data+simd, grain->Vz.data+simd,
+                     grain->Vx.data+simd, grain->Vy.data+simd, grain->Vz.data+simd,
+                     grain->AVx.data+simd, grain->AVy.data+simd, grain->AVz.data+simd,
+                     grain->AVx.data+simd, grain->AVy.data+simd, grain->AVz.data+simd,
+                     grain->Rx.data+simd, grain->Ry.data+simd, grain->Rz.data+simd, grain->Rw.data+simd,
+                     grain->Rx.data+simd, grain->Ry.data+simd, grain->Rz.data+simd, grain->Rw.data+simd,
                      grainGrainFx.begin(), grainGrainFy.begin(), grainGrainFz.begin(),
                      grainGrainTAx.begin(), grainGrainTAy.begin(), grainGrainTAz.begin(),
                      grainGrainTBx.begin(), grainGrainTBy.begin(), grainGrainTBz.begin() );
@@ -401,19 +401,20 @@ void Simulation::stepGrainGrain() {
    int index = grainGrainContact[i];
    int a = grainGrainA[index];
    int b = grainGrainB[index];
-   grain.Fx[a] += grainGrainFx[i];
-   grain.Fx[b] -= grainGrainFx[i];
-   grain.Fy[a] += grainGrainFy[i];
-   grain.Fy[b] -= grainGrainFy[i];
-   grain.Fz[a] += grainGrainFz[i];
-   grain.Fz[b] -= grainGrainFz[i];
+   assert_(a>=0 && b>=0); // DEBUG
+   grain->Fx[simd+a] += grainGrainFx[i];
+   grain->Fx[simd+b] -= grainGrainFx[i];
+   grain->Fy[simd+a] += grainGrainFy[i];
+   grain->Fy[simd+b] -= grainGrainFy[i];
+   grain->Fz[simd+a] += grainGrainFz[i];
+   grain->Fz[simd+b] -= grainGrainFz[i];
 
-   grain.Tx[a] += grainGrainTAx[i];
-   grain.Ty[a] += grainGrainTAy[i];
-   grain.Tz[a] += grainGrainTAz[i];
-   grain.Tx[b] += grainGrainTBx[i];
-   grain.Ty[b] += grainGrainTBy[i];
-   grain.Tz[b] += grainGrainTBz[i];
+   grain->Tx[simd+a] += grainGrainTAx[i];
+   grain->Ty[simd+a] += grainGrainTAy[i];
+   grain->Tz[simd+a] += grainGrainTAz[i];
+   grain->Tx[simd+b] += grainGrainTBx[i];
+   grain->Ty[simd+b] += grainGrainTBy[i];
+   grain->Tz[simd+b] += grainGrainTBz[i];
   }
   grainGrainSumTime.stop();
  } else {
@@ -428,7 +429,7 @@ void Simulation::stepGrainGrain() {
    const int* const grainGrainContact = this->grainGrainContact.data;
    const int* const grainGrainA = this->grainGrainA.data;
    const int* const grainGrainB = this->grainGrainB.data;
-   vXsi start = intX(grain.count);
+   vXsi start = intX(grain->count);
    vXsi stop = _0i;
    for(uint i = chunkIndex*chunkSize*simd; i < min(jobCount, (chunkIndex+1)*chunkSize)*simd; i+=simd) {
     const vXsi contacts = *(vXsi*)(grainGrainContact+i);
@@ -488,18 +489,19 @@ void Simulation::stepGrainGrain() {
    const int* const grainGrainContact = this->grainGrainContact.data;
    const int* const grainGrainA = this->grainGrainA.data;
    const int* const grainGrainB = this->grainGrainB.data;
-   const uint stride = align(simd, grain.count);
+   const uint stride = align(simd, grain->count);
    const uint base  = copy[chunkIndex]*stride;
    const float* const pGGFx = grainGrainFx.data, *pGGFy = grainGrainFy.data, *pGGFz = grainGrainFz.data;
    const float* const pGGTAx = grainGrainTAx.data, *pGGTAy = grainGrainTAy.data, *pGGTAz = grainGrainTAz.data;
    const float* const pGGTBx = grainGrainTBx.data, *pGGTBy = grainGrainTBy.data, *pGGTBz = grainGrainTBz.data;
-   float* const pFx = grain.Fx.begin()+base, *pFy = grain.Fy.begin()+base, *pFz = grain.Fz.begin()+base;
-   float* const pTx = grain.Tx.begin()+base, *pTy = grain.Ty.begin()+base, *pTz = grain.Tz.begin()+base;
+   float* const pFx = grain->Fx.begin()+simd+base, *pFy = grain->Fy.begin()+simd+base, *pFz = grain->Fz.begin()+simd+base;
+   float* const pTx = grain->Tx.begin()+simd+base, *pTy = grain->Ty.begin()+simd+base, *pTz = grain->Tz.begin()+simd+base;
    // Scalar scatter add
    for(uint i=chunkIndex*chunkSize*simd; i<min(jobCount, (chunkIndex+1)*chunkSize)*simd; i++) {
     uint index = grainGrainContact[i];
-    uint a = grainGrainA[index];
-    uint b = grainGrainB[index];
+    int a = grainGrainA[index];
+    int b = grainGrainB[index];
+    assert_(a>=0 && b>=0); // DEBUG
     pFx[a] += pGGFx[i];
     pFx[b] -= pGGFx[i];
     pFy[a] += pGGFy[i];
@@ -518,9 +520,9 @@ void Simulation::stepGrainGrain() {
   grainGrainSumSumTime += parallel_for(0, chunkCount, sum);
   // TODO: range optimized zero/copy
   auto merge = [this, copyCount](uint, uint start, uint size) {
-   float* const pFx = grain.Fx.begin(), *pFy = grain.Fy.begin(), *pFz = grain.Fz.begin();
-   float* const pTx = grain.Tx.begin(), *pTy = grain.Ty.begin(), *pTz = grain.Tz.begin();
-   const uint stride = align(simd, grain.count);
+   float* const pFx = grain->Fx.begin(), *pFy = grain->Fy.begin(), *pFz = grain->Fz.begin();
+   float* const pTx = grain->Tx.begin(), *pTy = grain->Ty.begin(), *pTz = grain->Tz.begin();
+   const uint stride = align(simd, grain->count);
    for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
     vXsf Fx = _0f, Fy = _0f, Fz = _0f, Tx = _0f, Ty = _0f, Tz = _0f;
     for(uint copyIndex = 1; copyIndex < copyCount; copyIndex++) {
@@ -540,7 +542,7 @@ void Simulation::stepGrainGrain() {
     store(pTz, i, load(pTz, i) + Tz);
    }
   };
-  grainGrainSumMergeTime += parallel_chunk(align(simd, grain.count)/simd, merge);
+  grainGrainSumMergeTime += parallel_chunk(align(simd, grain->count)/simd, merge);
 #else
   error("Unsupported");
 #endif

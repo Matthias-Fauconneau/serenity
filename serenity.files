@@ -97,3 +97,7 @@ ui/utf8.cc
 tools/shader.glsl
 tools/sweep.cc
 tools/sge.h
+simulation/grain.h
+simulation/membrane.h
+simulation/wire.h
+simulation/plate.h

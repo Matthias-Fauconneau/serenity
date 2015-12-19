@@ -104,7 +104,7 @@ struct Random {
     uint sz,sw;
     uint z,w;
     Random(uint sz=1, uint sw=1) : sz(sz), sw(sw) { reset(); }
-    void seed() { sz=readCycleCounter(); sw=readCycleCounter(); }
+    //void seed() { sz=readCycleCounter(); sw=readCycleCounter(); }
     void reset() { z=sz; w=sw; }
     uint64 next() {
      z = 36969 * (z & 0xFFFF) + (z >> 16);

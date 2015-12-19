@@ -13,7 +13,7 @@ struct SSH : Poll {
  array<byte> status;
 
  SSH(ref<string> args, bool log=false) {
-  pid = execute(which(args[0]), args.slice(1), false, currentWorkingDirectory(), &stdout);
+  pid = execute("/opt/ge2011.pleiades/bin/linux-x64/qsub.orig", args.slice(1), false, currentWorkingDirectory(), &stdout);
   if(log) { fd=stdout.fd; registerPoll(); }
  }
  void event() {

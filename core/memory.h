@@ -123,10 +123,10 @@ generic buffer<T> join(ref<ref<T>> list, const ref<T> separator) {
  if(!list) return {};
  size_t size = 0;
  for(auto e: list) {
-  assert_(e.size < 4096, e.size, list.size);
+  assert_(size < 4096 && e.size < 4096, e.size, list.size);
   size += e.size;
  }
- buffer<T> target ( size + (list.size-1)*separator.size, 0);
+ buffer<T> target (size + (list.size-1)*separator.size, 0);
  for(size_t i: range(list.size)) { target.append( list[i] ); if(i<list.size-1) target.append( separator ); }
  return target;
 }

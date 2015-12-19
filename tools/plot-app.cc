@@ -16,7 +16,7 @@ struct PlotView : HList<Plot> {
  unique<Window> window = ::window(this, int2(0, 720));
  bool shown = false;
  size_t index = 0;
- buffer<unique<FileWatcher>> watchers = apply2(/*arguments()*/ref<string>{"Results"}, [this](string path){
+ buffer<unique<FileWatcher>> watchers = apply2(/*arguments()*/ref<string>{"."}, [this](string path){
   return unique<FileWatcher>(path, [this](string){ if(shown) load(); shown=false; window->render(); });
 });
  PlotView() {
@@ -49,7 +49,7 @@ struct PlotView : HList<Plot> {
    plot.xlabel = "Strain (%)"__;
    plot.ylabel = copyRef(ref<string>{"Axial (Pa)","Normalized deviator stress"}[index]);
    map<String, array<Variant>> allCoordinates;
-   for(Folder folder: {"Results"_}/*arguments()*/) {
+   for(Folder folder: {"."_}/*arguments()*/) {
     for(string name: folder.list(Files)) {
      auto parameters = parseDict(name);
      for(const auto parameter: parameters)
