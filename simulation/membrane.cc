@@ -151,7 +151,7 @@ void Simulation::stepMembraneIntegration() {
   float maxMembraneV_[threadCount]; mref<float>(maxMembraneV_, threadCount).clear(0);
   membraneIntegrationTime += parallel_for(1, membrane.H-1, [this, &maxMembraneV_](uint id, uint i) {
   const vXsf dt_mass = floatX(this->dt / membrane.mass), dt = floatX(this->dt);
-   const vXsf unused bottomZ = floatX(this->bottomZ), topZ = floatX(this->topZ);
+   const vXsf membraneViscosity = floatX(this->membraneViscosity);
    vXsf maxMembraneVX = _0f;
    float* const pFx = membrane.Fx.begin(), *pFy = membrane.Fy.begin(), *pFz = membrane.Fz.begin();
    float* const pVx = membrane.Vx.begin(), *pVy = membrane.Vy.begin(), *pVz = membrane.Vz.begin();
@@ -174,10 +174,12 @@ void Simulation::stepMembraneIntegration() {
     Vx += dt_mass * Fx;
     Vy += dt_mass * Fy;
     Vz += dt_mass * Fz;
+    Vx *= membraneViscosity;
+    Vy *= membraneViscosity;
+    Vz *= membraneViscosity;
     Px += dt * Vx;
     Py += dt * Vy;
     Pz += dt * Vz;
-    //Pz = max(bottomZ, min(topZ, Pz));
     store(pVx, k, Vx); store(pVy, k, Vy); store(pVz, k, Vz);
     store(pPx, k, Px); store(pPy, k, Py); store(pPz, k, Pz);
     maxMembraneVX = max(maxMembraneVX, sqrt(Vx*Vx + Vy*Vy + Vz*Vz));

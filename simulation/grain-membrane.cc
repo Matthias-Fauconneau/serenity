@@ -377,7 +377,9 @@ void Simulation::stepGrainMembrane() {
  grainMembraneContactSizeSum += grainMembraneContact.size;
 
  grainMembraneSumTime.start();
- //float radialForce = 0;
+#if RADIAL
+ float radialForce = 0;
+#endif
  for(size_t i = 0; i < grainMembraneContact.size; i++) { // Scalar scatter add
   size_t index = grainMembraneContact[i];
   size_t a = grainMembraneA[index];
@@ -391,10 +393,15 @@ void Simulation::stepGrainMembrane() {
   grain.Tx[a] += grainMembraneTAx[i];
   grain.Ty[a] += grainMembraneTAy[i];
   grain.Tz[a] += grainMembraneTAz[i];
-  /*vec2 N = grain.position(a).xy();
+#if RADIAL
+  vec2 N = grain.position(a).xy();
   N /= length(N);
-  radialForce += dot(N, vec2(grainMembraneFx[i], grainMembraneFy[i]));*/
+  radialForce += dot(N, vec2(grainMembraneFx[i], grainMembraneFy[i]));
+#endif
  }
- //this->radialForce = -radialForce; // FIXME: average
+#if RADIAL
+ this->radialForce += -radialForce;
+ radialSumStepCount++;
+#endif
  grainMembraneSumTime.stop();
 }

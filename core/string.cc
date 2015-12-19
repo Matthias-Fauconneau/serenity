@@ -222,7 +222,7 @@ String str(float n, uint precision, uint exponent, uint pad) {
   s.append( str(uint64(integer)) );
   s.append('.');
   s.append( str(decimal, precision) );
-  //while(s.last()=='0') s.pop(); // Trim trailing zeroes
+  while(s.last()=='0') s.pop(); // Trim trailing zeroes
   if(s.last()=='.') s.pop(); // Trim trailing dot
  } else s.append( str(uint64(round(n))) );
  if(exponent==3 && e==3) s.append('K');

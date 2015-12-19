@@ -16,16 +16,6 @@ struct System {
  sconst float s = 1, m = 1, kg = 1, N = kg /m /(s*s), Pa = N / (m*m);
  sconst float mm = 1e-3*m, g = 1e-3*kg, KPa = 1e3 * Pa, MPa = 1e6 * Pa, GPa = 1e9 * Pa;
 
- // Contact parameters
- //sconst float e = 1./2; // Restitution coefficient
- //const float normalDampingRate = ln(e) / sqrt(sq(PI)+ln(ln(e)));
- sconst float normalDampingRate = 1; // ~ ln e / √(π²+ln²e) [restitution coefficient e]
- sconst float dynamicFrictionCoefficient = 0.1; // Interparticle 0.1 (FIXME: boundary: 0.23)
- sconst float staticFrictionSpeed = 1 * mm/s;
- sconst float staticFrictionLength = 1e-3 * m; // ~ Grain::radius/4 //~ Wire::radius
- sconst float staticFrictionStiffness = 100; //00* 1*g*10/(1.25*mm); //k/F = F/L ~ Grain::mass*G/L //~ Wire::mass*G/Wire::radius
- sconst float staticFrictionDamping = 1; // * g/s; // TODO: relative to k ?
-
  sconst bool validation = true;
  sconst bool fast = false;
 
@@ -42,7 +32,8 @@ struct System {
  struct Grain {
   sconst float radius = validation ? 2.5 * mm: 40 * mm;
   sconst float density = 7.8e3 * kg/cb(m);
-  sconst float mass = validation ? 4./3*PI*cb(radius) * density /*~5g*/ : 2.7 * g;
+  sconst float volume = 4./3*PI*cb(radius);
+  sconst float mass = validation ? volume * density /*~5g*/ : 2.7 * g;
   sconst float curvature = 1./radius;
   sconst float poissonRatio = validation ? 0.28 : 0.35;
   sconst float shearModulus = 77000/8/(fast?4:1) * MPa;
@@ -119,7 +110,7 @@ struct System {
 #endif
 
  struct Membrane {
-  sconst float density = 1000 * kg / cb(m);
+  sconst float density = 10 * 1000 * kg / cb(m);
   sconst float curvature = 0;
   sconst float elasticModulus = 100 * MPa;
   sconst float poissonRatio = 0.48;

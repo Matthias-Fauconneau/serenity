@@ -39,7 +39,7 @@ struct Element {
  /// Returns element as parseable String
  String str(uint depth=0) const;
 };
-String str(const Element& e);
+//String str(const Element& e);
 
 /// Parse an XML document as a tree of \a Element
 Element parseXML(string document);

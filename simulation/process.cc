@@ -3,30 +3,37 @@
 void Simulation::stepProcess() {
  // Process
  if(grain.count == grain.capacity-simd) {
+  dynamicFrictionCoefficient = targetDynamicFrictionCoefficient;
   if(processState  < Pressure) { // Fits top plate while disabling gravity
    float topZ = 0;
    for(float z: grain.Pz.slice(simd, grain.count)) topZ = ::max(topZ, z+Grain::radius);
-   if(topZ < this->topZ) this->topZ = this->topZ + dt * (topZ-this->topZ) / s;
+   if(topZ < this->topZ) this->topZ = topZ;
    topZ0 = this->topZ;
    Gz = 0;
   }
   if(processState < Pressure) {
    if(timeStep%(int(1/(dt*60))) == 0) log(maxGrainV*1e3f, "mm/s");
-   if(maxGrainV > 100 * mm/s) return;
-   //pressure = targetPressure;
+   if(maxGrainV > 600 * mm/s) return;
+   pressure = targetPressure;
   }
-  if(pressure < targetPressure) { // Increases pressure toward target pressure
+  if(pressure < targetPressure || membraneViscosity < 1) { // Increases pressure toward target pressure
    processState = Pressure;
-   pressure += dt * targetPressure * Pa/s;
+   //pressure += dt * targetPressure * Pa/s;
+   membraneViscosity += 100 * dt * 1/s;
   } else { // Displace plates with constant velocity
    pressure = targetPressure;
+   if(processState < Load) {
+    topForceZ = 0; topSumStepCount = 0;
+    bottomForceZ = 0; bottomSumStepCount = 0;
+    radialForce = 0; radialSumStepCount = 0;
+   }
    processState = Load;
    topZ -= dt * plateSpeed;
    bottomZ += dt * plateSpeed;
   }
  } else {
   // Increases current height
-  if(currentHeight < topZ-Grain::radius+1e-4) currentHeight += verticalSpeed * dt;
+  if(currentHeight < topZ-Grain::radius) currentHeight += verticalSpeed * dt;
 
 #if WIRE
   // Generates wire
@@ -125,6 +132,12 @@ void Simulation::stepProcess() {
       grain.Rz[i] = cos(t1)*sin(t2);
       grain.Rw[i] = cos(t2);
       grain.count++;
+      {
+       float height = topZ-bottomZ;
+       float totalVolume = PI*sq(membrane.radius)*height;
+       float grainVolume = grain.count * Grain::volume;
+       voidRatio = (totalVolume-grainVolume)/grainVolume;
+      }
       // Forces verlet lists reevaluation
       /*if(timeStep%grain.count == 0)*/ grainMembraneGlobalMinD = 0;
       grainGrainGlobalMinD = 0;

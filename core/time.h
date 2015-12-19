@@ -60,7 +60,7 @@ inline String strD(const Time& num, const Time& div) {
  return strD(num.nanoseconds(), div.nanoseconds());
 }
 
-#if 0
+#if 1
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;
     int weekDay=-1;

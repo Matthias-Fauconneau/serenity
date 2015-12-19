@@ -12,7 +12,7 @@
 //include "wire-bottom.h"
 //include "grain-wire.h"
 
-constexpr float System::staticFrictionLength;
+//constexpr float System::staticFrictionLength;
 constexpr float System::Grain::radius;
 constexpr float System::Grain::mass;
 constexpr float System::Grain::angularMass;
@@ -26,6 +26,11 @@ constexpr string Simulation::patterns[];
 #endif
 
 Simulation::Simulation(const Dict& p) : System(p.at("TimeStep"), (int)p.at("Count"), p.at("Radius")),
+  targetDynamicFrictionCoefficient((float)p.at("Friction")*1),
+  staticFrictionSpeed((float)p.at("sfSpeed")*m/s),
+  staticFrictionLength((float)p.at("sfLength")*m),
+  staticFrictionStiffness((float)p.at("sfStiffness")*N/m),
+  staticFrictionDamping((float)p.at("sfDamping")*N/(m/s)),
   targetPressure((float)p.at("Pressure")*Pa),
   plateSpeed((float)p.at("Speed")*mm/s)
 #if WIRE
@@ -215,7 +220,7 @@ bool Simulation::run(const Time& totalTime) {
  stepTimeRT.start();
  stepTime.start();
  //for(Time time{true}; time.nanoseconds() < second/60;) step();
- for(int unused t: range(int(1/(dt*60))/8)) step();
+ for(int unused t: range(int(1/(dt*10000)))) step();
  stepTime.stop();
  stepTimeRT.stop();
  //viewStep++;
@@ -225,22 +230,30 @@ bool Simulation::run(const Time& totalTime) {
   //if(threadCount()<17) log(threadCount(), coreFrequencies()); else log("//", threadCount());
   profile(totalTime);
  }
- if(processState == Pressure) log("Pressure", int(round(pressure)), "Pa");
+ if(processState == Pressure) log(
+    "Pressure", int(round(pressure)), "Pa",
+    "Membrane viscosity", membraneViscosity
+    );
  if(processState == Load) {
   float height = topZ-bottomZ;
   float strain = 1-height/topZ0;
   float area = PI*sq(membrane.radius) * 2 /*2 plates*/;
   float force = topForceZ/topSumStepCount + bottomForceZ/bottomSumStepCount;
+  topForceZ = 0; topSumStepCount = 0;
+  bottomForceZ = 0; bottomSumStepCount = 0;
   float stress = force / area;
-  //float side = 2*PI*membrane.radius*height;
-  //float radial = radialForce / side;
+#if RADIAL
+  float side = 2*PI*membrane.radius*height;
+  float radial = (radialForce/radialSumStepCount) / side;
+  radialForce = 0; radialSumStepCount = 0;
+#endif
   if(!pressureStrain) {
-   //assert_(!existsFile(arguments()[0], "Results"_));
-   if(existsFile(arguments()[0], "Results"_)) log("Overwrote", arguments()[0]);
-   pressureStrain = File(arguments()[0], "Results"_, Flags(WriteOnly|Create|Truncate));
-   pressureStrain.write("Strain (%), "/*Radial (Pa), */"Stress (Pa)""\n");
+   if(existsFile(arguments()[0])) log("Overwrote", arguments()[0]);
+   pressureStrain = File(arguments()[0], currentWorkingDirectory(), Flags(WriteOnly|Create|Truncate));
+   pressureStrain.write("voidRatio:"+str(voidRatio)+"\n");
+   pressureStrain.write("Strain (%), ""Radial (Pa), ""Axial (Pa)""\n");
   }
-  String line = str(strain*100, 4u)+' '/*+str(int(round(radial)))+' '*/+str(int(round(stress)))+'\n';
+  String line = str(strain*100, 4u)+' '+str(int(round(radial)))+' '+str(int(round(stress)))+'\n';
   log_(line);
   pressureStrain.write(line);
   if(strain > 1./8) return false;

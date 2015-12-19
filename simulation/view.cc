@@ -105,7 +105,7 @@ struct SimulationView : Widget {
    GLBuffer Rw (simulation.grain.Rw);
    shader.bind("Rw"_, Rw, 0);*/
    // Reduces Z radius to see membrane mesh on/in grain
-   shader["radius"] = float(scale.z/2 * simulation.grain.radius);
+   shader["radius"] = float(scale.z/2 * simulation.grain.radius * 7/8);
    shader["hpxRadius"] = 1 / (size.x * scale.x * simulation.grain.radius);
    //shader["viewRotation"] = viewRotation;
    vertexArray.draw(Triangles, positions.size);
@@ -184,11 +184,13 @@ struct SimulationView : Widget {
    static GLVertexArray vertexArray;
    // FIXME: reuse buffers / no update before pressure
    if(!xBuffer) xBuffer = GLBuffer(simulation.membrane.Px);
-   else if(simulation.processState >= Simulation::Pressure) xBuffer.unmap();
+   else if(simulation.processState >= Simulation::Pressure) xBuffer.upload(simulation.membrane.Px);
    vertexArray.bindAttribute(shader.attribLocation("x"_), 1, Float, xBuffer);
    if(!yBuffer) yBuffer = GLBuffer(simulation.membrane.Py);
+   else if(simulation.processState >= Simulation::Pressure) yBuffer.upload(simulation.membrane.Py);
    vertexArray.bindAttribute(shader.attribLocation("y"_), 1, Float, yBuffer);
    if(!zBuffer) zBuffer = GLBuffer(simulation.membrane.Pz);
+   else if(simulation.processState >= Simulation::Pressure) zBuffer.upload(simulation.membrane.Pz);
    vertexArray.bindAttribute(shader.attribLocation("z"_), 1, Float, zBuffer);
    vertexArray.bind();
    indexBuffer.draw();
@@ -252,7 +254,10 @@ struct SimulationApp : Poll {
  SimulationApp(const Dict& parameters) : Poll(0, 0, simulationMasterThread), simulation(parameters),
    view(simulation) {
   window->actions[Escape] = [this]{ running=false; window=nullptr; exit_group(0); /*FIXME*/ };
-  window->presentComplete = [this]{ window->render(); };
+  window->presentComplete = [this]{
+   window->render();
+   window->setTitle(str(simulation.timeStep*simulation.dt, simulation.grain.count, simulation.voidRatio, simulation.maxGrainV));
+  };
   queue(); simulationMasterThread.spawn();
  }
  void event() {

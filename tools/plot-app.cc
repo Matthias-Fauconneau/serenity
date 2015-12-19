@@ -47,7 +47,7 @@ struct PlotView : HList<Plot> {
   for(size_t index: range(2)) {
    Plot& plot = append();
    plot.xlabel = "Strain (%)"__;
-   plot.ylabel = copyRef(ref<string>{"Stress (Pa)","Normalized deviator stress"}[index]);
+   plot.ylabel = copyRef(ref<string>{"Axial (Pa)","Normalized deviator stress"}[index]);
    map<String, array<Variant>> allCoordinates;
    for(Folder folder: {"Results"_}/*arguments()*/) {
     for(string name: folder.list(Files)) {
@@ -58,6 +58,7 @@ struct PlotView : HList<Plot> {
     }
     for(string name: folder.list(Files)) {
      TextData s (readFile(name, folder));
+     s.until('\n'); // First line: constant results
      buffer<string> names = split(s.until('\n'),", "); // Second line: Headers
      map<string, array<float>> dataSets;
      for(string name: names) dataSets.insert(name);
@@ -75,10 +76,12 @@ struct PlotView : HList<Plot> {
      auto parameters = parseDict(name);
      if(plot.ylabel == "Normalized deviator stress") {
       float pressure = parameters.at("Pressure");
-      ref<float> stress = dataSets.at("Stress (Pa)");
+      ref<float> radial = dataSets.at("Radial (Pa)");
+      ref<float> axial = dataSets.at("Axial (Pa)");
       array<float>& ndeviator = dataSets.insert("Normalized deviator stress");
-      ndeviator.reserve(stress.size);
-      for(float s: stress) ndeviator.append((s-pressure)/pressure);
+      ndeviator.grow(axial.size);
+      //for(int i: range(ndeviator.size)) ndeviator[i] = ((axial[i]-radial[i])/radial[i]);
+      for(int i: range(ndeviator.size)) ndeviator[i] = ((axial[i]-min(pressure,radial[i]))/min(pressure,radial[i]));
      }
      assert_(dataSets.contains(plot.xlabel));
      assert_(dataSets.contains(plot.ylabel));

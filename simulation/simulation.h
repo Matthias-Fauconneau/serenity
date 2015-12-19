@@ -16,8 +16,17 @@ static inline void qapply(vXsf Qx, vXsf Qy, vXsf Qz, vXsf Qw, vXsf Vx, vXsf Vy, 
 
 // High level simulation and contact management
 struct Simulation : System {
+ // Contact parameters
+ sconst float normalDampingRate = 1;
+ const float targetDynamicFrictionCoefficient;// = 0.23; //.23; // Interparticle 0.1 (FIXME: boundary: 0.23)
+ float dynamicFrictionCoefficient = 0; //.23; // Interparticle 0.1 (FIXME: boundary: 0.23)
+ const float staticFrictionSpeed; //0.1 * m/s; //100 * mm/s;
+ const float staticFrictionLength; // = 1e-2 * mm; // ~ Grain::radius
+ const float staticFrictionStiffness;// = 1000000; //00* 1*g*10/(1.25*mm); //k/F = F/L ~ Grain::mass*G/L //~ Wire::mass*G/Wire::radius
+ const float staticFrictionDamping;// = 10; //100; // * F/V; // TODO: relative to k ?
+
  // Process parameters
- float Gz = -10 * N/kg; // Gravity
+ float Gz = 10000 * -10 * N/kg; // Gravity
  const float verticalSpeed = 1 * m/s;
  const float targetPressure;
  const float plateSpeed;// = 10 * mm/s;
@@ -37,14 +46,19 @@ struct Simulation : System {
  Random random;
  float currentHeight = Grain::radius;
  float pressure = targetPressure;
+ float membraneViscosity = 0;
  float bottomZ = 0, topZ = membrane.height, topZ0;
 #if WIRE
  float lastAngle = 0, winchAngle = 0, currentWinchRadius = patternRadius;
 #endif
 
  // Results
- int bottomSumStepCount = 0, topSumStepCount = 0;
- float bottomForceZ = 0, topForceZ = 0;//, radialForce;
+ int bottomSumStepCount = 0; float bottomForceZ = 0;
+ int topSumStepCount = 0; float topForceZ = 0;
+#define RADIAL 1
+ #if RADIAL
+ int radialSumStepCount = 0; float radialForce = 0;
+#endif
 
  // Grain-Bottom
  buffer<int> oldGrainBottomA;
@@ -225,6 +239,7 @@ struct Simulation : System {
  buffer<float> grainMembraneTAz;
 
  File pressureStrain;
+ float voidRatio = 0;
 
  Simulation(const Dict& p);
 

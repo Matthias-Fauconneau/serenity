@@ -95,3 +95,5 @@ simulation/grain-obstacle.h
 tools/plot-app.cc
 ui/utf8.cc
 tools/shader.glsl
+tools/sweep.cc
+tools/sge.h
