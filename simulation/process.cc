@@ -6,6 +6,10 @@ void Simulation::stepProcess() {
  // Process
  if(grain->count == targetGrainCount) {
   dynamicFrictionCoefficient = targetDynamicFrictionCoefficient;
+  staticFrictionSpeed = targetStaticFrictionSpeed;
+  staticFrictionLength = targetStaticFrictionLength;
+  staticFrictionStiffness = targetStaticFrictionStiffness;
+  staticFrictionDamping = targetStaticFrictionDamping;
   if(processState  < Pressure) { // Fits top plate while disabling gravity
    float topZ = 0;
    for(float z: grain->Pz.slice(simd, grain->count)) topZ = ::max(topZ, z+Grain::radius);
@@ -20,8 +24,8 @@ void Simulation::stepProcess() {
   }
   if(pressure < targetPressure || membraneViscosity < 1) { // Increases pressure toward target pressure
    processState = Pressure;
-   //pressure += dt * targetPressure * Pa/s;
-   membraneViscosity += 100 * dt * 1/s;
+   //pressure += dt * targetPressure;
+   membraneViscosity += 100 * dt;
   } else { // Displace plates with constant velocity
    pressure = targetPressure;
    if(processState < Load) {
@@ -36,6 +40,7 @@ void Simulation::stepProcess() {
  } else {
   // Increases current height
   if(currentHeight < topZ-Grain::radius) currentHeight += verticalSpeed * dt;
+  else currentHeight = topZ-Grain::radius;
 
 #if WIRE
   // Generates wire
@@ -93,7 +98,8 @@ void Simulation::stepProcess() {
     if(grain->count == targetGrainCount) break;
     vec2 p(random()*2-1,random()*2-1);
     if(length(p)<1) { // Within cylinder
-     vec3 newPosition ((membrane->radius-Grain::radius)*p.x, (membrane->radius-Grain::radius)*p.y, Grain::radius);
+     vec3 newPosition ((membrane->radius-Grain::radius)*p.x, (membrane->radius-Grain::radius)*p.y,
+                                     Grain::radius);
      if(grain->count) {// Deposits grain without grain overlap
       const/*expr*/ size_t threadCount = ::threadCount();
       float maxZ_[threadCount]; mref<float>(maxZ_, threadCount).clear(0);
@@ -117,7 +123,7 @@ void Simulation::stepProcess() {
       //log(newPosition.z);
      }
      // Under current wire drop height
-     if(newPosition.z < currentHeight) {
+     if(newPosition.z <= currentHeight) {
 #if WIRE
       // Without wire overlap
       for(size_t index: range(wire.count))
@@ -125,8 +131,10 @@ void Simulation::stepProcess() {
 #endif
       size_t i = grain->count;
       assert_(newPosition.z >= Grain::radius);
-      grain->Px[simd+i] = newPosition.x; grain->Py[i+simd] = newPosition.y; grain->Pz[simd+i] = newPosition.z;
-      grain->Vx[simd+i] = 0; grain->Vy[simd+i] = 0; grain->Vz[simd+i] = 0; //- 1 * m/s;
+      grain->Px[simd+i] = newPosition.x;
+      grain->Py[i+simd] = newPosition.y;
+      grain->Pz[simd+i] = newPosition.z;
+      grain->Vx[simd+i] = 0; grain->Vy[simd+i] = 0; grain->Vz[simd+i] = 0;
       grain->AVx[simd+i] = 0; grain->AVy[simd+i] = 0; grain->AVz[simd+i] = 0;
       float t0 = 2*PI*random();
       float t1 = acos(1-2*random());
@@ -144,9 +152,10 @@ void Simulation::stepProcess() {
        voidRatio = (totalVolume-grainVolume)/grainVolume;
       }
       // Forces verlet lists reevaluation
-      /*if(timeStep%grain->count == 0)*/ grainMembraneGlobalMinD = 0;
+      grainMembraneGlobalMinD = 0;
       grainGrainGlobalMinD = 0;
       grainWireGlobalMinD = 0;
+      assert_(!validGrainLattice);
      } else break;
     }
     break;

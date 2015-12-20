@@ -87,34 +87,6 @@ void Simulation::stepGrainTop() {
   grainTopContact = buffer<int>(align(simd, grainTopA.size));
  }
  grainTopContact.size = 0;
-#if 0
- auto filter =  [&](uint, size_t start, size_t size) {
-  for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
-   vXsi A = load(grainTopA.data, i);
-   vXsf Az = gather(grain->Pz.data+simd, A);
-   vXsf depth = Az - floatX(topZ-Grain::radius);
-   for(size_t k: range(simd)) { // TODO: SIMD
-    size_t j = i+k;
-    if(j == grainTopA.size) break /*2*/;
-    if(extract(depth, k) >= 0) {
-     // Creates a map from packed contact to index into unpacked contact list (indirect reference)
-     // Instead of packing (copying) the unpacked list to a packed contact list
-     // To keep track of where to write back (unpacked) contact positions (for static friction)
-     // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
-     grainTopContact.appendAtomic( j );
-    } else {
-     error(extract(depth, k));
-     // Resets contact (static friction spring)
-     grainTopLocalAx[j] = 0;
-    }
-   }
-  }
- };
- grainTopFilterTime += parallel_chunk(align(simd, grainTopA.size)/simd, filter);
- for(size_t i=grainTopContact.size; i<align(simd, grainTopContact.size); i++)
-  grainTopContact.begin()[i] = grainTopA.size;
- if(!grainTopContact) return;
-#endif
  // Creates a map from packed contact to index into unpacked contact list (indirect reference)
  // Instead of packing (copying) the unpacked list to a packed contact list
  // To keep track of where to write back (unpacked) contact positions (for static friction)
@@ -195,6 +167,7 @@ void Simulation::stepGrainTop() {
   grain->Fx[simd+a] += grainTopFx[i];
   grain->Fy[simd+a] += grainTopFy[i];
   grain->Fz[simd+a] += grainTopFz[i];
+  //assert_(grainTopFz[i] > -400*N, a, grainTopFz[i], grain->Pz[simd+a], topZ-Grain::radius);
   grain->Tx[simd+a] += grainTopTAx[i];
   grain->Ty[simd+a] += grainTopTAy[i];
   grain->Tz[simd+a] += grainTopTAz[i];

@@ -15,12 +15,16 @@ struct Simulation {
 
  // Contact parameters
  sconst float normalDampingRate = 1;
- const float targetDynamicFrictionCoefficient;// = 0.23; //.23; // Interparticle 0.1 (FIXME: boundary: 0.23)
- float dynamicFrictionCoefficient = 0; //.23; // Interparticle 0.1 (FIXME: boundary: 0.23)
- const float staticFrictionSpeed; //0.1 * m/s; //100 * mm/s;
- const float staticFrictionLength; // = 1e-2 * mm; // ~ Grain::radius
- const float staticFrictionStiffness;// = 1000000; //00* 1*g*10/(1.25*mm); //k/F = F/L ~ Grain::mass*G/L //~ Wire::mass*G/Wire::radius
- const float staticFrictionDamping;// = 10; //100; // * F/V; // TODO: relative to k ?
+ const float targetDynamicFrictionCoefficient;
+ float dynamicFrictionCoefficient = 0;
+ const float targetStaticFrictionSpeed;
+ float staticFrictionSpeed;
+ const float targetStaticFrictionLength;
+ float staticFrictionLength;
+ const float targetStaticFrictionStiffness;
+ float staticFrictionStiffness;
+ const float targetStaticFrictionDamping;
+ float staticFrictionDamping;
 
  const int targetGrainCount;
 
@@ -29,7 +33,7 @@ struct Simulation {
  unique<Plate> plate;
 
  // Process parameters
- float Gz = 1/*5000*/ * -10 * N/kg; // Gravity
+ float Gz;
  const float verticalSpeed = 1 * m/s;
  const float targetPressure;
  const float plateSpeed;// = 10 * mm/s;

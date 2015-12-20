@@ -28,15 +28,16 @@ constexpr string Simulation::patterns[];
 #endif
 
 Simulation::Simulation(const Dict& p) :
-  dt(p.at("TimeStep")),
+  dt((float)p.at("TimeStep")*s),
   targetDynamicFrictionCoefficient((float)p.at("Friction")*1),
-  staticFrictionSpeed((float)p.at("sfSpeed")*m/s),
-  staticFrictionLength((float)p.at("sfLength")*m),
-  staticFrictionStiffness((float)p.at("sfStiffness")*N/m),
-  staticFrictionDamping((float)p.at("sfDamping")*N/(m/s)),
+  targetStaticFrictionSpeed((float)p.at("sfSpeed")*m/s),
+  targetStaticFrictionLength((float)p.at("sfLength")*m),
+  targetStaticFrictionStiffness((float)p.at("sfStiffness")*N/m),
+  targetStaticFrictionDamping((float)p.at("sfDamping")*N/(m/s)),
   targetGrainCount((int)p.at("Count")),
   grain(targetGrainCount),
-  membrane(p.at("Radius")),
+  membrane((float)p.at("Radius")*m),
+  Gz(10 * -10 * N/kg), // Gravity
   targetPressure((float)p.at("Pressure")*Pa),
   plateSpeed((float)p.at("Speed")*mm/s),
   currentHeight(Grain::radius),
@@ -108,7 +109,7 @@ void Simulation::step() {
 }
 
 void Simulation::profile() {
- log("----",timeStep/size_t(1*1/(dt*60)),"----");
+ log("----",timeStep/size_t(1*1/(dt*(60/s))),"----");
  log(totalTime.microseconds()/timeStep, "us/step", totalTime, timeStep);
  //if(stepTimeRT.nanoseconds()*100<totalTime.nanoseconds()*99) log("step", strD(stepTimeRT, totalTime));
 #if WIRE

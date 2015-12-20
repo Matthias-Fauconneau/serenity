@@ -206,7 +206,7 @@ void Simulation::stepGrainGrain() {
                        + convert(scale*(Ax-minX));
     // Neighbours
     for(uint n: range(62)) { // A is not monotonous
-     for(int k: range(simd)) {
+     /*for(int k: range(simd)) {
       assert_((latticeNeighbours[n]-lattice.base.data)+index[k] >= -(lattice.base.data-lattice.cells.data)
               && (latticeNeighbours[n]-lattice.base.data)+index[k]<int(lattice.base.size),
               k, grain->count, index[k], (latticeNeighbours[n]-lattice.base.data),
@@ -218,7 +218,7 @@ void Simulation::stepGrainGrain() {
               lattice.max,
               lattice.size
               );
-     }
+     }*/
      vXsi b = gather(latticeNeighbours[n], index);
      const vXsf Bx = gather(gPx, b), By = gather(gPy, b), Bz = gather(gPz, b);
      const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
@@ -260,7 +260,7 @@ void Simulation::stepGrainGrain() {
    }
   }
   if(!contactCount) return;
-  assert(contactCount <= grainGrainA.capacity);
+  assert_(contactCount <= grainGrainA.capacity);
   grainGrainA.size = contactCount;
   grainGrainB.size = contactCount;
   grainGrainLocalAx.size = contactCount;
@@ -414,7 +414,6 @@ void Simulation::stepGrainGrain() {
    int index = grainGrainContact[i];
    int a = grainGrainA[index];
    int b = grainGrainB[index];
-   assert_(a>=0 && b>=0); // DEBUG
    grain->Fx[simd+a] += grainGrainFx[i];
    grain->Fx[simd+b] -= grainGrainFx[i];
    grain->Fy[simd+a] += grainGrainFy[i];
@@ -514,7 +513,6 @@ void Simulation::stepGrainGrain() {
     uint index = grainGrainContact[i];
     int a = grainGrainA[index];
     int b = grainGrainB[index];
-    assert_(a>=0 && b>=0); // DEBUG
     pFx[a] += pGGFx[i];
     pFx[b] -= pGGFx[i];
     pFy[a] += pGGFy[i];

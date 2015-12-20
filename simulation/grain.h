@@ -7,7 +7,7 @@ struct Grain {
  virtual ~Grain() {}
 
  sconst float radius = 2.5 * mm; // 40 * mm
- sconst float density = 7.8e3 * kg/cb(m);
+ sconst float density = 7.8e3 * kg / cb(m);
  sconst float volume = 4./3*PI*cb(radius);
  sconst float mass = volume * density; // 2.7 g
  sconst float curvature = 1./radius;

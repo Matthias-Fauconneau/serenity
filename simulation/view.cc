@@ -254,7 +254,7 @@ struct SimulationApp : Poll {
   window->actions[Escape] = [this]{ exit_group(0); /*FIXME*/ };
   window->presentComplete = [this]{
    window->render();
-   window->setTitle(str(simulation.timeStep*simulation.dt, simulation.grain->count, simulation.voidRatio, simulation.maxGrainV));
+   window->setTitle(str(simulation.timeStep*simulation.dt /s, simulation.grain->count, simulation.voidRatio, simulation.maxGrainV /(m/s)));
   };
   queue(); simulationMasterThread.spawn();
  }

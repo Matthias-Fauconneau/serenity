@@ -35,12 +35,12 @@ void Simulation::grainLattice() {
    vXsi index = convert(scale*(Az-minZ)) * sizeYX
      + convert(scale*(Ay-minY)) * sizeX
      + convert(scale*(Ax-minX));
-   for(int k: range(simd)) assert_(index[k] >= -(base-lattice.cells.data) && index[k]<int(lattice.base.size),
+   /*for(int k: range(simd)) assert_(index[k] >= -(base-lattice.cells.data) && index[k]<int(lattice.base.size),
                                    k, grain->count, index[k], base-lattice.cells.data,
                                    Ax[k], Ay[k], Az[k],
                                    minX[k], minY[k], minZ[k],
                                    lattice.size
-                                   );
+                                   );*/
    ::scatter(base, index, a);
   }
  };
@@ -92,11 +92,21 @@ void Simulation::stepGrainIntegration() {
    Px += dt * Vx;
    Py += dt * Vy;
    Pz += dt * Vz;
-   for(int k: range(simd)) {
-    assert_(Fz[k] < 100000 &&
-            Vz[k] > -10 && Vz[k] < 10 &&
-            Pz[k] < membrane->height, membrane->height, Pz[k], Vz[k], Fz[k]);
-   }
+   /*for(int k: range(simd)) {
+    assert_(sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 400*N &&
+             sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k] < 10*m/s &&
+            Pz[k] < membrane->height-Grain::radius,
+            i+k, grain->count,
+            membrane->height,
+            Px[k], Py[k], Pz[k],
+            Vx[k], Vy[k], Vz[k],
+            Fx[k], Fy[k], Fz[k],
+            "//",
+            (membrane->height-Grain::radius) /m,
+            Px[k] /m, Py[k] /m, Pz[k] /m,
+            Vx[k] /(m/s), Vy[k] /(m/s), Vz[k] /(m/s),
+            Fx[k] /N, Fy[k] /N, Fz[k] /N);
+   }*/
    store(pVx, i, Vx); store(pVy, i, Vy); store(pVz, i, Vz);
    store(pPx, i, Px); store(pPy, i, Py); store(pPz, i, Pz);
 
