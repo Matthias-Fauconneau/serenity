@@ -4,7 +4,7 @@
 
 void Simulation::stepProcess() {
  // Process
- if(grain->count == grain->capacity-simd) {
+ if(grain->count == targetGrainCount) {
   dynamicFrictionCoefficient = targetDynamicFrictionCoefficient;
   if(processState  < Pressure) { // Fits top plate while disabling gravity
    float topZ = 0;
@@ -90,7 +90,7 @@ void Simulation::stepProcess() {
   // Generates grain
   if(currentHeight >= Grain::radius) {
    for(;;) {
-    if(grain->count == grain->capacity-simd) break;
+    if(grain->count == targetGrainCount) break;
     vec2 p(random()*2-1,random()*2-1);
     if(length(p)<1) { // Within cylinder
      vec3 newPosition ((membrane->radius-Grain::radius)*p.x, (membrane->radius-Grain::radius)*p.y, Grain::radius);

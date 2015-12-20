@@ -1,6 +1,7 @@
 #include "simulation.h"
 #include "grain.h"
 #include "parallel.h"
+#include "membrane.h"
 
 void Simulation::stepGrain() {
  const vXsf m_Gz = floatX(Grain::mass * Gz);
@@ -91,6 +92,11 @@ void Simulation::stepGrainIntegration() {
    Px += dt * Vx;
    Py += dt * Vy;
    Pz += dt * Vz;
+   for(int k: range(simd)) {
+    assert_(Fz[k] < 100000 &&
+            Vz[k] > -10 && Vz[k] < 10 &&
+            Pz[k] < membrane->height, membrane->height, Pz[k], Vz[k], Fz[k]);
+   }
    store(pVx, i, Vx); store(pVy, i, Vy); store(pVz, i, Vz);
    store(pPx, i, Px); store(pPy, i, Py); store(pPz, i, Pz);
 

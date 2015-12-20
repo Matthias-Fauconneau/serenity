@@ -42,6 +42,7 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
   const vXsf Fb = - Kb * sqrt(sqrt(depth)) * normalSpeed ; // Damping
   // Normal force
   const vXsf Fn = Fk + Fb;
+  for(int k: range(simd)) assert_(A[k]==-1 || Fn[k] < 100000, Fn[k], Fk[k], Fb[k], Kb[k], depth[k], normalSpeed[k], Az[k], obstacleZ_Gr[k], A[k]);
   const vXsf NFx = Fn * Nx;
   const vXsf NFy = Fn * Ny;
   const vXsf NFz = Fn * Nz;

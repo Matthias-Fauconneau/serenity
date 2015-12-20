@@ -22,12 +22,14 @@ struct Simulation {
  const float staticFrictionStiffness;// = 1000000; //00* 1*g*10/(1.25*mm); //k/F = F/L ~ Grain::mass*G/L //~ Wire::mass*G/Wire::radius
  const float staticFrictionDamping;// = 10; //100; // * F/V; // TODO: relative to k ?
 
+ const int targetGrainCount;
+
  unique<Grain> grain;
  unique<Membrane> membrane;
  unique<Plate> plate;
 
  // Process parameters
- float Gz = 5000 * -10 * N/kg; // Gravity
+ float Gz = 1/*5000*/ * -10 * N/kg; // Gravity
  const float verticalSpeed = 1 * m/s;
  const float targetPressure;
  const float plateSpeed;// = 10 * mm/s;

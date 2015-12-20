@@ -17,7 +17,7 @@ struct Grain {
  sconst float angularMass = 2./3*mass*sq(radius);
 
  const size_t capacity;
- size_t count = 0;
+ int count = 0;
  buffer<float> Px { capacity };
  buffer<float> Py { capacity };
  buffer<float> Pz { capacity };

@@ -263,7 +263,7 @@ static inline v8sf mask3_fmadd(v8sf a, v8sf b, v8sf c, v8si k) { return mask(k, 
 #if __INTEL_COMPILER
 static inline v8si convert(v8sf x) { return _mm256_cvttps_epi32(x); }
 #else
-static inline v8si convert(v8sf x) { return __builtin_ia32_cvtps2dq256(x); }
+static inline v8si convert(v8sf x) { return __builtin_ia32_cvttps2dq256(x); }
 #endif
 
 #if __INTEL_COMPILER

@@ -35,7 +35,7 @@ struct ParameterSweep {
         parameters["Pressure"__] = String(str(pressure)+"K"_);
         for(float radius: {0.025/*, 0.050*/}) {
          parameters["Radius"__] = radius;
-         parameters["Count"__] = 187; //1909; //3852*4;
+         parameters["Count"__] = 73; //1909; //3852*4;
          for(float staticFrictionSpeed: {/*0.01,*/ 0.1/*, 1.*/}) {
           parameters["sfSpeed"__] = staticFrictionSpeed;
           for(float staticFrictionLength: {/*0.01e-3,*/ 0.1e-3/*, 1e-3*/}) {

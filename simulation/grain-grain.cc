@@ -206,6 +206,19 @@ void Simulation::stepGrainGrain() {
                        + convert(scale*(Ax-minX));
     // Neighbours
     for(uint n: range(62)) { // A is not monotonous
+     for(int k: range(simd)) {
+      assert_((latticeNeighbours[n]-lattice.base.data)+index[k] >= -(lattice.base.data-lattice.cells.data)
+              && (latticeNeighbours[n]-lattice.base.data)+index[k]<int(lattice.base.size),
+              k, grain->count, index[k], (latticeNeighbours[n]-lattice.base.data),
+              (latticeNeighbours[n]-lattice.base.data)+index[k],
+              lattice.base.data-lattice.cells.data,
+              lattice.base.size,
+              Ax[k], Ay[k], Az[k],
+              minX[k], minY[k], minZ[k],
+              lattice.max,
+              lattice.size
+              );
+     }
      vXsi b = gather(latticeNeighbours[n], index);
      const vXsf Bx = gather(gPx, b), By = gather(gPy, b), Bz = gather(gPz, b);
      const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;

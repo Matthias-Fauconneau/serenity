@@ -34,14 +34,15 @@ Simulation::Simulation(const Dict& p) :
   staticFrictionLength((float)p.at("sfLength")*m),
   staticFrictionStiffness((float)p.at("sfStiffness")*N/m),
   staticFrictionDamping((float)p.at("sfDamping")*N/(m/s)),
-  grain((int)p.at("Count")),
+  targetGrainCount((int)p.at("Count")),
+  grain(targetGrainCount),
   membrane(p.at("Radius")),
   targetPressure((float)p.at("Pressure")*Pa),
   plateSpeed((float)p.at("Speed")*mm/s),
   currentHeight(Grain::radius),
   topZ(membrane->height),
   lattice {sqrt(3.)/(2*Grain::radius), vec3(vec2(-membrane->radius), -Grain::radius*2),
-                                           vec3(vec2(membrane->radius), membrane->height)}
+                                           vec3(vec2(membrane->radius), membrane->height+Grain::radius)}
 #if WIRE
 , pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):None)
 #endif
@@ -261,7 +262,7 @@ void Simulation::run() {
    }
    if(strain > 1./8) break;
   }
-  if(grain->count == grain->capacity-simd) break; // DEBUG
+  if(grain->count == targetGrainCount) break; // DEBUG
  }
  totalTime.stop();
 }
