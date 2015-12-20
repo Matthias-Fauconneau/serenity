@@ -34,10 +34,11 @@ Simulation::Simulation(const Dict& p) :
   targetStaticFrictionLength((float)p.at("sfLength")*m),
   targetStaticFrictionStiffness((float)p.at("sfStiffness")*N/m),
   targetStaticFrictionDamping((float)p.at("sfDamping")*N/(m/s)),
-  targetGrainCount((int)p.at("Count")),
+  targetGrainCount(4*PI*cb((float)p.at("Radius")*m)/Grain::volume/(1+/*(float)p.at("VoidRatio")*/0.7)),
+  //targetGrainCount((int)p.at("Count")),
   grain(targetGrainCount),
   membrane((float)p.at("Radius")*m),
-  Gz(10 * -10 * N/kg), // Gravity
+  Gz(100 * -10 * N/kg), // Gravity (FIXME: TODO: only on immobile grain to compact without high velocities)
   targetPressure((float)p.at("Pressure")*Pa),
   plateSpeed((float)p.at("Speed")*mm/s),
   currentHeight(Grain::radius),
@@ -48,6 +49,7 @@ Simulation::Simulation(const Dict& p) :
 , pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):None)
 #endif
 {
+ log(targetGrainCount);
 #if WIRE
  if(pattern) { // Initial wire node
   size_t i = wire.count++;
@@ -263,7 +265,6 @@ void Simulation::run() {
    }
    if(strain > 1./8) break;
   }
-  if(grain->count == targetGrainCount) break; // DEBUG
  }
  totalTime.stop();
 }

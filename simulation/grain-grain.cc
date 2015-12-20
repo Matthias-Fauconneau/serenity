@@ -531,8 +531,8 @@ void Simulation::stepGrainGrain() {
   grainGrainSumSumTime += parallel_for(0, chunkCount, sum);
   // TODO: range optimized zero/copy
   auto merge = [this, copyCount](uint, uint start, uint size) {
-   float* const pFx = grain->Fx.begin(), *pFy = grain->Fy.begin(), *pFz = grain->Fz.begin();
-   float* const pTx = grain->Tx.begin(), *pTy = grain->Ty.begin(), *pTz = grain->Tz.begin();
+   float* const pFx = grain->Fx.begin()+simd, *pFy = grain->Fy.begin()+simd, *pFz = grain->Fz.begin()+simd;
+   float* const pTx = grain->Tx.begin()+simd, *pTy = grain->Ty.begin()+simd, *pTz = grain->Tz.begin()+simd;
    const uint stride = align(simd, grain->count);
    for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
     vXsf Fx = _0f, Fy = _0f, Fz = _0f, Tx = _0f, Ty = _0f, Tz = _0f;

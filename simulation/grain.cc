@@ -35,12 +35,14 @@ void Simulation::grainLattice() {
    vXsi index = convert(scale*(Az-minZ)) * sizeYX
      + convert(scale*(Ay-minY)) * sizeX
      + convert(scale*(Ax-minX));
-   /*for(int k: range(simd)) assert_(index[k] >= -(base-lattice.cells.data) && index[k]<int(lattice.base.size),
-                                   k, grain->count, index[k], base-lattice.cells.data,
+   for(int k: range(simd)) assert_(index[k] >= -(base-lattice.cells.data) && index[k]<int(lattice.base.size),
+                                   i+k, grain->count, index[k], base-lattice.cells.data,
                                    Ax[k], Ay[k], Az[k],
                                    minX[k], minY[k], minZ[k],
-                                   lattice.size
-                                   );*/
+                                   lattice.size,
+                                   grain->Vx[simd+i+k], grain->Vy[simd+i+k], grain->Vz[simd+i+k],
+                                   grain->Fx[simd+i+k], grain->Fy[simd+i+k], grain->Fz[simd+i+k]
+                                   );
    ::scatter(base, index, a);
   }
  };
@@ -65,7 +67,11 @@ void Simulation::grainLattice() {
 
 void Simulation::stepGrainIntegration() {
  if(!grain->count) return;
- for(size_t i: range(grain->count, align(simd, grain->count))) { grain->Fx[i] = 0; grain->Fy[i] = 0; grain->Fz[i] = 0; }
+ for(size_t i: range(grain->count, align(simd, grain->count))) {
+  grain->Fx[simd+i] = 0;
+  grain->Fy[simd+i] = 0;
+  grain->Fz[simd+i] = 0;
+ }
  const/*expr*/ size_t threadCount = ::threadCount();
  float maxGrainV_[threadCount]; mref<float>(maxGrainV_, threadCount).clear(0);
  grainIntegrationTime += parallel_chunk(align(simd, grain->count)/simd, [this, &maxGrainV_](uint id, size_t start, size_t size) {
@@ -93,19 +99,22 @@ void Simulation::stepGrainIntegration() {
    Py += dt * Vy;
    Pz += dt * Vz;
    /*for(int k: range(simd)) {
-    assert_(sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 400*N &&
-             sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k] < 10*m/s &&
+    assert_(sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 500*N &&
+             sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k] < 8*m/s &&
+            Pz[k] < membrane->height,
+            sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 500*N,
+            sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k] < 8*m/s,
             Pz[k] < membrane->height-Grain::radius,
-            i+k, grain->count,
-            membrane->height,
-            Px[k], Py[k], Pz[k],
-            Vx[k], Vy[k], Vz[k],
-            Fx[k], Fy[k], Fz[k],
+            "I", i+k, grain->count,
+            "H", membrane->height,
+            "X", Px[k], Py[k], Pz[k],
+            "V", Vx[k], Vy[k], Vz[k],
+            "F", Fx[k], Fy[k], Fz[k],
             "//",
-            (membrane->height-Grain::radius) /m,
-            Px[k] /m, Py[k] /m, Pz[k] /m,
-            Vx[k] /(m/s), Vy[k] /(m/s), Vz[k] /(m/s),
-            Fx[k] /N, Fy[k] /N, Fz[k] /N);
+            "H", (membrane->height-Grain::radius) /m,
+            "X",  Px[k] /m, Py[k] /m, Pz[k] /m,
+            "V", Vx[k] /(m/s), Vy[k] /(m/s), Vz[k] /(m/s),
+            "F", Fx[k] /N, Fy[k] /N, Fz[k] /N);
    }*/
    store(pVx, i, Vx); store(pVy, i, Vy); store(pVz, i, Vz);
    store(pPx, i, Px); store(pPy, i, Py); store(pPz, i, Pz);

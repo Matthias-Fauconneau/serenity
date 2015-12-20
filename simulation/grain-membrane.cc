@@ -229,7 +229,7 @@ void Simulation::stepGrainMembrane() {
                        + convert(scale*(Bx-minX));
     // Neighbours
     for(int n: range(3*3)) for(int i: range(3)) {
-     /*for(int k: range(simd)) {
+     for(int k: range(simd)) {
       assert_((latticeNeighbours[n]-lattice.base.data)+i+index[k] >= -(lattice.base.data-lattice.cells.data)
               && (latticeNeighbours[n]-lattice.base.data)+i+index[k]<int(lattice.base.size),
               k, grain->count, index[k], (latticeNeighbours[n]-lattice.base.data)+i,
@@ -241,7 +241,7 @@ void Simulation::stepGrainMembrane() {
               lattice.max,
               lattice.size
               );
-     }*/
+     }
      vXsi a = gather(latticeNeighbours[n]+i, index);
      const vXsf Ax = gather(gPx, a), Ay = gather(gPy, a), Az = gather(gPz, a);
      const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;

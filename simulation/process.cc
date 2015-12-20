@@ -6,10 +6,10 @@ void Simulation::stepProcess() {
  // Process
  if(grain->count == targetGrainCount) {
   dynamicFrictionCoefficient = targetDynamicFrictionCoefficient;
-  staticFrictionSpeed = targetStaticFrictionSpeed;
+  /*staticFrictionSpeed = targetStaticFrictionSpeed;
   staticFrictionLength = targetStaticFrictionLength;
   staticFrictionStiffness = targetStaticFrictionStiffness;
-  staticFrictionDamping = targetStaticFrictionDamping;
+  staticFrictionDamping = targetStaticFrictionDamping;*/
   if(processState  < Pressure) { // Fits top plate while disabling gravity
    float topZ = 0;
    for(float z: grain->Pz.slice(simd, grain->count)) topZ = ::max(topZ, z+Grain::radius);
@@ -18,7 +18,7 @@ void Simulation::stepProcess() {
    Gz = 0;
   }
   if(processState < Pressure) {
-   if(timeStep%(int(1/(dt*60))) == 0) log(maxGrainV*1e3f, "mm/s");
+   //if(timeStep%(int(1/(dt*60/s))) == 0) log(maxGrainV*1e3f, "mm/s");
    if(maxGrainV > 600 * mm/s) return;
    pressure = targetPressure;
   }
@@ -132,9 +132,9 @@ void Simulation::stepProcess() {
       size_t i = grain->count;
       assert_(newPosition.z >= Grain::radius);
       grain->Px[simd+i] = newPosition.x;
-      grain->Py[i+simd] = newPosition.y;
+      grain->Py[simd+i] = newPosition.y;
       grain->Pz[simd+i] = newPosition.z;
-      grain->Vx[simd+i] = 0; grain->Vy[simd+i] = 0; grain->Vz[simd+i] = 0;
+      grain->Vx[simd+i] = 0; grain->Vy[simd+i] = 0; grain->Vz[simd+i] = -0.1 * m/s;
       grain->AVx[simd+i] = 0; grain->AVy[simd+i] = 0; grain->AVz[simd+i] = 0;
       float t0 = 2*PI*random();
       float t1 = acos(1-2*random());

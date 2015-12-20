@@ -159,7 +159,7 @@ void __attribute((constructor(102))) setup_signals() {
  check(sigaction(SIGFPE, &sa, 0));
  //check(sigaction(SIGUSR1, &sa, 0));
  enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
- //setExceptions(/*Invalid|*//*Denormal|*/DivisionByZero/*|Overflow*//*|Underflow*//*|Precision*/);
+ //setExceptions(/*Invalid|*//*Denormal|*//*DivisionByZero|*//*Overflow*//*|Underflow*//*|Precision*/);
 }
 
 //static void __attribute((noreturn)) exit_thread(int status) { syscall(SYS_exit, status); __builtin_unreachable(); }

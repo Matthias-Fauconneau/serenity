@@ -12,7 +12,7 @@ struct Grain {
  sconst float mass = volume * density; // 2.7 g
  sconst float curvature = 1./radius;
  sconst float poissonRatio = 0.28; // 0.35
- sconst float shearModulus = 77000/4 * MPa;
+ sconst float shearModulus = 77000 * MPa;
  sconst float elasticModulus = 2*shearModulus*(1+poissonRatio); // 250 * MPa
  sconst float angularMass = 2./3*mass*sq(radius);
 
@@ -43,7 +43,7 @@ struct Grain {
  }
 
  const vec3 position(size_t i) const { return vec3(Px[simd+i], Py[simd+i], Pz[simd+i]);  }
- const vec3 velocity(size_t i) const { return vec3(Vx[i], Vy[i], Vz[i]);  }
- const vec3 force(size_t i) const { return vec3(Fx[i], Fy[i], Fz[i]);  }
- const vec4 rotation(size_t i) const { return vec4(Rx[i], Ry[i], Rz[i], Rw[i]);  }
+ const vec3 velocity(size_t i) const { return vec3(Vx[simd+i], Vy[simd+i], Vz[simd+i]);  }
+ const vec3 force(size_t i) const { return vec3(Fx[simd+i], Fy[simd+i], Fz[simd+i]);  }
+ const vec4 rotation(size_t i) const { return vec4(Rx[simd+i], Ry[simd+i], Rz[simd+i], Rw[simd+i]);  }
 };

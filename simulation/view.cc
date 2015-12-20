@@ -56,7 +56,7 @@ struct SimulationView : Widget {
     const vXsf Qy = floatX(viewRotation.y);
     const vXsf Qz = floatX(viewRotation.z);
     const vXsf Qw = floatX(viewRotation.w);
-    const float* pPx = simulation.grain->Px.data, *pPy = simulation.grain->Py.data, *pPz = simulation.grain->Pz.data;
+    const float* pPx = simulation.grain->Px.data+simd, *pPy = simulation.grain->Py.data+simd, *pPz = simulation.grain->Pz.data+simd;
     float* const pQPz = grainZ.begin();
     int size = grainIndices.size;
     for(int i=0; i<size; i+=simd) {

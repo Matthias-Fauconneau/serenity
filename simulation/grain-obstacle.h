@@ -43,17 +43,22 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
   // Normal force
   const vXsf Fn = Fk + Fb;
   /*for(int k: range(simd))
-   assert_(A[k]==-1 || Fn[k] < 200*N,
-           A[k],
-           Fn[k], Fk[k], K[k],
-           depth[k],
-           Az[k], obstacleZ_Gr[k],
-           Fb[k], Kb[k], normalSpeed[k],
+   assert_(A[k]==-1 || Fn[k] < 10000*N,
+           "A", A[k],
+           "K", K[k],
+           "F", Fn[k], Fk[k],
+           "d", depth[k],
+           "P", Az[k], obstacleZ_Gr[k],
+           "b", Fb[k], Kb[k], normalSpeed[k],
+           "X", Ax[k], Ay[k], Az[k],
+           "V", RVx[k], RVy[k], RVz[k],
            "//",
-           Fn[k] /N, Fk[k] /N, K[k],
-           depth[k] /mm,
-           Az[k] /m, obstacleZ_Gr[k] /m,
-           Fb[k] /N, Kb[k], normalSpeed[k] /(m/s)
+           "F", Fn[k] /N, Fk[k] /N,
+           "d", depth[k] /mm,
+           "P", Az[k] /m, obstacleZ_Gr[k] /m,
+           "b", Fb[k] /N, Kb[k], normalSpeed[k] /(m/s),
+           "X", Ax[k] /m, Ay[k] /m, Az[k] /m,
+           "V", RVx[k] /(m/s), RVy[k] /(m/s), RVz[k] /(m/s)
            );*/
   const vXsf NFx = Fn * Nx;
   const vXsf NFy = Fn * Ny;
