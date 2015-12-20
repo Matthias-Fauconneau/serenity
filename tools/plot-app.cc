@@ -20,6 +20,7 @@ struct PlotView : HList<Plot> {
   return unique<FileWatcher>(path, [this](string){ if(shown) load(); shown=false; window->render(); });
 });
  PlotView() {
+  window->actions[Escape] = []{ exit_group(0); /*FIXME*/ };
   window->actions[F12] = {this, &PlotView::snapshot};
   window->presentComplete = [this]{ shown=true; };
   load();
@@ -75,13 +76,13 @@ struct PlotView : HList<Plot> {
      //for(mref<float> data: dataSets.values) if(data) data[0]=0; // Filters invalid first point (inertia)
      auto parameters = parseDict(name);
      if(plot.ylabel == "Normalized deviator stress") {
-      float pressure = parameters.at("Pressure");
+      //float pressure = parameters.at("Pressure");
       ref<float> radial = dataSets.at("Radial (Pa)");
       ref<float> axial = dataSets.at("Axial (Pa)");
       array<float>& ndeviator = dataSets.insert("Normalized deviator stress");
       ndeviator.grow(axial.size);
-      //for(int i: range(ndeviator.size)) ndeviator[i] = ((axial[i]-radial[i])/radial[i]);
-      for(int i: range(ndeviator.size)) ndeviator[i] = ((axial[i]-min(pressure,radial[i]))/min(pressure,radial[i]));
+      for(int i: range(ndeviator.size)) ndeviator[i] = ((axial[i]-radial[i])/radial[i]);
+      //for(int i: range(ndeviator.size)) ndeviator[i] = ((axial[i]-min(pressure,radial[i]))/min(pressure,radial[i]));
      }
      assert_(dataSets.contains(plot.xlabel));
      assert_(dataSets.contains(plot.ylabel));

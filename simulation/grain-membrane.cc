@@ -232,13 +232,13 @@ void Simulation::stepGrainMembrane() {
      for(int k: range(simd)) {
       assert_((latticeNeighbours[n]-lattice.base.data)+i+index[k] >= -(lattice.base.data-lattice.cells.data)
               && (latticeNeighbours[n]-lattice.base.data)+i+index[k]<int(lattice.base.size),
-              k, grain->count, index[k], (latticeNeighbours[n]-lattice.base.data)+i,
+              i+k, k, grain->count, index[k], (latticeNeighbours[n]-lattice.base.data)+i,
               (latticeNeighbours[n]-lattice.base.data)+i+index[k],
               lattice.base.data-lattice.cells.data,
               lattice.base.size,
-              Bx[k], By[k], Bz[k],
+              "B", Bx[k], By[k], Bz[k],
               minX[k], minY[k], minZ[k],
-              lattice.max,
+              "M", lattice.max,
               lattice.size
               );
      }

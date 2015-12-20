@@ -6,10 +6,10 @@ void Simulation::stepProcess() {
  // Process
  if(grain->count == targetGrainCount) {
   dynamicFrictionCoefficient = targetDynamicFrictionCoefficient;
-  /*staticFrictionSpeed = targetStaticFrictionSpeed;
+  staticFrictionSpeed = targetStaticFrictionSpeed;
   staticFrictionLength = targetStaticFrictionLength;
   staticFrictionStiffness = targetStaticFrictionStiffness;
-  staticFrictionDamping = targetStaticFrictionDamping;*/
+  staticFrictionDamping = targetStaticFrictionDamping;
   if(processState  < Pressure) { // Fits top plate while disabling gravity
    float topZ = 0;
    for(float z: grain->Pz.slice(simd, grain->count)) topZ = ::max(topZ, z+Grain::radius);

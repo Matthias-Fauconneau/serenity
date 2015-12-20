@@ -259,7 +259,7 @@ void Simulation::run() {
      if(pressureStrain) pressureStrain.write(line);
     }
    }
-   {String line = str(strain*100, 4u)+' '+str(int(round(radial)))+' '+str(int(round(stress)))+'\n';
+   {String line = str(strain*100, 4u)+' '+str(int(round(radial/Pa)))+' '+str(int(round(stress/Pa)))+'\n';
     log_(line);
     if(pressureStrain) pressureStrain.write(line);
    }
