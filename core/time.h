@@ -114,3 +114,13 @@ struct Random {
     operator uint64() { return next(); }
     float operator()() { float f = float(next()&((1<<24)-1))*0x1p-24f; assert(f>=0 && f<1); return f; }
 };
+
+#include "thread.h"
+struct Timer : Stream, Poll {
+ Timer(const function<void()>& timeout={}, long sec=0, Thread& thread=mainThread);
+ virtual ~Timer() {}
+ void setAbsolute(uint64 nsec);
+ void setRelative(long msec);
+ function<void()> timeout;
+ virtual void event();
+};

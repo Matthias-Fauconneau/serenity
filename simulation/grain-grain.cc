@@ -393,7 +393,7 @@ void Simulation::stepGrainGrain() {
                      grainGrainLocalAx.begin(), grainGrainLocalAy.begin(), grainGrainLocalAz.begin(),
                      grainGrainLocalBx.begin(), grainGrainLocalBy.begin(), grainGrainLocalBz.begin(),
                      floatX(K), floatX(Kb),
-                     floatX(staticFrictionStiffness), floatX(dynamicFrictionCoefficient),
+                     floatX(staticFrictionStiffness), floatX(dynamicGrainGrainFrictionCoefficient),
                      floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping),
                      grain->Vx.data+simd, grain->Vy.data+simd, grain->Vz.data+simd,
                      grain->Vx.data+simd, grain->Vy.data+simd, grain->Vz.data+simd,

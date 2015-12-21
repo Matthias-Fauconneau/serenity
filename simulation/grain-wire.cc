@@ -350,7 +350,7 @@ void Simulation::stepGrainWire() {
                       grainWireLocalAx.begin(), grainWireLocalAy.begin(), grainWireLocalAz.begin(),
                       grainWireLocalBx.begin(), grainWireLocalBy.begin(), grainWireLocalBz.begin(),
                       floatX(K), floatX(Kb),
-                      floatX(staticFrictionStiffness), floatX(dynamicFrictionCoefficient),
+                      floatX(staticFrictionStiffness), floatX(dynamicGrainWireFrictionCoefficient),
                       floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping),
                       grain.Vx.data+simd, grain.Vy.data+simd, grain.Vz.data+simd,
                       wire.Vx.data, wire.Vy.data, wire.Vz.data,

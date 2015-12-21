@@ -12,7 +12,6 @@ long currentTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.
 int64 realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000000000ull+ts.tv_nsec; }
 int64 threadCPUTime() { timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.tv_sec*1000000000ull+ts.tv_nsec; }
 
-#if 1
 static bool leap(int year) { return (year%4==0)&&((year%100!=0)||(year%400==0)); }
 int daysInMonth(int month, int year=0) {
  if(month==1 && leap(year)) { assert(year!=0); return 29; }
@@ -165,4 +164,17 @@ Date parseDate(TextData& s) {
  date.invariant();
  return date;
 }
-#endif
+
+Timer::Timer(const function<void()>& timeout, long sec, Thread& thread)
+ : Stream(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC)), Poll(Stream::fd, POLLIN, thread), timeout(timeout) {
+ if(sec) setAbsolute(realTime()+sec*1000000000ull);
+}
+void Timer::event() { read<uint64>(); timeout(); }
+void Timer::setAbsolute(uint64 nsec) {
+ timespec time[2]={{0,0},{long(nsec/1000000000ull),long(nsec%1000000000ull)}};
+ timerfd_settime(Stream::fd, 1, (const itimerspec*)time,0);
+}
+void Timer::setRelative(long msec) {
+ timespec time[2]={{0,0},{msec/1000,(msec%1000)*1000000}};
+ timerfd_settime(Stream::fd, 0, (const itimerspec*)time,0);
+}

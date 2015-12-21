@@ -5,7 +5,10 @@
 void Simulation::stepProcess() {
  // Process
  if(grain->count == targetGrainCount) {
-  dynamicFrictionCoefficient = targetDynamicFrictionCoefficient;
+  dynamicGrainObstacleFrictionCoefficient = targetDynamicGrainObstacleFrictionCoefficient;
+  dynamicGrainMembraneFrictionCoefficient = targetDynamicGrainMembraneFrictionCoefficient;
+  dynamicGrainGrainFrictionCoefficient = targetDynamicGrainGrainFrictionCoefficient;
+  dynamicGrainWireFrictionCoefficient = targetDynamicGrainWireFrictionCoefficient;
   staticFrictionSpeed = targetStaticFrictionSpeed;
   staticFrictionLength = targetStaticFrictionLength;
   staticFrictionStiffness = targetStaticFrictionStiffness;

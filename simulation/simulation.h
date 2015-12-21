@@ -15,8 +15,14 @@ struct Simulation {
 
  // Contact parameters
  sconst float normalDampingRate = 1;
- const float targetDynamicFrictionCoefficient;
- float dynamicFrictionCoefficient = 0;
+ const float targetDynamicGrainObstacleFrictionCoefficient;
+ float dynamicGrainObstacleFrictionCoefficient = 0;
+ const float targetDynamicGrainMembraneFrictionCoefficient;
+ float dynamicGrainMembraneFrictionCoefficient = 0;
+ const float targetDynamicGrainGrainFrictionCoefficient;
+ float dynamicGrainGrainFrictionCoefficient = 0;
+ const float targetDynamicGrainWireFrictionCoefficient;
+ float dynamicGrainWireFrictionCoefficient = 0;
  const float targetStaticFrictionSpeed;
  float staticFrictionSpeed;
  const float targetStaticFrictionLength;
@@ -36,7 +42,7 @@ struct Simulation {
  float Gz;
  const float verticalSpeed = 1 * m/s;
  const float targetPressure;
- const float plateSpeed;// = 10 * mm/s;
+ const float plateSpeed;
 #if WIRE
  const float patternRadius = membrane.radius - Grain::radius;
  enum Pattern { None, Helix, Cross, Loop };

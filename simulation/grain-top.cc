@@ -150,7 +150,7 @@ void Simulation::stepGrainTop() {
                      grainTopLocalAx.begin(), grainTopLocalAy.begin(), grainTopLocalAz.begin(),
                      grainTopLocalBx.begin(), grainTopLocalBy.begin(), grainTopLocalBz.begin(),
                      floatX(K), floatX(Kb),
-                     floatX(staticFrictionStiffness), floatX(dynamicFrictionCoefficient),
+                     floatX(staticFrictionStiffness), floatX(dynamicGrainObstacleFrictionCoefficient),
                      floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping),
                      grain->Vx.data+simd, grain->Vy.data+simd, grain->Vz.data+simd,
                      grain->AVx.data+simd, grain->AVy.data+simd, grain->AVz.data+simd,

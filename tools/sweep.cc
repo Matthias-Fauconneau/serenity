@@ -22,52 +22,43 @@ struct ParameterSweep {
    if(queued ) log("Queued jobs:["+str(queuedCount)+"]: qdel -f"+queued+" &");
   }
   size_t done = 0, running = 0, queued = 0;
-  for(string dt: {"0.1"_, "1"_}) {
+  for(string dt: {"1"_}) {
    parameters["TimeStep"__] = String(dt+"µ");
-   for(string plateSpeed: {"10"_,/*"20"_*//*,"30"_*/}) {
-    parameters["Speed"__] = plateSpeed;
-    {
-     for(float frictionCoefficient: {0.1, 0.2, 0.3}) {
-      parameters["Friction"__] = frictionCoefficient; // FIXME: separate Ball-Wire friction coefficient
-      for(string pattern: ref<string>{"none"/*,"helix","cross","loop"*/}) {
-       parameters["Pattern"__] = pattern;
-       for(int pressure: {80}) {
-        parameters["Pressure"__] = String(str(pressure)+"K"_);
-        for(float radius: {0.025, 0.050}) {
-         parameters["Radius"__] = radius;
-         //parameters["VoidRatio"__] = 0.7;
-         for(float staticFrictionSpeed: {/*0.01,*/ 0.1/*, 1.*/}) {
-          parameters["sfSpeed"__] = staticFrictionSpeed;
-          for(float staticFrictionLength: {/*0.01e-3,*/ 0.1e-3/*, 1e-3*/}) {
-           parameters["sfLength"__] = staticFrictionLength;
-           for(float staticFrictionStiffness: {/*1e1,*/ 1e2/*, 1e3*/}) {
-            parameters["sfStiffness"__] = String(str(staticFrictionStiffness)+"K");
-            for(float staticFrictionDamping: {/*1,*/ 10/*, 100*/}) {
-             parameters["sfDamping"__] = staticFrictionDamping;
-             auto add = [&] {
-              String id = str(parameters);
-              if(arguments().size > 0 && arguments()[0].contains('=')) {
-               auto filter = parseDict(arguments()[0]);
-               if(!parameters.includes(filter)) return;
-              }
-              all.append(copyRef(id));
-              if(jobs.contains(parseDict(id))) {
-               const auto& job = jobs.at(jobs.indexOf(parseDict(id)));
-               if(job.state == "running") running++;
-               else queued++;
-               jobs.take(jobs.indexOf(parseDict(id)));
-               return;
-              }
-              if(existing.contains(id)) {
-               //if(existsFile(id)) { log("Remove", id); remove(id); }
-               done++; return;
-              }
-              missing.append(move(id));
-             };
-             add();
-            }
+   for(string plateSpeed: {/*"1"_,*/"10"_}) {
+    parameters["Speed"__] = plateSpeed; // mm/s
+    for(int pressure: {80}) {
+     parameters["Pressure"__] = String(str(pressure)+"K"_); // Pa
+     for(float radius: {25}) {
+      parameters["Radius"__] = radius; //mm
+      for(string staticFrictionSpeed: {"1"_,"10"_,"100"_}) {
+       parameters["sfSpeed"__] = staticFrictionSpeed; // mm/s
+       for(string staticFrictionLength: {"1µ"_, "10µ"_,"100µ"_}) {
+        parameters["sfLength"__] = staticFrictionLength; // m
+        for(string staticFrictionStiffness: {"1K"_, "10K"_,"100K"_}) {
+         parameters["sfStiffness"__] = staticFrictionStiffness;
+         for(string staticFrictionDamping: {"0"_, "1"_,"10"_}) {
+          parameters["sfDamping"__] = staticFrictionDamping; // ?
+          auto add = [&] {
+           String id = str(parameters);
+           if(arguments().size > 0 && arguments()[0].contains('=')) {
+            auto filter = parseDict(arguments()[0]);
+            if(!parameters.includes(filter)) return;
            }
-          }
+           all.append(copyRef(id));
+           if(jobs.contains(parseDict(id))) {
+            const auto& job = jobs.at(jobs.indexOf(parseDict(id)));
+            if(job.state == "running") running++;
+            else queued++;
+            jobs.take(jobs.indexOf(parseDict(id)));
+            return;
+           }
+           if(existing.contains(id)) {
+            //if(existsFile(id)) { log("Remove", id); remove(id); }
+            done++; return;
+           }
+           missing.append(move(id));
+          };
+          add();
          }
         }
        }
@@ -89,6 +80,7 @@ struct ParameterSweep {
    log(runningCount+queuedCount, "jobs are not included in the current sweep parameters");
   }
 
+  //int random=0;
   Random random;
   size_t missingCount = missing.size;
   size_t count = 0;
@@ -106,7 +98,7 @@ struct ParameterSweep {
                "-j", "y",
                "-o", "Results/$JOB_NAME.stdout",
                "-b","y",
-               //"-pe", "omp",
+               "-pe", "omp", "16"/*16*5/4*/,
                "~/run", parameters})) { log("Error"); break; }
     count++;
    }
