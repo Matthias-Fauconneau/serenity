@@ -19,7 +19,7 @@
 void Handle::close() { if(fd>0) ::close(fd); fd=0; }
 
 String Handle::name() const {
- //if(fd==AT_FDCWD) return "."__;
+ if(fd==AT_FDCWD) return "."__;
  static Folder procSelfFD("/proc/self/fd/");
  String s (256); s.size=check(readlinkat(procSelfFD.fd, strz(str((int)fd)), s.begin(), s.capacity), (int)fd);
  return s;
@@ -93,6 +93,7 @@ void Stream::read(mref<byte> target) {
 buffer<byte> Stream::readUpTo(size_t capacity) {
  buffer<byte> buffer(capacity);
  buffer.size = check( ::read(fd, (void*)buffer.data, capacity) );
+ assert_(buffer.size < buffer.capacity);
  return buffer;
 }
 

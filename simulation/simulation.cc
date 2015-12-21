@@ -246,8 +246,8 @@ void Simulation::run() {
    if(!primed) {
     primed = true;
     //if(existsFile(arguments()[0])) log("Overwrote", arguments()[0]);
-    if(!existsFile(arguments()[0]))
-     pressureStrain = File(arguments()[0], currentWorkingDirectory(), Flags(WriteOnly|Create|Truncate));
+    if(!existsFile(arguments()[0], Folder("Results",home())))
+     pressureStrain = File(arguments()[0], Folder("Results",home()), Flags(WriteOnly|Create|Truncate));
     {
      String line = "voidRatio:"+str(voidRatio)+"\n";
      log_(line);

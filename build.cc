@@ -224,6 +224,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
 
  // Installs
  if(install && (!existsFile(target, install) || File(binary).modifiedTime() > File(target, install).modifiedTime())) {
+  ::log(binary, "->", install+"/"+target);
   copy(currentWorkingDirectory(), binary, install, target);
  }
 }

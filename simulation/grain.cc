@@ -35,14 +35,19 @@ void Simulation::grainLattice() {
    vXsi index = convert(scale*(Az-minZ)) * sizeYX
      + convert(scale*(Ay-minY)) * sizeX
      + convert(scale*(Ax-minX));
-   for(int k: range(simd)) assert_(index[k] >= -(base-lattice.cells.data) && index[k]<int(lattice.base.size),
-                                   i+k, grain->count, index[k], base-lattice.cells.data,
-                                   Ax[k], Ay[k], Az[k],
-                                   minX[k], minY[k], minZ[k],
-                                   lattice.size,
-                                   grain->Vx[simd+i+k], grain->Vy[simd+i+k], grain->Vz[simd+i+k],
-                                   grain->Fx[simd+i+k], grain->Fy[simd+i+k], grain->Fz[simd+i+k]
-                                   );
+   /*for(int k: range(simd)) assert_(index[k] >= -(base-lattice.cells.data) && index[k]<int(lattice.base.size),
+                                   "#", i+k, "/", grain->count,
+                                   "@", index[k], "<", base-lattice.cells.data,
+                                   "size", lattice.size,
+                                   "min", minX[k], minY[k], minZ[k],
+                                   "X", Ax[k], Ay[k], Az[k],
+                                   "V", grain->Vx[simd+i+k], grain->Vy[simd+i+k], grain->Vz[simd+i+k],
+                                   "F", grain->Fx[simd+i+k], grain->Fy[simd+i+k], grain->Fz[simd+i+k],
+                                   "//",
+                                   "X", Ax[k] /m, Ay[k] /m, Az[k] /m,
+                                   "V", grain->Vx[simd+i+k] /(m/s), grain->Vy[simd+i+k] /(m/s), grain->Vz[simd+i+k] /(m/s),
+                                    "F", grain->Fx[simd+i+k] /N, grain->Fy[simd+i+k] /N, grain->Fz[simd+i+k] /N
+                                   );*/
    ::scatter(base, index, a);
   }
  };

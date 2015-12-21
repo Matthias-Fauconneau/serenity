@@ -22,6 +22,7 @@ struct PlotView : HList<Plot> {
  PlotView() {
   window->actions[Escape] = []{ exit_group(0); /*FIXME*/ };
   window->actions[F12] = {this, &PlotView::snapshot};
+  window->actions[Space] = [this]{ if(shown) load(); shown=false; window->render(); }; // no inotify on NFS
   window->presentComplete = [this]{ shown=true; };
   load();
  }
@@ -52,12 +53,14 @@ struct PlotView : HList<Plot> {
    map<String, array<Variant>> allCoordinates;
    for(Folder folder: {"."_}/*arguments()*/) {
     for(string name: folder.list(Files)) {
+     if(endsWith(name,"stdout")) continue;
      auto parameters = parseDict(name);
      for(const auto parameter: parameters)
       if(!allCoordinates[::copy(parameter.key)].contains(parameter.value))
        allCoordinates.at(parameter.key).insertSorted(::copy(parameter.value));
     }
     for(string name: folder.list(Files)) {
+     if(endsWith(name,"stdout")) continue;
      TextData s (readFile(name, folder));
      s.until('\n'); // First line: constant results
      buffer<string> names = split(s.until('\n'),", "); // Second line: Headers
@@ -67,7 +70,7 @@ struct PlotView : HList<Plot> {
       for(size_t i = 0; s && !s.match('\n'); i++) {
        string d = s.whileDecimal();
        float decimal = parseDecimal(d);
-       assert_(isNumber(decimal));
+       assert_(isNumber(decimal), decimal, d);
        assert_(i < dataSets.values.size, i, dataSets.keys);
        dataSets.values[i].append( decimal );
        s.whileAny(' ');

@@ -5,12 +5,12 @@ struct ParameterSweep {
   array<String> all, missing;
   Dict parameters;
   array<String> existing;
-  auto list = currentWorkingDirectory().list(Files);
+  auto list = Folder("Results", home()).list(Files);
   for(string name: list) {
    existing.append(copyRef(name));
-   if(startsWith(name, "Count=")) remove(name);
+   //if(startsWith(name, "Count=")) remove(name);
   }
-  array<SGEJob> jobs ;// = qstat(0);
+  array<SGEJob> jobs = qstat();
   {
    array<char> running, queued;
    size_t runningCount = 0, queuedCount = 0;
@@ -22,18 +22,18 @@ struct ParameterSweep {
    if(queued ) log("Queued jobs:["+str(queuedCount)+"]: qdel -f"+queued+" &");
   }
   size_t done = 0, running = 0, queued = 0;
-  for(float dt: {1e-6}) {
-   parameters["TimeStep"__] = String(str(int(round(dt*1e6)))+"µ");
-   for(string plateSpeed: {/*"10"_,*/"20"_/*,"30"_*/}) {
+  for(string dt: {"0.1"_, "1"_}) {
+   parameters["TimeStep"__] = String(dt+"µ");
+   for(string plateSpeed: {"10"_,/*"20"_*//*,"30"_*/}) {
     parameters["Speed"__] = plateSpeed;
     {
-     for(float frictionCoefficient: {/*0.1,*/ 0.2/*, 0.3*/}) {
+     for(float frictionCoefficient: {0.1, 0.2, 0.3}) {
       parameters["Friction"__] = frictionCoefficient; // FIXME: separate Ball-Wire friction coefficient
       for(string pattern: ref<string>{"none"/*,"helix","cross","loop"*/}) {
        parameters["Pattern"__] = pattern;
        for(int pressure: {80}) {
         parameters["Pressure"__] = String(str(pressure)+"K"_);
-        for(float radius: {0.025/*, 0.050*/}) {
+        for(float radius: {0.025, 0.050}) {
          parameters["Radius"__] = radius;
          //parameters["VoidRatio"__] = 0.7;
          for(float staticFrictionSpeed: {/*0.01,*/ 0.1/*, 1.*/}) {
@@ -59,8 +59,8 @@ struct ParameterSweep {
                return;
               }
               if(existing.contains(id)) {
-               if(existsFile(id)) { log("Remove", id); remove(id); }
-               //done++; return;
+               //if(existsFile(id)) { log("Remove", id); remove(id); }
+               done++; return;
               }
               missing.append(move(id));
              };
@@ -104,7 +104,7 @@ struct ParameterSweep {
                "-l", "fq=true",
                "-N", name,
                "-j", "y",
-               "-o", "$JOB_NAME",
+               "-o", "Results/$JOB_NAME.stdout",
                "-b","y",
                //"-pe", "omp",
                "~/run", parameters})) { log("Error"); break; }

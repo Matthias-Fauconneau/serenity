@@ -9,9 +9,9 @@ struct Sym { uint name; byte info,other; uint16 shndx; byte* value; long size; }
 
 /// Reads a little endian variable size integer
 static int readLEV(BinaryData& s, bool sign=false) {
-    int result=0; int shift=0; uint8 b;
+    uint result=0; uint shift=0; uint8 b;
     do { b = s.read(); result |= (b & 0x7f) << shift; shift += 7; } while(b & 0x80);
-    if(sign && (shift < 32) && (b & 0x40)) result |= -1 << shift;
+    if(sign && (shift < 32) && (b & 0x40)) result |= uint(~0) << shift;
     return result;
 }
 

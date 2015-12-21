@@ -115,15 +115,15 @@ String Element::text(string path) const {
  return move(text);
 }
 
-/*String Element::str(uint depth) const {
-    //assert(name||content, attributes, children);
+String Element::str(uint depth) const {
+ //assert(name||content, attributes, children);
  array<char> line;
  String indent = repeat(" "_, depth);
  if(name) line.append(indent+'<'+name);
  for(auto attr: attributes) line.append(' '+attr.key+"=\""+attr.value+'"');
-    if(trim(content)||children) {
+ if(trim(content)||children) {
   if(name) line.append(">");
-  if(trim(content)) line.append(replace(simplify(trim(content)),"\n",'\n'+indent));
+  if(trim(content)) line.append(replace(/*simplify(trim(content))*/content,"\n",'\n'+indent));
   if(children) {
    line.append('\n');
    for(const Element& e: children) line.append( e.str(depth+1) );
@@ -133,7 +133,7 @@ String Element::text(string path) const {
  } else if(name) line.append(" />\n");
  return move(line);
 }
-String str(const Element& e) { return e.str(); }*/
+String str(const Element& e) { return e.str(); }
 
 String unescape(string xml) {
  static map<string, string> entities;
