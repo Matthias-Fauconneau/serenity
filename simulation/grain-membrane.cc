@@ -6,7 +6,7 @@
 
 #define MEMBRANE_POINT 1
 #if !MEMBRANE_POINT
-static inline float distance(float Rx, float Ry, float Rz, float Rx0, float Ry0, float Rz0, float Rx1, float Ry1, float Rz1) {
+static inline float sqDistance(float Rx, float Ry, float Rz, float Rx0, float Ry0, float Rz0, float Rx1, float Ry1, float Rz1) {
  // -?
  const float Dx = Ry0*Rz1 - Ry1*Rz0;
  const float Dy = Rz0*Rx1 - Rz1*Rx0;
@@ -19,19 +19,20 @@ static inline float distance(float Rx, float Ry, float Rz, float Rx0, float Ry0,
  const float Py = Nz*Rx1 - Rz1*Nx;
  const float Pz = Nx*Ry1 - Rx1*Ny;
  const float det = Px * Rx0 + Py * Ry0 + Pz * Rz0;
- assert_(det > 0.000001, det);
- float invDet = 1 / det;
+ //assert_(det > 0.000001, det);
+ const float invDet = 1 / det;
  float u = invDet * (Px*Rx + Py*Ry + Pz*Rz);
  if(u < 0) u = 0;
- if(u > 1) u = 1;
  const float Qx = Ry*Rz0 - Ry0*Rz;
  const float Qy = Rz*Rx0 - Rz0*Rx;
  const float Qz = Rx*Ry0 - Rx0*Ry;
  float v = invDet * (Qx*Nx + Qy*Ny + Qz*Nz);
- if(v < 0) v = 0;
  if(v  > 1-u) v = 1 - u;
- float t = invDet * (Qx*Rx1 + Qy*Ry1 + Qz*Rz1);
- return t;
+ //float t = invDet * (Qx*Rx1 + Qy*Ry1 + Qz*Rz1);
+ const float x = u*Rx0 + v*Rx1;
+ const float y = u*Ry0 + v*Ry1;
+ const float z = u*Rz0 + v*Rz1;
+ return x*x + y*y + z*z;
 }
 #endif
 
@@ -218,12 +219,12 @@ void Simulation::stepGrainMembrane() {
   grainMembraneA.size = grainMembraneA.capacity;
   grainMembraneB.size = grainMembraneB.capacity;
 
+  const float verletDistance = 2*Grain::radius/sqrt(3.);
+  assert(verletDistance > Grain::radius + 0);
+
   atomic contactCount;
 #if MEMBRANE_POINT
   grainLattice();
-
-  const float verletDistance = 2*Grain::radius/sqrt(3.);
-  assert(verletDistance > Grain::radius + 0);
 
   const int X = lattice.size.x, Y = lattice.size.y;
   const int* latticeNeighbours[3*3] = {
@@ -247,7 +248,7 @@ void Simulation::stepGrainMembrane() {
    const vXsf scale = floatX(lattice.scale);
    const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
    const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
-   const vXsf verletDistanceX = floatX(verletDistance);
+   const vXsf sqVerletDistanceX = floatX(sq(verletDistance));
    const vXsi _1i = intX(-1);
    int W = membrane->W;
    int base = membrane->margin+rowIndex*membrane->stride;
@@ -263,8 +264,8 @@ void Simulation::stepGrainMembrane() {
      vXsi a = gather(latticeNeighbours[n]+i, index);
      const vXsf Ax = gather(gPx, a), Ay = gather(gPy, a), Az = gather(gPz, a);
      const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-     vXsf distance = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
-     maskX mask = notEqual(a, _1i) & lessThan(distance, verletDistanceX);
+     vXsf sqDistance = Rx*Rx + Ry*Ry + Rz*Rz;
+     maskX mask = notEqual(a, _1i) & lessThan(sqDistance, sqVerletDistanceX);
      uint targetIndex = contactCount.fetchAdd(countBits(mask));
      compressStore(gmA+targetIndex, mask, a);
      compressStore(gmB+targetIndex, mask, b);
@@ -273,50 +274,51 @@ void Simulation::stepGrainMembrane() {
   };
   grainMembraneSearchTime += parallel_for(0, membrane->H, search);
 #else // Face
-  const float verletDistance = 2*Grain::radius/sqrt(3.); // TODO: Face with Lattice
-  assert(verletDistance > Grain::radius + 0);
+  // TODO: Face with Lattice
 
-  atomic contactCount;
   auto search = [&](uint, uint rowIndex) {
    const float* const mPx = membrane->Px.data, *mPy = membrane->Py.data, *mPz = membrane->Pz.data;
    const float* const gPx = grain->Px.data+simd, *gPy = grain->Py.data+simd, *gPz = grain->Pz.data+simd;
    int* const gmA = grainMembraneA.begin(), *gmB = grainMembraneB.begin();
-   //const vXsf verletDistanceX = floatX(verletDistance);
    const int W = membrane->W;
    const int stride = membrane->stride;
    const int base = membrane->margin+rowIndex*stride;
-   const int e0 = base-stride+rowIndex%2;
-   const int e1 = base-stride-!(rowIndex%2);
-   const int e2 = base-1;
+   const int e0 = -stride+rowIndex%2;
+   const int e1 = -stride-!(rowIndex%2);
+   const int e2 = -1;
    for(int j=0; j<W; j++) {
-    const int index = base+j;
-    const float Ox = mPx[index];
-    const float Oy = mPy[index];
-    const float Oz = mPz[index];
-    const int e0j = e0+j;
-    const int e1j = e1+j;
-    const int e2j = e2+j;
+    const int v = base+j;
+    const float Ox = mPx[v];
+    const float Oy = mPy[v];
+    const float Oz = mPz[v];
+    const int e0j = v+e0;
+    const int e1j = v+e1;
+    const int e2j = v+e2;
     const float Rx0 = mPx[e0j], Ry0 = mPy[e0j], Rz0 = mPz[e0j];
     const float Rx1 = mPx[e1j], Ry1 = mPy[e1j], Rz1 = mPz[e1j];
     const float Rx2 = mPx[e2j], Ry2 = mPy[e2j], Rz2 = mPz[e2j];
-    for(int a: range(grain.count)) {
+    for(int a: range(grain->count)) {
      const float Ax = gPx[a], Ay = gPy[a], Az = gPz[a];
-     const float Rx = Ax-Ox, Ry = Ay-Oy, Az = Az-Oz;
-     // (.,0,1)
-     float distance = ::distance(Rx, Ry, Rz, Rx0, Ry0, Rz0, Rx1, Ry1, Rz1);
-     bool mask = distance < verletDistance;
-     if(mask) {
-      uint targetIndex = contactCount.fetchAdd(1);
-      gmA[targetIndex] = a;
-      gmB[targetIndex] = b;
+     const float Rx = Ax-Ox, Ry = Ay-Oy, Rz = Az-Oz;
+     {// (.,0,1)
+      float sqDistance = ::sqDistance(Rx, Ry, Rz, Rx0, Ry0, Rz0, Rx1, Ry1, Rz1);
+      bool mask = sqDistance < sq(verletDistance);
+      if(mask) {
+       uint targetIndex = contactCount.fetchAdd(1);
+       gmA[targetIndex] = a;
+       int b = 2*v+0;
+       gmB[targetIndex] = b;
+      }
      }
-     // (.,1,2)
-     float distance = ::distance(Rx, Ry, Rz, Rx1, Ry1, Rz1, Rx2, Ry2, Rz2);
-     bool mask = distance < verletDistance;
-     if(mask) {
-      uint targetIndex = contactCount.fetchAdd(1);
-      gmA[targetIndex] = a;
-      gmB[targetIndex] = b;
+     {// (.,1,2)
+      float sqDistance = ::sqDistance(Rx, Ry, Rz, Rx1, Ry1, Rz1, Rx2, Ry2, Rz2);
+      bool mask = sqDistance < sq(verletDistance);
+      if(mask) {
+       uint targetIndex = contactCount.fetchAdd(1);
+       gmA[targetIndex] = a;
+       int b = 2*v+1;
+       gmB[targetIndex] = b;
+      }
      }
     }
    }
@@ -367,7 +369,7 @@ void Simulation::stepGrainMembrane() {
   assert(align(simd, grainMembraneB.size+1) <= grainMembraneB.capacity);
   for(size_t i=grainMembraneB.size; i<align(simd, grainMembraneB.size +1); i++) grainMembraneB.begin()[i] = 0;
 
-  grainMembraneGlobalMinD = /*minD*/verletDistance - (Grain::radius+0);
+  grainMembraneGlobalMinD = verletDistance - (Grain::radius+0);
   if(grainMembraneGlobalMinD < 0) log("grainMembraneGlobalMinD", grainMembraneGlobalMinD);
 
   /*if(processState > ProcessState::Pour) // Element creation resets verlet lists
@@ -388,19 +390,59 @@ void Simulation::stepGrainMembrane() {
   const float* const mPx = membrane->Px.data, *mPy = membrane->Py.data, *mPz = membrane->Pz.data;
   float* const gmL = grainMembraneLocalAx.begin();
   int* const gmContact = grainMembraneContact.begin();
-  const vXsf Gr = floatX(Grain::radius);
+#if MEMBRANE_POINT
+  const vXsf sqRadius = floatX(sq(Grain::radius));
   for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
    vXsi A = load(gmA, i), B = load(gmB, i);
    vXsf Ax = gather(gPx, A), Ay = gather(gPy, A), Az = gather(gPz, A);
    vXsf Bx = gather(mPx, B), By = gather(mPy, B), Bz = gather(mPz, B);
    vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-   vXsf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
-   vXsf depth = Gr - length;
-   maskX contact = greaterThanOrEqual(depth, _0f);
+   vXsf sqDistance = Rx*Rx + Ry*Ry + Rz*Rz;
+   maskX contact = lessThan(sqDistance, sqRadius);
    maskStore(gmL+i, ~contact, _0f);
    uint index = contactCount.fetchAdd(countBits(contact));
    compressStore(gmContact+index, contact, intX(i)+_seqi);
   }
+#else
+  const float sqRadius = sq(Grain::radius);
+  const int margin = membrane->margin;
+  const int stride = membrane->stride;
+  for(uint i=start*simd; i<(start+size)*simd; i++) {
+   const int A = gmA[i], B = gmB[i];
+   const float Ax = gPx[A], Ay = gPy[A], Az = gPz[A];
+   const int v = B/2;
+   const float Ox = mPx[v], Oy = mPy[v], Oz = mPz[v];
+   const float Rx = Ax-Ox, Ry = Ay-Oy, Rz = Az-Oz;
+   const int rowIndex = (v-margin)/stride;
+   if(B%2 == 0) { // (.,0,1)
+    const int e0 = -stride+rowIndex%2;
+    const int e1 = -stride-!(rowIndex%2);
+    const int e0j = v+e0;
+    const int e1j = v+e1;
+    const float Rx0 = mPx[e0j], Ry0 = mPy[e0j], Rz0 = mPz[e0j];
+    const float Rx1 = mPx[e1j], Ry1 = mPy[e1j], Rz1 = mPz[e1j];
+    float sqDistance = ::sqDistance(Rx, Ry, Rz, Rx0, Ry0, Rz0, Rx1, Ry1, Rz1);
+    bool mask = sqDistance < sqRadius;
+    if(mask) {
+     uint targetIndex = contactCount.fetchAdd(1);
+     gmContact[targetIndex] = i;
+    } else gmL[i] = 0;
+   } else { // (.,1,2)
+    const int e1 = -stride-!(rowIndex%2);
+    const int e2 = -1;
+    const int e1j = v+e1;
+    const int e2j = v+e2;
+    const float Rx1 = mPx[e1j], Ry1 = mPy[e1j], Rz1 = mPz[e1j];
+    const float Rx2 = mPx[e2j], Ry2 = mPy[e2j], Rz2 = mPz[e2j];
+    float sqDistance = ::sqDistance(Rx, Ry, Rz, Rx1, Ry1, Rz1, Rx2, Ry2, Rz2);
+    bool mask = sqDistance < sqRadius;
+    if(mask) {
+     uint targetIndex = contactCount.fetchAdd(1);
+     gmContact[targetIndex] = i;
+    } else gmL[i] = 0;
+   }
+  }
+#endif
  };
  if(grainMembraneA.size/simd) grainMembraneFilterTime += parallel_chunk(grainMembraneA.size/simd, filter);
  // The partial iteration has to be executed last so that invalid contacts are trailing

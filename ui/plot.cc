@@ -144,13 +144,23 @@ shared<Graphics> Plot::graphics(vec2 size) {
  else pen.x += left + 2*tickLength;
  if(legendPosition&2) {
   pen.y += size.y - bottom - tickLabelSize.y/2;
-  //for(size_t /: range(dataSets.size())) pen.y -= textSize; //Text(dataSets.keys[i], textSize, 0,1,0, fontName).sizeHint().y;
   pen.y -= dataSets.size()*textSize;
  } else {
   pen.y += top;
  }
- /*if(dataSets.size() <= 1)*/ //for(size_t i: range(dataSets.size())) { // Legend
- for(size_t i: reverse_range(dataSets.size())) { // Legend
+
+ // Orders legend by last point value
+ buffer<int> order (dataSets.size(), 0);
+ for(size_t i: range(dataSets.size())) order.append(i);
+ for(int i: range(1, order.size)) {
+  while(i > 0) {
+   if(!(dataSets.values[order[i-1]].values.last() < dataSets.values[order[i]].values.last())) break;
+   swap(order[i-1], order[i]);
+   i--;
+  }
+ }
+
+ for(size_t i: order) { // Legend
   Text text(dataSets.keys[i], textSize, colors[i], 1,0, fontName);
   graphics->graphics.insert(vec2(pen+int2(legendPosition&1 ? -text.sizeHint().x : 0,0)), text.graphics(0));
   pen.y += textSize; //text.sizeHint().y;

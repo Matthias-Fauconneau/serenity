@@ -37,8 +37,7 @@ void Simulation::stepGrainBottom() {
    int* const gbA = grainBottomA.begin();
    for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
      vXsf Az = load(gPz, i);
-     vXsf depth = _bZ_Gr - Az;
-     maskX contact = greaterThanOrEqual(depth, _0f);
+     maskX contact = lessThan(Az, _bZ_Gr);
      uint index = contactCount.fetchAdd(countBits(contact));
      compressStore(gbA+index, contact, intX(i)+_seqi);
    }
@@ -101,12 +100,11 @@ void Simulation::stepGrainBottom() {
   const float* const gPz = grain->Pz.data+simd;
   float* const gbL = grainBottomLocalAx.begin();
   int* const gbContact = grainBottomContact.begin();
-  const vXsf _bZ_Gr = floatX(bottomZ+Grain::radius);
+  const vXsf bZ_Gr = floatX(bottomZ+Grain::radius);
   for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
     vXsi A = load(gbA, i);
     vXsf Az = gather(gPz, A);
-    vXsf depth = _bZ_Gr - Az;
-    maskX contact = greaterThanOrEqual(depth, _0f);
+    maskX contact = lessThan(Az, bZ_Gr);
     maskStore(gbL+i, ~contact, _0f);
     uint index = contactCount.fetchAdd(countBits(contact));
     compressStore(gbContact+index, contact, intX(i)+_seqi);

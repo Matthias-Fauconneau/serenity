@@ -328,15 +328,14 @@ void Simulation::stepGrainGrain() {
   const float* const gPx = grain->Px.data+simd, *gPy = grain->Py.data+simd, *gPz = grain->Pz.data+simd;
   float* const ggL = grainGrainLocalAx.begin();
   int* const ggContact = grainGrainContact.begin();
-  const vXsf _2Gr = floatX(Grain::radius+Grain::radius);
+  const vXsf sq2Radius = floatX(sq(Grain::radius+Grain::radius));
   for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
     vXsi A = load(ggA, i), B = load(ggB, i);
     vXsf Ax = gather(gPx, A), Ay = gather(gPy, A), Az = gather(gPz, A);
     vXsf Bx = gather(gPx, B), By = gather(gPy, B), Bz = gather(gPz, B);
     vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-    vXsf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
-    vXsf depth = _2Gr - length;
-    maskX contact = greaterThanOrEqual(depth, _0f);
+    vXsf sqDistance = Rx*Rx + Ry*Ry + Rz*Rz;
+    maskX contact = lessThan(sqDistance, sq2Radius);
     maskStore(ggL+i, ~contact, _0f);
     uint index = contactCount.fetchAdd(countBits(contact));
     compressStore(ggContact+index, contact, intX(i)+_seqi);

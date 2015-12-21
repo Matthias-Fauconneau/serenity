@@ -116,8 +116,11 @@ struct PlotView : HList<Plot> {
      assert_(dataSets.contains(plot.xlabel), plot.xlabel);
      assert_(dataSets.contains(plot.ylabel), plot.ylabel);
      parameters.filter([&](string key, const Variant&){ return allCoordinates.at(key).size==1; });
-     plot.dataSets.insert(str(parameters,", "_),
-     {::move(dataSets.at(plot.xlabel)), ::move(dataSets.at(plot.ylabel))});
+     //float key = dataSets.at(plot.ylabel).last();
+     /*size_t i = plot.dataSets.size();//0; while(i<plot.dataSets.size() && plot.dataSets.values[i].values.last() <= key) i++;
+     plot.dataSets.keys.insertAt(i, str(parameters,", "_));
+     plot.dataSets.values.insertAt(i, map<float,float>{::move(dataSets.at(plot.xlabel)), ::move(dataSets.at(plot.ylabel))});*/
+     plot.dataSets.insert(str(parameters,", "_), {::move(dataSets.at(plot.xlabel)), ::move(dataSets.at(plot.ylabel))});
      if(plot.ylabel=="Normalized deviator stress") { plot.min.y = 0; plot.max.y = 1; }
     }
    }

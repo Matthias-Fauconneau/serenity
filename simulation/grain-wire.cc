@@ -237,10 +237,10 @@ void Simulation::stepGrainWire() {
        if(!b) break;
        b--;
        assert(a < grain.count && b < wire.count, a, grain.count, b, wire.count, offset, n, i);
-       float d = sqrt(sq(grain.Px[simd+a]-wire.Px[b])
-                      + sq(grain.Py[simd+a]-wire.Py[b])
-                      + sq(grain.Pz[simd+a]-wire.Pz[b])); // TODO: SIMD //FIXME: fails with Ofast?
-       if(d > verletDistance) { /*minD=::min(minD, d);*/ continue; }
+       float sqDistance = sq(grain.Px[simd+a]-wire.Px[b])
+                                   + sq(grain.Py[simd+a]-wire.Py[b])
+                                   + sq(grain.Pz[simd+a]-wire.Pz[b])); // TODO: SIMD //FIXME: fails with Ofast?
+       if(sqDistance> sq(verletDistance)) { /*minD=::min(minD, d);*/ continue; }
        assert(grainWireA.size < grainWireA.capacity);
        grainWireA.append( a ); // Grain
        grainWireB.append( b ); // Wire

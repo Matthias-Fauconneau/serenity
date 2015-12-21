@@ -32,12 +32,11 @@ void Simulation::stepGrainTop() {
   atomic contactCount;
   auto search = [&](uint, size_t start, size_t size) {
    const float* const gPz = grain->Pz.data+simd;
-   const vXsf _tZ_Gr = floatX(topZ-Grain::radius);
+   const vXsf tZ_Gr = floatX(topZ-Grain::radius);
    int* const gtA = grainTopA.begin();
    for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
      vXsf Az = load(gPz, i);
-     vXsf depth = Az - _tZ_Gr;
-     maskX contact = greaterThanOrEqual(depth, _0f);
+     maskX contact = greaterThan(Az, tZ_Gr);
      uint index = contactCount.fetchAdd(countBits(contact));
      compressStore(gtA+index, contact, intX(i)+_seqi);
    }
@@ -97,12 +96,11 @@ void Simulation::stepGrainTop() {
   const float* const gPz = grain->Pz.data+simd;
   float* const gtL = grainTopLocalAx.begin();
   int* const gtContact = grainTopContact.begin();
-  const vXsf _tZ_Gr = floatX(topZ-Grain::radius);
+  const vXsf tZ_Gr = floatX(topZ-Grain::radius);
   for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
     vXsi A = load(gtA, i);
     vXsf Az = gather(gPz, A);
-    vXsf depth = Az - _tZ_Gr;
-    maskX contact = greaterThanOrEqual(depth, _0f);
+    maskX contact = greaterThan(Az, tZ_Gr);
     maskStore(gtL+i, ~contact, _0f);
     uint index = contactCount.fetchAdd(countBits(contact));
     compressStore(gtContact+index, contact, intX(i)+_seqi);
