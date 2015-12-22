@@ -36,7 +36,7 @@ void Simulation::stepGrainTop() {
    int* const gtA = grainTopA.begin();
    for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
      vXsf Az = load(gPz, i);
-     maskX contact = greaterThan(Az, tZ_Gr);
+     maskX contact = greaterThanOrEqual(Az, tZ_Gr);
      uint index = contactCount.fetchAdd(countBits(contact));
      compressStore(gtA+index, contact, intX(i)+_seqi);
    }
@@ -100,7 +100,7 @@ void Simulation::stepGrainTop() {
   for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
     vXsi A = load(gtA, i);
     vXsf Az = gather(gPz, A);
-    maskX contact = greaterThan(Az, tZ_Gr);
+    maskX contact = greaterThanOrEqual(Az, tZ_Gr);
     maskStore(gtL+i, ~contact, _0f);
     uint index = contactCount.fetchAdd(countBits(contact));
     compressStore(gtContact+index, contact, intX(i)+_seqi);

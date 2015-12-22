@@ -33,11 +33,11 @@ void Simulation::stepGrainBottom() {
   atomic contactCount;
   auto search = [&](uint, size_t start, size_t size) {
    const float* const gPz = grain->Pz.data+simd;
-   const vXsf _bZ_Gr = floatX(bottomZ+Grain::radius);
+   const vXsf bZ_Gr = floatX(bottomZ+Grain::radius);
    int* const gbA = grainBottomA.begin();
    for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
      vXsf Az = load(gPz, i);
-     maskX contact = lessThan(Az, _bZ_Gr);
+     maskX contact = lessThan(Az, bZ_Gr);
      uint index = contactCount.fetchAdd(countBits(contact));
      compressStore(gbA+index, contact, intX(i)+_seqi);
    }

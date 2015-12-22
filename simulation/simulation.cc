@@ -82,7 +82,7 @@ void Simulation::step() {
  grainTotalTime.stop();
 
  membraneTotalTime.start();
- if(processState >= ProcessState::Pressure) {
+ if(processState >= ProcessState::Pressure || 1) {
   stepMembrane();
  }
  grainMembraneTotalTime.start();

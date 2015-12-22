@@ -196,7 +196,7 @@ void Simulation::stepGrainGrain() {
    const vXsf scale = floatX(lattice.scale);
    const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
    const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
-   const vXsf verletDistanceX = floatX(verletDistance);
+   const vXsf sqVerletDistanceX = floatX(sq(verletDistance));
    const vXsi _1i = intX(-1);
    for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
     vXsi a = intX(i)+_seqi;
@@ -222,8 +222,8 @@ void Simulation::stepGrainGrain() {
      vXsi b = gather(latticeNeighbours[n], index);
      const vXsf Bx = gather(gPx, b), By = gather(gPy, b), Bz = gather(gPz, b);
      const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-     vXsf distance = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
-     maskX mask = notEqual(b, _1i) & lessThan(distance, verletDistanceX);
+     vXsf sqDistance = Rx*Rx + Ry*Ry + Rz*Rz;
+     maskX mask = notEqual(b, _1i) & lessThan(sqDistance, sqVerletDistanceX);
      uint targetIndex = contactCount.fetchAdd(countBits(mask));
      compressStore(ggA+targetIndex, mask, a);
      compressStore(ggB+targetIndex, mask, b);
@@ -237,7 +237,7 @@ void Simulation::stepGrainGrain() {
    const vXsf scale = floatX(lattice.scale);
    const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
    const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
-   const vXsf verletDistanceX = floatX(verletDistance);
+   const vXsf sqVerletDistanceX = floatX(sq(verletDistance));
    const vXsi _1i = intX(-1);
    uint i=grain->count/simd*simd;
    vXsi a = intX(i)+_seqi;
@@ -252,8 +252,8 @@ void Simulation::stepGrainGrain() {
     vXsi b = gather(latticeNeighbours[n], index);
     const vXsf Bx = gather(gPx, b), By = gather(gPy, b), Bz = gather(gPz, b);
     const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-    vXsf distance = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
-    maskX mask = valid & notEqual(b, _1i) & lessThan(distance, verletDistanceX);
+    vXsf sqDistance = Rx*Rx + Ry*Ry + Rz*Rz;
+    maskX mask = valid & notEqual(b, _1i) & lessThan(sqDistance, sqVerletDistanceX);
     uint targetIndex = contactCount.fetchAdd(countBits(mask));
     compressStore(ggA+targetIndex, mask, a);
     compressStore(ggB+targetIndex, mask, b);

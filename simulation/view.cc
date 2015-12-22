@@ -16,7 +16,7 @@ struct SimulationView : Widget {
  const Simulation& simulation;
 
  size_t timeStep = 0;
- vec2 yawPitch = vec2(0, -PI/3); // Current view angles
+ vec2 yawPitch = vec2(0, 0/*-PI/3*/); // Current view angles
 
  struct {
   vec2 cursor;
@@ -162,7 +162,7 @@ struct SimulationView : Widget {
       margin = simulation.membrane->margin;
     buffer<uint16> indices(W*(simulation.membrane->H-1)*6-W*2);
     int s = 0;
-    for(int i: range(1, simulation.membrane->H-1)) {
+    for(int i: range(0, simulation.membrane->H-1)) {
      int base = margin+i*stride;
      for(int j: range(W)) {
       int a = base+j;
@@ -186,13 +186,13 @@ struct SimulationView : Widget {
    static GLVertexArray vertexArray;
    // FIXME: reuse buffers / no update before pressure
    if(!xBuffer) xBuffer = GLBuffer(simulation.membrane->Px);
-   else if(simulation.processState >= Simulation::Pressure) xBuffer.upload(simulation.membrane->Px);
+   else if(simulation.membraneViscosity) xBuffer.upload(simulation.membrane->Px);
    vertexArray.bindAttribute(shader.attribLocation("x"_), 1, Float, xBuffer);
    if(!yBuffer) yBuffer = GLBuffer(simulation.membrane->Py);
-   else if(simulation.processState >= Simulation::Pressure) yBuffer.upload(simulation.membrane->Py);
+   else if(simulation.membraneViscosity) yBuffer.upload(simulation.membrane->Py);
    vertexArray.bindAttribute(shader.attribLocation("y"_), 1, Float, yBuffer);
    if(!zBuffer) zBuffer = GLBuffer(simulation.membrane->Pz);
-   else if(simulation.processState >= Simulation::Pressure) zBuffer.upload(simulation.membrane->Pz);
+   else if(simulation.membraneViscosity) zBuffer.upload(simulation.membrane->Pz);
    vertexArray.bindAttribute(shader.attribLocation("z"_), 1, Float, zBuffer);
    vertexArray.bind();
    indexBuffer.draw();

@@ -236,9 +236,11 @@ struct Simulation {
  buffer<float> grainMembraneLocalAx;
  buffer<float> grainMembraneLocalAy;
  buffer<float> grainMembraneLocalAz;
+#if MEMBRANE_FACE
  buffer<float> grainMembraneLocalBx;
  buffer<float> grainMembraneLocalBy;
  buffer<float> grainMembraneLocalBz;
+#endif
 
  buffer<int> grainMembraneContact;
 

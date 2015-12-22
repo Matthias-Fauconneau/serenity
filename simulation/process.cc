@@ -100,9 +100,9 @@ void Simulation::stepProcess() {
    for(;;) {
     if(grain->count == targetGrainCount) break;
     vec2 p(random()*2-1,random()*2-1);
-    if(length(p)<1) { // Within cylinder
-     vec3 newPosition ((membrane->radius-Grain::radius)*p.x, (membrane->radius-Grain::radius)*p.y,
-                                     Grain::radius);
+    if(length(p)<1) { // Within unit circle
+     const float inradius = membrane->radius*cos(PI/membrane->W)-Grain::radius;
+     vec3 newPosition (inradius*p.x, inradius*p.y, Grain::radius);
      if(grain->count) {// Deposits grain without grain overlap
       const/*expr*/ size_t threadCount = ::threadCount();
       float maxZ_[threadCount]; mref<float>(maxZ_, threadCount).clear(0);
