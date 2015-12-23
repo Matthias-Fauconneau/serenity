@@ -10,9 +10,13 @@ struct Membrane {
  sconst float elasticModulus = 100 * MPa;
  sconst float poissonRatio = 0.48;
 
- sconst float resolution = Grain::radius / 2/*.5*/;
  const float radius;
- const int W = int(2*PI*radius/resolution)/simd*simd;
+#if MEMBRANE_FACE
+ const float resolution = 2*PI*radius/16;
+#else
+ sconst float resolution = Grain::radius / 2;
+#endif
+ const int W = int(round(2*PI*radius/resolution))/simd*simd;
  const int margin = simd; // 16 to ensure no false sharing ?
  const int stride = margin+W+margin;
  const float internodeLength = 2*sin(PI/W)*radius;

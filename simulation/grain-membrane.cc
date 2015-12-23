@@ -4,8 +4,6 @@
 #include "grain.h"
 #include "membrane.h"
 
-#define MEMBRANE_FACE 1
-#define MEMBRANE_POINT !MEMBRANE_FACE
 #if MEMBRANE_FACE
 // Returns nearest point to triangle relative to the triangle's first vertex position
 static inline bool nearest(float Rx, float Ry, float Rz, float Rx0, float Ry0, float Rz0, float Rx1, float Ry1, float Rz1, float& x, float& y, float& z) {
@@ -73,6 +71,7 @@ static inline void evaluateGrainMembrane(const size_t start, const size_t size,
   const vXsi contacts = load(grainMembraneContact, i);
   const vXsi A = gather(grainMembraneA, contacts), B = gather(grainMembraneB, contacts);
   const vXsf Ax = gather(grainPx, A), Ay = gather(grainPy, A), Az = gather(grainPz, A);
+#define MEMBRANE_POINT !MEMBRANE_FACE
 #if MEMBRANE_POINT
   // FIXME: Recomputing from intersection (more efficient than storing?)
   const vXsf Bx = gather(membranePx, B), By = gather(membranePy, B), Bz = gather(membranePz, B);
