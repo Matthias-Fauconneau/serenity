@@ -14,7 +14,7 @@ struct Simulation {
  size_t timeStep = 0;
 
  // Contact parameters
- sconst float normalDampingRate = 1;
+ const float normalDampingRate;
  const float targetDynamicGrainObstacleFrictionCoefficient;
  float dynamicGrainObstacleFrictionCoefficient = 0;
  const float targetDynamicGrainMembraneFrictionCoefficient;

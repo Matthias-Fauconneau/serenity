@@ -109,13 +109,13 @@ struct PlotView : HList<Plot> {
       ref<float> axial = dataSets.at("Axial (Pa)");
       array<float>& ndeviator = dataSets.insert("Normalized deviator stress");
       ndeviator.grow(axial.size);
-      /**/  if(0) for(int i: range(ndeviator.size)) ndeviator[i] = ((axial[i]-radial[i])/radial[i]);
-      else if(1) for(int i: range(ndeviator.size)) ndeviator[i] = (axial[i]-pressure)/pressure;
+      /**/  if(1) for(int i: range(ndeviator.size)) ndeviator[i] = ((axial[i]-radial[i])/radial[i]);
+      else if(0) for(int i: range(ndeviator.size)) ndeviator[i] = (axial[i]-pressure)/pressure;
       else /**/  for(int i: range(ndeviator.size)) ndeviator[i] = ((axial[i]-min(pressure,radial[i]))/min(pressure,radial[i]));
      }
      assert_(dataSets.contains(plot.xlabel), plot.xlabel);
      assert_(dataSets.contains(plot.ylabel), plot.ylabel);
-     parameters.filter([&](string key, const Variant&){ return allCoordinates.at(key).size==1; });
+     //parameters.filter([&](string key, const Variant&){ return allCoordinates.at(key).size==1; });
      //float key = dataSets.at(plot.ylabel).last();
      /*size_t i = plot.dataSets.size();//0; while(i<plot.dataSets.size() && plot.dataSets.values[i].values.last() <= key) i++;
      plot.dataSets.keys.insertAt(i, str(parameters,", "_));

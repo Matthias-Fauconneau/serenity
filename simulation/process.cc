@@ -6,28 +6,30 @@ void Simulation::stepProcess() {
  //pressure = 0; membraneViscosity = 1; // DEBUG
  // Process
  if(grain->count == targetGrainCount) {
-  log("Enable friction");
-  dynamicGrainObstacleFrictionCoefficient = targetDynamicGrainObstacleFrictionCoefficient;
-  dynamicGrainMembraneFrictionCoefficient = targetDynamicGrainMembraneFrictionCoefficient;
-  dynamicGrainGrainFrictionCoefficient = targetDynamicGrainGrainFrictionCoefficient;
-  dynamicGrainWireFrictionCoefficient = targetDynamicGrainWireFrictionCoefficient;
-  staticFrictionSpeed = targetStaticFrictionSpeed;
-  staticFrictionLength = targetStaticFrictionLength;
-  staticFrictionStiffness = targetStaticFrictionStiffness;
-  staticFrictionDamping = targetStaticFrictionDamping;
-  if(processState  < Pressure) { // Fits top plate while disabling gravity
-   log("Fits plate");
+  if(processState  < Pressure) {
+   //log("Enable friction");
+   dynamicGrainObstacleFrictionCoefficient = targetDynamicGrainObstacleFrictionCoefficient;
+   dynamicGrainMembraneFrictionCoefficient = targetDynamicGrainMembraneFrictionCoefficient;
+   dynamicGrainGrainFrictionCoefficient = targetDynamicGrainGrainFrictionCoefficient;
+   dynamicGrainWireFrictionCoefficient = targetDynamicGrainWireFrictionCoefficient;
+   staticFrictionSpeed = targetStaticFrictionSpeed;
+   staticFrictionLength = targetStaticFrictionLength;
+   staticFrictionStiffness = targetStaticFrictionStiffness;
+   staticFrictionDamping = targetStaticFrictionDamping;
+  }
+  if(processState < Pressure) { // Fits top plate while disabling gravity
+   //log("Fits plate");
    float topZ = 0;
    for(float z: grain->Pz.slice(simd, grain->count)) topZ = ::max(topZ, z+Grain::radius);
    if(topZ < this->topZ) this->topZ = topZ;
    topZ0 = this->topZ;
-   log("Zeroes gravity");
+   //log("Zeroes gravity");
    Gz = 0;
   }
   if(processState < Pressure) {
-   log("Enables pressure");
+   //log("Enables pressure");
    //if(timeStep%(int(1/(dt*60/s))) == 0) log(maxGrainV*1e3f, "mm/s");
-   if(maxGrainV > 600 * mm/s) return;
+   //if(maxGrainV > 600 * mm/s) return;
    pressure = targetPressure;
   }
   if(pressure < targetPressure || membraneViscosity < 1) { // Increases pressure toward target pressure
@@ -42,7 +44,7 @@ void Simulation::stepProcess() {
     topForceZ = 0; topSumStepCount = 0;
     bottomForceZ = 0; bottomSumStepCount = 0;
     radialForce = 0; radialSumStepCount = 0;
-    log("Displaces plates");
+    //log("Displaces plates");
    }
    processState = Load;
    topZ -= dt * plateSpeed;
@@ -50,8 +52,8 @@ void Simulation::stepProcess() {
   }
  } else {
   // Increases current height
-  if(currentHeight < topZ-Grain::radius) currentHeight += verticalSpeed * dt;
-  else currentHeight = topZ-Grain::radius;
+  if(currentHeight < topZ-Grain::radius/2) currentHeight += verticalSpeed * dt;
+  //else currentHeight = topZ-Grain::radius;
 
 #if WIRE
   // Generates wire
@@ -145,7 +147,7 @@ void Simulation::stepProcess() {
       grain->Px[simd+i] = newPosition.x;
       grain->Py[simd+i] = newPosition.y;
       grain->Pz[simd+i] = newPosition.z;
-      grain->Vx[simd+i] = 0; grain->Vy[simd+i] = 0; grain->Vz[simd+i] = 0; //-0.1 * m/s;
+      grain->Vx[simd+i] = 0; grain->Vy[simd+i] = 0; grain->Vz[simd+i] = -1 * m/s;
       grain->AVx[simd+i] = 0; grain->AVy[simd+i] = 0; grain->AVz[simd+i] = 0;
       float t0 = 2*PI*random();
       float t1 = acos(1-2*random());

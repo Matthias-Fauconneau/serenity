@@ -29,6 +29,7 @@ constexpr string Simulation::patterns[];
 
 Simulation::Simulation(const Dict& p) :
   dt((float)p.at("TimeStep")*s),
+  normalDampingRate((float)p.at("nDamping")*1),
   targetDynamicGrainObstacleFrictionCoefficient(0.228),
   targetDynamicGrainMembraneFrictionCoefficient(0.228),
   targetDynamicGrainGrainFrictionCoefficient(0.096),
@@ -37,10 +38,10 @@ Simulation::Simulation(const Dict& p) :
   targetStaticFrictionLength((float)p.at("sfLength")*m),
   targetStaticFrictionStiffness((float)p.at("sfStiffness")*N/m),
   targetStaticFrictionDamping((float)p.at("sfDamping")*N/(m/s)),
-  targetGrainCount(4*PI*cb((float)p.at("Radius")*mm)/Grain::volume/(1+0.7)),
+  targetGrainCount(4*PI*cb((float)p.at("Radius")*mm)/Grain::volume/(1+0.615)-49),
   grain(targetGrainCount),
   membrane((float)p.at("Radius")*mm),
-  Gz(1/*00*/ * -10 * N/kg),
+  Gz(5000 * -10 * N/kg),
   targetPressure((float)p.at("Pressure")*Pa),
   plateSpeed((float)p.at("Speed")*mm/s),
   currentHeight(Grain::radius),
@@ -246,8 +247,9 @@ void Simulation::run() {
    if(!primed) {
     primed = true;
     //if(existsFile(arguments()[0])) log("Overwrote", arguments()[0]);
-    if(!existsFile(arguments()[0], Folder("Results",home(),true)))
-     pressureStrain = File(arguments()[0], Folder("Results",home()), Flags(WriteOnly|Create|Truncate));
+    String name = replace(/*replace(*/arguments()[0]/*,"=",":")*/,"/",":");
+    if(!existsFile(name))
+     pressureStrain = File(name, currentWorkingDirectory(), Flags(WriteOnly|Create|Truncate));
     {
      String line = "voidRatio:"+str(voidRatio)+"\n";
      log_(line);

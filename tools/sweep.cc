@@ -22,6 +22,7 @@ struct ParameterSweep {
    if(queued ) log("Queued jobs:["+str(queuedCount)+"]: qdel -f"+queued+" &");
   }
   size_t done = 0, running = 0, queued = 0;
+  parameters["nDamping"__] = "1"__;
   for(string dt: {"1"_}) {
    parameters["TimeStep"__] = String(dt+"µ");
    for(string plateSpeed: {/*"1"_,*/"10"_}) {
