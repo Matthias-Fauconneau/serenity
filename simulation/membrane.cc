@@ -107,7 +107,7 @@ static inline void membraneTensionPressure(const float* const Px, const float* c
    const vXsf VOz = load(Vz, v);
 
    // Tension
-   tension(3) tension(4); pressure(3, 4)
+   tension(3) tension(4);
    const vXsf fx = load(Fx, v) + tx3 + tx4; store(Fx, v, fx);
    const vXsf fy = load(Fy, v) + ty3 + ty4; store(Fy, v, fy);
    const vXsf fz = load(Fz, v)  + tz3 + tz4; store(Fz, v, fz);
@@ -146,7 +146,6 @@ void Simulation::stepMembrane() {
 void Simulation::stepMembraneIntegration() {
  if(!membrane->count) return;
  float maxMembraneV2 = 0;
- membraneViscosity = 1; // DEBUG
  if(membraneViscosity) {
   const size_t threadCount = ::threadCount();
   float maxMembraneV2_[threadCount]; mref<float>(maxMembraneV2_, threadCount).clear(0);

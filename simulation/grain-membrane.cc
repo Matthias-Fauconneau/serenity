@@ -80,7 +80,7 @@ static inline void evaluateGrainMembrane(const size_t start, const size_t size,
   const vXsf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
   const vXsf Fb = - Kb * sqrt(sqrt(depth)) * normalSpeed ; // Damping
   // Normal force
-  const vXsf Fn = Fk /*+ Fb*/;
+  const vXsf Fn = Fk + Fb;
   const vXsf NFx = Fn * Nx;
   const vXsf NFy = Fn * Ny;
   const vXsf NFz = Fn * Nz;
@@ -160,9 +160,9 @@ static inline void evaluateGrainMembrane(const size_t start, const size_t size,
   // Resets contacts without static friction
   localAx = blend(hasStaticFriction, _0f, localAx); // FIXME use 1s (NaN) not 0s to flag resets
 
-  store(pFx, i, NFx /*+ FTx*/);
-  store(pFy, i, NFy /*+ FTy*/);
-  store(pFz, i, NFz /*+ FTz*/);
+  store(pFx, i, NFx + FTx);
+  store(pFy, i, NFy + FTy);
+  store(pFz, i, NFz + FTz);
   store(pTAx, i, RAy*FTz - RAz*FTy);
   store(pTAy, i, RAz*FTx - RAx*FTz);
   store(pTAz, i, RAx*FTy - RAy*FTx);
@@ -498,26 +498,31 @@ void Simulation::stepGrainMembrane() {
   size_t index = grainMembraneContact[i];
   size_t a = grainMembraneA[index];
   size_t b = grainMembraneB[index];
-  /*{
+  if(0) {
    const float* const gPx = grain->Px.data+simd, *gPy = grain->Py.data+simd, *gPz = grain->Pz.data+simd;
    const float* const mPx = membrane->Px.data, *mPy = membrane->Py.data, *mPz = membrane->Pz.data;
    const float Rx = gPx[a]-mPx[b],  Ry = gPy[a]-mPy[b], Rz = gPz[a]-mPz[b];
-   log(a, b, membrane->margin, membrane->W, membrane->stride, membrane->H,
-       b-membrane->margin,
-       (b-membrane->margin)/membrane->stride,
-       (b-membrane->margin)%membrane->stride,
-       gPx[a], gPy[a], gPz[a],
-       mPx[b], mPy[b], mPz[b],
-       Rx, Ry, Rz,
-       Rx*Rx + Ry*Ry + Rz*Rz,
-       sqrt(Rx*Rx + Ry*Ry + Rz*Rz),
-       sqrt(Rx*Rx + Ry*Ry + Rz*Rz)-Grain::radius,
-       sqrt(Rx*Rx + Ry*Ry + Rz*Rz) < Grain::radius,
-       sqrt(sq(mPx[b])+sq(mPy[b])+sq(mPz[b])),
-       sqrt(sq(mPx[b])+sq(mPy[b])+sq(mPz[b]))-membrane->radius,
-       sqrt(sq(mPx[b])+sq(mPy[b])+sq(mPz[b])) < membrane->radius
-       );
-  }*/
+   const float Fx = grainMembraneFx[i], Fy = grainMembraneFy[i], Fz = grainMembraneFz[i];
+   assert_(sqrt(Fx*Fx + Fy*Fy + Fz*Fz) < 500*N,
+           a, "/", grain->count, "b", b, "/",
+           "m", membrane->margin, "W", membrane->W, "s", membrane->stride, "H", membrane->H,
+           "b0", b-membrane->margin,
+           "x", (b-membrane->margin)/membrane->stride,
+           "y", (b-membrane->margin)%membrane->stride,
+           "g", gPx[a], gPy[a], gPz[a],
+           "m", mPx[b], mPy[b], mPz[b],
+           "R", Rx, Ry, Rz, //Rx*Rx + Ry*Ry + Rz*Rz,
+           sqrt(Rx*Rx + Ry*Ry + Rz*Rz),
+           "R-gR", sqrt(Rx*Rx + Ry*Ry + Rz*Rz)-Grain::radius,
+           "R<gR", sqrt(Rx*Rx + Ry*Ry + Rz*Rz) < Grain::radius,
+           "Rm", sqrt(sq(mPx[b])+sq(mPy[b])+sq(mPz[b])),
+           "Rm-mR", sqrt(sq(mPx[b])+sq(mPy[b])+sq(mPz[b]))-membrane->radius,
+           "Rm<mR", sqrt(sq(mPx[b])+sq(mPy[b])+sq(mPz[b])) < membrane->radius,
+           "Rm<mR", sqrt(sq(mPx[b])+sq(mPy[b])+sq(mPz[b])) < membrane->radius+Grain::radius,
+           "Rm<mR", sqrt(sq(mPx[b])+sq(mPy[b])+sq(mPz[b])) < membrane->radius*3./2,
+           "F", Fx, Fy, Fz, sqrt(Fx*Fx + Fy*Fy + Fz*Fz)
+           );
+  }
   grain->Fx[simd+a] += grainMembraneFx[i];
   membrane->Fx[b] -= grainMembraneFx[i];
   grain->Fy[simd+a] += grainMembraneFy[i];

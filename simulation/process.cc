@@ -3,8 +3,10 @@
 #include "membrane.h"
 
 void Simulation::stepProcess() {
+ //pressure = 0; membraneViscosity = 1; // DEBUG
  // Process
  if(grain->count == targetGrainCount) {
+  log("Enable friction");
   dynamicGrainObstacleFrictionCoefficient = targetDynamicGrainObstacleFrictionCoefficient;
   dynamicGrainMembraneFrictionCoefficient = targetDynamicGrainMembraneFrictionCoefficient;
   dynamicGrainGrainFrictionCoefficient = targetDynamicGrainGrainFrictionCoefficient;
@@ -14,27 +16,33 @@ void Simulation::stepProcess() {
   staticFrictionStiffness = targetStaticFrictionStiffness;
   staticFrictionDamping = targetStaticFrictionDamping;
   if(processState  < Pressure) { // Fits top plate while disabling gravity
+   log("Fits plate");
    float topZ = 0;
    for(float z: grain->Pz.slice(simd, grain->count)) topZ = ::max(topZ, z+Grain::radius);
    if(topZ < this->topZ) this->topZ = topZ;
    topZ0 = this->topZ;
+   log("Zeroes gravity");
    Gz = 0;
   }
   if(processState < Pressure) {
+   log("Enables pressure");
    //if(timeStep%(int(1/(dt*60/s))) == 0) log(maxGrainV*1e3f, "mm/s");
    if(maxGrainV > 600 * mm/s) return;
    pressure = targetPressure;
   }
   if(pressure < targetPressure || membraneViscosity < 1) { // Increases pressure toward target pressure
+   if(processState < Pressure) log("Release");
    processState = Pressure;
    //pressure += dt * targetPressure;
+   assert_(pressure== targetPressure);
    membraneViscosity += 100 * dt;
-  } else { // Displace plates with constant velocity
+  } else { // Displaces plates with constant velocity
    pressure = targetPressure;
    if(processState < Load) {
     topForceZ = 0; topSumStepCount = 0;
     bottomForceZ = 0; bottomSumStepCount = 0;
     radialForce = 0; radialSumStepCount = 0;
+    log("Displaces plates");
    }
    processState = Load;
    topZ -= dt * plateSpeed;
@@ -101,7 +109,7 @@ void Simulation::stepProcess() {
     if(grain->count == targetGrainCount) break;
     vec2 p(random()*2-1,random()*2-1);
     if(length(p)<1) { // Within unit circle
-     const float inradius = membrane->radius*cos(PI/membrane->W)-Grain::radius;
+     const float inradius = membrane->radius*cos(PI/membrane->W) /*/2*//*DEBUG*/ -Grain::radius;
      vec3 newPosition (inradius*p.x, inradius*p.y, Grain::radius);
      if(grain->count) {// Deposits grain without grain overlap
       const/*expr*/ size_t threadCount = ::threadCount();
@@ -126,7 +134,7 @@ void Simulation::stepProcess() {
       //log(newPosition.z);
      }
      // Under current wire drop height
-     if(newPosition.z <= currentHeight) {
+     if(newPosition.z < currentHeight) {
 #if WIRE
       // Without wire overlap
       for(size_t index: range(wire.count))
@@ -137,7 +145,7 @@ void Simulation::stepProcess() {
       grain->Px[simd+i] = newPosition.x;
       grain->Py[simd+i] = newPosition.y;
       grain->Pz[simd+i] = newPosition.z;
-      grain->Vx[simd+i] = 0; grain->Vy[simd+i] = 0; grain->Vz[simd+i] = -0.1 * m/s;
+      grain->Vx[simd+i] = 0; grain->Vy[simd+i] = 0; grain->Vz[simd+i] = 0; //-0.1 * m/s;
       grain->AVx[simd+i] = 0; grain->AVy[simd+i] = 0; grain->AVz[simd+i] = 0;
       float t0 = 2*PI*random();
       float t1 = acos(1-2*random());

@@ -35,7 +35,7 @@ void Simulation::grainLattice() {
    vXsi index = convert(scale*(Az-minZ)) * sizeYX
      + convert(scale*(Ay-minY)) * sizeX
      + convert(scale*(Ax-minX));
-   /*for(int k: range(simd)) assert_(index[k] >= -(base-lattice.cells.data) && index[k]<int(lattice.base.size),
+   if(1) for(int k: range(simd)) assert_(index[k] >= -(base-lattice.cells.data) && index[k]<int(lattice.base.size),
                                    "#", i+k, "/", grain->count,
                                    "@", index[k], "<", base-lattice.cells.data,
                                    "size", lattice.size,
@@ -47,7 +47,7 @@ void Simulation::grainLattice() {
                                    "X", Ax[k] /m, Ay[k] /m, Az[k] /m,
                                    "V", grain->Vx[simd+i+k] /(m/s), grain->Vy[simd+i+k] /(m/s), grain->Vz[simd+i+k] /(m/s),
                                     "F", grain->Fx[simd+i+k] /N, grain->Fy[simd+i+k] /N, grain->Fz[simd+i+k] /N
-                                   );*/
+                                   );
    ::scatter(base, index, a);
   }
  };
@@ -96,6 +96,24 @@ void Simulation::stepGrainIntegration() {
    vXsf Vx = load(pVx, i), Vy = load(pVy, i), Vz = load(pVz, i);
    vXsf Px = load(pPx, i), Py = load(pPy, i), Pz = load(pPz, i);
    //for(int k: range(simd)) log(k, Pz[k], Vz[k], Fz[k]);
+   if(0) for(int k: range(simd)) {
+    assert_(sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 500*N &&
+            sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k] < 8*m/s &&
+            Pz[k] < membrane->height,
+            sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 500*N,
+            sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k] < 8*m/s,
+            Pz[k] < membrane->height-Grain::radius,
+            "I", i+k, grain->count,
+            "H", membrane->height,
+            "X", Px[k], Py[k], Pz[k],
+            "V", Vx[k], Vy[k], Vz[k], sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k],
+            "F", Fx[k], Fy[k], Fz[k], sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k],
+            "//",
+            "H", (membrane->height-Grain::radius) /m,
+            "X",  Px[k] /m, Py[k] /m, Pz[k] /m,
+            "V", Vx[k] /(m/s), Vy[k] /(m/s), Vz[k] /(m/s),
+            "F", Fx[k] /N, Fy[k] /N, Fz[k] /N);
+   }
    // Symplectic Euler
    Vx += dt_mass * Fx;
    Vy += dt_mass * Fy;
@@ -133,7 +151,7 @@ void Simulation::stepGrainIntegration() {
  }, threadCount);
  float maxGrainV2 = 0;
  for(size_t k: range(threadCount)) maxGrainV2 = ::max(maxGrainV2, maxGrainV2_[k]);
- this->maxGrainV = sqrt(maxGrainV);
+ maxGrainV = sqrt(maxGrainV2);
  float maxGrainGrainV = maxGrainV + maxGrainV;
  grainGrainGlobalMinD -= maxGrainGrainV * this->dt;
 }

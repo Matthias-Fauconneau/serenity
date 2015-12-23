@@ -16,7 +16,7 @@ struct SimulationView : Widget {
  const Simulation& simulation;
 
  size_t timeStep = 0;
- vec2 yawPitch = vec2(0, 0/*-PI/3*/); // Current view angles
+ vec2 yawPitch = vec2(0, -PI/2); // Current view angles
 
  struct {
   vec2 cursor;

@@ -40,13 +40,13 @@ Simulation::Simulation(const Dict& p) :
   targetGrainCount(4*PI*cb((float)p.at("Radius")*mm)/Grain::volume/(1+0.7)),
   grain(targetGrainCount),
   membrane((float)p.at("Radius")*mm),
-  Gz(100 * -10 * N/kg),
+  Gz(1/*00*/ * -10 * N/kg),
   targetPressure((float)p.at("Pressure")*Pa),
   plateSpeed((float)p.at("Speed")*mm/s),
   currentHeight(Grain::radius),
   topZ(membrane->height),
-  lattice {sqrt(3.)/(2*Grain::radius), vec3(vec2(-membrane->radius), -Grain::radius*2),
-                                           vec3(vec2(membrane->radius), membrane->height+Grain::radius)}
+  lattice {sqrt(3.)/(2*Grain::radius), vec3(vec2(-(membrane->radius*3./2/*+Grain::radius*/)), -Grain::radius*2),
+                                           vec3(vec2(membrane->radius*3./2/*+Grain::radius*/), membrane->height+Grain::radius)}
 #if WIRE
 , pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):None)
 #endif
@@ -82,9 +82,7 @@ void Simulation::step() {
  grainTotalTime.stop();
 
  membraneTotalTime.start();
- if(processState >= ProcessState::Pressure || 1) {
-  stepMembrane();
- }
+ if(membraneViscosity) stepMembrane();
  grainMembraneTotalTime.start();
  stepGrainMembrane();
  grainMembraneTotalTime.stop();
