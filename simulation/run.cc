@@ -18,7 +18,7 @@ __attribute((constructor(101))) void logCompiler() {
 #else
  log("PThread", ::threadCount());
 #endif
- //log_(File("/proc/sys/kernel/hostname").readUpTo(256));
+ log_(File("/proc/sys/kernel/hostname").readUpTo(256));
  log(arguments());
 }
 

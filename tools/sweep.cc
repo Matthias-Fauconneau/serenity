@@ -5,7 +5,7 @@ struct ParameterSweep {
   array<String> all, missing;
   Dict parameters;
   array<String> existing;
-  auto list = Folder("Results", home()).list(Files);
+  auto list = /*Folder("Results", home())*/currentWorkingDirectory().list(Files);
   for(string name: list) {
    existing.append(copyRef(name));
    //if(startsWith(name, "Count=")) remove(name);
@@ -90,8 +90,6 @@ struct ParameterSweep {
    else {
     String parameters = missing.take(random%missing.size);
     String name = replace(parameters,':','=');
-    //-hard -l h_vmem=4G,vf=4G
-    //"-pe", "omp",
     if(execute("/opt/ge2011.pleiades/bin/linux-x64/qsub.orig", {
                "-q", "fast.q@@blade04,fast.q@@blade05",
                "-l", "fq=true",
@@ -99,7 +97,7 @@ struct ParameterSweep {
                "-j", "y",
                "-o", "Results/$JOB_NAME.stdout",
                "-b","y",
-               "-pe", "omp", "16"/*16*5/4*/,
+               "-pe", "omp", "16",
                "~/run", parameters})) { log("Error"); break; }
     count++;
    }

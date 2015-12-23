@@ -205,7 +205,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
   // Waits for all translation units to finish compilation before final link
   for(Build::Job& job: jobs) {
    int status = wait(job.pid);
-   log(job.stdout.readUpTo(4096));
+   log(job.stdout.readUpTo(8192));
    if(status) { binary={}; return; }
    else log(job.target+'\n');
   }
