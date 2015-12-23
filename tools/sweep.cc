@@ -5,7 +5,7 @@ struct ParameterSweep {
   array<String> all, missing;
   Dict parameters;
   array<String> existing;
-  auto list = /*Folder("Results", home())*/currentWorkingDirectory().list(Files);
+  auto list = Folder("Results", home()).list(Files);
   for(string name: list) {
    existing.append(copyRef(name));
    //if(startsWith(name, "Count=")) remove(name);
@@ -95,10 +95,10 @@ struct ParameterSweep {
                "-l", "fq=true",
                "-N", name,
                "-j", "y",
-               "-o", "Results/$JOB_NAME.stdout",
+               "-o", "$JOB_NAME.stdout",
                "-b","y",
                "-pe", "omp", "16",
-               "~/run", parameters})) { log("Error"); break; }
+               "~/run", parameters}, true, Folder("Results", home()))) { log("Error"); break; }
     count++;
    }
   }
