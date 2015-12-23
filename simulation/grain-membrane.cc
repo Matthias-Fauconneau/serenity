@@ -4,7 +4,7 @@
 #include "grain.h"
 #include "membrane.h"
 
-#define MEMBRANE_POINT 1
+#define MEMBRANE_POINT 0
 #if !MEMBRANE_POINT
 static inline float sqDistance(float Rx, float Ry, float Rz, float Rx0, float Ry0, float Rz0, float Rx1, float Ry1, float Rz1) {
  // -?
@@ -63,7 +63,7 @@ static inline void evaluateGrainMembrane(const size_t start, const size_t size,
   const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
   const vXsf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
   const vXsf depth = Gr - length;
-  for(int k: range(simd)) assert_(depth[k] > 0, depth[k], k);
+  //for(int k: range(simd)) assert_(depth[k] > 0, depth[k], k);
   const vXsf Nx = Rx/length, Ny = Ry/length, Nz = Rz/length;
   const vXsf RAx = - Gr  * Nx, RAy = - Gr * Ny, RAz = - Gr * Nz;
   /// Evaluates contact force between two objects with friction (rotating A, non rotating B)
@@ -498,7 +498,7 @@ void Simulation::stepGrainMembrane() {
   size_t index = grainMembraneContact[i];
   size_t a = grainMembraneA[index];
   size_t b = grainMembraneB[index];
-  if(0) {
+  /*if(0) {
    const float* const gPx = grain->Px.data+simd, *gPy = grain->Py.data+simd, *gPz = grain->Pz.data+simd;
    const float* const mPx = membrane->Px.data, *mPy = membrane->Py.data, *mPz = membrane->Pz.data;
    const float Rx = gPx[a]-mPx[b],  Ry = gPy[a]-mPy[b], Rz = gPz[a]-mPz[b];
@@ -522,7 +522,7 @@ void Simulation::stepGrainMembrane() {
            "Rm<mR", sqrt(sq(mPx[b])+sq(mPy[b])+sq(mPz[b])) < membrane->radius*3./2,
            "F", Fx, Fy, Fz, sqrt(Fx*Fx + Fy*Fy + Fz*Fz)
            );
-  }
+  }*/
   grain->Fx[simd+a] += grainMembraneFx[i];
   membrane->Fx[b] -= grainMembraneFx[i];
   grain->Fy[simd+a] += grainMembraneFy[i];

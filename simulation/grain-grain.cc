@@ -206,7 +206,7 @@ void Simulation::stepGrainGrain() {
                        + convert(scale*(Ax-minX));
     // Neighbours
     for(uint n: range(62)) { // A is not monotonous
-     /*for(int k: range(simd)) {
+     /*if(0) for(int k: range(simd)) {
       assert_((latticeNeighbours[n]-lattice.base.data)+index[k] >= -(lattice.base.data-lattice.cells.data)
               && (latticeNeighbours[n]-lattice.base.data)+index[k]<int(lattice.base.size),
               k, grain->count, index[k], (latticeNeighbours[n]-lattice.base.data),
