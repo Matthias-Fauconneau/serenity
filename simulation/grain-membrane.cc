@@ -5,66 +5,59 @@
 #include "membrane.h"
 
 #if MEMBRANE_FACE
-/// Returns nearest point to triangle
-/// \note The coordinates system is relative to the triangle origin (first vertex position).
-static inline bool nearest(float Rx, float Ry, float Rz, float Rx0, float Ry0, float Rz0, float Rx1, float Ry1, float Rz1, float& x, float& y, float& z) {
- // -?
- const float Dx = Ry0*Rz1 - Ry1*Rz0;
- const float Dy = Rz0*Rx1 - Rz1*Rx0;
- const float Dz = Rx0*Ry1 - Rx1*Ry0;
- /*const float L = sqrt(Dx*Dx + Dy*Dy + Dz*Dz);
- assert_(L, Dx, Dy, Dz, Rx, Ry, Rz, Rx0, Ry0, Rz0, Rx1, Ry1, Rz1);
- const float Nx = Dx/L;
- const float Ny = Dy/L;
- const float Nz = Dz/L;*/
- const float Nx = Dx;
- const float Ny = Dy;
- const float Nz = Dz;
- const float Px = Ny*Rz1 - Ry1*Nz;
- const float Py = Nz*Rx1 - Rz1*Nx;
- const float Pz = Nx*Ry1 - Rx1*Ny;
- const float det = Px * Rx0 + Py * Ry0 + Pz * Rz0;
+static inline bool pointTriangle(float Ox, float Oy, float Oz, float e0x, float e0y, float e0z, float e1x, float e1y, float e1z, float& d2) {
+ const float Nx = e0y*e1z - e1y*e0z;
+ const float Ny = e0z*e1x - e1z*e0x;
+ const float Nz = e0x*e1y - e1x*e0y;
+ const float Px = Ny*e1z - e1y*Nz;
+ const float Py = Nz*e1x - e1z*Nx;
+ const float Pz = Nx*e1y - e1x*Ny;
+ const float det = Px * e0x + Py * e0y + Pz * e0z;
  //assert_(det > 0.000001, det);
  const float invDet = 1 / det;
- float u = invDet * (Px*Rx + Py*Ry + Pz*Rz);
- //log(Rx, Ry, Rz, Rx0, Ry0, Rz0, u);
- if(u < 0) return false; //u = 0;
- const float Qx = Ry*Rz0 - Ry0*Rz;
- const float Qy = Rz*Rx0 - Rz0*Rx;
- const float Qz = Rx*Ry0 - Rx0*Ry;
+ float u = invDet * (Px*Ox + Py*Oy + Pz*Oz);
+ if(u < 0) return false;
+ const float Qx = Oy*e0z - e0y*Oz;
+ const float Qy = Oz*e0x - e0z*Ox;
+ const float Qz = Ox*e0y - e0x*Oy;
  float v = invDet * (Qx*Nx + Qy*Ny + Qz*Nz);
  if(v < 0) return false;
- if(u + v > 1) return false; //v = 1 - u;
- float t = invDet * (Qx*Rx1 + Qy*Ry1 + Qz*Rz1);
- // Relative to triangle origin
- x = u*Rx0 + v*Rx1 + t*Nx;
- y = u*Ry0 + v*Ry1 + t*Ny;
- z = u*Rz0 + v*Rz1 + t*Nz;
- float dx = Rx-x;
- float dy = Ry-y;
- float dz = Rz-z;
- log("------------------------");
- log("R", Rx, Ry, Rz);
- log("D", Dx, Dy, Dz);
- log(/*"L", L,*/ "det", det);
- log("u", u, "v", v, "t", t);
- log("xyz", x, y, z);
- log("d", dx, dy, dz, sqrt(dx*dx + dy*dy + dz*dz), sqrt(dx*dx + dy*dy + dz*dz)-Grain::radius);
- assert_(sqrt(dx*dx + dy*dy + dz*dz) > Grain::radius);
+ if(u + v > 1) return false;
+ const float N2 = Nx*Nx + Ny*Ny + Nz*Nz;
+ float t = invDet * (Qx*e1x + Qy*e1y + Qz*e1z);
+ assert(t >= 0);
+ d2 = t * N2;
  return true;
 }
-static inline float sqDistance(float Rx, float Ry, float Rz, float Rx0, float Ry0, float Rz0, float Rx1, float Ry1, float Rz1) {
- float x,y,z;
- if(nearest(Rx, Ry, Rz, Rx0, Ry0, Rz0, Rx1, Ry1, Rz1, x, y, z)) {
-  // Both test and nearest point are relative to the the triangle origin (first vertex position).
-  float dx = Rx-x;
-  float dy = Ry-y;
-  float dz = Rz-z;
-  return dx*dx + dy*dy + dz*dz;
- }
- else return inff;
+static inline bool pointTriangle(float Ox, float Oy, float Oz, float e0x, float e0y, float e0z, float e1x, float e1y, float e1z, float& d, float& Nx, float& Ny, float& Nz) {
+ Nx = e0y*e1z - e1y*e0z;
+ Ny = e0z*e1x - e1z*e0x;
+ Nz = e0x*e1y - e1x*e0y;
+ const float Px = Ny*e1z - e1y*Nz;
+ const float Py = Nz*e1x - e1z*Nx;
+ const float Pz = Nx*e1y - e1x*Ny;
+ const float det = Px * e0x + Py * e0y + Pz * e0z;
+ assert_(det, det);
+ const float invDet = 1 / det;
+ float u = invDet * (Px*Ox + Py*Oy + Pz*Oz);
+ if(u < 0) return false;
+ const float Qx = Oy*e0z - e0y*Oz;
+ const float Qy = Oz*e0x - e0z*Ox;
+ const float Qz = Ox*e0y - e0x*Oy;
+ float v = invDet * (Qx*Nx + Qy*Ny + Qz*Nz);
+ if(v < 0) return false;
+ if(u + v > 1) return false;
+ const float N = sqrt(Nx*Nx + Ny*Ny + Nz*Nz);
+ assert_(N);
+ float t = invDet * (Qx*e1x + Qy*e1y + Qz*e1z);
+ assert(t >= 0);
+ d = t * N;
+ Nx /= N;
+ Ny /= N;
+ Nz /= N;
+ assert_(sqrt(Nx*Nx + Ny*Ny + Nz*Nz) == 1, sqrt(Nx*Nx + Ny*Ny + Nz*Nz));
+ return true;
 }
-
 #endif
 
 static inline void evaluateGrainMembrane(const size_t start, const size_t size,
@@ -99,15 +92,15 @@ static inline void evaluateGrainMembrane(const size_t start, const size_t size,
 #if MEMBRANE_POINT
   // FIXME: Recomputing from intersection (more efficient than storing?)
   const vXsf Bx = gather(membranePx, B), By = gather(membranePy, B), Bz = gather(membranePz, B);
+  const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
 #else
-  vXsf Bx, By, Bz;
+  vXsf Rx, Ry, Rz;
   for(int k: range(simd)) {
    if(i+k >= grainMembraneContactSize) break; // FIXME: pad values produces NaN in ::nearest
-   //const float Ax = gPx[A], Ay = gPy[A], Az = gPz[A];
    const int b = B[k];
    const int v = b/2;
-   const float Ox = membranePx[v], Oy = membranePy[v], Oz = membranePz[v];
-   const float Rx = Ax[k]-Ox, Ry = Ay[k]-Oy, Rz = Az[k]-Oz;
+   const float V0x = membranePx[v], V0y = membranePy[v], V0z = membranePz[v];
+   const float Ox = Ax[k]-V0x, Oy = Ay[k]-V0y, Oz = Az[k]-V0z;
    const int rowIndex = (v-margin)/stride;
    const int e0 = -stride+rowIndex%2;
    const int e1 = e0-1;
@@ -117,30 +110,40 @@ static inline void evaluateGrainMembrane(const size_t start, const size_t size,
     const int e1v = v+e1;
     const float Rx0 = membranePx[e0v], Ry0 = membranePy[e0v], Rz0 = membranePz[e0v];
     const float Rx1 = membranePx[e1v], Ry1 = membranePy[e1v], Rz1 = membranePz[e1v];
-    float x,y,z;
-    bool contact = nearest(Rx, Ry, Rz, Rx0, Ry0, Rz0, Rx1, Ry1, Rz1, x, y, z);
+    float Nx, Ny, Nz, d;
+    bool contact = pointTriangle(Ox, Oy, Oz, Rx0, Ry0, Rz0, Rx1, Ry1, Rz1, d, Nx, Ny, Nz);
     assert_(contact);
-    Bx[k] = Ox+x;
-    By[k] = Oy+y;
-    Bz[k] = Oz+z;
+    Rx[k] = -d*Nx;
+    Ry[k] = -d*Ny;
+    Rz[k] = -d*Nz;
+    //log(V0x, V0y, V0z, d, Nx, Ny, Nz, Rx[k], Ry[k], Rz[k]);
+    //const float Rx = Ax[k]-Bx[k], Ry = Ay[k]-By[k], Rz = Az[k]-Bz[k];
+    //const float length = sqrt(Rx[k]*Rx[k] + Ry[k]*Ry[k] + Rz[k]*Rz[k]);
+    //assert_(length == -d, length, -d, ::length(vec3(Nx,Ny,Nz)));
+    assert_(-d < Grain::radius, -d, 1*Grain::radius, k, i+k, B[k]);
    } else { // (.,1,2)
     const int e1v = v+e1;
     const int e2v = v+e2;
     const float Rx1 = membranePx[e1v], Ry1 = membranePy[e1v], Rz1 = membranePz[e1v];
     const float Rx2 = membranePx[e2v], Ry2 = membranePy[e2v], Rz2 = membranePz[e2v];
-    float x,y,z;
-    bool contact = nearest(Rx, Ry, Rz, Rx1, Ry1, Rz1, Rx2, Ry2, Rz2, x, y, z);
+    float Nx, Ny, Nz, d;
+    bool contact = pointTriangle(Ox, Oy, Oz, Rx1, Ry1, Rz1, Rx2, Ry2, Rz2, d, Nx, Ny, Nz);
     assert_(contact);
-    Bx[k] = Ox+x;
-    By[k] = Oy+y;
-    Bz[k] = Oz+z;
+    Rx[k] = -d*Nx;
+    Ry[k] = -d*Ny;
+    Rz[k] = -d*Nz;
+    //log(V0x, V0y, V0z, d, Nx, Ny, Nz, Rx[k], Ry[k], Rz[k]);
+    //const float Rx = Ax[k]-Bx[k], Ry = Ay[k]-By[k], Rz = Az[k]-Bz[k];
+    //const float length = sqrt(Rx[k]*Rx[k] + Ry[k]*Ry[k] + Rz[k]*Rz[k]);
+    //assert_(length == -d, length, -d, ::length(vec3(Nx,Ny,Nz)));
+    assert_(-d < Grain::radius, -d, 1*Grain::radius, k, i+k, B[k]);
    }
   }
+  const vXsf Bx = Ax-Rx, By = Ay-Ry, Bz = Az-Rz;
 #endif
-  const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
   const vXsf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
   const vXsf depth = Gr - length;
-  //for(int k: range(simd)) assert_(depth[k] > 0, depth[k], k);
+  for(int k: range(simd)) assert_(depth[k] > 0, depth[k], k);
   const vXsf Nx = Rx/length, Ny = Ry/length, Nz = Rz/length;
   const vXsf RAx = - Gr  * Nx, RAy = - Gr * Ny, RAz = - Gr * Nz;
 #if MEMBRANE_FACE
@@ -399,25 +402,29 @@ void Simulation::stepGrainMembrane() {
      const float Ax = gPx[a], Ay = gPy[a], Az = gPz[a];
      const float Rx = Ax-Ox, Ry = Ay-Oy, Rz = Az-Oz;
      {// (.,0,1)
-      float sqDistance = ::sqDistance(Rx, Ry, Rz, Rx0, Ry0, Rz0, Rx1, Ry1, Rz1);
-      bool mask = sqDistance < sqVerletDistance;
-      if(mask) {
-       assert_(contactCount.count < grainMembraneA.capacity, grain->count);
-       uint targetIndex = contactCount.fetchAdd(1);
-       gmA[targetIndex] = a;
-       int b = 2*v+0;
-       gmB[targetIndex] = b;
+      float sqDistance;
+      if(pointTriangle(Rx, Ry, Rz, Rx0, Ry0, Rz0, Rx1, Ry1, Rz1, sqDistance)) {
+       bool mask = sqDistance < sqVerletDistance;
+       if(mask) {
+        assert_(contactCount.count < grainMembraneA.capacity, grain->count);
+        uint targetIndex = contactCount.fetchAdd(1);
+        gmA[targetIndex] = a;
+        int b = 2*v+0;
+        gmB[targetIndex] = b;
+       }
       }
      }
      {// (.,1,2)
-      assert_(contactCount.count < grainMembraneA.capacity);
-      float sqDistance = ::sqDistance(Rx, Ry, Rz, Rx1, Ry1, Rz1, Rx2, Ry2, Rz2);
-      bool mask = sqDistance < sqVerletDistance;
-      if(mask) {
-       uint targetIndex = contactCount.fetchAdd(1);
-       gmA[targetIndex] = a;
-       int b = 2*v+1;
-       gmB[targetIndex] = b;
+      float sqDistance;
+      if(pointTriangle(Rx, Ry, Rz, Rx1, Ry1, Rz1, Rx2, Ry2, Rz2, sqDistance)) {
+       bool mask = sqDistance < sqVerletDistance;
+       if(mask) {
+        assert_(contactCount.count < grainMembraneA.capacity);
+        uint targetIndex = contactCount.fetchAdd(1);
+        gmA[targetIndex] = a;
+        int b = 2*v+1;
+        gmB[targetIndex] = b;
+       }
       }
      }
     }
@@ -527,22 +534,26 @@ void Simulation::stepGrainMembrane() {
     const int e1v = v+e1;
     const float Rx0 = mPx[e0v], Ry0 = mPy[e0v], Rz0 = mPz[e0v];
     const float Rx1 = mPx[e1v], Ry1 = mPy[e1v], Rz1 = mPz[e1v];
-    float sqDistance = ::sqDistance(Rx, Ry, Rz, Rx0, Ry0, Rz0, Rx1, Ry1, Rz1);
-    bool mask = sqDistance < sqRadius;
-    if(mask) {
-     uint targetIndex = contactCount.fetchAdd(1);
-     gmContact[targetIndex] = i;
+    float sqDistance;
+    if(pointTriangle(Rx, Ry, Rz, Rx0, Ry0, Rz0, Rx1, Ry1, Rz1, sqDistance)) {
+     bool mask = sqDistance < sqRadius;
+     if(mask) {
+      uint targetIndex = contactCount.fetchAdd(1);
+      gmContact[targetIndex] = i;
+     } else gmL[i] = 0;
     } else gmL[i] = 0;
    } else { // (.,1,2)
     const int e1v = v+e1;
     const int e2v = v+e2;
     const float Rx1 = mPx[e1v], Ry1 = mPy[e1v], Rz1 = mPz[e1v];
     const float Rx2 = mPx[e2v], Ry2 = mPy[e2v], Rz2 = mPz[e2v];
-    float sqDistance = ::sqDistance(Rx, Ry, Rz, Rx1, Ry1, Rz1, Rx2, Ry2, Rz2);
-    bool mask = sqDistance < sqRadius;
-    if(mask) {
-     uint targetIndex = contactCount.fetchAdd(1);
-     gmContact[targetIndex] = i;
+    float sqDistance;
+    if(pointTriangle(Rx, Ry, Rz, Rx1, Ry1, Rz1, Rx2, Ry2, Rz2, sqDistance)) {
+     bool mask = sqDistance < sqRadius;
+     if(mask) {
+      uint targetIndex = contactCount.fetchAdd(1);
+      gmContact[targetIndex] = i;
+     } else gmL[i] = 0;
     } else gmL[i] = 0;
    }
   }

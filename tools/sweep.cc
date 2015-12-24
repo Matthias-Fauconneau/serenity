@@ -34,7 +34,7 @@ struct ParameterSweep {
       parameters["Radius"__] = radius; //mm
       for(string staticFrictionSpeed: {/*"1"_,*/"10"_,"100"_}) {
        parameters["sfSpeed"__] = staticFrictionSpeed; // mm/s
-       for(string staticFrictionLength: {/*"1µ"_,*/"10µ"_,"100µ"_}) {
+       for(string staticFrictionLength: {"1µ"_,"10µ"_}) {
         parameters["sfLength"__] = staticFrictionLength; // m
         for(string staticFrictionStiffness: {/*"1K"_,*/"10K"_,"100K"_}) {
          parameters["sfStiffness"__] = staticFrictionStiffness;
