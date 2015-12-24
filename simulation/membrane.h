@@ -5,14 +5,14 @@
 struct Membrane {
  virtual ~Membrane() {}
 
- sconst float density = 10 * 1000 * kg / cb(m);
+ sconst float density = /*10 **/ 1000 * kg / cb(m);
  sconst float curvature = 0;
  sconst float elasticModulus = 100 * MPa;
  sconst float poissonRatio = 0.48;
 
  const float radius;
 #if MEMBRANE_FACE
- const float resolution = 2*PI*radius/16;
+ const float resolution = 2*PI*radius/8;
 #else
  sconst float resolution = Grain::radius / 2;
 #endif

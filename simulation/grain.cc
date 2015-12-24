@@ -64,7 +64,22 @@ void Simulation::grainLattice() {
   vXsi index = convert(scale*(Az-minZ)) * sizeYX
     + convert(scale*(Ay-minY)) * sizeX
     + convert(scale*(Ax-minX));
-  for(int k: range(grain->count-i)) base[extract(index, k)] = extract(a, k);
+  for(int k: range(grain->count-i)) {
+   if(1) assert_(index[k] >= -(base-lattice.cells.data) && index[k]<int(lattice.base.size),
+                 "#", i+k, "/", grain->count,
+                 "@", index[k], "<", base-lattice.cells.data,
+                 "size", lattice.size,
+                 "min", minX[k], minY[k], minZ[k],
+                 "X", Ax[k], Ay[k], Az[k],
+                 "V", grain->Vx[simd+i+k], grain->Vy[simd+i+k], grain->Vz[simd+i+k],
+     "F", grain->Fx[simd+i+k], grain->Fy[simd+i+k], grain->Fz[simd+i+k],
+     "//",
+     "X", Ax[k] /m, Ay[k] /m, Az[k] /m,
+     "V", grain->Vx[simd+i+k] /(m/s), grain->Vy[simd+i+k] /(m/s), grain->Vz[simd+i+k] /(m/s),
+     "F", grain->Fx[simd+i+k] /N, grain->Fy[simd+i+k] /N, grain->Fz[simd+i+k] /N
+     );
+   base[extract(index, k)] = extract(a, k);
+  }
  }
 
  validGrainLattice = true;
@@ -96,7 +111,8 @@ void Simulation::stepGrainIntegration() {
    vXsf Vx = load(pVx, i), Vy = load(pVy, i), Vz = load(pVz, i);
    vXsf Px = load(pPx, i), Py = load(pPy, i), Pz = load(pPz, i);
    //for(int k: range(simd)) log(k, Pz[k], Vz[k], Fz[k]);
-   /*if(0) for(int k: range(simd)) {
+#if DEBUG
+   if(1) for(int k: range(simd)) {
     assert_(sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 500*N &&
             sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k] < 8*m/s &&
             Pz[k] < membrane->height,
@@ -113,7 +129,8 @@ void Simulation::stepGrainIntegration() {
             "X",  Px[k] /m, Py[k] /m, Pz[k] /m,
             "V", Vx[k] /(m/s), Vy[k] /(m/s), Vz[k] /(m/s),
             "F", Fx[k] /N, Fy[k] /N, Fz[k] /N);
-   }*/
+   }
+#endif
    // Symplectic Euler
    Vx += dt_mass * Fx;
    Vy += dt_mass * Fy;

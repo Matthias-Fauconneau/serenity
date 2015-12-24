@@ -69,6 +69,7 @@ struct PlotView : HList<Plot> {
    map<String, array<Variant>> allCoordinates;
    for(Folder folder: {"."_}/*arguments()*/) {
     for(string name: folder.list(Files)) {
+     if(name=="core") continue;
      if(endsWith(name,"stdout")) continue;
      auto parameters = parseDict(name);
      for(const auto parameter: parameters)
@@ -76,6 +77,7 @@ struct PlotView : HList<Plot> {
        allCoordinates.at(parameter.key).insertSorted(::copy(parameter.value));
     }
     for(string name: folder.list(Files)) {
+     if(name=="core") continue;
      if(endsWith(name,"stdout")) continue;
      TextData s (readFile(name, folder));
      s.until('\n'); // First line: constant results
@@ -98,7 +100,7 @@ struct PlotView : HList<Plot> {
      for(auto data: dataSets) {
       if(data.key=="Axial (Pa)" || data.key == "Radial (Pa)") data.value = medianFilter(data.value);
       else {
-       assert_(data.value.size > 2*medianWindowRadius, data.value.size);
+       assert_(data.value.size >= 2*medianWindowRadius, data.value.size);
        data.value = copyRef(data.value.slice(medianWindowRadius, data.value.size-2*medianWindowRadius));
       }
      }
@@ -113,7 +115,7 @@ struct PlotView : HList<Plot> {
       else if(0) for(int i: range(ndeviator.size)) ndeviator[i] = (axial[i]-pressure)/pressure;
       else /**/  for(int i: range(ndeviator.size)) ndeviator[i] = ((axial[i]-min(pressure,radial[i]))/min(pressure,radial[i]));
      }
-     assert_(dataSets.contains(plot.xlabel), plot.xlabel);
+     assert_(dataSets.contains(plot.xlabel), plot.xlabel, name);
      assert_(dataSets.contains(plot.ylabel), plot.ylabel);
      //parameters.filter([&](string key, const Variant&){ return allCoordinates.at(key).size==1; });
      //float key = dataSets.at(plot.ylabel).last();

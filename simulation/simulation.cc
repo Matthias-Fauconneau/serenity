@@ -41,7 +41,11 @@ Simulation::Simulation(const Dict& p) :
   targetGrainCount(4*PI*cb((float)p.at("Radius")*mm)/Grain::volume/(1+0.615)-49),
   grain(targetGrainCount),
   membrane((float)p.at("Radius")*mm),
+  #if DEBUG
+  Gz( -10 * N/kg),
+  #else
   Gz(5000 * -10 * N/kg),
+  #endif
   targetPressure((float)p.at("Pressure")*Pa),
   plateSpeed((float)p.at("Speed")*mm/s),
   currentHeight(Grain::radius),
