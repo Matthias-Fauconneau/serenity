@@ -13,7 +13,6 @@ static inline bool pointTriangle(float Ox, float Oy, float Oz, float e0x, float 
  const float Py = Nz*e1x - e1z*Nx;
  const float Pz = Nx*e1y - e1x*Ny;
  const float det = Px * e0x + Py * e0y + Pz * e0z;
- //assert_(det > 0.000001, det);
  const float invDet = 1 / det;
  float u = invDet * (Px*Ox + Py*Oy + Pz*Oz);
  if(u < 0) return false;
@@ -23,10 +22,10 @@ static inline bool pointTriangle(float Ox, float Oy, float Oz, float e0x, float 
  float v = invDet * (Qx*Nx + Qy*Ny + Qz*Nz);
  if(v < 0) return false;
  if(u + v > 1) return false;
- const float N2 = Nx*Nx + Ny*Ny + Nz*Nz;
  float t = invDet * (Qx*e1x + Qy*e1y + Qz*e1z);
- assert(t >= 0);
- d2 = t * N2;
+ if(t > 0) return false;
+ const float N2 = Nx*Nx + Ny*Ny + Nz*Nz;
+ d2 = -t * N2;
  return true;
 }
 static inline bool pointTriangle(float Ox, float Oy, float Oz, float e0x, float e0y, float e0z, float e1x, float e1y, float e1z, float& d, float& Nx, float& Ny, float& Nz) {
@@ -47,15 +46,13 @@ static inline bool pointTriangle(float Ox, float Oy, float Oz, float e0x, float 
  float v = invDet * (Qx*Nx + Qy*Ny + Qz*Nz);
  if(v < 0) return false;
  if(u + v > 1) return false;
- const float N = sqrt(Nx*Nx + Ny*Ny + Nz*Nz);
- assert_(N);
  float t = invDet * (Qx*e1x + Qy*e1y + Qz*e1z);
- assert(t >= 0);
- d = t * N;
+ if(t > 0) return false;
+ const float N = sqrt(Nx*Nx + Ny*Ny + Nz*Nz);
+ d = -t * N;
  Nx /= N;
  Ny /= N;
  Nz /= N;
- assert_(sqrt(Nx*Nx + Ny*Ny + Nz*Nz) == 1, sqrt(Nx*Nx + Ny*Ny + Nz*Nz));
  return true;
 }
 #endif
@@ -113,14 +110,14 @@ static inline void evaluateGrainMembrane(const size_t start, const size_t size,
     float Nx, Ny, Nz, d;
     bool contact = pointTriangle(Ox, Oy, Oz, Rx0, Ry0, Rz0, Rx1, Ry1, Rz1, d, Nx, Ny, Nz);
     assert_(contact);
-    Rx[k] = -d*Nx;
-    Ry[k] = -d*Ny;
-    Rz[k] = -d*Nz;
+    Rx[k] = d*Nx;
+    Ry[k] = d*Ny;
+    Rz[k] = d*Nz;
     //log(V0x, V0y, V0z, d, Nx, Ny, Nz, Rx[k], Ry[k], Rz[k]);
     //const float Rx = Ax[k]-Bx[k], Ry = Ay[k]-By[k], Rz = Az[k]-Bz[k];
     //const float length = sqrt(Rx[k]*Rx[k] + Ry[k]*Ry[k] + Rz[k]*Rz[k]);
     //assert_(length == -d, length, -d, ::length(vec3(Nx,Ny,Nz)));
-    assert_(-d < Grain::radius, -d, 1*Grain::radius, k, i+k, B[k]);
+    assert_(d >= 0 && d < Grain::radius, -d, 1*Grain::radius, k, i+k, B[k]);
    } else { // (.,1,2)
     const int e1v = v+e1;
     const int e2v = v+e2;
@@ -129,14 +126,14 @@ static inline void evaluateGrainMembrane(const size_t start, const size_t size,
     float Nx, Ny, Nz, d;
     bool contact = pointTriangle(Ox, Oy, Oz, Rx1, Ry1, Rz1, Rx2, Ry2, Rz2, d, Nx, Ny, Nz);
     assert_(contact);
-    Rx[k] = -d*Nx;
-    Ry[k] = -d*Ny;
-    Rz[k] = -d*Nz;
+    Rx[k] = d*Nx;
+    Ry[k] = d*Ny;
+    Rz[k] = d*Nz;
     //log(V0x, V0y, V0z, d, Nx, Ny, Nz, Rx[k], Ry[k], Rz[k]);
     //const float Rx = Ax[k]-Bx[k], Ry = Ay[k]-By[k], Rz = Az[k]-Bz[k];
     //const float length = sqrt(Rx[k]*Rx[k] + Ry[k]*Ry[k] + Rz[k]*Rz[k]);
     //assert_(length == -d, length, -d, ::length(vec3(Nx,Ny,Nz)));
-    assert_(-d < Grain::radius, -d, 1*Grain::radius, k, i+k, B[k]);
+    assert_(d >= 0 && d < Grain::radius, d, 1*Grain::radius, k, i+k, B[k]);
    }
   }
   const vXsf Bx = Ax-Rx, By = Ay-Ry, Bz = Az-Rz;
