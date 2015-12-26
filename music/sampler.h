@@ -7,7 +7,7 @@
 #include "thread.h"
 #include "map.h"
 #include "simd.h"
-typedef struct fftwf_plan_s* fftwf_plan;
+#include "time.h"
 
 /// High performance, low latency SFZ sound font sampler
 struct Sampler : Poll {
@@ -22,6 +22,9 @@ struct Sampler : Poll {
     // Using two locks as new notes may be added while decoding (except on realloc)
 
     array<Layer> layers;
+
+    Random random;
+    uint cc64;
 
     static constexpr uint channels = 2;
     uint rate = 0;
@@ -38,6 +41,7 @@ struct Sampler : Poll {
     Sampler(string path, const uint periodSize=256/*[12ms/82Hz/4m]*/, function<void(uint)> timeChanged={}, Thread& thread=mainThread);
     virtual ~Sampler();
 
+    void ccEvent(uint key, uint value);
     void noteEvent(uint key, uint velocity, float2 gain);
 
     /// Callback to decode samples

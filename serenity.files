@@ -1,4 +1,4 @@
-trserenity.files
+serenity.files
 README.md
 TODO
 build.sh
@@ -87,3 +87,4 @@ music/keyboard.h
 pitch/biquad.h
 music/music-practice.cc
 extract.cc
+music/sampler.cc

@@ -35,6 +35,7 @@ void MidiInput::event() {
             }
         } else if(type == Controller) {
             if(key==64) {
+                ccEvent(key, value);
                 sustain = (value != 0);
                 if(!sustain) {
                     for(int key : sustained) { noteEvent(key,0,1); assert(!pressed.contains(key)); }
