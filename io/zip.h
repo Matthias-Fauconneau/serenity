@@ -81,8 +81,8 @@ struct Zip64Extra {
  //uint32 disk;
 } packed;
 
-/*buffer<byte> extractZIPFile(ref<byte> zip, ref<byte> fileName) {
- for(int i=zip.size-sizeof(DirectoryEnd64); i>=0; i--) {
+buffer<byte> extractZIPFile(ref<byte> zip, ref<byte> fileName) {
+ for(size_t i=zip.size-sizeof(DirectoryEnd64); i>0; i--) {
   if(zip.slice(i, sizeof(DirectoryEnd64::signature)) == ref<byte>(DirectoryEnd64().signature, 4)) {
    const DirectoryEnd64& directory = raw<DirectoryEnd64>(zip.slice(i, sizeof(DirectoryEnd64)));
    size_t offset = directory.offset;
@@ -91,10 +91,16 @@ struct Zip64Extra {
     const FileHeader& header =  raw<FileHeader>(zip.slice(offset, sizeof(FileHeader)));
     string name = zip.slice(offset+sizeof(header), header.nameLength);
     if(name.last() != '/') {
-     const LocalHeader& local = raw<LocalHeader>(zip.slice(header.offset, sizeof(LocalHeader)));
-     ref<byte> compressed = zip.slice(header.offset+sizeof(local)+local.nameLength+local.extraLength, local.compressedSize);
+     size_t fileOffset = header.offset;
+     if(header.extraLength) {
+      string extra = zip.slice(offset+sizeof(FileHeader)+name.size, header.extraLength);
+      const Zip64Extra& zip64 = raw<Zip64Extra>(extra.slice(0, sizeof(Zip64Extra)));
+      fileOffset = zip64.offset;
+     }
+     const LocalHeader& local = raw<LocalHeader>(zip.slice(fileOffset, sizeof(LocalHeader)));
+     ref<byte> compressed = zip.slice(fileOffset+sizeof(LocalHeader)+local.nameLength+local.extraLength, local.compressedSize);
      assert_(header.compression == 8);
-     if(name == fileName) return inflate(compressed, buffer<byte>(local.size));
+     if(name == fileName) return inflate(compressed, buffer<byte>(align(2048,local.size), local.size));
      files.append(name);
     }
     offset += sizeof(header)+header.nameLength+header.extraLength+header.commentLength;
@@ -105,7 +111,7 @@ struct Zip64Extra {
  }
  error("Missing end of central directory signature");
  return {};
-}*/
+}
 
 map<string, size_t> listZIPFile(ref<byte> zip) {
  for(size_t i=zip.size-sizeof(DirectoryEnd64); i>0; i--) {
@@ -116,45 +122,18 @@ map<string, size_t> listZIPFile(ref<byte> zip) {
    buffer<size_t> sizes (directory.totalEntryCount, 0);
    for(size_t unused entryIndex: range(directory.totalEntryCount)) {
     const FileHeader& header =  raw<FileHeader>(zip.slice(offset, sizeof(FileHeader)));
-    assert_(ref<byte>(header.signature,4) == ref<byte>(FileHeader().signature, 4), hex(ref<byte>(header.signature,4)));
-    string name = zip.slice(offset+sizeof(header), header.nameLength);
+    string name = zip.slice(offset+sizeof(FileHeader), header.nameLength);
     if(name.last() != '/') {
-     //assert_(header.offset != 0xFFFFFFFF);
-     //assert_(!header.extraLength, header.extraLength);
      size_t fileOffset = header.offset;
      if(header.extraLength) {
-      assert_(fileOffset == 0xFFFFFFFF);
-      assert_(header.compressedSize < 0xFFFFFFFF);
-      assert_(header.size < 0xFFFFFFFF);
       string extra = zip.slice(offset+sizeof(header)+name.size, header.extraLength);
-      /*while(extra.slice(0,2)!=ref<byte>{1,0}) {
-       uint16 size = raw<uint16>(extra.slice(2,2));
-       log(size);
-       if(size >= extra.size) {
-        log("Damaged entry", size, extra.size, header.offset, name, name.size, header.extraLength, hex(extra), sizeof(header));
-        log(sizeof(header), zip.slice(offset+sizeof(header), header.nameLength+header.extraLength));
-        goto skip;
-       }
-       assert_(size < extra.size, size, extra.size, extra.slice(0,2));
-       extra=extra.slice(2+size);
-      }*/
-      assert_(extra.size == sizeof(Zip64Extra), extra.size, sizeof(Zip64Extra));
       const Zip64Extra& zip64 = raw<Zip64Extra>(extra.slice(0, sizeof(Zip64Extra)));
-      assert_(ref<byte>(zip64.signature, 2) == ref<byte>(Zip64Extra().signature, 2), hex(ref<byte>(zip64.signature,2)));
       fileOffset = zip64.offset;
-      assert_(fileOffset+sizeof(LocalHeader) <= zip.size, fileOffset, hex(fileOffset), zip.size, sizeof(Zip64Extra), extra.size);
      }
-     assert_(fileOffset != 0xFFFFFFFF);
-     assert_(fileOffset+sizeof(LocalHeader) <= zip.size, fileOffset, hex(fileOffset), zip.size);
      const LocalHeader& local = raw<LocalHeader>(zip.slice(fileOffset, sizeof(LocalHeader)));
-     assert_(header.compression == 8, header.compression, name);
-     assert_(local.compressedSize != 0xFFFFFFFF);
-     assert_(local.size != 0xFFFFFFFF);
-     log(name, local.compressedSize, local.size);
      files.append(name);
      sizes.append(local.size);
     }
-    //skip:;
     offset += sizeof(header)+header.nameLength+header.extraLength+header.commentLength;
    }
    return {::move(files), ::move(sizes)};

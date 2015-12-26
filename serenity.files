@@ -38,6 +38,7 @@ io/font.cc
 io/font.h
 io/xml.h
 io/xml.cc
+io/inflate.h
 io/zip.h
 
 ui/x.h
@@ -85,4 +86,4 @@ music/music-video.cc
 music/keyboard.h
 pitch/biquad.h
 music/music-practice.cc
-test.cc
+extract.cc
