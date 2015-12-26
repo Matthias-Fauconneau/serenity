@@ -385,7 +385,7 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
             };
 
             auto drawText= [&Cm,&Tm,box,&page](FontData& fontData, float size, float spacing, float wordSpacing, string data) {
-                assert_(&fontData && fontData.data);
+                //assert(&fontData && fontData.data);
                 if(!(Cm*Tm)(0,0)) { log("Rotated glyph"); return; } // FIXME: rotated glyphs
                 Font& font = fontData.font((Cm*Tm)(0,0)*size);
                 for(uint8 code : data) {

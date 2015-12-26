@@ -27,17 +27,17 @@ struct Music {
     array<unique<FontData>> fonts;
     unique<Sheet> sheet = nullptr;
     unique<Scroll<HList<GraphicsWidget>>> pages;
-    Window window {&pages->area(), 0};
+    unique<Window> window = ::window(&pages->area(), 0);
 
     Music() {
-        window.actions[UpArrow] = {this, &Music::previousTitle};
-        window.actions[DownArrow] = {this, &Music::nextTitle};
-        window.actions[Return] = {this, &Music::nextTitle};
-        window.actions[Key('1')] = [this]{ setInstrument("Maestro"); };
-        window.actions[Key('2')] = [this]{ setInstrument("Blanchet"); };
+        window->actions[UpArrow] = {this, &Music::previousTitle};
+        window->actions[DownArrow] = {this, &Music::nextTitle};
+        window->actions[Return] = {this, &Music::nextTitle};
+        window->actions[Key('1')] = [this]{ setInstrument("Maestro"); };
+        window->actions[Key('2')] = [this]{ setInstrument("Blanchet"); };
 
-        assert_(files);
-        setTitle(arguments() ? arguments()[0] : files[0]);
+        //assert_(files);
+        if(files) setTitle(arguments() ? arguments()[0] : files[0]);
 
         setInstrument("Maestro");
 
@@ -67,7 +67,7 @@ struct Music {
         buffer<Graphics> pages;
         /**/ if(existsFile(title+".xml"_, folder)) { // MusicXML
             MusicXML musicXML (readFile(title+".xml"_, folder));
-            sheet = unique<Sheet>(musicXML.signs, musicXML.divisions, window.size);
+            sheet = unique<Sheet>(musicXML.signs, musicXML.divisions, window->size);
             pages = move(sheet->pages);
         }
         else if(existsFile(title+".pdf"_, folder)) { // PDF
@@ -75,15 +75,15 @@ struct Music {
         }
         else if(existsFile(title+".mid"_, folder)) { // MIDI
             MidiFile midi (readFile(title+".mid"_, folder));
-            sheet = unique<Sheet>(midi.signs, midi.divisions, window.size);
+            sheet = unique<Sheet>(midi.signs, midi.divisions, window->size);
             pages = move(sheet->pages);
         }
         else error(title);
         this->pages = unique<Scroll<HList<GraphicsWidget>>>( apply(pages, [](Graphics& o) { return GraphicsWidget(move(o)); }) );
         this->pages->horizontal = true;
-        window.widget = window.focus = &this->pages->area();
-        window.render();
-        window.setTitle(title);
+        window->widget = window->focus = &this->pages->area();
+        window->render();
+        window->setTitle(title);
     }
     void previousTitle() {
         for(size_t index: range(1, files.size)) if(startsWith(files[index], title) && !startsWith(files[index-1], title)) {

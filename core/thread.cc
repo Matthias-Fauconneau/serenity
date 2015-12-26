@@ -13,8 +13,6 @@
 #include <sys/syscall.h>
 
 // Log
-//Stream stdout(2);
-//void log_(string message) { /*stdout*/Stream(2).write(message); }
 void log_(string message) { ::write(2, message.data, message.size); }
 void log(string message) { log_(message+'\n');  }
 
