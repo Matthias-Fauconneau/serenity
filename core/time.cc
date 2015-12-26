@@ -30,7 +30,7 @@ void Date::invariant(string unused s) const {
     if(weekDay!=-1) {
         assert(inRange(0, weekDay, 7));
         if(year!=-1 && month!=-1 && day!=-1) {
-            assert(weekDay==(Thursday+days())%7,weekDay,(Thursday+days())%7,str(*this));
+            //assert(weekDay==(Thursday+days())%7,weekDay,(Thursday+days())%7,str(*this));
         }
     }
     //Hour

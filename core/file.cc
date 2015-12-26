@@ -177,7 +177,7 @@ Map::~Map() { unmap(); }
 int Map::lock(size_t size) const { return mlock(data, min<size_t>(this->size,size)); }
 
 void Map::unmap() {
-	if(data) munmap((void*)data, size);
+    if(data) { munmap((void*)data, size); }
 	data=0, size=0;
 }
 

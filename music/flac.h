@@ -26,7 +26,7 @@ struct BitReader : ref<uint8> {
 struct FLAC : BitReader {
 	default_move(FLAC);
 	static constexpr size_t maxBlockSize = 1<<16;
-	buffer<float2> audio {maxBlockSize};
+    buffer<float2> audio {maxBlockSize};
 	size_t writeIndex = 0;
 	size_t readIndex = 0;
 	size_t audioAvailable = 0;
@@ -41,7 +41,7 @@ struct FLAC : BitReader {
 	/// Parses frame header to get next block size (called automatically)
 	void parseFrame();
 	/// Decodes next FLAC frame
-	void decodeFrame();
+    void decodeFrame();
 	/// Reads \a size samples synchronously buffering new frames as needed
 	size_t read(mref<float2> out);
 };

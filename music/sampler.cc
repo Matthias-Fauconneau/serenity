@@ -153,7 +153,7 @@ Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeCh
     sample->name = copy(path);
     sample->data = Map(path, folder, Map::Read, Map::Flags(Map::Shared/*|Map::Populate*/));
     sample->flac = FLAC(sample->data);
-    if(!rate) rate=sample->flac.rate;
+    if(!rate) rate = sample->flac.rate;
     else if(rate!=sample->flac.rate) error("Sample rate mismatch", rate,sample->flac.rate);
    }
    else if(key=="trigger"_) { if(value=="release"_) sample->trigger = 1; else error("Unknown trigger",value); }
@@ -205,7 +205,7 @@ Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeCh
   }
   //log(s.decayTime, s.flac.duration);
 
-  //s.flac.decodeFrame(); // Decodes first frame of all samples to start mixing without latency
+  s.flac.decodeFrame(); // Decodes first frame of all samples to start mixing without latency
   //s.data.lock(); // Locks compressed samples in memory
 
   for(int key: range(s.lokey,s.hikey+1)) { // Instantiates all pitch shifts on startup

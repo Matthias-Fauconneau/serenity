@@ -82,6 +82,7 @@ video/encoder.cc
 music/midi.h
 music/midi.cc
 music/flac.h
+music/flac.cc
 music/music-video.cc
 music/keyboard.h
 pitch/biquad.h
