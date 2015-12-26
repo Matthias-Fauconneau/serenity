@@ -38,9 +38,9 @@ struct Music {
 
   setInstrument("Piano");
 
-  AudioControl("Master Playback Switch") = 1;
-  AudioControl("Headphone Playback Switch") = 1;
-  AudioControl("Master Playback Volume") = 100;
+  //AudioControl("Master Playback Switch") = 1;
+  //AudioControl("Headphone Playback Switch") = 1;
+  //AudioControl("Master Playback Volume") = 100;
   audio.start(sampler->rate, sampler->periodSize, 32, 2);
   //assert_(audioThread);
  }
