@@ -36,10 +36,10 @@ struct Data {
     /// Peeks at data without advancing
     byte operator[](int i) const { assert(index+i<data.size); return data[index+i]; }
     /// Returns a reference to the next \a size bytes
-	inline ref<byte> peek(size_t size) const { return slice(index,size); }
+    inline ref<byte> peek(size_t size) const { return slice(index, size); }
 
     /// Advances \a count bytes
-    virtual void advance(size_t step) {assert(index+step<=data.size,index,step,data.size); index+=step; }
+    virtual void advance(size_t step) { assert(index+step<=data.size, index, step, data.size); index+=step; }
     /// Returns next byte and advance one byte
     byte next() { byte b=peek(); advance(1); return b; }
     /// Returns a reference to the next \a size bytes and advances \a size bytes

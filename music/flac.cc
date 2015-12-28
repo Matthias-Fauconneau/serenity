@@ -111,7 +111,7 @@ void FLAC::parseFrame() {
  assert(blockSize>0);
  //int unused endIndex = index/8;
  uint8 unused crc8 = binary(8);
- assert(::crc8(slice(startIndex, endIndex-startIndex)) == crc8);
+ //assert(::crc8(slice(startIndex, endIndex-startIndex)) == crc8);
  this->blockSize = blockSize;
 }
 

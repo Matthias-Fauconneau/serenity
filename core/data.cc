@@ -69,7 +69,7 @@ TextData::TextData(ref<byte> data) : Data(data) {
 }
 
 void TextData::advance(size_t step) {
- assert(index+step<=data.size, index, data.size);
+ assert(index+step<=data.size, index, step, data.size);
  for(uint start=index; index<start+step; index++) if(data[index]=='\n') lineIndex++, columnIndex=1; else columnIndex++;
 }
 
@@ -143,7 +143,8 @@ string TextData::until(char key) {
 string TextData::until(const string key) {
  uint start=index, end;
  for(;;advance(1)) {
-  if(available(key.size)<key.size) { advance(key.size-1); end=index; break; }
+  size_t size = available(key.size);
+  if(size < key.size) { advance(size); end=index; break; }
   if(peek(key.size) == key) { end=index; advance(key.size); break; }
  }
  return slice(start, end-start);
