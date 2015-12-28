@@ -23,8 +23,6 @@ struct BitReader : ref<uint8> {
 	uint utf8();
 };
 
-#include "md5.h"
-
 struct FLAC : BitReader {
 	default_move(FLAC);
 	static constexpr size_t maxBlockSize = 1<<16;
@@ -36,8 +34,6 @@ struct FLAC : BitReader {
 	uint rate = 0;
 	uint channelMode = 0, sampleSize = 0;
 	uint position = 0, duration = 0;
- //ref<uint32> digest;
- //MD5 md5;
 
 	FLAC() {}
 	/// Reads header and decode first frame from data

@@ -217,6 +217,7 @@ Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeCh
     Layer layer;
     layer.shift = shift;
     layer.notes.reserve(64);
+    //assert_(rate == outputRate);
     if(shift /*|| rate!=outputRate*/) {
      const uint size = 2048; // Accurate frequency resolution while keeping reasonnable filter bank size
      layer.resampler = Resampler(2, size, round(size*exp2((-shift)/12.0)/**outputRate/rate*/),
@@ -449,7 +450,7 @@ size_t Sampler::read(mref<float2> output) {
    } else {
     for(Note& note: layer.notes) {
      if(Poll::thread.tid == gettid()) { // Synchronous decoder
-      error("Synchronous decoder");
+      static bool unused once = ({ log("Synchronous decoder"); true; });
       while(note.flac.blockSize && note.readCount < output.size) {
        size_t size = note.flac.blockSize;
        note.writeCount.acquire(size);

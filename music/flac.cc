@@ -74,7 +74,6 @@ FLAC::FLAC(ref<byte> data) : BitReader(cast<uint8>(data)) {
    uint unused channels = binary(3)+1; assert(channels==2);
    uint unused sampleSize = binary(5)+1; assert(sampleSize==16 || sampleSize==24);
    duration = (binary(36-24)<<24) | binary(24); //time = binary(36);
-   //digest = cast<uint32>(slice(index, 4*sizeof(uint32)));
    skip(4*sizeof(uint32)*8); //MD5
   } else skip(size*8);
   if(last) break;
@@ -141,11 +140,11 @@ template<int unroll> inline void convolve(double* predictor, double* even, doubl
 template<int unroll,int channelMode> inline void interleave(const float* A, const float* B, float2* ptr, float2* end, float2 scale) {
  for(;ptr<end;) {
   for(uint i: range(unroll)) {
-   float a=A[i], b=B[i];
-   if(channelMode==Independent) ptr[i]=scale*(float2){a,b};
-   else if(channelMode==LeftSide) ptr[i]=scale*(float2){a,a-b};
-   else if(channelMode==MidSide) ptr[i]=scale*(float2){a+b/2,a-b/2};
-   else if(channelMode==RightSide) ptr[i]=scale*(float2){a+b, b};
+   float a=scale[0]*A[i], b=scale[1]*B[i];
+   if(channelMode==Independent) ptr[i]=(float2){a,b};
+   else if(channelMode==LeftSide) ptr[i]=(float2){a,a-b};
+   else if(channelMode==MidSide) ptr[i]=(float2){a+b/2,a-b/2};
+   else if(channelMode==RightSide) ptr[i]=(float2){a+b, b};
   }
   A+=unroll; B+=unroll; ptr+=unroll;
  }
@@ -265,13 +264,10 @@ void FLAC::decodeFrame() {
  float2 scale {float(1<<wastedBits[0]), float(1<<wastedBits[1])};
  if(blockSize > beforeWrap) {
   interleave<4>(channelMode, block[0], block[1], audio.begin()+writeIndex, audio.begin()+audio.capacity, scale);
-  //md5(cast<float>(audio.slice(writeIndex, beforeWrap)));
   interleave<4>(channelMode, block[0]+beforeWrap, block[1]+beforeWrap, audio.begin(), audio.begin()+blockSize-beforeWrap, scale);
-  //md5(cast<float>(audio.slice(0, blockSize-beforeWrap)));
   writeIndex = blockSize-beforeWrap;
  } else {
   interleave<4>(channelMode, block[0], block[1], audio.begin()+writeIndex, audio.begin()+writeIndex+blockSize, scale);
-  //md5(cast<float>(audio.slice(writeIndex, blockSize)));
   writeIndex += blockSize;
  }
  if(index<bitSize) parseFrame(); else blockSize=0;
