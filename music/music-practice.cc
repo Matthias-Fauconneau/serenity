@@ -21,20 +21,23 @@ struct Music {
  Thread decodeThread;
  unique<Sampler> sampler = nullptr;
  Thread audioThread{-20};
- AudioOutput audio {audioThread};
- MidiInput input {audioThread};
+
+ unique<Window> window = nullptr; // = ::window(&pages->area(), 0);
+
+ AudioOutput audio {window?audioThread:mainThread};
+ MidiInput input {audioThread?audioThread:mainThread};
 
  array<unique<FontData>> fonts;
  unique<Sheet> sheet = nullptr;
  unique<Scroll<HList<GraphicsWidget>>> pages;
- unique<Window> window = ::window(&pages->area(), 0);
 
  Music() {
-  window->actions[UpArrow] = {this, &Music::previousTitle};
-  window->actions[DownArrow] = {this, &Music::nextTitle};
-  window->actions[Return] = {this, &Music::nextTitle};
-
-  if(files) setTitle(arguments() ? arguments()[0] : files[0]);
+  if(window) {
+   window->actions[UpArrow] = {this, &Music::previousTitle};
+   window->actions[DownArrow] = {this, &Music::nextTitle};
+   window->actions[Return] = {this, &Music::nextTitle};
+   if(files) setTitle(arguments() ? arguments()[0] : files[0]);
+  }
 
   setInstrument("Piano");
 
@@ -43,10 +46,13 @@ struct Music {
   //AudioControl("Master Playback Volume") = 100;
   audio.start(sampler->rate, sampler->periodSize, 32, 2);
   //assert_(audioThread);
+  assert_(audio.status->state == Prepared);
+  sampler->noteEvent(60, 64);
  }
  ~Music() {
+  audio.stop();
   decodeThread.wait(); // ~Thread
-  audioThread.wait(); // ~Thread
+  if(audioThread) audioThread.wait(); // ~Thread
  }
 
  void setInstrument(string name) {
@@ -56,7 +62,7 @@ struct Music {
   input.noteEvent = {sampler.pointer, &Sampler::noteEvent};
   input.ccEvent = {sampler.pointer, &Sampler::ccEvent};
   audio.read32 = {sampler.pointer, &Sampler::read32};
-  audioThread.spawn();
+  if(window) audioThread.spawn();
   decodeThread.spawn();
  }
  void setTitle(string title) {

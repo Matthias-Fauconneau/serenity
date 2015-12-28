@@ -237,7 +237,7 @@ Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeCh
 void Sampler::ccEvent(uint key, uint value) {
  if(key==64) cc64 = value;
 }
-void Sampler::noteEvent(uint key, uint velocity, float2 gain) {
+void Sampler::noteEvent(uint key, uint velocity/*, float2 gain*/) {
  //TODO: Pedal events
  Note* released=0;
  //if(velocity==0) { // Do not release repetitions (i.e needs as many releases as press as if playing multiple instruments) // Also releases repetitions
@@ -257,6 +257,8 @@ void Sampler::noteEvent(uint key, uint velocity, float2 gain) {
  //}
  uint random = this->random%2;
  for(const Sample& s : samples) {
+  if(0 && s.trigger == (released?1:0) && s.lokey <= key && key <= s.hikey)
+   log("key", s.lokey, key, s.hikey, "vel", s.lovel, velocity, s.hivel, "cc64", s.locc64, cc64, s.hicc64, "random", random, s.random);
   if(s.trigger == (released?1:0) && s.lokey <= key && key <= s.hikey && s.lovel <= velocity && velocity <= s.hivel && s.locc64 <= cc64 && cc64 < s.hicc64 && random==s.random) {
    float2 level = 1;
    /*if(released) { // Release (rt_decay is unreliable, matching levels works better), FIXME: window length for energy evaluation is arbitrary
@@ -281,10 +283,10 @@ void Sampler::noteEvent(uint key, uint velocity, float2 gain) {
     note.level = float4(1); // Velocity layers already select correct level
     //note.level = float4(s.volume * float(velocity) / s.hivel); // E ~ A^2 ~ v^2 => A ~ v (TODO: normalize levels)
     //note.level = float4(s.volume * float(velocity) / 127/*s.hivel*/); // FIXME: this is not right
-    note.level[0] *= gain[0];
+    /*note.level[0] *= gain[0];
     note.level[1] *= gain[1];
     note.level[2] *= gain[0];
-    note.level[3] *= gain[1];
+    note.level[3] *= gain[1];*/
     //log(velocity, s.lovel, s.hivel, note.level[0]);
    } else {
     note.level = {level[0], level[1], level[0], level[1]};
@@ -305,7 +307,7 @@ void Sampler::noteEvent(uint key, uint velocity, float2 gain) {
   }
  }
  if(released) return; // Release samples are not mandatory
- if(key<=30 || key>=90) return; // Some instruments have a narrow range
+ //if(key<=30 || key>=90) return; // Some instruments have a narrow range
  log("Missing sample"_, key, velocity);
 }
 
@@ -386,8 +388,8 @@ size_t Sampler::read16(mref<short2> output) {
  assert_(size==output.size);
  for(size_t i: range(size)) for(size_t c: range(channels)) {
   float u = buffer[i][c];
-  if(u<minValue) { minValue=u; log(minValue, maxValue); }
-  if(u>maxValue) { maxValue=u; log(minValue, maxValue); }
+  if(u<minValue) { minValue=u; log("<min", minValue, maxValue, pow(2,ceil(log2(-minValue))), pow(2,ceil(maxValue))); }
+  if(u>maxValue) { maxValue=u; log(">max", minValue, maxValue, pow(2,ceil(log2(-minValue))), pow(2,ceil(maxValue))); }
   float v = (u-minValue) / (maxValue-minValue); // Normalizes range to [0-1] //((u-minValue) / (maxValue-minValue)) * 2 - 1; // Normalizes range to [-1-1]
   int w = v*0x1p16 - 0x1p15; // Converts floating point to two-complement signed 16 bit integer
   output[i][c] = w;

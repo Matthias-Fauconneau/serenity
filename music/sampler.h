@@ -34,7 +34,7 @@ struct Sampler : Poll {
     /// Just before samples are mixed, polls note events
     function<void(uint)> timeChanged;
     uint audioTime=0, stopTime=0;
-    float minValue=-65536*3/2, maxValue=-minValue; // >88192
+    float minValue=-7066444, maxValue=6602319;
 
     explicit operator bool() const { return samples.size; }
 
@@ -42,7 +42,7 @@ struct Sampler : Poll {
     virtual ~Sampler();
 
     void ccEvent(uint key, uint value);
-    void noteEvent(uint key, uint velocity, float2 gain);
+    void noteEvent(uint key, uint velocity/*, float2 gain*/);
 
     /// Callback to decode samples
     void event() override;
