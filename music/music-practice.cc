@@ -18,7 +18,7 @@ struct Music {
  String title;
 
  const uint rate = 44100;
- Thread decodeThread;
+ Thread decodeThread {19};
  unique<Sampler> sampler = nullptr;
  Thread audioThread{-20};
 
@@ -58,7 +58,7 @@ struct Music {
  void setInstrument(string name) {
   if(audioThread) audioThread.wait();
   if(decodeThread) decodeThread.wait(); // ~Thread
-  sampler = unique<Sampler>(name+'/'+name+".sfz"_, 512, [this](uint){ input.event(); }, decodeThread); // Ensures all events are received right before mixing
+  sampler = unique<Sampler>(name+'/'+name+".sfz"_, 2048, [this](uint){ input.event(); }, decodeThread); // Ensures all events are received right before mixing
   input.noteEvent = {sampler.pointer, &Sampler::noteEvent};
   input.ccEvent = {sampler.pointer, &Sampler::ccEvent};
   audio.read32 = {sampler.pointer, &Sampler::read32};

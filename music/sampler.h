@@ -29,12 +29,12 @@ struct Sampler : Poll {
     static constexpr uint channels = 2;
     uint rate = 0;
     const uint periodSize;
-    const bool realTime = periodSize < 1024; // Whether to output decoder underrun warnings
+    const bool realTime = true; //periodSize < 1024; // Whether to output decoder underrun warnings
 
     /// Just before samples are mixed, polls note events
     function<void(uint)> timeChanged;
     uint audioTime=0, stopTime=0;
-    float minValue=-7066444, maxValue=6602319;
+    float minValue=-12415746, maxValue=12722155;
 
     explicit operator bool() const { return samples.size; }
 

@@ -74,7 +74,8 @@ FLAC::FLAC(ref<byte> data) : BitReader(cast<uint8>(data)) {
    uint unused channels = binary(3)+1; assert(channels==2);
    uint unused sampleSize = binary(5)+1; assert(sampleSize==16 || sampleSize==24);
    duration = (binary(36-24)<<24) | binary(24); //time = binary(36);
-   skip(128); //MD5
+   //digest = cast<uint32>(slice(index, 4*sizeof(uint32)));
+   skip(4*sizeof(uint32)*8); //MD5
   } else skip(size*8);
   if(last) break;
  };
@@ -143,7 +144,7 @@ template<int unroll,int channelMode> inline void interleave(const float* A, cons
    float a=A[i], b=B[i];
    if(channelMode==Independent) ptr[i]=scale*(float2){a,b};
    else if(channelMode==LeftSide) ptr[i]=scale*(float2){a,a-b};
-   else if(channelMode==MidSide) a-=b/2, ptr[i]=scale*(float2){a+b,a};
+   else if(channelMode==MidSide) ptr[i]=scale*(float2){a+b/2,a-b/2};
    else if(channelMode==RightSide) ptr[i]=scale*(float2){a+b, b};
   }
   A+=unroll; B+=unroll; ptr+=unroll;
@@ -191,17 +192,9 @@ void FLAC::decodeFrame() {
    order = (type&~0x20)+1; assert(order>0 && order<=32,order);
    for(uint i: range(order)) even[i]=odd[i]=signal[i]= sbinary(rawSampleSize);
    int precision = binary(4)+1; assert(precision<=15,precision);
-   int shift = sbinary(5);
-   if(order%2) {
-    assert(shift>=0, shift, order);
-    predictor[0]=0;
-    for(uint i: range(order)) predictor[order-i]= double(sbinary(precision))/(1<<shift); } // Right align odd order
-   else {
-    if(shift>=0)
-     for(uint i: range(order)) predictor[order-1-i]= double(sbinary(precision))/(1<<shift);
-    else
-     for(uint i: range(order)) predictor[order-1-i]= double(sbinary(precision))*(1<<shift);
-   }
+   int shift = sbinary(5); assert_(shift>=0, shift, order);
+   if(order%2) { predictor[0]=0; for(uint i: range(order)) predictor[order-i]= double(sbinary(precision))/(1<<shift); } // Right align odd order
+   else for(uint i: range(order)) predictor[order-1-i]= double(sbinary(precision))/(1<<shift);
   } else if(type>=8 && type <=12) { //Fixed
    order = type & ~0x8; assert(order<=4,order);
    for(uint i: range(order)) even[i]=odd[i]=signal[i]= sbinary(rawSampleSize);
@@ -239,7 +232,7 @@ void FLAC::decodeFrame() {
      *signal++ = s;
     }
    } else {
-    int n = binary(5); assert(n<=31, n);
+    int n = binary(5); assert(n<=16, n);
     for(;signal<end;) {
      uint u = binary(n);
      int s = (u >> 1) ^ (-(u & 1));
@@ -272,10 +265,13 @@ void FLAC::decodeFrame() {
  float2 scale {float(1<<wastedBits[0]), float(1<<wastedBits[1])};
  if(blockSize > beforeWrap) {
   interleave<4>(channelMode, block[0], block[1], audio.begin()+writeIndex, audio.begin()+audio.capacity, scale);
+  //md5(cast<float>(audio.slice(writeIndex, beforeWrap)));
   interleave<4>(channelMode, block[0]+beforeWrap, block[1]+beforeWrap, audio.begin(), audio.begin()+blockSize-beforeWrap, scale);
+  //md5(cast<float>(audio.slice(0, blockSize-beforeWrap)));
   writeIndex = blockSize-beforeWrap;
  } else {
   interleave<4>(channelMode, block[0], block[1], audio.begin()+writeIndex, audio.begin()+writeIndex+blockSize, scale);
+  //md5(cast<float>(audio.slice(writeIndex, blockSize)));
   writeIndex += blockSize;
  }
  if(index<bitSize) parseFrame(); else blockSize=0;

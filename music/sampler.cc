@@ -68,7 +68,7 @@ struct Sampler::Layer {
 };
 
 int noteToMIDI(const string& value) {
- int note=24;
+ int note=12;
  uint i=0;
  assert(value[i]>='a' && value[i]<='g');
  note += "c#d#ef#g#a#b"_.indexOf(value[i]);
@@ -257,8 +257,6 @@ void Sampler::noteEvent(uint key, uint velocity/*, float2 gain*/) {
  //}
  uint random = this->random%2;
  for(const Sample& s : samples) {
-  if(0 && s.trigger == (released?1:0) && s.lokey <= key && key <= s.hikey)
-   log("key", s.lokey, key, s.hikey, "vel", s.lovel, velocity, s.hivel, "cc64", s.locc64, cc64, s.hicc64, "random", random, s.random);
   if(s.trigger == (released?1:0) && s.lokey <= key && key <= s.hikey && s.lovel <= velocity && velocity <= s.hivel && s.locc64 <= cc64 && cc64 < s.hicc64 && random==s.random) {
    float2 level = 1;
    /*if(released) { // Release (rt_decay is unreliable, matching levels works better), FIXME: window length for energy evaluation is arbitrary
@@ -309,6 +307,10 @@ void Sampler::noteEvent(uint key, uint velocity/*, float2 gain*/) {
  if(released) return; // Release samples are not mandatory
  //if(key<=30 || key>=90) return; // Some instruments have a narrow range
  log("Missing sample"_, key, velocity);
+ for(const Sample& s : samples) {
+  if(s.trigger == (released?1:0))
+   log("key", s.lokey, key, s.hikey, "vel", s.lovel, velocity, s.hivel, "cc64", s.locc64, cc64, s.hicc64, "random", random, s.random);
+ }
 }
 
 /// Background decoder (background thread)
@@ -409,8 +411,8 @@ size_t Sampler::read32(mref<int2> output) { // Audio thread
  assert_(size==output.size);
  for(size_t i: range(size)) for(size_t c: range(channels)) {
   float u = buffer[i][c];
-  if(u<minValue) { minValue=u; log(minValue, maxValue); }
-  if(u>maxValue) { maxValue=u; log(minValue, maxValue); }
+  if(u<minValue) { minValue=u; log(minValue, maxValue, pow(2,ceil(log2(-minValue))), pow(2,ceil(maxValue))); }
+  if(u>maxValue) { maxValue=u; log(minValue, maxValue, pow(2,ceil(log2(-minValue))), pow(2,ceil(maxValue))); }
   float v = (u-minValue) / (maxValue-minValue); // Normalizes range to [0-1] //((u-minValue) / (maxValue-minValue)) * 2 - 1; // Normalizes range to [-1-1]
   int w = v*0x1p32 - 0x1p31; // Converts floating point to two-complement signed 32 bit integer
   output[i][c] = w;
@@ -447,6 +449,7 @@ size_t Sampler::read(mref<float2> output) {
    } else {
     for(Note& note: layer.notes) {
      if(Poll::thread.tid == gettid()) { // Synchronous decoder
+      error("Synchronous decoder");
       while(note.flac.blockSize && note.readCount < output.size) {
        size_t size = note.flac.blockSize;
        note.writeCount.acquire(size);
