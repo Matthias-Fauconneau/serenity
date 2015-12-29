@@ -130,7 +130,6 @@ bool AudioOutput::start(uint rate, uint periodSize, uint sampleBits, uint channe
   this->rate = hparams.interval(Rate);
   this->periodSize = hparams.interval(PeriodSize);
   bufferSize = hparams.interval(Periods) * this->periodSize;
-  log(sampleBits, channels, rate, periodSize, bufferSize);
   buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Prot(Map::Read|Map::Write))).data);
   status = (Status*)(maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data;
   control = (Control*)(maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data;

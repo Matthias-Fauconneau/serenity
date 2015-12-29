@@ -10,7 +10,8 @@
 
 static Sampler* sampler; // DEBUG
 
-struct Audio : buffer<float2> { uint rate; Audio(buffer&& data, uint rate) : buffer(::move(data)), rate(rate){} };
+// -> flac.cc
+/*struct Audio : buffer<float2> { uint rate; Audio(buffer&& data, uint rate) : buffer(::move(data)), rate(rate){} };
 /// Decodes a full audio file
 Audio decodeAudio(const ref<byte>& data, uint duration=-1);
 
@@ -20,7 +21,7 @@ Audio decodeAudio(const ref<byte>& data, uint duration) {
  flac.audio = buffer<float2>(max(32768u,duration+8192));
  while(flac.audioAvailable<duration) flac.decodeFrame();
  return {copyRef(flac.audio.slice(0, duration)), flac.rate};
-}
+}*/
 
 struct Sampler::Sample {
  String name;
@@ -206,7 +207,7 @@ Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeCh
   //log(s.decayTime, s.flac.duration);
 
   s.flac.decodeFrame(); // Decodes first frame of all samples to start mixing without latency
-  //s.data.lock(); // Locks compressed samples in memory
+  s.data.lock(); // Locks compressed samples in memory
 
   for(int key: range(s.lokey,s.hikey+1)) { // Instantiates all pitch shifts on startup
    float shift = key-s.pitch_keycenter; //TODO: tune
@@ -258,7 +259,7 @@ void Sampler::noteEvent(uint key, uint velocity/*, float2 gain*/) {
  //}
  uint random = this->random%2;
  for(const Sample& s : samples) {
-  if(s.trigger == (released?1:0) && s.lokey <= key && key <= s.hikey && s.lovel <= velocity && velocity <= s.hivel && s.locc64 <= cc64 && cc64 < s.hicc64 && random==s.random) {
+  if(s.trigger == (released?1:0) && s.lokey <= key && key <= s.hikey && s.lovel <= velocity && velocity <= s.hivel && s.locc64 <= cc64 && cc64 <= s.hicc64 && random==s.random) {
    float2 level = 1;
    /*if(released) { // Release (rt_decay is unreliable, matching levels works better), FIXME: window length for energy evaluation is arbitrary
                 float releaseLevel = s.startLevel; // 42ms
@@ -279,9 +280,9 @@ void Sampler::noteEvent(uint key, uint velocity/*, float2 gain*/) {
    //note.decayTime = s.decayTime;
    if(!released) { // Press
     note.key = key, note.velocity = velocity;
-    note.level = float4(1); // Velocity layers already select correct level
+    //note.level = float4(1); // Velocity layers already select correct level
     //note.level = float4(s.volume * float(velocity) / s.hivel); // E ~ A^2 ~ v^2 => A ~ v (TODO: normalize levels)
-    //note.level = float4(s.volume * float(velocity) / 127/*s.hivel*/); // FIXME: this is not right
+    note.level = float4(s.volume * float(velocity) / 127/*s.hivel*/); // FIXME: this is not right
     /*note.level[0] *= gain[0];
     note.level[1] *= gain[1];
     note.level[2] *= gain[0];

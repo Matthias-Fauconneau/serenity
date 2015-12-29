@@ -47,7 +47,7 @@ uint BitReader::utf8() {
  else if((code&0b11100000)==0b11000000) { index+=16; return(code&0b11111)<<6  |(pointer[1]&0b111111); }
  else if((code&0b11110000)==0b11100000) { index+=24; return(code&0b01111)<<12|(pointer[1]&0b111111)<<6  |(pointer[2]&0b111111); }
  else if((code&0b11111000)==0b11110000) { index+=32; return(code&0b00111)<<18|(pointer[1]&0b111111)<<12|(pointer[2]&0b111111)<<6|(pointer[3]&0b111111); }
- error("");
+ error("utf8", code);
 }
 
 typedef double double2 __attribute((vector_size(16)));
@@ -258,7 +258,7 @@ void FLAC::decodeFrame() {
  setRoundMode(Even);
  index=align(8, index);
  skip(16);
- assert(align(4,blockSize)<=readIndex+audio.capacity-writeIndex,blockSize,align(4,blockSize),align(4,blockSize)+writeIndex,audio.capacity);
+ assert(align(4,blockSize)<=readIndex+audio.capacity-writeIndex,blockSize,align(4,blockSize),align(4,blockSize)+writeIndex, audio.capacity);
  __sync_add_and_fetch(&audioAvailable, blockSize);
  uint beforeWrap = audio.capacity-writeIndex;
  float2 scale {float(1<<wastedBits[0]), float(1<<wastedBits[1])};
@@ -270,7 +270,8 @@ void FLAC::decodeFrame() {
   interleave<4>(channelMode, block[0], block[1], audio.begin()+writeIndex, audio.begin()+writeIndex+blockSize, scale);
   writeIndex += blockSize;
  }
- if(index<bitSize) parseFrame(); else blockSize=0;
+ position += blockSize;
+ if(position<duration) { assert_(index<bitSize, index, bitSize, position, duration); parseFrame(); } else blockSize=0;
  //log(::predict/::order); // GCC~4 / Clang~8 [in cycles/(sample*order) on Athlon64 3200]
 }
 
@@ -285,6 +286,17 @@ size_t FLAC::read(mref<float2> out) {
   out.copy(audio.slice(readIndex, out.size));
   readIndex+=out.size;
  }
- audioAvailable -= out.size; position += out.size;
+ audioAvailable -= out.size; //position += out.size;
  return out.size;
+}
+
+Audio decodeAudio(const ref<byte>& data, uint duration) {
+ FLAC flac(data);
+ duration = ::min(duration, flac.duration);
+ assert_(duration <= flac.duration, duration, flac.duration);
+ flac.audio = buffer<float2>(max(32768u,duration+8192), 0);
+ while(flac.audioAvailable<duration) flac.decodeFrame();
+ flac.audio.size = flac.audioAvailable;
+ assert_(flac.audio.size >= duration, flac.audio.size, flac.audioAvailable);
+ return {move(flac.audio), flac.rate};
 }

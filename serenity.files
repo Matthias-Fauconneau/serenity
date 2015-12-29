@@ -92,3 +92,4 @@ music/sampler.cc
 music/midi-input.cc
 music/md5.h
 music/md5.cc
+tuner/analyze.cc

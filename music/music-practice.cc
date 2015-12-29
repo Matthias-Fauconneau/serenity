@@ -13,7 +13,7 @@
 
 /// SFZ sampler and PDF renderer
 struct Music {
- const Folder& folder = currentWorkingDirectory();
+ const Folder folder = "Scores"_;
  array<String> files = folder.list(Files|Sorted);
  String title;
 
@@ -22,14 +22,13 @@ struct Music {
  unique<Sampler> sampler = nullptr;
  Thread audioThread{-20};
 
- unique<Window> window = nullptr; // = ::window(&pages->area(), 0);
-
- AudioOutput audio {window?audioThread:mainThread};
- MidiInput input {audioThread?audioThread:mainThread};
-
  array<unique<FontData>> fonts;
  unique<Sheet> sheet = nullptr;
  unique<Scroll<HList<GraphicsWidget>>> pages;
+ unique<Window> window = ::window(&pages->area(), 0);
+
+ AudioOutput audio {window?audioThread:mainThread};
+ MidiInput input {audioThread?audioThread:mainThread};
 
  Music() {
   if(window) {
@@ -58,7 +57,7 @@ struct Music {
  void setInstrument(string name) {
   if(audioThread) audioThread.wait();
   if(decodeThread) decodeThread.wait(); // ~Thread
-  sampler = unique<Sampler>(name+'/'+name+".sfz"_, 2048, [this](uint){ input.event(); }, decodeThread); // Ensures all events are received right before mixing
+  sampler = unique<Sampler>(name+'/'+name+".sfz"_, 256, [this](uint){ input.event(); }, decodeThread); // Ensures all events are received right before mixing
   input.noteEvent = {sampler.pointer, &Sampler::noteEvent};
   input.ccEvent = {sampler.pointer, &Sampler::ccEvent};
   audio.read32 = {sampler.pointer, &Sampler::read32};
@@ -66,6 +65,7 @@ struct Music {
   decodeThread.spawn();
  }
  void setTitle(string title) {
+  assert_(window);
   if(endsWith(title,".pdf"_)||endsWith(title,".xml"_)||endsWith(title,".mid"_)) title=title.slice(0,title.size-4);
   this->title = copyRef(title);
   buffer<Graphics> pages;

@@ -7,7 +7,7 @@ shared<Graphics> ScrollArea::graphics(vec2 size) {
     vec2 hint = abs(widget().sizeHint(vec2( horizontal||size.x<0 ? 0/*-1 FIXME*/: 1, vertical||size.y<0? 0/*-1 FIXME*/: 1 )*abs(size)));
     vec2 view (horizontal?max(hint.x,size.x):size.x, vertical?max(hint.y,size.y):size.y);
     offset = min(vec2(0), max(-vec2(hint-size), offset));
-    assert_(offset <= vec2(0) && (!(size < view) || offset==vec2(0)));
+    //assert(offset <= vec2(0) && (!(size < view) || offset==vec2(0)));
     shared<Graphics> graphics;
     graphics->graphics.insert(offset, widget().graphics(view, Rect::fromOriginAndSize(vec2(-offset), size)));
     if(scrollbar) {
