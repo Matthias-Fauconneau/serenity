@@ -24,7 +24,7 @@ struct Sampler : Poll {
     array<Layer> layers;
 
     Random random;
-    uint cc64;
+    uint cc64 = 0;
 
     static constexpr uint channels = 2;
     uint rate = 0;
@@ -34,8 +34,7 @@ struct Sampler : Poll {
     /// Just before samples are mixed, polls note events
     function<void(uint)> timeChanged;
     uint audioTime=0, stopTime=0;
-    float minValue=-12415746, maxValue=12722155;
-
+    float minValue = -64577408, maxValue = 76015472;
     explicit operator bool() const { return samples.size; }
 
     Sampler(string path, const uint periodSize=256/*[12ms/82Hz/4m]*/, function<void(uint)> timeChanged={}, Thread& thread=mainThread);

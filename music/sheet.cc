@@ -138,7 +138,7 @@ float System::glyph(vec2 origin, uint code, float opacity, float size, FontData*
 
 void System::ledger(Sign sign, float x, float ledgerHalfLength) { // Ledger lines
  uint staff = sign.staff;
- if(!ledgerHalfLength) ledgerHalfLength = noteSize(sign);
+ if(!ledgerHalfLength) ledgerHalfLength = noteSize(sign)*2/3;
  int step = clefStep(sign);
  float opacity = (sign.note.tie == Note::NoTie || sign.note.tie == Note::TieStart) ? 1 : 1./2;
  for(int s=2; s<=step; s+=2) {
@@ -583,7 +583,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
      ClefSign clefSign = clef.clefSign;
      if(clef.octave==1) clefSign = ClefSign(clefSign+SMuFL::Clef::_8va);
      else if(clef.octave==-1) clefSign = ClefSign(clefSign+SMuFL::Clef::_8vb);
-     else assert_(clef.octave==0, clef, clef.octave);
+     else assert(clef.octave==0, clef, clef.octave);
      float& x = staves[signClef.staff].x; // No need to advance up to time track synchronization point
      if(sign.type == Sign::Note||sign.type == Sign::Rest) {
       //x = max(x, min((x + timeTrack.at(sign.time) - glyphSize(clefSign).x)/2 /*Center between last staff sign and next synchronization point*/,
@@ -650,7 +650,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 
      if(note.tremolo /*== Note::Start*/) { tremolo.append(Chord{{sign}}); } // FIXME: tremolo chord
      if(note.tremolo == Note::Stop) {
-      assert_(tremolo.size == 2, tremolo.size);
+      assert(tremolo.size == 2, tremolo.size);
       log("tremolo");
       // Draws pairing tremolo (similar to pairing beam)
       bool stemUp = true;

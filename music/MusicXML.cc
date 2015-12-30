@@ -290,7 +290,7 @@ MusicXML::MusicXML(string document, string) {
                                 auto type = tremolo->attribute("type"_);
                                 if(type=="start"_) sign.note.tremolo = Note::Tremolo::Start;
                                 else if(type=="stop"_) sign.note.tremolo = Note::Tremolo::Stop;
-                                else error(e);
+                                else log("Unknown tremolo type", e);
                             }
 
                             // Acciaccatura are played before principal beat. Records graces to shift in on parsing principal
@@ -361,9 +361,12 @@ MusicXML::MusicXML(string document, string) {
                         else if(d.contains("metronome"_)) {
                             Value beatUnit = Value(ref<string>({"whole"_,"half"_,"quarter"_,"eighth"_,"16th"_})
                                                    .indexOf(d("metronome"_)("beat-unit"_).text()));
-                            TextData s (d("metronome"_)("per-minute"_).text());
-                            s.whileNo("0123456789"_);
-                            float perMinute = s.decimal();
+                            float perMinute = 60;
+                            if(d("metronome"_).contains("per-minute"_)) {
+                             TextData s (d("metronome"_)("per-minute"_).text());
+                             s.whileNo("0123456789"_);
+                             s.decimal();
+                            }
                             assert_(perMinute==uint(perMinute));
                             insertSign({Sign::Metronome, time, {.metronome={beatUnit, uint(perMinute)}}});
                         }
@@ -404,6 +407,7 @@ MusicXML::MusicXML(string document, string) {
                             });
                         }
                         else if(d.contains("image"_)) {}
+                        else if(d.contains("segno"_)) {}
                         else error("Unknown direction", d);
                     }
                     if(e.contains("sound"_) && e("sound"_)["tempo"_]) {

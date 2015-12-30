@@ -52,9 +52,9 @@ namespace Pedal { enum { Mark = 0xE650 }; }
 enum Segment { Arpeggio = 0xEAA9 };
 }
 
-enum Value { InvalidValue=-1, /*Long,*/ Breve, Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
-static constexpr string valueNames[] = {/*"long",*/ "breve"_, "whole"_,"half"_, "quarter"_, "eighth"_, "16th"_, "32nd"_, "64th"_};
-static constexpr uint valueDurations[] = {/*256,*/ 128,       64,         32,       16,           8,             4,         2,         1};
+enum Value { InvalidValue=-1, Long, Breve, Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
+static constexpr string valueNames[] = {"long", "breve"_, "whole"_,"half"_, "quarter"_, "eighth"_, "16th"_, "32nd"_, "64th"_};
+static constexpr uint valueDurations[] = {256, 128,       64,         32,       16,           8,             4,         2,         1};
 static constexpr uint quarterDuration = 16;
 
 enum ClefSign { NoClef=0, FClef=SMuFL::Clef::F, GClef=SMuFL::Clef::G };

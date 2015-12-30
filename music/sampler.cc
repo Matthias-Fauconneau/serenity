@@ -27,7 +27,7 @@ struct Sampler::Sample {
  String name;
  Map data; FLAC flac; array<float> envelope; //Sample data
  int trigger=0; uint lovel=0; uint hivel=127; uint lokey=0; uint hikey=127; uint locc64=0, hicc64=127; uint random=0; //Input controls
- uint pitch_keycenter=-1;/*60;*/ float releaseTime=1; float amp_veltrack=1; float volume=1; //Performance parameters
+ uint pitch_keycenter=-1;/*60;*/ float releaseTime=1; float amp_veltrack=1; float volume=1; uint offset=0; //Performance parameters
  int rt_decay=0;
  float startLevel = 1; // Sound level of first 2K samples
  uint decayTime = 0; // Time (in samples) where level decays below
@@ -63,6 +63,7 @@ inline String str(const Note& o) {
 
 struct Sampler::Layer {
  float shift;
+ Lock lock;
  array<Note> notes; // Active notes (currently being sampled) in this layer
  Resampler resampler; // Resampler to shift pitch
  buffer<float2> audio; // Buffer to mix notes before resampling
@@ -164,14 +165,15 @@ Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeCh
    else if(key=="hicc64"_) sample->hicc64=parseInteger(value);
    else if(key=="lokey"_) sample->lokey=isInteger(value)?parseInteger(value):noteToMIDI(value);
    else if(key=="hikey"_) sample->hikey=isInteger(value)?parseInteger(value):noteToMIDI(value);
-   else if(key=="hirand"_ && value=="0.500") sample->random=0;
-   else if(key=="lorand"_ && value=="0.501") sample->random=1;
+   else if(key=="hirand"_) { if(value!="1") sample->random=0; }
+   else if(key=="lorand"_) { if(value!="0") sample->random=1; }
+   else if(key=="offset"_) sample->offset=parseInteger(value);
    else if(key=="pitch_keycenter"_) sample->pitch_keycenter=isInteger(value)?parseInteger(value):noteToMIDI(value);
    else if(key=="key"_) sample->lokey=sample->hikey=sample->pitch_keycenter=isInteger(value)?parseInteger(value):noteToMIDI(value);
    else if(key=="ampeg_release"_) sample->releaseTime = parseDecimal(value);
    else if(key=="amp_veltrack"_) {} /*sample->amp_veltrack=fromDecimal(value)/100;*/
    else if(key=="rt_decay"_) sample->rt_decay = parseInteger(value);
-   else if(key=="volume"_) sample->volume = exp10(parseDecimal(value)/20.0); // dB (energy) to amplitude
+   else if(key=="volume"_) sample->volume = exp10(parseDecimal(value)/20.0); // dB 20?
    else if(key=="tune"_) {} //FIXME
    else if(key=="ampeg_attack"_) {} //FIXME
    else if(key=="ampeg_vel2attack"_) {} //FIXME
@@ -208,6 +210,7 @@ Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeCh
 
   s.flac.decodeFrame(); // Decodes first frame of all samples to start mixing without latency
   s.data.lock(); // Locks compressed samples in memory
+  s.flac.seek(s.offset/8*8); // Skips offset to trim silent leads
 
   for(int key: range(s.lokey,s.hikey+1)) { // Instantiates all pitch shifts on startup
    float shift = key-s.pitch_keycenter; //TODO: tune
@@ -268,21 +271,26 @@ void Sampler::noteEvent(uint key, uint velocity/*, float2 gain*/) {
                 float2 estimatedLevel = min<float2>(1.f, currentAttenuation * releasedLevel / releaseLevel); // 341ms/21ms
                 level = estimatedLevel; //min(estimatedLevel, modeledLevel);
             }*/
-   if(level < float2(0x1p-7)) return;
+   //if(level < float2(0x1p-7)) return;
 
    float shift = int(key)-s.pitch_keycenter; //TODO: tune
    Layer* layer=0;
    for(Layer& l : layers) if(l.shift==shift) layer=&l;
    assert(layer);
 
+   log(key, s.lovel, velocity, s.hivel, s.offset);
+
    Note note (::copy(s.flac));
    //note.envelope = s.envelope;
    //note.decayTime = s.decayTime;
    if(!released) { // Press
     note.key = key, note.velocity = velocity;
-    //note.level = float4(1); // Velocity layers already select correct level
-    //note.level = float4(s.volume * float(velocity) / s.hivel); // E ~ A^2 ~ v^2 => A ~ v (TODO: normalize levels)
-    note.level = float4(s.volume * float(velocity) / 127/*s.hivel*/); // FIXME: this is not right
+    note.level = float4(s.volume * float(velocity) / 127); // E ~ A^2 ~ v^2 => A ~ v
+    //note.level = float4(sqrt(s.volume) * float(velocity) / 127); // E ~ A^2 ~ v^2 => A ~ v
+    //note.level = float4(s.volume * sq(float(velocity) / 127)); // A ~ F ~ v^2 ?
+    //note.level = float4(s.volume * (float(velocity) / 127)); // A ~ F ~ v^2 ?
+    //note.level = float4(sq(s.volume) * sq(float(velocity) / 127)); // A ~ F ~ v^2 ?
+    //note.level = float4(s.volume);
     /*note.level[0] *= gain[0];
     note.level[1] *= gain[1];
     note.level[2] *= gain[0];
@@ -299,9 +307,10 @@ void Sampler::noteEvent(uint key, uint velocity/*, float2 gain*/) {
    if(layer->notes.size >= layer->notes.capacity) log(layer->notes.size >= layer->notes.capacity, layer->notes.size, layer->notes.capacity);
    else {
     //{Locker lock(notesSizeLock); // Locks note cleanup (assumes note cleanup is only done in this same thread)
+    Locker lock(layer->lock); // Cleanup in decode thread as cleaning up in audio thread would block if decoder locks
     layer->notes.append(move(note)); // Copies predecoded buffer and corresponding FLAC decoder state
     //}
-    queue(); //queue background decoder in main thread
+    queue(); // Queues background decoder in main thread
    }
    return;
   }
@@ -319,9 +328,10 @@ void Sampler::noteEvent(uint key, uint velocity/*, float2 gain*/) {
 
 void Sampler::event() { // Decode thread event posted every period from Sampler::read by audio thread
  for(;;) {
-  Locker lock(noteReferencesLock); // Locks note cleanup while decoding
+  //Locker lock(noteReferencesLock); // Locks note cleanup while decoding
   Note* note=0; size_t minBufferSize=-1;
   for(Layer& layer: layers) {
+   // No need to lock as audio thread can only append new notes (array may not reallocate (reserved))
    for(Note& n: layer.notes) { // Finds least buffered note
     if(n.flac.blockSize /*!EOF*/ && n.writeCount >= n.flac.blockSize && n.flac.audioAvailable < minBufferSize) {
      note = &n;
@@ -337,12 +347,13 @@ void Sampler::event() { // Decode thread event posted every period from Sampler:
   note->readCount.release(size);
   //}
  }
- /*Locker lock1(notesSizeLock); // FIXME: locks new notes while waiting for decoder lock
-        Locker lock2(noteReferencesLock);
-    // Cleanups silent notes
-        for(Layer& layer: layers) layer.notes.filter([this](const Note& note) {
-                return (note.flac.blockSize==0 && note.readCount<uint64(2*periodSize)) || note.level[0]<0x1p-7 || note.flac.position > note.decayTime;
-        });*/
+ // Cleanups silent notes
+ for(Layer& layer: layers) {
+  Locker lock(layer.lock);
+  layer.notes.filter([this](const Note& note) {
+   return (note.flac.blockSize==0 && note.readCount<uint64(2*periodSize)) || note.level[0]<0x1p-7 || (note.decayTime && note.flac.position > note.decayTime);
+  });
+ }
 }
 
 /// Audio mixer (realtime thread)
@@ -413,8 +424,9 @@ size_t Sampler::read32(mref<int2> output) { // Audio thread
  assert_(size==output.size);
  for(size_t i: range(size)) for(size_t c: range(channels)) {
   float u = buffer[i][c];
-  if(u<minValue) { minValue=u; log(minValue, maxValue, pow(2,ceil(log2(-minValue))), pow(2,ceil(maxValue))); }
-  if(u>maxValue) { maxValue=u; log(minValue, maxValue, pow(2,ceil(log2(-minValue))), pow(2,ceil(maxValue))); }
+  if(u<minValue) { minValue=u; log(minValue, maxValue); }//, pow(2,ceil(log2(-minValue))), pow(2,ceil(maxValue))); }
+  if(u>maxValue) { maxValue=u; log(minValue, maxValue); }//, pow(2,ceil(log2(-minValue))), pow(2,ceil(maxValue))); }
+  //if(u) log(u);
   float v = (u-minValue) / (maxValue-minValue); // Normalizes range to [0-1] //((u-minValue) / (maxValue-minValue)) * 2 - 1; // Normalizes range to [-1-1]
   int w = v*0x1p32 - 0x1p31; // Converts floating point to two-complement signed 32 bit integer
   output[i][c] = w;
@@ -429,13 +441,14 @@ size_t Sampler::read(mref<float2> output) {
  {
   if(timeChanged) timeChanged(audioTime); // Updates active notes
   for(Layer& layer: layers) { // Mixes all notes of all layers
-   {Locker lock (noteReferencesLock); // Locks decoder
+   /*{Locker lock (noteReferencesLock); // Locks decoder
     //Locker lock (notesSizeLock) // Assumes new notes are only added in this mixer thread
     // Cleanups silent notes
     layer.notes.filter([this](const Note& note) {
      return (note.flac.blockSize==0 && note.readCount<uint64(periodSize)) || note.level[0]<0x1p-7 || (note.decayTime && note.flac.position > note.decayTime);
     });
-   }
+   }*/
+   Locker lock (layer.lock); // Blocks cleanup while mixing (cleanup is fast and does not block mixer)
    if(layer.resampler) {
     error("");
     int need = layer.resampler.need(output.size);

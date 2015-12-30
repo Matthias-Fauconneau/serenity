@@ -290,6 +290,15 @@ size_t FLAC::read(mref<float2> out) {
  return out.size;
 }
 
+size_t FLAC::seek(size_t size) {
+ while(audioAvailable<=size){ assert_(blockSize!=0); decodeFrame(); }
+ size_t beforeWrap = audio.capacity-readIndex;
+ if(size>beforeWrap) readIndex=size-beforeWrap;
+ else readIndex+=size;
+ audioAvailable -= size;
+ return size;
+}
+
 Audio decodeAudio(const ref<byte>& data, uint duration) {
  FLAC flac(data);
  duration = ::min(duration, flac.duration);

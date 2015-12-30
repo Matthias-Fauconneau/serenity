@@ -28,12 +28,13 @@ struct Music {
  unique<Window> window = ::window(&pages->area(), 0);
 
  AudioOutput audio {window?audioThread:mainThread};
- MidiInput input {audioThread?audioThread:mainThread};
+ MidiInput input {window?audioThread:mainThread};
 
  Music() {
   if(window) {
+   //window->actions[Key('s')] = [this]{ writeFile("keyboard", str(input.max), ".config"_, true); };
    window->actions[UpArrow] = {this, &Music::previousTitle};
-   window->actions[DownArrow] = {this, &Music::nextTitle};
+   window->actions[DownArrow] = [this]{ writeFile("keyboard", str(input.max), ".config"_, true); nextTitle(); }; //{this, &Music::nextTitle};
    window->actions[Return] = {this, &Music::nextTitle};
    if(files) setTitle(arguments() ? arguments()[0] : files[0]);
   }
@@ -44,20 +45,18 @@ struct Music {
   //AudioControl("Headphone Playback Switch") = 1;
   //AudioControl("Master Playback Volume") = 100;
   audio.start(sampler->rate, sampler->periodSize, 32, 2);
-  //assert_(audioThread);
-  assert_(audio.status->state == Prepared);
   sampler->noteEvent(60, 64);
  }
  ~Music() {
-  audio.stop();
-  decodeThread.wait(); // ~Thread
-  if(audioThread) audioThread.wait(); // ~Thread
+  //audio.stop();
+  //decodeThread.wait(); // ~Thread
+  //if(audioThread) audioThread.wait(); // ~Thread
  }
 
  void setInstrument(string name) {
   if(audioThread) audioThread.wait();
   if(decodeThread) decodeThread.wait(); // ~Thread
-  sampler = unique<Sampler>(name+'/'+name+".sfz"_, 256, [this](uint){ input.event(); }, decodeThread); // Ensures all events are received right before mixing
+  sampler = unique<Sampler>(name+'/'+name+".autocorrected.sfz"_, 256, [this](uint){ input.event(); }, decodeThread); // Ensures all events are received right before mixing
   input.noteEvent = {sampler.pointer, &Sampler::noteEvent};
   input.ccEvent = {sampler.pointer, &Sampler::ccEvent};
   audio.read32 = {sampler.pointer, &Sampler::read32};

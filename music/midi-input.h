@@ -6,6 +6,7 @@
 
 /// MIDI input through ALSA rawmidi interface
 struct MidiInput : Device, Poll {
+    buffer<int> max;
     uint8 type=0;
     array<uint8> pressed;
     array<uint8> sustained;
@@ -17,5 +18,6 @@ struct MidiInput : Device, Poll {
     int lastTick=0;
 
     MidiInput(Thread& thread=mainThread);
+    ~MidiInput();
     void event();
 };

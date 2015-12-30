@@ -58,7 +58,7 @@ Thread::Thread(int priority, bool spawn) : Poll(0,POLLIN,*this), priority(priori
 void Thread::setPriority(int priority) { setpriority(0,0,priority); }
 #if !NO_PTHREAD
 static void* run(void* thread) { ((Thread*)thread)->run(); return 0; }
-void Thread::spawn() { assert_(!thread); pthread_create(&thread,0,&::run,this); }
+void Thread::spawn() { assert_(!thread); pthread_create(&thread,0,&::run,this); assert_(thread); }
 #endif
 
 int32 gettid() { return syscall(SYS_gettid); }
