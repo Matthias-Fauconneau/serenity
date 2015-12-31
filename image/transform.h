@@ -42,10 +42,10 @@ Transform operator *(const Transform& a, const Transform& b) {
 }
 
 void minmax(ref<Transform> transforms, int2& min, int2& max) {
-#if CROP // CROP
+#if 0 // CROP
 	min = ::max(apply(transforms,[&](const Transform& t){ return t.min(size); }));
 	max =::min(apply(transforms,[&](const Transform& t){ return t.max(size); }));
-#elif 0 // EXTEND X CROP Y
+#elif 1 // EXTEND X CROP Y
 	int2 minmin = ::min(apply(transforms,[&](const Transform& t){ return t.min(t.size); }));
 	int2 maxmin = ::max(apply(transforms,[&](const Transform& t){ return t.min(t.size); }));
 	int2 minmax =::min(apply(transforms,[&](const Transform& t){ return t.max(t.size); }));

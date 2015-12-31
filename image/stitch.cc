@@ -110,7 +110,7 @@ struct PanoramaWeights : ImageGroupSource {
 
 struct PanoramaStitch {
 	const Folder& folder = currentWorkingDirectory();
-	ImageFolder source {folder, {}, 4};
+    ImageFolder source {folder, {}, 2 /*Downsample*/};
 	AllImages groups {source};
 
 	ImageOperationT<Intensity> intensity {source};

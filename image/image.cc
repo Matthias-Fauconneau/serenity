@@ -55,6 +55,7 @@ void convolve(float* target, const float* source, const float* kernel, int radiu
     for(int dx: range(N)) sum += kernel[dx] * span[dx];
     targetColumn[(x+radius)*targetStride] = sum;
    }
+   assert_(width >= 2*radius);
    for(int x: range(width-2*radius,width-radius)){
     float sum = 0;
     for(int dx: range(N)) sum += kernel[dx] * line[width-1-abs(x+dx-(width-1))];

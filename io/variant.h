@@ -47,7 +47,6 @@ struct Variant {
  if(a.type != b.type) return false;
  if(a.type == Variant::Data) return a.data == b.data;
  error(int(a.type));
- //return (string)a == (string)b;
 }*/
 inline bool operator <(const Variant& a, const Variant& b) {
  if((a.type == Variant::Integer || a.type == Variant::Real) &&
@@ -59,14 +58,13 @@ inline bool operator <(const Variant& a, const Variant& b) {
   return a.data < b.data;
  }
  error(int(a.type));
- //return (string)a < (string)b;
 }
 
-/*template<> inline Variant copy(const Variant& v) {
+template<> inline Variant copy(const Variant& v) {
  if(v.type == Variant::Integer || v.type == Variant::Real) return v.number;
  if(v.type == Variant::Data) return v.data;
  error(int(v.type));
-}*/
+}
 generic String str(const map<T,Variant>& dict) {
  array<char> s;
  s.append("<<"); for(auto entry: dict) s.append( '/'+entry.key+' '+str(entry.value)+' ' ); s.append(">>");

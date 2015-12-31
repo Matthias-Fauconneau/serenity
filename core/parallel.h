@@ -10,8 +10,8 @@
 // -> \file math.h
 //inline void operator*=(mref<float> values, float factor) { values.apply([factor](float v) { return factor*v; }, values); }
 
-static const size_t maxThreadCount = 8;
-static const int threadCount = parseInteger(environmentVariable("THREADS", "1"));
+static const size_t maxThreadCount = 2;
+static const int threadCount = parseInteger(environmentVariable("THREADS", "2"));
 
 struct thread {
  pthread_t pthread = 0;
