@@ -168,6 +168,7 @@ Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeCh
    else if(key=="hirand"_) { if(value!="1") sample->random=0; }
    else if(key=="lorand"_) { if(value!="0") sample->random=1; }
    else if(key=="offset"_) sample->offset=parseInteger(value);
+   else if(key=="end"_) {}//sample->decayTime=parseInteger(value);
    else if(key=="pitch_keycenter"_) sample->pitch_keycenter=isInteger(value)?parseInteger(value):noteToMIDI(value);
    else if(key=="key"_) sample->lokey=sample->hikey=sample->pitch_keycenter=isInteger(value)?parseInteger(value):noteToMIDI(value);
    else if(key=="ampeg_release"_) sample->releaseTime = parseDecimal(value);
@@ -185,7 +186,9 @@ Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeCh
  add();
 
  //Folder("Envelope"_, folder, true);
+ uint maxlovel=0;
  for(Sample& s: samples) {
+  maxlovel = ::max(maxlovel, s.lovel);
   //log(s.name);
   if(0) {
    if(!existsFile(String("Envelope/"_+s.name+".env"_),folder)) {
@@ -231,7 +234,7 @@ Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeCh
    }
   }
  }
-
+ log("maxlovel", maxlovel);
  if(&thread != &mainThread) registerPoll();
 }
 
@@ -278,7 +281,7 @@ void Sampler::noteEvent(uint key, uint velocity/*, float2 gain*/) {
    for(Layer& l : layers) if(l.shift==shift) layer=&l;
    assert(layer);
 
-   log(key, s.lovel, velocity, s.hivel, s.offset);
+   //log(key, s.lovel, velocity, s.hivel, s.offset);
 
    Note note (::copy(s.flac));
    //note.envelope = s.envelope;

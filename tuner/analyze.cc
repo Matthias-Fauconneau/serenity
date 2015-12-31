@@ -63,22 +63,25 @@ struct Analysis {
   log(minDuration, minDuration/sampler.rate);
   //assert_(minDuration >= sampler.rate/2);
   //minDuration = 8192; // Attack energy (0.4s)
-  const uint maxThresholdT0 = 10685;//742;
+  //const uint maxThresholdT0 = 10685;//742;
   //const uint maxMaxT0 = 16059;
   //const uint unused D = 402058;
   //const uint unused maxMaxT0 = 8141;
   //const uint maxMaxT0 = 24717;
-  const uint N = 4096; // Analysis window size ~ 0.2s
+  //const uint N = 4096; // Analysis window size ~ 0.2s
   //assert_(maxThresholdT0+N <= minDuration);
 
   buffer</*velocity*/ map<float /*key*/,float>> energies (velocityLayers.size, 0);  // For each note (in MIDI key), energy relative to mean of loudest layer
   buffer</*velocity*/ map<float /*key*/,float>> correctedEnergies (velocityLayers.size, 0);  // For each note (in MIDI key), energy relative to mean of loudest layer
   buffer<float> sampleEnergies (sampler.samples.size);
   buffer<float> sampleStarts (sampler.samples.size);
+  buffer<float> sampleEnds (sampler.samples.size);
   float minE = inf, maxE = 0;
   uint minmaxT = -1, maxmaxT = 0; float minmax = inf;
   float threshold = 0.0005;
   uint minThresholdT = -1, maxThresholdT = 0;
+  uint minThresholdTend = -1, maxThresholdTend = 0;
+  uint minN = -1, maxN = 0;
   for(int velocityLayer: range(velocityLayers.size)) {
    energies.append();
    correctedEnergies.append();
@@ -88,7 +91,7 @@ struct Analysis {
      assert_(sample.trigger==0); //if(sample.trigger!=0) continue;
      if(range(sample.lovel, sample.hivel+1) != velocityLayers[velocityLayer]) continue;
      if(sample.pitch_keycenter != keys[keyIndex]) continue;
-     buffer<float2> Y = decodeAudio(sample.data, /*maxMaxT0+N*//*D*//*minDuration*/maxThresholdT0+N);
+     buffer<float2> Y = decodeAudio(sample.data, 65536);
      //assert(stereo.size == N, stereo.size, sample.name, sample.data.size);
      float sum = 0;
      for(float2 y: Y) sum += (y[0]+y[1]) * 0x1p-25f;
@@ -100,32 +103,44 @@ struct Analysis {
       if(abs(y) > max) { max=abs(y); maxT=t; }
       if(thresholdT==uint(~0))  if(abs(y) >= threshold) thresholdT=t;
      }
+     uint thresholdTend = 0;
+     for(size_t t : reverse_range(Y.size)) {
+      float y = (Y[t][0]+Y[t][1]) * 0x1p-25f - mean;
+      if(abs(y) >= threshold) { thresholdTend=t; break; }
+     }
      if(max < threshold) {
       assert_(thresholdT == uint(~0) && maxT < thresholdT, thresholdT, max, threshold, maxT, thresholdT);
       error(max);
       thresholdT = maxT;
      }
      //thresholdT = maxT;
-     assert_(thresholdT+N <= Y.size, thresholdT);
-     for(size_t t : range(thresholdT, thresholdT+N)) {
+     //assert_(thresholdT+N <= Y.size, thresholdT);
+     thresholdTend = ::max(thresholdTend, thresholdT+4096);
+     for(size_t t : range(thresholdT, thresholdTend)) {
       float y = (Y[t][0]+Y[t][1]) * 0x1p-25f - mean;
       energy += sq(y); // Measures energy only from maxT to maxT+N
      }
+     energy /= (thresholdTend-thresholdT);
      //assert_(threshold <= max, threshold, max, maxT, sample.flac.duration, sample.name);
     // assert_(thresholdT!=uint(~0));
      //log(max, maxT, threshold, thresholdT);
+     maxN = ::max(maxN, thresholdTend-thresholdT);
+     minN = ::min(minN, thresholdTend-thresholdT);
+
      maxmaxT = ::max(maxmaxT, maxT);
      minmaxT = ::min(minmaxT, maxT);
      minmax = ::min(minmax, max);
      minThresholdT = ::min(minThresholdT, thresholdT);
      maxThresholdT = ::max(maxThresholdT, thresholdT);
-     energy /= N;
+     minThresholdTend = ::min(minThresholdTend, thresholdTend);
+     maxThresholdTend = ::max(maxThresholdTend, thresholdTend);
      energies[velocityLayer].insertMulti(keys[keyIndex], energy);
      correctedEnergies[velocityLayer].insertMulti(keys[keyIndex], energy*sq(sample.volume));
      sampleEnergies[sampleIndex] = energy;
-     if(sample.pitch_keycenter==57) { log(sample.pitch_keycenter, thresholdT); assert_(thresholdT < 2115, thresholdT); }
+     if(sample.pitch_keycenter==57) { log(sample.pitch_keycenter, thresholdT, thresholdTend); assert_(thresholdT < 2115, thresholdT); }
      if(sample.pitch_keycenter==26) assert_(thresholdT <= 450 || thresholdT>=2503, thresholdT);// log(sample.pitch_keycenter, thresholdT, thresholdT >= 2509);
      sampleStarts[sampleIndex] = thresholdT;
+     sampleEnds[sampleIndex] = thresholdTend;
      minE = ::min(minE, energy);
      maxE = ::max(maxE, energy);
     }
@@ -134,13 +149,17 @@ struct Analysis {
   }
   log("minmax", minmax, "minmaxT", minmaxT, "maxmaxT", maxmaxT);//, minE, maxE);
   log("minThresholdT", minThresholdT, "maxThresholdT", maxThresholdT);
+  log("minThresholdTend", minThresholdTend, "maxThresholdTend", maxThresholdTend);
+  log("minN", minN, "maxN", maxN);
   {// Flattens all samples to same level using SFZ "volume" attribute
    array<char> sfz;
+   int maxlovel = 0;
    auto process = [&](bool with) {
     for(size_t sampleIndex: range(sampler.samples.size)) {
      Sampler::Sample& sample = sampler.samples[sampleIndex];
      if(sample.trigger!=0 || (with ^ !(sample.pitch_keycenter>88))) continue;
      float e = sampleEnergies[sampleIndex];
+#if 1 // Overrides velocity layers
      float under = minE, over = maxE;
      for(size_t otherIndex: range(sampler.samples.size)) {
       const Sampler::Sample& other = sampler.samples[otherIndex];
@@ -160,6 +179,11 @@ struct Analysis {
      int hivel = min(127, int(0+ceil((highE-ln(minE))/(ln(maxE)-ln(minE))*127)));
      //int lovel = sqrt((lowE-minE)/(maxE-minE))*127;
      //int hivel = sqrt((highE-minE)/(maxE-minE))*127;
+#else
+     int lovel = sample.lovel;
+     int hivel = sample.hivel;
+#endif
+     maxlovel = ::max(maxlovel, lovel);
      assert_(0 <= lovel && lovel <= hivel && hivel  <= 127, lovel, hivel, minE, under, lowE, e, highE, over, maxE); //FIXME: round robin too similar samples
      sfz.append("<region> sample="_+sample.name
                 +" lokey="_+str(sample.lokey)+" hikey="_+str(sample.hikey)
@@ -167,12 +191,14 @@ struct Analysis {
                 +" locc64="_+str(sample.locc64)+" hicc64="_+str(sample.hicc64)
                 +" lorand="_+(sample.random?"0.5"_:"0"_)+" hirand="_+(sample.random?"1"_:"0.5"_)
                 +" pitch_keycenter="_+str(sample.pitch_keycenter)
-                +" volume="_+str(10*log10(maxE/e))
+                +" volume="_+str(10*log10(maxE/e)) // 10 not 20 as energy is already squared
                 +" offset="_+str(sampleStarts[sampleIndex])
-                +"\n"_); // 10 not 20 as energy is already squared
+                +" end="_+str(sampleEnds[sampleIndex])
+                +"\n"_);
      sample.lovel = lovel; sample.hivel = hivel; // DEBUG
     }
    };
+   log("maxlovel", maxlovel);
    // Keys with dampers
    sfz.append("<group> ampeg_release=1\n"_);
    process(true);

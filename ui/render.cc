@@ -216,8 +216,10 @@ void render(const Image& target, const Graphics& graphics, vec2 offset) {
     offset += graphics.offset;
     for(const auto& e: graphics.blits) {
 		if(int2(e.size) == e.image.size) blit(target, int2(round(offset+e.origin)), e.image, e.color, e.opacity);
-        //else blit(target, int2(round(offset+e.origin)), resize(int2(round(e.size)), e.image), e.color, e.opacity); // FIXME: subpixel blit
-        else error(e.size, e.image.size);
+        else {
+         //assert_(abs(offset+e.origin-round(offset+e.origin)) < vec2(0.3), offset+e.origin); // FIXME: subpixel blit
+         blit(target, int2(round(offset+e.origin)), resize(int2(round(e.size)), e.image), e.color, e.opacity);
+        } //else error(e.size, e.image.size);
     }
 	for(const auto& e: graphics.fills) fill(target, int2(round(offset+e.origin)), int2(e.size), e.color, e.opacity);
     for(const auto& e: graphics.lines) line(target, offset+e.a, offset+e.b, e.color, e.opacity, e.hint);
