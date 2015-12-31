@@ -8,48 +8,10 @@
 #include "file.h"
 
 // -> \file math.h
-inline void operator*=(mref<float> values, float factor) { values.apply([factor](float v) { return factor*v; }, values); }
-
-// \file parallel.h
-#include "vector.h"
-
-/*void atomic_add(v4sf& a, v4sf b) {
- v4sf expected, desired;
- do {
-  expected = a;
-  desired = expected+b;
- } while(!__sync_bool_compare_and_swap((__int128*)&a, *(__int128*)&expected,
-                *(__int128*)&desired));
-}*/
-
-inline void atomic_sub(v4sf& a, v4sf b) {
- v4sf expected, desired;
- do {
-  expected = a;
-  desired = expected-b;
- } while(!__sync_bool_compare_and_swap((__int128*)&a, *(__int128*)&expected,
-                *(__int128*)&desired));
-}
-
-inline void atomic_add(float& a, float b) {
- float expected = a;
- float desired;
- do {
-  desired = expected+b;
- } while(!__atomic_compare_exchange_n((int*)&a, (int*)&expected,
-                                      *(int*)&desired, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
-}
+//inline void operator*=(mref<float> values, float factor) { values.apply([factor](float v) { return factor*v; }, values); }
 
 static const size_t maxThreadCount = 8;
-/*static size_t coreCount() {
- TextData s(File("/proc/cpuinfo").readUpToLoop(1<<16));
- assert_(s.data.size<s.buffer.capacity);
- size_t coreCount = 0;
- while(s) { if(s.match("processor")) coreCount++; s.line(); }
- assert_(coreCount <= maxThreadCount);
- return coreCount;
-}*/
-static const int threadCount = parseInteger(environmentVariable("THREADS", "1")); //coreCount();
+static const int threadCount = parseInteger(environmentVariable("THREADS", "1"));
 
 struct thread {
  pthread_t pthread = 0;
