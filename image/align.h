@@ -27,7 +27,7 @@ struct Align : ImageTransformGroupOperator, OperatorT<Align> {
 		transforms.append(A[0].size, 0);
 		for(const ImageF& image : images.slice(1)) { // Compares each image with next one
 			array<ImageF> B = mipmap(image, levelCount);
-			Transform bestTransform (B[0].size, int2(-B[0].size.x*3/4, 0)); // Initializes right of previous image
+            Transform bestTransform (B[0].size, int2(-B[0].size.x*1/2, 0)); // Initializes right of previous image
 			for(int level: range(max(0, levelCount-8), levelCount)) { // From coarsest (last 2Kpx) to finest (first 8px)
 				const ImageF& a = A[levelCount-1-level];
 				const ImageF& b = B[levelCount-1-level];
@@ -44,7 +44,7 @@ struct Align : ImageTransformGroupOperator, OperatorT<Align> {
 																					  int2(-1,  1), int2( 0,  1), int2(1,  1),
 																										  int2(0, 2) }) {
                         Transform transform = levelBestTransform * Transform(b.size, offset); double& similarity = similarities[transform];
-						if(transform.offset.x > -B[0].size.x*3/4) continue; // Restricts overlap for similar images
+                        //if(transform.offset.x > -B[0].size.x*3/4) continue; // Restricts overlap for similar images
 						if(!similarity) similarity = ::similarity(a, b, transform);
 						if(similarity > bestSimilarity) {
 							bestSimilarity = similarity;

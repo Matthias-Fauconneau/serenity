@@ -82,6 +82,6 @@ struct Multiply : ImageOperator, OperatorT<Multiply> {
 /// Sums together all images in an image group
 struct Sum : ImageGroupOperator1, OperatorT<Sum> {
 	void apply(const ImageF& Y, ref<ImageF> X) const override {
-     /*parallel*/::apply((buffer<float>&)Y, [&](size_t index) { return sum<float>(::apply(X, [index](const ImageF& x) { return x[index]; })); });
+     Y.apply([&](size_t index) { return sum<float>(::apply(X, [index](const ImageF& x) { return x[index]; })); });
     }
 };

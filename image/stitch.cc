@@ -114,15 +114,11 @@ struct PanoramaStitch {
 	AllImages groups {source};
 
 	ImageOperationT<Intensity> intensity {source};
-	GroupImageOperation groupIntensity {intensity, groups};
-	//ImageOperationT<Normalize> normalize {intensity};
-	//GroupImageOperation groupNormalize {normalize, groups};
+    GroupImageOperation groupIntensity {intensity, groups};
 	ImageGroupTransformOperationT<Align> transforms {groupIntensity};
-	//SampleImageGroupOperation alignAlignSource {transforms.source, transforms};
 
 	GroupImageOperation groupSource {source, groups};
 	SampleImageGroupOperation alignSource {groupSource, transforms};
-	//ImageGroupOperationT<Intensity> alignIntensity {alignSource}; //FIXME
 
 	PanoramaWeights weights {groupSource, transforms};
 	ImageGroupOperationT<NormalizeSum> normalizeWeights {weights};
@@ -130,14 +126,13 @@ struct PanoramaStitch {
 	ImageGroupFoldT<Sum> select {applySelectionWeights};
 
 	ImageGroupOperationT<WeightFilterBank> weightBands {weights}; // Splits each weight selection in bands
-	//BinaryImageGroupOperationT<Mask> maskWeightBands {alignIntensity, weightBands};
 	ImageGroupOperationT<NormalizeSum> normalizeWeightBands {weightBands}; // Normalizes weight selection over images for each band
 
-	ImageGroupForwardComponent multiscale {alignSource, sumBands};
-	ImageGroupOperationT<FilterBank> splitBands {multiscale.source};
+    ImageGroupForwardComponent multiscale {alignSource, sumBands};
+    ImageGroupOperationT<FilterBank> splitBands {multiscale.source};
 	BinaryImageGroupOperationT<Multiply> weightedBands {normalizeWeightBands, splitBands}; // Applies weights to each band
 	ImageGroupOperationT<Sum> sumBands {weightedBands}; // Sums bands
-	ImageGroupFoldT<Sum> blend {multiscale}; // Sums images
+    ImageGroupFoldT<Sum> blend {multiscale}; // Sums images
 };
 
 struct PanoramaStitchPreview : PanoramaStitch, Application {
@@ -147,13 +142,15 @@ struct PanoramaStitchPreview : PanoramaStitch, Application {
 	size_t imageIndex = 0;
 
 #if 0
-	sRGBGroupOperation sRGB [2] = {alignSource, multiscale};
-	array<Scroll<ImageGroupSourceView>> sRGBView = apply(mref<sRGBGroupOperation>(sRGB), [&](ImageRGBGroupSource& source) {
-			return Scroll<ImageGroupSourceView>(source, &index, &imageIndex); });
+    sRGBGroupOperation sRGB [3] = {alignSource, normalizeWeightBands, multiscale};
+    /*array<Scroll<ImageGroupSourceView>> sRGBView = apply(mref<sRGBGroupOperation>(sRGB), [&](ImageRGBGroupSource& source) {
+            return Scroll<ImageGroupSourceView>(source, &index, &imageIndex); });*/
+    array<ImageGroupSourceView> sRGBView = apply(mref<sRGBGroupOperation>(sRGB), [&](ImageRGBGroupSource& source) {
+      return ImageGroupSourceView(source, &index, &imageIndex); });
 #else
 	sRGBOperation sRGB [1] = {blend};
-	array<Scroll<ImageSourceView>> sRGBView = apply(mref<sRGBOperation>(sRGB),
-													[&](ImageRGBSource& source) -> Scroll<ImageSourceView> { return {source, &index}; });
+    //array<Scroll<ImageSourceView>> sRGBView = apply(mref<sRGBOperation>(sRGB), [&](ImageRGBSource& source) -> Scroll<ImageSourceView> { return {source, &index}; });
+    array<ImageSourceView> sRGBView = apply(mref<sRGBOperation>(sRGB), [&](ImageRGBSource& source) -> ImageSourceView { return {source, &index}; });
 #endif
 	VBox views {toWidgets(sRGBView), VBox::Share, VBox::Expand};
     unique<Window> window = ::window(&views);
