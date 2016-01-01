@@ -248,7 +248,13 @@ void play(const Audio& data) {
  size_t t = 0;
  function<size_t(mref<int2>)> read32 = [&](mref<int2> out) {
   size_t size = ::min(data.size-t, out.size);
-  for(size_t i: range(size)) out[i] = int2(data[t+i]);
+  for(size_t i: range(size*2)) {
+   float u = data[t+i/2][i%2];
+   constexpr float minValue = -64577408, maxValue = 76015472;
+   float v = (u-minValue) / (maxValue-minValue); // Normalizes range to [0-1] //((u-minValue) / (maxValue-minValue)) * 2 - 1; // Normalizes range to [-1-1]
+   int w = v*0x1p32 - 0x1p31; // Converts floating point to two-complement signed 32 bit integer
+   out[i/2][i%2] = w;
+  }
   t += size;
   return size;
  };
@@ -297,21 +303,25 @@ struct Loudness {
   for(;;) {
    const size_t a = random%sampler.samples.size;
    const Sampler::Sample& A = sampler.samples[a];
-   log("A");
-   play(decodeAudio(A.data));
    const size_t b = random%sampler.samples.size;
    const Sampler::Sample& B = sampler.samples[b];
+   log("A");
+   play(decodeAudio(A.data));
    log("B");
    play(decodeAudio(B.data));
    bool done = false;
    Keyboard keyboard;
    keyboard.keyPress = [&](Key key) {
-    log(key, char(key), int('a'), int('b'), int(Space));
+    if(key == Space) {
+     log("A");
+     play(decodeAudio(A.data));
+     log("B");
+     play(decodeAudio(B.data));
+    }
     if(key == 'a') { log("A > B"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(A.name, ">", B.name)+'\n'); done=true; }
     if(key == 'b') { log("B > A"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(B.name, ">", A.name)+'\n'); done=true; }
-    if(key == Space) { log("A ~ B"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(A.name, "~", B.name)+'\n'); done=true; }
+    if(key == '=') { log("A ~ B"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(A.name, "~", B.name)+'\n'); done=true; }
     if(key == Escape) { extern int exit_group(int); exit_group(0); }
-exit_group()
    };
    while(!done) {
     keyboard.poll(-1);
