@@ -277,7 +277,19 @@ void Keyboard::event() {
 struct Loudness {
  Loudness() {
   Sampler sampler ("Piano/Piano.sfz"_);
-  Random random;
+
+  bool next = false, done = false;
+  size_t a, b;
+  Keyboard keyboard;
+  keyboard.keyPress = [&](Key key) {
+   const auto& A = sampler.samples[a];
+   const auto& B = sampler.samples[b];
+   if(key == 'a') { log("A > B"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(A.name, ">", B.name)+'\n'); next=true; }
+   if(key == 'b') { log("B > A"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(B.name, ">", A.name)+'\n'); next=true; }
+   if(key == Space) { log("A ~ B"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(A.name, "~", B.name)+'\n'); next=true; }
+   if(key == Escape) done = true;
+  };
+
   ref<float2> data; size_t t = 0;
   function<size_t(mref<int2>)> read32 = [&](mref<int2> out) {
    size_t size = ::min(data.size-t, out.size);
@@ -290,43 +302,29 @@ struct Loudness {
    }
    t += size;
    for(size_t i: range(size*2, out.size*2)) out[i/2][i%2] = 0;
+   keyboard.event(); // Polls for key press events
    return out.size;
   };
   AudioOutput audio( read32 );
-  audio.start(audio.rate, 8192, 32, 2); // Keeps device open to avoid clicks
+  audio.start(sampler.rate, 4096, 32, 2); // Keeps device open to avoid clicks
   auto play = [&](const Audio& sample) {
    data=sample; t=0;
-   while(t<data.size) {
+   while(t<data.size && !next && !done) {
     pollfd pollfd{audio.Device::fd,POLLOUT,0}; ::poll(&pollfd,1,-1);
     audio.event();
    }
   };
-  for(;;) {
-   const size_t a = random%sampler.samples.size;
-   const Sampler::Sample& A = sampler.samples[a];
-   Audio audioA = decodeAudio(A.data);
-   const size_t b = random%sampler.samples.size;
-   const Sampler::Sample& B = sampler.samples[b];
-   Audio audioB = decodeAudio(B.data);
-   log("A"); play(audioA);
-   log("B"); play(audioB);
-   log(".");
-   bool done = false;
-   Keyboard keyboard;
-   keyboard.keyPress = [&](Key key) {
-    if(key == Space) {
-     log("A"); play(audioA);
-     log("B"); play(audioB);
-     log(".");
-    }
-    if(key == 'a') { log("A > B"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(A.name, ">", B.name)+'\n'); done=true; }
-    if(key == 'b') { log("B > A"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(B.name, ">", A.name)+'\n'); done=true; }
-    if(key == '=') { log("A ~ B"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(A.name, "~", B.name)+'\n'); done=true; }
-    if(key == Escape) { extern int exit_group(int); exit_group(0); }
-   };
-   while(!done) {
-    keyboard.poll(-1);
-    keyboard.event();
+  Random random;
+  random.seed();
+  while(!done) {
+   a = random%sampler.samples.size;
+   Audio A = decodeAudio(sampler.samples[a].data, sampler.rate);
+   b = random%sampler.samples.size;
+   Audio B = decodeAudio(sampler.samples[b].data, sampler.rate);
+   next = false;
+   while(!next && !done) {
+    log("A"); play(A);
+    log("B"); play(B);
    }
   }
  }
