@@ -265,7 +265,6 @@ void Keyboard::event() {
             {98, ref<int>{KP_Slash, 0,0,0, Home, UpArrow, PageUp, LeftArrow, RightArrow, End, DownArrow, PageDown, Insert, Delete}}}) {
                 if(e.code >= range.key && e.code <= range.key+range.value.size) {
                  code = range.value[e.code-range.key];
-                 log(range.key, e.code, range.key+range.value.size, code, (char)code);
                  break;
                 }
             }
@@ -275,57 +274,90 @@ void Keyboard::event() {
 }
 
 struct Loudness {
- Loudness() {
-  Sampler sampler ("Piano/Piano.sfz"_);
+  Sampler sampler {"Piano/Piano.sfz"_};
 
-  bool next = false, done = false;
-  size_t a, b;
+  size_t a = invalid, b = invalid;
   Keyboard keyboard;
-  keyboard.keyPress = [&](Key key) {
-   const auto& A = sampler.samples[a];
-   const auto& B = sampler.samples[b];
-   if(key == 'a') { log("A > B"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(A.name, ">", B.name)+'\n'); next=true; }
-   if(key == 'b') { log("B > A"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(B.name, ">", A.name)+'\n'); next=true; }
-   if(key == Space) { log("A ~ B"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(A.name, "~", B.name)+'\n'); next=true; }
-   if(key == Escape) done = true;
-  };
 
-  ref<float2> data; size_t t = 0;
-  function<size_t(mref<int2>)> read32 = [&](mref<int2> out) {
-   size_t size = ::min(data.size-t, out.size);
-   for(size_t i: range(size*2)) {
-    float u = data[t+i/2][i%2];
+  size_t nextA, nextB;
+  FLAC current, other;
+  string currentName = "A"_, otherName = "B"_;
+  size_t currentIndex, otherIndex;
+  size_t read32(mref<int2> out) {
+   buffer<float2> buffer(out.size);
+   size_t read = current.read(buffer);
+   if(read<out.size || current.position >= sampler.rate) {
+    swap(current, other);
+    swap(currentName, otherName);
+    swap(currentIndex, otherIndex);
+    log(currentName);
+    /**/  if(a==invalid) a = nextA;
+    else if(b==invalid) b = nextB;
+    current = ::copy(sampler.samples[currentIndex].flac); // Resets decoder
+    size_t read2 = current.read(buffer.slice(read)); // Complete frame
+    assert_(read+read2 == out.size); // Assumes samples are longer than a period
+   }
+   for(size_t i: range(out.size*2)) {
+    float u = buffer[i/2][i%2];
     constexpr float minValue = -64577408, maxValue = 76015472;
     float v = (u-minValue) / (maxValue-minValue); // Normalizes range to [0-1] //((u-minValue) / (maxValue-minValue)) * 2 - 1; // Normalizes range to [-1-1]
     int w = v*0x1p32 - 0x1p31; // Converts floating point to two-complement signed 32 bit integer
     out[i/2][i%2] = w;
    }
-   t += size;
-   for(size_t i: range(size*2, out.size*2)) out[i/2][i%2] = 0;
-   keyboard.event(); // Polls for key press events
    return out.size;
-  };
-  AudioOutput audio( read32 );
-  audio.start(sampler.rate, 4096, 32, 2); // Keeps device open to avoid clicks
-  auto play = [&](const Audio& sample) {
-   data=sample; t=0;
-   while(t<data.size && !next && !done) {
-    pollfd pollfd{audio.Device::fd,POLLOUT,0}; ::poll(&pollfd,1,-1);
-    audio.event();
-   }
-  };
-  Random random;
-  random.seed();
-  while(!done) {
-   a = random%sampler.samples.size;
-   Audio A = decodeAudio(sampler.samples[a].data, sampler.rate);
-   b = random%sampler.samples.size;
-   Audio B = decodeAudio(sampler.samples[b].data, sampler.rate);
-   next = false;
-   while(!next && !done) {
-    log("A"); play(A);
-    log("B"); play(B);
-   }
   }
- }
+
+  Random random;
+  AudioOutput audio {{this, &Loudness::read32}};
+
+  void next() {
+   a = invalid, b = invalid;
+   currentIndex = nextA = random%sampler.samples.size;
+   otherIndex = nextB = random%sampler.samples.size;
+   current = ::copy(sampler.samples[nextA].flac); currentName = "A"_;
+   other = ::copy(sampler.samples[nextB].flac); otherName = "B"_;
+   log(nextA, nextB);
+   log("A");
+  }
+
+  void keyPress(Key key) {
+   if(key == Escape) requestTermination();
+   if(a == invalid || b == invalid) return;
+   const auto& A = sampler.samples[a];
+   const auto& B = sampler.samples[b];
+   if(key == 'a') { log("A > B"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(A.name, ">", B.name)+'\n'); next(); }
+   if(key == 'b') { log("B > A"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(B.name, ">", A.name)+'\n'); next(); }
+   if(key == Space) { log("A ~ B"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(A.name, "~", B.name)+'\n'); next(); }
+  }
+
+  Loudness() {
+   if(existsFile("loudness",".config"_)) {
+    String loudness = readFile("loudness",".config"_);
+    array<string> testedSamples; size_t inequalCount = 0;
+    for(string line: split(loudness,"\n")) {
+     TextData s (line);
+     string A = s.until(' ');
+     string cmp = s.until(' ');
+     assert_(cmp == "~" || cmp == ">");
+     string B = s.until('\n');
+     if(cmp == ">") {
+      inequalCount++;
+      testedSamples.addSorted(A);
+      testedSamples.addSorted(B);
+     }
+    }
+    size_t found = 0, missing = 0, total = sampler.samples.size;
+    for(const auto& sample: sampler.samples) {
+     for(string tested: testedSamples) if(tested == sample.name) { found++; goto break_; }
+     /*else*/ missing++;
+    break_:;
+    }
+    assert_(found+missing == total);
+    log(found,"+",missing,"=",total, "(", inequalCount, ")");
+   }
+   keyboard.keyPress = {this, &Loudness::keyPress};
+   random.seed();
+   next();
+   audio.start(sampler.rate, 4096, 32, 2); // Keeps device open to avoid clicks
+  }
 } loudness;

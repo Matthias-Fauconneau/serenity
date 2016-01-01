@@ -211,7 +211,7 @@ Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeCh
   }
   //log(s.decayTime, s.flac.duration);
 
-  s.flac.decodeFrame(); // Decodes first frame of all samples to start mixing without latency
+  //s.flac.decodeFrame(); // Decodes first frame of all samples to start mixing without latency
   s.data.lock(); // Locks compressed samples in memory
   s.flac.seek(s.offset/8*8); // Skips offset to trim silent leads
 
@@ -234,7 +234,7 @@ Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeCh
    }
   }
  }
- log("maxlovel", maxlovel);
+ //log("maxlovel", maxlovel);
  if(&thread != &mainThread) registerPoll();
 }
 
