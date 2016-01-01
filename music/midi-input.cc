@@ -38,8 +38,8 @@ void MidiInput::event() {
                 assert_(key >= 21 && key < 21+88);
                 int& max = this->max[key-21];
                 if(value > max) max = value;
-                //noteEvent(key, min(127,(int)value*127/max));
-                noteEvent(key, value);
+                noteEvent(key, min(127,(int)value*127/max));
+                //noteEvent(key, value);
             }
         } else if(type == Controller) {
             if(key==64) {

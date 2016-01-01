@@ -29,10 +29,10 @@ struct Sampler::Sample {
  uint decayTime = 0; // Time (in samples) where level decays below
 };
 
-static const float threshold = 0.0005;
+static const float threshold = 0.0009;
 
 float energy(ref<byte> data, uint& start, uint& end) {
- buffer<float2> Y = decodeAudio(data, 65536);
+ buffer<float2> Y = decodeAudio(data, 8192);
  float sum = 0;
  for(float2 y: Y) sum += (y[0]+y[1]) * 0x1p-25f;
  float mean = sum / Y.size;
@@ -41,17 +41,18 @@ float energy(ref<byte> data, uint& start, uint& end) {
  for(size_t t : range(Y.size)) {
   float y = (Y[t][0]+Y[t][1]) * 0x1p-25f - mean;
   if(abs(y) > max) { max=abs(y); maxT=t; }
-  if(start==uint(~0))  if(abs(y) >= threshold) start=t;
+  if(start==uint(~0)) if(abs(y) >= threshold) start=t;
  }
  end = 0;
  for(size_t t : reverse_range(Y.size)) {
   float y = (Y[t][0]+Y[t][1]) * 0x1p-25f - mean;
-  if(abs(y) >= threshold) { end=t; break; }
+  if(abs(y) >= threshold) { end=t+1; break; }
  }
  if(max < threshold) {
   assert_(start == uint(~0) && maxT < start, start, max, threshold, maxT, start);
-  error(max);
-  start = maxT;
+  log(max);
+  start = 0; //maxT;
+  assert_(max < 0.000236);
  }
  //thresholdT = maxT;
  //assert_(thresholdT+N <= Y.size, thresholdT);
@@ -65,6 +66,7 @@ float energy(ref<byte> data, uint& start, uint& end) {
 }
 float energy(ref<byte> data) { uint start,end; return energy(data, start, end); }
 
+#if 1
 struct Analysis {
  VList<Plot> plots;
  unique<Window> window = nullptr;
@@ -173,7 +175,8 @@ struct Analysis {
      correctedEnergies[velocityLayer].insertMulti(keys[keyIndex], energy*sq(sample.volume));
      sampleEnergies[sampleIndex] = energy;
      //if(sample.pitch_keycenter==57) { log(sample.pitch_keycenter, thresholdT, thresholdTend); assert_(thresholdT < 2115, thresholdT); }
-     //if(sample.pitch_keycenter==26) assert_(thresholdT <= 450 || thresholdT>=2503, thresholdT);// log(sample.pitch_keycenter, thresholdT, thresholdT >= 2509);
+     if(sample.pitch_keycenter==26) { assert_(start <= 644 || start>=2001, start, sample.pitch_keycenter); log(sample.pitch_keycenter, start); }
+     if(sample.pitch_keycenter==33) assert_(start <= 595 || start>=2801, start, sample.pitch_keycenter);// log(sample.pitch_keycenter, thresholdT, thresholdT >= 2509);
      sampleStarts[sampleIndex] = start;
      sampleEnds[sampleIndex] = end;
      minE = ::min(minE, energy);
@@ -207,13 +210,22 @@ struct Analysis {
       if(otherE > e && otherE < over) over = otherE;
      }
      assert_(under <= e && e <= over, minE, under, e, over, maxE);
+#if 1 // ln to use more low velocity layers
      float lowE = under>minE ? (ln(under)+ln(e))/2 : ln(minE);
      float highE = over<maxE ? (ln(e)+ln(over))/2 : ln(maxE);
      assert_(lowE < highE, lowE, highE);
-     int lovel = 1+floor((lowE-ln(minE))/(ln(maxE)-ln(minE))*127);
-     int hivel = min(127, int(0+ceil((highE-ln(minE))/(ln(maxE)-ln(minE))*127)));
-     //int lovel = sqrt((lowE-minE)/(maxE-minE))*127;
+     int lovel = 1+floor((lowE-ln(minE))/(ln(maxE)-ln(minE))*64);
+     int hivel = min(127, int(0+ceil((highE-ln(minE))/(ln(maxE)-ln(minE))*64)));
+#else // sqrt to use more high velocity layers
+     float lowE = under>minE ? (sqrt(under)+sqrt(e))/2 : sqrt(minE);
+     float highE = over<maxE ? (sqrt(e)+sqrt(over))/2 : sqrt(maxE);
+     assert_(lowE < highE, lowE, highE);
+     int lovel = 1+floor((lowE-sqrt(minE))/(sqrt(maxE)-sqrt(minE))*128);
+     int hivel = min(127, int(0+ceil((highE-sqrt(minE))/(sqrt(maxE)-sqrt(minE))*128)));
+#endif
+     if(over >= maxE) hivel = 127;     //int lovel = sqrt((lowE-minE)/(maxE-minE))*127;
      //int hivel = sqrt((highE-minE)/(maxE-minE))*127;
+     // TODO: plot velocity layers
 #else
      int lovel = sample.lovel;
      int hivel = sample.hivel;
@@ -276,7 +288,9 @@ struct Analysis {
 #endif
   if(plots) window = ::window(&plots);
  }
-};
+} analyze;
+
+#else
 
 #include "asound.h"
 #include "text.h"
@@ -316,7 +330,7 @@ struct Loudness {
     /**/  if(a==invalid) a = nextA;
     else if(b==invalid) b = nextB;
     current = ::copy(sampler.samples[currentIndex].flac); // Resets decoder
-    current.skip(start[currentIndex]);
+    //current.skip(start[currentIndex]); // Already skipped in Sampler
     size_t read2 = current.read(buffer.slice(read)); // Complete frame
     assert_(read+read2 == out.size); // Assumes samples are longer than a period
    }
@@ -338,19 +352,24 @@ struct Loudness {
    nextA = random%sampler.samples.size;
    nextB = random%sampler.samples.size;
 #elif 1 // Confirm energy inversions
+   if(index >= energyDifference.size) { log("Review completed. Next pass", energyDifference.size); index=0; }
+   assert_(energyDifference.size, "All user references agrees with automatic evaluation");
    nextA = energyDifference[index].a;
    nextB = energyDifference[index].b;
    log(energyDifference[index].d);
+   log("A", start[nextA], end[nextA], energy[nextA]);
+   log("B", start[nextB], end[nextB], energy[nextB]);
 #elif 0 // TODO: Confirm velocity layer inversion
 #endif
-   currentIndex = nextA; current = ::copy(sampler.samples[nextA].flac); current.skip(start[currentIndex]); currentName = "A"_;
-   otherIndex = nextB; other = ::copy(sampler.samples[nextB].flac); other.skip(start[otherIndex]); otherName = "B"_;
+   currentIndex = nextA; current = ::copy(sampler.samples[nextA].flac); currentName = "A"_; // current.skip(start[currentIndex]); Already skipped in Sampler
+   otherIndex = nextB; other = ::copy(sampler.samples[nextB].flac); otherName = "B"_; // other.skip(start[otherIndex]); Already skipped in Sampler
    log(nextA, nextB);
    text = "A"_; window->render();
   }
 
   void parse() {
    greaterThan.clear();
+   energyDifference.clear();
    array<string> sampleNames = apply(sampler.samples, [](const Sampler::Sample& sample)->string{ return sample.name; });
    if(existsFile("loudness",".config"_)) {
     String loudness = readFile("loudness",".config"_);
@@ -384,12 +403,13 @@ struct Loudness {
     float a = energy[entry.a];
     float b = energy[entry.b];
     float difference = a-b;
-    energyDifference.insertSorted({difference, entry.a, entry.b});
+    if(difference < 0) energyDifference.insertSorted({difference, entry.a, entry.b});
    }
+   log(energyDifference.size, "inversions of automatic estimation versus user reference");
   }
 
   Loudness() {
-   if(!existsFile("energy",".cache"_) || !existsFile("start",".cache"_) || !existsFile("end",".cache"_)) {
+   if(!existsFile("energy",".cache"_) || !existsFile("start",".cache"_) || !existsFile("end",".cache"_) || 1) {
     buffer<float> energy(sampler.samples.size);
     buffer<uint> start(sampler.samples.size);
     buffer<uint> end(sampler.samples.size);
@@ -437,3 +457,4 @@ struct Loudness {
    audio.start(sampler.rate, 4096, 32, 2); // Keeps device open to avoid clicks
   }
 } loudness;
+#endif
