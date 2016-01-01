@@ -13,9 +13,14 @@ Device getMIDIDevice() {
 }
 
 MidiInput::MidiInput(Thread& thread) : Device(getMIDIDevice()), Poll(Device::fd,POLLIN,thread),
+  min(existsFile("keyboard.min",".config"_) ? apply(split(readFile("keyboard.min",".config"_).slice(1)," "), [](string s)->int{return parseInteger(s);}) : apply(88, [](int){return 127;})),
   max(existsFile("keyboard",".config"_) ? apply(split(readFile("keyboard",".config"_).slice(1)," "), [](string s)->int{return parseInteger(s);}) : apply(88, [](int){return 1;}))
-{ assert_(max.size == 88,max.size,max,readFile("keyboard",".config"_).slice(1)); /*log(max);*/ }
-MidiInput::~MidiInput() { writeFile("keyboard", str(max), ".config"_, true); /*log(max);*/ }
+{ assert_(min.size == 88,min.size,min,readFile("keyboard.min",".config"_).slice(1)); /*log(min);*/
+   assert_(max.size == 88,max.size,max,readFile("keyboard",".config"_).slice(1)); /*log(max);*/ }
+  MidiInput::~MidiInput() {
+   writeFile("keyboard.min", str(min), ".config"_, true); log(min);
+   writeFile("keyboard", str(max), ".config"_, true); log(max);
+  }
 
 void MidiInput::event() {
     while(Stream::fd && poll()) {
@@ -36,9 +41,13 @@ void MidiInput::event() {
                 pressed.append(key);
                 //if(value*4/3 > 127) log(key, value); noteEvent(key, min(127,(int)value*4/3)); // Keyboard saturates at 96
                 assert_(key >= 21 && key < 21+88);
+                int& min = this->min[key-21];
+                if(value < min) min = value;
                 int& max = this->max[key-21];
                 if(value > max) max = value;
-                noteEvent(key, min(127,(int)value*127/max));
+                int MIN = ::min(min, 32);
+                if(value < MIN) value=MIN;
+                noteEvent(key, ::min(127,1+(int)(value-MIN)*128/(max-MIN)));
                 //noteEvent(key, value);
             }
         } else if(type == Controller) {

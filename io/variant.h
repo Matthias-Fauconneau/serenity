@@ -63,6 +63,7 @@ inline bool operator <(const Variant& a, const Variant& b) {
 template<> inline Variant copy(const Variant& v) {
  if(v.type == Variant::Integer || v.type == Variant::Real) return v.number;
  if(v.type == Variant::Data) return v.data;
+ if(v.type == Variant::List) return copy(v.list);
  if(v.type == Variant::Dict) return copy(v.dict);
  error(int(v.type));
 }

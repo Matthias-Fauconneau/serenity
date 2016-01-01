@@ -6,6 +6,7 @@
 
 /// MIDI input through ALSA rawmidi interface
 struct MidiInput : Device, Poll {
+    buffer<int> min;
     buffer<int> max;
     uint8 type=0;
     array<uint8> pressed;
