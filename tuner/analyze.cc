@@ -244,28 +244,6 @@ struct Analysis {
 };
 
 #include "asound.h"
-void play(const Audio& data) {
- size_t t = 0;
- function<size_t(mref<int2>)> read32 = [&](mref<int2> out) {
-  size_t size = ::min(data.size-t, out.size);
-  for(size_t i: range(size*2)) {
-   float u = data[t+i/2][i%2];
-   constexpr float minValue = -64577408, maxValue = 76015472;
-   float v = (u-minValue) / (maxValue-minValue); // Normalizes range to [0-1] //((u-minValue) / (maxValue-minValue)) * 2 - 1; // Normalizes range to [-1-1]
-   int w = v*0x1p32 - 0x1p31; // Converts floating point to two-complement signed 32 bit integer
-   out[i/2][i%2] = w;
-  }
-  t += size;
-  return size;
- };
- AudioOutput audio( read32 );
- audio.start(audio.rate, 4096, 32, 2);
- while(t<data.size) {
-  pollfd pollfd{audio.Device::fd,POLLOUT,0}; ::poll(&pollfd,1,-1);
-  audio.event();
- }
-}
-
 #include <unistd.h>
 struct input_event { long sec,usec; uint16 type, code; int32 value; };
 enum { EV_SYN, EV_KEY, EV_REL, EV_ABS };
@@ -300,23 +278,46 @@ struct Loudness {
  Loudness() {
   Sampler sampler ("Piano/Piano.sfz"_);
   Random random;
+  ref<float2> data; size_t t = 0;
+  function<size_t(mref<int2>)> read32 = [&](mref<int2> out) {
+   size_t size = ::min(data.size-t, out.size);
+   for(size_t i: range(size*2)) {
+    float u = data[t+i/2][i%2];
+    constexpr float minValue = -64577408, maxValue = 76015472;
+    float v = (u-minValue) / (maxValue-minValue); // Normalizes range to [0-1] //((u-minValue) / (maxValue-minValue)) * 2 - 1; // Normalizes range to [-1-1]
+    int w = v*0x1p32 - 0x1p31; // Converts floating point to two-complement signed 32 bit integer
+    out[i/2][i%2] = w;
+   }
+   t += size;
+   for(size_t i: range(size*2, out.size*2)) out[i/2][i%2] = 0;
+   return out.size;
+  };
+  AudioOutput audio( read32 );
+  audio.start(audio.rate, 8192, 32, 2); // Keeps device open to avoid clicks
+  auto play = [&](const Audio& sample) {
+   data=sample; t=0;
+   while(t<data.size) {
+    pollfd pollfd{audio.Device::fd,POLLOUT,0}; ::poll(&pollfd,1,-1);
+    audio.event();
+   }
+  };
   for(;;) {
    const size_t a = random%sampler.samples.size;
    const Sampler::Sample& A = sampler.samples[a];
+   Audio audioA = decodeAudio(A.data);
    const size_t b = random%sampler.samples.size;
    const Sampler::Sample& B = sampler.samples[b];
-   log("A");
-   play(decodeAudio(A.data));
-   log("B");
-   play(decodeAudio(B.data));
+   Audio audioB = decodeAudio(B.data);
+   log("A"); play(audioA);
+   log("B"); play(audioB);
+   log(".");
    bool done = false;
    Keyboard keyboard;
    keyboard.keyPress = [&](Key key) {
     if(key == Space) {
-     log("A");
-     play(decodeAudio(A.data));
-     log("B");
-     play(decodeAudio(B.data));
+     log("A"); play(audioA);
+     log("B"); play(audioB);
+     log(".");
     }
     if(key == 'a') { log("A > B"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(A.name, ">", B.name)+'\n'); done=true; }
     if(key == 'b') { log("B > A"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(B.name, ">", A.name)+'\n'); done=true; }
