@@ -93,6 +93,7 @@ music/midi-input.cc
 music/md5.h
 music/md5.cc
 tuner/analyze.cc
+audio/asound.h
 
 image/source.h
 image/source-view.h

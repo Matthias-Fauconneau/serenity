@@ -87,7 +87,7 @@ dictionaryEnd: s.whileAny(" \t\r\n");
     const byte* src = stream.data;
     byte* dst = stream.begin(); // in-place
     int predictor = v.dict.at("DecodeParms"_).dict.contains("Predictor"_) ? v.dict.at("DecodeParms"_).dict.at("Predictor"_).integer() : 1;
-    if(predictor==15) { // PNG predictor
+    if(predictor>=10) { // PNG predictor
      uint8 prior[width]; mref<uint8>(prior, width).clear();
      for(uint unused y: range(height)) {
       uint filter = *src++; assert(filter<=4,"Unknown PNG filter",filter);

@@ -241,4 +241,82 @@ struct Analysis {
 #endif
   if(plots) window = ::window(&plots);
  }
-} analyze;
+};
+
+#include "asound.h"
+void play(const Audio& data) {
+ size_t t = 0;
+ function<size_t(mref<int2>)> read32 = [&](mref<int2> out) {
+  size_t size = ::min(data.size-t, out.size);
+  for(size_t i: range(size)) out[i] = int2(data[t+i]);
+  t += size;
+  return size;
+ };
+ AudioOutput audio( read32 );
+ audio.start(audio.rate, 4096, 32, 2);
+ while(t<data.size) {
+  pollfd pollfd{audio.Device::fd,POLLOUT,0}; ::poll(&pollfd,1,-1);
+  audio.event();
+ }
+}
+
+#include <unistd.h>
+struct input_event { long sec,usec; uint16 type, code; int32 value; };
+enum { EV_SYN, EV_KEY, EV_REL, EV_ABS };
+struct Keyboard : Device, Poll {
+    function<void(Key)> keyPress;
+    Keyboard(Thread& thread = mainThread);
+    void event() override;
+};
+Keyboard::Keyboard(Thread& thread) : Device("platform-i8042-serio-0-event-kbd", "/dev/input/by-path"_, Flags(ReadOnly|NonBlocking)), Poll(Device::fd, POLLIN, thread) {}
+#include "map.h"
+void Keyboard::event() {
+    for(input_event e; ::read(Device::fd, &e, sizeof(e)) > 0;) {
+        if(e.type == EV_KEY && e.value) {
+            int code = 0;
+            for(auto range: ref<const_entry<int, ref<int>>>{
+            {0,ref<int>{0,Escape,'1','2','3','4','5','6','7','8','9','0','-','=',Backspace, Tab, 'q','w','e','r','t','y','u','i','o','p','{','}',Return,LeftControl,
+                'a','s','d','f','g','h','j','k','l',';','\'','`', LeftShift, '\\', 'z','x','c','v','b','n','m',',','.','/', RightShift, KP_Asterisk, 0/*LeftAlt*/, ' '}},
+            {71, ref<int>{KP_7, KP_8, KP_9, KP_Minus, KP_4, KP_5, KP_6, KP_Plus, KP_1, KP_2, KP_3, KP_0}},
+            {98, ref<int>{KP_Slash, 0,0,0, Home, UpArrow, PageUp, LeftArrow, RightArrow, End, DownArrow, PageDown, Insert, Delete}}}) {
+                if(e.code >= range.key && e.code <= range.key+range.value.size) {
+                 code = range.value[e.code-range.key];
+                 log(range.key, e.code, range.key+range.value.size, code, (char)code);
+                 break;
+                }
+            }
+            keyPress(Key(code));
+        }
+    }
+}
+
+struct Loudness {
+ Loudness() {
+  Sampler sampler ("Piano/Piano.sfz"_);
+  Random random;
+  for(;;) {
+   const size_t a = random%sampler.samples.size;
+   const Sampler::Sample& A = sampler.samples[a];
+   log("A");
+   play(decodeAudio(A.data));
+   const size_t b = random%sampler.samples.size;
+   const Sampler::Sample& B = sampler.samples[b];
+   log("B");
+   play(decodeAudio(B.data));
+   bool done = false;
+   Keyboard keyboard;
+   keyboard.keyPress = [&](Key key) {
+    log(key, char(key), int('a'), int('b'), int(Space));
+    if(key == 'a') { log("A > B"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(A.name, ">", B.name)+'\n'); done=true; }
+    if(key == 'b') { log("B > A"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(B.name, ">", A.name)+'\n'); done=true; }
+    if(key == Space) { log("A ~ B"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(A.name, "~", B.name)+'\n'); done=true; }
+    if(key == Escape) { extern int exit_group(int); exit_group(0); }
+exit_group()
+   };
+   while(!done) {
+    keyboard.poll(-1);
+    keyboard.event();
+   }
+  }
+ }
+} loudness;
