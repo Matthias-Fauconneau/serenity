@@ -84,8 +84,7 @@ struct Timer : Stream, Poll {
 struct Random {
     uint sz=1,sw=1;
     uint z,w;
-    Random() { /*seed();*/ reset(); }
-    void seed() { sz=rdtsc(); sw=rdtsc(); }
+    void seed() { z=sz=rdtsc(); w=sw=rdtsc(); } // and resets
     void reset() { z=sz; w=sw; }
     uint64 next() {
 	z = 36969 * (z & 0xFFFF) + (z >> 16);

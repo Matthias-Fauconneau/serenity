@@ -29,6 +29,42 @@ struct Sampler::Sample {
  uint decayTime = 0; // Time (in samples) where level decays below
 };
 
+static const float threshold = 0.0005;
+
+float energy(ref<byte> data, uint& start, uint& end) {
+ buffer<float2> Y = decodeAudio(data, 65536);
+ float sum = 0;
+ for(float2 y: Y) sum += (y[0]+y[1]) * 0x1p-25f;
+ float mean = sum / Y.size;
+ float energy = 0;
+ float max = 0; uint maxT = 0; start = ~0;
+ for(size_t t : range(Y.size)) {
+  float y = (Y[t][0]+Y[t][1]) * 0x1p-25f - mean;
+  if(abs(y) > max) { max=abs(y); maxT=t; }
+  if(start==uint(~0))  if(abs(y) >= threshold) start=t;
+ }
+ end = 0;
+ for(size_t t : reverse_range(Y.size)) {
+  float y = (Y[t][0]+Y[t][1]) * 0x1p-25f - mean;
+  if(abs(y) >= threshold) { end=t; break; }
+ }
+ if(max < threshold) {
+  assert_(start == uint(~0) && maxT < start, start, max, threshold, maxT, start);
+  error(max);
+  start = maxT;
+ }
+ //thresholdT = maxT;
+ //assert_(thresholdT+N <= Y.size, thresholdT);
+ end = ::max(end, start+4096);
+ for(size_t t : range(start, end)) {
+  float y = (Y[t][0]+Y[t][1]) * 0x1p-25f - mean;
+  energy += sq(y); // Measures energy only from maxT to maxT+N
+ }
+ energy /= (end-start);
+ return energy;
+}
+float energy(ref<byte> data) { uint start,end; return energy(data, start, end); }
+
 struct Analysis {
  VList<Plot> plots;
  unique<Window> window = nullptr;
@@ -77,11 +113,10 @@ struct Analysis {
   buffer<float> sampleStarts (sampler.samples.size);
   buffer<float> sampleEnds (sampler.samples.size);
   float minE = inf, maxE = 0;
-  uint minmaxT = -1, maxmaxT = 0; float minmax = inf;
-  float threshold = 0.0005;
+  /*uint minmaxT = -1, maxmaxT = 0; float minmax = inf;
   uint minThresholdT = -1, maxThresholdT = 0;
   uint minThresholdTend = -1, maxThresholdTend = 0;
-  uint minN = -1, maxN = 0;
+  uint minN = -1, maxN = 0;*/
   for(int velocityLayer: range(velocityLayers.size)) {
    energies.append();
    correctedEnergies.append();
@@ -91,8 +126,8 @@ struct Analysis {
      assert_(sample.trigger==0); //if(sample.trigger!=0) continue;
      if(range(sample.lovel, sample.hivel+1) != velocityLayers[velocityLayer]) continue;
      if(sample.pitch_keycenter != keys[keyIndex]) continue;
+#if 0
      buffer<float2> Y = decodeAudio(sample.data, 65536);
-     //assert(stereo.size == N, stereo.size, sample.name, sample.data.size);
      float sum = 0;
      for(float2 y: Y) sum += (y[0]+y[1]) * 0x1p-25f;
      float mean = sum / Y.size;
@@ -121,12 +156,8 @@ struct Analysis {
       energy += sq(y); // Measures energy only from maxT to maxT+N
      }
      energy /= (thresholdTend-thresholdT);
-     //assert_(threshold <= max, threshold, max, maxT, sample.flac.duration, sample.name);
-    // assert_(thresholdT!=uint(~0));
-     //log(max, maxT, threshold, thresholdT);
      maxN = ::max(maxN, thresholdTend-thresholdT);
      minN = ::min(minN, thresholdTend-thresholdT);
-
      maxmaxT = ::max(maxmaxT, maxT);
      minmaxT = ::min(minmaxT, maxT);
      minmax = ::min(minmax, max);
@@ -134,23 +165,27 @@ struct Analysis {
      maxThresholdT = ::max(maxThresholdT, thresholdT);
      minThresholdTend = ::min(minThresholdTend, thresholdTend);
      maxThresholdTend = ::max(maxThresholdTend, thresholdTend);
+#else
+     uint start, end;
+     float energy = ::energy(sample.data, start, end);
+#endif
      energies[velocityLayer].insertMulti(keys[keyIndex], energy);
      correctedEnergies[velocityLayer].insertMulti(keys[keyIndex], energy*sq(sample.volume));
      sampleEnergies[sampleIndex] = energy;
-     if(sample.pitch_keycenter==57) { log(sample.pitch_keycenter, thresholdT, thresholdTend); assert_(thresholdT < 2115, thresholdT); }
-     if(sample.pitch_keycenter==26) assert_(thresholdT <= 450 || thresholdT>=2503, thresholdT);// log(sample.pitch_keycenter, thresholdT, thresholdT >= 2509);
-     sampleStarts[sampleIndex] = thresholdT;
-     sampleEnds[sampleIndex] = thresholdTend;
+     //if(sample.pitch_keycenter==57) { log(sample.pitch_keycenter, thresholdT, thresholdTend); assert_(thresholdT < 2115, thresholdT); }
+     //if(sample.pitch_keycenter==26) assert_(thresholdT <= 450 || thresholdT>=2503, thresholdT);// log(sample.pitch_keycenter, thresholdT, thresholdT >= 2509);
+     sampleStarts[sampleIndex] = start;
+     sampleEnds[sampleIndex] = end;
      minE = ::min(minE, energy);
      maxE = ::max(maxE, energy);
     }
    }
    log(velocityLayer+1, "/", velocityLayers.size);
   }
-  log("minmax", minmax, "minmaxT", minmaxT, "maxmaxT", maxmaxT);//, minE, maxE);
-  log("minThresholdT", minThresholdT, "maxThresholdT", maxThresholdT);
-  log("minThresholdTend", minThresholdTend, "maxThresholdTend", maxThresholdTend);
-  log("minN", minN, "maxN", maxN);
+  //log("minmax", minmax, "minmaxT", minmaxT, "maxmaxT", maxmaxT);//, minE, maxE);
+  //log("minThresholdT", minThresholdT, "maxThresholdT", maxThresholdT);
+  //log("minThresholdTend", minThresholdTend, "maxThresholdTend", maxThresholdTend);
+  //log("minN", minN, "maxN", maxN);
   {// Flattens all samples to same level using SFZ "volume" attribute
    array<char> sfz;
    int maxlovel = 0;
@@ -244,56 +279,44 @@ struct Analysis {
 };
 
 #include "asound.h"
-#include <unistd.h>
-struct input_event { long sec,usec; uint16 type, code; int32 value; };
-enum { EV_SYN, EV_KEY, EV_REL, EV_ABS };
-struct Keyboard : Device, Poll {
-    function<void(Key)> keyPress;
-    Keyboard(Thread& thread = mainThread);
-    void event() override;
-};
-Keyboard::Keyboard(Thread& thread) : Device("platform-i8042-serio-0-event-kbd", "/dev/input/by-path"_, Flags(ReadOnly|NonBlocking)), Poll(Device::fd, POLLIN, thread) {}
-#include "map.h"
-void Keyboard::event() {
-    for(input_event e; ::read(Device::fd, &e, sizeof(e)) > 0;) {
-        if(e.type == EV_KEY && e.value) {
-            int code = 0;
-            for(auto range: ref<const_entry<int, ref<int>>>{
-            {0,ref<int>{0,Escape,'1','2','3','4','5','6','7','8','9','0','-','=',Backspace, Tab, 'q','w','e','r','t','y','u','i','o','p','{','}',Return,LeftControl,
-                'a','s','d','f','g','h','j','k','l',';','\'','`', LeftShift, '\\', 'z','x','c','v','b','n','m',',','.','/', RightShift, KP_Asterisk, 0/*LeftAlt*/, ' '}},
-            {71, ref<int>{KP_7, KP_8, KP_9, KP_Minus, KP_4, KP_5, KP_6, KP_Plus, KP_1, KP_2, KP_3, KP_0}},
-            {98, ref<int>{KP_Slash, 0,0,0, Home, UpArrow, PageUp, LeftArrow, RightArrow, End, DownArrow, PageDown, Insert, Delete}}}) {
-                if(e.code >= range.key && e.code <= range.key+range.value.size) {
-                 code = range.value[e.code-range.key];
-                 break;
-                }
-            }
-            keyPress(Key(code));
-        }
-    }
-}
+#include "text.h"
 
 struct Loudness {
   Sampler sampler {"Piano/Piano.sfz"_};
 
-  size_t a = invalid, b = invalid;
-  Keyboard keyboard;
+  AudioOutput audio {{this, &Loudness::read32}};
 
-  size_t nextA, nextB;
   FLAC current, other;
   string currentName = "A"_, otherName = "B"_;
   size_t currentIndex, otherIndex;
+  size_t nextA, nextB;
+  size_t a = invalid, b = invalid;
+
+  Random random;
+
+  Text text {"A"_};
+  unique<Window> window = ::window(&text);
+
+  buffer<float> energy;
+  buffer<uint> start, end;
+  struct pair { int a, b; bool operator<(const pair& o) const { return a < o.a || (a==o.a && b < o.b); } };
+  array<pair> greaterThan;
+  struct EnergyDifference { float d; int a, b; bool operator<(const EnergyDifference& o) const { return d < o.d; } };
+  array<EnergyDifference> energyDifference;
+
   size_t read32(mref<int2> out) {
    buffer<float2> buffer(out.size);
    size_t read = current.read(buffer);
-   if(read<out.size || current.position >= sampler.rate) {
+   if(a!=invalid && b==invalid && current.position >= sampler.rate/4) b = nextB; // Already allow to decide while still playing B for the first time
+   if(read<out.size || current.position >= end[currentIndex]) {
     swap(current, other);
     swap(currentName, otherName);
     swap(currentIndex, otherIndex);
-    log(currentName);
+    text = currentName; window->render();
     /**/  if(a==invalid) a = nextA;
     else if(b==invalid) b = nextB;
     current = ::copy(sampler.samples[currentIndex].flac); // Resets decoder
+    current.skip(start[currentIndex]);
     size_t read2 = current.read(buffer.slice(read)); // Complete frame
     assert_(read+read2 == out.size); // Assumes samples are longer than a period
    }
@@ -307,55 +330,108 @@ struct Loudness {
    return out.size;
   }
 
-  Random random;
-  AudioOutput audio {{this, &Loudness::read32}};
-
+  size_t index = -1;
   void next() {
-   a = invalid, b = invalid;
-   currentIndex = nextA = random%sampler.samples.size;
-   otherIndex = nextB = random%sampler.samples.size;
-   current = ::copy(sampler.samples[nextA].flac); currentName = "A"_;
-   other = ::copy(sampler.samples[nextB].flac); otherName = "B"_;
+   a = invalid, b = invalid; index++;
+   parse();
+#if RANDOM
+   nextA = random%sampler.samples.size;
+   nextB = random%sampler.samples.size;
+#elif 1 // Confirm energy inversions
+   nextA = energyDifference[index].a;
+   nextB = energyDifference[index].b;
+   log(energyDifference[index].d);
+#elif 0 // TODO: Confirm velocity layer inversion
+#endif
+   currentIndex = nextA; current = ::copy(sampler.samples[nextA].flac); current.skip(start[currentIndex]); currentName = "A"_;
+   otherIndex = nextB; other = ::copy(sampler.samples[nextB].flac); other.skip(start[otherIndex]); otherName = "B"_;
    log(nextA, nextB);
-   log("A");
+   text = "A"_; window->render();
   }
 
-  void keyPress(Key key) {
-   if(key == Escape) requestTermination();
-   if(a == invalid || b == invalid) return;
-   const auto& A = sampler.samples[a];
-   const auto& B = sampler.samples[b];
-   if(key == 'a') { log("A > B"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(A.name, ">", B.name)+'\n'); next(); }
-   if(key == 'b') { log("B > A"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(B.name, ">", A.name)+'\n'); next(); }
-   if(key == Space) { log("A ~ B"); File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(A.name, "~", B.name)+'\n'); next(); }
-  }
-
-  Loudness() {
+  void parse() {
+   greaterThan.clear();
+   array<string> sampleNames = apply(sampler.samples, [](const Sampler::Sample& sample)->string{ return sample.name; });
    if(existsFile("loudness",".config"_)) {
     String loudness = readFile("loudness",".config"_);
-    array<string> testedSamples; size_t inequalCount = 0;
+    array<int> testedSamples; size_t inequalCount = 0;
     for(string line: split(loudness,"\n")) {
      TextData s (line);
      string A = s.until(' ');
+     int a = sampleNames.indexOf(A);
      string cmp = s.until(' ');
-     assert_(cmp == "~" || cmp == ">");
      string B = s.until('\n');
+     int b = sampleNames.indexOf(B);
+
+     if(testedSamples.contains(a) && testedSamples.contains(b)) { // Filters duplicates
+      greaterThan.filter([=](const pair& o) {
+       if(o.a == b && o.b == a) return true; // Inverse entries cancel each other, ~ cancels >
+       if(o.a == a && o.b == b) return true; // Duplicate entries can be removed, ~ cancels >
+       return false;
+      });
+     }
+
      if(cmp == ">") {
       inequalCount++;
-      testedSamples.addSorted(A);
-      testedSamples.addSorted(B);
-     }
+      testedSamples.addSorted(a);
+      testedSamples.addSorted(b);
+      greaterThan.insertSorted({a, b});
+     } else assert_(cmp == "~");
     }
-    size_t found = 0, missing = 0, total = sampler.samples.size;
-    for(const auto& sample: sampler.samples) {
-     for(string tested: testedSamples) if(tested == sample.name) { found++; goto break_; }
-     /*else*/ missing++;
-    break_:;
-    }
-    assert_(found+missing == total);
-    log(found,"+",missing,"=",total, "(", inequalCount, ")");
+    log(inequalCount, "=>", testedSamples.size, "/", sampler.samples.size);
    }
-   keyboard.keyPress = {this, &Loudness::keyPress};
+   for(pair entry: greaterThan) {
+    float a = energy[entry.a];
+    float b = energy[entry.b];
+    float difference = a-b;
+    energyDifference.insertSorted({difference, entry.a, entry.b});
+   }
+  }
+
+  Loudness() {
+   if(!existsFile("energy",".cache"_) || !existsFile("start",".cache"_) || !existsFile("end",".cache"_)) {
+    buffer<float> energy(sampler.samples.size);
+    buffer<uint> start(sampler.samples.size);
+    buffer<uint> end(sampler.samples.size);
+    for(size_t i: range(sampler.samples.size)) {
+     const Sampler::Sample& sample = sampler.samples[i];
+     log(sample.name);
+     energy[i] = ::energy(sample.data, start[i], end[i]);
+    }
+    writeFile("energy",cast<byte>(energy), ".cache"_, true);
+    writeFile("start",cast<byte>(start), ".cache"_, true);
+    writeFile("end",cast<byte>(end), ".cache"_, true);
+   }
+   energy = cast<float>(readFile("energy", ".cache"_));
+   start = cast<uint>(readFile("start", ".cache"_));
+   end = cast<uint>(readFile("end", ".cache"_));
+   parse();
+
+   window->actions[Key('a')] = [this]{
+    if(a == invalid || b == invalid) return;
+    const auto& A = sampler.samples[a];
+    const auto& B = sampler.samples[b];
+    log("A > B");
+    File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(A.name, ">", B.name)+'\n');
+    next();
+   };
+   window->actions[Key('b')] = [this]{
+    if(a == invalid || b == invalid) return;
+    const auto& A = sampler.samples[a];
+    const auto& B = sampler.samples[b];
+    log("B > A");
+    File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(B.name, ">", A.name)+'\n');
+    next();
+   };
+   window->actions[Space] = [this]{
+    if(a == invalid || b == invalid) return;
+    const auto& A = sampler.samples[a];
+    const auto& B = sampler.samples[b];
+    log("A ~ B");
+    File("loudness",".config"_, Flags(WriteOnly|Create|Append)).write(str(A.name, "~", B.name)+'\n');
+    next();
+   };
+
    random.seed();
    next();
    audio.start(sampler.rate, 4096, 32, 2); // Keeps device open to avoid clicks
