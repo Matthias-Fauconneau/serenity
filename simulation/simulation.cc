@@ -26,6 +26,9 @@ constexpr float System::Wire::tensionStiffness;
 constexpr float System::Wire::bendStiffness;
 constexpr string Simulation::patterns[];
 #endif
+bool fail = false;
+Lock lock;
+array<vec2x3> lines;
 
 Simulation::Simulation(const Dict& p) :
   dt((float)p.at("TimeStep")*s),
@@ -41,11 +44,12 @@ Simulation::Simulation(const Dict& p) :
   targetGrainCount(4*PI*cb((float)p.at("Radius")*mm)/Grain::volume/(1+0.615)-49),
   grain(targetGrainCount),
   membrane((float)p.at("Radius")*mm),
-  #if DEBUG
-  Gz( -10 * N/kg),
-  #else
-  Gz(5000 * -10 * N/kg),
-  #endif
+  //#if DEBUG
+  //Gz( -10 * N/kg),
+  //#else
+  Gz(1 * -10 * N/kg),
+  //Gz(5000 * -10 * N/kg),
+  //#endif
   targetPressure((float)p.at("Pressure")*Pa),
   plateSpeed((float)p.at("Speed")*mm/s),
   currentHeight(Grain::radius),
@@ -92,6 +96,7 @@ void Simulation::step() {
  stepGrainMembrane();
  grainMembraneTotalTime.stop();
  membraneTotalTime.stop();
+ if(fail) return;
 
 #if WIRE
  stepWire();
@@ -227,7 +232,7 @@ void Simulation::profile() {
 void Simulation::run() {
  totalTime.start();
  for(;;) {
-  for(int unused t: range(256)) step();
+  for(int unused t: range(256)) { step(); if(fail) return; }
   if(timeStep%4096 == 0) {
    profile();
    if(processState == Pour) log(grain->count, "/", targetGrainCount);

@@ -8,6 +8,11 @@ struct Grain;
 struct Membrane;
 struct Plate;
 
+extern bool fail;
+extern Lock lock;
+struct vec2x3 { vec3 a, b; };
+extern array<vec2x3> lines;
+
 // High level simulation and contact management
 struct Simulation {
  const float dt;
