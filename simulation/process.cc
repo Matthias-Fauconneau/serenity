@@ -52,7 +52,7 @@ void Simulation::stepProcess() {
   }
  } else {
   // Increases current height
-  if(currentHeight < topZ-Grain::radius/2) currentHeight += verticalSpeed * dt;
+  if(currentHeight < topZ-Grain::radius/*/2*/) currentHeight += verticalSpeed * dt;
   //else currentHeight = topZ-Grain::radius;
 
 #if WIRE

@@ -16,17 +16,25 @@ static inline bool pointTriangle(float Ox, float Oy, float Oz, float e0x, float 
  const float det = Px * e0x + Py * e0y + Pz * e0z;
  const float invDet = 1 / det;
  float u = invDet * (Px*Ox + Py*Oy + Pz*Oz);
- if(u < 0) return false;
+ if(u < 0) u=0; //return false; // FIXME: u/v edge contacts are doubled
  const float Qx = Oy*e0z - e0y*Oz;
  const float Qy = Oz*e0x - e0z*Ox;
  const float Qz = Ox*e0y - e0x*Oy;
  float v = invDet * (Qx*Nx + Qy*Ny + Qz*Nz);
- if(v < 0) return false;
- if(u + v > 1) return false;
+ if(v < 0) v=0; //return false; // FIXME: u/v edge contacts are doubled
+ if(u + v > 1) return false; // Any edge contact is handled by neighbouring face's u=0 or v=0 edge
  float t = invDet * (Qx*e1x + Qy*e1y + Qz*e1z);
  if(t > 0) return false;
- const float N2 = Nx*Nx + Ny*Ny + Nz*Nz;
- d2 = sq(-t) * N2;
+ if(u > 0 && v > 0) { // If u nor v are constrained to edge, this is the normal line (face contacts)
+  const float N2 = Nx*Nx + Ny*Ny + Nz*Nz;
+  d2 = sq(-t) * N2;
+ } else { // Edge contacts are not along the face normal
+  // Contact point
+  float X = u*e0x + v*e1x;
+  float Y = u*e0y + v*e1y;
+  float Z = u*e0z + v*e1z;
+  d2 = sq(Ox-X) + sq(Oy-Y) + sq(Oz-Z);
+ }
  return true;
 }
 
@@ -42,21 +50,36 @@ static inline bool pointTriangle(float Ox, float Oy, float Oz, float e0x, float 
  const float det = Px * e0x + Py * e0y + Pz * e0z;
  const float invDet = 1 / det;
  float u = invDet * (Px*Ox + Py*Oy + Pz*Oz);
- if(u < 0) return false;
+ if(u < 0) u=0; //return false; // FIXME: u/v edge contacts are doubled
  const float Qx = Oy*e0z - e0y*Oz;
  const float Qy = Oz*e0x - e0z*Ox;
  const float Qz = Ox*e0y - e0x*Oy;
  float v = invDet * (Qx*Nx + Qy*Ny + Qz*Nz);
- if(v < 0) return false;
- if(u + v > 1) return false;
+ if(v < 0) v=0; //return false; // FIXME: u/v edge contacts are doubled
+ if(u + v > 1) return false; // Any edge contact is handled by neighbouring face's u=0 or v=0 edge
  float t = invDet * (Qx*e1x + Qy*e1y + Qz*e1z);
  if(t > 0) return false;
- const float N2 = Nx*Nx + Ny*Ny + Nz*Nz;
- const float N = sqrt(N2);
- d = -t * N;
- Nx /= N;
- Ny /= N;
- Nz /= N;
+ if(u > 0 && v > 0) { // If u nor v are constrained to edge, this is the normal line (face contacts)
+  const float N2 = Nx*Nx + Ny*Ny + Nz*Nz;
+  const float N = sqrt(N2);
+  d = -t * N;
+  Nx /= N;
+  Ny /= N;
+  Nz /= N;
+ } else { // Edge contacts are not along the face normal
+  // Contact point
+  float X = u*e0x + v*e1x;
+  float Y = u*e0y + v*e1y;
+  float Z = u*e0z + v*e1z;
+  Nx = Ox-X;
+  Ny = Oy-Y;
+  Nz = Oz-Z;
+  float d2 = sq(Nx) + sq(Ny) + sq(Nz);
+  d = sqrt(d2);
+  Nx /= d;
+  Ny /= d;
+  Nz /= d;
+ }
  return true;
 }
 #endif
@@ -154,7 +177,8 @@ static inline void evaluateGrainMembrane(const int start, const int size,
 #endif
   const vXsf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
   const vXsf depth = Gr - length;
-  for(int k: range(min(simd, size-i))) assert_(depth[k] >= 0, depth[k], start, i, k, size);
+  for(int k: range(min(simd, size-i))) assert_(depth[k] >= -0, depth[k],
+                                               (float)__builtin_log2(-depth[k]), start, i, k, size);
   const vXsf Nx = Rx/length, Ny = Ry/length, Nz = Rz/length;
   const vXsf RAx = - Gr  * Nx, RAy = - Gr * Ny, RAz = - Gr * Nz;
 #if MEMBRANE_FACE
@@ -285,13 +309,30 @@ static inline void evaluateGrainMembrane(const int start, const int size,
   const vXsf FTz = mask3_fmadd(sfFt, SDz, FDz, hasStaticFriction & hasTangentLength);
   // Resets contacts without static friction
   localAx = blend(hasStaticFriction, _0f, localAx); // FIXME use 1s (NaN) not 0s to flag resets
+#if MEMBRANE_FACE
+  for(int k: range(min(simd, size-i))) {
+   assert_(Fk[k] < 10000 * ::N && isNumber(Fk[k]) &&
+           isNumber(Nx[k]) && isNumber(Ny[k]) && isNumber(Nz[k]),
+           Fk[k], Nx[k], Ny[k], Nz[k], depth[k]);
+  }
+  store(pFx, i, Fk * Nx);
+  store(pFy, i, Fk * Ny);
+  store(pFz, i, Fk * Nz);
+  for(int k: range(min(simd, size-i)))
+   assert_(sqrt(sq(pFx[i+k]) + sq(pFx[i+k]) + sq(pFx[i+k])) < 100000 * ::N
+      && isNumber(pFx[i+k]) && isNumber(pFy[i+k]) && isNumber(pFz[i+k]));
 
+  store(pTAx, i, _0f);
+  store(pTAy, i, _0f);
+  store(pTAz, i, _0f);
+#else
   store(pFx, i, NFx + FTx);
   store(pFy, i, NFy + FTy);
   store(pFz, i, NFz + FTz);
   store(pTAx, i, RAy*FTz - RAz*FTy);
   store(pTAy, i, RAz*FTx - RAx*FTz);
   store(pTAz, i, RAx*FTy - RAy*FTx);
+#endif
   // Scatter static frictions
   scatter(grainMembraneLocalAx, contacts, localAx);
   scatter(grainMembraneLocalAy, contacts, localAy);
@@ -718,8 +759,8 @@ void Simulation::stepGrainMembrane() {
   membrane->Fy[b] -= grainMembraneFy[i];
   membrane->Fz[b] -= grainMembraneFz[i];
 #else
-  /*assert_(sqrt(sq(grainMembraneFx[i]) + sq(grainMembraneFy[i]) + sq(grainMembraneFz[i])) < 500 * ::N,
-          grainMembraneFx[i], grainMembraneFy[i], grainMembraneFz[i]);*/
+  assert_(sqrt(sq(grainMembraneFx[i]) + sq(grainMembraneFy[i]) + sq(grainMembraneFz[i])) < 100000 * ::N,
+          grainMembraneFx[i], grainMembraneFy[i], grainMembraneFz[i], i, grainMembraneContact.size);
   const int v = b/2;
   membrane->Fx[v] -= grainMembraneFx[i]/3;
   membrane->Fy[v] -= grainMembraneFy[i]/3;

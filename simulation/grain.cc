@@ -111,14 +111,17 @@ void Simulation::stepGrainIntegration() {
    vXsf Vx = load(pVx, i), Vy = load(pVy, i), Vz = load(pVz, i);
    vXsf Px = load(pPx, i), Py = load(pPy, i), Pz = load(pPz, i);
    //for(int k: range(simd)) log(k, Pz[k], Vz[k], Fz[k]);
-#if DEBUG && 0
+#if 1
    if(1) for(int k: range(simd)) {
-    assert_(sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 500*N &&
-            sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k] < 8*m/s &&
+    if(!(sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 100000*N &&
+            sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k] < 100*m/s &&
+            Pz[k] < membrane->height)) { log(
+        "sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 100000*N &&\
+        sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k] < 100*m/s &&\
+        Pz[k] < membrane->height)",
+            sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 1000*N,
+            sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k] < 100*m/s,
             Pz[k] < membrane->height,
-            sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 500*N,
-            sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k] < 8*m/s,
-            Pz[k] < membrane->height-Grain::radius,
             "I", i+k, grain->count,
             "H", membrane->height,
             "X", Px[k], Py[k], Pz[k],
@@ -128,7 +131,7 @@ void Simulation::stepGrainIntegration() {
             "H", (membrane->height-Grain::radius) /m,
             "X",  Px[k] /m, Py[k] /m, Pz[k] /m,
             "V", Vx[k] /(m/s), Vy[k] /(m/s), Vz[k] /(m/s),
-            "F", Fx[k] /N, Fy[k] /N, Fz[k] /N);
+            "F", Fx[k] /N, Fy[k] /N, Fz[k] /N); fail=true; return; }
    }
 #endif
    // Symplectic Euler
