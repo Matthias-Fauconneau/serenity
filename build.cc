@@ -134,7 +134,7 @@ bool Build::compileModule(string target) {
    int pid = wait(); // Waits for any child to terminate
    int status = wait(pid);
    Job job = jobs.take(jobs.indexOf(pid));
-   log(job.stdout.readUpTo(8192));
+   log(job.stdout.readUpTo(16384));
    if(status) { log("Failed to compile\n"); return false; }
    else log(job.target+'\n');
   }

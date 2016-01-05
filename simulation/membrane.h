@@ -11,11 +11,7 @@ struct Membrane {
  sconst float poissonRatio = 0.48;
 
  const float radius;
-#if MEMBRANE_FACE
  const float resolution = 2*PI*radius/32;
-#else
- sconst float resolution = Grain::radius / 2;
-#endif
  const int W = int(round(2*PI*radius/resolution))/simd*simd;
  const int margin = simd; // 16 to ensure no false sharing ?
  const int stride = margin+W+margin;

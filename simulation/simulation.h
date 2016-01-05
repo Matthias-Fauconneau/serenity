@@ -233,22 +233,18 @@ struct Simulation {
   buffer<float> oldLocalAx;
   buffer<float> oldLocalAy;
   buffer<float> oldLocalAz;
-#if MEMBRANE_FACE
   buffer<float> oldLocalBu;
   buffer<float> oldLocalBv;
   buffer<float> oldLocalBt;
-#endif
 
   buffer<int> A;
   buffer<int> B;
   buffer<float> localAx;
   buffer<float> localAy;
   buffer<float> localAz;
-#if MEMBRANE_FACE
   buffer<float> localBu;
   buffer<float> localBv;
   buffer<float> localBt;
-#endif
 
   buffer<int> contacts;
 
@@ -258,10 +254,8 @@ struct Simulation {
   buffer<float> TAx;
   buffer<float> TAy;
   buffer<float> TAz;
-#if MEMBRANE_FACE
   buffer<float> U;
   buffer<float> V;
-#endif
  } grainMembrane[2];
 
  bool primed = false;
