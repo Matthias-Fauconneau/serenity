@@ -227,38 +227,42 @@ struct Simulation {
  float grainMembraneGlobalMinD = 0;
  uint grainMembraneSkipped = 0;
 
- buffer<int> oldGrainMembraneA;
- buffer<int> oldGrainMembraneB;
- buffer<float> oldGrainMembraneLocalAx;
- buffer<float> oldGrainMembraneLocalAy;
- buffer<float> oldGrainMembraneLocalAz;
- buffer<float> oldGrainMembraneLocalBu;
- buffer<float> oldGrainMembraneLocalBv;
- buffer<float> oldGrainMembraneLocalBt;
-
- buffer<int> grainMembraneA;
- buffer<int> grainMembraneB;
- buffer<float> grainMembraneLocalAx;
- buffer<float> grainMembraneLocalAy;
- buffer<float> grainMembraneLocalAz;
+ struct {
+  buffer<int> oldA;
+  buffer<int> oldB;
+  buffer<float> oldLocalAx;
+  buffer<float> oldLocalAy;
+  buffer<float> oldLocalAz;
 #if MEMBRANE_FACE
- buffer<float> grainMembraneLocalBu;
- buffer<float> grainMembraneLocalBv;
- buffer<float> grainMembraneLocalBt;
+  buffer<float> oldLocalBu;
+  buffer<float> oldLocalBv;
+  buffer<float> oldLocalBt;
 #endif
 
- buffer<int> grainMembraneContact;
-
- buffer<float> grainMembraneFx;
- buffer<float> grainMembraneFy;
- buffer<float> grainMembraneFz;
- buffer<float> grainMembraneTAx;
- buffer<float> grainMembraneTAy;
- buffer<float> grainMembraneTAz;
+  buffer<int> A;
+  buffer<int> B;
+  buffer<float> localAx;
+  buffer<float> localAy;
+  buffer<float> localAz;
 #if MEMBRANE_FACE
- buffer<float> grainMembraneU;
- buffer<float> grainMembraneV;
+  buffer<float> localBu;
+  buffer<float> localBv;
+  buffer<float> localBt;
 #endif
+
+  buffer<int> contacts;
+
+  buffer<float> Fx;
+  buffer<float> Fy;
+  buffer<float> Fz;
+  buffer<float> TAx;
+  buffer<float> TAy;
+  buffer<float> TAz;
+#if MEMBRANE_FACE
+  buffer<float> U;
+  buffer<float> V;
+#endif
+ } grainMembrane[2];
 
  bool primed = false;
  File pressureStrain;
