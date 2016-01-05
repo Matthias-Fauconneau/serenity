@@ -330,14 +330,14 @@ void Simulation::stepGrainGrain() {
   int* const ggContact = grainGrainContact.begin();
   const vXsf sq2Radius = floatX(sq(Grain::radius+Grain::radius));
   for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
-    vXsi A = load(ggA, i), B = load(ggB, i);
-    vXsf Ax = gather(gPx, A), Ay = gather(gPy, A), Az = gather(gPz, A);
-    vXsf Bx = gather(gPx, B), By = gather(gPy, B), Bz = gather(gPz, B);
-    vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-    vXsf sqDistance = Rx*Rx + Ry*Ry + Rz*Rz;
-    maskX contact = lessThan(sqDistance, sq2Radius);
+    const vXsi A = load(ggA, i), B = load(ggB, i);
+    const vXsf Ax = gather(gPx, A), Ay = gather(gPy, A), Az = gather(gPz, A);
+    const vXsf Bx = gather(gPx, B), By = gather(gPy, B), Bz = gather(gPz, B);
+    const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
+    const vXsf sqDistance = Rx*Rx + Ry*Ry + Rz*Rz;
+    const maskX contact = lessThan(sqDistance, sq2Radius);
     maskStore(ggL+i, ~contact, _0f);
-    uint index = contactCount.fetchAdd(countBits(contact));
+    const uint index = contactCount.fetchAdd(countBits(contact));
     compressStore(ggContact+index, contact, intX(i)+_seqi);
   }
  };
