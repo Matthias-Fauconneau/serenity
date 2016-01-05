@@ -232,9 +232,9 @@ struct Simulation {
  buffer<float> oldGrainMembraneLocalAx;
  buffer<float> oldGrainMembraneLocalAy;
  buffer<float> oldGrainMembraneLocalAz;
- buffer<float> oldGrainMembraneLocalBx;
- buffer<float> oldGrainMembraneLocalBy;
- buffer<float> oldGrainMembraneLocalBz;
+ buffer<float> oldGrainMembraneLocalBu;
+ buffer<float> oldGrainMembraneLocalBv;
+ buffer<float> oldGrainMembraneLocalBt;
 
  buffer<int> grainMembraneA;
  buffer<int> grainMembraneB;
@@ -242,9 +242,9 @@ struct Simulation {
  buffer<float> grainMembraneLocalAy;
  buffer<float> grainMembraneLocalAz;
 #if MEMBRANE_FACE
- buffer<float> grainMembraneLocalBx;
- buffer<float> grainMembraneLocalBy;
- buffer<float> grainMembraneLocalBz;
+ buffer<float> grainMembraneLocalBu;
+ buffer<float> grainMembraneLocalBv;
+ buffer<float> grainMembraneLocalBt;
 #endif
 
  buffer<int> grainMembraneContact;
@@ -255,6 +255,10 @@ struct Simulation {
  buffer<float> grainMembraneTAx;
  buffer<float> grainMembraneTAy;
  buffer<float> grainMembraneTAz;
+#if MEMBRANE_FACE
+ buffer<float> grainMembraneU;
+ buffer<float> grainMembraneV;
+#endif
 
  bool primed = false;
  File pressureStrain;

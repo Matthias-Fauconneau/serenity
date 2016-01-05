@@ -3,7 +3,7 @@
 #include "membrane.h"
 
 void Simulation::stepProcess() {
- //pressure = 0; membraneViscosity = 1; // DEBUG
+ //pressure = 0; membraneViscosity = 1-1000*dt; // DEBUG
  // Process
  if(grain->count == targetGrainCount) {
   if(processState  < Pressure) {
@@ -17,7 +17,7 @@ void Simulation::stepProcess() {
    staticFrictionStiffness = targetStaticFrictionStiffness;
    staticFrictionDamping = targetStaticFrictionDamping;
   }
-  if(processState < Pressure) { // Fits top plate while disabling gravity
+  if(processState < Load) { // Fits top plate while disabling gravity
    static bool unused once = ({ log("Fits plate"); true; });
    float topZ = 0;
    for(float z: grain->Pz.slice(simd, grain->count)) topZ = ::max(topZ, z+Grain::radius);
@@ -26,18 +26,21 @@ void Simulation::stepProcess() {
    //log("Zeroes gravity");
    Gz = 0;
   }
-  if(processState < Pressure) {
+  /*if(processState < Pressure) {
    static bool unused once = ({ log("Enables pressure"); true; });
    //if(timeStep%(int(1/(dt*60/s))) == 0) log(maxGrainV*1e3f, "mm/s");
    //if(maxGrainV > 600 * mm/s) return;
    pressure = targetPressure;
-  }
-  if(pressure < targetPressure || membraneViscosity < 1) { // Increases pressure toward target pressure
+  }*/
+  const float targetViscosity = 1-10000*dt;
+  if(pressure < targetPressure || membraneViscosity < targetViscosity) { // Increases pressure toward target pressure
    if(processState < Pressure) log("Release");
    processState = Pressure;
-   //pressure += dt * targetPressure;
-   assert_(pressure== targetPressure);
-   membraneViscosity += 100 * dt;
+   if(pressure < targetPressure) pressure += 100 * targetPressure * dt;
+   if(pressure > targetPressure) pressure = targetPressure;
+   //pressure=targetPressure; //assert_(pressure== targetPressure, pressure, targetPressure);
+   if(membraneViscosity < targetViscosity) membraneViscosity += 100 * dt;
+   if(membraneViscosity > targetViscosity) membraneViscosity = targetViscosity;
   } else { // Displaces plates with constant velocity
    pressure = targetPressure;
    if(processState < Load) {
