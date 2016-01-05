@@ -111,7 +111,7 @@ void Simulation::stepGrainIntegration() {
    vXsf Vx = load(pVx, i), Vy = load(pVy, i), Vz = load(pVz, i);
    vXsf Px = load(pPx, i), Py = load(pPy, i), Pz = load(pPz, i);
    //for(int k: range(simd)) log(k, Pz[k], Vz[k], Fz[k]);
-#if 1
+#if 0
    if(1) for(int k: range(simd)) {
     if(!(sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 100000*N &&
             sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k] < 100*m/s &&

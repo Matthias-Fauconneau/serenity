@@ -12,7 +12,7 @@ struct Membrane {
 
  const float radius;
 #if MEMBRANE_FACE
- const float resolution = 2*PI*radius/8;
+ const float resolution = 2*PI*radius/16;
 #else
  sconst float resolution = Grain::radius / 2;
 #endif

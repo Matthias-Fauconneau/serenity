@@ -102,7 +102,7 @@ static inline void evaluateGrainMembrane(const int start, const int size,
                                      const vXsf staticFrictionLength, const vXsf staticFrictionSpeed,
                                      const vXsf staticFrictionDamping,
                                      const float* AVx, const float* AVy, const float* AVz,
-                                     const float* BVx, const float* BVy, const float* BVz,
+                                     //const float* BVx, const float* BVy, const float* BVz, FIXME
                                      const float* pAAVx, const float* pAAVy, const float* pAAVz,
                                      const float* ArotationX, const float* ArotationY, const float* ArotationZ,
                                      const float* ArotationW,
@@ -177,7 +177,7 @@ static inline void evaluateGrainMembrane(const int start, const int size,
 #endif
   const vXsf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
   const vXsf depth = Gr - length;
-  for(int k: range(min(simd, size-i))) assert_(depth[k] >= -0, depth[k],
+  for(int k: range(min(simd, size-i))) assert_(depth[k] >= 0, depth[k],
                                                (float)__builtin_log2(-depth[k]), start, i, k, size);
   const vXsf Nx = Rx/length, Ny = Ry/length, Nz = Rz/length;
   const vXsf RAx = - Gr  * Nx, RAy = - Gr * Ny, RAz = - Gr * Nz;
@@ -187,18 +187,18 @@ static inline void evaluateGrainMembrane(const int start, const int size,
 
   // Tension
   const vXsf Fk = K * sqrt(depth) * depth;
-  for(int k: range(min(simd, size-i))) {
+  /*for(int k: range(min(simd, grainMembraneContactSize-i))) {
    //assert_(Fk[k] < 500 * ::N, Fk[k], depth[k], Gr[k], length[k]);
-   if(!(Fk[k] < 1000 * ::N)) { log("Fk[k] < X * ::N", Fk[k], depth[k], Gr[k], length[k]); fail=true;
+   if(!(Fk[k] < 5000 * ::N)) { log("Fk[k] < X * ::N", Fk[k], depth[k], Gr[k], length[k]); fail=true;
     {Locker lock(::lock); ::lines.append({vec3(Ax[k],Ay[k],Az[k]),vec3(Bx[k],By[k],Bz[k])});}
     return;
    }
-  }
+  }*/
   // Relative velocity
   const vXsf AAVx = gather(pAAVx, A), AAVy = gather(pAAVy, A), AAVz = gather(pAAVz, A);
-  const vXsf RVx = gather(AVx, A) + (AAVy*RAz - AAVz*RAy) - gather(BVx, B);
-  const vXsf RVy = gather(AVy, A) + (AAVz*RAx - AAVx*RAz) - gather(BVy, B);
-  const vXsf RVz = gather(AVz, A) + (AAVx*RAy - AAVy*RAx) - gather(BVz, B);
+  const vXsf RVx = gather(AVx, A) + (AAVy*RAz - AAVz*RAy);// - gather(BVx, B);
+  const vXsf RVy = gather(AVy, A) + (AAVz*RAx - AAVx*RAz);// - gather(BVy, B);
+  const vXsf RVz = gather(AVz, A) + (AAVx*RAy - AAVy*RAx);// - gather(BVz, B);
   // Damping
   const vXsf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
   const vXsf Fb = - Kb * sqrt(sqrt(depth)) * normalSpeed ; // Damping
@@ -309,8 +309,8 @@ static inline void evaluateGrainMembrane(const int start, const int size,
   const vXsf FTz = mask3_fmadd(sfFt, SDz, FDz, hasStaticFriction & hasTangentLength);
   // Resets contacts without static friction
   localAx = blend(hasStaticFriction, _0f, localAx); // FIXME use 1s (NaN) not 0s to flag resets
-#if MEMBRANE_FACE
-  for(int k: range(min(simd, size-i))) {
+#if 0
+  for(int k: range(min(simd, grainMembraneContactSize-i))) {
    assert_(Fk[k] < 10000 * ::N && isNumber(Fk[k]) &&
            isNumber(Nx[k]) && isNumber(Ny[k]) && isNumber(Nz[k]),
            Fk[k], Nx[k], Ny[k], Nz[k], depth[k]);
@@ -318,7 +318,7 @@ static inline void evaluateGrainMembrane(const int start, const int size,
   store(pFx, i, Fk * Nx);
   store(pFy, i, Fk * Ny);
   store(pFz, i, Fk * Nz);
-  for(int k: range(min(simd, size-i)))
+  for(int k: range(min(simd, grainMembraneContactSize-i)))
    assert_(sqrt(sq(pFx[i+k]) + sq(pFx[i+k]) + sq(pFx[i+k])) < 100000 * ::N
       && isNumber(pFx[i+k]) && isNumber(pFy[i+k]) && isNumber(pFz[i+k]));
 
@@ -598,7 +598,7 @@ void Simulation::stepGrainMembrane() {
    compressStore(gmContact+index, contact, intX(i)+_seqi);
   }
 #else
-  const float sqRadius = sq(Grain::radius);
+  //const float sqRadius = sq(Grain::radius);
   const int margin = membrane->margin;
   const int stride = membrane->stride;
   for(uint i=start*simd; i<(start+size)*simd; i++) {
@@ -617,9 +617,12 @@ void Simulation::stepGrainMembrane() {
     const int e1v = v+e1;
     const float e0x = mPx[e0v]-V0x, e0y = mPy[e0v]-V0y, e0z = mPz[e0v]-V0z;
     const float e1x = mPx[e1v]-V0x, e1y = mPy[e1v]-V0y, e1z = mPz[e1v]-V0z;
-    float sqDistance;
+    /*float sqDistance;
     if(pointTriangle(Ox, Oy, Oz, e0x, e0y, e0z, e1x, e1y, e1z, sqDistance)) {
-     bool mask = sqDistance < sqRadius;
+     bool mask = sqDistance < sqRadius;*/
+    float distance, Nx, Ny, Nz;
+    if(pointTriangle(Ox, Oy, Oz, e0x, e0y, e0z, e1x, e1y, e1z, distance, Nx, Ny, Nz)) {
+     bool mask = distance < Grain::radius;
      if(mask) {
       uint targetIndex = contactCount.fetchAdd(1);
       gmContact[targetIndex] = i;
@@ -631,9 +634,12 @@ void Simulation::stepGrainMembrane() {
     const int e2v = v+e2;
     const float e1x = mPx[e1v]-V0x, e1y = mPy[e1v]-V0y, e1z = mPz[e1v]-V0z;
     const float e2x = mPx[e2v]-V0x, e2y = mPy[e2v]-V0y, e2z = mPz[e2v]-V0z;
-    float sqDistance;
+    /*float sqDistance;
     if(pointTriangle(Ox, Oy, Oz, e1x, e1y, e1z, e2x, e2y, e2z, sqDistance)) {
-     bool mask = sqDistance < sqRadius;
+     bool mask = sqDistance < sqRadius;*/
+    float distance, Nx, Ny, Nz;
+    if(pointTriangle(Ox, Oy, Oz, e1x, e1y, e1z, e2x, e2y, e2z, distance, Nx, Ny, Nz)) {
+     bool mask = distance < Grain::radius;
      if(mask) {
       uint targetIndex = contactCount.fetchAdd(1);
       gmContact[targetIndex] = i;
@@ -697,7 +703,7 @@ void Simulation::stepGrainMembrane() {
                       floatX(staticFrictionStiffness), floatX(dynamicGrainMembraneFrictionCoefficient),
                       floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping),
                       grain->Vx.data+simd, grain->Vy.data+simd, grain->Vz.data+simd,
-                      membrane->Vx.data, membrane->Vy.data, membrane->Vz.data,
+                      //membrane->Vx.data, membrane->Vy.data, membrane->Vz.data, FIXME
                       grain->AVx.data+simd, grain->AVy.data+simd, grain->AVz.data+simd,
                       grain->Rx.data+simd, grain->Ry.data+simd, grain->Rz.data+simd, grain->Rw.data+simd,
                       grainMembraneFx.begin(), grainMembraneFy.begin(), grainMembraneFz.begin(),
@@ -759,8 +765,12 @@ void Simulation::stepGrainMembrane() {
   membrane->Fy[b] -= grainMembraneFy[i];
   membrane->Fz[b] -= grainMembraneFz[i];
 #else
-  assert_(sqrt(sq(grainMembraneFx[i]) + sq(grainMembraneFy[i]) + sq(grainMembraneFz[i])) < 100000 * ::N,
-          grainMembraneFx[i], grainMembraneFy[i], grainMembraneFz[i], i, grainMembraneContact.size);
+  //assert_(sqrt(sq(grainMembraneFx[i]) + sq(grainMembraneFy[i]) + sq(grainMembraneFz[i])) < 100000 * ::N,
+  if(!(sqrt(sq(grainMembraneFx[i]) + sq(grainMembraneFy[i]) + sq(grainMembraneFz[i])) < 100000 * ::N)) {
+   log("gmF", grainMembraneFx[i], grainMembraneFy[i], grainMembraneFz[i]);
+   log(i, grainMembraneContact.size, a, b);
+   fail = true; return;
+  }
   const int v = b/2;
   membrane->Fx[v] -= grainMembraneFx[i]/3;
   membrane->Fy[v] -= grainMembraneFy[i]/3;

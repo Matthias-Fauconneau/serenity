@@ -7,7 +7,7 @@ void Simulation::stepProcess() {
  // Process
  if(grain->count == targetGrainCount) {
   if(processState  < Pressure) {
-   //log("Enable friction");
+   static bool unused once = ({ log("Set Friction"); true; });
    dynamicGrainObstacleFrictionCoefficient = targetDynamicGrainObstacleFrictionCoefficient;
    dynamicGrainMembraneFrictionCoefficient = targetDynamicGrainMembraneFrictionCoefficient;
    dynamicGrainGrainFrictionCoefficient = targetDynamicGrainGrainFrictionCoefficient;
@@ -18,7 +18,7 @@ void Simulation::stepProcess() {
    staticFrictionDamping = targetStaticFrictionDamping;
   }
   if(processState < Pressure) { // Fits top plate while disabling gravity
-   //log("Fits plate");
+   static bool unused once = ({ log("Fits plate"); true; });
    float topZ = 0;
    for(float z: grain->Pz.slice(simd, grain->count)) topZ = ::max(topZ, z+Grain::radius);
    if(topZ < this->topZ) this->topZ = topZ;
@@ -27,7 +27,7 @@ void Simulation::stepProcess() {
    Gz = 0;
   }
   if(processState < Pressure) {
-   //log("Enables pressure");
+   static bool unused once = ({ log("Enables pressure"); true; });
    //if(timeStep%(int(1/(dt*60/s))) == 0) log(maxGrainV*1e3f, "mm/s");
    //if(maxGrainV > 600 * mm/s) return;
    pressure = targetPressure;
