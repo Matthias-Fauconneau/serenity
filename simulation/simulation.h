@@ -235,7 +235,7 @@ struct Simulation {
   buffer<float> oldLocalAz;
   buffer<float> oldLocalBu;
   buffer<float> oldLocalBv;
-  buffer<float> oldLocalBt;
+  //buffer<float> oldLocalBt;
 
   buffer<int> A;
   buffer<int> B;
@@ -244,7 +244,7 @@ struct Simulation {
   buffer<float> localAz;
   buffer<float> localBu;
   buffer<float> localBv;
-  buffer<float> localBt;
+  //buffer<float> localBt;
 
   buffer<int> contacts;
 

@@ -35,6 +35,20 @@ void Simulation::grainLattice() {
    vXsi index = convert(scale*(Az-minZ)) * sizeYX
      + convert(scale*(Ay-minY)) * sizeX
      + convert(scale*(Ax-minX));
+   if(1) for(int k: range(simd))
+    assert_(index[k] >= -(base-lattice.cells.data) && index[k]<int(lattice.base.size),
+            "#", i+k, "/", grain->count,
+            "@", index[k], "<", base-lattice.cells.data,
+            "size", lattice.size,
+            "min", minX[k], minY[k], minZ[k],
+            "X", Ax[k], Ay[k], Az[k],
+            "V", grain->Vx[simd+i+k], grain->Vy[simd+i+k], grain->Vz[simd+i+k],
+      "F", grain->Fx[simd+i+k], grain->Fy[simd+i+k], grain->Fz[simd+i+k],
+      "//",
+      "X", Ax[k] /m, Ay[k] /m, Az[k] /m,
+      "V", grain->Vx[simd+i+k] /(m/s), grain->Vy[simd+i+k] /(m/s), grain->Vz[simd+i+k] /(m/s),
+      "F", grain->Fx[simd+i+k] /N, grain->Fy[simd+i+k] /N, grain->Fz[simd+i+k] /N
+      );
    ::scatter(base, index, a);
   }
  };
@@ -82,6 +96,29 @@ void Simulation::stepGrainIntegration() {
    const vXsf Fx = load(pFx, i), Fy = load(pFy, i), Fz = load(pFz, i);
    vXsf Vx = load(pVx, i), Vy = load(pVy, i), Vz = load(pVz, i);
    vXsf Px = load(pPx, i), Py = load(pPy, i), Pz = load(pPz, i);
+#if 1
+   for(int k: range(simd)) {
+    if(!(sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 1000*N &&
+         sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k] < 100*m/s &&
+         Pz[k] < membrane->height)) { log(
+        "sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 100000*N &&\
+        sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k] < 100*m/s &&\
+        Pz[k] < membrane->height)",
+       sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 1000*N,
+       sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k] < 100*m/s,
+       Pz[k] < membrane->height,
+       "I", i+k, grain->count,
+       "H", membrane->height,
+       "X", Px[k], Py[k], Pz[k],
+       "V", Vx[k], Vy[k], Vz[k], sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k],
+       "F", Fx[k], Fy[k], Fz[k], sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k],
+       "//",
+       "H", (membrane->height-Grain::radius) /m,
+       "X",  Px[k] /m, Py[k] /m, Pz[k] /m,
+       "V", Vx[k] /(m/s), Vy[k] /(m/s), Vz[k] /(m/s),
+       "F", Fx[k] /N, Fy[k] /N, Fz[k] /N); fail=true; return; }
+   }
+#endif
    // Symplectic Euler
    Vx += dt_mass * Fx;
    Vy += dt_mass * Fy;

@@ -4,8 +4,8 @@
 #include "grain.h"
 #include "membrane.h"
 
-static inline /*maskX*/vXsf pointTriangleDistance(vXsf Ox, vXsf Oy, vXsf Oz, vXsf e0x, vXsf e0y, vXsf e0z,
-                                 vXsf e1x, vXsf e1y, vXsf e1z/*, vXsf maxDistance2*/) {
+static inline vXsf pointTriangleDistance(vXsf Ox, vXsf Oy, vXsf Oz, vXsf e0x, vXsf e0y, vXsf e0z,
+                                         vXsf e1x, vXsf e1y, vXsf e1z, vXsf& u, vXsf& v, vXsf& Rx, vXsf& Ry, vXsf& Rz) {
  const vXsf Nx = e0y*e1z - e1y*e0z;
  const vXsf Ny = e0z*e1x - e1z*e0x;
  const vXsf Nz = e0x*e1y - e1x*e0y;
@@ -15,7 +15,6 @@ static inline /*maskX*/vXsf pointTriangleDistance(vXsf Ox, vXsf Oy, vXsf Oz, vXs
  const vXsf det = Px * e0x + Py * e0y + Pz * e0z;
  const vXsf invDet = rcp(det);
  const vXsf u1 = max(_0f, invDet * (Px*Ox + Py*Oy + Pz*Oz));
- //if(u < 0) u=0; //return false; // FIXME: u/v edge contacts are doubled
  const vXsf Qx = Oy*e0z - e0y*Oz;
  const vXsf Qy = Oz*e0x - e0z*Ox;
  const vXsf Qz = Ox*e0y - e0x*Oy;
@@ -24,86 +23,32 @@ static inline /*maskX*/vXsf pointTriangleDistance(vXsf Ox, vXsf Oy, vXsf Oz, vXs
  const vXsf u2 = min(_1f, (u1+v1)); // Clamps to third (diagonal // e1-e0) edge
  const vXsf v2 = (-u1+v1);
  // Rotates back to e0,e1
-const vXsf u = (u2-v2)/2;
-const vXsf v = (u2+v2)/2;
- //if(v < 0) v=0; //return false; // FIXME: u/v edge contacts are doubled
- //if(u + v > 1) return false; // Any edge contact is handled by neighbouring face's u=0 or v=0 edge
- // FIXME: still need to clip for distance (verlet)
- //const vXsf t = invDet * (Qx*e1x + Qy*e1y + Qz*e1z);
- //if(t > 0) return false;
- //if(u > 0 && v > 0) { // If u nor v are constrained to edge, this is the normal line (face contacts)
- /*const vXsf n2 = Nx*Nx + Ny*Ny + Nz*Nz;
- const vXsf d2 = t*t*n2;
- return greaterThanOrEqual(u, _0f) &
-            greaterThanOrEqual(v, _0f) &
-            lessThan(u+v, _1f) &
-            lessThan(d2, maxDistance2);
- } else { // Edge contacts are not along the face normal*/
-  // Contact point
-  const v8sf X = u*e0x + v*e1x;
-  const v8sf Y = u*e0y + v*e1y;
-  const v8sf Z = u*e0z + v*e1z;
-  /*const v8sf d2 =*/return sq(Ox-X) + sq(Oy-Y) + sq(Oz-Z);
-  //return d2 < maxDistance2;
- /*}
- return true;*/
+ u = (u2-v2)/2;
+ v = (u2+v2)/2;
+ const v8sf X = u*e0x + v*e1x;
+ const v8sf Y = u*e0y + v*e1y;
+ const v8sf Z = u*e0z + v*e1z;
+ Rx = Ox-X;
+ Ry = Oy-Y;
+ Rx = Oz-Z;
+ return sq(Rx) + sq(Ry) + sq(Rz);
 }
-
-static inline void pointTriangle(float Ox, float Oy, float Oz, float e0x, float e0y, float e0z,
-                                 float e1x, float e1y, float e1z,
-                                 float& d, float& Nx, float& Ny, float& Nz,
-                                 float& u, float& v, float& t) {
- Nx = e0y*e1z - e1y*e0z;
- Ny = e0z*e1x - e1z*e0x;
- Nz = e0x*e1y - e1x*e0y;
- const float Px = Ny*e1z - e1y*Nz;
- const float Py = Nz*e1x - e1z*Nx;
- const float Pz = Nx*e1y - e1x*Ny;
- const float det = Px * e0x + Py * e0y + Pz * e0z;
- const float invDet = 1 / det;
- u = invDet * (Px*Ox + Py*Oy + Pz*Oz);
- if(u < 0) u=0; // FIXME: u/v edge contacts are doubled
- const float Qx = Oy*e0z - e0y*Oz;
- const float Qy = Oz*e0x - e0z*Ox;
- const float Qz = Ox*e0y - e0x*Oy;
- v = invDet * (Qx*Nx + Qy*Ny + Qz*Nz);
- if(v < 0) v=0; // FIXME: u/v edge contacts are doubled
- //if(u + v > 1) return false; // Any edge contact is handled by neighbouring face's u=0 or v=0 edge
- t = invDet * (Qx*e1x + Qy*e1y + Qz*e1z);
- //if(t > 0) return false;
- if(u > 0 && v > 0) { // If u nor v are constrained to edge, this is the normal line (face contacts)
-  const float N2 = Nx*Nx + Ny*Ny + Nz*Nz;
-  const float N = sqrt(N2);
-  d = -t * N;
-  Nx /= N;
-  Ny /= N;
-  Nz /= N;
- } else { // Edge contacts are not along the face normal
-  // Contact point
-  float X = u*e0x + v*e1x;
-  float Y = u*e0y + v*e1y;
-  float Z = u*e0z + v*e1z;
-  Nx = Ox-X;
-  Ny = Oy-Y;
-  Nz = Oz-Z;
-  float d2 = sq(Nx) + sq(Ny) + sq(Nz);
-  d = sqrt(d2);
-  Nx /= d;
-  Ny /= d;
-  Nz /= d;
- }
+static inline vXsf pointTriangleDistance(vXsf Ox, vXsf Oy, vXsf Oz, vXsf e0x, vXsf e0y, vXsf e0z,
+                                         vXsf e1x, vXsf e1y, vXsf e1z) {
+ vXsf u, v; vXsf Rx, Ry, Rz;
+ return pointTriangleDistance(Ox, Oy, Oz, e0x, e0y, e0z, e1x, e1y, e1z, u, v, Rx, Ry, Rz);
 }
 
 static inline void evaluateGrainMembrane(const int start, const int size,
                                          const int* pContacts, const int unused contactCount,
                                          const int* gmA, const int* gmB,
                                          const float* grainPx, const float* grainPy, const float* grainPz,
-                                         const float* membranePx, const float* membranePy, const float* membranePz,
+                                         const float* mPx, const float* mPy, const float* mPz,
                                          const int margin, const int stride,
                                          const float Gr,
                                          float* const pLocalAx, float* const pLocalAy, float* const pLocalAz,
-                                         float* const pLocalBu, float* const pLocalBv, float* const pLocalBt,
-                                           const vXsf K, const vXsf Kb,
+                                         float* const pLocalBu, float* const pLocalBv, //float* const pLocalBt,
+                                         const vXsf K, const vXsf Kb,
                                          const vXsf staticFrictionStiffness, const vXsf dynamicFrictionCoefficient,
                                          const vXsf staticFrictionLength, const vXsf staticFrictionSpeed,
                                          const vXsf staticFrictionDamping,
@@ -114,103 +59,66 @@ static inline void evaluateGrainMembrane(const int start, const int size,
                                          const float* ArotationW,
                                          float* const pFx, float* const pFy, float* const pFz,
                                          float* const pTAx, float* const pTAy, float* const pTAz,
-                                         float* const pU, float* const pV, int I) {
+                                         float* const pU, float* const pV, const int I) {
+ const vXsi marginX = intX(margin);
+ const vXsi strideX = intX(stride);
  for(int i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
   const vXsi contacts = load(pContacts, i);
   const vXsi A = gather(gmA, contacts), B = gather(gmB, contacts);
   const vXsf Ax = gather(grainPx, A), Ay = gather(grainPy, A), Az = gather(grainPz, A);
-  vXsf Rx, Ry, Rz, U, V, T, BVx, BVy, BVz, TNx, TNy, TNz, B0x, B0y, B0z, B1x, B1y, B1z, B2x, B2y, B2z, depth;
-  vXsf Nx, Ny, Nz;
-  for(int k: range(simd)) {
-   if(i+k >= contactCount) break; // FIXME: pad values produces NaN in ::nearest
-   const int b = B[k];
-   const float V0x = membranePx[b], V0y = membranePy[b], V0z = membranePz[b];
-   const float Ox = Ax[k]-V0x, Oy = Ay[k]-V0y, Oz = Az[k]-V0z;
-   const int rowIndex = (b-margin)/stride;
-   const int e0 = -stride+rowIndex%2;
-   const int e1 = e0-1;
-   const int e2 = -1;
-   if(I == 0) { // (.,0,1)
-    const int e0v = b+e0;
-    const int e1v = b+e1;
-    const float e0x = membranePx[e0v]-V0x, e0y = membranePy[e0v]-V0y, e0z = membranePz[e0v]-V0z;
-    const float e1x = membranePx[e1v]-V0x, e1y = membranePy[e1v]-V0y, e1z = membranePz[e1v]-V0z;
-    float nx, ny, nz, d, u, v, t;
-    pointTriangle(Ox, Oy, Oz, e0x, e0y, e0z, e1x, e1y, e1z, d, nx, ny, nz, u, v, t);
-    Nx[k] = nx;
-    Ny[k] = ny;
-    Nz[k] = nz;
-    Rx[k] = d*nx;
-    Ry[k] = d*ny;
-    Rz[k] = d*nz;
-    depth[k] = Gr - d;
-    U[k] = u;
-    V[k] = v;
-    T[k] = t;
-    TNx[k] = e0y*e1z - e1y*e0z;
-    TNy[k] = e0z*e1x - e1z*e0x;
-    TNz[k] = e0x*e1y - e1x*e0y;
-    B0x[k] = V0x;
-    B0y[k] = V0y;
-    B0z[k] = V0z;
-    B1x[k] = membranePx[e0v];
-    B1y[k] = membranePy[e0v];
-    B1z[k] = membranePz[e0v];
-    B2x[k] = membranePx[e1v];
-    B2y[k] = membranePy[e1v];
-    B2z[k] = membranePz[e1v];
-    const float BV0x = pBVx[b], BV0y = pBVy[b], BV0z = pBVz[b];
-    const float BV1x = pBVx[e0v], BV1y = pBVy[e0v], BV1z = pBVz[e0v];
-    const float BV2x = pBVx[e1v], BV2y = pBVy[e1v], BV2z = pBVz[e1v];
-    const float w = 1-u-v;
-    BVx[k] = w*BV0x + u*BV1x + v*BV2x;
-    BVy[k] = w*BV0y + u*BV1y + v*BV2y;
-    BVz[k] = w*BV0z + u*BV1z + v*BV2z;
-   } else { // (.,1,2)
-    const int e1v = b+e1;
-    const int e2v = b+e2;
-    const float e1x = membranePx[e1v]-V0x, e1y = membranePy[e1v]-V0y, e1z = membranePz[e1v]-V0z;
-    const float e2x = membranePx[e2v]-V0x, e2y = membranePy[e2v]-V0y, e2z = membranePz[e2v]-V0z;
-    float nx, ny, nz, d, u, v, t;
-    pointTriangle(Ox, Oy, Oz, e1x, e1y, e1z, e2x, e2y, e2z, d, nx, ny, nz, u, v, t);
-    Nx[k] = nx;
-    Ny[k] = ny;
-    Nz[k] = nz;
-    Rx[k] = d*nx;
-    Ry[k] = d*ny;
-    Rz[k] = d*nz;
-    depth[k] = Gr - d;
-    U[k] = u;
-    V[k] = v;
-    T[k] = t;
-    TNx[k] = e1y*e2z - e2y*e1z;
-    TNy[k] = e1z*e2x - e2z*e1x;
-    TNz[k] = e1x*e2y - e2x*e1y;
-    B0x[k] = V0x;
-    B0y[k] = V0y;
-    B0z[k] = V0z;
-    B1x[k] = membranePx[e1v];
-    B1y[k] = membranePy[e1v];
-    B1z[k] = membranePz[e1v];
-    B2x[k] = membranePx[e2v];
-    B2y[k] = membranePy[e2v];
-    B2z[k] = membranePz[e2v];
-    const float BV0x = pBVx[b], BV0y = pBVy[b], BV0z = pBVz[b];
-    const float BV1x = pBVx[e1v], BV1y = pBVy[e1v], BV1z = pBVz[e1v];
-    const float BV2x = pBVx[e2v], BV2y = pBVy[e2v], BV2z = pBVz[e2v];
-    const float w = 1-u-v;
-    BVx[k] = w*BV0x + u*BV1x + v*BV2x;
-    BVy[k] = w*BV0y + u*BV1y + v*BV2y;
-    BVz[k] = w*BV0z + u*BV1z + v*BV2z;
-   }
+  const vXsf B0x = gather(mPx, B), B0y = gather(mPy, B), B0z = gather(mPz, B);
+  const vXsf Ox = Ax-B0x, Oy = Ay-B0y, Oz = Az-B0z;
+  const vXsi rowIndex = (B-marginX)/strideX;
+  vXsi e0, e1;
+  // FIXME: assert peeled
+  if(I == 0) { // (.,0,1)
+   e0 = -stride+rowIndex%2;
+   e1 = intX(-1) + e0;
+  } else { // (.,1,2)
+   e0 = -stride-intX(1) +rowIndex%2;
+   e1 = intX(-1);
   }
-  const vXsf Bx = Ax-Rx, By = Ay-Ry, Bz = Az-Rz;
-  const vXsf RAx = - Gr  * Nx, RAy = - Gr * Ny, RAz = - Gr * Nz;
-
+  const vXsf B1x = gather(mPx, B+e0);
+  const vXsf B1y = gather(mPy, B+e0);
+  const vXsf B1z = gather(mPz, B+e0);
+  const vXsf B2x = gather(mPx, B+e1);
+  const vXsf B2y = gather(mPy, B+e1);
+  const vXsf B2z = gather(mPz, B+e1);
+  const vXsf e0x = B1x - B0x;
+  const vXsf e0y = B1y - B0y;
+  const vXsf e0z = B1z - B0z;
+  const vXsf e1x = B2x - B0x;
+  const vXsf e1y = B2y - B0y;
+  const vXsf e1z = B2z - B0z;
+  vXsf U, V, Rx, Ry, Rz;
+  const vXsf d2 = pointTriangleDistance(Ox, Oy, Oz, e0x, e0y, e0z, e1x, e1y, e1z, U, V, Rx, Ry, Rz);
+  const vXsf R = sqrt(d2);
+  const vXsf depth = Gr - R;
   // Tension
   const vXsf Fk = K * sqrt(depth) * depth;
+  for(int k: range(min(simd, contactCount-i))) {
+   if(!(Fk[k] < 5000 * ::N)) {
+    log("Fk[k] < X * ::N", Fk[k], depth[k]);
+    fail=true; return;
+   }
+  }
   // Relative velocity
   const vXsf AAVx = gather(pAAVx, A), AAVy = gather(pAAVy, A), AAVz = gather(pAAVz, A);
+  const vXsf BV0x = gather(pBVx, B);
+  const vXsf BV0y = gather(pBVy, B);
+  const vXsf BV0z = gather(pBVz, B);
+  const vXsf BV1x = gather(pBVx, B+e0);
+  const vXsf BV1y = gather(pBVy, B+e0);
+  const vXsf BV1z = gather(pBVz, B+e0);
+  const vXsf BV2x = gather(pBVx, B+e1);
+  const vXsf BV2y = gather(pBVy, B+e1);
+  const vXsf BV2z = gather(pBVz, B+e1);
+  const vXsf W = 1-U-V;
+  const vXsf BVx = W*BV0x + U*BV1x + V*BV2x;
+  const vXsf BVy = W*BV0y + U*BV1y + V*BV2y;
+  const vXsf BVz = W*BV0z + U*BV1z + V*BV2z;
+  const vXsf Nx = Rx/R, Ny = Ry/R, Nz = Rz/R;
+  const vXsf RAx = -Gr * Nx, RAy = -Gr * Ny, RAz = -Gr * Nz;
   const vXsf RVx = gather(AVx, A) + (AAVy*RAz - AAVz*RAy) - BVx;
   const vXsf RVy = gather(AVy, A) + (AAVz*RAx - AAVx*RAz) - BVy;
   const vXsf RVz = gather(AVz, A) + (AAVx*RAy - AAVy*RAx) - BVz;
@@ -242,7 +150,7 @@ static inline void evaluateGrainMembrane(const int start, const int size,
   const vXsf oldLocalAz = gather(pLocalAz, contacts);
   const vXsf oldlocalBu = gather(pLocalBu, contacts);
   const vXsf oldlocalBv = gather(pLocalBv, contacts);
-  const vXsf oldlocalBt = gather(pLocalBt, contacts);
+  //const vXsf oldlocalBt = gather(pLocalBt, contacts);
 
   const vXsf QAx = gather(ArotationX, A);
   const vXsf QAy = gather(ArotationY, A);
@@ -258,7 +166,7 @@ static inline void evaluateGrainMembrane(const int start, const int size,
 
   const vXsf newlocalBu = U;
   const vXsf newlocalBv = V;
-  const vXsf newlocalBt = T;
+  //const vXsf newlocalBt = T;
 
   const maskX reset = equal(oldLocalAx, _0f);
   vXsf localAx = blend(reset, oldLocalAx, newLocalAx);
@@ -266,26 +174,23 @@ static inline void evaluateGrainMembrane(const int start, const int size,
   const vXsf localAz = blend(reset, oldLocalAz, newLocalAz);
   const vXsf localBu = blend(reset, oldlocalBu, newlocalBu);
   const vXsf localBv = blend(reset, oldlocalBv, newlocalBv);
-  const vXsf localBt = blend(reset, oldlocalBt, newlocalBt);
+  //const vXsf localBt = blend(reset, oldlocalBt, newlocalBt);
 
-  const vXsf X = QAw*localAx - (localAy*QAz - QAy*localAz);
-  const vXsf Y = QAw*localAy - (localAz*QAx - QAz*localAx);
-  const vXsf Z = QAw*localAz - (localAx*QAy - QAx*localAy);
-  const vXsf W = localAx * QAx + localAy * QAy + localAz * QAz;
-  const vXsf FRAx = QAw*X + W*QAx + QAy*Z - Y*QAz;
-  const vXsf FRAy = QAw*Y + W*QAy + QAz*X - Z*QAx;
-  const vXsf FRAz = QAw*Z + W*QAz + QAx*Y - X*QAy;
+  const vXsf QX = QAw*localAx - (localAy*QAz - QAy*localAz);
+  const vXsf QY = QAw*localAy - (localAz*QAx - QAz*localAx);
+  const vXsf QZ = QAw*localAz - (localAx*QAy - QAx*localAy);
+  const vXsf QW = localAx * QAx + localAy * QAy + localAz * QAz;
+  const vXsf FRAx = QAw*QX + QW*QAx + QAy*QZ - QY*QAz;
+  const vXsf FRAy = QAw*QY + QW*QAy + QAz*QX - QZ*QAx;
+  const vXsf FRAz = QAw*QZ + QW*QAz + QAx*QY - QX*QAy;
   const vXsf localBw = _1f - localBu - localBv;
-  const vXsf FRBx = localBw * B0x + localBu * B1x + localBv * B2x + localBt * TNx;
-  const vXsf FRBy = localBw * B0y + localBu * B1y + localBv * B2y + localBt * TNy;
-  const vXsf FRBz = localBw * B0z + localBu * B1z + localBv * B2z + localBt * TNz;
+  const vXsf gBx = localBw * B0x + localBu * B1x + localBv * B2x;// + localBt * TNx;
+  const vXsf gBy = localBw * B0y + localBu * B1y + localBv * B2y;// + localBt * TNy;
+  const vXsf gBz = localBw * B0z + localBu * B1z + localBv * B2z;// + localBt * TNz;
 
   const vXsf gAx = Ax + FRAx;
   const vXsf gAy = Ay + FRAy;
   const vXsf gAz = Az + FRAz;
-  const vXsf gBx = Bx + FRBx;
-  const vXsf gBy = By + FRBy;
-  const vXsf gBz = Bz + FRBz;
   const vXsf Dx = gBx - gAx;
   const vXsf Dy = gBy - gAy;
   const vXsf Dz = gBz - gAz;
@@ -326,7 +231,7 @@ static inline void evaluateGrainMembrane(const int start, const int size,
   scatter(pLocalAz, contacts, localAz);
   scatter(pLocalBu, contacts, localBu);
   scatter(pLocalBv, contacts, localBv);
-  scatter(pLocalBt, contacts, localBt);
+  //scatter(pLocalBt, contacts, localBt);
  }
 }
 
@@ -347,7 +252,7 @@ void Simulation::stepGrainMembrane() {
    swap(gm.oldLocalAz, gm.localAz);
    swap(gm.oldLocalBu, gm.localBu);
    swap(gm.oldLocalBv, gm.localBv);
-   swap(gm.oldLocalBt, gm.localBt);
+   //swap(gm.oldLocalBt, gm.localBt);
 
    static constexpr size_t averageContactCount = 3;
    const size_t GWcc = align(simd, grain->count * averageContactCount +1);
@@ -360,7 +265,7 @@ void Simulation::stepGrainMembrane() {
     gm.localAz = buffer<float>(GWcc, 0);
     gm.localBu = buffer<float>(GWcc, 0);
     gm.localBv = buffer<float>(GWcc, 0);
-    gm.localBt = buffer<float>(GWcc, 0);
+    //gm.localBt = buffer<float>(GWcc, 0);
     memoryTime.stop();
    }
    gm.A.size = gm.A.capacity;
@@ -375,54 +280,35 @@ void Simulation::stepGrainMembrane() {
     const int W = membrane->W;
     const int stride = membrane->stride;
     const int base = membrane->margin+rowIndex*stride;
+    int e0, e1;
     if(I==0) { // (.,0,1)
-     const int e0 = -stride+rowIndex%2;
-     const int e1 = e0-1;
-     for(int j=0; j<W; j+=simd) {
-      const int b = base+j;
-      vXsi B = intX(b)+_seqi;
-      const vXsf V0x = load(mPx, b), V0y = load(mPy, b), V0z = load(mPz, b);
-      const vXsf e0x = load(mPx, b+e0)-V0x;
-      const vXsf e0y = load(mPy, b+e0)-V0y;
-      const vXsf e0z = load(mPz, b+e0)-V0z;
-      const vXsf e1x = load(mPx, b+e1)-V0x;
-      const vXsf e1y = load(mPy, b+e1)-V0y;
-      const vXsf e1z = load(mPz, b+e1)-V0z;
-      for(int a: range(grain->count)) { // TODO: lattice
-       const vXsf Ax = floatX(gPx[a]), Ay = floatX(gPy[a]), Az = floatX(gPz[a]);
-       const vXsf Rx = Ax-V0x, Ry = Ay-V0y, Rz = Az-V0z;
-       //maskX mask = pointTriangle(Rx, Ry, Rz, e0x, e0y, e0z, e1x, e1y, e1z, sqVerletDistance);
-       maskX mask
-         = lessThan(pointTriangleDistance(Rx, Ry, Rz, e0x, e0y, e0z, e1x, e1y, e1z), sqVerletDistance);
-       uint targetIndex = contactCount.fetchAdd(countBits(mask));
-       compressStore(gmA+targetIndex, mask, intX(a));
-       compressStore(gmB+targetIndex, mask, B);
-      }
-     }
+     e0 = -stride+rowIndex%2;
+     e1 = e0-1;
+    } else { // (.,1,2)
+     e0 = -stride+rowIndex%2-1;
+     e1 = -1;
     }
-    else { // (.,1,2)
-     const int e1 = -stride+rowIndex%2-1;
-     const int e2 = -1;
-     for(int j=0; j<W; j++) {
-      const int b = base+j;
-      vXsi B = intX(b)+_seqi;
-      const vXsf V0x = load(mPx, b), V0y = load(mPy, b), V0z = load(mPz, b);
-      const vXsf e1x = load(mPx, b+e1)-V0x;
-      const vXsf e1y = load(mPy, b+e1)-V0y;
-      const vXsf e1z = load(mPz, b+e1)-V0z;
-      const vXsf e2x = load(mPx, b+e2)-V0x;
-      const vXsf e2y = load(mPy, b+e2)-V0y;
-      const vXsf e2z = load(mPz, b+e2)-V0z;
-      for(int a: range(grain->count)) {
-       const vXsf Ax = floatX(gPx[a]), Ay = floatX(gPy[a]), Az = floatX(gPz[a]);
-       const vXsf Rx = Ax-V0x, Ry = Ay-V0y, Rz = Az-V0z;
-       //maskX mask = pointTriangle(Rx, Ry, Rz, e1x, e1y, e1z, e2x, e2y, e2z, sqVerletDistance);
-       maskX mask
-         = lessThan(pointTriangleDistance(Rx, Ry, Rz, e1x, e1y, e1z, e2x, e2y, e2z), sqVerletDistance);
-       uint targetIndex = contactCount.fetchAdd(countBits(mask));
-       compressStore(gmA+targetIndex, mask, intX(a));
-       compressStore(gmB+targetIndex, mask, B);
-      }
+    for(int j=0; j<W; j+=simd) {
+     const int b = base+j;
+     vXsi B = intX(b)+_seqi;
+     const vXsf V0x = load(mPx, b);
+     const vXsf V0y = load(mPy, b);
+     const vXsf V0z = load(mPz, b);
+     const vXsf e0x = loadu(mPx, b+e0)-V0x;
+     const vXsf e0y = loadu(mPy, b+e0)-V0y;
+     const vXsf e0z = loadu(mPz, b+e0)-V0z;
+     const vXsf e1x = loadu(mPx, b+e1)-V0x;
+     const vXsf e1y = loadu(mPy, b+e1)-V0y;
+     const vXsf e1z = loadu(mPz, b+e1)-V0z;
+     for(int a: range(grain->count)) { // TODO: lattice
+      const vXsf Ax = floatX(gPx[a]), Ay = floatX(gPy[a]), Az = floatX(gPz[a]);
+      const vXsf Rx = Ax-V0x, Ry = Ay-V0y, Rz = Az-V0z;
+      //maskX mask = pointTriangle(Rx, Ry, Rz, e0x, e0y, e0z, e1x, e1y, e1z, sqVerletDistance);
+      maskX mask
+        = lessThan(pointTriangleDistance(Rx, Ry, Rz, e0x, e0y, e0z, e1x, e1y, e1z), sqVerletDistance);
+      uint targetIndex = contactCount.fetchAdd(countBits(mask));
+      compressStore(gmA+targetIndex, mask, intX(a));
+      compressStore(gmB+targetIndex, mask, B);
      }
     }
    };
@@ -436,7 +322,7 @@ void Simulation::stepGrainMembrane() {
    gm.localAz.size = contactCount;
    gm.localBu.size = contactCount;
    gm.localBv.size = contactCount;
-   gm.localBt.size = contactCount;
+   //gm.localBt.size = contactCount;
 
    grainMembraneRepackFrictionTime.start();
    size_t index = 0; // Index of first contact with A in old [Local]A|B list
@@ -452,7 +338,7 @@ void Simulation::stepGrainMembrane() {
       gm.localAz[i] = gm.oldLocalAz[j];
       gm.localBu[i] = gm.oldLocalBu[j];
       gm.localBv[i] = gm.oldLocalBv[j];
-      gm.localBt[i] = gm.oldLocalBt[j];
+      //gm.localBt[i] = gm.oldLocalBt[j];
       goto break_;
      }
     } /*else*/ { // New contact
@@ -469,7 +355,7 @@ void Simulation::stepGrainMembrane() {
    assert(align(simd, gm.A.size+1) <= gm.A.capacity);
    for(size_t i=gm.A.size; i<align(simd, gm.A.size +1); i++) gm.A.begin()[i] = -1;
    assert(align(simd, gm.B.size+1) <= gm.B.capacity);
-   for(size_t i=gm.B.size; i<align(simd, gm.B.size +1); i++) gm.B.begin()[i] = 0;
+   for(size_t i=gm.B.size; i<align(simd, gm.B.size +1); i++) gm.B.begin()[i] = membrane->stride+1;
   }
   grainMembraneGlobalMinD = verletDistance - (Grain::radius+0);
   if(grainMembraneGlobalMinD < 0) log("grainMembraneGlobalMinD", grainMembraneGlobalMinD);
@@ -503,36 +389,26 @@ void Simulation::stepGrainMembrane() {
     const vXsf V0x = gather(mPx, B), V0y = gather(mPy, B), V0z = gather(mPz, B);
     const vXsf Rx = Ax-V0x, Ry = Ay-V0y, Rz = Az-V0z;
     const vXsi rowIndex = (B-margin)/stride;
+    vXsi e0, e1;
     // FIXME: assert peeled
     if(I == 0) { // (., 0, 1)
-     const vXsi e0 = -stride+ rowIndex%2;
-     const vXsi e1 = intX(-1) + e0;
-     const vXsf e0x = gather(mPx, B+e0) - V0x;
-     const vXsf e0y = gather(mPy, B+e0) - V0y;
-     const vXsf e0z = gather(mPz, B+e0) - V0z;
-     const vXsf e1x = gather(mPx, B+e1) - V0x;
-     const vXsf e1y = gather(mPy, B+e1) - V0y;
-     const vXsf e1z = gather(mPz, B+e1) - V0z;
-     const maskX contact =
-       lessThan(pointTriangleDistance(Rx, Ry, Rz, e0x, e0y, e0z, e1x, e1y, e1z), sqRadius);
-     maskStore(gmL+i, ~contact, _0f);
-     const uint index = contactCount.fetchAdd(countBits(contact));
-     compressStore(gmContact+index, contact, intX(i)+_seqi);
+     e0 = -stride+ rowIndex%2;
+     e1 = intX(-1) + e0;
     } else { // (., 1, 2)
-     const vXsi e1 = -stride-intX(1) +rowIndex%2;
-     const vXsi e2 = intX(-1);
-     const vXsf e1x = gather(mPx, B+e1) - V0x;
-     const vXsf e1y = gather(mPy, B+e1) - V0y;
-     const vXsf e1z = gather(mPz, B+e1) - V0z;
-     const vXsf e2x = gather(mPx, B+e2) - V0x;
-     const vXsf e2y = gather(mPy, B+e2) - V0y;
-     const vXsf e2z = gather(mPz, B+e2) - V0z;
-     const maskX contact =
-       lessThan(pointTriangleDistance(Rx, Ry, Rz, e1x, e1y, e1z, e2x, e2y, e2z), sqRadius);
-     maskStore(gmL+i, ~contact, _0f);
-     const uint index = contactCount.fetchAdd(countBits(contact));
-     compressStore(gmContact+index, contact, intX(i)+_seqi);
+     e0 = -stride-intX(1) +rowIndex%2;
+     e1 = intX(-1);
     }
+    const vXsf e0x = gather(mPx, B+e0) - V0x;
+    const vXsf e0y = gather(mPy, B+e0) - V0y;
+    const vXsf e0z = gather(mPz, B+e0) - V0z;
+    const vXsf e1x = gather(mPx, B+e1) - V0x;
+    const vXsf e1y = gather(mPy, B+e1) - V0y;
+    const vXsf e1z = gather(mPz, B+e1) - V0z;
+    const maskX contact =
+      lessThan(pointTriangleDistance(Rx, Ry, Rz, e0x, e0y, e0z, e1x, e1y, e1z), sqRadius);
+    maskStore(gmL+i, ~contact, _0f);
+    const uint index = contactCount.fetchAdd(countBits(contact));
+    compressStore(gmContact+index, contact, intX(i)+_seqi);
    }
   };
   if(gm.A.size/simd) grainMembraneFilterTime += parallel_chunk(gm.A.size/simd, filter);
@@ -583,7 +459,7 @@ void Simulation::stepGrainMembrane() {
                           membrane->margin, membrane->stride,
                           Grain::radius,
                           gm.localAx.begin(), gm.localAy.begin(), gm.localAz.begin(),
-                          gm.localBu.begin(), gm.localBv.begin(), gm.localBt.begin(),
+                          gm.localBu.begin(), gm.localBv.begin(), //gm.localBt.begin(),
                           floatX(K), floatX(Kb),
                           floatX(staticFrictionStiffness), floatX(dynamicGrainMembraneFrictionCoefficient),
                           floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping),
@@ -608,6 +484,11 @@ void Simulation::stepGrainMembrane() {
    size_t index = gm.contacts[i];
    size_t a = gm.A[index];
    size_t b = gm.B[index];
+   if(!(sqrt(sq(gm.Fx[i]) + sq(gm.Fy[i]) + sq(gm.Fz[i])) < 100000 * ::N)) {
+    log("gmF", gm.Fx[i], gm.Fy[i], gm.Fz[i]);
+    log(i, gm.contacts.size, a, b);
+    fail = true; return;
+   }
    grain->Fx[simd+a] += gm.Fx[i];
    grain->Fy[simd+a] += gm.Fy[i];
    grain->Fz[simd+a] += gm.Fz[i];
