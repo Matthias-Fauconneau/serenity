@@ -13,11 +13,9 @@
 //include "wire-bottom.h"
 //include "grain-wire.h"
 
-#if GRAIN
 constexpr float Grain::radius;
 constexpr float Grain::mass;
-constexpr float Grain::angularMass;
-#endif
+//constexpr float Grain::angularMass;
 #if WIRE
 constexpr float System::Wire::radius;
 constexpr float System::Wire::mass;
@@ -45,12 +43,9 @@ Simulation::Simulation(const Dict& p) :
   targetGrainCount(4*PI*cb((float)p.at("Radius")*mm)/Grain::volume/(1+0.615)-49),
   grain(targetGrainCount),
   membrane((float)p.at("Radius")*mm),
-  //#if DEBUG
-  //Gz( -10 * N/kg),
-  //#else
-  Gz(1 * -10 * N/kg),
+  //Gz(1 * -10 * N/kg),
+  Gz(1000 * -10 * N/kg),
   //Gz(5000 * -10 * N/kg),
-  //#endif
   targetPressure((float)p.at("Pressure")*Pa),
   plateSpeed((float)p.at("Speed")*mm/s),
   currentHeight(Grain::radius),

@@ -7,11 +7,11 @@ struct Membrane {
 
  sconst float density = /*10 **/ 1000 * kg / cb(m);
  sconst float curvature = 0;
- sconst float elasticModulus = 10/*0*/ * MPa;
+ sconst float elasticModulus = 100 * MPa;
  sconst float poissonRatio = 0.48;
 
  const float radius;
- const float resolution = 2*PI*radius/32;
+ const float resolution = 2*PI*radius/64;
  const int W = int(round(2*PI*radius/resolution))/simd*simd;
  const int margin = simd; // 16 to ensure no false sharing ?
  const int stride = margin+W+margin;

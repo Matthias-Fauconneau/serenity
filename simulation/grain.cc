@@ -35,6 +35,7 @@ void Simulation::grainLattice() {
    vXsi index = convert(scale*(Az-minZ)) * sizeYX
      + convert(scale*(Ay-minY)) * sizeX
      + convert(scale*(Ax-minX));
+#if 0
    if(1) for(int k: range(simd))
     assert_(index[k] >= -(base-lattice.cells.data) && index[k]<int(lattice.base.size),
             "#", i+k, "/", grain->count,
@@ -49,6 +50,7 @@ void Simulation::grainLattice() {
       "V", grain->Vx[simd+i+k] /(m/s), grain->Vy[simd+i+k] /(m/s), grain->Vz[simd+i+k] /(m/s),
       "F", grain->Fx[simd+i+k] /N, grain->Fy[simd+i+k] /N, grain->Fz[simd+i+k] /N
       );
+#endif
    ::scatter(base, index, a);
   }
  };

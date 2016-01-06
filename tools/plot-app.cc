@@ -100,7 +100,7 @@ struct PlotView : HList<Plot> {
      for(auto data: dataSets) {
       if(data.key=="Axial (Pa)" || data.key == "Radial (Pa)") data.value = medianFilter(data.value);
       else {
-       assert_(data.value.size >= 2*medianWindowRadius, data.value.size);
+       //assert_(data.value.size >= 2*medianWindowRadius, data.value.size);
        data.value = copyRef(data.value.slice(medianWindowRadius, data.value.size-2*medianWindowRadius));
       }
      }

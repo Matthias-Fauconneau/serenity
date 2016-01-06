@@ -183,7 +183,17 @@ static v8sf unused _1f = float8(1);
 
 static inline v8sf load(const float* a, int index) { return *(v8sf*)(a+index); }
 static inline v8sf load(ref<float> a, int index) { return load(a.data, index); }
+#if __clang__
+static inline v8sf loadu(const float* a, int index) {
+#undef packed
+ struct u { v8sf v; } __attribute((packed, may_alias));
+ return ((u*)a+index)->v;
+}
+#elif __INTEL_COMPILER
+static inline v8sf loadu(const float* a, int index) { return _mm256_loadu_ps(a+index); }
+#elif __GNUC__
 static inline v8sf loadu(const float* a, int index) { return __builtin_ia32_loadups256(a+index); }
+#endif
 static inline v8sf loadu(ref<float> a, int index) { return loadu(a.data, index); }
 
 static inline void store(float* const a, int index, v8sf v) { *(v8sf*)(a+index) = v; }

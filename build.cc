@@ -134,7 +134,7 @@ bool Build::compileModule(string target) {
    int pid = wait(); // Waits for any child to terminate
    int status = wait(pid);
    Job job = jobs.take(jobs.indexOf(pid));
-   log(job.stdout.readUpTo(16384));
+   log(job.stdout.readUpTo(32768));
    if(status) { log("Failed to compile\n"); return false; }
    else log(job.target+'\n');
   }
@@ -205,7 +205,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
   // Waits for all translation units to finish compilation before final link
   for(Build::Job& job: jobs) {
    int status = wait(job.pid);
-   log(job.stdout.readUpTo(32768));
+   log(job.stdout.readUpTo(65536));
    if(status) { binary={}; return; }
    else log(job.target+'\n');
   }

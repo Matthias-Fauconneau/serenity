@@ -151,11 +151,8 @@ void Simulation::stepProcess() {
       grain->Py[simd+i] = newPosition.y;
       grain->Pz[simd+i] = newPosition.z;
       grain->Vx[simd+i] = 0; grain->Vy[simd+i] = 0;
-/*#if DEBUG
-      grain->Vz[simd+i] = 0 * m/s;
-#else*/
-      grain->Vz[simd+i] = 0/*-1*/ * m/s;
-//#endif
+      grain->Vz[simd+i] = -1 * m/s;
+      //grain->Vz[simd+i] = 0 * m/s;
       grain->AVx[simd+i] = 0; grain->AVy[simd+i] = 0; grain->AVz[simd+i] = 0;
       float t0 = 2*PI*random();
       float t1 = acos(1-2*random());
