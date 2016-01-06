@@ -429,35 +429,6 @@ void Simulation::stepGrainMembrane() {
                                + convert(scale*(My-minY)) * sizeX
                                + convert(scale*(Mx-minX)); // FIXME: Clang miscompiles
      for(int n: range(3*3)) for(int i: range(3)) {
-#if 0
-      for(int k: range(simd)) {
-       assert_(Mx[k] > minX[k] && My[k] > minY[k] && Mz[k] > minZ[k]);
-       assert_((latticeNeighbours[n]+i-lattice.base.data)+index[k] >= -(lattice.base.data-lattice.cells.data)
-               && (latticeNeighbours[n]+i-lattice.base.data)+index[k]<int(lattice.base.size),
-               k, index[k], (latticeNeighbours[n]+i-lattice.base.data),
-               (latticeNeighbours[n]+i-lattice.base.data)+index[k],
-               lattice.base.data-lattice.cells.data,
-               lattice.base.size,
-               "m", minX[k], minY[k], minZ[k],
-               "x", Mx[k], My[k], Mz[k],
-               "M", lattice.max,
-               lattice.size, "\n",
-               Mx[k]-minY[k],My[k]-minY[k],Mz[k]-minZ[k], "\n",
-               scale[k],
-               scale[k]*(Mx-minY)[k],scale[k]*(My-minY)[k],scale[k]*(Mz-minZ)[k], "\n",
-               convert(scale*(Mx-minY))[k],
-               convert(scale*(My-minY))[k],
-               convert(scale*(Mz-minZ))[k], "\n",
-               (convert(scale*(Mz-minZ)) * sizeYX)[k], "\n",
-               (convert(scale*(My-minY)) * sizeX)[k], "\n",
-               (convert(scale*(Mz-minZ)) * sizeYX
-               + convert(scale*(My-minY)) * sizeX)[k], "\n",
-               B0z[k], B1z[k], B2z[k], Mz[k], "\n",
-               isNumber(B0z[k]), isNumber(B1z[k]), isNumber(B2z[k]),
-               isNumber(minZ[k]), isNumber((Mz-minZ)[k])
-               );
-      }
-#endif
       const vXsi a = gather(latticeNeighbours[n]+i, index);
       const vXsf Ax = gather(gPx, a), Ay = gather(gPy, a), Az = gather(gPz, a);
       const vXsf Rx = Ax-B0x, Ry = Ay-B0y, Rz = Az-B0z;
