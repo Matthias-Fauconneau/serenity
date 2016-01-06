@@ -96,15 +96,15 @@ void Simulation::stepGrainIntegration() {
    const vXsf Fx = load(pFx, i), Fy = load(pFy, i), Fz = load(pFz, i);
    vXsf Vx = load(pVx, i), Vy = load(pVy, i), Vz = load(pVz, i);
    vXsf Px = load(pPx, i), Py = load(pPy, i), Pz = load(pPz, i);
-#if 1
+#if 0
    for(int k: range(simd)) {
-    if(!(sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 1000*N &&
+    if(!(sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 100000*N &&
          sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k] < 100*m/s &&
          Pz[k] < membrane->height)) { log(
         "sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 100000*N &&\
         sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k] < 100*m/s &&\
         Pz[k] < membrane->height)",
-       sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 1000*N,
+       sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 100000*N,
        sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k] < 100*m/s,
        Pz[k] < membrane->height,
        "I", i+k, grain->count,

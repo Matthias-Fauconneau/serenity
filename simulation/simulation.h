@@ -12,6 +12,7 @@ extern bool fail;
 extern Lock lock;
 struct vec2x3 { vec3 a, b; };
 extern array<vec2x3> lines;
+extern array<int> faces;
 
 // High level simulation and contact management
 struct Simulation {

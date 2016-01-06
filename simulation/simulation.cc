@@ -29,6 +29,7 @@ constexpr string Simulation::patterns[];
 bool fail = false;
 Lock lock;
 array<vec2x3> lines;
+array<int> faces;
 
 Simulation::Simulation(const Dict& p) :
   dt((float)p.at("TimeStep")*s),

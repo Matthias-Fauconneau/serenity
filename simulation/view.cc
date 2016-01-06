@@ -223,45 +223,6 @@ struct SimulationView : Widget {
     vec3 A = viewProjection * a, B= viewProjection * b;
     positions.append(A); positions.append(B);
    }
-   /*{
-    const float* const mPx =  simulation.membrane->Px.data;
-    const float* const mPy =  simulation.membrane->Py.data;
-    const float* const mPz =  simulation.membrane->Pz.data;
-    const int W = simulation.membrane->W;
-    const int stride = simulation.membrane->stride;
-    for(int rowIndex: range(1, simulation.membrane->H)) {
-     const int base = simulation.membrane->margin+rowIndex*stride;
-     const int e0 = -stride+rowIndex%2;
-     const int e1 = e0-1;
-     const int e2 = -1;
-     for(int j: range(W)) {
-      const int v = base+j;
-      const float V0x = mPx[v];
-      const float V0y = mPy[v];
-      const float V0z = mPz[v];
-      const int e0v = v+e0;
-      const int e1v = v+e1;
-      const int e2v = v+e2;
-      const float Rx0 = mPx[e0v], Ry0 = mPy[e0v], Rz0 = mPz[e0v];
-      const float Rx1 = mPx[e1v], Ry1 = mPy[e1v], Rz1 = mPz[e1v];
-      const float Rx2 = mPx[e2v], Ry2 = mPy[e2v], Rz2 = mPz[e2v];
-      const float l = Grain::radius;
-      {// (.,0,1)
-       vec3 a ((V0x+Rx0+Rx1)/3, (V0y+Ry0+Ry1)/3, (V0z+Rz0+Rz1)/3);
-       vec3 N = cross(vec3(Rx0-V0x, Ry0-V0y, Rz0-V0z), vec3(Rx1-V0x, Ry1-V0y, Rz1-V0z));
-       vec3 A = viewProjection * a, B= viewProjection * (a+l*N/length(N));
-       positions.append(A); positions.append(B);
-      }
-      {// (.,1,2)
-       vec3 a ((V0x+Rx1+Rx2)/3, (V0y+Ry1+Ry2)/3, (V0z+Rz1+Rz2)/3);
-       vec3 N = cross(vec3(Rx1-V0x, Ry1-V0y, Rz1-V0z), vec3(Rx2-V0x, Ry2-V0y, Rz2-V0z));
-       vec3 A = viewProjection * a, B= viewProjection * (a+l*N/length(N));
-       positions.append(A); positions.append(B);
-      }
-     }
-    }
-   }*/
-   //log(lines.size, "lines");
    {Locker lock(::lock);
    for(vec2x3 l: ::lines) { positions.append(viewProjection * l.a); positions.append(viewProjection * l.b); }}
    static GLVertexArray vertexArray;
@@ -269,6 +230,40 @@ struct SimulationView : Widget {
    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
    vertexArray.draw(Lines, positions.size);
   }
+
+  if(::faces) {
+   static GLShader shader {::shader_glsl(), {"interleaved flat"}};
+   shader.bind();
+   shader.bindFragments({"color"});
+   shader["transform"] = mat4(1);
+   shader["uColor"] = vec4(1,0,0, 1);
+   array<vec3> positions;
+   const int margin = simulation.membrane->margin;
+   const int stride = simulation.membrane->stride;
+   {Locker lock(::lock);
+    for(int v: ::faces) {
+     int b = v/2, I = v%2;
+     int rowIndex = (b-margin)/stride;
+     int e0, e1;
+     // FIXME: assert peeled
+     if(I == 0) { // (., 0, 1)
+      e0 = rowIndex%2 -stride;
+      e1 = rowIndex%2 -stride-1;
+     } else { // (., 1, 2)
+      e0 = rowIndex%2 -stride-1;
+      e1 = -1;
+     }
+     positions.append(viewProjection * vec3(simulation.membrane->position(b)));
+     positions.append(viewProjection * vec3(simulation.membrane->position(b+e0)));
+     positions.append(viewProjection * vec3(simulation.membrane->position(b+e1)));
+    }
+   }
+   static GLVertexArray vertexArray;
+   GLBuffer positionBuffer (positions);
+   vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
+   vertexArray.draw(Triangles, positions.size);
+  }
+
   renderTime.stop();
   return shared<Graphics>();
  }
