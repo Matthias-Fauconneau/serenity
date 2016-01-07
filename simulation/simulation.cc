@@ -9,19 +9,15 @@
 //#include "grain-top.h"
 //#include "grain-grain.h"
 //#include "grain-membrane.h"
-//include "wire.h"
+#include "wire.h"
 //include "wire-bottom.h"
 //include "grain-wire.h"
 
-
-#if WIRE
-constexpr float System::Wire::radius;
-constexpr float System::Wire::mass;
-constexpr float System::Wire::internodeLength;
-constexpr float System::Wire::tensionStiffness;
-constexpr float System::Wire::bendStiffness;
+constexpr float Wire::radius;
+constexpr float Wire::tensionStiffness;
+constexpr float Wire::bendStiffness;
 constexpr string Simulation::patterns[];
-#endif
+
 bool fail = false;
 Lock lock;
 array<vec2x3> lines;
@@ -39,6 +35,7 @@ Simulation::Simulation(const Dict& p) :
            p.value("grainWallThickness", 0),
            targetGrainCount),
   membrane((float)p.at("Radius")*mm, grain->radius),
+  wire(grain->radius/2),
   targetDynamicGrainObstacleFrictionCoefficient(0.228),
   targetDynamicGrainMembraneFrictionCoefficient(0.228),
   targetDynamicGrainGrainFrictionCoefficient(0.096),
@@ -52,23 +49,20 @@ Simulation::Simulation(const Dict& p) :
   verticalSpeed(p.value("verticalSpeed",1.f)*m/s),
   targetPressure((float)p.at("Pressure")*Pa),
   plateSpeed((float)p.at("Speed")*mm/s),
+  patternRadius(membrane->radius - grain->radius),
+  pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):None),
   currentHeight(grain->radius),
   topZ(membrane->height),
   latticeRadius(useMembrane?membrane->radius+grain->radius:2*membrane->radius),
   lattice {sqrt(3.)/(2*grain->radius), vec3(vec2(-latticeRadius), -grain->radius*2),
                                            vec3(vec2(latticeRadius), membrane->height+grain->radius)}
-#if WIRE
-, pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):None)
-#endif
 {
-#if WIRE
  if(pattern) { // Initial wire node
-  size_t i = wire.count++;
-  wire.Px[i] = patternRadius; wire.Py[i] = 0; wire.Pz[i] = currentHeight+grain->radius+Wire::radius;
-  wire.Vx[i] = 0; wire.Vy[i] = 0; wire.Vz[i] = 0;
-  winchAngle += Wire::internodeLength / currentWinchRadius;
+  size_t i = wire->count++;
+  wire->Px[i] = patternRadius; wire->Py[i] = 0; wire->Pz[i] = currentHeight+grain->radius+Wire::radius;
+  wire->Vx[i] = 0; wire->Vy[i] = 0; wire->Vz[i] = 0;
+  winchAngle += wire->internodeLength / currentWinchRadius;
  }
-#endif
  if(useMembrane) {
   dynamicGrainObstacleFrictionCoefficient = targetDynamicGrainObstacleFrictionCoefficient;
   dynamicGrainMembraneFrictionCoefficient = targetDynamicGrainMembraneFrictionCoefficient;
@@ -124,14 +118,12 @@ void Simulation::step() {
   if(fail) return;
  }
 
-#if WIRE
- stepWire();
- stepGrainWire();
- stepWireTension();
- stepWireBendingResistance();
- stepWireBottom();
- stepWireIntegration();
-#endif
+ //stepWire();
+ //stepGrainWire();
+ //stepWireTension();
+ //stepWireBendingResistance();
+ //stepWireBottom();
+ //stepWireIntegration();
 
  grainTotalTime.start();
  stepGrainIntegration();
@@ -152,13 +144,11 @@ void Simulation::profile() {
  log("----",timeStep/size_t(1*1/(dt*(60/s))),"----");
  log(totalTime.microseconds()/timeStep, "us/step", totalTime, timeStep);
  //if(stepTimeRT.nanoseconds()*100<totalTime.nanoseconds()*99) log("step", strD(stepTimeRT, totalTime));
-#if WIRE
  if(grainWireContactSizeSum) {
   log("grain-wire contact count mean", grainWireContactSizeSum/timeStep);
   log("grain-wire cycle/grain", (float)grainWireEvaluateTime/grainWireContactSizeSum);
   log("grain-wire B/cycle", (float)(grainWireContactSizeSum*41*4)/grainWireEvaluateTime);
  }
-#endif
  log("W", membrane->W, "H", membrane->H, "W*H", membrane->W*membrane->H, grain->count);
  const bool reset = false;
  size_t accounted = 0, shown = 0;
@@ -234,7 +224,6 @@ void Simulation::profile() {
  logTime(grainMembraneSum);
  logTime(membraneIntegration);
 
-#if WIRE
  logTime(wireInitialization);
  logTime(wireTension);
  logTime(wireBendingResistance);
@@ -246,7 +235,6 @@ void Simulation::profile() {
  logTime(grainWireEvaluate);
  logTime(grainWireSum);
  logTime(wireIntegration);
-#endif
 
 #undef logTime
  for(const auto entry: profile) {
@@ -276,11 +264,9 @@ void Simulation::run() {
    topForceZ = 0; topSumStepCount = 0;
    bottomForceZ = 0; bottomSumStepCount = 0;
    float stress = force / area;
-#if RADIAL
    float side = 2*PI*membrane->radius*height;
    float radial = (radialSumStepCount?radialForce/radialSumStepCount:0) / side;
    radialForce = 0; radialSumStepCount = 0;
-#endif
    if(!primed) {
     primed = true;
     //if(existsFile(arguments()[0])) log("Overwrote", arguments()[0]);

@@ -1,5 +1,6 @@
 #include "simulation.h"
 #include "membrane.h"
+#include "parallel.h"
 
 static inline void membraneTensionPressure(const float* const Px, const float* const Py, const float* const Pz,
                                            const float* const Vx, const float* const Vy, const float* const Vz,

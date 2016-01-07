@@ -1,14 +1,13 @@
 #pragma once
 #include "system.h"
 
-#if WIRE
  struct Wire {
   sconst float radius = 3*mm;
-  sconst float internodeLength = Grain::radius/2;
+  const float internodeLength;
   sconst float section = PI * sq(radius);
-  sconst float volume = section * internodeLength;
+  const float volume = section * internodeLength;
   sconst float density = 1000 * kg / cb(m);
-  sconst float mass = Wire::density * Wire::volume;
+  const float mass = density * volume;
   sconst float curvature = 1./radius;
   sconst float elasticModulus = 1e0 * MPa;
   sconst float poissonRatio = 0.48;
@@ -30,10 +29,9 @@
   buffer<float> Fy { capacity };
   buffer<float> Fz { capacity };
 
-  Wire() : capacity(0) {}
+  Wire(float internodeLength) : internodeLength(internodeLength), capacity(0) {}
 
   const vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]);  }
   const vec3 velocity(size_t i) const { return vec3(Vx[i], Vy[i], Vz[i]);  }
   const vec3 force(size_t i) const { return vec3(Fx[i], Fy[i], Fz[i]);  }
- } wire;
-#endif
+ };

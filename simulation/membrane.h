@@ -1,6 +1,5 @@
 #pragma once
 #include "system.h"
-#include "grain.h"
 
 struct Membrane {
  virtual ~Membrane() {}

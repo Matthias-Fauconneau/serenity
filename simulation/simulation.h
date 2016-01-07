@@ -7,6 +7,7 @@
 struct Grain;
 struct Membrane;
 struct Plate;
+struct Wire;
 
 extern bool fail;
 extern Lock lock;
@@ -24,6 +25,7 @@ struct Simulation {
  unique<Grain> grain;
  unique<Membrane> membrane;
  unique<Plate> plate;
+ unique<Wire> wire;
 
  // Friction parameters
  const float targetDynamicGrainObstacleFrictionCoefficient;
@@ -49,14 +51,13 @@ struct Simulation {
  const float verticalSpeed;
  const float targetPressure;
  const float plateSpeed;
-#if WIRE
- const float patternRadius = membrane.radius - Grain::radius;
+
+ const float patternRadius;
  enum Pattern { None, Helix, Cross, Loop };
  sconst string patterns[] {"none", "helix", "radial", "spiral"};
  const Pattern pattern;
  const float linearSpeed = 4 * m/s;
  const float loopAngle = PI*(3-sqrt(5.));
-#endif
 
  // Process variables
  enum ProcessState { Pour, Pressure, Load, Error };
@@ -68,17 +69,12 @@ struct Simulation {
  float membraneViscosity = 0;
  float bottomZ = 0, topZ, topZ0;
  float latticeRadius;
-#if WIRE
  float lastAngle = 0, winchAngle = 0, currentWinchRadius = patternRadius;
-#endif
 
  // Results
  int bottomSumStepCount = 0; float bottomForceZ = 0;
  int topSumStepCount = 0; float topForceZ = 0;
-#define RADIAL 1
- #if RADIAL
  int radialSumStepCount = 0; float radialForce = 0;
-#endif
 
  // Grain-Bottom
  buffer<int> oldGrainBottomA;
@@ -323,7 +319,6 @@ struct Simulation {
  void stepMembraneIntegration();
   uint64 membraneIntegrationTime = 0;
 
-#if WIRE
  void stepWire();
   uint64 wireInitializationTime = 0;
  void stepWireTension();
@@ -336,7 +331,7 @@ struct Simulation {
   uint64 wireBottomEvaluateTime = 0;
   tsc wireBottomSumTime;
   void stepGrainWire();
-   tsc grainWireLatticeTime = 0;
+   tsc grainWireLatticeTime;
    uint64 grainWireSearchTime = 0;
    uint64 grainWireFilterTime = 0;
    uint64 grainWireEvaluateTime = 0;
@@ -344,7 +339,6 @@ struct Simulation {
    size_t grainWireContactSizeSum;
  void stepWireIntegration();
   uint64 wireIntegrationTime = 0;
-#endif
 
   void profile();
   void run();

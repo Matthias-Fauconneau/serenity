@@ -2,6 +2,7 @@
 #include "simulation.h"
 #include "grain.h"
 #include "membrane.h"
+#include "wire.h"
 #include "matrix.h"
 #include "gl.h"
 FILE(shader_glsl)
@@ -115,19 +116,18 @@ struct SimulationView : Widget {
    vertexArray.draw(Triangles, positions.size);
   }
 
-#if WIRE
-  if(simulation.wire.count>1) {
-   buffer<vec3> positions {(simulation.wire.count-1)*6};
-   buffer<vec4> colors {(simulation.wire.count-1)};
+  if(simulation.wire->count>1) {
+   buffer<vec3> positions {(simulation.wire->count-1)*6};
+   buffer<vec4> colors {(simulation.wire->count-1)};
    size_t s = 0;
-   for(size_t i: range(simulation.wire.count-1)) {
-    vec3 a (simulation.wire.position(i)), b (simulation.wire.position(i+1));
+   for(size_t i: range(simulation.wire->count-1)) {
+    vec3 a (simulation.wire->position(i)), b (simulation.wire->position(i+1));
     // FIXME: GPU quad projection
     vec3 A = viewProjection * a, B= viewProjection * b;
     vec2 r = B.xy()-A.xy();
     float l = length(r);
     vec2 t = r/l;
-    vec3 n = scale*float(simulation.wire.radius)*vec3(t.y, -t.x, 0); // FIXME: hpx
+    vec3 n = scale*float(simulation.wire->radius)*vec3(t.y, -t.x, 0); // FIXME: hpx
     vec3 P[4] {A-n, A+n, B-n, B+n};
     positions[s*6+0] = P[0];
     positions[s*6+1] = P[1];
@@ -145,8 +145,8 @@ struct SimulationView : Widget {
     shader.bind();
     shader.bindFragments({"color"});
     shader["transform"] = mat4(1);
-    shader["radius"] = float(scale.z/2 * simulation.wire.radius);
-    shader["hpxRadius"] = 1 / (size.x * scale.x * simulation.wire.radius);
+    shader["radius"] = float(scale.z/2 * simulation.wire->radius);
+    shader["hpxRadius"] = 1 / (size.x * scale.x * simulation.wire->radius);
     static GLVertexArray vertexArray;
     GLBuffer positionBuffer (positions);
     vertexArray.bindAttribute(shader.attribLocation("position"_),
@@ -156,7 +156,6 @@ struct SimulationView : Widget {
     vertexArray.draw(Triangles, positions.size);
    }
   }
-#endif
 
   if(simulation.useMembrane && simulation.membrane->count) {
    if(!indexBuffer) {

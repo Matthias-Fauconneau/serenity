@@ -1,6 +1,7 @@
 #include "simulation.h"
 #include "grain.h"
 #include "membrane.h"
+#include "wire.h"
 
 void Simulation::stepProcess() {
  //pressure = 0; membraneViscosity = 1-1000*dt; // DEBUG
@@ -59,7 +60,6 @@ void Simulation::stepProcess() {
   if(currentHeight < topZ-grain->radius/*/2*/) currentHeight += verticalSpeed * dt;
   //else currentHeight = topZ-grain->radius;
 
-#if WIRE
   // Generates wire
   if(pattern) {
    vec2 end;
@@ -95,19 +95,18 @@ void Simulation::stepProcess() {
    } else error("Unknown pattern:", int(pattern));
    float z = currentHeight+grain->radius+Wire::radius; // Over pour
    //float z = currentHeight-grain->radius-Wire::radius; // Under pour
-   vec3 relativePosition = vec3(end.x, end.y, z) - wire.position(wire.count-1);
+   vec3 relativePosition = vec3(end.x, end.y, z) - wire->position(wire->count-1);
    float length = ::length(relativePosition);
-   if(length >= Wire::internodeLength) {
-    assert(wire.count < wire.capacity);
-    vec3 p = wire.position(wire.count-1) + Wire::internodeLength * relativePosition/length;
-    size_t i = wire.count++;
-    wire.Px[i] = p[0]; wire.Py[i] = p[1]; wire.Pz[i] = p[2];
-    wire.Vx[i] = 0; wire.Vy[i] = 0; wire.Vz[i] = 0;
+   if(length >= wire->internodeLength) {
+    assert(wire->count < wire->capacity);
+    vec3 p = wire->position(wire->count-1) + wire->internodeLength * relativePosition/length;
+    size_t i = wire->count++;
+    wire->Px[i] = p[0]; wire->Py[i] = p[1]; wire->Pz[i] = p[2];
+    wire->Vx[i] = 0; wire->Vy[i] = 0; wire->Vz[i] = 0;
     // Forces verlet lists reevaluation
     grainWireGlobalMinD = 0;
    }
   }
-#endif
 
   // Generates grain
   if(currentHeight >= grain->radius) {
@@ -141,11 +140,10 @@ void Simulation::stepProcess() {
      }
      // Under current wire drop height
      if(newPosition.z < currentHeight) {
-#if WIRE
       // Without wire overlap
-      for(size_t index: range(wire.count))
-       if(length(wire.position(index) - newPosition) < grain->radius+Wire::radius) { processTime.stop(); return; }
-#endif
+      for(size_t index: range(wire->count))
+       if(length(wire->position(index) - newPosition) < grain->radius+Wire::radius) break;
+
       size_t i = grain->count;
       assert_(newPosition.z >= grain->radius);
       grain->Px[simd+i] = newPosition.x;
