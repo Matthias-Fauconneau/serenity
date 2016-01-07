@@ -11,9 +11,9 @@ struct Grain {
  sconst float volume = 4./3*PI*cb(radius);
  sconst float mass = volume * density; // 2.7 g
  sconst float curvature = 1./radius;
- sconst float poissonRatio = 0.28; // 0.35
+ sconst float poissonRatio = 0.28;
  sconst float shearModulus = 77000 * MPa;
- sconst float elasticModulus = 2*shearModulus*(1+poissonRatio); // 250 * MPa
+ sconst float elasticModulus = 2*shearModulus*(1+poissonRatio);
  sconst float angularMass = 2./3*mass*sq(radius);
 
  const size_t capacity;

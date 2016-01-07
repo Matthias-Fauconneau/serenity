@@ -145,6 +145,9 @@ void Simulation::stepGrainBottom() {
  const float K = 4./3*E*sqrt(R);
  constexpr float mass = 1/(1/Grain::mass/*+1/Plate::mass*/);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
+#if MIDLIN
+ const float Kt = 8 * 1/(1/Grain::shearModulus+1/Plate::shearModulus) * sqrt(R);
+#endif
  grainBottomEvaluateTime += parallel_chunk(GBcc/simd, [&](uint, int start, int size) {
    evaluateGrainObstacle<false>(start, size,
                      grainBottomContact.data,
@@ -154,8 +157,12 @@ void Simulation::stepGrainBottom() {
                      grainBottomLocalAx.begin(), grainBottomLocalAy.begin(), grainBottomLocalAz.begin(),
                      grainBottomLocalBx.begin(), grainBottomLocalBy.begin(), grainBottomLocalBz.begin(),
                      floatX(K), floatX(Kb),
+#if MIDLIN
+                     floatX(Kt), floatX(dynamicGrainObstacleFrictionCoefficient),
+#else
                      floatX(staticFrictionStiffness), floatX(dynamicGrainObstacleFrictionCoefficient),
                      floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping),
+#endif
                      grain->Vx.data+simd, grain->Vy.data+simd, grain->Vz.data+simd,
                      grain->AVx.data+simd, grain->AVy.data+simd, grain->AVz.data+simd,
                      grain->Rx.data+simd, grain->Ry.data+simd, grain->Rz.data+simd, grain->Rw.data+simd,

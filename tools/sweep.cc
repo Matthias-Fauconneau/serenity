@@ -23,20 +23,20 @@ struct ParameterSweep {
   }
   size_t done = 0, running = 0, queued = 0;\
   parameters["nDamping"__] = "1"__;
-  parameters["mDensity"__] = "1"__;
+  parameters["mDensity"__] = "1"__; // Unused
   for(string dt: {"1"_}) {
    parameters["TimeStep"__] = String(dt+"µ");
-   for(string plateSpeed: {/*"1"_,*/"10"_/*,"100"_*/}) {
+   for(string plateSpeed: {/*"1"_,*/"10"_}) {
     parameters["Speed"__] = plateSpeed; // mm/s
     for(int pressure: {80}) {
      parameters["Pressure"__] = String(str(pressure)+"K"_); // Pa
      for(float radius: {25, 50}) {
       parameters["Radius"__] = radius; //mm
-      for(string staticFrictionSpeed: {"100"_,"1000"_}) {
+      for(string staticFrictionSpeed: {"10"_,"100"_,"1000"_}) {
        parameters["sfSpeed"__] = staticFrictionSpeed; // mm/s
-       for(string staticFrictionLength: {"1µ"_,"10µ"_}) {
+       for(string staticFrictionLength: {"10µ"_,"100µ"_,}) {
         parameters["sfLength"__] = staticFrictionLength; // m
-        for(string staticFrictionStiffness: {/*"1K"_,*/"10K"_,"100K"_}) {
+        for(string staticFrictionStiffness: {"100K"_,"1M"_}) {
          parameters["sfStiffness"__] = staticFrictionStiffness;
          for(string staticFrictionDamping: {"1"_,"10"_,"100"_}) {
           parameters["sfDamping"__] = staticFrictionDamping; // ?

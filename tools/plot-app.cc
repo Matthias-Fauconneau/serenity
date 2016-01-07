@@ -7,7 +7,7 @@
 #include "variant.h"
 #include "time.h"
 
-constexpr size_t medianWindowRadius = 0;
+size_t medianWindowRadius = 32;
 buffer<float> medianFilter(ref<float> source, size_t W=medianWindowRadius) {
  assert_(source.size > W+1+W);
  buffer<float> target(source.size-2*W);
@@ -32,11 +32,15 @@ struct PlotView : HList<Plot> {
  bool shown = true;
  size_t index = 0;
  FileWatcher watcher {"."_, [this](string){load();}};
- Timer timer {[this]{load(); timer.setRelative(1000);}, 1}; // no inotify on NFS
+ //Timer timer {[this]{load(); timer.setRelative(2000);}, 2}; // no inotify on NFS
  PlotView() {
   window->actions[Escape] = []{ exit_group(0); /*FIXME*/ };
   window->actions[F12] = {this, &PlotView::snapshot};
-  window->actions[Space] = [this]{ if(shown) load(); shown=false; window->render(); }; // no inotify on NFS
+  window->actions[Space] = {this, &PlotView::load}; // no inotify on NFS
+  window->actions[Key('m')] = [this]{
+   medianWindowRadius = medianWindowRadius?64:0;
+   load();
+  };
   window->presentComplete = [this]{ shown=true; };
   load();
  }
@@ -111,13 +115,12 @@ struct PlotView : HList<Plot> {
       ref<float> axial = dataSets.at("Axial (Pa)");
       array<float>& ndeviator = dataSets.insert("Normalized deviator stress");
       ndeviator.grow(axial.size);
-      /**/  if(1) for(int i: range(ndeviator.size)) ndeviator[i] = ((axial[i]-radial[i])/radial[i]);
-      else if(0) for(int i: range(ndeviator.size)) ndeviator[i] = (axial[i]-pressure)/pressure;
-      else /**/  for(int i: range(ndeviator.size)) ndeviator[i] = ((axial[i]-min(pressure,radial[i]))/min(pressure,radial[i]));
+      if(0) for(int i: range(ndeviator.size)) ndeviator[i] = ((axial[i]-radial[i])/radial[i]);
+      else for(int i: range(ndeviator.size)) ndeviator[i] = (axial[i]-pressure)/pressure;
      }
      assert_(dataSets.contains(plot.xlabel), plot.xlabel, name);
      assert_(dataSets.contains(plot.ylabel), plot.ylabel);
-     //parameters.filter([&](string key, const Variant&){ return allCoordinates.at(key).size==1; });
+     parameters.filter([&](string key, const Variant&){ return allCoordinates.at(key).size==1; });
      //float key = dataSets.at(plot.ylabel).last();
      /*size_t i = plot.dataSets.size();//0; while(i<plot.dataSets.size() && plot.dataSets.values[i].values.last() <= key) i++;
      plot.dataSets.keys.insertAt(i, str(parameters,", "_));
@@ -128,6 +131,7 @@ struct PlotView : HList<Plot> {
    }
   }
   //if(count()) window->setTitle(array<Plot>::at(0).ylabel);
+  shown = false;
   window->render();
  }
 } app;

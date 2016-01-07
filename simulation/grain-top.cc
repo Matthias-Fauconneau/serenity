@@ -139,6 +139,9 @@ void Simulation::stepGrainTop() {
  const float K = 4./3*E*sqrt(R);
  constexpr float mass = 1/(1/Grain::mass/*+1/Obstacle::mass*/);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
+#if MIDLIN
+ const float Kt = 8 * 1/(1/Grain::shearModulus+1/Plate::shearModulus) * sqrt(R);
+#endif
  grainTopEvaluateTime += parallel_chunk(GTcc/simd, [&](uint, size_t start, size_t size) {
    evaluateGrainObstacle<true>(start, size,
                      grainTopContact.data,
@@ -148,8 +151,13 @@ void Simulation::stepGrainTop() {
                      grainTopLocalAx.begin(), grainTopLocalAy.begin(), grainTopLocalAz.begin(),
                      grainTopLocalBx.begin(), grainTopLocalBy.begin(), grainTopLocalBz.begin(),
                      floatX(K), floatX(Kb),
+#if MIDLIN
+                     floatX(Kt), floatX(dynamicGrainObstacleFrictionCoefficient),
+#else
                      floatX(staticFrictionStiffness), floatX(dynamicGrainObstacleFrictionCoefficient),
                      floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping),
+#endif
+                     //floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping),
                      grain->Vx.data+simd, grain->Vy.data+simd, grain->Vz.data+simd,
                      grain->AVx.data+simd, grain->AVy.data+simd, grain->AVz.data+simd,
                      grain->Rx.data+simd, grain->Ry.data+simd, grain->Rz.data+simd, grain->Rw.data+simd,

@@ -31,7 +31,7 @@ array<int> faces;
 
 Simulation::Simulation(const Dict& p) :
   dt((float)p.at("TimeStep")*s),
-  normalDampingRate((float)p.at("nDamping")*1),
+  normalDampingRate((float)p.value("nDamping",1.f)*1),
   targetDynamicGrainObstacleFrictionCoefficient(0.228),
   targetDynamicGrainMembraneFrictionCoefficient(0.228),
   targetDynamicGrainGrainFrictionCoefficient(0.096),
@@ -43,9 +43,7 @@ Simulation::Simulation(const Dict& p) :
   targetGrainCount(4*PI*cb((float)p.at("Radius")*mm)/Grain::volume/(1+0.615)-49),
   grain(targetGrainCount),
   membrane((float)p.at("Radius")*mm),
-  //Gz(1 * -10 * N/kg),
-  Gz(1000 * -10 * N/kg),
-  //Gz(5000 * -10 * N/kg),
+  Gz(4000 * -10 * N/kg),
   targetPressure((float)p.at("Pressure")*Pa),
   plateSpeed((float)p.at("Speed")*mm/s),
   currentHeight(Grain::radius),

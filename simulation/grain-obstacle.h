@@ -10,9 +10,10 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
                            float* const grainObstacleLocalAx, float* const grainObstacleLocalAy, float* const grainObstacleLocalAz,
                            float* const grainObstacleLocalBx, float* const grainObstacleLocalBy, float* const grainObstacleLocalBz,
                            const vXsf K, const vXsf Kb,
-                           const vXsf staticFrictionStiffness, const vXsf dynamicFrictionCoefficient,
-                           const vXsf staticFrictionLength, const vXsf staticFrictionSpeed,
-                           const vXsf staticFrictionDamping,
+                           const vXsf staticFrictionStiffness, const vXsf frictionCoefficient,
+#if !MIDLIN
+                           const vXsf staticFrictionLength, const vXsf staticFrictionSpeed, const vXsf staticFrictionDamping,
+#endif
                            const float* AVx, const float* AVy, const float* AVz,
                            const float* pAAVx, const float* pAAVy, const float* pAAVz,
                            const float* AQX, const float* AQY, const float* AQZ, const float* AQW,
@@ -42,24 +43,6 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
   const vXsf Fb = - Kb * sqrt(sqrt(depth)) * normalSpeed ; // Damping
   // Normal force
   const vXsf Fn = Fk + Fb;
-  /*for(int k: range(simd))
-   assert_(A[k]==-1 || Fn[k] < 10000*N,
-           "A", A[k],
-           "K", K[k],
-           "F", Fn[k], Fk[k],
-           "d", depth[k],
-           "P", Az[k], obstacleZ_Gr[k],
-           "b", Fb[k], Kb[k], normalSpeed[k],
-           "X", Ax[k], Ay[k], Az[k],
-           "V", RVx[k], RVy[k], RVz[k],
-           "//",
-           "F", Fn[k] /N, Fk[k] /N,
-           "d", depth[k] /mm,
-           "P", Az[k] /m, obstacleZ_Gr[k] /m,
-           "b", Fb[k] /N, Kb[k], normalSpeed[k] /(m/s),
-           "X", Ax[k] /m, Ay[k] /m, Az[k] /m,
-           "V", RVx[k] /(m/s), RVy[k] /(m/s), RVz[k] /(m/s)
-           );*/
   const vXsf NFx = Fn * Nx;
   const vXsf NFy = Fn * Ny;
   const vXsf NFz = Fn * Nz;
@@ -72,7 +55,7 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
   const vXsf TRVz = RVz - RVn * Nz;
   const vXsf tangentRelativeSpeed = sqrt(TRVx*TRVx + TRVy*TRVy + TRVz*TRVz);
   const maskX div0 = greaterThan(tangentRelativeSpeed, _0f);
-  const vXsf Fd = - dynamicFrictionCoefficient * Fn / tangentRelativeSpeed;
+  const vXsf Fd = - /*dynamicF*/frictionCoefficient * Fn / tangentRelativeSpeed;
   const vXsf FDx = mask3_fmadd(Fd, TRVx, _0f, div0);
   const vXsf FDy = mask3_fmadd(Fd, TRVy, _0f, div0);
   const vXsf FDz = mask3_fmadd(Fd, TRVz, _0f, div0);
@@ -135,20 +118,32 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
   const vXsf TOy = Dy - Dn * Ny;
   const vXsf TOz = Dz - Dn * Nz;
   const vXsf tangentLength = sqrt(TOx*TOx+TOy*TOy+TOz*TOz);
+#if MIDLIN
+  const vXsf Ks = staticFrictionStiffness * sqrt(depth);
+#else
   const vXsf Ks = staticFrictionStiffness * Fn;
-  const vXsf Fs = Ks * tangentLength; // 0.1~1 fN
+#endif
+  const vXsf Fs = Ks * tangentLength;
   // Spring direction
   const vXsf SDx = TOx / tangentLength;
   const vXsf SDy = TOy / tangentLength;
   const vXsf SDz = TOz / tangentLength;
   const maskX hasTangentLength = greaterThan(tangentLength, _0f);
+#if MIDLIN
+  const maskX hasStaticFriction = lessThan(Fs, frictionCoefficient * Fn);
+  const vXsf sfFt = Fs;
+  // FIXME: static friction does not cumulate but replace dynamic friction
+  // but also static friction spring should not be reset, elongation should only be capped to have fS=fD
+#else
   const vXsf sfFb = staticFrictionDamping * (SDx * RVx + SDy * RVy + SDz * RVz);
   const maskX hasStaticFriction = greaterThan(staticFrictionLength, tangentLength)
                                               & greaterThan(staticFrictionSpeed, tangentRelativeSpeed);
   const vXsf sfFt = maskSub(Fs, hasTangentLength, sfFb);
+#endif
   const vXsf FTx = mask3_fmadd(sfFt, SDx, FDx, hasStaticFriction & hasTangentLength);
   const vXsf FTy = mask3_fmadd(sfFt, SDy, FDy, hasStaticFriction & hasTangentLength);
   const vXsf FTz = mask3_fmadd(sfFt, SDz, FDz, hasStaticFriction & hasTangentLength);
+
   // Resets contacts without static friction
   localAx = blend(hasStaticFriction, _0f, localAx); // FIXME use 1s (NaN) not 0s to flag resets
 
