@@ -13,9 +13,7 @@
 //include "wire-bottom.h"
 //include "grain-wire.h"
 
-constexpr float Grain::radius;
-constexpr float Grain::mass;
-//constexpr float Grain::angularMass;
+
 #if WIRE
 constexpr float System::Wire::radius;
 constexpr float System::Wire::mass;
@@ -32,6 +30,15 @@ array<int> faces;
 Simulation::Simulation(const Dict& p) :
   dt((float)p.at("TimeStep")*s),
   normalDampingRate((float)p.value("nDamping",1.f)*1),
+  targetGrainCount(4*PI*cb((float)p.at("Radius")*mm)/(4./3*PI*cb(p.value("grainRadius",2.5f)*mm))
+                              /(1+0.611)/*-49*/),
+  grain(p.value("grainRadius",2.5f)*mm,
+           p.value("grainDensity", 7.8e3f)*kg/cb(m),
+           p.value("grainShearModulus", 77000)*MPa,
+           p.value("grainPoissonRatio", 0.28),
+           p.value("grainWallThickness", 0),
+           targetGrainCount),
+  membrane((float)p.at("Radius")*mm, grain->radius),
   targetDynamicGrainObstacleFrictionCoefficient(0.228),
   targetDynamicGrainMembraneFrictionCoefficient(0.228),
   targetDynamicGrainGrainFrictionCoefficient(0.096),
@@ -40,16 +47,14 @@ Simulation::Simulation(const Dict& p) :
   targetStaticFrictionLength((float)p.at("sfLength")*m),
   targetStaticFrictionStiffness((float)p.at("sfStiffness")*N/m),
   targetStaticFrictionDamping((float)p.at("sfDamping")*N/(m/s)),
-  targetGrainCount(4*PI*cb((float)p.at("Radius")*mm)/Grain::volume/(1+0.615)-49),
-  grain(targetGrainCount),
-  membrane((float)p.at("Radius")*mm),
-  Gz(4000 * -10 * N/kg),
+  Gz(-(float)p.value("G", 4000*10.f)*N/kg),
+  verticalSpeed(p.value("verticalSpeed",1.f)*m/s),
   targetPressure((float)p.at("Pressure")*Pa),
   plateSpeed((float)p.at("Speed")*mm/s),
-  currentHeight(Grain::radius),
+  currentHeight(grain->radius),
   topZ(membrane->height),
-  lattice {sqrt(3.)/(2*Grain::radius), vec3(vec2(-(membrane->radius*3./2/*+Grain::radius*/)), -Grain::radius*2),
-                                           vec3(vec2(membrane->radius*3./2/*+Grain::radius*/), membrane->height+Grain::radius)}
+  lattice {sqrt(3.)/(2*grain->radius), vec3(vec2(-(membrane->radius*3./2/*+grain->radius*/)), -grain->radius*2),
+                                           vec3(vec2(membrane->radius*3./2/*+grain->radius*/), membrane->height+grain->radius)}
 #if WIRE
 , pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):None)
 #endif
@@ -58,7 +63,7 @@ Simulation::Simulation(const Dict& p) :
 #if WIRE
  if(pattern) { // Initial wire node
   size_t i = wire.count++;
-  wire.Px[i] = patternRadius; wire.Py[i] = 0; wire.Pz[i] = currentHeight+Grain::radius+Wire::radius;
+  wire.Px[i] = patternRadius; wire.Py[i] = 0; wire.Pz[i] = currentHeight+grain->radius+Wire::radius;
   wire.Vx[i] = 0; wire.Vy[i] = 0; wire.Vz[i] = 0;
   winchAngle += Wire::internodeLength / currentWinchRadius;
  }

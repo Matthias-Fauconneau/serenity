@@ -12,7 +12,7 @@ struct Membrane {
  sconst float elasticModulus = 2*shearModulus*(1+poissonRatio);
 
  const float radius;
- const float resolution = 2*PI*radius/64;
+ const float resolution;//= 2*PI*radius/64;
  const int W = int(round(2*PI*radius/resolution))/simd*simd;
  const int margin = simd; // 16 to ensure no false sharing ?
  const int stride = margin+W+margin;
@@ -41,7 +41,7 @@ struct Membrane {
  buffer<float> Fy { capacity };
  buffer<float> Fz { capacity };
 
- Membrane(float radius) : radius(radius) {
+ Membrane(float radius, float resolution) : radius(radius), resolution(resolution) {
   Px.clear(0); Py.clear(0); Pz.clear(0);
   Vx.clear(0); Vy.clear(0); Vz.clear(0);
   Fx.clear(0); Fy.clear(0); Fz.clear(0);

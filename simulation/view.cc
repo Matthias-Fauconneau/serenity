@@ -79,6 +79,11 @@ struct SimulationView : Widget {
    }
 
    buffer<vec3> positions {grainIndices.size*6};
+   /*buffer<float> Rx {grainIndices.size};
+   buffer<float> Ry {grainIndices.size};
+   buffer<float> Rz {grainIndices.size};
+   buffer<float> Rw {grainIndices.size};*/
+   buffer<vec4> R {grainIndices.size};
    for(size_t i: range(grainIndices.size)) {
     // FIXME: GPU quad projection
     vec3 O = viewProjection * simulation.grain->position(grainIndices[i]);
@@ -90,6 +95,14 @@ struct SimulationView : Widget {
     positions[i*6+3] = vec3(min.x, max.y, O.z);
     positions[i*6+4] = vec3(max.x, min.y, O.z);
     positions[i*6+5] = vec3(max, O.z);
+    /*Rx[i] = simulation.grain->Rx[simd+grainIndices[i]];
+    Ry[i] = simulation.grain->Ry[simd+grainIndices[i]];
+    Rz[i] = simulation.grain->Rz[simd+grainIndices[i]];
+    Rw[i] = simulation.grain->Rw[simd+grainIndices[i]];*/
+    R[i] = vec4(simulation.grain->Rx[simd+grainIndices[i]],
+                      simulation.grain->Ry[simd+grainIndices[i]],
+                      simulation.grain->Rz[simd+grainIndices[i]],
+                      simulation.grain->Rw[simd+grainIndices[i]]);
    }
 
    static GLShader shader {::shader_glsl(), {"interleaved sphere"}};
@@ -99,18 +112,22 @@ struct SimulationView : Widget {
    static GLVertexArray vertexArray;
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
-   /*GLBuffer Rx (simulation.grain->Rx+simd);
-   shader.bind("Rx"_, Rx, 0);
-   GLBuffer Ry (simulation.grain->Ry+simd);
-   shader.bind("Ry"_, Ry, 0);
-   GLBuffer Rz (simulation.grain->Rz+simd);
-   shader.bind("Rz"_, Rz, 0);
-   GLBuffer Rw (simulation.grain->Rw+simd);
-   shader.bind("Rw"_, Rw, 0);*/
+#if 1
+   /*GLBuffer RxBuffer (Rx);
+   shader.bind("Rx"_, RxBuffer, 0);
+   GLBuffer RyBuffer (Ry);
+   shader.bind("Ry"_, RyBuffer, 1);
+   GLBuffer RzBuffer (Rz);
+   shader.bind("Rz"_, RzBuffer, 2);
+   GLBuffer RwBuffer (Rw);
+   shader.bind("Rw"_, RwBuffer, 3);*/
+   GLBuffer RBuffer (R);
+   shader.bind("R"_, RBuffer);
+   shader["viewRotation"] = viewRotation;
+#endif
    // Reduces Z radius to see membrane mesh on/in grain
    shader["radius"] = float(scale.z/2 * simulation.grain->radius * 7/8);
    shader["hpxRadius"] = 1 / (size.x * scale.x * simulation.grain->radius);
-   //shader["viewRotation"] = viewRotation;
    vertexArray.draw(Triangles, positions.size);
   }
 

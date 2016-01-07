@@ -4,7 +4,7 @@
 #include "membrane.h"
 
 void Simulation::stepGrain() {
- const vXsf m_Gz = floatX(Grain::mass * Gz);
+ const vXsf m_Gz = floatX(grain->mass * Gz);
  grainTime += parallel_chunk(align(simd, grain->count)/simd, [&](uint, size_t start, size_t size) {
    for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
   store(grain->Fx.begin()+simd, i, _0f);
@@ -85,7 +85,7 @@ void Simulation::stepGrainIntegration() {
  grainIntegrationTime += parallel_chunk(align(simd, grain->count)/simd, [this, &maxGrainV2_](uint id, size_t start, size_t size) {
   const vXsf dt_mass = floatX(dt / grain->mass), dt = floatX(this->dt);
   const vXsf dt_2 = floatX(this->dt / 2);
-  const vXsf dt_angularMass = floatX(this->dt / Grain::angularMass);
+  const vXsf dt_angularMass = floatX(this->dt / grain->angularMass);
   vXsf maxGrainVX2 = _0f;
   const float* pFx = grain->Fx.data+simd, *pFy = grain->Fy.data+simd, *pFz = grain->Fz.data+simd;
   const float* pTx = grain->Tx.begin()+simd, *pTy = grain->Ty.begin()+simd, *pTz = grain->Tz.begin()+simd;
@@ -115,7 +115,7 @@ void Simulation::stepGrainIntegration() {
        "V", Vx[k], Vy[k], Vz[k], sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k],
        "F", Fx[k], Fy[k], Fz[k], sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k],
        "//",
-       "H", (membrane->height-Grain::radius) /m,
+       "H", (membrane->height-grain->radius) /m,
        "X",  Px[k] /m, Py[k] /m, Pz[k] /m,
        "V", Vx[k] /(m/s), Vy[k] /(m/s), Vz[k] /(m/s),
        "F", Fx[k] /N, Fy[k] /N, Fz[k] /N); fail=true; return; }

@@ -32,7 +32,7 @@ void Simulation::stepGrainTop() {
   atomic contactCount;
   auto search = [&](uint, size_t start, size_t size) {
    const float* const gPz = grain->Pz.data+simd;
-   const vXsf tZ_Gr = floatX(topZ-Grain::radius);
+   const vXsf tZ_Gr = floatX(topZ-grain->radius);
    int* const gtA = grainTopA.begin();
    for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
      vXsf Az = load(gPz, i);
@@ -96,7 +96,7 @@ void Simulation::stepGrainTop() {
   const float* const gPz = grain->Pz.data+simd;
   float* const gtL = grainTopLocalAx.begin();
   int* const gtContact = grainTopContact.begin();
-  const vXsf tZ_Gr = floatX(topZ-Grain::radius);
+  const vXsf tZ_Gr = floatX(topZ-grain->radius);
   for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
     vXsi A = load(gtA, i);
     vXsf Az = gather(gPz, A);
@@ -134,20 +134,20 @@ void Simulation::stepGrainTop() {
  grainTopTAx.size = GTcc;
  grainTopTAy.size = GTcc;
  grainTopTAz.size = GTcc;
- constexpr float E = 1/((1-sq(Grain::poissonRatio))/Grain::elasticModulus+(1-sq(Plate::poissonRatio))/Plate::elasticModulus);
- constexpr float R = 1/(Grain::curvature/*+Obstacle::curvature*/);
+ const float E = 1/((1-sq(grain->poissonRatio))/grain->elasticModulus+(1-sq(Plate::poissonRatio))/Plate::elasticModulus);
+ const float R = 1/(grain->curvature/*+Obstacle::curvature*/);
  const float K = 4./3*E*sqrt(R);
- constexpr float mass = 1/(1/Grain::mass/*+1/Obstacle::mass*/);
+ const float mass = 1/(1/grain->mass/*+1/Obstacle::mass*/);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
 #if MIDLIN
- const float Kt = 8 * 1/(1/Grain::shearModulus+1/Plate::shearModulus) * sqrt(R);
+ const float Kt = 8 * 1/(1/grain->shearModulus+1/Plate::shearModulus) * sqrt(R);
 #endif
  grainTopEvaluateTime += parallel_chunk(GTcc/simd, [&](uint, size_t start, size_t size) {
    evaluateGrainObstacle<true>(start, size,
                      grainTopContact.data,
                      grainTopA.data,
                      grain->Px.data+simd, grain->Py.data+simd, grain->Pz.data+simd,
-                     floatX(topZ-Grain::radius), floatX(Grain::radius),
+                     floatX(topZ-grain->radius), floatX(grain->radius),
                      grainTopLocalAx.begin(), grainTopLocalAy.begin(), grainTopLocalAz.begin(),
                      grainTopLocalBx.begin(), grainTopLocalBy.begin(), grainTopLocalBz.begin(),
                      floatX(K), floatX(Kb),
@@ -173,7 +173,7 @@ void Simulation::stepGrainTop() {
   grain->Fx[simd+a] += grainTopFx[i];
   grain->Fy[simd+a] += grainTopFy[i];
   grain->Fz[simd+a] += grainTopFz[i];
-  //assert_(grainTopFz[i] > -400*N, a, grainTopFz[i], grain->Pz[simd+a], topZ-Grain::radius);
+  //assert_(grainTopFz[i] > -400*N, a, grainTopFz[i], grain->Pz[simd+a], topZ-grain->radius);
   grain->Tx[simd+a] += grainTopTAx[i];
   grain->Ty[simd+a] += grainTopTAy[i];
   grain->Tz[simd+a] += grainTopTAz[i];

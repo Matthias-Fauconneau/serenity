@@ -150,6 +150,9 @@ template<int I> static inline void evaluate(const int start, const int size,
   const vXsf BVz = W*BV0z + U*BV1z + V*BV2z;
   const vXsf Nx = Rx/R, Ny = Ry/R, Nz = Rz/R;
   const vXsf RAx = -Gr * Nx, RAy = -Gr * Ny, RAz = -Gr * Nz;
+  /*const vXsf RVx = gather(AVx, A) - BVx;
+  const vXsf RVy = gather(AVy, A) - BVy;
+  const vXsf RVz = gather(AVz, A) - BVz;*/
   const vXsf RVx = gather(AVx, A) + (AAVy*RAz - AAVz*RAy) - BVx;
   const vXsf RVy = gather(AVy, A) + (AAVz*RAx - AAVx*RAz) - BVy;
   const vXsf RVz = gather(AVz, A) + (AAVx*RAy - AAVy*RAx) - BVz;
@@ -176,7 +179,7 @@ template<int I> static inline void evaluate(const int start, const int size,
   const vXsf FDz = mask3_fmadd(Fd, TRVz, _0f, div0);
 
   // Gather static frictions
-  const vXsf oldLocalAx = gather(pLocalAx, contacts);
+  /*const vXsf oldLocalAx = gather(pLocalAx, contacts);
   const vXsf oldLocalAy = gather(pLocalAy, contacts);
   const vXsf oldLocalAz = gather(pLocalAz, contacts);
   const vXsf oldlocalBu = gather(pLocalBu, contacts);
@@ -256,14 +259,6 @@ template<int I> static inline void evaluate(const int start, const int size,
 
   // Resets contacts without static friction
   localAx = blend(hasStaticFriction, _0f, localAx); // FIXME use 1s (NaN) not 0s to flag resets
-  store(pFx, i, NFx + FTx);
-  store(pFy, i, NFy + FTy);
-  store(pFz, i, NFz + FTz);
-  store(pTAx, i, RAy*FTz - RAz*FTy);
-  store(pTAy, i, RAz*FTx - RAx*FTz);
-  store(pTAz, i, RAx*FTy - RAy*FTx);
-  store(pU, i, U);
-  store(pV, i, V);
 
   // Scatter static frictions
   scatter(pLocalAx, contacts, localAx);
@@ -271,6 +266,27 @@ template<int I> static inline void evaluate(const int start, const int size,
   scatter(pLocalAz, contacts, localAz);
   scatter(pLocalBu, contacts, localBu);
   scatter(pLocalBv, contacts, localBv);
+*/
+#if 0
+  store(pFx, i, Fk * Nx);
+  store(pFy, i, Fk * Ny);
+  store(pFz, i, Fk * Nz);
+  store(pTAx, i, _0f);
+  store(pTAy, i, _0f);
+  store(pTAz, i, _0f);
+#else
+  const vXsf FTx = FDx;
+  const vXsf FTy = FDy;
+  const vXsf FTz = FDz;
+  store(pFx, i, NFx + FTx);
+  store(pFy, i, NFy + FTy);
+  store(pFz, i, NFz + FTz);
+  store(pTAx, i, RAy*FTz - RAz*FTy);
+  store(pTAy, i, RAz*FTx - RAx*FTz);
+  store(pTAz, i, RAx*FTy - RAy*FTx);
+#endif
+  store(pU, i, U);
+  store(pV, i, V);
  }
 }
 
@@ -298,9 +314,10 @@ template<int I> static inline float sum(const uint size, const int* const contac
 #endif
   float Fx = pFx[i];
   float Fy = pFy[i];
+  float Fz = pFz[i];
   gFx[a] += Fx;
   gFy[a] += Fy;
-  gFz[a] += pFz[i];
+  gFz[a] += Fz;
   gTx[a] += pTAx[i];
   gTy[a] += pTAy[i];
   gTz[a] += pTAz[i];
@@ -312,9 +329,9 @@ template<int I> static inline float sum(const uint size, const int* const contac
   float u = U[i];
   float v = V[i];
   float w = 1-u-v;
-  mFx[b] -= w*pFx[i];
-  mFy[b] -= w*pFy[i];
-  mFz[b] -= w*pFz[i];
+  mFx[b] -= w*Fx;
+  mFy[b] -= w*Fy;
+  mFz[b] -= w*Fz;
   const int rowIndex = (b-margin)/stride;
   int e0, e1;
   if(I == 0) { // (.,0,1)
@@ -324,12 +341,12 @@ template<int I> static inline float sum(const uint size, const int* const contac
    e0 = rowIndex%2 -stride-1;
    e1 = -1;
   }
-  mFx[b+e0] -= u*pFx[i];
-  mFy[b+e0] -= u*pFy[i];
-  mFz[b+e0] -= u*pFz[i];
-  mFx[b+e1] -= v*pFx[i];
-  mFy[b+e1] -= v*pFy[i];
-  mFz[b+e1] -= v*pFz[i];
+  mFx[b+e0] -= u*Fx;
+  mFy[b+e0] -= u*Fy;
+  mFz[b+e0] -= u*Fz;
+  mFx[b+e1] -= v*Fx;
+  mFy[b+e1] -= v*Fy;
+  mFz[b+e1] -= v*Fz;
  }
  return -radialForce;
 }
@@ -354,8 +371,8 @@ void Simulation::stepGrainMembrane() {
    lattice.base.data+(X*Y+X-1)
   };
 
-  const float verletDistance = 2*Grain::radius/sqrt(3.); //FIXME: - Grain::radius/*Face bounding radius*/;
-  assert_(verletDistance > Grain::radius + 0);
+  const float verletDistance = 2*grain->radius/sqrt(3.); //FIXME: - grain->radius/*Face bounding radius*/;
+  assert_(verletDistance > grain->radius + 0);
 
   for(size_t I: range(2)) { // Two faces / vertex
    auto& gm = grainMembrane[I];
@@ -484,7 +501,7 @@ void Simulation::stepGrainMembrane() {
    assert(align(simd, gm.B.size+1) <= gm.B.capacity);
    for(size_t i=gm.B.size; i<align(simd, gm.B.size +1); i++) gm.B.begin()[i] = membrane->stride+1;
   }
-  grainMembraneGlobalMinD = verletDistance - (Grain::radius+0);
+  grainMembraneGlobalMinD = verletDistance - (grain->radius+0);
   if(grainMembraneGlobalMinD < 0) log("grainMembraneGlobalMinD", grainMembraneGlobalMinD);
 
   /*if(processState > ProcessState::Pour) // Element creation resets verlet lists
@@ -508,7 +525,7 @@ void Simulation::stepGrainMembrane() {
             grain->Px.data+simd, grain->Py.data+simd, grain->Pz.data+simd, \
             membrane->Px.data, membrane->Py.data, membrane->Pz.data, \
             intX(membrane->margin), intX(membrane->stride), \
-            floatX(sq(Grain::radius)), \
+            floatX(sq(grain->radius)), \
             gm.localAx.begin(), contactCount, gm.contacts.begin())
    if(I==0) filter(0); else filter(1);
 #undef filter
@@ -547,13 +564,13 @@ void Simulation::stepGrainMembrane() {
   gm.TAz.size = GWcc;
   gm.U.size = GWcc;
   gm.V.size = GWcc;
-  constexpr float E = 1/((1-sq(Grain::poissonRatio))/Grain::elasticModulus+(1-sq(Grain::poissonRatio))/Grain::elasticModulus);
-  constexpr float R = 1/(Grain::curvature+Membrane::curvature);
+  const float E = 1/((1-sq(grain->poissonRatio))/grain->elasticModulus+(1-sq(grain->poissonRatio))/grain->elasticModulus);
+  const float R = 1/(grain->curvature+Membrane::curvature);
   const float K = 4./3*E*sqrt(R);
-  const float mass = 1/(1/Grain::mass+1/membrane->mass);
+  const float mass = 1/(1/grain->mass+1/membrane->mass);
   const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
 #if MIDLIN
-  const float Kt = 8 * 1/(1/Grain::shearModulus+1/Membrane::shearModulus) * sqrt(R);
+  const float Kt = 8 * 1/(1/grain->shearModulus+1/Membrane::shearModulus) * sqrt(R);
 #endif
   grainMembraneEvaluateTime += parallel_chunk(GWcc/simd, [&](uint, size_t start, size_t size) {
   #define evaluate(I) \
@@ -563,7 +580,7 @@ void Simulation::stepGrainMembrane() {
                           grain->Px.data+simd, grain->Py.data+simd, grain->Pz.data+simd, \
                           membrane->Px.data, membrane->Py.data, membrane->Pz.data, \
                           membrane->margin, membrane->stride, \
-                          floatX(Grain::radius), \
+                          floatX(grain->radius), \
                           gm.localAx.begin(), gm.localAy.begin(), gm.localAz.begin(), \
                           gm.localBu.begin(), gm.localBv.begin(), \
                           floatX(K), floatX(Kb), \

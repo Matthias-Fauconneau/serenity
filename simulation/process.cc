@@ -20,7 +20,7 @@ void Simulation::stepProcess() {
   if(processState < Load) { // Fits top plate while disabling gravity
    static bool unused once = ({ log("Fits plate"); true; });
    float topZ = 0;
-   for(float z: grain->Pz.slice(simd, grain->count)) topZ = ::max(topZ, z+Grain::radius);
+   for(float z: grain->Pz.slice(simd, grain->count)) topZ = ::max(topZ, z+grain->radius);
    if(topZ < this->topZ) this->topZ = topZ;
    topZ0 = this->topZ;
    //log("Zeroes gravity");
@@ -55,8 +55,8 @@ void Simulation::stepProcess() {
   }
  } else {
   // Increases current height
-  if(currentHeight < topZ-Grain::radius/*/2*/) currentHeight += verticalSpeed * dt;
-  //else currentHeight = topZ-Grain::radius;
+  if(currentHeight < topZ-grain->radius/*/2*/) currentHeight += verticalSpeed * dt;
+  //else currentHeight = topZ-grain->radius;
 
 #if WIRE
   // Generates wire
@@ -92,8 +92,8 @@ void Simulation::stepProcess() {
     end = vec2((R-r)*cos(A)+r*cos(a),(R-r)*sin(A)+r*sin(a));
     winchAngle += linearSpeed/r * dt;
    } else error("Unknown pattern:", int(pattern));
-   float z = currentHeight+Grain::radius+Wire::radius; // Over pour
-   //float z = currentHeight-Grain::radius-Wire::radius; // Under pour
+   float z = currentHeight+grain->radius+Wire::radius; // Over pour
+   //float z = currentHeight-grain->radius-Wire::radius; // Under pour
    vec3 relativePosition = vec3(end.x, end.y, z) - wire.position(wire.count-1);
    float length = ::length(relativePosition);
    if(length >= Wire::internodeLength) {
@@ -109,13 +109,13 @@ void Simulation::stepProcess() {
 #endif
 
   // Generates grain
-  if(currentHeight >= Grain::radius) {
+  if(currentHeight >= grain->radius) {
    for(;;) {
     if(grain->count == targetGrainCount) break;
     vec2 p(random()*2-1,random()*2-1);
     if(length(p)<1) { // Within unit circle
-     const float inradius = membrane->radius*cos(PI/membrane->W) /*/2*//*DEBUG*/ -Grain::radius;
-     vec3 newPosition (inradius*p.x, inradius*p.y, Grain::radius);
+     const float inradius = membrane->radius*cos(PI/membrane->W) /*/2*//*DEBUG*/ -grain->radius;
+     vec3 newPosition (inradius*p.x, inradius*p.y, grain->radius);
      if(grain->count) {// Deposits grain without grain overlap
       const/*expr*/ size_t threadCount = ::threadCount();
       float maxZ_[threadCount]; mref<float>(maxZ_, threadCount).clear(0);
@@ -123,7 +123,7 @@ void Simulation::stepProcess() {
                                     [this, newPosition, &maxZ_](uint id, size_t start, size_t size) {
        float* const pPx = grain->Px.begin()+simd, *pPy = grain->Py.begin()+simd, *pPz = grain->Pz.begin()+simd;
        const vXsf nPx = floatX(newPosition.x), nPy = floatX(newPosition.y);
-       const vXsf _2_Gr2 = floatX(sq(2*Grain::radius));
+       const vXsf _2_Gr2 = floatX(sq(2*grain->radius));
        vXsf maxZ = _0f;
        for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
         vXsf Px = load(pPx, i), Py = load(pPy, i), Pz = load(pPz, i);
@@ -143,10 +143,10 @@ void Simulation::stepProcess() {
 #if WIRE
       // Without wire overlap
       for(size_t index: range(wire.count))
-       if(length(wire.position(index) - newPosition) < Grain::radius+Wire::radius) { processTime.stop(); return; }
+       if(length(wire.position(index) - newPosition) < grain->radius+Wire::radius) { processTime.stop(); return; }
 #endif
       size_t i = grain->count;
-      assert_(newPosition.z >= Grain::radius);
+      assert_(newPosition.z >= grain->radius);
       grain->Px[simd+i] = newPosition.x;
       grain->Py[simd+i] = newPosition.y;
       grain->Pz[simd+i] = newPosition.z;
@@ -166,7 +166,7 @@ void Simulation::stepProcess() {
       {
        float height = topZ-bottomZ;
        float totalVolume = PI*sq(membrane->radius)*height;
-       float grainVolume = grain->count * Grain::volume;
+       float grainVolume = grain->count * grain->volume;
        voidRatio = (totalVolume-grainVolume)/grainVolume;
       }
       // Forces verlet lists reevaluation

@@ -191,7 +191,7 @@ void Simulation::stepGrainGrain() {
   grainGrainA.size = grainGrainA.capacity;
   grainGrainB.size = grainGrainB.capacity;
 
-  const float verletDistance = 2*2*Grain::radius/sqrt(3.); // > Grain::radius + Grain::radius
+  const float verletDistance = 2*2*grain->radius/sqrt(3.); // > grain->radius + grain->radius
   const int32/*16*/* latticeNeighbours[62];
   {const int Y = lattice.size.y, X = lattice.size.x;
    uint i = 0; for(int z: range(0, 2 +1)) for(int y: range((z?-2:0), 2 +1)) for(int x: range(((z||y)?-2:1), 2 +1)) {
@@ -313,7 +313,7 @@ void Simulation::stepGrainGrain() {
   for(uint i=grainGrainA.size; i<align(simd, grainGrainA.size+1); i++) grainGrainA.begin()[i] = -1;
   for(uint i=grainGrainB.size; i<align(simd, grainGrainB.size+1); i++) grainGrainB.begin()[i] = -1;
 
-  grainGrainGlobalMinD = verletDistance/*minD*/ - 2*Grain::radius;
+  grainGrainGlobalMinD = verletDistance/*minD*/ - 2*grain->radius;
   if(grainGrainGlobalMinD <= 0) log("grainGrainGlobalMinD12", grainGrainGlobalMinD);
 
   //log("grain-grain", grainGrainSkipped);
@@ -338,7 +338,7 @@ void Simulation::stepGrainGrain() {
   const float* const gPx = grain->Px.data+simd, *gPy = grain->Py.data+simd, *gPz = grain->Pz.data+simd;
   float* const ggL = grainGrainLocalAx.begin();
   int* const ggContact = grainGrainContact.begin();
-  const vXsf sq2Radius = floatX(sq(Grain::radius+Grain::radius));
+  const vXsf sq2Radius = floatX(sq(grain->radius+grain->radius));
   for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
     const vXsi A = load(ggA, i), B = load(ggB, i);
     const vXsf Ax = gather(gPx, A), Ay = gather(gPy, A), Az = gather(gPz, A);
@@ -388,18 +388,20 @@ void Simulation::stepGrainGrain() {
  grainGrainTBy.size = GGcc;
  grainGrainTBz.size = GGcc;
 
- constexpr float E = 1/((1-sq(Grain::poissonRatio))/Grain::elasticModulus+(1-sq(Grain::poissonRatio))/Grain::elasticModulus);
- constexpr float R = 1/(Grain::curvature+Grain::curvature);
+ const float E = 1/((1-sq(grain->poissonRatio))/grain->elasticModulus+(1-sq(grain->poissonRatio))/grain->elasticModulus);
+ const float R = 1/(grain->curvature+grain->curvature);
  const float K = 4./3*E*sqrt(R);
- constexpr float mass = 1/(1/Grain::mass+1/Grain::mass);
+ const float mass = 1/(1/grain->mass+1/grain->mass);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
- const float Kt = 8 * 1/(1/Grain::shearModulus+1/Grain::shearModulus) * sqrt(R);
- auto evaluate = [this, K, Kb, Kt](uint, int start, int size) {
+#if MIDLIN
+ const float Kt = 8 * 1/(1/grain->shearModulus+1/grain->shearModulus) * sqrt(R);
+#endif
+ auto evaluate = [this, K, Kb/*, Kt*/](uint, int start, int size) {
   evaluateGrainGrain(start, size,
                      grainGrainContact.data,
                      grainGrainA.data, grainGrainB.data,
                      grain->Px.data+simd, grain->Py.data+simd, grain->Pz.data+simd,
-                     floatX(Grain::radius+Grain::radius), floatX(Grain::radius), floatX(Grain::radius),
+                     floatX(grain->radius+grain->radius), floatX(grain->radius), floatX(grain->radius),
                      grainGrainLocalAx.begin(), grainGrainLocalAy.begin(), grainGrainLocalAz.begin(),
                      grainGrainLocalBx.begin(), grainGrainLocalBy.begin(), grainGrainLocalBz.begin(),
                      floatX(K), floatX(Kb),

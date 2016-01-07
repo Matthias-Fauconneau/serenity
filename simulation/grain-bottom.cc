@@ -33,7 +33,7 @@ void Simulation::stepGrainBottom() {
   atomic contactCount;
   auto search = [&](uint, size_t start, size_t size) {
    const float* const gPz = grain->Pz.data+simd;
-   const vXsf bZ_Gr = floatX(bottomZ+Grain::radius);
+   const vXsf bZ_Gr = floatX(bottomZ+grain->radius);
    int* const gbA = grainBottomA.begin();
    for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
      vXsf Az = load(gPz, i);
@@ -100,7 +100,7 @@ void Simulation::stepGrainBottom() {
   const float* const gPz = grain->Pz.data+simd;
   float* const gbL = grainBottomLocalAx.begin();
   int* const gbContact = grainBottomContact.begin();
-  const vXsf bZ_Gr = floatX(bottomZ+Grain::radius);
+  const vXsf bZ_Gr = floatX(bottomZ+grain->radius);
   for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
     vXsi A = load(gbA, i);
     vXsf Az = gather(gPz, A);
@@ -140,20 +140,20 @@ void Simulation::stepGrainBottom() {
  grainBottomTAx.size = GBcc;
  grainBottomTAy.size = GBcc;
  grainBottomTAz.size = GBcc;
- constexpr float E = 1/((1-sq(Grain::poissonRatio))/Grain::elasticModulus+(1-sq(Plate::poissonRatio))/Plate::elasticModulus);
- constexpr float R = 1/(Grain::curvature/*+Plate::curvature*/);
+ const float E = 1/((1-sq(grain->poissonRatio))/grain->elasticModulus+(1-sq(Plate::poissonRatio))/Plate::elasticModulus);
+ const float R = 1/(grain->curvature/*+Plate::curvature*/);
  const float K = 4./3*E*sqrt(R);
- constexpr float mass = 1/(1/Grain::mass/*+1/Plate::mass*/);
+ const float mass = 1/(1/grain->mass/*+1/Plate::mass*/);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
 #if MIDLIN
- const float Kt = 8 * 1/(1/Grain::shearModulus+1/Plate::shearModulus) * sqrt(R);
+ const float Kt = 8 * 1/(1/grain->shearModulus+1/Plate::shearModulus) * sqrt(R);
 #endif
  grainBottomEvaluateTime += parallel_chunk(GBcc/simd, [&](uint, int start, int size) {
    evaluateGrainObstacle<false>(start, size,
                      grainBottomContact.data,
                      grainBottomA.data,
                      grain->Px.data+simd, grain->Py.data+simd, grain->Pz.data+simd,
-                     floatX(bottomZ+Grain::radius), floatX(Grain::radius),
+                     floatX(bottomZ+grain->radius), floatX(grain->radius),
                      grainBottomLocalAx.begin(), grainBottomLocalAy.begin(), grainBottomLocalAz.begin(),
                      grainBottomLocalBx.begin(), grainBottomLocalBy.begin(), grainBottomLocalBz.begin(),
                      floatX(K), floatX(Kb),

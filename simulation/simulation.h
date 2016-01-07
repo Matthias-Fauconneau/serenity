@@ -18,9 +18,14 @@ extern array<int> faces;
 struct Simulation {
  const float dt;
  size_t timeStep = 0;
-
- // Contact parameters
  const float normalDampingRate;
+
+ const int targetGrainCount;
+ unique<Grain> grain;
+ unique<Membrane> membrane;
+ unique<Plate> plate;
+
+ // Friction parameters
  const float targetDynamicGrainObstacleFrictionCoefficient;
  float dynamicGrainObstacleFrictionCoefficient = 0;
  const float targetDynamicGrainMembraneFrictionCoefficient;
@@ -38,15 +43,9 @@ struct Simulation {
  const float targetStaticFrictionDamping;
  float staticFrictionDamping;
 
- const int targetGrainCount;
-
- unique<Grain> grain;
- unique<Membrane> membrane;
- unique<Plate> plate;
-
  // Process parameters
  float Gz;
- const float verticalSpeed = 1 * m/s;
+ const float verticalSpeed;
  const float targetPressure;
  const float plateSpeed;
 #if WIRE
