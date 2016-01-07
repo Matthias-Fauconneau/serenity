@@ -7,7 +7,7 @@
 #include "variant.h"
 #include "time.h"
 
-size_t medianWindowRadius = 32;
+size_t medianWindowRadius = 16;
 buffer<float> medianFilter(ref<float> source, size_t W=medianWindowRadius) {
  assert_(source.size > W+1+W);
  buffer<float> target(source.size-2*W);
@@ -83,6 +83,8 @@ struct PlotView : HList<Plot> {
     for(string name: folder.list(Files)) {
      if(name=="core") continue;
      if(endsWith(name,"stdout")) continue;
+     auto parameters = parseDict(name);
+     if(parameters.at("Radius")=="25"_) continue;
      TextData s (readFile(name, folder));
      s.until('\n'); // First line: constant results
      buffer<string> names = split(s.until('\n'),", "); // Second line: Headers
@@ -108,7 +110,6 @@ struct PlotView : HList<Plot> {
        data.value = copyRef(data.value.slice(medianWindowRadius, data.value.size-2*medianWindowRadius));
       }
      }
-     auto parameters = parseDict(name);
      if(plot.ylabel == "Normalized deviator stress") {
       float pressure = parameters.at("Pressure");
       ref<float> radial = dataSets.at("Radial (Pa)");
