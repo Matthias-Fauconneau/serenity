@@ -6,6 +6,7 @@ void Simulation::stepProcess() {
  //pressure = 0; membraneViscosity = 1-1000*dt; // DEBUG
  // Process
  if(grain->count == targetGrainCount) {
+  if(!useMembrane) return;
   if(processState  < Pressure) {
    static bool unused once = ({ log("Set Friction"); true; });
    dynamicGrainObstacleFrictionCoefficient = targetDynamicGrainObstacleFrictionCoefficient;

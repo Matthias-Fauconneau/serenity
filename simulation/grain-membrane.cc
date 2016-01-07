@@ -179,7 +179,7 @@ template<int I> static inline void evaluate(const int start, const int size,
   const vXsf FDz = mask3_fmadd(Fd, TRVz, _0f, div0);
 
   // Gather static frictions
-  /*const vXsf oldLocalAx = gather(pLocalAx, contacts);
+  const vXsf oldLocalAx = gather(pLocalAx, contacts);
   const vXsf oldLocalAy = gather(pLocalAy, contacts);
   const vXsf oldLocalAz = gather(pLocalAz, contacts);
   const vXsf oldlocalBu = gather(pLocalBu, contacts);
@@ -266,7 +266,7 @@ template<int I> static inline void evaluate(const int start, const int size,
   scatter(pLocalAz, contacts, localAz);
   scatter(pLocalBu, contacts, localBu);
   scatter(pLocalBv, contacts, localBv);
-*/
+
 #if 0
   store(pFx, i, Fk * Nx);
   store(pFy, i, Fk * Ny);
@@ -275,9 +275,9 @@ template<int I> static inline void evaluate(const int start, const int size,
   store(pTAy, i, _0f);
   store(pTAz, i, _0f);
 #else
-  const vXsf FTx = FDx;
+  /*const vXsf FTx = FDx;
   const vXsf FTy = FDy;
-  const vXsf FTz = FDz;
+  const vXsf FTz = FDz;*/
   store(pFx, i, NFx + FTx);
   store(pFy, i, NFy + FTy);
   store(pFz, i, NFz + FTz);

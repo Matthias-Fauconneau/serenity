@@ -44,6 +44,7 @@ struct Simulation {
  float staticFrictionDamping;
 
  // Process parameters
+ bool useMembrane;
  float Gz;
  const float verticalSpeed;
  const float targetPressure;
@@ -66,6 +67,7 @@ struct Simulation {
  float pressure = targetPressure;
  float membraneViscosity = 0;
  float bottomZ = 0, topZ, topZ0;
+ float latticeRadius;
 #if WIRE
  float lastAngle = 0, winchAngle = 0, currentWinchRadius = patternRadius;
 #endif

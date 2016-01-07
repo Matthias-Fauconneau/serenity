@@ -40,7 +40,7 @@ struct SimulationView : Widget {
   renderTime.start();
 
   vec4 viewRotation = qmul(angleVector(yawPitch.y, vec3(1,0,0)), angleVector(yawPitch.x, vec3(0,0,1)));
-  const vec3 scale = vec3(2/(simulation.topZ-simulation.bottomZ));
+  const vec3 scale = vec3(vec2(2/(simulation.topZ-simulation.bottomZ)), 1./16);
   mat4 viewProjection = mat4()
     .scale(vec3(1,1,-1))
     .scale(scale)
@@ -79,10 +79,6 @@ struct SimulationView : Widget {
    }
 
    buffer<vec3> positions {grainIndices.size*6};
-   /*buffer<float> Rx {grainIndices.size};
-   buffer<float> Ry {grainIndices.size};
-   buffer<float> Rz {grainIndices.size};
-   buffer<float> Rw {grainIndices.size};*/
    buffer<vec4> R {grainIndices.size};
    for(size_t i: range(grainIndices.size)) {
     // FIXME: GPU quad projection
@@ -95,10 +91,6 @@ struct SimulationView : Widget {
     positions[i*6+3] = vec3(min.x, max.y, O.z);
     positions[i*6+4] = vec3(max.x, min.y, O.z);
     positions[i*6+5] = vec3(max, O.z);
-    /*Rx[i] = simulation.grain->Rx[simd+grainIndices[i]];
-    Ry[i] = simulation.grain->Ry[simd+grainIndices[i]];
-    Rz[i] = simulation.grain->Rz[simd+grainIndices[i]];
-    Rw[i] = simulation.grain->Rw[simd+grainIndices[i]];*/
     R[i] = vec4(simulation.grain->Rx[simd+grainIndices[i]],
                       simulation.grain->Ry[simd+grainIndices[i]],
                       simulation.grain->Rz[simd+grainIndices[i]],
@@ -113,14 +105,6 @@ struct SimulationView : Widget {
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
 #if 1
-   /*GLBuffer RxBuffer (Rx);
-   shader.bind("Rx"_, RxBuffer, 0);
-   GLBuffer RyBuffer (Ry);
-   shader.bind("Ry"_, RyBuffer, 1);
-   GLBuffer RzBuffer (Rz);
-   shader.bind("Rz"_, RzBuffer, 2);
-   GLBuffer RwBuffer (Rw);
-   shader.bind("Rw"_, RwBuffer, 3);*/
    GLBuffer RBuffer (R);
    shader.bind("R"_, RBuffer);
    shader["viewRotation"] = viewRotation;
@@ -174,7 +158,7 @@ struct SimulationView : Widget {
   }
 #endif
 
-  if(simulation.membrane->count) {
+  if(simulation.useMembrane && simulation.membrane->count) {
    if(!indexBuffer) {
     const int W = simulation.membrane->W, stride = simulation.membrane->stride,
       margin = simulation.membrane->margin;
