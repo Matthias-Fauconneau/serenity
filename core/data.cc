@@ -239,7 +239,7 @@ string TextData::whileDecimal() {
  if(!match("∞")) for(bool gotNumber=false, gotDot=false, gotE=false;available(1);) {
   char c = peek();
   /**/ if(c>='0'&&c<='9') { gotNumber=true; advance(1); }
-  else if(gotNumber && c=='.') { if(gotDot||gotE) break; gotDot=true; advance(1); }
+  else if(/*gotNumber &&*/ c=='.') { if(gotDot||gotE) break; gotDot=true; advance(1); }
   else if(gotNumber &&  (c=='e' || c=='E')) {
    if(gotE) break; gotE=true;
    advance(1);
@@ -258,7 +258,7 @@ double TextData::decimal() {
  double significand=0, decimal=0, eSign=1, exponent=0;
  if(match("∞")) return sign*__builtin_inf();
  //assert_(isInteger(), data);
- if(!isInteger()) return nan;
+ if(!isInteger() && !match('.')) return nan;
  for(bool gotDot=false, gotE=false; available(1);) {
   /**/  if(!gotDot && match('.')) gotDot=true;
   else if(!gotE && matchAny("eE")) { gotE=true; if(match('-')) eSign=-1; else match('+'); }

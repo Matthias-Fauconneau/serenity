@@ -43,9 +43,11 @@ static Image trimWhite(const Image& image) {
 
 static Variant parseVariant(TextData& s) {
  s.whileAny(" \t\r\n"_);
+ assert_(s);
  if("0123456789.-"_.contains(s.peek())) {
   string number = s.whileDecimal();
   if(s[0]==' '&&(s[1]>='0'&&s[1]<='9')&&s[2]==' '&&s[3]=='R') s.advance(4); //FIXME: regexp
+  assert_(number, s.slice(s.index, 16));
   return number.contains('.') ? Variant(parseDecimal(number)) : Variant(parseInteger(number));
  }
  if(s.match('/')) return copyRef(s.identifier("-+."_));
@@ -509,7 +511,9 @@ buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
     args.clear();
    }
    page.bounds.min = max(box.min, page.bounds.min);
-   page.bounds.max = min(box.max, page.bounds.max);
+   page.bounds.max = min(page.bounds.max, box.max);
+   if(!isNumber(page.bounds.max)) page.bounds.max = box.max;
+   assert_(isNumber(page.bounds.max), page.bounds, box);
 
    { // Transforms from bottom-left to top left
     mat3x2 m (1,0, 0, -1, 0, page.bounds.max.y);
