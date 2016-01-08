@@ -51,7 +51,7 @@ fragment {
     float dz = sqrt(max(0,1-l));
     uniform float hpxRadius;
     float a = ((1+hpxRadius)-l)/(2*hpxRadius);
-    color = vec4(dz*(gl_PrimitiveID/2%2==0?vec3(2./4):vec3(3./4)), a) * aColor[gl_PrimitiveID/2];
+    color = vec4(dz*(gl_PrimitiveID/2%2==0?vec3(2./4):vec3(3./4)), a);
     uniform float radius;
     gl_FragDepth = gl_FragCoord.z + dz * radius;
   }

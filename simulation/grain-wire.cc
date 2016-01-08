@@ -2,10 +2,12 @@
 #include "simulation.h"
 #include "grid.h"
 #include "parallel.h"
+#include "wire.h"
+#include "grain.h"
 
-static inline void evaluateGrainWire(const size_t start, const size_t size,
-                                     const uint* grainWireContact, const size_t unused grainWireContactSize,
-                                     const uint* grainWireA, const uint* grainWireB,
+static inline void evaluateGrainWire(const int start, const int size,
+                                     const int* grainWireContact, const int unused grainWireContactSize,
+                                     const int* grainWireA, const int* grainWireB,
                                      const float* grainPx, const float* grainPy, const float* grainPz,
                                      const float* wirePx, const float* wirePy, const float* wirePz,
                                      const vXsf Gr_Wr, const vXsf Gr, const vXsf Wr,
@@ -22,9 +24,9 @@ static inline void evaluateGrainWire(const size_t start, const size_t size,
                                      const float* ArotationW,
                                      float* const pFx, float* const pFy, float* const pFz,
                                      float* const pTAx, float* const pTAy, float* const pTAz) {
- for(size_t i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
-  const vXui contacts = *(vXui*)(grainWireContact+i);
-  const vXui A = gather(grainWireA, contacts), B = gather(grainWireB, contacts);
+ for(int i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
+  const vXsi contacts = *(vXsi*)(grainWireContact+i);
+  const vXsi A = gather(grainWireA, contacts), B = gather(grainWireB, contacts);
   // FIXME: Recomputing from intersection (more efficient than storing?)
   const vXsf Ax = gather(grainPx, A), Ay = gather(grainPy, A), Az = gather(grainPz, A);
   const vXsf Bx = gather(wirePx, B), By = gather(wirePy, B), Bz = gather(wirePz, B);
@@ -158,23 +160,23 @@ static inline void evaluateGrainWire(const size_t start, const size_t size,
 }
 
 void Simulation::stepGrainWire() {
- if(!grain.count || !wire.count) return;
+ if(!grain->count || !wire->count) return;
  if(grainWireGlobalMinD <= 0)  {
 
   //vec3 min, max; domainWire(min, max);
-  vec3 min = vec3(vec2(-membrane.radius), 0), max = vec3(vec2(membrane.radius), membrane.height);
+  vec3 min = vec3(vec2(-latticeRadius), 0), max = vec3(vec2(latticeRadius), topZ);
   memoryTime.start();
-  Grid grid(1/(Grain::radius+Grain::radius), min, max);
+  Grid grid(1/(grain->radius+grain->radius), min, max);
   memoryTime.stop();
   grainWireLatticeTime.start();
-  for(size_t i: range(wire.count))
-   grid.cell(wire.Px[i], wire.Py[i], wire.Pz[i]).append(1+i);
+  for(size_t i: range(wire->count))
+   grid.cell(wire->Px[i], wire->Py[i], wire->Pz[i]).append(1+i);
   grainWireLatticeTime.stop();
 
-  const float verletDistance = 2*(2*Grain::radius/sqrt(3.)) - (Grain::radius + Wire::radius); // FIXME: ?
-  //const float verletDistance = Grain::radius + Grain::radius;
-  assert(verletDistance > Grain::radius + Wire::radius);
-  assert(verletDistance <= Grain::radius + Grain::radius);
+  const float verletDistance = 2*(2*grain->radius/sqrt(3.)) - (grain->radius + Wire::radius); // FIXME: ?
+  //const float verletDistance = grain->radius + grain->radius;
+  assert(verletDistance > grain->radius + Wire::radius);
+  assert(verletDistance <= grain->radius + grain->radius);
   // Minimum distance over verlet distance parameter is the actual verlet distance which can be used
   //float minD = __builtin_inff();
 
@@ -203,10 +205,10 @@ void Simulation::stepGrainWire() {
   swap(oldGrainWireLocalBz, grainWireLocalBz);
 
   static constexpr size_t averageGrainWireContactCount = 32;
-  const size_t GWcc = align(simd, grain.count * averageGrainWireContactCount +1);
+  const size_t GWcc = align(simd, grain->count * averageGrainWireContactCount +1);
   if(GWcc > grainWireA.capacity) {
-   grainWireA = buffer<uint>(GWcc, 0);
-   grainWireB = buffer<uint>(GWcc, 0);
+   grainWireA = buffer<int>(GWcc, 0);
+   grainWireB = buffer<int>(GWcc, 0);
    grainWireLocalAx = buffer<float>(GWcc, 0);
    grainWireLocalAy = buffer<float>(GWcc, 0);
    grainWireLocalAz = buffer<float>(GWcc, 0);
@@ -224,22 +226,22 @@ void Simulation::stepGrainWire() {
   grainWireLocalBz.size = 0;
 
   size_t grainWireIndex = 0; // Index of first contact with A in old grainWire[Local]A|B list
-  grainWireSearchTime += parallel_chunk(grain.count, [&](uint, size_t start, size_t size) {
-   for(size_t a=start; a<(start+size); a+=1) { // TODO: SIMD
-     size_t offset = grid.index(grain.Px[simd+a], grain.Py[simd+a], grain.Pz[simd+a]);
+  grainWireSearchTime += parallel_chunk(grain->count, [&](uint, int start, int size) {
+   for(int a=start; a<(start+size); a+=1) { // TODO: SIMD
+     size_t offset = grid.index(grain->Px[simd+a], grain->Py[simd+a], grain->Pz[simd+a]);
      // Neighbours
      for(size_t n: range(3*3)) for(size_t i: range(3)) {
       ref<uint16> list(wireNeighbours[n] + offset + i * Grid::cellCapacity, Grid::cellCapacity);
 
       for(size_t j: range(Grid::cellCapacity)) {
        assert(list.begin() >= grid.cells.begin() && list.end()<=grid.cells.end(), offset, n, i);
-       size_t b = list[j];
+       int b = list[j];
        if(!b) break;
        b--;
-       assert(a < grain.count && b < wire.count, a, grain.count, b, wire.count, offset, n, i);
-       float sqDistance = sq(grain.Px[simd+a]-wire.Px[b])
-                                   + sq(grain.Py[simd+a]-wire.Py[b])
-                                   + sq(grain.Pz[simd+a]-wire.Pz[b])); // TODO: SIMD //FIXME: fails with Ofast?
+       assert(a < grain->count && b < wire->count, a, grain->count, b, wire->count, offset, n, i);
+       float sqDistance = sq(grain->Px[simd+a]-wire->Px[b])
+                                   + sq(grain->Py[simd+a]-wire->Py[b])
+                                   + sq(grain->Pz[simd+a]-wire->Pz[b]); // TODO: SIMD //FIXME: fails with Ofast?
        if(sqDistance> sq(verletDistance)) { /*minD=::min(minD, d);*/ continue; }
        assert(grainWireA.size < grainWireA.capacity);
        grainWireA.append( a ); // Grain
@@ -279,7 +281,7 @@ void Simulation::stepGrainWire() {
   assert(align(simd, grainWireB.size+1) <= grainWireB.capacity);
   for(size_t i=grainWireB.size; i<align(simd, grainWireB.size +1); i++) grainWireB.begin()[i] = -1;
 
-  grainWireGlobalMinD = /*minD*/verletDistance - (Grain::radius+Wire::radius);
+  grainWireGlobalMinD = /*minD*/verletDistance - (grain->radius+Wire::radius);
   if(grainWireGlobalMinD < 0) log("grainWireGlobalMinD", grainWireGlobalMinD);
 
   /*if(processState > ProcessState::Pour) // Element creation resets verlet lists
@@ -289,17 +291,17 @@ void Simulation::stepGrainWire() {
 
  // Filters verlet lists, packing contacts to evaluate
  if(align(simd, grainWireA.size) > grainWireContact.capacity) {
-  grainWireContact = buffer<uint>(align(simd, grainWireA.size));
+  grainWireContact = buffer<int>(align(simd, grainWireA.size));
  }
  grainWireContact.size = 0;
  grainWireFilterTime += parallel_chunk(align(simd, grainWireA.size)/simd, [&](uint, size_t start, size_t size) {
    for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
-    vXui A = *(vXui*)(grainWireA.data+i), B = *(vXui*)(grainWireB.data+i);
-    vXsf Ax = gather(grain.Px.data+simd, A), Ay = gather(grain.Py.data+simd, A), Az = gather(grain.Pz.data+simd, A);
-    vXsf Bx = gather(wire.Px.data, B), By = gather(wire.Py.data, B), Bz = gather(wire.Pz.data, B);
+    vXsi A = *(vXsi*)(grainWireA.data+i), B = *(vXsi*)(grainWireB.data+i);
+    vXsf Ax = gather(grain->Px.data+simd, A), Ay = gather(grain->Py.data+simd, A), Az = gather(grain->Pz.data+simd, A);
+    vXsf Bx = gather(wire->Px.data, B), By = gather(wire->Py.data, B), Bz = gather(wire->Pz.data, B);
     vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
     vXsf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
-    vXsf depth = floatX(Grain::radius+Wire::radius) - length;
+    vXsf depth = floatX(grain->radius+Wire::radius) - length;
     for(size_t k: range(simd)) {
      size_t j = i+k;
      if(j == grainWireA.size) break /*2*/;
@@ -335,27 +337,27 @@ void Simulation::stepGrainWire() {
  grainWireTAx.size = GWcc;
  grainWireTAy.size = GWcc;
  grainWireTAz.size = GWcc;
- constexpr float E = 1/((1-sq(Grain::poissonRatio))/Grain::elasticModulus+(1-sq(Grain::poissonRatio))/Grain::elasticModulus);
- constexpr float R = 1/(Grain::curvature+Wire::curvature);
+ const float E = 1/((1-sq(grain->poissonRatio))/grain->elasticModulus+(1-sq(grain->poissonRatio))/grain->elasticModulus);
+ const float R = 1/(grain->curvature+Wire::curvature);
  const float K = 4./3*E*sqrt(R);
- constexpr float mass = 1/(1/Grain::mass+1/Wire::mass);
+ const float mass = 1/(1/grain->mass+1/wire->mass);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
  grainWireEvaluateTime += parallel_chunk(GWcc/simd, [&](uint, size_t start, size_t size) {
     evaluateGrainWire(start, size,
                       grainWireContact.data, grainWireContact.size,
                       grainWireA.data, grainWireB.data,
-                      grain.Px.data+simd, grain.Py.data+simd, grain.Pz.data+simd,
-                      wire.Px.data, wire.Py.data, wire.Pz.data,
-                      floatX(Grain::radius+Wire::radius), floatX(Grain::radius), floatX(Wire::radius),
+                      grain->Px.data+simd, grain->Py.data+simd, grain->Pz.data+simd,
+                      wire->Px.data, wire->Py.data, wire->Pz.data,
+                      floatX(grain->radius+Wire::radius), floatX(grain->radius), floatX(Wire::radius),
                       grainWireLocalAx.begin(), grainWireLocalAy.begin(), grainWireLocalAz.begin(),
                       grainWireLocalBx.begin(), grainWireLocalBy.begin(), grainWireLocalBz.begin(),
                       floatX(K), floatX(Kb),
                       floatX(staticFrictionStiffness), floatX(dynamicGrainWireFrictionCoefficient),
                       floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping),
-                      grain.Vx.data+simd, grain.Vy.data+simd, grain.Vz.data+simd,
-                      wire.Vx.data, wire.Vy.data, wire.Vz.data,
-                      grain.AVx.data+simd, grain.AVy.data+simd, grain.AVz.data+simd,
-                      grain.Rx.data+simd, grain.Ry.data+simd, grain.Rz.data+simd, grain.Rw.data+simd,
+                      grain->Vx.data+simd, grain->Vy.data+simd, grain->Vz.data+simd,
+                      wire->Vx.data, wire->Vy.data, wire->Vz.data,
+                      grain->AVx.data+simd, grain->AVy.data+simd, grain->AVz.data+simd,
+                      grain->Rx.data+simd, grain->Ry.data+simd, grain->Rz.data+simd, grain->Rw.data+simd,
                       grainWireFx.begin(), grainWireFy.begin(), grainWireFz.begin(),
                       grainWireTAx.begin(), grainWireTAy.begin(), grainWireTAz.begin() );
  });
@@ -366,15 +368,15 @@ void Simulation::stepGrainWire() {
   size_t index = grainWireContact[i];
   size_t a = grainWireA[index];
   size_t b = grainWireB[index];
-  grain.Fx[simd+a] += grainWireFx[i];
-  wire .Fx[b] -= grainWireFx[i];
-  grain.Fy[simd+a] += grainWireFy[i];
-  wire .Fy[b] -= grainWireFy[i];
-  grain.Fz[simd+a] += grainWireFz[i];
-  wire .Fz[b] -= grainWireFz[i];
-  grain.Tx[simd+a] += grainWireTAx[i];
-  grain.Ty[simd+a] += grainWireTAy[i];
-  grain.Tz[simd+a] += grainWireTAz[i];
+  grain->Fx[simd+a] += grainWireFx[i];
+  wire->Fx[b] -= grainWireFx[i];
+  grain->Fy[simd+a] += grainWireFy[i];
+  wire->Fy[b] -= grainWireFy[i];
+  grain->Fz[simd+a] += grainWireFz[i];
+  wire->Fz[b] -= grainWireFz[i];
+  grain->Tx[simd+a] += grainWireTAx[i];
+  grain->Ty[simd+a] += grainWireTAy[i];
+  grain->Tz[simd+a] += grainWireTAz[i];
  }
  grainWireSumTime.stop();
 }

@@ -18,7 +18,7 @@
   sconst float bendDamping = 0*g /*mass*/ / s;
 
   const size_t capacity;
-  size_t count = 0;
+  int count = 0;
   buffer<float> Px { capacity };
   buffer<float> Py { capacity };
   buffer<float> Pz { capacity };
@@ -29,7 +29,7 @@
   buffer<float> Fy { capacity };
   buffer<float> Fz { capacity };
 
-  Wire(float internodeLength) : internodeLength(internodeLength), capacity(0) {}
+  Wire(float internodeLength) : internodeLength(internodeLength), capacity(65536) {}
 
   const vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]);  }
   const vec3 velocity(size_t i) const { return vec3(Vx[i], Vy[i], Vz[i]);  }

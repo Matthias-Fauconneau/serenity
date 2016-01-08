@@ -305,13 +305,6 @@ template<int I> static inline float sum(const uint size, const int* const contac
   uint index = contacts[i];
   uint a = A[index];
   uint b = B[index];
-#if 0
-  if(!(sqrt(sq(pFx[i]) + sq(pFy[i]) + sq(pFz[i])) < 100000 * ::N)) {
-   log("gmF", pFx[i], pFy[i], pFz[i]);
-   log(i, pcontacts.size, a, b);
-   fail = true; return;
-  }
-#endif
   float Fx = pFx[i];
   float Fy = pFy[i];
   float Fz = pFz[i];
@@ -321,11 +314,9 @@ template<int I> static inline float sum(const uint size, const int* const contac
   gTx[a] += pTAx[i];
   gTy[a] += pTAy[i];
   gTz[a] += pTAz[i];
-#if RADIAL // TODO: SIMD
   float Px = gPx[a], Py = gPy[a];
   float L = sqrt(Px*Px + Py*Py);
   radialForce += (Px * Fx + Py * Fy) / L;
-#endif
   float u = U[i];
   float v = V[i];
   float w = 1-u-v;

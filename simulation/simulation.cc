@@ -11,7 +11,7 @@
 //#include "grain-membrane.h"
 #include "wire.h"
 //include "wire-bottom.h"
-//include "grain-wire.h"
+//#include "grain-wire.h"
 
 constexpr float Wire::radius;
 constexpr float Wire::tensionStiffness;
@@ -47,6 +47,7 @@ Simulation::Simulation(const Dict& p) :
   useMembrane(p.value("Membrane", 1)),
   Gz(-(float)p.value("G", 4000*10.f)*N/kg),
   verticalSpeed(p.value("verticalSpeed",1.f)*m/s),
+  linearSpeed(p.value("linearSpeed",1.f)*m/s),
   targetPressure((float)p.at("Pressure")*Pa),
   plateSpeed((float)p.at("Speed")*mm/s),
   patternRadius(membrane->radius - grain->radius),
@@ -59,7 +60,10 @@ Simulation::Simulation(const Dict& p) :
 {
  if(pattern) { // Initial wire node
   size_t i = wire->count++;
-  wire->Px[i] = patternRadius; wire->Py[i] = 0; wire->Pz[i] = currentHeight+grain->radius+Wire::radius;
+  assert_(wire->count < wire->capacity);
+  wire->Px[i] = patternRadius;
+  wire->Py[i] = 0;
+  wire->Pz[i] = currentHeight+grain->radius+Wire::radius;
   wire->Vx[i] = 0; wire->Vy[i] = 0; wire->Vz[i] = 0;
   winchAngle += wire->internodeLength / currentWinchRadius;
  }
@@ -119,7 +123,7 @@ void Simulation::step() {
  }
 
  //stepWire();
- //stepGrainWire();
+ stepGrainWire();
  //stepWireTension();
  //stepWireBendingResistance();
  //stepWireBottom();

@@ -49,6 +49,7 @@ struct Simulation {
  bool useMembrane;
  float Gz;
  const float verticalSpeed;
+ const float linearSpeed;
  const float targetPressure;
  const float plateSpeed;
 
@@ -56,7 +57,6 @@ struct Simulation {
  enum Pattern { None, Helix, Cross, Loop };
  sconst string patterns[] {"none", "helix", "radial", "spiral"};
  const Pattern pattern;
- const float linearSpeed = 4 * m/s;
  const float loopAngle = PI*(3-sqrt(5.));
 
  // Process variables

@@ -16,7 +16,7 @@ void Simulation::stepWire() {
 void Simulation::stepWireTension() {
  if(wire->count == 0) return;
  wireTensionTime.start();
- for(size_t i=0; i<wire->count-1; i+=simd) {
+ for(int i=0; i<wire->count-1; i+=simd) {
   vXsf Ax = load(wire->Px, i     ), Ay = load(wire->Py, i     ), Az = load(wire->Pz, i    );
 #if DEBUG
   vXsf Bx = loadu(wire->Px, i+1), By = loadu(wire->Py, i+1), Bz = loadu(wire->Pz, i+1);
