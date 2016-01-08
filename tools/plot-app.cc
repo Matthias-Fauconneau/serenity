@@ -7,17 +7,28 @@
 #include "variant.h"
 #include "time.h"
 
-size_t medianWindowRadius = 16;
+size_t medianWindowRadius = 0;
 buffer<float> medianFilter(ref<float> source, size_t W=medianWindowRadius) {
  assert_(source.size > W+1+W);
  buffer<float> target(source.size-2*W);
- //target.slice(0, W).copy(source.slice(0, W));
  buffer<float> window(W+1+W);
  for(size_t i: range(W, source.size-W)) {
   window.copy(source.slice(i-W, W+1+W));
-  target[i-W] = ::median(window); // Quickselect median mutates buffer
+  target[i-W] = ::median(window); // Median quickselect mutates buffer
  }
- //target.slice(target.size-W).copy(source.slice(source.size-W));
+ return target;
+}
+
+size_t meanWindowRadius = 8;
+buffer<float> meanFilter(ref<float> source, size_t W=meanWindowRadius) {
+ assert_(source.size > W+1+W);
+ buffer<float> target(source.size-2*W);
+ buffer<float> window(W+1+W);
+ for(size_t i: range(W, source.size-W)) {
+  float sum = 0;
+  for(float v: source.slice(i-W, W+1+W)) sum += v;
+  target[i-W] = sum/(W+1+W);
+ }
  return target;
 }
 
@@ -48,9 +59,9 @@ struct PlotView : HList<Plot> {
   String name = array<Plot>::at(0).ylabel+"-"+array<Plot>::at(0).xlabel;
   if(existsFile(name+".png"_)) log(name+".png exists");
   else {
-   int2 size(1280, 720);
+   int2 size(1680, 1050);
    Image target = render(size, graphics(vec2(size), Rect(vec2(size))));
-   writeFile(name+".png", encodePNG(target), currentWorkingDirectory(), true);
+   writeFile(name+".png", encodePNG(target), home(), true);
   }
  }
  bool mouseEvent(vec2, vec2, Event, Button button, Widget*&) override {
@@ -66,7 +77,7 @@ struct PlotView : HList<Plot> {
   if(!shown) return;
   clear();
   static buffer<string> Y = split("Axial (Pa)" ", Radial (Pa)" ", Normalized deviator stress"_,", ");
-  for(size_t index: range(Y.size)) {
+  for(size_t index: range(2, Y.size)) {
    Plot& plot = append();
    plot.xlabel = "Strain (%)"__;
    plot.ylabel = copyRef(Y[index]);
@@ -79,12 +90,18 @@ struct PlotView : HList<Plot> {
      for(const auto parameter: parameters)
       if(!allCoordinates[::copy(parameter.key)].contains(parameter.value))
        allCoordinates.at(parameter.key).insertSorted(::copy(parameter.value));
+     for(string key: allCoordinates.keys) if(!parameters.contains(key)) allCoordinates.at(key).add(""_);
     }
     for(string name: folder.list(Files)) {
      if(name=="core") continue;
-     if(endsWith(name,"stdout")) continue;
+     if(endsWith(name,".stdout")) continue;
+     if(endsWith(name,".png")) continue;
      auto parameters = parseDict(name);
-     if(parameters.at("Radius")=="25"_) continue;
+     if(parameters.at("Radius")!="50"_) continue;
+     if(parameters.at("sfStiffness")!="1M"_) continue;
+     if(parameters.at("sfSpeed")!="100"_) continue;
+     if(!(parameters.contains("nDamping") || parameters.contains("mDensity"))) continue;
+      // FIXME: old version
      TextData s (readFile(name, folder));
      s.until('\n'); // First line: constant results
      buffer<string> names = split(s.until('\n'),", "); // Second line: Headers
@@ -104,10 +121,13 @@ struct PlotView : HList<Plot> {
      break2:;
      //for(mref<float> data: dataSets.values) if(data) data[0]=0; // Filters invalid first point (inertia)
      for(auto data: dataSets) {
-      if(data.key=="Axial (Pa)" || data.key == "Radial (Pa)") data.value = medianFilter(data.value);
+      if(data.key=="Axial (Pa)" || data.key == "Radial (Pa)")
+       //data.value = medianFilter(data.value);
+       data.value = meanFilter(data.value);
       else {
        //assert_(data.value.size >= 2*medianWindowRadius, data.value.size);
-       data.value = copyRef(data.value.slice(medianWindowRadius, data.value.size-2*medianWindowRadius));
+       //data.value = copyRef(data.value.slice(medianWindowRadius, data.value.size-2*medianWindowRadius));
+       data.value = copyRef(data.value.slice(meanWindowRadius, data.value.size-2*meanWindowRadius));
       }
      }
      if(plot.ylabel == "Normalized deviator stress") {
@@ -121,6 +141,7 @@ struct PlotView : HList<Plot> {
      }
      assert_(dataSets.contains(plot.xlabel), plot.xlabel, name);
      assert_(dataSets.contains(plot.ylabel), plot.ylabel);
+     for(string key: allCoordinates.keys) if(!parameters.contains(key)) allCoordinates.at(key).add(""_);
      parameters.filter([&](string key, const Variant&){ return allCoordinates.at(key).size==1; });
      //float key = dataSets.at(plot.ylabel).last();
      /*size_t i = plot.dataSets.size();//0; while(i<plot.dataSets.size() && plot.dataSets.values[i].values.last() <= key) i++;
@@ -134,6 +155,7 @@ struct PlotView : HList<Plot> {
   //if(count()) window->setTitle(array<Plot>::at(0).ylabel);
   shown = false;
   window->render();
+  log("Loaded");
  }
 } app;
 
