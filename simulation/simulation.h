@@ -139,7 +139,7 @@ struct Simulation {
  buffer<float> oldWireBottomLocalBy;
  buffer<float> oldWireBottomLocalBz;
 
-  buffer<int> wireBottomContact;
+ buffer<int> wireBottomContact;
 
  buffer<int> wireBottomA;
  buffer<float> wireBottomLocalAx;

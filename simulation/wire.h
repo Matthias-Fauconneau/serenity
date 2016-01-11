@@ -14,7 +14,7 @@
   sconst float tensionStiffness = elasticModulus * PI * sq(radius);
   const float tensionDamping = 2 * sqrt(mass * tensionStiffness);
   sconst float areaMomentOfInertia = PI/4*pow4(radius);
-  sconst float bendStiffness = 0; //elasticModulus * areaMomentOfInertia / internodeLength;
+  const float bendStiffness = elasticModulus * areaMomentOfInertia / internodeLength;
   sconst float bendDamping = 0*g /*mass*/ / s;
 
   const size_t capacity;

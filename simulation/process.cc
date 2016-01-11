@@ -94,13 +94,13 @@ void Simulation::stepProcess() {
     end = vec2((R-r)*cos(A)+r*cos(a),(R-r)*sin(A)+r*sin(a));
     winchAngle += linearSpeed/r * dt;
    } else error("Unknown pattern:", int(pattern));
-   float z = currentHeight+grain->radius+Wire::radius; // Over pour
+   float z = currentHeight/*+grain->radius*/+Wire::radius; // Over pour
    //float z = currentHeight-grain->radius-Wire::radius; // Under pour
    vec3 relativePosition = vec3(end.x, end.y, z) - wire->position(wire->count-1);
    float length = ::length(relativePosition);
    if(length >= wire->internodeLength) {
     assert(wire->count < wire->capacity);
-    vec3 p = wire->position(wire->count-1) + wire->internodeLength * relativePosition/length;
+    vec3 p = wire->position(wire->count-1) + wire->internodeLength/length * relativePosition;
     size_t i = wire->count++;
     wire->Px[i] = p[0]; wire->Py[i] = p[1]; wire->Pz[i] = p[2];
     wire->Vx[i] = 0; wire->Vy[i] = 0; wire->Vz[i] = 0;
@@ -110,7 +110,7 @@ void Simulation::stepProcess() {
   }
 
   // Generates grain
-  if(currentHeight >= grain->radius) {
+  if(currentHeight >= grain->radius && 0) {
    for(;;) {
     if(grain->count == targetGrainCount) break;
     vec2 p(random()*2-1,random()*2-1);

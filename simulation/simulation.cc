@@ -13,9 +13,6 @@
 //#include "wire-bottom.h"
 //#include "grain-wire.h"
 
-constexpr float Wire::radius;
-constexpr float Wire::tensionStiffness;
-constexpr float Wire::bendStiffness;
 constexpr string Simulation::patterns[];
 
 bool fail = false;
@@ -40,6 +37,7 @@ Simulation::Simulation(const Dict& p) :
   targetDynamicGrainMembraneFrictionCoefficient(0.228),
   targetDynamicGrainGrainFrictionCoefficient(0.096),
   targetDynamicGrainWireFrictionCoefficient(0.228),
+  targetDynamicWireBottomFrictionCoefficient(1),
   targetStaticFrictionSpeed((float)p.at("sfSpeed")*mm/s),
   targetStaticFrictionLength((float)p.at("sfLength")*m),
   targetStaticFrictionStiffness((float)p.at("sfStiffness")/m),
@@ -67,11 +65,12 @@ Simulation::Simulation(const Dict& p) :
   wire->Vx[i] = 0; wire->Vy[i] = 0; wire->Vz[i] = 0;
   winchAngle += wire->internodeLength / currentWinchRadius;
  }
- if(useMembrane) {
+ if(!useMembrane) {
   dynamicGrainObstacleFrictionCoefficient = targetDynamicGrainObstacleFrictionCoefficient;
   dynamicGrainMembraneFrictionCoefficient = targetDynamicGrainMembraneFrictionCoefficient;
   dynamicGrainGrainFrictionCoefficient = targetDynamicGrainGrainFrictionCoefficient;
   dynamicGrainWireFrictionCoefficient = targetDynamicGrainWireFrictionCoefficient;
+  dynamicWireBottomFrictionCoefficient = targetDynamicWireBottomFrictionCoefficient;
   staticFrictionSpeed = targetStaticFrictionSpeed;
   staticFrictionLength = targetStaticFrictionLength;
   staticFrictionStiffness = targetStaticFrictionStiffness;
@@ -124,8 +123,8 @@ void Simulation::step() {
 
  stepWire();
  stepGrainWire();
- //stepWireTension();
- //stepWireBendingResistance();
+ stepWireTension();
+ stepWireBendingResistance();
  stepWireBottom();
  stepWireIntegration();
 
@@ -278,7 +277,7 @@ void Simulation::run() {
     if(!existsFile(name))
      pressureStrain = File(name, currentWorkingDirectory(), Flags(WriteOnly|Create|Truncate));
     {
-     String line = "voidRatio:"+str(voidRatio)+"\n";
+     String line = "version:"+str(VERSION)+",voidRatio:"+str(voidRatio)+"\n";
      log_(line);
      if(pressureStrain) pressureStrain.write(line);
     }

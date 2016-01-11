@@ -17,23 +17,15 @@ void Simulation::stepWireTension() {
  if(wire->count == 0) return;
  wireTensionTime.start();
  for(int i=0; i<wire->count-1; i+=simd) {
-  vXsf Ax = load(wire->Px, i     ), Ay = load(wire->Py, i     ), Az = load(wire->Pz, i    );
-#if DEBUG
+  vXsf Ax = load  (wire->Px, i     ), Ay = load  (wire->Py, i    ), Az = load  (wire->Pz, i     );
   vXsf Bx = loadu(wire->Px, i+1), By = loadu(wire->Py, i+1), Bz = loadu(wire->Pz, i+1);
-#else // CHECKME: How is the unaligned load optimized ?
-  vXsf Bx = load(wire->Px, i+1), By = load(wire->Py, i+1), Bz = load(wire->Pz, i+1);
-#endif
   vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
   vXsf L = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
   vXsf x = L - floatX(wire->internodeLength);
   vXsf fS = - floatX(wire->tensionStiffness) * x;
   vXsf Nx = Rx/L, Ny = Ry/L, Nz = Rz/L;
-  vXsf AVx = load(wire->Vx, i     ), AVy = load(wire->Vy, i     ), AVz = load(wire->Vz, i    );
-#if DEBUG
+  vXsf AVx = load  (wire->Vx, i     ), AVy = load  (wire->Vy, i     ), AVz = load (wire->Vz, i     );
   vXsf BVx = loadu(wire->Vx, i+1), BVy = loadu(wire->Vy, i+1), BVz = loadu(wire->Vz, i+1);
-#else // CHECKME: How is the unaligned load optimized ?
-  vXsf BVx = load(wire->Vx, i+1), BVy = load(wire->Vy, i+1), BVz = load(wire->Vz, i+1);
-#endif
   vXsf RVx = AVx - BVx, RVy = AVy - BVy, RVz = AVz - BVz;
   vXsf fB = - floatX(wire->tensionDamping) * (Nx * RVx + Ny * RVy + Nz * RVz);
   vXsf f = fS + fB;
@@ -46,21 +38,18 @@ void Simulation::stepWireTension() {
    FTy = blend(mask, _0f, FTy);
    FTz = blend(mask, _0f, FTz);
   }
-  /*for(size_t k: range(X))
-   if(i+k<wire->count-1) assert(isNumber(vec3(FTx[k],FTy[k],FTz[k])), f[k], Nx[k], Ny[k], Nz[k], L[k], Ax[k], Bx[k], i, i+k, coun);*/
   store(wire->Fx, i, load(wire->Fx, i) + FTx);
   store(wire->Fy, i, load(wire->Fy, i) + FTy);
   store(wire->Fz, i, load(wire->Fz, i) + FTz);
-  // FIXME: parallel
-  store/*u*/(wire->Fx, i+1, loadu(wire->Fx, i+1) - FTx);
-  store/*u*/(wire->Fy, i+1, loadu(wire->Fy, i+1) - FTy);
-  store/*u*/(wire->Fz, i+1, loadu(wire->Fz, i+1) - FTz);
+  storeu(wire->Fx, i+1, loadu(wire->Fx, i+1) - FTx);
+  storeu(wire->Fy, i+1, loadu(wire->Fy, i+1) - FTy);
+  storeu(wire->Fz, i+1, loadu(wire->Fz, i+1) - FTz);
  }
  wireTensionTime.stop();
 }
 
 void Simulation::stepWireBendingResistance() {
- if(!Wire::bendStiffness || wire->count < 2) return;
+ if(!wire->bendStiffness || wire->count < 2) return;
  wireBendingResistanceTime.start();
  for(size_t i: range(1, wire->count-1)) { // TODO: SIMD
   vec3 A = wire->position(i-1), B = wire->position(i), C = wire->position(i+1);
@@ -131,26 +120,3 @@ void Simulation::stepWireIntegration() {
  float maxGrainWireV = maxGrainV + sqrt(maxWireV2);
  grainWireGlobalMinD -= maxGrainWireV * this->dt;
 }
-
-/*void Simulation::domainWire(vec3& min, vec3& max) {
- float* const Px = wire->Px.begin(), *Py = wire->Py.begin(), *Pz = wire->Pz.begin();
- vXsf minX_ = _0f, minY_ = _0f, minZ_ = _0f, maxX_ = _0f, maxY_ = _0f, maxZ_ = _0f;
- for(size_t i=0; i<wire->count; i+=simd) {
-  vXsf X = load(Px, i), Y = load(Py, i), Z = load(Pz, i);
-  minX_ = ::min(minX_, X);
-  maxX_ = ::max(maxX_, X);
-  minY_ = ::min(minY_, Y);
-  maxY_ = ::max(maxY_, Y);
-  minZ_ = ::min(minZ_, Z);
-  maxZ_ = ::max(maxZ_, Z);
- }
- const float minX = ::min(minX_);
- const float minY = ::min(minY_);
- const float minZ = ::min(minZ_);
- const float maxX = ::max(maxX_);
- const float maxY = ::max(maxY_);
- const float maxZ = ::max(maxZ_);
- assert(maxX-minX < 16 && maxY-minY < 16 && maxZ-minZ < 16, "wire");
- min = vec3(minX, minY, minZ);
- max = vec3(maxX, maxY, maxZ);
-}*/

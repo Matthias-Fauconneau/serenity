@@ -175,21 +175,25 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
  //args.append("-iquote."__);
  args.append("-g"__);
  if(flags.contains("profile")) args.append("-finstrument-functions"__);
- for(string flag: flags) if(flag=="native"_||flag=="haswell"_||flag=="core_avx2"_||flag=="sandybridge"_)
-  args.append("-march="+replace(flag,'_','-'));
- for(string flag: flags) if(flag=="mic"_) {
-  //args.append("-xMIC-AVX512"__);
+ for(string flag: flags) {
+  if(flag=="native"_||flag=="haswell"_||flag=="core_avx2"_||flag=="sandybridge"_)
+   args.append("-march="+replace(flag,'_','-'));
+ }
+ if(flags.contains("mic"_)) {
   args.append("-mmic"__);
-  //args.append(ref<String>{"-opt"__, "-report-phase"__, "hlo"__,  "-opt-report"__, "3"__});
   args.append("-ansi-alias"__);
-  //args.append("-no-opt-prefetch"__);
   linkArgs.append("-mmic"__);
  }
- for(string flag: flags) if(flag=="openmp"_) { args.append("-fopenmp"__); linkArgs.append("-fopenmp"__); }
+ if(flags.contains("openmp"_)) { args.append("-fopenmp"__); linkArgs.append("-fopenmp"__); }
  for(string flag: flags) if(startsWith(flag,"O")) args.append("-"+flag);
  args.append( "-DARGS=\""+str(args)+"\"");
  args.append(apply(folder.list(Folders), [this](string subfolder)->String{ return "-iquote"+subfolder; }));
  for(string flag: flags) args.append( "-D"+toUpper(flag)+"=1" );
+ Stream stdout;
+ execute(which("git"), {"describe"_,"--long"_,"--tags"_,"--dirty"_,"--always"_}, true,
+               currentWorkingDirectory(), &stdout);
+ String version = simplify( stdout.readUpTo(64) );
+ args.append("-DVERSION=\""_+version+"\""_);
 
  Folder(tmp, currentWorkingDirectory(), true);
  Folder(tmp + "/"_ + join(flags, "-"_), currentWorkingDirectory(), true);

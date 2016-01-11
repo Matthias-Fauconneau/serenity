@@ -169,7 +169,6 @@ struct PlotView : HList<Plot> {
   //if(count()) window->setTitle(array<Plot>::at(0).ylabel);
   shown = false;
   window->render();
-  log("Loaded");
  }
 } app;
 
