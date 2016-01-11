@@ -14,6 +14,7 @@ void Simulation::stepProcess() {
    dynamicGrainMembraneFrictionCoefficient = targetDynamicGrainMembraneFrictionCoefficient;
    dynamicGrainGrainFrictionCoefficient = targetDynamicGrainGrainFrictionCoefficient;
    dynamicGrainWireFrictionCoefficient = targetDynamicGrainWireFrictionCoefficient;
+   dynamicWireBottomFrictionCoefficient = targetDynamicWireBottomFrictionCoefficient;
    staticFrictionSpeed = targetStaticFrictionSpeed;
    staticFrictionLength = targetStaticFrictionLength;
    staticFrictionStiffness = targetStaticFrictionStiffness;
@@ -61,7 +62,7 @@ void Simulation::stepProcess() {
   //else currentHeight = topZ-grain->radius;
 
   // Generates wire
-  if(pattern) {
+  if(pattern && currentHeight < topZ-grain->radius) {
    vec2 end;
    if(pattern == Helix) { // Simple helix
     float a = winchAngle;
@@ -142,7 +143,7 @@ void Simulation::stepProcess() {
      if(newPosition.z < currentHeight) {
       // Without wire overlap
       for(size_t index: range(wire->count))
-       if(length(wire->position(index) - newPosition) < grain->radius+Wire::radius) break;
+       if(length(wire->position(index) - newPosition) < grain->radius+Wire::radius) return;
 
       size_t i = grain->count;
       assert_(newPosition.z >= grain->radius);

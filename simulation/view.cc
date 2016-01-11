@@ -117,8 +117,8 @@ struct SimulationView : Widget {
   }
 
   if(simulation.wire->count>1) {
-   buffer<vec3> positions {(simulation.wire->count-1)*6};
-   buffer<vec4> colors {(simulation.wire->count-1)};
+   buffer<vec3> positions {size_t(simulation.wire->count-1)*6};
+   buffer<vec4> colors {size_t(simulation.wire->count-1)};
    size_t s = 0;
    for(size_t i: range(simulation.wire->count-1)) {
     vec3 a (simulation.wire->position(i)), b (simulation.wire->position(i+1));

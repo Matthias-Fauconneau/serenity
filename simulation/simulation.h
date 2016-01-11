@@ -36,6 +36,8 @@ struct Simulation {
  float dynamicGrainGrainFrictionCoefficient = 0;
  const float targetDynamicGrainWireFrictionCoefficient;
  float dynamicGrainWireFrictionCoefficient = 0;
+ const float targetDynamicWireBottomFrictionCoefficient;
+ float dynamicWireBottomFrictionCoefficient = 0;
  const float targetStaticFrictionSpeed;
  float staticFrictionSpeed;
  const float targetStaticFrictionLength;

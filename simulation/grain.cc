@@ -4,6 +4,7 @@
 #include "membrane.h"
 
 void Simulation::stepGrain() {
+ if(!grain->count) return;
  const vXsf m_Gz = floatX(grain->mass * Gz);
  grainTime += parallel_chunk(align(simd, grain->count)/simd, [&](uint, size_t start, size_t size) {
    for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {

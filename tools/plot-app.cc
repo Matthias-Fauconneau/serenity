@@ -76,8 +76,8 @@ struct PlotView : HList<Plot> {
  void load() {
   if(!shown) return;
   clear();
-  static buffer<string> Y = split("Axial (Pa)" ", Radial (Pa)" ", Normalized deviator stress"_,", ");
-  for(size_t index: range(2, Y.size)) {
+  static buffer<string> Y = split("Axial (Pa)" ", Radial (Pa)" ", Normalized deviator stress, Stress ratio"_,", ");
+  for(size_t index: range(3, Y.size)) {
    Plot& plot = append();
    plot.xlabel = "Strain (%)"__;
    plot.ylabel = copyRef(Y[index]);
@@ -87,6 +87,11 @@ struct PlotView : HList<Plot> {
      if(name=="core") continue;
      if(endsWith(name,"stdout")) continue;
      auto parameters = parseDict(name);
+     if(parameters.at("Radius")!="50"_) continue;
+     if(parameters.at("sfStiffness")!="1M"_) continue;
+     if(parameters.at("sfSpeed")!="100"_) continue;
+     if(!(parameters.contains("nDamping") || parameters.contains("mDensity"))) continue;
+      // FIXME: keeping only old versions
      for(const auto parameter: parameters)
       if(!allCoordinates[::copy(parameter.key)].contains(parameter.value))
        allCoordinates.at(parameter.key).insertSorted(::copy(parameter.value));
@@ -101,7 +106,7 @@ struct PlotView : HList<Plot> {
      if(parameters.at("sfStiffness")!="1M"_) continue;
      if(parameters.at("sfSpeed")!="100"_) continue;
      if(!(parameters.contains("nDamping") || parameters.contains("mDensity"))) continue;
-      // FIXME: old version
+      // FIXME: keeping only old versions
      TextData s (readFile(name, folder));
      s.until('\n'); // First line: constant results
      buffer<string> names = split(s.until('\n'),", "); // Second line: Headers
@@ -138,6 +143,15 @@ struct PlotView : HList<Plot> {
       ndeviator.grow(axial.size);
       if(0) for(int i: range(ndeviator.size)) ndeviator[i] = ((axial[i]-radial[i])/radial[i]);
       else for(int i: range(ndeviator.size)) ndeviator[i] = (axial[i]-pressure)/pressure;
+     }
+     if(plot.ylabel == "Stress ratio") {
+      float pressure = parameters.at("Pressure");
+      ref<float> radial = dataSets.at("Radial (Pa)");
+      ref<float> axial = dataSets.at("Axial (Pa)");
+      array<float>& ndeviator = dataSets.insert("Stress ratio");
+      ndeviator.grow(axial.size);
+      if(0) for(int i: range(ndeviator.size)) ndeviator[i] = (axial[i]-radial[i])/(axial[i]+radial[i]);
+      else for(int i: range(ndeviator.size)) ndeviator[i] = (axial[i]-pressure)/(axial[i]+pressure);
      }
      assert_(dataSets.contains(plot.xlabel), plot.xlabel, name);
      assert_(dataSets.contains(plot.ylabel), plot.ylabel);

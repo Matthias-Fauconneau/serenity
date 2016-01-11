@@ -289,6 +289,7 @@ void Simulation::stepGrainWire() {
   grainWireSkipped=0;
  } else grainWireSkipped++;
 
+ if(!grainWireA.size) return;
  // Filters verlet lists, packing contacts to evaluate
  if(align(simd, grainWireA.size) > grainWireContact.capacity) {
   grainWireContact = buffer<int>(align(simd, grainWireA.size));
@@ -318,6 +319,7 @@ void Simulation::stepGrainWire() {
     }
    }
  });
+ if(!grainWireContact) return;
  for(size_t i=grainWireContact.size; i<align(simd, grainWireContact.size); i++)
   grainWireContact.begin()[i] = grainWireA.size;
 
