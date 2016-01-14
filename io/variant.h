@@ -5,11 +5,11 @@
 
 struct Variant {
  enum { Null, Boolean, Integer, Real, Data, List, Dict, Rational } type = Null;
- double number = 0;
+ float/*double*/ number = 0;
  String data;
  array<Variant> list;
  map<String,Variant> dict;
- double denominator = 1;
+ float/*double*/ denominator = 1;
 
  Variant(){}
  Variant(decltype(nullptr)) : type(Null) {}

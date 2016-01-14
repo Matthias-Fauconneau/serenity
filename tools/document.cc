@@ -4,7 +4,7 @@
 #include "window.h"
 #include "interface.h"
 #include "png.h"
-#include "jpeg.h
+#include "jpeg.h"
 #include "pdf.h"
 
 struct Placeholder : Widget {
@@ -158,10 +158,10 @@ break_:;
    else if(s.match('^')) text.append( superscript(parseScript(s, delimiters)) );
    else if(s.match('{')) {
     String num = regular(trim(parseText(s, {"/"_,"}"_,"\n"_, "\""_})));
-    if(!s.match('/')) warn(s, "Expected / stack delimiter, got '"_+string{s.peek()}+"'"_);
+    if(!s.match('/')) warn(s, "Expected / stack delimiter, got '"_+s.peek()+"'"_);
     bool fraction = s.match('/');
     String den = regular(trim(parseText(s, {"}"_,"\n"_})) ?: "?"_);
-    if(!s.match('}')) warn(s, "Expected } stack delimiter, got '"_+string{s.peek()}+"'"_);
+    if(!s.match('}')) warn(s, "Expected } stack delimiter, got '"_+s.peek()+"'"_);
     text.append(fraction ? ::fraction(num+den) : ::stack(num+den));
    }
    else text.append(s.next());
@@ -194,7 +194,8 @@ break_:;
     else if(type && s.match(type)) {}
     else if(!type && s.wouldMatchAny("-|+$"_)) type = s.next();
     else {
-     children.append(&warnText(s, page, "Expected "_+(type?"'"_+str(type)+"'"_:"-, |, +, $ "_), "or ), got '"_+str(s?string{s.peek()}:"EOD"_)+"'"_));
+     children.append(&warnText(s, page, "Expected "_+(type?"'"_+str(type)+"'"_:"-, |, +, $ "_),
+                               "or ), got '"_+(s?s.peek():'$')+"'"_));
      break;
     }
    }

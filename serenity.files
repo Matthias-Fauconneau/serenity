@@ -41,6 +41,7 @@ io/font.cc
 io/font.h
 io/xml.h
 io/xml.cc
+io/jpeg.cc
 
 ui/x.h
 ui/display.h
@@ -101,3 +102,4 @@ simulation/grain.h
 simulation/membrane.h
 simulation/wire.h
 simulation/plate.h
+tools/document.cc

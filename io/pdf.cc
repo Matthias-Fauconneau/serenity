@@ -164,22 +164,22 @@ buffer<byte> toPDF(vec2 pageSize, const ref<Graphics> pages, float px) {
       String id = "Image"+str(pdfPages.at("Count").number)+str(index);
       {Object& xImage = objects.append();
        xImage.insert("Subtype"__, "/Image"_);
-       xImage.insert("Width"__, image.width);
-       xImage.insert("Height"__, image.height);
+       xImage.insert("Width"__, image.size.x);
+       xImage.insert("Height"__, image.size.y);
        xImage.insert("ColorSpace"__, "/DeviceRGB"_);
        xImage.insert("BitsPerComponent"__, 8);
        typedef vec<rgb,uint8,3> rgb3;
        typedef vec<rgb,int,3> rgb3i;
-       buffer<rgb3> rgb (image.height * image.width);
-       for(uint y: range(image.height)) for(uint x: range(image.width)) {
+       buffer<rgb3> rgb (image.size.y * image.size.x);
+       for(uint y: range(image.size.y)) for(uint x: range(image.size.x)) {
         auto source = image[y*image.stride+x];
-        rgb[y*image.width+x] = rgb3(rgb3i(source.r, source.g, source.b)*int(source.a)/0xFF) + rgb3(0xFF-source.a);
+        rgb[y*image.size.x+x] = rgb3(rgb3i(source.r, source.g, source.b)*int(source.a)/0xFF) + rgb3(0xFF-source.a);
        }
        xImage.insert("Filter"__, "/FlateDecode"_);
        xImage = deflate(cast<byte>(rgb));
        xObjects.insert(copy(id), ref(xImage));
       }
-      assert_(image.width && image.height, image.size);
+      assert_(image.size.x && image.size.y, image.size);
       setColor(bgra4f(blit.color, blit.opacity));
       content.append("q "+str(blit.size.x*px,0,0,blit.size.y*px, blit.origin.x*px, (pageSize.y-blit.origin.y-blit.size.y)*px)+
                      " cm /"+id+" Do Q\n");

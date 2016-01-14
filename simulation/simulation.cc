@@ -61,7 +61,7 @@ Simulation::Simulation(const Dict& p) :
   assert_(wire->count < (int)wire->capacity);
   wire->Px[i] = patternRadius;
   wire->Py[i] = 0;
-  wire->Pz[i] = currentHeight+grain->radius+Wire::radius;
+  wire->Pz[i] = currentHeight+/*grain->radius+*/Wire::radius;
   wire->Vx[i] = 0; wire->Vy[i] = 0; wire->Vz[i] = 0;
   winchAngle += wire->internodeLength / currentWinchRadius;
  }

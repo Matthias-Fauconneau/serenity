@@ -11,8 +11,8 @@
   sconst float curvature = 1./radius;
   sconst float elasticModulus = 1e0 * MPa;
   sconst float poissonRatio = 0.48;
-  sconst float tensionStiffness = elasticModulus * PI * sq(radius);
-  const float tensionDamping = 2 * sqrt(mass * tensionStiffness);
+  sconst float tensionStiffness = 1 * elasticModulus * PI * sq(radius);
+  const float tensionDamping = 0 * 2 * sqrt(mass * tensionStiffness);
   sconst float areaMomentOfInertia = PI/4*pow4(radius);
   const float bendStiffness = elasticModulus * areaMomentOfInertia / internodeLength;
   sconst float bendDamping = 0*g /*mass*/ / s;
