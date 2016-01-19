@@ -173,7 +173,6 @@ void Simulation::stepGrainTop() {
   grain->Fx[simd+a] += grainTopFx[i];
   grain->Fy[simd+a] += grainTopFy[i];
   grain->Fz[simd+a] += grainTopFz[i];
-  //assert_(grainTopFz[i] > -400*N, a, grainTopFz[i], grain->Pz[simd+a], topZ-grain->radius);
   grain->Tx[simd+a] += grainTopTAx[i];
   grain->Ty[simd+a] += grainTopTAy[i];
   grain->Tz[simd+a] += grainTopTAz[i];

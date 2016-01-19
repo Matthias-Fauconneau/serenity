@@ -7,6 +7,7 @@
 void Simulation::stepGrainBottom() {
  if(!grain->count) return;
  { // TODO: verlet
+  tsc grainBottomSearchTime; grainBottomSearchTime.start();
   swap(oldGrainBottomA, grainBottomA);
   swap(oldGrainBottomLocalAx, grainBottomLocalAx);
   swap(oldGrainBottomLocalAy, grainBottomLocalAy);
@@ -42,7 +43,7 @@ void Simulation::stepGrainBottom() {
      compressStore(gbA+index, contact, intX(i)+_seqi);
    }
   };
-  if(grain->count/simd) grainBottomSearchTime += parallel_chunk(grain->count/simd, search);
+  if(grain->count/simd) /*grainBottomSearchTime +=*/ parallel_chunk(grain->count/simd, search);
   if(grain->count%simd) search(0, grain->count/simd, 1u);
   grainBottomA.size = contactCount;
   while(contactCount.count > 0 && grainBottomA[contactCount-1] >= (int)grain->count) contactCount.count--;
@@ -53,8 +54,11 @@ void Simulation::stepGrainBottom() {
   grainBottomLocalBx.size = grainBottomA.size;
   grainBottomLocalBy.size = grainBottomA.size;
   grainBottomLocalBz.size = grainBottomA.size;
+  assert(align(simd, grainBottomA.size+1) <= grainBottomA.capacity);
+  for(size_t i=grainBottomA.size; i<align(simd, grainBottomA.size+1); i++)
+   grainBottomA.begin()[i] = -1;
+  this->grainBottomSearchTime += grainBottomSearchTime.cycleCount();
   if(!grainBottomA.size) return;
-  //if(!contactCount) return;
 
   grainBottomRepackFrictionTime.start();
   size_t grainBottomI = 0; // Index of first contact with A in old grainBottom[Local]A|B list
@@ -77,14 +81,10 @@ void Simulation::stepGrainBottom() {
     grainBottomI++;
   }
   grainBottomRepackFrictionTime.stop();
-
-  assert(align(simd, grainBottomA.size+1) <= grainBottomA.capacity);
-  for(size_t i=grainBottomA.size; i<align(simd, grainBottomA.size+1); i++)
-   grainBottomA.begin()[i] = -1;
  }
- if(!grainBottomA) return;
 
  // Filters verlet lists, packing contacts to evaluate
+ tsc grainBottomFilterTime; grainBottomFilterTime.start();
  if(align(simd, grainBottomA.size) > grainBottomContact.capacity) {
   grainBottomContact = buffer<int>(align(simd, grainBottomA.size));
  }
@@ -110,7 +110,7 @@ void Simulation::stepGrainBottom() {
     compressStore(gbContact+index, contact, intX(i)+_seqi);
   }
  };
- if(grainBottomA.size/simd) grainBottomFilterTime += parallel_chunk(grainBottomA.size/simd, filter);
+ if(grainBottomA.size/simd) /*grainBottomFilterTime +=*/ parallel_chunk(grainBottomA.size/simd, filter);
  // The partial iteration has to be executed last so that invalid contacts are trailing
  // and can be easily trimmed
  if(grainBottomA.size%simd != 0) filter(0, grainBottomA.size/simd, 1u);
@@ -118,11 +118,13 @@ void Simulation::stepGrainBottom() {
  while(contactCount.count > 0 && grainBottomContact[contactCount.count-1] >= (int)grainBottomA.size)
   contactCount.count--; // Trims trailing invalid contacts
  grainBottomContact.size = contactCount;
- if(!grainBottomContact.size) return;
  for(uint i=grainBottomContact.size; i<align(simd, grainBottomContact.size); i++)
   grainBottomContact.begin()[i] = grainBottomA.size;
+ this->grainBottomFilterTime += grainBottomFilterTime.cycleCount();
+ if(!grainBottomContact.size) return;
 
  // Evaluates forces from (packed) intersections (SoA)
+ tsc grainBottomEvaluateTime; grainBottomEvaluateTime.start();
  size_t GBcc = align(simd, grainBottomContact.size); // Grain-Bottom contact count
  if(GBcc > grainBottomFx.capacity) {
   memoryTime.start();
@@ -148,7 +150,7 @@ void Simulation::stepGrainBottom() {
 #if MIDLIN
  const float Kt = 8 * 1/(1/grain->shearModulus+1/Plate::shearModulus) * sqrt(R);
 #endif
- grainBottomEvaluateTime += parallel_chunk(GBcc/simd, [&](uint, int start, int size) {
+ /*grainBottomEvaluateTime +=*/ parallel_chunk(GBcc/simd, [&](uint, int start, int size) {
    evaluateGrainObstacle<false>(start, size,
                      grainBottomContact.data,
                      grainBottomA.data,
@@ -169,6 +171,7 @@ void Simulation::stepGrainBottom() {
                      grainBottomFx.begin(), grainBottomFy.begin(), grainBottomFz.begin(),
                      grainBottomTAx.begin(), grainBottomTAy.begin(), grainBottomTAz.begin() );
  });
+ this->grainBottomEvaluateTime += grainBottomEvaluateTime.cycleCount();
 
  grainBottomSumTime.start();
  float bottomForceZ = 0;

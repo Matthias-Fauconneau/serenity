@@ -165,6 +165,7 @@ void Simulation::stepGrainGrain() {
  if(!grain->count) return;
  if(grainGrainGlobalMinD <= 0) { // Re-evaluates verlet lists (using a lattice for grains)
   grainLattice();
+  tsc grainGrainSearchTime; grainGrainSearchTime.start();
   swap(oldGrainGrainA, grainGrainA);
   swap(oldGrainGrainB, grainGrainB);
   swap(oldGrainGrainLocalAx, grainGrainLocalAx);
@@ -240,7 +241,7 @@ void Simulation::stepGrainGrain() {
     }
    }
   };
-  if(grain->count/simd) grainGrainSearchTime += parallel_chunk(grain->count/simd, search);
+  if(grain->count/simd) /*grainGrainSearchTime +=*/ parallel_chunk(grain->count/simd, search);
   if(grain->count%simd) {
    const float* const gPx = grain->Px.data+simd, *gPy = grain->Py.data+simd, *gPz = grain->Pz.data+simd;
    int* const ggA = grainGrainA.begin(), *ggB = grainGrainB.begin();
@@ -269,7 +270,6 @@ void Simulation::stepGrainGrain() {
     compressStore(ggB+targetIndex, mask, b);
    }
   }
-  if(!contactCount) return;
   assert_(contactCount <= grainGrainA.capacity, contactCount.count, grainGrainA.capacity);
   grainGrainA.size = contactCount;
   grainGrainB.size = contactCount;
@@ -279,6 +279,19 @@ void Simulation::stepGrainGrain() {
   grainGrainLocalBx.size = contactCount;
   grainGrainLocalBy.size = contactCount;
   grainGrainLocalBz.size = contactCount;
+
+  assert(align(simd, grainGrainA.size+1) <= grainGrainA.capacity);
+  for(uint i=grainGrainA.size; i<align(simd, grainGrainA.size+1); i++) grainGrainA.begin()[i] = -1;
+  for(uint i=grainGrainB.size; i<align(simd, grainGrainB.size+1); i++) grainGrainB.begin()[i] = -1;
+
+  grainGrainGlobalMinD = verletDistance/*minD*/ - 2*grain->radius;
+  if(grainGrainGlobalMinD <= 0) log("grainGrainGlobalMinD12", grainGrainGlobalMinD);
+
+  //log("grain-grain", grainGrainSkipped);
+  grainGrainSkipped=0;
+
+  this->grainGrainSearchTime += grainGrainSearchTime.cycleCount();
+  if(!contactCount) return;
 
   grainGrainRepackFrictionTime.start();
   uint grainGrainIndex = 0; // Index of first contact with A in old grainGrain[Local]A|B list
@@ -308,19 +321,10 @@ void Simulation::stepGrainGrain() {
     grainGrainIndex++;
   }
   grainGrainRepackFrictionTime.stop();
-
-  assert(align(simd, grainGrainA.size+1) <= grainGrainA.capacity);
-  for(uint i=grainGrainA.size; i<align(simd, grainGrainA.size+1); i++) grainGrainA.begin()[i] = -1;
-  for(uint i=grainGrainB.size; i<align(simd, grainGrainB.size+1); i++) grainGrainB.begin()[i] = -1;
-
-  grainGrainGlobalMinD = verletDistance/*minD*/ - 2*grain->radius;
-  if(grainGrainGlobalMinD <= 0) log("grainGrainGlobalMinD12", grainGrainGlobalMinD);
-
-  //log("grain-grain", grainGrainSkipped);
-  grainGrainSkipped=0;
  } else grainGrainSkipped++;
 
  // Filters verlet lists, packing contacts to evaluate
+ tsc grainGrainFilterTime; grainGrainFilterTime.start();
  if(align(simd, grainGrainA.size) > grainGrainContact.capacity) {
   memoryTime.start();
   grainGrainContact = buffer<int>(align(simd, grainGrainA.size));
@@ -351,7 +355,7 @@ void Simulation::stepGrainGrain() {
     compressStore(ggContact+index, contact, intX(i)+_seqi);
   }
  };
- if(grainGrainA.size/simd) grainGrainFilterTime += parallel_chunk(grainGrainA.size/simd, filter);
+ if(grainGrainA.size/simd) /*grainGrainFilterTime +=*/ parallel_chunk(grainGrainA.size/simd, filter);
  // The partial iteration has to be executed last so that invalid contacts are trailing
  // and can be easily trimmed
  if(grainGrainA.size%simd != 0) filter(0, grainGrainA.size/simd, 1u);
@@ -359,11 +363,13 @@ void Simulation::stepGrainGrain() {
  while(contactCount.count > 0 && grainGrainContact[contactCount.count-1] >= (int)grainGrainA.size)
   contactCount.count--; // Trims trailing invalid contacts
  grainGrainContact.size = contactCount;
- if(!grainGrainContact.size) return;
  for(uint i=grainGrainContact.size; i<align(simd, grainGrainContact.size); i++)
   grainGrainContact.begin()[i] = grainGrainA.size;;
+ this->grainGrainFilterTime += grainGrainFilterTime.cycleCount();
+ if(!grainGrainContact.size) return;
 
  // Evaluates forces from (packed) intersections (SoA)
+ tsc grainGrainEvaluateTime; grainGrainEvaluateTime.start();
  uint GGcc = align(simd, grainGrainContact.size); // Grain-Grain contact count
  if(GGcc > grainGrainFx.capacity) {
   memoryTime.start();
@@ -421,10 +427,11 @@ void Simulation::stepGrainGrain() {
                      grainGrainTAx.begin(), grainGrainTAy.begin(), grainGrainTAz.begin(),
                      grainGrainTBx.begin(), grainGrainTBy.begin(), grainGrainTBz.begin() );
  };
- grainGrainEvaluateTime += parallel_chunk(GGcc/simd, evaluate);
+ /*grainGrainEvaluateTime +=*/ parallel_chunk(GGcc/simd, evaluate);
+ this->grainGrainEvaluateTime += grainGrainEvaluateTime.cycleCount();
 
  const uint threadCount = ::min(::threadCount()/2, int(sqrt(grainGrainContact.size/simd)));
- if(threadCount < 4) { // Sequential scalar scatter add
+ if(threadCount < 4 || 1) { // Sequential scalar scatter add
   grainGrainSumTime.start();
   for(int i = 0; i < (int)grainGrainContact.size; i++) {
    int index = grainGrainContact[i];

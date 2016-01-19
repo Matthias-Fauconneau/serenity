@@ -8,7 +8,7 @@
 
 //FIXME: factorize Wire and Grain - Bottom/Top
 void evaluateWireObstacle(const int start, const int size,
-                                     const int* wireObstacleContact, //int wireObstacleContactSize,
+                                     const int* wireObstacleContact, int wireObstacleContactSize,
                                      const int* wireObstacleA, //int wireObstacleASize,
                                      const float* wirePx, const float* wirePy, const float* wirePz,
                                      const vXsf obstacleZ, const vXsf Wr,
@@ -22,9 +22,6 @@ void evaluateWireObstacle(const int start, const int size,
                                      float* const pFx, float* const pFy, float* const pFz) {
  for(int i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
   const vXsi contacts = *(vXsi*)(wireObstacleContact+i);
-  /*for(int k: range(simd)) assert_(contacts[k] >= 0 && contacts[k] <= wireObstacleASize,
-                                  start, size, i+k, wireObstacleContactSize,
-                                  contacts[k], wireObstacleASize);*/
   const vXsi A = gather(wireObstacleA, contacts);
   // FIXME: Recomputing from intersection (more efficient than storing?)
   //for(int k: range(simd)) assert_(A[k] >= 0 && A[k] <= simulation->wire->count, A[k]);
@@ -130,6 +127,14 @@ void evaluateWireObstacle(const int start, const int size,
   store(pFx, i, NFx + FTx);
   store(pFy, i, NFy + FTy);
   store(pFz, i, NFz + FTz);
+  /*for(int k: range(simd)) {
+   if(i+k < wireObstacleContactSize)
+    assert_(length(vec3(pFx[i+k],pFy[i+k],pFz[i+k])) < 100*N,
+           length(vec3(pFx[i+k],pFy[i+k],pFz[i+k]))/N, "WB2",
+           i, N,
+      NFx[i+k], NFy[i+k], NFz[i+k],
+      FTx[i+k], FTy[i+k], FTz[i+k]);
+  }*/
   // Scatter static frictions
   scatter(wireObstacleLocalAx, contacts, localAx);
   scatter(wireObstacleLocalAy, contacts, localAy);
@@ -142,6 +147,7 @@ void evaluateWireObstacle(const int start, const int size,
 
 void Simulation::stepWireBottom() {
  {
+  tsc wireBottomSearchTime; wireBottomSearchTime.start();
   swap(oldWireBottomA, wireBottomA);
   swap(oldWireBottomLocalAx, wireBottomLocalAx);
   swap(oldWireBottomLocalAy, wireBottomLocalAy);
@@ -153,6 +159,7 @@ void Simulation::stepWireBottom() {
   static constexpr size_t averageWireBottomContactCount = 1;
   size_t WBcc = align(simd, wire->count * averageWireBottomContactCount + 1);
   if(WBcc > wireBottomA.capacity) {
+   memoryTime.start();
    wireBottomA = buffer<int>(WBcc, 0);
    wireBottomLocalAx = buffer<float>(WBcc, 0);
    wireBottomLocalAy = buffer<float>(WBcc, 0);
@@ -160,6 +167,7 @@ void Simulation::stepWireBottom() {
    wireBottomLocalBx = buffer<float>(WBcc, 0);
    wireBottomLocalBy = buffer<float>(WBcc, 0);
    wireBottomLocalBz = buffer<float>(WBcc, 0);
+   memoryTime.stop();
   }
   wireBottomA.size = 0;
   wireBottomLocalAx.size = 0;
@@ -197,13 +205,14 @@ void Simulation::stepWireBottom() {
       wireBottomI++;
     }
   };
-  wireBottomSearchTime += parallel_chunk(wire->count, search, 1 /*FIXME*/);
+  /*wireBottomSearchTime +=*/ parallel_chunk(wire->count, search, 1 /*FIXME*/);
 
   assert_(align(simd, wireBottomA.size+1) <= wireBottomA.capacity);
   for(size_t i=wireBottomA.size; i<align(simd, wireBottomA.size+1); i++) wireBottomA.begin()[i] = wire->count;
+  this->wireBottomSearchTime += wireBottomSearchTime.cycleCount();
  }
  if(!wireBottomA.size) return;
-
+ tsc wireBottomFilterTime; wireBottomFilterTime.start();
  // TODO: verlet
  // Filters verlet lists, packing contacts to evaluate
  if(align(simd, wireBottomA.size) > wireBottomContact.capacity) {
@@ -222,7 +231,6 @@ void Simulation::stepWireBottom() {
      // Instead of packing (copying) the unpacked list to a packed contact list
      // To keep track of where to write back (unpacked) contact positions (for static friction)
      // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
-     //assert_(j < wireBottomA.size);
      wireBottomContact.appendAtomic( j );
     } else {
      // Resets contact (static friction spring)
@@ -231,17 +239,21 @@ void Simulation::stepWireBottom() {
    }
   }
  };
- wireBottomFilterTime += parallel_chunk(align(simd, wireBottomA.size)/simd, filter);
- if(!wireBottomContact) return;
+ /*wireBottomFilterTime +=*/ parallel_chunk(align(simd, wireBottomA.size)/simd, filter);
  for(size_t i=wireBottomContact.size; i<align(simd, wireBottomContact.size); i++)
   wireBottomContact.begin()[i] = wireBottomA.size;
+ this->wireBottomFilterTime += wireBottomFilterTime.cycleCount();
+ if(!wireBottomContact) return;
 
  // Evaluates forces from (packed) intersections (SoA)
+ tsc wireBottomEvaluateTime; wireBottomEvaluateTime.start();
  const size_t WBcc = align(simd, wireBottomContact.size); // Wire-Bottom contact count
  if(WBcc > wireBottomFx.capacity) {
+  memoryTime.start();
   wireBottomFx = buffer<float>(WBcc);
   wireBottomFy = buffer<float>(WBcc);
   wireBottomFz = buffer<float>(WBcc);
+  memoryTime.stop();
  }
  wireBottomFx.size = WBcc;
  wireBottomFy.size = WBcc;
@@ -252,9 +264,9 @@ void Simulation::stepWireBottom() {
  const float mass = 1/(1/wire->mass/*+1/Plate::mass*/);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
  //::simulation = this; // DEBUG
- wireBottomEvaluateTime += parallel_chunk(WBcc/simd, [&](uint, size_t start, size_t size) {
+ /*wireBottomEvaluateTime +=*/ parallel_chunk(WBcc/simd, [&](uint, size_t start, size_t size) {
    evaluateWireObstacle(start, size,
-                     wireBottomContact.data, //wireBottomContact.size,
+                     wireBottomContact.data, wireBottomContact.size,
                      wireBottomA.data, //wireBottomA.size,
                      wire->Px.data, wire->Py.data, wire->Pz.data,
                      floatX(bottomZ), floatX(Wire::radius),
@@ -266,13 +278,16 @@ void Simulation::stepWireBottom() {
                      wire->Vx.data, wire->Vy.data, wire->Vz.data,
                      wireBottomFx.begin(), wireBottomFy.begin(), wireBottomFz.begin() );
  });
-
+ this->wireBottomEvaluateTime += wireBottomEvaluateTime.cycleCount();
  wireBottomSumTime.start();
- for(size_t index = 0; index < wireBottomA.size; index++) { // Scalar scatter add
-  size_t a = wireBottomA[index];
-  wire->Fx[a] += wireBottomFx[index];
-  wire->Fy[a] += wireBottomFy[index];
-  wire->Fz[a] += wireBottomFz[index];
+ for(size_t index = 0; index<wireBottomContact.size; index++) { // Scalar scatter add
+  size_t i = wireBottomA[index];
+  wire->Fx[i] += wireBottomFx[index];
+  wire->Fy[i] += wireBottomFy[index];
+  wire->Fz[i] += wireBottomFz[index];
+  /*assert_(length(vec3(wire->Fx[i],wire->Fy[i],wire->Fz[i])) < 100*N,
+          length(vec3(wire->Fx[i],wire->Fy[i],wire->Fz[i]))/N, "WB",
+          index, wireBottomA.size);*/
  }
  wireBottomSumTime.stop();
 }

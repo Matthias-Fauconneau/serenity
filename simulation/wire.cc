@@ -44,6 +44,10 @@ void Simulation::stepWireTension() {
   storeu(wire->Fx, i+1, loadu(wire->Fx, i+1) - FTx);
   storeu(wire->Fy, i+1, loadu(wire->Fy, i+1) - FTy);
   storeu(wire->Fz, i+1, loadu(wire->Fz, i+1) - FTz);
+  /*assert_(length(vec3(wire->Fx[i],wire->Fy[i],wire->Fz[i])) < 100*N,
+          length(vec3(wire->Fx[i],wire->Fy[i],wire->Fz[i]))/N, "WT");
+  assert_(length(vec3(wire->Fx[i+1],wire->Fy[i+1],wire->Fz[i+1])) < 100*N,
+          length(vec3(wire->Fx[i+1],wire->Fy[i+1],wire->Fz[i+1]))/N);*/
  }
  wireTensionTime.stop();
 }
@@ -101,22 +105,32 @@ void Simulation::stepWireIntegration() {
  parallel_chunk(align(simd, wire->count-fixLast)/simd, [this,maxWireVT2](uint id, size_t start, size_t size) {
    const vXsf dt_mass = floatX(dt / wire->mass), dt = floatX(this->dt);
    vXsf maxWireVX2 = _0f;
-   const float* Fx = wire->Fx.data, *Fy = wire->Fy.data, *Fz = wire->Fz.data;
+   const float* pFx = wire->Fx.data, *pFy = wire->Fy.data, *pFz = wire->Fz.data;
    float* const pVx = wire->Vx.begin(), *pVy = wire->Vy.begin(), *pVz = wire->Vz.begin();
-   float* const Px = wire->Px.begin(), *Py = wire->Py.begin(), *Pz = wire->Pz.begin();
+   float* const pPx = wire->Px.begin(), *pPy = wire->Py.begin(), *pPz = wire->Pz.begin();
    for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
     // Symplectic Euler
     vXsf Vx = load(pVx, i), Vy = load(pVy, i), Vz = load(pVz, i);
-    Vx += dt_mass * load(Fx, i);
-    Vy += dt_mass * load(Fy, i);
-    Vz += dt_mass * load(Fz, i);
+    /*for(size_t k: range(simd)) {
+     if(i+k >= (size_t)wire->count) break;
+     assert_(length(vec3(pFx[i+k],pFy[i+k],pFz[i+k])) < 100*N,
+             length(vec3(pFx[i+k],pFy[i+k],pFz[i+k]))/N, "S");
+    }*/
+    Vx += dt_mass * load(pFx, i);
+    Vy += dt_mass * load(pFy, i);
+    Vz += dt_mass * load(pFz, i);
     store(pVx, i, Vx);
     store(pVy, i, Vy);
     store(pVz, i, Vz);
-    store(Px, i, load(Px, i) + dt * Vx);
-    store(Py, i, load(Py, i) + dt * Vy);
-    store(Pz, i, load(Pz, i) + dt * Vz);
+    store(pPx, i, load(pPx, i) + dt * Vx);
+    store(pPy, i, load(pPy, i) + dt * Vy);
+    store(pPz, i, load(pPz, i) + dt * Vz);
     maxWireVX2 = max(maxWireVX2, Vx*Vx + Vy*Vy + Vz*Vz);
+    /*for(size_t k: range(simd)) {
+     if(i+k >= (size_t)wire->count) break;
+     assert_(length(vec3(pVx[i+k],pVy[i+k],pVz[i+k])) < 10*m/s,
+             length(vec3(pVx[i+k],pVy[i+k],pVz[i+k]))/(m/s));
+    }*/
    }
    float maxWireV2 = 0;
    for(size_t k: range(simd)) maxWireV2 = ::max(maxWireV2, extract(maxWireVX2, k));

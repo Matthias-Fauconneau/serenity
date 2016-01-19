@@ -201,7 +201,7 @@ struct SimulationView : Widget {
   }
 
   // Lines
-  {
+  if(0) {
    static GLShader shader {::shader_glsl(), {"interleaved flat"}};
    shader.bind();
    shader.bindFragments({"color"});
@@ -232,7 +232,7 @@ struct SimulationView : Widget {
    vertexArray.draw(Lines, positions.size);
   }
 
-  if(::faces) {
+  if(::faces && 0) {
    static GLShader shader {::shader_glsl(), {"interleaved flat"}};
    shader.bind();
    shader.bindFragments({"color"});
@@ -291,7 +291,12 @@ struct SimulationApp : Poll {
 
  SimulationApp(const Dict& parameters)
   : Poll(0, 0, simulationMasterThread), simulation(parameters), view(simulation) {
-  window->actions[Escape] = [this]{ exit(0);/*Calls destructors (Writes out profiles)*/ /*exit_group(0);*/ /*FIXME*/ };
+  window->actions[Escape] = [this]{
+   simulation.stop = true;
+   requestTermination();
+   simulationMasterThread.wait();
+   exit(0);/*Calls destructors (Writes out profiles)*/ /*exit_group(0);*/ /*FIXME*/
+  };
   window->presentComplete = [this]{
    window->render();
    window->setTitle(str(simulation.timeStep*simulation.dt /s, simulation.grain->count, simulation.voidRatio, simulation.maxGrainV /(m/s)));

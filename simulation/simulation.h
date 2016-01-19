@@ -19,6 +19,7 @@ extern array<int> faces;
 struct Simulation {
  const float dt;
  size_t timeStep = 0;
+ bool stop = false;
  const float normalDampingRate;
 
  const int targetGrainCount;
@@ -268,6 +269,7 @@ struct Simulation {
  void grainLattice();
 
  Time totalTime;
+ tsc totalTimeC;
  void step();
   tsc stepTime;
  void stepProcess();
@@ -275,6 +277,7 @@ struct Simulation {
  tsc grainTotalTime;
  void stepGrain();
   uint64 grainTime = 0;
+  tsc grainSideTime;
  void stepGrainBottom();
   tsc grainBottomTotalTime;
   uint64 grainBottomSearchTime = 0;
@@ -328,6 +331,7 @@ struct Simulation {
  void stepWireBendingResistance();
   tsc wireBendingResistanceTime;
  void stepWireBottom();
+  tsc wireBottomTotalTime;
   uint64 wireBottomSearchTime = 0;
   uint64 wireBottomFilterTime = 0;
   uint64 wireBottomEvaluateTime = 0;

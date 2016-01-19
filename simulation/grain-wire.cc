@@ -298,9 +298,7 @@ void Simulation::stepGrainWire() {
  grainWireFilterTime += parallel_chunk(align(simd, grainWireA.size)/simd, [&](uint, size_t start, size_t size) {
    for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
     vXsi A = *(vXsi*)(grainWireA.data+i), B = *(vXsi*)(grainWireB.data+i);
-    //for(int k: range(simd)) assert_(A[k] >= 0 && A[k] <= wire->count, A[k]);
     vXsf Ax = gather(grain->Px.data+simd, A), Ay = gather(grain->Py.data+simd, A), Az = gather(grain->Pz.data+simd, A);
-    //for(int k: range(simd)) assert_(B[k] >= 0 && B[k] <= wire->count);
     vXsf Bx = gather(wire->Px.data, B), By = gather(wire->Py.data, B), Bz = gather(wire->Pz.data, B);
     vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
     vXsf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
@@ -372,6 +370,8 @@ void Simulation::stepGrainWire() {
   size_t index = grainWireContact[i];
   size_t a = grainWireA[index];
   size_t b = grainWireB[index];
+  /*assert_(length(vec3(grainWireFx[i],grainWireFy[i],grainWireFz[i])) < 1*N,
+          length(vec3(grainWireFx[i],grainWireFy[i],grainWireFz[i]))/N);*/
   grain->Fx[simd+a] += grainWireFx[i];
   wire->Fx[b] -= grainWireFx[i];
   grain->Fy[simd+a] += grainWireFy[i];
@@ -381,6 +381,8 @@ void Simulation::stepGrainWire() {
   grain->Tx[simd+a] += grainWireTAx[i];
   grain->Ty[simd+a] += grainWireTAy[i];
   grain->Tz[simd+a] += grainWireTAz[i];
+  /*assert_(length(vec3(wire->Fx[i],wire->Fy[i],wire->Fz[i])) < 100*N,
+          length(vec3(wire->Fx[i],wire->Fy[i],wire->Fz[i]))/N, "GW");*/
  }
  grainWireSumTime.stop();
 }
