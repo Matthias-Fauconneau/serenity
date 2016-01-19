@@ -5,6 +5,7 @@
 #include "wire.h"
 #include "matrix.h"
 #include "gl.h"
+#include <stdlib.h>
 FILE(shader_glsl)
 
 Dict parameters() {
@@ -127,7 +128,7 @@ struct SimulationView : Widget {
     vec2 r = B.xy()-A.xy();
     float l = length(r);
     vec2 t = r/l;
-    vec3 n = scale*float(simulation.wire->radius)*vec3(t.y, -t.x, 0); // FIXME: hpx
+    vec3 n = scale*float(Wire::radius)*vec3(t.y, -t.x, 0); // FIXME: hpx
     vec3 P[4] {A-n, A+n, B-n, B+n};
     positions[s*6+0] = P[0];
     positions[s*6+1] = P[1];
@@ -145,8 +146,8 @@ struct SimulationView : Widget {
     shader.bind();
     shader.bindFragments({"color"});
     shader["transform"] = mat4(1);
-    shader["radius"] = float(scale.z/2 * simulation.wire->radius);
-    shader["hpxRadius"] = 1 / (size.x * scale.x * simulation.wire->radius);
+    shader["radius"] = float(scale.z/2 * Wire::radius);
+    shader["hpxRadius"] = 1 / (size.x * scale.x * Wire::radius);
     static GLVertexArray vertexArray;
     GLBuffer positionBuffer (positions);
     vertexArray.bindAttribute(shader.attribLocation("position"_),
@@ -290,7 +291,7 @@ struct SimulationApp : Poll {
 
  SimulationApp(const Dict& parameters)
   : Poll(0, 0, simulationMasterThread), simulation(parameters), view(simulation) {
-  window->actions[Escape] = [this]{ exit_group(0); /*FIXME*/ };
+  window->actions[Escape] = [this]{ exit(0);/*Calls destructors (Writes out profiles)*/ /*exit_group(0);*/ /*FIXME*/ };
   window->presentComplete = [this]{
    window->render();
    window->setTitle(str(simulation.timeStep*simulation.dt /s, simulation.grain->count, simulation.voidRatio, simulation.maxGrainV /(m/s)));

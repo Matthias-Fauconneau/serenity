@@ -3,10 +3,9 @@
 #include "core.h"
 
 // C runtime memory allocation
-extern "C" void* malloc(size_t size) /*noexcept*/;
-extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size) /*noexcept*/;
-extern "C" void free(void* buffer) /*noexcept*/;
-//#include <type_traits>
+extern "C" void* malloc(size_t size) noexcept;
+extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size) noexcept;
+extern "C" void free(void* buffer) noexcept;
 
 #if __INTEL_COMPILER
 #define __atomic_fetch_add __atomic_fetch_add_explicit

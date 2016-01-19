@@ -1,7 +1,7 @@
 #pragma once
 /// \file array.h Contiguous collection of elements
 #include "memory.h"
-extern "C" void* realloc(void* buffer, size_t size) /*noexcept*/;
+extern "C" void* realloc(void* buffer, size_t size) noexcept;
 
 /// Managed variable capacity reference to an array of elements
 /// \note Data is either an heap allocation managed by this object or a reference to memory managed by another object.

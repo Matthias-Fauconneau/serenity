@@ -174,7 +174,7 @@ void Simulation::stepGrainGrain() {
   swap(oldGrainGrainLocalBy, grainGrainLocalBy);
   swap(oldGrainGrainLocalBz, grainGrainLocalBz);
 
-  static constexpr uint averageGrainGrainContactCount = 7;
+  static constexpr uint averageGrainGrainContactCount = 8;
   uint GGcc = align(simd, grain->count * averageGrainGrainContactCount +1);
   if(GGcc > grainGrainA.capacity) {
    memoryTime.start();
@@ -270,7 +270,7 @@ void Simulation::stepGrainGrain() {
    }
   }
   if(!contactCount) return;
-  assert_(contactCount <= grainGrainA.capacity);
+  assert_(contactCount <= grainGrainA.capacity, contactCount.count, grainGrainA.capacity);
   grainGrainA.size = contactCount;
   grainGrainB.size = contactCount;
   grainGrainLocalAx.size = contactCount;
@@ -451,7 +451,9 @@ void Simulation::stepGrainGrain() {
   const uint chunkSize = (jobCount+threadCount-1)/threadCount;
   const uint chunkCount = (jobCount+chunkSize-1)/chunkSize;
   assert(chunkCount <= threadCount);
-  uint chunkDomainStarts[chunkCount], chunkDomainStops[chunkCount];
+  uint chunkDomainStarts_[chunkCount], chunkDomainStops_[chunkCount];
+  uint* const chunkDomainStarts = chunkDomainStarts_;
+  uint* const chunkDomainStops = chunkDomainStops_;
   // Evaluates domain (range) for each chunk
   auto domainMinMax = [&](uint, uint chunkIndex) {
    const int* const grainGrainContact = this->grainGrainContact.data;
@@ -477,7 +479,8 @@ void Simulation::stepGrainGrain() {
   /*mref<uint>(copyStart, maxCopyCount*maxDomainCount).clear(0);
   mref<uint>(copyStop, maxCopyCount*maxDomainCount).clear(0);*/
   copyStart.clear(0); copyStop.clear(0);
-  uint copy[maxCopyCount]; // Allocates buffer copies to chunks without range overlap
+  uint copy_[maxCopyCount]; // Allocates buffer copies to chunks without range overlap
+  uint* const copy = copy_;
   uint copyCount = 0;
   for(uint chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
    uint chunkDomainStart = chunkDomainStarts[chunkIndex];

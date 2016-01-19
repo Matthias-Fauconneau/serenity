@@ -149,8 +149,9 @@ void Simulation::stepMembraneIntegration() {
  float maxMembraneV2 = 0;
  if(membraneViscosity) {
   const size_t threadCount = ::threadCount();
-  float maxMembraneV2_[threadCount]; mref<float>(maxMembraneV2_, threadCount).clear(0);
-  membraneIntegrationTime += parallel_for(1, membrane->H-1, [this, &maxMembraneV2_](uint id, uint i) {
+  float maxMembraneVT2_[threadCount]; mref<float>(maxMembraneVT2_, threadCount).clear(0);
+  float* const maxMembraneVT2 = maxMembraneVT2_;
+  membraneIntegrationTime += parallel_for(1, membrane->H-1, [this, maxMembraneVT2](uint id, uint i) {
   const vXsf dt_mass = floatX(this->dt / membrane->mass), dt = floatX(this->dt);
    const vXsf membraneViscosity = floatX(this->membraneViscosity);
    vXsf maxMembraneVX2 = _0f;
@@ -199,9 +200,9 @@ void Simulation::stepMembraneIntegration() {
    pVx[i*stride+margin+W] = pVx[i*stride+margin+0];
    pVy[i*stride+margin+W] = pVy[i*stride+margin+0];
    pVz[i*stride+margin+W] = pVz[i*stride+margin+0];
-   maxMembraneV2_[id] = max(maxMembraneV2_[id], max(maxMembraneVX2));
+   maxMembraneVT2[id] = max(maxMembraneVT2[id], max(maxMembraneVX2));
   });
-  for(int k: range(threadCount)) maxMembraneV2 = ::max(maxMembraneV2, maxMembraneV2_[k]);
+  for(int k: range(threadCount)) maxMembraneV2 = ::max(maxMembraneV2, maxMembraneVT2[k]);
  }
  float maxGrainMembraneV = maxGrainV + sqrt(maxMembraneV2);
  grainMembraneGlobalMinD -= maxGrainMembraneV * this->dt;

@@ -41,6 +41,7 @@ inline String strD(const uint64 num, const uint64 div) {
  return div ? str(uint(round(100*float(num)/float(div))))+'%' : String();
 }
 inline String strD(const tsc& num, const tsc& div) { return strD(num.cycleCount(), div.cycleCount()); }
+inline String str(const tsc& t) { return str(t.cycleCount()/1e9f)+"Gc"_; }
 
 struct Time {
     uint64 startTime=realTime(), stopTime=0;

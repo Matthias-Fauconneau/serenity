@@ -123,6 +123,16 @@ Image rotateHalfTurn(Image&& target) {
  return move(target);
 }
 
+Image negate(Image&& target, const Image& source) {
+    for(uint y: range(target.size.y)) for(uint x: range(target.size.x)) {
+        byte4 BGRA = source(x, y);
+        vec3 linear = vec3(sRGB_reverse[BGRA[0]], sRGB_reverse[BGRA[1]], sRGB_reverse[BGRA[2]]);
+        int3 negate = int3(round((float(0xFFF)*(vec3(1)-linear))));
+        target(x,y) = byte4(sRGB_forward[negate[0]], sRGB_forward[negate[1]], sRGB_forward[negate[2]], BGRA.a);
+    }
+    return move(target);
+}
+
 // -- Resample (3x8bit) --
 
 static void bilinear(const Image& target, const Image& source) {

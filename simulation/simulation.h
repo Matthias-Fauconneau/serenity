@@ -57,7 +57,7 @@ struct Simulation {
 
  const float patternRadius;
  enum Pattern { None, Helix, Cross, Loop };
- sconst string patterns[] {"none", "helix", "radial", "spiral"};
+ sconst string patterns[] {"none"_, "helix"_, "radial"_, "spiral"_};
  const Pattern pattern;
  const float loopAngle = PI*(3-sqrt(5.));
 

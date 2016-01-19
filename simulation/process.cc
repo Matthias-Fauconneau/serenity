@@ -94,15 +94,21 @@ void Simulation::stepProcess() {
     end = vec2((R-r)*cos(A)+r*cos(a),(R-r)*sin(A)+r*sin(a));
     winchAngle += linearSpeed/r * dt;
    } else error("Unknown pattern:", int(pattern));
-   float z = currentHeight/*+grain->radius*/+Wire::radius; // Over pour
+   float z = currentHeight+grain->radius+Wire::radius; // Over pour
    //float z = currentHeight-grain->radius-Wire::radius; // Under pour
    vec3 relativePosition = vec3(end.x, end.y, z) - wire->position(wire->count-1);
    float length = ::length(relativePosition);
    if(length >= wire->internodeLength) {
-    assert(wire->count < wire->capacity);
-    vec3 p = wire->position(wire->count-1) + wire->internodeLength/length * relativePosition;
+    assert(wire->count < (int)wire->capacity);
+    vec3 newPosition = wire->position(wire->count-1) + wire->internodeLength/length * relativePosition;
+    // Without grain overlap
+    for(size_t index: range(grain->count))
+     if(::length(grain->position(index) - newPosition) < grain->radius+Wire::radius) {
+      //log("Grain blocks wire trajectory");
+      return;
+     }
     size_t i = wire->count++;
-    wire->Px[i] = p[0]; wire->Py[i] = p[1]; wire->Pz[i] = p[2];
+    wire->Px[i] = newPosition[0]; wire->Py[i] = newPosition[1]; wire->Pz[i] = newPosition[2];
     wire->Vx[i] = 0; wire->Vy[i] = 0; wire->Vz[i] = 0;
     // Forces verlet lists reevaluation
     grainWireGlobalMinD = 0;
@@ -110,7 +116,7 @@ void Simulation::stepProcess() {
   }
 
   // Generates grain
-  if(currentHeight >= grain->radius && 0) {
+  if(currentHeight >= grain->radius && 1) {
    for(;;) {
     if(grain->count == targetGrainCount) break;
     vec2 p(random()*2-1,random()*2-1);
@@ -119,9 +125,10 @@ void Simulation::stepProcess() {
      vec3 newPosition (inradius*p.x, inradius*p.y, grain->radius);
      if(grain->count) {// Deposits grain without grain overlap
       const/*expr*/ size_t threadCount = ::threadCount();
-      float maxZ_[threadCount]; mref<float>(maxZ_, threadCount).clear(0);
+      float maxTZ_[threadCount]; mref<float>(maxTZ_, threadCount).clear(0);
+      float* const maxTZ = maxTZ_;
       processTime += parallel_chunk(align(simd, grain->count)/simd,
-                                    [this, newPosition, &maxZ_](uint id, size_t start, size_t size) {
+                                    [this, newPosition, maxTZ](uint id, size_t start, size_t size) {
        float* const pPx = grain->Px.begin()+simd, *pPy = grain->Py.begin()+simd, *pPz = grain->Pz.begin()+simd;
        const vXsf nPx = floatX(newPosition.x), nPy = floatX(newPosition.y);
        const vXsf _2_Gr2 = floatX(sq(2*grain->radius));
@@ -133,10 +140,10 @@ void Simulation::stepProcess() {
         vXsf Dz = sqrt(_2_Gr2 - Dxy2);
         maxZ = max(Pz+Dz, maxZ); // Dxy2>_2Gr2: max(NaN, z) = z
        }
-       maxZ_[id] = max(maxZ_[id], max(maxZ));
+       maxTZ[id] = max(maxTZ[id], max(maxZ));
       });
-      for(size_t k: range(threadCount)) newPosition.z = ::max(newPosition.z, maxZ_[k]);
-      // for(size_t k: range(threadCount)) log(k, maxZ_[k]);
+      for(size_t k: range(threadCount)) newPosition.z = ::max(newPosition.z, maxTZ[k]);
+      // for(size_t k: range(threadCount)) log(k, maxTZ[k]);
       //log(newPosition.z);
      }
      // Under current wire drop height
@@ -151,8 +158,8 @@ void Simulation::stepProcess() {
       grain->Py[simd+i] = newPosition.y;
       grain->Pz[simd+i] = newPosition.z;
       grain->Vx[simd+i] = 0; grain->Vy[simd+i] = 0;
-      grain->Vz[simd+i] = -1 * m/s;
-      //grain->Vz[simd+i] = 0 * m/s;
+      //grain->Vz[simd+i] = -1 * m/s;
+      grain->Vz[simd+i] = 0 * m/s;
       grain->AVx[simd+i] = 0; grain->AVy[simd+i] = 0; grain->AVz[simd+i] = 0;
       float t0 = 2*PI*random();
       float t1 = acos(1-2*random());

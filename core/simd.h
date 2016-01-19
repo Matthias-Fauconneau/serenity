@@ -248,7 +248,12 @@ static inline v8si greaterThan(v8sf a, v8sf b) { return (v8si)(v8sf)_mm256_cmp_p
 static inline v8si greaterThanOrEqual(v8sf a, v8sf b) { return (v8si)(v8sf)_mm256_cmp_ps(a, b, _CMP_GE_OS); }
 static inline v8si equal(v8sf a, v8sf b) { return (v8si)(v8sf)_mm256_cmp_ps(a, b, _CMP_EQ_OQ); }
 static inline v8si notEqual(v8si a, v8si b) {
- return (__m256i)_mm256_andnot_ps((__m256)(__m256i)_mm256_cmpeq_epi32(a, b), (__m256)(__m256i)_1i); }
+#if AVX2
+ return (__m256i)_mm256_andnot_ps((__m256)(__m256i)_mm256_cmpeq_epi32(a, b), (__m256)(__m256i)_1i);
+#else
+ return (v8si)(v8sf)_mm256_cmp_ps((v8sf)a, (v8sf)b, _CMP_NEQ_UQ);
+#endif
+}
 #else
 static inline v8si lessThan(v8sf a, v8sf b) { return a < b; }
 static inline v8si greaterThan(v8sf a, v8sf b) { return a > b; }
@@ -257,8 +262,8 @@ static inline v8si notEqual(v8si a, v8si b) { return a != b; }
 static inline v8si equal(v8sf a, v8sf b) { return a == b; }
 #endif
 
-static const unused v8si select {1<<7, 1<<6, 1<<5, 1<<4,  1<<3, 1<<2, 1<<1, 1<<0};
-static inline v8si expandMask(const uint8 mask) { return notEqual(intX(mask) & select, _0i); }
+static const unused v8si selectMask {1<<7, 1<<6, 1<<5, 1<<4,  1<<3, 1<<2, 1<<1, 1<<0};
+static inline v8si expandMask(const uint8 mask) { return notEqual(intX(mask) & selectMask, _0i); }
 
 #if __clang__
 static inline v8sf blend(v8si k, v8sf a, v8sf b) { return __builtin_ia32_blendvps256(a, b, k); }

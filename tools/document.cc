@@ -109,16 +109,16 @@ struct Document {
 
  /// Parses a sub|super script expression
  String parseScript(TextData& s, const ref<string>& delimiters) const {
-  ref<string> lefts {"["_,"{"_,"⌊"_};
-  ref<string> rights{"]"_,"}"_,"⌋"_};
+  /*static ref<string> lefts {"["_,"{"_,"⌊"_};
+  static ref<string> rights{"]"_,"}"_,"⌋"_};*/
 
   array<char> e;
-  if(!s.wouldMatchAny(lefts)) e.append( s.next() );
+  //if(!s.wouldMatchAny(lefts)) e.append( s.next() );
   for(;;) {
    if(!s || s.wouldMatchAny(delimiters)) break;
    else if(s.match('_')) e.append( subscript(parseScript(s, delimiters)) );
    else {
-    for(int index: range(lefts.size)) {
+    /*for(int index: range(lefts.size)) {
      if(s.match(lefts[index])) {
       if(index>=2) e.append( lefts[index] );
       String content = parseText(s, {rights[index]});
@@ -128,10 +128,10 @@ struct Document {
       if(index>=2) e.append( rights[index] );
       goto break_;
      }
-    } /*else*/
+    }*/ /*else*/
     if(s.wouldMatchAny(" \t\n,.;()^+-|*"_) || s.wouldMatchAny({"\xC2\xA0"_,"·"_,"⌋"_,"²"_})) break;
     else e.append( s.next() );
-break_:;
+    //break_:;
    }
   }
   if(e.size==0 || e.size>15) warn(s,  "Long subscript"_);
@@ -160,7 +160,7 @@ break_:;
     String num = regular(trim(parseText(s, {"/"_,"}"_,"\n"_, "\""_})));
     if(!s.match('/')) warn(s, "Expected / stack delimiter, got '"_+s.peek()+"'"_);
     bool fraction = s.match('/');
-    String den = regular(trim(parseText(s, {"}"_,"\n"_})) ?: "?"_);
+    String den = regular(trim(parseText(s, {"}"_,"\n"_})));
     if(!s.match('}')) warn(s, "Expected } stack delimiter, got '"_+s.peek()+"'"_);
     text.append(fraction ? ::fraction(num+den) : ::stack(num+den));
    }
@@ -176,14 +176,14 @@ break_:;
   s.skip('('); s.whileAny(" "_);
   array<Widget*> children;
   char type = 0; int width=0;
-  while(!s.match(')')) {
+  for(;;) {
    children.append(parseWidget(s, page, quick));
    s.whileAny(" "_);
    // Separator
-   if((type=='+' || type=='$') && s.match('\n')) { if(!width) width=children.size; if(children.size%width) warn(s, children.size ,width);/*FIXME*/ }
+   if((type=='+' || type=='&') && s.match('\n')) { if(!width) width=children.size; if(children.size%width) warn(s, children.size ,width);/*FIXME*/ }
    else if(!type && s.match('\n')) {
     s.whileAny(" \n"_);
-    if(s.wouldMatchAny("-|+$"_)) type = s.next();
+    if(s.wouldMatchAny("-|+&"_)) type = s.next();
     else type='\n';
    }
    else if(type=='\n' && s.match('\n')) {}
@@ -192,18 +192,18 @@ break_:;
     s.whileAny(" \n"_); // \n might be tight list or array width specifier
     /**/ if(s.match(')')) break;
     else if(type && s.match(type)) {}
-    else if(!type && s.wouldMatchAny("-|+$"_)) type = s.next();
+    else if(!type && s.wouldMatchAny("-|+&"_)) type = s.next();
     else {
-     children.append(&warnText(s, page, "Expected "_+(type?"'"_+str(type)+"'"_:"-, |, +, $ "_),
-                               "or ), got '"_+(s?s.peek():'$')+"'"_));
+     children.append(&warnText(s, page, "Expected "_+(type?"'"_+str(type)+"'"_:"-, |, +, & "_),
+                               "or ), got '"_+/*(s?s.peek():'&')*/s.peek(16)+"'"_));
      break;
     }
    }
   }
   if(type=='-') return &element<VBox>(page, move(children), VBox::Spread, VBox::AlignCenter, false);
-  else if(type=='|' || type=='@') return &element<HBox>(page, move(children), HBox::Share, HBox::AlignCenter, /*true*/false);
+  else if(type=='|' || type=='@') return &element<HBox>(page, move(children), HBox::Share, HBox::AlignCenter, false);
   else if(type=='+') return &element<WidgetGrid>(page, move(children), false, false, width);
-  else if(type=='$') return &element<WidgetGrid>(page, move(children), true, true, width);
+  else if(type=='&') return &element<WidgetGrid>(page, move(children), true, true, width);
   else if(type=='\n') return &element<VBox>(page, move(children), VBox::Center, VBox::AlignCenter, false);
   else if(!type) {
    if(!children) return &warnText(s, page, "Empty layout");
@@ -215,15 +215,15 @@ break_:;
 
  Widget* parseImage(TextData& s, Page& page, bool quick) const {
   s.skip('@');
-  //bool negate = s.match('-');
-  string path = s.whileNo(" \t\n)|+$"_);
+  bool negate = s.match('-');
+  string path = s.whileNo(" \t\n)|+-&"_);
   if(quick) return &element<Placeholder>(page); //FIXME
   Image image;
   /**/ if(existsFile(path)) image = decodeImage(readFile(path));
   else if(existsFile(path+".png"_)) image = decodeImage(readFile(path+".png"_));
   else if(existsFile(path+".jpg"_)) image = decodeImage(readFile(path+".jpg"_));
   if(!image) return &warnText(s, page, "Missing image", path);
-  //if(negate) image = ::negate(move(image), image);
+  if(negate) image = ::negate(move(image), image);
   page.images.append( unique<Image>(move(image)) );
   return &element<ImageView>(page, unsafeShare<byte4>(page.images.last()));
  }
@@ -247,7 +247,7 @@ break_:;
   else {
    String text;
    if(s.match('"')) { text = parseText(s, {"\""_}); s.skip("\""_); }
-   else text = parseText(s, {"\n"_,"|"_,"-"_,"+"_,"$"_,")"_});
+   else text = parseText(s, {"\n"_,"|"_,"-"_,"+"_,"&"_,")"_});
    return &newText(page, trim(text), format.textSize, false);
   }
  }
@@ -306,6 +306,7 @@ break_:;
      VBox* list = 0;
      uint topIndex = -1;
      for(const Header& header: headers) {
+      if(header.indices.size >= 3) continue;
       if(header.indices[0] != topIndex) {
        if(list) grid.append(list);
        list = &element<VBox>(page, VBox::Center, VBox::AlignCenter, false);
@@ -389,9 +390,10 @@ struct PageView : Widget {
   : pageCount(pageCount), getPage(getPage), pageIndex(min(pageIndex, pageCount-1)) {}
 
  bool keyPress(Key key, Modifiers) override {
-  /**/ if(key == LeftArrow) pageIndex = max(0, pageIndex-1);
-  else if(key == RightArrow) pageIndex = min(pageCount-1, pageIndex+1);
+  /**/ if(key == LeftArrow) pageIndex--;
+  else if(key == RightArrow) pageIndex++;
   else return false;
+  pageIndex = clamp(0, pageIndex, pageCount-1);
   page = getPage(pageIndex);
   return true;
  }
@@ -423,7 +425,9 @@ struct DocumentViewer {
    window->setTitle(str(pageIndex));
    writeFile(lastPageIndexPath, str(pageIndex), currentWorkingDirectory(), true);
   }
-  //document.~Document(); new (&document) Document(readFile(path)); // FIXME: FileWatcher does not work properly
+  document.~Document(); new (&document) Document(readFile(path)); // FIXME: FileWatcher does not work properly
+  view.pageCount = document.pages.size;
+  view.pageIndex = min(view.pageIndex, view.pageCount-1);
   return document.parsePage(pageIndex);
  }
 

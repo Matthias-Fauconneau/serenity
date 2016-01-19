@@ -82,8 +82,9 @@ void Simulation::stepGrainIntegration() {
   grain->Fz[simd+i] = 0;
  }
  const/*expr*/ size_t threadCount = ::threadCount();
- float maxGrainV2_[threadCount]; mref<float>(maxGrainV2_, threadCount).clear(0);
- grainIntegrationTime += parallel_chunk(align(simd, grain->count)/simd, [this, &maxGrainV2_](uint id, size_t start, size_t size) {
+ float maxGrainVT2_[threadCount]; mref<float>(maxGrainVT2_, threadCount).clear(0);
+ float* const maxGrainVT2 = maxGrainVT2_;
+ grainIntegrationTime += parallel_chunk(align(simd, grain->count)/simd, [this, maxGrainVT2](uint id, size_t start, size_t size) {
   const vXsf dt_mass = floatX(dt / grain->mass), dt = floatX(this->dt);
   const vXsf dt_2 = floatX(this->dt / 2);
   const vXsf dt_angularMass = floatX(this->dt / grain->angularMass);
@@ -155,10 +156,10 @@ void Simulation::stepGrainIntegration() {
     store(pRw, i, normalize*Rw);
    }
   }
-  maxGrainV2_[id] = max(maxGrainV2_[id], max(maxGrainVX2));
+  maxGrainVT2[id] = max(maxGrainVT2[id], max(maxGrainVX2));
  }, threadCount);
  float maxGrainV2 = 0;
- for(size_t k: range(threadCount)) maxGrainV2 = ::max(maxGrainV2, maxGrainV2_[k]);
+ for(size_t k: range(threadCount)) maxGrainV2 = ::max(maxGrainV2, maxGrainVT2[k]);
  maxGrainV = sqrt(maxGrainV2);
  float maxGrainGrainV = maxGrainV + maxGrainV;
  grainGrainGlobalMinD -= maxGrainGrainV * this->dt;

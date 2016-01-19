@@ -93,7 +93,7 @@ void Stream::read(mref<byte> target) {
 buffer<byte> Stream::readUpTo(size_t capacity) {
  buffer<byte> buffer(capacity);
  buffer.size = check( ::read(fd, (void*)buffer.data, capacity) );
- assert_(buffer.size < buffer.capacity);
+ assert_(buffer.size < buffer.capacity, buffer.size, buffer.capacity);
  return buffer;
 }
 

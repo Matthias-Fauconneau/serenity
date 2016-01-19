@@ -134,12 +134,13 @@ bool Build::compileModule(string target) {
    int pid = wait(); // Waits for any child to terminate
    int status = wait(pid);
    Job job = jobs.take(jobs.indexOf(pid));
-   log(job.stdout.readUpTo(32768));
+   log(job.stdout.readUpTo(65536));
    if(status) { log("Failed to compile\n"); return false; }
    else log(job.target+'\n');
   }
   Folder(tmp+"/"+join(flags,string("-"_))+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
   Stream stdout;
+  //::log(args);
   int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++11",
                                      "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing",
                                      "-I/usr/include/freetype2","-I/var/tmp/include", "-iquote.",
@@ -185,6 +186,15 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
   linkArgs.append("-mmic"__);
  }
  if(flags.contains("openmp"_)) { args.append("-fopenmp"__); linkArgs.append("-fopenmp"__); }
+ if(flags.contains("pg"_)) {
+  args.append("-fprofile-generate"__);
+  linkArgs.append("-fprofile-generate"__);
+ }
+ if(flags.contains("pgu"_)) {
+  args.append("-fprofile-use"__);
+  linkArgs.append("-fprofile-use"__);
+ }
+ if(flags.contains("asan"_)) args.append("-fsanitize=address"__);
  for(string flag: flags) if(startsWith(flag,"O")) args.append("-"+flag);
  args.append( "-DARGS=\""+str(args)+"\"");
  args.append(apply(folder.list(Folders), [this](string subfolder)->String{ return "-iquote"+subfolder; }));

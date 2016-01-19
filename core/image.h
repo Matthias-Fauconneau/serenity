@@ -74,6 +74,8 @@ inline Image rotate(const Image& source) { return rotate(Image(int2(source.size.
 /// Rotates an image around
 Image rotateHalfTurn(Image&& target);
 
+Image negate(Image&& target, const Image& source);
+
 // -- Resample (3x8bit) --
 
 /// Resizes \a source into \a target

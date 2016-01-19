@@ -642,7 +642,7 @@ struct Review {
    plot.plotBandsY = true;
    plot.max.y = array.max;
   } else if(index==Deviatoric) {
-   plot.ylabel = /*Deviatoric*/"Shear stress (KPa)"__;
+   plot.ylabel = /*Deviatoric*/"Maximum shear stress (KPa)"__;
    plot.plotPoints = true;
    plot.plotLines = false;
    if(plotIndex!=invalid) {

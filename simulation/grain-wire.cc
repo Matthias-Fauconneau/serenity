@@ -277,9 +277,9 @@ void Simulation::stepGrainWire() {
   }, 1 /*FIXME: grainWireIndex*/);
 
   assert(align(simd, grainWireA.size+1) <= grainWireA.capacity);
-  for(size_t i=grainWireA.size; i<align(simd, grainWireA.size +1); i++) grainWireA.begin()[i] = -1;
+  for(size_t i=grainWireA.size; i<align(simd, grainWireA.size +1); i++) grainWireA.begin()[i] = wire->count;
   assert(align(simd, grainWireB.size+1) <= grainWireB.capacity);
-  for(size_t i=grainWireB.size; i<align(simd, grainWireB.size +1); i++) grainWireB.begin()[i] = -1;
+  for(size_t i=grainWireB.size; i<align(simd, grainWireB.size +1); i++) grainWireB.begin()[i] = wire->count;
 
   grainWireGlobalMinD = /*minD*/verletDistance - (grain->radius+Wire::radius);
   if(grainWireGlobalMinD < 0) log("grainWireGlobalMinD", grainWireGlobalMinD);
@@ -298,7 +298,9 @@ void Simulation::stepGrainWire() {
  grainWireFilterTime += parallel_chunk(align(simd, grainWireA.size)/simd, [&](uint, size_t start, size_t size) {
    for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
     vXsi A = *(vXsi*)(grainWireA.data+i), B = *(vXsi*)(grainWireB.data+i);
+    //for(int k: range(simd)) assert_(A[k] >= 0 && A[k] <= wire->count, A[k]);
     vXsf Ax = gather(grain->Px.data+simd, A), Ay = gather(grain->Py.data+simd, A), Az = gather(grain->Pz.data+simd, A);
+    //for(int k: range(simd)) assert_(B[k] >= 0 && B[k] <= wire->count);
     vXsf Bx = gather(wire->Px.data, B), By = gather(wire->Py.data, B), Bz = gather(wire->Pz.data, B);
     vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
     vXsf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);

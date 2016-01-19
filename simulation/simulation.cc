@@ -50,7 +50,7 @@ Simulation::Simulation(const Dict& p) :
   plateSpeed((float)p.at("Speed")*mm/s),
   patternRadius(membrane->radius - grain->radius),
   pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):None),
-  currentHeight(wire->radius/*grain->radius*/),
+  currentHeight(Wire::radius/*grain->radius*/),
   topZ(membrane->height),
   latticeRadius(useMembrane?membrane->radius+grain->radius:2*membrane->radius),
   lattice {sqrt(3.)/(2*grain->radius), vec3(vec2(-latticeRadius), -grain->radius*2),
@@ -61,7 +61,7 @@ Simulation::Simulation(const Dict& p) :
   assert_(wire->count < (int)wire->capacity);
   wire->Px[i] = patternRadius;
   wire->Py[i] = 0;
-  wire->Pz[i] = currentHeight+/*grain->radius+*/Wire::radius;
+  wire->Pz[i] = currentHeight+grain->radius+Wire::radius;
   wire->Vx[i] = 0; wire->Vy[i] = 0; wire->Vz[i] = 0;
   winchAngle += wire->internodeLength / currentWinchRadius;
  }
@@ -170,7 +170,12 @@ void Simulation::profile() {
 
  profile.insertSortedMulti(grainTotalTime, "=sum{grain}"+
                            strD(grainTime+grainBottomTotalTime+grainTopTotalTime+grainGrainTotalTime
-                                +grainIntegrationTime, grainTotalTime));
+                                +grainIntegrationTime, grainTotalTime)
+                           +" "+strD(grainTime, grainTotalTime)
+                           +" "+strD(grainBottomTotalTime, grainTotalTime)
+                           +" "+strD(grainTopTotalTime, grainTotalTime)
+                           +" "+strD(grainGrainTotalTime, grainTotalTime)
+                           +" "+strD(grainIntegrationTime, grainTotalTime));
  if(reset) grainTotalTime.reset();
  logTime(grain);
  profile.insertSortedMulti(grainBottomTotalTime, "=sum{grain-bottom}"_+
@@ -230,13 +235,16 @@ void Simulation::profile() {
  logTime(wireInitialization);
  logTime(wireTension);
  logTime(wireBendingResistance);
+ logTime(wireBottomSearch);
  logTime(wireBottomFilter);
  logTime(wireBottomEvaluate);
  logTime(wireBottomSum);
+
  logTime(grainWireSearch);
  logTime(grainWireFilter);
  logTime(grainWireEvaluate);
  logTime(grainWireSum);
+
  logTime(wireIntegration);
 
 #undef logTime

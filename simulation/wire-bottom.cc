@@ -4,10 +4,12 @@
 #include "wire.h"
 #include "plate.h"
 
+//Simulation* simulation; // DEBUG
+
 //FIXME: factorize Wire and Grain - Bottom/Top
 void evaluateWireObstacle(const int start, const int size,
-                                     const int* wireObstacleContact,
-                                     const int* wireObstacleA,
+                                     const int* wireObstacleContact, //int wireObstacleContactSize,
+                                     const int* wireObstacleA, //int wireObstacleASize,
                                      const float* wirePx, const float* wirePy, const float* wirePz,
                                      const vXsf obstacleZ, const vXsf Wr,
                                      float* const wireObstacleLocalAx, float* const wireObstacleLocalAy, float* const wireObstacleLocalAz,
@@ -20,8 +22,12 @@ void evaluateWireObstacle(const int start, const int size,
                                      float* const pFx, float* const pFy, float* const pFz) {
  for(int i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
   const vXsi contacts = *(vXsi*)(wireObstacleContact+i);
+  /*for(int k: range(simd)) assert_(contacts[k] >= 0 && contacts[k] <= wireObstacleASize,
+                                  start, size, i+k, wireObstacleContactSize,
+                                  contacts[k], wireObstacleASize);*/
   const vXsi A = gather(wireObstacleA, contacts);
   // FIXME: Recomputing from intersection (more efficient than storing?)
+  //for(int k: range(simd)) assert_(A[k] >= 0 && A[k] <= simulation->wire->count, A[k]);
   const vXsf Ax = gather(wirePx, A), Ay = gather(wirePy, A), Az = gather(wirePz, A);
   const vXsf depth = (obstacleZ+Wr) - Az; // Top: Az - (obstacleZ-Gr);
   const vXsf Nx = _0f, Ny = _0f, Nz = _1f;
@@ -145,7 +151,7 @@ void Simulation::stepWireBottom() {
   swap(oldWireBottomLocalBz, wireBottomLocalBz);
 
   static constexpr size_t averageWireBottomContactCount = 1;
-  size_t WBcc = align(simd, wire->count * averageWireBottomContactCount);
+  size_t WBcc = align(simd, wire->count * averageWireBottomContactCount + 1);
   if(WBcc > wireBottomA.capacity) {
    wireBottomA = buffer<int>(WBcc, 0);
    wireBottomLocalAx = buffer<float>(WBcc, 0);
@@ -191,9 +197,10 @@ void Simulation::stepWireBottom() {
       wireBottomI++;
     }
   };
-  wireBottomFilterTime += parallel_chunk(wire->count, search, 1 /*FIXME*/);
+  wireBottomSearchTime += parallel_chunk(wire->count, search, 1 /*FIXME*/);
 
-  for(size_t i=wireBottomA.size; i<align(simd, wireBottomA.size); i++) wireBottomA.begin()[i] = -1;
+  assert_(align(simd, wireBottomA.size+1) <= wireBottomA.capacity);
+  for(size_t i=wireBottomA.size; i<align(simd, wireBottomA.size+1); i++) wireBottomA.begin()[i] = wire->count;
  }
  if(!wireBottomA.size) return;
 
@@ -215,6 +222,7 @@ void Simulation::stepWireBottom() {
      // Instead of packing (copying) the unpacked list to a packed contact list
      // To keep track of where to write back (unpacked) contact positions (for static friction)
      // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
+     //assert_(j < wireBottomA.size);
      wireBottomContact.appendAtomic( j );
     } else {
      // Resets contact (static friction spring)
@@ -223,12 +231,13 @@ void Simulation::stepWireBottom() {
    }
   }
  };
- wireBottomFilterTime += parallel_chunk(align(simd, wireBottomA.size)/simd, filter, 1/*JICTBS*/);
+ wireBottomFilterTime += parallel_chunk(align(simd, wireBottomA.size)/simd, filter);
+ if(!wireBottomContact) return;
  for(size_t i=wireBottomContact.size; i<align(simd, wireBottomContact.size); i++)
   wireBottomContact.begin()[i] = wireBottomA.size;
 
  // Evaluates forces from (packed) intersections (SoA)
- const size_t WBcc = align(simd, wireBottomA.size); // Wire-Bottom contact count
+ const size_t WBcc = align(simd, wireBottomContact.size); // Wire-Bottom contact count
  if(WBcc > wireBottomFx.capacity) {
   wireBottomFx = buffer<float>(WBcc);
   wireBottomFy = buffer<float>(WBcc);
@@ -242,10 +251,11 @@ void Simulation::stepWireBottom() {
  const float K = 4./3*E*sqrt(R);
  const float mass = 1/(1/wire->mass/*+1/Plate::mass*/);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
+ //::simulation = this; // DEBUG
  wireBottomEvaluateTime += parallel_chunk(WBcc/simd, [&](uint, size_t start, size_t size) {
    evaluateWireObstacle(start, size,
-                     wireBottomContact.data,
-                     wireBottomA.data,
+                     wireBottomContact.data, //wireBottomContact.size,
+                     wireBottomA.data, //wireBottomA.size,
                      wire->Px.data, wire->Py.data, wire->Pz.data,
                      floatX(bottomZ), floatX(Wire::radius),
                      wireBottomLocalAx.begin(), wireBottomLocalAy.begin(), wireBottomLocalAz.begin(),
@@ -255,7 +265,7 @@ void Simulation::stepWireBottom() {
                      floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping),
                      wire->Vx.data, wire->Vy.data, wire->Vz.data,
                      wireBottomFx.begin(), wireBottomFy.begin(), wireBottomFz.begin() );
- }, 1/*JICTBS*/);
+ });
 
  wireBottomSumTime.start();
  for(size_t index = 0; index < wireBottomA.size; index++) { // Scalar scatter add
