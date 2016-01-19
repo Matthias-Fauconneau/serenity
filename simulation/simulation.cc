@@ -11,7 +11,7 @@
 //#include "grain-membrane.h"
 #include "wire.h"
 //#include "wire-bottom.h"
-//#include "grain-wire.h"
+//#include "wire-grain.h"
 
 constexpr string Simulation::patterns[];
 
@@ -21,35 +21,35 @@ array<vec2x3> lines;
 array<int> faces;
 
 Simulation::Simulation(const Dict& p) :
-  dt((float)p.at("TimeStep")*s),
+  dt((float)p.value("TimeStep",10e-6)*s),
   normalDampingRate((float)p.value("nDamping",1.f)*1),
-  targetGrainCount(4*PI*cb((float)p.at("Radius")*mm)/(4./3*PI*cb(p.value("grainRadius",2.5f)*mm))
+  targetGrainCount(4*PI*cb((float)p.value("Radius", 100)*mm)/(4./3*PI*cb(p.value("grainRadius", 20 /*2.5f*/)*mm))
                               /(1+0.611)-49),
-  grain(p.value("grainRadius",2.5f)*mm,
-           p.value("grainDensity", 7.8e3f)*kg/cb(m),
-           p.value("grainShearModulus", 77000)*MPa,
-           p.value("grainPoissonRatio", 0.28),
-           p.value("grainWallThickness", 0),
+  grain(p.value("grainRadius", 20 /*2.5f*/)*mm,
+           p.value("grainDensity", 1.4e3 /*7.8e3f*/)*kg/cb(m),
+           p.value("grainShearModulus", 30 /*77000*/)*MPa,
+           p.value("grainPoissonRatio", 0.35 /*0.28*/),
+           p.value("grainWallThickness", 0.4 /*0*/),
            targetGrainCount),
-  membrane((float)p.at("Radius")*mm, grain->radius),
+  membrane((float)p.value("Radius", 100)*mm, grain->radius),
   wire(grain->radius/2),
   targetDynamicGrainObstacleFrictionCoefficient(0.228),
   targetDynamicGrainMembraneFrictionCoefficient(0.228),
   targetDynamicGrainGrainFrictionCoefficient(0.096),
-  targetDynamicGrainWireFrictionCoefficient(1/*0.228*/),
+  targetDynamicWireGrainFrictionCoefficient(1/*0.228*/),
   targetDynamicWireBottomFrictionCoefficient(1),
-  targetStaticFrictionSpeed((float)p.at("sfSpeed")*m/s),
-  targetStaticFrictionLength((float)p.at("sfLength")*m),
-  targetStaticFrictionStiffness((float)p.at("sfStiffness")/m),
-  targetStaticFrictionDamping((float)p.at("sfDamping")*N/(m/s)),
+  targetStaticFrictionSpeed((float)p.value("sfSpeed", 0.1f)*m/s),
+  targetStaticFrictionLength((float)p.value("sfLength", 1e-3f)*m),
+  targetStaticFrictionStiffness((float)p.value("sfStiffness", 1e3f)/m),
+  targetStaticFrictionDamping((float)p.value("sfDamping", 10)*N/(m/s)),
   useMembrane(p.value("Membrane", 1)),
-  Gz(-(float)p.value("G", 4000*10.f)*N/kg),
-  verticalSpeed(p.value("verticalSpeed",1.f)*m/s),
+  Gz(-(float)p.value("G", /*4000**/10.f)*N/kg),
+  verticalSpeed(p.value("verticalSpeed",0.02f)*m/s),
   linearSpeed(p.value("linearSpeed",1.f)*m/s),
-  targetPressure((float)p.at("Pressure")*Pa),
-  plateSpeed((float)p.at("Speed")*mm/s),
+  targetPressure((float)p.value("Pressure", 80e3f)*Pa),
+  plateSpeed((float)p.value("Speed", 10)*mm/s),
   patternRadius(membrane->radius - grain->radius),
-  pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):None),
+  pattern(Pattern(ref<string>(patterns).indexOf(p.value("Pattern","helix")))),
   currentHeight(0?Wire::radius:grain->radius),
   topZ(membrane->height),
   latticeRadius(useMembrane?membrane->radius+grain->radius:2*membrane->radius),
@@ -57,6 +57,7 @@ Simulation::Simulation(const Dict& p) :
                                            vec3(vec2(latticeRadius), membrane->height+grain->radius)}
 {
  log(p);
+ assert(str(p).size < 256, str(p).size);
  if(pattern) { // Initial wire node
   size_t i = wire->count++;
   assert_(wire->count < (int)wire->capacity);
@@ -70,7 +71,7 @@ Simulation::Simulation(const Dict& p) :
   dynamicGrainObstacleFrictionCoefficient = targetDynamicGrainObstacleFrictionCoefficient;
   dynamicGrainMembraneFrictionCoefficient = targetDynamicGrainMembraneFrictionCoefficient;
   dynamicGrainGrainFrictionCoefficient = targetDynamicGrainGrainFrictionCoefficient;
-  dynamicGrainWireFrictionCoefficient = targetDynamicGrainWireFrictionCoefficient;
+  dynamicWireGrainFrictionCoefficient = targetDynamicWireGrainFrictionCoefficient;
   dynamicWireBottomFrictionCoefficient = targetDynamicWireBottomFrictionCoefficient;
   staticFrictionSpeed = targetStaticFrictionSpeed;
   staticFrictionLength = targetStaticFrictionLength;
@@ -129,7 +130,7 @@ void Simulation::step() {
  }
 
  stepWire();
- stepGrainWire();
+ stepWireGrain();
  stepWireTension();
  //stepWireBendingResistance();
  wireBottomTotalTime.start();
@@ -158,10 +159,10 @@ void Simulation::profile() {
  log("----",timeStep/size_t(1*1/(dt*(60/s))),"----");
  log(totalTime.microseconds()/timeStep, "us/step", totalTime, timeStep);
  //if(stepTimeRT.nanoseconds()*100<totalTime.nanoseconds()*99) log("step", strD(stepTimeRT, totalTime));
- if(grainWireContactSizeSum) {
-  log("grain-wire contact count mean", grainWireContactSizeSum/timeStep);
-  log("grain-wire cycle/grain", (float)grainWireEvaluateTime/grainWireContactSizeSum);
-  log("grain-wire B/cycle", (float)(grainWireContactSizeSum*41*4)/grainWireEvaluateTime);
+ if(wireGrainContactSizeSum) {
+  log("grain-wire contact count mean", wireGrainContactSizeSum/timeStep);
+  log("grain-wire cycle/grain", (float)wireGrainEvaluateTime/wireGrainContactSizeSum);
+  log("grain-wire B/cycle", (float)(wireGrainContactSizeSum*41*4)/wireGrainEvaluateTime);
  }
  log("W", membrane->W, "H", membrane->H, "W*H", membrane->W*membrane->H, grain->count);
  const bool reset = false;
@@ -262,10 +263,10 @@ void Simulation::profile() {
  logTime(wireBottomEvaluate);
  logTime(wireBottomSum);
 
- logTime(grainWireSearch);
- logTime(grainWireFilter);
- logTime(grainWireEvaluate);
- logTime(grainWireSum);
+ logTime(wireGrainSearch);
+ logTime(wireGrainFilter);
+ logTime(wireGrainEvaluate);
+ logTime(wireGrainSum);
 
  logTime(wireIntegration);
 

@@ -35,8 +35,8 @@ struct Simulation {
  float dynamicGrainMembraneFrictionCoefficient = 0;
  const float targetDynamicGrainGrainFrictionCoefficient;
  float dynamicGrainGrainFrictionCoefficient = 0;
- const float targetDynamicGrainWireFrictionCoefficient;
- float dynamicGrainWireFrictionCoefficient = 0;
+ const float targetDynamicWireGrainFrictionCoefficient;
+ float dynamicWireGrainFrictionCoefficient = 0;
  const float targetDynamicWireBottomFrictionCoefficient;
  float dynamicWireBottomFrictionCoefficient = 0;
  const float targetStaticFrictionSpeed;
@@ -195,35 +195,35 @@ struct Simulation {
  buffer<float> grainGrainTBz;
 
  // Grain - Wire
- float grainWireGlobalMinD = 0;
- uint grainWireSkipped = 0;
+ float wireGrainGlobalMinD = 0;
+ uint wireGrainSkipped = 0;
 
- buffer<int> oldGrainWireA;
- buffer<int> oldGrainWireB;
- buffer<float> oldGrainWireLocalAx;
- buffer<float> oldGrainWireLocalAy;
- buffer<float> oldGrainWireLocalAz;
- buffer<float> oldGrainWireLocalBx;
- buffer<float> oldGrainWireLocalBy;
- buffer<float> oldGrainWireLocalBz;
+ buffer<int> oldWireGrainA;
+ buffer<int> oldWireGrainB;
+ buffer<float> oldWireGrainLocalAx;
+ buffer<float> oldWireGrainLocalAy;
+ buffer<float> oldWireGrainLocalAz;
+ buffer<float> oldWireGrainLocalBx;
+ buffer<float> oldWireGrainLocalBy;
+ buffer<float> oldWireGrainLocalBz;
 
- buffer<int> grainWireA;
- buffer<int> grainWireB;
- buffer<float> grainWireLocalAx;
- buffer<float> grainWireLocalAy;
- buffer<float> grainWireLocalAz;
- buffer<float> grainWireLocalBx;
- buffer<float> grainWireLocalBy;
- buffer<float> grainWireLocalBz;
+ buffer<int> wireGrainA;
+ buffer<int> wireGrainB;
+ buffer<float> wireGrainLocalAx;
+ buffer<float> wireGrainLocalAy;
+ buffer<float> wireGrainLocalAz;
+ buffer<float> wireGrainLocalBx;
+ buffer<float> wireGrainLocalBy;
+ buffer<float> wireGrainLocalBz;
 
- buffer<int> grainWireContact;
+ buffer<int> wireGrainContact;
 
- buffer<float> grainWireFx;
- buffer<float> grainWireFy;
- buffer<float> grainWireFz;
- buffer<float> grainWireTAx;
- buffer<float> grainWireTAy;
- buffer<float> grainWireTAz;
+ buffer<float> wireGrainFx;
+ buffer<float> wireGrainFy;
+ buffer<float> wireGrainFz;
+ buffer<float> wireGrainTAx;
+ buffer<float> wireGrainTAy;
+ buffer<float> wireGrainTAz;
 
  // Grain - Membrane
  float grainMembraneGlobalMinD = 0;
@@ -337,13 +337,14 @@ struct Simulation {
   uint64 wireBottomFilterTime = 0;
   uint64 wireBottomEvaluateTime = 0;
   tsc wireBottomSumTime;
-  void stepGrainWire();
-   tsc grainWireLatticeTime;
-   uint64 grainWireSearchTime = 0;
-   uint64 grainWireFilterTime = 0;
-   uint64 grainWireEvaluateTime = 0;
-   tsc grainWireSumTime;
-   size_t grainWireContactSizeSum;
+  void stepWireGrain();
+   tsc wireGrainLatticeTime;
+   uint64 wireGrainSearchTime = 0;
+   uint64 wireGrainRepackTime = 0;
+   uint64 wireGrainFilterTime = 0;
+   uint64 wireGrainEvaluateTime = 0;
+   tsc wireGrainSumTime;
+   size_t wireGrainContactSizeSum;
  void stepWireIntegration();
   uint64 wireIntegrationTime = 0;
 

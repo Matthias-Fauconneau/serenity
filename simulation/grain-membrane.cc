@@ -460,31 +460,25 @@ void Simulation::stepGrainMembrane() {
    //gm.localBt.size = contactCount;
 
    grainMembraneRepackFrictionTime.start();
-   size_t index = 0; // Index of first contact with A in old [Local]A|B list
-   for(uint i=0; i<gm.A.size; i++) { // seq
-    int a = gm.A[i];
-    int b = gm.B[i];
-    for(uint k = 0;; k++) {
-     size_t j = index+k;
-     if(j >= gm.oldA.size || gm.oldA[j] != a) break;
-     if(gm.oldB[j] == b) { // Repack existing friction
-      gm.localAx[i] = gm.oldLocalAx[j];
-      gm.localAy[i] = gm.oldLocalAy[j];
-      gm.localAz[i] = gm.oldLocalAz[j];
-      gm.localBu[i] = gm.oldLocalBu[j];
-      gm.localBv[i] = gm.oldLocalBv[j];
-      //gm.localBt[i] = gm.oldLocalBt[j];
-      goto break_;
+   if(gm.A.size) parallel_chunk(gm.A.size, [&](uint, size_t start, size_t size) {
+     for(size_t i=start; i<start+size; i++) {
+       int a = gm.A[i];
+       int b = gm.B[i];
+       for(int j: range(gm.oldA.size)) {
+        if(gm.oldA[j] == a && gm.oldB[j] == b) {
+         gm.localAx[i] = gm.oldLocalAx[j];
+         gm.localAy[i] = gm.oldLocalAy[j];
+         gm.localAz[i] = gm.oldLocalAz[j];
+         gm.localBu[i] = gm.oldLocalBu[j];
+         gm.localBv[i] = gm.oldLocalBv[j];
+         goto break_;
+        }
+       } /*else*/ {
+        gm.localAx[i] = 0;
+       }
+       break_:;
      }
-    } /*else*/ { // New contact
-     // Appends zero to reserve slot. Zero flags contacts for evaluation.
-     // Contact points (for static friction) will be computed during force evaluation (if fine test passes)
-     gm.localAx[i] = 0;
-    }
-    /**/break_:;
-    while(index < gm.oldA.size && gm.oldA[index] == a)
-     index++;
-   }
+   });
    grainMembraneRepackFrictionTime.stop();
 
    assert(align(simd, gm.A.size+1) <= gm.A.capacity, gm.A.size, gm.A.capacity);

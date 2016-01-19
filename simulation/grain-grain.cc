@@ -215,21 +215,7 @@ void Simulation::stepGrainGrain() {
     vXsi index = convert(scale*(Az-minZ)) * sizeYX
                        + convert(scale*(Ay-minY)) * sizeX
                        + convert(scale*(Ax-minX));
-    // Neighbours
-    for(uint n: range(62)) { // A is not monotonous
-     /*if(0) for(int k: range(simd)) {
-      assert_((latticeNeighbours[n]-lattice.base.data)+index[k] >= -(lattice.base.data-lattice.cells.data)
-              && (latticeNeighbours[n]-lattice.base.data)+index[k]<int(lattice.base.size),
-              k, grain->count, index[k], (latticeNeighbours[n]-lattice.base.data),
-              (latticeNeighbours[n]-lattice.base.data)+index[k],
-              lattice.base.data-lattice.cells.data,
-              lattice.base.size,
-              Ax[k], Ay[k], Az[k],
-              minX[k], minY[k], minZ[k],
-              lattice.max,
-              lattice.size
-              );
-     }*/
+    for(uint n: range(62)) {
      vXsi b = gather(latticeNeighbours[n], index);
      const vXsf Bx = gather(gPx, b), By = gather(gPy, b), Bz = gather(gPz, b);
      const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
@@ -294,32 +280,26 @@ void Simulation::stepGrainGrain() {
   if(!contactCount) return;
 
   grainGrainRepackFrictionTime.start();
-  uint grainGrainIndex = 0; // Index of first contact with A in old grainGrain[Local]A|B list
-  for(uint i=0; i<grainGrainA.size; i++) { // seq
-   int a = grainGrainA[i];
-   int b = grainGrainB[i];
-   assert(a != b);
-   for(uint k = 0;; k++) {
-    uint j = grainGrainIndex+k;
-    if(j >= oldGrainGrainA.size || oldGrainGrainA[j] != a) break;
-    if(oldGrainGrainB[j] == b) { // Repack existing friction
-     grainGrainLocalAx[i] = oldGrainGrainLocalAx[j];
-     grainGrainLocalAy[i] = oldGrainGrainLocalAy[j];
-     grainGrainLocalAz[i] = oldGrainGrainLocalAz[j];
-     grainGrainLocalBx[i] = oldGrainGrainLocalBx[j];
-     grainGrainLocalBy[i] = oldGrainGrainLocalBy[j];
-     grainGrainLocalBz[i] = oldGrainGrainLocalBz[j];
-     goto break_;
+  parallel_chunk(grainGrainA.size, [&](uint, size_t start, size_t size) {
+    for(size_t i=start; i<start+size; i++) {
+      int a = grainGrainA[i];
+      int b = grainGrainB[i];
+      for(int j: range(oldGrainGrainA.size)) {
+       if(oldGrainGrainA[j] == a && oldGrainGrainB[j] == b) {
+        grainGrainLocalAx[i] = oldGrainGrainLocalAx[j];
+        grainGrainLocalAy[i] = oldGrainGrainLocalAy[j];
+        grainGrainLocalAz[i] = oldGrainGrainLocalAz[j];
+        grainGrainLocalBx[i] = oldGrainGrainLocalBx[j];
+        grainGrainLocalBy[i] = oldGrainGrainLocalBy[j];
+        grainGrainLocalBz[i] = oldGrainGrainLocalBz[j];
+        goto break_;
+       }
+      } /*else*/ {
+       grainGrainLocalAx[i] = 0;
+      }
+      break_:;
     }
-   } /*else*/ { // New contact
-    // Appends zero to reserve slot. Zero flags contacts for evaluation.
-    // Contact points (for static friction) will be computed during force evaluation (if fine test passes)
-    grainGrainLocalAx[i] = 0;
-   }
-   /**/break_:;
-   while(grainGrainIndex < oldGrainGrainA.size && oldGrainGrainA[grainGrainIndex] == a)
-    grainGrainIndex++;
-  }
+  });
   grainGrainRepackFrictionTime.stop();
  } else grainGrainSkipped++;
 

@@ -55,25 +55,25 @@ void Simulation::stepGrainTop() {
   if(!grainTopA.size) return;
 
   grainTopRepackFrictionTime.start();
-  size_t grainTopI = 0; // Index of first contact with A in old grainTop[Local]A|B list
-  for(uint i=0; i<grainTopA.size; i++) { // seq
-   size_t j = grainTopI;
-   if(grainTopI < oldGrainTopA.size && (uint)oldGrainTopA[grainTopI] == i) {
-    // Repack existing friction
-    grainTopLocalAx[i] = oldGrainTopLocalAx[j];
-    grainTopLocalAy[i] = oldGrainTopLocalAy[j];
-    grainTopLocalAz[i] = oldGrainTopLocalAz[j];
-    grainTopLocalBx[i] = oldGrainTopLocalBx[j];
-    grainTopLocalBy[i] = oldGrainTopLocalBy[j];
-    grainTopLocalBz[i] = oldGrainTopLocalBz[j];
-   } else { // New contact
-    // Appends zero to reserve slot. Zero flags contacts for evaluation.
-    // Contact points (for static friction) will be computed during force evaluation (if fine test passes)
-    grainTopLocalAx[i] = 0;
-   }
-   while(grainTopI < oldGrainTopA.size && (uint)oldGrainTopA[grainTopI] == i)
-    grainTopI++;
-  }
+  parallel_chunk(grainTopA.size, [&](uint, size_t start, size_t size) {
+    for(size_t i=start; i<start+size; i++) {
+      int a = grainTopA[i];
+      for(int j: range(oldGrainTopA.size)) {
+       if(oldGrainTopA[j] == a) {
+        grainTopLocalAx[i] = oldGrainTopLocalAx[j];
+        grainTopLocalAy[i] = oldGrainTopLocalAy[j];
+        grainTopLocalAz[i] = oldGrainTopLocalAz[j];
+        grainTopLocalBx[i] = oldGrainTopLocalBx[j];
+        grainTopLocalBy[i] = oldGrainTopLocalBy[j];
+        grainTopLocalBz[i] = oldGrainTopLocalBz[j];
+        goto break_;
+       }
+      } /*else*/ {
+       grainBottomLocalAx[i] = 0;
+      }
+      break_:;
+    }
+  });
   grainTopRepackFrictionTime.stop();
 
   for(size_t i=grainTopA.size; i<align(simd, grainTopA.size+1); i++)

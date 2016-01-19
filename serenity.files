@@ -77,7 +77,7 @@ simulation/grid.h
 simulation/simulation.cc
 simulation/process.cc
 simulation/grain-grain.cc
-simulation/grain-wire.cc
+simulation/wire-grain.cc
 simulation/grain-bottom.cc
 simulation/grain-side.cc
 simulation/wire-bottom.cc

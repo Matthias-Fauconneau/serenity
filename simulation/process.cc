@@ -13,7 +13,7 @@ void Simulation::stepProcess() {
    dynamicGrainObstacleFrictionCoefficient = targetDynamicGrainObstacleFrictionCoefficient;
    dynamicGrainMembraneFrictionCoefficient = targetDynamicGrainMembraneFrictionCoefficient;
    dynamicGrainGrainFrictionCoefficient = targetDynamicGrainGrainFrictionCoefficient;
-   dynamicGrainWireFrictionCoefficient = targetDynamicGrainWireFrictionCoefficient;
+   dynamicWireGrainFrictionCoefficient = targetDynamicWireGrainFrictionCoefficient;
    dynamicWireBottomFrictionCoefficient = targetDynamicWireBottomFrictionCoefficient;
    staticFrictionSpeed = targetStaticFrictionSpeed;
    staticFrictionLength = targetStaticFrictionLength;
@@ -111,7 +111,7 @@ void Simulation::stepProcess() {
     wire->Px[i] = newPosition[0]; wire->Py[i] = newPosition[1]; wire->Pz[i] = newPosition[2];
     wire->Vx[i] = 0; wire->Vy[i] = 0; wire->Vz[i] = 0;
     // Forces verlet lists reevaluation
-    grainWireGlobalMinD = 0;
+    wireGrainGlobalMinD = 0;
    }
   }
 
@@ -179,7 +179,7 @@ void Simulation::stepProcess() {
       // Forces verlet lists reevaluation
       grainMembraneGlobalMinD = 0;
       grainGrainGlobalMinD = 0;
-      grainWireGlobalMinD = 0;
+      wireGrainGlobalMinD = 0;
       assert_(!validGrainLattice);
      } else break;
     }
