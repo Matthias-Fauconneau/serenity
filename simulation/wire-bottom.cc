@@ -8,7 +8,7 @@
 
 //FIXME: factorize Wire and Grain - Bottom/Top
 void evaluateWireObstacle(const int start, const int size,
-                                     const int* wireObstacleContact, int wireObstacleContactSize,
+                                     const int* wireObstacleContact, //int wireObstacleContactSize,
                                      const int* wireObstacleA, //int wireObstacleASize,
                                      const float* wirePx, const float* wirePy, const float* wirePz,
                                      const vXsf obstacleZ, const vXsf Wr,
@@ -266,7 +266,7 @@ void Simulation::stepWireBottom() {
  //::simulation = this; // DEBUG
  /*wireBottomEvaluateTime +=*/ parallel_chunk(WBcc/simd, [&](uint, size_t start, size_t size) {
    evaluateWireObstacle(start, size,
-                     wireBottomContact.data, wireBottomContact.size,
+                     wireBottomContact.data, //wireBottomContact.size,
                      wireBottomA.data, //wireBottomA.size,
                      wire->Px.data, wire->Py.data, wire->Pz.data,
                      floatX(bottomZ), floatX(Wire::radius),

@@ -44,10 +44,6 @@ void Simulation::stepWireTension() {
   storeu(wire->Fx, i+1, loadu(wire->Fx, i+1) - FTx);
   storeu(wire->Fy, i+1, loadu(wire->Fy, i+1) - FTy);
   storeu(wire->Fz, i+1, loadu(wire->Fz, i+1) - FTz);
-  /*assert_(length(vec3(wire->Fx[i],wire->Fy[i],wire->Fz[i])) < 100*N,
-          length(vec3(wire->Fx[i],wire->Fy[i],wire->Fz[i]))/N, "WT");
-  assert_(length(vec3(wire->Fx[i+1],wire->Fy[i+1],wire->Fz[i+1])) < 100*N,
-          length(vec3(wire->Fx[i+1],wire->Fy[i+1],wire->Fz[i+1]))/N);*/
  }
  wireTensionTime.stop();
 }
@@ -119,6 +115,9 @@ void Simulation::stepWireIntegration() {
     Vx += dt_mass * load(pFx, i);
     Vy += dt_mass * load(pFy, i);
     Vz += dt_mass * load(pFz, i);
+    Vx *= wireViscosity;
+    Vy *= wireViscosity;
+    Vz *= wireViscosity;
     store(pVx, i, Vx);
     store(pVy, i, Vy);
     store(pVz, i, Vz);

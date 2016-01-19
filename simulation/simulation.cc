@@ -36,9 +36,9 @@ Simulation::Simulation(const Dict& p) :
   targetDynamicGrainObstacleFrictionCoefficient(0.228),
   targetDynamicGrainMembraneFrictionCoefficient(0.228),
   targetDynamicGrainGrainFrictionCoefficient(0.096),
-  targetDynamicGrainWireFrictionCoefficient(0.228),
+  targetDynamicGrainWireFrictionCoefficient(1/*0.228*/),
   targetDynamicWireBottomFrictionCoefficient(1),
-  targetStaticFrictionSpeed((float)p.at("sfSpeed")*mm/s),
+  targetStaticFrictionSpeed((float)p.at("sfSpeed")*m/s),
   targetStaticFrictionLength((float)p.at("sfLength")*m),
   targetStaticFrictionStiffness((float)p.at("sfStiffness")/m),
   targetStaticFrictionDamping((float)p.at("sfDamping")*N/(m/s)),
@@ -50,12 +50,13 @@ Simulation::Simulation(const Dict& p) :
   plateSpeed((float)p.at("Speed")*mm/s),
   patternRadius(membrane->radius - grain->radius),
   pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):None),
-  currentHeight(Wire::radius/*grain->radius*/),
+  currentHeight(0?Wire::radius:grain->radius),
   topZ(membrane->height),
   latticeRadius(useMembrane?membrane->radius+grain->radius:2*membrane->radius),
   lattice {sqrt(3.)/(2*grain->radius), vec3(vec2(-latticeRadius), -grain->radius*2),
                                            vec3(vec2(latticeRadius), membrane->height+grain->radius)}
 {
+ log(p);
  if(pattern) { // Initial wire node
   size_t i = wire->count++;
   assert_(wire->count < (int)wire->capacity);
@@ -130,7 +131,7 @@ void Simulation::step() {
  stepWire();
  stepGrainWire();
  stepWireTension();
- stepWireBendingResistance();
+ //stepWireBendingResistance();
  wireBottomTotalTime.start();
  stepWireBottom();
  wireBottomTotalTime.stop();

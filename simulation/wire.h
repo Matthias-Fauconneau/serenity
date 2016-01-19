@@ -6,10 +6,10 @@
   const float internodeLength;
   sconst float section = PI * sq(radius);
   const float volume = section * internodeLength;
-  sconst float density = 1000 * kg / cb(m);
+  sconst float density = 2000 * kg / cb(m);
   const float mass = density * volume;
   sconst float curvature = 1./radius;
-  sconst float elasticModulus = 1e0 * MPa;
+  sconst float elasticModulus = 10 * MPa;
   sconst float poissonRatio = 0.48;
   sconst float tensionStiffness = 1 * elasticModulus * PI * sq(radius);
   const float tensionDamping = 2 * sqrt(mass * tensionStiffness);

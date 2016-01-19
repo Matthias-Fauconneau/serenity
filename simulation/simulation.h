@@ -70,6 +70,7 @@ struct Simulation {
  float currentHeight;
  float pressure = targetPressure;
  float membraneViscosity = 0;
+ float wireViscosity = 1-100*dt;
  float bottomZ = 0, topZ, topZ0;
  float latticeRadius;
  float lastAngle = 0, winchAngle = 0, currentWinchRadius = patternRadius;
