@@ -14,6 +14,7 @@ extern Lock lock;
 struct vec2x3 { vec3 a, b; };
 extern array<vec2x3> lines;
 extern array<int> faces;
+extern array<int> cylinders;
 
 // High level simulation and contact management
 struct Simulation {
@@ -49,7 +50,7 @@ struct Simulation {
  float staticFrictionDamping;
 
  // Process parameters
- bool useMembrane;
+ //bool useMembrane;
  float Gz;
  const float verticalSpeed;
  const float linearSpeed;
@@ -63,7 +64,7 @@ struct Simulation {
  const float loopAngle = PI*(3-sqrt(5.));
 
  // Process variables
- enum ProcessState { Pour, Pressure, Load, Error };
+ enum ProcessState { Pour, Pressure, Load, Release, Error };
  //sconst string processStates[] {"pour", "load", "error"};
  ProcessState processState = Pour;
  Random random;
@@ -221,9 +222,9 @@ struct Simulation {
  buffer<float> wireGrainFx;
  buffer<float> wireGrainFy;
  buffer<float> wireGrainFz;
- buffer<float> wireGrainTAx;
- buffer<float> wireGrainTAy;
- buffer<float> wireGrainTAz;
+ buffer<float> wireGrainTBx;
+ buffer<float> wireGrainTBy;
+ buffer<float> wireGrainTBz;
 
  // Grain - Membrane
  float grainMembraneGlobalMinD = 0;

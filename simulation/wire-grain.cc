@@ -22,7 +22,7 @@ static inline void evaluateWireGrain(const int start, const int size,
                                      const float* GrotationX, const float* GrotationY, const float* GrotationZ,
                                      const float* GrotationW,
                                      float* const pFx, float* const pFy, float* const pFz,
-                                     float* const pTAx, float* const pTAy, float* const pTAz) {
+                                     float* const pgTx, float* const pgTy, float* const pgTz) {
  for(int i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
   const vXsi contacts = *(vXsi*)(wireGrainContact+i);
   const vXsi A = gather(wireGrainA, contacts), B = gather(wireGrainB, contacts);
@@ -42,9 +42,9 @@ static inline void evaluateWireGrain(const int start, const int size,
   const vXsf Fk = K * sqrt(depth) * depth;
   // Relative velocity
   const vXsf BAVx = gather(pgAVx, B), BAVy = gather(pgAVy, B), BAVz = gather(pgAVz, B);
-  const vXsf RVx = gather(wVx, A) - gather(gVx, B) - (BAVy*RAz - BAVz*RAy) ;
-  const vXsf RVy = gather(wVy, A) - gather(gVy, B) - (BAVz*RAx - BAVx*RAz);
-  const vXsf RVz = gather(wVz, A) - gather(gVz, B) - (BAVx*RAy - BAVy*RAx);
+  const vXsf RVx = gather(wVx, A) - gather(gVx, B) - (BAVy*RBz - BAVz*RBy) ;
+  const vXsf RVy = gather(wVy, A) - gather(gVy, B) - (BAVz*RBx - BAVx*RBz);
+  const vXsf RVz = gather(wVz, A) - gather(gVz, B) - (BAVx*RBy - BAVy*RBx);
   // Damping
   const vXsf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
   const vXsf Fb = - Kb * sqrt(sqrt(depth)) * normalSpeed ; // Damping
@@ -145,9 +145,18 @@ static inline void evaluateWireGrain(const int start, const int size,
   store(pFx, i, NFx + FTx);
   store(pFy, i, NFy + FTy);
   store(pFz, i, NFz + FTz);
-  store(pTAx, i, RAy*FTz - RAz*FTy);
-  store(pTAy, i, RAz*FTx - RAx*FTz);
-  store(pTAz, i, RAx*FTy - RAy*FTx);
+  /*if(1) for(size_t k: range(simd)) {
+   if(i+k >= (size_t)wire->count) break;
+   if(!(length(vec3(pFx[i+k],pFy[i+k],pFz[i+k])) < 10000*N)) {
+    cylinders.append(i+k);
+    log(length(vec3(pFx[i+k],pFy[i+k],pFz[i+k]))/N, "S");
+    fail = true;
+    return;
+   }
+  }*/
+  store(pgTx, i, RBz*FTy - RBy*FTz);
+  store(pgTy, i, RBx*FTz - RBz*FTx);
+  store(pgTz, i, RBy*FTx - RBx*FTy);
   // Scatter static frictions
   scatter(wireGrainLocalAx, contacts, localAx);
   scatter(wireGrainLocalAy, contacts, localAy);
@@ -191,8 +200,8 @@ void Simulation::stepWireGrain() {
   swap(oldWireGrainLocalBy, wireGrainLocalBy);
   swap(oldWireGrainLocalBz, wireGrainLocalBz);
 
-  static constexpr size_t averagewireGrainContactCount = 16;
-  const size_t GWcc = align(simd, grain->count * averagewireGrainContactCount +1);
+  static constexpr size_t averageWireGrainContactCount = 16;
+  const size_t GWcc = align(simd, grain->count * averageWireGrainContactCount +1);
   if(GWcc > wireGrainA.capacity) {
    wireGrainA = buffer<int>(GWcc, 0);
    wireGrainB = buffer<int>(GWcc, 0);
@@ -223,7 +232,16 @@ void Simulation::stepWireGrain() {
                         + convert(scale*(Ay-minY)) * sizeX
                         + convert(scale*(Ax-minX));
      for(int n: range(3*3)) for(int i: range(3)) {
+      if(0) for(int k: range(simd)) {
+       if(!((latticeNeighbours[n]-lattice.base.data)+index[k]+i >= -(lattice.base.data-lattice.cells.data)
+            && (latticeNeighbours[n]-lattice.base.data)+index[k]+i<int(lattice.base.size))) {
+        log(vec3(minX[k], minY[k], minZ[k]), vec3(Ax[k], Ay[k], Az[k]), lattice.max);
+        fail = true;
+        return;
+       }
+      }
       const vXsi b = gather(latticeNeighbours[n]+i, index);
+      for(int k: range(simd)) assert_(b[k] >= -1 && b[k] < grain->count, b[k]);
       const vXsf Bx = gather(gPx, b), By = gather(gPy, b), Bz = gather(gPz, b);
       const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
       vXsf sqDistance = Rx*Rx + Ry*Ry + Rz*Rz;
@@ -235,6 +253,7 @@ void Simulation::stepWireGrain() {
     }
   };
   if(wire->count/simd) wireGrainSearchTime += parallel_chunk(wire->count/simd, search);
+  if(fail) return;
   if(wire->count%simd) {
    const float* const wPx = wire->Px.data, *wPy = wire->Py.data, *wPz = wire->Pz.data;
    const float* const gPx = grain->Px.data+simd, *gPy = grain->Py.data+simd, *gPz = grain->Pz.data+simd;
@@ -311,37 +330,41 @@ void Simulation::stepWireGrain() {
  if(!wireGrainA.size) return;
 
  // Filters verlet lists, packing contacts to evaluate
+ tsc wireGrainFilterTime; wireGrainFilterTime.start();
  if(align(simd, wireGrainA.size) > wireGrainContact.capacity) {
   wireGrainContact = buffer<int>(align(simd, wireGrainA.size));
  }
  wireGrainContact.size = 0;
- wireGrainFilterTime += parallel_chunk(align(simd, wireGrainA.size)/simd, [&](uint, size_t start, size_t size) {
-   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
-    vXsi A = *(vXsi*)(wireGrainA.data+i), B = *(vXsi*)(wireGrainB.data+i);
-    vXsf Ax = gather(wire->Px.data, A), Ay = gather(wire->Py.data, A), Az = gather(wire->Pz.data, A);
-    vXsf Bx = gather(grain->Px.data+simd, B), By = gather(grain->Py.data+simd, B), Bz = gather(grain->Pz.data+simd, B);
-    vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
-    vXsf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
-    vXsf depth = floatX(grain->radius+Wire::radius) - length;
-    for(size_t k: range(simd)) {
-     size_t j = i+k;
-     if(j == wireGrainA.size) break /*2*/;
-     if(extract(depth, k) >= 0) {
-      // Creates a map from packed contact to index into unpacked contact list (indirect reference)
-      // Instead of packing (copying) the unpacked list to a packed contact list
-      // To keep track of where to write back (unpacked) contact positions (for static friction)
-      // At the cost of requiring gathers (AVX2 (Haswell), MIC (Xeon Phi))
-      wireGrainContact.append( j );
-     } else {
-      // Resets contact (static friction spring)
-      wireGrainLocalAx[j] = 0;
-     }
-    }
-   }
- });
- if(!wireGrainContact) return;
+
+ atomic contactCount;
+ auto filter = [&](uint, size_t start, size_t size) {
+  const int* const wgA = wireGrainA.data, *wgB = wireGrainB.data;
+  const float* const wPx = wire->Px.data, *wPy = wire->Py.data, *wPz = wire->Pz.data;
+  const float* const gPx = grain->Px.data+simd, *gPy = grain->Py.data+simd, *gPz = grain->Pz.data+simd;
+  float* const wgL = wireGrainLocalAx.begin();
+  int* const wgContact = wireGrainContact.begin();
+  const vXsf sq2Radius = floatX(sq(wire->radius+grain->radius));
+  for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
+   const vXsi A = load(wgA, i), B = load(wgB, i);
+   const vXsf Ax = gather(wPx, A), Ay = gather(wPy, A), Az = gather(wPz, A);
+   const vXsf Bx = gather(gPx, B), By = gather(gPy, B), Bz = gather(gPz, B);
+   const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
+   const vXsf sqDistance = Rx*Rx + Ry*Ry + Rz*Rz;
+   const maskX contact = lessThan(sqDistance, sq2Radius);
+   maskStore(wgL+i, ~contact, _0f);
+   const uint index = contactCount.fetchAdd(countBits(contact));
+   compressStore(wgContact+index, contact, intX(i)+_seqi);
+  }
+ };
+ if(wireGrainA.size/simd) parallel_chunk(wireGrainA.size/simd, filter);
+ if(wireGrainA.size%simd != 0) filter(0, wireGrainA.size/simd, 1u);
+ wireGrainContact.size = contactCount;
+ while(wireGrainContact.size > 0 && wireGrainContact.last() >= (int)wireGrainA.size)
+  wireGrainContact.size--; // Trims trailing invalid contacts
  for(size_t i=wireGrainContact.size; i<align(simd, wireGrainContact.size); i++)
   wireGrainContact.begin()[i] = wireGrainA.size;
+ this->wireGrainFilterTime += wireGrainFilterTime.cycleCount();
+ if(!wireGrainContact) return;
 
  // Evaluates forces from (packed) intersections (SoA)
  size_t GWcc = align(simd, wireGrainContact.size); // Grain-Wire contact count
@@ -349,16 +372,16 @@ void Simulation::stepWireGrain() {
   wireGrainFx = buffer<float>(GWcc);
   wireGrainFy = buffer<float>(GWcc);
   wireGrainFz = buffer<float>(GWcc);
-  wireGrainTAx = buffer<float>(GWcc);
-  wireGrainTAy = buffer<float>(GWcc);
-  wireGrainTAz = buffer<float>(GWcc);
+  wireGrainTBx = buffer<float>(GWcc);
+  wireGrainTBy = buffer<float>(GWcc);
+  wireGrainTBz = buffer<float>(GWcc);
  }
  wireGrainFx.size = GWcc;
  wireGrainFy.size = GWcc;
  wireGrainFz.size = GWcc;
- wireGrainTAx.size = GWcc;
- wireGrainTAy.size = GWcc;
- wireGrainTAz.size = GWcc;
+ wireGrainTBx.size = GWcc;
+ wireGrainTBy.size = GWcc;
+ wireGrainTBz.size = GWcc;
  const float E = 1/((1-sq(grain->poissonRatio))/grain->elasticModulus+(1-sq(grain->poissonRatio))/grain->elasticModulus);
  const float R = 1/(grain->curvature+Wire::curvature);
  const float K = 4./3*E*sqrt(R);
@@ -381,7 +404,7 @@ void Simulation::stepWireGrain() {
                       grain->AVx.data+simd, grain->AVy.data+simd, grain->AVz.data+simd,
                       grain->Rx.data+simd, grain->Ry.data+simd, grain->Rz.data+simd, grain->Rw.data+simd,
                       wireGrainFx.begin(), wireGrainFy.begin(), wireGrainFz.begin(),
-                      wireGrainTAx.begin(), wireGrainTAy.begin(), wireGrainTAz.begin() );
+                      wireGrainTBx.begin(), wireGrainTBy.begin(), wireGrainTBz.begin() );
  });
  wireGrainContactSizeSum += wireGrainContact.size;
 
@@ -396,9 +419,9 @@ void Simulation::stepWireGrain() {
   grain->Fy[simd+b] -= wireGrainFy[i];
   wire->Fz[a] += wireGrainFz[i];
   grain->Fz[simd+b] -= wireGrainFz[i];
-  grain->Tx[simd+b] -= wireGrainTAx[i];
-  grain->Ty[simd+b] -= wireGrainTAy[i];
-  grain->Tz[simd+b] -= wireGrainTAz[i];
+  grain->Tx[simd+b] += wireGrainTBx[i];
+  grain->Ty[simd+b] += wireGrainTBy[i];
+  grain->Tz[simd+b] += wireGrainTBz[i];
  }
  wireGrainSumTime.stop();
 }

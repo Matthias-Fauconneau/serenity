@@ -35,7 +35,7 @@ struct SimulationView : Widget {
 
  SimulationView(const Simulation& simulation) : simulation(simulation) {}
 
- vec2 sizeHint(vec2) override { return vec2(1024); }
+ vec2 sizeHint(vec2) override { return vec2(1008); }
 
  shared<Graphics> graphics(vec2 size) override {
   if(!totalTime) totalTime.start();
@@ -136,7 +136,7 @@ struct SimulationView : Widget {
     positions[s*6+3] = P[2];
     positions[s*6+4] = P[1];
     positions[s*6+5] = P[3];
-    colors[s] = vec4(1, 1, 1, 1);
+    colors[s] = cylinders.contains(i) ? vec4(1,0,0,1) : vec4(1, 1, 1, 1);
     s++;
    }
    assert(s*6 <= positions.size);
@@ -158,7 +158,7 @@ struct SimulationView : Widget {
    }
   }
 
-  if(simulation.useMembrane && simulation.membrane->count) {
+  if(/*simulation.useMembrane*/simulation.processState < Simulation::Release && simulation.membrane->count) {
    if(!indexBuffer) {
     const int W = simulation.membrane->W, stride = simulation.membrane->stride,
       margin = simulation.membrane->margin;
@@ -291,6 +291,9 @@ struct SimulationApp : Poll {
 
  SimulationApp(const Dict& parameters)
   : Poll(0, 0, simulationMasterThread), simulation(parameters), view(simulation) {
+  window->actions[Space] = [this] {
+   simulation.processState = Simulation::Release;
+  };
   window->actions[Escape] = [this]{
    simulation.stop = true;
    requestTermination();

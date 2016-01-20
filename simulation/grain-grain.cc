@@ -340,11 +340,10 @@ void Simulation::stepGrainGrain() {
  // and can be easily trimmed
  if(grainGrainA.size%simd != 0) filter(0, grainGrainA.size/simd, 1u);
  grainGrainContact.size = contactCount;
- while(contactCount.count > 0 && grainGrainContact[contactCount.count-1] >= (int)grainGrainA.size)
-  contactCount.count--; // Trims trailing invalid contacts
- grainGrainContact.size = contactCount;
+ while(grainGrainContact.size > 0 && grainGrainContact.last() >= (int)grainGrainA.size)
+  grainGrainContact.size--; // Trims trailing invalid contacts
  for(uint i=grainGrainContact.size; i<align(simd, grainGrainContact.size); i++)
-  grainGrainContact.begin()[i] = grainGrainA.size;;
+  grainGrainContact.begin()[i] = grainGrainA.size;
  this->grainGrainFilterTime += grainGrainFilterTime.cycleCount();
  if(!grainGrainContact.size) return;
 

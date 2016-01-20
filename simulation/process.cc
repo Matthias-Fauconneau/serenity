@@ -4,10 +4,12 @@
 #include "wire.h"
 
 void Simulation::stepProcess() {
+ if(processState >= Release) return;
  //pressure = 0; membraneViscosity = 1-1000*dt; // DEBUG
  // Process
  if(grain->count == targetGrainCount) {
-  if(!useMembrane) return;
+  //if(!useMembrane) return;
+  processState = Release;
   if(processState  < Pressure) {
    static bool unused once = ({ log("Set Friction"); true; });
    dynamicGrainObstacleFrictionCoefficient = targetDynamicGrainObstacleFrictionCoefficient;
@@ -37,7 +39,7 @@ void Simulation::stepProcess() {
   }*/
   const float targetViscosity = 1-10000*dt;
   if(pressure < targetPressure || membraneViscosity < targetViscosity) { // Increases pressure toward target pressure
-   if(processState < Pressure) log("Release");
+   if(processState < Pressure) log("Pressure");
    processState = Pressure;
    if(pressure < targetPressure) pressure += 100 * targetPressure * dt;
    if(pressure > targetPressure) pressure = targetPressure;
@@ -98,7 +100,7 @@ void Simulation::stepProcess() {
    //float z = currentHeight-grain->radius-Wire::radius; // Under pour
    vec3 relativePosition = vec3(end.x, end.y, z) - wire->position(wire->count-1);
    float length = ::length(relativePosition);
-   if(length >= wire->internodeLength) {
+   if(length >= wire->internodeLength && wire->count < (int)wire->capacity) {
     assert(wire->count < (int)wire->capacity);
     vec3 newPosition = wire->position(wire->count-1) + wire->internodeLength/length * relativePosition;
     // Without grain overlap

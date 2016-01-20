@@ -107,11 +107,15 @@ void Simulation::stepWireIntegration() {
    for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
     // Symplectic Euler
     vXsf Vx = load(pVx, i), Vy = load(pVy, i), Vz = load(pVz, i);
-    /*for(size_t k: range(simd)) {
+    if(1) for(size_t k: range(simd)) {
      if(i+k >= (size_t)wire->count) break;
-     assert_(length(vec3(pFx[i+k],pFy[i+k],pFz[i+k])) < 100*N,
-             length(vec3(pFx[i+k],pFy[i+k],pFz[i+k]))/N, "S");
-    }*/
+     if(!(length(vec3(pFx[i+k],pFy[i+k],pFz[i+k])) < 10000*N)) {
+      cylinders.append(i+k);
+      log(length(vec3(pFx[i+k],pFy[i+k],pFz[i+k]))/N, "S");
+      fail = true;
+      return;
+     }
+    }
     Vx += dt_mass * load(pFx, i);
     Vy += dt_mass * load(pFy, i);
     Vz += dt_mass * load(pFz, i);
@@ -125,11 +129,14 @@ void Simulation::stepWireIntegration() {
     store(pPy, i, load(pPy, i) + dt * Vy);
     store(pPz, i, load(pPz, i) + dt * Vz);
     maxWireVX2 = max(maxWireVX2, Vx*Vx + Vy*Vy + Vz*Vz);
-    /*for(size_t k: range(simd)) {
+    if(1) for(size_t k: range(simd)) {
      if(i+k >= (size_t)wire->count) break;
-     assert_(length(vec3(pVx[i+k],pVy[i+k],pVz[i+k])) < 10*m/s,
-             length(vec3(pVx[i+k],pVy[i+k],pVz[i+k]))/(m/s));
-    }*/
+     if(!(length(vec3(pVx[i+k],pVy[i+k],pVz[i+k])) < 1000*m/s)) {
+      log(length(vec3(pVx[i+k],pVy[i+k],pVz[i+k]))/(m/s));
+      fail = true;
+      return;
+     }
+    }
    }
    float maxWireV2 = 0;
    for(size_t k: range(simd)) maxWireV2 = ::max(maxWireV2, extract(maxWireVX2, k));
