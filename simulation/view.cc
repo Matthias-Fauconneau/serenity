@@ -117,11 +117,12 @@ struct SimulationView : Widget {
    vertexArray.draw(Triangles, positions.size);
   }
 
-  if(simulation.wire->count>1) {
-   buffer<vec3> positions {size_t(simulation.wire->count-1)*6};
-   buffer<vec4> colors {size_t(simulation.wire->count-1)};
+  size_t wireCount = simulation.wire->count;
+  if(wireCount>1) {
+   buffer<vec3> positions {size_t(wireCount-1)*6};
+   buffer<vec4> colors {size_t(wireCount-1)};
    size_t s = 0;
-   for(int i: range(simulation.wire->count-1)) {
+   for(int i: range(wireCount-1)) {
     vec3 a (simulation.wire->position(i)), b (simulation.wire->position(i+1));
     // FIXME: GPU quad projection
     vec3 A = viewProjection * a, B= viewProjection * b;

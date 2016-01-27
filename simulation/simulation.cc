@@ -50,7 +50,7 @@ Simulation::Simulation(const Dict& p) :
   linearSpeed(p.value("linearSpeed",1.f)*m/s),
   targetPressure((float)p.value("Pressure", 0 /*80e3f*/)*Pa),
   plateSpeed((float)p.value("Speed", 10)*mm/s),
-  patternRadius(membrane->radius - grain->radius),
+  patternRadius(membrane->radius - Wire::radius/* - grain->radius*/),
   pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):Loop),
   currentHeight(0?Wire::radius:grain->radius),
   membraneRadius(membrane->radius),
@@ -88,7 +88,7 @@ void Simulation::step() {
  if(processState == Release) {
   /*if(membraneViscosity < targetViscosity) membraneViscosity += 10 * dt;
   if(membraneViscosity > targetViscosity) membraneViscosity = targetViscosity;*/
-  constexpr float membraneRadiusSpeed = 0.01*m/s;
+  constexpr float membraneRadiusSpeed = 0.05*m/s;
   if(membraneRadius < latticeRadius) membraneRadius += membraneRadiusSpeed * dt;
   if(membraneRadius > latticeRadius) membraneRadius  = latticeRadius;
   float maxGrainMembraneV = maxGrainV + membraneRadiusSpeed;

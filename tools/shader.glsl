@@ -34,13 +34,16 @@ fragment {
     vec3 mul(vec4 p, vec3 v) {
       return qmul(p, qmul(vec4(v, 0), vec4(-p.xyz, p.w))).xyz;
     }
-    vec3 v = vec3(vLocalCoords, dz);
     uniform vec4 viewRotation;
-    vec3 lv = mul(conjugate(qmul(viewRotation, q)), v);
-    float r = length(lv.xyz);
-    const float PI = 3.14159265358979323846;
-    vec2 s = vec2(acos(lv.z/r)/PI, (PI+atan(lv.y, lv.x))/(2*PI));
-    color = vec4(dz*vec3((1+mod(vec2(2,4)*s,1))/2, 1), a);
+    vec3 v = mul(conjugate(qmul(viewRotation, q)), vec3(vLocalCoords, dz));
+    mat2x3 D = mat2x3(dFdx(v), dFdy(v));
+    mat3x2 Dt = transpose(D);
+    vec3 G = vec3(length(Dt[0]), length(Dt[1]), length(Dt[2]));
+    vec3 S = vec3(
+                clamp((v.x-G.x/2)/G.x, 0, 1),
+                clamp((v.y-G.y/2)/G.y, 0, 1),
+                clamp((v.z-G.z/2)/G.z, 0, 1));
+    color = vec4(dz*S, a);
     uniform float radius;
     gl_FragDepth = gl_FragCoord.z + dz * radius;
   }
@@ -63,3 +66,4 @@ fragment {
     color = uColor;
   }
 }
+

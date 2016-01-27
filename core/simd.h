@@ -196,9 +196,11 @@ static inline v8sf loadu(const float* a, int index) { return __builtin_ia32_load
 #endif
 static inline v8sf loadu(ref<float> a, int index) { return loadu(a.data, index); }
 
-static inline void store(float* const a, int index, v8sf v) { *(v8sf*)(a+index) = v; }
+static inline void store(float* const a, v8sf v) { *(v8sf*)a = v; }
+static inline void store(float* const a, int index, v8sf v) { store(a+index, v); }
 static inline void store(mref<float> a, int index, v8sf v) { store(a.begin(), index, v); }
-static inline void storeu(float* const a, int index, v8sf v) { __builtin_ia32_storeups256(a+index, v); }
+static inline void storeu(float* const a, v8sf v) { __builtin_ia32_storeups256(a, v); }
+static inline void storeu(float* const a, int index, v8sf v) { storeu(a+index, v); }
 static inline void storeu(mref<float> a, int index, v8sf v) { storeu(a.begin(), index, v); }
 
 static inline v8sf min(v8sf a, v8sf b) { return __builtin_ia32_minps256(a, b); }
