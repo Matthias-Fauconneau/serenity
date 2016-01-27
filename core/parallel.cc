@@ -7,7 +7,7 @@ const int maxThreadCount = 60; //240;
 const int maxThreadCount = 1; //240;
 #endif
 #elif !DEBUG && 1
-const int maxThreadCount = 32;
+const int maxThreadCount = 8; // 32
 #else
 const int maxThreadCount = 1;
 #endif

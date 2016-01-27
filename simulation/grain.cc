@@ -90,6 +90,8 @@ void Simulation::stepGrainIntegration() {
   const vXsf dt_mass = floatX(dt / grain->mass), dt = floatX(this->dt);
   const vXsf dt_2 = floatX(this->dt / 2);
   const vXsf dt_angularMass = floatX(this->dt / grain->angularMass);
+  const vXsf grainViscosity = floatX(this->grainViscosity);
+  const vXsf angularViscosity = floatX(this->angularViscosity);
   vXsf maxGrainVX2 = _0f;
   const float* pFx = grain->Fx.data+simd, *pFy = grain->Fy.data+simd, *pFz = grain->Fz.data+simd;
   const float* pTx = grain->Tx.begin()+simd, *pTy = grain->Ty.begin()+simd, *pTz = grain->Tz.begin()+simd;
@@ -129,6 +131,9 @@ void Simulation::stepGrainIntegration() {
    Vx += dt_mass * Fx;
    Vy += dt_mass * Fy;
    Vz += dt_mass * Fz;
+   Vx *= grainViscosity;
+   Vy *= grainViscosity;
+   Vz *= grainViscosity;
    Px += dt * Vx;
    Py += dt * Vy;
    Pz += dt * Vz;
@@ -138,7 +143,7 @@ void Simulation::stepGrainIntegration() {
    maxGrainVX2 = max(maxGrainVX2, Vx*Vx + Vy*Vy + Vz*Vz);
 
    {
-    const vXsf AVx = load(pAVx, i), AVy = load(pAVy, i), AVz = load(pAVz, i);
+    vXsf AVx = load(pAVx, i), AVy = load(pAVy, i), AVz = load(pAVz, i);
     vXsf Rx = load(pRx, i), Ry = load(pRy, i), Rz = load(pRz, i), Rw = load(pRw, i);
     const vXsf dRx = dt_2 * (Rw * Rx + AVy*Rz - Ry*AVz);
     const vXsf dRy = dt_2 * (Rw * Ry + AVz*Rx - Rz*AVx);
@@ -148,9 +153,15 @@ void Simulation::stepGrainIntegration() {
     Ry += dRy;
     Rz += dRz;
     Rw += dRw;
-    store(pAVx, i, AVx + dt_angularMass * load(pTx, i));
-    store(pAVy, i, AVy + dt_angularMass * load(pTy, i));
-    store(pAVz, i, AVz + dt_angularMass * load(pTz, i));
+    AVx += dt_angularMass * load(pTx, i);
+    AVy += dt_angularMass * load(pTy, i);
+    AVz += dt_angularMass * load(pTz, i);
+    AVx *= angularViscosity;
+    AVy *= angularViscosity;
+    AVz *= angularViscosity;
+    store(pAVx, i, AVx);
+    store(pAVy, i, AVy);
+    store(pAVz, i, AVz);
     vXsf normalize = rsqrt(Rx*Rx+Ry*Ry+Rz*Rz+Rw*Rw);
     store(pRx, i, normalize*Rx);
     store(pRy, i, normalize*Ry);

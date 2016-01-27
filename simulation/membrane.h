@@ -4,7 +4,7 @@
 struct Membrane {
  virtual ~Membrane() {}
 
- sconst float density = /*10 **/ 1000 * kg / cb(m);
+ sconst float density = 1000 * kg / cb(m);
  sconst float curvature = 0;
  sconst float shearModulus = 0.3 * MPa;
  sconst float poissonRatio = 0.48;
@@ -16,15 +16,15 @@ struct Membrane {
  const int margin = simd; // 16 to ensure no false sharing ?
  const int stride = margin+W+margin;
  const float internodeLength = 2*sin(PI/W)*radius;
- const float exactHeight = radius * 4;
+ const float exactHeight = radius * 2/*4*/;
  const float cellHeight = sqrt(3.)/2*internodeLength;
  const int H = ceil(exactHeight/cellHeight)+1;
  const float height = (H-1) * cellHeight;
- sconst float thickness = 1 * mm;
- const float tensileStrength = 1680 * MPa;
+ sconst float thickness = 0.05 * mm;
+ const float tensileStrength = 1/*1680*/ * MPa;
  const float mass = sqrt(3.)/2 * sq(internodeLength) * thickness * density;
  const float tensionStiffness = sqrt(3.)/2 * internodeLength * thickness * tensileStrength;
- const float tensionDamping = 2 * sqrt(mass * tensionStiffness);
+ const float tensionDamping = 1 * sqrt(mass * tensionStiffness);
  //sconst float areaMomentOfInertia = pow4(1*mm); // FIXME
  //const float bendStiffness = 0;//elasticModulus * areaMomentOfInertia / internodeLength; // FIXME
 

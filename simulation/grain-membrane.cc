@@ -417,6 +417,8 @@ void Simulation::stepGrainMembrane() {
      const vXsf B0x = load(mPx, b);
      const vXsf B0y = load(mPy, b);
      const vXsf B0z = load(mPz, b);
+     //assert_(b+e0 >= 0 && b+e0 < membrane->H*membrane->stride, b, e0, b+e0, membrane->H, membrane->stride, membrane->H*membrane->stride);
+     //log(b+e0, membrane->H*membrane->stride);
      const vXsf B1x = loadu(mPx, b+e0);
      const vXsf B1y = loadu(mPy, b+e0);
      const vXsf B1z = loadu(mPz, b+e0);
@@ -436,6 +438,7 @@ void Simulation::stepGrainMembrane() {
                                + convert(scale*(My-minY)) * sizeX
                                + convert(scale*(Mx-minX)); // FIXME: Clang miscompiles
      for(int n: range(3*3)) for(int i: range(3)) {
+      //log(n, i , latticeNeighbours[n]+i, index);
       const vXsi a = gather(latticeNeighbours[n]+i, index);
       const vXsf Ax = gather(gPx, a), Ay = gather(gPy, a), Az = gather(gPz, a);
       const vXsf Rx = Ax-B0x, Ry = Ay-B0y, Rz = Az-B0z;

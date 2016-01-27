@@ -14,6 +14,7 @@
 //#include "wire-grain.h"
 
 constexpr string Simulation::patterns[];
+constexpr string Simulation::processStates[];
 
 bool fail = false;
 Lock lock;
@@ -33,27 +34,28 @@ Simulation::Simulation(const Dict& p) :
            p.value("grainWallThickness", 0.4 /*0*/)*mm,
            targetGrainCount),
   membrane((float)p.value("Radius", 100)*mm, grain->radius),
-  wire(grain->radius),
-  targetDynamicGrainObstacleFrictionCoefficient(0.228),
-  targetDynamicGrainMembraneFrictionCoefficient(0.228),
-  targetDynamicGrainGrainFrictionCoefficient(0.096),
-  targetDynamicWireGrainFrictionCoefficient(1),
-  targetDynamicWireBottomFrictionCoefficient(0.3),
-  targetStaticFrictionSpeed((float)p.value("sfSpeed", 0.1f)*m/s),
-  targetStaticFrictionLength((float)p.value("sfLength", 1e-3f)*m),
-  targetStaticFrictionStiffness((float)p.value("sfStiffness", 1e3f)/m),
-  targetStaticFrictionDamping((float)p.value("sfDamping", 10)*N/(m/s)),
+  wire(grain->radius/2),
+  targetDynamicGrainObstacleFrictionCoefficient(0.5/*0.228*/),
+  targetDynamicGrainMembraneFrictionCoefficient(0/*.096*//*228*/),
+  targetDynamicGrainGrainFrictionCoefficient(0.5/*0.096*/),
+  targetDynamicWireGrainFrictionCoefficient(0.5),
+  targetDynamicWireBottomFrictionCoefficient(0.5/*0.228*/),
+  targetStaticFrictionSpeed((float)p.value("sfSpeed", 0.01f)*m/s),
+  targetStaticFrictionLength((float)p.value("sfLength", 1e-4f)*m),
+  targetStaticFrictionStiffness((float)p.value("sfStiffness", 1e4f)/m),
+  targetStaticFrictionDamping((float)p.value("sfDamping", 1)*N/(m/s)),
   //useMembrane(p.value("Membrane", 1)),
   Gz(-(float)p.value("G", /*4000**/10.f)*N/kg),
-  verticalSpeed(p.value("verticalSpeed",0.015f)*m/s),
+  verticalSpeed(p.value("verticalSpeed",0.01f)*m/s),
   linearSpeed(p.value("linearSpeed",1.f)*m/s),
-  targetPressure((float)p.value("Pressure", 80e3f)*Pa),
+  targetPressure((float)p.value("Pressure", 0 /*80e3f*/)*Pa),
   plateSpeed((float)p.value("Speed", 10)*mm/s),
   patternRadius(membrane->radius - grain->radius),
-  pattern(Pattern(ref<string>(patterns).indexOf(p.value("Pattern","helix")))),
+  pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):Loop),
   currentHeight(0?Wire::radius:grain->radius),
+  membraneRadius(membrane->radius),
   topZ(membrane->height),
-  latticeRadius(/*useMembrane*/1? membrane->radius+grain->radius : 2*membrane->radius),
+  latticeRadius(/*useMembrane*/0? membrane->radius+grain->radius : 2*membrane->radius),
   lattice {sqrt(3.)/(2*grain->radius), vec3(vec2(-latticeRadius), -grain->radius*2),
                                            vec3(vec2(latticeRadius), membrane->height+grain->radius)}
 {
@@ -83,6 +85,47 @@ Simulation::Simulation(const Dict& p) :
 Simulation::~Simulation() {}
 
 void Simulation::step() {
+ if(processState == Release) {
+  /*if(membraneViscosity < targetViscosity) membraneViscosity += 10 * dt;
+  if(membraneViscosity > targetViscosity) membraneViscosity = targetViscosity;*/
+  constexpr float membraneRadiusSpeed = 0.01*m/s;
+  if(membraneRadius < latticeRadius) membraneRadius += membraneRadiusSpeed * dt;
+  if(membraneRadius > latticeRadius) membraneRadius  = latticeRadius;
+  float maxGrainMembraneV = maxGrainV + membraneRadiusSpeed;
+  grainMembraneGlobalMinD -= maxGrainMembraneV * this->dt;
+  const int W = membrane->W;
+  const int stride = membrane->stride;
+  const int margin = membrane->margin;
+  for(size_t i: range(membrane->H)) {
+   for(size_t j: range(membrane->W)) {
+    float z = i*membrane->height/(membrane->H-1);
+    float a = 2*PI*(j+(i%2)*1./2)/membrane->W;
+    float x = membraneRadius*cos(a), y = membraneRadius*sin(a);
+    membrane->Px[i*stride+margin+j] = x;
+    membrane->Py[i*stride+margin+j] = y;
+    membrane->Pz[i*stride+margin+j] = z;
+   }
+   // Copies position back to repeated nodes
+   membrane->Px[i*stride+margin-1] = membrane->Px[i*stride+margin+W-1];
+   membrane->Py[i*stride+margin-1] = membrane->Py[i*stride+margin+W-1];
+   membrane->Pz[i*stride+margin-1] = membrane->Pz[i*stride+margin+W-1];
+   membrane->Px[i*stride+margin+W] = membrane->Px[i*stride+margin+0];
+   membrane->Py[i*stride+margin+W] = membrane->Py[i*stride+margin+0];
+   membrane->Pz[i*stride+margin+W] = membrane->Pz[i*stride+margin+0];
+  }
+  membranePositionChanged = true;
+  if(membraneViscosity == targetViscosity) processState = Released;
+ }
+ if(nextProcessState > processState) {
+  processState = nextProcessState;
+  log("processState = ", processStates[processState]);
+  if(processState == Release) {
+   //membraneViscosity = targetViscosity;
+   //wire->count--;
+   //for(size_t i: range(wire->count)) { wire->Vx[i] = 0; wire->Vy[i] = 0; wire->Vz[i] = 0; }
+   log("Release", wire->count);
+  }
+ }
  stepTime.start();
 
  stepProcess();
@@ -91,7 +134,8 @@ void Simulation::step() {
   grainTotalTime.start();
   stepGrain();
   grainSideTime.start();
-  if(processState == Release) { // Reprojects any grain outside lattice bounds (when not already constrained)
+  /*if(processState >= Released) { // Reprojects any grain outside lattice bounds (when not already constrained)
+   assert_(latticeRadius == 2*membrane->radius);
    if(latticeRadius < 2*membrane->radius) {
     latticeRadius = 2*membrane->radius;
     lattice.~Lattice<int32>();
@@ -112,36 +156,38 @@ void Simulation::step() {
      grain->Vy[simd+i] = 0;
     }
    }
-  }
+  }*/
   grainSideTime.stop();
   grainBottomTotalTime.start();
   stepGrainBottom();
   grainBottomTotalTime.stop();
-  if(processState < Release) {
+  /*if(processState < Released) {
    grainTopTotalTime.start();
    stepGrainTop();
    grainTopTotalTime.stop();
-  }
+  }*/
   grainGrainTotalTime.start();
   stepGrainGrain();
   grainGrainTotalTime.stop();
   grainTotalTime.stop();
  }
 
-  if(processState < Release) {
+ if(processState < Released) {
   membraneTotalTime.start();
   if(membraneViscosity) stepMembrane();
-  grainMembraneTotalTime.start();
-  stepGrainMembrane();
-  grainMembraneTotalTime.stop();
+  if(1) {
+   grainMembraneTotalTime.start();
+   stepGrainMembrane();
+   grainMembraneTotalTime.stop();
+  }
   membraneTotalTime.stop();
   if(fail) return;
  }
 
  stepWire();
- stepWireGrain();
  stepWireTension();
- //stepWireBendingResistance();
+ stepWireGrain();
+ stepWireBendingResistance();
  wireBottomTotalTime.start();
  stepWireBottom();
  wireBottomTotalTime.stop();
@@ -153,7 +199,7 @@ void Simulation::step() {
   validGrainLattice = false;
   grainTotalTime.stop();
  }
- if(/*useMembrane*/processState < Release) {
+ if(/*useMembrane*/processState < Released) {
   membraneTotalTime.start();
   stepMembraneIntegration();
   membraneTotalTime.stop();

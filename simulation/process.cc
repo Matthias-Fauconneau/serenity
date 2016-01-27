@@ -4,11 +4,22 @@
 #include "wire.h"
 
 void Simulation::stepProcess() {
- if(processState >= Release) return;
+ if(currentHeight >= topZ-grain->radius && processState < Release) {
+  log("processState = Release");
+  processState = Release;
+  /*wire->Vx[wire->count-1] = 0;
+  wire->Vy[wire->count-1] = 0;
+  wire->Vz[wire->count-1] = 0;*/
+  wire->Vx[wire->count-1] = wire->Vx[wire->count-2];
+  wire->Vy[wire->count-1] = wire->Vy[wire->count-2];
+  wire->Vz[wire->count-1] = wire->Vz[wire->count-2];
+ }
+ if(processState >= Release/*d*/) return;
  //pressure = 0; membraneViscosity = 1-1000*dt; // DEBUG
  // Process
- if(grain->count == targetGrainCount) {
+ if(grain->count == targetGrainCount || processState > Pour) {
   //if(!useMembrane) return;
+  log("processState = Release");
   processState = Release;
   if(processState  < Pressure) {
    static bool unused once = ({ log("Set Friction"); true; });
@@ -37,12 +48,15 @@ void Simulation::stepProcess() {
    //if(maxGrainV > 600 * mm/s) return;
    pressure = targetPressure;
   }*/
-  const float targetViscosity = 1-10000*dt;
   if(pressure < targetPressure || membraneViscosity < targetViscosity) { // Increases pressure toward target pressure
-   if(processState < Pressure) log("Pressure");
-   processState = Pressure;
-   if(pressure < targetPressure) pressure += 100 * targetPressure * dt;
-   if(pressure > targetPressure) pressure = targetPressure;
+   if(processState < Pressure) {
+    log("Pressure");
+    processState = Pressure;
+   }
+   if(processState == Pressure) {
+    if(pressure < targetPressure) pressure += 100 * targetPressure * dt;
+    if(pressure > targetPressure) pressure = targetPressure;
+   }
    //pressure=targetPressure; //assert_(pressure== targetPressure, pressure, targetPressure);
    if(membraneViscosity < targetViscosity) membraneViscosity += 100 * dt;
    if(membraneViscosity > targetViscosity) membraneViscosity = targetViscosity;
@@ -53,10 +67,17 @@ void Simulation::stepProcess() {
     bottomForceZ = 0; bottomSumStepCount = 0;
     radialForce = 0; radialSumStepCount = 0;
     //log("Displaces plates");
+    log("processState = Load");
+    processState = Load;
    }
-   processState = Load;
-   topZ -= dt * plateSpeed;
-   bottomZ += dt * plateSpeed;
+   if(processState == Load) {
+    topZ -= dt * plateSpeed;
+    bottomZ += dt * plateSpeed;
+   }
+   if(processState == Release) {
+    log("processState = Released");
+    processState = Released;
+   }
   }
  } else {
   // Increases current height

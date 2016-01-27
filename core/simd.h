@@ -187,7 +187,7 @@ static inline v8sf load(ref<float> a, int index) { return load(a.data, index); }
 static inline v8sf loadu(const float* a, int index) {
 #undef packed
  struct u { v8sf v; } __attribute((packed, may_alias));
- return ((u*)a+index)->v;
+ return ((u*)(a+index))->v;
 }
 #elif __INTEL_COMPILER
 static inline v8sf loadu(const float* a, int index) { return _mm256_loadu_ps(a+index); }

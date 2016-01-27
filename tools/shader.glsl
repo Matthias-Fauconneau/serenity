@@ -36,7 +36,11 @@ fragment {
     }
     vec3 v = vec3(vLocalCoords, dz);
     uniform vec4 viewRotation;
-    color = vec4(dz*(1+mul(conjugate(qmul(viewRotation, q)), v))/2, a);
+    vec3 lv = mul(conjugate(qmul(viewRotation, q)), v);
+    float r = length(lv.xyz);
+    const float PI = 3.14159265358979323846;
+    vec2 s = vec2(acos(lv.z/r)/PI, (PI+atan(lv.y, lv.x))/(2*PI));
+    color = vec4(dz*vec3((1+mod(vec2(2,4)*s,1))/2, 1), a);
     uniform float radius;
     gl_FragDepth = gl_FragCoord.z + dz * radius;
   }

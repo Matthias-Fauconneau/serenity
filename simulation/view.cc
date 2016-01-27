@@ -35,14 +35,14 @@ struct SimulationView : Widget {
 
  SimulationView(const Simulation& simulation) : simulation(simulation) {}
 
- vec2 sizeHint(vec2) override { return vec2(1008); }
+ vec2 sizeHint(vec2) override { return vec2(992); }
 
  shared<Graphics> graphics(vec2 size) override {
   if(!totalTime) totalTime.start();
   renderTime.start();
 
   vec4 viewRotation = qmul(angleVector(yawPitch.y, vec3(1,0,0)), angleVector(yawPitch.x, vec3(0,0,1)));
-  const vec3 scale = vec3(vec2(2/(simulation.topZ-simulation.bottomZ)), 1./16);
+  const vec3 scale = vec3(vec2(sqrt(2)/(simulation.topZ-simulation.bottomZ)), 1./16);
   mat4 viewProjection = mat4()
     .scale(vec3(1,1,-1))
     .scale(scale)
@@ -121,7 +121,7 @@ struct SimulationView : Widget {
    buffer<vec3> positions {size_t(simulation.wire->count-1)*6};
    buffer<vec4> colors {size_t(simulation.wire->count-1)};
    size_t s = 0;
-   for(size_t i: range(simulation.wire->count-1)) {
+   for(int i: range(simulation.wire->count-1)) {
     vec3 a (simulation.wire->position(i)), b (simulation.wire->position(i+1));
     // FIXME: GPU quad projection
     vec3 A = viewProjection * a, B= viewProjection * b;
@@ -158,7 +158,7 @@ struct SimulationView : Widget {
    }
   }
 
-  if(/*simulation.useMembrane*/simulation.processState < Simulation::Release && simulation.membrane->count) {
+  if(/*simulation.useMembrane*/simulation.processState < Simulation::Released && simulation.membrane->count) {
    if(!indexBuffer) {
     const int W = simulation.membrane->W, stride = simulation.membrane->stride,
       margin = simulation.membrane->margin;
@@ -188,13 +188,16 @@ struct SimulationView : Widget {
    static GLVertexArray vertexArray;
    // FIXME: reuse buffers / no update before pressure
    if(!xBuffer) xBuffer = GLBuffer(simulation.membrane->Px);
-   else if(simulation.membraneViscosity) xBuffer.upload(simulation.membrane->Px);
+   else if(simulation.membraneViscosity || simulation.membranePositionChanged)
+    xBuffer.upload(simulation.membrane->Px);
    vertexArray.bindAttribute(shader.attribLocation("x"_), 1, Float, xBuffer);
    if(!yBuffer) yBuffer = GLBuffer(simulation.membrane->Py);
-   else if(simulation.membraneViscosity) yBuffer.upload(simulation.membrane->Py);
+   else if(simulation.membraneViscosity || simulation.membranePositionChanged)
+    yBuffer.upload(simulation.membrane->Py);
    vertexArray.bindAttribute(shader.attribLocation("y"_), 1, Float, yBuffer);
    if(!zBuffer) zBuffer = GLBuffer(simulation.membrane->Pz);
-   else if(simulation.membraneViscosity) zBuffer.upload(simulation.membrane->Pz);
+   else if(simulation.membraneViscosity || simulation.membranePositionChanged)
+    zBuffer.upload(simulation.membrane->Pz);
    vertexArray.bindAttribute(shader.attribLocation("z"_), 1, Float, zBuffer);
    vertexArray.bind();
    indexBuffer.draw();
@@ -292,17 +295,24 @@ struct SimulationApp : Poll {
  SimulationApp(const Dict& parameters)
   : Poll(0, 0, simulationMasterThread), simulation(parameters), view(simulation) {
   window->actions[Space] = [this] {
-   simulation.processState = Simulation::Release;
+   if(simulation.processState < Simulation::Release) {
+    simulation.nextProcessState = Simulation::Release;
+   } else if(simulation.processState < Simulation::Released) {
+    simulation.nextProcessState = Simulation::Released;
+   }
+   log(simulation.processStates[simulation.processState],
+         simulation.processStates[simulation.nextProcessState]);
   };
   window->actions[Escape] = [this]{
    simulation.stop = true;
    requestTermination();
    simulationMasterThread.wait();
-   exit(0);/*Calls destructors (Writes out profiles)*/ /*exit_group(0);*/ /*FIXME*/
+   //exit(0);/*Calls destructors (Writes out profiles)*/ /*exit_group(0);*/ /*FIXME*/
   };
   window->presentComplete = [this]{
    window->render();
-   window->setTitle(str(simulation.timeStep*simulation.dt /s, simulation.grain->count, simulation.voidRatio, simulation.maxGrainV /(m/s)));
+   //window->setTitle(str(simulation.timeStep*simulation.dt /s, simulation.grain->count, simulation.voidRatio, simulation.maxGrainV /(m/s)));
+   window->setTitle(simulation.processStates[simulation.processState]);
   };
   queue(); simulationMasterThread.spawn();
  }

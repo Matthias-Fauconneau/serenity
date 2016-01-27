@@ -64,14 +64,20 @@ struct Simulation {
  const float loopAngle = PI*(3-sqrt(5.));
 
  // Process variables
- enum ProcessState { Pour, Pressure, Load, Release, Error };
- //sconst string processStates[] {"pour", "load", "error"};
+ enum ProcessState { Pour, Pressure, Load, Release, Released, Error };
+ sconst string processStates[] {"pour"_, "pressure"_, "load"_, "release"_, "released"_, "error"_};
  ProcessState processState = Pour;
+ ProcessState nextProcessState = Pour;
  Random random;
  float currentHeight;
  float pressure = targetPressure;
+ float grainViscosity = 1-1*dt;
+ float angularViscosity = 1-1*dt;
+ const float targetViscosity = 1;//-10*dt;
  float membraneViscosity = 0;
- float wireViscosity = 1-100*dt;
+ float wireViscosity = 1-1*dt;
+ float membraneRadius;
+ bool membranePositionChanged = false;
  float bottomZ = 0, topZ, topZ0;
  float latticeRadius;
  float lastAngle = 0, winchAngle = 0, currentWinchRadius = patternRadius;

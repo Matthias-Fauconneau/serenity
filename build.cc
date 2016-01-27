@@ -194,7 +194,10 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
   args.append("-fprofile-use"__);
   linkArgs.append("-fprofile-use"__);
  }
- if(flags.contains("asan"_)) args.append("-fsanitize=address"__);
+ if(flags.contains("asan"_)) {
+  args.append("-fsanitize=address"__);
+  linkArgs.append("-fsanitize=address"__);
+ }
  for(string flag: flags) if(startsWith(flag,"O")) args.append("-"+flag);
  args.append( "-DARGS=\""+str(args)+"\"");
  args.append(apply(folder.list(Folders), [this](string subfolder)->String{ return "-iquote"+subfolder; }));
