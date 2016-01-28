@@ -92,13 +92,35 @@ void Simulation::stepWireTension() {
  wireTensionTime.stop();
 }
 
-// SIMD atan (w/o AVX512F) (y>0)
-static const vXsf c1 = floatX(PI/4), c2 = floatX(3*PI/4);
-inline vXsf atan(const vXsf y, const vXsf x) {
- //return blend(lessThan(x, _0f), c2-c1*(x+y)/(y-x), c1-c1*(x-y)/(x+y));
- return {atan(y[0],x[0]),atan(y[1],x[1]),atan(y[2],x[2]),atan(y[3],x[3]),
-              atan(y[4],x[4]),atan(y[5],x[5]),atan(y[6],x[6]),atan(y[7],y[7]),};
+inline vXsf andnot(v8si a, vXsf b) { return (vXsf)(~a & (vXsi)b); }
+inline vXsf abs(vXsf a) { return andnot(signBit, a); }
+#if 0
+// x>0, |x|>|y| => [-PI/4, PI/4]
+vXsf atan(vXsf y, vXsf x) {
+    //const vXsf r = y / x;
+    return y; //r*(floatX(PI/4) - floatX(0.2447)*(abs(r)-_1f));
 }
+#else
+// FIXME: fails for x<0, y<0, |x|>|y|
+static vXsf PIX = floatX(PI);
+static vXsf PI2 = floatX(PI/2);
+static vXsf PI4 = floatX(PI/4);
+static vXsf c0 = floatX(0.2447);
+static vXsf c1 = floatX(0.0663);
+inline vXsf atan(vXsf y, vXsf x) {
+    const maskX XgtY = greaterThan(abs(x), abs(y));
+    const vXsf r = ((vXsf)(XgtY & (vXsi)y) + (vXsf)(~XgtY & (vXsi)x)) /
+                           ((vXsf)(XgtY & (vXsi)x) + (vXsf)(~XgtY & (vXsi)y));
+    const vXsf atan0 = r*(PI4 - (abs(r)-_1f)*(c0+c1*abs(r)));
+    const maskX Xgt0 = greaterThan(x, _0f);
+    const maskX Ygt0 = greaterThan(y, _0f);
+    const vXsf atan = (vXsf)(((~XgtY) & signBit) ^ (vXsi)atan0); // |x|<=|y| ? -atan
+    const vXsf shift0 = PIX - (vXsf)(~XgtY & (vXsi)PI2); // |x| < |y| ? -PI/2
+    const vXsf shift1 = (vXsf)((~Ygt0 & signBit) ^ (vXsi)shift0); // y < 0 ? -shift
+    const vXsf shift2 = (vXsf)(~(XgtY & Xgt0) & (vXsi)shift1); // |x|>|y| & x>0 ? 0
+    return atan + shift2;
+}
+#endif
 
 void Simulation::stepWireBendingResistance() {
  if((!wire->bendStiffness && !wire->bendDamping) || wire->count < 2) return;
