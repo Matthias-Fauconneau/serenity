@@ -243,6 +243,11 @@ static inline void scatter(float* const P, const v8si i, const v8sf x) {
  P[i[4]] = x[4]; P[i[5]] = x[5]; P[i[6]] = x[6]; P[i[7]] = x[7];
 #endif
 }
+#include <immintrin.h>
+static constexpr v8si signBit = /*(v8sf)*/(v8si){
+        (int)0x80000000,(int)0x80000000,(int)0x80000000,(int)0x80000000,
+        (int)0x80000000,(int)0x80000000,(int)0x80000000,(int)0x80000000};
+//inline v8sf andnot(v8sf a, v8sf b) { return (v8sf)(~(v8si)a & (v8si)b); }
 
 #if __INTEL_COMPILER
 static inline v8si lessThan(v8sf a, v8sf b) { return (v8si)(v8sf)_mm256_cmp_ps(a, b, _CMP_LT_OS); }
@@ -382,3 +387,25 @@ typedef v8si maskX;
 inline vXsf floatX(float x) { return float8(x); }
 
 #endif
+
+inline vXsf andnot(v8si a, vXsf b) { return (vXsf)(~a & (vXsi)b); }
+inline vXsf abs(vXsf a) { return andnot(signBit, a); }
+/*// x>0, |x|>|y| => [-PI/4, PI/4]
+vXsf atan0(vXsf y, vXsf x) {
+    const vXsf r = y / x;
+    return r*(floatX(PI/4) - floatX(0.2447)*(abs(r)-_1f));
+}*/
+// FIXME: fails for x<0, y<0, |x|>|y|
+vXsf atan(vXsf y, vXsf x) {
+    const maskX XgtY = greaterThan(abs(x), abs(y));
+    const vXsf r = ((vXsf)(XgtY & (vXsi)y) + (vXsf)(~XgtY & (vXsi)x)) /
+                           ((vXsf)(XgtY & (vXsi)x) + (vXsf)(~XgtY & (vXsi)y));
+    const vXsf atan0 = r*(floatX(PI/4) - (abs(r)-_1f)*(floatX(0.2447)+floatX(0.0663)*abs(r)));
+    const maskX Xgt0 = greaterThan(x, _0f);
+    const maskX Ygt0 = greaterThan(y, _0f);
+    const vXsf atan = (vXsf)(((~XgtY) & signBit) ^ (vXsi)atan0); // |x|<=|y| ? -atan
+    const vXsf shift0 = floatX(::PI) - (vXsf)(~XgtY & (vXsi)floatX(PI/2)); // |x| < |y| ? -PI/2
+    const vXsf shift1 = (vXsf)((~Ygt0 & signBit) ^ (vXsi)shift0); // y < 0 ? -shift
+    const vXsf shift2 = (vXsf)(~(XgtY & Xgt0) & (vXsi)shift1); // |x|>|y| & x>0 ? 0
+    return atan + shift2;
+}

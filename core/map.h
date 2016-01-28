@@ -17,7 +17,7 @@ template<Type K, Type V> struct map {
 
  size_t size() const { return keys.size; }
  size_t count() const { return keys.size; }
- void reserve(int size) { return keys.reserve(size); values.reserve(size); }
+ void reserve(int size) { keys.reserve(size); values.reserve(size); }
  void clear() { keys.clear(); values.clear(); }
 
  explicit operator bool() const { return keys.size; }

@@ -103,3 +103,4 @@ simulation/membrane.h
 simulation/wire.h
 simulation/plate.h
 tools/document.cc
+test.cc

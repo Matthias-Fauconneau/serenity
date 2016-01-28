@@ -7,8 +7,12 @@
 #include "math.h"
 
 String findFont(string fontName, ref<string> fontTypes) {
-    for(string folder: {"/usr/share/fonts"_,"/usr/local/share/fonts"_}) {
-        if(existsFolder(folder)) for(string path: Folder(folder).list(Files|Recursive)) {
+    /*for(string folder: {"/usr/share/fonts"_,"/usr/local/share/fonts"_}) {
+        if(existsFolder(folder)) for(string path: Folder(folder).list(Files|Recursive))*/
+ {
+  string folder = "/usr/share/fonts"_;
+  static auto list = Folder(folder).list(Files|Recursive);
+  for(string path: list) {
             if(endsWith(path,".ttf") || endsWith(path,".otf")) for(string fontType: fontTypes) {
                 if( find(path, fontName+     fontType+'.') ||
                         find(path, fontName+'-'+fontType+'.') ||

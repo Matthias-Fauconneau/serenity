@@ -154,6 +154,7 @@ shared<Graphics> Plot::graphics(vec2 size) {
  for(size_t i: range(dataSets.size())) order.append(i);
  for(int i: range(1, order.size)) {
   while(i > 0) {
+   if(!dataSets.values || !dataSets.values[order[i-1]].values || !dataSets.values[order[i]].values) break;
    if(!(dataSets.values[order[i-1]].values.last() < dataSets.values[order[i]].values.last())) break;
    swap(order[i-1], order[i]);
    i--;
