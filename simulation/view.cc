@@ -42,7 +42,7 @@ struct SimulationView : Widget {
   renderTime.start();
 
   vec4 viewRotation = qmul(angleVector(yawPitch.y, vec3(1,0,0)), angleVector(yawPitch.x, vec3(0,0,1)));
-  const vec3 scale = vec3(vec2(sqrt(2)/(simulation.topZ-simulation.bottomZ)), 1./16);
+  const vec3 scale = vec3(vec2(2/(simulation.topZ-simulation.bottomZ)), 1./16);
   mat4 viewProjection = mat4()
     .scale(vec3(1,1,-1))
     .scale(scale)
@@ -314,6 +314,12 @@ struct SimulationApp : Poll {
    window->render();
    //window->setTitle(str(simulation.timeStep*simulation.dt /s, simulation.grain->count, simulation.voidRatio, simulation.maxGrainV /(m/s)));
    window->setTitle(simulation.processStates[simulation.processState]);
+  };
+  window->actions[F12] = [this]{
+   simulation.stop = true;
+   requestTermination();
+   simulationMasterThread.wait();
+   //exit(0);/*Calls destructors (Writes out profiles)*/ /*exit_group(0);*/ /*FIXME*/
   };
   queue(); simulationMasterThread.spawn();
  }

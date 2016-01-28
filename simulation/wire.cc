@@ -99,14 +99,15 @@ return blend(lessThan(x, _0f), c2-c1*(x+y)/(y-x), c1-c1*(x-y)/(x+y));
 }
 
 void Simulation::stepWireBendingResistance() {
- if(!wire->bendStiffness || wire->count < 2) return;
- const float* const wPx = wire->Px.data, *wPy = wire->Py.data, *wPz = wire->Pz.data;
- //const float* const wVx = wire->Vx.data, *wVy = wire->Vy.data, *wVz = wire->Vz.data;
- float* const wFx = wire->Fx.begin(), *wFy = wire->Fy.begin(), *wFz = wire->Fz.begin();
- const vXsf K = floatX(wire->bendStiffness/*/2*/);
- //const vXsf bendDamping = floatX(wire->bendDamping/2);
- //return; DEBUG
+ if((!wire->bendStiffness && !wire->bendDamping) || wire->count < 2) return;
  wireBendingResistanceTime.start();
+#if 0 // FIXME
+ const float* const wPx = wire->Px.data, *wPy = wire->Py.data, *wPz = wire->Pz.data;
+ const float* const wVx = wire->Vx.data, *wVy = wire->Vy.data, *wVz = wire->Vz.data;
+ float* const wFx = wire->Fx.begin(), *wFy = wire->Fy.begin(), *wFz = wire->Fz.begin();
+ const vXsf K = floatX(wire->bendStiffness/200 /*/ wire->internodeLength?*/); // ~F
+ const vXsf bendDamping = floatX(wire->bendDamping);
+ //return; //DEBUG
  for(int i=1; i<(wire->count-1)/simd*simd; i+=simd) { // FIXME: partial last
   const vXsf Ax = load  (wPx, i-1  ), Ay = load  (wPy, i-1 ), Az = load  (wPz, i-1 );
   const vXsf Bx = loadu(wPx, i     ), By = loadu(wPy, i     ), Bz = loadu(wPz, i     );
@@ -114,16 +115,16 @@ void Simulation::stepWireBendingResistance() {
   const vXsf aX = Cx-Bx, aY = Cy-By, aZ = Cz-Bz;
   const vXsf bX = Bx-Ax, bY = By-Ay, bZ = Bz-Az;
 #if 0
-  const vXsf cX = Ay*Bz - By*Az;
-  const vXsf cY = Az*Bx - Bz*Ax;
-  const vXsf cZ = Ax*By - Bx*Ay;
+  const vXsf cX = aY*bZ - bY*aZ;
+  const vXsf cY = aZ*bX - bZ*aX;
+  const vXsf cZ = aX*bY - bX*aY;
   const vXsf L = sqrt(cX*cX + cY*cY + cZ*cZ);
-  //const vXsf angle = atan(L, aX*bX + aY*bY + aZ*bZ);*/
-  const vXsf d = aX*bX + aY*bY + aZ*bZ;
+  const vXsf angle = atan(L, aX*bX + aY*bY + aZ*bZ);
   const vXsf La = sqrt(aX*aX + aY*aY + aZ*aZ);
   const vXsf Lb = sqrt(bX*bX + bY*bY + bZ*bZ);
-  const vXsf angle = /*2**/sqrt(_1f-(d/(La*Lb)));
-  const vXsf p = bendStiffness * angle;
+  /*const vXsf d = aX*bX + aY*bY + aZ*bZ;
+  const vXsf angle = sqrt(_1f-(d/(La*Lb)));*/
+  const vXsf p = K * angle;
   const vXsf LaL = La * L;
   const vXsf dapX = (aY*cZ - cY*aZ) / LaL;
   const vXsf dapY = (aZ*cX - cZ*aX) / LaL;
@@ -142,12 +143,16 @@ void Simulation::stepWireBendingResistance() {
   maskStore(wFx+i-1, mask, load(wFx, i-1) - p * dbpX);
   maskStore(wFy+i-1, mask, load(wFy, i-1) - p * dbpY);
   maskStore(wFz+i-1, mask, load(wFz, i-1) - p * dbpZ);
+  const vXsf uAx = aX/La, uAy = aY/La, uAz = aZ/La;
+  const vXsf uBx = bX/Lb, uBy = bY/Lb, uBz = bZ/Lb;
+  const vXsf uX = uBx-uAx, uY = uBy-uAy, uZ = uBz-uAz;
 #else
   const vXsf La = sqrt(aX*aX + aY*aY + aZ*aZ);
   const vXsf Lb = sqrt(bX*bX + bY*bY + bZ*bZ);
   const vXsf uAx = aX/La, uAy = aY/La, uAz = aZ/La;
   const vXsf uBx = bX/Lb, uBy = bY/Lb, uBz = bZ/Lb;
-  const vXsf fX = K*(uBx-uAx), fY = K*(uBy-uAy), fZ = K*(uBz-uAz);
+  const vXsf uX = uBx-uAx, uY = uBy-uAy, uZ = uBz-uAz;
+  const vXsf fX = K*uX, fY = K*uY, fZ = K*uZ;
   storeu(wFx+i+1, loadu(wFx, i+1) + fX);
   storeu(wFy+i+1, loadu(wFy, i+1) + fY);
   storeu(wFz+i+1, loadu(wFz, i+1) + fZ);
@@ -155,7 +160,8 @@ void Simulation::stepWireBendingResistance() {
   store(wFy+i-1, load(wFy, i-1) - fY);
   store(wFz+i-1, load(wFz, i-1) - fZ);
 #endif
-  /*if(wire->bendDamping)*/ /*{
+  /*if(wire->bendDamping)*/ {
+#if 0
    const vXsf VAx = load  (wVx, i-1  ), VAy = load  (wVy, i-1 ), VAz = load  (wVz, i-1 );
    const vXsf VBx = loadu(wVx, i     ), VBy = loadu(wVy, i     ), VBz = loadu(wVz, i     );
    const vXsf VCx = loadu(wVx, i+1), VCy = loadu(wVy, i+1), VCz = loadu(wVz, i+1);
@@ -169,11 +175,57 @@ void Simulation::stepWireBendingResistance() {
    const maskX mask = greaterThan(L, _0f);
    const vXsf f = bendDamping * angularVelocity / L;
    const vXsf VcaX = VCx-VAx, VcaY = VCy-VAy, VcaZ = VCz-VAz;
+   const vXsf cX = aY*bZ - bY*aZ;
+   const vXsf cY = aZ*bX - bZ*aX;
+   const vXsf cZ = aX*bY - bX*aY;
    maskStore(wFx+i, mask, load(wFx, i) + f * (cY*VcaZ - VcaY*cZ));
    maskStore(wFy+i, mask, load(wFy, i) + f * (cZ*VcaX - VcaZ*cX));
    maskStore(wFz+i, mask, load(wFz, i) + f * (cX*VcaY - VcaX*cY));
-  }*/
+#else
+   const vXsf Vx = loadu(wVx, i     ), Vy = loadu(wVy, i     ), Vz = loadu(wVz, i     );
+   const vXsf Lu2 = uX*uX + uY*uY + uZ*uZ;
+   const vXsf F = - bendDamping * (uX*Vx + uY*Vy + uZ*Vz) / Lu2;
+   storeu(wFx+i, loadu(wFx, i) + F * uX);
+   storeu(wFy+i, loadu(wFy, i) + F * uY);
+   storeu(wFz+i, loadu(wFz, i) + F * uZ);
+#endif
+  }
  }
+#else
+ for(size_t i: range(1, wire->count-1)) { // TODO: SIMD
+  vec3 A = wire->position(i-1), B = wire->position(i), C = wire->position(i+1);
+  vec3 a = C-B, b = B-A;
+  vec3 c = cross(a, b);
+  float length = ::length(c);
+  if(length) {
+   float angle = atan(length, dot(a, b));
+   float p = wire->bendStiffness * angle;
+   vec3 dap = cross(a, c) / (::length(a) * length);
+   vec3 dbp = cross(b, c) / (::length(b) * length);
+   wire->Fx[i+1] += p * (-dap).x;
+   wire->Fy[i+1] += p * (-dap).y;
+   wire->Fz[i+1] += p * (-dap).z;
+   wire->Fx[i] += p * (dap + dbp).x;
+   wire->Fy[i] += p * (dap + dbp).y;
+   wire->Fz[i] += p * (dap + dbp).z;
+   wire->Fx[i-1] += p * (-dbp).x;
+   wire->Fy[i-1] += p * (-dbp).y;
+   wire->Fz[i-1] += p * (-dbp).z;
+   if(wire->bendDamping) {
+    vec3 A = wire->velocity(i-1), B = wire->velocity(i), C = wire->velocity(i+1);
+    vec3 axis = cross(C-B, B-A);
+    float length = ::length(axis);
+    if(length) {
+     float angularVelocity = atan(length, dot(C-B, B-A));
+     vec3 f = (wire->bendDamping * angularVelocity / 2 / length) * cross(axis, C-A);
+     wire->Fx[i] += f.x;
+     wire->Fy[i] += f.y;
+     wire->Fz[i] += f.z;
+    }
+   }
+  }
+ }
+#endif
  wireBendingResistanceTime.stop();
 }
 

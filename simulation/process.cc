@@ -17,7 +17,7 @@ void Simulation::stepProcess() {
  if(processState >= Release/*d*/) return;
  //pressure = 0; membraneViscosity = 1-1000*dt; // DEBUG
  // Process
- if(grain->count == targetGrainCount || processState > Pour) {
+ if(targetGrainCount && (grain->count == targetGrainCount || processState > Pour)) {
   //if(!useMembrane) return;
   log("processState = Release");
   processState = Release;

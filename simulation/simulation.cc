@@ -25,20 +25,21 @@ array<int> cylinders;
 Simulation::Simulation(const Dict& p) :
   dt((float)p.value("TimeStep",10e-6)*s),
   normalDampingRate((float)p.value("nDamping",1.f)*1),
-  targetGrainCount(4*PI*cb((float)p.value("Radius", 100)*mm)/(4./3*PI*cb(p.value("grainRadius", 20 /*2.5f*/)*mm))
-                              /(1+0.611)-49),
+  targetGrainCount(p.value("grainRadius", 20) != 0 ?
+   4*PI*cb((float)p.value("Radius", 100)*mm)/(4./3*PI*cb(p.value("grainRadius", 20 /*2.5f*/)*mm))
+                              /(1+0.611)-49 : 0),
   grain(p.value("grainRadius", 20 /*2.5f*/)*mm,
            p.value("grainDensity", 1.4e3 /*7.8e3f*/)*kg/cb(m),
            p.value("grainShearModulus", 30 /*77000*/)*MPa,
            p.value("grainPoissonRatio", 0.35 /*0.28*/)*1,
            p.value("grainWallThickness", 0.4 /*0*/)*mm,
            targetGrainCount),
-  membrane((float)p.value("Radius", 100)*mm, grain->radius),
-  wire(grain->radius/2),
+  membrane((float)p.value("Radius", 100)*mm, grain->radius?:20*mm),
+  wire(grain->radius/2?:10*mm),
   targetDynamicGrainObstacleFrictionCoefficient(0.5/*0.228*/),
   targetDynamicGrainMembraneFrictionCoefficient(0/*.096*//*228*/),
-  targetDynamicGrainGrainFrictionCoefficient(0.5/*0.096*/),
-  targetDynamicWireGrainFrictionCoefficient(0.5),
+  targetDynamicGrainGrainFrictionCoefficient(1/*0.5*//*0.096*/),
+  targetDynamicWireGrainFrictionCoefficient(2),
   targetDynamicWireBottomFrictionCoefficient(0.5/*0.228*/),
   targetStaticFrictionSpeed((float)p.value("sfSpeed", 0.01f)*m/s),
   targetStaticFrictionLength((float)p.value("sfLength", 1e-4f)*m),
@@ -50,7 +51,7 @@ Simulation::Simulation(const Dict& p) :
   linearSpeed(p.value("linearSpeed",1.f)*m/s),
   targetPressure((float)p.value("Pressure", 0 /*80e3f*/)*Pa),
   plateSpeed((float)p.value("Speed", 10)*mm/s),
-  patternRadius(membrane->radius - Wire::radius/* - grain->radius*/),
+  patternRadius(membrane->radius - grain->radius/*/2*//* - Wire::radius*//* - grain->radius*/),
   pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):Loop),
   currentHeight(0?Wire::radius:grain->radius),
   membraneRadius(membrane->radius),
@@ -88,7 +89,7 @@ void Simulation::step() {
  if(processState == Release) {
   /*if(membraneViscosity < targetViscosity) membraneViscosity += 10 * dt;
   if(membraneViscosity > targetViscosity) membraneViscosity = targetViscosity;*/
-  constexpr float membraneRadiusSpeed = 0.05*m/s;
+  constexpr float membraneRadiusSpeed = 0.04*m/s;
   if(membraneRadius < latticeRadius) membraneRadius += membraneRadiusSpeed * dt;
   if(membraneRadius > latticeRadius) membraneRadius  = latticeRadius;
   float maxGrainMembraneV = maxGrainV + membraneRadiusSpeed;
