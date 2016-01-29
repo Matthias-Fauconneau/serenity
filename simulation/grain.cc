@@ -198,45 +198,29 @@ void Simulation::stepGrainIntegration() {
     store(pRz, i, normalize*Rz);
     store(pRw, i, normalize*Rw);
 #else // PCDM rotation integration
-    vXsf Wx, Wy, Wz;
-    qapply(-Rx, -Ry, -Rz, Rw, AVx, AVy, AVz, Wx, Wy, Wz); // W = R* AV;
-    //for(int k: range(simd)) if(i+k<grain->count) log("W", Wx[k], Wy[k], Wz[k]);
-    // vec3 t = q.conjugate() * grain.torque[i];
-    vXsf Tx, Ty, Tz;
-    qapply(-Rx, -Ry, -Rz, Rw, load(pTx, i), load(pTy, i), load(pTz, i), Tx, Ty, Tz);
-    //for(int k: range(simd)) if(i+k<grain->count) log("T", Tx[k], Ty[k], Tz[k]);
-    //vec3 dw = dt/Grain::angularMass * (t - cross(w, I*w)) (I scalar => cross(w, I*w) = 0)
-    vXsf DWx = dt_angularMass * Tx;
-    vXsf DWy = dt_angularMass * Ty;
-    vXsf DWz = dt_angularMass * Tz;
-    //for(int k: range(simd)) if(i+k<grain->count) log("dW", DWx[k], DWy[k], DWz[k]);
-    // vec3 w4w = q * (w + 1./4*dw);
-    vXsf W4x, W4y, W4z;
-    qapply(Rx, Ry, Rz, Rw, Wq◌̂x + _4*DWx, Wy + _4*DWy, Wz + _4*DWz, W4x, W4y, W4z);
-    //for(int k: range(simd)) if(i+k<grain->count) log("W4", W4x[k], W4y[k], W4z[k]);
-    // Prediction (multiplicative update)
-    //quat qp = angleVector(dt/2, w4w) * q;
+    vXsf Wx, Wy, Wz; qapply(-Rx, -Ry, -Rz, Rw, AVx, AVy, AVz, Wx, Wy, Wz); // R* AV
+    vXsf Tx, Ty, Tz; qapply(-Rx, -Ry, -Rz, Rw, load(pTx, i), load(pTy, i), load(pTz, i), Tx, Ty, Tz); // R* T
+    vXsf DWx = dt_angularMass * Tx, DWy = dt_angularMass * Ty, DWz = dt_angularMass * Tz;
+    vXsf W4x, W4y, W4z; // q (w + 1/4*dw)
+    qapply(Rx, Ry, Rz, Rw, Wx + _4*DWx, Wy + _4*DWy, Wz + _4*DWz, W4x, W4y, W4z);
+    // qp
     vXsf L = sqrt(W4x*W4x + W4y*W4y + W4z*W4z);
     vXsf A = dt_4*L;
     vXsf S = (v8sf)(greaterThan(L, _0f) & (v8si)(sin(A)/L)); // L ? sin(A)/L : 0
     vXsf Qx, Qy, Qz, Qw;
     qmul(S*W4x, S*W4y, S*W4z, cos(A), Rx, Ry, Rz, Rw, Qx, Qy, Qz, Qw);
-    // vec3 w2 = w + 1./2*dw;
-    // vec3 w2w = qp * w2;
+    // qp * (w + 1/2*dw)
     vXsf W2x, W2y, W2z;
     qapply(Qx, Qy, Qz, Qw, Wx + _2*DWx, Wy + _2*DWy, Wz + _2*DWz, W2x, W2y, W2z);
     // Correction (multiplicative update)
-    //q = angleVector(dt, w2w) * q;
+    // q = angleVector(dt, w2w) * q;
     {vXsf L = sqrt(W2x*W2x + W2y*W2y + W2z*W2z);
-     //if(!l) return quat{1, 0};
      vXsf A = dt_2*L;
-     //vXsf S = sin(A)/L;
      vXsf S = (v8sf)(greaterThan(L, _0f) & (v8si)(sin(A)/L)); // L ? sin(A)/L : 0
      vXsf Qx, Qy, Qz, Qw;
      qmul(S*W2x, S*W2y, S*W2z, cos(A), Rx, Ry, Rz, Rw, Qx, Qy, Qz, Qw);
-     //q = normalize(q); // FIXME
-     //const vXsf normalize = rsqrt(Qx*Qx+Qy*Qy+Qz*Qz+Qw*Qw);
-     const vXsf normalize = _1f;
+     const vXsf normalize = rsqrt(Qx*Qx+Qy*Qy+Qz*Qz+Qw*Qw); // FIXME
+     //const vXsf normalize = _1f;
      store(pRx, i, normalize*Qx);
      store(pRy, i, normalize*Qy);
      store(pRz, i, normalize*Qz);
