@@ -26,7 +26,6 @@ struct Grain {
  buffer<float> Fx { ::threadCount() * capacity };
  buffer<float> Fy { ::threadCount() * capacity };
  buffer<float> Fz { ::threadCount() * capacity };
-  // TODO: Rodrigues vector
  buffer<float> Rx { capacity }, Ry { capacity }, Rz { capacity }, Rw { capacity };
  buffer<float> AVx { capacity }, AVy { capacity }, AVz { capacity }; // Angular velocity
  buffer<float> Tx { ::threadCount() * capacity };

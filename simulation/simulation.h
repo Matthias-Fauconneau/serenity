@@ -72,7 +72,7 @@ struct Simulation {
  float currentHeight;
  float pressure = targetPressure;
  float grainViscosity = 1-2*dt;
- float angularViscosity = 1-2*dt;
+ float angularViscosity = 1; //1-2*dt;
  const float targetViscosity = 1;//-10*dt;
  float membraneViscosity = 0;
  float wireViscosity = 1-32*dt;

@@ -3,6 +3,7 @@
 #include "wire.h"
 
 void Simulation::stepWire() {
+ if(!wire->count) return;
  const vXsf m_Gz = floatX(wire->mass * Gz);
  float* const wFx = wire->Fx.begin(), *wFy = wire->Fy.begin(), *wFz = wire->Fz.begin();
  wireInitializationTime += parallel_chunk(align(simd, wire->count)/simd, [&](uint, size_t start, size_t size) {

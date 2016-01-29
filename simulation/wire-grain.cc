@@ -202,7 +202,7 @@ void Simulation::stepWireGrain() {
   swap(oldWireGrainLocalBy, wireGrainLocalBy);
   swap(oldWireGrainLocalBz, wireGrainLocalBz);
 
-  static constexpr size_t averageWireGrainContactCount = 16;
+  static constexpr size_t averageWireGrainContactCount = 32;
   const size_t GWcc = max(4096u, align(simd, grain->count * averageWireGrainContactCount +1));
   if(GWcc > wireGrainA.capacity) {
    wireGrainA = buffer<int>(GWcc, 0);
