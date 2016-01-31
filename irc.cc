@@ -3,6 +3,7 @@
 #include "time.h"
 #include <sys/socket.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 // Sockets
 
@@ -66,12 +67,12 @@ uint resolve(const ref<byte>& host) {
   }
   query.append(ref<byte>{0,0,1,0,1});
   dns.write(query);
-  if(!dns.poll(1000)){log("DNS query timed out, retrying... "); dns.write(query); if(!dns.poll(1000)){log("giving up"); return -1; }}
+  if(!dns.poll(2000)){log("DNS query timed out, retrying... "); dns.write(query); if(!dns.poll(2000)){log("giving up"); return -1; }}
   BinaryData s(dns.readUpTo(4096), true);
   header = s.read<Header>();
-  for(int i=0;i<big16(header.qd);i++) { for(uint8 n;(n=s.read());) s.advance(n); s.advance(4); } //skip any query headers
+  for(int i=0;i<big16(header.qd);i++) { for(uint8 n;(n=s.read());) s.advance(n); s.advance(4); } // Skips any query headers
   for(int i=0;i<big16(header.an);i++) {
-   for(uint8 n;(n=s.read());) { if(n>=0xC0) { s.advance(1); break; } s.advance(n); } //skip name
+   for(uint8 n;(n=s.read());) { if(n>=0xC0) { s.advance(1); break; } s.advance(n); } // Skips name
    uint16 type=s.read(), unused class_=s.read(); uint32 unused ttl=s.read(); uint16 unused size=s.read();
    if(type!=1) { s.advance(size); continue; }
    assert(type=1/*A*/); assert(class_==1/*INET*/);
@@ -105,33 +106,40 @@ struct URL {
   host = s.until(':');
   port = s.integer();
   s.match('/');
-  for(;;) {
-   channels.append(s.word("-_"));
-   if(s.match('/')) break;
-   s.skip(',');
+  do {
+   channels.append(s.identifier("-_.[]"));
+  } while(s.match(','));
+  s.whileAny(' ');
+  if(s.match("/msg ")) {
+   bot = s.until(' ');
+   s.skip("xdcc send #");
+  } else {
+   s.skip("/");
+   bot = s.until('#');
   }
-  bot = s.until('#');
   number = s.whileInteger();
   assert_(!s, s.untilEnd(), s);
   log(host, channels, bot, number);
  }
 };
 
-struct IRC : URL {
+struct DCC : URL {
  TextDataStream<TCPSocket> irc{resolve(host), port};
- string nick = "Guest";
+ String nick = copyRef("Guest0"_);
+ String fileName;
+ size_t position;
+ size_t fileSize;
  void write(string command) {
   irc.write(command);
   log_(">"+command);
  }
- void listen(int stage) {
+ bool listen(int stage) {
   for(;;) {
    string prefix;
    if(irc.match(':')) {
     prefix = irc.until(' ');
    }
    string command = irc.until(' ');
-   if(!command) break;
    string params = irc.until("\r\n"_);
    if(     command=="NOTICE" ||
            command=="433" /*Nick already exists*/ ||
@@ -150,6 +158,7 @@ struct IRC : URL {
            command=="372" /*Message of the Day */ ||
            command=="376" /*Message of the Day End*/ ||
 
+           command=="422" /*?*/ ||
            command=="439" /*?*/ ||
 
            command=="MODE" ||
@@ -172,54 +181,81 @@ struct IRC : URL {
      log(prefix, command, params);
      write("PONG "+params+"\r\n"_);
     }
-    /*else if(command=="PRIVMSG" && params==nick+ " :\x01VERSION\x01") {
-     log(prefix, command, params);
-     write(str("NOTICE", prefix, ":\x01VERSION\x01 SerenityDCC\r\n"));
-    }*/
-    else if(command=="PRIVMSG" && startsWith(prefix, bot)) {
+    else if(command=="PRIVMSG" && startsWith(prefix, bot) && startsWith(params, nick)) {
      log(prefix, command, params);
      TextData s (params);
      s.skip(nick);
      s.skip(" :\x01");
-     if(stage==1) s.skip("DCC SEND ");
-     else s.skip("DCC ACCEPT ");
+     if(stage==2) s.skip("DCC SEND ");
+     else {
+      if(s.match("DCC SEND ")) {
+       continue;
+       log("Repeated DCC SEND, Expecting DCC Accept");
+      }
+      s.skip("DCC ACCEPT ");
+     }
      string name = s.until(' ');
-     uint ip = stage==1 ? big32(parseInteger(s.until(' '))) : stage;
+     this->fileName = copyRef(name);
+     uint ip = stage==2 ? big32(parseInteger(s.until(' '))) : stage;
      uint16 port = parseInteger(s.until(' '));
-     size_t size = parseInteger(s.until(' '));
+     size_t partSize = parseInteger(s.until(' '));
+     if(stage == 2) fileSize = partSize; // else partSize | position ?
      log(name, str(uint8(raw(ip)[0]))+"."_+str(uint8(raw(ip)[1]))+"."_+
        str(uint8(raw(ip)[2]))+"."_+str(uint8(raw(ip)[3])),
-       port, size);
-     //assert_(!existsFile(name));
+       port, fileSize);
      File file (name, currentWorkingDirectory(), Flags(WriteOnly|Create|Append));
-     size_t position = file.size();
-     if(stage== 1 && position) {
+     position = file.size();
+     if(stage == 2 && position) {
+      assert_(position <= fileSize);
+      if(position == fileSize) { log("Completed"); return true; }
       write(":"+nick+" PRIVMSG "_+bot+" :\x01""DCC RESUME "_+name+" "_+str(port)+" "_+str(position)+"\x01\r\n"_);
-      listen(ip);
-      return;
+      return listen(ip);
      }
+     assert(position+partSize == fileSize);
      TCPSocket dcc (ip, port);
-     size_t read = 0;
-     Time time{true};
-     while(read<size) {
-      dcc.poll(-1);
-      buffer<byte> chunk = dcc.readUpTo(min(1ul<<21,size-read));
-      assert_(chunk);
-      read += chunk.size;
-      log(100*read/size, read/(float)time);
+     int64 startTime = realTime(), lastTime = startTime;
+     size_t readSinceLastTime = 0;
+     while(position<fileSize) {
+      if(!dcc.poll(10000)) {
+       log("10s");
+       if(!dcc.poll(10000)) {
+        log("20s");
+        return false;
+       }
+      }
+      buffer<byte> chunk = dcc.readUpTo(min(1ul<<21,fileSize-position));
+      if(!chunk) {
+       log("!chunk");
+       return false;
+      }
+      position += chunk.size;
+      readSinceLastTime += chunk.size;
+      if(realTime() > lastTime+second) {
+       log(100*position/fileSize, readSinceLastTime*second/(realTime()-lastTime)/1024, (fileSize-position)*(realTime()-startTime)/position/second/60);
+       lastTime = realTime();
+       readSinceLastTime = 0;
+      }
       file.write(chunk);
      }
-     assert_(read == size);
-     log(name, file.size());
-     return;
+     assert_(position == fileSize);
+     log(name, fileSize);
+     return true;
     }
-    else if(stage==0 && command=="376") {
+    else if(stage==0 && command=="MODE") {
      log(prefix, command, params);
-     return;
-    } else if(0 && (
-             (command=="PRIVMSG" && (startsWith(params,"#MOVIEGODS")||startsWith(toLower(params),"#mg-chat")))
+     return true;
+    }
+    else if(stage==0 && command=="433" ) { // Nick name already in use
+     log(prefix, command, params);
+     return false;
+    }
+    else if(stage==1 && command=="366"/*End of names list*/) {
+     log(prefix, command, params);
+     return true;
+    } else if(1 && (
+             (command=="PRIVMSG" && startsWith(params,"#"))
              || (command == "NOTICE" && !startsWith(prefix,bot))
-             || (0 && (command == "JOIN" || command == "PART" || command=="QUIT" || command=="MODE" || command=="NICK"
+             || (1 && (command == "JOIN" || command == "PART" || command=="QUIT" || command=="MODE" || command=="NICK"
                        || command=="001" || command=="002" || command=="003" || command=="004" || command=="005"
                        || command=="251" || command=="252" || command=="253" || command=="254" || command=="255" || command=="265" || command=="266"
                        || command=="375" || command=="372" || command=="376" || command=="439"
@@ -230,13 +266,29 @@ struct IRC : URL {
     log(prefix, command, params);
   }
  }
- IRC() : URL(arguments()[0]) {
-  write("NICK "+nick+"\r\n"_);
-  write("USER "+nick+" localhost "_+host+" :"+nick+"\r\n"_);
-  listen(0);
+ DCC(string url) : URL(url) {
+  for(int i=0;i<=9;i++) {
+   nick.last() = '0'+i;
+   write("NICK "+nick+"\r\n"_);
+   write("USER "+nick+" localhost "_+host+" :"+nick+"\r\n"_);
+   if(listen(0)) break; // Waits for MODE
+   // else NICK already in use
+  }
   for(string channel: channels) write("JOIN #"+channel+"\r\n");
   write(":"+nick+" PRIVMSG "_+bot+" :xdcc remove"+"\r\n"_);
+  listen(1); // Waits for first JOIN confirmation
   write(":"+nick+" PRIVMSG "_+bot+" :xdcc send #"_+number+"\r\n"_);
-  listen(1);
+  listen(2); // Handles DCC
  }
-} irc;
+};
+
+struct DCCApp {
+ DCCApp() {
+  for(int i: range(7)) {
+   DCC dcc(join(arguments(), " "));
+   if(!dcc.fileName || !dcc.fileSize || !dcc.position) return; // Failed
+   if(dcc.position == dcc.fileSize) return; // Completed
+   log("Retry", i); // Retry
+  }
+ }
+} fetch;

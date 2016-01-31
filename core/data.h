@@ -193,7 +193,7 @@ struct TextData : virtual Data {
     /// Matches [-+]?[0-9]*
     string whileInteger(bool sign=false, int base=10);
     /// Reads an integer
-    int integer(bool sign=true, int base=10);
+    int64 integer(bool sign=true, int base=10);
     /// Reads a signed integer, return defaultValue if fails
     int mayInteger(int defaultValue=-1);
     /// Matches [-+]?[0-9]*\.[0-9]*

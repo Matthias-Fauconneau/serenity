@@ -204,13 +204,13 @@ string TextData::whileInteger(bool sign, int base) {
  return slice(start,index-start);
 }
 
-int TextData::integer(bool maySign, int base) {
+int64 TextData::integer(bool maySign, int base) {
  assert_(data);
  assert(base==10 || base==16);
  int sign=1;
  if(maySign) { if(match('-')) sign=-1; else match('+'); }
  assert_(isInteger(base), "Expected integer, got '"+escape(slice(index, 64))+"'");
- long value=0;
+ int64 value=0;
  do {
   char c = peek();
   int n;
