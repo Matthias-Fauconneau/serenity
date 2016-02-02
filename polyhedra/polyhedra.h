@@ -374,8 +374,8 @@ struct PolyhedraSimulation {
   {
     float kE = 0;
     for(size_t i: range(polyhedras.size)) {
-     kE += 1./2 * polyhedras[i].mass * sq(velocity[i]);
-     kE += 1./2 * polyhedras[i].angularMass * sq(angularVelocity[i]);
+     kE += 1./2 * /*polyhedras[i].*/Polyhedra::mass * sq(velocity[i]);
+     kE += 1./2 * /*polyhedras[i].*/Polyhedra::angularMass * sq(angularVelocity[i]);
     }
   }
   status = true;
