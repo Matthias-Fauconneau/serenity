@@ -5,7 +5,7 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
 
  struct State {
   buffer<vec3> position;
-  buffer<v4sf> rotation;
+  buffer<vec4> rotation;
   buffer<Contact> contacts;
   buffer<Force> forces;
   buffer<vec4> planes;
@@ -15,14 +15,14 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
  void record() {
   State state;
   state.position = buffer<vec3>(polyhedras.size);
-  state.rotation = buffer<v4sf>(polyhedras.size);
+  state.rotation = buffer<vec4>(polyhedras.size);
   for(size_t p: range(polyhedras.size)) {
    state.position[p] = polyhedras[p].position;
    state.rotation[p] = polyhedras[p].rotation;
   }
   state.contacts = ::move(contacts);
   state.forces = ::move(forces);
-  state.planes = ::move(planes);
+  //state.planes = ::move(planes);
   states.append(move(state));
  }
 
@@ -58,7 +58,7 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
  shared<Graphics> graphics(vec2 size) override {
   shared<Graphics> graphics;
 
-  v4sf viewRotation = qmul(angleVector(viewYawPitch.y, vec3(1,0,0)), angleVector(viewYawPitch.x, vec3(0,0,1)));
+  vec4 viewRotation = qmul(angleVector(viewYawPitch.y, vec3(1,0,0)), angleVector(viewYawPitch.x, vec3(0,0,1)));
 
   assert_(viewT < states.size, viewT, states.size);
   const State& state = states[viewT];
@@ -87,7 +87,7 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
   for(size_t p: range(polyhedras.size)) {
    const Polyhedra& A = polyhedras[p];
    vec3 position = states[viewT].position[p];
-   v4sf rotation = states[viewT].rotation[p];
+   vec4 rotation = states[viewT].rotation[p];
    for(size_t edgeIndex: range(A.edges.size)) {
     Edge eA = A.edges[edgeIndex];
     vec3 A1 = position + qapply(rotation, A.vertices[eA.a]);
@@ -147,7 +147,17 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
    graphics->lines.append(A, B, blue);
   }
 
-  for(vec4 plane: state.planes) {
+  // Floor plane
+  if(1) for(size_t i: range(4)) {
+   vec2 P[] {vec2(0,0),vec2(1,0),vec2(1,1),vec2(0,1)};
+   vec2 P1 = offset + scale * qapply(viewRotation, vec3(P[i], 0)*d).xy();
+   vec2 P2 = offset + scale * qapply(viewRotation, vec3(P[(i+1)%4], 0)*d).xy();
+   assert_(isNumber(P1) && isNumber(P2));
+   graphics->lines.append(P1, P2);
+  }
+
+  // Contact plane visualization
+  /*for(vec4 plane: state.planes) {
    vec3 N = plane.xyz();
    float d = plane.w;
    vec3 X = cross(N, vec3(0,0,1));
@@ -162,7 +172,7 @@ struct PolyhedraView : PolyhedraSimulation, Widget {
     assert_(isNumber(P1) && isNumber(P2));
     graphics->lines.append(P1, P2);
    }
-  }
+  }*/
   return graphics;
  }
 };

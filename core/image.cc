@@ -5,7 +5,6 @@
 #include "math.h"
 #include "map.h"
 
-static inline double pow(double x, double y) { return __builtin_pow(x,y); }
 static inline double round(double x) { return __builtin_round(x); }
 
 // -- sRGB --

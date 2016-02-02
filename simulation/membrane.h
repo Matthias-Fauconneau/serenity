@@ -16,7 +16,7 @@ struct Membrane {
  const int margin = simd; // 16 to ensure no false sharing ?
  const int stride = margin+W+margin;
  const float internodeLength = 2*sin(PI/W)*radius;
- const float exactHeight = radius * 4;
+ const float exactHeight = radius * 2.5;
  const float cellHeight = sqrt(3.)/2*internodeLength;
  const int H = ceil(exactHeight/cellHeight)+1;
  const float height = (H-1) * cellHeight;

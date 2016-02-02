@@ -15,6 +15,7 @@ struct vec2x3 { vec3 a, b; };
 extern array<vec2x3> lines;
 extern array<int> faces;
 extern array<int> cylinders;
+extern array<int> highlightGrains;
 
 // High level simulation and contact management
 struct Simulation {
@@ -71,11 +72,11 @@ struct Simulation {
  Random random;
  float currentHeight;
  float pressure = targetPressure;
- float grainViscosity = 1-2*dt;
- float angularViscosity = 1; //1-2*dt;
+ float grainViscosity = 1-32*dt;
+ float angularViscosity = 1-1*dt;
  const float targetViscosity = 1;//-10*dt;
  float membraneViscosity = 0;
- float wireViscosity = 1-32*dt;
+ float wireViscosity = 1-128*dt;
  float membraneRadius;
  bool membranePositionChanged = false;
  float bottomZ = 0, topZ, topZ0;

@@ -26,6 +26,7 @@ inline float acos(float t) { return __builtin_acos(t); }
 inline float sin(float t) { return __builtin_sin(t); }
 inline float atan(float y, float x) { return __builtin_atan2f(y, x); }
 
+inline double pow(double x, double y) { return __builtin_pow(x,y); }
 
 // -> \file algorithm.h
 

@@ -19,6 +19,7 @@ constexpr string Simulation::processStates[];
 bool fail = false;
 Lock lock;
 array<vec2x3> lines;
+array<int> highlightGrains;
 array<int> faces;
 array<int> cylinders;
 
@@ -38,12 +39,12 @@ Simulation::Simulation(const Dict& p) :
   wire(grain->radius/2?:10*mm),
   targetDynamicGrainObstacleFrictionCoefficient(0.5/*0.228*/),
   targetDynamicGrainMembraneFrictionCoefficient(0/*.096*//*228*/),
-  targetDynamicGrainGrainFrictionCoefficient(3./4/*0.5*//*0.096*/),
-  targetDynamicWireGrainFrictionCoefficient(1),
+  targetDynamicGrainGrainFrictionCoefficient(1.5/*0.5*//*0.096*/),
+  targetDynamicWireGrainFrictionCoefficient(3),
   targetDynamicWireBottomFrictionCoefficient(0.5/*0.228*/),
-  targetStaticFrictionSpeed((float)p.value("sfSpeed", 0.01f)*m/s),
-  targetStaticFrictionLength((float)p.value("sfLength", 1e-4f)*m),
-  targetStaticFrictionStiffness((float)p.value("sfStiffness", 1e4f)/m),
+  targetStaticFrictionSpeed((float)p.value("sfSpeed", 0.001f)*m/s),
+  targetStaticFrictionLength((float)p.value("sfLength", 1e-3f)*m),
+  targetStaticFrictionStiffness((float)p.value("sfStiffness", 1e3f)/m),
   targetStaticFrictionDamping((float)p.value("sfDamping", 1)*N/(m/s)),
   //useMembrane(p.value("Membrane", 1)),
   Gz(-(float)p.value("G", /*4000**/10.f)*N/kg),
@@ -51,7 +52,7 @@ Simulation::Simulation(const Dict& p) :
   linearSpeed(p.value("linearSpeed",1.f)*m/s),
   targetPressure((float)p.value("Pressure", 0 /*80e3f*/)*Pa),
   plateSpeed((float)p.value("Speed", 10)*mm/s),
-  patternRadius(membrane->radius - grain->radius/*/2*//* - Wire::radius*//* - grain->radius*/),
+  patternRadius(membrane->radius - Wire::radius /* - Wire::radius*//* - grain->radius /2?*/),
   pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):Loop),
   currentHeight(0?Wire::radius:grain->radius),
   membraneRadius(membrane->radius),
@@ -188,7 +189,7 @@ void Simulation::step() {
  stepWire();
  stepWireTension();
  stepWireGrain();
- stepWireBendingResistance();
+ //stepWireBendingResistance();
  wireBottomTotalTime.start();
  stepWireBottom();
  wireBottomTotalTime.stop();

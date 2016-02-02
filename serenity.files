@@ -104,3 +104,7 @@ simulation/wire.h
 simulation/plate.h
 tools/document.cc
 test.cc
+
+polyhedra/polyhedra.h
+polyhedra/polyhedra-view.cc
+

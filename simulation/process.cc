@@ -113,7 +113,7 @@ void Simulation::stepProcess() {
    }
    else if (pattern == Loop) { // Loops
     float A = winchAngle, a = winchAngle * (2*PI) / loopAngle;
-    float R = patternRadius, r = R * loopAngle / (2*PI);
+    float R = patternRadius, r = R/2; //R * loopAngle / (2*PI);
     end = vec2((R-r)*cos(A)+r*cos(a),(R-r)*sin(A)+r*sin(a));
     winchAngle += linearSpeed/r * dt;
    } else error("Unknown pattern:", int(pattern));

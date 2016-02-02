@@ -203,9 +203,9 @@ void Simulation::stepWireIntegration() {
    for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
     // Symplectic Euler
     vXsf Vx = load(pVx, i), Vy = load(pVy, i), Vz = load(pVz, i);
-    /*if(1) for(size_t k: range(simd)) {
+    if(0) for(size_t k: range(simd)) {
      if(i+k >= (size_t)wire->count-fixLast) break;
-     if(!(length(vec3(pFx[i+k],pFy[i+k],pFz[i+k])) < 300*N)) {
+     if(!(length(vec3(pFx[i+k],pFy[i+k],pFz[i+k])) < 100*N)) {
       cylinders.append(i+k);
       log(fixLast, processStates[processState], i+k, wire->count, "I0\n",
         "F", vec3(pFx[i+k]/N,pFy[i+k]/N,pFz[i+k]/N),
@@ -213,7 +213,7 @@ void Simulation::stepWireIntegration() {
       fail = true;
       return;
      }
-    }*/
+    }
     Vx += dt_mass * load(pFx, i);
     Vy += dt_mass * load(pFy, i);
     Vz += dt_mass * load(pFz, i);
