@@ -28,3 +28,4 @@ sconst float N = kg*m/(s*s), Pa = N/(m*m);
 sconst float mm = 1e-3*m, g = 1e-3*kg, KPa = 1e3 * Pa, MPa = 1e6 * Pa, GPa = 1e9 * Pa;
 
 #define MIDLIN 0
+#define GEAR 1

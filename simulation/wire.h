@@ -22,6 +22,11 @@
   buffer<float> Px { capacity };
   buffer<float> Py { capacity };
   buffer<float> Pz { capacity };
+#if GEAR
+ buffer<float> PDx[2] {capacity, capacity};
+ buffer<float> PDy[2] {capacity, capacity};
+ buffer<float> PDz[2] {capacity, capacity};
+#endif
   buffer<float> Vx { capacity };
   buffer<float> Vy { capacity };
   buffer<float> Vz { capacity };

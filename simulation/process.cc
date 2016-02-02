@@ -133,6 +133,9 @@ void Simulation::stepProcess() {
     size_t i = wire->count++;
     wire->Px[i] = newPosition[0]; wire->Py[i] = newPosition[1]; wire->Pz[i] = newPosition[2];
     wire->Vx[i] = 0; wire->Vy[i] = 0; wire->Vz[i] = 0;
+#if GEAR
+    for(size_t n: range(3)) { wire->PDx[n][i] = 0; wire->PDy[n][i] = 0; wire->PDz[n][i] = 0; }
+#endif
     // Forces verlet lists reevaluation
     wireGrainGlobalMinD = 0;
    }
@@ -180,9 +183,12 @@ void Simulation::stepProcess() {
       grain->Px[simd+i] = newPosition.x;
       grain->Py[simd+i] = newPosition.y;
       grain->Pz[simd+i] = newPosition.z;
-      grain->Vx[simd+i] = 0; grain->Vy[simd+i] = 0;
-      //grain->Vz[simd+i] = -1 * m/s;
-      grain->Vz[simd+i] = 0 * m/s;
+      grain->Vx[simd+i] = 0;
+      grain->Vy[simd+i] = 0;
+      grain->Vz[simd+i] = 0;
+#if GEAR
+      for(size_t n: range(3)) { grain->PDx[n][i] = 0; grain->PDy[n][i] = 0; grain->PDz[n][i] = 0; }
+#endif
       grain->AVx[simd+i] = 0; grain->AVy[simd+i] = 0; grain->AVz[simd+i] = 0;
       float t0 = 2*PI*random();
       float t1 = acos(1-2*random());
