@@ -244,6 +244,7 @@ void Simulation::stepWireIntegration() {
  });
  float maxWireV2 = 0;
  for(size_t k: range(threadCount())) maxWireV2 = ::max(maxWireV2, maxWireVT2[k]);
- float maxGrainWireV = maxGrainV + sqrt(maxWireV2);
+ maxWireV = sqrt(maxWireV2);
+ float maxGrainWireV = maxGrainV + maxWireV;
  wireGrainGlobalMinD -= maxGrainWireV * this->dt;
 }

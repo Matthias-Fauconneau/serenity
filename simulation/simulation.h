@@ -168,7 +168,7 @@ struct Simulation {
  bool validGrainLattice = false;
 
  // Grain - Grain
- float maxGrainV = 0;
+ float maxGrainV = 0, maxWireV = 0;
  float grainGrainGlobalMinD = 0;
  uint grainGrainSkipped = 0;
 

@@ -48,7 +48,7 @@ arguments().contains("rotation") ? 1 :
   targetDynamicWireBottomFrictionCoefficient(0.5/*0.228*/),
   targetStaticFrictionSpeed((float)p.value("sfSpeed", /*arguments().contains("rotation")?0:*//*0.*/0.1)*m/s),
   targetStaticFrictionLength((float)p.value("sfLength", /*arguments().contains("rotation")?0:*/1e-3f)*m),
-  targetStaticFrictionStiffness((float)p.value("sfStiffness", 1e3f)/m),
+  targetStaticFrictionStiffness((float)p.value("sfStiffness", 5e3f)/m),
   targetStaticFrictionDamping((float)p.value("sfDamping", 1)*N/(m/s)),
   //useMembrane(p.value("Membrane", 1)),
   Gz(-(float)p.value("G", /*4000**/10.f)*N/kg),
