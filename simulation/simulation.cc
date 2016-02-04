@@ -24,16 +24,14 @@ array<int> faces;
 array<int> cylinders;
 
 Simulation::Simulation(const Dict& p) :
-  dt((float)p.value("TimeStep",10e-6)*s),
+  dt((float)p.value("TimeStep", 5e-6)*s),
   normalDampingRate((float)p.value("nDamping",1.f)*1),
   targetGrainCount(
-   #if 0
-   1
-   #else
+arguments().contains("rotation") ? 1 :
    p.value("grainRadius", 20) != 0 ?
    4*PI*cb((float)p.value("Radius", 100)*mm)/(4./3*PI*cb(p.value("grainRadius", 20 /*2.5f*/)*mm))
                               /(1+0.611)-49 : 0
-   #endif
+
    ),
   grain(p.value("grainRadius", 20 /*2.5f*/)*mm,
            p.value("grainDensity", 1.4e3 /*7.8e3f*/)*kg/cb(m),
@@ -43,18 +41,18 @@ Simulation::Simulation(const Dict& p) :
            targetGrainCount),
   membrane((float)p.value("Radius", 100)*mm, grain->radius?:20*mm),
   wire(grain->radius/2?:10*mm),
-  targetDynamicGrainObstacleFrictionCoefficient(0.5/*0.228*/),
+  targetDynamicGrainObstacleFrictionCoefficient(/*arguments().contains("rotation")?0:*/0.5/*0.228*/),
   targetDynamicGrainMembraneFrictionCoefficient(0/*.096*//*228*/),
-  targetDynamicGrainGrainFrictionCoefficient(1.5/*0.5*//*0.096*/),
-  targetDynamicWireGrainFrictionCoefficient(3),
+  targetDynamicGrainGrainFrictionCoefficient(1/*0.5*//*0.096*/),
+  targetDynamicWireGrainFrictionCoefficient(2),
   targetDynamicWireBottomFrictionCoefficient(0.5/*0.228*/),
-  targetStaticFrictionSpeed((float)p.value("sfSpeed", 0.1f)*m/s),
-  targetStaticFrictionLength((float)p.value("sfLength", 1e-3f)*m),
+  targetStaticFrictionSpeed((float)p.value("sfSpeed", /*arguments().contains("rotation")?0:*//*0.*/0.1)*m/s),
+  targetStaticFrictionLength((float)p.value("sfLength", /*arguments().contains("rotation")?0:*/1e-3f)*m),
   targetStaticFrictionStiffness((float)p.value("sfStiffness", 1e3f)/m),
   targetStaticFrictionDamping((float)p.value("sfDamping", 1)*N/(m/s)),
   //useMembrane(p.value("Membrane", 1)),
   Gz(-(float)p.value("G", /*4000**/10.f)*N/kg),
-  verticalSpeed(p.value("verticalSpeed",0.01f)*m/s),
+  verticalSpeed(p.value("verticalSpeed",0.05f)*m/s),
   linearSpeed(p.value("linearSpeed",1.f)*m/s),
   targetPressure((float)p.value("Pressure", 0 /*80e3f*/)*Pa),
   plateSpeed((float)p.value("Speed", 10)*mm/s),

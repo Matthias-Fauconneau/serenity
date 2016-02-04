@@ -76,7 +76,8 @@ void Simulation::grainLattice() {
  this->grainLatticeTime += grainLatticeTime.cycleCount();
 }
 
-#define PCDM 1
+#define PCDM 0
+#define MPQ 1
 #if PCDM
 static inline void qmul(vXsf Qx, vXsf Qy, vXsf Qz, vXsf Qw, vXsf Vx, vXsf Vy, vXsf Vz, vXsf Vw,
                           vXsf& QVx, vXsf& QVy, vXsf& QVz, vXsf& QVw) {
@@ -112,14 +113,22 @@ void Simulation::stepGrainIntegration() {
 #else
   const vXsf dt_mass = floatX(dt / grain->mass), dt = floatX(this->dt);
 #endif
-  const vXsf dt_2 = floatX(this->dt / 2);
   const vXsf dt_angularMass = floatX(this->dt / grain->angularMass);
   const vXsf grainViscosity = floatX(this->grainViscosity);
 #if PCDM
-  const vXsf _2 = floatX(1./2);
-  const vXsf _4 = floatX(1./4);
+  const vXsf _1_2 = floatX(1./2);
+  const vXsf _1_4 = floatX(1./4);
   const vXsf dt_4 = floatX(this->dt / 4);
+#elif MPQ
+  const vXsf _1_dt = floatX(1 / this->dt);
+  const vXsf _1_4 = floatX(1./4);
+  const vXsf _1_2 = floatX(1./2);
+  const vXsf _4dt2 = floatX(4 * sq(this->dt));
+  const vXsf _16 = floatX(16);
+  const vXsf _dt2 = floatX(sq(this->dt));
+  const vXsf _4_dt = floatX(4/this->dt);
 #else
+  const vXsf dt_2 = floatX(this->dt / 2);
   const vXsf angularViscosity = floatX(this->angularViscosity);
 #endif
   vXsf maxGrainVX2 = _0f;
@@ -232,7 +241,7 @@ void Simulation::stepGrainIntegration() {
     vXsf AVx = load(pAVx, i), AVy = load(pAVy, i), AVz = load(pAVz, i);
     vXsf Rx = load(pRx, i), Ry = load(pRy, i), Rz = load(pRz, i), Rw = load(pRw, i);
     //for(int k: range(simd)) if(i+k<grain->count) log("R", Rx[k], Ry[k], Rz[k], Rw[k], "AV", AVx[k], AVy[k], AVz[k]);
-#if !PCDM // Forward Euler
+#if !PCDM && !MPQ // Forward Euler
     /*//R = normalize(R + dt/2 * R * quat{0, w}); ?
     const vXsf dRx = dt_2 * (Rw * Rx + Ry*AVz - AVy*Rz);
     const vXsf dRy = dt_2 * (Rw * Ry + Rz*AVx - AVz*Rx);
@@ -261,7 +270,7 @@ void Simulation::stepGrainIntegration() {
     store(pRy, i, normalize*Ry);
     store(pRz, i, normalize*Rz);
     store(pRw, i, normalize*Rw);
-#else // PCDM rotation integration
+#elif PCDM // PCDM rotation integration
     vXsf Wx, Wy, Wz; qapply(-Rx, -Ry, -Rz, Rw, AVx, AVy, AVz, Wx, Wy, Wz); // R* AV
     vXsf Tx, Ty, Tz; qapply(-Rx, -Ry, -Rz, Rw, load(pTx, i), load(pTy, i), load(pTz, i), Tx, Ty, Tz); // R* T
     vXsf DWx = dt_angularMass * Tx, DWy = dt_angularMass * Ty, DWz = dt_angularMass * Tz;
@@ -297,6 +306,31 @@ void Simulation::stepGrainIntegration() {
      //log("Q",Qx, Qy, Qz, Qw, "AV", AVx, AVy, AVz);
      //for(int k: range(simd)) if(i+k<grain->count) log("Q", Qx[k], Qy[k], Qz[k], Qw[k], "AV", AVx[k], AVy[k], AVz[k]);
     }
+#else
+    const vXsf W1x = AVx + dt_angularMass * load(pTx, i);
+    const vXsf W1y = AVy + dt_angularMass * load(pTy, i);
+    const vXsf W1z = AVz + dt_angularMass * load(pTz, i);
+    // Mid point
+    const vXsf Wx = _1_2 * (AVx+W1x);
+    const vXsf Wy = _1_2 * (AVy+W1y);
+    const vXsf Wz = _1_2 * (AVz+W1z);
+    const vXsf Bw = _1_dt * Rw - _1_4 * (Rx*Wx + Ry*Wy + Rz*Wz);
+    const vXsf Bx = _1_dt * Rx + _1_4 * (Rw*Wx + Wy*Rz - Ry*Wz);
+    const vXsf By = _1_dt * Ry + _1_4 * (Rw*Wy + Wz*Rx - Rz*Wx);
+    const vXsf Bz = _1_dt * Rz + _1_4 * (Rw*Wz + Wx*Ry - Rx*Wy);
+    const vXsf S = _4dt2 / (_16 + _dt2*(Wx*Wx + Wy*Wy + Wz*Wz));
+    const vXsf Qw = S * (_4_dt*Bw     -Wx*Bx     -Wy*By      -Wz*Bz);
+    const vXsf Qx =  S * (+Wx*Bw +_4_dt*Bx     -Wz*By     +Wy*Bz);
+    const vXsf Qy =  S * (+Wy*Bw    +Wz*Bx +_4_dt*By      -Wx*Bz);
+    const vXsf Qz =  S * (+Wz*Bw    -Wy*Bx      +Wx*By +_4_dt*Bz);
+    store(pAVx, i, W1x);
+    store(pAVy, i, W1y);
+    store(pAVz, i, W1z);
+    const vXsf normalize = rsqrt(Qx*Qx+Qy*Qy+Qz*Qz+Qw*Qw);
+    store(pRx, i, normalize*Qx);
+    store(pRy, i, normalize*Qy);
+    store(pRz, i, normalize*Qz);
+    store(pRw, i, normalize*Qw);
 #endif
    }
   }

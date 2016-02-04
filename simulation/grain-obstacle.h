@@ -153,6 +153,7 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
   store(pTAx, i, RAy*FTz - RAz*FTy);
   store(pTAy, i, RAz*FTx - RAx*FTz);
   store(pTAz, i, RAx*FTy - RAy*FTx);
+  //store(pTAx, i, _0f); store(pTAy, i, _0f); store(pTAz, i, _0f); // DEBUG
   // Scatter static frictions
   scatter(grainObstacleLocalAx, contacts, localAx);
   scatter(grainObstacleLocalAy, contacts, localAy);

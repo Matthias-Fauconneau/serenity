@@ -267,24 +267,13 @@ template<int I> static inline void evaluate(const int start, const int size,
   scatter(pLocalBu, contacts, localBu);
   scatter(pLocalBv, contacts, localBv);
 
-#if 0
-  store(pFx, i, Fk * Nx);
-  store(pFy, i, Fk * Ny);
-  store(pFz, i, Fk * Nz);
-  store(pTAx, i, _0f);
-  store(pTAy, i, _0f);
-  store(pTAz, i, _0f);
-#else
-  /*const vXsf FTx = FDx;
-  const vXsf FTy = FDy;
-  const vXsf FTz = FDz;*/
   store(pFx, i, NFx + FTx);
   store(pFy, i, NFy + FTy);
   store(pFz, i, NFz + FTz);
   store(pTAx, i, RAy*FTz - RAz*FTy);
   store(pTAy, i, RAz*FTx - RAx*FTz);
   store(pTAz, i, RAx*FTy - RAy*FTx);
-#endif
+  //store(pTAx, i, _0f); store(pTAy, i, _0f); store(pTAz, i, _0f); // DEBUG
   store(pU, i, U);
   store(pV, i, V);
  }

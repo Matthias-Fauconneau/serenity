@@ -327,7 +327,7 @@ struct SimulationApp : Poll {
   window->presentComplete = [this]{
    if(encoder) {
     encoder->writeVideoFrame(window->readback());
-    view.yawPitch.x += 2*PI*simulation.dt/60;
+    //view.yawPitch.x += 2*PI/60;
    }
    window->render();
    //window->setTitle(str(simulation.timeStep*simulation.dt /s, simulation.grain->count, simulation.voidRatio, simulation.maxGrainV /(m/s)));
@@ -348,6 +348,10 @@ struct SimulationApp : Poll {
  }
  void event() override {
   if(encoder) { // Synchronous
+   if(encoder->videoTime%60 /*1sec*/) {
+    log(encoder->videoTime/60);
+    if(encoder->videoTime > 60*60 /*1min*/) return;
+   }
    for(int unused t: range((1/(60*simulation.dt)))) { simulation.step(); if(fail) return; }
    queue();
   } else { // Asynchronous (simulationMasterThread)

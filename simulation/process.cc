@@ -198,6 +198,15 @@ void Simulation::stepProcess() {
       grain->Rz[simd+i] = cos(t1)*sin(t2);
       grain->Rw[simd+i] = cos(t2);
       //log(i, grain->Pz[simd+i]);
+      if(arguments().contains("rotation")) {
+       //grain->Pz[simd+i] = random()*membrane->height;
+       grain->Vx[simd+i] = random();
+       grain->Vy[simd+i] = random();
+       grain->Vz[simd+i] = random();
+       /*grain->AVx[simd+i] = random();
+       grain->AVy[simd+i] = random();
+       grain->AVz[simd+i] = random();*/
+      }
       grain->count++;
       {
        float height = topZ-bottomZ;
