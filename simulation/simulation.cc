@@ -26,12 +26,18 @@ array<int> cylinders;
 Simulation::Simulation(const Dict& p) :
   dt((float)p.value("TimeStep",10e-6)*s),
   normalDampingRate((float)p.value("nDamping",1.f)*1),
-  targetGrainCount(p.value("grainRadius", 20) != 0 ?
+  targetGrainCount(
+   #if 0
+   1
+   #else
+   p.value("grainRadius", 20) != 0 ?
    4*PI*cb((float)p.value("Radius", 100)*mm)/(4./3*PI*cb(p.value("grainRadius", 20 /*2.5f*/)*mm))
-                              /(1+0.611)-49 : 0),
+                              /(1+0.611)-49 : 0
+   #endif
+   ),
   grain(p.value("grainRadius", 20 /*2.5f*/)*mm,
            p.value("grainDensity", 1.4e3 /*7.8e3f*/)*kg/cb(m),
-           p.value("grainShearModulus", 30 /*77000*/)*MPa,
+           p.value("grainShearModulus", 3/*0*/ /*77000*/)*MPa,
            p.value("grainPoissonRatio", 0.35 /*0.28*/)*1,
            p.value("grainWallThickness", 0.4 /*0*/)*mm,
            targetGrainCount),
@@ -42,7 +48,7 @@ Simulation::Simulation(const Dict& p) :
   targetDynamicGrainGrainFrictionCoefficient(1.5/*0.5*//*0.096*/),
   targetDynamicWireGrainFrictionCoefficient(3),
   targetDynamicWireBottomFrictionCoefficient(0.5/*0.228*/),
-  targetStaticFrictionSpeed((float)p.value("sfSpeed", 0.001f)*m/s),
+  targetStaticFrictionSpeed((float)p.value("sfSpeed", 0.1f)*m/s),
   targetStaticFrictionLength((float)p.value("sfLength", 1e-3f)*m),
   targetStaticFrictionStiffness((float)p.value("sfStiffness", 1e3f)/m),
   targetStaticFrictionDamping((float)p.value("sfDamping", 1)*N/(m/s)),

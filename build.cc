@@ -143,7 +143,8 @@ bool Build::compileModule(string target) {
   //::log(args);
   int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++11",
                                      "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing",
-                                     "-I/usr/include/freetype2","-I/var/tmp/include", "-iquote.",
+                                     "-I/usr/include/freetype2","-I/usr/include/ffmpeg",
+                                     "-I/var/tmp/include", "-iquote.",
                                      "-o", object, fileName} + toRefs(args),
                     false, currentWorkingDirectory(), 0, &stdout);
   jobs.append(copyRef(target), pid, move(stdout));

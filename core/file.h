@@ -16,7 +16,7 @@ constexpr string linuxErrors[] = {
  "CONNABORTED","CONNRESET", "NOBUFS", "ISCONN", "NOTCONN", "SHUTDOWN", "TOOMANYREFS", "TIMEDOUT", "CONNREFUSED",
  "HOSTDOWN","HOSTUNREACH","ALREADY", "INPROGRESS", "STALE", "UCLEAN", "NOTNAM", "NAVAIL", "ISNAM", "REMOTEIO", "DQUOT",
  "NOMEDIUM","MEDIUMTYPE", "CANCELED", "NOKEY", "KEYEXPIRED", "KEYREVOKED", "KEYREJECTED", "OWNERDEAD", "NOTRECOVERABLE"};
-extern "C" /*const*/ int* __errno_location() /*noexcept*/;
+extern "C" /*const*/ int* __errno_location() noexcept;
 
 /// Aborts if \a expr is negative and logs corresponding error code
 #define check(expr, args...) ({ \

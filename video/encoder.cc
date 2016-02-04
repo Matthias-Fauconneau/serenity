@@ -17,7 +17,7 @@ extern "C" {
 #include <libavutil/avutil.h> //avutil
 #include <libavutil/opt.h>
 //fdk-aac
-#include <libavutil/channel_layout.h> //x264
+#include <libavutil/channel_layout.h>
 #include <libavutil/mathematics.h> //swresample
 }
 
@@ -151,11 +151,14 @@ void Encoder::writeMJPEGPacket(ref<byte> data, int pts) {
 }
 
 void Encoder::writeVideoFrame(const Image& image) {
-    assert_(videoStream && image.size==int2(width,height), image.size);
+    assert_(videoStream && image.size==uint2(width,height), image.size);
     int stride = image.stride*4;
     sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, height, frame->data, frame->linesize);
     //assert_(videoCodec->time_base.num==1 && videoCodec->time_base.den == videoFrameRate);
     frame->pts = videoTime;
+    frame->width = width;
+    frame->height = height;
+    frame->format = AV_PIX_FMT_YUV420P;
 
     AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
     int gotVideoPacket;

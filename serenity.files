@@ -108,3 +108,4 @@ test.cc
 polyhedra/polyhedra.h
 polyhedra/polyhedra-view.cc
 
+video/encoder.cc

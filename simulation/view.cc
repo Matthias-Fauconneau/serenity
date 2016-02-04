@@ -5,7 +5,8 @@
 #include "wire.h"
 #include "matrix.h"
 #include "gl.h"
-#include <stdlib.h>
+#include "encoder.h"
+#define ENCODER 1
 FILE(shader_glsl)
 
 Dict parameters() {
@@ -35,7 +36,13 @@ struct SimulationView : Widget {
 
  SimulationView(const Simulation& simulation) : simulation(simulation) {}
 
- vec2 sizeHint(vec2) override { return vec2(992); }
+ vec2 sizeHint(vec2) override {
+#if ENCODER
+  return vec2(/*1280, 720*//*768*/992);
+#else
+  return vec2(992);
+#endif
+ }
 
  shared<Graphics> graphics(vec2 size) override {
   if(!totalTime) totalTime.start();
@@ -295,8 +302,13 @@ struct SimulationApp : Poll {
  unique<Window> window = ::window(&view, -1, mainThread, true, false);
  Thread simulationMasterThread;
 
+ GLFrameBuffer target;
+ unique<Encoder> encoder =
+   arguments().contains("video") ? unique<Encoder>("heap.mp4"_) : nullptr;
+
  SimulationApp(const Dict& parameters)
-  : Poll(0, 0, simulationMasterThread), simulation(parameters), view(simulation) {
+  : Poll(0, 0, arguments().contains("video")?mainThread:simulationMasterThread),
+    simulation(parameters), view(simulation) {
   window->actions[Space] = [this] {
    if(simulation.processState < Simulation::Release) {
     simulation.nextProcessState = Simulation::Release;
@@ -313,9 +325,13 @@ struct SimulationApp : Poll {
    //exit(0);/*Calls destructors (Writes out profiles)*/ /*exit_group(0);*/ /*FIXME*/
   };
   window->presentComplete = [this]{
+   if(encoder) {
+    encoder->writeVideoFrame(window->readback());
+    view.yawPitch.x += 2*PI*simulation.dt/60;
+   }
    window->render();
    //window->setTitle(str(simulation.timeStep*simulation.dt /s, simulation.grain->count, simulation.voidRatio, simulation.maxGrainV /(m/s)));
-   window->setTitle(simulation.processStates[simulation.processState]);
+   //window->setTitle(simulation.processStates[simulation.processState]);
   };
   window->actions[F12] = [this]{
    simulation.stop = true;
@@ -323,10 +339,20 @@ struct SimulationApp : Poll {
    simulationMasterThread.wait();
    //exit(0);/*Calls destructors (Writes out profiles)*/ /*exit_group(0);*/ /*FIXME*/
   };
-  queue(); simulationMasterThread.spawn();
+  if(encoder) {
+   encoder->setH264(int2(/*1280,720*//*768*/992), 60);
+   encoder->open();
+  }
+  queue();
+  if(!encoder) simulationMasterThread.spawn();
  }
- void event() {
-  simulation.run();
-  window->setTitle("Done");
+ void event() override {
+  if(encoder) { // Synchronous
+   for(int unused t: range((1/(60*simulation.dt)))) { simulation.step(); if(fail) return; }
+   queue();
+  } else { // Asynchronous (simulationMasterThread)
+   simulation.run();
+   window->setTitle("Done");
+  }
  }
 } app (parameters());
