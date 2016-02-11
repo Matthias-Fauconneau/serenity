@@ -33,8 +33,10 @@ struct SimulationView : Widget {
  array<int> grainIndices;
  GLIndexBuffer indexBuffer;
  GLBuffer xBuffer, yBuffer, zBuffer;
+ bool lockView = false;
 
- SimulationView(const Simulation& simulation) : simulation(simulation) {}
+ SimulationView(const Simulation& simulation, bool lockView = false)
+  : simulation(simulation), lockView(lockView) {}
 
  vec2 sizeHint(vec2) override {
 #if ENCODER
@@ -285,6 +287,7 @@ struct SimulationView : Widget {
  // Orbital ("turntable") view control
  bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button,
                  Widget*&) override {
+  if(lockView) return false;
   if(event == Press) dragStart = {cursor, yawPitch, timeStep};
   if(event==Motion && button==LeftButton) {
    yawPitch = dragStart.yawPitch + float(2*PI) * (cursor - dragStart.cursor) / size;
@@ -308,21 +311,26 @@ struct SimulationApp : Poll {
 
  SimulationApp(const Dict& parameters)
   : Poll(0, 0, arguments().contains("video")?mainThread:simulationMasterThread),
-    simulation(parameters), view(simulation) {
+    simulation(parameters), view(simulation, encoder?true:false) {
   window->actions[Space] = [this] {
-   if(simulation.processState < Simulation::Release) {
-    simulation.nextProcessState = Simulation::Release;
-   } else if(simulation.processState < Simulation::Released) {
-    simulation.nextProcessState = Simulation::Released;
+   if(simulation.validation) {
+    if(simulation.processState < Simulation::Pressure) {
+     simulation.nextProcessState = Simulation::Pressure;
+    }
+   } else {
+    if(simulation.processState < Simulation::Release) {
+     simulation.nextProcessState = Simulation::Release;
+    } else if(simulation.processState < Simulation::Released) {
+     simulation.nextProcessState = Simulation::Released;
+    }
    }
    log(simulation.processStates[simulation.processState],
-         simulation.processStates[simulation.nextProcessState]);
+     simulation.processStates[simulation.nextProcessState]);
   };
   window->actions[Escape] = [this]{
    simulation.stop = true;
    requestTermination();
-   simulationMasterThread.wait();
-   //exit(0);/*Calls destructors (Writes out profiles)*/ /*exit_group(0);*/ /*FIXME*/
+   if(!encoder) simulationMasterThread.wait();
   };
   window->presentComplete = [this]{
    if(encoder) {
@@ -330,15 +338,13 @@ struct SimulationApp : Poll {
     //view.yawPitch.x += 2*PI/60;
     queue();
    } else window->render();
-   //window->setTitle(str(simulation.timeStep*simulation.dt /s, simulation.grain->count, simulation.voidRatio, simulation.maxGrainV /(m/s)));
    //window->setTitle(simulation.processStates[simulation.processState]);
-   window->setTitle(str(simulation.timeStep*simulation.dt /s, simulation.maxGrainV, simulation.maxWireV));
-  };
-  window->actions[F12] = [this]{
-   simulation.stop = true;
-   requestTermination();
-   simulationMasterThread.wait();
-   //exit(0);/*Calls destructors (Writes out profiles)*/ /*exit_group(0);*/ /*FIXME*/
+   if(simulation.validation)
+    window->setTitle(str(simulation.timeStep*simulation.dt /s, simulation.grain->count,
+                                      simulation.voidRatio, simulation.maxGrainV /(m/s)));
+   else
+    window->setTitle(str(simulation.timeStep*simulation.dt /s, simulation.maxGrainV,
+                                      simulation.maxWireV));
   };
   if(encoder) {
    encoder->setH264(int2(/*1280,720*//*768*/992), 60);
@@ -350,8 +356,11 @@ struct SimulationApp : Poll {
  }
  void event() override {
   if(encoder) { // Synchronous
-   if(encoder->videoTime%60==0 /*1sec*/) {
-    if(encoder->videoTime > 60*60 /*1min*/) return;
+   if(encoder->videoTime >= 30*60) {
+    log("Done", encoder->videoTime);
+    simulation.stop = true;
+    requestTermination();
+    return;
    }
    for(int unused t: range((1/(60*simulation.dt)))) { simulation.step(); if(fail) return; }
    window->render();

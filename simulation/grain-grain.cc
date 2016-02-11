@@ -6,7 +6,7 @@ static inline void evaluateGrainGrain(const int start, const int size,
                                      const int* grainGrainContact,
                                      const int* grainGrainA, const int* grainGrainB,
                                      const float* grainPx, const float* grainPy, const float* grainPz,
-                                     const vXsf Gr_Wr, const vXsf Gr, const vXsf Wr,
+                                     const vXsf Ar_Br, const vXsf Ar, const vXsf Br,
                                      float* const grainGrainLocalAx, float* const grainGrainLocalAy, float* const grainGrainLocalAz,
                                      float* const grainGrainLocalBx, float* const grainGrainLocalBy, float* const grainGrainLocalBz,
                                      const vXsf K, const vXsf Kb,
@@ -31,10 +31,10 @@ static inline void evaluateGrainGrain(const int start, const int size,
   const vXsf Bx = gather(grainPx, B), By = gather(grainPy, B), Bz = gather(grainPz, B);
   const vXsf Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
   const vXsf length = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
-  const vXsf depth = Gr_Wr - length;
+  const vXsf depth = Ar_Br - length;
   const vXsf Nx = Rx/length, Ny = Ry/length, Nz = Rz/length;
-  const vXsf ARx = - Gr  * Nx, ARy = - Gr * Ny, ARz = - Gr * Nz;
-  const vXsf BRx = + Wr  * Nx, BRy = + Wr * Ny, BRz = + Wr * Nz;
+  const vXsf ARx = - Ar  * Nx, ARy = - Ar * Ny, ARz = - Ar * Nz;
+  const vXsf BRx = + Br  * Nx, BRy = + Br * Ny, BRz = + Br * Nz;
   /// Evaluates contact force between two objects with friction (rotating A, non rotating B)
   // Grain - Grain
 
@@ -141,6 +141,9 @@ static inline void evaluateGrainGrain(const int start, const int size,
   const vXsf FTx = mask3_fmadd(sfFt, SDx, FDx, hasStaticFriction & hasTangentLength);
   const vXsf FTy = mask3_fmadd(sfFt, SDy, FDy, hasStaticFriction & hasTangentLength);
   const vXsf FTz = mask3_fmadd(sfFt, SDz, FDz, hasStaticFriction & hasTangentLength);
+
+  // Resets contacts without static friction
+  localAx = blend(hasStaticFriction, _0f, localAx); // FIXME use 1s (NaN) not 0s to flag resets
 
   store(pFx, i, NFx + FTx);
   store(pFy, i, NFy + FTy);
@@ -267,8 +270,10 @@ void Simulation::stepGrainGrain() {
   grainGrainLocalBz.size = contactCount;
 
   assert(align(simd, grainGrainA.size+1) <= grainGrainA.capacity);
-  for(uint i=grainGrainA.size; i<align(simd, grainGrainA.size+1); i++) grainGrainA.begin()[i] = -1;
-  for(uint i=grainGrainB.size; i<align(simd, grainGrainB.size+1); i++) grainGrainB.begin()[i] = -1;
+  for(uint i=grainGrainA.size; i<align(simd, grainGrainA.size+1); i++)
+   grainGrainA.begin()[i] = -1;
+  for(uint i=grainGrainB.size; i<align(simd, grainGrainB.size+1); i++)
+   grainGrainB.begin()[i] = -1;
 
   grainGrainGlobalMinD = verletDistance/*minD*/ - 2*grain->radius;
   if(grainGrainGlobalMinD <= 0) log("grainGrainGlobalMinD12", grainGrainGlobalMinD);

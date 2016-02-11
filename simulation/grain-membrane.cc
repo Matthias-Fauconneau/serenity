@@ -333,6 +333,7 @@ template<int I> static inline float sum(const uint size, const int* const contac
 
 void Simulation::stepGrainMembrane() {
  if(!grain->count || !membrane->count) return;
+ //grainMembraneGlobalMinD = 0; // DEBUG
  if(grainMembraneGlobalMinD <= 0)  {
   grainLattice();
 
@@ -364,8 +365,8 @@ void Simulation::stepGrainMembrane() {
    swap(gm.oldLocalBu, gm.localBu);
    swap(gm.oldLocalBv, gm.localBv);
 
-   static constexpr size_t averageVerletCount = 8;
-   const size_t GWcc = align(simd, grain->count * averageVerletCount +1);
+   static constexpr size_t averageVerletCount = 16;
+   const size_t GWcc = align(simd, max(2048ul, grain->count * averageVerletCount +1));
    if(GWcc > gm.A.capacity) {
     memoryTime.start();
     gm.A = buffer<int>(GWcc, 0);
@@ -428,6 +429,26 @@ void Simulation::stepGrainMembrane() {
                                + convert(scale*(Mx-minX)); // FIXME: Clang miscompiles
      for(int n: range(3*3)) for(int i: range(3)) {
       //log(n, i , latticeNeighbours[n]+i, index);
+#if 1
+   if(1) for(int k: range(simd))
+    if(!(index[k] >= 0/*-(base-lattice.cells.data)*/ && index[k]<int(lattice.base.size))) {
+     log("index[k] >= 0/*-(base-lattice.cells.data)*/ && index[k]<int(lattice.base.size)",
+            "\n#", i+k, "/", grain->count,
+            "@", index[k], "<", /*base-lattice.cells.data*/0,
+            "size", lattice.size,
+            "min", minX[k], minY[k], minZ[k],
+            "X", Mx[k], My[k], Mz[k],
+            "V", grain->Vx[simd+i+k], grain->Vy[simd+i+k], grain->Vz[simd+i+k],
+      "F", grain->Fx[simd+i+k], grain->Fy[simd+i+k], grain->Fz[simd+i+k]
+      /*,"//",
+        "X", Ax[k] /m, Ay[k] /m, Az[k] /m,
+        "V", grain->Vx[simd+i+k] /(m/s), grain->Vy[simd+i+k] /(m/s), grain->Vz[simd+i+k] /(m/s),
+        "F", grain->Fx[simd+i+k] /N, grain->Fy[simd+i+k] /N, grain->Fz[simd+i+k] /N*/
+      );
+    fail = true;
+    return;
+   }
+#endif
       const vXsi a = gather(latticeNeighbours[n]+i, index);
       const vXsf Ax = gather(gPx, a), Ay = gather(gPy, a), Az = gather(gPz, a);
       const vXsf Rx = Ax-B0x, Ry = Ay-B0y, Rz = Az-B0z;

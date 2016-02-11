@@ -24,48 +24,50 @@ array<int> faces;
 array<int> cylinders;
 
 Simulation::Simulation(const Dict& p) :
-  dt((float)p.value("TimeStep", 5e-6)*s),
-  normalDampingRate((float)p.value("nDamping",1.f)*1),
+  triaxial(p.value("triaxial", "0"_)!="0"_),
+  validation(p.value("validation", "0"_)!="0"_),
+  dt((float)p.value("TimeStep", validation ? 1e-6 : 4e-6)*s),
+  normalDampingRate((float)p.value("nDamping",validation ? 1./2 : 1.f)*1),
   targetGrainCount(
-arguments().contains("rotation") ? 1 :
-   p.value("grainRadius", 20) != 0 ?
-   4*PI*cb((float)p.value("Radius", 100)*mm)/(4./3*PI*cb(p.value("grainRadius", 20 /*2.5f*/)*mm))
-                              /(1+0.611)-49 : 0
-
+   p.value("grainRadius", validation ? 2.5f : 20) != 0 ?
+     (4*PI*cb((float)p.value("Radius", validation ? 50 : 100)*mm)
+   / (4./3*PI*cb(p.value("grainRadius", validation ? 2.5f : 20)*mm))) / (1+0.60/*2*//*611*/)/*-60*/ : 0
    ),
-  grain(p.value("grainRadius", 20 /*2.5f*/)*mm,
-           p.value("grainDensity", 1.4e3 /*7.8e3f*/)*kg/cb(m),
-           p.value("grainShearModulus", 3/*0*/ /*77000*/)*MPa,
-           p.value("grainPoissonRatio", 0.35 /*0.28*/)*1,
-           p.value("grainWallThickness", 0.4 /*0*/)*mm,
+  grain(p.value("grainRadius", validation ? 2.5f : 20)*mm,
+           p.value("grainDensity", validation ? 7.8e3 : 1.4e3)*kg/cb(m),
+           p.value("grainShearModulus", validation ? /*10000*//*77000*/50000 : 30)*MPa,
+           p.value("grainPoissonRatio", validation ? 0.28 : 0.35)*1,
+           p.value("grainWallThickness", validation ? 0 : 0.4)*mm,
            targetGrainCount),
-  membrane((float)p.value("Radius", 100)*mm, grain->radius?:20*mm),
+  membrane((float)p.value("Radius", validation ? 50 : 100)*mm,
+           validation ? grain->radius*(1-1./4) : (grain->radius?:20*mm),
+           validation ? 4 : 2.5),
   wire(grain->radius/2?:10*mm),
-  targetDynamicGrainObstacleFrictionCoefficient(/*arguments().contains("rotation")?0:*/0.5/*0.228*/),
-  targetDynamicGrainMembraneFrictionCoefficient(0/*.096*//*228*/),
-  targetDynamicGrainGrainFrictionCoefficient(1/*0.5*//*0.096*/),
-  targetDynamicWireGrainFrictionCoefficient(2),
-  targetDynamicWireBottomFrictionCoefficient(0.5/*0.228*/),
-  targetStaticFrictionSpeed((float)p.value("sfSpeed", /*arguments().contains("rotation")?0:*//*0.*/0.1)*m/s),
-  targetStaticFrictionLength((float)p.value("sfLength", /*arguments().contains("rotation")?0:*/1e-3f)*m),
-  targetStaticFrictionStiffness((float)p.value("sfStiffness", 5e3f)/m),
+  targetDynamicGrainObstacleFrictionCoefficient(validation? 0.228 : 1),
+  targetDynamicGrainMembraneFrictionCoefficient(validation ? 0.228 : 0.228),
+  targetDynamicGrainGrainFrictionCoefficient(validation ? 0.096 : 1),
+  targetDynamicWireGrainFrictionCoefficient(3./2),
+  targetDynamicWireBottomFrictionCoefficient(1),
+  targetStaticFrictionSpeed((float)p.value("sfSpeed", validation ? 0.1 : 0.05/*0.1*/)*m/s),
+  targetStaticFrictionLength((float)p.value("sfLength", validation ? 1e-3f : 4e-4f/*1e-3f*/)*m),
+  targetStaticFrictionStiffness((float)p.value("sfStiffness", validation ? 4e3f : 4e3f)/m),
   targetStaticFrictionDamping((float)p.value("sfDamping", 1)*N/(m/s)),
-  //useMembrane(p.value("Membrane", 1)),
-  Gz(-(float)p.value("G", /*4000**/10.f)*N/kg),
-  verticalSpeed(p.value("verticalSpeed",0.05f)*m/s),
+  Gz(-(float)p.value("G", validation?4000:10.f)*N/kg),
+  verticalSpeed(p.value("verticalSpeed", validation ? 2 : 0.05f)*m/s),
   linearSpeed(p.value("linearSpeed",1.f)*m/s),
-  targetPressure((float)p.value("Pressure", 0 /*80e3f*/)*Pa),
+  targetPressure((float)p.value("Pressure", 80e3f)*Pa),
   plateSpeed((float)p.value("Speed", 10)*mm/s),
-  patternRadius(membrane->radius - Wire::radius /* - Wire::radius*//* - grain->radius /2?*/),
-  pattern(p.contains("Pattern")?Pattern(ref<string>(patterns).indexOf(p.at("Pattern"))):Loop),
+  patternRadius(membrane->radius - Wire::radius),
+  pattern(p.contains("Pattern") ? Pattern(ref<string>(patterns).indexOf(p.at("Pattern")))
+                                                : (validation?None:Loop)),
   currentHeight(0?Wire::radius:grain->radius),
   membraneRadius(membrane->radius),
   topZ(membrane->height),
-  latticeRadius(/*useMembrane*/0? membrane->radius+grain->radius : 2*membrane->radius),
+  latticeRadius(triaxial ? membrane->radius+grain->radius : 2*membrane->radius),
   lattice {sqrt(3.)/(2*grain->radius), vec3(vec2(-latticeRadius), -grain->radius*2),
                                            vec3(vec2(latticeRadius), membrane->height+grain->radius)}
 {
- log(p);
+ log(p, Gz, grain->mass);
  assert(str(p).size < 256, str(p).size);
  if(pattern) { // Initial wire node
   size_t i = wire->count++;
@@ -76,7 +78,7 @@ arguments().contains("rotation") ? 1 :
   wire->Vx[i] = 0; wire->Vy[i] = 0; wire->Vz[i] = 0;
   winchAngle += wire->internodeLength / currentWinchRadius;
  }
- if(/*!useMembrane*/1) {
+ if(!triaxial) {
   dynamicGrainObstacleFrictionCoefficient = targetDynamicGrainObstacleFrictionCoefficient;
   dynamicGrainMembraneFrictionCoefficient = targetDynamicGrainMembraneFrictionCoefficient;
   dynamicGrainGrainFrictionCoefficient = targetDynamicGrainGrainFrictionCoefficient;
@@ -140,7 +142,7 @@ void Simulation::step() {
   grainTotalTime.start();
   stepGrain();
   grainSideTime.start();
-  /*if(processState >= Released) { // Reprojects any grain outside lattice bounds (when not already constrained)
+  if(processState >= Released) { // Reprojects any grain outside lattice bounds (when not already constrained)
    assert_(latticeRadius == 2*membrane->radius);
    if(latticeRadius < 2*membrane->radius) {
     latticeRadius = 2*membrane->radius;
@@ -162,16 +164,16 @@ void Simulation::step() {
      grain->Vy[simd+i] = 0;
     }
    }
-  }*/
+  }
   grainSideTime.stop();
   grainBottomTotalTime.start();
   stepGrainBottom();
   grainBottomTotalTime.stop();
-  /*if(processState < Released) {
+  if(/*processState < Released*/triaxial) {
    grainTopTotalTime.start();
    stepGrainTop();
    grainTopTotalTime.stop();
-  }*/
+  }
   grainGrainTotalTime.start();
   stepGrainGrain();
   grainGrainTotalTime.stop();
@@ -345,7 +347,45 @@ void Simulation::run() {
  totalTimeC.start();
  for(;;) {
   if(stop) break;
-  for(int unused t: range(256)) { step(); if(fail) return; }
+  for(int unused t: range(256)) {
+   step();
+   if(!dump) {
+    String name = replace(arguments()[0],"/",":");
+    dump = File(name+".dump", currentWorkingDirectory(), Flags(WriteOnly|Create|Truncate));
+   }
+   dump.write(raw(grain->count)+raw(membrane->count)+
+              raw(membrane->W)+raw(membrane->H)+raw(membrane->stride)+
+              raw(membrane->margin));
+   dump.write(cast<byte>(grain->Px));
+   dump.write(cast<byte>(grain->Py));
+   dump.write(cast<byte>(grain->Pz));
+   dump.write(cast<byte>(grain->Vx));
+   dump.write(cast<byte>(grain->Vy));
+   dump.write(cast<byte>(grain->Vz));
+   dump.write(cast<byte>(grain->Fx));
+   dump.write(cast<byte>(grain->Fy));
+   dump.write(cast<byte>(grain->Fz));
+   dump.write(cast<byte>(grain->Rx));
+   dump.write(cast<byte>(grain->Ry));
+   dump.write(cast<byte>(grain->Rz));
+   dump.write(cast<byte>(grain->Rw));
+   dump.write(cast<byte>(grain->AVx));
+   dump.write(cast<byte>(grain->AVy));
+   dump.write(cast<byte>(grain->AVz));
+   dump.write(cast<byte>(grain->Tx));
+   dump.write(cast<byte>(grain->Ty));
+   dump.write(cast<byte>(grain->Tz));
+   dump.write(cast<byte>(membrane->Px));
+   dump.write(cast<byte>(membrane->Py));
+   dump.write(cast<byte>(membrane->Pz));
+   dump.write(cast<byte>(membrane->Vx));
+   dump.write(cast<byte>(membrane->Vy));
+   dump.write(cast<byte>(membrane->Vz));
+   dump.write(cast<byte>(membrane->Fx));
+   dump.write(cast<byte>(membrane->Fy));
+   dump.write(cast<byte>(membrane->Fz));
+   if(fail) return;
+  }
   if(timeStep%65536 == 0) {
    profile();
    if(processState == Pour) log(grain->count, "/", targetGrainCount);
@@ -366,10 +406,8 @@ void Simulation::run() {
    radialForce = 0; radialSumStepCount = 0;
    if(!primed) {
     primed = true;
-    //if(existsFile(arguments()[0])) log("Overwrote", arguments()[0]);
-    String name = replace(/*replace(*/arguments()[0]/*,"=",":")*/,"/",":");
-    if(!existsFile(name))
-     pressureStrain = File(name, currentWorkingDirectory(), Flags(WriteOnly|Create|Truncate));
+    String name = replace(arguments()[0],"/",":");
+    pressureStrain = File(name, currentWorkingDirectory(), Flags(WriteOnly|Create|Truncate));
     {
      String line = "version:"+str(VERSION)+",voidRatio:"+str(voidRatio)+"\n";
      log_(line);

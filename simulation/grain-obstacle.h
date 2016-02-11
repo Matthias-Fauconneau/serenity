@@ -6,7 +6,7 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
                            const int* grainObstacleContact,
                            const int* grainObstacleA,
                            const float* grainPx, const float* grainPy, const float* grainPz,
-                           const vXsf obstacleZ_Gr, const vXsf Gr,
+                           const vXsf obstacleZ_Ar, const vXsf Ar,
                            float* const grainObstacleLocalAx, float* const grainObstacleLocalAy, float* const grainObstacleLocalAz,
                            float* const grainObstacleLocalBx, float* const grainObstacleLocalBy, float* const grainObstacleLocalBz,
                            const vXsf K, const vXsf Kb,
@@ -16,7 +16,7 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
 #endif
                            const float* AVx, const float* AVy, const float* AVz,
                            const float* pAAVx, const float* pAAVy, const float* pAAVz,
-                           const float* AQX, const float* AQY, const float* AQZ, const float* AQW,
+                           const float* pAQX, const float* pAQY, const float* pAQZ, const float* pAQW,
                            float* const pFx, float* const pFy, float* const pFz,
                            float* const pTAx, float* const pTAy, float* const pTAz) {
  for(size_t i=start*simd; i<(start+size)*simd; i+=simd) { // Preserves alignment
@@ -24,10 +24,10 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
   const vXsi A = gather(grainObstacleA, contacts);
   // FIXME: Recomputing from intersection (more efficient than storing?)
   const vXsf Ax = gather(grainPx, A), Ay = gather(grainPy, A), Az = gather(grainPz, A);
-  const vXsf depth = top ? Az - obstacleZ_Gr : obstacleZ_Gr - Az;
+  const vXsf depth = top ? Az - obstacleZ_Ar : obstacleZ_Ar - Az;
   const vXsf Nx = _0f, Ny = _0f, Nz = top ? -_1f : _1f;
-  const vXsf RAx = - Gr  * Nx, RAy = - Gr * Ny, RAz = - Gr * Nz;
-  const vXsf RBx = Ax + RAx, RBy = Ay + RAy, RBz = Az + RAz;
+  const vXsf ARx = - Ar  * Nx, ARy = - Ar * Ny, ARz = - Ar * Nz;
+  const vXsf BRx = Ax + ARx, BRy = Ay + ARy, BRz = Az + ARz;
   /// Evaluates contact force between two objects with friction (rotating A, non rotating B)
   // Grain - Obstacle
 
@@ -35,9 +35,9 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
   const vXsf Fk = K * sqrt(depth) * depth;
   // Relative velocity
   const vXsf AAVx = gather(pAAVx, A), AAVy = gather(pAAVy, A), AAVz = gather(pAAVz, A);
-  const vXsf RVx = gather(AVx, A) + (AAVy*RAz - AAVz*RAy);
-  const vXsf RVy = gather(AVy, A) + (AAVz*RAx - AAVx*RAz);
-  const vXsf RVz = gather(AVz, A) + (AAVx*RAy - AAVy*RAx);
+  const vXsf RVx = gather(AVx, A) + (AAVy*ARz - AAVz*ARy);
+  const vXsf RVy = gather(AVy, A) + (AAVz*ARx - AAVx*ARz);
+  const vXsf RVz = gather(AVz, A) + (AAVx*ARy - AAVy*ARx);
   // Damping
   const vXsf normalSpeed = Nx*RVx+Ny*RVy+Nz*RVz;
   const vXsf Fb = - Kb * sqrt(sqrt(depth)) * normalSpeed ; // Damping
@@ -68,21 +68,14 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
   const vXsf oldLocalBy = gather(grainObstacleLocalBy, contacts);
   const vXsf oldLocalBz = gather(grainObstacleLocalBz, contacts);
 
-  const vXsf QAx = gather(AQX, A);
-  const vXsf QAy = gather(AQY, A);
-  const vXsf QAz = gather(AQZ, A);
-  const vXsf QAw = gather(AQW, A);
-  const vXsf X1 = QAw*RAx + RAy*QAz - QAy*RAz;
-  const vXsf Y1 = QAw*RAy + RAz*QAx - QAz*RAx;
-  const vXsf Z1 = QAw*RAz + RAx*QAy - QAx*RAy;
-  const vXsf W1 = - (RAx * QAx + RAy * QAy + RAz * QAz);
-  const vXsf newLocalAx = QAw*X1 - (W1*QAx + QAy*Z1 - Y1*QAz);
-  const vXsf newLocalAy = QAw*Y1 - (W1*QAy + QAz*X1 - Z1*QAx);
-  const vXsf newLocalAz = QAw*Z1 - (W1*QAz + QAx*Y1 - X1*QAy);
+  const vXsf AQx = gather(pAQX, A);
+  const vXsf AQy = gather(pAQY, A);
+  const vXsf AQz = gather(pAQZ, A);
+  const vXsf AQw = gather(pAQW, A);
+  vXsf newLocalAx, newLocalAy, newLocalAz;
+  qapply(-AQx, -AQy, -AQz, AQw, ARx, ARy, ARz, newLocalAx, newLocalAy, newLocalAz);
 
-  const vXsf newLocalBx = RBx;
-  const vXsf newLocalBy = RBy;
-  const vXsf newLocalBz = RBz;
+  const vXsf newLocalBx = BRx, newLocalBy = BRy, newLocalBz = BRz;
 
   const maskX reset = equal(oldLocalAx, _0f);
   vXsf localAx = blend(reset, oldLocalAx, newLocalAx);
@@ -92,16 +85,8 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
   const vXsf localBy = blend(reset, oldLocalBy, newLocalBy);
   const vXsf localBz = blend(reset, oldLocalBz, newLocalBz);
 
-  const vXsf X = QAw*localAx - (localAy*QAz - QAy*localAz);
-  const vXsf Y = QAw*localAy - (localAz*QAx - QAz*localAx);
-  const vXsf Z = QAw*localAz - (localAx*QAy - QAx*localAy);
-  const vXsf W = localAx * QAx + localAy * QAy + localAz * QAz;
-  const vXsf FRAx = QAw*X + W*QAx + QAy*Z - Y*QAz;
-  const vXsf FRAy = QAw*Y + W*QAy + QAz*X - Z*QAx;
-  const vXsf FRAz = QAw*Z + W*QAz + QAx*Y - X*QAy;
-  const vXsf FRBx = localBx;
-  const vXsf FRBy = localBy;
-  const vXsf FRBz = localBz;
+  vXsf FRAx, FRAy, FRAz; qapply(AQx, AQy, AQz, AQw, localAx, localAy, localAz, FRAx, FRAy, FRAz);
+  const vXsf FRBx = localBx, FRBy = localBy, FRBz = localBz;
 
   const vXsf gAx = Ax + FRAx;
   const vXsf gAy = Ay + FRAy;
@@ -150,9 +135,10 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
   store(pFx, i, NFx + FTx);
   store(pFy, i, NFy + FTy);
   store(pFz, i, NFz + FTz);
-  store(pTAx, i, RAy*FTz - RAz*FTy);
-  store(pTAy, i, RAz*FTx - RAx*FTz);
-  store(pTAz, i, RAx*FTy - RAy*FTx);
+  store(pTAx, i, ARy*FTz - ARz*FTy);
+  store(pTAy, i, ARz*FTx - ARx*FTz);
+  //store(pTAz, i, ARx*FTy - ARy*FTx);
+  store(pTAz, i, ARx*FTy - ARy*FTx - floatX(1) * Ar * AAVz /*Spin friction*/);
   //store(pTAx, i, _0f); store(pTAy, i, _0f); store(pTAz, i, _0f); // DEBUG
   // Scatter static frictions
   scatter(grainObstacleLocalAx, contacts, localAx);

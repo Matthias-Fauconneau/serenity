@@ -126,7 +126,7 @@ static inline void evaluateWireGrain(const int start, const int size,
   const vXsf TOz = Dz - Dn * Nz;
   const vXsf tangentLength = sqrt(TOx*TOx+TOy*TOy+TOz*TOz);
   const vXsf Ks = staticFrictionStiffness * Fn;
-  const vXsf Fs = Ks * tangentLength; // 0.1~1 fN
+  const vXsf Fs = Ks * tangentLength;
   // Spring direction
   const vXsf SDx = TOx / tangentLength;
   const vXsf SDy = TOy / tangentLength;
@@ -145,17 +145,6 @@ static inline void evaluateWireGrain(const int start, const int size,
   store(pFx, i, NFx + FTx);
   store(pFy, i, NFy + FTy);
   store(pFz, i, NFz + FTz);
-  /*if(0) for(size_t k: range(simd)) {
-   if(i+k >= (size_t)wireGrainContactSize) break;
-   if(!(::length(vec3(pFx[i+k],pFy[i+k],pFz[i+k])) < 400*N)) {
-    cylinders.append(i+k);
-    log(length(vec3(pFx[i+k],pFy[i+k],pFz[i+k]))/N, "S0","\n",
-      "N", Fn[k],
-      "T", length(vec3(FTx[k],FTy[k],FTz[k])));
-    fail = true;
-    return;
-   }
-  }*/
   store(pgTx, i, RBz*FTy - RBy*FTz);
   store(pgTy, i, RBx*FTz - RBz*FTx);
   store(pgTz, i, RBy*FTx - RBx*FTy);
@@ -203,7 +192,7 @@ void Simulation::stepWireGrain() {
   swap(oldWireGrainLocalBz, wireGrainLocalBz);
 
   static constexpr size_t averageWireGrainContactCount = 32;
-  const size_t GWcc = max(4096u, align(simd, grain->count * averageWireGrainContactCount +1));
+  const size_t GWcc = max(4096ul, align(simd, grain->count * averageWireGrainContactCount +1));
   if(GWcc > wireGrainA.capacity) {
    wireGrainA = buffer<int>(GWcc, 0);
    wireGrainB = buffer<int>(GWcc, 0);

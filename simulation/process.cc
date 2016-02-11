@@ -4,25 +4,28 @@
 #include "wire.h"
 
 void Simulation::stepProcess() {
- if(currentHeight >= topZ-grain->radius && processState < Release) {
-  log("processState = Release");
+ if(currentHeight >= topZ-grain->radius && processState < Release && !triaxial) {
+  //log("processState = Release");
   processState = Release;
-  /*wire->Vx[wire->count-1] = 0;
+  if(wire->count) {
+   /*wire->Vx[wire->count-1] = 0;
   wire->Vy[wire->count-1] = 0;
   wire->Vz[wire->count-1] = 0;*/
-  wire->Vx[wire->count-1] = wire->Vx[wire->count-2];
-  wire->Vy[wire->count-1] = wire->Vy[wire->count-2];
-  wire->Vz[wire->count-1] = wire->Vz[wire->count-2];
+   wire->Vx[wire->count-1] = wire->Vx[wire->count-2];
+   wire->Vy[wire->count-1] = wire->Vy[wire->count-2];
+   wire->Vz[wire->count-1] = wire->Vz[wire->count-2];
+  }
  }
  if(processState >= Release/*d*/) return;
  //pressure = 0; membraneViscosity = 1-1000*dt; // DEBUG
  // Process
- if(targetGrainCount && (grain->count == targetGrainCount || processState > Pour)) {
+ if(targetGrainCount && (grain->count == targetGrainCount || processState > Pour ||
+                         int(lastGrainSpawnTimeStep) < int(timeStep)-int(0.01/dt))) {
   //if(!useMembrane) return;
-  log("processState = Release");
-  processState = Release;
+  //log("processState = Release");
+  if(!triaxial) processState = Release;
   if(processState  < Pressure) {
-   static bool unused once = ({ log("Set Friction"); true; });
+   //static bool unused once = ({ log("Set Friction"); true; });
    dynamicGrainObstacleFrictionCoefficient = targetDynamicGrainObstacleFrictionCoefficient;
    dynamicGrainMembraneFrictionCoefficient = targetDynamicGrainMembraneFrictionCoefficient;
    dynamicGrainGrainFrictionCoefficient = targetDynamicGrainGrainFrictionCoefficient;
@@ -34,7 +37,7 @@ void Simulation::stepProcess() {
    staticFrictionDamping = targetStaticFrictionDamping;
   }
   if(processState < Load) { // Fits top plate while disabling gravity
-   static bool unused once = ({ log("Fits plate"); true; });
+   //static bool unused once = ({ log("Fits plate"); true; });
    float topZ = 0;
    for(float z: grain->Pz.slice(simd, grain->count)) topZ = ::max(topZ, z+grain->radius);
    if(topZ < this->topZ) this->topZ = topZ;
@@ -50,7 +53,7 @@ void Simulation::stepProcess() {
   }*/
   if(pressure < targetPressure || membraneViscosity < targetViscosity) { // Increases pressure toward target pressure
    if(processState < Pressure) {
-    log("Pressure");
+    //log("Pressure");
     processState = Pressure;
    }
    if(processState == Pressure) {
@@ -58,8 +61,11 @@ void Simulation::stepProcess() {
     if(pressure > targetPressure) pressure = targetPressure;
    }
    //pressure=targetPressure; //assert_(pressure== targetPressure, pressure, targetPressure);
-   if(membraneViscosity < targetViscosity) membraneViscosity += 100 * dt;
-   if(membraneViscosity > targetViscosity) membraneViscosity = targetViscosity;
+   if(membraneViscosity < targetViscosity) membraneViscosity += 50 * dt;
+   if(membraneViscosity > targetViscosity) {
+    membraneViscosity = targetViscosity;
+    log("membraneViscosity", membraneViscosity);
+   }
   } else { // Displaces plates with constant velocity
    pressure = targetPressure;
    if(processState < Load) {
@@ -207,6 +213,7 @@ void Simulation::stepProcess() {
        grain->AVy[simd+i] = random();
        grain->AVz[simd+i] = random();*/
       }
+      lastGrainSpawnTimeStep = timeStep;
       grain->count++;
       {
        float height = topZ-bottomZ;

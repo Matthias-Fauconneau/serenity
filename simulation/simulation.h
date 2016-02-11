@@ -19,6 +19,8 @@ extern array<int> highlightGrains;
 
 // High level simulation and contact management
 struct Simulation {
+ const bool triaxial, validation;
+
  const float dt;
  size_t timeStep = 0;
  bool stop = false;
@@ -51,7 +53,6 @@ struct Simulation {
  float staticFrictionDamping;
 
  // Process parameters
- //bool useMembrane;
  float Gz;
  const float verticalSpeed;
  const float linearSpeed;
@@ -72,10 +73,11 @@ struct Simulation {
  Random random;
  float currentHeight;
  float pressure = targetPressure;
- float grainViscosity = 1-1*dt;
+ size_t lastGrainSpawnTimeStep = 0;
+ float grainViscosity = 1-/*1*/32*dt;
  float angularViscosity = 1-1*dt;
- const float targetViscosity = 1-10*dt;
- float wireViscosity = 1-8*dt;
+ const float targetViscosity = 1-1./3; //512*dt; //1./3; //1-256/*8*/*dt;
+ float wireViscosity = 1-1*dt;
  float membraneViscosity = 0;
  float membraneRadius;
  bool membranePositionChanged = false;
@@ -268,6 +270,7 @@ struct Simulation {
   buffer<float> V;
  } grainMembrane[2];
 
+ File dump;
  bool primed = false;
  File pressureStrain;
  float voidRatio = 0;

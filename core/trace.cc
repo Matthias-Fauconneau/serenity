@@ -205,18 +205,7 @@ void* return_address(void* fp) { return *((void**)fp+1); }
 String trace(int skip, void* ip) {
     array<char> log;
     void* stack[32];
-#if 1
     int i = backtrace(stack, 32);
-#else
-    int i=0;
-    void* frame = __builtin_frame_address(0);
-    for(;i<32;i++) {
-        ::log(frame);
-        if(ptr(frame)<0x70000F000000 || ptr(frame)>0x800000000000) break; //1MB stack
-        stack[i]=return_address(frame);
-        frame=caller_frame(frame);
-    }
-#endif
     for(i=i-4; i>=skip; i--) {
         Symbol s = findSymbol(stack[i]);
         if(s.function||s.file||s.line) log.append(left(s.file+':'+str(s.line),16)+'\t'+s.function+'\n');

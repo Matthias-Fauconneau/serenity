@@ -61,7 +61,6 @@ inline String strD(const Time& num, const Time& div) {
  return strD(num.nanoseconds(), div.nanoseconds());
 }
 
-#if 1
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;
     int weekDay=-1;
@@ -98,7 +97,6 @@ String str(Date date, const string format="dddd, dd MMMM yyyy hh:mm:ss");
 /// Parses a date from s
 Date parseDate(TextData& s);
 inline Date parseDate(string s) { TextData t(s); Date date = parseDate(t); return t ? Date() : date; }
-#endif
 
 /// Generates a sequence of uniformly distributed pseudo-random 64bit integers
 struct Random {

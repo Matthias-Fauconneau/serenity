@@ -6,7 +6,7 @@ struct Membrane {
 
  sconst float density = 1000 * kg / cb(m);
  sconst float curvature = 0;
- sconst float shearModulus = 0.3 * MPa;
+ sconst float shearModulus = 0.1/*3*/ * MPa;
  sconst float poissonRatio = 0.48;
  sconst float elasticModulus = 2*shearModulus*(1+poissonRatio);
 
@@ -16,12 +16,13 @@ struct Membrane {
  const int margin = simd; // 16 to ensure no false sharing ?
  const int stride = margin+W+margin;
  const float internodeLength = 2*sin(PI/W)*radius;
- const float exactHeight = radius * 2.5;
+ const float ratio;
+ const float exactHeight = radius * ratio;
  const float cellHeight = sqrt(3.)/2*internodeLength;
  const int H = ceil(exactHeight/cellHeight)+1;
  const float height = (H-1) * cellHeight;
  sconst float thickness = 0.05 * mm;
- const float tensileStrength = 1/*1680*/ * MPa;
+ const float tensileStrength = 1680/*1-1680*/ * MPa;
  const float mass = sqrt(3.)/2 * sq(internodeLength) * thickness * density;
  const float tensionStiffness = sqrt(3.)/2 * internodeLength * thickness * tensileStrength;
  const float tensionDamping = 1 * sqrt(mass * tensionStiffness);
@@ -40,7 +41,7 @@ struct Membrane {
  buffer<float> Fy { capacity };
  buffer<float> Fz { capacity };
 
- Membrane(float radius, float resolution) : radius(radius), resolution(resolution) {
+ Membrane(float radius, float resolution, float ratio) : radius(radius), resolution(resolution), ratio(ratio) {
   Px.clear(0); Py.clear(0); Pz.clear(0);
   Vx.clear(0); Vy.clear(0); Vz.clear(0);
   Fx.clear(0); Fy.clear(0); Fz.clear(0);

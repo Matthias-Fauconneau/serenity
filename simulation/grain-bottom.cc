@@ -48,15 +48,17 @@ void Simulation::stepGrainBottom() {
   grainBottomA.size = contactCount;
   while(contactCount.count > 0 && grainBottomA[contactCount-1] >= (int)grain->count) contactCount.count--;
   grainBottomA.size = contactCount;
-  grainBottomLocalAx.size = grainBottomA.size;
-  grainBottomLocalAy.size = grainBottomA.size;
-  grainBottomLocalAz.size = grainBottomA.size;
-  grainBottomLocalBx.size = grainBottomA.size;
-  grainBottomLocalBy.size = grainBottomA.size;
-  grainBottomLocalBz.size = grainBottomA.size;
+  grainBottomLocalAx.size = contactCount;
+  grainBottomLocalAy.size = contactCount;
+  grainBottomLocalAz.size = contactCount;
+  grainBottomLocalBx.size = contactCount;
+  grainBottomLocalBy.size = contactCount;
+  grainBottomLocalBz.size = contactCount;
+
   assert(align(simd, grainBottomA.size+1) <= grainBottomA.capacity);
   for(size_t i=grainBottomA.size; i<align(simd, grainBottomA.size+1); i++)
    grainBottomA.begin()[i] = -1;
+
   this->grainBottomSearchTime += grainBottomSearchTime.cycleCount();
   if(!grainBottomA.size) return;
 

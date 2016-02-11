@@ -87,10 +87,10 @@ struct PlotView : HList<Plot> {
      if(name=="core") continue;
      if(endsWith(name,"stdout")) continue;
      auto parameters = parseDict(name);
-     if(parameters.at("Radius")!="50"_) continue;
+     /*if(parameters.at("Radius")!="50"_) continue;
      if(parameters.at("sfStiffness")!="1M"_) continue;
-     if(parameters.at("sfSpeed")!="100"_) continue;
-     if(!(parameters.contains("nDamping") || parameters.contains("mDensity"))) continue;
+     if(parameters.at("sfSpeed")!="100"_) continue;*/
+     //if(!(parameters.contains("nDamping") || parameters.contains("mDensity"))) continue;
       // FIXME: keeping only old versions
      for(const auto parameter: parameters)
       if(!allCoordinates[::copy(parameter.key)].contains(parameter.value))
@@ -102,10 +102,10 @@ struct PlotView : HList<Plot> {
      if(endsWith(name,".stdout")) continue;
      if(endsWith(name,".png")) continue;
      auto parameters = parseDict(name);
-     if(parameters.at("Radius")!="50"_) continue;
+     /*if(parameters.at("Radius")!="50"_) continue;
      if(parameters.at("sfStiffness")!="1M"_) continue;
-     if(parameters.at("sfSpeed")!="100"_) continue;
-     if(!(parameters.contains("nDamping") || parameters.contains("mDensity"))) continue;
+     if(parameters.at("sfSpeed")!="100"_) continue;*/
+     //if(!(parameters.contains("nDamping") || parameters.contains("mDensity"))) continue;
       // FIXME: keeping only old versions
      TextData s (readFile(name, folder));
      s.until('\n'); // First line: constant results
