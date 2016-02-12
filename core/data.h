@@ -94,6 +94,7 @@ struct BinaryData : Data {
  int64 read64() { return isBigEndian?big64(read<int64>()):read<int64>(); }
  int32 read32() { return isBigEndian?big32(read<int32>()):read<int32>(); }
  int16 read16() { return isBigEndian?big16(read<int16>()):read<int16>(); }
+ float readF() { return read<float>(); }
 
  /// Provides template overloaded specialization (for swap) and return type overloading through cast operators.
  struct ReadOperator {
@@ -101,6 +102,8 @@ struct BinaryData : Data {
   /// Reads an int64 and if necessary, swaps to host byte order
   operator uint64() { return s->read64(); }
   operator int64() { return s->read64(); }
+  /// Reads a single precision floating point number
+  operator float() { return s->readF(); }
   /// Reads an int32 and if necessary, swaps to host byte order
   operator uint32() { return s->read32(); }
   operator int32() { return s->read32(); }

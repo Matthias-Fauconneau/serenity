@@ -50,8 +50,10 @@ struct Membrane {
   Px.clear(0); Py.clear(0); Pz.clear(0);
   Vx.clear(0); Vy.clear(0); Vz.clear(0);
   Fx.clear(0); Fy.clear(0); Fz.clear(0);
+#if GEAR
   PDx[0].clear(0); PDy[0].clear(0); PDz[0].clear(0);
   PDx[1].clear(0); PDy[1].clear(0); PDz[1].clear(0);
+#endif
   for(size_t i: range(H)) {
    for(size_t j: range(W)) {
     float z = i*height/(H-1);

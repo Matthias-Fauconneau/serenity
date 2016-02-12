@@ -362,35 +362,28 @@ void Simulation::run() {
    header.append(raw(membrane->stride));
    header.append(raw(membrane->margin));
    header.append(raw(membrane->radius));
+   header.size = 64;
    dump.write(header);
-   dump.write(cast<byte>(grain->Px));
-   dump.write(cast<byte>(grain->Py));
-   dump.write(cast<byte>(grain->Pz));
-   dump.write(cast<byte>(grain->Vx));
-   dump.write(cast<byte>(grain->Vy));
-   dump.write(cast<byte>(grain->Vz));
-   dump.write(cast<byte>(grain->Fx));
-   dump.write(cast<byte>(grain->Fy));
-   dump.write(cast<byte>(grain->Fz));
-   dump.write(cast<byte>(grain->Rx));
-   dump.write(cast<byte>(grain->Ry));
-   dump.write(cast<byte>(grain->Rz));
-   dump.write(cast<byte>(grain->Rw));
-   dump.write(cast<byte>(grain->AVx));
-   dump.write(cast<byte>(grain->AVy));
-   dump.write(cast<byte>(grain->AVz));
-   dump.write(cast<byte>(grain->Tx));
-   dump.write(cast<byte>(grain->Ty));
-   dump.write(cast<byte>(grain->Tz));
-   dump.write(cast<byte>(membrane->Px));
-   dump.write(cast<byte>(membrane->Py));
-   dump.write(cast<byte>(membrane->Pz));
-   dump.write(cast<byte>(membrane->Vx));
-   dump.write(cast<byte>(membrane->Vy));
-   dump.write(cast<byte>(membrane->Vz));
-   dump.write(cast<byte>(membrane->Fx));
-   dump.write(cast<byte>(membrane->Fy));
-   dump.write(cast<byte>(membrane->Fz));
+   {
+    auto write = [this](const buffer<float>& A) {
+     dump.write(cast<byte>(ref<float>(A.data+simd, align(64, grain->count))));
+    };
+    write(grain->Px); write(grain->Py); write(grain->Pz);
+    write(grain->Vx); write(grain->Vy); write(grain->Vz);
+    write(grain->Fx); write(grain->Fy); write(grain->Fz);
+    write(grain->Rx); write(grain->Ry); write(grain->Rz); write(grain->Rw);
+    write(grain->AVx); write(grain->AVy); write(grain->AVz);
+    write(grain->Tx); write(grain->Ty); write(grain->Tz);
+   }
+   { // TODO: compact? (no margin, stride=W)
+       auto write = [this](const buffer<float>& A) {
+        assert_(A.size == membrane->count);
+        dump.write(cast<byte>(ref<float>(A.data, align(64, A.size))));
+       };
+       write(membrane->Px); write(membrane->Py); write(membrane->Pz);
+       write(membrane->Vx); write(membrane->Vy); write(membrane->Vz);
+       write(membrane->Fx); write(membrane->Fy); write(membrane->Fz);
+   }
    if(fail) return;
   }
   if(timeStep%65536 == 0) {

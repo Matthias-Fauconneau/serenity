@@ -106,5 +106,5 @@ tools/sweep.cc
 polyhedra/polyhedra.h
 polyhedra/polyhedra-view.cc
 
-tools/snapshot-view.h
-tools/snapshot-view.cc
+tools/state-view.h
+tools/state-view.cc

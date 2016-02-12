@@ -6,7 +6,7 @@ FILE(shader_glsl)
 
 struct State {
  struct Grain {
-  float radius = 2.5e-3; // FIXME
+  float radius;
   size_t count;
   ref<float> Px;
   ref<float> Py;
@@ -43,7 +43,7 @@ struct State {
  struct Membrane {
   size_t W, H, stride, margin;
   size_t count;
-  float radius = 10; // FIXME
+  float radius;
   ref<float> Px;
   ref<float> Py;
   ref<float> Pz;
@@ -101,7 +101,7 @@ struct StateView : Widget {
     const vXsf Qy = floatX(viewRotation.y);
     const vXsf Qz = floatX(viewRotation.z);
     const vXsf Qw = floatX(viewRotation.w);
-    const float* pPx = state.grain.Px.data+simd, *pPy = state.grain.Py.data+simd, *pPz = state.grain.Pz.data+simd;
+    const float* pPx = state.grain.Px.data, *pPy = state.grain.Py.data, *pPz = state.grain.Pz.data;
     float* const pQPz = grainZ.begin();
     int size = grainIndices.size;
     for(int i=0; i<size; i+=simd) {
@@ -137,10 +137,10 @@ struct StateView : Widget {
     positions[i*6+3] = vec3(min.x, max.y, O.z);
     positions[i*6+4] = vec3(max.x, min.y, O.z);
     positions[i*6+5] = vec3(max, O.z);
-    R[i] = vec4(state.grain.Rx[simd+grainIndices[i]],
-                      state.grain.Ry[simd+grainIndices[i]],
-                      state.grain.Rz[simd+grainIndices[i]],
-                      state.grain.Rw[simd+grainIndices[i]]);
+    R[i] = vec4(state.grain.Rx[grainIndices[i]],
+                      state.grain.Ry[grainIndices[i]],
+                      state.grain.Rz[grainIndices[i]],
+                      state.grain.Rw[grainIndices[i]]);
    }
 
    static GLShader shader {::shader_glsl(), {"interleaved sphere"}};
