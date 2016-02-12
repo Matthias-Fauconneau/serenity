@@ -43,8 +43,8 @@ fragment {
                 clamp((v.x-G.x/2)/G.x, 0, 1),
                 clamp((v.y-G.y/2)/G.y, 0, 1),
                 clamp((v.z-G.z/2)/G.z, 0, 1));
-    buffer colorBuffer { vec4[] aColor; };
-    color = aColor[gl_PrimitiveID/2]*vec4(dz*S, a);
+    //buffer colorBuffer { vec4[] aColor; };
+    color = /*aColor[gl_PrimitiveID/2]**/vec4(dz*S, a);
     uniform float radius;
     gl_FragDepth = gl_FragCoord.z + dz * radius;
   }

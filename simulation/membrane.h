@@ -34,6 +34,11 @@ struct Membrane {
  buffer<float> Px { capacity };
  buffer<float> Py { capacity };
  buffer<float> Pz { capacity };
+#if GEAR
+ buffer<float> PDx[2] {capacity, capacity};
+ buffer<float> PDy[2] {capacity, capacity};
+ buffer<float> PDz[2] {capacity, capacity};
+#endif
  buffer<float> Vx { capacity };
  buffer<float> Vy { capacity };
  buffer<float> Vz { capacity };
@@ -45,6 +50,8 @@ struct Membrane {
   Px.clear(0); Py.clear(0); Pz.clear(0);
   Vx.clear(0); Vy.clear(0); Vz.clear(0);
   Fx.clear(0); Fy.clear(0); Fz.clear(0);
+  PDx[0].clear(0); PDy[0].clear(0); PDz[0].clear(0);
+  PDx[1].clear(0); PDy[1].clear(0); PDz[1].clear(0);
   for(size_t i: range(H)) {
    for(size_t j: range(W)) {
     float z = i*height/(H-1);

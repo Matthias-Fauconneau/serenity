@@ -28,6 +28,7 @@ core/trace.cc
 core/file.cc
 core/serialization.h
 core/parallel.h
+core/parallel.cc
 core/time.h
 core/time.cc
 core/profile.cc
@@ -82,10 +83,7 @@ simulation/grain-bottom.cc
 simulation/grain-side.cc
 simulation/wire-bottom.cc
 simulation/run.cc
-disasm.h
-disasm.cc
 simulation/wire.cc
-core/parallel.cc
 simulation/grain-membrane.cc
 simulation/membrane.cc
 simulation/grain-top.cc
@@ -93,19 +91,20 @@ simulation/grain-obstacle.h
 simulation/grain-obstacle.cc
 simulation/grain.cc
 simulation/grain-obstacle.h
-tools/plot-app.cc
-ui/utf8.cc
-tools/shader.glsl
-tools/sweep.cc
-tools/sge.h
 simulation/grain.h
 simulation/membrane.h
 simulation/wire.h
 simulation/plate.h
-tools/document.cc
-test.cc
+tools/shader.glsl
+
+video/encoder.cc
+
+tools/plot-app.cc
+tools/sge.h
+tools/sweep.cc
 
 polyhedra/polyhedra.h
 polyhedra/polyhedra-view.cc
 
-video/encoder.cc
+tools/snapshot-view.h
+tools/snapshot-view.cc

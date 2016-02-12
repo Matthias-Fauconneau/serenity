@@ -353,9 +353,16 @@ void Simulation::run() {
     String name = replace(arguments()[0],"/",":");
     dump = File(name+".dump", currentWorkingDirectory(), Flags(WriteOnly|Create|Truncate));
    }
-   dump.write(raw(grain->count)+raw(membrane->count)+
-              raw(membrane->W)+raw(membrane->H)+raw(membrane->stride)+
-              raw(membrane->margin));
+   buffer<byte> header (64, 0);
+   header.append(raw(grain->count));
+   header.append(raw(grain->radius));
+   header.append(raw(membrane->count)); // 8
+   header.append(raw(membrane->W));
+   header.append(raw(membrane->H));
+   header.append(raw(membrane->stride));
+   header.append(raw(membrane->margin));
+   header.append(raw(membrane->radius));
+   dump.write(header);
    dump.write(cast<byte>(grain->Px));
    dump.write(cast<byte>(grain->Py));
    dump.write(cast<byte>(grain->Pz));

@@ -1,167 +1,180 @@
-#include "matrix.h"
-#include "window.h"
-#include "render.h"
-#include "png.h"
-#include "layout.h"
-#include "encoder.h"
+#include "widget.h"
 #include "gl.h"
+#include "matrix.h"
+#include "simd.h"
 FILE(shader_glsl)
-typedef v4sf vec4f;
 
-struct SnapshotView : Widget {
- String id;
- // View
- vec2 lastPos; // for relative cursor movements
- vec2 viewYawPitch = vec2(0, -PI/3); // Current view angles
-
- GLFrameBuffer target;
-
+struct State {
  struct Grain {
-  float radius;
-  size_t count = 0;
-  array<vec4f> position;
-  struct { vec4f operator[](size_t) const { return _0001f; }} rotation;
+  float radius = 2.5e-3; // FIXME
+  size_t count;
+  ref<float> Px;
+  ref<float> Py;
+  ref<float> Pz;
+  ref<float> Vx;
+  ref<float> Vy;
+  ref<float> Vz;
+  ref<float> Fx;
+  ref<float> Fy;
+  ref<float> Fz;
+  ref<float> Rx;
+  ref<float> Ry;
+  ref<float> Rz;
+  ref<float> Rw;
+  ref<float> AVx;
+  ref<float> AVy;
+  ref<float> AVz;
+  ref<float> Tx;
+  ref<float> Ty;
+  ref<float> Tz;
+  vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]); }
+  //vec4 rotation(size_t i) const { return vec4(Rx[i], Ry[i], Rz[i], Rw[i]); }
  } grain;
-
+#if WIRE
  struct Wire {
-  float radius;
+  float radius = 0;
   size_t count = 0;
-  array<vec4f> position;
+  buffer<float> Px;
+  buffer<float> Py;
+  buffer<float> Pz;
+  vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]); }
  } wire;
+#endif
+ struct Membrane {
+  size_t W, H, stride, margin;
+  size_t count;
+  float radius = 10; // FIXME
+  ref<float> Px;
+  ref<float> Py;
+  ref<float> Pz;
+  ref<float> Vx;
+  ref<float> Vy;
+  ref<float> Vz;
+  ref<float> Fx;
+  ref<float> Fy;
+  ref<float> Fz;
+  //vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]); }
+ } membrane;
+ //float radius,
+ float bottomZ = 0, topZ = 0;
+ //vec3 min, max;
+};
 
- struct Side {
-  array<vec4f> position;
- } side;
+struct StateView : Widget {
+ State state;
+ size_t timeStep = 0;
 
- SnapshotView() {}
- SnapshotView(string id) : id(copyRef(id)) {
-  if(!id) return;
-  assert_(existsFile(id+".grain"), id, currentWorkingDirectory().list(Files));
-  assert_(existsFile(id+".side"), id, currentWorkingDirectory().list(Files));
-  if(existsFile(id+".grain")) {TextData s(readFile(id+".grain"));
-   grain.radius = s.decimal(); s.line();
-   s.line(); // Header
-   while(s) {
-    float x = s.decimal(); s.skip(' ');
-    float y = s.decimal(); s.skip(' ');
-    float z = s.decimal(); s.skip(' ');
-    grain.position.append(v4sf{x,y,z,0});
-    grain.count++;
-    s.line();
-   }
-  }
-  if(existsFile(id+".wire")) {TextData s(readFile(id+".wire"));
-   wire.radius = s.decimal(); s.line();
-   s.line(); // Header
-   while(s) {
-    float x = s.decimal(); s.skip(' ');
-    float y = s.decimal(); s.skip(' ');
-    float z = s.decimal(); s.skip(' ');
-    wire.position.append(v4sf{x,y,z,0});
-    wire.count++;
-    s.line();
-   }
-  }
-  if(existsFile(id+".side")) {TextData s(readFile(id+".side"));
-   while(s) {
-    {float x = s.decimal(); s.skip(' ');
-     float y = s.decimal(); s.skip(' ');
-     float z = s.decimal(); s.skip(' ');
-     side.position.append(v4sf{x,y,z,0});}
-    {float x = s.decimal(); s.skip(' ');
-     float y = s.decimal(); s.skip(' ');
-     float z = s.decimal(); if(!s.match('\n')) break;
-     side.position.append(v4sf{x,y,z,0});}
-   }
-  }
-  log(id, grain.count, wire.count, side.position.size);
- }
- void snapshot() {
-  writeFile(id+".png", encodePNG(target.readback()), currentWorkingDirectory(), true);
- }
+ vec2 yawPitch = vec2(0, -PI/2); // Current view angles
 
- vec2 sizeHint(vec2 size) override {
-  if(!grain.count) return 0;
-  if(size.x || size.y) return max(size.x, size.y);
-  return vec2(1050/3, 1050/3/**size.y/size.x*/);
- }
+ struct {
+  vec2 cursor;
+  vec2 yawPitch;
+  size_t timeStep;
+ } dragStart = {0,0,0};
 
- Image render(int2 size) {
-  vec4f viewRotation = qmul(angleVector(viewYawPitch.y, vec3(1,0,0)),
-                                             angleVector(viewYawPitch.x, vec3(0,0,1)));
+ array<int> grainIndices;
+ GLIndexBuffer indexBuffer;
+ GLBuffer xBuffer, yBuffer, zBuffer;
 
-  vec3 scale, translation; // Fit view
-  array<vec3> grainPositions (grain.count); // Rotated, Z-Sorted
-  {
-   vec3 min = inf, max = -inf;
-   for(vec4f p: grain.position.slice(0, grain.count)) {
-    vec3 O = toVec3(qapply(viewRotation, p));
-    min = ::min(min, O - vec3(grain.radius));
-    max = ::max(max, O + vec3(grain.radius));
-    size_t i = 0;
-    while(i < grainPositions.size && grainPositions[i].z < O.z) i++;
-    grainPositions.insertAt(i, O);
-   }
-   scale = vec3(vec2(2/::max(max.x-min.x, max.y-min.y)), 2/(max-min).z);
-   translation = -vec3((min+max).xy()/2.f, min.z);
+ vec2 sizeHint(vec2) override { return vec2(992); }
+
+ shared<Graphics> graphics(vec2 size) override {
+  state.bottomZ = 0, state.topZ = 0;
+  for(float z: state.grain.Pz) {
+   state.bottomZ = min(state.bottomZ, z);
+   state.topZ = max(state.topZ, z);
   }
 
+  vec4 viewRotation = qmul(angleVector(yawPitch.y, vec3(1,0,0)), angleVector(yawPitch.x, vec3(0,0,1)));
+  const vec3 scale = vec3(vec2(2/(state.topZ-state.bottomZ)), 1./16);
   mat4 viewProjection = mat4()
     .scale(vec3(1,1,-1))
-    //.translate(vec3(0,0,-1))
     .scale(scale)
-    .translate(translation);
-  mat4 rotatedViewProjection = mat4(viewProjection).rotateX(viewYawPitch.y) .rotateZ(viewYawPitch.x);
+    .rotateX(yawPitch.y).rotateZ(yawPitch.x)
+    .translate(vec3(0,0,-(state.bottomZ+state.topZ)/2));
 
-  if(!target) target = GLFrameBuffer(size);
-  target.bind(ClearColor|ClearDepth);
-  glDepthTest(true);
+  if(state.grain.count) {
+   for(int i: range(grainIndices.size, state.grain.count)) grainIndices.append(i);
+   buffer<float> grainZ (align(simd, grainIndices.size));
+   {
+    const vXsf Qx = floatX(viewRotation.x);
+    const vXsf Qy = floatX(viewRotation.y);
+    const vXsf Qz = floatX(viewRotation.z);
+    const vXsf Qw = floatX(viewRotation.w);
+    const float* pPx = state.grain.Px.data+simd, *pPy = state.grain.Py.data+simd, *pPz = state.grain.Pz.data+simd;
+    float* const pQPz = grainZ.begin();
+    int size = grainIndices.size;
+    for(int i=0; i<size; i+=simd) {
+     const vXsf Px = load(pPx, i), Py = load(pPy, i), Pz = load(pPz, i);
+     const vXsf X = Qw*Px - Py*Qz + Qy*Pz;
+     const vXsf Y = Qw*Py - Pz*Qx + Qz*Px;
+     const vXsf Z = Qw*Pz - Px*Qy + Qx*Py;
+     const vXsf W = Px * Qx + Py * Qy + Pz * Qz;
+     const vXsf QPz = Qw*Z + W*Qz + Qx*Y - X*Qy;
+     store(pQPz, i, QPz);
+    }
+   }
+   for(int i: range(1, grainIndices.size)) {
+    int j = i;
+    while(j > 0 && grainZ[grainIndices[j-1]] > grainZ[grainIndices[j]]) {
+     swap(grainIndices[j-1], grainIndices[j]);
+     j--;
+    }
+   }
 
-  if(grain.count) { // Grains
-   buffer<vec3> positions {grain.count*6};
-   for(size_t i: range(grain.count)) {
+   glDepthTest(true);
+
+   buffer<vec3> positions {grainIndices.size*6};
+   buffer<vec4> R {grainIndices.size};
+   for(size_t i: range(grainIndices.size)) {
     // FIXME: GPU quad projection
-    vec3 O = viewProjection * grainPositions[i]; //toVec3(grain.position[i]);
-    vec2 min = O.xy() - vec2(scale.xy()) * vec2(grain.radius) - vec2(2.f/size.x); // Parallel
-    vec2 max = O.xy() + vec2(scale.xy()) * vec2(grain.radius) + vec2(2.f/size.x); // Parallel
+    vec3 O = viewProjection * state.grain.position(grainIndices[i]);
+    vec2 min = O.xy() - vec2(scale.xy()) * vec2(state.grain.radius) - vec2(2.f/size.x); // Parallel
+    vec2 max = O.xy() + vec2(scale.xy()) * vec2(state.grain.radius) + vec2(2.f/size.x); // Parallel
     positions[i*6+0] = vec3(min, O.z);
     positions[i*6+1] = vec3(max.x, min.y, O.z);
     positions[i*6+2] = vec3(min.x, max.y, O.z);
     positions[i*6+3] = vec3(min.x, max.y, O.z);
     positions[i*6+4] = vec3(max.x, min.y, O.z);
     positions[i*6+5] = vec3(max, O.z);
+    R[i] = vec4(state.grain.Rx[simd+grainIndices[i]],
+                      state.grain.Ry[simd+grainIndices[i]],
+                      state.grain.Rz[simd+grainIndices[i]],
+                      state.grain.Rw[simd+grainIndices[i]]);
    }
 
-   static GLShader shader {::shader_glsl(), {"sphere"}};
+   static GLShader shader {::shader_glsl(), {"interleaved sphere"}};
    shader.bind();
    shader["transform"] = mat4(1);
    shader.bindFragments({"color"});
    static GLVertexArray vertexArray;
    GLBuffer positionBuffer (positions);
-   vertexArray.bindAttribute(shader.attribLocation("position"_),
-                             3, Float, positionBuffer);
-   GLBuffer rotationBuffer (apply(grain.count,
-                                  [=](size_t) -> vec4f { return _0001f/*conjugate(qmul(viewRotation,_0001f))*/; }));
-   shader.bind("rotationBuffer"_, rotationBuffer, 0);
-   shader["radius"] = float(scale.z/2 * grain.radius*3/4); // reduce Z radius to see membrane mesh on/in grain
-   shader["hpxRadius"] = 1 / (size.x * scale.x * grain.radius);
+   vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
+   GLBuffer RBuffer (R);
+   shader.bind("R"_, RBuffer);
+   shader["viewRotation"] = viewRotation;
+   /*GLBuffer colorBuffer (colors);
+   shader.bind("colorBuffer"_, colorBuffer, 1);*/
+   // Reduces Z radius to see membrane mesh on/in grain
+   shader["radius"] = float(scale.z/2 * state.grain.radius * 7/8);
+   shader["hpxRadius"] = 1 / (size.x * scale.x * state.grain.radius);
    vertexArray.draw(Triangles, positions.size);
   }
 
-  if(wire.count>1) { // Wire
-   size_t wireCount = wire.count;
-   buffer<vec3> positions {(wireCount-1)*6};
+#if WIRE
+  size_t wireCount = state.wire.count;
+  if(wireCount>1) {
+   buffer<vec3> positions {size_t(wireCount-1)*6};
+   buffer<vec4> colors {size_t(wireCount-1)};
    size_t s = 0;
-   for(size_t i: range(wireCount-1)) {
-    vec3 a (toVec3(wire.position[i])), b (toVec3(wire.position[i+1]));
-    if(length(a.xy()) > 0.03) continue;
-    if(length(b.xy()) > 0.03) continue;
+   for(int i: range(wireCount-1)) {
+    vec3 a (state.wire.position(i)), b (state.wire.position(i+1));
     // FIXME: GPU quad projection
-    vec3 A = rotatedViewProjection * a, B= rotatedViewProjection * b;
+    vec3 A = viewProjection * a, B= viewProjection * b;
     vec2 r = B.xy()-A.xy();
     float l = length(r);
     vec2 t = r/l;
-    vec3 n = scale*float(wire.radius)*vec3(t.y, -t.x, 0); // FIXME: hpx
+    vec3 n = scale*float(Wire::radius)*vec3(t.y, -t.x, 0); // FIXME: hpx
     vec3 P[4] {A-n, A+n, B-n, B+n};
     positions[s*6+0] = P[0];
     positions[s*6+1] = P[1];
@@ -169,72 +182,145 @@ struct SnapshotView : Widget {
     positions[s*6+3] = P[2];
     positions[s*6+4] = P[1];
     positions[s*6+5] = P[3];
+    colors[s] = cylinders.contains(i) ? vec4(1,0,0,1) : vec4(1, 1, 1, 1);
     s++;
    }
+   assert(s*6 <= positions.size);
    positions.size = s*6;
-   static GLShader shader {::shader_glsl(), {"cylinder"}};
-   shader.bind();
-   shader.bindFragments({"color"});
-   shader["transform"] = mat4(1);
-   shader["radius"] = float(scale.z/2 * wire.radius);
-   shader["hpxRadius"] = 1 / (size.x * scale.x * wire.radius);
-   static GLVertexArray vertexArray;
-   GLBuffer positionBuffer (positions);
-   vertexArray.bindAttribute(shader.attribLocation("position"_),
-                             3, Float, positionBuffer);
-   vertexArray.draw(Triangles, positions.size);
+   if(positions.size) {
+    static GLShader shader {::shader_glsl(), {"interleaved cylinder"}};
+    shader.bind();
+    shader.bindFragments({"color"});
+    shader["transform"] = mat4(1);
+    shader["radius"] = float(scale.z/2 * Wire::radius);
+    shader["hpxRadius"] = 1 / (size.x * scale.x * Wire::radius);
+    static GLVertexArray vertexArray;
+    GLBuffer positionBuffer (positions);
+    vertexArray.bindAttribute(shader.attribLocation("position"_),
+                              3, Float, positionBuffer);
+    GLBuffer colorBuffer (colors);
+    shader.bind("colorBuffer"_, colorBuffer, 1);
+    vertexArray.draw(Triangles, positions.size);
+   }
   }
-
-  if(side.position) { // Side
-   static GLShader shader {::shader_glsl(), {"flat"}};
+#endif
+  if(state.membrane.count) {
+   if(!indexBuffer) {
+    const int W = state.membrane.W, stride = state.membrane.stride,
+      margin = state.membrane.margin;
+    buffer<uint16> indices(W*(state.membrane.H-1)*6-W*2);
+    int s = 0;
+    for(int i: range(0, state.membrane.H-1)) {
+     int base = margin+i*stride;
+     for(int j: range(W)) {
+      int a = base+j;
+      int b = base+(j+1)%W;
+      int c = base+stride+(j+i%2)%W;
+      indices[s+0] = c; indices[s+1] = a;
+      indices[s+2] = b; indices[s+3] = c;
+      if(i) { indices[s+4] = a; indices[s+5] = b; s += 6;}
+      else s += 4;
+     }
+    }
+    indices.size = s;
+    indexBuffer = indices;
+    indexBuffer.primitiveType = Lines;
+   }
+   static GLShader shader {::shader_glsl(), {"packed flat"}};
+   shader.bind();
+   shader.bindFragments({"color"});
+   shader["transform"] = viewProjection;
+   shader["uColor"] = vec4(black, 1);
+   static GLVertexArray vertexArray;
+   // FIXME: reuse buffers / no update before pressure
+   if(!xBuffer) xBuffer = GLBuffer(state.membrane.Px);
+   xBuffer.upload(state.membrane.Px);
+   vertexArray.bindAttribute(shader.attribLocation("x"_), 1, Float, xBuffer);
+   if(!yBuffer) yBuffer = GLBuffer(state.membrane.Py);
+   yBuffer.upload(state.membrane.Py);
+   vertexArray.bindAttribute(shader.attribLocation("y"_), 1, Float, yBuffer);
+   if(!zBuffer) zBuffer = GLBuffer(state.membrane.Pz);
+   zBuffer.upload(state.membrane.Pz);
+   vertexArray.bindAttribute(shader.attribLocation("z"_), 1, Float, zBuffer);
+   vertexArray.bind();
+   indexBuffer.draw();
+  }
+#if 0
+  // Lines
+  if(0) {
+   static GLShader shader {::shader_glsl(), {"interleaved flat"}};
    shader.bind();
    shader.bindFragments({"color"});
    shader["transform"] = mat4(1);
+   shader["uColor"] = vec4(black, 1);
 
-   // World space bounding box
-   vec3 min = inf, max = -inf;
-   for(vec4f p: grain.position.slice(0, grain.count)) {
-    min = ::min(min, toVec3(p) - vec3(grain.radius));
-    max = ::max(max, toVec3(p) + vec3(grain.radius));
+   // Plates
+   size_t N = 64;
+   array<vec3> positions; //buffer<vec3> positions {N*2*2, 0};
+   const int radius = state.membrane.radius;
+   for(size_t i: range(N)) {
+    float a1 = 2*PI*(i+0)/N; vec3 a (radius*cos(a1), radius*sin(a1), state.bottomZ);
+    float a2 = 2*PI*(i+1)/N; vec3 b (radius*cos(a2), radius*sin(a2), state.bottomZ);
+    vec3 A = viewProjection * a, B= viewProjection * b;
+    positions.append(A); positions.append(B);
    }
-
-   buffer<vec3> positions {side.position.size};
-   size_t s = 0;
-   for(size_t i: range(side.position.size/2)) {
-    vec3 a (toVec3(side.position[i*2+0]));
-    vec3 b (toVec3(side.position[i*2+1]));
-    if(a.z < min.z || a.z > max.z) continue;
-    if(b.z < min.z || b.z > max.z) continue;
-    // FIXME: GPU projection
-    vec3 A = rotatedViewProjection * a, B= rotatedViewProjection * b;
-    positions[s*2+0] = A;
-    positions[s*2+1] = B;
-    s++;
+   for(size_t i: range(N)) {
+    float a1 = 2*PI*(i+0)/N; vec3 a (radius*cos(a1), radius*sin(a1), state.topZ);
+    float a2 = 2*PI*(i+1)/N; vec3 b (radius*cos(a2), radius*sin(a2), state.topZ);
+    vec3 A = viewProjection * a, B= viewProjection * b;
+    positions.append(A); positions.append(B);
    }
-   positions.size = s*2;
-   //shader["uColor"] = vec4(black, 1);
+   {Locker lock(::lock);
+   for(vec2x3 l: ::lines) { positions.append(viewProjection * l.a); positions.append(viewProjection * l.b); }}
    static GLVertexArray vertexArray;
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
    vertexArray.draw(Lines, positions.size);
   }
 
-  return target.readback();
- }
+  if(::faces && 0) {
+   static GLShader shader {::shader_glsl(), {"interleaved flat"}};
+   shader.bind();
+   shader.bindFragments({"color"});
+   shader["transform"] = mat4(1);
+   shader["uColor"] = vec4(1,0,0, 1);
+   array<vec3> positions;
+   const int margin = state.membrane.margin;
+   const int stride = state.membrane.stride;
+   {Locker lock(::lock);
+    for(int v: ::faces) {
+     int b = v/2, I = v%2;
+     int rowIndex = (b-margin)/stride;
+     int e0, e1;
+     // FIXME: assert peeled
+     if(I == 0) { // (., 0, 1)
+      e0 = rowIndex%2 -stride;
+      e1 = rowIndex%2 -stride-1;
+     } else { // (., 1, 2)
+      e0 = rowIndex%2 -stride-1;
+      e1 = -1;
+     }
+     positions.append(viewProjection * vec3(state.membrane.position(b)));
+     positions.append(viewProjection * vec3(state.membrane.position(b+e0)));
+     positions.append(viewProjection * vec3(state.membrane.position(b+e1)));
+    }
+   }
+   static GLVertexArray vertexArray;
+   GLBuffer positionBuffer (positions);
+   vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
+   vertexArray.draw(Triangles, positions.size);
+  }
+#endif
 
- shared<Graphics> graphics(vec2 widgetSize) override {
-  shared<Graphics> graphics;
-  graphics->blits.append(0, widgetSize, render(int2(widgetSize)));
-  return graphics;
+  return shared<Graphics>();
  }
 
  // Orbital ("turntable") view control
- bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button,
-                 Widget*&) override {
-  vec2 delta = cursor-lastPos; lastPos=cursor;
+ bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override {
+  if(event == Press) dragStart = {cursor, yawPitch, timeStep};
   if(event==Motion && button==LeftButton) {
-   viewYawPitch += float(2*PI) * delta / size; //TODO: warp
-   viewYawPitch.y = clamp<float>(-PI, viewYawPitch.y, 0);
+   yawPitch = dragStart.yawPitch + float(2*PI) * (cursor - dragStart.cursor) / size;
+   yawPitch.y = clamp<float>(-PI, yawPitch.y, 0);
   }
   else return false;
   return true;

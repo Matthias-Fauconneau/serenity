@@ -206,9 +206,9 @@ void Simulation::stepGrainIntegration() {
    Px += dt * Vx;
    Py += dt * Vy;
    Pz += dt * Vz;
+#endif
    store(pVx, i, Vx); store(pVy, i, Vy); store(pVz, i, Vz);
    store(pPx, i, Px); store(pPy, i, Py); store(pPz, i, Pz);
-#endif
    maxGrainVX2 = max(maxGrainVX2, Vx*Vx + Vy*Vy + Vz*Vz);
 
    {

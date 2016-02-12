@@ -91,7 +91,7 @@ struct SimulationView : Widget {
 
    buffer<vec3> positions {grainIndices.size*6};
    buffer<vec4> R {grainIndices.size};
-   buffer<vec4> colors {grainIndices.size};
+   //buffer<vec4> colors {grainIndices.size};
    for(size_t i: range(grainIndices.size)) {
     // FIXME: GPU quad projection
     vec3 O = viewProjection * simulation.grain->position(grainIndices[i]);
@@ -107,7 +107,7 @@ struct SimulationView : Widget {
                       simulation.grain->Ry[simd+grainIndices[i]],
                       simulation.grain->Rz[simd+grainIndices[i]],
                       simulation.grain->Rw[simd+grainIndices[i]]);
-    colors[i] = highlightGrains.contains(grainIndices[i]) ? vec4(1,0,0,1) : vec4(1,1,1,1);
+    //colors[i] = highlightGrains.contains(grainIndices[i]) ? vec4(1,0,0,1) : vec4(1,1,1,1);
    }
 
    static GLShader shader {::shader_glsl(), {"interleaved sphere"}};
@@ -120,8 +120,8 @@ struct SimulationView : Widget {
    GLBuffer RBuffer (R);
    shader.bind("R"_, RBuffer);
    shader["viewRotation"] = viewRotation;
-   GLBuffer colorBuffer (colors);
-   shader.bind("colorBuffer"_, colorBuffer, 1);
+   //GLBuffer colorBuffer (colors);
+   //shader.bind("colorBuffer"_, colorBuffer, 1);
    // Reduces Z radius to see membrane mesh on/in grain
    shader["radius"] = float(scale.z/2 * simulation.grain->radius * 7/8);
    shader["hpxRadius"] = 1 / (size.x * scale.x * simulation.grain->radius);
