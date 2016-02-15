@@ -138,7 +138,7 @@ void Simulation::stepGrainIntegration() {
        "X",  Px[k] /m, Py[k] /m, Pz[k] /m,
        "V", Vx[k] /(m/s), Vy[k] /(m/s), Vz[k] /(m/s),
        "F", Fx[k] /N, Fy[k] /N, Fz[k] /N*/);
-     highlightGrains.append(i+k);
+     //highlightGrains.append(i+k);
      fail=true; return;
     }
    }

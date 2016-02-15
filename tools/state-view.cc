@@ -21,6 +21,7 @@ struct StateViewApp {
  bool load() {
   BinaryData data(map);
   size_t t = 0;
+  size_t forceCount;
   for(;;) {
    if(!data) { log("EOF"); running=false; return false; }
    view.state.grain.count = data.read32();
@@ -31,10 +32,12 @@ struct StateViewApp {
    view.state.membrane.stride = data.read32();
    view.state.membrane.margin = data.read32();
    view.state.membrane.radius = data.readF();
+   forceCount = data.read64();
    data.index = align(64, data.index);
    if(t == view.timeStep) break;
    data.index += 19*align(64, view.state.grain.count)*sizeof(float);
    data.index += 9*align(64, view.state.membrane.count)*sizeof(float);
+   data.index += forceCount*sizeof(State::Force);
    t++;
   }
   {
@@ -60,6 +63,8 @@ struct StateViewApp {
    read(VSM.Vx); read(VSM.Vy); read(VSM.Vz);
    read(VSM.Fx); read(VSM.Fy); read(VSM.Fz);
   }
+  view.state.forces = data.read<State::Force>(forceCount);
+  log(view.state.forces.size);
   return true;
  }
 } app ( replace(arguments()[0],"/",":")+".dump" );

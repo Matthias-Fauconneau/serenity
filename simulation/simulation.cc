@@ -18,10 +18,11 @@ constexpr string Simulation::processStates[];
 
 bool fail = false;
 Lock lock;
-array<vec2x3> lines;
+/*array<vec2x3> lines;
 array<int> highlightGrains;
 array<int> faces;
-array<int> cylinders;
+array<int> cylinders;*/
+array<Force> forces;
 
 Simulation::Simulation(const Dict& p) :
   triaxial(p.value("triaxial", "0"_)!="0"_),
@@ -362,6 +363,7 @@ void Simulation::run() {
    header.append(raw(membrane->stride));
    header.append(raw(membrane->margin));
    header.append(raw(membrane->radius));
+   header.append(raw(forces.size)); // 8
    header.size = 64;
    dump.write(header);
    {
@@ -384,6 +386,9 @@ void Simulation::run() {
        write(membrane->Vx); write(membrane->Vy); write(membrane->Vz);
        write(membrane->Fx); write(membrane->Fy); write(membrane->Fz);
    }
+   log(forces.size);
+   dump.write(cast<byte>(forces));
+   forces.clear();
    if(fail) return;
   }
   if(timeStep%65536 == 0) {

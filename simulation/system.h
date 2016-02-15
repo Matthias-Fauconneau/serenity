@@ -29,3 +29,4 @@ sconst float mm = 1e-3*m, g = 1e-3*kg, KPa = 1e3 * Pa, MPa = 1e6 * Pa, GPa = 1e9
 
 #define MIDLIN 0
 #define GEAR 0
+#define MEMBRANE_FACE 0

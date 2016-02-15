@@ -131,7 +131,7 @@ struct SimulationView : Widget {
   size_t wireCount = simulation.wire->count;
   if(wireCount>1) {
    buffer<vec3> positions {size_t(wireCount-1)*6};
-   buffer<vec4> colors {size_t(wireCount-1)};
+   //buffer<vec4> colors {size_t(wireCount-1)};
    size_t s = 0;
    for(int i: range(wireCount-1)) {
     vec3 a (simulation.wire->position(i)), b (simulation.wire->position(i+1));
@@ -148,7 +148,7 @@ struct SimulationView : Widget {
     positions[s*6+3] = P[2];
     positions[s*6+4] = P[1];
     positions[s*6+5] = P[3];
-    colors[s] = cylinders.contains(i) ? vec4(1,0,0,1) : vec4(1, 1, 1, 1);
+    //colors[s] = cylinders.contains(i) ? vec4(1,0,0,1) : vec4(1, 1, 1, 1);
     s++;
    }
    assert(s*6 <= positions.size);
@@ -164,13 +164,13 @@ struct SimulationView : Widget {
     GLBuffer positionBuffer (positions);
     vertexArray.bindAttribute(shader.attribLocation("position"_),
                               3, Float, positionBuffer);
-    GLBuffer colorBuffer (colors);
-    shader.bind("colorBuffer"_, colorBuffer, 1);
+    /*GLBuffer colorBuffer (colors);
+    shader.bind("colorBuffer"_, colorBuffer, 1);*/
     vertexArray.draw(Triangles, positions.size);
    }
   }
 
-  if(/*simulation.useMembrane*/simulation.processState < Simulation::Released && simulation.membrane->count) {
+  if(simulation.processState < Simulation::Released && simulation.membrane->count) {
    if(!indexBuffer) {
     const int W = simulation.membrane->W, stride = simulation.membrane->stride,
       margin = simulation.membrane->margin;
@@ -213,6 +213,32 @@ struct SimulationView : Widget {
    vertexArray.bindAttribute(shader.attribLocation("z"_), 1, Float, zBuffer);
    vertexArray.bind();
    indexBuffer.draw();
+
+   // Membrane forces
+   {
+    array<vec3> positions;
+    float maxF = 0;
+    for(size_t i: range(simulation.membrane->count))
+     maxF = ::max(maxF, length(simulation.membrane->force(i)));
+    float scale = simulation.membrane->radius/maxF;
+    for(size_t i: range(simulation.membrane->count)) {
+     positions.append(simulation.membrane->position(i));
+     positions.append(simulation.membrane->position(i) + scale*simulation.membrane->force(i));
+    }
+    if(positions) {
+     static GLShader shader {::shader_glsl(), {"interleaved flat"}};
+     shader.bind();
+     shader.bindFragments({"color"});
+     shader["transform"] = viewProjection;
+     shader["uColor"] = vec4(0,0,1, 1/*./2*/);
+     static GLVertexArray vertexArray;
+     GLBuffer positionBuffer (positions);
+     vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
+     extern float lineWidth; lineWidth = 1/*./2*/;
+     glBlendAlpha();
+     vertexArray.draw(Lines, positions.size);
+    }
+   }
   }
 
   // Lines
@@ -239,15 +265,15 @@ struct SimulationView : Widget {
     vec3 A = viewProjection * a, B= viewProjection * b;
     positions.append(A); positions.append(B);
    }
-   {Locker lock(::lock);
+   /*{Locker lock(::lock);
    for(vec2x3 l: ::lines) { positions.append(viewProjection * l.a); positions.append(viewProjection * l.b); }}
    static GLVertexArray vertexArray;
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
    vertexArray.draw(Lines, positions.size);
-  }
+  }*/
 
-  if(::faces && 0) {
+  /*if(::faces && 0) {
    static GLShader shader {::shader_glsl(), {"interleaved flat"}};
    shader.bind();
    shader.bindFragments({"color"});
@@ -277,7 +303,7 @@ struct SimulationView : Widget {
    static GLVertexArray vertexArray;
    GLBuffer positionBuffer (positions);
    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
-   vertexArray.draw(Triangles, positions.size);
+   vertexArray.draw(Triangles, positions.size);*/
   }
 
   renderTime.stop();

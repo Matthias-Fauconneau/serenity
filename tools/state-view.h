@@ -5,6 +5,7 @@
 FILE(shader_glsl)
 
 struct State {
+ float bottomZ = 0, topZ = 0;
  struct Grain {
   float radius;
   size_t count;
@@ -53,11 +54,11 @@ struct State {
   ref<float> Fx;
   ref<float> Fy;
   ref<float> Fz;
-  //vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]); }
+  vec3 position(size_t i) const { return vec3(Px[i], Py[i], Pz[i]); }
+  vec3 force(size_t i) const { return vec3(Fx[i], Fy[i], Fz[i]); }
  } membrane;
- //float radius,
- float bottomZ = 0, topZ = 0;
- //vec3 min, max;
+ struct Force { vec3 origin, force; };
+ ref<Force> forces;
 };
 
 struct StateView : Widget {
@@ -204,6 +205,15 @@ struct StateView : Widget {
    }
   }
 #endif
+
+  float maxF = 0;
+  for(size_t i: range(state.membrane.count))
+   maxF = ::max(maxF, length(state.membrane.force(i)));
+  for(size_t i: range(state.forces.size))
+   if(isNumber(length(state.forces[i].force)))
+    maxF = ::max(maxF, length(state.forces[i].force));
+  assert_(isNumber(maxF));
+
   if(state.membrane.count) {
    if(!indexBuffer) {
     const int W = state.membrane.W, stride = state.membrane.stride,
@@ -244,7 +254,56 @@ struct StateView : Widget {
    vertexArray.bindAttribute(shader.attribLocation("z"_), 1, Float, zBuffer);
    vertexArray.bind();
    indexBuffer.draw();
+
+   // Membrane force sum
+   if(1) {
+    array<vec3> positions;
+    float scale = state.membrane.radius/maxF;
+    for(size_t i: range(state.membrane.count)) {
+     positions.append(state.membrane.position(i));
+     positions.append(state.membrane.position(i) + scale*state.membrane.force(i));
+    }
+    if(positions) {
+     static GLShader shader {::shader_glsl(), {"interleaved flat"}};
+     shader.bind();
+     shader.bindFragments({"color"});
+     shader["transform"] = viewProjection;
+     shader["uColor"] = vec4(0,0,1, 1/*./2*/);
+     static GLVertexArray vertexArray;
+     GLBuffer positionBuffer (positions);
+     vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
+     extern float lineWidth; lineWidth = 1/*./2*/;
+     glBlendAlpha();
+     vertexArray.draw(Lines, positions.size);
+    }
+   }
   }
+
+  // Forces
+  {
+   array<vec3> positions;
+   float scale = state.membrane.radius/maxF;
+   for(size_t i: range(state.forces.size)) {
+    if(isNumber(state.forces[i].force)) {
+     positions.append(state.forces[i].origin);
+     positions.append(state.forces[i].origin - scale*state.forces[i].force);
+    }
+   }
+   if(positions) {
+    static GLShader shader {::shader_glsl(), {"interleaved flat"}};
+    shader.bind();
+    shader.bindFragments({"color"});
+    shader["transform"] = viewProjection;
+    shader["uColor"] = vec4(1,0,0, 1/*./2*/);
+    static GLVertexArray vertexArray;
+    GLBuffer positionBuffer (positions);
+    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
+    extern float lineWidth; lineWidth = 1/*./2*/;
+    glBlendAlpha();
+    vertexArray.draw(Lines, positions.size);
+   }
+  }
+
 #if 0
   // Lines
   if(0) {

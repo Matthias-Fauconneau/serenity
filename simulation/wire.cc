@@ -100,16 +100,16 @@ static vXsf PI2 = floatX(PI/2);
 static vXsf PI4 = floatX(PI/4);
 static vXsf c0 = floatX(0.2447);
 static vXsf c1 = floatX(0.0663);
-inline vXsf atan(vXsf y, vXsf x) {
-    const maskX XgtY = greaterThan(abs(x), abs(y));
+inline vXsf atan(vXsf y /*>0*/, vXsf x) {
+    const maskX XgtY = greaterThan(abs(x), /*abs(*/y/*)*/);
     const vXsf r = ((vXsf)(XgtY & (vXsi)y) + (vXsf)(~XgtY & (vXsi)x)) /
                            ((vXsf)(XgtY & (vXsi)x) + (vXsf)(~XgtY & (vXsi)y));
     const vXsf atan0 = r*(PI4 - (abs(r)-_1f)*(c0+c1*abs(r)));
     const maskX Xgt0 = greaterThan(x, _0f);
-    const maskX Ygt0 = greaterThan(y, _0f);
+    //const maskX Ygt0 = greaterThan(y, _0f);
     const vXsf atan = (vXsf)(((~XgtY) & signBit) ^ (vXsi)atan0); // |x|<=|y| ? -atan
     const vXsf shift0 = PIX - (vXsf)(~XgtY & (vXsi)PI2); // |x| < |y| ? -PI/2
-    const vXsf shift1 = (vXsf)((~Ygt0 & signBit) ^ (vXsi)shift0); // y < 0 ? -shift
+    const vXsf shift1 = shift0; //(vXsf)((~Ygt0 & signBit) ^ (vXsi)shift0); // y < 0 ? -shift
     const vXsf shift2 = (vXsf)(~(XgtY & Xgt0) & (vXsi)shift1); // |x|>|y| & x>0 ? 0
     return atan + shift2;
 }
@@ -206,7 +206,7 @@ void Simulation::stepWireIntegration() {
     if(0) for(size_t k: range(simd)) {
      if(i+k >= (size_t)wire->count-fixLast) break;
      if(!(length(vec3(pFx[i+k],pFy[i+k],pFz[i+k])) < 100*N)) {
-      cylinders.append(i+k);
+      //cylinders.append(i+k);
       log(fixLast, processStates[processState], i+k, wire->count, "I0\n",
         "F", vec3(pFx[i+k]/N,pFy[i+k]/N,pFz[i+k]/N),
         length(vec3(pFx[i+k]/N,pFy[i+k]/N,pFz[i+k]/N)));

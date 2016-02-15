@@ -11,11 +11,13 @@ struct Wire;
 
 extern bool fail;
 extern Lock lock;
-struct vec2x3 { vec3 a, b; };
+/*struct vec2x3 { vec3 a, b; };
 extern array<vec2x3> lines;
 extern array<int> faces;
 extern array<int> cylinders;
-extern array<int> highlightGrains;
+extern array<int> highlightGrains;*/
+struct Force { vec3 origin, force; };
+extern array<Force> forces;
 
 // High level simulation and contact management
 struct Simulation {
@@ -245,18 +247,22 @@ struct Simulation {
   buffer<float> oldLocalAx;
   buffer<float> oldLocalAy;
   buffer<float> oldLocalAz;
+#if MEMBRANE_FACE
   buffer<float> oldLocalBu;
   buffer<float> oldLocalBv;
   //buffer<float> oldLocalBt;
+#endif
 
   buffer<int> A;
   buffer<int> B;
   buffer<float> localAx;
   buffer<float> localAy;
   buffer<float> localAz;
+#if MEMBRANE_FACE
   buffer<float> localBu;
   buffer<float> localBv;
   //buffer<float> localBt;
+#endif
 
   buffer<int> contacts;
 
