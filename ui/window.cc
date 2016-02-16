@@ -87,7 +87,7 @@ XWindow::XWindow(Widget* widget, Thread& thread, int2 sizeHint, bool useGL, bool
  if(useGL) {
   glDisplay = XOpenDisplay(strz(environmentVariable("DISPLAY"_,":0"_)));
   assert_(glDisplay);
-  const int fbAttribs[] = {GLX_DOUBLEBUFFER, 0,
+  const int fbAttribs[] = {/*GLX_DOUBLEBUFFER, 0,*/ GLX_FRAMEBUFFER_SRGB_CAPABLE_ARB, 1,
                            GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8,  0};
   int fbCount=0;
   GLXFBConfig* fbConfigs = glXChooseFBConfig(glDisplay, 0, fbAttribs, &fbCount);
@@ -293,6 +293,7 @@ void XWindow::initializeThreadGLContext() {
  glContext = ((PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB"))
    (glDisplay, fbConfig, glContext, 1, contextAttribs);
  glXMakeCurrent(glDisplay, id+Window, glContext);
+ glEnable(GL_FRAMEBUFFER_SRGB);
 }
 
 Image XWindow::readback() {

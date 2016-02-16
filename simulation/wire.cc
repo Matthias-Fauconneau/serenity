@@ -93,8 +93,7 @@ void Simulation::stepWireTension() {
  wireTensionTime.stop();
 }
 
-#if 1
-#else
+#if SIMD
 inline vXsf andnot(vXsi a, vXsf b) { return (vXsf)(~a & (vXsi)b); }
 inline vXsf abs(vXsf a) { return andnot(signBit, a); }
 static vXsf PIX = floatX(PI);

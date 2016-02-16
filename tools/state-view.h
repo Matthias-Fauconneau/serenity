@@ -5,10 +5,11 @@
 FILE(shader_glsl)
 
 struct State {
+ size_t timeStep = 0;
  float bottomZ = 0, topZ = 0;
  struct Grain {
   float radius;
-  size_t count;
+  size_t count = 0;
   ref<float> Px;
   ref<float> Py;
   ref<float> Pz;
@@ -43,7 +44,7 @@ struct State {
 #endif
  struct Membrane {
   size_t W, H, stride, margin;
-  size_t count;
+  size_t count = 0;
   float radius;
   ref<float> Px;
   ref<float> Py;
@@ -59,18 +60,20 @@ struct State {
  } membrane;
  struct Force { vec3 origin, force; };
  ref<Force> forces;
+ float maxF = 0;
 };
 
 struct StateView : Widget {
  State state;
- size_t timeStep = 0;
+ size_t value = 0, maximum = 0;
+ function<void(size_t)> valueChanged;
 
  vec2 yawPitch = vec2(0, -PI/2); // Current view angles
 
  struct {
   vec2 cursor;
   vec2 yawPitch;
-  size_t timeStep;
+  size_t value;
  } dragStart = {0,0,0};
 
  array<int> grainIndices;
@@ -81,9 +84,13 @@ struct StateView : Widget {
 
  shared<Graphics> graphics(vec2 size) override {
   state.bottomZ = 0, state.topZ = 0;
-  for(float z: state.grain.Pz) {
+  /*for(float z: state.grain.Pz) {
    state.bottomZ = min(state.bottomZ, z);
    state.topZ = max(state.topZ, z);
+  }*/
+  for(size_t i: range(state.membrane.count)) {
+   //state.bottomZ = min(state.bottomZ, state.membrane.Pz[i]);
+   state.topZ = max(state.topZ, state.membrane.Pz[i]);
   }
 
   vec4 viewRotation = qmul(angleVector(yawPitch.y, vec3(1,0,0)), angleVector(yawPitch.x, vec3(0,0,1)));
@@ -95,6 +102,7 @@ struct StateView : Widget {
     .translate(vec3(0,0,-(state.bottomZ+state.topZ)/2));
 
   if(state.grain.count) {
+   grainIndices.clear();
    for(int i: range(grainIndices.size, state.grain.count)) grainIndices.append(i);
    buffer<float> grainZ (align(simd, grainIndices.size));
    {
@@ -157,7 +165,7 @@ struct StateView : Widget {
    /*GLBuffer colorBuffer (colors);
    shader.bind("colorBuffer"_, colorBuffer, 1);*/
    // Reduces Z radius to see membrane mesh on/in grain
-   shader["radius"] = float(scale.z/2 * state.grain.radius * 7/8);
+   shader["radius"] = float(scale.z/2 * state.grain.radius); //* 7/8
    shader["hpxRadius"] = 1 / (size.x * scale.x * state.grain.radius);
    vertexArray.draw(Triangles, positions.size);
   }
@@ -205,14 +213,7 @@ struct StateView : Widget {
    }
   }
 #endif
-
-  float maxF = 0;
-  for(size_t i: range(state.membrane.count))
-   maxF = ::max(maxF, length(state.membrane.force(i)));
-  for(size_t i: range(state.forces.size))
-   if(isNumber(length(state.forces[i].force)))
-    maxF = ::max(maxF, length(state.forces[i].force));
-  assert_(isNumber(maxF));
+  const float maxF = max(50000.f, state.maxF);
 
   if(state.membrane.count) {
    if(!indexBuffer) {
@@ -240,7 +241,7 @@ struct StateView : Widget {
    shader.bind();
    shader.bindFragments({"color"});
    shader["transform"] = viewProjection;
-   shader["uColor"] = vec4(black, 1);
+   shader["uColor"] = vec4(white, 1);
    static GLVertexArray vertexArray;
    // FIXME: reuse buffers / no update before pressure
    if(!xBuffer) xBuffer = GLBuffer(state.membrane.Px);
@@ -255,13 +256,17 @@ struct StateView : Widget {
    vertexArray.bind();
    indexBuffer.draw();
 
-   // Membrane force sum
+   // Membrane forces
    if(1) {
     array<vec3> positions;
     float scale = state.membrane.radius/maxF;
-    for(size_t i: range(state.membrane.count)) {
-     positions.append(state.membrane.position(i));
-     positions.append(state.membrane.position(i) + scale*state.membrane.force(i));
+    for(size_t i=1; i<state.membrane.H-1; i++) {
+     int base = state.membrane.margin+i*state.membrane.stride;
+     for(size_t j=0; j<state.membrane.W; j++) {
+      int k = base+j;
+      positions.append(state.membrane.position(k));
+      positions.append(state.membrane.position(k) + scale*state.membrane.force(k));
+     }
     }
     if(positions) {
      static GLShader shader {::shader_glsl(), {"interleaved flat"}};
@@ -376,12 +381,18 @@ struct StateView : Widget {
 
  // Orbital ("turntable") view control
  bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override {
-  if(event == Press) dragStart = {cursor, yawPitch, timeStep};
+  if(event == Press) dragStart = {cursor, yawPitch, value};
   if(event==Motion && button==LeftButton) {
    yawPitch = dragStart.yawPitch + float(2*PI) * (cursor - dragStart.cursor) / size;
    yawPitch.y = clamp<float>(-PI, yawPitch.y, 0);
   }
-  else return false;
+  else if(event==Motion && button==RightButton) {
+   value = clamp<int>(
+      0,
+      int(dragStart.value) + (cursor.x - dragStart.cursor.x) /** maximum / (size.x/2-1)*/,
+      maximum);
+   if(valueChanged) valueChanged(value);
+  } else return false;
   return true;
  }
 };

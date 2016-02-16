@@ -188,6 +188,7 @@ void Simulation::stepGrainBottom() {
   grain->Tz[simd+a] += grainBottomTAz[i];
   bottomForceZ += grainBottomFz[i];
  }
+ assert_(isNumber(bottomForceZ));
  this->bottomForceZ += bottomForceZ;
  bottomSumStepCount++;
  grainBottomSumTime.stop();

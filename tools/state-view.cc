@@ -9,65 +9,84 @@ struct StateViewApp {
  unique<Window> window = ::window(&view, -1, mainThread, true, false);
 
  StateViewApp(string file) : map(file) {
-  load();
-  window->presentComplete = [this]() {
-   if(!running) return;
-   const float dt = 10e-6; // FIXME
-   const float Dt = 1./60;
-   view.timeStep += Dt/dt;
-   if(load()) window->render();
-  };
+  window->backgroundColor = black;
+  view.maximum = load(-1).timeStep;
+  window->presentComplete = {this, &StateViewApp::next};
+  window->actions[Space] = [this]() { running = !running; next(); };
+  window->actions[LeftArrow] = [this]() { show(max(0, int(view.state.timeStep)-1)); };
+  window->actions[RightArrow] = [this]() { show(min(view.maximum, view.state.timeStep+1)); };
+  view.valueChanged = {this, &StateViewApp::show};
  }
- bool load() {
+ void next() {
+  if(!running) return;
+  const float dt = 10e-6; // FIXME
+  const float Dt = 1./60;
+  view.value += Dt/dt;
+  if(view.value >= view.maximum) running = false;
+  show(view.value);
+  if(view.state.maxF > 30000/*N*/) running = false;
+ }
+ void show(size_t timeStep) {
+  view.state = load(timeStep);
+  window->render();
+  window->setTitle(str(view.state.maxF)+"N");
+ }
+ State load(size_t position) {
   BinaryData data(map);
-  size_t t = 0;
-  size_t forceCount;
-  for(;;) {
-   if(data.available(4) < 4) {
-    log("EOF"); assert_(!data, data.available(4)); running=false; return false;
-   }
-   size_t headerStart = data.index;
-   view.state.grain.count = data.read32();
-   view.state.grain.radius = data.readF();
-   view.state.membrane.count = data.read32();
-   view.state.membrane.W = data.read32();
-   view.state.membrane.H = data.read32();
-   view.state.membrane.stride = data.read32();
-   view.state.membrane.margin = data.read32();
-   view.state.membrane.radius = data.readF();
-   forceCount = data.read32();
+  State state;
+  while(data) {
+   state.grain.count = data.read32();
+   state.grain.radius = data.readF();
+   state.membrane.count = data.read32();
+   state.membrane.W = data.read32();
+   state.membrane.H = data.read32();
+   state.membrane.stride = data.read32();
+   state.membrane.margin = data.read32();
+   state.membrane.radius = data.readF();
+   size_t forceCount = 0; //data.read32();
    data.index = align(64, data.index);
-   if(t == view.timeStep) break;
-   data.index += 19*align(64, view.state.grain.count)*sizeof(float);
-   data.index += 9*align(64, view.state.membrane.count)*sizeof(float);
-   data.index += align(64, forceCount*sizeof(State::Force));
-   t++;
+   {
+    auto read = [state, &data](ref<float>& A) {
+     A = data.read<float>(align(64, state.grain.count));
+     A.size = state.grain.count;
+    };
+    read(state.grain.Px); read(state.grain.Py); read(state.grain.Pz);
+    //read(state.grain.Vx); read(state.grain.Vy); read(state.grain.Vz);
+    //read(state.grain.Fx); read(state.grain.Fy); read(state.grain.Fz);
+    read(state.grain.Rx); read(state.grain.Ry); read(state.grain.Rz); read(state.grain.Rw);
+    //read(state.grain.AVx); read(state.grain.AVy); read(state.grain.AVz);
+    //read(state.grain.Tx); read(state.grain.Tx); read(state.grain.Tx);
+   }
+   {
+    auto read = [state, &data](ref<float>& A) {
+     A = data.read<float>(align(64, state.membrane.count));
+     A.size = state.membrane.count;
+    };
+    read(state.membrane.Px); read(state.membrane.Py); read(state.membrane.Pz);
+    //read(state.membrane.Vx); read(state.membrane.Vy); read(state.membrane.Vz);
+    read(state.membrane.Fx); read(state.membrane.Fy); read(state.membrane.Fz);
+   }
+   state.forces = data.read<State::Force>(forceCount);
+   data.index = align(64, data.index);
+   if(state.timeStep == position) {
+    float maxF = 0;
+    /*if(state.membrane.H) {
+     for(size_t i=1; i<state.membrane.H-1; i++) {
+      int base = state.membrane.margin+i*state.membrane.stride;
+      for(size_t j=0; j<state.membrane.W; j++) {
+       int k = base+j;
+       maxF = ::max(maxF, length(state.membrane.force(k)));
+      }
+     }
+    }*/
+    for(size_t i: range(state.forces.size))
+     if(isNumber(length(state.forces[i].force)))
+      maxF = ::max(maxF, length(state.forces[i].force));
+    state.maxF = maxF;
+    break;
+   }
+   state.timeStep++;
   }
-  {
-   auto read = [&](ref<float>& A) {
-    A = data.read<float>(align(64, view.state.grain.count));
-    A.size = view.state.grain.count;
-   };
-#define VSG view.state.grain
-   read(VSG.Px); read(VSG.Py); read(VSG.Pz);
-   read(VSG.Vx); read(VSG.Vy); read(VSG.Vz);
-   read(VSG.Fx); read(VSG.Fy); read(VSG.Fz);
-   read(VSG.Rx); read(VSG.Ry); read(VSG.Rz); read(VSG.Rw);
-   read(VSG.AVx); read(VSG.AVy); read(VSG.AVz);
-   read(VSG.Tx); read(VSG.Tx); read(VSG.Tx);
-  }
-  {
-   auto read = [&](ref<float>& A) {
-    A = data.read<float>(align(64, view.state.membrane.count));
-    A.size = view.state.membrane.count;
-   };
-#define VSM view.state.membrane
-   read(VSM.Px); read(VSM.Py); read(VSM.Pz);
-   read(VSM.Vx); read(VSM.Vy); read(VSM.Vz);
-   read(VSM.Fx); read(VSM.Fy); read(VSM.Fz);
-  }
-  view.state.forces = data.read<State::Force>(forceCount);
-  log(view.state.forces.size);
-  return true;
+  return state;
  }
 } app ( replace(arguments()[0],"/",":")+".dump" );

@@ -82,8 +82,6 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
  /// Window title
  String title;
  function<String()> getTitle;
- /// Background color
- bgr3f backgroundColor = white;
 
  /// Associated window resource (relative to resource ID base Display::id)
  enum Resource { Window, GraphicContext, Colormap, PresentEvent, Segment, Pixmap, Picture, Cursor, CursorPixmap };

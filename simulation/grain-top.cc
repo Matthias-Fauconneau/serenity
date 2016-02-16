@@ -178,7 +178,8 @@ void Simulation::stepGrainTop() {
   grain->Tz[simd+a] += grainTopTAz[i];
   topForceZ -= grainTopFz[i];
  }
- this->topForceZ = topForceZ; // FIXME: average
+ assert_(isNumber(topForceZ));
+ this->topForceZ += topForceZ;
  topSumStepCount++;
  grainTopSumTime.stop();
 }

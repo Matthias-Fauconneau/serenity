@@ -16,8 +16,8 @@ extern array<vec2x3> lines;
 extern array<int> faces;
 extern array<int> cylinders;
 extern array<int> highlightGrains;*/
-struct Force { vec3 origin, force; };
-extern array<Force> forces;
+//struct Force { vec3 origin, force; };
+//extern array<Force> forces;
 
 // High level simulation and contact management
 struct Simulation {
@@ -76,9 +76,9 @@ struct Simulation {
  float currentHeight;
  float pressure = targetPressure;
  size_t lastGrainSpawnTimeStep = 0;
- float grainViscosity = 1-/*1*/32*dt;
+ float grainViscosity = 1-32*dt; //32
  float angularViscosity = 1-1*dt;
- const float targetViscosity = 1-1./3; //512*dt; //1./3; //1-256/*8*/*dt;
+ const float targetViscosity = 1-1./4; //-512*dt;  // 8-256
  float wireViscosity = 1-1*dt;
  float membraneViscosity = 0;
  float membraneRadius;

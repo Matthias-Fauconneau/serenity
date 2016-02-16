@@ -2,8 +2,8 @@
 /// \file simd.h SIMD intrinsics (SSE, AVX, ...)
 #include "core.h"
 
-#if 1
-
+#define SIMD 1
+#if !SIMD
 static inline float load(const float* a, int index) { return a[index]; }
 static inline float loadu(const float* a, int index) { return a[index]; }
 static inline float gather(const float* a, int index) { return a[index]; }
@@ -19,6 +19,7 @@ static float unused _1f = 1;
 static inline float min(float x) { return x; }
 static inline float max(float x) { return x; }
 static inline int convert(float x) { return x; } // Rounds to -∞
+static inline float rcp(float x) { return 1/x; }
 static inline float rsqrt(float x) { return 1/sqrt(x); }
 
 static inline bool lessThan(float a, float b) { return a < b; }

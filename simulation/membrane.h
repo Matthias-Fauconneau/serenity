@@ -6,7 +6,7 @@ struct Membrane {
 
  sconst float density = 1000 * kg / cb(m);
  sconst float curvature = 0;
- sconst float shearModulus = 0.1/*3*/ * MPa;
+ sconst float shearModulus = 3 * MPa;
  sconst float poissonRatio = 0.48;
  sconst float elasticModulus = 2*shearModulus*(1+poissonRatio);
 
@@ -22,7 +22,7 @@ struct Membrane {
  const int H = ceil(exactHeight/cellHeight)+1;
  const float height = (H-1) * cellHeight;
  sconst float thickness = 0.05 * mm;
- const float tensileStrength = 1680/*1-1680*/ * MPa;
+ const float tensileStrength = 1680 * MPa;
  const float mass = sqrt(3.)/2 * sq(internodeLength) * thickness * density;
  const float tensionStiffness = sqrt(3.)/2 * internodeLength * thickness * tensileStrength;
  const float tensionDamping = 1 * sqrt(mass * tensionStiffness);

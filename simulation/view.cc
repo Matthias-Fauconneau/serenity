@@ -123,7 +123,7 @@ struct SimulationView : Widget {
    //GLBuffer colorBuffer (colors);
    //shader.bind("colorBuffer"_, colorBuffer, 1);
    // Reduces Z radius to see membrane mesh on/in grain
-   shader["radius"] = float(scale.z/2 * simulation.grain->radius * 7/8);
+   shader["radius"] = float(scale.z/2 * simulation.grain->radius); // * 7/8
    shader["hpxRadius"] = 1 / (size.x * scale.x * simulation.grain->radius);
    vertexArray.draw(Triangles, positions.size);
   }
@@ -169,6 +169,18 @@ struct SimulationView : Widget {
     vertexArray.draw(Triangles, positions.size);
    }
   }
+
+  float maxF = 0;
+  /*for(int i=1; i<simulation.membrane->H-1; i++) {
+   int base = simulation.membrane->margin+i*simulation.membrane->stride;
+   for(int j=0; j<simulation.membrane->W; j++) {
+    int k = base+j;
+    maxF = ::max(maxF, length(simulation.membrane->force(k)));
+   }
+  }*/
+  /*for(size_t i: range(forces.size))
+   //if(isNumber(length(forces[i].force)))
+   maxF = ::max(maxF, length(forces[i].force));*/
 
   if(simulation.processState < Simulation::Released && simulation.membrane->count) {
    if(!indexBuffer) {
@@ -217,13 +229,14 @@ struct SimulationView : Widget {
    // Membrane forces
    {
     array<vec3> positions;
-    float maxF = 0;
-    for(size_t i: range(simulation.membrane->count))
-     maxF = ::max(maxF, length(simulation.membrane->force(i)));
     float scale = simulation.membrane->radius/maxF;
-    for(size_t i: range(simulation.membrane->count)) {
-     positions.append(simulation.membrane->position(i));
-     positions.append(simulation.membrane->position(i) + scale*simulation.membrane->force(i));
+    for(int i=1; i<simulation.membrane->H-1; i++) {
+     int base = simulation.membrane->margin+i*simulation.membrane->stride;
+     for(int j=0; j<simulation.membrane->W; j++) {
+      int k = base+j;
+      positions.append(simulation.membrane->position(k));
+      positions.append(simulation.membrane->position(k) + scale*simulation.membrane->force(k));
+     }
     }
     if(positions) {
      static GLShader shader {::shader_glsl(), {"interleaved flat"}};
@@ -241,6 +254,33 @@ struct SimulationView : Widget {
    }
   }
 
+#if 0
+  // Forces
+  {
+   array<vec3> positions;
+   float scale = simulation.membrane->radius/maxF;
+   for(size_t i: range(forces.size)) {
+    //if(isNumber(state.forces[i].force)) {
+     positions.append(forces[i].origin);
+     positions.append(forces[i].origin - scale*forces[i].force);
+    //}
+   }
+   if(positions) {
+    static GLShader shader {::shader_glsl(), {"interleaved flat"}};
+    shader.bind();
+    shader.bindFragments({"color"});
+    shader["transform"] = viewProjection;
+    shader["uColor"] = vec4(1,0,0, 1/*./2*/);
+    static GLVertexArray vertexArray;
+    GLBuffer positionBuffer (positions);
+    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
+    extern float lineWidth; lineWidth = 1/*./2*/;
+    glBlendAlpha();
+    vertexArray.draw(Lines, positions.size);
+   }
+  }
+#endif
+#if 0
   // Lines
   if(0) {
    static GLShader shader {::shader_glsl(), {"interleaved flat"}};
@@ -305,6 +345,7 @@ struct SimulationView : Widget {
    vertexArray.bindAttribute(shader.attribLocation("position"_), 3, Float, positionBuffer);
    vertexArray.draw(Triangles, positions.size);*/
   }
+#endif
 
   renderTime.stop();
   return shared<Graphics>();

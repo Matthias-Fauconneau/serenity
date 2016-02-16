@@ -2,6 +2,9 @@
 #include "membrane.h"
 #include "parallel.h"
 
+#define MEMBRANE_LATTICE 0
+#define MEMBRANE_LATTICE_3 0
+
 static inline void membraneTensionPressure(const float* const Px, const float* const Py, const float* const Pz,
                                            const float* const Vx, const float* const Vy, const float* const Vz,
                                            float* const Fx, float* const Fy, float* const Fz,

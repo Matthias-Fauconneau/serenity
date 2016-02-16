@@ -22,7 +22,7 @@ Lock lock;
 array<int> highlightGrains;
 array<int> faces;
 array<int> cylinders;*/
-array<Force> forces;
+//array<Force> forces;
 
 Simulation::Simulation(const Dict& p) :
   triaxial(p.value("triaxial", "0"_)!="0"_),
@@ -36,12 +36,12 @@ Simulation::Simulation(const Dict& p) :
    ),
   grain(p.value("grainRadius", validation ? 2.5f : 20)*mm,
            p.value("grainDensity", validation ? 7.8e3 : 1.4e3)*kg/cb(m),
-           p.value("grainShearModulus", validation ? /*10000*//*77000*/50000 : 30)*MPa,
+           p.value("grainShearModulus", validation ? 77000 : 30)*MPa,
            p.value("grainPoissonRatio", validation ? 0.28 : 0.35)*1,
            p.value("grainWallThickness", validation ? 0 : 0.4)*mm,
            targetGrainCount),
   membrane((float)p.value("Radius", validation ? 50 : 100)*mm,
-           validation ? grain->radius*(1-1./4) : (grain->radius?:20*mm),
+           validation ? grain->radius*2 : (grain->radius?:20*mm), // resolution
            validation ? 4 : 2.5),
   wire(grain->radius/2?:10*mm),
   targetDynamicGrainObstacleFrictionCoefficient(validation? 0.228 : 1),
@@ -49,8 +49,8 @@ Simulation::Simulation(const Dict& p) :
   targetDynamicGrainGrainFrictionCoefficient(validation ? 0.096 : 1),
   targetDynamicWireGrainFrictionCoefficient(3./2),
   targetDynamicWireBottomFrictionCoefficient(1),
-  targetStaticFrictionSpeed((float)p.value("sfSpeed", validation ? 0.1 : 0.05/*0.1*/)*m/s),
-  targetStaticFrictionLength((float)p.value("sfLength", validation ? 1e-3f : 4e-4f/*1e-3f*/)*m),
+  targetStaticFrictionSpeed((float)p.value("sfSpeed", validation ? 0.05 : 0.05/*0.1*/)*m/s),
+  targetStaticFrictionLength((float)p.value("sfLength", validation ? 4e-4f : 4e-4f/*1e-3f*/)*m),
   targetStaticFrictionStiffness((float)p.value("sfStiffness", validation ? 4e3f : 4e3f)/m),
   targetStaticFrictionDamping((float)p.value("sfDamping", 1)*N/(m/s)),
   Gz(-(float)p.value("G", validation?4000:10.f)*N/kg),
@@ -200,6 +200,58 @@ void Simulation::step() {
  wireBottomTotalTime.start();
  stepWireBottom();
  wireBottomTotalTime.stop();
+
+ float height = topZ-bottomZ;
+ float strain = 1-height/topZ0;
+ if(processState == Load && strain>0.08 && 0) { // Records state after force evaluation before integration
+  if(dump && dump.size()/*FIXME: without stat*/ > 4ul<<30) dump = File(); // Closes dump to reset if >4G
+  if(!dump) {
+   String name = replace(arguments()[0],"/",":");
+   dump = File(name+".dump", /*currentWorkingDirectory()*/"/dev/shm"_, Flags(WriteOnly|Create|Truncate));
+  }
+  buffer<byte> header (64, 0);
+  header.append(raw(grain->count));
+  header.append(raw(grain->radius));
+  header.append(raw(uint(membrane->count)));
+  header.append(raw(membrane->W));
+  header.append(raw(membrane->H));
+  header.append(raw(membrane->stride));
+  header.append(raw(membrane->margin));
+  header.append(raw(membrane->radius));
+#if 0
+  header.append(raw(uint(forces.size)));
+#else
+  header.append(raw(uint(0)));
+#endif
+  header.size = 64;
+  dump.write(header);
+  {
+   auto write = [this](const buffer<float>& A) {
+    assert_(simd+align(64, grain->count) <= A.capacity, A.size, A.capacity, align(64, A.size));
+    dump.write(cast<byte>(ref<float>(A.data+simd, align(64, grain->count))));
+   };
+   write(grain->Px); write(grain->Py); write(grain->Pz);
+   //write(grain->Vx); write(grain->Vy); write(grain->Vz);
+   //write(grain->Fx); write(grain->Fy); write(grain->Fz);
+   write(grain->Rx); write(grain->Ry); write(grain->Rz); write(grain->Rw);
+   //write(grain->AVx); write(grain->AVy); write(grain->AVz);
+   //write(grain->Tx); write(grain->Ty); write(grain->Tz);
+  }
+  { // TODO: compact? (no margin, stride=W)
+   auto write = [this](const buffer<float>& A) {
+    assert_(A.size == membrane->count);
+    assert_(align(64, A.size) <= A.capacity, A.size, A.capacity, align(64, A.size));
+    dump.write(cast<byte>(ref<float>(A.data, align(64, A.size))));
+   };
+   write(membrane->Px); write(membrane->Py); write(membrane->Pz);
+   //write(membrane->Vx); write(membrane->Vy); write(membrane->Vz);
+   write(membrane->Fx); write(membrane->Fy); write(membrane->Fz);
+  }
+  /*auto forces = cast<byte>(::forces);
+  dump.write(ref<byte>(forces.data, align(64, forces.size)));*/
+ }
+ //::forces.clear();
+
  stepWireIntegration();
 
  if(grain->count) {
@@ -350,52 +402,6 @@ void Simulation::run() {
   if(stop) break;
   for(int unused t: range(256)) {
    step();
-   if(!dump) {
-    String name = replace(arguments()[0],"/",":");
-    dump = File(name+".dump", currentWorkingDirectory(), Flags(WriteOnly|Create|Truncate));
-   }
-   buffer<byte> header (64, 0);
-   assert_(grain->count < 1<<16);
-   header.append(raw(grain->count));
-   header.append(raw(grain->radius));
-   assert_(uint(membrane->count) < 1<<16);
-   header.append(raw(uint(membrane->count)));
-   header.append(raw(membrane->W));
-   header.append(raw(membrane->H));
-   header.append(raw(membrane->stride));
-   header.append(raw(membrane->margin));
-   header.append(raw(membrane->radius));
-   assert_(forces.size < 1<<16);
-   header.append(raw(uint(forces.size)));
-   assert_(header.size == 9*sizeof(int));
-   header.size = 64;
-   dump.write(header);
-   {
-    auto write = [this](const buffer<float>& A) {
-     assert_(simd+align(64, grain->count) <= A.capacity, A.size, A.capacity, align(64, A.size));
-     dump.write(cast<byte>(ref<float>(A.data+simd, align(64, grain->count))));
-    };
-    write(grain->Px); write(grain->Py); write(grain->Pz);
-    write(grain->Vx); write(grain->Vy); write(grain->Vz);
-    write(grain->Fx); write(grain->Fy); write(grain->Fz);
-    write(grain->Rx); write(grain->Ry); write(grain->Rz); write(grain->Rw);
-    write(grain->AVx); write(grain->AVy); write(grain->AVz);
-    write(grain->Tx); write(grain->Ty); write(grain->Tz);
-   }
-   { // TODO: compact? (no margin, stride=W)
-       auto write = [this](const buffer<float>& A) {
-        assert_(A.size == membrane->count);
-        assert_(align(64, A.size) <= A.capacity, A.size, A.capacity, align(64, A.size));
-        dump.write(cast<byte>(ref<float>(A.data, align(64, A.size))));
-       };
-       write(membrane->Px); write(membrane->Py); write(membrane->Pz);
-       write(membrane->Vx); write(membrane->Vy); write(membrane->Vz);
-       write(membrane->Fx); write(membrane->Fy); write(membrane->Fz);
-   }
-   assert_(sizeof(Force) == 6*sizeof(float));
-   auto forces = cast<byte>(::forces);
-   dump.write(ref<byte>(forces.data, align(64, forces.size)));
-   ::forces.clear();
    if(fail) return;
   }
   if(timeStep%65536 == 0) {
