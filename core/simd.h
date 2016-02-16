@@ -2,7 +2,57 @@
 /// \file simd.h SIMD intrinsics (SSE, AVX, ...)
 #include "core.h"
 
-#if __INTEL_COMPILER && __MIC__
+#if 1
+
+static inline float load(const float* a, int index) { return a[index]; }
+static inline float loadu(const float* a, int index) { return a[index]; }
+static inline float gather(const float* a, int index) { return a[index]; }
+static inline void store(float* const a, int index, float v) { *(float*)(a+index) = v; }
+static inline void storeu(float* const a, int index, float v) { *(float*)(a+index) = v; }
+static inline void scatter(float* const P, const int i, const float x) { P[i] = x; }
+
+static inline float extract(float x, int) { return x; }
+
+static float unused _0f = 0;
+static float unused _1f = 1;
+
+static inline float min(float x) { return x; }
+static inline float max(float x) { return x; }
+static inline int convert(float x) { return x; } // Rounds to -∞
+static inline float rsqrt(float x) { return 1/sqrt(x); }
+
+static inline bool lessThan(float a, float b) { return a < b; }
+static inline bool greaterThan(float a, float b) { return a > b; }
+static inline bool greaterThanOrEqual(float a, float b) { return a >= b; }
+static inline bool notEqual(float a, float b) { return a != b; }
+static inline bool equal(float a, float b) { return a == b; }
+
+static inline float blend(bool k, float a, float b) { return k ? b : a; }
+static inline void maskStore(float* p, bool k, float a) { if(k) p[0] = a; }
+static inline float mask3_fmadd(float a, float b, float c, bool k) { return k ? a*b + c : c; }
+static inline float maskSub(float a, bool k, float b) { return k ? a - b : a; }
+
+static inline int load(const int* a, int index) { return a[index]; }
+static inline int gather(const int* a, int index) { return a[index]; }
+
+static int unused _0i  = 0;
+static int unused _1i  = 1;
+static int unused _seqi  = 0;
+
+static inline void scatter(int* const P, const int i, const int x) { P[i] = x; }
+static inline int extract(int x, int) { return x; }
+static inline uint countBits(bool k) { return k; }
+static inline void compressStore(int* p, bool k, int a) { if(k) *p = a; }
+static inline void insert(int& x, int, int v) { x = v; }
+
+static constexpr int simd = 1; // SIMD size
+typedef float vXsf;
+typedef int vXsi;
+typedef bool maskX;
+inline float floatX(float x) { return x; }
+inline int intX(int x) { return x; }
+
+#elif __INTEL_COMPILER && __MIC__
 typedef int v16si __attribute((__vector_size__ (64)));
 inline v16si intX(int x) { return (v16si){x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x}; }
 static v16si unused _0i = intX(0);

@@ -93,7 +93,9 @@ void Simulation::stepWireTension() {
  wireTensionTime.stop();
 }
 
-inline vXsf andnot(v8si a, vXsf b) { return (vXsf)(~a & (vXsi)b); }
+#if 1
+#else
+inline vXsf andnot(vXsi a, vXsf b) { return (vXsf)(~a & (vXsi)b); }
 inline vXsf abs(vXsf a) { return andnot(signBit, a); }
 static vXsf PIX = floatX(PI);
 static vXsf PI2 = floatX(PI/2);
@@ -113,6 +115,7 @@ inline vXsf atan(vXsf y /*>0*/, vXsf x) {
     const vXsf shift2 = (vXsf)(~(XgtY & Xgt0) & (vXsi)shift1); // |x|>|y| & x>0 ? 0
     return atan + shift2;
 }
+#endif
 
 void Simulation::stepWireBendingResistance() {
  if((!wire->bendStiffness && !wire->bendDamping) || wire->count < 2) return;

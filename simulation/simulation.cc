@@ -386,7 +386,6 @@ void Simulation::run() {
        write(membrane->Vx); write(membrane->Vy); write(membrane->Vz);
        write(membrane->Fx); write(membrane->Fy); write(membrane->Fz);
    }
-   log(forces.size);
    dump.write(cast<byte>(forces));
    forces.clear();
    if(fail) return;

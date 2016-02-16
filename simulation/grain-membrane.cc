@@ -383,6 +383,10 @@ static inline void evaluateGrainMembrane(const int start, const int size,
   const vXsf NFy = Fn * Ny;
   const vXsf NFz = Fn * Nz;
 
+  for(size_t k: range(simd)) // FIXME: ignore pad
+   forces.append(vec3(extract(Ax-Rx, k), extract(Ay-Ry, k), extract(Az-Rz, k)),
+                 vec3(extract(NFx, k), extract(NFy, k), extract(NFz, k)));
+
   // Dynamic friction
   // Tangent relative velocity
   const vXsf RVn = Nx*RVx + Ny*RVy + Nz*RVz;
@@ -580,9 +584,9 @@ void Simulation::stepGrainMembrane() {
                                + convert(scale*(Mx-minX)); // FIXME: Clang miscompiles ?
      for(int n: range(3*3)) for(int i: range(3)) {
       //log(n, i , latticeNeighbours[n]+i, index);
-#if 1
+#if 0
    if(1) for(int k: range(simd))
-    if(!(index[k] >= 0/*-(base-lattice.cells.data)*/ && index[k]<int(lattice.base.size))) {
+    if(!(extract(index, k) >= 0/*-(base-lattice.cells.data)*/ && index[k]<int(lattice.base.size))) {
      log("index[k] >= 0/*-(base-lattice.cells.data)*/ && index[k]<int(lattice.base.size)",
             "\n#", i+k, "/", grain->count,
             "@", index[k], "<", /*base-lattice.cells.data*/0,

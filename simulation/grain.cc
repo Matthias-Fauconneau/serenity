@@ -37,7 +37,7 @@ void Simulation::grainLattice() {
    vXsi index = convert(scale*(Az-minZ)) * sizeYX
      + convert(scale*(Ay-minY)) * sizeX
      + convert(scale*(Ax-minX));
-#if 1
+#if 0
    if(1) for(int k: range(simd))
     assert_(index[k] >= -(base-lattice.cells.data) && index[k]<int(lattice.base.size),
             "\n#", i+k, "/", grain->count,
@@ -117,7 +117,7 @@ void Simulation::stepGrainIntegration() {
    const vXsf Fx = load(pFx, i), Fy = load(pFy, i), Fz = load(pFz, i);
    vXsf Vx = load(pVx, i), Vy = load(pVy, i), Vz = load(pVz, i);
    vXsf Px = load(pPx, i), Py = load(pPy, i), Pz = load(pPz, i);
-#if 1
+#if 0
    if(triaxial || validation) for(int k: range(simd)) {
     if(!(sqrt(Fx*Fx + Fy*Fy + Fz*Fz)[k] < 10000*N &&
          sqrt(Vx*Vx + Vy*Vy + Vz*Vz)[k] < 100*m/s &&

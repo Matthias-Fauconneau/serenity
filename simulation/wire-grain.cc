@@ -223,6 +223,7 @@ void Simulation::stepWireGrain() {
                         + convert(scale*(Ay-minY)) * sizeX
                         + convert(scale*(Ax-minX));
      for(int n: range(3*3)) for(int i: range(3)) {
+#if 0
       if(1) for(int k: range(simd)) {
        if(!((latticeNeighbours[n]-lattice.base.data)+index[k]+i >= -(lattice.base.data-lattice.cells.data)
             && (latticeNeighbours[n]-lattice.base.data)+index[k]+i<int(lattice.base.size))) {
@@ -231,6 +232,7 @@ void Simulation::stepWireGrain() {
         return;
        }
       }
+#endif
       const vXsi b = gather(latticeNeighbours[n]+i, index);
       //if(1) for(int k: range(simd)) assert_(b[k] >= -1 && b[k] < grain->count, b[k]);
       const vXsf Bx = gather(gPx, b), By = gather(gPy, b), Bz = gather(gPz, b);
