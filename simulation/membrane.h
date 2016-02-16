@@ -29,7 +29,7 @@ struct Membrane {
  //sconst float areaMomentOfInertia = pow4(1*mm); // FIXME
  //const float bendStiffness = 0;//elasticModulus * areaMomentOfInertia / internodeLength; // FIXME
 
- const size_t capacity = H*stride;
+ const size_t capacity = align(64, H*stride);
  const size_t count = capacity;
  buffer<float> Px { capacity };
  buffer<float> Py { capacity };

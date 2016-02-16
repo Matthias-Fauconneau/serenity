@@ -355,19 +355,24 @@ void Simulation::run() {
     dump = File(name+".dump", currentWorkingDirectory(), Flags(WriteOnly|Create|Truncate));
    }
    buffer<byte> header (64, 0);
+   assert_(grain->count < 1<<16);
    header.append(raw(grain->count));
    header.append(raw(grain->radius));
-   header.append(raw(membrane->count)); // 8
+   assert_(uint(membrane->count) < 1<<16);
+   header.append(raw(uint(membrane->count)));
    header.append(raw(membrane->W));
    header.append(raw(membrane->H));
    header.append(raw(membrane->stride));
    header.append(raw(membrane->margin));
    header.append(raw(membrane->radius));
-   header.append(raw(forces.size)); // 8
+   assert_(forces.size < 1<<16);
+   header.append(raw(uint(forces.size)));
+   assert_(header.size == 9*sizeof(int));
    header.size = 64;
    dump.write(header);
    {
     auto write = [this](const buffer<float>& A) {
+     assert_(simd+align(64, grain->count) <= A.capacity, A.size, A.capacity, align(64, A.size));
      dump.write(cast<byte>(ref<float>(A.data+simd, align(64, grain->count))));
     };
     write(grain->Px); write(grain->Py); write(grain->Pz);
@@ -380,14 +385,17 @@ void Simulation::run() {
    { // TODO: compact? (no margin, stride=W)
        auto write = [this](const buffer<float>& A) {
         assert_(A.size == membrane->count);
+        assert_(align(64, A.size) <= A.capacity, A.size, A.capacity, align(64, A.size));
         dump.write(cast<byte>(ref<float>(A.data, align(64, A.size))));
        };
        write(membrane->Px); write(membrane->Py); write(membrane->Pz);
        write(membrane->Vx); write(membrane->Vy); write(membrane->Vz);
        write(membrane->Fx); write(membrane->Fy); write(membrane->Fz);
    }
-   dump.write(cast<byte>(forces));
-   forces.clear();
+   assert_(sizeof(Force) == 6*sizeof(float));
+   auto forces = cast<byte>(::forces);
+   dump.write(ref<byte>(forces.data, align(64, forces.size)));
+   ::forces.clear();
    if(fail) return;
   }
   if(timeStep%65536 == 0) {

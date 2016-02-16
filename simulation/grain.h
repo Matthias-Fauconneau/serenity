@@ -40,7 +40,7 @@ struct Grain {
  Grain(float radius, float density, float shearModulus, float poissonRatio, float thickness, size_t capacity)
   : density(density), shearModulus(shearModulus), poissonRatio(poissonRatio),
     radius(radius), volume(4./3*PI*cb(radius)), mass(density*4*PI*sq(radius)*(thickness?:radius/3)),
-    capacity(align(simd, capacity+simd)) {
+    capacity(simd+align(64, capacity)) {
   Px.clear(0); Py.clear(0); Pz.clear(0);
   Vx.clear(0); Vy.clear(0); Vz.clear(0);
   Fx.clear(0); Fy.clear(0); Fz.clear(0);

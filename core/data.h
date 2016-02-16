@@ -19,7 +19,10 @@ struct Data {
  /// Creates a Data interface to a \a buffer
  Data(::buffer<byte>&& buffer) : data(buffer), buffer(::move(buffer)) {}
  /// Slices a reference to the buffer from \a index to \a index + \a size
- inline ref<byte> slice(size_t pos, size_t size) const { return data.slice(pos,size); }
+ inline ref<byte> slice(size_t pos, size_t size) const {
+     assert_(pos+size<=data.size, pos, size, data.size);
+     return data.slice(pos, size);
+ }
  inline ref<byte> sliceRange(size_t begin, size_t end) const { return data.sliceRange(begin, end); }
  /// Slices a reference to the buffer from \a index to the end of the data
  inline ref<byte> slice(size_t pos) const { return data.slice(pos); }
@@ -32,7 +35,7 @@ struct Data {
  /// Returns next byte without advancing
  inline byte peek() const { assert(index<data.size, index, data.size); return data[index];}
  /// Peeks at data without advancing
- byte operator[](int i) const { assert(index+i<data.size); return data[index+i]; }
+ byte operator[](size_t i) const { assert(index+i<data.size); return data[index+i]; }
  /// Returns a reference to the next \a size bytes
  inline ref<byte> peek(size_t size) const { return slice(index,size); }
 

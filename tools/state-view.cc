@@ -23,21 +23,24 @@ struct StateViewApp {
   size_t t = 0;
   size_t forceCount;
   for(;;) {
-   if(!data) { log("EOF"); running=false; return false; }
+   if(data.available(4) < 4) {
+    log("EOF"); assert_(!data, data.available(4)); running=false; return false;
+   }
+   size_t headerStart = data.index;
    view.state.grain.count = data.read32();
    view.state.grain.radius = data.readF();
-   view.state.membrane.count = data.read64();
+   view.state.membrane.count = data.read32();
    view.state.membrane.W = data.read32();
    view.state.membrane.H = data.read32();
    view.state.membrane.stride = data.read32();
    view.state.membrane.margin = data.read32();
    view.state.membrane.radius = data.readF();
-   forceCount = data.read64();
+   forceCount = data.read32();
    data.index = align(64, data.index);
    if(t == view.timeStep) break;
    data.index += 19*align(64, view.state.grain.count)*sizeof(float);
    data.index += 9*align(64, view.state.membrane.count)*sizeof(float);
-   data.index += forceCount*sizeof(State::Force);
+   data.index += align(64, forceCount*sizeof(State::Force));
    t++;
   }
   {
