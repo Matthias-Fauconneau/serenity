@@ -14,14 +14,15 @@ extern Lock lock;
 /*struct vec2x3 { vec3 a, b; };
 extern array<vec2x3> lines;
 extern array<int> faces;
-extern array<int> cylinders;
-extern array<int> highlightGrains;*/
+extern array<int> cylinders;*/
+extern array<int> highlightGrains;
 //struct Force { vec3 origin, force; };
 //extern array<Force> forces;
 
 // High level simulation and contact management
 struct Simulation {
- const bool triaxial, validation;
+ //const bool triaxial, validation;
+ static constexpr bool triaxial = true, validation = true;
 
  const float dt;
  size_t timeStep = 0;
@@ -76,9 +77,9 @@ struct Simulation {
  float currentHeight;
  float pressure = targetPressure;
  size_t lastGrainSpawnTimeStep = 0;
- float grainViscosity = 1-32*dt; //32
+ float grainViscosity = 1-2*dt;
  float angularViscosity = 1-1*dt;
- const float targetViscosity = 1-1./4; //-512*dt;  // 8-256
+ const float targetViscosity = 1-2*dt;
  float wireViscosity = 1-1*dt;
  float membraneViscosity = 0;
  float membraneRadius;

@@ -18,16 +18,16 @@ constexpr string Simulation::processStates[];
 
 bool fail = false;
 Lock lock;
-/*array<vec2x3> lines;
+//array<vec2x3> lines;
 array<int> highlightGrains;
-array<int> faces;
-array<int> cylinders;*/
+//array<int> faces;
+//array<int> cylinders;
 //array<Force> forces;
 
 Simulation::Simulation(const Dict& p) :
-  triaxial(p.value("triaxial", "0"_)!="0"_),
-  validation(p.value("validation", "0"_)!="0"_),
-  dt((float)p.value("TimeStep", validation ? 1e-6 : 4e-6)*s),
+  /*triaxial(p.value("triaxial","1"_)!="0"_),
+  validation(p.value("validation","1"_)!="0"_),*/
+  dt((float)p.value("TimeStep", validation ? 1e-6 : 1e-6)*s),
   normalDampingRate((float)p.value("nDamping",validation ? 1./2 : 1.f)*1),
   targetGrainCount(
    p.value("grainRadius", validation ? 2.5f : 20) != 0 ?
@@ -41,7 +41,7 @@ Simulation::Simulation(const Dict& p) :
            p.value("grainWallThickness", validation ? 0 : 0.4)*mm,
            targetGrainCount),
   membrane((float)p.value("Radius", validation ? 50 : 100)*mm,
-           validation ? grain->radius*2 : (grain->radius?:20*mm), // resolution
+           validation ? grain->radius/**2*/ : (grain->radius?:20*mm), // resolution
            validation ? 4 : 2.5),
   wire(grain->radius/2?:10*mm),
   targetDynamicGrainObstacleFrictionCoefficient(validation? 0.228 : 1),
@@ -49,11 +49,11 @@ Simulation::Simulation(const Dict& p) :
   targetDynamicGrainGrainFrictionCoefficient(validation ? 0.096 : 1),
   targetDynamicWireGrainFrictionCoefficient(3./2),
   targetDynamicWireBottomFrictionCoefficient(1),
-  targetStaticFrictionSpeed((float)p.value("sfSpeed", validation ? 0.05 : 0.05/*0.1*/)*m/s),
-  targetStaticFrictionLength((float)p.value("sfLength", validation ? 4e-4f : 4e-4f/*1e-3f*/)*m),
+  targetStaticFrictionSpeed((float)p.value("sfSpeed", validation ? 100/*50*/ : 50/*100*/)*mm/s),
+  targetStaticFrictionLength((float)p.value("sfLength", validation ? 1/*0.4*/ : 0.4/*1*/)*mm),
   targetStaticFrictionStiffness((float)p.value("sfStiffness", validation ? 4e3f : 4e3f)/m),
   targetStaticFrictionDamping((float)p.value("sfDamping", 1)*N/(m/s)),
-  Gz(-(float)p.value("G", validation?4000:10.f)*N/kg),
+  Gz(-(float)p.value("G", validation?10000:10.f)*N/kg),
   verticalSpeed(p.value("verticalSpeed", validation ? 2 : 0.05f)*m/s),
   linearSpeed(p.value("linearSpeed",1.f)*m/s),
   targetPressure((float)p.value("Pressure", 80e3f)*Pa),
@@ -79,6 +79,8 @@ Simulation::Simulation(const Dict& p) :
   wire->Vx[i] = 0; wire->Vy[i] = 0; wire->Vz[i] = 0;
   winchAngle += wire->internodeLength / currentWinchRadius;
  }
+ // Keeps a bit of grain membrane friction to damp full solid rotation
+ dynamicGrainMembraneFrictionCoefficient = 0.1;
  if(!triaxial) {
   dynamicGrainObstacleFrictionCoefficient = targetDynamicGrainObstacleFrictionCoefficient;
   dynamicGrainMembraneFrictionCoefficient = targetDynamicGrainMembraneFrictionCoefficient;
@@ -404,7 +406,7 @@ void Simulation::run() {
    step();
    if(fail) return;
   }
-  if(timeStep%65536 == 0) {
+  if(timeStep%4096 == 0) {
    profile();
    if(processState == Pour) log(grain->count, "/", targetGrainCount);
    if(processState == Pressure) log(
@@ -427,7 +429,11 @@ void Simulation::run() {
     String name = replace(arguments()[0],"/",":");
     pressureStrain = File(name, currentWorkingDirectory(), Flags(WriteOnly|Create|Truncate));
     {
-     String line = "version:"+str(VERSION)+",voidRatio:"+str(voidRatio)+"\n";
+     String line = "version:"+str(VERSION)+",voidRatio:"+str(voidRatio)+
+       ",sfSpeed:"+str(targetStaticFrictionSpeed)+
+       ",sfLength:"+str(targetStaticFrictionLength)+
+       ",sfStiffness:"+str(targetStaticFrictionStiffness)+
+       ",sfDamping:"+str(targetStaticFrictionDamping)+"\n";
      log_(line);
      if(pressureStrain) pressureStrain.write(line);
     }

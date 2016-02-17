@@ -211,7 +211,6 @@ void Simulation::stepGrainGrain() {
    const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
    const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
    const vXsf sqVerletDistanceX = floatX(sq(verletDistance));
-   const vXsi _1i = intX(-1);
    for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
     vXsi a = intX(i)+_seqi;
     const vXsf Ax = load(gPx, i), Ay = load(gPy, i), Az = load(gPz, i);
@@ -238,7 +237,6 @@ void Simulation::stepGrainGrain() {
    const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
    const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
    const vXsf sqVerletDistanceX = floatX(sq(verletDistance));
-   const vXsi _1i = intX(-1);
    uint i=grain->count/simd*simd;
    vXsi a = intX(i)+_seqi;
    maskX valid = lessThan(a, intX(grain->count));

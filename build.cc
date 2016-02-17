@@ -178,7 +178,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
  args.append("-g"__);
  if(flags.contains("profile")) args.append("-finstrument-functions"__);
  for(string flag: flags) {
-  if(flag=="native"_||flag=="haswell"_||flag=="core_avx2"_||flag=="sandybridge"_)
+  if(flag=="native"_||flag=="haswell"_||flag=="core_avx2"_||flag=="sandybridge"_||flag=="core_avx_i"_)
    args.append("-march="+replace(flag,'_','-'));
  }
  if(flags.contains("mic"_)) {

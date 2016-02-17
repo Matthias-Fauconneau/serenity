@@ -520,9 +520,8 @@ static inline void evaluateGrainMembrane(const int start, const int size,
 
 void Simulation::stepGrainMembrane() {
  if(!grain->count || !membrane->count) return;
- //grainMembraneGlobalMinD = 0; // DEBUG
+ grainMembraneGlobalMinD = 0; // DEBUG
  if(grainMembraneGlobalMinD <= 0)  {
-#if MEMBRANE_LATTICE
   grainLattice();
 
   const int X = lattice.size.x, Y = lattice.size.y;
@@ -539,7 +538,6 @@ void Simulation::stepGrainMembrane() {
    lattice.base.data+(X*Y-1),
    lattice.base.data+(X*Y+X-1)
   };
-#endif
 
   const float verletDistance = 2*grain->radius/sqrt(3.); //FIXME: - grain->radius/*Face bounding radius*/;
   assert_(verletDistance > grain->radius + 0);
@@ -583,11 +581,9 @@ void Simulation::stepGrainMembrane() {
     const int W = membrane->W;
     const int stride = membrane->stride;
     const int base = membrane->margin+rowIndex*stride;
-#if MEMBRANE_LATTICE
     const vXsf scale = floatX(lattice.scale);
     const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
     const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
-#endif
 #if MEMBRANE_FACE
     int e0, e1;
     if(I==0) { // (.,0,1)
@@ -617,73 +613,31 @@ void Simulation::stepGrainMembrane() {
      const vXsf e1x = B2x-B0x;
      const vXsf e1y = B2y-B0y;
      const vXsf e1z = B2z-B0z;
-#if MEMBRANE_LATTICE && !MEMBRANE_LATTICE_3
-     // FIXME: Assumes triangle is small enough
-     const vXsf Mx = (B0x+B1x+B2x)*floatX(1./3);
-     const vXsf My = (B0y+B1y+B2y)*floatX(1./3);
-     const vXsf Mz = (B0z+B1z+B2z)*floatX(1./3);
-#endif
 #else
      const vXsf Mx = B0x;
      const vXsf My = B0y;
      const vXsf Mz = B0z;
 #endif
-#if MEMBRANE_LATTICE
-#if MEMBRANE_LATTICE_3
-     for(int p: range(3)) {
-      const vXsf Mx = (vXsf[]){B0x,B1x,B2x}[p];
-      const vXsf My = (vXsf[]){B0y,B1y,B2y}[p];
-      const vXsf Mz = (vXsf[]){B0z,B1z,B2z}[p];
-      const vXsi index = convert(scale*(Mz-minZ)) * sizeYX
-        + convert(scale*(My-minY)) * sizeX
-        + convert(scale*(Mx-minX)); // FIXME: Clang miscompiles ?
-#else
-     {
-      const vXsi index = convert(scale*(Mz-minZ)) * sizeYX
-        + convert(scale*(My-minY)) * sizeX
-        + convert(scale*(Mx-minX)); // FIXME: Clang miscompiles ?
-#endif
-      for(int n: range(3*3)) for(int i: range(3)) {
-       //log(n, i , latticeNeighbours[n]+i, index);
-#if 1
-       if(1) for(int k: range(simd))
-        if(!(extract(index, k) >= 0/*-(base-lattice.cells.data)*/ && extract(index, k)<int(lattice.base.size))) {
-         log("index[k] >= 0/*-(base-lattice.cells.data)*/ && index[k]<int(lattice.base.size)",
-             "\n#", i+k, "/", grain->count,
-             "@", extract(index, k), "<", /*base-lattice.cells.data*/0,
-             "size", lattice.size,
-             "min", extract(minX, k), extract(minY, k), extract(minZ, k),
-             "X", extract(Mx, k), extract(My, k), extract(Mz, k),
-             "V", grain->Vx[simd+i+k], grain->Vy[simd+i+k], grain->Vz[simd+i+k],
-           "F", grain->Fx[simd+i+k], grain->Fy[simd+i+k], grain->Fz[simd+i+k]
-           /*,"//",
-          "X", Ax[k] /m, Ay[k] /m, Az[k] /m,
-          "V", grain->Vx[simd+i+k] /(m/s), grain->Vy[simd+i+k] /(m/s), grain->Vz[simd+i+k] /(m/s),
-          "F", grain->Fx[simd+i+k] /N, grain->Fy[simd+i+k] /N, grain->Fz[simd+i+k] /N*/
-           );
-         fail = true;
-         return;
-        }
-#endif
-       const vXsi A = gather(latticeNeighbours[n]+i, index);
-#else
-     {
-      for(int a: range(grain->count)) {
-       const vXsi A = intX(a);
-#endif
-       const vXsf Ax = gather(gPx, A), Ay = gather(gPy, A), Az = gather(gPz, A);
-       const vXsf Rx = Ax-B0x, Ry = Ay-B0y, Rz = Az-B0z;
-       maskX mask = notEqual(A, _1i) & lessThan(
-   #if MEMBRANE_FACE
-          pointTriangleDistance(Rx, Ry, Rz, e0x, e0y, e0z, e1x, e1y, e1z), sqVerletDistance);
-#else
-          Rx*Rx + Ry*Ry + Rz*Rz, sqVerletDistance);
-#endif
-       uint targetIndex = contactCount.fetchAdd(countBits(mask));
-       compressStore(gmA+targetIndex, mask, A);
-       compressStore(gmB+targetIndex, mask, B);
-      }
-     }
+#define search(N) { \
+     const vXsf Mx = B##N##x; \
+     const vXsf My = B##N##y; \
+     const vXsf Mz = B##N##z;\
+     const vXsi index = convert(scale*(Mz-minZ)) * sizeYX \
+       + convert(scale*(My-minY)) * sizeX \
+       + convert(scale*(Mx-minX)); \
+     for(int n: range(3*3)) for(int i: range(3)) { \
+       const vXsi A = gather(latticeNeighbours[n]+i, index); \
+       const vXsf Ax = gather(gPx, A), Ay = gather(gPy, A), Az = gather(gPz, A); \
+       const vXsf Rx = Ax-B0x, Ry = Ay-B0y, Rz = Az-B0z; \
+       maskX mask = notEqual(A, _1i) & lessThan( \
+          pointTriangleDistance(Rx, Ry, Rz, e0x, e0y, e0z, e1x, e1y, e1z), sqVerletDistance); \
+       uint targetIndex = contactCount.fetchAdd(countBits(mask)); \
+       compressStore(gmA+targetIndex, mask, A); \
+       compressStore(gmB+targetIndex, mask, B); \
+      } \
+    }
+     search(0) search(1) search(2)
+#undef search
    }
   };
   grainMembraneSearchTime += parallel_for(1, membrane->H, search);
@@ -812,7 +766,7 @@ for(size_t I: range(1+MEMBRANE_FACE)) { // Face type
  gm.TAz.size = GWcc;
  gm.U.size = GWcc;
  gm.V.size = GWcc;
- const float E = 1/((1-sq(grain->poissonRatio))/grain->elasticModulus+(1-sq(grain->poissonRatio))/grain->elasticModulus);
+ const float E = 1/((1-sq(grain->poissonRatio))/grain->elasticModulus+(1-sq(membrane->poissonRatio))/membrane->elasticModulus);
  const float R = 1/(grain->curvature+Membrane::curvature);
  const float K = 4./3*E*sqrt(R);
  const float mass = 1/(1/grain->mass+1/membrane->mass);

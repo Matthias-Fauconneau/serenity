@@ -215,7 +215,6 @@ void Simulation::stepWireGrain() {
     const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
     const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
     const vXsf sqVerletDistanceX = floatX(sq(verletDistance));
-    const vXsi _1i = intX(-1);
     for(uint i=start*simd; i<(start+size)*simd; i+=simd) {
      const vXsi a = intX(i)+_seqi;
      const vXsf Ax = load(wPx, i), Ay = load(wPy, i), Az = load(wPz, i);
@@ -255,7 +254,6 @@ void Simulation::stepWireGrain() {
    const vXsf minX = floatX(lattice.min.x), minY = floatX(lattice.min.y), minZ = floatX(lattice.min.z);
    const vXsi sizeX = intX(lattice.size.x), sizeYX = intX(lattice.size.y * lattice.size.x);
    const vXsf sqVerletDistanceX = floatX(sq(verletDistance));
-   const vXsi _1i = intX(-1);
    uint i=wire->count/simd*simd;
    const vXsi a = intX(i)+_seqi;
    maskX valid = lessThan(a, intX(wire->count));

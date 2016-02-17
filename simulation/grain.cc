@@ -105,6 +105,7 @@ void Simulation::stepGrainIntegration() {
   const vXsf _16 = floatX(16);
   const vXsf _dt2 = floatX(sq(this->dt));
   const vXsf _4_dt = floatX(4/this->dt);
+  const vXsf angularViscosity = floatX(this->angularViscosity);
   vXsf maxGrainVX2 = _0f;
   const float* pFx = grain->Fx.data+simd, *pFy = grain->Fy.data+simd, *pFz = grain->Fz.data+simd;
   const float* pTx = grain->Tx.begin()+simd, *pTy = grain->Ty.begin()+simd, *pTz = grain->Tz.begin()+simd;
@@ -212,11 +213,17 @@ void Simulation::stepGrainIntegration() {
    maxGrainVX2 = max(maxGrainVX2, Vx*Vx + Vy*Vy + Vz*Vz);
 
    {
-    vXsf AVx = load(pAVx, i), AVy = load(pAVy, i), AVz = load(pAVz, i);
-    vXsf Rx = load(pRx, i), Ry = load(pRy, i), Rz = load(pRz, i), Rw = load(pRw, i);
-    const vXsf W1x = AVx + dt_angularMass * load(pTx, i);
-    const vXsf W1y = AVy + dt_angularMass * load(pTy, i);
-    const vXsf W1z = AVz + dt_angularMass * load(pTz, i);
+    const vXsf AVx = load(pAVx, i), AVy = load(pAVy, i), AVz = load(pAVz, i);
+    const vXsf Rx = load(pRx, i), Ry = load(pRy, i), Rz = load(pRz, i), Rw = load(pRw, i);
+    const vXsf W1x = angularViscosity * (AVx + dt_angularMass * load(pTx, i));
+    const vXsf W1y = angularViscosity * (AVy + dt_angularMass * load(pTy, i));
+    const vXsf W1z = angularViscosity * (AVz + dt_angularMass * load(pTz, i));
+#if 0
+    const vXsf Qx = Rx + dt_2 * (Rw * Rx + AVy*Rz - Ry*AVz);
+    const vXsf Qy = Ry + dt_2 * (Rw * Ry + AVz*Rx - Rz*AVx);
+    const vXsf Qz = Rz + dt_2 * (Rw * Rz + AVx*Ry - Rx*AVy);
+    const vXsf Qw = Rw + dt_2 * -(AVx*Rx + AVy*Ry + AVz*Rz);
+#else
     // Mid point
     const vXsf Wx = _1_2 * (AVx+W1x);
     const vXsf Wy = _1_2 * (AVy+W1y);
@@ -230,6 +237,7 @@ void Simulation::stepGrainIntegration() {
     const vXsf Qx =  S * (+Wx*Bw +_4_dt*Bx     -Wz*By     +Wy*Bz);
     const vXsf Qy =  S * (+Wy*Bw    +Wz*Bx +_4_dt*By      -Wx*Bz);
     const vXsf Qz =  S * (+Wz*Bw    -Wy*Bx      +Wx*By +_4_dt*Bz);
+#endif
     store(pAVx, i, W1x);
     store(pAVy, i, W1y);
     store(pAVz, i, W1z);

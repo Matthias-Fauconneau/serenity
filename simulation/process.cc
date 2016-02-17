@@ -20,7 +20,7 @@ void Simulation::stepProcess() {
  //pressure = 0; membraneViscosity = 1-1000*dt; // DEBUG
  // Process
  if(targetGrainCount && (grain->count == targetGrainCount || processState > Pour ||
-                         int(lastGrainSpawnTimeStep) < int(timeStep)-int(0.01/dt))) {
+                         int(lastGrainSpawnTimeStep) < int(timeStep)-int(/*0.01*/0.008/dt))) {
   //if(!useMembrane) return;
   //log("processState = Release");
   if(!triaxial) processState = Release;

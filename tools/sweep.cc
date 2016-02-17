@@ -22,24 +22,22 @@ struct ParameterSweep {
    if(queued ) log("Queued jobs:["+str(queuedCount)+"]: qdel -f"+queued+" &");
   }
   size_t done = 0, running = 0, queued = 0;\
-  //parameters["nDamping"__] = "1"__;
-  //parameters["mDensity"__] = "1"__; // Unused
   for(string dt: {"1"_}) {
    parameters["TimeStep"__] = String(dt+"µ");
-   for(string plateSpeed: {"1"_,"10"_}) {
+   for(string plateSpeed: {"10"_/*,"100"_*/}) {
     parameters["Speed"__] = plateSpeed; // mm/s
     for(int pressure: {80}) {
      parameters["Pressure"__] = String(str(pressure)+"K"_); // Pa
      for(float radius: {50}) {
       parameters["Radius"__] = radius; //mm
-      for(string staticFrictionSpeed: {"10"_,"100"_}) {
+      for(string staticFrictionSpeed: {"100"_}) {
        parameters["sfSpeed"__] = staticFrictionSpeed; // mm/s
-       for(string staticFrictionLength: {"1µ"_,"10µ"_}) {
-        parameters["sfLength"__] = staticFrictionLength; // m
-        for(string staticFrictionStiffness: {"1M"_}) {
+       for(string staticFrictionLength: {"1"_}) {
+        parameters["sfLength"__] = staticFrictionLength; // mm
+        for(string staticFrictionStiffness: {"4K"_}) {
          parameters["sfStiffness"__] = staticFrictionStiffness;
-         for(string staticFrictionDamping: {"1"_,"10"_}) {
-          parameters["sfDamping"__] = staticFrictionDamping; // ?
+         for(string staticFrictionDamping: {"1"_}) {
+          parameters["sfDamping"__] = staticFrictionDamping; // N/(m/s)
           auto add = [&] {
            String id = str(parameters);
            if(arguments().size > 0 && arguments()[0].contains('=')) {
@@ -91,6 +89,8 @@ struct ParameterSweep {
    else {
     String parameters = missing.take(random%missing.size);
     String name = replace(parameters,':','=');
+    Folder folder("Results", home());
+    if(existsFile(name+".stdout",folder)) remove(name+".stdout",folder);
     if(execute("/opt/ge2011.pleiades/bin/linux-x64/qsub.orig", {
                "-q", "fast.q@@blade04,fast.q@@blade05",
                "-l", "fq=true",
@@ -98,8 +98,8 @@ struct ParameterSweep {
                "-j", "y",
                "-o", "$JOB_NAME.stdout",
                "-b","y",
-               "-pe", "omp", "16",
-               "~/run", parameters}, true, Folder("Results", home()))) { log("Error"); break; }
+               "-pe", "omp", "4",
+               "~/run", parameters}, true, folder)) { log("Error"); break; }
     count++;
    }
   }

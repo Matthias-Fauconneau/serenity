@@ -28,6 +28,6 @@ Dict parameters() {
  return parameters;
 }
 
-struct SimulationView : Simulation {
- SimulationView(const Dict& parameters) : Simulation(parameters) { run(); }
+struct SimulationRun: Simulation {
+ SimulationRun(const Dict& parameters) : Simulation(parameters) { run(); }
 } app (parameters());

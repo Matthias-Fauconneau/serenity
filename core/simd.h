@@ -37,7 +37,7 @@ static inline int load(const int* a, int index) { return a[index]; }
 static inline int gather(const int* a, int index) { return a[index]; }
 
 static int unused _0i  = 0;
-static int unused _1i  = 1;
+static int unused _1i  = -1;
 static int unused _seqi  = 0;
 
 static inline void scatter(int* const P, const int i, const int x) { P[i] = x; }
