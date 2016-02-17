@@ -217,6 +217,19 @@ void Simulation::stepGrainGrain() {
     vXsi index = convert(scale*(Az-minZ)) * sizeYX
                        + convert(scale*(Ay-minY)) * sizeX
                        + convert(scale*(Ax-minX));
+#if 0
+    int* const base = lattice.base.begin();
+   if(1) for(int k: range(simd))
+    assert_(index[k] >= -(base-lattice.cells.data) && index[k]<int(lattice.base.size),
+            "\ngrain.cc\n#", i+k, "/", grain->count,
+            "@", index[k], " ", base-lattice.cells.data, "\n",
+            "size", lattice.size, "\n",
+            "min", minX[k], minY[k], minZ[k], "\n",
+            "X", Ax[k], Ay[k], Az[k], "\n",
+            "max", lattice.max, "\n",
+            "V", grain->Vx[simd+i+k], grain->Vy[simd+i+k], grain->Vz[simd+i+k], "\n",
+            "F", grain->Fx[simd+i+k], grain->Fy[simd+i+k], grain->Fz[simd+i+k], "\n" );
+#endif
     for(uint n: range(62)) {
      vXsi b = gather(latticeNeighbours[n], index);
      const vXsf Bx = gather(gPx, b), By = gather(gPy, b), Bz = gather(gPz, b);
@@ -282,12 +295,13 @@ void Simulation::stepGrainGrain() {
   this->grainGrainSearchTime += grainGrainSearchTime.cycleCount();
   if(!contactCount) return;
 
-  grainGrainRepackFrictionTime.start();
-  parallel_chunk(grainGrainA.size, [&](uint, size_t start, size_t size) {
+  if(dynamicGrainGrainFrictionCoefficient) {
+   grainGrainRepackFrictionTime.start();
+   parallel_chunk(grainGrainA.size, [&](uint, size_t start, size_t size) {
     for(size_t i=start; i<start+size; i++) {
       int a = grainGrainA[i];
       int b = grainGrainB[i];
-      for(int j: range(oldGrainGrainA.size)) {
+      for(int j: range(oldGrainGrainA.size)) { // FIXME: N2
        if(oldGrainGrainA[j] == a && oldGrainGrainB[j] == b) {
         grainGrainLocalAx[i] = oldGrainGrainLocalAx[j];
         grainGrainLocalAy[i] = oldGrainGrainLocalAy[j];
@@ -302,8 +316,9 @@ void Simulation::stepGrainGrain() {
       }
       break_:;
     }
-  });
-  grainGrainRepackFrictionTime.stop();
+   });
+   grainGrainRepackFrictionTime.stop();
+  }
  } else grainGrainSkipped++;
 
  // Filters verlet lists, packing contacts to evaluate

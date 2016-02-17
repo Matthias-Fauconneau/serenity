@@ -162,6 +162,8 @@ void Simulation::stepMembraneIntegration() {
    const vXsf dt_mass = floatX(this->dt / membrane->mass), dt = floatX(this->dt);
 #endif
    const vXsf membraneViscosity = floatX(this->membraneViscosity);
+   const vXsf bottomZ = floatX(this->bottomZ);
+   const vXsf topZ = floatX(this->topZ);
    vXsf maxMembraneVX2 = _0f;
    float* const pFx = membrane->Fx.begin(), *pFy = membrane->Fy.begin(), *pFz = membrane->Fz.begin();
    float* const pVx = membrane->Vx.begin(), *pVy = membrane->Vy.begin(), *pVz = membrane->Vz.begin();
@@ -240,9 +242,10 @@ void Simulation::stepMembraneIntegration() {
     Vx += dt_mass * Fx;
     Vy += dt_mass * Fy;
     Vz += dt_mass * Fz;
-    Vx *= membraneViscosity;
-    Vy *= membraneViscosity;
-    Vz *= membraneViscosity;
+    const vXsf viscosity = blend(lessThan(Pz, topZ) & greaterThan(Pz, bottomZ), _0f, membraneViscosity);
+    Vx *= viscosity;
+    Vy *= viscosity;
+    Vz *= viscosity;
     Px += dt * Vx;
     Py += dt * Vy;
     Pz += dt * Vz;

@@ -136,7 +136,7 @@ struct PlotView : HList<Plot> {
       }
      }
      if(plot.ylabel == "Normalized deviator stress") {
-      float pressure = parameters.at("Pressure");
+      float pressure = parameters.value("Pressure", 80e3);
       ref<float> radial = dataSets.at("Radial (Pa)");
       ref<float> axial = dataSets.at("Axial (Pa)");
       array<float>& ndeviator = dataSets.insert("Normalized deviator stress");
@@ -145,7 +145,7 @@ struct PlotView : HList<Plot> {
       else for(int i: range(ndeviator.size)) ndeviator[i] = (axial[i]-pressure)/pressure;
      }
      if(plot.ylabel == "Stress ratio") {
-      float pressure = parameters.at("Pressure");
+      float pressure = parameters.value("Pressure", 80e3);
       ref<float> radial = dataSets.at("Radial (Pa)");
       ref<float> axial = dataSets.at("Axial (Pa)");
       array<float>& ndeviator = dataSets.insert("Stress ratio");

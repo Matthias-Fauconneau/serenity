@@ -28,7 +28,7 @@ struct ParameterSweep {
     parameters["Speed"__] = plateSpeed; // mm/s
     for(int pressure: {80}) {
      parameters["Pressure"__] = String(str(pressure)+"K"_); // Pa
-     for(float radius: {50}) {
+     for(float radius: {30/*50*/}) {
       parameters["Radius"__] = radius; //mm
       for(string staticFrictionSpeed: {"100"_}) {
        parameters["sfSpeed"__] = staticFrictionSpeed; // mm/s

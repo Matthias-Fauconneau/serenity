@@ -520,7 +520,7 @@ static inline void evaluateGrainMembrane(const int start, const int size,
 
 void Simulation::stepGrainMembrane() {
  if(!grain->count || !membrane->count) return;
- grainMembraneGlobalMinD = 0; // DEBUG
+ //grainMembraneGlobalMinD = 0; // DEBUG
  if(grainMembraneGlobalMinD <= 0)  {
   grainLattice();
 
@@ -618,6 +618,8 @@ void Simulation::stepGrainMembrane() {
      const vXsf My = B0y;
      const vXsf Mz = B0z;
 #endif
+#if 0
+     // FIXME: duplicate contacts
 #define search(N) { \
      const vXsf Mx = B##N##x; \
      const vXsf My = B##N##y; \
@@ -638,6 +640,25 @@ void Simulation::stepGrainMembrane() {
     }
      search(0) search(1) search(2)
 #undef search
+#else
+     // FIXME: Assumes triangle is small enough
+     const vXsf Mx = (B0x+B1x+B2x)*floatX(1./3);
+     const vXsf My = (B0y+B1y+B2y)*floatX(1./3);
+     const vXsf Mz = (B0z+B1z+B2z)*floatX(1./3);
+     const vXsi index = convert(scale*(Mz-minZ)) * sizeYX
+       + convert(scale*(My-minY)) * sizeX
+       + convert(scale*(Mx-minX));
+     for(int n: range(3*3)) for(int i: range(3)) {
+      const vXsi A = gather(latticeNeighbours[n]+i, index);
+      const vXsf Ax = gather(gPx, A), Ay = gather(gPy, A), Az = gather(gPz, A);
+      const vXsf Rx = Ax-B0x, Ry = Ay-B0y, Rz = Az-B0z;
+      maskX mask = notEqual(A, _1i) & lessThan(
+         pointTriangleDistance(Rx, Ry, Rz, e0x, e0y, e0z, e1x, e1y, e1z), sqVerletDistance);
+      uint targetIndex = contactCount.fetchAdd(countBits(mask));
+      compressStore(gmA+targetIndex, mask, A);
+      compressStore(gmB+targetIndex, mask, B);
+     }
+#endif
    }
   };
   grainMembraneSearchTime += parallel_for(1, membrane->H, search);
@@ -766,7 +787,7 @@ for(size_t I: range(1+MEMBRANE_FACE)) { // Face type
  gm.TAz.size = GWcc;
  gm.U.size = GWcc;
  gm.V.size = GWcc;
- const float E = 1/((1-sq(grain->poissonRatio))/grain->elasticModulus+(1-sq(membrane->poissonRatio))/membrane->elasticModulus);
+ const float E = 1/((1-sq(grain->poissonRatio))/grain->elasticModulus+(1-sq(Membrane::poissonRatio))/Membrane::elasticModulus);
  const float R = 1/(grain->curvature+Membrane::curvature);
  const float K = 4./3*E*sqrt(R);
  const float mass = 1/(1/grain->mass+1/membrane->mass);

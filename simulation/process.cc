@@ -20,7 +20,7 @@ void Simulation::stepProcess() {
  //pressure = 0; membraneViscosity = 1-1000*dt; // DEBUG
  // Process
  if(targetGrainCount && (grain->count == targetGrainCount || processState > Pour ||
-                         int(lastGrainSpawnTimeStep) < int(timeStep)-int(/*0.01*/0.008/dt))) {
+                         int(lastGrainSpawnTimeStep) < int(timeStep)-int(/*0.01*/0.004/dt))) {
   //if(!useMembrane) return;
   //log("processState = Release");
   if(!triaxial) processState = Release;
@@ -57,15 +57,15 @@ void Simulation::stepProcess() {
     processState = Pressure;
    }
    if(processState == Pressure) {
-    if(pressure < targetPressure) pressure += 100 * targetPressure * dt;
-    if(pressure > targetPressure) pressure = targetPressure;
+    /*if(pressure < targetPressure) pressure += 100 * targetPressure * dt;
+    if(pressure > targetPressure)*/ pressure = targetPressure;
    }
    //pressure=targetPressure; //assert_(pressure== targetPressure, pressure, targetPressure);
-   if(membraneViscosity < targetViscosity) membraneViscosity += 50 * dt;
-   if(membraneViscosity > targetViscosity) {
+   /*if(membraneViscosity < targetViscosity) membraneViscosity += 50 * dt;
+   if(membraneViscosity > targetViscosity) {*/
     membraneViscosity = targetViscosity;
     log("membraneViscosity", membraneViscosity);
-   }
+   //}
   } else { // Displaces plates with constant velocity
    pressure = targetPressure;
    if(processState < Load) {
@@ -191,7 +191,7 @@ void Simulation::stepProcess() {
       grain->Pz[simd+i] = newPosition.z;
       grain->Vx[simd+i] = 0;
       grain->Vy[simd+i] = 0;
-      grain->Vz[simd+i] = 0;
+      grain->Vz[simd+i] = - 1 * m/s;
 #if GEAR
       for(size_t n: range(3)) { grain->PDx[n][i] = 0; grain->PDy[n][i] = 0; grain->PDz[n][i] = 0; }
 #endif

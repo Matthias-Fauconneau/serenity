@@ -37,21 +37,17 @@ void Simulation::grainLattice() {
    vXsi index = convert(scale*(Az-minZ)) * sizeYX
      + convert(scale*(Ay-minY)) * sizeX
      + convert(scale*(Ax-minX));
-#if 0
+#if DEBUG
    if(1) for(int k: range(simd))
     assert_(index[k] >= -(base-lattice.cells.data) && index[k]<int(lattice.base.size),
             "\n#", i+k, "/", grain->count,
-            "@", index[k], "<", base-lattice.cells.data,
-            "size", lattice.size,
-            "min", minX[k], minY[k], minZ[k],
-            "X", Ax[k], Ay[k], Az[k],
-            "V", grain->Vx[simd+i+k], grain->Vy[simd+i+k], grain->Vz[simd+i+k],
-      "F", grain->Fx[simd+i+k], grain->Fy[simd+i+k], grain->Fz[simd+i+k],
-      "//",
-      "X", Ax[k] /m, Ay[k] /m, Az[k] /m,
-      "V", grain->Vx[simd+i+k] /(m/s), grain->Vy[simd+i+k] /(m/s), grain->Vz[simd+i+k] /(m/s),
-      "F", grain->Fx[simd+i+k] /N, grain->Fy[simd+i+k] /N, grain->Fz[simd+i+k] /N
-      );
+            "@", index[k], " ", base-lattice.cells.data, "\n",
+            "size", lattice.size, "\n",
+            "min", minX[k], minY[k], minZ[k], "\n",
+            "X", Ax[k], Ay[k], Az[k], "\n",
+            "max", lattice.max, "\n",
+            "V", grain->Vx[simd+i+k], grain->Vy[simd+i+k], grain->Vz[simd+i+k], "\n",
+            "F", grain->Fx[simd+i+k], grain->Fy[simd+i+k], grain->Fz[simd+i+k], "\n" );
 #endif
    ::scatter(base, index, a);
   }
@@ -69,6 +65,18 @@ void Simulation::grainLattice() {
   vXsi index = convert(scale*(Az-minZ)) * sizeYX
     + convert(scale*(Ay-minY)) * sizeX
     + convert(scale*(Ax-minX));
+#if DEBUG
+   if(1) for(int k: range(simd))
+    assert_(index[k] >= -(base-lattice.cells.data) && index[k]<int(lattice.base.size),
+            "\ngrain.cc\n#", i+k, "/", grain->count,
+            "@", index[k], " ", base-lattice.cells.data, "\n",
+            "size", lattice.size, "\n",
+            "min", minX[k], minY[k], minZ[k], "\n",
+            "X", Ax[k], Ay[k], Az[k], "\n",
+            "max", lattice.max, "\n",
+            "V", grain->Vx[simd+i+k], grain->Vy[simd+i+k], grain->Vz[simd+i+k], "\n",
+            "F", grain->Fx[simd+i+k], grain->Fy[simd+i+k], grain->Fz[simd+i+k], "\n" );
+#endif
   for(int k: range(grain->count-i)) base[extract(index, k)] = extract(a, k);
  }
 

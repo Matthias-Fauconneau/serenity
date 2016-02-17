@@ -69,7 +69,7 @@ void Simulation::stepGrainTop() {
         goto break_;
        }
       } /*else*/ {
-       grainBottomLocalAx[i] = 0;
+       grainTopLocalAx[i] = 0;
       }
       break_:;
     }

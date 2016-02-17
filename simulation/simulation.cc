@@ -36,7 +36,7 @@ Simulation::Simulation(const Dict& p) :
    ),
   grain(p.value("grainRadius", validation ? 2.5f : 20)*mm,
            p.value("grainDensity", validation ? 7.8e3 : 1.4e3)*kg/cb(m),
-           p.value("grainShearModulus", validation ? 77000 : 30)*MPa,
+           p.value("grainShearModulus", validation ? /*77000*/100 : 30)*MPa,
            p.value("grainPoissonRatio", validation ? 0.28 : 0.35)*1,
            p.value("grainWallThickness", validation ? 0 : 0.4)*mm,
            targetGrainCount),
@@ -53,8 +53,8 @@ Simulation::Simulation(const Dict& p) :
   targetStaticFrictionLength((float)p.value("sfLength", validation ? 1/*0.4*/ : 0.4/*1*/)*mm),
   targetStaticFrictionStiffness((float)p.value("sfStiffness", validation ? 4e3f : 4e3f)/m),
   targetStaticFrictionDamping((float)p.value("sfDamping", 1)*N/(m/s)),
-  Gz(-(float)p.value("G", validation?10000:10.f)*N/kg),
-  verticalSpeed(p.value("verticalSpeed", validation ? 2 : 0.05f)*m/s),
+  Gz(-(float)p.value("G", validation ? 1000 : 10.f)*N/kg),
+  verticalSpeed(p.value("verticalSpeed", validation ? 1 : 0.05f)*m/s),
   linearSpeed(p.value("linearSpeed",1.f)*m/s),
   targetPressure((float)p.value("Pressure", 80e3f)*Pa),
   plateSpeed((float)p.value("Speed", 10)*mm/s),
@@ -68,7 +68,6 @@ Simulation::Simulation(const Dict& p) :
   lattice {sqrt(3.)/(2*grain->radius), vec3(vec2(-latticeRadius), -grain->radius*2),
                                            vec3(vec2(latticeRadius), membrane->height+grain->radius)}
 {
- log(p, Gz, grain->mass);
  assert(str(p).size < 256, str(p).size);
  if(pattern) { // Initial wire node
   size_t i = wire->count++;
@@ -282,7 +281,7 @@ void Simulation::profile() {
   log("grain-wire cycle/grain", (float)wireGrainEvaluateTime/wireGrainContactSizeSum);
   log("grain-wire B/cycle", (float)(wireGrainContactSizeSum*41*4)/wireGrainEvaluateTime);
  }
- log("W", membrane->W, "H", membrane->H, "W*H", membrane->W*membrane->H, grain->count);
+ log("W", membrane->W, "H", membrane->H, "W*H", membrane->W*membrane->H, "G", grain->count);
  const bool reset = false;
  size_t accounted = 0, shown = 0;
  map<uint64, String> profile; profile.reserve(64);
@@ -447,7 +446,7 @@ void Simulation::run() {
     log_(line);
     if(pressureStrain) pressureStrain.write(line);
    }
-   if(strain > 1./8) break;
+   if(strain > 1./9) break;
   }
  }
  totalTime.stop();
