@@ -180,7 +180,7 @@ void Simulation::stepWireBottom() {
   size_t wireBottomI = 0; // Index of first contact with A in old wireBottom[Local]A|B list
   auto search = [&](uint, int start, int size) {
    for(int i=start; i<(start+size); i+=1) { // TODO: SIMD
-     if(wire->Pz[i] > Wire::radius) continue;
+     if(wire->Pz[i] > wire->radius) continue;
      wireBottomA.append( i ); // Wire
      size_t j = wireBottomI;
      if(wireBottomI < oldWireBottomA.size && oldWireBottomA[wireBottomI] == i) {
@@ -226,7 +226,7 @@ void Simulation::stepWireBottom() {
    for(size_t k: range(simd)) {
     size_t j = i+k;
     if(j == wireBottomA.size) break /*2*/;
-    if(extract(Az, k) < bottomZ+Wire::radius) {
+    if(extract(Az, k) < bottomZ+wire->radius) {
      // Creates a map from packed contact to index into unpacked contact list (indirect reference)
      // Instead of packing (copying) the unpacked list to a packed contact list
      // To keep track of where to write back (unpacked) contact positions (for static friction)
@@ -259,17 +259,16 @@ void Simulation::stepWireBottom() {
  wireBottomFy.size = WBcc;
  wireBottomFz.size = WBcc;
  constexpr float E = 1/((1-sq(Wire::poissonRatio))/Wire::elasticModulus+(1-sq(Plate::poissonRatio))/Plate::elasticModulus);
- constexpr float R = 1/(Wire::curvature/*+Plate::curvature*/);
+ const float R = 1/(wire->curvature/*+Plate::curvature*/);
  const float K = 4./3*E*sqrt(R);
  const float mass = 1/(1/wire->mass/*+1/Plate::mass*/);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
- //::simulation = this; // DEBUG
  /*wireBottomEvaluateTime +=*/ parallel_chunk(WBcc/simd, [&](uint, size_t start, size_t size) {
    evaluateWireObstacle(start, size,
                      wireBottomContact.data, //wireBottomContact.size,
                      wireBottomA.data, //wireBottomA.size,
                      wire->Px.data, wire->Py.data, wire->Pz.data,
-                     floatX(bottomZ), floatX(Wire::radius),
+                     floatX(bottomZ), floatX(wire->radius),
                      wireBottomLocalAx.begin(), wireBottomLocalAy.begin(), wireBottomLocalAz.begin(),
                      wireBottomLocalBx.begin(), wireBottomLocalBy.begin(), wireBottomLocalBz.begin(),
                      floatX(K), floatX(Kb),
@@ -285,9 +284,6 @@ void Simulation::stepWireBottom() {
   wire->Fx[i] += wireBottomFx[index];
   wire->Fy[i] += wireBottomFy[index];
   wire->Fz[i] += wireBottomFz[index];
-  /*assert_(length(vec3(wire->Fx[i],wire->Fy[i],wire->Fz[i])) < 100*N,
-          length(vec3(wire->Fx[i],wire->Fy[i],wire->Fz[i]))/N, "WB",
-          index, wireBottomA.size);*/
  }
  wireBottomSumTime.stop();
 }

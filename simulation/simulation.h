@@ -69,7 +69,7 @@ struct Simulation {
  const float loopAngle = PI*(3-sqrt(5.));
 
  // Process variables
- enum ProcessState { Pour, Pressure, Load, Release, Released, Error };
+ enum ProcessState { Pour, Pressure, Load, Release, Released, Done, Error };
  sconst string processStates[] {"pour"_, "pressure"_, "load"_, "release"_, "released"_, "error"_};
  ProcessState processState = Pour;
  ProcessState nextProcessState = Pour;

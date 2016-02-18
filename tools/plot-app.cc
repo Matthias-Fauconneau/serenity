@@ -162,7 +162,8 @@ struct PlotView : HList<Plot> {
      plot.dataSets.keys.insertAt(i, str(parameters,", "_));
      plot.dataSets.values.insertAt(i, map<float,float>{::move(dataSets.at(plot.xlabel)), ::move(dataSets.at(plot.ylabel))});*/
      plot.dataSets.insert(str(parameters,", "_), {::move(dataSets.at(plot.xlabel)), ::move(dataSets.at(plot.ylabel))});
-     if(plot.ylabel=="Normalized deviator stress") { plot.min.y = 0; plot.max.y = 1; }
+     //if(plot.ylabel=="Normalized deviator stress") { plot.min.y = 0; plot.max.y = 1; }
+     plot.min.y = 0; plot.max.y = 0.5;
     }
    }
   }

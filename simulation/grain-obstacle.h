@@ -11,9 +11,7 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
                            float* const grainObstacleLocalBx, float* const grainObstacleLocalBy, float* const grainObstacleLocalBz,
                            const vXsf K, const vXsf Kb,
                            const vXsf staticFrictionStiffness, const vXsf frictionCoefficient,
-#if !MIDLIN
                            const vXsf staticFrictionLength, const vXsf staticFrictionSpeed, const vXsf staticFrictionDamping,
-#endif
                            const float* AVx, const float* AVy, const float* AVz,
                            const float* pAAVx, const float* pAAVy, const float* pAAVz,
                            const float* pAQX, const float* pAQY, const float* pAQZ, const float* pAQW,
@@ -103,28 +101,17 @@ template<bool top> static inline void evaluateGrainObstacle(const size_t start, 
   const vXsf TOy = Dy - Dn * Ny;
   const vXsf TOz = Dz - Dn * Nz;
   const vXsf tangentLength = sqrt(TOx*TOx+TOy*TOy+TOz*TOz);
-#if MIDLIN
-  const vXsf Ks = staticFrictionStiffness * sqrt(depth);
-#else
   const vXsf Ks = staticFrictionStiffness * Fn;
-#endif
   const vXsf Fs = Ks * tangentLength;
   // Spring direction
   const vXsf SDx = TOx / tangentLength;
   const vXsf SDy = TOy / tangentLength;
   const vXsf SDz = TOz / tangentLength;
   const maskX hasTangentLength = greaterThan(tangentLength, _0f);
-#if MIDLIN
-  const maskX hasStaticFriction = lessThan(Fs, frictionCoefficient * Fn);
-  const vXsf sfFt = Fs;
-  // FIXME: static friction does not cumulate but replace dynamic friction
-  // but also static friction spring should not be reset, elongation should only be capped to have fS=fD
-#else
   const vXsf sfFb = staticFrictionDamping * (SDx * RVx + SDy * RVy + SDz * RVz);
   const maskX hasStaticFriction = greaterThan(staticFrictionLength, tangentLength)
                                               & greaterThan(staticFrictionSpeed, tangentRelativeSpeed);
   const vXsf sfFt = maskSub(Fs, hasTangentLength, sfFb);
-#endif
   const vXsf FTx = mask3_fmadd(sfFt, SDx, FDx, hasStaticFriction & hasTangentLength);
   const vXsf FTy = mask3_fmadd(sfFt, SDy, FDy, hasStaticFriction & hasTangentLength);
   const vXsf FTz = mask3_fmadd(sfFt, SDz, FDz, hasStaticFriction & hasTangentLength);

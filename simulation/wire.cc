@@ -17,21 +17,12 @@ void Simulation::stepWire() {
 
 void Simulation::stepWireTension() {
  if(wire->count == 0) return;
- /*if(1) {
-  const int count = wire->count;
-  for(int i=0; i<count-1; i+=simd) {
-   for(size_t k: range(simd)) {
-    if(i+k+1 >= (size_t)count) break;
-    assert_(length(vec3(wFx[i+1+k],wFy[i+1+k],wFz[i+1+k])) < 100*N);
-   }
-  }
- }*/
  wireTensionTime.start();
  const float* const wPx = wire->Px.data, *wPy = wire->Py.data, *wPz = wire->Pz.data;
  const float* const wVx = wire->Vx.data, *wVy = wire->Vy.data, *wVz = wire->Vz.data;
  float* const wFx = wire->Fx.begin(), *wFy = wire->Fy.begin(), *wFz = wire->Fz.begin();
  const vXsf internodeLength = floatX(wire->internodeLength);
- const vXsf tensionStiffness = floatX(Wire::tensionStiffness);
+ const vXsf tensionStiffness = floatX(wire->tensionStiffness);
  const vXsf tensionDamping = floatX(wire->tensionDamping);
  const int count = wire->count;
  for(int i=0; i<count-1; i+=simd) { // TODO: //
@@ -55,40 +46,13 @@ void Simulation::stepWireTension() {
    FTx = blend(mask, _0f, FTx);
    FTy = blend(mask, _0f, FTy);
    FTz = blend(mask, _0f, FTz);
-   //for(size_t k: range(count-1-i, simd)) { FTx[k] = 0; FTy[k] = 0; FTz[k] = 0; }
   }
   store(wFx, i, load(wFx, i) + FTx);
   store(wFy, i, load(wFy, i) + FTy);
   store(wFz, i, load(wFz, i) + FTz);
-  /*if(1) for(size_t k: range(simd)) {
-   if(i+k >= (size_t)count) break;
-   if(!(length(vec3(wFx[i+k],wFy[i+k],wFz[i+k])) < 200*N)) {
-    cylinders.append(i+k);
-    log("i", i, "k", k, "i+k", i+k, "/", count,
-        length(vec3(wFx[i+k],wFy[i+k],wFz[i+k]))/N,"N");
-    log("W0", wFx[i+k]/N,wFy[i+k]/N,wFz[i+k]/N);
-    log(fS[k]/N, fB[k]/N, f[k]/N);
-    fail = true;
-    return;
-   }
-  }*/
   storeu(wFx, i+1, loadu(wFx, i+1) - FTx);
   storeu(wFy, i+1, loadu(wFy, i+1) - FTy);
   storeu(wFz, i+1, loadu(wFz, i+1) - FTz);
-  /*if(1) for(size_t k: range(simd)) {
-   if(i+k+1 >= (size_t)count) break;
-   if(!(length(vec3(wFx[i+1+k],wFy[i+1+k],wFz[i+1+k])) < 100*N) || (i+k+1==255 && wFz[i+k+1] < -15*N)) {
-    cylinders.append(i+1+k);
-    log(i+k+1, count, "W1\n",
-      "F", vec3(wFx[i+1+k]/N,wFy[i+1+k]/N,wFz[i+1+k]/N),
-       length(vec3(wFx[i+1+k],wFy[i+1+k],wFz[i+1+k]))/N, "\n",
-      "FT", FTx[k], FTy[k], FTz[k], "\n",
-      "V", wVx[i+1+k],wFy[i+1+k],wFz[i+1+k],"\n",
-      "P", wPx[i+1+k],wPy[i+1+k],wPz[i+1+k]);
-    fail = true;
-    return;
-   }
-  }*/
  }
  wireTensionTime.stop();
 }

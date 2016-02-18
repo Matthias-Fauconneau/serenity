@@ -22,22 +22,22 @@ struct ParameterSweep {
    if(queued ) log("Queued jobs:["+str(queuedCount)+"]: qdel -f"+queued+" &");
   }
   size_t done = 0, running = 0, queued = 0;\
-  for(string dt: {"1"_}) {
+  for(string dt: {"0.5"_}) {
    parameters["TimeStep"__] = String(dt+"µ");
-   for(string plateSpeed: {"10"_/*,"100"_*/}) {
+   for(string plateSpeed: {"20"_}) {
     parameters["Speed"__] = plateSpeed; // mm/s
     for(int pressure: {80}) {
      parameters["Pressure"__] = String(str(pressure)+"K"_); // Pa
-     for(float radius: {30/*50*/}) {
+     for(float radius: {40}) {
       parameters["Radius"__] = radius; //mm
-      for(string staticFrictionSpeed: {"100"_}) {
+      /*for(string staticFrictionSpeed: {"50"_}) {
        parameters["sfSpeed"__] = staticFrictionSpeed; // mm/s
-       for(string staticFrictionLength: {"1"_}) {
+       for(string staticFrictionLength: {"0.4"_}) {
         parameters["sfLength"__] = staticFrictionLength; // mm
-        for(string staticFrictionStiffness: {"4K"_}) {
+        for(string staticFrictionStiffness: {"1K"_}) {
          parameters["sfStiffness"__] = staticFrictionStiffness;
          for(string staticFrictionDamping: {"1"_}) {
-          parameters["sfDamping"__] = staticFrictionDamping; // N/(m/s)
+          parameters["sfDamping"__] = staticFrictionDamping; // N/(m/s)*/
           auto add = [&] {
            String id = str(parameters);
            if(arguments().size > 0 && arguments()[0].contains('=')) {
@@ -59,10 +59,10 @@ struct ParameterSweep {
            missing.append(move(id));
           };
           add();
-         }
+         /*}
         }
        }
-      }
+      }*/
      }
     }
    }

@@ -86,9 +86,7 @@ template<int I> static inline void evaluate(const int start, const int size,
                                             float* const pLocalBu, float* const pLocalBv,
                                             const vXsf K, const vXsf Kb,
                                             const vXsf staticFrictionStiffness, const vXsf frictionCoefficient,
-                                            #if !MIDLIN
                                             const vXsf staticFrictionLength, const vXsf staticFrictionSpeed, const vXsf staticFrictionDamping,
-                                            #endif
                                             const float* AVx, const float* AVy, const float* AVz,
                                             const float* pBVx, const float* pBVy, const float* pBVz,
                                             const float* pAAVx, const float* pAAVy, const float* pAAVz,
@@ -269,28 +267,17 @@ template<int I> static inline void evaluate(const int start, const int size,
   const vXsf TOy = Dy - Dn * Ny;
   const vXsf TOz = Dz - Dn * Nz;
   const vXsf tangentLength = sqrt(TOx*TOx+TOy*TOy+TOz*TOz);
-#if MIDLIN
-  const vXsf Ks = staticFrictionStiffness * sqrt(depth);
-#else
   const vXsf Ks = staticFrictionStiffness * Fn;
-#endif
   const vXsf Fs = Ks * tangentLength;
   // Spring direction
   const vXsf SDx = TOx / tangentLength;
   const vXsf SDy = TOy / tangentLength;
   const vXsf SDz = TOz / tangentLength;
   const maskX hasTangentLength = greaterThan(tangentLength, _0f);
-#if MIDLIN
-  const maskX hasStaticFriction = lessThan(Fs, frictionCoefficient * Fn);
-  const vXsf sfFt = Fs;
-  // FIXME: static friction does not cumulate but replace dynamic friction
-  // but also static friction spring should not be reset, elongation should only be capped to have fS=fD
-#else
   const vXsf sfFb = staticFrictionDamping * (SDx * RVx + SDy * RVy + SDz * RVz);
   const maskX hasStaticFriction = greaterThan(staticFrictionLength, tangentLength)
     & greaterThan(staticFrictionSpeed, tangentRelativeSpeed);
   const vXsf sfFt = maskSub(Fs, hasTangentLength, sfFb);
-#endif
   const vXsf FTx = mask3_fmadd(sfFt, SDx, FDx, hasStaticFriction & hasTangentLength);
   const vXsf FTy = mask3_fmadd(sfFt, SDy, FDy, hasStaticFriction & hasTangentLength);
   const vXsf FTz = mask3_fmadd(sfFt, SDz, FDz, hasStaticFriction & hasTangentLength);
@@ -792,9 +779,6 @@ for(size_t I: range(1+MEMBRANE_FACE)) { // Face type
  const float K = 4./3*E*sqrt(R);
  const float mass = 1/(1/grain->mass+1/membrane->mass);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
-#if MIDLIN
- const float Kt = 8 * 1/(1/grain->shearModulus+1/Membrane::shearModulus) * sqrt(R);
-#endif
  grainMembraneEvaluateTime += parallel_chunk(GWcc/simd, [&](uint, size_t start, size_t size) {
   #if MEMBRANE_FACE
   #define evaluate(I) \
@@ -808,12 +792,8 @@ for(size_t I: range(1+MEMBRANE_FACE)) { // Face type
    gm.localAx.begin(), gm.localAy.begin(), gm.localAz.begin(), \
    gm.localBu.begin(), gm.localBv.begin(), \
    floatX(K), floatX(Kb), \
-   /*#if MIDLIN*/ \
-   /*floatX(Kt), floatX(dynamicGrainMembraneFrictionCoefficient),*/ \
-   /*#else*/ \
    floatX(staticFrictionStiffness), floatX(dynamicGrainMembraneFrictionCoefficient), \
    floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping), \
-   /*#endif \*/ \
    grain->Vx.data+simd, grain->Vy.data+simd, grain->Vz.data+simd, \
    membrane->Vx.data, membrane->Vy.data, membrane->Vz.data, \
    grain->AVx.data+simd, grain->AVy.data+simd, grain->AVz.data+simd, \

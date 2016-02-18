@@ -11,9 +11,7 @@ static inline void evaluateGrainGrain(const int start, const int size,
                                      float* const grainGrainLocalBx, float* const grainGrainLocalBy, float* const grainGrainLocalBz,
                                      const vXsf K, const vXsf Kb,
                                      const vXsf staticFrictionStiffness, const vXsf frictionCoefficient,
-#if !MIDLIN
                                       const vXsf staticFrictionLength, const vXsf staticFrictionSpeed, const vXsf staticFrictionDamping,
-#endif
                                      const float* AVx, const float* AVy, const float* AVz,
                                      const float* BVx, const float* BVy, const float* BVz,
                                      const float* pAAVx, const float* pAAVy, const float* pAAVz,
@@ -116,28 +114,17 @@ static inline void evaluateGrainGrain(const int start, const int size,
   const vXsf TOy = Dy - Dn * Ny;
   const vXsf TOz = Dz - Dn * Nz;
   const vXsf tangentLength = sqrt(TOx*TOx+TOy*TOy+TOz*TOz);
-#if MIDLIN
-  const vXsf Ks = staticFrictionStiffness * sqrt(depth);
-#else
   const vXsf Ks = staticFrictionStiffness * Fn;
-#endif
   const vXsf Fs = Ks * tangentLength; // 0.1~1 fN
   // Spring direction
   const vXsf SDx = TOx / tangentLength;
   const vXsf SDy = TOy / tangentLength;
   const vXsf SDz = TOz / tangentLength;
   const maskX hasTangentLength = greaterThan(tangentLength, _0f);
-#if MIDLIN
-  const maskX hasStaticFriction = lessThan(Fs, frictionCoefficient * Fn);
-  const vXsf sfFt = Fs;
-  // FIXME: static friction does not cumulate but replace dynamic friction
-  // but also static friction spring should not be reset, elongation should only be capped to have fS=fD
-#else
   const vXsf sfFb = staticFrictionDamping * (SDx * RVx + SDy * RVy + SDz * RVz);
   const maskX hasStaticFriction = greaterThan(staticFrictionLength, tangentLength)
                                               & greaterThan(staticFrictionSpeed, tangentRelativeSpeed);
   const vXsf sfFt = maskSub(Fs, hasTangentLength, sfFb);
-#endif
   const vXsf FTx = mask3_fmadd(sfFt, SDx, FDx, hasStaticFriction & hasTangentLength);
   const vXsf FTy = mask3_fmadd(sfFt, SDy, FDy, hasStaticFriction & hasTangentLength);
   const vXsf FTz = mask3_fmadd(sfFt, SDz, FDz, hasStaticFriction & hasTangentLength);
@@ -396,10 +383,7 @@ void Simulation::stepGrainGrain() {
  const float K = 4./3*E*sqrt(R);
  const float mass = 1/(1/grain->mass+1/grain->mass);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
-#if MIDLIN
- const float Kt = 8 * 1/(1/grain->shearModulus+1/grain->shearModulus) * sqrt(R);
-#endif
- auto evaluate = [this, K, Kb/*, Kt*/](uint, int start, int size) {
+ auto evaluate = [this, K, Kb](uint, int start, int size) {
   evaluateGrainGrain(start, size,
                      grainGrainContact.data,
                      grainGrainA.data, grainGrainB.data,
@@ -408,12 +392,8 @@ void Simulation::stepGrainGrain() {
                      grainGrainLocalAx.begin(), grainGrainLocalAy.begin(), grainGrainLocalAz.begin(),
                      grainGrainLocalBx.begin(), grainGrainLocalBy.begin(), grainGrainLocalBz.begin(),
                      floatX(K), floatX(Kb),
-#if MIDLIN
-                     floatX(Kt), floatX(dynamicGrainGrainFrictionCoefficient),
-#else
                      floatX(staticFrictionStiffness), floatX(dynamicGrainGrainFrictionCoefficient),
                      floatX(staticFrictionLength), floatX(staticFrictionSpeed), floatX(staticFrictionDamping),
-#endif
                      grain->Vx.data+simd, grain->Vy.data+simd, grain->Vz.data+simd,
                      grain->Vx.data+simd, grain->Vy.data+simd, grain->Vz.data+simd,
                      grain->AVx.data+simd, grain->AVy.data+simd, grain->AVz.data+simd,

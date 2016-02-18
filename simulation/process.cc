@@ -20,7 +20,7 @@ void Simulation::stepProcess() {
  //pressure = 0; membraneViscosity = 1-1000*dt; // DEBUG
  // Process
  if(targetGrainCount && (grain->count == targetGrainCount || processState > Pour ||
-                         int(lastGrainSpawnTimeStep) < int(timeStep)-int(/*0.01*/0.004/dt))) {
+                         int(lastGrainSpawnTimeStep) < int(timeStep)-int(0.004/dt))) {
   //if(!useMembrane) return;
   //log("processState = Release");
   if(!triaxial) processState = Release;
@@ -123,8 +123,8 @@ void Simulation::stepProcess() {
     end = vec2((R-r)*cos(A)+r*cos(a),(R-r)*sin(A)+r*sin(a));
     winchAngle += linearSpeed/r * dt;
    } else error("Unknown pattern:", int(pattern));
-   float z = currentHeight+grain->radius+Wire::radius; // Over pour
-   //float z = currentHeight-grain->radius-Wire::radius; // Under pour
+   float z = currentHeight+grain->radius+wire->radius; // Over pour
+   //float z = currentHeight-grain->radius-wire->radius; // Under pour
    vec3 relativePosition = vec3(end.x, end.y, z) - wire->position(wire->count-1);
    float length = ::length(relativePosition);
    if(length >= wire->internodeLength && wire->count < (int)wire->capacity) {
@@ -132,7 +132,7 @@ void Simulation::stepProcess() {
     vec3 newPosition = wire->position(wire->count-1) + wire->internodeLength/length * relativePosition;
     // Without grain overlap
     for(size_t index: range(grain->count))
-     if(::length(grain->position(index) - newPosition) < grain->radius+Wire::radius) {
+     if(::length(grain->position(index) - newPosition) < grain->radius+wire->radius) {
       //log("Grain blocks wire trajectory");
       return;
      }
@@ -175,14 +175,12 @@ void Simulation::stepProcess() {
        maxTZ[id] = max(maxTZ[id], max(maxZ));
       });
       for(size_t k: range(threadCount)) newPosition.z = ::max(newPosition.z, maxTZ[k]);
-      // for(size_t k: range(threadCount)) log(k, maxTZ[k]);
-      //log(newPosition.z);
      }
      // Under current wire drop height
      if(newPosition.z < currentHeight) {
       // Without wire overlap
       for(size_t index: range(wire->count))
-       if(length(wire->position(index) - newPosition) < grain->radius+Wire::radius) return;
+       if(length(wire->position(index) - newPosition) < grain->radius+wire->radius) return;
 
       size_t i = grain->count;
       assert_(newPosition.z >= grain->radius);
@@ -203,13 +201,6 @@ void Simulation::stepProcess() {
       grain->Ry[simd+i] = cos(t0)*sin(t1)*sin(t2);
       grain->Rz[simd+i] = cos(t1)*sin(t2);
       grain->Rw[simd+i] = cos(t2);
-      //log(i, grain->Pz[simd+i]);
-      /*if(arguments().contains("rotation")) {
-       //grain->Pz[simd+i] = random()*membrane->height;
-       grain->Vx[simd+i] = random();
-       grain->Vy[simd+i] = random();
-       grain->Vz[simd+i] = random();
-      }*/
       lastGrainSpawnTimeStep = timeStep;
       grain->count++;
       {

@@ -28,11 +28,11 @@ Simulation::Simulation(const Dict& p) :
   /*triaxial(p.value("triaxial","1"_)!="0"_),
   validation(p.value("validation","1"_)!="0"_),*/
   dt((float)p.value("TimeStep", validation ? 1e-6 : 1e-6)*s),
-  normalDampingRate((float)p.value("nDamping",validation ? 1./2 : 1.f)*1),
+  normalDampingRate((float)p.value("nDamping",1/*1./2*/)*1),
   targetGrainCount(
    p.value("grainRadius", validation ? 2.5f : 20) != 0 ?
      (4*PI*cb((float)p.value("Radius", validation ? 50 : 100)*mm)
-   / (4./3*PI*cb(p.value("grainRadius", validation ? 2.5f : 20)*mm))) / (1+0.60/*2*//*611*/)/*-60*/ : 0
+   / (4./3*PI*cb(p.value("grainRadius", validation ? 2.5f : 20)*mm))) / 1.5 : 0
    ),
   grain(p.value("grainRadius", validation ? 2.5f : 20)*mm,
            p.value("grainDensity", validation ? 7.8e3 : 1.4e3)*kg/cb(m),
@@ -43,38 +43,42 @@ Simulation::Simulation(const Dict& p) :
   membrane((float)p.value("Radius", validation ? 50 : 100)*mm,
            validation ? grain->radius/**2*/ : (grain->radius?:20*mm), // resolution
            validation ? 4 : 2.5),
-  wire(grain->radius/2?:10*mm),
+  wire(validation ? 0.5*mm : 2*mm, grain->radius/2?:10*mm),
   targetDynamicGrainObstacleFrictionCoefficient(validation? 0.228 : 1),
   targetDynamicGrainMembraneFrictionCoefficient(validation ? 0.228 : 0.228),
   targetDynamicGrainGrainFrictionCoefficient(validation ? 0.096 : 1),
   targetDynamicWireGrainFrictionCoefficient(3./2),
   targetDynamicWireBottomFrictionCoefficient(1),
-  targetStaticFrictionSpeed((float)p.value("sfSpeed", validation ? 100/*50*/ : 50/*100*/)*mm/s),
-  targetStaticFrictionLength((float)p.value("sfLength", validation ? 1/*0.4*/ : 0.4/*1*/)*mm),
-  targetStaticFrictionStiffness((float)p.value("sfStiffness", validation ? 4e3f : 4e3f)/m),
+  targetStaticFrictionSpeed((float)p.value("sfSpeed", validation ? 10 : 50/*100*/)*mm/s),
+  targetStaticFrictionLength((float)p.value("sfLength", validation ? 0.1 : 0.4/*1*/)*mm),
+  targetStaticFrictionStiffness((float)p.value("sfStiffness", validation ? 1e3f : 4e3f)/m),
   targetStaticFrictionDamping((float)p.value("sfDamping", 1)*N/(m/s)),
   Gz(-(float)p.value("G", validation ? 1000 : 10.f)*N/kg),
   verticalSpeed(p.value("verticalSpeed", validation ? 1 : 0.05f)*m/s),
   linearSpeed(p.value("linearSpeed",1.f)*m/s),
   targetPressure((float)p.value("Pressure", 80e3f)*Pa),
-  plateSpeed((float)p.value("Speed", 10)*mm/s),
-  patternRadius(membrane->radius - Wire::radius),
+  plateSpeed((float)p.value("Speed", 30)*mm/s),
+  patternRadius(membrane->radius - wire->radius),
   pattern(p.contains("Pattern") ? Pattern(ref<string>(patterns).indexOf(p.at("Pattern")))
                                                 : (validation?None:Loop)),
-  currentHeight(0?Wire::radius:grain->radius),
+  currentHeight(0?wire->radius:grain->radius),
   membraneRadius(membrane->radius),
   topZ(membrane->height),
   latticeRadius(triaxial ? membrane->radius+grain->radius : 2*membrane->radius),
   lattice {sqrt(3.)/(2*grain->radius), vec3(vec2(-latticeRadius), -grain->radius*2),
                                            vec3(vec2(latticeRadius), membrane->height+grain->radius)}
 {
+ for(string key: p.keys)
+  assert_(ref<string>({
+                       "TimeStep","Radius","Pressure","Speed","Pattern",
+                       "sfDamping","sfLength","sfSpeed","sfStiffness"}).contains(key), key);
  assert(str(p).size < 256, str(p).size);
  if(pattern) { // Initial wire node
   size_t i = wire->count++;
   assert_(wire->count < (int)wire->capacity);
   wire->Px[i] = patternRadius;
   wire->Py[i] = 0;
-  wire->Pz[i] = currentHeight+grain->radius+Wire::radius;
+  wire->Pz[i] = currentHeight+grain->radius+wire->radius;
   wire->Vx[i] = 0; wire->Vy[i] = 0; wire->Vz[i] = 0;
   winchAngle += wire->internodeLength / currentWinchRadius;
  }
@@ -405,7 +409,7 @@ void Simulation::run() {
    step();
    if(fail) return;
   }
-  if(timeStep%4096 == 0) {
+  if(timeStep%8192 == 0) {
    profile();
    if(processState == Pour) log(grain->count, "/", targetGrainCount);
    if(processState == Pressure) log(
@@ -446,7 +450,7 @@ void Simulation::run() {
     log_(line);
     if(pressureStrain) pressureStrain.write(line);
    }
-   if(strain > 1./9) break;
+   if(strain > 1./9) { processState=Done; break; }
   }
  }
  totalTime.stop();

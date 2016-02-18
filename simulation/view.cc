@@ -139,7 +139,7 @@ struct SimulationView : Widget {
     vec2 r = B.xy()-A.xy();
     float l = length(r);
     vec2 t = r/l;
-    vec3 n = scale*float(Wire::radius)*vec3(t.y, -t.x, 0); // FIXME: hpx
+    vec3 n = scale*float(simulation.wire->radius)*vec3(t.y, -t.x, 0); // FIXME: hpx
     vec3 P[4] {A-n, A+n, B-n, B+n};
     positions[s*6+0] = P[0];
     positions[s*6+1] = P[1];
@@ -157,8 +157,8 @@ struct SimulationView : Widget {
     shader.bind();
     shader.bindFragments({"color"});
     shader["transform"] = mat4(1);
-    shader["radius"] = float(scale.z/2 * Wire::radius);
-    shader["hpxRadius"] = 1 / (size.x * scale.x * Wire::radius);
+    shader["radius"] = float(scale.z/2 * simulation.wire->radius);
+    shader["hpxRadius"] = 1 / (size.x * scale.x * simulation.wire->radius);
     static GLVertexArray vertexArray;
     GLBuffer positionBuffer (positions);
     vertexArray.bindAttribute(shader.attribLocation("position"_),
@@ -366,12 +366,10 @@ struct SimulationView : Widget {
 
 struct SimulationApp : Poll {
  Simulation simulation;
- SimulationView view;
-
- unique<Window> window = ::window(&view, -1, mainThread, true, false);
  Thread simulationMasterThread;
-
- GLFrameBuffer target;
+ SimulationView view;
+ unique<Window> window = ::window(&view, -1, mainThread, true, false);
+ int lastStrain = 0;
  unique<Encoder> encoder =
    arguments().contains("video") ? unique<Encoder>("heap.mp4"_) : nullptr;
 
@@ -403,14 +401,19 @@ struct SimulationApp : Poll {
     encoder->writeVideoFrame(window->readback());
     //view.yawPitch.x += 2*PI/60;
     queue();
-   } else window->render();
+   }
+   else if(simulation.processState < Simulation::Done) window->render();
+   else window->setTitle("Done");
+   int strain = 100 * 1-(simulation.topZ-simulation.bottomZ)/simulation.topZ0;
+   if(strain != lastStrain) window->setTitle(str(strain));
+   lastStrain = strain ;
    //window->setTitle(simulation.processStates[simulation.processState]);
-   if(simulation.validation)
+   /*if(simulation.validation)
     window->setTitle(str(simulation.timeStep*simulation.dt /s, simulation.grain->count,
                                       simulation.voidRatio, simulation.maxGrainV /(m/s)));
    else
     window->setTitle(str(simulation.timeStep*simulation.dt /s, simulation.maxGrainV,
-                                      simulation.maxWireV));
+                                      simulation.maxWireV));*/
   };
   if(encoder) {
    encoder->setH264(int2(/*1280,720*//*768*/992), 60);
@@ -432,7 +435,6 @@ struct SimulationApp : Poll {
    window->render();
   } else { // Asynchronous (simulationMasterThread)
    simulation.run();
-   window->setTitle("Done");
   }
  }
 } app (parameters());

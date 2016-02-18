@@ -163,8 +163,8 @@ void Simulation::stepWireGrain() {
  if(wireGrainGlobalMinD <= 0)  {
   grainLattice();
 
-  const float verletDistance = 2*(2*grain->radius/sqrt(3.)) - (grain->radius + Wire::radius); // FIXME: ?
-  assert(grain->radius + Wire::radius < verletDistance
+  const float verletDistance = 2*(2*grain->radius/sqrt(3.)) - (grain->radius + wire->radius); // FIXME: ?
+  assert(grain->radius + wire->radius < verletDistance
                                                         && verletDistance <= grain->radius + grain->radius);
 
   const int X = lattice.size.x, Y = lattice.size.y;
@@ -295,8 +295,8 @@ void Simulation::stepWireGrain() {
   for(size_t i=wireGrainA.size; i<align(simd, wireGrainA.size +1); i++) wireGrainA.begin()[i] = wire->count;
   for(size_t i=wireGrainB.size; i<align(simd, wireGrainB.size +1); i++) wireGrainB.begin()[i] = grain->count;
 
-  wireGrainGlobalMinD = /*minD*/verletDistance - (grain->radius+Wire::radius);
-  if(wireGrainGlobalMinD < 0) log("wireGrainGlobalMinD", wireGrainGlobalMinD);
+  wireGrainGlobalMinD = /*minD*/verletDistance - (grain->radius+wire->radius);
+  //if(wireGrainGlobalMinD < 0) log("wireGrainGlobalMinD", wireGrainGlobalMinD);
 
   //log("grain-wire", wireGrainSkipped);
   wireGrainSkipped=0;
@@ -342,7 +342,7 @@ void Simulation::stepWireGrain() {
   const float* const gPx = grain->Px.data+simd, *gPy = grain->Py.data+simd, *gPz = grain->Pz.data+simd;
   float* const wgL = wireGrainLocalAx.begin();
   int* const wgContact = wireGrainContact.begin();
-  const vXsf sq2Radius = floatX(sq(Wire::radius+grain->radius));
+  const vXsf sq2Radius = floatX(sq(wire->radius+grain->radius));
   for(size_t i=start*simd; i<(start+size)*simd; i+=simd) {
    const vXsi A = load(wgA, i), B = load(wgB, i);
    const vXsf Ax = gather(wPx, A), Ay = gather(wPy, A), Az = gather(wPz, A);
@@ -382,7 +382,7 @@ void Simulation::stepWireGrain() {
  wireGrainTBy.size = GWcc;
  wireGrainTBz.size = GWcc;
  const float E = 1/((1-sq(grain->poissonRatio))/grain->elasticModulus+(1-sq(grain->poissonRatio))/grain->elasticModulus);
- const float R = 1/(grain->curvature+Wire::curvature);
+ const float R = 1/(grain->curvature+wire->curvature);
  const float K = 4./3*E*sqrt(R);
  const float mass = 1/(1/grain->mass+1/wire->mass);
  const float Kb = 2 * normalDampingRate * sqrt(2 * sqrt(R) * E * mass);
@@ -392,7 +392,7 @@ void Simulation::stepWireGrain() {
                       wireGrainA.data, wireGrainB.data,
                       wire->Px.data, wire->Py.data, wire->Pz.data,
                       grain->Px.data+simd, grain->Py.data+simd, grain->Pz.data+simd,
-                      floatX(Wire::radius+grain->radius), floatX(Wire::radius), floatX(grain->radius),
+                      floatX(wire->radius+grain->radius), floatX(wire->radius), floatX(grain->radius),
                       wireGrainLocalAx.begin(), wireGrainLocalAy.begin(), wireGrainLocalAz.begin(),
                       wireGrainLocalBx.begin(), wireGrainLocalBy.begin(), wireGrainLocalBz.begin(),
                       floatX(K), floatX(Kb),
