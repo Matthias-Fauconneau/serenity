@@ -22,13 +22,13 @@ struct ParameterSweep {
    if(queued ) log("Queued jobs:["+str(queuedCount)+"]: qdel -f"+queued+" &");
   }
   size_t done = 0, running = 0, queued = 0;\
-  for(string dt: {"0.5"_}) {
-   parameters["TimeStep"__] = String(dt+"µ");
-   for(string plateSpeed: {"20"_}) {
-    parameters["Speed"__] = plateSpeed; // mm/s
-    for(int pressure: {80}) {
+  for(string dt: {1?"0.1"_:"1"_}) {
+   parameters["TimeStep"__] = dt;
+   /*for(string plateSpeed: {"40"_}) {
+    parameters["Speed"__] = plateSpeed; // mm/s*/
+    for(int pressure: {0,20,40,60,80}) {
      parameters["Pressure"__] = String(str(pressure)+"K"_); // Pa
-     for(float radius: {40}) {
+     for(float radius: {30/*20,*//*30,*//*40*/}) {
       parameters["Radius"__] = radius; //mm
       /*for(string staticFrictionSpeed: {"50"_}) {
        parameters["sfSpeed"__] = staticFrictionSpeed; // mm/s
@@ -38,6 +38,8 @@ struct ParameterSweep {
          parameters["sfStiffness"__] = staticFrictionStiffness;
          for(string staticFrictionDamping: {"1"_}) {
           parameters["sfDamping"__] = staticFrictionDamping; // N/(m/s)*/
+      for(string pattern: ref<string>{"none","helix","spiral","radial"}) {
+       parameters["Pattern"__] = pattern;
           auto add = [&] {
            String id = str(parameters);
            if(arguments().size > 0 && arguments()[0].contains('=')) {
@@ -59,13 +61,13 @@ struct ParameterSweep {
            missing.append(move(id));
           };
           add();
-         /*}
-        }
+         }
+        /*}
        }
       }*/
      }
     }
-   }
+   //}
   }
   if(jobs) {
    array<char> running, queued;
@@ -84,7 +86,20 @@ struct ParameterSweep {
   Random random;
   size_t missingCount = missing.size;
   size_t count = 0;
+  array<SGEHost> hosts = qhost();
   while(missing) {
+   int threadCount = 0;
+   for(int N: {4}) {
+    for(SGEHost& host: hosts) if(host.jobCount+N<min(18,host.slotCount)) {
+     host.jobCount+=N;
+     log(host);
+     threadCount = N;
+     goto break2_;
+    }
+   }
+   /*else*/ { log(hosts); if(0) { log("Not all jobs submitted"); break; } else log("Queuing"); }
+   break2_:;
+   assert_(threadCount);
    if(arguments().contains("pretend"_)) log(parseDict(missing.take(random%missing.size)));
    else {
     String parameters = missing.take(random%missing.size);
@@ -98,7 +113,7 @@ struct ParameterSweep {
                "-j", "y",
                "-o", "$JOB_NAME.stdout",
                "-b","y",
-               "-pe", "omp", "4",
+               "-pe", "omp", str(threadCount),
                "~/run", parameters}, true, folder)) { log("Error"); break; }
     count++;
    }

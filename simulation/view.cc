@@ -181,7 +181,7 @@ struct SimulationView : Widget {
    //if(isNumber(length(forces[i].force)))
    maxF = ::max(maxF, length(forces[i].force));*/
 
-  if(simulation.processState < Simulation::Released && simulation.membrane->count) {
+  if(/*simulation.processState < Simulation::Released &&*/ simulation.membrane->count) {
    if(!indexBuffer) {
     const int W = simulation.membrane->W, stride = simulation.membrane->stride,
       margin = simulation.membrane->margin;
@@ -369,7 +369,6 @@ struct SimulationApp : Poll {
  Thread simulationMasterThread;
  SimulationView view;
  unique<Window> window = ::window(&view, -1, mainThread, true, false);
- int lastStrain = 0;
  unique<Encoder> encoder =
    arguments().contains("video") ? unique<Encoder>("heap.mp4"_) : nullptr;
 
@@ -402,11 +401,23 @@ struct SimulationApp : Poll {
     //view.yawPitch.x += 2*PI/60;
     queue();
    }
-   else if(simulation.processState < Simulation::Done) window->render();
+   else if(simulation.processState < Simulation::Done) {
+    if(simulation.triaxial) {
+     if(simulation.topZ0) {
+      int strain = 100 * (1-(simulation.topZ-simulation.bottomZ)/simulation.topZ0);
+      window->setTitle(str(strain));
+     } else {
+      int fill = 100 * simulation.currentHeight/simulation.topZ;
+      window->setTitle(str(fill));
+     }
+    } else {
+     log(simulation.bottomZ, simulation.topZ);
+     window->setTitle(str(simulation.processStates[simulation.processState],
+                      simulation.timeStep*simulation.dt /s, simulation.grain->count));
+    }
+    window->render();
+   }
    else window->setTitle("Done");
-   int strain = 100 * 1-(simulation.topZ-simulation.bottomZ)/simulation.topZ0;
-   if(strain != lastStrain) window->setTitle(str(strain));
-   lastStrain = strain ;
    //window->setTitle(simulation.processStates[simulation.processState]);
    /*if(simulation.validation)
     window->setTitle(str(simulation.timeStep*simulation.dt /s, simulation.grain->count,
@@ -425,7 +436,7 @@ struct SimulationApp : Poll {
  }
  void event() override {
   if(encoder) { // Synchronous
-   if(encoder->videoTime >= 30*60) {
+   if(encoder->videoTime >= 60*60) {
     log("Done", encoder->videoTime);
     simulation.stop = true;
     requestTermination();

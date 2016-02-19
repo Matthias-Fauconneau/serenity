@@ -5,7 +5,7 @@
 
 void Simulation::stepProcess() {
  if(currentHeight >= topZ-grain->radius && processState < Release && !triaxial) {
-  //log("processState = Release");
+  log("processState = Release 1");
   processState = Release;
   if(wire->count) {
    /*wire->Vx[wire->count-1] = 0;
@@ -20,30 +20,30 @@ void Simulation::stepProcess() {
  //pressure = 0; membraneViscosity = 1-1000*dt; // DEBUG
  // Process
  if(targetGrainCount && (grain->count == targetGrainCount || processState > Pour ||
-                         int(lastGrainSpawnTimeStep) < int(timeStep)-int(0.004/dt))) {
+                         (triaxial && lastSpawnTimeStep+0.001/dt < timeStep))) {
   //if(!useMembrane) return;
-  //log("processState = Release");
+  log("processState = Release 2");
   if(!triaxial) processState = Release;
   if(processState  < Pressure) {
    //static bool unused once = ({ log("Set Friction"); true; });
    dynamicGrainObstacleFrictionCoefficient = targetDynamicGrainObstacleFrictionCoefficient;
    dynamicGrainMembraneFrictionCoefficient = targetDynamicGrainMembraneFrictionCoefficient;
    dynamicGrainGrainFrictionCoefficient = targetDynamicGrainGrainFrictionCoefficient;
-   dynamicWireGrainFrictionCoefficient = targetDynamicWireGrainFrictionCoefficient;
+   /*dynamicWireGrainFrictionCoefficient = targetDynamicWireGrainFrictionCoefficient;
    dynamicWireBottomFrictionCoefficient = targetDynamicWireBottomFrictionCoefficient;
    staticFrictionSpeed = targetStaticFrictionSpeed;
    staticFrictionLength = targetStaticFrictionLength;
    staticFrictionStiffness = targetStaticFrictionStiffness;
-   staticFrictionDamping = targetStaticFrictionDamping;
+   staticFrictionDamping = targetStaticFrictionDamping;*/
   }
-  if(processState < Load) { // Fits top plate while disabling gravity
+  if(triaxial && processState < Load) { // Fits top plate while disabling gravity
    //static bool unused once = ({ log("Fits plate"); true; });
    float topZ = 0;
    for(float z: grain->Pz.slice(simd, grain->count)) topZ = ::max(topZ, z+grain->radius);
    if(topZ < this->topZ) this->topZ = topZ;
    topZ0 = this->topZ;
    //log("Zeroes gravity");
-   Gz = 0;
+   Gz = 0.01; // Keep a bit of gravity to prevent wire from flying off (no top boundary)
   }
   /*if(processState < Pressure) {
    static bool unused once = ({ log("Enables pressure"); true; });
@@ -51,21 +51,21 @@ void Simulation::stepProcess() {
    //if(maxGrainV > 600 * mm/s) return;
    pressure = targetPressure;
   }*/
-  if(pressure < targetPressure || membraneViscosity < targetViscosity) { // Increases pressure toward target pressure
+  if(triaxial && (pressure < targetPressure || membraneViscosity < targetViscosity)) { // Increases pressure toward target pressure
    if(processState < Pressure) {
     //log("Pressure");
     processState = Pressure;
    }
    if(processState == Pressure) {
-    /*if(pressure < targetPressure) pressure += 100 * targetPressure * dt;
-    if(pressure > targetPressure)*/ pressure = targetPressure;
+    if(pressure < targetPressure) pressure += 100 * targetPressure * dt;
+    if(pressure > targetPressure) pressure = targetPressure;
    }
    //pressure=targetPressure; //assert_(pressure== targetPressure, pressure, targetPressure);
-   /*if(membraneViscosity < targetViscosity) membraneViscosity += 50 * dt;
-   if(membraneViscosity > targetViscosity) {*/
+   if(membraneViscosity < targetViscosity) membraneViscosity += 100 * dt;
+   if(membraneViscosity > targetViscosity) {
     membraneViscosity = targetViscosity;
     log("membraneViscosity", membraneViscosity);
-   //}
+   }
   } else { // Displaces plates with constant velocity
    pressure = targetPressure;
    if(processState < Load) {
@@ -139,6 +139,7 @@ void Simulation::stepProcess() {
     size_t i = wire->count++;
     wire->Px[i] = newPosition[0]; wire->Py[i] = newPosition[1]; wire->Pz[i] = newPosition[2];
     wire->Vx[i] = 0; wire->Vy[i] = 0; wire->Vz[i] = 0;
+    lastSpawnTimeStep = timeStep;
 #if GEAR
     for(size_t n: range(3)) { wire->PDx[n][i] = 0; wire->PDy[n][i] = 0; wire->PDz[n][i] = 0; }
 #endif
@@ -201,7 +202,7 @@ void Simulation::stepProcess() {
       grain->Ry[simd+i] = cos(t0)*sin(t1)*sin(t2);
       grain->Rz[simd+i] = cos(t1)*sin(t2);
       grain->Rw[simd+i] = cos(t2);
-      lastGrainSpawnTimeStep = timeStep;
+      lastSpawnTimeStep = timeStep;
       grain->count++;
       {
        float height = topZ-bottomZ;

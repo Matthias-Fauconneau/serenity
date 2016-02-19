@@ -22,7 +22,7 @@ inline bool operator <(const NaturalString& a, const NaturalString& b) {
  }
 }
 
-struct Fit { double a, b; };
+struct Fit { float a, b; };
 
 struct Plot : virtual Widget {
  enum LegendPosition { TopLeft, TopRight, BottomLeft, BottomRight };

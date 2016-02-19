@@ -47,6 +47,7 @@ struct Membrane {
  buffer<float> Fz { capacity };
 
  Membrane(float radius, float resolution, float ratio) : radius(radius), resolution(resolution), ratio(ratio) {
+   assert_(isNumber(height), radius, resolution, ratio);
   Px.clear(0); Py.clear(0); Pz.clear(0);
   Vx.clear(0); Vy.clear(0); Vz.clear(0);
   Fx.clear(0); Fy.clear(0); Fz.clear(0);

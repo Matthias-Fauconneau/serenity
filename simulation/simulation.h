@@ -21,8 +21,8 @@ extern array<int> highlightGrains;
 
 // High level simulation and contact management
 struct Simulation {
- //const bool triaxial, validation;
- static constexpr bool triaxial = true, validation = true;
+ const bool triaxial, validation;
+ //static constexpr bool triaxial = true, validation = true;
 
  const float dt;
  size_t timeStep = 0;
@@ -42,18 +42,18 @@ struct Simulation {
  float dynamicGrainMembraneFrictionCoefficient = 0;
  const float targetDynamicGrainGrainFrictionCoefficient;
  float dynamicGrainGrainFrictionCoefficient = 0;
- const float targetDynamicWireGrainFrictionCoefficient;
- float dynamicWireGrainFrictionCoefficient = 0;
- const float targetDynamicWireBottomFrictionCoefficient;
- float dynamicWireBottomFrictionCoefficient = 0;
- const float targetStaticFrictionSpeed;
- float staticFrictionSpeed;
- const float targetStaticFrictionLength;
- float staticFrictionLength;
- const float targetStaticFrictionStiffness;
- float staticFrictionStiffness;
- const float targetStaticFrictionDamping;
- float staticFrictionDamping;
+ //const float targetDynamicWireGrainFrictionCoefficient;
+ const float dynamicWireGrainFrictionCoefficient;
+ //const float targetDynamicWireBottomFrictionCoefficient;
+ const float dynamicWireBottomFrictionCoefficient;
+ //const float targetStaticFrictionSpeed;
+ const float staticFrictionSpeed;
+ //const float targetStaticFrictionLength;
+ const float staticFrictionLength;
+ //const float targetStaticFrictionStiffness;
+ const float staticFrictionStiffness;
+ //const float targetStaticFrictionDamping;
+ const float staticFrictionDamping;
 
  // Process parameters
  float Gz;
@@ -76,7 +76,7 @@ struct Simulation {
  Random random;
  float currentHeight;
  float pressure = targetPressure;
- size_t lastGrainSpawnTimeStep = 0;
+ size_t lastSpawnTimeStep = 0;
  float grainViscosity = 1-16*dt;
  float angularViscosity = 1-1*dt;
  const float targetViscosity = 1-16*dt;
@@ -84,7 +84,7 @@ struct Simulation {
  float membraneViscosity = 0;
  float membraneRadius;
  bool membranePositionChanged = false;
- float bottomZ = 0, topZ, topZ0;
+ float bottomZ = 0, topZ = 0, topZ0 = 0;
  float latticeRadius;
  float lastAngle = 0, winchAngle = 0, currentWinchRadius = patternRadius;
 
@@ -277,7 +277,8 @@ struct Simulation {
   buffer<float> V;
  } grainMembrane[2];
 
- File dump;
+ File dumpFile;
+ void dump();
  bool primed = false;
  File pressureStrain;
  float voidRatio = 0;

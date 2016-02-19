@@ -21,7 +21,7 @@ buffer<float> medianFilter(ref<float> source, size_t W=medianWindowRadius) {
 
 size_t meanWindowRadius = 8;
 buffer<float> meanFilter(ref<float> source, size_t W=meanWindowRadius) {
- assert_(source.size > W+1+W);
+ assert_(source.size >= W+1+W);
  buffer<float> target(source.size-2*W);
  buffer<float> window(W+1+W);
  for(size_t i: range(W, source.size-W)) {
@@ -82,16 +82,11 @@ struct PlotView : HList<Plot> {
    plot.xlabel = "Strain (%)"__;
    plot.ylabel = copyRef(Y[index]);
    map<String, array<Variant>> allCoordinates;
-   for(Folder folder: {"."_}/*arguments()*/) {
+   for(Folder folder: {"."_}) {
     for(string name: folder.list(Files)) {
      if(name=="core") continue;
      if(endsWith(name,"stdout")) continue;
      auto parameters = parseDict(name);
-     /*if(parameters.at("Radius")!="50"_) continue;
-     if(parameters.at("sfStiffness")!="1M"_) continue;
-     if(parameters.at("sfSpeed")!="100"_) continue;*/
-     //if(!(parameters.contains("nDamping") || parameters.contains("mDensity"))) continue;
-      // FIXME: keeping only old versions
      for(const auto parameter: parameters)
       if(!allCoordinates[::copy(parameter.key)].contains(parameter.value))
        allCoordinates.at(parameter.key).insertSorted(::copy(parameter.value));
@@ -102,11 +97,8 @@ struct PlotView : HList<Plot> {
      if(endsWith(name,".stdout")) continue;
      if(endsWith(name,".png")) continue;
      auto parameters = parseDict(name);
-     /*if(parameters.at("Radius")!="50"_) continue;
-     if(parameters.at("sfStiffness")!="1M"_) continue;
-     if(parameters.at("sfSpeed")!="100"_) continue;*/
-     //if(!(parameters.contains("nDamping") || parameters.contains("mDensity"))) continue;
-      // FIXME: keeping only old versions
+     if(parameters.at("Radius")!="20"_) continue;
+     if(parameters.at("TimeStep")!="0.1"_) continue;
      TextData s (readFile(name, folder));
      s.until('\n'); // First line: constant results
      buffer<string> names = split(s.until('\n'),", "); // Second line: Headers
@@ -124,17 +116,6 @@ struct PlotView : HList<Plot> {
       }
      }
      break2:;
-     //for(mref<float> data: dataSets.values) if(data) data[0]=0; // Filters invalid first point (inertia)
-     for(auto data: dataSets) {
-      if(data.key=="Axial (Pa)" || data.key == "Radial (Pa)")
-       //data.value = medianFilter(data.value);
-       data.value = meanFilter(data.value);
-      else {
-       //assert_(data.value.size >= 2*medianWindowRadius, data.value.size);
-       //data.value = copyRef(data.value.slice(medianWindowRadius, data.value.size-2*medianWindowRadius));
-       data.value = copyRef(data.value.slice(meanWindowRadius, data.value.size-2*meanWindowRadius));
-      }
-     }
      if(plot.ylabel == "Normalized deviator stress") {
       float pressure = parameters.value("Pressure", 80e3);
       ref<float> radial = dataSets.at("Radial (Pa)");
@@ -161,11 +142,18 @@ struct PlotView : HList<Plot> {
      /*size_t i = plot.dataSets.size();//0; while(i<plot.dataSets.size() && plot.dataSets.values[i].values.last() <= key) i++;
      plot.dataSets.keys.insertAt(i, str(parameters,", "_));
      plot.dataSets.values.insertAt(i, map<float,float>{::move(dataSets.at(plot.xlabel)), ::move(dataSets.at(plot.ylabel))});*/
-     plot.dataSets.insert(str(parameters,", "_), {::move(dataSets.at(plot.xlabel)), ::move(dataSets.at(plot.ylabel))});
+     if(max(dataSets.at("Strain (%)"_)) < 100./14) { log("Failed", str(parameters,", "_)); /*continue;*/ }
+     mref<float> strain = dataSets.at("Strain (%)"_);
+     //for(size_t i : range(strain.size)) strain[i] -= (100./12 - 8)/2;
+     size_t first=0; //for(size_t i : range(strain.size)) if(strain[i] >= 0) { first=i; break; }
+     size_t last=strain.size; for(size_t i : range(strain.size)) if(strain[i] > 100./13) { last=i; break; }
+     plot.dataSets.insert(str(parameters,", "_), {copyRef(dataSets.at(plot.xlabel).sliceRange(first, last)),
+                                                                              copyRef(dataSets.at(plot.ylabel).sliceRange(first, last))});
      //if(plot.ylabel=="Normalized deviator stress") { plot.min.y = 0; plot.max.y = 1; }
-     plot.min.y = 0; plot.max.y = 0.5;
     }
    }
+   plot.min.x = 0; plot.max.x = 8;
+   plot.min.y = 0; plot.max.y = 0.5;
   }
   //if(count()) window->setTitle(array<Plot>::at(0).ylabel);
   shown = false;

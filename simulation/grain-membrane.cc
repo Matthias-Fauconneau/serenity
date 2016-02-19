@@ -357,7 +357,6 @@ template<int I> static inline float sum(const uint size, const int* const contac
   fail = true;
   return 0;
  }
- //assert_(isNumber(radialForce));
  return -radialForce;
 }
 #else

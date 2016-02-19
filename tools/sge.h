@@ -3,23 +3,39 @@
 #include "time.h"
 #include "thread.h"
 
+struct SSH : Poll {
+ Stream stdout;
+ int pid;
+ array<byte> status;
+
+ SSH(ref<string> args, bool log=false) {
+  pid = execute("/opt/ge2011.pleiades/bin/linux-x64/qsub.orig", args.slice(1), false, currentWorkingDirectory(), &stdout);
+  if(log) { fd=stdout.fd; registerPoll(); }
+ }
+ void event() {
+  read(false, true);
+ }
+ string read(bool wait=false, bool log=false) {
+  if(!stdout) return {};
+  for(;;) {
+   auto packet = stdout.readUpTo(1<<16);
+   status.append(packet);
+   if(log && packet) ::log(packet);
+   if(!wait || !(packet || isRunning(pid))) { if(log) ::log("Done"); break; }
+  }
+  return status;
+ }
+ operator string() { return read(true, false); }
+};
+
+buffer<byte> eval(const string path, ref<string> args) {
+ Stream stdout; execute(path, args, true, currentWorkingDirectory(), &stdout);
+ return stdout.readUpTo(1<<16);
+}
+
 struct SGEJob { String state; Dict dict; String id; float elapsed; };
 String str(const SGEJob& o) { return str(o.dict, o.id, o.elapsed); }
 bool operator==(const SGEJob& o, const Dict& dict) { return o.dict == dict; }
-
-buffer<byte> eval(const string path, ref<string> args) {
- Stream stdout;
- /*int pid =*/ execute(path, args, true, currentWorkingDirectory(), &stdout);
- /*array<byte> buffer;
- while(isRunning(pid)) {
-  ::buffer<byte> packet = stdout.readUpTo(1<<16);
-  if(!packet) break;
-  buffer.append(packet);
- }
- assert_(buffer, path, args);
- return ::move(buffer);*/
- return stdout.readUpTo(1<<16);
-}
 
 array<SGEJob> qstat() {
  buffer<byte> document
@@ -51,3 +67,30 @@ array<SGEJob> qstat() {
  if(badJobs) error("qdel -f", str(badJobs," "_,""_), "&");
  return jobs;
 }
+
+struct SGEHost { String name; int jobCount=0, slotCount=0; float load=0; };
+String str(const SGEHost& o) { return str(o.name, str(o.jobCount)+"/"+str(o.slotCount)); }
+
+array<SGEHost> qhost() {
+ TextData s (eval("/opt/ge2011.pleiades/bin/linux-x64/qhost"_, ref<string>{"-j"_,"-h",
+"ifbn043,ifbn044,ifbn045,ifbn046,ifbn047,ifbn048,ifbn049,ifbn050,ifbn051,ifbn052,ifbn053,ifbn054,ifbn055"_}
+                              ));
+ array<SGEHost> hosts;
+ s.line(); s.line(); s.line();
+ while(s) {
+  SGEHost host;
+  host.name = copyRef(s.until(' ')); s.whileAny(' ');
+  s.until(' '); s.whileAny(' ');
+  host.slotCount = s.integer(); s.whileAny(' ');
+  host.load = s.match("-")?0:s.decimal(); s.line();
+  for(;s.match(' ');s.line()) {
+   s.whileAny(' ');
+   if(s.match("job-ID") || s.match("------")) continue;
+   else if(s.isInteger() || s.match("normal.q@i"_) || s.match("fast.q@i"_)) host.jobCount++;
+   else error(s.line());
+  }
+  hosts.append(::move(host));
+ }
+ return hosts;
+}
+

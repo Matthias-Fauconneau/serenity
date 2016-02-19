@@ -97,7 +97,10 @@ template<template<Type> class V, Type T, uint N> inline String str(const vec& v)
 
 #undef vec
 
-generic struct xy { T x,y; };
+generic struct xy {
+ T x,y;
+ vec< ::xy, T, 2> yx() const { return vec< ::xy, T, 2>{y,x}; }
+};
 typedef vec<xy,int,2> int2;
 typedef vec<xy,uint,2> uint2;
 typedef vec<xy,float,2> vec2;

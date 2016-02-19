@@ -25,7 +25,10 @@ static inline void qapply(vXsf Qx, vXsf Qy, vXsf Qz, vXsf Qw, vXsf Vx, vXsf Vy, 
 //sconst float s = 1e6, m = 1e5, kg = 1e6;
 sconst float s = 1, m = 1, kg = 1;
 sconst float N = kg*m/(s*s), Pa = N/(m*m);
-sconst float mm = 1e-3*m, g = 1e-3*kg, KPa = 1e3 * Pa, MPa = 1e6 * Pa, GPa = 1e9 * Pa;
+sconst float us = 1e-6*s;
+sconst float mm = 1e-3*m;
+sconst float g = 1e-3*kg;
+sconst float KPa = 1e3 * Pa, MPa = 1e6 * Pa, GPa = 1e9 * Pa;
 
 #define GEAR 0
 #define MEMBRANE_FACE 1

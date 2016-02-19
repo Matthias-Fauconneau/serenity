@@ -25,9 +25,9 @@ array<int> highlightGrains;
 //array<Force> forces;
 
 Simulation::Simulation(const Dict& p) :
-  /*triaxial(p.value("triaxial","1"_)!="0"_),
-  validation(p.value("validation","1"_)!="0"_),*/
-  dt((float)p.value("TimeStep", validation ? 1e-6 : 1e-6)*s),
+  triaxial(p.value("triaxial","1"_)!="0"_),
+  validation(p.value("validation","1"_)!="0"_),
+  dt((float)p.value("TimeStep", validation ? 1.f : 1.f)*us),
   normalDampingRate((float)p.value("nDamping",1/*1./2*/)*1),
   targetGrainCount(
    p.value("grainRadius", validation ? 2.5f : 20) != 0 ?
@@ -36,28 +36,28 @@ Simulation::Simulation(const Dict& p) :
    ),
   grain(p.value("grainRadius", validation ? 2.5f : 20)*mm,
            p.value("grainDensity", validation ? 7.8e3 : 1.4e3)*kg/cb(m),
-           p.value("grainShearModulus", validation ? /*77000*/100 : 30)*MPa,
+           p.value("grainShearModulus", validation ? /*77000*/1 : 30)*MPa,
            p.value("grainPoissonRatio", validation ? 0.28 : 0.35)*1,
            p.value("grainWallThickness", validation ? 0 : 0.4)*mm,
            targetGrainCount),
   membrane((float)p.value("Radius", validation ? 50 : 100)*mm,
            validation ? grain->radius/**2*/ : (grain->radius?:20*mm), // resolution
            validation ? 4 : 2.5),
-  wire(validation ? 0.5*mm : 2*mm, grain->radius/2?:10*mm),
+  wire(validation ? 0.3*mm : 2*mm, validation ? grain->radius : grain->radius/2?:10*mm),
   targetDynamicGrainObstacleFrictionCoefficient(validation? 0.228 : 1),
   targetDynamicGrainMembraneFrictionCoefficient(validation ? 0.228 : 0.228),
   targetDynamicGrainGrainFrictionCoefficient(validation ? 0.096 : 1),
-  targetDynamicWireGrainFrictionCoefficient(3./2),
-  targetDynamicWireBottomFrictionCoefficient(1),
-  targetStaticFrictionSpeed((float)p.value("sfSpeed", validation ? 10 : 50/*100*/)*mm/s),
-  targetStaticFrictionLength((float)p.value("sfLength", validation ? 0.1 : 0.4/*1*/)*mm),
-  targetStaticFrictionStiffness((float)p.value("sfStiffness", validation ? 1e3f : 4e3f)/m),
-  targetStaticFrictionDamping((float)p.value("sfDamping", 1)*N/(m/s)),
+  /*targetD*/dynamicWireGrainFrictionCoefficient(3./2),
+  /*targetD*/dynamicWireBottomFrictionCoefficient(1),
+  /*targetS*/staticFrictionSpeed((float)p.value("sfSpeed", validation ? 10 : 50/*100*/)*mm/s),
+  /*targetS*/staticFrictionLength((float)p.value("sfLength", validation ? 0.1 : 0.4/*1*/)*mm),
+  /*targetS*/staticFrictionStiffness((float)p.value("sfStiffness", validation ? 1e3f : 4e3f)/m),
+  /*targetS*/staticFrictionDamping((float)p.value("sfDamping", 1)*N/(m/s)),
   Gz(-(float)p.value("G", validation ? 1000 : 10.f)*N/kg),
-  verticalSpeed(p.value("verticalSpeed", validation ? 1 : 0.05f)*m/s),
-  linearSpeed(p.value("linearSpeed",1.f)*m/s),
+  verticalSpeed(p.value("verticalSpeed", validation ? 0.5 : 0.05f)*m/s),
+  linearSpeed(p.value("linearSpeed", membrane->radius/mm)*m/s),
   targetPressure((float)p.value("Pressure", 80e3f)*Pa),
-  plateSpeed((float)p.value("Speed", 30)*mm/s),
+  plateSpeed((float)p.value("Speed", 40)*mm/s),
   patternRadius(membrane->radius - wire->radius),
   pattern(p.contains("Pattern") ? Pattern(ref<string>(patterns).indexOf(p.at("Pattern")))
                                                 : (validation?None:Loop)),
@@ -65,12 +65,12 @@ Simulation::Simulation(const Dict& p) :
   membraneRadius(membrane->radius),
   topZ(membrane->height),
   latticeRadius(triaxial ? membrane->radius+grain->radius : 2*membrane->radius),
-  lattice {sqrt(3.)/(2*grain->radius), vec3(vec2(-latticeRadius), -grain->radius*2),
+  lattice {sqrt(3.)/(2*grain->radius), vec3(vec2(-latticeRadius), -grain->radius),
                                            vec3(vec2(latticeRadius), membrane->height+grain->radius)}
 {
  for(string key: p.keys)
   assert_(ref<string>({
-                       "TimeStep","Radius","Pressure","Speed","Pattern",
+                       "TimeStep","Radius","Pressure","Speed","Pattern","triaxial","validation",
                        "sfDamping","sfLength","sfSpeed","sfStiffness"}).contains(key), key);
  assert(str(p).size < 256, str(p).size);
  if(pattern) { // Initial wire node
@@ -83,20 +83,69 @@ Simulation::Simulation(const Dict& p) :
   winchAngle += wire->internodeLength / currentWinchRadius;
  }
  // Keeps a bit of grain membrane friction to damp full solid rotation
- dynamicGrainMembraneFrictionCoefficient = 0.1;
+ /*staticFrictionSpeed = targetStaticFrictionSpeed;
+ staticFrictionLength = targetStaticFrictionLength;
+ staticFrictionStiffness = targetStaticFrictionStiffness;
+ staticFrictionDamping = targetStaticFrictionDamping;*/
  if(!triaxial) {
   dynamicGrainObstacleFrictionCoefficient = targetDynamicGrainObstacleFrictionCoefficient;
   dynamicGrainMembraneFrictionCoefficient = targetDynamicGrainMembraneFrictionCoefficient;
   dynamicGrainGrainFrictionCoefficient = targetDynamicGrainGrainFrictionCoefficient;
-  dynamicWireGrainFrictionCoefficient = targetDynamicWireGrainFrictionCoefficient;
-  dynamicWireBottomFrictionCoefficient = targetDynamicWireBottomFrictionCoefficient;
-  staticFrictionSpeed = targetStaticFrictionSpeed;
-  staticFrictionLength = targetStaticFrictionLength;
-  staticFrictionStiffness = targetStaticFrictionStiffness;
-  staticFrictionDamping = targetStaticFrictionDamping;
+ } else {
+  dynamicGrainMembraneFrictionCoefficient = 0.1;
  }
+ /*dynamicWireGrainFrictionCoefficient = targetDynamicWireGrainFrictionCoefficient;
+ dynamicWireBottomFrictionCoefficient = targetDynamicWireBottomFrictionCoefficient;*/
 }
 Simulation::~Simulation() {}
+
+void Simulation::dump() {
+ //if(dumpFile && dumpFile.size()/*FIXME: without stat*/ > 4ul<<30) dumpFile = File(); // Reset if >4G
+ if(!dumpFile) {
+  String name = replace(arguments()[0],"/",":");
+  dumpFile = File(name+".dump", /*currentWorkingDirectory()*/"/dev/shm"_, Flags(WriteOnly|Create|Truncate));
+ }
+ buffer<byte> header (64, 0);
+ header.append(raw(grain->count));
+ header.append(raw(grain->radius));
+ header.append(raw(uint(membrane->count)));
+ header.append(raw(membrane->W));
+ header.append(raw(membrane->H));
+ header.append(raw(membrane->stride));
+ header.append(raw(membrane->margin));
+ header.append(raw(membrane->radius));
+#if 0
+ header.append(raw(uint(forces.size)));
+#else
+ header.append(raw(uint(0)));
+#endif
+ header.size = 64;
+ dumpFile.write(header);
+ {
+  auto write = [this](const buffer<float>& A) {
+   assert_(simd+align(64, grain->count) <= A.capacity, A.size, A.capacity, align(64, A.size));
+   dumpFile.write(cast<byte>(ref<float>(A.data+simd, align(64, grain->count))));
+  };
+  write(grain->Px); write(grain->Py); write(grain->Pz);
+  //write(grain->Vx); write(grain->Vy); write(grain->Vz);
+  //write(grain->Fx); write(grain->Fy); write(grain->Fz);
+  write(grain->Rx); write(grain->Ry); write(grain->Rz); write(grain->Rw);
+  //write(grain->AVx); write(grain->AVy); write(grain->AVz);
+  //write(grain->Tx); write(grain->Ty); write(grain->Tz);
+ }
+ { // TODO: compact? (no margin, stride=W)
+  auto write = [this](const buffer<float>& A) {
+   assert_(A.size == membrane->count);
+   assert_(align(64, A.size) <= A.capacity, A.size, A.capacity, align(64, A.size));
+   dumpFile.write(cast<byte>(ref<float>(A.data, align(64, A.size))));
+  };
+  write(membrane->Px); write(membrane->Py); write(membrane->Pz);
+  //write(membrane->Vx); write(membrane->Vy); write(membrane->Vz);
+  write(membrane->Fx); write(membrane->Fy); write(membrane->Fz);
+ }
+ /*auto forces = cast<byte>(::forces);
+   dumpFile.write(ref<byte>(forces.data, align(64, forces.size)));*/
+}
 
 void Simulation::step() {
  if(processState == Release) {
@@ -209,51 +258,7 @@ void Simulation::step() {
  float height = topZ-bottomZ;
  float strain = 1-height/topZ0;
  if(processState == Load && strain>0.08 && 0) { // Records state after force evaluation before integration
-  if(dump && dump.size()/*FIXME: without stat*/ > 4ul<<30) dump = File(); // Closes dump to reset if >4G
-  if(!dump) {
-   String name = replace(arguments()[0],"/",":");
-   dump = File(name+".dump", /*currentWorkingDirectory()*/"/dev/shm"_, Flags(WriteOnly|Create|Truncate));
-  }
-  buffer<byte> header (64, 0);
-  header.append(raw(grain->count));
-  header.append(raw(grain->radius));
-  header.append(raw(uint(membrane->count)));
-  header.append(raw(membrane->W));
-  header.append(raw(membrane->H));
-  header.append(raw(membrane->stride));
-  header.append(raw(membrane->margin));
-  header.append(raw(membrane->radius));
-#if 0
-  header.append(raw(uint(forces.size)));
-#else
-  header.append(raw(uint(0)));
-#endif
-  header.size = 64;
-  dump.write(header);
-  {
-   auto write = [this](const buffer<float>& A) {
-    assert_(simd+align(64, grain->count) <= A.capacity, A.size, A.capacity, align(64, A.size));
-    dump.write(cast<byte>(ref<float>(A.data+simd, align(64, grain->count))));
-   };
-   write(grain->Px); write(grain->Py); write(grain->Pz);
-   //write(grain->Vx); write(grain->Vy); write(grain->Vz);
-   //write(grain->Fx); write(grain->Fy); write(grain->Fz);
-   write(grain->Rx); write(grain->Ry); write(grain->Rz); write(grain->Rw);
-   //write(grain->AVx); write(grain->AVy); write(grain->AVz);
-   //write(grain->Tx); write(grain->Ty); write(grain->Tz);
-  }
-  { // TODO: compact? (no margin, stride=W)
-   auto write = [this](const buffer<float>& A) {
-    assert_(A.size == membrane->count);
-    assert_(align(64, A.size) <= A.capacity, A.size, A.capacity, align(64, A.size));
-    dump.write(cast<byte>(ref<float>(A.data, align(64, A.size))));
-   };
-   write(membrane->Px); write(membrane->Py); write(membrane->Pz);
-   //write(membrane->Vx); write(membrane->Vy); write(membrane->Vz);
-   write(membrane->Fx); write(membrane->Fy); write(membrane->Fz);
-  }
-  /*auto forces = cast<byte>(::forces);
-  dump.write(ref<byte>(forces.data, align(64, forces.size)));*/
+
  }
  //::forces.clear();
 
@@ -277,6 +282,7 @@ void Simulation::step() {
 }
 
 void Simulation::profile() {
+ assert_(dt*(60/s), dt);
  log("----",timeStep/size_t(1*1/(dt*(60/s))),"----");
  log(totalTime.microseconds()/timeStep, "us/step", totalTime, timeStep);
  //if(stepTimeRT.nanoseconds()*100<totalTime.nanoseconds()*99) log("step", strD(stepTimeRT, totalTime));
@@ -433,10 +439,11 @@ void Simulation::run() {
     pressureStrain = File(name, currentWorkingDirectory(), Flags(WriteOnly|Create|Truncate));
     {
      String line = "version:"+str(VERSION)+",voidRatio:"+str(voidRatio)+
-       ",sfSpeed:"+str(targetStaticFrictionSpeed)+
-       ",sfLength:"+str(targetStaticFrictionLength)+
-       ",sfStiffness:"+str(targetStaticFrictionStiffness)+
-       ",sfDamping:"+str(targetStaticFrictionDamping)+"\n";
+       ",TimeStep:"+str(dt/us)+
+       ",sfSpeed:"+str(staticFrictionSpeed)+
+       ",sfLength:"+str(staticFrictionLength)+
+       ",sfStiffness:"+str(staticFrictionStiffness)+
+       ",sfDamping:"+str(staticFrictionDamping)+"\n";
      log_(line);
      if(pressureStrain) pressureStrain.write(line);
     }
@@ -450,7 +457,11 @@ void Simulation::run() {
     log_(line);
     if(pressureStrain) pressureStrain.write(line);
    }
-   if(strain > 1./9) { processState=Done; break; }
+   if(strain > 1./8) {
+    processState=Done;
+    dump();
+    break;
+   }
   }
  }
  totalTime.stop();
