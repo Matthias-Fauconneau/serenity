@@ -4,8 +4,52 @@
 #include "wire.h"
 
 void Simulation::stepProcess() {
+ if(processState == Release) {
+  /*if(membraneViscosity < targetViscosity) membraneViscosity += 10 * dt;
+  if(membraneViscosity > targetViscosity) membraneViscosity = targetViscosity;*/
+  constexpr float membraneRadiusSpeed = 0.04*m/s;
+  if(membraneRadius < latticeRadius) membraneRadius += membraneRadiusSpeed * dt;
+  if(membraneRadius > latticeRadius) {
+   membraneRadius  = latticeRadius;
+   processState = Released;
+  }
+  float maxGrainMembraneV = maxGrainV + membraneRadiusSpeed;
+  grainMembraneGlobalMinD -= maxGrainMembraneV * this->dt;
+  const int W = membrane->W;
+  const int stride = membrane->stride;
+  const int margin = membrane->margin;
+  for(size_t i: range(membrane->H)) {
+   for(size_t j: range(membrane->W)) {
+    float z = i*membrane->height/(membrane->H-1);
+    float a = 2*PI*(j+(i%2)*1./2)/membrane->W;
+    float x = membraneRadius*cos(a), y = membraneRadius*sin(a);
+    membrane->Px[i*stride+margin+j] = x;
+    membrane->Py[i*stride+margin+j] = y;
+    membrane->Pz[i*stride+margin+j] = z;
+   }
+   // Copies position back to repeated nodes
+   membrane->Px[i*stride+margin-1] = membrane->Px[i*stride+margin+W-1];
+   membrane->Py[i*stride+margin-1] = membrane->Py[i*stride+margin+W-1];
+   membrane->Pz[i*stride+margin-1] = membrane->Pz[i*stride+margin+W-1];
+   membrane->Px[i*stride+margin+W] = membrane->Px[i*stride+margin+0];
+   membrane->Py[i*stride+margin+W] = membrane->Py[i*stride+margin+0];
+   membrane->Pz[i*stride+margin+W] = membrane->Pz[i*stride+margin+0];
+  }
+  membranePositionChanged = true;
+  //if(membraneViscosity == targetViscosity) processState = Released;
+ }
+ if(nextProcessState > processState) {
+  processState = nextProcessState;
+  log("processState = ", processStates[processState]);
+  if(processState == Release) {
+   //membraneViscosity = targetViscosity;
+   //wire->count--;
+   //for(size_t i: range(wire->count)) { wire->Vx[i] = 0; wire->Vy[i] = 0; wire->Vz[i] = 0; }
+   log("Release", wire->count);
+  }
+ }
  if(currentHeight >= topZ-grain->radius && processState < Release && !triaxial) {
-  log("processState = Release 1");
+  //log("processState = Release 1");
   processState = Release;
   if(wire->count) {
    /*wire->Vx[wire->count-1] = 0;
@@ -16,13 +60,17 @@ void Simulation::stepProcess() {
    wire->Vz[wire->count-1] = wire->Vz[wire->count-2];
   }
  }
+ /*if(processState == Release) {
+  log("processState = Released");
+  processState = Released;
+ }*/
  if(processState >= Release/*d*/) return;
  //pressure = 0; membraneViscosity = 1-1000*dt; // DEBUG
  // Process
  if(targetGrainCount && (grain->count == targetGrainCount || processState > Pour ||
-                         (triaxial && lastSpawnTimeStep+0.001/dt < timeStep))) {
+                         (triaxial && lastSpawnTimeStep+0.008/dt < timeStep))) {
   //if(!useMembrane) return;
-  log("processState = Release 2");
+  //log("processState = Release 2");
   if(!triaxial) processState = Release;
   if(processState  < Pressure) {
    //static bool unused once = ({ log("Set Friction"); true; });
@@ -79,10 +127,6 @@ void Simulation::stepProcess() {
    if(processState == Load) {
     topZ -= dt * plateSpeed;
     bottomZ += dt * plateSpeed;
-   }
-   if(processState == Release) {
-    log("processState = Released");
-    processState = Released;
    }
   }
  } else {

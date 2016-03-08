@@ -77,10 +77,10 @@ struct Simulation {
  float currentHeight;
  float pressure = targetPressure;
  size_t lastSpawnTimeStep = 0;
- float grainViscosity = 1-16*dt;
- float angularViscosity = 1-1*dt;
- const float targetViscosity = 1-16*dt;
- float wireViscosity = 1-1*dt;
+ float grainViscosity = 1-0/*16*/*dt;
+ float angularViscosity = 1-0/*1*/*dt;
+ const float targetViscosity = 1-0/*16*/*dt;
+ float wireViscosity = 1-0/*1*/*dt;
  float membraneViscosity = 0;
  float membraneRadius;
  bool membranePositionChanged = false;
@@ -280,8 +280,10 @@ struct Simulation {
  File dumpFile;
  void dump();
  bool primed = false;
+ File energyFile;
  File pressureStrain;
  float voidRatio = 0;
+ map<float, float> speedTime;
 
  Simulation(const Dict& p);
  virtual ~Simulation();

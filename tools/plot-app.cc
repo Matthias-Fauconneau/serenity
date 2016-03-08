@@ -7,6 +7,7 @@
 #include "variant.h"
 #include "time.h"
 
+#if 0
 size_t medianWindowRadius = 0;
 buffer<float> medianFilter(ref<float> source, size_t W=medianWindowRadius) {
  assert_(source.size > W+1+W);
@@ -31,6 +32,7 @@ buffer<float> meanFilter(ref<float> source, size_t W=meanWindowRadius) {
  }
  return target;
 }
+#endif
 
 //FIXME
 /// Returns an array of the application of a function to every elements of a reference
@@ -48,10 +50,10 @@ struct PlotView : HList<Plot> {
   window->actions[Escape] = []{ exit_group(0); /*FIXME*/ };
   window->actions[F12] = {this, &PlotView::snapshot};
   window->actions[Space] = {this, &PlotView::load}; // no inotify on NFS
-  window->actions[Key('m')] = [this]{
+  /*window->actions[Key('m')] = [this]{
    medianWindowRadius = medianWindowRadius?64:0;
    load();
-  };
+  };*/
   window->presentComplete = [this]{ shown=true; };
   load();
  }
@@ -79,8 +81,13 @@ struct PlotView : HList<Plot> {
   static buffer<string> Y = split("Axial (Pa)" ", Radial (Pa)" ", Normalized deviator stress, Stress ratio"_,", ");
   for(size_t index: range(3, Y.size)) {
    Plot& plot = append();
-   plot.xlabel = "Strain (%)"__;
-   plot.ylabel = copyRef(Y[index]);
+   if(1) {
+    plot.xlabel = "Strain (%)"__;
+    plot.ylabel = copyRef(Y[index]);
+   } else {
+    plot.xlabel = "Time (s)"__;
+    plot.ylabel = "Maximum grain speed (m/s)"__;
+   }
    map<String, array<Variant>> allCoordinates;
    for(Folder folder: {"."_}) {
     for(string name: folder.list(Files)) {
@@ -97,8 +104,11 @@ struct PlotView : HList<Plot> {
      if(endsWith(name,".stdout")) continue;
      if(endsWith(name,".png")) continue;
      auto parameters = parseDict(name);
-     if(parameters.at("Radius")!="20"_) continue;
-     if(parameters.at("TimeStep")!="0.1"_) continue;
+     if(1) {
+      if(parameters.at("Radius")!="30"_) continue;
+      if(parameters.at("TimeStep")!="0.2"_) continue;
+      if(parameters.at("grainShearModulus")!="0.2"_) continue;
+     }
      TextData s (readFile(name, folder));
      s.until('\n'); // First line: constant results
      buffer<string> names = split(s.until('\n'),", "); // Second line: Headers
@@ -116,6 +126,7 @@ struct PlotView : HList<Plot> {
       }
      }
      break2:;
+     if(!dataSets.contains(plot.xlabel)) continue;
      if(plot.ylabel == "Normalized deviator stress") {
       float pressure = parameters.value("Pressure", 80e3);
       ref<float> radial = dataSets.at("Radial (Pa)");
@@ -142,18 +153,22 @@ struct PlotView : HList<Plot> {
      /*size_t i = plot.dataSets.size();//0; while(i<plot.dataSets.size() && plot.dataSets.values[i].values.last() <= key) i++;
      plot.dataSets.keys.insertAt(i, str(parameters,", "_));
      plot.dataSets.values.insertAt(i, map<float,float>{::move(dataSets.at(plot.xlabel)), ::move(dataSets.at(plot.ylabel))});*/
-     if(max(dataSets.at("Strain (%)"_)) < 100./14) { log("Failed", str(parameters,", "_)); /*continue;*/ }
-     mref<float> strain = dataSets.at("Strain (%)"_);
-     //for(size_t i : range(strain.size)) strain[i] -= (100./12 - 8)/2;
-     size_t first=0; //for(size_t i : range(strain.size)) if(strain[i] >= 0) { first=i; break; }
-     size_t last=strain.size; for(size_t i : range(strain.size)) if(strain[i] > 100./13) { last=i; break; }
+     mref<float> X = dataSets.at(plot.xlabel);
+     size_t first = 0;
+     size_t last = X.size;
+     if(plot.xlabel == "Strain (%)"_) {
+      if(max(dataSets.at(plot.xlabel)) < 100./14) { log("Failed", str(parameters,", "_)); /*continue;*/ }
+      //for(size_t i : range(strain.size)) strain[i] -= (100./12 - 8)/2;
+      //for(size_t i : range(strain.size)) if(strain[i] >= 0) { first=i; break; }
+      //for(size_t i : range(X.size)) if(X[i] > 100./13) { last=i; break; }
+     }
      plot.dataSets.insert(str(parameters,", "_), {copyRef(dataSets.at(plot.xlabel).sliceRange(first, last)),
                                                                               copyRef(dataSets.at(plot.ylabel).sliceRange(first, last))});
      //if(plot.ylabel=="Normalized deviator stress") { plot.min.y = 0; plot.max.y = 1; }
     }
    }
-   plot.min.x = 0; plot.max.x = 8;
-   plot.min.y = 0; plot.max.y = 0.5;
+   //if(plot.xlabel == "Strain (%)"_) { plot.min.x = 0; plot.max.x = 8; }
+   if(plot.ylabel == "Stress ratio"_) { plot.min.y = 0, plot.max.y = 0.4; }
   }
   //if(count()) window->setTitle(array<Plot>::at(0).ylabel);
   shown = false;

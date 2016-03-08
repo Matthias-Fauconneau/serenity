@@ -66,12 +66,12 @@ buffer<String> Folder::list(uint flags) const {
       || (flags&Folders && type==DT_DIR)
       || (flags&Devices && type==DT_CHR)
       || (flags&Drives && type==DT_BLK) ) {
-    if(flags&Sorted) error("UNIMPL"); //list.insertSorted( copyRef(name) );
+    if(flags&Sorted) list.insertSorted( copyRef(name) );
     else list.append( copyRef(name) );
    }
    if(flags&Recursive && type==DT_DIR) {
     for(const String& file: Folder(name,*this).list(flags)) {
-     if(flags&Sorted) error("UNIMPL"); //list.insertSorted( name+'/'+file );
+     if(flags&Sorted) list.insertSorted( name+'/'+file );
      else list.append( name+'/'+file );
     }
    }

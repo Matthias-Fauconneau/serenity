@@ -21,14 +21,14 @@ struct ParameterSweep {
    if(running) log("Running jobs: ["+str(runningCount)+"]: qdel -f"+running+" &");
    if(queued ) log("Queued jobs:["+str(queuedCount)+"]: qdel -f"+queued+" &");
   }
-  size_t done = 0, running = 0, queued = 0;\
-  for(string dt: {1?"0.1"_:"1"_}) {
+  size_t done = 0, running = 0, queued = 0;
+  for(string dt: {/*"0.125"_,"0.25"_,"0.5"_,"1"_*/"0.2"_}) {
    parameters["TimeStep"__] = dt;
    /*for(string plateSpeed: {"40"_}) {
     parameters["Speed"__] = plateSpeed; // mm/s*/
     for(int pressure: {0,20,40,60,80}) {
      parameters["Pressure"__] = String(str(pressure)+"K"_); // Pa
-     for(float radius: {30/*20,*//*30,*//*40*/}) {
+     for(float radius: {/*20,*/30/*,40*//*20,*//*30,*//*40*/}) {
       parameters["Radius"__] = radius; //mm
       /*for(string staticFrictionSpeed: {"50"_}) {
        parameters["sfSpeed"__] = staticFrictionSpeed; // mm/s
@@ -38,6 +38,8 @@ struct ParameterSweep {
          parameters["sfStiffness"__] = staticFrictionStiffness;
          for(string staticFrictionDamping: {"1"_}) {
           parameters["sfDamping"__] = staticFrictionDamping; // N/(m/s)*/
+      for(string grainShearModulus: {/*"100"_,"200"_,"400"_,*/"800"_}) {
+       parameters["grainShearModulus"__] = grainShearModulus; // MPa
       for(string pattern: ref<string>{"none","helix","spiral","radial"}) {
        parameters["Pattern"__] = pattern;
           auto add = [&] {
@@ -62,8 +64,8 @@ struct ParameterSweep {
           };
           add();
          }
-        /*}
-       }
+        }
+       /*}
       }*/
      }
     }
@@ -90,7 +92,7 @@ struct ParameterSweep {
   while(missing) {
    int threadCount = 0;
    for(int N: {4}) {
-    for(SGEHost& host: hosts) if(host.jobCount+N<min(18,host.slotCount)) {
+    for(SGEHost& host: hosts) if(host.jobCount+N</*min(18,*/(host.slotCount)) {
      host.jobCount+=N;
      log(host);
      threadCount = N;

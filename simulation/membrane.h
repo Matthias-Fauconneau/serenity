@@ -6,7 +6,7 @@ struct Membrane {
 
  sconst float density = 1000 * kg / cb(m);
  sconst float curvature = 0;
- sconst float shearModulus = 10 * MPa;
+ sconst float shearModulus = /*10*/1 * MPa;
  sconst float poissonRatio = 0.48;
  sconst float elasticModulus = 2*shearModulus*(1+poissonRatio);
 

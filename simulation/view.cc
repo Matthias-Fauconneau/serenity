@@ -5,6 +5,10 @@
 #include "wire.h"
 #include "matrix.h"
 #include "gl.h"
+#if PLOT
+#include "plot.h"
+#include "layout.h"
+#endif
 #include "encoder.h"
 #define ENCODER 1
 FILE(shader_glsl)
@@ -368,7 +372,11 @@ struct SimulationApp : Poll {
  Simulation simulation;
  Thread simulationMasterThread;
  SimulationView view;
- unique<Window> window = ::window(&view, -1, mainThread, true, false);
+#if PLOT
+ Plot plot;
+ VBox vbox {{&view, &plot}};
+#endif
+ unique<Window> window = ::window(/*&vbox*/&view, -1, mainThread, true, false);
  unique<Encoder> encoder =
    arguments().contains("video") ? unique<Encoder>("heap.mp4"_) : nullptr;
 
@@ -390,34 +398,41 @@ struct SimulationApp : Poll {
    log(simulation.processStates[simulation.processState],
      simulation.processStates[simulation.nextProcessState]);
   };
-  window->actions[Escape] = [this]{
+  window->actions[Escape] = [this] {
    simulation.stop = true;
    requestTermination();
    if(!encoder) simulationMasterThread.wait();
   };
-  window->presentComplete = [this]{
+  window->presentComplete = [this] {
    if(encoder) {
     encoder->writeVideoFrame(window->readback());
     //view.yawPitch.x += 2*PI/60;
     queue();
    }
-   else if(simulation.processState < Simulation::Done) {
-    if(simulation.triaxial) {
-     if(simulation.topZ0) {
-      int strain = 100 * (1-(simulation.topZ-simulation.bottomZ)/simulation.topZ0);
-      window->setTitle(str(strain));
+   else {
+    if(simulation.processState < Simulation::Done) {
+     if(simulation.triaxial) {
+      if(simulation.topZ0) {
+       int strain = 100 * (1-(simulation.topZ-simulation.bottomZ)/simulation.topZ0);
+       window->setTitle(str(strain));
+      } else {
+       int fill = 100 * simulation.currentHeight/simulation.topZ;
+       window->setTitle(str(fill));
+      }
      } else {
-      int fill = 100 * simulation.currentHeight/simulation.topZ;
-      window->setTitle(str(fill));
+      window->setTitle(str(simulation.processStates[simulation.processState],
+                       simulation.timeStep*simulation.dt /s, simulation.grain->count));
      }
-    } else {
-     log(simulation.bottomZ, simulation.topZ);
-     window->setTitle(str(simulation.processStates[simulation.processState],
-                      simulation.timeStep*simulation.dt /s, simulation.grain->count));
+     window->render();
     }
-    window->render();
+    else window->setTitle("Done");
+#if PLOT
+    plot.xlabel = "Time (s)"__;
+    plot.ylabel = "Maximum Speed (m/s)"__;
+    plot.max.x = 60;
+    plot.dataSets["Maximum Speed"__] = ::copy(simulation.speedTime);
+#endif
    }
-   else window->setTitle("Done");
    //window->setTitle(simulation.processStates[simulation.processState]);
    /*if(simulation.validation)
     window->setTitle(str(simulation.timeStep*simulation.dt /s, simulation.grain->count,
@@ -443,6 +458,12 @@ struct SimulationApp : Poll {
     return;
    }
    for(int unused t: range((1/(60*simulation.dt)))) { simulation.step(); if(fail) return; }
+#if PLOT
+   plot.xlabel = "Time (s)"__;
+   plot.ylabel = "Maximum Speed (m/s)"__;
+   plot.max.x = 60;
+   plot.dataSets["Maximum Speed"__] = ::copy(simulation.speedTime);
+#endif
    window->render();
   } else { // Asynchronous (simulationMasterThread)
    simulation.run();

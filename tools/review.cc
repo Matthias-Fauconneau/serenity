@@ -819,6 +819,7 @@ struct Review {
 
   plot.xlabel = "Strain (%)"__;
   plot.max.x = 100./8;
+  plot.min.y = 0, plot.max.y = 0.5;
   buffer<float> strain;
   if(dataSets.contains(plot.xlabel)) strain = move(dataSets.at("Strain (%)"));
   else {
@@ -827,6 +828,7 @@ struct Review {
    strain = apply(height, [=](float h){ return (1-h/height[0])*100; });
   }
 
+#if 0
   if(index == Volume) {
    plot.ylabel ="Volumetric Strain (%)"__;
    buffer<float> volume;
@@ -837,8 +839,7 @@ struct Review {
     buffer<float> radius = ::radius(dataSets);
     ref<float> height = dataSets.at("Height (m)"_);
     float v0 = height[0] * float(PI) * sq(radius[0]);
-    volume = apply(strain.size, [&](size_t i){
-     return (1 - (height[i] * float(PI) * sq(radius[i]))/v0)*100; });
+    volume = apply(strain.size, [&](size_t i) { return (1 - (height[i] * float(PI) * sq(radius[i]))/v0)*100; });
    }
    plot.dataSets.insert(""__, {::move(strain), ::move(volume)});
   }
@@ -864,7 +865,10 @@ struct Review {
    }
    plot.dataSets.insert(""__, {::move(strain), ::move(pressure)});
   }*/
-  else {
+ }
+  else
+#endif
+ {
    buffer<float> stress = ::stress(dataSets);
    /*if(useMedianFilter  && strain.size > 2*medianWindowRadius+1)
       strain = copyRef(strain.slice(medianWindowRadius, strain.size-2*medianWindowRadius));
@@ -874,8 +878,8 @@ struct Review {
     plot.dataSets.insert(""__, {::move(strain), ::move(stress)});
    }
    else*/ if(index==Deviatoric) {
-    ref<float> force = dataSets.at(dataSets.contains("Side Force (N)"_) ? "Side Force (N)"_ : "Radial Force (N)"_);
-    buffer<float> radius = ::radius(dataSets);
+    //ref<float> force = dataSets.at(dataSets.contains("Side Force (N)"_) ? "Side Force (N)"_ : "Radial Force (N)"_);
+    /*buffer<float> radius = ::radius(dataSets);
     ref<float> height = dataSets.at("Height (m)"_);
     buffer<float> pressure (force.size);
     float outsidePressure = float(point.at("Pressure"));
@@ -884,19 +888,21 @@ struct Review {
         pressure[i] = force[i] / (height[i] * 2 * PI * radius[i]);
         pressure[i] = ::min(pressure[i], outsidePressure); // Not corrected
         //assert_(pressure[i] >= 0);
-    }
+    }*/
     /*if(useMedianFilter && pressure.size > 2*medianWindowRadius+1) {
      const size_t medianWindowRadius = 4;
      pressure = medianFilter(pressure , medianWindowRadius);
     }*/
     plot.ylabel = "Normalized Deviatoric Stress"__;
     buffer<float> deviatoric (strain.size);
-    assert_(strain.size <= pressure.size, strain.size, pressure.size);
-    for(size_t i: range(deviatoric.size)) deviatoric[i] = (stress[i]-pressure[i])/(stress[i]+pressure[i]);
+    //assert_(strain.size <= pressure.size, strain.size);
+    //for(size_t i: range(deviatoric.size)) deviatoric[i] = (stress[i]-pressure[i])/(stress[i]+pressure[i]);
+    float pressure = float(point.at("Pressure"));
+    for(size_t i: range(deviatoric.size)) deviatoric[i] = (stress[i]-pressure)/(stress[i]+pressure);
     //plot.min.y = 0; plot.max.y = 0.4;
     plot.dataSets.insert(""__, {::move(strain), ::move(deviatoric)});
    }
-   else error(index);
+   else log("index", index);
   }
   return plot;
  }
@@ -1073,7 +1079,7 @@ struct Review {
    } else log("Missing ID", point);
 
    if(details) {
-       buffer<String> files = Folder(".").list(Files|Sorted);
+       buffer<String> files = Folder(".").list(Files/*|Sorted*/);
     String lastSnapshot; int64 lastTime = 0;
     for(string file: files) if(startsWith(file, str(array.stripSortKeys(point)))) {
      if(endsWith(file, ".grain") || endsWith(file, ".side") /*|| endsWith(file, ".wire")*/) {

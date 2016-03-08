@@ -158,6 +158,11 @@ void Simulation::stepWireIntegration() {
   wire->Vy[wire->count-1] = 0;
   wire->Vz[wire->count-1] = 0;
  }
+ for(size_t i: range(wire->count, align(simd, wire->count))) { // Correct maximum wire speed
+  wire->Vx[simd+i] = 0;
+  wire->Vy[simd+i] = 0;
+  wire->Vz[simd+i] = 0;
+ }
  wireIntegrationTime +=
  parallel_chunk(align(simd, wire->count-fixLast)/simd, [this,maxWireVT2,fixLast/*DEBUG*/](uint id, size_t start, size_t size) {
    const vXsf dt_mass = floatX(dt / wire->mass), dt = floatX(this->dt);

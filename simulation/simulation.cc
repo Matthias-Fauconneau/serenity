@@ -27,7 +27,7 @@ array<int> highlightGrains;
 Simulation::Simulation(const Dict& p) :
   triaxial(p.value("triaxial","1"_)!="0"_),
   validation(p.value("validation","1"_)!="0"_),
-  dt((float)p.value("TimeStep", validation ? 1.f : 1.f)*us),
+  dt((float)p.value("TimeStep", validation ? 0.2f : 10.f)*us),
   normalDampingRate((float)p.value("nDamping",1/*1./2*/)*1),
   targetGrainCount(
    p.value("grainRadius", validation ? 2.5f : 20) != 0 ?
@@ -36,7 +36,7 @@ Simulation::Simulation(const Dict& p) :
    ),
   grain(p.value("grainRadius", validation ? 2.5f : 20)*mm,
            p.value("grainDensity", validation ? 7.8e3 : 1.4e3)*kg/cb(m),
-           p.value("grainShearModulus", validation ? /*77000*/1 : 30)*MPa,
+           p.value("grainShearModulus", validation ? /*77000*/800 : 30)*MPa,
            p.value("grainPoissonRatio", validation ? 0.28 : 0.35)*1,
            p.value("grainWallThickness", validation ? 0 : 0.4)*mm,
            targetGrainCount),
@@ -53,9 +53,9 @@ Simulation::Simulation(const Dict& p) :
   /*targetS*/staticFrictionLength((float)p.value("sfLength", validation ? 0.1 : 0.4/*1*/)*mm),
   /*targetS*/staticFrictionStiffness((float)p.value("sfStiffness", validation ? 1e3f : 4e3f)/m),
   /*targetS*/staticFrictionDamping((float)p.value("sfDamping", 1)*N/(m/s)),
-  Gz(-(float)p.value("G", validation ? 1000 : 10.f)*N/kg),
-  verticalSpeed(p.value("verticalSpeed", validation ? 0.5 : 0.05f)*m/s),
-  linearSpeed(p.value("linearSpeed", membrane->radius/mm)*m/s),
+  Gz(-(float)p.value("G", validation ? 10 : 10.f)*N/kg),
+  verticalSpeed(p.value("verticalSpeed", (/*validation ? 0.1 : 0.01f*/0.05f)*membrane->radius/mm)*m/s),
+  linearSpeed(p.value("linearSpeed", (/*validation ? 1 : 0.4f*/2)*membrane->radius/mm)*m/s),
   targetPressure((float)p.value("Pressure", 80e3f)*Pa),
   plateSpeed((float)p.value("Speed", 40)*mm/s),
   patternRadius(membrane->radius - wire->radius),
@@ -71,6 +71,7 @@ Simulation::Simulation(const Dict& p) :
  for(string key: p.keys)
   assert_(ref<string>({
                        "TimeStep","Radius","Pressure","Speed","Pattern","triaxial","validation",
+                       "grainShearModulus",
                        "sfDamping","sfLength","sfSpeed","sfStiffness"}).contains(key), key);
  assert(str(p).size < 256, str(p).size);
  if(pattern) { // Initial wire node
@@ -148,47 +149,6 @@ void Simulation::dump() {
 }
 
 void Simulation::step() {
- if(processState == Release) {
-  /*if(membraneViscosity < targetViscosity) membraneViscosity += 10 * dt;
-  if(membraneViscosity > targetViscosity) membraneViscosity = targetViscosity;*/
-  constexpr float membraneRadiusSpeed = 0.04*m/s;
-  if(membraneRadius < latticeRadius) membraneRadius += membraneRadiusSpeed * dt;
-  if(membraneRadius > latticeRadius) membraneRadius  = latticeRadius;
-  float maxGrainMembraneV = maxGrainV + membraneRadiusSpeed;
-  grainMembraneGlobalMinD -= maxGrainMembraneV * this->dt;
-  const int W = membrane->W;
-  const int stride = membrane->stride;
-  const int margin = membrane->margin;
-  for(size_t i: range(membrane->H)) {
-   for(size_t j: range(membrane->W)) {
-    float z = i*membrane->height/(membrane->H-1);
-    float a = 2*PI*(j+(i%2)*1./2)/membrane->W;
-    float x = membraneRadius*cos(a), y = membraneRadius*sin(a);
-    membrane->Px[i*stride+margin+j] = x;
-    membrane->Py[i*stride+margin+j] = y;
-    membrane->Pz[i*stride+margin+j] = z;
-   }
-   // Copies position back to repeated nodes
-   membrane->Px[i*stride+margin-1] = membrane->Px[i*stride+margin+W-1];
-   membrane->Py[i*stride+margin-1] = membrane->Py[i*stride+margin+W-1];
-   membrane->Pz[i*stride+margin-1] = membrane->Pz[i*stride+margin+W-1];
-   membrane->Px[i*stride+margin+W] = membrane->Px[i*stride+margin+0];
-   membrane->Py[i*stride+margin+W] = membrane->Py[i*stride+margin+0];
-   membrane->Pz[i*stride+margin+W] = membrane->Pz[i*stride+margin+0];
-  }
-  membranePositionChanged = true;
-  if(membraneViscosity == targetViscosity) processState = Released;
- }
- if(nextProcessState > processState) {
-  processState = nextProcessState;
-  log("processState = ", processStates[processState]);
-  if(processState == Release) {
-   //membraneViscosity = targetViscosity;
-   //wire->count--;
-   //for(size_t i: range(wire->count)) { wire->Vx[i] = 0; wire->Vy[i] = 0; wire->Vz[i] = 0; }
-   log("Release", wire->count);
-  }
- }
  stepTime.start();
 
  stepProcess();
@@ -421,6 +381,34 @@ void Simulation::run() {
    if(processState == Pressure) log(
       "Pressure", int(round(pressure)), "Pa",
       "Membrane viscosity", membraneViscosity );
+  }
+  if(!triaxial) {
+   if(!primed) {
+    primed = true;
+    String name = replace(arguments()[0],"/",":");
+    energyFile= File(name, currentWorkingDirectory(), Flags(WriteOnly|Create|Truncate));
+    {
+     String line = "version:"+str(VERSION)+",voidRatio:"+str(voidRatio)+
+       ",TimeStep:"+str(dt/us)+
+       ",grainShearModulus:"+str(grain->shearModulus)+
+       ",sfSpeed:"+str(staticFrictionSpeed)+
+       ",sfLength:"+str(staticFrictionLength)+
+       ",sfStiffness:"+str(staticFrictionStiffness)+
+       ",sfDamping:"+str(staticFrictionDamping)+"\n";
+     log_(line);
+     energyFile.write(line);
+    }
+    {
+     String line = "Time (s), ""Maximum grain speed (m/s), ""Maximum wire speed (m/s)""\n"__;
+     log_(line);
+     energyFile.write(line);
+    }
+   }
+   speedTime.insert(timeStep*dt/s, max(maxGrainV, maxWireV));
+   {String line = str(timeStep*dt/s, maxGrainV, maxWireV)+'\n';
+    log_(line);
+    if(energyFile) energyFile.write(line);
+   }
   }
   if(processState == Load) {
    float height = topZ-bottomZ;
