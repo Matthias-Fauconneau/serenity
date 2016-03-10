@@ -55,7 +55,7 @@ Simulation::Simulation(const Dict& p) :
   /*targetS*/staticFrictionDamping((float)p.value("sfDamping", 1)*N/(m/s)),
   Gz(-(float)p.value("G", validation ? 10 : 10.f)*N/kg),
   verticalSpeed(p.value("verticalSpeed", (/*validation ? 0.1 : 0.01f*/0.05f)*membrane->radius/mm)*m/s),
-  linearSpeed(p.value("linearSpeed", (/*validation ? 1 : 0.4f*/2)*membrane->radius/mm)*m/s),
+  linearSpeed(p.value("linearSpeed", (/*validation ? 1 : 0.4f*/4)*membrane->radius/mm)*m/s),
   targetPressure((float)p.value("Pressure", 80e3f)*Pa),
   plateSpeed((float)p.value("Speed", 40)*mm/s),
   patternRadius(membrane->radius - wire->radius),
@@ -71,7 +71,7 @@ Simulation::Simulation(const Dict& p) :
  for(string key: p.keys)
   assert_(ref<string>({
                        "TimeStep","Radius","Pressure","Speed","Pattern","triaxial","validation",
-                       "grainShearModulus",
+                       "grainShearModulus","linearSpeed",
                        "sfDamping","sfLength","sfSpeed","sfStiffness"}).contains(key), key);
  assert(str(p).size < 256, str(p).size);
  if(pattern) { // Initial wire node
@@ -104,7 +104,7 @@ void Simulation::dump() {
  //if(dumpFile && dumpFile.size()/*FIXME: without stat*/ > 4ul<<30) dumpFile = File(); // Reset if >4G
  if(!dumpFile) {
   String name = replace(arguments()[0],"/",":");
-  dumpFile = File(name+".dump", /*currentWorkingDirectory()*/"/dev/shm"_, Flags(WriteOnly|Create|Truncate));
+  dumpFile = File(name+".dump", currentWorkingDirectory()/*"/dev/shm"_*/, Flags(WriteOnly|Create|Truncate));
  }
  buffer<byte> header (64, 0);
  header.append(raw(grain->count));

@@ -22,14 +22,16 @@ struct ParameterSweep {
    if(queued ) log("Queued jobs:["+str(queuedCount)+"]: qdel -f"+queued+" &");
   }
   size_t done = 0, running = 0, queued = 0;
-  for(string dt: {/*"0.125"_,"0.25"_,"0.5"_,"1"_*/"0.2"_}) {
+  for(string dt: {"0.1"_}) {
    parameters["TimeStep"__] = dt;
    /*for(string plateSpeed: {"40"_}) {
     parameters["Speed"__] = plateSpeed; // mm/s*/
-    for(int pressure: {0,20,40,60,80}) {
+    for(int pressure: {0,10,20,30,40,50,60,70,80}) {
      parameters["Pressure"__] = String(str(pressure)+"K"_); // Pa
-     for(float radius: {/*20,*/30/*,40*//*20,*//*30,*//*40*/}) {
+     for(float radius: {20,30,40,50}) {
       parameters["Radius"__] = radius; //mm
+      for(float linearSpeed: {2,4,8}) {
+       parameters["linearSpeed"__] = linearSpeed; // m/s
       /*for(string staticFrictionSpeed: {"50"_}) {
        parameters["sfSpeed"__] = staticFrictionSpeed; // mm/s
        for(string staticFrictionLength: {"0.4"_}) {
@@ -65,8 +67,8 @@ struct ParameterSweep {
           add();
          }
         }
-       /*}
-      }*/
+       }
+      //}
      }
     }
    //}
@@ -90,9 +92,10 @@ struct ParameterSweep {
   size_t count = 0;
   array<SGEHost> hosts = qhost();
   while(missing) {
+#if 0
    int threadCount = 0;
-   for(int N: {4}) {
-    for(SGEHost& host: hosts) if(host.jobCount+N</*min(18,*/(host.slotCount)) {
+   for(int N: {1}) {
+    for(SGEHost& host: hosts) if(host.jobCount+N<host.slotCount)) {
      host.jobCount+=N;
      log(host);
      threadCount = N;
@@ -102,6 +105,9 @@ struct ParameterSweep {
    /*else*/ { log(hosts); if(0) { log("Not all jobs submitted"); break; } else log("Queuing"); }
    break2_:;
    assert_(threadCount);
+#else
+   int threadCount = 1;
+#endif
    if(arguments().contains("pretend"_)) log(parseDict(missing.take(random%missing.size)));
    else {
     String parameters = missing.take(random%missing.size);
