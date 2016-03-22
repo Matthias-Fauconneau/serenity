@@ -49,14 +49,14 @@ Simulation::Simulation(const Dict& p) :
   targetDynamicGrainGrainFrictionCoefficient(validation ? 0.096 : 1),
   /*targetD*/dynamicWireGrainFrictionCoefficient(3./2),
   /*targetD*/dynamicWireBottomFrictionCoefficient(1),
-  /*targetS*/staticFrictionSpeed((float)p.value("sfSpeed", validation ? 10 : 50/*100*/)*mm/s),
-  /*targetS*/staticFrictionLength((float)p.value("sfLength", validation ? 0.1 : 0.4/*1*/)*mm),
-  /*targetS*/staticFrictionStiffness((float)p.value("sfStiffness", validation ? 1e3f : 4e3f)/m),
+  /*targetS*/staticFrictionSpeed((float)p.value("sfSpeed", /*validation ? 10 : 50*/100/*100*/)*mm/s),
+  /*targetS*/staticFrictionLength((float)p.value("sfLength", /*validation ? 0.1 :*/ 0.4/*1*/)*mm),
+  /*targetS*/staticFrictionStiffness((float)p.value("sfStiffness", /*validation ? 1e3f :*/ 4e3f)/m),
   /*targetS*/staticFrictionDamping((float)p.value("sfDamping", 1)*N/(m/s)),
   Gz(-(float)p.value("G", validation ? 10 : 10.f)*N/kg),
   verticalSpeed(p.value("verticalSpeed", (/*validation ? 0.1 : 0.01f*/0.05f)*membrane->radius/mm)*m/s),
   linearSpeed(p.value("linearSpeed", (/*validation ? 1 : 0.4f*/4)*membrane->radius/mm)*m/s),
-  targetPressure((float)p.value("Pressure", 80e3f)*Pa),
+  targetPressure((float)p.value("Pressure", 40e3f)*Pa),
   plateSpeed((float)p.value("Speed", 40)*mm/s),
   patternRadius(membrane->radius - wire->radius),
   pattern(p.contains("Pattern") ? Pattern(ref<string>(patterns).indexOf(p.at("Pattern")))
@@ -215,11 +215,11 @@ void Simulation::step() {
  stepWireBottom();
  wireBottomTotalTime.stop();
 
- float height = topZ-bottomZ;
+ /*float height = topZ-bottomZ;
  float strain = 1-height/topZ0;
  if(processState == Load && strain>0.08 && 0) { // Records state after force evaluation before integration
 
- }
+ }*/
  //::forces.clear();
 
  stepWireIntegration();
@@ -421,6 +421,21 @@ void Simulation::run() {
    float side = 2*PI*membrane->radius*height;
    float radial = (radialSumStepCount?radialForce/radialSumStepCount:0) / side;
    radialForce = 0; radialSumStepCount = 0;
+   float tensionLength = 0;
+   {
+    const float* const wPx = wire->Px.data, *wPy = wire->Py.data, *wPz = wire->Pz.data;
+    const float internodeLength = wire->internodeLength;
+    float sum = 0;
+    for(int i=0; i<count-1; i++) {
+     float Ax = wPx[i], Ay = wPy[i], Az = wPz[i];
+     float Bx = wPx[i+1], By = wPy[i+1], Bz = wPz[i+1];
+     float Rx = Ax-Bx, Ry = Ay-By, Rz = Az-Bz;
+     float L = sqrt(Rx*Rx + Ry*Ry + Rz*Rz);
+     float x = internodeLength - L;
+     if(x>0) sum += x;
+    }
+    tensionLength = sum;
+   }
    if(!primed) {
     primed = true;
     String name = replace(arguments()[0],"/",":");
@@ -436,12 +451,13 @@ void Simulation::run() {
      if(pressureStrain) pressureStrain.write(line);
     }
     {
-     String line = "Strain (%), ""Radial (Pa), ""Axial (Pa)""\n"__;
+     String line = "Strain (%), ""Radial (Pa), ""Axial (Pa), ""Length (m)""\n"__;
      log_(line);
      if(pressureStrain) pressureStrain.write(line);
     }
    }
-   {String line = str(strain*100, 4u)+' '+str(int(round(radial/Pa)))+' '+str(int(round(stress/Pa)))+'\n';
+   {String line = str(strain*100, 4u)+' '+str(int(round(radial/Pa)))+' '+str(int(round(stress/Pa)))+' '
+                     +str(int(round(tensionLength/m)))+'\n';
     log_(line);
     if(pressureStrain) pressureStrain.write(line);
    }

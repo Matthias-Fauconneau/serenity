@@ -82,22 +82,26 @@ struct ArrayView : Widget {
   Folder results ("."_);
   auto list = results.list(Files);
   for(string fileName: list) {
-   if(!fileName.contains('.')) continue;
+   log(fileName);
+   //if(!fileName.contains('.')) continue;
    if(endsWith(fileName,".stdout")) continue;
-   string id = section(fileName,'.',0,-2);
+   if(endsWith(fileName,".dump")) continue;
+   string id = fileName; //section(fileName,'.',0,-2);
    Dict configuration = parseDict(id);
    //if(configuration.at("Radius")!="30"_) continue;
-   if(configuration.at("TimeStep")!="0.1"_) continue;
-   if(configuration.at("grainShearModulus")!="800"_) continue;
+   //if(configuration.at("TimeStep")!="0.05"_) continue;
+   if(!configuration.contains("grainShearModulus") || configuration.at("grainShearModulus")!="800"_) continue;
+   //if(configuration.at("linearSpeed")!="40"_) continue;
    //if(points.contains(configuration)) continue;
    assert_(!points.contains(configuration), "Duplicate", configuration, points);
    array<char> data;
-   if(0 && existsFile(id,cache) && File(id, cache).modifiedTime() >= realTime()-time*60e9)
+   if(1 && existsFile(id,cache) && File(id, cache).modifiedTime() >= realTime()-time*60e9)
     data = readFile(id, cache); // FIXME: do not reload old unchanged files
    if(!data) {
     String resultName;
     if(existsFile(id)) resultName = copyRef(id);
-    if(!resultName) continue;
+    assert_(resultName, id);
+    //if(!resultName) continue;
     /*if(resultName)*/ {
      map<string, array<float>> dataSets;
      TextData s (readFile(resultName));
@@ -171,7 +175,7 @@ break2:;
     assert_(data, fileName, id, resultName);
     log(id, data);
     writeFile(id, data, cache, true);
-   }
+   } else log(id, data);
    TextData s (data);
    /*float wireDensity = s.decimal();
    assert_(isNumber(wireDensity), s);
@@ -202,7 +206,8 @@ break2:;
    }
    log(displacement);
    if(displacement<12) continue;*/
-   if(maxStrain<12) continue;
+   //if(maxStrain<12) continue;
+   //if(maxStrain<6) continue;
    axial.insert(copy(configuration), peakStress);
    points.insert(move(configuration), peakStress);
   }
@@ -212,7 +217,7 @@ break2:;
    max = ::max(points.values);
   }
   dimensions[0] = copyRef(ref<string>{"TimeStep"_, "Radius"_, "Pressure"_, "Seed"_});
-  dimensions[1] = copyRef(ref<string>{"linearSpeed","Pattern"_});
+  dimensions[1] = copyRef(ref<string>{"sfLength","sfSpeed","sfStiffness","Speed","linearSpeed","Pattern"_});
   for(auto& dimensions: this->dimensions) {
    dimensions.filter([this](const string dimension) {
     for(const Dict& coordinates: points.keys) if(coordinates.keys.contains(dimension)) return false;

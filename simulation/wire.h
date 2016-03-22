@@ -9,7 +9,7 @@
   sconst float density = 2000 * kg / cb(m);
   const float mass = density * volume;
   const float curvature = 1./radius;
-  sconst float elasticModulus = 50 * MPa;
+  sconst float elasticModulus = 800 * MPa;
   sconst float poissonRatio = 0.48;
   const float tensionStiffness = 1 * elasticModulus * PI * sq(radius);
   const float tensionDamping = 1/*?*/ * sqrt(mass * tensionStiffness);

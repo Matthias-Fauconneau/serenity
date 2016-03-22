@@ -22,56 +22,59 @@ struct ParameterSweep {
    if(queued ) log("Queued jobs:["+str(queuedCount)+"]: qdel -f"+queued+" &");
   }
   size_t done = 0, running = 0, queued = 0;
-  for(string dt: {"0.1"_}) {
+  for(string dt: {"0.05"_,"0.10"_}) {
    parameters["TimeStep"__] = dt;
-   /*for(string plateSpeed: {"40"_}) {
-    parameters["Speed"__] = plateSpeed; // mm/s*/
-    for(int pressure: {0,10,20,30,40,50,60,70,80}) {
+   for(string plateSpeed: {"10"_/*,"40"_*/}) {
+    parameters["Speed"__] = plateSpeed; // mm/s
+    for(int pressure: {0,/*10,*/20,/*30,*/40,/*50,*/60,/*70,*/80}) {
      parameters["Pressure"__] = String(str(pressure)+"K"_); // Pa
-     for(float radius: {20,30,40,50}) {
+     for(float radius: {30,40}) {
       parameters["Radius"__] = radius; //mm
-      for(float linearSpeed: {2,4,8}) {
+      for(float linearSpeed: {20,40}) {
        parameters["linearSpeed"__] = linearSpeed; // m/s
-      /*for(string staticFrictionSpeed: {"50"_}) {
-       parameters["sfSpeed"__] = staticFrictionSpeed; // mm/s
-       for(string staticFrictionLength: {"0.4"_}) {
-        parameters["sfLength"__] = staticFrictionLength; // mm
-        for(string staticFrictionStiffness: {"1K"_}) {
-         parameters["sfStiffness"__] = staticFrictionStiffness;
-         for(string staticFrictionDamping: {"1"_}) {
-          parameters["sfDamping"__] = staticFrictionDamping; // N/(m/s)*/
-      for(string grainShearModulus: {/*"100"_,"200"_,"400"_,*/"800"_}) {
-       parameters["grainShearModulus"__] = grainShearModulus; // MPa
-      for(string pattern: ref<string>{"none","helix","spiral","radial"}) {
-       parameters["Pattern"__] = pattern;
-          auto add = [&] {
-           String id = str(parameters);
-           if(arguments().size > 0 && arguments()[0].contains('=')) {
-            auto filter = parseDict(arguments()[0]);
-            if(!parameters.includes(filter)) return;
+       for(string staticFrictionSpeed: {"20"_,/*"40"_,"80"_*/}) {
+        parameters["sfSpeed"__] = staticFrictionSpeed; // mm/s
+        for(string staticFrictionLength: {"0.2"_/*,"0.4"_*/}) {
+         parameters["sfLength"__] = staticFrictionLength; // mm
+         for(string staticFrictionStiffness: {"2K"_/*,"4K"_*/}) {
+          parameters["sfStiffness"__] = staticFrictionStiffness;
+          for(string staticFrictionDamping: {"1"_}) {
+           parameters["sfDamping"__] = staticFrictionDamping; // N/(m/s)*/
+           for(string grainShearModulus: {"800"_}) {
+            parameters["grainShearModulus"__] = grainShearModulus; // MPa
+            for(string pattern: ref<string>{"none","helix","spiral","radial"}) {
+             parameters["Pattern"__] = pattern;
+             auto add = [&] {
+              String id = str(parameters);
+              if(arguments().size > 0 && arguments()[0].contains('=')) {
+               auto filter = parseDict(arguments()[0]);
+               if(!parameters.includes(filter)) return;
+              }
+              all.append(copyRef(id));
+              if(jobs.contains(parseDict(id))) {
+               const auto& job = jobs.at(jobs.indexOf(parseDict(id)));
+               if(job.state == "running") running++;
+               else queued++;
+               jobs.take(jobs.indexOf(parseDict(id)));
+               return;
+              }
+              if(existing.contains(id)) {
+               //if(existsFile(id)) { log("Remove", id); remove(id); }
+               done++; return;
+              }
+              missing.append(move(id));
+             };
+             add();
+            }
            }
-           all.append(copyRef(id));
-           if(jobs.contains(parseDict(id))) {
-            const auto& job = jobs.at(jobs.indexOf(parseDict(id)));
-            if(job.state == "running") running++;
-            else queued++;
-            jobs.take(jobs.indexOf(parseDict(id)));
-            return;
-           }
-           if(existing.contains(id)) {
-            //if(existsFile(id)) { log("Remove", id); remove(id); }
-            done++; return;
-           }
-           missing.append(move(id));
-          };
-          add();
+          }
          }
         }
        }
-      //}
+      }
      }
     }
-   //}
+   }
   }
   if(jobs) {
    array<char> running, queued;
