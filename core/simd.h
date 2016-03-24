@@ -45,6 +45,7 @@ inline v4si cvtps2dq(v4sf a) { return __builtin_ia32_cvtps2dq(a); }
 inline v4si cvttps2dq(v4sf a) { return __builtin_ia32_cvttps2dq(a); }
 inline v4sf cvtdq2ps(v4si a) { return __builtin_ia32_cvtdq2ps(a); }
 
+#if 0
 #if __clang__
 #define shuffle(a,b, x, y, z, w) __builtin_shufflevector(a,b, x, y, z, w)
 #else
@@ -63,6 +64,7 @@ inline v4sf qmul(v4sf a, v4sf b) {
    + (v4sf)(_0001 ^ (v4si)(shuffle(a,a,0,1,2,1) * shuffle(b,b,3,3,3,1)
                                       + shuffle(a,a,1,2,0,2) * shuffle(b,b,2,0,1,2)));
 }
+#endif
 
 inline v4sf mix(v4sf x, v4sf y, float a) { return float4(1-a)*x + float4(a)*y; }
 

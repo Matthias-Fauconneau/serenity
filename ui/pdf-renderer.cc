@@ -135,7 +135,11 @@ dictionaryEnd: s.whileAny(" \t\r\n");
  error("Unknown type"_, escape(s.slice(s.index, 128)), hex(s.slice(s.index, 128)));
 }
 static Variant parseVariant(string buffer) { TextData s(buffer); return parseVariant(s); }
-static Dict toDict(const array<String>& xref, Variant&& object) { return object.dict ? move(object.dict) : parseVariant(xref[object.integer()]).dict; }
+static Dict toDict(const array<String>& xref, Variant&& object) {
+ if(object.type == Variant::Dict) return  move(object.dict);
+ if(object.type == Variant::Integer) return parseVariant(xref[object.integer()]).dict;
+ error(object);
+}
 
 buffer<Graphics> decodePDF(ref<byte> file, array<unique<FontData>>& outFonts) {
  array<String> xref;

@@ -45,9 +45,11 @@ void MidiInput::event() {
                 if(value < min) min = value;
                 int& max = this->max[key-21];
                 if(value > max) max = value;
-                int MIN = ::min(min, 32);
+                int MIN = min; //::min(min, 32);
                 if(value < MIN) value=MIN;
-                noteEvent(key, ::min(127,1+(int)(value-MIN)*128/(max-MIN)));
+                int MAX = ::max(max, 127);
+                if(value > MAX) value = MAX;
+                noteEvent(key, ::min(127,1+(int)(value-MIN)*128/(MAX-MIN)));
                 //noteEvent(key, value);
             }
         } else if(type == Controller) {

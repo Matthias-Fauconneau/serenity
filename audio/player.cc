@@ -25,9 +25,9 @@ generic buffer<T> shuffle(buffer<T>&& a) {
 /// Music player with a two-column interface (albums/track), gapless playback and persistence of last track+position
 struct Player : Poll {
 // Playback
-    AudioControl volume;
+    //AudioControl volume;
 	static constexpr uint channels = 2;
-	static constexpr uint periodSize = 32768;
+    static constexpr uint periodSize = 0;
 	unique<FFmpeg> file = 0;
     AudioOutput audio {{this,&Player::read}};
     mref<short2> lastPeriod;

@@ -253,7 +253,7 @@ struct DCC : URL {
      log(prefix, command, params);
      return true;
     } else if(1 && (
-             (command=="PRIVMSG" && startsWith(params,"#"))
+             (command=="PRIVMSG" && startsWith(params,"#") && !startsWith(prefix,bot))
              || (command == "NOTICE" && !startsWith(prefix,bot))
              || (1 && (command == "JOIN" || command == "PART" || command=="QUIT" || command=="MODE" || command=="NICK"
                        || command=="001" || command=="002" || command=="003" || command=="004" || command=="005"

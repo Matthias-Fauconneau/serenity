@@ -285,12 +285,13 @@ MusicXML::MusicXML(string document, string) {
                                                     //.stem = e.contains("stem"_) && e("stem").text() == "up"_,
                                                 }}}}}};
                             const Element* tremolo = ornaments && ornaments->contains("tremolo"_) ? &ornaments->child("tremolo"_) : 0;
-                            if(tremolo) {
-                                assert_(parseInteger(tremolo->text()) == 3);
-                                auto type = tremolo->attribute("type"_);
-                                if(type=="start"_) sign.note.tremolo = Note::Tremolo::Start;
-                                else if(type=="stop"_) sign.note.tremolo = Note::Tremolo::Stop;
-                                else log("Unknown tremolo type", e);
+                            if(tremolo && parseInteger(tremolo->text()) != 1) { // FIXME: single note tremolo
+                             if(parseInteger(tremolo->text()) != 3) log("parseInteger(tremolo->text()) == 3", tremolo->text());
+                             assert_(parseInteger(tremolo->text()) == 3, tremolo->text());
+                             auto type = tremolo->attribute("type"_);
+                             if(type=="start"_) sign.note.tremolo = Note::Tremolo::Start;
+                             else if(type=="stop"_) sign.note.tremolo = Note::Tremolo::Stop;
+                             else log("Unknown tremolo type", e);
                             }
 
                             // Acciaccatura are played before principal beat. Records graces to shift in on parsing principal

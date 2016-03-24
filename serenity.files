@@ -111,3 +111,5 @@ image/weight.cc
 image/multiscale.cc
 io/exif.cc
 irc.cc
+
+audio/player.cc
