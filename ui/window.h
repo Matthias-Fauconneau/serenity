@@ -177,4 +177,4 @@ struct DRMWindow : Window {
 };
 #endif
 
-unique<Window> window(Widget* widget, int2 size=-1, Thread& thread=mainThread, bool useGL=false, string title="");
+unique<Window> window(Widget* widget, int2 size=-1, Thread& thread=mainThread, bool useGL=false, string title=""_);

@@ -112,7 +112,7 @@ size_t FFmpeg::read32(mref<int32> output) {
      else if(audio->sample_fmt == AV_SAMPLE_FMT_FLTP) {
       for(size_t i : range(bufferSize)) for(size_t j : range(channels)) {
        int32 s = ((float*)frame->data[j])[i]*(1<<30); //TODO: ReplayGain
-       if(s<-(1<<31) || s >= int(uint(1<<31)-1)) error("Clip", -(1<<31), s, 1<<31, ((float*)frame->data[j])[i]);
+       //if(s<-(1<<31) || s >= int(uint(1<<31)-1)) error("Clip", -(1<<31), s, 1<<31, ((float*)frame->data[j])[i]);
        int32Buffer[i*channels+j] = s;
       }
      }

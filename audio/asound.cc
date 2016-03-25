@@ -134,7 +134,7 @@ bool AudioOutput::start(uint rate, uint periodSize, uint sampleBits, uint channe
   buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Prot(Map::Read|Map::Write))).data);
   status = (Status*)(maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data;
   control = (Control*)(maps[2]=Map(Device::fd, 0x81000000, 0x1000, Map::Prot(Map::Read|Map::Write))).data;
-  control->availableMinimum = periodSize; // Minimum available space to trigger POLLOUT
+  control->availableMinimum = this->periodSize; // Minimum available space to trigger POLLOUT
  }
  registerPoll();
  if(status->state < Prepared) {
@@ -341,5 +341,5 @@ AudioControl::operator long() {
 }
 void AudioControl::operator =(long v) {
  if(!id) { log("No associated control"); return; }
- Value value{.id={.numid = id}, .values = {clamp(min, v, max) /*L*/, clamp(min, v, max)/*R*/}}; iowr<ELEM_WRITE>(value);
+ Value value{.id={.numid = id, 0,0,0,{},0}, 0, .values = {clamp(min, v, max) /*L*/, clamp(min, v, max)/*R*/}, .reserved={}}; iowr<ELEM_WRITE>(value);
 }

@@ -114,7 +114,7 @@ inline String str(uint8 number, uint pad=0, char padChar='0', uint base=10) { re
 /// Converts an unsigned integer (implicit conversion)
 inline String str(uint16 number, uint pad=0, char padChar='0', uint base=10) { return str(uint64(number), pad, padChar, base); }
 /// Converts an unsigned integer (implicit conversion)
-inline String str(uint32 number) { return str(uint64(number), 0, '0', 10); }
+inline String str(uint32 number, uint pad=0, char padChar='0', uint base=10) { return str(uint64(number), pad, padChar, base); }
 #if __x86_64__
 /// Converts an unsigned integer (implicit conversion)
 inline String str(size_t number, uint pad=0, char padChar='0', uint base=10) { return str(uint64(number), pad, padChar, base); }

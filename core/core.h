@@ -219,7 +219,7 @@ void log(string message);
 
 /// Logs a message to standard output and signals all threads to log their stack trace and abort
 template<Type... Args> void  __attribute((noreturn)) error(const Args&... args);
-template<> void __attribute((noreturn)) error(const string& message);
+template<> void __attribute((noreturn,no_instrument_function)) error(const string& message);
 
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message (even in release)
 #define assert_(expr, message...) ({ if(!(expr)) error(#expr ""_, ## message); })

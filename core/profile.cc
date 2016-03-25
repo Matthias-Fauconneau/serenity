@@ -40,7 +40,7 @@ extern "C" notrace void __cyg_profile_func_enter(void* function, void*) {
 	if(tracePaused) return;
     uint64 tsc = readCycleCounter();
     top++;
-	assert_(top-stack < 32);
+    //assert_(top-stack < 32);
 	*top = {tsc, function, 0};
 }
 

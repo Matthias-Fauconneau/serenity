@@ -9,7 +9,7 @@ inline size_t align(size_t width, size_t offset) { assert((width&(width-1))==0);
 extern "C" void* malloc(size_t size) noexcept;
 extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size) noexcept;
 extern "C" void free(void* buffer) noexcept;
-#include <type_traits>
+
 /// Managed fixed capacity mutable reference to an array of elements
 /// \note Data is either an heap allocation managed by this object or a reference to memory managed by another object.
 generic struct buffer : mref<T> {
