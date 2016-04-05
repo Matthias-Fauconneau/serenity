@@ -204,10 +204,10 @@ void HTTP::header() {
         return;
     }
     else if(status==400) log("Bad Request"_, url); //cache reply anyway to avoid repeating bad requests
-    else if(status==403) error("Denied"_, url);
+    else if(status==403) { log("Denied"_, url, data); state = Denied; return; }
     else if(status==404) log("Not Found"_, url);
     else if(status==408) log("Request timeout"_);
-    else if(status==500) log("Internal Server Error"_,untilEnd());
+    else if(status==500) log("Internal Server Error"_, untilEnd());
     else if(status==502) log("Bad gateway"_);
     else if(status==504) log("Gateway timeout"_);
     else { log("Unhandled status",status,"from", url); done(); return; }

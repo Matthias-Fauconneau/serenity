@@ -82,7 +82,7 @@ struct HTTP : DataStream<SSLSocket>, Poll, TextData {
    // Data
    int chunkSize=0;
    array<byte> content;
-   enum { Request, Header, Content, Downloaded, Handle, Handled } state = Request;
+   enum { Request, Header, Denied, Content, Downloaded, Handle, Handled } state = Request;
 };
 
 /// Requests ressource at \a url and call \a handler when available

@@ -3,6 +3,7 @@
 #include "data.h"
 #include "variant.h"
 #include "time.h"
+#include <unistd.h>
 
 static string key = arguments()[0];
 
@@ -140,7 +141,11 @@ struct Youtube {
     log(rates, minRate);
     {
      HTTP request(move(minURL), {}, {}, false);
-     while(request.state < HTTP::Content) assert_(request.wait());
+     while(request.state < HTTP::Content) {
+      if(request.state == HTTP::Denied) { log("Denied"); break; }
+      assert_(request.wait());
+     }
+     if(request.state == HTTP::Denied) { log("Will try next item"); sleep(1); continue; }
      assert_(request.contentLength);
      ::buffer<byte> buffer(request.contentLength, 0);
      File file(split(title," - ")[1], folder, Flags(WriteOnly|Create|Truncate));
