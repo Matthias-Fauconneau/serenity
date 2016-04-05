@@ -101,7 +101,8 @@ struct Youtube {
  int64 startTime, lastTime;
  size_t readSinceLastTime;
  unique<FFmpeg> audioFile = nullptr;
- //AudioOutput audio {{this,&Youtube::read}};
+ Thread audioThread;
+ AudioOutput audio {{this,&Youtube::read}, audioThread};
 
  Youtube() { next(); }
  void next() {
@@ -115,7 +116,7 @@ struct Youtube {
   String scores = readFile("Scores.txt");
   for(string title: split(scores, "\n")) {
    title = trim(title);
-   if(titles.contains(title)) continue; // Already downloaded
+   if(!title || titles.contains(title)) continue; // Already downloaded
    log(title);
    Map map = getURL(URL("https://www.googleapis.com/youtube/v3/search?key="_+key+"&q="+replace(title," ","+")+
                         "&part=snippet"));
@@ -196,29 +197,12 @@ struct Youtube {
    next();
   } else if(!audioFile) { // Playback while downloading
    audioFile = unique<FFmpeg>(file.name());
-   //audio.start()
+   audio.start(audioFile->audioFrameRate, 0, 16, 2);
+   if(!audioThread) audioThread.spawn();
   }
  }
-
- /*size_t read(mref<short2> output) {
-     assert_(audio.rate == file->audioFrameRate);
-     uint readSize = 0;
-     for(mref<short2> chunk=output;;) {
-         if(!file) return readSize;
-         assert(readSize<output.size);
-         if(audio.rate != file->audioFrameRate) { queue(); return readSize; } // Returns partial period and schedule restart
-         size_t read = file->read16(mcast<int16>(chunk));
-         assert(read<=chunk.size, read);
-         chunk = chunk.slice(read); readSize += read;
-         if(readSize == output.size) { update(file->audioTime/file->audioFrameRate,file->duration/file->audioFrameRate); break; } // Complete chunk
-         else next(); // End of file
-     }
-     if(!lastPeriod) for(uint i: range(output.size)) { // Fades in
-         float level = exp(12. * ((float) i / output.size - 1) ); // Linear perceived sound level
-         output[i][0] *= level;
-         output[i][1] *= level;
-     }
-     lastPeriod = output;
-     return readSize;
- }*/
+ size_t read(mref<short2> output) {
+  size_t size = audioFile->read16(mcast<int16>(output));
+  return size;
+ }
 } app;

@@ -251,7 +251,7 @@ void HTTP::event() {
  if(!(revents&POLLIN) && state <= Content) { log("No data",url,revents,available(1),Data::available(1)); done(); return; }
  if(state == Header) { header(); }
  if(state == Content) {
-  if(downloadHandler) { downloadHandler(); return; }
+  if(downloadHandler) { assert_(revents==POLLIN); downloadHandler(); return; }
   if(contentLength) {
    if(available(contentLength)<contentLength) return;
    content.append(Data::read(contentLength));

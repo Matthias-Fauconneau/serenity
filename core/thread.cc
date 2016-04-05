@@ -22,6 +22,7 @@ void Poll::registerPoll() {
  if(thread.contains(this)) { thread.unregistered.tryRemove(this); return; }
  assert_(!thread.unregistered.contains(this));
  thread.append(this);
+ //thread.insertAt(0, this);
  if(thread.tid) thread.post(); // Resets poll to include this new descriptor (FIXME: only if not current)
 }
 void Poll::unregisterPoll() {
@@ -74,8 +75,11 @@ void Thread::run() {
      if(size==1 && !queue) break; // Terminates if no Poll objects (except thread queue EventFD) are registered and no job is queued)
 
      pollfd pollfds[size];
-     for(uint i: range(size)) pollfds[i]=*at(i); //Copy pollfds as objects might unregister while processing in the loop
-     if((LinuxError)check( ::poll(pollfds,size,-1) ) != LinuxError::Interrupted) {
+     for(uint i: range(size)) {
+      pollfds[i]=*at(i); //Copy pollfds as objects might unregister while processing in the loop
+      pollfds[i].revents = 0; // Necessary?
+     }
+      if((LinuxError)check( ::poll(pollfds,size,-1) ) != LinuxError::Interrupted) {
          for(uint i: range(size)) {
              if(::terminationRequested || this->terminationRequested) break;
              Poll* poll=at(i); int revents=pollfds[i].revents;
@@ -83,6 +87,7 @@ void Thread::run() {
                  poll->revents = revents;
                  Locker lock(runLock);
                  poll->event();
+                 poll->revents = 0;
              }
          }
      }
