@@ -13,49 +13,49 @@ extern "C" void free(void* buffer) noexcept;
 /// Managed fixed capacity mutable reference to an array of elements
 /// \note Data is either an heap allocation managed by this object or a reference to memory managed by another object.
 generic struct buffer : mref<T> {
-                         using mref<T>::data;
-using mref<T>::size;
-size_t capacity = 0; /// 0: reference, >0: size of the owned heap allocation
+ using mref<T>::data;
+ using mref<T>::size;
+ size_t capacity = 0; /// 0: reference, >0: size of the owned heap allocation
 
-using mref<T>::at;
-using mref<T>::set;
-using mref<T>::slice;
+ using mref<T>::at;
+ using mref<T>::set;
+ using mref<T>::slice;
 
-buffer(){}
-buffer(buffer&& o) : mref<T>(o), capacity(o.capacity) { o.data=0; o.size=0; o.capacity=0; }
-buffer(T* data, size_t size, size_t capacity) : mref<T>(data, size), capacity(capacity) {}
+ buffer(){}
+ buffer(buffer&& o) : mref<T>(o), capacity(o.capacity) { o.data=0; o.size=0; o.capacity=0; }
+ buffer(T* data, size_t size, size_t capacity) : mref<T>(data, size), capacity(capacity) {}
 
-/// Allocates an uninitialized buffer for \a capacity elements
-buffer(size_t capacity, size_t size) : mref<T>((T*)0, size), capacity(capacity) {
- assert(capacity>=size && size>=0);
- if(capacity && posix_memalign((void**)&data, 64, capacity*sizeof(T))) error("Out of memory", size, capacity, sizeof(T));
-}
-explicit buffer(size_t size) : buffer(size, size) {}
-
-buffer& operator=(buffer&& o) { this->~buffer(); new (this) buffer(::move(o)); return *this; }
-
-/// If the buffer owns the reference, returns the memory to the allocator
-~buffer() {
- if(capacity) {
-  if(!__has_trivial_destructor(T)) for(size_t i: range(size)) at(i).~T();
-  free((void*)data);
+ /// Allocates an uninitialized buffer for \a capacity elements
+ buffer(size_t capacity, size_t size) : mref<T>((T*)0, size), capacity(capacity) {
+  assert(capacity>=size && size>=0);
+  if(capacity && posix_memalign((void**)&data, 64, capacity*sizeof(T))) error("Out of memory", size, capacity, sizeof(T));
  }
- data=0; capacity=0; size=0;
-}
+ explicit buffer(size_t size) : buffer(size, size) {}
 
-void setSize(size_t size) { assert_(size<=capacity, size, capacity); this->size=size; }
-/// Appends a default element
-T& append() { setSize(size+1); return set(size-1, T()); }
-/// Appends an implicitly copiable value
-T& append(const T& e) { setSize(size+1); return set(size-1, e); }
-/// Appends a movable value
-T& append(T&& e) { setSize(size+1); return set(size-1, ::move(e)); }
-template<Type A0, Type A1, Type... Args> void append(A0&& a0, A1&& a1, Args&&... args) const {
- set(size-1, forward<A0>(a0), forward<A1>(a1), forward<Args>(args)...); }
-/// Appends another list of elements to this array by moving
-void append(const mref<T> source) { setSize(size+source.size); slice(size-source.size).move(source); }
-/// Appends another list of elements to this array by copying
-void append(const ref<T> source) { setSize(size+source.size); slice(size-source.size).copy(source); }
+ buffer& operator=(buffer&& o) { this->~buffer(); new (this) buffer(::move(o)); return *this; }
+
+ /// If the buffer owns the reference, returns the memory to the allocator
+ ~buffer() {
+  if(capacity) {
+   if(!__has_trivial_destructor(T)) for(size_t i: range(size)) at(i).~T();
+   free((void*)data);
+  }
+  data=0; capacity=0; size=0;
+ }
+
+ void setSize(size_t size) { assert_(size<=capacity, size, capacity); this->size=size; }
+ /// Appends a default element
+ T& append() { setSize(size+1); return set(size-1, T()); }
+ /// Appends an implicitly copiable value
+ T& append(const T& e) { setSize(size+1); return set(size-1, e); }
+ /// Appends a movable value
+ T& append(T&& e) { setSize(size+1); return set(size-1, ::move(e)); }
+ template<Type A0, Type A1, Type... Args> void append(A0&& a0, A1&& a1, Args&&... args) const {
+  set(size-1, forward<A0>(a0), forward<A1>(a1), forward<Args>(args)...); }
+ /// Appends another list of elements to this array by moving
+ void append(const mref<T> source) { setSize(size+source.size); slice(size-source.size).move(source); }
+ /// Appends another list of elements to this array by copying
+ void append(const ref<T> source) { setSize(size+source.size); slice(size-source.size).copy(source); }
 };
 /// Initializes a new buffer with the content of \a o
 generic buffer<T> copy(const buffer<T>& o) { buffer<T> t(o.capacity?:o.size, o.size); t.copy(o); return t; }

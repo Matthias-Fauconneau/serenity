@@ -20,7 +20,8 @@ struct SSLSocket : TCPSocket {
     ~SSLSocket();
 
     void connect(uint host, uint16 port, bool secure=false);
-    array<byte> readUpTo(int size);
+    int64 readUpTo(mref<byte> target);
+    buffer<byte> readUpTo(int64 size);
     void write(const ref<byte>& buffer);
     void disconnect();
 
@@ -56,6 +57,33 @@ template<> inline URL copy(const URL& o) {
 
 /// Returns path to cache file for \a url
 String cacheFile(const URL& url);
+
+/// Asynchronously fetches a file over HTTP
+struct HTTP : DataStream<SSLSocket>, Poll, TextData {
+    /// Connects to \a host and requests \a path
+    /// \note \a headers and \a content will be added to request
+    /// \note If \a secure is true, an SSL connection will be used
+    HTTP(URL&& url, function<void(const URL&, Map&&)> handler, array<String>&& headers, bool cache = true);
+
+   void request();
+   void header();
+   void event() override;
+   void done();
+
+   // Request
+   URL url;
+   array<String> headers;
+   function<void(const URL&, Map&&)> handler;
+   bool cache = true;
+   // Header
+   uint contentLength=0;
+   bool chunked=false;
+   array<String> redirect;
+   // Data
+   int chunkSize=0;
+   array<byte> content;
+   enum { Request, Header, Content, Downloaded, Handle, Handled } state = Request;
+};
 
 /// Requests ressource at \a url and call \a handler when available
 /// \note Persistent disk caching will be used, no request will be sent if cache is younger than \a maximumAge hours

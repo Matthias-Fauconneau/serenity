@@ -2,6 +2,7 @@
 #include "http.h"
 #include "data.h"
 #include "variant.h"
+#include "time.h"
 
 static string key = arguments()[0];
 
@@ -108,7 +109,7 @@ struct Youtube {
    for(const Variant& item: root.dict.at("items").list) {
     string itemTitle = item.dict.at("snippet").dict.at("title").data;
     log(itemTitle);
-    if(!title.contains('-')) error(title, itemTitle);
+    if(!title.contains('-')) { log(itemTitle); continue; }
     Folder folder(split(title," - ")[0], "/Music"_, true);
     assert_(!existsFile(split(title," - ")[1], folder));
     string id = item.dict.at("id").dict.at("videoId").data;
@@ -116,6 +117,7 @@ struct Youtube {
     TextData s(map);
     s.until("adaptive_fmts\":\"");
     uint minRate = -1; String minURL;
+    array<uint> rates;
     for(string format: split(s.until('"'),",")) {
      ::map<string, String> dict;
      TextData s(unescapeU(TextData(format)));
@@ -125,14 +127,39 @@ struct Youtube {
       dict.insert(key, unescape(TextData(value)));
      }
      dict.at("url") = unescape(dict.at("url"));
-     uint rate = parseInteger(dict.at("bitrate"));
-     if(find(dict.at("type"),"audio") && rate < minRate) {
-      minRate = rate;
-      minURL = dict.take("url");
+     //log(dict);
+     if(find(dict.at("type"),"audio")) {
+      uint rate = parseInteger(dict.at("bitrate"));
+      rates.append(rate);
+      if(rate > 74343 && rate < minRate) {
+       minRate = rate;
+       minURL = dict.take("url");
+      }
      }
     }
+    log(rates, minRate);
     {
-     log(writeFile(split(title," - ")[1], downloadFile(minURL), folder));
+     HTTP request(move(minURL), {}, {}, false);
+     while(request.state < HTTP::Content) assert_(request.wait());
+     assert_(request.contentLength);
+     ::buffer<byte> buffer(request.contentLength, 0);
+     File file(split(title," - ")[1], folder, Flags(WriteOnly|Create|Truncate));
+     int64 startTime = realTime(), lastTime = startTime;
+     size_t readSinceLastTime = 0;
+     while(buffer.size < buffer.capacity) {
+      mref<byte> chunk(buffer.begin()+buffer.size, buffer.capacity-buffer.size);
+      int64 size = request.readUpTo(chunk);
+      if(size<0) error(size);
+      chunk.size = size;
+      buffer.size += chunk.size;
+      file.write(chunk);
+      readSinceLastTime += chunk.size;
+      if(realTime() > lastTime+second) {
+       log(100*buffer.size/buffer.capacity, readSinceLastTime*second/(realTime()-lastTime)/1024, (buffer.capacity-buffer.size)*(realTime()-startTime)/buffer.size/second);
+       lastTime = realTime();
+       readSinceLastTime = 0;
+      }
+     }
     }
     break;
    }

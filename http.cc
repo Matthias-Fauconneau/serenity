@@ -40,11 +40,16 @@ void SSLSocket::connect(uint host, uint16 port, bool secure) {
   SSL_connect(ssl);
  }
 }
-array<byte> SSLSocket::readUpTo(int size) {
-    if(!ssl) return TCPSocket::readUpTo(size);
-    array<byte> buffer(size);
-    size=SSL_read(ssl, buffer.begin(), size);
-    if(size>=0) buffer.size=size; else error("SSL error",size);
+/// Reads up to \a size bytes into \a buffer
+int64 SSLSocket::readUpTo(mref<byte> target) {
+ if(ssl) return SSL_read(ssl, target.begin(), target.size);
+ else return TCPSocket::readUpTo(target);
+}
+buffer<byte> SSLSocket::readUpTo(int64 capacity) {
+    ::buffer<byte> buffer(capacity, 0);
+    int64 size = readUpTo(mref<byte>(buffer.begin(), capacity));
+    if(size<0) error("SSL error", size);
+    buffer.size = size;
     return buffer;
 }
 void SSLSocket::write(const ref<byte>& buffer) {
@@ -164,34 +169,6 @@ String cacheFile(const URL& url) {
 
 // HTTP
 
-
-/// Asynchronously fetches a file over HTTP
-struct HTTP : DataStream<SSLSocket>, Poll, TextData {
-    /// Connects to \a host and requests \a path
-    /// \note \a headers and \a content will be added to request
-    /// \note If \a secure is true, an SSL connection will be used
-    HTTP(URL&& url, function<void(const URL&, Map&&)> handler, array<String>&& headers, bool cache = true);
-
-   void request();
-   void header();
-   void event() override;
-   void done();
-
-   // Request
-   URL url;
-   array<String> headers;
-   function<void(const URL&, Map&&)> handler;
-   bool cache = true;
-   // Header
-   uint contentLength=0;
-   bool chunked=false;
-   array<String> redirect;
-   // Data
-   int chunkSize=0;
-   array<byte> content;
-   enum { Request, Header, Content, Downloaded, Handle, Handled } state = Request;
-};
-
 array<unique<HTTP>> requests; // weakly referenced by Thread::array<Poll*>
 
 HTTP::HTTP(URL&& url, function<void(const URL&, Map&&)> handler, array<String>&& headers, bool cache)
@@ -273,6 +250,7 @@ void HTTP::event() {
     if(!(revents&POLLIN) && state <= Content) { log("No data",url,revents,available(1),Data::available(1)); done(); return; }
     if(state == Header) { header(); }
     if(state == Content) {
+     if(!cache) return; // Let application download content
         if(contentLength) {
          if(available(contentLength)<contentLength) return;
          content.append(Data::read(contentLength));
@@ -291,7 +269,7 @@ void HTTP::event() {
         if(state == Downloaded) {
             if(!content) { log("Missing content",buffer); done(); return; }
             if(cache) {
-             if(content.size>256*1024) log("Downloaded",url,content.size/1024,"KB"); else log("Downloaded",url,content.size,"B");
+             if(content.size>256*1024) log("Downloaded",url,content.size/1024,"KB"); //else log("Downloaded",url,content.size,"B");
              redirect.append(cacheFile(url));
              for(string file: redirect) {Folder(section(file,'/'), ::cache(), true); writeFile(file, content, ::cache(), true);}
             }
