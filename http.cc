@@ -171,9 +171,9 @@ String cacheFile(const URL& url) {
 
 array<unique<HTTP>> requests; // weakly referenced by Thread::array<Poll*>
 
-HTTP::HTTP(URL&& url, function<void(const URL&, Map&&)> handler, array<String>&& headers, bool cache)
+HTTP::HTTP(URL&& url, function<void(const URL&, Map&&)> handler, array<String>&& headers)
     : DataStream<SSLSocket>(resolve(url.host),url.scheme=="https"_?443:80,url.scheme=="https"_), Poll(Socket::fd,POLLOUT),
-      url(move(url)), headers(move(headers)), handler(handler), cache(cache) {
+      url(move(url)), headers(move(headers)), handler(handler) {
     if(!Socket::fd) { error("Unknown host",this->url.host); done(); return; }
     registerPoll();
 }
@@ -190,7 +190,7 @@ void HTTP::request() {
 }
 
 void HTTP::header() {
-    String cacheFileName = cache ? cacheFile(url) : String();
+    String cacheFileName = !downloadHandler ? cacheFile(url) : String();
     // Status
     if(!match("HTTP/1.1 "_)&&!match("HTTP/1.0 "_)) { log("No HTTP", url, data); done(); return; }
     int status = parseInteger(until(" "_));
@@ -203,7 +203,7 @@ void HTTP::header() {
         state = Handle;
         return;
     }
-    else if(status==400) log("Bad Request"_, url); //cache reply anyway to avoid repeating bad requests
+    else if(status==400) { error("Bad Request"_, url, data); state = BadRequest; return; } // Caches reply anyway to avoid repeating bad requests
     else if(status==403) { log("Denied"_, url, data); state = Denied; return; }
     else if(status==404) log("Not Found"_, url);
     else if(status==408) log("Request timeout"_);
@@ -225,9 +225,10 @@ void HTTP::header() {
             log(url);
             if(url.scheme != this->url.scheme || url.host != this->url.host) {
                 uint ip = resolve(url.host);
-                if(ip==uint(-1)) { log("Unknown host",url); done(); return; }
-                //error("reconnect", url.scheme);
-                log("reconnect", url.scheme, url.host);
+                if(ip==uint(-1)) { log("Unknown host", url); done(); return; }
+                log("Redirect", url.scheme, url.host);
+                this->url = ::move(url);
+                //state = Redirect; return;
                 disconnect();
                 connect(ip, url.scheme=="https"_?443:80, url.scheme=="https"_);
                 Poll::fd = SSLSocket::fd;
@@ -245,41 +246,41 @@ void HTTP::header() {
     state = Content;
 }
 void HTTP::event() {
-    if((revents&POLLHUP) && state <= Content) { log("Connection broken",url); done(); return; }
-    if(state == Request) { events=POLLIN; request(); return; }
-    if(!(revents&POLLIN) && state <= Content) { log("No data",url,revents,available(1),Data::available(1)); done(); return; }
-    if(state == Header) { header(); }
-    if(state == Content) {
-     if(!cache) return; // Let application download content
-        if(contentLength) {
-         if(available(contentLength)<contentLength) return;
-         content.append(Data::read(contentLength));
-         state=Downloaded;
-        }
-        else if(chunked) {
-            do {
-                if(chunkSize<=0) { chunkSize = integer(false, 16); match("\r\n"_); } //else already parsed
-                if(chunkSize==0) { state=Downloaded; break; }
-                if(chunkSize<0 || available(chunkSize+2)<uint(chunkSize+2)) return;
-                content.append( Data::read(chunkSize) ); match("\r\n"_);
-                chunkSize=0;
-            } while(Data::available(3)>=3);
-        }
-        else state=Downloaded;
-        if(state == Downloaded) {
-            if(!content) { log("Missing content",buffer); done(); return; }
-            if(cache) {
-             if(content.size>256*1024) log("Downloaded",url,content.size/1024,"KB"); //else log("Downloaded",url,content.size,"B");
-             redirect.append(cacheFile(url));
-             for(string file: redirect) {Folder(section(file,'/'), ::cache(), true); writeFile(file, content, ::cache(), true);}
-            }
-            // Caches other outstanding requests before handling this one
-            state = Handle;
-            queue();
-            return;
-        }
-    }
-    if(state==Handle) { handler(url, Map(cacheFile(url), ::cache())); done(); return; }
+ if((revents&POLLHUP) && state <= Content) { log("Connection broken",url); done(); return; }
+ if(state == Request) { events=POLLIN; request(); return; }
+ if(!(revents&POLLIN) && state <= Content) { log("No data",url,revents,available(1),Data::available(1)); done(); return; }
+ if(state == Header) { header(); }
+ if(state == Content) {
+  if(downloadHandler) { downloadHandler(); return; }
+  if(contentLength) {
+   if(available(contentLength)<contentLength) return;
+   content.append(Data::read(contentLength));
+   state=Downloaded;
+  }
+  else if(chunked) {
+   do {
+    if(chunkSize<=0) { chunkSize = integer(false, 16); match("\r\n"_); } //else already parsed
+    if(chunkSize==0) { state=Downloaded; break; }
+    if(chunkSize<0 || available(chunkSize+2)<uint(chunkSize+2)) return;
+    content.append( Data::read(chunkSize) ); match("\r\n"_);
+    chunkSize=0;
+   } while(Data::available(3)>=3);
+  }
+  else state=Downloaded;
+  if(state == Downloaded) {
+   if(!content) { log("Missing content",buffer); done(); return; }
+   if(!downloadHandler) {
+    if(content.size>256*1024) log("Downloaded",url,content.size/1024,"KB"); //else log("Downloaded",url,content.size,"B");
+    redirect.append(cacheFile(url));
+    for(string file: redirect) {Folder(section(file,'/'), ::cache(), true); writeFile(file, content, ::cache(), true);}
+   }
+   // Caches other outstanding requests before handling this one
+   state = Handle;
+   queue();
+   return;
+  }
+ }
+ if(state==Handle) { handler(url, Map(cacheFile(url), ::cache())); done(); return; }
 }
 
 void HTTP::done() { state=Handled; /*while(requests.contains(this))*/ if(requests.contains(this)) requests.remove(this); /*else was synchronous request*/ }
@@ -314,15 +315,6 @@ Map getURL(URL&& url, function<void(const URL&, Map&&)> handler, int maximumAge,
         requests.append( unique<HTTP>(move(url),handler,move(headers)) );
     }
     return {};
-}
-
-array<byte> downloadFile(URL&& url) {
-    assert(url.host,url);
-    array<String> headers;
-    if(url.authorization) headers.append( "Authorization: Basic "_+url.authorization );
-    HTTP request(move(url), {}, move(headers), false);
-    while(request.state < HTTP::Handle) assert_(request.wait());
-    return move(request.content);
 }
 
 #if 0

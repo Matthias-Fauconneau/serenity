@@ -114,4 +114,5 @@ io/exif.cc
 audio/asound.cc
 audio/player.cc
 http.cc
+http.h
 youtube.cc

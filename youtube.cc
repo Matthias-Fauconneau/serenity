@@ -3,6 +3,8 @@
 #include "data.h"
 #include "variant.h"
 #include "time.h"
+#include "asound.h"
+#include "audio.h"
 #include <unistd.h>
 
 static string key = arguments()[0];
@@ -92,7 +94,17 @@ String unescape(TextData s) {
 String unescape(string s) { return unescape(TextData(s)); }
 
 struct Youtube {
- Youtube() {
+ unique<HTTP> request = nullptr;
+ Folder folder; String title;
+ ::buffer<byte> buffer;
+ File file;
+ int64 startTime, lastTime;
+ size_t readSinceLastTime;
+ unique<FFmpeg> audioFile = nullptr;
+ //AudioOutput audio {{this,&Youtube::read}};
+
+ Youtube() { next(); }
+ void next() {
   array<String> titles;
   for(string path : Folder("/Music").list(Files|Recursive)) {
    string file = section(path,'/',1,-1);
@@ -102,6 +114,7 @@ struct Youtube {
 
   String scores = readFile("Scores.txt");
   for(string title: split(scores, "\n")) {
+   title = trim(title);
    if(titles.contains(title)) continue; // Already downloaded
    log(title);
    Map map = getURL(URL("https://www.googleapis.com/youtube/v3/search?key="_+key+"&q="+replace(title," ","+")+
@@ -109,8 +122,8 @@ struct Youtube {
    Variant root = parseJSON(map);
    for(const Variant& item: root.dict.at("items").list) {
     string itemTitle = item.dict.at("snippet").dict.at("title").data;
-    log(itemTitle);
     if(!title.contains('-')) { log(itemTitle); continue; }
+    log(itemTitle);
     Folder folder(split(title," - ")[0], "/Music"_, true);
     assert_(!existsFile(split(title," - ")[1], folder));
     string id = item.dict.at("id").dict.at("videoId").data;
@@ -128,7 +141,6 @@ struct Youtube {
       dict.insert(key, unescape(TextData(value)));
      }
      dict.at("url") = unescape(dict.at("url"));
-     //log(dict);
      if(find(dict.at("type"),"audio")) {
       uint rate = parseInteger(dict.at("bitrate"));
       rates.append(rate);
@@ -139,35 +151,74 @@ struct Youtube {
      }
     }
     log(rates, minRate);
-    {
-     HTTP request(move(minURL), {}, {}, false);
-     while(request.state < HTTP::Content) {
-      if(request.state == HTTP::Denied) { log("Denied"); break; }
-      assert_(request.wait());
-     }
-     if(request.state == HTTP::Denied) { log("Will try next item"); sleep(1); continue; }
-     assert_(request.contentLength);
-     ::buffer<byte> buffer(request.contentLength, 0);
-     File file(split(title," - ")[1], folder, Flags(WriteOnly|Create|Truncate));
-     int64 startTime = realTime(), lastTime = startTime;
-     size_t readSinceLastTime = 0;
-     while(buffer.size < buffer.capacity) {
-      mref<byte> chunk(buffer.begin()+buffer.size, buffer.capacity-buffer.size);
-      int64 size = request.readUpTo(chunk);
-      if(size<0) error(size);
-      chunk.size = size;
-      buffer.size += chunk.size;
-      file.write(chunk);
-      readSinceLastTime += chunk.size;
-      if(realTime() > lastTime+second) {
-       log(100*buffer.size/buffer.capacity, readSinceLastTime*second/(realTime()-lastTime)/1024, (buffer.capacity-buffer.size)*(realTime()-startTime)/buffer.size/second);
-       lastTime = realTime();
-       readSinceLastTime = 0;
-      }
-     }
+    request = unique<HTTP>(URL(minURL));
+    request->downloadHandler = {this, &Youtube::receive};
+    this->title = copyRef(title);
+    this->folder = ::move(folder);
+    while(request->state < HTTP::Content) {
+     if(request->state == HTTP::Denied) { log("Denied"); break; }
+     assert_(request->wait());
     }
-    break;
+    if(request->state == HTTP::Denied) { request = nullptr; log("Denied"); continue; }
+    return;
    }
   }
  }
+
+ void receive() {
+  if(!buffer) { // First chunk
+   log(request->contentLength);
+   assert_(request->contentLength && request->contentLength < 16*1024*1024);
+   buffer = ::buffer<byte>(request->contentLength, 0);
+   file = File(split(title," - ")[1], folder, Flags(WriteOnly|Create|Truncate));
+   startTime = realTime(), lastTime = startTime;
+   readSinceLastTime = 0;
+  }
+  if(buffer.size < buffer.capacity) {
+   mref<byte> chunk(buffer.begin()+buffer.size, buffer.capacity-buffer.size);
+   int64 size = request->readUpTo(chunk);
+   if(size<0) error(size);
+   chunk.size = size;
+   buffer.size += chunk.size;
+   file.write(chunk);
+   readSinceLastTime += chunk.size;
+   if(realTime() > lastTime+second) {
+    log(100*buffer.size/buffer.capacity, readSinceLastTime*second/(realTime()-lastTime)/1024, (buffer.capacity-buffer.size)*(realTime()-startTime)/buffer.size/second);
+    lastTime = realTime();
+    readSinceLastTime = 0;
+   }
+  }
+  if(buffer.size == buffer.capacity) { // Done
+   file = File(); // Closes file
+   request = nullptr; // Closes socket
+   audioFile = nullptr; // Closes decoder
+   buffer = ::buffer<byte>(); // Releases buffer
+   next();
+  } else if(!audioFile) { // Playback while downloading
+   audioFile = unique<FFmpeg>(file.name());
+   //audio.start()
+  }
+ }
+
+ /*size_t read(mref<short2> output) {
+     assert_(audio.rate == file->audioFrameRate);
+     uint readSize = 0;
+     for(mref<short2> chunk=output;;) {
+         if(!file) return readSize;
+         assert(readSize<output.size);
+         if(audio.rate != file->audioFrameRate) { queue(); return readSize; } // Returns partial period and schedule restart
+         size_t read = file->read16(mcast<int16>(chunk));
+         assert(read<=chunk.size, read);
+         chunk = chunk.slice(read); readSize += read;
+         if(readSize == output.size) { update(file->audioTime/file->audioFrameRate,file->duration/file->audioFrameRate); break; } // Complete chunk
+         else next(); // End of file
+     }
+     if(!lastPeriod) for(uint i: range(output.size)) { // Fades in
+         float level = exp(12. * ((float) i / output.size - 1) ); // Linear perceived sound level
+         output[i][0] *= level;
+         output[i][1] *= level;
+     }
+     lastPeriod = output;
+     return readSize;
+ }*/
 } app;
