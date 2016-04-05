@@ -114,7 +114,7 @@ size_t Stream::write(const byte* data, size_t size) {
 
 size_t Stream::write(const ref<byte> buffer) { return write(buffer.data, buffer.size); }
 
-Socket::Socket(int domain, int type):Stream(check(socket(domain,type|SOCK_CLOEXEC,0))){}
+Socket::Socket(int domain, int type) : Stream(check(socket(domain,type|SOCK_CLOEXEC,0))){}
 
 // -- File
 
@@ -239,9 +239,9 @@ string environmentVariable(const string name, string value) {
 
 ref<string> cmdline() {
  static auto cmdline = File("/proc/self/cmdline").readUpTo(512);
-	assert(cmdline.size<4096);
+ assert(cmdline.size<4096);
  static array<string> arguments = split(cmdline,"\0");
-	return arguments;
+ return arguments;
 }
 ref<string> arguments() { return cmdline().slice(1); }
 

@@ -67,19 +67,14 @@ template<> inline Variant copy(const Variant& v) {
  if(v.type == Variant::Dict) return copy(v.dict);
  error(int(v.type));
 }
-generic String str(const map<T,Variant>& dict) {
- array<char> s;
- s.append("<<"); for(auto entry: dict) s.append( '/'+entry.key+' '+str(entry.value)+' ' ); s.append(">>");
- return move(s);
-}
 
 inline String str(const Variant& o) {
  if(o.type==Variant::Boolean) return unsafeRef(str(bool(o.number)));
  if(o.type==Variant::Integer) { assert(o.number==int(o.number)); return str(int(o.number)); }
  if(o.type==Variant::Real || o.type==Variant::Rational) return str(o.real());
  if(o.type==Variant::Data) return copy(o.data);
- if(o.type==Variant::List) return str(o.list);
- if(o.type==Variant::Dict) return str(o.dict);
+ if(o.type==Variant::List) return '['+str(o.list)+']';
+ if(o.type==Variant::Dict) return "{\n"+str(o.dict)+"}\n";
  error("Invalid Variant",int(o.type));
 }
 

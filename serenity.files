@@ -110,7 +110,8 @@ image/image.cc
 image/weight.cc
 image/multiscale.cc
 io/exif.cc
-irc.cc
 
 audio/asound.cc
 audio/player.cc
+http.cc
+youtube.cc

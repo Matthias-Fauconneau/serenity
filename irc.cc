@@ -18,9 +18,13 @@ struct UDPSocket : Socket {
 struct TCPSocket : Socket {
  /// Connects to \a port on \a host
  TCPSocket(uint host, uint16 port);
+ void connect(uint host, uint16 port);
 };
 
-TCPSocket::TCPSocket(uint host, uint16 port) : Socket(PF_INET,SOCK_STREAM|SOCK_NONBLOCK) {
+TCPSocket::TCPSocket(uint host, uint16 port) { connect(host, port); }
+void TCPSocket::connect(uint host, uint16 port) {
+ assert_(!fd);
+ fd = check(socket(PF_INET,SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC,0));
  if(host==uint(-1)) { close(); return; }
  sockaddress addr = {PF_INET, big16(port), host, {0,0}}; connect(Socket::fd, (const sockaddr*)&addr, sizeof(addr));
  fcntl(Socket::fd, F_SETFL, 0);

@@ -8,8 +8,10 @@
 
 /// TCP network socket (POSIX)
 struct TCPSocket : Socket {
+    TCPSocket() {}
     /// Connects to \a port on \a host
     TCPSocket(uint host, uint16 port);
+    void connect(uint host, uint16 port);
 };
 
 /// SSL network socket (openssl)
@@ -17,8 +19,10 @@ struct SSLSocket : TCPSocket {
     SSLSocket(uint host, uint16 port, bool secure=false);
     ~SSLSocket();
 
+    void connect(uint host, uint16 port, bool secure=false);
     array<byte> readUpTo(int size);
     void write(const ref<byte>& buffer);
+    void disconnect();
 
     handle<struct ssl_st*> ssl;
 };
@@ -56,6 +60,7 @@ String cacheFile(const URL& url);
 /// Requests ressource at \a url and call \a handler when available
 /// \note Persistent disk caching will be used, no request will be sent if cache is younger than \a maximumAge hours
 Map getURL(URL&& url, function<void(const URL&, Map&&)> handler={}, int maximumAge=24, bool wait=true);
+array<byte> downloadFile(URL&& url);
 
 /// Requests image at \a url and call \a handler when available (if was not cached)
 void getImage(URL&& url, Image* target, function<void()> imageLoaded, int2 size=0, uint maximumAge=24*60);

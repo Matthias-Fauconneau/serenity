@@ -18,22 +18,28 @@ struct UDPSocket : Socket {
     }
 };
 
-TCPSocket::TCPSocket(uint host, uint16 port) : Socket(PF_INET,SOCK_STREAM|SOCK_NONBLOCK) {
-    if(host==uint(-1)) { close(); return; }
-    sockaddress addr = {PF_INET, big16(port), host, {0,0}}; connect(Socket::fd, (const sockaddr*)&addr, sizeof(addr));
-    fcntl(Socket::fd, F_SETFL, 0);
+TCPSocket::TCPSocket(uint host, uint16 port) { connect(host, port); }
+void TCPSocket::connect(uint host, uint16 port) {
+ assert_(!fd);
+ fd = check(socket(PF_INET,SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC,0));
+ if(host==uint(-1)) { close(); return; }
+ sockaddress addr = {PF_INET, big16(port), host, {0,0}}; ::connect(Socket::fd, (const sockaddr*)&addr, sizeof(addr));
+ fcntl(Socket::fd, F_SETFL, 0);
 }
 
 #include <openssl/ssl.h> // ssl
-SSLSocket::SSLSocket(uint host, uint16 port, bool secure) : TCPSocket(host,port) {
-    if(secure && fd) {
-        static auto* ctx=(SSL_library_init(), SSL_CTX_new(TLSv1_client_method()));
-        ssl = SSL_new(ctx);
-        SSL_set_fd(ssl, fd);
-        SSL_connect(ssl);
-    }
+SSLSocket::SSLSocket(uint host, uint16 port, bool secure) { connect(host, port, secure); }
+SSLSocket::~SSLSocket() { disconnect(); }
+
+void SSLSocket::connect(uint host, uint16 port, bool secure) {
+ TCPSocket::connect(host,port);
+ if(secure && fd) {
+  static auto* ctx=(SSL_library_init(), SSL_CTX_new(TLSv1_client_method()));
+  ssl = SSL_new(ctx);
+  SSL_set_fd(ssl, fd);
+  SSL_connect(ssl);
+ }
 }
-SSLSocket::~SSLSocket() { if(ssl) SSL_shutdown(ssl); }
 array<byte> SSLSocket::readUpTo(int size) {
     if(!ssl) return TCPSocket::readUpTo(size);
     array<byte> buffer(size);
@@ -45,12 +51,15 @@ void SSLSocket::write(const ref<byte>& buffer) {
     if(!ssl) { TCPSocket::write(buffer); return; }
     int unused size=SSL_write(ssl,buffer.data,buffer.size); assert(size==(int)buffer.size);
 }
+void SSLSocket::disconnect() { if(ssl) { SSL_shutdown(ssl); ssl=0; } close(); }
+
 
 template<class T> size_t DataStream<T>::available(size_t need) {
     while(need>Data::available(need) && T::poll(1000)) {
         ::buffer<byte> chunk = T::readUpTo(max(4096ul, need-Data::available(need)));
         if(!chunk) { error("Empty chunk: already buffered ", Data::available(need), "but need", need); break; }
         buffer.append( chunk ); data=buffer;
+        if(need > 256*1024) log(chunk.size, buffer.size, need);
     }
     return Data::available(need);
 }
@@ -149,6 +158,7 @@ String cacheFile(const URL& url) {
     if(startsWith(name,"."_)) name=copyRef(name.slice(1));
     if(!name) name="index.htm"__;
     assert(url.host && !url.host.contains('/'));
+    assert_((url.host+"/"_+name).size() < 256);
     return url.host+"/"_+name;
 }
 
@@ -160,7 +170,7 @@ struct HTTP : DataStream<SSLSocket>, Poll, TextData {
     /// Connects to \a host and requests \a path
     /// \note \a headers and \a content will be added to request
     /// \note If \a secure is true, an SSL connection will be used
-    HTTP(URL&& url, function<void(const URL&, Map&&)> handler, array<String>&& headers);
+    HTTP(URL&& url, function<void(const URL&, Map&&)> handler, array<String>&& headers, bool cache = true);
 
    void request();
    void header();
@@ -170,6 +180,8 @@ struct HTTP : DataStream<SSLSocket>, Poll, TextData {
    // Request
    URL url;
    array<String> headers;
+   function<void(const URL&, Map&&)> handler;
+   bool cache = true;
    // Header
    uint contentLength=0;
    bool chunked=false;
@@ -177,15 +189,14 @@ struct HTTP : DataStream<SSLSocket>, Poll, TextData {
    // Data
    int chunkSize=0;
    array<byte> content;
-   function<void(const URL&, Map&&)> handler;
-   enum { Request, Header, Content, Cache, Handle, Done } state = Request;
+   enum { Request, Header, Content, Downloaded, Handle, Handled } state = Request;
 };
 
 array<unique<HTTP>> requests; // weakly referenced by Thread::array<Poll*>
 
-HTTP::HTTP(URL&& url, function<void(const URL&, Map&&)> handler, array<String>&& headers)
+HTTP::HTTP(URL&& url, function<void(const URL&, Map&&)> handler, array<String>&& headers, bool cache)
     : DataStream<SSLSocket>(resolve(url.host),url.scheme=="https"_?443:80,url.scheme=="https"_), Poll(Socket::fd,POLLOUT),
-      url(move(url)), headers(move(headers)), handler(handler) {
+      url(move(url)), headers(move(headers)), handler(handler), cache(cache) {
     if(!Socket::fd) { error("Unknown host",this->url.host); done(); return; }
     registerPoll();
 }
@@ -202,15 +213,15 @@ void HTTP::request() {
 }
 
 void HTTP::header() {
-    String cacheFileName = cacheFile(url);
+    String cacheFileName = cache ? cacheFile(url) : String();
     // Status
     if(!match("HTTP/1.1 "_)&&!match("HTTP/1.0 "_)) { log("No HTTP", url, data); done(); return; }
     int status = parseInteger(until(" "_));
     until("\r\n"_);
     if(status==200||status==301||status==302) {}
     else if(status==304) { //Not Modified
-        assert(existsFile(cacheFileName, cache()));
-        touchFile(cacheFileName, cache(), true);
+        assert(cacheFileName && existsFile(cacheFileName, ::cache()));
+        touchFile(cacheFileName, ::cache(), true);
         log("Not Modified", url);
         state = Handle;
         return;
@@ -232,13 +243,16 @@ void HTTP::header() {
         else if(key=="Transfer-Encoding"_ && value=="chunked"_) chunked=true;
         else if((key=="Location"_ && status!=200) || key=="Refresh"_) {
             if(startsWith(value,"0;URL="_)) value=value.slice(6);
+            log(status, key);
             URL url = this->url.relative(value);
+            log(url);
             if(url.scheme != this->url.scheme || url.host != this->url.host) {
                 uint ip = resolve(url.host);
                 if(ip==uint(-1)) { log("Unknown host",url); done(); return; }
-                error("reconnect");
-                //this->SSLSocket::~SSLSocket();
-                //new (this) SSLSocket(ip, url.scheme=="https"_?443:80, url.scheme=="https"_);
+                //error("reconnect", url.scheme);
+                log("reconnect", url.scheme, url.host);
+                disconnect();
+                connect(ip, url.scheme=="https"_?443:80, url.scheme=="https"_);
                 Poll::fd = SSLSocket::fd;
             }
             data = {};
@@ -246,7 +260,7 @@ void HTTP::header() {
             buffer = array<byte>();
             contentLength=0;
             chunked=0;
-            redirect.append(move(cacheFileName));
+            if(cacheFileName) redirect.append(move(cacheFileName));
             state=Request; events=POLLOUT;
             return;
         }
@@ -260,32 +274,37 @@ void HTTP::event() {
     if(state == Header) { header(); }
     if(state == Content) {
         if(contentLength) {
-            if(available(contentLength)<contentLength) return;
-            content.append(Data::read(contentLength));
-            state=Cache;
+         if(available(contentLength)<contentLength) return;
+         content.append(Data::read(contentLength));
+         state=Downloaded;
         }
         else if(chunked) {
             do {
                 if(chunkSize<=0) { chunkSize = integer(false, 16); match("\r\n"_); } //else already parsed
-                if(chunkSize==0) { state=Cache; break; }
+                if(chunkSize==0) { state=Downloaded; break; }
                 if(chunkSize<0 || available(chunkSize+2)<uint(chunkSize+2)) return;
                 content.append( Data::read(chunkSize) ); match("\r\n"_);
                 chunkSize=0;
             } while(Data::available(3)>=3);
         }
-        else state=Cache;
+        else state=Downloaded;
+        if(state == Downloaded) {
+            if(!content) { log("Missing content",buffer); done(); return; }
+            if(cache) {
+             if(content.size>256*1024) log("Downloaded",url,content.size/1024,"KB"); else log("Downloaded",url,content.size,"B");
+             redirect.append(cacheFile(url));
+             for(string file: redirect) {Folder(section(file,'/'), ::cache(), true); writeFile(file, content, ::cache(), true);}
+            }
+            // Caches other outstanding requests before handling this one
+            state = Handle;
+            queue();
+            return;
+        }
     }
-    if(state == Cache) {
-        if(!content) { log("Missing content",buffer); done(); return; }
-        if(content.size>1024) log("Downloaded",url,content.size/1024,"KB"); else log("Downloaded",url,content.size,"B");
-        redirect.append(cacheFile(url));
-        for(string file: redirect) {Folder(section(file,'/'),cache(),true); writeFile(file,content,cache(),true);}
-        state=Handle; queue(); return; //Cache other outstanding requests before handling this one
-    }
-    if(state==Handle) { handler(url,Map(cacheFile(url),cache())); done(); return; }
+    if(state==Handle) { handler(url, Map(cacheFile(url), ::cache())); done(); return; }
 }
 
-void HTTP::done() { state=Done; /*while(requests.contains(this))*/ if(requests.contains(this)) requests.remove(this); /*else was synchronous request*/ }
+void HTTP::done() { state=Handled; /*while(requests.contains(this))*/ if(requests.contains(this)) requests.remove(this); /*else was synchronous request*/ }
 
 // Requests
 
@@ -317,6 +336,15 @@ Map getURL(URL&& url, function<void(const URL&, Map&&)> handler, int maximumAge,
         requests.append( unique<HTTP>(move(url),handler,move(headers)) );
     }
     return {};
+}
+
+array<byte> downloadFile(URL&& url) {
+    assert(url.host,url);
+    array<String> headers;
+    if(url.authorization) headers.append( "Authorization: Basic "_+url.authorization );
+    HTTP request(move(url), {}, move(headers), false);
+    while(request.state < HTTP::Handle) assert_(request.wait());
+    return move(request.content);
 }
 
 #if 0

@@ -99,6 +99,7 @@ enum Flags {ReadOnly, WriteOnly, ReadWrite, Create=0100, Truncate=01000, Append=
 struct Socket : Stream {
     enum {PF_LOCAL=1, PF_INET};
 	enum {SOCK_STREAM=1, SOCK_DGRAM};
+    Socket() {}
     Socket(int domain, int type);
 };
 
