@@ -111,6 +111,7 @@ struct Youtube {
  void next() {
   array<String> titles;
   uint minSize = 1*1024*1024; string smallestFile;
+  map<uint, string> byViewCount;
   for(string path : Folder("/Music").list(Files|Recursive)) {
    string file = section(path,'/',1,-1);
    if(file.contains('.')) file = section(file,'.');
@@ -124,20 +125,39 @@ struct Youtube {
     smallestFile = file;
    }
   }
-  log(smallestFile);
+  if(smallestFile) log(smallestFile);
 
   String scores = readFile("Scores.txt");
   for(string title: split(scores, "\n")) {
    title = trim(title);
-   if(!title || titles.contains(title)) continue; // Already downloaded
+   if(!title) continue;
    log(title);
+   if(titles.contains(title)) continue; // Already downloaded
+
    Map map = getURL(URL("https://www.googleapis.com/youtube/v3/search?key="_+key+"&q="+replace(title," ","+")+
                         "&part=snippet"));
    Variant root = parseJSON(map);
    for(const Variant& item: root.dict.at("items").list) {
     string itemTitle = item.dict.at("snippet").dict.at("title").data;
     if(!title.contains('-')) { log(itemTitle); continue; }
+
+#if 1
     log(itemTitle);
+    if(find(itemTitle,"Extended")) continue;
+#else
+    {
+     string id = item.dict.at("id").dict.at("videoId").data;
+     Map map = getURL(URL("https://www.googleapis.com/youtube/v3/videos?key="_+key+"&id="+id+
+                          "&part=statistics"));
+     Variant root = parseJSON(map);
+     uint viewCount = parseInteger(root.dict.at("items").list[0].dict.at("statistics").dict.at("viewCount").data);
+     assert_(viewCount);
+     byViewCount.insertSorted(viewCount, title);
+     log(title, itemTitle, viewCount);
+    }
+    break;
+#endif
+
     Folder folder(split(title," - ")[0], "/Music"_, true);
     assert_(!existsFile(split(title," - ")[1], folder));
     string id = item.dict.at("id").dict.at("videoId").data;
@@ -177,6 +197,7 @@ struct Youtube {
     return;
    }
   }
+  for(auto item: byViewCount) log(item.key, item.value);
  }
 
  void receive() {
