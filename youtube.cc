@@ -104,14 +104,27 @@ struct Youtube {
  Thread audioThread;
  AudioOutput audio {{this,&Youtube::read}, audioThread};
 
- Youtube() { next(); }
+ Youtube() {
+  next();
+  mainThread.setPriority(-20);
+ }
  void next() {
   array<String> titles;
+  uint minSize = 1*1024*1024; string smallestFile;
   for(string path : Folder("/Music").list(Files|Recursive)) {
    string file = section(path,'/',1,-1);
    if(file.contains('.')) file = section(file,'.');
    titles.append(section(path,'/')+" - "+file);
+   size_t size = File(path, "/Music"_).size();
+   if(size <= 16384) {
+    log(path);
+    ::remove(path, "/Music"_);
+   } else if(size < minSize) {
+    minSize = size;
+    smallestFile = file;
+   }
   }
+  log(smallestFile);
 
   String scores = readFile("Scores.txt");
   for(string title: split(scores, "\n")) {
@@ -131,9 +144,9 @@ struct Youtube {
     Map map = getURL(URL("https://www.youtube.com/watch?v="+id), {}, 0);
     TextData s(map);
     s.until("adaptive_fmts\":\"");
-    uint minRate = -1; String minURL;
-    array<uint> rates;
-    for(string format: split(s.until('"'),",")) {
+    uint maxRate = 0; String bestURL;
+    string formats = s.until('"');
+    for(string format: split(formats,",")) {
      ::map<string, String> dict;
      TextData s(unescapeU(TextData(format)));
      while(s) {
@@ -144,15 +157,14 @@ struct Youtube {
      dict.at("url") = unescape(dict.at("url"));
      if(find(dict.at("type"),"audio")) {
       uint rate = parseInteger(dict.at("bitrate"));
-      rates.append(rate);
-      if(rate > 74343 && rate < minRate) {
-       minRate = rate;
-       minURL = dict.take("url");
+      if(rate > maxRate) {
+       maxRate = rate;
+       bestURL = dict.take("url");
       }
      }
     }
-    log(rates, minRate);
-    request = unique<HTTP>(URL(minURL));
+    assert_(bestURL, formats);
+    request = unique<HTTP>(URL(bestURL));
     request->downloadHandler = {this, &Youtube::receive};
     this->title = copyRef(title);
     this->folder = ::move(folder);
@@ -161,15 +173,17 @@ struct Youtube {
      assert_(request->wait());
     }
     if(request->state == HTTP::Denied) { request = nullptr; log("Denied"); continue; }
+    if(request->contentLength >= 32*1024*1024) { request = nullptr; log(request->contentLength); continue; }
     return;
    }
   }
  }
 
  void receive() {
+  if(!request) { log("!request"); return; }
   if(!buffer) { // First chunk
    log(request->contentLength);
-   assert_(request->contentLength && request->contentLength < 16*1024*1024);
+   assert_(request->contentLength && request->contentLength < 32*1024*1024, request->contentLength);
    buffer = ::buffer<byte>(request->contentLength, 0);
    file = File(split(title," - ")[1], folder, Flags(WriteOnly|Create|Truncate));
    startTime = realTime(), lastTime = startTime;
@@ -192,9 +206,11 @@ struct Youtube {
   if(buffer.size == buffer.capacity) { // Done
    file = File(); // Closes file
    request = nullptr; // Closes socket
-   audioFile = nullptr; // Closes decoder
    buffer = ::buffer<byte>(); // Releases buffer
    next();
+   if(audioThread) audioThread.wait();
+   audio.stop();
+   audioFile = nullptr; // Closes decoder
   } else if(!audioFile) { // Playback while downloading
    audioFile = unique<FFmpeg>(file.name());
    audio.start(audioFile->audioFrameRate, 0, 16, 2);
@@ -203,6 +219,11 @@ struct Youtube {
  }
  size_t read(mref<short2> output) {
   size_t size = audioFile->read16(mcast<int16>(output));
+  if(size < output.size) { // Resets
+   log(size);
+   audioFile = unique<FFmpeg>(file.name());
+   return audioFile->read16(mcast<int16>(output));
+  }
   return size;
  }
 } app;
