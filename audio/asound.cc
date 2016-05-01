@@ -76,12 +76,12 @@ bool playbackDeviceAvailable() {
  error("No PCM playback device found"); //FIXME: Block and watch folder until connected
 }
 
-Device getPlaybackDevice() {
+Device getPlaybackDevice(bool nonBlocking=false) {
  Folder snd("/dev/snd");
  for(const String& device: snd.list(Devices))
-  if(startsWith(device, "pcm") && endsWith(device,"D0p")) return Device(device, snd, Flags(ReadWrite/*|NonBlocking*/));
+  if(startsWith(device, "pcm") && endsWith(device,"D0p")) return Device(device, snd, Flags(ReadWrite|(nonBlocking?NonBlocking:0)));
  for(const String& device: snd.list(Devices))
-  if(startsWith(device, "pcm") && endsWith(device,"p")) return Device(device, snd, Flags(ReadWrite/*|NonBlocking*/));
+  if(startsWith(device, "pcm") && endsWith(device,"p")) return Device(device, snd, Flags(ReadWrite|(nonBlocking?NonBlocking:0)));
  error("No PCM playback device found"); //FIXME: Block and watch folder until connected
 }
 
@@ -89,8 +89,8 @@ AudioOutput::AudioOutput(Thread& thread) : Poll(0, POLLOUT, thread) {}
 AudioOutput::AudioOutput(decltype(read16) read, Thread& thread) : Poll(0, POLLOUT, thread), read16(read) {}
 AudioOutput::AudioOutput(decltype(read32) read, Thread& thread) : Poll(0, POLLOUT, thread), read32(read) {}
 
-bool AudioOutput::start(uint rate, uint periodSize, uint sampleBits, uint channels) {
- if(!Device::fd) { Device::fd = move(getPlaybackDevice().fd); Poll::fd = Device::fd; }
+bool AudioOutput::start(uint rate, uint periodSize, uint sampleBits, uint channels, bool nonBlocking) {
+ if(!Device::fd) { Device::fd = move(getPlaybackDevice(nonBlocking).fd); Poll::fd = Device::fd; }
  if(!Device::fd) { log("AudioOutput::start failed"); return false; }
  //{CardInfo info = ior<CARD_INFO>(); log(info.card, info.id, info.driver, info.name, info.longname, info.mixername, info.components); }
  if(!status || status->state < Setup || this->rate!=rate || this->periodSize!=periodSize || this->sampleBits!=sampleBits) {
@@ -211,7 +211,7 @@ void AudioInput::setup(uint channels, uint rate, uint periodSize) {
   hparams.interval(Channels).max = channels;
   hparams.interval(Rate) = rate; assert(rate);
   hparams.interval(Periods) = 2;
-  hparams.interval(PeriodSize) = periodSize?:-1;
+  if(periodSize) hparams.interval(PeriodSize) = periodSize;
   iowr<HW_REFINE>(hparams);
   if(!sampleBits) {
    channels = hparams.interval(Channels);
@@ -236,7 +236,7 @@ void AudioInput::setup(uint channels, uint rate, uint periodSize) {
   this->rate = hparams.interval(Rate);
   assert_(this->rate == rate);
   this->periodSize = hparams.interval(PeriodSize);
-  assert_(this->periodSize == periodSize);
+  //if(!periodSize) log(this->periodSize); //assert_(this->periodSize == periodSize);
   bufferSize = hparams.interval(Periods) * this->periodSize;
   buffer = (void*)((maps[0]=Map(Device::fd, 0, bufferSize * channels * this->sampleBits/8, Map::Read)).data);
   status = (Status*)(maps[1]=Map(Device::fd, 0x80000000, 0x1000, Map::Read)).data;

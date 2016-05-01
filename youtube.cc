@@ -132,7 +132,10 @@ struct Youtube {
    title = trim(title);
    if(!title) continue;
    log(title);
+#define DOWNLOAD 0
+#if DOWNLOAD
    if(titles.contains(title)) continue; // Already downloaded
+#endif
 
    Map map = getURL(URL("https://www.googleapis.com/youtube/v3/search?key="_+key+"&q="+replace(title," ","+")+
                         "&part=snippet"));
@@ -141,7 +144,7 @@ struct Youtube {
     string itemTitle = item.dict.at("snippet").dict.at("title").data;
     if(!title.contains('-')) { log(itemTitle); continue; }
 
-#if 1
+#if DOWNLOAD
     log(itemTitle);
     if(find(itemTitle,"Extended")) continue;
 #else

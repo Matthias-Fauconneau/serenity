@@ -116,3 +116,5 @@ audio/player.cc
 http.cc
 http.h
 youtube.cc
+irc.cc
+nine.cc

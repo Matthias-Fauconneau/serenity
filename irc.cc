@@ -26,7 +26,7 @@ void TCPSocket::connect(uint host, uint16 port) {
  assert_(!fd);
  fd = check(socket(PF_INET,SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC,0));
  if(host==uint(-1)) { close(); return; }
- sockaddress addr = {PF_INET, big16(port), host, {0,0}}; connect(Socket::fd, (const sockaddr*)&addr, sizeof(addr));
+ sockaddress addr = {PF_INET, big16(port), host, {0,0}}; ::connect(Socket::fd, (const sockaddr*)&addr, sizeof(addr));
  fcntl(Socket::fd, F_SETFL, 0);
 }
 
@@ -198,7 +198,9 @@ struct DCC : URL {
       }
       s.skip("DCC ACCEPT ");
      }
-     string name = s.until(' ');
+     string name;
+     if(s.match('"')) { name = s.until('"'); s.skip(' '); }
+     else name = s.until(' ');
      this->fileName = copyRef(name);
      uint ip = stage==2 ? big32(parseInteger(s.until(' '))) : stage;
      uint16 port = parseInteger(s.until(' '));
@@ -288,7 +290,7 @@ struct DCC : URL {
 
 struct DCCApp {
  DCCApp() {
-  for(int i: range(7)) {
+  for(int i: range(8)) {
    DCC dcc(join(arguments(), " "));
    if(!dcc.fileName || !dcc.fileSize || !dcc.position) return; // Failed
    if(dcc.position == dcc.fileSize) return; // Completed

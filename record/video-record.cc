@@ -64,7 +64,7 @@ struct Record : Poll, Widget {
         video.start();
         videoThread.spawn();
 #endif
-        audio.start(2, 48000, 4096 /*ChromeOS kernel restricts maximum buffer size*/);
+        audio.start(2, 48000, 0);
         audioThread.spawn(); // after registerPoll in audio.setup
         //start();
     }
@@ -73,6 +73,7 @@ struct Record : Poll, Widget {
 #if VIDEO
         videoThread.wait();
 #endif
+        stop();
     }
 
     void start() {
@@ -80,7 +81,7 @@ struct Record : Poll, Widget {
         abort();
         Locker locker(lock);
         firstTimeStamp = 0;
-        encoder = unique<Encoder>(arguments()[0]+".mkv"_);
+        encoder = unique<Encoder>(arguments()?arguments()[0]:"test"_+".mkv"_);
 #if VIDEO
         if(encodeVideo) encoder->setMJPEG(int2(video.width, video.height), video.frameRate);
 #endif

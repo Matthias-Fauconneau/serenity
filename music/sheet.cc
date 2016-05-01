@@ -76,15 +76,16 @@ struct System : SheetContext {
  // Glyph methods
  vec2 glyphSize(uint code, Font* font_=0/*font*/) { Font& font=font_?*font_:this->font; return font.metrics(font.index(code)).size; }
  float glyphAdvance(uint code, Font* font_=0/*font*/) { Font& font=font_?*font_:this->font; return font.metrics(font.index(code)).advance; }
- int noteCode(const Sign& sign) { assert_(sign.type==Sign::Note); return min<int>(SMuFL::NoteHead::Breve+int(sign.note.value), int(SMuFL::NoteHead::Black)); };
+ int noteCode(const Sign& sign) { assert_(sign.type==Sign::Note); return min<int>(SMuFL::NoteHead::Breve+int(sign.note.value-1), int(SMuFL::NoteHead::Black)); };
  float noteSize(const Sign& sign) {
   return font.metrics(font.index(noteCode(sign))).advance;
  };
 
  // Metrics
  // Enough space for accidented dichords
- const float space = /*glyphSize(SMuFL::Accidental::Flat, &smallFont).x+*/glyphSize(SMuFL::NoteHead::Black).x;
- const float spaceWidth; // Minimum space on pass 0, Space width for measure justification on pass 1
+ //const float space = /*glyphSize(SMuFL::Accidental::Flat, &smallFont).x+*/glyphSize(SMuFL::NoteHead::Black).x;
+ const float space = glyphSize(SMuFL::Accidental::Flat, &smallFont).x+glyphSize(SMuFL::NoteHead::Black).x;
+ const float spaceWidth; // Minimum space width on initial layout pass, then space width for measure justification on final layout pass
 
  // Page context
  const float pageWidth;
@@ -92,6 +93,7 @@ struct System : SheetContext {
  Graphics* previousSystem;
 
  // System context
+ size_t measureCount = 0;
  size_t lastMeasureBarIndex = -1;
  float allocatedLineWidth = 0;
  uint spaceCount = 0;
@@ -111,6 +113,7 @@ struct System : SheetContext {
  const buffer<Range> line;
 
  map<uint, float> timeTrack; // Maps time to horizontal position
+ size_t justifiedSpace = 0;
 
  // -- Layout helpers
  float glyph(vec2 origin, uint code, float opacity=1, float size=8, FontData* font=0);
@@ -572,7 +575,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
                         };*/
 
   // Clears any pending clef changes
-  if(sign.type == Sign::Note || sign.type == Sign::KeySignature) {
+  if((sign.type == Sign::Note /*||sign.type == Sign::Rest*/) || sign.type == Sign::KeySignature) {
    for(size_t index=0; index<pendingClefChange.size;) {
     // Skips if not needed yet to keep the opportunity to clear right before measure bar
     if(((sign.type == Sign::Note||sign.type == Sign::Rest||sign.type == Sign::Clef||sign.type == Sign::OctaveShift) && sign.staff == pendingClefChange[index].staff) // Same staff
@@ -641,7 +644,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
      //log(pages.size, pageSystems.size, sign, staves[staff].clef.octave);
     } else error(int(sign.type));
     //timeTrack.at(sign.time).staves[staff].x = x;
-   } else {
+   } else { // Note|Rest
     x += spaceWidth;
     if(sign.type == Sign::Note) {
      Note& note = sign.note;
@@ -726,8 +729,14 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
       }
       else {
        vec2 p = vec2(x, staffY(staff, -4));
-       x += glyph(p, SMuFL::Rest::Double+int(sign.rest.value), 1./2, 6);
-       //assert_(!sign.rest.dot);
+       x += glyph(p, SMuFL::Rest::Longa+int(sign.rest.value), 1./2, 6);
+       assert_(sign.rest.value >= Value::Long && sign.rest.value <= Value::Eighth, int(sign.rest.value));
+       //assert_(!sign.rest.dot, signIndex, int(sign.rest.value));
+       // Dot
+       if(sign.rest.dot) {
+        float dotOffset = glyphSize(SMuFL::Dot, &smallFont).x;
+        glyph(vec2(x+dotOffset, staffY(staff, -3)), SMuFL::Dot, 1./2, 6);
+       }
       }
       uint beatDuration = quarterDuration * 4 / timeSignature.beatUnit;
       uint measureLength = timeSignature.beats * beatDuration;
@@ -776,20 +785,19 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
     float w = glyphAdvance(SMuFL::TimeSignature::_0);
     float W = max(beats.size, beatUnit.size)*w;
     float startX = x;
-    x = startX + (W-beats.size*w)/2;
+    x = startX + (W-beats.size*w)/2; // Align center
     for(char digit: beats) {
      for(size_t staff: range(staves.size)) glyph(vec2(x, staffY(staff, -2)), SMuFL::TimeSignature::_0+digit-'0');
      x += glyphAdvance(SMuFL::TimeSignature::_0+digit-'0');
     }
     float maxX = x;
-    x = startX + (W-beatUnit.size*w)/2;
+    x = startX + (W-beatUnit.size*w)/2; // Align center
     for(char digit: beatUnit) {
      for(size_t staff: range(staves.size)) glyph(vec2(x, staffY(staff, -6)), SMuFL::TimeSignature::_0+digit-'0');
      x += glyphAdvance(SMuFL::TimeSignature::_0+digit-'0');
     }
-    maxX = startX+2*glyphAdvance(SMuFL::TimeSignature::_0);
-    //x += space;
-    //timeTrack.at(sign.time).setStaves(maxX); // Does not clear directions lines
+    maxX = max(maxX, x); //startX+2*glyphAdvance(SMuFL::TimeSignature::_0);
+    timeTrack.at(sign.time) = maxX;
     for(Staff& staff: staves) staff.x = maxX;
    } else { // Clears all lines (including direction lines)
     if(sign.type == Sign::Measure) {
@@ -846,11 +854,12 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 
      // Line break
      //if(signIndex == signs.size-1) break; // End of line, last measure bar FIXME: skips last measure
-     if(x > pageWidth && !measureBars && !activeTies && !notes) {
+     if(x > pageWidth && !measureBars && !activeTies && !notes && measureCount > 2 /*Never breaks with only 2 measures*/) {
       //log("end of line", pageWidth, x);
       break;
      }
      // Records current parameters at the end of this measure in case next measure triggers a line break
+     measureCount++;
      if(sign.measure.lineBreak == Measure::PageBreak) pageBreak = true;
      lastMeasureBarIndex = signIndex;
      allocatedLineWidth = x + margin;
@@ -880,6 +889,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
        glyph(vec2(x, Y(0, {staves[0].clef.clefSign, 0}, step - (staves[0].clef.clefSign==FClef ? 14 : 0))), symbol);
        x += glyph(vec2(x, Y(1, {staves[1].clef.clefSign, 0}, step - (staves[1].clef.clefSign==FClef ? 14 : 0))), symbol);
       }
+      x += space;
      }
      keySignature = sign.keySignature;
     }
@@ -900,7 +910,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
     }
     else error(int(sign.type));
     //x += space;
-    //additionnalSpaceCount++; // Measure, Key, Time, Repeat adds additional spaces at a single timeTrack point
+    //additionnalSpaceCount++; // Measure, Key, Time, Repeat adds additional spaces at a single ckck point
     //timeTrack.at(sign.time).setAll(x);
     // Sets all positions
     for(Staff& staff: staves) staff.x = x;

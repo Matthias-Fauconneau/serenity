@@ -67,7 +67,7 @@ Element::Element(TextData& s, bool html) {
         else {
             string content = s.whileNot('<');
             if(trim(content)) {
-                assert_(!this->content, this->content, content);
+                //assert_(!this->content, *this, content); // FIXME:
                 this->content = trim(content);
             }
             else if(!content) {

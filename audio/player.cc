@@ -32,7 +32,7 @@ struct Player : Poll {
     AudioOutput audio {{this,&Player::read}};
     mref<short2> lastPeriod;
     size_t read(mref<short2> output) {
-        assert_(audio.rate == file->audioFrameRate);
+        //assert_(audio.rate == file->audioFrameRate); Might fail on track change
         uint readSize = 0;
         for(mref<short2> chunk=output;;) {
             if(!file) return readSize;
@@ -136,7 +136,9 @@ struct Player : Poll {
         if(files) playTitle(0);
     }
     void insertFile(int index, const string folder, const string file, bool withAlbumName) {
-		String title = copyRef(section(section(file,'/',-2,-1),'.',0,-2));
+    string fileName = section(file,'/',-2,-1);
+    if(fileName.contains('.')) fileName = section(fileName,'.',0,-2);
+     String title = copyRef(fileName);
         uint i=title.indexOf('-'); i++; //skip album name
         while(i<title.size && title[i]>='0'&&title[i]<='9') i++; //skip track number
         while(i<title.size && (title[i]==' '||title[i]=='.'||title[i]=='-'||title[i]=='_')) i++; //skip whitespace

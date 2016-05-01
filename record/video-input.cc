@@ -66,8 +66,9 @@ void VideoInput::event() {
         videoTime = buf.sequence;
     }
     uint64 timeStamp = uint64(buf.timestamp.tv_sec)*1000000ull + uint64(buf.timestamp.tv_usec);
+    //log(timeStamp);
     write(buffers[buf.index].slice(0, buf.bytesused), timeStamp);
-    if(lastTimeStamp && timeStamp-lastTimeStamp > 33600) log(timeStamp-lastTimeStamp);
+    if(lastTimeStamp && timeStamp-lastTimeStamp > 36017/*33600*/) log("Delay", timeStamp-lastTimeStamp);
     lastTimeStamp = timeStamp;
     iowr<QueueBuffer>(buf);
     videoTime++;

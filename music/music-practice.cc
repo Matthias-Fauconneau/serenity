@@ -25,7 +25,7 @@ struct Music {
  array<unique<FontData>> fonts;
  unique<Sheet> sheet = nullptr;
  unique<Scroll<HList<GraphicsWidget>>> pages;
- unique<Window> window = ::window(&pages->area(), 0);
+ unique<Window> window = ::window(&pages->area(), int2(1366/2, 768));
 
  AudioOutput audio {window?audioThread:mainThread};
  MidiInput input {window?audioThread:mainThread};
@@ -44,8 +44,8 @@ struct Music {
   //AudioControl("Master Playback Switch") = 1;
   //AudioControl("Headphone Playback Switch") = 1;
   //AudioControl("Master Playback Volume") = 100;
-  audio.start(sampler->rate, sampler->periodSize, 32, 2);
-  sampler->noteEvent(60, 64);
+  audio.start(sampler->rate, sampler->periodSize, 32, 2, true);
+  //sampler->noteEvent(60, 64);
  }
  ~Music() {
   //audio.stop();
@@ -83,6 +83,7 @@ struct Music {
   }
   else error(title);
   this->pages = unique<Scroll<HList<GraphicsWidget>>>( apply(pages, [](Graphics& o) { return GraphicsWidget(move(o)); }) );
+  this->pages->vertical = false;
   this->pages->horizontal = true;
   window->widget = window->focus = &this->pages->area();
   window->render();
