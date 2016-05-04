@@ -16,6 +16,7 @@ struct TCPSocket : Socket {
 
 /// SSL network socket (openssl)
 struct SSLSocket : TCPSocket {
+ SSLSocket() {}
  SSLSocket(uint host, uint16 port, bool secure=false);
  ~SSLSocket();
 
@@ -60,35 +61,40 @@ String cacheFile(const URL& url);
 
 /// Asynchronously fetches a file over HTTP
 struct HTTP : DataStream<SSLSocket>, Poll, TextData {
+ HTTP() : state(Invalid) {}
  /// Connects to \a host and requests \a path
  /// \note \a headers and \a content will be added to request
  /// \note If \a secure is true, an SSL connection will be used
- HTTP(URL&& url, function<void(const URL&, Map&&)> handler={}, array<String>&& headers={});
+ HTTP(URL&& url, function<void(const URL&, Map&&)> contentAvailable={}, array<String>&& headers={});
 
  void request();
  void header();
+ virtual void receiveContent();
+ virtual void cache();
  void event() override;
  void done();
 
  // Request
  URL url;
  array<String> headers;
- function<void()> downloadHandler;
- function<void(const URL&, Map&&)> handler;
+ function<void()> chunkReceived;
+ function<void(const URL&, Map&&)> contentAvailable;
  // Header
- uint contentLength=0;
+ size_t contentLength=0;
  bool chunked=false;
  array<String> redirect;
  // Data
  int chunkSize=0;
  array<byte> content;
- enum { Request, Header, Redirect, Denied, BadRequest, Content, Downloaded, Handle, Handled } state = Request;
+ enum { Invalid, Request, Header, Redirect, Denied, BadRequest, Content, Cache, Available, Handled } state = Request;
+
+ operator bool() { return state != Invalid; }
 };
 
-/// Requests ressource at \a url and call \a handler when available
+/// Requests ressource at \a url and call \a contentAvailable when available
 /// \note Persistent disk caching will be used, no request will be sent if cache is younger than \a maximumAge hours
-Map getURL(URL&& url, function<void(const URL&, Map&&)> handler={}, int maximumAge=24, bool wait=true);
+Map getURL(URL&& url, function<void(const URL&, Map&&)> contentAvailable={}, int maximumAge=24, bool wait=true);
 
-/// Requests image at \a url and call \a handler when available (if was not cached)
+/// Requests image at \a url and call \a contentAvailable when available (if was not cached)
 void getImage(URL&& url, Image* target, function<void()> imageLoaded, int2 size=0, uint maximumAge=24*60);
 

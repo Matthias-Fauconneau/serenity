@@ -27,7 +27,7 @@ struct Data {
 	inline ref<byte> slice(size_t pos) const { return data.slice(pos); }
 
     /// Buffers \a need bytes (if overridden) and returns number of bytes available
-    virtual inline size_t available(size_t /*need*/) { return data.size-index; }
+    virtual inline size_t available(size_t /*need*/) { assert_(data.size>=index, index, data.size); return data.size-index; }
 	/// Returns whether there is data to read
     explicit operator bool() { return available(1); }
 
@@ -46,7 +46,7 @@ struct Data {
     ref<byte> read(size_t size) { ref<byte> t = peek(size); advance(size); return t; }
 
     /// Reads until the end of input
-    ref<byte> untilEnd() { size_t size=available(-1); return read(size); }
+    ref<byte> untilEnd() { size_t size = available(-1); return read(size); }
 
     /// Returns whether input match \a key
     bool wouldMatch(uint8 key);
