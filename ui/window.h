@@ -56,6 +56,7 @@ struct Window : Poll {
 	/// Current widget that has the drag focus
 	Widget* drag = 0;
 
+    uint64 currentFrameCounterValue = 0;
     function<void()> presentComplete;
 
 	Window(Widget* widget, Thread& thread, int2 size = 0) : Poll(0,0,thread), widget(widget), size(size) {}
@@ -69,7 +70,6 @@ struct Window : Poll {
 	/// Immediately renders the first pending update to target
     Update render(int2 size, const Image& target);
     virtual Image readback() { return Image(); }
-    Time swapTime;
 
 	// Control
 	virtual function<void()>& globalAction(Key) abstract;
@@ -96,7 +96,6 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
  State state = Idle;
 
  uint64 firstFrameCounterValue = 0;
- uint64 currentFrameCounterValue = 0;
 
  /// An event held to implement motion compression and ignore autorepeats
  //unique<XEvent> heldEvent;

@@ -136,6 +136,7 @@ void XWindow::onEvent(const ref<byte> ge) {
    assert_(sizeof(X11::Event)+event.genericEvent.size*4 == sizeof(completeNotify),
            sizeof(X11::Event)+event.genericEvent.size*4, sizeof(completeNotify));
    state = Idle;
+   assert_(completeNotify.msc, completeNotify.ust);
    currentFrameCounterValue = completeNotify.msc;
    if(!firstFrameCounterValue) firstFrameCounterValue = currentFrameCounterValue;
    presentComplete();
@@ -212,7 +213,16 @@ bool XWindow::processEvent(const X11::Event& e) {
   else requestTermination(0); // Exits application by default
  }
  else if(type==MappingNotify) {}
- else if(type==Shm::event+Shm::Completion) { assert_(state == Copy); if(Present::EXT) state = Present; else { state = Idle; if(presentComplete) presentComplete(); } }
+ else if(type==Shm::event+Shm::Completion) {
+  assert_(state == Copy);
+  if(Present::EXT) state = Present;
+  else {
+   state = Idle;
+   if(!firstFrameCounterValue) firstFrameCounterValue = currentFrameCounterValue;
+   if(presentComplete) presentComplete();
+   currentFrameCounterValue++; // Inaccurate
+  }
+ }
  else { currentWindow = 0; return false; }
  currentWindow = 0;
  return true;
@@ -265,9 +275,7 @@ void XWindow::event() {
  Update update = render(Window::size, target);
  if(update) {
   if(glContext) {
-   swapTime.start();
    glXSwapBuffers(glDisplay, id+Window);
-   swapTime.stop();
   } else {
    {Shm::PutImage r; send(({r.window=id+(Present::EXT?Pixmap:Window), r.context=id+GraphicContext, r.seg=id+Segment,
                             r.totalW=uint16(target.stride), r.totalH=uint16(target.height), r.srcX=uint16(update.origin.x), r.srcY=uint16(update.origin.y),
