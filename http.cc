@@ -269,12 +269,12 @@ void HTTP::receiveContent() {
   if(!content.capacity) {
    content = array<byte>(contentLength);
    if(Data::available(0)) content.append(Data::read(Data::available(0))); // Appends any content send directly with the header packet (reading directly into separate content buffer as no parsing is needed)
-   if(contentLength > 64*1024) {
+   //if(contentLength > 64*1024) {
     Folder(section(cacheFile(url),'/'), ::cache(), true);
     assert_(!existsFile(cacheFile(url), ::cache()));
     file = File(cacheFile(url), ::cache(), Flags(WriteOnly|Create|Truncate));
     file.write(content);
-   }
+   //}
   }
   if(content.size < contentLength) {
    mref<byte> chunk(content.begin()+content.size, content.capacity-content.size);

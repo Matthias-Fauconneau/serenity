@@ -17,7 +17,7 @@ extern "C" {
 #include <libavutil/mathematics.h>
 }
 
-__attribute((constructor(1001))) void initialize_FFmpeg() { av_register_all(); } // ffmpeg.cc
+__attribute((constructor(1001))) void initialize_FFmpeg() { av_register_all(); avformat_network_init(); } // ffmpeg.cc
 
 Decoder::Decoder(string path) {
     //file = avformat_alloc_context();
