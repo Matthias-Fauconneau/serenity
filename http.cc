@@ -181,7 +181,7 @@ HTTP::HTTP(URL&& url, function<void(const URL&, Map&&)> contentAvailable, array<
 
 void HTTP::request() {
  String request = (url.post?"POST"_:"GET"_)+" "_+(startsWith(url.path,"/"_)?""_:"/"_)+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\n"
-   "User-Agent: Serenity\r\n"_;
+   ;//"User-Agent: Serenity\r\n"_;
  if(url.post) {
   headers.append("Content-Type: application/x-www-form-urlencoded"__);
   headers.append("Content-Length: "+str(url.post.size));
@@ -218,7 +218,7 @@ void HTTP::header() {
   ref<byte> key = until(": "_); assert(key,buffer);
   ref<byte> value = until("\r\n"_);
   if(key=="Content-Length"_) contentLength=parseInteger(value);
-  else if(key=="Transfer-Encoding"_ && value=="chunked"_) chunked=true;
+  else if((key=="Transfer-Encoding"_||key=="transfer-encoding") && value=="chunked"_) chunked=true;
   else if((key=="Location"_ && status!=200) || key=="Refresh"_) {
    if(startsWith(value,"0;URL="_)) value=value.slice(6);
    log(status, key);
@@ -251,12 +251,18 @@ void HTTP::receiveContent() {
  if(!content) assert_(cacheFile(url).size < 256); // Aborts on long names before starting content download
  if(chunked) {
   do {
-   if(chunkSize<=0) { chunkSize = integer(false, 16); match("\r\n"_); } //else already parsed
-   if(chunkSize==0) { state=Cache; break; }
-   if(chunkSize<0 || available(chunkSize+2)<uint(chunkSize+2)) return;
+   /*if(chunkSize==0) { chunkSize = integer(false, 16); match("\r\n"_); } // else chunk size already parsed
+   if(chunkSize==0) { state=Cache; assert_(content); break; } // Last chunk
+   if(chunkSize<0 || available(chunkSize+2)<uint(chunkSize+2)) return; // Waits for more
    content.append( Data::read(chunkSize) ); match("\r\n"_);
-   chunkSize=0;
-  } while(Data::available(3)>=3);
+   chunkSize=0;*/
+   if(!chunkSize) { chunkSize = integer(false, 16); match("\r\n"_); } // Parses chunk size if not already known
+   size_t size = available(chunkSize+2);
+   content.append( Data::read(size) ); // Already reads as much as possible into user space as chunk might be larger than kernel buffer
+   if(size<uint(chunkSize+2)) { chunkSize-=size; return; } // Waits for full chunk
+   match("\r\n"_); // Consumes chunk
+  } while(Data::available(3)>=3); // Parses any following chunk
+  assert_(content);
  } else if(contentLength) {
   if(!content.capacity) {
    content = array<byte>(contentLength);
@@ -272,14 +278,19 @@ void HTTP::receiveContent() {
   }
   if(content.size == contentLength) state=Cache;
  }
- else state=Cache;
+ else error("Missing content", chunked, contentLength, buffer); //state=Cache;
 }
 
 void HTTP::cache() {
  if(!content) { log("Missing content", buffer); done(); return; }
  if(content.size>64*1024) log("Downloaded",url,content.size/1024,"KB"); else log("Downloaded",url,content.size,"B");
  redirect.append(cacheFile(url));
- for(string file: redirect) { Folder(section(file,'/'), ::cache(), true); writeFile(file, content, ::cache(), true);}
+ for(string file: redirect) {
+  Folder(section(file,'/'), ::cache(), true);
+  writeFile(file, content, ::cache(), true);
+  log(file);
+  assert_(existsFile(file, ::cache()));
+ }
 }
 
 void HTTP::event() {
@@ -323,7 +334,9 @@ Map getURL(URL&& url, function<void(const URL&, Map&&)> contentAvailable, int ma
  if(requests.size>5) error("Concurrent request limit", requests.size);
  if(wait) {
   HTTP request(move(url),contentAvailable,move(headers));
-  while(request.state < HTTP::Available) assert_(request.wait(), request.events, request.revents);
+  while(request.state < HTTP::Available) { assert_(request.wait(), request.events, request.revents);
+   log(request.chunked, request.contentLength, request.buffer.size, request.content.size); }
+  assert_(existsFile(cacheFile(request.url),cache()), cacheFile(request.url));
   if(!contentAvailable) return Map(cacheFile(request.url),cache());
   contentAvailable(move(request.url), Map(cacheFile(request.url),cache()));
  } else {

@@ -99,13 +99,18 @@ bool Element::contains(string name) const {
 
 const Element& Element::operator()(string path) const {
  const Element* element = 0;
- xpath(path, [&element, path, this](const Element& e){
-  if(element) { log("Multiple match for", path, "in", *this); return; }
+ xpath(path, [&element, path, this](const Element& e)->void{
+  if(element) { log("Multiple matches for", path, "in", *this); return; }
   element = &e;
+  // Checks for multiple matches
  });
- assert_(element, "No such ", path, "in", this->name, apply(children, [](const Element& e) { return e.name; }));
- static Element empty;
- return element ? *element : empty;
+ if(element) {
+  return *element;
+ } else {
+  assert_(element, "No such ", path, "in", this->name, apply(children, [](const Element& e) { return e.name; }));
+  static Element empty;
+  return empty;
+ }
 }
 
 void Element::visit(const function<void(const Element&)>& visitor) const {
@@ -117,11 +122,13 @@ void Element::mayVisit(const function<bool(const Element&)>& visitor) const {
  if(visitor(*this)) for(const Element& e: children) e.mayVisit(visitor);
 }
 
-void Element::xpath(string path, const function<void(const Element &)>& visitor) const {
+bool Element::XPath(string path, const function<bool(const Element &)>& visitor) const {
  assert(path);
  if(startsWith(path,"//"_)) {
   string next = path.slice(2);
-  visit([&next,&visitor](const Element& e)->void{ e.xpath(next,visitor); });
+  bool stop=false;
+  mayVisit([&next,&visitor,&stop](const Element& e)->bool{ if(stop) return false; stop = e.XPath(next,visitor); if(stop) return false; else return true; });
+  return stop;
  }
  string current = section(path,'/');
  string next = section(path,'/',1,-1);
@@ -129,9 +136,13 @@ void Element::xpath(string path, const function<void(const Element &)>& visitor)
   if(  (startsWith(current, "#") && e.attributes.contains("id") && e.attribute("id") == current.slice(1)) ||
        (startsWith(current, ".") && e.attributes.contains("class") && split(e.attribute("class")," ").contains(current.slice(1))) ||
        e.name==current) {
-   if(next) e.xpath(next,visitor); else visitor(e);
+   if(next) e.XPath(next,visitor); else if(visitor(e)) return true;
   }
  }
+ return false;
+}
+void Element::xpath(string path, const function<void(const Element &)>& visitor) const {
+ XPath(path, [&visitor](const Element& e){visitor(e); return false;});
 }
 
 String Element::text() const { array<char> text; visit([&text](const Element& e){ text.append(e.content); }); return move(text); }

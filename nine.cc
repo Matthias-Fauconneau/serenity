@@ -18,7 +18,6 @@ struct Nine {
  }
 } app;
 #else
-#include "json.h"
 #include "window.h"
 #include "interface.h"
 #include "layout.h"
@@ -31,49 +30,64 @@ struct Nine {
  Text caption;
  ImageView image;
  HBox layout {{&caption, &image}};
- unique<Window> window = ::window(&layout, int2(0));
+ unique<Window> window = nullptr;
 
  Nine() {
   if(!existsFile(".nine")) writeFile(".nine","");
-  window->actions[Space] = {this, &Nine::next};
   next();
+  window->actions[Space] = {this, &Nine::next};
  }
  void next() {
-  window->presentComplete = {};
+  if(window) window->presentComplete = {};
   video = Decoder();
   String history = readFile(".nine");
   buffer<string> ids = split(history, "\n");
-  Map document = getURL(URL("http://"+arguments()[0]));
-  //Element root = parseHTML(document);
-  Variant root = parseJSON(document);
+  URL index ("http://"+arguments()[0]);
   array<string> list;
-  for(const Variant& item: root.dict.at("data").list) {
-   string id = item.dict.at("id").data;
-   list.append(id);
-   if(ids.contains(id)) continue;
-   //log(item.dict.at("votes").dict.at("count").integer());
-   //log(item);
-   caption = item.dict.at("caption").data;
-   if(item.dict.contains("media") && item.dict.at("media").type != Variant::Boolean) {
-    assert_(item.dict.at("media").dict, item);
-    String url = unescape(item.dict.at("media").dict.at("mp4").data);
-    log(url);
-    getURL(url);
-    video = Decoder(".cache/"+cacheFile(url));
-    window->presentComplete = [this]{
-     Image image = video.read();
-     if(image) { this->image = ::move(image); window->render(); }
-     else window->presentComplete = {};
-    };
+  for(int unused times: range(5)) {
+   log(index);
+   Map document = getURL(copy(index));
+   Element root = parseHTML(document);
+   if(root.XPath("//article", [this, &ids, &list](const Element& e) {
+    string id = e["data-entry-id"];
+    list.append(id);
+    if(ids.contains(id)) return false;
+    String caption = e("header").text();
+    assert_(caption, e("header"));
+    this->caption = caption;
+    if(e.XPath("//video", [this](const Element& e) {
+              string url = e(0)["src"];
+              log(url);
+              getURL(url);
+              video = Decoder(".cache/"+cacheFile(url));
+              if(!window) window = ::window(&layout, int2(0));
+              window->presentComplete = [this]{
+               Image image = video.read();
+               if(image) { this->image = ::move(image); window->render(); }
+               else window->presentComplete = {};
+              };
+              return true;
+    }) ||
+    e.XPath("//img", [this](const Element& e) {
+     log(e["src"]);
+     image = decodeImage(getURL(e["src"]));
+     return true;
+    })) {
+     File(".nine", currentWorkingDirectory(), Flags(WriteOnly|Append)).write(id+'\n');
+     return true;
+    }
+    //error(e);
+    return false;
+   })) {
+    if(!window) window = ::window(&layout, int2(0));
+    window->render();
+    return;
    }
    else {
-    image = decodeImage(getURL(unescape(item.dict.at("images").dict.at("large").data)));
+    index = index.relative(copyRef(root("//.badge-load-more-post")["href"]));
    }
-   window->render();
-   File(".nine", currentWorkingDirectory(), Flags(WriteOnly|Append)).write(id+'\n');
-   return;
   }
-  error("No new items", list);
+  error("No new items");
  }
 } app;
 #endif

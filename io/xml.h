@@ -31,6 +31,7 @@ struct Element {
  /// Depth-first visits all descendants, skip element if /a visitor returns false.
  void mayVisit(const function<bool(const Element&)>& visitor) const;
  /// Process elements with matching \a path
+ bool XPath(string path, const function<bool(const Element&)>& visitor) const;
  void xpath(string path, const function<void(const Element&)>& visitor) const;
  /// Collects text content of descendants
  String text() const;
