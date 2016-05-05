@@ -26,8 +26,7 @@ struct Nine {
   buffer<string> ids = split(history, "\n");
   URL index ("http://"+arguments()[0]);
   array<string> list;
-  for(int unused times: range(7)) {
-   log(index);
+  for(int unused times: range(10)) {
    Map document = getURL(copy(index));
    Element root = parseHTML(document);
    if(root.XPath("//article", [this, &ids, &list](const Element& e) {
@@ -40,7 +39,7 @@ struct Nine {
     if(e.XPath("//video", [this](const Element& e) {
               string url = e(0)["src"];
               log(url);
-              getURL(url);
+              getURL(url, {}, 24, HTTP::Content); // Waits for start of content but no need for full file yet
               video = Decoder(".cache/"+cacheFile(url));
               if(!window) window = ::window(&layout, int2(0));
               window->presentComplete = [this]{

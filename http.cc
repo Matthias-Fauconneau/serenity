@@ -65,7 +65,6 @@ template<class T> size_t DataStream<T>::available(size_t need) {
   ::buffer<byte> chunk = T::readUpTo(max(4096ll, int64(need)-(int64)Data::available(need)));
   if(!chunk) { error("Empty chunk: already buffered ", Data::available(need), "but need", need); break; }
   buffer.append( chunk ); data=buffer;
-  if(need > 256*1024) log(chunk.size, buffer.size, need);
  }
  return Data::available(need);
 }
@@ -251,24 +250,16 @@ void HTTP::receiveContent() {
  if(!content) assert_(cacheFile(url).size < 256); // Aborts on long names before starting content download
  if(chunked) {
   do {
-   /*if(chunkSize==0) { chunkSize = integer(false, 16); match("\r\n"_); } // else chunk size already parsed
-   if(chunkSize==0) { state=Cache; assert_(content); break; } // Last chunk
-   if(chunkSize<0 || available(chunkSize+2)<uint(chunkSize+2)) return; // Waits for more
-   content.append( Data::read(chunkSize) ); match("\r\n"_);
-   chunkSize=0;*/
    if(chunkSize==invalid) { // Parses chunk size if not already known
-     chunkSize = integer(false, 16); match("\r\n"_); log("chunk", chunkSize);
+     chunkSize = integer(false, 16); match("\r\n"_);
      if(chunkSize==0) { state=Cache; assert_(content); break; } // Last chunk has no end marker?
    }
    if(chunkSize) { // Packet breaks within chunk
     size_t size = min(chunkSize, available(chunkSize));
     content.append( Data::read(size) ); // Already reads as much as possible into user space as chunk might be larger than kernel buffer
-    log("read", size, "of", chunkSize);
     chunkSize -= size;
-    log("remains", chunkSize);
     if(chunkSize) return; // Needs full chunk before end marker
    }
-   assert_(chunkSize==0);
    if(available(2) < 2) return; // Waits for end marker
    match("\r\n"_); // Consumes chunk end marker
    chunkSize = invalid;
@@ -278,13 +269,19 @@ void HTTP::receiveContent() {
   if(!content.capacity) {
    content = array<byte>(contentLength);
    if(Data::available(0)) content.append(Data::read(Data::available(0))); // Appends any content send directly with the header packet (reading directly into separate content buffer as no parsing is needed)
-   log(content.size, contentLength);
+   if(contentLength > 64*1024) {
+    Folder(section(cacheFile(url),'/'), ::cache(), true);
+    assert_(!existsFile(cacheFile(url), ::cache()));
+    file = File(cacheFile(url), ::cache(), Flags(WriteOnly|Create|Truncate));
+    file.write(content);
+   }
   }
   if(content.size < contentLength) {
    mref<byte> chunk(content.begin()+content.size, content.capacity-content.size);
    int64 size = readUpTo(chunk);
    if(size<0) error(size);
    chunk.size = size;
+   if(file) file.write(chunk);
    content.size += chunk.size;
   }
   if(content.size == contentLength) state=Cache;
@@ -295,7 +292,7 @@ void HTTP::receiveContent() {
 void HTTP::cache() {
  if(!content) { log("Missing content", buffer); done(); return; }
  if(content.size>64*1024) log("Downloaded",url,content.size/1024,"KB"); else log("Downloaded",url,content.size,"B");
- redirect.append(cacheFile(url));
+ if(!file) redirect.append(cacheFile(url)); // else already written progressively
  for(string file: redirect) {
   Folder(section(file,'/'), ::cache(), true);
   writeFile(file, content, ::cache(), true);
@@ -324,7 +321,7 @@ void HTTP::done() { state=Handled; /*while(requests.contains(this))*/ if(request
 
 // Requests
 
-Map getURL(URL&& url, function<void(const URL&, Map&&)> contentAvailable, int maximumAge, bool wait) {
+Map getURL(URL&& url, function<void(const URL&, Map&&)> contentAvailable, int maximumAge, HTTP::State wait) {
  assert(url.host,url);
  String file = cacheFile(url);
  array<String> headers;
@@ -343,15 +340,15 @@ Map getURL(URL&& url, function<void(const URL&, Map&&)> contentAvailable, int ma
  }
  for(const unique<HTTP>& request: requests) if(request->url == url) { log("Duplicate request", url); return {}; }
  if(requests.size>5) error("Concurrent request limit", requests.size);
- if(wait) {
+ if(wait == HTTP::Available) {
   HTTP request(move(url),contentAvailable,move(headers));
-  while(request.state < HTTP::Available) { assert_(request.wait(), request.events, request.revents);
-   log(request.chunked, request.contentLength, request.buffer.size, request.content.size); }
+  while(request.state < wait) { assert_(request.wait(), request.events, request.revents); }
   assert_(existsFile(cacheFile(request.url),cache()), cacheFile(request.url));
   if(!contentAvailable) return Map(cacheFile(request.url),cache());
   contentAvailable(move(request.url), Map(cacheFile(request.url),cache()));
  } else {
-  requests.append( unique<HTTP>(move(url),contentAvailable,move(headers)) );
+  HTTP& request = requests.append( unique<HTTP>(move(url),contentAvailable,move(headers)) );
+  while(request.state < wait) { assert_(request.wait(), request.events, request.revents); }
  }
  return {};
 }

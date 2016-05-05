@@ -85,15 +85,17 @@ struct HTTP : DataStream<SSLSocket>, Poll, TextData {
  array<String> redirect;
  // Data
  size_t chunkSize = invalid;
+ File file;
  array<byte> content;
- enum { Invalid, Request, Header, Redirect, Denied, BadRequest, Content, Cache, Available, Handled } state = Request;
+ enum State { Invalid, Request, Header, Redirect, Denied, BadRequest, Content, Cache, Available, Handled };
+ State state = Request;
 
  operator bool() { return state != Invalid; }
 };
 
 /// Requests ressource at \a url and call \a contentAvailable when available
 /// \note Persistent disk caching will be used, no request will be sent if cache is younger than \a maximumAge hours
-Map getURL(URL&& url, function<void(const URL&, Map&&)> contentAvailable={}, int maximumAge=24, bool wait=true);
+Map getURL(URL&& url, function<void(const URL&, Map&&)> contentAvailable={}, int maximumAge=24, HTTP::State wait=HTTP::Available);
 
 /// Requests image at \a url and call \a contentAvailable when available (if was not cached)
 void getImage(URL&& url, Image* target, function<void()> imageLoaded, int2 size=0, uint maximumAge=24*60);
