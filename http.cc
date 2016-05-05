@@ -181,7 +181,7 @@ HTTP::HTTP(URL&& url, function<void(const URL&, Map&&)> contentAvailable, array<
 
 void HTTP::request() {
  String request = (url.post?"POST"_:"GET"_)+" "_+(startsWith(url.path,"/"_)?""_:"/"_)+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\n"
-   ;//User-Agent: Serenity\r\n"_;
+   "User-Agent: Serenity\r\n"_;
  if(url.post) {
   headers.append("Content-Type: application/x-www-form-urlencoded"__);
   headers.append("Content-Length: "+str(url.post.size));

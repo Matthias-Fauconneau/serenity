@@ -1,4 +1,23 @@
 #include "http.h"
+#include "xml.h"
+
+#if 0
+struct Nine {
+ Nine() {
+  Map document = getURL(URL("http://"+arguments()[0]));
+  Element root = parseHTML(document);
+  root.xpath("//article", [](const Element& e) {
+   string id = e["data-entry-id"];
+   String caption = e("header").text();
+   string content;
+   e.xpath("//video", [&content](const Element& e) { content = e(0)["src"]; });
+   if(!content) e.xpath("//img", [&content](const Element& e) { content = e["src"]; });
+   assert_(content, e);
+   log(id, caption, content);
+  });
+ }
+} app;
+#else
 #include "json.h"
 #include "window.h"
 #include "interface.h"
@@ -57,3 +76,4 @@ struct Nine {
   error("No new items", list);
  }
 } app;
+#endif
