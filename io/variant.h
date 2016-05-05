@@ -40,6 +40,12 @@ struct Variant {
  operator float() const { return real(); }
  operator int() const { return real(); }
 };
+
+/*inline bool operator ==(const Variant& a, const bool& b) {
+ assert_(a.type == Variant::Boolean);
+ return bool(a.number) == b;
+}*/
+
 /*inline bool operator ==(const Variant& a, const Variant& b) {
  if((a.type == Variant::Integer || a.type == Variant::Real) &&
     (b.type == Variant::Integer || b.type == Variant::Real))

@@ -277,7 +277,7 @@ void HTTP::receiveContent() {
 
 void HTTP::cache() {
  if(!content) { log("Missing content", buffer); done(); return; }
- if(content.size>256*1024) log("Downloaded",url,content.size/1024,"KB"); //else log("Downloaded",url,content.size,"B");
+ if(content.size>64*1024) log("Downloaded",url,content.size/1024,"KB"); else log("Downloaded",url,content.size,"B");
  redirect.append(cacheFile(url));
  for(string file: redirect) { Folder(section(file,'/'), ::cache(), true); writeFile(file, content, ::cache(), true);}
 }

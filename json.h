@@ -45,3 +45,31 @@ static Variant parseJSON(TextData& s) {
  }
 }
 Variant parseJSON(string buffer) { TextData s (buffer); return parseJSON(s); }
+
+
+String unescape(TextData s) {
+ array<char> u;
+ while(s) {
+  char c = s.next();
+  if(c=='%') {
+   if(s.peek() == '%') { s.advance(1); u.append('%'); }
+   else { u.append(TextData(s.read(2)).integer(false,16)); }
+  }
+  else if(c=='\\') {
+   char c = s.peek();
+   {
+    int i="\'\"nrtbf()\\"_.indexOf(c);
+    assert(i>=0);
+    s.advance(1);
+    u.append("\'\"\n\r\t\b\f()\\"[i]);
+   }
+  }
+  else if(c=='/' && s.peek()=='/') {
+   s.advance(1);
+   u.append('/');
+  }
+  else u.append(c);
+ }
+ return move(u);
+}
+String unescape(string s) { return unescape(TextData(s)); }
