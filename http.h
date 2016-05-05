@@ -84,7 +84,7 @@ struct HTTP : DataStream<SSLSocket>, Poll, TextData {
  bool chunked=false;
  array<String> redirect;
  // Data
- size_t chunkSize = 0;
+ size_t chunkSize = invalid;
  array<byte> content;
  enum { Invalid, Request, Header, Redirect, Denied, BadRequest, Content, Cache, Available, Handled } state = Request;
 

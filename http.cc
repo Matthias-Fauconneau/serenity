@@ -256,11 +256,22 @@ void HTTP::receiveContent() {
    if(chunkSize<0 || available(chunkSize+2)<uint(chunkSize+2)) return; // Waits for more
    content.append( Data::read(chunkSize) ); match("\r\n"_);
    chunkSize=0;*/
-   if(!chunkSize) { chunkSize = integer(false, 16); match("\r\n"_); } // Parses chunk size if not already known
-   size_t size = available(chunkSize+2);
-   content.append( Data::read(size) ); // Already reads as much as possible into user space as chunk might be larger than kernel buffer
-   if(size<uint(chunkSize+2)) { chunkSize-=size; return; } // Waits for full chunk
-   match("\r\n"_); // Consumes chunk
+   if(chunkSize==invalid) { // Parses chunk size if not already known
+     chunkSize = integer(false, 16); match("\r\n"_); log("chunk", chunkSize);
+     if(chunkSize==0) { state=Cache; assert_(content); break; } // Last chunk has no end marker?
+   }
+   if(chunkSize) { // Packet breaks within chunk
+    size_t size = min(chunkSize, available(chunkSize));
+    content.append( Data::read(size) ); // Already reads as much as possible into user space as chunk might be larger than kernel buffer
+    log("read", size, "of", chunkSize);
+    chunkSize -= size;
+    log("remains", chunkSize);
+    if(chunkSize) return; // Needs full chunk before end marker
+   }
+   assert_(chunkSize==0);
+   if(available(2) < 2) return; // Waits for end marker
+   match("\r\n"_); // Consumes chunk end marker
+   chunkSize = invalid;
   } while(Data::available(3)>=3); // Parses any following chunk
   assert_(content);
  } else if(contentLength) {

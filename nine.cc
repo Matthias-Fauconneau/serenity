@@ -1,23 +1,5 @@
 #include "http.h"
 #include "xml.h"
-
-#if 0
-struct Nine {
- Nine() {
-  Map document = getURL(URL("http://"+arguments()[0]));
-  Element root = parseHTML(document);
-  root.xpath("//article", [](const Element& e) {
-   string id = e["data-entry-id"];
-   String caption = e("header").text();
-   string content;
-   e.xpath("//video", [&content](const Element& e) { content = e(0)["src"]; });
-   if(!content) e.xpath("//img", [&content](const Element& e) { content = e["src"]; });
-   assert_(content, e);
-   log(id, caption, content);
-  });
- }
-} app;
-#else
 #include "window.h"
 #include "interface.h"
 #include "layout.h"
@@ -44,7 +26,7 @@ struct Nine {
   buffer<string> ids = split(history, "\n");
   URL index ("http://"+arguments()[0]);
   array<string> list;
-  for(int unused times: range(5)) {
+  for(int unused times: range(7)) {
    log(index);
    Map document = getURL(copy(index));
    Element root = parseHTML(document);
@@ -90,4 +72,3 @@ struct Nine {
   error("No new items");
  }
 } app;
-#endif
