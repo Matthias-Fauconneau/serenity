@@ -48,8 +48,10 @@ struct Background : Widget {
  Map clip;
 
  size_t frameIndex = 0, frameCount = 0;
- Image32 sum;
+ //Image32 sum;
  Map cache;
+ Image8 mode;
+ Image8 median;
  unique<Window> window = nullptr;
 
  Background() {
@@ -62,6 +64,7 @@ struct Background : Widget {
     frameCount += File(file).size() / (size.x*size.y);
    }
   }
+#if 0
   if(!existsFile(baseName+".sum")) {
    sum = Image32(size);
    for(;;clipFrameIndex++, frameIndex++) {
@@ -76,6 +79,49 @@ struct Background : Widget {
    cache = Map(baseName+".sum");
    sum = Image32(unsafeRef(cast<uint32>(cache)), size);
   }
+#elif 0
+  if(!existsFile(baseName+".mode")) {
+   assert_(frameCount > (1<<8) && frameCount < (1<<16));
+   mode = Image8(size);
+   buffer<uint16> histogram(256*mode.ref::size); // 500 MB
+   histogram.clear(0);
+   for(;;clipFrameIndex++, frameIndex++) {
+    Image8 image = this->image();
+    if(!image) break;
+    for(size_t i: range(image.ref::size)) histogram[i*256+image[i]]++;
+    log(frameIndex, frameCount);
+   }
+   clipIndex = 0;
+   for(size_t i: range(mode.ref::size)) mode[i] = argmax(histogram.slice(i*256, 256));
+   writeFile(baseName+".mode", cast<byte>(mode));
+  } else {
+   cache = Map(baseName+".mode");
+   mode = Image8(unsafeRef(cast<uint8>(cache)), size);
+  }
+#else
+  if(!existsFile(baseName+".median")) {
+   assert_(frameCount > (1<<8) && frameCount < (1<<16));
+   median = Image8(size);
+   buffer<uint16> histogram(256*median.ref::size); // 500 MB
+   histogram.clear(0);
+   for(;;clipFrameIndex++, frameIndex++) {
+    Image8 image = this->image();
+    if(!image) break;
+    for(size_t i: range(image.ref::size)) histogram[i*256+image[i]]++;
+    log(frameIndex, frameCount);
+   }
+   clipIndex = 0;
+   for(size_t i: range(median.ref::size)) {
+    ref<uint16> H = histogram.slice(i*256, 256);
+    size_t m = 0, sum = 0; for(;sum<frameCount/2;m++) sum += H[m];
+    median[i] = m;
+   }
+   writeFile(baseName+".median", cast<byte>(median));
+  } else {
+   cache = Map(baseName+".median");
+   median = Image8(unsafeRef(cast<uint8>(cache)), size);
+  }
+#endif
   window = ::window(this, size);
   window->backgroundColor = nan;
   window->presentComplete = [this]{ window->render(); };
@@ -100,10 +146,13 @@ struct Background : Widget {
   //for(size_t i: range(image.ref::size)) sum[i] += image[i];
   for(size_t y: range(window->target.size.y)) {
    for(size_t x: range(window->target.size.x)) {
-    int v = image(x, y);
-    int m = sum(x, y)/frameCount;
+    //int v = image(x, y);
+    //int m = sum(x, y)/frameCount;
+    //int m = mode(x, y);
+    int m = median(x, y);
     int f = 0;
-    if(abs(v-m) > 16) f = v; // Foreground
+    //if(abs(v-m) > 16) f = v; // Foreground
+    f = m;
     window->target(x,y) = byte3(f);
    }
   }
