@@ -81,6 +81,8 @@ inline Image resize(int2 size, const Image& source) { return resize(Image(size, 
 typedef ImageT<uint8> Image8;
 /// 2D array of 16bit integer pixels
 typedef ImageT<uint16> Image16;
+/// 2D array of 32bit integer pixels
+typedef ImageT<uint32> Image32;
 /// 2D array of 32bit floating-point pixels
 //typedef ImageT<float> ImageF;
 /// 2D array of 32bit floating-point 4 component vector pixels
