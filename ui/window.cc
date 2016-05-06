@@ -44,7 +44,7 @@ void Window::render(shared<Graphics>&& graphics, int2 origin, int2 size) {
  lock.unlock();
  queue();
 }
-void Window::render() { assert_(size); 	lock.lock(); updates.clear(); lock.unlock(); render(nullptr, int2(0), size); }
+void Window::render() { assert_(size); lock.lock(); updates.clear(); lock.unlock(); render(nullptr, int2(0), size); }
 
 Window::Update Window::render(int2 size, const Image& target) {
  lock.lock();
@@ -57,7 +57,7 @@ Window::Update Window::render(int2 size, const Image& target) {
   currentWindow = 0;
  }
  if(target) {
-  fill(target, update.origin, update.size, backgroundColor, 1); // Clear framebuffer
+  if(isNumber(backgroundColor)) fill(target, update.origin, update.size, backgroundColor, 1); // Clear framebuffer
   ::render(target, update.graphics); 	// Render retained graphics
  }
  return update;
@@ -139,7 +139,8 @@ void XWindow::onEvent(const ref<byte> ge) {
    assert_(completeNotify.msc, completeNotify.ust);
    currentFrameCounterValue = completeNotify.msc;
    if(!firstFrameCounterValue) firstFrameCounterValue = currentFrameCounterValue;
-   presentComplete();
+   //log(currentFrameCounterValue);
+   if(presentComplete) presentComplete();
   }
   else error("Unhandled event", ref<string>(X11::events)[type]);
  }
@@ -221,6 +222,7 @@ bool XWindow::processEvent(const X11::Event& e) {
   assert_(state == Copy);
   if(Present::EXT) state = Present;
   else {
+   error("!Present");
    state = Idle;
    if(!firstFrameCounterValue) firstFrameCounterValue = currentFrameCounterValue;
    if(presentComplete) presentComplete();

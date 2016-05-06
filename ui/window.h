@@ -19,6 +19,9 @@ struct Window : Poll {
 	/// Current cursor
 	MouseCursor cursor = MouseCursor::Arrow;
 
+    /// Rendering target in shared memory
+    Image target;
+
     // GLX/Xlib/DRI2
     struct __GLXFBConfigRec* fbConfig = 0;
     struct _XDisplay* glDisplay = 0;
@@ -89,8 +92,6 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
  enum Resource { Window, GraphicContext, Colormap, PresentEvent, Segment, Pixmap, Picture, Cursor, CursorPixmap };
  /// System V shared memory
  uint shm = 0;
- /// Rendering target in shared memory
- Image target;
  /// Shared window buffer state
  enum State { Idle, Copy, Present };
  State state = Idle;

@@ -49,7 +49,7 @@ template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)>
         static_assert(sizeof(const_method<O,R(Args...)>)<=sizeof(any),"");
         new (any) const_method<O,R(Args...)>(object, pmf);
     }
-    virtual R operator()(Args... args) const override { assert(any[0]); return ((functor<R(Args...)>&)any)(forward<Args>(args)...); }
+    virtual R operator()(Args... args) const override { assert_(any[0]); return ((functor<R(Args...)>&)any)(forward<Args>(args)...); }
     explicit operator bool() { return any[0]; }
 };
 

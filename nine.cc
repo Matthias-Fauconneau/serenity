@@ -29,8 +29,8 @@ struct Nine {
   buffer<string> ids = split(history, "\n");
   URL index ("http://"+arguments()[0]);
   array<string> list;
-  for(int unused times: range(192)) {
-   Map document = getURL(copy(index));
+  for(int unused times: range(8)) {
+   Map document = getURL(copy(index), {}, 6);
    Element root = parseHTML(document);
    if(root.XPath("//article", [this, &ids, &list](const Element& e) {
     string id = e["data-entry-id"];
@@ -54,7 +54,13 @@ struct Nine {
                 return;
                }
                Image image = video.read();
-               if(!image) { video.seek(0); while(video.videoTime>(int)video.timeDen/4) image = video.read(); log(video.videoTime, video.timeDen); start=realTime()/*window->currentFrameCounterValue*/; } // Loop
+               if(!image) { // Loop
+                video.seek(0); video.videoTime = 0;
+                while(video.videoTime>(int)video.timeDen/4) video.read(Image());
+                image = video.scale();
+                log(video.videoTime, video.timeDen);
+                start=realTime();
+               }
                this->image = ::move(image);
                window->render();
              };

@@ -119,3 +119,5 @@ youtube.cc
 irc.cc
 nine.cc
 json.h
+music/background.cc
+video/video.cc

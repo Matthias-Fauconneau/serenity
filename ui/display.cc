@@ -71,8 +71,8 @@ XDisplay::XDisplay(Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket:
         Shm::EXT=re.major; Shm::event=re.firstEvent; Shm::errorBase=re.firstError; assert_(Shm::EXT); }
     /*{auto r = request(QueryExtension{.length="RENDER"_.size, .size=uint16(2+align(4,"RENDER"_.size)/4)}, "RENDER"_);
         XRender::EXT=r.major; XRender::errorBase=r.firstError; }*/
-    /*{auto r = request(({QueryExtension r; r.length="Present"_.size, r.size=uint16(2+align(4,"Present"_.size)/4), r;}), "Present"_);
-        Present::EXT=r.major; assert_(Present::EXT); }*/
+    {auto r = request(({QueryExtension r; r.length="Present"_.size, r.size=uint16(2+align(4,"Present"_.size)/4), r;}), "Present"_);
+        Present::EXT=r.major; assert_(Present::EXT); }
 }
 
 void XDisplay::event() {
