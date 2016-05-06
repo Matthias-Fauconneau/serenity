@@ -7,7 +7,7 @@
 uint mean(ref<uint8> Y) { uint sum=0; for(uint8 v: Y) sum+=v; return sum / Y.size; }
 
 struct Background : Widget {
- Decoder video = Decoder(arguments()[0]+".mkv");
+ Decoder video = Decoder(baseName+".mkv");
  unique<Window> window = ::window(this);
  //int64 clipIndex = 0, frameCount = 0;
  //File file;
@@ -30,7 +30,7 @@ struct Background : Widget {
    do { video.read(Image()); } while(mean(video.Y()) < 64); // Skips
    video.scale(window->target);
    //assert_(clipIndex < 11);
-   //file = File(arguments()[0]+"."+str(clipIndex)+"."+strx(video.size), currentWorkingDirectory(), ::Flags(ReadWrite|Create));
+   //file = File(baseName+"."+str(clipIndex)+"."+strx(video.size), currentWorkingDirectory(), ::Flags(ReadWrite|Create));
    //log(clipIndex);
    //frameCount = 0; clipIndex++;
   }
@@ -41,48 +41,73 @@ struct Background : Widget {
 } app;
 #else
 struct Background : Widget {
+ string baseName = arguments()[0];
  int2 size;
 
- size_t clipIndex = 1, frameIndex = 0, clipFrameCount = 0;
+ size_t clipIndex = 1, clipFrameIndex = 0, clipFrameCount = 0;
  Map clip;
 
- size_t frameCount = 0;
+ size_t frameIndex = 0, frameCount = 0;
  Image32 sum;
+ Map cache;
  unique<Window> window = nullptr;
 
  Background() {
   for(string file: currentWorkingDirectory().list(Files)) {
-   if(startsWith(file, arguments()[0]) && !endsWith(file, "mkv")) {
-    TextData s(section(file,'.',-2,-1));
-    size.x = s.integer(); s.skip('x'); size.y = s.integer();
+   TextData s(section(file,'.',-2,-1));
+   if(startsWith(file, baseName) && s.isInteger()) {
+    int2 size; size.x = s.integer(); s.skip('x'); size.y = s.integer();
+    if(!this->size) this->size = size;
+    assert_(size == this->size);
+    frameCount += File(file).size() / (size.x*size.y);
    }
   }
-  sum = Image32(size);
+  if(!existsFile(baseName+".sum")) {
+   sum = Image32(size);
+   for(;;clipFrameIndex++, frameIndex++) {
+    Image8 image = this->image();
+    if(!image) break;
+    for(size_t i: range(image.ref::size)) sum[i] += image[i];
+    log(frameIndex, frameCount);
+   }
+   clipIndex = 0;
+   writeFile(baseName+".sum", cast<byte>(sum));
+  } else {
+   cache = Map(baseName+".sum");
+   sum = Image32(unsafeRef(cast<uint32>(cache)), size);
+  }
   window = ::window(this, size);
   window->backgroundColor = nan;
   window->presentComplete = [this]{ window->render(); };
  }
- vec2 sizeHint(vec2) override { return vec2(size); };
- shared<Graphics> graphics(vec2) override {
-  while(frameIndex == clipFrameCount) {
-   frameIndex = 0; clipFrameCount = 0;
-   String name = arguments()[0]+'.'+str(clipIndex)+'.'+strx(size);
-   if(!existsFile(name)) { requestTermination(); return shared<Graphics>(); } //{ clipIndex++; log(clipIndex); continue; }
+ Image8 image() {
+  while(clipFrameIndex == clipFrameCount) {
+   clipFrameIndex = 0; clipFrameCount = 0;
+   String name = baseName+'.'+str(clipIndex)+'.'+strx(size);
+   if(!existsFile(name)) return Image8(); //{ clipIndex++; log(clipIndex); continue; }
    log(name);
    clip = Map(name);
    assert_(clip.size % (size.x*size.y) == 0);
    clipFrameCount = clip.size / (size.x*size.y);
    clipIndex++;
   }
-  frameCount++;
-  Image8 Y (unsafeRef(cast<uint8>(clip.slice(frameIndex*(size.x*size.y), size.x*size.y))), size);
-  for(size_t i: range(Y.ref::size)) sum[i] += Y[i];
+  return Image8(unsafeRef(cast<uint8>(clip.slice(clipFrameIndex*(size.x*size.y), size.x*size.y))), size);
+ }
+ vec2 sizeHint(vec2) override { return vec2(size); };
+ shared<Graphics> graphics(vec2) override {
+  Image8 image = this->image();
+  if(!image) {  requestTermination(); return shared<Graphics>();  }
+  //for(size_t i: range(image.ref::size)) sum[i] += image[i];
   for(size_t y: range(window->target.size.y)) {
    for(size_t x: range(window->target.size.x)) {
-    //window->target(x,y) = byte3(Y(x, y));
-    window->target(x,y) = byte3(sum(x, y)/frameCount);
+    int v = image(x, y);
+    int m = sum(x, y)/frameCount;
+    int f = 0;
+    if(abs(v-m) > 16) f = v; // Foreground
+    window->target(x,y) = byte3(f);
    }
   }
+  clipFrameIndex++;
   frameIndex++;
   return shared<Graphics>();
  }
