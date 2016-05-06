@@ -91,5 +91,5 @@ Image Decoder::read() {
 void Decoder::seek(uint64 videoTime) {
     //assert_(videoStream->time_base.num == 1);
     av_seek_frame(file, videoStream->index, videoTime/**videoStream->time_base.den/videoFrameRate*/, 0);
-    this->videoTime = videoTime; // FIXME: actual
+    //this->videoTime = videoTime; // FIXME: actual
 }

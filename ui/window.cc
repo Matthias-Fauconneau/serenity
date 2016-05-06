@@ -151,6 +151,10 @@ bool XWindow::processEvent(const X11::Event& e) {
  /**/ if(type==ButtonPress) {
   Widget* previousFocus = focus;
   if(widget->mouseEvent(vec2(e.x,e.y), vec2(Window::size), Press, (Button)e.key, focus) || focus!=previousFocus) render();
+  else {
+   function<void()>* action = Window::actions.find(Key(e.key));
+   if(action) (*action)(); // Local window action
+  }
   drag = focus;
  }
  else if(type==ButtonRelease) {

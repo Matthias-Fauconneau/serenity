@@ -19,15 +19,17 @@ struct Nine {
   if(!existsFile(".nine")) writeFile(".nine","");
   next();
   window->actions[Space] = {this, &Nine::next};
+  window->actions[Key(LeftButton)] = {this, &Nine::next};
  }
  void next() {
   if(window) window->presentComplete = {};
   video = Decoder();
+  start = 0;
   String history = readFile(".nine");
   buffer<string> ids = split(history, "\n");
   URL index ("http://"+arguments()[0]);
   array<string> list;
-  for(int unused times: range(15)) {
+  for(int unused times: range(192)) {
    Map document = getURL(copy(index));
    Element root = parseHTML(document);
    if(root.XPath("//article", [this, &ids, &list](const Element& e) {
@@ -43,16 +45,16 @@ struct Nine {
               //getURL(url, {}, 24, HTTP::Content); // Waits for start of content but no need for full file yet
               //video = Decoder(".cache/"+cacheFile(url));
               video = Decoder("cache:"+url); // Lets libavformat download/block as needed (FIXME: cache)
-               if(!window) window = ::window(&layout, int2(0));
+              start = 0;
+              if(!window) window = ::window(&layout, int2(0));
               window->presentComplete = [this]{
                if(!start) start = realTime();//window->currentFrameCounterValue;
-               log((float)video.videoTime/video.timeDen, float(realTime()-start)/second);
                if(video.videoTime*second > 2*(realTime()/*window->currentFrameCounterValue*/-start)*video.timeDen) {
                 window->render(); // Repeat frame (FIXME: get refresh notification without representing same frame)
                 return;
                }
                Image image = video.read();
-               if(!image) { video.seek(0); image = video.read(); start=realTime()/*window->currentFrameCounterValue*/; } // Loop
+               if(!image) { video.seek(0); while(video.videoTime>(int)video.timeDen/4) image = video.read(); log(video.videoTime, video.timeDen); start=realTime()/*window->currentFrameCounterValue*/; } // Loop
                this->image = ::move(image);
                window->render();
              };
