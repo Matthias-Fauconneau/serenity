@@ -77,7 +77,7 @@ static double SSE(const Image4f& a, const Image4f& b, int2 offset, int2 size) {
 
 int2 templateMatch(const Image4f& A, const Image4f& b, int2& size) {
     array<Image4f> mipmap;
-    mipmap.append(share(A));
+    mipmap.append(unsafeRef(A));
     size = b.size;
     while(mipmap.last().size > size*3) mipmap.append(downsample(mipmap.last()));
     int2 offset = mipmap.last().size / 2 - size / 2;

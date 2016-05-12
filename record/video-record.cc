@@ -242,7 +242,7 @@ struct Record : Poll, Widget {
             graphics->fills.append(vec2(channel?offset.x+image.size.x:0, 0), vec2(offset.x, y), black);
             graphics->fills.append(vec2(channel?offset.x+image.size.x:0, y), vec2(offset.x, size.y-y), maximumAmplitude < ((1<<31)-1) ? green : red);
         }
-        if(image) graphics->blits.append(vec2(offset), vec2(image.size), unsafeShare(image));
+        if(image) graphics->blits.append(vec2(offset), vec2(image.size), unsafeRef(image));
         return graphics;
     }
 } app;

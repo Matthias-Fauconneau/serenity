@@ -14,12 +14,14 @@ struct Nine {
  HBox layout {{&caption, &image}};
  unique<Window> window = nullptr;
  int64 start = 0;
+ String id;
 
  Nine() {
   if(!existsFile(".nine")) writeFile(".nine","");
   next();
   window->actions[Space] = {this, &Nine::next};
   window->actions[Key(LeftButton)] = {this, &Nine::next};
+  window->actions[Return] = [this]{ execute(which("firefox-bin"),{"http://"+arguments()[0]+"/gag/"+id}); };
  }
  void next() {
   if(window) window->presentComplete = {};
@@ -30,12 +32,13 @@ struct Nine {
   URL index ("http://"+arguments()[0]);
   array<string> list;
   for(int unused times: range(8)) {
-   Map document = getURL(copy(index), {}, 6);
+   Map document = getURL(copy(index), {}, 1);
    Element root = parseHTML(document);
    if(root.XPath("//article", [this, &ids, &list](const Element& e) {
     string id = e["data-entry-id"];
     list.append(id);
     if(ids.contains(id)) return false;
+    this->id = copyRef(id);
     String caption = e("header").text();
     assert_(caption, e("header"));
     this->caption = caption;

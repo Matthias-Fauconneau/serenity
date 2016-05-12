@@ -8,7 +8,7 @@ static double similarity(const ImageF& A, const ImageF& B, Transform transform) 
 
 /// Evaluates first \a levelCount mipmap levels (shares source as first element)
 static array<ImageF> mipmap(const ImageF& source, int levelCount) {
-	array<ImageF> mipmap; mipmap.append( share(source) );
+    array<ImageF> mipmap; mipmap.append( unsafeRef(source) );
 	for(int unused level: range(levelCount)) {
 		mipmap.append(downsample(mipmap.last()));
 		assert_(mipmap.last());

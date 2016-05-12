@@ -6,6 +6,8 @@
 #include "file.h"
 #include "image.h"
 
+uint resolve(string host);
+
 /// TCP network socket (POSIX)
 struct TCPSocket : Socket {
  TCPSocket() {}

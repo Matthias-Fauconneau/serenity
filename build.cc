@@ -71,14 +71,13 @@ void Build::tryParseDefines(TextData& s) {
 bool Build::tryParseConditions(TextData& s, string fileName) {
  if(!s.match("#if ")) return false;
  bool condition = !s.match('!');
- string id = s.identifier("_");
+ string id = s.whileNo(" \t\n");
  bool value = false;
  /**/  if(id=="0") value=false;
  else if(id=="1") value=true;
  else if(flags.contains(toLower(id))) value=true; // Conditionnal build (extern use flag)
  else if(defines.contains(toLower(id))) value=true; // Conditionnal build (intern use flag)
  if(value != condition) {
-  s.whileAny(" ");
   while(!s.match("#else") && !s.match("#endif")) {
    assert_(s, fileName+": Expected #endif, got EOD");
    if(!tryParseConditions(s, fileName)) s.line();

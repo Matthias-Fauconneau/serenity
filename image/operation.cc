@@ -8,7 +8,7 @@ SourceImage ImageOperation::image(size_t imageIndex, size_t componentIndex, int2
 		return move(::cacheGroup<ImageF>(path(), elementName(imageIndex)+parameters, this->size(imageIndex, hint), outputs(), time(imageIndex),
 									[&](ref<ImageF> outputs) {
 			auto inputs = apply(source.outputs(), [&](size_t inputIndex) { return source.image(imageIndex, inputIndex, hint, parameters); });
-			operation.apply(outputs, share(inputs));
+                        operation.apply(outputs, unsafeRef(inputs));
 		})[componentIndex]);
 	}
 	assert_(operation.outputs() == 1);
@@ -22,7 +22,7 @@ SourceImage ImageOperation::image(size_t imageIndex, size_t componentIndex, int2
 			inputs = apply(operation.inputs()?:source.outputs(),
 						   [&](size_t inputIndex) { return source.image(imageIndex, inputIndex, hint, parameters); });
 		}
-		operation.apply({share(target)}, share(inputs));
+                operation.apply({unsafeRef(target)}, unsafeRef(inputs));
 	});
 }
 
@@ -57,13 +57,13 @@ SourceImage ImageGroupFold::image(size_t groupIndex, size_t componentIndex, int2
 			for(size_t componentIndex: range(outputs())) {
 				array<SourceImage> inputs = source.images(groupIndex, componentIndex, hint, parameters);
 				assert_(operation.inputs() == 0 || operation.inputs() == inputs.size);
-				operation.apply(targets.slice(componentIndex, 1), share(inputs));
+                                operation.apply(targets.slice(componentIndex, 1), unsafeRef(inputs));
 			}
 		} else {
 			assert_(source.outputs() == 1, "ImageGroupFold", source.outputs(), name());
 			array<SourceImage> inputs = source.images(groupIndex, 0, hint, parameters);
 			log("fold", name(), operation.inputs(), inputs.size);
-			operation.apply(targets, share(inputs));
+                        operation.apply(targets, unsafeRef(inputs));
 		}
 	})[componentIndex]);
 }
@@ -96,7 +96,7 @@ array<SourceImage> ImageGroupOperation::images(size_t groupIndex, size_t compone
 									 [&](ref<ImageF> targets) {
 					array<ImageF> inputs;
 					// Transposes images/components
-					for(size_t inputIndex: range(source.outputs())) inputs.append( share(images[inputIndex][imageIndex]) );
+                                        for(size_t inputIndex: range(source.outputs())) inputs.append( unsafeRef(images[inputIndex][imageIndex]) );
 					log(operation.name(), groupIndex, imageIndex);
 					operation.apply(targets, inputs);
 				});
@@ -113,7 +113,7 @@ array<SourceImage> ImageGroupOperation::images(size_t groupIndex, size_t compone
 		// Operates on all images at once (forwards componentIndex)
 		if(operation.inputs() == 0 && operation.outputs() == 0 && source.outputs() == outputs()) {
 			array<SourceImage> inputs = source.images(groupIndex, componentIndex, hint, parameters);
-			operation.apply(targets, share(inputs));
+                        operation.apply(targets, unsafeRef(inputs));
 		}
 		else { // Operates on each image separately (only single component supported)
 			assert_((source.outputs() == operation.inputs() || operation.inputs()==0) && outputs()==1 && componentIndex == 0,
@@ -123,7 +123,7 @@ array<SourceImage> ImageGroupOperation::images(size_t groupIndex, size_t compone
 			for(size_t imageIndex: range(groupSize(groupIndex))) {
 				array<ImageF> components;
 				// Transposes images/components
-				for(size_t inputIndex: range(source.outputs())) components.append( share(images[inputIndex][imageIndex]) );
+                                for(size_t inputIndex: range(source.outputs())) components.append( unsafeRef(images[inputIndex][imageIndex]) );
 				operation.apply(targets.slice(imageIndex, 1), components);
 			}
 		}
@@ -142,7 +142,7 @@ array<SourceImageRGB> sRGBGroupOperation::images(size_t groupIndex, int2 hint, s
 		for(size_t imageIndex: range(groupSize(groupIndex))) { // Operates on each image separately
 			array<ImageF> components;
 			// Transposes images/components
-			for(size_t inputIndex: range(source.outputs())) components.append( share(images[inputIndex][imageIndex]) );
+                        for(size_t inputIndex: range(source.outputs())) components.append( unsafeRef(images[inputIndex][imageIndex]) );
 			/**/  if(images.size==1) ::sRGB(targets[imageIndex], components[0]);
 			else if(images.size==3) ::sRGB(targets[imageIndex], components[0], components[1], components[2]);
 			else error(images.size);
@@ -160,7 +160,7 @@ SourceImage BinaryImageOperation::image(size_t imageIndex, size_t componentIndex
 		inputs.append( A.image(imageIndex, componentIndex, hint, parameters) );
 		inputs.append( B.image(imageIndex, componentIndex, hint, parameters) );
 		SourceImage output ( this->size(imageIndex, hint) );
-		operation.apply({share(output)}, share(inputs));
+                operation.apply({unsafeRef(output)}, unsafeRef(inputs));
 		return output;
 	}
 	assert_(A.outputs() == 1 && operation.inputs() == 2, A.outputs(), B.outputs(), operation.inputs(), operation.name());
@@ -168,7 +168,7 @@ SourceImage BinaryImageOperation::image(size_t imageIndex, size_t componentIndex
 	inputs.append( A.image(imageIndex, 0, hint, parameters) );
 	inputs.append( B.image(imageIndex, componentIndex, hint, parameters) );
 	SourceImage output ( this->size(imageIndex, hint) );
-	operation.apply({share(output)}, share(inputs));
+        operation.apply({unsafeRef(output)}, unsafeRef(inputs));
 	return output;
 }
 
@@ -186,11 +186,11 @@ array<SourceImage> BinaryImageGroupOperation::images(size_t groupIndex, size_t c
 		for(size_t imageIndex: range(a.size)) {
 			// FIXME: cache
 			array<ImageF> inputs;
-			inputs.append( share( a[imageIndex] ) );
-			inputs.append( share( b[imageIndex] ) );
+                        inputs.append( unsafeRef( a[imageIndex] ) );
+                        inputs.append( unsafeRef( b[imageIndex] ) );
 			array<SourceImage> outputs;
 			for(size_t unused index: range(operation.outputs())) outputs.append( SourceImage(this->size(groupIndex, hint)) );
-			operation.apply(share(outputs), inputs);
+                        operation.apply(unsafeRef(outputs), inputs);
 			allOutputs.append(outputs);
 		}
 	} else { // For each image of the group, operates on A[*], B[componentIndex]
@@ -205,12 +205,12 @@ array<SourceImage> BinaryImageGroupOperation::images(size_t groupIndex, size_t c
 		for(size_t imageIndex: range(groupInputs[0].size)) {
 			// FIXME: cache
 			array<ImageF> inputs;
-			for(size_t inputIndex: range(groupInputs.size)) inputs.append(share(groupInputs[inputIndex][imageIndex]));
-			inputs.append( share(b[imageIndex]) );
+                        for(size_t inputIndex: range(groupInputs.size)) inputs.append(unsafeRef(groupInputs[inputIndex][imageIndex]));
+                        inputs.append( unsafeRef(b[imageIndex]) );
 			for(auto& x: inputs) assert_(x.size == this->size(groupIndex, hint), inputs, name());
 			array<SourceImage> outputs;
 			for(size_t unused index: range(operation.outputs())) outputs.append( SourceImage(this->size(groupIndex, hint)) );
-			operation.apply(share(outputs), inputs);
+                        operation.apply(unsafeRef(outputs), inputs);
 			allOutputs.append(outputs);
 		}
 	}

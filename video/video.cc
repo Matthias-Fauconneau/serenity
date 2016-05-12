@@ -81,9 +81,9 @@ bool Decoder::read(const Image& image) {
 }
 Image Decoder::read() { Image image(size); if(read(image)) return image; else return {}; }
 
-Image8 Decoder::Y() const {
- assert_(frame->linesize[0] == frame->width);
- return Image8(buffer<uint8>(frame->data[0], frame->linesize[0]*height, 0), int2(frame->width, frame->height), frame->linesize[0]);
+Image8 Decoder::YUV(size_t i) const {
+ assert_(frame->linesize[i] == (i ? frame->width/2 : frame->width));
+ return Image8(buffer<uint8>(frame->data[i], frame->linesize[i]*(height/(i?2:1)), 0), int2(frame->width/(i?2:1), frame->height/(i?2:1)), frame->linesize[i]);
 }
 
 void Decoder::scale(const Image& image) {

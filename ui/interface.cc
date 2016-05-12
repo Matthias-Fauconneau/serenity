@@ -115,7 +115,7 @@ shared<Graphics> ImageView::graphics(vec2 size) {
 		    max(vec2(0),vec2((int2(size)-image.size)/2)), // Centers
 		    vec2(min(int2(size), image.size)), // or fits
             cropShare(image, offset, min(int2(size), image.size-offset)) ); // by cropping center*/
-     graphics->blits.append((size-sizeHint(size))/2.f, sizeHint(size), unsafeShare(image) ); // Resizes
+     graphics->blits.append((size-sizeHint(size))/2.f, sizeHint(size), unsafeRef(image) ); // Resizes
     }
     return graphics;
 }
@@ -140,7 +140,7 @@ bool ImageLink::mouseEvent(vec2, vec2, Event event, Button, Widget*&) {
 
 //  ToggleButton
 bool ToggleButton::mouseEvent(vec2, vec2, Event event, Button button, Widget*&) {
-    if(event==Press && button==LeftButton) { enabled = !enabled; image = enabled?unsafeShare(disableIcon):unsafeShare(enableIcon); toggled(enabled); return true; }
+    if(event==Press && button==LeftButton) { enabled = !enabled; image = enabled?unsafeRef(disableIcon):unsafeRef(enableIcon); toggled(enabled); return true; }
     return false;
 }
 

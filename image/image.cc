@@ -9,7 +9,7 @@ void linear(mref<float> target, ref<byte4> source, int component) {
  else error(component);
 }
 
-static uint8 sRGB(float v) {
+uint8 sRGB(float v) {
  assert_(isNumber(v), v);
  v = ::min(1.f, v); // Saturates
  v = ::max(0.f, v); // Clips

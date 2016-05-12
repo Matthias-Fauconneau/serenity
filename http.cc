@@ -68,6 +68,7 @@ template<class T> size_t DataStream<T>::available(size_t need) {
  }
  return Data::available(need);
 }
+template struct DataStream<TCPSocket>;
 
 // Cache
 static const Folder& cache() { static Folder cache(".cache", home()); return cache; }
@@ -76,7 +77,7 @@ static const Folder& cache() { static Folder cache(".cache", home()); return cac
 
 uint ip(TextData& s) { int a=s.integer(), b=(s.match('.'),s.integer()), c=(s.match('.'),s.integer()), d=(s.match('.'),s.integer()); return (d<<24)|(c<<16)|(b<<8)|a; }
 uint nameserver() { static uint ip = ({ auto data = readFile("/etc/resolv.conf"_); TextData s (data); s.until("nameserver "_); ::ip(s); }); return ip; }
-uint resolve(const ref<byte>& host) {
+uint resolve(string host) {
  static File dnsCache("dns"_, cache(), Flags(ReadWrite|Create|Append));
  static Map dnsMap (dnsCache);
  uint ip=-1;

@@ -36,7 +36,8 @@ struct Decoder {
     Image read();
     void scale(const Image& image);
     Image scale();
-    Image8 Y() const;
+    Image8 YUV(size_t i) const;
+    Image8 Y() const { return YUV(0); }
 
     void seek(uint64 videoTime);
 };

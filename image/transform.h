@@ -85,7 +85,7 @@ struct ImageGroupTransformOperation : TransformGroupSource {
 		//if(!size) size = source.maximumSize()/16; FIXME
 		array<SourceImage> images = source.images(groupIndex, 0, size);
 		return parseArray<Transform>(cache(Folder(operation.name(), source.path(), true), source.elementName(groupIndex), strx(size), time(groupIndex), [&]() {
-			return str(operation(apply(images, [](const SourceImage& x){ return share(x); })));
+            return str(operation(apply(images, [](const SourceImage& x){ return unsafeRef(x); })));
 		}, false));
 	}
 };

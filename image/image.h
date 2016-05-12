@@ -47,7 +47,7 @@ inline ImageF copy(const ImageF& o) {
 inline String str(const ImageF& o) { return strx(o.size); }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
-inline ImageF share(const ImageF& o) { return ImageF(unsafeRef(o), o.size, o.stride); }
+inline ImageF unsafeRef(const ImageF& o) { return ImageF(unsafeRef((const buffer<float>&)o), o.size, o.stride); }
 
 /// Returns a cropped weak reference to \a image (unsafe if referenced image is freed)
 inline ImageF crop(const ImageF& source, int2 origin, int2 size) {
@@ -72,8 +72,14 @@ template<Type F, Type... S> void apply(const ImageF& target, F function, const S
   }
 #endif
 }
+template<Type F> ImageF apply(ImageF&& y, const ImageF& a, F function) { apply(y, function, a); return move(y); }
+template<Type F> ImageF apply(const ImageF& a, F function) { return apply(a.size, a, function); }
+
 template<Type F> ImageF apply(ImageF&& y, const ImageF& a, const ImageF& b, F function) { apply(y, function, a, b); return move(y); }
 template<Type F> ImageF apply(const ImageF& a, const ImageF& b, F function) { return apply(a.size, a, b, function); }
+
+template<Type F> ImageF apply(ImageF&& y, const ImageF& a, const ImageF& b, const ImageF& c, F function) { apply(y, function, a, b, c); return move(y); }
+template<Type F> ImageF apply(const ImageF& a, const ImageF& b, const ImageF& c, F function) { return apply(a.size, a, b, c, function); }
 
 inline void max(const ImageF& y, const ImageF& a, const ImageF& b) { apply(y, [](float a, float b){ return max(a, b);}, a, b); }
 inline void min(const ImageF& y, const ImageF& a, const ImageF& b) { apply(y, [](float a, float b){ return min(a, b);}, a, b); }
@@ -107,10 +113,12 @@ void linear(mref<float> target, ref<byte4> source, int component);
 inline ImageF linear(ImageF&& target, const Image& source, int component) { linear(target, source, component); return move(target); }
 inline ImageF linear(const Image& source, int component) { return linear(source.size, source, component); }
 
+uint8 sRGB(float v);
+
 void sRGB(mref<byte4> target, ref<float> value);
-inline Image sRGB(const ImageF& value) {
+/*inline Image sRGB(const ImageF& value) {
  Image sRGB (value.size); ::sRGB(sRGB, value); return sRGB;
-}
+}*/
 
 /// Converts linear float pixels for each component to color sRGB pixels
 void sRGB(mref<byte4> target, ref<float> blue, ref<float> green, ref<float> red);

@@ -478,9 +478,9 @@ struct Music : Widget {
     if(!image) { if(!preview) log("Missing image"); break; }
     assert_(image);
     if(rotate) ::rotate(image);
-    Image crop = this->crop||1 ? cropShare(image, int2(0, image.height*10/24), int2(image.width, image.height/2)) : unsafeShare(image);
-    //Image crop = cropShare(image, int2(0, image.height*10/24), int2(image.width, image.height/2)) : unsafeShare(image);
-    //Image scale = this->scale||1 ? ::scale(crop, 2, 1) : unsafeShare(crop);
+    Image crop = this->crop||1 ? cropRef(image, int2(0, image.height*10/24), int2(image.width, image.height/2)) : unsafeRef(image);
+    //Image crop = cropRef(image, int2(0, image.height*10/24), int2(image.width, image.height/2)) : unsafeRef(image);
+    //Image scale = this->scale||1 ? ::scale(crop, 2, 1) : unsafeRef(crop);
     //videoView.image = ::move(scale); ///*this->resize ? ::resize(scale.size*resize/(resize+1), scale) :*/ copy(crop);
     videoView.image = copy(crop);
     contentChanged=true;

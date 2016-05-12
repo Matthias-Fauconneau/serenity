@@ -33,7 +33,7 @@ struct GenericImageSourceView : ImageView {
 	shared<Graphics> graphics(vec2 size) override {
 		if(!source.count(1)) return shared<Graphics>();
 		update(index, int2(size));
-        ImageView::image = unsafeShare(image);
+        ImageView::image = unsafeRef(image);
 		//assert_(image.size.x <= size.x || image.size.y <= size.y, image.size, size);
         return ImageView::graphics(size);
     }
@@ -94,7 +94,7 @@ struct ImageGroupSourceView  : GenericImageSourceView {
 			images = source.images(min<size_t>(index, source.count(index+1)-1), size);
 		}
 		assert_(images.size);
-        image = unsafeShare(images[min<size_t>(images.size-1, imageIndex)]);
+        image = unsafeRef(images[min<size_t>(images.size-1, imageIndex)]);
 	}
 
 	/// Cycles between images of a group with the mouse wheel

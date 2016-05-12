@@ -41,8 +41,8 @@ generic struct ImageMapSource : T {
     default_move(ImageMapSource);
     ImageMapSource(T&& image=T(), Map&& map=Map()) : T(move(image)), map(move(map)) {}
 };
-generic auto share(ref<ImageMapSource<T>> ref) -> buffer<decltype(share(ref[0]))> {
-    return apply(ref,  [](const ImageMapSource<T>& x){ return share(x); });
+generic auto unsafeRef(ref<ImageMapSource<T>> ref) -> buffer<decltype(unsafeRef(ref[0]))> {
+    return apply(ref,  [](const ImageMapSource<T>& x){ return unsafeRef(x); });
 }
 
 /// Maps results to be generated or read from cache

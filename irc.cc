@@ -1,10 +1,13 @@
 #include "thread.h"
 #include "data.h"
 #include "time.h"
+#include "http.h"
+#include "xml.h"
 #include <sys/socket.h>
 #include <fcntl.h>
 #include <unistd.h>
 
+#if 0
 // Sockets
 
 struct sockaddress { uint16 family; uint16 port; uint host; int pad[2]; };
@@ -95,16 +98,17 @@ uint resolve(const ref<byte>& host) {
  }
  return ip;
 }
+#endif
 
 template<class T/*: Stream*/> struct TextDataStream : DataStream<T>, TextData { using DataStream<T>::DataStream; };
 
-struct URL {
+struct Link {
  string host;
  uint16 port;
  array<string> channels;
  string bot;
  string number;
- URL(string url) {
+ Link(string url) {
   TextData s (url);
   s.skip("irc://");
   host = s.until(':');
@@ -123,11 +127,11 @@ struct URL {
   }
   number = s.whileInteger();
   assert_(!s, s.untilEnd(), s);
-  log(host, channels, bot, number);
+  //log(host, channels, bot, number);
  }
 };
 
-struct DCC : URL {
+struct DCC : Link {
  TextDataStream<TCPSocket> irc{resolve(host), port};
  String nick = copyRef("Guest0"_);
  String fileName;
@@ -272,7 +276,7 @@ struct DCC : URL {
     log(prefix, command, params);
   }
  }
- DCC(string url) : URL(url) {
+ DCC(string url) : Link(url) {
   for(int i=0;i<=9;i++) {
    nick.last() = '0'+i;
    write("NICK "+nick+"\r\n"_);
@@ -290,8 +294,35 @@ struct DCC : URL {
 
 struct DCCApp {
  DCCApp() {
+  String query = join(arguments(), " ");
+  String url = unsafeRef(query);
+  if(true || arguments().size > 1) {
+   String config = readFile(".irc");
+   String search = replace(section(config, '\n') ,"%", query);
+   buffer<string> bots = split(section(config, '\n', 1, -1), "\n");
+   Map document = getURL(search);
+   Element root = parseHTML(document);
+   const Element& table = root("//table");
+   for(size_t i=1; i<table.children.size; i+=2) {
+    const Element& row = table(i);
+    String file = row(0).text();
+    assert_(find(file, query) || find(file, replace(query, " ", ".")), file, query);
+    string irc = row(0)(0)["href"];
+    int size = parseInteger(row(6).text());
+    String age = unescape(row(8).text());
+    string command = table(i+1)(0)(0)["value"];
+    String linkURL = irc+" "+command;
+    Link link(linkURL);
+    if(bots.contains(link.bot)) {
+     log(file, str(size)+" MB", age, link.channels, link.bot);
+     url = ::move(linkURL);
+     break;
+    }
+   }
+  }
+  log(url);
   for(int i: range(8)) {
-   DCC dcc(join(arguments(), " "));
+   DCC dcc(url);
    if(!dcc.fileName || !dcc.fileSize || !dcc.position) return; // Failed
    if(dcc.position == dcc.fileSize) return; // Completed
    log("Retry", i); // Retry
