@@ -27,6 +27,7 @@ struct Time {
     double toReal() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
     operator float() const { return toReal(); }
     operator double() const { return toReal(); }
+    explicit operator bool() const { return !stopTime; }
 };
 inline String str(const Time& t) { return str(t.toReal(), 1u)+'s'; }
 inline bool operator<(float a, const Time& b) { return a < b.toReal(); }

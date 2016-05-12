@@ -1,6 +1,4 @@
 #include "window.h"
-#include "interface.h"
-#include "image/image.h"
 
 #if 0
 #include "video.h"
@@ -45,6 +43,7 @@ struct Background : Widget {
  }
 } app;
 #else
+#include "png.h"
 
 void toFloat(mref<float> target, ref<uint8> source) { target.apply([](uint8 v) { return v; }, source); }
 inline ImageF toFloat(ImageF&& target, const Image8& source) { toFloat(target, source); return move(target); }
@@ -118,18 +117,13 @@ ImageF mean(const ImageF& source, int R) {
  return image;
 }
 
-ImageF mul(const ImageF& a, const ImageF& b) { return apply(a, b, [](float a, float b){ return a*b;}); }
-ImageF sq(const ImageF& x) { return apply(x, [](float x){ return sq(x);}); }
-ImageF sqrt(const ImageF& x) { return apply(x, [](float x){ return sqrt(x);}); }
-
 const double Kb = 0.0722, Kr = 0.2126;
 const double rv = (1-Kr)*255/112;
 const double gu = (1-Kb)*Kb/(1-Kr-Kb)*255/112;
 const double gv = (1-Kr)*Kr/(1-Kr-Kb)*255/112;
 const double bu = (1-Kb)*255/112;
 
-Image sRGB709(const ImageF& Y, const ImageF& U, const ImageF& V) {
- Image target(Y.size);
+void sRGB709(const Image& target, const ImageF& Y, const ImageF& U, const ImageF& V) {
  for(size_t i: range(Y.ref::size)) {
   int y = (int(Y[i]) - 16)*255/219;
   int Cb = int(U[i]) - 128;
@@ -139,9 +133,9 @@ Image sRGB709(const ImageF& Y, const ImageF& U, const ImageF& V) {
   int b = y + Cb*bu;
   target[i] = byte4(clamp(0,b,255), clamp(0,g,255), clamp(0,r,255));
  }
- return target;
 }
 
+#if 0
 Image sRGB709(const Image8& Y, const Image8& U, const Image8& V) {
  const int rv = ::rv*65536;
  const int gu = ::gu*65536;
@@ -158,6 +152,108 @@ Image sRGB709(const Image8& Y, const Image8& U, const Image8& V) {
   target[i] = byte4(clamp(0,b,255), clamp(0,g,255), clamp(0,r,255));
  }
  return target;
+}
+#endif
+
+Time times[9];
+void guidedFilter(const Image& target, const Image8& Y, const Image8& U, const Image8& V) {
+ times[0].start();
+ ImageF I[] {toFloat(Y), toFloat(U), toFloat(V)};
+ times[0].stop();
+
+ /*ImageF linear = ::linear(source);
+ //ImageF blur = unsafeRef(linear);
+ ImageF blur = gaussianBlur(linear, this->R);
+ //ImageF mask = apply(mode, blur, [](float a, float b){ return abs(a-b); });
+ //ImageF mask = apply(mode, blur, [](float a, float b){ return sq(a-b); });
+ ImageF mask = apply(mode, blur, [](float a, float b){ return abs(a-b) > 1./16; });*/
+
+ const int R = 32; // 16
+ const float e = 256;
+ ImageF meanI[3];
+ ImageF covII[6];
+ size_t index[3*3] = {0,1,2, 1,3,4, 2,4,5};
+
+ times[1].start();
+ for(size_t i: range(3)) {
+  const ImageF& Ii = I[i];
+  meanI[i] = ::mean(Ii, R);
+  for(size_t j: range(i+1)) {
+   ImageF corrIIij (I[i].size);
+   for(size_t k: range(corrIIij.ref::size)) corrIIij[k] =  I[i][k] * I[j][k];
+   ImageF meanCorrIIij = ::mean(corrIIij, R);
+   ImageF covIIij (corrIIij.size);
+   for(size_t k: range(covIIij.ref::size)) covIIij[k] = meanCorrIIij[k] - meanI[i][k]*meanI[j][k];
+   covII[index[i*3+j]] = ::move(covIIij);
+ }
+ }
+ times[1].stop();
+
+ for(size_t i: range(3)) {
+  times[2].start();
+  const ImageF& p = I[i];
+  ImageF meanP = ::mean(p, R);
+  times[2].stop();
+  times[3].start();
+  ImageF covIP[3];
+  for(size_t j: range(3)) {
+   ImageF corrIPj (I[i].size);
+   for(size_t k: range(corrIPj.ref::size)) corrIPj[k] =  p[k] * I[j][k];
+   ImageF meanCorrIPij = ::mean(corrIPj, R);
+   ImageF covIPj (corrIPj.size);
+   for(size_t k: range(covIPj.ref::size)) covIPj[k] = meanCorrIPij[k] - meanP[k]*meanI[i][k];
+   covIP[j] = ::move(covIPj);
+  }
+  times[3].stop();
+  times[4].start();
+  ImageF a[3] {p.size, p.size, p.size};
+  ImageF b (p.size);
+  times[4].stop();
+  times[5].start();
+  for(size_t k: range(p.ref::size)) {
+   float m11 = covII[0][k], m12 = covII[1][k], m13 = covII[2][k];
+   float m22 = covII[3][k], m23 = covII[4][k];
+   float m33 = covII[5][k];
+
+   float D = 1/(- m11*m12*m12 + m11*m22*m33
+                      - m12*m12*m33 + 2*m12*m13*m23
+                      - m13*m13*m22);
+
+   float a11 = (m33*m22 - m23*m23) * D + e;
+   float a12 = (m13*m23 - m33*m12) * D;
+   float a13 = (m12*m23 - m13*m22) * D;
+
+   float a22 = (m11*m33 - m13*m13) * D + e;
+   float a23 = (m12*m13 - m11*m23) * D;
+
+   float a33 = (m11*m22 - m12*m12) * D + e;
+
+   a[0][k] = a11*covIP[0][k] + a12*covIP[1][k] + a13*covIP[2][k];
+   a[1][k] = a12*covIP[0][k] + a22*covIP[1][k] + a23*covIP[2][k];
+   a[2][k] = a13*covIP[0][k] + a23*covIP[1][k] + a33*covIP[2][k];
+   b[k] = meanP[i] - (a[0][k] * meanI[0][k] + a[1][k] * meanI[1][k] + a[2][k] * meanI[2][k]);
+  }
+  times[5].stop();
+  times[6].stop();
+  ImageF meanA[3];
+  for(size_t j: range(3)) meanA[j] = ::mean(a[j], R);
+  times[6].stop();
+  times[7].start();
+  ImageF meanB = ::mean(b, R);
+  times[7].stop();
+  times[8].stop();
+  ImageF q (p.size);
+  for(size_t k: range(q.ref::size)) {
+   q[k] = meanB[i] + (meanA[0][k] * I[0][k] + meanA[1][k] * I[1][k] + meanA[2][k] * I[2][k]);
+  }
+  times[8].stop();
+  //ImageF target = apply(q, I, [](float q, float I) { return I*q; });
+  I[i] = ::move(q);
+ }
+ times[2].start();
+ sRGB709(target, I[0], I[1], I[2]);
+ times[2].stop();
+ log(times);
 }
 
 struct Background : Widget {
@@ -176,6 +272,8 @@ struct Background : Widget {
 
  unique<Window> window = nullptr;
  bool toggle = false;
+
+ Time totalTime {true};
 
  Background() {
   for(string file: currentWorkingDirectory().list(Files)) {
@@ -214,11 +312,20 @@ struct Background : Widget {
   }
 #endif
 
-  window = ::window(this, size);
-  window->backgroundColor = nan;
-  window->presentComplete = [this]{ window->render(); };
-  window->actions[Space] = [this] { toggle=!toggle; };
+  Image8 images[] {this->image(0), this->image(1), this->image(2)};
+  Image target(size);
+  guidedFilter(target, images[0], images[1], images[2]);
+  if(1) {
+   writeFile("guided.png", encodePNG(target),currentWorkingDirectory(), true);
+   log(totalTime);
+  } else {
+   window = ::window(this, size);
+   window->backgroundColor = nan;
+   window->presentComplete = [this]{ window->render(); };
+   window->actions[Space] = [this] { toggle=!toggle; };
+  }
  }
+
  Image8 image(size_t i) {
   while(clipFrameIndex == clipFrameCount) {
    clipFrameIndex = 0; clipFrameCount = 0;
@@ -233,41 +340,21 @@ struct Background : Widget {
   int2 size = this->size / (i?2:1);
   return Image8(unsafeRef(cast<uint8>(clip[i].slice(clipFrameIndex*(size.x*size.y), size.x*size.y))), size);
  }
+
  vec2 sizeHint(vec2) override { return vec2(size); };
+
  shared<Graphics> graphics(vec2) override {
-  ImageF YUV[] {toFloat(this->image(0)), toFloat(upsample(this->image(1))), toFloat(upsample(this->image(2)))};
-  if(!YUV[0]) { requestTermination(); return shared<Graphics>(); }
-
-  /*ImageF linear = ::linear(source);
-  //ImageF blur = unsafeRef(linear);
-  ImageF blur = gaussianBlur(linear, this->R);
-  //ImageF mask = apply(mode, blur, [](float a, float b){ return abs(a-b); });
-  //ImageF mask = apply(mode, blur, [](float a, float b){ return sq(a-b); });
-  ImageF mask = apply(mode, blur, [](float a, float b){ return abs(a-b) > 1./16; });*/
-
-  const int R = toggle ? 16 : 32;
-  const float e = 256;
-  const ImageF& I = YUV[0];
-  ImageF meanI = ::mean(I, R);
-  ImageF corrII = ::mean(::sq(I), R);
-  ImageF covII = apply(meanI, corrII, [](float meanI, float corrII){ return corrII - meanI*meanI; });
-
-  for(size_t i: range(3)) {
-   const ImageF& p = YUV[i];
-   ImageF meanP = ::mean(p, R);
-   ImageF corrIP = ::mean(::mul(I, p), R);
-   ImageF covIP = apply(corrIP, meanI, meanP, [](float corrIP, float meanI, float meanP){ return corrIP - meanI*meanP; });
-   ImageF a = apply(covII, covIP, [e](float covII, float covIP){ return covIP/(covII+e); });
-   ImageF b = apply(meanP, a, meanI, [](float meanP, float a, float meanI){ return meanP - a*meanI; });
-   ImageF meanA = ::mean(a, R);
-   ImageF meanB = ::mean(b, R);
-   ImageF q = apply(meanA, I, meanB, [](float meanA, float I, float meanB){ return meanA*I + meanB; });
-   //ImageF target = apply(q, I, [](float q, float I) { return I*q; });
-   YUV[i] = ::move(q);
+  Image8 images[] {this->image(0), this->image(1), this->image(2)};
+  if(images[0]) {
+   Image target(images[0].size);
+   guidedFilter(target, images[0], images[1], images[2]);
+   resize(window->target, target);
+   log(totalTime.reset());
+   clipFrameIndex++;
+   frameIndex++;
+  } else {
+   requestTermination();
   }
-  resize(window->target, sRGB709(YUV[0], YUV[1], YUV[2]));
-  clipFrameIndex++;
-  frameIndex++;
   return shared<Graphics>();
  }
 } app;
