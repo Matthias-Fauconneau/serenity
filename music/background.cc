@@ -46,13 +46,9 @@ struct Background : Widget {
 } app;
 #else
 
-/// Converts an sRGB component to linear float
-void linear(mref<float> target, ref<uint8> source) { target.apply([](uint8 v) { return sRGB_reverse[v]; }, source); }
-inline ImageF linear(ImageF&& target, const Image8& source) { linear(target, source); return move(target); }
-inline ImageF linear(const Image8& source) { return linear(source.size, source); }
-
-void sRGB(mref<uint8> target, ref<float> source) { target.apply([](float value) { return sRGB(value); }, source); }
-inline Image8 sRGB(const ImageF& value) { Image8 sRGB (value.size); ::sRGB(sRGB, value); return sRGB; }
+void toFloat(mref<float> target, ref<uint8> source) { target.apply([](uint8 v) { return v; }, source); }
+inline ImageF toFloat(ImageF&& target, const Image8& source) { toFloat(target, source); return move(target); }
+inline ImageF toFloat(const Image8& source) { return toFloat(source.size, source); }
 
 #if 0
 static void bilinear(const Image& target, const Image8& source) {
@@ -126,34 +122,39 @@ ImageF mul(const ImageF& a, const ImageF& b) { return apply(a, b, [](float a, fl
 ImageF sq(const ImageF& x) { return apply(x, [](float x){ return sq(x);}); }
 ImageF sqrt(const ImageF& x) { return apply(x, [](float x){ return sqrt(x);}); }
 
-Image sRGB709(const Image8& Y, const Image8& U, const Image8& V) {
- const double Kb = 0.0722, Kr = 0.2126;
- const double rv = (1-Kr)*255/112;
- const double gu = (1-Kb)*Kb/(1-Kr-Kb)*255/112;
- const double gv = (1-Kr)*Kr/(1-Kr-Kb)*255/112;
- const double bu = (1-Kb)*255/112;
- //log(a*65536, b*65536, c*65536, d*65536);
- // FIXME         117489, 13975, 34925, 138438
- // libswscale: 117504, 13954, 34903, 138453
- const int RV = rv*65536;
- const int GU = gu*65536;
- const int GV = gv*65536;
- const int BU = bu*65536;
+const double Kb = 0.0722, Kr = 0.2126;
+const double rv = (1-Kr)*255/112;
+const double gu = (1-Kb)*Kb/(1-Kr-Kb)*255/112;
+const double gv = (1-Kr)*Kr/(1-Kr-Kb)*255/112;
+const double bu = (1-Kb)*255/112;
+
+Image sRGB709(const ImageF& Y, const ImageF& U, const ImageF& V) {
  Image target(Y.size);
  for(size_t i: range(Y.ref::size)) {
-  //assert_(Y[i] >= 16 && Y[i] <= 235, Y[i]);
-  //assert_(U[i] >= 16 && U[i] <= 240);
-  //assert_(V[i] >= 16 && V[i] <= 240);
-  //int y = Y[i];
   int y = (int(Y[i]) - 16)*255/219;
   int Cb = int(U[i]) - 128;
   int Cr = int(V[i]) - 128;
-  int r = y                        + Cr*RV/65536;
-  int g = y - Cb*GU/65536 - Cr*GV/65536;
-  int b = y + Cb*BU/65536;
-  //assert_(b >= 0 && b <= 255, b);
-  //assert_(g >= 0 && g <= 255, g, y, Y[i]);
-  //assert_(r >= 0 && r <= 255, r, y, Y[i]);
+  int r = y                        + Cr*rv;
+  int g = y - Cb*gu - Cr*gv;
+  int b = y + Cb*bu;
+  target[i] = byte4(clamp(0,b,255), clamp(0,g,255), clamp(0,r,255));
+ }
+ return target;
+}
+
+Image sRGB709(const Image8& Y, const Image8& U, const Image8& V) {
+ const int rv = ::rv*65536;
+ const int gu = ::gu*65536;
+ const int gv = ::gv*65536;
+ const int bu = ::bu*65536;
+ Image target(Y.size);
+ for(size_t i: range(Y.ref::size)) {
+  int y = (int(Y[i]) - 16)*255/219;
+  int Cb = int(U[i]) - 128;
+  int Cr = int(V[i]) - 128;
+  int r = y                        + Cr*rv/65536;
+  int g = y - Cb*gu/65536 - Cr*gv/65536;
+  int b = y + Cb*bu/65536;
   target[i] = byte4(clamp(0,b,255), clamp(0,g,255), clamp(0,r,255));
  }
  return target;
@@ -168,8 +169,8 @@ struct Background : Widget {
 
  size_t frameIndex = 0, frameCount = 0;
 
- float R = 16;
- float e = 1./256;
+ //float R = 16;
+ //float e = 16;//./256;
 
  ImageF mode[3];
 
@@ -188,6 +189,7 @@ struct Background : Widget {
   }
   assert_(size);
 
+#if 0
   for(size_t i: range(3)) {
    int2 size = this->size / (i?2:1);
    if(!existsFile(baseName+".mode."+"YUV"[i])) { // FIXME: 3D mode
@@ -208,8 +210,9 @@ struct Background : Widget {
    Map map(baseName+".mode."+"YUV"[i]);
    Image8 image(unsafeRef(cast<uint8>(map)), size);
    if(i) image = upsample(image);
-   mode[i] = gaussianBlur(linear(image), R);
+   mode[i] = gaussianBlur(toFloat(image), R);
   }
+#endif
 
   window = ::window(this, size);
   window->backgroundColor = nan;
@@ -232,71 +235,36 @@ struct Background : Widget {
  }
  vec2 sizeHint(vec2) override { return vec2(size); };
  shared<Graphics> graphics(vec2) override {
-  Image8 YUV[] {this->image(0), upsample(this->image(1)), upsample(this->image(2))};
+  ImageF YUV[] {toFloat(this->image(0)), toFloat(upsample(this->image(1))), toFloat(upsample(this->image(2)))};
   if(!YUV[0]) { requestTermination(); return shared<Graphics>(); }
-#if 0
-#if 0
-  ImageF mask (image.size);
-  for(size_t i: range(image.ref::size)) mask[i] = sq(int(image[i])-int(mode[i]));
-  for(size_t y: range(mask.size.y)) for(size_t x: range(mask.size.x*7/12, mask.size.x*9/12)) mask(x, y) = sq(255);
-  mask = gaussianBlur(mask, R); // TODO: bilateral blur weighted by image
-  for(int unused i: range(0)) {
-   ImageF target (mask.size);
-   for(size_t y: range(1, target.size.y-1)) {
-    for(size_t x: range(1, target.size.x-1)) {
-     for(int2 d: {int2(1, 0), int2(0,1)}) {
-      int v = image(x, y);
-      int n = image(x+d.x, y+d.y);
-      if(abs(v-n) < 16) {
-       target(x, y) = (mask(x,y)+mask(x+d.x,y+d.y)) / 2;
-       target(x+d.x, y+d.y) = (mask(x,y)+mask(x+d.x,y+d.y)) / 2;
-      }
-     }
-    }
-   }
-   mask = ::move(target);
-  }
-  //const ImageF& blur = mask;
-  Image8 target (image.size);
-  if(toggle) image = this->image();
-  for(size_t y: range(target.size.y)) {
-   for(size_t x: range(target.size.x)) {
-    int v = image(x, y);
-    float m = mask(x,y);
-    target(x,y) = m >= 64 ? v : 0;
-   }
-  }
-#else
-  ImageF linear = ::linear(source);
+
+  /*ImageF linear = ::linear(source);
   //ImageF blur = unsafeRef(linear);
   ImageF blur = gaussianBlur(linear, this->R);
   //ImageF mask = apply(mode, blur, [](float a, float b){ return abs(a-b); });
   //ImageF mask = apply(mode, blur, [](float a, float b){ return sq(a-b); });
-  ImageF mask = apply(mode, blur, [](float a, float b){ return abs(a-b) > 1./16; });
+  ImageF mask = apply(mode, blur, [](float a, float b){ return abs(a-b) > 1./16; });*/
 
-  int R = toggle ? 16 : 8;
-  const ImageF& I = linear;
-  const ImageF& p = mask;
-#if 0
+  const int R = toggle ? 16 : 32;
+  const float e = 256;
+  const ImageF& I = YUV[0];
   ImageF meanI = ::mean(I, R);
-  ImageF meanP = ::mean(p, R);
   ImageF corrII = ::mean(::sq(I), R);
-  ImageF corrIP = ::mean(::mul(I, p), R);
   ImageF covII = apply(meanI, corrII, [](float meanI, float corrII){ return corrII - meanI*meanI; });
-  ImageF covIP = apply(corrIP, meanI, meanP, [](float corrIP, float meanI, float meanP){ return corrIP - meanI*meanP; });
-  ImageF a = apply(covII, covIP, [this](float covII, float covIP){ return covIP/(covII+e); });
-  ImageF b = apply(a, meanP, [](float a, float meanP){ return (1-a)*meanP; });
-  ImageF meanA = ::mean(a, R);
-  ImageF meanB = ::mean(b, R);
-  ImageF q = apply(meanA, I, meanB, [](float meanA, float I, float meanB){ return meanA*I + meanB; });
-#else
-  //const ImageF& q = p;
-  const ImageF& q = linear;
-#endif
-  //ImageF target = apply(q, I, [](float q, float I) { return I*q; });
-  ImageF target = unsafeRef(q);
-#endif
-#endif
+
+  for(size_t i: range(3)) {
+   const ImageF& p = YUV[i];
+   ImageF meanP = ::mean(p, R);
+   ImageF corrIP = ::mean(::mul(I, p), R);
+   ImageF covIP = apply(corrIP, meanI, meanP, [](float corrIP, float meanI, float meanP){ return corrIP - meanI*meanP; });
+   ImageF a = apply(covII, covIP, [e](float covII, float covIP){ return covIP/(covII+e); });
+   ImageF b = apply(meanP, a, meanI, [](float meanP, float a, float meanI){ return meanP - a*meanI; });
+   ImageF meanA = ::mean(a, R);
+   ImageF meanB = ::mean(b, R);
+   ImageF q = apply(meanA, I, meanB, [](float meanA, float I, float meanB){ return meanA*I + meanB; });
+   //ImageF target = apply(q, I, [](float q, float I) { return I*q; });
+   YUV[i] = ::move(q);
+  }
   resize(window->target, sRGB709(YUV[0], YUV[1], YUV[2]));
   clipFrameIndex++;
   frameIndex++;
