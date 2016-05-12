@@ -81,7 +81,7 @@ Image8 upsample(const Image8& source) {
  return target;
 }
 
-static void bilinear(const Image& target, const ImageF& source) {
+/*static void bilinear(const Image& target, const ImageF& source) {
  const size_t stride = source.stride;
  for(size_t y: range(target.height)) {
   for(size_t x: range(target.width)) {
@@ -94,7 +94,7 @@ static void bilinear(const Image& target, const ImageF& source) {
    target(x, y) = byte3(sRGB(d));
   }
  }
-}
+}*/
 
 ImageF mean(const ImageF& source, int R) {
  ImageF image = unsafeRef(source);
@@ -126,6 +126,39 @@ ImageF mul(const ImageF& a, const ImageF& b) { return apply(a, b, [](float a, fl
 ImageF sq(const ImageF& x) { return apply(x, [](float x){ return sq(x);}); }
 ImageF sqrt(const ImageF& x) { return apply(x, [](float x){ return sqrt(x);}); }
 
+Image sRGB709(const Image8& Y, const Image8& U, const Image8& V) {
+ const double Kb = 0.0722, Kr = 0.2126;
+ const double rv = (1-Kr)*255/112;
+ const double gu = (1-Kb)*Kb/(1-Kr-Kb)*255/112;
+ const double gv = (1-Kr)*Kr/(1-Kr-Kb)*255/112;
+ const double bu = (1-Kb)*255/112;
+ //log(a*65536, b*65536, c*65536, d*65536);
+ // FIXME         117489, 13975, 34925, 138438
+ // libswscale: 117504, 13954, 34903, 138453
+ const int RV = rv*65536;
+ const int GU = gu*65536;
+ const int GV = gv*65536;
+ const int BU = bu*65536;
+ Image target(Y.size);
+ for(size_t i: range(Y.ref::size)) {
+  //assert_(Y[i] >= 16 && Y[i] <= 235, Y[i]);
+  //assert_(U[i] >= 16 && U[i] <= 240);
+  //assert_(V[i] >= 16 && V[i] <= 240);
+  //int y = Y[i];
+  int y = (int(Y[i]) - 16)*255/219;
+  int Cb = int(U[i]) - 128;
+  int Cr = int(V[i]) - 128;
+  int r = y                        + Cr*RV/65536;
+  int g = y - Cb*GU/65536 - Cr*GV/65536;
+  int b = y + Cb*BU/65536;
+  //assert_(b >= 0 && b <= 255, b);
+  //assert_(g >= 0 && g <= 255, g, y, Y[i]);
+  //assert_(r >= 0 && r <= 255, r, y, Y[i]);
+  target[i] = byte4(clamp(0,b,255), clamp(0,g,255), clamp(0,r,255));
+ }
+ return target;
+}
+
 struct Background : Widget {
  string baseName = arguments()[0];
  int2 size;
@@ -138,87 +171,46 @@ struct Background : Widget {
  float R = 16;
  float e = 1./256;
 
- Map modeCache;
- ImageF mode;
- Map medianCache;
- Image8 median;
+ ImageF mode[3];
 
  unique<Window> window = nullptr;
  bool toggle = false;
 
  Background() {
   for(string file: currentWorkingDirectory().list(Files)) {
-   TextData s(section(file,'.',-2,-1));
-   if(startsWith(file, baseName) && s.isInteger()) {
+   TextData s(section(file,'.',-3,-2));
+   if(startsWith(file, baseName) && s.isInteger() && endsWith(file, ".Y")) {
     int2 size; size.x = s.integer(); s.skip('x'); size.y = s.integer();
     if(!this->size) this->size = size;
     assert_(size == this->size);
     frameCount += File(file).size() / (size.x*size.y);
    }
   }
-#if 0
-  if(!existsFile(baseName+".sum")) {
-   sum = Image32(size);
-   for(;;clipFrameIndex++, frameIndex++) {
-    Image8 image = this->image();
-    if(!image) break;
-    for(size_t i: range(image.ref::size)) sum[i] += image[i];
-    log(frameIndex, frameCount);
+  assert_(size);
+
+  for(size_t i: range(3)) {
+   int2 size = this->size / (i?2:1);
+   if(!existsFile(baseName+".mode."+"YUV"[i])) { // FIXME: 3D mode
+    assert_(frameCount > (1<<8) && frameCount < (1<<16));
+    Image8 mode = Image8(size);
+    buffer<uint16> histogram(256*mode.ref::size); // 500 MB
+    histogram.clear(0);
+    for(;;clipFrameIndex++, frameIndex++) {
+     Image8 image = this->image(i);
+     if(!image) break;
+     for(size_t i: range(image.ref::size)) histogram[i*256+image[i]]++;
+     log(frameIndex, frameCount);
+    }
+    clipIndex = 0; frameIndex=0; clipFrameIndex=0;
+    for(size_t i: range(mode.ref::size)) mode[i] = argmax(histogram.slice(i*256, 256));
+    writeFile(baseName+".mode."+"YUV"[i], cast<byte>(mode));
    }
-   clipIndex = 0;
-   writeFile(baseName+".sum", cast<byte>(sum));
-  } else {
-   cache = Map(baseName+".sum");
-   sum = Image32(unsafeRef(cast<uint32>(cache)), size);
+   Map map(baseName+".mode."+"YUV"[i]);
+   Image8 image(unsafeRef(cast<uint8>(map)), size);
+   if(i) image = upsample(image);
+   mode[i] = gaussianBlur(linear(image), R);
   }
-#elif 1
-  if(!existsFile(baseName+".mode")) {
-   assert_(frameCount > (1<<8) && frameCount < (1<<16));
-   Image8 mode = Image8(size);
-   buffer<uint16> histogram(256*mode.ref::size); // 500 MB
-   histogram.clear(0);
-   for(;;clipFrameIndex++, frameIndex++) {
-    Image8 image = this->image();
-    if(!image) break;
-    for(size_t i: range(image.ref::size)) histogram[i*256+image[i]]++;
-    log(frameIndex, frameCount);
-   }
-   clipIndex = 0;
-   for(size_t i: range(mode.ref::size)) mode[i] = argmax(histogram.slice(i*256, 256));
-   writeFile(baseName+".mode", cast<byte>(mode));
-   this->mode = gaussianBlur(linear(mode), R);
-   error(".");
-  } else {
-   modeCache = Map(baseName+".mode");
-   Image8 mode = Image8(unsafeRef(cast<uint8>(modeCache)), size);
-   this->mode = gaussianBlur(linear(mode), R);
-   //this->mode = linear(mode);
-  }
-#endif
-#if 1
-  if(!existsFile(baseName+".median")) {
-   assert_(frameCount > (1<<8) && frameCount < (1<<16));
-   median = Image8(size);
-   buffer<uint16> histogram(256*median.ref::size); // 500 MB
-   histogram.clear(0);
-   for(;;clipFrameIndex++, frameIndex++) {
-    Image8 image = this->image();
-    if(!image) break;
-    for(size_t i: range(image.ref::size)) histogram[i*256+image[i]]++;
-    log(frameIndex, frameCount);
-   }
-   clipIndex = 0;
-   for(size_t i: range(median.ref::size)) {
-    ref<uint16> H = histogram.slice(i*256, 256);
-    size_t m = 0, sum = 0; for(;sum<frameCount/2;m++) sum += H[m];
-    median[i] = m;
-   }
-   writeFile(baseName+".median", cast<byte>(median));
-  } else {
-   medianCache = Map(baseName+".median");
-   median = Image8(unsafeRef(cast<uint8>(medianCache)), size);
-  }
-#endif
+
   window = ::window(this, size);
   window->backgroundColor = nan;
   window->presentComplete = [this]{ window->render(); };
@@ -242,6 +234,7 @@ struct Background : Widget {
  shared<Graphics> graphics(vec2) override {
   Image8 YUV[] {this->image(0), upsample(this->image(1)), upsample(this->image(2))};
   if(!YUV[0]) { requestTermination(); return shared<Graphics>(); }
+#if 0
 #if 0
   ImageF mask (image.size);
   for(size_t i: range(image.ref::size)) mask[i] = sq(int(image[i])-int(mode[i]));
@@ -303,7 +296,8 @@ struct Background : Widget {
   //ImageF target = apply(q, I, [](float q, float I) { return I*q; });
   ImageF target = unsafeRef(q);
 #endif
-  bilinear(window->target, target);
+#endif
+  resize(window->target, sRGB709(YUV[0], YUV[1], YUV[2]));
   clipFrameIndex++;
   frameIndex++;
   return shared<Graphics>();
