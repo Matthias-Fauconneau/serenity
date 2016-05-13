@@ -27,12 +27,12 @@ inline double round(double x) { return __builtin_round(x); }
 inline float ceil(float x) { return __builtin_ceilf(x); }
 inline double ceil(double x) { return __builtin_ceil(x); }
 
-#if 0
-inline float fract(float x) { return x - floor(x); }
-inline double mod(double q, double d) { return __builtin_fmod(q, d); }
 inline float sqrt(float f) { return __builtin_sqrtf(f); }
 inline double sqrt(double f) { return __builtin_sqrt(f); }
 
+#if 0
+inline float fract(float x) { return x - floor(x); }
+inline double mod(double q, double d) { return __builtin_fmod(q, d); }
 inline double pow(double x, double y) { return __builtin_pow(x,y); }
 
 const double expUnderflow = -7.45133219101941108420e+02;

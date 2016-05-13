@@ -88,6 +88,7 @@ Image8 downsample(const Image8& source);
 void mean(const ImageF& target, const ImageF& buffer, const ImageF& source, uint R);
 
 void sRGBfromBT709(const Image& target, const ImageF& Y, const ImageF& U, const ImageF& V);
+void sRGBfromBT709(const Image& target, const ImageF& Y);
 
 // -- Convolution --
 

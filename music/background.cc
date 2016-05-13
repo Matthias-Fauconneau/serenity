@@ -1,5 +1,6 @@
 #include "window.h"
 #include "algorithm.h"
+#include "text.h"
 
 #if 0
 #include "video.h"
@@ -57,12 +58,16 @@ struct Background : Widget {
  size_t frameIndex = 0, frameCount = 0;
 
  ImageF mode[3];
- float blurR = 1;
+ const float blurR = 8;
 
  unique<Window> window = nullptr;
  bool toggle = false;
 
  Time totalTime {true};
+
+ Text text;
+
+ ImageF temporal;
 
  Background() {
   for(string file: currentWorkingDirectory().list(Files)) {
@@ -99,6 +104,7 @@ struct Background : Widget {
    if(!i) image = downsample(image);
    mode[i] = gaussianBlur(toFloat(image), blurR);
   }
+  temporal = ImageF(size/2); temporal.clear();
 #endif
 
 #if 0
@@ -134,7 +140,7 @@ struct Background : Widget {
 
  vec2 sizeHint(vec2) override { return vec2(size/2); };
 
- shared<Graphics> graphics(vec2) override {
+ shared<Graphics> graphics(vec2 wSize) override {
   Image8 images[] {downsample(this->image(0)), this->image(1), this->image(2)};
   if(images[0]) {
    times["toFloat"].start();
@@ -145,34 +151,66 @@ struct Background : Widget {
    const ImageF blur[] {size, size, size};
    for(size_t i: range(3)) gaussianBlur(blur[i], I[i], blurR);
    ImageF mask (size);
-   for(size_t k: range(mask.ref::size)) mask[k] = sq(I[0][k] - blur[0][k]) + sq(I[1][k] - blur[1][k]) + sq(I[2][k] - blur[2][k]);
+   assert_(blur[0].size == mode[0].size && blur[1].size == mode[1].size && blur[2].size == mode[2].size);
+   static float mmax = 138;
+   float max = mmax;
+   for(size_t k: range(mask.ref::size)) {
+    float d = sqrt(sq(blur[0][k] - mode[0][k]) + sq(blur[1][k] - mode[1][k]) + sq(blur[2][k] - mode[2][k]));
+    max = ::max(max, d);
+    mask[k] = d;
+   }
+   if(max > mmax) { mmax=max; log(mmax); }
+   max=mmax;
+   //for(size_t k: range(mask.ref::size)) mask[k] *= 1/max;
+   for(size_t k: range(mask.ref::size)) mask[k] = mask[k] > max/8 ? 1 : 0;
+   for(size_t y: range(mask.size.y)) for(size_t x: range(mask.size.x*7/12, mask.size.x*9/12)) mask(x, y) = 1;
 
    Image target(images[0].size);
-   /*if(toggle) mref<ImageF>(q).apply([](const ImageF& o) { return unsafeRef(o); }, ref<ImageF>(I));
-   else*/
    if(0) {
     ImageF q[3] {size, size, size};
-    guidedFilter(ref<ImageF>(q), ref<ImageF>(I));
+    guidedFilter(ref<ImageF>(q), ref<ImageF>(I), 32, 16);
     times["sRGB"].start();
     sRGBfromBT709(target, q[0], q[1], q[2]);
     times["sRGB"].stop();
    } else {
-    ImageF q (size);
-    guidedFilter(q, ref<ImageF>(I), mask);
-    sRGBfromBT709(target, mask, I[1], I[2]);
+    mask = guidedFilter(ref<ImageF>(I), mask, 32, 16);
+    //for(size_t k: range(mask.ref::size)) mask[k] = mask[k] > 1./2 ? 1 : 0;
+
+    if(!toggle) {
+     mask = guidedFilter(ref<ImageF>(I), mask, 8, 256);
+     for(size_t k: range(mask.ref::size)) mask[k] = mask[k] > 1./2 ? 1 : 0;
+
+     assert_(temporal.size == mask.size, temporal.size, mask.size);
+     const float dt = 1./4;
+     for(size_t k: range(mask.ref::size)) temporal[k] = (1-dt)*temporal[k] + dt*mask[k];
+
+     mask = guidedFilter(ref<ImageF>(I), toggle ? mask : temporal, 8, 256);
+     for(size_t k: range(mask.ref::size)) mask[k] = mask[k] > 1./2 ? 1 : 0;
+    } else {
+     mask = guidedFilter(ref<ImageF>(I), mask, 8, 256);
+     for(size_t k: range(mask.ref::size)) mask[k] = mask[k] > 1./2 ? 1 : 0;
+    }
+
+    for(size_t k: range(mask.ref::size)) {
+     I[0][k] *= mask[k];
+     I[1][k] = 128+ mask[k]*(I[1][k]-128);
+     I[2][k] = 128+ mask[k]*(I[2][k]-128);
+    }
+    sRGBfromBT709(target, I[0], I[1], I[2]);
    }
    resize(window->target, target);
    if(0) {
     uint64 t = totalTime.reset();
     log(apply(times, [t](const Time& time) { return strD(time, t); }), strD(sum(apply(times.values, [](const Time& t) { return (uint64)t; })), t), str((double)t/second, 2u)+"s");
-    for(const Time& t: times.values) t.reset();
+    for(Time& t: times.values) t.reset();
    }
    clipFrameIndex++;
    frameIndex++;
   } else {
    requestTermination();
   }
-  return shared<Graphics>();
+  text = str(toggle); text.color = white;
+  return text.graphics(wSize);
  }
 } app;
 #endif

@@ -243,6 +243,7 @@ void sRGBfromBT709(const Image& target, const ImageF& Y, const ImageF& U, const 
  }
 }
 
+void sRGBfromBT709(const Image& target, const ImageF& Y) { for(size_t i: range(Y.ref::size)) target[i] = byte3(clamp(0, (int(Y[i]) - 16)*255/219, 255)); }
 
 // -- Convolution --
 
