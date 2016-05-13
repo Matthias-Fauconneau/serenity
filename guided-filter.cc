@@ -2,19 +2,8 @@
 
 map<string, Time> times;
 
-void guidedFilter(const Image& target, const Image8& Y, const Image8& U, const Image8& V) {
- times["toFloat"].start();
- assert(Y.size == U.size && Y.size == V.size);
- const ImageF I[] {toFloat(Y), toFloat(U), toFloat(V)};
+void guidedFilter(ref<ImageF> q, ref<ImageF> I) {
  const int2 size = I[0].size;
- times["toFloat"].stop();
-
- /*ImageF linear = ::linear(source);
- //ImageF blur = unsafeRef(linear);
- ImageF blur = gaussianBlur(linear, this->R);
- //ImageF mask = apply(mode, blur, [](float a, float b){ return abs(a-b); });
- //ImageF mask = apply(mode, blur, [](float a, float b){ return sq(a-b); });
- ImageF mask = apply(mode, blur, [](float a, float b){ return abs(a-b) > 1./16; });*/
 
  const int R = 16;
  const float e = 256;
@@ -37,7 +26,7 @@ void guidedFilter(const Image& target, const Image8& Y, const Image8& U, const I
  }
 
  const ref<ImageF> p (I);
- const ImageF meanP[3] {size, size, size};
+ const ref<ImageF> meanP (q);
  const ImageF corrIP[3*3] {size,size,size, size,size,size, size,size,size};
  const ImageF a[3*3] {size,size,size, size,size,size, size,size,size};
  const ref<ImageF> b (meanP);
@@ -95,7 +84,6 @@ void guidedFilter(const Image& target, const Image8& Y, const Image8& U, const I
  times["ab"].stop();
  ref<ImageF> meanA (a);
  ref<ImageF> meanB (b);
- ref<ImageF> q (meanB);
  for(size_t i: range(3)) {
   times["meanA"].start();
   for(size_t j: range(3)) ::mean(meanA[i*3+j], buffer, a[i*3+j], R); // -> meanA
@@ -108,7 +96,4 @@ void guidedFilter(const Image& target, const Image8& Y, const Image8& U, const I
   //for(size_t k: range(q[i].ref::size)) q[i][k] = meanA[i*3+0][k];
   times["q"].stop();
  }
- times["sRGB"].start();
- sRGBfromBT709(target, q[0], q[1], q[2]);
- times["sRGB"].stop();
 }

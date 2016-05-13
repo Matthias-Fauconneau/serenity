@@ -86,4 +86,15 @@ void downsample(const Image8& target, const Image8& source);
 Image8 downsample(const Image8& source);
 
 void mean(const ImageF& target, const ImageF& buffer, const ImageF& source, uint R);
+
 void sRGBfromBT709(const Image& target, const ImageF& Y, const ImageF& U, const ImageF& V);
+
+// -- Convolution --
+
+void convolve(float* target, const float* source, const float* kernel, int radius, int width, int height, uint sourceStride, uint targetStride);
+
+/// Selects image (signal) components of scale (frequency) below threshold
+/// Applies a gaussian blur
+void gaussianBlur(const ImageF& target, const ImageF& source, float sigma, int radius=0);
+inline ImageF gaussianBlur(ImageF&& target, const ImageF& source, float sigma) { gaussianBlur(target, source, sigma); return move(target); }
+inline ImageF gaussianBlur(const ImageF& source, float sigma) { return gaussianBlur(source.size, source, sigma); }

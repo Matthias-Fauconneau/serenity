@@ -57,6 +57,7 @@ struct Background : Widget {
  size_t frameIndex = 0, frameCount = 0;
 
  ImageF mode[3];
+ float blurR = 1;
 
  unique<Window> window = nullptr;
  bool toggle = false;
@@ -75,7 +76,7 @@ struct Background : Widget {
   }
   assert_(size);
 
-#if 0
+#if 1
   for(size_t i: range(3)) {
    int2 size = this->size / (i?2:1);
    if(!existsFile(baseName+".mode."+"YUV"[i])) { // FIXME: 3D mode
@@ -95,25 +96,25 @@ struct Background : Widget {
    }
    Map map(baseName+".mode."+"YUV"[i]);
    Image8 image(unsafeRef(cast<uint8>(map)), size);
-   if(i) image = upsample(image);
-   mode[i] = gaussianBlur(toFloat(image), R);
+   if(!i) image = downsample(image);
+   mode[i] = gaussianBlur(toFloat(image), blurR);
   }
 #endif
 
-  Image8 images[] {downsample(this->image(0)), this->image(1), this->image(2)};
-  Image target(images[0].size);
-  totalTime.reset();
-  guidedFilter(target, images[0], images[1], images[2]);
-  uint64 t = totalTime.reset();
-  log(apply(times, [t](const Time& time) { return strD(time, t); }), strD(sum(apply(ref<Time>(times.values), [](const Time& t) { return (uint64)t; })), t), str((double)t/second, 2u)+"s");
-  if(1) {
+#if 0
+   Image8 images[] {downsample(this->image(0)), this->image(1), this->image(2)};
+   Image target(images[0].size);
+   totalTime.reset();
+   guidedFilter(target, images[0], images[1], images[2]);
+   uint64 t = totalTime.reset();
+   log(apply(times, [t](const Time& time) { return strD(time, t); }), strD(sum(apply(ref<Time>(times.values), [](const Time& t) { return (uint64)t; })), t), str((double)t/second, 2u)+"s");
    writeFile("guided.png", encodePNG(target),currentWorkingDirectory(), true);
-  } else {
+#else
    window = ::window(this, size);
    window->backgroundColor = nan;
    window->presentComplete = [this]{ window->render(); };
    window->actions[Space] = [this] { toggle=!toggle; };
-  }
+#endif
  }
 
  Image8 image(size_t i) {
@@ -136,11 +137,36 @@ struct Background : Widget {
  shared<Graphics> graphics(vec2) override {
   Image8 images[] {downsample(this->image(0)), this->image(1), this->image(2)};
   if(images[0]) {
+   times["toFloat"].start();
+   const ImageF I[] {toFloat(images[0]), toFloat(images[1]), toFloat(images[2])};
+   times["toFloat"].stop();
+   const int2 size = I[0].size;
+
+   const ImageF blur[] {size, size, size};
+   for(size_t i: range(3)) gaussianBlur(blur[i], I[i], blurR);
+   ImageF mask (size);
+   for(size_t k: range(mask.ref::size)) mask[k] = sq(I[0][k] - blur[0][k]) + sq(I[1][k] - blur[1][k]) + sq(I[2][k] - blur[2][k]);
+
    Image target(images[0].size);
-   guidedFilter(target, images[0], images[1], images[2]);
+   /*if(toggle) mref<ImageF>(q).apply([](const ImageF& o) { return unsafeRef(o); }, ref<ImageF>(I));
+   else*/
+   if(0) {
+    ImageF q[3] {size, size, size};
+    guidedFilter(ref<ImageF>(q), ref<ImageF>(I));
+    times["sRGB"].start();
+    sRGBfromBT709(target, q[0], q[1], q[2]);
+    times["sRGB"].stop();
+   } else {
+    ImageF q (size);
+    guidedFilter(q, ref<ImageF>(I), mask);
+    sRGBfromBT709(target, mask, I[1], I[2]);
+   }
    resize(window->target, target);
-   uint64 t = totalTime.reset();
-   log(apply(times, [t](const Time& time) { return strD(time, t); }), strD(sum(apply(ref<Time>(times.values), [](const Time& t) { return (uint64)t; })), t), str((double)t/second, 2u)+"s");
+   if(0) {
+    uint64 t = totalTime.reset();
+    log(apply(times, [t](const Time& time) { return strD(time, t); }), strD(sum(apply(times.values, [](const Time& t) { return (uint64)t; })), t), str((double)t/second, 2u)+"s");
+    for(const Time& t: times.values) t.reset();
+   }
    clipFrameIndex++;
    frameIndex++;
   } else {
