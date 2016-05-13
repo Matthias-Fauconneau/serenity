@@ -291,14 +291,14 @@ generic struct mref : ref<T> {
 	/// Initializes reference from \a source using copy constructor
  void copy(const ref<T> source) const { assert(size==source.size); for(size_t index: range(size)) set(index, ::copy(source[index])); }
 
-	/// Stores the application of a function to every index up to a size in a mref
+    /// Stores the application of a function to every index up to a size
 	template<Type Function> void apply(Function function) const { for(size_t index: range(size)) set(index, function(index)); }
-	/// Stores the application of a function to every elements of a ref in a mref
-	template<Type Function, Type... S> void apply(Function function, ref<S>... sources) const {
+    /// Stores the application of a function to every elements of a ref
+    template<Type Function, Type... V> void apply(Function function, ref<V>... sources) const {
 		for(size_t index: range(size)) new (&at(index)) T(function(sources[index]...));
 	}
-	/// Stores the application of a function to every elements of a ref in a mref
-	template<Type Function, Type... S> void apply(Function function, mref<S>... sources) const {
+    /// Stores the application of a function to every elements of a mref
+    template<Type Function, Type... V> void apply(Function function, mref<V>... sources) const {
 		for(size_t index: range(size)) new (&at(index)) T(function(sources[index]...));
 	}
 

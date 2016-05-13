@@ -67,14 +67,21 @@ static void bilinear(const Image& target, const Image8& source) {
 }
 #endif
 
-Image8 upsample(const Image8& source) {
+void downsample(const Image8& target, const Image8& source) {
+ assert_(target.size == source.size/2, target.size, source.size);
+ for(uint y: range(target.height)) for(uint x: range(target.width))
+  target(x,y) = (source(x*2+0,y*2+0) + source(x*2+1,y*2+0) + source(x*2+0,y*2+1) + source(x*2+1,y*2+1)) / 4;
+}
+Image8 downsample(const Image8& source) { Image8 target(source.size/2); downsample(target, source); return target; }
+
+/*Image8 upsample(const Image8& source) {
  size_t w=source.width, h=source.height;
  Image8 target(w*2,h*2);
  for(size_t y: range(h)) for(size_t x: range(w)) {
   target(x*2+0,y*2+0) = target(x*2+1,y*2+0) = target(x*2+0,y*2+1) = target(x*2+1,y*2+1) = source(x,y);
  }
  return target;
-}
+}*/
 
 /*static void bilinear(const Image& target, const ImageF& source) {
  const size_t stride = source.stride;
@@ -91,30 +98,29 @@ Image8 upsample(const Image8& source) {
  }
 }*/
 
-ImageF mean(const ImageF& source, int R) {
- ImageF image = unsafeRef(source);
+void mean(const ImageF& target, const ImageF& buffer, const ImageF& source, int R) {
+ assert(target.size == buffer.size.yx() && buffer.size.yx() == source.size);
  for(size_t unused i: range(2)) {
-  ImageF target(image.size.yx());
-  for(size_t y: range(image.size.y)) {
+  const ImageF& X = *(const ImageF*[]){&source, &buffer}[i];
+  const ImageF& Y = *(const ImageF*[]){&buffer, &target}[i];
+  for(size_t y: range(X.size.y)) {
    float sum = 0;
-   for(size_t x: range(R)) sum += image(x, y);
+   for(size_t x: range(R)) sum += X(x, y);
    for(size_t x: range(R)) {
-    sum += image(x+R, y);
-    target(y, x) = sum / (R+x+1);
+    sum += X(x+R, y);
+    Y(y, x) = sum / (R+x+1);
    }
-   for(size_t x: range(R, image.size.x-R)) {
-    sum += image(x+R, y);
-    target(y, x) = sum / (2*R+1);
-    sum -= image(x-R, y);
+   for(size_t x: range(R, X.size.x-R)) {
+    sum += X(x+R, y);
+    Y(y, x) = sum / (2*R+1);
+    sum -= X(x-R, y);
    }
-   for(size_t x: range(image.size.x-R, image.size.x)) {
-    target(y, x) = sum / (R+(image.size.x-1-x)+1);
-    sum -= image(x-R, y);
+   for(size_t x: range(X.size.x-R, X.size.x)) {
+    Y(y, x) = sum / (R+(X.size.x-1-x)+1);
+    sum -= X(x-R, y);
    }
   }
-  image = ::move(target);
  }
- return image;
 }
 
 const double Kb = 0.0722, Kr = 0.2126;
@@ -123,7 +129,7 @@ const double gu = (1-Kb)*Kb/(1-Kr-Kb)*255/112;
 const double gv = (1-Kr)*Kr/(1-Kr-Kb)*255/112;
 const double bu = (1-Kb)*255/112;
 
-void sRGB709(const Image& target, const ImageF& Y, const ImageF& U, const ImageF& V) {
+void sRGBfromBT709(const Image& target, const ImageF& Y, const ImageF& U, const ImageF& V) {
  for(size_t i: range(Y.ref::size)) {
   int y = (int(Y[i]) - 16)*255/219;
   int Cb = int(U[i]) - 128;
@@ -136,7 +142,7 @@ void sRGB709(const Image& target, const ImageF& Y, const ImageF& U, const ImageF
 }
 
 #if 0
-Image sRGB709(const Image8& Y, const Image8& U, const Image8& V) {
+Image sRGBfromBT709(const Image8& Y, const Image8& U, const Image8& V) {
  const int rv = ::rv*65536;
  const int gu = ::gu*65536;
  const int gv = ::gv*65536;
@@ -155,11 +161,13 @@ Image sRGB709(const Image8& Y, const Image8& U, const Image8& V) {
 }
 #endif
 
-Time times[9];
+map<string, Time> times;
 void guidedFilter(const Image& target, const Image8& Y, const Image8& U, const Image8& V) {
- times[0].start();
+ times["toFloat"].start();
+ assert(Y.size == U.size && Y.size == V.size);
  ImageF I[] {toFloat(Y), toFloat(U), toFloat(V)};
- times[0].stop();
+ int2 size = I[0].size;
+ times["toFloat"].stop();
 
  /*ImageF linear = ::linear(source);
  //ImageF blur = unsafeRef(linear);
@@ -168,92 +176,99 @@ void guidedFilter(const Image& target, const Image8& Y, const Image8& U, const I
  //ImageF mask = apply(mode, blur, [](float a, float b){ return sq(a-b); });
  ImageF mask = apply(mode, blur, [](float a, float b){ return abs(a-b) > 1./16; });*/
 
- const int R = 32; // 16
+ const int R = 16; // 16
  const float e = 256;
- ImageF meanI[3];
- ImageF covII[6];
+ ImageF buffer {size.yx()};
+ ImageF meanI[3] {size, size, size};
+ ImageF corrII[6] {size, size, size, size, size, size};
  size_t index[3*3] = {0,1,2, 1,3,4, 2,4,5};
 
- times[1].start();
- for(size_t i: range(3)) {
-  const ImageF& Ii = I[i];
-  meanI[i] = ::mean(Ii, R);
+ for(size_t i: range(3)) { // meanI, covII
+  times["meanI"].start();
+  ::mean(meanI[i], buffer, I[i], R);
+  times["meanI"].stop();
+  times["corrII"].start();
   for(size_t j: range(i+1)) {
-   ImageF corrIIij (I[i].size);
-   for(size_t k: range(corrIIij.ref::size)) corrIIij[k] =  I[i][k] * I[j][k];
-   ImageF meanCorrIIij = ::mean(corrIIij, R);
-   ImageF covIIij (corrIIij.size);
-   for(size_t k: range(covIIij.ref::size)) covIIij[k] = meanCorrIIij[k] - meanI[i][k]*meanI[j][k];
-   covII[index[i*3+j]] = ::move(covIIij);
+   const ImageF& corrIIij = corrII[index[i*3+j]];
+   for(size_t k: range(corrIIij.ref::size)) corrIIij[k] = I[i][k] * I[j][k]; // corrIIij
+   ::mean(corrIIij, buffer, corrIIij, R); // -> mean corrIIij
+  }
+  times["corrII"].stop();
  }
- }
- times[1].stop();
+
+ ref<ImageF> p (I);
+ ImageF meanP[3] {size, size, size};
+ ImageF corrIP[3*3] {size,size,size, size,size,size, size,size,size};
+ ImageF a[3*3] {size,size,size, size,size,size, size,size,size};
+ const ref<ImageF> b (meanP);
 
  for(size_t i: range(3)) {
-  times[2].start();
-  const ImageF& p = I[i];
-  ImageF meanP = ::mean(p, R);
-  times[2].stop();
-  times[3].start();
-  ImageF covIP[3];
-  for(size_t j: range(3)) {
-   ImageF corrIPj (I[i].size);
-   for(size_t k: range(corrIPj.ref::size)) corrIPj[k] =  p[k] * I[j][k];
-   ImageF meanCorrIPij = ::mean(corrIPj, R);
-   ImageF covIPj (corrIPj.size);
-   for(size_t k: range(covIPj.ref::size)) covIPj[k] = meanCorrIPij[k] - meanP[k]*meanI[i][k];
-   covIP[j] = ::move(covIPj);
-  }
-  times[3].stop();
-  times[4].start();
-  ImageF a[3] {p.size, p.size, p.size};
-  ImageF b (p.size);
-  times[4].stop();
-  times[5].start();
-  for(size_t k: range(p.ref::size)) {
-   float m11 = covII[0][k], m12 = covII[1][k], m13 = covII[2][k];
-   float m22 = covII[3][k], m23 = covII[4][k];
-   float m33 = covII[5][k];
-
-   float D = 1/(- m11*m12*m12 + m11*m22*m33
-                      - m12*m12*m33 + 2*m12*m13*m23
-                      - m13*m13*m22);
-
-   float a11 = (m33*m22 - m23*m23) * D + e;
-   float a12 = (m13*m23 - m33*m12) * D;
-   float a13 = (m12*m23 - m13*m22) * D;
-
-   float a22 = (m11*m33 - m13*m13) * D + e;
-   float a23 = (m12*m13 - m11*m23) * D;
-
-   float a33 = (m11*m22 - m12*m12) * D + e;
-
-   a[0][k] = a11*covIP[0][k] + a12*covIP[1][k] + a13*covIP[2][k];
-   a[1][k] = a12*covIP[0][k] + a22*covIP[1][k] + a23*covIP[2][k];
-   a[2][k] = a13*covIP[0][k] + a23*covIP[1][k] + a33*covIP[2][k];
-   b[k] = meanP[i] - (a[0][k] * meanI[0][k] + a[1][k] * meanI[1][k] + a[2][k] * meanI[2][k]);
-  }
-  times[5].stop();
-  times[6].stop();
-  ImageF meanA[3];
-  for(size_t j: range(3)) meanA[j] = ::mean(a[j], R);
-  times[6].stop();
-  times[7].start();
-  ImageF meanB = ::mean(b, R);
-  times[7].stop();
-  times[8].stop();
-  ImageF q (p.size);
-  for(size_t k: range(q.ref::size)) {
-   q[k] = meanB[i] + (meanA[0][k] * I[0][k] + meanA[1][k] * I[1][k] + meanA[2][k] * I[2][k]);
-  }
-  times[8].stop();
-  //ImageF target = apply(q, I, [](float q, float I) { return I*q; });
-  I[i] = ::move(q);
+ times["meanP"].start();
+ ::mean(meanP[i], buffer, p[i], R);
+ times["meanP"].stop();
+ times["corrIP"].start();
+ for(size_t j: range(3)) {
+  const ImageF& corrIPij = corrIP[i*3+j];
+  for(size_t k: range(corrIPij.ref::size)) corrIPij[k] =  p[i][k] * I[j][k]; // corrIPij
+  ::mean(corrIPij, buffer, corrIPij, R); // -> mean corrIPij
  }
- times[2].start();
- sRGB709(target, I[0], I[1], I[2]);
- times[2].stop();
- log(times);
+ times["corrIP"].stop();
+ }
+ times["ab"].start();
+ for(size_t k: range(p.ref::size)) {
+  float m00 = corrII[0][k] - meanI[0][k]*meanI[0][k], m01 = corrII[1][k] - meanI[0][k]*meanI[1][k], m02 = corrII[2][k] - meanI[0][k]*meanI[2][k];
+  float m11 = corrII[3][k] - meanI[1][k]*meanI[1][k], m12 = corrII[4][k] - meanI[1][k]*meanI[2][k];
+  float m22 = corrII[5][k] - meanI[2][k]*meanI[2][k];
+
+  float D = 1/(- m00*m01*m01 + m00*m11*m22
+               - m01*m01*m22 + 2*m01*m02*m12
+               - m02*m02*m11);
+
+  float a00 = (m22*m11 - m12*m12) * D + e;
+  float a01 = (m02*m12 - m22*m01) * D;
+  float a02 = (m01*m12 - m02*m11) * D;
+
+  float a11 = (m00*m22 - m02*m02) * D + e;
+  float a12 = (m01*m02 - m00*m12) * D;
+
+  float a22 = (m00*m11 - m01*m01) * D + e;
+
+  for(size_t i: range(3)) {
+   float meanPi = meanP[i][k];
+   float meanI0 = meanI[0][k];
+   float meanI1 = meanI[1][k];
+   float meanI2 = meanI[2][k];
+   float covIPi0 = corrIP[i*3+0][k]  - meanPi*meanI0;
+   float covIPi1 = corrIP[i*3+1][k]  - meanPi*meanI1;
+   float covIPi2 = corrIP[i*3+2][k]  - meanPi*meanI2;
+
+   float ai0 = a00*covIPi0 + a01*covIPi1 + a02*covIPi2;
+   a[i*3+0][k] = ai0;
+   float ai1 = a01*covIPi0 + a11*covIPi1 + a12*covIPi2;
+   a[i*3+1][k] = ai1;
+   float ai2 = a02*covIPi0 + a12*covIPi1 + a22*covIPi2;
+   a[i*3+2][k] = ai2;
+   b[i][k] = meanPi - (ai0 * meanI0 + ai1 * meanI1 + ai2 * meanI2);
+  }
+ }
+ times["ab"].stop();
+ ref<ImageF> meanA (a);
+ ref<ImageF> meanB (b);
+ ref<ImageF> q (meanB);
+ for(size_t i: range(3)) {
+  times["meanA"].start();
+  for(size_t j: range(3)) ::mean(meanA[i*3+j], buffer, a[i*3+j], R); // -> meanA
+  times["meanA"].stop();
+  times["meanB"].start();
+  ::mean(meanB[i], buffer, b[i], R); // -> meanB
+  times["meanB"].stop();
+  times["q"].start();
+  for(size_t k: range(q.ref::size)) q[i][k] = meanB[i][k] + (meanA[i*3+0][k] * I[0][k] + meanA[i*3+1][k] * I[1][k] + meanA[i*3+2][k] * I[2][k]);
+  times["q"].stop();
+ }
+ times["sRGB"].start();
+ sRGBfromBT709(target, q[0], q[1], q[2]);
+ times["sRGB"].stop();
 }
 
 struct Background : Widget {
@@ -312,12 +327,16 @@ struct Background : Widget {
   }
 #endif
 
-  Image8 images[] {this->image(0), this->image(1), this->image(2)};
+  Image8 images[] {downsample(this->image(0)), this->image(1), this->image(2)};
   Image target(size);
+  totalTime.reset();
   guidedFilter(target, images[0], images[1], images[2]);
+  uint64 t = totalTime.reset();
+  log(apply(times, [t](const Time& time) { return strD(time, t); }),
+      strD(sum(apply(ref<Time>(times.values), [](const Time& t) { return (uint64)t; })), t), str(t/second, 1u)+"s");
+
   if(1) {
    writeFile("guided.png", encodePNG(target),currentWorkingDirectory(), true);
-   log(totalTime);
   } else {
    window = ::window(this, size);
    window->backgroundColor = nan;
@@ -344,12 +363,13 @@ struct Background : Widget {
  vec2 sizeHint(vec2) override { return vec2(size); };
 
  shared<Graphics> graphics(vec2) override {
-  Image8 images[] {this->image(0), this->image(1), this->image(2)};
+  Image8 images[] {downsample(this->image(0)), this->image(1), this->image(2)};
   if(images[0]) {
    Image target(images[0].size);
    guidedFilter(target, images[0], images[1], images[2]);
    resize(window->target, target);
-   log(totalTime.reset());
+   //uint64 t = totalTime.reset();
+   //log(apply(ref<Time>(times), [t](const Time& time) { return strD(time, t); }), strD(sum(ref<Time>(times)), t), str(t/second, 1u)+"s");
    clipFrameIndex++;
    frameIndex++;
   } else {

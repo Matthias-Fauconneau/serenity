@@ -18,21 +18,23 @@ int64 threadCPUTime();
 inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)::"memory"); return (((uint64)hi)<<32)|lo; }
 
 struct Time {
-    uint64 startTime=realTime(), stopTime=0;
-    Time(bool start=false) : stopTime(start?0:startTime) {}
-    void start() { if(stopTime) startTime=realTime()-(stopTime-startTime); stopTime=0; }
-    void stop() { if(!stopTime) stopTime=realTime(); }
-    String reset() { stop(); String s=str((stopTime-startTime)/1000000000., 1u)+'s'; startTime=stopTime; stopTime=0; return s; }
-    operator uint64() const { return ((stopTime?:realTime()) - startTime)/1000000; }
-    double toReal() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
-    operator float() const { return toReal(); }
-    operator double() const { return toReal(); }
-    explicit operator bool() const { return !stopTime; }
+ uint64 startTime=realTime(), stopTime=0;
+ Time(bool start=false) : stopTime(start?0:startTime) {}
+ void start() { if(stopTime) startTime=realTime()-(stopTime-startTime); stopTime=0; }
+ void stop() { if(!stopTime) stopTime=realTime(); }
+ uint64 reset() { stop(); uint64 t = stopTime-startTime; startTime=stopTime; stopTime=0; return t; }
+ operator uint64() const { return ((stopTime?:realTime()) - startTime); }
+ double toReal() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
+ explicit operator bool() const { return !stopTime; }
 };
-inline String str(const Time& t) { return str(t.toReal(), 1u)+'s'; }
+
+inline String strD(uint64 num, uint64 div) { return str(int(round(100.*num/div)))+'%'; }
+template<> inline String str(const Time& t) { return str(t.toReal(), 1u)+'s'; }
+
 inline bool operator<(float a, const Time& b) { return a < b.toReal(); }
 inline bool operator<(double a, const Time& b) { return a < b.toReal(); }
-inline String str(const Time& num, const Time& div) { return str(int(round(100*num.toReal()/div.toReal())))+'%'; }
+//inline uint64 operator+(const uint64& a, const Time& b) { return a+(uint64)b; }
+//inline uint64 operator+(const Time& a, const Time& b) { return (uint64)a+(uint64)b; }
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;

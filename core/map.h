@@ -17,7 +17,7 @@ template<Type K, Type V> struct map {
 
  size_t size() const { return keys.size; }
  size_t count() const { return keys.size; }
- void reserve(int size) { return keys.reserve(size); values.reserve(size); }
+ void reserve(int size) { keys.reserve(size); values.reserve(size); }
  void clear() { keys.clear(); values.clear(); }
 
  explicit operator bool() const { return keys.size; }
@@ -125,6 +125,14 @@ template<Type K, Type V> String str(const map<K,V>& m, string separator=","_) {
  //s.append(separator.last());
  //s.append('}');
  return move(s);
+}
+
+/// Returns a map of the application of a function to every values of a map
+template<Type Function, Type K, Type V> auto apply(const map<K, V>& source, Function function) -> map<K, decltype(function(source.values[0]))> {
+ map<K, decltype(function(source.values[0]))> target;
+ target.keys = copy(source.keys);
+ target.values = apply(source.values, function);
+ return target;
 }
 
 /// Associates each argument's name with its string conversion

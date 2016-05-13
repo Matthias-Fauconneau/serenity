@@ -306,15 +306,15 @@ struct DCCApp {
    for(size_t i=1; i<table.children.size; i+=2) {
     const Element& row = table(i);
     String file = row(0).text();
-    assert_(find(file, query) || find(file, replace(query, " ", ".")), file, query);
+    if(!(find(file, query) || find(file, replace(query, " ", ".")))) continue;
     string irc = row(0)(0)["href"];
-    int size = parseInteger(row(6).text());
+    String size = row(6).text();
     String age = unescape(row(8).text());
     string command = table(i+1)(0)(0)["value"];
     String linkURL = irc+" "+command;
     Link link(linkURL);
     if(bots.contains(link.bot)) {
-     log(file, str(size)+" MB", age, link.channels, link.bot);
+     log(file, size, age, link.channels, link.bot);
      url = ::move(linkURL);
      break;
     }
