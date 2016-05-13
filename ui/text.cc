@@ -2,6 +2,7 @@
 #include "graphics.h"
 #include "font.h"
 #include "utf8.h"
+#include "algorithm.h"
 
 vec2 TextLayout::min(const ref<Glyph> word) {
 	assert_(word);

@@ -1,6 +1,5 @@
 #include "render.h"
 // "math.h"
-inline float floor(float x) { return __builtin_floorf(x); }
 inline float fract(float x) { return x - floor(x); }
 
 extern uint8 sRGB_forward[0x1000];

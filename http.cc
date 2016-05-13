@@ -343,6 +343,7 @@ Map getURL(URL&& url, function<void(const URL&, Map&&)> contentAvailable, int ma
  if(requests.size>5) error("Concurrent request limit", requests.size);
  if(wait == HTTP::Available) {
   HTTP request(move(url),contentAvailable,move(headers));
+  if(request.state < wait) log(url);
   while(request.state < wait) { assert_(request.wait(), request.events, request.revents); }
   assert_(existsFile(cacheFile(request.url),cache()), cacheFile(request.url));
   if(!contentAvailable) return Map(cacheFile(request.url),cache());

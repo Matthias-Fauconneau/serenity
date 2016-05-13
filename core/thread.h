@@ -92,7 +92,7 @@ struct Thread;
 extern Thread mainThread;
 
 struct pollfd { int fd; short events; short revents; };
-enum { POLLIN=1 };
+enum { POLLIN=1, POLLOUT=4, POLLHUP=0x10 };
 /// Poll is a convenient interface to participate in the event loop
 struct Poll : pollfd {
     enum { IDLE=64 };

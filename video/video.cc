@@ -63,8 +63,8 @@ bool Decoder::read(const Image& image) {
   if(av_read_frame(file, &packet) < 0) { av_free_packet(&packet); return false; }
   if(file->streams[packet.stream_index]==videoStream) {
    int gotFrame=0;
-   int used = avcodec_decode_video2(videoCodec, frame, &gotFrame, &packet);
-   assert_(used >= 0);
+   /*int used =*/ avcodec_decode_video2(videoCodec, frame, &gotFrame, &packet);
+   //assert_(used >= 0);
    if(gotFrame) {
     if(image) scale(image);
     //if(!firstPTS) firstPTS=frame->pkt_pts; // Ignores any embedded sync

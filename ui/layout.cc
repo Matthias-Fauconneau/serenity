@@ -1,4 +1,5 @@
 #include "layout.h"
+#include "algorithm.h"
 
 // Layout
 shared<Graphics> Layout::graphics(vec2 size, Rect clip) {

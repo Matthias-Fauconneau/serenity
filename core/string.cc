@@ -148,7 +148,6 @@ String str(int64 number, uint pad, char padChar, uint base) {
 }
 
 // math.h
-inline double floor(double x) { return __builtin_floor(x); }
 inline double exp10(double x) { return __builtin_exp2(__builtin_log2(10)*x); }
 inline double log10(double x) { return __builtin_log10(x); }
 

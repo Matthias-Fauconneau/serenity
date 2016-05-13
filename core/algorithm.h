@@ -1,4 +1,5 @@
 #pragma once
+#include "core.h"
 
 template<Type A, Type F> A reduce(range range, F fold, A accumulator) {
     for(size_t index: range) accumulator = fold(accumulator, index);

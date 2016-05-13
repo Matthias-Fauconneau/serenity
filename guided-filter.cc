@@ -56,22 +56,23 @@ void guidedFilter(const Image& target, const Image8& Y, const Image8& U, const I
  }
  times["ab"].start();
  for(size_t k: range(a[0].ref::size)) {
-  float m00 = corrII[0][k] - meanI[0][k]*meanI[0][k], m01 = corrII[1][k] - meanI[0][k]*meanI[1][k], m02 = corrII[2][k] - meanI[0][k]*meanI[2][k];
-  float m11 = corrII[3][k] - meanI[1][k]*meanI[1][k], m12 = corrII[4][k] - meanI[1][k]*meanI[2][k];
-  float m22 = corrII[5][k] - meanI[2][k]*meanI[2][k];
+  float m00 = corrII[0][k] - meanI[0][k]*meanI[0][k] + e, m01 = corrII[1][k] - meanI[0][k]*meanI[1][k], m02 = corrII[2][k] - meanI[0][k]*meanI[2][k];
+  float m11 = corrII[3][k] - meanI[1][k]*meanI[1][k] + e, m12 = corrII[4][k] - meanI[1][k]*meanI[2][k];
+  float m22 = corrII[5][k] - meanI[2][k]*meanI[2][k] + e;
 
-  float D = 1/(- m00*m01*m01 + m00*m11*m22
-               - m01*m01*m22 + 2*m01*m02*m12
-               - m02*m02*m11);
+  float D = 1/(
+     m00 * (m11*m22 - m12*m12) -
+     m01 * (m01*m22 - m02*m12) +
+     m02 * (m01*m12 - m02*m11) );
 
-  float a00 = (m22*m11 - m12*m12) * D + e;
-  float a01 = (m02*m12 - m22*m01) * D;
-  float a02 = (m01*m12 - m02*m11) * D;
+  float a00 =  (m11*m22 - m12*m12) * D;
+  float a01 = -(m01*m22 - m02*m12) * D;
+  float a02 =  (m01*m12 - m02*m11) * D;
 
-  float a11 = (m00*m22 - m02*m02) * D + e;
-  float a12 = (m01*m02 - m00*m12) * D;
+  float a11 =  (m00*m22 - m02*m02) * D;
+  float a12 = -(m00*m12 - m02*m01) * D;
 
-  float a22 = (m00*m11 - m01*m01) * D + e;
+  float a22 = (m00*m11 - m01*m01) * D;
 
   for(size_t i: range(3)) {
    float meanPi = meanP[i][k];
