@@ -1,6 +1,6 @@
 #include "string.h"
-#include "math.h"
 #include "data.h"
+#include "math.h"
 
 // -- string
 
@@ -146,6 +146,11 @@ String str(int64 number, uint pad, char padChar, uint base) {
 	while(64<pad+i) buf[--i] = padChar;
 	return copyRef(string(buf+i,64-i));
 }
+
+// math.h
+inline double floor(double x) { return __builtin_floor(x); }
+inline double exp10(double x) { return __builtin_exp2(__builtin_log2(10)*x); }
+inline double log10(double x) { return __builtin_log10(x); }
 
 String str(double n, uint precision, uint exponent, uint pad) {
     bool sign = n<0; n=abs(n);

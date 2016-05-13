@@ -190,7 +190,7 @@ inline ImageF insert(const ImageF& source, const ImageF& crop, int2 origin) { re
 // -- Reduction - argmin --
 
 inline int2 argmin(const ImageF& source) {
- struct C { int2 position=0; float value=inf; };
+ struct C { int2 position=0; float value=inff; };
 #if PARALLEL
  C minimums[threadCount];
  mref<C>(minimums).clear(); // Some threads may not iterate

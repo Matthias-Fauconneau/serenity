@@ -22,6 +22,7 @@ core/file.h
 core/data.h
 core/data.cc
 core/function.h
+core/thread.h
 core/thread.cc
 core/file.cc
 core/serialization.h
@@ -121,3 +122,8 @@ nine.cc
 json.h
 music/background.cc
 video/video.cc
+view.cc
+guided-filter.h
+guided-filter.cc
+core/algorithm.h
+core/sort.h

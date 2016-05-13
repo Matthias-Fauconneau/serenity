@@ -5,13 +5,13 @@
 
 vec2 TextLayout::min(const ref<Glyph> word) {
 	assert_(word);
- vec2 min=inf;
+ vec2 min=inff;
 	for(const Glyph& g : word) min=::min(min, g.origin - g.bearing);
 	return min;
 }
 vec2 TextLayout::max(const ref<Glyph> word) {
 	assert_(word);
- vec2 max=-inf;
+ vec2 max=-inff;
 	for(const Glyph& g : word) max=::max(max, g.origin - g.bearing + g.size);
 	return max;
 }
@@ -22,7 +22,7 @@ float TextLayout::width(const ref<Glyph> word) {
 }
 float TextLayout::advance(const ref<Glyph> word) {
 	if(!word) return 0;
-	float max=-inf; for(const Glyph& g : word) max=::max(max, g.origin.x + g.advance); return max;
+    float max=-inff; for(const Glyph& g : word) max=::max(max, g.origin.x + g.advance); return max;
 }
 
 void TextLayout::nextLine(bool justify, int align) {

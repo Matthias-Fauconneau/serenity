@@ -1,7 +1,6 @@
 #pragma once
 /// \file image.h Image container and operations
 #include "vector.h"
-#include "simd.h"
 
 /// 2D array of pixels
 generic struct ImageT : buffer<T> {
@@ -11,16 +10,13 @@ generic struct ImageT : buffer<T> {
 
     ImageT() {}
     default_move(ImageT);
-    ImageT(buffer<T>&& pixels, int2 size, uint stride=0, bool alpha=false) : buffer<T>(::move(pixels)), size(size), stride(stride?:size.x), alpha(alpha) {
-        //assert_(buffer::data && buffer::size == height*this->stride);
-    }
-	ImageT(uint width, uint height, bool alpha=false) : buffer<T>(height*width), width(width), height(height), stride(width), alpha(alpha) {
-        //assert_(width && height && buffer::data);
-    }
+    ImageT(buffer<T>&& pixels, int2 size, uint stride=0, bool alpha=false) : buffer<T>(::move(pixels)), size(size), stride(stride?:size.x), alpha(alpha) {}
+    ImageT(uint width, uint height, bool alpha=false) : buffer<T>(height*width), width(width), height(height), stride(width), alpha(alpha) {}
 	ImageT(int2 size, bool alpha=false) : ImageT(size.x, size.y, alpha) {}
 
 	explicit operator bool() const { return buffer<T>::data && width && height; }
 	inline T& operator()(uint x, uint y) const { assert(x<width && y<height); return buffer<T>::at(y*stride+x); }
+    inline mref<T> row(uint y) const { assert(y<height); return buffer<T>::slice(y*stride, width); }
 };
 generic String str(const ImageT<T>& o) { return strx(o.size); }
 generic ImageT<T> copy(const ImageT<T>& o) {
@@ -79,15 +75,15 @@ inline Image resize(int2 size, const Image& source) { return resize(Image(size, 
 
 /// 2D array of 8bit integer pixels
 typedef ImageT<uint8> Image8;
-/// 2D array of 16bit integer pixels
-typedef ImageT<uint16> Image16;
-/// 2D array of 32bit integer pixels
-typedef ImageT<uint32> Image32;
 /// 2D array of 32bit floating-point pixels
 typedef ImageT<float> ImageF;
-/// 2D array of 32bit floating-point 4 component vector pixels
-typedef ImageT<v4sf> Image4f;
 
-Image4f convert(const Image& source);
-Image convert(const Image4f& source);
-void box(const Image4f& target, const Image4f& source, const int width);
+void toFloat(mref<float> target, ref<uint8> source);
+ImageF toFloat(ImageF&& target, const Image8& source);
+ImageF toFloat(const Image8& source);
+
+void downsample(const Image8& target, const Image8& source);
+Image8 downsample(const Image8& source);
+
+void mean(const ImageF& target, const ImageF& buffer, const ImageF& source, uint R);
+void sRGBfromBT709(const Image& target, const ImageF& Y, const ImageF& U, const ImageF& V);

@@ -251,6 +251,8 @@ string TextData::whileDecimal() {
  return slice(start,index-start);
 }
 
+inline double exp10(double x) { return __builtin_exp2(__builtin_log2(10)*x); } // math.h
+
 double TextData::decimal() {
  if(!available(1)) return __builtin_nan("");
  double sign=1;

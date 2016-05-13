@@ -1,4 +1,7 @@
 #include "render.h"
+// "math.h"
+inline float floor(float x) { return __builtin_floorf(x); }
+inline float fract(float x) { return x - floor(x); }
 
 extern uint8 sRGB_forward[0x1000];
 extern float sRGB_reverse[0x100];
@@ -78,15 +81,12 @@ static void blend(const Image& target, uint x, uint y, bgr3f color, float opacit
 }
 
 void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity, bool hint) {
- assert_(isNumber(p1) && isNumber(p2), p1, p2);
- //if(hint && p1.y == p2.y) p1.y = p2.y = round(p1.y); // Hints
  if(hint) { // TODO: preprocess
   if(p1.x == p2.x) fill(target, int2(round(p1)), int2(1, p2.y-p1.y), color, opacity);
   else if(p1.y == p2.y) fill(target, int2(round(p1)), int2(p2.x-p1.x, 1), color, opacity);
   else error(p1, p2);
   return;
  }
- //if(p1.x >= target.size.x || p2.x < 0) return; // Assumes p1.x < p2.x
  assert(bgr3f(0) <= color && color <= bgr3f(1));
 
  float dx = p2.x - p1.x, dy = p2.y - p1.y;
@@ -214,14 +214,12 @@ void cubic(const Image& target, ref<vec2> sourcePoints, bgr3f color, float opaci
 #endif
 
 void render(const Image& target, const Graphics& graphics, vec2 offset) {
- assert_(isNumber(offset)); assert_(isNumber(graphics.offset));
  offset += graphics.offset;
  for(const auto& e: graphics.blits) {
   if(int2(e.size) == e.image.size) blit(target, int2(round(offset+e.origin)), e.image, e.color, e.opacity);
   else {
-   //assert_(abs(offset+e.origin-round(offset+e.origin)) < vec2(0.3), offset+e.origin); // FIXME: subpixel blit
    blit(target, int2(round(offset+e.origin)), resize(int2(round(e.size)), e.image), e.color, e.opacity);
-  } //else error(e.size, e.image.size);
+  }
  }
  for(const auto& e: graphics.fills) fill(target, int2(round(offset+e.origin)), int2(e.size), e.color, e.opacity);
  for(const auto& e: graphics.lines) line(target, offset+e.a, offset+e.b, e.color, e.opacity, e.hint);
@@ -231,8 +229,5 @@ void render(const Image& target, const Graphics& graphics, vec2 offset) {
  }
  for(const auto& e: graphics.parallelograms) parallelogram(target, int2(round(offset+e.min)), int2(round(offset+e.max)), e.dy, e.color, e.opacity);
  //for(const auto& e: graphics.cubics) cubic(target, e.points, e.color, e.opacity, offset);
- for(const auto& e: graphics.graphics) {
-  assert_(isNumber(e.key));
-  render(target, e.value, offset+e.key);
- }
+ for(const auto& e: graphics.graphics) render(target, e.value, offset+e.key);
 }

@@ -6,8 +6,6 @@
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
 template<template<Type> /*Type*/class V, Type T, uint N> struct vec : V<T> {
-    //static_assert(sizeof(V<T>)==N*sizeof(T), ""/*req C++14*/);
-
     /// Defaults initializes to zero
 	inline vec() : vec(0) {}
     /// Initializes all components to the same value \a v
@@ -69,10 +67,10 @@ generic bool operator >=(const vec& u, const vec& v) { for(uint i: range(N)) if(
 generic bool operator >(const vec& u, const vec& v) { for(uint i: range(N)) if(u[i]<=v[i]) return false; return true; }
 
 generic vec abs(const vec& v){ vec r; for(uint i: range(N)) r[i]=abs(v[i]); return r;  }
-generic vec floor(const vec& v){ vec r; for(uint i: range(N)) r[i]=floor(v[i]); return r;  }
-generic vec fract(const vec& v){ vec r; for(uint i: range(N)) r[i]=mod(v[i],1); return r;  }
+//generic vec floor(const vec& v){ vec r; for(uint i: range(N)) r[i]=floor(v[i]); return r;  }
+//generic vec fract(const vec& v){ vec r; for(uint i: range(N)) r[i]=mod(v[i],1); return r;  }
 generic vec round(const vec& v){ vec r; for(uint i: range(N)) r[i]=round(v[i]); return r;  }
-generic vec ceil(const vec& v){ vec r; for(uint i: range(N)) r[i]=ceil(v[i]); return r;  }
+//generic vec ceil(const vec& v){ vec r; for(uint i: range(N)) r[i]=ceil(v[i]); return r;  }
 generic vec min(const vec& a, const vec& b){ vec r; for(uint i: range(N)) r[i]=min(a[i],b[i]); return r; }
 generic vec max(const vec& a, const vec& b){ vec r; for(uint i: range(N)) r[i]=max(a[i],b[i]); return r; }
 generic vec clamp(const vec& min, const vec& x, const vec& max){vec r; for(uint i: range(N)) r[i]=clamp(min[i],x[i],max[i]); return r;}
@@ -83,7 +81,6 @@ generic T product(const vec& a) { T product=1; for(uint i: range(N)) product *= 
 generic T dot(const vec& a, const vec& b) { T ssq=0; for(uint i: range(N)) ssq += a[i]*b[i]; return ssq; }
 generic T sq(const vec& a) { return dot(a,a); }
 //generic float length(const vec& a) { return sqrt(dot(a,a)); }
-//generic vec normalize(const vec& a){ return a/length(a); }
 generic bool isNaN(const vec& v){ for(uint i: range(N)) if(isNaN(v[i])) return true; return false; }
 generic bool isNumber(const vec& v){ for(uint i: range(N)) if(!isNumber(v[i])) return false; return true; }
 
@@ -113,13 +110,10 @@ inline String strx(int2 N) { return str(N.x)+'x'+str(N.y); }
 /// Single precision x,y vector
 typedef vec<xy,float,2> vec2;
 typedef vec<xy,float,2> float2;
-//inline String strx(vec2 N) { return str(N.x)+'x'+str(N.y); }
 
-#include "simd.h"
 generic struct xyz {
     T x,y,z;
     vec<xy,T,2>& xy() const { return (vec< ::xy,T,2>&)*this; }
-    inline operator v4sf() const { return (v4sf){x,y,z,0}; }
 };
 /// Integer x,y,z vector
 typedef vec<xyz,int,3> int3;
@@ -127,7 +121,6 @@ typedef vec<xyz,int,3> int3;
 typedef vec<xyz,uint16,3> short3;
 /// Floating-point x,y,z vector
 typedef vec<xyz,float,3> vec3;
-inline vec3 toVec3(v4sf v) { return vec3(v[0],v[1],v[2]); }
 
 generic struct xyzw {
     T x,y,z,w;
@@ -171,83 +164,16 @@ typedef vec<rgba,float,4> rgba4f;
 
 /// Integer b,g,r,a vector (8bit)
 struct byte4 : vec<bgra,uint8,4> {
-	//using vec::vec;
-    byte4() : vec(0) {} // Defaults initalizes to zero
-	inline byte4(byte v) : vec(v) {}
-	inline byte4(byte b, byte g, byte r, byte a=0xFF) : vec(b,g,r,a) {}
-	// bgr
-	byte4(byte3 bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
-	//byte3 bgr() { return byte3(b, g, r); } // -> bgra
-	// bgr3f
-	byte4(bgr3f bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
-	bgr3f bgr() { return bgr3f(b, g, r); }
-	// rgba
-	byte4(vec<rgba,uint8,4> rgba) : vec(rgba.b, rgba.g, rgba.r, rgba.a) {}
-	byte4(vec<rgb,uint8,3> rgb) : vec(rgb.b, rgb.g, rgb.r, 0xFF) {}
+ byte4() : vec(0) {} // Defaults initalizes to zero
+ inline byte4(byte v) : vec(v) {}
+ inline byte4(byte b, byte g, byte r, byte a=0xFF) : vec(b,g,r,a) {}
+ byte4(byte3 bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
+ byte4(bgr3f bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
+ bgr3f bgr() { return bgr3f(b, g, r); }
+ byte4(vec<rgba,uint8,4> rgba) : vec(rgba.b, rgba.g, rgba.r, rgba.a) {}
+ byte4(vec<rgb,uint8,3> rgb) : vec(rgb.b, rgb.g, rgb.r, 0xFF) {}
 };
 /// Integer b,g,r,a vector (32bit)
 typedef vec<bgra,int,4> int4;
 /// Unsigned integer b,g,r,a vector (32bit)
 typedef vec<bgra,uint,4> uint4;
-
-/// Integer x,y vector (64bit)
-typedef vec<xy,int64,2> long2;
-
-template<template<Type> /*Type*/class V, Type T, uint N> inline
-         /*constexpr*/ T length(vec<V,T,N> a) { return sqrt(dot(a,a)); }
-template<template<Type> /*Type*/class V, Type T> inline
- vec<V,T,3> cross(vec<V,T,3> a, vec<V,T,3> b) {
- return vec<V,T,3>(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y);
-}
-
-static constexpr unused v4si _1110
- = {int(0x80000000),int(0x80000000),int(0x80000000),0};
-inline v4sf conjugate(v4sf q) { return (v4sf)(_1110 ^ (v4si)q); }
-
-inline v4sf angleVector(float a, vec3 v) {
- float l = length(v);
- if(!l) return _0001f;
- vec3 b = sin(a/2*l)/l*v;
- return (v4sf){b.x, b.y, b.z, cos(a/2*l)};
-}
-#if 0
-inline v4sf qapply(v4sf q, v4sf v) {
- assert(abs(v[3]) <= 0x1p-28, v);
- return qmul(q, qmul(v, conjugate(q)));
-}
-#endif
-
-//template<Type A, Type B> struct pair { A a; B b; };/*pair<v4sf, v4sf>*/
-inline void closest(v4sf a1, v4sf a2, v4sf b1, v4sf b2, v4sf& A, v4sf& B) {
-    const v4sf u = a2 - a1, v = b2 - b1, w = a1 - b1;
-    const float a = dot3(u,u)[0];
-    const float b = dot3(u,v)[0];
-    const float c = dot3(v,v)[0];
-    const float d = dot3(u,w)[0];
-    const float e = dot3(v,w)[0];
-    const float D = a*c - b*b; float sD = D,  tD = D;
-    // Compute the line parameters of the two closest points
-    float sN, tN;
-    if(D < __FLT_EPSILON__) sN = 0, sD = 1, tN = e, tD = c;
-    else {
-        sN = (b*e - c*d), tN = (a*e - b*d);
-        /**/  if(sN < 0) { sN = 0, tN = e, tD = c; }
-        else if (sN > sD) { sN = sD; tN = e + b; tD = c; }
-    }
-    /**/  if(tN < 0) {
-        tN = 0;
-        /**/  if(-d < 0) sN = 0;
-        else if(-d > a) sN = sD;
-        else { sN = -d; sD = a; }
-    }
-    else if(tN > tD) {
-        tN = tD;
-        /**/  if((-d + b) < 0) sN = 0;
-        else if((-d + b) > a) sN = sD;
-        else { sN = (-d + b); sD = a; }
-    }
-    float sc = abs(sN) < __FLT_EPSILON__ ? 0 : sN / sD;
-    float tc = abs(tN) < __FLT_EPSILON__ ? 0 : tN / tD;
-    A = a1 + (float4(sc) * u); B = b1 - (float4(tc) * v);
-    //return {a1 + (float4(sc) * u), b1 - (float4(tc) * v)};
-}

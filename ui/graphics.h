@@ -92,7 +92,7 @@ inline Rect operator +(vec2 offset, Rect rect) { return Rect(offset+rect.min,off
 /// Set of graphic elements
 struct Graphics : shareable {
  vec2 offset = 0;
- Rect bounds = Rect(inf, -inf); // bounding box of untransformed primitives
+ Rect bounds = Rect(inff, -inff); // bounding box of untransformed primitives
  array<Fill> fills;
  array<Blit> blits;
  array<Glyph> glyphs;
@@ -103,7 +103,6 @@ struct Graphics : shareable {
  map<vec2, shared<Graphics>> graphics;
 
  void translate(vec2 offset) {
-  assert_(isNumber(offset));
   bounds = offset+bounds;
   for(auto& o: fills) o.origin += offset;
   for(auto& o: blits) o.origin += offset;

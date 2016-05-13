@@ -2,9 +2,6 @@
 /// \file time.h Time and date operations
 #include "data.h"
 #include "thread.h"
-#include "function.h"
-#include "string.h"
-#include "math.h"
 
 /// A second in nanoseconds
 const int64 second = 1000000000ull;
@@ -28,13 +25,11 @@ struct Time {
  explicit operator bool() const { return !stopTime; }
 };
 
-inline String strD(uint64 num, uint64 div) { return str(int(round(100.*num/div)))+'%'; }
+String strD(uint64 num, uint64 div);
 template<> inline String str(const Time& t) { return str(t.toReal(), 1u)+'s'; }
 
 inline bool operator<(float a, const Time& b) { return a < b.toReal(); }
 inline bool operator<(double a, const Time& b) { return a < b.toReal(); }
-//inline uint64 operator+(const uint64& a, const Time& b) { return a+(uint64)b; }
-//inline uint64 operator+(const Time& a, const Time& b) { return (uint64)a+(uint64)b; }
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;
@@ -54,7 +49,7 @@ struct Date {
     int localTimeOffset(int64 utc) const;
     /// Converts the date to Unix time (in seconds)
     operator int64() const;
-    explicit operator bool() const { return year>=0&&month>=0&&day>=0 /*&&hours>=0&&minutes>=0&&seconds>=0*/; }
+    explicit operator bool() const { return year>=0&&month>=0&&day>=0; }
 };
 /// Orders two dates
 bool operator <(const Date& a, const Date& b);

@@ -1,11 +1,11 @@
 #include "core/image.h"
 #include "data.h"
 #include "vector.h"
-//include "parallel.h"
-#include "math.h"
 #include "map.h"
 
 // -- sRGB --
+
+inline double pow(double x, double y) { return __builtin_pow(x,y); } // math.h
 
 uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)
 __attribute((constructor(1001))) void generate_sRGB_forward() {
@@ -88,7 +88,8 @@ __attribute((weak)) Image decodeBMP(const ref<byte>) { error("BMP support not li
 __attribute((weak)) Image decodeTGA(const ref<byte>) { error("TGA support not linked"); }
 
 Image decodeImage(const ref<byte> file) {
- if(startsWith(file,"\xFF\xD8"_)) return decodeJPEG(file);
+ if(!file) return Image();
+ else if(startsWith(file,"\xFF\xD8"_)) return decodeJPEG(file);
  else if(startsWith(file,"\x89PNG"_)) return decodePNG(file);
  else if(startsWith(file,"\x00\x00\x01\x00"_)) return decodeICO(file);
  else if(startsWith(file,"\x00\x00\x02\x00"_)||startsWith(file,"\x00\x00\x0A\x00"_)) return decodeTGA(file);
@@ -177,5 +178,66 @@ void resize(const Image& target, const Image& source) {
   int downsampleFactor = min(source.size.x/target.size.x, source.size.y/target.size.y);
   assert_(downsampleFactor, target, source);
   bilinear(target, box(Image((source.size)/downsampleFactor, source.alpha), source));
+ }
+}
+
+
+void toFloat(mref<float> target, ref<uint8> source) { target.apply([](uint8 v) { return v; }, source); }
+ImageF toFloat(ImageF&& target, const Image8& source) { toFloat(target, source); return move(target); }
+ImageF toFloat(const Image8& source) { return toFloat(source.size, source); }
+
+void downsample(const Image8& target, const Image8& source) {
+ assert_(target.size == source.size/2, target.size, source.size);
+ for(uint y: range(target.height)) for(uint x: range(target.width))
+  target(x,y) = (source(x*2+0,y*2+0) + source(x*2+1,y*2+0) + source(x*2+0,y*2+1) + source(x*2+1,y*2+1)) / 4;
+}
+Image8 downsample(const Image8& source) { Image8 target(source.size/2); downsample(target, source); return target; }
+
+void mean (const ImageF& target, const ImageF& buffer, const ImageF& source, uint R) {
+ assert(target.size == buffer.size.yx() && buffer.size.yx() == source.size);
+ for(size_t i: range(2)) {
+  const ImageF& X = *(const ImageF*[]){&source, &buffer}[i];
+  const ImageF& Y = *(const ImageF*[]){&buffer, &target}[i];
+  for(uint y: range(X.size.y)) {
+   const ref<float> Xy = X.row(y);
+   const mref<float> Yy = Y.slice(y);
+   const uint W = Y.stride;
+   float sum = 0;
+   for(uint x: range(R)) sum += Xy[x];
+   for(uint x: range(R)) {
+    sum += Xy[x+R];
+    Yy[x*W] = sum / (R+x+1);
+   }
+   const uint end = X.size.x-R;
+   const float w = 1.f / (2*R+1);
+   for(uint x=R; x<end; x++) {
+    sum += Xy[x+R];
+    Yy[x*W] = w * sum;
+    sum -= Xy[x-R];
+   }
+   for(uint x: range(X.size.x-R, X.size.x)) {
+    Yy[x*W] = sum / (R+(X.size.x-1-x)+1);
+    sum -= Xy[x-R];
+   }
+  }
+ }
+}
+
+const double Kb = 0.0722, Kr = 0.2126;
+const double rv = (1-Kr)*255/112;
+const double gu = (1-Kb)*Kb/(1-Kr-Kb)*255/112;
+const double gv = (1-Kr)*Kr/(1-Kr-Kb)*255/112;
+const double bu = (1-Kb)*255/112;
+
+void sRGBfromBT709(const Image& target, const ImageF& Y, const ImageF& U, const ImageF& V) {
+ assert_(target.size == Y.size && target.stride == Y.stride && Y.size == U.size && Y.size == V.size && Y.stride == U.stride && Y.stride == V.stride);
+ for(size_t i: range(Y.ref::size)) {
+  int y = (int(Y[i]) - 16)*255/219;
+  int Cb = int(U[i]) - 128;
+  int Cr = int(V[i]) - 128;
+  int r = y                        + Cr*rv;
+  int g = y - Cb*gu - Cr*gv;
+  int b = y + Cb*bu;
+  target[i] = byte4(clamp(0,b,255), clamp(0,g,255), clamp(0,r,255));
  }
 }

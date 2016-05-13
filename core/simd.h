@@ -68,7 +68,7 @@ inline v4sf qmul(v4sf a, v4sf b) {
 
 inline v4sf mix(v4sf x, v4sf y, float a) { return float4(1-a)*x + float4(a)*y; }
 
-#include "math.h"
+#include "algorithm.h"
 inline v4sf mean(const ref<v4sf> x) { assert(x.size); return sum(x, float4(0)) / float4(x.size); }
 #include "string.h"
 template<> inline String str(const v4sf& v) { return "("+str(v[0], v[1], v[2], v[3])+")"; }

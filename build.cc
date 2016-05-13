@@ -8,30 +8,6 @@ String str(const Node& o) {
  return o.name+'\n'+join(apply(o.edges, [=](const Node* child){ return str(child); }));
 };
 
-struct Branch {
- String name;
- array<Branch> children;
- explicit Branch(String&& name) : name(move(name)) {}
-};
-String str(const Branch& o, int depth=0) {
- return repeat(" ", depth)+o.name+'\n'+join(apply(o.children, [=](const Branch& child){ return str(child, depth+1); }));
-};
-
-/*/// Breaks cycles (converts a directed graph to a directed acyclic graph (DAG))
-Branch collect(const Node* source, array<const Node*>& stack, int maxDepth) {
-    stack.append(source);
-    Branch branch (copy(source->name));
-    if(stack.size <= maxDepth) {
-        for(const Node* child: source->edges) {
-            if(!stack.contains(child))
-                branch.children.append( collect(child, stack, maxDepth) );
-        }
-    }
-    stack.pop();
-    return branch;
-}
-Branch collect(const Node& source, int maxDepth) { array<const Node*> stack; return collect(&source, stack, maxDepth); }*/
-
 String Build::find(string file) {
  for(string path: sources) if(path == file) return copyRef(path.contains('.') ? section(path,'.',0,-2) : path); // Exact match
  for(string path: sources) if(section(path,'/',-2,-1) == file) return copyRef(path.contains('.') ? section(path,'.',0,-2) : path); // Sub match
@@ -55,7 +31,7 @@ String Build::tryParseIncludes(TextData& s, string fileName) {
     if(!library) break;
     if(!libraries.contains(library)) libraries.append(copyRef(library));
    }
-   assert_(s.wouldMatch('\n'));
+   assert(s.wouldMatch('\n'));
   }
  }
  return {};
@@ -79,7 +55,7 @@ bool Build::tryParseConditions(TextData& s, string fileName) {
  else if(defines.contains(toLower(id))) value=true; // Conditionnal build (intern use flag)
  if(value != condition) {
   while(!s.match("#else") && !s.match("#endif")) {
-   assert_(s, fileName+": Expected #endif, got EOD");
+   assert(s, fileName+": Expected #endif, got EOD");
    if(!tryParseConditions(s, fileName)) s.line();
   }
  }
@@ -92,19 +68,14 @@ bool Build::tryParseFiles(TextData& s) {
  s.skip(')');
  name = replace(name, '_', '.');
  String path = find(name);
- /*String path;
- for(string p: sources) {
-  if(section(p.contains('.')?section(p,'.'):p,'/',-2,-1) == name)
-   { path=copyRef(p); break; }
- }*/
  assert(path, "No such file to embed", name);
  String filesPath = tmp+"/files";
  Folder(filesPath, currentWorkingDirectory(), true);
  Folder subfolder = Folder(section(path,'/',0,-2), folder);
  string file = name; //section(path,'/',-2,-1);
  String object = filesPath+"/"+name+".o";
- assert_(!files.contains(object), name);
- assert_(existsFile(file, subfolder), file, name);
+ assert(!files.contains(object), name);
+ assert(existsFile(file, subfolder), file, name);
  int64 lastFileEdit = File(file, subfolder).modifiedTime();
  if(!existsFile(object) || lastFileEdit >= File(object).modifiedTime()) {
   if(execute(LD, {"-r", "-b", "binary", "-o", object, file}, true, subfolder)) error("Failed to embed");
@@ -122,7 +93,7 @@ int64 Build::parse(string fileName, Node& parent) {
   {String name = tryParseIncludes(s, fileName);
    if(name) {
     String module = find(name+".h"); // .h to find module corresponding to header
-    assert_(module, "No such module", name, "imported from", fileName);
+    assert(module, "No such module", name, "imported from", fileName);
     lastEdit = max(lastEdit, parse(module+".h", parent));
     if(!parent.edges.contains(module) && existsFile(module+".cc", folder) && module != parent.name) {
      if(!modules.contains<string>(module)) { if(!compileModule(module)) return 0; }
@@ -138,7 +109,7 @@ int64 Build::parse(string fileName, Node& parent) {
 }
 
 bool Build::compileModule(string target) {
- assert_(target);
+ assert(target);
  modules.append( unique<Node>(copyRef(target)) );
  Node& module = modules.last();
  String fileName = target+".cc";
@@ -150,16 +121,16 @@ bool Build::compileModule(string target) {
    int pid = wait(); // Waits for any child to terminate
    int status = wait(pid);
    Job job = jobs.take(jobs.indexOf(pid));
-   log(job.stdout.readUpTo(4096));
+   log(job.stdout.readUpTo(65536));
    if(status) { log("Failed to compile\n"); return false; }
-   else log(job.target+'\n');
+   else log(job.target+' '+str(job.time)+'\n');
   }
   Folder(tmp+"/"+join(flags,"-")+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
   Stream stdout;
   int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1z", "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing", "-march=native",
                                      "-o", object, fileName, "-I/usr/include/freetype2","-I/var/tmp/include"} + toRefs(args),
                     false, currentWorkingDirectory(), 0, &stdout);
-  jobs.append({copyRef(target), pid, move(stdout)});
+  jobs.append({copyRef(target), pid, move(stdout), true});
   needLink = true;
  }
  files.append( tmp+"/"+join(flags,"-")+"/"+target+".o" );
@@ -170,7 +141,8 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
  // Configures
  string install;
  for(string arg: arguments) {
-  if(startsWith(arg,"-"_)) {} // Build command flag
+  if(arg=="-ftime-report"_||arg=="-v") args.append(unsafeRef(arg)); // Build command flag without influence on output build
+  //else if(startsWith(arg,"-"_)) {} // Build command flag
   else if(startsWith(arg,"/"_)) install=arg;
   else if(find(arg+".cc") && arg!="profile") {
    if(target) log(str("Multiple targets unsupported, building last target:", arg, ". Parsing arguments:", arguments)+'\n');
@@ -180,7 +152,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
  }
 
  if(!target) target = base;
- assert_(find(target+".cc"), "Invalid target"_, target, sources);
+ assert(find(target+".cc"), "Invalid target"_, target, sources);
 
  args.append("-iquote."__);
  for(string flag: flags) args.append( "-D"+toUpper(flag)+"=1" );
@@ -197,18 +169,16 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
  if(flags.contains("profile")) if(!compileModule(find("core/profile.cc"))) { log("Failed to compile\n"); return; }
  if(!compileModule( find(target+".cc") )) { log("Failed to compile\n"); return; }
 
- //if(arguments.contains("-tree")) { log(str(collect(modules.first(), 1))+'\n'); return; }
-
  // Links
  binary = tmp+"/"+join(flags,"-")+"/"+target;
- assert_(!existsFolder(binary));
+ assert(!existsFolder(binary));
  if(!existsFile(binary) || needLink) {
   // Waits for all translation units to finish compilation before final link
   for(Build::Job& job: jobs) {
    int status = wait(job.pid);
-   log(job.stdout.readUpTo(4096));
+   log(job.stdout.readUpTo(65536));
    if(status) { binary={}; return; }
-   else log(job.target+'\n');
+   else log(job.target+' '+str(job.time)+'\n');
   }
   libraries.append("stdc++"__);
   libraries.append("m"__);

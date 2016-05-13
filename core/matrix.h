@@ -1,6 +1,9 @@
 #pragma once
 /// file matrix.h 3x3 homogeneous transformation matrix
 #include "vector.h"
+// math.h
+inline float cos(float t) { return __builtin_cos(t); }
+inline float sin(float t) { return __builtin_sin(t); }
 
 /// 2D affine transformation
 struct mat3x2 {

@@ -3,11 +3,7 @@
 #include "map.h"
 #include "file.h"
 #include "function.h"
-#include <poll.h>
 #include <pthread.h> //pthread
-#include <sys/inotify.h>
-
-//extern Stream stdout;
 
 /// Abstract factory pattern (allows construction of class by names)
 template<Type I> struct Interface {
@@ -17,7 +13,7 @@ template<Type I> struct Interface {
     static map<string, AbstractFactory*>& factories() { static map<string, AbstractFactory*> factories; return factories; }
     template<Type C> struct Factory : AbstractFactory {
         unique<I> constructNewInstance() override { return unique<C>(); }
-	Factory(string name) { factories().insert(name, this); }
+        Factory(string name) { factories().insert(name, this); }
         static Factory registerFactory;
     };
     static unique<I> instance(const string& name) { return factories().at(name)->constructNewInstance(); }
@@ -49,45 +45,45 @@ struct Locker {
 };
 
 struct Condition : handle<pthread_cond_t> {
-	default_move(Condition);
-	Condition() { pthread_cond_init(&pointer,0); }
-	~Condition(){ pthread_cond_destroy(&pointer); }
+    default_move(Condition);
+    Condition() { pthread_cond_init(&pointer,0); }
+    ~Condition(){ pthread_cond_destroy(&pointer); }
 };
 
 /// A semaphore implemented using POSIX mutex, POSIX condition variable, and a counter
 struct Semaphore {
-	default_move(Semaphore);
-	Lock mutex;
-	Condition condition;
-	int64 counter;
-	/// Creates a semaphore with \a count initial ressources
-	explicit Semaphore(int64 count=0) : counter(count) {}
-	/// Acquires \a count ressources
-	void acquire(int64 count) {
-		mutex.lock();
-  while(counter<count) pthread_cond_wait(&condition, &mutex);
-  __sync_sub_and_fetch(&counter,count);
-  assert(counter>=0);
-		mutex.unlock();
-	}
-	/// Atomically tries to acquires \a count ressources only if available
-	bool tryAcquire(int64 count) {
-		mutex.lock();
-		if(counter<count) { mutex.unlock(); return false; }
-		assert(count>0);
-		__sync_sub_and_fetch(&counter,count);
-		mutex.unlock();
-		return true;
-	}
-	/// Releases \a count ressources
-	void release(int64 count) {
-  mutex.lock();
-  __sync_add_and_fetch(&counter, count);
-  pthread_cond_broadcast(&condition);
-  mutex.unlock();
-	}
-	/// Returns available ressources \a count
-	operator uint64() const { return counter; }
+    default_move(Semaphore);
+    Lock mutex;
+    Condition condition;
+    int64 counter;
+    /// Creates a semaphore with \a count initial ressources
+    explicit Semaphore(int64 count=0) : counter(count) {}
+    /// Acquires \a count ressources
+    void acquire(int64 count) {
+        mutex.lock();
+        while(counter<count) pthread_cond_wait(&condition, &mutex);
+        __sync_sub_and_fetch(&counter,count);
+        assert(counter>=0);
+        mutex.unlock();
+    }
+    /// Atomically tries to acquires \a count ressources only if available
+    bool tryAcquire(int64 count) {
+        mutex.lock();
+        if(counter<count) { mutex.unlock(); return false; }
+        assert(count>0);
+        __sync_sub_and_fetch(&counter,count);
+        mutex.unlock();
+        return true;
+    }
+    /// Releases \a count ressources
+    void release(int64 count) {
+        mutex.lock();
+        __sync_add_and_fetch(&counter, count);
+        pthread_cond_broadcast(&condition);
+        mutex.unlock();
+    }
+    /// Returns available ressources \a count
+    operator uint64() const { return counter; }
 };
 inline String str(const Semaphore& o) { return str(o.counter); }
 
@@ -95,7 +91,8 @@ struct Thread;
 /// Original thread spawned when this process was forked, terminating this thread leader terminates the whole thread group
 extern Thread mainThread;
 
-struct pollfd;
+struct pollfd { int fd; short events; short revents; };
+enum { POLLIN=1 };
 /// Poll is a convenient interface to participate in the event loop
 struct Poll : pollfd {
     enum { IDLE=64 };
@@ -152,9 +149,9 @@ struct Thread : array<Poll*>, EventFD, Lock, Poll {
 int32 gettid();
 
 struct Job : Poll {
-	function<void()> job;
-	Job(Thread& thread, function<void()> job, bool queue=true) : Poll(0,0,thread), job(job) { if(queue) this->queue(); }
-	void event() override { job(); }
+    function<void()> job;
+    Job(Thread& thread, function<void()> job, bool queue=true) : Poll(0,0,thread), job(job) { if(queue) this->queue(); }
+    void event() override { job(); }
 };
 
 /// Flags all threads to terminate as soon as they return to event loop, destroys all global objects and exits process.
@@ -174,43 +171,13 @@ int wait(int pid);
 /// Returns whether process \a pid is running
 bool isRunning(int pid);
 
-struct inotify_event;
 /// Watches a folder for new files
 struct FileWatcher : File, Poll {
-	String path;
-	function<void(string)> fileModified;
+    String path;
+    function<void(string)> fileModified;
 
-	FileWatcher(string path, function<void(string)> fileModified)
-		: File(inotify_init1(IN_CLOEXEC)), Poll(File::fd), path(copyRef(path)), fileModified(fileModified) {
-		addWatch(path);
-	}
- virtual ~FileWatcher() {}
- void addWatch(string path)  { check(inotify_add_watch(File::fd, strz(path), IN_MODIFY|IN_MOVE), path); }
-	void event() override {
-		while(poll()) {
-			::buffer<byte> buffer = readUpTo(sizeof(inotify_event) + 256);
-			inotify_event e = *(inotify_event*)buffer.data;
-			string name = e.len ? string(e.name, e.len-1) : path;
-			fileModified(name);
-   //addWatch(name); // FIXME: should already not be one shot
-		}
-	}
+    FileWatcher(string path, function<void(string)> fileModified);
+    virtual ~FileWatcher() {}
+    void addWatch(string path);
+    void event() override;
 };
-/*struct FileWatcher : File, Poll {
-    FileWatcher(string path, function<void(string)> fileCreated, function<void(string)> fileDeleted={})
-        : File(inotify_init1(IN_CLOEXEC)), Poll(File::fd), watch(check(inotify_add_watch(File::fd, strz(path), IN_CREATE|IN_DELETE))),
-          fileCreated(fileCreated), fileDeleted(fileDeleted) {}
-    void event() override {
-        while(poll()) {
-            //::buffer<byte> buffer = readUpTo(2*sizeof(inotify_event)+4); // Maximum size fitting only a single event (FIXME)
-            ::buffer<byte> buffer = readUpTo(sizeof(struct inotify_event) + 256);
-            inotify_event e = *(inotify_event*)buffer.data;
-            string name = str((const char*)buffer.slice(__builtin_offsetof(inotify_event, name), e.len-1).data);
-            if((e.mask&IN_CREATE) && fileCreated) fileCreated(name);
-            if((e.mask&IN_DELETE) && fileDeleted) fileDeleted(name);
-        }
-    }
-    const uint watch;
-    function<void(string)> fileCreated;
-    function<void(string)> fileDeleted;
-};*/

@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <sys/syscall.h>
+#include <sys/inotify.h>
 
 // Log
 void log_(string message) { ssize_t unused written = ::write(2, message.data, message.size); }
@@ -30,6 +31,7 @@ void Poll::unregisterPoll() {
  if(thread.contains(this) && !thread.unregistered.contains(this)) thread.unregistered.append(this);
 }
 void Poll::queue() {Locker lock(thread); if(!thread.queue.contains(this)) thread.queue.append(this); thread.post();}
+extern "C" int poll (pollfd* fds, ulong nfds, int timeout);
 bool Poll::wait() { if(::poll(this,1,-1)!=1 || !(revents&events)) return false; event(); return true; }
 
 EventFD::EventFD() : Stream(check(eventfd(0, EFD_SEMAPHORE))) {}
@@ -266,3 +268,19 @@ int execute(const string path, const ref<string> args, bool wait, const Folder& 
 int wait() { return waitpid(-1,0,0); }
 int wait(int pid) { int status=0; waitpid(pid,&status,0); return status; }
 bool isRunning(int pid) { int status=0; waitpid(pid,&status,WNOHANG); return (status&0x7f); }
+
+
+FileWatcher::FileWatcher(string path, function<void(string)> fileModified)
+ : File(inotify_init1(IN_CLOEXEC)), Poll(File::fd), path(copyRef(path)), fileModified(fileModified) {
+ addWatch(path);
+}
+void FileWatcher::addWatch(string path)  { check(inotify_add_watch(File::fd, strz(path), IN_MODIFY|IN_MOVE), path); }
+void FileWatcher::event() {
+ while(poll()) {
+  ::buffer<byte> buffer = readUpTo(sizeof(inotify_event) + 256);
+  inotify_event e = *(inotify_event*)buffer.data;
+  string name = e.len ? string(e.name, e.len-1) : path;
+  fileModified(name);
+  //addWatch(name); // FIXME: should already not be one shot
+ }
+}

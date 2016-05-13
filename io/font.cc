@@ -1,10 +1,10 @@
+#include "font.h"
+#include "file.h"
+
+#undef generic
 #include <ft2build.h>
 #include <freetype/freetype.h> //freetype
 #include <freetype/ftlcdfil.h> //z
-
-#include "font.h"
-#include "file.h"
-#include "math.h"
 
 String findFont(string fontName, ref<string> fontTypes) {
     for(string folder: {"/usr/share/fonts"_,"/usr/local/share/fonts"_}) {

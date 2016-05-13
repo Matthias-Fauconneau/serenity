@@ -12,6 +12,9 @@ long currentTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.
 int64 realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000000000ull+ts.tv_nsec; }
 int64 threadCPUTime() { timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.tv_sec*1000000000ull+ts.tv_nsec; }
 
+inline double round(double x) { return __builtin_round(x); } // math.h
+String strD(uint64 num, uint64 div) { return str(int(round(100.*num/div)))+'%'; }
+
 static bool leap(int year) { return (year%4==0)&&((year%100!=0)||(year%400==0)); }
 int daysInMonth(int month, int year=0) {
     if(month==1 && leap(year)) { assert(year!=0); return 29; }
