@@ -194,8 +194,8 @@ void downsample(const Image8& target, const Image8& source) {
 }
 Image8 downsample(const Image8& source) { Image8 target(source.size/2); downsample(target, source); return target; }
 
-void mean (const ImageF& target, const ImageF& buffer, const ImageF& source, uint R) {
- assert(target.size == buffer.size.yx() && buffer.size.yx() == source.size);
+void mean(const ImageF& target, const ImageF& buffer, const ImageF& source, uint R) {
+ assert_(target.size == buffer.size.yx() && buffer.size.yx() == source.size);
  for(size_t i: range(2)) {
   const ImageF& X = *(const ImageF*[]){&source, &buffer}[i];
   const ImageF& Y = *(const ImageF*[]){&buffer, &target}[i];
@@ -223,6 +223,7 @@ void mean (const ImageF& target, const ImageF& buffer, const ImageF& source, uin
   }
  }
 }
+ImageF mean(const ImageF& source, uint R) { ImageF target(source.size); ImageF buffer(source.size.yx()); mean(target, buffer, source, R); return target; }
 
 const double Kb = 0.0722, Kr = 0.2126;
 const double rv = (1-Kr)*255/112;
@@ -244,6 +245,7 @@ void sRGBfromBT709(const Image& target, const ImageF& Y, const ImageF& U, const 
 }
 
 void sRGBfromBT709(const Image& target, const ImageF& Y) { for(size_t i: range(Y.ref::size)) target[i] = byte3(clamp(0, (int(Y[i]) - 16)*255/219, 255)); }
+Image sRGBfromBT709(const ImageF& Y) { Image target(Y.size); sRGBfromBT709(target, Y); return target; }
 
 // -- Convolution --
 

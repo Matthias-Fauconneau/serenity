@@ -1,5 +1,5 @@
 #pragma once
-#include "core/image.h"
+#include "image.h"
 struct AVFormatContext;
 struct SwsContext;
 struct AVStream;
@@ -12,8 +12,7 @@ struct Decoder {
         int2 size = 0;
         struct { uint width, height; };
     };
-    uint /*timeNum=0,*/ timeDen=0;
-    //int firstPTS = 0;
+    uint timeDen=0;
 
     int duration = 0; // in stream time base
 

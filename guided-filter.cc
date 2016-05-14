@@ -31,7 +31,7 @@ void guidedFilter(const ImageF& q, const ImageF& I, const ImageF& p, const int R
  times["corrIP"].stop();
  times["ab"].start();
  for(size_t k: range(a.ref::size)) {
-  float m00 = corrII[0] - meanI[k]*meanI[k] + e;
+  float m00 = corrII[k] - meanI[k]*meanI[k] + e;
   float a00 = 1/m00;
   float meanPk = meanP[k];
   float meanIk = meanI[k];
