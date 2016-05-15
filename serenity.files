@@ -104,3 +104,4 @@ guided-filter.cc
 core/algorithm.h
 core/sort.h
 cut.cc
+irc.cc

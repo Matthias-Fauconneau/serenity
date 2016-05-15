@@ -300,7 +300,7 @@ struct DCCApp {
    String config = readFile(".irc");
    String search = replace(section(config, '\n') ,"%", query);
    buffer<string> bots = split(section(config, '\n', 1, -1), "\n");
-   Map document = getURL(search);
+   Map document = getURL(search, {}, 1);
    Element root = parseHTML(document);
    const Element& table = root("//table");
    for(size_t i=1; i<table.children.size; i+=2) {

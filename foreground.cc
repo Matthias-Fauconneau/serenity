@@ -80,7 +80,7 @@ struct Foreground : Widget {
 
  Time totalTime {true};
 
- ImageF temporal0, temporal1;
+ ImageF temporal;
 
  Foreground() {
   for(string file: currentWorkingDirectory().list(Files)) {
@@ -99,8 +99,7 @@ struct Foreground : Widget {
   assert_(clip[0].size % (size.x*size.y) == 0);
   clipFrameCount = clip[0].size / (size.x*size.y);
 
-  temporal0 = ImageF(size/2); temporal0.clear(64);
-  temporal1 = ImageF(size/2); temporal1.clear(64);
+  temporal = ImageF(size/2); temporal.clear(8);
 
   window = ::window(this, size);
   window->backgroundColor = nan;
@@ -165,30 +164,19 @@ struct Foreground : Widget {
   //float sumD = 0;
   ImageF contour (source.size);
   for(size_t k: range(source.ref::size)) {
-   contour[k] = sq(source[k]-next[k]) + sq(next[k]-next1[k]);
+   contour[k] = abs(source[k]-next[k]) + abs(next[k]-next1[k]);
    //float d = //((source[k]/mean0)-(next[k]/mean1));
    //source[k] = 255 * d;
    //sumD += d;
   }
 
-  //ImageF
-  const int R = 15;
-  ImageF region0;
-  region0 = guidedFilter(source, contour, R, 1);
-  ImageF region1;
-  region1 = ::mean(contour, R);
-  //static array<char> O; O.append(sum / source.ref::size > 10 ? '1' : '0'); if(endsWith(O, "1111")) O.clear(); int H[2]={0,0}; for(char c: O) H[c=='1']++; log(O.size, H, O
-  //log(mean0, mean1, sumD / source.ref::size);
-
-  //assert_(temporal.size == region.size, temporal.size, region.size);
-  const float dt = 1./8;
-  for(size_t k: range(region0.ref::size)) temporal0[k] = (1-dt)*temporal0[k] + dt*region0[k];
-  for(size_t k: range(region0.ref::size)) temporal1[k] = (1-dt)*temporal1[k] + dt*region1[k];
-  for(size_t k: range(source.ref::size)) {
-   float mask = (toggle?temporal1:temporal0)[k];
-   //source[k] = min(1.f, (toggle?temporal1:temporal0)[k]/255) * source[k];
-   source[k] = (mask>64 ? 1 : 0) * source[k];
-  }
+  ImageF region;
+  region = ::mean(contour, 15);
+  const float dt = 1./16;
+  for(size_t k: range(region.ref::size)) temporal[k] = (1-dt)*temporal[k] + dt*region[k];
+  for(size_t k: range(region.ref::size)) region[k] = temporal[k]>8;
+  if(!toggle) region = guidedFilter(source, region, 15, 1);
+  for(size_t k: range(source.ref::size)) source[k] *= region[k]>1./2;
 #endif
   return sRGBfromBT709(source);
  }
