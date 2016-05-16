@@ -94,7 +94,7 @@ struct Foreground : Widget {
     for(size_t j: range(3)) samples[i][j].append(first[j][k]);
    }
    Random random;
-   static constexpr int K = 1;
+   static constexpr int K = 4;
    struct Model {
     struct Component {
      vec3 mean;
@@ -104,8 +104,12 @@ struct Foreground : Widget {
    Model models[2];
    for(size_t i: range(2)) {
     Model model;
-    for(size_t k: range(K)) model.components[k].mean = vec3(random(), random(), random());
-    for(size_t unused step: range(1)) {
+    for(size_t k: range(K)) {
+     size_t s = random%samples[i][0].size;
+     model.components[k].mean = vec3(samples[i][0][s], samples[i][1][s], samples[i][2][s]);
+    }
+    // K-means
+    for(size_t unused step: range(12)) {
      int3 sum[K] = {}; uint count[K]={};
      for(size_t s: range(samples[i][0].size)) {
       int3 sample (samples[i][0][s], samples[i][1][s], samples[i][2][s]);
@@ -117,28 +121,47 @@ struct Foreground : Widget {
       sum[nearestComponent] += sample;
       count[nearestComponent] += 1;
      }
-     for(size_t k: range(K)) model.components[k].mean = vec3(sum[k]) / float(count[k]);
+     bool changed = false;
+     for(size_t k: range(K)) {
+      vec3 value = vec3(sum[k]) / float(count[k]);
+      vec3& mean = model.components[k].mean;
+      if(mean != value) { mean = value; changed = true; }
+     }
+     if(!changed) break;
     }
+    //TODO: GMM EM
     models[i] = model;
    }
 
-   debug = Image(256*2); debug.clear(byte4(0,0,0,0xFF)); // Plots color distribution as additive projection orthogonal to each Y,U,V axis
-   Image view[4]; for(size_t x: range(2)) for(size_t y: range(2)) view[y*2+x] = cropRef(debug, int2(x, y)*debug.size/2, debug.size/2);
+   debug = Image(256*int2(3,2)); debug.clear(byte4(0,0,0,0xFF)); // Plots color distribution as additive projection orthogonal to each Y,U,V axis
+   Image view[6]; for(size_t x: range(3)) for(size_t y: range(2)) view[y*3+x] = cropRef(debug, int2(x, y)*debug.size/int2(3,2), debug.size/int2(3,2));
    for(size_t i: range(2)) {
     for(size_t s: range(samples[i][0].size)) {
-     vec3 sample (samples[i][0][s], samples[i][1][s], samples[i][2][s]);
+     int3 sample (samples[i][0][s], samples[i][1][s], samples[i][2][s]);
      for(size_t p: range(3)) {
       int2 Ps (sample[p], sample[(p+1)%3]);
-      uint8& bin = view[p](Ps.x, Ps.y)[1+i];
+      byte4& pixel = view[i*3+p](Ps.x, Ps.y);
+#if 1
+      size_t nearestComponent; float distance = inf;
+      for(size_t k: range(K)) {
+       float d = sq(sample - int3(models[i].components[k].mean));
+       if(d < distance) { distance=d; nearestComponent=k; }
+      }
+      {uint8& bin = pixel[(uint[]){0,1,2,0}[nearestComponent]]; if(bin<0xFF) bin++; }
+      {uint8& bin = pixel[(uint[]){0,1,2,0}[nearestComponent]]; if(bin<0xFF) bin++; }
+      {uint8& bin = pixel[(uint[]){0,1,2,1}[nearestComponent]]; if(bin<0xFF) bin++; }
+#else
+      uint8& bin = pixel[1+i];
       if(bin<0xFF) bin++;
+#endif
      }
     }
     for(size_t p: range(3)) {
      for(size_t k: range(K)) {
       vec3 O = models[i].components[k].mean;
       int2 P (O[p], O[(p+1)%3]);
-      view[p](P.x, P.y)[0] = 0xFF;
-      view[p](P.x, P.y)[1+i] = 0xFF;
+      view[i*3+p](P.x, P.y)[0] = 0xFF;
+      view[i*3+p](P.x, P.y)[1+i] = 0xFF;
      }
     }
    }
@@ -169,7 +192,7 @@ struct Foreground : Widget {
   if(clipFrameIndex+2 >= clipFrameCount) { requestTermination(); return shared<Graphics>(); }
   //resize(window->target, image(clipFrameIndex));
   window->target.clear(0);
-  resize(cropRef(window->target,0,768), debug);
+  resize(cropRef(window->target,0,int2(768*3/2,768)), debug);
   //assert_(window->target.size == debug.size, window->target.size, debug.size); copy(window->target, debug);
   //clipFrameIndex++;
   return shared<Graphics>();
