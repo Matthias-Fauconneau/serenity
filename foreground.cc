@@ -1,72 +1,6 @@
+#include "matrix.h"
 #include "window.h"
-#include "guided-filter.h"
-
-#if 0
-void corner(const ImageF& target, const ImageF& source) {
- assert_(target.size == source.size);
- target.clear();
- const int m = 9;
- const int R = 2;
- const int r = 3;
- for(size_t y : range(m+r, source.size.y-m-r)) for(size_t x : range(m+r, source.size.x-m-r)) {
-  float min = inf;
-  for(int oy: range(-R, R+1)) for(int ox: range(-R, R+1)) { // FIXME: round window
-   if(ox==0 && oy==0) continue;
-   float sum = 0;
-   for(int dy: range(-r, r+1)) for(int dx: range(-r, r+1)) {
-    sum += abs(source(x+ox+dx, y+oy+dy) - source(x+dx, y+dy));
-   }
-   if(sum < min) min = sum;
-  }
-  target(x,y) = min;
- }
-}
-ImageF corner(const ImageF& source) { ImageF target(source.size); corner(target, source); return target; }
-
-#if 0
-// Filters non maximum
-void localMax(const ImageF& target, const ImageF& source, int R) {
- for(size_t y : range(R, source.size.y-R)) for(size_t x : range(R, source.size.x-R)) {
-  float max = source(x, y);
-  for(int dy: range(-R, R +1)) for(int dx: range(-R, R+1)) if((dx || dy) && source(x+dx, y+dy) >= max) { max=0; break; }
-  target(x, y) = max;
- }
-}
-ImageF localMax(const ImageF& source, int R) { ImageF target(source.size); localMax(target, source, R); return target; }
-#else
-// Filters non maximum
-buffer<int2> localMax(const ImageF& source, int R) {
- buffer<int2> target(2048, 0);
- for(size_t y : range(R, source.size.y-R)) for(size_t x : range(R, source.size.x-R)) { // FIXME: round window
-  float max = source(x, y);
-  for(int dy: range(-R, R +1)) for(int dx: range(-R, R+1)) if((dx || dy) && source(x+dx, y+dy) >= max) { max=0; break; }
-  if(max) {
-   assert_(target.size < target.capacity, target.size, target.capacity);
-   target.append(int2(x, y));
-  }
- }
- return target;
-}
-#endif
-
-void track(const mref<int2> target, const ImageF& A, const ImageF& B, const ref<int2> source) {
- const int R = 9;
- const int r = 3;
- for(size_t i: range(source.size)) {
-  size_t x = source[i].x, y = source[i].y;
-  float min = inf; int Ox, Oy;
-  for(int oy: range(-R, R+1)) for(int ox: range(-R, R+1)) { // FIXME: round window
-   float sum = 0;
-   for(int dy: range(-r, r+1)) for(int dx: range(-r, r+1)) {
-    sum += abs(B(x+ox+dx, y+oy+dy) - A(x+dx, y+dy));
-   }
-   sum += sq(ox) + sq(oy); // Regularization
-   if(sum < min) min = sum, Ox = ox, Oy = oy;
-  }
-  target[i] = int2(Ox, Oy);
- }
-}
-#endif
+#include "png.h"
 
 struct Foreground : Widget {
  string baseName = arguments()[0];
@@ -80,7 +14,9 @@ struct Foreground : Widget {
 
  Time totalTime {true};
 
- ImageF temporal;
+ ImageF trimap;
+
+ Image debug;
 
  Foreground() {
   for(string file: currentWorkingDirectory().list(Files)) {
@@ -99,11 +35,117 @@ struct Foreground : Widget {
   assert_(clip[0].size % (size.x*size.y) == 0);
   clipFrameCount = clip[0].size / (size.x*size.y);
 
-  temporal = ImageF(size/2); temporal.clear(8);
+  const Image8 first[] = {downsample(this->source(0, 0)), this->source(1, 0), this->source(2, 0)};
+  Image input = decodeImage(readFile("trimap.png"));
+#if 0
+  if(0) {
+   writeFile("first.png", encodePNG(sRGBfromBT709(first[0], first[1], first[2])));
+   return;
+  } else {
+   #if 0
+   trimap = ImageF(size);
+   assert(trimap.size == input.size);
+   for(size_t k: range(input.ref::size)) {
+    /***/ if(input[k]==byte4(0,0,0xFF)) trimap[k] = 0;
+    else if(input[k]==byte4(0,0xFF,0)) trimap[k] = 1;
+    else trimap[k] = 1./2;
+   }
+#elif 0
+   buffer<uint32> background[3], foreground[3];
+   for(size_t i: range(3)) {
+    background[i] = buffer<uint32>(256); background[i].clear(0);
+    foreground[i] = buffer<uint32>(256); foreground[i].clear(0);
+   }
+   for(size_t k: range(input.ref::size)) {
+    /***/ if(input[k]==byte4(0,0,0xFF)) for(size_t i: range(3)) background[i][first[i][k]]++;
+    else if(input[k]==byte4(0,0xFF,0)) for(size_t i: range(3)) foreground[i][first[i][k]]++;
+   }
+   for(size_t i: range(3)) {
+    uint F=0, B=0;
+    for(size_t k: range(256)) {
+     F += foreground[i][k];
+     B += background[i][k];
+    }
+    if(F < B) for(size_t k: range(256)) foreground[i][k] = foreground[i][k]*F/B;
+    else for(size_t k: range(256)) background[i][k] = background[i][k]*F/B;
+   }
+   trimap = ImageF(size);
+   for(size_t k: range(input.ref::size)) {
+    /***/ if(input[k]==byte4(0,0,0xFF)) trimap[k] = 0;
+    else if(input[k]==byte4(0,0xFF,0)) trimap[k] = 1;
+    else {
+     int sum = 0;
+     for(size_t i: range(3)) sum += foreground[i][first[i][k]] - background[i][first[i][k]];
+     if(sum > 0) trimap[k] = 3./4;
+     else if(sum < 0) trimap[k] = 1./4;
+     else trimap[k] = 1./2;
+    }
+   }
+#endif
+#endif
+   buffer<uint8> samples[2][3];
+   for(size_t i: range(2)) for(size_t j: range(3)) samples[i][j] = buffer<uint8>(input.ref::size, 0);
+   // Inlines foreground/background samples from input image into contiguous buffers
+   for(size_t k: range(input.ref::size)) {
+    size_t i;
+    /***/ if(input[k]==byte4(0,0,0xFF)) i=0;
+    else if(input[k]==byte4(0,0xFF,0)) i=1;
+    else continue;
+    for(size_t j: range(3)) samples[i][j].append(first[j][k]);
+   }
+   Random random;
+   static constexpr int K = 1;
+   struct Model {
+    struct Component {
+     vec3 mean;
+     mat3 covariance;
+    } components[K];
+   };
+   Model models[2];
+   for(size_t i: range(2)) {
+    Model model;
+    for(size_t k: range(K)) model.components[k].mean = vec3(random(), random(), random());
+    for(size_t unused step: range(1)) {
+     int3 sum[K] = {}; uint count[K]={};
+     for(size_t s: range(samples[i][0].size)) {
+      int3 sample (samples[i][0][s], samples[i][1][s], samples[i][2][s]);
+      size_t nearestComponent; float distance = inf;
+      for(size_t k: range(K)) {
+       float d = sq(sample - int3(model.components[k].mean));
+       if(d < distance) { distance=d; nearestComponent=k; }
+      }
+      sum[nearestComponent] += sample;
+      count[nearestComponent] += 1;
+     }
+     for(size_t k: range(K)) model.components[k].mean = vec3(sum[k]) / float(count[k]);
+    }
+    models[i] = model;
+   }
+
+   debug = Image(256*2); debug.clear(byte4(0,0,0,0xFF)); // Plots color distribution as additive projection orthogonal to each Y,U,V axis
+   Image view[4]; for(size_t x: range(2)) for(size_t y: range(2)) view[y*2+x] = cropRef(debug, int2(x, y)*debug.size/2, debug.size/2);
+   for(size_t i: range(2)) {
+    for(size_t s: range(samples[i][0].size)) {
+     vec3 sample (samples[i][0][s], samples[i][1][s], samples[i][2][s]);
+     for(size_t p: range(3)) {
+      int2 Ps (sample[p], sample[(p+1)%3]);
+      uint8& bin = view[p](Ps.x, Ps.y)[1+i];
+      if(bin<0xFF) bin++;
+     }
+    }
+    for(size_t p: range(3)) {
+     for(size_t k: range(K)) {
+      vec3 O = models[i].components[k].mean;
+      int2 P (O[p], O[(p+1)%3]);
+      view[p](P.x, P.y)[0] = 0xFF;
+      view[p](P.x, P.y)[1+i] = 0xFF;
+     }
+    }
+   }
 
   window = ::window(this, size);
   window->backgroundColor = nan;
-  window->presentComplete = [this]{ window->render(); };
+  //window->presentComplete = [this]{ window->render(); };
   window->actions[Space] = [this] { toggle=!toggle; };
  }
 
@@ -116,77 +158,20 @@ struct Foreground : Widget {
   //Image8 images[] {downsample(this->image(0, clipFrameIndex)), this->image(1, clipFrameIndex), this->image(2, clipFrameIndex)};
   //const ImageF I[] {toFloat(images[0]), toFloat(images[1]), toFloat(images[2])};
   ImageF source = toFloat(downsample(this->source(0, clipFrameIndex)));
-#if 0
-  ImageF corner = ::corner(source);
-  buffer<int2> corners = localMax(corner, 6);
-  //float sum = 0; float N = 0; for(size_t k : range(target.ref::size)) if(target[k]) sum+=target[k], N++; float mean = sum / N;
-  //for(size_t k : range(target.ref::size)) target[k] = target[k] ? 255 : 0;
-  //size_t N = 0; for(size_t k : range(target.ref::size)) if(target[k]) N++; log(N);
-  ImageF next = toFloat(downsample(this->source(0, clipFrameIndex+1)));
-  buffer<int2> vectors (corners.size);
-  track(vectors, source, next, corners);
-  for(size_t k: range(source.ref::size)) source[k] = 128+(source[k]-128)/2; // Reduces contrast
-  float max = 0 ;
-  for(size_t i: range(vectors.size)) {
-   float d = sqrt(float(sq(vectors[i].x) + sq(vectors[i].y)));
-   if(d > max) max = d;
-  }
-  for(size_t i: range(vectors.size)) {
-   float d = sqrt(float(sq(vectors[i].x) + sq(vectors[i].y)));
-   //source(corners[i].x, corners[i].y) = vectors[i].x||vectors[i].y ? 255 : 0;
-   int x0 = corners[i].x, y0 = corners[i].y;
-   int x1 = corners[i].x+vectors[i].x, y1 = corners[i].y+vectors[i].y;
-   int dx = abs(x1-x0), sx = x0<x1 ? 1 : -1;
-   int dy = abs(y1-y0), sy = y0<y1 ? 1 : -1;
-   int err = (dx>dy ? dx : -dy)/2, e2;
-
-   for(;;) {
-    source(x0, y0) = d*255/max;
-    if (x0==x1 && y0==y1) break;
-    e2 = err;
-    if (e2 >-dx) { err -= dy; x0 += sx; }
-    if (e2 < dy) { err += dx; y0 += sy; }
-   }
-  }
-#else
-
-  ImageF next = toFloat(downsample(this->source(0, clipFrameIndex+1)));
-  ImageF next1 = toFloat(downsample(this->source(0, clipFrameIndex+2)));
-
-  /*float sum0 = 0;
-  for(size_t k: range(source.ref::size))  sum0 += source[k];
-  float mean0 = sum0 / source.ref::size;
-
-  float sum1 = 0;
-  for(size_t k: range(next.ref::size)) sum1 += next[k];
-  float mean1 = sum1 / next.ref::size;*/
-
-  //float sumD = 0;
-  ImageF contour (source.size);
-  for(size_t k: range(source.ref::size)) {
-   contour[k] = abs(source[k]-next[k]) + abs(next[k]-next1[k]);
-   //float d = //((source[k]/mean0)-(next[k]/mean1));
-   //source[k] = 255 * d;
-   //sumD += d;
-  }
-
-  ImageF region;
-  region = ::mean(contour, 15);
-  const float dt = 1./16;
-  for(size_t k: range(region.ref::size)) temporal[k] = (1-dt)*temporal[k] + dt*region[k];
-  for(size_t k: range(region.ref::size)) region[k] = temporal[k]>8;
-  if(!toggle) region = guidedFilter(source, region, 15, 1);
-  for(size_t k: range(source.ref::size)) source[k] *= region[k]>1./2;
-#endif
+  for(size_t k: range(source.ref::size)) source[k] *= trimap[k];
   return sRGBfromBT709(source);
  }
 
+ //vec2 sizeHint(vec2) override { return vec2(512); }
  vec2 sizeHint(vec2) override { return vec2(size/2); }
 
  shared<Graphics> graphics(vec2) override {
   if(clipFrameIndex+2 >= clipFrameCount) { requestTermination(); return shared<Graphics>(); }
-  resize(window->target, image(clipFrameIndex));
-  clipFrameIndex++;
+  //resize(window->target, image(clipFrameIndex));
+  window->target.clear(0);
+  resize(cropRef(window->target,0,768), debug);
+  //assert_(window->target.size == debug.size, window->target.size, debug.size); copy(window->target, debug);
+  //clipFrameIndex++;
   return shared<Graphics>();
  }
 } app;

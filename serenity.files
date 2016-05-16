@@ -95,6 +95,8 @@ music/md5.h
 music/md5.cc
 tuner/analyze.cc
 audio/asound.h
+pitch/pitch.h
+pitch/pitch.cc
 
 foreground.cc
 video/video.cc

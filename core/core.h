@@ -289,7 +289,7 @@ generic struct mref : ref<T> {
 	/// Initializes reference from \a source using move constructor
 	void move(const mref<T>& source) { assert(size==source.size); for(size_t index: range(size)) set(index, ::move(source[index])); }
 	/// Initializes reference from \a source using copy constructor
- void copy(const ref<T> source) const { assert(size==source.size); for(size_t index: range(size)) set(index, ::copy(source[index])); }
+    void copy(const ref<T> source) const { assert(size==source.size); for(size_t index: range(size)) set(index, ::copy(source[index])); }
 
     /// Stores the application of a function to every index up to a size
 	template<Type Function> void apply(Function function) const { for(size_t index: range(size)) set(index, function(index)); }

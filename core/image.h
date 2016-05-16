@@ -19,10 +19,13 @@ generic struct ImageT : buffer<T> {
     inline mref<T> row(uint y) const { assert(y<height); return buffer<T>::slice(y*stride, width); }
 };
 generic String str(const ImageT<T>& o) { return strx(o.size); }
-generic ImageT<T> copy(const ImageT<T>& o) {
-    if(o.width == o.stride) return ImageT<T>(copyRef(o), o.size, o.stride, o.alpha);
-    ImageT<T> target(o.size, o.alpha);
+generic void copy(const ImageT<T>& target, const ImageT<T>& o) {
+    if(target.stride == o.stride) return target.copy(o);
     for(size_t y: range(o.height)) target.slice(y*target.stride, target.width).copy(o.slice(y*o.stride, o.width));
+}
+generic ImageT<T> copy(const ImageT<T>& o) {
+    ImageT<T> target(o.size, o.alpha);
+    copy(target, o);
     return target;
 }
 
@@ -89,6 +92,7 @@ void mean(const ImageF& target, const ImageF& buffer, const ImageF& source, uint
 ImageF mean(const ImageF& source, uint R);
 
 void sRGBfromBT709(const Image& target, const ImageF& Y, const ImageF& U, const ImageF& V);
+Image sRGBfromBT709(const ImageF& Y, const ImageF& U, const ImageF& V);
 void sRGBfromBT709(const Image& target, const ImageF& Y);
 Image sRGBfromBT709(const ImageF& Y);
 

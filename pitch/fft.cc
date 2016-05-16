@@ -2,6 +2,9 @@
 #include "math.h"
 #include <fftw3.h> //fftw3f fftw3f_threads
 #include "string.h"
+// math.h
+constexpr double PI = 3.14159265358979323846;
+inline float cos(float t) { return __builtin_cos(t); }
 
 __attribute((constructor(1001))) void initialize_FFTW() {
     fftwf_init_threads();

@@ -53,6 +53,7 @@ struct PitchEstimator : FFT {
     float estimate();
 };
 
+inline double exp2(double x) { return __builtin_exp2(x); } // math.h
 inline float keyToPitch(float key) { return 440*exp2((key-69)/12); }
 inline float pitchToKey(float pitch) { return 69+log2(pitch/440)*12; }
 inline String strKey(int key) { return (string[]){"A","A#","B","C","C#","D","D#","E","F","F#","G","G#"}[(key+2*12+3)%12]+str(key/12-2); }

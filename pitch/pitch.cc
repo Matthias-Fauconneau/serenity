@@ -1,5 +1,6 @@
-#include "fft.h"
 #include "pitch.h"
+#include "fft.h"
+#include "sort.h"
 
 float PitchEstimator::estimate() {
     {harmonicEnergy=0, F0=0, B=0, this->F1=0, this->nHigh=0;}

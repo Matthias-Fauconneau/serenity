@@ -243,6 +243,7 @@ void sRGBfromBT709(const Image& target, const ImageF& Y, const ImageF& U, const 
   target[i] = byte4(clamp(0,b,255), clamp(0,g,255), clamp(0,r,255));
  }
 }
+Image sRGBfromBT709(const ImageF& Y, const ImageF& U, const ImageF& V) { Image target(Y.size); sRGBfromBT709(target, Y, U, V); return target; }
 
 void sRGBfromBT709(const Image& target, const ImageF& Y) { for(size_t i: range(Y.ref::size)) target[i] = byte3(clamp(0, (int(Y[i]) - 16)*255/219, 255)); }
 Image sRGBfromBT709(const ImageF& Y) { Image target(Y.size); sRGBfromBT709(target, Y); return target; }

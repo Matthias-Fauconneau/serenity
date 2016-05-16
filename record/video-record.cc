@@ -5,6 +5,9 @@
 #include "interface.h"
 #include "text.h"
 #include "jpeg.h"
+// math.h
+constexpr double PI = 3.14159265358979323846;
+inline float sin(float t) { return __builtin_sin(t); }
 
 struct Record : Poll, Widget {
     Lock lock;
@@ -73,7 +76,7 @@ struct Record : Poll, Widget {
 #if VIDEO
         videoThread.wait();
 #endif
-        stop();
+        if(encoder) stop();
     }
 
     void start() {
