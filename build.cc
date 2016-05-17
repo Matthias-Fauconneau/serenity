@@ -158,7 +158,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
  for(string flag: flags) args.append( "-D"+toUpper(flag)+"=1" );
  if(!flags.contains("release")) args.append("-g"__);
  if(!flags.contains("debug")) args.append("-O3"__);
- else if(flags.contains("fast")) args.append("-O3"__); // fast-debug
+ else if(flags.contains("fast")) args.append("-O1"__); // fast-debug
  if(flags.contains("profile")) args.append("-finstrument-functions"__);
  if(flags.contains("m32"_)) args.append("-m32"__); // "-mfpmath=sse"__
 

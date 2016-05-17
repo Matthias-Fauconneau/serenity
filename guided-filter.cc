@@ -94,19 +94,17 @@ void guidedFilter(const ImageF& q, const ref<ImageF> I, const ImageF& p, const i
   float m11 = corrII[3][k] - meanI[1][k]*meanI[1][k] + e, m12 = corrII[4][k] - meanI[1][k]*meanI[2][k];
   float m22 = corrII[5][k] - meanI[2][k]*meanI[2][k] + e;
 
-  float D = 1/(
+  float invD = 1/(
      m00 * (m11*m22 - m12*m12) -
      m01 * (m01*m22 - m02*m12) +
      m02 * (m01*m12 - m02*m11) );
 
-  float a00 =  (m11*m22 - m12*m12) * D;
-  float a01 = -(m01*m22 - m02*m12) * D;
-  float a02 =  (m01*m12 - m02*m11) * D;
-
-  float a11 =  (m00*m22 - m02*m02) * D;
-  float a12 = -(m00*m12 - m02*m01) * D;
-
-  float a22 = (m00*m11 - m01*m01) * D;
+  float a00 =  (m11*m22 - m12*m12) * invD;
+  float a01 = -(m01*m22 - m02*m12) * invD;
+  float a02 =  (m01*m12 - m02*m11) * invD;
+  float a11 =  (m00*m22 - m02*m02) * invD;
+  float a12 = -(m00*m12 - m02*m01) * invD;
+  float a22 =  (m00*m11 - m01*m01) * invD;
 
   float meanPk = meanP[k];
   float meanI0 = meanI[0][k];
@@ -184,19 +182,17 @@ void guidedFilter(const ref<ImageF> q, const ref<ImageF> I, const ref<ImageF> p,
   float m11 = corrII[3][k] - meanI[1][k]*meanI[1][k] + e, m12 = corrII[4][k] - meanI[1][k]*meanI[2][k];
   float m22 = corrII[5][k] - meanI[2][k]*meanI[2][k] + e;
 
-  float D = 1/(
+  float invD = 1/(
      m00 * (m11*m22 - m12*m12) -
      m01 * (m01*m22 - m02*m12) +
      m02 * (m01*m12 - m02*m11) );
 
-  float a00 =  (m11*m22 - m12*m12) * D;
-  float a01 = -(m01*m22 - m02*m12) * D;
-  float a02 =  (m01*m12 - m02*m11) * D;
-
-  float a11 =  (m00*m22 - m02*m02) * D;
-  float a12 = -(m00*m12 - m02*m01) * D;
-
-  float a22 = (m00*m11 - m01*m01) * D;
+  float a00 =  (m11*m22 - m12*m12) * invD;
+  float a01 = -(m01*m22 - m02*m12) * invD;
+  float a02 =  (m01*m12 - m02*m11) * invD;
+  float a11 =  (m00*m22 - m02*m02) * invD;
+  float a12 = -(m00*m12 - m02*m01) * invD;
+  float a22 =  (m00*m11 - m01*m01) * invD;
 
   float meanI0 = meanI[0][k];
   float meanI1 = meanI[1][k];

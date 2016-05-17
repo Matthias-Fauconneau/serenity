@@ -69,15 +69,11 @@ struct mat3 {
  void rotateY(float angle) { float c=cos(angle),s=sin(angle); mat3 r; r.M(0,0) = c; r.M(2,2) = c; r.M(2,0) = -s; r.M(0,2) = s; *this = *this * r; }
  void rotateZ(float angle) { float c=cos(angle),s=sin(angle); mat3 r; r.M(0,0) = c; r.M(1,1) = c; r.M(0,1) = -s; r.M(1,0) = s; *this = *this * r; }
 };
-inline mat3 operator*(float s, mat3 M) {
- mat3 r; for(int j: range(3)) for(int i: range(3)) r.M(i,j) = s * M(i,j); return r; }
-//inline mat3 operator+(float s, mat3 M) { for(int i: range(3)) M(i,i) = s + M(i,i); return M; }
-inline mat3 operator-(float s, mat3 M) {
- for(int j: range(3)) for(int i: range(3)) M(i,j) = -M(i,j); for(int i: range(3)) M(i,i) += s; return M; }
-inline mat3 outer(vec3 a, vec3 b) {
- mat3 r; for(int j: range(3)) for(int i: range(3)) r.M(i,j)=a[i]*b[j]; return r; }
-inline mat3 operator+(mat3 a, mat3 b) {
- mat3 r; for(int j : range(3)) for(int i: range(3)) r(i,j)=a(i,j)+b(i,j); return r; }
+inline mat3 operator*(float s, mat3 M) { mat3 r; for(int j: range(3)) for(int i: range(3)) r.M(i,j) = s * M(i,j); return r; }
+inline mat3 operator-(float s, mat3 M) { for(int j: range(3)) for(int i: range(3)) M(i,j) = -M(i,j); for(int i: range(3)) M(i,i) += s; return M; }
+inline mat3 outer(vec3 a, vec3 b) { mat3 r; for(int j: range(3)) for(int i: range(3)) r.M(i,j)=a[i]*b[j]; return r; }
+inline mat3 operator+(mat3 a, mat3 b) { mat3 r; for(int j : range(3)) for(int i: range(3)) r(i,j)=a(i,j)+b(i,j); return r; }
+inline mat3& operator+=(mat3& a, mat3 b) { for(int j : range(3)) for(int i: range(3)) a(i,j)+=b(i,j); return a; }
 
 struct mat4; inline mat4 operator*(float s, mat4 M);
 /// 3D projective transformation

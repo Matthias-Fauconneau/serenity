@@ -7,99 +7,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#if 0
-// Sockets
-
-struct sockaddress { uint16 family; uint16 port; uint host; int pad[2]; };
-
-struct UDPSocket : Socket {
- UDPSocket(uint host, uint16 port) : Socket(PF_INET,SOCK_DGRAM) {
-  sockaddress addr = {PF_INET, big16(port), host, {0,0}}; check(::connect(fd, (const sockaddr*)&addr, sizeof(addr)));
- }
-};
-/// TCP socket (POSIX)
-struct TCPSocket : Socket {
- /// Connects to \a port on \a host
- TCPSocket(uint host, uint16 port);
- void connect(uint host, uint16 port);
-};
-
-TCPSocket::TCPSocket(uint host, uint16 port) { connect(host, port); }
-void TCPSocket::connect(uint host, uint16 port) {
- assert_(!fd);
- fd = check(socket(PF_INET,SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC,0));
- if(host==uint(-1)) { close(); return; }
- sockaddress addr = {PF_INET, big16(port), host, {0,0}}; ::connect(Socket::fd, (const sockaddr*)&addr, sizeof(addr));
- fcntl(Socket::fd, F_SETFL, 0);
-}
-
-/// Implements Data::available using Stream::readUpTo
-template<class T/*: Stream*/> struct DataStream : T, virtual Data {
- using T::T;
- /// Feeds Data buffer using T::readUpTo
- size_t available(size_t need) override;
-};
-
-template<class T> size_t DataStream<T>::available(size_t need) {
- while(need>Data::available(need) && T::poll(-1)) {
-  ::buffer<byte> chunk = T::readUpTo(max(4096ul, need-Data::available(need)));
-  if(!chunk) { error("Empty chunk: already buffered ", Data::available(need), "but need", need); break; }
-  buffer.append( chunk ); data=buffer;
- }
- return Data::available(need);
-}
-
-// Cache
-const Folder& cache() { static Folder cache(".cache", currentWorkingDirectory()); return cache; }
-
-// DNS
-
-uint ip(TextData& s) { int a=s.integer(), b=(s.match('.'),s.integer()), c=(s.match('.'),s.integer()), d=(s.match('.'),s.integer()); return (d<<24)|(c<<16)|(b<<8)|a; }
-uint nameserver() { static uint ip = ({ auto data = readFile("/etc/resolv.conf"_); TextData s (data); s.until("nameserver "_); ::ip(s); }); return ip; }
-uint resolve(const ref<byte>& host) {
- static File dnsCache("dns"_, cache(), Flags(ReadWrite|Create|Append));
- static Map dnsMap (dnsCache);
- uint ip=-1;
- for(TextData s(dnsMap);s;s.line()) { if(s.match(host)) { s.match(' '); ip=::ip(s); break; } } //TODO: binary search (on fixed length lines)
- bool negativeEntry=false; if(!ip) ip=-1, negativeEntry=true; //return false; //try to resolve negative entries again
- if(ip==uint(-1)) {
-  static UDPSocket dns(nameserver(), 53);
-  array<byte> query;
-  struct Header { uint16 id=big16(currentTime()); uint16 flags=1; uint16 qd=big16(1), an=0, ns=0, ar=0; } packed header;
-  query.append( raw(header) );
-  for(TextData s(host);s;) { //QNAME
-   ref<byte> label = s.until('.');
-   query.append(label.size);
-   query.append(label);
-  }
-  query.append(ref<byte>{0,0,1,0,1});
-  dns.write(query);
-  if(!dns.poll(2000)){log("DNS query timed out, retrying... "); dns.write(query); if(!dns.poll(2000)){log("giving up"); return -1; }}
-  BinaryData s(dns.readUpTo(4096), true);
-  header = s.read<Header>();
-  for(int i=0;i<big16(header.qd);i++) { for(uint8 n;(n=s.read());) s.advance(n); s.advance(4); } // Skips any query headers
-  for(int i=0;i<big16(header.an);i++) {
-   for(uint8 n;(n=s.read());) { if(n>=0xC0) { s.advance(1); break; } s.advance(n); } // Skips name
-   uint16 type=s.read(), unused class_=s.read(); uint32 unused ttl=s.read(); uint16 unused size=s.read();
-   if(type!=1) { s.advance(size); continue; }
-   assert(type=1/*A*/); assert(class_==1/*INET*/);
-   ip = s.read<uint>(); //IP (no swap)
-   String entry = host+" "_+str(uint8(raw(ip)[0]))+"."_+str(uint8(raw(ip)[1]))+"."_+str(uint8(raw(ip)[2]))+"."_+str(uint8(raw(ip)[3]))+"\n"_;
-   log_(entry);
-   dnsCache.write(entry); //add new entry
-   dnsMap = Map(dnsCache); //remap cache
-   break;
-  }
-  if(ip==uint(-1) && !negativeEntry) {
-   log("unknown",host);
-   dnsCache.write(host+" 0.0.0.0\n"_); // add negative entry
-   dnsMap = Map(dnsCache); //remap cache
-  }
- }
- return ip;
-}
-#endif
-
 template<class T/*: Stream*/> struct TextDataStream : DataStream<T>, TextData { using DataStream<T>::DataStream; };
 
 struct Link {
@@ -295,7 +202,7 @@ struct DCC : Link {
 struct DCCApp {
  DCCApp() {
   String query = join(arguments(), " ");
-  String url = unsafeRef(query);
+  String url;
   if(true || arguments().size > 1) {
    String config = readFile(".irc");
    String search = replace(section(config, '\n') ,"%", query);
@@ -303,6 +210,7 @@ struct DCCApp {
    Map document = getURL(search, {}, 1);
    Element root = parseHTML(document);
    const Element& table = root("//table");
+   array<string> linkBots;
    for(size_t i=1; i<table.children.size; i+=2) {
     const Element& row = table(i);
     String file = row(0).text();
@@ -318,8 +226,11 @@ struct DCCApp {
      url = ::move(linkURL);
      break;
     }
+    linkBots.append(link.bot);
    }
+   if(!url) error(search, linkBots);
   }
+  else url = unsafeRef(query);
   log(url);
   for(int i: range(8)) {
    DCC dcc(url);

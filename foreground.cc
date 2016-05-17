@@ -1,6 +1,8 @@
 #include "matrix.h"
 #include "window.h"
 #include "png.h"
+constexpr double PI = 3.14159265358979323846; // math.h
+inline double exp(float x) { return __builtin_expf(x); } // math.h
 
 struct Foreground : Widget {
  string baseName = arguments()[0];
@@ -97,51 +99,169 @@ struct Foreground : Widget {
    static constexpr int K = 4;
    struct Model {
     struct Component {
+     float weight = 1.f/K;
      vec3 mean;
-     mat3 covariance;
+     float a;
+     float invV[6]; // inverse of covariance
     } components[K];
    };
    Model models[2];
    for(size_t i: range(2)) {
+    ref<buffer<uint8>> X (samples[i]);
+    size_t N = X[0].size;
     Model model;
     for(size_t k: range(K)) {
-     size_t s = random%samples[i][0].size;
-     model.components[k].mean = vec3(samples[i][0][s], samples[i][1][s], samples[i][2][s]);
+     size_t n = random%N;
+     model.components[k].mean = vec3(X[0][n], X[1][n], X[2][n]);
     }
     // K-means
     for(size_t unused step: range(12)) {
+     // Expectation
      int3 sum[K] = {}; uint count[K]={};
-     for(size_t s: range(samples[i][0].size)) {
-      int3 sample (samples[i][0][s], samples[i][1][s], samples[i][2][s]);
+     for(size_t n: range(N)) {
+      int3 x (X[0][n], X[1][n], X[2][n]);
       size_t nearestComponent; float distance = inf;
       for(size_t k: range(K)) {
-       float d = sq(sample - int3(model.components[k].mean));
+       float d = sq(x - int3(model.components[k].mean));
        if(d < distance) { distance=d; nearestComponent=k; }
       }
-      sum[nearestComponent] += sample;
+      sum[nearestComponent] += x;
       count[nearestComponent] += 1;
      }
+     // Maximization
      bool changed = false;
      for(size_t k: range(K)) {
-      vec3 value = vec3(sum[k]) / float(count[k]);
-      vec3& mean = model.components[k].mean;
-      if(mean != value) { mean = value; changed = true; }
+      Model::Component& c = model.components[k];
+      vec3 mean = vec3(sum[k]) / float(count[k]);
+      if(c.mean != mean) { c.mean = mean; changed = true; }
      }
      if(!changed) break;
     }
-    //TODO: GMM EM
+    // GMM EM
+    log("GMM EM");
+    // Initializes GMM with cluster covariance (FIXME: only on last step)
+    float sumPxx[K][6]; uint count[K]={};
+    for(size_t k: range(K)) mref<float>(sumPxx[k]).clear(0);
+    for(size_t n: range(N)) {
+     int3 x (X[0][n], X[1][n], X[2][n]);
+     size_t nearestComponent; float distance = inf;
+     for(size_t k: range(K)) {
+      float d = sq(x - int3(model.components[k].mean));
+      if(d < distance) { distance=d; nearestComponent=k; }
+     }
+     size_t b = nearestComponent;
+     vec3 xm = vec3(x) - model.components[b].mean;
+     sumPxx[b][0] += xm[0] * xm[0];
+     sumPxx[b][1] += xm[0] * xm[1];
+     sumPxx[b][2] += xm[0] * xm[2];
+     sumPxx[b][3] += xm[1] * xm[1];
+     sumPxx[b][4] += xm[1] * xm[2];
+     sumPxx[b][5] += xm[2] * xm[2];
+     count[b] += 1;
+    }
+    for(size_t k: range(K)) {
+     Model::Component& c = model.components[k];
+     c.weight = float(count[k]) / float(N);
+     float m00 = sumPxx[k][0] / count[k];
+     float m01 = sumPxx[k][1] / count[k];
+     float m02 = sumPxx[k][2] / count[k];
+     float m11 = sumPxx[k][3] / count[k];
+     float m12 = sumPxx[k][4] / count[k];
+     float m22 = sumPxx[k][5] / count[k];
+     float D =
+       m00 * (m11*m22 - m12*m12) -
+       m01 * (m01*m22 - m02*m12) +
+       m02 * (m01*m12 - m02*m11);
+     assert(D>0);
+     c.a = c.weight/sqrt(cb(2*PI)*D);
+     float invD = 1/D;
+     c.invV[0] =  (m11*m22 - m12*m12) * invD;
+     c.invV[1] = -(m01*m22 - m02*m12) * invD;
+     c.invV[2] =  (m01*m12 - m02*m11) * invD;
+     c.invV[3] =  (m00*m22 - m02*m02) * invD;
+     c.invV[4] = -(m00*m12 - m02*m01) * invD;
+     c.invV[5] =  (m00*m11 - m01*m01) * invD;
+    }
+
+    for(size_t unused step: range(1)) {
+     // Expectation
+     float sumP[K] = {};
+     vec3 sumPx[K] = {};
+     buffer<float> Pkx[K];
+     for(size_t k: range(K)) Pkx[k] = buffer<float>(N);
+     for(size_t n: range(N)) {
+      vec3 x (X[0][n], X[1][n], X[2][n]);
+      float Pxk[K]; float sumKPxk = 0;
+      for(size_t k: range(K)) {
+       Model::Component c = model.components[k];
+       vec3 xm = x - c.mean;
+       vec3 invVxm (c.invV[0] * xm[0] + c.invV[1] * xm[1] + c.invV[2] * xm[2], c.invV[1] * xm[0] + c.invV[3] * xm[1] + c.invV[4] * xm[2], c.invV[2] * xm[0] + c.invV[4] * xm[1] + c.invV[5] * xm[2]);
+       Pxk[k] = c.a * exp( -1.f/2 * dot(xm, invVxm));
+       sumKPxk += Pxk[k];
+      }
+      for(size_t k: range(K)) {
+       Pkx[k][n] = Pxk[k] / sumKPxk;
+       sumP[k] += Pkx[k][n];
+       sumPx[k] += Pkx[k][n] * x;
+      }
+     }
+     // Maximization
+     float sumPxx[K][6];
+     for(size_t k: range(K)) {
+      Model::Component& c = model.components[k];
+      c.weight = sumP[k] / N;
+      c.mean = sumPx[k] / sumP[k];
+      mref<float>(sumPxx[k]).clear(0);
+     }
+     for(size_t n: range(N)) {
+      vec3 x (X[0][n], X[1][n], X[2][n]);
+      for(size_t k: range(K)) {
+       vec3 m = model.components[k].mean;
+       vec3 xm = x - m;
+       float P = Pkx[k][n];
+       sumPxx[k][0] += P * xm[0] * xm[0];
+       sumPxx[k][1] += P * xm[0] * xm[1];
+       sumPxx[k][2] += P * xm[0] * xm[2];
+       sumPxx[k][3] += P * xm[1] * xm[1];
+       sumPxx[k][4] += P * xm[1] * xm[2];
+       sumPxx[k][5] += P * xm[2] * xm[2];
+      }
+     }
+     for(size_t k: range(K)) {
+      Model::Component& c = model.components[k];
+      float m00 = sumPxx[k][0] / sumP[k];
+      float m01 = sumPxx[k][1] / sumP[k];
+      float m02 = sumPxx[k][2] / sumP[k];
+      float m11 = sumPxx[k][3] / sumP[k];
+      float m12 = sumPxx[k][4] / sumP[k];
+      float m22 = sumPxx[k][5] / sumP[k];
+      float D =
+        m00 * (m11*m22 - m12*m12) -
+        m01 * (m01*m22 - m02*m12) +
+        m02 * (m01*m12 - m02*m11);
+      c.a = c.weight/sqrt(cb(2*PI)*D);
+      float invD = 1/D;
+      c.invV[0] =  (m11*m22 - m12*m12) * invD;
+      c.invV[1] = -(m01*m22 - m02*m12) * invD;
+      c.invV[2] =  (m01*m12 - m02*m11) * invD;
+      c.invV[3] =  (m00*m22 - m02*m02) * invD;
+      c.invV[4] = -(m00*m12 - m02*m01) * invD;
+      c.invV[5] =  (m00*m11 - m01*m01) * invD;
+     }
+    }
     models[i] = model;
    }
 
    debug = Image(256*int2(3,2)); debug.clear(byte4(0,0,0,0xFF)); // Plots color distribution as additive projection orthogonal to each Y,U,V axis
    Image view[6]; for(size_t x: range(3)) for(size_t y: range(2)) view[y*3+x] = cropRef(debug, int2(x, y)*debug.size/int2(3,2), debug.size/int2(3,2));
    for(size_t i: range(2)) {
-    for(size_t s: range(samples[i][0].size)) {
-     int3 sample (samples[i][0][s], samples[i][1][s], samples[i][2][s]);
+    ref<buffer<uint8>> X (samples[i]);
+    for(size_t n: range(X[0].size)) {
+     int3 x (X[0][n], X[1][n], X[2][n]);
      for(size_t p: range(3)) {
-      int2 Ps (sample[p], sample[(p+1)%3]);
+      int2 Ps (x[p], x[(p+1)%3]);
+  #if 0
       byte4& pixel = view[i*3+p](Ps.x, Ps.y);
-#if 1
       size_t nearestComponent; float distance = inf;
       for(size_t k: range(K)) {
        float d = sq(sample - int3(models[i].components[k].mean));
@@ -150,7 +270,21 @@ struct Foreground : Widget {
       {uint8& bin = pixel[(uint[]){0,1,2,0}[nearestComponent]]; if(bin<0xFF) bin++; }
       {uint8& bin = pixel[(uint[]){0,1,2,0}[nearestComponent]]; if(bin<0xFF) bin++; }
       {uint8& bin = pixel[(uint[]){0,1,2,1}[nearestComponent]]; if(bin<0xFF) bin++; }
+#elif 1
+      float Pxk[K]; float sumKPxk = 0;
+      for(size_t k: range(K)) {
+       Model::Component c = models[i].components[k];
+       vec3 xm = vec3(x) - c.mean;
+       vec3 invVxm (c.invV[0] * xm[0] + c.invV[1] * xm[1] + c.invV[2] * xm[2], c.invV[1] * xm[0] + c.invV[3] * xm[1] + c.invV[4] * xm[2], c.invV[2] * xm[0] + c.invV[4] * xm[1] + c.invV[5] * xm[2]);
+       Pxk[k] = c.a * exp( -1.f/2 * dot(xm, invVxm));
+       sumKPxk += Pxk[k];
+      }
+      bgr3f colors[K] = {vec3(1,0,0),vec3(0,1,0),vec3(0,0,1),vec3(1./2,1./2,0)};
+      bgr3f color = 0;
+      for(size_t k: range(K)) color += Pxk[k] / sumKPxk * colors[k];
+      view[i*3+p](Ps.x, Ps.y) = byte3(float(0xFF) * color);
 #else
+      byte4& pixel = view[i*3+p](Ps.x, Ps.y);
       uint8& bin = pixel[1+i];
       if(bin<0xFF) bin++;
 #endif
@@ -160,8 +294,10 @@ struct Foreground : Widget {
      for(size_t k: range(K)) {
       vec3 O = models[i].components[k].mean;
       int2 P (O[p], O[(p+1)%3]);
-      view[i*3+p](P.x, P.y)[0] = 0xFF;
-      view[i*3+p](P.x, P.y)[1+i] = 0xFF;
+      if(P >= int2(0) && P < int2(256)) {
+       view[i*3+p](P.x, P.y)[0] = 0xFF;
+       view[i*3+p](P.x, P.y)[1+i] = 0xFF;
+      }
      }
     }
    }
@@ -193,7 +329,6 @@ struct Foreground : Widget {
   //resize(window->target, image(clipFrameIndex));
   window->target.clear(0);
   resize(cropRef(window->target,0,int2(768*3/2,768)), debug);
-  //assert_(window->target.size == debug.size, window->target.size, debug.size); copy(window->target, debug);
   //clipFrameIndex++;
   return shared<Graphics>();
  }
