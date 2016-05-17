@@ -253,24 +253,15 @@ struct Foreground : Widget {
    }
 
    debug = Image(256*int2(3,2)); debug.clear(byte4(0,0,0,0xFF)); // Plots color distribution as additive projection orthogonal to each Y,U,V axis
-   Image view[6]; for(size_t x: range(3)) for(size_t y: range(2)) view[y*3+x] = cropRef(debug, int2(x, y)*debug.size/int2(3,2), debug.size/int2(3,2));
+   Image view[2][3]; for(size_t i: range(2)) for(size_t p: range(3)) view[i][p] = cropRef(debug, int2(p, i)*int2(256), int2(256));
    for(size_t i: range(2)) {
     ref<buffer<uint8>> X (samples[i]);
+    ImageF PX[3][3];
+    for(size_t p: range(3)) for(size_t c: range(3)) { PX[p][c] = ImageF(256); PX[p][c].clear(0); }
     for(size_t n: range(X[0].size)) {
      int3 x (X[0][n], X[1][n], X[2][n]);
      for(size_t p: range(3)) {
       int2 Ps (x[p], x[(p+1)%3]);
-  #if 0
-      byte4& pixel = view[i*3+p](Ps.x, Ps.y);
-      size_t nearestComponent; float distance = inf;
-      for(size_t k: range(K)) {
-       float d = sq(sample - int3(models[i].components[k].mean));
-       if(d < distance) { distance=d; nearestComponent=k; }
-      }
-      {uint8& bin = pixel[(uint[]){0,1,2,0}[nearestComponent]]; if(bin<0xFF) bin++; }
-      {uint8& bin = pixel[(uint[]){0,1,2,0}[nearestComponent]]; if(bin<0xFF) bin++; }
-      {uint8& bin = pixel[(uint[]){0,1,2,1}[nearestComponent]]; if(bin<0xFF) bin++; }
-#elif 1
       float Pxk[K]; float sumKPxk = 0;
       for(size_t k: range(K)) {
        Model::Component c = models[i].components[k];
@@ -282,24 +273,10 @@ struct Foreground : Widget {
       bgr3f colors[K] = {vec3(1,0,0),vec3(0,1,0),vec3(0,0,1),vec3(1./2,1./2,0)};
       bgr3f color = 0;
       for(size_t k: range(K)) color += Pxk[k] / sumKPxk * colors[k];
-      view[i*3+p](Ps.x, Ps.y) = byte3(float(0xFF) * color);
-#else
-      byte4& pixel = view[i*3+p](Ps.x, Ps.y);
-      uint8& bin = pixel[1+i];
-      if(bin<0xFF) bin++;
-#endif
+      for(size_t c: range(3)) PX[p][c](Ps.x, Ps.y) += color[c];
      }
     }
-    for(size_t p: range(3)) {
-     for(size_t k: range(K)) {
-      vec3 O = models[i].components[k].mean;
-      int2 P (O[p], O[(p+1)%3]);
-      if(P >= int2(0) && P < int2(256)) {
-       view[i*3+p](P.x, P.y)[0] = 0xFF;
-       view[i*3+p](P.x, P.y)[1+i] = 0xFF;
-      }
-     }
-    }
+    for(size_t p: range(3)) for(size_t y: range(view[i][p].height)) for(size_t x: range(view[i][p].width)) view[i][p](x, y) = byte3(min(bgr3i(0xFF), bgr3i(PX[p][0](x, y), PX[p][1](x, y), PX[p][2](x, y))));
    }
 
   window = ::window(this, size);

@@ -38,8 +38,12 @@ generic ImageT<T> cropRef(const ImageT<T>& o, int2 offset, int2 size) {
     return ImageT<T>(unsafeRef(o.slice(offset.y*o.stride+offset.x, size.y*o.stride-offset.x)),size,o.stride,o.alpha);
 }
 
+/// 2D array of 8bit integer pixels
+typedef ImageT<uint8> Image8;
 /// 2D array of BGRA 8-bit unsigned integer pixels (sRGB colorspace)
 typedef ImageT<byte4> Image;
+/// 2D array of 32bit floating-point pixels
+typedef ImageT<float> ImageF;
 
 // -- Decode --
 
@@ -75,11 +79,6 @@ Image rotateHalfTurn(Image&& target);
 void resize(const Image& target, const Image& source);
 inline Image resize(Image&& target, const Image& source) { resize(target, source); return move(target); }
 inline Image resize(int2 size, const Image& source) { return resize(Image(size, source.alpha), source); }
-
-/// 2D array of 8bit integer pixels
-typedef ImageT<uint8> Image8;
-/// 2D array of 32bit floating-point pixels
-typedef ImageT<float> ImageF;
 
 void toFloat(mref<float> target, ref<uint8> source);
 ImageF toFloat(ImageF&& target, const Image8& source);
