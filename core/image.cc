@@ -231,6 +231,24 @@ const double gu = (1-Kb)*Kb/(1-Kr-Kb)*255/112;
 const double gv = (1-Kr)*Kr/(1-Kr-Kb)*255/112;
 const double bu = (1-Kb)*255/112;
 
+Image sRGBfromBT709(const Image8& Y, const Image8& U, const Image8& V) {
+ const int rv = ::rv*65536;
+ const int gu = ::gu*65536;
+ const int gv = ::gv*65536;
+ const int bu = ::bu*65536;
+ Image target(Y.size);
+ for(size_t i: range(Y.ref::size)) {
+  int y = (int(Y[i]) - 16)*255/219;
+  int Cb = int(U[i]) - 128;
+  int Cr = int(V[i]) - 128;
+  int r = y                        + Cr*rv/65536;
+  int g = y - Cb*gu/65536 - Cr*gv/65536;
+  int b = y + Cb*bu/65536;
+  target[i] = byte4(clamp(0,b,255), clamp(0,g,255), clamp(0,r,255));
+ }
+ return target;
+}
+
 void sRGBfromBT709(const Image& target, const ImageF& Y, const ImageF& U, const ImageF& V) {
  assert_(target.size == Y.size && target.stride == Y.stride && Y.size == U.size && Y.size == V.size && Y.stride == U.stride && Y.stride == V.stride);
  for(size_t i: range(Y.ref::size)) {

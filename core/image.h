@@ -90,6 +90,7 @@ Image8 downsample(const Image8& source);
 void mean(const ImageF& target, const ImageF& buffer, const ImageF& source, uint R);
 ImageF mean(const ImageF& source, uint R);
 
+Image sRGBfromBT709(const Image8& Y, const Image8& U, const Image8& V);
 void sRGBfromBT709(const Image& target, const ImageF& Y, const ImageF& U, const ImageF& V);
 Image sRGBfromBT709(const ImageF& Y, const ImageF& U, const ImageF& V);
 void sRGBfromBT709(const Image& target, const ImageF& Y);

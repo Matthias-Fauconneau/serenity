@@ -1,6 +1,7 @@
 #include "matrix.h"
 #include "window.h"
 #include "png.h"
+#include "guided-filter.h"
 constexpr double PI = 3.14159265358979323846; // math.h
 inline double exp(float x) { return __builtin_expf(x); } // math.h
 
@@ -17,6 +18,17 @@ struct Foreground : Widget {
  Time totalTime {true};
 
  ImageF trimap;
+
+ static constexpr int K = 4;
+ struct Model {
+  struct Component {
+   float weight = 1.f/K;
+   vec3 mean;
+   float a;
+   float invV[6]; // inverse of covariance
+  } components[K];
+ };
+ Model models[2];
 
  Image debug;
 
@@ -39,73 +51,30 @@ struct Foreground : Widget {
 
   const Image8 first[] = {downsample(this->source(0, 0)), this->source(1, 0), this->source(2, 0)};
   Image input = decodeImage(readFile("trimap.png"));
-#if 0
   if(0) {
    writeFile("first.png", encodePNG(sRGBfromBT709(first[0], first[1], first[2])));
    return;
-  } else {
-   #if 0
-   trimap = ImageF(size);
-   assert(trimap.size == input.size);
-   for(size_t k: range(input.ref::size)) {
-    /***/ if(input[k]==byte4(0,0,0xFF)) trimap[k] = 0;
-    else if(input[k]==byte4(0,0xFF,0)) trimap[k] = 1;
-    else trimap[k] = 1./2;
-   }
-#elif 0
-   buffer<uint32> background[3], foreground[3];
-   for(size_t i: range(3)) {
-    background[i] = buffer<uint32>(256); background[i].clear(0);
-    foreground[i] = buffer<uint32>(256); foreground[i].clear(0);
-   }
-   for(size_t k: range(input.ref::size)) {
-    /***/ if(input[k]==byte4(0,0,0xFF)) for(size_t i: range(3)) background[i][first[i][k]]++;
-    else if(input[k]==byte4(0,0xFF,0)) for(size_t i: range(3)) foreground[i][first[i][k]]++;
-   }
-   for(size_t i: range(3)) {
-    uint F=0, B=0;
-    for(size_t k: range(256)) {
-     F += foreground[i][k];
-     B += background[i][k];
-    }
-    if(F < B) for(size_t k: range(256)) foreground[i][k] = foreground[i][k]*F/B;
-    else for(size_t k: range(256)) background[i][k] = background[i][k]*F/B;
-   }
-   trimap = ImageF(size);
-   for(size_t k: range(input.ref::size)) {
-    /***/ if(input[k]==byte4(0,0,0xFF)) trimap[k] = 0;
-    else if(input[k]==byte4(0,0xFF,0)) trimap[k] = 1;
-    else {
-     int sum = 0;
-     for(size_t i: range(3)) sum += foreground[i][first[i][k]] - background[i][first[i][k]];
-     if(sum > 0) trimap[k] = 3./4;
-     else if(sum < 0) trimap[k] = 1./4;
-     else trimap[k] = 1./2;
-    }
-   }
-#endif
-#endif
-   buffer<uint8> samples[2][3];
-   for(size_t i: range(2)) for(size_t j: range(3)) samples[i][j] = buffer<uint8>(input.ref::size, 0);
-   // Inlines foreground/background samples from input image into contiguous buffers
-   for(size_t k: range(input.ref::size)) {
-    size_t i;
-    /***/ if(input[k]==byte4(0,0,0xFF)) i=0;
-    else if(input[k]==byte4(0,0xFF,0)) i=1;
-    else continue;
-    for(size_t j: range(3)) samples[i][j].append(first[j][k]);
-   }
+  }
+
+  trimap = ImageF(size);
+  assert(trimap.size == input.size);
+  for(size_t k: range(input.ref::size)) {
+   /***/ if(input[k]==byte4(0,0,0xFF)) trimap[k] = 0;
+   else if(input[k]==byte4(0,0xFF,0)) trimap[k] = 1;
+   else trimap[k] = 1./2;
+  }
+  buffer<uint8> samples[2][3];
+  for(size_t i: range(2)) for(size_t j: range(3)) samples[i][j] = buffer<uint8>(input.ref::size, 0);
+  // Inlines foreground/background samples from input image into contiguous buffers
+  for(size_t k: range(input.ref::size)) {
+   size_t i;
+   /***/ if(input[k]==byte4(0,0,0xFF)) i=0;
+   else if(input[k]==byte4(0,0xFF,0)) i=1;
+   else continue;
+   for(size_t j: range(3)) samples[i][j].append(first[j][k]);
+  }
+
    Random random;
-   static constexpr int K = 4;
-   struct Model {
-    struct Component {
-     float weight = 1.f/K;
-     vec3 mean;
-     float a;
-     float invV[6]; // inverse of covariance
-    } components[K];
-   };
-   Model models[2];
    for(size_t i: range(2)) {
     ref<buffer<uint8>> X (samples[i]);
     size_t N = X[0].size;
@@ -138,7 +107,6 @@ struct Foreground : Widget {
      if(!changed) break;
     }
     // GMM EM
-    log("GMM EM");
     // Initializes GMM with cluster covariance (FIXME: only on last step)
     float sumPxx[K][6]; uint count[K]={};
     for(size_t k: range(K)) mref<float>(sumPxx[k]).clear(0);
@@ -291,21 +259,42 @@ struct Foreground : Widget {
  }
 
  Image image(size_t clipFrameIndex) {
-  //Image8 images[] {downsample(this->image(0, clipFrameIndex)), this->image(1, clipFrameIndex), this->image(2, clipFrameIndex)};
-  //const ImageF I[] {toFloat(images[0]), toFloat(images[1]), toFloat(images[2])};
-  ImageF source = toFloat(downsample(this->source(0, clipFrameIndex)));
-  for(size_t k: range(source.ref::size)) source[k] *= trimap[k];
-  return sRGBfromBT709(source);
+  Image8 input[] {downsample(source(0, clipFrameIndex)), source(1, clipFrameIndex), source(2, clipFrameIndex)};
+  ImageF X[] {toFloat(input[0]), toFloat(input[1]), toFloat(input[2])};
+  ImageF P (X[0].size);
+  for(size_t n: range(X[0].ref::size)) {
+   vec3 x (X[0][n], X[1][n], X[2][n]);
+   float Pxi[2];
+   for(size_t i: range(2)) {
+    float Px = 0;
+    for(size_t k: range(K)) {
+      Model::Component c = models[i].components[k];
+      vec3 xm = x - c.mean;
+      vec3 invVxm (c.invV[0] * xm[0] + c.invV[1] * xm[1] + c.invV[2] * xm[2], c.invV[1] * xm[0] + c.invV[3] * xm[1] + c.invV[4] * xm[2], c.invV[2] * xm[0] + c.invV[4] * xm[1] + c.invV[5] * xm[2]);
+      Px += c.a * exp( -1.f/2 * dot(xm, invVxm) );
+    }
+    Pxi[i] = Px;
+   }
+   P[n] = Pxi[1]/(Pxi[0]+Pxi[1]);
+  }
+  for(size_t n: range(X[0].ref::size)) { if(trimap[n] == 0) P[n]=0; else if(trimap[n] == 1) P[n]=1; } // Annotation (TODO: use temporal coherence for other frames)
+  P = guidedFilter(ref<ImageF>(X), P, 8, sq(8)); // Edge aware blur
+  for(size_t n: range(X[0].ref::size)) P[n] = P[n] > 1./2; // Threshold
+  gaussianBlur(P, P, 2); // Feather
+  for(size_t n: range(X[0].ref::size)) {
+   float p = P[n];
+   X[0][n] *= p;
+   X[1][n] = 128+(X[1][n]-128)*p;
+   X[2][n] = 128+(X[2][n]-128)*p;
+  }
+  return sRGBfromBT709(X[0], X[1], X[2]);
  }
 
- //vec2 sizeHint(vec2) override { return vec2(512); }
  vec2 sizeHint(vec2) override { return vec2(size/2); }
 
  shared<Graphics> graphics(vec2) override {
   if(clipFrameIndex+2 >= clipFrameCount) { requestTermination(); return shared<Graphics>(); }
-  //resize(window->target, image(clipFrameIndex));
-  window->target.clear(0);
-  resize(cropRef(window->target,0,int2(768*3/2,768)), debug);
+  resize(window->target, image(clipFrameIndex));
   //clipFrameIndex++;
   return shared<Graphics>();
  }
