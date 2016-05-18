@@ -1,6 +1,8 @@
 ﻿#include "sheet.h"
 #include "notation.h"
 #include "text.h"
+#include "algorithm.h"
+#include "sort.h"
 
 static int clefStep(Clef clef, int step) { return step - (clef.clefSign==GClef ? 10 : -2) - clef.octave*7; } // Translates C4 step to top line step using clef
 static int clefStep(Sign sign) { assert_(sign.type==Sign::Note, int(sign.type)); return clefStep(sign.note.clef, sign.note.step); }
@@ -865,6 +867,10 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
      allocatedLineWidth = x + margin;
      spaceCount = timeTrack.size() - 1; /*-1 as there is no space for last measure bar*/ // + additionnalSpaceCount;
 
+     // Aligns beat time after pickup measure for correct beaming
+     uint measureDuration = quarterDuration * timeSignature.beats / timeSignature.beatUnit;
+     for(size_t staff: range(staves.size)) if(staves[staff].beatTime < measureDuration) staves[staff].beatTime = measureDuration;
+
      // Evaluates next measure step ranges
      nextMeasureIndex++;
      while(nextMeasureIndex < signs.size && signs[nextMeasureIndex].type != Sign::Measure) nextMeasureIndex++;
@@ -1024,7 +1030,8 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
      assert_(timeSignature.beatUnit == 2 || timeSignature.beatUnit == 4 || timeSignature.beatUnit == 8, timeSignature.beatUnit);
      uint beatDuration = quarterDuration * 4 / timeSignature.beatUnit;
      //if(timeSignature.beats == 4 && timeSignature.beatUnit == 4) beatDuration *= 2; // FIXME: not always
-     if(/*timeSignature.beats == 6 &&*/ timeSignature.beatUnit == 8) beatDuration *= 2; // Beams quaver pairs even in /8 (i.e <=> 3/4)
+     //if(/*timeSignature.beats == 6 &&*/ timeSignature.beatUnit == 8) beatDuration *= 2; // Beams quaver pairs even in /8 (i.e <=> 3/4)
+     if(timeSignature.beats == 6 && timeSignature.beatUnit == 8) beatDuration = quarterDuration * timeSignature.beats / timeSignature.beatUnit; // Beams quaver pairs even in /8 (i.e <=> 3/4)
 
 
      if(beamDuration+chordDuration > maximumBeamDuration /*Beam before too long*/

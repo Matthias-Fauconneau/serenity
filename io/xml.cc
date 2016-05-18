@@ -97,7 +97,7 @@ bool Element::contains(string name) const {
  return false;
 }
 
-const Element& Element::operator()(string path) const {
+const Element& Element::child(string path) const {
  const Element* element = 0;
  xpath(path, [&element, path, this](const Element& e)->void{
   if(element) { log("Multiple matches for", path, "in", *this); return; }
@@ -112,6 +112,7 @@ const Element& Element::operator()(string path) const {
   return empty;
  }
 }
+const Element& Element::operator()(string path) const { return child(path); }
 
 void Element::visit(const function<void(const Element&)>& visitor) const {
  for(const Element& e: children) e.visit(visitor);

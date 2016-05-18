@@ -25,6 +25,7 @@ struct Element {
  /// Returns whether any child element have tag \a name
  bool contains(string name) const;
  /// Returns child element with tag \a name (fail if missing)
+ const Element& child(string name) const;
  const Element& operator()(string name) const;
  /// Depth-first visits all descendants
  void visit(const function<void(const Element&)>& visitor) const;
