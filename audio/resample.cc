@@ -29,8 +29,11 @@
 #include "math.h"
 #include "resample.h"
 #include "string.h"
-
 #include "simd.h"
+// math.h
+constexpr double PI = 3.14159265358979323846;
+inline float sin(float t) { return __builtin_sin(t); }
+
 static float product(ref<float> kernel, ref<float> signal) {
  assert(kernel.size==signal.size && kernel.size%4==0);
  v4sf sum = {0,0,0,0};

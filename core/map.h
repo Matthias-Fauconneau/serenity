@@ -114,18 +114,20 @@ template<Type K, Type V> map<K,V> copy(const map<K,V>& o) {
  map<K,V> t; t.keys=copy(o.keys); t.values=copy(o.values); return t;
 }
 
+#if 0
 template<Type K, Type V> String str(const map<K,V>& m, string separator=","_) {
  array<char> s;
- //s.append('{');
- //s.append(separator.last());
+ s.append('{');
+ s.append(separator.last());
  for(uint i: range(m.size())) {
-  s.append(str(m.keys[i])+"="+str(m.values[i])); // = instead of : for compatibility as SGE job name
+  s.append(str(m.keys[i])+": "+str(m.values[i]));
   if(i<m.size()-1) s.append(separator);
  }
- //s.append(separator.last());
- //s.append('}');
+ s.append(separator.last());
+ s.append('}');
  return move(s);
 }
+#endif
 
 /// Returns a map of the application of a function to every values of a map
 template<Type Function, Type K, Type V> auto apply(const map<K, V>& source, Function function) -> map<K, decltype(function(source.values[0]))> {

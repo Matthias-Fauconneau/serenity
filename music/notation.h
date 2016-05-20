@@ -164,13 +164,13 @@ struct Sign {
         Dynamic, Wedge,
         Pedal,
     } type;
-    uint time; // Absolute time offset
+    uint time; // Absolute time offset in ticks (/sa ticksPerQuarter)
     union {
         struct {
             uint staff;
             union {
                 struct {
-                    int duration; // in ticks
+                    /*u*/int duration;
                     //Value value;
                     union {
                         ::Note note;
@@ -212,10 +212,11 @@ inline String strKey(int fifths, int key) {
     //return (string[]){"A"_,"A♯"_,"B"_,"C"_,"C♯"_,"D"_,"D♯"_,"E"_,"F"_,"F♯"_,"G"_,"G♯"_}[(key+2*12+3)%12]
     /*+superDigit(key/12-2)*/;
     int step = keyStep(fifths, key)+37;
-    //int octave = key/12-2; ///*lowest A-1*/3 + (step>0 ? step/7 : (step-6)/7); // Rounds towards negative
+    int octave = key/12-2; //*lowest A-1*/3 + (step>0 ? step/7 : (step-6)/7); // Rounds towards negative
     int alt = keyAlteration(fifths, key)+1;
     assert_(alt >= 0 && alt <= 2);
-    return char('A'+step%7)+ref<string>{"♭"_,""_,"♯"_}[alt];//+str(octave);
+    //return char('A'+step%7)+ref<string>{"♭"_,""_,"♯"_}[alt];//+str(octave);
+    return char('A'+step%7)+ref<string>{"b"_,""_,"#"_}[alt]+str(octave);
 }
 inline String strNote(int octave, int step, Accidental accidental) {
     octave += /*lowest A-1*/3 + (step>0 ? step/7 : (step-6)/7); // Rounds towards negative

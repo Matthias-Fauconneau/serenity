@@ -56,6 +56,8 @@ inline FLAC copy(const FLAC& o) {
 	return t;
 }
 
+#if 0
 struct Audio : buffer<float2> { uint rate; Audio(buffer&& data, uint rate) : buffer(::move(data)), rate(rate){} };
 /// Decodes a full audio file
 Audio decodeAudio(const ref<byte>& data, uint duration=-1);
+#endif

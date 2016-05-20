@@ -1,6 +1,7 @@
 #include "midi.h"
 #include "file.h"
 #include "math.h"
+inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
 
 inline uint parseKey(TextData& s) {
  int key=24;

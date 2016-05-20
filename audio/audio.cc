@@ -12,7 +12,7 @@ extern "C" {
 #include <libavutil/avutil.h> //avutil
 }
 
-__attribute((constructor(1001))) void initialize_FFmpeg() { av_register_all(); }
+//__attribute((constructor(1001))) void initialize_FFmpeg() { av_register_all(); }
 
 FFmpeg::FFmpeg(string path) {
  if(avformat_open_input(&file, strz(path), 0, 0)) { log("No such file"_, path); return; }

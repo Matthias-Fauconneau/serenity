@@ -48,6 +48,7 @@ uint audioStart(string audioFileName) {
 
 /// Converts MIDI time base to audio sample rate
 MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds, int start) {
+ assert_(notes);
  int offset = start-(int64)notes.first().time*targetTicksPerSeconds/notes.ticksPerSeconds;
  for(MidiNote& note: notes) {
   note.time = offset + (int64)note.time*targetTicksPerSeconds/notes.ticksPerSeconds;
@@ -57,6 +58,7 @@ MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds, int start) {
 }
 
 struct Peak { int time; uint key; float value; };
+template<> inline String str(const Peak& o) { return strKey(0, o.key); } //str(o.time/48000, o.key, str(o.value, 2u)); }
 bool operator <(const Peak& a, const Peak& b) { return a.value > b.value; } // Decreasing order
 typedef array<Peak> Bin;
 
@@ -69,6 +71,7 @@ struct Synchronizer : Widget {
  array<Bar> bars;
  int currentTime = 0;
  Synchronizer(Audio audio, MidiNotes& notes, ref<Sign> signs, map<uint, float>& measureBars) : measureBars(measureBars) {
+  //log(notes.ticksPerSeconds, notes.last().time, audio.rate, audio.size);
   array<Bin> P; // peaks
   if(audio) {
    assert_(notes.ticksPerSeconds = audio.rate);
@@ -100,7 +103,7 @@ struct Synchronizer : Widget {
      for(size_t key: range(max(firstKey, uint(round(pitchToKey(k*audio.rate/N)))), round(pitchToKey((k+1)*audio.rate/N))))
       keyOnsetFunctions[(key-firstKey)*frameCount+frameIndex] += fft.spectrum[k];
     }
-    if(frameIndex>0) for(size_t key: range(keyCount)) { // Differentiates (key granularity should be more robust against frequency oscillations)
+    if(frameIndex>0) for(size_t key: range(keyCount)) { // Differentiates (after binning to keys to be more robust against frequency oscillations)
      keyOnsetFunctions[key*frameCount+frameIndex] =
        max(0.f, keyOnsetFunctions[key*frameCount+frameIndex] - keyOnsetFunctions[key*frameCount+frameIndex-1]);
     }
@@ -125,6 +128,7 @@ struct Synchronizer : Widget {
    });
    log(time);
 #endif
+   //buffer<float> meanF(keyCount);
    /// Normalizes onset function
    for(size_t key: range(keyCount)) {
     mref<float> f = keyOnsetFunctions.slice(key*frameCount, frameCount);
@@ -132,10 +136,12 @@ struct Synchronizer : Widget {
     for(float& v: f) SSQ += sq(v);
     float deviation = sqrt(SSQ / frameCount);
     if(deviation) for(float& v: f) v /= deviation;
+    //float sum = 0; for(float& v: f) sum += v; meanF[key] = sum / frameCount;
    }
 
    /// Selects onset peaks
-   {const int w = 2, W=3, m = 3;
+   {const int w = 2;
+    const int before = 9, after = 3; //const int W = 3, m = 3;
     for(int i: range(frameCount)) {
      array<Peak> chord;
      for(uint key: range(keyCount)) {
@@ -147,17 +153,22 @@ struct Synchronizer : Widget {
       }
       if(localMaximum) {
        double sum = 0;
-       for(size_t k: range(max(0, i-m*W), min(int(f.size)-1, i+W+1))) sum += f[k];
-       double mean = sum / (min(int(f.size)*1, i+W+1) - max(0, i-m*W));
-       const double threshold = 1./4; // FFT
+       //for(size_t k: range(max(0, i-m*W), min(int(f.size)-1, i+W+1))) sum += f[k];
+       for(size_t k: range(max(0, i-before), min(int(f.size)-1, i+after+1))) sum += f[k];
+       double mean = sum / (min(int(f.size)*1, i+after+1) - max(0, i-before));
+       //double mean = 0;//meanF[key];
+       //const double threshold = 1./4; // FFT
        //const double threshold = 1; // Filter
+       //const double threshold = 1./4;
+       const double threshold = 1./16;
        if(f[i] > mean + threshold)
-        chord.insertSorted(Peak{int(i*h)/*-peakTimeOrigin*/, firstKey+key, f[i]/**127*/});
+        chord.insertSorted(Peak{int(i*h)/*-peakTimeOrigin*/, firstKey+key, 1/*f[i]*//**127*/});
       }
      }
      if(chord) P.append(move(chord));
     }
    }
+   log(P);
 
    /// Collects MIDI chords following MusicXML at the same time to cluster (assumes performance is correctly ordered)
    array<Bin> S; // MIDI
@@ -187,7 +198,7 @@ struct Synchronizer : Widget {
    // Reversed scan here to have the forward scan when walking back the best path
    for(size_t i: reverse_range(m)) for(size_t j: reverse_range(n)) { // Evaluates match (i,j)
     float d = 0;
-    for(Peak s: S[i]) for(Peak p: P[j]) d += (s.key==p.key || s.key==p.key-12 || s.key==p.key-12-7) * p.value;
+    for(Peak s: S[i]) for(Peak p: P[j]) d += (s.key==p.key || s.key==p.key-12/* || s.key==p.key-12-7*/) * p.value;
     // Evaluates best cumulative score to an alignment point (i,j)
     D(i,j) = max((float[]){
                   j+1==n?0:D(i,j+1), // Ignores peak j
@@ -203,10 +214,13 @@ struct Synchronizer : Widget {
    size_t midiIndex = 0;
    while(i<m && j<n) {
     int localOffset = (int(P[j][0].time) - int(notes[midiIndex].time)) - globalOffset; // >0: late, <0: early
-    const int limitDelay = 0/*notes.ticksPerSeconds/8*/, limitAdvance = notes.ticksPerSeconds/4;
+    const int limitDelay = notes.ticksPerSeconds/2, limitAdvance = notes.ticksPerSeconds;
     if(j+1<n && ((D(i,j) == D(i,j+1) && (i==0 || localOffset < limitDelay)) || (i && localOffset < -limitAdvance))) {
+    //if(j+1<n && D(i,j) == D(i,j+1)) {
      j++;
     } else {
+     log(P[j], onsets[i], notes[midiIndex]);
+     //globalOffset = P[0][0].time;
      globalOffset = int(P[j][0].time) - int(notes[midiIndex].time);
      for(size_t unused count: range(S[i].size)) {
       assert_(notes[midiIndex].velocity);
@@ -343,8 +357,8 @@ struct Music : Widget {
  // Name
  string name = arguments() ? arguments()[0] : (error("Expected name"), string());
  // Files
- String audioFileName = arguments().contains("noaudio") ? ""__ : arguments().contains("novideo") ? name+".mp3" : name+".mp4";
- String videoFile = arguments().contains("novideo") ? ""__ : name+".mp4";
+ String audioFileName = arguments().contains("noaudio") ? ""__ : arguments().contains("novideo") ? name+".mp3" : name+".mkv"; //".mp4";
+ String videoFile = arguments().contains("novideo") ? ""__ : name+".mkv"; //.mp4";
 
  // Audio
  unique<FFmpeg> audioFile = audioFileName ? unique<FFmpeg>(audioFileName) : nullptr;
@@ -354,10 +368,10 @@ struct Music : Widget {
  // MIDI
  MidiFile midi = existsFile(name+".mid"_) ? MidiFile(readFile(name+".mid"_)) : MidiFile(); // if used: midi.signs are scaled in synchronizer
 
- MidiNotes notes = ::scale(/*midi ?*/ copy(midi.notes) /*: ::notes(xml.signs, xml.divisions)*/, audioFile ? audioFile->audioFrameRate : /*sampler.rate*/0, audioStart(audioFileName));
+ MidiNotes notes = ::scale(midi ? copy(midi.notes) : ::notes(xml.signs, xml.divisions), audioFile ? audioFile->audioFrameRate : /*sampler.rate*/0, audioStart(audioFileName));
  // Sheet
  Sheet sheet {/*xml ?*/ xml.signs /*: midi.signs*/, /*xml ?*/ xml.divisions /*: midi.divisions*/, 0, 4,
-    /*apply(*/filter(notes, [](MidiNote o){return o.velocity==0;})/*, [](MidiNote o){return o.key;})*/};
+    /*apply(*/midi||1 ? filter(notes, [](MidiNote o){return o.velocity==0;}) : ref<MidiNote>()/*, [](MidiNote o){return o.key;})*/};
  Synchronizer synchronizer {audioFileName&&!midi?decodeAudio(audioFileName):Audio(), notes, sheet.midiToSign, sheet.measureBars};
 
  // Video
@@ -375,7 +389,7 @@ struct Music : Widget {
 
  // View
  GraphicsWidget system {move(sheet.pages[0])};
- Scroll<VBox> scroll {{&system/*, &synchronizer*/}}; // 1/3 ~ 240
+ Scroll<VBox> scroll {{&system, &synchronizer}}; // 1/3 ~ 240
  ImageView videoView; // 1/2 ~ 360
  Keyboard keyboard; // 1/6 ~ 120
  VBox widget {{&scroll/*, &videoView, &keyboard*/}};
@@ -520,7 +534,7 @@ struct Music : Widget {
   if(encode) { // Encode
    assert_(!failed);
 
-   Encoder encoder {name+".mp4"_};
+   Encoder encoder {name+".demo.mp4"_};
    encoder.setH264(int2(1280,/*720*/240), 30/*60*/);
    if(audioFile && (audioFile->codec==FFmpeg::AAC || audioFile->codec==FFmpeg::MP3)) encoder.setAudio(audioFile);
    else error("Unknown codec");//if(audioFile) encoder.setAAC(2 /*Youtube requires stereo*/, audioFile->audioFrameRate);
@@ -608,7 +622,10 @@ struct Music : Widget {
  vec2 sizeHint(vec2 size) override { return running ? widget.sizeHint(size) : scroll.ScrollArea::sizeHint(size); }
  shared<Graphics> graphics(vec2 size) override {
   if(running /*&& video.videoTime < video.duration*/) {
-   if(audioFile) follow(audioFile->audioTime, audioFile->audioFrameRate, vec2(window->size));
+   if(audioFile) {
+    //log(audioFile->audioTime/float(audioFile->audioFrameRate));
+    follow(audioFile->audioTime, audioFile->audioFrameRate, vec2(window->size));
+   }
 #if SAMPLER
    else follow(sampler.audioTime, sampler.rate, vec2(window->size));
 #endif

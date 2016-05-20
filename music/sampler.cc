@@ -7,6 +7,10 @@
 #include "time.h"
 #include "string.h"
 #include "math.h"
+inline double exp2(double x) { return __builtin_exp2(x); } // math.h
+inline double exp10(double x) { return __builtin_exp2(__builtin_log2(10)*x); } // math.h
+inline double pow(double x, double y) { return __builtin_pow(x,y); } // math.h
+inline double log2(double x) { return __builtin_log2(x); }
 
 static Sampler* sampler; // DEBUG
 

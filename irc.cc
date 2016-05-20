@@ -37,6 +37,7 @@ struct Link {
   //log(host, channels, bot, number);
  }
 };
+template<> inline String str(const Link& o) { return "irc://"+o.host+":"+str(o.port)+"/"+str(o.channels,","_)+" /msg "+o.bot+" xdcc send #"+str(o.number); }
 
 struct DCC : Link {
  TextDataStream<TCPSocket> irc{resolve(host), port};
@@ -206,7 +207,8 @@ struct DCCApp {
   if(true || arguments().size > 1) {
    String config = readFile(".irc");
    String search = replace(section(config, '\n') ,"%", query);
-   buffer<string> bots = split(section(config, '\n', 1, -1), "\n");
+   buffer<string> channels = split(section(config, '\n', 1, 2), " ");
+   buffer<string> bots = split(section(config, '\n', 2, -1), "\n");
    Map document = getURL(search, {}, 1);
    Element root = parseHTML(document);
    const Element& table = root("//table");
@@ -221,9 +223,10 @@ struct DCCApp {
     string command = table(i+1)(0)(0)["value"];
     String linkURL = irc+" "+command;
     Link link(linkURL);
+    if(link.channels[0]==channels[0]) link.channels.append(channels[1]);
     if(bots.contains(link.bot)) {
      log(file, size, age, link.channels, link.bot);
-     url = ::move(linkURL);
+     url = str(link);
      break;
     }
     linkBots.append(link.bot);

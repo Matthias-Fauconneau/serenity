@@ -8,7 +8,7 @@
 struct MidiNote { uint time, key, velocity; vec2 gain = 1; };
 notrace inline bool operator ==(const MidiNote& a, const MidiNote& b) { return a.time == b.time && a.key == b.key && a.velocity == b.velocity; }
 notrace inline bool operator <(const MidiNote& a, const MidiNote& b) { return a.time < b.time || (a.time == b.time && a.key < b.key); }
-inline String str(const MidiNote& o) { return str(o.time, strKey(0, o.key)); }
+inline String str(const MidiNote& o) { return /*str(o.time,*/( strKey(0, o.key)); }
 
 struct MidiNotes : array<MidiNote> {
 	MidiNotes() {}

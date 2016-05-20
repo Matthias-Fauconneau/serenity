@@ -299,6 +299,7 @@ size_t FLAC::seek(size_t size) {
  return size;
 }
 
+#if 0
 Audio decodeAudio(const ref<byte>& data, uint duration) {
  FLAC flac(data);
  duration = ::min(duration, flac.duration);
@@ -309,3 +310,4 @@ Audio decodeAudio(const ref<byte>& data, uint duration) {
  assert_(flac.audio.size >= duration, flac.audio.size, flac.audioAvailable);
  return {move(flac.audio), flac.rate};
 }
+#endif

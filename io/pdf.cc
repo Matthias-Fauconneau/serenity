@@ -4,12 +4,6 @@
 #include "matrix.h"
 #include "deflate.h"
 
-generic String str(const map<T,Variant>& dict) {
- array<char> s;
- s.append("<<"); for(auto entry: dict) s.append( '/'+entry.key+' '+str(entry.value)+' ' ); s.append(">>");
- return move(s);
-}
-
 struct Object : Dict {
     buffer<byte> data;
 

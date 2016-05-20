@@ -3,10 +3,9 @@
 #include "vector.h"
 #include "map.h"
 #include "algorithm.h"
+inline double pow(double x, double y) { return __builtin_pow(x,y); } // math.h
 
 // -- sRGB --
-
-inline double pow(double x, double y) { return __builtin_pow(x,y); } // math.h
 
 uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)
 __attribute((constructor(1001))) void generate_sRGB_forward() {
