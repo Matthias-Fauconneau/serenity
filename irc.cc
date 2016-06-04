@@ -22,7 +22,7 @@ struct Link {
   port = s.integer();
   s.match('/');
   do {
-   channels.append(s.identifier("-_.[]"));
+   channels.append(s.whileNo(" ,/"));
   } while(s.match(','));
   s.whileAny(' ');
   if(s.match("/msg ")) {
@@ -213,17 +213,19 @@ struct DCCApp {
    Element root = parseHTML(document);
    const Element& table = root("//table");
    array<string> linkBots;
-   for(size_t i=1; i<table.children.size; i+=2) {
+   for(size_t i=1; i<table.children.size; i++) {
     const Element& row = table(i);
     String file = row(0).text();
-    if(!(find(file, query) || find(file, replace(query, " ", ".")))) continue;
+    //if(!(find(file, query) || find(file, replace(query, " ", ".")))) continue;
     string irc = row(0)(0)["href"];
+    if(!startsWith(irc,"irc")) continue;
     String size = row(6).text();
     String age = unescape(row(8).text());
     string command = table(i+1)(0)(0)["value"];
     String linkURL = irc+" "+command;
     Link link(linkURL);
     if(link.channels[0]==channels[0]) link.channels.append(channels[1]);
+    log(link);
     if(bots.contains(link.bot)) {
      log(file, size, age, link.channels, link.bot);
      url = str(link);
@@ -231,7 +233,7 @@ struct DCCApp {
     }
     linkBots.append(link.bot);
    }
-   if(!url) error(search, linkBots);
+   if(!url) error(search, linkBots, table);
   }
   else url = unsafeRef(query);
   log(url);

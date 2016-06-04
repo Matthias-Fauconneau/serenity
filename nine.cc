@@ -19,9 +19,10 @@ struct Nine {
  Nine() {
   if(!existsFile(".nine")) writeFile(".nine","");
   next();
+  window->backgroundColor = black;
   window->actions[Space] = {this, &Nine::next};
   window->actions[Key(LeftButton)] = {this, &Nine::next};
-  window->actions[Return] = [this]{ execute(which("firefox-bin"),{"http://"+arguments()[0]+"/gag/"+id}); };
+  window->actions[Return] = [this]{ execute(which("firefox-bin"),{"http://"+URL(arguments()[0]).host+"/gag/"+id}); };
  }
  void next() {
   if(window) window->presentComplete = {};
@@ -41,7 +42,7 @@ struct Nine {
     this->id = copyRef(id);
     String caption = e("header").text();
     assert_(caption, e("header"));
-    this->caption = caption;
+    this->caption = Text(caption, 16, white, 1, 1366/2);
     if(e.XPath("//video", [this](const Element& e) {
               string url = e(0)["src"];
               log(url);

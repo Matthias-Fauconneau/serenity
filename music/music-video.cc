@@ -84,7 +84,7 @@ struct Synchronizer : Widget {
    uint keyCount = lastKey+1-firstKey;
 
    size_t T = audio.size/audio.channels; // Total sample count
-#if 1 // FFT
+#if 0 // FFT
    size_t N = 8192;  // Frame size: 48KHz * 2 (Nyquist) * 2 (window) / frameSize ~ 24Hz~A0
    size_t h = 2048; // Hop size: 48KHz * 60 s/min / 4 b/q / hopSize / 2 (Nyquist) ~ 175 bpm
    FFT fft(N);
@@ -156,13 +156,10 @@ struct Synchronizer : Widget {
        //for(size_t k: range(max(0, i-m*W), min(int(f.size)-1, i+W+1))) sum += f[k];
        for(size_t k: range(max(0, i-before), min(int(f.size)-1, i+after+1))) sum += f[k];
        double mean = sum / (min(int(f.size)*1, i+after+1) - max(0, i-before));
-       //double mean = 0;//meanF[key];
        //const double threshold = 1./4; // FFT
-       //const double threshold = 1; // Filter
-       //const double threshold = 1./4;
-       const double threshold = 1./16;
+       const double threshold = 1; // Filter
        if(f[i] > mean + threshold)
-        chord.insertSorted(Peak{int(i*h)/*-peakTimeOrigin*/, firstKey+key, 1/*f[i]*//**127*/});
+        chord.insertSorted(Peak{int(i*h)/*-peakTimeOrigin*/, firstKey+key, f[i]});
       }
      }
      if(chord) P.append(move(chord));
@@ -198,7 +195,7 @@ struct Synchronizer : Widget {
    // Reversed scan here to have the forward scan when walking back the best path
    for(size_t i: reverse_range(m)) for(size_t j: reverse_range(n)) { // Evaluates match (i,j)
     float d = 0;
-    for(Peak s: S[i]) for(Peak p: P[j]) d += (s.key==p.key || s.key==p.key-12/* || s.key==p.key-12-7*/) * p.value;
+    for(Peak s: S[i]) for(Peak p: P[j]) d += (s.key==p.key || s.key==p.key-12 || s.key==p.key-12-7) * p.value;
     // Evaluates best cumulative score to an alignment point (i,j)
     D(i,j) = max((float[]){
                   j+1==n?0:D(i,j+1), // Ignores peak j
@@ -214,8 +211,8 @@ struct Synchronizer : Widget {
    size_t midiIndex = 0;
    while(i<m && j<n) {
     int localOffset = (int(P[j][0].time) - int(notes[midiIndex].time)) - globalOffset; // >0: late, <0: early
-    const int limitDelay = notes.ticksPerSeconds/2, limitAdvance = notes.ticksPerSeconds;
-    if(j+1<n && ((D(i,j) == D(i,j+1) && (i==0 || localOffset < limitDelay)) || (i && localOffset < -limitAdvance))) {
+    const int limitDelay = 0, limitAdvance = notes.ticksPerSeconds*4;
+    if(j+1<n && ((D(i,j) == D(i,j+1) && (i==0 || localOffset < limitDelay)) || (i && 0/*localOffset < -limitAdvance*/))) {
     //if(j+1<n && D(i,j) == D(i,j+1)) {
      j++;
     } else {

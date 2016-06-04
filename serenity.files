@@ -91,3 +91,5 @@ guided-filter.h
 guided-filter.cc
 
 irc.cc
+nine.cc
+test.cc
