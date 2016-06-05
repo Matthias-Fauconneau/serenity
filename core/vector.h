@@ -171,6 +171,7 @@ struct byte4 : vec<bgra,uint8,4> {
  inline byte4(byte b, byte g, byte r, byte a=0xFF) : vec(b,g,r,a) {}
  byte4(byte3 bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
  byte4(bgr3f bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
+ byte4(::vec<::bgra,int,4> v) : vec(v.b, v.g, v.r, v.a) {}
  //bgr3f bgr() { return bgr3f(b, g, r); }
  byte3& bgr() { return *(byte3*)this; }
  byte4(vec<rgba,uint8,4> rgba) : vec(rgba.b, rgba.g, rgba.r, rgba.a) {}
