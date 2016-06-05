@@ -193,6 +193,14 @@ void downsample(const Image8& target, const Image8& source) {
 }
 Image8 downsample(const Image8& source) { Image8 target(source.size/2); downsample(target, source); return target; }
 
+void upsample(const Image& target, const Image& source) {
+ assert_(target.size == source.size*2, target.size, source.size);
+ for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) {
+  target(x*2+0,y*2+0) = target(x*2+1,y*2+0) = target(x*2+0,y*2+1) = target(x*2+1,y*2+1) = source(x,y);
+ }
+}
+Image upsample(const Image& source) { Image target(source.size*2); upsample(target, source); return target; }
+
 void mean(const ImageF& target, const ImageF& buffer, const ImageF& source, uint R) {
  assert_(target.size == buffer.size.yx() && buffer.size.yx() == source.size);
  for(size_t i: range(2)) {

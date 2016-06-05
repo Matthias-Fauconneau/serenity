@@ -88,6 +88,10 @@ ImageF toFloat(const Image8& source);
 void downsample(const Image8& target, const Image8& source);
 Image8 downsample(const Image8& source);
 
+/// Upsamples an image by duplicating samples
+void upsample(const Image& target, const Image& source);
+Image upsample(const Image& source);
+
 void mean(const ImageF& target, const ImageF& buffer, const ImageF& source, uint R);
 ImageF mean(const ImageF& source, uint R);
 

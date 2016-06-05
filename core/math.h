@@ -30,6 +30,12 @@ inline double ceil(double x) { return __builtin_ceil(x); }
 inline float sqrt(float f) { return __builtin_sqrtf(f); }
 inline double sqrt(double f) { return __builtin_sqrt(f); }
 
+constexpr double PI = 3.14159265358979323846;
+inline double sin(double t) { return __builtin_sin(t); }
+inline float sin(float t) { return __builtin_sin(t); }
+inline double cos(double t) { return __builtin_cos(t); }
+inline float cos(float t) { return __builtin_cos(t); }
+
 #if 0
 inline float fract(float x) { return x - floor(x); }
 inline double mod(double q, double d) { return __builtin_fmod(q, d); }
@@ -40,12 +46,7 @@ const double expOverflow = 7.09782712893383973096e+02;
 inline double exp(double x) { assert(x>expUnderflow && x<expOverflow); return __builtin_exp(x); }
 inline double ln(double x) { return __builtin_log(x); }
 
-constexpr double PI = 3.14159265358979323846;
-inline double cos(double t) { return __builtin_cos(t); }
-inline float cos(float t) { return __builtin_cos(t); }
 inline double acos(double t) { return __builtin_acos(t); }
-inline double sin(double t) { return __builtin_sin(t); }
-inline float sin(float t) { return __builtin_sin(t); }
 inline double asin(double t) { return __builtin_asin(t); }
 inline double tan(double t) { return __builtin_tan(t); }
 inline double atan(double y, double x) { return __builtin_atan2(y, x); }
