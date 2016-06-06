@@ -82,7 +82,8 @@ generic T sum(const vec& a) { T sum=0; for(uint i: range(N)) sum+=a[i]; return s
 generic T product(const vec& a) { T product=1; for(uint i: range(N)) product *= a[i]; return product; }
 generic T dot(const vec& a, const vec& b) { T ssq=0; for(uint i: range(N)) ssq += a[i]*b[i]; return ssq; }
 generic T sq(const vec& a) { return dot(a,a); }
-//generic float length(const vec& a) { return sqrt(dot(a,a)); }
+generic float length(const vec& a) { return sqrt(dot(a,a)); }
+generic vec normalize(const vec& a){ return a/length(a); }
 generic bool isNaN(const vec& v){ for(uint i: range(N)) if(isNaN(v[i])) return true; return false; }
 generic bool isNumber(const vec& v){ for(uint i: range(N)) if(!isNumber(v[i])) return false; return true; }
 
@@ -123,6 +124,10 @@ typedef vec<xyz,int,3> int3;
 typedef vec<xyz,uint16,3> short3;
 /// Floating-point x,y,z vector
 typedef vec<xyz,float,3> vec3;
+
+template<template<Type> Type V, Type T> inline vec<V,T,3> cross(vec<V,T,3> a, vec<V,T,3> b) {
+ return vec<V,T,3>(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y);
+}
 
 generic struct xyzw {
     T x,y,z,w;
