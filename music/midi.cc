@@ -17,8 +17,8 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
  BinaryData s(file, true);
  s.advance(10);
  uint16 nofChunks = s.read();
- notes.ticksPerSeconds = 2*(uint16)s.read(); // Ticks per second (*2 as actually defined for MIDI as ticks per beat at 120bpm)
- divisions = notes.ticksPerSeconds; // Defaults to 60 qpm (FIXME: max 64/metronome.perMinute)
+ ticksPerBeat = (uint16)s.read(); // Defaults to 60 qpm (FIXME: max 64/metronome.perMinute)
+ notes.ticksPerSeconds = 120/60*ticksPerBeat; // Ticks per second (Default tempo is 120bpm/60s/min)
 
  for(int i=0; s && i<nofChunks;i++) {
   ref<byte> tag = s.read<byte>(4); uint32 length = s.read();
@@ -46,17 +46,21 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 
  KeySignature keySignature = 0;
  TimeSignature timeSignature = {4,4};
- uint tempo = 60000000 / 120; // 500000
+ uint64 usPerBeat = 60000000 / 120; // 500000
  Metronome metronome = {Quarter, 120};
- uint lastTempoChange = 0, lastTempoChange120 = 0; // Last tempo changes in file ticks and in 120bpm ticks
+ uint lastTempoChange = 0, lastTempoChangeUS = 0; // Last tempo changes in ticks and microseconds
  uint measureIndex = 0;
  int lastMeasureStart = 0;
- Clef clefs[2] = {{FClef,0}, {GClef,0}};
- for(uint staff: range(2)) signs.insertSorted({Sign::Clef, 0, {{staff, {.clef=clefs[staff]}}}});
- array<MidiNote> currents[2]; // New notes to be pressed
- array<MidiNote> actives[2]; // Notes currently pressed
- array<MidiNote> commited[2]; // Commited/assigned notes to be written once duration is known (on note off)
- uint lastOff[2] = {0,0}; // For rests
+ constexpr int staffCount = 1;
+ Clef clefs[staffCount];
+ if(staffCount==1) clefs[0] = {GClef,0};
+ else { clefs[0] = {FClef,0}, clefs[1] = {GClef,0}; }
+ for(uint staff: range(staffCount)) signs.insertSorted({Sign::Clef, 0, {{staff, {.clef=clefs[staff]}}}});
+ array<MidiNote> currents[staffCount]; // New notes to be pressed
+ array<MidiNote> actives[staffCount]; // Notes currently pressed
+ array<MidiNote> commited[staffCount]; // Commited/assigned notes to be written once duration is known (on note off)
+ uint lastOff[staffCount] = {}; // For rests
+ signs.insertSorted({Sign::TimeSignature, 0, .timeSignature=timeSignature});
  for(uint lastTime = 0;;) {
   size_t trackIndex = invalid;
   for(size_t index: range(tracks.size))
@@ -67,14 +71,15 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
   assert_(track.time >= lastTime);
 
   if(track.time != lastTime) { // Commits last chord
-   uint sustain[2] = { (uint)actives[0].size, (uint)actives[1].size }; // Remaining notes kept sustained
+   uint sustain[staffCount];
+   for(uint i: range(staffCount)) sustain[i] = (uint)actives[i].size; // Remaining notes kept sustained
    // Balances load on both hand
-   for(size_t staff: range(2)) {
+   for(size_t staff: range(staffCount)) {
     array<MidiNote>& active = actives[staff];
     array<MidiNote>& otherActive = actives[!staff];
     array<MidiNote>& current = currents[staff];
     array<MidiNote>& other = currents[!staff];
-    if(0)
+    if(0) {
      while(
            current && // Any notes to move from staff to !staff ?
            ((staff==0 && current.last().key>parseKey("F2")) || (staff==1 && current.first().key<68)) && // Prevents stealing from far notes (TODO: relative to last active)
@@ -109,27 +114,16 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
        }
       }
      }
+    }
    }
-   for(size_t staff: range(2)) commited[staff].append(::move(currents[staff]));  // Defers until duration is known (on note off)
-   for(size_t staff: range(2)) currents[staff].clear(); // FIXME: ^ move should already clear currents[staff]
-   for(size_t staff: range(2)) assert_(!currents[staff], currents, commited);
-   /*if(measureIndex > 35) {
-                signs.insertSorted({Sign::Measure, track.time, .measure={Measure::NoBreak, measureIndex, 1, 1, measureIndex}});
-                break; // HACK: Stops 'Brave Adventurers' before repeat
-            }*/
+   for(size_t staff: range(staffCount)) commited[staff].append(::move(currents[staff]));  // Defers until duration is known (on note off)
+   for(size_t staff: range(staffCount)) currents[staff].clear(); // FIXME: ^ move should already clear currents[staff]
+   for(size_t staff: range(staffCount)) assert_(!currents[staff], currents, commited);
   }
 
   lastTime = track.time;
-
-  // When latest track is ready to switch measure
-  int measureLength = timeSignature.beats*60*divisions/metronome.perMinute;
-  assert_(measureLength);
-  uint nextMeasureStart = lastMeasureStart+measureLength;
-  if(track.time >= nextMeasureStart) {
-   lastMeasureStart = nextMeasureStart;
-   signs.insertSorted({Sign::Measure, nextMeasureStart, .measure={Measure::NoBreak, measureIndex, 1, 1, measureIndex}});
-   measureIndex++;
-  }
+  assert_(track.time >= lastTempoChange);
+  uint64 trackTimeUS = lastTempoChangeUS + (track.time-lastTempoChange)*usPerBeat/ticksPerBeat;
 
   BinaryData& s = tracks[trackIndex].data;
   uint8 key=s.read();
@@ -148,22 +142,26 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
    if(MIDI(key)==MIDI::TimeSignature) {
     uint beats = data[0];
     uint beatUnit = 1<<data[1];
-    timeSignature = TimeSignature{beats, beatUnit};
-    signs.insertSorted({Sign::TimeSignature, track.time, .timeSignature=timeSignature});
+    TimeSignature newTimeSignature {beats, beatUnit};
+    if(newTimeSignature.beats != timeSignature.beats || newTimeSignature.beatUnit != timeSignature.beatUnit) {
+     signs.insertSorted({Sign::TimeSignature, track.time, .timeSignature=timeSignature});
+     assert_(track.time == 0, track.time);
+    }
    }
    else if(MIDI(key)==MIDI::Tempo) {
-    metronome.perMinute = 60000000 / tempo; // Beats per minute
-    //if(perMinute) signs.insertSorted({track.time, 0, uint(-1), Sign::Metronome, .metronome={Quarter, perMinute}});
-    lastTempoChange120 += (uint64)(track.time - lastTempoChange) * tempo / 500000; // FIXME: use microseconds per beat
+    lastTempoChangeUS += (track.time - lastTempoChange) * usPerBeat/ticksPerBeat;
     lastTempoChange = track.time;
-    tempo = ((data[0]<<16)|(data[1]<<8)|data[2]); // Microseconds per beat (quarter)
+    usPerBeat = ((data[0]<<16)|(data[1]<<8)|data[2]); // Microseconds per beat (quarter)
+    trackTimeUS = lastTempoChangeUS;
+    metronome.perMinute = 60000000 / usPerBeat; // Beats per minute
+    //if(perMinute) signs.insertSorted({track.time, 0, uint(-1), Sign::Metronome, .metronome={Quarter, perMinute}});
    }
    else if(MIDI(key)==MIDI::KeySignature) {
     int newKeySignature = (int8)data[0];
     //scale=data[1]?Minor:Major;
     if(keySignature != newKeySignature) {
      keySignature = newKeySignature;
-     signs.insertSorted({Sign::KeySignature, track.time, .keySignature=keySignature});
+     signs.insertSorted({Sign::KeySignature, trackTimeUS, .keySignature=keySignature});
     }
    }
    else if(MIDI(key)==MIDI::TrackName || MIDI(key)==MIDI::InstrumentName || MIDI(key)==MIDI::Text || MIDI(key)==MIDI::Copyright) {}
@@ -174,8 +172,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
 
   if(type==NoteOff) type=NoteOn, vel=0;
   if(type==NoteOn) {
-   assert_(track.time >= lastTempoChange);
-   MidiNote note{lastTempoChange120 + uint((uint64)(track.time-lastTempoChange)*tempo/500000), key, vel};
+   MidiNote note{trackTimeUS, key, vel};
    if(note.velocity) {
     if(notes && notes.last().velocity && notes.last().time <= note.time)
      assert_(notes.last().key != key, notes.last(), note, notes.last().velocity, note.velocity, notes.last().time, note.time);
@@ -185,43 +182,49 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
     }
    }
    notes.insertSorted( note );
-   for(uint staff: range(2)) actives[staff].filter([key](MidiNote o){return o.key == key;}); // Releases active note
+   for(uint staff: range(staffCount)) actives[staff].filter([key](MidiNote o){return o.key == key;}); // Releases active note
    // Commits before any repeated note on (auto release on note on without matching note off)
-   for(uint staff: range(2)) { // Inserts chord now that durations are known
+   for(uint staff: range(staffCount)) { // Inserts chord now that durations are known
     for(size_t index: range(commited[staff].size)) {
      if(commited[staff][index].key !=  note.key) continue;
      MidiNote noteOn = commited[staff].take(index);
 
-     // Value
-     int duration = note.time - noteOn.time;
-     if(duration) {
-      const int quarterDuration = 16*metronome.perMinute/60;
+     const int measureLengthUS = timeSignature.beats*usPerBeat;
+     assert_(measureLengthUS);
 
-      if(noteOn.time > lastOff[staff]+quarterDuration/8) { // Rest
-       int duration = noteOn.time - lastOff[staff];
-       assert_(duration >=/*>*/ quarterDuration/7/*4*/, duration, quarterDuration, quarterDuration/6);
-       const uint quarterDuration = 16*metronome.perMinute/60;
-       uint valueDuration = duration*quarterDuration/divisions;
-       if(!valueDuration) valueDuration = quarterDuration/2; //FIXME
-       assert_(valueDuration, duration, quarterDuration, divisions);
-       bool dot=false;
-       if(valueDuration%3 == 0) {
-        dot = true;
-        valueDuration = valueDuration * 2 / 3;
+     // Value
+     int duration = note.time - noteOn.time; // us
+     if(duration) {
+      int64 totalDuration = noteOn.time - lastOff[staff]; // us
+      int64 restStart = lastOff[staff]; // us
+      while(totalDuration >= int64(usPerBeat/4)) {
+       int64 nextMeasureStart = lastMeasureStart+measureLengthUS;
+       int64 restDuration = ::min(totalDuration, nextMeasureStart-restStart);
+       if(restDuration*16/usPerBeat>=8) {
+        //log(restDuration*16/usPerBeat);
+        signs.insertSorted({Sign::Rest, uint64(restStart), {{staff, {{restDuration, .rest={Value(ref<uint>(valueDurations).size-1-log2(restDuration*16/usPerBeat))}}}}}});
+       //log(restStart, restDuration, restStart+restDuration);
        }
-       //assert_(isPowerOfTwo(valueDuration), duration, quarterDuration, divisions, valueDuration, strKey(key), "rest");
-       if(valueDuration>=valueDurations[Eighth]) {
-        assert_(valueDuration>=valueDurations[Eighth], duration, quarterDuration, divisions, valueDuration, strKey(0, key), "rest");
-        Value value = Value(ref<uint>(valueDurations).size-1-log2(valueDuration));
-        //assert_(int(value) >= 0, duration, valueDuration);
-        if(int(value) >= 0) // FIXME
-         signs.insertSorted({Sign::Rest, lastOff[staff], {{staff, {{duration, .rest={value}}}}}});
+       totalDuration -= restDuration;
+       restStart += restDuration;
+       if(restStart >= nextMeasureStart) {
+        lastMeasureStart = nextMeasureStart;
+        signs.insertSorted({Sign::Measure, uint(nextMeasureStart), .measure={Measure::NoBreak, measureIndex, 1, 1, measureIndex}});
+        measureIndex++;
        }
       }
 
-      uint valueDuration = duration*quarterDuration/divisions;
-      if(!valueDuration) valueDuration = quarterDuration/2; //FIXME
-      assert_(valueDuration, duration, quarterDuration, divisions);
+      // When latest track is ready to switch measure
+      uint nextMeasureStart = lastMeasureStart+measureLengthUS;
+      if(trackTimeUS >= nextMeasureStart) {
+       lastMeasureStart = nextMeasureStart;
+       signs.insertSorted({Sign::Measure, nextMeasureStart, .measure={Measure::NoBreak, measureIndex, 1, 1, measureIndex}});
+       measureIndex++;
+      }
+
+      uint valueDuration = duration*16/usPerBeat;
+      if(!valueDuration) valueDuration = 8; //FIXME
+      assert_(valueDuration, duration, ticksPerBeat);
       bool dot=false;
       uint tuplet = 1;
       if(valueDuration >= 1 && valueDuration <= 1) valueDuration = 1; // Grace
@@ -265,8 +268,8 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
       } else if(valueDuration>=150 /*&& valueDuration <= 299*/) { // Long
        valueDuration = 256;
       }
-      else error("Unsupported duration", valueDuration, duration, quarterDuration, divisions, duration*quarterDuration/divisions, strKey(0, key), dot);
-      assert_(isPowerOfTwo(valueDuration), duration, quarterDuration, divisions, duration*quarterDuration/divisions, valueDuration, strKey(0, key), dot);
+      else error("Unsupported duration", valueDuration, duration, ticksPerBeat, duration*32/ticksPerBeat, strKey(0, key), dot);
+      assert_(isPowerOfTwo(valueDuration), duration, ticksPerBeat, duration*32/ticksPerBeat, valueDuration, strKey(0, key), dot);
       Value value = Value(ref<uint>(valueDurations).size-1-log2(valueDuration));
       //assert_(int(value) >= 0, duration, valueDuration, note.time - noteOn.time);
       if(int(value) >= 0) // FIXME
@@ -275,12 +278,14 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
                                                                     .clef = clefs[staff],
                                                                     .step = keyStep(keySignature, key),
                                                                     .alteration = keyAlteration(keySignature, key),
-                                                                    .accidental = alterationAccidental(keyAlteration(keySignature, key)), // FIXME
+                                                                    //.accidental = alterationAccidental(keyAlteration(keySignature, key)), // FIXME
+                                                                    .accidental = keyAlteration(keySignature, key) ? alterationAccidental(keyAlteration(keySignature, key)) : Accidental::None, // FIXME
                                                                     .tie = Note::NoTie,
                                                                     .durationCoefficientNum = tuplet!=1 ? tuplet-1 : 1,
                                                                     .durationCoefficientDen = tuplet,
                                                                     .dot=dot,
                                                                    }}}}}});
+      //log("on", noteOn.time, noteOn.time*32/ticksPerBeat, "off", note.time, note.time*32/ticksPerBeat);
       lastOff[staff] = note.time;
      }
      break; // Assumes single match (FIXME: assert)
@@ -288,6 +293,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
    }
    if(vel) { // First rough split based on pitch (final load balanced staff assignment deferred until whole chord is seen)
     uint staff = key >= 60; // C4
+    staff = ::min(staff, uint(staffCount)-1);
     for(MidiNote o: currents[staff]) assert_(o.time == note.time, o.time, note.time, "current", currents[staff]);
     //for(MidiNote o: actives[staff]) assert_(o.time == note.time, o.time, note.time, "active", actives[staff]);
     // Sorts by key (bass to treble)
@@ -309,13 +315,13 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
    track.time += t;
   }
  }
- for(uint staff: range(2)) {
+ for(uint staff: range(staffCount)) {
   assert_(!currents[staff], currents[staff]);
   //assert_(!actives[staff], actives[staff]);
   //assert_(!commited[staff], commited[staff]);
  }
  // Measures are signaled on end
- int measureLength = timeSignature.beats*60*divisions/metronome.perMinute;
+ const int measureLength = timeSignature.beats*ticksPerBeat/2; //t/q = t/s * 60s/m / (120q/m)
  assert_(measureLength);
  uint nextMeasureStart = lastMeasureStart+measureLength;
  signs.insertSorted({Sign::Measure, nextMeasureStart, .measure={Measure::NoBreak, measureIndex, 1, 1, measureIndex}}); // Last measure bar

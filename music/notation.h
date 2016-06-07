@@ -164,13 +164,13 @@ struct Sign {
         Dynamic, Wedge,
         Pedal,
     } type;
-    uint time; // Absolute time offset in ticks (/sa ticksPerQuarter)
+    uint64 time; // Absolute time offset in ticks (/sa ticksPerQuarter)
     union {
         struct {
             uint staff;
             union {
                 struct {
-                    /*u*/int duration;
+                    /*u*/int64 duration;
                     //Value value;
                     union {
                         ::Note note;

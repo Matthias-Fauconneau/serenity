@@ -74,6 +74,7 @@ audio/audio.cc
 audio/resample.cc
 
 pitch/biquad.h
+pitch/fft.cc
 
 music/notation.h
 music/MusicXML.cc
@@ -86,10 +87,5 @@ music/flac.h
 music/flac.cc
 music/music-video.cc
 
-foreground.cc
-guided-filter.h
-guided-filter.cc
 
-irc.cc
-nine.cc
 test.cc

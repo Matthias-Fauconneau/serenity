@@ -1,10 +1,7 @@
 #pragma once
 #include "math.h"
-constexpr double PI = 3.14159265358979323846;
 inline double exp2(double x) { return __builtin_exp2(x); }
 inline double log2(double x) { return __builtin_log2(x); }
-inline double cos(double t) { return __builtin_cos(t); }
-inline double sin(double t) { return __builtin_sin(t); }
 
 // Biquad filter
 struct Biquad {

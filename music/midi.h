@@ -5,7 +5,7 @@
 #include "map.h"
 #include "notation.h"
 
-struct MidiNote { uint time, key, velocity; vec2 gain = 1; };
+struct MidiNote { uint64 time; uint key, velocity; vec2 gain = 1; };
 notrace inline bool operator ==(const MidiNote& a, const MidiNote& b) { return a.time == b.time && a.key == b.key && a.velocity == b.velocity; }
 notrace inline bool operator <(const MidiNote& a, const MidiNote& b) { return a.time < b.time || (a.time == b.time && a.key < b.key); }
 inline String str(const MidiNote& o) { return /*str(o.time,*/( strKey(0, o.key)); }
@@ -34,7 +34,7 @@ struct MidiFile {
 	uint duration = 0; // Duration in ticks
 
 	array<Sign> signs;
-	uint divisions = 0; // Time unit (ticks) per beat (quarter note)
+    uint ticksPerBeat = 0; // Time unit (ticks) per beat (quarter note)
 
 	MidiFile() {}
 	MidiFile(ref<byte> file);

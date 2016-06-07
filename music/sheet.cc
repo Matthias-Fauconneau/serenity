@@ -187,7 +187,8 @@ static bool isStemUp(ref<Chord> chords) {
 }
 
 float System::stemX(const Chord& chord, bool stemUp) {
- return X(chord[0].time) + spaceWidth + (stemUp ? noteSize(chord.last())-1 : 0);
+ //log("stemX", X(chord[0].time));
+ return X(chord[0].time) /*+ spaceWidth*/ + (stemUp ? noteSize(chord.last())-1 : 0);
 }
 
 bool anyAccidental(const Chord& chord){ for(const Sign& a: chord) if(a.note.accidental) return true; return false; }
@@ -364,7 +365,7 @@ void System::layoutNotes(uint staff) {
    Sign& sign = chord[index];
    assert_(sign.type==Sign::Note, int(sign.type));
    Note& note = sign.note;
-   const float x = X(sign.time) + spaceWidth + (shift[index] ? (stemUp?1:-1)*noteSize(sign) : 0), y = Y(sign);
+   const float x = X(sign.time) /*+ spaceWidth*/ + (shift[index] ? (stemUp?1:-1)*noteSize(sign) : 0), y = Y(sign);
    float opacity = (note.tie == Note::NoTie || note.tie == Note::TieStart) ? 1 : 1./2;
 
    // Ledger
@@ -375,13 +376,13 @@ void System::layoutNotes(uint staff) {
    // Dot
    if(note.dot) {
     float dotOffset = glyphSize(SMuFL::NoteHead::Black).x*7/6;
-    glyph(vec2(X(sign.time) + spaceWidth + (shift.contains(true) ? noteSize(sign) : 0)+dotOffset, Y(sign.staff, note.clef, note.step/2*2 +1)), SMuFL::Dot, opacity);
+    glyph(vec2(X(sign.time) /*+ spaceWidth*/ + (shift.contains(true) ? noteSize(sign) : 0)+dotOffset, Y(sign.staff, note.clef, note.step/2*2 +1)), SMuFL::Dot, opacity);
    }
 
    // Accidental
    if(note.accidental) {
     {note.accidentalGlyphIndex = system.glyphs.size; // Records glyph index of accidental, i.e next glyph to be appended to system.glyphs :
-     glyph(vec2(X(sign.time) + spaceWidth - accidentalShift[index] * glyphSize(note.accidental, &smallFont).x
+     glyph(vec2(X(sign.time) /*+ spaceWidth*/ - accidentalShift[index] * glyphSize(note.accidental, &smallFont).x
                 - glyphSize(note.accidental, &smallFont).x, y), note.accidental, note.accidentalOpacity, 6);
     }
    }
@@ -405,7 +406,7 @@ void System::layoutNotes(uint staff) {
 
      //assert_(tie.position.y == Y(sign));
      if(tie.position.y != Y(sign)) log("tie.position.y != Y(sign)", tie.position.y, Y(sign));
-     float x = X(sign.time) + spaceWidth, y = Y(sign);
+     float x = X(sign.time) /*+ spaceWidth*/, y = Y(sign);
      int slurDown = (chord.size>1 && index==chord.size-1) ? -1 :(y > staffY(staff, -4) ? 1 : -1);
      vec2 p0 = vec2(tie.position.x + noteSize(sign)/2 + (note.dot?space/2:0), y + slurDown*halfLineInterval);
      float bodyOffset = shift[index] ? noteSize(sign) : 0; // Shift body for dichords
@@ -444,7 +445,7 @@ void System::layoutNotes(uint staff) {
     float bodyOffset = shift[index] ? noteSize(sign) : 0; // Shift body for dichords
     if(activeTies) { // Skips on first pass
      auto& activeTies = *this->activeTies;
-     activeTies.append(staff, note.step, vec2(X(sign.time)+spaceWidth+bodyOffset, Y(sign)));
+     activeTies.append(staff, note.step, vec2(X(sign.time)/*+spaceWidth*/+bodyOffset, Y(sign)));
      //log(apply(activeTies[staff],[](TieStart o){return o.step;}));
     }
    }
@@ -497,7 +498,7 @@ void System::layoutNotes(uint staff) {
   array<int> fingering;
   for(const Sign& sign: chord) if(sign.note.finger) fingering.append( sign.note.finger );
   if(fingering) {
-   float x = X(chord[0].time)+spaceWidth+noteSize(chord[0])/2, y = baseY;
+   float x = X(chord[0].time)/*+spaceWidth*/+noteSize(chord[0])/2, y = baseY;
    for(int finger: fingering.reverse()) { // Top to bottom
     Font& font = textFont.font(textSize/2);
     uint code = str(finger)[0];
@@ -599,7 +600,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
                         };*/
 
   // Clears any pending clef changes
-  if((sign.type == Sign::Note /*||sign.type == Sign::Rest*/) || sign.type == Sign::KeySignature) {
+  if((sign.type == Sign::Note ||sign.type == Sign::Rest) || sign.type == Sign::KeySignature) {
    for(size_t index=0; index<pendingClefChange.size;) {
     // Skips if not needed yet to keep the opportunity to clear right before measure bar
     if(((sign.type == Sign::Note||sign.type == Sign::Rest||sign.type == Sign::Clef||sign.type == Sign::OctaveShift) && sign.staff == pendingClefChange[index].staff) // Same staff
@@ -621,8 +622,10 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
      x += glyph(vec2(x, y), clefSign);
      timeTrack[sign.time] = max(timeTrack[sign.time], x); // Updates next synchronization point
 #else
+     assert_(sign.time >= measureStartTime);
+     //log(measureStartX);
      float advance = glyph(vec2(X(sign.time), y), clefSign);
-     if(sign.staff==1) measureStartX += advance; // FIXME
+     /*if(sign.staff==1)*/ measureStartX += advance; // FIXME
 #endif
     } else { index++; continue; }
    }
@@ -676,7 +679,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
     } else error(int(sign.type));
     //timeTrack.at(sign.time).staves[staff].x = x;
    } else { // Note|Rest
-    x += spaceWidth;
+    //x += spaceWidth;
     if(sign.type == Sign::Note) {
      Note& note = sign.note;
      note.clef = staves[staff].clef;
@@ -829,7 +832,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
      x += glyphAdvance(SMuFL::TimeSignature::_0+digit-'0');
     }
     maxX = max(maxX, x); //startX+2*glyphAdvance(SMuFL::TimeSignature::_0);
-    measureStartX += maxX - x;
+    measureStartX += maxX - startX;
     //timeTrack.at(sign.time) = maxX;
     //for(Staff& staff: staves) staff.x = maxX;
    } else { // Clears all lines (including direction lines)
@@ -849,21 +852,23 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
      { array<uint> keys = ::move(measureNoteKeys);
       array<char> chord;
       if(measureNumbers && measureBars) chord.append(str(measureBars->size())+" "_); // Measure index
-      uint root = keys[0];
-      chord.append( strKey(keySignature, root) );
-      if(keys.size>1) {
-       uint third = keys[1];
-       if(third-root == 3) chord.append("m");
+      if(keys) {
+       uint root = keys[0];
+       chord.append( strKey(keySignature, root) );
+       if(keys.size>1) {
+        uint third = keys[1];
+        if(third-root == 3) chord.append("m");
+       }
+       float x = measureFirstNote;
+       text(vec2(x, staffY(staves.size-1, max(10, line.last().top))), chord, textSize, system.glyphs, vec2(1./2,0/*1*/));
       }
-      float x = measureFirstNote;
-      text(vec2(x, staffY(staves.size-1, max(10, line[1].top))), chord, textSize, system.glyphs, vec2(1./2,0/*1*/));
       //error(chord);
       //log_(chord+" ");
       //log(chord, keys);
      }
 
      // Clears any pending clef changes right before measure bar (FIXME: defer to new system on break)
-     float dx = space;
+     float dx = 0;
      for(Sign sign: pendingClefChange) {
       Clef clef = sign.clef;
       float y = staffY(sign.staff, clef.clefSign==GClef ? -6 : -2);
@@ -876,9 +881,11 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
      pendingClefChange.clear();
 
      // Draws measure bar
+     //if(measureBars) log("|", sign.time, x);
      x += dx;
      if(margin || signIndex < signs.size-1) {
       if(1) { // Grand staff
+       //if(measureBars)  log("|", x);
        system.lines.append(vec2(x, staffY(staves.size-1,0)), vec2(x, staffY(0,-8)), black, 1.f/2, true); // Bar
       } else {
        for(size_t staff : range(staves.size)) system.lines.append(vec2(x, staffY(staff,0)), vec2(x, staffY(staff,-8)), black, 1.f/2, true);
@@ -1186,7 +1193,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
    size_t breakIndex = signs.size;
    float spaceWidth = 0;
    if(pageSize.x) { // Evaluates next line break
-    System system(context, staves, pageSize.x, pages.size, pageSystems.size, pageSystems ? &pageSystems.last() : nullptr, signs.slice(startIndex), 0, 0, 0, 0);
+    System system(context, staves, pageSize.x, pages.size, pageSystems.size, pageSystems ? &pageSystems.last() : nullptr, signs.slice(startIndex), 0, 0, 0, 0, false);
     breakIndex = startIndex + system.lastMeasureBarIndex + 1;
     if(!(startIndex < breakIndex && system.spaceCount)) { log("Empty line"); break; }
     assert_(startIndex < breakIndex && system.spaceCount, startIndex, breakIndex, system.spaceCount);
@@ -1212,7 +1219,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
    requiredHeight += system.system.bounds.size().y;
    pageSystems.append(move(system.system));
    this->lowestStep = min(this->lowestStep, system.line[0].bottom);
-   this->highestStep = max(this->highestStep, system.line[1].top);
+   this->highestStep = max(this->highestStep, system.line.last().top);
 
    startIndex = breakIndex;
   }
@@ -1289,6 +1296,10 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
 
   /// Synchronizes MIDI and score using dynamic time warping
   size_t m = S.size, n = M.size;
+  if(m > n) {
+   log("m > n", m, n);
+   return;
+  }
   assert_(m <= n, m, n);
 
   // Evaluates cumulative score matrix at each alignment point (i, j)

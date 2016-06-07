@@ -38,6 +38,7 @@ MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter, 	ref<float2> staffGains =
 }
 
 uint audioStart(string audioFileName) {
+ if(!audioFileName) return 0;
  for(FFmpeg file(audioFileName);;) {
   int32 buffer[1024  * file.channels];
   size_t size = file.read32(mref<int32>(buffer, 1024 * file.channels));
@@ -173,7 +174,7 @@ struct Synchronizer : Widget {
    for(size_t index = 0; index < onsets.size;) {
     array<Peak> chord;
     int64 time = onsets[index].time;
-    while(index < onsets.size && onsets[index].time < time+int(h)) {
+    while(index < onsets.size && onsets[index].time < time+uint64(h)) {
      if(chord) assert_(int(time)/*-scoreTimeOrigin*/-chord[0].time < 24000, onsets[index].time, chord[0].time);
      chord.append(Peak{int(onsets[index].time)/*-scoreTimeOrigin*/, onsets[index].key, (float)onsets[index].velocity});
      index++;
@@ -212,7 +213,7 @@ struct Synchronizer : Widget {
    while(i<m && j<n) {
     int localOffset = (int(P[j][0].time) - int(notes[midiIndex].time)) - globalOffset; // >0: late, <0: early
     const int limitDelay = 0, limitAdvance = notes.ticksPerSeconds*4;
-    if(j+1<n && ((D(i,j) == D(i,j+1) && (i==0 || localOffset < limitDelay)) || (i && 0/*localOffset < -limitAdvance*/))) {
+    if(j+1<n && ((D(i,j) == D(i,j+1) && (i==0 || localOffset < limitDelay)) || (i && localOffset < -limitAdvance))) {
     //if(j+1<n && D(i,j) == D(i,j+1)) {
      j++;
     } else {
@@ -314,7 +315,7 @@ struct Synchronizer : Widget {
  }
  vec2 sizeHint(vec2) override { return vec2(measureBars.values.last(), 32); }
  shared<Graphics> graphics(vec2 size) override {
-  assert_(size.x > 1050, size, sizeHint(size));
+  //assert_(size.x > 1050, size, sizeHint(size));
   shared<Graphics> graphics;
   for(Bar bar: bars) graphics->fills.append(vec2(bar.x, 0), vec2(2, size.y), bar.color, 1.f/2);
   for(int index: range(measureBars.size()-1)) {
@@ -367,7 +368,7 @@ struct Music : Widget {
 
  MidiNotes notes = ::scale(midi ? copy(midi.notes) : ::notes(xml.signs, xml.divisions), audioFile ? audioFile->audioFrameRate : /*sampler.rate*/0, audioStart(audioFileName));
  // Sheet
- Sheet sheet {/*xml ?*/ xml.signs /*: midi.signs*/, /*xml ?*/ xml.divisions /*: midi.divisions*/, 0, 4,
+ Sheet sheet {xml ? xml.signs : midi.signs, xml ? xml.divisions : 1000000, 0, 4,
     /*apply(*/midi||1 ? filter(notes, [](MidiNote o){return o.velocity==0;}) : ref<MidiNote>()/*, [](MidiNote o){return o.key;})*/};
  Synchronizer synchronizer {audioFileName&&!midi?decodeAudio(audioFileName):Audio(), notes, sheet.midiToSign, sheet.measureBars};
 
@@ -386,7 +387,8 @@ struct Music : Widget {
 
  // View
  GraphicsWidget system {move(sheet.pages[0])};
- Scroll<VBox> scroll {{&system, &synchronizer}}; // 1/3 ~ 240
+ //Scroll<VBox> scroll {{&system, &synchronizer}}; // 1/3 ~ 240
+ Scroll<VBox> scroll {{&system}}; // 1/3 ~ 240
  ImageView videoView; // 1/2 ~ 360
  Keyboard keyboard; // 1/6 ~ 120
  VBox widget {{&scroll/*, &videoView, &keyboard*/}};
@@ -604,12 +606,12 @@ struct Music : Widget {
    window = ::window(this, int2(1366/*1280*/,240));
    window->backgroundColor = white;
    window->show();
-   if(running && playbackDeviceAvailable()) {
+   if(running && audioFile && playbackDeviceAvailable()) {
 #if SAMPLER
     if(sampler) decodeThread.spawn();
 #endif
     audio.start(audioFile ? audioFile->audioFrameRate : /*sampler.rate*/0, audioFile ? 1024 : /*sampler.periodSize*/0, 32, 2);
-    assert_(audio.rate == (audioFile ? audioFile->audioFrameRate : /*sampler.rate*/0));
+    assert_(audio.rate == (audioFile ? audioFile->audioFrameRate : /*sampler.rate*/0), audio.rate);
     //seek(audioFile->duration/3);
     audioThread.spawn();
    } else running = false;
