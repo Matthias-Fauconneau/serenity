@@ -9,12 +9,15 @@
 #include "asound.h"
 #include "ui/render.h"
 #include "time.h"
-#include "sampler.h"
 #include "parallel.h"
 #include "fft.h"
 #include "biquad.h"
 #include "video.h"
 #include "encoder.h"
+#define SAMPLER 0
+#if SAMPLER
+#include "sampler.h"
+#endif
 
 /// Converts signs to notes
 MidiNotes notes(ref<Sign> signs, uint ticksPerQuarter, 	ref<float2> staffGains = {}) {
@@ -48,9 +51,10 @@ uint audioStart(string audioFileName) {
 }
 
 /// Converts MIDI time base to audio sample rate
-MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds, int start) {
+MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds, int unused start) {
  assert_(notes);
- int offset = start-(int64)notes.first().time*targetTicksPerSeconds/notes.ticksPerSeconds;
+ //assert_(start==0, start);
+ int offset = 0; //start-(int64)notes.first().time*targetTicksPerSeconds/notes.ticksPerSeconds;
  for(MidiNote& note: notes) {
   note.time = offset + (int64)note.time*targetTicksPerSeconds/notes.ticksPerSeconds;
  }
@@ -360,13 +364,20 @@ struct Music : Widget {
 
  // Audio
  unique<FFmpeg> audioFile = audioFileName ? unique<FFmpeg>(audioFileName) : nullptr;
-
+ const bool encode = arguments().contains("encode") || arguments().contains("export");
+#if SAMPLER
+ // Sampler
+ Thread decodeThread;
+ Sampler sampler {"Piano/Piano.sfz"_, 1024, {this, &Music::timeChanged}, encode ? mainThread : decodeThread};
+#else
+ struct { int rate=0; } sampler;
+#endif
  // MusicXML
  MusicXML xml = existsFile(name+".xml"_) ? readFile(name+".xml"_) : MusicXML();
  // MIDI
  MidiFile midi = existsFile(name+".mid"_) ? MidiFile(readFile(name+".mid"_)) : MidiFile(); // if used: midi.signs are scaled in synchronizer
 
- MidiNotes notes = ::scale(midi ? copy(midi.notes) : ::notes(xml.signs, xml.divisions), audioFile ? audioFile->audioFrameRate : /*sampler.rate*/0, audioStart(audioFileName));
+ MidiNotes notes = ::scale(midi ? copy(midi.notes) : ::notes(xml.signs, xml.divisions), audioFile ? audioFile->audioFrameRate : sampler.rate, audioStart(audioFileName));
  // Sheet
  Sheet sheet {xml ? xml.signs : midi.signs, xml ? xml.divisions : 1000000, 0, 4,
     /*apply(*/midi||1 ? filter(notes, [](MidiNote o){return o.velocity==0;}) : ref<MidiNote>()/*, [](MidiNote o){return o.key;})*/};
@@ -383,7 +394,6 @@ struct Music : Widget {
  bool crop = keyboardView;
  bool scale = keyboardView;
  int resize = keyboardView ? 4 : 1;
- const bool encode = arguments().contains("encode") || arguments().contains("export");
 
  // View
  GraphicsWidget system {move(sheet.pages[0])};
@@ -414,11 +424,14 @@ struct Music : Widget {
     return output.size;
    } else error(audioFile->channels);
   } else {
-   /*assert_(sampler.channels == audio.channels);
-            assert_(sampler.rate == audio.rate);
-            return sampler.read32(output);*/
+#if SAMPLER
+   assert_(sampler.channels == audio.channels);
+   assert_(sampler.rate == audio.rate);
+   return sampler.read32(output);
+#else
    error("UNIMPL Sampler");
    return 0;
+#endif
   }
  }
 
@@ -428,7 +441,7 @@ struct Music : Widget {
  void timeChanged(uint time) {
   while(samplerMidiIndex < notes.size && (int64)notes[samplerMidiIndex].time*sampler.rate <= (int64)time*notes.ticksPerSeconds) {
    auto note = notes[samplerMidiIndex];
-   sampler.noteEvent(note.key, note.velocity, note.gain);
+   sampler.noteEvent(note.key, note.velocity);//, note.gain);
    samplerMidiIndex++;
   }
  }
@@ -534,7 +547,8 @@ struct Music : Widget {
    assert_(!failed);
 
    Encoder encoder {name+".demo.mp4"_};
-   encoder.setH264(int2(1280,/*720*/240), 30/*60*/);
+   //encoder.setH264(int2(1280,/*720*/240), 30/*60*/);
+   encoder.setH264(int2(1280,widget.sizeHint(vec2(1280,720)).y), 60);
    if(audioFile && (audioFile->codec==FFmpeg::AAC || audioFile->codec==FFmpeg::MP3)) encoder.setAudio(audioFile);
    else error("Unknown codec");//if(audioFile) encoder.setAAC(2 /*Youtube requires stereo*/, audioFile->audioFrameRate);
    encoder.open();
@@ -593,8 +607,8 @@ struct Music : Widget {
     uint64 durationTicks = notes.last().time;
     int percent = round(100.*timeTicks/durationTicks);
     if(percent!=lastReport) {
-     log(str(percent, 2u)+"%", "Render", str(renderTime, totalTime), "Encode", str(videoEncodeTime, totalTime),
-         int(round((float)totalTime*((float)durationTicks/timeTicks-1))), "/", int(round((float)totalTime/timeTicks*durationTicks)), "s");
+     log(str(percent, 2u)+"%", "Render", str(renderTime, totalTime), "Encode", str(videoEncodeTime, totalTime)
+         /*,int(round((float)totalTime*((float)durationTicks/timeTicks-1))), "/", int(round((float)totalTime/timeTicks*durationTicks)), "s"*/);
      lastReport=percent;
     }
     if(timeTicks >= durationTicks) break;
@@ -603,7 +617,7 @@ struct Music : Widget {
    }
    log("Done");
   } else { // Preview
-   window = ::window(this, int2(1366/*1280*/,240));
+   window = ::window(this, int2(/*1366*//*1280*/720,-1));
    window->backgroundColor = white;
    window->show();
    if(running && audioFile && playbackDeviceAvailable()) {

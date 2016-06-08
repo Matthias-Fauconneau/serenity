@@ -6,6 +6,7 @@
 #include "thread.h"
 #include "data.h"
 #include "file.h"
+#include "algorithm.h"
 
 // -> \file math.h
 //inline void operator*=(mref<float> values, float factor) { values.apply([factor](float v) { return factor*v; }, values); }

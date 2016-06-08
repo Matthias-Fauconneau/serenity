@@ -18,7 +18,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
  s.advance(10);
  uint16 nofChunks = s.read();
  ticksPerBeat = (uint16)s.read(); // Defaults to 60 qpm (FIXME: max 64/metronome.perMinute)
- notes.ticksPerSeconds = 120/60*ticksPerBeat; // Ticks per second (Default tempo is 120bpm/60s/min)
+ notes.ticksPerSeconds = 1000000; // microseconds //120/60*ticksPerBeat; // Ticks per second (Default tempo is 120bpm/60s/min)
 
  for(int i=0; s && i<nofChunks;i++) {
   ref<byte> tag = s.read<byte>(4); uint32 length = s.read();
@@ -455,7 +455,16 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
     }
 #endif
 
-    // FIXME: Remove repeat
-    int index=(signs.size+1)/2+1; for(;;index++) if(signs[index].type == Sign::Measure) break;
-    signs = copyRef(signs.slice(0, index+1));
+    {    // FIXME: Remove repeat
+     int index=(signs.size+1)/2+1; for(;;index++) if(signs[index].type == Sign::Measure) break;
+     signs = copyRef(signs.slice(0, index+1));
+     notes = MidiNotes(copyRef(notes.slice(0, notes.size/2)), notes.ticksPerSeconds);
+    }
+
+    {
+     uint64 measureLength = 0;
+     for(int index=0;;index++) if(signs[index].type == Sign::Measure) { measureLength = signs[index].time; break; }
+     log(measureLength);
+     for(MidiNote& note: notes) note.time += 2*measureLength;
+    }
 }

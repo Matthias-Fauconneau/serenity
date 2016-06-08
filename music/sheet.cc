@@ -854,7 +854,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
      { array<uint> keys = ::move(measureNoteKeys);
       array<char> chord;
       if(measureNumbers && measureBars) chord.append(str(measureBars->size())+" "_); // Measure index
-      if(keys) { // Chord names
+      if(keys && 0) { // Chord names
        uint root = keys[0];
        chord.append( strKey(keySignature, root) );
        if(keys.size>1) {
@@ -1262,7 +1262,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerSecond, int2 pageSize, float halfLine
  // Associates MIDI notes with score notes
  // chordToNote: First MIDI note index of chord
  midiToSign = buffer<Sign>(midiNotes.size, 0);
- constexpr bool logErrors = true;
+ constexpr bool logErrors = false;
 
 #if 1
  if(midiNotes) {
@@ -1305,6 +1305,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerSecond, int2 pageSize, float halfLine
 
   /// Synchronizes MIDI and score using dynamic time warping
   size_t m = S.size, n = M.size;
+  //log(m, n);
   if(m > n) {
    log("m > n", m, n);
    return;
