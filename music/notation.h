@@ -149,7 +149,7 @@ typedef int KeySignature; // Index on the fifths circle
 struct TimeSignature { uint beats, beatUnit; };
 struct Metronome { Value beatUnit; uint perMinute; };
 struct Step { uint staff; int step; };
-struct Tuplet { uint size; struct { /*uint time; Step min, max;*/ int min, max; } first, last; /*Step min, max;*/ int min, max; };
+struct Tuplet { uint size; struct { int min, max; } first, last; int min, max; };
 using Dynamic = SMuFL::Dynamic;
 enum Wedge { Crescendo, Diminuendo, WedgeStop };
 enum Pedal { Start, Change, PedalStop, Ped };
@@ -251,4 +251,34 @@ inline String str(const Sign& o) {
     if(o.type==Sign::Wedge) return copyRef(ref<string>{"<"_, ">", ""_}[int(o.wedge)]);
     if(o.type==Sign::Pedal) return copyRef(ref<string>{"\\"_, "^"_, "⌋"_, "P"_}[int(o.pedal)/*-Ped*/]);
     error(int(o.type));
+}
+
+inline int insertSign(array<Sign>& signs, array<int>& activeTies, int& minStep, int& maxStep, Tuplet& tuplet, Sign sign) {
+    int signIndex = signs.insertSorted(sign);
+    for(int& index: activeTies) if(signIndex <= index) index++;
+    if(signIndex <= minStep) minStep++;
+    if(signIndex <= maxStep) maxStep++;
+    for(Sign& sign: signs) {
+        if(sign.type == Sign::Tuplet) {
+            Tuplet& tuplet = sign.tuplet;
+            if(signIndex <= tuplet.first.min) tuplet.first.min++;
+            if(signIndex <= tuplet.first.max) tuplet.first.max++;
+            if(signIndex <= tuplet.last.min) tuplet.last.min++;
+            if(signIndex <= tuplet.last.max) tuplet.last.max++;
+            if(signIndex <= tuplet.min) tuplet.min++;
+            if(signIndex <= tuplet.max) tuplet.max++;
+        }
+    }
+    if(signIndex <= tuplet.first.min) tuplet.first.min++;
+    if(signIndex <= tuplet.first.max) tuplet.first.max++;
+    if(signIndex <= tuplet.last.min) tuplet.last.min++;
+    if(signIndex <= tuplet.last.max) tuplet.last.max++;
+    if(signIndex <= tuplet.min) tuplet.min++;
+    if(signIndex <= tuplet.max) tuplet.max++;
+    return signIndex;
+};
+
+#include "map.h"
+inline int implicitAlteration(int keySignature, const map<int, int>& measureAlterations, int step) {
+    return measureAlterations.contains(step) ? measureAlterations.at(step) : signatureAlteration(keySignature, step);
 }

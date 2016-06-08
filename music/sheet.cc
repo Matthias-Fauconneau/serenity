@@ -19,8 +19,8 @@ static vec2 text(vec2 origin, string message, float fontSize, array<Glyph>& glyp
 // Sheet parameters and musical context
 struct SheetContext {
  // Musical context
- uint ticksPerQuarter; // Divisions (tick time unit rhythmic definition)
- uint ticksPerMinutes = 0; // Tempo
+ uint ticksPerSecond; // Divisions (tick time unit rhythmic definition)
+ uint beatsPerMinute = 0; // Tempo
  TimeSignature timeSignature = {4,4};
  KeySignature keySignature = 0;
  vec2 pedalStart = 0; size_t pedalStartSystemIndex=0; // Last pedal start/change position
@@ -39,7 +39,7 @@ struct SheetContext {
  float Y(uint staff, Clef clef, int step) { return staffY(staff, clefStep(clef, step)); };
  float Y(Sign sign) { assert_(sign.type==Sign::Note, int(sign.type)); return staffY(sign.staff, clefStep(sign)); };
 
- SheetContext(uint ticksPerQuarter, float halfLineInterval) : ticksPerQuarter(ticksPerQuarter), halfLineInterval(halfLineInterval) {}
+ SheetContext(uint ticksPerSecond, float halfLineInterval) : ticksPerSecond(ticksPerSecond), halfLineInterval(halfLineInterval) {}
 };
 
 // Signs belonging to a same chord (same time)
@@ -54,7 +54,7 @@ struct Staff {
  Clef clef {NoClef,0};
  Sign octaveStart {.octave=OctaveStop}; // Current octave shift (for each staff)
  uint beatTime = 0; // Time after last commited chord in .16 quarters since last time signature change
- uint time = 0; // Time after last commited chord in ticks
+ //uint64 time = 0; // Time after last commited chord in ticks
  // Staff measure context
  //float x = 0;// = margin; 	// Holds current pen position for each line
  bool pendingWhole = false;
@@ -121,7 +121,7 @@ struct System : SheetContext {
  uint measureStartTime = 0; // in ticks
  uint shortestInterval = 0; // in ticks
  float X(uint time) {
-  assert_(shortestInterval && measureStartTime <= time);
+  assert_(shortestInterval && measureStartTime <= time, shortestInterval, measureStartTime, time);
   return measureStartX + (time-measureStartTime)/shortestInterval*spaceWidth;
  }
  size_t justifiedSpace = 0;
@@ -187,7 +187,8 @@ static bool isStemUp(ref<Chord> chords) {
 }
 
 float System::stemX(const Chord& chord, bool stemUp) {
- //log("stemX", X(chord[0].time));
+ //log("stemX", measureStartX, chord[0].time-measureStartTime, measureStartX, chord[0].time, X(chord[0].time)-measureStartX, X(chord[0].time));
+ //assert_(X(chord[0].time)-measureStartX < 200);
  return X(chord[0].time) /*+ spaceWidth*/ + (stemUp ? noteSize(chord.last())-1 : 0);
 }
 
@@ -582,15 +583,13 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 
  for(size_t signIndex: range(signs.size)) {
   Sign sign = signs[signIndex];
-  if(0 && sign.type == Sign::Rest && sign.rest.value == Whole) {
-   continue; // FIXME: Skips whole rest (spacing workaround)
-  }
+  //if(0 && sign.type == Sign::Rest && sign.rest.value == Whole) continue; // FIXME: Skips whole rest (spacing workaround)
   /*auto nextStaffTime = [&](uint staff, int time) {
                                 assert_(staff < staffCount);
                                 //assert_(sign.time >= staves[staff].time);
                                 if(sign.time > staves[staff].time) {
                                         uint unmarkedRestTickDuration = time - staves[staff].time;
-                                        int unmarkedRestDuration = unmarkedRestTickDuration * quarterDuration / ticksPerQuarter;
+                                        int unmarkedRestDuration = unmarkedRestTickDuration * quarterDuration / ticksPerSecond;
                                         //log("Unmarked rest", staff, staves[staff].beatTime, unmarkedRestDuration, staves[staff].time, time, unmarkedRestTickDuration);
                                         staves[staff].time += unmarkedRestTickDuration;
                                         staves[staff].beatTime += unmarkedRestDuration;
@@ -719,6 +718,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
       /*for(Sign sign: staves[staff].chord) // Dichord
                            if(abs(sign.note.step-note.step) <= 1) { x += glyphAdvance(SMuFL::NoteHead::Black); break; }*/
       staves[staff].chord.insertSorted(sign);
+      //log(".");
      } else { // Grace note
       //error("Grace");
 #if GRACE || 1
@@ -764,7 +764,8 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
       else {
        vec2 p = vec2(x, staffY(staff, -4));
        x += glyph(p, SMuFL::Rest::Longa+int(sign.rest.value), 1./2, 6);
-       assert_(sign.rest.value >= Value::Long && sign.rest.value <= Value::Eighth, int(sign.rest.value));
+       //assert_(sign.rest.value >= Value::Long && sign.rest.value <= Value::Eighth, int(sign.rest.value));
+       assert_(sign.rest.value >= Value::Long && sign.rest.value <= Value::Sixteenth, int(sign.rest.value));
        //assert_(!sign.rest.dot, signIndex, int(sign.rest.value));
        // Dot
        if(sign.rest.dot) {
@@ -777,7 +778,8 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
       uint duration = sign.rest.duration();
       if(sign.rest.value == Whole) duration = measureLength - staves[staff].beatTime%measureLength;
       staves[staff].beatTime += duration;
-      staves[staff].time += duration * ticksPerQuarter / quarterDuration; //sign.duration;
+      //staves[staff].time += duration * ticksPerSecond * 60 / beatsPerMinute / quarterDuration; //sign.duration;
+      //log("r", staves[staff].beatTime);
      }
     }
     else error(int(sign.type));
@@ -808,8 +810,8 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
    //float x = timeTrack.values.last(); //timeTrack.at(sign.time);//.maximum();
    float x = X(sign.time);
 
-   uint beatDuration = quarterDuration * 4 / timeSignature.beatUnit;
-   for(Staff& staff: staves) if(staff.beatTime % beatDuration != 0) staff.beatTime = 0;
+   //uint beatDuration = quarterDuration * 4 / timeSignature.beatUnit;
+   //for(Staff& staff: staves) if(staff.beatTime % beatDuration != 0) staff.beatTime = 0;
 
    if(sign.type==Sign::TimeSignature) {
     for(Staff& staff: staves) staff.beatTime = 0;
@@ -852,7 +854,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
      { array<uint> keys = ::move(measureNoteKeys);
       array<char> chord;
       if(measureNumbers && measureBars) chord.append(str(measureBars->size())+" "_); // Measure index
-      if(keys) {
+      if(keys) { // Chord names
        uint root = keys[0];
        chord.append( strKey(keySignature, root) );
        if(keys.size>1) {
@@ -860,7 +862,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
         if(third-root == 3) chord.append("m");
        }
        float x = measureFirstNote;
-       text(vec2(x, staffY(staves.size-1, max(10, line.last().top))), chord, textSize, system.glyphs, vec2(1./2,0/*1*/));
+       text(vec2(x, staffY(staves.size-1, max(11, line.last().top))), chord, textSize, system.glyphs, vec2(1./2,0/*1*/));
       }
       //error(chord);
       //log_(chord+" ");
@@ -883,6 +885,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
      // Draws measure bar
      //if(measureBars) log("|", sign.time, x);
      x += dx;
+     x -= spaceWidth/2;
      if(margin || signIndex < signs.size-1) {
       if(1) { // Grand staff
        //if(measureBars)  log("|", x);
@@ -901,14 +904,17 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
      }
      // Records current parameters at the end of this measure in case next measure triggers a line break
      measureCount++;
+     //if(measureCount==5) break;
      if(sign.measure.lineBreak == Measure::PageBreak) pageBreak = true;
      lastMeasureBarIndex = signIndex;
      allocatedLineWidth = x + margin;
      //spaceCount = timeTrack.size() - 1; /*-1 as there is no space for last measure bar*/ // + additionnalSpaceCount;
-     uint currentMeasureDuration = staves[0].beatTime*ticksPerQuarter - measureStartTime;
+     uint currentMeasureDuration = staves[0].beatTime*ticksPerSecond *60/beatsPerMinute - measureStartTime;
      spaceCount = currentMeasureDuration / shortestInterval;
 
-     if(measureCount==1) firstMeasureTime = staves[0].beatTime; // Track pickup duration to offset times for correct beaming
+     //log("|", staves[0].beatTime);
+     //if(measureCount==1)
+     firstMeasureTime = staves[0].beatTime; // Track pickup duration to offset times for correct beaming
 
      // Evaluates next measure step ranges
      nextMeasureIndex++;
@@ -919,7 +925,8 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
                     }*/
      measure = evaluateStepRanges(signs.slice(signIndex, nextMeasureIndex-signIndex));
      shortestInterval = evaluateShortestInterval(signs.slice(0, nextMeasureIndex));
-     measureStartX = X(sign.time)+spaceWidth;
+     //measureStartX = X(sign.time);//+spaceWidth;
+     measureStartX = x+spaceWidth/2;
      measureStartTime = sign.time;
     }
     else if(sign.type==Sign::KeySignature) {
@@ -972,8 +979,8 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
    bool stemUp = isStemUp({signs[signIndex+tuplet.min].staff, clefStep(signs[signIndex+tuplet.min])}, {signs[signIndex+tuplet.max].staff, clefStep(signs[signIndex+tuplet.max])});
    bool above = stemUp;
 
-   float x0 = X((signs[signIndex + (above ? tuplet.first.max : tuplet.first.min)]).time) + spaceWidth;
-   float x1 = X((signs[signIndex + (above ? tuplet. last.max : tuplet. last.min)]).time) + spaceWidth + glyphSize(SMuFL::NoteHead::Black).x;
+   float x0 = X((signs[signIndex + (above ? tuplet.first.max : tuplet.first.min)]).time);// + spaceWidth;
+   float x1 = X((signs[signIndex + (above ? tuplet. last.max : tuplet. last.min)]).time)/* + spaceWidth*/ + glyphSize(SMuFL::NoteHead::Black).x;
    //float tx = Text(str(tupletSize.size), textSize, 0, 1, 0, "LinLibertine", false).sizeHint().x;
    float x = (x0+x1)/2;// + glyphSize(SMuFL::NoteHead::Black).x/2;// - tx;
 
@@ -983,7 +990,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
    float dy = (above ? -1 : 1) * beamWidth;
    float y = stemY+dy;
    vec2 unused size = text(vec2(x,y), str(tuplet.size), textSize/2, system.glyphs, vec2(1./2, 1./2/*above ? 1 : 0*/));
-   if(uint(signs[signIndex+tuplet.last.min].time - signs[signIndex+tuplet.first.min].time) > ticksPerQuarter) { // No beam ? draw lines
+   if(uint(signs[signIndex+tuplet.last.min].time - signs[signIndex+tuplet.first.min].time) > ticksPerSecond*60/beatsPerMinute) { // No beam ? draw lines
     system.lines.append(vec2(x0, y0+dy), vec2(x-size.x, y0+((x-size.x)-x0)/(x1-x0)*(y1-y0)+dy), black);
     system.lines.append(vec2(x+size.x, y0+((x+size.x)-x0)/(x1-x0)*(y1-y0)+dy), vec2(x1, y1+dy), black);
    }
@@ -993,10 +1000,10 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
    float x = X(sign.time);
 
    if(sign.type == Sign::Metronome) {
-    if(ticksPerMinutes!=sign.metronome.perMinute*ticksPerQuarter) {
+    if(beatsPerMinute!=sign.metronome.perMinute) {
      x += text(vec2(x, staffY(staves.size-1, 16)), "♩="_+str(sign.metronome.perMinute)+" "_, textSize, system.glyphs, vec2(0,0)).x;
-     if(ticksPerMinutes) log(ticksPerMinutes, "->", sign.metronome.perMinute*ticksPerQuarter); // FIXME: variable tempo
-     ticksPerMinutes = max(ticksPerMinutes, sign.metronome.perMinute*ticksPerQuarter);
+     if(beatsPerMinute) log(beatsPerMinute, "->", sign.metronome.perMinute); // FIXME: variable tempo
+     beatsPerMinute = sign.metronome.perMinute;
     }
    } else if(sign.type == Sign::Dynamic) {
     assert_(sign.dynamic!=-1);
@@ -1045,6 +1052,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
    } else error(int(sign.type));
   }
 
+  //log("?");
   for(size_t staff: range(staves.size)) { // Layout notes, stems, beams and ties
    array<Chord>& beam = staves[staff].beam;
    Chord& chord = staves[staff].chord;
@@ -1077,13 +1085,14 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
      //if(timeSignature.beats == 4 && timeSignature.beatUnit == 4) beatDuration *= 2; // FIXME: not always
      //if(/*timeSignature.beats == 6 &&*/ timeSignature.beatUnit == 8) beatDuration *= 2; // Beams quaver pairs even in /8 (i.e <=> 3/4)
      //if(timeSignature.beats == 6 && timeSignature.beatUnit == 8)
-     uint beatDuration = quarterDuration * 3 / 2; //timeSignature.beats / timeSignature.beatUnit;
+     //uint beatDuration = quarterDuration * 3 / 2; //timeSignature.beats / timeSignature.beatUnit;
+     uint beatDuration = quarterDuration * 2;
 
-
-     if(beamDuration+chordDuration > maximumBeamDuration /*Beam before too long*/
+     //log(firstMeasureTime, staves[staff].beatTime, (staves[staff].beatTime-firstMeasureTime)%beatDuration, beatDuration, chordDuration, beamDuration);
+     if( beamDuration+chordDuration > maximumBeamDuration /*Beam before too long*/
         || beam.size >= 8 /*Beam before too many*/
         || (staves[staff].beatTime-firstMeasureTime)%beatDuration==0 /*Beam before spanning*/
-        //|| beam[0][0].note.durationCoefficientDen != chord[0].note.durationCoefficientDen // Do not mix tuplet beams
+        || beam[0][0].note.durationCoefficientDen != chord[0].note.durationCoefficientDen // Do not mix tuplet beams
         || (beam[0][0].note.durationCoefficientDen>1 && beam.size == beam[0][0].note.durationCoefficientDen) // Full tuplet beams
         ) {
       layoutNotes(staff);
@@ -1099,11 +1108,13 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 
     // Next
     chord.clear();
-    if(sign.time >= staves[staff].time) {
+    //if(sign.time >= staves[staff].time) {
      //assert_(sign.time == staves[staff].time, sign.time, staves[staff].time);
-     staves[staff].time += chordDuration * ticksPerQuarter / quarterDuration;
+     //staves[staff].time += chordDuration * ticksPerSecond*60/beatsPerMinute / quarterDuration;
      staves[staff].beatTime += chordDuration;
-    }
+     //log("o", staves[staff].beatTime);
+     //assert_(sign.time >= staves[staff].time, sign.time, staves[staff].time, chordDuration, ticksPerSecond*60/beatsPerMinute, quarterDuration);
+    //} else error(sign.time, staves[staff].time, chordDuration, ticksPerSecond*60/beatsPerMinute, quarterDuration);
    }
   }
 continue2_:;
@@ -1120,7 +1131,7 @@ continue2_:;
    system.lines.append(vec2(measureBars->values[0], y), vec2(measureBars->values.last(), y), black, 3.f/4, true); // Raster
   }
  }
- const int highMargin = 0, lowMargin = -18;
+ const int highMargin = 13, lowMargin = -18;
  system.bounds.min = vec2(0, staffY(staves.size-1, max(highMargin, line[staves.size-1].top)+2));
  system.bounds.max = vec2(pageWidth, staffY(0, min(lowMargin, line[0].bottom)));
 }
@@ -1131,9 +1142,9 @@ inline bool operator ==(const Sign& sign, const uint& key) {
 }
 
 // Layouts notations to graphic primitives (and parses notes to MIDI keys)
-Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLineInterval, ref<MidiNote> midiNotes, string title, bool pageNumbers, bool measureNumbers)
+Sheet::Sheet(ref<Sign> signs, uint ticksPerSecond, int2 pageSize, float halfLineInterval, ref<MidiNote> midiNotes, string title, bool pageNumbers, bool measureNumbers)
  : pageSize(pageSize) {
- SheetContext context (ticksPerQuarter, halfLineInterval);
+ SheetContext context (ticksPerSecond, halfLineInterval);
  uint staffCount = 0; for(const Sign& sign: signs) if(sign.type == Sign::Note) staffCount = max(staffCount, sign.staff+1);
  buffer<Staff> staves {staffCount}; staves.clear(); //for(Staff& staff: staves) staff.x = context.margin;
  array<System::TieStart> activeTies;
@@ -1248,8 +1259,6 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
   doPage(pageSystems);
  }
 
- if(!context.ticksPerMinutes) context.ticksPerMinutes = 90*ticksPerQuarter;
-
  // Associates MIDI notes with score notes
  // chordToNote: First MIDI note index of chord
  midiToSign = buffer<Sign>(midiNotes.size, 0);
@@ -1279,7 +1288,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerQuarter, int2 pageSize, float halfLin
    array<uint> bin;
    array<uint> binI;
    int64 time = midiNotes[index].time;
-   while(index < midiNotes.size && midiNotes[index].time < time+int(2048)) { // TODO: cluster size with most similar bin count/size
+   while(index < midiNotes.size && int64(midiNotes[index].time) < time+2048) { // TODO: cluster size with most similar bin count/size
     bin.append(midiNotes[index].key);
     index++;
    }

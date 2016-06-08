@@ -55,12 +55,18 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
  Clef clefs[staffCount];
  if(staffCount==1) clefs[0] = {GClef,0};
  else { clefs[0] = {FClef,0}, clefs[1] = {GClef,0}; }
- for(uint staff: range(staffCount)) signs.insertSorted({Sign::Clef, 0, {{staff, {.clef=clefs[staff]}}}});
  array<MidiNote> currents[staffCount]; // New notes to be pressed
  array<MidiNote> actives[staffCount]; // Notes currently pressed
  array<MidiNote> commited[staffCount]; // Commited/assigned notes to be written once duration is known (on note off)
  uint lastOff[staffCount] = {}; // For rests
- signs.insertSorted({Sign::TimeSignature, 0, .timeSignature=timeSignature});
+ //uint lastChordTime=0;
+ int minStep = 0, maxStep = 0;
+ Tuplet tuplet {0, {0,0}, {0,0}, 0,0}; //{0,{},{},{},{}};
+ uint tupletCurrentSize = 0;
+ array<int> activeTies;
+ auto insertSign = [this,&activeTies,&minStep,&maxStep,&tuplet](Sign sign) { return ::insertSign(signs, activeTies, minStep, maxStep, tuplet, sign); };
+ insertSign({Sign::TimeSignature, 0, .timeSignature=timeSignature});
+ for(uint staff: range(staffCount)) insertSign({Sign::Clef, 0, {{staff, {.clef=clefs[staff]}}}});
  for(uint lastTime = 0;;) {
   size_t trackIndex = invalid;
   for(size_t index: range(tracks.size))
@@ -144,7 +150,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
     uint beatUnit = 1<<data[1];
     TimeSignature newTimeSignature {beats, beatUnit};
     if(newTimeSignature.beats != timeSignature.beats || newTimeSignature.beatUnit != timeSignature.beatUnit) {
-     signs.insertSorted({Sign::TimeSignature, track.time, .timeSignature=timeSignature});
+     insertSign({Sign::TimeSignature, track.time, .timeSignature=timeSignature});
      assert_(track.time == 0, track.time);
     }
    }
@@ -153,15 +159,15 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
     lastTempoChange = track.time;
     usPerBeat = ((data[0]<<16)|(data[1]<<8)|data[2]); // Microseconds per beat (quarter)
     trackTimeUS = lastTempoChangeUS;
-    metronome.perMinute = 60000000 / usPerBeat; // Beats per minute
-    //if(perMinute) signs.insertSorted({track.time, 0, uint(-1), Sign::Metronome, .metronome={Quarter, perMinute}});
+    metronome.perMinute = round(60000000. / usPerBeat); // Beats per minute
+    if(metronome.perMinute) insertSign({Sign::Metronome, track.time, .metronome={Quarter, metronome.perMinute}});
    }
    else if(MIDI(key)==MIDI::KeySignature) {
     int newKeySignature = (int8)data[0];
     //scale=data[1]?Minor:Major;
     if(keySignature != newKeySignature) {
      keySignature = newKeySignature;
-     signs.insertSorted({Sign::KeySignature, trackTimeUS, .keySignature=keySignature});
+     insertSign({Sign::KeySignature, trackTimeUS, .keySignature=keySignature});
     }
    }
    else if(MIDI(key)==MIDI::TrackName || MIDI(key)==MIDI::InstrumentName || MIDI(key)==MIDI::Text || MIDI(key)==MIDI::Copyright) {}
@@ -200,16 +206,16 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
       while(totalDuration >= int64(usPerBeat/4)) {
        int64 nextMeasureStart = lastMeasureStart+measureLengthUS;
        int64 restDuration = ::min(totalDuration, nextMeasureStart-restStart);
-       if(restDuration*16/usPerBeat>=8) {
+       if(restDuration*16/usPerBeat>=4) {
         //log(restDuration*16/usPerBeat);
-        signs.insertSorted({Sign::Rest, uint64(restStart), {{staff, {{restDuration, .rest={Value(ref<uint>(valueDurations).size-1-log2(restDuration*16/usPerBeat))}}}}}});
+        insertSign({Sign::Rest, uint64(restStart), {{staff, {{restDuration, .rest={Value(ref<uint>(valueDurations).size-1-log2(restDuration*16/usPerBeat))}}}}}});
        //log(restStart, restDuration, restStart+restDuration);
        }
        totalDuration -= restDuration;
        restStart += restDuration;
        if(restStart >= nextMeasureStart) {
         lastMeasureStart = nextMeasureStart;
-        signs.insertSorted({Sign::Measure, uint(nextMeasureStart), .measure={Measure::NoBreak, measureIndex, 1, 1, measureIndex}});
+        insertSign({Sign::Measure, uint(nextMeasureStart), .measure={Measure::NoBreak, measureIndex, 1, 1, measureIndex}});
         measureIndex++;
        }
       }
@@ -218,7 +224,8 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
       uint nextMeasureStart = lastMeasureStart+measureLengthUS;
       if(trackTimeUS >= nextMeasureStart) {
        lastMeasureStart = nextMeasureStart;
-       signs.insertSorted({Sign::Measure, nextMeasureStart, .measure={Measure::NoBreak, measureIndex, 1, 1, measureIndex}});
+       assert_(tupletCurrentSize == 0, tupletCurrentSize, measureIndex);
+       insertSign({Sign::Measure, nextMeasureStart, .measure={Measure::NoBreak, measureIndex, 1, 1, measureIndex}});
        measureIndex++;
       }
 
@@ -226,17 +233,18 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
       if(!valueDuration) valueDuration = 8; //FIXME
       assert_(valueDuration, duration, ticksPerBeat);
       bool dot=false;
-      uint tuplet = 1;
+      uint tupletSize = 1;
+      //log(valueDuration);
       if(valueDuration >= 1 && valueDuration <= 1) valueDuration = 1; // Grace
       else if(valueDuration >= 2 && valueDuration <= 2) valueDuration = 2; // Grace
-      else if(valueDuration >= 3 && valueDuration <= 4) valueDuration = 4; // Semiquaver
-      else if(valueDuration >= 5 && valueDuration <= 6) { // Triplet of quavers
-       tuplet = 3;
+      else if(valueDuration >= 3 && valueDuration <= 3) valueDuration = 4; // Semiquaver
+      else if(valueDuration >= 4/*5*/ && valueDuration <= 6) { // Triplet of quavers
+       tupletSize = 3;
        valueDuration = 8;
       }
       else if(valueDuration >= 7 && valueDuration <= 8) valueDuration = 8; // Quaver
       else if(valueDuration >= 9 && valueDuration <= 12) { // Triplet of quarter (32/3~11)
-       tuplet = 3;
+       tupletSize = 3;
        valueDuration = 16;
       }
       else if(valueDuration >= 13/*14*/ && valueDuration <= 19/*16*/) valueDuration = 16; // Quarter
@@ -272,19 +280,41 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
       assert_(isPowerOfTwo(valueDuration), duration, ticksPerBeat, duration*32/ticksPerBeat, valueDuration, strKey(0, key), dot);
       Value value = Value(ref<uint>(valueDurations).size-1-log2(valueDuration));
       //assert_(int(value) >= 0, duration, valueDuration, note.time - noteOn.time);
-      if(int(value) >= 0) // FIXME
-       signs.insertSorted(Sign{Sign::Note, noteOn.time, {{staff, {{duration, .note={
+      //if(int(value) >= 0) // FIXME
+      int step = keyStep(keySignature, key);
+      int index = insertSign(Sign{Sign::Note, noteOn.time, {{staff, {{duration, .note={
                                                                     .value = value,
                                                                     .clef = clefs[staff],
-                                                                    .step = keyStep(keySignature, key),
+                                                                    .step = step,
                                                                     .alteration = keyAlteration(keySignature, key),
-                                                                    //.accidental = alterationAccidental(keyAlteration(keySignature, key)), // FIXME
-                                                                    .accidental = keyAlteration(keySignature, key) ? alterationAccidental(keyAlteration(keySignature, key)) : Accidental::None, // FIXME
+                                                                    .accidental = alterationAccidental(keyAlteration(keySignature, key)), // Implicit accidentals are filtered at the end
                                                                     .tie = Note::NoTie,
-                                                                    .durationCoefficientNum = tuplet!=1 ? tuplet-1 : 1,
-                                                                    .durationCoefficientDen = tuplet,
+                                                                    .durationCoefficientNum = tupletSize!=1 ? tupletSize-1 : 1,
+                                                                    .durationCoefficientDen = tupletSize,
                                                                     .dot=dot,
                                                                    }}}}}});
+      //log(valueDuration, tupletSize, tupletCurrentSize);
+      if(tupletCurrentSize && tuplet.size && tupletSize==1 && tupletCurrentSize==tuplet.size-1) { // Correct missing last tuplet
+       tupletSize = tuplet.size;
+       //assert_(tupletSize==tuplet.size, tupletSize, tuplet.size, tupletCurrentSize, valueDuration, measureIndex, signs);
+      }
+      if(tupletSize!=1) {
+       if(!tupletCurrentSize) {
+        tuplet = {tupletSize, {index,index}, {index,index}, index,index};
+        tupletCurrentSize = 1;
+       } else {
+        tupletCurrentSize++;
+        tuplet.last = {index,index};
+        if(step < signs[tuplet.min].note.step) tuplet.min = index;
+        if(step < signs[tuplet.max].note.step) tuplet.max = index;
+       }
+       if(tupletCurrentSize == tupletSize) {
+        //log(signs[tuplet.first.min].time);
+        insertSign({Sign::Tuplet, noteOn.time, {.tuplet=tuplet}});
+        tupletCurrentSize = 0;
+        tuplet = {0, {0,0}, {0,0}, 0,0};
+       }
+      }
       //log("on", noteOn.time, noteOn.time*32/ticksPerBeat, "off", note.time, note.time*32/ticksPerBeat);
       lastOff[staff] = note.time;
      }
@@ -324,5 +354,108 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
  const int measureLength = timeSignature.beats*ticksPerBeat/2; //t/q = t/s * 60s/m / (120q/m)
  assert_(measureLength);
  uint nextMeasureStart = lastMeasureStart+measureLength;
- signs.insertSorted({Sign::Measure, nextMeasureStart, .measure={Measure::NoBreak, measureIndex, 1, 1, measureIndex}}); // Last measure bar
+ insertSign({Sign::Measure, nextMeasureStart, .measure={Measure::NoBreak, measureIndex, 1, 1, measureIndex}}); // Last measure bar
+
+ // FIXME: factorize with MusicXML
+#if 1
+    // Converts absolute references to relative references (tuplet)
+    for(int signIndex: range(signs.size)) {
+        Sign& sign = signs[signIndex];
+        if(sign.type == Sign::Tuplet) {
+            Tuplet& tuplet = sign.tuplet;
+            tuplet.first.min = tuplet.first.min - signIndex;
+            tuplet.first.max = tuplet.first.max - signIndex;
+            tuplet.last.min = tuplet.last.min - signIndex;
+            tuplet.last.max = tuplet.last.max - signIndex;
+            tuplet.min = tuplet.min - signIndex;
+            tuplet.max = tuplet.max - signIndex;
+        }
+    }
+#endif
+
+#if 1 // Converts accidentals to match key signature (pitch class). Tie support needs explicit tiedNoteIndex to match ties while editing steps
+    {
+     KeySignature keySignature = 0;
+     size_t measureStartIndex=0;
+     map<int, int> previousMeasureAlterations; // Currently accidented steps (for implicit accidentals)
+     for(size_t signIndex : range(signs.size)) {
+      map<int, int> measureAlterations; // Currently accidented steps (for implicit accidentals)
+      map<int, int> sameAlterationCount; // Alteration occurence count
+      for(size_t index: range(measureStartIndex, signIndex)) {
+       const Sign sign = signs[index];
+       if(sign.type == Sign::Note) {
+        sameAlterationCount[sign.note.step]++;
+        if(sign.note.accidental && measureAlterations[sign.note.step] != accidentalAlteration(sign.note.accidental)) {
+         measureAlterations[sign.note.step] = accidentalAlteration(sign.note.accidental);
+         sameAlterationCount[sign.note.step] = 0;
+        }
+       }
+      }
+
+      Sign& sign = signs[signIndex];
+      if(sign.type == Sign::Measure) { measureStartIndex = signIndex; previousMeasureAlterations = move(measureAlterations); }
+      if(sign.type == Sign::KeySignature) keySignature = sign.keySignature;
+      if(sign.type == Sign::Note) {
+       if(sign.note.tie == Note::TieContinue || sign.note.tie == Note::TieStop)  {
+        if(sign.note.tieStartNoteIndex) {
+         assert_(sign.note.tieStartNoteIndex);
+         assert_(signs[sign.note.tieStartNoteIndex].type == Sign::Note && (
+            signs[sign.note.tieStartNoteIndex].note.tie == Note::TieStart
+           || signs[sign.note.tieStartNoteIndex].note.tie == Note::TieContinue), sign,
+           sign.note.tieStartNoteIndex, signs[sign.note.tieStartNoteIndex]);
+         sign.note.step = signs[sign.note.tieStartNoteIndex].note.step;
+         sign.note.alteration = signs[sign.note.tieStartNoteIndex].note.alteration;
+         if(sign.note.accidental) log("sign.note.accidental");
+         continue;
+        }
+       }
+
+       auto measureAccidental = [&](int step, int alteration) {
+        return (alteration == implicitAlteration(keySignature, measureAlterations, step)
+                && (!measureAlterations.contains(step) || sameAlterationCount[step] > 1) // Repeats measure alterations once
+                && alteration == previousMeasureAlterations.value(step, alteration)) // Courtesy accidental
+          //&& TODO: courtesy accidentals for white to white key alteration (Cb, Fb, B#, E#)
+          ? Accidental::None :
+            alterationAccidental(alteration);
+       };
+       auto courtesyAccidental = [&](int step, int alteration) {
+        return alteration == implicitAlteration(keySignature, measureAlterations, step)
+          && ((measureAlterations.contains(step) && sameAlterationCount[step] <= 1) // Repeats measure alterations once
+              || alteration != previousMeasureAlterations.value(step, alteration)); // Courtesy accidental
+       };
+
+       // Recomputes accidental to reflect any previous changes to implicit alterations in the same measure
+       sign.note.accidental = measureAccidental(sign.note.step, sign.note.alteration);
+       sign.note.accidentalOpacity = courtesyAccidental(sign.note.step, sign.note.alteration) ? 1./2 : 1;
+
+       int key = sign.note.key();
+       int step = keyStep(keySignature, key) - sign.note.clef.octave*7;
+       int alteration = keyAlteration(keySignature, key);
+       Accidental accidental = measureAccidental(step, alteration);
+
+       //assert(!sign.note.clef.octave, sign.note.clef.octave, sign.note.step);
+       assert_(key == noteKey(sign.note.clef.octave, step, alteration),
+               keySignature, sign.note, sign.note.clef.octave, sign.note.step, sign.note.alteration, key, step, alteration, noteKey(sign.note.clef.octave, step, alteration),
+               strNote(0, step, accidental)/*, strKey(101), strKey(113)*/);
+
+       if((accidental && !sign.note.accidental) // Does not introduce additional accidentals (for ambiguous tones)
+          || (accidental && sign.note.accidental  // Restricts changes to an existing accidental ...
+              && (sign.note.accidental < accidental) == (keySignature < 0) // if already aligned with key alteration direction
+              && sign.note.accidental < Accidental::DoubleSharp)) { // and if simple accidental (explicit complex accidentals)
+        if(previousMeasureAlterations.contains(sign.note.step)) previousMeasureAlterations.remove(sign.note.step); // Do not repeat courtesy accidentals
+        continue;
+       }
+       sign.note.step = step;
+       sign.note.alteration = alteration;
+       sign.note.accidental = accidental;
+       sign.note.accidentalOpacity = courtesyAccidental(sign.note.step, sign.note.alteration) ? 1./2 : 1;
+       if(previousMeasureAlterations.contains(step)) previousMeasureAlterations.remove(step); // Do not repeat courtesy accidentals
+      }
+     }
+    }
+#endif
+
+    // FIXME: Remove repeat
+    int index=(signs.size+1)/2+1; for(;;index++) if(signs[index].type == Sign::Measure) break;
+    signs = copyRef(signs.slice(0, index+1));
 }

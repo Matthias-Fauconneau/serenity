@@ -1,10 +1,6 @@
 #include "MusicXML.h"
 #include "xml.h"
 
-static int implicitAlteration(int keySignature, const map<int, int>& measureAlterations, int step) {
-    return measureAlterations.contains(step) ? measureAlterations.at(step) : signatureAlteration(keySignature, step);
-}
-
 MusicXML::MusicXML(string document, string) {
     Element root = parseXML(document);
 
@@ -88,30 +84,7 @@ MusicXML::MusicXML(string document, string) {
             uint lastChordTime=0; int minStep = 0, maxStep = 0;
             Tuplet tuplet {0, {0,0}, {0,0}, 0,0}; //{0,{},{},{},{}};
 
-            auto insertSign = [&](Sign sign) {
-                int signIndex = signs.insertSorted(sign);
-                for(int& index: activeTies) if(signIndex <= index) index++;
-                if(signIndex <= minStep) minStep++;
-                if(signIndex <= maxStep) maxStep++;
-                for(Sign& sign: signs) {
-                    if(sign.type == Sign::Tuplet) {
-                        Tuplet& tuplet = sign.tuplet;
-                        if(signIndex <= tuplet.first.min) tuplet.first.min++;
-                        if(signIndex <= tuplet.first.max) tuplet.first.max++;
-                        if(signIndex <= tuplet.last.min) tuplet.last.min++;
-                        if(signIndex <= tuplet.last.max) tuplet.last.max++;
-                        if(signIndex <= tuplet.min) tuplet.min++;
-                        if(signIndex <= tuplet.max) tuplet.max++;
-                    }
-                }
-                if(signIndex <= tuplet.first.min) tuplet.first.min++;
-                if(signIndex <= tuplet.first.max) tuplet.first.max++;
-                if(signIndex <= tuplet.last.min) tuplet.last.min++;
-                if(signIndex <= tuplet.last.max) tuplet.last.max++;
-                if(signIndex <= tuplet.min) tuplet.min++;
-                if(signIndex <= tuplet.max) tuplet.max++;
-                return signIndex;
-            };
+            auto insertSign = [this,&activeTies,&minStep,&maxStep,&tuplet](Sign sign) { return ::insertSign(signs, activeTies, minStep, maxStep, tuplet, sign); };
 
             for(const Element& e: m.children) {
                 //if(e.name=="note"_ && e.contains("grace"_)) continue; // FIXME: graces // FIXME: sync
