@@ -25,12 +25,12 @@ ABC::ABC(ref<byte> file) {
  map<int, int> measureAlterations; // Currently altered steps (for implicit alterations)
 
  while(s) {
-  if(s.match(" ")) {}
+  if(s.match(" ")||s.match("\t")) {}
   else if(s.match("\n")) {
    assert_(tuplet.size==1);
    measureAlterations.clear();
    bool pageBreak = s.match("\n") ? true : false;
-   log(measureIndex+1, "|", time);
+   //log(measureIndex+1, "|", time);
    assert_(time%(4*12)==0, time-(time/(4*12)*(4*12)), 4*12, 4*12-(time-(time/(4*12)*(4*12))));
    insertSign({Sign::Measure, time, .measure={pageBreak?Measure::PageBreak:Measure::NoBreak, measureIndex, 1, 1, measureIndex}});
    measureIndex++;
@@ -42,7 +42,7 @@ ABC::ABC(ref<byte> file) {
   else if(s.match("]")) {
    assert_(tuplet.size>1);
    assert_(tuplet.size == tupletCurrentSize, tuplet.size, tupletCurrentSize);
-   log("T", time);
+   //log("T", time);
    insertSign({Sign::Tuplet, signs[tuplet.last.max].time, {.tuplet=tuplet}});
    tuplet = {1, {0,0}, {0,0}, 0,0};
    tupletCurrentSize = 0;
@@ -61,16 +61,31 @@ ABC::ABC(ref<byte> file) {
   }
   else if(s.isInteger()) nextFingering = s.integer();
   else { // Chord
-   int start = s.index;
+   //int start = s.index;
    int minDuration = -1;
    for(;;) {
     int step = "CDEFGABcdefgab"_.indexOf(s.peek());
     if(step == -1) break;
+    int start = s.index;
     s.advance(1);
     Accidental accidental = Accidental::None;
     /**/  if(s.match("♭")) accidental = Accidental::Flat;
     else if(s.match("♮")) accidental = Accidental::Natural;
     else if(s.match("♯")) accidental = Accidental::Sharp;
+    size_t point = s.index;
+    for(;;) {
+     if(s.match("/")) s.matchAny("CDEFGAB");
+     else if(s.match("dim")||s.match("maj")||s.match("m")) {}
+     else if(s.match("⁵")||s.match("⁶")||s.match("⁷")||s.match("⁹")||s.match("¹³")||s.match("♭")||s.match("♯")||s.match("⁽")||s.match("ᵇ")||s.match("⁺")||s.match("⁾")) {}
+     else break;
+    }
+    if(s.index > point) { // Chord name
+     ChordName name;
+     mref<char>(name.name).slice(0,s.index-start).copy(s.sliceRange(start,s.index));
+     mref<char>(name.name).slice(s.index-start).clear(0);
+     insertSign({Sign::ChordName, time, .chordName=name});
+     goto continue2;
+    }
     const int implicitAlteration = ::implicitAlteration(keySignature, measureAlterations, step);
     const int alteration = accidental ? accidentalAlteration(accidental): implicitAlteration;
     //if(alteration == implicitAlteration) accidental = Accidental::None;
@@ -109,12 +124,13 @@ ABC::ABC(ref<byte> file) {
     nextFingering = 0;
    }
    assert_(minDuration>0, s.line());
-   assert_(s.wouldMatchAny(" \n]"), s.line());
+   assert_(s.wouldMatchAny(" \t\n]"), s.line());
    if(tuplet.size>1) tupletCurrentSize++;
-   log(s.sliceRange(start, s.index), minDuration);
+   //log(s.sliceRange(start, s.index), minDuration);
    time += minDuration;
    //nextFingering = 0;
   }
+  continue2:;
  }
  toRelative(signs);
  convertAccidentals(signs);

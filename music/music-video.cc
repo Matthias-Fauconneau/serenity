@@ -457,6 +457,7 @@ struct Music : Widget {
  bool follow(int64 timeNum, int64 timeDen, vec2 size, bool unused preview=true) {
   assert_(timeDen);
   assert_(timeNum >= 0, timeNum);
+  constexpr int staffCount = 1;
   bool contentChanged = false;
   for(;midiIndex < notes.size && (int64)notes[midiIndex].time*timeDen <= timeNum*(int64)notes.ticksPerSeconds; midiIndex++) {
    MidiNote note = notes[midiIndex];
@@ -468,7 +469,7 @@ struct Music : Widget {
      active.insertMulti(note.key, sign);
      if(sign.note.pageIndex != invalid && sign.note.glyphIndex[0] != invalid) {
       assert_(sign.note.pageIndex == 0);
-      for(size_t index: ref<size_t>(sign.note.glyphIndex)) if(index!=invalid) system.glyphs[index].color = (sign.staff?red:green);
+      for(size_t index: ref<size_t>(sign.note.glyphIndex)) if(index!=invalid) system.glyphs[index].color = (sign.staff?red:(staffCount==1?blue:green));
       contentChanged = true;
      }
     }

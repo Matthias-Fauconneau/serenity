@@ -46,7 +46,7 @@ string section(const string s, byte separator, int begin, int end) {
 string trim(const string s) {
 	int begin=0,end=s.size;
     for(;begin<end;begin++) { byte c=s[(uint)begin]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } // Trims heading
-    for(;end>begin;end--) { uint c=s[(uint)end-1]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r') break; } // Trims trailing
+    for(;end>begin;end--) { uint c=s[(uint)end-1]; if(c!=' '&&c!='\t'&&c!='\n'&&c!='\r'&&c!='\0') break; } // Trims trailing
 	return s.slice(begin, end-begin);
 }
 

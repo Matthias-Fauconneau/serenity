@@ -150,7 +150,7 @@ enum class Repeat { Begin=-2, End=-1, None=0 };
 typedef int KeySignature; // Index on the fifths circle
 struct TimeSignature { uint beats, beatUnit; };
 struct Metronome { Value beatUnit; uint perMinute; };
-struct Step { uint staff; int step; };
+struct ChordName { char name[24]={}; };
 struct Tuplet { uint size; struct { int min, max; } first, last; int min, max; };
 using Dynamic = SMuFL::Dynamic;
 enum Wedge { Crescendo, Diminuendo, WedgeStop };
@@ -160,7 +160,7 @@ struct Sign {
     enum {
         Invalid,
         Clef, OctaveShift,
-        Measure, Repeat, KeySignature, TimeSignature, Metronome,
+        Measure, Repeat, KeySignature, TimeSignature, Metronome, ChordName,
         Note, Rest,
         Tuplet,
         Dynamic, Wedge,
@@ -189,6 +189,7 @@ struct Sign {
         ::Repeat repeat;
         ::Tuplet tuplet;
         ::Metronome metronome;
+        ::ChordName chordName;
         ::Dynamic dynamic;
         ::Wedge wedge;
         ::Pedal pedal;

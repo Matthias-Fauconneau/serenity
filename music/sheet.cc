@@ -116,8 +116,7 @@ struct System : SheetContext {
 
  // Metrics
  // Enough space for accidented dichords
- //const float space = /*glyphSize(SMuFL::Accidental::Flat, &smallFont).x+*/glyphSize(SMuFL::NoteHead::Black).x;
- const float space = glyphSize(SMuFL::Accidental::Flat, &smallFont).x+glyphSize(SMuFL::NoteHead::Black).x;
+ const float space = 2*glyphSize(SMuFL::Accidental::Sharp, &smallFont).x+glyphSize(SMuFL::NoteHead::Black).x;
  const float spaceWidth; // Minimum space width on initial layout pass, then space width for measure justification on final layout pass
 
  // Page context
@@ -197,6 +196,8 @@ void System::ledger(Sign sign, float x, float ledgerHalfLength) { // Ledger line
   system.lines.append(vec2(x+noteSize(sign)/2-ledgerHalfLength,y),vec2(x+noteSize(sign)/2+ledgerHalfLength,y), black, opacity, true); // Ledger
  }
 }
+
+struct Step { uint staff; int step; };
 
 static bool isStemUp(Step min, Step max) {
  const int middle = -4;
@@ -358,11 +359,11 @@ void System::layoutNotes(uint staff) {
   // -- Accidental shifts
   buffer<int> accidentalShift (chord.size); accidentalShift.clear();
   // Shifts accidental left when note is left from stem
-  /*for(size_t index: range(chord.size)) {
-            const Sign& sign = chord[index];
-            const Note& note = sign.note;
-            if(note.accidental && ((stemUp && !shift[index]) || (!stemUp && shift[index])) ) accidentalShift[index] = 1;
-        }*/
+  if(1) for(size_t index: range(chord.size)) {
+   const Sign& sign = chord[index];
+   const Note& note = sign.note;
+   if(note.accidental && (/*(stemUp && !shift[index]) ||*/ (!stemUp && shift[index])) ) accidentalShift[index] = 2;
+  }
   // Alternates accidentals shifts
   size_t previousAccidentalIndex = 0;
   while(previousAccidentalIndex < chord.size && !chord[previousAccidentalIndex].note.accidental) previousAccidentalIndex++;
@@ -378,20 +379,20 @@ void System::layoutNotes(uint staff) {
     }
    }
   }
-#if 0
   // Shifts some more when a nearby note is dichord shifted
-  for(size_t index: range(chord.size)) {
+  if(1) for(size_t index: range(chord.size)) {
    const Sign& sign = chord[index];
    const Note& note = sign.note;
    if(note.accidental) {
-    if( ((stemUp && !shift[index]) || (!stemUp && shift[index])) ||
+    if( //((stemUp && !shift[index]) || (!stemUp && shift[index])) ||
         (index > 0            && abs(chord[index-1].note.step-note.step)<=1 && ((stemUp && !shift[index-1]) || (!stemUp && shift[index-1]))) ||
         (index < chord.size-1 && abs(chord[index+1].note.step-note.step)<=1 && ((stemUp && !shift[index+1]) || (!stemUp && shift[index+1])) )) {
-     accidentalShift[index] = /*min(2,*/ accidentalShift[index]+1; //);
+     accidentalShift[index] += 1;
+     //accidentalShift[index] += 2;
+     //accidentalShift[index] = min(4, accidentalShift[index]+2);
     }
    }
   }
-#endif
 
   for(size_t index: range(chord.size)) {
    Sign& sign = chord[index];
@@ -417,14 +418,22 @@ void System::layoutNotes(uint staff) {
     // Dot
     if(note.dot) {
      float dotOffset = glyphSize(SMuFL::NoteHead::Black).x*7/6;
-     glyph(vec2(X(sign.time) /*+ spaceWidth*/ + (shift.contains(true) ? noteSize(sign) : 0)+dotOffset, Y(sign.staff, note.clef, note.step/2*2 +1)), SMuFL::Dot, opacity);
+     glyph(vec2(X(sign.time) + (shift.contains(true) ? noteSize(sign) : 0)+dotOffset, Y(sign.staff, note.clef, note.step/2*2 +1)), SMuFL::Dot, opacity);
     }
 
+    if(0) error(
+       glyphAdvance(SMuFL::Accidental::Flat      , &smallFont), glyphSize(SMuFL::Accidental::Flat     , &smallFont).x,
+       glyphAdvance(SMuFL::Accidental::Natural, &smallFont), glyphSize(SMuFL::Accidental::Natural, &smallFont).x,
+       glyphAdvance(SMuFL::Accidental::Sharp  , &smallFont), glyphSize(SMuFL::Accidental::Sharp   , &smallFont).x );
     // Accidental
     if(note.accidental) {
      {note.glyphIndex[1] = system.glyphs.size; // Records glyph index of accidental, i.e next glyph to be appended to system.glyphs :
-      glyph(vec2(X(sign.time) /*+ spaceWidth*/ - accidentalShift[index] * glyphSize(note.accidental, &smallFont).x
-                 - glyphSize(note.accidental, &smallFont).x, y), note.accidental, note.accidentalOpacity, 6);
+      float dx = 0; // Tweaks accidental advance
+      if(note.accidental==Accidental::Flat) dx = glyphAdvance(SMuFL::Accidental::Flat, &smallFont)*1./4;
+      if(note.accidental==Accidental::Natural) dx = glyphAdvance(SMuFL::Accidental::Natural, &smallFont)*1./3;
+      if(note.accidental==Accidental::Sharp) dx = glyphAdvance(SMuFL::Accidental::Sharp, &smallFont)*1./2;
+      glyph(vec2(X(sign.time) - accidentalShift[index] * glyphAdvance(SMuFL::Accidental::Sharp, &smallFont)*5./4
+                 - glyphAdvance(sign.note.accidental, &smallFont) - dx, y), note.accidental, note.accidentalOpacity, 6);
      }
     }
    }
@@ -448,7 +457,7 @@ void System::layoutNotes(uint staff) {
 
      //assert_(tie.position.y == Y(sign));
      if(tie.position.y != Y(sign)) log("tie.position.y != Y(sign)", tie.position.y, Y(sign));
-     float x = X(sign.time) /*+ spaceWidth*/, y = Y(sign);
+     float x = X(sign.time), y = Y(sign);
      int slurDown = (chord.size>1 && index==chord.size-1) ? -1 :(y > staffY(staff, -4) ? 1 : -1);
      vec2 p0 = vec2(tie.position.x + noteSize(sign)/2 + (note.dot?space/2:0), y + slurDown*halfLineInterval);
      float bodyOffset = shift[index] ? noteSize(sign) : 0; // Shift body for dichords
@@ -487,7 +496,7 @@ void System::layoutNotes(uint staff) {
     float bodyOffset = shift[index] ? noteSize(sign) : 0; // Shift body for dichords
     if(activeTies) { // Skips on first pass
      auto& activeTies = *this->activeTies;
-     activeTies.append(staff, note.step, vec2(X(sign.time)/*+spaceWidth*/+bodyOffset, Y(sign)));
+     activeTies.append(staff, note.step, vec2(X(sign.time)+bodyOffset, Y(sign)));
      //log(apply(activeTies[staff],[](TieStart o){return o.step;}));
     }
    }
@@ -1068,6 +1077,9 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
      if(beatsPerMinute) log(beatsPerMinute, "->", sign.metronome.perMinute); // FIXME: variable tempo
      beatsPerMinute = sign.metronome.perMinute;
     }
+   } else if(sign.type == Sign::ChordName) {
+    //log(trim(ref<char>(sign.chordName.name)));
+    x += text(vec2(x, staffY(staves.size-1, 16)), trim(sign.chordName.name), textSize, system.glyphs, vec2(0,0)).x;
    } else if(sign.type == Sign::Dynamic) {
     assert_(sign.dynamic!=-1);
     //float y = (max(staffY(1, measure[1].bottom-2), staffY(0, measure[0].top/*+5*/)) + staffY(1, measure[1].bottom-2))/2;
@@ -1203,7 +1215,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
    system.lines.append(vec2(measureBars->values[0], y), vec2(measureBars->values.last(), y), black, 3.f/4, true); // Raster
   }
  }
- const int highMargin = 13, lowMargin = -18;
+ const int highMargin = 14, lowMargin = -18;
  system.bounds.min = vec2(0, staffY(staves.size-1, max(highMargin, line[staves.size-1].top)+2));
  system.bounds.max = vec2(pageWidth, staffY(0, min(lowMargin, line[0].bottom)));
  if(tablature) system.bounds.max.y = staffY(-1, -14);
