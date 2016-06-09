@@ -126,11 +126,13 @@ struct Note {
     size_t pageIndex = invalid, measureIndex = invalid, glyphIndex = invalid, accidentalGlyphIndex = invalid;
     int tieStartNoteIndex = 0; // Invalidated by any insertion/deletion
     float accidentalOpacity = 1;
+    int string, fret;
 
     uint key() const { return noteKey(clef.octave, step, alteration); }
     uint duration() const { // in .16 beat units
         uint duration = valueDurations[value];
         if(dot) duration = duration * 3 / 2;
+        assert_(durationCoefficientDen);
         duration = duration * durationCoefficientNum / durationCoefficientDen;
         return duration;
     };
@@ -196,7 +198,8 @@ struct Sign {
 
 inline bool operator <(const Sign& a, const Sign& b) {
     if(a.time==b.time) {
-        if(a.type==Sign::Note && b.type==Sign::Note) return a.note.step < b.note.step;
+     if(a.type==Sign::Note && b.type==Sign::Note && (a.note.string||b.note.string)) return a.note.string < b.note.string;
+     if(a.type==Sign::Note && b.type==Sign::Note) return a.note.step < b.note.step;
         if(a.type==Sign::Measure && b.type==Sign::Repeat) return b.repeat != Repeat::End;
         if(a.type==Sign::Measure && b.type==Sign::Pedal) return b.pedal != Pedal::PedalStop;
         return a.type < b.type;
@@ -277,6 +280,23 @@ inline int insertSign(array<Sign>& signs, array<int>& activeTies, int& minStep, 
     if(signIndex <= tuplet.max) tuplet.max++;
     return signIndex;
 };
+
+inline void toRelative(mref<Sign> signs) {
+ // Converts absolute references to relative references (tuplet)
+ for(int signIndex: range(signs.size)) {
+  Sign& sign = signs[signIndex];
+  if(sign.type == Sign::Tuplet) {
+   Tuplet& tuplet = sign.tuplet;
+   tuplet.first.min = tuplet.first.min - signIndex;
+   tuplet.first.max = tuplet.first.max - signIndex;
+   tuplet.last.min = tuplet.last.min - signIndex;
+   tuplet.last.max = tuplet.last.max - signIndex;
+   tuplet.min = tuplet.min - signIndex;
+   tuplet.max = tuplet.max - signIndex;
+   assert_(tuplet.first.min<0&&tuplet.first.max<0&&tuplet.last.min<0&&tuplet.last.max<0&&tuplet.min<0&&tuplet.max<0);
+  }
+ }
+}
 
 #include "map.h"
 inline int implicitAlteration(int keySignature, const map<int, int>& measureAlterations, int step) {

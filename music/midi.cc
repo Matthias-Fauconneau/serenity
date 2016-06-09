@@ -306,7 +306,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
         tupletCurrentSize++;
         tuplet.last = {index,index};
         if(step < signs[tuplet.min].note.step) tuplet.min = index;
-        if(step < signs[tuplet.max].note.step) tuplet.max = index;
+        if(step > signs[tuplet.max].note.step) tuplet.max = index;
        }
        if(tupletCurrentSize == tupletSize) {
         //log(signs[tuplet.first.min].time);
@@ -356,23 +356,8 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
  uint nextMeasureStart = lastMeasureStart+measureLength;
  insertSign({Sign::Measure, nextMeasureStart, .measure={Measure::NoBreak, measureIndex, 1, 1, measureIndex}}); // Last measure bar
 
+ toRelative(signs);
  // FIXME: factorize with MusicXML
-#if 1
-    // Converts absolute references to relative references (tuplet)
-    for(int signIndex: range(signs.size)) {
-        Sign& sign = signs[signIndex];
-        if(sign.type == Sign::Tuplet) {
-            Tuplet& tuplet = sign.tuplet;
-            tuplet.first.min = tuplet.first.min - signIndex;
-            tuplet.first.max = tuplet.first.max - signIndex;
-            tuplet.last.min = tuplet.last.min - signIndex;
-            tuplet.last.max = tuplet.last.max - signIndex;
-            tuplet.min = tuplet.min - signIndex;
-            tuplet.max = tuplet.max - signIndex;
-        }
-    }
-#endif
-
 #if 1 // Converts accidentals to match key signature (pitch class). Tie support needs explicit tiedNoteIndex to match ties while editing steps
     {
      KeySignature keySignature = 0;

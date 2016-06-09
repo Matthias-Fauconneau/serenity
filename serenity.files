@@ -89,3 +89,6 @@ music/music-video.cc
 
 
 test.cc
+test.cc
+music/abc.h
+music/abc.cc

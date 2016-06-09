@@ -455,21 +455,7 @@ MusicXML::MusicXML(string document, string) {
         partFirstStaffIndex += partStaffCount;
     });
 
-#if 1
-    // Converts absolute references to relative references (tuplet)
-    for(int signIndex: range(signs.size)) {
-        Sign& sign = signs[signIndex];
-        if(sign.type == Sign::Tuplet) {
-            Tuplet& tuplet = sign.tuplet;
-            tuplet.first.min = tuplet.first.min - signIndex;
-            tuplet.first.max = tuplet.first.max - signIndex;
-            tuplet.last.min = tuplet.last.min - signIndex;
-            tuplet.last.max = tuplet.last.max - signIndex;
-            tuplet.min = tuplet.min - signIndex;
-            tuplet.max = tuplet.max - signIndex;
-        }
-    }
-#endif
+    toRelative(signs);
 
 #if 1
     // Removes unused clef change and dynamics

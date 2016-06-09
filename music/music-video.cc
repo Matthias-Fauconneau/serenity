@@ -1,4 +1,5 @@
 #include "MusicXML.h"
+#include "abc.h"
 #include "midi.h"
 #include "sheet.h"
 #include "window.h"
@@ -54,7 +55,7 @@ uint audioStart(string audioFileName) {
 MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds, int unused start) {
  assert_(notes);
  //assert_(start==0, start);
- int offset = 0; //start-(int64)notes.first().time*targetTicksPerSeconds/notes.ticksPerSeconds;
+ int offset = start; //start-(int64)notes.first().time*targetTicksPerSeconds/notes.ticksPerSeconds;
  for(MidiNote& note: notes) {
   note.time = offset + (int64)note.time*targetTicksPerSeconds/notes.ticksPerSeconds;
  }
@@ -216,12 +217,12 @@ struct Synchronizer : Widget {
    size_t midiIndex = 0;
    while(i<m && j<n) {
     int localOffset = (int(P[j][0].time) - int(notes[midiIndex].time)) - globalOffset; // >0: late, <0: early
-    const int limitDelay = 0, limitAdvance = notes.ticksPerSeconds*4;
+    const int limitDelay = notes.ticksPerSeconds, limitAdvance = notes.ticksPerSeconds; //notes.ticksPerSeconds*4;
     if(j+1<n && ((D(i,j) == D(i,j+1) && (i==0 || localOffset < limitDelay)) || (i && localOffset < -limitAdvance))) {
     //if(j+1<n && D(i,j) == D(i,j+1)) {
      j++;
     } else {
-     log(P[j], onsets[i], notes[midiIndex]);
+     //log(P[j], onsets[i], notes[midiIndex]);
      //globalOffset = P[0][0].time;
      globalOffset = int(P[j][0].time) - int(notes[midiIndex].time);
      for(size_t unused count: range(S[i].size)) {
@@ -359,8 +360,8 @@ struct Music : Widget {
  // Name
  string name = arguments() ? arguments()[0] : (error("Expected name"), string());
  // Files
- String audioFileName = arguments().contains("noaudio") ? ""__ : arguments().contains("novideo") ? name+".mp3" : name+".mkv"; //".mp4";
- String videoFile = arguments().contains("novideo") ? ""__ : name+".mkv"; //.mp4";
+ String audioFileName = arguments().contains("noaudio") ? ""__ : arguments().contains("novideo") ? name+".mp3" : name+".mp4"; //+".mkv"; //".mp4";
+ String videoFile = arguments().contains("novideo") ? ""__ : name+".mp4"; //".mkv"; //.mp4";
 
  // Audio
  unique<FFmpeg> audioFile = audioFileName ? unique<FFmpeg>(audioFileName) : nullptr;
@@ -374,12 +375,14 @@ struct Music : Widget {
 #endif
  // MusicXML
  MusicXML xml = existsFile(name+".xml"_) ? readFile(name+".xml"_) : MusicXML();
+ // ABC
+ ABC abc = existsFile(name+".abc"_) ? ABC(readFile(name+".abc"_)) : ABC();
  // MIDI
  MidiFile midi = existsFile(name+".mid"_) ? MidiFile(readFile(name+".mid"_)) : MidiFile(); // if used: midi.signs are scaled in synchronizer
 
  MidiNotes notes = ::scale(midi ? copy(midi.notes) : ::notes(xml.signs, xml.divisions), audioFile ? audioFile->audioFrameRate : sampler.rate, audioStart(audioFileName));
  // Sheet
- Sheet sheet {xml ? xml.signs : midi.signs, xml ? xml.divisions : 1000000, 0, 4,
+ Sheet sheet {xml ? xml.signs : abc ? abc.signs : midi.signs, xml ? xml.divisions : abc ? abc.ticksPerBeat : 1000000, 0, 4,
     /*apply(*/midi||1 ? filter(notes, [](MidiNote o){return o.velocity==0;}) : ref<MidiNote>()/*, [](MidiNote o){return o.key;})*/};
  Synchronizer synchronizer {audioFileName&&!midi?decodeAudio(audioFileName):Audio(), notes, sheet.midiToSign, sheet.measureBars};
 
@@ -401,7 +404,7 @@ struct Music : Widget {
  Scroll<VBox> scroll {{&system}}; // 1/3 ~ 240
  ImageView videoView; // 1/2 ~ 360
  Keyboard keyboard; // 1/6 ~ 120
- VBox widget {{&scroll/*, &videoView, &keyboard*/}};
+ VBox widget {{&scroll, &videoView/*, &keyboard*/}};
 
  // Highlighting
  map<uint, Sign> active; // Maps active keys to notes (indices)
@@ -504,7 +507,7 @@ struct Music : Widget {
     if(!image) { if(!preview) log("Missing image"); break; }
     assert_(image);
     if(rotate) ::rotate(image);
-    Image crop = this->crop||1 ? cropRef(image, int2(0, image.height*10/24), int2(image.width, image.height/2)) : unsafeRef(image);
+    Image crop = this->crop ? cropRef(image, int2(0, image.height*10/24), int2(image.width, image.height/2)) : unsafeRef(image);
     //Image crop = cropRef(image, int2(0, image.height*10/24), int2(image.width, image.height/2)) : unsafeRef(image);
     //Image scale = this->scale||1 ? ::scale(crop, 2, 1) : unsafeRef(crop);
     //videoView.image = ::move(scale); ///*this->resize ? ::resize(scale.size*resize/(resize+1), scale) :*/ copy(crop);
@@ -546,9 +549,10 @@ struct Music : Widget {
   if(encode) { // Encode
    assert_(!failed);
 
-   Encoder encoder {name+".demo.mp4"_};
+   Encoder encoder {name+".tab.mp4"_};
+   encoder.setH264(int2(720, 480), 0/*1000/1001*30*/);
    //encoder.setH264(int2(1280,/*720*/240), 30/*60*/);
-   encoder.setH264(int2(1280,widget.sizeHint(vec2(1280,720)).y), 60);
+   //encoder.setH264(int2(1280,widget.sizeHint(vec2(1280,720)).y), 60);
    if(audioFile && (audioFile->codec==FFmpeg::AAC || audioFile->codec==FFmpeg::MP3)) encoder.setAudio(audioFile);
    else error("Unknown codec");//if(audioFile) encoder.setAAC(2 /*Youtube requires stereo*/, audioFile->audioFrameRate);
    encoder.open();
@@ -617,7 +621,7 @@ struct Music : Widget {
    }
    log("Done");
   } else { // Preview
-   window = ::window(this, int2(/*1366*//*1280*/720,-1));
+   window = ::window(this, int2(1280,/*720*/-1));
    window->backgroundColor = white;
    window->show();
    if(running && audioFile && playbackDeviceAvailable()) {
