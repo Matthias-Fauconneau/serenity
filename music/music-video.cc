@@ -466,10 +466,9 @@ struct Music : Widget {
     if(sign.type == Sign::Note) {
      (sign.staff?keyboard.left:keyboard.right).append( sign.note.key() );
      active.insertMulti(note.key, sign);
-     if(sign.note.pageIndex != invalid && sign.note.glyphIndex != invalid) {
+     if(sign.note.pageIndex != invalid && sign.note.glyphIndex[0] != invalid) {
       assert_(sign.note.pageIndex == 0);
-      system.glyphs[sign.note.glyphIndex].color = (sign.staff?red:green);
-      if(sign.note.accidentalGlyphIndex != invalid) system.glyphs[sign.note.accidentalGlyphIndex].color = (sign.staff?red:green);
+      for(size_t index: ref<size_t>(sign.note.glyphIndex)) if(index!=invalid) system.glyphs[index].color = (sign.staff?red:green);
       contentChanged = true;
      }
     }
@@ -479,10 +478,9 @@ struct Music : Widget {
     while(active.contains(note.key)) {
      Sign sign = active.take(note.key);
      (sign.staff?keyboard.left:keyboard.right).remove( sign.note.key() );
-     if(sign.note.pageIndex != invalid && sign.note.glyphIndex != invalid) {
+     if(sign.note.pageIndex != invalid && sign.note.glyphIndex[0] != invalid) {
       assert_(sign.note.pageIndex == 0);
-      system.glyphs[sign.note.glyphIndex].color = black;
-      if(sign.note.accidentalGlyphIndex != invalid) system.glyphs[sign.note.accidentalGlyphIndex].color = black;
+      for(size_t index: ref<size_t>(sign.note.glyphIndex)) if(index!=invalid)  system.glyphs[index].color = black;
      }
      contentChanged = true;
     }
@@ -628,7 +626,8 @@ struct Music : Widget {
    }
    log("Done");
   } else { // Preview
-   window = ::window(this, int2(1280,/*720*/-1));
+   //window = ::window(this, int2(1280,/*720*/-1));
+   window = ::window(this, int2(720, 480));
    window->backgroundColor = white;
    window->show();
    if(running && audioFile && playbackDeviceAvailable()) {

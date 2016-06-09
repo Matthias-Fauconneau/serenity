@@ -123,7 +123,7 @@ struct Note {
     bool arpeggio = false;
     int finger = 0;
     //bool stem:1; // 0: undefined, 1: down, 2: up
-    size_t pageIndex = invalid, measureIndex = invalid, glyphIndex = invalid, accidentalGlyphIndex = invalid;
+    size_t pageIndex = invalid, measureIndex = invalid, glyphIndex[4] = {invalid, invalid, invalid, invalid};
     int tieStartNoteIndex = 0; // Invalidated by any insertion/deletion
     float accidentalOpacity = 1;
     int string, fret;
