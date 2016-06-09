@@ -54,8 +54,12 @@ uint audioStart(string audioFileName) {
 /// Converts MIDI time base to audio sample rate
 MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds, int unused start) {
  assert_(notes);
+ assert_(targetTicksPerSeconds);
  //assert_(start==0, start);
- int offset = start; //start-(int64)notes.first().time*targetTicksPerSeconds/notes.ticksPerSeconds;
+ //int offset = start;
+ //int offset = start-(int64)notes.first().time*targetTicksPerSeconds/notes.ticksPerSeconds;
+ //int offset = 0;
+ int offset = -(int64)notes.first().time*targetTicksPerSeconds/notes.ticksPerSeconds;
  for(MidiNote& note: notes) {
   note.time = offset + (int64)note.time*targetTicksPerSeconds/notes.ticksPerSeconds;
  }
@@ -382,7 +386,7 @@ struct Music : Widget {
 
  MidiNotes notes = ::scale(midi ? copy(midi.notes) : ::notes(xml.signs, xml.divisions), audioFile ? audioFile->audioFrameRate : sampler.rate, audioStart(audioFileName));
  // Sheet
- Sheet sheet {xml ? xml.signs : abc ? abc.signs : midi.signs, xml ? xml.divisions : abc ? abc.ticksPerBeat : 1000000, 0, 4,
+ Sheet sheet {xml ? xml.signs : abc ? abc.signs : midi.signs, xml ? xml.divisions : abc ? abc.ticksPerBeat : 1000000, 0, 6,
     /*apply(*/midi||1 ? filter(notes, [](MidiNote o){return o.velocity==0;}) : ref<MidiNote>()/*, [](MidiNote o){return o.key;})*/};
  Synchronizer synchronizer {audioFileName&&!midi?decodeAudio(audioFileName):Audio(), notes, sheet.midiToSign, sheet.measureBars};
 
@@ -450,11 +454,11 @@ struct Music : Widget {
  }
 #endif
 
- bool follow(int timeNum, uint timeDen, vec2 size, bool unused preview=true) {
+ bool follow(int64 timeNum, int64 timeDen, vec2 size, bool unused preview=true) {
   assert_(timeDen);
   assert_(timeNum >= 0, timeNum);
   bool contentChanged = false;
-  for(;midiIndex < notes.size && (int64)notes[midiIndex].time*timeDen <= (int64)timeNum*notes.ticksPerSeconds; midiIndex++) {
+  for(;midiIndex < notes.size && (int64)notes[midiIndex].time*timeDen <= timeNum*(int64)notes.ticksPerSeconds; midiIndex++) {
    MidiNote note = notes[midiIndex];
    if(note.velocity) {
     assert_(noteIndex < sheet.midiToSign.size, noteIndex, sheet.midiToSign.size);
@@ -465,6 +469,7 @@ struct Music : Widget {
      if(sign.note.pageIndex != invalid && sign.note.glyphIndex != invalid) {
       assert_(sign.note.pageIndex == 0);
       system.glyphs[sign.note.glyphIndex].color = (sign.staff?red:green);
+      if(sign.note.accidentalGlyphIndex != invalid) system.glyphs[sign.note.accidentalGlyphIndex].color = (sign.staff?red:green);
       contentChanged = true;
      }
     }
@@ -477,6 +482,7 @@ struct Music : Widget {
      if(sign.note.pageIndex != invalid && sign.note.glyphIndex != invalid) {
       assert_(sign.note.pageIndex == 0);
       system.glyphs[sign.note.glyphIndex].color = black;
+      if(sign.note.accidentalGlyphIndex != invalid) system.glyphs[sign.note.accidentalGlyphIndex].color = black;
      }
      contentChanged = true;
     }
@@ -486,13 +492,13 @@ struct Music : Widget {
   int64 t = (int64)timeNum*notes.ticksPerSeconds;
   float previousOffset = scroll.offset.x;
   // Cardinal cubic B-Spline
-  for(int index: range(sheet.measureBars.size()-2)) {
+  for(int index: range(sheet.measureBars.size()-1)) {
    int64 t1 = (int64)sheet.measureBars.keys[index]*timeDen;
    int64 t2 = (int64)sheet.measureBars.keys[index+1]*timeDen;
    if(t1 <= t && t < t2) {
     double f = double(t-t1)/double(t2-t1);
     double w[4] = { 1./6 * cb(1-f), 2./3 - 1./2 * sq(f)*(2-f), 2./3 - 1./2 * sq(1-f)*(2-(1-f)), 1./6 * cb(f) };
-    auto X = [&](int index) { return clamp(0.f, sheet.measureBars.values[clamp<int>(0, index, sheet.measureBars.values.size)] - size.x/2,
+    auto X = [&](int index) { return clamp(0.f, sheet.measureBars.values[clamp<int>(0, index, sheet.measureBars.values.size-1)] - size.x/2,
        abs(system.sizeHint(size).x)-size.x); };
     float newOffset = round( w[0]*X(index-1) + w[1]*X(index) + w[2]*X(index+1) + w[3]*X(index+2) );
     if(newOffset >= -scroll.offset.x) scroll.offset.x = -newOffset;
@@ -550,7 +556,8 @@ struct Music : Widget {
    assert_(!failed);
 
    Encoder encoder {name+".tab.mp4"_};
-   encoder.setH264(int2(720, 480), 0/*1000/1001*30*/);
+   //encoder.setH264(int2(720, 480), 0/*1000/1001*30*/);
+   encoder.setH264(int2(720, 480), 60);
    //encoder.setH264(int2(1280,/*720*/240), 30/*60*/);
    //encoder.setH264(int2(1280,widget.sizeHint(vec2(1280,720)).y), 60);
    if(audioFile && (audioFile->codec==FFmpeg::AAC || audioFile->codec==FFmpeg::MP3)) encoder.setAudio(audioFile);
@@ -579,16 +586,16 @@ struct Music : Widget {
      }
      return true;
     };
-    if(encoder.videoFrameRate) { // Interleaved AV
+    if(encoder.videoFrameRateNum) { // Interleaved AV
      //assert_(encoder.audioStream->time_base.num == 1 && encoder.audioStream->time_base.den == (int)encoder.audioFrameRate);
      // If both streams are at same PTS, starts with audio
      bool done = false;
-     while((int64)encoder.audioTime*encoder.videoFrameRate <= (int64)encoder.videoTime*encoder.audioFrameRate) {
+     while((int64)encoder.audioTime*encoder.videoFrameRateNum <= (int64)encoder.videoTime*encoder.audioFrameRate*encoder.videoFrameRateDen) {
       if(!writeAudio()) { done = true; break /*2*/; }
      }
      if(done) { log("Audio track end"); break; }
-     while((int64)encoder.videoTime*encoder.audioFrameRate <= (int64)encoder.audioTime*encoder.videoFrameRate) {
-      follow(videoTime, encoder.videoFrameRate, vec2(encoder.size), false);
+     while((int64)encoder.videoTime*encoder.audioFrameRate*encoder.videoFrameRateDen <= (int64)encoder.audioTime*encoder.videoFrameRateNum) {
+      follow(videoTime*encoder.videoFrameRateDen, encoder.videoFrameRateNum, vec2(encoder.size), false);
       renderTime.start();
       Image target (encoder.size);
       target.clear(0xFF);
@@ -603,7 +610,7 @@ struct Music : Widget {
      if(!writeAudio()) { log("Audio track end"); break; }
     }
     uint64 timeTicks;
-    if(encoder.videoFrameRate) timeTicks = (uint64)videoTime*notes.ticksPerSeconds/encoder.videoFrameRate;
+    if(encoder.videoFrameRateNum) timeTicks = (uint64)videoTime*encoder.videoFrameRateDen*notes.ticksPerSeconds/encoder.videoFrameRateNum;
     else if(encoder.audioFrameRate) timeTicks = (uint64)encoder.audioTime*notes.ticksPerSeconds/encoder.audioFrameRate;
     else error("");
     //buffer<uint> onsets = apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.time;});

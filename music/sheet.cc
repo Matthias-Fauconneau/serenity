@@ -36,27 +36,11 @@ struct SheetContext {
  bool tablature = true;
 
  // Tablature
- uint64 lastTimes[4] = {invalid,invalid,invalid,invalid};
- int lastFrets[4] = {9,9,9,9};
- int lastStrings[4] = {2,2,2,2};
- //Sign lastSign = {};
+ int handPosition = 9; // Lowest fret
  struct StringFret { int string, fret; };
  StringFret nextNote(Sign sign) {
-  int fret = fingering(sign).fret;
-  int string = fingering(sign).string;
-  lastFrets[0]=lastFrets[1];
-  lastFrets[1]=lastFrets[2];
-  lastFrets[2]=lastFrets[3];
-  lastFrets[3]=fret;
-  lastTimes[0]=lastTimes[1];
-  lastTimes[1]=lastTimes[2];
-  lastTimes[2]=lastTimes[3];
-  lastTimes[3]=sign.time;
-  lastStrings[0]=lastStrings[1];
-  lastStrings[1]=lastStrings[2];
-  lastStrings[2]=lastStrings[3];
-  lastStrings[3]=string;
-  return {string, fret};
+  if(sign.note.finger) handPosition = sign.note.finger;
+  return fingering(sign);
  }
 
  StringFret fingering(Sign sign) {
@@ -65,25 +49,13 @@ struct SheetContext {
   //assert_(sign.time != lastSign.time || sign.note.key() != lastSign.note.key(), lastSign, sign);
   static int strings[] = {52, 57, 62, 67, 71, 76}; //EADGBe
   int key = sign.note.key();
-  //ref<int> last4 = lastFrets.slice(max(0,int(lastFrets.size)-4),min(4ul,lastFrets.size));
-  ref<int> last4 (lastFrets);
-  int sum=0; for(int fret: last4) sum+=fret; float meanFret=sum/last4.size; // Arithmetic average
-  int bestString,bestFret;
-  float bestScore=inf;
+  int bestString = 0, bestFret = 0;
   for(int string: range(6)) {
-   if(lastTimes[3] == sign.time && string == lastStrings[3]) continue; // Single note per string
    int fret = key - strings[string];
-   if(fret < 0) break;
-   float score = abs(fret - meanFret); // closest to mean of last 4 frets
-   //log(meanFret, fret, string, score, bestScore);
-   if(score < bestScore) { bestString=string, bestFret=fret, bestScore=score; }
+   if(fret < handPosition) break;
+   bestString = string;
+   bestFret = fret;
   }
-  //error(bestString, bestFret);
-  //lastFrets.append(bestFret);
-  /*lastFrets[0]=lastFrets[1];
-  lastFrets[1]=lastFrets[2];
-  lastFrets[2]=lastFrets[3];
-  lastFrets[3]=bestFret;*/
   return {bestString, bestFret};
 }
 
@@ -273,10 +245,10 @@ void System::layoutNotes(uint staff) {
   float yStem = stemUp ? yTop-stemLength : yBottom+stemLength;
   float x = stemX(beam[0], stemUp);
   float opacity = allTied(beam[0]) ? 1./2 : 1;
-  if(sign.note.value>=Half)
+  if(!tablature) if(sign.note.value>=Half)
    system.lines.append(vec2(x, ::min(yBase, yStem)), vec2(x, max(yBase, yStem)), black, opacity, true); // Stem
   if(sign.note.value>=Eighth)
-   glyph(vec2(x, yStem), (int(sign.note.value)-Eighth)*2 + (stemUp ? SMuFL::Flag::Above : SMuFL::Flag::Below), opacity, 7);
+   if(!tablature) glyph(vec2(x, yStem), (int(sign.note.value)-Eighth)*2 + (stemUp ? SMuFL::Flag::Above : SMuFL::Flag::Below), opacity, 7);
  } else if(beam.size==2) { // Draws pairing beam
   float x[2], base[2], tip[2];
   for(uint i: range(2)) {
@@ -292,7 +264,7 @@ void System::layoutNotes(uint staff) {
   for(uint i: range(2)) {
    float opacity = allTied(beam[i]) ? 1./2 : 1;
    tip[i] = midTip+delta[i];
-   system.lines.append(vec2(x[i], ::min(base[i],tip[i])), vec2(x[i], ::max(base[i],tip[i])), black, opacity, true); // Stem
+   if(!tablature) system.lines.append(vec2(x[i], ::min(base[i],tip[i])), vec2(x[i], ::max(base[i],tip[i])), black, opacity, true); // Stem
   }
   float opacity = allTied(beam[0]) && allTied(beam[1]) ? 1./2 : 1;
   Value first = max(apply(beam[0], [](Sign sign){return sign.note.value;}));
@@ -302,21 +274,21 @@ void System::layoutNotes(uint staff) {
    float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1) - !stemUp * beamWidth;
    vec2 p0 (x[0]-stemWidth/2, tip[0] + Y);
    vec2 p1 (x[1]+stemWidth/2, tip[1] + Y);
-   system.parallelograms.append(p0, p1, beamWidth, black, opacity);
+   if(!tablature) system.parallelograms.append(p0, p1, beamWidth, black, opacity);
   }
   for(size_t index: range(min(first,second)-Quarter, first-Quarter)) {
    float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1) - !stemUp * beamWidth;
    vec2 p0 (x[0]-stemWidth/2, tip[0] + Y);
    vec2 p1 (x[1]+stemWidth/2, (tip[0]+tip[1])/2 + Y);
    p1 = (float(sign[1].duration)*p0 + float(sign[0].duration)*p1)/float(sign[0].duration+sign[1].duration);
-   system.parallelograms.append(p0, p1, beamWidth, black, opacity);
+   if(!tablature) system.parallelograms.append(p0, p1, beamWidth, black, opacity);
   }
   for(size_t index: range(int(min(first,second)-Quarter), int(second-Quarter))) {
    float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1) - !stemUp * beamWidth;
    vec2 p0 (x[0]-stemWidth/2, tip[0] + Y);
    vec2 p1 (x[1]+stemWidth/2, tip[1] + Y);
    p0 = (float(sign[1].duration)*p0 + float(sign[0].duration)*p1)/float(sign[0].duration+sign[1].duration);
-   system.parallelograms.append(p0, p1, beamWidth, black, opacity);
+   if(!tablature) system.parallelograms.append(p0, p1, beamWidth, black, opacity);
   }
  }
  else // Draws grouping beam
@@ -338,14 +310,14 @@ void System::layoutNotes(uint staff) {
    float stemY = firstStemY + (lastStemY-firstStemY) * (x - stemX(beam[0], stemUp))
      / (stemX(beam.last(), stemUp) - stemX(beam[0], stemUp));
    stemsY.append(stemY);
-   system.lines.append(vec2(x, ::min(y, stemY)), vec2(x, ::max(stemY, y)), black, opacity, true); // Stem
+   if(!tablature) system.lines.append(vec2(x, ::min(y, stemY)), vec2(x, ::max(stemY, y)), black, opacity, true); // Stem
   }
   // Beam
   for(size_t chordIndex: range(beam.size-1)) {
    Value value = ::min(beam[chordIndex][0].note.value, beam[chordIndex+1][0].note.value);
    for(size_t index: range(value-Quarter)) {
     float dy = (stemUp ? 1 : -1) * float(index) * (beamWidth+1) - !stemUp * beamWidth;
-    system.parallelograms.append(
+    if(!tablature) system.parallelograms.append(
        vec2(stemX(beam[chordIndex], stemUp)-(chordIndex==0?1./2:0), stemsY[chordIndex]+dy),
        vec2(stemX(beam[chordIndex+1], stemUp)+(chordIndex==beam.size-1?1./2:0), stemsY[chordIndex+1]+dy), beamWidth);
    }
@@ -434,7 +406,9 @@ void System::layoutNotes(uint staff) {
    if(tablature) {
     // Body
     {note.glyphIndex = system.glyphs.size; // Records glyph index of body, i.e next glyph to be appended to system.glyphs :
-     text(vec2(x, y), str(note.fret), note.grace?lineInterval:2*lineInterval, system.glyphs, vec2(1./2)); }
+     text(vec2(x, y), str(note.fret), note.grace?lineInterval:2*lineInterval, system.glyphs, vec2(1./2));
+     if(system.glyphs.size-1 != note.glyphIndex) note.accidentalGlyphIndex = system.glyphs.size-1; // 2nd glyph index (complex glyph composed of two digits)
+    }
    } else {
     // Ledger
     ledger(sign, x);
@@ -573,10 +547,11 @@ void System::layoutNotes(uint staff) {
    if(!tablature) x+= noteSize(chord[0])/2;
    y = ::min(y, staffY(staff, 4));
    for(int finger: fingering.reverse()) { // Top to bottom
-    Font& font = textFont.font(textSize/2);
-    uint code = str(finger)[0];
-    auto metrics = font.metrics(font.index(code));
-    glyph(vec2(x-metrics.bearing.x-metrics.size.x/2,y+metrics.bearing.y), code, 1, 3, &textFont);
+    //Font& font = textFont.font(textSize/2);
+    //uint code = str(finger)[0];
+    //auto metrics = font.metrics(font.index(code));
+    //glyph(vec2(x-metrics.bearing.x-metrics.size.x/2,y+metrics.bearing.y), code, 1, 3, &textFont);
+    text(vec2(x,y),str(finger),2*lineInterval,system.glyphs,vec2(1./2));
     y += lineInterval;
    }
   }
@@ -1055,24 +1030,35 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
    }
   } else if(sign.type == Sign::Tuplet) {
    const Tuplet tuplet = sign.tuplet;
+
    bool stemUp = isStemUp({signs[signIndex+tuplet.min].staff, clefStep(signs[signIndex+tuplet.min])}, {signs[signIndex+tuplet.max].staff, clefStep(signs[signIndex+tuplet.max])}) && !tablature;
    bool above = stemUp;
 
    float x0 = X((signs[signIndex + (above ? tuplet.first.max : tuplet.first.min)]).time);// + spaceWidth;
-   float x1 = X((signs[signIndex + (above ? tuplet. last.max : tuplet. last.min)]).time)/* + spaceWidth*/ + glyphSize(SMuFL::NoteHead::Black).x;
+   float x1 = X((signs[signIndex + (above ? tuplet. last.max : tuplet. last.min)]).time);// /* + spaceWidth*/ + glyphSize(SMuFL::NoteHead::Black).x;
    //float tx = Text(str(tupletSize.size), textSize, 0, 1, 0, "LinLibertine", false).sizeHint().x;
    float x = (x0+x1)/2;// + glyphSize(SMuFL::NoteHead::Black).x/2;// - tx;
 
-   float y0 = Y(signs[signIndex + (above ? tuplet.max : tuplet.min)]) + (stemUp?-1:1)*stemLength;
-   float y1 = Y(signs[signIndex + (above ? tuplet.max : tuplet.min)]) + (stemUp?-1:1)*stemLength;
+   // FIXME: Stem length also depends on inner notes (TODO: factorize with beam layout code)
+   //float y0 = Y(signs[signIndex + (above ? tuplet.max : tuplet.min)]) + (stemUp?-1:1)*stemLength;
+   //float y1 = Y(signs[signIndex + (above ? tuplet.max : tuplet.min)]) + (stemUp?-1:1)*stemLength;
+   float y0 = Y(signs[signIndex + (above ? tuplet.first.max : tuplet.first.min)]) + (stemUp?-1:1)*shortStemLength;
+   float y1 = Y(signs[signIndex + (above ? tuplet.last.max : tuplet.last.min)]) + (stemUp?-1:1)*shortStemLength;
+   /*float firstStemY = Y(stemUp?tuplet.first.max:tuplet.first.min)+(stemUp?-1:1)*stemLength;
+   float lastStemY = Y(stemUp?tuplet.last.max:tuplet.first.max)+(stemUp?-1:1)*stemLength;
+   for(const Chord& chord: beam) {
+    firstStemY = stemUp ? min(firstStemY, Y(chord.last())-shortStemLength) : max(firstStemY, Y(chord.first())+shortStemLength);
+    lastStemY = stemUp ? min(lastStemY, Y(chord.last())-shortStemLength) : max(lastStemY, Y(chord.first())+shortStemLength);
+   }*/
+   //float stemY = (firstStemY + lastStemY) / 2;
    float stemY = (y0 + y1) / 2;
    float dy = (above ? -1 : 1) * beamWidth;
    float y = stemY+dy;
    vec2 unused size = text(vec2(x,y), str(tuplet.size), textSize/2, system.glyphs, vec2(1./2, 1./2/*above ? 1 : 0*/));
-   if(uint(signs[signIndex+tuplet.last.min].time - signs[signIndex+tuplet.first.min].time) > ticksPerSecond*60/beatsPerMinute) { // No beam ? draw lines
+   /*if(uint(signs[signIndex+tuplet.last.min].time - signs[signIndex+tuplet.first.min].time) > ticksPerSecond*60/beatsPerMinute) { // No beam ? draw lines
     system.lines.append(vec2(x0, y0+dy), vec2(x-size.x, y0+((x-size.x)-x0)/(x1-x0)*(y1-y0)+dy), black);
     system.lines.append(vec2(x+size.x, y0+((x+size.x)-x0)/(x1-x0)*(y1-y0)+dy), vec2(x1, y1+dy), black);
-   }
+   }*/
   }
   else { // Directions signs
    //if(!timeTrack.contains(sign.time)) timeTrack.insert(sign.time, timeTrack.values[min(timeTrack.keys.linearSearch(sign.time), timeTrack.keys.size-1)]);
@@ -1234,7 +1220,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerSecond, int2 pageSize, float halfLine
  map<uint, array<Sign>> notes;
 
  /// Distributes systems evenly within page
- auto doPage = [this, pageSize, title, context, pageNumbers](mref<Graphics> systems){
+ auto doPage = [this, pageSize, title, context, pageNumbers](mref<Graphics> systems) {
   float totalHeight = sum(apply(systems, [](const Graphics& o) { return o.bounds.size().y; }));
   if(pageSize.y) {
    if(totalHeight < pageSize.y) { // Spreads systems with margins
@@ -1340,6 +1326,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerSecond, int2 pageSize, float halfLine
    pageSystems.append(move(system));
   }
   doPage(pageSystems);
+  //assert_(measureBars.count() == 33, measureBars.count());
  }
 
  // Associates MIDI notes with score notes

@@ -86,9 +86,6 @@ music/midi.cc
 music/flac.h
 music/flac.cc
 music/music-video.cc
-
-
-test.cc
-test.cc
 music/abc.h
 music/abc.cc
+video/encoder.cc

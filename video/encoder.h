@@ -9,7 +9,7 @@ struct Encoder {
     String path;
 
     union { int2 size = 0; struct { uint width, height; }; };
-    uint videoFrameRate=0;
+    uint videoFrameRateNum=0, videoFrameRateDen=0;
     uint channels = 0; uint audioFrameRate=0; uint audioFrameSize=0;
     struct AVFormatContext* context=0;
     struct SwsContext* swsContext=0;
