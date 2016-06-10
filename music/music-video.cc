@@ -6,6 +6,7 @@
 #include "interface.h"
 #include "ui/layout.h"
 #include "keyboard.h"
+#include "fret.h"
 #include "audio.h"
 #include "asound.h"
 #include "ui/render.h"
@@ -384,10 +385,11 @@ struct Music : Widget {
  // MIDI
  MidiFile midi = existsFile(name+".mid"_) ? MidiFile(readFile(name+".mid"_)) : MidiFile(); // if used: midi.signs are scaled in synchronizer
 
- MidiNotes notes = ::scale(midi ? copy(midi.notes) : ::notes(xml.signs, xml.divisions), audioFile ? audioFile->audioFrameRate : sampler.rate, audioStart(audioFileName));
- // Sheet
- Sheet sheet {xml ? xml.signs : abc ? abc.signs : midi.signs, xml ? xml.divisions : abc ? abc.ticksPerBeat : 1000000, 0, 6,
-    /*apply(*/midi||1 ? filter(notes, [](MidiNote o){return o.velocity==0;}) : ref<MidiNote>()/*, [](MidiNote o){return o.key;})*/};
+ const mref<Sign> signs = xml ? xml.signs : abc ? abc.signs : midi.signs;
+ const uint ticksPerBeat = xml ? xml.divisions : abc ? abc.ticksPerBeat : 1000000;
+
+ MidiNotes notes = ::scale(midi ? copy(midi.notes) : ::notes(signs, ticksPerBeat), audioFile ? audioFile->audioFrameRate : sampler.rate, audioStart(audioFileName));
+ Sheet sheet {signs, ticksPerBeat, 0, 6, filter(notes, [](MidiNote o){return o.velocity==0;})};
  Synchronizer synchronizer {audioFileName&&!midi?decodeAudio(audioFileName):Audio(), notes, sheet.midiToSign, sheet.measureBars};
 
  // Video
@@ -396,11 +398,11 @@ struct Music : Widget {
  // State
  bool failed = sheet.firstSynchronizationFailureChordIndex != invalid;
  bool running = !arguments().contains("pause") && !failed;
- bool keyboardView = false; //videoFile ? endsWith(videoFile, ".mkv") : false;
+ /*bool keyboardView = false; //videoFile ? endsWith(videoFile, ".mkv") : false;
  bool rotate = keyboardView;
  bool crop = keyboardView;
  bool scale = keyboardView;
- int resize = keyboardView ? 4 : 1;
+ int resize = keyboardView ? 4 : 1;*/
 
  // View
  GraphicsWidget system {move(sheet.pages[0])};
@@ -408,7 +410,8 @@ struct Music : Widget {
  Scroll<VBox> scroll {{&system}}; // 1/3 ~ 240
  ImageView videoView; // 1/2 ~ 360
  Keyboard keyboard; // 1/6 ~ 120
- VBox widget {{&scroll, &videoView/*, &keyboard*/}};
+ Fret fret;
+ VBox widget {{&scroll, &videoView, &fret/*, &keyboard*/}};
 
  // Highlighting
  map<uint, Sign> active; // Maps active keys to notes (indices)
@@ -465,23 +468,56 @@ struct Music : Widget {
     assert_(noteIndex < sheet.midiToSign.size, noteIndex, sheet.midiToSign.size);
     Sign sign = sheet.midiToSign[noteIndex];
     if(sign.type == Sign::Note) {
-     (sign.staff?keyboard.left:keyboard.right).append( sign.note.key() );
      active.insertMulti(note.key, sign);
+     (sign.staff?keyboard.left:keyboard.right).append( sign.note.key() );
+     fret.active.insertMulti(note.key, sign);
      if(sign.note.pageIndex != invalid && sign.note.glyphIndex[0] != invalid) {
       assert_(sign.note.pageIndex == 0);
       for(size_t index: ref<size_t>(sign.note.glyphIndex)) if(index!=invalid) system.glyphs[index].color = (sign.staff?red:(staffCount==1?blue:green));
       contentChanged = true;
      }
     }
+    // Updates next notes
+    fret.measure.clear();
+    size_t firstSignIndex = sign.note.signIndex;
+    assert_(firstSignIndex != invalid);
+    bool firstNote = true;
+    for(size_t signIndex: range(firstSignIndex, signs.size)) {
+     assert_(signIndex < signs.size, signIndex);
+     const Sign& sign = signs[signIndex];
+     if(sign.type == Sign::Note) {
+      fret.measure.insertMulti(sign.note.key(), sign);
+      if(!firstNote && sign.note.finger) break; // Shows all notes until next hand position change
+      firstNote = false;
+     }
+     //if(sign.type == Sign::Measure) break;
+    }
     noteIndex++;
    }
    else if(!note.velocity && active.contains(note.key)) {
     while(active.contains(note.key)) {
      Sign sign = active.take(note.key);
+     fret.active.take(note.key);
+     //if(fret.measure.contains(note.key)) fret.measure.remove(note.key);
      (sign.staff?keyboard.left:keyboard.right).remove( sign.note.key() );
      if(sign.note.pageIndex != invalid && sign.note.glyphIndex[0] != invalid) {
       assert_(sign.note.pageIndex == 0);
       for(size_t index: ref<size_t>(sign.note.glyphIndex)) if(index!=invalid)  system.glyphs[index].color = black;
+     }
+     // Updates next notes
+     fret.measure.clear();
+     size_t firstSignIndex = sign.note.signIndex+1;
+     assert_(firstSignIndex != invalid);
+     bool firstNote = true;
+     for(size_t signIndex: range(firstSignIndex, signs.size)) {
+      assert_(signIndex < signs.size, signIndex);
+      const Sign& sign = signs[signIndex];
+      if(sign.type == Sign::Note) {
+       fret.measure.insertMulti(sign.note.key(), sign);
+       if(!firstNote && sign.note.finger) break; // Shows all notes until next hand position change
+       firstNote = false;
+      }
+      //if(sign.type == Sign::Measure) break;
      }
      contentChanged = true;
     }
@@ -511,12 +547,13 @@ struct Music : Widget {
     Image image = video.read();
     if(!image) { if(!preview) log("Missing image"); break; }
     assert_(image);
-    if(rotate) ::rotate(image);
-    Image crop = this->crop ? cropRef(image, int2(0, image.height*10/24), int2(image.width, image.height/2)) : unsafeRef(image);
+    //if(rotate) ::rotate(image);
+    //Image crop = this->crop ? cropRef(image, int2(0, image.height*10/24), int2(image.width, image.height/2)) : unsafeRef(image);
     //Image crop = cropRef(image, int2(0, image.height*10/24), int2(image.width, image.height/2)) : unsafeRef(image);
     //Image scale = this->scale||1 ? ::scale(crop, 2, 1) : unsafeRef(crop);
     //videoView.image = ::move(scale); ///*this->resize ? ::resize(scale.size*resize/(resize+1), scale) :*/ copy(crop);
-    videoView.image = copy(crop);
+    //videoView.image = copy(crop);
+    videoView.image = ::move(image);
     contentChanged=true;
     // Only preview may have lower framerate than video
     assert_((int64)video.videoTime*timeDen >= (int64)timeNum*video.timeDen || preview || video.videoTime == 0 /*First frame might have a negative timecode*/, video.videoTime, video.timeDen, timeNum, timeDen);
@@ -554,9 +591,9 @@ struct Music : Widget {
   if(encode) { // Encode
    assert_(!failed);
 
-   Encoder encoder {name+".tab.mp4"_};
+   Encoder encoder {name+".tutorial.mp4"_};
    //encoder.setH264(int2(720, 480), 0/*1000/1001*30*/);
-   encoder.setH264(int2(720, 480), 60);
+   encoder.setH264(int2(854, 480), 60);
    //encoder.setH264(int2(1280,/*720*/240), 30/*60*/);
    //encoder.setH264(int2(1280,widget.sizeHint(vec2(1280,720)).y), 60);
    if(audioFile && (audioFile->codec==FFmpeg::AAC || audioFile->codec==FFmpeg::MP3)) encoder.setAudio(audioFile);
@@ -628,7 +665,7 @@ struct Music : Widget {
    log("Done");
   } else { // Preview
    //window = ::window(this, int2(1280,/*720*/-1));
-   window = ::window(this, int2(720, 480));
+   window = ::window(this, int2(854, 480));
    window->backgroundColor = white;
    window->show();
    if(running && audioFile && playbackDeviceAvailable()) {

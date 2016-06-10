@@ -56,6 +56,7 @@ struct SheetContext {
    bestString = string;
    bestFret = fret;
   }
+  assert_(bestFret <= 16, bestFret);
   return {bestString, bestFret};
 }
 
@@ -167,7 +168,7 @@ struct System : SheetContext {
  // Evaluates shortest interval
  uint evaluateShortestInterval(ref<Sign> signs) const;
 
- System(SheetContext context, ref<Staff> staves, float pageWidth, size_t pageIndex, size_t systemIndex, Graphics* previousSystem, ref<Sign> signs,
+ System(SheetContext context, ref<Staff> staves, float pageWidth, size_t pageIndex, size_t systemIndex, Graphics* previousSystem, mref<Sign> signs,
         map<uint, float>* measureBars = 0, array<TieStart>* activeTies = 0, map<uint, array<Sign>>* notes=0, float spaceWidth=0, bool measureNumbers=false);
 };
 
@@ -507,6 +508,7 @@ void System::layoutNotes(uint staff) {
    if(note.tie == Note::NoTie || note.tie == Note::TieStart) {
     if(notes) {
      assert_(sign.note.measureIndex != invalid);
+     assert_(sign.note.signIndex != invalid);
      notes->sorted(sign.time).append( sign );
      //log("note", notes->size(), sign.time, notes->sorted(sign.time));
     }
@@ -604,7 +606,7 @@ uint System::evaluateShortestInterval(ref<Sign> signs) const {
 }
 
 // Layouts a system
-System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t pageIndex, size_t systemIndex, Graphics* previousSystem, ref<Sign> signs,
+System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t pageIndex, size_t systemIndex, Graphics* previousSystem, mref<Sign> signs,
                map<uint, float>* measureBars, array<TieStart>* activeTies, map<uint, array<Sign>>* notes, float _spaceWidth, bool measureNumbers)
  : SheetContext(context), staves(copyRef(_staves)), spaceWidth(_spaceWidth?:space), pageWidth(pageWidth), pageIndex(pageIndex), systemIndex(systemIndex), previousSystem(previousSystem),
    measureBars(measureBars), activeTies(activeTies), notes(notes), line(evaluateStepRanges(signs)) {
@@ -738,6 +740,8 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
      StringFret fingering = nextNote(sign); // Update fingering context (has to be called in temporal note order)
      note.string = fingering.string;
      note.fret = fingering.fret;
+     signs[signIndex].note.string = note.string;
+     signs[signIndex].note.fret = note.fret;
 
      note.clef = staves[staff].clef;
      //for(const auto& sign: staves[staff].chord) if(sign.note.key() == note.key()) goto continue2_;
@@ -774,7 +778,9 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 
       x += glyphAdvance(SMuFL::NoteHead::Black);
       /*for(Sign sign: staves[staff].chord) // Dichord
-                           if(abs(sign.note.step-note.step) <= 1) { x += glyphAdvance(SMuFL::NoteHead::Black); break; }*/
+       if(abs(sign.note.step-note.step) <= 1) { x += glyphAdvance(SMuFL::NoteHead::Black); break; }*/
+      sign.note.signIndex = signIndex;
+      assert_(sign.note.signIndex != invalid);
       staves[staff].chord.insertSorted(sign);
       //log(".");
      } else { // Grace note
@@ -804,6 +810,8 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
       if(measureBars) note.measureIndex = measureBars->size()-1;
       if(notes) {
        assert_(sign.note.measureIndex != invalid);
+       assert_(sign.note.signIndex == invalid);
+       sign.note.signIndex = signIndex;
        notes->sorted(sign.time).append(sign);
        //log("grace", notes->size(), sign.time, notes->sorted(sign.time));
       }
@@ -1227,7 +1235,7 @@ inline bool operator ==(const Sign& sign, const uint& key) {
 }
 
 // Layouts notations to graphic primitives (and parses notes to MIDI keys)
-Sheet::Sheet(ref<Sign> signs, uint ticksPerSecond, int2 pageSize, float halfLineInterval, ref<MidiNote> midiNotes, string title, bool pageNumbers, bool measureNumbers)
+Sheet::Sheet(mref<Sign> signs, uint ticksPerSecond, int2 pageSize, float halfLineInterval, ref<MidiNote> midiNotes, string title, bool pageNumbers, bool measureNumbers)
  : pageSize(pageSize) {
  SheetContext context (ticksPerSecond, halfLineInterval);
  uint staffCount = 0; for(const Sign& sign: signs) if(sign.type == Sign::Note) staffCount = max(staffCount, sign.staff+1);
@@ -1431,6 +1439,7 @@ Sheet::Sheet(ref<Sign> signs, uint ticksPerSecond, int2 pageSize, float halfLine
      //assert_(i < notes.values.size && k < notes.values[i].size, i, k, notes.values.size);
      Sign sign{};
      if(Mi[j][k]<notes.values[i].size) sign = notes.values[i][Si[i][Mi[j][k]]]; // Map original MIDI index to sorted to original note index
+     assert_(sign.note.signIndex != invalid);
      midiToSign.append( sign );
      Note note = sign.note;
      if(note.pageIndex != invalid && note.glyphIndex[0] != invalid) {

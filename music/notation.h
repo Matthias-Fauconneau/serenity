@@ -124,6 +124,7 @@ struct Note {
     int finger = 0;
     //bool stem:1; // 0: undefined, 1: down, 2: up
     size_t pageIndex = invalid, measureIndex = invalid, glyphIndex[4] = {invalid, invalid, invalid, invalid};
+    size_t signIndex = invalid;
     int tieStartNoteIndex = 0; // Invalidated by any insertion/deletion
     float accidentalOpacity = 1;
     int string, fret;
@@ -197,6 +198,13 @@ struct Sign {
 };
 //static_assert(sizeof(Sign)<=112/*40*/, "");
 
+inline bool operator ==(const Note& a, const Note& b) {
+ return a.key() == b.key();
+}
+inline bool operator ==(const Sign& a, const Sign& b) {
+ assert_(a.type==Sign::Note && b.type==Sign::Note);
+ return a.note == b.note;
+}
 inline bool operator <(const Sign& a, const Sign& b) {
     if(a.time==b.time) {
      if(a.type==Sign::Note && b.type==Sign::Note && (a.note.string||b.note.string)) return a.note.string < b.note.string;
@@ -216,11 +224,11 @@ inline String strKey(int fifths, int key) {
     //return (string[]){"A"_,"A♯"_,"B"_,"C"_,"C♯"_,"D"_,"D♯"_,"E"_,"F"_,"F♯"_,"G"_,"G♯"_}[(key+2*12+3)%12]
     /*+superDigit(key/12-2)*/;
     int step = keyStep(fifths, key)+37;
-    int octave = key/12-2; //*lowest A-1*/3 + (step>0 ? step/7 : (step-6)/7); // Rounds towards negative
+    //int octave = key/12-2; //*lowest A-1*/3 + (step>0 ? step/7 : (step-6)/7); // Rounds towards negative
     int alt = keyAlteration(fifths, key)+1;
     assert_(alt >= 0 && alt <= 2);
-    //return char('A'+step%7)+ref<string>{"♭"_,""_,"♯"_}[alt];//+str(octave);
-    return char('A'+step%7)+ref<string>{"b"_,""_,"#"_}[alt]+str(octave);
+    return char('A'+step%7)+ref<string>{"♭"_,""_,"♯"_}[alt];//+str(octave);
+    //return char('A'+step%7)+ref<string>{"b"_,""_,"#"_}[alt]+str(octave);
 }
 inline String strNote(int octave, int step, Accidental accidental) {
     octave += /*lowest A-1*/3 + (step>0 ? step/7 : (step-6)/7); // Rounds towards negative

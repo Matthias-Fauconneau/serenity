@@ -112,6 +112,7 @@ struct Graphics : shareable {
   for(auto& o: cubics) for(vec2& p: o.points) p+=vec2(offset);
  }
  void append(const Graphics& o) {
+  assert_(!o.offset);
   bounds.extend(o.bounds.min); bounds.extend(o.bounds.max);
   fills.append(o.fills);
   blits.append(o.blits);

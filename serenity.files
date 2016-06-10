@@ -89,3 +89,5 @@ music/music-video.cc
 music/abc.h
 music/abc.cc
 video/encoder.cc
+music/fret.h
+music/fret.cc
