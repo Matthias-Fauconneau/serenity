@@ -268,7 +268,7 @@ const TextLayout& Text::layout(float wrap) {
 
 vec2 Text::sizeHint(vec2 size) {
  const TextLayout& layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
- return max(minimalSizeHint, ceil(layout.bbMax - layout.bbMin));
+ return max(minimalSizeHint, /*ceil*/(layout.bbMax - layout.bbMin));
 }
 
 shared<Graphics> Text::graphics(vec2 size) {

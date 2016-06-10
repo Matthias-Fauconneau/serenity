@@ -34,6 +34,7 @@ struct SheetContext {
  float margin = halfLineInterval;
  float textSize = 6*halfLineInterval;
  bool tablature = true;
+ float interstaffDistance = 14*lineInterval;
 
  // Tablature
  int handPosition = 9; // Lowest fret
@@ -43,21 +44,32 @@ struct SheetContext {
   return fingering(sign);
  }
 
- StringFret fingering(Sign sign) {
-  assert_(sign.type==Sign::Note, int(sign.type));
-  assert_(tablature);
-  //assert_(sign.time != lastSign.time || sign.note.key() != lastSign.note.key(), lastSign, sign);
+ StringFret fingering(int key, int lowestFret) {
   static int strings[] = {52, 57, 62, 67, 71, 76}; //EADGBe
-  int key = sign.note.key();
   int bestString = 0, bestFret = 0;
   for(int string: range(6)) {
    int fret = key - strings[string];
-   if(fret < handPosition) break;
+   if(fret < lowestFret) break;
    bestString = string;
    bestFret = fret;
   }
-  assert_(bestFret <= 16, bestFret);
+  //assert_(bestFret <= 16, bestFret);
+  assert_(bestFret <= 19, bestFret);
   return {bestString, bestFret};
+}
+ StringFret fingering(Sign sign) {
+  assert_(sign.type==Sign::Note, int(sign.type));
+  assert_(tablature);
+  return fingering(sign.note.key(), this->handPosition);
+ }
+
+ StringFret fingeringS(int key, int lowestFret, int highestFret) {
+  static int strings[] = {52, 57, 62, 67, 71, 76}; //EADGBe
+  for(int string: range(6)) {
+   int fret = key - strings[string];
+   if(fret >= lowestFret && fret <= highestFret) return {string, fret};
+  }
+  return {-1,-1};
 }
 
  // Vertical positioning
@@ -68,7 +80,7 @@ struct SheetContext {
   return staffY(sign.staff, clefStep(sign));
  }
  float tablatureY(Sign sign) {
-  return -(int(sign.staff)-1)*10*lineInterval + (5-sign.note.string) * lineInterval;// - (sign.note.fret-5)/10.f * halfLineInterval;
+  return -int(sign.staff)*10*lineInterval + interstaffDistance + (5-sign.note.string) * lineInterval;// - (sign.note.fret-5)/10.f * halfLineInterval;
  }
 
  SheetContext(uint ticksPerSecond, float halfLineInterval) : ticksPerSecond(ticksPerSecond), halfLineInterval(halfLineInterval) {}
@@ -405,7 +417,7 @@ void System::layoutNotes(uint staff) {
    if(tablature) {
     // Body
     {note.glyphIndex[2] = system.glyphs.size; // Records glyph index of body, i.e next glyph to be appended to system.glyphs :
-     text(vec2(x, tablatureY(sign)), str(note.fret), note.grace?lineInterval:2*lineInterval, system.glyphs, vec2(1./2));
+     text(vec2(x, tablatureY(sign)), bold(str(note.fret)), note.grace?lineInterval:2*lineInterval, system.glyphs, vec2(1./2));
      if(system.glyphs.size-1 != note.glyphIndex[2]) note.glyphIndex[3] = system.glyphs.size-1; // 2nd glyph index (complex glyph composed of two digits)
     }
    }
@@ -1088,6 +1100,62 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
    } else if(sign.type == Sign::ChordName) {
     //log(trim(ref<char>(sign.chordName.name)));
     x += text(vec2(x, staffY(staves.size-1, 16)), trim(sign.chordName.name), textSize, system.glyphs, vec2(0,0)).x;
+   } else if(sign.type == Sign::ChordBox) {
+    const int topFret = sign.chordBox.top;
+    TextData s (sign.chordBox.name);
+    array<int> notes;
+    int step = "CDEFGAB"_.indexOf(s.next());
+    assert_(step >= 0);
+    int root = 72+ref<uint>{0,2,4,5,7,9,11}[step];
+    if(s.match("♭")) root--;
+    else if(s.match("♯")) root++;
+    notes.append(root);
+    notes.append(root+4); // Third
+    notes.append(root+11); // Seventh
+    notes.append(root+7); // Fifth
+    log(root, strKey(0, root), strKey(0, root+4), strKey(0, root+11));
+    float y = staffY(staves.size-1, -16);
+    const int stringCount = 6, fretCount = 4;
+    const float interval = lineInterval;
+    for(int fret: range(fretCount+1)) system.fills.append(vec2(x+interval/2, y+fret*interval), vec2((stringCount-1)*interval, 1));
+    for(int string: range(stringCount)) {
+     const float x0 = x+string*interval;
+     const float x1 = x+(string+1)*interval;
+     //system.fills.append(vec2((x0+x1)/2, y), vec2(1, fretCount*interval));
+     system.lines.append(vec2((x0+x1)/2, y), vec2((x0+x1)/2, y+fretCount*interval));
+    }
+    bool busy[stringCount] = {};
+    for(int note: notes) {
+     static int strings[] = {52, 57, 62, 67, 71, 76}; //EADGBe
+     //assert_(strings[5]+fretCount >= strings[0]+12);
+     if(note >= strings[5]+topFret+fretCount) note-=12;
+     while(note < strings[0]+topFret) note+=12;
+     StringFret sf = fingeringS(note, topFret, topFret+fretCount);
+     int string = sf.string, fret = sf.fret-topFret;
+     //assert_(fret <= fretCount, fret, note, string, fret);
+     if(fret < 0) continue;//error("Low", sign.chordBox.top, sign.chordBox.name, string, fret, topFret+fret, strKey(0, note));
+     if(busy[string]) {
+      note-=12;
+      StringFret sf = fingeringS(note, topFret, topFret+fretCount);
+      string = sf.string, fret = sf.fret-topFret;
+      if(busy[string]) {
+       log("Busy", sign.chordBox.top, sign.chordBox.name, string, fret, topFret+fret, strKey(0, note));
+       continue;
+      }
+     }
+     //if(fret < 0) error("Low", sign.chordBox.top, sign.chordBox.name, string, fret, topFret+fret, strKey(0, note));
+     if(fret >= 0 && fret < fretCount) {
+      const float x0 = x+string*interval;
+      const float x1 = x+(string+1)*interval;
+      const float y1 = y+(fret+1)*interval;
+      log(sign.chordBox.top, sign.chordBox.name, string, fret, topFret+fret, strKey(0, note));
+      glyph(vec2(x0, y1),SMuFL::FilledCircle,1,7*interval/halfLineInterval);
+      text(vec2((x0+x1)/2, y+fretCount*interval), strKey(0, note), interval, system.glyphs, vec2(1./2,0));
+      busy[string] = true;
+     }
+    }
+    text(vec2(x+5*halfLineInterval, y), trim(sign.chordBox.name), 3./2*interval, system.glyphs, vec2(1./2,1));
+    text(vec2(x, y), bold(str(topFret)), interval, system.glyphs, vec2(1,0));
    } else if(sign.type == Sign::Dynamic) {
     assert_(sign.dynamic!=-1);
     //float y = (max(staffY(1, measure[1].bottom-2), staffY(0, measure[0].top/*+5*/)) + staffY(1, measure[1].bottom-2))/2;
@@ -1218,7 +1286,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
    system.lines.append(vec2(measureBars->values[0], y), vec2(measureBars->values.last(), y), black, 3.f/4, true); // Raster
   }
   if(tablature) for(int line: range(6)) {
-   float y = staffY(staff-1, -line*2);
+   float y = interstaffDistance + staffY(staff, -line*2);
    assert_(measureBars);
    system.lines.append(vec2(measureBars->values[0], y), vec2(measureBars->values.last(), y), black, 3.f/4, true); // Raster
   }

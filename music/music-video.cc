@@ -55,7 +55,7 @@ uint audioStart(string audioFileName) {
 /// Converts MIDI time base to audio sample rate
 MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds, int unused start) {
  assert_(notes);
- assert_(targetTicksPerSeconds);
+ //assert_(targetTicksPerSeconds);
  //assert_(start==0, start);
  //int offset = start;
  //int offset = start-(int64)notes.first().time*targetTicksPerSeconds/notes.ticksPerSeconds;
@@ -654,7 +654,7 @@ struct Music : Widget {
     uint64 durationTicks = notes.last().time;
     int percent = round(100.*timeTicks/durationTicks);
     if(percent!=lastReport) {
-     log(str(percent, 2u)+"%", "Render", str(renderTime, totalTime), "Encode", str(videoEncodeTime, totalTime)
+     log(str(percent, 2u)+"%", "Render", strD(renderTime, totalTime), "Encode", strD(videoEncodeTime, totalTime)
          /*,int(round((float)totalTime*((float)durationTicks/timeTicks-1))), "/", int(round((float)totalTime/timeTicks*durationTicks)), "s"*/);
      lastReport=percent;
     }
@@ -664,8 +664,8 @@ struct Music : Widget {
    }
    log("Done");
   } else { // Preview
-   //window = ::window(this, int2(1280,/*720*/-1));
-   window = ::window(this, int2(854, 480));
+   //window = ::window(this, int2(854, 480));
+   window = ::window(this, int2(1280,720));
    window->backgroundColor = white;
    window->show();
    if(running && audioFile && playbackDeviceAvailable()) {

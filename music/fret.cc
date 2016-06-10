@@ -4,6 +4,7 @@ inline double pow(double x, double y) { return __builtin_pow(x,y); } // math.h
 
 shared<Graphics> Fret::graphics(vec2 size) {
     shared<Graphics> graphics;
+    const string font = "LinLibertine";
     const uint stringCount = 6;
     for(uint string=0; string<stringCount; string++) {
      graphics->fills.append(vec2(0, (string+1./2)/stringCount*size.y), vec2(size.x, 1), black, 1.f/2);
@@ -39,7 +40,7 @@ shared<Graphics> Fret::graphics(vec2 size) {
       int string = sign.note.string;
       const float y0 = float(string)/stringCount*size.y;
       const float y1 = float(string+1)/stringCount*size.y;
-      graphics->graphics.insertMulti(vec2(x0, y0), Text(str(sign),y1-y0,1./2,1./2,0,"DejaVuSans"_,true,1,0).graphics(vec2(x1-x0, y1-y0)));
+      graphics->graphics.insertMulti(vec2(x0, y0), Text(str(sign),y1-y0,1./2,1./2,0,font,true,1,0).graphics(vec2(x1-x0, y1-y0)));
       //uint index = font->font(size).index(code);
       //system.glyphs.append(origin, size, *font, code, index, black, opacity);
      }
@@ -48,7 +49,7 @@ shared<Graphics> Fret::graphics(vec2 size) {
       int string = sign.note.string;
       const float y0 = float(string)/stringCount*size.y;
       const float y1 = float(string+1)/stringCount*size.y;
-      graphics->graphics.insertMulti(vec2(x0, y0), Text(str(sign),y1-y0,black,1,0,"DejaVuSans"_,true,1,0).graphics(vec2(x1-x0, y1-y0)));
+      graphics->graphics.insertMulti(vec2(x0, y0), Text(str(sign),y1-y0,black,1,0,font,true,1,0).graphics(vec2(x1-x0, y1-y0)));
       //uint index = font->font(size).index(code);
       //system.glyphs.append(origin, size, *font, code, index, black, opacity);
      }

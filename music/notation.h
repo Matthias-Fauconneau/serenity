@@ -50,6 +50,7 @@ static constexpr string dynamic[] = {
 enum Ornaments { SlashUp = 0xE564, SlashDown };
 namespace Pedal { enum { Mark = 0xE650 }; }
 enum Segment { Arpeggio = 0xEAA9 };
+enum Fretboard { FilledCircle=0xE858 };
 }
 
 enum Value { InvalidValue=-1, Long, Breve, Whole, Half, Quarter, Eighth, Sixteenth, Thirtysecond, Sixtyfourth };
@@ -152,6 +153,7 @@ typedef int KeySignature; // Index on the fifths circle
 struct TimeSignature { uint beats, beatUnit; };
 struct Metronome { Value beatUnit; uint perMinute; };
 struct ChordName { char name[24]={}; };
+struct ChordBox { int top=0; char name[24]={}; };
 struct Tuplet { uint size; struct { int min, max; } first, last; int min, max; };
 using Dynamic = SMuFL::Dynamic;
 enum Wedge { Crescendo, Diminuendo, WedgeStop };
@@ -161,7 +163,7 @@ struct Sign {
     enum {
         Invalid,
         Clef, OctaveShift,
-        Measure, Repeat, KeySignature, TimeSignature, Metronome, ChordName,
+        Measure, Repeat, KeySignature, TimeSignature, Metronome, ChordName, ChordBox,
         Note, Rest,
         Tuplet,
         Dynamic, Wedge,
@@ -191,6 +193,7 @@ struct Sign {
         ::Tuplet tuplet;
         ::Metronome metronome;
         ::ChordName chordName;
+        ::ChordBox chordBox;
         ::Dynamic dynamic;
         ::Wedge wedge;
         ::Pedal pedal;

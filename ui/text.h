@@ -109,7 +109,7 @@ struct Text : virtual Widget {
 	/// Whether to justify explicit line breaks
 	bool justifyExplicitLineBreak;
     /// Minimal size hint
- vec2 minimalSizeHint;
+    vec2 minimalSizeHint;
 	/// User activated a link
 	function<void(ref<uint>)> linkActivated;
 

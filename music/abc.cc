@@ -35,6 +35,15 @@ ABC::ABC(ref<byte> file) {
    insertSign({Sign::Measure, time, .measure={pageBreak?Measure::PageBreak:Measure::NoBreak, measureIndex, 1, 1, measureIndex}});
    measureIndex++;
   }
+  else if(s.match("|")) {
+   int top = s.integer();
+   s.skip(' ');
+   string name = s.until('|');
+   ChordBox chord {top};
+   mref<char>(chord.name).slice(0,name.size).copy(name);
+   mref<char>(chord.name).slice(name.size).clear(0);
+   insertSign({Sign::ChordBox, time, .chordBox=chord});
+  }
   else if(s.match("[")) {
    assert_(tuplet.size==1);
    tuplet.size = 3;
@@ -80,10 +89,11 @@ ABC::ABC(ref<byte> file) {
      else break;
     }
     if(s.index > point) { // Chord name
-     ChordName name;
-     mref<char>(name.name).slice(0,s.index-start).copy(s.sliceRange(start,s.index));
-     mref<char>(name.name).slice(s.index-start).clear(0);
-     insertSign({Sign::ChordName, time, .chordName=name});
+     string name = s.sliceRange(start,s.index);
+     ChordName chord;
+     mref<char>(chord.name).slice(0,name.size).copy(name);
+     mref<char>(chord.name).slice(name.size).clear(0);
+     insertSign({Sign::ChordName, time, .chordName=chord});
      goto continue2;
     }
     const int implicitAlteration = ::implicitAlteration(keySignature, measureAlterations, step);
