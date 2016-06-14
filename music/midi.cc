@@ -150,6 +150,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
     uint beatUnit = 1<<data[1];
     TimeSignature newTimeSignature {beats, beatUnit};
     if(newTimeSignature.beats != timeSignature.beats || newTimeSignature.beatUnit != timeSignature.beatUnit) {
+     timeSignature = newTimeSignature;
      insertSign({Sign::TimeSignature, track.time, .timeSignature=timeSignature});
      assert_(track.time == 0, track.time);
     }
@@ -282,6 +283,10 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
       //assert_(int(value) >= 0, duration, valueDuration, note.time - noteOn.time);
       //if(int(value) >= 0) // FIXME
       int step = keyStep(keySignature, key);
+      if(tupletCurrentSize && tuplet.size && tupletSize==1 && tupletCurrentSize==tuplet.size-1) { // Correct missing last tuplet
+       tupletSize = tuplet.size;
+       //assert_(tupletSize==tuplet.size, tupletSize, tuplet.size, tupletCurrentSize, valueDuration, measureIndex, signs);
+      }
       int index = insertSign(Sign{Sign::Note, noteOn.time, {{staff, {{duration, .note={
                                                                     .value = value,
                                                                     .clef = clefs[staff],
@@ -294,10 +299,6 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
                                                                     .dot=dot,
                                                                    }}}}}});
       //log(valueDuration, tupletSize, tupletCurrentSize);
-      if(tupletCurrentSize && tuplet.size && tupletSize==1 && tupletCurrentSize==tuplet.size-1) { // Correct missing last tuplet
-       tupletSize = tuplet.size;
-       //assert_(tupletSize==tuplet.size, tupletSize, tuplet.size, tupletCurrentSize, valueDuration, measureIndex, signs);
-      }
       if(tupletSize!=1) {
        if(!tupletCurrentSize) {
         tuplet = {tupletSize, {index,index}, {index,index}, index,index};
@@ -365,6 +366,14 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
   int index=(signs.size+1)/2+1; for(;;index++) if(signs[index].type == Sign::Measure) break;
   signs = copyRef(signs.slice(0, index+1));
   notes = MidiNotes(copyRef(notes.slice(0, notes.size/2)), notes.ticksPerSeconds);
+ }
+#endif
+#if 0
+ // HACK: Fix last rest
+ {
+  Sign& sign = signs[signs.size-2];
+  assert_(sign.type == Sign::Rest, int(sign.type));
+  sign.rest.value = Quarter;
  }
 #endif
 #if 0

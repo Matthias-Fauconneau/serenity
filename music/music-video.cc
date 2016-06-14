@@ -47,7 +47,7 @@ uint audioStart(string audioFileName) {
  for(FFmpeg file(audioFileName);;) {
   int32 buffer[1024  * file.channels];
   size_t size = file.read32(mref<int32>(buffer, 1024 * file.channels));
-  assert_(size);
+  assert_(size, audioFileName, existsFile(audioFileName), file.duration);
   for(size_t i: range(size  * file.channels)) if(abs(buffer[i])>1<<23) return file.audioTime+i;
  }
 }
@@ -363,9 +363,9 @@ uint mean(const Image& image) {
 
 struct Music : Widget {
  // Name
- string name = arguments() ? arguments()[0] : (error("Expected name"), string());
+ string name = arguments() ? (arguments()[0].contains('.')?section(arguments()[0],'.'):arguments()[0]) : (error("Expected name"), string());
  // Files
- String audioFileName = arguments().contains("noaudio") ? ""__ : arguments().contains("novideo") ? name+".mp3" : name+".mp4"; //+".mkv"; //".mp4";
+ String audioFileName = arguments().contains("noaudio") ? ""__ : (arguments().contains("novideo") || !existsFile(name+".mp4") ? name+".mp3" : name+".mp4"); //+".mkv"; //".mp4";
  String videoFile = arguments().contains("novideo") ? ""__ : name+".mp4"; //".mkv"; //.mp4";
 
  // Audio
@@ -393,7 +393,7 @@ struct Music : Widget {
  Synchronizer synchronizer {audioFileName&&!midi?decodeAudio(audioFileName):Audio(), notes, sheet.midiToSign, sheet.measureBars};
 
  // Video
- Decoder video = videoFile ? Decoder(videoFile) : Decoder();
+ Decoder video = videoFile && existsFile(videoFile) ? Decoder(videoFile) : Decoder();
 
  // State
  bool failed = sheet.firstSynchronizationFailureChordIndex != invalid;
@@ -581,6 +581,72 @@ struct Music : Widget {
  }
 
  Music() {
+  if(!abc) {
+   array<char> s;
+   int64 lastTime = 0;
+   int time = 0; // Beat time
+   int duration = 0;
+   bool tuplet = false;
+   for(const Sign& sign: signs) {
+    if(int64(sign.time) > lastTime) {
+     s.append(' ');
+     time += duration;
+     duration = 0;
+    }
+    lastTime = sign.time;
+    /**/  if(sign.type==Sign::Measure) {
+     if((time+6)%(12*4)==0) {
+      s.append(',');
+      time += 6;
+     }
+     assert_(time%(12*4)==0, time, time%(12*4), s);
+     s.append("\n");
+    }
+    else if(sign.type==Sign::Rest) {
+     s.append(str(sign));
+     if(sign.rest.value == Sixteenth) time += 3;
+     else if(sign.rest.value == Eighth) time += 6;
+     else if(sign.rest.value == Quarter) time += 12;
+     else error(int(sign.rest.value));
+     log(time);
+    }
+    else if(sign.type==Sign::Note) {
+     if(!tuplet && sign.note.durationCoefficientDen > 1) {
+      s.append('[');
+      tuplet = true;
+     }
+     if(tuplet) assert_(sign.note.durationCoefficientDen > 1, sign.note.durationCoefficientDen, sign.note.durationCoefficientNum, s);
+     s.append(str(sign));
+     if(sign.note.value == Sixteenth) duration = 3;
+     else if(sign.note.value == Eighth) duration = 6;
+     else if(sign.note.value == Quarter) duration = 12;
+     else error(int(sign.note.value));
+     if(tuplet) duration = duration*2/3;
+     }
+    else if(sign.type==Sign::Clef) {
+     //assert(sign.clef.clefSign == GClef);
+     s.append(str(sign)+'\n');
+    }
+    else if(sign.type==Sign::TimeSignature) {
+     //assert(sign.timeSignature.beats == 4 && sign.timeSignature.beatUnit == 4);
+     s.append(str(sign)+'\n');
+    }
+    else if(sign.type==Sign::Metronome) {
+     //assert(sign.metronome.beatUnit == Quarter && sign.metronome.perMinute == 106);
+     s.append(str(sign)+'\n');
+    }
+    else if(sign.type==Sign::Tuplet) {
+     assert_(tuplet);
+     s.append(']');
+     tuplet = false;
+    }
+    else error(int(sign.type), sign);
+   }
+   log(s);
+   writeFile(name+".abc", s);
+   return;
+  }
+
   scroll.horizontal=true, scroll.vertical=false, scroll.scrollbar = true;
   if(failed) { // Seeks to first synchronization failure
    size_t measureIndex = 0;

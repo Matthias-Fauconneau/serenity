@@ -11,12 +11,9 @@ ABC::ABC(ref<byte> file) {
  auto insertSign = [this,&activeTies,&minStep,&maxStep,&tuplet](Sign sign) { return ::insertSign(signs, activeTies, minStep, maxStep, tuplet, sign); };
 
  KeySignature keySignature = 0;
- TimeSignature timeSignature = {4,4};
+ TimeSignature timeSignature = {0,0};
  constexpr int staffCount = 1;
  Clef clefs[staffCount] = {{GClef,0}};
-
- insertSign({Sign::TimeSignature, 0, .timeSignature=timeSignature});
- for(uint staff: range(staffCount)) insertSign({Sign::Clef, 0, {{staff, {.clef=clefs[staff]}}}});
 
  const uint staff = 0;
  uint time = 0;
@@ -25,13 +22,14 @@ ABC::ABC(ref<byte> file) {
  map<int, int> measureAlterations; // Currently altered steps (for implicit alterations)
 
  while(s) {
+  assert_(!s.match('/'), nextFingering);
   if(s.match(" ")||s.match("\t")) {}
   else if(s.match("\n")) {
    assert_(tuplet.size==1);
    measureAlterations.clear();
    bool pageBreak = s.match("\n") ? true : false;
    //log(measureIndex+1, "|", time);
-   assert_(time%(4*12)==0, time-(time/(4*12)*(4*12)), 4*12, 4*12-(time-(time/(4*12)*(4*12))));
+   assert_(time%(4*12)==0, time-(time/(4*12)*(4*12)), 4*12, 4*12-(time-(time/(4*12)*(4*12))), s.data.slice(0, s.index), "|&^|", s.data.slice(s.index, 16));
    insertSign({Sign::Measure, time, .measure={pageBreak?Measure::PageBreak:Measure::NoBreak, measureIndex, 1, 1, measureIndex}});
    measureIndex++;
   }
@@ -68,7 +66,29 @@ ABC::ABC(ref<byte> file) {
    insertSign({Sign::Rest, uint64(time), {{staff, {{12, .rest={Quarter}}}}}});
    time += 12;
   }
-  else if(s.isInteger()) nextFingering = s.integer();
+  else if(s.isInteger()) {
+   int integer = s.integer();
+   if(s.match("/")) { // Time Signature
+    uint beats = integer;
+    uint beatUnit = s.integer();
+    s.match('\n');
+    TimeSignature newTimeSignature {beats, beatUnit};
+    if(newTimeSignature.beats != timeSignature.beats || newTimeSignature.beatUnit != timeSignature.beatUnit) {
+     assert_(time == 0);
+     timeSignature = newTimeSignature;
+     insertSign({Sign::TimeSignature, 0, .timeSignature=timeSignature});
+    }
+   } else nextFingering = integer;
+  }
+  else if(s.match("♩=")) {
+   uint perMinute = s.integer();
+   s.match('\n');
+   insertSign({Sign::Metronome, uint64(time), .metronome={Quarter, perMinute}});
+  }
+  else if(s.match("G:")) {
+   s.match('\n');
+   for(uint staff: range(staffCount)) insertSign({Sign::Clef, 0, {{staff, {.clef=clefs[staff]}}}});
+  }
   else { // Chord
    //int start = s.index;
    int minDuration = -1;

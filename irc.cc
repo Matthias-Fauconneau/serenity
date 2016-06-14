@@ -216,7 +216,8 @@ struct DCCApp {
    for(size_t i=1; i<table.children.size; i++) {
     const Element& row = table(i);
     String file = row(0).text();
-    //if(!(find(file, query) || find(file, replace(query, " ", ".")))) continue;
+    //if(!(find(file, query) || !find(file, replace(query, " ", ".")))) continue;
+    if(find(toUpper(file), "NL") || find(toUpper(file), "SUB")) continue;
     string irc = row(0)(0)["href"];
     if(!startsWith(irc,"irc")) continue;
     String size = row(6).text();

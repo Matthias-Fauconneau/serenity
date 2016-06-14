@@ -20,7 +20,7 @@ static vec2 text(vec2 origin, string message, float fontSize, array<Glyph>& glyp
 struct SheetContext {
  // Musical context
  uint ticksPerSecond; // Divisions (tick time unit rhythmic definition)
- uint beatsPerMinute = 106; // Tempo
+ uint beatsPerMinute = 0; // Tempo
  TimeSignature timeSignature = {4,4};
  KeySignature keySignature = 0;
  vec2 pedalStart = 0; size_t pedalStartSystemIndex=0; // Last pedal start/change position

@@ -235,11 +235,25 @@ inline String strKey(int fifths, int key) {
 }
 inline String strNote(int octave, int step, Accidental accidental) {
     octave += /*lowest A-1*/3 + (step>0 ? step/7 : (step-6)/7); // Rounds towards negative
+    octave -= 3;
+    assert_(octave >= 0, octave);
     int octaveStep = (step - step/7*7 + 7)%7; // signed step%7 (Step offset on octave scale)
-    return "CDEFGAB"_[octaveStep]+(accidental?ref<string>{"♭"_,"♮","♯"_}[accidental-Accidental::AccidentalBase]:""_)+superDigit(octave);
+    array<char> s;
+    s.append("CDEFGABcdefgab"_[min(1,octave)*7+octaveStep]);
+    if(accidental) s.append(ref<string>{"♭"_,"♮","♯"_}[accidental-Accidental::AccidentalBase]);
+    s.append(repeat("'"_, max(0, octave-1))); //superDigit(octave);
+    return ::move(s);
     //return "CDEFGAB"_[octaveStep]+(accidental?ref<string>{"B"_,"N"_,"#"_}[accidental-Accidental::AccidentalBase]:""_)+str(octave);
 }
-inline String str(const Note& o) { return strNote(o.clef.octave, o.step, o.accidental); }
+inline String str(const Note& o) {
+ array<char> s = strNote(o.clef.octave, o.step, o.accidental);
+ /**/  /*if(o.value == Half) s.append('-');
+ else*/ if(o.value == Quarter) s.append('-');
+ else if(o.value == Eighth) {}
+ else if(o.value == Sixteenth) s.append(';');
+ else error(int(o.value));
+ return ::move(s);
+}
 inline String str(const Clef& o) {
     if(o.clefSign==ClefSign::GClef) return "G:"__;
     if(o.clefSign==ClefSign::FClef) return "F:"__;
@@ -250,8 +264,13 @@ inline String str(const Sign& o) {
         String s;
         if(o.type==Sign::Clef) s = str(o.clef);
         else if(o.type==Sign::OctaveShift) s = copyRef(ref<string>{"8va"_,"8vb"_,"⸥"_}[int(o.octave)]);
-        else if(o.type==Sign::Note) s = strKey(0, o.note.key()); //str(o.note);
-        else if(o.type==Sign::Rest) s = copyRef(str("-;,"_[clamp(0, int(o.rest.value)-Value::Whole, 1)]));
+        //else if(o.type==Sign::Note) s = strKey(0, o.note.key()); //str(o.note);
+        else if(o.type==Sign::Note) s = str(o.note);
+        else if(o.type==Sign::Rest) {
+         assert_(o.rest.value >= Quarter && o.rest.value <= Sixteenth);
+         s = copyRef(str(":,;"_[clamp(0, int(o.rest.value)-Value::Quarter, 2)]));
+         //log(int(o.rest.value), s);
+        }
         else error(int(o.type));
         assert_(o.staff <= 9);
         return s;// + ref<string>{"₀","₁","₂","₃","₄","₅","₆","₇","₈","₉"}[o.staff];
