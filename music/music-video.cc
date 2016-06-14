@@ -362,8 +362,19 @@ uint mean(const Image& image) {
 }
 
 struct Music : Widget {
+ String findTitle() {
+  String title;
+  if(arguments()) title = copyRef(arguments()[0]);
+  else for(string file: currentWorkingDirectory().list(Files)) {
+   if(!title) title=copyRef(section(file,'.'));
+   assert_(section(file,'.')==title, title, section(file,'.'), "Multiple title in folder. Executable called without specifying which title as a command line argument");
+  }
+  if(title.contains('.')) title = copyRef(section(title,'.'));
+  return title;
+ }
+
  // Name
- string name = arguments() ? (arguments()[0].contains('.')?section(arguments()[0],'.'):arguments()[0]) : (error("Expected name"), string());
+ String name = findTitle();
  // Files
  String audioFileName = arguments().contains("noaudio") ? ""__ : (arguments().contains("novideo") || !existsFile(name+".mp4") ? name+".mp3" : name+".mp4"); //+".mkv"; //".mp4";
  String videoFile = arguments().contains("novideo") ? ""__ : name+".mp4"; //".mkv"; //.mp4";
