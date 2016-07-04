@@ -30,8 +30,10 @@ struct OffsetPlot : Widget {
 	vec2 sizeHint(vec2) override { return vec2(-keyCount*18, 768); }
 	shared<Graphics> graphics(vec2 size) override {
 		shared<Graphics> graphics;
-        float minimumOffset = -1./4;
-        float maximumOffset = 1./4;
+        //float minimumOffset = -1./4;
+        //float maximumOffset = 1./4;
+	float minimumOffset = -1./2;
+        float maximumOffset = 1./2;
         for(int key: range(keyCount)) {
             int x0 = key * size.x / keyCount;
             int x1 = (key+1) * size.x / keyCount;

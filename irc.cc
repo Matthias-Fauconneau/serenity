@@ -193,7 +193,7 @@ struct DCC : Link {
    // else NICK already in use
   }
   for(string channel: channels) write("JOIN #"+channel+"\r\n");
-  write(":"+nick+" PRIVMSG "_+bot+" :xdcc remove"+"\r\n"_);
+  //write(":"+nick+" PRIVMSG "_+bot+" :xdcc remove"+"\r\n"_);
   listen(1); // Waits for first JOIN confirmation
   write(":"+nick+" PRIVMSG "_+bot+" :xdcc send #"_+number+"\r\n"_);
   listen(2); // Handles DCC
@@ -209,32 +209,47 @@ struct DCCApp {
    String search = replace(section(config, '\n') ,"%", query);
    buffer<string> channels = split(section(config, '\n', 1, 2), " ");
    buffer<string> bots = split(section(config, '\n', 2, -1), "\n");
-   Map document = getURL(search, {}, 1);
-   Element root = parseHTML(document);
-   const Element& table = root("//table");
-   array<string> linkBots;
-   for(size_t i=1; i<table.children.size; i++) {
-    const Element& row = table(i);
-    String file = row(0).text();
-    //if(!(find(file, query) || !find(file, replace(query, " ", ".")))) continue;
-    if(find(toUpper(file), "NL") || find(toUpper(file), "SUB")) continue;
-    string irc = row(0)(0)["href"];
-    if(!startsWith(irc,"irc")) continue;
-    String size = row(6).text();
-    String age = unescape(row(8).text());
-    string command = table(i+1)(0)(0)["value"];
-    String linkURL = irc+" "+command;
-    Link link(linkURL);
-    if(link.channels[0]==channels[0]) link.channels.append(channels[1]);
-    log(link);
-    if(bots.contains(link.bot)) {
-     log(file, size, age, link.channels, link.bot);
-     url = str(link);
-     break;
-    }
-    linkBots.append(link.bot);
+   array<String> linkBots;
+   for(size_t p=0; p<11; p++) {
+       String searchURL = copyRef(search);
+       if(p>0) searchURL = searchURL+"&pn="+str(p);
+       Map document = getURL(searchURL, {}, 1);
+       Element root = parseHTML(document);
+       const Element& table = root("//table");
+       for(size_t i=1; i<table.children.size; i++) {
+           const Element& row = table(i);
+           String file = row(0).text();
+           //if(!(find(file, query) || !find(file, replace(query, " ", ".")))) continue;
+           if(find(toUpper(file), "NL") || find(toUpper(file), "SUB")) continue;
+           string irc = row(0)(0)["href"];
+           if(!startsWith(irc,"irc")) continue;
+           String sizeString = replace(row(6).text(), "&nbsp;", " ");
+           TextData s(sizeString);
+           double size = s.decimal();
+           s.skip(" ");
+           if(s.match("KB")) size *= 1e3;
+           else if(s.match("MB")) size *= 1e6;
+           else if(s.match("GB")) size *= 1e9;
+           else error(s);
+           String age = unescape(row(8).text());
+           string command = table(i+1)(0)(0)["value"];
+           String linkURL = irc+" "+command;
+           Link link(linkURL);
+           if(link.channels[0]==channels[0]) link.channels.append(channels[1]);
+           for(string word: split(query," ")) if(!find(file, word)) goto continue2;
+           log(file, size/1e9, link.bot);
+           if(availableCapacity(".") < size) continue;
+           if(bots.contains(link.bot)) {
+               log(file, size, age, link.channels, link.bot);
+               url = str(link);
+               break;
+           }
+           linkBots.append(str(file, size, link.bot));
+           continue2:;
+       }
+       if(url) break;
    }
-   if(!url) error(search, linkBots, table);
+   if(!url) error(search, linkBots);//, table);
   }
   else url = unsafeRef(query);
   log(url);
