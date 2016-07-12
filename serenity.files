@@ -91,3 +91,7 @@ music/abc.cc
 video/encoder.cc
 music/fret.h
 music/fret.cc
+
+io/tiff.h
+io/tiff.cc
+raw.cc
