@@ -97,7 +97,7 @@ struct BinaryData : Data {
     int64 read64() { return isBigEndian?big64(read<int64>()):read<int64>(); }
     int32 read32() { return isBigEndian?big32(read<int32>()):read<int32>(); }
     int16 read16() { return isBigEndian?big16(read<int16>()):read<int16>(); }
-    int8   read8  () { return isBigEndian?big16(read<int8  >()):read<int8  >(); }
+    uint8   read8() { return read<uint8>(); }
 
     /// Provides template overloaded specialization (for swap) and return type overloading through cast operators.
     struct ReadOperator {

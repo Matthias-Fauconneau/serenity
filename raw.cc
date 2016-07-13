@@ -1,6 +1,7 @@
 #include "thread.h"
 #include "data.h"
 #include "image.h"
+#include "png.h"
 
 /// 2D array of 16bit integer samples
 typedef ImageT<uint16> Image16;
@@ -13,8 +14,7 @@ struct Raw {
     Map file (name);
     BinaryData s(file);
     s.skip("II\x2A\x00");
-    //Image preview;
-    //Image16 image;
+    Image16 image;
     for(;;) {
      s.index = s.read32();
      if(!s.index) break;
@@ -114,57 +114,70 @@ struct Raw {
        {uint16 marker = s.read16();
         assert_(marker == 0xFFD8, hex(marker)); // Start Of Image
        }
-       int maxLength;
        struct LengthSymbol { uint8 length; uint8 symbol; };
-       buffer<LengthSymbol> lengthSymbolForCode;
+       int maxLength[2];
+       buffer<LengthSymbol> lengthSymbolForCode[2];
        {uint16 marker = s.read16();
         assert_(marker == 0xFFC4); // Define Huffman Table
-        uint start = s.index;
-        uint16 length = s.read16();
-        uint8 huffmanTableInfo = s.read8();
-        unused uint index = huffmanTableInfo&0b111;
-        assert_((huffmanTableInfo&0b0001) == 0); // DC
-        ref<uint8> symbolCountsForLength = s.read<uint8>(16);
-        //log(symbolCountsForLength);
-        maxLength=16; for(; maxLength && !symbolCountsForLength[maxLength-1]; maxLength--);
-        int totalSymbolCount = 0; for(int count: symbolCountsForLength) totalSymbolCount += count;
-        lengthSymbolForCode = buffer<LengthSymbol>(1<<maxLength);
-        int p = 0;
-        ref<uint8> symbols = s.read<uint8>(totalSymbolCount);
-        for(int h=0, length=1; length <= maxLength; length++) {
-         for(int i=0; i < symbolCountsForLength[length-1]; i++, p++) {
-          //log(symbols[p]);
-          for(int j=0; j < (1 << (maxLength-length)); j++) {
-           lengthSymbolForCode[h++] = {uint8(length), symbols[p]};
+        //uint start = s.index;
+        unused uint16 length = s.read16();
+        for(uint index: range(2)) {
+         uint8 huffmanTableInfo = s.read8();
+         unused uint tableIndex = huffmanTableInfo&0b1111;
+         //log(index);
+         assert_(index==tableIndex);
+         assert_((huffmanTableInfo&0b10000) == 0, huffmanTableInfo); // DC
+         ref<uint8> symbolCountsForLength = s.read<uint8>(16);
+         //log(symbolCountsForLength);
+         maxLength[index]=16; for(; maxLength[index] && !symbolCountsForLength[maxLength[index]-1]; maxLength[index]--);
+         int totalSymbolCount = 0; for(int count: symbolCountsForLength) totalSymbolCount += count;
+         lengthSymbolForCode[index] = buffer<LengthSymbol>(1<<maxLength[index]);
+         int p = 0;
+         ref<uint8> symbols = s.read<uint8>(totalSymbolCount);
+         for(int h=0, length=1; length <= maxLength[index]; length++) {
+          for(int i=0; i < symbolCountsForLength[length-1]; i++, p++) {
+           //log(symbols[p]);
+           for(int j=0; j < (1 << (maxLength[tableIndex]-length)); j++) {
+            lengthSymbolForCode[tableIndex][h++] = {uint8(length), symbols[p]};
+           }
           }
          }
+         if(0) for(uint code=1; code<lengthSymbolForCode[index].size;) {
+          LengthSymbol lengthSymbol = lengthSymbolForCode[index][code];
+          uint length = lengthSymbol.length, symbol = lengthSymbol.symbol;
+          log(str(code>>(maxLength[index]-length), length, '0', 2u), symbol);
+          code += (1 << (maxLength[index]-length));
+         }
         }
-        if(0) for(uint code=1; code<lengthSymbolForCode.size;) {
-         LengthSymbol lengthSymbol = lengthSymbolForCode[code];
-         uint length = lengthSymbol.length, symbol = lengthSymbol.symbol;
-         log(str(code>>(maxLength-length), length, '0', 2u), symbol);
-         code += (1 << (maxLength-length));
-        }
-       assert(s.index <= start+length, start, length, s.index, start+length);
-       s.index = start+length;
+        assert(s.index == start+length, start, length, s.index, start+length);
+        //s.index = start+length;
        }
-       log(maxLength);
+       uint sampleSize;
+       uint width, height;
        {
         uint16 marker = s.read16();
         assert_(marker == 0xFFC3, hex(marker)); // Start Of Frame (Lossless)
-        size_t start = s.index;
-        uint16 length = s.read16();
+        unused size_t start = s.index;
+        unused uint16 length = s.read16();
         assert_(length == 14, length);
-        uint8 sampleSize = s.read8();
-        assert_(sampleSize == 14 || sampleSize == 0, sampleSize);
-        uint16 width = s.read16();
-        assert_(width == 3710, width);
-        uint16 height = s.read16();
-        assert_(height == 2816, height);
-        uint16 componentCount = s.read8();
-        assert_(componentCount == 0, componentCount);
-        assert(s.index <= start+length, start, length, s.index, start+length);
-        s.index = start+length;
+        sampleSize = s.read8();
+        assert_(sampleSize == 12, sampleSize);
+        height = s.read16();
+        assert_(height == 3710, height);
+        width = s.read16();
+        assert_(width == 2816, width);
+        uint8 componentCount = s.read8();
+        assert_(componentCount == 2, componentCount);
+        for(uint c: range(componentCount)) {
+         uint8 index = s.read8();
+         assert_(index == 1+c, index, c);
+         uint8 HV = s.read8();
+         assert_(HV==0b00010001, HV);
+         uint8 quantizationTable = s.read8();
+         assert_(quantizationTable == 0);
+        }
+        assert(s.index == start+length, start, length, s.index, start+length);
+        //s.index = start+length;
        }
        {
         uint16 marker = s.read16();
@@ -173,21 +186,29 @@ struct Raw {
         uint16 length = s.read16();
         assert_(length == 10, length);
         uint8 componentCount = s.read8();
-        assert_(componentCount == 0, componentCount);
+        assert_(componentCount == 2, componentCount);
+        for(uint c: range(componentCount)) {
+         uint8 index = s.read8();
+         assert_(index == c+1);
+         uint8 DCACindex = s.read8();
+         assert_(DCACindex == c<<4, DCACindex);
+        }
         uint8 predictor = s.read8();
-        assert_(predictor == 0, predictor);
+        assert_(predictor == 1, predictor);
         uint8 endOfSpectralSelection = s.read8();
         assert_(endOfSpectralSelection == 0);
         uint8 successiveApproximation = s.read8();
         assert_(successiveApproximation == 0);
-        assert(s.index <= start+length, start, length, s.index, start+length);
-        s.index = start+length;
+        assert(s.index == start+length, start, length, s.index, start+length);
+        //s.index = start+length;
        }
-       uint bitbuf = 0, vbits = 0;
-       auto readBits = [&](const uint nbits) {
+       //log(hex(cast<uint8>(s.peek(16))));
+       uint bitbuf = 0; int vbits = 0;
+       auto readBits = [&](const int nbits) -> uint {
+        if(nbits==0) return 0u;
         while(vbits < nbits) {
-         uint8 c = s.read8();
-         if(c == 0xff) assert_(s.read8() == 0x00);
+         uint c = s.read<uint8>();
+         if(c == 0xff) assert_(s.read<uint8>() == 0x00);
          bitbuf <<= 8;
          bitbuf |= c;
          vbits += 8;
@@ -196,28 +217,54 @@ struct Raw {
         vbits -= nbits;
         return value;
        };
-       auto readHuffman = [&]() {
-        const uint nbits = maxLength;
+       auto readHuffman = [&](uint i) {
+        const int nbits = maxLength[i];
         while(vbits < nbits) {
-         uint8 byte = s.read8();
+         uint byte = s.read8();
          if(byte == 0xff) { uint8 v = s.read8(); assert_(v == 0x00, v); }
          bitbuf <<= 8;
          bitbuf |= byte;
          vbits += 8;
         }
         uint code = (bitbuf << (32-vbits)) >> (32-nbits);
-        assert_(lengthSymbolForCode[code].length <= maxLength);
-        vbits -= lengthSymbolForCode[code].length;
-        return lengthSymbolForCode[code].symbol;
+        assert_(lengthSymbolForCode[i][code].length <= maxLength[i]);
+        vbits -= lengthSymbolForCode[i][code].length;
+        return lengthSymbolForCode[i][code].symbol;
        };
-       for(;;) {
-        uint length = readHuffman();
-        log(length, readBits(length));
+       assert_(sampleSize > 8 && sampleSize <= 16);
+       assert_(!image);
+       image = Image16(width*2, height);
+       int predictor[2] = {1<<(sampleSize-1), 1<<(sampleSize-1)};
+       for(uint unused y: range(height)) {
+        for(uint c: range(2)) predictor[c] = 1<<(sampleSize-1); // ?
+        for(uint unused x: range(width)) {
+         for(uint c: range(2)) {
+          int length = readHuffman(c);
+          assert_(length < 16);
+          int residual = readBits(length);
+          if((residual & (1 << (length-1))) == 0) residual -= (1 << length) - 1;
+          int value = predictor[c] + residual;
+          image(x*2+c, y) = value; // FIXME: components
+          predictor[c] = value;
+         }
+        }
+       }
+       {
+        uint16 marker = s.read16();
+        assert_(marker == 0xFFD9, hex(marker)); // End Of Image
        }
       }
      };
      readIFD(s);
     }
+    assert_(image);
+    Image sRGB (image.size);
+    assert_(sRGB.stride == image.stride);
+    int min = 0xFFFF, max = 0;
+    for(size_t i: range(image.ref::size)) min=::min(min,int(image[i])), max=::max(max,int(image[i]));
+    //for(size_t i: range(image.ref::size)) sRGB[i] = byte3(image[i] >> (12-8));
+    for(size_t i: range(image.ref::size)) sRGB[i] = byte3((int(image[i])-min)*0xFF/(max-min));
+    writeFile(name+".png"_,encodePNG(sRGB), currentWorkingDirectory(), true);
     break;
    }
  }
