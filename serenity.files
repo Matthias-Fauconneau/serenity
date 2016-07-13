@@ -95,3 +95,5 @@ music/fret.cc
 io/tiff.h
 io/tiff.cc
 raw.cc
+cr2.h
+cr2.cc
