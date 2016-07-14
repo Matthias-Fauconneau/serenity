@@ -25,7 +25,7 @@ uint8 CR2::readHuffman(uint i) {
   vbits += 8;
  }
  uint code = (bitbuf << (32-vbits)) >> (32-nbits);
- assert_(lengthSymbolForCode[i][code].length <= maxLength[i]);
+ //assert_(lengthSymbolForCode[i][code].length <= maxLength[i]);
  vbits -= lengthSymbolForCode[i][code].length;
  return lengthSymbolForCode[i][code].symbol;
 }
@@ -351,13 +351,13 @@ void CR2::readIFD(BinaryData& s) {
   assert_(sampleSize > 8 && sampleSize <= 16);
   assert_(!image);
   image = Image16(width*2, height);
-  int predictor[2] = {1<<(sampleSize-1), 1<<(sampleSize-1)};
+  int predictor[2];// = {1<<(sampleSize-1), 1<<(sampleSize-1)};
   for(uint unused y: range(height)) {
    for(uint c: range(2)) predictor[c] = 1<<(sampleSize-1); // ?
    for(uint unused x: range(width)) {
     for(uint c: range(2)) {
      int length = readHuffman(c);
-     assert_(length < 16);
+     //assert_(length < 16);
      int residual = readBits(length);
      if((residual & (1 << (length-1))) == 0) residual -= (1 << length) - 1;
      int value = predictor[c] + residual;
