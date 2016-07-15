@@ -104,8 +104,6 @@ void CR2::readIFD(BinaryData& s) {
   else if(entry.tag == 0x201) {} // JPEGInterchangeFormat (deprecated)
   else if(entry.tag == 0x202) {} // JPEGInterchangeFormatLength (deprecated)
   else if(entry.tag == 0x2BC) {} // XML_Packet (XMP)
-  // {DNG 50xxx} 2C2: Version, Backward, Model; 2D1: ColorMatrix; 2E4: Private; 30A: CalibrationIlluminant, 33B: OriginalName
-  // 3A3: Camera, Profile Calibration, Signature; 3A8: ProfileName; 3AC: Profile Tone Curve, Embed Policy, Copyright, 3C4: ForwardMatrix, 3D5: Look Table
   else if(entry.tag == 0x8298) {} // Copyright
   else if(entry.tag == 0x8769) { // EXIF
    BinaryData& s = value; // Renames value -> s

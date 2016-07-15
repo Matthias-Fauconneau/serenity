@@ -1,6 +1,7 @@
 #include "cr2.h"
 #include "png.h"
 #include "time.h"
+#include "matrix.h"
 
 /// 2D array of 32bit integer pixels
 typedef ImageT<uint32> Image32;
@@ -15,81 +16,84 @@ struct Raw {
     Time decode {true};
     CR2 cr2(map);
     log(decode);
-    log(cr2.whiteBalance.R, cr2.whiteBalance.G, cr2.whiteBalance.B);
     const Image16& image = cr2.image;
-    Image32 R (image.size/2), G (image.size/2), B (image.size/2); // Linear
-    //cr2.whiteBalance.R = 1, cr2.whiteBalance.G = 1, cr2.whiteBalance.B = 1;
-    uint scaleR = 2*cr2.whiteBalance.R, scaleG = cr2.whiteBalance.G, scaleB = 2*cr2.whiteBalance.B;
-    scaleR = 2, scaleG = 1, scaleB = 2;
-    for(size_t y: range(image.height/2)) {
-     for(size_t x: range(image.width/2)) {
-      R(x, y) = uint(image(x*2+0, y*2+0))*scaleR;
-      G(x, y) = (uint(image(x*2+1, y*2+0))+uint(image(x*2+0, y*2+1)))*scaleG;
-      B(x, y) = uint(image(x*2+1, y*2+1))*scaleB;
+    uint minR = -1, minG1 = -1, minG2 = -1, minB = -1;
+    uint maxR0 = 0, maxG1 = 0, maxG2 = 0, maxB0 = 0;
+    for(size_t Y: range(image.height/2/8, 7*image.height/2/8)) for(size_t X: range(image.width/2/8, 7*image.width/2/8)) {
+     size_t y = 2*Y, x = 2*X;
+     uint R = image(x+0,y+0), G1 = image(x+1,y+0), G2 = image(x+0,y+1), B = image(x+1,y+1);
+     minR=::min(minR, R);
+     minG1=::min(minG1, G1);
+     minG2=::min(minG2, G2);
+     minB=::min(minB, B);
+     maxR0=::max(maxR0,R);
+     maxG1=::max(maxG1,G1);
+     maxG2=::max(maxG2,G2);
+     maxB0=::max(maxB0,B);
+    }
+    log(minR, minG1, minG2, minB);
+    //minR = 511, minG1 = 511, minG2 = 511, minB = 511;
+    log(maxR0, maxG1, maxG2, maxB0);
+    log(cr2.whiteBalance.R, cr2.whiteBalance.G, cr2.whiteBalance.B);
+    uint max = 4000;
+    cr2.whiteBalance.R = 1, cr2.whiteBalance.G = 1, cr2.whiteBalance.B = 1;
+    uint maxBalance = ::max(::max(cr2.whiteBalance.R, cr2.whiteBalance.G), cr2.whiteBalance.B);
+    uint64 _2_32 = (1ul<<32)-1;
+    uint scaleR = _2_32*cr2.whiteBalance.R/(maxBalance*max), scaleG = _2_32*cr2.whiteBalance.G/(maxBalance*max*2), scaleB = _2_32*cr2.whiteBalance.B/(maxBalance*max);
+    log(scaleR, scaleG, scaleB); // 33-12 = 21 +12 = 33
+    log(max*scaleR, max*scaleG, max*scaleB);
+    uint maxR = 0, maxG = 0, maxB = 0;
+    size_t cropY = 18, cropX = 96;
+    int2 size ((image.width-cropX)/2, (image.height-cropY)/2);
+
+    /*mat3 xyz {
+      vec3(0.9602, -0.3823, -0.0937),
+      vec3(-0.2984, 1.1495,  0.1675),
+      vec3(-0.0407, 0.1415, 0.5049)};*/
+    mat3 xyz {
+      vec3(0.9602, -0.3823, -0.0937),
+      vec3(-0.2984, 1.1495,  0.1675),
+      vec3(-0.0407, 0.1415, 0.5049)};
+    mat3 xyz_rgb{			/* XYZ from RGB */
+        { 0.412453, 0.357580, 0.180423 },
+        { 0.212671, 0.715160, 0.072169 },
+        { 0.019334, 0.119193, 0.950227 } };
+
+    ImageF R (size), G (size), B (size); // Linear sRGB
+    for(size_t Y: range(size.y)) {
+     for(size_t X: range(size.x)) {
+      size_t y = cropY+2*Y, x = cropX+2*X;
+      uint r = image(x+0,y+0), g1 = image(x+1,y+0), g2 = image(x+0,y+1), b = image(x+1,y+1);
+      uint sR = ::max(0,int(r-minR))*scaleR;
+      uint sG = (::max(0,int(g1-minG1))+::max(0,int(g2-minG2)))*scaleG;
+      uint sB = ::max(0,int(b-minB))*scaleB;
+      maxR=::max(maxR,sR);
+      maxG=::max(maxG,sG);
+      maxB=::max(maxB,sB);
+      R(X, Y) = sR;
+      G(X, Y) = sG;
+      B(X, Y) = sB;
      }
     }
-    Image sRGB (image.size/2);
-    uint minR = -1, minG = -1, minB = -1, max = 0;
-    //uint64 sumR = 0, sumG = 0, sumB = 0;
-    //for(size_t i: range(R.ref::size)) { minR=::min(minR,R[i]), max=::max(max,R[i]); sumR += R[i]; }
-    //for(size_t i: range(G.ref::size)) { minG=::min(minG,G[i]), max=::max(max,G[i]); sumG += G[i]; }
-    //for(size_t i: range(B.ref::size)) { minB=::min(minB,B[i]), max=::max(max,B[i]); sumB += B[i]; }
-    for(size_t y: range(R.height/4, 3*R.height/4)) for(size_t x: range(R.width/4, 3*R.width/4)) { minR=::min(minR,R(x,y)), max=::max(max,R(x,y)); }
-    for(size_t y: range(G.height/4, 3*G.height/4)) for(size_t x: range(G.width/4, 3*G.width/4)) { minG=::min(minG,G(x,y)), max=::max(max,G(x,y)); }
-    for(size_t y: range(B.height/4, 3*B.height/4)) for(size_t x: range(B.width/4, 3*B.width/4)) { minB=::min(minB,B(x,y)), max=::max(max,B(x,y)); }
-    //for(size_t i: range(2*G.width, G.ref::size)) { minG=::min(minG,G[i]), max=::max(max,G[i]); }
-    //for(size_t i: range(2*B.width, B.ref::size)) { minB=::min(minB,B[i]), max=::max(max,B[i]); }
-    log(minB, minG, minR, max);
-    //minB = minG = minR = 1963;
-    {uint scaleR = cr2.whiteBalance.R, scaleG = cr2.whiteBalance.G, scaleB = cr2.whiteBalance.B;
-    for(size_t i: range(R.ref::size)) R[i] = ::max(0,int(R[i]-minR))*scaleR;
-    for(size_t i: range(G.ref::size)) G[i] = ::max(0,int(G[i]-minG))*scaleG;
-    for(size_t i: range(B.ref::size)) B[i] = ::max(0,int(B[i]-minB))*scaleB;}
-#if 0
-    uint64 sumR = 0, sumG = 0, sumB = 0;
-    for(size_t i: range(R.ref::size)) { sumR += ::max(0,int(R[i]-minR)); }
-    for(size_t i: range(G.ref::size)) { sumG += ::max(0,int(G[i]-minG)); }
-    for(size_t i: range(B.ref::size)) { sumB += ::max(0,int(B[i]-minB)); }
-    //log(sumR, sumG, sumB);
-    unused uint meanR = sumR / R.ref::size, meanG = sumG  / G.ref::size, meanB = sumB / B.ref::size;
-    //meanR = max(1,meanR), meanG = max(1, meanG), meanB = max(1,meanB);
-#endif
-    max = 0;
-    for(size_t i: range(R.ref::size)) { max=::max(max,R[i]); }
-    for(size_t i: range(G.ref::size)) { max=::max(max,G[i]); }
-    for(size_t i: range(B.ref::size)) { max=::max(max,B[i]); }
-    //max -= min; //assert_(min == 0, min, max);
-
     extern uint8 sRGB_forward[0x1000];
-    //log(meanB, meanG, meanR);
-    /*uint denB = (max-minB)/0xFFF;
-    uint denG = (max-minG)/0xFFF;
-    uint denR = (max-minR)/0xFFF;*/
-    //max = 1<<22;
-    uint denB = (max)/0xFFF;
-    uint denG = (max)/0xFFF;
-    uint denR = (max)/0xFFF;
-    log(denB, denG, denR, max);
+    Image sRGB (size);
     for(size_t i: range(sRGB.ref::size))
 #if 0
      sRGB[i] = byte4(
-       sRGB_forward[min<uint>(0xFFF,::max(0,int(B[i]-minB))*0x800/meanB)],
-       sRGB_forward[min<uint>(0xFFF,::max(0,int(G[i]-minG))*0x800/meanG)],
-       sRGB_forward[min<uint>(0xFFF,::max(0,int(R[i]-minR))*0x800/meanR)], 0xFF);
-#elif 0
+        B[i]>>(32-8),
+        G[i]>>(32-8),
+        R[i]>>(32-8), 0xFF);
+#elif 1
      sRGB[i] = byte4(
-       sRGB_forward[min<uint>(0xFFF,::max(0,int(B[i]-minB))/denB)],
-       sRGB_forward[min<uint>(0xFFF,::max(0,int(G[i]-minG))/denG)],
-       sRGB_forward[min<uint>(0xFFF,::max(0,int(R[i]-minR))/denR)], 0xFF);
+      sRGB_forward[min<uint>(0xFFF, B[i]>>(32-12))],
+      sRGB_forward[min<uint>(0xFFF, G[i]>>(32-12))],
+      sRGB_forward[min<uint>(0xFFF, R[i]>>(32-12))], 0xFF);
 #else
-    sRGB[i] = byte4(
-      sRGB_forward[min<uint>(0xFFF,::max(0,int(B[i]))/denB)],
-      sRGB_forward[min<uint>(0xFFF,::max(0,int(G[i]))/denG)],
-      sRGB_forward[min<uint>(0xFFF,::max(0,int(R[i]))/denR)], 0xFF);
+     sRGB[i] = byte4(
+      sRGB_forward[min<uint>(0xFFF, B[i]/(maxB/0xFFF))],
+      sRGB_forward[min<uint>(0xFFF, G[i]/(maxG/0xFFF))],
+      sRGB_forward[min<uint>(0xFFF, R[i]/(maxR/0xFFF))], 0xFF);
 #endif
-    //for(size_t i: range(sRGB.ref::size)) sRGB[i] = byte4(B[i]>>(12-8), G[i]>>(12-8), R[i]>>(12-8), 0xFF);
-    //for(size_t i: range(sRGB.ref::size)) sRGB[i] = byte4((B[i]-minB)*0xFF/(max-minB), (G[i]-minG)*0xFF/(max-minG), (R[i]-minR)*0xFF/(max-minR), 0xFF);
-    //for(size_t i: range(image.ref::size)) sRGB[i] = byte3((int(image[i])-min)*0xFF/(max-min));
     Time encode {true};
     auto png = encodePNG(sRGB);
     log(encode);
