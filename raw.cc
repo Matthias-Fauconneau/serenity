@@ -2,6 +2,7 @@
 #include "png.h"
 #include "time.h"
 #include "matrix.h"
+inline double log2(double x) { return __builtin_log2(x); }
 
 /// 2D array of 32bit integer pixels
 typedef ImageT<uint32> Image32;
@@ -35,15 +36,54 @@ mat3 pseudoinverse(mat3 in) {
 
 struct Raw {
  Raw() {
+  size_t totalSize = 0, huffmanSize = 0, entropySize = 0;
   for(string name: Folder(".").list(Files|Sorted))
    if(endsWith(toLower(name), ".cr2")) {
-    log(name);
-    Time total {true};
+    if(name != "IMG_1729.CR2") continue;
+    //Time total {true};
     Map map(name);
-    Time decode {true};
-    CR2 cr2(map);
-    log(decode);
+    //Time decode {true};
+    constexpr bool onlyParse = false;
+    CR2 cr2(map, onlyParse);
+    //log(decode);
+    totalSize += map.size;
+    huffmanSize += cr2.huffmanSize;
+    if(onlyParse) continue;
     const Image16& image = cr2.image;
+    Image16 planes[4]; // R, G1, G2, B
+    for(size_t i: range(4)) planes[i] = Image16(image.size/2);
+    for(size_t y: range(image.size.y/2)) for(size_t x: range(image.size.y/2)) {
+     planes[0](x,y) = image(x*2+0, y*2+0);
+     planes[1](x,y) = image(x*2+1, y*2+0);
+     planes[2](x,y) = image(x*2+0, y*2+1);
+     planes[3](x,y) = image(x*2+1, y*2+1);
+    }
+    double entropyCoded = 0;
+    for(size_t i: range(4)) {
+     const Image16& plane = planes[i];
+     int16 predictor = 0;
+     for(int16& value: plane) {
+      int16 next = value-predictor;
+      predictor = value;
+      value = next;
+     }
+     int16 min = 0x7FFF, max = 0;
+     for(int16 value: plane) { min=::min(min, value); max=::max(max, value); }
+     //log(min, max);
+     assert_(max+1-min <= 46980, min, max, max+1-min);
+     buffer<uint32> histogram(max+1-min);
+     histogram.clear(0);
+     uint32* base = histogram.begin()-min;
+     for(int16 value: plane) base[value]++;
+     //uint32 maxCount = 0; for(uint32 count: histogram) maxCount=::max(maxCount, count); log(maxCount);
+     const uint32 total = plane.ref::size;
+     //log("Uniform", str(total*log2(double(max-min))/8/1024/1024, 0u), "MB");
+     for(uint32 count: histogram) if(count) entropyCoded += count * log2(double(total)/double(count));
+     entropyCoded += histogram.size*8;
+    }
+    log(name, map.size/1024/1024,"MB","Huffman",cr2.huffmanSize/1024/1024,"MB","Entropy", str(entropyCoded/8/1024/1024,0u),"MB");
+    entropySize += entropyCoded/8;
+#if 0
     uint min = 511, max = 4000;
     //min=2000; //min=-1; for(uint v: image) min=::min(min, v); log(min);
     uint minR = -1, minG1 = -1, minG2 = -1, minB = -1;
@@ -131,8 +171,13 @@ struct Raw {
     auto png = encodePNG(sRGB);
     log(encode);
     writeFile(name+".png"_, png, currentWorkingDirectory(), true);
-    log(total);
-    break;
+#endif
+    //log(total);
+    //break;
+    log(totalSize/1024/1024,"MB -", entropySize/1024/1024,"MB =", (totalSize-entropySize)/1024/1024,"MB", 100*(totalSize-entropySize)/totalSize,"%");
    }
+  //log(totalSize/1024/1024,"MB -", compressedSize/1024/1024,"MB =", (totalSize-compressedSize)/1024/1024,"MB", 100*(totalSize-compressedSize)/compressedSize,"%");
+  //log(huffmanSize/1024/1024,"MB -", entropySize/1024/1024,"MB =", (huffmanSize-entropySize)/1024/1024,"MB", 100*(huffmanSize-entropySize)/totalSize,"%");
+  log(totalSize/1024/1024,"MB -", entropySize/1024/1024,"MB =", (totalSize-entropySize)/1024/1024,"MB", 100*(totalSize-entropySize)/totalSize,"%");
  }
 } app;

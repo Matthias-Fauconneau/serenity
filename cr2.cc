@@ -19,22 +19,21 @@ uint8 CR2::readHuffman(uint i) {
  const int nbits = maxLength[i];
  while(vbits < nbits) {
   uint byte = *pointer; pointer++;
-  if(byte == 0xFF) { uint8 v = *pointer; pointer++; assert_(v == 0x00); }
+  if(byte == 0xFF) { uint8 v = *pointer; pointer++; assert_(v == 0x00, hex(v)); }
   bitbuf <<= 8;
   bitbuf |= byte;
   vbits += 8;
  }
  uint code = (bitbuf << (32-vbits)) >> (32-nbits);
- //assert_(lengthSymbolForCode[i][code].length <= maxLength[i]);
+ assert_(lengthSymbolForCode[i][code].length <= maxLength[i]);
  vbits -= lengthSymbolForCode[i][code].length;
  return lengthSymbolForCode[i][code].symbol;
 }
 
 void CR2::readIFD(BinaryData& s) {
  int compression = 0;
- ref<byte> data;
+ size = {};
  uint16 entryCount = s.read();
- int2 size = 0; size_t stride = 0;
  for(uint unused i : range(entryCount)) {
   struct Entry { uint16 tag, type; uint count; uint value; } entry = s.read<Entry>();
   BinaryData value (s.data); value.index = entry.value;
@@ -85,7 +84,7 @@ void CR2::readIFD(BinaryData& s) {
   }
   else if(entry.tag == 0x112) assert_(entry.value==1 || entry.value == 6, "Orientation", entry.value); // Orientation
   else if(entry.tag == 0x115) assert_(entry.value == 3, entry.value); // PhotometricInterpretation
-  else if(entry.tag == 0x116) {} //log("RowPerStrip", entry.value); // RowPerStrip
+  else if(entry.tag == 0x116) {} // RowPerStrip
   else if(entry.tag == 0x117) { // StripByteCount
    assert_(entry.value == 1 || entry.value == (uint)size.y || entry.value==(uint)size.x*size.y*3*2 || compression>1, entry.value, size); // 1 row per trip or single strip
    data.size = entry.value;
@@ -100,6 +99,7 @@ void CR2::readIFD(BinaryData& s) {
   else if(entry.tag == 0x14A) { // SubIFDs
    assert_(entry.count == 1);
    readIFD(value);
+   if(image) return;
   }
   else if(entry.tag == 0x201) {} // JPEGInterchangeFormat (deprecated)
   else if(entry.tag == 0x202) {} // JPEGInterchangeFormatLength (deprecated)
@@ -107,109 +107,97 @@ void CR2::readIFD(BinaryData& s) {
   else if(entry.tag == 0x8298) {} // Copyright
   else if(entry.tag == 0x8769) { // EXIF
    BinaryData& s = value; // Renames value -> s
+   unused size_t exifStart = s.index;
+   size_t referencesSize = 0;
    uint16 entryCount = s.read();
    for(uint unused i : range(entryCount)) {
     Entry entry = s.read<Entry>();
     BinaryData value (s.data); value.index = entry.value;
     if(entry.tag == 0x829A) { // ExposureTime
      assert_(entry.type == 5 && entry.count == 1);
-     uint num = value.read32();
-     uint den = value.read32();
-     log("ExposureTime", num,"/",den, "s");
+     unused uint num = value.read32();
+     unused uint den = value.read32();
+     //log("ExposureTime", num,"/",den, "s");
+     referencesSize += 8;
     }
     else if(entry.tag == 0x829D) { // fNumber
      assert_(entry.type == 5 && entry.count == 1);
-     uint num = value.read32();
-     uint den = value.read32();
-     log("fNumber", num,"/",den);
+     unused uint num = value.read32();
+     unused uint den = value.read32();
+     //log("fNumber", num,"/",den);
+     referencesSize += 8;
     }
     else if(entry.tag == 0x8827) { // ISOSpeedRatings
      assert_(entry.type == 3 && entry.count == 1);
-     log("ISO", entry.value);
+     //log("ISO", entry.value);
     }
     else if(entry.tag == 0x8830) { // SensitivityType
      assert_(entry.type == 3 && entry.count == 1);
-     log("Type", entry.value); // 2: Recommended Exposure Index
+     //log("Type", entry.value); // 2: Recommended Exposure Index
     }
     else if(entry.tag == 0x8832) { // RecommendedExposureIndex
      assert_(entry.type == 4 && entry.count == 1);
-     log("RecommendedExposureIndex", entry.value);
+     //log("RecommendedExposureIndex", entry.value);
     }
-    else if(entry.tag == 0x9000) { // ExifVersion
-     assert_(entry.type == 7 && entry.count == 4);
-     log("ExifVersion");
-    }
+    else if(entry.tag == 0x9000) { assert_(entry.type == 7 && entry.count == 4); } // ExifVersion
     else if(entry.tag == 0x9003) { // DateTimeOriginal
      assert_(entry.type == 2);
-     log("DateTimeOriginal", value.peek(entry.count));
+     //log("DateTimeOriginal", value.peek(entry.count));
     }
-    else if(entry.tag == 0x9004) { // DateTimeDigitized
-     assert_(entry.type == 2);
-     log("DateTimeDigitized", value.peek(entry.count));
-    }
-    else if(entry.tag == 0x9101) { // ExifVersion
-     assert_(entry.type == 7 && entry.count == 4);
-     log("ComponentsConfiguration");
-    }
-    else if(entry.tag == 0x9102) { // CompressedBitsPerPixel
-     assert_(entry.type == 5 && entry.count == 1);
-     log("CompressedBitsPerPixel");
-    }
+    else if(entry.tag == 0x9004) { assert_(entry.type == 2); } // DateTimeDigitized
+    else if(entry.tag == 0x9101) { assert_(entry.type == 7 && entry.count == 4); } // ComponentsConfiguration
+    else if(entry.tag == 0x9102) { assert_(entry.type == 5 && entry.count == 1); } // CompressedBitsPerPixel
     else if(entry.tag == 0x9201) { // ShutterSpeedValue
      assert_(entry.type == 10 && entry.count == 1);
-     int32 num = value.read32();
-     int32 den = value.read32();
-     log("ShutterSpeedValue", num,"/",den);
+     unused int32 num = value.read32();
+     unused int32 den = value.read32();
+     //log("ShutterSpeedValue", num,"/",den);
+     referencesSize += 8;
     }
     else if(entry.tag == 0x9202) { // ApertureValue
      assert_(entry.type == 5 && entry.count == 1);
-     uint32 num = value.read32();
-     uint32 den = value.read32();
-     log("ApertureValue", num,"/",den);
+     unused uint32 num = value.read32();
+     unused uint32 den = value.read32();
+     //log("ApertureValue", num,"/",den);
+     referencesSize += 8;
     }
     else if(entry.tag == 0x9204) { // ExposureBiasValue
      assert_(entry.type == 10 && entry.count == 1);
-     uint32 num = value.read32();
-     uint32 den = value.read32();
-     log("ExposureBiasValue", num,"/",den);
+     unused uint32 num = value.read32();
+     unused uint32 den = value.read32();
+     //log("ExposureBiasValue", num,"/",den);
+     referencesSize += 8;
     }
     else if(entry.tag == 0x9205) { // MaxApertureValue
      assert_(entry.type == 5 && entry.count == 1);
-     uint32 num = value.read32();
-     uint32 den = value.read32();
-     log("MaxApertureValue", num,"/",den);
+     unused uint32 num = value.read32();
+     unused uint32 den = value.read32();
+     //log("MaxApertureValue", num,"/",den);
+     referencesSize += 8;
     }
-    else if(entry.tag == 0x9207) { // MeteringMode
-     assert_(entry.type == 3 && entry.count == 1);
-     log("MeteringMode", entry.value); // 5: Multi-segment
-    }
+    else if(entry.tag == 0x9207) { assert_(entry.type == 3 && entry.count == 1); } // MeteringMode
     else if(entry.tag == 0x9209) { // Flash
      assert_(entry.type == 3 && entry.count == 1);
-     log("Flash", entry.value); // 16: Off
+     //log("Flash", entry.value); // 16: Off
     }
     else if(entry.tag == 0x920A) { // FocalLength
      assert_(entry.type == 5 && entry.count == 1);
-     uint32 num = value.read32();
-     uint32 den = value.read32();
-     log("FocalLength", num,"/",den);
+     unused uint32 num = value.read32();
+     unused uint32 den = value.read32();
+     //log("FocalLength", num,"/",den);
+     referencesSize += 8;
     }
     else if(entry.tag == 0x927C) { // MakerNote
      assert_(entry.type == 7);
      BinaryData& s = value; // Renames value -> s
+     size_t makerNoteStart = s.index;
      uint16 entryCount = s.read();
-     log(entryCount);
      for(uint unused i : range(entryCount)) {
       Entry entry = s.read<Entry>();
       BinaryData value (s.data); value.index = entry.value;
-      if(entry.tag == 0x0001) { // CameraSettings
-       assert_(entry.type == 3 && entry.count == 50);
-       log("CameraSettings");
-      }
+      if(entry.tag == 0x0001) {  assert_(entry.type == 3 && entry.count == 50); } // CameraSettings
       else if(entry.tag <= 0x0004) {}
-      else if(entry.tag == 0x0006) {
-       assert_(entry.type==2);
-       log("ImageType", value.peek(entry.count));
-      }
+      else if(entry.tag == 0x0006) { assert_(entry.type==2); } // ImageType
       else if(entry.tag >= 0x0007 && entry.tag <= 0x00D0) {}
       else if(entry.tag == 0x00E0) {
        assert_(entry.type == 3 && entry.count == 17);
@@ -219,9 +207,10 @@ void CR2::readIFD(BinaryData& s) {
         uint16 left, top, right, bottom;
         struct { uint16 left, top, right, bottom; } blackMask;
        } info = value.read<SensorInfo>();
-       log("SensorInfo", info.width, info.height);
+       assert_(info.width == 5632 && info.height == 3710);
        //log(info.left, info.top, info.right, info.bottom);
        //log(info.blackMask.left, info.blackMask.top, info.blackMask.right, info.blackMask.bottom);
+       referencesSize += sizeof(SensorInfo);
       }
       else if(entry.tag == 0x4001) { // ColorBalance
        assert_(entry.type == 7 && entry.count == 5120);
@@ -231,14 +220,13 @@ void CR2::readIFD(BinaryData& s) {
        whiteBalance.G = RGGB[1];
        assert_(whiteBalance.G == RGGB[2]);
        whiteBalance.B = RGGB[3];
-       log("RGGB", RGGB);
+       //log("RGGB", RGGB);
+       referencesSize += entry.count;
       }
-      else if(entry.tag == 0x4015) { // VignettingCorrection
-       assert_(entry.type == 7 && entry.count == 1012);
-       log("VignettingCorrection");
-      }
-      else log(entry.tag, hex(entry.tag), entry.type, entry.count, entry.value);
+      else if(entry.tag == 0x4015) { assert_(entry.type == 7 && entry.count == 1012); } // VignettingCorrection
+      else error(entry.tag, hex(entry.tag), entry.type, entry.count, entry.value);
      }
+     referencesSize += s.index - makerNoteStart;
     }
     else if(entry.tag == 0x9286) {} // UserComment
     else if(entry.tag == 0xA000) {} // FlashpixVersion
@@ -259,6 +247,7 @@ void CR2::readIFD(BinaryData& s) {
     else if(entry.tag == 0xA430) {} // OwnerName
     else error(entry.tag, hex(entry.tag), entry.type, entry.count, entry.value);
    }
+   //log("EXIF", s.index-exifStart + referencesSize); // /!\ TODO: Copy references (fractions, MakerNote)
   }
   else if(entry.tag == 0x8825) {} // GPS
   else if(entry.tag == 0xC5D8 || entry.tag == 0xC5D9 || entry.tag == 0xC5E0 || entry.tag == 0xC6C5 || entry.tag == 0xC6DC) {} // ?
@@ -272,14 +261,14 @@ void CR2::readIFD(BinaryData& s) {
   else if(entry.tag == 0xFFC3) error("Thumb");
   else error(entry.tag, hex(entry.tag));
  }
- if(data && !size) {
+ if(size) data={}; // Thumbnail
+ if(data) {
   BinaryData s (data, true);
   {uint16 marker = s.read16();
    assert_(marker == 0xFFD8, hex(marker)); // Start Of Image
   }
   {uint16 marker = s.read16();
-   assert_(marker == 0xFFC4); // Define Huffman Table
-   //uint start = s.index;
+   assert_(marker == 0xFFC4, hex(marker)); // Define Huffman Table
    unused uint16 length = s.read16();
    for(uint index: range(2)) {
     uint8 huffmanTableInfo = s.read8();
@@ -345,21 +334,24 @@ void CR2::readIFD(BinaryData& s) {
    uint8 successiveApproximation = s.read8();
    assert_(successiveApproximation == 0);
   }
-  pointer = (uint8*)s.data.begin()+s.index;
+  if(onlyParse) return;
   assert_(sampleSize > 8 && sampleSize <= 16);
   assert_(!image);
+  pointer = (uint8*)s.data.begin()+s.index;
   image = Image16(width*2, height);
-  int predictor[2];// = {1<<(sampleSize-1), 1<<(sampleSize-1)};
+  int16* target = image.begin();
+  int predictor[2];
   for(uint unused y: range(height)) {
-   for(uint c: range(2)) predictor[c] = 1<<(sampleSize-1); // ?
+   for(uint c: range(2)) predictor[c] = 1<<(sampleSize-1);
    for(uint unused x: range(width)) {
     for(uint c: range(2)) {
      int length = readHuffman(c);
-     //assert_(length < 16);
+     assert_(length < 16);
      int residual = readBits(length);
      if((residual & (1 << (length-1))) == 0) residual -= (1 << length) - 1;
      int value = predictor[c] + residual;
-     image(x*2+c, y) = value; // FIXME: components
+     /*image(x*2+c, y)*/ *target = value;
+     target++;
      predictor[c] = value;
     }
    }
@@ -369,15 +361,18 @@ void CR2::readIFD(BinaryData& s) {
    uint16 marker = s.read16();
    assert_(marker == 0xFFD9, hex(marker)); // End Of Image
   }
+  assert_(!s);
  }
 }
 
-CR2::CR2(const ref<byte> file) {
+CR2::CR2(const ref<byte> file, bool onlyParse) : onlyParse(onlyParse)  {
  BinaryData s(file);
  s.skip("II\x2A\x00");
  for(;;) {
   s.index = s.read32();
   if(!s.index) break;
   readIFD(s);
+  if(image) break;
  }
+ huffmanSize = data.size;
 }

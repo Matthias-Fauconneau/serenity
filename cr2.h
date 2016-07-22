@@ -3,12 +3,12 @@
 #include "image.h"
 
 /// 2D array of 16bit integer samples
-typedef ImageT<uint16> Image16;
+typedef ImageT<int16> Image16;
 
 struct CR2 {
- struct { uint16 R, G, B; } whiteBalance = {0,0,0};
- Image16 image;
-
+ bool onlyParse;
+ ref<byte> data;
+ int2 size = 0; size_t stride = 0;
  const uint8* pointer = 0;
  uint bitbuf = 0;
  int vbits = 0;
@@ -19,6 +19,10 @@ struct CR2 {
  buffer<LengthSymbol> lengthSymbolForCode[2];
  uint8 readHuffman(uint i);
 
+ struct { uint16 R, G, B; } whiteBalance = {0,0,0};
+ Image16 image;
+ size_t huffmanSize = 0;
+
  void readIFD(BinaryData& s);
- CR2(const ref<byte> file);
+ CR2(const ref<byte> file, bool onlyParse=false);
 };
