@@ -15,17 +15,21 @@ uint CR2::readBits(const int nbits) {
  return value;
 }
 
-uint8 CR2::readHuffman(uint i) {
+int CR2::readHuffman(uint i) {
  const int nbits = maxLength[i];
  while(vbits < nbits) {
   uint byte = *pointer; pointer++;
-  if(byte == 0xFF) { uint8 v = *pointer; pointer++; assert_(v == 0x00, hex(v)); }
+  if(byte == 0xFF) {
+   uint8 v = *pointer; pointer++;
+   if(v == 0xD9) return -1;
+   assert_(v == 0x00, hex(v), pointer-(uint8*)data.begin());
+  }
   bitbuf <<= 8;
   bitbuf |= byte;
   vbits += 8;
  }
  uint code = (bitbuf << (32-vbits)) >> (32-nbits);
- assert_(lengthSymbolForCode[i][code].length <= maxLength[i]);
+ //assert_(lengthSymbolForCode[i][code].length <= maxLength[i]);
  vbits -= lengthSymbolForCode[i][code].length;
  return lengthSymbolForCode[i][code].symbol;
 }
@@ -279,6 +283,7 @@ void CR2::readIFD(BinaryData& s) {
     maxLength[index]=16; for(; maxLength[index] && !symbolCountsForLength[maxLength[index]-1]; maxLength[index]--);
     int totalSymbolCount = 0; for(int count: symbolCountsForLength) totalSymbolCount += count;
     lengthSymbolForCode[index] = buffer<LengthSymbol>(1<<maxLength[index]);
+    lengthSymbolForCode[index].clear();
     int p = 0;
     ref<uint8> symbols = s.read<uint8>(totalSymbolCount);
     for(int h=0, length=1; length <= maxLength[index]; length++) {
@@ -340,13 +345,14 @@ void CR2::readIFD(BinaryData& s) {
   pointer = (uint8*)s.data.begin()+s.index;
   image = Image16(width*2, height);
   int16* target = image.begin();
-  int predictor[2];
+  int predictor[2] = {0,0};
   for(uint unused y: range(height)) {
    for(uint c: range(2)) predictor[c] = 1<<(sampleSize-1);
    for(uint unused x: range(width)) {
     for(uint c: range(2)) {
      int length = readHuffman(c);
-     assert_(length < 16);
+     if(length == -1) { assert_(y==height-1 && x==width-1 && c==1, y, x, c); target[0]=0; return; }
+     //assert_(length < 16);
      int residual = readBits(length);
      if((residual & (1 << (length-1))) == 0) residual -= (1 << length) - 1;
      int value = predictor[c] + residual;
@@ -356,6 +362,7 @@ void CR2::readIFD(BinaryData& s) {
     }
    }
   }
+  assert_(target == image.end());
   s.index = (const byte*)pointer-s.data.begin();
   {
    uint16 marker = s.read16();
