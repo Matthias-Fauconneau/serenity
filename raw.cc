@@ -13,16 +13,32 @@ struct Raw {
   for(string name: Folder(".").list(Files|Sorted)) {
    if(!endsWith(toLower(name), ".cr2")) continue;
    log(name);
-   Map map(name);
-   constexpr bool onlyParse = false;
+   //Map map(name);
+   buffer<byte> file = readFile(name);
+   totalSize += file.size;
+   {CR2 cr2(file, true);
+    const size_t target = 0x3800;
+    for(CR2::Entry* entry: cr2.entriesToFix) {
+     if(entry->tag==0x102) { entry->count=1; entry->value=16; }
+     else if(entry->tag == 0x111) { entry->value = target; }
+     else if(entry->tag == 0x2BC) { entry->count = 0; entry->value = 0; }
+     //else if(entry->tag == 0xC640) assert_(entry->value+6 < target); //{ entry->count=1; entry->value=5632; }
+     else error(entry->tag);
+    }
+    for(uint* ifdOffset: cr2.ifdOffset) log(hex((byte*)ifdOffset-file.begin()), hex(*ifdOffset));
+    *cr2.ifdOffset[1] = *cr2.ifdOffset[3]; // Skips JPEG and RGB thumbs
+    const size_t source = cr2.data.begin()-file.begin();
+    log(hex(target), hex(source), (source-target)/1024,"K", cr2.data.size);
+    for(size_t i: range(cr2.data.size)) file[target+i] = file[source+i];
+    file.size -= source-target;
+    huffmanSize += file.size;
+   }
    decodeTime.start();
-   CR2 cr2(map, onlyParse);
+   CR2 cr2(file, false);
    decodeTime.stop();
    log(decodeTime);
-   totalSize += map.size;
-   huffmanSize += cr2.huffmanSize;
+   writeFile("_"+name, file);
    break;
-   if(onlyParse) continue;
    const Image16& image = cr2.image;
    Image16 planes[4] = {}; // R, G1, G2, B
    for(size_t i: range(4)) planes[i] = Image16(image.size/2);
@@ -33,7 +49,7 @@ struct Raw {
     planes[3](x,y) = image(x*2+1, y*2+1);
    }
    index++;
-   log(str(index,3u)+"/"+str(imageCount,3u), name, map.size/1024/1024,"MB","Huffman",cr2.huffmanSize/1024/1024,"MB");
+   log(str(index,3u)+"/"+str(imageCount,3u), name, file.size/1024/1024,"MB","Huffman",cr2.huffmanSize/1024/1024,"MB");
    double entropyCoded = 0;
    for(size_t i: range(4)) {
     const Image16& plane = planes[i];

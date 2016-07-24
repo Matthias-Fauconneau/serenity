@@ -30,19 +30,18 @@ int CR2::readHuffman(uint i) {
   vbits += 8;
  }
  uint code = (bitbuf << (32-vbits)) >> (32-nbits);
- //assert_(lengthSymbolForCode[i][code].length <= maxLength[i]);
  vbits -= lengthSymbolForCode[i][code].length;
  return lengthSymbolForCode[i][code].symbol;
 }
 
 void CR2::readIFD(BinaryData& s) {
+ size_t ifdStart = s.index;
  int compression = 0;
  size = {}; data = {};
  uint16 entryCount = s.read();
- size_t ifdStart = s.index;
  size_t lastReference = ifdStart;
  for(uint unused i : range(entryCount)) {
-  struct Entry { uint16 tag, type; uint count; uint value; } entry = s.read<Entry>();
+  const Entry& entry = s.read<Entry>(1)[0];
   BinaryData value (s.data); value.index = entry.value;
   if((entry.type==2||entry.type==5||entry.type==10||entry.count>1)&&value.index) {
    size_t size = 0;
@@ -53,7 +52,6 @@ void CR2::readIFD(BinaryData& s) {
    assert_(size, entry.type, entry.count);
    lastReference = ::max(lastReference, value.index+size);
   }
-  // 0xFE: NewSubfileType
   /**/  if(entry.tag == 0x100) size.x = entry.value; // Width
   else if(entry.tag == 0x101) size.y = entry.value; // Height
   else if(entry.tag == 0x102) { // BitsPerSample
@@ -65,6 +63,7 @@ void CR2::readIFD(BinaryData& s) {
     int G = value.read16();
     int B = value.read16();
     assert_((R==8 && G==8 && B==8) || (R==16 && G==16 && B==16), R, G, B);
+    entriesToFix.append((Entry*)&entry);
    }
   }
   else if(entry.tag == 0x103) { // Compression
@@ -82,6 +81,7 @@ void CR2::readIFD(BinaryData& s) {
    assert_(compression==1 || compression==6);
    assert_(!data.size);
    data.data = s.data.data+offset;
+   entriesToFix.append((Entry*)&entry);
   }
   else if(entry.tag == 0x112) assert_(entry.value==1 || entry.value == 6, "Orientation", entry.value); // Orientation
   else if(entry.tag == 0x115) assert_(entry.value == 3, entry.value); // PhotometricInterpretation
@@ -100,14 +100,17 @@ void CR2::readIFD(BinaryData& s) {
   else if(entry.tag == 0x201) { // JPEGInterchangeFormat (deprecated)
    assert_(!data);
    data = s.slice(entry.value, 0);
-   //sections.append({entry.value,0, name+".JPEG"});
+   assert_(!compression);
+   compression = 6;
+   //entriesToFix.append((Entry*)&entry); // Removed anyway
   }
   else if(entry.tag == 0x202) { // JPEGInterchangeFormatLength (deprecated)
    assert_(!data.size, data.size);
    data.size = entry.value;
-   //sections.last().size = entry.value;
+   //entriesToFix.append((Entry*)&entry); // Removed anyway
   }
   else if(entry.tag == 0x2BC) { // XML_Packet (XMP)
+   entriesToFix.append((Entry*)&entry); // Removed anyway
    sections.append({value.index, entry.count, "XMP"__});
   }
   else if(entry.tag == 0x8298) {} // Copyright
@@ -265,17 +268,23 @@ void CR2::readIFD(BinaryData& s) {
     else error(entry.tag, hex(entry.tag), entry.type, entry.count, entry.value);
    }
    //log("EXIF", hex(exifStart), hex(s.index), ":", s.index-exifStart + referencesSize); // /!\ TODO: Copy references (fractions, MakerNote)
-   //sections.append({exifStart, lastReference-exifStart, "EXIF"__});
+   sections.append({exifStart, lastEXIFReference-exifStart, "EXIF"__});
    lastReference = ::max(lastReference, lastEXIFReference);
   }
   else if(entry.tag == 0x8825) {} // GPS
   else if(entry.tag == 0xC5D8 || entry.tag == 0xC5D9 || entry.tag == 0xC5E0 || entry.tag == 0xC6C5 || entry.tag == 0xC6DC) {} // ?
   else if(entry.tag == 0xC640) {
-   assert_(entry.type == 3 && entry.count == 3);
-   int A = value.read16();
-   int B = value.read16();
-   int C = value.read16();
-   assert_(A==0 && B==0 && C==5632);
+   assert_(entry.type == 3);
+   if(entry.count == 1) assert_(entry.value == 5632);
+   else {
+    assert_(entry.count==3);
+    int A = value.read16();
+    int B = value.read16();
+    int C = value.read16();
+    assert_(A==0 && B==0 && C==5632);
+    //entriesToFix.append((Entry*)&entry);
+    assert_(entry.value+6 < 0x3800);
+   }
   }
   else if(entry.tag == 0xFFC3) error("Thumb");
   else error(entry.tag, hex(entry.tag));
@@ -285,8 +294,9 @@ void CR2::readIFD(BinaryData& s) {
                   (size?strx(size)+" ":""__)+str(compression==6?"JPEG ":compression==1?"RGB ":"")+"@"+hex(data.begin()-s.data.begin())});
  if(data) {
   //log(hex(data.begin()-s.data.begin()), "-", hex(data.end()-s.data.begin()), ":", data.size/1024, "K");
-  sections.append({size_t(data.begin()-s.data.begin()), data.size,
-                   (size?strx(size)+" ":""__)+(compression==6?"JPEG "_:compression==1?"RGB "_:""_)});
+  String name = (size?strx(size)+" ":""__)+(compression==6?"JPEG "_:compression==1?"RGB "_:""_);
+  assert_(name, entryCount);
+  sections.append({size_t(data.begin()-s.data.begin()), data.size, move(name)});
  }
  if(size) data={}; // Thumbnail
  if(data) {
@@ -400,6 +410,7 @@ CR2::CR2(const ref<byte> file, bool onlyParse) : onlyParse(onlyParse)  {
  BinaryData s(file);
  s.skip("II\x2A\x00");
  for(;;) {
+  ifdOffset.append((uint*)cast<uint>(s.slice(s.index,4)).begin());
   s.index = s.read32();
   if(!s.index) break;
   readIFD(s);
@@ -408,5 +419,7 @@ CR2::CR2(const ref<byte> file, bool onlyParse) : onlyParse(onlyParse)  {
  sections.append({0, file.size, ""__});
  sort(sections);
  for(const Section& section: sections) log(hex(section.start), "-", hex(section.start+section.size), "["+str(section.size/1024)+"K] :", section.name);
+ //log(hex(zeroOffset));
+ //log(hex(ifdOffset));
  huffmanSize = data.size;
 }

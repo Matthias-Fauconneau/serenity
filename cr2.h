@@ -11,6 +11,10 @@ inline bool operator>(const Section& a, const Section& b) { return a.start > b.s
 struct CR2 {
  bool onlyParse = false;
  array<Section> sections;
+ array<uint*> zeroOffset; // Words to zero to delete JPEG thumb (but keep EXIF) (1MB)
+ array<uint*> ifdOffset; // Replace nextIFD after JPEG thumb with 3rd IFD (RAW) to remove RGB thumb (1MB)
+ struct Entry { uint16 tag, type; uint count; uint value; };
+ array<Entry*> entriesToFix; // Entries which would have dangling references after truncation
  ref<byte> data;
  int2 size = 0; size_t stride = 0;
  const uint8* pointer = 0;
