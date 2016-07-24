@@ -140,53 +140,22 @@ struct Raw {
     }
 
     uint16* ptr = begin;
-#if 0
-    typedef uint v4ui __attribute__((__vector_size__(16)));
-    v4ui x;
-    x[0] = ptr[0] | (ptr[1] << 16); ptr+=2;
-    x[1] = ptr[0] | (ptr[1] << 16); ptr+=2;
-    x[2] = ptr[0] | (ptr[1] << 16); ptr+=2;
-    x[3] = ptr[0] | (ptr[1] << 16); ptr+=2;
-    for(size_t i=0; i<residual.ref::size; i += 4) {
-     for(int k: range(4)) {
-      uint32 slot = x[k] & (M-1);
-      x[k] = (slots[slot]&0xFFFF) * (x[k]>>scaleBits) + (slots[slot]>>16);
-      assert_(residual[i+k]-min == reverse[slot]);
-      if((uint)x[k] < L) {
-       x[k] = (x[k] << 16) | *ptr;
-       ptr++;
-      }
-     }
-    }
-#else
     __v4si x = _mm_loadu_si128((const __m128i*)ptr);
     ptr += 8; // !! not 16
     assert_(residual.ref::size%4 == 0);
     for(size_t i=0; i<residual.ref::size; i += 4) {
-     log("x0", hex((uint)x[0], 8), hex((uint)x[1], 8), hex((uint)x[2], 8), hex((uint)x[3], 8));
      __v4si slot = _mm_and_si128(x, _mm_set1_epi32(M - 1));
-     log("slots", slot[0], slot[1], slot[2], slot[3]);
-     for(int k: range(4)) assert_(residual[i+k]-min == reverse[slot[k]], residual[i+k], reverse[slot[k]], "\n",
-       residual[i+0]-min, residual[i+1]-min, residual[i+2]-min, residual[i+3]-min, "\n",
-       reverse[slot[0]], reverse[slot[1]], reverse[slot[2]], reverse[slot[3]], "\n",
-       slot[0], slot[1], slot[2], slot[3]
-       );
+     for(int k: range(4)) assert_(residual[i+k]-min == reverse[slot[k]]);
 
      __v4si freq_bias_lo = _mm_cvtsi32_si128(slots[slot[0]]);
      freq_bias_lo = _mm_insert_epi32(freq_bias_lo, slots[slot[1]], 1);
      __v4si freq_bias_hi = _mm_cvtsi32_si128(slots[slot[2]]);
      freq_bias_hi = _mm_insert_epi32(freq_bias_hi, slots[slot[3]], 1);
      __v4si freq_bias = _mm_unpacklo_epi64(freq_bias_lo, freq_bias_hi);
-     log("freq_bias", ((__v4si)freq_bias)[0], ((__v4si)freq_bias)[1], ((__v4si)freq_bias)[2], ((__v4si)freq_bias)[3]);
-
      __v4si xscaled = _mm_srli_epi32(x, scaleBits);
-     log("xscaled", hex((uint)xscaled[0], 8), hex((uint)xscaled[1], 8), hex((uint)xscaled[2], 8), hex((uint)xscaled[3], 8));
      __v4si freq = _mm_and_si128(freq_bias, _mm_set1_epi32(0xffff));
-     log("freq", ((__v4si)freq)[0], ((__v4si)freq)[1], ((__v4si)freq)[2], ((__v4si)freq)[3]);
      __v4si bias = _mm_srli_epi32(freq_bias, 16);
-     log("bias", ((__v4si)bias)[0], ((__v4si)bias)[1], ((__v4si)bias)[2], ((__v4si)bias)[3]);
      x = xscaled * freq + bias;
-     log("xfq", hex((uint)x[0], 8), hex((uint)x[1], 8), hex((uint)x[2], 8), hex((uint)x[3], 8));
 
      static int8 const shuffles[16][16] = {
  #define _ -1
@@ -212,20 +181,13 @@ struct Raw {
      __v4si x_biased = _mm_xor_si128(x, _mm_set1_epi32(int(0x80000000)));
      __v4si greater = _mm_cmplt_epi32(x_biased, _mm_set1_epi32(L - 0x80000000));
      uint mask = _mm_movemask_ps(greater);
-     log(str(mask, 4u, '0', 2u), mask);
      __v4si memvals = _mm_loadl_epi64((const __m128i*)ptr);
-     log("memvals", hex((uint)memvals[0], 8), hex((uint)memvals[1], 8));
      __v4si xshifted = _mm_slli_epi32(x, 16);
-     log("xshifted", hex((uint)xshifted[0], 8), hex((uint)xshifted[1], 8), hex((uint)xshifted[2], 8), hex((uint)xshifted[3], 8));
      __v4si shufmask = _mm_load_si128((const __m128i*)shuffles[mask]);
-     log("shufmask", hex((uint)shufmask[0], 8), hex((uint)shufmask[1], 8), hex((uint)shufmask[2], 8), hex((uint)shufmask[3], 8));
        __v4si newx = _mm_or_si128(xshifted, _mm_shuffle_epi8(memvals, shufmask));
-     log("newx", hex((uint)newx[0], 8), hex((uint)newx[1], 8), hex((uint)newx[2], 8), hex((uint)newx[3], 8));
      x = _mm_blendv_epi8(x, newx, greater);
-     log("x", hex((uint)x[0], 8), hex((uint)x[1], 8), hex((uint)x[2], 8), hex((uint)x[3], 8));
      ptr += numBytes[mask];
     }
-#endif
    }
    verifyTime.stop();
    //assert_(entropyCoded/8 <= huffmanSize, entropyCoded/8/1024/1024, huffmanSize/1024/1024);
