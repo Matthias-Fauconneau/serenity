@@ -44,7 +44,7 @@
     for(size_t Y: range(size.y)) {
      for(size_t X: range(size.x)) {
       size_t y = cropY+2*Y, x = cropX+2*X;
-      uint r = image(x+0,y+0), g1 = image(x+1,y+0), g2 = image(x+0,y+1), b = image(x+1,y+1);
+      uint r = image(x+0,y+0), g1 = image(x+1,y+0), g2 = image(x+0,y+1), b = image(x+1,y+1); // | GB/RG ?
 #if 0
       uint cR = ::max(0,int(r-min));
       uint cG = (::max(0,int(g1-min)) + ::max(0,int(g2-min)))/2;
