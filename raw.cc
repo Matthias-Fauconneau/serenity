@@ -1,43 +1,7 @@
 #include "cr2.h"
-#include <flif.h> // flif
 #include "time.h"
 inline double log2(double x) { return __builtin_log2(x); }
 int median(int a, int b, int c) { return max(min(a,b), min(max(a,b),c)); }
-
-buffer<byte> encodeFLIF(const Image16& source, Time& encodeTime) {
- log(source.width, source.height);
- FLIF_IMAGE* image = flif_create_image_HDR(source.width/4, source.height);
- for(size_t y: range(source.height)) flif_image_write_row_RGBA16(image, y, source.row(y).data, source.row(y).size*sizeof(int16));
- FLIF_ENCODER* flif = flif_create_encoder();
- flif_encoder_set_alpha_zero_lossless(flif);
- flif_encoder_set_auto_color_buckets(flif, 0);
- flif_encoder_set_palette_size(flif, 0);
- flif_encoder_set_learn_repeat(flif, 0);
- flif_encoder_set_lookback(flif, 0);
- flif_encoder_set_channel_compact(flif, 0);
- flif_encoder_set_ycocg(flif, 0);
- flif_encoder_set_frame_shape(flif, 0);
- flif_encoder_add_image(flif, image);
- buffer<byte> buffer;
- encodeTime.start();
- flif_encoder_encode_memory(flif, &(void*&)buffer.data, &buffer.size);
- encodeTime.stop();
- flif_destroy_encoder(flif);
- flif_destroy_image(image);
- buffer.capacity = buffer.size;
- return buffer;
-}
-
-void writeRGGB(string name, ref<Image16> planes) {
- Image16 RGGB (planes[0].width*4, planes[0].height);
- for(size_t y: range(planes[0].height)) for(size_t x: range(planes[0].width)) {
-  RGGB(x*4+0,y) = planes[0](x, y);
-  RGGB(x*4+1,y) = planes[1](x, y);
-  RGGB(x*4+2,y) = planes[2](x, y);
-  RGGB(x*4+3,y) = planes[3](x, y);
- }
- writeFile(name+".rggb", cast<byte>(RGGB), home(), true);
-}
 
 struct Raw {
  Raw() {
@@ -60,30 +24,19 @@ struct Raw {
    huffmanSize += cr2.huffmanSize;
    if(onlyParse) continue;
    const Image16& image = cr2.image;
-   //{size_t size = encodeFLIF(image, encodeTime).size; log(encodeTime, size/1024, "K");}
    Image16 planes[4] = {}; // R, G1, G2, B
    for(size_t i: range(4)) planes[i] = Image16(image.size/2);
    for(size_t y: range(image.size.y/2)) for(size_t x: range(image.size.x/2)) {
-    planes[0](x,y) = image(x*2+0, y*2+0);
+    /*planes[0](x,y) = image(x*2+0, y*2+0);
     planes[1](x,y) = image(x*2+1, y*2+0);
     planes[2](x,y) = image(x*2+0, y*2+1);
-    planes[3](x,y) = image(x*2+1, y*2+1);
+    planes[3](x,y) = image(x*2+1, y*2+1);*/
+    int R = image(x*2+0, y*2+0), G1 = image(x*2+1, y*2+0), G2 = image(x*2+0, y*2+1), B = image(x*2+1, y*2+1);
+    planes[0](x,y) = (R+G1+G2+B)/4;
+    planes[1](x,y) = (-R+G1+G2-B)/2;
+    planes[2](x,y) = (R+B);
+    planes[3](x,y) = G2-G1;
    }
-#if 0
-   Image16 RGGB (image.width/2*4, image.height/2);
-   for(size_t y: range(image.size.y/2)) for(size_t x: range(image.size.x/2)) {
-    RGGB(x*4+0,y) = planes[0](x, y);
-    RGGB(x*4+1,y) = planes[1](x, y);
-    RGGB(x*4+2,y) = planes[2](x, y);
-    RGGB(x*4+3,y) = planes[3](x, y);
-   }
-   writeFile(name+".rggb", cast<byte>(RGGB), home());
-#if 0
-   encodeTime.reset();
-   {size_t size = encodeFLIF(RGGB, encodeTime).size;
-    log(encodeTime, size/1024);}
-#endif
-#endif
    index++;
    log(str(index,3u)+"/"+str(count,3u), name, map.size/1024/1024,"MB","Huffman",cr2.huffmanSize/1024/1024,"MB");
    for(size_t method: range(N)) {
@@ -91,13 +44,6 @@ struct Raw {
     Image16 residuals[4];
     for(size_t i: range(4)) {
      const Image16& plane = planes[i];
-     /*int predictor = 0;
-     for(int16& value: plane) {
-      int r = value-predictor;
-      predictor = value;
-      assert_(-0x8000 <= r && r <= 0x7FFF);
-      value = r;
-     }*/
      Image16& residual = residuals[i];
      residual = Image16(plane.size);
      for(int y: range(plane.size.y)) for(int x: range(plane.size.x)) {
@@ -131,11 +77,10 @@ struct Raw {
      for(uint32 count: histogram) if(count) entropyCoded += count * log2(double(total)/double(count));
      //entropyCoded += histogram.size*32*8; //
     }
-    if(method>0) assert_(entropyCoded/8 <= huffmanSize, entropyCoded/8/1024/1024, huffmanSize/1024/1024);
+    //if(method>0) assert_(entropyCoded/8 <= huffmanSize, entropyCoded/8/1024/1024, huffmanSize/1024/1024);
     entropySize[method] += entropyCoded/8;
     if(method>0) log(method, str(entropyCoded/8/1024/1024,0u)+"MB",
                      "Σ", str(entropySize[method]/1024/1024)+"MB =", str((totalSize-entropySize[method])/1024/1024)+"MB ("+str(100*(totalSize-entropySize[method])/totalSize)+"%)");
-    writeRGGB(name+"."+str(method), ref<Image16>(residuals));
    }
    break;
   }
