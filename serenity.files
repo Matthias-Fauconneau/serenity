@@ -98,3 +98,4 @@ raw.cc
 cr2.h
 cr2.cc
 convert.cc
+range.h
