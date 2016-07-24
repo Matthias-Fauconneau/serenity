@@ -1,17 +1,7 @@
 #include "cr2.h"
 #include "time.h"
-#include "range.h"
+#include <smmintrin.h>
 inline double log2(double x) { return __builtin_log2(x); }
-
-/*void rescale(const mref<uint16> target, const ref<uint32> source) {
- target[0] = 0;
- for(int i: range(1, source.size)) {
-  uint t = source[i]*65536/source.last();
-  //if(!(target[i-1]<t)) t = target[i-1]+1;
-  assert_(t < 65536 && target[i-1] <= t, source[i-1], source[i]);
-  target[i] = t;
- }
-}*/
 
 struct Raw {
  Raw() {
@@ -66,32 +56,65 @@ struct Raw {
     buffer<uint> cumulative(1+histogram.size);
     cumulative[0] = 0;
     for(size_t i: range(histogram.size)) cumulative[i+1] = cumulative[i] + histogram[i];
-    buffer<uint16> cumulative16 (cumulative.size); // Quantize entropy to reduce decoder lookup table
-    //rescale(cumulative16, cumulative);
-    cumulative16[0] = 0;
-    for(size_t i: range(1, cumulative.size)) {
-     uint t = cumulative[i]*64512ull/cumulative.last(); // not 1<<16 as headroom is required to ceil last symbols
-     if(!(cumulative16[i-1]<t)) {
-      if(cumulative[i-1] == cumulative[i]) t = cumulative16[i-1];
-      else if(cumulative[i-1] < cumulative[i]) t = cumulative16[i-1]+1;
-      else error("");
-     }
-     assert_((t < 65536 || (i==cumulative.size-1 && t==65536)) && (cumulative16[i-1] < t || (cumulative16[i-1]==t && cumulative[i-1]==cumulative[i])),
-       cumulative[i-1], cumulative[i], cumulative16[i-1], t, i, cumulative.size);
-     cumulative16[i] = t;
-    }
-    const uint totalRange = cumulative16.last();
-    assert_(uint64(totalRange) < RangeCoder::maxRange);
-    buffer<byte> buffer (residual.ref::size); // ~ 5bps
+
+    buffer<uint16> buffer (residual.ref::size); // ~ 5bps
     encodeTime.start();
-    RangeEncoder encode (buffer);
-    for(int r: residual) {
-     uint s = r-min; // Symbol
-     //assert(cumulative16[s]<cumulative16[s+1]);
-     encode(cumulative16[s], cumulative16[s+1], totalRange);
+
+    static constexpr uint L = 1u << 16;
+    static constexpr uint scaleBits = 12; // <= 16
+    static constexpr uint M = 1<<scaleBits;
+
+    ::buffer<uint16> freqM (histogram.size);
+    ::buffer<uint16> cumulativeM (cumulative.size);
+    cumulativeM[0] = 0;
+    for(size_t i: range(1, cumulative.size)) {
+     cumulativeM[i] = (uint64)cumulative[i]*M/cumulative.last();
     }
-    encode.flush();
-    buffer.size = (byte*)encode.output - buffer.begin();
+    for(size_t i: range(1, cumulative.size)) {
+     if(histogram[i-1] && cumulativeM[i] == cumulativeM[i-1]) {
+      uint32 bestFreq = 0; //~0u;
+      size_t bestIndex = invalid;
+      for(int j: range(1, cumulative.size)) {
+       uint32 freq = cumulativeM[j] - cumulativeM[j-1];
+       if(freq > 1 && freq >/*<*/ bestFreq) { bestFreq = freq; bestIndex = j; }
+      }
+      assert_(bestIndex != invalid && bestIndex != i);
+      if(bestIndex < i) for(size_t j: range(bestIndex, i)) cumulativeM[j]--;
+      if(bestIndex > i) for(size_t j: range(i, bestIndex)) cumulativeM[j]++;
+     }
+    }
+    assert_(cumulativeM[0] == 0 && cumulativeM.last() == M);
+    for(size_t i: range(histogram.size)) {
+     if(histogram[i] == 0) assert_(cumulativeM[i+1] == cumulativeM[i]);
+     else assert_(cumulativeM[i+1] > cumulativeM[i]);
+     freqM[i] = cumulativeM[i+1] - cumulativeM[i];
+    }
+
+    uint16* begin; {
+     uint16* ptr = buffer.end();
+     uint32 rans[4];
+     for(uint32& r: rans) r = L;
+     for(int i: reverse_range(residual.ref::size)) {
+      uint s = residual[i]-min;
+      uint32 x = rans[i%4];
+      uint freq = freqM[s];
+      if(x >= ((L>>scaleBits)<<16) * freq) {
+       ptr -= 1;
+       *ptr = (uint16)(x&0xffff);
+       x >>= 16;
+      }
+      rans[i%4] = ((x / freq) << scaleBits) + (x % freq) + cumulativeM[s];
+     }
+     for(int i: reverse_range(4)) {
+      uint32 x = rans[i%4];
+      ptr -= 2;
+      ptr[0] = (uint16)(x>>0);
+      ptr[1] = (uint16)(x>>16);
+     }
+     assert_(ptr >= buffer.begin());
+     begin = ptr;
+    }
+    size_t bufferSize = buffer.end()-begin;
     encodeTime.stop();
 
     const uint32 total = residual.ref::size;
@@ -100,38 +123,109 @@ struct Raw {
     log(str(100*histogram.size*32/planeEntropyCoded)+"%");
     //planeEntropyCoded += histogram.size * 32; // 10K
     entropyCoded += planeEntropyCoded;
-    log(buffer.size, uint(planeEntropyCoded/8), buffer.size/(planeEntropyCoded/8));
+    log(bufferSize*2, uint(planeEntropyCoded/8), bufferSize/(planeEntropyCoded/16));
 
     // Verify
     verifyTime.start();
-    RangeDecoder decode (buffer.begin());
-    log(totalRange);
-    ::buffer<int16> reverse (totalRange); // FIXME: scale range to reduce lookup table size
-    for(int symbol: range(cumulative16.size-1)) {
-     assert_(cumulative16[symbol] < reverse.size);
-     for(int k: range(cumulative16[symbol], cumulative16[symbol+1])) reverse[k] = symbol;
+
+    uint16 reverse[M];
+    uint slots[M];
+    for(uint16 sym: range(histogram.size)) {
+     for(uint16 i: range(freqM[sym])) {
+      uint slot = cumulativeM[sym]+i;
+      reverse[slot] = sym;
+      // uint16 freq, bias;
+      slots[slot] = uint(freqM[sym]) | (uint(i) << 16);
+     }
     }
-    for(int r: residual) {
-     uint reference = r-min;
-     uint key = decode(totalRange);
-#if 0 // 30s
-     uint s; for(s = max-min; key < cumulative16[s]; s--) {}
-#elif 0 // 3.6s
-     /// Returns index to the last element lesser than \a key using binary search (assuming a sorted array)
-     uint min=0, max=cumulative16.size-1;
-     do {
-         size_t mid = (min+max+1)/2;
-         if(cumulative16[mid] <= key) min = mid;
-         else max = mid-1;
-     } while(min<max);
-     uint s = min;
-#else // 1.7s
-     assert_(key < reverse.size, key, reverse.size);
-     uint s = reverse[key];
+
+    uint16* ptr = begin;
+#if 0
+    typedef uint v4ui __attribute__((__vector_size__(16)));
+    v4ui x;
+    x[0] = ptr[0] | (ptr[1] << 16); ptr+=2;
+    x[1] = ptr[0] | (ptr[1] << 16); ptr+=2;
+    x[2] = ptr[0] | (ptr[1] << 16); ptr+=2;
+    x[3] = ptr[0] | (ptr[1] << 16); ptr+=2;
+    for(size_t i=0; i<residual.ref::size; i += 4) {
+     for(int k: range(4)) {
+      uint32 slot = x[k] & (M-1);
+      x[k] = (slots[slot]&0xFFFF) * (x[k]>>scaleBits) + (slots[slot]>>16);
+      assert_(residual[i+k]-min == reverse[slot]);
+      if((uint)x[k] < L) {
+       x[k] = (x[k] << 16) | *ptr;
+       ptr++;
+      }
+     }
+    }
+#else
+    __v4si x = _mm_loadu_si128((const __m128i*)ptr);
+    ptr += 8; // !! not 16
+    assert_(residual.ref::size%4 == 0);
+    for(size_t i=0; i<residual.ref::size; i += 4) {
+     log("x0", hex((uint)x[0], 8), hex((uint)x[1], 8), hex((uint)x[2], 8), hex((uint)x[3], 8));
+     __v4si slot = _mm_and_si128(x, _mm_set1_epi32(M - 1));
+     log("slots", slot[0], slot[1], slot[2], slot[3]);
+     for(int k: range(4)) assert_(residual[i+k]-min == reverse[slot[k]], residual[i+k], reverse[slot[k]], "\n",
+       residual[i+0]-min, residual[i+1]-min, residual[i+2]-min, residual[i+3]-min, "\n",
+       reverse[slot[0]], reverse[slot[1]], reverse[slot[2]], reverse[slot[3]], "\n",
+       slot[0], slot[1], slot[2], slot[3]
+       );
+
+     __v4si freq_bias_lo = _mm_cvtsi32_si128(slots[slot[0]]);
+     freq_bias_lo = _mm_insert_epi32(freq_bias_lo, slots[slot[1]], 1);
+     __v4si freq_bias_hi = _mm_cvtsi32_si128(slots[slot[2]]);
+     freq_bias_hi = _mm_insert_epi32(freq_bias_hi, slots[slot[3]], 1);
+     __v4si freq_bias = _mm_unpacklo_epi64(freq_bias_lo, freq_bias_hi);
+     log("freq_bias", ((__v4si)freq_bias)[0], ((__v4si)freq_bias)[1], ((__v4si)freq_bias)[2], ((__v4si)freq_bias)[3]);
+
+     __v4si xscaled = _mm_srli_epi32(x, scaleBits);
+     log("xscaled", hex((uint)xscaled[0], 8), hex((uint)xscaled[1], 8), hex((uint)xscaled[2], 8), hex((uint)xscaled[3], 8));
+     __v4si freq = _mm_and_si128(freq_bias, _mm_set1_epi32(0xffff));
+     log("freq", ((__v4si)freq)[0], ((__v4si)freq)[1], ((__v4si)freq)[2], ((__v4si)freq)[3]);
+     __v4si bias = _mm_srli_epi32(freq_bias, 16);
+     log("bias", ((__v4si)bias)[0], ((__v4si)bias)[1], ((__v4si)bias)[2], ((__v4si)bias)[3]);
+     x = xscaled * freq + bias;
+     log("xfq", hex((uint)x[0], 8), hex((uint)x[1], 8), hex((uint)x[2], 8), hex((uint)x[3], 8));
+
+     static int8 const shuffles[16][16] = {
+ #define _ -1
+      { _,_,_,_, _,_,_,_, _,_,_,_, _,_,_,_ }, // 0000
+      { 0,1,_,_, _,_,_,_, _,_,_,_, _,_,_,_ }, // 0001
+      { _,_,_,_, 0,1,_,_, _,_,_,_, _,_,_,_ }, // 0010
+      { 0,1,_,_, 2,3,_,_, _,_,_,_, _,_,_,_ }, // 0011
+      { _,_,_,_, _,_,_,_, 0,1,_,_, _,_,_,_ }, // 0100
+      { 0,1,_,_, _,_,_,_, 2,3,_,_, _,_,_,_ }, // 0101
+      { _,_,_,_, 0,1,_,_, 2,3,_,_, _,_,_,_ }, // 0110
+      { 0,1,_,_, 2,3,_,_, 4,5,_,_, _,_,_,_ }, // 0111
+      { _,_,_,_, _,_,_,_, _,_,_,_, 0,1,_,_ }, // 1000
+      { 0,1,_,_, _,_,_,_, _,_,_,_, 2,3,_,_ }, // 1001
+      { _,_,_,_, 0,1,_,_, _,_,_,_, 2,3,_,_ }, // 1010
+      { 0,1,_,_, 2,3,_,_, _,_,_,_, 4,5,_,_ }, // 1011
+      { _,_,_,_, _,_,_,_, 0,1,_,_, 2,3,_,_ }, // 1100
+      { 0,1,_,_, _,_,_,_, 2,3,_,_, 4,5,_,_ }, // 1101
+      { _,_,_,_, 0,1,_,_, 2,3,_,_, 4,5,_,_ }, // 1110
+      { 0,1,_,_, 2,3,_,_, 4,5,_,_, 6,7,_,_ }, // 1111
+ #undef _
+     };
+     static uint8 const numBytes[16] = { 0,1,1,2, 1,2,2,3, 1,2,2,3, 2,3,3,4 };
+     __v4si x_biased = _mm_xor_si128(x, _mm_set1_epi32(int(0x80000000)));
+     __v4si greater = _mm_cmplt_epi32(x_biased, _mm_set1_epi32(L - 0x80000000));
+     uint mask = _mm_movemask_ps(greater);
+     log(str(mask, 4u, '0', 2u), mask);
+     __v4si memvals = _mm_loadl_epi64((const __m128i*)ptr);
+     log("memvals", hex((uint)memvals[0], 8), hex((uint)memvals[1], 8));
+     __v4si xshifted = _mm_slli_epi32(x, 16);
+     log("xshifted", hex((uint)xshifted[0], 8), hex((uint)xshifted[1], 8), hex((uint)xshifted[2], 8), hex((uint)xshifted[3], 8));
+     __v4si shufmask = _mm_load_si128((const __m128i*)shuffles[mask]);
+     log("shufmask", hex((uint)shufmask[0], 8), hex((uint)shufmask[1], 8), hex((uint)shufmask[2], 8), hex((uint)shufmask[3], 8));
+       __v4si newx = _mm_or_si128(xshifted, _mm_shuffle_epi8(memvals, shufmask));
+     log("newx", hex((uint)newx[0], 8), hex((uint)newx[1], 8), hex((uint)newx[2], 8), hex((uint)newx[3], 8));
+     x = _mm_blendv_epi8(x, newx, greater);
+     log("x", hex((uint)x[0], 8), hex((uint)x[1], 8), hex((uint)x[2], 8), hex((uint)x[3], 8));
+     ptr += numBytes[mask];
+    }
 #endif
-     assert_(reference == s, reference, s, key);
-     decode.next(cumulative16[s], cumulative16[s+1]);
-    }
    }
    verifyTime.stop();
    //assert_(entropyCoded/8 <= huffmanSize, entropyCoded/8/1024/1024, huffmanSize/1024/1024);
