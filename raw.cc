@@ -14,6 +14,7 @@ buffer<byte> encodeFLIF(const Image16& source, Time& encodeTime) {
  flif_encoder_set_palette_size(flif, 0);
  flif_encoder_set_learn_repeat(flif, 0);
  flif_encoder_set_lookback(flif, 0);
+ flif_encoder_set_channel_compact(flif, 0);
  flif_encoder_set_ycocg(flif, 0);
  flif_encoder_set_frame_shape(flif, 0);
  flif_encoder_add_image(flif, image);
@@ -27,12 +28,23 @@ buffer<byte> encodeFLIF(const Image16& source, Time& encodeTime) {
  return buffer;
 }
 
+void writeRGGB(string name, ref<Image16> planes) {
+ Image16 RGGB (planes[0].width*4, planes[0].height);
+ for(size_t y: range(planes[0].height)) for(size_t x: range(planes[0].width)) {
+  RGGB(x*4+0,y) = planes[0](x, y);
+  RGGB(x*4+1,y) = planes[1](x, y);
+  RGGB(x*4+2,y) = planes[2](x, y);
+  RGGB(x*4+3,y) = planes[3](x, y);
+ }
+ writeFile(name+".rggb", cast<byte>(RGGB), home(), true);
+}
+
 struct Raw {
  Raw() {
   size_t count = 0;
   for(string name: Folder(".").list(Files|Sorted)) if(endsWith(toLower(name), ".cr2")) count++;
   Time decodeTime, encodeTime, totalTime {true};
-  const size_t N = 4;
+  const size_t N = 5;
   size_t totalSize = 0, huffmanSize = 0, entropySize[N] = {};
   size_t index = 0;
   for(string name: Folder(".").list(Files|Sorted)) {
@@ -57,6 +69,7 @@ struct Raw {
     planes[2](x,y) = image(x*2+0, y*2+1);
     planes[3](x,y) = image(x*2+1, y*2+1);
    }
+#if 0
    Image16 RGGB (image.width/2*4, image.height/2);
    for(size_t y: range(image.size.y/2)) for(size_t x: range(image.size.x/2)) {
     RGGB(x*4+0,y) = planes[0](x, y);
@@ -64,13 +77,18 @@ struct Raw {
     RGGB(x*4+2,y) = planes[2](x, y);
     RGGB(x*4+3,y) = planes[3](x, y);
    }
+   writeFile(name+".rggb", cast<byte>(RGGB), home());
+#if 0
    encodeTime.reset();
    {size_t size = encodeFLIF(RGGB, encodeTime).size;
     log(encodeTime, size/1024);}
+#endif
+#endif
    index++;
    log(str(index,3u)+"/"+str(count,3u), name, map.size/1024/1024,"MB","Huffman",cr2.huffmanSize/1024/1024,"MB");
    for(size_t method: range(N)) {
     double entropyCoded = 0;
+    Image16 residuals[4];
     for(size_t i: range(4)) {
      const Image16& plane = planes[i];
      /*int predictor = 0;
@@ -80,16 +98,19 @@ struct Raw {
       assert_(-0x8000 <= r && r <= 0x7FFF);
       value = r;
      }*/
-     Image16 residual (plane.size);
+     Image16& residual = residuals[i];
+     residual = Image16(plane.size);
      for(int y: range(plane.size.y)) for(int x: range(plane.size.x)) {
+      int left = x>0 ? plane(x-1, y) : 0;
+      int top = y>0 ? plane(x, y-1) : 0;
+      int topleft = x > 0 && y>0 ? plane(x-1, y-1) : 0;
+      int gradient = left+top-topleft;
       int predictor;
       /**/  if(method == 0) predictor = 0;
-      else if(method == 1) predictor = plane(max(0, x-1), y);
-      else if(method == 2) predictor = (plane(max(0, x-1), y)+plane(x, max(0, y-1)))/2;
-      else if(method == 3) predictor = ::median(
-         plane(max(0, x-1),             y    ),
-         plane(max(0, x-1), max(0, y-1)),
-         plane(            x     , max(0, y-1)) );
+      else if(method == 1) predictor = left;
+      else if(method == 2) predictor = (left+top)/2;
+      else if(method == 3) predictor = ::median(left, top, topleft);
+      else if(method == 4) predictor = ::median(left, top, gradient);
       else error(method);
       int value = plane(x, y);
       int r = value - predictor;
@@ -114,6 +135,7 @@ struct Raw {
     entropySize[method] += entropyCoded/8;
     if(method>0) log(method, str(entropyCoded/8/1024/1024,0u)+"MB",
                      "Σ", str(entropySize[method]/1024/1024)+"MB =", str((totalSize-entropySize[method])/1024/1024)+"MB ("+str(100*(totalSize-entropySize[method])/totalSize)+"%)");
+    writeRGGB(name+"."+str(method), ref<Image16>(residuals));
    }
    break;
   }
