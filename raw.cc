@@ -21,6 +21,7 @@ struct Raw {
    log(decodeTime);
    totalSize += map.size;
    huffmanSize += cr2.huffmanSize;
+   break;
    if(onlyParse) continue;
    const Image16& image = cr2.image;
    Image16 planes[4] = {}; // R, G1, G2, B

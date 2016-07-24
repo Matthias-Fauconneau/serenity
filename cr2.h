@@ -5,8 +5,12 @@
 /// 2D array of 16bit integer samples
 typedef ImageT<int16> Image16;
 
+struct Section { size_t start, size; String name; };
+inline bool operator>(const Section& a, const Section& b) { return a.start > b.start; }
+
 struct CR2 {
  bool onlyParse = false;
+ array<Section> sections;
  ref<byte> data;
  int2 size = 0; size_t stride = 0;
  const uint8* pointer = 0;

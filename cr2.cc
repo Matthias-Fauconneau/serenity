@@ -1,5 +1,6 @@
 #include "cr2.h"
 #include "bit.h"
+#include "sort.h"
 
 uint CR2::readBits(const int nbits) {
  if(nbits==0) return 0u;
@@ -36,11 +37,22 @@ int CR2::readHuffman(uint i) {
 
 void CR2::readIFD(BinaryData& s) {
  int compression = 0;
- size = {};
+ size = {}; data = {};
  uint16 entryCount = s.read();
+ size_t ifdStart = s.index;
+ size_t lastReference = ifdStart;
  for(uint unused i : range(entryCount)) {
   struct Entry { uint16 tag, type; uint count; uint value; } entry = s.read<Entry>();
   BinaryData value (s.data); value.index = entry.value;
+  if((entry.type==2||entry.type==5||entry.type==10||entry.count>1)&&value.index) {
+   size_t size = 0;
+   if(entry.type==1||entry.type==2) size=entry.count;
+   else if(entry.type==3) size=entry.count*2;
+   else if(entry.type==4) size=entry.count*4;
+   else if(entry.type==5||entry.type==10) size=8;
+   assert_(size, entry.type, entry.count);
+   lastReference = ::max(lastReference, value.index+size);
+  }
   // 0xFE: NewSubfileType
   /**/  if(entry.tag == 0x100) size.x = entry.value; // Width
   else if(entry.tag == 0x101) size.y = entry.value; // Height
@@ -65,26 +77,11 @@ void CR2::readIFD(BinaryData& s) {
   else if(entry.tag == 0x106) assert_(entry.value == 2); // PhotometricInterpretation
   else if(entry.tag == 0x111) { // StripOffset
    assert_(entry.count == 1);
-   size_t offset;
-   if(entry.count==1) {
-    offset = value.index;
-    stride = size.x;
-   } else {
-    assert_(entry.count>1);
-    offset = value.read32();
-    uint32 lastOffset = offset;
-    for(uint unused i : range(1, entry.count)) {
-     uint32 nextOffset = value.read32();
-     uint32 nextStride = (nextOffset - lastOffset)/2;
-     if(!stride) stride = nextStride; //16bit
-     else assert_(stride == nextStride);
-     break;
-    }
-    assert(compression==1 || compression==6);
-   }
+   size_t offset = value.index;
+   stride = size.x;
+   assert_(compression==1 || compression==6);
    assert_(!data.size);
    data.data = s.data.data+offset;
-   //((ref<int16>&)image) = cast<int16>(s.slice(offset, image.size.y*image.size.x*2));
   }
   else if(entry.tag == 0x112) assert_(entry.value==1 || entry.value == 6, "Orientation", entry.value); // Orientation
   else if(entry.tag == 0x115) assert_(entry.value == 3, entry.value); // PhotometricInterpretation
@@ -100,23 +97,32 @@ void CR2::readIFD(BinaryData& s) {
   else if(entry.tag == 0x128) assert_(entry.type==3 && entry.value==2); // resolutionUnit (ppi)
   else if(entry.tag == 0x132) assert_(entry.type==2); // DateTime
   else if(entry.tag == 0x13B) assert_(entry.type==2); // Artist
-  else if(entry.tag == 0x14A) { // SubIFDs
-   assert_(entry.count == 1);
-   readIFD(value);
-   if(image) return;
+  else if(entry.tag == 0x201) { // JPEGInterchangeFormat (deprecated)
+   assert_(!data);
+   data = s.slice(entry.value, 0);
+   //sections.append({entry.value,0, name+".JPEG"});
   }
-  else if(entry.tag == 0x201) {} // JPEGInterchangeFormat (deprecated)
-  else if(entry.tag == 0x202) {} // JPEGInterchangeFormatLength (deprecated)
-  else if(entry.tag == 0x2BC) {} // XML_Packet (XMP)
+  else if(entry.tag == 0x202) { // JPEGInterchangeFormatLength (deprecated)
+   assert_(!data.size, data.size);
+   data.size = entry.value;
+   //sections.last().size = entry.value;
+  }
+  else if(entry.tag == 0x2BC) { // XML_Packet (XMP)
+   sections.append({value.index, entry.count, "XMP"__});
+  }
   else if(entry.tag == 0x8298) {} // Copyright
   else if(entry.tag == 0x8769) { // EXIF
    BinaryData& s = value; // Renames value -> s
    unused size_t exifStart = s.index;
    size_t referencesSize = 0;
+   size_t lastEXIFReference = 0;
    uint16 entryCount = s.read();
    for(uint unused i : range(entryCount)) {
     Entry entry = s.read<Entry>();
     BinaryData value (s.data); value.index = entry.value;
+    if((entry.type==2||entry.type==5||entry.type==10||(entry.count>1&&entry.type!=7))&&value.index) {
+     lastEXIFReference = ::max(lastEXIFReference, value.index);
+    }
     if(entry.tag == 0x829A) { // ExposureTime
      assert_(entry.type == 5 && entry.count == 1);
      unused uint num = value.read32();
@@ -194,11 +200,16 @@ void CR2::readIFD(BinaryData& s) {
     else if(entry.tag == 0x927C) { // MakerNote
      assert_(entry.type == 7);
      BinaryData& s = value; // Renames value -> s
-     size_t makerNoteStart = s.index;
+     unused size_t makerNoteStart = s.index;
+     size_t lastMakerNoteReference = 0;
      uint16 entryCount = s.read();
      for(uint unused i : range(entryCount)) {
       Entry entry = s.read<Entry>();
       BinaryData value (s.data); value.index = entry.value;
+      if(entry.type==2||entry.type==5||entry.type==10||entry.count>1) {
+       //log("MakerNote@", hex(value.index), entry.count);
+       lastMakerNoteReference = ::max(lastMakerNoteReference, value.index);
+      }
       if(entry.tag == 0x0001) {  assert_(entry.type == 3 && entry.count == 50); } // CameraSettings
       else if(entry.tag <= 0x0004) {}
       else if(entry.tag == 0x0006) { assert_(entry.type==2); } // ImageType
@@ -230,7 +241,9 @@ void CR2::readIFD(BinaryData& s) {
       else if(entry.tag == 0x4015) { assert_(entry.type == 7 && entry.count == 1012); } // VignettingCorrection
       else error(entry.tag, hex(entry.tag), entry.type, entry.count, entry.value);
      }
-     referencesSize += s.index - makerNoteStart;
+     //referencesSize += s.index - makerNoteStart;
+     //sections.append({makerNoteStart, lastReference-makerNoteStart, "EXIF.MakerNote"__});
+     lastEXIFReference = ::max(lastEXIFReference, lastMakerNoteReference);
     }
     else if(entry.tag == 0x9286) {} // UserComment
     else if(entry.tag == 0xA000) {} // FlashpixVersion
@@ -251,7 +264,9 @@ void CR2::readIFD(BinaryData& s) {
     else if(entry.tag == 0xA430) {} // OwnerName
     else error(entry.tag, hex(entry.tag), entry.type, entry.count, entry.value);
    }
-   //log("EXIF", s.index-exifStart + referencesSize); // /!\ TODO: Copy references (fractions, MakerNote)
+   //log("EXIF", hex(exifStart), hex(s.index), ":", s.index-exifStart + referencesSize); // /!\ TODO: Copy references (fractions, MakerNote)
+   //sections.append({exifStart, lastReference-exifStart, "EXIF"__});
+   lastReference = ::max(lastReference, lastEXIFReference);
   }
   else if(entry.tag == 0x8825) {} // GPS
   else if(entry.tag == 0xC5D8 || entry.tag == 0xC5D9 || entry.tag == 0xC5E0 || entry.tag == 0xC6C5 || entry.tag == 0xC6DC) {} // ?
@@ -265,6 +280,14 @@ void CR2::readIFD(BinaryData& s) {
   else if(entry.tag == 0xFFC3) error("Thumb");
   else error(entry.tag, hex(entry.tag));
  }
+ lastReference = ::max(lastReference, s.index);
+ sections.append({ifdStart, lastReference-ifdStart,
+                  (size?strx(size)+" ":""__)+str(compression==6?"JPEG ":compression==1?"RGB ":"")+"@"+hex(data.begin()-s.data.begin())});
+ if(data) {
+  //log(hex(data.begin()-s.data.begin()), "-", hex(data.end()-s.data.begin()), ":", data.size/1024, "K");
+  sections.append({size_t(data.begin()-s.data.begin()), data.size,
+                   (size?strx(size)+" ":""__)+(compression==6?"JPEG "_:compression==1?"RGB "_:""_)});
+ }
  if(size) data={}; // Thumbnail
  if(data) {
   BinaryData s (data, true);
@@ -272,6 +295,7 @@ void CR2::readIFD(BinaryData& s) {
    assert_(marker == 0xFFD8, hex(marker)); // Start Of Image
   }
   {uint16 marker = s.read16();
+   if(marker == 0xFFE2) return; // APP2 (ICC?) from JPEG thumbnail
    assert_(marker == 0xFFC4, hex(marker)); // Define Huffman Table
    unused uint16 length = s.read16();
    for(uint index: range(2)) {
@@ -379,7 +403,10 @@ CR2::CR2(const ref<byte> file, bool onlyParse) : onlyParse(onlyParse)  {
   s.index = s.read32();
   if(!s.index) break;
   readIFD(s);
-  if(image) break;
  }
+ sections.last().size += 2; // EOF
+ sections.append({0, file.size, ""__});
+ sort(sections);
+ for(const Section& section: sections) log(hex(section.start), "-", hex(section.start+section.size), "["+str(section.size/1024)+"K] :", section.name);
  huffmanSize = data.size;
 }
