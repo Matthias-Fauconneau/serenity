@@ -128,7 +128,7 @@ bool Build::compileModule(string target) {
   Folder(tmp+"/"+join(flags,"-")+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
   Stream stdout;
   int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1z", "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing", "-march=native",
-                                     "-o", object, fileName, "-I/usr/include/freetype2","-I/var/tmp/include"} + toRefs(args),
+                                     "-o", object, fileName, "-I/usr/include/freetype2"} + toRefs(args),
                     false, currentWorkingDirectory(), 0, &stdout);
   jobs.append({copyRef(target), pid, move(stdout), true});
   needLink = true;
@@ -142,7 +142,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
  string install;
  for(string arg: arguments) {
   if(arg=="-ftime-report"_||arg=="-v") args.append(unsafeRef(arg)); // Build command flag without influence on output build
-  //else if(startsWith(arg,"-"_)) {} // Build command flag
+  else if(startsWith(arg,"-"_)) args.append(unsafeRef(arg)); // Build command flag
   else if(startsWith(arg,"/"_)) install=arg;
   else if(find(arg+".cc") && arg!="profile") {
    if(target) log(str("Multiple targets unsupported, building last target:", arg, ". Parsing arguments:", arguments)+'\n');

@@ -1,61 +1,55 @@
 #include "cr2.h"
-#include "png.h"
+#include <flif.h> // flif
 #include "time.h"
-#include "matrix.h"
 inline double log2(double x) { return __builtin_log2(x); }
-
-/// 2D array of 32bit integer pixels
-typedef ImageT<uint32> Image32;
-
-mat3 pseudoinverse(mat3 in) {
- mat3 out;
- float w[3][6];
- for(int i: range(3)) {
-  for(int j: range(6)) w[i][j] = (j == i+3);
-  for(int j: range(3)) for(int k: range(3))
-   w[i][j] += in[k][i] * in[k][j];
- }
- for(int i: range(3)) {
-  float sum = w[i][i];
-  for(int j: range(6)) w[i][j] /= sum;
-  for(int k: range(3)) {
-   if (k==i) continue;
-   float wki = w[k][i];
-   for(int j: range(6)) w[k][j] -= w[i][j] * wki;
-  }
- }
- for(int i: range(3)) {
-  for(int j: range(3)) {
-   out[i][j] = 0;
-   for(int k: range(3)) out[i][j] += w[j][k+3] * in[i][k];
-  }
- }
- return out;
-}
-
 int median(int a, int b, int c) { return max(min(a,b), min(max(a,b),c)); }
+
+buffer<byte> encodeFLIF(const Image16& source, Time& encodeTime) {
+ log(source.width, source.height);
+ FLIF_IMAGE* image = flif_create_image_HDR(source.width/4, source.height);
+ for(size_t y: range(source.height)) flif_image_write_row_RGBA16(image, y, source.row(y).data, source.row(y).size*sizeof(int16));
+ FLIF_ENCODER* flif = flif_create_encoder();
+ flif_encoder_set_alpha_zero_lossless(flif);
+ flif_encoder_set_auto_color_buckets(flif, 0);
+ flif_encoder_set_palette_size(flif, 0);
+ flif_encoder_set_learn_repeat(flif, 0);
+ flif_encoder_set_lookback(flif, 0);
+ flif_encoder_set_ycocg(flif, 0);
+ flif_encoder_set_frame_shape(flif, 0);
+ flif_encoder_add_image(flif, image);
+ buffer<byte> buffer;
+ encodeTime.start();
+ flif_encoder_encode_memory(flif, &(void*&)buffer.data, &buffer.size);
+ encodeTime.stop();
+ flif_destroy_encoder(flif);
+ flif_destroy_image(image);
+ buffer.capacity = buffer.size;
+ return buffer;
+}
 
 struct Raw {
  Raw() {
   size_t count = 0;
   for(string name: Folder(".").list(Files|Sorted)) if(endsWith(toLower(name), ".cr2")) count++;
-  Time decodeTime, totalTime {true};
+  Time decodeTime, encodeTime, totalTime {true};
   const size_t N = 4;
   size_t totalSize = 0, huffmanSize = 0, entropySize[N] = {};
   size_t index = 0;
   for(string name: Folder(".").list(Files|Sorted)) {
    if(!endsWith(toLower(name), ".cr2")) continue;
-   //log(name);
+   log(name);
    Map map(name);
    constexpr bool onlyParse = false;
    decodeTime.start();
    CR2 cr2(map, onlyParse);
    decodeTime.stop();
+   log(decodeTime);
    totalSize += map.size;
    huffmanSize += cr2.huffmanSize;
    if(onlyParse) continue;
    const Image16& image = cr2.image;
-   Image16 planes[4] = {}; // G1, B, R, G2
+   //{size_t size = encodeFLIF(image, encodeTime).size; log(encodeTime, size/1024, "K");}
+   Image16 planes[4] = {}; // R, G1, G2, B
    for(size_t i: range(4)) planes[i] = Image16(image.size/2);
    for(size_t y: range(image.size.y/2)) for(size_t x: range(image.size.x/2)) {
     planes[0](x,y) = image(x*2+0, y*2+0);
@@ -63,6 +57,16 @@ struct Raw {
     planes[2](x,y) = image(x*2+0, y*2+1);
     planes[3](x,y) = image(x*2+1, y*2+1);
    }
+   Image16 RGGB (image.width/2*4, image.height/2);
+   for(size_t y: range(image.size.y/2)) for(size_t x: range(image.size.x/2)) {
+    RGGB(x*4+0,y) = planes[0](x, y);
+    RGGB(x*4+1,y) = planes[1](x, y);
+    RGGB(x*4+2,y) = planes[2](x, y);
+    RGGB(x*4+3,y) = planes[3](x, y);
+   }
+   encodeTime.reset();
+   {size_t size = encodeFLIF(RGGB, encodeTime).size;
+    log(encodeTime, size/1024);}
    index++;
    log(str(index,3u)+"/"+str(count,3u), name, map.size/1024/1024,"MB","Huffman",cr2.huffmanSize/1024/1024,"MB");
    for(size_t method: range(N)) {
@@ -111,6 +115,7 @@ struct Raw {
     if(method>0) log(method, str(entropyCoded/8/1024/1024,0u)+"MB",
                      "Σ", str(entropySize[method]/1024/1024)+"MB =", str((totalSize-entropySize[method])/1024/1024)+"MB ("+str(100*(totalSize-entropySize[method])/totalSize)+"%)");
    }
+   break;
   }
   log(decodeTime, totalTime); // 5min
   if(totalSize)
