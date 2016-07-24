@@ -7,7 +7,7 @@ struct Raw {
  Raw() {
   size_t imageCount = 0;
   for(string name: Folder(".").list(Files|Sorted)) if(endsWith(toLower(name), ".cr2")) imageCount++;
-  Time decodeTime, encodeTime, totalTime {true};
+  Time decodeTime, encodeTime, verifyTime, totalTime {true};
   size_t totalSize = 0, huffmanSize = 0, entropySize = 0;
   size_t index = 0;
   for(string name: Folder(".").list(Files|Sorted)) {
@@ -52,33 +52,71 @@ struct Raw {
     buffer<uint32> histogram(max+1-min);
     histogram.clear(0);
     uint32* base = histogram.begin()-min;
-    for(int16 value: residual) base[value]++;
-    buffer<uint32> cumulative(1+histogram.size);
+    for(int value: residual) base[value]++;
+    buffer<uint64> cumulative(1+histogram.size);
     cumulative[0] = 0;
     for(size_t i: range(histogram.size)) cumulative[i+1] = cumulative[i] + histogram[i];
-    buffer<byte> output(residual.ref::size);
-    RangeEncoder encode (output.begin());
+    const uint64 totalRange = cumulative.last();
+    assert_(totalRange < RangeCoder::maxRange);
+    buffer<byte> buffer (residual.ref::size); // ~ 5bps
+    encodeTime.start();
+    RangeEncoder encode (buffer);
     for(int r: residual) {
-     int s = min+r; // Symbol
-     encode(cumulative[s], cumulative[s+1], cumulative.last());
-     encode.flush();
-     output.size = encode.output - output.begin();
+     uint s = r-min; // Symbol
+     //assert(cumulative[s]<cumulative[s+1]);
+     encode(cumulative[s], cumulative[s+1], totalRange);
     }
+    encode.flush();
+    buffer.size = (byte*)encode.output - buffer.begin();
+    encodeTime.stop();
+
     const uint32 total = residual.ref::size;
     double planeEntropyCoded = 0;
     for(uint32 count: histogram) if(count) planeEntropyCoded += count * log2(double(total)/double(count));
     log(str(100*histogram.size*32/planeEntropyCoded)+"%");
     //planeEntropyCoded += histogram.size * 32; // 10K
     entropyCoded += planeEntropyCoded;
-    log(output.size, planeEntropyCoded);
+    log(buffer.size, uint(planeEntropyCoded/8), buffer.size/(planeEntropyCoded/8));
+
+    // Verify
+    verifyTime.start();
+    RangeDecoder decode (buffer.begin());
+    log(totalRange);
+    ::buffer<int16> reverse (totalRange); // FIXME: scale range to reduce lookup table size
+    for(int symbol: range(cumulative.size-1)) {
+     assert_(cumulative[symbol] < reverse.size);
+     for(int k: range(cumulative[symbol], cumulative[symbol+1])) reverse[k] = symbol;
+    }
+    for(int r: residual) {
+     uint reference = r-min;
+     uint64 key = decode(totalRange);
+#if 0
+     uint s; for(s = max-min; key < cumulative[s]; s--) {}
+#elif 0 // 3.6s
+     /// Returns index to the last element lesser than \a key using binary search (assuming a sorted array)
+     uint min=0, max=cumulative.size-1;
+     do {
+         size_t mid = (min+max+1)/2;
+         if(cumulative[mid] <= key) min = mid;
+         else max = mid-1;
+     } while(min<max);
+     uint s = min;
+#else // 2.2s
+     assert_(key < reverse.size, key, reverse.size);
+     uint s = reverse[key];
+#endif
+     assert_(reference == s, reference, s, key);
+     decode.next(cumulative[s], cumulative[s+1]);
+    }
    }
+   verifyTime.stop();
    //assert_(entropyCoded/8 <= huffmanSize, entropyCoded/8/1024/1024, huffmanSize/1024/1024);
    entropySize += entropyCoded/8;
    log(str(entropyCoded/8/1024/1024,0u)+"MB",
        "Σ", str(entropySize/1024/1024)+"MB =", str((totalSize-entropySize)/1024/1024)+"MB ("+str(100*(totalSize-entropySize)/totalSize)+"%)");
    break;
   }
-  log(decodeTime, totalTime); // 5min
+  log(decodeTime, encodeTime, verifyTime, totalTime); // 5min
   if(totalSize) log(totalSize/1024/1024,"MB -", huffmanSize/1024/1024,"MB =", (totalSize-huffmanSize)/1024/1024,"MB", 100*(totalSize-huffmanSize)/totalSize,"%");
   if(huffmanSize)
    log(huffmanSize/1024/1024,"MB -", entropySize/1024/1024,"MB =", (huffmanSize-entropySize)/1024/1024,"MB", 100*(huffmanSize-entropySize)/huffmanSize,"%");
