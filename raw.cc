@@ -3,6 +3,16 @@
 #include "range.h"
 inline double log2(double x) { return __builtin_log2(x); }
 
+/*void rescale(const mref<uint16> target, const ref<uint32> source) {
+ target[0] = 0;
+ for(int i: range(1, source.size)) {
+  uint t = source[i]*65536/source.last();
+  //if(!(target[i-1]<t)) t = target[i-1]+1;
+  assert_(t < 65536 && target[i-1] <= t, source[i-1], source[i]);
+  target[i] = t;
+ }
+}*/
+
 struct Raw {
  Raw() {
   size_t imageCount = 0;
@@ -53,18 +63,32 @@ struct Raw {
     histogram.clear(0);
     uint32* base = histogram.begin()-min;
     for(int value: residual) base[value]++;
-    buffer<uint64> cumulative(1+histogram.size);
+    buffer<uint> cumulative(1+histogram.size);
     cumulative[0] = 0;
     for(size_t i: range(histogram.size)) cumulative[i+1] = cumulative[i] + histogram[i];
-    const uint64 totalRange = cumulative.last();
-    assert_(totalRange < RangeCoder::maxRange);
+    buffer<uint16> cumulative16 (cumulative.size); // Quantize entropy to reduce decoder lookup table
+    //rescale(cumulative16, cumulative);
+    cumulative16[0] = 0;
+    for(size_t i: range(1, cumulative.size)) {
+     uint t = cumulative[i]*64512ull/cumulative.last(); // not 1<<16 as headroom is required to ceil last symbols
+     if(!(cumulative16[i-1]<t)) {
+      if(cumulative[i-1] == cumulative[i]) t = cumulative16[i-1];
+      else if(cumulative[i-1] < cumulative[i]) t = cumulative16[i-1]+1;
+      else error("");
+     }
+     assert_((t < 65536 || (i==cumulative.size-1 && t==65536)) && (cumulative16[i-1] < t || (cumulative16[i-1]==t && cumulative[i-1]==cumulative[i])),
+       cumulative[i-1], cumulative[i], cumulative16[i-1], t, i, cumulative.size);
+     cumulative16[i] = t;
+    }
+    const uint totalRange = cumulative16.last();
+    assert_(uint64(totalRange) < RangeCoder::maxRange);
     buffer<byte> buffer (residual.ref::size); // ~ 5bps
     encodeTime.start();
     RangeEncoder encode (buffer);
     for(int r: residual) {
      uint s = r-min; // Symbol
-     //assert(cumulative[s]<cumulative[s+1]);
-     encode(cumulative[s], cumulative[s+1], totalRange);
+     //assert(cumulative16[s]<cumulative16[s+1]);
+     encode(cumulative16[s], cumulative16[s+1], totalRange);
     }
     encode.flush();
     buffer.size = (byte*)encode.output - buffer.begin();
@@ -83,30 +107,30 @@ struct Raw {
     RangeDecoder decode (buffer.begin());
     log(totalRange);
     ::buffer<int16> reverse (totalRange); // FIXME: scale range to reduce lookup table size
-    for(int symbol: range(cumulative.size-1)) {
-     assert_(cumulative[symbol] < reverse.size);
-     for(int k: range(cumulative[symbol], cumulative[symbol+1])) reverse[k] = symbol;
+    for(int symbol: range(cumulative16.size-1)) {
+     assert_(cumulative16[symbol] < reverse.size);
+     for(int k: range(cumulative16[symbol], cumulative16[symbol+1])) reverse[k] = symbol;
     }
     for(int r: residual) {
      uint reference = r-min;
-     uint64 key = decode(totalRange);
-#if 0
-     uint s; for(s = max-min; key < cumulative[s]; s--) {}
+     uint key = decode(totalRange);
+#if 0 // 30s
+     uint s; for(s = max-min; key < cumulative16[s]; s--) {}
 #elif 0 // 3.6s
      /// Returns index to the last element lesser than \a key using binary search (assuming a sorted array)
-     uint min=0, max=cumulative.size-1;
+     uint min=0, max=cumulative16.size-1;
      do {
          size_t mid = (min+max+1)/2;
-         if(cumulative[mid] <= key) min = mid;
+         if(cumulative16[mid] <= key) min = mid;
          else max = mid-1;
      } while(min<max);
      uint s = min;
-#else // 2.2s
+#else // 1.7s
      assert_(key < reverse.size, key, reverse.size);
      uint s = reverse[key];
 #endif
      assert_(reference == s, reference, s, key);
-     decode.next(cumulative[s], cumulative[s+1]);
+     decode.next(cumulative16[s], cumulative16[s+1]);
     }
    }
    verifyTime.stop();

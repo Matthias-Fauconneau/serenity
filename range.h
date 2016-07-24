@@ -14,7 +14,7 @@ struct RangeEncoder : RangeCoder {
  void operator()(uint64 symbolLow, uint64 symbolHigh, uint64 totalRange) {
   low += symbolLow*(range/=totalRange);
   range *= symbolHigh-symbolLow;
-  while( (low^(low+range))<top || range<bottom && ((range=-low & (bottom-1)),1)) {
+  while( (low^(low+range))<top || range<bottom && ((range=-low&(bottom-1)),1)) {
    *output = low>>56; output++;
    range <<= 8;
    low <<= 8;
@@ -41,7 +41,7 @@ struct RangeDecoder: RangeCoder {
  void next(uint64 symbolLow, uint64 symbolHigh) {
   low += symbolLow*range;
   range *= symbolHigh-symbolLow;
-  while((low^low+range)<top || range<bottom && ((range = -low&bottom-1),1)) {
+  while((low^(low+range))<top || range<bottom && ((range = -low&(bottom-1)),1)) {
    code = code<<8 | *input; input++;
    range <<= 8;
    low <<= 8;
