@@ -53,42 +53,24 @@ struct Raw {
     histogram.clear(0);
     uint32* base = histogram.begin()-min;
     for(int16 value: residual) base[value]++;
-    uint32 maxCount = 0; for(uint32 count: histogram) maxCount=::max(maxCount, count); log(maxCount, log2(maxCount));
+    buffer<uint32> cumulative(1+histogram.size);
+    cumulative[0] = 0;
+    for(size_t i: range(histogram.size)) cumulative[i+1] = cumulative[i] + histogram[i];
+    buffer<byte> output(residual.ref::size);
+    RangeEncoder encode (output.begin());
+    for(int r: residual) {
+     int s = min+r; // Symbol
+     encode(cumulative[s], cumulative[s+1], cumulative.last());
+     encode.flush();
+     output.size = encode.output - output.begin();
+    }
     const uint32 total = residual.ref::size;
     double planeEntropyCoded = 0;
     for(uint32 count: histogram) if(count) planeEntropyCoded += count * log2(double(total)/double(count));
-    /*for(uint v: range(histogram.size)) {
-     if(!histogram[v]) continue;
-     int s = v-min;
-     uint u  = (s<<1) ^ (s>>31); // s>0 ? (s<<1) : (-s<<1) - 1;
-     // Exp Golomb _ r
-     static constexpr size_t EG = 10;
-     uint x = u + (1<<EG);
-     uint b = (sizeof(x)*8-1) - __builtin_clz(x); // BSR
-     assert_((sizeof(x)*8-1) >= __builtin_clz(x), (sizeof(x)*8-1), __builtin_clz(x), x, u, (1<<EG));
-     assert_(b+b+1 > EG);
-     assert_(b+b+1-EG <= 16, b+b+1-EG, b, EG, u, histogram[v]);
-     entropyCoded += histogram[v] * (b+b+1-EG);
-    }*/
-    log(histogram.size*32, str(100*histogram.size*32/planeEntropyCoded)+"%");
-    planeEntropyCoded += histogram.size * 32; // 10K
+    log(str(100*histogram.size*32/planeEntropyCoded)+"%");
+    //planeEntropyCoded += histogram.size * 32; // 10K
     entropyCoded += planeEntropyCoded;
-#if 0
-    for(int method: range(3)) {
-     float encodedSize = 0;
-     if(method==0) for(uint32 count: histogram) encodedSize += count ? 20 : 0;
-     if(method==1) {
-      int zeroLength = 0;
-      for(uint32 count: histogram) {
-       if(!count) { zeroLength++; continue; }
-       if(zeroLength) { encodedSize += 19+12; /*escape, length*/  zeroLength=0; }
-       else encodedSize += 19;
-      }
-     }
-     if(method==2) for(uint32 count: histogram) encodedSize += 2*log2(1+count)+1; // Golomb
-     log(encodedSize);
-    }
-#endif
+    log(output.size, planeEntropyCoded);
    }
    //assert_(entropyCoded/8 <= huffmanSize, entropyCoded/8/1024/1024, huffmanSize/1024/1024);
    entropySize += entropyCoded/8;

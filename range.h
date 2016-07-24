@@ -9,6 +9,7 @@ struct RangeCoder{
 
 struct RangeEncoder : RangeCoder {
     byte* output;
+    RangeEncoder(byte* output) : output(output) {}
     void operator()(uint symbolLow, uint symbolHigh, uint totalRange) {
         low += symbolLow*(range/=totalRange);
         range *= symbolHigh-symbolLow;
@@ -18,7 +19,7 @@ struct RangeEncoder : RangeCoder {
             low <<= 8;
         }
     }
-    ~RangeEncoder() {
+    void flush() {
         for(uint unused i: ::range(8)) {
             *output = low>>56; output++;
             low<<=8;
