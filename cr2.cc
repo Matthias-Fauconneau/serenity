@@ -415,11 +415,10 @@ CR2::CR2(const ref<byte> file, bool onlyParse) : onlyParse(onlyParse)  {
   if(!s.index) break;
   readIFD(s);
  }
- sections.last().size += 2; // EOF
- sections.append({0, file.size, ""__});
- sort(sections);
- for(const Section& section: sections) log(hex(section.start), "-", hex(section.start+section.size), "["+str(section.size/1024)+"K] :", section.name);
- //log(hex(zeroOffset));
- //log(hex(ifdOffset));
- huffmanSize = data.size;
+ if(0) {
+  sections.last().size += 2; // EOF
+  sections.append({0, file.size, ""__});
+  sort(sections);
+  for(const Section& section: sections) log(hex(section.start), "-", hex(section.start+section.size), "["+str(section.size/1024)+"K] :", section.name);
+ }
 }

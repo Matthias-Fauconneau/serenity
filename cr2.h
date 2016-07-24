@@ -29,7 +29,6 @@ struct CR2 {
 
  struct { uint16 R, G, B; } whiteBalance = {0,0,0};
  Image16 image;
- size_t huffmanSize = 0;
 
  void readIFD(BinaryData& s);
  CR2(const ref<byte> file, bool onlyParse=false);

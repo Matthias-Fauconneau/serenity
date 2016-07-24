@@ -6,18 +6,47 @@ inline double log2(double x) { return __builtin_log2(x); }
 struct Raw {
  Raw() {
   size_t imageCount = 0;
-  for(string name: Folder(".").list(Files|Sorted)) if(endsWith(toLower(name), ".cr2")) imageCount++;
-  Time decodeTime, encodeTime, verifyTime, totalTime {true};
-  size_t totalSize = 0, huffmanSize = 0, entropySize = 0;
-  size_t index = 0;
-  for(string name: Folder(".").list(Files|Sorted)) {
+  array<String> files = Folder(".").list(Files|Sorted);
+  for(string name: files) {
    if(!endsWith(toLower(name), ".cr2")) continue;
-   log(name);
+   String jpgName = section(name,'.')+".JPG";
+   if(files.contains(jpgName)) {
+    assert_(existsFile(section(name,'.')+".CR2"));
+    log("Removing", jpgName);
+    remove(jpgName);
+    //return;
+   }
+   //assert_(!files.contains(section(name,'.')+".JPG"), name);
+   Map file(name);
+   CR2 cr2(file, true);
+   const size_t source = cr2.data.begin()-file.begin();
+   const size_t target = 0x3800;
+   if(cr2.ifdOffset.size <= 3 && source == target) continue;
+   imageCount++;
+  }
+  Time decodeTime, encodeTime, verifyTime, totalTime {true};
+  size_t totalSize = 0, stripSize = 0, archiveSize = 0;
+  size_t index = 0;
+  for(string name: files) {
+   if(!endsWith(toLower(name), ".cr2")) continue;
+   {
+    Map file(name);
+    CR2 cr2(file, true);
+    const size_t source = cr2.data.begin()-file.begin();
+    const size_t target = 0x3800;
+    if(cr2.ifdOffset.size <= 3 && source == target) continue;
+   }
+   index++;
+   log(index,"/",imageCount,name);
    //Map map(name);
    buffer<byte> file = readFile(name);
-   totalSize += file.size;
+   log(str(file.size/1024/1024., 2u), "MB");
    {CR2 cr2(file, true);
+    const size_t source = cr2.data.begin()-file.begin();
     const size_t target = 0x3800;
+    if(cr2.ifdOffset.size <= 3 && source == target) continue;
+    totalSize += file.size;
+    assert_(cr2.ifdOffset.size == 5 && source > target);
     for(CR2::Entry* entry: cr2.entriesToFix) {
      if(entry->tag==0x102) { entry->count=1; entry->value=16; }
      else if(entry->tag == 0x111) { entry->value = target; }
@@ -25,20 +54,23 @@ struct Raw {
      //else if(entry->tag == 0xC640) assert_(entry->value+6 < target); //{ entry->count=1; entry->value=5632; }
      else error(entry->tag);
     }
-    for(uint* ifdOffset: cr2.ifdOffset) log(hex((byte*)ifdOffset-file.begin()), hex(*ifdOffset));
+    //for(uint* ifdOffset: cr2.ifdOffset) log(hex((byte*)ifdOffset-file.begin()), hex(*ifdOffset));
     *cr2.ifdOffset[1] = *cr2.ifdOffset[3]; // Skips JPEG and RGB thumbs
-    const size_t source = cr2.data.begin()-file.begin();
-    log(hex(target), hex(source), (source-target)/1024,"K", cr2.data.size);
+    //log(hex(target), hex(source), (source-target)/1024,"K", cr2.data.size);
     for(size_t i: range(cr2.data.size)) file[target+i] = file[source+i];
     file.size -= source-target;
-    huffmanSize += file.size;
+    log(str(file.size/1024/1024., 2u), "MB", str(100.*(source-target)/file.size, 2u)+"%");
+    stripSize += file.size;
    }
    decodeTime.start();
    CR2 cr2(file, false);
    decodeTime.stop();
    log(decodeTime);
-   writeFile("_"+name, file);
-   break;
+   writeFile(name, file, currentWorkingDirectory(), true);
+   log(decodeTime, encodeTime, verifyTime, totalTime); // 5min
+   if(totalSize) log(totalSize/1024/1024,"MB -", stripSize/1024/1024,"MB =", (totalSize-stripSize)/1024/1024,"MB", 100*(totalSize-stripSize)/totalSize,"%");
+   //break;
+   continue;
    const Image16& image = cr2.image;
    Image16 planes[4] = {}; // R, G1, G2, B
    for(size_t i: range(4)) planes[i] = Image16(image.size/2);
@@ -48,9 +80,7 @@ struct Raw {
     planes[2](x,y) = image(x*2+0, y*2+1);
     planes[3](x,y) = image(x*2+1, y*2+1);
    }
-   index++;
-   log(str(index,3u)+"/"+str(imageCount,3u), name, file.size/1024/1024,"MB","Huffman",cr2.huffmanSize/1024/1024,"MB");
-   double entropyCoded = 0;
+   size_t compressedSize = 0;
    for(size_t i: range(4)) {
     const Image16& plane = planes[i];
     Image16 residual (plane.size);
@@ -134,13 +164,8 @@ struct Raw {
     size_t bufferSize = buffer.end()-begin;
     encodeTime.stop();
 
-    const uint32 total = residual.ref::size;
-    double planeEntropyCoded = 0;
-    for(uint32 count: histogram) if(count) planeEntropyCoded += count * log2(double(total)/double(count));
-    log(str(100*histogram.size*32/planeEntropyCoded)+"%");
-    //planeEntropyCoded += histogram.size * 32; // 10K
-    entropyCoded += planeEntropyCoded;
-    log(bufferSize*2, uint(planeEntropyCoded/8), bufferSize/(planeEntropyCoded/16));
+    log(str(100*histogram.size/bufferSize)+"%");
+    compressedSize += (bufferSize+histogram.size)*2;
 
     // Verify
     verifyTime.start();
@@ -151,8 +176,7 @@ struct Raw {
      for(uint16 i: range(freqM[sym])) {
       uint slot = cumulativeM[sym]+i;
       reverse[slot] = sym;
-      // uint16 freq, bias;
-      slots[slot] = uint(freqM[sym]) | (uint(i) << 16);
+      slots[slot] = uint(freqM[sym]) | (uint(i) << 16); // uint16 freq, bias;
      }
     }
 
@@ -207,16 +231,15 @@ struct Raw {
     }
    }
    verifyTime.stop();
-   //assert_(entropyCoded/8 <= huffmanSize, entropyCoded/8/1024/1024, huffmanSize/1024/1024);
-   entropySize += entropyCoded/8;
-   log(str(entropyCoded/8/1024/1024,0u)+"MB",
-       "Σ", str(entropySize/1024/1024)+"MB =", str((totalSize-entropySize)/1024/1024)+"MB ("+str(100*(totalSize-entropySize)/totalSize)+"%)");
+   archiveSize += compressedSize;
+   log(str(compressedSize/1024/1024,0u)+"MB",
+       "Σ", str(archiveSize/1024/1024)+"MB =", str((totalSize-archiveSize)/1024/1024)+"MB ("+str(100*(totalSize-archiveSize)/totalSize)+"%)");
    break;
   }
   log(decodeTime, encodeTime, verifyTime, totalTime); // 5min
-  if(totalSize) log(totalSize/1024/1024,"MB -", huffmanSize/1024/1024,"MB =", (totalSize-huffmanSize)/1024/1024,"MB", 100*(totalSize-huffmanSize)/totalSize,"%");
-  if(huffmanSize)
-   log(huffmanSize/1024/1024,"MB -", entropySize/1024/1024,"MB =", (huffmanSize-entropySize)/1024/1024,"MB", 100*(huffmanSize-entropySize)/huffmanSize,"%");
-  if(totalSize) log(totalSize/1024/1024,"MB -", entropySize/1024/1024,"MB =", (totalSize-entropySize)/1024/1024,"MB", 100*(totalSize-entropySize)/totalSize,"%");
+  if(totalSize) log(totalSize/1024/1024,"MB -", stripSize/1024/1024,"MB =", (totalSize-stripSize)/1024/1024,"MB", 100*(totalSize-stripSize)/totalSize,"%");
+  if(stripSize)
+   log(stripSize/1024/1024,"MB -", archiveSize/1024/1024,"MB =", (stripSize-archiveSize)/1024/1024,"MB", 100*(stripSize-archiveSize)/stripSize,"%");
+  if(totalSize) log(totalSize/1024/1024,"MB -", archiveSize/1024/1024,"MB =", (totalSize-archiveSize)/1024/1024,"MB", 100*(totalSize-archiveSize)/totalSize,"%");
  }
 } app;
