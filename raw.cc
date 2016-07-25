@@ -30,7 +30,8 @@ struct Raw {
    imageCount++;
   }
   Time readTime, encodeTime, decodeTime, totalTime {true};
-  size_t totalSize = 0, stripSize = 0, archiveSize = 0;
+  constexpr size_t N = 5;
+  size_t totalSize = 0, stripSize = 0, ransSize[N] = {0,0,0,0,0};
   size_t index = 0;
   for(string name: files) {
    if(!endsWith(toLower(name), ".cr2")) continue;
@@ -60,8 +61,8 @@ struct Raw {
      for(size_t i: range(cr2.data.size)) file[target+i] = file[source+i];
      size_t originalSize = file.size;
      file.size -= source-target;
-     log(str(originalSize/1024/1024., 2u), "MB", str((source-target)/1024/1024., 2u), "MB", str(100.*(source-target)/file.size, 2u)+"%",
-         str(file.size/1024/1024., 2u), "MB");
+     log(str(originalSize/1024/1024., 1u), "MB", str((source-target)/1024/1024., 1u), "MB", str(100.*(source-target)/file.size, 1u)+"%",
+         str(file.size/1024/1024., 1u), "MB");
      stripSize += file.size;
     }
     {CR2 cr2(file);} // Verify
@@ -73,7 +74,7 @@ struct Raw {
     readTime.start();
     const Image16& source = CR2(file).image;
     readTime.stop();
-    for(size_t method: range(5)) {
+    for(size_t method: range(N)) {
      static constexpr uint L = 1u << 16;
      static constexpr uint scaleBits = 15; // < 16
      static constexpr uint M = 1<<scaleBits;
@@ -110,7 +111,7 @@ struct Raw {
 
        int16 min = 0x7FFF, max = 0;
        for(int16 value: residual) { min=::min(min, value); max=::max(max, value); }
-       assert_(max+1-min <= 0x1000, min, max, max+1-min);
+       assert_(max+1-min <= 0x2000, min, max, max+1-min);
        ::buffer<uint32> histogram(max+1-min);
        histogram.clear(0);
        uint32* base = histogram.begin()-min;
@@ -281,16 +282,14 @@ struct Raw {
      for(size_t i: range(source.ref::size)) assert_(target[i] == source[i]);
      size_t jpegSize = file.size-0x3800;
      log(method, str((jpegSize-              0)/1024/1024.,1u)+"MB", str(buffer.size/1024/1024.,1u)+"MB",
-           str((jpegSize-buffer.size)/1024/1024.,1u)+"MB", str(100*(jpegSize-buffer.size)/jpegSize)+"%");
+           str((jpegSize-buffer.size)/1024/1024.,1u)+"MB", str(100.*(jpegSize-buffer.size)/jpegSize,1u)+"%");
+     ransSize[method] += buffer.size;
     }
-    //archiveSize += buffer.size;
-    if(totalSize) log(str((totalSize-                0)/1024/1024., 1u)+"MB", str(archiveSize/1024/1024.,1u)+"MB",
-                             str((totalSize-archiveSize)/1024/1024., 2u)+"MB", str(100.*(totalSize-archiveSize)/totalSize, 1u)+"%");
-    break;
+    log(readTime, encodeTime, decodeTime, totalTime); // 5min
+    if(totalSize) for(size_t method: range(5)) log(method, str((totalSize-                0)/1024/1024.,1u)+"MB", str(ransSize[method]/1024/1024.,1u)+"MB",
+                                                   str((totalSize-ransSize[method])/1024/1024.,1u)+"MB", str(100.*(totalSize-ransSize[method])/totalSize, 1u)+"%");
+    //break;
    }
   }
-  log(readTime, encodeTime, decodeTime, totalTime); // 5min
-  if(totalSize) log(str(totalSize/1024/1024., 1u)+"MB", str(archiveSize/1024/1024.,1u)+"MB",
-                           str((totalSize-archiveSize)/1024/1024., 2u)+"MB", str(100.*(totalSize-archiveSize)/totalSize, 1u)+"%");
  }
 } app;
