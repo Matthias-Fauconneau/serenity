@@ -13,7 +13,6 @@ uint CR2::readBits(const int nbits) {
  }
  uint value = (bitbuf << (32-vbits)) >> (32-nbits);
  vbits -= nbits;
- //assert_((sizeof(value)*8) - __builtin_clz(value) == nbits, (sizeof(value)*8) - __builtin_clz(value), nbits);
  return value;
 }
 
@@ -31,8 +30,6 @@ int CR2::readHuffman(uint i) {
   vbits += 8;
  }
  uint code = (bitbuf << (32-vbits)) >> (32-nbits);
- {static int t =0; if(t++<16) log(lengthSymbolForCode[i][code].symbol, lengthSymbolForCode[i][code].length,
-                                 str((code<<(32-lengthSymbolForCode[i][code].length))>>(32-lengthSymbolForCode[i][code].length),0u,'0',2u));}
  vbits -= lengthSymbolForCode[i][code].length;
  return lengthSymbolForCode[i][code].symbol;
 }
@@ -386,13 +383,12 @@ void CR2::readIFD(BinaryData& s) {
    for(uint unused x: range(width)) {
     for(uint c: range(2)) {
      int length = readHuffman(c);
-     if(length == -1) { assert_(y==height-1 && x==width-1 && c==1, y, x, c); target[0]=0; log("EARLY EOF"); return; }
+     if(length == -1) { assert_(y==height-1 && x==width-1 && c==1, y, x, c); target[0]=0; log("Early EOF"); return; }
      //assert_(length < 16);
      uint signMagnitude = readBits(length);
      int sign = signMagnitude & (1<<(length-1));
      int residual = sign ? signMagnitude : signMagnitude-((1<<length)-1); // Remove offset
      int value = predictor[c] + residual;
-     if(y==0 && x < 16) log(value, predictor[c], residual, length, sign, str(signMagnitude,uint(length),'0',2u));
      /*image(x*2+c, y)*/ *target = value;
      target++;
      predictor[c] = value;

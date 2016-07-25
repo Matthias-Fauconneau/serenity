@@ -2,7 +2,6 @@
 #include "time.h"
 #include <smmintrin.h>
 inline double log2(double x) { return __builtin_log2(x); }
-int median(int a, int b, int c) { return max(min(a,b), min(max(a,b),c)); }
 
 struct Raw {
  Raw() {
@@ -87,40 +86,17 @@ struct Raw {
      LengthCode lengthCodeForSymbol[2][16];
      for(uint c: range(2)) {
       assert_(cr2.maxLength[c] <= 16);
-#if 0
-      for(uint code: range(1<<cr2.maxLength[c])) {
-       CR2::LengthSymbol lengthSymbol = cr2.lengthSymbolForCode[c][code];
-       //log(code, lengthSymbol.length, lengthSymbol.symbol);
-       assert_(lengthSymbol.symbol < 16);
-       /*assert_(lengthCodeForSymbol[c][lengthSymbol.symbol].length == 0,
-         lengthCodeForSymbol[c][lengthSymbol.symbol].length, lengthSymbol.length,
-         lengthCodeForSymbol[c][lengthSymbol.symbol].code, code);*/
-       log(str(code,uint(cr2.maxLength[c]),'0',2u), lengthSymbol.length, lengthSymbol.symbol);
-       //assert_((code ? (sizeof(code)*8) - __builtin_clz(code) : 0) <= lengthSymbol.length, lengthSymbol.length, str(code,0u,'0',2u), (sizeof(code)*8-1) - __builtin_clz(code));
-       lengthCodeForSymbol[c][lengthSymbol.symbol] = {lengthSymbol.length, uint16(code)};
-      }
-#else
       for(int p=0, code=0, length=1; length <= cr2.maxLength[c]; length++) {
        for(int i=0; i < cr2.symbolCountsForLength[c][length-1]; i++, p++) {
-        //for(int j=0; j < (1 << (maxLength[tableIndex]-length)); j++) {
         assert_(length < 0xFF && code < 0xFFFF);
         uint8 symbol = cr2.symbols[c][p];
         lengthCodeForSymbol[c][symbol] = {uint8(length), uint16(code>>(cr2.maxLength[c]-length))};
-        //log(str(lengthCodeForSymbol[c][symbol].code,uint(/*cr2.maxLength[c]*/length),'0',2u), length, symbol);
-         //+(1<<(cr2.maxLength[c]-length))
-         code += (1 << (cr2.maxLength[c]-length));
-        //}
-        /*for(int j=0; j < (1 << (maxLength[tableIndex]-length)); j++) {
-         lengthSymbolForCode[tableIndex][h++] = {uint8(length), symbols[c][p]};
-        }*/
+        code += (1 << (cr2.maxLength[c]-length));
        }
       }
-#endif
      }
-     //source = Image16(width*2, height);
      const int16* s = source.begin();
      int predictor[2] = {0,0};
-     uint totalLength = 0;
      for(uint unused y: range(source.height)) {
       const uint sampleSize = 12;
       for(uint c: range(2)) predictor[c] = 1<<(sampleSize-1);
@@ -129,74 +105,33 @@ struct Raw {
         uint value = *s; /*source(x*2+c, y)*/;
         s++;
         int residual = value - predictor[c];
-        uint magnitude = abs(residual);
-        uint length = magnitude ? (sizeof(magnitude)*8) - __builtin_clz(magnitude) : 0;
-        //if(y==0 && x==0)
-        //log(value, predictor[c], residual, length, magnitude, str(magnitude,0u,'0',2u), str(uint(residual),0u,'0',2u));
         predictor[c] = value;
-        uint signMagnitude = magnitude;
-        if(residual) {
-         //int sign = signMagnitude & (1<<(length-1));
-         //int residual = sign ? signMagnitude : signMagnitude-(1<<length)-1; // Remove sign bit and negates
-         if(residual < 0) {
-          //signMagnitude |= (1<<(length-1));
-          signMagnitude = residual+((1<<length)-1);
-          if(signMagnitude&(1<<(length-1))) length++; // Ensures leading zero
-          assert_((sizeof(signMagnitude)*8) - __builtin_clz(signMagnitude) <= length-1,
-                  str(signMagnitude,length,'0',2u), length, str(residual,length,'0',2u), str(((1<<(length-1))-1),length,'0',2u));
-         } else {
-          //length++;
-          //assert_(!(signMagnitude&(1<<(length-1))), signMagnitude);
-          //signMagnitude |= (1<<(length-1));
-         }
+        uint signMagnitude, length;
+        if(residual<0) {
+         length = ((sizeof(residual)*8) - __builtin_clz(-residual));
+         signMagnitude = residual+((1<<length)-1);
+         if(signMagnitude&(1<<(length-1))) length++; // Ensures leading zero
+        } else if(residual>0) {
+         signMagnitude = residual;
+         length = ((sizeof(signMagnitude)*8) - __builtin_clz(signMagnitude)); // Sign bit is also leading significant bit
+        } else {
+         signMagnitude = 0;
+         length = 0;
         }
-        //if(y==0 && x==0) log(length, residual, str(signMagnitude,length,'0',2u));
-        for(uint l: range(length+1, 13)) {
-         assert_(l + lengthCodeForSymbol[c][l].length >= length+lengthCodeForSymbol[c][length].length,
-                 l, lengthCodeForSymbol[c][l].length, l + lengthCodeForSymbol[c][l].length,
-                 length, lengthCodeForSymbol[c][length].length, length+lengthCodeForSymbol[c][length].length);
-        }
-        //else assert_(length==0);
-        totalLength += lengthCodeForSymbol[c][length].length + length;
-        //log(residual>0, length, str(signMagnitude,length,'0',2u));
-        /*void write(uint size, ::word value) {
-            assert_(size <= sizeof(word)*8-8, size);
-            if(size < bitLeftCount) {
-                word <<= size;
-                word |= value;
-            } else {
-                assert_(bitLeftCount<sizeof(word)*8);
-                word <<= bitLeftCount;
-                word |= value >> (size - bitLeftCount); // Puts leftmost bits in remaining space
-                bitLeftCount += sizeof(word)*8;
-                assert_(bitLeftCount >= size, size, bitLeftCount, sizeof(word));
-                assert_(pointer < end, pointer, end);
-                *(::word*)pointer = (sizeof(word)==4 ? __builtin_bswap32(word) : __builtin_bswap64(word)); // MSB
-                word = value; // Already stored leftmost bits will be pushed out eventually
-                pointer += sizeof(word);
-            }
-            bitLeftCount -= size;
-        }*/
         {
          uint symbol = length;
          LengthCode lengthCode = lengthCodeForSymbol[c][symbol];
          {
           uint size = lengthCode.length;
           uint value = lengthCode.code;
-          assert(value ? (sizeof(value)*8) - __builtin_clz(value) : 0 <= size);
-          //{static int i =0; if(i<16) log(symbol, size, str(value,0u,'0',2u));}
           if(size < bitLeftCount) {
            bitbuf <<= size;
            bitbuf |= value;
-           //log(str(bitbuf,64u,'0',2u));
           } else {
            bitbuf <<= bitLeftCount;
            bitbuf |= value >> (size - bitLeftCount); // Puts leftmost bits in remaining space
            bitLeftCount += sizeof(bitbuf)*8;
            *(uint64*)pointer = __builtin_bswap64(bitbuf); // MSB msb
-           /*assert_(*(uint64*)pointer == *(const uint64*)(cr2.begin+(pointer-buffer.begin())), (pointer-buffer.begin()), "\n",
-                   str(__builtin_bswap64(*(uint64*)pointer),64u,'0',2u), "\n",
-                   str(__builtin_bswap64(*(uint64*)(cr2.begin+(pointer-buffer.begin()))),64u,'0',2u));*/
            bitbuf = value; // Already stored leftmost bits will be pushed out eventually
            pointer += sizeof(bitbuf);
           }
@@ -206,12 +141,9 @@ struct Raw {
         if(length) {
          uint size = length;
          uint value = signMagnitude;
-         //log(size, str(value,size,'0',2u));
-         assert(value ? (sizeof(value)*8) - __builtin_clz(value) : 0 <= size);
          if(size < bitLeftCount) {
           bitbuf <<= size;
           bitbuf |= value;
-          //log(str(bitbuf,64u,'0',2u));
          } else {
           bitbuf <<= bitLeftCount;
           bitbuf |= value >> (size - bitLeftCount); // Puts leftmost bits in remaining space
@@ -233,7 +165,6 @@ struct Raw {
       bitbuf <<= 8;
       bitLeftCount += 8;
      }
-     log(bitLeftCount);
      assert_(s == source.end());
      buffer.size = pointer-buffer.begin();
      ref<uint8> original (cr2.begin, cr2.pointer-cr2.begin);
