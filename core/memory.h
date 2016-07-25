@@ -43,7 +43,7 @@ generic struct buffer : mref<T> {
   data=0; capacity=0; size=0;
  }
 
- void setSize(size_t size) { assert_(size<=capacity, size, capacity); this->size=size; }
+ void setSize(size_t size) { assert(size<=capacity, size, capacity); this->size=size; }
  /// Appends a default element
  T& append() { setSize(size+1); return set(size-1, T()); }
  /// Appends an implicitly copiable value

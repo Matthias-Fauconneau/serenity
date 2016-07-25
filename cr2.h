@@ -1,15 +1,21 @@
 #pragma once
 #include "data.h"
 #include "image.h"
+#include <smmintrin.h>
 
 /// 2D array of 16bit integer samples
 typedef ImageT<int16> Image16;
+
+static constexpr uint L = 1u << 16;
+static constexpr uint scaleBits = 15; // < 16
+static constexpr uint M = 1<<scaleBits;
 
 struct Section { size_t start, size; String name; };
 inline bool operator>(const Section& a, const Section& b) { return a.start > b.start; }
 
 struct CR2 {
  bool onlyParse = false;
+ bool earlyEOF = false;
  array<Section> sections;
  array<uint*> zeroOffset; // Words to zero to delete JPEG thumb (but keep EXIF) (1MB)
  array<uint*> ifdOffset; // Replace nextIFD after JPEG thumb with 3rd IFD (RAW) to remove RGB thumb (1MB)

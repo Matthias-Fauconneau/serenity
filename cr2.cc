@@ -67,8 +67,9 @@ void CR2::readIFD(BinaryData& s) {
    }
   }
   else if(entry.tag == 0x103) { // Compression
-   assert_(entry.value == 1 || entry.value == 6 /*JPEG*/);
+   assert_(entry.value == 1 || entry.value == 6 /*JPEG*/ || entry.value == 0x879C /*rANS4*/);
    compression = entry.value;
+   entriesToFix.append((Entry*)&entry);
   }
   else if(entry.tag == 0x10E) {} // ImageDescription
   else if(entry.tag == 0x10F) {} // Manufacturer
@@ -78,7 +79,7 @@ void CR2::readIFD(BinaryData& s) {
    assert_(entry.count == 1);
    size_t offset = value.index;
    stride = size.x;
-   assert_(compression==1 || compression==6);
+   assert_(compression==1 || compression==6 || compression==0x879C);
    assert_(!data.size);
    data.data = s.data.data+offset;
    entriesToFix.append((Entry*)&entry);
@@ -88,8 +89,10 @@ void CR2::readIFD(BinaryData& s) {
   else if(entry.tag == 0x116) {} // RowPerStrip
   else if(entry.tag == 0x117) { // StripByteCount
    assert_(entry.value == 1 || entry.value == (uint)size.y || entry.value==(uint)size.x*size.y*3*2 || compression>1, entry.value, size); // 1 row per trip or single strip
-   data.size = entry.value;
+   if(!size) data.size = entry.value;
+   // else ignore first IFD (EXIF), only set data reference to RAW
    assert_(data.end() <= s.data.end());
+   if(!size) entriesToFix.append((Entry*)&entry); // Only sets size of RAW IFD (FIXME: should zero size of removed JPEG)
   }
   else if(entry.tag == 0x11A) assert_(entry.type==5 && entry.count==1); // xResolution (72)
   else if(entry.tag == 0x11B) assert_(entry.type==5 && entry.count==1); // yResolution (72)
@@ -295,7 +298,7 @@ void CR2::readIFD(BinaryData& s) {
  if(data) {
   //log(hex(data.begin()-s.data.begin()), "-", hex(data.end()-s.data.begin()), ":", data.size/1024, "K");
   String name = (size?strx(size)+" ":""__)+(compression==6?"JPEG "_:compression==1?"RGB "_:""_);
-  assert_(name, entryCount);
+  //assert_(name, entryCount);
   sections.append({size_t(data.begin()-s.data.begin()), data.size, move(name)});
  }
  if(size) data={}; // Thumbnail
@@ -374,32 +377,121 @@ void CR2::readIFD(BinaryData& s) {
   if(onlyParse) return;
   assert_(sampleSize > 8 && sampleSize <= 16);
   assert_(!image);
-  pointer = begin = (uint8*)s.data.begin()+s.index;
+  begin = (uint8*)s.data.begin()+s.index;
   image = Image16(width*2, height);
-  int16* target = image.begin();
-  int predictor[2] = {0,0};
-  for(uint unused y: range(height)) {
-   for(uint c: range(2)) predictor[c] = 1<<(sampleSize-1);
-   for(uint unused x: range(width)) {
-    for(uint c: range(2)) {
-     int length = readHuffman(c);
-     if(length == -1) { assert_(y==height-1 && x==width-1 && c==1, y, x, c); target[0]=0; log("Early EOF"); return; }
-     //assert_(length < 16);
-     uint signMagnitude = readBits(length);
-     int sign = signMagnitude & (1<<(length-1));
-     int residual = sign ? signMagnitude : signMagnitude-((1<<length)-1); // Remove offset
-     int value = predictor[c] + residual;
-     /*image(x*2+c, y)*/ *target = value;
-     target++;
-     predictor[c] = value;
+  if(compression == 6) { // JPEG
+   pointer = begin;
+   int16* target = image.begin();
+   int predictor[2] = {0,0};
+   for(uint unused y: range(height)) {
+    for(uint c: range(2)) predictor[c] = 1<<(sampleSize-1);
+    for(uint unused x: range(width)) {
+     for(uint c: range(2)) {
+      int length = readHuffman(c);
+      if(length == -1) { assert_(y==height-1 && x==width-1 && c==1, y, x, c); target[0]=0; log("Early EOF"); earlyEOF = true; return; }
+      assert_(length < 16);
+      uint signMagnitude = readBits(length);
+      int sign = signMagnitude & (1<<(length-1));
+      int residual = sign ? signMagnitude : signMagnitude-((1<<length)-1); // Remove offset
+      int value = predictor[c] + residual;
+      /*image(x*2+c, y)*/ *target = value;
+      target++;
+      predictor[c] = value;
+     }
     }
    }
-  }
-  assert_(target == image.end());
-  s.index = (const byte*)pointer-s.data.begin();
-  {
-   uint16 marker = s.read16();
-   assert_(marker == 0xFFD9, hex(marker)); // End Of Image
+   assert_(target == image.end());
+   s.index = (const byte*)pointer-s.data.begin();
+   {
+    uint16 marker = s.read16();
+    assert_(marker == 0xFFD9, hex(marker)); // End Of Image
+   }
+  } else { // rANS4
+   assert_(compression == 0x879C);
+   const uint16* ptr = (uint16*)begin;
+   for(size_t i: range(4)) {
+    int16 min = *ptr; ptr++;
+    int16 max = *ptr; ptr++;
+    ref<uint16> freqM (ptr, max+1-min);
+    ptr += freqM.size;
+    ::buffer<uint16> cumulativeM(1+freqM.size);
+    cumulativeM[0] = 0;
+    for(size_t i: range(freqM.size)) cumulativeM[i+1] = cumulativeM[i] + freqM[i];
+
+    int16 reverse[M]; // 64K
+    uint slots[M]; // 128K
+    for(uint16 sym: range(freqM.size)) {
+     for(uint16 i: range(freqM[sym])) {
+      uint slot = cumulativeM[sym]+i;
+      reverse[slot] = min+sym;
+      slots[slot] = uint(freqM[sym]) | (uint(i) << 16); // uint16 freq, bias;
+     }
+    }
+
+    __v4si x = _mm_loadu_si128((const __m128i*)ptr);
+    ptr += 8; // !! not 16
+    uint W = image.width/2;
+    assert_(W%4 == 0);
+    int16* plane = image.begin() + (i&2)*W + (i&1);
+    for(uint y: range(image.height/2)) {
+     const int16* const up = plane + (y-1)*2*W*2;
+     int16* const row = plane + y*2*W*2;
+     for(uint X=0; X<W; X+=4) {
+      const __v4si slot = _mm_and_si128(x, _mm_set1_epi32(M - 1));
+      for(uint k: range(4)) {
+       uint x = X+k;
+       uint top = y>0 ? up[x*2] : 0;
+       uint left = x>0 ? row[x*2-2] : 0;
+       int predictor = (left+top)/2;
+       int r = reverse[slot[k]];
+       uint value = predictor + r;
+       row[x*2] = value;
+      }
+
+      __v4si freq_bias_lo = _mm_cvtsi32_si128(slots[slot[0]]);
+      freq_bias_lo = _mm_insert_epi32(freq_bias_lo, slots[slot[1]], 1);
+      __v4si freq_bias_hi = _mm_cvtsi32_si128(slots[slot[2]]);
+      freq_bias_hi = _mm_insert_epi32(freq_bias_hi, slots[slot[3]], 1);
+      __v4si freq_bias = _mm_unpacklo_epi64(freq_bias_lo, freq_bias_hi);
+      __v4si xscaled = _mm_srli_epi32(x, scaleBits);
+      __v4si freq = _mm_and_si128(freq_bias, _mm_set1_epi32(0xffff));
+      __v4si bias = _mm_srli_epi32(freq_bias, 16);
+      x = xscaled * freq + bias;
+
+      static int8 const shuffles[16][16] = {
+#define _ -1
+       { _,_,_,_, _,_,_,_, _,_,_,_, _,_,_,_ }, // 0000
+       { 0,1,_,_, _,_,_,_, _,_,_,_, _,_,_,_ }, // 0001
+       { _,_,_,_, 0,1,_,_, _,_,_,_, _,_,_,_ }, // 0010
+       { 0,1,_,_, 2,3,_,_, _,_,_,_, _,_,_,_ }, // 0011
+       { _,_,_,_, _,_,_,_, 0,1,_,_, _,_,_,_ }, // 0100
+       { 0,1,_,_, _,_,_,_, 2,3,_,_, _,_,_,_ }, // 0101
+       { _,_,_,_, 0,1,_,_, 2,3,_,_, _,_,_,_ }, // 0110
+       { 0,1,_,_, 2,3,_,_, 4,5,_,_, _,_,_,_ }, // 0111
+       { _,_,_,_, _,_,_,_, _,_,_,_, 0,1,_,_ }, // 1000
+       { 0,1,_,_, _,_,_,_, _,_,_,_, 2,3,_,_ }, // 1001
+       { _,_,_,_, 0,1,_,_, _,_,_,_, 2,3,_,_ }, // 1010
+       { 0,1,_,_, 2,3,_,_, _,_,_,_, 4,5,_,_ }, // 1011
+       { _,_,_,_, _,_,_,_, 0,1,_,_, 2,3,_,_ }, // 1100
+       { 0,1,_,_, _,_,_,_, 2,3,_,_, 4,5,_,_ }, // 1101
+       { _,_,_,_, 0,1,_,_, 2,3,_,_, 4,5,_,_ }, // 1110
+       { 0,1,_,_, 2,3,_,_, 4,5,_,_, 6,7,_,_ }, // 1111
+#undef _
+      };
+      static uint8 const numBytes[16] = { 0,1,1,2, 1,2,2,3, 1,2,2,3, 2,3,3,4 };
+      __v4si x_biased = _mm_xor_si128(x, _mm_set1_epi32(int(0x80000000)));
+      __v4si greater = _mm_cmplt_epi32(x_biased, _mm_set1_epi32(L - 0x80000000));
+      uint mask = _mm_movemask_ps(greater);
+      __v4si memvals = _mm_loadl_epi64((const __m128i*)ptr);
+      __v4si xshifted = _mm_slli_epi32(x, 16);
+      __v4si shufmask = _mm_load_si128((const __m128i*)shuffles[mask]);
+      __v4si newx = _mm_or_si128(xshifted, _mm_shuffle_epi8(memvals, shufmask));
+      x = _mm_blendv_epi8(x, newx, greater);
+      ptr += numBytes[mask];
+     }
+    }
+   }
+   s.index = ((byte*)ptr)-s.data.begin();
   }
   assert_(!s);
  }
