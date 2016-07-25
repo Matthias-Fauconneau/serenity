@@ -17,6 +17,7 @@ struct CR2 {
  array<Entry*> entriesToFix; // Entries which would have dangling references after truncation
  ref<byte> data;
  int2 size = 0; size_t stride = 0;
+ const uint8* begin = 0;
  const uint8* pointer = 0;
  uint bitbuf = 0;
  int vbits = 0;
@@ -24,7 +25,9 @@ struct CR2 {
 
  struct LengthSymbol { uint8 length = 0; uint8 symbol = 0; };
  int maxLength[2] = {0,0};
- buffer<LengthSymbol> lengthSymbolForCode[2] = {};
+ ref<uint8> symbolCountsForLength[2];
+ ref<uint8> symbols[2];
+ LengthSymbol lengthSymbolForCode[2][512];
  int readHuffman(uint i);
 
  struct { uint16 R, G, B; } whiteBalance = {0,0,0};

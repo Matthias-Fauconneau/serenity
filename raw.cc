@@ -72,8 +72,182 @@ struct Raw {
     Map file(name);
     totalSize += file.size;
     readTime.start();
-    const Image16& source = CR2(file).image;
+    CR2 cr2(file);
+    const Image16& source = cr2.image;
+#if 1
+    {// Encode image back to JPEG-LS
+     ::buffer<uint8> buffer (source.ref::size);
+     uint8* pointer = buffer.begin();
+     //uint bitbuf = 0;
+     //int vbits = 0;
+     uint64 bitbuf = 0;
+     uint bitLeftCount = sizeof(bitbuf)*8;
+
+     struct LengthCode { uint8 length = 0; uint16 code = 0; };
+     LengthCode lengthCodeForSymbol[2][16];
+     for(uint c: range(2)) {
+      assert_(cr2.maxLength[c] <= 16);
+#if 0
+      for(uint code: range(1<<cr2.maxLength[c])) {
+       CR2::LengthSymbol lengthSymbol = cr2.lengthSymbolForCode[c][code];
+       //log(code, lengthSymbol.length, lengthSymbol.symbol);
+       assert_(lengthSymbol.symbol < 16);
+       /*assert_(lengthCodeForSymbol[c][lengthSymbol.symbol].length == 0,
+         lengthCodeForSymbol[c][lengthSymbol.symbol].length, lengthSymbol.length,
+         lengthCodeForSymbol[c][lengthSymbol.symbol].code, code);*/
+       log(str(code,uint(cr2.maxLength[c]),'0',2u), lengthSymbol.length, lengthSymbol.symbol);
+       //assert_((code ? (sizeof(code)*8) - __builtin_clz(code) : 0) <= lengthSymbol.length, lengthSymbol.length, str(code,0u,'0',2u), (sizeof(code)*8-1) - __builtin_clz(code));
+       lengthCodeForSymbol[c][lengthSymbol.symbol] = {lengthSymbol.length, uint16(code)};
+      }
+#else
+      for(int p=0, code=0, length=1; length <= cr2.maxLength[c]; length++) {
+       for(int i=0; i < cr2.symbolCountsForLength[c][length-1]; i++, p++) {
+        //for(int j=0; j < (1 << (maxLength[tableIndex]-length)); j++) {
+        assert_(length < 0xFF && code < 0xFFFF);
+        uint8 symbol = cr2.symbols[c][p];
+        lengthCodeForSymbol[c][symbol] = {uint8(length), uint16(code>>(cr2.maxLength[c]-length))};
+        //log(str(lengthCodeForSymbol[c][symbol].code,uint(/*cr2.maxLength[c]*/length),'0',2u), length, symbol);
+         //+(1<<(cr2.maxLength[c]-length))
+         code += (1 << (cr2.maxLength[c]-length));
+        //}
+        /*for(int j=0; j < (1 << (maxLength[tableIndex]-length)); j++) {
+         lengthSymbolForCode[tableIndex][h++] = {uint8(length), symbols[c][p]};
+        }*/
+       }
+      }
+#endif
+     }
+     //source = Image16(width*2, height);
+     const int16* s = source.begin();
+     int predictor[2] = {0,0};
+     uint totalLength = 0;
+     for(uint unused y: range(source.height)) {
+      const uint sampleSize = 12;
+      for(uint c: range(2)) predictor[c] = 1<<(sampleSize-1);
+      for(uint unused x: range(source.width/2)) {
+       for(uint c: range(2)) {
+        uint value = *s; /*source(x*2+c, y)*/;
+        s++;
+        int residual = value - predictor[c];
+        uint magnitude = abs(residual);
+        uint length = magnitude ? (sizeof(magnitude)*8) - __builtin_clz(magnitude) : 0;
+        //if(y==0 && x==0)
+        //log(value, predictor[c], residual, length, magnitude, str(magnitude,0u,'0',2u), str(uint(residual),0u,'0',2u));
+        predictor[c] = value;
+        uint signMagnitude = magnitude;
+        if(residual) {
+         //int sign = signMagnitude & (1<<(length-1));
+         //int residual = sign ? signMagnitude : signMagnitude-(1<<length)-1; // Remove sign bit and negates
+         if(residual < 0) {
+          //signMagnitude |= (1<<(length-1));
+          signMagnitude = residual+((1<<length)-1);
+          if(signMagnitude&(1<<(length-1))) length++; // Ensures leading zero
+          assert_((sizeof(signMagnitude)*8) - __builtin_clz(signMagnitude) <= length-1,
+                  str(signMagnitude,length,'0',2u), length, str(residual,length,'0',2u), str(((1<<(length-1))-1),length,'0',2u));
+         } else {
+          //length++;
+          //assert_(!(signMagnitude&(1<<(length-1))), signMagnitude);
+          //signMagnitude |= (1<<(length-1));
+         }
+        }
+        //if(y==0 && x==0) log(length, residual, str(signMagnitude,length,'0',2u));
+        for(uint l: range(length+1, 13)) {
+         assert_(l + lengthCodeForSymbol[c][l].length >= length+lengthCodeForSymbol[c][length].length,
+                 l, lengthCodeForSymbol[c][l].length, l + lengthCodeForSymbol[c][l].length,
+                 length, lengthCodeForSymbol[c][length].length, length+lengthCodeForSymbol[c][length].length);
+        }
+        //else assert_(length==0);
+        totalLength += lengthCodeForSymbol[c][length].length + length;
+        //log(residual>0, length, str(signMagnitude,length,'0',2u));
+        /*void write(uint size, ::word value) {
+            assert_(size <= sizeof(word)*8-8, size);
+            if(size < bitLeftCount) {
+                word <<= size;
+                word |= value;
+            } else {
+                assert_(bitLeftCount<sizeof(word)*8);
+                word <<= bitLeftCount;
+                word |= value >> (size - bitLeftCount); // Puts leftmost bits in remaining space
+                bitLeftCount += sizeof(word)*8;
+                assert_(bitLeftCount >= size, size, bitLeftCount, sizeof(word));
+                assert_(pointer < end, pointer, end);
+                *(::word*)pointer = (sizeof(word)==4 ? __builtin_bswap32(word) : __builtin_bswap64(word)); // MSB
+                word = value; // Already stored leftmost bits will be pushed out eventually
+                pointer += sizeof(word);
+            }
+            bitLeftCount -= size;
+        }*/
+        {
+         uint symbol = length;
+         LengthCode lengthCode = lengthCodeForSymbol[c][symbol];
+         {
+          uint size = lengthCode.length;
+          uint value = lengthCode.code;
+          assert(value ? (sizeof(value)*8) - __builtin_clz(value) : 0 <= size);
+          //{static int i =0; if(i<16) log(symbol, size, str(value,0u,'0',2u));}
+          if(size < bitLeftCount) {
+           bitbuf <<= size;
+           bitbuf |= value;
+           //log(str(bitbuf,64u,'0',2u));
+          } else {
+           bitbuf <<= bitLeftCount;
+           bitbuf |= value >> (size - bitLeftCount); // Puts leftmost bits in remaining space
+           bitLeftCount += sizeof(bitbuf)*8;
+           *(uint64*)pointer = __builtin_bswap64(bitbuf); // MSB msb
+           /*assert_(*(uint64*)pointer == *(const uint64*)(cr2.begin+(pointer-buffer.begin())), (pointer-buffer.begin()), "\n",
+                   str(__builtin_bswap64(*(uint64*)pointer),64u,'0',2u), "\n",
+                   str(__builtin_bswap64(*(uint64*)(cr2.begin+(pointer-buffer.begin()))),64u,'0',2u));*/
+           bitbuf = value; // Already stored leftmost bits will be pushed out eventually
+           pointer += sizeof(bitbuf);
+          }
+          bitLeftCount -= size;
+         }
+        }
+        if(length) {
+         uint size = length;
+         uint value = signMagnitude;
+         //log(size, str(value,size,'0',2u));
+         assert(value ? (sizeof(value)*8) - __builtin_clz(value) : 0 <= size);
+         if(size < bitLeftCount) {
+          bitbuf <<= size;
+          bitbuf |= value;
+          //log(str(bitbuf,64u,'0',2u));
+         } else {
+          bitbuf <<= bitLeftCount;
+          bitbuf |= value >> (size - bitLeftCount); // Puts leftmost bits in remaining space
+          bitLeftCount += sizeof(bitbuf)*8;
+          *(uint64*)pointer = __builtin_bswap64(bitbuf); // MSB msb
+          bitbuf = value; // Already stored leftmost bits will be pushed out eventually
+          pointer += sizeof(bitbuf);
+         }
+         bitLeftCount -= size;
+        }
+       }
+      }
+     }
+     // Flush
+     if(bitLeftCount<sizeof(bitbuf)*8) bitbuf <<= bitLeftCount;
+     while(bitLeftCount<sizeof(bitbuf)*8) {
+      assert_(pointer < buffer.end());
+      *pointer++ = bitbuf>>(sizeof(bitbuf)*8-8);
+      bitbuf <<= 8;
+      bitLeftCount += 8;
+     }
+     log(bitLeftCount);
+     assert_(s == source.end());
+     buffer.size = pointer-buffer.begin();
+     ref<uint8> original (cr2.begin, cr2.pointer-cr2.begin);
+     ::buffer<uint8> jpeg (buffer.size*2, 0);
+     for(uint8 b: buffer) {
+      jpeg.append(b);
+      if(b==0xFF) jpeg.append(0x00);
+     }
+     //assert_(jpeg.size == original.size, buffer.size, jpeg.size, original.size, totalLength/8);
+     for(size_t i: range(original.ref::size-1)) assert_(jpeg[i] == original[i], i, str(jpeg[i],8u,'0',2u), str(original[i],8u,'0',2u));
+    }
+#endif
     readTime.stop();
+    continue;
     for(size_t method: range(N)) {
      static constexpr uint L = 1u << 16;
      static constexpr uint scaleBits = 15; // < 16
@@ -266,9 +440,9 @@ struct Raw {
      for(size_t i: range(source.ref::size)) assert_(target[i] == source[i]);
      size_t jpegSize = file.size-0x3800;
      assert_(method==0);
-     log(str((jpegSize-              0)/1024/1024.,1u)+"MB", str(buffer.size/1024/1024.,1u)+"MB",
-           str((jpegSize-buffer.size)/1024/1024.,1u)+"MB", str(100.*(jpegSize-buffer.size)/jpegSize,1u)+"%");
-     ransSize[method] += buffer.size;
+     log(str((jpegSize-              0)/1024/1024.,1u)+"MB", str(buffer.size*2/1024/1024.,1u)+"MB",
+           str((jpegSize-buffer.size*2)/1024/1024.,1u)+"MB", str(100.*(jpegSize-buffer.size*2)/jpegSize,1u)+"%");
+     ransSize[method] += buffer.size*2;
     }
     log(readTime, encodeTime, decodeTime, totalTime); // 5min
     if(totalSize) for(size_t method: range(N)) log(str((totalSize-                0)/1024/1024.,1u)+"MB", str(ransSize[method]/1024/1024.,1u)+"MB",

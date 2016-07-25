@@ -13,6 +13,7 @@ uint CR2::readBits(const int nbits) {
  }
  uint value = (bitbuf << (32-vbits)) >> (32-nbits);
  vbits -= nbits;
+ //assert_((sizeof(value)*8) - __builtin_clz(value) == nbits, (sizeof(value)*8) - __builtin_clz(value), nbits);
  return value;
 }
 
@@ -30,6 +31,8 @@ int CR2::readHuffman(uint i) {
   vbits += 8;
  }
  uint code = (bitbuf << (32-vbits)) >> (32-nbits);
+ {static int t =0; if(t++<16) log(lengthSymbolForCode[i][code].symbol, lengthSymbolForCode[i][code].length,
+                                 str((code<<(32-lengthSymbolForCode[i][code].length))>>(32-lengthSymbolForCode[i][code].length),0u,'0',2u));}
  vbits -= lengthSymbolForCode[i][code].length;
  return lengthSymbolForCode[i][code].symbol;
 }
@@ -308,22 +311,20 @@ void CR2::readIFD(BinaryData& s) {
    if(marker == 0xFFE2) return; // APP2 (ICC?) from JPEG thumbnail
    assert_(marker == 0xFFC4, hex(marker)); // Define Huffman Table
    unused uint16 length = s.read16();
-   for(uint index: range(2)) {
+   for(uint c: range(2)) {
     uint8 huffmanTableInfo = s.read8();
     unused uint tableIndex = huffmanTableInfo&0b1111;
-    assert_(index==tableIndex);
+    assert_(c==tableIndex);
     assert_((huffmanTableInfo&0b10000) == 0, huffmanTableInfo); // DC
-    ref<uint8> symbolCountsForLength = s.read<uint8>(16);
-    maxLength[index]=16; for(; maxLength[index] && !symbolCountsForLength[maxLength[index]-1]; maxLength[index]--);
-    int totalSymbolCount = 0; for(int count: symbolCountsForLength) totalSymbolCount += count;
-    lengthSymbolForCode[index] = buffer<LengthSymbol>(1<<maxLength[index]);
-    lengthSymbolForCode[index].clear();
-    int p = 0;
-    ref<uint8> symbols = s.read<uint8>(totalSymbolCount);
-    for(int h=0, length=1; length <= maxLength[index]; length++) {
-     for(int i=0; i < symbolCountsForLength[length-1]; i++, p++) {
-      for(int j=0; j < (1 << (maxLength[tableIndex]-length)); j++) {
-       lengthSymbolForCode[tableIndex][h++] = {uint8(length), symbols[p]};
+    symbolCountsForLength[c] = s.read<uint8>(16);
+    maxLength[c]=16; for(; maxLength[c] && !symbolCountsForLength[c][maxLength[c]-1]; maxLength[c]--);
+    int totalSymbolCount = 0; for(int count: symbolCountsForLength[c]) totalSymbolCount += count;
+    assert_(maxLength[c] <= 9);
+    symbols[c] = s.read<uint8>(totalSymbolCount);
+    for(int p=0, h=0, length=1; length <= maxLength[c]; length++) {
+     for(int i=0; i < symbolCountsForLength[c][length-1]; i++, p++) {
+      for(int j=0; j < (1 << (maxLength[c]-length)); j++) {
+       lengthSymbolForCode[c][h++] = {uint8(length), symbols[c][p]};
       }
      }
     }
@@ -376,7 +377,7 @@ void CR2::readIFD(BinaryData& s) {
   if(onlyParse) return;
   assert_(sampleSize > 8 && sampleSize <= 16);
   assert_(!image);
-  pointer = (uint8*)s.data.begin()+s.index;
+  pointer = begin = (uint8*)s.data.begin()+s.index;
   image = Image16(width*2, height);
   int16* target = image.begin();
   int predictor[2] = {0,0};
@@ -385,11 +386,13 @@ void CR2::readIFD(BinaryData& s) {
    for(uint unused x: range(width)) {
     for(uint c: range(2)) {
      int length = readHuffman(c);
-     if(length == -1) { assert_(y==height-1 && x==width-1 && c==1, y, x, c); target[0]=0; return; }
+     if(length == -1) { assert_(y==height-1 && x==width-1 && c==1, y, x, c); target[0]=0; log("EARLY EOF"); return; }
      //assert_(length < 16);
-     int residual = readBits(length);
-     if((residual & (1 << (length-1))) == 0) residual -= (1 << length) - 1;
+     uint signMagnitude = readBits(length);
+     int sign = signMagnitude & (1<<(length-1));
+     int residual = sign ? signMagnitude : signMagnitude-((1<<length)-1); // Remove offset
      int value = predictor[c] + residual;
+     if(y==0 && x < 16) log(value, predictor[c], residual, length, sign, str(signMagnitude,uint(length),'0',2u));
      /*image(x*2+c, y)*/ *target = value;
      target++;
      predictor[c] = value;
