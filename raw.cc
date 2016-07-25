@@ -2,6 +2,7 @@
 #include "time.h"
 #include <smmintrin.h>
 inline double log2(double x) { return __builtin_log2(x); }
+int median(int a, int b, int c) { return max(min(a,b), min(max(a,b),c)); }
 
 struct Raw {
  Raw() {
@@ -9,19 +10,23 @@ struct Raw {
   array<String> files = Folder(".").list(Files|Sorted);
   for(string name: files) {
    if(!endsWith(toLower(name), ".cr2")) continue;
-   String jpgName = section(name,'.')+".JPG";
-   if(files.contains(jpgName)) {
-    assert_(existsFile(section(name,'.')+".CR2"));
-    log("Removing", jpgName);
-    remove(jpgName);
-    //return;
+   if(0) {
+    String jpgName = section(name,'.')+".JPG";
+    if(files.contains(jpgName)) {
+     assert_(existsFile(section(name,'.')+".CR2"));
+     log("Removing", jpgName);
+     remove(jpgName);
+     //return;
+    }
+    //assert_(!files.contains(section(name,'.')+".JPG"), name);
    }
-   //assert_(!files.contains(section(name,'.')+".JPG"), name);
-   Map file(name);
-   CR2 cr2(file, true);
-   const size_t source = cr2.data.begin()-file.begin();
-   const size_t target = 0x3800;
-   if(cr2.ifdOffset.size <= 3 && source == target) continue;
+   if(0) {
+    Map file(name);
+    CR2 cr2(file, true);
+    const size_t source = cr2.data.begin()-file.begin();
+    const size_t target = 0x3800;
+    if(cr2.ifdOffset.size <= 3 && source == target) continue;
+   }
    imageCount++;
   }
   Time readTime, encodeTime, decodeTime, totalTime {true};
@@ -56,7 +61,7 @@ struct Raw {
      size_t originalSize = file.size;
      file.size -= source-target;
      log(str(originalSize/1024/1024., 2u), "MB", str((source-target)/1024/1024., 2u), "MB", str(100.*(source-target)/file.size, 2u)+"%",
-           str(file.size/1024/1024., 2u), "MB");
+         str(file.size/1024/1024., 2u), "MB");
      stripSize += file.size;
     }
     {CR2 cr2(file);} // Verify
@@ -68,112 +73,116 @@ struct Raw {
     readTime.start();
     const Image16& source = CR2(file).image;
     readTime.stop();
-
-    static constexpr uint L = 1u << 16;
-    static constexpr uint scaleBits = 15; // < 16
-    static constexpr uint M = 1<<scaleBits;
-    ::buffer<uint16> buffer (source.ref::size, 0);
-    ::buffer<uint16> planarSource (source.ref::size, 0);
-    {encodeTime.start();
-     assert_(source.width%2==0 && source.height%2==0);
-     Image16 residual (source.size/2);
-     for(uint i: range(4)) {
-      uint W = source.width/2;
-      assert_(W%4 == 0);
-      const int16* plane = source.data + (i&2)*W + (i&1);
-      for(uint y: range(source.height/2)) {
-       const int16* const up = plane + (y-1)*2*W*2;
-       const int16* const row = plane + y*2*W*2;
-       int16* const target = residual.begin() + y*W;
-       for(uint x: range(W)) {
-        uint top = y>0 ? up[x*2] : 0;
-        uint left = x>0 ? row[x*2-2] : 0;
-        uint predictor = 0;// (top+left)/2;
-        uint value = row[x*2];
-        int r = value - predictor;
-        assert_(-0x2000 <= r && r <= 0x2000, r, hex(r));
-        target[x] = r;
-        planarSource.append(r);
-       }
-      }
-
-      int16 min = 0x7FFF, max = 0;
-      for(int16 value: residual) { min=::min(min, value); max=::max(max, value); }
-      log(min, max, max+1-min);
-      assert_(max+1-min <= 0x1000, min, max, max+1-min);
-      ::buffer<uint32> histogram(max+1-min);
-      histogram.clear(0);
-      uint32* base = histogram.begin()-min;
-      for(int value: residual) base[value]++;
-      ::buffer<uint> cumulative(1+histogram.size);
-      cumulative[0] = 0;
-      for(size_t i: range(histogram.size)) cumulative[i+1] = cumulative[i] + histogram[i];
-
-      ::buffer<uint16> freqM (histogram.size);
-      ::buffer<uint16> cumulativeM (cumulative.size);
-      cumulativeM[0] = 0;
-      for(size_t i: range(1, cumulative.size)) cumulativeM[i] = (uint64)cumulative[i]*M/cumulative.last();
-      for(size_t i: range(1, cumulative.size)) {
-       if(histogram[i-1] && cumulativeM[i] == cumulativeM[i-1]) {
-        uint32 bestFreq = 0;
-        size_t bestIndex = invalid;
-        for(int j: range(1, cumulative.size)) {
-         uint32 freq = cumulativeM[j] - cumulativeM[j-1];
-         if(freq > 1 && freq > bestFreq) { bestFreq = freq; bestIndex = j; }
+    for(size_t method: range(5)) {
+     static constexpr uint L = 1u << 16;
+     static constexpr uint scaleBits = 15; // < 16
+     static constexpr uint M = 1<<scaleBits;
+     ::buffer<uint16> buffer (source.ref::size, 0);
+     {encodeTime.start();
+      assert_(source.width%2==0 && source.height%2==0);
+      Image16 residual (source.size/2);
+      for(uint i: range(4)) {
+       uint W = source.width/2;
+       assert_(W%4 == 0);
+       const int16* plane = source.data + (i&2)*W + (i&1);
+       for(uint y: range(source.height/2)) {
+        const int16* const up = plane + (y-1)*2*W*2;
+        const int16* const row = plane + y*2*W*2;
+        int16* const target = residual.begin() + y*W;
+        for(uint x: range(W)) {
+         uint top = y>0 ? up[x*2] : 0;
+         uint left = x>0 ? row[x*2-2] : 0;
+         uint topleft = x > 0 && y>0 ? up[x*2-2] : 0;
+         int gradient = left+top-topleft;
+         int predictor;
+         /**/  if(method == 0) predictor = 0;
+         else if(method == 1) predictor = left;
+         else if(method == 2) predictor = (left+top)/2;
+         else if(method == 3) predictor = ::median(left, top, topleft);
+         else if(method == 4) predictor = ::median(left, top, gradient);
+         else error(method);
+         uint value = row[x*2];
+         int r = value - predictor;
+         assert_(-0x2000 <= r && r <= 0x2000, r, hex(r));
+         target[x] = r;
         }
-        assert_(bestIndex != invalid && bestIndex != i);
-        if(bestIndex < i) for(size_t j: range(bestIndex, i)) cumulativeM[j]--;
-        if(bestIndex > i) for(size_t j: range(i, bestIndex)) cumulativeM[j]++;
        }
-      }
-      assert_(cumulativeM[0] == 0 && cumulativeM.last() == M, cumulativeM.last());
-      for(size_t i: range(histogram.size)) {
-       if(histogram[i] == 0) assert_(cumulativeM[i+1] == cumulativeM[i]);
-       else assert_(cumulativeM[i+1] > cumulativeM[i]);
-       freqM[i] = cumulativeM[i+1] - cumulativeM[i];
-      }
 
-      uint16* const end = buffer.begin()+buffer.capacity;
-      uint16* begin; {
-       uint16* ptr = end;
-       uint32 rans[4];
-       for(uint32& r: rans) r = L;
-       for(int i: reverse_range(residual.ref::size)) {
-        uint s = residual[i]-min;
-        uint32 x = rans[i%4];
-        uint freq = freqM[s];
-        if(x >= ((L>>scaleBits)<<16) * freq) {
-         ptr -= 1;
-         *ptr = (uint16)(x&0xffff);
-         x >>= 16;
+       int16 min = 0x7FFF, max = 0;
+       for(int16 value: residual) { min=::min(min, value); max=::max(max, value); }
+       assert_(max+1-min <= 0x1000, min, max, max+1-min);
+       ::buffer<uint32> histogram(max+1-min);
+       histogram.clear(0);
+       uint32* base = histogram.begin()-min;
+       for(int value: residual) base[value]++;
+       ::buffer<uint> cumulative(1+histogram.size);
+       cumulative[0] = 0;
+       for(size_t i: range(histogram.size)) cumulative[i+1] = cumulative[i] + histogram[i];
+
+       ::buffer<uint16> freqM (histogram.size);
+       ::buffer<uint16> cumulativeM (cumulative.size);
+       cumulativeM[0] = 0;
+       for(size_t i: range(1, cumulative.size)) cumulativeM[i] = (uint64)cumulative[i]*M/cumulative.last();
+       for(size_t i: range(1, cumulative.size)) {
+        if(histogram[i-1] && cumulativeM[i] == cumulativeM[i-1]) {
+         uint32 bestFreq = 0;
+         size_t bestIndex = invalid;
+         for(int j: range(1, cumulative.size)) {
+          uint32 freq = cumulativeM[j] - cumulativeM[j-1];
+          if(freq > 1 && freq > bestFreq) { bestFreq = freq; bestIndex = j; }
+         }
+         assert_(bestIndex != invalid && bestIndex != i);
+         if(bestIndex < i) for(size_t j: range(bestIndex, i)) cumulativeM[j]--;
+         if(bestIndex > i) for(size_t j: range(i, bestIndex)) cumulativeM[j]++;
         }
-        rans[i%4] = ((x / freq) << scaleBits) + (x % freq) + cumulativeM[s];
        }
-       for(int i: reverse_range(4)) {
-        uint32 x = rans[i%4];
-        ptr -= 2;
-        ptr[0] = (uint16)(x>>0);
-        ptr[1] = (uint16)(x>>16);
+       assert_(cumulativeM[0] == 0 && cumulativeM.last() == M, cumulativeM.last());
+       for(size_t i: range(histogram.size)) {
+        if(histogram[i] == 0) assert_(cumulativeM[i+1] == cumulativeM[i]);
+        else assert_(cumulativeM[i+1] > cumulativeM[i]);
+        freqM[i] = cumulativeM[i+1] - cumulativeM[i];
        }
-       assert_(ptr >= buffer.begin());
-       begin = ptr;
-      }
-      buffer.append(cast<uint16>(ref<int16>{min, max}));
-      buffer.append(freqM);
-      assert_(begin > buffer.end());
-      buffer.append(ref<uint16>(begin, end-begin));
 
-      if(1) {
-       const uint32 total = residual.ref::size;
-       double entropy = 0;
-       for(uint32 count: histogram) if(count) entropy += count * log2(double(total)/double(count));
-       log(str(100.*((end-begin)/(entropy/16)-1), 1u)+"%", str(100.*histogram.size/(end-begin), 1u)+"%");
+       uint16* const end = buffer.begin()+buffer.capacity;
+       uint16* begin; {
+        uint16* ptr = end;
+        uint32 rans[4];
+        for(uint32& r: rans) r = L;
+        for(int i: reverse_range(residual.ref::size)) {
+         uint s = residual[i]-min;
+         uint32 x = rans[i%4];
+         uint freq = freqM[s];
+         if(x >= ((L>>scaleBits)<<16) * freq) {
+          ptr -= 1;
+          *ptr = (uint16)(x&0xffff);
+          x >>= 16;
+         }
+         rans[i%4] = ((x / freq) << scaleBits) + (x % freq) + cumulativeM[s];
+        }
+        for(int i: reverse_range(4)) {
+         uint32 x = rans[i%4];
+         ptr -= 2;
+         ptr[0] = (uint16)(x>>0);
+         ptr[1] = (uint16)(x>>16);
+        }
+        assert_(ptr >= buffer.begin());
+        begin = ptr;
+       }
+       buffer.append(cast<uint16>(ref<int16>{min, max}));
+       buffer.append(freqM);
+       assert_(begin > buffer.end());
+       buffer.append(ref<uint16>(begin, end-begin));
+
+       if(0) {
+        const uint32 total = residual.ref::size;
+        double entropy = 0;
+        for(uint32 count: histogram) if(count) entropy += count * log2(double(total)/double(count));
+        log(str(100.*((end-begin)/(entropy/16)-1), 1u)+"%", str(100.*histogram.size/(end-begin), 1u)+"%");
+       }
       }
-     }
-     encodeTime.stop();
+      encodeTime.stop();}
 
      Image16 target(source.size);
-     ::buffer<uint16> planarTarget (source.ref::size, 0);
 
      decodeTime.start();
      uint16* ptr = buffer.begin();
@@ -185,7 +194,6 @@ struct Raw {
       ::buffer<uint16> cumulativeM(1+freqM.size);
       cumulativeM[0] = 0;
       for(size_t i: range(freqM.size)) cumulativeM[i+1] = cumulativeM[i] + freqM[i];
-      log(min, max, max+1-min);
 
       int16 reverse[M]; // 64K
       uint slots[M]; // 128K
@@ -211,9 +219,16 @@ struct Raw {
          uint x = X+k;
          uint top = y>0 ? up[x*2] : 0;
          uint left = x>0 ? row[x*2-2] : 0;
-         uint predictor = 0; //(top+left)/2;
+         uint topleft = x > 0 && y>0 ? up[x*2-2] : 0;
+         int gradient = left+top-topleft;
+         int predictor;
+         /**/  if(method == 0) predictor = 0;
+         else if(method == 1) predictor = left;
+         else if(method == 2) predictor = (left+top)/2;
+         else if(method == 3) predictor = ::median(left, top, topleft);
+         else if(method == 4) predictor = ::median(left, top, gradient);
+         else error(method);
          int r = reverse[slot[k]];
-         planarTarget.append(r);
          uint value = predictor + r;
          row[x*2] = value;
         }
@@ -262,18 +277,20 @@ struct Raw {
       }
      }
      decodeTime.stop();
-     for(size_t i: range(planarSource.ref::size)) assert_(planarTarget[i] == planarSource[i], i/1024, i, planarTarget.ref::size, planarSource[i], planarTarget[i]);
      assert_(target.ref::size == source.ref::size && target.size == source.size && target.stride == target.width && source.stride == source.width);
-     for(size_t i: range(source.ref::size)) assert_(target[i] == source[i], i/1024, i, target.ref::size, source[i], target[i]);
+     for(size_t i: range(source.ref::size)) assert_(target[i] == source[i]);
+     size_t jpegSize = file.size-0x3800;
+     log(method, str((jpegSize-              0)/1024/1024.,1u)+"MB", str(buffer.size/1024/1024.,1u)+"MB",
+           str((jpegSize-buffer.size)/1024/1024.,1u)+"MB", str(100*(jpegSize-buffer.size)/jpegSize)+"%");
     }
-    archiveSize += buffer.size;
-    log(str(buffer.size/1024/1024,0u)+"MB",
-        "Σ", str(archiveSize/1024/1024)+"MB =", str((totalSize-archiveSize)/1024/1024)+"MB ("+str(100*(totalSize-archiveSize)/totalSize)+"%)");
+    //archiveSize += buffer.size;
+    if(totalSize) log(str((totalSize-                0)/1024/1024., 1u)+"MB", str(archiveSize/1024/1024.,1u)+"MB",
+                             str((totalSize-archiveSize)/1024/1024., 2u)+"MB", str(100.*(totalSize-archiveSize)/totalSize, 1u)+"%");
     break;
    }
   }
   log(readTime, encodeTime, decodeTime, totalTime); // 5min
-  if(totalSize) log(str(totalSize/1024/1024., 2u),"MB -", str(archiveSize/1024/1024.,2u),"MB",str(100.*(totalSize-archiveSize)/totalSize, 1u),"% =",
-                           str((totalSize-archiveSize)/1024/1024., 2u),"MB");
+  if(totalSize) log(str(totalSize/1024/1024., 1u)+"MB", str(archiveSize/1024/1024.,1u)+"MB",
+                           str((totalSize-archiveSize)/1024/1024., 2u)+"MB", str(100.*(totalSize-archiveSize)/totalSize, 1u)+"%");
  }
 } app;
