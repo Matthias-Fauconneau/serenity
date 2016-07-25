@@ -30,8 +30,8 @@ struct Raw {
    imageCount++;
   }
   Time readTime, encodeTime, decodeTime, totalTime {true};
-  constexpr size_t N = 5;
-  size_t totalSize = 0, stripSize = 0, ransSize[N] = {0,0,0,0,0};
+  constexpr size_t N = 1;
+  size_t totalSize = 0, stripSize = 0, ransSize[N] = {};
   size_t index = 0;
   for(string name: files) {
    if(!endsWith(toLower(name), ".cr2")) continue;
@@ -93,15 +93,7 @@ struct Raw {
         for(uint x: range(W)) {
          uint top = y>0 ? up[x*2] : 0;
          uint left = x>0 ? row[x*2-2] : 0;
-         uint topleft = x > 0 && y>0 ? up[x*2-2] : 0;
-         int gradient = left+top-topleft;
-         int predictor;
-         /**/  if(method == 0) predictor = 0;
-         else if(method == 1) predictor = left;
-         else if(method == 2) predictor = (left+top)/2;
-         else if(method == 3) predictor = ::median(left, top, topleft);
-         else if(method == 4) predictor = ::median(left, top, gradient);
-         else error(method);
+         int predictor = (left+top)/2;
          uint value = row[x*2];
          int r = value - predictor;
          assert_(-0x2000 <= r && r <= 0x2000, r, hex(r));
@@ -220,15 +212,7 @@ struct Raw {
          uint x = X+k;
          uint top = y>0 ? up[x*2] : 0;
          uint left = x>0 ? row[x*2-2] : 0;
-         uint topleft = x > 0 && y>0 ? up[x*2-2] : 0;
-         int gradient = left+top-topleft;
-         int predictor;
-         /**/  if(method == 0) predictor = 0;
-         else if(method == 1) predictor = left;
-         else if(method == 2) predictor = (left+top)/2;
-         else if(method == 3) predictor = ::median(left, top, topleft);
-         else if(method == 4) predictor = ::median(left, top, gradient);
-         else error(method);
+         int predictor = (left+top)/2;
          int r = reverse[slot[k]];
          uint value = predictor + r;
          row[x*2] = value;
@@ -281,12 +265,13 @@ struct Raw {
      assert_(target.ref::size == source.ref::size && target.size == source.size && target.stride == target.width && source.stride == source.width);
      for(size_t i: range(source.ref::size)) assert_(target[i] == source[i]);
      size_t jpegSize = file.size-0x3800;
-     log(method, str((jpegSize-              0)/1024/1024.,1u)+"MB", str(buffer.size/1024/1024.,1u)+"MB",
+     assert_(method==0);
+     log(str((jpegSize-              0)/1024/1024.,1u)+"MB", str(buffer.size/1024/1024.,1u)+"MB",
            str((jpegSize-buffer.size)/1024/1024.,1u)+"MB", str(100.*(jpegSize-buffer.size)/jpegSize,1u)+"%");
      ransSize[method] += buffer.size;
     }
     log(readTime, encodeTime, decodeTime, totalTime); // 5min
-    if(totalSize) for(size_t method: range(5)) log(method, str((totalSize-                0)/1024/1024.,1u)+"MB", str(ransSize[method]/1024/1024.,1u)+"MB",
+    if(totalSize) for(size_t method: range(N)) log(str((totalSize-                0)/1024/1024.,1u)+"MB", str(ransSize[method]/1024/1024.,1u)+"MB",
                                                    str((totalSize-ransSize[method])/1024/1024.,1u)+"MB", str(100.*(totalSize-ransSize[method])/totalSize, 1u)+"%");
     //break;
    }
