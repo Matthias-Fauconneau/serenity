@@ -12,6 +12,7 @@ void LJPEG::parse(ref<byte> data) {
   unused uint16 length = s.read16();
   for(uint c: range(2)) {
    unused uint8 huffmanTableInfo = s.read8();
+   symbolCountsForLength[c] = s.read<uint8>(16);
    maxLength[c]=16; for(; maxLength[c] && !symbolCountsForLength[c][maxLength[c]-1]; maxLength[c]--);
    int totalSymbolCount = 0; for(int count: symbolCountsForLength[c]) totalSymbolCount += count;
    assert_(maxLength[c] <= 9);
@@ -53,11 +54,11 @@ void LJPEG::parse(ref<byte> data) {
  headerSize = s.index;
 }
 
-void LJPEG::decode(const mref<uint16> image, ref<byte> data) {
+void LJPEG::decode(const mref<int16> image, ref<byte> data) {
  const uint8* pointer = (uint8*)data.begin();
  uint bitbuf = 0;
  int bitLeftCount = 0;
- uint16* target = image.begin();
+ int16* target = image.begin();
  int predictor[2] = {0,0};
  for(uint unused y: range(height)) {
   for(uint c: range(2)) predictor[c] = 1<<(sampleSize-1);
@@ -104,7 +105,7 @@ void LJPEG::decode(const mref<uint16> image, ref<byte> data) {
  }
 }
 
-size_t encode(const LJPEG& ljpeg, const mref<byte> target, const ref<uint16> source) {
+size_t encode(const LJPEG& ljpeg, const mref<byte> target, const ref<int16> source) {
  struct LengthCode { uint8 length = -1; uint16 code = -1; };
  LengthCode lengthCodeForSymbol[2][16];
  for(uint c: range(2)) {
@@ -119,7 +120,7 @@ size_t encode(const LJPEG& ljpeg, const mref<byte> target, const ref<uint16> sou
   }
  }
 
- const uint16* s = source.begin();
+ const int16* s = source.begin();
  ::buffer<uint8> buffer (source.size);
  uint8* pointer = buffer.begin(); // Not writing directly to target as we need to replace FF with FF 00 (JPEG sync)
  uint64 bitbuf = 0;

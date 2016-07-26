@@ -35,10 +35,10 @@ void decodeRANS4(const Image16& target, const ref<byte> source) {
   pointer += 8; // !! not 16
   uint W = target.width/2;
   assert_(W%4 == 0);
-  uint16* plane = target.begin() + (i&2)*W + (i&1);
+  int16* plane = target.begin() + (i&2)*W + (i&1);
   for(uint y: range(target.height/2)) {
-   const uint16* const up = plane + (y-1)*2*W*2;
-   uint16* const row = plane + y*2*W*2;
+   const int16* const up = plane + (y-1)*2*W*2;
+   int16* const row = plane + y*2*W*2;
    for(uint X=0; X<W; X+=4) {
     const v4si slot = x & set1(M-1);
     for(uint k: range(4)) { // FIXME: SIMD
@@ -96,17 +96,17 @@ size_t encodeRANS4(const mref<byte> target, const Image16& source) {
   Buffer(const mref<uint16>& buffer) : mref<uint16>(buffer) {}
   void append(int16 e) { at(size++) = e; }
   void append(const ref<uint16> source) { slice(size, source.size).copy(source); size += source.size; }
- } buffer (mcast<uint16>(target));
+ } buffer (mcast<uint16>(target.slice(0,target.size/2*2)));
  assert_(source.width%2==0 && source.height%2==0);
  Image16 residual (source.size/2);
  for(uint planeIndex: range(4)) {
   uint W = source.width/2;
   assert_(W%4 == 0);
-  const uint16* plane = source.data + (planeIndex&2)*W + (planeIndex&1);
+  const int16* plane = source.data + (planeIndex&2)*W + (planeIndex&1);
   for(uint y: range(source.height/2)) {
-   const uint16* const up = plane + (y-1)*2*W*2;
-   const uint16* const row = plane + y*2*W*2;
-   uint16* const target = residual.begin() + y*W;
+   const int16* const up = plane + (y-1)*2*W*2;
+   const int16* const row = plane + y*2*W*2;
+   int16* const target = residual.begin() + y*W;
    for(uint x: range(W)) {
     uint top = y>0 ? up[x*2] : 0;
     uint left = x>0 ? row[x*2-2] : 0;
@@ -153,36 +153,31 @@ size_t encodeRANS4(const mref<byte> target, const Image16& source) {
    freqM[i] = cumulativeM[i+1] - cumulativeM[i];
   }
 
-  uint16* const end = buffer.end();
-  uint16* begin; {
-   uint16* pointer = end;
-   uint32 rans[4];
-   for(uint32& r: rans) r = L;
-   for(int i: reverse_range(residual.ref::size)) {
-    uint s = residual[i]-min;
-    uint32 x = rans[i%4];
-    uint freq = freqM[s];
-    if(x >= ((L>>scaleBits)<<16) * freq) {
-     pointer -= 1;
-     *pointer = (uint16)(x&0xffff);
-     x >>= 16;
-    }
-    rans[i%4] = ((x / freq) << scaleBits) + (x % freq) + cumulativeM[s];
+  uint16* pointer = buffer.end();
+  uint32 rans[4];
+  for(uint32& r: rans) r = L;
+  for(int i: reverse_range(residual.ref::size)) {
+   uint s = residual[i]-min;
+   uint32 x = rans[i%4];
+   uint freq = freqM[s];
+   if(x >= ((L>>scaleBits)<<16) * freq) {
+    pointer -= 1;
+    *pointer = (uint16)(x&0xffff);
+    x >>= 16;
    }
-   for(int i: reverse_range(4)) {
-    uint32 x = rans[i%4];
-    pointer -= 2;
-    pointer[0] = (uint16)(x>>0);
-    pointer[1] = (uint16)(x>>16);
-   }
-   assert_(pointer >= buffer.begin());
-   begin = pointer;
+   rans[i%4] = ((x / freq) << scaleBits) + (x % freq) + cumulativeM[s];
+  }
+  for(int i: reverse_range(4)) {
+   uint32 x = rans[i%4];
+   pointer -= 2;
+   pointer[0] = (uint16)(x>>0);
+   pointer[1] = (uint16)(x>>16);
   }
   buffer.append(min);
   buffer.append(max);
   buffer.append(freqM);
-  assert_(begin > buffer.end());
-  buffer.append(ref<uint16>(begin, end-begin));
+  assert_(size_t(pointer-buffer.begin()) >= buffer.size);
+  buffer.append(ref<uint16>(pointer, buffer.end()-pointer));
  }
  return buffer.size*sizeof(uint16);
 }

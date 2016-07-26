@@ -2,10 +2,12 @@
 
 CR2::CR2(const ref<byte> file, bool onlyParse) : onlyParse(onlyParse)  {
  int compression = 0;
- for(BinaryData TIFF(file.slice(4));;) {
+ BinaryData TIFF(file);
+ TIFF.skip("II\x2A\x00");
+ for(;;) {
   TIFF.index = TIFF.read32();
   if(!TIFF.index) break;
-  uint16 entryCount = TIFF.read();
+  uint16 entryCount = TIFF.read16();
   for(const CR2::Entry& entry : TIFF.read<CR2::Entry>(entryCount)) {
    /**/ if(entry.tag == 0x103) { // Compression
     assert_(entry.value == 1 || entry.value == 6 /*JPEG*/ || entry.value == 0x879C /*rANS4*/);
@@ -16,15 +18,14 @@ CR2::CR2(const ref<byte> file, bool onlyParse) : onlyParse(onlyParse)  {
     tiffHeaderSize = entry.value;
    }
    else if(entry.tag == 0x117) { // StripByteCount
-    assert_(entry.value == 1); // 1 row per trip or single strip
     dataSize = entry.value;
     assert_(dataSize <= TIFF.data.size);
    }
    else if(entry.tag == 0x8769) { // EXIF
-    BinaryData EXIF (TIFF.data.slice(entry.value));
+    BinaryData EXIF (TIFF.data); EXIF.index = entry.value;
     uint16 entryCount = EXIF.read();
     for(const CR2::Entry& entry : EXIF.read<CR2::Entry>(entryCount)) {
-     BinaryData value (TIFF.data.slice(entry.value));
+     BinaryData value (EXIF.data); value.index = entry.value;
      if(entry.tag == 0x829A) { // ExposureTime
       assert_(entry.type == 5 && entry.count == 1);
       unused uint num = value.read32();
@@ -75,11 +76,11 @@ CR2::CR2(const ref<byte> file, bool onlyParse) : onlyParse(onlyParse)  {
      }
      else if(entry.tag == 0x927C) { // MakerNote
       assert_(entry.type == 7);
-      BinaryData makerNote (TIFF.data.slice(entry.value));
+      BinaryData makerNote (EXIF.data); makerNote.index = entry.value;
       uint16 entryCount = makerNote.read();
       for(const CR2::Entry& entry : makerNote.read<CR2::Entry>(entryCount)) {
        if(entry.tag == 0x4001) { // ColorBalance
-        ref<uint16> RGGB = cast<uint16>(TIFF.data.slice(entry.value+142));
+        ref<uint16> RGGB = cast<uint16>(makerNote.slice(entry.value+142, 4*sizeof(uint16)));
         whiteBalance.R = RGGB[0];
         whiteBalance.G = RGGB[1];
         whiteBalance.B = RGGB[3];

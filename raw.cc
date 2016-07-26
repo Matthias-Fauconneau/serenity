@@ -15,7 +15,8 @@ void stripThumbnails(mref<byte>& file) {
  *cr2.ifdOffset[1] = *cr2.ifdOffset[3]; // Skips JPEG and RGB thumbs
  for(size_t i: range(cr2.data.size)) file[target+i] = file[source+i];
 #endif
- BinaryData s(file.slice(4));
+ BinaryData s(file);
+ s.skip("II\x2A\x00");
  uint* ifdOffset = 0;
  size_t source = 0;
  const size_t target = 0x3800;
@@ -81,11 +82,13 @@ struct Raw {
     ransEncTime.stop();
 
     // Updates header
-    for(BinaryData s(file.slice(4));;) {
-     s.index = s.read32();
-     if(!s.index) break;
-     uint16 entryCount = s.read();
-     for(const CR2::Entry& e: s.read<CR2::Entry>(entryCount)) { CR2::Entry& entry = (CR2::Entry&)e;
+    BinaryData TIFF(file);
+    TIFF.skip("II\x2A\x00");
+    for(;;) {
+     TIFF.index = TIFF.read32();
+     if(!TIFF.index) break;
+     uint16 entryCount = TIFF.read();
+     for(const CR2::Entry& e: TIFF.read<CR2::Entry>(entryCount)) { CR2::Entry& entry = (CR2::Entry&)e;
       if(entry.tag==0x103) { assert_(entry.value==6); entry.value=0x879C; } // Compression
       if(entry.tag==0x117) entry.value = cr2.ljpeg.headerSize + ransSize;
      }
@@ -122,11 +125,13 @@ struct Raw {
    jpegEncTime.stop();
 
    // Updates header
-   for(BinaryData s(file.slice(4));;) {
-    s.index = s.read32();
-    if(!s.index) break;
-    uint16 entryCount = s.read();
-    for(const CR2::Entry& e : s.read<CR2::Entry>(entryCount)) { CR2::Entry& entry = (CR2::Entry&)e;
+   BinaryData TIFF(file);
+   TIFF.skip("II\x2A\x00");
+   for(;;) {
+    TIFF.index = TIFF.read32();
+    if(!TIFF.index) break;
+    uint16 entryCount = TIFF.read();
+    for(const CR2::Entry& e: TIFF.read<CR2::Entry>(entryCount)) { CR2::Entry& entry = (CR2::Entry&)e;
      if(entry.tag==0x103) { assert_(entry.value==0x879C); entry.value=6; } // Compression
      if(entry.tag==0x117) entry.value = cr2.ljpeg.headerSize + jpegSize;
     }

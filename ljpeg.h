@@ -10,7 +10,7 @@ struct LJPEG {
  LengthSymbol lengthSymbolForCode[2][512];
  uint width = 01, height = 0, sampleSize = 0;
  void parse(ref<byte> data);
- void decode(const mref<uint16> target, ref<byte> data);
+ void decode(const mref<int16> target, ref<byte> data);
 };
 
-size_t encode(const LJPEG& ljpeg, const mref<byte> target, const ref<uint16> source);
+size_t encode(const LJPEG& ljpeg, const mref<byte> target, const ref<int16> source);

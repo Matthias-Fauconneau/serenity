@@ -110,7 +110,7 @@ inline Dict parseDict(TextData& s) {
   if(s.matchAny("|,"_)) continue;
   else if(curly && s.match('}')) break;
   else if(!curly && !s) break;
-  else error("Invalid Dict '"+s.data.slice(s.index)+"'", (bool)s, curly, dict, s.data);
+  else error("Invalid Dict '"+s.slice(s.index)+"'", (bool)s, curly, dict, s.data);
  }
  return dict;
 }

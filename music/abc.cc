@@ -29,7 +29,7 @@ ABC::ABC(ref<byte> file) {
    measureAlterations.clear();
    bool pageBreak = s.match("\n") ? true : false;
    //log(measureIndex+1, "|", time);
-   assert_(time%(4*12)==0, time-(time/(4*12)*(4*12)), 4*12, 4*12-(time-(time/(4*12)*(4*12))), s.data.slice(0, s.index), "|&^|", s.data.slice(s.index, 16));
+   assert_(time%(4*12)==0, time-(time/(4*12)*(4*12)), 4*12, 4*12-(time-(time/(4*12)*(4*12))), s.slice(0, s.index), "|&^|", s.slice(s.index, 16));
    insertSign({Sign::Measure, time, .measure={pageBreak?Measure::PageBreak:Measure::NoBreak, measureIndex, 1, 1, measureIndex}});
    measureIndex++;
   }

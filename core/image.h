@@ -26,7 +26,7 @@ generic ImageT<T> unsafeRef(const ImageT<T>& o) { return ImageT<T>(unsafeRef((co
 /// 2D array of 8bit integer pixels
 typedef ImageT<uint8> Image8;
 /// 2D array of 16bit integer samples
-typedef ImageT<uint16> Image16;
+typedef ImageT<int16> Image16;
 /// 2D array of BGRA 8-bit unsigned integer pixels (sRGB colorspace)
 typedef ImageT<byte4> Image;
 /// 2D array of 32bit floating-point pixels
