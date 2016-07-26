@@ -12,37 +12,32 @@ uint CR2::readBits(const int nbits) {
  if(nbits==0) return 0u;
  while(vbits < nbits) {
   uint byte = *pointer; pointer++;
-  if(byte == 0xFF) { uint8 v = *pointer; pointer++; assert_(v == 0x00); }
+  if(byte == 0xFF) { unused uint8 v = *pointer; pointer++; assert(v == 0x00); }
   bitbuf <<= 8;
   bitbuf |= byte;
   vbits += 8;
  }
  uint value = (bitbuf << (32-vbits)) >> (32-nbits);
- codes.append(uint8(nbits), uint16(value), uint8(0));
  vbits -= nbits;
  return value;
 }
 
 int CR2::readHuffman(uint i) {
  const int nbits = maxLength[i];
- assert_(nbits == 9);
  while(vbits < nbits) {
   uint byte = *pointer; pointer++;
   if(byte == 0xFF) {
    uint8 v = *pointer; pointer++;
    if(v == 0xD9) return -1;
-   assert_(v == 0x00, hex(v), pointer-(uint8*)data.begin());
+   assert(v == 0x00);
   }
   bitbuf <<= 8;
   bitbuf |= byte;
   vbits += 8;
  }
  uint code = (bitbuf << (32-vbits)) >> (32-nbits);
- assert_(code < 512);
  uint8 length = lengthSymbolForCode[i][code].length;
  uint8 symbol = lengthSymbolForCode[i][code].symbol;
- assert_(length <= maxLength[i] && symbol <= 12);
- codes.append(uint8(length), uint16(code>>(maxLength[i]-length)), uint8(symbol));
  vbits -= length;
  return symbol;
 }
@@ -127,7 +122,6 @@ void CR2::readIFD(BinaryData& s) {
   }
   else if(entry.tag == 0x2BC) { // XML_Packet (XMP)
    entriesToFix.append((Entry*)&entry); // Removed anyway
-   sections.append({value.index, entry.count, "XMP"__});
   }
   else if(entry.tag == 0x8298) {} // Copyright
   else if(entry.tag == 0x8769) { // EXIF
@@ -283,10 +277,7 @@ void CR2::readIFD(BinaryData& s) {
     else if(entry.tag == 0xA430) {} // OwnerName
     else error(entry.tag, hex(entry.tag), entry.type, entry.count, entry.value);
    }
-   //log("EXIF", hex(exifStart), hex(s.index), ":", s.index-exifStart + referencesSize); // /!\ TODO: Copy references (fractions, MakerNote)
-   sections.append({exifStart, lastEXIFReference-exifStart, "EXIF"__});
-   lastReference = ::max(lastReference, lastEXIFReference);
-  }
+ }
   else if(entry.tag == 0x8825) {} // GPS
   else if(entry.tag == 0xC5D8 || entry.tag == 0xC5D9 || entry.tag == 0xC5E0 || entry.tag == 0xC6C5 || entry.tag == 0xC6DC) {} // ?
   else if(entry.tag == 0xC640) {
@@ -304,15 +295,6 @@ void CR2::readIFD(BinaryData& s) {
   }
   else if(entry.tag == 0xFFC3) error("Thumb");
   else error(entry.tag, hex(entry.tag));
- }
- lastReference = ::max(lastReference, s.index);
- sections.append({ifdStart, lastReference-ifdStart,
-                  (size?strx(size)+" ":""__)+str(compression==6?"JPEG ":compression==1?"RGB ":"")+"@"+hex(data.begin()-s.data.begin())});
- if(data) {
-  //log(hex(data.begin()-s.data.begin()), "-", hex(data.end()-s.data.begin()), ":", data.size/1024, "K");
-  String name = (size?strx(size)+" ":""__)+(compression==6?"JPEG "_:compression==1?"RGB "_:""_);
-  //assert_(name, entryCount);
-  sections.append({size_t(data.begin()-s.data.begin()), data.size, move(name)});
  }
  if(size) data={}; // Thumbnail
  if(data) {
@@ -402,8 +384,7 @@ void CR2::readIFD(BinaryData& s) {
     for(uint unused x: range(width)) {
      for(uint c: range(2)) {
       int length = readHuffman(c);
-      if(length == -1) {
-       assert_(y==height-1 && x==width-1 && c==1, y, x, c); target[0]=0; target++; earlyEOF = true; pointer-=2; goto break2; }
+      if(length == -1) { assert_(y==height-1 && x==width-1 && c==1, y, x, c); target[0]=0; target++; pointer-=2; goto break2; }
       assert_(length < 16);
       uint signMagnitude = readBits(length);
       int sign = signMagnitude & (1<<(length-1));
@@ -419,10 +400,9 @@ void CR2::readIFD(BinaryData& s) {
    assert_(target == image.end());
    end = pointer;
    s.index = (const byte*)pointer-s.data.begin();
-   if(s.data.end() == file.end()-2) { log("Wrong StripByteCount"); s.data.size+=2; } // StripByteCount size failed to include End Of Image marker
-   assert_(s, s.data.size-s.index, hex(s.data.slice(s.data.size-4)), file.end()-s.data.end());
-   uint16 marker = s.read16();
-   assert_(marker == 0xFFD9, hex(marker), s.data.size-s.index, hex(s.data.slice(s.data.size-4))); // End Of Image
+   //if(s.data.end() == file.end()-2) s.data.size+=2; // StripByteCount size failed to include End Of Image marker
+   unused uint16 marker = s.read16();
+   assert(marker == 0xFFD9); // End Of Image
   } else { // rANS4
    assert_(compression == 0x879C);
    const uint16* ptr = (uint16*)begin;
@@ -509,7 +489,7 @@ void CR2::readIFD(BinaryData& s) {
  }
 }
 
-CR2::CR2(const ref<byte> file, bool onlyParse) : file(file), onlyParse(onlyParse)  {
+CR2::CR2(const ref<byte> file, bool onlyParse) : onlyParse(onlyParse)  {
  BinaryData s(file);
  s.skip("II\x2A\x00");
  for(;;) {
@@ -517,11 +497,5 @@ CR2::CR2(const ref<byte> file, bool onlyParse) : file(file), onlyParse(onlyParse
   s.index = s.read32();
   if(!s.index) break;
   readIFD(s);
- }
- if(0) {
-  sections.last().size += 2; // EOF
-  sections.append({0, file.size, ""__});
-  sort(sections);
-  for(const Section& section: sections) log(hex(section.start), "-", hex(section.start+section.size), "["+str(section.size/1024)+"K] :", section.name);
  }
 }

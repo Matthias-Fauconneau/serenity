@@ -30,9 +30,7 @@ struct Raw {
     const size_t target = 0x3800;
     if(cr2.ifdOffset.size <= 3 && source == target) continue;
    }
-   if(0) if(CR2(Map(name), false).earlyEOF) continue;
    imageCount++;
-   //log(imageCount, "/", cr2Count);
   }
   Time jpegDecTime, ransEncTime, ransDecTime, jpegEncTime, totalTime {true};
   size_t totalSize = 0, stripSize = 0, ransSize = {};
@@ -81,19 +79,15 @@ struct Raw {
     buffer<byte> original = copyRef(file);
     totalSize += file.size;
     Image16 source;
-    array<Code> originalCodes;
     size_t pass = -1;
     {
      // Decode JPEG-LS
      jpegDecTime.start();
      CR2 cr2(file);
-     if(0) if(cr2.earlyEOF) { ransSize+=file.size; continue; }
-     earlyEOF = cr2.earlyEOF;
      source = ::move(cr2.image);
-     originalCodes = ::move(cr2.codes);
      jpegDecTime.stop();
 
-     if(0) {
+     if(1) {
       // Encode as rANS4
       ransEncTime.start();
       ::buffer<uint16> buffer;
@@ -212,24 +206,13 @@ struct Raw {
     size_t ransFileSize = file.size;
     ransSize += ransFileSize;
     {
-#if 0
-     // Decode rANS4
+     // Decodes rANS4
      ransDecTime.start();
      CR2 cr2(file);
      const Image16& source = cr2.image;
      ransDecTime.stop();
-#else
-     CR2 cr2(file, false);
-     assert_(cr2.end);
-     // Replaces FF 00 with FF (for bitstream verification)
-     ::buffer<uint8> bitstream (cr2.end-cr2.begin, 0);
-     for(const uint8* ptr=cr2.begin; ptr < (uint8*)file.end()-2; ptr++) {
-      bitstream.append(*ptr);
-      if(*ptr==0xFF) { ptr++; assert_(*ptr == 0x00, *ptr); }
-     }
-#endif
 
-     // Encode image back to JPEG-LS
+     // Encodes image back to JPEG-LS
      jpegEncTime.start();
      // JPEG-LS headers (e.g Huffman table) were preserved by rANS converter, only need to regenerate image encoding
 
@@ -253,8 +236,6 @@ struct Raw {
      }
      const int16* s = source.begin();
      int predictor[2] = {0,0};
-     array<Code> codes;
-     size_t index = 0;
      for(uint unused y: range(source.height)) {
       const uint sampleSize = 12;
       for(uint c: range(2)) predictor[c] = 1<<(sampleSize-1);
@@ -282,8 +263,6 @@ struct Raw {
          {
           uint size = lengthCode.length;
           uint value = lengthCode.code;
-          assert_((value ? ((sizeof(value)*8) - __builtin_clz(value)) : 0) <= size && size <= 9);
-          codes.append(uint8(size), uint16(value), uint8(symbol));
           if(size < bitLeftCount) {
            bitbuf <<= size;
            bitbuf |= value;
@@ -301,8 +280,6 @@ struct Raw {
         if(length) {
          uint size = length;
          uint value = signMagnitude;
-         assert_((value ? ((sizeof(value)*8) - __builtin_clz(value)) : 0) <= size && size <= 12);
-         codes.append(uint8(size), uint16(value), uint8(0));
          if(size < bitLeftCount) {
           bitbuf <<= size;
           bitbuf |= value;
@@ -311,16 +288,6 @@ struct Raw {
           bitbuf |= value >> (size - bitLeftCount); // Puts leftmost bits in remaining space
           bitLeftCount += sizeof(bitbuf)*8;
           *(uint64*)pointer = __builtin_bswap64(bitbuf); // MSB msb
-          if(!(*(uint64*)pointer == *(const uint64*)(bitstream.begin()+(pointer-buffer.begin()))) && 1) {
-           log(index=codes.size-1);
-           log(codes[codes.size-1]);
-           log(originalCodes[codes.size-1]);
-           assert_(codes[codes.size-1] != originalCodes[codes.size-1]);
-           log((pointer-buffer.begin()), cr2.end-cr2.begin, "\n",
-                  str(__builtin_bswap64(*(uint64*)pointer),64u,'0',2u), "\n",
-                  str(__builtin_bswap64(*(uint64*)(bitstream.begin()+(pointer-buffer.begin()))),64u,'0',2u));
-           //return;
-          }
           bitbuf = value; // Already stored leftmost bits will be pushed out eventually
           pointer += sizeof(bitbuf);
          }
@@ -341,22 +308,6 @@ struct Raw {
      assert_(s == source.end());
      buffer.size = pointer-buffer.begin();
 
-     //assert_(codes == originalCodes);
-     assert_(codes.size == originalCodes.size
-             || (earlyEOF && codes.size == originalCodes.size+2)
-             , codes.size, originalCodes.size);
-     log(codes.size, originalCodes.size);
-     //log(index);
-     //log(codes[index]);
-     //log(originalCodes[index]);
-     //assert_(codes[index] != originalCodes[index]);
-     for(size_t i: range(originalCodes.size)) {
-      //if(!(codes[i].length == originalCodes[i].length && codes[i].value == originalCodes[i].value && codes[i].symbol == originalCodes[i].symbol)) {
-      if(codes[i] != originalCodes[i]) {
-       log(i, "\n", codes[i], "\n", originalCodes[i]);
-       return;
-      }
-     }
      // Replaces FF with FF 00 (JPEG sync)
      uint8* ptr = (uint8*)cr2.begin;
      for(uint8 b: buffer) {
@@ -379,55 +330,9 @@ struct Raw {
      }
     }
 
-    Image16 target;
-    {
-     // Redecode JPEG-LS
-     jpegDecTime.start();
-     CR2 cr2(file);
-     target = ::move(cr2.image);
-     jpegDecTime.stop();
-    }
-
-    // Image verification
-    assert_(source == target);
-
-    // Bitstream verification
-    /*if(0) for(size_t i: range(original.size)) {
-     if(file[i] != original[i]) wrong++;
-     if(wrong) log(i, "\n",
-                   str((uint8)file[i-4],8u,'0',2u), str((uint8)original[i-4],8u,'0',2u), "\n",
-                   str((uint8)file[i-3],8u,'0',2u), str((uint8)original[i-3],8u,'0',2u), "\n",
-                   str((uint8)file[i-2],8u,'0',2u), str((uint8)original[i-2],8u,'0',2u), "\n",
-                   str((uint8)file[i-1],8u,'0',2u), str((uint8)original[i-1],8u,'0',2u), "\n",
-                   str((uint8)file[i+0],8u,'0',2u), str((uint8)original[i+0],8u,'0',2u), "\n",
-                   str((uint8)file[i+1],8u,'0',2u), str((uint8)original[i+1],8u,'0',2u), "\n",
-                   str((uint8)file[i+2],8u,'0',2u), str((uint8)original[i+2],8u,'0',2u));
-     //assert_(wrong < 1);
-     if(!(wrong < 1)) return;
-    }*/
-
     // File verification
-    //assert_(file == original);
-    //if(file.size != original.size) log(file.size, original.size);
-    // FIXME: "earlyEOF"
-    assert_(file.size == original.size
-            || (earlyEOF && file.size == original.size+2)
-            || (earlyEOF && file.size == original.size+3)
-            , earlyEOF, file.size, original.size);
-    for(size_t i: range(original.size)) {
-     if(file[i] != original[i] && !(earlyEOF && (i>=original.size-5 || (i==pass || i==pass+1 || i==pass+2 || i==pass+3)))) {
-      log(i, "\n",
-          str((uint8)file[i-4],8u,'0',2u), str((uint8)original[i-4],8u,'0',2u), "\n",
-        str((uint8)file[i-3],8u,'0',2u), str((uint8)original[i-3],8u,'0',2u), "\n",
-        str((uint8)file[i-2],8u,'0',2u), str((uint8)original[i-2],8u,'0',2u), "\n",
-        str((uint8)file[i-1],8u,'0',2u), str((uint8)original[i-1],8u,'0',2u), "\n",
-        str((uint8)file[i+0],8u,'0',2u), str((uint8)original[i+0],8u,'0',2u), "\n",
-        str((uint8)file[i+1],8u,'0',2u), str((uint8)original[i+1],8u,'0',2u), "\n",
-        str((uint8)file[i+2],8u,'0',2u), str((uint8)original[i+2],8u,'0',2u));
-      return;
-     }
-    }
-
+    assert_(file.size >= original.size && file.size <= original.size+3);
+    for(size_t i: range(original.size-5)) assert_(file[i] == original[i] || (pass<= i && i<pass+4));
     log(str((file.size-              0)/1024/1024.,1u)+"MB", str(ransFileSize*2/1024/1024.,1u)+"MB",
         str((file.size-ransFileSize)/1024/1024.,1u)+"MB", str(100.*(file.size-ransFileSize)/file.size,1u)+"%");
    }
