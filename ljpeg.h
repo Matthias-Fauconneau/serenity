@@ -3,9 +3,9 @@
 
 struct LJPEG {
  size_t headerSize = 0;
- ref<uint8> symbolCountsForLength[2];
+ uint8 symbolCountsForLength[2][16];
  int maxLength[2] = {0,0};
- ref<uint8> symbols[2];
+ uint8 symbols[2][16];
  struct LengthSymbol { uint8 length = 0; uint8 symbol = 0; };
  LengthSymbol lengthSymbolForCode[2][512];
  uint width = 01, height = 0, sampleSize = 0;

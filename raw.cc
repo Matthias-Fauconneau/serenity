@@ -37,6 +37,52 @@ void stripThumbnails(mref<byte>& file) {
  log(str(originalSize/1024/1024., 1u),"MB", str((source-target)/1024/1024., 1u),"MB", str(100.*(source-target)/file.size, 1u)+"%", str(file.size/1024/1024., 1u),"MB");
 }
 
+//buffer<byte> encodeRANS4(const ref<byte> source) { return encodeRANS4(source, CR2(source)); }
+buffer<byte> encodeRANS4(const ref<byte> source, const CR2& cr2) {
+ buffer<byte> target(cr2.tiffHeaderSize + cr2.ljpeg.headerSize + cr2.dataSize); // Assumes rANS4 < LJPEG
+ target.slice(0, cr2.tiffHeaderSize+cr2.ljpeg.headerSize).copy(source.slice(0, cr2.tiffHeaderSize+cr2.ljpeg.headerSize));
+ size_t size = encodeRANS4(target.slice(cr2.tiffHeaderSize+cr2.ljpeg.headerSize), cr2.image);
+ target.size = cr2.tiffHeaderSize + cr2.ljpeg.headerSize + size;
+
+ // Updates header
+ BinaryData TIFF(target);
+ TIFF.skip("II\x2A\x00");
+ for(;;) {
+  TIFF.index = TIFF.read32();
+  if(!TIFF.index) break;
+  uint16 entryCount = TIFF.read();
+  for(const CR2::Entry& e: TIFF.read<CR2::Entry>(entryCount)) { CR2::Entry& entry = (CR2::Entry&)e;
+   if(entry.tag==0x103) { assert_(entry.value==6); entry.value=0x879C; } // Compression
+   if(entry.tag==0x117) entry.value = cr2.ljpeg.headerSize + size;
+  }
+ }
+
+ return target;
+}
+
+//buffer<byte> encodeLJPEG(const ref<byte> source) { return encodeLJPEG(source, CR2(source)); }
+buffer<byte> encodeLJPEG(const ref<byte> source, const CR2& cr2) {
+ buffer<byte> target(cr2.tiffHeaderSize + cr2.ljpeg.headerSize + cr2.dataSize*2); // Assumes JPEG < 2·rANS4
+ target.slice(0, cr2.tiffHeaderSize+cr2.ljpeg.headerSize).copy(source.slice(0, cr2.tiffHeaderSize+cr2.ljpeg.headerSize));
+ size_t size = encode(cr2.ljpeg, target.slice(cr2.tiffHeaderSize+cr2.ljpeg.headerSize), cr2.image);
+ target.size = cr2.tiffHeaderSize + cr2.ljpeg.headerSize + size;
+
+ // Updates header
+ BinaryData TIFF(target);
+ TIFF.skip("II\x2A\x00");
+ for(;;) {
+  TIFF.index = TIFF.read32();
+  if(!TIFF.index) break;
+  uint16 entryCount = TIFF.read();
+  for(const CR2::Entry& e: TIFF.read<CR2::Entry>(entryCount)) { CR2::Entry& entry = (CR2::Entry&)e;
+   if(entry.tag==0x103) { assert_(entry.value==0x879C); entry.value=6; } // Compression
+   if(entry.tag==0x117) entry.value = cr2.ljpeg.headerSize + size;
+  }
+ }
+
+ return target;
+}
+
 struct Raw {
  Raw() {
   array<String> files = Folder(".").list(Files|Sorted);
@@ -53,8 +99,8 @@ struct Raw {
    }
    imageCount++;
   }
-  Time jpegDecTime, ransEncTime, totalTime {true};
-  size_t totalSize = 0, stripSize = 0, ransSize = {};
+  Time totalTime {true};
+  size_t totalSize = 0, stripSize = 0, ransSize = 0;
   size_t index = 0;
   for(string name: files) {
    if(!endsWith(toLower(name), ".cr2")) continue;
@@ -68,79 +114,38 @@ struct Raw {
     stripSize += file.size;
    }
    if(1) { // Encodes rANS4
-    buffer<byte> file = readFile(name);
-    totalSize += file.size;
-
-    // Decodes lossless JPEG
-    jpegDecTime.start();
-    CR2 cr2(file);
-    jpegDecTime.stop();
-
-    // Encodes rANS4
-    ransEncTime.start();
-    size_t ransSize = encodeRANS4(file.slice(cr2.tiffHeaderSize+cr2.ljpeg.headerSize), cr2.image);
-    ransEncTime.stop();
-
-    // Updates header
-    BinaryData TIFF(file);
-    TIFF.skip("II\x2A\x00");
-    for(;;) {
-     TIFF.index = TIFF.read32();
-     if(!TIFF.index) break;
-     uint16 entryCount = TIFF.read();
-     for(const CR2::Entry& e: TIFF.read<CR2::Entry>(entryCount)) { CR2::Entry& entry = (CR2::Entry&)e;
-      if(entry.tag==0x103) { assert_(entry.value==6); entry.value=0x879C; } // Compression
-      if(entry.tag==0x117) entry.value = cr2.ljpeg.headerSize + ransSize;
-     }
+    if(existsFile(section(name,'.')+".ANS")) {
+     size_t sourceSize = File(name).size();
+     size_t targetSize = File(section(name,'.')+".ANS").size();
+     log(str((sourceSize-              0)/1024/1024.,1u)+"MB", str(targetSize/1024/1024.,1u)+"MB",
+         str((sourceSize-targetSize)/1024/1024.,1u)+"MB", str(100.*(sourceSize-targetSize)/targetSize,1u)+"%");
+     break; // TEST
+     continue;
     }
+    Map source (name);
+    CR2 cr2 (source); // Decodes LJPEG
+    buffer<byte> target = encodeRANS4(source, cr2);
+    writeFile(section(name,'.')+".ANS", target);
+    {CR2 ans(Map(section(name,'.')+".ANS")); assert_(ans.image == cr2.image && ans.whiteBalance.G == cr2.whiteBalance.G);} // Verifies
 
-    size_t jpegSize = file.size;
-    file.size = cr2.tiffHeaderSize + cr2.ljpeg.headerSize + ransSize;
-    writeFile(section(name,'.')+".ANS", file);
-
-    break; // TEST
-
-    log(str((jpegSize-              0)/1024/1024.,1u)+"MB", str(file.size/1024/1024.,1u)+"MB",
-        str((jpegSize-file.size)/1024/1024.,1u)+"MB", str(100.*(jpegSize-file.size)/file.size,1u)+"%");
+    totalSize += source.size;
+    ransSize += target.size;
+    break;
+    log(str((source.size-              0)/1024/1024.,1u)+"MB", str(target.size/1024/1024.,1u)+"MB",
+        str((source.size-target.size)/1024/1024.,1u)+"MB", str(100.*(source.size-target.size)/target.size,1u)+"%");
+    remove(name);
    }
   }
-  log(jpegDecTime, ransEncTime, totalTime);
   if(totalSize) log(str((totalSize-                0)/1024/1024.,1u)+"MB", str(ransSize/1024/1024.,1u)+"MB",
                     str((totalSize-ransSize)/1024/1024.,1u)+"MB", str(100.*(totalSize-ransSize)/ransSize, 1u)+"%");
-  Time ransDecTime, jpegEncTime;
+  log(totalTime);
   totalTime.reset();
   for(string name: files) {
    if(!endsWith(toLower(name), ".ans")) continue;
-   array<byte> file = readFile(name);
-   file.reserve(file.size*2); // rANS4 to JPEG expands (reallocates before references are taken)
-
-   // Decodes rANS4
-   ransDecTime.start();
-   CR2 cr2(file);
-   ransDecTime.stop();
-
-   // Encodes LJPEG
-   jpegEncTime.start();
-   size_t jpegSize = encode(cr2.ljpeg, file.slice(cr2.tiffHeaderSize+cr2.ljpeg.headerSize), cr2.image);
-   jpegEncTime.stop();
-
-   // Updates header
-   BinaryData TIFF(file);
-   TIFF.skip("II\x2A\x00");
-   for(;;) {
-    TIFF.index = TIFF.read32();
-    if(!TIFF.index) break;
-    uint16 entryCount = TIFF.read();
-    for(const CR2::Entry& e: TIFF.read<CR2::Entry>(entryCount)) { CR2::Entry& entry = (CR2::Entry&)e;
-     if(entry.tag==0x103) { assert_(entry.value==0x879C); entry.value=6; } // Compression
-     if(entry.tag==0x117) entry.value = cr2.ljpeg.headerSize + jpegSize;
-    }
-   }
-
-   file.size = cr2.tiffHeaderSize + cr2.ljpeg.headerSize + jpegSize;
-   assert_(file.size <= file.capacity);
-   writeFile(section(name,'.')+".cr2", file);
+   Map source(name);
+   CR2 cr2 (source); // Decodes rANS4
+   writeFile(section(name,'.')+".cr2", encodeLJPEG(source, cr2));
   }
-  log(ransDecTime, jpegEncTime, totalTime);
+  log(totalTime);
  }
 } app;

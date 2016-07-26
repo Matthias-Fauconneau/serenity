@@ -1,6 +1,6 @@
 #include "cr2.h"
 
-CR2::CR2(const ref<byte> file, bool onlyParse) : onlyParse(onlyParse)  {
+CR2::CR2(const ref<byte> file, bool onlyParse) {
  int compression = 0;
  BinaryData TIFF(file);
  TIFF.skip("II\x2A\x00");

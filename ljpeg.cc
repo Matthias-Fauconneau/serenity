@@ -12,11 +12,11 @@ void LJPEG::parse(ref<byte> data) {
   unused uint16 length = s.read16();
   for(uint c: range(2)) {
    unused uint8 huffmanTableInfo = s.read8();
-   symbolCountsForLength[c] = s.read<uint8>(16);
+   mref<uint8>(symbolCountsForLength[c]).copy(s.read<uint8>(16));
    maxLength[c]=16; for(; maxLength[c] && !symbolCountsForLength[c][maxLength[c]-1]; maxLength[c]--);
    int totalSymbolCount = 0; for(int count: symbolCountsForLength[c]) totalSymbolCount += count;
-   assert_(maxLength[c] <= 9);
-   symbols[c] = s.read<uint8>(totalSymbolCount);
+   assert_(totalSymbolCount < 16);
+   mref<uint8>(symbols[c]).slice(0, totalSymbolCount).copy(s.read<uint8>(totalSymbolCount));
    for(int p=0, h=0, length=1; length <= maxLength[c]; length++) {
     for(int i=0; i < symbolCountsForLength[c][length-1]; i++, p++) {
      for(int j=0; j < (1 << (maxLength[c]-length)); j++) {
@@ -27,7 +27,7 @@ void LJPEG::parse(ref<byte> data) {
   }
  }
  {
-  unused uint16 marker = s.read16(); // 0xFFC3: Start Of Frame (Lossless)
+  unused uint16 marker = s.read16(); // 0xFFC3: Start Of Frame (LJPEG)
   unused uint16 length = s.read16(); // 14
   sampleSize = s.read8();
   height = s.read16();
@@ -205,5 +205,6 @@ size_t encode(const LJPEG& ljpeg, const mref<byte> target, const ref<int16> sour
  }
  // Restores End of Image marker
  *ptr++ = 0xFF; *ptr++ = 0xD9;
+ assert_(ptr <= target.end());
  return ptr-target.begin();
 }
