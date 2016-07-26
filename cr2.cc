@@ -403,7 +403,7 @@ void CR2::readIFD(BinaryData& s) {
      for(uint c: range(2)) {
       int length = readHuffman(c);
       if(length == -1) {
-       assert_(y==height-1 && x==width-1 && c==1, y, x, c); target[0]=0; target++; log("Early EOF"); earlyEOF = true; pointer-=2; goto break2; }
+       assert_(y==height-1 && x==width-1 && c==1, y, x, c); target[0]=0; target++; earlyEOF = true; pointer-=2; goto break2; }
       assert_(length < 16);
       uint signMagnitude = readBits(length);
       int sign = signMagnitude & (1<<(length-1));

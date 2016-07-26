@@ -73,7 +73,10 @@ struct Raw {
    }
    if(1) {
     //Map file(name);
-    buffer<byte> file = readFile(name);
+    array<byte> file = readFile(name);
+    // Needs to be done before references are taken
+    //file.grow(file.size*2); // rANS4 to JPEG expands
+    file.reserve(file.size+1); // JPEG to JPEG may also expands if original had premature EOF
     bool earlyEOF = false;
     buffer<byte> original = copyRef(file);
     totalSize += file.size;
@@ -365,13 +368,12 @@ struct Raw {
 
      size_t ransFileSize = file.size;
      file.size = (byte*)ptr-file.begin();
+     assert_(file.size <= file.capacity, file.size, file.capacity);
      for(CR2::Entry* entry: cr2.entriesToFix) {
       if(entry->tag==0x103) { /*assert_(entry->value==0x879C);*/ entry->value=6; } // Compression
       if(entry->tag==0x117) {
        assert_(entry->value==ransFileSize-(cr2.data.begin()-file.begin()));
-       log("JPEG", entry->value);
        entry->value = file.size - (cr2.data.begin()-file.begin()); // May introduce change when original was wrong
-       log("JPEG", entry->value);
        pass = ((byte*)&entry->value)-file.begin();
       }
      }
@@ -406,7 +408,7 @@ struct Raw {
 
     // File verification
     //assert_(file == original);
-    if(file.size != original.size) log(file.size, original.size);
+    //if(file.size != original.size) log(file.size, original.size);
     // FIXME: "earlyEOF"
     assert_(file.size == original.size
             || (earlyEOF && file.size == original.size+2)
