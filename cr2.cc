@@ -2,6 +2,12 @@
 #include "bit.h"
 #include "sort.h"
 
+typedef float m128 __attribute__((__vector_size__(16)));
+typedef int __attribute((__vector_size__(16))) v4si;
+typedef char v16qi __attribute__((__vector_size__(16)));
+inline v4si set1(int i) { return (v4si){i,i,i,i}; }
+#include <smmintrin.h>
+
 uint CR2::readBits(const int nbits) {
  if(nbits==0) return 0u;
  while(vbits < nbits) {
@@ -12,12 +18,14 @@ uint CR2::readBits(const int nbits) {
   vbits += 8;
  }
  uint value = (bitbuf << (32-vbits)) >> (32-nbits);
+ codes.append(uint8(nbits), uint16(value), uint8(0));
  vbits -= nbits;
  return value;
 }
 
 int CR2::readHuffman(uint i) {
  const int nbits = maxLength[i];
+ assert_(nbits == 9);
  while(vbits < nbits) {
   uint byte = *pointer; pointer++;
   if(byte == 0xFF) {
@@ -30,8 +38,13 @@ int CR2::readHuffman(uint i) {
   vbits += 8;
  }
  uint code = (bitbuf << (32-vbits)) >> (32-nbits);
- vbits -= lengthSymbolForCode[i][code].length;
- return lengthSymbolForCode[i][code].symbol;
+ assert_(code < 512);
+ uint8 length = lengthSymbolForCode[i][code].length;
+ uint8 symbol = lengthSymbolForCode[i][code].symbol;
+ assert_(length <= maxLength[i] && symbol <= 12);
+ codes.append(uint8(length), uint16(code>>(maxLength[i]-length)), uint8(symbol));
+ vbits -= length;
+ return symbol;
 }
 
 void CR2::readIFD(BinaryData& s) {
@@ -323,6 +336,7 @@ void CR2::readIFD(BinaryData& s) {
     symbols[c] = s.read<uint8>(totalSymbolCount);
     for(int p=0, h=0, length=1; length <= maxLength[c]; length++) {
      for(int i=0; i < symbolCountsForLength[c][length-1]; i++, p++) {
+      //log(str(h>>(maxLength[c]-length),uint(length),'0',2u), symbols[c][p]);
       for(int j=0; j < (1 << (maxLength[c]-length)); j++) {
        lengthSymbolForCode[c][h++] = {uint8(length), symbols[c][p]};
       }
@@ -374,10 +388,10 @@ void CR2::readIFD(BinaryData& s) {
    uint8 successiveApproximation = s.read8();
    assert_(successiveApproximation == 0);
   }
-  if(onlyParse) return;
   assert_(sampleSize > 8 && sampleSize <= 16);
   assert_(!image);
   begin = (uint8*)s.data.begin()+s.index;
+  if(onlyParse) return;
   image = Image16(width*2, height);
   if(compression == 6) { // JPEG
    pointer = begin;
@@ -388,7 +402,8 @@ void CR2::readIFD(BinaryData& s) {
     for(uint unused x: range(width)) {
      for(uint c: range(2)) {
       int length = readHuffman(c);
-      if(length == -1) { assert_(y==height-1 && x==width-1 && c==1, y, x, c); target[0]=0; log("Early EOF"); earlyEOF = true; return; }
+      if(length == -1) {
+       assert_(y==height-1 && x==width-1 && c==1, y, x, c); target[0]=0; target++; log("Early EOF"); earlyEOF = true; pointer-=2; goto break2; }
       assert_(length < 16);
       uint signMagnitude = readBits(length);
       int sign = signMagnitude & (1<<(length-1));
@@ -400,12 +415,14 @@ void CR2::readIFD(BinaryData& s) {
      }
     }
    }
+   break2:;
    assert_(target == image.end());
+   end = pointer;
    s.index = (const byte*)pointer-s.data.begin();
-   {
-    uint16 marker = s.read16();
-    assert_(marker == 0xFFD9, hex(marker)); // End Of Image
-   }
+   if(s.data.end() == file.end()-2) { log("Wrong StripByteCount"); s.data.size+=2; } // StripByteCount size failed to include End Of Image marker
+   assert_(s, s.data.size-s.index, hex(s.data.slice(s.data.size-4)), file.end()-s.data.end());
+   uint16 marker = s.read16();
+   assert_(marker == 0xFFD9, hex(marker), s.data.size-s.index, hex(s.data.slice(s.data.size-4))); // End Of Image
   } else { // rANS4
    assert_(compression == 0x879C);
    const uint16* ptr = (uint16*)begin;
@@ -428,7 +445,7 @@ void CR2::readIFD(BinaryData& s) {
      }
     }
 
-    __v4si x = _mm_loadu_si128((const __m128i*)ptr);
+    v4si x = (v4si)_mm_loadu_si128((const __m128i*)ptr);
     ptr += 8; // !! not 16
     uint W = image.width/2;
     assert_(W%4 == 0);
@@ -437,8 +454,8 @@ void CR2::readIFD(BinaryData& s) {
      const int16* const up = plane + (y-1)*2*W*2;
      int16* const row = plane + y*2*W*2;
      for(uint X=0; X<W; X+=4) {
-      const __v4si slot = _mm_and_si128(x, _mm_set1_epi32(M - 1));
-      for(uint k: range(4)) {
+      const v4si slot = x & set1(M-1);
+      for(uint k: range(4)) { // FIXME: SIMD
        uint x = X+k;
        uint top = y>0 ? up[x*2] : 0;
        uint left = x>0 ? row[x*2-2] : 0;
@@ -448,17 +465,13 @@ void CR2::readIFD(BinaryData& s) {
        row[x*2] = value;
       }
 
-      __v4si freq_bias_lo = _mm_cvtsi32_si128(slots[slot[0]]);
-      freq_bias_lo = _mm_insert_epi32(freq_bias_lo, slots[slot[1]], 1);
-      __v4si freq_bias_hi = _mm_cvtsi32_si128(slots[slot[2]]);
-      freq_bias_hi = _mm_insert_epi32(freq_bias_hi, slots[slot[3]], 1);
-      __v4si freq_bias = _mm_unpacklo_epi64(freq_bias_lo, freq_bias_hi);
-      __v4si xscaled = _mm_srli_epi32(x, scaleBits);
-      __v4si freq = _mm_and_si128(freq_bias, _mm_set1_epi32(0xffff));
-      __v4si bias = _mm_srli_epi32(freq_bias, 16);
+      const v4si freq_bias {(int)slots[slot[0]], (int)slots[slot[1]], (int)slots[slot[2]], (int)slots[slot[3]]};
+      const v4si xscaled = __builtin_ia32_psrldi128(x, scaleBits);
+      v4si freq = freq_bias & set1(0xffff);
+      v4si bias = __builtin_ia32_psrldi128(freq_bias, 16);
       x = xscaled * freq + bias;
 
-      static int8 const shuffles[16][16] = {
+      static v16qi const shuffles[16] = {
 #define _ -1
        { _,_,_,_, _,_,_,_, _,_,_,_, _,_,_,_ }, // 0000
        { 0,1,_,_, _,_,_,_, _,_,_,_, _,_,_,_ }, // 0001
@@ -479,25 +492,24 @@ void CR2::readIFD(BinaryData& s) {
 #undef _
       };
       static uint8 const numBytes[16] = { 0,1,1,2, 1,2,2,3, 1,2,2,3, 2,3,3,4 };
-      __v4si x_biased = _mm_xor_si128(x, _mm_set1_epi32(int(0x80000000)));
-      __v4si greater = _mm_cmplt_epi32(x_biased, _mm_set1_epi32(L - 0x80000000));
-      uint mask = _mm_movemask_ps(greater);
-      __v4si memvals = _mm_loadl_epi64((const __m128i*)ptr);
-      __v4si xshifted = _mm_slli_epi32(x, 16);
-      __v4si shufmask = _mm_load_si128((const __m128i*)shuffles[mask]);
-      __v4si newx = _mm_or_si128(xshifted, _mm_shuffle_epi8(memvals, shufmask));
-      x = _mm_blendv_epi8(x, newx, greater);
+      v4si x_biased = x ^ set1(0x80000000);
+      v4si greater = set1(L - 0x80000000) > x_biased;
+      uint mask = __builtin_ia32_movmskps((m128)greater);
+      v4si xshifted = __builtin_ia32_pslldi128(x, 16);
+      v4si newx = xshifted | (v4si)__builtin_ia32_pshufb128((v16qi)_mm_loadl_epi64((const __m128i*)ptr), shuffles[mask]);
+      x = (v4si)__builtin_ia32_pblendvb128((v16qi)x, (v16qi)newx, (v16qi)greater);
       ptr += numBytes[mask];
      }
     }
    }
+   end = (uint8*)ptr;
    s.index = ((byte*)ptr)-s.data.begin();
   }
   assert_(!s);
  }
 }
 
-CR2::CR2(const ref<byte> file, bool onlyParse) : onlyParse(onlyParse)  {
+CR2::CR2(const ref<byte> file, bool onlyParse) : file(file), onlyParse(onlyParse)  {
  BinaryData s(file);
  s.skip("II\x2A\x00");
  for(;;) {

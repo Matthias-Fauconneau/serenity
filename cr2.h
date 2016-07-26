@@ -1,7 +1,6 @@
 #pragma once
 #include "data.h"
 #include "image.h"
-#include <smmintrin.h>
 
 /// 2D array of 16bit integer samples
 typedef ImageT<int16> Image16;
@@ -13,7 +12,12 @@ static constexpr uint M = 1<<scaleBits;
 struct Section { size_t start, size; String name; };
 inline bool operator>(const Section& a, const Section& b) { return a.start > b.start; }
 
+struct Code { uint8 length; uint16 value; uint8 symbol; };
+inline bool operator ==(Code a, Code b) { return a.length == b.length && a.value == b.value && a.symbol == b.symbol; }
+template<> inline String str(const Code& code) { return str(code.length, str(code.value,uint(code.length),'0',2u), code.symbol); }
+
 struct CR2 {
+ const ref<byte> file;
  bool onlyParse = false;
  bool earlyEOF = false;
  array<Section> sections;
@@ -23,8 +27,12 @@ struct CR2 {
  array<Entry*> entriesToFix; // Entries which would have dangling references after truncation
  ref<byte> data;
  int2 size = 0; size_t stride = 0;
+
+ array<Code> codes;
+
  const uint8* begin = 0;
  const uint8* pointer = 0;
+ const uint8* end = 0;
  uint bitbuf = 0;
  int vbits = 0;
  uint readBits(const int nbits);

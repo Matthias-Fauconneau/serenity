@@ -30,9 +30,9 @@ struct Raw {
     const size_t target = 0x3800;
     if(cr2.ifdOffset.size <= 3 && source == target) continue;
    }
-   if(1) if(CR2(Map(name), false).earlyEOF) continue;
+   if(0) if(CR2(Map(name), false).earlyEOF) continue;
    imageCount++;
-   log(imageCount, "/", cr2Count);
+   //log(imageCount, "/", cr2Count);
   }
   Time jpegDecTime, ransEncTime, ransDecTime, jpegEncTime, totalTime {true};
   size_t totalSize = 0, stripSize = 0, ransSize = {};
@@ -78,137 +78,153 @@ struct Raw {
     buffer<byte> original = copyRef(file);
     totalSize += file.size;
     Image16 source;
+    array<Code> originalCodes;
+    size_t pass = -1;
     {
      // Decode JPEG-LS
      jpegDecTime.start();
      CR2 cr2(file);
-     if(1) if(cr2.earlyEOF) continue;
+     if(0) if(cr2.earlyEOF) { ransSize+=file.size; continue; }
      earlyEOF = cr2.earlyEOF;
      source = ::move(cr2.image);
+     originalCodes = ::move(cr2.codes);
      jpegDecTime.stop();
 
-     // Encode as rANS4
-     ransEncTime.start();
-     ::buffer<uint16> buffer;
-     buffer.data = (uint16*)cr2.begin;
-     buffer.size = 0;
-     buffer.capacity = (uint16*)file.end()-(uint16*)cr2.begin; // HACK: to use append (capacity flags heap allocation to be freed which is not the case here)
-     // buffer.capacity needs to be cleared to zero before destruction as it is not a heap allocation
-     assert_(source.width%2==0 && source.height%2==0);
-     Image16 residual (source.size/2);
-     for(uint i: range(4)) {
-      uint W = source.width/2;
-      assert_(W%4 == 0);
-      const int16* plane = source.data + (i&2)*W + (i&1);
-      for(uint y: range(source.height/2)) {
-       const int16* const up = plane + (y-1)*2*W*2;
-       const int16* const row = plane + y*2*W*2;
-       int16* const target = residual.begin() + y*W;
-       for(uint x: range(W)) {
-        uint top = y>0 ? up[x*2] : 0;
-        uint left = x>0 ? row[x*2-2] : 0;
-        int predictor = (left+top)/2;
-        uint value = row[x*2];
-        int r = value - predictor;
-        assert_(-0x2000 <= r && r <= 0x2000, r, hex(r));
-        target[x] = r;
-       }
-      }
-
-      int16 min = 0x7FFF, max = 0;
-      for(int16 value: residual) { min=::min(min, value); max=::max(max, value); }
-      assert_(max+1-min <= 0x2000, min, max, max+1-min);
-      ::buffer<uint32> histogram(max+1-min);
-      histogram.clear(0);
-      uint32* base = histogram.begin()-min;
-      for(int value: residual) base[value]++;
-      ::buffer<uint> cumulative(1+histogram.size);
-      cumulative[0] = 0;
-      for(size_t i: range(histogram.size)) cumulative[i+1] = cumulative[i] + histogram[i];
-
-      ::buffer<uint16> freqM (histogram.size);
-      ::buffer<uint16> cumulativeM (cumulative.size);
-      cumulativeM[0] = 0;
-      for(size_t i: range(1, cumulative.size)) cumulativeM[i] = (uint64)cumulative[i]*M/cumulative.last();
-      for(size_t i: range(1, cumulative.size)) {
-       if(histogram[i-1] && cumulativeM[i] == cumulativeM[i-1]) {
-        uint32 bestFreq = 0;
-        size_t bestIndex = invalid;
-        for(int j: range(1, cumulative.size)) {
-         uint32 freq = cumulativeM[j] - cumulativeM[j-1];
-         if(freq > 1 && freq > bestFreq) { bestFreq = freq; bestIndex = j; }
+     if(0) {
+      // Encode as rANS4
+      ransEncTime.start();
+      ::buffer<uint16> buffer;
+      buffer.data = (uint16*)cr2.begin;
+      buffer.size = 0;
+      buffer.capacity = (uint16*)file.end()-(uint16*)cr2.begin; // HACK: to use append (capacity flags heap allocation to be freed which is not the case here)
+      // buffer.capacity needs to be cleared to zero before destruction as it is not a heap allocation
+      assert_(source.width%2==0 && source.height%2==0);
+      Image16 residual (source.size/2);
+      for(uint i: range(4)) {
+       uint W = source.width/2;
+       assert_(W%4 == 0);
+       const int16* plane = source.data + (i&2)*W + (i&1);
+       for(uint y: range(source.height/2)) {
+        const int16* const up = plane + (y-1)*2*W*2;
+        const int16* const row = plane + y*2*W*2;
+        int16* const target = residual.begin() + y*W;
+        for(uint x: range(W)) {
+         uint top = y>0 ? up[x*2] : 0;
+         uint left = x>0 ? row[x*2-2] : 0;
+         int predictor = (left+top)/2;
+         uint value = row[x*2];
+         int r = value - predictor;
+         assert_(-0x2000 <= r && r <= 0x2000, r, hex(r));
+         target[x] = r;
         }
-        assert_(bestIndex != invalid && bestIndex != i);
-        if(bestIndex < i) for(size_t j: range(bestIndex, i)) cumulativeM[j]--;
-        if(bestIndex > i) for(size_t j: range(i, bestIndex)) cumulativeM[j]++;
        }
-      }
-      assert_(cumulativeM[0] == 0 && cumulativeM.last() == M, cumulativeM.last());
-      for(size_t i: range(histogram.size)) {
-       if(histogram[i] == 0) assert_(cumulativeM[i+1] == cumulativeM[i]);
-       else assert_(cumulativeM[i+1] > cumulativeM[i]);
-       freqM[i] = cumulativeM[i+1] - cumulativeM[i];
-      }
 
-      uint16* const end = buffer.begin()+buffer.capacity;
-      assert_((end-(uint16*)file.end())/2 == 0, end);
-      uint16* begin; {
-       uint16* ptr = end;
-       uint32 rans[4];
-       for(uint32& r: rans) r = L;
-       for(int i: reverse_range(residual.ref::size)) {
-        uint s = residual[i]-min;
-        uint32 x = rans[i%4];
-        uint freq = freqM[s];
-        if(x >= ((L>>scaleBits)<<16) * freq) {
-         ptr -= 1;
-         *ptr = (uint16)(x&0xffff);
-         x >>= 16;
+       int16 min = 0x7FFF, max = 0;
+       for(int16 value: residual) { min=::min(min, value); max=::max(max, value); }
+       assert_(max+1-min <= 0x2000, min, max, max+1-min);
+       ::buffer<uint32> histogram(max+1-min);
+       histogram.clear(0);
+       uint32* base = histogram.begin()-min;
+       for(int value: residual) base[value]++;
+       ::buffer<uint> cumulative(1+histogram.size);
+       cumulative[0] = 0;
+       for(size_t i: range(histogram.size)) cumulative[i+1] = cumulative[i] + histogram[i];
+
+       ::buffer<uint16> freqM (histogram.size);
+       ::buffer<uint16> cumulativeM (cumulative.size);
+       cumulativeM[0] = 0;
+       for(size_t i: range(1, cumulative.size)) cumulativeM[i] = (uint64)cumulative[i]*M/cumulative.last();
+       for(size_t i: range(1, cumulative.size)) {
+        if(histogram[i-1] && cumulativeM[i] == cumulativeM[i-1]) {
+         uint32 bestFreq = 0;
+         size_t bestIndex = invalid;
+         for(int j: range(1, cumulative.size)) {
+          uint32 freq = cumulativeM[j] - cumulativeM[j-1];
+          if(freq > 1 && freq > bestFreq) { bestFreq = freq; bestIndex = j; }
+         }
+         assert_(bestIndex != invalid && bestIndex != i);
+         if(bestIndex < i) for(size_t j: range(bestIndex, i)) cumulativeM[j]--;
+         if(bestIndex > i) for(size_t j: range(i, bestIndex)) cumulativeM[j]++;
         }
-        rans[i%4] = ((x / freq) << scaleBits) + (x % freq) + cumulativeM[s];
        }
-       for(int i: reverse_range(4)) {
-        uint32 x = rans[i%4];
-        ptr -= 2;
-        ptr[0] = (uint16)(x>>0);
-        ptr[1] = (uint16)(x>>16);
+       assert_(cumulativeM[0] == 0 && cumulativeM.last() == M, cumulativeM.last());
+       for(size_t i: range(histogram.size)) {
+        if(histogram[i] == 0) assert_(cumulativeM[i+1] == cumulativeM[i]);
+        else assert_(cumulativeM[i+1] > cumulativeM[i]);
+        freqM[i] = cumulativeM[i+1] - cumulativeM[i];
        }
-       assert_(ptr >= buffer.begin());
-       begin = ptr;
-      }
-      buffer.append(cast<uint16>(ref<int16>{min, max}));
-      buffer.append(freqM);
-      assert_(begin > buffer.end());
-      buffer.append(ref<uint16>(begin, end-begin));
 
-      if(0) {
-       const uint32 total = residual.ref::size;
-       double entropy = 0;
-       for(uint32 count: histogram) if(count) entropy += count * log2(double(total)/double(count));
-       log(str(100.*((end-begin)/(entropy/16)-1), 1u)+"%", str(100.*histogram.size/(end-begin), 1u)+"%");
+       uint16* const end = buffer.begin()+buffer.capacity;
+       assert_((end-(uint16*)file.end())/2 == 0, end);
+       uint16* begin; {
+        uint16* ptr = end;
+        uint32 rans[4];
+        for(uint32& r: rans) r = L;
+        for(int i: reverse_range(residual.ref::size)) {
+         uint s = residual[i]-min;
+         uint32 x = rans[i%4];
+         uint freq = freqM[s];
+         if(x >= ((L>>scaleBits)<<16) * freq) {
+          ptr -= 1;
+          *ptr = (uint16)(x&0xffff);
+          x >>= 16;
+         }
+         rans[i%4] = ((x / freq) << scaleBits) + (x % freq) + cumulativeM[s];
+        }
+        for(int i: reverse_range(4)) {
+         uint32 x = rans[i%4];
+         ptr -= 2;
+         ptr[0] = (uint16)(x>>0);
+         ptr[1] = (uint16)(x>>16);
+        }
+        assert_(ptr >= buffer.begin());
+        begin = ptr;
+       }
+       buffer.append(cast<uint16>(ref<int16>{min, max}));
+       buffer.append(freqM);
+       assert_(begin > buffer.end(), buffer.end(), begin, earlyEOF);
+       buffer.append(ref<uint16>(begin, end-begin));
+
+       if(0) {
+        const uint32 total = residual.ref::size;
+        double entropy = 0;
+        for(uint32 count: histogram) if(count) entropy += count * log2(double(total)/double(count));
+        log(str(100.*((end-begin)/(entropy/16)-1), 1u)+"%", str(100.*histogram.size/(end-begin), 1u)+"%");
+       }
       }
-     }
-     buffer.capacity = 0; // reference buffer
-     size_t jpegFileSize = file.size;
-     file.size = ((byte*)cr2.begin-file.begin())+buffer.size*2;
-     for(CR2::Entry* entry: cr2.entriesToFix) {
-      if(entry->tag==0x103) { assert_(entry->value==6); entry->value=0x879C; } // Compression
-      if(entry->tag==0x117) {
-       assert_(entry->value==jpegFileSize-(cr2.data.begin()-file.begin()),
-               jpegFileSize-(cr2.data.begin()-file.begin()), entry->value, cr2.data.size);
-       entry->value = file.size - (cr2.data.begin()-file.begin());
+      buffer.capacity = 0; // reference buffer
+      size_t jpegFileSize = file.size;
+      file.size = ((byte*)cr2.begin-file.begin())+buffer.size*2;
+      for(CR2::Entry* entry: cr2.entriesToFix) {
+       if(entry->tag==0x103) { assert_(entry->value==6); entry->value=0x879C; } // Compression
+       if(entry->tag==0x117) {
+        assert_(entry->value==jpegFileSize-(cr2.data.begin()-file.begin()),
+                jpegFileSize-(cr2.data.begin()-file.begin()), entry->value, cr2.data.size);
+        entry->value = file.size - (cr2.data.begin()-file.begin());
+       }
       }
+      ransEncTime.stop();
      }
-     ransEncTime.stop();
     }
     size_t ransFileSize = file.size;
     ransSize += ransFileSize;
     {
+#if 0
      // Decode rANS4
      ransDecTime.start();
      CR2 cr2(file);
      const Image16& source = cr2.image;
      ransDecTime.stop();
+#else
+     CR2 cr2(file, false);
+     assert_(cr2.end);
+     // Replaces FF 00 with FF (for bitstream verification)
+     ::buffer<uint8> bitstream (cr2.end-cr2.begin, 0);
+     for(const uint8* ptr=cr2.begin; ptr < (uint8*)file.end()-2; ptr++) {
+      bitstream.append(*ptr);
+      if(*ptr==0xFF) { ptr++; assert_(*ptr == 0x00, *ptr); }
+     }
+#endif
 
      // Encode image back to JPEG-LS
      jpegEncTime.start();
@@ -219,7 +235,7 @@ struct Raw {
      uint64 bitbuf = 0;
      uint bitLeftCount = sizeof(bitbuf)*8;
 
-     struct LengthCode { uint8 length = 0; uint16 code = 0; };
+     struct LengthCode { uint8 length = -1; uint16 code = -1; };
      LengthCode lengthCodeForSymbol[2][16];
      for(uint c: range(2)) {
       assert_(cr2.maxLength[c] <= 16);
@@ -234,6 +250,8 @@ struct Raw {
      }
      const int16* s = source.begin();
      int predictor[2] = {0,0};
+     array<Code> codes;
+     size_t index = 0;
      for(uint unused y: range(source.height)) {
       const uint sampleSize = 12;
       for(uint c: range(2)) predictor[c] = 1<<(sampleSize-1);
@@ -261,6 +279,8 @@ struct Raw {
          {
           uint size = lengthCode.length;
           uint value = lengthCode.code;
+          assert_((value ? ((sizeof(value)*8) - __builtin_clz(value)) : 0) <= size && size <= 9);
+          codes.append(uint8(size), uint16(value), uint8(symbol));
           if(size < bitLeftCount) {
            bitbuf <<= size;
            bitbuf |= value;
@@ -278,6 +298,8 @@ struct Raw {
         if(length) {
          uint size = length;
          uint value = signMagnitude;
+         assert_((value ? ((sizeof(value)*8) - __builtin_clz(value)) : 0) <= size && size <= 12);
+         codes.append(uint8(size), uint16(value), uint8(0));
          if(size < bitLeftCount) {
           bitbuf <<= size;
           bitbuf |= value;
@@ -286,6 +308,16 @@ struct Raw {
           bitbuf |= value >> (size - bitLeftCount); // Puts leftmost bits in remaining space
           bitLeftCount += sizeof(bitbuf)*8;
           *(uint64*)pointer = __builtin_bswap64(bitbuf); // MSB msb
+          if(!(*(uint64*)pointer == *(const uint64*)(bitstream.begin()+(pointer-buffer.begin()))) && 1) {
+           log(index=codes.size-1);
+           log(codes[codes.size-1]);
+           log(originalCodes[codes.size-1]);
+           assert_(codes[codes.size-1] != originalCodes[codes.size-1]);
+           log((pointer-buffer.begin()), cr2.end-cr2.begin, "\n",
+                  str(__builtin_bswap64(*(uint64*)pointer),64u,'0',2u), "\n",
+                  str(__builtin_bswap64(*(uint64*)(bitstream.begin()+(pointer-buffer.begin()))),64u,'0',2u));
+           //return;
+          }
           bitbuf = value; // Already stored leftmost bits will be pushed out eventually
           pointer += sizeof(bitbuf);
          }
@@ -306,6 +338,22 @@ struct Raw {
      assert_(s == source.end());
      buffer.size = pointer-buffer.begin();
 
+     //assert_(codes == originalCodes);
+     assert_(codes.size == originalCodes.size
+             || (earlyEOF && codes.size == originalCodes.size+2)
+             , codes.size, originalCodes.size);
+     log(codes.size, originalCodes.size);
+     //log(index);
+     //log(codes[index]);
+     //log(originalCodes[index]);
+     //assert_(codes[index] != originalCodes[index]);
+     for(size_t i: range(originalCodes.size)) {
+      //if(!(codes[i].length == originalCodes[i].length && codes[i].value == originalCodes[i].value && codes[i].symbol == originalCodes[i].symbol)) {
+      if(codes[i] != originalCodes[i]) {
+       log(i, "\n", codes[i], "\n", originalCodes[i]);
+       return;
+      }
+     }
      // Replaces FF with FF 00 (JPEG sync)
      uint8* ptr = (uint8*)cr2.begin;
      for(uint8 b: buffer) {
@@ -318,10 +366,13 @@ struct Raw {
      size_t ransFileSize = file.size;
      file.size = (byte*)ptr-file.begin();
      for(CR2::Entry* entry: cr2.entriesToFix) {
-      if(entry->tag==0x103) { assert_(entry->value==0x879C); entry->value=6; } // Compression
+      if(entry->tag==0x103) { /*assert_(entry->value==0x879C);*/ entry->value=6; } // Compression
       if(entry->tag==0x117) {
        assert_(entry->value==ransFileSize-(cr2.data.begin()-file.begin()));
-       entry->value = file.size - (cr2.data.begin()-file.begin());
+       log("JPEG", entry->value);
+       entry->value = file.size - (cr2.data.begin()-file.begin()); // May introduce change when original was wrong
+       log("JPEG", entry->value);
+       pass = ((byte*)&entry->value)-file.begin();
       }
      }
     }
@@ -338,21 +389,41 @@ struct Raw {
     // Image verification
     assert_(source == target);
 
+    // Bitstream verification
+    /*if(0) for(size_t i: range(original.size)) {
+     if(file[i] != original[i]) wrong++;
+     if(wrong) log(i, "\n",
+                   str((uint8)file[i-4],8u,'0',2u), str((uint8)original[i-4],8u,'0',2u), "\n",
+                   str((uint8)file[i-3],8u,'0',2u), str((uint8)original[i-3],8u,'0',2u), "\n",
+                   str((uint8)file[i-2],8u,'0',2u), str((uint8)original[i-2],8u,'0',2u), "\n",
+                   str((uint8)file[i-1],8u,'0',2u), str((uint8)original[i-1],8u,'0',2u), "\n",
+                   str((uint8)file[i+0],8u,'0',2u), str((uint8)original[i+0],8u,'0',2u), "\n",
+                   str((uint8)file[i+1],8u,'0',2u), str((uint8)original[i+1],8u,'0',2u), "\n",
+                   str((uint8)file[i+2],8u,'0',2u), str((uint8)original[i+2],8u,'0',2u));
+     //assert_(wrong < 1);
+     if(!(wrong < 1)) return;
+    }*/
+
     // File verification
     //assert_(file == original);
     if(file.size != original.size) log(file.size, original.size);
     // FIXME: "earlyEOF"
     assert_(file.size == original.size
             || (earlyEOF && file.size == original.size+2)
-            || (earlyEOF && file.size == original.size+3),
-            earlyEOF, file.size, original.size);
-    int wrong = 0;
+            || (earlyEOF && file.size == original.size+3)
+            , earlyEOF, file.size, original.size);
     for(size_t i: range(original.size)) {
-     if(file[i] != original[i]) wrong++;
-     if(wrong) log(i, "\n", str((uint8)file[i+0],8u,'0',2u), str((uint8)original[i+0],8u,'0',2u), "\n",
-       str((uint8)file[i+1],8u,'0',2u), str((uint8)original[i+1],8u,'0',2u), "\n",
-       str((uint8)file[i+2],8u,'0',2u), str((uint8)original[i+2],8u,'0',2u));
-     assert_(wrong < 1 || earlyEOF);
+     if(file[i] != original[i] && !(earlyEOF && (i>=original.size-5 || (i==pass || i==pass+1 || i==pass+2 || i==pass+3)))) {
+      log(i, "\n",
+          str((uint8)file[i-4],8u,'0',2u), str((uint8)original[i-4],8u,'0',2u), "\n",
+        str((uint8)file[i-3],8u,'0',2u), str((uint8)original[i-3],8u,'0',2u), "\n",
+        str((uint8)file[i-2],8u,'0',2u), str((uint8)original[i-2],8u,'0',2u), "\n",
+        str((uint8)file[i-1],8u,'0',2u), str((uint8)original[i-1],8u,'0',2u), "\n",
+        str((uint8)file[i+0],8u,'0',2u), str((uint8)original[i+0],8u,'0',2u), "\n",
+        str((uint8)file[i+1],8u,'0',2u), str((uint8)original[i+1],8u,'0',2u), "\n",
+        str((uint8)file[i+2],8u,'0',2u), str((uint8)original[i+2],8u,'0',2u));
+      return;
+     }
     }
 
     log(str((file.size-              0)/1024/1024.,1u)+"MB", str(ransFileSize*2/1024/1024.,1u)+"MB",
