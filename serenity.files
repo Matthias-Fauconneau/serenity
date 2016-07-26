@@ -15,7 +15,6 @@ core/string.cc
 core/vector.h
 core/matrix.h
 core/image.h
-core/image.cc
 core/simd.h
 core/map.h
 core/file.h
@@ -35,14 +34,10 @@ core/sort.h
 
 io/variant.h
 io/png.cc
-io/bit.h
-io/flic.h
 io/font.cc
 io/font.h
 io/xml.h
 io/xml.cc
-io/inflate.h
-io/zip.h
 
 ui/x.h
 ui/display.h
@@ -98,3 +93,7 @@ raw.cc
 cr2.h
 cr2.cc
 convert.cc
+rans4.h
+rans4.cc
+ljpeg.h
+ljpeg.cc
