@@ -35,8 +35,6 @@ struct mat3 {
  float& M(int i, int j) { return data[j*3+i]; }
  float operator()(int i, int j) const { return M(i,j); }
  float& operator()(int i, int j) { return M(i,j); }
- vec3& operator[](int j) { return (vec3&)data[j*3]; }
- const vec3& operator[](int j) const { return (vec3&)data[j*3]; }
 
  vec2 operator*(vec2 v) const {vec2 r; for(int i: range(2)) r[i] = v.x*M(i,0)+v.y*M(i,1)+1*M(i,2); return r; }
  vec3 operator*(vec3 v) const {vec3 r; for(int i: range(3)) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2); return r; }
@@ -84,8 +82,6 @@ struct mat4 {
  float& M(int i, int j) { return data[j*4+i]; }
  float operator()(int i, int j) const { return M(i,j); }
  float& operator()(int i, int j) { return M(i,j); }
- vec4& operator[](int j) { return (vec4&)data[j*4]; }
- const vec4& operator[](int j) const { return (vec4&)data[j*4]; }
 
  vec3 operator*(vec3 v) const { vec4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+1*M(i,3); return r.xyz()/r.w; }
  vec4 operator*(vec4 v) const { vec4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+v.w*M(i,3); return r; }

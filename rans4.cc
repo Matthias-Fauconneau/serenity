@@ -176,7 +176,10 @@ size_t encodeRANS4(const mref<byte> target, const Image16& source) {
   buffer.append(min);
   buffer.append(max);
   buffer.append(freqM);
-  assert_(size_t(pointer-buffer.begin()) >= buffer.size);
+  if(size_t(pointer-buffer.begin()) < buffer.size) {
+   log("rANS4", str((buffer.size+size_t(buffer.end()-pointer))*2)+"K", " > LJPEG", str(target.size)+"K");
+   return 0;
+  }
   buffer.append(ref<uint16>(pointer, buffer.end()-pointer));
  }
  return buffer.size*sizeof(uint16);

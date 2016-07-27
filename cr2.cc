@@ -21,6 +21,7 @@ CR2::CR2(const ref<byte> file, bool onlyParse) {
     dataSize = entry.value;
     assert_(dataSize <= TIFF.data.size);
    }
+   else if(entry.tag == 0x123) error("");
    else if(entry.tag == 0x8769) { // EXIF
     BinaryData EXIF (TIFF.data); EXIF.index = entry.value;
     uint16 entryCount = EXIF.read();

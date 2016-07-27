@@ -50,6 +50,7 @@ void LJPEG::parse(ref<byte> data) {
   unused uint8 predictor = s.read8();
   unused uint8 endOfSpectralSelection = s.read8();
   unused uint8 successiveApproximation = s.read8();
+  assert_(successiveApproximation == 0);
  }
  headerSize = s.index;
 }

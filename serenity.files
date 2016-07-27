@@ -89,7 +89,7 @@ music/fret.cc
 
 io/tiff.h
 io/tiff.cc
-raw.cc
+codec.cc
 cr2.h
 cr2.cc
 convert.cc
@@ -97,3 +97,4 @@ rans4.h
 rans4.cc
 ljpeg.h
 ljpeg.cc
+core/image.cc

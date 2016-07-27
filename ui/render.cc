@@ -2,7 +2,6 @@
 // "math.h"
 inline float fract(float x) { return x - floor(x); }
 
-extern uint8 sRGB_forward[0x1000];
 extern float sRGB_reverse[0x100];
 
 static void blend(const Image& target, uint x, uint y, bgr3f source_linear, float opacity) {
