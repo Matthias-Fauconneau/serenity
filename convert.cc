@@ -14,14 +14,14 @@ struct Convert {
 
   // Min/Max
   uint min = -1, max = 0;
-  for(size_t y: range(cropY, image.height)) for(size_t x: range(cropX, image.width)) {
+  for(size_t y: range(cropY, image.size.y)) for(size_t x: range(cropX, image.size.x)) {
    const uint v = image(x,y);
    min = ::min<uint>(min, v);
    max = ::max<uint>(max, v);
   }
 
   // "Demosaic" (G1+G2) (and de-bias black level)
-  int2 size ((image.width-cropX)/2, (image.height-cropY)/2);
+  int2 size ((image.size.x-cropX)/2, (image.size.y-cropY)/2);
   Image16 R(size), G(size), B(size);
   for(size_t y: range(size.y)) {
    for(size_t x: range(size.x)) {
@@ -81,6 +81,7 @@ struct Convert {
   mat3 RGB_sensor = sensor_RGB.inverse();
   mat3 XYZ_sensor = XYZ_RGB*RGB_sensor; // FIXME: direct WB normalization in XYZ ?
 
+#if 0
   // Luminance histogram
   buffer<uint32> histogram (1<<15); // 128K
   histogram.clear(0);
@@ -114,6 +115,48 @@ struct Convert {
    G[i] = int(RGB.g);
    B[i] = int(RGB.b);
   }
+#else
+  // Luminance image
+  uint maxY = 0;
+  Image16 Y(size);
+  for(size_t i: range(R.ref::size)) {
+   int y = (XYZ_sensor * vec3(R[i], G[i], B[i]))[1];
+   maxY = ::max<uint>(maxY, y);
+   assert_(y >= 0 && y < 1<<15, y);
+   Y[i] = y;
+  }
+
+  // Colorspace conversion, Adaptive histogram equalization
+  mat3 RGB_XYZ = XYZ_RGB.inverse();
+  log("AHE");
+  Time AHE {true};
+  for(int y: range(Y.size.y)) {
+   for(int x: range(Y.size.x)) {
+    const int L = 8;
+    int s = 0;
+    size_t  i = y*Y.stride+x;
+    int r = Y[i];
+    for(int dy: range(::max(0, y-L), ::min(Y.size.y, y+L+1))) {
+     for(int dx: range(::max(0, x-L), ::min(Y.size.x, x+L+1))) {
+      int c = Y(dx, dy);
+      if(c < r) s += 2;
+      else if(c==r) s += 1;
+     }
+    }
+    assert_(s < sq(2*L+1)*2, s, sq(2*L+1)*2);
+    vec3 XYZ = XYZ_sensor * vec3(R[i], G[i], B[i]);
+    int32 y = XYZ.y;
+    int32 HEy = s*(1<<13)/(sq(2*L+1)*2);
+    float HEscale = float(HEy)/float(y);
+    rgb3f RGB = RGB_XYZ * (HEscale * XYZ);
+    assert_(int3(vec3(RGB))<int3(8192), RGB);
+    R[i] = int(RGB.r);
+    G[i] = int(RGB.g);
+    B[i] = int(RGB.b);
+   }
+  }
+  log(AHE);
+#endif
 
   // Gamma compression
   Image sRGB (size);
