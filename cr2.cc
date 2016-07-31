@@ -73,7 +73,8 @@ CR2::CR2(const ref<byte> file, bool onlyParse) {
       assert_(entry.type == 5 && entry.count == 1);
       unused uint32 num = value.read32();
       unused uint32 den = value.read32();
-      //log("FocalLength", num,"/",den);
+      focalLengthMM = (float)num/den;
+      assert_(den == 1000, num, den);
      }
      else if(entry.tag == 0x927C) { // MakerNote
       assert_(entry.type == 7);

@@ -64,6 +64,32 @@ struct Convert {
    }
   }
   uint bin = 0; for(uint count =0; count < size_t(size.x*size.y/2); bin++) count += histogram[bin];
+
+#if 1
+  // Lens distortion correction
+  Image16 Ru(size), Gu(size), Bu(size);
+  assert_(cr2.focalLengthMM==8.8f, cr2.focalLengthMM);
+  const float a = 0.03872, b = -0.15563, c = 0.02544, d = 1-a-b-c;
+  vec2 center = vec2(size-int2(1))/2.f;
+  for(size_t Uy: range(size.y)) {
+   for(size_t Ux: range(size.x)) {
+    vec2 U = vec2(Ux, Uy) - center;
+    float Ur = length(U) / (size.y/2);
+    float Dr = (((a*Ur + b)*Ur+ c)*Ur + d)*Ur;
+    vec2 D = center + (Dr/Ur)*U;
+    int Dx = round(D.x), Dy = round(D.y);
+    assert_(Dx >= 0 && Dx < size.x && Dy >= 0 && Dy < size.y, U, Ur, Dr, D, size);
+    // Nearest resample
+    Ru(Ux, Uy) = R(Dx, Dy);
+    Gu(Ux, Uy) = G(Dx, Dy);
+    Bu(Ux, Uy) = B(Dx, Dy);
+   }
+  }
+  R = ::move(Ru);
+  G = ::move(Gu);
+  B = ::move(Bu);
+#endif
+
   Image sRGB (size);
   for(size_t i: range(sRGB.ref::size)) {
    // Scales median to -4bit
