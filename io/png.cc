@@ -5,8 +5,6 @@
 generic struct ia { T i,a; operator byte4() const {return byte4(i,i,i,a); } };
 generic struct luma { T i; operator byte4() const {return byte4(i,i,i,0xFF); } };
 
-typedef vec<rgb,uint8,3> rgb3;
-
 // Paeth median
 template<template<Type> class T, int N> vec<T, uint8, N> Paeth(vec<T, int, N> a, vec<T, int, N> b, vec<T, int, N> c) {
  vec<T, int, N> d = a + b - c;
@@ -71,7 +69,7 @@ Image decodePNG(const ref<byte> file) {
    s.advance(4); //CRC
    break;
   } else if(tag == "PLTE") {
-   ref<rgb3> plte = s.read<rgb3>(size/3);
+   ref<vec<rgb,uint8,3>> plte = s.read<vec<rgb,uint8,3>>(size/3);
    assert(plte.size<=256);
    for(size_t i: range(plte.size)) palette[i] = plte[i];
   }  else if(tag == "tRNS") {

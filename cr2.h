@@ -6,7 +6,7 @@
 struct CR2 {
  struct Entry { uint16 tag, type; uint count; uint value; };
  size_t tiffHeaderSize, dataSize;
- struct { uint16 R, G, B; } whiteBalance = {0,0,0};
+ rgb3 whiteBalance;
  float focalLengthMM = 0;
  LJPEG ljpeg;
  Image16 image;

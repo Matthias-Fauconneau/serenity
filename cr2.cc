@@ -83,9 +83,9 @@ CR2::CR2(const ref<byte> file, bool onlyParse) {
       for(const CR2::Entry& entry : makerNote.read<CR2::Entry>(entryCount)) {
        if(entry.tag == 0x4001) { // ColorBalance
         ref<uint16> RGGB = cast<uint16>(makerNote.slice(entry.value+142, 4*sizeof(uint16)));
-        whiteBalance.R = RGGB[0];
-        whiteBalance.G = RGGB[1];
-        whiteBalance.B = RGGB[3];
+        whiteBalance.r = RGGB[0];
+        whiteBalance.g = RGGB[1];
+        whiteBalance.b = RGGB[3];
        }
       }
      }

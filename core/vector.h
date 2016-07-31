@@ -152,6 +152,8 @@ generic struct bgra;
 generic struct rgb {
     T r,g,b;
 };
+/// Unsigned integer r,g,b vector (32bit)
+typedef vec<rgb,int,3> rgb3;
 /// Floating-point r,g,b vector
 typedef vec<rgb,float,3> rgb3f;
 
@@ -177,7 +179,6 @@ struct byte4 : vec<bgra,uint8,4> {
  byte4(byte3 bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
  byte4(bgr3f bgr, uint8 a = 0xFF) : vec(bgr.b, bgr.g, bgr.r, a) {}
  byte4(::vec<::bgra,int,4> v) : vec(v.b, v.g, v.r, v.a) {}
- //bgr3f bgr() { return bgr3f(b, g, r); }
  byte3& bgr() { return *(byte3*)this; }
  byte4(vec<rgba,uint8,4> rgba) : vec(rgba.b, rgba.g, rgba.r, rgba.a) {}
  byte4(vec<rgb,uint8,3> rgb) : vec(rgb.b, rgb.g, rgb.r, 0xFF) {}
