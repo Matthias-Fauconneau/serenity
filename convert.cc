@@ -13,8 +13,8 @@ struct Convert {
   const Image16& image = cr2.image;
 
   constexpr int2 minOffset (48, 9);
-  constexpr int Ncrop = 128;
-  constexpr int N = 0;
+  constexpr int Ncrop = 256;
+  constexpr int N = 256;
   int2 size = floor(int2(3,2)*Ncrop, image.size/2-minOffset);
   int2 offset = minOffset+((image.size/2-minOffset)-size)/2; // Centers crop
 
@@ -113,35 +113,51 @@ struct Convert {
 
   if(N) {
    assert_(2*size.x == 3*size.y && size.x%N == 0 && size.y%N == 0, size, size.x%N, size.y%N, image.size, offset);
-   const int maxY = 1<<15;
-   struct HE { uint16 HE[maxY]; };
+   const int capacity = 1<<15;
+   struct HE { uint16 HE[capacity]; };
    ImageT<HE> HEs (size/N); // 20 MB
+   uint globalMinY = -1, globalMaxY = 0;
    for(size_t Y: range(size.y/N)) {
     for(size_t X: range(size.x/N)) {
      // Luminance histogram
-     buffer<uint16> histogram (maxY); // 64K
+     buffer<uint16> histogram (capacity); // 64K
      histogram.clear(0);
+     uint minY = -1, maxY = 0;
      const size_t tileI = Y*N*stride + X*N;
      for(int y: range(N)) {
       const size_t rowI = tileI + y*stride;
       for(int x: range(N)) {
        const size_t i = rowI + x;
        int Y = (XYZ_sensor * vec3(R[i], G[i], B[i]))[1];
-       assert_(Y >= 0 && Y < maxY, Y);
+       assert_(Y >= 0 && Y < capacity, Y);
+       minY = ::min<uint>(minY, Y);
+       maxY = ::max<uint>(maxY, Y);
        histogram[Y]++;
       }
      }
+     globalMinY = ::min<uint>(globalMinY, minY);
+     globalMaxY = ::max<uint>(globalMaxY, maxY);
 
      // Evaluates histogram equalization
      HE& HE = HEs(X, Y);
      constexpr uint totalCount = N*N;
-     constexpr uint targetMaxY = 1<<11;
-     for(uint bin=0, count=0; bin < maxY; bin++) {
+     constexpr uint targetMaxY = 1<<12;
+     // Contrast limit
+     const uint limit = totalCount/targetMaxY/2;
+     uint overflow = 0;
+     for(uint16& count: histogram) if(count > limit) {
+      overflow += count-limit;
+      count = limit;
+     }
+     overflow /= maxY+1-minY;
+     for(uint16& count: histogram.slice(minY, maxY+1-minY)) count += overflow;
+     for(uint bin=0, count=0; bin < capacity; bin++) {
       HE.HE[bin] = (uint64)count*targetMaxY/totalCount;
       count += histogram[bin];
      }
     }
    }
+   assert_(globalMinY <= 107 && globalMaxY > 1<<14, globalMinY, globalMaxY);
 
    // Colorspace conversion, Histogram equalization
    const int W = size.x/N, H = size.y/N;
@@ -167,12 +183,11 @@ struct Convert {
        const int32 HE11y = HE11.HE[Y];
        // FIXME: 5 fmul, 5 cvt -> 4 imul, 2 shift, 1 cvt ?
        const float fx = float(x)/N;
-       const float HEy =
-         (1-fy) * ( (1-fx) * float(HE00y) + fx * float(HE10y) ) +
-         fy * ( (1-fx) * float(HE01y) + fx * float(HE11y) );
+       const float HEy = (1-fy) * ( (1-fx) * float(HE00y) + fx * float(HE10y) ) +
+                                         fy * ( (1-fx) * float(HE01y) + fx * float(HE11y) );
        const float HEscale = float(HEy)/XYZ.y;
        const rgb3f RGB = RGB_XYZ * (HEscale * XYZ);
-       assert_(int3(vec3(RGB))<int3(8192), RGB, HEy);
+       assert_(int3(vec3(RGB))<=int3(0x1FFF), RGB, HEy);
        R[i] = int(RGB.r);
        G[i] = int(RGB.g);
        B[i] = int(RGB.b);
@@ -205,6 +220,6 @@ struct Convert {
   Time encode {true};
   buffer<byte> png = encodePNG(sRGB);
   log(encode);
-  writeFile(section(name,'.')+".png"_, png, currentWorkingDirectory(), true);
+  writeFile(section(name,'.')+"_CLAHE_"+str(N)+".png"_, png, currentWorkingDirectory(), true);
  }
 } app;
