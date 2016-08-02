@@ -1,7 +1,7 @@
 #pragma once
 /// \file font.h Freetype font renderer wrapper (Font)
 #include "file.h"
-#include "core/image.h"
+#include "image.h"
 #include "map.h"
 struct  FT_FaceRec_;
 

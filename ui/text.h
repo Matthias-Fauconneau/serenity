@@ -2,7 +2,7 @@
 /// \file text.h Rich text label/paragraph widget
 #include "widget.h"
 #include "function.h"
-#include "core/image.h"
+#include "image.h"
 #include "utf8.h"
 
 /// Rich text format control code encoded in 00-1F range

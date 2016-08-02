@@ -204,19 +204,9 @@ inline int2 argmin(const ImageF& source) {
 
 template<Type A, Type F, Type... Ss> A sumXY(int2 size, F apply, A initialValue) {
  assert_(size);
- //if(size.y <= 16) {
-  A accumulator = initialValue;
-  for(size_t y: range(size.y)) for(size_t x: range(size.x)) accumulator += apply(x, y);
-  return accumulator;
- /*}
- A accumulators[threadCount];
- mref<A>(accumulators).clear(initialValue); // Some threads may not iterate
- parallel_chunk(size.y, [&](uint id, uint64 start, uint64 chunkSize) {
-  A accumulator = initialValue;
-  for(size_t y: range(start, start+chunkSize)) for(size_t x: range(size.x)) accumulator += apply(x, y);
-  accumulators[id] += accumulator;
- });
- return ::sum<A>(accumulators);*/
+ A accumulator = initialValue;
+ for(size_t y: range(size.y)) for(size_t x: range(size.x)) accumulator += apply(x, y);
+ return accumulator;
 }
 
 // -- SSE --

@@ -151,6 +151,7 @@ typedef vec<bgr,float,3> bgr3f;
 generic struct bgra;
 generic struct rgb {
     T r,g,b;
+    //rgb(vec<bgra,uint8,3> bgra) : vec(bgra.r, bgra.g, bgra.b, 0xFF) {}
 };
 /// Unsigned integer r,g,b vector (32bit)
 typedef vec<rgb,int,3> rgb3;

@@ -15,6 +15,7 @@ core/string.cc
 core/vector.h
 core/matrix.h
 core/image.h
+core/image.cc
 core/simd.h
 core/map.h
 core/file.h
@@ -24,20 +25,16 @@ core/function.h
 core/thread.h
 core/thread.cc
 core/file.cc
-core/serialization.h
-core/parallel.h
 core/time.h
 core/time.cc
 core/profile.cc
 core/algorithm.h
 core/sort.h
 
-io/variant.h
 io/png.cc
 io/font.cc
 io/font.h
-io/xml.h
-io/xml.cc
+io/jpeg.cc
 
 ui/x.h
 ui/display.h
@@ -87,8 +84,6 @@ video/encoder.cc
 music/fret.h
 music/fret.cc
 
-io/tiff.h
-io/tiff.cc
 codec.cc
 cr2.h
 cr2.cc
@@ -97,4 +92,4 @@ rans4.h
 rans4.cc
 ljpeg.h
 ljpeg.cc
-core/image.cc
+compare.cc

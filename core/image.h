@@ -20,8 +20,21 @@ generic struct ImageT : buffer<T> {
 };
 generic String str(const ImageT<T>& o) { return strx(o.size); }
 
+generic void copy(const ImageT<T>& target, const ImageT<T>& o) {
+ assert_(target.size == o.size);
+ if(target.stride == o.stride) return target.copy(o);
+ for(size_t y: range(o.height)) target.slice(y*target.stride, target.width).copy(o.slice(y*o.stride, o.width));
+}
+generic ImageT<T> copy(const ImageT<T>& o) { ImageT<T> target(o.size, o.alpha); copy(target, o); return target; }
+
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 generic ImageT<T> unsafeRef(const ImageT<T>& o) { return ImageT<T>(unsafeRef((const buffer<T>&)o),o.size,o.stride,o.alpha); }
+
+/// Returns a weak reference to \a image (unsafe if referenced image is freed)
+generic ImageT<T> cropRef(const ImageT<T>& o, int2 offset, int2 size) {
+    assert_(offset+size <= o.size, offset, size, o.size);
+    return ImageT<T>(unsafeRef(o.slice(offset.y*o.stride+offset.x, size.y*o.stride-offset.x)),size,o.stride,o.alpha);
+}
 
 /// 2D array of 8bit integer pixels
 typedef ImageT<uint8> Image8;
