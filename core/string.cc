@@ -26,11 +26,12 @@ bool endsWith(const string s, const string a) {
     return a.size<=s.size && string(s.data+s.size-a.size,a.size)==a;
 }
 
-bool find(const string s, const string a) {
-    if(a.size>s.size) return false;
-    for(uint i=0;i<=s.size-a.size;i++) if(string(s.data+i,a.size)==a) return true;
-    return false;
+size_t indexOf(const string s, const string a) {
+    if(a.size>s.size) return invalid;
+    for(uint i=0;i<=s.size-a.size;i++) if(string(s.data+i,a.size)==a) return i;
+    return invalid;
 }
+bool find(const string s, const string a) { return indexOf(s, a) != invalid; }
 
 string section(const string s, byte separator, int begin, int end) {
 	if(!s) return ""_;

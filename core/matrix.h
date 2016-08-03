@@ -2,6 +2,16 @@
 /// file matrix.h 3x3 homogeneous transformation matrix
 #include "vector.h"
 
+/// 2D linear transformation
+struct mat2 {
+    float m11, m12, m21, m22;
+    constexpr mat2(float m11, float m12, float m21, float m22):m11(m11),m12(m12),m21(m21),m22(m22){}
+    constexpr mat2() : mat2(1,0,0,1) {}
+    vec2 operator*(vec2 v) const { return vec2( m11*v.x + m21*v.y, m12*v.x + m22*v.y ); }
+    mat2 operator*(mat2 m) const { return mat2( m11*m.m11 + m12*m.m21, m11*m.m12 + m12*m.m22,
+                                                m21*m.m11 + m22*m.m21, m21*m.m12 + m22*m.m22); }
+};
+
 /// 2D affine transformation
 struct mat3x2 {
     float data[3*2];

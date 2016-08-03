@@ -71,3 +71,9 @@ inline v4sf mean(const ref<v4sf> x) { assert(x.size); return sum(x, float4(0)) /
 #include "string.h"
 template<> inline String str(const v4sf& v) { return "("+str(v[0], v[1], v[2], v[3])+")"; }
 inline bool isNumber(v4sf v){ for(uint i: range(4)) if(!isNumber(v[i])) return false; return true; }
+
+inline v4sf clamp(float min, v4sf x, float max) {
+    v4sf y;
+    for(size_t i: range(4)) y[i] = x[i] < min ? min : max < x[i] ? max : x[i];
+    return y;
+}

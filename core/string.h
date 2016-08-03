@@ -35,6 +35,8 @@ inline bool startsWith(const string a, const string b) { return startsWith<char>
 
 /// Returns whether \a str ends with \a sub
 bool endsWith(const string str, const string sub);
+
+size_t indexOf(const string s, const string a);
 /// Returns whether \a str contains the \a substring
 bool find(const string str, const string substring);
 
