@@ -48,7 +48,7 @@ struct Room {
                    || endsWith(negativeFile, section(section(url.path,'/',-2,-1),'.',0,-2)));
         else
          negative = find(negativeFile, url.path);
-        if(negative /*&& threshold<inf*/) {reason="filter"__+url.path; return false;}
+        //if(negative /*&& threshold<inf*/) {reason="filter"__+url.path; return false;}
 
         // Filters based on data available directly in index to reduce room detail requests
         if(postDate && parseDate(postDate) <= Date(currentTime()-31*24*60*60)) {/*assert_(!negative,"date", address);*/ reason=str("post",postDate); return false;}
@@ -185,9 +185,7 @@ struct Room {
                         if(outbound) time=-time;
                         else { s.skip('-'); swap(A, B); }
                         float duration = ::duration(A, B, time)/60.;
-                        if(destinationIndex==0 &&
-                               (//(duration >= 20 && price>=420) ||
-                                //(duration >= 40 && price>=360) ||
+                        if(destinationIndex==0 && (
                                 0)) {assert(!negative, duration, A, B, address, url.path); reason="far"__; return false;}
                         //if(route) log(A, B, duration);
                         assert_(duration < 102, duration, A, B, duration);
@@ -209,18 +207,6 @@ struct Room {
                 durations[destinationIndex] = perTrip;
                 if(score > threshold) {assert_(!negative, durations, score, score-price, price, address, url); reason="threshold"__; return false;}
                 //if(altScore > altThreshold) {assert_(!negative, durations, score, score-price, price, address, url); reason="threshold"__; return false;}
-                if( //(price >= 699 && round(score-price) >= 193/*248*/ && round(durations[0]) >= 16) ||
-                    //(price >= 740 && round(score-price) >= 228 && round(durations[0]) >= 9) ||
-                    //(price >= 600 && round(score-price) >= 211 && round(durations[0]) >= 18) ||
-                    //(price >= 850 && round(score-price) >= 141 && round(durations[0]) >= 12) ||
-                    //(price >= 820 && round(score-price) >= 173 && round(durations[0]) >= 14) ||
-                    //(price >= 800 && round(score-price) >= 195 && round(durations[0]) >= 16) ||
-                      //(price >= 900 && round(score-price) >= 131 && round(durations[0]) >= 11) ||
-                    //round(score-price) > 193 ||
-                    0) {
-                 assert(!negative, durations, score, score-price, price, address, url);
-                 reason = str("S-P", score-price, "D", durations[0]); return false;
-                }
             }
         }
         if(1) { if(negative && threshold<inf) {reason="filter"__; return false;} }
@@ -274,10 +260,7 @@ struct WG {
                     s.skip("SFr. ");
                     room.price = s.integer();
                     s.skip(".00"_);
-                    //if(room.price <= 60) room.price = room.price*40/3;
-                    //if(room.price <= 240) room.price = room.price*10/3;
                     if(room.price <= 200) continue;
-                    //assert_(room.price > 200, room.price, room.url);
                 }
 
                 if(room.evaluate()) rooms.insertSorted(move(room));
@@ -315,6 +298,7 @@ struct WG {
             room.startDate = copyRef(section(id,'-',0,3));
             room.untilDate = copyRef(section(id,'-',3,4));
             room.price = parseInteger(copyRef(section(id,'-',4,5)));
+            if(room.price <= 240) room.price = room.price*10/3;
             room.evaluate();
             rooms.append(move(room));
         }
