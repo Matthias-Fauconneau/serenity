@@ -98,22 +98,24 @@ bool Element::contains(string name) const {
  return false;
 }
 
-const Element& Element::child(string path) const {
+const Element* Element::child(string path) const {
  const Element* element = 0;
  xpath(path, [&element, path, this](const Element& e)->void{
-  if(element) { log("Multiple matches for", path, "in", *this); return; }
+  if(element) { error("Multiple matches for", path, "in", *this); return; }
   element = &e;
-  // Checks for multiple matches
  });
- if(element) {
-  return *element;
- } else {
-  assert_(element, "No such ", path, "in", this->name, apply(children, [](const Element& e) { return e.name; }));
-  static Element empty;
-  return empty;
- }
+ return element;
 }
-const Element& Element::operator()(string path) const { return child(path); }
+const Element& Element::operator()(string path) const {
+    const Element* element = child(path);
+    if(element) {
+        return *element;
+    } else {
+        assert_(element, "No such ", path, "in", this->name, apply(children, [](const Element& e) { return e.name; }));
+        static Element empty;
+        return empty;
+    }
+}
 
 void Element::visit(const function<void(const Element&)>& visitor) const {
  for(const Element& e: children) e.visit(visitor);
