@@ -89,21 +89,34 @@ struct Compare {
    return Similarity{bestTransform, similarity, bestRatio};
   };
 
-  ImageF similarityMatrix (arguments().size);
+  const ref<String> set = files; // arguments()
+  ImageF similarityMatrix (set.size);
   float minTrueSimilarity = inf;
+  float minSimilarity = inf, maxSimilarity = 0;
   for(size_t i: range(similarityMatrix.size.x)) {
    similarityMatrix(i, i) = 1;
    for(size_t j: range(i)) {
-    float similarity = compare(files.indexOf(arguments()[i]), files.indexOf(arguments()[j])).similarity;
+    float similarity = compare(files.indexOf(set[i]), files.indexOf(set[j])).similarity;
     similarityMatrix(i, j) = similarityMatrix(j, i) = similarity;
     minTrueSimilarity = ::min(minTrueSimilarity, similarity);
+    minSimilarity = ::min(minSimilarity, similarity);
+    maxSimilarity = ::max(maxSimilarity, similarity);
    }
   }
+  for(size_t i: range(similarityMatrix.size.x)) {
+   array<int> similarityRow;
+   for(size_t j: range(i)) {
+    float similarity = similarityMatrix(i, j);
+    similarityRow.append(round(10*(similarity-minSimilarity)/(maxSimilarity-minSimilarity)));
+   }
+   log(similarityRow);
+  }
+#if 0
   float minSimilarity = inf, maxSimilarity = 0;
   for(size_t a: range(images[0].size)) {
-   if(!arguments().contains(files[a])) {
+   if(!set.contains(files[a])) {
     for(size_t i: range(similarityMatrix.size.x)) {
-     size_t b = files.indexOf(arguments()[i]);
+     size_t b = files.indexOf(set[i]);
      auto S = compare(a, b);
      minSimilarity = ::min(minSimilarity, S.similarity);
      maxSimilarity = ::max(maxSimilarity, S.similarity);
@@ -113,10 +126,11 @@ struct Compare {
   }
   for(size_t a: range(images[0].size)) {
    for(size_t i: range(similarityMatrix.size.x)) {
-    size_t b = files.indexOf(arguments()[i]);
+    size_t b = files.indexOf(set[i]);
     auto S = compare(a, b);
     log(files[a].slice(5,3), files[b].slice(5,3), S.transform.scale.A, S.transform.scale.B, S.transform.offset, round(100*(S.similarity-minSimilarity)/(maxSimilarity-minSimilarity))); //, S.ratio.num, S.ratio.den);
    }
   }
+#endif
  }
 } app;

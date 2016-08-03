@@ -44,7 +44,7 @@ struct URL {
  URL(string url);
  /// Parses \a url relative to this URL
  URL relative(URL&& url) const;
- explicit operator bool() { return (bool)host; }
+ explicit operator bool() const { return (bool)host; }
 
  String scheme, authorization, host, path, fragment, post;
 };

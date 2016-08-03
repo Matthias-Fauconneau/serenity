@@ -61,6 +61,7 @@ Element::Element(TextData& s, bool html) {
    if(content) children.append( unique<Element>(content) );
   }
   else if(s.match("<!--"_)) s.until("-->"_);
+  else if(s.match("<!"_)) s.until(">"_);
   else if(s.match("</"_)) { if(name==s.until(">"_)) break; } // FIXME: check correct closing tag
   //else if(s.match(String("<?"_+name+">"_))) { log("Invalid tag","<?"_+name+">"_); return; }
   else if(s.match('<')) children.append( unique<Element>(s,html) );
