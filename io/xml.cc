@@ -32,7 +32,7 @@ Element::Element(TextData& s, bool html) {
   if(s.match("/>")) return;
   else if(s.match('/')) {} //spurious /
   else if(s.match('<')) break; // forgotten >
-  s.whileAny(" \t\n");
+  s.whileAny(" \t\r\n");
   string key = s.identifier("_-:"); /*TODO:reference*/
   if(!key) { log("Attribute syntax error"_,s.slice(begin,s.index-begin),"|"_,s.until('>')); s.until('>'); break; }
   string value;

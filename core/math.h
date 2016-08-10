@@ -9,8 +9,8 @@ generic inline constexpr T cb(const T x) { return x*x*x; }
 inline float abs(float x) { return __builtin_fabsf(x); }
 inline double abs(double x) { return __builtin_fabs(x); }
 
-constexpr float nanf = __builtin_nanf("");
-constexpr double nan = __builtin_nan("");
+//constexpr float nanf = __builtin_nanf("");
+//constexpr double nan = __builtin_nan("");
 inline bool isNaN(float x) { return x!=x; }
 inline bool isNaN(double x) { return x!=x; }
 static constexpr float inff = __builtin_inff();

@@ -28,16 +28,22 @@ void TCPSocket::connect(uint host, uint16 port) {
 }
 
 #include <openssl/ssl.h> // ssl
+//#include <openssl/err.h>
 SSLSocket::SSLSocket(uint host, uint16 port, bool secure) { connect(host, port, secure); }
 SSLSocket::~SSLSocket() { disconnect(); }
 
 void SSLSocket::connect(uint host, uint16 port, bool secure) {
  TCPSocket::connect(host,port);
  if(secure && fd) {
-  static auto* ctx=(SSL_library_init(), SSL_CTX_new(TLSv1_client_method()));
+  static SSL_CTX* ctx=(SSL_library_init(), SSL_CTX_new(TLSv1_client_method()));
   ssl = SSL_new(ctx);
   SSL_set_fd(ssl, fd);
-  SSL_connect(ssl);
+  int ret = SSL_connect(ssl);
+  if(ret!=1) {
+      assert_(SSL_get_error(ssl, ret)==1);
+      //for(;;) {unsigned long err = ERR_get_error(); log(ERR_error_string(err, 0));}
+      error("SSL");
+  }
  }
 }
 /// Reads up to \a size bytes into \a buffer
@@ -181,7 +187,8 @@ HTTP::HTTP(URL&& url, function<void(const URL&, Map&&)> contentAvailable, array<
 
 void HTTP::request() {
  String request = (url.post?"POST"_:"GET"_)+" "_+(startsWith(url.path,"/"_)?""_:"/"_)+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\n"
-   ;//"User-Agent: Serenity\r\n"_;
+         "Accept-Encoding: gzip, deflate\r\n"
+         ;
  if(url.post) {
   headers.append("Content-Type: application/x-www-form-urlencoded"__);
   headers.append("Content-Length: "+str(url.post.size));
@@ -292,12 +299,11 @@ void HTTP::receiveContent() {
 
 void HTTP::cache() {
  if(!content) { log("Missing content", buffer); done(); return; }
- if(content.size>64*1024) log("Downloaded",url,content.size/1024,"KB"); else log("Downloaded",url,content.size,"B");
+ if(content.size>4*1024) log("Downloaded",url,content.size/1024,"KB"); else log("Downloaded",url,content.size,"B");
  if(!file) redirect.append(cacheFile(url)); // else already written progressively
  for(string file: redirect) {
   Folder(section(file,'/'), ::cache(), true);
   writeFile(file, content, ::cache(), true);
-  log(file);
   assert_(existsFile(file, ::cache()));
  }
 }
@@ -343,7 +349,7 @@ Map getURL(URL&& url, function<void(const URL&, Map&&)> contentAvailable, int ma
  if(requests.size>5) error("Concurrent request limit", requests.size);
  if(wait == HTTP::Available) {
   HTTP request(move(url),contentAvailable,move(headers));
-  if(request.state < wait) log(url);
+  //if(request.state < wait) log(url);
   while(request.state < wait) { assert_(request.wait(), request.events, request.revents); }
   assert_(existsFile(cacheFile(request.url),cache()), cacheFile(request.url));
   if(!contentAvailable) return Map(cacheFile(request.url),cache());
