@@ -6,7 +6,7 @@
 // -- str()
 
 // Enforces exact match for overload resolution
-generic String str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); error(); }
+generic String str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); }
 
 /// Forwards string
 inline String str(string s) { return unsafeRef(s); }

@@ -3,6 +3,7 @@
 
 struct Test {
  Test() {
+  DBus dbus;
   //org.kde.kglobalaccel /kglobalaccel setShortcut
  }
 } test;

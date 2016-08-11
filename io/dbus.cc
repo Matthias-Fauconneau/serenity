@@ -100,12 +100,13 @@ uint32 DBus::writeSerializedMessage(uint8 type, int32 replySerial, const string&
 
 /// Reply / Object
 
-template<class T> DBus::Reply::operator T() {
+generic DBus::Reply::operator T() {
     assert(dbus,"Reply read twice"_);
     T t;
-    dbus->readMessage<T>(serial,t);
+    dbus->readMessage<T>(serial, t);
     dbus=0; return move(t);
 }
+
 template<class A> void DBus::Object::noreply(const string& method, const A& a) {
     string interface = section(method,'.',0,-2), member=section(method,'.',-2,-1);
     dbus->writeMessage(MethodCall,-2, target, object,interface,member, a);
@@ -135,21 +136,21 @@ void DBus::methodWrapper(uint32 serial, string name, ref<byte>) {
     writeMessage(MethodReturn,serial,""_,""_,""_,""_);
 }
 /// Unpacks one argument, calls method delegate and return empty reply
-template<class A> void DBus::methodWrapper(uint32 serial, string name, ref<byte> data) {
+template<Type A> void DBus::methodWrapper(uint32 serial, string name, ref<byte> data) {
     BinaryData in(move(data));
-    A a; ::read(in,a);
+    A a; ::read(in, a);
     (*(function<void(A)>*)&delegates.at(name))(move(a));
     writeMessage(MethodReturn,serial,""_,""_,""_,""_);
 }
 /// Unpacks one argument and calls method delegate and return reply
-template<class R, class A> void DBus::methodWrapper(uint32 serial, string name, ref<byte> data) {
+template<Type R, Type A> void DBus::methodWrapper(uint32 serial, string name, ref<byte> data) {
     BinaryData in(move(data));
     A a; ::read(in,a);
     R r = (*(function<R(A)>*)&delegates.at(name))(move(a));
     writeMessage(MethodReturn,serial,""_,""_,""_,""_,r);
 }
 /// Unpacks two arguments and calls the method delegate and return reply
-template<class R, class A, class B> void DBus::methodWrapper(uint32 serial, string name, ref<byte> data) {
+template<Type R, Type A, Type B> void DBus::methodWrapper(uint32 serial, string name, ref<byte> data) {
     BinaryData in(move(data));
     A a; B b; ::read(in,a,b);
     R r = (*(function<R(A,B)>*)&delegates.at(name))(move(a),move(b));
@@ -158,58 +159,64 @@ template<class R, class A, class B> void DBus::methodWrapper(uint32 serial, stri
 
 /// Signals
 
+#if 1
+generic T readValue(BinaryData& in) { T t; read(in, t); return t; }
+template<Type... Args> void DBus::signalWrapper(string name, ref<byte> data) {
+    BinaryData in(move(data));
+    (*(function<void(Args...)>*)&delegates.at(name))(readValue<Args>(in)...);
+}
+#else
 void DBus::signalWrapper(string name, ref<byte>) {
     delegates.at(name)();
 }
-template<class A> void DBus::signalWrapper(string name, ref<byte> data) {
+template<Type A> void DBus::signalWrapper(string name, ref<byte> data) {
     BinaryData in(move(data));
     A a; ::read(in,a);
     (*(function<void(A)>*)&delegates.at(name))(move(a));
 }
-template<class A, class B> void DBus::signalWrapper(string name, ref<byte> data) {
+template<Type A, Type B> void DBus::signalWrapper(string name, ref<byte> data) {
     BinaryData in(move(data));
-    A a; B b; ::read(in,a,b);
+    A a; B b; ::read(in, a, b);
     (*(function<void(A,B)>*)&delegates.at(name))(move(a),move(b));
 }
-template<class A, class B, class C> void DBus::signalWrapper(string name, ref<byte> data) {
+template<Type A, Type B, Type C> void DBus::signalWrapper(string name, ref<byte> data) {
     BinaryData in(move(data));
-    A a; B b; C c; ::read(in,a,b,c);
+    A a; B b; C c; ::read(in, a, b, c);
     (*(function<void(A,B,C)>*)&delegates.at(name))(move(a),move(b),move(c));
 }
+#endif
 
 /// Connection
 
 DBus::DBus(Scope scope) : Socket(PF_LOCAL,SOCK_STREAM), Poll(Socket::fd) {
-     string path;
-     if(scope == Session) path = section(section(environmentVariable("DBUS_SESSION_BUS_ADDRESS"_),'=',1,2),',');
-     else if(scope == System) path = "/var/run/dbus/system_bus_socket"_;
-     else error("Unknown scope"_);
-     if(find(environmentVariable("DBUS_SESSION_BUS_ADDRESS"_),"abstract"_)) {
-         sockaddr_un addr = {};
-         addr.sun_family = AF_UNIX;
-         addr.sun_path[0]=0;
-         mref<byte>((byte*)addr.sun_path+1,path.size+1).copy(strz(path));
-         check( ::connect(Socket::fd,(sockaddr*)&addr,3+path.size), path);
-     } else {
-         sockaddr_un addr = {};
-         addr.sun_family = AF_LOCAL;
-         mref<byte>((byte*)addr.sun_path,path.size+1).copy(strz(path));
-         check( ::connect(Socket::fd,(sockaddr*)&addr,2+path.size), path);
-     }
-     write("\0AUTH EXTERNAL 31303030\r\n"_); String status=read(37); assert(startsWith(status, "OK"_)); write("BEGIN \r\n"_);
-     name = Object{this, "org.freedesktop.DBus"__, "/org/freedesktop/DBus"__}("org.freedesktop.DBus.Hello"_);
+ string path;
+ if(scope == Session) path = section(section(environmentVariable("DBUS_SESSION_BUS_ADDRESS"_),'=',1,2),',');
+ else if(scope == System) path = "/var/run/dbus/system_bus_socket"_;
+ else error("Unknown scope"_);
+ if(find(environmentVariable("DBUS_SESSION_BUS_ADDRESS"_),"abstract"_)) {
+  sockaddr_un addr = {};
+  addr.sun_family = AF_UNIX;
+  addr.sun_path[0]=0;
+  mref<byte>((byte*)addr.sun_path+1,path.size+1).copy(strz(path));
+  check( ::connect(Socket::fd,(sockaddr*)&addr,3+path.size), path);
+ } else {
+  sockaddr_un addr = {};
+  addr.sun_family = AF_LOCAL;
+  mref<byte>((byte*)addr.sun_path,path.size+1).copy(strz(path));
+  check( ::connect(Socket::fd,(sockaddr*)&addr,2+path.size), path);
  }
- void DBus::event() { readMessage(0); }
+ write("\0AUTH EXTERNAL 31303030\r\n"_); String status=read(37); assert(startsWith(status, "OK"_)); write("BEGIN \r\n"_);
+ name = Object{this, "org.freedesktop.DBus"__, "/org/freedesktop/DBus"__}("org.freedesktop.DBus.Hello"_);
+}
+void DBus::event() { readMessage(0); }
 
- /// Explicit template instanciations
+/// Explicit template instanciations
 
- template DBus::Reply::operator uint();
-template DBus::Reply::operator array<string>();
+template DBus::Reply::operator uint();
 template void DBus::Object::noreply(const string&, const string&);
 template void DBus::Object::noreply(const string&, const string&, const uint&);
 template void DBus::Object::noreply(const string&, const int&, const int&);
 template void DBus::Object::noreply(const string&, const int&, const string&);
 
-template void DBus::methodWrapper<variant<int>, string, string>(unsigned int, string, ref<byte>);
-template void DBus::methodWrapper<string>(unsigned int, string, ref<byte>);
-template void DBus::signalWrapper<string, string, string>(string, ref<byte>);
+template void DBus::methodWrapper<variant<int>, String, String>(unsigned int, string, ref<byte>);
+template void DBus::methodWrapper<String>(unsigned int, string, ref<byte>);
