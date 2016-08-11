@@ -1,3 +1,6 @@
+/usr/lib/clang/3.8.1/include
+
+.
 core
 io
 ui
@@ -7,6 +10,10 @@ tuner
 image
 layout
 video
+
 /usr/include/freetype2
-/usr/lib/clang/3.8.1/include
-.
+
+/usr/include/qt5
+/usr/include/qt5/QtCore
+/usr/include/qt5/QtGui
+/usr/include/KF5/KGlobalAccel

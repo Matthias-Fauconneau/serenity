@@ -50,6 +50,7 @@ void DBus::readMessage(uint32 serial, function<void(BinaryData&)> readOutputs) {
             } else if(header.message == Signal) {
                 RawSignal* signal = signals_.find(name);
                 if(signal) (*signal)(name, s.untilEnd());
+                else log("Unconnected signal", name);
             } else if(header.message == MethodCall) {
                 RawMethod method = methods.at(name);
                 method(header.serial, name, s.untilEnd());
@@ -65,8 +66,8 @@ void DBus::readMessage(uint32 serial, function<void(BinaryData&)> readOutputs) {
 
 /// Serializer
 
-uint32 DBus::writeSerializedMessage(uint8 type, int32 replySerial, const string& target, const string& object,
-                                           const string& interface, const string& member, const ref<byte>& signature, const ref<byte>& arguments) {
+uint32 DBus::writeSerializedMessage(uint8 type, int32 replySerial, const string target, const string object,
+                                           const string interface, const string member, const ref<byte>& signature, const ref<byte>& arguments) {
     array<byte> out;
     out.append( raw(Header{'l', type, replySerial==-2, 1, 0, ++serial, 0 }));
     // Fields
@@ -100,18 +101,11 @@ uint32 DBus::writeSerializedMessage(uint8 type, int32 replySerial, const string&
 
 /// Reply / Object
 
-generic DBus::Reply::operator T() {
-    assert(dbus,"Reply read twice"_);
-    T t;
-    dbus->readMessage<T>(serial, t);
-    dbus=0; return move(t);
-}
-
-template<class A> void DBus::Object::noreply(const string& method, const A& a) {
+template<class A> void DBus::Object::noreply(const string method, const A& a) {
     string interface = section(method,'.',0,-2), member=section(method,'.',-2,-1);
     dbus->writeMessage(MethodCall,-2, target, object,interface,member, a);
 }
-template<class A, class B> void DBus::Object::noreply(const string& method, const A& a, const B& b) {
+template<class A, class B> void DBus::Object::noreply(const string method, const A& a, const B& b) {
     string interface = section(method,'.',0,-2), member=section(method,'.',-2,-1);
     dbus->writeMessage(MethodCall,-2, target, object,interface,member, a, b);
 }
@@ -127,7 +121,7 @@ DBus::Object DBus::Object::node(string name) {
     return DBus::Object{dbus,copy(target),object+"/"_+name};
 }
 
-DBus::Object DBus::operator ()(const string& object) { return {this, copyRef(section(object,'/')), "/"_+section(object,'/',-2,-1)}; }
+DBus::Object DBus::operator ()(const string object) { return {this, copyRef(section(object,'/')), "/"_+section(object,'/',-2,-1)}; }
 
 /// Methods
 
@@ -159,6 +153,7 @@ template<Type R, Type A, Type B> void DBus::methodWrapper(uint32 serial, string 
 
 /// Signals
 
+#if 0
 #if 1
 generic T readValue(BinaryData& in) { T t; read(in, t); return t; }
 template<Type... Args> void DBus::signalWrapper(string name, ref<byte> data) {
@@ -184,6 +179,7 @@ template<Type A, Type B, Type C> void DBus::signalWrapper(string name, ref<byte>
     A a; B b; C c; ::read(in, a, b, c);
     (*(function<void(A,B,C)>*)&delegates.at(name))(move(a),move(b),move(c));
 }
+#endif
 #endif
 
 /// Connection
@@ -213,10 +209,10 @@ void DBus::event() { readMessage(0); }
 /// Explicit template instanciations
 
 template DBus::Reply::operator uint();
-template void DBus::Object::noreply(const string&, const string&);
-template void DBus::Object::noreply(const string&, const string&, const uint&);
-template void DBus::Object::noreply(const string&, const int&, const int&);
-template void DBus::Object::noreply(const string&, const int&, const string&);
+//template void DBus::Object::noreply(const string, const string);
+//template void DBus::Object::noreply(const string, const string, const uint&);
+//template void DBus::Object::noreply(const string, const int&, const int&);
+//template void DBus::Object::noreply(const string, const int&, const string);
 
 template void DBus::methodWrapper<variant<int>, String, String>(unsigned int, string, ref<byte>);
 template void DBus::methodWrapper<String>(unsigned int, string, ref<byte>);

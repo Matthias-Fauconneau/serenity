@@ -28,7 +28,7 @@ generic struct remove_reference<T&&> { typedef T type; };
 generic __attribute((warn_unused_result)) inline constexpr Type remove_reference<T>::type&& move(T&& t)
 { return (Type remove_reference<T>::type&&)(t); }
 /// Swap values (using move semantics as necessary)
-generic inline void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
+//generic inline void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 /// Forwards references and copyable values
 generic constexpr T&& forward(Type remove_reference<T>::type& t) { return (T&&)t; }
 /// Forwards moveable values
@@ -113,7 +113,7 @@ struct reverse_range {
 };
 
 // -- initializer_list
-
+#ifndef _INITIALIZER_LIST
 namespace std {
 generic struct initializer_list {
  const T* data;
@@ -124,7 +124,7 @@ generic struct initializer_list {
  constexpr const T* end() const { return (T*)data+length; }
 };
 }
-
+#endif
 // -- ref
 
 generic struct Ref;
@@ -247,7 +247,9 @@ generic inline ref<T> Ref<T>::slice(size_t pos) const { assert(pos<=size); retur
 // -- mref
 
 /// Initializes memory using a constructor (placement new)
+#ifndef _NEW
 inline void* operator new(size_t, void* p) noexcept { return p; }
+#endif
 
 /// Unmanaged fixed-size mutable reference to an array of elements
 generic struct mref : ref<T> {

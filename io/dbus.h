@@ -58,8 +58,10 @@ template<> inline void sign< variant<int> >(array<char>& s) { s.append('v'); }
 //template<Type K, Type V> inline void sign<DictEntry<K,V>>(array<char>& s) { s.append('{'); sign<K>(s); sign<V>(s); s.append("}"); } // Function template partial specialization is not allowed
 template<> inline void sign<DictEntry<String,variant<String>>>(array<char>& s) { s.append('{'); sign<String>(s); sign<variant<String>>(s); s.append('}'); }
 
-//template<Type T> inline void sign<array<T>>(array<char>& s) { s.append('a'); sign<T>(s); } // Function template partial specialization is not allowed
-template<> inline void sign<array<DictEntry<String,variant<String>>>>(array<char>& s) { s.append('a'); sign<DictEntry<String,variant<String>>>(s); }
+//template<Type T> inline void sign<ref<T>>(array<char>& s) { s.append('a'); sign<T>(s); } // Function template partial specialization is not allowed
+template<> inline void sign<ref<int>>(array<char>& s) { s.append('a'); sign<int>(s); }
+template<> inline void sign<ref<string>>(array<char>& s) { s.append('a'); sign<string>(s); }
+template<> inline void sign<ref<DictEntry<String,variant<String>>>>(array<char>& s) { s.append('a'); sign<DictEntry<String,variant<String>>>(s); }
 typedef array<DictEntry<String,variant<String>>> Dict;
 
 //  D-Bus arguments serializer
@@ -82,7 +84,7 @@ template<Type K, Type V> void serialize(array<byte>& s, const DictEntry<K,V>& en
 template<Type T> void serialize(array<byte>& s, const ref<T>& array) { serialize(s, uint(s.size*sizeof(T))); align(s, alignof(T)); for(const auto& e: array) serialize(s, e); }
 template<Type T> void serialize(array<byte>& s, const array<T>& array) { serialize(s, (ref<T>)array); }
 
-inline void serialize(array<byte>& s, const string& input) { serialize(s, uint(input.size)); s.append(input); s.append(0); }
+inline void serialize(array<byte>& s, const string input) { serialize(s, uint(input.size)); s.append(input); s.append(0); }
 inline void serialize(array<byte>& s, const String& input) { serialize(s, (string)input ); }
 
 /// Session bus
@@ -107,10 +109,10 @@ struct DBus : Socket, Poll {
 
 
     /// Writes a message of type \a type using \a Args as arguments
-    uint32 writeSerializedMessage(uint8 type, int32 replySerial, const string& target, const string& object,
-                        const string& interface, const string& member,  const ref<byte>& signature, const ref<byte>& arguments);
-    template<Type... Args> uint32 writeMessage(uint8 type, int32 replySerial, const string& target, const string& object,
-                                           const string& interface, const string& member, const Args&... arguments) {
+    uint32 writeSerializedMessage(uint8 type, int32 replySerial, const string target, const string object,
+                        const string interface, const string member,  const ref<byte>& signature, const ref<byte>& arguments);
+    template<Type... Args> uint32 writeMessage(uint8 type, int32 replySerial, const string target, const string object,
+                                           const string interface, const string member, const Args&... arguments) {
         ::Signature<Args...> signature; array<byte> serializedSignature; if(signature) serialize(serializedSignature, signature);
         array<byte> serializedArguments; serialize(serializedArguments, arguments...);
         return writeSerializedMessage(type, replySerial, target, object, interface, member, serializedSignature, serializedArguments);
@@ -120,7 +122,12 @@ struct DBus : Socket, Poll {
         handle<DBus*> dbus; uint32 serial;
 
         /// Read the reply and return its value
-        template<Type T> operator T();
+        template<Type T> operator T() {//;//generic DBus::Reply::operator T() {
+            assert(dbus,"Reply read twice"_);
+            T t;
+            dbus->readMessage<T>(serial, t);
+            dbus=0; return move(t);
+        }
         /// Read empty replies
         /// \note \a Reply must be read before interleaving any call
         ~Reply() { if(dbus) dbus->read(serial); dbus=0; }
@@ -132,18 +139,18 @@ struct DBus : Socket, Poll {
         String object;
         /// MethodCall \a method with \a args. Returns a handle to read the reply.
         /// \note \a Reply must be read before interleaving any call
-        template<Type... Args> DBus::Reply operator ()(const string& method, const Args&... args) {
-            string interface = section(method,'.',0,-2)?:target, member=section(method,'.',-2,-1);
+        template<Type... Args> DBus::Reply operator ()(const string method, const Args&... args) {
+            string interface = method.contains('.')?section(method,'.',0,-2):target, member=section(method,'.',-2,-1);
             return {dbus, dbus->writeMessage(MethodCall, -1, target, object, interface, member, args ...)};
         }
-        template<Type A> void noreply(const string& method, const A&);
-        template<Type A, Type B> void noreply(const string& method, const A&, const B&);
-        template<Type T> T get(const string& property)  {
+        template<Type A> void noreply(const string method, const A&);
+        template<Type A, Type B> void noreply(const string method, const A&, const B&);
+        template<Type T> T get(const string property)  {
             string interface = section(property,'.',0,-2)?:target, member=section(property,'.',-2,-1);
             uint32 serial = dbus->writeMessage(MethodCall,-1, target, object, "org.freedesktop.DBus.Properties"_, "Get"_, interface, member);
             variant<T> t; dbus->readMessage(serial, t); return move(t);
         }
-        template<Type T> void set(const string& property, variant<T> t)  {
+        template<Type T> void set(const string property, variant<T> t)  {
             string interface = section(property,'.',0,-2)?:target, member=section(property,'.',-2,-1);
             dbus->writeMessage(MethodCall,-1, target, object, "org.freedesktop.DBus.Properties"_, "Set"_, interface, member, t);
         }
@@ -152,7 +159,7 @@ struct DBus : Socket, Poll {
     };
 
     /// Gets a handle to a D-Bus object
-    Object operator()(const string& object);
+    Object operator()(const string object);
 
     /// Calls method delegate and returns empty reply
     void methodWrapper(uint32 serial, string name, ref<byte>);
@@ -164,18 +171,23 @@ struct DBus : Socket, Poll {
     template<Type R, Type A, Type B> void methodWrapper(uint32 serial, string name, ref<byte> data);
 
     /// Generates an IPC wrapper for \a method and binds it to \a name
-    template<Type C, Type R, Type... Args> void bind(const string& name, C* object, R (C::*method)(Args...) ) {
+    template<Type C, Type R, Type... Args> void bind(const string name, C* object, R (C::*method)(Args...) ) {
         methods.insert(name, {this,&DBus::methodWrapper<R,Args...>});
         delegates.insert(name, {object, (void (C::*)())method});
     }
-    template<Type C, Type... Args> void bind(const string& name, C* object, void (C::*method)(Args...) ) {
+    template<Type C, Type... Args> void bind(const string name, C* object, void (C::*method)(Args...) ) {
         methods.insert(name, {this,&DBus::methodWrapper<Args...>});
         delegates.insert(name, {object, (void (C::*)())method});
     }
 
-#if 1
-    template<Type... Args> void signalWrapper(string name, ref<byte> data); // Function template partial specialization is not allowed
     /// Calls signal delegate
+#if 1
+    //template<Type... Args> void signalWrapper(string name, ref<byte> data); // Function template partial specialization is not allowed
+    generic T readValue(BinaryData& in) { T t; read(in, t); return t; }
+    template<Type... Args> void signalWrapper(string name, ref<byte> data) {
+        BinaryData in(move(data));
+        (*(function<void(Args...)>*)&delegates.at(name))(readValue<Args>(in)...);
+    }
 #else
     void signalWrapper(string name, ref<byte>);
     /// Unpacks one argument and calls signal delegate
@@ -187,9 +199,9 @@ struct DBus : Socket, Poll {
 #endif
 
     /// Generates an IPC wrapper for \a signal and connect it to \a name
-    template<Type C, Type... Args> void connect(const string& name, C* object, void (C::*signal)(Args...) ) {
-        signals_[name].connect(this,&DBus::signalWrapper<Args...>);
-        delegates.insert(name, {object, (void (C::*)())signal});
+    template<Type C, Type... Args> void connect(const string name, C* object, void (C::*signal)(Args...) ) {
+        signals_[copyRef(name)].connect(this,&DBus::signalWrapper<Args...>);
+        delegates.insert(copyRef(name), {object, (void (C::*)())signal});
     }
 
     enum Scope { Session, System };

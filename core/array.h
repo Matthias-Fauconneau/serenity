@@ -34,9 +34,9 @@ generic struct array : buffer<T> {
 			} else {
 				const T* data = 0;
 				if(posix_memalign((void**)&data,16,nextCapacity*sizeof(T))) error("Out of memory"); // TODO: move compatible realloc
-				swap(data, this->data);
-				assert_(!size); //mref<T>::move(mref<T>((T*)data, size));
-				if(capacity) free((void*)data);
+                assert_(!size);
+                if(capacity) free((void*)this->data);
+                this->data = data;
 			}
 			capacity = nextCapacity;
 		}
@@ -46,8 +46,7 @@ generic struct array : buffer<T> {
     /// Removes all elements
     void clear() { if(size) shrink(0); }
     /// Grows the array to \a size without initializing new elements
-    /// \return Previous size
-    size_t grow(size_t size) { reserve(size); swap(this->size, size); return size; }
+    void grow(size_t size) { reserve(size); this->size=size; }
 
     // - Append
     /// Appends a default element

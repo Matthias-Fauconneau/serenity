@@ -1,14 +1,41 @@
-#if 1 // KGLOBALACCEL_TEST
+#if 1
+#include <QtCore/QCoreApplication>
+#include <QtWidgets/QAction> // Qt5Core Qt5Gui Qt5Widgets
+#include <KF5/KGlobalAccel/KGlobalAccel> // KF5GlobalAccel
+#include "string.h"
+int main(int argc, char** argv) {
+ QCoreApplication app(argc, argv);
+ QAction action(&app);
+ QObject::connect(&action, &QAction::triggered, [](bool){log("Triggered");});
+ KGlobalAccel::setGlobalShortcut(&action, {QKeySequence(Qt::Key_F6)}); //QList<QKeySequence>());
+ return app.exec();
+}
+#elif 0 // KGLOBALACCEL_TEST
 #include "dbus.h"
+#if 0
+#include <qt5/QtCore/qnamespace.h>
+#else
+namespace Qt {
+enum Key {
+ Key_F6 = 0x01000035,
+ Key_F7 = 0x01000036,
+};
+}
+#endif
 
 struct Test {
- Test() {
-  DBus dbus;
-  //org.kde.kglobalaccel /kglobalaccel setShortcut
+ DBus dbus;
+ Test() { dbus.connect("NameAcquired", this, &Test::nameAcquired); }
+ void nameAcquired() {
+  DBus::Object kglobalaccel {&dbus, "org.kde.kglobalaccel"__, "/kglobalaccel"__};
+  log("setShortcut");
+  array<int> sequence = kglobalaccel("org.kde.kglobalaccel.setShortcut"_,
+                                     ref<string>{},ref<int>{}, 0); // ref<string>{"serenity","Increase Screen Brightness","Serenity","Increase Screen Brightness"},
+     //                                ref<int>{Qt::Key_F6}, 0);
+  log(sequence);
  }
 } test;
-#endif
-#if WAYLAND_TEST
+#else
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
