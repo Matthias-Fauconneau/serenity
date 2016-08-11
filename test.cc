@@ -1,3 +1,13 @@
+#if 1 // KGLOBALACCEL_TEST
+#include "dbus.h"
+
+struct Test {
+ Test() {
+  //org.kde.kglobalaccel /kglobalaccel setShortcut
+ }
+} test;
+#endif
+#if WAYLAND_TEST
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -117,3 +127,4 @@ struct Test {
   wl_display_disconnect(display);
  }
 } app;
+#endif

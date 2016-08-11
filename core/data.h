@@ -91,6 +91,8 @@ struct BinaryData : Data {
 
     /// Seeks to /a index
 	void seek(size_t index) { assert(index<data.size); this->index=index; }
+    /// Seeks to next aligned position
+    void align(uint width) { index=::align(width,index); }
 
     /// Reads one raw \a T element
     generic const T& read() { return *(T*)Data::read(sizeof(T)).data; }
