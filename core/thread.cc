@@ -185,6 +185,7 @@ template<> void __attribute((noreturn)) error(const string& message) {
  exit_group(-1); // Exits this group (process)
 }
 
+#if !APPMAIN
 // Entry point
 int argc; char** argv;
 int main(int argc, char** argv) {
@@ -198,6 +199,7 @@ int main(int argc, char** argv) {
  mainThread.run(); // Reuses main thread as default event loop runner when not overriden in Poll constructor
  return groupExitStatus; // Destroys all file-scope objects (libc atexit handlers) and terminates using exit_group
 }
+#endif
 
 void requestTermination(int status) {
  if(status) groupExitStatus = status;
