@@ -135,8 +135,8 @@ GLUniform GLShader::operator[](string name) {
  return GLUniform(id, location);
 }
 void GLShader::bind(string name, const GLBuffer& ssbo, uint binding) {
- uint index = glGetProgramResourceIndex(id, GL_SHADER_STORAGE_BLOCK, strz(name));
- glShaderStorageBlockBinding(id, index, binding);
+ unused uint index = glGetProgramResourceIndex(id, GL_SHADER_STORAGE_BLOCK, strz(name));
+ error("glShaderStorageBlockBinding(id, index, binding);");
  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, ssbo.id);
 }
 

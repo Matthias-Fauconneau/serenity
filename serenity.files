@@ -109,3 +109,4 @@ polyhedra/polyhedra-view.cc
 tools/state-view.h
 tools/state-view.cc
 tools/review.cc
+light.cc
