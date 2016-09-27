@@ -233,7 +233,17 @@ void XWindow::setIcon(const Image& /*icon*/) {
                         .length=2+icon.width*icon.height, .size=uint16(6+2+icon.width*icon.height)},
                         raw(icon.width)+raw(icon.height)+cast<byte>(icon));*/
 }
-void XWindow::setSize(int2 /*size*/) { /*send(SetSize{.id=id+Window, .w=uint(size.x), .h=uint(size.y)});*/ }
+void XWindow::setSize(int2 sizeHint) {
+    if(sizeHint.x<=0) Window::size.x=XDisplay::size.x;
+    if(sizeHint.y<=0) Window::size.y=XDisplay::size.y;
+    if((sizeHint.x<0||sizeHint.y<0) && widget) {
+     int2 hint (widget->sizeHint(vec2(Window::size)));
+     if(sizeHint.x<0) Window::size.x=min(max(abs(hint.x),-sizeHint.x), XDisplay::size.x);
+     if(sizeHint.y<0) Window::size.y=min(max(abs(hint.y),-sizeHint.y), XDisplay::size.y-46);
+    }
+    assert_(Window::size);
+    {SetSize r; send(({r.id=id+Window, r.w=uint(Window::size.x), r.h=uint(Window::size.y), r;}));}
+}
 
 //FILE(shader)
 

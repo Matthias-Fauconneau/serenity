@@ -47,6 +47,8 @@ struct Window : Poll {
  /// Sets window icon to \a icon
  virtual void setIcon(const Image& icon) abstract;
  virtual void setCursor(MouseCursor cursor) abstract;
+ /// Resizes window to \a size
+ virtual void setSize(int2 size=-1) abstract;
 
  // Input
  /// Actions triggered when a key is pressed
@@ -126,7 +128,7 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
  /// Sets window icon to \a icon
  void setIcon(const Image& icon) override;
  /// Resizes window to \a size
- void setSize(int2 size);
+ void setSize(int2 size) override;
 
  // Display
  void event() override;

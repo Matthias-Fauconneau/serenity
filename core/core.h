@@ -4,10 +4,11 @@
 // Keywords
 #ifdef PROFILE
 #define notrace __attribute((no_instrument_function))
+#define notrace inline __attribute((no_instrument_function))
 #else
 #define notrace
+#define inline inline
 #endif
-#define inline inline notrace
 #define unused __attribute((unused))
 #define packed __attribute((packed))
 #define Type typename
