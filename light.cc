@@ -5,7 +5,8 @@
 inline String str(range r) { return str(r.start, r.stop); } // -> string.h
 
 struct SliderSurface : virtual Widget {
-    function<void(int3)> valueChanged;
+    //function<void(int3)> valueChanged;
+    virtual void valueChanged(int3) {}
     int3 minimum, maximum;
     int3 value;
     virtual bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override;
@@ -16,11 +17,12 @@ bool SliderSurface::mouseEvent(vec2 cursor, vec2 size, Event event, Button butto
      value.z = (this->value.z+maximum.z+(button==WheelUp?1:-1))%(maximum.z+1);
     }
     if((event == Motion || event==Press) && button==LeftButton) {
-        value.xy() = minimum.xy()+int2(cursor)*(maximum.xy()-minimum.xy())/int2(size);
+        value.xy() = clamp(minimum.xy(), minimum.xy()+int2(cursor)*(maximum.xy()-minimum.xy())/int2(size), maximum.xy());
+        //assert_(minimum <= value && value <= maximum, minimum, value, maximum);
     }
     if(value != this->value) {
         this->value = value;
-        if(valueChanged) {
+        /*if(valueChanged)*/ {
             valueChanged(value);
             return true;
         }
@@ -28,24 +30,34 @@ bool SliderSurface::mouseEvent(vec2 cursor, vec2 size, Event event, Button butto
     return false;
 }
 
-struct SliderView : SliderSurface, ImageView { ~SliderView(); };
+struct SliderView : ImageView, SliderSurface { ~SliderView(); };
 SliderView::~SliderView() {}
 
-static struct Light {
+struct Light {
     Folder tmp {"/var/tmp/light",currentWorkingDirectory(), true};
     buffer<String> inputs = currentWorkingDirectory().list(Folders);
 
     string name;
     array<Map> maps;
     ImageT<Image> images;
-    SliderView view;
+    //SliderView view;
+    struct SliderView : ::SliderView {
+        Light* _this;
+        SliderView(Light* _this) : _this(_this) {}
+        virtual void valueChanged(int3 value) override { _this->setImage(value); }
+    } view {this};
     unique<Window> window = nullptr;
 
     Light() {
+        //view.valueChanged = {this, &Light::setImage};
         assert_(inputs);
         load(inputs[0]);
         window = ::window(&view);
         window->setTitle(name);
+    }
+    void setImage(int3 value) {
+        if(inputs[size_t(value.z)] != this->name) load(inputs[size_t(value.z)]);
+        view.image = unsafeShare(images(images.size.x-1-uint(value.x), uint(value.y)));
     }
     void load(string name) {
         view.image = Image();
@@ -103,11 +115,8 @@ static struct Light {
         }
         view.minimum = int3(xRange.start, yRange.start, 0);
         view.maximum = int3(xRange.stop-1, yRange.stop-1, inputs.size-1);
-        view.valueChanged = [this](int3 value) {
-            if(inputs[size_t(value.z)] != this->name) load(inputs[size_t(value.z)]);
-            view.image = unsafeShare(images(images.size.x-1-uint(value.x), uint(value.y)));
-        };
-        view.valueChanged(view.value = int3((xRange.start+xRange.stop)/2, (yRange.start+yRange.stop)/2, inputs.indexOf(name)));
+        view.value = int3((xRange.start+xRange.stop)/2, (yRange.start+yRange.stop)/2, inputs.indexOf(name));
+        setImage(view.value);
         if(window) {
             window->setSize();
             window->setTitle(name);
