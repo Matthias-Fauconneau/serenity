@@ -19,11 +19,11 @@ static void fill(uint* target, uint stride, uint w, uint h, uint value) {
  }
 }
 
-void fill(const Image& target, int2 origin, int2 size, bgr3f color, float opacity) {
+void fill(const Image& target, int2 origin, uint2 size, bgr3f color, float opacity) {
  assert_(bgr3f(0) <= color && color <= bgr3f(1));
 
  int2 min = ::max(int2(0), origin);
- int2 max = ::min(int2(target.size), origin+size);
+ int2 max = ::min(int2(target.size), origin+int2(size));
  if(max<=min) return;
 
  if(opacity==1) { // Solid fill
@@ -81,8 +81,8 @@ void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity, boo
  assert_(isNumber(p1) && isNumber(p2));
  //if(hint && p1.y == p2.y) p1.y = p2.y = round(p1.y); // Hints
  if(hint) { // TODO: preprocess
-  if(p1.x == p2.x) fill(target, int2(round(p1)), int2(1, p2.y-p1.y), color, opacity);
-  else if(p1.y == p2.y) fill(target, int2(round(p1)), int2(p2.x-p1.x, 1), color, opacity);
+  if(p1.x == p2.x) fill(target, int2(round(p1)), uint2(1, p2.y-p1.y), color, opacity);
+  else if(p1.y == p2.y) fill(target, int2(round(p1)), uint2(p2.x-p1.x, 1), color, opacity);
   else error("");
   return;
  }
@@ -237,7 +237,7 @@ void render(const Image& target, const Graphics& graphics, vec2 offset) {
    blit(target, int2(round(offset+e.origin)), e.image, e.color, e.opacity);
   //else blit(target, int2(round(offset+e.origin)), resize(int2(round(e.size)), e.image), e.color, e.opacity); // FIXME: subpixel blit
  }
- for(const auto& e: graphics.fills) fill(target, int2(round(offset+e.origin)), int2(e.size), e.color, e.opacity);
+ for(const auto& e: graphics.fills) fill(target, int2(round(offset+e.origin)), uint2(e.size), e.color, e.opacity);
  for(const auto& e: graphics.lines) line(target, offset+e.a, offset+e.b, e.color, e.opacity, e.hint);
  for(const auto& e: graphics.glyphs) {
   Font::Glyph glyph = e.font.font(e.fontSize).render(e.index);

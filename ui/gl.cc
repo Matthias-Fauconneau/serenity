@@ -331,7 +331,7 @@ void GLFrameBuffer::bind(uint clearFlags, rgba4f color) {
   glClear(clearFlags);
  }
 }
-void GLFrameBuffer::bindWindow(int2 position, int2 size, uint clearFlags, rgba4f color) {
+void GLFrameBuffer::bindWindow(int2 position, uint2 size, uint clearFlags, rgba4f color) {
  glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
  glViewport(position.x, position.y, size.x, size.y);
  if(clearFlags&ClearColor) glClearColor(color.r, color.g, color.b, color.a);

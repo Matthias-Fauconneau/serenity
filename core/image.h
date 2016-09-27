@@ -16,7 +16,7 @@ generic struct ImageT : buffer<T> {
  ImageT(uint width, uint height, bool alpha=false) : buffer<T>(height*width), size(width, height), stride(width), alpha(alpha) {
   //assert_(width && height && buffer::data);
  }
- ImageT(int2 size, bool alpha=false) : ImageT(size.x, size.y, alpha) {}
+ ImageT(uint2 size, bool alpha=false) : ImageT(size.x, size.y, alpha) {}
 
  explicit operator bool() const { return buffer<T>::data && size.x && size.y; }
  inline T& operator()(uint x, uint y) const {
@@ -70,7 +70,7 @@ Image flip(Image&& image);
 /// Rotates an image
 void rotate(const Image& target, const Image& source);
 inline Image rotate(Image&& target, const Image& source) { rotate(target, source); return move(target); }
-inline Image rotate(const Image& source) { return rotate(Image(int2(source.size.y, source.size.x), source.alpha), source); }
+inline Image rotate(const Image& source) { return rotate(Image(uint2(source.size.y, source.size.x), source.alpha), source); }
 /// Rotates an image around
 Image rotateHalfTurn(Image&& target);
 
@@ -81,7 +81,7 @@ Image negate(Image&& target, const Image& source);
 /// Resizes \a source into \a target
 void resize(const Image& target, const Image& source);
 inline Image resize(Image&& target, const Image& source) { resize(target, source); return move(target); }
-inline Image resize(int2 size, const Image& source) { return resize(Image(size, source.alpha), source); }
+inline Image resize(uint2 size, const Image& source) { return resize(Image(size, source.alpha), source); }
 
 /// 2D array of 32bit floating-point pixels
 typedef ImageT<float> ImageF;

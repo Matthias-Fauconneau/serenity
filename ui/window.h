@@ -13,7 +13,7 @@ struct Window : Poll {
 
  // Display
  /// Window size
- int2 size = 0;
+ uint2 size = 0;
  /// Background color
  bgr3f backgroundColor = white;
  /// Current cursor
@@ -27,9 +27,10 @@ struct Window : Poll {
  /// Updates to be rendered
  struct Update {
   shared<Graphics> graphics;
-  int2 origin = 0, size = 0;
+  int2 origin = 0;
+  uint2 size = 0;
   explicit operator bool() { return size.x || size.y; }
-  Update(shared<Graphics>&& graphics=nullptr, int2 origin=0, int2 size=0) : graphics(move(graphics)), origin(origin), size(size) {} //req C++14
+  Update(shared<Graphics>&& graphics=nullptr, int2 origin=0, uint2 size=0) : graphics(move(graphics)), origin(origin), size(size) {} //req C++14
  };
  Lock lock;
  array<Update> updates;
@@ -65,11 +66,11 @@ struct Window : Poll {
 
  // Display
  /// Schedules partial rendering after all events have been processed (\sa Poll::queue)
- void render(shared<Graphics>&& graphics, int2 origin, int2 size);
+ void render(shared<Graphics>&& graphics, int2 origin, uint2 size);
  /// Schedules window rendering after all events have been processed (\sa Poll::queue)
  void render();
  /// Immediately renders the first pending update to target
- Update render(int2 size, const Image& target);
+ Update render(uint2 size, const Image& target);
  virtual Image readback() { return Image(); }
  Time swapTime;
 

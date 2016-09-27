@@ -57,7 +57,12 @@ struct Light {
     }
     void setImage(int3 value) {
         if(inputs[size_t(value.z)] != this->name) load(inputs[size_t(value.z)]);
-        view.image = unsafeShare(images(images.size.x-1-uint(value.x), uint(value.y)));
+        //view.image = unsafeShare(images(images.size.x-1-uint(value.x), uint(value.y)));
+        Image image (images.size);
+        for(size_t y: range(images.size.y)) for(size_t x: range(images.size.x)) {
+            image(x, y) = images(x, y)(value.x, value.y);
+        }
+        view.image = resize(image.size*128u, image);
     }
     void load(string name) {
         view.image = Image();
@@ -113,8 +118,13 @@ struct Light {
             }
             continue2_:;
         }
-        view.minimum = int3(xRange.start, yRange.start, 0);
-        view.maximum = int3(xRange.stop-1, yRange.stop-1, inputs.size-1);
+        if(0) {
+            view.minimum = int3(xRange.start, yRange.start, 0);
+            view.maximum = int3(xRange.stop-1, yRange.stop-1, inputs.size-1);
+        } else {
+            view.minimum = int3(int2(0, 0), 0);
+            view.maximum = int3(int2(images[0].size-uint2(1)), inputs.size-1);
+        }
         view.value = int3((xRange.start+xRange.stop)/2, (yRange.start+yRange.stop)/2, inputs.indexOf(name));
         setImage(view.value);
         if(window) {

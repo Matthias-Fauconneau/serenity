@@ -38,15 +38,15 @@ void setCursor(MouseCursor cursor) { assert_(currentWindow); currentWindow->setC
 String getSelection(bool clipboard) { assert(currentWindow); return currentWindow->getSelection(clipboard); }
 void setSelection(string selection, bool clipboard) { assert(currentWindow); return currentWindow->setSelection(selection, clipboard); }
 
-void Window::render(shared<Graphics>&& graphics, int2 origin, int2 size) {
+void Window::render(shared<Graphics>&& graphics, int2 origin, uint2 size) {
  lock.lock();
- updates.append( Update{move(graphics),origin,size} );
+ updates.append( Update{move(graphics), origin, size} );
  lock.unlock();
  queue();
 }
 void Window::render() { assert_(size); 	lock.lock(); updates.clear(); lock.unlock(); render(nullptr, int2(0), size); }
 
-Window::Update Window::render(int2 size, const Image& target) {
+Window::Update Window::render(uint2 size, const Image& target) {
  lock.lock();
  if(!updates) { lock.unlock(); return Update(); }
  Update update = updates.take(0);
@@ -184,7 +184,7 @@ bool XWindow::processEvent(const X11::Event& e) {
  else if(type==UnmapNotify) mapped=false;
  else if(type==MapNotify) mapped=true;
  else if(type==ReparentNotify) {}
- else if(type==ConfigureNotify) { int2 size(e.configure.w,e.configure.h); if(size!=Window::size) { Window::size=size; render(); } }
+ else if(type==ConfigureNotify) { uint2 size(e.configure.w, e.configure.h); if(size!=Window::size) { Window::size=size; render(); } }
  else if(type==GravityNotify) {}
 #if 0
  else if(type==SelectionClear) {}
@@ -253,7 +253,7 @@ void XWindow::event() {
  setTitle(getTitle ? getTitle() : widget->title());
  if(state!=Idle || !mapped) return;
 
- if(int2(target.size) != Window::size) {
+ if(target.size != Window::size) {
   if(target) {
    {FreePixmap r; send(({r.pixmap=id+Pixmap, r;}));} target=Image();
    assert_(shm);
@@ -273,8 +273,7 @@ void XWindow::event() {
  }
 
  if(glContext && !useSW) // if useSW: GL image should be composited in CPU target
-  GLFrameBuffer::bindWindow(0, Window::size, ClearColor|ClearDepth,
-                            rgba4f(backgroundColor, 1));
+  GLFrameBuffer::bindWindow(0, Window::size, ClearColor|ClearDepth, rgba4f(backgroundColor, 1));
  Update update = render(Window::size, target);
  if(update) {
   if(glContext && !useSW) {

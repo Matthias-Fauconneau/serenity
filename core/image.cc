@@ -160,4 +160,5 @@ static void bilinear(const Image& target, const Image& source) {
 void resize(const Image& target, const Image& source) {
  assert_(source && target && source.size != target.size);
  if(target.size > source.size/2u) bilinear(target, source); // Bilinear resample
+ else error(target.size, source.size);
 }
