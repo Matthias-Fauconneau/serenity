@@ -70,7 +70,7 @@ generic bool operator >(const vec& u, const vec& v) { for(uint i: range(N)) if(u
 
 generic vec abs(const vec& v){ vec r; for(uint i: range(N)) r[i]=abs(v[i]); return r;  }
 generic vec floor(const vec& v){ vec r; for(uint i: range(N)) r[i]=floor(v[i]); return r;  }
-generic vec fract(const vec& v){ vec r; for(uint i: range(N)) r[i]=mod(v[i],1); return r;  }
+generic vec fract(const vec& v){ vec r; for(uint i: range(N)) r[i]=fract(v[i]); return r;  }
 generic vec round(const vec& v){ vec r; for(uint i: range(N)) r[i]=round(v[i]); return r;  }
 generic vec ceil(const vec& v){ vec r; for(uint i: range(N)) r[i]=ceil(v[i]); return r;  }
 generic vec min(const vec& a, const vec& b){ vec r; for(uint i: range(N)) r[i]=min(a[i],b[i]); return r; }
@@ -120,6 +120,7 @@ generic struct xyzw {
 typedef vec<xyzw,float,4> vec4;
 
 generic struct bgr { T b,g,r; };
+typedef vec<bgr,uint8,3> byte3;
 typedef vec<bgr,int,3> bgr3i;
 typedef vec<bgr,float,3> bgr3f;
 generic struct rgb { T r,g,b; };
