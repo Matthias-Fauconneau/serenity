@@ -6,21 +6,21 @@ struct ViewControl : virtual Widget {
     vec2 viewYawPitch = vec2(0, 0); // Current view angles
 
     struct {
-     vec2 cursor;
-     vec2 viewYawPitch;
+        vec2 cursor;
+        vec2 viewYawPitch;
     } dragStart;
 
     // Orbital ("turntable") view control
     virtual bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button,
-                                   Widget*&) override {
-     if(event == Press) dragStart = {cursor, viewYawPitch};
-     if(event==Motion && button==LeftButton) {
-      viewYawPitch = dragStart.viewYawPitch + float(2*PI) * (cursor - dragStart.cursor) / size;
-      viewYawPitch.x = clamp<float>(-PI/2, viewYawPitch.x, PI/2);
-      viewYawPitch.y = clamp<float>(-PI/2, viewYawPitch.y, PI/2);
-     }
-     else return false;
-     return true;
+                            Widget*&) override {
+        if(event == Press) dragStart = {cursor, viewYawPitch};
+        if(event==Motion && button==LeftButton) {
+            viewYawPitch = dragStart.viewYawPitch + float(2*PI) * (cursor - dragStart.cursor) / size;
+            viewYawPitch.x = clamp<float>(-PI/2, viewYawPitch.x, PI/2);
+            viewYawPitch.y = clamp<float>(-PI/2, viewYawPitch.y, PI/2);
+        }
+        else return false;
+        return true;
     }
 };
 
@@ -29,48 +29,19 @@ struct Light {
     buffer<String> inputs = currentWorkingDirectory().list(Folders);
 
     string name;
+    uint2 imageSize;
     array<Map> maps;
     ImageT<Image> images;
 
-    struct LightView : ViewControl, ImageView {
+    struct View : ViewControl, ImageView {
         Light* _this;
-        LightView(Light* _this) : _this(_this) {}
+        View(Light* _this) : _this(_this) {}
 
         virtual vec2 sizeHint(vec2) override { return 1024; }
         virtual shared<Graphics> graphics(vec2 size) override {
-            Image target { uint2(size) };
-            target.clear(0xFF);
-
-            // Rotated orthographic projection
             vec4 viewRotation = qmul(angleVector(-viewYawPitch.y, vec3(1,0,0)), angleVector(viewYawPitch.x, vec3(0,1,0)));
-            vec4 invViewRotation = conjugate(viewRotation);
-            vec2 scale = size.x/2;
-            vec2 offset = size/2.f;
-
-            for(int y: range(target.size.y)) for(int x: range(target.size.x)) {
-                vec3 Ov (x,y,0); // View space
-                vec3 O = qapply(invViewRotation, ((Ov - vec3(offset, 0)) / vec3(scale, 1))); // World space
-                vec3 d = qapply(invViewRotation, vec3(0, 0, 1));
-                for(float z: {0, 1}) {
-                    vec3 M (0,0,z);
-                    vec3 n (0,0,-1);
-                    vec3 P = O + dot(n, M-O) / dot(n, d) * d;
-                    if(P.x >= -1 && P.x <= 1 &&
-                       P.y >= -1 && P.y <= 1)
-                        target(x, y) = byte4((P.x+1)/2*0xFF, (P.y+1)/2*0xFF, z*0xFF, 0xFF);
-                }
-            }
-#if 0
-         for(float z: {0, 1}) for(size_t i: range(4)) { // st, uv
-          vec2 P[] {vec2(-1,-1),vec2(1,-1),vec2(1,1),vec2(-1,1)};
-          vec2 P1 = offset + scale * qapply(viewRotation, vec3(P[i], z)).xy();
-          vec2 P2 = offset + scale * qapply(viewRotation, vec3(P[(i+1)%4], z)).xy();
-          assert_(isNumber(P1) && isNumber(P2));
-          graphics->lines.append(P1, P2);
-         }
-#endif
-         this->image = ::move(target);
-         return ImageView::graphics(size);
+            this->image = _this->render(uint2(size), viewRotation);
+            return ImageView::graphics(size);
         }
     } view {this};
     unique<Window> window = nullptr;
@@ -81,31 +52,68 @@ struct Light {
         window = ::window(&view);
         window->setTitle(name);
     }
-#if 0
-    void setImage(vec3 value) {
-        if(inputs[size_t(value.z)] != this->name) load(inputs[size_t(value.z)]);
-        vec2 st (images.size.x-1-value.x, value.y);
-        st = min(st, vec2(images.size-uint2(1))-vec2(1./2));
-        assert(vec2(0) <= st && st < vec2(images.size-uint2(1)));
-        const Image& st00 = images(st.x, st.y);
-        const Image& st10 = images(st.x+1, st.y);
-        const Image& st01 = images(st.x, st.y+1);
-        const Image& st11 = images(st.x+1, st.y+1);
-        vec2 f = fract(st);
-        Image image (st00.size);
-        for(size_t y: range(image.size.y)) for(size_t x: range(image.size.x)) {
-            image(x, y) = byte4(byte3(
-                    (1-f.y) * ( (1-f.x) * bgr3f(st00(x, y).bgr()) + f.x * bgr3f(st10(x, y).bgr()) )
-                    +  f.y  * ( (1-f.x) * bgr3f(st01(x, y).bgr()) + f.x * bgr3f(st11(x, y).bgr()) )), 0);
+    Image render(uint2 size, vec4 viewRotation) {
+        Image target (size);
+        target.clear(0xFF);
+
+        // Rotated orthographic projection
+        vec4 invViewRotation = conjugate(viewRotation);
+        vec2 scale = size.x/2;
+        vec2 offset = vec2(size)/2.f;
+
+        for(int y: range(target.size.y)) for(int x: range(target.size.x)) {
+            vec3 Ov (x,y,0); // View space
+            vec3 O = qapply(invViewRotation, ((Ov - vec3(offset, 0)) / vec3(scale, 1))); // World space
+            vec3 d = qapply(invViewRotation, vec3(0, 0, 1));
+            vec3 n (0,0,-1);
+            vec2 st, uv;
+            { vec3 M (0,0,0);
+                vec3 P = O + dot(n, M-O) / dot(n, d) * d;
+                st = (P.xy()+vec2(1))/2.f;
+            }
+            { vec3 M (0,0,1);
+                vec3 P = O + dot(n, M-O) / dot(n, d) * d;
+                uv = (P.xy()+vec2(1))/2.f;
+            }
+
+            st *= vec2(images.size-uint2(1));
+            if(!(int2(0) <= int2(st) && int2(st) < int2(images.size-uint2(1)))) continue;
+            uv *= vec2(imageSize-uint2(1));
+            if(!(int2(0) <= int2(uv) && int2(uv) < int2(imageSize-uint2(1)))) continue;
+            float s = st[0], t = st[1], u = uv[0], v = uv[1];
+
+            bgr3f Sstuv [2][2][2][2];
+            for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1}) for(const int dv: {0, 1}) {
+                Sstuv[ds][dt][du][dv] = bgr3f(images(s+ds, t+dt)(u+du, v+dv).bgr());
+            }
+
+            bgr3f Sstu [2][2][2];
+            float fv = fract(v);
+            for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1})
+                Sstu[ds][dt][du] = (1-fv) * Sstuv[ds][dt][du][0] + fv * Sstuv[ds][dt][du][1];
+
+            bgr3f Sst [2][2];
+            float fu = fract(u);
+            for(const int ds: {0, 1}) for(const int dt: {0, 1})
+                Sst[ds][dt] = (1-fu) * Sstu[ds][dt][0] + fu * Sstu[ds][dt][1];
+
+            bgr3f Ss [2];
+            float ft = fract(t);
+            for(const int ds: {0, 1})
+                Ss[ds] = (1-ft) * Sst[ds][0] + ft * Sst[ds][1];
+
+            bgr3f S;
+            float fs = fract(s);
+            S = (1-fs) * Ss[0] + fs * Ss[1];
+
+            target(x, y) = byte4(byte3(S), 0xFF);
         }
-        view.image = ::move(image);
+        return target;
     }
-#endif
-    void load(string unused name) {
-#if 0
-        view.image = Image();
+    void load(string name) {
         array<Image>(::move(images)).clear(); // Proper destruction in case heap allocated
         maps.clear();
+        imageSize = 0;
         this->name = name;
         Folder input (name);
         Folder tmp (name, this->tmp, true);
@@ -143,32 +151,22 @@ struct Light {
                     s.match('x');
                     uint h = uint(s.integer(false));
                     images(x, y) = Image(cast<byte4>(unsafeRef(maps.append(mapName, tmp))), uint2(w, h));
-                    goto continue2_;
+                    goto break_;
                 }
-            }
-            {
+            } /*else*/ {
                 log(name);
                 Image image = decodeImage(Map(name, input));
                 assert_(image.stride == image.size.x);
                 String mapName = name+'.'+strx(image.size);
                 writeFile(mapName, cast<byte>(image), tmp);
                 images(x, y) = Image(cast<byte4>(unsafeRef(maps.append(mapName, tmp))), image.size);
-            }
-            continue2_:;
+            } break_:;
+            if(!imageSize) imageSize = images(x, y).size;
+            assert_(images(x,y).size == imageSize);
         }
-        if(1) {
-            view.minimum = int3(xRange.start, yRange.start, 0);
-            view.maximum = int3(xRange.stop-1, yRange.stop-1, inputs.size-1);
-        } else {
-            view.minimum = int3(int2(0, 0), 0);
-            view.maximum = int3(int2(images[0].size-uint2(1)), inputs.size-1);
-        }
-        view.value = vec3((xRange.start+xRange.stop)/2, (yRange.start+yRange.stop)/2, inputs.indexOf(name));
-        setImage(view.value);
         if(window) {
             window->setSize();
             window->setTitle(name);
         }
-#endif
     }
 } app;
