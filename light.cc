@@ -15,7 +15,7 @@ struct ViewControl : virtual Widget {
                             Widget*&) override {
         if(event == Press) dragStart = {cursor, viewYawPitch};
         if(event==Motion && button==LeftButton) {
-            viewYawPitch = dragStart.viewYawPitch + float(2*PI) * (cursor - dragStart.cursor) / size;
+            viewYawPitch = dragStart.viewYawPitch + float(2*PI) * (cursor - dragStart.cursor) / size / 10.f;
             viewYawPitch.x = clamp<float>(-PI/2, viewYawPitch.x, PI/2);
             viewYawPitch.y = clamp<float>(-PI/2, viewYawPitch.y, PI/2);
         }
@@ -54,7 +54,7 @@ struct Light {
     }
     Image render(uint2 size, vec4 viewRotation) {
         Image target (size);
-        target.clear(0xFF);
+        target.clear(0);
 
         // Rotated orthographic projection
         vec4 invViewRotation = conjugate(viewRotation);
@@ -67,43 +67,43 @@ struct Light {
             vec3 d = qapply(invViewRotation, vec3(0, 0, 1));
             vec3 n (0,0,-1);
             vec2 st, uv;
-            { vec3 M (0,0,0);
+            { vec3 M (0,0,10);
                 vec3 P = O + dot(n, M-O) / dot(n, d) * d;
+                //P.xy() *= 10;
                 st = (P.xy()+vec2(1))/2.f;
             }
-            { vec3 M (0,0,1);
+            { vec3 M (0,0,0);
                 vec3 P = O + dot(n, M-O) / dot(n, d) * d;
                 uv = (P.xy()+vec2(1))/2.f;
             }
 
+            st[1] = 1-st[1];
             st *= vec2(images.size-uint2(1));
-            if(!(int2(0) <= int2(st) && int2(st) < int2(images.size-uint2(1)))) continue;
-            uv *= vec2(imageSize-uint2(1));
-            if(!(int2(0) <= int2(uv) && int2(uv) < int2(imageSize-uint2(1)))) continue;
-            float s = st[0], t = st[1], u = uv[0], v = uv[1];
+            //uv[1] = 1-uv[1];
+            uv *= imageSize.x-1;
+            int is = st[0], it = st[1], iu = uv[0], iv = uv[1];
+            if(is < 0 || is >= int(images.size.x)-1 || it < 0 || it >= int(images.size.y)-1) continue;
+            if(iu < 0 || iu >= int(imageSize.x)-1 || iv < 0 || iv >= int(imageSize.y)-1) continue;
+            float fs = fract(st[0]), ft = fract(st[1]), fu = fract(uv[0]), fv = fract(uv[1]);
 
             bgr3f Sstuv [2][2][2][2];
             for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1}) for(const int dv: {0, 1}) {
-                Sstuv[ds][dt][du][dv] = bgr3f(images(s+ds, t+dt)(u+du, v+dv).bgr());
+                Sstuv[ds][dt][du][dv] = bgr3f(images(is+ds, it+dt)(iu+du, iv+dv).bgr());
             }
 
             bgr3f Sstu [2][2][2];
-            float fv = fract(v);
             for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1})
                 Sstu[ds][dt][du] = (1-fv) * Sstuv[ds][dt][du][0] + fv * Sstuv[ds][dt][du][1];
 
             bgr3f Sst [2][2];
-            float fu = fract(u);
             for(const int ds: {0, 1}) for(const int dt: {0, 1})
                 Sst[ds][dt] = (1-fu) * Sstu[ds][dt][0] + fu * Sstu[ds][dt][1];
 
             bgr3f Ss [2];
-            float ft = fract(t);
             for(const int ds: {0, 1})
                 Ss[ds] = (1-ft) * Sst[ds][0] + ft * Sst[ds][1];
 
             bgr3f S;
-            float fs = fract(s);
             S = (1-fs) * Ss[0] + fs * Ss[1];
 
             target(x, y) = byte4(byte3(S), 0xFF);
