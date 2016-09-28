@@ -150,3 +150,13 @@ vec<V,T,3> cross(vec<V,T,3> a, vec<V,T,3> b) {
 }
 
 inline String strx(uint2 N) { return str(N.x)+'x'+str(N.y); }
+
+inline vec4 conjugate(vec4 q) { return vec4(-q.xyz(), q.w); }
+inline vec4 qmul(vec4 a, vec4 b) { return vec4( a[3] * b.xyz() + b[3] * a.xyz() + cross(a.xyz(), b.xyz()), a[3]*b[3] - dot(a.xyz(), b.xyz())); }
+inline vec3 qapply(vec4 q, vec3 v) { return qmul(q, qmul(vec4(v, 0), conjugate(q))).xyz(); }
+inline vec4 angleVector(float a, vec3 v) {
+ float l = length(v);
+ if(!l) return vec4(vec3(0), 1);
+ vec3 b = sin(a/2*l)/l*v;
+ return vec4(b, cos(a/2*l));
+}

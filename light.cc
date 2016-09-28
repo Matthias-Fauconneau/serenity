@@ -1,102 +1,27 @@
-#if 1
-#include "interface.h"
-#include "render.h"
-#include "window.h"
-
-inline String str(range r) { return str(r.start, r.stop); } // -> string.h
-
-struct Light {
-    Folder tmp {"/var/tmp/light",currentWorkingDirectory(), true};
-    buffer<String> inputs = currentWorkingDirectory().list(Folders);
-
-    string name;
-    ImageView view;
-    unique<Window> window = nullptr;
-
-    Light() {
-        assert_(inputs);
-        load(inputs[0]);
-        window = ::window(&view);
-        window->setTitle(name);
-    }
-    void load(string name) {
-        this->name = name;
-        Folder input (name);
-        Folder tmp (name, this->tmp, true);
-
-        range xRange {0}, yRange {0};
-        for(string name: input.list(Files)) {
-            TextData s (name);
-            s.until('_');
-            int y = s.integer();
-            s.match('_');
-            int x = s.integer();
-
-            xRange.start = ::min(xRange.start, x);
-            xRange.stop = ::max(xRange.stop, x+1);
-
-            yRange.start = ::min(yRange.start, y);
-            yRange.stop = ::max(yRange.stop, y+1);
-        }
-
-        int2 size (0, 0);
-        for(string name: input.list(Files)) {
-            TextData s (name);
-            s.until('_');
-            unused uint y = uint(s.integer(false));
-            s.match('_');
-            unused uint x = uint(s.integer(false));
-
-            int2 imageSize = ::imageSize(Map(name, input));
-            if(!size) size = imageSize;
-            assert_(imageSize == size);
-        }
-
-        Image image(1024);
-        log(xRange, size);
-        const int M = 8, N = 64;
-        for(int s: range(xRange.size()/M+1)) /*for(int t: yRange)*/ for(int u: range(size.x/N)) /*for(int v: range(size.y))*/ {
-            float x0 = (s*M-xRange.start)*(image.size.x-1)/(xRange.size()-1);
-            float x1 = (u*N-0)*(image.size.x-1)/(size.x-1);
-            line(image, vec2(x0, 0), vec2(x1, image.size.y), white);
-        }
-        view.image = ::move(image);
-    }
-} app;
-
-#else
 #include "png.h"
 #include "interface.h"
 #include "window.h"
 
-struct SliderSurface : virtual Widget {
-    //function<void(int3)> valueChanged;
-    virtual void valueChanged(vec3) {}
-    int3 minimum, maximum;
-    vec3 value;
-    virtual bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override;
-};
-bool SliderSurface::mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) {
-    vec3 value = this->value;
-    if(event == Press && (button == WheelUp || button == WheelDown)) {
-     value.z = (int(this->value.z)+maximum.z+(button==WheelUp?1:-1))%(maximum.z+1);
-    }
-    if((event == Motion || event==Press) && button==LeftButton) {
-        value.xy() = clamp(vec2(minimum.xy()), vec2(minimum.xy())+cursor*vec2(maximum.xy()-minimum.xy())/size, vec2(maximum.xy()));
-        //assert_(minimum <= value && value <= maximum, minimum, value, maximum);
-    }
-    if(value != this->value) {
-        this->value = value;
-        /*if(valueChanged)*/ {
-            valueChanged(value);
-            return true;
-        }
-    }
-    return false;
-}
+struct ViewControl : virtual Widget {
+    vec2 viewYawPitch = vec2(0, PI/3); // Current view angles
 
-struct SliderView : ImageView, SliderSurface { ~SliderView(); };
-SliderView::~SliderView() {}
+    struct {
+     vec2 cursor;
+     vec2 viewYawPitch;
+    } dragStart;
+
+    // Orbital ("turntable") view control
+    virtual bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button,
+                                   Widget*&) override {
+     if(event == Press) dragStart = {cursor, viewYawPitch};
+     if(event==Motion && button==LeftButton) {
+      viewYawPitch = dragStart.viewYawPitch + float(2*PI) * (cursor - dragStart.cursor) / size;
+      viewYawPitch.y = clamp<float>(0, viewYawPitch.y, PI);
+     }
+     else return false;
+     return true;
+    }
+};
 
 struct Light {
     Folder tmp {"/var/tmp/light",currentWorkingDirectory(), true};
@@ -105,24 +30,39 @@ struct Light {
     string name;
     array<Map> maps;
     ImageT<Image> images;
-    //SliderView view;
-    struct SliderView : ::SliderView {
+
+    struct LightView : ViewControl {
         Light* _this;
-        SliderView(Light* _this) : _this(_this) {}
-        virtual void valueChanged(vec3 value) override { _this->setImage(value); }
+        LightView(Light* _this) : _this(_this) {}
+
+        virtual vec2 sizeHint(vec2) override { return 1024; }
+        virtual shared<Graphics> graphics(vec2 size) override {
+         shared<Graphics> graphics;
+         // Rotated orthographic projection
+         vec4 viewRotation = qmul(angleVector(viewYawPitch.y, vec3(1,0,0)), angleVector(viewYawPitch.x, vec3(0,0,1)));
+         vec2 scale = size.x/2;
+         vec2 offset = size/2.f;
+         for(float z: {0, 1}) for(size_t i: range(4)) { // st, uv
+          vec2 P[] {vec2(-1,-1),vec2(1,-1),vec2(1,1),vec2(-1,1)};
+          vec2 P1 = offset + scale * qapply(viewRotation, vec3(P[i], z)).xy();
+          vec2 P2 = offset + scale * qapply(viewRotation, vec3(P[(i+1)%4], z)).xy();
+          assert_(isNumber(P1) && isNumber(P2));
+          graphics->lines.append(P1, P2);
+         }
+         return ::move(graphics);
+        }
     } view {this};
     unique<Window> window = nullptr;
 
     Light() {
-        //view.valueChanged = {this, &Light::setImage};
         assert_(inputs);
         load(inputs[0]);
         window = ::window(&view);
         window->setTitle(name);
     }
+#if 0
     void setImage(vec3 value) {
         if(inputs[size_t(value.z)] != this->name) load(inputs[size_t(value.z)]);
-#if 1
         vec2 st (images.size.x-1-value.x, value.y);
         st = min(st, vec2(images.size-uint2(1))-vec2(1./2));
         assert(vec2(0) <= st && st < vec2(images.size-uint2(1)));
@@ -138,17 +78,10 @@ struct Light {
                     +  f.y  * ( (1-f.x) * bgr3f(st01(x, y).bgr()) + f.x * bgr3f(st11(x, y).bgr()) )), 0);
         }
         view.image = ::move(image);
-#elif 0
-        view.image = unsafeShare(images(images.size.x-1-uint(value.x), uint(value.y)));
-#else
-        Image image (images.size);
-        for(size_t y: range(images.size.y)) for(size_t x: range(images.size.x)) {
-            image(x, y) = images(x, y)(value.x, value.y);
-        }
-        view.image = resize(image.size*128u, image);
-#endif
     }
-    void load(string name) {
+#endif
+    void load(string unused name) {
+#if 0
         view.image = Image();
         array<Image>(::move(images)).clear(); // Proper destruction in case heap allocated
         maps.clear();
@@ -215,6 +148,6 @@ struct Light {
             window->setSize();
             window->setTitle(name);
         }
+#endif
     }
 } app;
-#endif
