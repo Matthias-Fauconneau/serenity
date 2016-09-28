@@ -32,17 +32,35 @@ struct Light {
     array<Map> maps;
     ImageT<Image> images;
 
-    struct LightView : ViewControl {
+    struct LightView : ViewControl, ImageView {
         Light* _this;
         LightView(Light* _this) : _this(_this) {}
 
         virtual vec2 sizeHint(vec2) override { return 1024; }
         virtual shared<Graphics> graphics(vec2 size) override {
-         shared<Graphics> graphics;
-         // Rotated orthographic projection
-         vec4 viewRotation = qmul(angleVector(viewYawPitch.y, vec3(1,0,0)), angleVector(viewYawPitch.x, vec3(0,1,0)));
-         vec2 scale = size.x/2;
-         vec2 offset = size/2.f;
+            Image target { uint2(size) };
+            target.clear(0xFF);
+
+            // Rotated orthographic projection
+            vec4 viewRotation = qmul(angleVector(-viewYawPitch.y, vec3(1,0,0)), angleVector(viewYawPitch.x, vec3(0,1,0)));
+            vec4 invViewRotation = conjugate(viewRotation);
+            vec2 scale = size.x/2;
+            vec2 offset = size/2.f;
+
+            for(int y: range(target.size.y)) for(int x: range(target.size.x)) {
+                vec3 Ov (x,y,0); // View space
+                vec3 O = qapply(invViewRotation, ((Ov - vec3(offset, 0)) / vec3(scale, 1))); // World space
+                vec3 d = qapply(invViewRotation, vec3(0, 0, 1));
+                for(float z: {0, 1}) {
+                    vec3 M (0,0,z);
+                    vec3 n (0,0,-1);
+                    vec3 P = O + dot(n, M-O) / dot(n, d) * d;
+                    if(P.x >= -1 && P.x <= 1 &&
+                       P.y >= -1 && P.y <= 1)
+                        target(x, y) = byte4((P.x+1)/2*0xFF, (P.y+1)/2*0xFF, z*0xFF, 0xFF);
+                }
+            }
+#if 0
          for(float z: {0, 1}) for(size_t i: range(4)) { // st, uv
           vec2 P[] {vec2(-1,-1),vec2(1,-1),vec2(1,1),vec2(-1,1)};
           vec2 P1 = offset + scale * qapply(viewRotation, vec3(P[i], z)).xy();
@@ -50,7 +68,9 @@ struct Light {
           assert_(isNumber(P1) && isNumber(P2));
           graphics->lines.append(P1, P2);
          }
-         return ::move(graphics);
+#endif
+         this->image = ::move(target);
+         return ImageView::graphics(size);
         }
     } view {this};
     unique<Window> window = nullptr;

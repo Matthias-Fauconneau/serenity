@@ -4,7 +4,10 @@
 
 // functor abstract interface
 template<Type R, Type... Args> struct functor;
-template<Type R, Type... Args> struct functor<R(Args...)> { virtual R operator()(Args... args) const abstract; };
+template<Type R, Type... Args> struct functor<R(Args...)> {
+    virtual ~functor() {}
+    virtual R operator()(Args... args) const abstract;
+};
 // functor template specialization for anonymous functions
 template<Type F, Type R, Type... Args> struct anonymous_function;
 template<Type F, Type R, Type... Args> struct anonymous_function<F, R(Args...)> : functor<R(Args...)> {
