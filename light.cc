@@ -1,8 +1,73 @@
-#include "png.h"
+#if 1
 #include "interface.h"
+#include "render.h"
 #include "window.h"
 
 inline String str(range r) { return str(r.start, r.stop); } // -> string.h
+
+struct Light {
+    Folder tmp {"/var/tmp/light",currentWorkingDirectory(), true};
+    buffer<String> inputs = currentWorkingDirectory().list(Folders);
+
+    string name;
+    ImageView view;
+    unique<Window> window = nullptr;
+
+    Light() {
+        assert_(inputs);
+        load(inputs[0]);
+        window = ::window(&view);
+        window->setTitle(name);
+    }
+    void load(string name) {
+        this->name = name;
+        Folder input (name);
+        Folder tmp (name, this->tmp, true);
+
+        range xRange {0}, yRange {0};
+        for(string name: input.list(Files)) {
+            TextData s (name);
+            s.until('_');
+            int y = s.integer();
+            s.match('_');
+            int x = s.integer();
+
+            xRange.start = ::min(xRange.start, x);
+            xRange.stop = ::max(xRange.stop, x+1);
+
+            yRange.start = ::min(yRange.start, y);
+            yRange.stop = ::max(yRange.stop, y+1);
+        }
+
+        int2 size (0, 0);
+        for(string name: input.list(Files)) {
+            TextData s (name);
+            s.until('_');
+            unused uint y = uint(s.integer(false));
+            s.match('_');
+            unused uint x = uint(s.integer(false));
+
+            int2 imageSize = ::imageSize(Map(name, input));
+            if(!size) size = imageSize;
+            assert_(imageSize == size);
+        }
+
+        Image image(1024);
+        log(xRange, size);
+        const int M = 8, N = 64;
+        for(int s: range(xRange.size()/M+1)) /*for(int t: yRange)*/ for(int u: range(size.x/N)) /*for(int v: range(size.y))*/ {
+            float x0 = (s*M-xRange.start)*(image.size.x-1)/(xRange.size()-1);
+            float x1 = (u*N-0)*(image.size.x-1)/(size.x-1);
+            line(image, vec2(x0, 0), vec2(x1, image.size.y), white);
+        }
+        view.image = ::move(image);
+    }
+} app;
+
+#else
+#include "png.h"
+#include "interface.h"
+#include "window.h"
 
 struct SliderSurface : virtual Widget {
     //function<void(int3)> valueChanged;
@@ -152,3 +217,4 @@ struct Light {
         }
     }
 } app;
+#endif
