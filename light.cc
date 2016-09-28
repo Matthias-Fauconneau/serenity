@@ -3,7 +3,7 @@
 #include "window.h"
 
 struct ViewControl : virtual Widget {
-    vec2 viewYawPitch = vec2(0, PI/3); // Current view angles
+    vec2 viewYawPitch = vec2(0, 0); // Current view angles
 
     struct {
      vec2 cursor;
@@ -16,7 +16,8 @@ struct ViewControl : virtual Widget {
      if(event == Press) dragStart = {cursor, viewYawPitch};
      if(event==Motion && button==LeftButton) {
       viewYawPitch = dragStart.viewYawPitch + float(2*PI) * (cursor - dragStart.cursor) / size;
-      viewYawPitch.y = clamp<float>(0, viewYawPitch.y, PI);
+      viewYawPitch.x = clamp<float>(-PI/2, viewYawPitch.x, PI/2);
+      viewYawPitch.y = clamp<float>(-PI/2, viewYawPitch.y, PI/2);
      }
      else return false;
      return true;
@@ -39,7 +40,7 @@ struct Light {
         virtual shared<Graphics> graphics(vec2 size) override {
          shared<Graphics> graphics;
          // Rotated orthographic projection
-         vec4 viewRotation = qmul(angleVector(viewYawPitch.y, vec3(1,0,0)), angleVector(viewYawPitch.x, vec3(0,0,1)));
+         vec4 viewRotation = qmul(angleVector(viewYawPitch.y, vec3(1,0,0)), angleVector(viewYawPitch.x, vec3(0,1,0)));
          vec2 scale = size.x/2;
          vec2 offset = size/2.f;
          for(float z: {0, 1}) for(size_t i: range(4)) { // st, uv
