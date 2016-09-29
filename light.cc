@@ -29,6 +29,7 @@ struct Light {
     buffer<String> inputs = currentWorkingDirectory().list(Folders);
 
     string name;
+    vec2 min, max;
     uint2 imageSize;
     array<Map> maps;
     ImageT<Image> images;
@@ -67,9 +68,8 @@ struct Light {
             vec3 d = qapply(invViewRotation, vec3(0, 0, 1));
             vec3 n (0,0,-1);
             vec2 st, uv;
-            { vec3 M (0,0,10);
+            { vec3 M (0,0,100);
                 vec3 P = O + dot(n, M-O) / dot(n, d) * d;
-                //P.xy() *= 10;
                 st = (P.xy()+vec2(1))/2.f;
             }
             { vec3 M (0,0,0);
@@ -78,7 +78,24 @@ struct Light {
             }
 
             st[1] = 1-st[1];
-            st *= vec2(images.size-uint2(1));
+            if(1) {
+                st *= vec2(images.size-uint2(1));
+            } else {
+                if(x==target.size.x/2 && y==target.size.y/2) log(1, st);
+                st *= imageSize.y-1;
+                if(x==target.size.x/2 && y==target.size.y/2) log(2, st);
+                // Converts from pixel to image indices
+                st = st - min + vec2(imageSize)/2.f; // Corner to center
+                if(x==target.size.x/2 && y==target.size.y/2) log(3, st);
+                st *= vec2(images.size-uint2(1));
+                if(x==target.size.x/2 && y==target.size.y/2) log(4, st);
+                st[0] = st[0] / (max-min)[0];
+                st[1] = st[1] / (max-min)[1];
+                if(x==target.size.x/2 && y==target.size.y/2) log(5, st);
+                st -= vec2(images.size-uint2(1))/2.f; // Center to corner
+                if(x==target.size.x/2 && y==target.size.y/2) log(6, st);
+            }
+
             //uv[1] = 1-uv[1];
             uv *= imageSize.x-1;
             int is = st[0], it = st[1], iu = uv[0], iv = uv[1];
@@ -119,19 +136,33 @@ struct Light {
         Folder tmp (name, this->tmp, true);
 
         range xRange {0}, yRange {0};
+        min = vec2(inff), max = vec2(-inff);
         for(string name: input.list(Files)) {
             TextData s (name);
             s.until('_');
             int y = s.integer();
             s.match('_');
             int x = s.integer();
+            s.match('_');
+            float py = s.decimal();
+            s.match('_');
+            float px = s.decimal();
 
             xRange.start = ::min(xRange.start, x);
             xRange.stop = ::max(xRange.stop, x+1);
 
             yRange.start = ::min(yRange.start, y);
             yRange.stop = ::max(yRange.stop, y+1);
+
+            min = ::min(min, vec2(px, py));
+            max = ::max(max, vec2(px, py));
         }
+        if(1) {
+            min.y = -min.y;
+            max.y = -max.y;
+            swap(min.y, max.y);
+        }
+        if(0) log(min, max, max-min);
 
         images = ImageT<Image>(uint(xRange.size()), uint(yRange.size()));
         images.clear(Image());
