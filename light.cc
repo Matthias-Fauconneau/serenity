@@ -2,6 +2,19 @@
 #include "interface.h"
 #include "window.h"
 
+struct ScrollValue : virtual Widget {
+    int minimum = 0, maximum = 0;
+    int value = 0;
+    ScrollValue(int minimum, int maximum) : minimum(minimum), maximum(maximum) {}
+    virtual bool mouseEvent(vec2, vec2, Event event, Button button, Widget*&) override {
+        int value = this->value;
+        if(event == Press && (button == WheelUp || button == WheelDown))
+            value = int(this->value+maximum+(button==WheelUp?1:-1))%(maximum+1);
+        if(value != this->value) { this->value = value; return true; }
+        return false;
+    }
+};
+
 struct ViewControl : virtual Widget {
     vec2 viewYawPitch = vec2(0, 0); // Current view angles
 
@@ -11,11 +24,10 @@ struct ViewControl : virtual Widget {
     } dragStart;
 
     // Orbital ("turntable") view control
-    virtual bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button,
-                            Widget*&) override {
+    virtual bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override {
         if(event == Press) dragStart = {cursor, viewYawPitch};
         if(event==Motion && button==LeftButton) {
-            viewYawPitch = dragStart.viewYawPitch + float(2*PI) * (cursor - dragStart.cursor) / size / 10.f;
+            viewYawPitch = dragStart.viewYawPitch + float(2*PI) * (cursor - dragStart.cursor) / size / 100.f;
             viewYawPitch.x = clamp<float>(-PI/2, viewYawPitch.x, PI/2);
             viewYawPitch.y = clamp<float>(-PI/2, viewYawPitch.y, PI/2);
         }
@@ -34,17 +46,20 @@ struct Light {
     array<Map> maps;
     ImageT<Image> images;
 
-    struct View : ViewControl, ImageView {
-        Light* _this;
-        View(Light* _this) : _this(_this) {}
+    struct View : ScrollValue, ViewControl, ImageView {
+        Light& _this;
+        View(Light& _this) : ScrollValue(0, _this.inputs.size-1), _this(_this) {}
 
+        virtual bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& widget) override {
+            return ScrollValue::mouseEvent(cursor,size,event,button,widget) || ViewControl::mouseEvent(cursor,size,event,button,widget);
+        }
         virtual vec2 sizeHint(vec2) override { return 1024; }
         virtual shared<Graphics> graphics(vec2 size) override {
             vec4 viewRotation = qmul(angleVector(-viewYawPitch.y, vec3(1,0,0)), angleVector(viewYawPitch.x, vec3(0,1,0)));
-            this->image = _this->render(uint2(size), viewRotation);
+            this->image = _this.render(uint2(size), viewRotation);
             return ImageView::graphics(size);
         }
-    } view {this};
+    } view {*this};
     unique<Window> window = nullptr;
 
     Light() {
@@ -54,6 +69,7 @@ struct Light {
         window->setTitle(name);
     }
     Image render(uint2 size, vec4 viewRotation) {
+        if(inputs[view.value] != this->name) load(inputs[view.value]);
         Image target (size);
         target.clear(0);
 
