@@ -1,3 +1,41 @@
+#include "file.h"
+Folder tmp {"/var/tmp/light",currentWorkingDirectory(), true};
+
+#if 1
+#include "image.h"
+#include "png.h"
+
+struct Render {
+    Render() {
+        Folder folder {"synthetic", tmp, true};
+        const int N = 17;
+        Image target (1024);
+        for(int sIndex: range(N)) for(int tIndex: range(N)) {
+            float s = sIndex/float(N-1), t = tIndex/float(N-1);
+            target.clear(0);
+            for(int vIndex: range(target.size.y)) for(int uIndex: range(target.size.x)) {
+                float u = uIndex/float(target.size.x-1), v = vIndex/float(target.size.y-1);
+                vec3 O (s, t, 0); // World space ray origin
+                vec3 D (u, v, 1); // World space ray destination
+                vec3 d = normalize(D-O); // World space ray direction (sheared perspective pinhole)
+                // Object (Plane)
+                vec3 n (0,0,-1);
+                vec3 M (vec2(1./2), 1);
+                vec3 P = O + dot(n, M-O) / dot(n, d) * d;
+                vec2 xy = P.xy(); //(P.xy()+vec2(1))/2.f;
+                //log(O, D, d, P);
+                //assert_(xy >= vec2(0-0x1p-20) && xy <= vec2(1+0x1p-20), s, t, u, v, O, xy);
+                target(uIndex, vIndex) = byte4(byte2(float(0xFF)*min(xy, vec2(1))), 0, 0xFF);
+            }
+            writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(target.size), cast<byte>(target), folder, true);
+            //writeFile(str(tIndex)+'_'+str(sIndex)+".png", encodePNG(target), folder, true);
+        }
+    }
+} app;
+
+#endif
+#if 1
+
 #include "png.h"
 #include "interface.h"
 #include "window.h"
@@ -27,7 +65,7 @@ struct ViewControl : virtual Widget {
     virtual bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override {
         if(event == Press) dragStart = {cursor, viewYawPitch};
         if(event==Motion && button==LeftButton) {
-            viewYawPitch = dragStart.viewYawPitch + float(2*PI) * (cursor - dragStart.cursor) / size / 100.f;
+            viewYawPitch = dragStart.viewYawPitch + float(2*PI) * (cursor - dragStart.cursor) / size;// / 100.f;
             viewYawPitch.x = clamp<float>(-PI/2, viewYawPitch.x, PI/2);
             viewYawPitch.y = clamp<float>(-PI/2, viewYawPitch.y, PI/2);
         }
@@ -37,7 +75,6 @@ struct ViewControl : virtual Widget {
 };
 
 struct Light {
-    Folder tmp {"/var/tmp/light",currentWorkingDirectory(), true};
     buffer<String> inputs = currentWorkingDirectory().list(Folders);
 
     string name;
@@ -63,13 +100,13 @@ struct Light {
     unique<Window> window = nullptr;
 
     Light() {
-        assert_(inputs);
-        load(inputs[0]);
+        assert_(arguments() || inputs);
+        load(arguments() ? arguments()[0] : inputs[0]);
         window = ::window(&view);
         window->setTitle(name);
     }
     Image render(uint2 size, vec4 viewRotation) {
-        if(inputs[view.value] != this->name) load(inputs[view.value]);
+        //if(inputs[view.value] != this->name) load(inputs[view.value]);
         Image target (size);
         target.clear(0);
 
@@ -84,7 +121,7 @@ struct Light {
             vec3 d = qapply(invViewRotation, vec3(0, 0, 1));
             vec3 n (0,0,-1);
             vec2 st, uv;
-            { vec3 M (0,0,100);
+            { vec3 M (0,0,1);
                 vec3 P = O + dot(n, M-O) / dot(n, d) * d;
                 st = (P.xy()+vec2(1))/2.f;
             }
@@ -93,7 +130,7 @@ struct Light {
                 uv = (P.xy()+vec2(1))/2.f;
             }
 
-            st[1] = 1-st[1];
+            //st[1] = 1-st[1];
             if(1) {
                 st *= vec2(images.size-uint2(1));
             } else {
@@ -149,20 +186,16 @@ struct Light {
         imageSize = 0;
         this->name = name;
         Folder input (name);
-        Folder tmp (name, this->tmp, true);
+        Folder tmp (name, ::tmp, true);
 
         range xRange {0}, yRange {0};
         min = vec2(inff), max = vec2(-inff);
         for(string name: input.list(Files)) {
             TextData s (name);
-            s.until('_');
+            if(find(name, ".png")) s.until('_');
             int y = s.integer();
             s.match('_');
             int x = s.integer();
-            s.match('_');
-            float py = s.decimal();
-            s.match('_');
-            float px = s.decimal();
 
             xRange.start = ::min(xRange.start, x);
             xRange.stop = ::max(xRange.stop, x+1);
@@ -170,10 +203,16 @@ struct Light {
             yRange.start = ::min(yRange.start, y);
             yRange.stop = ::max(yRange.stop, y+1);
 
-            min = ::min(min, vec2(px, py));
-            max = ::max(max, vec2(px, py));
+            if(0) {
+                s.match('_');
+                float py = s.decimal();
+                s.match('_');
+                float px = s.decimal();
+                min = ::min(min, vec2(px, py));
+                max = ::max(max, vec2(px, py));
+            }
         }
-        if(1) {
+        if(0) {
             min.y = -min.y;
             max.y = -max.y;
             swap(min.y, max.y);
@@ -185,7 +224,7 @@ struct Light {
 
         for(string name: input.list(Files)) {
             TextData s (name);
-            s.until('_');
+            if(find(name, ".png")) s.until('_');
             uint y = uint(s.integer(false));
             s.match('_');
             uint x = uint(s.integer(false));
@@ -193,7 +232,7 @@ struct Light {
             for(string mapName: tmp.list(Files)) {
                 if(find(mapName, name)) {
                     TextData s (mapName);
-                    s.until(".png.");
+                    if(find(mapName, ".png.")) s.until(".png."); else s.until('.');
                     uint w = uint(s.integer(false));
                     s.match('x');
                     uint h = uint(s.integer(false));
@@ -217,3 +256,5 @@ struct Light {
         }
     }
 } app;
+
+#endif

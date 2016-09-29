@@ -216,13 +216,13 @@ int TextData::integer(bool maySign, int base) {
  assert(base==10 || base==16);
  int sign=1;
  if(maySign) { if(match('-')) sign=-1; else match('+'); }
- assert_(isInteger(base), "Expected integer, got '"+/*escape(*/slice(index, 16)/*)*/+"'", line());
+ assert_(isInteger(base), "Expected integer, got '"+/*escape(*/slice(index, min(16ul, data.size-index))/*)*/+"'", line());
  long value=0;
  do {
   char c = peek();
   int n;
   /**/  if(c>='0' && c<='9') n = c-'0';
-  else if(c == '.') { error("Unexpected decimal"_, line()); break; }
+  //else if(c == '.') { error("Unexpected decimal"_, line()); break; }
   else if(base!=16) break;
   else if(c>='a' && c<='f') n = c+10-'a';
   else if(c>='A' && c<='F') n = c+10-'A';
