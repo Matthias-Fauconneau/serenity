@@ -216,7 +216,7 @@ int TextData::integer(bool maySign, int base) {
  assert(base==10 || base==16);
  int sign=1;
  if(maySign) { if(match('-')) sign=-1; else match('+'); }
- assert_(isInteger(base), "Expected integer, got '"+/*escape(*/slice(index, min(16ul, data.size-index))/*)*/+"'", line());
+ assert_(isInteger(base), "Expected integer, got '"+/*escape(*/slice(index, min(16ul, data.size-index))/*)*/+"'", line(), data);
  long value=0;
  do {
   char c = peek();

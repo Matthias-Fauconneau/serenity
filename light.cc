@@ -1,44 +1,87 @@
 #include "file.h"
-Folder tmp {"/var/tmp/light",currentWorkingDirectory(), true};
-
-#if 1
 #include "image.h"
-#include "png.h"
-
-struct Render {
-    Render() {
-        Folder folder {"synthetic", tmp, true};
-        const int N = 17;
-        Image target (1024);
-        for(int sIndex: range(N)) for(int tIndex: range(N)) {
-            float s = sIndex/float(N-1), t = tIndex/float(N-1);
-            target.clear(0);
-            for(int vIndex: range(target.size.y)) for(int uIndex: range(target.size.x)) {
-                float u = uIndex/float(target.size.x-1), v = vIndex/float(target.size.y-1);
-                vec3 O (s, t, 0); // World space ray origin
-                vec3 D (u, v, 1); // World space ray destination
-                vec3 d = normalize(D-O); // World space ray direction (sheared perspective pinhole)
-                // Object (Plane)
-                vec3 n (0,0,-1);
-                vec3 M (vec2(1./2), 1);
-                vec3 P = O + dot(n, M-O) / dot(n, d) * d;
-                vec2 xy = P.xy(); //(P.xy()+vec2(1))/2.f;
-                //log(O, D, d, P);
-                //assert_(xy >= vec2(0-0x1p-20) && xy <= vec2(1+0x1p-20), s, t, u, v, O, xy);
-                target(uIndex, vIndex) = byte4(byte2(float(0xFF)*min(xy, vec2(1))), 0, 0xFF);
-            }
-            writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(target.size), cast<byte>(target), folder, true);
-            //writeFile(str(tIndex)+'_'+str(sIndex)+".png", encodePNG(target), folder, true);
-        }
-    }
-} app;
-
-#endif
-#if 1
-
 #include "png.h"
 #include "interface.h"
 #include "window.h"
+
+Folder tmp {"/var/tmp/light",currentWorkingDirectory(), true};
+
+static bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u, float& v) { //from "Fast, Minimum Storage Ray/Triangle Intersection"
+    //if(dot(A-O, d)<=0 && dot(B-O, d)<=0 && dot(C-O, d)<=0) return false;
+    vec3 edge1 = B - A;
+    vec3 edge2 = C - A;
+    vec3 pvec = cross(d, edge2);
+    float det = dot(edge1, pvec);
+    if(det < 0/*0x1p-16f*/) return false;
+    vec3 tvec = O - A;
+    u = dot(tvec, pvec);
+    if(u < 0 || u > det) return false;
+    vec3 qvec = cross(tvec, edge1);
+    v = dot(d, qvec);
+    if(v < 0 || u + v > det) return false;
+    t = dot(edge2, qvec);
+    t /= det;
+    u /= det;
+    v /= det;
+    return true;
+}
+
+struct Scene {
+    struct Face { vec3 vertices[3]; };
+    Face faces[6*2]; // Cube
+    Scene() {
+            vec3 vertices[8];
+            const float size = 1./4;
+            for(int i: range(8)) vertices[i] = vec3(vec2(1./2), 1) + size * (vec3(i/4, (i/2)%2, i%2) - vec3(1.f/2));
+            const int indices[6*4] = { 0,2,3,1, 0,1,5,4, 0,4,6,2, 1,3,7,5, 2,6,7,3, 4,5,7,6};
+            for(int i: range(6)) {
+                faces[i*2+0] = {{vertices[indices[i*4+0]], vertices[indices[i*4+1]], vertices[indices[i*4+2]]}};
+                faces[i*2+1] = {{vertices[indices[i*4+0]], vertices[indices[i*4+2]], vertices[indices[i*4+3]]}};
+            }
+    }
+    bgr3f raycast(vec3 O, vec3 d) const {
+        float minZ = inff; bgr3f color (0, 0, 0);
+        for(Face face: faces) {
+            float z, u, v;
+            if(!intersect(face.vertices[0], face.vertices[1], face.vertices[2], O, d, z, u, v) || z>minZ) continue;
+            color.b = u;
+            color.g = v;
+        }
+        return color;
+    }
+};
+
+#if 1
+struct Render {
+    Render() {
+        const Scene scene;
+        Folder folder {"synthetic", tmp, true};
+        for(string file: folder.list(Files)) remove(file, folder);
+        const int N = 17;
+        Image target (128);
+        Time time (true);
+        for(int sIndex: range(N)) {
+            for(int tIndex: range(N)) {
+                float s = sIndex/float(N-1), t = tIndex/float(N-1);
+                target.clear(0);
+                for(int vIndex: range(target.size.y)) for(int uIndex: range(target.size.x)) {
+                    float u = uIndex/float(target.size.x-1), v = vIndex/float(target.size.y-1);
+                    vec3 O (s, t, 0); // World space ray origin
+                    vec3 D (u, v, 1); // World space ray destination
+                    vec3 d = normalize(D-O); // World space ray direction (sheared perspective pinhole)
+                    target(uIndex, vIndex) = byte4(byte3(clamp(bgr3i(0), bgr3i(float(0xFF)*scene.raycast(O, d)), bgr3i(0xFF))), 0xFF);
+                }
+                writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(target.size), cast<byte>(target), folder, true);
+                writeFile(str(tIndex)+'_'+str(sIndex)+".png", encodePNG(target), folder, true);
+            }
+        }
+        log(time);
+    }
+} render;
+
+#endif
+
+#if 1
 
 struct ScrollValue : virtual Widget {
     int minimum = 0, maximum = 0;
@@ -82,17 +125,18 @@ struct Light {
     uint2 imageSize;
     array<Map> maps;
     ImageT<Image> images;
+    Scene scene;
 
     struct View : ScrollValue, ViewControl, ImageView {
         Light& _this;
-        View(Light& _this) : ScrollValue(0, _this.inputs.size-1), _this(_this) {}
+        View(Light& _this) : ScrollValue(0, 2/*_this.inputs.size-1*/), _this(_this) {}
 
         virtual bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& widget) override {
             return ScrollValue::mouseEvent(cursor,size,event,button,widget) || ViewControl::mouseEvent(cursor,size,event,button,widget);
         }
         virtual vec2 sizeHint(vec2) override { return 1024; }
         virtual shared<Graphics> graphics(vec2 size) override {
-            vec4 viewRotation = qmul(angleVector(-viewYawPitch.y, vec3(1,0,0)), angleVector(viewYawPitch.x, vec3(0,1,0)));
+            vec4 viewRotation = qmul(angleVector(viewYawPitch.y, vec3(1,0,0)), angleVector(-viewYawPitch.x, vec3(0,1,0)));
             this->image = _this.render(uint2(size), viewRotation);
             return ImageView::graphics(size);
         }
@@ -110,6 +154,7 @@ struct Light {
         Image target (size);
         target.clear(0);
 
+#if 1
         // Rotated orthographic projection
         vec4 invViewRotation = conjugate(viewRotation);
         vec2 scale = size.x/2;
@@ -119,9 +164,24 @@ struct Light {
             vec3 Ov (x,y,0); // View space
             vec3 O = qapply(invViewRotation, ((Ov - vec3(offset, 0)) / vec3(scale, 1))); // World space
             vec3 d = qapply(invViewRotation, vec3(0, 0, 1));
+#else
+        float s = qapply(viewRotation, vec3(0, 0, 1))[0], t = qapply(viewRotation, vec3(0, 0, 1))[1];
+        for(int vIndex: range(target.size.y)) for(int uIndex: range(target.size.x)) {
+            int y = vIndex, x = uIndex;
+            float u = uIndex/float(target.size.x-1), v = vIndex/float(target.size.y-1);
+            vec3 O (s, t, 0); // World space ray origin
+            vec3 D (u, v, 1); // World space ray destination
+            vec3 d = normalize(D-O); // World space ray direction (sheared perspective pinhole)
+#endif
+
+            if(view.value) {
+                target(x, y) = byte4(byte3(clamp(bgr3i(0), bgr3i(float(0xFF)*scene.raycast(O, d)), bgr3i(0xFF))), 0xFF);
+                continue;
+            }
+
             vec3 n (0,0,-1);
             vec2 st, uv;
-            { vec3 M (0,0,1);
+            { vec3 M (0,0,2);
                 vec3 P = O + dot(n, M-O) / dot(n, d) * d;
                 st = (P.xy()+vec2(1))/2.f;
             }
@@ -142,8 +202,7 @@ struct Light {
                 if(x==target.size.x/2 && y==target.size.y/2) log(3, st);
                 st *= vec2(images.size-uint2(1));
                 if(x==target.size.x/2 && y==target.size.y/2) log(4, st);
-                st[0] = st[0] / (max-min)[0];
-                st[1] = st[1] / (max-min)[1];
+                st *= 1.f/(max-min);
                 if(x==target.size.x/2 && y==target.size.y/2) log(5, st);
                 st -= vec2(images.size-uint2(1))/2.f; // Center to corner
                 if(x==target.size.x/2 && y==target.size.y/2) log(6, st);
@@ -151,9 +210,18 @@ struct Light {
 
             //uv[1] = 1-uv[1];
             uv *= imageSize.x-1;
-            int is = st[0], it = st[1], iu = uv[0], iv = uv[1];
-            if(is < 0 || is >= int(images.size.x)-1 || it < 0 || it >= int(images.size.y)-1) continue;
-            if(iu < 0 || iu >= int(imageSize.x)-1 || iv < 0 || iv >= int(imageSize.y)-1) continue;
+
+            if(1) {
+                st = (view.viewYawPitch+vec2(PI/2)) * vec2(images.size-uint2(1)) * (1.f/PI);
+                uv = vec2(x, y) * 128.f / 1024.f;
+                if(x==0 && y == 0) log(st);
+            }
+
+            if(st[0] < 0 || st[1] < 0 || uv[0] < 0 || uv[1] < 0) continue;
+            int is = st[0], it = st[1], iu = uv[0], iv = uv[1]; // Warning: Floors towards zero
+            assert_(is >= 0 && it >= 0 && iu >= 0 && iv >= 0);
+            if(is >= int(images.size.x)-1 || it >= int(images.size.y)-1) continue;
+            if(iu >= int(imageSize.x)-1 || iv >= int(imageSize.y)-1) continue;
             float fs = fract(st[0]), ft = fract(st[1]), fu = fract(uv[0]), fv = fract(uv[1]);
 
             bgr3f Sstuv [2][2][2][2];
@@ -176,6 +244,13 @@ struct Light {
             bgr3f S;
             S = (1-fs) * Ss[0] + fs * Ss[1];
 
+            if(1) S = Sstuv[0][0][0][0];
+            if(0) {
+                //S = float(0xFF)*bgr3f(st[0]/(images.size[0]-1), st[1]/(images.size[1]-1), 0/*uv[0]/(imageSize[0]-1)*/);
+                S = float(0xFF)*bgr3f(st[1]/(images.size[1]-1), uv[1]/(imageSize[1]-1), 0/*uv[0]/(imageSize[0]-1)*/);
+            }
+            //if(1) S *= bgr3f(it*16, iv, 0)/256.f;
+
             target(x, y) = byte4(byte3(S), 0xFF);
         }
         return target;
@@ -192,7 +267,9 @@ struct Light {
         min = vec2(inff), max = vec2(-inff);
         for(string name: input.list(Files)) {
             TextData s (name);
-            if(find(name, ".png")) s.until('_');
+            //if(find(name, ".png"))
+            if(!s.isInteger()) s.until('_');
+            //if(!s.isInteger()) continue;
             int y = s.integer();
             s.match('_');
             int x = s.integer();
@@ -224,21 +301,26 @@ struct Light {
 
         for(string name: input.list(Files)) {
             TextData s (name);
-            if(find(name, ".png")) s.until('_');
+            if(!s.isInteger()) s.until('_');
             uint y = uint(s.integer(false));
             s.match('_');
             uint x = uint(s.integer(false));
 
             for(string mapName: tmp.list(Files)) {
-                if(find(mapName, name)) {
-                    TextData s (mapName);
-                    if(find(mapName, ".png.")) s.until(".png."); else s.until('.');
-                    uint w = uint(s.integer(false));
-                    s.match('x');
-                    uint h = uint(s.integer(false));
-                    images(x, y) = Image(cast<byte4>(unsafeRef(maps.append(mapName, tmp))), uint2(w, h));
-                    goto break_;
-                }
+                if(endsWith(mapName, ".png")) continue;
+                TextData s (mapName);
+                if(!s.isInteger()) s.until('_');
+                uint my = uint(s.integer(false));
+                if(my != y) continue;
+                s.match('_');
+                uint mx = uint(s.integer(false));
+                if(mx != x) continue;
+                if(!s.match(".png.")) s.skip('.');
+                uint w = uint(s.integer(false));
+                s.match('x');
+                uint h = uint(s.integer(false));
+                images(x, y) = Image(cast<byte4>(unsafeRef(maps.append(mapName, tmp))), uint2(w, h));
+                goto break_;
             } /*else*/ {
                 log(name);
                 Image image = decodeImage(Map(name, input));
@@ -255,6 +337,6 @@ struct Light {
             window->setTitle(name);
         }
     }
-} app;
+} view;
 
 #endif
