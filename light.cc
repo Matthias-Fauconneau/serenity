@@ -31,8 +31,8 @@ struct Scene {
     Face faces[6*2]; // Cube
     Scene() {
             vec3 vertices[8];
-            const float size = 1./4;
-            for(int i: range(8)) vertices[i] = vec3(vec2(1./2), 1) + size * (vec3(i/4, (i/2)%2, i%2) - vec3(1.f/2));
+            const float size = 1./2;
+            for(int i: range(8)) vertices[i] = size * (2.f * vec3(i/4, (i/2)%2, i%2) - vec3(1)); // -1, 1
             const int indices[6*4] = { 0,2,3,1, 0,1,5,4, 0,4,6,2, 1,3,7,5, 2,6,7,3, 4,5,7,6};
             for(int i: range(6)) {
                 faces[i*2+0] = {{vertices[indices[i*4+0]], vertices[indices[i*4+1]], vertices[indices[i*4+2]]}};
@@ -62,17 +62,17 @@ struct Render {
         Time time (true);
         for(int sIndex: range(N)) {
             for(int tIndex: range(N)) {
-                float s = sIndex/float(N-1), t = tIndex/float(N-1);
+                float s = 2*sIndex/float(N-1)-1, t = 2*tIndex/float(N-1)-1; // [-1, 1]
                 target.clear(0);
                 for(int vIndex: range(target.size.y)) for(int uIndex: range(target.size.x)) {
-                    float u = uIndex/float(target.size.x-1), v = vIndex/float(target.size.y-1);
-                    vec3 O (s, t, 0); // World space ray origin
-                    vec3 D (u, v, 1); // World space ray destination
+                    float u = 2*uIndex/float(target.size.x-1)-1, v = 2*vIndex/float(target.size.y-1)-1; // [-1, 1]
+                    vec3 O (s, t, -1); // World space ray origin
+                    vec3 D (u, v, 0); // World space ray destination
                     vec3 d = normalize(D-O); // World space ray direction (sheared perspective pinhole)
                     target(uIndex, vIndex) = byte4(byte3(clamp(bgr3i(0), bgr3i(float(0xFF)*scene.raycast(O, d)), bgr3i(0xFF))), 0xFF);
                 }
                 writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(target.size), cast<byte>(target), folder, true);
-                writeFile(str(tIndex)+'_'+str(sIndex)+".png", encodePNG(target), folder, true);
+                //writeFile(str(tIndex)+'_'+str(sIndex)+".png", encodePNG(target), folder, true);
             }
         }
         log(time);
@@ -154,104 +154,81 @@ struct Light {
         Image target (size);
         target.clear(0);
 
-#if 1
         // Rotated orthographic projection
         vec4 invViewRotation = conjugate(viewRotation);
-        vec2 scale = size.x/2;
-        vec2 offset = vec2(size)/2.f;
 
-        for(int y: range(target.size.y)) for(int x: range(target.size.x)) {
-            vec3 Ov (x,y,0); // View space
-            vec3 O = qapply(invViewRotation, ((Ov - vec3(offset, 0)) / vec3(scale, 1))); // World space
-            vec3 d = qapply(invViewRotation, vec3(0, 0, 1));
-#else
-        float s = qapply(viewRotation, vec3(0, 0, 1))[0], t = qapply(viewRotation, vec3(0, 0, 1))[1];
-        for(int vIndex: range(target.size.y)) for(int uIndex: range(target.size.x)) {
-            int y = vIndex, x = uIndex;
-            float u = uIndex/float(target.size.x-1), v = vIndex/float(target.size.y-1);
-            vec3 O (s, t, 0); // World space ray origin
-            vec3 D (u, v, 1); // World space ray destination
-            vec3 d = normalize(D-O); // World space ray direction (sheared perspective pinhole)
-#endif
-
-            if(view.value) {
+        if(view.value) {
+            for(int y: range(target.size.y)) for(int x: range(target.size.x)) {
+                vec3 O = qapply(invViewRotation, vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, -1)); // [-1, 1]
+                vec3 d = qapply(invViewRotation, vec3(0, 0, 1));
                 target(x, y) = byte4(byte3(clamp(bgr3i(0), bgr3i(float(0xFF)*scene.raycast(O, d)), bgr3i(0xFF))), 0xFF);
-                continue;
             }
+        } else {
+            for(int y: range(target.size.y)) for(int x: range(target.size.x)) {
+                vec3 O = qapply(invViewRotation, vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, -1)); // [-1, 1]
+                vec3 d = qapply(invViewRotation, vec3(0, 0, 1));
 
-            vec3 n (0,0,-1);
-            vec2 st, uv;
-            { vec3 M (0,0,2);
-                vec3 P = O + dot(n, M-O) / dot(n, d) * d;
-                st = (P.xy()+vec2(1))/2.f;
+                vec3 n (0,0,-1);
+                vec2 st, uv;
+                { vec3 M (0,0,-1);
+                    vec3 P = O + dot(n, M-O) / dot(n, d) * d;
+                    st = (P.xy()+vec2(1))/2.f;
+                }
+                { vec3 M (0,0,0);
+                    vec3 P = O + dot(n, M-O) / dot(n, d) * d;
+                    uv = (P.xy()+vec2(1))/2.f;
+                }
+
+                //st[1] = 1-st[1];
+                if(1) {
+                    st *= vec2(images.size-uint2(1));
+                } else {
+                    if(x==target.size.x/2 && y==target.size.y/2) log(1, st);
+                    st *= imageSize.y-1;
+                    if(x==target.size.x/2 && y==target.size.y/2) log(2, st);
+                    // Converts from pixel to image indices
+                    st = st - min + vec2(imageSize)/2.f; // Corner to center
+                    if(x==target.size.x/2 && y==target.size.y/2) log(3, st);
+                    st *= vec2(images.size-uint2(1));
+                    if(x==target.size.x/2 && y==target.size.y/2) log(4, st);
+                    st *= 1.f/(max-min);
+                    if(x==target.size.x/2 && y==target.size.y/2) log(5, st);
+                    st -= vec2(images.size-uint2(1))/2.f; // Center to corner
+                    if(x==target.size.x/2 && y==target.size.y/2) log(6, st);
+                }
+
+                //uv[1] = 1-uv[1];
+                uv *= imageSize.x-1;
+
+                if(st[0] < 0 || st[1] < 0 || uv[0] < 0 || uv[1] < 0) continue;
+                int is = st[0], it = st[1], iu = uv[0], iv = uv[1]; // Warning: Floors towards zero
+                assert_(is >= 0 && it >= 0 && iu >= 0 && iv >= 0);
+                if(is >= int(images.size.x)-1 || it >= int(images.size.y)-1) continue;
+                if(iu >= int(imageSize.x)-1 || iv >= int(imageSize.y)-1) continue;
+                float fs = fract(st[0]), ft = fract(st[1]), fu = fract(uv[0]), fv = fract(uv[1]);
+
+                bgr3f Sstuv [2][2][2][2];
+                for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1}) for(const int dv: {0, 1}) {
+                    Sstuv[ds][dt][du][dv] = bgr3f(images(is+ds, it+dt)(iu+du, iv+dv).bgr());
+                }
+
+                bgr3f Sstu [2][2][2];
+                for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1})
+                    Sstu[ds][dt][du] = (1-fv) * Sstuv[ds][dt][du][0] + fv * Sstuv[ds][dt][du][1];
+
+                bgr3f Sst [2][2];
+                for(const int ds: {0, 1}) for(const int dt: {0, 1})
+                    Sst[ds][dt] = (1-fu) * Sstu[ds][dt][0] + fu * Sstu[ds][dt][1];
+
+                bgr3f Ss [2];
+                for(const int ds: {0, 1})
+                    Ss[ds] = (1-ft) * Sst[ds][0] + ft * Sst[ds][1];
+
+                bgr3f S;
+                S = (1-fs) * Ss[0] + fs * Ss[1];
+
+                target(x, y) = byte4(byte3(S), 0xFF);
             }
-            { vec3 M (0,0,0);
-                vec3 P = O + dot(n, M-O) / dot(n, d) * d;
-                uv = (P.xy()+vec2(1))/2.f;
-            }
-
-            //st[1] = 1-st[1];
-            if(1) {
-                st *= vec2(images.size-uint2(1));
-            } else {
-                if(x==target.size.x/2 && y==target.size.y/2) log(1, st);
-                st *= imageSize.y-1;
-                if(x==target.size.x/2 && y==target.size.y/2) log(2, st);
-                // Converts from pixel to image indices
-                st = st - min + vec2(imageSize)/2.f; // Corner to center
-                if(x==target.size.x/2 && y==target.size.y/2) log(3, st);
-                st *= vec2(images.size-uint2(1));
-                if(x==target.size.x/2 && y==target.size.y/2) log(4, st);
-                st *= 1.f/(max-min);
-                if(x==target.size.x/2 && y==target.size.y/2) log(5, st);
-                st -= vec2(images.size-uint2(1))/2.f; // Center to corner
-                if(x==target.size.x/2 && y==target.size.y/2) log(6, st);
-            }
-
-            //uv[1] = 1-uv[1];
-            uv *= imageSize.x-1;
-
-            if(1) {
-                st = (view.viewYawPitch+vec2(PI/2)) * vec2(images.size-uint2(1)) * (1.f/PI);
-                uv = vec2(x, y) * 128.f / 1024.f;
-                if(x==0 && y == 0) log(st);
-            }
-
-            if(st[0] < 0 || st[1] < 0 || uv[0] < 0 || uv[1] < 0) continue;
-            int is = st[0], it = st[1], iu = uv[0], iv = uv[1]; // Warning: Floors towards zero
-            assert_(is >= 0 && it >= 0 && iu >= 0 && iv >= 0);
-            if(is >= int(images.size.x)-1 || it >= int(images.size.y)-1) continue;
-            if(iu >= int(imageSize.x)-1 || iv >= int(imageSize.y)-1) continue;
-            float fs = fract(st[0]), ft = fract(st[1]), fu = fract(uv[0]), fv = fract(uv[1]);
-
-            bgr3f Sstuv [2][2][2][2];
-            for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1}) for(const int dv: {0, 1}) {
-                Sstuv[ds][dt][du][dv] = bgr3f(images(is+ds, it+dt)(iu+du, iv+dv).bgr());
-            }
-
-            bgr3f Sstu [2][2][2];
-            for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1})
-                Sstu[ds][dt][du] = (1-fv) * Sstuv[ds][dt][du][0] + fv * Sstuv[ds][dt][du][1];
-
-            bgr3f Sst [2][2];
-            for(const int ds: {0, 1}) for(const int dt: {0, 1})
-                Sst[ds][dt] = (1-fu) * Sstu[ds][dt][0] + fu * Sstu[ds][dt][1];
-
-            bgr3f Ss [2];
-            for(const int ds: {0, 1})
-                Ss[ds] = (1-ft) * Sst[ds][0] + ft * Sst[ds][1];
-
-            bgr3f S;
-            S = (1-fs) * Ss[0] + fs * Ss[1];
-
-            if(1) S = Sstuv[0][0][0][0];
-            if(0) {
-                //S = float(0xFF)*bgr3f(st[0]/(images.size[0]-1), st[1]/(images.size[1]-1), 0/*uv[0]/(imageSize[0]-1)*/);
-                S = float(0xFF)*bgr3f(st[1]/(images.size[1]-1), uv[1]/(imageSize[1]-1), 0/*uv[0]/(imageSize[0]-1)*/);
-            }
-            //if(1) S *= bgr3f(it*16, iv, 0)/256.f;
-
-            target(x, y) = byte4(byte3(S), 0xFF);
         }
         return target;
     }
