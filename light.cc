@@ -57,10 +57,11 @@ struct Render {
         const Scene scene;
         Folder folder {"synthetic", tmp, true};
         for(string file: folder.list(Files)) remove(file, folder);
-        const int N = 17;
-        Image target (128);
-        Time time (true);
+        const int N = 33;
+        Image target (256);
+        Time time (true), lastReport(true);
         for(int sIndex: range(N)) {
+            if(lastReport.seconds() > 1) { log(sIndex, "/", N, time); lastReport.reset(); }
             for(int tIndex: range(N)) {
                 float s = 2*sIndex/float(N-1)-1, t = 2*tIndex/float(N-1)-1; // [-1, 1]
                 target.clear(0);
@@ -69,7 +70,7 @@ struct Render {
                     vec3 O (s, t, -1); // World space ray origin
                     vec3 D (u, v, 0); // World space ray destination
                     vec3 d = normalize(D-O); // World space ray direction (sheared perspective pinhole)
-                    target(uIndex, vIndex) = byte4(byte3(clamp(bgr3i(0), bgr3i(float(0xFF)*scene.raycast(O, d)), bgr3i(0xFF))), 0xFF);
+                    target(uIndex, vIndex) = byte4(byte3(clamp(bgr3i(0), bgr3i(float(0xFF)*scene.raycast(O, d)), bgr3i(0xFF))), 0xFF); // FIXME: slow
                 }
                 writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(target.size), cast<byte>(target), folder, true);
                 //writeFile(str(tIndex)+'_'+str(sIndex)+".png", encodePNG(target), folder, true);
