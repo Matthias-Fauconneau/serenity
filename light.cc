@@ -54,17 +54,17 @@ struct Scene {
 };
 #else
 struct Scene {
-    struct Face { vec3 position[3]; };
+    struct Face { vec3 position[3]; bgr3f color; };
     RenderTarget target; // Render target (RenderPass renders on these tiles)
     /// Shader for flat surfaces
     struct Shader {
         // Shader specification (used by rasterizer)
-        struct FaceAttributes {};
+        struct FaceAttributes { bgr3f color; };
         static constexpr int V = 0;
         static constexpr bool blend = false; // Disables unnecessary blending
 
-        vec4 operator()(FaceAttributes unused face, float unused varying[V]) const {
-            return vec4(vec3(1.f),1.f);
+        bgra4f operator()(FaceAttributes face, float unused varying[V]) const {
+            return bgra4f(face.color,1.f);
         }
     } shader;
     RenderPass<Shader> pass {shader};
@@ -74,19 +74,20 @@ struct Scene {
             const float size = 1./2;
             for(int i: range(8)) position[i] = size * (2.f * vec3(i/4, (i/2)%2, i%2) - vec3(1)); // -1, 1
             const int indices[6*4] = { 0,2,3,1, 0,1,5,4, 0,4,6,2, 1,3,7,5, 2,6,7,3, 4,5,7,6};
+            const bgr3f colors[6] = {red, green, blue, cyan, magenta, yellow};
             for(int i: range(6)) {
-                faces[i*2+0] = {{position[indices[i*4+0]], position[indices[i*4+1]], position[indices[i*4+2]]}};
-                faces[i*2+1] = {{position[indices[i*4+0]], position[indices[i*4+2]], position[indices[i*4+3]]}};
+                faces[i*2+0] = {{position[indices[i*4+0]], position[indices[i*4+1]], position[indices[i*4+2]]}, colors[i]};
+                faces[i*2+1] = {{position[indices[i*4+0]], position[indices[i*4+2]], position[indices[i*4+3]]}, colors[i]};
             }
     }
     void render(Image& final, mat4 view) {
         target.setup(int2(final.size));
         pass.setup(target, ref<Face>(faces).size); // Resize if necessary and clears
         for(const Face& face: faces) {
-            vec4 A = view*face.position[0], B = view*face.position[1], C = view*face.position[2];
-            if(cross((B-A).xyz(),(C-A).xyz()).z <= 0) continue; // Backward face culling
+            vec3 A = view*face.position[0], B = view*face.position[1], C = view*face.position[2];
+            //if(cross(B-A,C-A).z <= 0) continue; // Backward face culling
             vec3 attributes[0];
-            pass.submit(A,B,C, attributes, {});
+            pass.submit(A,B,C, attributes, {face.color});
         }
         pass.render(target);
         target.resolve(final);
@@ -227,24 +228,32 @@ struct Light {
                 target(x, y) = byte4(byte3(clamp(bgr3i(0), bgr3i(float(0xFF)*scene.raycast(O, d)), bgr3i(0xFF))), 0xFF);
             }
 #else
-            float s = (view.viewYawPitch.x+PI/2)/PI, t = (view.viewYawPitch.y+PI/2)/PI;
+            float s = (view.viewYawPitch.x+PI/2)/PI, t = 1-(view.viewYawPitch.y+PI/2)/PI;
             mat4 NDC;
             NDC.scale(vec3(vec2(target.size*4u)/2.f, 1)); // 0, 2 -> subsample size
             NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
             mat4 P;
+            float a = PI/4, cotan = cos(a/2)/sin(a/2);
             float near = 1-1./2, d = 1, far = 1+1./2;
-            float left = s*near/d, right = (1-s)*near/d;
-            float top = t*near/d, bottom = (1-t)*near/d;
-            P(0,0) = - 2*near / (right+left);
-            P(1,1) = - 2*near / (top+bottom);
-            P(0,2) = - (right-left) / (right+left);
-            P(1,2) = - (top-bottom) / (top+bottom);
+            float S = s*2-1, T = t*2-1; // [0,1] -> [-1, 1]
+            float left = (-1-S)*near/d, right = (1-S)*near/d;
+            float bottom = (-1-T)*near/d, top = (1-T)*near/d;
+            float e = 2*near / (cotan*(right-left));
+            left *= e; right *= e; bottom *= e; top *= e;
+            /*float left = (-1-S), right = (1-S);
+            float bottom = (-1-T), top = (1-T);*/
+            P(0,0) = 2*near / (right-left);
+            P(1,1) = 2*near / (top-bottom);
+            P(0,2) = (right+left) / (right-left);
+            P(1,2) = (top+bottom) / (top-bottom);
             P(2,2) = - (near+far) / (far-near);
-            P(2,3) = 2*near*far / (far-near);
-            P(3,2) = 1;
+            P(2,3) = - 2*near*far / (far-near);
+            P(3,2) = - 1;
             P(3,3) = 0;
-            log(s, t, "\n"+str(P));
-            scene.render(target, NDC * P);
+            mat4 M;
+            M.translate(vec3(-S,-T,0));
+            M.translate(vec3(0,0,1)); // 0 -> 1 (Z)
+            scene.render(target, NDC * P * M);
 #endif
         } else {
             for(int y: range(target.size.y)) for(int x: range(target.size.x)) {

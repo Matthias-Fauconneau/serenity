@@ -96,8 +96,8 @@ template<class Shader> struct RenderPass {
         vec16 blockRejectStep[3], blockAcceptStep[3], pixelRejectStep[3], pixelAcceptStep[3], sampleStep[3]; // Precomputed step grids
         vec2 edges[3]; // triangle edge equations
         float binReject[3], binAccept[3]; // Initial distance step at a bin reject/accept corner
-        vec3 iw, iz; vec3 varyings[V]; //varying (perspective-interpolated) vertex attributes
-        FaceAttributes faceAttributes; //custom constant face attributes
+        vec3 i1, iz; vec3 varyings[V]; // Varying (perspective-interpolated) vertex attributes
+        FaceAttributes faceAttributes; // Custom constant face attributes
     };
     uint faceCapacity;
     buffer<Face> faces=0;
@@ -134,46 +134,46 @@ template<class Shader> struct RenderPass {
     // Implementation is inline to allow per-pass face attributes specialization and inline shader calls
 
     /// Submits triangles for binning, actual rendering is deferred until render
-    /// \note Device coordinates are not normalized, positions should be in [0..4×Width],[0..4×Height]
-    void submit(vec4 A, vec4 B, vec4 C, const vec3 vertexAttributes[V], FaceAttributes faceAttributes) {
+    /// \note Device coordinates are not normalized, positions should be in [0..4·Width],[0..4·Height]
+    void submit(vec3 A, vec3 B, vec3 C, const vec3 vertexAttributes[V], FaceAttributes faceAttributes) {
         if(faceCount>=faceCapacity) { error("Face overflow"_); return; }
         Face& face = faces[faceCount];
-        mat3 E = mat3(A.xyw(), B.xyw(), C.xyw());
-        E = E.cofactor(); //edge equations are now columns of E
+        mat3 E = mat3(vec3(A.xy(), 1), vec3(B.xy(), 1), vec3(C.xy(), 1));
+        E = E.cofactor(); // Edge equations are now columns of E
         if(E[0].x>0/*dy<0*/ || (E[0].x==0/*dy=0*/ && E[0].y<0/*dx<0*/)) E[0].z++;
         if(E[1].x>0/*dy<0*/ || (E[1].x==0/*dy=0*/ && E[1].y<0/*dx<0*/)) E[1].z++;
         if(E[2].x>0/*dy<0*/ || (E[2].x==0/*dy=0*/ && E[2].y<0/*dx<0*/)) E[2].z++;
 
-        for(int e=0;e<3;e++) {
+        for(int e: range(3)) {
             const vec2& edge = face.edges[e] = E[e].xy();
-            { // Rejects
+            { // Reject masks
                 float step0 = (edge.x>0?edge.x:0) + (edge.y>0?edge.y:0);
                 // Initial reject corner distance
                 face.binReject[e] = E[e].z + 64.f*step0;
                 // 4×4 reject corner steps
                 int rejectIndex = (edge.x>0)*2 + (edge.y>0);
-                for(int i=0;i<4*4;i++) {
+                for(int i: range(4*4)) { // FIXME: SIMD
                     float step = dot(edge, XY[rejectIndex][i]);
                     face.blockRejectStep[e][i] = 16.f*step;
                     face.pixelRejectStep[e][i] = 4.f*step;
-                    face.sampleStep[e][i] = -(1.f*step-1.f/2*step0); //to center (reversed to allow direct comparison)
+                    face.sampleStep[e][i] = -(1.f*step-1.f/2*step0); // To center (reversed to allow direct comparison)
                 }
             }
 
-            { // Accepts
+            { // Accept masks
                 float step0 = (edge.x<=0?edge.x:0) + (edge.y<=0?edge.y:0);
                 // Accept corner distance
                 face.binAccept[e] = E[e].z + 64.f*step0;
                 // 4×4 accept corner steps
                 int acceptIndex = (edge.x<=0)*2 + (edge.y<=0);
-                for(int i=0;i<4*4;i++) {
+                for(int i: range(4*4)) { // FIXME: SIMD
                     float step = dot(edge, XY[acceptIndex][i]);
                     face.blockAcceptStep[e][i] = 16.f*step;
                     face.pixelAcceptStep[e][i] = -4.f*step; // Reversed to allow direct comparison
                 }
             }
         }
-        face.iw = E[0]+E[1]+E[2];
+        face.i1 = E[0]+E[1]+E[2];
         face.iz = E*vec3(A.z,B.z,C.z);
         for(int i=0;i<V;i++) face.varyings[i] = E*vertexAttributes[i];
         face.faceAttributes=faceAttributes;
@@ -291,7 +291,7 @@ template<class Shader> struct RenderPass {
 
                         if(!(tile.subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) { // Pixel coverage on single sample pixel
                             vec3 XY1 = vec3(pixelXY+vec2(4.f/2, 4.f/2), 1.f);
-                            float w = 1/dot(face.iw,XY1);
+                            float w = 1/dot(face.i1,XY1);
                             float z = w*dot(face.iz,XY1);
 
                             float& depth = tile.depth[pixelPtr/16][pixelPtr%16];
@@ -319,7 +319,7 @@ template<class Shader> struct RenderPass {
                             // 2D coordinates vector
                             const vec16 sampleX = pixelXY.x + X, sampleY = pixelXY.y + Y;
                             // Interpolates w for perspective correction
-                            const vec16 w = 1/(face.iw.x*sampleX + face.iw.y*sampleY + face.iw.z);
+                            const vec16 w = 1/(face.i1.x*sampleX + face.i1.y*sampleY + face.i1.z);
                             // Interpolates perspective correct z
                             const vec16 z = w*(face.iz.x*sampleX + face.iz.y*sampleY + face.iz.z);
 
@@ -374,7 +374,7 @@ template<class Shader> struct RenderPass {
                     // 2D coordinates vector
                     const vec16 sampleX = pixelXY.x + X, sampleY = pixelXY.y + Y;
                     // Interpolates w for perspective correction
-                    const vec16 w = 1/(face.iw.x*sampleX + face.iw.y*sampleY + face.iw.z);
+                    const vec16 w = 1/(face.i1.x*sampleX + face.i1.y*sampleY + face.i1.z);
                     // Interpolates perspective correct z
                     const vec16 z = w*(face.iz.x*sampleX + face.iz.y*sampleY + face.iz.z);
 
