@@ -229,26 +229,23 @@ struct Light {
             }
 #else
             float s = (view.viewYawPitch.x+PI/2)/PI, t = 1-(view.viewYawPitch.y+PI/2)/PI;
+            assert_(s >= 0 && s <= 1 && t >= 0 && t <= 1);
             mat4 NDC;
             NDC.scale(vec3(vec2(target.size*4u)/2.f, 1)); // 0, 2 -> subsample size
             NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
             mat4 P;
-            float a = PI/4, cotan = cos(a/2)/sin(a/2);
-            float near = 1-1./2, d = 1, far = 1+1./2;
-            float S = s*2-1, T = t*2-1; // [0,1] -> [-1, 1]
-            float left = (-1-S)*near/d, right = (1-S)*near/d;
-            float bottom = (-1-T)*near/d, top = (1-T)*near/d;
-            float e = 2*near / (cotan*(right-left));
-            left *= e; right *= e; bottom *= e; top *= e;
-            /*float left = (-1-S), right = (1-S);
-            float bottom = (-1-T), top = (1-T);*/
-            P(0,0) = 2*near / (right-left);
-            P(1,1) = 2*near / (top-bottom);
-            P(0,2) = (right+left) / (right-left);
-            P(1,2) = (top+bottom) / (top-bottom);
-            P(2,2) = - (near+far) / (far-near);
-            P(2,3) = - 2*near*far / (far-near);
-            P(3,2) = - 1;
+            float near = 1-1./2, far = 1+1./2;
+            // Sheared perspective (rectification)
+            float S = 2*s-1, T = 2*t-1; // [0,1] -> [-1, 1]
+            float left = (-1-S), right = (1-S);
+            float bottom = (-1-T), top = (1-T);
+            P(0,0) = 2 / (right-left);
+            P(1,1) = 2 / (top-bottom);
+            P(0,2) = - (right+left) / (right-left);
+            P(1,2) = - (top+bottom) / (top-bottom);
+            P(2,2) = (far+near) / (far-near);
+            P(2,3) = 2*far*near / (far-near);
+            P(3,2) = 1;
             P(3,3) = 0;
             mat4 M;
             M.translate(vec3(-S,-T,0));
