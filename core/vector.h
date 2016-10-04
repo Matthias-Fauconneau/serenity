@@ -118,7 +118,9 @@ typedef vec<xyz,float,3> vec3;
 
 generic struct xyzw {
  T x,y,z,w;
+ vec< ::xy,T,2> xy() const { return *(vec< ::xyz,T,2>*)this; }
  vec< ::xyz,T,3> xyz() const { return *(vec< ::xyz,T,3>*)this; }
+ vec< ::xyz,T,3> xyw() const { return vec3(x, y, w); }
 };
 typedef vec<xyzw,float,4> vec4;
 

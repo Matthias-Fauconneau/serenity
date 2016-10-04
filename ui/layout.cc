@@ -32,7 +32,7 @@ vec2 Linear::sizeHint(const vec2 xySize) {
  size_t count = this->count();
  if(!count) return {};
  const vec2 size = xy(xySize);
- float widths[count];
+ float widths[count] = {};
  float remainingWidth = abs(size.x);
  float expandingWidth = 0;
  float height = 0;

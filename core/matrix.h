@@ -91,12 +91,13 @@ struct mat4 {
     vec4& operator[](int j) { return (vec4&)data[j*4]; }
     const vec4& operator[](int j) const { return (vec4&)data[j*4]; }
 
-    //vec3 operator*(vec3 v) const { vec3 r; for(int i=0;i<3;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+1*M(i,3); return r; }
-    vec3 operator*(vec3 v) const { vec4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+1*M(i,3); return r.xyz()/r.w; }
+    //vec3 operator*(vec3 v) const { vec4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+1*M(i,3); return r.xyz()/r.w; }
+      vec4 operator*(vec3 v) const { vec4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+1*M(i,3); return r; }
     vec4 operator*(vec4 v) const { vec4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+v.w*M(i,3); return r; }
     mat4 operator*(mat4 b) const{mat4 r(0); for(int j=0;j<4;j++) for(int i=0;i<4;i++) for(int k=0;k<4;k++) r.M(i,j) += M(i,k)*b.M(k,j); return r; }
 
-    /*float minor(int j0, int j1, int j2, int i0, int i1, int i2) const {
+#if INVERSE
+    float minor(int j0, int j1, int j2, int i0, int i1, int i2) const {
         return
                 M(i0,j0) * (M(i1,j1) * M(i2,j2) - M(i2,j1) * M(i1,j2)) -
                 M(i0,j1) * (M(i1,j0) * M(i2,j2) - M(i2,j0) * M(i1,j2)) +
@@ -114,23 +115,18 @@ struct mat4 {
     mat4 transpose() {mat4 r; for(int j=0;j<4;j++) for(int i=0;i<4;i++) r(j,i)=M(i,j); return r;}
     mat4 adjugate() const { return cofactor().transpose(); }
     mat4 inverse() const { return 1/det() * adjugate() ; }
-    mat3 normalMatrix() const { return (mat3)inverse().transpose(); }*/
+    mat3 normalMatrix() const { return (mat3)inverse().transpose(); }
+#endif
+#if 0
     explicit operator mat3() const {
         mat3 r;
         for(int i=0;i<3;i++) for(int j=0;j<3;j++) r(i,j)=M(i,j);
         return r;
     }
-
- inline mat4& perspective(float hfov, vec2 size, float nearPlane, float farPlane) {
-        float cotan = cos(hfov/2) / sin(hfov/2);
-		M(0,0) = cotan * size.y / size.x; M(1,1) = cotan; M(2,2) = (nearPlane+farPlane) / (nearPlane-farPlane);
-        M(2,3) = (2*nearPlane*farPlane) / (nearPlane-farPlane); M(3,2) = -1; M(3,3) = 0;
-		return *this;
-    }
- mat4& translate(vec3 v) { for(int i=0;i<4;i++) M(i,3) += M(i,0)*v.x + M(i,1)*v.y + M(i,2)*v.z; return *this; }
-	mat4& scale(float f) { for(int j=0;j<3;j++) for(int i=0;i<4;i++) M(i,j)*=f; return *this; }
- mat4& scale(vec3 v) { for(int j=0;j<3;j++) for(int i=0;i<4;i++) M(i,j)*=v[j]; return *this; }
- mat4& rotate(float angle, vec3 u) {
+#endif
+    mat4& translate(vec3 v) { for(int i=0;i<4;i++) M(i,3) += M(i,0)*v.x + M(i,1)*v.y + M(i,2)*v.z; return *this; }
+    mat4& scale(vec3 v) { for(int j=0;j<3;j++) for(int i=0;i<4;i++) M(i,j)*=v[j]; return *this; }
+    mat4& rotate(float angle, vec3 u) {
         float x=u.x, y=u.y, z=u.z;
         float c=cos(angle), s=sin(angle), ic=1-c;
         mat4 r;
@@ -138,11 +134,11 @@ struct mat4 {
         r(0,1) = y*x*ic + z*s; r(1,1) = y*y*ic + c; r(2,1) = y*z*ic - x*s; r(3,1) = 0;
         r(0,2) = x*z*ic - y*s; r(1,2) = y*z*ic + x*s; r(2,2) = z*z*ic + c; r(3,2) = 0;
         r(0,3) = 0; r(1,3) = 0; r(2,3) = 0; r(3,3) = 1;
-		return *this = *this * r;
+        return *this = *this * r;
     }
-	mat4& rotateX(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r.M(1,1) = c; r.M(2,2) = c; r.M(1,2) = -s; r.M(2,1) = s; return *this = *this * r; }
-	mat4& rotateY(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r.M(0,0) = c; r.M(2,2) = c; r.M(2,0) = -s; r.M(0,2) = s; return *this = *this * r; }
-	mat4& rotateZ(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r.M(0,0) = c; r.M(1,1) = c; r.M(0,1) = -s; r.M(1,0) = s; return *this = *this * r; }
+    mat4& rotateX(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r.M(1,1) = c; r.M(2,2) = c; r.M(1,2) = -s; r.M(2,1) = s; return *this = *this * r; }
+    mat4& rotateY(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r.M(0,0) = c; r.M(2,2) = c; r.M(2,0) = -s; r.M(0,2) = s; return *this = *this * r; }
+    mat4& rotateZ(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r.M(0,0) = c; r.M(1,1) = c; r.M(0,1) = -s; r.M(1,0) = s; return *this = *this * r; }
 };
 inline mat4 operator*(float s, mat4 M) {mat4 r; for(int j=0;j<4;j++) for(int i=0;i<4;i++) r.M(i,j)=s*M(i,j); return r; }
 
@@ -154,7 +150,7 @@ template<int N, int M, Type T> inline String str(const T a[M*N]) {
             for(int j=0;j<N;j++) {
                 s.append("\t"+str(a[j*M+i], 4u));
             }
-			if(i<M-1) s.append('\n');
+            if(i<M-1) s.append('\n');
         }
     }
     return move(s);

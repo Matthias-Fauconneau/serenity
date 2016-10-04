@@ -3,9 +3,11 @@
 #include "png.h"
 #include "interface.h"
 #include "window.h"
+#include "raster.h"
 
 Folder tmp {"/var/tmp/light",currentWorkingDirectory(), true};
 
+#if 0
 static bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u, float& v) { //from "Fast, Minimum Storage Ray/Triangle Intersection"
     //if(dot(A-O, d)<=0 && dot(B-O, d)<=0 && dot(C-O, d)<=0) return false;
     vec3 edge1 = B - A;
@@ -27,31 +29,72 @@ static bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u
 }
 
 struct Scene {
-    struct Face { vec3 vertices[3]; };
+    struct Face { vec3 position[3]; };
     Face faces[6*2]; // Cube
     Scene() {
-            vec3 vertices[8];
+            vec3 position[8];
             const float size = 1./2;
-            for(int i: range(8)) vertices[i] = size * (2.f * vec3(i/4, (i/2)%2, i%2) - vec3(1)); // -1, 1
+            for(int i: range(8)) position[i] = size * (2.f * vec3(i/4, (i/2)%2, i%2) - vec3(1)); // -1, 1
             const int indices[6*4] = { 0,2,3,1, 0,1,5,4, 0,4,6,2, 1,3,7,5, 2,6,7,3, 4,5,7,6};
             for(int i: range(6)) {
-                faces[i*2+0] = {{vertices[indices[i*4+0]], vertices[indices[i*4+1]], vertices[indices[i*4+2]]}};
-                faces[i*2+1] = {{vertices[indices[i*4+0]], vertices[indices[i*4+2]], vertices[indices[i*4+3]]}};
+                faces[i*2+0] = {{position[indices[i*4+0]], position[indices[i*4+1]], position[indices[i*4+2]]}};
+                faces[i*2+1] = {{position[indices[i*4+0]], position[indices[i*4+2]], position[indices[i*4+3]]}};
             }
     }
     bgr3f raycast(vec3 O, vec3 d) const {
         float minZ = inff; bgr3f color (0, 0, 0);
         for(Face face: faces) {
             float z, u, v;
-            if(!intersect(face.vertices[0], face.vertices[1], face.vertices[2], O, d, z, u, v) || z>minZ) continue;
+            if(!intersect(face.position[0], face.position[1], face.position[2], O, d, z, u, v) || z>minZ) continue;
             color.b = u;
             color.g = v;
         }
         return color;
     }
 };
+#else
+struct Scene {
+    struct Face { vec3 position[3]; };
+    RenderTarget target; // Render target (RenderPass renders on these tiles)
+    /// Shader for flat surfaces
+    struct Shader {
+        // Shader specification (used by rasterizer)
+        struct FaceAttributes {};
+        static constexpr int V = 0;
+        static constexpr bool blend = false; // Disables unnecessary blending
 
-#if 1
+        vec4 operator()(FaceAttributes unused face, float unused varying[V]) const {
+            return vec4(vec3(1.f),1.f);
+        }
+    } shader;
+    RenderPass<Shader> pass {shader};
+    Face faces[6*2]; // Cube
+    Scene() {
+            vec3 position[8];
+            const float size = 1./2;
+            for(int i: range(8)) position[i] = size * (2.f * vec3(i/4, (i/2)%2, i%2) - vec3(1)); // -1, 1
+            const int indices[6*4] = { 0,2,3,1, 0,1,5,4, 0,4,6,2, 1,3,7,5, 2,6,7,3, 4,5,7,6};
+            for(int i: range(6)) {
+                faces[i*2+0] = {{position[indices[i*4+0]], position[indices[i*4+1]], position[indices[i*4+2]]}};
+                faces[i*2+1] = {{position[indices[i*4+0]], position[indices[i*4+2]], position[indices[i*4+3]]}};
+            }
+    }
+    void render(Image& final, mat4 view) {
+        target.setup(int2(final.size));
+        pass.setup(target, ref<Face>(faces).size); // Resize if necessary and clears
+        for(const Face& face: faces) {
+            vec4 A = view*face.position[0], B = view*face.position[1], C = view*face.position[2];
+            if(cross((B-A).xyz(),(C-A).xyz()).z <= 0) continue; // Backward face culling
+            vec3 attributes[0];
+            pass.submit(A,B,C, attributes, {});
+        }
+        pass.render(target);
+        target.resolve(final);
+    }
+};
+#endif
+
+#if 0
 struct Render {
     Render() {
         const Scene scene;
@@ -65,6 +108,7 @@ struct Render {
             for(int tIndex: range(N)) {
                 float s = 2*sIndex/float(N-1)-1, t = 2*tIndex/float(N-1)-1; // [-1, 1]
                 target.clear(0);
+#if 0
                 for(int vIndex: range(target.size.y)) for(int uIndex: range(target.size.x)) {
                     float u = 2*uIndex/float(target.size.x-1)-1, v = 2*vIndex/float(target.size.y-1)-1; // [-1, 1]
                     vec3 O (s, t, -1); // World space ray origin
@@ -72,6 +116,24 @@ struct Render {
                     vec3 d = normalize(D-O); // World space ray direction (sheared perspective pinhole)
                     target(uIndex, vIndex) = byte4(byte3(clamp(bgr3i(0), bgr3i(float(0xFF)*scene.raycast(O, d)), bgr3i(0xFF))), 0xFF); // FIXME: slow
                 }
+#else
+                mat4 NDC;
+                NDC.scale(vec3(1.f/(vec2(target.size)/2.f), 1)); // 0, 2
+                NDC.translate(vec3(-1./2,0.f,0.f)); //-1, 1
+                mat4 P;
+                float near = 1-1./2, d = 1, far = 1+1./2;
+                float left = s*near/d, right = (1-s)*near/d;
+                float top = t*near/d, bottom = (1-t)*near/d;
+                P(0,0) = 2*near;
+                P(1,1) = 2*near;
+                P(0,2) = (right-left)/(right+left);
+                P(1,2) = (top-bottom)/(top+bottom);
+                P(2,2) = (near+far) / (near-far);
+                P(2,3) = 2*near*far / (near-far);
+                P(3,2) = 1;
+                P(3,3) = 0;
+                scene.render(target, P * NDC);
+#endif
                 writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(target.size), cast<byte>(target), folder, true);
                 //writeFile(str(tIndex)+'_'+str(sIndex)+".png", encodePNG(target), folder, true);
             }
@@ -86,7 +148,7 @@ struct Render {
 
 struct ScrollValue : virtual Widget {
     int minimum = 0, maximum = 0;
-    int value = 0;
+    int value = 1;
     ScrollValue(int minimum, int maximum) : minimum(minimum), maximum(maximum) {}
     virtual bool mouseEvent(vec2, vec2, Event event, Button button, Widget*&) override {
         int value = this->value;
@@ -157,13 +219,33 @@ struct Light {
 
         // Rotated orthographic projection
         vec4 invViewRotation = conjugate(viewRotation);
-
         if(view.value) {
+#if 0
             for(int y: range(target.size.y)) for(int x: range(target.size.x)) {
                 vec3 O = qapply(invViewRotation, vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, -1)); // [-1, 1]
                 vec3 d = qapply(invViewRotation, vec3(0, 0, 1));
                 target(x, y) = byte4(byte3(clamp(bgr3i(0), bgr3i(float(0xFF)*scene.raycast(O, d)), bgr3i(0xFF))), 0xFF);
             }
+#else
+            float s = (view.viewYawPitch.x+PI/2)/PI, t = (view.viewYawPitch.y+PI/2)/PI;
+            mat4 NDC;
+            NDC.scale(vec3(vec2(target.size*4u)/2.f, 1)); // 0, 2 -> subsample size
+            NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
+            mat4 P;
+            float near = 1-1./2, d = 1, far = 1+1./2;
+            float left = s*near/d, right = (1-s)*near/d;
+            float top = t*near/d, bottom = (1-t)*near/d;
+            P(0,0) = - 2*near / (right+left);
+            P(1,1) = - 2*near / (top+bottom);
+            P(0,2) = - (right-left) / (right+left);
+            P(1,2) = - (top-bottom) / (top+bottom);
+            P(2,2) = - (near+far) / (far-near);
+            P(2,3) = 2*near*far / (far-near);
+            P(3,2) = 1;
+            P(3,3) = 0;
+            log(s, t, "\n"+str(P));
+            scene.render(target, NDC * P);
+#endif
         } else {
             for(int y: range(target.size.y)) for(int x: range(target.size.x)) {
                 vec3 O = qapply(invViewRotation, vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, -1)); // [-1, 1]

@@ -20,7 +20,7 @@ generic struct ImageT : buffer<T> {
 
  explicit operator bool() const { return buffer<T>::data && size.x && size.y; }
  inline T& operator()(uint x, uint y) const {
-  assert(x<uint(size.x) && y<uint(size.y));
+  assert(x<uint(size.x) && y<uint(size.y), int(x), int(y), size);
   return buffer<T>::at(y*stride+x);
  }
 };

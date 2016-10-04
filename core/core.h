@@ -4,7 +4,7 @@
 // Keywords
 #ifdef PROFILE
 #define notrace __attribute((no_instrument_function))
-#define notrace inline __attribute((no_instrument_function))
+#define inline  inline __attribute((no_instrument_function))
 #else
 #define notrace
 #define inline inline
