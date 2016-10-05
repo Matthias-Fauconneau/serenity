@@ -9,12 +9,11 @@
 Folder tmp {"/var/tmp/light",currentWorkingDirectory(), true};
 
 static bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u, float& v) { //from "Fast, Minimum Storage Ray/Triangle Intersection"
-    //if(dot(A-O, d)<=0 && dot(B-O, d)<=0 && dot(C-O, d)<=0) return false;
     vec3 edge1 = B - A;
     vec3 edge2 = C - A;
     vec3 pvec = cross(d, edge2);
     float det = dot(edge1, pvec);
-    //if(det < 0/*0x1p-16f*/) return false;
+    if(det < 0) return false;
     vec3 tvec = O - A;
     u = dot(tvec, pvec);
     if(u < 0 || u > det) return false;
@@ -28,33 +27,29 @@ static bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u
     return true;
 }
 
-static thread_local bool debug = false;
-
 struct Scene {
     struct Face { vec3 position[3]; bgr3f color; };
     Face faces[6*2]; // Cube
 
     Scene() {
-            vec3 position[8];
-            const float size = 1./2;
-            for(int i: range(8)) position[i] = size * (2.f * vec3(i/4, (i/2)%2, i%2) - vec3(1)); // -1, 1
-            const int indices[6*4] = { 0,2,3,1, 0,1,5,4, 0,4,6,2, 1,3,7,5, 2,6,7,3, 4,5,7,6};
-            const bgr3f colors[6] = {red, green, blue, cyan, magenta, yellow};
-            for(int i: range(6)) {
-                faces[i*2+0] = {{position[indices[i*4+0]], position[indices[i*4+1]], position[indices[i*4+2]]}, colors[i]};
-                faces[i*2+1] = {{position[indices[i*4+0]], position[indices[i*4+2]], position[indices[i*4+3]]}, colors[i]};
-            }
+        vec3 position[8];
+        const float size = 1./2;
+        for(int i: range(8)) position[i] = size * (2.f * vec3(i/4, (i/2)%2, i%2) - vec3(1)); // -1, 1
+        const int indices[6*4] = { 0,2,3,1, 0,1,5,4, 0,4,6,2, 1,3,7,5, 2,6,7,3, 4,5,7,6};
+        const bgr3f colors[6] = {red, green, blue, cyan, magenta, yellow};
+        for(int i: range(6)) {
+            faces[i*2+0] = {{position[indices[i*4+2]], position[indices[i*4+1]], position[indices[i*4+0]]}, colors[i]};
+            faces[i*2+1] = {{position[indices[i*4+3]], position[indices[i*4+2]], position[indices[i*4+0]]}, colors[i]};
+        }
     }
-
 
     bgr3f raycast(vec3 O, vec3 d) const {
         float nearestZ = inff; bgr3f color (0, 0, 0);
         for(Face face: faces) {
             float t, u, v;
-            bool intersect = ::intersect(face.position[0], face.position[1], face.position[2], O, d, t, u, v);
+            if(!::intersect(face.position[0], face.position[1], face.position[2], O, d, t, u, v)) continue;
             float z = t*d.z;
-            if(debug) log(face.position[0], face.position[1], face.position[2], intersect, z<nearestZ, z, nearestZ);
-            if(!intersect || z>nearestZ) continue; // Keeps min Z
+            if(z > nearestZ) continue;
             nearestZ = z;
             color = face.color;
         }
@@ -80,7 +75,7 @@ struct Scene {
         pass.setup(target, ref<Face>(faces).size); // Resize if necessary and clears
         for(const Face& face: faces) {
             vec3 A = view*face.position[0], B = view*face.position[1], C = view*face.position[2];
-            //if(cross(B-A,C-A).z <= 0) continue; // Backward face culling
+            if(cross(B-A,C-A).z <= 0) continue; // Backward face culling
             vec3 attributes[0];
             pass.submit(A,B,C, attributes, {face.color});
         }
@@ -101,26 +96,22 @@ struct Render {
             if(lastReport.seconds() > 1) { log(sIndex, "/", N, time); lastReport.reset(); }
             for(int tIndex: range(N)) {
                 target.clear(0);
-                float S = 2*sIndex/float(N-1)-1, T = 2*tIndex/float(N-1)-1; // [-1, 1]
-                mat4 NDC;
-                NDC.scale(vec3(vec2(target.size*4u)/2.f, 1)); // 0, 2 -> subsample size
-                NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
-                mat4 P;
-                float near = 1-1./2, far = 1+1./2;
                 // Sheared perspective (rectification)
-                float left = (-1-S), right = (1-S);
-                float bottom = (-1-T), top = (1-T);
-                P(0,0) = 2 / (right-left);
-                P(1,1) = 2 / (top-bottom);
-                P(0,2) = - (right+left) / (right-left);
-                P(1,2) = - (top+bottom) / (top-bottom);
-                P(2,2) = (far+near) / (far-near);
-                P(2,3) = 2*far*near / (far-near);
-                P(3,2) = 1;
-                P(3,3) = 0;
+                const float S = 2*sIndex/float(N-1)-1, T = 2*tIndex/float(N-1)-1; // [-1, 1]
+                const float left = (-1-S), right = (1-S);
+                const float bottom = (-1-T), top = (1-T);
                 mat4 M;
-                M.translate(vec3(-S,-T,0));
-                M.translate(vec3(0,0,1)); // 0 -> 1 (+Z)
+                M(0,0) = 2 / (right-left);
+                M(1,1) = 2 / (top-bottom);
+                M(0,2) = (right+left) / (right-left);
+                M(1,2) = (top+bottom) / (top-bottom);
+                const float near = 1-1./2, far = 1+1./2;
+                M(2,2) = - (far+near) / (far-near);
+                M(2,3) = - 2*far*near / (far-near);
+                M(3,2) = - 1;
+                M(3,3) = 0;
+                M.translate(vec3(S,T,0));
+                M.translate(vec3(0,0,-1)); // 0 -> -1 (Z-)
                 if(0) {
                     parallel_chunk(target.size.y*target.size.x, [&](uint, size_t start, size_t size) { // TODO: SSAA
                         for(int i: range(start, start+size)) {
@@ -132,7 +123,10 @@ struct Render {
                         }
                     });
                 } else {
-                    scene.render(target, NDC * P * M);
+                    mat4 NDC;
+                    NDC.scale(vec3(vec2(target.size*4u)/2.f, 1)); // 0, 2 -> subsample size
+                    NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
+                    scene.render(target, NDC * M);
                 }
                 writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(target.size), cast<byte>(target), folder, true);
                 writeFile(str(tIndex)+'_'+str(sIndex)+".png", encodePNG(target), folder, true);
@@ -140,8 +134,7 @@ struct Render {
         }
         log(time);
     }
-}
-;//render;
+} ;//render;
 
 struct ScrollValue : virtual Widget {
     int minimum = 0, maximum = 0;
@@ -187,7 +180,7 @@ struct Light {
     ImageT<Image> images;
     Scene scene;
 
-    bool sample = false, raycast = true, orthographic = true;
+    bool sample = false, raycast = false, orthographic = false;
 
     struct View : ScrollValue, ViewControl, ImageView {
         Light& _this;
@@ -198,8 +191,7 @@ struct Light {
         }
         virtual vec2 sizeHint(vec2) override { return 1024; }
         virtual shared<Graphics> graphics(vec2 size) override {
-            vec4 viewRotation = qmul(angleVector(viewYawPitch.y, vec3(1,0,0)), angleVector(-viewYawPitch.x, vec3(0,1,0)));
-            this->image = _this.render(uint2(size), viewRotation);
+            this->image = _this.render(uint2(size));
             return ImageView::graphics(size);
         }
     } view {*this};
@@ -214,7 +206,7 @@ struct Light {
         window->actions[Key('r')] = [this]{ raycast=!raycast; window->render(); };
         window->actions[Key('o')] = [this]{ orthographic=!orthographic; window->render(); };
     }
-    Image render(uint2 size, vec4 unused viewRotation) {
+    Image render(uint2 size) {
         //if(inputs[view.value] != this->name) load(inputs[view.value]);
         Image target (size);
         target.clear(0);
@@ -223,49 +215,52 @@ struct Light {
         if(orthographic) {
             M.rotateX(view.viewYawPitch.y); // Pitch
             M.rotateY(view.viewYawPitch.x); // Yaw
+            M.scale(vec3(1,1,-1)); // Z-
         } else {
-            float near = 1-1./2, far = 1+1./2;
             // Sheared perspective (rectification)
-            float s = (view.viewYawPitch.x+PI/2)/PI, t = (view.viewYawPitch.y+PI/2)/PI;
-            assert_(s >= 0 && s <= 1 && t >= 0 && t <= 1);
-            float S = 2*s-1, T = 2*t-1; // [0,1] -> [-1, 1]
-            float left = (-1-S), right = (1-S);
-            float bottom = (-1-T), top = (1-T);
+            const float s = (view.viewYawPitch.x+PI/2)/PI, t = (view.viewYawPitch.y+PI/2)/PI;
+            const float S = 2*s-1, T = 2*t-1; // [0,1] -> [-1, 1]
+            const float left = (-1-S), right = (1-S);
+            const float bottom = (-1-T), top = (1-T);
             M(0,0) = 2 / (right-left);
             M(1,1) = 2 / (top-bottom);
             M(0,2) = (right+left) / (right-left);
             M(1,2) = (top+bottom) / (top-bottom);
+            const float near = 1-1./2, far = 1+1./2;
             M(2,2) = - (far+near) / (far-near);
             M(2,3) = - 2*far*near / (far-near);
             M(3,2) = - 1;
             M(3,3) = 0;
             M.translate(vec3(S,T,0));
-            M.translate(vec3(0,0,-1)); // 0 -> 1 (+Z)
+            M.translate(vec3(0,0,-1)); // 0 -> -1 (Z-)
         }
 
         if(raycast) {
             parallel_chunk(target.size.y*target.size.x, [&](uint, size_t start, size_t size) { // TODO: SSAA
                 for(int i: range(start, start+size)) {
                     int y = i/target.size.x, x = i%target.size.x;
-                    const vec3 O = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, 1);
-                    const vec3 P = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, -1);
+                    const vec3 O = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, -1);
+                    const vec3 P = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, 1);
                     const vec3 d = normalize(P-O);
 
                     bgr3f S;
                     if(sample) {
-                        const vec3 n (0,0,-1);
+                        const vec3 n (0,0,1);
                         const float nd = dot(n, d);
+                        assert_(nd);
                         const vec3 n_nd = n / nd;
 
                         const vec2 Pst = O.xy() + dot(n_nd, vec3(0,0,-1)-O) * d.xy();
-                        vec2 st = (Pst+vec2(1))/2.f;
+                        const vec2 ST = (Pst+vec2(1))/2.f;
+                        assert_(isNumber(ST), ST, Pst, n_nd, O, d);
                         const vec2 Puv = O.xy() + dot(n_nd, vec3(0,0,0)-O) * d.xy();
-                        vec2 uv = (Puv+vec2(1))/2.f;
+                        const vec2 UV = (Puv+vec2(1))/2.f;
 
-                        if(name!="synthetic") st[1] = 1-st[1];
-                        if(name=="synthetic") {
-                            st *= vec2(images.size-uint2(1));
-                        } else {
+                        //if(name=="synthetic") {
+                            //st *= vec2(images.size-uint2(1));
+                        const vec2 st = ST * vec2(images.size-uint2(1));
+                        /*} else {
+                            st[1] = 1-st[1];
                             if(x==target.size.x/2 && y==target.size.y/2) log(1, st);
                             st *= imageSize.y-1; // Pixel units
                             if(x==target.size.x/2 && y==target.size.y/2) log(2, st, imageSize.y);
@@ -275,14 +270,15 @@ struct Light {
                             if(x==target.size.x/2 && y==target.size.y/2) log(3, st, min, max, images.size);
                             //st -= vec2(images.size-uint2(1))/2.f; // Center to corner
                             //if(x==target.size.x/2 && y==target.size.y/2) log(5, st);
-                        }
+                        }*/
 
                         //if(name!="synthetic") uv[1] = 1-uv[1];
-                        uv *= imageSize.x-1;
+                        //uv *= imageSize.x-1;
+                        const vec2 uv = UV * float(imageSize.x-1);
 
                         if(st[0] < 0 || st[1] < 0 || uv[0] < 0 || uv[1] < 0) continue;
                         int is = st[0], it = st[1], iu = uv[0], iv = uv[1]; // Warning: Floors towards zero
-                        assert_(is >= 0 && it >= 0 && iu >= 0 && iv >= 0, is, it, iu, iv, st, uv, min, max, imageSize, images.size, Pst, Puv, O, d, nd, n_nd);
+                        assert_(is >= 0 && it >= 0 && iu >= 0 && iv >= 0, is, it, iu, iv, st, uv, imageSize, images.size, Pst, Puv, O, d, nd, n_nd);
                         if(is >= int(images.size.x)-1 || it >= int(images.size.y)-1) continue;
                         if(iu >= int(imageSize.x)-1 || iv >= int(imageSize.y)-1) continue;
                         float fs = fract(st[0]), ft = fract(st[1]), fu = fract(uv[0]), fv = fract(uv[1]);
