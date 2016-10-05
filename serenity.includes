@@ -12,3 +12,4 @@ video
 /scratch/include
 .
 simulation
+/usr/lib/clang/3.9.0/include/

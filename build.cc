@@ -141,7 +141,7 @@ bool Build::compileModule(string target) {
   Folder(tmp+"/"+join(flags,string("-"_))+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
   Stream stdout;
   //::log(args);
-  int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1z","-fno-exceptions",//"-stdlib=libc++",
+  int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1z","-fno-exceptions","-fno-operator-names",
                                      "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing",
                                      "-I/usr/include/freetype2","-I/usr/include/ffmpeg",
                                      "-I/var/tmp/include", "-iquote.",

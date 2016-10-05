@@ -71,7 +71,7 @@ struct Scene {
     RenderPass<Shader> pass {shader};
 
     void render(Image& final, mat4 view) {
-        target.setup(int2(final.size));
+        target.setup(int2(final.size/4u/*MSAA->4x*/));
         pass.setup(target, ref<Face>(faces).size); // Resize if necessary and clears
         for(const Face& face: faces) {
             vec3 A = view*face.position[0], B = view*face.position[1], C = view*face.position[2];
@@ -90,7 +90,7 @@ struct Render {
         Folder folder {"synthetic", tmp, true};
         for(string file: folder.list(Files)) remove(file, folder);
         const int N = 33;
-        Image target (256);
+        Image target (512);
         Time time (true), lastReport(true);
         for(int sIndex: range(N)) {
             if(lastReport.seconds() > 1) { log(sIndex, "/", N, time); lastReport.reset(); }
@@ -124,7 +124,7 @@ struct Render {
                     });
                 } else {
                     mat4 NDC;
-                    NDC.scale(vec3(vec2(target.size*4u)/2.f, 1)); // 0, 2 -> subsample size
+                    NDC.scale(vec3(vec2(target.size/**4u*/)/2.f, 1)); // 0, 2 -> subsample size
                     NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
                     scene.render(target, NDC * M);
                 }
@@ -134,7 +134,7 @@ struct Render {
         }
         log(time);
     }
-} ;//render;
+} render;
 
 struct ScrollValue : virtual Widget {
     int minimum = 0, maximum = 0;
@@ -189,7 +189,7 @@ struct Light {
         virtual bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& widget) override {
             return ScrollValue::mouseEvent(cursor,size,event,button,widget) || ViewControl::mouseEvent(cursor,size,event,button,widget);
         }
-        virtual vec2 sizeHint(vec2) override { return 1024; }
+        virtual vec2 sizeHint(vec2) override { return 512; }
         virtual shared<Graphics> graphics(vec2 size) override {
             this->image = _this.render(uint2(size));
             return ImageView::graphics(size);
@@ -309,7 +309,7 @@ struct Light {
             });
         } else {
             mat4 NDC;
-            NDC.scale(vec3(vec2(target.size*4u)/2.f, 1)); // 0, 2 -> subsample size
+            NDC.scale(vec3(vec2(target.size/**4u*/)/2.f, 1)); // 0, 2 -> subsample size
             NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
             scene.render(target, NDC * M);
         }

@@ -70,6 +70,6 @@ ui/render.h
 ui/color.h
 
 light.cc
-vec16.h
 raster.h
 raster.cc
+vec16.h
