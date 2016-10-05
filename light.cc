@@ -110,14 +110,14 @@ struct Render {
                 M(2,3) = - 2*far*near / (far-near);
                 M(3,2) = - 1;
                 M(3,3) = 0;
-                M.translate(vec3(S,T,0));
+                M.translate(vec3(-S,-T,0));
                 M.translate(vec3(0,0,-1)); // 0 -> -1 (Z-)
                 if(0) {
                     parallel_chunk(target.size.y*target.size.x, [&](uint, size_t start, size_t size) { // TODO: SSAA
                         for(int i: range(start, start+size)) {
                             int y = i/target.size.x, x = i%target.size.x;
-                            const vec3 O = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, 1);
-                            const vec3 P = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, -1);
+                            const vec3 O = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, -1);
+                            const vec3 P = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, 1);
                             const vec3 d = normalize(P-O);
                             target(x, y) = byte4(byte3(float(0xFF)*scene.raycast(O, d)), 0xFF);
                         }
@@ -231,7 +231,7 @@ struct Light {
             M(2,3) = - 2*far*near / (far-near);
             M(3,2) = - 1;
             M(3,3) = 0;
-            M.translate(vec3(S,T,0));
+            M.translate(vec3(-S,-T,0));
             M.translate(vec3(0,0,-1)); // 0 -> -1 (Z-)
         }
 
@@ -245,12 +245,12 @@ struct Light {
 
                     bgr3f S;
                     if(sample) {
-                        const vec3 n (0,0,1);
+                        const vec3 n (0,0,-1);
                         const float nd = dot(n, d);
                         assert_(nd);
                         const vec3 n_nd = n / nd;
 
-                        const vec2 Pst = O.xy() + dot(n_nd, vec3(0,0,-1)-O) * d.xy();
+                        const vec2 Pst = O.xy() + dot(n_nd, vec3(0,0,1)-O) * d.xy();
                         const vec2 ST = (Pst+vec2(1))/2.f;
                         assert_(isNumber(ST), ST, Pst, n_nd, O, d);
                         const vec2 Puv = O.xy() + dot(n_nd, vec3(0,0,0)-O) * d.xy();
