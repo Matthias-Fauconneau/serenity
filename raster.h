@@ -39,7 +39,7 @@ struct RenderTarget {
     float depth; bgr3f backgroundColor;
 
     // Allocates all bins, flags them to be cleared
-    void setup(int2 size, float depth=-0x1p16f, bgr3f backgroundColor=0) {
+    void setup(int2 size, float depth=inff, bgr3f backgroundColor=0) {
         if(this->size != size) {
             this->size = size;
             width = align(64,size.x*4)/64;
@@ -140,9 +140,9 @@ template<class Shader> struct RenderPass {
         Face& face = faces[faceCount];
         mat3 E = mat3(vec3(A.xy(), 1), vec3(B.xy(), 1), vec3(C.xy(), 1));
         E = E.cofactor(); // Edge equations are now columns of E
-        if(E[0].x>0/*dy<0*/ || (E[0].x==0/*dy=0*/ && E[0].y<0/*dx<0*/)) E[0].z++;
-        if(E[1].x>0/*dy<0*/ || (E[1].x==0/*dy=0*/ && E[1].y<0/*dx<0*/)) E[1].z++;
-        if(E[2].x>0/*dy<0*/ || (E[2].x==0/*dy=0*/ && E[2].y<0/*dx<0*/)) E[2].z++;
+        if(E[0].x>0/*dy<0*/ || (E[0].x==0/*dy=0*/ && E[0].y<0/*dx<0*/)) E[0].z--;
+        if(E[1].x>0/*dy<0*/ || (E[1].x==0/*dy=0*/ && E[1].y<0/*dx<0*/)) E[1].z--;
+        if(E[2].x>0/*dy<0*/ || (E[2].x==0/*dy=0*/ && E[2].y<0/*dx<0*/)) E[2].z--;
 
         for(int e: range(3)) {
             const vec2& edge = face.edges[e] = E[e].xy();
@@ -295,7 +295,7 @@ template<class Shader> struct RenderPass {
                             float z = w*dot(face.iz,XY1);
 
                             float& depth = tile.depth[pixelPtr/16][pixelPtr%16];
-                            if(z < depth) continue;
+                            if(z > depth) continue;
                             depth = z;
 
                             float centroid[V]; for(int i=0;i<V;i++) centroid[i]=w*dot(face.varyings[i],XY1);
@@ -387,7 +387,7 @@ template<class Shader> struct RenderPass {
 
                         // Performs Z-Test
                         float pixelZ = tile.depth[pixelPtr/16][pixelPtr%16];
-                        const vec16 visibleMask =  (z >= pixelZ) & draw.mask;
+                        const vec16 visibleMask = (z <= pixelZ) & draw.mask;
 
                         // Blends accepted pixels in subsampled Z buffer
                         tile.subdepth[pixelPtr] = blend16(pixelZ, z, visibleMask);
@@ -430,7 +430,7 @@ template<class Shader> struct RenderPass {
 
                         // Performs Z-Test
                         vec16& subpixel = tile.subdepth[pixelPtr];
-                        const vec16 visibleMask =  (z >= subpixel) & draw.mask;
+                        const vec16 visibleMask = (z <= subpixel) & draw.mask;
 
                         // Stores accepted pixels in Z buffer
                         maskstore(subpixel, visibleMask, z);

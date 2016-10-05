@@ -4,19 +4,17 @@
 #include "interface.h"
 #include "window.h"
 #include "raster.h"
+#include "parallel.h"
 
 Folder tmp {"/var/tmp/light",currentWorkingDirectory(), true};
 
-#define RAYCAST 1
-
-#if RAYCAST
 static bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u, float& v) { //from "Fast, Minimum Storage Ray/Triangle Intersection"
     //if(dot(A-O, d)<=0 && dot(B-O, d)<=0 && dot(C-O, d)<=0) return false;
     vec3 edge1 = B - A;
     vec3 edge2 = C - A;
     vec3 pvec = cross(d, edge2);
     float det = dot(edge1, pvec);
-    if(det < 0/*0x1p-16f*/) return false;
+    //if(det < 0/*0x1p-16f*/) return false;
     vec3 tvec = O - A;
     u = dot(tvec, pvec);
     if(u < 0 || u > det) return false;
@@ -30,38 +28,39 @@ static bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u
     return true;
 }
 
+static thread_local bool debug = false;
+
 struct Scene {
     struct Face { vec3 position[3]; bgr3f color; };
     Face faces[6*2]; // Cube
+
     Scene() {
             vec3 position[8];
             const float size = 1./2;
             for(int i: range(8)) position[i] = size * (2.f * vec3(i/4, (i/2)%2, i%2) - vec3(1)); // -1, 1
-            const int indices[6*4] = {0,2,3,1, 0,1,5,4, 0,4,6,2, 1,3,7,5, 2,6,7,3, 4,5,7,6};
+            const int indices[6*4] = { 0,2,3,1, 0,1,5,4, 0,4,6,2, 1,3,7,5, 2,6,7,3, 4,5,7,6};
             const bgr3f colors[6] = {red, green, blue, cyan, magenta, yellow};
             for(int i: range(6)) {
-#if 0
-                faces[i*2+0] = {{position[indices[i*4+0]], position[indices[i*4+1]], position[indices[i*4+2]]}};
-                faces[i*2+1] = {{position[indices[i*4+0]], position[indices[i*4+2]], position[indices[i*4+3]]}};
-#else // Reversed winding
-                faces[i*2+0] = {{position[indices[i*4+2]], position[indices[i*4+1]], position[indices[i*4+0]]}, colors[i]};
-                faces[i*2+1] = {{position[indices[i*4+3]], position[indices[i*4+2]], position[indices[i*4+0]]}, colors[i]};
-#endif
+                faces[i*2+0] = {{position[indices[i*4+0]], position[indices[i*4+1]], position[indices[i*4+2]]}, colors[i]};
+                faces[i*2+1] = {{position[indices[i*4+0]], position[indices[i*4+2]], position[indices[i*4+3]]}, colors[i]};
             }
     }
+
+
     bgr3f raycast(vec3 O, vec3 d) const {
-        float minZ = inff; bgr3f color (0, 0, 0);
+        float nearestZ = inff; bgr3f color (0, 0, 0);
         for(Face face: faces) {
-            float z, u, v;
-            if(!intersect(face.position[0], face.position[1], face.position[2], O, d, z, u, v) || z>minZ) continue;
+            float t, u, v;
+            bool intersect = ::intersect(face.position[0], face.position[1], face.position[2], O, d, t, u, v);
+            float z = t*d.z;
+            if(debug) log(face.position[0], face.position[1], face.position[2], intersect, z<nearestZ, z, nearestZ);
+            if(!intersect || z>nearestZ) continue; // Keeps min Z
+            nearestZ = z;
             color = face.color;
         }
         return color;
     }
-};
-#else
-struct Scene {
-    struct Face { vec3 position[3]; bgr3f color; };
+
     RenderTarget target; // Render target (RenderPass renders on these tiles)
     /// Shader for flat surfaces
     struct Shader {
@@ -75,18 +74,7 @@ struct Scene {
         }
     } shader;
     RenderPass<Shader> pass {shader};
-    Face faces[6*2]; // Cube
-    Scene() {
-            vec3 position[8];
-            const float size = 1./2;
-            for(int i: range(8)) position[i] = size * (2.f * vec3(i/4, (i/2)%2, i%2) - vec3(1)); // -1, 1
-            const int indices[6*4] = { 0,2,3,1, 0,1,5,4, 0,4,6,2, 1,3,7,5, 2,6,7,3, 4,5,7,6};
-            const bgr3f colors[6] = {red, green, blue, cyan, magenta, yellow};
-            for(int i: range(6)) {
-                faces[i*2+0] = {{position[indices[i*4+0]], position[indices[i*4+1]], position[indices[i*4+2]]}, colors[i]};
-                faces[i*2+1] = {{position[indices[i*4+0]], position[indices[i*4+2]], position[indices[i*4+3]]}, colors[i]};
-            }
-    }
+
     void render(Image& final, mat4 view) {
         target.setup(int2(final.size));
         pass.setup(target, ref<Face>(faces).size); // Resize if necessary and clears
@@ -100,9 +88,7 @@ struct Scene {
         target.resolve(final);
     }
 };
-#endif
 
-#if 1
 struct Render {
     Render() {
         Scene scene;
@@ -115,16 +101,6 @@ struct Render {
             if(lastReport.seconds() > 1) { log(sIndex, "/", N, time); lastReport.reset(); }
             for(int tIndex: range(N)) {
                 target.clear(0);
-#if RAYCAST
-                float s = sIndex/float(N-1), t = tIndex/float(N-1); // [0, 1]
-                for(int vIndex: range(target.size.y)) for(int uIndex: range(target.size.x)) {
-                    float u = 2*uIndex/float(target.size.x-1)-1, v = 2*vIndex/float(target.size.y-1)-1; // [-1, 1]
-                    vec3 O (s, t, -1); // World space ray origin
-                    vec3 D (u, v, 0); // World space ray destination
-                    vec3 d = normalize(D-O); // World space ray direction (sheared perspective pinhole)
-                    target(uIndex, vIndex) = byte4(byte3(clamp(bgr3i(0), bgr3i(float(0xFF)*scene.raycast(O, d)), bgr3i(0xFF))), 0xFF); // FIXME: slow
-                }
-#else
                 float S = 2*sIndex/float(N-1)-1, T = 2*tIndex/float(N-1)-1; // [-1, 1]
                 mat4 NDC;
                 NDC.scale(vec3(vec2(target.size*4u)/2.f, 1)); // 0, 2 -> subsample size
@@ -145,8 +121,19 @@ struct Render {
                 mat4 M;
                 M.translate(vec3(-S,-T,0));
                 M.translate(vec3(0,0,1)); // 0 -> 1 (+Z)
-                scene.render(target, NDC * P * M);
-#endif
+                if(0) {
+                    parallel_chunk(target.size.y*target.size.x, [&](uint, size_t start, size_t size) { // TODO: SSAA
+                        for(int i: range(start, start+size)) {
+                            int y = i/target.size.x, x = i%target.size.x;
+                            const vec3 O = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, 1);
+                            const vec3 P = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, -1);
+                            const vec3 d = normalize(P-O);
+                            target(x, y) = byte4(byte3(float(0xFF)*scene.raycast(O, d)), 0xFF);
+                        }
+                    });
+                } else {
+                    scene.render(target, NDC * P * M);
+                }
                 writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(target.size), cast<byte>(target), folder, true);
                 writeFile(str(tIndex)+'_'+str(sIndex)+".png", encodePNG(target), folder, true);
             }
@@ -155,10 +142,6 @@ struct Render {
     }
 }
 ;//render;
-
-#endif
-
-#if 1
 
 struct ScrollValue : virtual Widget {
     int minimum = 0, maximum = 0;
@@ -185,7 +168,7 @@ struct ViewControl : virtual Widget {
     virtual bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override {
         if(event == Press) dragStart = {cursor, viewYawPitch};
         if(event==Motion && button==LeftButton) {
-            viewYawPitch = dragStart.viewYawPitch + float(2*PI) * (cursor - dragStart.cursor) / size;// / 100.f;
+            viewYawPitch = dragStart.viewYawPitch + float(2*PI) * (cursor - dragStart.cursor) / size;
             viewYawPitch.x = clamp<float>(-PI/3, viewYawPitch.x, PI/3);
             viewYawPitch.y = clamp<float>(-PI/3, viewYawPitch.y, PI/3);
         }
@@ -204,9 +187,11 @@ struct Light {
     ImageT<Image> images;
     Scene scene;
 
+    bool sample = false, raycast = true, orthographic = true;
+
     struct View : ScrollValue, ViewControl, ImageView {
         Light& _this;
-        View(Light& _this) : ScrollValue(0, 2/*_this.inputs.size-1*/), _this(_this) {}
+        View(Light& _this) : ScrollValue(0, _this.inputs.size-1), _this(_this) {}
 
         virtual bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& widget) override {
             return ScrollValue::mouseEvent(cursor,size,event,button,widget) || ViewControl::mouseEvent(cursor,size,event,button,widget);
@@ -225,187 +210,112 @@ struct Light {
         load(arguments() ? arguments()[0] : inputs[0]);
         window = ::window(&view);
         window->setTitle(name);
+        window->actions[Key('s')] = [this]{ sample=!sample; window->render(); };
+        window->actions[Key('r')] = [this]{ raycast=!raycast; window->render(); };
+        window->actions[Key('o')] = [this]{ orthographic=!orthographic; window->render(); };
     }
     Image render(uint2 size, vec4 unused viewRotation) {
         //if(inputs[view.value] != this->name) load(inputs[view.value]);
         Image target (size);
         target.clear(0);
 
-        if(view.value) {
-#if 1 // Raycast
-#if 0 // Rotated orthographic
-            vec4 invViewRotation = conjugate(viewRotation);
-            for(int y: range(target.size.y)) for(int x: range(target.size.x)) {
-                vec3 O = qapply(invViewRotation, vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, -1)); // [-1, 1]
-                vec3 d = qapply(invViewRotation, vec3(0, 0, 1));
-                target(x, y) = byte4(byte3(clamp(bgr3i(0), bgr3i(float(0xFF)*scene.raycast(O, d)), bgr3i(0xFF))), 0xFF);
-            }
-#else // Sheared perspective
-            mat4 NDC;
-            NDC.scale(vec3(vec2(target.size*4u)/2.f, 1)); // 0, 2 -> subsample size
-            NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
-            float near = 1-1./2, far = 1+1./2;
-            // Sheared perspective (rectification)
-            float s = (view.viewYawPitch.x+PI/2)/PI, t = 1-(view.viewYawPitch.y+PI/2)/PI;
-            assert_(s >= 0 && s <= 1 && t >= 0 && t <= 1);
-            float S = 2*s-1, T = 2*t-1; // [0,1] -> [-1, 1]
-            float left = (-1-S), right = (1-S);
-            float bottom = (-1-T), top = (1-T);
-            mat4 P;
-            P(0,0) = 2 / (right-left);
-            P(1,1) = 2 / (top-bottom);
-            P(0,2) = - (right+left) / (right-left);
-            P(1,2) = - (top+bottom) / (top-bottom);
-            P(2,2) = (far+near) / (far-near);
-            P(2,3) = 2*far*near / (far-near);
-            P(3,2) = 1;
-            P(3,3) = 0;
-            mat4 M;
-            M.translate(vec3(-S,-T,0));
-            M.translate(vec3(0,0,1)); // 0 -> 1 (+Z)
-            vec3 O = (P * M).inverse() * vec3(0,0,0);
-            for(int y: range(target.size.y)) for(int x: range(target.size.x)) {
-                const vec3 d = normalize(((mat3)(P * M).transpose()) * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, 1));
-                //const vec3 d = normalize((P * M).inverse().normalMatrix() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, 1));
-                target(x, y) = byte4(byte3(clamp(bgr3i(0), bgr3i(float(0xFF)*scene.raycast(O, d)), bgr3i(0xFF))), 0xFF);
-            }
-#endif
-#else // Rasterize
-#if 0 // Sheared perspective
-            float near = 1-1./2, far = 1+1./2;
-            // Sheared perspective (rectification)
-            float s = (view.viewYawPitch.x+PI/2)/PI, t = 1-(view.viewYawPitch.y+PI/2)/PI;
-            assert_(s >= 0 && s <= 1 && t >= 0 && t <= 1);
-            float S = 2*s-1, T = 2*t-1; // [0,1] -> [-1, 1]
-            float left = (-1-S), right = (1-S);
-            float bottom = (-1-T), top = (1-T);
-            mat4 P;
-            P(0,0) = 2 / (right-left);
-            P(1,1) = 2 / (top-bottom);
-            P(0,2) = - (right+left) / (right-left);
-            P(1,2) = - (top+bottom) / (top-bottom);
-            P(2,2) = (far+near) / (far-near);
-            P(2,3) = 2*far*near / (far-near);
-            P(3,2) = 1;
-            P(3,3) = 0;
-            mat4 M;
-            M.translate(vec3(-S,-T,0));
-            M.translate(vec3(0,0,1)); // 0 -> 1 (+Z)
-#else // Rotated orthographic
-            mat4 NDC;
-            NDC.scale(vec3(vec2(target.size*4u)/2.f, 1)); // 0, 2 -> subsample size
-            NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
-            mat4 P;
-            mat4 M;
+        mat4 M;
+        if(orthographic) {
             M.rotateX(view.viewYawPitch.y); // Pitch
             M.rotateY(view.viewYawPitch.x); // Yaw
-            scene.render(target, NDC * P * M);
-#endif
-#endif
         } else {
-#if 0 // Sample (rotated orthographic)
-            vec4 invViewRotation = conjugate(viewRotation);
-            const vec3 d = qapply(invViewRotation, vec3(0, 0, 1));
-            const vec3 n (0,0,-1);
-            const float nd = dot(n, d);
-            assert_(nd, view.viewYawPitch, d);
-            const vec3 n_nd = n / nd;
-            for(int y: range(target.size.y)) for(int x: range(target.size.x)) {
-                const vec3 O = qapply(invViewRotation, vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, -1)); // [-1, 1]
-
-                const vec2 Pst = O.xy() + dot(n_nd, vec3(0,0,-1)-O) * d.xy();
-                vec2 st = (Pst+vec2(1))/2.f;
-                const vec2 Puv = O.xy() + dot(n_nd, vec3(0,0,0)-O) * d.xy();
-                vec2 uv = (Puv+vec2(1))/2.f;
-#else // Sample (sheared perspective)
-            mat4 NDC;
-            NDC.scale(vec3(vec2(target.size*4u)/2.f, 1)); // 0, 2 -> subsample size
-            NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
             float near = 1-1./2, far = 1+1./2;
             // Sheared perspective (rectification)
-            float s = (view.viewYawPitch.x+PI/2)/PI, t = 1-(view.viewYawPitch.y+PI/2)/PI;
+            float s = (view.viewYawPitch.x+PI/2)/PI, t = (view.viewYawPitch.y+PI/2)/PI;
             assert_(s >= 0 && s <= 1 && t >= 0 && t <= 1);
             float S = 2*s-1, T = 2*t-1; // [0,1] -> [-1, 1]
             float left = (-1-S), right = (1-S);
             float bottom = (-1-T), top = (1-T);
-            mat4 P;
-            P(0,0) = 2 / (right-left);
-            P(1,1) = 2 / (top-bottom);
-            P(0,2) = - (right+left) / (right-left);
-            P(1,2) = - (top+bottom) / (top-bottom);
-            P(2,2) = (far+near) / (far-near);
-            P(2,3) = 2*far*near / (far-near);
-            P(3,2) = 1;
-            P(3,3) = 0;
-            mat4 M;
-            M.translate(vec3(-S,-T,0));
-            M.translate(vec3(0,0,1)); // 0 -> 1 (+Z)
-            vec3 O = (P * M).inverse() * vec3(0,0,0);
-            for(int y: range(target.size.y)) for(int x: range(target.size.x)) {
-                const vec3 d = ((mat3)(NDC * P * M).transpose()) * normalize(vec3(x,y,1));
-                const vec3 n (0,0,-1);
-                const float nd = dot(n, d);
-                const vec3 n_nd = n / nd;
+            M(0,0) = 2 / (right-left);
+            M(1,1) = 2 / (top-bottom);
+            M(0,2) = (right+left) / (right-left);
+            M(1,2) = (top+bottom) / (top-bottom);
+            M(2,2) = - (far+near) / (far-near);
+            M(2,3) = - 2*far*near / (far-near);
+            M(3,2) = - 1;
+            M(3,3) = 0;
+            M.translate(vec3(S,T,0));
+            M.translate(vec3(0,0,-1)); // 0 -> 1 (+Z)
+        }
 
-                const vec2 Pst = O.xy() + dot(n_nd, vec3(0,0,-1)-O) * d.xy();
-                vec2 st = (Pst+vec2(1))/2.f;
-                const vec2 Puv = O.xy() + dot(n_nd, vec3(0,0,0)-O) * d.xy();
-                vec2 uv = (Puv+vec2(1))/2.f;
-#endif
-                if(name!="synthetic") st[1] = 1-st[1];
-                if(name=="synthetic") {
-                    st *= vec2(images.size-uint2(1));
-                } else {
-                    if(x==target.size.x/2 && y==target.size.y/2) log(1, st);
-                    st *= imageSize.y-1; // Pixel units
-                    if(x==target.size.x/2 && y==target.size.y/2) log(2, st, imageSize.y);
-                    //st += vec2(imageSize)/2.f; // Corner to center
-                    //if(x==target.size.x/2 && y==target.size.y/2) log(3, st, min);
-                    st = (st-min)/(max-min) * vec2(images.size-uint2(1)); // Pixel to image indices
-                    if(x==target.size.x/2 && y==target.size.y/2) log(3, st, min, max, images.size);
-                    //st -= vec2(images.size-uint2(1))/2.f; // Center to corner
-                    //if(x==target.size.x/2 && y==target.size.y/2) log(5, st);
+        if(raycast) {
+            parallel_chunk(target.size.y*target.size.x, [&](uint, size_t start, size_t size) { // TODO: SSAA
+                for(int i: range(start, start+size)) {
+                    int y = i/target.size.x, x = i%target.size.x;
+                    const vec3 O = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, 1);
+                    const vec3 P = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, -1);
+                    const vec3 d = normalize(P-O);
+
+                    bgr3f S;
+                    if(sample) {
+                        const vec3 n (0,0,-1);
+                        const float nd = dot(n, d);
+                        const vec3 n_nd = n / nd;
+
+                        const vec2 Pst = O.xy() + dot(n_nd, vec3(0,0,-1)-O) * d.xy();
+                        vec2 st = (Pst+vec2(1))/2.f;
+                        const vec2 Puv = O.xy() + dot(n_nd, vec3(0,0,0)-O) * d.xy();
+                        vec2 uv = (Puv+vec2(1))/2.f;
+
+                        if(name!="synthetic") st[1] = 1-st[1];
+                        if(name=="synthetic") {
+                            st *= vec2(images.size-uint2(1));
+                        } else {
+                            if(x==target.size.x/2 && y==target.size.y/2) log(1, st);
+                            st *= imageSize.y-1; // Pixel units
+                            if(x==target.size.x/2 && y==target.size.y/2) log(2, st, imageSize.y);
+                            //st += vec2(imageSize)/2.f; // Corner to center
+                            //if(x==target.size.x/2 && y==target.size.y/2) log(3, st, min);
+                            st = (st-min)/(max-min) * vec2(images.size-uint2(1)); // Pixel to image indices
+                            if(x==target.size.x/2 && y==target.size.y/2) log(3, st, min, max, images.size);
+                            //st -= vec2(images.size-uint2(1))/2.f; // Center to corner
+                            //if(x==target.size.x/2 && y==target.size.y/2) log(5, st);
+                        }
+
+                        //if(name!="synthetic") uv[1] = 1-uv[1];
+                        uv *= imageSize.x-1;
+
+                        if(st[0] < 0 || st[1] < 0 || uv[0] < 0 || uv[1] < 0) continue;
+                        int is = st[0], it = st[1], iu = uv[0], iv = uv[1]; // Warning: Floors towards zero
+                        assert_(is >= 0 && it >= 0 && iu >= 0 && iv >= 0, is, it, iu, iv, st, uv, min, max, imageSize, images.size, Pst, Puv, O, d, nd, n_nd);
+                        if(is >= int(images.size.x)-1 || it >= int(images.size.y)-1) continue;
+                        if(iu >= int(imageSize.x)-1 || iv >= int(imageSize.y)-1) continue;
+                        float fs = fract(st[0]), ft = fract(st[1]), fu = fract(uv[0]), fv = fract(uv[1]);
+
+                        bgr3f Sstuv [2][2][2][2];
+                        for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1}) for(const int dv: {0, 1}) {
+                            Sstuv[ds][dt][du][dv] = bgr3f(images(is+ds, it+dt)(iu+du, iv+dv).bgr());
+                        }
+
+                        bgr3f Sstu [2][2][2];
+                        for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1})
+                            Sstu[ds][dt][du] = (1-fv) * Sstuv[ds][dt][du][0] + fv * Sstuv[ds][dt][du][1];
+
+                        bgr3f Sst [2][2];
+                        for(const int ds: {0, 1}) for(const int dt: {0, 1})
+                            Sst[ds][dt] = (1-fu) * Sstu[ds][dt][0] + fu * Sstu[ds][dt][1];
+
+                        bgr3f Ss [2];
+                        for(const int ds: {0, 1})
+                            Ss[ds] = (1-ft) * Sst[ds][0] + ft * Sst[ds][1];
+
+                        S = (1-fs) * Ss[0] + fs * Ss[1];
+                    } else {
+                        S = float(0xFF)*scene.raycast(O, d);
+                    }
+                    target(x, y) = byte4(byte3(S), 0xFF);
                 }
-
-                //if(name!="synthetic") uv[1] = 1-uv[1];
-                uv *= imageSize.x-1;
-
-                if(st[0] < 0 || st[1] < 0 || uv[0] < 0 || uv[1] < 0) continue;
-                int is = st[0], it = st[1], iu = uv[0], iv = uv[1]; // Warning: Floors towards zero
-                assert_(is >= 0 && it >= 0 && iu >= 0 && iv >= 0, is, it, iu, iv, st, uv, min, max, imageSize, images.size, Pst, Puv, O, d, nd, n_nd);
-                if(is >= int(images.size.x)-1 || it >= int(images.size.y)-1) continue;
-                if(iu >= int(imageSize.x)-1 || iv >= int(imageSize.y)-1) continue;
-                float fs = fract(st[0]), ft = fract(st[1]), fu = fract(uv[0]), fv = fract(uv[1]);
-
-                bgr3f Sstuv [2][2][2][2];
-                for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1}) for(const int dv: {0, 1}) {
-                    Sstuv[ds][dt][du][dv] = bgr3f(images(is+ds, it+dt)(iu+du, iv+dv).bgr());
-                }
-
-                bgr3f Sstu [2][2][2];
-                for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1})
-                    Sstu[ds][dt][du] = (1-fv) * Sstuv[ds][dt][du][0] + fv * Sstuv[ds][dt][du][1];
-
-                bgr3f Sst [2][2];
-                for(const int ds: {0, 1}) for(const int dt: {0, 1})
-                    Sst[ds][dt] = (1-fu) * Sstu[ds][dt][0] + fu * Sstu[ds][dt][1];
-
-                bgr3f Ss [2];
-                for(const int ds: {0, 1})
-                    Ss[ds] = (1-ft) * Sst[ds][0] + ft * Sst[ds][1];
-
-                bgr3f S;
-                S = (1-fs) * Ss[0] + fs * Ss[1];
-
-                if(0) S = Sstuv[0][0][0][0];
-                if(0) S = float(0xFF)*bgr3f(st[0]/(images.size[0]-1), st[1]/(images.size[1]-1), 0);
-                if(0) S = float(0xFF)*bgr3f(uv[0]/(imageSize[0]-1), uv[1]/(imageSize[1]-1), 0);
-                if(0) S = float(0xFF)*bgr3f(st[0]/(images.size[0]-1), uv[0]/(imageSize[0]-1), 0);
-                if(0) S = float(0xFF)*bgr3f(st[1]/(images.size[1]-1), uv[1]/(imageSize[1]-1), 0);
-                if(0) S *= bgr3f(it*16, iv, 0)/256.f;
-
-                target(x, y) = byte4(byte3(S), 0xFF);
-            }
+            });
+        } else {
+            mat4 NDC;
+            NDC.scale(vec3(vec2(target.size*4u)/2.f, 1)); // 0, 2 -> subsample size
+            NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
+            scene.render(target, NDC * M);
         }
         return target;
     }
@@ -502,5 +412,3 @@ struct Light {
         }
     }
 } view;
-
-#endif

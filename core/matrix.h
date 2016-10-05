@@ -119,7 +119,7 @@ struct mat4 {
         for(int i=0;i<3;i++) for(int j=0;j<3;j++) r(i,j)=M(i,j);
         return r;
     }
-    mat3 normalMatrix() const { return (mat3)inverse().transpose(); }
+    mat3 normalMatrix() const { return (mat3)(inverse().transpose()); }
 
     mat4& translate(vec3 v) { for(int i=0;i<4;i++) M(i,3) += M(i,0)*v.x + M(i,1)*v.y + M(i,2)*v.z; return *this; }
     mat4& scale(vec3 v) { for(int j=0;j<3;j++) for(int i=0;i<4;i++) M(i,j)*=v[j]; return *this; }

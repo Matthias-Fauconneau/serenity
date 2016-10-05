@@ -208,8 +208,8 @@ static inline bool isNumber(float x) { return !isNaN(x) && x != __builtin_inff()
 String str(float n, uint precision, uint exponent, uint unused pad) {
  bool sign = n<0; n=abs(n);
  if(__builtin_isnan(n)) return "NaN"__; //::right("NaN", pad);
- if(n==__builtin_inff()) return "∞"__; //::right("∞", pad+2);
  if(n==-__builtin_inff()) return "-∞"__; //::right("-∞", pad+2);
+ if(n==__builtin_inff()) return "∞"__; //::right("∞", pad+2);
  int e=0;
  if(n && exponent && (n<1 || log10(n)>=precision+3/*4*/)) {
   e = floor(log10(n) / exponent) * exponent;

@@ -11,7 +11,7 @@ const int maxThreadCount = 8; // 32
 #else
 const int maxThreadCount = 1;
 #endif
-extern thread threads[::maxThreadCount];
+//extern thread threads[::maxThreadCount];
 thread threads[::maxThreadCount];
 
 Semaphore jobs __attribute((init_priority(101)));
@@ -56,6 +56,7 @@ __attribute((constructor(102))) void spawnWorkers() {
  }
 }
 
+#if 1
 extern "C" int omp_get_thread_num();
 extern "C" void omp_set_num_threads(int threadCount);
 uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate, const int unused threadCount) {
@@ -89,3 +90,4 @@ uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate
 #endif
  }
 }
+#endif

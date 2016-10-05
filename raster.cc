@@ -11,7 +11,7 @@ void RenderTarget::resolve(const Image& target) {
         if(!tile.cleared) {
             if(tile.lastCleared) { // Was already background on last frame (no need to regenerate)
                 for(uint y=0;y<16;y++) for(uint x=0;x<16;x++) {
-                    uint tx = tileX*16+x, ty = size.y-1-(tileY*16+y);
+                    uint tx = tileX*16+x, ty = /*size.y-1-*/(tileY*16+y);
                     target(tx, ty) = backgroundColor;
                 }
             }
@@ -33,7 +33,7 @@ void RenderTarget::resolve(const Image& target) {
                     green = sum16(tile.subgreen[pixelPtr]) * 0xFFF/(4*4);
                     red = sum16(tile.subred[pixelPtr]) * 0xFFF/(4*4);
                 }
-                const uint x = (tileX*4+blockX)*4+pixelX, y = size.y-1-((tileY*4+blockY)*4+pixelY);
+                const uint x = (tileX*4+blockX)*4+pixelX, y = /*size.y-1-*/((tileY*4+blockY)*4+pixelY);
                 target(x,y) = byte4(sRGB_forward[uint(blue)], sRGB_forward[uint(green)], sRGB_forward[uint(red)], 0xFF);
             }
         }
